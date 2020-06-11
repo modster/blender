@@ -1338,10 +1338,8 @@ static void graph_panel_modifiers(const bContext *C, Panel *panel)
 {
   bAnimListElem *ale;
   FCurve *fcu;
-  FModifier *fcm;
-  uiLayout *col, *row;
+  uiLayout *row;
   uiBlock *block;
-  bool active;
 
   if (!graph_panel_context(C, &ale, &fcu)) {
     return;
@@ -1350,30 +1348,16 @@ static void graph_panel_modifiers(const bContext *C, Panel *panel)
   block = uiLayoutGetBlock(panel->layout);
   UI_block_func_handle_set(block, do_graph_region_modifier_buttons, NULL);
 
-  /* 'add modifier' button at top of panel */
-  {
-    row = uiLayoutRow(panel->layout, false);
+  row = uiLayoutRow(panel->layout, false);
+  uiItemMenuEnumO(
+      row, (bContext *)C, "GRAPH_OT_fmodifier_add", "type", IFACE_("Add Modifier"), ICON_NONE);
 
-    /* this is an operator button which calls a 'add modifier' operator...
-     * a menu might be nicer but would be tricky as we need some custom filtering
-     */
-    uiItemMenuEnumO(
-        row, (bContext *)C, "GRAPH_OT_fmodifier_add", "type", IFACE_("Add Modifier"), ICON_NONE);
+  /* Copy / paste as sub-row. */
+  row = uiLayoutRow(row, true);
+  uiItemO(row, "", ICON_COPYDOWN, "GRAPH_OT_fmodifier_copy");
+  uiItemO(row, "", ICON_PASTEDOWN, "GRAPH_OT_fmodifier_paste");
 
-    /* copy/paste (as sub-row) */
-    row = uiLayoutRow(row, true);
-    uiItemO(row, "", ICON_COPYDOWN, "GRAPH_OT_fmodifier_copy");
-    uiItemO(row, "", ICON_PASTEDOWN, "GRAPH_OT_fmodifier_paste");
-  }
-
-  active = !(fcu->flag & FCURVE_MOD_OFF);
-  /* draw each modifier */
-  for (fcm = fcu->modifiers.first; fcm; fcm = fcm->next) {
-    col = uiLayoutColumn(panel->layout, true);
-    uiLayoutSetActive(col, active);
-
-    ANIM_uiTemplate_fmodifier_draw(col, ale->fcurve_owner_id, &fcu->modifiers, fcm);
-  }
+  ANIM_fmodifier_panels(C, &fcu->modifiers);
 
   MEM_freeN(ale);
 }
@@ -1437,9 +1421,18 @@ void graph_buttons_register(ARegionType *art)
   strcpy(pt->label, N_("Modifiers"));
   strcpy(pt->category, "Modifiers");
   strcpy(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
+  pt->flag = PNL_NO_HEADER;
   pt->draw = graph_panel_modifiers;
   pt->poll = graph_panel_poll;
   BLI_addtail(&art->paneltypes, pt);
+
+  ANIM_fcm_generator_panel_register(art);
+  ANIM_fcm_fn_generator_panel_register(art);
+  ANIM_fcm_cycles_panel_register(art);
+  ANIM_fcm_noise_panel_register(art);
+  ANIM_fcm_envelope_panel_register(art);
+  ANIM_fcm_limits_panel_register(art);
+  ANIM_fcm_stepped_panel_register(art);
 
   pt = MEM_callocN(sizeof(PanelType), "spacetype graph panel view");
   strcpy(pt->idname, "GRAPH_PT_view");

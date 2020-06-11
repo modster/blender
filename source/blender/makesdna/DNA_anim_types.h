@@ -58,6 +58,10 @@ typedef struct FModifier {
   short type;
   /** Settings for the modifier. */
   short flag;
+  /** Expansion state for the modifier panel and subpanels. */
+  short ui_expand_flag;
+
+  char _pad[6];
 
   /** The amount that the modifier should influence the value. */
   float influence;
@@ -98,7 +102,7 @@ typedef enum eFModifier_Flags {
   /** Modifier is not able to be evaluated for some reason, and should be skipped (internal). */
   FMODIFIER_FLAG_DISABLED = (1 << 0),
   /** Modifier's data is expanded (in UI). */
-  FMODIFIER_FLAG_EXPANDED = (1 << 1),
+  FMODIFIER_FLAG_EXPANDED_DEPRECATED = (1 << 1),
   /** Modifier is active one (in UI) for editing purposes. */
   FMODIFIER_FLAG_ACTIVE = (1 << 2),
   /** User wants modifier to be skipped. */

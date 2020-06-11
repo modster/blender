@@ -44,6 +44,7 @@
 
 #include "BKE_context.h"
 #include "BKE_fcurve.h"
+#include "BKE_screen.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -58,8 +59,244 @@
 
 #include "DEG_depsgraph.h"
 
-/* ********************************************** */
-/* UI STUFF */
+#include "anim_intern.h"
+
+typedef void (*PanelDrawFn)(const bContext *, struct Panel *);
+static void deg_update(bContext *C, void *owner_id, void *UNUSED(var2));
+static void fmodifier_panel_header(const bContext *C, Panel *panel);
+
+/* -------------------------------------------------------------------- */
+/** \name Panel Registering and Panel Callbacks
+ * \{ */
+
+static bAnimListElem *get_active_fcurve_channel(bAnimContext *ac)
+{
+  ListBase anim_data = {NULL, NULL};
+  int filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_ACTIVE);
+  size_t items = ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
+
+  /* We take the first F-Curve only, since some other ones may have had 'active' flag set
+   * if they were from linked data.
+   */
+  if (items) {
+    bAnimListElem *ale = (bAnimListElem *)anim_data.first;
+
+    /* remove first item from list, then free the rest of the list and return the stored one */
+    BLI_remlink(&anim_data, ale);
+    ANIM_animdata_freelist(&anim_data);
+
+    return ale;
+  }
+
+  /* no active F-Curve */
+  return NULL;
+}
+
+static int graph_panel_context(const bContext *C, bAnimListElem **ale, FCurve **fcu)
+{
+  bAnimContext ac;
+  bAnimListElem *elem = NULL;
+
+  /* For now, only draw if we could init the anim-context info
+   * (necessary for all animation-related tools)
+   * to work correctly is able to be correctly retrieved.
+   * There's no point showing empty panels?
+   */
+  if (ANIM_animdata_get_context(C, &ac) == 0) {
+    return 0;
+  }
+
+  /* try to find 'active' F-Curve */
+  elem = get_active_fcurve_channel(&ac);
+  if (elem == NULL) {
+    return 0;
+  }
+
+  if (fcu) {
+    *fcu = (FCurve *)elem->data;
+  }
+  if (ale) {
+    *ale = elem;
+  }
+  else {
+    MEM_freeN(elem);
+  }
+
+  return 1;
+}
+
+static void fmodifier_get_pointers(const bContext *C,
+                                   Panel *panel,
+                                   FModifier **r_fcm,
+                                   ID **r_owner_id)
+{
+  bAnimListElem *ale;
+  FCurve *fcu;
+  if (!graph_panel_context(C, &ale, &fcu)) {
+    return;
+  }
+  ListBase *modifiers = &fcu->modifiers;
+
+  *r_fcm = BLI_findlink(modifiers, panel->runtime.list_index);
+  *r_owner_id = ale->fcurve_owner_id;
+
+  uiLayoutSetActive(panel->layout, !(fcu->flag & FCURVE_MOD_OFF));
+}
+
+static bool graph_panel_poll(const bContext *C, PanelType *UNUSED(pt))
+{
+  return graph_panel_context(C, NULL, NULL);
+}
+
+/**
+ * Move an FModifier to the index it's moved to after a drag and drop.
+ */
+static void fmodifier_reorder(bContext *C, Panel *panel, int new_index)
+{
+  bAnimListElem *ale;
+  FCurve *fcu;
+  if (!graph_panel_context(C, &ale, &fcu)) {
+    return;
+  }
+
+  int current_index = panel->runtime.list_index;
+  if (current_index == new_index) {
+    return;
+  }
+
+  ListBase *modifiers = &fcu->modifiers;
+  FModifier *fcm = BLI_findlink(modifiers, current_index);
+  if (fcm == NULL) {
+    return;
+  }
+
+  /* Cycles modifier has to be the first, so make sure it's kept that way. */
+  if (fcm->type == FMODIFIER_TYPE_CYCLES) {
+    return;
+  }
+  FModifier *fcm_first = modifiers->first;
+  if (fcm_first->type == FMODIFIER_TYPE_CYCLES && new_index == 0) {
+    return;
+  }
+
+  BLI_assert(current_index >= 0);
+  BLI_assert(new_index >= 0);
+
+  /* Move the FModifier in the list. */
+  BLI_listbase_link_move(modifiers, fcm, new_index - current_index);
+
+  ED_undo_push(C, "Move F-Curve Modifier");
+
+  ID *fcurve_owner_id = ale->fcurve_owner_id;
+  WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
+  DEG_id_tag_update(fcurve_owner_id, ID_RECALC_ANIMATION);
+}
+
+#define FMODIFIER_TYPE_PANEL_PREFIX "ANIM_PT_"
+void ANIM_fmodifier_type_panel_id(int type, char *r_idname)
+{
+  const FModifierTypeInfo *fmi = get_fmodifier_typeinfo(type);
+
+  strcpy(r_idname, FMODIFIER_TYPE_PANEL_PREFIX);
+  strcat(r_idname, fmi->name);
+}
+
+static short get_fmodifier_expand_flag(const bContext *C, Panel *panel)
+{
+  FCurve *fcu;
+  if (!graph_panel_context(C, NULL, &fcu)) {
+    return 1;
+  }
+  FModifier *fcm = BLI_findlink(&fcu->modifiers, panel->runtime.list_index);
+  return fcm->ui_expand_flag;
+}
+
+static void set_fmodifier_expand_flag(const bContext *C, Panel *panel, short expand_flag)
+{
+  FCurve *fcu;
+  if (!graph_panel_context(C, NULL, &fcu)) {
+    return;
+  }
+  FModifier *fcm = BLI_findlink(&fcu->modifiers, panel->runtime.list_index);
+  fcm->ui_expand_flag = expand_flag;
+}
+
+static PanelType *fmodifier_panel_register(ARegionType *region_type,
+                                           eFModifier_Types type,
+                                           PanelDrawFn draw)
+{
+  /* Get the name for the modifier's panel. */
+  char panel_idname[BKE_ST_MAXNAME];
+  ANIM_fmodifier_type_panel_id(type, panel_idname);
+
+  PanelType *panel_type = MEM_callocN(sizeof(PanelType), panel_idname);
+
+  strcpy(panel_type->idname, panel_idname);
+  strcpy(panel_type->label, "");
+  strcpy(panel_type->category, "Modifiers");
+  strcpy(panel_type->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
+
+  panel_type->draw_header = fmodifier_panel_header;
+  panel_type->draw = draw;
+  panel_type->poll = graph_panel_poll;
+
+  /* Give the panel the special flag that says it was built here and corresponds to a
+   * modifer rather than a PanelType. */
+  panel_type->flag = PNL_LAYOUT_HEADER_EXPAND | PNL_DRAW_BOX | PNL_INSTANCED;
+  panel_type->reorder = fmodifier_reorder;
+  panel_type->get_list_data_expand_flag = get_fmodifier_expand_flag;
+  panel_type->set_list_data_expand_flag = set_fmodifier_expand_flag;
+
+  BLI_addtail(&region_type->paneltypes, panel_type);
+
+  return panel_type;
+}
+
+/**
+ * Add a child panel to the parent.
+ *
+ * \note To create the panel type's idname, it appends the \a name argument to the \a parent's
+ * idname.
+ */
+static PanelType *fmodifier_subpanel_register(ARegionType *region_type,
+                                              const char *name,
+                                              const char *label,
+                                              PanelDrawFn draw_header,
+                                              PanelDrawFn draw,
+                                              PanelType *parent)
+{
+  /* Create the subpanel's ID name. */
+  char panel_idname[BKE_ST_MAXNAME];
+  strcpy(panel_idname, parent->idname);
+  strcat(panel_idname, "_");
+  strcat(panel_idname, name);
+
+  PanelType *panel_type = MEM_callocN(sizeof(PanelType), panel_idname);
+
+  strcpy(panel_type->idname, panel_idname);
+  strcpy(panel_type->label, label);
+  strcpy(panel_type->category, "Modifiers");
+  strcpy(panel_type->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
+
+  panel_type->draw_header = draw_header;
+  panel_type->draw = draw;
+  panel_type->poll = graph_panel_poll;
+  panel_type->flag = (PNL_DEFAULT_CLOSED | PNL_DRAW_BOX);
+
+  BLI_assert(parent != NULL);
+  strcpy(panel_type->parent_id, parent->idname);
+  panel_type->parent = parent;
+  BLI_addtail(&parent->children, BLI_genericNodeN(panel_type));
+  BLI_addtail(&region_type->paneltypes, panel_type);
+
+  return panel_type;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name General UI Callbacks and Drawing
+ * \{ */
 
 // XXX! --------------------------------
 /* Temporary definition for limits of float number buttons
@@ -112,28 +349,156 @@ static void delete_fmodifier_cb(bContext *C, void *ctx_v, void *fcm_v)
 
   deg_update(C, ctx->fcurve_owner_id, NULL);
 }
-/* --------------- */
 
-/* draw settings for generator modifier */
-static void draw_modifier__generator(uiLayout *layout,
-                                     ID *fcurve_owner_id,
-                                     FModifier *fcm,
-                                     short width)
+static void fmodifier_influence_draw(uiLayout *layout, ID *fcurve_owner_id, FModifier *fcm)
 {
-  FMod_Generator *data = (FMod_Generator *)fcm->data;
-  uiLayout /* *col, */ /* UNUSED */ *row;
-  uiBlock *block;
-  uiBut *but;
   PointerRNA ptr;
-  short bwidth = width - 1.5 * UI_UNIT_X; /* max button width */
+  RNA_pointer_create(fcurve_owner_id, &RNA_FModifier, fcm, &ptr);
 
-  /* init the RNA-pointer */
+  uiItemS(layout);
+
+  uiLayout *row = uiLayoutRowWithHeading(layout, true, IFACE_("Influence"));
+  uiItemR(row, &ptr, "use_influence", 0, "", ICON_NONE);
+  uiLayout *sub = uiLayoutRow(row, true);
+  uiLayoutSetActive(sub, fcm->flag & FMODIFIER_FLAG_USEINFLUENCE);
+  uiItemR(sub, &ptr, "influence", 0, "", ICON_NONE);
+}
+
+static void fmodifier_frame_range_header_draw(const bContext *C, Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  FModifier *fcm;
+  ID *fcurve_owner_id;
+  fmodifier_get_pointers(C, panel, &fcm, &fcurve_owner_id);
+
+  PointerRNA ptr;
+  RNA_pointer_create(fcurve_owner_id, &RNA_FModifier, fcm, &ptr);
+  uiItemR(layout, &ptr, "use_restricted_range", 0, "", ICON_NONE);
+}
+
+static void fmodifier_frame_range_draw(const bContext *C, Panel *panel)
+{
+  uiLayout *col;
+  uiLayout *layout = panel->layout;
+
+  FModifier *fcm;
+  ID *fcurve_owner_id;
+  fmodifier_get_pointers(C, panel, &fcm, &fcurve_owner_id);
+
+  PointerRNA ptr;
+  RNA_pointer_create(fcurve_owner_id, &RNA_FModifier, fcm, &ptr);
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiLayoutSetActive(layout, fcm->flag & FMODIFIER_FLAG_RANGERESTRICT);
+
+  col = uiLayoutColumn(layout, true);
+  uiItemR(col, &ptr, "frame_start", 0, IFACE_("Frame Start"), ICON_NONE);
+  uiItemR(col, &ptr, "frame_end", 0, IFACE_("End"), ICON_NONE);
+
+  col = uiLayoutColumn(layout, true);
+  uiItemR(col, &ptr, "blend_in", 0, IFACE_("Blend In"), ICON_NONE);
+  uiItemR(col, &ptr, "blend_out", 0, IFACE_("Out"), ICON_NONE);
+}
+
+static void fmodifier_panel_header(const bContext *C, Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  FModifier *fcm;
+  ID *owner_id;
+  fmodifier_get_pointers(C, panel, &fcm, &owner_id);
+
+  PointerRNA ptr;
+  RNA_pointer_create(owner_id, &RNA_FModifier, fcm, &ptr);
+  const FModifierTypeInfo *fmi = fmodifier_get_typeinfo(fcm);
+
+  /* get layout-row + UI-block for this */
+
+  uiBlock *block = uiLayoutGetBlock(layout);  // err...
+
+  /* left-align -------------------------------------------- */
+  uiLayout *sub = uiLayoutRow(layout, true);
+  uiLayoutSetAlignment(sub, UI_LAYOUT_ALIGN_LEFT);
+
+  UI_block_emboss_set(block, UI_EMBOSS_NONE);
+
+  /* checkbox for 'active' status (for now) */
+  uiItemR(sub, &ptr, "active", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+
+  /* name */
+  if (fmi) {
+    uiItemL(sub, IFACE_(fmi->name), ICON_NONE);
+  }
+  else {
+    uiItemL(sub, IFACE_("<Unknown Modifier>"), ICON_NONE);
+  }
+
+  /* right-align ------------------------------------------- */
+  sub = uiLayoutRow(layout, true);
+  uiLayoutSetAlignment(sub, UI_LAYOUT_ALIGN_RIGHT);
+
+  /* 'mute' button */
+  uiItemR(sub, &ptr, "mute", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+
+  UI_block_emboss_set(block, UI_EMBOSS_NONE);
+
+  /* delete button */
+  uiBut *but = uiDefIconBut(block,
+                            UI_BTYPE_BUT,
+                            B_REDR,
+                            ICON_X,
+                            0,
+                            0,
+                            UI_UNIT_X,
+                            UI_UNIT_Y,
+                            NULL,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            TIP_("Delete F-Curve Modifier"));
+  FModifierDeleteContext *ctx = MEM_mallocN(sizeof(FModifierDeleteContext), "fmodifier ctx");
+  ctx->fcurve_owner_id = owner_id;
+  FCurve *fcu;
+  if (!graph_panel_context(C, NULL, &fcu)) {
+    return;
+  }
+  ctx->modifiers = &fcu->modifiers;
+  UI_but_funcN_set(but, delete_fmodifier_cb, ctx, fcm);
+
+  UI_block_emboss_set(block, UI_EMBOSS);
+
+  uiItemS(layout);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Generator Modifier
+ * \{ */
+
+static void generator_panel_draw(const bContext *C, Panel *panel)
+{
+  uiLayout *row;
+  uiLayout *layout = panel->layout;
+
+  FModifier *fcm;
+  ID *fcurve_owner_id;
+  fmodifier_get_pointers(C, panel, &fcm, &fcurve_owner_id);
+
+  uiBut *but;
+  short bwidth = 314 - 1.5 * UI_UNIT_X; /* max button width */
+
+  FMod_Generator *data = (FMod_Generator *)fcm->data;
+
+  PointerRNA ptr;
   RNA_pointer_create(fcurve_owner_id, &RNA_FModifierFunctionGenerator, fcm, &ptr);
 
   /* basic settings (backdrop + mode selector + some padding) */
   /* col = uiLayoutColumn(layout, true); */ /* UNUSED */
-  block = uiLayoutGetBlock(layout);
-  UI_block_align_begin(block);
+  uiBlock *block = uiLayoutGetBlock(layout);
   but = uiDefButR(block,
                   UI_BTYPE_MENU,
                   B_FMODIFIER_REDRAW,
@@ -152,25 +517,9 @@ static void draw_modifier__generator(uiLayout *layout,
                   NULL);
   UI_but_func_set(but, validate_fmodifier_cb, fcm, NULL);
 
-  uiDefButR(block,
-            UI_BTYPE_TOGGLE,
-            B_FMODIFIER_REDRAW,
-            NULL,
-            0,
-            0,
-            bwidth,
-            UI_UNIT_Y,
-            &ptr,
-            "use_additive",
-            -1,
-            0,
-            0,
-            -1,
-            -1,
-            NULL);
-  UI_block_align_end(block);
+  uiItemR(layout, &ptr, "use_additive", 0, NULL, ICON_NONE);
 
-  /* now add settings for individual modes */
+  /* Settings for individual modes. */
   switch (data->mode) {
     case FCM_GENERATOR_POLYNOMIAL: /* polynomial expression */
     {
@@ -329,7 +678,7 @@ static void draw_modifier__generator(uiLayout *layout,
           IFACE_("Poly Order:"),
           0,
           0,
-          width - 1.5 * UI_UNIT_X,
+          314 - 1.5 * UI_UNIT_X,
           UI_UNIT_Y,
           &data->poly_order,
           1,
@@ -472,99 +821,158 @@ static void draw_modifier__generator(uiLayout *layout,
       break;
     }
   }
+
+  fmodifier_influence_draw(layout, fcurve_owner_id, fcm);
 }
 
-/* --------------- */
+void ANIM_fcm_generator_panel_register(ARegionType *region_type)
+{
+  PanelType *panel_type = fmodifier_panel_register(
+      region_type, FMODIFIER_TYPE_GENERATOR, generator_panel_draw);
+  fmodifier_subpanel_register(region_type,
+                              "frame_range",
+                              "Restrict Frame Range",
+                              fmodifier_frame_range_header_draw,
+                              fmodifier_frame_range_draw,
+                              panel_type);
+}
 
-/* draw settings for generator modifier */
-static void draw_modifier__fn_generator(uiLayout *layout,
-                                        ID *fcurve_owner_id,
-                                        FModifier *fcm,
-                                        short UNUSED(width))
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Function Generator Modifier
+ * \{ */
+
+static void fn_generator_panel_draw(const bContext *C, Panel *panel)
 {
   uiLayout *col;
-  PointerRNA ptr;
+  uiLayout *layout = panel->layout;
 
-  /* init the RNA-pointer */
+  FModifier *fcm;
+  ID *fcurve_owner_id;
+  fmodifier_get_pointers(C, panel, &fcm, &fcurve_owner_id);
+
+  PointerRNA ptr;
   RNA_pointer_create(fcurve_owner_id, &RNA_FModifierFunctionGenerator, fcm, &ptr);
 
-  /* add the settings */
-  col = uiLayoutColumn(layout, true);
-  uiItemR(col, &ptr, "function_type", 0, "", ICON_NONE);
-  uiItemR(col, &ptr, "use_additive", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
+  uiItemR(layout, &ptr, "function_type", 0, "", ICON_NONE);
 
-  col = uiLayoutColumn(layout, false);  // no grouping for now
+  uiLayoutSetPropSep(layout, true);
+
+  col = uiLayoutColumn(layout, false);
+  uiItemR(col, &ptr, "use_additive", 0, NULL, ICON_NONE);
+
+  col = uiLayoutColumn(layout, false);
   uiItemR(col, &ptr, "amplitude", 0, NULL, ICON_NONE);
   uiItemR(col, &ptr, "phase_multiplier", 0, NULL, ICON_NONE);
   uiItemR(col, &ptr, "phase_offset", 0, NULL, ICON_NONE);
   uiItemR(col, &ptr, "value_offset", 0, NULL, ICON_NONE);
+
+  fmodifier_influence_draw(layout, fcurve_owner_id, fcm);
 }
 
-/* --------------- */
-
-/* draw settings for cycles modifier */
-static void draw_modifier__cycles(uiLayout *layout,
-                                  ID *fcurve_owner_id,
-                                  FModifier *fcm,
-                                  short UNUSED(width))
+void ANIM_fcm_fn_generator_panel_register(ARegionType *region_type)
 {
-  uiLayout *split, *col;
-  PointerRNA ptr;
+  PanelType *panel_type = fmodifier_panel_register(
+      region_type, FMODIFIER_TYPE_FN_GENERATOR, fn_generator_panel_draw);
+  fmodifier_subpanel_register(region_type,
+                              "frame_range",
+                              "Restrict Frame Range",
+                              fmodifier_frame_range_header_draw,
+                              fmodifier_frame_range_draw,
+                              panel_type);
+}
 
-  /* init the RNA-pointer */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Cycles Modifier
+ * \{ */
+
+static void cycles_panel_draw(const bContext *C, Panel *panel)
+{
+  uiLayout *col;
+  uiLayout *layout = panel->layout;
+
+  FModifier *fcm;
+  ID *fcurve_owner_id;
+  fmodifier_get_pointers(C, panel, &fcm, &fcurve_owner_id);
+
+  PointerRNA ptr;
   RNA_pointer_create(fcurve_owner_id, &RNA_FModifierCycles, fcm, &ptr);
 
-  /* split into 2 columns
-   * NOTE: the mode comboboxes shouldn't get labels, otherwise there isn't enough room
-   */
-  split = uiLayoutSplit(layout, 0.5f, false);
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
 
-  /* before range */
-  col = uiLayoutColumn(split, true);
-  uiItemL(col, IFACE_("Before:"), ICON_NONE);
-  uiItemR(col, &ptr, "mode_before", 0, "", ICON_NONE);
-  uiItemR(col, &ptr, "cycles_before", 0, NULL, ICON_NONE);
+  /* Before. */
+  col = uiLayoutColumn(layout, false);
+  uiItemR(col, &ptr, "mode_before", 0, NULL, ICON_NONE);
+  uiItemR(col, &ptr, "cycles_before", 0, IFACE_("Count"), ICON_NONE);
 
-  /* after range */
-  col = uiLayoutColumn(split, true);
-  uiItemL(col, IFACE_("After:"), ICON_NONE);
-  uiItemR(col, &ptr, "mode_after", 0, "", ICON_NONE);
-  uiItemR(col, &ptr, "cycles_after", 0, NULL, ICON_NONE);
+  /* After. */
+  col = uiLayoutColumn(layout, false);
+  uiItemR(col, &ptr, "mode_after", 0, NULL, ICON_NONE);
+  uiItemR(col, &ptr, "cycles_after", 0, IFACE_("Count"), ICON_NONE);
+
+  fmodifier_influence_draw(layout, fcurve_owner_id, fcm);
 }
 
-/* --------------- */
-
-/* draw settings for noise modifier */
-static void draw_modifier__noise(uiLayout *layout,
-                                 ID *fcurve_owner_id,
-                                 FModifier *fcm,
-                                 short UNUSED(width))
+void ANIM_fcm_cycles_panel_register(ARegionType *region_type)
 {
-  uiLayout *split, *col;
-  PointerRNA ptr;
+  fmodifier_panel_register(region_type, FMODIFIER_TYPE_CYCLES, cycles_panel_draw);
+}
 
-  /* init the RNA-pointer */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Noise Modifier
+ * \{ */
+
+static void noise_panel_draw(const bContext *C, Panel *panel)
+{
+  uiLayout *col;
+  uiLayout *layout = panel->layout;
+
+  FModifier *fcm;
+  ID *fcurve_owner_id;
+  fmodifier_get_pointers(C, panel, &fcm, &fcurve_owner_id);
+
+  PointerRNA ptr;
   RNA_pointer_create(fcurve_owner_id, &RNA_FModifierNoise, fcm, &ptr);
 
-  /* blending mode */
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
+
   uiItemR(layout, &ptr, "blend_type", 0, NULL, ICON_NONE);
 
-  /* split into 2 columns */
-  split = uiLayoutSplit(layout, 0.5f, false);
-
-  /* col 1 */
-  col = uiLayoutColumn(split, false);
+  col = uiLayoutColumn(layout, false);
   uiItemR(col, &ptr, "scale", 0, NULL, ICON_NONE);
   uiItemR(col, &ptr, "strength", 0, NULL, ICON_NONE);
   uiItemR(col, &ptr, "offset", 0, NULL, ICON_NONE);
-
-  /* col 2 */
-  col = uiLayoutColumn(split, false);
   uiItemR(col, &ptr, "phase", 0, NULL, ICON_NONE);
   uiItemR(col, &ptr, "depth", 0, NULL, ICON_NONE);
+
+  fmodifier_influence_draw(layout, fcurve_owner_id, fcm);
 }
 
-/* callback to add new envelope data point */
+void ANIM_fcm_noise_panel_register(ARegionType *region_type)
+{
+  PanelType *panel_type = fmodifier_panel_register(
+      region_type, FMODIFIER_TYPE_NOISE, noise_panel_draw);
+  fmodifier_subpanel_register(region_type,
+                              "frame_range",
+                              "Restrict Frame Range",
+                              fmodifier_frame_range_header_draw,
+                              fmodifier_frame_range_draw,
+                              panel_type);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Enevelope Modifier
+ * \{ */
+
 static void fmod_envelope_addpoint_cb(bContext *C, void *fcm_dv, void *UNUSED(arg))
 {
   Scene *scene = CTX_data_scene(C);
@@ -653,126 +1061,64 @@ static void fmod_envelope_deletepoint_cb(bContext *UNUSED(C), void *fcm_dv, void
 }
 
 /* draw settings for envelope modifier */
-static void draw_modifier__envelope(uiLayout *layout,
-                                    ID *fcurve_owner_id,
-                                    FModifier *fcm,
-                                    short UNUSED(width))
+static void envelope_panel_draw(const bContext *C, Panel *panel)
 {
-  FMod_Envelope *env = (FMod_Envelope *)fcm->data;
-  FCM_EnvelopeData *fed;
-  uiLayout *col, *row;
-  uiBlock *block;
-  uiBut *but;
-  PointerRNA ptr;
-  int i;
+  uiLayout *row, *col;
+  uiLayout *layout = panel->layout;
 
-  /* init the RNA-pointer */
+  FModifier *fcm;
+  ID *fcurve_owner_id;
+  fmodifier_get_pointers(C, panel, &fcm, &fcurve_owner_id);
+
+  FMod_Envelope *env = (FMod_Envelope *)fcm->data;
+
+  PointerRNA ptr;
   RNA_pointer_create(fcurve_owner_id, &RNA_FModifierEnvelope, fcm, &ptr);
 
-  /* general settings */
+  uiLayoutSetPropSep(layout, true);
+
+  /* General settings. */
   col = uiLayoutColumn(layout, true);
-  uiItemL(col, IFACE_("Envelope:"), ICON_NONE);
-  uiItemR(col, &ptr, "reference_value", 0, NULL, ICON_NONE);
+  uiItemR(col, &ptr, "reference_value", 0, IFACE_("Reference"), ICON_NONE);
+  uiItemR(col, &ptr, "default_min", 0, IFACE_("Min"), ICON_NONE);
+  uiItemR(col, &ptr, "default_max", 0, IFACE_("Max"), ICON_NONE);
 
-  row = uiLayoutRow(col, true);
-  uiItemR(row, &ptr, "default_min", 0, IFACE_("Min"), ICON_NONE);
-  uiItemR(row, &ptr, "default_max", 0, IFACE_("Max"), ICON_NONE);
+  /* Control points list. */
 
-  /* control points header */
-  /* TODO: move this control-point control stuff to using the new special widgets for lists
-   * the current way is far too cramped */
   row = uiLayoutRow(layout, false);
-  block = uiLayoutGetBlock(row);
+  uiBlock *block = uiLayoutGetBlock(row);
 
-  uiDefBut(block,
-           UI_BTYPE_LABEL,
-           1,
-           IFACE_("Control Points:"),
-           0,
-           0,
-           7.5 * UI_UNIT_X,
-           UI_UNIT_Y,
-           NULL,
-           0.0,
-           0.0,
-           0,
-           0,
-           "");
-
-  but = uiDefBut(block,
-                 UI_BTYPE_BUT,
-                 B_FMODIFIER_REDRAW,
-                 IFACE_("Add Point"),
-                 0,
-                 0,
-                 7.5 * UI_UNIT_X,
-                 UI_UNIT_Y,
-                 NULL,
-                 0,
-                 0,
-                 0,
-                 0,
-                 TIP_("Add a new control-point to the envelope on the current frame"));
+  uiBut *but = uiDefBut(block,
+                        UI_BTYPE_BUT,
+                        B_FMODIFIER_REDRAW,
+                        IFACE_("Add Control Point"),
+                        0,
+                        0,
+                        7.5 * UI_UNIT_X,
+                        UI_UNIT_Y,
+                        NULL,
+                        0,
+                        0,
+                        0,
+                        0,
+                        TIP_("Add a new control-point to the envelope on the current frame"));
   UI_but_func_set(but, fmod_envelope_addpoint_cb, env, NULL);
 
-  /* control points list */
-  for (i = 0, fed = env->data; i < env->totvert; i++, fed++) {
+  col = uiLayoutColumn(layout, false);
+  uiLayoutSetPropSep(col, false);
+
+  FCM_EnvelopeData *fed = env->data;
+  for (int i = 0; i < env->totvert; i++, fed++) {
     PointerRNA ctrl_ptr;
     RNA_pointer_create(fcurve_owner_id, &RNA_FModifierEnvelopeControlPoint, fed, &ctrl_ptr);
 
     /* get a new row to operate on */
-    row = uiLayoutRow(layout, true);
+    row = uiLayoutRow(col, true);
     block = uiLayoutGetBlock(row);
 
-    UI_block_align_begin(block);
-    uiDefButR(block,
-              UI_BTYPE_NUM,
-              B_FMODIFIER_REDRAW,
-              IFACE_("Fra:"),
-              0,
-              0,
-              4.5 * UI_UNIT_X,
-              UI_UNIT_Y,
-              &ctrl_ptr,
-              "frame",
-              -1,
-              -MAXFRAMEF,
-              MAXFRAMEF,
-              10,
-              1,
-              NULL);
-    uiDefButR(block,
-              UI_BTYPE_NUM,
-              B_FMODIFIER_REDRAW,
-              IFACE_("Min:"),
-              0,
-              0,
-              5 * UI_UNIT_X,
-              UI_UNIT_Y,
-              &ctrl_ptr,
-              "min",
-              -1,
-              -UI_FLT_MAX,
-              UI_FLT_MAX,
-              10,
-              2,
-              NULL);
-    uiDefButR(block,
-              UI_BTYPE_NUM,
-              B_FMODIFIER_REDRAW,
-              IFACE_("Max:"),
-              0,
-              0,
-              5 * UI_UNIT_X,
-              UI_UNIT_Y,
-              &ctrl_ptr,
-              "max",
-              -1,
-              -UI_FLT_MAX,
-              UI_FLT_MAX,
-              10,
-              2,
-              NULL);
+    uiItemR(row, &ctrl_ptr, "frame", 0, NULL, ICON_NONE);
+    uiItemR(row, &ctrl_ptr, "min", 0, IFACE_("Min"), ICON_NONE);
+    uiItemR(row, &ctrl_ptr, "max", 0, IFACE_("Max"), ICON_NONE);
 
     but = uiDefIconBut(block,
                        UI_BTYPE_BUT,
@@ -791,253 +1137,190 @@ static void draw_modifier__envelope(uiLayout *layout,
     UI_but_func_set(but, fmod_envelope_deletepoint_cb, env, POINTER_FROM_INT(i));
     UI_block_align_begin(block);
   }
+
+  fmodifier_influence_draw(layout, fcurve_owner_id, fcm);
 }
 
-/* --------------- */
-
-/* draw settings for limits modifier */
-static void draw_modifier__limits(uiLayout *layout,
-                                  ID *fcurve_owner_id,
-                                  FModifier *fcm,
-                                  short UNUSED(width))
+void ANIM_fcm_envelope_panel_register(ARegionType *region_type)
 {
-  uiLayout *split, *col /* , *row */ /* UNUSED */;
-  PointerRNA ptr;
+  PanelType *panel_type = fmodifier_panel_register(
+      region_type, FMODIFIER_TYPE_ENVELOPE, envelope_panel_draw);
+  fmodifier_subpanel_register(region_type,
+                              "frame_range",
+                              "Restrict Frame Range",
+                              fmodifier_frame_range_header_draw,
+                              fmodifier_frame_range_draw,
+                              panel_type);
+}
 
-  /* init the RNA-pointer */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Limits Modifier
+ * \{ */
+
+static void limits_panel_draw(const bContext *C, Panel *panel)
+{
+  uiLayout *col, *row, *sub;
+  uiLayout *layout = panel->layout;
+
+  FModifier *fcm;
+  ID *fcurve_owner_id;
+  fmodifier_get_pointers(C, panel, &fcm, &fcurve_owner_id);
+
+  PointerRNA ptr;
   RNA_pointer_create(fcurve_owner_id, &RNA_FModifierLimits, fcm, &ptr);
 
-  /* row 1: minimum */
-  {
-    /* row = uiLayoutRow(layout, false); */ /* UNUSED */
+  uiLayoutSetPropSep(layout, true);
 
-    /* split into 2 columns */
-    split = uiLayoutSplit(layout, 0.5f, false);
+  /* Minimums. */
+  col = uiLayoutColumn(layout, false);
+  row = uiLayoutRowWithHeading(col, true, IFACE_("Minumum X"));
+  uiItemR(row, &ptr, "use_min_x", 0, "", ICON_NONE);
+  sub = uiLayoutColumn(row, true);
+  uiLayoutSetActive(sub, RNA_boolean_get(&ptr, "use_min_x"));
+  uiItemR(sub, &ptr, "min_x", 0, "", ICON_NONE);
 
-    /* x-minimum */
-    col = uiLayoutColumn(split, true);
-    uiItemR(col, &ptr, "use_min_x", 0, NULL, ICON_NONE);
-    uiItemR(col, &ptr, "min_x", 0, NULL, ICON_NONE);
+  row = uiLayoutRowWithHeading(col, true, IFACE_("Y"));
+  uiItemR(row, &ptr, "use_min_y", 0, "", ICON_NONE);
+  sub = uiLayoutColumn(row, true);
+  uiLayoutSetActive(sub, RNA_boolean_get(&ptr, "use_min_y"));
+  uiItemR(sub, &ptr, "min_y", 0, "", ICON_NONE);
 
-    /* y-minimum*/
-    col = uiLayoutColumn(split, true);
-    uiItemR(col, &ptr, "use_min_y", 0, NULL, ICON_NONE);
-    uiItemR(col, &ptr, "min_y", 0, NULL, ICON_NONE);
-  }
+  /* Maximums. */
+  col = uiLayoutColumn(layout, false);
+  row = uiLayoutRowWithHeading(col, true, IFACE_("Maximum X"));
+  uiItemR(row, &ptr, "use_max_x", 0, "", ICON_NONE);
+  sub = uiLayoutColumn(row, true);
+  uiLayoutSetActive(sub, RNA_boolean_get(&ptr, "use_max_x"));
+  uiItemR(sub, &ptr, "max_x", 0, "", ICON_NONE);
 
-  /* row 2: maximum */
-  {
-    /* row = uiLayoutRow(layout, false); */ /* UNUSED */
+  row = uiLayoutRowWithHeading(col, true, IFACE_("Y"));
+  uiItemR(row, &ptr, "use_max_y", 0, "", ICON_NONE);
+  sub = uiLayoutColumn(row, true);
+  uiLayoutSetActive(sub, RNA_boolean_get(&ptr, "use_max_y"));
+  uiItemR(sub, &ptr, "max_y", 0, "", ICON_NONE);
 
-    /* split into 2 columns */
-    split = uiLayoutSplit(layout, 0.5f, false);
-
-    /* x-minimum */
-    col = uiLayoutColumn(split, true);
-    uiItemR(col, &ptr, "use_max_x", 0, NULL, ICON_NONE);
-    uiItemR(col, &ptr, "max_x", 0, NULL, ICON_NONE);
-
-    /* y-minimum*/
-    col = uiLayoutColumn(split, true);
-    uiItemR(col, &ptr, "use_max_y", 0, NULL, ICON_NONE);
-    uiItemR(col, &ptr, "max_y", 0, NULL, ICON_NONE);
-  }
+  fmodifier_influence_draw(layout, fcurve_owner_id, fcm);
 }
 
-/* --------------- */
-
-/* draw settings for stepped interpolation modifier */
-static void draw_modifier__stepped(uiLayout *layout,
-                                   ID *fcurve_owner_id,
-                                   FModifier *fcm,
-                                   short UNUSED(width))
+void ANIM_fcm_limits_panel_register(ARegionType *region_type)
 {
-  uiLayout *col, *sub;
-  PointerRNA ptr;
+  PanelType *panel_type = fmodifier_panel_register(
+      region_type, FMODIFIER_TYPE_LIMITS, limits_panel_draw);
+  fmodifier_subpanel_register(region_type,
+                              "frame_range",
+                              "Restrict Frame Range",
+                              fmodifier_frame_range_header_draw,
+                              fmodifier_frame_range_draw,
+                              panel_type);
+}
 
-  /* init the RNA-pointer */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Stepped Interpolation Modifier
+ * \{ */
+
+static void stepped_panel_draw(const bContext *C, Panel *panel)
+{
+  uiLayout *col, *sub, *row;
+  uiLayout *layout = panel->layout;
+
+  FModifier *fcm;
+  ID *fcurve_owner_id;
+  fmodifier_get_pointers(C, panel, &fcm, &fcurve_owner_id);
+
+  PointerRNA ptr;
   RNA_pointer_create(fcurve_owner_id, &RNA_FModifierStepped, fcm, &ptr);
 
-  /* block 1: "stepping" settings */
+  uiLayoutSetPropSep(layout, true);
+
+  /* Stepping Settings. */
   col = uiLayoutColumn(layout, false);
   uiItemR(col, &ptr, "frame_step", 0, NULL, ICON_NONE);
   uiItemR(col, &ptr, "frame_offset", 0, NULL, ICON_NONE);
 
-  /* block 2: start range settings */
-  col = uiLayoutColumn(layout, true);
-  uiItemR(col, &ptr, "use_frame_start", 0, NULL, ICON_NONE);
-
-  sub = uiLayoutColumn(col, true);
+  /* Start range settings. */
+  row = uiLayoutRowWithHeading(layout, true, IFACE_("Start Frame"));
+  uiItemR(row, &ptr, "use_frame_start", 0, "", ICON_NONE);
+  sub = uiLayoutColumn(row, true);
   uiLayoutSetActive(sub, RNA_boolean_get(&ptr, "use_frame_start"));
-  uiItemR(sub, &ptr, "frame_start", 0, NULL, ICON_NONE);
+  uiItemR(sub, &ptr, "frame_start", 0, "", ICON_NONE);
 
-  /* block 3: end range settings */
-  col = uiLayoutColumn(layout, true);
-  uiItemR(col, &ptr, "use_frame_end", 0, NULL, ICON_NONE);
-
-  sub = uiLayoutColumn(col, true);
+  /* End range settings. */
+  row = uiLayoutRowWithHeading(layout, true, IFACE_("End Frame"));
+  uiItemR(row, &ptr, "use_frame_end", 0, "", ICON_NONE);
+  sub = uiLayoutColumn(row, true);
   uiLayoutSetActive(sub, RNA_boolean_get(&ptr, "use_frame_end"));
-  uiItemR(sub, &ptr, "frame_end", 0, NULL, ICON_NONE);
+  uiItemR(sub, &ptr, "frame_end", 0, "", ICON_NONE);
+
+  fmodifier_influence_draw(layout, fcurve_owner_id, fcm);
 }
 
-/* --------------- */
-
-void ANIM_uiTemplate_fmodifier_draw(uiLayout *layout,
-                                    ID *fcurve_owner_id,
-                                    ListBase *modifiers,
-                                    FModifier *fcm)
+void ANIM_fcm_stepped_panel_register(ARegionType *region_type)
 {
-  const FModifierTypeInfo *fmi = fmodifier_get_typeinfo(fcm);
-  uiLayout *box, *row, *sub, *col;
-  uiBlock *block;
-  uiBut *but;
-  short width = 314;
-  PointerRNA ptr;
+  PanelType *panel_type = fmodifier_panel_register(
+      region_type, FMODIFIER_TYPE_STEPPED, stepped_panel_draw);
+  fmodifier_subpanel_register(region_type,
+                              "frame_range",
+                              "Restrict Frame Range",
+                              fmodifier_frame_range_header_draw,
+                              fmodifier_frame_range_draw,
+                              panel_type);
+}
 
-  /* init the RNA-pointer */
-  RNA_pointer_create(fcurve_owner_id, &RNA_FModifier, fcm, &ptr);
+/** \} */
 
-  /* draw header */
-  {
-    /* get layout-row + UI-block for this */
-    box = uiLayoutBox(layout);
+/* -------------------------------------------------------------------- */
+/** \name Panel Creator "Template"
+ *
+ * Checks if the panels match the FCurve's modifiers, rebubilds them if they don't.
+ * \{ */
 
-    row = uiLayoutRow(box, false);
-    block = uiLayoutGetBlock(row);  // err...
+static void fmodifier_panel_id(void *fcm_link, char *r_name)
+{
+  FModifier *fcm = (FModifier *)fcm_link;
+  ANIM_fmodifier_type_panel_id(fcm->type, r_name);
+}
 
-    /* left-align -------------------------------------------- */
-    sub = uiLayoutRow(row, true);
-    uiLayoutSetAlignment(sub, UI_LAYOUT_ALIGN_LEFT);
+void ANIM_fmodifier_panels(const bContext *C, ListBase *fmodifiers)
+{
+  ScrArea *sa = CTX_wm_area(C);
+  ARegion *region = CTX_wm_region(C);
 
-    UI_block_emboss_set(block, UI_EMBOSS_NONE);
+  bool panels_match = UI_panel_list_matches_data(region, fmodifiers, fmodifier_panel_id);
 
-    /* expand */
-    uiItemR(sub, &ptr, "show_expanded", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+  if (!panels_match) {
+    UI_panels_free_instanced(C, region);
+    FModifier *fcm = fmodifiers->first;
+    for (int i = 0; fcm; i++, fcm = fcm->next) {
+      const FModifierTypeInfo *fmi = get_fmodifier_typeinfo(fcm->type);
+      // if (fmi->panelRegister) {
+      char panel_idname[MAX_NAME];
+      fmodifier_panel_id(fcm, panel_idname);
 
-    /* checkbox for 'active' status (for now) */
-    uiItemR(sub, &ptr, "active", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
-
-    /* name */
-    if (fmi) {
-      uiItemL(sub, IFACE_(fmi->name), ICON_NONE);
+      Panel *new_panel = UI_panel_add_instanced(sa, region, &region->panels, panel_idname, i);
+      if (new_panel != NULL) {
+        UI_panel_set_expand_from_list_data(C, new_panel);
+      }
+      // }
     }
-    else {
-      uiItemL(sub, IFACE_("<Unknown Modifier>"), ICON_NONE);
-    }
-
-    /* right-align ------------------------------------------- */
-    sub = uiLayoutRow(row, true);
-    uiLayoutSetAlignment(sub, UI_LAYOUT_ALIGN_RIGHT);
-
-    /* 'mute' button */
-    uiItemR(sub, &ptr, "mute", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
-
-    UI_block_emboss_set(block, UI_EMBOSS_NONE);
-
-    /* delete button */
-    but = uiDefIconBut(block,
-                       UI_BTYPE_BUT,
-                       B_REDR,
-                       ICON_X,
-                       0,
-                       0,
-                       UI_UNIT_X,
-                       UI_UNIT_Y,
-                       NULL,
-                       0.0,
-                       0.0,
-                       0.0,
-                       0.0,
-                       TIP_("Delete F-Curve Modifier"));
-    FModifierDeleteContext *ctx = MEM_mallocN(sizeof(FModifierDeleteContext), "fmodifier ctx");
-    ctx->fcurve_owner_id = fcurve_owner_id;
-    ctx->modifiers = modifiers;
-    UI_but_funcN_set(but, delete_fmodifier_cb, ctx, fcm);
-
-    UI_block_emboss_set(block, UI_EMBOSS);
   }
-
-  /* when modifier is expanded, draw settings */
-  if (fcm->flag & FMODIFIER_FLAG_EXPANDED) {
-    /* set up the flexible-box layout which acts as the backdrop for the modifier settings */
-    box = uiLayoutBox(layout);
-
-    /* draw settings for individual modifiers */
-    switch (fcm->type) {
-      case FMODIFIER_TYPE_GENERATOR: /* Generator */
-        draw_modifier__generator(box, fcurve_owner_id, fcm, width);
-        break;
-
-      case FMODIFIER_TYPE_FN_GENERATOR: /* Built-In Function Generator */
-        draw_modifier__fn_generator(box, fcurve_owner_id, fcm, width);
-        break;
-
-      case FMODIFIER_TYPE_CYCLES: /* Cycles */
-        draw_modifier__cycles(box, fcurve_owner_id, fcm, width);
-        break;
-
-      case FMODIFIER_TYPE_ENVELOPE: /* Envelope */
-        draw_modifier__envelope(box, fcurve_owner_id, fcm, width);
-        break;
-
-      case FMODIFIER_TYPE_LIMITS: /* Limits */
-        draw_modifier__limits(box, fcurve_owner_id, fcm, width);
-        break;
-
-      case FMODIFIER_TYPE_NOISE: /* Noise */
-        draw_modifier__noise(box, fcurve_owner_id, fcm, width);
-        break;
-
-      case FMODIFIER_TYPE_STEPPED: /* Stepped */
-        draw_modifier__stepped(box, fcurve_owner_id, fcm, width);
-        break;
-
-      default: /* unknown type */
-        break;
-    }
-
-    /* one last panel below this: FModifier range */
-    // TODO: experiment with placement of this
-    {
-      box = uiLayoutBox(layout);
-
-      /* restricted range ----------------------------------------------------- */
-      col = uiLayoutColumn(box, true);
-
-      /* top row: use restricted range */
-      row = uiLayoutRow(col, true);
-      uiItemR(row, &ptr, "use_restricted_range", 0, NULL, ICON_NONE);
-
-      if (fcm->flag & FMODIFIER_FLAG_RANGERESTRICT) {
-        /* second row: settings */
-        row = uiLayoutRow(col, true);
-
-        uiItemR(row, &ptr, "frame_start", 0, IFACE_("Start"), ICON_NONE);
-        uiItemR(row, &ptr, "frame_end", 0, IFACE_("End"), ICON_NONE);
-
-        /* third row: blending influence */
-        row = uiLayoutRow(col, true);
-
-        uiItemR(row, &ptr, "blend_in", 0, IFACE_("In"), ICON_NONE);
-        uiItemR(row, &ptr, "blend_out", 0, IFACE_("Out"), ICON_NONE);
-      }
-
-      /* influence -------------------------------------------------------------- */
-      col = uiLayoutColumn(box, true);
-
-      /* top row: use influence */
-      uiItemR(col, &ptr, "use_influence", 0, NULL, ICON_NONE);
-
-      if (fcm->flag & FMODIFIER_FLAG_USEINFLUENCE) {
-        /* second row: influence value */
-        uiItemR(col, &ptr, "influence", 0, NULL, ICON_NONE);
-      }
+  else {
+    /* The expansion might have been changed elsewhere, so we still need to set it. */
+    LISTBASE_FOREACH (Panel *, panel, &region->panels) {
+      if ((panel->type != NULL) && (panel->type->flag & PNL_INSTANCED))
+        UI_panel_set_expand_from_list_data(C, panel);
     }
   }
 }
 
-/* ********************************************** */
-/* COPY/PASTE BUFFER STUFF */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Copy / Paste Buffer Code
+ * \{ */
 
 /* Copy/Paste Buffer itself (list of FModifier 's) */
 static ListBase fmodifier_copypaste_buf = {NULL, NULL};
@@ -1128,4 +1411,4 @@ bool ANIM_fmodifiers_paste_from_buf(ListBase *modifiers, bool replace, FCurve *c
   return ok;
 }
 
-/* ********************************************** */
+/** \} */

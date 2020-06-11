@@ -36,6 +36,7 @@ struct FCurve;
 struct FModifier;
 
 struct AnimData;
+struct ARegionType;
 struct BezTriple;
 struct LibraryForeachIDData;
 struct PathResolvedRNA;

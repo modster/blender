@@ -34,6 +34,7 @@ struct ID;
 struct ListBase;
 
 struct ARegion;
+struct ARegionType;
 struct Main;
 struct ReportList;
 struct ScrArea;
@@ -667,11 +668,17 @@ void ANIM_draw_framerange(struct Scene *scene, struct View2D *v2d);
 
 /* ------------- UI Panel Drawing -------------- */
 
-/* draw a given F-Modifier for some layout/UI-Block */
-void ANIM_uiTemplate_fmodifier_draw(struct uiLayout *layout,
-                                    struct ID *fcurve_owner_id,
-                                    ListBase *modifiers,
-                                    struct FModifier *fcm);
+void ANIM_fmodifier_panels(const struct bContext *C, ListBase *fmodifiers);
+
+void ANIM_fmodifier_type_panel_id(int type, char *r_idname);
+
+void ANIM_fcm_generator_panel_register(struct ARegionType *region_type);
+void ANIM_fcm_fn_generator_panel_register(struct ARegionType *region_type);
+void ANIM_fcm_cycles_panel_register(struct ARegionType *region_type);
+void ANIM_fcm_noise_panel_register(struct ARegionType *region_type);
+void ANIM_fcm_envelope_panel_register(struct ARegionType *region_type);
+void ANIM_fcm_limits_panel_register(struct ARegionType *region_type);
+void ANIM_fcm_stepped_panel_register(struct ARegionType *region_type);
 
 /* ------------- Copy/Paste Buffer -------------- */
 

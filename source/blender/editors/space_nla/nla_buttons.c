@@ -540,8 +540,7 @@ static void nla_panel_modifiers(const bContext *C, Panel *panel)
 {
   PointerRNA strip_ptr;
   NlaStrip *strip;
-  FModifier *fcm;
-  uiLayout *col, *row;
+  uiLayout *row;
   uiBlock *block;
 
   /* check context and also validity of pointer */
@@ -569,12 +568,7 @@ static void nla_panel_modifiers(const bContext *C, Panel *panel)
     uiItemO(row, "", ICON_PASTEDOWN, "NLA_OT_fmodifier_paste");
   }
 
-  /* draw each modifier */
-  for (fcm = strip->modifiers.first; fcm; fcm = fcm->next) {
-    col = uiLayoutColumn(panel->layout, true);
-
-    ANIM_uiTemplate_fmodifier_draw(col, strip_ptr.owner_id, &strip->modifiers, fcm);
-  }
+  ANIM_fmodifier_panels(C, &strip->modifiers);
 }
 
 /* ******************* general ******************************** */
@@ -658,4 +652,11 @@ void nla_buttons_register(ARegionType *art)
   pt->draw = nla_panel_modifiers;
   pt->poll = nla_strip_eval_panel_poll;
   BLI_addtail(&art->paneltypes, pt);
+
+  ANIM_fcm_generator_panel_register(art);
+  ANIM_fcm_fn_generator_panel_register(art);
+  ANIM_fcm_noise_panel_register(art);
+  ANIM_fcm_envelope_panel_register(art);
+  ANIM_fcm_limits_panel_register(art);
+  ANIM_fcm_stepped_panel_register(art);
 }
