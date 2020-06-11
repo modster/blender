@@ -919,7 +919,14 @@ static void cycles_panel_draw(const bContext *C, Panel *panel)
 
 void ANIM_fcm_cycles_panel_register(ARegionType *region_type)
 {
-  fmodifier_panel_register(region_type, FMODIFIER_TYPE_CYCLES, cycles_panel_draw);
+  PanelType *panel_type = fmodifier_panel_register(
+      region_type, FMODIFIER_TYPE_CYCLES, cycles_panel_draw);
+  fmodifier_subpanel_register(region_type,
+                              "frame_range",
+                              "Restrict Frame Range",
+                              fmodifier_frame_range_header_draw,
+                              fmodifier_frame_range_draw,
+                              panel_type);
 }
 
 /** \} */
