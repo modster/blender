@@ -117,7 +117,7 @@ typedef struct PanelSort {
 static int get_panel_real_size_y(const Panel *panel);
 static void panel_activate_state(const bContext *C, Panel *panel, uiHandlePanelState state);
 static int compare_panel(const void *a1, const void *a2);
-static bool panel_type_context_poll(PanelType *panel_type, const char *context);
+static bool panel_type_context_poll(ARegion *region, PanelType *panel_type, const char *context);
 
 static void panel_title_color_get(bool show_background, uchar color[4])
 {
@@ -427,14 +427,17 @@ static void reorder_instanced_panel_list(bContext *C, ARegion *region, Panel *dr
     return;
   }
 
-  char *context = drag_panel->type->context;
+  char *context;
+  if (!UI_panel_category_is_visible(region)) {
+    context = drag_panel->type->context;
+  }
 
   /* Find how many instanced panels with this context string. */
   int list_panels_len = 0;
   LISTBASE_FOREACH (Panel *, panel, &region->panels) {
     if (panel->type) {
-      if (panel_type_context_poll(panel->type, context)) {
-        if (panel->type->flag & PNL_INSTANCED) {
+      if (panel->type->flag & PNL_INSTANCED) {
+        if (panel_type_context_poll(region, panel->type, context)) {
           list_panels_len++;
         }
       }
@@ -446,8 +449,8 @@ static void reorder_instanced_panel_list(bContext *C, ARegion *region, Panel *dr
   PanelSort *sort_index = panel_sort;
   LISTBASE_FOREACH (Panel *, panel, &region->panels) {
     if (panel->type) {
-      if (panel_type_context_poll(panel->type, context)) {
-        if (panel->type->flag & PNL_INSTANCED) {
+      if (panel->type->flag & PNL_INSTANCED) {
+        if (panel_type_context_poll(region, panel->type, context)) {
           sort_index->panel = MEM_dupallocN(panel);
           sort_index->orig = panel;
           sort_index++;
@@ -605,12 +608,17 @@ static void panels_collapse_all(const bContext *C,
   set_panels_list_data_expand_flag(C, region);
 }
 
-static bool panel_type_context_poll(PanelType *panel_type, const char *context)
+static bool panel_type_context_poll(ARegion *region, PanelType *panel_type, const char *context)
 {
-  if (panel_type->context[0] && STREQ(panel_type->context, context)) {
-    return true;
+  if (UI_panel_category_is_visible(region)) {
+    return STREQ(panel_type->category, UI_panel_category_active_get(region, false));
   }
-  return false;
+  else {
+    if (panel_type->context[0] && STREQ(panel_type->context, context)) {
+      return true;
+    }
+    return false;
+  }
 }
 
 Panel *UI_panel_find_by_type(ListBase *lb, PanelType *pt)
