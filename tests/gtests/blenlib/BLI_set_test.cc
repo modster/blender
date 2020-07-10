@@ -1,3 +1,5 @@
+/* Apache License, Version 2.0 */
+
 #include <set>
 #include <unordered_set>
 
@@ -9,12 +11,12 @@
 #include "BLI_vector.hh"
 #include "testing/testing.h"
 
-using namespace blender;
+namespace blender {
 
 TEST(set, DefaultConstructor)
 {
   Set<int> set;
-  EXPECT_EQ(set.size(), 0);
+  EXPECT_EQ(set.size(), 0u);
   EXPECT_TRUE(set.is_empty());
 }
 
@@ -52,7 +54,7 @@ TEST(set, AddMany)
 TEST(set, InitializerListConstructor)
 {
   Set<int> set = {4, 5, 6};
-  EXPECT_EQ(set.size(), 3);
+  EXPECT_EQ(set.size(), 3u);
   EXPECT_TRUE(set.contains(4));
   EXPECT_TRUE(set.contains(5));
   EXPECT_TRUE(set.contains(6));
@@ -77,10 +79,10 @@ TEST(set, CopyConstructor)
 TEST(set, MoveConstructor)
 {
   Set<int> set = {1, 2, 3};
-  EXPECT_EQ(set.size(), 3);
+  EXPECT_EQ(set.size(), 3u);
   Set<int> set2(std::move(set));
-  EXPECT_EQ(set.size(), 0);
-  EXPECT_EQ(set2.size(), 3);
+  EXPECT_EQ(set.size(), 0u);
+  EXPECT_EQ(set2.size(), 3u);
 }
 
 TEST(set, CopyAssignment)
@@ -101,11 +103,11 @@ TEST(set, CopyAssignment)
 TEST(set, MoveAssignment)
 {
   Set<int> set = {1, 2, 3};
-  EXPECT_EQ(set.size(), 3);
+  EXPECT_EQ(set.size(), 3u);
   Set<int> set2;
   set2 = std::move(set);
-  EXPECT_EQ(set.size(), 0);
-  EXPECT_EQ(set2.size(), 3);
+  EXPECT_EQ(set.size(), 0u);
+  EXPECT_EQ(set2.size(), 3u);
 }
 
 TEST(set, RemoveContained)
@@ -177,7 +179,7 @@ TEST(set, AddMultiple)
   a.add_multiple({2, 4, 7});
   EXPECT_TRUE(a.contains(4));
   EXPECT_TRUE(a.contains(2));
-  EXPECT_EQ(a.size(), 4);
+  EXPECT_EQ(a.size(), 4u);
 }
 
 TEST(set, AddMultipleNew)
@@ -195,7 +197,7 @@ TEST(set, Iterator)
   for (int value : set) {
     vec.append(value);
   }
-  EXPECT_EQ(vec.size(), 5);
+  EXPECT_EQ(vec.size(), 5u);
   EXPECT_TRUE(vec.contains(1));
   EXPECT_TRUE(vec.contains(3));
   EXPECT_TRUE(vec.contains(2));
@@ -208,9 +210,9 @@ TEST(set, OftenAddRemoveContained)
   Set<int> set;
   for (int i = 0; i < 100; i++) {
     set.add(42);
-    EXPECT_EQ(set.size(), 1);
+    EXPECT_EQ(set.size(), 1u);
     set.remove_contained(42);
-    EXPECT_EQ(set.size(), 0);
+    EXPECT_EQ(set.size(), 0u);
   }
 }
 
@@ -222,15 +224,15 @@ TEST(set, UniquePtrValues)
   set.add_new(std::move(value1));
   set.add(std::unique_ptr<int>(new int()));
 
-  EXPECT_EQ(set.size(), 3);
+  EXPECT_EQ(set.size(), 3u);
 }
 
 TEST(set, Clear)
 {
   Set<int> set = {3, 4, 6, 7};
-  EXPECT_EQ(set.size(), 4);
+  EXPECT_EQ(set.size(), 4u);
   set.clear();
-  EXPECT_EQ(set.size(), 0);
+  EXPECT_EQ(set.size(), 0u);
 }
 
 TEST(set, StringSet)
@@ -238,7 +240,7 @@ TEST(set, StringSet)
   Set<std::string> set;
   set.add("hello");
   set.add("world");
-  EXPECT_EQ(set.size(), 2);
+  EXPECT_EQ(set.size(), 2u);
   EXPECT_TRUE(set.contains("hello"));
   EXPECT_TRUE(set.contains("world"));
   EXPECT_FALSE(set.contains("world2"));
@@ -250,7 +252,7 @@ TEST(set, PointerSet)
   Set<int *> set;
   set.add(&a);
   set.add(&b);
-  EXPECT_EQ(set.size(), 2);
+  EXPECT_EQ(set.size(), 2u);
   EXPECT_TRUE(set.contains(&a));
   EXPECT_TRUE(set.contains(&b));
   EXPECT_FALSE(set.contains(&c));
@@ -259,14 +261,14 @@ TEST(set, PointerSet)
 TEST(set, Remove)
 {
   Set<int> set = {1, 2, 3, 4, 5, 6};
-  EXPECT_EQ(set.size(), 6);
+  EXPECT_EQ(set.size(), 6u);
   EXPECT_TRUE(set.remove(2));
-  EXPECT_EQ(set.size(), 5);
+  EXPECT_EQ(set.size(), 5u);
   EXPECT_FALSE(set.contains(2));
   EXPECT_FALSE(set.remove(2));
-  EXPECT_EQ(set.size(), 5);
+  EXPECT_EQ(set.size(), 5u);
   EXPECT_TRUE(set.remove(5));
-  EXPECT_EQ(set.size(), 4);
+  EXPECT_EQ(set.size(), 4u);
 }
 
 struct Type1 {
@@ -290,7 +292,7 @@ bool operator==(const Type2 &a, const Type1 &b)
   return a.value == b.value;
 }
 
-template<> struct blender::DefaultHash<Type1> {
+template<> struct DefaultHash<Type1> {
   uint32_t operator()(const Type1 &value) const
   {
     return value.value;
@@ -403,6 +405,51 @@ TEST(set, IntrusiveIntKey)
   EXPECT_TRUE(set.remove(4));
 }
 
+struct MyKeyType {
+  uint32_t key;
+  int32_t attached_data;
+
+  uint32_t hash() const
+  {
+    return key;
+  }
+
+  friend bool operator==(const MyKeyType &a, const MyKeyType &b)
+  {
+    return a.key == b.key;
+  }
+};
+
+TEST(set, LookupKey)
+{
+  Set<MyKeyType> set;
+  set.add({1, 10});
+  set.add({2, 20});
+  EXPECT_EQ(set.lookup_key({1, 30}).attached_data, 10);
+  EXPECT_EQ(set.lookup_key({2, 0}).attached_data, 20);
+}
+
+TEST(set, LookupKeyDefault)
+{
+  Set<MyKeyType> set;
+  set.add({1, 10});
+  set.add({2, 20});
+
+  MyKeyType fallback{5, 50};
+  EXPECT_EQ(set.lookup_key_default({1, 66}, fallback).attached_data, 10);
+  EXPECT_EQ(set.lookup_key_default({4, 40}, fallback).attached_data, 50);
+}
+
+TEST(set, LookupKeyPtr)
+{
+  Set<MyKeyType> set;
+  set.add({1, 10});
+  set.add({2, 20});
+  EXPECT_EQ(set.lookup_key_ptr({1, 50})->attached_data, 10);
+  EXPECT_EQ(set.lookup_key_ptr({2, 50})->attached_data, 20);
+  EXPECT_EQ(set.lookup_key_ptr({3, 50}), nullptr);
+}
+
 /**
  * Set this to 1 to activate the benchmark. It is disabled by default, because it prints a lot.
  */
@@ -511,3 +558,5 @@ TEST(set, Benchmark)
  */
 
 #endif /* Benchmark */
+
+}  // namespace blender

@@ -27,6 +27,7 @@ set(INC
   ../bmesh
   ../depsgraph
   ../draw
+  ../functions
   ../gpencil_modifiers
   ../gpu
   ../ikplugin
@@ -74,6 +75,7 @@ set(SRC
   intern/anim_visualization.c
   intern/appdir.c
   intern/armature.c
+  intern/armature_deform.c
   intern/armature_update.c
   intern/autoexec.c
   intern/blender.c
@@ -99,6 +101,7 @@ set(SRC
   intern/crazyspace.c
   intern/curve.c
   intern/curve_decimate.c
+  intern/curve_deform.c
   intern/curveprofile.c
   intern/customdata.c
   intern/customdata_file.c
@@ -138,6 +141,7 @@ set(SRC
   intern/key.c
   intern/keyconfig.c
   intern/lattice.c
+  intern/lattice_deform.c
   intern/layer.c
   intern/layer_utils.c
   intern/lib_id.c
@@ -184,6 +188,7 @@ set(SRC
   intern/multires_unsubdivide.c
   intern/nla.c
   intern/node.c
+  intern/node_tree_multi_function.cc
   intern/node_tree_ref.cc
   intern/object.c
   intern/object_deform.c
@@ -353,6 +358,7 @@ set(SRC
   BKE_multires.h
   BKE_nla.h
   BKE_node.h
+  BKE_node_tree_multi_function.hh
   BKE_node_tree_ref.hh
   BKE_object.h
   BKE_object_deform.h
@@ -421,6 +427,7 @@ set(LIB
   bf_bmesh
   bf_depsgraph
   bf_draw
+  bf_functions
   bf_gpencil_modifiers
   bf_gpu
   bf_ikplugin

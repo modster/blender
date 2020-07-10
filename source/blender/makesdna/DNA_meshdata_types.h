@@ -286,6 +286,7 @@ typedef struct MDeformWeight {
 } MDeformWeight;
 
 typedef struct MDeformVert {
+  /* Mut be sorted by def_nr due to binary search. */
   struct MDeformWeight *dw;
   int totweight;
   /** Flag is only in use as a run-time tag at the moment. */
@@ -345,7 +346,7 @@ typedef struct MLoopCol {
 } MLoopCol;
 
 typedef struct MPropCol {
-  float col[4];
+  float color[4];
 } MPropCol;
 
 /** Multi-Resolution loop data. */

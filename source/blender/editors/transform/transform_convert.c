@@ -55,7 +55,6 @@
 #include "DEG_depsgraph_build.h"
 
 #include "transform.h"
-#include "transform_mode.h"
 #include "transform_snap.h"
 
 /* Own include. */
@@ -70,39 +69,19 @@ bool transform_mode_use_local_origins(const TransInfo *t)
  * Transforming around ourselves is no use, fallback to individual origins,
  * useful for curve/armatures.
  */
-void transform_around_single_fallback(TransInfo *t)
+void transform_around_single_fallback_ex(TransInfo *t, int data_len_all)
 {
   if ((ELEM(t->around, V3D_AROUND_CENTER_BOUNDS, V3D_AROUND_CENTER_MEDIAN, V3D_AROUND_ACTIVE)) &&
       transform_mode_use_local_origins(t)) {
-
-    bool is_data_single = false;
-    if (t->data_len_all == 1) {
-      is_data_single = true;
-    }
-    else if (t->data_len_all == 3) {
-      if (t->obedit_type == OB_CURVE) {
-        /* Special case check for curve, if we have a single curve bezier triple selected
-         * treat */
-        FOREACH_TRANS_DATA_CONTAINER (t, tc) {
-          if (!tc->data_len) {
-            continue;
-          }
-          if (tc->data_len == 3) {
-            const TransData *td = tc->data;
-            if ((td[0].flag | td[1].flag | td[2].flag) & TD_BEZTRIPLE) {
-              if ((td[0].loc == td[1].loc) && (td[1].loc == td[2].loc)) {
-                is_data_single = true;
-              }
-            }
-          }
-          break;
-        }
-      }
-    }
-    if (is_data_single) {
+    if (data_len_all == 1) {
       t->around = V3D_AROUND_LOCAL_ORIGINS;
     }
   }
+}
+
+void transform_around_single_fallback(TransInfo *t)
+{
+  transform_around_single_fallback_ex(t, t->data_len_all);
 }
 
 /* -------------------------------------------------------------------- */
@@ -117,12 +96,10 @@ static int trans_data_compare_dist(const void *a, const void *b)
   if (td_a->dist < td_b->dist) {
     return -1;
   }
-  else if (td_a->dist > td_b->dist) {
+  if (td_a->dist > td_b->dist) {
     return 1;
   }
-  else {
-    return 0;
-  }
+  return 0;
 }
 
 static int trans_data_compare_rdist(const void *a, const void *b)
@@ -133,12 +110,10 @@ static int trans_data_compare_rdist(const void *a, const void *b)
   if (td_a->rdist < td_b->rdist) {
     return -1;
   }
-  else if (td_a->rdist > td_b->rdist) {
+  if (td_a->rdist > td_b->rdist) {
     return 1;
   }
-  else {
-    return 0;
-  }
+  return 0;
 }
 
 static void sort_trans_data_dist_container(const TransInfo *t, TransDataContainer *tc)
@@ -631,9 +606,7 @@ bool FrameOnMouseSide(char side, float frame, float cframe)
   if (side == 'R') {
     return (frame >= cframe);
   }
-  else {
-    return (frame <= cframe);
-  }
+  return (frame <= cframe);
 }
 
 /** \} */
@@ -691,7 +664,7 @@ void posttrans_fcurve_clean(FCurve *fcu, const int sel_flag, const bool use_hand
           found = true;
           break;
         }
-        else if (rk->frame < bezt->vec[1][0]) {
+        if (rk->frame < bezt->vec[1][0]) {
           /* Terminate early if have passed the supposed insertion point? */
           break;
         }
@@ -717,11 +690,10 @@ void posttrans_fcurve_clean(FCurve *fcu, const int sel_flag, const bool use_hand
     }
     return;
   }
-  else {
-    /* Compute the average values for each retained keyframe */
-    LISTBASE_FOREACH (tRetainedKeyframe *, rk, &retained_keys) {
-      rk->val = rk->val / (float)rk->tot_count;
-    }
+
+  /* Compute the average values for each retained keyframe */
+  LISTBASE_FOREACH (tRetainedKeyframe *, rk, &retained_keys) {
+    rk->val = rk->val / (float)rk->tot_count;
   }
 
   /* 2) Delete all keyframes duplicating the "retained keys" found above
@@ -795,7 +767,7 @@ bool constraints_list_needinv(TransInfo *t, ListBase *list)
   bConstraint *con;
 
   /* loop through constraints, checking if there's one of the mentioned
-   * constraints needing special crazyspace corrections
+   * constraints needing special crazy-space corrections
    */
   if (list) {
     for (con = list->first; con; con = con->next) {
@@ -916,6 +888,9 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
     case TC_OBJECT_TEXSPACE:
       special_aftertrans_update__object(C, t);
       break;
+    case TC_SCULPT:
+      special_aftertrans_update__sculpt(C, t);
+      break;
     case TC_SEQ_DATA:
       special_aftertrans_update__sequencer(C, t);
       break;
@@ -932,7 +907,6 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
     case TC_MESH_UV:
     case TC_PAINT_CURVE_VERTS:
     case TC_PARTICLE_VERTS:
-    case TC_SCULPT:
     case TC_NONE:
     default:
       break;
@@ -944,13 +918,13 @@ int special_transform_moving(TransInfo *t)
   if (t->spacetype == SPACE_SEQ) {
     return G_TRANSFORM_SEQ;
   }
-  else if (t->spacetype == SPACE_GRAPH) {
+  if (t->spacetype == SPACE_GRAPH) {
     return G_TRANSFORM_FCURVES;
   }
-  else if ((t->flag & T_EDIT) || (t->flag & T_POSE)) {
+  if ((t->flag & T_EDIT) || (t->flag & T_POSE)) {
     return G_TRANSFORM_EDIT;
   }
-  else if (t->flag & (T_OBJECT | T_TEXTURE)) {
+  if (t->flag & (T_OBJECT | T_TEXTURE)) {
     return G_TRANSFORM_OBJ;
   }
 
@@ -1013,7 +987,8 @@ void createTransData(bContext *C, TransInfo *t)
       convert_type = TC_CURSOR_VIEW3D;
     }
   }
-  else if ((t->options & CTX_SCULPT) && !(t->options & CTX_PAINT_CURVE)) {
+  else if (!(t->options & CTX_PAINT_CURVE) && (t->spacetype == SPACE_VIEW3D) && ob &&
+           (ob->mode == OB_MODE_SCULPT) && ob->sculpt) {
     convert_type = TC_SCULPT;
   }
   else if (t->options & CTX_TEXTURE) {
@@ -1166,21 +1141,6 @@ void createTransData(bContext *C, TransInfo *t)
     }
 
     t->flag |= T_OBJECT;
-
-    /* Check if we're transforming the camera from the camera */
-    if ((t->spacetype == SPACE_VIEW3D) && (t->region->regiontype == RGN_TYPE_WINDOW)) {
-      View3D *v3d = t->view;
-      RegionView3D *rv3d = t->region->regiondata;
-      if ((rv3d->persp == RV3D_CAMOB) && v3d->camera) {
-        /* we could have a flag to easily check an object is being transformed */
-        if (v3d->camera->id.tag & LIB_TAG_DOIT) {
-          t->flag |= T_CAMERA;
-        }
-      }
-      else if (v3d->ob_center && v3d->ob_center->id.tag & LIB_TAG_DOIT) {
-        t->flag |= T_CAMERA;
-      }
-    }
     convert_type = TC_OBJECT;
   }
 
@@ -1193,6 +1153,7 @@ void createTransData(bContext *C, TransInfo *t)
       break;
     case TC_POSE:
       createTransPose(t);
+      /* Disable PET, its not usable in pose mode yet [#32444] */
       init_prop_edit = false;
       break;
     case TC_ARMATURE_VERTS:
@@ -1242,6 +1203,20 @@ void createTransData(bContext *C, TransInfo *t)
       break;
     case TC_OBJECT:
       createTransObject(C, t);
+      /* Check if we're transforming the camera from the camera */
+      if ((t->spacetype == SPACE_VIEW3D) && (t->region->regiontype == RGN_TYPE_WINDOW)) {
+        View3D *v3d = t->view;
+        RegionView3D *rv3d = t->region->regiondata;
+        if ((rv3d->persp == RV3D_CAMOB) && v3d->camera) {
+          /* we could have a flag to easily check an object is being transformed */
+          if (v3d->camera->id.tag & LIB_TAG_DOIT) {
+            t->flag |= T_CAMERA;
+          }
+        }
+        else if (v3d->ob_center && v3d->ob_center->id.tag & LIB_TAG_DOIT) {
+          t->flag |= T_CAMERA;
+        }
+      }
       break;
     case TC_OBJECT_TEXSPACE:
       createTransTexspace(t);
@@ -1255,7 +1230,7 @@ void createTransData(bContext *C, TransInfo *t)
       createTransParticleVerts(C, t);
       break;
     case TC_SCULPT:
-      createTransSculpt(t);
+      createTransSculpt(C, t);
       init_prop_edit = false;
       break;
     case TC_SEQ_DATA:
@@ -1310,18 +1285,9 @@ void createTransData(bContext *C, TransInfo *t)
        * and are still added into transform data. */
       sort_trans_data_selected_first(t);
     }
-  }
 
-  /* exception... hackish, we want bonesize to use bone orientation matrix (ton) */
-  if (t->mode == TFM_BONESIZE) {
-    t->flag &= ~(T_EDIT | T_POINTS);
-    t->flag |= T_POSE;
-    t->obedit_type = -1;
-    t->data_type = TC_NONE;
-
-    FOREACH_TRANS_DATA_CONTAINER (t, tc) {
-      tc->poseobj = tc->obedit;
-      tc->obedit = NULL;
+    if (!init_prop_edit) {
+      t->flag &= ~T_PROP_EDIT_ALL;
     }
   }
 

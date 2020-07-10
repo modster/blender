@@ -1432,7 +1432,7 @@ static int separate_exec(bContext *C, wmOperator *op)
     /* 2. Duplicate the object and data. */
 
     /* Take into account user preferences for duplicating actions. */
-    short dupflag = (U.dupflag & USER_DUP_ACT);
+    const eDupli_ID_Flags dupflag = (U.dupflag & USER_DUP_ACT);
 
     newbase = ED_object_add_duplicate(bmain, scene, view_layer, oldbase, dupflag);
     DEG_relations_tag_update(bmain);
@@ -2436,12 +2436,12 @@ static void adduplicateflagNurb(
                       /* actvert in cyclicu selection */
                       break;
                     }
-                    else if (calc_duplicate_actvert(editnurb,
-                                                    newnurb,
-                                                    cu,
-                                                    starta,
-                                                    starta + newu,
-                                                    cu->actvert - starta + b * newnu->pntsu)) {
+                    if (calc_duplicate_actvert(editnurb,
+                                               newnurb,
+                                               cu,
+                                               starta,
+                                               starta + newu,
+                                               cu->actvert - starta + b * newnu->pntsu)) {
                       /* actvert in 'current' iteration selection */
                       break;
                     }
@@ -4544,15 +4544,13 @@ static int make_segment_exec(bContext *C, wmOperator *op)
         if (nu_select_num > 1) {
           break;
         }
-        else {
-          /* only 1 selected, not first or last, a little complex, but intuitive */
-          if (nu->pntsv == 1) {
-            if ((nu->bp->f1 & SELECT) || (nu->bp[nu->pntsu - 1].f1 & SELECT)) {
-              /* pass */
-            }
-            else {
-              break;
-            }
+        /* only 1 selected, not first or last, a little complex, but intuitive */
+        if (nu->pntsv == 1) {
+          if ((nu->bp->f1 & SELECT) || (nu->bp[nu->pntsu - 1].f1 & SELECT)) {
+            /* pass */
+          }
+          else {
+            break;
           }
         }
       }
@@ -5593,9 +5591,7 @@ static int add_vertex_exec(bContext *C, wmOperator *op)
 
     return OPERATOR_FINISHED;
   }
-  else {
-    return OPERATOR_CANCELLED;
-  }
+  return OPERATOR_CANCELLED;
 }
 
 static int add_vertex_invoke(bContext *C, wmOperator *op, const wmEvent *event)
@@ -6517,9 +6513,7 @@ static int curve_delete_exec(bContext *C, wmOperator *op)
   if (changed_multi) {
     return OPERATOR_FINISHED;
   }
-  else {
-    return OPERATOR_CANCELLED;
-  }
+  return OPERATOR_CANCELLED;
 }
 
 static const EnumPropertyItem curve_delete_type_items[] = {
@@ -6895,7 +6889,7 @@ void CURVE_OT_shade_flat(wmOperatorType *ot)
  * This is used externally, by #OBJECT_OT_join.
  * TODO: shape keys - as with meshes.
  */
-int join_curve_exec(bContext *C, wmOperator *op)
+int ED_curve_join_objects_exec(bContext *C, wmOperator *op)
 {
   Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);

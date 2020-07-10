@@ -24,14 +24,20 @@
 #include "BLI_utildefines.h"
 
 #include "DNA_brush_types.h"
+#include "DNA_constraint_types.h"
 #include "DNA_genfile.h"
 #include "DNA_gpencil_modifier_types.h"
+#include "DNA_gpencil_types.h"
+#include "DNA_lattice_types.h"
+#include "DNA_mesh_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
 #include "DNA_screen_types.h"
+#include "DNA_shader_fx_types.h"
 
 #include "BKE_collection.h"
 #include "BKE_colortools.h"
+#include "BKE_deform.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
 
@@ -255,18 +261,8 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
-  /**
-   * Versioning code until next subversion bump goes here.
-   *
-   * \note Be sure to check when bumping the version:
-   * - "versioning_userdef.c", #BLO_version_defaults_userpref_blend
-   * - "versioning_userdef.c", #do_versions_theme
-   *
-   * \note Keep this message at the bottom of the function.
-   */
-  {
-    /* Keep this block, even when empty. */
-
+  if (!MAIN_VERSION_ATLEAST(bmain, 290, 6)) {
+    /* Transition to saving expansion for all of a modifier's sub-panels. */
     if (!DNA_struct_elem_find(fd->filesdna, "ModifierData", "short", "ui_expand_flag")) {
       for (Object *object = bmain->objects.first; object != NULL; object = object->id.next) {
         LISTBASE_FOREACH (ModifierData *, md, &object->modifiers) {
@@ -279,5 +275,119 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
         }
       }
     }
+
+    /* EEVEE Motion blur new parameters. */
+    if (!DNA_struct_elem_find(fd->filesdna, "SceneEEVEE", "float", "motion_blur_depth_scale")) {
+      LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+        scene->eevee.motion_blur_depth_scale = 100.0f;
+        scene->eevee.motion_blur_max = 32;
+      }
+    }
+
+    if (!DNA_struct_elem_find(fd->filesdna, "SceneEEVEE", "int", "motion_blur_steps")) {
+      LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+        scene->eevee.motion_blur_steps = 1;
+      }
+    }
+
+    /* Transition to saving expansion for all of a constraint's sub-panels. */
+    if (!DNA_struct_elem_find(fd->filesdna, "bConstraint", "short", "ui_expand_flag")) {
+      for (Object *object = bmain->objects.first; object != NULL; object = object->id.next) {
+        LISTBASE_FOREACH (bConstraint *, con, &object->constraints) {
+          if (con->flag & CONSTRAINT_EXPAND_DEPRECATED) {
+            con->ui_expand_flag = 1;
+          }
+          else {
+            con->ui_expand_flag = 0;
+          }
+        }
+      }
+    }
+
+    /* Transition to saving expansion for all of grease pencil modifier's sub-panels. */
+    if (!DNA_struct_elem_find(fd->filesdna, "GpencilModifierData", "short", "ui_expand_flag")) {
+      for (Object *object = bmain->objects.first; object != NULL; object = object->id.next) {
+        LISTBASE_FOREACH (GpencilModifierData *, md, &object->greasepencil_modifiers) {
+          if (md->mode & eGpencilModifierMode_Expanded_DEPRECATED) {
+            md->ui_expand_flag = 1;
+          }
+          else {
+            md->ui_expand_flag = 0;
+          }
+        }
+      }
+    }
+
+    /* Transition to saving expansion for all of an effect's sub-panels. */
+    if (!DNA_struct_elem_find(fd->filesdna, "ShaderFxData", "short", "ui_expand_flag")) {
+      for (Object *object = bmain->objects.first; object != NULL; object = object->id.next) {
+        LISTBASE_FOREACH (ShaderFxData *, fx, &object->shader_fx) {
+          if (fx->mode & eShaderFxMode_Expanded_DEPRECATED) {
+            fx->ui_expand_flag = 1;
+          }
+          else {
+            fx->ui_expand_flag = 0;
+          }
+        }
+      }
+    }
+
+    /* Refactor bevel profile type to use an enum. */
+    if (!DNA_struct_elem_find(fd->filesdna, "BevelModifierData", "short", "profile_type")) {
+      for (Object *object = bmain->objects.first; object != NULL; object = object->id.next) {
+        LISTBASE_FOREACH (ModifierData *, md, &object->modifiers) {
+          if (md->type == eModifierType_Bevel) {
+            BevelModifierData *bmd = (BevelModifierData *)md;
+            bool use_custom_profile = bmd->flags & MOD_BEVEL_CUSTOM_PROFILE_DEPRECATED;
+            bmd->profile_type = use_custom_profile ? MOD_BEVEL_PROFILE_CUSTOM :
+                                                     MOD_BEVEL_PROFILE_SUPERELLIPSE;
+          }
+        }
+      }
+    }
+
+    /* Change ocean modifier values from [0, 10] to [0, 1] ranges. */
+    for (Object *object = bmain->objects.first; object != NULL; object = object->id.next) {
+      LISTBASE_FOREACH (ModifierData *, md, &object->modifiers) {
+        if (md->type == eModifierType_Ocean) {
+          OceanModifierData *omd = (OceanModifierData *)md;
+          omd->wave_alignment *= 0.1f;
+          omd->sharpen_peak_jonswap *= 0.1f;
+        }
+      }
+    }
+  }
+
+  /* Make sure that all weights of MDeformVert are sorted. */
+  if (!MAIN_VERSION_ATLEAST(bmain, 290, 7)) {
+    for (Mesh *mesh = bmain->meshes.first; mesh != NULL; mesh = mesh->id.next) {
+      BKE_defvert_array_sort_weights(mesh->dvert, mesh->totvert);
+    }
+    for (Lattice *lt = bmain->lattices.first; lt != NULL; lt = lt->id.next) {
+      const int totvert = lt->pntsu * lt->pntsv * lt->pntsw;
+      BKE_defvert_array_sort_weights(lt->dvert, totvert);
+    }
+    for (bGPdata *gp = bmain->gpencils.first; gp != NULL; gp = gp->id.next) {
+      LISTBASE_FOREACH (bGPDlayer *, layer, &gp->layers) {
+        LISTBASE_FOREACH (bGPDframe *, frame, &layer->frames) {
+          LISTBASE_FOREACH (bGPDstroke *, stroke, &frame->strokes) {
+            BKE_defvert_array_sort_weights(stroke->dvert, stroke->totpoints);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Versioning code until next subversion bump goes here.
+   *
+   * \note Be sure to check when bumping the version:
+   * - "versioning_userdef.c", #BLO_version_defaults_userpref_blend
+   * - "versioning_userdef.c", #do_versions_theme
+   *
+   * \note Keep this message at the bottom of the function.
+   */
+  {
+    /* Keep this block, even when empty. */
   }
 }

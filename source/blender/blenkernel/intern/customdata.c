@@ -47,6 +47,7 @@
 
 #include "BKE_customdata.h"
 #include "BKE_customdata_file.h"
+#include "BKE_deform.h"
 #include "BKE_main.h"
 #include "BKE_mesh_mapping.h"
 #include "BKE_mesh_remap.h"
@@ -300,7 +301,7 @@ static void layerInterp_mdeformvert(const void **sources,
 
   /* now we know how many unique deform weights there are, so realloc */
   if (dvert->dw && (dvert->totweight == totweight)) {
-    /* pass (fastpath if we don't need to realloc) */
+    /* pass (fast-path if we don't need to realloc). */
   }
   else {
     if (dvert->dw) {
@@ -320,6 +321,7 @@ static void layerInterp_mdeformvert(const void **sources,
       }
       dvert->dw[i] = node->dw;
     }
+    BKE_defvert_array_sort_weights(dvert, totweight);
   }
   else {
     memset(dvert, 0, sizeof(*dvert));
@@ -858,7 +860,6 @@ static void layerDoMinMax_mloopcol(const void *data, void *vmin, void *vmax)
   if (m->a < min->a) {
     min->a = m->a;
   }
-
   if (m->r > max->r) {
     max->r = m->r;
   }
@@ -1355,7 +1356,7 @@ static void layerCopyValue_propcol(const void *source,
     /* Modes that do a full copy or nothing. */
     if (ELEM(mixmode, CDT_MIX_REPLACE_ABOVE_THRESHOLD, CDT_MIX_REPLACE_BELOW_THRESHOLD)) {
       /* TODO: Check for a real valid way to get 'factor' value of our dest color? */
-      const float f = (m2->col[0] + m2->col[1] + m2->col[2]) / 3.0f;
+      const float f = (m2->color[0] + m2->color[1] + m2->color[2]) / 3.0f;
       if (mixmode == CDT_MIX_REPLACE_ABOVE_THRESHOLD && f < mixfactor) {
         return; /* Do Nothing! */
       }
@@ -1363,29 +1364,29 @@ static void layerCopyValue_propcol(const void *source,
         return; /* Do Nothing! */
       }
     }
-    copy_v3_v3(m2->col, m1->col);
+    copy_v3_v3(m2->color, m1->color);
   }
   else { /* Modes that support 'real' mix factor. */
     if (mixmode == CDT_MIX_MIX) {
-      blend_color_mix_float(tmp_col, m2->col, m1->col);
+      blend_color_mix_float(tmp_col, m2->color, m1->color);
     }
     else if (mixmode == CDT_MIX_ADD) {
-      blend_color_add_float(tmp_col, m2->col, m1->col);
+      blend_color_add_float(tmp_col, m2->color, m1->color);
     }
     else if (mixmode == CDT_MIX_SUB) {
-      blend_color_sub_float(tmp_col, m2->col, m1->col);
+      blend_color_sub_float(tmp_col, m2->color, m1->color);
     }
     else if (mixmode == CDT_MIX_MUL) {
-      blend_color_mul_float(tmp_col, m2->col, m1->col);
+      blend_color_mul_float(tmp_col, m2->color, m1->color);
     }
     else {
-      memcpy(tmp_col, m1->col, sizeof(tmp_col));
+      memcpy(tmp_col, m1->color, sizeof(tmp_col));
     }
-    blend_color_interpolate_float(m2->col, m2->col, tmp_col, mixfactor);
+    blend_color_interpolate_float(m2->color, m2->color, tmp_col, mixfactor);
 
-    copy_v3_v3(m2->col, m1->col);
+    copy_v3_v3(m2->color, m1->color);
   }
-  m2->col[3] = m1->col[3];
+  m2->color[3] = m1->color[3];
 }
 
 static bool layerEqual_propcol(const void *data1, const void *data2)
@@ -1394,7 +1395,7 @@ static bool layerEqual_propcol(const void *data1, const void *data2)
   float tot = 0;
 
   for (int i = 0; i < 4; i++) {
-    float c = (m1->col[i] - m2->col[i]);
+    float c = (m1->color[i] - m2->color[i]);
     tot += c * c;
   }
 
@@ -1404,29 +1405,29 @@ static bool layerEqual_propcol(const void *data1, const void *data2)
 static void layerMultiply_propcol(void *data, float fac)
 {
   MPropCol *m = data;
-  mul_v4_fl(m->col, fac);
+  mul_v4_fl(m->color, fac);
 }
 
 static void layerAdd_propcol(void *data1, const void *data2)
 {
   MPropCol *m = data1;
   const MPropCol *m2 = data2;
-  add_v4_v4(m->col, m2->col);
+  add_v4_v4(m->color, m2->color);
 }
 
 static void layerDoMinMax_propcol(const void *data, void *vmin, void *vmax)
 {
   const MPropCol *m = data;
   MPropCol *min = vmin, *max = vmax;
-  minmax_v4v4_v4(min->col, max->col, m->col);
+  minmax_v4v4_v4(min->color, max->color, m->color);
 }
 
 static void layerInitMinMax_propcol(void *vmin, void *vmax)
 {
   MPropCol *min = vmin, *max = vmax;
 
-  copy_v4_fl(min->col, FLT_MAX);
-  copy_v4_fl(max->col, FLT_MIN);
+  copy_v4_fl(min->color, FLT_MAX);
+  copy_v4_fl(max->color, FLT_MIN);
 }
 
 static void layerDefault_propcol(void *data, int count)
@@ -1436,7 +1437,7 @@ static void layerDefault_propcol(void *data, int count)
   MPropCol *pcol = (MPropCol *)data;
   int i;
   for (i = 0; i < count; i++) {
-    copy_v4_v4(pcol[i].col, default_propcol.col);
+    copy_v4_v4(pcol[i].color, default_propcol.color);
   }
 }
 
@@ -1450,14 +1451,14 @@ static void layerInterp_propcol(
     float weight = weights ? weights[i] : 1.0f;
     const MPropCol *src = sources[i];
     if (sub_weights) {
-      madd_v4_v4fl(col, src->col, (*sub_weight) * weight);
+      madd_v4_v4fl(col, src->color, (*sub_weight) * weight);
       sub_weight++;
     }
     else {
-      madd_v4_v4fl(col, src->col, weight);
+      madd_v4_v4fl(col, src->color, weight);
     }
   }
-  copy_v4_v4(mc->col, col);
+  copy_v4_v4(mc->color, col);
 }
 
 static int layerMaxNum_propcol(void)
@@ -1773,7 +1774,7 @@ static const LayerTypeInfo LAYERTYPEINFO[CD_NUMTYPES] = {
     /* 42: CD_SCULPT_FACE_SETS */
     {sizeof(int), "", 0, NULL, NULL, NULL, NULL, NULL, NULL},
     /* 43: CD_LOCATION */
-    {sizeof(float[3]), "vec3f", 1, NULL, NULL, NULL, NULL, NULL, NULL},
+    {sizeof(float[3]), "vec3f", 1, "Location", NULL, NULL, NULL, NULL, NULL},
     /* 44: CD_RADIUS */
     {sizeof(float), "MFloatProperty", 1, NULL, NULL, NULL, NULL, NULL, NULL},
     /* 45: CD_HAIRCURVE */
@@ -1784,7 +1785,7 @@ static const LayerTypeInfo LAYERTYPEINFO[CD_NUMTYPES] = {
     {sizeof(MPropCol),
      "MPropCol",
      1,
-     N_("Col"),
+     N_("Color"),
      NULL,
      NULL,
      layerInterp_propcol,
@@ -1871,7 +1872,7 @@ const CustomData_MeshMasks CD_MASK_BAREMESH_ORIGINDEX = {
 };
 const CustomData_MeshMasks CD_MASK_MESH = {
     .vmask = (CD_MASK_MVERT | CD_MASK_MDEFORMVERT | CD_MASK_MVERT_SKIN | CD_MASK_PAINT_MASK |
-              CD_MASK_GENERIC_DATA),
+              CD_MASK_GENERIC_DATA | CD_MASK_PROP_COLOR),
     .emask = (CD_MASK_MEDGE | CD_MASK_FREESTYLE_EDGE | CD_MASK_GENERIC_DATA),
     .fmask = 0,
     .lmask = (CD_MASK_MLOOP | CD_MASK_MDISPS | CD_MASK_MLOOPUV | CD_MASK_MLOOPCOL |
@@ -1881,7 +1882,7 @@ const CustomData_MeshMasks CD_MASK_MESH = {
 };
 const CustomData_MeshMasks CD_MASK_EDITMESH = {
     .vmask = (CD_MASK_MDEFORMVERT | CD_MASK_PAINT_MASK | CD_MASK_MVERT_SKIN | CD_MASK_SHAPEKEY |
-              CD_MASK_SHAPE_KEYINDEX | CD_MASK_GENERIC_DATA),
+              CD_MASK_SHAPE_KEYINDEX | CD_MASK_GENERIC_DATA | CD_MASK_PROP_COLOR),
     .emask = (CD_MASK_GENERIC_DATA),
     .fmask = 0,
     .lmask = (CD_MASK_MDISPS | CD_MASK_MLOOPUV | CD_MASK_MLOOPCOL | CD_MASK_CUSTOMLOOPNORMAL |
@@ -1890,7 +1891,7 @@ const CustomData_MeshMasks CD_MASK_EDITMESH = {
 };
 const CustomData_MeshMasks CD_MASK_DERIVEDMESH = {
     .vmask = (CD_MASK_ORIGINDEX | CD_MASK_MDEFORMVERT | CD_MASK_SHAPEKEY | CD_MASK_MVERT_SKIN |
-              CD_MASK_ORCO | CD_MASK_CLOTH_ORCO | CD_MASK_GENERIC_DATA),
+              CD_MASK_ORCO | CD_MASK_CLOTH_ORCO | CD_MASK_GENERIC_DATA | CD_MASK_PROP_COLOR),
     .emask = (CD_MASK_ORIGINDEX | CD_MASK_FREESTYLE_EDGE | CD_MASK_GENERIC_DATA),
     .fmask = (CD_MASK_ORIGINDEX | CD_MASK_ORIGSPACE | CD_MASK_PREVIEW_MCOL | CD_MASK_TANGENT),
     .lmask = (CD_MASK_MLOOPUV | CD_MASK_MLOOPCOL | CD_MASK_CUSTOMLOOPNORMAL |
@@ -1901,7 +1902,8 @@ const CustomData_MeshMasks CD_MASK_DERIVEDMESH = {
 };
 const CustomData_MeshMasks CD_MASK_BMESH = {
     .vmask = (CD_MASK_MDEFORMVERT | CD_MASK_BWEIGHT | CD_MASK_MVERT_SKIN | CD_MASK_SHAPEKEY |
-              CD_MASK_SHAPE_KEYINDEX | CD_MASK_PAINT_MASK | CD_MASK_GENERIC_DATA),
+              CD_MASK_SHAPE_KEYINDEX | CD_MASK_PAINT_MASK | CD_MASK_GENERIC_DATA |
+              CD_MASK_PROP_COLOR),
     .emask = (CD_MASK_BWEIGHT | CD_MASK_CREASE | CD_MASK_FREESTYLE_EDGE | CD_MASK_GENERIC_DATA),
     .fmask = 0,
     .lmask = (CD_MASK_MDISPS | CD_MASK_MLOOPUV | CD_MASK_MLOOPCOL | CD_MASK_CUSTOMLOOPNORMAL |
@@ -1925,7 +1927,7 @@ const CustomData_MeshMasks CD_MASK_EVERYTHING = {
     .vmask = (CD_MASK_MVERT | CD_MASK_BM_ELEM_PYPTR | CD_MASK_ORIGINDEX | CD_MASK_NORMAL |
               CD_MASK_MDEFORMVERT | CD_MASK_BWEIGHT | CD_MASK_MVERT_SKIN | CD_MASK_ORCO |
               CD_MASK_CLOTH_ORCO | CD_MASK_SHAPEKEY | CD_MASK_SHAPE_KEYINDEX | CD_MASK_PAINT_MASK |
-              CD_MASK_GENERIC_DATA),
+              CD_MASK_GENERIC_DATA | CD_MASK_PROP_COLOR),
     .emask = (CD_MASK_MEDGE | CD_MASK_BM_ELEM_PYPTR | CD_MASK_ORIGINDEX | CD_MASK_BWEIGHT |
               CD_MASK_CREASE | CD_MASK_FREESTYLE_EDGE | CD_MASK_GENERIC_DATA),
     .fmask = (CD_MASK_MFACE | CD_MASK_ORIGINDEX | CD_MASK_NORMAL | CD_MASK_MTFACE | CD_MASK_MCOL |

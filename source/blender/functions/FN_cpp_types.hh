@@ -18,7 +18,7 @@
 #define __FN_CPP_TYPES_HH__
 
 /** \file
- * \ingroup functions
+ * \ingroup fn
  *
  * This header provides convenient access to CPPType instances for some core types like integer
  * types.
@@ -26,7 +26,7 @@
 
 #include "FN_cpp_type.hh"
 
-namespace FN {
+namespace blender::fn {
 
 extern const CPPType &CPPType_bool;
 
@@ -43,6 +43,6 @@ extern const CPPType &CPPType_Color4b;
 
 extern const CPPType &CPPType_string;
 
-}  // namespace FN
+}  // namespace blender::fn
 
 #endif /* __FN_CPP_TYPES_HH__ */

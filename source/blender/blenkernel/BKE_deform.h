@@ -40,18 +40,21 @@ struct bDeformGroup;
 struct bDeformGroup *BKE_object_defgroup_new(struct Object *ob, const char *name);
 void BKE_defgroup_copy_list(struct ListBase *lb1, const struct ListBase *lb2);
 struct bDeformGroup *BKE_defgroup_duplicate(const struct bDeformGroup *ingroup);
-struct bDeformGroup *BKE_object_defgroup_find_name(struct Object *ob, const char *name);
-int *BKE_object_defgroup_flip_map(struct Object *ob, int *flip_map_len, const bool use_default);
-int *BKE_object_defgroup_flip_map_single(struct Object *ob,
+struct bDeformGroup *BKE_object_defgroup_find_name(const struct Object *ob, const char *name);
+int *BKE_object_defgroup_flip_map(const struct Object *ob,
+                                  int *flip_map_len,
+                                  const bool use_default);
+int *BKE_object_defgroup_flip_map_single(const struct Object *ob,
                                          int *flip_map_len,
                                          const bool use_default,
                                          int defgroup);
-int BKE_object_defgroup_flip_index(struct Object *ob, int index, const bool use_default);
-int BKE_object_defgroup_name_index(struct Object *ob, const char *name);
+int BKE_object_defgroup_flip_index(const struct Object *ob, int index, const bool use_default);
+int BKE_object_defgroup_name_index(const struct Object *ob, const char *name);
 void BKE_object_defgroup_unique_name(struct bDeformGroup *dg, struct Object *ob);
 
 struct MDeformWeight *BKE_defvert_find_index(const struct MDeformVert *dv, const int defgroup);
 struct MDeformWeight *BKE_defvert_ensure_index(struct MDeformVert *dv, const int defgroup);
+void BKE_defvert_array_sort_weights(struct MDeformVert *dv, const int num_verts);
 void BKE_defvert_add_index_notest(struct MDeformVert *dv, int defgroup, const float weight);
 void BKE_defvert_remove_group(struct MDeformVert *dvert, struct MDeformWeight *dw);
 void BKE_defvert_clear(struct MDeformVert *dvert);
@@ -160,6 +163,16 @@ void BKE_defvert_extract_vgroup_to_polyweights(struct MDeformVert *dvert,
                                                const bool invert_vgroup);
 
 void BKE_defvert_weight_to_rgb(float r_rgb[3], const float weight);
+
+#ifndef NDEBUG
+bool BKE_defvert_is_sorted_for_assert(const struct MDeformVert *dv);
+#  define BKE_DEFVERT_IS_SORTED_ASSERT(dv) BLI_assert(BKE_defvert_is_sorted_for_assert(dv))
+#else
+#  define BKE_DEFVERT_IS_SORTED_ASSERT(dv) \
+    if (false) { \
+      (void)(dv); \
+    }
+#endif
 
 #ifdef __cplusplus
 }

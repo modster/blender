@@ -50,17 +50,12 @@
 #include "WM_types.h"
 
 #include "RNA_define.h"
-#include "RNA_enum_types.h"
 
 /* For menu, popup, icons, etc. */
-
-#include "ED_anim_api.h"
 #include "ED_numinput.h"
 #include "ED_outliner.h"
 #include "ED_screen.h"
 #include "ED_sequencer.h"
-#include "ED_space_api.h"
-#include "ED_transform.h"
 
 #include "UI_interface.h"
 #include "UI_view2d.h"
@@ -229,11 +224,11 @@ static void seq_proxy_build_job(const bContext *C, ReportList *reports)
 
     selected = true;
     if (!(seq->flag & SEQ_USE_PROXY)) {
-      BKE_reportf(reports, RPT_WARNING, "Proxy is not enabled for %s, skipping.", seq->name);
+      BKE_reportf(reports, RPT_WARNING, "Proxy is not enabled for %s, skipping", seq->name);
       continue;
     }
-    else if (seq->strip->proxy->build_size_flags == 0) {
-      BKE_reportf(reports, RPT_WARNING, "Resolution is not selected for %s, skipping.", seq->name);
+    if (seq->strip->proxy->build_size_flags == 0) {
+      BKE_reportf(reports, RPT_WARNING, "Resolution is not selected for %s, skipping", seq->name);
       continue;
     }
 
@@ -241,13 +236,13 @@ static void seq_proxy_build_job(const bContext *C, ReportList *reports)
         pj->main, pj->depsgraph, pj->scene, seq, file_list, &pj->queue);
 
     if (!success && (seq->strip->proxy->build_flags & SEQ_PROXY_SKIP_EXISTING) != 0) {
-      BKE_reportf(reports, RPT_WARNING, "Overwrite is not checked for %s, skipping.", seq->name);
+      BKE_reportf(reports, RPT_WARNING, "Overwrite is not checked for %s, skipping", seq->name);
     }
   }
   SEQ_END;
 
   if (!selected) {
-    BKE_reportf(reports, RPT_WARNING, "Select movie or image strips.");
+    BKE_reportf(reports, RPT_WARNING, "Select movie or image strips");
     return;
   }
 
@@ -397,7 +392,7 @@ static Sequence *find_next_prev_sequence(Scene *scene, Sequence *test, int lr, i
         best_seq = seq;
         break;
       }
-      else if (dist < best_dist) {
+      if (dist < best_dist) {
         best_dist = dist;
         best_seq = seq;
       }
@@ -480,16 +475,16 @@ static bool seq_is_predecessor(Sequence *pred, Sequence *seq)
   if (pred == seq) {
     return 0;
   }
-  else if (seq_is_parent(pred, seq)) {
+  if (seq_is_parent(pred, seq)) {
     return 1;
   }
-  else if (pred->seq1 && seq_is_predecessor(pred->seq1, seq)) {
+  if (pred->seq1 && seq_is_predecessor(pred->seq1, seq)) {
     return 1;
   }
-  else if (pred->seq2 && seq_is_predecessor(pred->seq2, seq)) {
+  if (pred->seq2 && seq_is_predecessor(pred->seq2, seq)) {
     return 1;
   }
-  else if (pred->seq3 && seq_is_predecessor(pred->seq3, seq)) {
+  if (pred->seq3 && seq_is_predecessor(pred->seq3, seq)) {
     return 1;
   }
 
@@ -678,6 +673,14 @@ int seq_effect_find_selected(Scene *scene,
   *r_selseq2 = seq2;
   *r_selseq3 = seq3;
 
+  /* TODO(Richard): This function needs some refactoring, this is just quick hack for T73828. */
+  if (BKE_sequence_effect_get_num_inputs(type) < 3) {
+    *r_selseq3 = NULL;
+  }
+  if (BKE_sequence_effect_get_num_inputs(type) < 2) {
+    *r_selseq2 = NULL;
+  }
+
   return 1;
 }
 
@@ -697,10 +700,10 @@ static Sequence *del_seq_find_replace_recurs(Scene *scene, Sequence *seq)
   if (!seq) {
     return NULL;
   }
-  else if (!(seq->type & SEQ_TYPE_EFFECT)) {
+  if (!(seq->type & SEQ_TYPE_EFFECT)) {
     return ((seq->flag & SELECT) ? NULL : seq);
   }
-  else if (!(seq->flag & SELECT)) {
+  if (!(seq->flag & SELECT)) {
     /* Try to find replacement for effect inputs. */
     seq1 = del_seq_find_replace_recurs(scene, seq->seq1);
     seq2 = del_seq_find_replace_recurs(scene, seq->seq2);
@@ -731,13 +734,9 @@ static Sequence *del_seq_find_replace_recurs(Scene *scene, Sequence *seq)
     if ((seq3 = del_seq_find_replace_recurs(scene, seq->seq3))) {
       return seq3;
     }
-    else {
-      return NULL;
-    }
+    return NULL;
   }
-  else {
-    return seq;
-  }
+  return seq;
 }
 
 static void del_seq_clear_modifiers_recurs(Scene *scene, Sequence *deleting_sequence)
@@ -1408,14 +1407,21 @@ static int sequencer_snap_exec(bContext *C, wmOperator *op)
         BKE_sequence_base_shuffle(ed->seqbasep, seq, scene);
       }
     }
-    else if (seq->type & SEQ_TYPE_EFFECT) {
+  }
+
+  /* Recalculate bounds of effect strips. */
+  for (seq = ed->seqbasep->first; seq; seq = seq->next) {
+    if (seq->type & SEQ_TYPE_EFFECT) {
       if (seq->seq1 && (seq->seq1->flag & SELECT)) {
+        BKE_sequencer_offset_animdata(scene, seq, (snap_frame - seq->startdisp));
         BKE_sequence_calc(scene, seq);
       }
       else if (seq->seq2 && (seq->seq2->flag & SELECT)) {
+        BKE_sequencer_offset_animdata(scene, seq, (snap_frame - seq->startdisp));
         BKE_sequence_calc(scene, seq);
       }
       else if (seq->seq3 && (seq->seq3->flag & SELECT)) {
+        BKE_sequencer_offset_animdata(scene, seq, (snap_frame - seq->startdisp));
         BKE_sequence_calc(scene, seq);
       }
     }
@@ -1734,9 +1740,7 @@ static int sequencer_slip_exec(bContext *C, wmOperator *op)
     DEG_id_tag_update(&scene->id, ID_RECALC_SEQUENCER_STRIPS);
     return OPERATOR_FINISHED;
   }
-  else {
-    return OPERATOR_CANCELLED;
-  }
+  return OPERATOR_CANCELLED;
 }
 
 static void sequencer_slip_update_header(Scene *scene, ScrArea *area, SlipData *data, int offset)
@@ -2223,6 +2227,11 @@ static int sequencer_reassign_inputs_exec(bContext *C, wmOperator *op)
   Sequence *seq1, *seq2, *seq3, *last_seq = BKE_sequencer_active_get(scene);
   const char *error_msg;
 
+  if (BKE_sequence_effect_get_num_inputs(last_seq->type) != 0) {
+    BKE_report(op->reports, RPT_ERROR, "Cannot reassign inputs: strip has no inputs");
+    return OPERATOR_CANCELLED;
+  }
+
   if (!seq_effect_find_selected(
           scene, last_seq, last_seq->type, &seq1, &seq2, &seq3, &error_msg)) {
     BKE_report(op->reports, RPT_ERROR, error_msg);
@@ -2323,6 +2332,11 @@ void SEQUENCER_OT_swap_inputs(struct wmOperatorType *ot)
 /** \name Split Strips Operator
  * \{ */
 
+enum {
+  SEQ_SPLIT_SOFT,
+  SEQ_SPLIT_HARD,
+};
+
 static const EnumPropertyItem prop_split_types[] = {
     {SEQ_SPLIT_SOFT, "SOFT", 0, "Soft", ""},
     {SEQ_SPLIT_HARD, "HARD", 0, "Hard", ""},
@@ -2413,10 +2427,9 @@ static int sequencer_split_exec(bContext *C, wmOperator *op)
     WM_event_add_notifier(C, NC_SCENE | ND_SEQUENCER, scene);
     return OPERATOR_FINISHED;
   }
-  else {
-    /* Passthrough to selection if used as tool. */
-    return OPERATOR_CANCELLED | OPERATOR_PASS_THROUGH;
-  }
+
+  /* Passthrough to selection if used as tool. */
+  return OPERATOR_CANCELLED | OPERATOR_PASS_THROUGH;
 }
 
 static int sequencer_split_invoke(bContext *C, wmOperator *op, const wmEvent *event)
@@ -3010,18 +3023,16 @@ static int seq_depends_on_meta(Sequence *seq, Sequence *seqm)
   if (seq == seqm) {
     return 1;
   }
-  else if (seq->seq1 && seq_depends_on_meta(seq->seq1, seqm)) {
+  if (seq->seq1 && seq_depends_on_meta(seq->seq1, seqm)) {
     return 1;
   }
-  else if (seq->seq2 && seq_depends_on_meta(seq->seq2, seqm)) {
+  if (seq->seq2 && seq_depends_on_meta(seq->seq2, seqm)) {
     return 1;
   }
-  else if (seq->seq3 && seq_depends_on_meta(seq->seq3, seqm)) {
+  if (seq->seq3 && seq_depends_on_meta(seq->seq3, seqm)) {
     return 1;
   }
-  else {
-    return 0;
-  }
+  return 0;
 }
 
 static int sequencer_meta_separate_exec(bContext *C, wmOperator *UNUSED(op))
@@ -3087,321 +3098,6 @@ void SEQUENCER_OT_meta_separate(wmOperatorType *ot)
 
   /* Flags. */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Sequencer Frame All Operator
- * \{ */
-
-static int sequencer_view_all_exec(bContext *C, wmOperator *op)
-{
-  ARegion *region = CTX_wm_region(C);
-  rctf box;
-
-  const int smooth_viewtx = WM_operator_smooth_viewtx_get(op);
-
-  boundbox_seq(CTX_data_scene(C), &box);
-  UI_view2d_smooth_view(C, region, &box, smooth_viewtx);
-  return OPERATOR_FINISHED;
-}
-
-void SEQUENCER_OT_view_all(wmOperatorType *ot)
-{
-  /* Identifiers. */
-  ot->name = "Frame All";
-  ot->idname = "SEQUENCER_OT_view_all";
-  ot->description = "View all the strips in the sequencer";
-
-  /* Api callbacks. */
-  ot->exec = sequencer_view_all_exec;
-  ot->poll = ED_operator_sequencer_active;
-
-  /* Flags. */
-  ot->flag = OPTYPE_REGISTER;
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Go to Current Frame Operator
- * \{ */
-
-static int sequencer_view_frame_exec(bContext *C, wmOperator *op)
-{
-  const int smooth_viewtx = WM_operator_smooth_viewtx_get(op);
-  ANIM_center_frame(C, smooth_viewtx);
-
-  return OPERATOR_FINISHED;
-}
-
-void SEQUENCER_OT_view_frame(wmOperatorType *ot)
-{
-  /* Identifiers. */
-  ot->name = "Go to Current Frame";
-  ot->idname = "SEQUENCER_OT_view_frame";
-  ot->description = "Move the view to the current frame";
-
-  /* Api callbacks. */
-  ot->exec = sequencer_view_frame_exec;
-  ot->poll = ED_operator_sequencer_active;
-
-  /* Flags. */
-  ot->flag = 0;
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Preview Frame All Operator
- * \{ */
-
-static int sequencer_view_all_preview_exec(bContext *C, wmOperator *UNUSED(op))
-{
-  bScreen *screen = CTX_wm_screen(C);
-  ScrArea *area = CTX_wm_area(C);
-#if 0
-  ARegion *region = CTX_wm_region(C);
-  SpaceSeq *sseq = area->spacedata.first;
-  Scene *scene = CTX_data_scene(C);
-#endif
-  View2D *v2d = UI_view2d_fromcontext(C);
-
-  v2d->cur = v2d->tot;
-  UI_view2d_curRect_validate(v2d);
-  UI_view2d_sync(screen, area, v2d, V2D_LOCK_COPY);
-
-#if 0
-  /* Like zooming on an image view. */
-  float zoomX, zoomY;
-  int width, height, imgwidth, imgheight;
-
-  width = region->winx;
-  height = region->winy;
-
-  seq_reset_imageofs(sseq);
-
-  imgwidth = (scene->r.size * scene->r.xsch) / 100;
-  imgheight = (scene->r.size * scene->r.ysch) / 100;
-
-  /* Apply aspect, doesn't need to be that accurate. */
-  imgwidth = (int)(imgwidth * (scene->r.xasp / scene->r.yasp));
-
-  if (((imgwidth >= width) || (imgheight >= height)) && ((width > 0) && (height > 0))) {
-    /* Find the zoom value that will fit the image in the image space. */
-    zoomX = ((float)width) / ((float)imgwidth);
-    zoomY = ((float)height) / ((float)imgheight);
-    sseq->zoom = (zoomX < zoomY) ? zoomX : zoomY;
-
-    sseq->zoom = 1.0f / power_of_2(1 / min_ff(zoomX, zoomY));
-  }
-  else {
-    sseq->zoom = 1.0f;
-  }
-#endif
-
-  ED_area_tag_redraw(CTX_wm_area(C));
-  return OPERATOR_FINISHED;
-}
-
-void SEQUENCER_OT_view_all_preview(wmOperatorType *ot)
-{
-  /* Identifiers. */
-  ot->name = "Frame All";
-  ot->idname = "SEQUENCER_OT_view_all_preview";
-  ot->description = "Zoom preview to fit in the area";
-
-  /* Api callbacks. */
-  ot->exec = sequencer_view_all_preview_exec;
-  ot->poll = ED_operator_sequencer_active;
-
-  /* Flags. */
-  ot->flag = OPTYPE_REGISTER;
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Sequencer View Zoom Ratio Operator
- * \{ */
-
-static int sequencer_view_zoom_ratio_exec(bContext *C, wmOperator *op)
-{
-  RenderData *rd = &CTX_data_scene(C)->r;
-  View2D *v2d = UI_view2d_fromcontext(C);
-
-  float ratio = RNA_float_get(op->ptr, "ratio");
-
-  float winx = (int)(rd->size * rd->xsch) / 100;
-  float winy = (int)(rd->size * rd->ysch) / 100;
-
-  float facx = BLI_rcti_size_x(&v2d->mask) / winx;
-  float facy = BLI_rcti_size_y(&v2d->mask) / winy;
-
-  BLI_rctf_resize(&v2d->cur, ceilf(winx * facx / ratio + 0.5f), ceilf(winy * facy / ratio + 0.5f));
-
-  ED_region_tag_redraw(CTX_wm_region(C));
-
-  return OPERATOR_FINISHED;
-}
-
-void SEQUENCER_OT_view_zoom_ratio(wmOperatorType *ot)
-{
-  /* Identifiers. */
-  ot->name = "Sequencer View Zoom Ratio";
-  ot->idname = "SEQUENCER_OT_view_zoom_ratio";
-  ot->description = "Change zoom ratio of sequencer preview";
-
-  /* Api callbacks. */
-  ot->exec = sequencer_view_zoom_ratio_exec;
-  ot->poll = ED_operator_sequencer_active;
-
-  /* Properties. */
-  RNA_def_float(ot->srna,
-                "ratio",
-                1.0f,
-                -FLT_MAX,
-                FLT_MAX,
-                "Ratio",
-                "Zoom ratio, 1.0 is 1:1, higher is zoomed in, lower is zoomed out",
-                -FLT_MAX,
-                FLT_MAX);
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name View Toggle Operator
- * \{ */
-
-#if 0
-static const EnumPropertyItem view_type_items[] = {
-    {SEQ_VIEW_SEQUENCE, "SEQUENCER", ICON_SEQ_SEQUENCER, "Sequencer", ""},
-    {SEQ_VIEW_PREVIEW, "PREVIEW", ICON_SEQ_PREVIEW, "Image Preview", ""},
-    {SEQ_VIEW_SEQUENCE_PREVIEW,
-     "SEQUENCER_PREVIEW",
-     ICON_SEQ_SEQUENCER,
-     "Sequencer and Image Preview",
-     ""},
-    {0, NULL, 0, NULL, NULL},
-};
-#endif
-
-static int sequencer_view_toggle_exec(bContext *C, wmOperator *UNUSED(op))
-{
-  SpaceSeq *sseq = (SpaceSeq *)CTX_wm_space_data(C);
-
-  sseq->view++;
-  if (sseq->view > SEQ_VIEW_SEQUENCE_PREVIEW) {
-    sseq->view = SEQ_VIEW_SEQUENCE;
-  }
-
-  ED_area_tag_refresh(CTX_wm_area(C));
-
-  return OPERATOR_FINISHED;
-}
-
-void SEQUENCER_OT_view_toggle(wmOperatorType *ot)
-{
-  /* Identifiers. */
-  ot->name = "View Toggle";
-  ot->idname = "SEQUENCER_OT_view_toggle";
-  ot->description = "Toggle between sequencer views (sequence, preview, both)";
-
-  /* Api callbacks. */
-  ot->exec = sequencer_view_toggle_exec;
-  ot->poll = ED_operator_sequencer_active;
-
-  /* Flags. */
-  ot->flag = OPTYPE_REGISTER;
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Frame Selected Operator
- * \{ */
-
-static int sequencer_view_selected_exec(bContext *C, wmOperator *op)
-{
-  Scene *scene = CTX_data_scene(C);
-  View2D *v2d = UI_view2d_fromcontext(C);
-  ARegion *region = CTX_wm_region(C);
-  Editing *ed = BKE_sequencer_editing_get(scene, false);
-  Sequence *last_seq = BKE_sequencer_active_get(scene);
-  Sequence *seq;
-  rctf cur_new = v2d->cur;
-
-  int xmin = MAXFRAME * 2;
-  int xmax = -MAXFRAME * 2;
-  int ymin = MAXSEQ + 1;
-  int ymax = 0;
-  int orig_height;
-  int ymid;
-  int ymargin = 1;
-  int xmargin = FPS;
-
-  if (ed == NULL) {
-    return OPERATOR_CANCELLED;
-  }
-
-  for (seq = ed->seqbasep->first; seq; seq = seq->next) {
-    if ((seq->flag & SELECT) || (seq == last_seq)) {
-      xmin = min_ii(xmin, seq->startdisp);
-      xmax = max_ii(xmax, seq->enddisp);
-
-      ymin = min_ii(ymin, seq->machine);
-      ymax = max_ii(ymax, seq->machine);
-    }
-  }
-
-  if (ymax != 0) {
-    const int smooth_viewtx = WM_operator_smooth_viewtx_get(op);
-
-    xmax += xmargin;
-    xmin -= xmargin;
-    ymax += ymargin;
-    ymin -= ymargin;
-
-    orig_height = BLI_rctf_size_y(&cur_new);
-
-    cur_new.xmin = xmin;
-    cur_new.xmax = xmax;
-
-    cur_new.ymin = ymin;
-    cur_new.ymax = ymax;
-
-    /* Only zoom out vertically. */
-    if (orig_height > BLI_rctf_size_y(&cur_new)) {
-      ymid = BLI_rctf_cent_y(&cur_new);
-
-      cur_new.ymin = ymid - (orig_height / 2);
-      cur_new.ymax = ymid + (orig_height / 2);
-    }
-
-    UI_view2d_smooth_view(C, region, &cur_new, smooth_viewtx);
-
-    return OPERATOR_FINISHED;
-  }
-  else {
-    return OPERATOR_CANCELLED;
-  }
-}
-
-void SEQUENCER_OT_view_selected(wmOperatorType *ot)
-{
-  /* Identifiers. */
-  ot->name = "Frame Selected";
-  ot->idname = "SEQUENCER_OT_view_selected";
-  ot->description = "Zoom the sequencer on the selected strips";
-
-  /* Api callbacks. */
-  ot->exec = sequencer_view_selected_exec;
-  ot->poll = ED_operator_sequencer_active;
-
-  /* Flags. */
-  ot->flag = OPTYPE_REGISTER;
 }
 
 /** \} */
@@ -3748,6 +3444,7 @@ static int sequencer_paste_exec(bContext *C, wmOperator *UNUSED(op))
    * on the actual data-blocks. */
   BKE_sequencer_base_clipboard_pointers_restore(&seqbase_clipboard, bmain);
   BKE_sequence_base_dupli_recursive(scene, scene, &nseqbase, &seqbase_clipboard, 0, 0);
+  BKE_sequencer_base_clipboard_pointers_store(bmain, &seqbase_clipboard);
 
   iseq_first = nseqbase.first;
 
@@ -3766,6 +3463,7 @@ static int sequencer_paste_exec(bContext *C, wmOperator *UNUSED(op))
   }
 
   DEG_id_tag_update(&scene->id, ID_RECALC_SEQUENCER_STRIPS);
+  DEG_relations_tag_update(bmain);
   WM_event_add_notifier(C, NC_SCENE | ND_SEQUENCER, scene);
   ED_outliner_select_sync_from_sequence_tag(C);
 
@@ -3852,67 +3550,6 @@ void SEQUENCER_OT_swap_data(wmOperatorType *ot)
 
   /* Flags. */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Border Offset View Operator
- * \{ */
-
-static int view_ghost_border_exec(bContext *C, wmOperator *op)
-{
-  Scene *scene = CTX_data_scene(C);
-  View2D *v2d = UI_view2d_fromcontext(C);
-
-  rctf rect;
-
-  /* Convert coordinates of rect to 'tot' rect coordinates. */
-  WM_operator_properties_border_to_rctf(op, &rect);
-  UI_view2d_region_to_view_rctf(v2d, &rect, &rect);
-
-  rect.xmin /= fabsf(BLI_rctf_size_x(&v2d->tot));
-  rect.ymin /= fabsf(BLI_rctf_size_y(&v2d->tot));
-
-  rect.xmax /= fabsf(BLI_rctf_size_x(&v2d->tot));
-  rect.ymax /= fabsf(BLI_rctf_size_y(&v2d->tot));
-
-  rect.xmin += 0.5f;
-  rect.xmax += 0.5f;
-  rect.ymin += 0.5f;
-  rect.ymax += 0.5f;
-
-  CLAMP(rect.xmin, 0.0f, 1.0f);
-  CLAMP(rect.ymin, 0.0f, 1.0f);
-  CLAMP(rect.xmax, 0.0f, 1.0f);
-  CLAMP(rect.ymax, 0.0f, 1.0f);
-
-  scene->ed->over_border = rect;
-
-  WM_event_add_notifier(C, NC_SCENE | ND_SEQUENCER, scene);
-
-  return OPERATOR_FINISHED;
-}
-
-void SEQUENCER_OT_view_ghost_border(wmOperatorType *ot)
-{
-  /* Identifiers. */
-  ot->name = "Border Offset View";
-  ot->idname = "SEQUENCER_OT_view_ghost_border";
-  ot->description = "Set the boundaries of the border used for offset-view";
-
-  /* Api callbacks. */
-  ot->invoke = WM_gesture_box_invoke;
-  ot->exec = view_ghost_border_exec;
-  ot->modal = WM_gesture_box_modal;
-  ot->poll = sequencer_view_preview_poll;
-  ot->cancel = WM_gesture_box_cancel;
-
-  /* Flags. */
-  ot->flag = 0;
-
-  /* Properties. */
-  WM_operator_properties_gesture_box(ot);
 }
 
 /** \} */
@@ -4126,9 +3763,8 @@ static int sequencer_change_effect_input_exec(bContext *C, wmOperator *op)
     BKE_report(op->reports, RPT_ERROR, "One of the effect inputs is unset, cannot swap");
     return OPERATOR_CANCELLED;
   }
-  else {
-    SWAP(Sequence *, *seq_1, *seq_2);
-  }
+
+  SWAP(Sequence *, *seq_1, *seq_2);
 
   BKE_sequencer_update_changed_seq_and_deps(scene, seq, 0, 1);
 
@@ -4183,15 +3819,14 @@ static int sequencer_change_effect_type_exec(bContext *C, wmOperator *op)
     BKE_report(op->reports, RPT_ERROR, "New effect needs more input strips");
     return OPERATOR_CANCELLED;
   }
-  else {
-    sh = BKE_sequence_get_effect(seq);
-    sh.free(seq, true);
 
-    seq->type = new_type;
+  sh = BKE_sequence_get_effect(seq);
+  sh.free(seq, true);
 
-    sh = BKE_sequence_get_effect(seq);
-    sh.init(seq);
-  }
+  seq->type = new_type;
+
+  sh = BKE_sequence_get_effect(seq);
+  sh.init(seq);
 
   BKE_sequencer_update_changed_seq_and_deps(scene, seq, 0, 1);
   /* Invalidate cache. */
@@ -4301,7 +3936,7 @@ static int sequencer_change_path_exec(bContext *C, wmOperator *op)
     }
     char filepath[FILE_MAX];
     RNA_string_get(op->ptr, "filepath", filepath);
-    BLI_strncpy(sound->name, filepath, sizeof(sound->name));
+    BLI_strncpy(sound->filepath, filepath, sizeof(sound->filepath));
     BKE_sound_load(bmain, sound);
   }
   else {
@@ -4545,7 +4180,7 @@ static int sequencer_set_range_to_strips_exec(bContext *C, wmOperator *op)
     BKE_report(op->reports, RPT_WARNING, "Select one or more strips");
     return OPERATOR_CANCELLED;
   }
-  else if (efra < 0) {
+  if (efra < 0) {
     BKE_report(op->reports, RPT_ERROR, "Can't set a negative range");
     return OPERATOR_CANCELLED;
   }
