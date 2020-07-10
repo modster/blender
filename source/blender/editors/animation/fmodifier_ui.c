@@ -140,6 +140,8 @@ static void fmodifier_get_pointers(const bContext *C,
   *r_fcm = BLI_findlink(modifiers, panel->runtime.list_index);
   *r_owner_id = ale->fcurve_owner_id;
 
+  MEM_freeN(ale);
+
   uiLayoutSetActive(panel->layout, !(fcu->flag & FCURVE_MOD_OFF));
 }
 
@@ -316,21 +318,6 @@ static void deg_update(bContext *C, void *owner_id, void *UNUSED(var2))
   DEG_id_tag_update(owner_id, ID_RECALC_ANIMATION);
 }
 
-/* callback to verify modifier data */
-static void validate_fmodifier_cb(bContext *C, void *fcm_v, void *owner_id)
-{
-  FModifier *fcm = (FModifier *)fcm_v;
-  const FModifierTypeInfo *fmi = fmodifier_get_typeinfo(fcm);
-
-  /* call the verify callback on the modifier if applicable */
-  if (fmi && fmi->verify_data) {
-    fmi->verify_data(fcm);
-  }
-  if (owner_id) {
-    deg_update(C, owner_id, NULL);
-  }
-}
-
 /* callback to remove the given modifier  */
 typedef struct FModifierDeleteContext {
   ID *fcurve_owner_id;
@@ -394,7 +381,7 @@ static void fmodifier_frame_range_draw(const bContext *C, Panel *panel)
   uiLayoutSetActive(layout, fcm->flag & FMODIFIER_FLAG_RANGERESTRICT);
 
   col = uiLayoutColumn(layout, true);
-  uiItemR(col, &ptr, "frame_start", 0, IFACE_("Frame Start"), ICON_NONE);
+  uiItemR(col, &ptr, "frame_start", 0, IFACE_("Start"), ICON_NONE);
   uiItemR(col, &ptr, "frame_end", 0, IFACE_("End"), ICON_NONE);
 
   col = uiLayoutColumn(layout, true);
@@ -488,180 +475,35 @@ static void generator_panel_draw(const bContext *C, Panel *panel)
   ID *fcurve_owner_id;
   fmodifier_get_pointers(C, panel, &fcm, &fcurve_owner_id);
 
-  uiBut *but;
-  short bwidth = 314 - 1.5 * UI_UNIT_X; /* max button width */
-
   FMod_Generator *data = (FMod_Generator *)fcm->data;
 
   PointerRNA ptr;
   RNA_pointer_create(fcurve_owner_id, &RNA_FModifierFunctionGenerator, fcm, &ptr);
 
-  /* basic settings (backdrop + mode selector + some padding) */
-  /* col = uiLayoutColumn(layout, true); */ /* UNUSED */
-  uiBlock *block = uiLayoutGetBlock(layout);
-  but = uiDefButR(block,
-                  UI_BTYPE_MENU,
-                  B_FMODIFIER_REDRAW,
-                  NULL,
-                  0,
-                  0,
-                  bwidth,
-                  UI_UNIT_Y,
-                  &ptr,
-                  "mode",
-                  -1,
-                  0,
-                  0,
-                  -1,
-                  -1,
-                  NULL);
-  UI_but_func_set(but, validate_fmodifier_cb, fcm, NULL);
+  uiItemR(layout, &ptr, "mode", 0, "", ICON_NONE);
+
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
 
   uiItemR(layout, &ptr, "use_additive", 0, NULL, ICON_NONE);
+
+  uiItemR(layout, &ptr, "poly_order", 0, IFACE_("Order"), ICON_NONE);
 
   /* Settings for individual modes. */
   switch (data->mode) {
     case FCM_GENERATOR_POLYNOMIAL: /* polynomial expression */
     {
-      const uiFontStyle *fstyle = UI_FSTYLE_WIDGET;
-      float *cp = NULL;
       char xval[32];
-      uint i;
-      int maxXWidth;
 
-      /* draw polynomial order selector */
-      row = uiLayoutRow(layout, false);
-      block = uiLayoutGetBlock(row);
-
-      but = uiDefButI(
-          block,
-          UI_BTYPE_NUM,
-          B_FMODIFIER_REDRAW,
-          IFACE_("Poly Order:"),
-          0.5f * UI_UNIT_X,
-          0,
-          bwidth,
-          UI_UNIT_Y,
-          &data->poly_order,
-          1,
-          100,
-          1,
-          0,
-          TIP_("'Order' of the Polynomial (for a polynomial with n terms, 'order' is n-1)"));
-      UI_but_func_set(but, validate_fmodifier_cb, fcm, fcurve_owner_id);
-
-      /* calculate maximum width of label for "x^n" labels */
-      if (data->arraysize > 2) {
-        BLI_snprintf(xval, sizeof(xval), "x^%u", data->arraysize);
-        /* XXX: UI_fontstyle_string_width is not accurate */
-        maxXWidth = UI_fontstyle_string_width(fstyle, xval) + 0.5 * UI_UNIT_X;
-      }
-      else {
-        /* basic size (just "x") */
-        maxXWidth = UI_fontstyle_string_width(fstyle, "x") + 0.5 * UI_UNIT_X;
-      }
-
-      /* draw controls for each coefficient and a + sign at end of row */
-      row = uiLayoutRow(layout, true);
-      block = uiLayoutGetBlock(row);
-
-      /* Update depsgraph when values change */
-      UI_block_func_set(block, deg_update, fcurve_owner_id, NULL);
-
-      cp = data->coefficients;
-      for (i = 0; (i < data->arraysize) && (cp); i++, cp++) {
-        /* To align with first line... */
-        if (i) {
-          uiDefBut(block,
-                   UI_BTYPE_LABEL,
-                   1,
-                   "   ",
-                   0,
-                   0,
-                   2 * UI_UNIT_X,
-                   UI_UNIT_Y,
-                   NULL,
-                   0.0,
-                   0.0,
-                   0,
-                   0,
-                   "");
-        }
-        else {
-          uiDefBut(block,
-                   UI_BTYPE_LABEL,
-                   1,
-                   "y =",
-                   0,
-                   0,
-                   2 * UI_UNIT_X,
-                   UI_UNIT_Y,
-                   NULL,
-                   0.0,
-                   0.0,
-                   0,
-                   0,
-                   "");
-        }
-
-        /* coefficient */
-        uiDefButF(block,
-                  UI_BTYPE_NUM,
-                  B_FMODIFIER_REDRAW,
-                  "",
-                  0,
-                  0,
-                  bwidth / 2,
-                  UI_UNIT_Y,
-                  cp,
-                  -UI_FLT_MAX,
-                  UI_FLT_MAX,
-                  10,
-                  3,
-                  TIP_("Coefficient for polynomial"));
-
-        /* 'x' param (and '+' if necessary) */
-        if (i == 0) {
-          BLI_strncpy(xval, " ", sizeof(xval));
-        }
-        else if (i == 1) {
-          BLI_strncpy(xval, "x", sizeof(xval));
-        }
-        else {
-          BLI_snprintf(xval, sizeof(xval), "x^%u", i);
-        }
-        uiDefBut(block,
-                 UI_BTYPE_LABEL,
-                 1,
-                 xval,
-                 0,
-                 0,
-                 maxXWidth,
-                 UI_UNIT_Y,
-                 NULL,
-                 0.0,
-                 0.0,
-                 0,
-                 0,
-                 TIP_("Power of x"));
-
-        if ((i != (data->arraysize - 1)) || ((i == 0) && data->arraysize == 2)) {
-          uiDefBut(
-              block, UI_BTYPE_LABEL, 1, "+", 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL, 0.0, 0.0, 0, 0, "");
-
-          /* next coefficient on a new row */
-          row = uiLayoutRow(layout, true);
-          block = uiLayoutGetBlock(row);
-        }
-        else {
-          /* For alignment in UI! */
-          uiDefBut(
-              block, UI_BTYPE_LABEL, 1, " ", 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL, 0.0, 0.0, 0, 0, "");
-        }
+      uiLayout *col = uiLayoutColumn(layout, true);
+      BLI_strncpy(xval, "Coefficient", sizeof(xval));
+      for (int co = 0; co < data->arraysize; co++) {
+        PropertyRNA *prop = RNA_struct_find_property(&ptr, "coefficients");
+        uiItemFullR(col, &ptr, prop, co, 0, 0, IFACE_(xval), ICON_NONE);
+        BLI_snprintf(xval, sizeof(xval), "x^%d", co + 1);
       }
       break;
     }
-
     case FCM_GENERATOR_POLYNOMIAL_FACTORISED: /* Factorized polynomial expression */
     {
       float *cp = NULL;
@@ -669,28 +511,7 @@ static void generator_panel_draw(const bContext *C, Panel *panel)
 
       /* draw polynomial order selector */
       row = uiLayoutRow(layout, false);
-      block = uiLayoutGetBlock(row);
-
-      but = uiDefButI(
-          block,
-          UI_BTYPE_NUM,
-          B_FMODIFIER_REDRAW,
-          IFACE_("Poly Order:"),
-          0,
-          0,
-          314 - 1.5 * UI_UNIT_X,
-          UI_UNIT_Y,
-          &data->poly_order,
-          1,
-          100,
-          1,
-          0,
-          TIP_("'Order' of the Polynomial (for a polynomial with n terms, 'order' is n-1)"));
-      UI_but_func_set(but, validate_fmodifier_cb, fcm, fcurve_owner_id);
-
-      /* draw controls for each pair of coefficients */
-      row = uiLayoutRow(layout, true);
-      block = uiLayoutGetBlock(row);
+      uiBlock *block = uiLayoutGetBlock(row);
 
       /* Update depsgraph when values change */
       UI_block_func_set(block, deg_update, fcurve_owner_id, NULL);
@@ -1302,12 +1123,11 @@ void ANIM_fmodifier_panels(const bContext *C, ListBase *fmodifiers)
     UI_panels_free_instanced(C, region);
     FModifier *fcm = fmodifiers->first;
     for (int i = 0; fcm; i++, fcm = fcm->next) {
-      const FModifierTypeInfo *fmi = get_fmodifier_typeinfo(fcm->type);
-      // if (fmi->panelRegister) {
       char panel_idname[MAX_NAME];
       fmodifier_panel_id(fcm, panel_idname);
 
-      Panel *new_panel = UI_panel_add_instanced(sa, region, &region->panels, panel_idname, i);
+      Panel *new_panel = UI_panel_add_instanced(
+          sa, region, &region->panels, panel_idname, i, NULL);
       if (new_panel != NULL) {
         UI_panel_set_expand_from_list_data(C, new_panel);
       }
@@ -1317,8 +1137,9 @@ void ANIM_fmodifier_panels(const bContext *C, ListBase *fmodifiers)
   else {
     /* The expansion might have been changed elsewhere, so we still need to set it. */
     LISTBASE_FOREACH (Panel *, panel, &region->panels) {
-      if ((panel->type != NULL) && (panel->type->flag & PNL_INSTANCED))
+      if ((panel->type != NULL) && (panel->type->flag & PNL_INSTANCED)) {
         UI_panel_set_expand_from_list_data(C, panel);
+      }
     }
   }
 }
