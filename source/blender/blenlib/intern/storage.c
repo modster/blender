@@ -53,9 +53,9 @@
 #  include "BLI_string_utf8.h"
 #  include "BLI_winstuff.h"
 #  include "utfconv.h"
+#  include <ShObjIdl.h>
 #  include <direct.h>
 #  include <io.h>
-#  include <shobjidl_core.h>
 #  include <stdbool.h>
 #else
 #  include <pwd.h>
@@ -96,9 +96,7 @@ char *BLI_current_working_dir(char *dir, const size_t maxncpy)
       memcpy(dir, pwd, srclen + 1);
       return dir;
     }
-    else {
-      return NULL;
-    }
+    return NULL;
   }
   return getcwd(dir, maxncpy);
 #endif
@@ -290,7 +288,11 @@ eFileAttributes BLI_file_attributes(const char *path)
 
 /* Return alias/shortcut file target. Apple version is defined in storage_apple.mm */
 #ifndef __APPLE__
-bool BLI_file_alias_target(char target[FILE_MAXDIR], const char *filepath)
+bool BLI_file_alias_target(
+    /* This parameter can only be const on non-windows platforms.
+     * NOLINTNEXTLINE: readability-non-const-parameter. */
+    char target[FILE_MAXDIR],
+    const char *filepath)
 {
 #  ifdef WIN32
   if (!BLI_path_extension_check(filepath, ".lnk")) {
@@ -369,13 +371,13 @@ int BLI_exists(const char *name)
 
   free(tmp_16);
   if (res == -1) {
-    return (0);
+    return 0;
   }
 #else
   struct stat st;
   BLI_assert(!BLI_path_is_rel(name));
   if (stat(name, &st)) {
-    return (0);
+    return 0;
   }
 #endif
   return (st.st_mode);

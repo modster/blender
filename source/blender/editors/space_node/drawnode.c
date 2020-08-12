@@ -860,11 +860,13 @@ static void node_shader_buts_tex_sky(uiLayout *layout, bContext *UNUSED(C), Poin
   if (RNA_enum_get(ptr, "sky_type") == SHD_SKY_NISHITA) {
     uiItemR(layout, ptr, "sun_disc", DEFAULT_FLAGS, NULL, 0);
 
+    uiLayout *col;
     if (RNA_boolean_get(ptr, "sun_disc")) {
-      uiItemR(layout, ptr, "sun_size", DEFAULT_FLAGS, NULL, ICON_NONE);
+      col = uiLayoutColumn(layout, true);
+      uiItemR(col, ptr, "sun_size", DEFAULT_FLAGS, NULL, ICON_NONE);
+      uiItemR(col, ptr, "sun_intensity", DEFAULT_FLAGS, NULL, ICON_NONE);
     }
 
-    uiLayout *col;
     col = uiLayoutColumn(layout, true);
     uiItemR(col, ptr, "sun_elevation", DEFAULT_FLAGS, NULL, ICON_NONE);
     uiItemR(col, ptr, "sun_rotation", DEFAULT_FLAGS, NULL, ICON_NONE);
@@ -1013,7 +1015,8 @@ static void node_shader_buts_vertex_color(uiLayout *layout, bContext *C, Pointer
   if (obptr.data && RNA_enum_get(&obptr, "type") == OB_MESH) {
     PointerRNA dataptr = RNA_pointer_get(&obptr, "data");
 
-    if (RNA_collection_length(&dataptr, "sculpt_vertex_colors")) {
+    if (U.experimental.use_sculpt_vertex_colors &&
+        RNA_collection_length(&dataptr, "sculpt_vertex_colors")) {
       uiItemPointerR(
           layout, ptr, "layer_name", &dataptr, "sculpt_vertex_colors", "", ICON_GROUP_VCOL);
     }
@@ -3573,6 +3576,8 @@ static void std_node_socket_interface_draw(bContext *UNUSED(C), uiLayout *layout
       break;
     }
   }
+
+  uiItemR(layout, ptr, "hide_value", DEFAULT_FLAGS, NULL, 0);
 }
 
 void ED_init_standard_node_socket_type(bNodeSocketType *stype)
@@ -3673,9 +3678,8 @@ void draw_nodespace_back_pix(const bContext *C,
                          y,
                          ibuf->x,
                          ibuf->y,
-                         GL_RGBA,
-                         GL_UNSIGNED_BYTE,
-                         GL_NEAREST,
+                         GPU_RGBA8,
+                         false,
                          display_buffer,
                          snode->zoom,
                          snode->zoom,
@@ -3688,12 +3692,12 @@ void draw_nodespace_back_pix(const bContext *C,
         GPU_blend_set_func_separate(
             GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA, GPU_ONE, GPU_ONE_MINUS_SRC_ALPHA);
 
-        ED_draw_imbuf_ctx(C, ibuf, x, y, GL_NEAREST, snode->zoom, snode->zoom);
+        ED_draw_imbuf_ctx(C, ibuf, x, y, false, snode->zoom, snode->zoom);
 
         GPU_blend(false);
       }
       else {
-        ED_draw_imbuf_ctx(C, ibuf, x, y, GL_NEAREST, snode->zoom, snode->zoom);
+        ED_draw_imbuf_ctx(C, ibuf, x, y, false, snode->zoom, snode->zoom);
       }
 
       if (cache_handle) {
@@ -3847,9 +3851,9 @@ bool node_link_bezier_points(
   if (node_link_bezier_handles(v2d, snode, link, vec)) {
     /* always do all three, to prevent data hanging around */
     BKE_curve_forward_diff_bezier(
-        vec[0][0], vec[1][0], vec[2][0], vec[3][0], coord_array[0] + 0, resol, sizeof(float) * 2);
+        vec[0][0], vec[1][0], vec[2][0], vec[3][0], coord_array[0] + 0, resol, sizeof(float[2]));
     BKE_curve_forward_diff_bezier(
-        vec[0][1], vec[1][1], vec[2][1], vec[3][1], coord_array[0] + 1, resol, sizeof(float) * 2);
+        vec[0][1], vec[1][1], vec[2][1], vec[3][1], coord_array[0] + 1, resol, sizeof(float[2]));
 
     return 1;
   }

@@ -162,7 +162,7 @@ void OBJECT_OT_material_slot_add(wmOperatorType *ot)
 
   /* api callbacks */
   ot->exec = material_slot_add_exec;
-  ot->poll = ED_operator_object_active_editable;
+  ot->poll = ED_operator_object_active_local_editable;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
@@ -207,7 +207,7 @@ void OBJECT_OT_material_slot_remove(wmOperatorType *ot)
 
   /* api callbacks */
   ot->exec = material_slot_remove_exec;
-  ot->poll = ED_operator_object_active_editable;
+  ot->poll = ED_operator_object_active_local_editable;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
@@ -310,7 +310,7 @@ void OBJECT_OT_material_slot_assign(wmOperatorType *ot)
 
   /* api callbacks */
   ot->exec = material_slot_assign_exec;
-  ot->poll = ED_operator_object_active_editable;
+  ot->poll = ED_operator_object_active_local_editable;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
@@ -465,17 +465,27 @@ static int material_slot_copy_exec(bContext *C, wmOperator *UNUSED(op))
 {
   Main *bmain = CTX_data_main(C);
   Object *ob = ED_object_context(C);
-  Material ***matar;
+  Material ***matar_obdata;
 
-  if (!ob || !(matar = BKE_object_material_array_p(ob))) {
+  if (!ob || !(matar_obdata = BKE_object_material_array_p(ob))) {
     return OPERATOR_CANCELLED;
+  }
+
+  BLI_assert(ob->totcol == *BKE_object_material_len_p(ob));
+
+  Material ***matar_object = &ob->mat;
+
+  Material **matar = MEM_callocN(sizeof(*matar) * (size_t)ob->totcol, __func__);
+  for (int i = ob->totcol; i--;) {
+    matar[i] = ob->matbits[i] ? (*matar_object)[i] : (*matar_obdata)[i];
   }
 
   CTX_DATA_BEGIN (C, Object *, ob_iter, selected_editable_objects) {
     if (ob != ob_iter && BKE_object_material_array_p(ob_iter)) {
-      if (ob->data != ob_iter->data) {
-        BKE_object_material_array_assign(bmain, ob_iter, matar, ob->totcol);
-      }
+      /* If we are using the same obdata, we only assign slots in ob_iter that are using object
+       * materials, and not obdata ones. */
+      const bool is_same_obdata = ob->data == ob_iter->data;
+      BKE_object_material_array_assign(bmain, ob_iter, &matar, ob->totcol, is_same_obdata);
 
       if (ob_iter->totcol == ob->totcol) {
         ob_iter->actcol = ob->actcol;
@@ -485,6 +495,8 @@ static int material_slot_copy_exec(bContext *C, wmOperator *UNUSED(op))
     }
   }
   CTX_DATA_END;
+
+  MEM_freeN(matar);
 
   return OPERATOR_FINISHED;
 }
@@ -564,6 +576,7 @@ void OBJECT_OT_material_slot_move(wmOperatorType *ot)
   ot->description = "Move the active material up/down in the list";
 
   /* api callbacks */
+  ot->poll = ED_operator_object_active_local_editable;
   ot->exec = material_slot_move_exec;
 
   /* flags */
@@ -638,7 +651,7 @@ void OBJECT_OT_material_slot_remove_unused(wmOperatorType *ot)
 
   /* api callbacks */
   ot->exec = material_slot_remove_unused_exec;
-  ot->poll = ED_operator_object_active_editable;
+  ot->poll = ED_operator_object_active_local_editable;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
@@ -707,6 +720,7 @@ void MATERIAL_OT_new(wmOperatorType *ot)
   ot->description = "Add a new material";
 
   /* api callbacks */
+  ot->poll = ED_operator_object_active_local_editable;
   ot->exec = new_material_exec;
 
   /* flags */
@@ -931,6 +945,11 @@ static int light_cache_bake_modal(bContext *C, wmOperator *op, const wmEvent *ev
 
   /* no running blender, remove handler and pass through */
   if (0 == WM_jobs_test(CTX_wm_manager(C), scene, WM_JOB_TYPE_RENDER)) {
+    LightCache *lcache = scene->eevee.light_cache_data;
+    if (lcache && (lcache->flag & LIGHTCACHE_INVALID)) {
+      BKE_report(op->reports, RPT_ERROR, "Lightcache cannot allocate resources");
+      return OPERATOR_CANCELLED;
+    }
     return OPERATOR_FINISHED | OPERATOR_PASS_THROUGH;
   }
 

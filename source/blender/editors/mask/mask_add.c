@@ -439,7 +439,7 @@ static bool add_vertex_new(const bContext *C, Mask *mask, MaskLayer *mask_layer,
 /* Convert coordinate from normalized space to pixel one.
  * TODO(sergey): Make the function more generally available. */
 static void mask_point_make_pixel_space(bContext *C,
-                                        float point_normalized[2],
+                                        const float point_normalized[2],
                                         float point_pixel[2])
 {
   ScrArea *area = CTX_wm_area(C);
@@ -796,7 +796,7 @@ static void define_primitive_add_properties(wmOperatorType *ot)
 static int primitive_circle_add_exec(bContext *C, wmOperator *op)
 {
   const float points[4][2] = {{0.0f, 0.5f}, {0.5f, 1.0f}, {1.0f, 0.5f}, {0.5f, 0.0f}};
-  int num_points = sizeof(points) / (2 * sizeof(float));
+  int num_points = sizeof(points) / (sizeof(float[2]));
 
   create_primitive_from_points(C, op, points, num_points, HD_AUTO);
 
@@ -827,7 +827,7 @@ void MASK_OT_primitive_circle_add(wmOperatorType *ot)
 static int primitive_square_add_exec(bContext *C, wmOperator *op)
 {
   const float points[4][2] = {{0.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f}, {1.0f, 0.0f}};
-  int num_points = sizeof(points) / (2 * sizeof(float));
+  int num_points = sizeof(points) / (sizeof(float[2]));
 
   create_primitive_from_points(C, op, points, num_points, HD_VECT);
 

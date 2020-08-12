@@ -47,7 +47,7 @@
 #include "BKE_modifier.h"
 #include "BKE_pointcache.h"
 
-#include "BPH_mass_spring.h"
+#include "SIM_mass_spring.h"
 
 // #include "PIL_time.h"  /* timing for debug prints */
 
@@ -344,12 +344,12 @@ static int do_init_cloth(Object *ob, ClothModifierData *clmd, Mesh *result, int 
       return 0;
     }
 
-    BKE_cloth_solver_set_positions(clmd);
+    SIM_cloth_solver_set_positions(clmd);
 
     ClothSimSettings *parms = clmd->sim_parms;
     if (parms->flags & CLOTH_SIMSETTINGS_FLAG_PRESSURE &&
         !(parms->flags & CLOTH_SIMSETTINGS_FLAG_PRESSURE_VOL)) {
-      BKE_cloth_solver_set_volume(clmd);
+      SIM_cloth_solver_set_volume(clmd);
     }
 
     clmd->clothObject->last_frame = MINFRAME - 1;
@@ -404,7 +404,7 @@ static int do_step_cloth(
   // TIMEIT_START(cloth_step)
 
   /* call the solver. */
-  ret = BPH_cloth_solve(depsgraph, ob, framenr, clmd, effectors);
+  ret = SIM_cloth_solve(depsgraph, ob, framenr, clmd, effectors);
 
   // TIMEIT_END(cloth_step)
 
@@ -479,7 +479,7 @@ void clothModifier_do(ClothModifierData *clmd,
 
   if (cache_result == PTCACHE_READ_EXACT || cache_result == PTCACHE_READ_INTERPOLATED ||
       (!can_simulate && cache_result == PTCACHE_READ_OLD)) {
-    BKE_cloth_solver_set_positions(clmd);
+    SIM_cloth_solver_set_positions(clmd);
     cloth_to_object(ob, clmd, vertexCos);
 
     BKE_ptcache_validate(cache, framenr);
@@ -493,7 +493,7 @@ void clothModifier_do(ClothModifierData *clmd,
     return;
   }
   if (cache_result == PTCACHE_READ_OLD) {
-    BKE_cloth_solver_set_positions(clmd);
+    SIM_cloth_solver_set_positions(clmd);
   }
   else if (
       /* 2.4x disabled lib, but this can be used in some cases, testing further - campbell */
@@ -537,7 +537,7 @@ void cloth_free_modifier(ClothModifierData *clmd)
   cloth = clmd->clothObject;
 
   if (cloth) {
-    BPH_cloth_solver_free(clmd);
+    SIM_cloth_solver_free(clmd);
 
     // Free the verts.
     if (cloth->verts != NULL) {
@@ -619,7 +619,7 @@ void cloth_free_modifier_extern(ClothModifierData *clmd)
       printf("cloth_free_modifier_extern in\n");
     }
 
-    BPH_cloth_solver_free(clmd);
+    SIM_cloth_solver_free(clmd);
 
     // Free the verts.
     if (cloth->verts != NULL) {
@@ -825,7 +825,7 @@ static int cloth_from_object(
   MVert *mvert = NULL;
   ClothVertex *verts = NULL;
   float(*shapekey_rest)[3] = NULL;
-  float tnull[3] = {0, 0, 0};
+  const float tnull[3] = {0, 0, 0};
 
   // If we have a clothObject, free it.
   if (clmd->clothObject != NULL) {
@@ -919,10 +919,10 @@ static int cloth_from_object(
   }
 
   // init our solver
-  BPH_cloth_solver_init(ob, clmd);
+  SIM_cloth_solver_init(ob, clmd);
 
   if (!first) {
-    BKE_cloth_solver_set_positions(clmd);
+    SIM_cloth_solver_set_positions(clmd);
   }
 
   clmd->clothObject->bvhtree = bvhtree_build_from_cloth(clmd, clmd->coll_parms->epsilon);
@@ -1037,7 +1037,7 @@ static void cloth_free_errorsprings(Cloth *cloth,
 }
 
 BLI_INLINE void cloth_bend_poly_dir(
-    ClothVertex *verts, int i, int j, int *inds, int len, float r_dir[3])
+    ClothVertex *verts, int i, int j, const int *inds, int len, float r_dir[3])
 {
   float cent[3] = {0};
   float fact = 1.0f / len;
@@ -1355,7 +1355,7 @@ BLI_INLINE void cross_identity_v3(float r[3][3], const float v[3])
   r[2][1] = -v[0];
 }
 
-BLI_INLINE void madd_m3_m3fl(float r[3][3], float m[3][3], float f)
+BLI_INLINE void madd_m3_m3fl(float r[3][3], const float m[3][3], float f)
 {
   r[0][0] += m[0][0] * f;
   r[0][1] += m[0][1] * f;

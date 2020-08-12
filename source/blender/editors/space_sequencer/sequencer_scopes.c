@@ -50,14 +50,14 @@ static void rgb_to_yuv_normalized(const float rgb[3], float yuv[3])
   yuv[2] += 0.5f;
 }
 
-static void scope_put_pixel(uchar *table, uchar *pos)
+static void scope_put_pixel(const uchar *table, uchar *pos)
 {
   uchar newval = table[*pos];
   pos[0] = pos[1] = pos[2] = newval;
   pos[3] = 255;
 }
 
-static void scope_put_pixel_single(uchar *table, uchar *pos, int col)
+static void scope_put_pixel_single(const uchar *table, uchar *pos, int col)
 {
   char newval = table[pos[col]];
   pos[col] = newval;
@@ -730,7 +730,7 @@ static ImBuf *make_vectorscope_view_from_ibuf_float(ImBuf *ibuf)
       const float *src1 = src + 4 * (ibuf->x * y + x);
       const char *p;
 
-      memcpy(rgb, src1, 3 * sizeof(float));
+      memcpy(rgb, src1, sizeof(float[3]));
 
       clamp_v3(rgb, 0.0f, 1.0f);
 

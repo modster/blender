@@ -21,8 +21,7 @@
  * \ingroup editors
  */
 
-#ifndef __ED_ANIM_API_H__
-#define __ED_ANIM_API_H__
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -96,6 +95,8 @@ typedef struct bAnimContext {
   struct Scene *scene;
   /** active scene layer */
   struct ViewLayer *view_layer;
+  /** active dependency graph */
+  struct Depsgraph *depsgraph;
   /** active object */
   struct Object *obact;
   /** active set of markers */
@@ -885,5 +886,3 @@ void animviz_get_object_motionpaths(struct Object *ob, ListBase *targets);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __ED_ANIM_API_H__ */
