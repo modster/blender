@@ -35,7 +35,6 @@ struct FCurve;
 struct FModifier;
 
 struct AnimData;
-struct ARegionType;
 struct AnimationEvalContext;
 struct BezTriple;
 struct LibraryForeachIDData;
