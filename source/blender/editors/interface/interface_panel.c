@@ -117,7 +117,9 @@ typedef struct PanelSort {
 static int get_panel_real_size_y(const Panel *panel);
 static void panel_activate_state(const bContext *C, Panel *panel, uiHandlePanelState state);
 static int compare_panel(const void *a1, const void *a2);
-static bool panel_type_context_poll(ARegion *region, PanelType *panel_type, const char *context);
+static bool panel_type_context_poll(ARegion *region,
+                                    const PanelType *panel_type,
+                                    const char *context);
 
 static void panel_title_color_get(bool show_background, uchar color[4])
 {
@@ -370,7 +372,7 @@ static void panel_delete(const bContext *C, ARegion *region, ListBase *panels, P
  * \note Can be called with NULL \a C, but it should be avoided because
  * handlers might not be removed.
  */
-void UI_panels_free_instanced(bContext *C, ARegion *region)
+void UI_panels_free_instanced(const bContext *C, ARegion *region)
 {
   /* Delete panels with the instanced flag. */
   LISTBASE_FOREACH_MUTABLE (Panel *, panel, &region->panels) {
@@ -460,7 +462,7 @@ static void reorder_instanced_panel_list(bContext *C, ARegion *region, Panel *dr
     return;
   }
 
-  char *context;
+  char *context = NULL;
   if (!UI_panel_category_is_visible(region)) {
     context = drag_panel->type->context;
   }
@@ -660,17 +662,19 @@ static void panels_collapse_all(const bContext *C,
   set_panels_list_data_expand_flag(C, region);
 }
 
-static bool panel_type_context_poll(ARegion *region, PanelType *panel_type, const char *context)
+static bool panel_type_context_poll(ARegion *region,
+                                    const PanelType *panel_type,
+                                    const char *context)
 {
   if (UI_panel_category_is_visible(region)) {
     return STREQ(panel_type->category, UI_panel_category_active_get(region, false));
   }
-  else {
-    if (panel_type->context[0] && STREQ(panel_type->context, context)) {
-      return true;
-    }
-    return false;
+
+  if (panel_type->context[0] && STREQ(panel_type->context, context)) {
+    return true;
   }
+
+  return false;
 }
 
 Panel *UI_panel_find_by_type(ListBase *lb, PanelType *pt)
