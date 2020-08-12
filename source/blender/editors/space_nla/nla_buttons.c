@@ -651,6 +651,7 @@ void nla_buttons_register(ARegionType *art)
   strcpy(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
   pt->draw = nla_panel_modifiers;
   pt->poll = nla_strip_eval_panel_poll;
+  pt->flag = PNL_NO_HEADER;
   BLI_addtail(&art->paneltypes, pt);
 
   ANIM_fcm_generator_panel_register(art);
