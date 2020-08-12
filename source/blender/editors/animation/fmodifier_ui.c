@@ -496,6 +496,7 @@ static void generator_panel_draw(const bContext *C, Panel *panel)
       char xval[32];
 
       uiLayout *col = uiLayoutColumn(layout, true);
+      /* The value gets a "Coefficient" label. */
       BLI_strncpy(xval, "Coefficient", sizeof(xval));
       for (int co = 0; co < data->arraysize; co++) {
         PropertyRNA *prop = RNA_struct_find_property(&ptr, "coefficients");
