@@ -37,6 +37,7 @@
 #include "BLT_translation.h"
 
 #include "BKE_context.h"
+#include "BKE_fcurve.h"
 #include "BKE_nla.h"
 #include "BKE_screen.h"
 
@@ -535,6 +536,17 @@ static void nla_panel_animated_strip_time(const bContext *C, Panel *panel)
   uiItemR(layout, &strip_ptr, "strip_time", 0, NULL, ICON_NONE);
 }
 
+#define NLA_FMODIFIER_PANEL_PREFIX "NLA"
+
+static void nla_fmodifier_panel_id(void *fcm_link, char *r_name)
+{
+  FModifier *fcm = (FModifier *)fcm_link;
+  eFModifier_Types type = fcm->type;
+  snprintf(r_name, BKE_ST_MAXNAME, "%s_PT_", NLA_FMODIFIER_PANEL_PREFIX);
+  const FModifierTypeInfo *fmi = get_fmodifier_typeinfo(type);
+  strcat(r_name, fmi->name);
+}
+
 /* F-Modifiers for active NLA-Strip */
 static void nla_panel_modifiers(const bContext *C, Panel *panel)
 {
@@ -568,7 +580,7 @@ static void nla_panel_modifiers(const bContext *C, Panel *panel)
     uiItemO(row, "", ICON_PASTEDOWN, "NLA_OT_fmodifier_paste");
   }
 
-  ANIM_fmodifier_panels(C, &strip->modifiers);
+  ANIM_fmodifier_panels(C, strip_ptr.owner_id, &strip->modifiers, nla_fmodifier_panel_id);
 }
 
 /* ******************* general ******************************** */
@@ -654,10 +666,11 @@ void nla_buttons_register(ARegionType *art)
   pt->flag = PNL_NO_HEADER;
   BLI_addtail(&art->paneltypes, pt);
 
-  ANIM_fcm_generator_panel_register(art);
-  ANIM_fcm_fn_generator_panel_register(art);
-  ANIM_fcm_noise_panel_register(art);
-  ANIM_fcm_envelope_panel_register(art);
-  ANIM_fcm_limits_panel_register(art);
-  ANIM_fcm_stepped_panel_register(art);
+  const char *modifier_panel_prefix = NLA_FMODIFIER_PANEL_PREFIX;
+  ANIM_fcm_generator_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
+  ANIM_fcm_fn_generator_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
+  ANIM_fcm_noise_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
+  ANIM_fcm_envelope_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
+  ANIM_fcm_limits_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
+  ANIM_fcm_stepped_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
 }

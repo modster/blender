@@ -35,6 +35,7 @@ struct ListBase;
 struct ARegion;
 struct ARegionType;
 struct Main;
+struct PanelType;
 struct ReportList;
 struct ScrArea;
 struct SpaceLink;
@@ -673,18 +674,35 @@ void ANIM_draw_framerange(struct Scene *scene, struct View2D *v2d);
 /* F-MODIFIER TOOLS */
 
 /* ------------- UI Panel Drawing -------------- */
+typedef bool (*PanelTypePollFn)(const struct bContext *C, struct PanelType *pt);
+typedef void (*uiListPanelIDFromDataFunc)(void *data_link, char *r_idname);
 
-void ANIM_fmodifier_panels(const struct bContext *C, ListBase *fmodifiers);
+void ANIM_fmodifier_panels(const struct bContext *C,
+                           struct ID *owner_id,
+                           ListBase *fmodifiers,
+                           uiListPanelIDFromDataFunc panel_id_fn);
 
-void ANIM_fmodifier_type_panel_id(int type, char *r_idname);
-
-void ANIM_fcm_generator_panel_register(struct ARegionType *region_type);
-void ANIM_fcm_fn_generator_panel_register(struct ARegionType *region_type);
-void ANIM_fcm_cycles_panel_register(struct ARegionType *region_type);
-void ANIM_fcm_noise_panel_register(struct ARegionType *region_type);
-void ANIM_fcm_envelope_panel_register(struct ARegionType *region_type);
-void ANIM_fcm_limits_panel_register(struct ARegionType *region_type);
-void ANIM_fcm_stepped_panel_register(struct ARegionType *region_type);
+void ANIM_fcm_generator_panel_register(struct ARegionType *region_type,
+                                       const char *id_prefix,
+                                       PanelTypePollFn poll_fn);
+void ANIM_fcm_fn_generator_panel_register(struct ARegionType *region_type,
+                                          const char *id_prefix,
+                                          PanelTypePollFn poll_fn);
+void ANIM_fcm_cycles_panel_register(struct ARegionType *region_type,
+                                    const char *id_prefix,
+                                    PanelTypePollFn poll_fn);
+void ANIM_fcm_noise_panel_register(struct ARegionType *region_type,
+                                   const char *id_prefix,
+                                   PanelTypePollFn poll_fn);
+void ANIM_fcm_envelope_panel_register(struct ARegionType *region_type,
+                                      const char *id_prefix,
+                                      PanelTypePollFn poll_fn);
+void ANIM_fcm_limits_panel_register(struct ARegionType *region_type,
+                                    const char *id_prefix,
+                                    PanelTypePollFn poll_fn);
+void ANIM_fcm_stepped_panel_register(struct ARegionType *region_type,
+                                     const char *id_prefix,
+                                     PanelTypePollFn poll_fn);
 
 /* ------------- Copy/Paste Buffer -------------- */
 

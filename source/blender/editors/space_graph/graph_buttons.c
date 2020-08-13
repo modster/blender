@@ -1323,6 +1323,16 @@ static void graph_panel_drivers_popover(const bContext *C, Panel *panel)
 /* All the drawing code is in editors/animation/fmodifier_ui.c */
 
 #define B_FMODIFIER_REDRAW 20
+#define GRAPH_FMODIFIER_PANEL_PREFIX "GRAPH"
+
+static void graph_fmodifier_panel_id(void *fcm_link, char *r_name)
+{
+  FModifier *fcm = (FModifier *)fcm_link;
+  eFModifier_Types type = fcm->type;
+  snprintf(r_name, BKE_ST_MAXNAME, "%s_PT_", GRAPH_FMODIFIER_PANEL_PREFIX);
+  const FModifierTypeInfo *fmi = get_fmodifier_typeinfo(type);
+  strcat(r_name, fmi->name);
+}
 
 static void do_graph_region_modifier_buttons(bContext *C, void *UNUSED(arg), int event)
 {
@@ -1357,7 +1367,7 @@ static void graph_panel_modifiers(const bContext *C, Panel *panel)
   uiItemO(row, "", ICON_COPYDOWN, "GRAPH_OT_fmodifier_copy");
   uiItemO(row, "", ICON_PASTEDOWN, "GRAPH_OT_fmodifier_paste");
 
-  ANIM_fmodifier_panels(C, &fcu->modifiers);
+  ANIM_fmodifier_panels(C, ale->fcurve_owner_id, &fcu->modifiers, graph_fmodifier_panel_id);
 
   MEM_freeN(ale);
 }
@@ -1426,13 +1436,14 @@ void graph_buttons_register(ARegionType *art)
   pt->poll = graph_panel_poll;
   BLI_addtail(&art->paneltypes, pt);
 
-  ANIM_fcm_generator_panel_register(art);
-  ANIM_fcm_fn_generator_panel_register(art);
-  ANIM_fcm_cycles_panel_register(art);
-  ANIM_fcm_noise_panel_register(art);
-  ANIM_fcm_envelope_panel_register(art);
-  ANIM_fcm_limits_panel_register(art);
-  ANIM_fcm_stepped_panel_register(art);
+  const char *fmodifier_panel_prefix = GRAPH_FMODIFIER_PANEL_PREFIX;
+  ANIM_fcm_generator_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
+  ANIM_fcm_fn_generator_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
+  ANIM_fcm_cycles_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
+  ANIM_fcm_noise_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
+  ANIM_fcm_envelope_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
+  ANIM_fcm_limits_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
+  ANIM_fcm_stepped_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
 
   pt = MEM_callocN(sizeof(PanelType), "spacetype graph panel view");
   strcpy(pt->idname, "GRAPH_PT_view");
