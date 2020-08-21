@@ -247,7 +247,6 @@ static void deg_update(bContext *C, void *owner_id, void *UNUSED(var2))
 /* callback to remove the given modifier  */
 typedef struct FModifierDeleteContext {
   ID *fcurve_owner_id;
-  ListBase *modifiers;
 } FModifierDeleteContext;
 static void delete_fmodifier_cb(bContext *C, void *ctx_v, void *fcm_v)
 {
@@ -306,7 +305,7 @@ static void fmodifier_frame_range_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(col, ptr, "blend_out", 0, IFACE_("Out"), ICON_NONE);
 }
 
-static void fmodifier_panel_header(const bContext *UNUSED(C), Panel *panel)
+static void fmodifier_panel_header(const bContext *C, Panel *panel)
 {
   uiLayout *layout = panel->layout;
 
@@ -1014,7 +1013,6 @@ void ANIM_fmodifier_panels(const bContext *C,
                            ListBase *fmodifiers,
                            uiListPanelIDFromDataFunc panel_id_fn)
 {
-  ScrArea *sa = CTX_wm_area(C);
   ARegion *region = CTX_wm_region(C);
 
   bool panels_match = UI_panel_list_matches_data(region, fmodifiers, panel_id_fn);
@@ -1029,8 +1027,7 @@ void ANIM_fmodifier_panels(const bContext *C,
       PointerRNA *fcm_ptr = MEM_mallocN(sizeof(PointerRNA), "panel customdata");
       RNA_pointer_create(owner_id, &RNA_FModifier, fcm, fcm_ptr);
 
-      Panel *new_panel = UI_panel_add_instanced(
-          sa, region, &region->panels, panel_idname, i, fcm_ptr);
+      Panel *new_panel = UI_panel_add_instanced(region, &region->panels, panel_idname, i, fcm_ptr);
 
       if (new_panel != NULL) {
         UI_panel_set_expand_from_list_data(C, new_panel);
