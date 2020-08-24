@@ -51,11 +51,6 @@ Node::~Node()
 {
 }
 
-template<typename T> static T &get_socket_value(const Node *node, const SocketType &socket)
-{
-  return (T &)*(((char *)node) + socket.struct_offset);
-}
-
 #ifndef NDEBUG
 static bool is_socket_float3(const SocketType &socket)
 {

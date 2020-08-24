@@ -29,6 +29,55 @@ struct Node;
 struct NodeType;
 struct Transform;
 
+// todo(kevin) set_##name will copy the arrays
+#define NODE_PUBLIC_API(type_, name) \
+ public: \
+  type_ name; \
+\
+ public: \
+  const SocketType *get_##name##socket() const \
+  { \
+    static const SocketType *socket = type->find_input(ustring(#name)); \
+    return socket; \
+  } \
+  bool name##_is_modified() const \
+  { \
+    const SocketType *socket = get_##name##socket(); \
+    return socket_is_modified(*socket); \
+  } \
+  const type_ &get_##name() const \
+  { \
+    const SocketType *socket = get_##name##socket(); \
+    return get_socket_value<type_>(this, *socket); \
+  } \
+  void set_##name(type_ value) \
+  { \
+    const SocketType *socket = get_##name##socket(); \
+    this->set(*socket, value); \
+  }
+
+#define NODE_PUBLIC_API_STRUCT_MEMBER(type_, name, member) \
+  const SocketType *get_##name##_##member##socket() const \
+  { \
+    static const SocketType *socket = type->find_input(ustring(#name"."#member)); \
+    return socket; \
+  } \
+   bool name##_##member##_is_modified() const \
+   { \
+     const SocketType *socket = get_##name##_##member##socket(); \
+     return socket_is_modified(*socket); \
+   } \
+   const type_ &get_##name##_##member() const \
+   { \
+     const SocketType *socket = get_##name##_##member##socket(); \
+     return get_socket_value<type_>(this, *socket); \
+   } \
+   void set_##name##_##member(type_ value) \
+   { \
+     const SocketType *socket = get_##name##_##member##socket(); \
+     this->set(*socket, value); \
+   }
+
 /* Node */
 
 struct NodeOwner {
@@ -109,6 +158,11 @@ struct Node {
 
  protected:
   const NodeOwner *owner;
+
+  template<typename T> static T &get_socket_value(const Node *node, const SocketType &socket)
+  {
+    return (T &)*(((char *)node) + socket.struct_offset);
+  }
 };
 
 CCL_NAMESPACE_END
