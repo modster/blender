@@ -13,21 +13,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+#
+# The Original Code is Copyright (C) 2020, Blender Foundation
+# All rights reserved.
 # ***** END GPL LICENSE BLOCK *****
 
 set(INC
-  ../include
+  .
   ../../blenkernel
   ../../blenlib
-  ../../blentranslation
   ../../bmesh
+  ../../bmesh/intern
   ../../depsgraph
-  ../../io/alembic
-  ../../io/collada
-  ../../io/wavefront_obj
-  ../../io/usd
+  ../../editors/include
   ../../makesdna
   ../../makesrna
+  ../../nodes
   ../../windowmanager
   ../../../../intern/guardedalloc
 )
@@ -37,50 +38,37 @@ set(INC_SYS
 )
 
 set(SRC
-  io_alembic.c
-  io_cache.c
-  io_collada.c
-  io_obj.c
-  io_ops.c
-  io_usd.c
+  intern/utils.cc
+  intern/wavefront_obj.cc
+  intern/obj_exporter.cc
+  intern/obj_export_mesh.cc
+  intern/obj_export_mtl.cc
+  intern/obj_export_nurbs.cc
+  intern/obj_export_file_writer.cc
+  intern/obj_import_file_reader.cc
+  intern/obj_importer.cc
+  intern/obj_import_mesh.cc
+  intern/obj_import_mtl.cc
+  intern/obj_import_nurbs.cc
+  intern/obj_import_objects.cc
 
-  io_alembic.h
-  io_cache.h
-  io_collada.h
-  io_obj.h
-  io_ops.h
-  io_usd.h
+  IO_wavefront_obj.h
+  intern/utils.hh
+  intern/obj_exporter.hh
+  intern/obj_export_mesh.hh
+  intern/obj_export_mtl.hh
+  intern/obj_export_nurbs.hh
+  intern/obj_export_file_writer.hh
+  intern/obj_import_file_reader.hh
+  intern/obj_importer.hh
+  intern/obj_import_mesh.hh
+  intern/obj_import_mtl.hh
+  intern/obj_import_nurbs.hh
+  intern/obj_import_objects.hh
 )
 
 set(LIB
   bf_blenkernel
-  bf_blenlib
-  bf_wavefront_obj
 )
 
-if(WITH_OPENCOLLADA)
-  list(APPEND LIB
-    bf_collada
-  )
-  add_definitions(-DWITH_COLLADA)
-endif()
-
-if(WITH_ALEMBIC)
-  list(APPEND LIB
-    bf_alembic
-  )
-  add_definitions(-DWITH_ALEMBIC)
-endif()
-
-if(WITH_USD)
-  list(APPEND LIB
-    bf_usd
-  )
-  add_definitions(-DWITH_USD)
-endif()
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
-endif()
-
-blender_add_lib(bf_editor_io "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+blender_add_lib(bf_wavefront_obj "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
