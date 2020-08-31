@@ -37,26 +37,24 @@ namespace blender::io::obj {
 OBJNurbs::OBJNurbs(Depsgraph *depsgraph,
                    const OBJExportParams &export_params,
                    Object *export_object)
-    : depsgraph_(depsgraph), export_params_(export_params), export_object_eval_(export_object)
+    : depsgraph_(depsgraph), export_object_eval_(export_object)
 {
   export_object_eval_ = DEG_get_evaluated_object(depsgraph_, export_object);
   export_curve_ = static_cast<Curve *>(export_object_eval_->data);
-  store_world_axes_transform();
+  store_world_axes_transform(export_params.forward_axis, export_params.up_axis);
 }
 
 /**
  * Store the product of export axes settings and an object's world transform matrix.
  */
-void OBJNurbs::store_world_axes_transform()
+void OBJNurbs::store_world_axes_transform(const eTransformAxisForward forward,
+                                          const eTransformAxisUp up)
 {
   float axes_transform[3][3];
   unit_m3(axes_transform);
   /* -Y-forward and +Z-up are the default Blender axis settings. */
-  mat3_from_axis_conversion(OBJ_AXIS_NEGATIVE_Y_FORWARD,
-                            OBJ_AXIS_Z_UP,
-                            export_params_.forward_axis,
-                            export_params_.up_axis,
-                            axes_transform);
+  mat3_from_axis_conversion(
+      OBJ_AXIS_NEGATIVE_Y_FORWARD, OBJ_AXIS_Z_UP, forward, up, axes_transform);
   mul_m4_m3m4(world_axes_transform_, axes_transform, export_object_eval_->obmat);
   /* mul_m4_m3m4 does not copy last row of obmat, i.e. location data. */
   copy_v4_v4(world_axes_transform_[3], export_object_eval_->obmat[3]);
@@ -75,27 +73,29 @@ const ListBase *OBJNurbs::curve_nurbs() const
 /**
  * Get coordinates of a vertex at given point index.
  */
-float3 OBJNurbs::calc_point_coords(const Nurb *nurb, const int vert_index) const
+float3 OBJNurbs::calc_point_coords(const Nurb &nurb,
+                                   const int vert_index,
+                                   const float scaling_factor) const
 {
   float3 r_coord;
-  BPoint *bpoint = nurb->bp;
+  BPoint *bpoint = nurb.bp;
   bpoint += vert_index;
   copy_v3_v3(r_coord, bpoint->vec);
   mul_m4_v3(world_axes_transform_, r_coord);
-  mul_v3_fl(r_coord, export_params_.scaling_factor);
+  mul_v3_fl(r_coord, scaling_factor);
   return r_coord;
 }
 
 /**
  * Get number of "curv" points of a nurb.
  */
-int OBJNurbs::get_curve_num(const Nurb *nurb) const
+int OBJNurbs::get_curve_num(const Nurb &nurb) const
 {
-  const int r_nurbs_degree = nurb->orderu - 1;
+  const int r_nurbs_degree = nurb.orderu - 1;
   /* "curv_num" is the number of control points in a nurbs.
    * If it is cyclic, degree also adds up. */
-  int r_curv_num = nurb->pntsv * nurb->pntsu;
-  if (nurb->flagu & CU_NURB_CYCLIC) {
+  int r_curv_num = nurb.pntsv * nurb.pntsu;
+  if (nurb.flagu & CU_NURB_CYCLIC) {
     r_curv_num += r_nurbs_degree;
   }
   return r_curv_num;
@@ -104,9 +104,9 @@ int OBJNurbs::get_curve_num(const Nurb *nurb) const
 /**
  * Get Nurb's degree.
  */
-int OBJNurbs::get_curve_degree(const Nurb *nurb) const
+int OBJNurbs::get_curve_degree(const Nurb &nurb) const
 {
-  return nurb->orderu - 1;
+  return nurb.orderu - 1;
 }
 
 }  // namespace blender::io::obj

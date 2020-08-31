@@ -31,7 +31,6 @@ namespace blender::io::obj {
 class OBJNurbs : NonMovable, NonCopyable {
  private:
   const Depsgraph *depsgraph_;
-  const OBJExportParams &export_params_;
   const Object *export_object_eval_;
   const Curve *export_curve_;
   float world_axes_transform_[4][4];
@@ -41,12 +40,14 @@ class OBJNurbs : NonMovable, NonCopyable {
 
   const char *get_curve_name() const;
   const ListBase *curve_nurbs() const;
-  float3 calc_point_coords(const Nurb *nurb, int vert_index) const;
-  int get_curve_num(const Nurb *nurb) const;
-  int get_curve_degree(const Nurb *nurb) const;
+  float3 calc_point_coords(const Nurb &nurb,
+                           const int vert_index,
+                           const float scaling_factor) const;
+  int get_curve_num(const Nurb &nurb) const;
+  int get_curve_degree(const Nurb &nurb) const;
 
  private:
-  void store_world_axes_transform();
+  void store_world_axes_transform(const eTransformAxisForward forward, const eTransformAxisUp up);
 };
 
 }  // namespace blender::io::obj
