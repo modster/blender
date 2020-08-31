@@ -2291,6 +2291,7 @@ class VIEW3D_MT_object(Menu):
         layout.separator()
 
         layout.menu("VIEW3D_MT_object_showhide")
+        layout.menu("VIEW3D_MT_object_cleanup")
 
         layout.separator()
 
@@ -2728,6 +2729,20 @@ class VIEW3D_MT_object_showhide(Menu):
 
         layout.operator("object.hide_view_set", text="Hide Selected").unselected = False
         layout.operator("object.hide_view_set", text="Hide Unselected").unselected = True
+
+
+class VIEW3D_MT_object_cleanup(Menu):
+    bl_label = "Clean Up"
+
+    def draw(self, _context):
+        layout = self.layout
+
+        layout.operator("object.vertex_group_clean", text="Clean Vertex Group Weights").group_select_mode = 'ALL'
+        layout.operator("object.vertex_group_limit_total", text="Limit Total Vertex Groups").group_select_mode = 'ALL'
+
+        layout.separator()
+
+        layout.operator("object.material_slot_remove_unused", text="Remove Unused Material Slots")
 
 
 class VIEW3D_MT_make_single_user(Menu):
@@ -7451,6 +7466,7 @@ classes = (
     VIEW3D_MT_object_constraints,
     VIEW3D_MT_object_quick_effects,
     VIEW3D_MT_object_showhide,
+    VIEW3D_MT_object_cleanup,
     VIEW3D_MT_make_single_user,
     VIEW3D_MT_make_links,
     VIEW3D_MT_brush_paint_modes,
