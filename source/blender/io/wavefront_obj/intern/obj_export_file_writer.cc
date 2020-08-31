@@ -190,18 +190,15 @@ void OBJWriter::write_uv_coords(OBJMesh &obj_mesh_data, Vector<Vector<uint>> &uv
 void OBJWriter::write_poly_normals(OBJMesh &obj_mesh_data) const
 {
   obj_mesh_data.ensure_mesh_normals();
-  obj_mesh_data.calc_smooth_groups();
-  if (obj_mesh_data.tot_smooth_groups() > 0) {
-    float vertex_normal[3];
+  if (export_params_.export_smooth_groups && obj_mesh_data.tot_smooth_groups() > 0) {
     for (uint i = 0; i < obj_mesh_data.tot_vertices(); i++) {
-      obj_mesh_data.calc_vertex_normal(i, vertex_normal);
+      float3 vertex_normal = obj_mesh_data.calc_vertex_normal(i);
       fprintf(outfile_, "vn %f %f %f\n", vertex_normal[0], vertex_normal[1], vertex_normal[2]);
     }
   }
   else {
-    float poly_normal[3];
     for (uint i = 0; i < obj_mesh_data.tot_polygons(); i++) {
-      obj_mesh_data.calc_poly_normal(i, poly_normal);
+      float3 poly_normal = obj_mesh_data.calc_poly_normal(i);
       fprintf(outfile_, "vn %f %f %f\n", poly_normal[0], poly_normal[1], poly_normal[2]);
     }
   }
@@ -215,7 +212,7 @@ void OBJWriter::write_smooth_group(const OBJMesh &obj_mesh_data,
                                    const uint poly_index,
                                    int &r_last_face_smooth_group) const
 {
-  if (!export_params_.export_smooth_groups || !obj_mesh_data.tot_smooth_groups()) {
+  if (!export_params_.export_smooth_groups || obj_mesh_data.tot_smooth_groups() <= 0) {
     return;
   }
   if (obj_mesh_data.get_ith_poly(poly_index).flag & ME_SMOOTH) {
@@ -418,7 +415,10 @@ void OBJWriter::update_index_offsets(const OBJMesh &obj_mesh_data)
 {
   index_offset_[VERTEX_OFF] += obj_mesh_data.tot_vertices();
   index_offset_[UV_VERTEX_OFF] += obj_mesh_data.tot_uv_vertices();
-  index_offset_[NORMAL_OFF] += obj_mesh_data.tot_normals();
+  index_offset_[NORMAL_OFF] += (export_params_.export_smooth_groups &&
+                                obj_mesh_data.tot_smooth_groups()) ?
+                                   obj_mesh_data.tot_vertices() :
+                                   obj_mesh_data.tot_polygons();
 }
 
 /**
