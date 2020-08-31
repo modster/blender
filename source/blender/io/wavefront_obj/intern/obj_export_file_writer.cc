@@ -300,12 +300,12 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data,
   Vector<uint> vertex_indices;
   Vector<uint> normal_indices;
 
-  /* -1 has no significant value, it could have been any negative number. */
+  /* -1 has no significant value, it can be any negative number. */
   int last_face_smooth_group = -1;
-  /* -1 is used for a face having no vertex group. It could have been any _other_ negative
+  /* -1 is used to denote face having no vertex group. It can be any _other_ negative
    * number. */
   short last_face_vertex_group = -2;
-  /* -1 has no significant value, it could have been any negative number. */
+  /* -1 has no significant value, it can be any negative number. */
   short last_face_mat_nr = -1;
 
   void (OBJWriter::*func_vert_uv_normal_indices)(Span<uint> vert_indices,

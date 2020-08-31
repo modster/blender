@@ -61,8 +61,8 @@ struct OBJExportParams {
   int end_frame;
 
   /** Geometry Transform options. */
-  int forward_axis;
-  int up_axis;
+  eTransformAxisForward forward_axis;
+  eTransformAxisUp up_axis;
   float scaling_factor;
 
   /** File Write Options. */
