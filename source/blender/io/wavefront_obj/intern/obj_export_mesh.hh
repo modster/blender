@@ -40,7 +40,6 @@ namespace blender::io::obj {
 class OBJMesh : NonMovable, NonCopyable {
  private:
   Depsgraph *depsgraph_;
-  const OBJExportParams &export_params_;
 
   Object *export_object_eval_;
   Mesh *export_mesh_eval_;
@@ -82,7 +81,7 @@ class OBJMesh : NonMovable, NonCopyable {
 
   void ensure_mesh_normals() const;
   void ensure_mesh_edges() const;
-  void calc_smooth_groups();
+  void calc_smooth_groups(const bool use_bitflags);
   const Material *get_object_material(const short mat_nr) const;
 
   bool is_ith_poly_smooth(const uint poly_index) const;
@@ -93,7 +92,7 @@ class OBJMesh : NonMovable, NonCopyable {
   const char *get_object_mesh_name() const;
   const char *get_object_material_name(const short mat_nr) const;
 
-  float3 calc_vertex_coords(const uint vert_index) const;
+  float3 calc_vertex_coords(const uint vert_index, const float scaling_factor) const;
   void calc_poly_vertex_indices(const uint poly_index, Vector<uint> &r_poly_vertex_indices) const;
   void store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coords,
                                    Vector<Vector<uint>> &r_uv_indices);
@@ -104,6 +103,6 @@ class OBJMesh : NonMovable, NonCopyable {
 
  private:
   void triangulate_mesh_eval();
-  void store_world_axes_transform();
+  void store_world_axes_transform(const eTransformAxisForward forward, const eTransformAxisUp up);
 };
 }  // namespace blender::io::obj
