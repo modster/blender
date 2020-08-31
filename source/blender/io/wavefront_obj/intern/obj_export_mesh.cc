@@ -50,7 +50,7 @@ namespace blender::io::obj {
  * meshes.
  */
 OBJMesh::OBJMesh(Depsgraph *depsgraph, const OBJExportParams &export_params, Object *export_object)
-    : depsgraph_(depsgraph), export_params_(export_params), export_object_eval_(export_object)
+    : depsgraph_(depsgraph), export_object_eval_(export_object)
 {
   export_object_eval_ = DEG_get_evaluated_object(depsgraph_, export_object);
   export_mesh_eval_ = BKE_object_get_evaluated_mesh(export_object_eval_);
@@ -69,7 +69,7 @@ OBJMesh::OBJMesh(Depsgraph *depsgraph, const OBJExportParams &export_params, Obj
     case OB_SURF:
       ATTR_FALLTHROUGH;
     case OB_MESH: {
-      if (export_params_.export_triangulated_mesh) {
+      if (export_params.export_triangulated_mesh) {
         triangulate_mesh_eval();
       }
       break;
@@ -78,7 +78,7 @@ OBJMesh::OBJMesh(Depsgraph *depsgraph, const OBJExportParams &export_params, Obj
       break;
     }
   }
-  store_world_axes_transform();
+  store_world_axes_transform(export_params.forward_axis, export_params.up_axis);
 }
 
 /**
@@ -129,16 +129,14 @@ void OBJMesh::triangulate_mesh_eval()
  * Store the product of export axes settings and an object's world transform matrix in
  * world_and_axes_transform[4][4].
  */
-void OBJMesh::store_world_axes_transform()
+void OBJMesh::store_world_axes_transform(const eTransformAxisForward forward,
+                                         const eTransformAxisUp up)
 {
   float axes_transform[3][3];
   unit_m3(axes_transform);
   /* -Y-forward and +Z-up are the default Blender axis settings. */
-  mat3_from_axis_conversion(OBJ_AXIS_NEGATIVE_Y_FORWARD,
-                            OBJ_AXIS_Z_UP,
-                            export_params_.forward_axis,
-                            export_params_.up_axis,
-                            axes_transform);
+  mat3_from_axis_conversion(
+      OBJ_AXIS_NEGATIVE_Y_FORWARD, OBJ_AXIS_Z_UP, forward, up, axes_transform);
   mul_m4_m3m4(world_and_axes_transform_, axes_transform, export_object_eval_->obmat);
   /* mul_m4_m3m4 does not copy last row of obmat, i.e. location data. */
   copy_v4_v4(world_and_axes_transform_[3], export_object_eval_->obmat[3]);
@@ -209,10 +207,9 @@ void OBJMesh::ensure_mesh_edges() const
  * \return A polygon aligned array of smooth group numbers or bitflags if export
  * settings specify so.
  */
-void OBJMesh::calc_smooth_groups()
+void OBJMesh::calc_smooth_groups(const bool use_bitflags)
 {
   int tot_smooth_groups = 0;
-  const bool use_bitflags = export_params_.smooth_groups_bitflags;
   poly_smooth_groups_ = BKE_mesh_calc_smoothgroups(export_mesh_eval_->medge,
                                                    export_mesh_eval_->totedge,
                                                    export_mesh_eval_->mpoly,
@@ -280,12 +277,12 @@ const char *OBJMesh::get_object_material_name(short mat_nr) const
 /**
  * Calculate coordinates of a vertex at the given index.
  */
-float3 OBJMesh::calc_vertex_coords(const uint vert_index) const
+float3 OBJMesh::calc_vertex_coords(const uint vert_index, const float scaling_factor) const
 {
   float3 r_coords;
   copy_v3_v3(r_coords, export_mesh_eval_->mvert[vert_index].co);
   mul_m4_v3(world_and_axes_transform_, r_coords);
-  mul_v3_fl(r_coords, export_params_.scaling_factor);
+  mul_v3_fl(r_coords, scaling_factor);
   return r_coords;
 }
 

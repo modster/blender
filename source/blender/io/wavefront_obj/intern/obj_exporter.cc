@@ -134,7 +134,7 @@ static void export_frame(ViewLayer *view_layer,
     if (mesh_to_export->tot_polygons() > 0) {
       Vector<Vector<uint>> uv_indices;
       if (export_params.export_smooth_groups) {
-        mesh_to_export->calc_smooth_groups();
+        mesh_to_export->calc_smooth_groups(export_params.smooth_groups_bitflags);
       }
       if (export_params.export_normals) {
         frame_writer.write_poly_normals(*mesh_to_export);

@@ -168,7 +168,7 @@ void OBJWriter::write_object_name(const OBJMesh &obj_mesh_data) const
 void OBJWriter::write_vertex_coords(const OBJMesh &obj_mesh_data) const
 {
   for (uint i = 0; i < obj_mesh_data.tot_vertices(); i++) {
-    float3 vertex = obj_mesh_data.calc_vertex_coords(i);
+    float3 vertex = obj_mesh_data.calc_vertex_coords(i, export_params_.scaling_factor);
     fprintf(outfile_, "v %f %f %f\n", vertex[0], vertex[1], vertex[2]);
   }
 }
