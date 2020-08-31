@@ -115,6 +115,7 @@
 #include "BKE_action.h"
 #include "BKE_anim_data.h"
 #include "BKE_armature.h"
+#include "BKE_asset.h"
 #include "BKE_brush.h"
 #include "BKE_collection.h"
 #include "BKE_colortools.h"
@@ -2437,12 +2438,6 @@ static int direct_link_id_restore_recalc(const FileData *fd,
   return recalc;
 }
 
-static void direct_link_assetdata(BlendDataReader *reader, AssetData *asset_data)
-{
-  BLO_read_data_address(reader, &asset_data->description);
-  BLO_read_list(reader, &asset_data->tags);
-}
-
 static void direct_link_id_common(
     BlendDataReader *reader, Library *current_library, ID *id, ID *id_old, const int tag)
 {
@@ -2472,7 +2467,7 @@ static void direct_link_id_common(
 
   if (id->asset_data) {
     BLO_read_data_address(reader, &id->asset_data);
-    direct_link_assetdata(reader, id->asset_data);
+    BKE_assetdata_read(reader, id->asset_data);
   }
 
   /*link direct data of ID properties*/

@@ -660,45 +660,6 @@ static void writelist_id(WriteData *wd, int filecode, const char *structname, co
  * These functions are used by blender's .blend system for file saving/loading.
  * \{ */
 
-static void write_assetdata(BlendWriter *writer, AssetData *asset_data)
-{
-  BLO_write_struct(writer, AssetData, asset_data);
-
-  if (asset_data->description) {
-    BLO_write_string(writer, asset_data->description);
-  }
-  LISTBASE_FOREACH (CustomTag *, tag, &asset_data->tags) {
-    BLO_write_struct(writer, CustomTag, tag);
-  }
-}
-
-static void write_iddata(BlendWriter *writer, ID *id)
-{
-  /* ID_WM's id->properties are considered runtime only, and never written in .blend file. */
-  if (id->properties && !ELEM(GS(id->name), ID_WM)) {
-    IDP_BlendWrite(writer, id->properties);
-  }
-
-  if (id->override_library) {
-    BLO_write_struct(writer, IDOverrideLibrary, id->override_library);
-
-    BLO_write_struct_list(writer, IDOverrideLibraryProperty, &id->override_library->properties);
-    LISTBASE_FOREACH (IDOverrideLibraryProperty *, op, &id->override_library->properties) {
-      BLO_write_string(writer, op->rna_path);
-
-      BLO_write_struct_list(writer, IDOverrideLibraryPropertyOperation, &op->operations);
-      LISTBASE_FOREACH (IDOverrideLibraryPropertyOperation *, opop, &op->operations) {
-        if (opop->subitem_reference_name) {
-          BLO_write_string(writer, opop->subitem_reference_name);
-        }
-        if (opop->subitem_local_name) {
-          BLO_write_string(writer, opop->subitem_local_name);
-        }
-      }
-    }
-  }
-}
-
 static void write_previews(BlendWriter *writer, const PreviewImage *prv_orig)
 {
   /* Note we write previews also for undo steps. It takes up some memory,

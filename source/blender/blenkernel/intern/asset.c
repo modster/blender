@@ -27,8 +27,11 @@
 #include "BKE_asset.h"
 #include "BKE_icons.h"
 
+#include "DNA_ID.h"
 #include "DNA_asset_types.h"
 #include "DNA_defaults.h"
+
+#include "BLO_read_write.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -75,4 +78,26 @@ struct CustomTagEnsureResult BKE_assetdata_tag_ensure(AssetData *asset_data, con
 void BKE_assetdata_tag_remove(AssetData *asset_data, CustomTag *tag)
 {
   BLI_freelinkN(&asset_data->tags, tag);
+}
+
+/* .blend file API -------------------------------------------- */
+
+void BKE_assetdata_write(BlendWriter *writer, AssetData *asset_data)
+{
+  BLO_write_struct(writer, AssetData, asset_data);
+
+  if (asset_data->description) {
+    BLO_write_string(writer, asset_data->description);
+  }
+  LISTBASE_FOREACH (CustomTag *, tag, &asset_data->tags) {
+    BLO_write_struct(writer, CustomTag, tag);
+  }
+}
+
+void BKE_assetdata_read(BlendDataReader *reader, AssetData *asset_data)
+{
+  /* asset_data itself has been read already. */
+
+  BLO_read_data_address(reader, &asset_data->description);
+  BLO_read_list(reader, &asset_data->tags);
 }
