@@ -21,8 +21,8 @@
  * \ingroup obj
  */
 
-#include "BLI_math.h"
 #include "BLI_float3.hh"
+#include "BLI_math.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"

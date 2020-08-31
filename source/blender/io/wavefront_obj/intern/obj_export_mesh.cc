@@ -177,7 +177,8 @@ short OBJMesh::tot_col() const
  */
 uint OBJMesh::tot_smooth_groups() const
 {
-  BLI_assert(tot_smooth_groups_ == -1);
+  /* Calculate smooth groups first. */
+  BLI_assert(tot_smooth_groups_ != -1);
   return tot_smooth_groups_;
 }
 
@@ -186,6 +187,8 @@ uint OBJMesh::tot_smooth_groups() const
  */
 int OBJMesh::ith_smooth_group(int poly_index) const
 {
+  /* Calculate smooth groups first. */
+  BLI_assert(tot_smooth_groups_ != -1);
   BLI_assert(poly_smooth_groups_);
   return poly_smooth_groups_[poly_index];
 }
@@ -229,9 +232,21 @@ const Material *OBJMesh::get_object_material(const short mat_nr) const
   return BKE_object_material_get(export_object_eval_, mat_nr);
 }
 
-const MPoly &OBJMesh::get_ith_poly(const uint i) const
+bool OBJMesh::is_ith_poly_smooth(const uint poly_index) const
 {
-  return export_mesh_eval_->mpoly[i];
+  return export_mesh_eval_->mpoly[poly_index].flag & ME_SMOOTH;
+}
+
+short OBJMesh::ith_poly_matnr(const uint poly_index) const
+{
+  BLI_assert(poly_index < export_mesh_eval_->totpoly);
+  return export_mesh_eval_->mpoly[poly_index].mat_nr;
+}
+
+int OBJMesh::ith_poly_totloop(const uint poly_index) const
+{
+  BLI_assert(poly_index < export_mesh_eval_->totpoly);
+  return export_mesh_eval_->mpoly[poly_index].totloop;
 }
 
 /**
@@ -368,26 +383,6 @@ float3 OBJMesh::calc_vertex_normal(const uint vert_index) const
 }
 
 /**
- * Calculate face normal indices of all vertices in a polygon.
- */
-void OBJMesh::calc_poly_normal_indices(const uint poly_index, Vector<uint> &r_normal_indices) const
-{
-  r_normal_indices.resize(export_mesh_eval_->mpoly[poly_index].totloop);
-  if (export_params_.export_smooth_groups && tot_smooth_groups_ > 0) {
-    const MPoly &mpoly = export_mesh_eval_->mpoly[poly_index];
-    const MLoop *mloop = &export_mesh_eval_->mloop[mpoly.loopstart];
-    for (int i = 0; i < r_normal_indices.size(); i++) {
-      r_normal_indices[i] = mloop[i].v + 1;
-    }
-  }
-  else {
-    for (int i = 0; i < r_normal_indices.size(); i++) {
-      r_normal_indices[i] = poly_index + 1;
-    }
-  }
-}
-
-/**
  * Find the name of the vertex group with the maximum number of vertices in a poly.
  *
  * If no vertex belongs to any group, returned name is "off".
@@ -399,9 +394,11 @@ void OBJMesh::calc_poly_normal_indices(const uint poly_index, Vector<uint> &r_no
  * \param r_last_vertex_group stores the index of the vertex group found in last iteration,
  * indexing into Object->defbase.
  */
-const char *OBJMesh::get_poly_deform_group_name(const MPoly &mpoly,
+const char *OBJMesh::get_poly_deform_group_name(const uint poly_index,
                                                 short &r_last_vertex_group) const
 {
+  BLI_assert(poly_index < export_mesh_eval_->totpoly);
+  const MPoly &mpoly = export_mesh_eval_->mpoly[poly_index];
   const MLoop *mloop = &export_mesh_eval_->mloop[mpoly.loopstart];
   const uint tot_deform_groups = BLI_listbase_count(&export_object_eval_->defbase);
   /* Indices of the vector index into deform groups of an object; values are the number of vertex

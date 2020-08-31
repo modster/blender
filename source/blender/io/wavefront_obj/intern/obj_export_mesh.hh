@@ -84,7 +84,10 @@ class OBJMesh : NonMovable, NonCopyable {
   void ensure_mesh_edges() const;
   void calc_smooth_groups();
   const Material *get_object_material(const short mat_nr) const;
-  const MPoly &get_ith_poly(const uint i) const;
+
+  bool is_ith_poly_smooth(const uint poly_index) const;
+  short ith_poly_matnr(const uint poly_index) const;
+  int ith_poly_totloop(const uint poly_index) const;
 
   const char *get_object_name() const;
   const char *get_object_mesh_name() const;
@@ -96,8 +99,7 @@ class OBJMesh : NonMovable, NonCopyable {
                                    Vector<Vector<uint>> &r_uv_indices);
   float3 calc_poly_normal(const uint poly_index) const;
   float3 calc_vertex_normal(const uint vert_index) const;
-  void calc_poly_normal_indices(const uint poly_index, Vector<uint> &r_normal_indices) const;
-  const char *get_poly_deform_group_name(const MPoly &mpoly, short &r_last_vertex_group) const;
+  const char *get_poly_deform_group_name(const uint poly_index, short &r_last_vertex_group) const;
   std::optional<std::array<int, 2>> calc_edge_vert_indices(const uint edge_index) const;
 
  private:
