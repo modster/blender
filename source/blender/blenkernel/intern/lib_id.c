@@ -56,6 +56,7 @@
 
 #include "BKE_anim_data.h"
 #include "BKE_armature.h"
+#include "BKE_asset.h"
 #include "BKE_bpath.h"
 #include "BKE_context.h"
 #include "BKE_global.h"
@@ -74,6 +75,8 @@
 #include "DEG_depsgraph.h"
 
 #include "RNA_access.h"
+
+#include "BLO_read_write.h"
 
 #include "atomic_ops.h"
 
@@ -337,13 +340,16 @@ static int lib_id_expand_local_cb(LibraryIDLinkCallbackData *cb_data)
   int const cb_flag = cb_data->cb_flag;
 
   if (cb_flag & IDWALK_CB_LOOPBACK) {
-    /* We should never have anything to do with loopback pointers here. */
+    /* We should never have anything to do with loop-back pointers here. */
     return IDWALK_RET_NOP;
   }
 
   if (cb_flag & IDWALK_CB_EMBEDDED) {
-    /* Embedded data-blocks need to be made fully local as well. */
-    if (*id_pointer != NULL) {
+    /* Embedded data-blocks need to be made fully local as well.
+     * Note however that in some cases (when owner ID had to be duplicated instead of being made
+     * local directly), its embedded IDs should also have already been duplicated, and hence be
+     * fully local here already. */
+    if (*id_pointer != NULL && ID_IS_LINKED(*id_pointer)) {
       BLI_assert(*id_pointer != id_self);
 
       lib_id_clear_library_data_ex(bmain, *id_pointer);
@@ -2324,5 +2330,36 @@ void BKE_id_reorder(const ListBase *lb, ID *id, ID *relative, bool after)
     }
 
     *id_order = relative_order - 1;
+  }
+}
+
+void BKE_id_blend_write(BlendWriter *writer, ID *id)
+{
+  if (id->asset_data) {
+    BKE_assetdata_write(writer, id->asset_data);
+  }
+
+  /* ID_WM's id->properties are considered runtime only, and never written in .blend file. */
+  if (id->properties && !ELEM(GS(id->name), ID_WM)) {
+    IDP_BlendWrite(writer, id->properties);
+  }
+
+  if (id->override_library) {
+    BLO_write_struct(writer, IDOverrideLibrary, id->override_library);
+
+    BLO_write_struct_list(writer, IDOverrideLibraryProperty, &id->override_library->properties);
+    LISTBASE_FOREACH (IDOverrideLibraryProperty *, op, &id->override_library->properties) {
+      BLO_write_string(writer, op->rna_path);
+
+      BLO_write_struct_list(writer, IDOverrideLibraryPropertyOperation, &op->operations);
+      LISTBASE_FOREACH (IDOverrideLibraryPropertyOperation *, opop, &op->operations) {
+        if (opop->subitem_reference_name) {
+          BLO_write_string(writer, opop->subitem_reference_name);
+        }
+        if (opop->subitem_local_name) {
+          BLO_write_string(writer, opop->subitem_local_name);
+        }
+      }
+    }
   }
 }

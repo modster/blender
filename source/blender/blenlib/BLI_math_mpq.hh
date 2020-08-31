@@ -12,32 +12,25 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 by Mike Erwin.
- * All rights reserved.
- */
-
-/** \file
- * \ingroup gpu
- *
- * GPU vertex attribute binding
  */
 
 #pragma once
 
-#include "GPU_vertex_format.h"
-#include "gpu_shader_interface.hh"
+/** \file
+ * \ingroup bli
+ */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifdef WITH_GMP
 
-/* TODO(fclem) remove, use shaderface directly. */
-void AttrBinding_clear(GPUAttrBinding *binding);
+/* This file uses an external file header to define the multi-precision
+ * rational type, mpq_class.
+ * This class keeps separate multi-precision integer numerator and
+ * denominator, reduced to lowest terms after each arithmetic operation.
+ * It can be used where it is important to have exact arithmetic results.
+ *
+ * See gmplib.org for full documentation. In particular:
+ * https://gmplib.org/manual/C_002b_002b-Interface-Rationals
+ */
+#  include "gmpxx.h"
 
-void get_attr_locations(const GPUVertFormat *format, GPUAttrBinding *binding, GPUShader *shader);
-uint read_attr_location(const GPUAttrBinding *binding, uint a_idx);
-
-#ifdef __cplusplus
-}
-#endif
+#endif /* WITH_GMP */
