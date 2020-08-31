@@ -888,7 +888,7 @@ bool BlenderSession::draw(int w, int h)
 
       sync->sync_view(b_v3d, b_rv3d, width, height);
 
-      if (scene->camera->need_update)
+      if (scene->camera->is_modified())
         reset = true;
 
       session->scene->mutex.unlock();

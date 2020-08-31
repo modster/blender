@@ -431,8 +431,6 @@ void BlenderSync::sync_motion(BL::RenderSettings &b_render,
   if (b_override)
     b_cam = b_override;
 
-  Camera prevcam = *(scene->camera);
-
   int frame_center = b_scene.frame_current();
   float subframe_center = b_scene.frame_subframe();
   float frame_center_delta = 0.0f;
@@ -505,10 +503,6 @@ void BlenderSync::sync_motion(BL::RenderSettings &b_render,
   python_thread_state_restore(python_thread_state);
   b_engine.frame_set(frame_center, subframe_center);
   python_thread_state_save(python_thread_state);
-
-  /* tag camera for motion update */
-  if (scene->camera->motion_modified(prevcam))
-    scene->camera->tag_update();
 }
 
 CCL_NAMESPACE_END

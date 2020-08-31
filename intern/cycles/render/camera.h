@@ -73,78 +73,92 @@ class Camera : public Node {
   };
 
   /* motion blur */
-  float shuttertime;
-  MotionPosition motion_position;
-  array<float> shutter_curve;
+  NODE_PUBLIC_API(float, shuttertime)
+  NODE_PUBLIC_API(MotionPosition, motion_position)
+  NODE_PUBLIC_API(array<float>, shutter_curve)
   size_t shutter_table_offset;
 
   /* ** Rolling shutter effect. ** */
   /* Defines rolling shutter effect type. */
-  RollingShutterType rolling_shutter_type;
+  NODE_PUBLIC_API(RollingShutterType, rolling_shutter_type)
   /* Specifies exposure time of scanlines when using
    * rolling shutter effect.
    */
-  float rolling_shutter_duration;
+  NODE_PUBLIC_API(float, rolling_shutter_duration)
 
   /* depth of field */
-  float focaldistance;
-  float aperturesize;
-  uint blades;
-  float bladesrotation;
+  NODE_PUBLIC_API(float, focaldistance)
+  NODE_PUBLIC_API(float, aperturesize)
+  NODE_PUBLIC_API(uint, blades)
+  NODE_PUBLIC_API(float, bladesrotation)
 
   /* type */
-  CameraType type;
-  float fov;
+  NODE_PUBLIC_API(CameraType, camera_type)
+  NODE_PUBLIC_API(float, fov)
 
   /* panorama */
-  PanoramaType panorama_type;
-  float fisheye_fov;
-  float fisheye_lens;
-  float latitude_min;
-  float latitude_max;
-  float longitude_min;
-  float longitude_max;
+  NODE_PUBLIC_API(PanoramaType, panorama_type)
+  NODE_PUBLIC_API(float, fisheye_fov)
+  NODE_PUBLIC_API(float, fisheye_lens)
+  NODE_PUBLIC_API(float, latitude_min)
+  NODE_PUBLIC_API(float, latitude_max)
+  NODE_PUBLIC_API(float, longitude_min)
+  NODE_PUBLIC_API(float, longitude_max)
 
   /* panorama stereo */
-  StereoEye stereo_eye;
-  bool use_spherical_stereo;
-  float interocular_distance;
-  float convergence_distance;
-  bool use_pole_merge;
-  float pole_merge_angle_from;
-  float pole_merge_angle_to;
+  NODE_PUBLIC_API(StereoEye, stereo_eye)
+  NODE_PUBLIC_API(bool, use_spherical_stereo)
+  NODE_PUBLIC_API(float, interocular_distance)
+  NODE_PUBLIC_API(float, convergence_distance)
+  NODE_PUBLIC_API(bool, use_pole_merge)
+  NODE_PUBLIC_API(float, pole_merge_angle_from)
+  NODE_PUBLIC_API(float, pole_merge_angle_to)
 
   /* anamorphic lens bokeh */
-  float aperture_ratio;
+  NODE_PUBLIC_API(float, aperture_ratio)
 
   /* sensor */
-  float sensorwidth;
-  float sensorheight;
+  NODE_PUBLIC_API(float, sensorwidth)
+  NODE_PUBLIC_API(float, sensorheight)
 
   /* clipping */
-  float nearclip;
-  float farclip;
+  NODE_PUBLIC_API(float, nearclip)
+  NODE_PUBLIC_API(float, farclip)
 
   /* screen */
-  int width, height;
-  int resolution;
   BoundBox2D viewplane;
+  NODE_PUBLIC_API_STRUCT_MEMBER(float, viewplane, left)
+  NODE_PUBLIC_API_STRUCT_MEMBER(float, viewplane, right)
+  NODE_PUBLIC_API_STRUCT_MEMBER(float, viewplane, bottom)
+  NODE_PUBLIC_API_STRUCT_MEMBER(float, viewplane, top)
+
   /* width and height change during preview, so we need these for calculating dice rates. */
-  int full_width, full_height;
+  NODE_PUBLIC_API(int, full_width)
+  NODE_PUBLIC_API(int, full_height)
   /* controls how fast the dicing rate falls off for geometry out side of view */
-  float offscreen_dicing_scale;
+  NODE_PUBLIC_API(float, offscreen_dicing_scale)
 
   /* border */
   BoundBox2D border;
+  NODE_PUBLIC_API_STRUCT_MEMBER(float, border, left)
+  NODE_PUBLIC_API_STRUCT_MEMBER(float, border, right)
+  NODE_PUBLIC_API_STRUCT_MEMBER(float, border, bottom)
+  NODE_PUBLIC_API_STRUCT_MEMBER(float, border, top)
+
   BoundBox2D viewport_camera_border;
+  NODE_PUBLIC_API_STRUCT_MEMBER(float, viewport_camera_border, left)
+  NODE_PUBLIC_API_STRUCT_MEMBER(float, viewport_camera_border, right)
+  NODE_PUBLIC_API_STRUCT_MEMBER(float, viewport_camera_border, bottom)
+  NODE_PUBLIC_API_STRUCT_MEMBER(float, viewport_camera_border, top)
 
   /* transformation */
-  Transform matrix;
+  NODE_PUBLIC_API(Transform, matrix)
 
   /* motion */
-  array<Transform> motion;
-  bool use_perspective_motion;
-  float fov_pre, fov_post;
+  NODE_PUBLIC_API(array<Transform>, motion)
+  NODE_PUBLIC_API(bool, use_perspective_motion)
+  NODE_PUBLIC_API(float, fov_pre)
+  NODE_PUBLIC_API(float, fov_post)
 
   /* computed camera parameters */
   ProjectionTransform screentoworld;
@@ -172,7 +186,6 @@ class Camera : public Node {
   float3 frustum_top_normal;
 
   /* update */
-  bool need_update;
   bool need_device_update;
   bool need_flags_update;
   int previous_need_motion;
@@ -181,6 +194,12 @@ class Camera : public Node {
   KernelCamera kernel_camera;
   array<DecomposedTransform> kernel_camera_motion;
 
+  private:
+  int width;
+  int height;
+  int resolution;
+
+  public:
   /* functions */
   Camera();
   ~Camera();
@@ -193,8 +212,6 @@ class Camera : public Node {
   void device_update_volume(Device *device, DeviceScene *dscene, Scene *scene);
   void device_free(Device *device, DeviceScene *dscene, Scene *scene);
 
-  bool modified(const Camera &cam);
-  bool motion_modified(const Camera &cam);
   void tag_update();
 
   /* Public utility functions. */
@@ -207,6 +224,8 @@ class Camera : public Node {
   float motion_time(int step) const;
   int motion_step(float time) const;
   bool use_motion() const;
+
+  void set_screen_size_and_resolution(int width_, int height_, int resolution_);
 
  private:
   /* Private utility functions. */

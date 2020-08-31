@@ -373,7 +373,7 @@ bool Scene::need_data_update()
 
 bool Scene::need_reset()
 {
-  return need_data_update() || camera->need_update;
+  return need_data_update() || camera->is_modified();
 }
 
 void Scene::reset()
