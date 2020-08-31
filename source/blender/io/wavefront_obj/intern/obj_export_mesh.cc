@@ -245,7 +245,7 @@ const char *OBJMesh::get_object_name() const
 /**
  * Get object's mesh name.
  */
-const char *OBJMesh::get_object_data_name() const
+const char *OBJMesh::get_object_mesh_name() const
 {
   return export_mesh_eval_->id.name + 2;
 }
@@ -256,17 +256,22 @@ const char *OBJMesh::get_object_data_name() const
 const char *OBJMesh::get_object_material_name(short mat_nr) const
 {
   const Material *mat = BKE_object_material_get(export_object_eval_, mat_nr);
-  return mat->id.name + 2;
+#ifdef DEBUG
+  std::cerr << "Material not found for mat_nr" << mat_nr << std::endl;
+#endif
+  return mat ? mat->id.name + 2 : nullptr;
 }
 
 /**
  * Calculate coordinates of a vertex at the given index.
  */
-void OBJMesh::calc_vertex_coords(const uint vert_index, float r_coords[3]) const
+float3 OBJMesh::calc_vertex_coords(const uint vert_index) const
 {
+  float3 r_coords;
   copy_v3_v3(r_coords, export_mesh_eval_->mvert[vert_index].co);
   mul_m4_v3(world_and_axes_transform_, r_coords);
   mul_v3_fl(r_coords, export_params_.scaling_factor);
+  return r_coords;
 }
 
 /**
@@ -398,11 +403,10 @@ const char *OBJMesh::get_poly_deform_group_name(const MPoly &mpoly,
                                                 short &r_last_vertex_group) const
 {
   const MLoop *mloop = &export_mesh_eval_->mloop[mpoly.loopstart];
+  const uint tot_deform_groups = BLI_listbase_count(&export_object_eval_->defbase);
   /* Indices of the vector index into deform groups of an object; values are the number of vertex
    * members in one deform group. */
-  Vector<int> deform_group_members{};
-  const uint tot_deform_groups = BLI_listbase_count(&export_object_eval_->defbase);
-  deform_group_members.resize(tot_deform_groups, 0);
+  Vector<int> deform_group_members(tot_deform_groups, 0);
   /* Whether at least one vertex in the polygon belongs to any group. */
   bool found_group = false;
 
@@ -456,11 +460,11 @@ const char *OBJMesh::get_poly_deform_group_name(const MPoly &mpoly,
 /**
  * Only for curve converted to meshes and primitive circle: calculate vertex indices of one edge.
  */
-Array<int, 2> OBJMesh::calc_edge_vert_indices(const uint edge_index) const
+std::optional<std::array<int, 2>> OBJMesh::calc_edge_vert_indices(const uint edge_index) const
 {
   const MEdge &edge = export_mesh_eval_->medge[edge_index];
   if (edge.flag & ME_LOOSEEDGE) {
-    return {edge.v1 + 1, edge.v2 + 1};
+    return std::array<int, 2>{static_cast<int>(edge.v1 + 1), static_cast<int>(edge.v2 + 1)};
   }
   return {};
 }

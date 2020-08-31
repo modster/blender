@@ -41,8 +41,9 @@ class OBJNurbs : NonMovable, NonCopyable {
 
   const char *get_curve_name() const;
   const ListBase *curve_nurbs() const;
-  void calc_point_coords(const Nurb *nurb, int vert_index, float r_coords[3]) const;
-  void get_curve_info(const Nurb *nurb, int &r_nurbs_degree, int &r_curv_num) const;
+  float3 calc_point_coords(const Nurb *nurb, int vert_index) const;
+  int get_curve_num(const Nurb *nurb) const;
+  int get_curve_degree(const Nurb *nurb) const;
 
  private:
   void store_world_axes_transform();

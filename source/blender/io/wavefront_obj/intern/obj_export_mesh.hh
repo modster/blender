@@ -23,7 +23,10 @@
 
 #pragma once
 
+#include <optional>
+
 #include "BLI_array.hh"
+#include "BLI_float3.hh"
 #include "BLI_utility_mixins.hh"
 #include "BLI_vector.hh"
 
@@ -84,10 +87,10 @@ class OBJMesh : NonMovable, NonCopyable {
   const MPoly &get_ith_poly(const uint i) const;
 
   const char *get_object_name() const;
-  const char *get_object_data_name() const;
+  const char *get_object_mesh_name() const;
   const char *get_object_material_name(const short mat_nr) const;
 
-  void calc_vertex_coords(const uint vert_index, float r_coords[3]) const;
+  float3 calc_vertex_coords(const uint vert_index) const;
   void calc_poly_vertex_indices(const uint poly_index, Vector<uint> &r_poly_vertex_indices) const;
   void store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coords,
                                    Vector<Vector<uint>> &r_uv_indices);
@@ -95,7 +98,7 @@ class OBJMesh : NonMovable, NonCopyable {
   float3 calc_vertex_normal(const uint vert_index) const;
   void calc_poly_normal_indices(const uint poly_index, Vector<uint> &r_normal_indices) const;
   const char *get_poly_deform_group_name(const MPoly &mpoly, short &r_last_vertex_group) const;
-  Array<int, 2> calc_edge_vert_indices(const uint edge_index) const;
+  std::optional<std::array<int, 2>> calc_edge_vert_indices(const uint edge_index) const;
 
  private:
   void triangulate_mesh_eval();
