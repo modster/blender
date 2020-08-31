@@ -317,7 +317,7 @@ class MeshTest:
 
     def _add_modifier(self, test_object, modifier_spec: ModifierSpec):
         """
-        Add modifier to object and apply (if modifier_spec.apply_modifier is True)
+        Add modifier to object.
         :param test_object: bpy.types.Object - Blender object to apply modifier on.
         :param modifier_spec: ModifierSpec - ModifierSpec object with parameters
         """
@@ -557,32 +557,35 @@ class MeshTest:
                                         type(OperatorSpecObjectMode), type(ParticleSystemSpec), type(operation)))
 
         # Compare resulting mesh with expected one.
-        if self.verbose:
-            print("Comparing expected mesh with resulting mesh...")
-        evaluated_test_mesh = evaluated_test_object.data
-        expected_mesh = self.expected_object.data
-        if self.threshold:
-            compare_result = evaluated_test_mesh.unit_test_compare(mesh=expected_mesh, threshold=self.threshold)
-        else:
-            compare_result = evaluated_test_mesh.unit_test_compare(mesh=expected_mesh)
-        compare_success = (compare_result == 'Same')
-
-        # Also check if invalid geometry (which is never expected) had to be corrected...
-        validation_success = evaluated_test_mesh.validate(verbose=True) == False
-
-        if compare_success and validation_success:
+        if self.apply_modifier:
             if self.verbose:
-                print("Success!")
+                print("Comparing expected mesh with resulting mesh...")
+            evaluated_test_mesh = evaluated_test_object.data
+            expected_mesh = self.expected_object.data
+            if self.threshold:
+                compare_result = evaluated_test_mesh.unit_test_compare(mesh=expected_mesh, threshold=self.threshold)
+            else:
+                compare_result = evaluated_test_mesh.unit_test_compare(mesh=expected_mesh)
+            compare_success = (compare_result == 'Same')
 
-            # Clean up.
-            if self.verbose:
-                print("Cleaning up...")
-            # Delete evaluated_test_object.
-            bpy.ops.object.delete()
-            return True
+            # Also check if invalid geometry (which is never expected) had to be corrected...
+            validation_success = evaluated_test_mesh.validate(verbose=True) == False
 
+            if compare_success and validation_success:
+                if self.verbose:
+                    print("Success!")
+
+                # Clean up.
+                if self.verbose:
+                    print("Cleaning up...")
+                # Delete evaluated_test_object.
+                bpy.ops.object.delete()
+                return True
+
+            else:
+                return self._on_failed_test(compare_result, validation_success, evaluated_test_object)
         else:
-            return self._on_failed_test(compare_result, validation_success, evaluated_test_object)
+            print("Just visualizing")
 
 
 class RunTest:
