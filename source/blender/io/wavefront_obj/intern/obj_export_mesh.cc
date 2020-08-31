@@ -164,13 +164,6 @@ uint OBJMesh::tot_edges() const
   return export_mesh_eval_->totedge;
 }
 
-uint OBJMesh::tot_normals() const
-{
-  /* Calculate smooth groups first. Or use total polygons if suitable. */
-  BLI_assert(poly_smooth_groups_);
-  return tot_smooth_groups_ > 0 ? export_mesh_eval_->totvert : export_mesh_eval_->totpoly;
-}
-
 /**
  * Total materials in the object to export.
  */
@@ -184,6 +177,7 @@ short OBJMesh::tot_col() const
  */
 uint OBJMesh::tot_smooth_groups() const
 {
+  BLI_assert(tot_smooth_groups_ == -1);
   return tot_smooth_groups_;
 }
 
@@ -344,13 +338,15 @@ void OBJMesh::store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coo
 /**
  * Calculate face normal of a polygon at given index.
  */
-void OBJMesh::calc_poly_normal(const uint poly_index, float r_poly_normal[3]) const
+float3 OBJMesh::calc_poly_normal(const uint poly_index) const
 {
+  float3 r_poly_normal;
   const MPoly &poly_to_write = export_mesh_eval_->mpoly[poly_index];
   const MLoop &mloop = export_mesh_eval_->mloop[poly_to_write.loopstart];
   const MVert &mvert = *(export_mesh_eval_->mvert);
   BKE_mesh_calc_poly_normal(&poly_to_write, &mloop, &mvert, r_poly_normal);
   mul_mat3_m4_v3(world_and_axes_transform_, r_poly_normal);
+  return r_poly_normal;
 }
 
 /**
@@ -358,10 +354,12 @@ void OBJMesh::calc_poly_normal(const uint poly_index, float r_poly_normal[3]) co
  *
  * Should be used when a mesh is shaded smooth.
  */
-void OBJMesh::calc_vertex_normal(const uint vert_index, float r_vertex_normal[3]) const
+float3 OBJMesh::calc_vertex_normal(const uint vert_index) const
 {
+  float3 r_vertex_normal;
   normal_short_to_float_v3(r_vertex_normal, export_mesh_eval_->mvert[vert_index].no);
   mul_mat3_m4_v3(world_and_axes_transform_, r_vertex_normal);
+  return r_vertex_normal;
 }
 
 /**
@@ -370,7 +368,7 @@ void OBJMesh::calc_vertex_normal(const uint vert_index, float r_vertex_normal[3]
 void OBJMesh::calc_poly_normal_indices(const uint poly_index, Vector<uint> &r_normal_indices) const
 {
   r_normal_indices.resize(export_mesh_eval_->mpoly[poly_index].totloop);
-  if (tot_smooth_groups_ > 0) {
+  if (export_params_.export_smooth_groups && tot_smooth_groups_ > 0) {
     const MPoly &mpoly = export_mesh_eval_->mpoly[poly_index];
     const MLoop *mloop = &export_mesh_eval_->mloop[mpoly.loopstart];
     for (int i = 0; i < r_normal_indices.size(); i++) {

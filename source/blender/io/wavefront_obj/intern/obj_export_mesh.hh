@@ -59,7 +59,7 @@ class OBJMesh : NonMovable, NonCopyable {
   /**
    * Total smooth groups in an object.
    */
-  uint tot_smooth_groups_ = 0;
+  uint tot_smooth_groups_ = -1;
   /**
    * Smooth group of all the polygons. 0 if the polygon is not shaded smooth.
    */
@@ -73,7 +73,6 @@ class OBJMesh : NonMovable, NonCopyable {
   uint tot_polygons() const;
   uint tot_uv_vertices() const;
   uint tot_edges() const;
-  uint tot_normals() const;
   short tot_col() const;
   uint tot_smooth_groups() const;
   int ith_smooth_group(int poly_index) const;
@@ -92,8 +91,8 @@ class OBJMesh : NonMovable, NonCopyable {
   void calc_poly_vertex_indices(const uint poly_index, Vector<uint> &r_poly_vertex_indices) const;
   void store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coords,
                                    Vector<Vector<uint>> &r_uv_indices);
-  void calc_poly_normal(const uint poly_index, float r_poly_normal[3]) const;
-  void calc_vertex_normal(const uint vert_index, float r_vertex_normal[3]) const;
+  float3 calc_poly_normal(const uint poly_index) const;
+  float3 calc_vertex_normal(const uint vert_index) const;
   void calc_poly_normal_indices(const uint poly_index, Vector<uint> &r_normal_indices) const;
   const char *get_poly_deform_group_name(const MPoly &mpoly, short &r_last_vertex_group) const;
   Array<int, 2> calc_edge_vert_indices(const uint edge_index) const;
