@@ -22,6 +22,7 @@
  */
 
 #include "BLI_math.h"
+#include "BLI_float3.hh"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
@@ -74,27 +75,38 @@ const ListBase *OBJNurbs::curve_nurbs() const
 /**
  * Get coordinates of a vertex at given point index.
  */
-void OBJNurbs::calc_point_coords(const Nurb *nurb, const int vert_index, float r_coords[3]) const
+float3 OBJNurbs::calc_point_coords(const Nurb *nurb, const int vert_index) const
 {
+  float3 r_coord;
   BPoint *bpoint = nurb->bp;
   bpoint += vert_index;
-  copy_v3_v3(r_coords, bpoint->vec);
-  mul_m4_v3(world_axes_transform_, r_coords);
-  mul_v3_fl(r_coords, export_params_.scaling_factor);
+  copy_v3_v3(r_coord, bpoint->vec);
+  mul_m4_v3(world_axes_transform_, r_coord);
+  mul_v3_fl(r_coord, export_params_.scaling_factor);
+  return r_coord;
 }
 
 /**
- * Get nurbs' degree and number of "curv" points of a nurb.
+ * Get number of "curv" points of a nurb.
  */
-void OBJNurbs::get_curve_info(const Nurb *nurb, int &r_nurbs_degree, int &r_curv_num) const
+int OBJNurbs::get_curve_num(const Nurb *nurb) const
 {
-  r_nurbs_degree = nurb->orderu - 1;
+  const int r_nurbs_degree = nurb->orderu - 1;
   /* "curv_num" is the number of control points in a nurbs.
    * If it is cyclic, degree also adds up. */
-  r_curv_num = nurb->pntsv * nurb->pntsu;
+  int r_curv_num = nurb->pntsv * nurb->pntsu;
   if (nurb->flagu & CU_NURB_CYCLIC) {
     r_curv_num += r_nurbs_degree;
   }
+  return r_curv_num;
+}
+
+/**
+ * Get Nurb's degree.
+ */
+int OBJNurbs::get_curve_degree(const Nurb *nurb) const
+{
+  return nurb->orderu - 1;
 }
 
 }  // namespace blender::io::obj

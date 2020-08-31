@@ -99,7 +99,7 @@ static void linked_sockets_to_dest_id(Vector<const nodes::OutputSocketRef *> &r_
   Span<const nodes::InputSocketRef *> dest_inputs = object_dest_nodes.first()->inputs();
   const nodes::InputSocketRef *dest_socket = nullptr;
   for (const nodes::InputSocketRef *curr_socket : dest_inputs) {
-    if (STREQ(curr_socket->bsocket()->identifier, dest_socket_id.data())) {
+    if (STREQ(curr_socket->bsocket()->identifier, dest_socket_id.c_str())) {
       dest_socket = curr_socket;
       break;
     }
@@ -166,7 +166,7 @@ void MaterialWrap::init_bsdf_node(StringRefNull object_name)
   if (!export_mtl_->use_nodes) {
     fprintf(stderr,
             "No Principled-BSDF node found in the shader node tree of: '%s'.\n",
-            object_name.data());
+            object_name.c_str());
     bsdf_node_ = nullptr;
     return;
   }
@@ -179,7 +179,7 @@ void MaterialWrap::init_bsdf_node(StringRefNull object_name)
   }
   fprintf(stderr,
           "No Principled-BSDF node found in the shader node tree of: '%s'.\n",
-          object_name.data());
+          object_name.c_str());
   bsdf_node_ = nullptr;
 }
 

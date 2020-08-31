@@ -143,15 +143,19 @@ void OBJWriter::write_mtllib(const char *obj_filepath) const
 }
 
 /**
- * Write object name as it appears in the outliner.
+ * Write object name conditionally with mesh and material name.
  */
 void OBJWriter::write_object_name(const OBJMesh &obj_mesh_data) const
 {
   const char *object_name = obj_mesh_data.get_object_name();
 
   if (export_params_.export_object_groups) {
-    const char *object_data_name = obj_mesh_data.get_object_data_name();
-    fprintf(outfile_, "g %s_%s\n", object_name, object_data_name);
+    const char *object_mesh_name = obj_mesh_data.get_object_mesh_name();
+    if (export_params_.export_materials && export_params_.export_material_groups) {
+      const char *object_material_name = obj_mesh_data.get_object_material_name(0);
+      fprintf(outfile_, "g %s_%s_%s\n", object_name, object_mesh_name, object_material_name);
+    }
+    fprintf(outfile_, "g %s_%s\n", object_name, object_mesh_name);
   }
   else {
     fprintf(outfile_, "o %s\n", object_name);
@@ -163,9 +167,8 @@ void OBJWriter::write_object_name(const OBJMesh &obj_mesh_data) const
  */
 void OBJWriter::write_vertex_coords(const OBJMesh &obj_mesh_data) const
 {
-  float vertex[3];
   for (uint i = 0; i < obj_mesh_data.tot_vertices(); i++) {
-    obj_mesh_data.calc_vertex_coords(i, vertex);
+    float3 vertex = obj_mesh_data.calc_vertex_coords(i);
     fprintf(outfile_, "v %f %f %f\n", vertex[0], vertex[1], vertex[2]);
   }
 }
@@ -256,7 +259,7 @@ void OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
     const char *mat_name = obj_mesh_data.get_object_material_name(mat_nr + 1);
     if (export_params_.export_material_groups) {
       const char *object_name = obj_mesh_data.get_object_name();
-      const char *object_data_name = obj_mesh_data.get_object_data_name();
+      const char *object_data_name = obj_mesh_data.get_object_mesh_name();
       fprintf(outfile_, "g %s_%s_%s\n", object_name, object_data_name, mat_name);
     }
     fprintf(outfile_, "usemtl %s\n", mat_name);
@@ -348,15 +351,15 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data,
  */
 void OBJWriter::write_loose_edges(const OBJMesh &obj_mesh_data) const
 {
-  Array<int, 2> vertex_indices;
   obj_mesh_data.ensure_mesh_edges();
   for (uint edge_index = 0; edge_index < obj_mesh_data.tot_edges(); edge_index++) {
-    vertex_indices = obj_mesh_data.calc_edge_vert_indices(edge_index);
-    if (vertex_indices.size() == 2) {
+    std::optional<std::array<int, 2>> vertex_indices = obj_mesh_data.calc_edge_vert_indices(
+        edge_index);
+    if (vertex_indices) {
       fprintf(outfile_,
               "l %u %u\n",
-              vertex_indices[0] + index_offset_[VERTEX_OFF],
-              vertex_indices[1] + index_offset_[VERTEX_OFF]);
+              (*vertex_indices)[0] + index_offset_[VERTEX_OFF],
+              (*vertex_indices)[1] + index_offset_[VERTEX_OFF]);
     }
   }
 }
@@ -370,17 +373,15 @@ void OBJWriter::write_nurbs_curve(const OBJNurbs &obj_nurbs_data) const
   LISTBASE_FOREACH (const Nurb *, nurb, nurbs) {
     /* Total control points in a nurbs. */
     int tot_points = nurb->pntsv * nurb->pntsu;
-    float point_coord[3];
     for (int point_idx = 0; point_idx < tot_points; point_idx++) {
-      obj_nurbs_data.calc_point_coords(nurb, point_idx, point_coord);
+      float3 point_coord = obj_nurbs_data.calc_point_coords(nurb, point_idx);
       fprintf(outfile_, "v %f %f %f\n", point_coord[0], point_coord[1], point_coord[2]);
     }
 
     const char *nurbs_name = obj_nurbs_data.get_curve_name();
-    int nurbs_degree = 0;
+    int nurbs_degree = obj_nurbs_data.get_curve_degree(nurb);
     /* Number of vertices in the curve + degree of the curve if it is cyclic. */
-    int curv_num = 0;
-    obj_nurbs_data.get_curve_info(nurb, nurbs_degree, curv_num);
+    int curv_num = obj_nurbs_data.get_curve_num(nurb);
 
     fprintf(outfile_, "g %s\ncstype bspline\ndeg %d\n", nurbs_name, nurbs_degree);
     /**

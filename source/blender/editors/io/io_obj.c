@@ -323,7 +323,7 @@ void WM_OT_obj_export(struct wmOperatorType *ot)
                   true,
                   "Export Materials",
                   "Export MTL library. There must be a Principled-BSDF node for image textures to "
-                  "be exported to the MTL file.");
+                  "be exported to the MTL file");
   RNA_def_boolean(ot->srna,
                   "export_triangulated_mesh",
                   false,
