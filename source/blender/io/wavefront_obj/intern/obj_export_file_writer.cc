@@ -188,7 +188,7 @@ void OBJWriter::write_uv_coords(OBJMesh &obj_mesh_data, Vector<Vector<uint>> &uv
 }
 
 /**
- * Write all face normals or all vertex normals as vn x y z .
+ * Write vertex normals for smooth-shaded polygons, and face normals otherwise, as vn x y z .
  */
 void OBJWriter::write_poly_normals(OBJMesh &obj_mesh_data) const
 {
@@ -330,15 +330,15 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data, Span<Vector<ui
   /* Reset for every object. */
   tot_normals_ = 0;
   for (uint i = 0; i < obj_mesh_data.tot_polygons(); i++) {
-    obj_mesh_data.calc_poly_vertex_indices(i, vertex_indices);
-
     const int totloop = obj_mesh_data.ith_poly_totloop(i);
     normal_indices.resize(totloop);
+    vertex_indices.resize(totloop);
+    obj_mesh_data.calc_poly_vertex_indices(i, vertex_indices);
 
     if (obj_mesh_data.is_ith_poly_smooth(i)) {
       for (int j = 0; j < totloop; j++) {
         /* This is guaranteed because normals are written
-         * by going over mloops in the same order. */
+         * by going over `MLoop`s in the same order. */
         normal_indices[j] = tot_normals_ + j + 1;
       }
       tot_normals_ += totloop;
@@ -385,14 +385,15 @@ void OBJWriter::write_nurbs_curve(const OBJNurbs &obj_nurbs_data) const
     /* Total control points in a nurbs. */
     int tot_points = nurb->pntsv * nurb->pntsu;
     for (int point_idx = 0; point_idx < tot_points; point_idx++) {
-      float3 point_coord = obj_nurbs_data.calc_point_coords(nurb, point_idx);
+      float3 point_coord = obj_nurbs_data.calc_point_coords(
+          *nurb, point_idx, export_params_.scaling_factor);
       fprintf(outfile_, "v %f %f %f\n", point_coord[0], point_coord[1], point_coord[2]);
     }
 
     const char *nurbs_name = obj_nurbs_data.get_curve_name();
-    int nurbs_degree = obj_nurbs_data.get_curve_degree(nurb);
+    int nurbs_degree = obj_nurbs_data.get_curve_degree(*nurb);
     /* Number of vertices in the curve + degree of the curve if it is cyclic. */
-    int curv_num = obj_nurbs_data.get_curve_num(nurb);
+    int curv_num = obj_nurbs_data.get_curve_num(*nurb);
 
     fprintf(outfile_, "g %s\ncstype bspline\ndeg %d\n", nurbs_name, nurbs_degree);
     /**
@@ -428,6 +429,7 @@ void OBJWriter::update_index_offsets(const OBJMesh &obj_mesh_data)
   index_offset_[VERTEX_OFF] += obj_mesh_data.tot_vertices();
   index_offset_[UV_VERTEX_OFF] += obj_mesh_data.tot_uv_vertices();
   index_offset_[NORMAL_OFF] = tot_normals_;
+  tot_normals_ = 0;
 }
 
 /**
@@ -447,9 +449,7 @@ MTLWriter::MTLWriter(const char *obj_filepath)
 
 MTLWriter::~MTLWriter()
 {
-  if (mtl_outfile_) {
-    fclose(mtl_outfile_);
-  }
+  fclose(mtl_outfile_);
 }
 
 void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
