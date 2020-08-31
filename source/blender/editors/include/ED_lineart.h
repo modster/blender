@@ -435,10 +435,49 @@ typedef struct LineartBoundingArea {
 
 #define LRT_DOUBLE_CLOSE_ENOUGH(a, b) (((a) + DBL_EDGE_LIM) >= (b) && ((a)-DBL_EDGE_LIM) <= (b))
 
-BLI_INLINE double lineart_get_linear_ratio(double l, double r, double from_l);
 BLI_INLINE int lineart_LineIntersectTest2d(
     const double *a1, const double *a2, const double *b1, const double *b2, double *aRatio)
 {
+//#define USE_VECTOR_LINE_INTERSECTION
+#ifdef USE_VECTOR_LINE_INTERSECTION
+
+  /* from isect_line_line_v2_point() */
+
+  double s10[2], s32[2];
+  double div;
+
+  sub_v2_v2v2_db(s10, a2, a1);
+  sub_v2_v2v2_db(s32, b2, b1);
+
+  div = cross_v2v2_db(s10, s32);
+  if (div != 0.0f) {
+    const double u = cross_v2v2_db(a2, a1);
+    const double v = cross_v2v2_db(b2, b1);
+
+    const double rx = ((s32[0] * u) - (s10[0] * v)) / div;
+    const double ry = ((s32[1] * u) - (s10[1] * v)) / div;
+    double rr;
+
+    if (fabs(a2[0] - a1[0]) > fabs(a2[1] - a1[1])) {
+      *aRatio = ratiod(a1[0], a2[0], rx);
+      rr = ratiod(b1[0], b2[0], rx);
+      if ((*aRatio) > 0 && (*aRatio) < 1 && rr > 0 && rr < 1) {
+        return 1;
+      }
+      return 0;
+    }
+    else {
+      *aRatio = ratiod(a1[1], a2[1], ry);
+      rr = ratiod(b1[0], b2[0], rx);
+      if ((*aRatio) > 0 && (*aRatio) < 1 && rr > 0 && rr < 1) {
+        return 1;
+      }
+      return 0;
+    }
+  }
+  return 0;
+
+#else
   double k1, k2;
   double x;
   double y;
@@ -451,14 +490,14 @@ BLI_INLINE int lineart_LineIntersectTest2d(
       *aRatio = 0;
       return 0;
     }
-    double r2 = lineart_get_linear_ratio(b1[0], b2[0], a1[0]);
+    double r2 = ratiod(b1[0], b2[0], a1[0]);
     x = interpd(b2[0], b1[0], r2);
     y = interpd(b2[1], b1[1], r2);
-    *aRatio = ratio = lineart_get_linear_ratio(a1[1], a2[1], y);
+    *aRatio = ratio = ratiod(a1[1], a2[1], y);
   }
   else {
     if (LRT_DOUBLE_CLOSE_ENOUGH(x_diff2, 0)) {
-      ratio = lineart_get_linear_ratio(a1[0], a2[0], b1[0]);
+      ratio = ratiod(a1[0], a2[0], b1[0]);
       x = interpd(a2[0], a1[0], ratio);
       *aRatio = ratio;
     }
@@ -488,12 +527,7 @@ BLI_INLINE int lineart_LineIntersectTest2d(
     return 0;
 
   return 1;
-}
-
-BLI_INLINE double lineart_get_linear_ratio(double l, double r, double from_l)
-{
-  double ra = (from_l - l) / (r - l);
-  return ra;
+#endif
 }
 
 int ED_lineart_point_inside_triangled(double v[2], double v0[2], double v1[2], double v2[2]);

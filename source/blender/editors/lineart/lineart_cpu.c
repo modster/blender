@@ -513,12 +513,37 @@ int ED_lineart_point_inside_triangled(double v[2], double v0[2], double v1[2], d
   return 1;
 }
 
-static int lineart_point_on_lined(double v[2], double v0[2], double v1[2])
+static int lineart_point_on_segment(double v[2], double v0[2], double v1[2])
 {
   double c1, c2;
+  double l0[2], l1[2];
 
-  c1 = ratiod(v0[0], v1[0], v[0]);
-  c2 = ratiod(v0[1], v1[1], v[1]);
+  sub_v2_v2v2_db(l0, v, v0);
+  sub_v2_v2v2_db(l1, v, v1);
+
+  if (v1[0] == v0[0] && v1[1] == v0[1]) {
+    return 0;
+  }
+
+  if (v1[0] - v0[0]) {
+    c1 = ratiod(v0[0], v1[0], v[0]);
+  }
+  else {
+    if (v[0] == v1[0]) {
+      c2 = ratiod(v0[1], v1[1], v[1]);
+      return (c2 >= 0 && c2 <= 1);
+    }
+  }
+
+  if (v1[1] - v0[1]) {
+    c2 = ratiod(v0[1], v1[1], v[1]);
+  }
+  else {
+    if (v[1] == v1[1]) {
+      c1 = ratiod(v0[0], v1[0], v[0]);
+      return (c1 >= 0 && c1 <= 1);
+    }
+  }
 
   if (LRT_DOUBLE_CLOSE_ENOUGH(c1, c2) && c1 >= 0 && c1 <= 1) {
     return 1;
@@ -531,8 +556,8 @@ static int lineart_point_triangle_relation(double v[2], double v0[2], double v1[
 {
   double cl, c;
   double r;
-  if (lineart_point_on_lined(v, v0, v1) || lineart_point_on_lined(v, v1, v2) ||
-      lineart_point_on_lined(v, v2, v0)) {
+  if (lineart_point_on_segment(v, v0, v1) || lineart_point_on_segment(v, v1, v2) ||
+      lineart_point_on_segment(v, v2, v0)) {
     return 1;
   }
 
