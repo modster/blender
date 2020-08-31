@@ -51,6 +51,11 @@ class OBJWriter {
    * Vertex offset, UV vertex offset, face normal offset respetively.
    */
   uint index_offset_[3] = {0, 0, 0};
+  /**
+   * Keeps track of number of normals which depend of smooth shaded faces.
+   * Update index offset for normals using this.
+   */
+  int tot_normals_ = 0;
 
  public:
   OBJWriter(const OBJExportParams &export_params) : export_params_(export_params)
@@ -77,7 +82,7 @@ class OBJWriter {
   void write_vertex_group(const OBJMesh &obj_mesh_data,
                           const uint poly_index,
                           short &r_last_face_vertex_group) const;
-  void write_poly_elements(const OBJMesh &obj_mesh_data, Span<Vector<uint>> uv_indices) const;
+  void write_poly_elements(const OBJMesh &obj_mesh_data, Span<Vector<uint>> uv_indices);
   void write_loose_edges(const OBJMesh &obj_mesh_data) const;
   void write_nurbs_curve(const OBJNurbs &obj_nurbs_data) const;
 
@@ -87,19 +92,19 @@ class OBJWriter {
   void write_vert_uv_normal_indices(Span<uint> vert_indices,
                                     Span<uint> uv_indices,
                                     Span<uint> normal_indices,
-                                    const MPoly &poly_to_write) const;
+                                    const uint tot_loop) const;
   void write_vert_normal_indices(Span<uint> vert_indices,
                                  Span<uint> UNUSED(uv_indices),
                                  Span<uint> normal_indices,
-                                 const MPoly &poly_to_write) const;
+                                 const uint tot_loop) const;
   void write_vert_uv_indices(Span<uint> vert_indices,
                              Span<uint> uv_indices,
                              Span<uint> UNUSED(normal_indices),
-                             const MPoly &poly_to_write) const;
+                             const uint tot_loop) const;
   void write_vert_indices(Span<uint> vert_indices,
                           Span<uint> UNUSED(uv_indices),
                           Span<uint> UNUSED(normal_indices),
-                          const MPoly &poly_to_write) const;
+                          const uint tot_loop) const;
 };
 
 class MTLWriter {
