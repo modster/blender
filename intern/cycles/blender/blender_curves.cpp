@@ -77,7 +77,7 @@ static bool ObtainCacheParticleData(
 
       if ((b_part.render_type() == BL::ParticleSettings::render_type_PATH) &&
           (b_part.type() == BL::ParticleSettings::type_HAIR)) {
-        int shader = clamp(b_part.material() - 1, 0, hair->used_shaders.size() - 1);
+        int shader = clamp(b_part.material() - 1, 0, hair->get_used_shaders().size() - 1);
         int display_step = background ? b_part.render_step() : b_part.display_step();
         int totparts = b_psys.particles.length();
         int totchild = background ? b_psys.child_particles.length() :
@@ -820,7 +820,7 @@ void BlenderSync::sync_hair(Hair *hair, BL::Object &b_ob, bool motion, int motio
 void BlenderSync::sync_hair(BL::Depsgraph b_depsgraph,
                             BL::Object b_ob,
                             Hair *hair,
-                            const vector<Shader *> &used_shaders)
+                            const array<Shader *> &used_shaders)
 {
   /* Compares curve_keys rather than strands in order to handle quick hair
    * adjustments in dynamic BVH - other methods could probably do this better. */
@@ -830,7 +830,7 @@ void BlenderSync::sync_hair(BL::Depsgraph b_depsgraph,
   oldcurve_radius.steal_data(hair->curve_radius);
 
   hair->clear();
-  hair->used_shaders = used_shaders;
+  hair->set_used_shaders(used_shaders);
 
   if (view_layer.use_hair) {
     if (b_ob.type() == BL::Object::type_HAIR) {

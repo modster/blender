@@ -322,7 +322,7 @@ static vector<int> get_voxel_image_slots(Mesh *mesh)
 
 void BlenderSync::sync_volume(BL::Object &b_ob,
                               Volume *volume,
-                              const vector<Shader *> &used_shaders)
+                              const array<Shader *> &used_shaders)
 {
   vector<int> old_voxel_slots = get_voxel_image_slots(volume);
 

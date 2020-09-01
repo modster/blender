@@ -209,9 +209,10 @@ void Object::apply_transform(bool apply_to_motion)
 
 void Object::tag_update(Scene *scene)
 {
+  printf("Object::tag_update\n");
   if (geometry) {
     if (geometry->transform_applied)
-      geometry->need_update = true;
+      geometry->tag_modified();
 
     foreach (Shader *shader, geometry->used_shaders) {
       if (shader->use_mis && shader->has_surface_emission)
@@ -271,7 +272,7 @@ uint Object::visibility_for_tracing() const
 
 float Object::compute_volume_step_size() const
 {
-  if (geometry->type != Geometry::MESH && geometry->type != Geometry::VOLUME) {
+  if (geometry->geometry_type != Geometry::MESH && geometry->geometry_type != Geometry::VOLUME) {
     return FLT_MAX;
   }
 
@@ -300,7 +301,7 @@ float Object::compute_volume_step_size() const
   /* Compute step size from voxel grids. */
   float step_size = FLT_MAX;
 
-  if (geometry->type == Geometry::VOLUME) {
+  if (geometry->geometry_type == Geometry::VOLUME) {
     Volume *volume = static_cast<Volume *>(geometry);
 
     foreach (Attribute &attr, volume->attributes.attributes) {
@@ -366,18 +367,18 @@ ObjectManager::~ObjectManager()
 {
 }
 
-static float object_surface_area(UpdateObjectTransformState *state,
+float ObjectManager::object_surface_area(UpdateObjectTransformState *state,
                                  const Transform &tfm,
                                  Geometry *geom)
 {
-  if (geom->type != Geometry::MESH && geom->type != Geometry::VOLUME) {
+  if (geom->geometry_type != Geometry::MESH && geom->geometry_type != Geometry::VOLUME) {
     return 0.0f;
   }
 
   Mesh *mesh = static_cast<Mesh *>(geom);
-  if (mesh->has_volume || geom->type == Geometry::VOLUME) {
+  if (mesh->has_volume || geom->geometry_type == Geometry::VOLUME) {
     /* Volume density automatically adjust to object scale. */
-    if (geom->type == Geometry::VOLUME && static_cast<Volume *>(geom)->object_space) {
+    if (geom->geometry_type == Geometry::VOLUME && static_cast<Volume *>(geom)->object_space) {
       const float3 unit = normalize(make_float3(1.0f, 1.0f, 1.0f));
       return 1.0f / len(transform_direction(&tfm, unit));
     }
@@ -475,7 +476,7 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
     state->have_motion = true;
   }
 
-  if (geom->type == Geometry::MESH) {
+  if (geom->geometry_type == Geometry::MESH) {
     /* TODO: why only mesh? */
     Mesh *mesh = static_cast<Mesh *>(geom);
     if (mesh->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION)) {
@@ -526,13 +527,13 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
   kobject.dupli_generated[0] = ob->dupli_generated[0];
   kobject.dupli_generated[1] = ob->dupli_generated[1];
   kobject.dupli_generated[2] = ob->dupli_generated[2];
-  kobject.numkeys = (geom->type == Geometry::HAIR) ? static_cast<Hair *>(geom)->curve_keys.size() :
+  kobject.numkeys = (geom->geometry_type == Geometry::HAIR) ? static_cast<Hair *>(geom)->curve_keys.size() :
                                                      0;
   kobject.dupli_uv[0] = ob->dupli_uv[0];
   kobject.dupli_uv[1] = ob->dupli_uv[1];
   int totalsteps = geom->motion_steps;
   kobject.numsteps = (totalsteps - 1) / 2;
-  kobject.numverts = (geom->type == Geometry::MESH || geom->type == Geometry::VOLUME) ?
+  kobject.numverts = (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) ?
                          static_cast<Mesh *>(geom)->verts.size() :
                          0;
   kobject.patch_map_offset = 0;
@@ -551,7 +552,7 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
   state->object_volume_step[ob->index] = FLT_MAX;
 
   /* Have curves. */
-  if (geom->type == Geometry::HAIR) {
+  if (geom->geometry_type == Geometry::HAIR) {
     state->have_curves = true;
   }
 }
@@ -755,7 +756,7 @@ void ObjectManager::device_update_mesh_offsets(Device *, DeviceScene *dscene, Sc
   foreach (Object *object, scene->objects) {
     Geometry *geom = object->geometry;
 
-    if (geom->type == Geometry::MESH) {
+    if (geom->geometry_type == Geometry::MESH) {
       Mesh *mesh = static_cast<Mesh *>(geom);
       if (mesh->patch_table) {
         uint patch_map_offset = 2 * (mesh->patch_table_offset + mesh->patch_table->total_size() -
@@ -826,11 +827,11 @@ void ObjectManager::apply_static_transforms(DeviceScene *dscene, Scene *scene, P
     bool apply = (geometry_users[geom] == 1) && !geom->has_surface_bssrdf &&
                  !geom->has_true_displacement();
 
-    if (geom->type == Geometry::MESH || geom->type == Geometry::VOLUME) {
+    if (geom->geometry_type == Geometry::MESH) {
       Mesh *mesh = static_cast<Mesh *>(geom);
       apply = apply && mesh->subdivision_type == Mesh::SUBDIVISION_NONE;
     }
-    else if (geom->type == Geometry::HAIR) {
+    else if (geom->geometry_type == Geometry::HAIR) {
       /* Can't apply non-uniform scale to curves, this can't be represented by
        * control points and radius alone. */
       float scale;

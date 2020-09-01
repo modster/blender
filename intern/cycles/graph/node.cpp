@@ -36,6 +36,7 @@ Node::Node(const NodeType *type_, ustring name_) : name(name_), type(type_)
 
   owner = nullptr;
   socket_modified = ~0;
+  time_stamp = -1;
 
   /* assign non-empty name, convenient for debugging */
   if (name.empty()) {
@@ -185,6 +186,12 @@ void Node::set(const SocketType &input, array<Transform> &value)
 void Node::set(const SocketType &input, array<Node *> &value)
 {
   assert(input.type == SocketType::TRANSFORM_ARRAY);
+  set_if_different(input, value);
+}
+
+void Node::set(const SocketType &input, array<Shader *> &value)
+{
+  assert(input.type == SocketType::NODE_ARRAY);
   set_if_different(input, value);
 }
 
@@ -702,6 +709,11 @@ bool Node::is_modified()
   return socket_modified != 0;
 }
 
+void Node::tag_modified()
+{
+  socket_modified = ~0u;
+}
+
 void Node::clear_modified()
 {
   socket_modified = 0;
@@ -739,6 +751,16 @@ void Node::print_modified_sockets() const
       printf("-- socket modified : %s\n", socket.name.c_str());
     }
   }
+}
+
+int Node::get_time_stamp() const
+{
+  return time_stamp;
+}
+
+void Node::set_time_stamp(int time_stamp_)
+{
+  time_stamp = time_stamp_;
 }
 
 CCL_NAMESPACE_END

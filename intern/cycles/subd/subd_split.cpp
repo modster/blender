@@ -364,13 +364,13 @@ void DiagSplit::split_patches(Patch *patches, size_t patches_byte_stride)
   post_split();
 }
 
-static Edge *create_edge_from_corner(DiagSplit *split,
-                                     const Mesh *mesh,
-                                     const Mesh::SubdFace &face,
-                                     int corner,
-                                     bool &reversed,
-                                     int v0,
-                                     int v1)
+Edge *DiagSplit::create_edge_from_corner(DiagSplit *split,
+                                         const Mesh *mesh,
+                                         const Mesh::SubdFace &face,
+                                         int corner,
+                                         bool &reversed,
+                                         int v0,
+                                         int v1)
 {
   int a = mesh->subd_face_corners[face.start_corner + mod(corner + 0, face.num_corners)];
   int b = mesh->subd_face_corners[face.start_corner + mod(corner + 1, face.num_corners)];
@@ -431,15 +431,15 @@ void DiagSplit::split_quad(const Mesh::SubdFace &face, Patch *patch)
   split(subpatch, -2);
 }
 
-static Edge *create_split_edge_from_corner(DiagSplit *split,
-                                           const Mesh *mesh,
-                                           const Mesh::SubdFace &face,
-                                           int corner,
-                                           int side,
-                                           bool &reversed,
-                                           int v0,
-                                           int v1,
-                                           int vc)
+Edge *DiagSplit::create_split_edge_from_corner(DiagSplit *split,
+                                               const Mesh *mesh,
+                                               const Mesh::SubdFace &face,
+                                               int corner,
+                                               int side,
+                                               bool &reversed,
+                                               int v0,
+                                               int v1,
+                                               int vc)
 {
   Edge *edge = split->alloc_edge();
 

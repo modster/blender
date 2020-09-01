@@ -1218,7 +1218,7 @@ class OptiXDevice : public CUDADevice {
       if (geometry.find(geom) != geometry.end())
         continue;
 
-      if (geom->type == Geometry::HAIR) {
+      if (geom->geometry_type == Geometry::HAIR) {
         // Build BLAS for curve primitives
         Hair *const hair = static_cast<Hair *const>(ob->geometry);
         if (hair->num_curves() == 0) {
@@ -1389,7 +1389,7 @@ class OptiXDevice : public CUDADevice {
           return false;
         }
       }
-      else if (geom->type == Geometry::MESH || geom->type == Geometry::VOLUME) {
+      else if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
         // Build BLAS for triangle primitives
         Mesh *const mesh = static_cast<Mesh *const>(ob->geometry);
         if (mesh->num_triangles() == 0) {
@@ -1508,7 +1508,7 @@ class OptiXDevice : public CUDADevice {
         instance.visibilityMask |= 2;
       }
 
-      if (ob->geometry->type == Geometry::HAIR) {
+      if (ob->geometry->geometry_type == Geometry::HAIR) {
         // Same applies to curves (so they can be skipped in local trace calls)
         instance.visibilityMask |= 4;
 

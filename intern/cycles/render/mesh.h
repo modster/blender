@@ -118,36 +118,74 @@ class Mesh : public Geometry {
     float crease;
   };
 
+  SubdEdgeCrease get_subd_crease(size_t i) const
+  {
+    SubdEdgeCrease s;
+    s.v[0] = subd_creases_edge[i * 2];
+    s.v[1] = subd_creases_edge[i * 2 + 1];
+    s.crease = subd_creases_weight[i];
+    return s;
+  }
+
   enum SubdivisionType {
     SUBDIVISION_NONE,
     SUBDIVISION_LINEAR,
     SUBDIVISION_CATMULL_CLARK,
   };
 
-  SubdivisionType subdivision_type;
+  NODE_PUBLIC_API(SubdivisionType, subdivision_type)
 
   /* Mesh Data */
-  array<int> triangles;
-  array<float3> verts;
-  array<int> shader;
-  array<bool> smooth;
+  NODE_PUBLIC_API(array<int>, triangles)
+  NODE_PUBLIC_API(array<float3>, verts)
+  NODE_PUBLIC_API(array<int>, shader)
+  NODE_PUBLIC_API(array<bool>, smooth)
 
   /* used for storing patch info for subd triangles, only allocated if there are patches */
-  array<int> triangle_patch; /* must be < 0 for non subd triangles */
-  array<float2> vert_patch_uv;
+  NODE_PUBLIC_API(array<int>, triangle_patch) /* must be < 0 for non subd triangles */
+  NODE_PUBLIC_API(array<float2>, vert_patch_uv)
 
+  NODE_PUBLIC_API(float, volume_clipping)
+  NODE_PUBLIC_API(float, volume_step_size)
+  NODE_PUBLIC_API(bool, volume_object_space)
+
+  // NODE_PUBLIC_API(array<SubdFace>, subd_faces)
+ protected:
   array<SubdFace> subd_faces;
-  array<int> subd_face_corners;
-  int num_ngons;
 
-  array<SubdEdgeCrease> subd_creases;
+ public:
+  void set_subd_faces(array<SubdFace> &subd_faces_)
+  {
+    socket_modified = ~0u;
+    subd_faces.steal_data(subd_faces_);
+  }
+  array<SubdFace> &get_subd_faces()
+  {
+    socket_modified = ~0u;
+    return subd_faces;
+  }
+  array<SubdFace> const &get_subd_faces() const
+  {
+    return subd_faces;
+  }
 
-  SubdParams *subd_params;
+  NODE_PUBLIC_API(array<int>, subd_face_corners)
+  NODE_PUBLIC_API(int, num_ngons)
 
+  NODE_PUBLIC_API(array<int>, subd_creases_edge)
+  NODE_PUBLIC_API(array<float>, subd_creases_weight)
+
+  /* Subdivisions parameters */
+  NODE_PUBLIC_API(float, subd_dicing_rate)
+  NODE_PUBLIC_API(int, subd_max_level)
+  NODE_PUBLIC_API(Transform, subd_objecttoworld)
+
+  // NODE_PUBLIC_API(AttributeSet, subd_attributes)
+  // todo(kevin) deleted copy constructor so the macro is not working
   AttributeSet subd_attributes;
 
+ private:
   PackedPatchTable *patch_table;
-
   /* BVH */
   size_t vert_offset;
 
@@ -158,12 +196,26 @@ class Mesh : public Geometry {
 
   size_t num_subd_verts;
 
- private:
   unordered_map<int, int> vert_to_stitching_key_map; /* real vert index -> stitching index */
   unordered_multimap<int, int>
       vert_stitching_map; /* stitching index -> multiple real vert indices */
+
+  friend class Attribute;
+  friend class BVH;
+  friend class BVHBuild;
+  friend class BVHEmbree;
+  friend class BVHSpatialSplit;
   friend class DiagSplit;
+  friend class EdgeDice;
   friend class GeometryManager;
+  friend class LightManager;
+  friend class Object;
+  friend class ObjectManager;
+  friend class OsdData;
+
+  SubdParams *subd_params = nullptr;
+
+  SubdParams *get_subd_params();
 
  public:
   /* Functions */
@@ -174,12 +226,14 @@ class Mesh : public Geometry {
   void reserve_mesh(int numverts, int numfaces);
   void resize_subd_faces(int numfaces, int num_ngons, int numcorners);
   void reserve_subd_faces(int numfaces, int num_ngons, int numcorners);
+  void reserve_subd_creases(size_t num_creases);
   void clear(bool preserve_voxel_data);
   void clear() override;
   void add_vertex(float3 P);
   void add_vertex_slow(float3 P);
   void add_triangle(int v0, int v1, int v2, int shader, bool smooth);
   void add_subd_face(int *corners, int num_corners, int shader_, bool smooth_);
+  void add_crease(int v0, int v1, float weight);
 
   void copy_center_to_motion_step(const int motion_step);
 

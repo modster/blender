@@ -300,11 +300,11 @@ static bool rtc_progress_func(void *user_ptr, const double n)
 
 static size_t count_primitives(Geometry *geom)
 {
-  if (geom->type == Geometry::MESH || geom->type == Geometry::VOLUME) {
+  if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
     Mesh *mesh = static_cast<Mesh *>(geom);
     return mesh->num_triangles();
   }
-  else if (geom->type == Geometry::HAIR) {
+  else if (geom->geometry_type == Geometry::HAIR) {
     Hair *hair = static_cast<Hair *>(geom);
     return hair->num_segments();
   }
@@ -482,13 +482,13 @@ void BVHEmbree::add_object(Object *ob, int i)
 {
   Geometry *geom = ob->geometry;
 
-  if (geom->type == Geometry::MESH || geom->type == Geometry::VOLUME) {
+  if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
     Mesh *mesh = static_cast<Mesh *>(geom);
     if (mesh->num_triangles() > 0) {
       add_triangles(ob, mesh, i);
     }
   }
-  else if (geom->type == Geometry::HAIR) {
+  else if (geom->geometry_type == Geometry::HAIR) {
     Hair *hair = static_cast<Hair *>(geom);
     if (hair->num_curves() > 0) {
       add_curves(ob, hair, i);
@@ -930,14 +930,14 @@ void BVHEmbree::refit_nodes()
     if (!params.top_level || (ob->is_traceable() && !ob->geometry->is_instanced())) {
       Geometry *geom = ob->geometry;
 
-      if (geom->type == Geometry::MESH || geom->type == Geometry::VOLUME) {
+      if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
         Mesh *mesh = static_cast<Mesh *>(geom);
         if (mesh->num_triangles() > 0) {
           update_tri_vertex_buffer(rtcGetGeometry(scene, geom_id), mesh);
           rtcCommitGeometry(rtcGetGeometry(scene, geom_id));
         }
       }
-      else if (geom->type == Geometry::HAIR) {
+      else if (geom->geometry_type == Geometry::HAIR) {
         Hair *hair = static_cast<Hair *>(geom);
         if (hair->num_curves() > 0) {
           update_curve_vertex_buffer(rtcGetGeometry(scene, geom_id + 1), hair);

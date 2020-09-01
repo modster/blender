@@ -132,11 +132,51 @@ NODE_DEFINE(Mesh)
   SOCKET_INT_ARRAY(shader, "Shader", array<int>());
   SOCKET_BOOLEAN_ARRAY(smooth, "Smooth", array<bool>());
 
+  SOCKET_INT_ARRAY(triangle_patch, "Triangle Patch", array<int>());
+  SOCKET_POINT2_ARRAY(vert_patch_uv, "Patch UVs", array<float2>());
+
+  SOCKET_FLOAT(volume_clipping, "Volume Clipping", 0.001f);
+  SOCKET_FLOAT(volume_step_size, "Volume Step Size", 0.0f);
+  SOCKET_BOOLEAN(volume_object_space, "Volume Object Space", false);
+
+  static NodeEnum subdivision_type_enum;
+  subdivision_type_enum.insert("none", SUBDIVISION_NONE);
+  subdivision_type_enum.insert("linear", SUBDIVISION_LINEAR);
+  subdivision_type_enum.insert("catmull_clark", SUBDIVISION_CATMULL_CLARK);
+  SOCKET_ENUM(subdivision_type, "Subdivision Type", subdivision_type_enum, SUBDIVISION_NONE);
+
+  SOCKET_INT_ARRAY(subd_creases_edge, "Subdivision Crease Edges", array<int>());
+  SOCKET_FLOAT_ARRAY(subd_creases_weight, "Subdivision Crease Weights", array<float>());
+  SOCKET_INT_ARRAY(subd_face_corners, "Subdivision Face Corners", array<int>());
+  SOCKET_INT(num_ngons, "NGons Number", 0);
+
+  /* Subdivisions parameters */
+  SOCKET_FLOAT(subd_dicing_rate, "Subdivision Dicing Rate", 0.0f)
+  SOCKET_INT(subd_max_level, "Subdivision Dicing Rate", 0);
+  SOCKET_TRANSFORM(subd_objecttoworld, "Subdivision Object Transform", transform_identity());
+
   return type;
 }
 
-Mesh::Mesh(const NodeType *node_type_, Type geom_type_)
-    : Geometry(node_type_, geom_type_), subd_attributes(this, ATTR_PRIM_SUBD)
+ccl::SubdParams *ccl::Mesh::get_subd_params()
+{
+  if (subdivision_type == SubdivisionType::SUBDIVISION_NONE) {
+    return nullptr;
+  }
+
+  if (!subd_params) {
+    subd_params = new SubdParams(this);
+  }
+
+  subd_params->dicing_rate = subd_dicing_rate;
+  subd_params->max_level = subd_max_level;
+  subd_params->objecttoworld = subd_objecttoworld;
+
+  return subd_params;
+}
+
+Mesh::Mesh(const NodeType *node_type, Type geom_type_)
+    : Geometry(node_type, geom_type_), subd_attributes(this, ATTR_PRIM_SUBD)
 {
   vert_offset = 0;
 
@@ -213,8 +253,16 @@ void Mesh::reserve_subd_faces(int numfaces, int num_ngons_, int numcorners)
   subd_attributes.resize(true);
 }
 
+void Mesh::reserve_subd_creases(size_t num_creases)
+{
+  subd_creases_edge.reserve(num_creases * 2);
+  subd_creases_weight.reserve(num_creases);
+}
+
 void Mesh::clear(bool preserve_voxel_data)
 {
+  // Node::reset(); // will also reset single properties that we might want to preserve like
+  // subdivision dicing rate
   Geometry::clear();
 
   /* clear all verts and triangles */
@@ -231,13 +279,16 @@ void Mesh::clear(bool preserve_voxel_data)
 
   num_subd_verts = 0;
 
-  subd_creases.clear();
+  subd_creases_edge.clear();
+  subd_creases_weight.clear();
 
   subd_attributes.clear();
   attributes.clear(preserve_voxel_data);
 
   vert_to_stitching_key_map.clear();
   vert_stitching_map.clear();
+
+  subdivision_type = SubdivisionType::SUBDIVISION_NONE;
 
   delete patch_table;
   patch_table = NULL;
@@ -261,8 +312,11 @@ void Mesh::add_vertex_slow(float3 P)
 {
   verts.push_back_slow(P);
 
+  socket_modified |= get_triangles_socket()->modified_flag_bit;
+
   if (subd_faces.size()) {
     vert_patch_uv.push_back_slow(make_float2(0.0f, 0.0f));
+    socket_modified |= get_vert_patch_uv_socket()->modified_flag_bit;
   }
 }
 
@@ -274,8 +328,13 @@ void Mesh::add_triangle(int v0, int v1, int v2, int shader_, bool smooth_)
   shader.push_back_reserved(shader_);
   smooth.push_back_reserved(smooth_);
 
+  socket_modified |= get_triangles_socket()->modified_flag_bit;
+  socket_modified |= get_shader_socket()->modified_flag_bit;
+  socket_modified |= get_smooth_socket()->modified_flag_bit;
+
   if (subd_faces.size()) {
     triangle_patch.push_back_reserved(-1);
+    socket_modified |= get_triangle_patch_socket()->modified_flag_bit;
   }
 }
 
@@ -296,6 +355,13 @@ void Mesh::add_subd_face(int *corners, int num_corners, int shader_, bool smooth
 
   SubdFace face = {start_corner, num_corners, shader_, smooth_, ptex_offset};
   subd_faces.push_back_reserved(face);
+}
+
+void ccl::Mesh::add_crease(int v0, int v1, float weight)
+{
+  subd_creases_edge.push_back_slow(v0);
+  subd_creases_edge.push_back_slow(v1);
+  subd_creases_weight.push_back_slow(weight);
 }
 
 void Mesh::copy_center_to_motion_step(const int motion_step)

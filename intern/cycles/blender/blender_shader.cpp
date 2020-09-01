@@ -42,11 +42,11 @@ typedef map<string, ConvertNode *> ProxyMap;
 
 /* Find */
 
-void BlenderSync::find_shader(BL::ID &id, vector<Shader *> &used_shaders, Shader *default_shader)
+void BlenderSync::find_shader(BL::ID &id, array<Shader *> &used_shaders, Shader *default_shader)
 {
   Shader *shader = (id) ? shader_map.find(id) : default_shader;
 
-  used_shaders.push_back(shader);
+  used_shaders.push_back_slow(shader);
   shader->tag_used(scene);
 }
 

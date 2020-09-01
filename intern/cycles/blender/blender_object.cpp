@@ -260,7 +260,7 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
   /* object sync
    * transform comparison should not be needed, but duplis don't work perfect
    * in the depsgraph and may not signal changes, so this is a workaround */
-  if (object_updated || (object->geometry && object->geometry->need_update) ||
+  if (object_updated || (object->geometry && object->geometry->is_modified()) ||
       tfm != object->tfm) {
     object->name = b_ob.name().c_str();
     object->pass_id = b_ob.pass_index();
@@ -272,21 +272,21 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
     Scene::MotionType need_motion = scene->need_motion();
     if (need_motion != Scene::MOTION_NONE && object->geometry) {
       Geometry *geom = object->geometry;
-      geom->use_motion_blur = false;
-      geom->motion_steps = 0;
+      geom->set_use_motion_blur(false);
+      geom->set_motion_steps(0);
 
       uint motion_steps;
 
       if (need_motion == Scene::MOTION_BLUR) {
         motion_steps = object_motion_steps(b_parent, b_ob, Object::MAX_MOTION_STEPS);
-        geom->motion_steps = motion_steps;
+        geom->set_motion_steps(motion_steps);
         if (motion_steps && object_use_deform_motion(b_parent, b_ob)) {
-          geom->use_motion_blur = true;
+          geom->set_use_motion_blur(true);
         }
       }
       else {
         motion_steps = 3;
-        geom->motion_steps = motion_steps;
+        geom->set_motion_steps(motion_steps);
       }
 
       object->motion.clear();

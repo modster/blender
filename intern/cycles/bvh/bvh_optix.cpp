@@ -66,7 +66,7 @@ void BVHOptiX::pack_blas()
   assert(geometry.size() == 1 && objects.size() == 1);  // These are built per-mesh
   Geometry *const geom = geometry[0];
 
-  if (geom->type == Geometry::HAIR) {
+  if (geom->geometry_type == Geometry::HAIR) {
     Hair *const hair = static_cast<Hair *const>(geom);
     if (hair->num_curves() > 0) {
       const size_t num_curves = hair->num_curves();
@@ -95,7 +95,7 @@ void BVHOptiX::pack_blas()
       }
     }
   }
-  else if (geom->type == Geometry::MESH || geom->type == Geometry::VOLUME) {
+  else if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
     Mesh *const mesh = static_cast<Mesh *const>(geom);
     if (mesh->num_triangles() > 0) {
       const size_t num_triangles = mesh->num_triangles();

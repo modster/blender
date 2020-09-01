@@ -57,7 +57,7 @@ bool BlenderSync::sync_dupli_particle(BL::Object &b_ob,
       scene, &psys, b_ob, b_instance.object(), key);
 
   /* no update needed? */
-  if (!need_update && !object->geometry->need_update && !scene->object_manager->need_update)
+  if (!need_update && !object->geometry->is_modified() && !scene->object_manager->need_update)
     return true;
 
   /* first time used in this sync loop? clear and tag update */

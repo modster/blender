@@ -421,22 +421,22 @@ DeviceRequestedFeatures Scene::get_requested_device_features()
   foreach (Object *object, objects) {
     Geometry *geom = object->geometry;
     if (use_motion) {
-      requested_features.use_object_motion |= object->use_motion() | geom->use_motion_blur;
-      requested_features.use_camera_motion |= geom->use_motion_blur;
+      requested_features.use_object_motion |= object->use_motion() | geom->get_use_motion_blur();
+      requested_features.use_camera_motion |= geom->get_use_motion_blur();
     }
     if (object->is_shadow_catcher) {
       requested_features.use_shadow_tricks = true;
     }
-    if (geom->type == Geometry::MESH) {
+    if (geom->is_mesh()) {
       Mesh *mesh = static_cast<Mesh *>(geom);
 #ifdef WITH_OPENSUBDIV
-      if (mesh->subdivision_type != Mesh::SUBDIVISION_NONE) {
+      if (mesh->get_subdivision_type() != Mesh::SUBDIVISION_NONE) {
         requested_features.use_patch_evaluation = true;
       }
 #endif
       requested_features.use_true_displacement |= mesh->has_true_displacement();
     }
-    else if (geom->type == Geometry::HAIR) {
+    else if (geom->is_hair()) {
       requested_features.use_hair = true;
     }
   }

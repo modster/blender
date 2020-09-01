@@ -46,12 +46,13 @@ template<>
 bool TopologyRefinerFactory<ccl::Mesh>::resizeComponentTopology(TopologyRefiner &refiner,
                                                                 ccl::Mesh const &mesh)
 {
-  setNumBaseVertices(refiner, mesh.verts.size());
-  setNumBaseFaces(refiner, mesh.subd_faces.size());
+  const ccl::array<ccl::Mesh::SubdFace> &subd_faces = mesh.get_subd_faces();
+  setNumBaseVertices(refiner, mesh.get_verts().size());
+  setNumBaseFaces(refiner, subd_faces.size());
 
-  const ccl::Mesh::SubdFace *face = mesh.subd_faces.data();
+  const ccl::Mesh::SubdFace *face = subd_faces.data();
 
-  for (int i = 0; i < mesh.subd_faces.size(); i++, face++) {
+  for (int i = 0; i < subd_faces.size(); i++, face++) {
     setNumBaseFaceVertices(refiner, i, face->num_corners);
   }
 
@@ -62,12 +63,14 @@ template<>
 bool TopologyRefinerFactory<ccl::Mesh>::assignComponentTopology(TopologyRefiner &refiner,
                                                                 ccl::Mesh const &mesh)
 {
-  const ccl::Mesh::SubdFace *face = mesh.subd_faces.data();
+  const ccl::array<ccl::Mesh::SubdFace> &subd_faces = mesh.get_subd_faces();
+  const ccl::array<int> &subd_face_corners = mesh.get_subd_face_corners();
+  const ccl::Mesh::SubdFace *face = subd_faces.data();
 
-  for (int i = 0; i < mesh.subd_faces.size(); i++, face++) {
+  for (int i = 0; i < subd_faces.size(); i++, face++) {
     IndexArray face_verts = getBaseFaceVertices(refiner, i);
 
-    int *corner = &mesh.subd_face_corners[face->start_corner];
+    int *corner = &subd_face_corners[face->start_corner];
 
     for (int j = 0; j < face->num_corners; j++, corner++) {
       face_verts[j] = *corner;
@@ -81,17 +84,18 @@ template<>
 bool TopologyRefinerFactory<ccl::Mesh>::assignComponentTags(TopologyRefiner &refiner,
                                                             ccl::Mesh const &mesh)
 {
-  const ccl::Mesh::SubdEdgeCrease *crease = mesh.subd_creases.data();
+  size_t num_creases = mesh.get_subd_creases_weight().size();
 
-  for (int i = 0; i < mesh.subd_creases.size(); i++, crease++) {
-    Index edge = findBaseEdge(refiner, crease->v[0], crease->v[1]);
+  for (int i = 0; i < num_creases; i++) {
+    ccl::Mesh::SubdEdgeCrease crease = mesh.get_subd_crease(i);
+    Index edge = findBaseEdge(refiner, crease.v[0], crease.v[1]);
 
     if (edge != INDEX_INVALID) {
-      setBaseEdgeSharpness(refiner, edge, crease->crease * 10.0f);
+      setBaseEdgeSharpness(refiner, edge, crease.crease * 10.0f);
     }
   }
 
-  for (int i = 0; i < mesh.verts.size(); i++) {
+  for (int i = 0; i < mesh.get_verts().size(); i++) {
     ConstIndexArray vert_edges = getBaseVertexEdges(refiner, i);
 
     if (vert_edges.size() == 2) {
@@ -278,8 +282,9 @@ class OsdData {
   {
     /* loop over all edges to find longest in screen space */
     const Far::TopologyLevel &level = refiner->GetLevel(0);
-    Transform objecttoworld = mesh->subd_params->objecttoworld;
-    Camera *cam = mesh->subd_params->camera;
+    const SubdParams *subd_params = mesh->get_subd_params();
+    Transform objecttoworld = subd_params->objecttoworld;
+    Camera *cam = subd_params->camera;
 
     float longest_edge = 0.0f;
 
@@ -305,7 +310,7 @@ class OsdData {
     }
 
     /* calculate isolation level */
-    int isolation = (int)(log2f(max(longest_edge / mesh->subd_params->dicing_rate, 1.0f)) + 1.0f);
+    int isolation = (int)(log2f(max(longest_edge / subd_params->dicing_rate, 1.0f)) + 1.0f);
 
     return min(isolation, 10);
   }

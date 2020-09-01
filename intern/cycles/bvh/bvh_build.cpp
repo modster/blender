@@ -270,11 +270,11 @@ void BVHBuild::add_reference_curves(BoundBox &root, BoundBox &center, Hair *hair
 
 void BVHBuild::add_reference_geometry(BoundBox &root, BoundBox &center, Geometry *geom, int i)
 {
-  if (geom->type == Geometry::MESH || geom->type == Geometry::VOLUME) {
+  if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
     Mesh *mesh = static_cast<Mesh *>(geom);
     add_reference_triangles(root, center, mesh, i);
   }
-  else if (geom->type == Geometry::HAIR) {
+  else if (geom->geometry_type == Geometry::HAIR) {
     Hair *hair = static_cast<Hair *>(geom);
     add_reference_curves(root, center, hair, i);
   }
@@ -299,11 +299,11 @@ static size_t count_curve_segments(Hair *hair)
 
 static size_t count_primitives(Geometry *geom)
 {
-  if (geom->type == Geometry::MESH || geom->type == Geometry::VOLUME) {
+  if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
     Mesh *mesh = static_cast<Mesh *>(geom);
     return mesh->num_triangles();
   }
-  else if (geom->type == Geometry::HAIR) {
+  else if (geom->geometry_type == Geometry::HAIR) {
     Hair *hair = static_cast<Hair *>(geom);
     return count_curve_segments(hair);
   }

@@ -27,6 +27,7 @@ CCL_NAMESPACE_BEGIN
 class MD5Hash;
 struct Node;
 struct NodeType;
+struct Shader;
 struct Transform;
 
 // todo(kevin) set_##name will copy the arrays
@@ -35,46 +36,46 @@ struct Transform;
   type_ name; \
 \
  public: \
-  const SocketType *get_##name##socket() const \
+  const SocketType *get_##name##_socket() const \
   { \
     static const SocketType *socket = type->find_input(ustring(#name)); \
     return socket; \
   } \
   bool name##_is_modified() const \
   { \
-    const SocketType *socket = get_##name##socket(); \
+    const SocketType *socket = get_##name##_socket(); \
     return socket_is_modified(*socket); \
   } \
   const type_ &get_##name() const \
   { \
-    const SocketType *socket = get_##name##socket(); \
+    const SocketType *socket = get_##name##_socket(); \
     return get_socket_value<type_>(this, *socket); \
   } \
   void set_##name(type_ value) \
   { \
-    const SocketType *socket = get_##name##socket(); \
+    const SocketType *socket = get_##name##_socket(); \
     this->set(*socket, value); \
   }
 
 #define NODE_PUBLIC_API_STRUCT_MEMBER(type_, name, member) \
-  const SocketType *get_##name##_##member##socket() const \
+  const SocketType *get_##name##_##member##_socket() const \
   { \
     static const SocketType *socket = type->find_input(ustring(#name"."#member)); \
     return socket; \
   } \
    bool name##_##member##_is_modified() const \
    { \
-     const SocketType *socket = get_##name##_##member##socket(); \
+     const SocketType *socket = get_##name##_##member##_socket(); \
      return socket_is_modified(*socket); \
    } \
    const type_ &get_##name##_##member() const \
    { \
-     const SocketType *socket = get_##name##_##member##socket(); \
+     const SocketType *socket = get_##name##_##member##_socket(); \
      return get_socket_value<type_>(this, *socket); \
    } \
    void set_##name##_##member(type_ value) \
    { \
-     const SocketType *socket = get_##name##_##member##socket(); \
+     const SocketType *socket = get_##name##_##member##_socket(); \
      this->set(*socket, value); \
    }
 
@@ -110,6 +111,7 @@ struct Node {
   void set(const SocketType &input, array<ustring> &value);
   void set(const SocketType &input, array<Transform> &value);
   void set(const SocketType &input, array<Node *> &value);
+  void set(const SocketType &input, array<Shader *> &value);
 
   /* get values */
   bool get_bool(const SocketType &input) const;
@@ -131,6 +133,7 @@ struct Node {
   const array<ustring> &get_string_array(const SocketType &input) const;
   const array<Transform> &get_transform_array(const SocketType &input) const;
   const array<Node *> &get_node_array(const SocketType &input) const;
+  const array<Shader *> &get_shader_array(const SocketType &input) const;
 
   /* generic values operations */
   bool has_default_value(const SocketType &input) const;
@@ -154,9 +157,13 @@ struct Node {
 
   bool is_modified();
 
+  void tag_modified();
   void clear_modified();
 
   void print_modified_sockets() const;
+
+  int get_time_stamp() const;
+  void set_time_stamp(int time_stamp_);
 
   ustring name;
   const NodeType *type;
@@ -166,6 +173,7 @@ struct Node {
 
  protected:
   const NodeOwner *owner;
+  int time_stamp;
 
   template<typename T> static T &get_socket_value(const Node *node, const SocketType &socket)
   {

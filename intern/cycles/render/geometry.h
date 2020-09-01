@@ -56,26 +56,30 @@ class Geometry : public Node {
     VOLUME,
   };
 
-  Type type;
+  /* Maximum number of motion steps supported (due to Embree). */
+  static const uint MAX_MOTION_STEPS = 129;
+
+  /* Motion Blur */
+  NODE_PUBLIC_API(uint, motion_steps)
+  NODE_PUBLIC_API(bool, use_motion_blur)
 
   /* Attributes */
-  AttributeSet attributes;
+  AttributeSet attributes;  // @api
 
   /* Shaders */
-  vector<Shader *> used_shaders;
+  NODE_PUBLIC_API(array<Shader *>, used_shaders)
+
+  /* Update Flags */
+  bool need_update_rebuild;
+
+  bool transform_applied;
+
+  Type geometry_type;  // should not be public as it is read-only after creation
 
   /* Transform */
   BoundBox bounds;
-  bool transform_applied;
   bool transform_negative_scaled;
   Transform transform_normal;
-
-  /* Motion Blur */
-  uint motion_steps;
-  bool use_motion_blur;
-
-  /* Maximum number of motion steps supported (due to Embree). */
-  static const uint MAX_MOTION_STEPS = 129;
 
   /* BVH */
   BVH *bvh;
@@ -87,10 +91,7 @@ class Geometry : public Node {
   bool has_volume;         /* Set in the device_update_flags(). */
   bool has_surface_bssrdf; /* Set in the device_update_flags(). */
 
-  /* Update Flags */
-  bool need_update;
-  bool need_update_rebuild;
-
+ public:
   /* Constructor/Destructor */
   explicit Geometry(const NodeType *node_type, const Type type);
   virtual ~Geometry();
@@ -137,6 +138,16 @@ class Geometry : public Node {
   bool has_true_displacement() const;
   bool has_motion_blur() const;
   bool has_voxel_attributes() const;
+
+  inline bool is_mesh() const
+  {
+    return geometry_type == MESH;
+  }
+
+  inline bool is_hair() const
+  {
+    return geometry_type == HAIR;
+  }
 
   /* Updates */
   void tag_update(Scene *scene, bool rebuild);
@@ -200,6 +211,21 @@ class GeometryManager {
   void device_update_displacement_images(Device *device, Scene *scene, Progress &progress);
 
   void device_update_volume_images(Device *device, Scene *scene, Progress &progress);
+
+ private:
+  static void update_attribute_element_offset(Geometry *geom,
+                                              device_vector<float> &attr_float,
+                                              size_t &attr_float_offset,
+                                              device_vector<float2> &attr_float2,
+                                              size_t &attr_float2_offset,
+                                              device_vector<float4> &attr_float3,
+                                              size_t &attr_float3_offset,
+                                              device_vector<uchar4> &attr_uchar4,
+                                              size_t &attr_uchar4_offset,
+                                              Attribute *mattr,
+                                              AttributePrimitive prim,
+                                              TypeDesc &type,
+                                              AttributeDescriptor &desc);
 };
 
 CCL_NAMESPACE_END

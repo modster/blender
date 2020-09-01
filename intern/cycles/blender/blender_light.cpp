@@ -115,7 +115,7 @@ void BlenderSync::sync_light(BL::Object &b_parent,
   light->tfm = tfm;
 
   /* shader */
-  vector<Shader *> used_shaders;
+  array<Shader *> used_shaders;
   find_shader(b_light, used_shaders, scene->default_light);
   light->shader = used_shaders[0];
 

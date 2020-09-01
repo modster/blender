@@ -582,7 +582,7 @@ void GeometryManager::create_volume_mesh(Volume *volume, Progress &progress)
 
   volume->clear();
   volume->reserve_mesh(vertices.size(), indices.size() / 3);
-  volume->used_shaders.push_back(volume_shader);
+  volume->used_shaders.push_back_slow(volume_shader);
   volume->need_update_rebuild = true;
 
   for (size_t i = 0; i < vertices.size(); ++i) {

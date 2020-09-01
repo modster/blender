@@ -167,7 +167,7 @@ size_t Attribute::element_size(Geometry *geom, AttributePrimitive prim) const
       size = 1;
       break;
     case ATTR_ELEMENT_VERTEX:
-      if (geom->type == Geometry::MESH || geom->type == Geometry::VOLUME) {
+      if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
         Mesh *mesh = static_cast<Mesh *>(geom);
         size = mesh->verts.size() + mesh->num_ngons;
         if (prim == ATTR_PRIM_SUBD) {
@@ -176,7 +176,7 @@ size_t Attribute::element_size(Geometry *geom, AttributePrimitive prim) const
       }
       break;
     case ATTR_ELEMENT_VERTEX_MOTION:
-      if (geom->type == Geometry::MESH) {
+      if (geom->geometry_type == Geometry::MESH) {
         Mesh *mesh = static_cast<Mesh *>(geom);
         size = (mesh->verts.size() + mesh->num_ngons) * (mesh->motion_steps - 1);
         if (prim == ATTR_PRIM_SUBD) {
@@ -185,7 +185,7 @@ size_t Attribute::element_size(Geometry *geom, AttributePrimitive prim) const
       }
       break;
     case ATTR_ELEMENT_FACE:
-      if (geom->type == Geometry::MESH || geom->type == Geometry::VOLUME) {
+      if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
         Mesh *mesh = static_cast<Mesh *>(geom);
         if (prim == ATTR_PRIM_GEOMETRY) {
           size = mesh->num_triangles();
@@ -197,7 +197,7 @@ size_t Attribute::element_size(Geometry *geom, AttributePrimitive prim) const
       break;
     case ATTR_ELEMENT_CORNER:
     case ATTR_ELEMENT_CORNER_BYTE:
-      if (geom->type == Geometry::MESH) {
+      if (geom->geometry_type == Geometry::MESH) {
         Mesh *mesh = static_cast<Mesh *>(geom);
         if (prim == ATTR_PRIM_GEOMETRY) {
           size = mesh->num_triangles() * 3;
@@ -208,19 +208,19 @@ size_t Attribute::element_size(Geometry *geom, AttributePrimitive prim) const
       }
       break;
     case ATTR_ELEMENT_CURVE:
-      if (geom->type == Geometry::HAIR) {
+      if (geom->geometry_type == Geometry::HAIR) {
         Hair *hair = static_cast<Hair *>(geom);
         size = hair->num_curves();
       }
       break;
     case ATTR_ELEMENT_CURVE_KEY:
-      if (geom->type == Geometry::HAIR) {
+      if (geom->geometry_type == Geometry::HAIR) {
         Hair *hair = static_cast<Hair *>(geom);
         size = hair->curve_keys.size();
       }
       break;
     case ATTR_ELEMENT_CURVE_KEY_MOTION:
-      if (geom->type == Geometry::HAIR) {
+      if (geom->geometry_type == Geometry::HAIR) {
         Hair *hair = static_cast<Hair *>(geom);
         size = hair->curve_keys.size() * (hair->motion_steps - 1);
       }
@@ -445,7 +445,7 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
   if (name == ustring())
     name = Attribute::standard_name(std);
 
-  if (geometry->type == Geometry::MESH) {
+  if (geometry->geometry_type == Geometry::MESH) {
     switch (std) {
       case ATTR_STD_VERTEX_NORMAL:
         attr = add(name, TypeDesc::TypeNormal, ATTR_ELEMENT_VERTEX);
@@ -496,7 +496,7 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
         break;
     }
   }
-  else if (geometry->type == Geometry::VOLUME) {
+  else if (geometry->geometry_type == Geometry::VOLUME) {
     switch (std) {
       case ATTR_STD_VERTEX_NORMAL:
         attr = add(name, TypeDesc::TypeNormal, ATTR_ELEMENT_VERTEX);
@@ -521,7 +521,7 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
         break;
     }
   }
-  else if (geometry->type == Geometry::HAIR) {
+  else if (geometry->geometry_type == Geometry::HAIR) {
     switch (std) {
       case ATTR_STD_UV:
         attr = add(name, TypeFloat2, ATTR_ELEMENT_CURVE);
