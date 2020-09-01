@@ -25,7 +25,6 @@
 
 #include "BKE_lib_id.h"
 
-#include "BLI_array.hh"
 #include "BLI_float2.hh"
 #include "BLI_float3.hh"
 #include "BLI_vector.hh"

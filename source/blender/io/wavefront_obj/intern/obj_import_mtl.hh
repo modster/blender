@@ -27,7 +27,7 @@
 
 #include "DNA_node_types.h"
 
-#include "BLI_array.hh"
+#include <array>
 #include "BLI_float3.hh"
 #include "BLI_map.hh"
 #include "BLI_string_ref.hh"
@@ -115,7 +115,7 @@ class ShaderNodetreeWrap {
   const MTLMaterial *mtl_mat_;
 
   /* List of all locations occupied by nodes. */
-  Vector<Array<int, 2>> node_locations;
+  Vector<std::array<int, 2>> node_locations;
   const float node_size{300.f};
 
  public:

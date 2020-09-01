@@ -21,12 +21,13 @@
  * \ingroup obj
  */
 
+#include <array>
+
 #include "utils.hh"
 
 #include "BKE_displist.h"
 #include "BKE_mesh.h"
 
-#include "BLI_array.hh"
 #include "BLI_set.hh"
 
 #include "DNA_object_types.h"
@@ -159,7 +160,7 @@ Vector<Vector<int>> ngon_tessellate(Span<float3> vertex_coords, Span<int> face_v
     verts.append({vertex_coords[face_vertex_indices[i]], i});
   }
 
-  Vector<Array<int, 2>> edges;
+  Vector<std::array<int, 2>> edges;
   for (int i = 0; i < face_vertex_indices.size(); i++) {
     edges.append({i, i - 1});
   }

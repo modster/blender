@@ -21,6 +21,8 @@
  * \ingroup obj
  */
 
+#include <array>
+
 #include "DNA_scene_types.h" /* For eVGroupSelect. */
 
 #include "BKE_customdata.h"
@@ -184,7 +186,7 @@ void MeshFromGeometry::dissolve_edges(const Set<std::pair<int, int>> &fgon_edges
 
   BMesh *bmesh = BKE_mesh_to_bmesh_ex(blender_mesh_.get(), &bm_create_params, &bm_convert_params);
 
-  Vector<Array<BMVert *, 2>> edges;
+  Vector<std::array<BMVert *, 2>> edges;
   edges.reserve(fgon_edges.size());
   BM_mesh_elem_table_ensure(bmesh, BM_VERT);
   for (const std::pair<int, int> &edge : fgon_edges) {

@@ -183,7 +183,7 @@ std::tuple<float, float> ShaderNodetreeWrap::set_node_locations(const int pos_x)
   int pos_y = 0;
   bool found = false;
   while (true) {
-    for (const Array<int, 2> &location : node_locations) {
+    for (Span<int> location : node_locations) {
       if (location[0] == pos_x && location[1] == pos_y) {
         pos_y += 1;
         found = true;

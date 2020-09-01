@@ -124,7 +124,7 @@ static void split_by_char(StringRef in_string, const char delimiter, Vector<Stri
     in_string = in_string.drop_prefix(word_len);
     /* Skip all delimiters. */
     in_string = in_string.drop_prefix(
-        MIN2(in_string.find_first_not_of(delimiter), in_string.size()));
+        std::min(in_string.find_first_not_of(delimiter), in_string.size()));
   }
 }
 

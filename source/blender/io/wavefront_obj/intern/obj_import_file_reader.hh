@@ -43,8 +43,6 @@ class OBJParser {
   void parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometries,
                        GlobalVertices &r_global_vertices);
   Span<std::string> mtl_libraries() const;
-  void print_obj_data(Span<std::unique_ptr<Geometry>> all_geometries,
-                      const GlobalVertices &global_vertices);
 };
 
 /**

@@ -38,52 +38,6 @@
 namespace blender::io::obj {
 
 /**
- * Only for debug purposes. Must not be in master.
- */
-void OBJParser::print_obj_data(Span<std::unique_ptr<Geometry>> all_geometries,
-                               const GlobalVertices &global_vertices)
-{
-  for (const float3 &curr_vert : global_vertices.vertices) {
-    print_v3("vert", curr_vert);
-  }
-  printf("\n");
-  for (const float2 &curr_uv_vert : global_vertices.uv_vertices) {
-    print_v2("vert", curr_uv_vert);
-  }
-  printf("\n");
-
-  for (const std::unique_ptr<Geometry> &curr_ob : all_geometries) {
-    for (const int curr_vert_idx : curr_ob->vertex_indices_) {
-      printf(" %d", curr_vert_idx);
-    }
-    printf("\nglobal_vert_index^\n");
-    for (const MEdge &edge : curr_ob->edges()) {
-      printf(" %d %d", edge.v1, edge.v2);
-    }
-    printf("\nedge vertex indices^\n");
-    for (const FaceElement &curr_face : curr_ob->face_elements_) {
-      for (FaceCorner a : curr_face.face_corners) {
-        printf(" %d/%d", a.vert_index, a.uv_vert_index);
-      }
-      printf("\n");
-    }
-    printf("\nvert_index/uv_vert_index^\n");
-    for (StringRef b : curr_ob->material_names_) {
-      printf("%s ", b.data());
-    }
-    printf("\nmat names^\n");
-    for (const int t : curr_ob->nurbs_element_.curv_indices) {
-      printf(" %d", t);
-    }
-    printf("\nnurbs curv indces^\n");
-    for (const float t : curr_ob->nurbs_element_.parm) {
-      printf(" %f", t);
-    }
-    printf("\nnurbs parm values^\n");
-  }
-}
-
-/**
  * Make Blender Mesh, Curve etc from Geometry and add them to the import collection.
  */
 static void geometry_to_blender_objects(
@@ -127,7 +81,6 @@ void importer_main(bContext *C, const OBJImportParams &import_params)
     MTLParser mtl_parser{mtl_library, import_params.filepath};
     mtl_parser.parse_and_store(materials);
   }
-  //  obj_parser.print_obj_data(all_geometries, global_vertices);
 
   geometry_to_blender_objects(
       bmain, scene, import_params, all_geometries, global_vertices, materials);
