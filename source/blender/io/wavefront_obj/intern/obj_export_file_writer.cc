@@ -23,8 +23,6 @@
 
 #include "BKE_blender_version.h"
 
-#include "BLI_array.hh"
-
 #include "obj_export_file_writer.hh"
 #include "obj_export_mesh.hh"
 #include "obj_export_mtl.hh"
@@ -177,11 +175,11 @@ void OBJWriter::write_vertex_coords(const OBJMesh &obj_mesh_data) const
  * Write UV vertex coordinates for all vertices as vt u v .
  * \note UV indices are stored here, but written later.
  */
-void OBJWriter::write_uv_coords(OBJMesh &obj_mesh_data, Vector<Vector<uint>> &uv_indices) const
+void OBJWriter::write_uv_coords(OBJMesh &obj_mesh_data) const
 {
   Vector<std::array<float, 2>> uv_coords;
+  obj_mesh_data.store_uv_coords_and_indices(uv_coords);
 
-  obj_mesh_data.store_uv_coords_and_indices(uv_coords, uv_indices);
   for (const std::array<float, 2> &uv_vertex : uv_coords) {
     fprintf(outfile_, "vt %f %f\n", uv_vertex[0], uv_vertex[1]);
   }
@@ -290,7 +288,7 @@ void OBJWriter::write_vertex_group(const OBJMesh &obj_mesh_data,
  * indices and face normal indices. Also write groups: smooth, vertex, material.
  *  \note UV indices are stored while writing UV vertices.
  */
-void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data, Span<Vector<uint>> uv_indices)
+void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
 {
   /* -1 has no significant value, it can be any negative number. */
   int last_face_smooth_group = -1;
@@ -353,7 +351,7 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data, Span<Vector<ui
     write_smooth_group(obj_mesh_data, i, last_face_smooth_group);
     write_vertex_group(obj_mesh_data, i, last_face_vertex_group);
     write_poly_material(obj_mesh_data, i, last_face_mat_nr);
-    (this->*func_vert_uv_normal_indices)(vertex_indices, uv_indices[i], normal_indices, totloop);
+    (this->*func_vert_uv_normal_indices)(vertex_indices, obj_mesh_data.uv_indices(i), normal_indices, totloop);
   }
 }
 

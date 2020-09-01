@@ -71,7 +71,7 @@ class OBJWriter {
   void write_object_name(const OBJMesh &obj_mesh_data) const;
   void write_mtllib(const char *obj_filepath) const;
   void write_vertex_coords(const OBJMesh &obj_mesh_data) const;
-  void write_uv_coords(OBJMesh &obj_mesh_data, Vector<Vector<uint>> &uv_indices) const;
+  void write_uv_coords(OBJMesh &obj_mesh_data) const;
   void write_poly_normals(OBJMesh &obj_mesh_data) const;
   void write_smooth_group(const OBJMesh &obj_mesh_data,
                           uint poly_index,
@@ -82,7 +82,7 @@ class OBJWriter {
   void write_vertex_group(const OBJMesh &obj_mesh_data,
                           const uint poly_index,
                           short &r_last_face_vertex_group) const;
-  void write_poly_elements(const OBJMesh &obj_mesh_data, Span<Vector<uint>> uv_indices);
+  void write_poly_elements(const OBJMesh &obj_mesh_data);
   void write_loose_edges(const OBJMesh &obj_mesh_data) const;
   void write_nurbs_curve(const OBJCurve &obj_nurbs_data) const;
 

@@ -127,12 +127,14 @@ static void export_frame(ViewLayer *view_layer,
     /* Create an empty MTL file in the beginning, to be appended later. */
     frame_writer.write_mtllib(filepath);
   }
-  for (std::unique_ptr<OBJMesh> &mesh_to_export : exportable_as_mesh) {
+  for (int i = 0; i < exportable_as_mesh.size(); i++) {
+    /* Smooth groups and UV vertex indices may take huge memory, so remove objects right
+     * after they're written. */
+    const std::unique_ptr<OBJMesh> mesh_to_export = std::move(exportable_as_mesh[i]);
     frame_writer.write_object_name(*mesh_to_export);
     frame_writer.write_vertex_coords(*mesh_to_export);
 
     if (mesh_to_export->tot_polygons() > 0) {
-      Vector<Vector<uint>> uv_indices;
       if (export_params.export_smooth_groups) {
         mesh_to_export->calc_smooth_groups(export_params.smooth_groups_bitflags);
       }
@@ -140,20 +142,23 @@ static void export_frame(ViewLayer *view_layer,
         frame_writer.write_poly_normals(*mesh_to_export);
       }
       if (export_params.export_uv) {
-        frame_writer.write_uv_coords(*mesh_to_export, uv_indices);
+        frame_writer.write_uv_coords(*mesh_to_export);
       }
       if (export_params.export_materials) {
         MTLWriter mtl_writer(filepath);
         mtl_writer.append_materials(*mesh_to_export);
       }
-      frame_writer.write_poly_elements(*mesh_to_export, uv_indices);
+      frame_writer.write_poly_elements(*mesh_to_export);
     }
     frame_writer.write_loose_edges(*mesh_to_export);
 
     frame_writer.update_index_offsets(*mesh_to_export);
   }
+
   /* Export nurbs in parm form, not as vertices and edges. */
-  for (std::unique_ptr<OBJCurve> &nurbs_to_export : exportable_as_nurbs) {
+  for (const std::unique_ptr<OBJCurve> &nurbs_to_export : exportable_as_nurbs) {
+    /* Curves don't have any dynamically allocated memory, so it's find to keep them
+     * around till Vector's cleanup. */
     frame_writer.write_nurbs_curve(*nurbs_to_export);
   }
 }
