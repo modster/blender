@@ -19,15 +19,9 @@
 
 /** \file
  * \ingroup edanimation
- */
-
-/* User-Interface Stuff for F-Modifiers:
- * This file defines the (C-Coded) templates + editing callbacks needed
- * by the interface stuff or F-Modifiers, as used by F-Curves in the Graph Editor,
- * and NLA-Strips in the NLA Editor.
  *
- * Copy/Paste Buffer for F-Modifiers:
- * For now, this is also defined in this file so that it can be shared between the
+ * This file defines the templates + editing callbacks needed by the interface stuff for
+ * F-Modifiers, as used by F-Curves in the Graph Editor, and NLA-Strips in the NLA Editor.
  */
 
 #include <string.h>
@@ -59,8 +53,6 @@
 
 #include "DEG_depsgraph.h"
 
-#include "anim_intern.h"
-
 typedef void (*PanelDrawFn)(const bContext *, struct Panel *);
 static void deg_update(bContext *C, void *owner_id, void *UNUSED(var2));
 static void fmodifier_panel_header(const bContext *C, Panel *panel);
@@ -87,46 +79,50 @@ static PointerRNA *fmodifier_get_pointers(const Panel *panel, ID **r_owner_id)
 /**
  * Move an FModifier to the index it's moved to after a drag and drop.
  */
-// static void fmodifier_reorder(bContext *C, Panel *panel, int new_index)
-// {
-//   bAnimListElem *ale;
-//   FCurve *fcu;
-//   // if (!graph_panel_context(C, &ale, &fcu)) {
-//   //   return;
-//   // }
+static void fmodifier_reorder(bContext *C, Panel *panel, int new_index)
+{
+  ID *fcurve_owner_id;
+  PointerRNA *ptr = fmodifier_get_pointers(panel, &fcurve_owner_id);
+  FModifier *fcm = ptr->data;
 
-//   int current_index = panel->runtime.list_index;
-//   if (current_index == new_index) {
-//     return;
-//   }
+  /* Cycles modifier has to be the first, so make sure it's kept that way. */
+  if (fcm->type == FMODIFIER_TYPE_CYCLES) {
+    WM_report(RPT_ERROR, "Cannot reorder cycles modifier");
+    return;
+  }
 
-//   ListBase *modifiers = &fcu->modifiers;
-//   FModifier *fcm = BLI_findlink(modifiers, current_index);
-//   if (fcm == NULL) {
-//     return;
-//   }
+  ListBase *modifiers;
+  if (CTX_wm_space_graph(C)) {
+    modifiers = ANIM_graph_context_fmodifiers(C);
+  }
+  else if (CTX_wm_space_nla(C)) {
+    modifiers = ANIM_nla_context_fmodifiers(C);
+  }
 
-//   /* Cycles modifier has to be the first, so make sure it's kept that way. */
-//   if (fcm->type == FMODIFIER_TYPE_CYCLES) {
-//     return;
-//   }
-//   FModifier *fcm_first = modifiers->first;
-//   if (fcm_first->type == FMODIFIER_TYPE_CYCLES && new_index == 0) {
-//     return;
-//   }
+  /* Again, make sure we don't move a modifier before a cycles modifier. */
+  FModifier *fcm_first = modifiers->first;
+  if (fcm_first->type == FMODIFIER_TYPE_CYCLES && new_index == 0) {
+    WM_report(RPT_ERROR, "Cycles modifier must be first");
+    return;
+  }
 
-//   BLI_assert(current_index >= 0);
-//   BLI_assert(new_index >= 0);
+  int current_index = BLI_findindex(modifiers, fcm);
+  BLI_assert(current_index >= 0);
+  BLI_assert(new_index >= 0);
 
-//   /* Move the FModifier in the list. */
-//   BLI_listbase_link_move(modifiers, fcm, new_index - current_index);
+  /* Don't do anything if the drag didn't change the index. */
+  if (current_index == new_index) {
+    return;
+  }
 
-//   ED_undo_push(C, "Move F-Curve Modifier");
+  /* Move the FModifier in the list. */
+  BLI_listbase_link_move(modifiers, fcm, new_index - current_index);
 
-//   ID *fcurve_owner_id = ale->fcurve_owner_id;
-//   WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
-//   DEG_id_tag_update(fcurve_owner_id, ID_RECALC_ANIMATION);
-// }
+  ED_undo_push(C, "Move F-Curve Modifier");
+
+  WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
+  DEG_id_tag_update(fcurve_owner_id, ID_RECALC_ANIMATION);
+}
 
 static short get_fmodifier_expand_flag(const bContext *UNUSED(C), Panel *panel)
 {
@@ -170,7 +166,7 @@ static PanelType *fmodifier_panel_register(ARegionType *region_type,
   /* Give the panel the special flag that says it was built here and corresponds to a
    * modifer rather than a PanelType. */
   panel_type->flag = PNL_LAYOUT_HEADER_EXPAND | PNL_DRAW_BOX | PNL_INSTANCED;
-  // panel_type->reorder = fmodifier_reorder;
+  panel_type->reorder = fmodifier_reorder;
   panel_type->get_list_data_expand_flag = get_fmodifier_expand_flag;
   panel_type->set_list_data_expand_flag = set_fmodifier_expand_flag;
 
@@ -247,6 +243,7 @@ static void deg_update(bContext *C, void *owner_id, void *UNUSED(var2))
 /* callback to remove the given modifier  */
 typedef struct FModifierDeleteContext {
   ID *fcurve_owner_id;
+  ListBase *modifiers;
 } FModifierDeleteContext;
 static void delete_fmodifier_cb(bContext *C, void *ctx_v, void *fcm_v)
 {
@@ -314,20 +311,17 @@ static void fmodifier_panel_header(const bContext *C, Panel *panel)
   FModifier *fcm = (FModifier *)ptr->data;
   const FModifierTypeInfo *fmi = fmodifier_get_typeinfo(fcm);
 
-  /* get layout-row + UI-block for this */
-
   uiBlock *block = uiLayoutGetBlock(layout);  // err...
 
-  /* left-align -------------------------------------------- */
   uiLayout *sub = uiLayoutRow(layout, true);
   uiLayoutSetAlignment(sub, UI_LAYOUT_ALIGN_LEFT);
 
   UI_block_emboss_set(block, UI_EMBOSS_NONE);
 
-  /* checkbox for 'active' status (for now) */
+  /* Checkbox for 'active' status (for now). */
   uiItemR(sub, ptr, "active", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
 
-  /* name */
+  /* Name. */
   if (fmi) {
     uiItemL(sub, IFACE_(fmi->name), ICON_NONE);
   }
@@ -335,38 +329,41 @@ static void fmodifier_panel_header(const bContext *C, Panel *panel)
     uiItemL(sub, IFACE_("<Unknown Modifier>"), ICON_NONE);
   }
 
-  /* right-align ------------------------------------------- */
+  /* Right align. */
   sub = uiLayoutRow(layout, true);
   uiLayoutSetAlignment(sub, UI_LAYOUT_ALIGN_RIGHT);
 
-  /* 'mute' button */
+  /* 'Mute' button. */
   uiItemR(sub, ptr, "mute", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
 
   UI_block_emboss_set(block, UI_EMBOSS_NONE);
 
-  /* delete button */
-  // uiBut *but = uiDefIconBut(block,
-  //                           UI_BTYPE_BUT,
-  //                           B_REDR,
-  //                           ICON_X,
-  //                           0,
-  //                           0,
-  //                           UI_UNIT_X,
-  //                           UI_UNIT_Y,
-  //                           NULL,
-  //                           0.0,
-  //                           0.0,
-  //                           0.0,
-  //                           0.0,
-  //                           TIP_("Delete F-Curve Modifier"));
-  // FModifierDeleteContext *ctx = MEM_mallocN(sizeof(FModifierDeleteContext), "fmodifier ctx");
-  // ctx->fcurve_owner_id = fcurve_owner_id;
-  // FCurve *fcu;
-  // if (!graph_panel_context(C, NULL, &fcu)) {
-  //   return;
-  // }
-  // ctx->modifiers = &fcu->modifiers;
-  // UI_but_funcN_set(but, delete_fmodifier_cb, ctx, fcm);
+  /* Delete button. */
+  uiBut *but = uiDefIconBut(block,
+                            UI_BTYPE_BUT,
+                            B_REDR,
+                            ICON_X,
+                            0,
+                            0,
+                            UI_UNIT_X,
+                            UI_UNIT_Y,
+                            NULL,
+                            0.0,
+                            0.0,
+                            0.0,
+                            0.0,
+                            TIP_("Delete F-Curve Modifier"));
+  FModifierDeleteContext *ctx = MEM_mallocN(sizeof(FModifierDeleteContext), "fmodifier ctx");
+  ctx->fcurve_owner_id = fcurve_owner_id;
+
+  if (CTX_wm_space_graph(C)) {
+    ctx->modifiers = ANIM_graph_context_fmodifiers(C);
+  }
+  else if (CTX_wm_space_nla(C)) {
+    ctx->modifiers = ANIM_nla_context_fmodifiers(C);
+  }
+  BLI_assert(ctx->modifiers != NULL);
+  UI_but_funcN_set(but, delete_fmodifier_cb, ctx, fcm);
 
   UI_block_emboss_set(block, UI_EMBOSS);
 
@@ -400,7 +397,7 @@ static void generator_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   /* Settings for individual modes. */
   switch (data->mode) {
-    case FCM_GENERATOR_POLYNOMIAL: /* polynomial expression */
+    case FCM_GENERATOR_POLYNOMIAL: /* Polynomial expression. */
     {
       char xval[32];
 
@@ -1065,6 +1062,9 @@ void ANIM_fmodifier_panels(const bContext *C,
 
 /* -------------------------------------------------------------------- */
 /** \name Copy / Paste Buffer Code
+ *
+ * For now, this is also defined in this file so that it can be shared between the graph editor
+ * and the NLA editor.
  * \{ */
 
 /* Copy/Paste Buffer itself (list of FModifier 's) */

@@ -105,6 +105,16 @@ static int graph_panel_context(const bContext *C, bAnimListElem **ale, FCurve **
   return 1;
 }
 
+ListBase *ANIM_graph_context_fmodifiers(const bContext *C)
+{
+  FCurve *fcu;
+  if (!graph_panel_context(C, NULL, &fcu)) {
+    return NULL;
+  }
+
+  return &fcu->modifiers;
+}
+
 static bool graph_panel_poll(const bContext *C, PanelType *UNUSED(pt))
 {
   return graph_panel_context(C, NULL, NULL);
@@ -1358,14 +1368,21 @@ static void graph_panel_modifiers(const bContext *C, Panel *panel)
   block = uiLayoutGetBlock(panel->layout);
   UI_block_func_handle_set(block, do_graph_region_modifier_buttons, NULL);
 
-  row = uiLayoutRow(panel->layout, false);
-  uiItemMenuEnumO(
-      row, (bContext *)C, "GRAPH_OT_fmodifier_add", "type", IFACE_("Add Modifier"), ICON_NONE);
+  /* 'add modifier' button at top of panel */
+  {
+    row = uiLayoutRow(panel->layout, false);
 
-  /* Copy / paste as sub-row. */
-  row = uiLayoutRow(row, true);
-  uiItemO(row, "", ICON_COPYDOWN, "GRAPH_OT_fmodifier_copy");
-  uiItemO(row, "", ICON_PASTEDOWN, "GRAPH_OT_fmodifier_paste");
+    /* this is an operator button which calls a 'add modifier' operator...
+     * a menu might be nicer but would be tricky as we need some custom filtering
+     */
+    uiItemMenuEnumO(
+        row, (bContext *)C, "GRAPH_OT_fmodifier_add", "type", IFACE_("Add Modifier"), ICON_NONE);
+
+    /* copy/paste (as sub-row) */
+    row = uiLayoutRow(row, true);
+    uiItemO(row, "", ICON_COPYDOWN, "GRAPH_OT_fmodifier_copy");
+    uiItemO(row, "", ICON_PASTEDOWN, "GRAPH_OT_fmodifier_paste");
+  }
 
   ANIM_fmodifier_panels(C, ale->fcurve_owner_id, &fcu->modifiers, graph_fmodifier_panel_id);
 

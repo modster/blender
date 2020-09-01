@@ -52,7 +52,7 @@ const EnumPropertyItem rna_enum_fmodifier_type_items[] = {
     {FMODIFIER_TYPE_FN_GENERATOR,
      "FNGENERATOR",
      0,
-     "Function",
+     "Built-In Function",
      "Generate a curve using standard math functions such as sin and cos"},
     {FMODIFIER_TYPE_ENVELOPE,
      "ENVELOPE",
@@ -1201,7 +1201,8 @@ static void rna_def_fmodifier_function_generator(BlenderRNA *brna)
   };
 
   srna = RNA_def_struct(brna, "FModifierFunctionGenerator", "FModifier");
-  RNA_def_struct_ui_text(srna, "Function F-Modifier", "Generate values using a Built-In Function");
+  RNA_def_struct_ui_text(
+      srna, "Built-In Function F-Modifier", "Generate values using a Built-In Function");
   RNA_def_struct_sdna_from(srna, "FMod_FunctionGenerator", "data");
 
   /* coefficients */
@@ -1256,7 +1257,6 @@ static void rna_def_fmodifier_envelope_ctrl(BlenderRNA *brna)
    */
   prop = RNA_def_property(srna, "min", PROP_FLOAT, PROP_NONE);
   RNA_def_property_float_sdna(prop, NULL, "min");
-  /* HANS-TODO: UI ranges for these properties. */
   RNA_def_property_ui_text(prop, "Minimum Value", "Lower bound of envelope at this control-point");
   RNA_def_property_update(prop, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, "rna_FModifier_update");
 

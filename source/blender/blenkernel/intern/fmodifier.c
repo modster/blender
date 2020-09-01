@@ -374,7 +374,7 @@ static FModifierTypeInfo FMI_FN_GENERATOR = {
     sizeof(FMod_FunctionGenerator), /* size */
     FMI_TYPE_GENERATE_CURVE,        /* action type */
     FMI_REQUIRES_NOTHING,           /* requirements */
-    N_("Function"),                 /* name */
+    N_("Built-In Function"),        /* name */
     "FMod_FunctionGenerator",       /* struct name */
     0,                              /* storage size */
     NULL,                           /* free data */
@@ -1119,7 +1119,7 @@ FModifier *add_fmodifier(ListBase *modifiers, int type, FCurve *owner_fcu)
   /* add modifier itself */
   fcm = MEM_callocN(sizeof(FModifier), "F-Curve Modifier");
   fcm->type = type;
-  fcm->ui_expand_flag = (1 << 0); /* Expand the main panel. */
+  fcm->ui_expand_flag = (1 << 0); /* Expand the main panel, not the subpanels. */
   fcm->curve = owner_fcu;
   fcm->influence = 1.0f;
   BLI_addtail(modifiers, fcm);

@@ -185,6 +185,17 @@ bool nla_panel_context(const bContext *C,
   return (found != 0);
 }
 
+ListBase *ANIM_nla_context_fmodifiers(const bContext *C)
+{
+  PointerRNA strip_ptr;
+  if (!nla_panel_context(C, NULL, NULL, &strip_ptr)) {
+    return NULL;
+  }
+  NlaStrip *strip = strip_ptr.data;
+
+  return &strip->modifiers;
+}
+
 #if 0
 static bool nla_panel_poll(const bContext *C, PanelType *pt)
 {

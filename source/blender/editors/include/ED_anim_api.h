@@ -674,6 +674,10 @@ void ANIM_draw_framerange(struct Scene *scene, struct View2D *v2d);
 /* F-MODIFIER TOOLS */
 
 /* ------------- UI Panel Drawing -------------- */
+
+ListBase *ANIM_nla_context_fmodifiers(const struct bContext *C);
+ListBase *ANIM_graph_context_fmodifiers(const struct bContext *C);
+
 typedef bool (*PanelTypePollFn)(const struct bContext *C, struct PanelType *pt);
 typedef void (*uiListPanelIDFromDataFunc)(void *data_link, char *r_idname);
 
