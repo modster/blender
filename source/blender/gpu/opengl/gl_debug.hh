@@ -12,32 +12,35 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 by Mike Erwin.
- * All rights reserved.
  */
 
 /** \file
  * \ingroup gpu
- *
- * GPU vertex attribute binding
  */
 
 #pragma once
 
-#include "GPU_vertex_format.h"
-#include "gpu_shader_interface.hh"
+namespace blender {
+namespace gpu {
+namespace debug {
 
-#ifdef __cplusplus
-extern "C" {
+/* Enabled on MacOS by default since there is no support for debug callbacks. */
+#if defined(DEBUG) && defined(__APPLE__)
+#  define GL_CHECK_ERROR(info) debug::check_gl_error(info)
+#else
+#  define GL_CHECK_ERROR(info)
 #endif
 
-/* TODO(fclem) remove, use shaderface directly. */
-void AttrBinding_clear(GPUAttrBinding *binding);
-
-void get_attr_locations(const GPUVertFormat *format, GPUAttrBinding *binding, GPUShader *shader);
-uint read_attr_location(const GPUAttrBinding *binding, uint a_idx);
-
-#ifdef __cplusplus
-}
+#ifdef DEBUG
+#  define GL_CHECK_RESOURCES(info) debug::check_gl_resources(info)
+#else
+#  define GL_CHECK_RESOURCES(info)
 #endif
+
+void check_gl_error(const char *info);
+void check_gl_resources(const char *info);
+void init_gl_callbacks(void);
+
+}  // namespace debug
+}  // namespace gpu
+}  // namespace blender

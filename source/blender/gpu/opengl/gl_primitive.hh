@@ -20,42 +20,46 @@
 /** \file
  * \ingroup gpu
  *
- * GPU shader interface (C --> GLSL)
- *
- * Structure detailing needed vertex inputs and resources for a specific shader.
- * A shader interface can be shared between two similar shaders.
+ * Encapsulation of Framebuffer states (attached textures, viewport, scissors).
  */
 
 #pragma once
 
-#include "MEM_guardedalloc.h"
+#include "BLI_assert.h"
 
-#include "BLI_vector.hh"
+#include "GPU_primitive.h"
 
 #include "glew-mx.h"
 
-#include "gpu_shader_interface.hh"
-
 namespace blender::gpu {
 
-class GLVaoCache;
+static inline GLenum to_gl(GPUPrimType prim_type)
+{
+  BLI_assert(prim_type != GPU_PRIM_NONE);
+  switch (prim_type) {
+    default:
+    case GPU_PRIM_POINTS:
+      return GL_POINTS;
+    case GPU_PRIM_LINES:
+      return GL_LINES;
+    case GPU_PRIM_LINE_STRIP:
+      return GL_LINE_STRIP;
+    case GPU_PRIM_LINE_LOOP:
+      return GL_LINE_LOOP;
+    case GPU_PRIM_TRIS:
+      return GL_TRIANGLES;
+    case GPU_PRIM_TRI_STRIP:
+      return GL_TRIANGLE_STRIP;
+    case GPU_PRIM_TRI_FAN:
+      return GL_TRIANGLE_FAN;
 
-/**
- * Implementation of Shader interface using OpenGL.
- **/
-class GLShaderInterface : public ShaderInterface {
- private:
-  /** Reference to VaoCaches using this interface */
-  Vector<GLVaoCache *> refs_;
-
- public:
-  GLShaderInterface(GLuint program);
-  ~GLShaderInterface();
-
-  void ref_add(GLVaoCache *ref);
-  void ref_remove(GLVaoCache *ref);
-
-  MEM_CXX_CLASS_ALLOC_FUNCS("GLShaderInterface");
-};
+    case GPU_PRIM_LINES_ADJ:
+      return GL_LINES_ADJACENCY;
+    case GPU_PRIM_LINE_STRIP_ADJ:
+      return GL_LINE_STRIP_ADJACENCY;
+    case GPU_PRIM_TRIS_ADJ:
+      return GL_TRIANGLES_ADJACENCY;
+  };
+}
 
 }  // namespace blender::gpu
