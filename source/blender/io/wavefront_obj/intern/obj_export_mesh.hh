@@ -25,7 +25,6 @@
 
 #include <optional>
 
-#include "BLI_array.hh"
 #include "BLI_float3.hh"
 #include "BLI_utility_mixins.hh"
 #include "BLI_vector.hh"
@@ -59,6 +58,10 @@ class OBJMesh : NonMovable, NonCopyable {
    */
   uint tot_uv_vertices_ = 0;
   /**
+   * Per face per vertex UV vertex indices. Make sure to fill them while writing UV coordinates.
+   */
+  Vector<Vector<uint>> uv_indices_;
+  /**
    * Total smooth groups in an object.
    */
   uint tot_smooth_groups_ = -1;
@@ -74,10 +77,11 @@ class OBJMesh : NonMovable, NonCopyable {
   uint tot_vertices() const;
   uint tot_polygons() const;
   uint tot_uv_vertices() const;
+  Span<uint> uv_indices(const int poly_index) const;
   uint tot_edges() const;
   short tot_col() const;
   uint tot_smooth_groups() const;
-  int ith_smooth_group(int poly_index) const;
+  int ith_smooth_group(const int poly_index) const;
 
   void ensure_mesh_normals() const;
   void ensure_mesh_edges() const;
@@ -94,8 +98,7 @@ class OBJMesh : NonMovable, NonCopyable {
 
   float3 calc_vertex_coords(const uint vert_index, const float scaling_factor) const;
   void calc_poly_vertex_indices(const uint poly_index, Vector<uint> &r_poly_vertex_indices) const;
-  void store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coords,
-                                   Vector<Vector<uint>> &r_uv_indices);
+  void store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coords);
   float3 calc_poly_normal(const uint poly_index) const;
   float3 calc_vertex_normal(const uint vert_index) const;
   const char *get_poly_deform_group_name(const uint poly_index, short &r_last_vertex_group) const;

@@ -157,6 +157,16 @@ uint OBJMesh::tot_uv_vertices() const
   return tot_uv_vertices_;
 }
 
+/**
+ * UV vertex indices of one polygon.
+ */
+Span<uint> OBJMesh::uv_indices(const int poly_index) const
+{
+  BLI_assert(poly_index < export_mesh_eval_->totpoly);
+  BLI_assert(poly_index < uv_indices_.size());
+  return uv_indices_[poly_index];
+}
+
 uint OBJMesh::tot_edges() const
 {
   return export_mesh_eval_->totedge;
@@ -183,7 +193,7 @@ uint OBJMesh::tot_smooth_groups() const
 /**
  * Return smooth group of the polygon at the given index.
  */
-int OBJMesh::ith_smooth_group(int poly_index) const
+int OBJMesh::ith_smooth_group(const int poly_index) const
 {
   /* Calculate smooth groups first. */
   BLI_assert(tot_smooth_groups_ != -1);
@@ -300,10 +310,10 @@ void OBJMesh::calc_poly_vertex_indices(const uint poly_index,
 }
 
 /**
- * Store UV vertex coordinates of an object as well as their indices.
+ * Fill UV vertex coordinates of an object in the given buffer. Also, store the
+ * UV vertex indices in the member variable.
  */
-void OBJMesh::store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coords,
-                                          Vector<Vector<uint>> &r_uv_indices)
+void OBJMesh::store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coords)
 {
   const MPoly *mpoly = export_mesh_eval_->mpoly;
   const MLoop *mloop = export_mesh_eval_->mloop;
@@ -320,7 +330,7 @@ void OBJMesh::store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coo
   UvVertMap *uv_vert_map = BKE_mesh_uv_vert_map_create(
       mpoly, mloop, mloopuv, totpoly, totvert, limit, false, false);
 
-  r_uv_indices.resize(totpoly);
+  uv_indices_.resize(totpoly);
   /* At least total vertices of a mesh will be present in its texture map. So
    * reserve minimum space early. */
   r_uv_coords.reserve(totvert);
@@ -344,8 +354,8 @@ void OBJMesh::store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coo
       r_uv_coords[tot_uv_vertices_ - 1][0] = vert_uv_coords[0];
       r_uv_coords[tot_uv_vertices_ - 1][1] = vert_uv_coords[1];
 
-      r_uv_indices[uv_vert->poly_index].resize(vertices_in_poly);
-      r_uv_indices[uv_vert->poly_index][uv_vert->loop_of_poly_index] = tot_uv_vertices_;
+      uv_indices_[uv_vert->poly_index].resize(vertices_in_poly);
+      uv_indices_[uv_vert->poly_index][uv_vert->loop_of_poly_index] = tot_uv_vertices_;
     }
   }
   BKE_mesh_uv_vert_map_free(uv_vert_map);
