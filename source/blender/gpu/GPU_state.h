@@ -29,6 +29,7 @@ typedef enum eGPUWriteMask {
   GPU_WRITE_BLUE = (1 << 2),
   GPU_WRITE_ALPHA = (1 << 3),
   GPU_WRITE_DEPTH = (1 << 4),
+  GPU_WRITE_STENCIL = (1 << 5),
   GPU_WRITE_COLOR = (GPU_WRITE_RED | GPU_WRITE_GREEN | GPU_WRITE_BLUE | GPU_WRITE_ALPHA),
 } eGPUWriteMask;
 
@@ -107,6 +108,7 @@ extern "C" {
 void GPU_blend(eGPUBlend blend);
 void GPU_face_culling(eGPUFaceCullTest culling);
 void GPU_depth_test(eGPUDepthTest test);
+void GPU_stencil_test(eGPUStencilTest test);
 void GPU_provoking_vertex(eGPUProvokingVertex vert);
 void GPU_front_facing(bool invert);
 void GPU_depth_range(float near, float far);
@@ -145,6 +147,8 @@ void GPU_stencil_compare_mask_set(uint compare_mask);
 eGPUBlend GPU_blend_get(void);
 eGPUDepthTest GPU_depth_test_get(void);
 eGPUWriteMask GPU_write_mask_get(void);
+uint GPU_stencil_mask_get(void);
+eGPUStencilTest GPU_stencil_test_get(void);
 
 void GPU_flush(void);
 void GPU_finish(void);

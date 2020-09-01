@@ -13,25 +13,41 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2016 by Mike Erwin.
+ * The Original Code is Copyright (C) 2020 Blender Foundation.
  * All rights reserved.
  */
 
 /** \file
  * \ingroup gpu
- *
- * GPU geometric primitives
  */
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "BLI_assert.h"
 
-/* TODO(fclem) move to OGL backend */
-GLenum convert_prim_type_to_gl(GPUPrimType);
+namespace blender {
+namespace gpu {
 
-#ifdef __cplusplus
-}
-#endif
+class Texture {
+ public:
+  /** TODO(fclem): make it a non-static function. */
+  static GPUAttachmentType attachment_type(GPUTexture *tex, int slot)
+  {
+    switch (GPU_texture_format(tex)) {
+      case GPU_DEPTH_COMPONENT32F:
+      case GPU_DEPTH_COMPONENT24:
+      case GPU_DEPTH_COMPONENT16:
+        BLI_assert(slot == 0);
+        return GPU_FB_DEPTH_ATTACHMENT;
+      case GPU_DEPTH24_STENCIL8:
+      case GPU_DEPTH32F_STENCIL8:
+        BLI_assert(slot == 0);
+        return GPU_FB_DEPTH_STENCIL_ATTACHMENT;
+      default:
+        return static_cast<GPUAttachmentType>(GPU_FB_COLOR_ATTACHMENT0 + slot);
+    }
+  }
+};
+
+}  // namespace gpu
+}  // namespace blender
