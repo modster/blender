@@ -218,7 +218,7 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
 
   if (method == BRANCHED_PATH) {
     foreach (Light *light, scene->lights)
-      max_samples = max(max_samples, light->samples);
+      max_samples = max(max_samples, light->get_samples());
 
     max_samples = max(max_samples,
                       max(diffuse_samples, max(glossy_samples, transmission_samples)));

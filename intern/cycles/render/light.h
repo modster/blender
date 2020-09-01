@@ -41,41 +41,41 @@ class Light : public Node {
 
   Light();
 
-  LightType type;
-  float3 strength;
-  float3 co;
+  NODE_PUBLIC_API(LightType, light_type)
+  NODE_PUBLIC_API(float3, strength)
+  NODE_PUBLIC_API(float3, co)
 
-  float3 dir;
-  float size;
-  float angle;
+  NODE_PUBLIC_API(float3, dir)
+  NODE_PUBLIC_API(float, size)
+  NODE_PUBLIC_API(float, angle)
 
-  float3 axisu;
-  float sizeu;
-  float3 axisv;
-  float sizev;
-  bool round;
+  NODE_PUBLIC_API(float3, axisu)
+  NODE_PUBLIC_API(float, sizeu)
+  NODE_PUBLIC_API(float3, axisv)
+  NODE_PUBLIC_API(float, sizev)
+  NODE_PUBLIC_API(bool, round)
 
-  Transform tfm;
+  NODE_PUBLIC_API(Transform, tfm)
 
-  int map_resolution;
+  NODE_PUBLIC_API(int, map_resolution)
 
-  float spot_angle;
-  float spot_smooth;
+  NODE_PUBLIC_API(float, spot_angle)
+  NODE_PUBLIC_API(float, spot_smooth)
 
-  bool cast_shadow;
-  bool use_mis;
-  bool use_diffuse;
-  bool use_glossy;
-  bool use_transmission;
-  bool use_scatter;
+  NODE_PUBLIC_API(bool, cast_shadow)
+  NODE_PUBLIC_API(bool, use_mis)
+  NODE_PUBLIC_API(bool, use_diffuse)
+  NODE_PUBLIC_API(bool, use_glossy)
+  NODE_PUBLIC_API(bool, use_transmission)
+  NODE_PUBLIC_API(bool, use_scatter)
 
-  bool is_portal;
-  bool is_enabled;
+  NODE_PUBLIC_API(bool, is_portal)
+  NODE_PUBLIC_API(bool, is_enabled)
 
-  Shader *shader;
-  int samples;
-  int max_bounces;
-  uint random_id;
+  NODE_PUBLIC_API(Shader *, shader)
+  NODE_PUBLIC_API(int, samples)
+  NODE_PUBLIC_API(int, max_bounces)
+  NODE_PUBLIC_API(uint, random_id)
 
   void tag_update(Scene *scene);
 

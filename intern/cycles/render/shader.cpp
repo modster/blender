@@ -501,8 +501,8 @@ void ShaderManager::update_shaders_used(Scene *scene)
       shader->used = true;
 
   foreach (Light *light, scene->lights)
-    if (light->shader)
-      light->shader->used = true;
+    if (light->get_shader())
+      const_cast<Shader *>(light->get_shader())->used = true;
 }
 
 void ShaderManager::device_update_common(Device *device,

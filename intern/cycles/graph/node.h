@@ -46,7 +46,7 @@ struct Transform;
     const SocketType *socket = get_##name##_socket(); \
     return socket_is_modified(*socket); \
   } \
-  const type_ &get_##name() const \
+  type_ const &get_##name() const \
   { \
     const SocketType *socket = get_##name##_socket(); \
     return get_socket_value<type_>(this, *socket); \
@@ -100,6 +100,7 @@ struct Node {
   void set(const SocketType &input, ustring value);
   void set(const SocketType &input, const Transform &value);
   void set(const SocketType &input, Node *value);
+  void set(const SocketType &input, Shader *value);
 
   /* set array values. the memory from the input array will taken over
    * by the node and the input array will be empty after return */

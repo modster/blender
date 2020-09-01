@@ -113,7 +113,7 @@ NODE_DEFINE(Light)
   type_enum.insert("background", LIGHT_BACKGROUND);
   type_enum.insert("area", LIGHT_AREA);
   type_enum.insert("spot", LIGHT_SPOT);
-  SOCKET_ENUM(type, "Type", type_enum, LIGHT_POINT);
+  SOCKET_ENUM(light_type, "Type", type_enum, LIGHT_POINT);
 
   SOCKET_COLOR(strength, "Strength", make_float3(1.0f, 1.0f, 1.0f));
 
@@ -161,7 +161,7 @@ Light::Light() : Node(node_type)
 
 void Light::tag_update(Scene *scene)
 {
-  scene->light_manager->need_update = true;
+  scene->light_manager->need_update = is_modified();
 }
 
 bool Light::has_contribution(Scene *scene)
@@ -172,7 +172,7 @@ bool Light::has_contribution(Scene *scene)
   if (is_portal) {
     return false;
   }
-  if (type == LIGHT_BACKGROUND) {
+  if (light_type == LIGHT_BACKGROUND) {
     return true;
   }
   return (shader) ? shader->has_surface_emission : scene->default_light->has_surface_emission;
@@ -199,7 +199,7 @@ LightManager::~LightManager()
 bool LightManager::has_background_light(Scene *scene)
 {
   foreach (Light *light, scene->lights) {
-    if (light->type == LIGHT_BACKGROUND && light->is_enabled) {
+    if (light->light_type == LIGHT_BACKGROUND && light->is_enabled) {
       return true;
     }
   }
@@ -216,7 +216,7 @@ void LightManager::test_enabled_lights(Scene *scene)
   foreach (Light *light, scene->lights) {
     light->is_enabled = light->has_contribution(scene);
     has_portal |= light->is_portal;
-    has_background |= light->type == LIGHT_BACKGROUND;
+    has_background |= light->light_type == LIGHT_BACKGROUND;
   }
 
   bool background_enabled = false;
@@ -231,7 +231,7 @@ void LightManager::test_enabled_lights(Scene *scene)
     const bool disable_mis = !(has_portal || shader->has_surface_spatial_varying);
     VLOG_IF(1, disable_mis) << "Background MIS has been disabled.\n";
     foreach (Light *light, scene->lights) {
-      if (light->type == LIGHT_BACKGROUND) {
+      if (light->light_type == LIGHT_BACKGROUND) {
         light->is_enabled = !disable_mis;
         background_enabled = !disable_mis;
         background_resolution = light->map_resolution;
@@ -416,16 +416,16 @@ void LightManager::device_update_distribution(Device *,
     distribution[offset].lamp.size = light->size;
     totarea += lightarea;
 
-    if (light->type == LIGHT_DISTANT) {
+    if (light->light_type == LIGHT_DISTANT) {
       use_lamp_mis |= (light->angle > 0.0f && light->use_mis);
     }
-    else if (light->type == LIGHT_POINT || light->type == LIGHT_SPOT) {
+    else if (light->light_type == LIGHT_POINT || light->light_type == LIGHT_SPOT) {
       use_lamp_mis |= (light->size > 0.0f && light->use_mis);
     }
-    else if (light->type == LIGHT_AREA) {
+    else if (light->light_type == LIGHT_AREA) {
       use_lamp_mis |= light->use_mis;
     }
-    else if (light->type == LIGHT_BACKGROUND) {
+    else if (light->light_type == LIGHT_BACKGROUND) {
       num_background_lights++;
       background_mis |= light->use_mis;
     }
@@ -575,7 +575,7 @@ void LightManager::device_update_background(Device *device,
 
   /* find background light */
   foreach (Light *light, scene->lights) {
-    if (light->type == LIGHT_BACKGROUND) {
+    if (light->light_type == LIGHT_BACKGROUND) {
       background_light = light;
       break;
     }
@@ -770,13 +770,13 @@ void LightManager::device_update_points(Device *, DeviceScene *dscene, Scene *sc
       use_light_visibility = true;
     }
 
-    klights[light_index].type = light->type;
+    klights[light_index].type = light->light_type;
     klights[light_index].samples = light->samples;
     klights[light_index].strength[0] = light->strength.x;
     klights[light_index].strength[1] = light->strength.y;
     klights[light_index].strength[2] = light->strength.z;
 
-    if (light->type == LIGHT_POINT) {
+    if (light->light_type == LIGHT_POINT) {
       shader_id &= ~SHADER_AREA_LIGHT;
 
       float radius = light->size;
@@ -792,7 +792,7 @@ void LightManager::device_update_points(Device *, DeviceScene *dscene, Scene *sc
       klights[light_index].spot.radius = radius;
       klights[light_index].spot.invarea = invarea;
     }
-    else if (light->type == LIGHT_DISTANT) {
+    else if (light->light_type == LIGHT_DISTANT) {
       shader_id &= ~SHADER_AREA_LIGHT;
 
       float angle = light->angle / 2.0f;
@@ -815,7 +815,7 @@ void LightManager::device_update_points(Device *, DeviceScene *dscene, Scene *sc
       klights[light_index].distant.radius = radius;
       klights[light_index].distant.cosangle = cosangle;
     }
-    else if (light->type == LIGHT_BACKGROUND) {
+    else if (light->light_type == LIGHT_BACKGROUND) {
       uint visibility = scene->background->visibility;
 
       shader_id &= ~SHADER_AREA_LIGHT;
@@ -838,7 +838,7 @@ void LightManager::device_update_points(Device *, DeviceScene *dscene, Scene *sc
         use_light_visibility = true;
       }
     }
-    else if (light->type == LIGHT_AREA) {
+    else if (light->light_type == LIGHT_AREA) {
       float3 axisu = light->axisu * (light->sizeu * light->size);
       float3 axisv = light->axisv * (light->sizev * light->size);
       float area = len(axisu) * len(axisv);
@@ -868,7 +868,7 @@ void LightManager::device_update_points(Device *, DeviceScene *dscene, Scene *sc
       klights[light_index].area.dir[1] = dir.y;
       klights[light_index].area.dir[2] = dir.z;
     }
-    else if (light->type == LIGHT_SPOT) {
+    else if (light->light_type == LIGHT_SPOT) {
       shader_id &= ~SHADER_AREA_LIGHT;
 
       float radius = light->size;
@@ -912,7 +912,7 @@ void LightManager::device_update_points(Device *, DeviceScene *dscene, Scene *sc
   foreach (Light *light, scene->lights) {
     if (!light->is_portal)
       continue;
-    assert(light->type == LIGHT_AREA);
+    assert(light->light_type == LIGHT_AREA);
 
     float3 co = light->co;
     float3 axisu = light->axisu * (light->sizeu * light->size);
