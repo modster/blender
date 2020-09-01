@@ -28,7 +28,7 @@
 #include "DNA_curve_types.h"
 
 namespace blender::io::obj {
-class OBJNurbs : NonMovable, NonCopyable {
+class OBJCurve : NonMovable, NonCopyable {
  private:
   const Depsgraph *depsgraph_;
   const Object *export_object_eval_;
@@ -36,15 +36,16 @@ class OBJNurbs : NonMovable, NonCopyable {
   float world_axes_transform_[4][4];
 
  public:
-  OBJNurbs(Depsgraph *depsgraph, const OBJExportParams &export_params, Object *export_object);
+  OBJCurve(Depsgraph *depsgraph, const OBJExportParams &export_params, Object *export_object);
 
   const char *get_curve_name() const;
-  const ListBase *curve_nurbs() const;
-  float3 calc_point_coords(const Nurb &nurb,
-                           const int vert_index,
-                           const float scaling_factor) const;
-  int get_curve_num(const Nurb &nurb) const;
-  int get_curve_degree(const Nurb &nurb) const;
+  int tot_nurbs() const;
+  int get_nurbs_points(const int index) const;
+  float3 calc_nurbs_point_coords(const int index,
+                                 const int vert_index,
+                                 const float scaling_factor) const;
+  int get_nurbs_num(const int index) const;
+  int get_nurbs_degree(const int index) const;
 
  private:
   void store_world_axes_transform(const eTransformAxisForward forward, const eTransformAxisUp up);

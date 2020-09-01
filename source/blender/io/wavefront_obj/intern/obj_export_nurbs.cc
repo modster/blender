@@ -22,6 +22,7 @@
  */
 
 #include "BLI_float3.hh"
+#include "BLI_listbase.h"
 #include "BLI_math.h"
 
 #include "DEG_depsgraph.h"
@@ -32,9 +33,10 @@
 
 namespace blender::io::obj {
 /**
- * Store NURBS curves that will be exported in parameter form, not converted to meshes.
+ * Store NURBS splines of a Curve which will be exported in parameter form,
+ * and not converted to meshes.
  */
-OBJNurbs::OBJNurbs(Depsgraph *depsgraph,
+OBJCurve::OBJCurve(Depsgraph *depsgraph,
                    const OBJExportParams &export_params,
                    Object *export_object)
     : depsgraph_(depsgraph), export_object_eval_(export_object)
@@ -45,9 +47,10 @@ OBJNurbs::OBJNurbs(Depsgraph *depsgraph,
 }
 
 /**
- * Store the product of export axes settings and an object's world transform matrix.
+ * Store the product of export axes settings and an object's world transform
+ * matrix.
  */
-void OBJNurbs::store_world_axes_transform(const eTransformAxisForward forward,
+void OBJCurve::store_world_axes_transform(const eTransformAxisForward forward,
                                           const eTransformAxisUp up)
 {
   float axes_transform[3][3];
@@ -60,25 +63,32 @@ void OBJNurbs::store_world_axes_transform(const eTransformAxisForward forward,
   copy_v4_v4(world_axes_transform_[3], export_object_eval_->obmat[3]);
 }
 
-const char *OBJNurbs::get_curve_name() const
+const char *OBJCurve::get_curve_name() const
 {
   return export_object_eval_->id.name + 2;
 }
 
-const ListBase *OBJNurbs::curve_nurbs() const
+int OBJCurve::tot_nurbs() const
 {
-  return &export_curve_->nurb;
+  return BLI_listbase_count(&export_curve_->nurb);
+}
+
+int OBJCurve::get_nurbs_points(const int index) const
+{
+  const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, index));
+  return nurb->pntsu * nurb->pntsv;
 }
 
 /**
  * Get coordinates of a vertex at given point index.
  */
-float3 OBJNurbs::calc_point_coords(const Nurb &nurb,
-                                   const int vert_index,
-                                   const float scaling_factor) const
+float3 OBJCurve::calc_nurbs_point_coords(const int index,
+                                         const int vert_index,
+                                         const float scaling_factor) const
 {
+  const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, index));
   float3 r_coord;
-  BPoint *bpoint = nurb.bp;
+  BPoint *bpoint = nurb->bp;
   bpoint += vert_index;
   copy_v3_v3(r_coord, bpoint->vec);
   mul_m4_v3(world_axes_transform_, r_coord);
@@ -89,13 +99,14 @@ float3 OBJNurbs::calc_point_coords(const Nurb &nurb,
 /**
  * Get number of "curv" points of a nurb.
  */
-int OBJNurbs::get_curve_num(const Nurb &nurb) const
+int OBJCurve::get_nurbs_num(const int index) const
 {
-  const int r_nurbs_degree = nurb.orderu - 1;
+  const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, index));
+  const int r_nurbs_degree = nurb->orderu - 1;
   /* "curv_num" is the number of control points in a nurbs.
    * If it is cyclic, degree also adds up. */
-  int r_curv_num = nurb.pntsv * nurb.pntsu;
-  if (nurb.flagu & CU_NURB_CYCLIC) {
+  int r_curv_num = nurb->pntsv * nurb->pntsu;
+  if (nurb->flagu & CU_NURB_CYCLIC) {
     r_curv_num += r_nurbs_degree;
   }
   return r_curv_num;
@@ -104,9 +115,10 @@ int OBJNurbs::get_curve_num(const Nurb &nurb) const
 /**
  * Get Nurb's degree.
  */
-int OBJNurbs::get_curve_degree(const Nurb &nurb) const
+int OBJCurve::get_nurbs_degree(const int index) const
 {
-  return nurb.orderu - 1;
+  const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, index));
+  return nurb->orderu - 1;
 }
 
 }  // namespace blender::io::obj

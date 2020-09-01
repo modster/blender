@@ -57,7 +57,7 @@ OBJMesh::OBJMesh(Depsgraph *depsgraph, const OBJExportParams &export_params, Obj
   mesh_eval_needs_free_ = false;
 
   if (!export_mesh_eval_) {
-    /* Curves and nurbs surfaces need a new mesh when they're exported in the form of vertices and
+    /* Curves and NURBS surfaces need a new mesh when they're exported in the form of vertices and
      * edges.
      */
     export_mesh_eval_ = BKE_mesh_new_from_object(depsgraph_, export_object_eval_, true);

@@ -49,7 +49,7 @@ static void find_exportable_objects(ViewLayer *view_layer,
                                     Depsgraph *depsgraph,
                                     const OBJExportParams &export_params,
                                     Vector<std::unique_ptr<OBJMesh>> &r_exportable_meshes,
-                                    Vector<std::unique_ptr<OBJNurbs>> &r_exportable_nurbs)
+                                    Vector<std::unique_ptr<OBJCurve>> &r_exportable_nurbs)
 {
   LISTBASE_FOREACH (Base *, base, &view_layer->object_bases) {
     Object *object_in_layer = base->object;
@@ -72,8 +72,8 @@ static void find_exportable_objects(ViewLayer *view_layer,
           case CU_NURBS: {
             if (export_params.export_curves_as_nurbs) {
               /* Export in parameter form: control points. */
-              r_exportable_nurbs.append(std::unique_ptr<OBJNurbs>(
-                  new OBJNurbs(depsgraph, export_params, object_in_layer)));
+              r_exportable_nurbs.append(std::unique_ptr<OBJCurve>(
+                  new OBJCurve(depsgraph, export_params, object_in_layer)));
             }
             else {
               /* Export in mesh form: edges and vertices. */
@@ -119,7 +119,7 @@ static void export_frame(ViewLayer *view_layer,
   /* Meshes, and curves to be exported in mesh form. */
   Vector<std::unique_ptr<OBJMesh>> exportable_as_mesh;
   /* NURBS to be exported in parameter form. */
-  Vector<std::unique_ptr<OBJNurbs>> exportable_as_nurbs;
+  Vector<std::unique_ptr<OBJCurve>> exportable_as_nurbs;
   find_exportable_objects(
       view_layer, depsgraph, export_params, exportable_as_mesh, exportable_as_nurbs);
 
@@ -153,7 +153,7 @@ static void export_frame(ViewLayer *view_layer,
     frame_writer.update_index_offsets(*mesh_to_export);
   }
   /* Export nurbs in parm form, not as vertices and edges. */
-  for (std::unique_ptr<OBJNurbs> &nurbs_to_export : exportable_as_nurbs) {
+  for (std::unique_ptr<OBJCurve> &nurbs_to_export : exportable_as_nurbs) {
     frame_writer.write_nurbs_curve(*nurbs_to_export);
   }
 }

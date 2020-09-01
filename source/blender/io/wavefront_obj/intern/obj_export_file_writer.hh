@@ -31,7 +31,7 @@
 
 namespace blender::io::obj {
 class OBJMesh;
-class OBJNurbs;
+class OBJCurve;
 
 /* Types of index offsets. */
 enum eIndexOffsets {
@@ -84,7 +84,7 @@ class OBJWriter {
                           short &r_last_face_vertex_group) const;
   void write_poly_elements(const OBJMesh &obj_mesh_data, Span<Vector<uint>> uv_indices);
   void write_loose_edges(const OBJMesh &obj_mesh_data) const;
-  void write_nurbs_curve(const OBJNurbs &obj_nurbs_data) const;
+  void write_nurbs_curve(const OBJCurve &obj_nurbs_data) const;
 
   void update_index_offsets(const OBJMesh &obj_mesh_data);
 
