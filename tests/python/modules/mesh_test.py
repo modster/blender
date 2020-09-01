@@ -460,7 +460,7 @@ class MeshTest:
         if retval != {'FINISHED'}:
             raise RuntimeError("Unexpected operator return value: {}".format(retval))
         if self.verbose:
-            print("Applied operator {}".format(operator))
+            print("Applied {}".format(operator))
 
         bpy.ops.object.mode_set(mode='OBJECT')
 
@@ -557,6 +557,7 @@ class MeshTest:
                                         type(OperatorSpecObjectMode), type(ParticleSystemSpec), type(operation)))
 
         # Compare resulting mesh with expected one.
+        # Compare only when self.modifier is set to True, if modifiers are not applied test will always fail
         if self.apply_modifier:
             if self.verbose:
                 print("Comparing expected mesh with resulting mesh...")
@@ -585,7 +586,8 @@ class MeshTest:
             else:
                 return self._on_failed_test(compare_result, validation_success, evaluated_test_object)
         else:
-            print("Just visualizing")
+            print("Meshes/objects are not compared, compare evaluated and expected object in Blender for "
+                  "visualization.")
 
 
 class RunTest:
