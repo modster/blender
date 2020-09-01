@@ -94,7 +94,6 @@ NODE_DEFINE(Integrator)
 
 Integrator::Integrator() : Node(node_type)
 {
-  need_update = true;
 }
 
 Integrator::~Integrator()
@@ -103,7 +102,7 @@ Integrator::~Integrator()
 
 void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene)
 {
-  if (!need_update)
+  if (!is_modified())
     return;
 
   device_free(device, dscene);
@@ -257,17 +256,12 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
     dscene->sample_pattern_lut.copy_to_device();
   }
 
-  need_update = false;
+  clear_modified();
 }
 
 void Integrator::device_free(Device *, DeviceScene *dscene)
 {
   dscene->sample_pattern_lut.free();
-}
-
-bool Integrator::modified(const Integrator &integrator)
-{
-  return !Node::equals(integrator);
 }
 
 void Integrator::tag_update(Scene *scene)
@@ -278,7 +272,7 @@ void Integrator::tag_update(Scene *scene)
       break;
     }
   }
-  need_update = true;
+  tag_modified();
 }
 
 CCL_NAMESPACE_END

@@ -925,11 +925,12 @@ bool Session::update_scene()
   Integrator *integrator = scene->integrator;
   BakeManager *bake_manager = scene->bake_manager;
 
-  if (integrator->sampling_pattern != SAMPLING_PATTERN_SOBOL || bake_manager->get_baking()) {
+  if (integrator->get_sampling_pattern() != SAMPLING_PATTERN_SOBOL || bake_manager->get_baking()) {
     int aa_samples = tile_manager.num_samples;
 
-    if (aa_samples != integrator->aa_samples) {
-      integrator->aa_samples = aa_samples;
+    integrator->set_aa_samples(aa_samples);
+
+    if (integrator->is_modified()) {
       integrator->tag_update(scene);
     }
   }
@@ -1067,9 +1068,9 @@ void Session::render(bool need_denoise)
   task.update_tile_sample = function_bind(&Session::update_tile_sample, this, _1);
   task.update_progress_sample = function_bind(&Progress::add_samples, &this->progress, _1, _2);
   task.need_finish_queue = params.progressive_refine;
-  task.integrator_branched = scene->integrator->method == Integrator::BRANCHED_PATH;
+  task.integrator_branched = scene->integrator->get_method() == Integrator::BRANCHED_PATH;
 
-  task.adaptive_sampling.use = (scene->integrator->sampling_pattern == SAMPLING_PATTERN_PMJ) &&
+  task.adaptive_sampling.use = (scene->integrator->get_sampling_pattern() == SAMPLING_PATTERN_PMJ) &&
                                scene->dscene.data.film.pass_adaptive_aux_buffer;
   task.adaptive_sampling.min_samples = scene->dscene.data.integrator.adaptive_min_samples;
   task.adaptive_sampling.adaptive_step = scene->dscene.data.integrator.adaptive_step;

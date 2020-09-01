@@ -256,68 +256,70 @@ void BlenderSync::sync_integrator()
   experimental = (get_enum(cscene, "feature_set") != 0);
 
   Integrator *integrator = scene->integrator;
-  Integrator previntegrator = *integrator;
 
-  integrator->min_bounce = get_int(cscene, "min_light_bounces");
-  integrator->max_bounce = get_int(cscene, "max_bounces");
+  integrator->set_min_bounce(get_int(cscene, "min_light_bounces"));
+  integrator->set_max_bounce(get_int(cscene, "max_bounces"));
 
-  integrator->max_diffuse_bounce = get_int(cscene, "diffuse_bounces");
-  integrator->max_glossy_bounce = get_int(cscene, "glossy_bounces");
-  integrator->max_transmission_bounce = get_int(cscene, "transmission_bounces");
-  integrator->max_volume_bounce = get_int(cscene, "volume_bounces");
+  integrator->set_max_diffuse_bounce(get_int(cscene, "diffuse_bounces"));
+  integrator->set_max_glossy_bounce(get_int(cscene, "glossy_bounces"));
+  integrator->set_max_transmission_bounce(get_int(cscene, "transmission_bounces"));
+  integrator->set_max_volume_bounce(get_int(cscene, "volume_bounces"));
 
-  integrator->transparent_min_bounce = get_int(cscene, "min_transparent_bounces");
-  integrator->transparent_max_bounce = get_int(cscene, "transparent_max_bounces");
+  integrator->set_transparent_min_bounce(get_int(cscene, "min_transparent_bounces"));
+  integrator->set_transparent_max_bounce(get_int(cscene, "transparent_max_bounces"));
 
-  integrator->volume_max_steps = get_int(cscene, "volume_max_steps");
-  integrator->volume_step_rate = (preview) ? get_float(cscene, "volume_preview_step_rate") :
+  integrator->set_volume_max_steps(get_int(cscene, "volume_max_steps"));
+  float volume_step_rate = (preview) ? get_float(cscene, "volume_preview_step_rate") :
                                              get_float(cscene, "volume_step_rate");
+  integrator->set_volume_step_rate(volume_step_rate);
 
-  integrator->caustics_reflective = get_boolean(cscene, "caustics_reflective");
-  integrator->caustics_refractive = get_boolean(cscene, "caustics_refractive");
-  integrator->filter_glossy = get_float(cscene, "blur_glossy");
+  integrator->set_caustics_reflective(get_boolean(cscene, "caustics_reflective"));
+  integrator->set_caustics_refractive(get_boolean(cscene, "caustics_refractive"));
+  integrator->set_filter_glossy(get_float(cscene, "blur_glossy"));
 
-  integrator->seed = get_int(cscene, "seed");
+  int seed = get_int(cscene, "seed");
   if (get_boolean(cscene, "use_animated_seed")) {
-    integrator->seed = hash_uint2(b_scene.frame_current(), get_int(cscene, "seed"));
+    seed = hash_uint2(b_scene.frame_current(), get_int(cscene, "seed"));
     if (b_scene.frame_subframe() != 0.0f) {
       /* TODO(sergey): Ideally should be some sort of hash_merge,
        * but this is good enough for now.
        */
-      integrator->seed += hash_uint2((int)(b_scene.frame_subframe() * (float)INT_MAX),
+      seed += hash_uint2((int)(b_scene.frame_subframe() * (float)INT_MAX),
                                      get_int(cscene, "seed"));
     }
   }
 
-  integrator->sampling_pattern = (SamplingPattern)get_enum(
-      cscene, "sampling_pattern", SAMPLING_NUM_PATTERNS, SAMPLING_PATTERN_SOBOL);
+  integrator->set_seed(seed);
 
-  integrator->sample_clamp_direct = get_float(cscene, "sample_clamp_direct");
-  integrator->sample_clamp_indirect = get_float(cscene, "sample_clamp_indirect");
+  integrator->set_sampling_pattern((SamplingPattern)get_enum(
+      cscene, "sampling_pattern", SAMPLING_NUM_PATTERNS, SAMPLING_PATTERN_SOBOL));
+
+  integrator->set_sample_clamp_direct(get_float(cscene, "sample_clamp_direct"));
+  integrator->set_sample_clamp_indirect(get_float(cscene, "sample_clamp_indirect"));
   if (!preview) {
-    if (integrator->motion_blur != r.use_motion_blur()) {
+    if (integrator->get_motion_blur() != r.use_motion_blur()) {
       scene->object_manager->tag_update(scene);
       scene->camera->tag_update();
     }
 
-    integrator->motion_blur = r.use_motion_blur();
+    integrator->set_motion_blur(r.use_motion_blur());
   }
 
-  integrator->method = (Integrator::Method)get_enum(
-      cscene, "progressive", Integrator::NUM_METHODS, Integrator::PATH);
+  integrator->set_method((Integrator::Method)get_enum(
+      cscene, "progressive", Integrator::NUM_METHODS, Integrator::PATH));
 
-  integrator->sample_all_lights_direct = get_boolean(cscene, "sample_all_lights_direct");
-  integrator->sample_all_lights_indirect = get_boolean(cscene, "sample_all_lights_indirect");
-  integrator->light_sampling_threshold = get_float(cscene, "light_sampling_threshold");
+  integrator->set_sample_all_lights_direct(get_boolean(cscene, "sample_all_lights_direct"));
+  integrator->set_sample_all_lights_indirect(get_boolean(cscene, "sample_all_lights_indirect"));
+  integrator->set_light_sampling_threshold(get_float(cscene, "light_sampling_threshold"));
 
   if (RNA_boolean_get(&cscene, "use_adaptive_sampling")) {
-    integrator->sampling_pattern = SAMPLING_PATTERN_PMJ;
-    integrator->adaptive_min_samples = get_int(cscene, "adaptive_min_samples");
-    integrator->adaptive_threshold = get_float(cscene, "adaptive_threshold");
+    integrator->set_sampling_pattern(SAMPLING_PATTERN_PMJ);
+    integrator->set_adaptive_min_samples(get_int(cscene, "adaptive_min_samples"));
+    integrator->set_adaptive_threshold(get_float(cscene, "adaptive_threshold"));
   }
   else {
-    integrator->adaptive_min_samples = INT_MAX;
-    integrator->adaptive_threshold = 0.0f;
+    integrator->set_adaptive_min_samples(INT_MAX);
+    integrator->set_adaptive_threshold(0.0f);
   }
 
   int diffuse_samples = get_int(cscene, "diffuse_samples");
@@ -329,39 +331,39 @@ void BlenderSync::sync_integrator()
   int volume_samples = get_int(cscene, "volume_samples");
 
   if (get_boolean(cscene, "use_square_samples")) {
-    integrator->diffuse_samples = diffuse_samples * diffuse_samples;
-    integrator->glossy_samples = glossy_samples * glossy_samples;
-    integrator->transmission_samples = transmission_samples * transmission_samples;
-    integrator->ao_samples = ao_samples * ao_samples;
-    integrator->mesh_light_samples = mesh_light_samples * mesh_light_samples;
-    integrator->subsurface_samples = subsurface_samples * subsurface_samples;
-    integrator->volume_samples = volume_samples * volume_samples;
-    integrator->adaptive_min_samples = min(
-        integrator->adaptive_min_samples * integrator->adaptive_min_samples, INT_MAX);
+    integrator->set_diffuse_samples(diffuse_samples * diffuse_samples);
+    integrator->set_glossy_samples(glossy_samples * glossy_samples);
+    integrator->set_transmission_samples(transmission_samples * transmission_samples);
+    integrator->set_ao_samples(ao_samples * ao_samples);
+    integrator->set_mesh_light_samples(mesh_light_samples * mesh_light_samples);
+    integrator->set_subsurface_samples(subsurface_samples * subsurface_samples);
+    integrator->set_volume_samples(volume_samples * volume_samples);
+    integrator->set_adaptive_min_samples(min(
+        integrator->get_adaptive_min_samples() * integrator->get_adaptive_min_samples(), INT_MAX));
   }
   else {
-    integrator->diffuse_samples = diffuse_samples;
-    integrator->glossy_samples = glossy_samples;
-    integrator->transmission_samples = transmission_samples;
-    integrator->ao_samples = ao_samples;
-    integrator->mesh_light_samples = mesh_light_samples;
-    integrator->subsurface_samples = subsurface_samples;
-    integrator->volume_samples = volume_samples;
+    integrator->set_diffuse_samples(diffuse_samples);
+    integrator->set_glossy_samples(glossy_samples);
+    integrator->set_transmission_samples(transmission_samples);
+    integrator->set_ao_samples(ao_samples);
+    integrator->set_mesh_light_samples(mesh_light_samples);
+    integrator->set_subsurface_samples(subsurface_samples);
+    integrator->set_volume_samples(volume_samples);
   }
 
   if (b_scene.render().use_simplify()) {
     if (preview) {
-      integrator->ao_bounces = get_int(cscene, "ao_bounces");
+      integrator->set_ao_bounces(get_int(cscene, "ao_bounces"));
     }
     else {
-      integrator->ao_bounces = get_int(cscene, "ao_bounces_render");
+      integrator->set_ao_bounces(get_int(cscene, "ao_bounces_render"));
     }
   }
   else {
-    integrator->ao_bounces = 0;
+    integrator->set_ao_bounces(0);
   }
 
-  if (integrator->modified(previntegrator))
+  if (integrator->is_modified())
     integrator->tag_update(scene);
 }
 
@@ -571,7 +573,7 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
     BL::RenderPass b_pass(*b_pass_iter);
     PassType pass_type = get_pass_type(b_pass);
 
-    if (pass_type == PASS_MOTION && scene->integrator->motion_blur)
+    if (pass_type == PASS_MOTION && scene->integrator->get_motion_blur())
       continue;
     if (pass_type != PASS_NONE)
       Pass::add(pass_type, passes, b_pass.name().c_str());

@@ -2385,7 +2385,7 @@ void GlossyBsdfNode::simplify_settings(Scene *scene)
   }
   Integrator *integrator = scene->integrator;
   ShaderInput *roughness_input = input("Roughness");
-  if (integrator->filter_glossy == 0.0f) {
+  if (integrator->get_filter_glossy() == 0.0f) {
     /* Fallback to Sharp closure for Roughness close to 0.
      * Note: Keep the epsilon in sync with kernel!
      */
@@ -2478,7 +2478,7 @@ void GlassBsdfNode::simplify_settings(Scene *scene)
   }
   Integrator *integrator = scene->integrator;
   ShaderInput *roughness_input = input("Roughness");
-  if (integrator->filter_glossy == 0.0f) {
+  if (integrator->get_filter_glossy() == 0.0f) {
     /* Fallback to Sharp closure for Roughness close to 0.
      * Note: Keep the epsilon in sync with kernel!
      */
@@ -2571,7 +2571,7 @@ void RefractionBsdfNode::simplify_settings(Scene *scene)
   }
   Integrator *integrator = scene->integrator;
   ShaderInput *roughness_input = input("Roughness");
-  if (integrator->filter_glossy == 0.0f) {
+  if (integrator->get_filter_glossy() == 0.0f) {
     /* Fallback to Sharp closure for Roughness close to 0.
      * Note: Keep the epsilon in sync with kernel!
      */

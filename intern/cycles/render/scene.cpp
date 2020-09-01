@@ -337,7 +337,7 @@ void Scene::update_procedurals(Progress &progress)
 
 Scene::MotionType Scene::need_motion()
 {
-  if (integrator->motion_blur)
+  if (integrator->get_motion_blur())
     return MOTION_BLUR;
   else if (Pass::contains(passes, PASS_MOTION))
     return MOTION_PASS;
@@ -381,7 +381,7 @@ bool Scene::need_data_update()
 {
   return (background->need_update || image_manager->need_update || object_manager->need_update ||
           geometry_manager->need_update || light_manager->need_update ||
-          lookup_tables->need_update || integrator->need_update || shader_manager->need_update ||
+          lookup_tables->need_update || integrator->is_modified() || shader_manager->need_update ||
           particle_system_manager->need_update || bake_manager->need_update || film->need_update ||
           procedural_manager->need_update);
 }
@@ -399,7 +399,7 @@ bool Scene::need_reset()
   PRINT_NEED_UPDATE(geometry_manager)
   PRINT_NEED_UPDATE(light_manager)
   PRINT_NEED_UPDATE(lookup_tables)
-  PRINT_NEED_UPDATE(integrator)
+  //PRINT_NEED_UPDATE(integrator)
   PRINT_NEED_UPDATE(shader_manager)
   PRINT_NEED_UPDATE(particle_system_manager)
   PRINT_NEED_UPDATE(bake_manager)
@@ -478,7 +478,7 @@ DeviceRequestedFeatures Scene::get_requested_device_features()
   requested_features.use_background_light = light_manager->has_background_light(this);
 
   requested_features.use_baking = bake_manager->get_baking();
-  requested_features.use_integrator_branched = (integrator->method == Integrator::BRANCHED_PATH);
+  requested_features.use_integrator_branched = (integrator->get_method() == Integrator::BRANCHED_PATH);
   if (film->denoising_data_pass) {
     requested_features.use_denoising = true;
     requested_features.use_shadow_tricks = true;

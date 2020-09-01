@@ -35,7 +35,7 @@ static int aa_samples(Scene *scene, Object *object, ShaderEvalType type)
     if (object->geometry) {
       foreach (Shader *shader, object->geometry->get_used_shaders()) {
         if (shader->has_bump) {
-          return scene->integrator->aa_samples;
+          return scene->integrator->get_aa_samples();
         }
       }
     }
@@ -43,7 +43,7 @@ static int aa_samples(Scene *scene, Object *object, ShaderEvalType type)
     return 1;
   }
   else {
-    return scene->integrator->aa_samples;
+    return scene->integrator->get_aa_samples();
   }
 }
 

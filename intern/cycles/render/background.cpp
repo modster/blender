@@ -94,7 +94,7 @@ void Background::device_update(Device *device, DeviceScene *dscene, Scene *scene
   else
     kbackground->volume_shader = SHADER_NONE;
 
-  kbackground->volume_step_size = volume_step_size * scene->integrator->volume_step_rate;
+  kbackground->volume_step_size = volume_step_size * scene->integrator->get_volume_step_rate();
 
   /* No background node, make world shader invisible to all rays, to skip evaluation in kernel. */
   if (bg_shader->graph->nodes.size() <= 1) {
