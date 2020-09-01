@@ -493,8 +493,8 @@ void ShaderManager::update_shaders_used(Scene *scene)
   scene->default_background->used = true;
   scene->default_empty->used = true;
 
-  if (scene->background->shader)
-    scene->background->shader->used = true;
+  if (scene->background->get_shader())
+    scene->background->get_shader()->used = true;
 
   foreach (Geometry *geom, scene->geometry)
     foreach (Shader *shader, geom->used_shaders)

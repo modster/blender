@@ -1311,7 +1311,6 @@ void BlenderSync::sync_materials(BL::Depsgraph &b_depsgraph, bool update_all)
 void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d, bool update_all)
 {
   Background *background = scene->background;
-  Background prevbackground = *background;
 
   BL::World b_world = b_scene.world();
 
@@ -1404,9 +1403,9 @@ void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d,
       /* AO */
       BL::WorldLighting b_light = b_world.light_settings();
 
-      background->use_ao = b_light.use_ambient_occlusion();
-      background->ao_factor = b_light.ao_factor();
-      background->ao_distance = b_light.distance();
+      background->set_use_ao(b_light.use_ambient_occlusion());
+      background->set_ao_factor(b_light.ao_factor());
+      background->set_ao_distance(b_light.distance());
 
       /* visibility */
       PointerRNA cvisibility = RNA_pointer_get(&b_world.ptr, "cycles_visibility");
@@ -1418,12 +1417,12 @@ void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d,
       visibility |= get_boolean(cvisibility, "transmission") ? PATH_RAY_TRANSMIT : 0;
       visibility |= get_boolean(cvisibility, "scatter") ? PATH_RAY_VOLUME_SCATTER : 0;
 
-      background->visibility = visibility;
+      background->set_visibility(visibility);
     }
     else {
-      background->use_ao = false;
-      background->ao_factor = 0.0f;
-      background->ao_distance = FLT_MAX;
+      background->set_use_ao(false);
+      background->set_ao_factor(0.0f);
+      background->set_ao_distance(FLT_MAX);
     }
 
     shader->set_graph(graph);
@@ -1432,22 +1431,22 @@ void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d,
   }
 
   PointerRNA cscene = RNA_pointer_get(&b_scene.ptr, "cycles");
-  background->transparent = b_scene.render().film_transparent();
+  background->set_transparent(b_scene.render().film_transparent());
 
-  if (background->transparent) {
-    background->transparent_glass = get_boolean(cscene, "film_transparent_glass");
-    background->transparent_roughness_threshold = get_float(cscene, "film_transparent_roughness");
+  if (background->get_transparent()) {
+    background->set_transparent_glass(get_boolean(cscene, "film_transparent_glass"));
+    background->set_transparent_roughness_threshold(get_float(cscene, "film_transparent_roughness"));
   }
   else {
-    background->transparent_glass = false;
-    background->transparent_roughness_threshold = 0.0f;
+    background->set_transparent_glass(false);
+    background->set_transparent_roughness_threshold(0.0f);
   }
 
-  background->use_shader = view_layer.use_background_shader |
-                           viewport_parameters.custom_viewport_parameters();
-  background->use_ao = background->use_ao && view_layer.use_background_ao;
+  background->set_use_shader(view_layer.use_background_shader |
+                           viewport_parameters.custom_viewport_parameters());
+  background->set_use_ao(background->use_ao && view_layer.use_background_ao);
 
-  if (background->modified(prevbackground))
+  if (background->is_modified())
     background->tag_update(scene);
 }
 

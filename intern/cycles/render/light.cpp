@@ -816,7 +816,7 @@ void LightManager::device_update_points(Device *, DeviceScene *dscene, Scene *sc
       klights[light_index].distant.cosangle = cosangle;
     }
     else if (light->light_type == LIGHT_BACKGROUND) {
-      uint visibility = scene->background->visibility;
+      uint visibility = scene->background->get_visibility();
 
       shader_id &= ~SHADER_AREA_LIGHT;
       shader_id |= SHADER_USE_MIS;

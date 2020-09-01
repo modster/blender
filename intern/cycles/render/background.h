@@ -32,22 +32,20 @@ class Background : public Node {
  public:
   NODE_DECLARE
 
-  float ao_factor;
-  float ao_distance;
+  NODE_PUBLIC_API(float, ao_factor)
+  NODE_PUBLIC_API(float, ao_distance)
 
-  bool use_shader;
-  bool use_ao;
+  NODE_PUBLIC_API(bool, use_shader)
+  NODE_PUBLIC_API(bool, use_ao)
 
-  uint visibility;
-  Shader *shader;
+  NODE_PUBLIC_API(uint, visibility)
+  NODE_PUBLIC_API(Shader *, shader)
 
-  bool transparent;
-  bool transparent_glass;
-  float transparent_roughness_threshold;
+  NODE_PUBLIC_API(bool, transparent)
+  NODE_PUBLIC_API(bool, transparent_glass)
+  NODE_PUBLIC_API(float, transparent_roughness_threshold)
 
-  float volume_step_size;
-
-  bool need_update;
+  NODE_PUBLIC_API(float, volume_step_size)
 
   Background();
   ~Background();
@@ -55,7 +53,6 @@ class Background : public Node {
   void device_update(Device *device, DeviceScene *dscene, Scene *scene);
   void device_free(Device *device, DeviceScene *dscene);
 
-  bool modified(const Background &background);
   void tag_update(Scene *scene);
 
   Shader *get_shader(const Scene *scene);
