@@ -988,10 +988,7 @@ void LightManager::device_update(Device *device,
   if (progress.get_cancel())
     return;
 
-  if (use_light_visibility != scene->film->use_light_visibility) {
-    scene->film->use_light_visibility = use_light_visibility;
-    scene->film->tag_update(scene);
-  }
+  scene->film->set_use_light_visibility(use_light_visibility);
 
   need_update = false;
   need_update_background = false;

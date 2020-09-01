@@ -374,7 +374,7 @@ void Scene::need_global_attributes(AttributeRequestSet &attributes)
 
 bool Scene::need_update()
 {
-  return (need_reset() || film->need_update);
+  return (need_reset() || film->is_modified());
 }
 
 bool Scene::need_data_update()
@@ -382,7 +382,7 @@ bool Scene::need_data_update()
   return (background->need_update || image_manager->need_update || object_manager->need_update ||
           geometry_manager->need_update || light_manager->need_update ||
           lookup_tables->need_update || integrator->is_modified() || shader_manager->need_update ||
-          particle_system_manager->need_update || bake_manager->need_update || film->need_update ||
+          particle_system_manager->need_update || bake_manager->need_update || film->is_modified() ||
           procedural_manager->need_update);
 }
 
@@ -403,7 +403,7 @@ bool Scene::need_reset()
   PRINT_NEED_UPDATE(shader_manager)
   PRINT_NEED_UPDATE(particle_system_manager)
   PRINT_NEED_UPDATE(bake_manager)
-  PRINT_NEED_UPDATE(film)
+  //PRINT_NEED_UPDATE(film)
   PRINT_NEED_UPDATE(procedural_manager)
 
   return need_data_update() || camera->is_modified();
@@ -479,7 +479,7 @@ DeviceRequestedFeatures Scene::get_requested_device_features()
 
   requested_features.use_baking = bake_manager->get_baking();
   requested_features.use_integrator_branched = (integrator->get_method() == Integrator::BRANCHED_PATH);
-  if (film->denoising_data_pass) {
+  if (film->get_denoising_data_pass()) {
     requested_features.use_denoising = true;
     requested_features.use_shadow_tricks = true;
   }

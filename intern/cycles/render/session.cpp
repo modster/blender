@@ -1024,7 +1024,7 @@ bool Session::render_need_denoise(bool &delayed)
   /* Viewport render. */
 
   /* It can happen that denoising was already enabled, but the scene still needs an update. */
-  if (scene->film->need_update || !scene->film->denoising_data_offset) {
+  if (scene->film->is_modified() || !scene->film->get_denoising_data_offset()) {
     return false;
   }
 
@@ -1081,10 +1081,10 @@ void Session::render(bool need_denoise)
   if (need_denoise) {
     task.denoising = params.denoising;
 
-    task.pass_stride = scene->film->pass_stride;
+    task.pass_stride = scene->film->get_pass_stride();
     task.target_pass_stride = task.pass_stride;
-    task.pass_denoising_data = scene->film->denoising_data_offset;
-    task.pass_denoising_clean = scene->film->denoising_clean_offset;
+    task.pass_denoising_data = scene->film->get_denoising_data_offset();
+    task.pass_denoising_clean = scene->film->get_denoising_clean_offset();
 
     task.denoising_from_render = true;
 

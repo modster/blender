@@ -374,41 +374,37 @@ void BlenderSync::sync_film(BL::SpaceView3D &b_v3d)
   PointerRNA cscene = RNA_pointer_get(&b_scene.ptr, "cycles");
 
   Film *film = scene->film;
-  Film prevfilm = *film;
 
   vector<Pass> prevpasses = scene->passes;
 
   if (b_v3d) {
-    film->display_pass = update_viewport_display_passes(b_v3d, scene->passes);
+    film->set_display_pass(update_viewport_display_passes(b_v3d, scene->passes));
   }
 
-  film->exposure = get_float(cscene, "film_exposure");
-  film->filter_type = (FilterType)get_enum(
-      cscene, "pixel_filter_type", FILTER_NUM_TYPES, FILTER_BLACKMAN_HARRIS);
-  film->filter_width = (film->filter_type == FILTER_BOX) ? 1.0f :
+  film->set_exposure(get_float(cscene, "film_exposure"));
+  film->set_filter_type((FilterType)get_enum(
+      cscene, "pixel_filter_type", FILTER_NUM_TYPES, FILTER_BLACKMAN_HARRIS));
+  float filter_width = (film->get_filter_type() == FILTER_BOX) ? 1.0f :
                                                            get_float(cscene, "filter_width");
+  film->set_filter_width(filter_width);
 
   if (b_scene.world()) {
     BL::WorldMistSettings b_mist = b_scene.world().mist_settings();
 
-    film->mist_start = b_mist.start();
-    film->mist_depth = b_mist.depth();
+    film->set_mist_start(b_mist.start());
+    film->set_mist_depth(b_mist.depth());
 
     switch (b_mist.falloff()) {
       case BL::WorldMistSettings::falloff_QUADRATIC:
-        film->mist_falloff = 2.0f;
+        film->set_mist_falloff(2.0f);
         break;
       case BL::WorldMistSettings::falloff_LINEAR:
-        film->mist_falloff = 1.0f;
+        film->set_mist_falloff(1.0f);
         break;
       case BL::WorldMistSettings::falloff_INVERSE_QUADRATIC:
-        film->mist_falloff = 0.5f;
+        film->set_mist_falloff(0.5f);
         break;
     }
-  }
-
-  if (film->modified(prevfilm)) {
-    film->tag_update(scene);
   }
 
   if (!Pass::equals(prevpasses, scene->passes)) {
@@ -581,12 +577,12 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
 
   PointerRNA crl = RNA_pointer_get(&b_view_layer.ptr, "cycles");
 
-  scene->film->denoising_flags = 0;
+  int denoising_flags = 0;
   if (denoising.use || denoising.store_passes) {
     if (denoising.type == DENOISER_NLM) {
 #define MAP_OPTION(name, flag) \
   if (!get_boolean(crl, name)) \
-    scene->film->denoising_flags |= flag;
+    denoising_flags |= flag;
       MAP_OPTION("denoising_diffuse_direct", DENOISING_CLEAN_DIFFUSE_DIR);
       MAP_OPTION("denoising_diffuse_indirect", DENOISING_CLEAN_DIFFUSE_IND);
       MAP_OPTION("denoising_glossy_direct", DENOISING_CLEAN_GLOSSY_DIR);
@@ -597,6 +593,7 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
     }
     b_engine.add_pass("Noisy Image", 4, "RGBA", b_view_layer.name().c_str());
   }
+  scene->film->set_denoising_flags(denoising_flags);
 
   if (denoising.store_passes) {
     b_engine.add_pass("Denoising Normal", 3, "XYZ", b_view_layer.name().c_str());
@@ -651,16 +648,15 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
   /* Cryptomatte stores two ID/weight pairs per RGBA layer.
    * User facing parameter is the number of pairs. */
   int crypto_depth = divide_up(min(16, get_int(crl, "pass_crypto_depth")), 2);
-  scene->film->cryptomatte_depth = crypto_depth;
-  scene->film->cryptomatte_passes = CRYPT_NONE;
+  scene->film->set_cryptomatte_depth(crypto_depth);
+  CryptomatteType cryptomatte_passes = CRYPT_NONE;
   if (get_boolean(crl, "use_pass_crypto_object")) {
     for (int i = 0; i < crypto_depth; i++) {
       string passname = cryptomatte_prefix + string_printf("Object%02d", i);
       b_engine.add_pass(passname.c_str(), 4, "RGBA", b_view_layer.name().c_str());
       Pass::add(PASS_CRYPTOMATTE, passes, passname.c_str());
     }
-    scene->film->cryptomatte_passes = (CryptomatteType)(scene->film->cryptomatte_passes |
-                                                        CRYPT_OBJECT);
+    cryptomatte_passes = (CryptomatteType)(cryptomatte_passes | CRYPT_OBJECT);
   }
   if (get_boolean(crl, "use_pass_crypto_material")) {
     for (int i = 0; i < crypto_depth; i++) {
@@ -668,8 +664,7 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
       b_engine.add_pass(passname.c_str(), 4, "RGBA", b_view_layer.name().c_str());
       Pass::add(PASS_CRYPTOMATTE, passes, passname.c_str());
     }
-    scene->film->cryptomatte_passes = (CryptomatteType)(scene->film->cryptomatte_passes |
-                                                        CRYPT_MATERIAL);
+    cryptomatte_passes = (CryptomatteType)(cryptomatte_passes | CRYPT_MATERIAL);
   }
   if (get_boolean(crl, "use_pass_crypto_asset")) {
     for (int i = 0; i < crypto_depth; i++) {
@@ -677,13 +672,12 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
       b_engine.add_pass(passname.c_str(), 4, "RGBA", b_view_layer.name().c_str());
       Pass::add(PASS_CRYPTOMATTE, passes, passname.c_str());
     }
-    scene->film->cryptomatte_passes = (CryptomatteType)(scene->film->cryptomatte_passes |
-                                                        CRYPT_ASSET);
+    cryptomatte_passes = (CryptomatteType)(cryptomatte_passes | CRYPT_ASSET);
   }
-  if (get_boolean(crl, "pass_crypto_accurate") && scene->film->cryptomatte_passes != CRYPT_NONE) {
-    scene->film->cryptomatte_passes = (CryptomatteType)(scene->film->cryptomatte_passes |
-                                                        CRYPT_ACCURATE);
+  if (get_boolean(crl, "pass_crypto_accurate") && cryptomatte_passes != CRYPT_NONE) {
+    cryptomatte_passes = (CryptomatteType)(cryptomatte_passes | CRYPT_ACCURATE);
   }
+  scene->film->set_cryptomatte_passes(cryptomatte_passes);
 
   if (adaptive_sampling) {
     Pass::add(PASS_ADAPTIVE_AUX_BUFFER, passes);
@@ -707,14 +701,13 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
   }
   RNA_END;
 
-  scene->film->denoising_data_pass = denoising.use || denoising.store_passes;
-  scene->film->denoising_clean_pass = (scene->film->denoising_flags & DENOISING_CLEAN_ALL_PASSES);
-  scene->film->denoising_prefiltered_pass = denoising.store_passes &&
-                                            denoising.type == DENOISER_NLM;
+  scene->film->set_denoising_data_pass(denoising.use || denoising.store_passes);
+  scene->film->set_denoising_clean_pass(scene->film->get_denoising_flags() & DENOISING_CLEAN_ALL_PASSES);
+  scene->film->set_denoising_prefiltered_pass(denoising.store_passes &&
+                                            denoising.type == DENOISER_NLM);
 
-  scene->film->pass_alpha_threshold = b_view_layer.pass_alpha_threshold();
+  scene->film->set_pass_alpha_threshold(b_view_layer.pass_alpha_threshold());
   scene->film->tag_passes_update(scene, passes);
-  scene->film->tag_update(scene);
   scene->integrator->tag_update(scene);
 
   return passes;
