@@ -220,6 +220,7 @@ class BlenderSync {
 
   id_map<void *, Shader> shader_map;
   id_map<ObjectKey, Object> object_map;
+  id_map<ObjectKey, Procedural> procedural_map;
   id_map<GeometryKey, Geometry> geometry_map;
   id_map<ObjectKey, Light> light_map;
   id_map<ParticleSystemKey, ParticleSystem> particle_system_map;

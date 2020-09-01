@@ -24,6 +24,7 @@
 #include "render/mesh.h"
 #include "render/nodes.h"
 #include "render/object.h"
+#include "render/procedural.h"
 #include "render/scene.h"
 #include "render/shader.h"
 
@@ -57,6 +58,7 @@ BlenderSync::BlenderSync(BL::RenderEngine &b_engine,
       b_scene(b_scene),
       shader_map(),
       object_map(),
+      procedural_map(),
       geometry_map(),
       light_map(),
       particle_system_map(),

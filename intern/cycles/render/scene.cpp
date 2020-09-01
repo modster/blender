@@ -17,6 +17,7 @@
 #include <stdlib.h>
 
 #include "device/device.h"
+#include "render/alembic.h"
 #include "render/background.h"
 #include "render/bake.h"
 #include "render/camera.h"
@@ -28,6 +29,7 @@
 #include "render/object.h"
 #include "render/osl.h"
 #include "render/particles.h"
+#include "render/procedural.h"
 #include "render/scene.h"
 #include "render/session.h"
 #include "render/shader.h"
@@ -111,6 +113,7 @@ Scene::Scene(const SceneParams &params_, Device *device)
   image_manager = new ImageManager(device->info);
   particle_system_manager = new ParticleSystemManager();
   bake_manager = new BakeManager();
+  procedural_manager = new ProceduralManager();
   kernels_loaded = false;
 
   /* TODO(sergey): Check if it's indeed optimal value for the split kernel. */
@@ -144,12 +147,15 @@ void Scene::free_memory(bool final)
     delete l;
   foreach (ParticleSystem *p, particle_systems)
     delete p;
+  foreach (Procedural *p, procedurals)
+    delete p;
 
   shaders.clear();
   geometry.clear();
   objects.clear();
   lights.clear();
   particle_systems.clear();
+  procedurals.clear();
 
   if (device) {
     camera->device_free(device, &dscene, this);
@@ -188,6 +194,7 @@ void Scene::free_memory(bool final)
     delete particle_system_manager;
     delete image_manager;
     delete bake_manager;
+    delete procedural_manager;
   }
 }
 
@@ -208,6 +215,8 @@ void Scene::device_update(Device *device_, Progress &progress)
    * - Film needs light manager to run for use_light_visibility
    * - Lookup tables are done a second time to handle film tables
    */
+
+  update_procedurals(progress);
 
   progress.set_status("Updating Shaders");
   shader_manager->device_update(device, &dscene, this, progress);
@@ -321,6 +330,11 @@ void Scene::device_update(Device *device_, Progress &progress)
   }
 }
 
+void Scene::update_procedurals(Progress &progress)
+{
+  procedural_manager->update(this, progress);
+}
+
 Scene::MotionType Scene::need_motion()
 {
   if (integrator->motion_blur)
@@ -368,11 +382,30 @@ bool Scene::need_data_update()
   return (background->need_update || image_manager->need_update || object_manager->need_update ||
           geometry_manager->need_update || light_manager->need_update ||
           lookup_tables->need_update || integrator->need_update || shader_manager->need_update ||
-          particle_system_manager->need_update || bake_manager->need_update || film->need_update);
+          particle_system_manager->need_update || bake_manager->need_update || film->need_update ||
+          procedural_manager->need_update);
 }
 
 bool Scene::need_reset()
 {
+#define PRINT_NEED_UPDATE(x) \
+  if (x->need_update) { \
+    printf(#x "->need_update (need_reset)\n"); \
+  }
+
+  PRINT_NEED_UPDATE(background)
+  PRINT_NEED_UPDATE(image_manager)
+  PRINT_NEED_UPDATE(object_manager)
+  PRINT_NEED_UPDATE(geometry_manager)
+  PRINT_NEED_UPDATE(light_manager)
+  PRINT_NEED_UPDATE(lookup_tables)
+  PRINT_NEED_UPDATE(integrator)
+  PRINT_NEED_UPDATE(shader_manager)
+  PRINT_NEED_UPDATE(particle_system_manager)
+  PRINT_NEED_UPDATE(bake_manager)
+  PRINT_NEED_UPDATE(film)
+  PRINT_NEED_UPDATE(procedural_manager)
+
   return need_data_update() || camera->is_modified();
 }
 
@@ -391,6 +424,7 @@ void Scene::reset()
   geometry_manager->tag_update(this);
   light_manager->tag_update(this);
   particle_system_manager->tag_update(this);
+  procedural_manager->need_update = true;
 }
 
 void Scene::device_free()
@@ -457,6 +491,10 @@ bool Scene::update(Progress &progress, bool &kernel_switch_needed)
 {
   /* update scene */
   if (need_update()) {
+    /* Need to update the procedurals before tagging for used shaders as procedurals may create
+     * geometry which is not in the scene yet. */
+    update_procedurals(progress);
+
     /* Updated used shader tag so we know which features are need for the kernel. */
     shader_manager->update_shaders_used(this);
 
@@ -624,6 +662,15 @@ template<> Shader *Scene::create_node<Shader>()
   return node;
 }
 
+template<> AlembicProcedural *Scene::create_node<AlembicProcedural>()
+{
+  AlembicProcedural *node = new AlembicProcedural();
+  node->set_owner(this);
+  procedurals.push_back(node);
+  procedural_manager->need_update = true;
+  return node;
+}
+
 template<typename T> void delete_node_from_array(vector<T> &nodes, T node)
 {
   for (size_t i = 0; i < nodes.size(); ++i) {
@@ -682,6 +729,12 @@ template<> void Scene::delete_node_impl(ParticleSystem *node)
 template<> void Scene::delete_node_impl(Shader * /*node*/)
 {
   /* don't delete unused shaders, not supported */
+}
+
+template<> void Scene::delete_node_impl(AlembicProcedural *node)
+{
+  delete_node_from_array(procedurals, static_cast<Procedural *>(node));
+  procedural_manager->need_update = true;
 }
 
 CCL_NAMESPACE_END
