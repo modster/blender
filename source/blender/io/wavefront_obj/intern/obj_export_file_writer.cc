@@ -378,22 +378,22 @@ void OBJWriter::write_loose_edges(const OBJMesh &obj_mesh_data) const
 /**
  * Write a NURBS curve to the OBJ file in parameter form.
  */
-void OBJWriter::write_nurbs_curve(const OBJNurbs &obj_nurbs_data) const
+void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
 {
-  const ListBase *nurbs = obj_nurbs_data.curve_nurbs();
-  LISTBASE_FOREACH (const Nurb *, nurb, nurbs) {
+  const int tot_nurbs = obj_nurbs_data.tot_nurbs();
+  for (int i = 0; i < tot_nurbs; i++) {
     /* Total control points in a nurbs. */
-    int tot_points = nurb->pntsv * nurb->pntsu;
+    int tot_points = obj_nurbs_data.get_nurbs_points(i);
     for (int point_idx = 0; point_idx < tot_points; point_idx++) {
-      float3 point_coord = obj_nurbs_data.calc_point_coords(
-          *nurb, point_idx, export_params_.scaling_factor);
+      float3 point_coord = obj_nurbs_data.calc_nurbs_point_coords(
+          i, point_idx, export_params_.scaling_factor);
       fprintf(outfile_, "v %f %f %f\n", point_coord[0], point_coord[1], point_coord[2]);
     }
 
     const char *nurbs_name = obj_nurbs_data.get_curve_name();
-    int nurbs_degree = obj_nurbs_data.get_curve_degree(*nurb);
+    int nurbs_degree = obj_nurbs_data.get_nurbs_degree(i);
     /* Number of vertices in the curve + degree of the curve if it is cyclic. */
-    int curv_num = obj_nurbs_data.get_curve_num(*nurb);
+    int curv_num = obj_nurbs_data.get_nurbs_num(i);
 
     fprintf(outfile_, "g %s\ncstype bspline\ndeg %d\n", nurbs_name, nurbs_degree);
     /**
