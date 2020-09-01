@@ -22,6 +22,12 @@
 
 #pragma once
 
+#include "DRW_render.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef __APPLE__
 #  define USE_GEOM_SHADER_WORKAROUND 1
 #else
@@ -306,8 +312,6 @@ typedef struct OVERLAY_PrivateData {
     float overlay_color[4];
   } edit_text;
   struct {
-    int ghost_ob;
-    int edit_ob;
     bool do_zbufclip;
     bool do_faces;
     bool do_edges;
@@ -629,3 +633,7 @@ GPUShader *OVERLAY_shader_xray_fade(void);
 OVERLAY_InstanceFormats *OVERLAY_shader_instance_formats_get(void);
 
 void OVERLAY_shader_free(void);
+
+#ifdef __cplusplus
+}
+#endif

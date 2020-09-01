@@ -333,7 +333,7 @@ static void draw_fcurve_vertices(ARegion *region,
 
   uint pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
 
-  GPU_blend(true);
+  GPU_blend(GPU_BLEND_ALPHA);
   GPU_program_point_size(true);
 
   /* draw the two handles first (if they're shown, the curve doesn't
@@ -346,7 +346,7 @@ static void draw_fcurve_vertices(ARegion *region,
   draw_fcurve_keyframe_vertices(fcu, v2d, !(fcu->flag & FCURVE_PROTECTED), pos);
 
   GPU_program_point_size(false);
-  GPU_blend(false);
+  GPU_blend(GPU_BLEND_NONE);
 }
 
 /* Handles ---------------- */
@@ -387,7 +387,7 @@ static void draw_fcurve_handles(SpaceGraph *sipo, FCurve *fcu)
   if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) {
     GPU_line_smooth(true);
   }
-  GPU_blend(true);
+  GPU_blend(GPU_BLEND_ALPHA);
 
   immBeginAtMost(GPU_PRIM_LINES, 4 * 2 * fcu->totvert);
 
@@ -464,7 +464,7 @@ static void draw_fcurve_handles(SpaceGraph *sipo, FCurve *fcu)
 
   immEnd();
   immUnbindProgram();
-  GPU_blend(false);
+  GPU_blend(GPU_BLEND_NONE);
   if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) {
     GPU_line_smooth(false);
   }
@@ -517,7 +517,7 @@ static void draw_fcurve_samples(SpaceGraph *sipo, ARegion *region, FCurve *fcu)
     if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) {
       GPU_line_smooth(true);
     }
-    GPU_blend(true);
+    GPU_blend(GPU_BLEND_ALPHA);
 
     uint pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
     immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
@@ -529,7 +529,7 @@ static void draw_fcurve_samples(SpaceGraph *sipo, ARegion *region, FCurve *fcu)
 
     immUnbindProgram();
 
-    GPU_blend(false);
+    GPU_blend(GPU_BLEND_NONE);
     if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) {
       GPU_line_smooth(false);
     }
@@ -945,7 +945,7 @@ static void draw_fcurve(bAnimContext *ac, SpaceGraph *sipo, ARegion *region, bAn
     if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) {
       GPU_line_smooth(true);
     }
-    GPU_blend(true);
+    GPU_blend(GPU_BLEND_ALPHA);
 
     const uint shdr_pos = GPU_vertformat_attr_add(
         immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
@@ -1006,7 +1006,7 @@ static void draw_fcurve(bAnimContext *ac, SpaceGraph *sipo, ARegion *region, bAn
     if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) {
       GPU_line_smooth(false);
     }
-    GPU_blend(false);
+    GPU_blend(GPU_BLEND_NONE);
   }
 
   /* 2) draw handles and vertices as appropriate based on active
@@ -1203,7 +1203,7 @@ void graph_draw_ghost_curves(bAnimContext *ac, SpaceGraph *sipo, ARegion *region
   if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) {
     GPU_line_smooth(true);
   }
-  GPU_blend(true);
+  GPU_blend(GPU_BLEND_ALPHA);
 
   const uint shdr_pos = GPU_vertformat_attr_add(
       immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
@@ -1235,7 +1235,7 @@ void graph_draw_ghost_curves(bAnimContext *ac, SpaceGraph *sipo, ARegion *region
   if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) {
     GPU_line_smooth(false);
   }
-  GPU_blend(false);
+  GPU_blend(GPU_BLEND_NONE);
 }
 
 /* This is called twice from space_graph.c -> graph_main_region_draw()
@@ -1322,9 +1322,7 @@ void graph_draw_channel_names(bContext *C, bAnimContext *ac, ARegion *region)
     float ymax = ACHANNEL_FIRST_TOP(ac);
 
     /* set blending again, as may not be set in previous step */
-    GPU_blend_set_func_separate(
-        GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA, GPU_ONE, GPU_ONE_MINUS_SRC_ALPHA);
-    GPU_blend(true);
+    GPU_blend(GPU_BLEND_ALPHA);
 
     for (ale = anim_data.first; ale; ale = ale->next, ymax -= ACHANNEL_STEP(ac), channel_index++) {
       float ymin = ymax - ACHANNEL_HEIGHT(ac);
@@ -1342,7 +1340,7 @@ void graph_draw_channel_names(bContext *C, bAnimContext *ac, ARegion *region)
     UI_block_end(C, block);
     UI_block_draw(C, block);
 
-    GPU_blend(false);
+    GPU_blend(GPU_BLEND_NONE);
   }
 
   /* free tempolary channels */

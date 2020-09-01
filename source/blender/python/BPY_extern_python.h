@@ -12,34 +12,32 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 by Mike Erwin.
- * All rights reserved.
  */
 
 /** \file
- * \ingroup gpu
+ * \ingroup python
  *
- * GPU vertex attribute binding
+ * Functionality relating to Python setup & tear down.
  */
 
 #pragma once
 
-#include "GPU_shader_interface.h"
-#include "GPU_vertex_format.h"
+struct bContext;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* TODO(fclem) remove, use shaderface directly. */
-void AttrBinding_clear(GPUAttrBinding *binding);
+/* For 'FILE'. */
+#include <stdio.h>
 
-void get_attr_locations(const GPUVertFormat *format,
-                        GPUAttrBinding *binding,
-                        const GPUShaderInterface *shaderface);
-uint read_attr_location(const GPUAttrBinding *binding, uint a_idx);
+/* bpy_interface.c */
+void BPY_python_start(int argc, const char **argv);
+void BPY_python_end(void);
+void BPY_python_reset(struct bContext *C);
+void BPY_python_use_system_env(void);
+void BPY_python_backtrace(FILE *file);
 
 #ifdef __cplusplus
-}
+} /* extern "C" */
 #endif

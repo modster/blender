@@ -13,37 +13,34 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2016 by Mike Erwin.
+ * The Original Code is Copyright (C) 2020 Blender Foundation.
  * All rights reserved.
  */
 
 /** \file
  * \ingroup gpu
  *
- * GPU geometric primitives
+ * GPUDrawList is an API to do lots of similar draw-calls very fast using
+ * multi-draw-indirect. There is a fallback if the feature is not supported.
  */
 
-#include "GPU_primitive.h"
-#include "gpu_primitive_private.h"
+#pragma once
 
-GLenum convert_prim_type_to_gl(GPUPrimType prim_type)
-{
-#if TRUST_NO_ONE
-  assert(prim_type != GPU_PRIM_NONE);
+#ifdef __cplusplus
+extern "C" {
 #endif
-  static const GLenum table[] = {
-      [GPU_PRIM_POINTS] = GL_POINTS,
-      [GPU_PRIM_LINES] = GL_LINES,
-      [GPU_PRIM_LINE_STRIP] = GL_LINE_STRIP,
-      [GPU_PRIM_LINE_LOOP] = GL_LINE_LOOP,
-      [GPU_PRIM_TRIS] = GL_TRIANGLES,
-      [GPU_PRIM_TRI_STRIP] = GL_TRIANGLE_STRIP,
-      [GPU_PRIM_TRI_FAN] = GL_TRIANGLE_FAN,
 
-      [GPU_PRIM_LINES_ADJ] = GL_LINES_ADJACENCY,
-      [GPU_PRIM_LINE_STRIP_ADJ] = GL_LINE_STRIP_ADJACENCY,
-      [GPU_PRIM_TRIS_ADJ] = GL_TRIANGLES_ADJACENCY,
-  };
+struct GPUBatch;
 
-  return table[prim_type];
+typedef void *GPUDrawList; /* Opaque pointer. */
+
+/* Create a list with at least length drawcalls. Length can affect performance. */
+GPUDrawList GPU_draw_list_create(int length);
+void GPU_draw_list_discard(GPUDrawList list);
+
+void GPU_draw_list_append(GPUDrawList list, GPUBatch *batch, int i_first, int i_count);
+void GPU_draw_list_submit(GPUDrawList list);
+
+#ifdef __cplusplus
 }
+#endif

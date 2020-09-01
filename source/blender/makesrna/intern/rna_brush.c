@@ -45,6 +45,18 @@ static const EnumPropertyItem prop_direction_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
+#ifdef RNA_RUNTIME
+static const EnumPropertyItem prop_smooth_direction_items[] = {
+    {0, "SMOOTH", ICON_ADD, "Smooth", "Smooth the surfae"},
+    {BRUSH_DIR_IN,
+     "ENHANCE_DETAILS",
+     ICON_REMOVE,
+     "Enhance Details",
+     "Enhance the surface detail"},
+    {0, NULL, 0, NULL, NULL},
+};
+#endif
+
 static const EnumPropertyItem sculpt_stroke_method_items[] = {
     {0, "DOTS", 0, "Dots", "Apply paint on each mouse move step"},
     {BRUSH_DRAG_DOT, "DRAG_DOT", 0, "Drag Dot", "Allows a single dot to be carefully positioned"},
@@ -527,6 +539,7 @@ static bool rna_BrushCapabilitiesSculpt_has_direction_get(PointerRNA *ptr)
                SCULPT_TOOL_DRAW_SHARP,
                SCULPT_TOOL_CLAY,
                SCULPT_TOOL_CLAY_STRIPS,
+               SCULPT_TOOL_SMOOTH,
                SCULPT_TOOL_LAYER,
                SCULPT_TOOL_INFLATE,
                SCULPT_TOOL_BLOB,
@@ -795,7 +808,8 @@ static const EnumPropertyItem *rna_Brush_direction_itemf(bContext *C,
         case SCULPT_TOOL_CLAY:
         case SCULPT_TOOL_CLAY_STRIPS:
           return prop_direction_items;
-
+        case SCULPT_TOOL_SMOOTH:
+          return prop_smooth_direction_items;
         case SCULPT_TOOL_MASK:
           switch ((BrushMaskTool)me->mask_tool) {
             case BRUSH_MASK_DRAW:
@@ -1967,6 +1981,20 @@ static void rna_def_brush(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
+  static const EnumPropertyItem brush_deformation_target_items[] = {
+      {BRUSH_DEFORM_TARGET_GEOMETRY,
+       "GEOMETRY",
+       0,
+       "Geometry",
+       "Brush deformation displaces the vertices of the mesh"},
+      {BRUSH_DEFORM_TARGET_CLOTH_SIM,
+       "CLOTH_SIM",
+       0,
+       "Cloth Simulation",
+       "Brush deforms the mesh by deforming the constraints of a cloth simulation"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   static const EnumPropertyItem brush_elastic_deform_type_items[] = {
       {BRUSH_ELASTIC_DEFORM_GRAB, "GRAB", 0, "Grab", ""},
       {BRUSH_ELASTIC_DEFORM_GRAB_BISCALE, "GRAB_BISCALE", 0, "Bi-scale Grab", ""},
@@ -1988,12 +2016,38 @@ static void rna_def_brush(BlenderRNA *brna)
       {BRUSH_CLOTH_DEFORM_INFLATE, "INFLATE", 0, "Inflate", ""},
       {BRUSH_CLOTH_DEFORM_GRAB, "GRAB", 0, "Grab", ""},
       {BRUSH_CLOTH_DEFORM_EXPAND, "EXPAND", 0, "Expand", ""},
+      {BRUSH_CLOTH_DEFORM_SNAKE_HOOK, "SNAKE_HOOK", 0, "Snake Hook", ""},
       {0, NULL, 0, NULL, NULL},
   };
 
   static const EnumPropertyItem brush_cloth_force_falloff_type_items[] = {
       {BRUSH_CLOTH_FORCE_FALLOFF_RADIAL, "RADIAL", 0, "Radial", ""},
       {BRUSH_CLOTH_FORCE_FALLOFF_PLANE, "PLANE", 0, "Plane", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  static const EnumPropertyItem brush_boundary_falloff_type_items[] = {
+      {BRUSH_BOUNDARY_FALLOFF_CONSTANT,
+       "CONSTANT",
+       0,
+       "Constant",
+       "Applies the same deformation in the entire boundary"},
+      {BRUSH_BOUNDARY_FALLOFF_RADIUS,
+       "RADIUS",
+       0,
+       "Brush Radius",
+       "Applies the deformation in a localiced area limited by the brush radius"},
+      {BRUSH_BOUNDARY_FALLOFF_LOOP,
+       "LOOP",
+       0,
+       "Loop",
+       "Applies the brush falloff in a loop pattern"},
+      {BRUSH_BOUNDARY_FALLOFF_LOOP_INVERT,
+       "LOOP_INVERT",
+       0,
+       "Loop and Invert",
+       "Applies the fallof radius in a loop pattern, inverting the displacement direction in each "
+       "pattern repetition"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -2170,6 +2224,12 @@ static void rna_def_brush(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Curve Preset", "");
   RNA_def_property_update(prop, 0, "rna_Brush_update");
 
+  prop = RNA_def_property(srna, "deform_target", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, brush_deformation_target_items);
+  RNA_def_property_ui_text(
+      prop, "Deformation Target", "How the deformation of the brush will affect the object");
+  RNA_def_property_update(prop, 0, "rna_Brush_update");
+
   prop = RNA_def_property(srna, "elastic_deform_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, brush_elastic_deform_type_items);
   RNA_def_property_ui_text(prop, "Deformation", "Deformation type that is used in the brush");
@@ -2192,6 +2252,12 @@ static void rna_def_brush(BlenderRNA *brna)
       prop,
       "Simulation Area",
       "Part of the mesh that is going to be simulated when the stroke is active");
+  RNA_def_property_update(prop, 0, "rna_Brush_update");
+
+  prop = RNA_def_property(srna, "boundary_falloff_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, brush_boundary_falloff_type_items);
+  RNA_def_property_ui_text(
+      prop, "Boundary Falloff", "How the brush falloff is applied across the boundary");
   RNA_def_property_update(prop, 0, "rna_Brush_update");
 
   prop = RNA_def_property(srna, "smooth_deform_type", PROP_ENUM, PROP_NONE);
@@ -2543,6 +2609,14 @@ static void rna_def_brush(BlenderRNA *brna)
   RNA_def_property_ui_text(prop,
                            "Max Element Distance",
                            "Maximum distance to search for disconnected loose parts in the mesh");
+  RNA_def_property_update(prop, 0, "rna_Brush_update");
+
+  prop = RNA_def_property(srna, "boundary_offset", PROP_FLOAT, PROP_FACTOR);
+  RNA_def_property_float_sdna(prop, NULL, "boundary_offset");
+  RNA_def_property_range(prop, 0.0f, 30.0f);
+  RNA_def_property_ui_text(prop,
+                           "Boundary Origin Offset",
+                           "Offset of the boundary origin in relation to the brush radius");
   RNA_def_property_update(prop, 0, "rna_Brush_update");
 
   prop = RNA_def_property(srna, "surface_smooth_shape_preservation", PROP_FLOAT, PROP_FACTOR);
