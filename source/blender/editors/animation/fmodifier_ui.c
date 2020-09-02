@@ -1024,7 +1024,7 @@ void ANIM_fmodifier_panels(const bContext *C,
       PointerRNA *fcm_ptr = MEM_mallocN(sizeof(PointerRNA), "panel customdata");
       RNA_pointer_create(owner_id, &RNA_FModifier, fcm, fcm_ptr);
 
-      Panel *new_panel = UI_panel_add_instanced(region, &region->panels, panel_idname, i, fcm_ptr);
+      Panel *new_panel = UI_panel_add_instanced(region, &region->panels, panel_idname, fcm_ptr);
 
       if (new_panel != NULL) {
         UI_panel_set_expand_from_list_data(C, new_panel);
