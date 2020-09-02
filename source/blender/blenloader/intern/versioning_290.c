@@ -25,6 +25,7 @@
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
+#include "DNA_anim_types.h"
 #include "DNA_brush_types.h"
 #include "DNA_cachefile_types.h"
 #include "DNA_constraint_types.h"
@@ -547,5 +548,19 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
    */
   {
     /* Keep this block, even when empty. */
+
+    /* Move to storing expansion for all panels of FModifiers. */
+    LISTBASE_FOREACH (bAction *, act, &bmain->actions) {
+      LISTBASE_FOREACH (FCurve *, fcu, &act->curves) {
+        LISTBASE_FOREACH (FModifier *, fcm, &fcu->modifiers) {
+          if (fcm->flag & FMODIFIER_FLAG_EXPANDED_DEPRECATED) {
+            fcm->ui_expand_flag = 1;
+          }
+          else {
+            fcm->ui_expand_flag = 0;
+          }
+        }
+      }
+    }
   }
 }
