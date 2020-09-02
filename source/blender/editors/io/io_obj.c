@@ -333,7 +333,7 @@ void WM_OT_obj_export(struct wmOperatorType *ot)
                   true,
                   "Export Normals",
                   "Export per-face normals if the face is flat-shaded, per-face-per-vertex "
-                  "normals if smooth-shaded.");
+                  "normals if smooth-shaded");
   RNA_def_boolean(ot->srna,
                   "export_materials",
                   true,
