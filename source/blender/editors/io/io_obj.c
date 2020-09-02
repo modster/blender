@@ -148,8 +148,8 @@ static void ui_obj_export_settings(uiLayout *layout, PointerRNA *imfptr)
   /* Animation options. */
   uiLayout *box = uiLayoutBox(layout);
   uiItemL(box, IFACE_("Animation"), ICON_ANIM);
-  uiLayout *col = uiLayoutColumn(box, true);
-  uiLayout *sub = uiLayoutColumn(col, true);
+  uiLayout *col = uiLayoutColumn(box, false);
+  uiLayout *sub = uiLayoutColumn(col, false);
   uiItemR(sub, imfptr, "export_animation", 0, NULL, ICON_NONE);
   sub = uiLayoutColumn(sub, true);
   uiItemR(sub, imfptr, "start_frame", 0, IFACE_("Frame Start"), ICON_NONE);
@@ -159,17 +159,19 @@ static void ui_obj_export_settings(uiLayout *layout, PointerRNA *imfptr)
   /* Object Transform options. */
   box = uiLayoutBox(layout);
   uiItemL(box, IFACE_("Object Transform"), ICON_OBJECT_DATA);
-  col = uiLayoutColumn(box, true);
-  uiItemR(col, imfptr, "forward_axis", 0, NULL, ICON_NONE);
-  uiItemR(col, imfptr, "up_axis", 0, NULL, ICON_NONE);
-  uiItemR(col, imfptr, "scaling_factor", 0, NULL, ICON_NONE);
-  uiItemR(col, imfptr, "export_eval_mode", 0, NULL, ICON_NONE);
+  col = uiLayoutColumn(box, false);
+  sub = uiLayoutColumn(col, false);
+  uiItemR(sub, imfptr, "forward_axis", 0, IFACE_("Axis Forward"), ICON_NONE);
+  uiItemR(sub, imfptr, "up_axis", 0, IFACE_("Up"), ICON_NONE);
+  sub = uiLayoutColumn(box, false);
+  uiItemR(sub, imfptr, "scaling_factor", 0, NULL, ICON_NONE);
+  uiItemR(sub, imfptr, "export_eval_mode", 0, NULL, ICON_NONE);
 
   /* Options for what to write. */
   box = uiLayoutBox(layout);
-  uiItemL(box, IFACE_("Geometry Export Options"), ICON_EXPORT);
-  col = uiLayoutColumn(box, true);
-  sub = uiLayoutColumnWithHeading(col, true, IFACE_("Export"));
+  uiItemL(box, IFACE_("Geometry Export"), ICON_EXPORT);
+  col = uiLayoutColumn(box, false);
+  sub = uiLayoutColumnWithHeading(col, false, IFACE_("Export"));
   uiItemR(sub, imfptr, "export_uv", 0, IFACE_("UV Coordinates"), ICON_NONE);
   uiItemR(sub, imfptr, "export_normals", 0, IFACE_("Normals"), ICON_NONE);
   uiItemR(sub, imfptr, "export_materials", 0, IFACE_("Materials"), ICON_NONE);
@@ -178,14 +180,14 @@ static void ui_obj_export_settings(uiLayout *layout, PointerRNA *imfptr)
   uiItemR(sub, imfptr, "export_curves_as_nurbs", 0, IFACE_("Curves as NURBS"), ICON_NONE);
 
   box = uiLayoutBox(layout);
-  uiItemL(box, IFACE_("Grouping Options"), ICON_GROUP);
-  col = uiLayoutColumn(box, true);
-  sub = uiLayoutColumnWithHeading(col, true, IFACE_("Export"));
+  uiItemL(box, IFACE_("Grouping"), ICON_GROUP);
+  col = uiLayoutColumn(box, false);
+  sub = uiLayoutColumnWithHeading(col, false, IFACE_("Export"));
   uiItemR(sub, imfptr, "export_object_groups", 0, IFACE_("Object Groups"), ICON_NONE);
   uiItemR(sub, imfptr, "export_material_groups", 0, IFACE_("Material Groups"), ICON_NONE);
   uiItemR(sub, imfptr, "export_vertex_groups", 0, IFACE_("Vertex Groups"), ICON_NONE);
   uiItemR(sub, imfptr, "export_smooth_groups", 0, IFACE_("Smooth Groups"), ICON_NONE);
-  sub = uiLayoutColumn(sub, true);
+  sub = uiLayoutColumn(sub, false);
   uiLayoutSetEnabled(sub, export_smooth_groups);
   uiItemR(sub, imfptr, "smooth_group_bitflags", 0, IFACE_("Smooth Group Bitflags"), ICON_NONE);
 }
@@ -199,7 +201,7 @@ static void wm_obj_export_draw(bContext *UNUSED(C), wmOperator *op)
 
 static bool wm_obj_export_check(bContext *C, wmOperator *op)
 {
-  char filepath[FILE_MAX] = {};
+  char filepath[FILE_MAX];
   Scene *scene = CTX_data_scene(C);
   bool ret = false;
   RNA_string_get(op->ptr, "filepath", filepath);
@@ -210,14 +212,28 @@ static bool wm_obj_export_check(bContext *C, wmOperator *op)
     ret = true;
   }
 
-  /* Set the default export frames to the current one in viewport. */
   if (RNA_boolean_get(op->ptr, "export_animation")) {
-    RNA_int_set(op->ptr, "start_frame", SFRA);
-    RNA_int_set(op->ptr, "end_frame", EFRA);
+    const int start = RNA_int_get(op->ptr, "start_frame");
+    const int end = RNA_int_get(op->ptr, "end_frame");
+    /* Set the defaults. */
+    if (start == -INT_MAX) {
+      RNA_int_set(op->ptr, "start_frame", SFRA);
+    }
+    if (end == INT_MAX) {
+      RNA_int_set(op->ptr, "end_frame", EFRA);
+      ret = true;
+    }
+    /* Fix manual errors. */
+    if (end < start) {
+      RNA_int_set(op->ptr, "end_frame", RNA_int_get(op->ptr, "start_frame"));
+      ret = true;
+    }
   }
   else {
+    /* Set the default export frames to the current one in viewport. */
     RNA_int_set(op->ptr, "start_frame", CFRA);
     RNA_int_set(op->ptr, "end_frame", CFRA);
+    ret = true;
   }
 
   /* Both forward and up axes cannot be the same (or same except opposite sign). */
@@ -232,6 +248,7 @@ static bool wm_obj_export_check(bContext *C, wmOperator *op)
    */
   if (!RNA_boolean_get(op->ptr, "export_smooth_groups")) {
     RNA_boolean_set(op->ptr, "smooth_group_bitflags", false);
+    ret = true;
   }
   return ret;
 }
@@ -261,10 +278,10 @@ void WM_OT_obj_export(struct wmOperatorType *ot)
                   "export_animation",
                   false,
                   "Export Animation",
-                  "Export multiple frames. By default export the active frame only");
+                  "Export multiple frames instead of the current frame only");
   RNA_def_int(ot->srna,
               "start_frame",
-              INT_MAX,
+              -INT_MAX, /* Check function uses this to set SFRA. */
               -INT_MAX,
               INT_MAX,
               "Start Frame",
@@ -273,7 +290,7 @@ void WM_OT_obj_export(struct wmOperatorType *ot)
               INT_MAX);
   RNA_def_int(ot->srna,
               "end_frame",
-              1,
+              INT_MAX, /* Check function uses this to set EFRA. */
               -INT_MAX,
               INT_MAX,
               "End Frame",
@@ -305,19 +322,18 @@ void WM_OT_obj_export(struct wmOperatorType *ot)
                "Use Properties For",
                "Determines properties like object visibility, modifiers etc., where they differ "
                "for Render and Viewport");
-  RNA_def_boolean(
-      ot->srna,
-      "export_selected_objects",
-      false,
-      "Export Selected Objects",
-      "Export only selected objects in the scene. Exports all supported objects by default");
+  RNA_def_boolean(ot->srna,
+                  "export_selected_objects",
+                  false,
+                  "Export Selected Objects",
+                  "Export only selected objects instead of all supported objects");
   RNA_def_boolean(ot->srna, "export_uv", true, "Export UVs", "");
-  RNA_def_boolean(
-      ot->srna,
-      "export_normals",
-      true,
-      "Export Normals",
-      "Export face normals if no face is smooth-shaded, otherwise export vertex normals");
+  RNA_def_boolean(ot->srna,
+                  "export_normals",
+                  true,
+                  "Export Normals",
+                  "Export per-face normals if the face is flat-shaded, per-face-per-vertex "
+                  "normals if smooth-shaded.");
   RNA_def_boolean(ot->srna,
                   "export_materials",
                   true,
@@ -331,12 +347,11 @@ void WM_OT_obj_export(struct wmOperatorType *ot)
                   "All ngons with four or more vertices will be triangulated. Meshes in "
                   "the scene will not be affected. Behaves like Triangulate Modifier with "
                   "ngon-method: \"Beauty\", quad-method: \"Shortest Diagonal\", min vertices: 4");
-  RNA_def_boolean(
-      ot->srna,
-      "export_curves_as_nurbs",
-      false,
-      "Export Curves as NURBS",
-      "Export curves in parametric form. If unchecked, export them as vertices and edges");
+  RNA_def_boolean(ot->srna,
+                  "export_curves_as_nurbs",
+                  false,
+                  "Export Curves as NURBS",
+                  "Export curves in parametric form instead of vertices and edges");
 
   RNA_def_boolean(ot->srna,
                   "export_object_groups",
@@ -355,17 +370,17 @@ void WM_OT_obj_export(struct wmOperatorType *ot)
       "Export Vertex Groups",
       "Write the name of the vertex group of a face. It is approximated "
       "by choosing the vertex group with the most members among the vertices of a face");
-  RNA_def_boolean(ot->srna,
-                  "export_smooth_groups",
-                  false,
-                  "Export Smooth Groups",
-                  "Export smooth groups and also export per-vertex normals instead of per-face "
-                  "normals, if the mesh is shaded smooth");
+  RNA_def_boolean(
+      ot->srna,
+      "export_smooth_groups",
+      false,
+      "Export Smooth Groups",
+      "Every smooth-shaded face is assigned group \"1\" and every flat-shaded face \"off\"");
   RNA_def_boolean(ot->srna,
                   "smooth_group_bitflags",
                   false,
                   "Generate Bitflags for Smooth Groups",
-                  "Generates upto 32 but usually much less");
+                  "Generates groups ranging from 2-32, but usually much less than 32");
 }
 
 static int wm_obj_import_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
@@ -400,10 +415,11 @@ static void ui_obj_import_settings(uiLayout *layout, PointerRNA *imfptr)
 
   uiItemL(box, IFACE_("Transform"), ICON_OBJECT_DATA);
   uiLayout *col = uiLayoutColumn(box, false);
-  uiLayout *sub = uiLayoutColumn(col, true);
+  uiLayout *sub = uiLayoutColumn(col, false);
   uiItemR(sub, imfptr, "clamp_size", 0, NULL, ICON_NONE);
-  uiItemR(sub, imfptr, "forward_axis", 0, NULL, ICON_NONE);
-  uiItemR(sub, imfptr, "up_axis", 0, NULL, ICON_NONE);
+  sub = uiLayoutColumn(col, false);
+  uiItemR(sub, imfptr, "forward_axis", 0, IFACE_("Axis Forward"), ICON_NONE);
+  uiItemR(sub, imfptr, "up_axis", 0, IFACE_("Up"), ICON_NONE);
 }
 
 static void wm_obj_import_draw(bContext *C, wmOperator *op)

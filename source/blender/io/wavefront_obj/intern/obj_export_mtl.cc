@@ -191,6 +191,7 @@ void MaterialWrap::store_bsdf_properties(MTLMaterial &r_mtl_mat) const
   /* Empirical, and copied from original python exporter. */
   float spec_exponent = (1.0f - export_mtl_->roughness) * 30;
   spec_exponent *= spec_exponent;
+  /* If p-BSDF is not present, fallback to `Material *` of the object. */
   float specular = export_mtl_->spec;
   copy_property_from_node({&specular, 1}, SOCK_FLOAT, bsdf_node_, "Specular");
   float metallic = export_mtl_->metallic;
@@ -243,6 +244,10 @@ void MaterialWrap::store_bsdf_properties(MTLMaterial &r_mtl_mat) const
  */
 void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
 {
+  if (!export_mtl_->nodetree) {
+    /* No nodetree, no images. */
+    return;
+  }
   /* Need to create a NodeTreeRef for a faster way to find linked sockets, as opposed to
    * looping over all the links in a node tree to match two sockets of our interest. */
   nodes::NodeTreeRef node_tree(export_mtl_->nodetree);
