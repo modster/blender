@@ -135,7 +135,7 @@ static void split_by_char(StringRef in_string, const char delimiter, Vector<Stri
  * is set to the given fallback value in that case.
  */
 
-void copy_string_to_float(StringRef src, const float fallback_value, float &r_dst)
+static void copy_string_to_float(StringRef src, const float fallback_value, float &r_dst)
 {
   try {
     r_dst = std::stof(string(src));
@@ -158,7 +158,7 @@ void copy_string_to_float(StringRef src, const float fallback_value, float &r_ds
  * Catches exception if any string cannot be converted to a float. The destination
  * float is set to the given fallback value in that case.
  */
-BLI_INLINE void copy_string_to_float(Span<StringRef> src,
+static BLI_INLINE void copy_string_to_float(Span<StringRef> src,
                                      const float fallback_value,
                                      MutableSpan<float> r_dst)
 {
@@ -174,7 +174,7 @@ BLI_INLINE void copy_string_to_float(Span<StringRef> src,
  * Catches exception if the string cannot be converted to an integer. The destination
  * int is set to the given fallback value in that case.
  */
-BLI_INLINE void copy_string_to_int(StringRef src, const int fallback_value, int &r_dst)
+static BLI_INLINE void copy_string_to_int(StringRef src, const int fallback_value, int &r_dst)
 {
   try {
     r_dst = std::stoi(string(src));
@@ -196,7 +196,7 @@ BLI_INLINE void copy_string_to_int(StringRef src, const int fallback_value, int 
  * Catches exception if any string cannot be converted to an integer. The destination
  * int is set to the given fallback value in that case.
  */
-BLI_INLINE void copy_string_to_int(Span<StringRef> src,
+static BLI_INLINE void copy_string_to_int(Span<StringRef> src,
                                    const int fallback_value,
                                    MutableSpan<int> r_dst)
 {

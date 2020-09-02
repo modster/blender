@@ -214,7 +214,8 @@ void MeshFromGeometry::create_vertices()
                  global_vertices_.vertices[mesh_geometry_.vertex_index(i)]);
       if (i >= mesh_geometry_.tot_normals()) {
         /* Silence debug warning in mesh validate. */
-        normal_float_to_short_v3(blender_mesh_->mvert[i].no, (float[3]){1.0f, 1.0f, 1.0f});
+        const float3 normals = {1.0f, 1.0f, 1.0f};
+        normal_float_to_short_v3(blender_mesh_->mvert[i].no, normals);
       }
     }
     else {
