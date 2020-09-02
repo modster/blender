@@ -103,8 +103,12 @@ NODE_DEFINE(Object)
   SOCKET_POINT2(dupli_uv, "Dupli UV", make_float2(0.0f, 0.0f));
   SOCKET_TRANSFORM_ARRAY(motion, "Motion", array<Transform>());
   SOCKET_FLOAT(shadow_terminator_offset, "Terminator Offset", 0.0f);
+  SOCKET_STRING(asset_name, "Asset Name", ustring());
 
   SOCKET_BOOLEAN(is_shadow_catcher, "Shadow Catcher", false);
+
+  SOCKET_NODE(particle_system, "Particle System", &ParticleSystem::node_type);
+  SOCKET_INT(particle_index, "Particle System Index", 0);
 
   return type;
 }
@@ -662,6 +666,10 @@ void ObjectManager::device_update(Device *device,
   if (scene->params.bvh_type == SceneParams::BVH_STATIC) {
     progress.set_status("Updating Objects", "Applying Static Transformations");
     apply_static_transforms(dscene, scene, progress);
+  }
+
+  foreach (Object *object, scene->objects) {
+    object->clear_modified();
   }
 }
 

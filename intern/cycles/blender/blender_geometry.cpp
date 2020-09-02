@@ -159,7 +159,7 @@ void BlenderSync::sync_geometry_motion(BL::Depsgraph &b_depsgraph,
                                        bool use_particle_hair)
 {
   /* Ensure we only sync instanced geometry once. */
-  Geometry *geom = object->geometry;
+  Geometry *geom = object->get_geometry();
 
   if (geometry_motion_synced.find(geom) != geometry_motion_synced.end())
     return;

@@ -195,11 +195,13 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
       /* Set transform at matching motion time step. */
       int time_index = object->motion_step(motion_time);
       if (time_index >= 0) {
-        object->motion[time_index] = tfm;
+        array<Transform> motion = object->get_motion();
+        motion[time_index] = tfm;
+        object->set_motion(motion);
       }
 
       /* mesh deformation */
-      if (object->geometry)
+      if (object->get_geometry())
         sync_geometry_motion(b_depsgraph, b_ob, object, motion_time, use_particle_hair);
     }
 
@@ -213,34 +215,25 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
     object_updated = true;
 
   /* mesh sync */
-  object->geometry = sync_geometry(
+  Geometry *geometry = sync_geometry(
       b_depsgraph, b_ob, b_ob_instance, object_updated, use_particle_hair);
+  object->set_geometry(geometry);
 
   /* special case not tracked by object update flags */
 
   /* holdout */
-  if (use_holdout != object->use_holdout) {
-    object->use_holdout = use_holdout;
+  object->set_use_holdout(use_holdout);
+  if (object->use_holdout_is_modified()) {
     scene->object_manager->tag_update(scene);
-    object_updated = true;
   }
 
-  if (visibility != object->visibility) {
-    object->visibility = visibility;
-    object_updated = true;
-  }
+  object->set_visibility(visibility);
 
   bool is_shadow_catcher = get_boolean(cobject, "is_shadow_catcher");
-  if (is_shadow_catcher != object->is_shadow_catcher) {
-    object->is_shadow_catcher = is_shadow_catcher;
-    object_updated = true;
-  }
+  object->set_is_shadow_catcher(is_shadow_catcher);
 
   float shadow_terminator_offset = get_float(cobject, "shadow_terminator_offset");
-  if (shadow_terminator_offset != object->shadow_terminator_offset) {
-    object->shadow_terminator_offset = shadow_terminator_offset;
-    object_updated = true;
-  }
+  object->set_shadow_terminator_offset(shadow_terminator_offset);
 
   /* sync the asset name for Cryptomatte */
   BL::Object parent = b_ob.parent();
@@ -254,26 +247,24 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
   else {
     parent_name = b_ob.name();
   }
-  if (object->asset_name != parent_name) {
-    object->asset_name = parent_name;
-    object_updated = true;
-  }
+  object->set_asset_name(parent_name);
 
   /* object sync
    * transform comparison should not be needed, but duplis don't work perfect
    * in the depsgraph and may not signal changes, so this is a workaround */
-  if (object_updated || (object->geometry && object->geometry->is_modified()) ||
-      tfm != object->tfm) {
+  if (object->is_modified() || object_updated || (object->get_geometry() && object->get_geometry()->is_modified()) ||
+      tfm != object->get_tfm()) {
     object->name = b_ob.name().c_str();
-    object->pass_id = b_ob.pass_index();
-    object->color = get_float3(b_ob.color());
-    object->tfm = tfm;
-    object->motion.clear();
+    object->set_pass_id(b_ob.pass_index());
+    object->set_color(get_float3(b_ob.color()));
+    object->set_tfm(tfm);
+    array<Transform> motion;
+    object->set_motion(motion);
 
     /* motion blur */
     Scene::MotionType need_motion = scene->need_motion();
-    if (need_motion != Scene::MOTION_NONE && object->geometry) {
-      Geometry *geom = object->geometry;
+    if (need_motion != Scene::MOTION_NONE && object->get_geometry()) {
+      Geometry *geom = object->get_geometry();
       geom->set_use_motion_blur(false);
       geom->set_motion_steps(0);
 
@@ -291,29 +282,30 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
         geom->set_motion_steps(motion_steps);
       }
 
-      object->motion.clear();
-      object->motion.resize(motion_steps, transform_empty());
+      motion.resize(motion_steps, transform_empty());
 
       if (motion_steps) {
-        object->motion[motion_steps / 2] = tfm;
+        motion[motion_steps / 2] = tfm;
 
         for (size_t step = 0; step < motion_steps; step++) {
           motion_times.insert(object->motion_time(step));
         }
       }
+
+      object->set_motion(motion);
     }
 
     /* dupli texture coordinates and random_id */
     if (is_instance) {
-      object->dupli_generated = 0.5f * get_float3(b_instance.orco()) -
-                                make_float3(0.5f, 0.5f, 0.5f);
-      object->dupli_uv = get_float2(b_instance.uv());
-      object->random_id = b_instance.random_id();
+      object->set_dupli_generated(0.5f * get_float3(b_instance.orco()) -
+                                make_float3(0.5f, 0.5f, 0.5f));
+      object->set_dupli_uv(get_float2(b_instance.uv()));
+      object->set_random_id(b_instance.random_id());
     }
     else {
-      object->dupli_generated = make_float3(0.0f, 0.0f, 0.0f);
-      object->dupli_uv = make_float2(0.0f, 0.0f);
-      object->random_id = hash_uint2(hash_string(object->name.c_str()), 0);
+      object->set_dupli_generated(make_float3(0.0f, 0.0f, 0.0f));
+      object->set_dupli_uv(make_float2(0.0f, 0.0f));
+      object->set_random_id(hash_uint2(hash_string(object->name.c_str()), 0));
     }
 
     object->tag_update(scene);

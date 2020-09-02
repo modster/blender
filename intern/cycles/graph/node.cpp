@@ -94,7 +94,7 @@ void Node::set(const SocketType &input, float value)
 
 void Node::set(const SocketType &input, float2 value)
 {
-  assert(input.type == SocketType::FLOAT);
+  assert(input.type == SocketType::POINT2);
   set_if_different(input, value);
 }
 

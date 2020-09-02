@@ -57,7 +57,7 @@ bool BlenderSync::sync_dupli_particle(BL::Object &b_ob,
       scene, &psys, b_ob, b_instance.object(), key);
 
   /* no update needed? */
-  if (!need_update && !object->geometry->is_modified() && !scene->object_manager->need_update)
+  if (!need_update && !object->get_geometry()->is_modified() && !scene->object_manager->need_update)
     return true;
 
   /* first time used in this sync loop? clear and tag update */
@@ -81,10 +81,11 @@ bool BlenderSync::sync_dupli_particle(BL::Object &b_ob,
 
   psys->particles.push_back_slow(pa);
 
-  if (object->particle_index != psys->particles.size() - 1)
+  object->set_particle_system(psys);
+  object->set_particle_index(psys->particles.size() - 1);
+
+  if (object->particle_index_is_modified())
     scene->object_manager->tag_update(scene);
-  object->particle_system = psys;
-  object->particle_index = psys->particles.size() - 1;
 
   /* return that this object has particle data */
   return true;

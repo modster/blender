@@ -46,26 +46,26 @@ class Object : public Node {
  public:
   NODE_DECLARE
 
-  Geometry *geometry;
-  Transform tfm;
+  NODE_PUBLIC_API(Geometry *, geometry)
+  NODE_PUBLIC_API(Transform, tfm)
   BoundBox bounds;
-  uint random_id;
-  int pass_id;
-  float3 color;
-  ustring asset_name;
+  NODE_PUBLIC_API(uint, random_id)
+  NODE_PUBLIC_API(int, pass_id)
+  NODE_PUBLIC_API(float3, color)
+  NODE_PUBLIC_API(ustring, asset_name)
   vector<ParamValue> attributes;
-  uint visibility;
-  array<Transform> motion;
-  bool hide_on_missing_motion;
-  bool use_holdout;
-  bool is_shadow_catcher;
-  float shadow_terminator_offset;
+  NODE_PUBLIC_API(uint, visibility)
+  NODE_PUBLIC_API(array<Transform>, motion)
+  NODE_PUBLIC_API(bool, hide_on_missing_motion)
+  NODE_PUBLIC_API(bool, use_holdout)
+  NODE_PUBLIC_API(bool, is_shadow_catcher)
+  NODE_PUBLIC_API(float, shadow_terminator_offset)
 
-  float3 dupli_generated;
-  float2 dupli_uv;
+  NODE_PUBLIC_API(float3, dupli_generated)
+  NODE_PUBLIC_API(float2, dupli_uv)
 
-  ParticleSystem *particle_system;
-  int particle_index;
+  NODE_PUBLIC_API(ParticleSystem *, particle_system);
+  NODE_PUBLIC_API(int, particle_index);
 
   Object();
   ~Object();
