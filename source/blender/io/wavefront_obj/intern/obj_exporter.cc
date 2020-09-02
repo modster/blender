@@ -128,8 +128,8 @@ static void export_frame(ViewLayer *view_layer,
     frame_writer.write_mtllib(filepath);
   }
   for (int i = 0; i < exportable_as_mesh.size(); i++) {
-    /* Smooth groups and UV vertex indices may take huge memory, so remove objects right
-     * after they're written. */
+    /* Smooth groups and UV vertex indices may take huge memory, so objects should be freed right
+     * after they're written, instead of waiting for Vector to clean up. */
     const std::unique_ptr<OBJMesh> mesh_to_export = std::move(exportable_as_mesh[i]);
     frame_writer.write_object_name(*mesh_to_export);
     frame_writer.write_vertex_coords(*mesh_to_export);
@@ -157,8 +157,8 @@ static void export_frame(ViewLayer *view_layer,
 
   /* Export nurbs in parm form, not as vertices and edges. */
   for (const std::unique_ptr<OBJCurve> &nurbs_to_export : exportable_as_nurbs) {
-    /* Curves don't have any dynamically allocated memory, so it's find to keep them
-     * around till Vector's cleanup. */
+    /* Curves don't have any dynamically allocated memory, so it's fine
+     * to wait for Vector to clean the objects up. */
     frame_writer.write_nurbs_curve(*nurbs_to_export);
   }
 }
