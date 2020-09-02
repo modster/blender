@@ -1245,7 +1245,7 @@ void BlenderSync::sync_materials(BL::Depsgraph &b_depsgraph, bool update_all)
       ShaderGraph *graph = new ShaderGraph();
 
       shader->name = b_mat.name().c_str();
-      shader->pass_id = b_mat.pass_index();
+      shader->set_pass_id(b_mat.pass_index());
 
       /* create nodes */
       if (b_mat.use_nodes() && b_mat.node_tree()) {
@@ -1264,13 +1264,13 @@ void BlenderSync::sync_materials(BL::Depsgraph &b_depsgraph, bool update_all)
 
       /* settings */
       PointerRNA cmat = RNA_pointer_get(&b_mat.ptr, "cycles");
-      shader->use_mis = get_boolean(cmat, "sample_as_light");
-      shader->use_transparent_shadow = get_boolean(cmat, "use_transparent_shadow");
-      shader->heterogeneous_volume = !get_boolean(cmat, "homogeneous_volume");
-      shader->volume_sampling_method = get_volume_sampling(cmat);
-      shader->volume_interpolation_method = get_volume_interpolation(cmat);
-      shader->volume_step_rate = get_float(cmat, "volume_step_rate");
-      shader->displacement_method = get_displacement_method(cmat);
+      shader->set_use_mis(get_boolean(cmat, "sample_as_light"));
+      shader->set_use_transparent_shadow(get_boolean(cmat, "use_transparent_shadow"));
+      shader->set_heterogeneous_volume(!get_boolean(cmat, "homogeneous_volume"));
+      shader->set_volume_sampling_method(get_volume_sampling(cmat));
+      shader->set_volume_interpolation_method(get_volume_interpolation(cmat));
+      shader->set_volume_step_rate(get_float(cmat, "volume_step_rate"));
+      shader->set_displacement_method(get_displacement_method(cmat));
 
       shader->set_graph(graph);
 
@@ -1330,10 +1330,10 @@ void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d,
 
       /* volume */
       PointerRNA cworld = RNA_pointer_get(&b_world.ptr, "cycles");
-      shader->heterogeneous_volume = !get_boolean(cworld, "homogeneous_volume");
-      shader->volume_sampling_method = get_volume_sampling(cworld);
-      shader->volume_interpolation_method = get_volume_interpolation(cworld);
-      shader->volume_step_rate = get_float(cworld, "volume_step_size");
+      shader->set_heterogeneous_volume(!get_boolean(cworld, "homogeneous_volume"));
+      shader->set_volume_sampling_method(get_volume_sampling(cworld));
+      shader->set_volume_interpolation_method(get_volume_interpolation(cworld));
+      shader->set_volume_step_rate(get_float(cworld, "volume_step_size"));
     }
     else if (new_viewport_parameters.use_scene_world && b_world) {
       BackgroundNode *background = graph->create_node<BackgroundNode>();

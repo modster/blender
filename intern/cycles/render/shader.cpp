@@ -187,6 +187,8 @@ NODE_DEFINE(Shader)
   displacement_method_enum.insert("both", DISPLACE_BOTH);
   SOCKET_ENUM(displacement_method, "Displacement Method", displacement_method_enum, DISPLACE_BUMP);
 
+  SOCKET_INT(pass_id, "Pass ID", 0);
+
   return type;
 }
 
@@ -216,7 +218,6 @@ Shader::Shader() : Node(node_type)
   id = -1;
   used = false;
 
-  need_update = true;
   need_update_geometry = true;
 }
 
@@ -306,7 +307,7 @@ void Shader::set_graph(ShaderGraph *graph_)
 void Shader::tag_update(Scene *scene)
 {
   /* update tag */
-  need_update = true;
+  tag_modified();
   scene->shader_manager->need_update = true;
 
   /* if the shader previously was emissive, update light distribution,
@@ -369,7 +370,7 @@ void Shader::tag_used(Scene *scene)
   /* if an unused shader suddenly gets used somewhere, it needs to be
    * recompiled because it was skipped for compilation before */
   if (!used) {
-    need_update = true;
+    tag_modified();
     scene->shader_manager->need_update = true;
   }
 }

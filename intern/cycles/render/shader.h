@@ -81,22 +81,25 @@ class Shader : public Node {
  public:
   NODE_DECLARE
 
-  int pass_id;
-
   /* shader graph */
   ShaderGraph *graph;
 
+  NODE_PUBLIC_API(int, pass_id)
+
   /* sampling */
-  bool use_mis;
-  bool use_transparent_shadow;
-  bool heterogeneous_volume;
-  VolumeSampling volume_sampling_method;
-  int volume_interpolation_method;
-  float volume_step_rate;
+  NODE_PUBLIC_API(bool, use_mis)
+  NODE_PUBLIC_API(bool, use_transparent_shadow)
+  NODE_PUBLIC_API(bool, heterogeneous_volume)
+  NODE_PUBLIC_API(VolumeSampling, volume_sampling_method)
+  NODE_PUBLIC_API(int, volume_interpolation_method)
+  NODE_PUBLIC_API(float, volume_step_rate)
+
+  /* displacement */
+  NODE_PUBLIC_API(DisplacementMethod, displacement_method)
+
   float prev_volume_step_rate;
 
   /* synchronization */
-  bool need_update;
   bool need_update_geometry;
 
   /* If the shader has only volume components, the surface is assumed to
@@ -121,9 +124,6 @@ class Shader : public Node {
   bool has_volume_spatial_varying;
   bool has_volume_attribute_dependency;
   bool has_integrator_dependency;
-
-  /* displacement */
-  DisplacementMethod displacement_method;
 
   /* requested mesh attributes */
   AttributeRequestSet attributes;

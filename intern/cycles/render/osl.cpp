@@ -138,7 +138,7 @@ void OSLShaderManager::device_update(Device *device,
   og->use = true;
 
   foreach (Shader *shader, scene->shaders)
-    shader->need_update = false;
+    shader->clear_modified();
 
   need_update = false;
 
@@ -1113,7 +1113,7 @@ OSL::ShaderGroupRef OSLCompiler::compile_type(Shader *shader, ShaderGraph *graph
 
 void OSLCompiler::compile(OSLGlobals *og, Shader *shader)
 {
-  if (shader->need_update) {
+  if (shader->is_modified()) {
     ShaderGraph *graph = shader->graph;
     ShaderNode *output = (graph) ? graph->output() : NULL;
 

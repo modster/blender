@@ -116,7 +116,7 @@ void SVMShaderManager::device_update(Device *device,
   for (int i = 0; i < num_shaders; i++) {
     Shader *shader = scene->shaders[i];
 
-    shader->need_update = false;
+    shader->clear_modified();
     if (shader->use_mis && shader->has_surface_emission) {
       scene->light_manager->need_update = true;
     }
