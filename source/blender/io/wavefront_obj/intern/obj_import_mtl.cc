@@ -53,7 +53,7 @@ static void set_property_of_socket(eNodeSocketDatatype property_type,
       break;
     }
     case SOCK_RGBA: {
-      /* Alpha will be manually added. It is not read from the MTL file either. */
+      /* Alpha will be added manually. It is not read from the MTL file either. */
       BLI_assert(value.size() == 3);
       copy_v3_v3(static_cast<bNodeSocketValueRGBA *>(socket->default_value)->value, value.data());
       static_cast<bNodeSocketValueRGBA *>(socket->default_value)->value[3] = 1.0f;
@@ -86,12 +86,13 @@ static std::string replace_all_occurences(StringRef path, StringRef to_remove, S
 }
 
 /**
- * Load image for Image Texture node.
+ * Load image for Image Texture node and set the node properties.
  * Return success if Image can be loaded successfully.
  */
-static bool set_img_filepath(Main *bmain, const tex_map_XX &tex_map, bNode *r_node)
+static bool load_texture_image(Main *bmain, const tex_map_XX &tex_map, bNode *r_node)
 {
-  BLI_assert(r_node);
+  BLI_assert(r_node && r_node->type == SH_NODE_TEX_IMAGE);
+
   std::string tex_file_path{tex_map.mtl_dir_path + tex_map.image_path};
   Image *tex_image = BKE_image_load(bmain, tex_file_path.c_str());
   if (!tex_image) {
@@ -118,6 +119,8 @@ static bool set_img_filepath(Main *bmain, const tex_map_XX &tex_map, bNode *r_no
   if (tex_image) {
     fprintf(stderr, "Loaded image from:'%s'\n", tex_image->filepath);
     r_node->id = reinterpret_cast<ID *>(tex_image);
+    NodeTexImage *image = static_cast<NodeTexImage *>(r_node->storage);
+    image->projection = tex_map.projection_type;
     return true;
   }
   return false;
@@ -241,25 +244,26 @@ void ShaderNodetreeWrap::set_bsdf_socket_values()
  */
 void ShaderNodetreeWrap::add_image_textures(Main *bmain)
 {
-  for (const Map<const std::string, tex_map_XX>::Item &texture_map :
+  for (const Map<const std::string, tex_map_XX>::Item texture_map :
        mtl_mat_->texture_maps.items()) {
-
     if (texture_map.value.image_path.empty()) {
-      /* No Image texture node of this map type to add in this material. */
+      /* No Image texture node of this map type can be added to this material. */
       continue;
     }
+
     unique_node_ptr image_texture{add_node_to_tree(SH_NODE_TEX_IMAGE)};
     unique_node_ptr mapping{add_node_to_tree(SH_NODE_MAPPING)};
     unique_node_ptr texture_coordinate(add_node_to_tree(SH_NODE_TEX_COORD));
     unique_node_ptr normal_map = nullptr;
+
     if (texture_map.key == "map_Bump") {
       normal_map.reset(add_node_to_tree(SH_NODE_NORMAL_MAP));
       set_property_of_socket(
           SOCK_FLOAT, "Strength", {mtl_mat_->map_Bump_strength}, normal_map.get());
     }
 
-    if (!set_img_filepath(bmain, texture_map.value, image_texture.get())) {
-      /* Image cannot be added, so don't link image texture, vector, normal map nodes. */
+    if (!load_texture_image(bmain, texture_map.value, image_texture.get())) {
+      /* Image could not be added, so don't link image texture, vector, normal map nodes. */
       continue;
     }
     set_property_of_socket(

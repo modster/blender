@@ -28,6 +28,7 @@
 #include "BLI_float2.hh"
 #include "BLI_float3.hh"
 #include "BLI_vector.hh"
+#include "BLI_vector_set.hh"
 
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
@@ -81,6 +82,7 @@ struct FaceCorner {
 
 struct FaceElement {
   std::string vertex_group{};
+  std::string material_name;
   bool shaded_smooth = false;
   Vector<FaceCorner> face_corners;
   /* Not read from the OBJ file. Set to true for potentially invalid polygons. */
@@ -114,7 +116,7 @@ class Geometry {
  private:
   eGeometryType geom_type_ = GEOM_MESH;
   std::string geometry_name_{};
-  Vector<std::string> material_names_{};
+  VectorSet<std::string> material_names_{};
   /**
    * Indices in the vector range from zero to total vertices in a geomery.
    * Values range from zero to total coordinates in the global list.
@@ -149,7 +151,7 @@ class Geometry {
   int64_t vertex_normal_index(const int64_t index) const;
   int64_t tot_normals() const;
 
-  Span<std::string> material_names() const;
+  const VectorSet<std::string> &material_names() const;
 
   const NurbsElement &nurbs_elem() const;
   const std::string &group() const;

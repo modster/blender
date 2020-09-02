@@ -117,7 +117,7 @@ int64_t Geometry::tot_normals() const
   return vertex_normal_indices_.size();
 }
 
-Span<std::string> Geometry::material_names() const
+const VectorSet<std::string> &Geometry::material_names() const
 {
   return material_names_;
 }

@@ -43,6 +43,8 @@ struct tex_map_XX {
   const std::string dest_socket_id{};
   float3 translation = {0.0f, 0.0f, 0.0f};
   float3 scale = {1.0f, 1.0f, 1.0f};
+  /* Only Flat and Smooth projections are supported. */
+  int projection_type = SHD_PROJ_FLAT;
   std::string image_path{};
   std::string mtl_dir_path;
 };
@@ -108,7 +110,8 @@ using unique_nodetree_ptr = std::unique_ptr<bNodeTree, UniqueNodetreeDeleter>;
 class ShaderNodetreeWrap {
  private:
   /* Node arrangement:
-   * Texture Coordinates -> Mapping -> Image Texture -> (optional) Normal Map -> p-BSDF. */
+   * Texture Coordinates -> Mapping -> Image Texture -> (optional) Normal Map -> p-BSDF -> Material
+   * Output. */
   unique_nodetree_ptr nodetree_;
   unique_node_ptr bsdf_;
   unique_node_ptr shader_output_;

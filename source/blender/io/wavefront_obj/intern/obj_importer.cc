@@ -29,6 +29,8 @@
 #include "BLI_set.hh"
 #include "BLI_string_ref.hh"
 
+#include "BKE_scene.h"
+
 #include "obj_import_file_reader.hh"
 #include "obj_import_mesh.hh"
 #include "obj_import_nurbs.hh"
@@ -84,5 +86,6 @@ void importer_main(bContext *C, const OBJImportParams &import_params)
 
   geometry_to_blender_objects(
       bmain, scene, import_params, all_geometries, global_vertices, materials);
+  static_cast<void>(CTX_data_ensure_evaluated_depsgraph(C));
 }
 }  // namespace blender::io::obj

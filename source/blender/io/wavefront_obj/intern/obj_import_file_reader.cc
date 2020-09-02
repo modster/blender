@@ -42,7 +42,7 @@ using std::string;
 static void read_next_line(std::ifstream &file, string &r_line)
 {
   std::string new_line;
-  while (file.good() && r_line.back() == '\\') {
+  while (file.good() && !r_line.empty() && r_line.back() == '\\') {
     new_line.clear();
     bool ok = static_cast<bool>(std::getline(file, new_line));
     /* Remove the last backslash character. */
@@ -158,9 +158,9 @@ static void copy_string_to_float(StringRef src, const float fallback_value, floa
  * Catches exception if any string cannot be converted to a float. The destination
  * float is set to the given fallback value in that case.
  */
-static BLI_INLINE void copy_string_to_float(Span<StringRef> src,
-                                     const float fallback_value,
-                                     MutableSpan<float> r_dst)
+static void copy_string_to_float(Span<StringRef> src,
+                                 const float fallback_value,
+                                 MutableSpan<float> r_dst)
 {
   BLI_assert(src.size() >= r_dst.size());
   for (int i = 0; i < r_dst.size(); ++i) {
@@ -174,7 +174,7 @@ static BLI_INLINE void copy_string_to_float(Span<StringRef> src,
  * Catches exception if the string cannot be converted to an integer. The destination
  * int is set to the given fallback value in that case.
  */
-static BLI_INLINE void copy_string_to_int(StringRef src, const int fallback_value, int &r_dst)
+static void copy_string_to_int(StringRef src, const int fallback_value, int &r_dst)
 {
   try {
     r_dst = std::stoi(string(src));
@@ -196,9 +196,9 @@ static BLI_INLINE void copy_string_to_int(StringRef src, const int fallback_valu
  * Catches exception if any string cannot be converted to an integer. The destination
  * int is set to the given fallback value in that case.
  */
-static BLI_INLINE void copy_string_to_int(Span<StringRef> src,
-                                   const int fallback_value,
-                                   MutableSpan<int> r_dst)
+static void copy_string_to_int(Span<StringRef> src,
+                               const int fallback_value,
+                               MutableSpan<int> r_dst)
 {
   BLI_assert(src.size() >= r_dst.size());
   for (int i = 0; i < r_dst.size(); ++i) {
@@ -292,6 +292,7 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
    * elements in the object. */
   bool shaded_smooth = false;
   string object_group{};
+  string material_name;
 
   while (std::getline(obj_file_, line)) {
     /* Keep reading new lines if the last character is `\`. */
@@ -310,6 +311,7 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
     else if (line_key == "o") {
       shaded_smooth = false;
       object_group = {};
+      material_name = "";
       current_geometry = create_geometry(
           current_geometry, GEOM_MESH, rest_line, r_global_vertices, r_all_geometries, offset);
     }
@@ -375,6 +377,9 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
       BLI_assert(current_geometry);
       FaceElement curr_face;
       curr_face.shaded_smooth = shaded_smooth;
+      if (!material_name.empty()) {
+        curr_face.material_name = material_name;
+      }
       if (!object_group.empty()) {
         curr_face.vertex_group = object_group;
         /* Yes it repeats several times, but another if-check will not reduce steps either. */
@@ -470,7 +475,9 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
       /* Curves mark their end this way. */
     }
     else if (line_key == "usemtl") {
-      current_geometry->material_names_.append(string(rest_line));
+      /* Materials may repeat if faces are written without sorting. */
+      current_geometry->material_names_.add(string(rest_line));
+      material_name = rest_line;
     }
   }
 }
@@ -511,6 +518,22 @@ static StringRef skip_unsupported_options(StringRef line)
   }
 
   return line;
+}
+
+/**
+ * Fix incoming texture map line keys for variations due to other exporters.
+ */
+static string fix_bad_map_keys(StringRef map_key)
+{
+  string new_map_key(map_key);
+  if (map_key == "refl") {
+    new_map_key = "map_refl";
+  }
+  if (map_key.find("bump") != StringRef::not_found) {
+    /* Handles both "bump" and "map_Bump" */
+    new_map_key = "map_Bump";
+  }
+  return new_map_key;
 }
 
 /**
@@ -556,6 +579,10 @@ void MTLParser::parse_and_store(Map<string, std::unique_ptr<MTLMaterial>> &r_mtl
     if (line.empty() || rest_line.is_empty()) {
       continue;
     }
+
+    /* Fix lower case/ incomplete texture map identifiers. */
+    const string fixed_key = fix_bad_map_keys(line_key);
+    line_key = fixed_key;
 
     if (line_key == "newmtl") {
       if (r_mtl_materials.remove_as(rest_line)) {
@@ -631,6 +658,15 @@ void MTLParser::parse_and_store(Map<string, std::unique_ptr<MTLMaterial>> &r_mtl
       if (pos_bm != -1 && pos_bm + 1 < str_map_xx_split.size()) {
         copy_string_to_float(
             str_map_xx_split[pos_bm + 1], 0.0f, current_mtlmaterial->map_Bump_strength);
+      }
+      const int64_t pos_projection{str_map_xx_split.first_index_of_try("-type")};
+      if (pos_projection != -1 && pos_projection + 1 < str_map_xx_split.size()) {
+        /* Only Sphere is supported, so whatever the type is, set it to Sphere.  */
+        tex_map.projection_type = SHD_PROJ_SPHERE;
+        if (str_map_xx_split[pos_projection + 1] != "sphere") {
+          std::cerr << "Using projection type 'sphere', not:'"
+                    << str_map_xx_split[pos_projection + 1] << "'." << std::endl;
+        }
       }
 
       /* Skip all unsupported options and arguments. */

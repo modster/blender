@@ -28,6 +28,7 @@
 #include "BKE_customdata.h"
 #include "BKE_material.h"
 #include "BKE_mesh.h"
+#include "BKE_node.h"
 #include "BKE_object.h"
 #include "BKE_object_deform.h"
 
@@ -138,6 +139,7 @@ std::pair<int64_t, int64_t> MeshFromGeometry::tessellate_polygons(
                                                               face_vert_indices);
     for (Span<int> triangle : new_polygon_indices) {
       r_new_faces.append({curr_face.vertex_group,
+                          curr_face.material_name,
                           curr_face.shaded_smooth,
                           {{face_vert_indices[triangle[0]],
                             face_uv_indices[triangle[0]],
@@ -147,8 +149,10 @@ std::pair<int64_t, int64_t> MeshFromGeometry::tessellate_polygons(
                             face_normal_indices[triangle[1]]},
                            {face_vert_indices[triangle[2]],
                             face_uv_indices[triangle[2]],
-                            face_normal_indices[triangle[2]]}}});
+                            face_normal_indices[triangle[2]]}},
+                          false});
     }
+
     if (new_polygon_indices.size() > 1) {
       Set<std::pair<int, int>> edge_users;
       for (Span<int> triangle : new_polygon_indices) {
@@ -267,6 +271,7 @@ void MeshFromGeometry::create_polys_loops(Span<FaceElement> all_faces)
     if (curr_face.shaded_smooth) {
       mpoly.flag |= ME_SMOOTH;
     }
+    mpoly.mat_nr = mesh_geometry_.material_names().index_of_try(curr_face.material_name);
 
     for (const FaceCorner &curr_corner : curr_face.face_corners) {
       MLoop &mloop = blender_mesh_->mloop[tot_loop_idx];
@@ -369,15 +374,16 @@ void MeshFromGeometry::create_materials(
                 << std::endl;
       continue;
     }
-    const MTLMaterial &curr_mat = *materials.lookup_as(material_name).get();
     BKE_object_material_slot_add(bmain, mesh_object_.get());
     Material *mat = BKE_material_add(bmain, material_name.data());
     BKE_object_material_assign(
         bmain, mesh_object_.get(), mat, mesh_object_.get()->totcol, BKE_MAT_ASSIGN_USERPREF);
 
+    const MTLMaterial &curr_mat = *materials.lookup_as(material_name).get();
     ShaderNodetreeWrap mat_wrap{bmain, curr_mat};
     mat->use_nodes = true;
     mat->nodetree = mat_wrap.get_nodetree();
+    ntreeUpdateTree(bmain, mat->nodetree);
   }
 }
 
