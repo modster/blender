@@ -23,7 +23,7 @@
 
 #include <array>
 
-#include "utils.hh"
+#include "mesh_utils.hh"
 
 #include "BKE_displist.h"
 #include "BKE_mesh.h"

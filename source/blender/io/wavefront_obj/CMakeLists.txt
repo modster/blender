@@ -38,8 +38,7 @@ set(INC_SYS
 )
 
 set(SRC
-  intern/utils.cc
-  intern/wavefront_obj.cc
+  intern/mesh_utils.cc
   intern/obj_exporter.cc
   intern/obj_export_mesh.cc
   intern/obj_export_mtl.cc
@@ -51,9 +50,10 @@ set(SRC
   intern/obj_import_mtl.cc
   intern/obj_import_nurbs.cc
   intern/obj_import_objects.cc
+  intern/wavefront_obj.cc
 
   IO_wavefront_obj.h
-  intern/utils.hh
+  intern/mesh_utils.hh
   intern/obj_exporter.hh
   intern/obj_export_mesh.hh
   intern/obj_export_mtl.hh

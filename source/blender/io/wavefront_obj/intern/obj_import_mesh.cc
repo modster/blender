@@ -45,7 +45,7 @@
 #include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
 
-#include "utils.hh"
+#include "mesh_utils.hh"
 #include "obj_import_mesh.hh"
 
 namespace blender::io::obj {
