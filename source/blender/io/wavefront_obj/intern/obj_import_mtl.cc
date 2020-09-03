@@ -31,6 +31,7 @@
 #include "NOD_shader.h"
 
 #include "obj_import_mtl.hh"
+#include "string_utils.hh"
 
 namespace blender::io::obj {
 
@@ -72,18 +73,6 @@ static void set_property_of_socket(eNodeSocketDatatype property_type,
   }
 }
 
-static std::string replace_all_occurences(StringRef path, StringRef to_remove, StringRef to_add)
-{
-  std::string clean_path{path};
-  while (true) {
-    std::string::size_type pos = clean_path.find(to_remove);
-    if (pos == std::string::npos) {
-      break;
-    }
-    clean_path.replace(pos, to_add.size(), to_add);
-  }
-  return clean_path;
-}
 
 /**
  * Load image for Image Texture node and set the node properties.

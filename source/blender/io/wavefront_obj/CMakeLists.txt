@@ -50,6 +50,7 @@ set(SRC
   intern/obj_import_mtl.cc
   intern/obj_import_nurbs.cc
   intern/obj_import_objects.cc
+  intern/string_utils.cc
   intern/wavefront_obj.cc
 
   IO_wavefront_obj.h
@@ -64,6 +65,7 @@ set(SRC
   intern/obj_import_mesh.hh
   intern/obj_import_mtl.hh
   intern/obj_import_nurbs.hh
+  intern/string_utils.hh
   intern/obj_import_objects.hh
 )
 
