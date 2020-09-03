@@ -165,6 +165,7 @@ static void do_pose_brush_task_cb_ex(void *__restrict userdata,
   SculptSession *ss = data->ob->sculpt;
   SculptPoseIKChain *ik_chain = ss->cache->pose_ik_chain;
   SculptPoseIKChainSegment *segments = ik_chain->segments;
+  const Brush *brush = data->brush;
 
   PBVHVertexIter vd;
   float disp[3], new_co[3];
@@ -206,7 +207,9 @@ static void do_pose_brush_task_cb_ex(void *__restrict userdata,
 
     /* Apply the accumulated displacement to the vertex. */
     add_v3_v3v3(final_pos, orig_data.co, total_disp);
-    copy_v3_v3(vd.co, final_pos);
+
+    float *target_co = SCULPT_brush_deform_target_vertex_co_get(ss, brush->deform_target, &vd);
+    copy_v3_v3(target_co, final_pos);
 
     if (vd.mvert) {
       vd.mvert->flag |= ME_VERT_PBVH_UPDATE;
@@ -549,7 +552,7 @@ void SCULPT_pose_calc_pose_data(Sculpt *sd,
                                 float *r_pose_origin,
                                 float *r_pose_factor)
 {
-  SCULPT_vertex_random_access_init(ss);
+  SCULPT_vertex_random_access_ensure(ss);
 
   /* Calculate the pose rotation point based on the boundaries of the brush factor. */
   SculptFloodFill flood;

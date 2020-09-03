@@ -40,7 +40,7 @@
 #include "GHOST_C-api.h"
 
 #include "gpu_backend.hh"
-#include "gpu_batch_private.h"
+#include "gpu_batch_private.hh"
 #include "gpu_context_private.hh"
 #include "gpu_matrix_private.h"
 
@@ -70,6 +70,12 @@ GPUContext::GPUContext()
 GPUContext::~GPUContext()
 {
   GPU_matrix_state_discard(matrix_state);
+  delete state_manager;
+  delete front_left;
+  delete back_left;
+  delete front_right;
+  delete back_right;
+  delete imm;
 }
 
 bool GPUContext::is_active_on_thread(void)
@@ -83,12 +89,12 @@ bool GPUContext::is_active_on_thread(void)
 
 GPUContext *GPU_context_create(void *ghost_window)
 {
-  if (gpu_backend_get() == NULL) {
+  if (GPUBackend::get() == NULL) {
     /* TODO move where it make sense. */
     GPU_backend_init(GPU_BACKEND_OPENGL);
   }
 
-  GPUContext *ctx = gpu_backend_get()->context_alloc(ghost_window);
+  GPUContext *ctx = GPUBackend::get()->context_alloc(ghost_window);
 
   GPU_context_active_set(ctx);
   return ctx;
@@ -118,18 +124,6 @@ void GPU_context_active_set(GPUContext *ctx)
 GPUContext *GPU_context_active_get(void)
 {
   return active_ctx;
-}
-
-GLuint GPU_vao_default(void)
-{
-  BLI_assert(active_ctx); /* need at least an active context */
-  return static_cast<GLContext *>(active_ctx)->default_vao_;
-}
-
-GLuint GPU_framebuffer_default(void)
-{
-  BLI_assert(active_ctx); /* need at least an active context */
-  return static_cast<GLContext *>(active_ctx)->default_framebuffer_;
 }
 
 GLuint GPU_vao_alloc(void)
@@ -173,61 +167,15 @@ void GPU_fbo_free(GLuint fbo_id, GPUContext *ctx)
 void GPU_buf_free(GLuint buf_id)
 {
   /* TODO avoid using backend */
-  GPUBackend *backend = gpu_backend_get();
+  GPUBackend *backend = GPUBackend::get();
   static_cast<GLBackend *>(backend)->buf_free(buf_id);
 }
 
 void GPU_tex_free(GLuint tex_id)
 {
   /* TODO avoid using backend */
-  GPUBackend *backend = gpu_backend_get();
+  GPUBackend *backend = GPUBackend::get();
   static_cast<GLBackend *>(backend)->tex_free(tex_id);
-}
-
-/* GPUBatch & GPUFrameBuffer contains respectively VAO & FBO indices
- * which are not shared across contexts. So we need to keep track of
- * ownership. */
-
-void gpu_context_add_batch(GPUContext *ctx, GPUBatch *batch)
-{
-  BLI_assert(ctx);
-  static_cast<GLContext *>(ctx)->batch_register(batch);
-}
-
-void gpu_context_remove_batch(GPUContext *ctx, GPUBatch *batch)
-{
-  BLI_assert(ctx);
-  static_cast<GLContext *>(ctx)->batch_unregister(batch);
-}
-
-void gpu_context_add_framebuffer(GPUContext *ctx, GPUFrameBuffer *fb)
-{
-#ifdef DEBUG
-  BLI_assert(ctx);
-  static_cast<GLContext *>(ctx)->framebuffer_register(fb);
-#else
-  UNUSED_VARS(ctx, fb);
-#endif
-}
-
-void gpu_context_remove_framebuffer(GPUContext *ctx, GPUFrameBuffer *fb)
-{
-#ifdef DEBUG
-  BLI_assert(ctx);
-  static_cast<GLContext *>(ctx)->framebuffer_unregister(fb);
-#else
-  UNUSED_VARS(ctx, fb);
-#endif
-}
-
-void gpu_context_active_framebuffer_set(GPUContext *ctx, GPUFrameBuffer *fb)
-{
-  ctx->current_fbo = fb;
-}
-
-GPUFrameBuffer *gpu_context_active_framebuffer_get(GPUContext *ctx)
-{
-  return ctx->current_fbo;
 }
 
 struct GPUMatrixState *gpu_context_active_matrix_state_get()
@@ -280,14 +228,12 @@ void GPU_backend_init(eGPUBackendType backend_type)
 
 void GPU_backend_exit(void)
 {
-  if (g_backend) {
-    /* TODO assert no resource left. Currently UI textures are still not freed in their context
-     * correctly. */
-    delete g_backend;
-  }
+  /* TODO assert no resource left. Currently UI textures are still not freed in their context
+   * correctly. */
+  delete g_backend;
 }
 
-GPUBackend *gpu_backend_get(void)
+GPUBackend *GPUBackend::get(void)
 {
   return g_backend;
 }

@@ -62,6 +62,7 @@ static struct {
   GPUTexture *dummy_density;
   GPUTexture *dummy_color;
   GPUTexture *dummy_flame;
+  GPUTexture *dummy_missing;
 
   GPUTexture *dummy_scatter;
   GPUTexture *dummy_transmit;
@@ -141,6 +142,9 @@ static void eevee_create_shader_volumes(void)
 
   const float flame = 0.0f;
   e_data.dummy_flame = DRW_texture_create_3d(1, 1, 1, GPU_R8, DRW_TEX_WRAP, &flame);
+
+  const float missing[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+  e_data.dummy_missing = DRW_texture_create_3d(1, 1, 1, GPU_RGBA8, DRW_TEX_WRAP, missing);
 }
 
 void EEVEE_volumes_set_jitter(EEVEE_ViewLayerData *sldata, uint current_sample)
@@ -355,7 +359,7 @@ void EEVEE_volumes_cache_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata)
       /* Fix principle volumetric not working with world materials. */
       ListBase gpu_grids = GPU_material_volume_grids(mat);
       LISTBASE_FOREACH (GPUMaterialVolumeGrid *, gpu_grid, &gpu_grids) {
-        DRW_shgroup_uniform_texture(grp, gpu_grid->sampler_name, e_data.dummy_density);
+        DRW_shgroup_uniform_texture(grp, gpu_grid->sampler_name, e_data.dummy_missing);
       }
 
       DRW_shgroup_call_procedural_triangles(grp, NULL, common_data->vol_tex_size[2]);
@@ -368,6 +372,8 @@ void EEVEE_volumes_cache_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata)
     /* If no world or volume material is present just clear the buffer with this drawcall */
     grp = DRW_shgroup_create(e_data.volumetric_clear_sh, psl->volumetric_world_ps);
     DRW_shgroup_uniform_block(grp, "common_block", sldata->common_ubo);
+    DRW_shgroup_uniform_block(grp, "probe_block", sldata->probe_ubo);
+    DRW_shgroup_uniform_block(grp, "light_block", sldata->light_ubo);
     DRW_shgroup_uniform_block(grp, "renderpass_block", sldata->renderpass_ubo.combined);
 
     DRW_shgroup_call_procedural_triangles(grp, NULL, common_data->vol_tex_size[2]);
@@ -443,7 +449,7 @@ static bool eevee_volume_object_grids_init(Object *ob, ListBase *gpu_grids, DRWS
                                   NULL;
 
     DRW_shgroup_uniform_texture(
-        grp, gpu_grid->sampler_name, (drw_grid) ? drw_grid->texture : e_data.dummy_density);
+        grp, gpu_grid->sampler_name, (drw_grid) ? drw_grid->texture : e_data.dummy_missing);
 
     if (drw_grid && multiple_transforms) {
       /* Specify per-volume transform matrix that is applied after the
@@ -632,6 +638,7 @@ void EEVEE_volumes_cache_finish(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata)
     DRW_shgroup_uniform_block(grp, "light_block", sldata->light_ubo);
     DRW_shgroup_uniform_block(grp, "shadow_block", sldata->shadow_ubo);
     DRW_shgroup_uniform_block(grp, "common_block", sldata->common_ubo);
+    DRW_shgroup_uniform_block(grp, "probe_block", sldata->probe_ubo);
     DRW_shgroup_uniform_block(grp, "renderpass_block", sldata->renderpass_ubo.combined);
 
     DRW_shgroup_call_procedural_triangles(grp, NULL, common_data->vol_tex_size[2]);
@@ -641,6 +648,7 @@ void EEVEE_volumes_cache_finish(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata)
     DRW_shgroup_uniform_texture_ref(grp, "volumeScattering", &txl->volume_scatter);
     DRW_shgroup_uniform_texture_ref(grp, "volumeExtinction", &txl->volume_transmit);
     DRW_shgroup_uniform_block(grp, "common_block", sldata->common_ubo);
+    DRW_shgroup_uniform_block(grp, "probe_block", sldata->probe_ubo);
     DRW_shgroup_uniform_block(grp, "renderpass_block", sldata->renderpass_ubo.combined);
 
     DRW_shgroup_call_procedural_triangles(
@@ -652,6 +660,7 @@ void EEVEE_volumes_cache_finish(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata)
     DRW_shgroup_uniform_texture_ref(grp, "inTransmittance", &txl->volume_transmit);
     DRW_shgroup_uniform_texture_ref(grp, "inSceneDepth", &e_data.depth_src);
     DRW_shgroup_uniform_block(grp, "common_block", sldata->common_ubo);
+    DRW_shgroup_uniform_block(grp, "probe_block", sldata->probe_ubo);
     DRW_shgroup_uniform_block(grp, "renderpass_block", sldata->renderpass_ubo.combined);
 
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
@@ -830,6 +839,7 @@ void EEVEE_volumes_free(void)
   DRW_TEXTURE_FREE_SAFE(e_data.dummy_density);
   DRW_TEXTURE_FREE_SAFE(e_data.dummy_flame);
   DRW_TEXTURE_FREE_SAFE(e_data.dummy_color);
+  DRW_TEXTURE_FREE_SAFE(e_data.dummy_missing);
 
   DRW_SHADER_FREE_SAFE(e_data.volumetric_clear_sh);
   DRW_SHADER_FREE_SAFE(e_data.scatter_sh);

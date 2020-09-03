@@ -385,19 +385,7 @@ class _draw_tool_settings_context_mode:
         if tool is None:
             return False
 
-        # is_paint = True
-        # FIXME: tools must use their own UI drawing!
-        if tool.idname in {
-                "builtin.line",
-                "builtin.box",
-                "builtin.circle",
-                "builtin.arc",
-                "builtin.curve",
-                "builtin.polyline",
-        }:
-            # is_paint = False
-            pass
-        elif tool.idname == "builtin.cutter":
+        if tool.idname == "builtin.cutter":
             row = layout.row(align=True)
             row.prop(context.tool_settings.gpencil_sculpt, "intersection_threshold")
             return False
@@ -411,47 +399,16 @@ class _draw_tool_settings_context_mode:
 
         gp_settings = brush.gpencil_settings
 
-        def draw_color_selector():
-            ma = gp_settings.material
-            row = layout.row(align=True)
-            if not gp_settings.use_material_pin:
-                ma = context.object.active_material
-            icon_id = 0
-            if ma:
-                icon_id = ma.id_data.preview.icon_id
-                txt_ma = ma.name
-                maxw = 25
-                if len(txt_ma) > maxw:
-                    txt_ma = txt_ma[:maxw - 5] + '..' + txt_ma[-3:]
-            else:
-                txt_ma = ""
-
-            sub = row.row()
-            sub.ui_units_x = 8
-            sub.popover(
-                panel="TOPBAR_PT_gpencil_materials",
-                text=txt_ma,
-                icon_value=icon_id,
-            )
-
-            row.prop(gp_settings, "use_material_pin", text="")
-
-            if brush.gpencil_tool in {'DRAW', 'FILL'}:
-                row.separator(factor=1.0)
-                subrow = row.row(align=True)
-                row.prop_enum(settings, "color_mode", 'MATERIAL', text="", icon='MATERIAL')
-                row.prop_enum(settings, "color_mode", 'VERTEXCOLOR', text="", icon='VPAINT_HLT')
-                sub_row = row.row(align=True)
-                sub_row.enabled = settings.color_mode == 'VERTEXCOLOR'
-                sub_row.prop_with_popover(brush, "color", text="", panel="TOPBAR_PT_gpencil_vertexcolor")
-
         row = layout.row(align=True)
         tool_settings = context.scene.tool_settings
         settings = tool_settings.gpencil_paint
         row.template_ID_preview(settings, "brush", rows=3, cols=8, hide_buttons=True)
 
         if context.object and brush.gpencil_tool in {'FILL', 'DRAW'}:
-            draw_color_selector()
+            from bl_ui.properties_paint_common import (
+                brush_basic__draw_color_selector,
+            )
+            brush_basic__draw_color_selector(context, layout, brush, gp_settings, None)
 
         if context.object and brush.gpencil_tool == 'TINT':
             row.separator(factor=0.4)
@@ -963,9 +920,8 @@ class ShowHideMenu:
         layout.operator("%s.hide" % self._operator_name, text="Hide Unselected").unselected = True
 
 
-# Standard transforms which apply to all cases
-# NOTE: this doesn't seem to be able to be used directly
-class VIEW3D_MT_transform_base(Menu):
+# Standard transforms which apply to all cases (mix-in class, not used directly).
+class VIEW3D_MT_transform_base:
     bl_label = "Transform"
     bl_category = "View"
 
@@ -992,7 +948,7 @@ class VIEW3D_MT_transform_base(Menu):
 
 
 # Generic transform menu - geometry types
-class VIEW3D_MT_transform(VIEW3D_MT_transform_base):
+class VIEW3D_MT_transform(VIEW3D_MT_transform_base, Menu):
     def draw(self, context):
         # base menu
         VIEW3D_MT_transform_base.draw(self, context)
@@ -1012,7 +968,7 @@ class VIEW3D_MT_transform(VIEW3D_MT_transform_base):
 
 
 # Object-specific extensions to Transform menu
-class VIEW3D_MT_transform_object(VIEW3D_MT_transform_base):
+class VIEW3D_MT_transform_object(VIEW3D_MT_transform_base, Menu):
     def draw(self, context):
         layout = self.layout
 
@@ -1044,7 +1000,7 @@ class VIEW3D_MT_transform_object(VIEW3D_MT_transform_base):
 
 
 # Armature EditMode extensions to Transform menu
-class VIEW3D_MT_transform_armature(VIEW3D_MT_transform_base):
+class VIEW3D_MT_transform_armature(VIEW3D_MT_transform_base, Menu):
     def draw(self, context):
         layout = self.layout
 
@@ -2330,6 +2286,7 @@ class VIEW3D_MT_object(Menu):
         layout.separator()
 
         layout.menu("VIEW3D_MT_object_showhide")
+        layout.menu("VIEW3D_MT_object_cleanup")
 
         layout.separator()
 
@@ -2767,6 +2724,20 @@ class VIEW3D_MT_object_showhide(Menu):
 
         layout.operator("object.hide_view_set", text="Hide Selected").unselected = False
         layout.operator("object.hide_view_set", text="Hide Unselected").unselected = True
+
+
+class VIEW3D_MT_object_cleanup(Menu):
+    bl_label = "Clean Up"
+
+    def draw(self, _context):
+        layout = self.layout
+
+        layout.operator("object.vertex_group_clean", text="Clean Vertex Group Weights").group_select_mode = 'ALL'
+        layout.operator("object.vertex_group_limit_total", text="Limit Total Vertex Groups").group_select_mode = 'ALL'
+
+        layout.separator()
+
+        layout.operator("object.material_slot_remove_unused", text="Remove Unused Material Slots")
 
 
 class VIEW3D_MT_make_single_user(Menu):
@@ -5985,7 +5956,7 @@ class VIEW3D_PT_gizmo_display(Panel):
         layout.separator()
 
         col = layout.column()
-        col.active = view.show_gizmo_context
+        col.active = view.show_gizmo and view.show_gizmo_context
         col.label(text="Object Gizmos")
         col.prop(scene.transform_orientation_slots[1], "type", text="")
         col.prop(view, "show_gizmo_object_translate", text="Move")
@@ -5996,6 +5967,7 @@ class VIEW3D_PT_gizmo_display(Panel):
 
         # Match order of object type visibility
         col = layout.column()
+        col.active = view.show_gizmo
         col.label(text="Empty")
         col.prop(view, "show_gizmo_empty_image", text="Image")
         col.prop(view, "show_gizmo_empty_force_field", text="Force Field")
@@ -6154,8 +6126,12 @@ class VIEW3D_PT_overlay_motion_tracking(Panel):
     bl_label = "Motion Tracking"
 
     def draw_header(self, context):
+        layout = self.layout
         view = context.space_data
-        self.layout.prop(view, "show_reconstruction", text=self.bl_label)
+        overlay = view.overlay
+        display_all = overlay.show_overlays
+        layout.active = display_all
+        layout.prop(view, "show_reconstruction", text=self.bl_label)
 
     def draw(self, context):
         layout = self.layout
@@ -6177,6 +6153,7 @@ class VIEW3D_PT_overlay_motion_tracking(Panel):
             sub.prop(view, "show_bundle_names", text="Marker Names")
 
             col = layout.column()
+            col.active = display_all
             col.label(text="Tracks:")
             row = col.row(align=True)
             row.prop(view, "tracks_display_type", text="")
@@ -6523,7 +6500,7 @@ class VIEW3D_PT_overlay_vertex_paint(Panel):
         col = layout.column()
         col.active = display_all
 
-        col.prop(overlay, "vertex_paint_mode_opacity", text="Opacity")
+        col.prop(overlay, "vertex_paint_mode_opacity")
         col.prop(overlay, "show_paint_wire")
 
 
@@ -6612,6 +6589,8 @@ class VIEW3D_PT_proportional_edit(Panel):
         layout = self.layout
         tool_settings = context.tool_settings
         col = layout.column()
+        col.active = (tool_settings.use_proportional_edit_objects if context.mode == 'OBJECT'
+            else tool_settings.use_proportional_edit)
 
         if context.mode != 'OBJECT':
             col.prop(tool_settings, "use_proportional_connected")
@@ -7419,7 +7398,6 @@ classes = (
     VIEW3D_HT_tool_header,
     VIEW3D_MT_editor_menus,
     VIEW3D_MT_transform,
-    VIEW3D_MT_transform_base,
     VIEW3D_MT_transform_object,
     VIEW3D_MT_transform_armature,
     VIEW3D_MT_mirror,
@@ -7482,6 +7460,7 @@ classes = (
     VIEW3D_MT_object_constraints,
     VIEW3D_MT_object_quick_effects,
     VIEW3D_MT_object_showhide,
+    VIEW3D_MT_object_cleanup,
     VIEW3D_MT_make_single_user,
     VIEW3D_MT_make_links,
     VIEW3D_MT_brush_paint_modes,

@@ -11,12 +11,8 @@
 #=============================================================================
 # Copyright 2018 Blender Foundation.
 #
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
-#
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
+# Distributed under the OSI-approved BSD 3-Clause License,
+# see accompanying file BSD-3-Clause-license.txt for details.
 #=============================================================================
 
 # If EMBREE_ROOT_DIR was defined in the environment, use it.
@@ -63,6 +59,14 @@ FOREACH(COMPONENT ${_embree_FIND_COMPONENTS})
     PATH_SUFFIXES
       lib64 lib
     )
+  IF (NOT EMBREE_${UPPERCOMPONENT}_LIBRARY)
+    IF (EMBREE_EMBREE3_LIBRARY)
+      # If we can't find all the static libraries, try to fall back to the shared library if found.
+      # This allows building with a shared embree library
+      SET(_embree_LIBRARIES ${EMBREE_EMBREE3_LIBRARY})
+      BREAK()
+    ENDIF ()
+  ENDIF ()
   LIST(APPEND _embree_LIBRARIES "${EMBREE_${UPPERCOMPONENT}_LIBRARY}")
 ENDFOREACH()
 

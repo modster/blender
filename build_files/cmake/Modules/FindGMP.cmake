@@ -14,12 +14,8 @@
 #=============================================================================
 # Copyright 2011 Blender Foundation.
 #
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
-#
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
+# Distributed under the OSI-approved BSD 3-Clause License,
+# see accompanying file BSD-3-Clause-license.txt for details.
 #=============================================================================
 
 # If GMP_ROOT_DIR was defined in the environment, use it.
@@ -84,7 +80,7 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(GMP DEFAULT_MSG
     GMP_LIBRARY GMPXX_LIBRARY GMP_INCLUDE_DIR GMPXX_INCLUDE_DIR)
 
 IF(GMP_FOUND)
-  SET(GMP_LIBRARIES ${GMP_LIBRARY} ${GMPXX_LIBRARY})
+  SET(GMP_LIBRARIES ${GMPXX_LIBRARY} ${GMP_LIBRARY})
   SET(GMP_INCLUDE_DIRS ${GMP_INCLUDE_DIR} ${GMPXX_INCLUDE_DIR})
 ENDIF(GMP_FOUND)
 

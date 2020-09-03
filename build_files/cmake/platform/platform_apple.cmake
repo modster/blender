@@ -373,8 +373,9 @@ if(WITH_CYCLES_OSL)
   list(APPEND OSL_LIBRARIES ${OSL_LIB_COMP} -force_load ${OSL_LIB_EXEC} ${OSL_LIB_QUERY})
   find_path(OSL_INCLUDE_DIR OSL/oslclosure.h PATHS ${CYCLES_OSL}/include)
   find_program(OSL_COMPILER NAMES oslc PATHS ${CYCLES_OSL}/bin)
+  find_path(OSL_SHADER_DIR NAMES stdosl.h PATHS ${CYCLES_OSL}/shaders)
 
-  if(OSL_INCLUDE_DIR AND OSL_LIBRARIES AND OSL_COMPILER)
+  if(OSL_INCLUDE_DIR AND OSL_LIBRARIES AND OSL_COMPILER AND OSL_SHADER_DIR)
     set(OSL_FOUND TRUE)
   else()
     message(STATUS "OSL not found")
@@ -404,6 +405,15 @@ endif()
 
 if(WITH_TBB)
   find_package(TBB)
+endif()
+
+if(WITH_GMP)
+  find_package(GMP)
+
+  if(NOT GMP_FOUND)
+    set(WITH_GMP OFF)
+    message(STATUS "GMP not found")
+  endif()
 endif()
 
 # CMake FindOpenMP doesn't know about AppleClang before 3.12, so provide custom flags.

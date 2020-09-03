@@ -25,18 +25,19 @@
 
 #include "gpu_context_private.hh"
 
+#include "GPU_framebuffer.h"
+
 #include "BLI_set.hh"
 #include "BLI_vector.hh"
 
 #include "glew-mx.h"
 
-#include <iostream>
 #include <mutex>
-#include <unordered_set>
-#include <vector>
 
 namespace blender {
 namespace gpu {
+
+class GLVaoCache;
 
 class GLSharedOrphanLists {
  public:
@@ -51,19 +52,19 @@ class GLSharedOrphanLists {
 };
 
 class GLContext : public GPUContext {
+ public:
+  /** Used for debugging purpose. Bitflags of all bound slots. */
+  uint16_t bound_ubo_slots;
+
   /* TODO(fclem) these needs to become private. */
  public:
-  /** Default VAO for procedural draw calls. */
-  GLuint default_vao_;
-  /** Default framebuffer object for some GL implementation. */
-  GLuint default_framebuffer_;
   /** VBO for missing vertex attrib binding. Avoid undefined behavior on some implementation. */
   GLuint default_attr_vbo_;
   /**
    * GPUBatch & GPUFramebuffer have references to the context they are from, in the case the
    * context is destroyed, we need to remove any reference to it.
    */
-  Set<GPUBatch *> batches_;
+  Set<GLVaoCache *> vao_caches_;
   Set<GPUFrameBuffer *> framebuffers_;
   /** Mutex for the bellow structures. */
   std::mutex lists_mutex_;
@@ -77,6 +78,8 @@ class GLContext : public GPUContext {
   GLContext(void *ghost_window, GLSharedOrphanLists &shared_orphan_list);
   ~GLContext();
 
+  static void check_error(const char *info);
+
   void activate(void) override;
   void deactivate(void) override;
 
@@ -87,10 +90,8 @@ class GLContext : public GPUContext {
 
   void vao_free(GLuint vao_id);
   void fbo_free(GLuint fbo_id);
-  void batch_register(struct GPUBatch *batch);
-  void batch_unregister(struct GPUBatch *batch);
-  void framebuffer_register(struct GPUFrameBuffer *fb);
-  void framebuffer_unregister(struct GPUFrameBuffer *fb);
+  void vao_cache_register(GLVaoCache *cache);
+  void vao_cache_unregister(GLVaoCache *cache);
 };
 
 }  // namespace gpu
