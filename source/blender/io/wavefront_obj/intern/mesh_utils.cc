@@ -41,25 +41,31 @@ static float manhatten_len(const float3 coord)
   return std::abs(coord[0]) + std::abs(coord[1]) + std::abs(coord[2]);
 }
 
-struct vert_treplet {
+/**
+ * Keeps original index of the vertex as well as manhatten length for future use.
+ */
+struct vert_index_mlen {
   const float3 v;
   const int i;
   const float mlen;
 
-  vert_treplet(float3 v, int i) : v(v), i(i), mlen(manhatten_len(v))
+  vert_index_mlen(float3 v, int i) : v(v), i(i), mlen(manhatten_len(v))
   {
   }
-  friend bool operator==(const vert_treplet &one, const vert_treplet &other)
+  friend bool operator==(const vert_index_mlen &one, const vert_index_mlen &other)
   {
     return other.v == one.v;
   }
-  friend bool operator!=(const vert_treplet &one, const vert_treplet &other)
+  friend bool operator!=(const vert_index_mlen &one, const vert_index_mlen &other)
   {
     return !(one == other);
   }
 };
 
-static std::pair<float3, float3> ed_key_mlen(const vert_treplet &v1, const vert_treplet &v2)
+/**
+ * Reorder vertices `v1` and `v2` so that edges like (v1,v2) and (v2,v2) are processed as the same.
+ */
+static std::pair<float3, float3> ed_key_mlen(const vert_index_mlen &v1, const vert_index_mlen &v2)
 {
   if (v2.mlen < v1.mlen) {
     return {v2.v, v1.v};
@@ -67,10 +73,14 @@ static std::pair<float3, float3> ed_key_mlen(const vert_treplet &v1, const vert_
   return {v1.v, v2.v};
 }
 
-static bool join_segments(Vector<vert_treplet> *r_seg1, Vector<vert_treplet> *r_seg2)
+/**
+ * Join segments which have same starting or ending points.
+ * Caller should ensure non-empty segments.
+ */
+static bool join_segments(Vector<vert_index_mlen> *r_seg1, Vector<vert_index_mlen> *r_seg2)
 {
   if ((*r_seg1)[0].v == r_seg2->last().v) {
-    Vector<vert_treplet> *temp = r_seg1;
+    Vector<vert_index_mlen> *temp = r_seg1;
     r_seg1 = r_seg2;
     r_seg2 = temp;
   }
@@ -152,7 +162,7 @@ Vector<Vector<int>> ngon_tessellate(Span<float3> vertex_coords, Span<int> face_v
   if (face_vertex_indices.is_empty()) {
     return {};
   }
-  Vector<vert_treplet> verts;
+  Vector<vert_index_mlen> verts;
   verts.reserve(face_vertex_indices.size());
 
   for (int i = 0; i < face_vertex_indices.size(); i++) {
@@ -179,12 +189,12 @@ Vector<Vector<int>> ngon_tessellate(Span<float3> vertex_coords, Span<int> face_v
     }
   }
 
-  Vector<Vector<vert_treplet>> loop_segments;
+  Vector<Vector<vert_index_mlen>> loop_segments;
   {
-    const vert_treplet *vert_prev = &verts[0];
-    Vector<vert_treplet> context_loop{1, *vert_prev};
+    const vert_index_mlen *vert_prev = &verts[0];
+    Vector<vert_index_mlen> context_loop{1, *vert_prev};
     loop_segments.append(context_loop);
-    for (const vert_treplet &vertex : verts) {
+    for (const vert_index_mlen &vertex : verts) {
       if (vertex == *vert_prev) {
         continue;
       }
@@ -208,7 +218,7 @@ Vector<Vector<int>> ngon_tessellate(Span<float3> vertex_coords, Span<int> face_v
   while (joining_segements) {
     joining_segements = false;
     for (int j = loop_segments.size() - 1; j >= 0; j--) {
-      Vector<vert_treplet> &seg_j = loop_segments[j];
+      Vector<vert_index_mlen> &seg_j = loop_segments[j];
       if (seg_j.is_empty()) {
         continue;
       }
@@ -216,7 +226,7 @@ Vector<Vector<int>> ngon_tessellate(Span<float3> vertex_coords, Span<int> face_v
         if (seg_j.is_empty()) {
           break;
         }
-        Vector<vert_treplet> &seg_k = loop_segments[k];
+        Vector<vert_index_mlen> &seg_k = loop_segments[k];
         if (!seg_k.is_empty() && join_segments(&seg_j, &seg_k)) {
           joining_segements = true;
         }
@@ -224,14 +234,14 @@ Vector<Vector<int>> ngon_tessellate(Span<float3> vertex_coords, Span<int> face_v
     }
   }
 
-  for (Vector<vert_treplet> &loop : loop_segments) {
+  for (Vector<vert_index_mlen> &loop : loop_segments) {
     while (!loop.is_empty() && loop[0].v == loop.last().v) {
       loop.remove_last();
     }
   }
 
-  Vector<Vector<vert_treplet>> loop_list;
-  for (Vector<vert_treplet> &loop : loop_segments) {
+  Vector<Vector<vert_index_mlen>> loop_list;
+  for (Vector<vert_index_mlen> &loop : loop_segments) {
     if (loop.size() > 2) {
       loop_list.append(loop);
     }
@@ -240,7 +250,7 @@ Vector<Vector<int>> ngon_tessellate(Span<float3> vertex_coords, Span<int> face_v
 
   Vector<int> vert_map(face_vertex_indices.size(), 0);
   int ii = 0;
-  for (Span<vert_treplet> verts : loop_list) {
+  for (Span<vert_index_mlen> verts : loop_list) {
     if (verts.size() <= 2) {
       continue;
     }
@@ -253,9 +263,9 @@ Vector<Vector<int>> ngon_tessellate(Span<float3> vertex_coords, Span<int> face_v
   Vector<Vector<int>> fill;
   {
     Vector<Vector<float3>> coord_list;
-    for (Span<vert_treplet> loop : loop_list) {
+    for (Span<vert_index_mlen> loop : loop_list) {
       Vector<float3> coord;
-      for (const vert_treplet &vert : loop) {
+      for (const vert_index_mlen &vert : loop) {
         coord.append(vert.v);
       }
       coord_list.append(coord);

@@ -23,15 +23,16 @@
 
 #pragma once
 
-#include "MEM_guardedalloc.h"
-
-#include "DNA_node_types.h"
-
 #include <array>
+
 #include "BLI_float3.hh"
 #include "BLI_map.hh"
 #include "BLI_string_ref.hh"
 #include "BLI_vector.hh"
+
+#include "DNA_node_types.h"
+
+#include "MEM_guardedalloc.h"
 
 namespace blender::io::obj {
 /**
@@ -119,7 +120,7 @@ class ShaderNodetreeWrap {
 
   /* List of all locations occupied by nodes. */
   Vector<std::array<int, 2>> node_locations;
-  const float node_size{300.f};
+  const float node_size_{300.f};
 
  public:
   ShaderNodetreeWrap(Main *bmain, const MTLMaterial &mtl_mat);
