@@ -181,7 +181,7 @@ bNode *ShaderNodetreeWrap::add_node_to_tree(const int node_type)
  * Return x-y coordinates for a node where y is determined by other nodes present in
  * the same vertical column.
  */
-std::tuple<float, float> ShaderNodetreeWrap::set_node_locations(const int pos_x)
+std::pair<float, float> ShaderNodetreeWrap::set_node_locations(const int pos_x)
 {
   int pos_y = 0;
   bool found = false;
@@ -197,7 +197,7 @@ std::tuple<float, float> ShaderNodetreeWrap::set_node_locations(const int pos_x)
     }
     if (!found) {
       node_locations.append({pos_x, pos_y});
-      return std::make_tuple(pos_x * node_size, pos_y * node_size * 2 / 3);
+      return {pos_x * node_size_, pos_y * node_size_ * 2.0 / 3.0};
     }
   }
 }

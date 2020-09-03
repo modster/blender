@@ -129,7 +129,7 @@ class ShaderNodetreeWrap {
 
  private:
   bNode *add_node_to_tree(const int node_type);
-  std::tuple<float, float> set_node_locations(const int pos_x);
+  std::pair<float, float> set_node_locations(const int pos_x);
   void link_sockets(unique_node_ptr from_node,
                     StringRef from_node_id,
                     bNode *to_node,

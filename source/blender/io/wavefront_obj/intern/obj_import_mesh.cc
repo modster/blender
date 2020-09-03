@@ -377,9 +377,9 @@ void MeshFromGeometry::create_materials(
     BKE_object_material_slot_add(bmain, mesh_object_.get());
     Material *mat = BKE_material_add(bmain, material_name.data());
     BKE_object_material_assign(
-        bmain, mesh_object_.get(), mat, mesh_object_.get()->totcol, BKE_MAT_ASSIGN_USERPREF);
+        bmain, mesh_object_.get(), mat, mesh_object_->totcol, BKE_MAT_ASSIGN_USERPREF);
 
-    const MTLMaterial &curr_mat = *materials.lookup_as(material_name).get();
+    const MTLMaterial &curr_mat = *materials.lookup_as(material_name);
     ShaderNodetreeWrap mat_wrap{bmain, curr_mat};
     mat->use_nodes = true;
     mat->nodetree = mat_wrap.get_nodetree();

@@ -83,7 +83,8 @@ void CurveFromGeometry::create_nurbs(const OBJImportParams &import_params)
   nurb->pntsu = 0;
   /* Total points = pntsu * pntsv. */
   nurb->pntsv = 1;
-  nurb->orderu = nurb->orderv = nurbs_geometry.degree + 1;
+  nurb->orderu = nurb->orderv = (nurbs_geometry.degree + 1 > SHRT_MAX) ? 4 :
+                                                                         nurbs_geometry.degree + 1;
   nurb->resolu = nurb->resolv = blender_curve_->resolu;
 
   const int64_t tot_vert{curve_geometry_.nurbs_elem().curv_indices.size()};

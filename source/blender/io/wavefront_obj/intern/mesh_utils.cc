@@ -38,7 +38,7 @@ namespace blender::io::obj {
 
 static float manhatten_len(const float3 coord)
 {
-  return abs(coord[0]) + abs(coord[1]) + abs(coord[2]);
+  return std::abs(coord[0]) + std::abs(coord[1]) + std::abs(coord[2]);
 }
 
 struct vert_treplet {
@@ -101,7 +101,6 @@ static void tessellate_polygon(const Vector<Vector<float3>> &polyLineSeq,
   int64_t totpoints = 0;
   /* Display #ListBase. */
   ListBase dispbase = {NULL, NULL};
-  DispList *dl;
   const int64_t len_polylines{polyLineSeq.size()};
 
   for (int i = 0; i < len_polylines; i++) {
@@ -112,7 +111,7 @@ static void tessellate_polygon(const Vector<Vector<float3>> &polyLineSeq,
     if (len_polypoints <= 0) { /* don't bother adding edges as polylines */
       continue;
     }
-    dl = static_cast<DispList *>(MEM_callocN(sizeof(DispList), __func__));
+    DispList *dl = static_cast<DispList *>(MEM_callocN(sizeof(DispList), __func__));
     BLI_addtail(&dispbase, dl);
     dl->type = DL_INDEX3;
     dl->nr = len_polypoints;
@@ -133,7 +132,7 @@ static void tessellate_polygon(const Vector<Vector<float3>> &polyLineSeq,
 
     /* The faces are stored in a new DisplayList
      * that's added to the head of the #ListBase. */
-    dl = static_cast<DispList *>(dispbase.first);
+    const DispList *dl = static_cast<DispList *>(dispbase.first);
 
     for (int index = 0, *dl_face = dl->index; index < dl->parts; index++, dl_face += 3) {
       r_new_line_seq.append({dl_face[0], dl_face[1], dl_face[2]});
