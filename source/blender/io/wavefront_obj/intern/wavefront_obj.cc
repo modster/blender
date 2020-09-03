@@ -37,14 +37,12 @@
  */
 void OBJ_export(bContext *C, const OBJExportParams *export_params)
 {
-  double start_time = PIL_check_seconds_timer();
+  SCOPED_TIMER(__func__);
   blender::io::obj::exporter_main(C, *export_params);
-  double end_time = PIL_check_seconds_timer();
-  std::cout << "\nOBJ export time: " << (end_time - start_time) * 1000 << " milliseconds\n";
 }
 
 /**
- *
+ * Time the full import process.
  */
 void OBJ_import(bContext *C, const OBJImportParams *import_params)
 {

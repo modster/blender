@@ -493,8 +493,8 @@ void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
       if (texture_map.value.image_path.empty()) {
         continue;
       }
-      std::string map_bump_strength{"", 13};
-      if (texture_map.key == "map_Bump" && mtl_material.map_Bump_strength > -0.9f) {
+      std::string map_bump_strength;
+      if (texture_map.key == "map_Bump" && mtl_material.map_Bump_strength > 0.0001f) {
         map_bump_strength = " -bm " + std::to_string(mtl_material.map_Bump_strength);
       }
       /* Always keep only one space between options since filepaths may have leading spaces too.
@@ -508,7 +508,7 @@ void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
               texture_map.value.scale[0],
               texture_map.value.scale[1],
               texture_map.value.scale[2],
-              map_bump_strength.c_str(),
+              map_bump_strength.c_str(), /* Can be empty. */
               texture_map.value.image_path.c_str());
     }
   }
