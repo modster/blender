@@ -279,7 +279,9 @@ const char *OBJMesh::get_object_material_name(short mat_nr) const
 {
   const Material *mat = BKE_object_material_get(export_object_eval_, mat_nr);
 #ifdef DEBUG
-  std::cerr << "Material not found for mat_nr = " << mat_nr << std::endl;
+  if (!mat) {
+    std::cerr << "Material not found for mat_nr = " << mat_nr << std::endl;
+  }
 #endif
   return mat ? mat->id.name + 2 : nullptr;
 }
