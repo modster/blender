@@ -100,7 +100,7 @@ class OBJMesh : NonMovable, NonCopyable {
   void calc_poly_vertex_indices(const uint poly_index, Vector<uint> &r_poly_vertex_indices) const;
   void store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coords);
   float3 calc_poly_normal(const uint poly_index) const;
-  float3 calc_vertex_normal(const uint vert_index) const;
+  void calc_loop_normal(const uint poly_index, Vector<float3> &r_loop_normals) const;
   const char *get_poly_deform_group_name(const uint poly_index, short &r_last_vertex_group) const;
   std::optional<std::array<int, 2>> calc_edge_vert_indices(const uint edge_index) const;
 

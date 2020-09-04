@@ -187,19 +187,21 @@ void OBJWriter::write_uv_coords(OBJMesh &obj_mesh_data) const
 }
 
 /**
- * Write vertex normals for smooth-shaded polygons, and face normals otherwise, as vn x y z .
+ * Write loop normals for smooth-shaded polygons, and face normals otherwise, as vn x y z .
  */
 void OBJWriter::write_poly_normals(OBJMesh &obj_mesh_data) const
 {
   obj_mesh_data.ensure_mesh_normals();
+  Vector<float3> lnormals;
   for (uint i = 0; i < obj_mesh_data.tot_polygons(); i++) {
     if (obj_mesh_data.is_ith_poly_smooth(i)) {
-      for (int j = 0; j < obj_mesh_data.ith_poly_totloop(i); j++) {
-        float3 vertex_normal = obj_mesh_data.calc_vertex_normal(j);
-        fprintf(outfile_, "vn %f %f %f\n", vertex_normal[0], vertex_normal[1], vertex_normal[2]);
+      obj_mesh_data.calc_loop_normal(i, lnormals);
+      for (int j = 0; j < lnormals.size(); j++) {
+        fprintf(outfile_, "vn %f %f %f\n", lnormals[j][0], lnormals[j][1], lnormals[j][2]);
       }
     }
     else {
+      UNUSED_VARS(lnormals);
       float3 poly_normal = obj_mesh_data.calc_poly_normal(i);
       fprintf(outfile_, "vn %f %f %f\n", poly_normal[0], poly_normal[1], poly_normal[2]);
     }
@@ -352,7 +354,8 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
     write_smooth_group(obj_mesh_data, i, last_face_smooth_group);
     write_vertex_group(obj_mesh_data, i, last_face_vertex_group);
     write_poly_material(obj_mesh_data, i, last_face_mat_nr);
-    (this->*func_vert_uv_normal_indices)(vertex_indices, obj_mesh_data.uv_indices(i), normal_indices, totloop);
+    (this->*func_vert_uv_normal_indices)(
+        vertex_indices, obj_mesh_data.uv_indices(i), normal_indices, totloop);
   }
 }
 
