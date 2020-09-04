@@ -28,6 +28,7 @@
 #include "obj_export_mtl.hh"
 #include "obj_export_nurbs.hh"
 #include "obj_import_mtl.hh"
+#include "string_utils.hh"
 
 namespace blender::io::obj {
 
@@ -430,6 +431,10 @@ void OBJWriter::update_index_offsets(const OBJMesh &obj_mesh_data)
   tot_normals_ = 0;
 }
 
+/* -------------------------------------------------------------------- */
+/** \name MTL writers.
+ * \{ */
+
 /**
  * Open the MTL file in append mode.
  */
@@ -460,57 +465,64 @@ void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
   MaterialWrap mat_wrap(mesh_to_export, mtl_materials);
   mat_wrap.fill_materials();
 
+  auto all_items_positive = [](const float3 &triplet) {
+    return triplet.x >= 0.0f && triplet.y >= 0.0f && triplet.z >= 0.0f;
+  };
+
   for (const MTLMaterial &mtl_material : mtl_materials) {
     fprintf(mtl_outfile_, "\nnewmtl %s\n", mtl_material.name.c_str());
-    fprintf(mtl_outfile_, "Ns %.6f\n", mtl_material.Ns);
+    BLI_assert(all_items_positive({mtl_material.d, mtl_material.Ns, mtl_material.Ni}) &&
+               mtl_material.illum > 0);
+    BLI_assert(all_items_positive(mtl_material.Ka) && all_items_positive(mtl_material.Kd) &&
+               all_items_positive(mtl_material.Ks) && all_items_positive(mtl_material.Ke));
+
     fprintf(mtl_outfile_,
-            "Ka %0.6f %0.6f %0.6f\n",
-            mtl_material.Ka[0],
-            mtl_material.Ka[1],
-            mtl_material.Ka[2]);
-    fprintf(mtl_outfile_,
-            "Kd %0.6f %0.6f %0.6f\n",
-            mtl_material.Kd[0],
-            mtl_material.Kd[1],
-            mtl_material.Kd[2]);
-    fprintf(mtl_outfile_,
-            "Ks %0.6f %0.6f %0.6f\n",
-            mtl_material.Ks[0],
-            mtl_material.Ks[0],
-            mtl_material.Ks[0]);
-    fprintf(mtl_outfile_,
-            "Ke %0.6f %0.6f %0.6f\n",
-            mtl_material.Ke[0],
-            mtl_material.Ke[1],
-            mtl_material.Ke[2]);
-    fprintf(mtl_outfile_,
-            "Ni %0.6f\nd %.6f\nillum %d\n",
+            "Ni %0.6f\n"
+            "d %.6f\n"
+            "Ns %0.6f\n"
+            "illum %d\n",
             mtl_material.Ni,
             mtl_material.d,
+            mtl_material.Ns,
             mtl_material.illum);
+    fprintf(mtl_outfile_, "Ka %s\n", float3_to_string(mtl_material.Ka).c_str());
+    fprintf(mtl_outfile_, "Kd %s\n", float3_to_string(mtl_material.Kd).c_str());
+    fprintf(mtl_outfile_, "Ks %s\n", float3_to_string(mtl_material.Ks).c_str());
+    fprintf(mtl_outfile_, "Ke %s\n", float3_to_string(mtl_material.Ke).c_str());
+
+    /* Write image texture maps. */
     for (const Map<const std::string, tex_map_XX>::Item &texture_map :
          mtl_material.texture_maps.items()) {
       if (texture_map.value.image_path.empty()) {
         continue;
       }
+
       std::string map_bump_strength;
+      std::string scale;
+      std::string translation;
+      /* Texture map keys should have leading spaces. */
       if (texture_map.key == "map_Bump" && mtl_material.map_Bump_strength > 0.0001f) {
-        map_bump_strength = " -bm " + std::to_string(mtl_material.map_Bump_strength);
+        map_bump_strength.append(" -bm ").append(std::to_string(mtl_material.map_Bump_strength));
       }
-      /* Always keep only one space between options since filepaths may have leading spaces too.
-       * map_Bump string has its leading space. */
+      if (texture_map.value.scale != float3{1.0f, 1.0f, 1.0f}) {
+        scale.append(" -o ").append(float3_to_string(texture_map.value.scale));
+      }
+      if (texture_map.value.translation != float3{0.0f, 0.0f, 0.0f}) {
+        translation.append(" -s ").append(float3_to_string(texture_map.value.translation));
+      }
+
+      /* Always keep only one space between options since filepaths may have leading spaces too. */
       fprintf(mtl_outfile_,
-              "%s -o %.6f %.6f %.6f -s %.6f %.6f %.6f%s %s\n",
+              "%s%s%s%s %s\n",
               texture_map.key.c_str(),
-              texture_map.value.translation[0],
-              texture_map.value.translation[1],
-              texture_map.value.translation[2],
-              texture_map.value.scale[0],
-              texture_map.value.scale[1],
-              texture_map.value.scale[2],
+              translation.c_str(),       /* Can be empty. */
+              scale.c_str(),             /* Can be empty. */
               map_bump_strength.c_str(), /* Can be empty. */
               texture_map.value.image_path.c_str());
     }
   }
 }
+
+/** \} */
+
 }  // namespace blender::io::obj
