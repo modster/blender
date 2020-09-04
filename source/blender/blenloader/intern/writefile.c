@@ -987,7 +987,7 @@ static void write_usermenuitems(BlendWriter *writer, const ListBase *lb)
       const bUserMenuItem_Op *umi_op = (const bUserMenuItem_Op *)umi;
       BLO_write_struct(writer, bUserMenuItem_Op, umi_op);
       if (umi_op->prop) {
-        IDP_WriteProperty(umi_op->prop, writer);
+        IDP_BlendWrite(writer, umi_op->prop);
       }
     }
     else if (umi->type == USER_MENU_TYPE_MENU) {

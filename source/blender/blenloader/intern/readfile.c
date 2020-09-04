@@ -8909,7 +8909,7 @@ static void read_usermenuitems(BlendDataReader *reader,
     if (umi->type == USER_MENU_TYPE_OPERATOR) {
       bUserMenuItem_Op *umi_op = (bUserMenuItem_Op *)umi;
       BLO_read_data_address(reader, &umi_op->prop);
-      IDP_DirectLinkGroup_OrFree(&umi_op->prop, reader);
+      IDP_BlendDataRead(reader, &umi_op->prop);
     }
     if (umi->type == USER_MENU_TYPE_SUBMENU) {
       bUserMenuItem_SubMenu *umi_sm = (bUserMenuItem_SubMenu *)umi;

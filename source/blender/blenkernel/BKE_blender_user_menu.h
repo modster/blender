@@ -28,6 +28,7 @@ struct ListBase;
 struct bUserMenu;
 struct bUserMenuItem;
 struct wmWindowManager;
+struct bUserMenusGroup;
 
 void BKE_blender_user_menu_free_list(struct ListBase *lb);
 void BKE_blender_user_menus_group_idname_update(struct bUserMenusGroup *umg);
