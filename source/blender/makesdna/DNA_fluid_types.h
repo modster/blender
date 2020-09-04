@@ -80,11 +80,11 @@ enum {
   SLICE_AXIS_Z = 3,
 };
 
-/* Axis aligned method. */
+/* Display interpolation method. */
 enum {
-  VOLUME_INTERP_LINEAR = 0,
-  VOLUME_INTERP_CUBIC = 1,
-  VOLUME_INTERP_CLOSEST = 2,
+  FLUID_DISPLAY_INTERP_LINEAR = 0,
+  FLUID_DISPLAY_INTERP_CUBIC = 1,
+  FLUID_DISPLAY_INTERP_CLOSEST = 2,
 };
 
 enum {

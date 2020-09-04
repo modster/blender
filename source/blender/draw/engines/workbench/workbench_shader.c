@@ -465,7 +465,7 @@ GPUShader *workbench_shader_antialiasing_get(int stage)
 
 GPUShader *workbench_shader_volume_get(bool slice,
                                        bool coba,
-                                       WORKBENCH_VolumeInterpType interp_type,
+                                       eWORKBENCH_VolumeInterpType interp_type,
                                        bool smoke)
 {
   GPUShader **shader = &e_data.volume_sh[slice][coba][interp_type][smoke];
@@ -480,13 +480,13 @@ GPUShader *workbench_shader_volume_get(bool slice,
       BLI_dynstr_append(ds, "#define USE_COBA\n");
     }
     switch (interp_type) {
-      case INTERP_LINEAR:
+      case WORKBENCH_VOLUME_INTERP_LINEAR:
         BLI_dynstr_append(ds, "#define USE_TRILINEAR\n");
         break;
-      case INTERP_CUBIC:
+      case WORKBENCH_VOLUME_INTERP_CUBIC:
         BLI_dynstr_append(ds, "#define USE_TRICUBIC\n");
         break;
-      case INTERP_CLOSEST:
+      case WORKBENCH_VOLUME_INTERP_CLOSEST:
         BLI_dynstr_append(ds, "#define USE_CLOSEST\n");
         break;
     }

@@ -92,7 +92,6 @@ static void workbench_volume_modifier_cache_populate(WORKBENCH_Data *vedata,
   }
 
   const bool use_slice = (fds->axis_slice_method == AXIS_SLICE_SINGLE);
-  const WORKBENCH_VolumeInterpType interp_type = (WORKBENCH_VolumeInterpType)fds->interp_method;
   const bool show_phi = ELEM(fds->coba_field,
                              FLUID_DOMAIN_FIELD_PHI,
                              FLUID_DOMAIN_FIELD_PHI_IN,
@@ -100,6 +99,19 @@ static void workbench_volume_modifier_cache_populate(WORKBENCH_Data *vedata,
                              FLUID_DOMAIN_FIELD_PHI_OBSTACLE);
   const bool show_flags = (fds->coba_field == FLUID_DOMAIN_FIELD_FLAGS);
   const bool show_pressure = (fds->coba_field == FLUID_DOMAIN_FIELD_PRESSURE);
+  eWORKBENCH_VolumeInterpType interp_type = WORKBENCH_VOLUME_INTERP_CLOSEST;
+
+  switch (fds->interp_method) {
+    case FLUID_DISPLAY_INTERP_LINEAR:
+      interp_type = WORKBENCH_VOLUME_INTERP_LINEAR;
+      break;
+    case FLUID_DISPLAY_INTERP_CUBIC:
+      interp_type = WORKBENCH_VOLUME_INTERP_CUBIC;
+      break;
+    case FLUID_DISPLAY_INTERP_CLOSEST:
+      interp_type = WORKBENCH_VOLUME_INTERP_CLOSEST;
+      break;
+  }
   GPUShader *sh = workbench_shader_volume_get(use_slice, fds->use_coba, interp_type, true);
 
   if (use_slice) {
@@ -216,8 +228,19 @@ static void workbench_volume_object_cache_populate(WORKBENCH_Data *vedata,
 
   wpd->volumes_do = true;
   const bool use_slice = (volume->display.axis_slice_method == AXIS_SLICE_SINGLE);
-  const WORKBENCH_VolumeInterpType interp_type = (WORKBENCH_VolumeInterpType)
-                                                     volume->display.interpolation_method;
+  eWORKBENCH_VolumeInterpType interp_type = WORKBENCH_VOLUME_INTERP_CLOSEST;
+
+  switch (volume->display.interpolation_method) {
+    case VOLUME_DISPLAY_INTERP_LINEAR:
+      interp_type = WORKBENCH_VOLUME_INTERP_LINEAR;
+      break;
+    case VOLUME_DISPLAY_INTERP_CUBIC:
+      interp_type = WORKBENCH_VOLUME_INTERP_CUBIC;
+      break;
+    case VOLUME_DISPLAY_INTERP_CLOSEST:
+      interp_type = WORKBENCH_VOLUME_INTERP_CLOSEST;
+      break;
+  }
 
   /* Create shader. */
   GPUShader *sh = workbench_shader_volume_get(use_slice, false, interp_type, false);

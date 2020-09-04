@@ -396,13 +396,13 @@ static void rna_def_volume_display(BlenderRNA *brna)
   };
 
   static const EnumPropertyItem interpolation_method_items[] = {
-      {VOLUME_INTERPOLATION_LINEAR, "LINEAR", 0, "Linear", "Good smoothness and speed"},
-      {VOLUME_INTERPOLATION_CUBIC,
+      {VOLUME_DISPLAY_INTERP_LINEAR, "LINEAR", 0, "Linear", "Good smoothness and speed"},
+      {VOLUME_DISPLAY_INTERP_CUBIC,
        "CUBIC",
        0,
        "Cubic",
        "Smoothed high quality interpolation, but slower"},
-      {VOLUME_INTERPOLATION_RAW, "RAW", 0, "Raw", "No interpolation"},
+      {VOLUME_DISPLAY_INTERP_CLOSEST, "CLOSEST", 0, "Closest", "No interpolation"},
       {0, NULL, 0, NULL, NULL},
   };
 

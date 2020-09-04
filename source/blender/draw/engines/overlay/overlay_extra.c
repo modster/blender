@@ -1383,10 +1383,10 @@ static void OVERLAY_volume_extra(OVERLAY_ExtraCallBuffers *cb,
   const bool draw_velocity = (fds->draw_velocity && fds->fluid &&
                               CFRA >= fds->point_cache[0]->startframe);
 
-  /* Show gridlines only for slices without interpolation */
+  /* Show gridlines only for slices with no interpolation. */
   const bool show_gridlines = (fds->show_gridlines && fds->fluid &&
                                fds->axis_slice_method == AXIS_SLICE_SINGLE &&
-                               (fds->interp_method == VOLUME_INTERP_CLOSEST ||
+                               (fds->interp_method == FLUID_DISPLAY_INTERP_CLOSEST ||
                                 fds->coba_field == FLUID_DOMAIN_FIELD_FLAGS));
 
   const bool color_with_flags = (fds->gridlines_color_field == FLUID_GRIDLINE_COLOR_TYPE_FLAGS);
@@ -1470,8 +1470,6 @@ static void OVERLAY_volume_extra(OVERLAY_ExtraCallBuffers *cb,
   }
 
   if (show_gridlines) {
-    int line_count = 4 * fds->res[0] * fds->res[1] * fds->res[2] / fds->res[slice_axis];
-
     GPUShader *sh = OVERLAY_shader_volume_gridlines(color_with_flags, color_range);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, data->psl->extra_ps[0]);
     DRW_shgroup_uniform_ivec3_copy(grp, "volumeSize", fds->res);
@@ -1495,6 +1493,7 @@ static void OVERLAY_volume_extra(OVERLAY_ExtraCallBuffers *cb,
       DRW_shgroup_uniform_int_copy(grp, "cellFilter", fds->gridlines_cell_filter);
     }
 
+    const int line_count = 4 * fds->res[0] * fds->res[1] * fds->res[2] / fds->res[slice_axis];
     DRW_shgroup_call_procedural_lines(grp, ob, line_count);
   }
 

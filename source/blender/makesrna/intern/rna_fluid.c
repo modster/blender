@@ -1322,13 +1322,13 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
   };
 
   static const EnumPropertyItem interp_method_item[] = {
-      {VOLUME_INTERP_LINEAR, "LINEAR", 0, "Linear", "Good smoothness and speed"},
-      {VOLUME_INTERP_CUBIC,
+      {FLUID_DISPLAY_INTERP_LINEAR, "LINEAR", 0, "Linear", "Good smoothness and speed"},
+      {FLUID_DISPLAY_INTERP_CUBIC,
        "CUBIC",
        0,
        "Cubic",
        "Smoothed high quality interpolation, but slower"},
-      {VOLUME_INTERP_CLOSEST, "CLOSEST", 0, "Closest", "No interpolation"},
+      {FLUID_DISPLAY_INTERP_CLOSEST, "CLOSEST", 0, "Closest", "No interpolation"},
       {0, NULL, 0, NULL, NULL},
   };
 

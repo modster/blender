@@ -124,11 +124,11 @@ typedef enum VolumeRenderSpace {
 } VolumeRenderSpace;
 
 /* VolumeDisplay.interpolation_method */
-typedef enum VolumeInterpolationMethod {
-  VOLUME_INTERPOLATION_LINEAR = 0,
-  VOLUME_INTERPOLATION_CUBIC = 1,
-  VOLUME_INTERPOLATION_RAW = 2,
-} VolumeInterpolationMethod;
+typedef enum VolumeDisplayInterpMethod {
+  VOLUME_DISPLAY_INTERP_LINEAR = 0,
+  VOLUME_DISPLAY_INTERP_CUBIC = 1,
+  VOLUME_DISPLAY_INTERP_CLOSEST = 2,
+} VolumeDisplayInterpMethod;
 
 /* VolumeDisplay.axis_slice_method */
 typedef enum AxisAlignedSlicingMethod {
