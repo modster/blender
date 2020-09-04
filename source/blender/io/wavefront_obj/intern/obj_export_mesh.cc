@@ -204,6 +204,7 @@ int OBJMesh::ith_smooth_group(const int poly_index) const
 void OBJMesh::ensure_mesh_normals() const
 {
   BKE_mesh_ensure_normals(export_mesh_eval_);
+  BKE_mesh_calc_normals_split(export_mesh_eval_);
 }
 
 void OBJMesh::ensure_mesh_edges() const
@@ -378,16 +379,22 @@ float3 OBJMesh::calc_poly_normal(const uint poly_index) const
 }
 
 /**
- * Calculate vertex normal of a vertex at the given index.
+ * Calculate loop normal of a loop at the given index.
  *
- * Should be used when a mesh is shaded smooth.
+ * Should be used when a polygon is shaded smooth.
  */
-float3 OBJMesh::calc_vertex_normal(const uint vert_index) const
+void OBJMesh::calc_loop_normal(const uint poly_index, Vector<float3> &r_loop_normals) const
 {
-  float3 r_vertex_normal;
-  normal_short_to_float_v3(r_vertex_normal, export_mesh_eval_->mvert[vert_index].no);
-  mul_mat3_m4_v3(world_and_axes_transform_, r_vertex_normal);
-  return r_vertex_normal;
+  r_loop_normals.clear();
+  const MPoly &mpoly = export_mesh_eval_->mpoly[poly_index];
+  const float(*lnors)[3] = (const float(*)[3])(
+      CustomData_get_layer(&export_mesh_eval_->ldata, CD_NORMAL));
+  for (int loop_of_poly = 0; loop_of_poly < mpoly.totloop; loop_of_poly++) {
+    float3 loop_normal;
+    copy_v3_v3(loop_normal, lnors[mpoly.loopstart + loop_of_poly]);
+    mul_mat3_m4_v3(world_and_axes_transform_, loop_normal);
+    r_loop_normals.append(loop_normal);
+  }
 }
 
 /**

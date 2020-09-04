@@ -48,7 +48,7 @@ class OBJWriter {
   FILE *outfile_;
   const OBJExportParams &export_params_;
   /**
-   * Vertex offset, UV vertex offset, face normal offset respetively.
+   * Vertex offset, UV vertex offset, face/loop normal offset respetively.
    */
   uint index_offset_[3] = {0, 0, 0};
   /**

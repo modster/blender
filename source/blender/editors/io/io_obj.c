@@ -332,7 +332,7 @@ void WM_OT_obj_export(struct wmOperatorType *ot)
                   "export_normals",
                   true,
                   "Export Normals",
-                  "Export per-face normals if the face is flat-shaded, per-face-per-vertex "
+                  "Export per-face normals if the face is flat-shaded, per-face-per-loop "
                   "normals if smooth-shaded");
   RNA_def_boolean(ot->srna,
                   "export_materials",
@@ -368,7 +368,7 @@ void WM_OT_obj_export(struct wmOperatorType *ot)
       "export_vertex_groups",
       false,
       "Export Vertex Groups",
-      "Write the name of the vertex group of a face. It is approximated "
+      "Export the name of the vertex group of a face. It is approximated "
       "by choosing the vertex group with the most members among the vertices of a face");
   RNA_def_boolean(
       ot->srna,
