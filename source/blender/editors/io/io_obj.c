@@ -158,14 +158,16 @@ static void ui_obj_export_settings(uiLayout *layout, PointerRNA *imfptr)
 
   /* Object Transform options. */
   box = uiLayoutBox(layout);
-  uiItemL(box, IFACE_("Object Transform"), ICON_OBJECT_DATA);
+  uiItemL(box, IFACE_("Object Properties"), ICON_OBJECT_DATA);
   col = uiLayoutColumn(box, false);
   sub = uiLayoutColumn(col, false);
   uiItemR(sub, imfptr, "forward_axis", 0, IFACE_("Axis Forward"), ICON_NONE);
   uiItemR(sub, imfptr, "up_axis", 0, IFACE_("Up"), ICON_NONE);
-  sub = uiLayoutColumn(box, false);
+  sub = uiLayoutColumn(col, false);
   uiItemR(sub, imfptr, "scaling_factor", 0, NULL, ICON_NONE);
-  uiItemR(sub, imfptr, "export_eval_mode", 0, NULL, ICON_NONE);
+  sub = uiLayoutColumnWithHeading(col, false, IFACE_("Objects"));
+  uiItemR(sub, imfptr, "export_selected_objects", 0, IFACE_("Selected Only"), ICON_NONE);
+  uiItemR(sub, imfptr, "export_eval_mode", 0, IFACE_("Properties"), ICON_NONE);
 
   /* Options for what to write. */
   box = uiLayoutBox(layout);
@@ -175,7 +177,6 @@ static void ui_obj_export_settings(uiLayout *layout, PointerRNA *imfptr)
   uiItemR(sub, imfptr, "export_uv", 0, IFACE_("UV Coordinates"), ICON_NONE);
   uiItemR(sub, imfptr, "export_normals", 0, IFACE_("Normals"), ICON_NONE);
   uiItemR(sub, imfptr, "export_materials", 0, IFACE_("Materials"), ICON_NONE);
-  uiItemR(sub, imfptr, "export_selected_objects", 0, IFACE_("Selected Objects Only"), ICON_NONE);
   uiItemR(sub, imfptr, "export_triangulated_mesh", 0, IFACE_("Triangulated Mesh"), ICON_NONE);
   uiItemR(sub, imfptr, "export_curves_as_nurbs", 0, IFACE_("Curves as NURBS"), ICON_NONE);
 
@@ -319,7 +320,7 @@ void WM_OT_obj_export(struct wmOperatorType *ot)
                "export_eval_mode",
                io_obj_export_evaluation_mode,
                DAG_EVAL_VIEWPORT,
-               "Use Properties For",
+               "Object Properties",
                "Determines properties like object visibility, modifiers etc., where they differ "
                "for Render and Viewport");
   RNA_def_boolean(ot->srna,
