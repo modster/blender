@@ -120,7 +120,7 @@ static bool load_texture_image(Main *bmain, const tex_map_XX &tex_map, bNode *r_
  * surface socket.
  */
 ShaderNodetreeWrap::ShaderNodetreeWrap(Main *bmain, const MTLMaterial &mtl_mat)
-    : mtl_mat_(&mtl_mat)
+    : mtl_mat_(mtl_mat)
 {
   nodetree_.reset(ntreeAddTree(nullptr, "Shader Nodetree", ntreeType_Shader->idname));
   bsdf_.reset(add_node_to_tree(SH_NODE_BSDF_PRINCIPLED));
@@ -216,15 +216,115 @@ void ShaderNodetreeWrap::link_sockets(unique_node_ptr from_node,
  */
 void ShaderNodetreeWrap::set_bsdf_socket_values()
 {
-  const float specular_exponent{1 - sqrt(mtl_mat_->Ns) / 30};
-  set_property_of_socket(SOCK_FLOAT, "Roughness", {specular_exponent}, bsdf_.get());
-  /* Only one value is taken for Metallic and Specular. */
-  set_property_of_socket(SOCK_FLOAT, "Specular", {mtl_mat_->Ks[0]}, bsdf_.get());
-  set_property_of_socket(SOCK_FLOAT, "Metallic", {mtl_mat_->Ka[0]}, bsdf_.get());
-  set_property_of_socket(SOCK_FLOAT, "IOR", {mtl_mat_->Ni}, bsdf_.get());
-  set_property_of_socket(SOCK_FLOAT, "Alpha", {mtl_mat_->d}, bsdf_.get());
-  set_property_of_socket(SOCK_RGBA, "Base Color", {mtl_mat_->Kd, 3}, bsdf_.get());
-  set_property_of_socket(SOCK_RGBA, "Emission", {mtl_mat_->Ke, 3}, bsdf_.get());
+  const int illum = mtl_mat_.illum;
+  bool do_highlight = false;
+  bool do_tranparency = false;
+  bool do_reflection = false;
+  bool do_glass = false;
+  switch (illum) {
+    case 1: {
+      /* Base color on, ambient on. */
+      break;
+    }
+    case 2: {
+      /* Highlight on. */
+      do_highlight = true;
+      break;
+    }
+    case 3: {
+      /* Reflection on and Ray trace on. */
+      do_reflection = true;
+      break;
+    }
+    case 4: {
+      /* Transparency: Glass on, Reflection: Ray trace on. */
+      do_glass = true;
+      do_reflection = true;
+      do_tranparency = true;
+      break;
+    }
+    case 5: {
+      /* Reflection: Fresnel on and Ray trace on. */
+      do_reflection = true;
+      break;
+    }
+    case 6: {
+      /* Transparency: Refraction on, Reflection: Fresnel off and Ray trace on. */
+      do_reflection = true;
+      do_tranparency = true;
+      break;
+    }
+    case 7: {
+      /* Transparency: Refraction on, Reflection: Fresnel on and Ray trace on. */
+      do_reflection = true;
+      do_tranparency = true;
+      break;
+    }
+    case 8: {
+      /* Reflection on and Ray trace off. */
+      do_reflection = true;
+      break;
+    }
+    case 9: {
+      /* Transparency: Glass on, Reflection: Ray trace off. */
+      do_glass = true;
+      do_reflection = false;
+      do_tranparency = true;
+      break;
+    }
+    default: {
+      std::cerr << "Warning! illum value = " << illum
+                << "is not supported by the Principled-BSDF shader." << std::endl;
+      break;
+    }
+  }
+  float specular = (mtl_mat_.Ks[0] + mtl_mat_.Ks[1] + mtl_mat_.Ks[2]) / 3;
+  float roughness = 1.0f - 1.0f / 30 * sqrt(std::max(0.0f, std::min(900.0f, mtl_mat_.Ns)));
+  float metallic = (mtl_mat_.Ka[0] + mtl_mat_.Ka[1] + mtl_mat_.Ka[2]) / 3;
+  float ior = mtl_mat_.Ni;
+  float alpha = mtl_mat_.d;
+
+  if (specular < 0.0f) {
+    specular = static_cast<float>(do_highlight);
+  }
+  if (mtl_mat_.Ns < 0.0f) {
+    roughness = static_cast<float>(!do_highlight);
+  }
+  if (metallic < 0.0f) {
+    if (do_reflection) {
+      metallic = 1.0f;
+    }
+  }
+  else {
+    metallic = 0.0f;
+  }
+  if (ior < 0) {
+    if (do_tranparency) {
+      ior = 1.0f;
+    }
+    if (do_glass) {
+      ior = 1.5f;
+    }
+  }
+  if (alpha < 0) {
+    if (do_tranparency) {
+      alpha = 1.0f;
+    }
+  }
+  float3 base_color = {std::max(0.0f, mtl_mat_.Kd[0]),
+    std::max(0.0f, mtl_mat_.Kd[1]),
+    std::max(0.0f, mtl_mat_.Kd[2])};
+  float3 emission = {std::max(0.0f, mtl_mat_.Ke[0]),
+    std::max(0.0f, mtl_mat_.Ke[1]),
+    std::max(0.0f, mtl_mat_.Ke[2])};
+
+  set_property_of_socket(SOCK_RGBA, "Base Color", {base_color, 3}, bsdf_.get());
+  set_property_of_socket(SOCK_RGBA, "Emission", {emission, 3}, bsdf_.get());
+  set_property_of_socket(SOCK_FLOAT, "Specular", {specular}, bsdf_.get());
+  set_property_of_socket(SOCK_FLOAT, "Roughness", {roughness}, bsdf_.get());
+  set_property_of_socket(SOCK_FLOAT, "Metallic", {metallic}, bsdf_.get());
+  set_property_of_socket(SOCK_FLOAT, "IOR", {ior}, bsdf_.get());
+  set_property_of_socket(SOCK_FLOAT, "Alpha", {alpha}, bsdf_.get());
 }
 
 /**
@@ -234,7 +334,7 @@ void ShaderNodetreeWrap::set_bsdf_socket_values()
 void ShaderNodetreeWrap::add_image_textures(Main *bmain)
 {
   for (const Map<const std::string, tex_map_XX>::Item texture_map :
-       mtl_mat_->texture_maps.items()) {
+       mtl_mat_.texture_maps.items()) {
     if (texture_map.value.image_path.empty()) {
       /* No Image texture node of this map type can be added to this material. */
       continue;
@@ -247,8 +347,8 @@ void ShaderNodetreeWrap::add_image_textures(Main *bmain)
 
     if (texture_map.key == "map_Bump") {
       normal_map.reset(add_node_to_tree(SH_NODE_NORMAL_MAP));
-      set_property_of_socket(
-          SOCK_FLOAT, "Strength", {mtl_mat_->map_Bump_strength}, normal_map.get());
+      const float bump = std::max(0.0f, mtl_mat_.map_Bump_strength);
+      set_property_of_socket(SOCK_FLOAT, "Strength", {bump}, normal_map.get());
     }
 
     if (!load_texture_image(bmain, texture_map.value, image_texture.get())) {

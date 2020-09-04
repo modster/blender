@@ -78,17 +78,19 @@ struct MTLMaterial {
   }
 
   std::string name{};
-  float Ns{1.0f};
-  float3 Ka{0.0f};
-  float3 Kd{0.8f, 0.8f, 0.8f};
-  float3 Ks{1.0f};
-  float3 Ke{0.0f};
-  float Ni{1.0f};
-  float d{1.0f};
-  int illum{0};
+  /* Always check for negative values while importing or exporting. Use defaults if
+   * any value is negative. */
+  float Ns{-1.0f};
+  float3 Ka{-1.0f};
+  float3 Kd{-1.0f};
+  float3 Ks{-1.0f};
+  float3 Ke{-1.0f};
+  float Ni{-1.0f};
+  float d{-1.0f};
+  int illum{-1};
   Map<const std::string, tex_map_XX> texture_maps;
   /** Only used for Normal Map node: map_Bump. */
-  float map_Bump_strength = 0.0f;
+  float map_Bump_strength{-1.0f};
 };
 
 struct UniqueNodeDeleter {
@@ -116,7 +118,7 @@ class ShaderNodetreeWrap {
   unique_nodetree_ptr nodetree_;
   unique_node_ptr bsdf_;
   unique_node_ptr shader_output_;
-  const MTLMaterial *mtl_mat_;
+  const MTLMaterial &mtl_mat_;
 
   /* List of all locations occupied by nodes. */
   Vector<std::array<int, 2>> node_locations;
