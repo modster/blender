@@ -84,8 +84,8 @@ bool GLTexture::init_internal(void)
   this->ensure_mipmaps(0);
 
   /* Avoid issue with incomplete textures. */
-  if (false) {
-    /* TODO(fclem) Direct State Access. */
+  if (GLEW_ARB_direct_state_access) {
+    glTextureParameteri(tex_id_, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   }
   else {
     GLContext::state_manager_active_get()->texture_bind_temp(this);
@@ -112,8 +112,8 @@ bool GLTexture::init_internal(GPUVertBuf *vbo)
 
   GLenum internal_format = to_gl_internal_format(format_);
 
-  if (false) {
-    /* TODO(fclem) Direct State Access. */
+  if (GLEW_ARB_direct_state_access) {
+    glTextureBuffer(tex_id_, internal_format, vbo->vbo_id);
   }
   else {
     GLContext::state_manager_active_get()->texture_bind_temp(this);
@@ -222,8 +222,7 @@ void GLTexture::update_sub(
 
   GLContext::state_manager_active_get()->texture_bind_temp(this);
 
-  if (true && type_ == GPU_TEXTURE_CUBE) {
-    /* TODO(fclem) bypass if direct state access is available. */
+  if (!GLEW_ARB_direct_state_access && type_ == GPU_TEXTURE_CUBE) {
     /* Workaround when ARB_direct_state_access is not available. */
     for (int i = 0; i < extent[2]; i++) {
       GLenum target = GL_TEXTURE_CUBE_MAP_POSITIVE_X + offset[2] + i;
@@ -280,11 +279,11 @@ void GLTexture::generate_mipmap(void)
     return;
   }
 
-  if (false) {
-    /* TODO(fclem) Direct State Access. */
+  /* Downsample from mip 0 using implementation. */
+  if (GLEW_ARB_direct_state_access) {
+    glGenerateTextureMipmap(tex_id_);
   }
   else {
-    /* Downsample from mip 0 using implementation. */
     GLContext::state_manager_active_get()->texture_bind_temp(this);
     glGenerateMipmap(target_);
   }
@@ -360,9 +359,8 @@ void *GLTexture::read(int mip, eGPUDataFormat type)
   GLenum gl_format = to_gl_data_format(format_);
   GLenum gl_type = to_gl(type);
 
-  if (false) {
-    /* TODO(fclem) Direct State Access. */
-    /* NOTE: DSA can read GL_TEXTURE_CUBE_MAP directly. */
+  if (GLEW_ARB_direct_state_access) {
+    glGetTextureImage(tex_id_, mip, gl_format, gl_type, texture_size, data);
   }
   else {
     GLContext::state_manager_active_get()->texture_bind_temp(this);
@@ -392,8 +390,8 @@ void GLTexture::swizzle_set(const char swizzle[4])
                          (GLint)swizzle_to_gl(swizzle[1]),
                          (GLint)swizzle_to_gl(swizzle[2]),
                          (GLint)swizzle_to_gl(swizzle[3])};
-  if (false) {
-    /* TODO(fclem) Direct State Access. */
+  if (GLEW_ARB_direct_state_access) {
+    glTextureParameteriv(tex_id_, GL_TEXTURE_SWIZZLE_RGBA, gl_swizzle);
   }
   else {
     GLContext::state_manager_active_get()->texture_bind_temp(this);
@@ -404,8 +402,9 @@ void GLTexture::swizzle_set(const char swizzle[4])
 void GLTexture::mip_range_set(int min, int max)
 {
   BLI_assert(min <= max && min >= 0 && max <= mipmaps_);
-  if (false) {
-    /* TODO(fclem) Direct State Access. */
+  if (GLEW_ARB_direct_state_access) {
+    glTextureParameteri(tex_id_, GL_TEXTURE_BASE_LEVEL, min);
+    glTextureParameteri(tex_id_, GL_TEXTURE_MAX_LEVEL, max);
   }
   else {
     GLContext::state_manager_active_get()->texture_bind_temp(this);
