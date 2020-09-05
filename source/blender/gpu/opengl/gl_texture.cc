@@ -77,6 +77,9 @@ bool GLTexture::init_internal(void)
 
   target_ = to_gl_target(type_);
 
+  /* We need to bind once to define the texture type.  */
+  GLContext::state_manager_active_get()->texture_bind_temp(this);
+
   if (!this->proxy_check(0)) {
     return false;
   }
@@ -88,7 +91,6 @@ bool GLTexture::init_internal(void)
     glTextureParameteri(tex_id_, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   }
   else {
-    GLContext::state_manager_active_get()->texture_bind_temp(this);
     glTexParameteri(target_, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   }
 
@@ -110,13 +112,15 @@ bool GLTexture::init_internal(GPUVertBuf *vbo)
 {
   target_ = to_gl_target(type_);
 
+  /* We need to bind once to define the texture type.  */
+  GLContext::state_manager_active_get()->texture_bind_temp(this);
+
   GLenum internal_format = to_gl_internal_format(format_);
 
   if (GLEW_ARB_direct_state_access) {
     glTextureBuffer(tex_id_, internal_format, vbo->vbo_id);
   }
   else {
-    GLContext::state_manager_active_get()->texture_bind_temp(this);
     glTexBuffer(target_, internal_format, vbo->vbo_id);
   }
 
@@ -203,6 +207,43 @@ void GLTexture::ensure_mipmaps(int miplvl)
 /** \name Operations
  * \{ */
 
+void GLTexture::update_sub_direct_state_access(
+    int mip, int offset[3], int extent[3], GLenum format, GLenum type, const void *data)
+{
+  if (format_flag_ & GPU_FORMAT_COMPRESSED) {
+    size_t size = ((extent[0] + 3) / 4) * ((extent[1] + 3) / 4) * to_block_size(format_);
+    switch (this->dimensions_count()) {
+      default:
+      case 1:
+        glCompressedTextureSubImage1D(tex_id_, mip, offset[0], extent[0], format, size, data);
+        break;
+      case 2:
+        glCompressedTextureSubImage2D(
+            tex_id_, mip, UNPACK2(offset), UNPACK2(extent), format, size, data);
+        break;
+      case 3:
+        glCompressedTextureSubImage3D(
+            tex_id_, mip, UNPACK3(offset), UNPACK3(extent), format, size, data);
+        break;
+    }
+  }
+  else {
+    switch (this->dimensions_count()) {
+      default:
+      case 1:
+        glTextureSubImage1D(tex_id_, mip, offset[0], extent[0], format, type, data);
+        break;
+      case 2:
+        glTextureSubImage2D(tex_id_, mip, UNPACK2(offset), UNPACK2(extent), format, type, data);
+        break;
+      case 3:
+        glTextureSubImage3D(tex_id_, mip, UNPACK3(offset), UNPACK3(extent), format, type, data);
+        break;
+    }
+  }
+  GL_CHECK_ERROR("Post-update_sub_direct_state_access");
+}
+
 void GLTexture::update_sub(
     int mip, int offset[3], int extent[3], eGPUDataFormat type, const void *data)
 {
@@ -220,10 +261,13 @@ void GLTexture::update_sub(
   GLenum gl_format = to_gl_data_format(format_);
   GLenum gl_type = to_gl(type);
 
-  GLContext::state_manager_active_get()->texture_bind_temp(this);
+  if (GLEW_ARB_direct_state_access) {
+    this->update_sub_direct_state_access(mip, offset, extent, gl_format, gl_type, data);
+    return;
+  }
 
-  if (!GLEW_ARB_direct_state_access && type_ == GPU_TEXTURE_CUBE) {
-    /* Workaround when ARB_direct_state_access is not available. */
+  GLContext::state_manager_active_get()->texture_bind_temp(this);
+  if (type_ == GPU_TEXTURE_CUBE) {
     for (int i = 0; i < extent[2]; i++) {
       GLenum target = GL_TEXTURE_CUBE_MAP_POSITIVE_X + offset[2] + i;
       glTexSubImage2D(target, mip, UNPACK2(offset), UNPACK2(extent), gl_format, gl_type, data);
