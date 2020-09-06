@@ -30,7 +30,6 @@ from modules.mesh_test import RunTest, ModifierSpec, MeshTest
 def main():
     test = [
 
-        # Make sure no modifier is added on the test object.
         MeshTest("ClothSimple", "testClothPlane", "expectedClothPlane",
                  [ModifierSpec('Cloth', 'CLOTH', {'settings': {'quality': 5}}, 15)], threshold=1e-3),
 

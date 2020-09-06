@@ -130,7 +130,6 @@ class OperatorSpecObjectMode:
 
     def __init__(self, operator_name: str, operator_parameters: dict):
         """
-        Constructs an Object Operator spec
         :param operator_name: str - name of the object operator from bpy.ops.object, e.g. "shade_smooth" or "shape_keys"
         :param operator_parameters: dict - contains operator parameters.
         """
@@ -422,7 +421,7 @@ class MeshTest:
         if self.apply_modifier:
             self._apply_modifier(test_object, particle_sys_spec.modifier_name)
 
-    def _apply_operator(self, test_object, operator: OperatorSpecEditMode):
+    def _apply_operator_edit_mode(self, test_object, operator: OperatorSpecEditMode):
         """
         Apply operator on test object.
         :param test_object: bpy.types.Object - Blender object to apply operator on.
@@ -466,7 +465,7 @@ class MeshTest:
 
         bpy.ops.object.mode_set(mode='OBJECT')
 
-    def _apply_object_operator(self, operator: OperatorSpecObjectMode):
+    def _apply_operator_object_mode(self, operator: OperatorSpecObjectMode):
         """
         Applies the object operator.
         """
@@ -502,7 +501,7 @@ class MeshTest:
                 modifier_names.append(modifier_operations.modifier_name)
 
         if isinstance(object_operations, OperatorSpecObjectMode):
-            self._apply_object_operator(object_operations)
+            self._apply_operator_object_mode(object_operations)
 
         print("NAME", list(test_object.modifiers))
 
@@ -542,10 +541,10 @@ class MeshTest:
                     self._apply_modifier(evaluated_test_object, operation.modifier_name)
 
             elif isinstance(operation, OperatorSpecEditMode):
-                self._apply_operator(evaluated_test_object, operation)
+                self._apply_operator_edit_mode(evaluated_test_object, operation)
 
             elif isinstance(operation, OperatorSpecObjectMode):
-                self._apply_object_operator(operation)
+                self._apply_operator_object_mode(operation)
 
             elif isinstance(operation, DeformModifierSpec):
                 self._apply_deform_modifier(evaluated_test_object, operation)
