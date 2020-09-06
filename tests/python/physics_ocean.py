@@ -39,10 +39,12 @@ def main():
     for i, cmd in enumerate(command):
         if cmd == "--run-all-tests":
             ocean_test.apply_modifiers = True
+            ocean_test.do_compare = True
             ocean_test.run_all_tests()
             break
         elif cmd == "--run-test":
             ocean_test.apply_modifiers = False
+            ocean_test.do_compare = False
             name = command[i + 1]
             ocean_test.run_test(name)
             break

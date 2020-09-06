@@ -69,12 +69,12 @@ def main():
     command = list(sys.argv)
     for i, cmd in enumerate(command):
         if cmd == "--run-all-tests":
-            operator_test.apply_modifiers = True
+            operator_test.do_compare = True
             operator_test.run_all_tests()
             break
         elif cmd == "--run-test":
             name = command[i + 1]
-            operator_test.apply_modifiers = False
+            operator_test.do_compare = False
             operator_test.run_test(name)
             break
 

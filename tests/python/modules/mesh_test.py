@@ -170,7 +170,7 @@ class MeshTest:
     """
 
     def __init__(self, test_name: str, test_object_name: str, expected_object_name: str, operations_stack=None,
-                 apply_modifiers=False, threshold=None):
+                 apply_modifiers=False, do_compare=False, threshold=None):
         """
         Constructs a MeshTest object. Raises a KeyError if objects with names expected_object_name
         or test_object_name don't exist.
@@ -182,6 +182,7 @@ class MeshTest:
         :param apply_modifiers: bool - True if we want to apply the modifiers right after adding them to the object.
                                     - True if we want to apply the modifier to a list of modifiers, after some operation.
                                This affects operations of type ModifierSpec and DeformModifierSpec.
+        :param do_compare: bool - True if we want to compare the test and expected objects, False otherwise.
         :param threshold : exponent: To allow variations and accept difference to a certain degree.
 
         """
@@ -197,6 +198,7 @@ class MeshTest:
                                         type(operation)))
         self.operations_stack = operations_stack
         self.apply_modifier = apply_modifiers
+        self.do_compare = do_compare
         self.threshold = threshold
         self.test_name = test_name
 
@@ -557,8 +559,8 @@ class MeshTest:
                                         type(OperatorSpecObjectMode), type(ParticleSystemSpec), type(operation)))
 
         # Compare resulting mesh with expected one.
-        # Compare only when self.modifier is set to True, if modifiers are not applied test will always fail
-        if self.apply_modifier:
+        # Compare only when self.do_compare is set to True, it is set to False for run-test
+        if self.do_compare:
             if self.verbose:
                 print("Comparing expected mesh with resulting mesh...")
             evaluated_test_mesh = evaluated_test_object.data
@@ -612,7 +614,7 @@ class RunTest:
     >>> modifiers_test.run_all_tests()
     """
 
-    def __init__(self, tests, apply_modifiers=False):
+    def __init__(self, tests, apply_modifiers=False, do_compare=False):
         """
         Construct a modifier test.
         :param tests: list - list of modifier or operator test cases. Each element in the list must contain the
@@ -627,6 +629,7 @@ class RunTest:
         self.tests = tests
         self._check_for_unique_test_name()
         self.apply_modifiers = apply_modifiers
+        self.do_compare = do_compare
         self.verbose = os.environ.get("BLENDER_VERBOSE") is not None
         self._failed_tests_list = []
 
@@ -696,6 +699,9 @@ class RunTest:
         test = case
         if self.apply_modifiers:
             test.apply_modifier = True
+
+        if self.do_compare:
+            test.do_compare = True
 
         success = test.run_test()
         if test.is_test_updated():
