@@ -28,6 +28,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "GPU_batch.h"
+#include "GPU_batch_presets.h"
 #include "GPU_immediate.h"
 #include "GPU_matrix.h"
 #include "GPU_state.h"
@@ -482,22 +483,20 @@ static void vicon_gplayer_color_draw(Icon *icon, int x, int y, int w, int h)
   immUnbindProgram();
 }
 
-#  ifndef WITH_HEADLESS
-
 static void init_brush_icons(void)
 {
 
-#    define INIT_BRUSH_ICON(icon_id, name) \
-      { \
-        uchar *rect = (uchar *)datatoc_##name##_png; \
-        const int size = datatoc_##name##_png_size; \
-        DrawInfo *di; \
+#  define INIT_BRUSH_ICON(icon_id, name) \
+    { \
+      uchar *rect = (uchar *)datatoc_##name##_png; \
+      const int size = datatoc_##name##_png_size; \
+      DrawInfo *di; \
 \
-        di = def_internal_icon(NULL, icon_id, 0, 0, w, ICON_TYPE_BUFFER, 0); \
-        di->data.buffer.image->datatoc_rect = rect; \
-        di->data.buffer.image->datatoc_size = size; \
-      } \
-      ((void)0)
+      di = def_internal_icon(NULL, icon_id, 0, 0, w, ICON_TYPE_BUFFER, 0); \
+      di->data.buffer.image->datatoc_rect = rect; \
+      di->data.buffer.image->datatoc_size = size; \
+    } \
+    ((void)0)
   /* end INIT_BRUSH_ICON */
 
   const int w = 96; /* warning, brush size hardcoded in C, but it gets scaled */
@@ -555,7 +554,7 @@ static void init_brush_icons(void)
   INIT_BRUSH_ICON(ICON_GPBRUSH_ERASE_HARD, gp_brush_erase_hard);
   INIT_BRUSH_ICON(ICON_GPBRUSH_ERASE_STROKE, gp_brush_erase_stroke);
 
-#    undef INIT_BRUSH_ICON
+#  undef INIT_BRUSH_ICON
 }
 
 static DrawInfo *g_di_event_list = NULL;
@@ -629,16 +628,16 @@ static void init_event_icons(void)
 {
   DrawInfo *di_next = NULL;
 
-#    define INIT_EVENT_ICON(icon_id, type, value) \
-      { \
-        DrawInfo *di = def_internal_icon(NULL, icon_id, 0, 0, w, ICON_TYPE_EVENT, 0); \
-        di->data.input.event_type = type; \
-        di->data.input.event_value = value; \
-        di->data.input.icon = icon_id; \
-        di->data.input.next = di_next; \
-        di_next = di; \
-      } \
-      ((void)0)
+#  define INIT_EVENT_ICON(icon_id, type, value) \
+    { \
+      DrawInfo *di = def_internal_icon(NULL, icon_id, 0, 0, w, ICON_TYPE_EVENT, 0); \
+      di->data.input.event_type = type; \
+      di->data.input.event_value = value; \
+      di->data.input.icon = icon_id; \
+      di->data.input.next = di_next; \
+      di_next = di; \
+    } \
+    ((void)0)
   /* end INIT_EVENT_ICON */
 
   const int w = 16; /* DUMMY */
@@ -694,7 +693,7 @@ static void init_event_icons(void)
 
   g_di_event_list = di_next;
 
-#    undef INIT_EVENT_ICON
+#  undef INIT_EVENT_ICON
 }
 
 static void icon_verify_datatoc(IconImage *iimg)
@@ -867,31 +866,16 @@ void UI_icons_reload_internal_textures(void)
       icongltex.invw = 1.0f / b32buf->x;
       icongltex.invh = 1.0f / b32buf->y;
 
-      icongltex.tex[0] = GPU_texture_create_nD(b32buf->x,
-                                               b32buf->y,
-                                               0,
-                                               2,
-                                               b32buf->rect,
-                                               GPU_RGBA8,
-                                               GPU_DATA_UNSIGNED_BYTE,
-                                               0,
-                                               false,
-                                               NULL);
-      GPU_texture_add_mipmap(icongltex.tex[0], GPU_DATA_UNSIGNED_BYTE, 1, b16buf->rect);
+      icongltex.tex[0] = GPU_texture_create_2d("icons", b32buf->x, b32buf->y, 2, GPU_RGBA8, NULL);
+      GPU_texture_update_mipmap(icongltex.tex[0], 0, GPU_DATA_UNSIGNED_BYTE, b32buf->rect);
+      GPU_texture_update_mipmap(icongltex.tex[0], 1, GPU_DATA_UNSIGNED_BYTE, b16buf->rect);
     }
 
     if (need_icons_with_border && icongltex.tex[1] == NULL) {
-      icongltex.tex[1] = GPU_texture_create_nD(b32buf_border->x,
-                                               b32buf_border->y,
-                                               0,
-                                               2,
-                                               b32buf_border->rect,
-                                               GPU_RGBA8,
-                                               GPU_DATA_UNSIGNED_BYTE,
-                                               0,
-                                               false,
-                                               NULL);
-      GPU_texture_add_mipmap(icongltex.tex[1], GPU_DATA_UNSIGNED_BYTE, 1, b16buf_border->rect);
+      icongltex.tex[1] = GPU_texture_create_2d(
+          "icons_border", b32buf_border->x, b32buf_border->y, 2, GPU_RGBA8, NULL);
+      GPU_texture_update_mipmap(icongltex.tex[1], 0, GPU_DATA_UNSIGNED_BYTE, b32buf_border->rect);
+      GPU_texture_update_mipmap(icongltex.tex[1], 1, GPU_DATA_UNSIGNED_BYTE, b16buf_border->rect);
     }
   }
 
@@ -905,7 +889,7 @@ static void init_internal_icons(void)
 {
   int x, y;
 
-#    if 0  // temp disabled
+#  if 0  // temp disabled
   if ((btheme != NULL) && btheme->tui.iconfile[0]) {
     char *icondir = BKE_appdir_folder_id(BLENDER_DATAFILES, "icons");
     char iconfilestr[FILE_MAX];
@@ -930,7 +914,7 @@ static void init_internal_icons(void)
       printf("%s: 'icons' data path not found, continuing\n", __func__);
     }
   }
-#    endif
+#  endif
 
   /* Define icons. */
   for (y = 0; y < ICON_GRID_ROWS; y++) {
@@ -986,7 +970,6 @@ static void init_internal_icons(void)
   def_internal_vicon(ICON_COLORSET_19_VEC, vicon_colorset_draw_19);
   def_internal_vicon(ICON_COLORSET_20_VEC, vicon_colorset_draw_20);
 }
-#  endif /* WITH_HEADLESS */
 
 static void init_iconfile_list(struct ListBase *list)
 {
@@ -1568,12 +1551,13 @@ static void icon_draw_cache_texture_flush_ex(GPUTexture *texture,
   const int img_binding = GPU_shader_get_texture_binding(shader, "image");
   const int data_loc = GPU_shader_get_uniform(shader, "calls_data");
 
-  GPU_texture_bind(texture, img_binding);
-  GPU_sampler_icon_bind(img_binding);
+  GPU_texture_bind_ex(texture, GPU_SAMPLER_ICON, img_binding, false);
   GPU_shader_uniform_vector(
       shader, data_loc, 4, ICON_DRAW_CACHE_SIZE * 3, (float *)texture_draw_calls->drawcall_cache);
 
-  GPU_draw_primitive(GPU_PRIM_TRIS, 6 * texture_draw_calls->calls);
+  GPUBatch *quad = GPU_batch_preset_quad();
+  GPU_batch_set_shader(quad, shader);
+  GPU_batch_draw_instanced(quad, texture_draw_calls->calls);
 
   GPU_texture_unbind(texture);
 
@@ -1718,10 +1702,11 @@ static void icon_draw_texture(float x,
   GPU_shader_uniform_vector(shader, rect_tex_loc, 4, 1, (float[4]){x1, y1, x2, y2});
   GPU_shader_uniform_vector(shader, rect_geom_loc, 4, 1, (float[4]){x, y, x + w, y + h});
 
-  GPU_texture_bind(texture, img_binding);
-  GPU_sampler_icon_bind(img_binding);
+  GPU_texture_bind_ex(texture, GPU_SAMPLER_ICON, img_binding, false);
 
-  GPU_draw_primitive(GPU_PRIM_TRI_STRIP, 4);
+  GPUBatch *quad = GPU_batch_preset_quad();
+  GPU_batch_set_shader(quad, shader);
+  GPU_batch_draw(quad);
 
   GPU_texture_unbind(texture);
 

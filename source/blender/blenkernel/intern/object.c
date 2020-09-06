@@ -1274,6 +1274,44 @@ void *BKE_object_obdata_add_from_type(Main *bmain, int type, const char *name)
   }
 }
 
+/**
+ * Return -1 on failure.
+ */
+int BKE_object_obdata_to_type(const ID *id)
+{
+  /* Keep in sync with #OB_DATA_SUPPORT_ID macro. */
+  switch (GS(id->name)) {
+    case ID_ME:
+      return OB_MESH;
+    case ID_CU:
+      return BKE_curve_type_get((const Curve *)id);
+    case ID_MB:
+      return OB_MBALL;
+    case ID_LA:
+      return OB_LAMP;
+    case ID_SPK:
+      return OB_SPEAKER;
+    case ID_CA:
+      return OB_CAMERA;
+    case ID_LT:
+      return OB_LATTICE;
+    case ID_GD:
+      return OB_GPENCIL;
+    case ID_AR:
+      return OB_ARMATURE;
+    case ID_LP:
+      return OB_LIGHTPROBE;
+    case ID_HA:
+      return OB_HAIR;
+    case ID_PT:
+      return OB_POINTCLOUD;
+    case ID_VO:
+      return OB_VOLUME;
+    default:
+      return -1;
+  }
+}
+
 /* more general add: creates minimum required data, but without vertices etc. */
 Object *BKE_object_add_only_object(Main *bmain, int type, const char *name)
 {
@@ -3069,7 +3107,7 @@ void BKE_object_dimensions_set(Object *ob, const float value[3], int axis_mask)
   BKE_object_dimensions_set_ex(ob, value, axis_mask, NULL, NULL);
 }
 
-void BKE_object_minmax(Object *ob, float min_r[3], float max_r[3], const bool use_hidden)
+void BKE_object_minmax(Object *ob, float r_min[3], float r_max[3], const bool use_hidden)
 {
   BoundBox bb;
   float vec[3];
@@ -3080,19 +3118,19 @@ void BKE_object_minmax(Object *ob, float min_r[3], float max_r[3], const bool us
     case OB_FONT:
     case OB_SURF: {
       bb = *BKE_curve_boundbox_get(ob);
-      BKE_boundbox_minmax(&bb, ob->obmat, min_r, max_r);
+      BKE_boundbox_minmax(&bb, ob->obmat, r_min, r_max);
       changed = true;
       break;
     }
     case OB_MESH: {
       bb = *BKE_mesh_boundbox_get(ob);
-      BKE_boundbox_minmax(&bb, ob->obmat, min_r, max_r);
+      BKE_boundbox_minmax(&bb, ob->obmat, r_min, r_max);
       changed = true;
       break;
     }
     case OB_GPENCIL: {
       bb = *BKE_gpencil_boundbox_get(ob);
-      BKE_boundbox_minmax(&bb, ob->obmat, min_r, max_r);
+      BKE_boundbox_minmax(&bb, ob->obmat, r_min, r_max);
       changed = true;
       break;
     }
@@ -3105,7 +3143,7 @@ void BKE_object_minmax(Object *ob, float min_r[3], float max_r[3], const bool us
         for (v = 0; v < lt->pntsv; v++) {
           for (u = 0; u < lt->pntsu; u++, bp++) {
             mul_v3_m4v3(vec, ob->obmat, bp->vec);
-            minmax_v3v3_v3(min_r, max_r, vec);
+            minmax_v3v3_v3(r_min, r_max, vec);
           }
         }
       }
@@ -3113,7 +3151,7 @@ void BKE_object_minmax(Object *ob, float min_r[3], float max_r[3], const bool us
       break;
     }
     case OB_ARMATURE: {
-      changed = BKE_pose_minmax(ob, min_r, max_r, use_hidden, false);
+      changed = BKE_pose_minmax(ob, r_min, r_max, use_hidden, false);
       break;
     }
     case OB_MBALL: {
@@ -3121,27 +3159,27 @@ void BKE_object_minmax(Object *ob, float min_r[3], float max_r[3], const bool us
 
       changed = BKE_mball_minmax_ex(ob->data, ob_min, ob_max, ob->obmat, 0);
       if (changed) {
-        minmax_v3v3_v3(min_r, max_r, ob_min);
-        minmax_v3v3_v3(min_r, max_r, ob_max);
+        minmax_v3v3_v3(r_min, r_max, ob_min);
+        minmax_v3v3_v3(r_min, r_max, ob_max);
       }
       break;
     }
     case OB_HAIR: {
       bb = *BKE_hair_boundbox_get(ob);
-      BKE_boundbox_minmax(&bb, ob->obmat, min_r, max_r);
+      BKE_boundbox_minmax(&bb, ob->obmat, r_min, r_max);
       changed = true;
       break;
     }
 
     case OB_POINTCLOUD: {
       bb = *BKE_pointcloud_boundbox_get(ob);
-      BKE_boundbox_minmax(&bb, ob->obmat, min_r, max_r);
+      BKE_boundbox_minmax(&bb, ob->obmat, r_min, r_max);
       changed = true;
       break;
     }
     case OB_VOLUME: {
       bb = *BKE_volume_boundbox_get(ob);
-      BKE_boundbox_minmax(&bb, ob->obmat, min_r, max_r);
+      BKE_boundbox_minmax(&bb, ob->obmat, r_min, r_max);
       changed = true;
       break;
     }
@@ -3155,15 +3193,15 @@ void BKE_object_minmax(Object *ob, float min_r[3], float max_r[3], const bool us
       mul_v3_fl(size, ob->empty_drawsize);
     }
 
-    minmax_v3v3_v3(min_r, max_r, ob->obmat[3]);
+    minmax_v3v3_v3(r_min, r_max, ob->obmat[3]);
 
     copy_v3_v3(vec, ob->obmat[3]);
     add_v3_v3(vec, size);
-    minmax_v3v3_v3(min_r, max_r, vec);
+    minmax_v3v3_v3(r_min, r_max, vec);
 
     copy_v3_v3(vec, ob->obmat[3]);
     sub_v3_v3(vec, size);
-    minmax_v3v3_v3(min_r, max_r, vec);
+    minmax_v3v3_v3(r_min, r_max, vec);
   }
 }
 
@@ -3520,11 +3558,11 @@ void BKE_object_sculpt_data_create(Object *ob)
   ob->sculpt->mode_type = ob->mode;
 }
 
-int BKE_object_obdata_texspace_get(Object *ob, short **r_texflag, float **r_loc, float **r_size)
+bool BKE_object_obdata_texspace_get(Object *ob, short **r_texflag, float **r_loc, float **r_size)
 {
 
   if (ob->data == NULL) {
-    return 0;
+    return false;
   }
 
   switch (GS(((ID *)ob->data)->name)) {
@@ -3560,9 +3598,9 @@ int BKE_object_obdata_texspace_get(Object *ob, short **r_texflag, float **r_loc,
       break;
     }
     default:
-      return 0;
+      return false;
   }
-  return 1;
+  return true;
 }
 
 /** Get evaluated mesh for given object. */

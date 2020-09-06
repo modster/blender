@@ -30,16 +30,11 @@
 #include "BLI_set.hh"
 #include "BLI_vector.hh"
 
+#include "gl_state.hh"
+
 #include "glew-mx.h"
 
 #include <mutex>
-
-/* Enabled on MacOS by default since there is no support for debug callbacks. */
-#if defined(DEBUG) && defined(__APPLE__)
-#  define GL_CHECK_ERROR(info) GLContext::check_error(info)
-#else
-#  define GL_CHECK_ERROR(info)
-#endif
 
 namespace blender {
 namespace gpu {
@@ -59,10 +54,12 @@ class GLSharedOrphanLists {
 };
 
 class GLContext : public GPUContext {
+ public:
+  /** Used for debugging purpose. Bitflags of all bound slots. */
+  uint16_t bound_ubo_slots;
+
   /* TODO(fclem) these needs to become private. */
  public:
-  /** Default VAO for procedural draw calls. */
-  GLuint default_vao_;
   /** VBO for missing vertex attrib binding. Avoid undefined behavior on some implementation. */
   GLuint default_attr_vbo_;
   /**
@@ -88,6 +85,12 @@ class GLContext : public GPUContext {
   void activate(void) override;
   void deactivate(void) override;
 
+  static inline GLStateManager *state_manager_active_get()
+  {
+    GLContext *ctx = static_cast<GLContext *>(GPU_context_active_get());
+    return static_cast<GLStateManager *>(ctx->state_manager);
+  };
+
   /* TODO(fclem) these needs to become private. */
  public:
   void orphans_add(Vector<GLuint> &orphan_list, std::mutex &list_mutex, GLuint id);
@@ -97,8 +100,6 @@ class GLContext : public GPUContext {
   void fbo_free(GLuint fbo_id);
   void vao_cache_register(GLVaoCache *cache);
   void vao_cache_unregister(GLVaoCache *cache);
-  void framebuffer_register(struct GPUFrameBuffer *fb);
-  void framebuffer_unregister(struct GPUFrameBuffer *fb);
 };
 
 }  // namespace gpu

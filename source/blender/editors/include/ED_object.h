@@ -265,7 +265,7 @@ void ED_object_base_init_transform_on_add(struct Object *object,
                                           const float loc[3],
                                           const float rot[3]);
 float ED_object_new_primitive_matrix(struct bContext *C,
-                                     struct Object *editob,
+                                     struct Object *obedit,
                                      const float loc[3],
                                      const float rot[3],
                                      float primmat[4][4]);
@@ -352,6 +352,11 @@ void ED_object_mode_generic_exit(struct Main *bmain,
                                  struct Object *ob);
 bool ED_object_mode_generic_has_data(struct Depsgraph *depsgraph, struct Object *ob);
 
+void ED_object_posemode_set_for_weight_paint(struct bContext *C,
+                                             struct Main *bmain,
+                                             struct Object *ob,
+                                             const bool is_mode_set);
+
 /* object_modifier.c */
 enum {
   MODIFIER_APPLY_DATA = 1,
@@ -381,13 +386,13 @@ bool ED_object_modifier_move_to_index(struct ReportList *reports,
                                       struct ModifierData *md,
                                       const int index);
 
-int ED_object_modifier_convert(struct ReportList *reports,
-                               struct Main *bmain,
-                               struct Depsgraph *depsgraph,
-                               struct Scene *scene,
-                               struct ViewLayer *view_layer,
-                               struct Object *ob,
-                               struct ModifierData *md);
+bool ED_object_modifier_convert(struct ReportList *reports,
+                                struct Main *bmain,
+                                struct Depsgraph *depsgraph,
+                                struct Scene *scene,
+                                struct ViewLayer *view_layer,
+                                struct Object *ob,
+                                struct ModifierData *md);
 bool ED_object_modifier_apply(struct Main *bmain,
                               struct ReportList *reports,
                               struct Depsgraph *depsgraph,
