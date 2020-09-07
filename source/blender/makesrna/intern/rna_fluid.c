@@ -2555,14 +2555,14 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
-  prop = RNA_def_property(srna, "coba_field", PROP_ENUM, PROP_NONE);
+  prop = RNA_def_property(srna, "color_ramp_field", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "coba_field");
   RNA_def_property_enum_items(prop, coba_field_items);
   RNA_def_property_enum_funcs(prop, NULL, "rna_Fluid_cobafield_set", "rna_Fluid_cobafield_itemf");
   RNA_def_property_ui_text(prop, "Field", "Simulation field to color map");
   RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
 
-  prop = RNA_def_property(srna, "coba_field_scale", PROP_FLOAT, PROP_NONE);
+  prop = RNA_def_property(srna, "color_ramp_field_scale", PROP_FLOAT, PROP_NONE);
   RNA_def_property_float_sdna(prop, NULL, "grid_scale");
   RNA_def_property_range(prop, 0.001, 100000.0);
   RNA_def_property_ui_range(prop, 0.001, 1000.0, 0.1, 3);

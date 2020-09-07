@@ -1268,7 +1268,7 @@ class PHYSICS_PT_viewport_display(PhysicButtonsPanel, Panel):
         sub = col.column()
         sub.prop(domain, "display_interpolation")
 
-        if domain.use_color_ramp and domain.coba_field == 'FLAGS':
+        if domain.use_color_ramp and domain.color_ramp_field == 'FLAGS':
             sub.enabled = False
 
         col.prop(domain, "axis_slice_method")
@@ -1276,7 +1276,7 @@ class PHYSICS_PT_viewport_display(PhysicButtonsPanel, Panel):
         if not do_full_slicing:
             col.prop(domain, "slice_axis")
             col.prop(domain, "slice_depth")
-            if domain.display_interpolation == 'CLOSEST' or domain.coba_field == 'FLAGS':
+            if domain.display_interpolation == 'CLOSEST' or domain.color_ramp_field == 'FLAGS':
                 col.prop(domain, "show_gridlines")
 
         col = col.column()
@@ -1305,14 +1305,14 @@ class PHYSICS_PT_viewport_display_color(PhysicButtonsPanel, Panel):
         domain = context.fluid.domain_settings
         col = layout.column()
         col.active = domain.use_color_ramp
-        col.prop(domain, "coba_field")
+        col.prop(domain, "color_ramp_field")
 
-        if not domain.coba_field == 'FLAGS':
-            col.prop(domain, "coba_field_scale")
+        if not domain.color_ramp_field == 'FLAGS':
+            col.prop(domain, "color_ramp_field_scale")
 
         col.use_property_split = False
 
-        if domain.coba_field[:3] != 'PHI' and domain.coba_field not in {'FLAGS', 'PRESSURE'}:
+        if domain.color_ramp_field[:3] != 'PHI' and domain.color_ramp_field not in {'FLAGS', 'PRESSURE'}:
             col = col.column()
             col.template_color_ramp(domain, "color_ramp", expand=True)
 
@@ -1376,7 +1376,7 @@ class PHYSICS_PT_viewport_display_advanced(PhysicButtonsPanel, Panel):
         col.prop(domain, "gridlines_color_field", text="Color Gridlines")
 
         if domain.gridlines_color_field == 'RANGE':
-            if domain.use_color_ramp and domain.coba_field != 'FLAGS':
+            if domain.use_color_ramp and domain.color_ramp_field != 'FLAGS':
                 col.prop(domain, "gridlines_lower_bound")
                 col.prop(domain, "gridlines_upper_bound")
                 col.prop(domain, "gridlines_range_color")
