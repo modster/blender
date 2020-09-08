@@ -255,6 +255,8 @@ void AlembicProcedural::generate(Scene *scene)
   IArchive archive = factory.getArchive(filepath.c_str());
 
   if (!archive.valid()) {
+    // avoid potential infinite update loops in viewport synchronization
+    clear_modified();
     // TODO : error reporting
     return;
   }
