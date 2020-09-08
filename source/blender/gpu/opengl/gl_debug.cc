@@ -114,11 +114,6 @@ static void APIENTRY debug_callback(GLenum UNUSED(source),
 
 void init_gl_callbacks(void)
 {
-#ifdef __APPLE__
-  fprintf(stderr, "GPUDebug: OpenGL debug callback is not available on Apple\n");
-  return;
-#endif /* not Apple */
-
   char msg[256] = "";
   const char format[] = "Successfully hooked OpenGL debug callback using %s";
 
@@ -148,7 +143,8 @@ void init_gl_callbacks(void)
                             msg);
   }
   else {
-    fprintf(stderr, "GPUDebug: Failed to hook OpenGL debug callback\n");
+    fprintf(stderr, "GPUDebug: Failed to hook OpenGL debug callback. Use fallback debug layer.\n");
+    init_debug_layer();
   }
 }
 

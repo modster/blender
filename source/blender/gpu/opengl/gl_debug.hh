@@ -42,6 +42,8 @@ void check_gl_error(const char *info);
 void check_gl_resources(const char *info);
 void init_gl_callbacks(void);
 
+void init_debug_layer(void);
+
 }  // namespace debug
 }  // namespace gpu
 }  // namespace blender
