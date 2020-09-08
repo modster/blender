@@ -52,6 +52,7 @@ class AlembicObject : public Node {
   // TODO : this is only for Meshes at the moment
   // TODO : handle attributes as well
   struct DataCache {
+      bool dirty = false;
       array<float3> vertices{};
       array<int3> triangles{};
   };

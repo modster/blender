@@ -328,28 +328,49 @@ void AlembicProcedural::read_mesh(Scene *scene,
     load_all_data(abc_object, schema);
   }
 
-  mesh->clear();
-  mesh->set_used_shaders(used_shaders);
-  mesh->set_use_motion_blur(use_motion_blur);
-  mesh->tag_update(scene, true);
-
   int frame_index = static_cast<int>(frame);
   if (frame_time >= abc_object->frame_data.size()) {
     frame_index = abc_object->frame_data.size() - 1;
   }
 
   auto &data = abc_object->frame_data[frame_index];
-  // TODO : animations like fluids will have different data or different frames
+
+  // TODO : arrays are emptied when passed to the sockets, so we need to reload the data
+  // perhaps we should just have a way to set the pointer
+  if (data.dirty) {
+    abc_object->frame_data.clear();
+    load_all_data(abc_object, schema);
+    data = abc_object->frame_data[frame_index];
+  }
+
+  data.dirty = true;
+  // TODO : animations like fluids will have different data on different frames
   auto &triangle_data = abc_object->frame_data[0].triangles;
 
-  mesh->reserve_mesh(data.vertices.size(), triangle_data.size());
+  mesh->set_verts(data.vertices);
 
-  mesh->verts = data.vertices;
-
-  for (int i = 0; i < triangle_data.size(); ++i) {
-    int3 tri = triangle_data[i];
+  {
     // TODO : shader association
-    mesh->add_triangle(tri.x, tri.y, tri.z, 0, 1);
+    array<int> triangles;
+    array<bool> smooth;
+    array<int> shader;
+
+    triangles.reserve(triangle_data.size() * 3);
+    smooth.reserve(triangle_data.size());
+    shader.reserve(triangle_data.size());
+
+    for (int i = 0; i < triangle_data.size(); ++i) {
+      int3 tri = triangle_data[i];
+      triangles.push_back_reserved(tri.x);
+      triangles.push_back_reserved(tri.y);
+      triangles.push_back_reserved(tri.z);
+      shader.push_back_reserved(0);
+      smooth.push_back_reserved(1);
+    }
+
+    mesh->set_triangles(triangles);
+    mesh->set_smooth(smooth);
+    mesh->set_shader(shader);
   }
 
   IPolyMeshSchema::Sample samp = schema.getValue(ISampleSelector(frame_time));
@@ -365,6 +386,12 @@ void AlembicProcedural::read_mesh(Scene *scene,
     Attribute *attr = mesh->attributes.add(ATTR_STD_GENERATED);
     memcpy(
         attr->data_float3(), mesh->get_verts().data(), sizeof(float3) * mesh->get_verts().size());
+  }
+
+  if (mesh->is_modified()) {
+    // TODO : check for modification of subdivision data (is a separate object in Alembic)
+    bool need_rebuild = mesh->triangles_is_modified();
+    mesh->tag_update(scene, need_rebuild);
   }
 }
 
