@@ -357,10 +357,17 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
     procedural_map.used(p);
   }
 
-  p->set_current_frame(scene, static_cast<float>(frame_current));
+  p->set_frame(static_cast<float>(frame_current));
+  if (p->frame_is_modified()) {
+    scene->procedural_manager->need_update = true;
+  }
 
-  // check if it was already created (for synchronisation during interactive rendering)
-  if (p->objects.size()) {
+  auto absolute_path = blender_absolute_path(b_data, b_ob, b_mesh_cache.cache_file().filepath());
+
+  p->set_filepath(ustring(absolute_path));
+
+  /* if the filepath was not modified, then we have already created the objects */
+  if (!p->filepath_is_modified()) {
     return;
   }
 
@@ -379,17 +386,11 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
     used_shaders.push_back_slow(default_shader);
   }
 
-  auto absolute_path = blender_absolute_path(b_data, b_ob, b_mesh_cache.cache_file().filepath());
+  AlembicObject *abc_object = scene->create_node<AlembicObject>();
+  abc_object->set_path(ustring(b_mesh_cache.object_path()));
+  abc_object->set_used_shaders(used_shaders);
 
-  if (p->filepath != absolute_path) {
-    p->filepath = absolute_path;
-
-    AlembicObject *abc_object = scene->create_node<AlembicObject>();
-    abc_object->set_path(ustring(b_mesh_cache.object_path()));
-    abc_object->set_used_shaders(used_shaders);
-
-    p->objects.push_back_slow(abc_object);
-  }
+  p->objects.push_back_slow(abc_object);
 }
 
 void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,

@@ -262,7 +262,7 @@ AlembicProcedural::~AlembicProcedural()
 
 void AlembicProcedural::generate(Scene *scene)
 {
-  if (!need_update && !need_update_for_frame_change) {
+  if (!is_modified()) {
     return;
   }
 
@@ -290,7 +290,6 @@ void AlembicProcedural::generate(Scene *scene)
     objstack.pop();
 
     string path = obj.first.getFullName();
-    vector<pathShaderType>::const_iterator it;
     Transform currmatrix = obj.second;
 
     AlembicObject *object = NULL;
@@ -320,17 +319,7 @@ void AlembicProcedural::generate(Scene *scene)
       objstack.push(std::pair<IObject, Transform>(obj.first.getChild(i), currmatrix));
   }
 
-  need_update = false;
-  need_update_for_frame_change = false;
-}
-
-void AlembicProcedural::set_current_frame(ccl::Scene *scene, float frame_)
-{
-  if (frame != frame_) {
-    frame = frame_;
-    need_update_for_frame_change = true;
-    scene->procedural_manager->need_update = true;
-  }
+  clear_modified();
 }
 
 void AlembicProcedural::read_mesh(Scene *scene,

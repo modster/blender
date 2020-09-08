@@ -75,35 +75,19 @@ class AlembicObject : public Node {
 };
 
 class AlembicProcedural : public Procedural {
-  bool need_update = true;
-  bool need_update_for_frame_change = true;
-
  public:
   NODE_DECLARE
-
-  typedef std::pair<const ustring, Shader *> pathShaderType;
 
   AlembicProcedural();
   ~AlembicProcedural();
   void generate(Scene *scene);
 
-  bool use_motion_blur;
-  ustring filepath;
-  float frame;
-  float frame_rate;
-  array<AlembicObject *> objects;
+  NODE_PUBLIC_API(bool, use_motion_blur)
+  NODE_PUBLIC_API(ustring, filepath)
+  NODE_PUBLIC_API(float, frame)
+  NODE_PUBLIC_API(float, frame_rate)
 
-  void tag_update()
-  {
-    need_update = true;
-  }
-
-  bool should_remove(const Node * /*node*/) const
-  {
-    return false;
-  }
-
-  void set_current_frame(Scene *scene, float frame_);
+  array<AlembicObject *> objects; // todo : Node::set
 
  private:
   void read_mesh(Scene *scene,
@@ -111,6 +95,7 @@ class AlembicProcedural : public Procedural {
                  Transform xform,
                  IPolyMesh &mesh,
                  Abc::chrono_t frame_time);
+
   void read_curves(Scene *scene,
                    AlembicObject *abc_object,
                    Transform xform,
