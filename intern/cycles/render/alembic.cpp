@@ -161,7 +161,7 @@ AlembicProcedural::~AlembicProcedural()
   }
 }
 
-void AlembicProcedural::create(Scene *scene)
+void AlembicProcedural::generate(Scene *scene)
 {
   if (!need_update && !need_update_for_frame_change) {
     return;

@@ -29,7 +29,7 @@ class Procedural : public Node, public NodeOwner {
   NODE_ABSTRACT_DECLARE
   explicit Procedural(const NodeType *type);
   virtual ~Procedural();
-  virtual void create(Scene *scene) = 0;
+  virtual void generate(Scene *scene) = 0;
 
   virtual bool is_procedural() const;
 };

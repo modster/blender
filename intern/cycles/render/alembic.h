@@ -71,7 +71,7 @@ class AlembicProcedural : public Procedural {
 
   AlembicProcedural();
   ~AlembicProcedural();
-  void create(Scene *scene);
+  void generate(Scene *scene);
 
   bool use_motion_blur;
   ustring filepath;

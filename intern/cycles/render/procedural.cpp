@@ -64,7 +64,7 @@ void ProceduralManager::update(Scene *scene, Progress &progress)
       return;
     }
 
-    procedural->create(scene);
+    procedural->generate(scene);
   }
 
   if (progress.get_cancel()) {
