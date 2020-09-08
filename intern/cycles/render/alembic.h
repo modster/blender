@@ -48,6 +48,8 @@ class AlembicObject : public Node {
 
   // runtime data
   bool data_loaded = false;
+  chrono_t min_time = 0.0;
+  chrono_t max_time = 0.0;
 
   // TODO : this is only for Meshes at the moment
   // TODO : handle attributes as well
@@ -57,8 +59,9 @@ class AlembicObject : public Node {
       array<int3> triangles{};
   };
 
-  // TODO : find a way to store the time, for now we presume that frame 0 == index 0
   vector<DataCache> frame_data;
+
+  int frame_index(float frame, float frame_rate);
 };
 
 class AlembicProcedural : public Procedural {

@@ -133,6 +133,11 @@ AlembicObject::~AlembicObject()
 {
 }
 
+int AlembicObject::frame_index(float frame, float frame_rate)
+{
+  return static_cast<int>(frame - (static_cast<float>(min_time) * frame_rate));
+}
+
 NODE_DEFINE(AlembicProcedural)
 {
   NodeType *type = NodeType::add("alembic", create);
@@ -236,6 +241,17 @@ void AlembicProcedural::set_current_frame(ccl::Scene *scene, float frame_)
 
 static void load_all_data(AlembicObject *abc_object, IPolyMeshSchema &schema)
 {
+  const auto &time_sampling = schema.getTimeSampling();
+
+  if (!schema.isConstant()) {
+    auto num_samples = schema.getNumSamples();
+
+    if (num_samples > 0) {
+      abc_object->min_time = time_sampling->getSampleTime(0);
+      abc_object->max_time = time_sampling->getSampleTime(num_samples - 1);
+    }
+  }
+
   // TODO : store other properties and have a better structure to store these arrays
   for (size_t i = 0; i < schema.getNumSamples(); ++i) {
     abc_object->frame_data.emplace_back();
@@ -328,11 +344,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
     load_all_data(abc_object, schema);
   }
 
-  int frame_index = static_cast<int>(frame);
-  if (frame_time >= abc_object->frame_data.size()) {
-    frame_index = abc_object->frame_data.size() - 1;
-  }
-
+  int frame_index = abc_object->frame_index(frame, frame_rate);
   auto &data = abc_object->frame_data[frame_index];
 
   // TODO : arrays are emptied when passed to the sockets, so we need to reload the data
