@@ -32,31 +32,52 @@
 
 namespace blender::gpu::debug {
 
+/* Manual line breaks for readability. */
+/* clang-format off */
 #define _VA_ARG_LIST1(t) t
 #define _VA_ARG_LIST2(t, a) t a
-#define _VA_ARG_LIST4(t, a, ...) _VA_ARG_LIST2(t, a), _VA_ARG_LIST2(__VA_ARGS__)
-#define _VA_ARG_LIST6(t, a, ...) _VA_ARG_LIST2(t, a), _VA_ARG_LIST4(__VA_ARGS__)
-#define _VA_ARG_LIST8(t, a, ...) _VA_ARG_LIST2(t, a), _VA_ARG_LIST6(__VA_ARGS__)
-#define _VA_ARG_LIST10(t, a, ...) _VA_ARG_LIST2(t, a), _VA_ARG_LIST8(__VA_ARGS__)
-#define _VA_ARG_LIST12(t, a, ...) _VA_ARG_LIST2(t, a), _VA_ARG_LIST10(__VA_ARGS__)
-#define _VA_ARG_LIST14(t, a, ...) _VA_ARG_LIST2(t, a), _VA_ARG_LIST12(__VA_ARGS__)
-#define _VA_ARG_LIST16(t, a, ...) _VA_ARG_LIST2(t, a), _VA_ARG_LIST14(__VA_ARGS__)
-#define _VA_ARG_LIST18(t, a, ...) _VA_ARG_LIST2(t, a), _VA_ARG_LIST16(__VA_ARGS__)
-#define _VA_ARG_LIST20(t, a, ...) _VA_ARG_LIST2(t, a), _VA_ARG_LIST18(__VA_ARGS__)
+#define _VA_ARG_LIST4(t, a, b, c) \
+  _VA_ARG_LIST2(t, a), _VA_ARG_LIST2(b, c)
+#define _VA_ARG_LIST6(t, a, b, c, d, e) \
+  _VA_ARG_LIST2(t, a), _VA_ARG_LIST4(b, c, d, e)
+#define _VA_ARG_LIST8(t, a, b, c, d, e, f, g) \
+  _VA_ARG_LIST2(t, a), _VA_ARG_LIST6(b, c, d, e, f, g)
+#define _VA_ARG_LIST10(t, a, b, c, d, e, f, g, h, i) \
+  _VA_ARG_LIST2(t, a), _VA_ARG_LIST8(b, c, d, e, f, g, h, i)
+#define _VA_ARG_LIST12(t, a, b, c, d, e, f, g, h, i, j, k) \
+  _VA_ARG_LIST2(t, a), _VA_ARG_LIST10(b, c, d, e, f, g, h, i, j, k)
+#define _VA_ARG_LIST14(t, a, b, c, d, e, f, g, h, i, j, k, l, m) \
+  _VA_ARG_LIST2(t, a), _VA_ARG_LIST12(b, c, d, e, f, g, h, i, j, k, l, m)
+#define _VA_ARG_LIST16(t, a, b, c, d, e, f, g, h, i, j, k, l, m, o, p) \
+  _VA_ARG_LIST2(t, a), _VA_ARG_LIST14(b, c, d, e, f, g, h, i, j, k, l, m, o, p)
+#define _VA_ARG_LIST18(t, a, b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r) \
+  _VA_ARG_LIST2(t, a), _VA_ARG_LIST16(b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r)
+#define _VA_ARG_LIST20(t, a, b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r, s, u) \
+  _VA_ARG_LIST2(t, a), _VA_ARG_LIST18(b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r, s, u)
 #define ARG_LIST(...) VA_NARGS_CALL_OVERLOAD(_VA_ARG_LIST, __VA_ARGS__)
 
 #define _VA_ARG_LIST_CALL1(t)
 #define _VA_ARG_LIST_CALL2(t, a) a
-#define _VA_ARG_LIST_CALL4(t, a, ...) _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL2(__VA_ARGS__)
-#define _VA_ARG_LIST_CALL6(t, a, ...) _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL4(__VA_ARGS__)
-#define _VA_ARG_LIST_CALL8(t, a, ...) _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL6(__VA_ARGS__)
-#define _VA_ARG_LIST_CALL10(t, a, ...) _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL8(__VA_ARGS__)
-#define _VA_ARG_LIST_CALL12(t, a, ...) _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL10(__VA_ARGS__)
-#define _VA_ARG_LIST_CALL14(t, a, ...) _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL12(__VA_ARGS__)
-#define _VA_ARG_LIST_CALL16(t, a, ...) _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL14(__VA_ARGS__)
-#define _VA_ARG_LIST_CALL18(t, a, ...) _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL16(__VA_ARGS__)
-#define _VA_ARG_LIST_CALL20(t, a, ...) _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL18(__VA_ARGS__)
+#define _VA_ARG_LIST_CALL4(t, a, b, c) \
+  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL2(b, c)
+#define _VA_ARG_LIST_CALL6(t, a, b, c, d, e) \
+  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL4(b, c, d, e)
+#define _VA_ARG_LIST_CALL8(t, a, b, c, d, e, f, g) \
+  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL6(b, c, d, e, f, g)
+#define _VA_ARG_LIST_CALL10(t, a, b, c, d, e, f, g, h, i) \
+  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL8(b, c, d, e, f, g, h, i)
+#define _VA_ARG_LIST_CALL12(t, a, b, c, d, e, f, g, h, i, j, k) \
+  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL10(b, c, d, e, f, g, h, i, j, k)
+#define _VA_ARG_LIST_CALL14(t, a, b, c, d, e, f, g, h, i, j, k, l, m) \
+  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL12(b, c, d, e, f, g, h, i, j, k, l, m)
+#define _VA_ARG_LIST_CALL16(t, a, b, c, d, e, f, g, h, i, j, k, l, m, o, p) \
+  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL14(b, c, d, e, f, g, h, i, j, k, l, m, o, p)
+#define _VA_ARG_LIST_CALL18(t, a, b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r) \
+  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL16(b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r)
+#define _VA_ARG_LIST_CALL20(t, a, b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r, s, u) \
+  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL18(b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r, s, u)
 #define ARG_LIST_CALL(...) VA_NARGS_CALL_OVERLOAD(_VA_ARG_LIST_CALL, __VA_ARGS__)
+/* clang-format on */
 
 #define DEBUG_FUNC_DECLARE_VAL(pfn, rtn_type, fn, ...) \
   pfn real_##fn; \
