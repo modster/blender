@@ -46,8 +46,6 @@ class AlembicObject : public Node {
   void set_object(Object *object);
   Object *get_object();
 
-  int frame_index(float frame, float frame_rate);
-
   void load_all_data(IPolyMeshSchema &schema);
 
   bool has_data_loaded() const;
@@ -68,8 +66,6 @@ class AlembicObject : public Node {
 
   // runtime data
   bool data_loaded = false;
-  chrono_t min_time = 0.0;
-  chrono_t max_time = 0.0;
 
   vector<DataCache> frame_data;
 };

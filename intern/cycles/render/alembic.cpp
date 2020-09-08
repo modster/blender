@@ -148,11 +148,6 @@ bool AlembicObject::has_data_loaded() const
   return data_loaded;
 }
 
-int AlembicObject::frame_index(float frame, float frame_rate)
-{
-  return static_cast<int>(frame - (static_cast<float>(min_time) * frame_rate));
-}
-
 AlembicObject::DataCache &AlembicObject::get_frame_data(int index)
 {
   if (index < 0) {
@@ -169,17 +164,6 @@ AlembicObject::DataCache &AlembicObject::get_frame_data(int index)
 void AlembicObject::load_all_data(IPolyMeshSchema &schema)
 {
   frame_data.clear();
-
-  const auto &time_sampling = schema.getTimeSampling();
-
-  if (!schema.isConstant()) {
-    auto num_samples = schema.getNumSamples();
-
-    if (num_samples > 0) {
-      min_time = time_sampling->getSampleTime(0);
-      max_time = time_sampling->getSampleTime(num_samples - 1);
-    }
-  }
 
   // TODO : store other properties and have a better structure to store these arrays
   for (size_t i = 0; i < schema.getNumSamples(); ++i) {
@@ -363,7 +347,8 @@ void AlembicProcedural::read_mesh(Scene *scene,
     abc_object->load_all_data(schema);
   }
 
-  int frame_index = abc_object->frame_index(frame, frame_rate);
+  ISampleSelector sample_sel = ISampleSelector(frame_time);
+  int frame_index = sample_sel.getIndex(schema.getTimeSampling(), schema.getNumSamples());
   auto &data = abc_object->get_frame_data(frame_index);
 
   // TODO : arrays are emptied when passed to the sockets, so we need to reload the data
@@ -403,7 +388,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
     mesh->set_shader(shader);
   }
 
-  IPolyMeshSchema::Sample samp = schema.getValue(ISampleSelector(frame_time));
+  IPolyMeshSchema::Sample samp = schema.getValue(sample_sel);
   IV2fGeomParam uvs = polymesh.getSchema().getUVsParam();
   read_uvs(uvs, mesh, samp.getFaceCounts()->get(), samp.getFaceCounts()->size());
 
