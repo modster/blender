@@ -385,8 +385,8 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
     p->filepath = absolute_path;
 
     AlembicObject *abc_object = scene->create_node<AlembicObject>();
-    abc_object->path = b_mesh_cache.object_path();
-    abc_object->shader = used_shaders[0];
+    abc_object->set_path(ustring(b_mesh_cache.object_path()));
+    abc_object->set_used_shaders(used_shaders);
 
     p->objects.push_back_slow(abc_object);
   }

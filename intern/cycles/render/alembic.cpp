@@ -120,7 +120,7 @@ NODE_DEFINE(AlembicObject)
 {
   NodeType *type = NodeType::add("alembic_object", create);
   SOCKET_STRING(path, "Alembic Path", ustring());
-  SOCKET_NODE(shader, "Shader", &Shader::node_type);
+  SOCKET_NODE_ARRAY(used_shaders, "Used Shaders", &Shader::node_type);
 
   return type;
 }
@@ -133,9 +133,103 @@ AlembicObject::~AlembicObject()
 {
 }
 
+void AlembicObject::set_object(Object *object_)
+{
+  object = object_;
+}
+
+Object *AlembicObject::get_object()
+{
+  return object;
+}
+
+bool AlembicObject::has_data_loaded() const
+{
+  return data_loaded;
+}
+
 int AlembicObject::frame_index(float frame, float frame_rate)
 {
   return static_cast<int>(frame - (static_cast<float>(min_time) * frame_rate));
+}
+
+AlembicObject::DataCache &AlembicObject::get_frame_data(int index)
+{
+  if (index < 0) {
+    return frame_data[0];
+  }
+
+  if (index >= frame_data.size()) {
+    return frame_data.back();
+  }
+
+  return frame_data[index];
+}
+
+void AlembicObject::load_all_data(IPolyMeshSchema &schema)
+{
+  frame_data.clear();
+
+  const auto &time_sampling = schema.getTimeSampling();
+
+  if (!schema.isConstant()) {
+    auto num_samples = schema.getNumSamples();
+
+    if (num_samples > 0) {
+      min_time = time_sampling->getSampleTime(0);
+      max_time = time_sampling->getSampleTime(num_samples - 1);
+    }
+  }
+
+  // TODO : store other properties and have a better structure to store these arrays
+  for (size_t i = 0; i < schema.getNumSamples(); ++i) {
+    frame_data.emplace_back();
+    AlembicObject::DataCache &data_cache = frame_data.back();
+
+    auto sample = schema.getValue(ISampleSelector(static_cast<index_t>(i)));
+
+    auto positions = sample.getPositions();
+
+    if (positions) {
+      data_cache.vertices.reserve(positions->size());
+
+      for (int i = 0; i < positions->size(); i++) {
+        Imath::Vec3<float> f = positions->get()[i];
+        data_cache.vertices.push_back_reserved(make_float3_from_yup(f));
+      }
+    }
+
+    auto face_counts = sample.getFaceCounts();
+    auto face_indices = sample.getFaceIndices();
+
+    if (face_counts && face_indices) {
+      int num_faces = face_counts->size();
+      const int *face_counts_array = face_counts->get();
+      const int *face_indices_array = face_indices->get();
+
+      int num_triangles = 0;
+      for (int i = 0; i < face_counts->size(); i++) {
+        num_triangles += face_counts_array[i] - 2;
+      }
+
+      data_cache.triangles.reserve(num_triangles);
+      int index_offset = 0;
+
+      for (size_t i = 0; i < num_faces; i++) {
+        for (int j = 0; j < face_counts_array[i] - 2; j++) {
+          int v0 = face_indices_array[index_offset];
+          int v1 = face_indices_array[index_offset + j + 1];
+          int v2 = face_indices_array[index_offset + j + 2];
+
+          data_cache.triangles.push_back_reserved(make_int3(v0, v1, v2));
+        }
+
+        index_offset += face_counts_array[i];
+      }
+    }
+  }
+
+  data_loaded = true;
 }
 
 NODE_DEFINE(AlembicProcedural)
@@ -239,70 +333,6 @@ void AlembicProcedural::set_current_frame(ccl::Scene *scene, float frame_)
   }
 }
 
-static void load_all_data(AlembicObject *abc_object, IPolyMeshSchema &schema)
-{
-  const auto &time_sampling = schema.getTimeSampling();
-
-  if (!schema.isConstant()) {
-    auto num_samples = schema.getNumSamples();
-
-    if (num_samples > 0) {
-      abc_object->min_time = time_sampling->getSampleTime(0);
-      abc_object->max_time = time_sampling->getSampleTime(num_samples - 1);
-    }
-  }
-
-  // TODO : store other properties and have a better structure to store these arrays
-  for (size_t i = 0; i < schema.getNumSamples(); ++i) {
-    abc_object->frame_data.emplace_back();
-    AlembicObject::DataCache &data_cache = abc_object->frame_data.back();
-
-    auto sample = schema.getValue(ISampleSelector(static_cast<index_t>(i)));
-
-    auto positions = sample.getPositions();
-
-    if (positions) {
-      data_cache.vertices.reserve(positions->size());
-
-      for (int i = 0; i < positions->size(); i++) {
-        Imath::Vec3<float> f = positions->get()[i];
-        data_cache.vertices.push_back_reserved(make_float3_from_yup(f));
-      }
-    }
-
-    auto face_counts = sample.getFaceCounts();
-    auto face_indices = sample.getFaceIndices();
-
-    if (face_counts && face_indices) {
-      int num_faces = face_counts->size();
-      const int *face_counts_array = face_counts->get();
-      const int *face_indices_array = face_indices->get();
-
-      int num_triangles = 0;
-      for (int i = 0; i < face_counts->size(); i++) {
-        num_triangles += face_counts_array[i] - 2;
-      }
-
-      data_cache.triangles.reserve(num_triangles);
-      int index_offset = 0;
-
-      for (size_t i = 0; i < num_faces; i++) {
-        for (int j = 0; j < face_counts_array[i] - 2; j++) {
-          int v0 = face_indices_array[index_offset];
-          int v1 = face_indices_array[index_offset + j + 1];
-          int v2 = face_indices_array[index_offset + j + 2];
-
-          data_cache.triangles.push_back_reserved(make_int3(v0, v1, v2));
-        }
-
-        index_offset += face_counts_array[i];
-      }
-    }
-  }
-
-  abc_object->data_loaded = true;
-}
-
 void AlembicProcedural::read_mesh(Scene *scene,
                                   AlembicObject *abc_object,
                                   Transform xform,
@@ -310,26 +340,26 @@ void AlembicProcedural::read_mesh(Scene *scene,
                                   Abc::chrono_t frame_time)
 {
   // TODO : support animation at the transformation level
-
-  array<Shader *> used_shaders;
-  used_shaders.push_back_slow(abc_object->shader);
+  Mesh *mesh = nullptr;
 
   /* create a mesh node in the scene if not already done */
-  if (!abc_object->geometry) {
-    Mesh *mesh = scene->create_node<Mesh>();
-    mesh->set_used_shaders(used_shaders);
+  if (!abc_object->get_object()) {
+    mesh = scene->create_node<Mesh>();
     mesh->set_use_motion_blur(use_motion_blur);
+
+    array<Shader *> used_shaders = abc_object->get_used_shaders();
+    mesh->set_used_shaders(used_shaders);
 
     /* create object*/
     Object *object = scene->create_node<Object>();
-    object->geometry = mesh;
+    object->set_geometry(mesh);
     object->tfm = xform;
 
-    abc_object->object = object;
-    abc_object->geometry = mesh;
+    abc_object->set_object(object);
   }
-
-  Mesh *mesh = static_cast<Mesh *>(abc_object->geometry);
+  else {
+    mesh = static_cast<Mesh *>(abc_object->get_object()->get_geometry());
+  }
 
   // TODO : properly check if and what data needs to be rebuild
   if (mesh->get_time_stamp() == static_cast<int>(frame)) {
@@ -340,24 +370,23 @@ void AlembicProcedural::read_mesh(Scene *scene,
 
   IPolyMeshSchema schema = polymesh.getSchema();
 
-  if (abc_object->data_loaded == false) {
-    load_all_data(abc_object, schema);
+  if (!abc_object->has_data_loaded()) {
+    abc_object->load_all_data(schema);
   }
 
   int frame_index = abc_object->frame_index(frame, frame_rate);
-  auto &data = abc_object->frame_data[frame_index];
+  auto &data = abc_object->get_frame_data(frame_index);
 
   // TODO : arrays are emptied when passed to the sockets, so we need to reload the data
   // perhaps we should just have a way to set the pointer
   if (data.dirty) {
-    abc_object->frame_data.clear();
-    load_all_data(abc_object, schema);
-    data = abc_object->frame_data[frame_index];
+    abc_object->load_all_data(schema);
+    data = abc_object->get_frame_data(frame_index);
   }
 
   data.dirty = true;
   // TODO : animations like fluids will have different data on different frames
-  auto &triangle_data = abc_object->frame_data[0].triangles;
+  auto &triangle_data = abc_object->get_frame_data(0).triangles;
 
   mesh->set_verts(data.vertices);
 
@@ -414,25 +443,26 @@ void AlembicProcedural::read_curves(Scene *scene,
                                     Abc::chrono_t frame_time)
 {
   // TODO : support animation at the transformation level
-  array<Shader *> used_shaders;
-  used_shaders.push_back_slow(abc_object->shader);
+  Hair *hair;
 
   /* create a hair node in the scene if not already done */
-  if (!abc_object->geometry) {
-    Hair *hair = scene->create_node<Hair>();
-    hair->set_used_shaders(used_shaders);
+  if (!abc_object->get_object()) {
+    hair = scene->create_node<Hair>();
     hair->set_use_motion_blur(use_motion_blur);
+
+    array<Shader *> used_shaders = abc_object->get_used_shaders();
+    hair->set_used_shaders(used_shaders);
 
     /* create object*/
     Object *object = scene->create_node<Object>();
     object->geometry = hair;
     object->tfm = xform;
 
-    abc_object->object = object;
-    abc_object->geometry = hair;
+    abc_object->set_object(object);
   }
-
-  Hair *hair = static_cast<Hair *>(abc_object->geometry);
+  else {
+    hair = static_cast<Hair *>(abc_object->get_object()->get_geometry());
+  }
 
   ICurvesSchema::Sample samp = curves.getSchema().getValue(ISampleSelector(frame_time));
 

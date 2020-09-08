@@ -40,16 +40,17 @@ class AlembicObject : public Node {
   AlembicObject();
   ~AlembicObject();
 
-  ustring path;
-  Shader *shader = nullptr;
+  NODE_PUBLIC_API(ustring, path)
+  NODE_PUBLIC_API_ARRAY(array<Shader *>, used_shaders)
 
-  Object *object = nullptr;
-  Geometry *geometry = nullptr;
+  void set_object(Object *object);
+  Object *get_object();
 
-  // runtime data
-  bool data_loaded = false;
-  chrono_t min_time = 0.0;
-  chrono_t max_time = 0.0;
+  int frame_index(float frame, float frame_rate);
+
+  void load_all_data(IPolyMeshSchema &schema);
+
+  bool has_data_loaded() const;
 
   // TODO : this is only for Meshes at the moment
   // TODO : handle attributes as well
@@ -59,9 +60,18 @@ class AlembicObject : public Node {
       array<int3> triangles{};
   };
 
-  vector<DataCache> frame_data;
+  DataCache &get_frame_data(int index);
 
-  int frame_index(float frame, float frame_rate);
+  private:
+  Object *object = nullptr;
+  Geometry *geometry = nullptr;
+
+  // runtime data
+  bool data_loaded = false;
+  chrono_t min_time = 0.0;
+  chrono_t max_time = 0.0;
+
+  vector<DataCache> frame_data;
 };
 
 class AlembicProcedural : public Procedural {
