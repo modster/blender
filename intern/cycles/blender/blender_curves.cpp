@@ -820,7 +820,7 @@ void BlenderSync::sync_hair(Hair *hair, BL::Object &b_ob, bool motion, int motio
 void BlenderSync::sync_hair(BL::Depsgraph b_depsgraph,
                             BL::Object b_ob,
                             Hair *hair,
-                            const array<Shader *> &used_shaders)
+                            array<Shader *> &used_shaders)
 {
   /* Compares curve_keys rather than strands in order to handle quick hair
    * adjustments in dynamic BVH - other methods could probably do this better. */

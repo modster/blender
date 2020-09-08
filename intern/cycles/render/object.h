@@ -55,7 +55,7 @@ class Object : public Node {
   NODE_PUBLIC_API(ustring, asset_name)
   vector<ParamValue> attributes;
   NODE_PUBLIC_API(uint, visibility)
-  NODE_PUBLIC_API(array<Transform>, motion)
+  NODE_PUBLIC_API_ARRAY(array<Transform>, motion)
   NODE_PUBLIC_API(bool, hide_on_missing_motion)
   NODE_PUBLIC_API(bool, use_holdout)
   NODE_PUBLIC_API(bool, is_shadow_catcher)

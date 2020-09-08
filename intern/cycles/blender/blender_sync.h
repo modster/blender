@@ -156,14 +156,14 @@ class BlenderSync {
   void sync_mesh(BL::Depsgraph b_depsgraph,
                  BL::Object b_ob,
                  Mesh *mesh,
-                 const array<Shader *> &used_shaders);
+                 array<Shader *> &used_shaders);
   void sync_mesh_motion(BL::Depsgraph b_depsgraph, BL::Object b_ob, Mesh *mesh, int motion_step);
 
   /* Hair */
   void sync_hair(BL::Depsgraph b_depsgraph,
                  BL::Object b_ob,
                  Hair *hair,
-                 const array<Shader *> &used_shaders);
+                 array<Shader *> &used_shaders);
   void sync_hair_motion(BL::Depsgraph b_depsgraph, BL::Object b_ob, Hair *hair, int motion_step);
   void sync_hair(Hair *hair, BL::Object &b_ob, bool motion, int motion_step = 0);
   void sync_particle_hair(

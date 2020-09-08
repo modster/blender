@@ -75,7 +75,7 @@ class Camera : public Node {
   /* motion blur */
   NODE_PUBLIC_API(float, shuttertime)
   NODE_PUBLIC_API(MotionPosition, motion_position)
-  NODE_PUBLIC_API(array<float>, shutter_curve)
+  NODE_PUBLIC_API_ARRAY(array<float>, shutter_curve)
   size_t shutter_table_offset;
 
   /* ** Rolling shutter effect. ** */
@@ -155,7 +155,7 @@ class Camera : public Node {
   NODE_PUBLIC_API(Transform, matrix)
 
   /* motion */
-  NODE_PUBLIC_API(array<Transform>, motion)
+  NODE_PUBLIC_API_ARRAY(array<Transform>, motion)
   NODE_PUBLIC_API(bool, use_perspective_motion)
   NODE_PUBLIC_API(float, fov_pre)
   NODE_PUBLIC_API(float, fov_post)

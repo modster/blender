@@ -67,7 +67,7 @@ class Geometry : public Node {
   AttributeSet attributes;  // @api
 
   /* Shaders */
-  NODE_PUBLIC_API(array<Shader *>, used_shaders)
+  NODE_PUBLIC_API_ARRAY(array<Shader *>, used_shaders)
 
   /* Update Flags */
   bool need_update_rebuild;

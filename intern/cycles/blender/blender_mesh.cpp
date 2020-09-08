@@ -1017,7 +1017,7 @@ static void sync_mesh_fluid_motion(BL::Object &b_ob, Scene *scene, Mesh *mesh)
 void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph,
                             BL::Object b_ob,
                             Mesh *mesh,
-                            const array<Shader *> &used_shaders)
+                            array<Shader *> &used_shaders)
 {
   if (mesh->get_time_stamp() == b_depsgraph.scene().frame_current()) {
     return;

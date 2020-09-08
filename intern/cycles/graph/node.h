@@ -30,15 +30,15 @@ struct NodeType;
 struct Shader;
 struct Transform;
 
-// todo(kevin) set_##name will copy the arrays
-#define NODE_PUBLIC_API(type_, name) \
- public: \
+/* Note: in the following macros we use "type const &" instead of "const type &"
+ * to avoid issues when pasting a pointer type. */
+#define NODE_PUBLIC_API_BASE(type_, name, string_name) \
+  public: \
   type_ name; \
-\
  public: \
   const SocketType *get_##name##_socket() const \
   { \
-    static const SocketType *socket = type->find_input(ustring(#name)); \
+    static const SocketType *socket = type->find_input(ustring(string_name)); \
     return socket; \
   } \
   bool name##_is_modified() const \
@@ -50,34 +50,31 @@ struct Transform;
   { \
     const SocketType *socket = get_##name##_socket(); \
     return get_socket_value<type_>(this, *socket); \
-  } \
+  }
+
+#define NODE_PUBLIC_API(type_, name) \
+  NODE_PUBLIC_API_BASE(type_, name, #name) \
   void set_##name(type_ value) \
   { \
     const SocketType *socket = get_##name##_socket(); \
     this->set(*socket, value); \
   }
 
-#define NODE_PUBLIC_API_STRUCT_MEMBER(type_, name, member) \
-  const SocketType *get_##name##_##member##_socket() const \
+#define NODE_PUBLIC_API_ARRAY(type_, name) \
+  NODE_PUBLIC_API_BASE(type_, name, #name) \
+  void set_##name(type_ &value) \
   { \
-    static const SocketType *socket = type->find_input(ustring(#name"."#member)); \
-    return socket; \
-  } \
-   bool name##_##member##_is_modified() const \
-   { \
-     const SocketType *socket = get_##name##_##member##_socket(); \
-     return socket_is_modified(*socket); \
-   } \
-   const type_ &get_##name##_##member() const \
-   { \
-     const SocketType *socket = get_##name##_##member##_socket(); \
-     return get_socket_value<type_>(this, *socket); \
-   } \
-   void set_##name##_##member(type_ value) \
-   { \
-     const SocketType *socket = get_##name##_##member##_socket(); \
-     this->set(*socket, value); \
-   }
+    const SocketType *socket = get_##name##_socket(); \
+    this->set(*socket, value); \
+  }
+
+#define NODE_PUBLIC_API_STRUCT_MEMBER(type_, name, member) \
+  NODE_PUBLIC_API_BASE(type_, name##_##member, #name"."#member) \
+  void set_##name##_##member(type_ &value) \
+  { \
+    const SocketType *socket = get_##name##_##member##_socket(); \
+    this->set(*socket, value); \
+  }
 
 /* Node */
 
