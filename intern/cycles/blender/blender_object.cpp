@@ -321,24 +321,26 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
 
 /* Object Loop */
 
-static bool object_has_alembic_cache(BL::Object b_ob)
+static BL::MeshSequenceCacheModifier object_alembic_cache_find(BL::Object b_ob)
 {
-  /* Test if the object has a mesh sequence modifier. */
-  BL::Object::modifiers_iterator b_mod;
-  for (b_ob.modifiers.begin(b_mod); b_mod != b_ob.modifiers.end(); ++b_mod) {
-    if ((b_mod->type() == b_mod->type_MESH_SEQUENCE_CACHE)) {
-      return true;
+  if (b_ob.modifiers.length() > 0) {
+    BL::Modifier b_mod = b_ob.modifiers[b_ob.modifiers.length() - 1];
+
+    if (b_mod.type() == BL::Modifier::type_MESH_SEQUENCE_CACHE) {
+      return BL::MeshSequenceCacheModifier(b_mod);
     }
   }
 
-  return false;
+  return BL::MeshSequenceCacheModifier(PointerRNA_NULL);
 }
 
-void BlenderSync::sync_procedural(BL::Object b_ob, int frame_current, float motion_time)
+void BlenderSync::sync_procedural(BL::Object &b_ob,
+                                  BL::MeshSequenceCacheModifier &b_mesh_cache,
+                                  int frame_current,
+                                  float motion_time)
 {
   bool motion = motion_time != 0.0f;
 
-  // return for now
   if (motion) {
     return;
   }
@@ -377,25 +379,16 @@ void BlenderSync::sync_procedural(BL::Object b_ob, int frame_current, float moti
     used_shaders.push_back_slow(default_shader);
   }
 
-  BL::Object::modifiers_iterator b_mod;
-  for (b_ob.modifiers.begin(b_mod); b_mod != b_ob.modifiers.end(); ++b_mod) {
-    if ((b_mod->type() == b_mod->type_MESH_SEQUENCE_CACHE)) {
-      BL::MeshSequenceCacheModifier mcmd((const PointerRNA)b_mod->ptr);
+  auto absolute_path = blender_absolute_path(b_data, b_ob, b_mesh_cache.cache_file().filepath());
 
-      auto absolute_path = blender_absolute_path(b_data, b_ob, mcmd.cache_file().filepath());
+  if (p->filepath != absolute_path) {
+    p->filepath = absolute_path;
 
-      if (p->filepath != absolute_path) {
-        p->filepath = absolute_path;
+    AlembicObject *abc_object = scene->create_node<AlembicObject>();
+    abc_object->path = b_mesh_cache.object_path();
+    abc_object->shader = used_shaders[0];
 
-        AlembicObject *abc_object = scene->create_node<AlembicObject>();
-        abc_object->path = mcmd.object_path();
-        abc_object->shader = used_shaders[0];
-
-        p->objects.push_back_slow(abc_object);
-      }
-
-      break;
-    }
+    p->objects.push_back_slow(abc_object);
   }
 }
 
@@ -447,8 +440,10 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
 
     /* Object itself. */
     if (b_instance.show_self()) {
-      if (object_has_alembic_cache(b_ob)) {
-        sync_procedural(b_ob, b_depsgraph.scene().frame_current(), motion_time);
+      BL::MeshSequenceCacheModifier b_mesh_cache = object_alembic_cache_find(b_ob);
+
+      if (b_mesh_cache) {
+        sync_procedural(b_ob, b_mesh_cache, b_depsgraph.scene().frame_current(), motion_time);
       }
       else {
         sync_object(b_depsgraph,

@@ -147,7 +147,10 @@ class BlenderSync {
                       BlenderObjectCulling &culling,
                       bool *use_portal);
 
-  void sync_procedural(BL::Object b_ob, int frame_current, float motion_time);
+  void sync_procedural(BL::Object &b_ob,
+                       BL::MeshSequenceCacheModifier &b_mesh_cache,
+                       int frame_current,
+                       float motion_time);
 
   /* Volume */
   void sync_volume(BL::Object &b_ob, Volume *volume, const array<Shader *> &used_shaders);
