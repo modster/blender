@@ -242,7 +242,6 @@ bool Geometry::has_voxel_attributes() const
 
 void Geometry::tag_update(Scene *scene, bool rebuild)
 {
-  printf("Geometry::tag_update\n");
   socket_modified = ~0u;
 
   if (rebuild) {
@@ -1407,11 +1406,6 @@ void GeometryManager::device_update(Device *device,
      * displacement might be less optimal ot calculate.
      */
     scene->object_manager->need_flags_update = old_need_object_flags_update;
-  }
-
-  foreach (Geometry *geom, scene->geometry) {
-    printf("geom->was_processed()\n");
-    geom->clear_modified();
   }
 }
 

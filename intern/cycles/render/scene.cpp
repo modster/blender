@@ -388,24 +388,6 @@ bool Scene::need_data_update()
 
 bool Scene::need_reset()
 {
-#define PRINT_NEED_UPDATE(x) \
-  if (x->need_update) { \
-    printf(#x "->need_update (need_reset)\n"); \
-  }
-
-  //PRINT_NEED_UPDATE(background)
-  PRINT_NEED_UPDATE(image_manager)
-  PRINT_NEED_UPDATE(object_manager)
-  PRINT_NEED_UPDATE(geometry_manager)
-  PRINT_NEED_UPDATE(light_manager)
-  PRINT_NEED_UPDATE(lookup_tables)
-  //PRINT_NEED_UPDATE(integrator)
-  PRINT_NEED_UPDATE(shader_manager)
-  PRINT_NEED_UPDATE(particle_system_manager)
-  PRINT_NEED_UPDATE(bake_manager)
-  //PRINT_NEED_UPDATE(film)
-  PRINT_NEED_UPDATE(procedural_manager)
-
   return need_data_update() || camera->is_modified();
 }
 

@@ -213,7 +213,6 @@ void Object::apply_transform(bool apply_to_motion)
 
 void Object::tag_update(Scene *scene)
 {
-  printf("Object::tag_update\n");
   if (geometry) {
     if (geometry->transform_applied)
       geometry->tag_modified();
