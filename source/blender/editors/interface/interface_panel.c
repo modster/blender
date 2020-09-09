@@ -71,13 +71,13 @@
 #define ANIMATION_TIME 0.30
 #define ANIMATION_INTERVAL 0.02
 
-#define PNL_LAST_ADDED (1 << 0)
-#define PNL_ACTIVE (1 << 1)
-#define PNL_WAS_ACTIVE (1 << 2)
-#define PNL_ANIM_ALIGN (1 << 3)
-#define PNL_NEW_ADDED (1 << 4)
-#define PNL_FIRST (1 << 5)
-#define PNL_SEARCH_FILTER_MATCHES (1 << 6)
+#define PNL_LAST_ADDED 1
+#define PNL_ACTIVE 2
+#define PNL_WAS_ACTIVE 4
+#define PNL_ANIM_ALIGN 8
+#define PNL_NEW_ADDED 16
+#define PNL_FIRST 32
+#define PNL_SEARCH_FILTER_MATCHES 64
 
 /* the state of the mouse position relative to the panel */
 typedef enum uiPanelMouseState {
@@ -808,7 +808,6 @@ static void ui_offset_panel_block(uiBlock *block)
 void ui_panel_set_search_filter_match(struct Panel *panel, const bool value)
 {
   SET_FLAG_FROM_TEST(panel->runtime_flag, value, PNL_SEARCH_FILTER_MATCHES);
-  // SET_FLAG_FROM_TEST(panel->flag, !value, PNL_CLOSED);
 }
 
 static void panel_matches_search_filter_recursive(const Panel *panel, bool *filter_matches)

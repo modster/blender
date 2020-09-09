@@ -3454,7 +3454,6 @@ uiBlock *UI_block_begin(const bContext *C, ARegion *region, const char *name, ch
 
   window = CTX_wm_window(C);
   scn = CTX_data_scene(C);
-  ScrArea *area = CTX_wm_area(C);
 
   block = MEM_callocN(sizeof(uiBlock), "uiBlock");
   block->active = 1;
@@ -3462,6 +3461,7 @@ uiBlock *UI_block_begin(const bContext *C, ARegion *region, const char *name, ch
   block->evil_C = (void *)C; /* XXX */
 
   /* Set the search filter for the properties editor. */
+  ScrArea *area = CTX_wm_area(C);
   if ((region && region->regiontype == RGN_TYPE_WINDOW) &&
       (area && area->spacetype == SPACE_PROPERTIES)) {
     SpaceProperties *sbuts = CTX_wm_space_properties(C);
