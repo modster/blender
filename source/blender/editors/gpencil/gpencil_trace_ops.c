@@ -283,12 +283,12 @@ void GPENCIL_OT_trace_image(wmOperatorType *ot)
                 100.0f);
   RNA_def_float(ot->srna,
                 "sample",
-                0.05f,
-                0.001f,
+                0.0f,
+                0.0f,
                 100.0f,
                 "Sample",
-                "Distance to sample points",
-                0.001f,
+                "Distance to sample points, zero to disable",
+                0.0f,
                 100.0f);
   RNA_def_float_factor(ot->srna,
                        "threshold",

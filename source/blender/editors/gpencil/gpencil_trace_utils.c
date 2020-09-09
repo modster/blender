@@ -27,6 +27,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_blenlib.h"
 #include "BLI_math.h"
 
 #include "BKE_gpencil.h"
@@ -252,6 +253,7 @@ void ED_gpencil_trace_data_to_strokes(Main *bmain,
                                       const int32_t resolution,
                                       const int32_t thickness)
 {
+#define MAX_LENGTH 100.0f
   /* Find materials and create them if not found.  */
   int32_t mat_fill_idx = BKE_gpencil_material_find_index_by_name_prefix(ob, "Stroke");
   int32_t mat_mask_idx = BKE_gpencil_material_find_index_by_name_prefix(ob, "Mask");
@@ -348,10 +350,26 @@ void ED_gpencil_trace_data_to_strokes(Main *bmain,
           break;
       }
     }
-    /* Resample stroke. Don't need to call to BKE_gpencil_stroke_geometry_update() because
-     * the sample function already call that. */
-    BKE_gpencil_stroke_sample(gps, MAX2(sample, 0.001f), false);
+    /* In some situations, Potrace can produce a wrong data and generate a very
+     * long stroke. Here the length is checked and removed if the length is too big. */
+    float length = BKE_gpencil_stroke_length(gps, true);
+    if (length <= MAX_LENGTH) {
+      if (sample > 0.0f) {
+        /* Resample stroke. Don't need to call to BKE_gpencil_stroke_geometry_update() because
+         * the sample function already call that. */
+        BKE_gpencil_stroke_sample(gps, sample, false);
+      }
+      else {
+        BKE_gpencil_stroke_geometry_update(gps);
+      }
+    }
+    else {
+      /* Remove too long strokes. */
+      BLI_remlink(&gpf->strokes, gps);
+      BKE_gpencil_free_stroke(gps);
+    }
 
     path = path->next;
   }
+#undef MAX_LENGTH
 }
