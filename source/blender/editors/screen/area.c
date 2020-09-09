@@ -492,6 +492,9 @@ void ED_region_do_layout(bContext *C, ARegion *region)
 
   UI_SetTheme(area ? area->spacetype : 0, at->regionid);
   at->layout(C, region);
+
+  /* Clear temporary update flag. */
+  region->flag &= ~RGN_FLAG_SEARCH_FILTER_UPDATE;
 }
 
 /* only exported for WM */
@@ -732,6 +735,28 @@ void ED_area_tag_refresh(ScrArea *area)
   if (area) {
     area->do_refresh = true;
   }
+}
+
+/* *************************************************************** */
+
+/**
+ * Returns the search string if the space type supports property search.
+ */
+char *ED_area_search_filter_get(const bContext *C)
+{
+  SpaceProperties *sbuts = CTX_wm_space_properties(C);
+  if (sbuts != NULL) {
+    return sbuts->search_string;
+  }
+  return NULL;
+}
+
+void ED_region_search_filter_update(const bContext *C, ARegion *region)
+{
+  region->flag |= RGN_FLAG_SEARCH_FILTER_UPDATE;
+
+  const char *search_filter = ED_area_search_filter_get(C);
+  SET_FLAG_FROM_TEST(region->flag, search_filter[0] != '\0', RGN_FLAG_SEARCH_FILTER_ACTIVE);
 }
 
 /* *************************************************************** */
@@ -2558,7 +2583,8 @@ static void ed_panel_draw(const bContext *C,
                           Panel *panel,
                           int w,
                           int em,
-                          char *unique_panel_str)
+                          char *unique_panel_str,
+                          bool search_only)
 {
   const uiStyle *style = UI_style_get_dpi();
 
@@ -2571,6 +2597,7 @@ static void ed_panel_draw(const bContext *C,
     strncat(block_name, unique_panel_str, INSTANCED_PANEL_UNIQUE_STR_LEN);
   }
   uiBlock *block = UI_block_begin(C, region, block_name, UI_EMBOSS);
+  UI_block_set_search_only(block, search_only);
 
   bool open;
   panel = UI_panel_begin(region, lb, block, pt, panel, &open);
@@ -2590,6 +2617,7 @@ static void ed_panel_draw(const bContext *C,
                                     1,
                                     0,
                                     style);
+    uiLayoutRootSetSearchOnly(panel->layout, search_only);
 
     pt->draw_header_preset(C, panel);
 
@@ -2620,6 +2648,7 @@ static void ed_panel_draw(const bContext *C,
       panel->layout = UI_block_layout(
           block, UI_LAYOUT_HORIZONTAL, UI_LAYOUT_HEADER, labelx, labely, UI_UNIT_Y, 1, 0, style);
     }
+    uiLayoutRootSetSearchOnly(panel->layout, search_only);
 
     pt->draw_header(C, panel);
 
@@ -2631,7 +2660,7 @@ static void ed_panel_draw(const bContext *C,
     panel->labelofs = 0;
   }
 
-  if (open) {
+  if (open || UI_block_has_search_filter(block) || search_only) {
     short panelContext;
 
     /* panel context can either be toolbar region or normal panels region */
@@ -2655,6 +2684,7 @@ static void ed_panel_draw(const bContext *C,
                                     em,
                                     0,
                                     style);
+    uiLayoutRootSetSearchOnly(panel->layout, search_only || !open);
 
     pt->draw(C, panel);
 
@@ -2669,13 +2699,14 @@ static void ed_panel_draw(const bContext *C,
   UI_block_end(C, block);
 
   /* Draw child panels. */
-  if (open) {
+  if (open || UI_block_has_search_filter(block)) {
     LISTBASE_FOREACH (LinkData *, link, &pt->children) {
       PanelType *child_pt = link->data;
       Panel *child_panel = UI_panel_find_by_type(&panel->children, child_pt);
 
       if (child_pt->draw && (!child_pt->poll || child_pt->poll(C, child_pt))) {
-        ed_panel_draw(C, region, &panel->children, child_pt, child_panel, w, em, unique_panel_str);
+        ed_panel_draw(
+            C, region, &panel->children, child_pt, child_panel, w, em, unique_panel_str, !open);
       }
     }
   }
@@ -2813,7 +2844,8 @@ void ED_region_panels_layout_ex(const bContext *C,
                   panel,
                   (pt->flag & PNL_DRAW_BOX) ? w_box_panel : w,
                   em,
-                  NULL);
+                  NULL,
+                  false);
   }
 
   /* Draw "polyinstantaited" panels that don't have a 1 to 1 correspondence with their types. */
@@ -2846,7 +2878,18 @@ void ED_region_panels_layout_ex(const bContext *C,
                     panel,
                     (panel->type->flag & PNL_DRAW_BOX) ? w_box_panel : w,
                     em,
-                    unique_panel_str);
+                    unique_panel_str,
+                    false);
+    }
+  }
+
+  if (region->flag & RGN_FLAG_SEARCH_FILTER_UPDATE &&
+      region->flag & RGN_FLAG_SEARCH_FILTER_ACTIVE) {
+    LISTBASE_FOREACH (Panel *, panel, &region->panels) {
+      if (panel->type == NULL || (panel->type->flag & PNL_NO_HEADER)) {
+        continue; /* Some panels don't have a type. */
+      }
+      UI_panel_set_expansion_from_seach_filter(C, panel);
     }
   }
 

@@ -86,6 +86,13 @@ typedef struct uiLayoutRoot {
   int type;
   int opcontext;
 
+  /**
+   * If true, the root will be removed as part of the property search process.
+   * Necessary for cases like searching the contents of closed panels, where the
+   * block-level tag isn't enough because there might be buttons in the header.
+   */
+  bool search_only;
+
   int emw, emh;
   int padding;
 
@@ -5097,6 +5104,193 @@ int uiLayoutGetEmboss(uiLayout *layout)
   return layout->emboss;
 }
 
+void uiLayoutRootSetSearchOnly(uiLayout *layout, bool search_only)
+{
+  layout->root->search_only = search_only;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Block Layout Search Filtering
+ * \{ */
+
+// #define PROPERTY_SEARCH_USE_TOOLTIPS
+#define PROPERTY_SEARCH_USE_PANEL_LABELS
+
+static void layout_free_and_hide_buttons(uiLayout *layout)
+{
+  LISTBASE_FOREACH_MUTABLE (uiItem *, item, &layout->items) {
+    if (item->type == ITEM_BUTTON) {
+      uiButtonItem *button_item = (uiButtonItem *)item;
+      BLI_assert(button_item->but != NULL);
+      button_item->but->flag |= UI_HIDDEN;
+      MEM_freeN(item);
+    }
+    else {
+      layout_free_and_hide_buttons((uiLayout *)item);
+    }
+  }
+
+  MEM_freeN(layout);
+}
+
+/**
+ * Returns true if a button or the data / operator it represents matches the search filter.
+ *
+ * \note It's important to do the shorter checks first for performance.
+ */
+static bool button_matches_search_filter(uiBut *but, const char *search_filter)
+{
+  if (BLI_strcasestr(but->str, search_filter)) {
+    return true;
+  }
+
+  if (but->optype != NULL) {
+    if (BLI_strcasestr(but->optype->name, search_filter)) {
+      return true;
+    }
+  }
+
+  if (but->rnaprop != NULL) {
+    if (BLI_strcasestr(RNA_property_ui_name(but->rnaprop), search_filter)) {
+      return true;
+    }
+#ifdef PROPERTY_SEARCH_USE_TOOLTIPS
+    if (BLI_strcasestr(RNA_property_description(but->rnaprop), search_filter)) {
+      return true;
+    }
+#endif
+
+    /* Search through labels of enum property items if they are in a dropdown menu.
+     * Unfortunately we have no context here so we cannot search through RNA enums
+     * with dynamic entries (or "itemf" functions) which require context. */
+    if (but->type == UI_BTYPE_MENU) {
+      PointerRNA *ptr = &but->rnapoin;
+      PropertyRNA *enum_prop = but->rnaprop;
+
+      int items_len;
+      const EnumPropertyItem *enum_items = NULL;
+      bool free;
+      RNA_property_enum_items(NULL, ptr, enum_prop, &enum_items, &items_len, &free);
+
+      if (enum_items != NULL) {
+        for (int i = 0; i < items_len; i++) {
+          if (BLI_strcasestr(enum_items[i].name, search_filter)) {
+            return true;
+          }
+        }
+        if (free) {
+          MEM_freeN((void *)enum_items);
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Tag all buttons with whether they matched the search filter or not.
+ */
+static bool block_search_filter_tag_buttons(uiBlock *block)
+{
+  bool has_result = false;
+  LISTBASE_FOREACH (uiBut *, but, &block->buttons) {
+    /* First match regular buttons. */
+    if (!ELEM(but->type, UI_BTYPE_LABEL) &&
+        button_matches_search_filter(but, block->search_filter)) {
+      has_result = true;
+      but->flag |= UI_SEARCH_FILTER_MATCHES;
+    }
+    /* Then match their labels. */
+    if (but->label_but != NULL &&
+        button_matches_search_filter(but->label_but, block->search_filter)) {
+      has_result = true;
+      but->flag |= UI_SEARCH_FILTER_MATCHES;
+    }
+  }
+
+  /* Remove filter from labels and decorators that correspond to un-filtered buttons. */
+  LISTBASE_FOREACH (uiBut *, but, &block->buttons) {
+    if (but->flag & UI_SEARCH_FILTER_MATCHES) {
+      if (but->label_but != NULL) {
+        but->label_but->flag |= UI_SEARCH_FILTER_MATCHES;
+      }
+      if (but->decorator_but != NULL) {
+        but->decorator_but->flag |= UI_SEARCH_FILTER_MATCHES;
+      }
+    }
+  }
+
+  return has_result;
+}
+
+static bool block_search(uiBlock *block)
+{
+  /* Only continue if the block has the search filter set. */
+  if (!(block->search_filter && block->search_filter[0])) {
+    return false;
+  }
+
+  /* Also search based on panel labels. */
+  bool panel_label_matches = false;
+#ifdef PROPERTY_SEARCH_USE_PANEL_LABELS
+  if ((block->panel != NULL) && (block->panel->type != NULL)) {
+    if (BLI_strcasestr(block->panel->type->label, block->search_filter)) {
+      panel_label_matches = true;
+    }
+  }
+#endif
+
+  /* Apply search filter. */
+  bool has_result;
+  if (!panel_label_matches) {
+    has_result = block_search_filter_tag_buttons(block);
+  }
+  else {
+    has_result = true;
+  }
+
+  /* Remove search only layout roots before the next step. */
+  LISTBASE_FOREACH_MUTABLE (uiLayoutRoot *, root, &block->layouts) {
+    if (root->search_only) {
+      layout_free_and_hide_buttons(root->layout);
+      BLI_remlink(&block->layouts, root);
+      MEM_freeN(root);
+    }
+  }
+
+  /* Set empty flags. */
+  if (UI_block_is_search_only(block)) {
+    /* Make sure all of the block's buttons are hidden. They might not have
+     * been hidden if a layout wasn't searched. */
+    LISTBASE_FOREACH (uiBut *, but, &block->buttons) {
+      but->flag |= UI_HIDDEN;
+    }
+  }
+
+  if (block->panel != NULL) {
+    ui_panel_set_search_filter_match(block->panel, has_result);
+  }
+
+  return panel_label_matches;
+}
+
+static void block_search_deactive_buttons(uiBlock *block)
+{
+  /* Only continue if the block has the search filter set. */
+  if (!(block->search_filter && block->search_filter[0])) {
+    return;
+  }
+
+  LISTBASE_FOREACH (uiBut *, but, &block->buttons) {
+    if (!(but->flag & UI_SEARCH_FILTER_MATCHES)) {
+      but->flag |= UI_BUT_INACTIVE;
+    }
+  }
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -5524,12 +5718,18 @@ void UI_block_layout_resolve(uiBlock *block, int *r_x, int *r_y)
 
   block->curlayout = NULL;
 
+  const bool search_disabled = block_search(block);
+
   LISTBASE_FOREACH (uiLayoutRoot *, root, &block->layouts) {
     ui_layout_add_padding_button(root);
 
     /* NULL in advance so we don't interfere when adding button */
     ui_layout_end(block, root->layout, r_x, r_y);
     ui_layout_free(root->layout);
+  }
+
+  if (!search_disabled) {
+    block_search_deactive_buttons(block);
   }
 
   BLI_freelistN(&block->layouts);
