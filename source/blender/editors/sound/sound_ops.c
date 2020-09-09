@@ -386,7 +386,9 @@ static int sound_mixdown_exec(bContext *C, wmOperator *op)
                                      specs,
                                      container,
                                      codec,
-                                     bitrate);
+                                     bitrate,
+                                     NULL,
+                                     NULL);
   }
   else {
     result = AUD_mixdown(scene_eval->sound_scene,
@@ -397,7 +399,9 @@ static int sound_mixdown_exec(bContext *C, wmOperator *op)
                          specs,
                          container,
                          codec,
-                         bitrate);
+                         bitrate,
+                         NULL,
+                         NULL);
   }
 
   BKE_sound_reset_scene_specs(scene_eval);
@@ -749,10 +753,10 @@ static bool sound_poll(bContext *C)
   Editing *ed = CTX_data_scene(C)->ed;
 
   if (!ed || !ed->act_seq || ed->act_seq->type != SEQ_TYPE_SOUND_RAM) {
-    return 0;
+    return false;
   }
 
-  return 1;
+  return true;
 }
 /********************* pack operator *********************/
 

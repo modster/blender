@@ -162,10 +162,10 @@ typedef struct LayerTypeInfo {
   void (*copyvalue)(const void *source, void *dest, const int mixmode, const float mixfactor);
 
   /** a function to read data from a cdf file */
-  int (*read)(CDataFile *cdf, void *data, int count);
+  bool (*read)(CDataFile *cdf, void *data, int count);
 
   /** a function to write data to a cdf file */
-  int (*write)(CDataFile *cdf, const void *data, int count);
+  bool (*write)(CDataFile *cdf, const void *data, int count);
 
   /** a function to determine file size */
   size_t (*filesize)(CDataFile *cdf, const void *data, int count);
@@ -659,12 +659,11 @@ static void layerFree_mdisps(void *data, int count, int UNUSED(size))
   }
 }
 
-static int layerRead_mdisps(CDataFile *cdf, void *data, int count)
+static bool layerRead_mdisps(CDataFile *cdf, void *data, int count)
 {
   MDisps *d = data;
-  int i;
 
-  for (i = 0; i < count; i++) {
+  for (int i = 0; i < count; i++) {
     if (!d[i].disps) {
       d[i].disps = MEM_calloc_arrayN(d[i].totdisp, sizeof(float[3]), "mdisps read");
     }
@@ -675,22 +674,21 @@ static int layerRead_mdisps(CDataFile *cdf, void *data, int count)
     }
   }
 
-  return 1;
+  return true;
 }
 
-static int layerWrite_mdisps(CDataFile *cdf, const void *data, int count)
+static bool layerWrite_mdisps(CDataFile *cdf, const void *data, int count)
 {
   const MDisps *d = data;
-  int i;
 
-  for (i = 0; i < count; i++) {
+  for (int i = 0; i < count; i++) {
     if (!cdf_write_data(cdf, sizeof(float[3]) * d[i].totdisp, d[i].disps)) {
       CLOG_ERROR(&LOG, "failed to write multires displacement %d/%d %d", i, count, d[i].totdisp);
       return 0;
     }
   }
 
-  return 1;
+  return true;
 }
 
 static size_t layerFilesize_mdisps(CDataFile *UNUSED(cdf), const void *data, int count)
@@ -2594,12 +2592,12 @@ void CustomData_clear_layer_flag(struct CustomData *data, int type, int flag)
   }
 }
 
-static int customData_resize(CustomData *data, int amount)
+static bool customData_resize(CustomData *data, int amount)
 {
   CustomDataLayer *tmp = MEM_calloc_arrayN(
       (data->maxlayer + amount), sizeof(*tmp), "CustomData->layers");
   if (!tmp) {
-    return 0;
+    return false;
   }
 
   data->maxlayer += amount;
@@ -2609,7 +2607,7 @@ static int customData_resize(CustomData *data, int amount)
   }
   data->layers = tmp;
 
-  return 1;
+  return true;
 }
 
 static CustomDataLayer *customData_add_layer__internal(CustomData *data,
@@ -4273,7 +4271,7 @@ void CustomData_to_bmesh_block(const CustomData *source,
 void CustomData_from_bmesh_block(const CustomData *source,
                                  CustomData *dest,
                                  void *src_block,
-                                 int dst_index)
+                                 int dest_index)
 {
   int dest_i, src_i;
 
@@ -4299,7 +4297,7 @@ void CustomData_from_bmesh_block(const CustomData *source,
       int offset = source->layers[src_i].offset;
       const void *src_data = POINTER_OFFSET(src_block, offset);
       void *dst_data = POINTER_OFFSET(dest->layers[dest_i].data,
-                                      (size_t)dst_index * typeInfo->size);
+                                      (size_t)dest_index * typeInfo->size);
 
       if (typeInfo->copy) {
         typeInfo->copy(src_data, dst_data, 1);
@@ -4344,10 +4342,10 @@ void CustomData_file_write_info(int type, const char **r_struct_name, int *r_str
  * This means written typemap does not match written layers (as returned by \a r_write_layers).
  * Trivial to fix is ever needed.
  */
-void CustomData_file_write_prepare(CustomData *data,
-                                   CustomDataLayer **r_write_layers,
-                                   CustomDataLayer *write_layers_buff,
-                                   size_t write_layers_size)
+void CustomData_blend_write_prepare(CustomData *data,
+                                    CustomDataLayer **r_write_layers,
+                                    CustomDataLayer *write_layers_buff,
+                                    size_t write_layers_size)
 {
   CustomDataLayer *write_layers = write_layers_buff;
   const size_t chunk_size = (write_layers_size > 0) ? write_layers_size : CD_TEMP_CHUNK_SIZE;
@@ -5195,13 +5193,16 @@ static void write_grid_paint_mask(BlendWriter *writer, int count, GridPaintMask 
   }
 }
 
-void CustomData_blend_write(
-    BlendWriter *writer, CustomData *data, int count, CustomDataMask cddata_mask, ID *id)
+/**
+ * \param layers: The layers argument assigned by #CustomData_blend_write_prepare.
+ */
+void CustomData_blend_write(BlendWriter *writer,
+                            CustomData *data,
+                            CustomDataLayer *layers,
+                            int count,
+                            CustomDataMask cddata_mask,
+                            ID *id)
 {
-  CustomDataLayer *layers = NULL;
-  CustomDataLayer layers_buff[CD_TEMP_CHUNK_SIZE];
-  CustomData_file_write_prepare(data, &layers, layers_buff, ARRAY_SIZE(layers_buff));
-
   /* write external customdata (not for undo) */
   if (data->external && !BLO_write_is_undo(writer)) {
     CustomData_external_write(data, id, cddata_mask, count, 0);
@@ -5253,10 +5254,6 @@ void CustomData_blend_write(
 
   if (data->external) {
     BLO_write_struct(writer, CustomDataExternal, data->external);
-  }
-
-  if (!ELEM(layers, NULL, layers_buff)) {
-    MEM_freeN(layers);
   }
 }
 

@@ -639,7 +639,10 @@ static void ui_item_array(uiLayout *layout,
                           w,
                           UI_UNIT_Y);
       if (slider && but->type == UI_BTYPE_NUM) {
-        but->type = UI_BTYPE_NUM_SLIDER;
+        uiButNumber *number_but = (uiButNumber *)but;
+
+        but->a1 = number_but->step_size;
+        ui_but_change_type(but, UI_BTYPE_NUM_SLIDER);
       }
     }
   }
@@ -710,7 +713,10 @@ static void ui_item_array(uiLayout *layout,
 
         but = uiDefAutoButR(block, ptr, prop, a, str_buf, icon, 0, 0, width_item, UI_UNIT_Y);
         if (slider && but->type == UI_BTYPE_NUM) {
-          but->type = UI_BTYPE_NUM_SLIDER;
+          uiButNumber *number_but = (uiButNumber *)but;
+
+          but->a1 = number_but->step_size;
+          ui_but_change_type(but, UI_BTYPE_NUM_SLIDER);
         }
         if ((toggle == 1) && but->type == UI_BTYPE_CHECKBOX) {
           but->type = UI_BTYPE_TOGGLE;
@@ -1195,8 +1201,7 @@ static void ui_item_disabled(uiLayout *layout, const char *name)
   w = ui_text_icon_width(layout, name, 0, 0);
 
   but = uiDefBut(block, UI_BTYPE_LABEL, 0, name, 0, 0, w, UI_UNIT_Y, NULL, 0.0, 0.0, 0, 0, "");
-  but->flag |= UI_BUT_DISABLED;
-  but->disabled_info = "";
+  UI_but_disable(but, "");
 }
 
 /**
@@ -2366,7 +2371,10 @@ void uiItemFullR(uiLayout *layout,
     but = uiDefAutoButR(block, ptr, prop, index, name, icon, 0, 0, w, h);
 
     if (slider && but->type == UI_BTYPE_NUM) {
-      but->type = UI_BTYPE_NUM_SLIDER;
+      uiButNumber *num_but = (uiButNumber *)but;
+
+      but->a1 = num_but->step_size;
+      ui_but_change_type(but, UI_BTYPE_NUM_SLIDER);
     }
 
     if (flag & UI_ITEM_R_CHECKBOX_INVERT) {
@@ -5932,7 +5940,7 @@ void UI_paneltype_draw(bContext *C, PanelType *pt, uiLayout *layout)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Layout (Debuging/Introspection)
+/** \name Layout (Debugging/Introspection)
  *
  * Serialize the layout as a Python compatible dictionary,
  *
