@@ -97,7 +97,7 @@ void init_debug_layer(void);
 #define DEBUG_FUNC_OVERRIDE(func, ...) \
   inline void func(ARG_LIST(__VA_ARGS__)) \
   { \
-    if (GLContext::debug_layer_support) { \
+    if (GLContext::debug_layer_workaround) { \
       debug::check_gl_error("generated before " #func); \
       ::func(ARG_LIST_CALL(__VA_ARGS__)); \
       debug::check_gl_error("" #func); \

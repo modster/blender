@@ -321,6 +321,10 @@ static void detect_workarounds(void)
       GLContext::derivative_signs[1] = 1.0;
     }
   }
+  /* Enable our own incomplete debug layer if no other is available. */
+  if (GLContext::base_instance_support == false) {
+    GLContext::debug_layer_workaround = true;
+  }
 }
 
 /** Internal capabilities. */
@@ -333,6 +337,7 @@ bool GLContext::base_instance_support = false;
 bool GLContext::debug_layer_support = false;
 bool GLContext::texture_cube_map_array_support = false;
 /** Workarounds. */
+bool GLContext::debug_layer_workaround = false;
 bool GLContext::texture_copy_workaround = false;
 bool GLContext::unused_fb_slot_workaround = false;
 float GLContext::derivative_signs[2] = {1.0f, 1.0f};
@@ -357,12 +362,13 @@ void GLBackend::capabilities_init(void)
   GLContext::texture_cube_map_array_support = GLEW_ARB_texture_cube_map_array;
   GLContext::debug_layer_support = (GLEW_VERSION_4_3 || GLEW_KHR_debug);
 
-  if ((G.debug & G_DEBUG_GPU) == 0) {
-    /* Disable this feature entierly when not debugging. */
-    GLContext::debug_layer_support = false;
-  }
-
   detect_workarounds();
+
+  /* Disable this feature entirely when not debugging. */
+  if ((G.debug & G_DEBUG_GPU) == 0) {
+    GLContext::debug_layer_support = false;
+    GLContext::debug_layer_workaround = false;
+  }
 }
 
 /** \} */

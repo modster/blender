@@ -21,7 +21,7 @@
  * \ingroup gpu
  *
  * Implement our own subset of KHR_debug extension.
- * We just wrap some functions
+ * We override the functions pointers by our own implementation that just checks glGetError.
  */
 
 #include "BLI_utildefines.h"
@@ -49,13 +49,6 @@ typedef void *GPUvoidptr;
     rtn_type##_set real_##fn(ARG_LIST_CALL(__VA_ARGS__)); \
     debug::check_gl_error("" #fn); \
     rtn_type##_ret; \
-  }
-
-#define DEBUG_FUNC_DUMMY(pfn, fn, ...) \
-  pfn real_##fn; \
-  static void GLAPIENTRY debug_##fn(ARG_LIST(__VA_ARGS__)) \
-  { \
-    UNUSED_VARS(ARG_LIST_CALL(__VA_ARGS__)); \
   }
 
 namespace blender::gpu::debug {
@@ -108,12 +101,13 @@ DEBUG_FUNC_DECLARE(PFNGLTEXSUBIMAGE3DPROC, void, glTexSubImage3D, GLenum, target
 DEBUG_FUNC_DECLARE(PFNGLTEXTUREBUFFERPROC, void, glTextureBuffer, GLuint, texture, GLenum, internalformat, GLuint, buffer);
 DEBUG_FUNC_DECLARE(PFNGLUNMAPBUFFERPROC, GLboolean, glUnmapBuffer, GLenum, target);
 DEBUG_FUNC_DECLARE(PFNGLUSEPROGRAMPROC, void, glUseProgram, GLuint, program);
-DEBUG_FUNC_DUMMY(PFNGLOBJECTLABELPROC, glObjectLabel, GLenum, identifier, GLuint, name, GLsizei, length, const GLchar *, label);
 /* clang-format on */
 
 #undef DEBUG_FUNC_DECLARE
 
-/* On some systems,  */
+/* Init a fallback layer (to KHR_debug) that covers only some functions.
+ * We override the functions pointers by our own implementation that just checks glGetError.
+ * Some additional functions (not overridable) are covered inside the header using wrappers. */
 void init_debug_layer(void)
 {
 #define DEBUG_WRAP(function) \
@@ -158,7 +152,6 @@ void init_debug_layer(void)
   DEBUG_WRAP(glGenVertexArrays);
   DEBUG_WRAP(glLinkProgram);
   DEBUG_WRAP(glMapBufferRange);
-  DEBUG_WRAP(glObjectLabel);
   DEBUG_WRAP(glTexBuffer);
   DEBUG_WRAP(glTexImage3D);
   DEBUG_WRAP(glTexSubImage3D);

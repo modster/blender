@@ -112,6 +112,7 @@ static void APIENTRY debug_callback(GLenum UNUSED(source),
 
 #undef APIENTRY
 
+/* This function needs to be called once per context. */
 void init_gl_callbacks(void)
 {
   char msg[256] = "";
@@ -145,7 +146,6 @@ void init_gl_callbacks(void)
   else {
     fprintf(stderr, "GPUDebug: Failed to hook OpenGL debug callback. Use fallback debug layer.\n");
     init_debug_layer();
-    GLContext::debug_layer_support = true;
   }
 }
 
