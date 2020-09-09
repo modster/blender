@@ -1692,6 +1692,7 @@ int UI_panel_size_y(const struct Panel *panel);
 bool UI_panel_is_dragging(const struct Panel *panel);
 bool UI_panel_matches_search_filter(const struct Panel *panel);
 void UI_panel_set_expansion_from_seach_filter(const struct bContext *C, struct Panel *panel);
+bool UI_panel_is_active(const struct Panel *panel);
 
 bool UI_panel_category_is_visible(const struct ARegion *region);
 void UI_panel_category_add(struct ARegion *region, const char *name);
@@ -1716,6 +1717,8 @@ struct PointerRNA *UI_panel_custom_data_get(const struct Panel *panel);
 struct PointerRNA *UI_region_panel_custom_data_under_cursor(const struct bContext *C,
                                                             const struct wmEvent *event);
 void UI_panel_custom_data_set(struct Panel *panel, struct PointerRNA *custom_data);
+
+void UI_region_panels_remove_handlers(const struct bContext *C, struct ARegion *region);
 
 /* Polyinstantiated panels for representing a list of data. */
 struct Panel *UI_panel_add_instanced(struct ARegion *region,

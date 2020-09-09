@@ -48,6 +48,7 @@
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
 
+#include "UI_interface.h"
 #include "UI_resources.h"
 
 #include "buttons_intern.h" /* own include */
@@ -296,16 +297,125 @@ static void buttons_main_region_layout_properties(const bContext *C,
   ED_region_panels_layout_ex(C, region, &region->type->paneltypes, contexts, NULL);
 }
 
-static void buttons_main_region_layout(const bContext *C, ARegion *region)
+static void main_region_layout_current_context(const bContext *C,
+                                               SpaceProperties *sbuts,
+                                               ARegion *region)
 {
-  /* draw entirely, view changes should be handled here */
-  SpaceProperties *sbuts = CTX_wm_space_properties(C);
-
   if (sbuts->mainb == BCONTEXT_TOOL) {
     ED_view3d_buttons_region_layout_ex(C, region, "Tool");
   }
   else {
     buttons_main_region_layout_properties(C, sbuts, region);
+  }
+}
+
+static void property_search_move_to_next_tab_with_results(SpaceProperties *sbuts,
+                                                          const int *context_tabs_array,
+                                                          const int tabs_len)
+{
+  int current_tab_index = 0;
+  for (int i = 0; i < tabs_len; i++) {
+    if (sbuts->mainb == context_tabs_array[i]) {
+      current_tab_index = i;
+      break;
+    }
+  }
+
+  /* Try the tabs after the current tab. */
+  for (int i = current_tab_index; i < tabs_len; i++) {
+    if (sbuts->context_search_filter_active & (1 << i)) {
+      sbuts->mainbuser = context_tabs_array[i];
+      return;
+    }
+  }
+
+  /* Try the tabs before the current tab. */
+  for (int i = 0; i < current_tab_index; i++) {
+    if (sbuts->context_search_filter_active & (1 << i)) {
+      sbuts->mainbuser = context_tabs_array[i];
+      return;
+    }
+  }
+}
+
+static void property_search_all_tabs(const bContext *C,
+                                     SpaceProperties *sbuts,
+                                     ARegion *main_region)
+{
+  sbuts->context_search_filter_active = 0;
+
+  /* Duplicate space and region so we don't change any data for this space. */
+  ScrArea *area_copy = MEM_dupallocN(CTX_wm_area(C));
+  ARegion *region_copy = BKE_area_region_copy(CTX_wm_area(C)->type, main_region);
+  BKE_area_region_panels_free(&region_copy->panels);
+  bContext *C_copy = CTX_copy(C);
+  CTX_wm_area_set(C_copy, area_copy);
+  CTX_wm_region_set(C_copy, region_copy);
+  SpaceProperties *sbuts_copy = MEM_dupallocN(sbuts);
+
+  int context_tabs_array[32];
+  int tabs_tot = ED_buttons_tabs_list(sbuts, context_tabs_array);
+
+  bool current_tab_has_search_match = false;
+
+  /* Loop through the tabs added to the properties editor. */
+  for (int i = 0; i < tabs_tot; i++) {
+    if (context_tabs_array[i] == -1) {
+      continue;
+    }
+
+    /* Run the layout with this tab set active. */
+    sbuts_copy->mainb = sbuts->mainbo = sbuts_copy->mainbuser = context_tabs_array[i];
+
+    /* Run the layout for the actual region if the tab matches to avoid doing it again later on. */
+    const bool use_actual_region = sbuts->mainb == sbuts_copy->mainb;
+    if (use_actual_region) {
+      main_region_layout_current_context(C, sbuts, main_region);
+    }
+    else {
+      main_region_layout_current_context(C_copy, sbuts_copy, region_copy);
+    }
+
+    /* Store whether this tab has any unfiltered panels left. */
+    bool tab_has_search_match = false;
+    LISTBASE_FOREACH (
+        Panel *, panel, use_actual_region ? &main_region->panels : &region_copy->panels) {
+      tab_has_search_match |= UI_panel_matches_search_filter(panel) && UI_panel_is_active(panel);
+    }
+    if (tab_has_search_match) {
+      sbuts->context_search_filter_active |= (1 << i);
+      if (use_actual_region) {
+        current_tab_has_search_match = tab_has_search_match;
+      }
+    }
+
+    /* Free data created during the layout process. */
+    UI_region_panels_remove_handlers(C_copy, region_copy);
+    BKE_area_region_panels_free(&region_copy->panels);
+    UI_blocklist_free(C_copy, &region_copy->uiblocks);
+  }
+
+  if (!current_tab_has_search_match && main_region->flag & RGN_FLAG_SEARCH_FILTER_UPDATE) {
+    property_search_move_to_next_tab_with_results(sbuts, context_tabs_array, tabs_tot);
+  }
+
+  BKE_area_region_free(CTX_wm_area(C_copy)->type, region_copy);
+  MEM_freeN(region_copy);
+  MEM_freeN(sbuts_copy);
+  MEM_freeN(area_copy);
+  MEM_freeN(C_copy);
+}
+
+static void buttons_main_region_layout(const bContext *C, ARegion *region)
+{
+  /* draw entirely, view changes should be handled here */
+  SpaceProperties *sbuts = CTX_wm_space_properties(C);
+
+  if (region->flag & RGN_FLAG_SEARCH_FILTER_ACTIVE) {
+    property_search_all_tabs(C, sbuts, region);
+  }
+  else {
+    main_region_layout_current_context(C, sbuts, region);
   }
 
   sbuts->mainbo = sbuts->mainb;

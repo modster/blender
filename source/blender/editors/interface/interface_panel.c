@@ -833,6 +833,14 @@ bool UI_panel_matches_search_filter(const Panel *panel)
 }
 
 /**
+ * Returns whether a panel is currently active (displayed).
+ */
+bool UI_panel_is_active(const Panel *panel)
+{
+  return panel->runtime_flag & PNL_ACTIVE;
+}
+
+/**
  * Uses the panel's search filter flag to set its expansion,
  * activating animation if it was closed or opened.
  */
@@ -2622,6 +2630,13 @@ static void ui_handler_remove_panel(bContext *C, void *userdata)
   panel_activate_state(C, panel, PANEL_STATE_EXIT);
 }
 
+void UI_region_panels_remove_handlers(const bContext *C, ARegion *region)
+{
+  LISTBASE_FOREACH (Panel *, panel, &region->panels) {
+    panel_activate_state(C, panel, PANEL_STATE_EXIT);
+  }
+}
+
 static void panel_activate_state(const bContext *C, Panel *panel, uiHandlePanelState state)
 {
   uiHandlePanelData *data = panel->activedata;
@@ -2649,11 +2664,13 @@ static void panel_activate_state(const bContext *C, Panel *panel, uiHandlePanelS
   }
 
   if (state == PANEL_STATE_EXIT) {
-    MEM_freeN(data);
-    panel->activedata = NULL;
+    if (data != NULL) {
+      MEM_freeN(data);
+      panel->activedata = NULL;
 
-    WM_event_remove_ui_handler(
-        &win->modalhandlers, ui_handler_panel, ui_handler_remove_panel, panel, false);
+      WM_event_remove_ui_handler(
+          &win->modalhandlers, ui_handler_panel, ui_handler_remove_panel, panel, false);
+    }
   }
   else {
     if (!data) {
