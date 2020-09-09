@@ -219,10 +219,10 @@ static void value_id_set(void *id)
 }
 
 static void id_release_weakref_list(struct ID *id, GHash *weakinfo_hash);
-static PyObject *id_free_weakref_cb(PyObject *weakinfo_capsule, PyObject *weakref)
+static PyObject *id_free_weakref_cb(PyObject *weakinfo_pair, PyObject *weakref)
 {
   /* Important to search backwards. */
-  GHash *weakinfo_hash = PyCapsule_GetPointer(weakinfo_capsule, NULL);
+  GHash *weakinfo_hash = PyCapsule_GetPointer(weakinfo_pair, NULL);
 
   if (BLI_ghash_len(weakinfo_hash) > 1) {
     BLI_ghash_remove(weakinfo_hash, weakref, NULL, NULL);
@@ -9010,10 +9010,11 @@ void pyrna_struct_type_extend_capi(struct StructRNA *srna,
         py_method = PyClassMethod_New(cfunc);
         Py_DECREF(cfunc);
       }
-      else {
-        /* Currently only static and class methods are used. */
-        BLI_assert(method->ml_flags & METH_STATIC);
+      else if (method->ml_flags & METH_STATIC) {
         py_method = PyCFunction_New(method, NULL);
+      }
+      else {
+        py_method = PyDescr_NewMethod(type, method);
       }
 
       const int err = PyDict_SetItemString(dict, method->ml_name, py_method);

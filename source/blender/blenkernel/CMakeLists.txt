@@ -77,6 +77,7 @@ set(SRC
   intern/armature.c
   intern/armature_deform.c
   intern/armature_update.c
+  intern/attribute.c
   intern/autoexec.c
   intern/blender.c
   intern/blender_copybuffer.c
@@ -267,6 +268,7 @@ set(SRC
   BKE_animsys.h
   BKE_appdir.h
   BKE_armature.h
+  BKE_attribute.h
   BKE_autoexec.h
   BKE_blender.h
   BKE_blender_copybuffer.h
@@ -482,9 +484,15 @@ if(WITH_BULLET)
   list(APPEND INC
     ../../../intern/rigidbody
   )
+
+  if(NOT WITH_SYSTEM_BULLET)
+    list(APPEND LIB
+      extern_bullet
+    )
+  endif()
+
   list(APPEND LIB
     bf_intern_rigidbody
-    extern_bullet
 
     ${BULLET_LIBRARIES}
   )

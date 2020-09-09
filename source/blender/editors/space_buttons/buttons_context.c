@@ -333,6 +333,9 @@ static bool buttons_context_path_material(ButsContextPath *path)
 
     if (ob && OB_TYPE_SUPPORT_MATERIAL(ob->type)) {
       ma = BKE_object_material_get(ob, ob->actcol);
+      if (ma == NULL) {
+        return false;
+      }
       RNA_id_pointer_create(&ma->id, &path->ptr[path->len]);
       path->len++;
       return true;
@@ -1131,7 +1134,7 @@ void buttons_context_draw(const bContext *C, uiLayout *layout)
 {
   SpaceProperties *sbuts = CTX_wm_space_properties(C);
   ButsContextPath *path = sbuts->path;
-  uiLayout *row;
+  uiLayout *row, *sub;
   uiBlock *block;
   uiBut *but;
   PointerRNA *ptr;
@@ -1197,25 +1200,12 @@ void buttons_context_draw(const bContext *C, uiLayout *layout)
 
   uiItemSpacer(row);
 
-  block = uiLayoutGetBlock(row);
-  UI_block_emboss_set(block, UI_EMBOSS_NONE);
-  but = uiDefIconButBitC(block,
-                         UI_BTYPE_ICON_TOGGLE,
-                         SB_PIN_CONTEXT,
-                         0,
-                         ICON_UNPINNED,
-                         0,
-                         0,
-                         UI_UNIT_X,
-                         UI_UNIT_Y,
-                         &sbuts->flag,
-                         0,
-                         0,
-                         0,
-                         0,
-                         TIP_("Follow context or keep fixed data-block displayed"));
-  UI_but_flag_disable(but, UI_BUT_UNDO); /* skip undo on screen buttons */
-  UI_but_func_set(but, pin_cb, NULL, NULL);
+  sub = uiLayoutRow(row, false);
+  uiLayoutSetEmboss(sub, UI_EMBOSS_NONE);
+  uiItemO(sub,
+          "",
+          (sbuts->flag & SB_PIN_CONTEXT) ? ICON_PINNED : ICON_UNPINNED,
+          "BUTTONS_OT_toggle_pin");
 }
 
 #ifdef USE_HEADER_CONTEXT_PATH
