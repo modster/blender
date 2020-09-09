@@ -115,6 +115,7 @@ DEBUG_FUNC_OVERRIDE(glDeleteTextures, GLsizei, n, const GLuint *, textures);
 DEBUG_FUNC_OVERRIDE(glDrawArrays, GLenum, mode, GLint, first, GLsizei, count);
 DEBUG_FUNC_OVERRIDE(glFinish, void);
 DEBUG_FUNC_OVERRIDE(glFlush, void);
+DEBUG_FUNC_OVERRIDE(glGenTextures, GLsizei, n, GLuint *, textures);
 DEBUG_FUNC_OVERRIDE(glGetTexImage, GLenum, target, GLint, level, GLenum, format, GLenum, type, void *, pixels);
 DEBUG_FUNC_OVERRIDE(glReadBuffer, GLenum, mode);
 DEBUG_FUNC_OVERRIDE(glReadPixels, GLint, x, GLint, y, GLsizei, width, GLsizei, height, GLenum, format, GLenum, type, void *, pixels);

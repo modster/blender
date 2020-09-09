@@ -115,8 +115,8 @@ void init_debug_layer(void)
 {
 #define DEBUG_WRAP(function) \
   do { \
-    real_##function = function; \
-    function = &debug_##function; \
+    real_##function = ::function; \
+    ::function = &debug_##function; \
   } while (0)
 
   DEBUG_WRAP(glBeginQuery);

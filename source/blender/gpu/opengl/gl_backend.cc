@@ -178,7 +178,7 @@ static bool detect_mip_render_workaround(void)
   glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
   glClear(GL_COLOR_BUFFER_BIT);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  glDrawBuffer(GL_BACK);
+
   /* Read mip 1. If color is not the same as the clear_color, the rendering failed. */
   glGetTexImage(GL_TEXTURE_CUBE_MAP_POSITIVE_X, 1, GL_RGBA, GL_FLOAT, source_pix);
   bool enable_workaround = !equals_v4v4(clear_color, source_pix);

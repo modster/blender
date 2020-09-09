@@ -26,9 +26,11 @@
 #include "GPU_capabilities.h"
 
 #include "gl_backend.hh"
-#include "gl_framebuffer.hh"
+#include "gl_debug.hh"
 #include "gl_state.hh"
 #include "gl_texture.hh"
+
+#include "gl_framebuffer.hh"
 
 namespace blender::gpu {
 
