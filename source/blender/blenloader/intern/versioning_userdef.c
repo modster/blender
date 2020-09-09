@@ -228,6 +228,7 @@ static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
    */
   {
     /* Keep this block, even when empty. */
+    FROM_DEFAULT_V4_UCHAR(space_properties.search_match_color);
 
     /* The new defaults for the file browser theme are the same as
      * the outliner's, and it's less disruptive to just copy them. */

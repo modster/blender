@@ -264,6 +264,9 @@ typedef struct ThemeSpace {
   /* note, cannot use name 'panel' because of DNA mapping old files */
   uiPanelColors panelcolors;
 
+  unsigned char search_match_color[4];
+  char _pad2[4];
+
   unsigned char shade1[4];
   unsigned char shade2[4];
 
