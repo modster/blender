@@ -20,7 +20,9 @@
 
 #pragma once
 
-#include "BKE_global.h"
+#include "gl_context.hh"
+
+#include "glew-mx.h"
 
 namespace blender {
 namespace gpu {
@@ -98,7 +100,7 @@ void init_debug_layer(void);
 #define DEBUG_FUNC_OVERRIDE(func, ...) \
   inline void func(ARG_LIST(__VA_ARGS__)) \
   { \
-    if (G.debug & G_DEBUG_GPU) { \
+    if (GLContext::debug_layer_support) { \
       debug::check_gl_error("generated before " #func); \
       ::func(ARG_LIST_CALL(__VA_ARGS__)); \
       debug::check_gl_error("" #func); \
@@ -119,6 +121,12 @@ DEBUG_FUNC_OVERRIDE(glGenTextures, GLsizei, n, GLuint *, textures);
 DEBUG_FUNC_OVERRIDE(glGetTexImage, GLenum, target, GLint, level, GLenum, format, GLenum, type, void *, pixels);
 DEBUG_FUNC_OVERRIDE(glReadBuffer, GLenum, mode);
 DEBUG_FUNC_OVERRIDE(glReadPixels, GLint, x, GLint, y, GLsizei, width, GLsizei, height, GLenum, format, GLenum, type, void *, pixels);
+DEBUG_FUNC_OVERRIDE(glTexImage1D, GLenum, target, GLint, level, GLint, internalformat, GLsizei, width, GLint, border, GLenum, format, GLenum, type, const void *, pixels);
+DEBUG_FUNC_OVERRIDE(glTexImage2D, GLenum, target, GLint, level, GLint, internalformat, GLsizei, width, GLsizei, height, GLint, border, GLenum, format, GLenum, type, const void *, pixels);
+DEBUG_FUNC_OVERRIDE(glTexParameteri, GLenum, target, GLenum, pname, GLint, param);
+DEBUG_FUNC_OVERRIDE(glTexParameteriv, GLenum, target, GLenum, pname, const GLint *, params);
+DEBUG_FUNC_OVERRIDE(glTexSubImage1D, GLenum, target, GLint, level, GLint, xoffset, GLsizei, width, GLenum, format, GLenum, type, const void *, pixels);
+DEBUG_FUNC_OVERRIDE(glTexSubImage2D, GLenum, target, GLint, level, GLint, xoffset, GLint, yoffset, GLsizei, width, GLsizei, height, GLenum, format, GLenum, type, const void *, pixels);
 /* clang-format on */
 
 }  // namespace gpu

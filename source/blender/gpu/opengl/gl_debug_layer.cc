@@ -105,6 +105,7 @@ DEBUG_FUNC_DECLARE(PFNGLMAPBUFFERRANGEPROC, GPUvoidptr, glMapBufferRange, GLenum
 DEBUG_FUNC_DECLARE(PFNGLTEXTUREBUFFERPROC, void, glTextureBuffer, GLuint, texture, GLenum, internalformat, GLuint, buffer);
 DEBUG_FUNC_DECLARE(PFNGLUNMAPBUFFERPROC, GLboolean, glUnmapBuffer, GLenum, target);
 DEBUG_FUNC_DECLARE(PFNGLUSEPROGRAMPROC, void, glUseProgram, GLuint, program);
+DEBUG_FUNC_DECLARE(PFNGLTEXBUFFERPROC, void, glTexBuffer, GLenum, target, GLenum, internalFormat, GLuint, buffer);
 DEBUG_FUNC_DUMMY(PFNGLOBJECTLABELPROC, glObjectLabel, GLenum, identifier, GLuint, name, GLsizei, length, const GLchar *, label);
 /* clang-format on */
 
