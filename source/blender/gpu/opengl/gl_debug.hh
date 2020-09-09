@@ -24,10 +24,6 @@
 
 #include "glew-mx.h"
 
-namespace blender {
-namespace gpu {
-namespace debug {
-
 /* Manual line breaks for readability. */
 /* clang-format off */
 #define _VA_ARG_LIST1(t) t
@@ -85,12 +81,18 @@ namespace debug {
 #  define GL_CHECK_RESOURCES(info)
 #endif
 
+namespace blender {
+namespace gpu {
+namespace debug {
+
 void raise_gl_error(const char *info);
 void check_gl_error(const char *info);
 void check_gl_resources(const char *info);
 void init_gl_callbacks(void);
 
 void init_debug_layer(void);
+
+void object_label(GLenum type, GLuint object, const char *name);
 
 }  // namespace debug
 

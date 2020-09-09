@@ -60,11 +60,9 @@ GLImmediate::GLImmediate()
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
 
-  if (GLContext::debug_layer_support) {
-    glObjectLabel(GL_VERTEX_ARRAY, vao_id_, -1, "VAO-Immediate");
-    glObjectLabel(GL_BUFFER, buffer.vbo_id, -1, "VBO-ImmediateBuffer");
-    glObjectLabel(GL_BUFFER, buffer_strict.vbo_id, -1, "VBO-ImmediateBufferStrict");
-  }
+  debug::object_label(GL_VERTEX_ARRAY, vao_id_, "Immediate");
+  debug::object_label(GL_BUFFER, buffer.vbo_id, "ImmediateVbo");
+  debug::object_label(GL_BUFFER, buffer_strict.vbo_id, "ImmediateVboStrict");
 }
 
 GLImmediate::~GLImmediate()

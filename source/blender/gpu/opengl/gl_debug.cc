@@ -240,4 +240,68 @@ void raise_gl_error(const char *info)
 
 /** \} */
 
+/* -------------------------------------------------------------------- */
+/** \name Object Label
+ *
+ * Useful for debugging through renderdoc. Only defined if using --debug-gpu.
+ * Make sure to bind the object first so that it gets defined by the GL implementation.
+ * \{ */
+
+static const char *to_str_prefix(GLenum type)
+{
+  switch (type) {
+    case GL_FRAGMENT_SHADER:
+    case GL_GEOMETRY_SHADER:
+    case GL_VERTEX_SHADER:
+    case GL_SHADER:
+    case GL_PROGRAM:
+      return "SHD-";
+    case GL_SAMPLER:
+      return "SAM-";
+    case GL_TEXTURE:
+      return "TEX-";
+    case GL_FRAMEBUFFER:
+      return "FBO-";
+    case GL_VERTEX_ARRAY:
+      return "VAO-";
+    case GL_UNIFORM_BUFFER:
+      return "UBO-";
+    case GL_BUFFER:
+      return "BUF-";
+    default:
+      return "";
+  }
+}
+static const char *to_str_suffix(GLenum type)
+{
+  switch (type) {
+    case GL_FRAGMENT_SHADER:
+      return "-Frag";
+    case GL_GEOMETRY_SHADER:
+      return "-Geom";
+    case GL_VERTEX_SHADER:
+      return "-Vert";
+    default:
+      return "";
+  }
+}
+
+void object_label(GLenum type, GLuint object, const char *name)
+{
+  if (GLContext::debug_layer_support) {
+    char label[64];
+    SNPRINTF(label, "%s%s%s", to_str_prefix(type), name, to_str_suffix(type));
+    /* Small convenience for caller. */
+    if (ELEM(type, GL_FRAGMENT_SHADER, GL_GEOMETRY_SHADER, GL_VERTEX_SHADER)) {
+      type = GL_SHADER;
+    }
+    if (ELEM(type, GL_UNIFORM_BUFFER)) {
+      type = GL_BUFFER;
+    }
+    glObjectLabel(type, object, -1, label);
+  }
+}
+
+/** \} */
+
 }  // namespace blender::gpu::debug
