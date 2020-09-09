@@ -12,48 +12,25 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * The Original Code is Copyright (C) 2020 Blender Foundation.
+ * All rights reserved.
  */
 
 /** \file
- * \ingroup DNA
+ * \ingroup edgeometry
  */
 
-#pragma once
+#include "WM_api.h"
 
-#include "DNA_ID.h"
-#include "DNA_customdata_types.h"
+#include "ED_geometry.h"
 
-typedef struct PointCloud {
-  ID id;
-  struct AnimData *adt; /* animation data (must be immediately after id) */
+#include "geometry_intern.h"
 
-  int flag;
-  int _pad1[1];
+/**************************** registration **********************************/
 
-  /* Geometry */
-  float (*co)[3];
-  float *radius;
-  int totpoint;
-  int _pad2[1];
-
-  /* Custom Data */
-  struct CustomData pdata;
-  int attributes_active_index;
-  int _pad4;
-
-  /* Material */
-  struct Material **mat;
-  short totcol;
-  short _pad3[3];
-
-  /* Draw Cache */
-  void *batch_cache;
-} PointCloud;
-
-/* PointCloud.flag */
-enum {
-  PT_DS_EXPAND = (1 << 0),
-};
-
-/* Only one material supported currently. */
-#define POINTCLOUD_MATERIAL_NR 1
+void ED_operatortypes_geometry(void)
+{
+  WM_operatortype_append(GEOMETRY_OT_attribute_add);
+  WM_operatortype_append(GEOMETRY_OT_attribute_remove);
+}
