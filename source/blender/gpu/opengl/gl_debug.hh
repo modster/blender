@@ -75,13 +75,6 @@ namespace debug {
 #define ARG_LIST_CALL(...) VA_NARGS_CALL_OVERLOAD(_VA_ARG_LIST_CALL, __VA_ARGS__)
 /* clang-format on */
 
-/* Enabled on MacOS by default since there is no support for debug callbacks. */
-#if defined(DEBUG) && defined(__APPLE__)
-#  define GL_CHECK_ERROR(info) debug::check_gl_error(info)
-#else
-#  define GL_CHECK_ERROR(info)
-#endif
-
 #ifdef DEBUG
 #  define GL_CHECK_RESOURCES(info) debug::check_gl_resources(info)
 #else

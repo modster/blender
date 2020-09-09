@@ -102,8 +102,6 @@ bool GLTexture::init_internal(void)
     /* Binding before setting the label is needed on some drivers. */
     glObjectLabel(GL_TEXTURE, tex_id_, -1, sh_name);
   }
-
-  GL_CHECK_ERROR("Post-texture creation");
   return true;
 }
 
@@ -131,8 +129,6 @@ bool GLTexture::init_internal(GPUVertBuf *vbo)
     /* Binding before setting the label is needed on some drivers. */
     glObjectLabel(GL_TEXTURE, tex_id_, -1, sh_name);
   }
-
-  GL_CHECK_ERROR("Post-texture buffer creation");
   return true;
 }
 
@@ -193,8 +189,6 @@ void GLTexture::ensure_mipmaps(int miplvl)
           break;
       }
     }
-
-    GL_CHECK_ERROR("Post-mipmap creation");
   }
 
   this->mip_range_set(0, mipmaps_);
@@ -240,7 +234,6 @@ void GLTexture::update_sub_direct_state_access(
         break;
     }
   }
-  GL_CHECK_ERROR("Post-update_sub_direct_state_access");
 }
 
 void GLTexture::update_sub(
@@ -304,8 +297,6 @@ void GLTexture::update_sub(
         break;
     }
   }
-
-  GL_CHECK_ERROR("Post-update_sub");
 }
 
 /** This will create the mipmap images and populate them with filtered data from base level.
