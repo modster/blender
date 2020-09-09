@@ -30,55 +30,6 @@
 
 #include "gl_debug.hh"
 
-namespace blender::gpu::debug {
-
-/* Manual line breaks for readability. */
-/* clang-format off */
-#define _VA_ARG_LIST1(t) t
-#define _VA_ARG_LIST2(t, a) t a
-#define _VA_ARG_LIST4(t, a, b, c) \
-  _VA_ARG_LIST2(t, a), _VA_ARG_LIST2(b, c)
-#define _VA_ARG_LIST6(t, a, b, c, d, e) \
-  _VA_ARG_LIST2(t, a), _VA_ARG_LIST4(b, c, d, e)
-#define _VA_ARG_LIST8(t, a, b, c, d, e, f, g) \
-  _VA_ARG_LIST2(t, a), _VA_ARG_LIST6(b, c, d, e, f, g)
-#define _VA_ARG_LIST10(t, a, b, c, d, e, f, g, h, i) \
-  _VA_ARG_LIST2(t, a), _VA_ARG_LIST8(b, c, d, e, f, g, h, i)
-#define _VA_ARG_LIST12(t, a, b, c, d, e, f, g, h, i, j, k) \
-  _VA_ARG_LIST2(t, a), _VA_ARG_LIST10(b, c, d, e, f, g, h, i, j, k)
-#define _VA_ARG_LIST14(t, a, b, c, d, e, f, g, h, i, j, k, l, m) \
-  _VA_ARG_LIST2(t, a), _VA_ARG_LIST12(b, c, d, e, f, g, h, i, j, k, l, m)
-#define _VA_ARG_LIST16(t, a, b, c, d, e, f, g, h, i, j, k, l, m, o, p) \
-  _VA_ARG_LIST2(t, a), _VA_ARG_LIST14(b, c, d, e, f, g, h, i, j, k, l, m, o, p)
-#define _VA_ARG_LIST18(t, a, b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r) \
-  _VA_ARG_LIST2(t, a), _VA_ARG_LIST16(b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r)
-#define _VA_ARG_LIST20(t, a, b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r, s, u) \
-  _VA_ARG_LIST2(t, a), _VA_ARG_LIST18(b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r, s, u)
-#define ARG_LIST(...) VA_NARGS_CALL_OVERLOAD(_VA_ARG_LIST, __VA_ARGS__)
-
-#define _VA_ARG_LIST_CALL1(t)
-#define _VA_ARG_LIST_CALL2(t, a) a
-#define _VA_ARG_LIST_CALL4(t, a, b, c) \
-  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL2(b, c)
-#define _VA_ARG_LIST_CALL6(t, a, b, c, d, e) \
-  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL4(b, c, d, e)
-#define _VA_ARG_LIST_CALL8(t, a, b, c, d, e, f, g) \
-  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL6(b, c, d, e, f, g)
-#define _VA_ARG_LIST_CALL10(t, a, b, c, d, e, f, g, h, i) \
-  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL8(b, c, d, e, f, g, h, i)
-#define _VA_ARG_LIST_CALL12(t, a, b, c, d, e, f, g, h, i, j, k) \
-  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL10(b, c, d, e, f, g, h, i, j, k)
-#define _VA_ARG_LIST_CALL14(t, a, b, c, d, e, f, g, h, i, j, k, l, m) \
-  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL12(b, c, d, e, f, g, h, i, j, k, l, m)
-#define _VA_ARG_LIST_CALL16(t, a, b, c, d, e, f, g, h, i, j, k, l, m, o, p) \
-  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL14(b, c, d, e, f, g, h, i, j, k, l, m, o, p)
-#define _VA_ARG_LIST_CALL18(t, a, b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r) \
-  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL16(b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r)
-#define _VA_ARG_LIST_CALL20(t, a, b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r, s, u) \
-  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL18(b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r, s, u)
-#define ARG_LIST_CALL(...) VA_NARGS_CALL_OVERLOAD(_VA_ARG_LIST_CALL, __VA_ARGS__)
-/* clang-format on */
-
 typedef void *GPUvoidptr;
 
 #define GPUvoidptr_set void *ret =
@@ -94,9 +45,9 @@ typedef void *GPUvoidptr;
   pfn real_##fn; \
   static rtn_type GLAPIENTRY debug_##fn(ARG_LIST(__VA_ARGS__)) \
   { \
-    check_gl_error("generated before " #fn); \
+    debug::check_gl_error("generated before " #fn); \
     rtn_type##_set real_##fn(ARG_LIST_CALL(__VA_ARGS__)); \
-    check_gl_error("" #fn); \
+    debug::check_gl_error("" #fn); \
     rtn_type##_ret; \
   }
 
@@ -106,6 +57,8 @@ typedef void *GPUvoidptr;
   { \
     UNUSED_VARS(ARG_LIST_CALL(__VA_ARGS__)); \
   }
+
+namespace blender::gpu::debug {
 
 /* List of wrapped functions. We dont have to support all of them.
  * Some functions might be declared as extern in GLEW. We cannot override them in this case.
