@@ -50,6 +50,8 @@ namespace debug {
   _VA_ARG_LIST2(t, a), _VA_ARG_LIST16(b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r)
 #define _VA_ARG_LIST20(t, a, b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r, s, u) \
   _VA_ARG_LIST2(t, a), _VA_ARG_LIST18(b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r, s, u)
+#define _VA_ARG_LIST22(t, a, b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r, s, u, v, w) \
+  _VA_ARG_LIST2(t, a), _VA_ARG_LIST20(b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r, s, u, v, w)
 #define ARG_LIST(...) VA_NARGS_CALL_OVERLOAD(_VA_ARG_LIST, __VA_ARGS__)
 
 #define _VA_ARG_LIST_CALL1(t)
@@ -72,6 +74,8 @@ namespace debug {
   _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL16(b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r)
 #define _VA_ARG_LIST_CALL20(t, a, b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r, s, u) \
   _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL18(b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r, s, u)
+#define _VA_ARG_LIST_CALL22(t, a, b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r, s, u, v, w) \
+  _VA_ARG_LIST_CALL2(t, a), _VA_ARG_LIST_CALL20(b, c, d, e, f, g, h, i, j, k, l, m, o, p, q, r, s, u, v, w)
 #define ARG_LIST_CALL(...) VA_NARGS_CALL_OVERLOAD(_VA_ARG_LIST_CALL, __VA_ARGS__)
 /* clang-format on */
 

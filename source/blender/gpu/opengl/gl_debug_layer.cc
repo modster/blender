@@ -102,10 +102,12 @@ DEBUG_FUNC_DECLARE(PFNGLGENSAMPLERSPROC, void, glGenSamplers, GLsizei, n, GLuint
 DEBUG_FUNC_DECLARE(PFNGLGENVERTEXARRAYSPROC, void, glGenVertexArrays, GLsizei, n, GLuint *, arrays);
 DEBUG_FUNC_DECLARE(PFNGLLINKPROGRAMPROC, void, glLinkProgram, GLuint, program);
 DEBUG_FUNC_DECLARE(PFNGLMAPBUFFERRANGEPROC, GPUvoidptr, glMapBufferRange, GLenum, target, GLintptr, offset, GLsizeiptr, length, GLbitfield, access);
+DEBUG_FUNC_DECLARE(PFNGLTEXBUFFERPROC, void, glTexBuffer, GLenum, target, GLenum, internalFormat, GLuint, buffer);
+DEBUG_FUNC_DECLARE(PFNGLTEXIMAGE3DPROC, void, glTexImage3D, GLenum, target, GLint, level, GLint, internalFormat, GLsizei, width, GLsizei, height, GLsizei, depth, GLint, border, GLenum, format, GLenum, type, const GLvoid *,pixels);
+DEBUG_FUNC_DECLARE(PFNGLTEXSUBIMAGE3DPROC, void, glTexSubImage3D, GLenum, target, GLint, level, GLint, xoffset, GLint, yoffset, GLint, zoffset, GLsizei, width, GLsizei, height, GLsizei, depth, GLenum, format, GLenum, type, const GLvoid *, pixels);
 DEBUG_FUNC_DECLARE(PFNGLTEXTUREBUFFERPROC, void, glTextureBuffer, GLuint, texture, GLenum, internalformat, GLuint, buffer);
 DEBUG_FUNC_DECLARE(PFNGLUNMAPBUFFERPROC, GLboolean, glUnmapBuffer, GLenum, target);
 DEBUG_FUNC_DECLARE(PFNGLUSEPROGRAMPROC, void, glUseProgram, GLuint, program);
-DEBUG_FUNC_DECLARE(PFNGLTEXBUFFERPROC, void, glTexBuffer, GLenum, target, GLenum, internalFormat, GLuint, buffer);
 DEBUG_FUNC_DUMMY(PFNGLOBJECTLABELPROC, glObjectLabel, GLenum, identifier, GLuint, name, GLsizei, length, const GLchar *, label);
 /* clang-format on */
 
@@ -157,6 +159,9 @@ void init_debug_layer(void)
   DEBUG_WRAP(glLinkProgram);
   DEBUG_WRAP(glMapBufferRange);
   DEBUG_WRAP(glObjectLabel);
+  DEBUG_WRAP(glTexBuffer);
+  DEBUG_WRAP(glTexImage3D);
+  DEBUG_WRAP(glTexSubImage3D);
   DEBUG_WRAP(glTextureBuffer);
   DEBUG_WRAP(glUnmapBuffer);
   DEBUG_WRAP(glUseProgram);
