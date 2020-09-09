@@ -95,6 +95,11 @@ BLI_INLINE void mesh_cd_layers_type_clear(DRW_MeshCDMask *a)
   *((uint64_t *)a) = 0;
 }
 
+BLI_INLINE const Mesh *editmesh_final_or_this(const Mesh *me)
+{
+  return (me->edit_mesh && me->edit_mesh->mesh_eval_final) ? me->edit_mesh->mesh_eval_final : me;
+}
+
 static void mesh_cd_calc_edit_uv_layer(const Mesh *UNUSED(me), DRW_MeshCDMask *cd_used)
 {
   cd_used->edit_uv = 1;
@@ -132,7 +137,7 @@ BLI_INLINE const CustomData *mesh_cd_vdata_get_from_mesh(const Mesh *me)
 
 static void mesh_cd_calc_active_uv_layer(const Mesh *me, DRW_MeshCDMask *cd_used)
 {
-  const Mesh *me_final = (me->edit_mesh) ? me->edit_mesh->mesh_eval_final : me;
+  const Mesh *me_final = editmesh_final_or_this(me);
   const CustomData *cd_ldata = mesh_cd_ldata_get_from_mesh(me_final);
   int layer = CustomData_get_active_layer(cd_ldata, CD_MLOOPUV);
   if (layer != -1) {
@@ -142,7 +147,7 @@ static void mesh_cd_calc_active_uv_layer(const Mesh *me, DRW_MeshCDMask *cd_used
 
 static void mesh_cd_calc_active_mask_uv_layer(const Mesh *me, DRW_MeshCDMask *cd_used)
 {
-  const Mesh *me_final = (me->edit_mesh) ? me->edit_mesh->mesh_eval_final : me;
+  const Mesh *me_final = editmesh_final_or_this(me);
   const CustomData *cd_ldata = mesh_cd_ldata_get_from_mesh(me_final);
   int layer = CustomData_get_stencil_layer(cd_ldata, CD_MLOOPUV);
   if (layer != -1) {
@@ -152,7 +157,7 @@ static void mesh_cd_calc_active_mask_uv_layer(const Mesh *me, DRW_MeshCDMask *cd
 
 static void mesh_cd_calc_active_vcol_layer(const Mesh *me, DRW_MeshCDMask *cd_used)
 {
-  const Mesh *me_final = (me->edit_mesh) ? me->edit_mesh->mesh_eval_final : me;
+  const Mesh *me_final = editmesh_final_or_this(me);
   const CustomData *cd_vdata = mesh_cd_vdata_get_from_mesh(me_final);
 
   int layer = CustomData_get_active_layer(cd_vdata, CD_PROP_COLOR);
@@ -163,8 +168,8 @@ static void mesh_cd_calc_active_vcol_layer(const Mesh *me, DRW_MeshCDMask *cd_us
 
 static void mesh_cd_calc_active_mloopcol_layer(const Mesh *me, DRW_MeshCDMask *cd_used)
 {
-  const Mesh *me_final = (me->edit_mesh) ? me->edit_mesh->mesh_eval_final : me;
-  const CustomData *cd_ldata = &me_final->ldata;
+  const Mesh *me_final = editmesh_final_or_this(me);
+  const CustomData *cd_ldata = mesh_cd_ldata_get_from_mesh(me_final);
 
   int layer = CustomData_get_active_layer(cd_ldata, CD_MLOOPCOL);
   if (layer != -1) {
@@ -176,7 +181,7 @@ static DRW_MeshCDMask mesh_cd_calc_used_gpu_layers(const Mesh *me,
                                                    struct GPUMaterial **gpumat_array,
                                                    int gpumat_array_len)
 {
-  const Mesh *me_final = (me->edit_mesh) ? me->edit_mesh->mesh_eval_final : me;
+  const Mesh *me_final = editmesh_final_or_this(me);
   const CustomData *cd_ldata = mesh_cd_ldata_get_from_mesh(me_final);
   const CustomData *cd_vdata = mesh_cd_vdata_get_from_mesh(me_final);
 
@@ -798,9 +803,8 @@ GPUBatch *DRW_mesh_batch_cache_get_loose_edges(Mesh *me)
   if (cache->no_loose_wire) {
     return NULL;
   }
-  else {
-    return DRW_batch_request(&cache->batch.loose_edges);
-  }
+
+  return DRW_batch_request(&cache->batch.loose_edges);
 }
 
 GPUBatch *DRW_mesh_batch_cache_get_surface_weights(Mesh *me)
@@ -1182,7 +1186,15 @@ void DRW_mesh_batch_cache_create_requested(struct TaskGraph *task_graph,
     BLI_assert(me->edit_mesh->mesh_eval_final != NULL);
   }
 
-  const bool is_editmode = (me->edit_mesh != NULL) && DRW_object_is_in_edit_mode(ob);
+  /* Don't check `DRW_object_is_in_edit_mode(ob)` here because it means the same mesh
+   * may draw with edit-mesh data and regular mesh data.
+   * In this case the custom-data layers used wont always match in `me->runtime.batch_cache`.
+   * If we want to display regular mesh data, we should have a separate cache for the edit-mesh.
+   * See T77359. */
+  const bool is_editmode = (me->edit_mesh != NULL) /* && DRW_object_is_in_edit_mode(ob) */;
+
+  /* This could be set for paint mode too, currently it's only used for edit-mode. */
+  const bool is_mode_active = is_editmode && DRW_object_is_in_edit_mode(ob);
 
   DRWBatchFlag batch_requested = cache->batch_requested;
   cache->batch_requested = 0;
@@ -1244,7 +1256,7 @@ void DRW_mesh_batch_cache_create_requested(struct TaskGraph *task_graph,
           saved_elem_ranges[i] = cache->surface_per_mat[i]->elem;
           /* Avoid deletion as the batch is owner. */
           cache->surface_per_mat[i]->elem = NULL;
-          cache->surface_per_mat[i]->owns_flag &= ~GPU_BATCH_OWNS_INDEX;
+          cache->surface_per_mat[i]->flag &= ~GPU_BATCH_OWNS_INDEX;
         }
       }
       /* We can't discard batches at this point as they have been
@@ -1269,9 +1281,11 @@ void DRW_mesh_batch_cache_create_requested(struct TaskGraph *task_graph,
       FOREACH_MESH_BUFFER_CACHE (cache, mbuffercache) {
         GPU_VERTBUF_DISCARD_SAFE(mbuffercache->vbo.edituv_data);
         GPU_VERTBUF_DISCARD_SAFE(mbuffercache->vbo.fdots_uv);
+        GPU_VERTBUF_DISCARD_SAFE(mbuffercache->vbo.fdots_edituv_data);
         GPU_INDEXBUF_DISCARD_SAFE(mbuffercache->ibo.edituv_tris);
         GPU_INDEXBUF_DISCARD_SAFE(mbuffercache->ibo.edituv_lines);
         GPU_INDEXBUF_DISCARD_SAFE(mbuffercache->ibo.edituv_points);
+        GPU_INDEXBUF_DISCARD_SAFE(mbuffercache->ibo.edituv_fdots);
       }
       /* We only clear the batches as they may already have been
        * referenced. */
@@ -1501,6 +1515,7 @@ void DRW_mesh_batch_cache_create_requested(struct TaskGraph *task_graph,
                                        me,
                                        is_editmode,
                                        is_paint_mode,
+                                       is_mode_active,
                                        ob->obmat,
                                        false,
                                        true,
@@ -1518,6 +1533,7 @@ void DRW_mesh_batch_cache_create_requested(struct TaskGraph *task_graph,
                                        me,
                                        is_editmode,
                                        is_paint_mode,
+                                       is_mode_active,
                                        ob->obmat,
                                        false,
                                        false,
@@ -1534,6 +1550,7 @@ void DRW_mesh_batch_cache_create_requested(struct TaskGraph *task_graph,
                                      me,
                                      is_editmode,
                                      is_paint_mode,
+                                     is_mode_active,
                                      ob->obmat,
                                      true,
                                      false,
@@ -1542,6 +1559,9 @@ void DRW_mesh_batch_cache_create_requested(struct TaskGraph *task_graph,
                                      scene,
                                      ts,
                                      use_hide);
+  /* TODO(jbakker): Work-around for threading issues in 2.90. See T79533, T79038. Needs to be
+   * solved or made permanent in 2.91. Underlying issue still needs to be researched. */
+  BLI_task_graph_work_and_wait(task_graph);
 #ifdef DEBUG
   drw_mesh_batch_cache_check_available(task_graph, me);
 #endif

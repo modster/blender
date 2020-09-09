@@ -85,7 +85,7 @@ static const EnumPropertyItem DT_layer_items[] = {
      "Transfer Freestyle edge mark"},
     {0, "", 0, "Face Corner Data", ""},
     {DT_TYPE_LNOR, "CUSTOM_NORMAL", 0, "Custom Normals", "Transfer custom normals"},
-    {DT_TYPE_VCOL, "VCOL", 0, "VCol", "Vertex (face corners) colors"},
+    {DT_TYPE_VCOL, "VCOL", 0, "Vertex Colors", "Vertex (face corners) colors"},
     {DT_TYPE_UV, "UV", 0, "UVs", "Transfer UV layers"},
     {0, "", 0, "Face Data", ""},
     {DT_TYPE_SHARP_FACE, "SMOOTH", 0, "Smooth", "Transfer flat/smooth mark"},
@@ -420,8 +420,8 @@ static int data_transfer_exec(bContext *C, wmOperator *op)
   const float ray_radius = RNA_float_get(op->ptr, "ray_radius");
   const float islands_precision = RNA_float_get(op->ptr, "islands_precision");
 
-  const int layers_src = RNA_enum_get(op->ptr, "layers_select_src");
-  const int layers_dst = RNA_enum_get(op->ptr, "layers_select_dst");
+  int layers_src = RNA_enum_get(op->ptr, "layers_select_src");
+  int layers_dst = RNA_enum_get(op->ptr, "layers_select_dst");
   int layers_select_src[DT_MULTILAYER_INDEX_MAX] = {0};
   int layers_select_dst[DT_MULTILAYER_INDEX_MAX] = {0};
   const int fromto_idx = BKE_object_data_transfer_dttype_to_srcdst_index(data_type);
@@ -445,6 +445,10 @@ static int data_transfer_exec(bContext *C, wmOperator *op)
   if (reverse_transfer && (ID_IS_LINKED(ob_src->data) || ID_IS_OVERRIDE_LIBRARY(ob_src->data))) {
     /* Do not transfer to linked or override data, not supported. */
     return OPERATOR_CANCELLED;
+  }
+
+  if (reverse_transfer) {
+    SWAP(int, layers_src, layers_dst);
   }
 
   if (fromto_idx != DT_MULTILAYER_INDEX_INVALID) {
@@ -508,13 +512,15 @@ static int data_transfer_exec(bContext *C, wmOperator *op)
 
   BLI_freelistN(&ctx_objects);
 
-  WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, NULL);
+  if (changed) {
+    DEG_relations_tag_update(CTX_data_main(C));
+    WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, NULL);
+  }
 
 #if 0 /* TODO */
   /* Note: issue with that is that if canceled, operator cannot be redone... Nasty in our case. */
   return changed ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
 #else
-  (void)changed;
   return OPERATOR_FINISHED;
 #endif
 }
@@ -760,7 +766,7 @@ void OBJECT_OT_data_transfer(wmOperatorType *ot)
 
 static bool datalayout_transfer_poll(bContext *C)
 {
-  return (edit_modifier_poll_generic(C, &RNA_DataTransferModifier, (1 << OB_MESH), true) ||
+  return (edit_modifier_poll_generic(C, &RNA_DataTransferModifier, (1 << OB_MESH), true, false) ||
           data_transfer_poll(C));
 }
 

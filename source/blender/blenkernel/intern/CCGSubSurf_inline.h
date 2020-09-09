@@ -18,8 +18,7 @@
  * \ingroup bke
  */
 
-#ifndef __CCGSUBSURF_INLINE_H__
-#define __CCGSUBSURF_INLINE_H__
+#pragma once
 
 BLI_INLINE int ccg_gridsize(int level)
 {
@@ -214,15 +213,15 @@ BLI_INLINE void Normalize(float no[3])
 
 /* Data layers mathematics. */
 
-BLI_INLINE int VertDataEqual(const float a[], const float b[], const CCGSubSurf *ss)
+BLI_INLINE bool VertDataEqual(const float a[], const float b[], const CCGSubSurf *ss)
 {
   int i;
   for (i = 0; i < ss->meshIFC.numLayers; i++) {
     if (a[i] != b[i]) {
-      return 0;
+      return false;
     }
   }
-  return 1;
+  return true;
 }
 
 BLI_INLINE void VertDataZero(float v[], const CCGSubSurf *ss)
@@ -274,5 +273,3 @@ BLI_INLINE void VertDataAvg4(float v[],
     v[i] = (a[i] + b[i] + c[i] + d[i]) * 0.25f;
   }
 }
-
-#endif /* __CCGSUBSURF_INLINE_H__ */

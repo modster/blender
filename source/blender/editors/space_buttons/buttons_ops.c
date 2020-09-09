@@ -52,7 +52,9 @@
 
 #include "buttons_intern.h" /* own include */
 
-/********************** pin id operator *********************/
+/* -------------------------------------------------------------------- */
+/** \name Pin ID Operator
+ * \{ */
 
 static int toggle_pin_exec(bContext *C, wmOperator *UNUSED(op))
 {
@@ -69,17 +71,21 @@ static int toggle_pin_exec(bContext *C, wmOperator *UNUSED(op))
 
 void BUTTONS_OT_toggle_pin(wmOperatorType *ot)
 {
-  /* identifiers */
+  /* Identifiers. */
   ot->name = "Toggle Pin ID";
   ot->description = "Keep the current data-block displayed";
   ot->idname = "BUTTONS_OT_toggle_pin";
 
-  /* api callbacks */
+  /* Callbacks. */
   ot->exec = toggle_pin_exec;
   ot->poll = ED_operator_buttons_active;
 }
 
-/********************** context_menu operator *********************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Context Menu Operator
+ * \{ */
 
 static int context_menu_invoke(bContext *C, wmOperator *UNUSED(op), const wmEvent *UNUSED(event))
 {
@@ -94,17 +100,21 @@ static int context_menu_invoke(bContext *C, wmOperator *UNUSED(op), const wmEven
 
 void BUTTONS_OT_context_menu(wmOperatorType *ot)
 {
-  /* identifiers */
+  /* Identifiers. */
   ot->name = "Context Menu";
   ot->description = "Display properties editor context_menu";
   ot->idname = "BUTTONS_OT_context_menu";
 
-  /* api callbacks */
+  /* Callbacks. */
   ot->invoke = context_menu_invoke;
   ot->poll = ED_operator_buttons_active;
 }
 
-/********************** filebrowse operator *********************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name File Browse Operator
+ * \{ */
 
 typedef struct FileBrowseOp {
   PointerRNA ptr;
@@ -128,7 +138,7 @@ static int file_browse_exec(bContext *C, wmOperator *op)
 
   str = RNA_string_get_alloc(op->ptr, path_prop, NULL, 0);
 
-  /* add slash for directories, important for some properties */
+  /* Add slash for directories, important for some properties. */
   if (RNA_property_subtype(fbo->prop) == PROP_DIRPATH) {
     const bool is_relative = RNA_boolean_get(op->ptr, "relative_path");
     id = fbo->ptr.owner_id;
@@ -137,7 +147,7 @@ static int file_browse_exec(bContext *C, wmOperator *op)
     BLI_path_abs(path, id ? ID_BLEND_PATH(bmain, id) : BKE_main_blendfile_path(bmain));
 
     if (BLI_is_dir(path)) {
-      /* do this first so '//' isnt converted to '//\' on windows */
+      /* Do this first so '//' isnt converted to '//\' on windows. */
       BLI_path_slash_ensure(path);
       if (is_relative) {
         BLI_strncpy(path, str, FILE_MAX);
@@ -166,7 +176,7 @@ static int file_browse_exec(bContext *C, wmOperator *op)
     ED_undo_push(C, undostr);
   }
 
-  /* special, annoying exception, filesel on redo panel [#26618] */
+  /* Special annoying exception, filesel on redo panel [#26618]. */
   {
     wmOperator *redo_op = WM_operator_last_redo(C);
     if (redo_op) {
@@ -214,8 +224,8 @@ static int file_browse_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
   str = RNA_property_string_get_alloc(&ptr, prop, NULL, 0, NULL);
 
-  /* useful yet irritating feature, Shift+Click to open the file
-   * Alt+Click to browse a folder in the OS's browser */
+  /* Useful yet irritating feature, Shift+Click to open the file
+   * Alt+Click to browse a folder in the OS's browser. */
   if (event->shift || event->alt) {
     wmOperatorType *ot = WM_operatortype_find("WM_OT_path_open", true);
     PointerRNA props_ptr;
@@ -246,13 +256,13 @@ static int file_browse_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   fbo->is_userdef = is_userdef;
   op->customdata = fbo;
 
-  /* normally ED_fileselect_get_params would handle this but we need to because of stupid
-   * user-prefs exception - campbell */
+  /* Normally ED_fileselect_get_params would handle this but we need to because of stupid
+   * user-prefs exception. - campbell */
   if ((prop_relpath = RNA_struct_find_property(op->ptr, "relative_path"))) {
     if (!RNA_property_is_set(op->ptr, prop_relpath)) {
       bool is_relative = (U.flag & USER_RELPATHS) != 0;
 
-      /* while we want to follow the defaults,
+      /* While we want to follow the defaults,
        * we better not switch existing paths relative/absolute state. */
       if (str[0]) {
         is_relative = BLI_path_is_rel(str);
@@ -262,7 +272,7 @@ static int file_browse_invoke(bContext *C, wmOperator *op, const wmEvent *event)
         is_relative = false;
       }
 
-      /* annoying exception!, if we're dealing with the user prefs, default relative to be off */
+      /* Annoying exception!, if we're dealing with the user prefs, default relative to be off. */
       RNA_property_boolean_set(op->ptr, prop_relpath, is_relative);
     }
   }
@@ -277,21 +287,21 @@ static int file_browse_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
 void BUTTONS_OT_file_browse(wmOperatorType *ot)
 {
-  /* identifiers */
+  /* Identifiers. */
   ot->name = "Accept";
   ot->description =
       "Open a file browser, Hold Shift to open the file, Alt to browse containing directory";
   ot->idname = "BUTTONS_OT_file_browse";
 
-  /* api callbacks */
+  /* Callbacks. */
   ot->invoke = file_browse_invoke;
   ot->exec = file_browse_exec;
   ot->cancel = file_browse_cancel;
 
-  /* conditional undo based on button flag */
+  /* Conditional undo based on button flag. */
   ot->flag = 0;
 
-  /* properties */
+  /* Properties. */
   WM_operator_properties_filesel(ot,
                                  0,
                                  FILE_SPECIAL,
@@ -301,7 +311,7 @@ void BUTTONS_OT_file_browse(wmOperatorType *ot)
                                  FILE_SORT_ALPHA);
 }
 
-/* second operator, only difference from BUTTONS_OT_file_browse is WM_FILESEL_DIRECTORY */
+/* Second operator, only difference from BUTTONS_OT_file_browse is WM_FILESEL_DIRECTORY. */
 void BUTTONS_OT_directory_browse(wmOperatorType *ot)
 {
   /* identifiers */
@@ -327,3 +337,5 @@ void BUTTONS_OT_directory_browse(wmOperatorType *ot)
                                  FILE_DEFAULTDISPLAY,
                                  FILE_SORT_ALPHA);
 }
+
+/** \} */

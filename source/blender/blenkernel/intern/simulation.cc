@@ -112,9 +112,8 @@ static void simulation_copy_data(Main *bmain, ID *id_dst, const ID *id_src, cons
     BKE_simulation_state_copy_data(state_src, state_dst);
   }
 
-  BLI_listbase_clear(&simulation_dst->persistent_data_handles);
-  BLI_duplicatelist(&simulation_dst->persistent_data_handles,
-                    &simulation_src->persistent_data_handles);
+  BLI_listbase_clear(&simulation_dst->dependencies);
+  BLI_duplicatelist(&simulation_dst->dependencies, &simulation_src->dependencies);
 }
 
 static void simulation_free_data(ID *id)
@@ -131,7 +130,7 @@ static void simulation_free_data(ID *id)
 
   BKE_simulation_state_remove_all(simulation);
 
-  BLI_freelistN(&simulation->persistent_data_handles);
+  BLI_freelistN(&simulation->dependencies);
 }
 
 static void simulation_foreach_id(ID *id, LibraryForeachIDData *data)
@@ -141,9 +140,8 @@ static void simulation_foreach_id(ID *id, LibraryForeachIDData *data)
     /* nodetree **are owned by IDs**, treat them as mere sub-data and not real ID! */
     BKE_library_foreach_ID_embedded(data, (ID **)&simulation->nodetree);
   }
-  LISTBASE_FOREACH (
-      PersistentDataHandleItem *, handle_item, &simulation->persistent_data_handles) {
-    BKE_LIB_FOREACHID_PROCESS_ID(data, handle_item->id, IDWALK_CB_USER);
+  LISTBASE_FOREACH (SimulationDependency *, dependency, &simulation->dependencies) {
+    BKE_LIB_FOREACHID_PROCESS_ID(data, dependency->id, IDWALK_CB_USER);
   }
 }
 
@@ -162,6 +160,12 @@ IDTypeInfo IDType_ID_SIM = {
     /* free_data */ simulation_free_data,
     /* make_local */ nullptr,
     /* foreach_id */ simulation_foreach_id,
+    /* foreach_cache */ NULL,
+
+    /* blend_write */ NULL,
+    /* blend_read_data */ NULL,
+    /* blend_read_lib */ NULL,
+    /* blend_read_expand */ NULL,
 };
 
 void *BKE_simulation_add(Main *bmain, const char *name)
@@ -297,21 +301,20 @@ using StateTypeMap = blender::Map<std::string, std::unique_ptr<SimulationStateTy
 
 template<typename T>
 static void add_state_type(StateTypeMap &map,
-                           const char *name,
                            void (*init)(T *state),
                            void (*reset)(T *state),
                            void (*remove)(T *state),
                            void (*copy)(const T *src, T *dst))
 {
   SimulationStateType state_type{
-      name,
-      (int)sizeof(T),
+      BKE_simulation_get_state_type_name<T>(),
+      static_cast<int>(sizeof(T)),
       (StateInitFunction)init,
       (StateResetFunction)reset,
       (StateRemoveFunction)remove,
       (StateCopyFunction)copy,
   };
-  map.add_new(name, std::make_unique<SimulationStateType>(state_type));
+  map.add_new(state_type.name, std::make_unique<SimulationStateType>(state_type));
 }
 
 static StateTypeMap init_state_types()
@@ -319,7 +322,6 @@ static StateTypeMap init_state_types()
   StateTypeMap map;
   add_state_type<ParticleSimulationState>(
       map,
-      SIM_TYPE_NAME_PARTICLE_SIMULATION,
       [](ParticleSimulationState *state) { CustomData_reset(&state->attributes); },
       [](ParticleSimulationState *state) {
         CustomData_free(&state->attributes, state->tot_particles);
@@ -339,7 +341,6 @@ static StateTypeMap init_state_types()
 
   add_state_type<ParticleMeshEmitterSimulationState>(
       map,
-      SIM_TYPE_NAME_PARTICLE_MESH_EMITTER,
       [](ParticleMeshEmitterSimulationState *UNUSED(state)) {},
       [](ParticleMeshEmitterSimulationState *state) { state->last_birth_time = 0.0f; },
       [](ParticleMeshEmitterSimulationState *UNUSED(state)) {},

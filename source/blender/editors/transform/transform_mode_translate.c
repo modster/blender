@@ -89,13 +89,13 @@ static void headerTranslation(TransInfo *t, const float vec[3], char str[UI_MAX_
     dist = len_v3(vec);
     if (!(t->flag & T_2D_EDIT) && t->scene->unit.system) {
       for (int i = 0; i < 3; i++) {
-        bUnit_AsString2(&tvec[NUM_STR_REP_LEN * i],
-                        NUM_STR_REP_LEN,
-                        dvec[i] * t->scene->unit.scale_length,
-                        4,
-                        B_UNIT_LENGTH,
-                        &t->scene->unit,
-                        true);
+        BKE_unit_value_as_string(&tvec[NUM_STR_REP_LEN * i],
+                                 NUM_STR_REP_LEN,
+                                 dvec[i] * t->scene->unit.scale_length,
+                                 4,
+                                 B_UNIT_LENGTH,
+                                 &t->scene->unit,
+                                 true);
       }
     }
     else {
@@ -106,13 +106,13 @@ static void headerTranslation(TransInfo *t, const float vec[3], char str[UI_MAX_
   }
 
   if (!(t->flag & T_2D_EDIT) && t->scene->unit.system) {
-    bUnit_AsString2(distvec,
-                    sizeof(distvec),
-                    dist * t->scene->unit.scale_length,
-                    4,
-                    B_UNIT_LENGTH,
-                    &t->scene->unit,
-                    false);
+    BKE_unit_value_as_string(distvec,
+                             sizeof(distvec),
+                             dist * t->scene->unit.scale_length,
+                             4,
+                             B_UNIT_LENGTH,
+                             &t->scene->unit,
+                             false);
   }
   else if (dist > 1e10f || dist < -1e10f) {
     /* prevent string buffer overflow */
@@ -362,15 +362,28 @@ static void applyTranslation(TransInfo *t, const int UNUSED(mval[2]))
   }
   else {
     copy_v3_v3(global_dir, t->values);
-    if ((t->con.mode & CON_APPLY) == 0) {
-      snapGridIncrement(t, global_dir);
-    }
-
     if (applyNumInput(&t->num, global_dir)) {
       removeAspectRatio(t, global_dir);
     }
+    else {
+      applySnapping(t, global_dir);
 
-    applySnapping(t, global_dir);
+      if (!validSnap(t) && !(t->con.mode & CON_APPLY)) {
+        float dist_sq = FLT_MAX;
+        if (transform_snap_grid(t, global_dir)) {
+          dist_sq = len_squared_v3v3(t->values, global_dir);
+        }
+
+        /* Check the snap distance to the initial value to work with mixed snap. */
+        float increment_loc[3];
+        copy_v3_v3(increment_loc, t->values);
+        if (transform_snap_increment(t, increment_loc)) {
+          if ((dist_sq == FLT_MAX) || (len_squared_v3v3(t->values, increment_loc) < dist_sq)) {
+            copy_v3_v3(global_dir, increment_loc);
+          }
+        }
+      }
+    }
   }
 
   if (t->con.mode & CON_APPLY) {
