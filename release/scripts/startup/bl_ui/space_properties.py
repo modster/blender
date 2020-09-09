@@ -52,7 +52,7 @@ class PROPERTIES_PT_navigation_bar(Panel):
         layout.scale_x = 1.4
         layout.scale_y = 1.4
         if view.search_filter:
-            layout.prop_tabs_enum(view, "context", data_highlight=view, 
+            layout.prop_tabs_enum(view, "context", data_highlight=view,
                 property_highlight="context_search_filter_active", icon_only=True)
         else:
             layout.prop_tabs_enum(view, "context", icon_only=True)

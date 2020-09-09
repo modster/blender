@@ -2664,11 +2664,13 @@ static void panel_activate_state(const bContext *C, Panel *panel, uiHandlePanelS
   }
 
   if (state == PANEL_STATE_EXIT) {
-    MEM_SAFE_FREE(data);
-    panel->activedata = NULL;
+    if (data != NULL) {
+      MEM_freeN(data);
+      panel->activedata = NULL;
 
-    WM_event_remove_ui_handler(
-        &win->modalhandlers, ui_handler_panel, ui_handler_remove_panel, panel, false);
+      WM_event_remove_ui_handler(
+          &win->modalhandlers, ui_handler_panel, ui_handler_remove_panel, panel, false);
+    }
   }
   else {
     if (!data) {

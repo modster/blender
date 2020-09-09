@@ -157,8 +157,8 @@ enum {
   UI_BLOCK_POPOVER_ONCE = 1 << 22,
   /** Always show keymaps, even for non-menus. */
   UI_BLOCK_SHOW_SHORTCUT_ALWAYS = 1 << 23,
-  /** The block is only used during the layout process and will not be drawn.
-   * Currently just for the case of a panel's closed subpanel. */
+  /** The block is only used during the search process and will not be drawn.
+   * Currently just for the case of a closed panel's subpanel (and its subpanels). */
   UI_BLOCK_SEARCH_ONLY = 1 << 25,
 };
 
@@ -1925,7 +1925,6 @@ float uiLayoutGetUnitsY(uiLayout *layout);
 int uiLayoutGetEmboss(uiLayout *layout);
 bool uiLayoutGetPropSep(uiLayout *layout);
 bool uiLayoutGetPropDecorate(uiLayout *layout);
-bool uiLayoutGetPropSearch(uiLayout *layout);
 void uiLayoutRootSetSearchOnly(uiLayout *layout, bool search_only);
 
 /* layout specifiers */
