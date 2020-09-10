@@ -54,9 +54,6 @@
 #include "BKE_material.h"
 #include "BKE_object.h"
 
-//#include "UI_view2d.h"
-//#include "ED_view3d.h"
-
 #include "DEG_depsgraph_query.h"
 
 /* GP Object - Boundbox Support */
@@ -2300,8 +2297,8 @@ void BKE_gpencil_convert_mesh(Main *bmain,
   MPoly *mp, *mpoly = me_eval->mpoly;
   MLoop *mloop = me_eval->mloop;
   int mpoly_len = me_eval->totpoly;
-  int stroke_mat_index = gpencil_material_find_index_by_name_prefix(ob_gp, "Stroke");
-  int fill_mat_index = gpencil_material_find_index_by_name_prefix(ob_gp, "Fill");
+  int stroke_mat_index = BKE_gpencil_material_find_index_by_name_prefix(ob_gp, "Stroke");
+  int fill_mat_index = BKE_gpencil_material_find_index_by_name_prefix(ob_gp, "Fill");
 
   /* If the object has enough materials means it was created in a previous step. */
   const bool create_mat = ((ob_gp->totcol > 0) && (ob_gp->totcol >= ob_mesh->totcol)) ? false :
