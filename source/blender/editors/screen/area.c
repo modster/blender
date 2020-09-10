@@ -2625,6 +2625,7 @@ static void ed_panel_draw(const bContext *C,
 
     pt->draw_header_preset(C, panel);
 
+    UI_block_apply_search_filter(block);
     UI_block_layout_resolve(block, &xco, &yco);
     UI_block_translate(block, headerend - xco, 0);
     panel->layout = NULL;
@@ -2656,6 +2657,7 @@ static void ed_panel_draw(const bContext *C,
 
     pt->draw_header(C, panel);
 
+    UI_block_apply_search_filter(block);
     UI_block_layout_resolve(block, &xco, &yco);
     panel->labelofs = xco - labelx;
     panel->layout = NULL;
@@ -2692,6 +2694,7 @@ static void ed_panel_draw(const bContext *C,
 
     pt->draw(C, panel);
 
+    UI_block_apply_search_filter(block);
     UI_block_layout_resolve(block, &xco, &yco);
     panel->layout = NULL;
 
