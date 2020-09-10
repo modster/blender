@@ -251,7 +251,7 @@ bool Shader::is_constant_emission(float3 *emission)
       return false;
     }
 
-    *emission = node->color * node->strength;
+    *emission = node->get_color() * node->get_strength();
   }
   else if (surf->link->parent->type == BackgroundNode::node_type) {
     BackgroundNode *node = (BackgroundNode *)surf->link->parent;
@@ -263,7 +263,7 @@ bool Shader::is_constant_emission(float3 *emission)
       return false;
     }
 
-    *emission = node->color * node->strength;
+    *emission = node->get_color() * node->get_strength();
   }
   else {
     return false;
@@ -498,7 +498,7 @@ void ShaderManager::update_shaders_used(Scene *scene)
     scene->background->get_shader()->used = true;
 
   foreach (Geometry *geom, scene->geometry)
-    foreach (Shader *shader, geom->used_shaders)
+    foreach (Shader *shader, geom->get_used_shaders())
       shader->used = true;
 
   foreach (Light *light, scene->lights)
@@ -523,7 +523,7 @@ void ShaderManager::device_update_common(Device *device,
   foreach (Shader *shader, scene->shaders) {
     uint flag = 0;
 
-    if (shader->use_mis)
+    if (shader->get_use_mis())
       flag |= SD_USE_MIS;
     if (shader->has_surface_transparent && shader->use_transparent_shadow)
       flag |= SD_HAS_TRANSPARENT_SHADOW;
@@ -626,7 +626,7 @@ void ShaderManager::add_default(Scene *scene)
     ShaderGraph *graph = new ShaderGraph();
 
     DiffuseBsdfNode *diffuse = graph->create_node<DiffuseBsdfNode>();
-    diffuse->color = make_float3(0.8f, 0.8f, 0.8f);
+    diffuse->set_color(make_float3(0.8f, 0.8f, 0.8f));
     graph->add(diffuse);
 
     graph->connect(diffuse->output("BSDF"), graph->output()->input("Surface"));
@@ -659,8 +659,8 @@ void ShaderManager::add_default(Scene *scene)
     ShaderGraph *graph = new ShaderGraph();
 
     EmissionNode *emission = graph->create_node<EmissionNode>();
-    emission->color = make_float3(0.8f, 0.8f, 0.8f);
-    emission->strength = 0.0f;
+    emission->set_color(make_float3(0.8f, 0.8f, 0.8f));
+    emission->set_strength(0.0f);
     graph->add(emission);
 
     graph->connect(emission->output("Emission"), graph->output()->input("Surface"));
@@ -704,10 +704,10 @@ void ShaderManager::get_requested_graph_features(ShaderGraph *graph,
     requested_features->nodes_features |= node->get_feature();
     if (node->special_type == SHADER_SPECIAL_TYPE_CLOSURE) {
       BsdfBaseNode *bsdf_node = static_cast<BsdfBaseNode *>(node);
-      if (CLOSURE_IS_VOLUME(bsdf_node->closure)) {
+      if (CLOSURE_IS_VOLUME(bsdf_node->get_closure_type())) {
         requested_features->nodes_features |= NODE_FEATURE_VOLUME;
       }
-      else if (CLOSURE_IS_PRINCIPLED(bsdf_node->closure)) {
+      else if (CLOSURE_IS_PRINCIPLED(bsdf_node->get_closure_type())) {
         requested_features->use_principled = true;
       }
     }
