@@ -739,7 +739,7 @@ static bool lineart_triangle_adjacent_line_set(LineartRenderTriangle *rt,
  * for triangles that crossing the near plane, it will generate new 1 or 2 triangles with
  * new topology that represents the trimmed triangle. (which then became a triangle or square)
  */
-static void lineart_main_cull_triangles(LineartRenderBuffer *rb)
+static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
 {
   LineartRenderLine *rl;
   LineartRenderTriangle *rt, *rt1, *rt2, *rt_next_to;
@@ -752,19 +752,26 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb)
   int v_count = 0, t_count = 0;
   Object *ob;
   bool added;
-
+  double cam_pos[3];
+  double clip_start = rb->near_clip, clip_end = rb->far_clip;
   double view_dir[3], clip_advance[3];
+
   copy_v3_v3_db(view_dir, rb->view_vector);
   copy_v3_v3_db(clip_advance, rb->view_vector);
-
-  double cam_pos[3];
-  double clip_start;
   copy_v3_v3_db(cam_pos, rb->camera_pos);
 
-  clip_start = rb->near_clip;
+  if (clip_far) {
+    /* Move starting point to end plane */
+    mul_v3db_db(clip_advance, -clip_end);
+    add_v3_v3_db(cam_pos, clip_advance);
 
-  mul_v3db_db(clip_advance, -clip_start);
-  add_v3_v3_db(cam_pos, clip_advance);
+    /* "reverse looking" */
+    mul_v3db_db(view_dir, -1.0f);
+  }
+  else { /* Clip Near */
+    mul_v3db_db(clip_advance, -clip_start);
+    add_v3_v3_db(cam_pos, clip_advance);
+  }
 
   veln = lineart_memory_get_vert_space(rb);
   teln = lineart_memory_get_triangle_space(rb);
@@ -784,18 +791,29 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb)
       /* Select the triangle in the array. */
       rt = (void *)(((unsigned char *)reln->pointer) + rb->triangle_size * i);
 
-      /* Point inside near plane */
-      if (-rt->v[0]->fbcoord[3] > rt->v[0]->fbcoord[2] ||
-          rt->v[0]->fbcoord[2] > rt->v[0]->fbcoord[3]) {
-        in0 = 1;
+      if (clip_far) {
+        /* Point outside far plane */
+        if (rt->v[0]->fbcoord[3] > clip_end) {
+          in0 = 1;
+        }
+        if (rt->v[1]->fbcoord[3] > clip_end) {
+          in1 = 1;
+        }
+        if (rt->v[2]->fbcoord[3] > clip_end) {
+          in2 = 1;
+        }
       }
-      if (-rt->v[1]->fbcoord[3] > rt->v[1]->fbcoord[2] ||
-          rt->v[1]->fbcoord[2] > rt->v[1]->fbcoord[3]) {
-        in1 = 1;
-      }
-      if (-rt->v[2]->fbcoord[3] > rt->v[2]->fbcoord[2] ||
-          rt->v[2]->fbcoord[2] > rt->v[2]->fbcoord[3]) {
-        in2 = 1;
+      else {
+        /* Point inside near plane */
+        if (rt->v[0]->fbcoord[3] < clip_start) {
+          in0 = 1;
+        }
+        if (rt->v[1]->fbcoord[3] < clip_start) {
+          in1 = 1;
+        }
+        if (rt->v[2]->fbcoord[3] < clip_start) {
+          in2 = 1;
+        }
       }
 
       /* Additional memory space for storing generated points and triangles */
@@ -2417,9 +2435,14 @@ static void lineart_main_compute_scene_contours(LineartRenderBuffer *rb)
     LineartRenderLine *rl = (LineartRenderLine *)reln->pointer;
     int amount = reln->element_count;
     for (int i = 0; i < amount; i++) {
+      rl = &((LineartRenderLine *)reln->pointer)[i];
       add = 0;
       dot_1 = 0;
       dot_2 = 0;
+
+      if (!rl->next && !rl->prev) {
+        continue;
+      }
 
       if (rb->cam_is_persp) {
         sub_v3_v3v3_db(view_vector, rl->l->gloc, rb->camera_pos);
@@ -2495,9 +2518,6 @@ static void lineart_main_compute_scene_contours(LineartRenderBuffer *rb)
           }
         }
       }
-
-      /*  line count reserved for feature such as progress feedback */
-      rl++;
     }
   }
 
@@ -3702,7 +3722,8 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
   LRT_CANCEL_STAGE
 
   lineart_main_get_view_vector(rb);
-  lineart_main_cull_triangles(rb);
+  lineart_main_cull_triangles(rb, false);
+  lineart_main_cull_triangles(rb, true);
 
   lineart_main_perspective_division(rb);
 
