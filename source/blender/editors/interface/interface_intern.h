@@ -527,7 +527,11 @@ struct uiBlock {
    */
   char display_device[64];
 
-  char *search_filter;
+  /**
+   * Pointer to the space's property search string.
+   * The block doesn't allocate this or change it.
+   */
+  const char *search_filter;
 
   struct PieMenuData pie_data;
 };
