@@ -314,7 +314,7 @@ static void panel_draw(const bContext *C, Panel *panel)
   Scene *scene = CTX_data_scene(C);
 
   PointerRNA ptr, ob_ptr;
-  gpencil_modifier_panel_get_property_pointers(C, panel, &ob_ptr, &ptr);
+  gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
 
   PointerRNA obj_data_ptr = RNA_pointer_get(&ob_ptr, "data");
 
@@ -367,7 +367,7 @@ static void panel_draw(const bContext *C, Panel *panel)
 static void occlusion_panel_draw(const bContext *C, Panel *panel)
 {
   PointerRNA ptr;
-  gpencil_modifier_panel_get_property_pointers(C, panel, NULL, &ptr);
+  gpencil_modifier_panel_get_property_pointers(panel, NULL);
 
   uiLayout *layout = panel->layout;
 
