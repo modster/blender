@@ -461,16 +461,18 @@ static void view3d_main_region_exit(wmWindowManager *wm, ARegion *region)
   ED_view3d_stop_render_preview(wm, region);
 }
 
+static bool view3d_drop_in_main_region_poll(bContext *C, const wmEvent *event)
+{
+  ScrArea *area = CTX_wm_area(C);
+  return ED_region_overlap_isect_any_xy(area, &event->x) == false;
+}
+
 static ID *view3d_drop_id_in_main_region_poll_id(bContext *C,
                                                  wmDrag *drag,
                                                  const wmEvent *event,
                                                  ID_Type id_type)
 {
-  ScrArea *area = CTX_wm_area(C);
-  if (ED_region_overlap_isect_any_xy(area, &event->x)) {
-    return false;
-  }
-  return WM_drag_ID(drag, id_type) || WM_drag_asset_data(drag, id_type);
+  return view3d_drop_in_main_region_poll(C, event) ? WM_drag_ID(drag, id_type) : NULL;
 }
 
 static bool view3d_drop_id_in_main_region_poll(bContext *C,
@@ -478,7 +480,11 @@ static bool view3d_drop_id_in_main_region_poll(bContext *C,
                                                const wmEvent *event,
                                                ID_Type id_type)
 {
-  return (view3d_drop_id_in_main_region_poll_id(C, drag, event, id_type) != NULL);
+  if (!view3d_drop_in_main_region_poll(C, event)) {
+    return false;
+  }
+
+  return WM_drag_ID(drag, id_type) || WM_drag_asset_data(drag, id_type);
 }
 
 static bool view3d_ob_drop_poll(bContext *C,
