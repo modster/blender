@@ -28,9 +28,9 @@ class Volume : public Mesh {
 
   Volume();
 
-  float clipping;
-  float step_size;
-  bool object_space;
+  NODE_PUBLIC_API(float, clipping)
+  NODE_PUBLIC_API(float, step_size)
+  NODE_PUBLIC_API(bool, object_space)
 
   virtual void clear() override;
 };

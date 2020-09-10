@@ -518,20 +518,20 @@ void GeometryManager::create_volume_mesh(Volume *volume, Progress &progress)
 
       if (image_memory->data_elements == 1) {
         grid = openvdb_grid_from_device_texture<openvdb::FloatGrid>(
-            image_memory, volume->clipping, handle.metadata().transform_3d);
+            image_memory, volume->get_clipping(), handle.metadata().transform_3d);
       }
       else if (image_memory->data_elements == 3) {
         grid = openvdb_grid_from_device_texture<openvdb::Vec3fGrid>(
-            image_memory, volume->clipping, handle.metadata().transform_3d);
+            image_memory, volume->get_clipping(), handle.metadata().transform_3d);
       }
       else if (image_memory->data_elements == 4) {
         grid = openvdb_grid_from_device_texture<openvdb::Vec4fGrid>(
-            image_memory, volume->clipping, handle.metadata().transform_3d);
+            image_memory, volume->get_clipping(), handle.metadata().transform_3d);
       }
     }
 
     if (grid) {
-      builder.add_grid(grid, do_clipping, volume->clipping);
+      builder.add_grid(grid, do_clipping, volume->get_clipping());
     }
   }
 #endif

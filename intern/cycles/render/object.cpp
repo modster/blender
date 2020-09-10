@@ -316,7 +316,7 @@ float Object::compute_volume_step_size() const
         }
 
         /* User specified step size. */
-        float voxel_step_size = volume->step_size;
+        float voxel_step_size = volume->get_step_size();
 
         if (voxel_step_size == 0.0f) {
           /* Auto detect step size. */
@@ -330,7 +330,7 @@ float Object::compute_volume_step_size() const
           }
           voxel_step_size = min3(fabs(transform_direction(&voxel_tfm, size)));
         }
-        else if (volume->object_space) {
+        else if (volume->get_object_space()) {
           /* User specified step size in object space. */
           float3 size = make_float3(voxel_step_size, voxel_step_size, voxel_step_size);
           voxel_step_size = min3(fabs(transform_direction(&tfm, size)));
@@ -381,7 +381,7 @@ float ObjectManager::object_surface_area(UpdateObjectTransformState *state,
   Mesh *mesh = static_cast<Mesh *>(geom);
   if (mesh->has_volume || geom->geometry_type == Geometry::VOLUME) {
     /* Volume density automatically adjust to object scale. */
-    if (geom->geometry_type == Geometry::VOLUME && static_cast<Volume *>(geom)->object_space) {
+    if (geom->geometry_type == Geometry::VOLUME && static_cast<Volume *>(geom)->get_object_space()) {
       const float3 unit = normalize(make_float3(1.0f, 1.0f, 1.0f));
       return 1.0f / len(transform_direction(&tfm, unit));
     }
