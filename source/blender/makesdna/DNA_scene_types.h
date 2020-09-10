@@ -1138,6 +1138,9 @@ typedef struct GP_Interpolate_Settings {
   float back;
   /** BEZT_IPO_ELASTIC. */
   float amplitude, period;
+  /* Step between sequence interpolated frames. */
+  int step;
+  char _pad[4];
 
   /** Custom interpolation curve (for use with GP_IPO_CURVEMAP). */
   struct CurveMapping *custom_ipo;
@@ -1532,8 +1535,9 @@ typedef struct UnitSettings {
   char length_unit;
   char mass_unit;
   char time_unit;
+  char temperature_unit;
 
-  char _pad[5];
+  char _pad[4];
 } UnitSettings;
 
 /* ------------------------------------------- */

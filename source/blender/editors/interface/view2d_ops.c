@@ -107,7 +107,7 @@ typedef struct v2dViewPanData {
 } v2dViewPanData;
 
 /* initialize panning customdata */
-static int view_pan_init(bContext *C, wmOperator *op)
+static bool view_pan_init(bContext *C, wmOperator *op)
 {
   ARegion *region = CTX_wm_region(C);
   v2dViewPanData *vpd;
@@ -116,13 +116,13 @@ static int view_pan_init(bContext *C, wmOperator *op)
 
   /* regions now have v2d-data by default, so check for region */
   if (region == NULL) {
-    return 0;
+    return false;
   }
 
   /* check if panning is allowed at all */
   v2d = &region->v2d;
   if ((v2d->keepofs & V2D_LOCKOFS_X) && (v2d->keepofs & V2D_LOCKOFS_Y)) {
-    return 0;
+    return false;
   }
 
   /* set custom-data for operator */
@@ -141,7 +141,7 @@ static int view_pan_init(bContext *C, wmOperator *op)
   vpd->facx = (BLI_rctf_size_x(&v2d->cur)) / winx;
   vpd->facy = (BLI_rctf_size_y(&v2d->cur)) / winy;
 
-  return 1;
+  return true;
 }
 
 #ifdef WITH_INPUT_NDOF
@@ -152,17 +152,17 @@ static bool view_pan_poll(bContext *C)
 
   /* check if there's a region in context to work with */
   if (region == NULL) {
-    return 0;
+    return false;
   }
   v2d = &region->v2d;
 
   /* check that 2d-view can pan */
   if ((v2d->keepofs & V2D_LOCKOFS_X) && (v2d->keepofs & V2D_LOCKOFS_Y)) {
-    return 0;
+    return false;
   }
 
   /* view can pan */
-  return 1;
+  return true;
 }
 #endif
 
@@ -808,7 +808,7 @@ static void view_zoom_axis_lock_defaults(bContext *C, bool r_do_zoom_xy[2])
 }
 
 /* initialize panning customdata */
-static int view_zoomdrag_init(bContext *C, wmOperator *op)
+static bool view_zoomdrag_init(bContext *C, wmOperator *op)
 {
   ARegion *region = CTX_wm_region(C);
   v2dViewZoomData *vzd;
@@ -816,13 +816,13 @@ static int view_zoomdrag_init(bContext *C, wmOperator *op)
 
   /* regions now have v2d-data by default, so check for region */
   if (region == NULL) {
-    return 0;
+    return false;
   }
   v2d = &region->v2d;
 
   /* check that 2d-view is zoomable */
   if ((v2d->keepzoom & V2D_LOCKZOOM_X) && (v2d->keepzoom & V2D_LOCKZOOM_Y)) {
-    return 0;
+    return false;
   }
 
   /* set custom-data for operator */
@@ -833,7 +833,7 @@ static int view_zoomdrag_init(bContext *C, wmOperator *op)
   vzd->v2d = v2d;
   vzd->region = region;
 
-  return 1;
+  return true;
 }
 
 /* check if step-zoom can be applied */
@@ -1723,13 +1723,10 @@ static float smooth_view_rect_to_fac(const rctf *rect_a, const rctf *rect_b)
   const float cent_b[2] = {BLI_rctf_cent_x(rect_b), BLI_rctf_cent_y(rect_b)};
 
   float fac_max = 0.0f;
-  float tfac;
 
-  int i;
-
-  for (i = 0; i < 2; i++) {
+  for (int i = 0; i < 2; i++) {
     /* axis translation normalized to scale */
-    tfac = fabsf(cent_a[i] - cent_b[i]) / min_ff(size_a[i], size_b[i]);
+    float tfac = fabsf(cent_a[i] - cent_b[i]) / min_ff(size_a[i], size_b[i]);
     fac_max = max_ff(fac_max, tfac);
     if (fac_max >= 1.0f) {
       break;

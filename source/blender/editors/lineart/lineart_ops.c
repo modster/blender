@@ -21,6 +21,8 @@
  * \ingroup editors
  */
 
+#pragma once
+
 #include <stdlib.h>
 
 #include "BLI_utildefines.h"
@@ -34,3 +36,4 @@ void ED_operatortypes_lineart(void)
   WM_operatortype_append(SCENE_OT_lineart_update_strokes);
   WM_operatortype_append(SCENE_OT_lineart_bake_strokes);
 }
+

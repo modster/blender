@@ -154,9 +154,11 @@ static void scene_init_data(ID *id)
 
   scene->unit.system = USER_UNIT_METRIC;
   scene->unit.scale_length = 1.0f;
-  scene->unit.length_unit = (uchar)bUnit_GetBaseUnitOfType(USER_UNIT_METRIC, B_UNIT_LENGTH);
-  scene->unit.mass_unit = (uchar)bUnit_GetBaseUnitOfType(USER_UNIT_METRIC, B_UNIT_MASS);
-  scene->unit.time_unit = (uchar)bUnit_GetBaseUnitOfType(USER_UNIT_METRIC, B_UNIT_TIME);
+  scene->unit.length_unit = (uchar)BKE_unit_base_of_type_get(USER_UNIT_METRIC, B_UNIT_LENGTH);
+  scene->unit.mass_unit = (uchar)BKE_unit_base_of_type_get(USER_UNIT_METRIC, B_UNIT_MASS);
+  scene->unit.time_unit = (uchar)BKE_unit_base_of_type_get(USER_UNIT_METRIC, B_UNIT_TIME);
+  scene->unit.temperature_unit = (uchar)BKE_unit_base_of_type_get(USER_UNIT_METRIC,
+                                                                  B_UNIT_TEMPERATURE);
 
   /* Anti-Aliasing threshold. */
   scene->grease_pencil_settings.smaa_threshold = 1.0f;
@@ -1526,8 +1528,7 @@ static void scene_graph_update_tagged(Depsgraph *depsgraph, Main *bmain, bool on
     /* Flush editing data if needed. */
     prepare_mesh_for_viewport_render(bmain, view_layer);
     /* Update all objects: drivers, matrices, displists, etc. flags set
-     * by depgraph or manual, no layer check here, gets correct flushed.
-     */
+     * by depsgraph or manual, no layer check here, gets correct flushed. */
     DEG_evaluate_on_refresh(depsgraph);
     /* Update sound system. */
     BKE_scene_update_sound(depsgraph, bmain);
@@ -2449,6 +2450,10 @@ void BKE_scene_transform_orientation_remove(Scene *scene, TransformOrientation *
       /* could also use orientation_index-- */
       orient_slot->type = V3D_ORIENT_GLOBAL;
       orient_slot->index_custom = -1;
+    }
+    else if (orient_slot->index_custom > orientation_index) {
+      BLI_assert(orient_slot->type == V3D_ORIENT_CUSTOM);
+      orient_slot->index_custom--;
     }
   }
 
