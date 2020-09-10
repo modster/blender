@@ -5197,19 +5197,21 @@ static bool button_matches_search_filter(uiBut *but, const char *search_filter)
       PropertyRNA *enum_prop = but->rnaprop;
 
       int items_len;
-      const EnumPropertyItem *enum_items = NULL;
+      const EnumPropertyItem *items_array = NULL;
       bool free;
-      RNA_property_enum_items(NULL, ptr, enum_prop, &enum_items, &items_len, &free);
+      RNA_property_enum_items_gettexted(NULL, ptr, enum_prop, &items_array, &items_len, &free);
 
-      if (enum_items != NULL) {
-        for (int i = 0; i < items_len; i++) {
-          if (BLI_strcasestr(enum_items[i].name, search_filter)) {
-            return true;
-          }
+      if (items_array == NULL) {
+        return false;
+      }
+
+      for (int i = 0; i < items_len; i++) {
+        if (BLI_strcasestr(items_array[i].name, search_filter)) {
+          return true;
         }
-        if (free) {
-          MEM_freeN(enum_items);
-        }
+      }
+      if (free) {
+        MEM_freeN((EnumPropertyItem *)items_array);
       }
     }
   }
