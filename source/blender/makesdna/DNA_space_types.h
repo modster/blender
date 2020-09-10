@@ -129,6 +129,11 @@ typedef enum eSpaceInfo_RptMask {
 /** \name Properties Editor
  * \{ */
 
+typedef struct SpaceProperties_Runtime {
+  /** For filtering properties displayed in the space. Length defined as UI_MAX_NAME_STR. */
+  char search_string[128];
+} SpaceProperties_Runtime;
+
 /* Properties Editor */
 typedef struct SpaceProperties {
   SpaceLink *next, *prev;
@@ -158,10 +163,9 @@ typedef struct SpaceProperties {
   int pathflag, dataicon;
   ID *pinid;
 
-  /** For filtering properties displayed in the space. */
-  char search_string[64];
-
   void *texuser;
+
+  SpaceProperties_Runtime runtime;
 } SpaceProperties;
 
 /* button defines (deprecated) */
