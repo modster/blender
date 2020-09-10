@@ -80,8 +80,8 @@ void ED_region_tag_redraw_no_rebuild(struct ARegion *region);
 void ED_region_tag_refresh_ui(struct ARegion *region);
 void ED_region_tag_redraw_editor_overlays(struct ARegion *region);
 
-void ED_region_search_filter_update(const struct bContext *C, struct ARegion *region);
-char *ED_area_search_filter_get(const struct bContext *C);
+void ED_region_search_filter_update(const struct ScrArea *area, struct ARegion *region);
+const char *ED_area_search_filter_get(const struct ScrArea *area, const struct ARegion *region);
 
 void ED_region_panels_init(struct wmWindowManager *wm, struct ARegion *region);
 void ED_region_panels_ex(const struct bContext *C, struct ARegion *region, const char *contexts[]);
