@@ -392,8 +392,8 @@ void BVHSpatialSplit::split_curve_primitive(const Hair *hair,
   Hair::Curve curve = hair->get_curve(prim_index);
   const int k0 = curve.first_key + segment_index;
   const int k1 = k0 + 1;
-  float3 v0 = hair->curve_keys[k0];
-  float3 v1 = hair->curve_keys[k1];
+  float3 v0 = hair->get_curve_keys()[k0];
+  float3 v1 = hair->get_curve_keys()[k1];
 
   if (tfm != NULL) {
     v0 = transform_point(tfm, v0);

@@ -833,7 +833,7 @@ void GeometryManager::mesh_calc_offset(Scene *scene)
       hair->curvekey_offset = curve_key_size;
       hair->prim_offset = curve_size;
 
-      curve_key_size += hair->curve_keys.size();
+      curve_key_size += hair->get_curve_keys().size();
       curve_size += hair->num_curves();
 
       hair->optix_prim_offset = optix_prim_size;
@@ -875,7 +875,7 @@ void GeometryManager::device_update_mesh(
     else if (geom->is_hair()) {
       Hair *hair = static_cast<Hair *>(geom);
 
-      curve_key_size += hair->curve_keys.size();
+      curve_key_size += hair->get_curve_keys().size();
       curve_size += hair->num_curves();
     }
   }

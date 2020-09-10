@@ -216,13 +216,13 @@ size_t Attribute::element_size(Geometry *geom, AttributePrimitive prim) const
     case ATTR_ELEMENT_CURVE_KEY:
       if (geom->geometry_type == Geometry::HAIR) {
         Hair *hair = static_cast<Hair *>(geom);
-        size = hair->curve_keys.size();
+        size = hair->get_curve_keys().size();
       }
       break;
     case ATTR_ELEMENT_CURVE_KEY_MOTION:
       if (geom->geometry_type == Geometry::HAIR) {
         Hair *hair = static_cast<Hair *>(geom);
-        size = hair->curve_keys.size() * (hair->get_motion_steps() - 1);
+        size = hair->get_curve_keys().size() * (hair->get_motion_steps() - 1);
       }
       break;
     default:

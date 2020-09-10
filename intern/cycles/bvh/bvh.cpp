@@ -213,19 +213,19 @@ void BVH::refit_primitives(int start, int end, BoundBox &bbox, uint &visibility)
         Hair::Curve curve = hair->get_curve(pidx - prim_offset);
         int k = PRIMITIVE_UNPACK_SEGMENT(pack.prim_type[prim]);
 
-        curve.bounds_grow(k, &hair->curve_keys[0], &hair->curve_radius[0], bbox);
+        curve.bounds_grow(k, &hair->get_curve_keys()[0], &hair->get_curve_radius()[0], bbox);
 
         /* Motion curves. */
         if (hair->get_use_motion_blur()) {
           Attribute *attr = hair->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
 
           if (attr) {
-            size_t hair_size = hair->curve_keys.size();
+            size_t hair_size = hair->get_curve_keys().size();
             size_t steps = hair->get_motion_steps() - 1;
             float3 *key_steps = attr->data_float3();
 
             for (size_t i = 0; i < steps; i++)
-              curve.bounds_grow(k, key_steps + i * hair_size, &hair->curve_radius[0], bbox);
+              curve.bounds_grow(k, key_steps + i * hair_size, &hair->get_curve_radius()[0], bbox);
           }
         }
       }

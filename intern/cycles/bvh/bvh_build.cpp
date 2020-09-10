@@ -169,12 +169,12 @@ void BVHBuild::add_reference_curves(BoundBox &root, BoundBox &center, Hair *hair
   const size_t num_curves = hair->num_curves();
   for (uint j = 0; j < num_curves; j++) {
     const Hair::Curve curve = hair->get_curve(j);
-    const float *curve_radius = &hair->curve_radius[0];
+    const float *curve_radius = &hair->get_curve_radius()[0];
     for (int k = 0; k < curve.num_keys - 1; k++) {
       if (curve_attr_mP == NULL) {
         /* Really simple logic for static hair. */
         BoundBox bounds = BoundBox::empty;
-        curve.bounds_grow(k, &hair->curve_keys[0], curve_radius, bounds);
+        curve.bounds_grow(k, &hair->get_curve_keys()[0], curve_radius, bounds);
         if (bounds.valid()) {
           int packed_type = PRIMITIVE_PACK_SEGMENT(primitive_type, k);
           references.push_back(BVHReference(bounds, j, i, packed_type));
@@ -189,8 +189,8 @@ void BVHBuild::add_reference_curves(BoundBox &root, BoundBox &center, Hair *hair
          */
         /* TODO(sergey): Support motion steps for spatially split BVH. */
         BoundBox bounds = BoundBox::empty;
-        curve.bounds_grow(k, &hair->curve_keys[0], curve_radius, bounds);
-        const size_t num_keys = hair->curve_keys.size();
+        curve.bounds_grow(k, &hair->get_curve_keys()[0], curve_radius, bounds);
+        const size_t num_keys = hair->get_curve_keys().size();
         const size_t num_steps = hair->get_motion_steps();
         const float3 *key_steps = curve_attr_mP->data_float3();
         for (size_t step = 0; step < num_steps - 1; step++) {
@@ -211,9 +211,9 @@ void BVHBuild::add_reference_curves(BoundBox &root, BoundBox &center, Hair *hair
         const int num_bvh_steps = params.num_motion_curve_steps * 2 + 1;
         const float num_bvh_steps_inv_1 = 1.0f / (num_bvh_steps - 1);
         const size_t num_steps = hair->get_motion_steps();
-        const float3 *curve_keys = &hair->curve_keys[0];
+        const float3 *curve_keys = &hair->get_curve_keys()[0];
         const float3 *key_steps = curve_attr_mP->data_float3();
-        const size_t num_keys = hair->curve_keys.size();
+        const size_t num_keys = hair->get_curve_keys().size();
         /* Calculate bounding box of the previous time step.
          * Will be reused later to avoid duplicated work on
          * calculating BVH time step boundbox.

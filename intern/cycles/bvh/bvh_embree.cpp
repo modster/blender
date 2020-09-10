@@ -678,11 +678,11 @@ void BVHEmbree::update_curve_vertex_buffer(RTCGeometry geom_id, const Hair *hair
 
   /* Copy the CV data to Embree */
   const int t_mid = (num_motion_steps - 1) / 2;
-  const float *curve_radius = &hair->curve_radius[0];
+  const float *curve_radius = &hair->get_curve_radius()[0];
   for (int t = 0; t < num_motion_steps; ++t) {
     const float3 *verts;
     if (t == t_mid || attr_mP == NULL) {
-      verts = &hair->curve_keys[0];
+      verts = &hair->get_curve_keys()[0];
     }
     else {
       int t_ = (t > t_mid) ? (t - 1) : t;
