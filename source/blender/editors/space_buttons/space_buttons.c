@@ -123,7 +123,7 @@ static SpaceLink *buttons_duplicate(SpaceLink *sl)
   /* clear or remove stuff from old */
   sbutsn->path = NULL;
   sbutsn->texuser = NULL;
-  strcpy(sbutsn->search_string, "");
+  sbutsn->runtime.search_string[0] = '\0';
 
   return (SpaceLink *)sbutsn;
 }

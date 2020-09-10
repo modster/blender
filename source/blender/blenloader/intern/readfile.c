@@ -5829,6 +5829,7 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
       sbuts->texuser = NULL;
       sbuts->mainbo = sbuts->mainb;
       sbuts->mainbuser = sbuts->mainb;
+      memset(&sbuts->runtime, 0x0, sizeof(sbuts->runtime));
     }
     else if (sl->spacetype == SPACE_CONSOLE) {
       SpaceConsole *sconsole = (SpaceConsole *)sl;

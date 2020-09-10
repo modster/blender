@@ -747,7 +747,7 @@ const char *ED_area_search_filter_get(const ScrArea *area)
   /* Only the properties editor has a search string for now. */
   if (area->spacetype) {
     SpaceProperties *sbuts = area->spacedata.first;
-    return sbuts->search_string;
+    return sbuts->runtime.search_string;
   }
 
   return NULL;
