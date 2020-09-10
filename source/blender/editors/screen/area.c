@@ -742,12 +742,14 @@ void ED_area_tag_refresh(ScrArea *area)
 /**
  * Returns the search string if the space type supports property search.
  */
-const char *ED_area_search_filter_get(const ScrArea *area)
+const char *ED_area_search_filter_get(const ScrArea *area, const ARegion *region)
 {
   /* Only the properties editor has a search string for now. */
-  if (area->spacetype) {
+  if (area->spacetype == SPACE_PROPERTIES) {
     SpaceProperties *sbuts = area->spacedata.first;
-    return sbuts->runtime.search_string;
+    if (region->regiontype == RGN_TYPE_WINDOW) {
+      return sbuts->runtime.search_string;
+    }
   }
 
   return NULL;
@@ -757,8 +759,10 @@ void ED_region_search_filter_update(const ScrArea *area, ARegion *region)
 {
   region->flag |= RGN_FLAG_SEARCH_FILTER_UPDATE;
 
-  const char *search_filter = ED_area_search_filter_get(area);
-  SET_FLAG_FROM_TEST(region->flag, search_filter[0] != '\0', RGN_FLAG_SEARCH_FILTER_ACTIVE);
+  const char *search_filter = ED_area_search_filter_get(area, region);
+  SET_FLAG_FROM_TEST(region->flag,
+                     region->regiontype == RGN_TYPE_WINDOW && search_filter[0] != '\0',
+                     RGN_FLAG_SEARCH_FILTER_ACTIVE);
 }
 
 /* *************************************************************** */
@@ -2829,7 +2833,7 @@ void ED_region_panels_layout_ex(const bContext *C,
   UI_panels_begin(C, region);
 
   /* Get search string for property search. */
-  const char *search_filter = ED_area_search_filter_get(area);
+  const char *search_filter = ED_area_search_filter_get(area, region);
 
   /* set view2d view matrix  - UI_block_begin() stores it */
   UI_view2d_view_ortho(v2d);
