@@ -313,22 +313,22 @@ static void panel_draw(const bContext *C, Panel *panel)
   uiLayout *layout = panel->layout;
   Scene *scene = CTX_data_scene(C);
 
-  PointerRNA ptr, ob_ptr;
-  gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
 
   PointerRNA obj_data_ptr = RNA_pointer_get(&ob_ptr, "data");
 
-  int source_type = RNA_enum_get(&ptr, "source_type");
+  int source_type = RNA_enum_get(ptr, "source_type");
 
   uiLayoutSetPropSep(layout, true);
 
-  uiItemR(layout, &ptr, "source_type", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "source_type", 0, NULL, ICON_NONE);
 
   if (source_type == LRT_SOURCE_OBJECT) {
-    uiItemR(layout, &ptr, "source_object", 0, NULL, ICON_CUBE);
+    uiItemR(layout, ptr, "source_object", 0, NULL, ICON_CUBE);
   }
   else if (source_type == LRT_SOURCE_COLLECTION) {
-    uiItemR(layout, &ptr, "source_collection", 0, NULL, ICON_GROUP);
+    uiItemR(layout, ptr, "source_collection", 0, NULL, ICON_GROUP);
   }
 
   if (scene->lineart.flags & LRT_EVERYTHING_AS_CONTOUR) {
@@ -336,80 +336,79 @@ static void panel_draw(const bContext *C, Panel *panel)
   }
   else {
     if (scene->lineart.line_types & LRT_EDGE_FLAG_CONTOUR) {
-      uiItemR(layout, &ptr, "use_contour", 0, NULL, ICON_NONE);
+      uiItemR(layout, ptr, "use_contour", 0, NULL, ICON_NONE);
     }
     if (scene->lineart.line_types & LRT_EDGE_FLAG_CREASE) {
-      uiItemR(layout, &ptr, "use_crease", 0, "Crease", ICON_NONE);
+      uiItemR(layout, ptr, "use_crease", 0, "Crease", ICON_NONE);
     }
     if (scene->lineart.line_types & LRT_EDGE_FLAG_MATERIAL) {
-      uiItemR(layout, &ptr, "use_material", 0, "Material", ICON_NONE);
+      uiItemR(layout, ptr, "use_material", 0, "Material", ICON_NONE);
     }
     if (scene->lineart.line_types & LRT_EDGE_FLAG_EDGE_MARK) {
-      uiItemR(layout, &ptr, "use_edge_mark", 0, "Edge Marks", ICON_NONE);
+      uiItemR(layout, ptr, "use_edge_mark", 0, "Edge Marks", ICON_NONE);
     }
     if (scene->lineart.flags & LRT_INTERSECTION_AS_CONTOUR) {
       uiItemL(layout, "Intersection is fuzzy", ICON_NONE);
     }
     else {
       if (scene->lineart.line_types & LRT_EDGE_FLAG_INTERSECTION) {
-        uiItemR(layout, &ptr, "use_intersection", 0, "Intersection", ICON_NONE);
+        uiItemR(layout, ptr, "use_intersection", 0, "Intersection", ICON_NONE);
       }
     }
   }
 
-  uiItemPointerR(layout, &ptr, "target_layer", &obj_data_ptr, "layers", NULL, ICON_GREASEPENCIL);
+  uiItemPointerR(layout, ptr, "target_layer", &obj_data_ptr, "layers", NULL, ICON_GREASEPENCIL);
   uiItemPointerR(
-      layout, &ptr, "target_material", &obj_data_ptr, "materials", NULL, ICON_SHADING_TEXTURE);
+      layout, ptr, "target_material", &obj_data_ptr, "materials", NULL, ICON_SHADING_TEXTURE);
 
-  gpencil_modifier_panel_end(layout, &ptr);
+  gpencil_modifier_panel_end(layout, ptr);
 }
 
 static void occlusion_panel_draw(const bContext *C, Panel *panel)
 {
-  PointerRNA ptr;
-  gpencil_modifier_panel_get_property_pointers(panel, NULL);
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
 
   uiLayout *layout = panel->layout;
 
   uiLayoutSetPropSep(layout, true);
 
-  uiItemR(layout, &ptr, "thickness", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
-  uiItemR(layout, &ptr, "opacity", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "thickness", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "opacity", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 
-  uiItemR(layout, &ptr, "pre_sample_length", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "pre_sample_length", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 
-  bool use_multiple_levels = RNA_boolean_get(&ptr, "use_multiple_levels");
-  bool use_transparency = RNA_boolean_get(&ptr, "use_transparency");
+  bool use_multiple_levels = RNA_boolean_get(ptr, "use_multiple_levels");
+  bool use_transparency = RNA_boolean_get(ptr, "use_transparency");
 
-  uiItemR(layout, &ptr, "use_multiple_levels", 0, "Multiple Levels", ICON_NONE);
+  uiItemR(layout, ptr, "use_multiple_levels", 0, "Multiple Levels", ICON_NONE);
 
   if (use_multiple_levels) {
     uiLayout *col = uiLayoutColumn(layout, true);
-    uiItemR(col, &ptr, "level_start", 0, NULL, ICON_NONE);
-    uiItemR(col, &ptr, "level_end", 0, NULL, ICON_NONE);
+    uiItemR(col, ptr, "level_start", 0, NULL, ICON_NONE);
+    uiItemR(col, ptr, "level_end", 0, NULL, ICON_NONE);
   }
   else {
-    uiItemR(layout, &ptr, "level_start", 0, "Level", ICON_NONE);
+    uiItemR(layout, ptr, "level_start", 0, "Level", ICON_NONE);
   }
 
   uiLayout *row = uiLayoutRow(layout, false);
 
-  uiItemR(row, &ptr, "use_transparency", 0, "Transparency", ICON_NONE);
+  uiItemR(row, ptr, "use_transparency", 0, "Transparency", ICON_NONE);
 
   if (use_transparency) {
-    uiItemR(row, &ptr, "transparency_match", 0, "Match", ICON_NONE);
+    uiItemR(row, ptr, "transparency_match", 0, "Match", ICON_NONE);
   }
 
   if (use_transparency) {
     row = uiLayoutRow(layout, true);
-    uiItemR(row, &ptr, "transparency_mask_0", UI_ITEM_R_TOGGLE, "0", ICON_NONE);
-    uiItemR(row, &ptr, "transparency_mask_1", UI_ITEM_R_TOGGLE, "1", ICON_NONE);
-    uiItemR(row, &ptr, "transparency_mask_2", UI_ITEM_R_TOGGLE, "2", ICON_NONE);
-    uiItemR(row, &ptr, "transparency_mask_3", UI_ITEM_R_TOGGLE, "3", ICON_NONE);
-    uiItemR(row, &ptr, "transparency_mask_4", UI_ITEM_R_TOGGLE, "4", ICON_NONE);
-    uiItemR(row, &ptr, "transparency_mask_5", UI_ITEM_R_TOGGLE, "5", ICON_NONE);
-    uiItemR(row, &ptr, "transparency_mask_6", UI_ITEM_R_TOGGLE, "6", ICON_NONE);
-    uiItemR(row, &ptr, "transparency_mask_7", UI_ITEM_R_TOGGLE, "7", ICON_NONE);
+    uiItemR(row, ptr, "transparency_mask_0", UI_ITEM_R_TOGGLE, "0", ICON_NONE);
+    uiItemR(row, ptr, "transparency_mask_1", UI_ITEM_R_TOGGLE, "1", ICON_NONE);
+    uiItemR(row, ptr, "transparency_mask_2", UI_ITEM_R_TOGGLE, "2", ICON_NONE);
+    uiItemR(row, ptr, "transparency_mask_3", UI_ITEM_R_TOGGLE, "3", ICON_NONE);
+    uiItemR(row, ptr, "transparency_mask_4", UI_ITEM_R_TOGGLE, "4", ICON_NONE);
+    uiItemR(row, ptr, "transparency_mask_5", UI_ITEM_R_TOGGLE, "5", ICON_NONE);
+    uiItemR(row, ptr, "transparency_mask_6", UI_ITEM_R_TOGGLE, "6", ICON_NONE);
+    uiItemR(row, ptr, "transparency_mask_7", UI_ITEM_R_TOGGLE, "7", ICON_NONE);
   }
 }
 
