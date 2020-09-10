@@ -5181,7 +5181,7 @@ static bool button_matches_search_filter(uiBut *but, const char *search_filter)
           }
         }
         if (free) {
-          MEM_freeN((void *)enum_items);
+          MEM_freeN(enum_items);
         }
       }
     }
