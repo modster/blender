@@ -2903,13 +2903,11 @@ void ED_region_panels_layout_ex(const bContext *C,
     }
   }
 
-  if (region->flag & RGN_FLAG_SEARCH_FILTER_UPDATE &&
-      region->flag & RGN_FLAG_SEARCH_FILTER_ACTIVE) {
-    LISTBASE_FOREACH (Panel *, panel, &region->panels) {
-      if (panel->type == NULL || (panel->type->flag & PNL_NO_HEADER)) {
-        continue; /* Some panels don't have a type. */
-      }
-      UI_panel_set_expansion_from_seach_filter(C, panel);
+  /* Update panel expansion based on property search results. */
+  if (region->flag & RGN_FLAG_SEARCH_FILTER_UPDATE) {
+    /* Don't use the last update from the deactivation, or all the panels will be left closed. */
+    if (region->flag & RGN_FLAG_SEARCH_FILTER_ACTIVE) {
+      UI_panels_set_expansion_from_seach_filter(C, region);
     }
   }
 

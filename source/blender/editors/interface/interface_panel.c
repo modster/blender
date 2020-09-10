@@ -831,16 +831,34 @@ bool UI_panel_matches_search_filter(const Panel *panel)
   return search_filter_matches;
 }
 
-/**
- * Uses the panel's search filter flag to set its expansion,
- * activating animation if it was closed or opened.
- */
-void UI_panel_set_expansion_from_seach_filter(const bContext *C, Panel *panel)
+static void panel_set_expansion_from_seach_filter_recursive(const bContext *C, Panel *panel)
 {
   short start_flag = panel->flag;
   SET_FLAG_FROM_TEST(panel->flag, !UI_panel_matches_search_filter(panel), PNL_CLOSED);
   if (start_flag != panel->flag) {
     panel_activate_state(C, panel, PANEL_STATE_ANIMATION);
+  }
+
+  /* If the panel is filtered (removed) we need to check that its children are too. */
+  LISTBASE_FOREACH (Panel *, child_panel, &panel->children) {
+    if (panel->type == NULL || (panel->type->flag & PNL_NO_HEADER)) {
+      continue;
+    }
+    panel_set_expansion_from_seach_filter_recursive(C, child_panel);
+  }
+}
+
+/**
+ * Uses the panel's search filter flag to set its expansion,
+ * activating animation if it was closed or opened.
+ */
+void UI_panels_set_expansion_from_seach_filter(const bContext *C, ARegion *region)
+{
+  LISTBASE_FOREACH (Panel *, panel, &region->panels) {
+    if (panel->type == NULL || (panel->type->flag & PNL_NO_HEADER)) {
+      continue;
+    }
+    panel_set_expansion_from_seach_filter_recursive(C, panel);
   }
 }
 
