@@ -511,9 +511,9 @@ void BlenderSync::sync_motion(BL::RenderSettings &b_render,
   float frame_center_delta = 0.0f;
 
   if (scene->need_motion() != Scene::MOTION_PASS &&
-      scene->camera->motion_position != Camera::MOTION_POSITION_CENTER) {
-    float shuttertime = scene->camera->shuttertime;
-    if (scene->camera->motion_position == Camera::MOTION_POSITION_END) {
+      scene->camera->get_motion_position() != Camera::MOTION_POSITION_CENTER) {
+    float shuttertime = scene->camera->get_shuttertime();
+    if (scene->camera->get_motion_position() == Camera::MOTION_POSITION_END) {
       frame_center_delta = -shuttertime * 0.5f;
     }
     else {

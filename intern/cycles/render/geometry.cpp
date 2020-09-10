@@ -160,7 +160,7 @@ bool Geometry::is_instanced() const
 bool Geometry::has_true_displacement() const
 {
   foreach (Shader *shader, used_shaders) {
-    if (shader->has_displacement && shader->displacement_method != DISPLACE_BUMP) {
+    if (shader->has_displacement && shader->get_displacement_method() != DISPLACE_BUMP) {
       return true;
     }
   }
@@ -186,7 +186,7 @@ void Geometry::compute_bvh(
       msg += string_printf("%s %u/%u", name.c_str(), (uint)(n + 1), (uint)total);
 
     Object object;
-    object.geometry = this;
+    object.set_geometry(this);
 
     vector<Geometry *> geometry;
     geometry.push_back(this);
@@ -308,7 +308,7 @@ void GeometryManager::update_osl_attributes(Device *device,
     size_t j;
 
     for (j = 0; j < scene->geometry.size(); j++)
-      if (scene->geometry[j] == object->geometry)
+      if (scene->geometry[j] == object->get_geometry())
         break;
 
     AttributeRequestSet &attributes = geom_attributes[j];
@@ -647,7 +647,7 @@ void GeometryManager::device_update_attributes(Device *device,
 
     scene->need_global_attributes(geom_attributes[i]);
 
-    foreach (Shader *shader, geom->used_shaders) {
+    foreach (Shader *shader, geom->get_used_shaders()) {
       geom_attributes[i].add(shader->attributes);
     }
   }
@@ -1114,7 +1114,7 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
   foreach (Geometry *geom, scene->geometry) {
     geom->has_volume = false;
 
-    foreach (const Shader *shader, geom->used_shaders) {
+    foreach (const Shader *shader, geom->get_used_shaders()) {
       if (shader->has_volume) {
         geom->has_volume = true;
       }
@@ -1155,8 +1155,8 @@ void GeometryManager::device_update_displacement_images(Device *device,
   set<int> bump_images;
   foreach (Geometry *geom, scene->geometry) {
     if (geom->is_modified()) {
-      foreach (Shader *shader, geom->used_shaders) {
-        if (!shader->has_displacement || shader->displacement_method == DISPLACE_BUMP) {
+      foreach (Shader *shader, geom->get_used_shaders()) {
+        if (!shader->has_displacement || shader->get_displacement_method() == DISPLACE_BUMP) {
           continue;
         }
         foreach (ShaderNode *node, shader->graph->nodes) {
@@ -1232,7 +1232,7 @@ void GeometryManager::device_update(Device *device,
   size_t total_tess_needed = 0;
 
   foreach (Geometry *geom, scene->geometry) {
-    foreach (Shader *shader, geom->used_shaders) {
+    foreach (Shader *shader, geom->get_used_shaders()) {
       if (shader->need_update_geometry)
         geom->tag_modified();
     }

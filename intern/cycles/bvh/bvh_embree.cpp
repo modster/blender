@@ -402,15 +402,15 @@ void BVHEmbree::build(Progress &progress, Stats *stats_)
       if (!ob->is_traceable()) {
         continue;
       }
-      if (!ob->geometry->is_instanced()) {
-        prim_count += count_primitives(ob->geometry);
+      if (!ob->get_geometry()->is_instanced()) {
+        prim_count += count_primitives(ob->get_geometry());
       }
       else {
         ++prim_count;
       }
     }
     else {
-      prim_count += count_primitives(ob->geometry);
+      prim_count += count_primitives(ob->get_geometry());
     }
   }
 
@@ -429,7 +429,7 @@ void BVHEmbree::build(Progress &progress, Stats *stats_)
         ++i;
         continue;
       }
-      if (!ob->geometry->is_instanced()) {
+      if (!ob->get_geometry()->is_instanced()) {
         add_object(ob, i);
       }
       else {
@@ -480,7 +480,7 @@ BVHNode *BVHEmbree::widen_children_nodes(const BVHNode * /*root*/)
 
 void BVHEmbree::add_object(Object *ob, int i)
 {
-  Geometry *geom = ob->geometry;
+  Geometry *geom = ob->get_geometry();
 
   if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
     Mesh *mesh = static_cast<Mesh *>(geom);
@@ -498,17 +498,17 @@ void BVHEmbree::add_object(Object *ob, int i)
 
 void BVHEmbree::add_instance(Object *ob, int i)
 {
-  if (!ob || !ob->geometry) {
+  if (!ob || !ob->get_geometry()) {
     assert(0);
     return;
   }
-  BVHEmbree *instance_bvh = (BVHEmbree *)(ob->geometry->bvh);
+  BVHEmbree *instance_bvh = (BVHEmbree *)(ob->get_geometry()->bvh);
 
   if (instance_bvh->top_level != this) {
     instance_bvh->top_level = this;
   }
 
-  const size_t num_object_motion_steps = ob->use_motion() ? ob->motion.size() : 1;
+  const size_t num_object_motion_steps = ob->use_motion() ? ob->get_motion().size() : 1;
   const size_t num_motion_steps = min(num_object_motion_steps, RTC_MAX_TIME_STEP_COUNT);
   assert(num_object_motion_steps <= RTC_MAX_TIME_STEP_COUNT);
 
@@ -517,8 +517,8 @@ void BVHEmbree::add_instance(Object *ob, int i)
   rtcSetGeometryTimeStepCount(geom_id, num_motion_steps);
 
   if (ob->use_motion()) {
-    array<DecomposedTransform> decomp(ob->motion.size());
-    transform_motion_decompose(decomp.data(), ob->motion.data(), ob->motion.size());
+    array<DecomposedTransform> decomp(ob->get_motion().size());
+    transform_motion_decompose(decomp.data(), ob->get_motion().data(), ob->get_motion().size());
     for (size_t step = 0; step < num_motion_steps; ++step) {
       RTCQuaternionDecomposition rtc_decomp;
       rtcInitQuaternionDecomposition(&rtc_decomp);
@@ -534,7 +534,7 @@ void BVHEmbree::add_instance(Object *ob, int i)
     }
   }
   else {
-    rtcSetGeometryTransform(geom_id, 0, RTC_FORMAT_FLOAT3X4_ROW_MAJOR, (const float *)&ob->tfm);
+    rtcSetGeometryTransform(geom_id, 0, RTC_FORMAT_FLOAT3X4_ROW_MAJOR, (const float *)&ob->get_tfm());
   }
 
   pack.prim_index.push_back_slow(-1);
@@ -558,7 +558,7 @@ void BVHEmbree::add_triangles(const Object *ob, const Mesh *mesh, int i)
   if (mesh->has_motion_blur()) {
     attr_mP = mesh->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
     if (attr_mP) {
-      num_geometry_motion_steps = mesh->motion_steps;
+      num_geometry_motion_steps = mesh->get_motion_steps();
     }
   }
 
@@ -620,7 +620,7 @@ void BVHEmbree::update_tri_vertex_buffer(RTCGeometry geom_id, const Mesh *mesh)
   if (mesh->has_motion_blur()) {
     attr_mP = mesh->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
     if (attr_mP) {
-      num_motion_steps = mesh->motion_steps;
+      num_motion_steps = mesh->get_motion_steps();
       t_mid = (num_motion_steps - 1) / 2;
       if (num_motion_steps > RTC_MAX_TIME_STEP_COUNT) {
         assert(0);
@@ -661,7 +661,7 @@ void BVHEmbree::update_curve_vertex_buffer(RTCGeometry geom_id, const Hair *hair
   if (hair->has_motion_blur()) {
     attr_mP = hair->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
     if (attr_mP) {
-      num_motion_steps = hair->motion_steps;
+      num_motion_steps = hair->get_motion_steps();
     }
   }
 
@@ -720,7 +720,7 @@ void BVHEmbree::add_curves(const Object *ob, const Hair *hair, int i)
   if (hair->has_motion_blur()) {
     attr_mP = hair->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
     if (attr_mP) {
-      num_geometry_motion_steps = hair->motion_steps;
+      num_geometry_motion_steps = hair->get_motion_steps();
     }
   }
 
@@ -805,7 +805,7 @@ void BVHEmbree::pack_nodes(const BVHNode *)
 
   for (size_t i = 0; i < pack.prim_index.size(); ++i) {
     if (pack.prim_index[i] != -1) {
-      pack.prim_index[i] += objects[pack.prim_object[i]]->geometry->prim_offset;
+      pack.prim_index[i] += objects[pack.prim_object[i]]->get_geometry()->prim_offset;
     }
   }
 
@@ -822,7 +822,7 @@ void BVHEmbree::pack_nodes(const BVHNode *)
   map<Geometry *, int> geometry_map;
 
   foreach (Object *ob, objects) {
-    Geometry *geom = ob->geometry;
+    Geometry *geom = ob->get_geometry();
     BVH *bvh = geom->bvh;
 
     if (geom->need_build_bvh(BVH_LAYOUT_EMBREE)) {
@@ -852,7 +852,7 @@ void BVHEmbree::pack_nodes(const BVHNode *)
 
   /* merge */
   foreach (Object *ob, objects) {
-    Geometry *geom = ob->geometry;
+    Geometry *geom = ob->get_geometry();
 
     /* We assume that if mesh doesn't need own BVH it was already included
      * into a top-level BVH and no packing here is needed.
@@ -927,8 +927,8 @@ void BVHEmbree::refit_nodes()
   /* Update all vertex buffers, then tell Embree to rebuild/-fit the BVHs. */
   unsigned geom_id = 0;
   foreach (Object *ob, objects) {
-    if (!params.top_level || (ob->is_traceable() && !ob->geometry->is_instanced())) {
-      Geometry *geom = ob->geometry;
+    if (!params.top_level || (ob->is_traceable() && !ob->get_geometry()->is_instanced())) {
+      Geometry *geom = ob->get_geometry();
 
       if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
         Mesh *mesh = static_cast<Mesh *>(geom);

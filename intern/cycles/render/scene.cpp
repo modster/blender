@@ -350,7 +350,7 @@ float Scene::motion_shutter_time()
   if (need_motion() == Scene::MOTION_PASS)
     return 2.0f;
   else
-    return camera->shuttertime;
+    return camera->get_shuttertime();
 }
 
 bool Scene::need_global_attribute(AttributeStandard std)
@@ -435,12 +435,12 @@ DeviceRequestedFeatures Scene::get_requested_device_features()
   requested_features.use_object_motion = false;
   requested_features.use_camera_motion = use_motion && camera->use_motion();
   foreach (Object *object, objects) {
-    Geometry *geom = object->geometry;
+    Geometry *geom = object->get_geometry();
     if (use_motion) {
       requested_features.use_object_motion |= object->use_motion() | geom->get_use_motion_blur();
       requested_features.use_camera_motion |= geom->get_use_motion_blur();
     }
-    if (object->is_shadow_catcher) {
+    if (object->get_is_shadow_catcher()) {
       requested_features.use_shadow_tricks = true;
     }
     if (geom->is_mesh()) {

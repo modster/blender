@@ -50,7 +50,7 @@ struct Transform;
   }
 
 #define NODE_PUBLIC_API_BASE(type_, name, string_name) \
-  public: \
+  protected: \
   type_ name; \
  public: \
   NODE_PUBLIC_API_BASE_METHODS(type_, name, string_name)

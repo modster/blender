@@ -72,7 +72,7 @@ bool BVHUnaligned::compute_aligned_space(const BVHReference &ref, Transform *ali
   if (type & (PRIMITIVE_CURVE_RIBBON | PRIMITIVE_CURVE_THICK)) {
     const int curve_index = ref.prim_index();
     const int segment = PRIMITIVE_UNPACK_SEGMENT(packed_type);
-    const Hair *hair = static_cast<const Hair *>(object->geometry);
+    const Hair *hair = static_cast<const Hair *>(object->get_geometry());
     const Hair::Curve &curve = hair->get_curve(curve_index);
     const int key = curve.first_key + segment;
     const float3 v1 = hair->curve_keys[key], v2 = hair->curve_keys[key + 1];
@@ -98,7 +98,7 @@ BoundBox BVHUnaligned::compute_aligned_prim_boundbox(const BVHReference &prim,
   if (type & (PRIMITIVE_CURVE_RIBBON | PRIMITIVE_CURVE_THICK)) {
     const int curve_index = prim.prim_index();
     const int segment = PRIMITIVE_UNPACK_SEGMENT(packed_type);
-    const Hair *hair = static_cast<const Hair *>(object->geometry);
+    const Hair *hair = static_cast<const Hair *>(object->get_geometry());
     const Hair::Curve &curve = hair->get_curve(curve_index);
     curve.bounds_grow(
         segment, &hair->curve_keys[0], &hair->curve_radius[0], aligned_space, bounds);

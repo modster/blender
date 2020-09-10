@@ -124,7 +124,7 @@ void OSLShaderManager::device_update(Device *device,
     compiler.background = (shader == background_shader);
     compiler.compile(og, shader);
 
-    if (shader->use_mis && shader->has_surface_emission)
+    if (shader->get_use_mis() && shader->has_surface_emission)
       scene->light_manager->need_update = true;
   }
 
@@ -1117,14 +1117,14 @@ void OSLCompiler::compile(OSLGlobals *og, Shader *shader)
     ShaderGraph *graph = shader->graph;
     ShaderNode *output = (graph) ? graph->output() : NULL;
 
-    bool has_bump = (shader->displacement_method != DISPLACE_TRUE) &&
+    bool has_bump = (shader->get_displacement_method() != DISPLACE_TRUE) &&
                     output->input("Surface")->link && output->input("Displacement")->link;
 
     /* finalize */
     shader->graph->finalize(scene,
                             has_bump,
                             shader->has_integrator_dependency,
-                            shader->displacement_method == DISPLACE_BOTH);
+                            shader->get_displacement_method() == DISPLACE_BOTH);
 
     current_shader = shader;
 

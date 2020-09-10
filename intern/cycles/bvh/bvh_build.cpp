@@ -191,7 +191,7 @@ void BVHBuild::add_reference_curves(BoundBox &root, BoundBox &center, Hair *hair
         BoundBox bounds = BoundBox::empty;
         curve.bounds_grow(k, &hair->curve_keys[0], curve_radius, bounds);
         const size_t num_keys = hair->curve_keys.size();
-        const size_t num_steps = hair->motion_steps;
+        const size_t num_steps = hair->get_motion_steps();
         const float3 *key_steps = curve_attr_mP->data_float3();
         for (size_t step = 0; step < num_steps - 1; step++) {
           curve.bounds_grow(k, key_steps + step * num_keys, curve_radius, bounds);
@@ -210,7 +210,7 @@ void BVHBuild::add_reference_curves(BoundBox &root, BoundBox &center, Hair *hair
          */
         const int num_bvh_steps = params.num_motion_curve_steps * 2 + 1;
         const float num_bvh_steps_inv_1 = 1.0f / (num_bvh_steps - 1);
-        const size_t num_steps = hair->motion_steps;
+        const size_t num_steps = hair->get_motion_steps();
         const float3 *curve_keys = &hair->curve_keys[0];
         const float3 *key_steps = curve_attr_mP->data_float3();
         const size_t num_keys = hair->curve_keys.size();
@@ -321,14 +321,14 @@ void BVHBuild::add_references(BVHRange &root)
       if (!ob->is_traceable()) {
         continue;
       }
-      if (!ob->geometry->is_instanced()) {
-        num_alloc_references += count_primitives(ob->geometry);
+      if (!ob->get_geometry()->is_instanced()) {
+        num_alloc_references += count_primitives(ob->get_geometry());
       }
       else
         num_alloc_references++;
     }
     else {
-      num_alloc_references += count_primitives(ob->geometry);
+      num_alloc_references += count_primitives(ob->get_geometry());
     }
   }
 
@@ -344,13 +344,13 @@ void BVHBuild::add_references(BVHRange &root)
         ++i;
         continue;
       }
-      if (!ob->geometry->is_instanced())
-        add_reference_geometry(bounds, center, ob->geometry, i);
+      if (!ob->get_geometry()->is_instanced())
+        add_reference_geometry(bounds, center, ob->get_geometry(), i);
       else
         add_reference_object(bounds, center, ob, i);
     }
     else
-      add_reference_geometry(bounds, center, ob->geometry, i);
+      add_reference_geometry(bounds, center, ob->get_geometry(), i);
 
     i++;
 

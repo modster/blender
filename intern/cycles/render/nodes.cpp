@@ -308,7 +308,7 @@ void ImageTextureNode::cull_tiles(Scene *scene, ShaderGraph *graph)
     ShaderNode *node = vector_in->link->parent;
     if (node->type == UVMapNode::node_type) {
       UVMapNode *uvmap = (UVMapNode *)node;
-      attribute = uvmap->attribute;
+      attribute = uvmap->get_attribute();
     }
     else if (node->type == TextureCoordinateNode::node_type) {
       if (vector_in->link != node->output("UV")) {
@@ -325,7 +325,7 @@ void ImageTextureNode::cull_tiles(Scene *scene, ShaderGraph *graph)
    * be to have a cache in each mesh that is indexed by attribute.
    * Additionally, building a graph-to-meshes list once could help. */
   foreach (Geometry *geom, scene->geometry) {
-    foreach (Shader *shader, geom->used_shaders) {
+    foreach (Shader *shader, geom->get_used_shaders()) {
       if (shader->graph == graph) {
         geom->get_uv_tiles(attribute, used_tiles);
       }
@@ -2790,7 +2790,7 @@ void PrincipledBsdfNode::expand(ShaderGraph *graph)
     graph->add(add);
     graph->add(emission_node);
 
-    emission_node->strength = 1.0f;
+    emission_node->set_strength(1.0f);
     graph->relink(emission_in, emission_node->input("Color"));
     graph->relink(principled_out, new_out);
     graph->connect(emission_node->output("Emission"), add->input("Closure1"));
@@ -4476,7 +4476,7 @@ void VolumeInfoNode::expand(ShaderGraph *graph)
   ShaderOutput *color_out = output("Color");
   if (!color_out->links.empty()) {
     AttributeNode *attr = graph->create_node<AttributeNode>();
-    attr->attribute = "color";
+    attr->set_attribute(ustring("color"));
     graph->add(attr);
     graph->relink(color_out, attr->output("Color"));
   }
@@ -4484,7 +4484,7 @@ void VolumeInfoNode::expand(ShaderGraph *graph)
   ShaderOutput *density_out = output("Density");
   if (!density_out->links.empty()) {
     AttributeNode *attr = graph->create_node<AttributeNode>();
-    attr->attribute = "density";
+    attr->set_attribute(ustring("density"));
     graph->add(attr);
     graph->relink(density_out, attr->output("Fac"));
   }
@@ -4492,7 +4492,7 @@ void VolumeInfoNode::expand(ShaderGraph *graph)
   ShaderOutput *flame_out = output("Flame");
   if (!flame_out->links.empty()) {
     AttributeNode *attr = graph->create_node<AttributeNode>();
-    attr->attribute = "flame";
+    attr->set_attribute(ustring("flame"));
     graph->add(attr);
     graph->relink(flame_out, attr->output("Fac"));
   }
@@ -4500,7 +4500,7 @@ void VolumeInfoNode::expand(ShaderGraph *graph)
   ShaderOutput *temperature_out = output("Temperature");
   if (!temperature_out->links.empty()) {
     AttributeNode *attr = graph->create_node<AttributeNode>();
-    attr->attribute = "temperature";
+    attr->set_attribute(ustring("temperature"));
     graph->add(attr);
     graph->relink(temperature_out, attr->output("Fac"));
   }
@@ -5769,7 +5769,7 @@ void MapRangeNode::expand(ShaderGraph *graph)
     ShaderOutput *result_out = output("Result");
     if (!result_out->links.empty()) {
       ClampNode *clamp_node = graph->create_node<ClampNode>();
-      clamp_node->clamp_type = NODE_CLAMP_RANGE;
+      clamp_node->set_clamp_type(NODE_CLAMP_RANGE);
       graph->add(clamp_node);
       graph->relink(result_out, clamp_node->output("Result"));
       graph->connect(result_out, clamp_node->input("Value"));
@@ -5777,13 +5777,13 @@ void MapRangeNode::expand(ShaderGraph *graph)
         graph->connect(input("To Min")->link, clamp_node->input("Min"));
       }
       else {
-        clamp_node->min = to_min;
+        clamp_node->set_min(to_min);
       }
       if (input("To Max")->link) {
         graph->connect(input("To Max")->link, clamp_node->input("Max"));
       }
       else {
-        clamp_node->max = to_max;
+        clamp_node->set_max(to_max);
       }
     }
   }
@@ -6010,9 +6010,9 @@ void MathNode::expand(ShaderGraph *graph)
     ShaderOutput *result_out = output("Value");
     if (!result_out->links.empty()) {
       ClampNode *clamp_node = graph->create_node<ClampNode>();
-      clamp_node->clamp_type = NODE_CLAMP_MINMAX;
-      clamp_node->min = 0.0f;
-      clamp_node->max = 1.0f;
+      clamp_node->set_clamp_type(NODE_CLAMP_MINMAX);
+      clamp_node->set_min(0.0f);
+      clamp_node->set_max(1.0f);
       graph->add(clamp_node);
       graph->relink(result_out, clamp_node->output("Result"));
       graph->connect(result_out, clamp_node->input("Value"));

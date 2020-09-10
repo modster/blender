@@ -217,8 +217,8 @@ void Object::tag_update(Scene *scene)
     if (geometry->transform_applied)
       geometry->tag_modified();
 
-    foreach (Shader *shader, geometry->used_shaders) {
-      if (shader->use_mis && shader->has_surface_emission)
+    foreach (Shader *shader, geometry->get_used_shaders()) {
+      if (shader->get_use_mis() && shader->has_surface_emission)
         scene->light_manager->need_update = true;
     }
   }
@@ -290,9 +290,9 @@ float Object::compute_volume_step_size() const
 
   foreach (Shader *shader, mesh->used_shaders) {
     if (shader->has_volume) {
-      if ((shader->heterogeneous_volume && shader->has_volume_spatial_varying) ||
+      if ((shader->get_heterogeneous_volume() && shader->has_volume_spatial_varying) ||
           (shader->has_volume_attribute_dependency)) {
-        step_rate = fminf(shader->volume_step_rate, step_rate);
+        step_rate = fminf(shader->get_volume_step_rate(), step_rate);
       }
     }
   }
@@ -475,7 +475,7 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
   kobject.particle_index = particle_index;
   kobject.motion_offset = 0;
 
-  if (geom->use_motion_blur) {
+  if (geom->get_use_motion_blur()) {
     state->have_motion = true;
   }
 
@@ -534,7 +534,7 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
                                                      0;
   kobject.dupli_uv[0] = ob->dupli_uv[0];
   kobject.dupli_uv[1] = ob->dupli_uv[1];
-  int totalsteps = geom->motion_steps;
+  int totalsteps = geom->get_motion_steps();
   kobject.numsteps = (totalsteps - 1) / 2;
   kobject.numverts = (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) ?
                          static_cast<Mesh *>(geom)->verts.size() :

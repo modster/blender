@@ -153,7 +153,7 @@ class BlenderSync {
                        float motion_time);
 
   /* Volume */
-  void sync_volume(BL::Object &b_ob, Volume *volume, const array<Shader *> &used_shaders);
+  void sync_volume(BL::Object &b_ob, Volume *volume, array<Shader *> &used_shaders);
 
   /* Mesh */
   void sync_mesh(BL::Depsgraph b_depsgraph,

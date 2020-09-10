@@ -454,7 +454,7 @@ static void blender_camera_sync(Camera *cam,
   cam->set_convergence_distance(bcam->convergence_distance);
   cam->set_use_spherical_stereo(bcam->use_spherical_stereo);
 
-  if (cam->use_spherical_stereo) {
+  if (cam->get_use_spherical_stereo()) {
     if (strcmp(viewname, "left") == 0)
       cam->set_stereo_eye(Camera::STEREO_LEFT);
     else if (strcmp(viewname, "right") == 0)
@@ -481,13 +481,13 @@ static void blender_camera_sync(Camera *cam,
   cam->set_matrix(blender_camera_matrix(bcam->matrix, bcam->type, bcam->panorama_type));
 
   array<Transform> motion;
-  motion.resize(bcam->motion_steps, cam->matrix);
+  motion.resize(bcam->motion_steps, cam->get_matrix());
   cam->set_motion(motion);
   cam->set_use_perspective_motion(false);
 
   cam->set_shuttertime(bcam->shuttertime);
-  cam->set_fov_pre(cam->fov);
-  cam->set_fov_post(cam->fov);
+  cam->set_fov_pre(cam->get_fov());
+  cam->set_fov_post(cam->get_fov());
   cam->set_motion_position(bcam->motion_position);
 
   cam->set_rolling_shutter_type(bcam->rolling_shutter_type);
@@ -589,9 +589,9 @@ void BlenderSync::sync_camera_motion(
 
   Camera *cam = scene->camera;
   BL::Array<float, 16> b_ob_matrix;
-  b_engine.camera_model_matrix(b_ob, cam->use_spherical_stereo, b_ob_matrix);
+  b_engine.camera_model_matrix(b_ob, cam->get_use_spherical_stereo(), b_ob_matrix);
   Transform tfm = get_transform(b_ob_matrix);
-  tfm = blender_camera_matrix(tfm, cam->camera_type, cam->panorama_type);
+  tfm = blender_camera_matrix(tfm, cam->get_camera_type(), cam->get_panorama_type());
 
   if (motion_time == 0.0f) {
     /* When motion blur is not centered in frame, cam->matrix gets reset. */
@@ -606,7 +606,7 @@ void BlenderSync::sync_camera_motion(
     cam->set_motion(motion);
   }
 
-  if (cam->camera_type == CAMERA_PERSPECTIVE) {
+  if (cam->get_camera_type() == CAMERA_PERSPECTIVE) {
     BlenderCamera bcam;
     float aspectratio, sensor_size;
     blender_camera_init(&bcam, b_render);

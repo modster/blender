@@ -525,7 +525,7 @@ void ShaderManager::device_update_common(Device *device,
 
     if (shader->get_use_mis())
       flag |= SD_USE_MIS;
-    if (shader->has_surface_transparent && shader->use_transparent_shadow)
+    if (shader->has_surface_transparent && shader->get_use_transparent_shadow())
       flag |= SD_HAS_TRANSPARENT_SHADOW;
     if (shader->has_volume) {
       flag |= SD_HAS_VOLUME;
@@ -540,7 +540,7 @@ void ShaderManager::device_update_common(Device *device,
     if (shader->has_volume_connected && !shader->has_surface)
       flag |= SD_HAS_ONLY_VOLUME;
     if (shader->has_volume) {
-      if (shader->heterogeneous_volume && shader->has_volume_spatial_varying)
+      if (shader->get_heterogeneous_volume() && shader->has_volume_spatial_varying)
         flag |= SD_HETEROGENEOUS_VOLUME;
     }
     if (shader->has_volume_attribute_dependency)
@@ -548,16 +548,16 @@ void ShaderManager::device_update_common(Device *device,
     if (shader->has_bssrdf_bump)
       flag |= SD_HAS_BSSRDF_BUMP;
     if (device->info.has_volume_decoupled) {
-      if (shader->volume_sampling_method == VOLUME_SAMPLING_EQUIANGULAR)
+      if (shader->get_volume_sampling_method() == VOLUME_SAMPLING_EQUIANGULAR)
         flag |= SD_VOLUME_EQUIANGULAR;
-      if (shader->volume_sampling_method == VOLUME_SAMPLING_MULTIPLE_IMPORTANCE)
+      if (shader->get_volume_sampling_method() == VOLUME_SAMPLING_MULTIPLE_IMPORTANCE)
         flag |= SD_VOLUME_MIS;
     }
-    if (shader->volume_interpolation_method == VOLUME_INTERPOLATION_CUBIC)
+    if (shader->get_volume_interpolation_method() == VOLUME_INTERPOLATION_CUBIC)
       flag |= SD_VOLUME_CUBIC;
     if (shader->has_bump)
       flag |= SD_HAS_BUMP;
-    if (shader->displacement_method != DISPLACE_BUMP)
+    if (shader->get_displacement_method() != DISPLACE_BUMP)
       flag |= SD_HAS_DISPLACEMENT;
 
     /* constant emission check */
@@ -569,7 +569,7 @@ void ShaderManager::device_update_common(Device *device,
 
     /* regular shader */
     kshader->flags = flag;
-    kshader->pass_id = shader->pass_id;
+    kshader->pass_id = shader->get_pass_id();
     kshader->constant_emission[0] = constant_emission.x;
     kshader->constant_emission[1] = constant_emission.y;
     kshader->constant_emission[2] = constant_emission.z;
@@ -739,7 +739,7 @@ void ShaderManager::get_requested_features(Scene *scene,
     ShaderNode *output_node = shader->graph->output();
     if (output_node->input("Displacement")->link != NULL) {
       requested_features->nodes_features |= NODE_FEATURE_BUMP;
-      if (shader->displacement_method == DISPLACE_BOTH) {
+      if (shader->get_displacement_method() == DISPLACE_BOTH) {
         requested_features->nodes_features |= NODE_FEATURE_BUMP_STATE;
         requested_features->max_nodes_group = max(requested_features->max_nodes_group,
                                                   NODE_GROUP_LEVEL_1);

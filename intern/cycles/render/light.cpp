@@ -249,7 +249,7 @@ void LightManager::test_enabled_lights(Scene *scene)
 
 bool LightManager::object_usable_as_light(Object *object)
 {
-  Geometry *geom = object->geometry;
+  Geometry *geom = object->get_geometry();
   if (geom->geometry_type != Geometry::MESH && geom->geometry_type != Geometry::VOLUME) {
     return false;
   }
@@ -258,7 +258,7 @@ bool LightManager::object_usable_as_light(Object *object)
     return false;
   }
   /* Skip if we are not visible for BSDFs. */
-  if (!(object->visibility & (PATH_RAY_DIFFUSE | PATH_RAY_GLOSSY | PATH_RAY_TRANSMIT))) {
+  if (!(object->get_visibility() & (PATH_RAY_DIFFUSE | PATH_RAY_GLOSSY | PATH_RAY_TRANSMIT))) {
     return false;
   }
   /* Skip if we have no emission shaders. */
@@ -266,8 +266,8 @@ bool LightManager::object_usable_as_light(Object *object)
    * iterate all geometry shaders twice (when counting and when calculating
    * triangle area.
    */
-  foreach (const Shader *shader, geom->used_shaders) {
-    if (shader->use_mis && shader->has_surface_emission) {
+  foreach (const Shader *shader, geom->get_used_shaders()) {
+    if (shader->get_use_mis() && shader->has_surface_emission) {
       return true;
     }
   }
@@ -307,15 +307,15 @@ void LightManager::device_update_distribution(Device *,
     }
 
     /* Count triangles. */
-    Mesh *mesh = static_cast<Mesh *>(object->geometry);
+    Mesh *mesh = static_cast<Mesh *>(object->get_geometry());
     size_t mesh_num_triangles = mesh->num_triangles();
     for (size_t i = 0; i < mesh_num_triangles; i++) {
       int shader_index = mesh->shader[i];
-      Shader *shader = (shader_index < mesh->used_shaders.size()) ?
-                           mesh->used_shaders[shader_index] :
+      Shader *shader = (shader_index < mesh->get_used_shaders().size()) ?
+                           mesh->get_used_shaders()[shader_index] :
                            scene->default_surface;
 
-      if (shader->use_mis && shader->has_surface_emission) {
+      if (shader->get_use_mis() && shader->has_surface_emission) {
         num_triangles++;
       }
     }
@@ -341,25 +341,25 @@ void LightManager::device_update_distribution(Device *,
       continue;
     }
     /* Sum area. */
-    Mesh *mesh = static_cast<Mesh *>(object->geometry);
+    Mesh *mesh = static_cast<Mesh *>(object->get_geometry());
     bool transform_applied = mesh->transform_applied;
-    Transform tfm = object->tfm;
+    Transform tfm = object->get_tfm();
     int object_id = j;
     int shader_flag = 0;
 
-    if (!(object->visibility & PATH_RAY_DIFFUSE)) {
+    if (!(object->get_visibility() & PATH_RAY_DIFFUSE)) {
       shader_flag |= SHADER_EXCLUDE_DIFFUSE;
       use_light_visibility = true;
     }
-    if (!(object->visibility & PATH_RAY_GLOSSY)) {
+    if (!(object->get_visibility() & PATH_RAY_GLOSSY)) {
       shader_flag |= SHADER_EXCLUDE_GLOSSY;
       use_light_visibility = true;
     }
-    if (!(object->visibility & PATH_RAY_TRANSMIT)) {
+    if (!(object->get_visibility() & PATH_RAY_TRANSMIT)) {
       shader_flag |= SHADER_EXCLUDE_TRANSMIT;
       use_light_visibility = true;
     }
-    if (!(object->visibility & PATH_RAY_VOLUME_SCATTER)) {
+    if (!(object->get_visibility() & PATH_RAY_VOLUME_SCATTER)) {
       shader_flag |= SHADER_EXCLUDE_SCATTER;
       use_light_visibility = true;
     }
@@ -367,11 +367,11 @@ void LightManager::device_update_distribution(Device *,
     size_t mesh_num_triangles = mesh->num_triangles();
     for (size_t i = 0; i < mesh_num_triangles; i++) {
       int shader_index = mesh->shader[i];
-      Shader *shader = (shader_index < mesh->used_shaders.size()) ?
-                           mesh->used_shaders[shader_index] :
+      Shader *shader = (shader_index < mesh->get_used_shaders().size()) ?
+                           mesh->get_used_shaders()[shader_index] :
                            scene->default_surface;
 
-      if (shader->use_mis && shader->has_surface_emission) {
+      if (shader->get_use_mis() && shader->has_surface_emission) {
         distribution[offset].totarea = totarea;
         distribution[offset].prim = i + mesh->prim_offset;
         distribution[offset].mesh_light.shader_flag = shader_flag;

@@ -551,10 +551,10 @@ void GeometryManager::create_volume_mesh(Volume *volume, Progress &progress)
 
     volume_shader = shader;
 
-    if (shader->volume_interpolation_method == VOLUME_INTERPOLATION_LINEAR) {
+    if (shader->get_volume_interpolation_method() == VOLUME_INTERPOLATION_LINEAR) {
       pad_size = max(1, pad_size);
     }
-    else if (shader->volume_interpolation_method == VOLUME_INTERPOLATION_CUBIC) {
+    else if (shader->get_volume_interpolation_method() == VOLUME_INTERPOLATION_CUBIC) {
       pad_size = max(2, pad_size);
     }
 

@@ -232,7 +232,7 @@ void BlenderSync::sync_data(BL::RenderSettings &b_render,
   geometry_synced.clear(); /* use for objects and motion sync */
 
   if (scene->need_motion() == Scene::MOTION_PASS || scene->need_motion() == Scene::MOTION_NONE ||
-      scene->camera->motion_position == Camera::MOTION_POSITION_CENTER) {
+      scene->camera->get_motion_position() == Camera::MOTION_POSITION_CENTER) {
     sync_objects(b_depsgraph, b_v3d);
   }
   sync_motion(b_render, b_depsgraph, b_v3d, b_override, width, height, python_thread_state);
@@ -605,7 +605,7 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
       b_engine.add_pass("Denoising Intensity", 1, "X", b_view_layer.name().c_str());
     }
 
-    if (scene->film->denoising_flags & DENOISING_CLEAN_ALL_PASSES) {
+    if (scene->film->get_denoising_flags() & DENOISING_CLEAN_ALL_PASSES) {
       b_engine.add_pass("Denoising Clean", 3, "RGB", b_view_layer.name().c_str());
     }
   }

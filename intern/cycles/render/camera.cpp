@@ -519,7 +519,7 @@ void Camera::device_update_volume(Device * /*device*/, DeviceScene *dscene, Scen
                  [&](const blocked_range<size_t> &r) {
                    for (size_t i = r.begin(); i != r.end(); i++) {
                      Object *object = scene->objects[i];
-                     if (object->geometry->has_volume &&
+                     if (object->get_geometry()->has_volume &&
                          viewplane_boundbox.intersects(object->bounds)) {
                        /* TODO(sergey): Consider adding more grained check. */
                        VLOG(1) << "Detected camera inside volume.";

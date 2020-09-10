@@ -281,7 +281,7 @@ void AlembicProcedural::generate(Scene *scene)
     AlembicObject *object = NULL;
 
     for (int i = 0; i < objects.size(); i++) {
-      if (fnmatch(objects[i]->path.c_str(), path.c_str(), 0) == 0) {
+      if (fnmatch(objects[i]->get_path().c_str(), path.c_str(), 0) == 0) {
         object = objects[i];
       }
     }
@@ -328,7 +328,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
     /* create object*/
     Object *object = scene->create_node<Object>();
     object->set_geometry(mesh);
-    object->tfm = xform;
+    object->set_tfm(xform);
 
     abc_object->set_object(object);
   }
@@ -431,8 +431,8 @@ void AlembicProcedural::read_curves(Scene *scene,
 
     /* create object*/
     Object *object = scene->create_node<Object>();
-    object->geometry = hair;
-    object->tfm = xform;
+    object->set_geometry(hair);
+    object->set_tfm(xform);
 
     abc_object->set_object(object);
   }
@@ -459,8 +459,8 @@ void AlembicProcedural::read_curves(Scene *scene,
   if (use_motion_blur) {
     Attribute *attr = hair->attributes.add(ATTR_STD_MOTION_VERTEX_POSITION);
     float3 *fdata = attr->data_float3();
-    float shuttertimes[2] = {-scene->camera->shuttertime / 2.0f,
-                             scene->camera->shuttertime / 2.0f};
+    float shuttertimes[2] = {-scene->camera->get_shuttertime() / 2.0f,
+                             scene->camera->get_shuttertime() / 2.0f};
     AbcA::TimeSamplingPtr ts = curves.getSchema().getTimeSampling();
     for (int i = 0; i < 2; i++) {
       frame_time = static_cast<Abc::chrono_t>((frame + shuttertimes[i]) / frame_rate);

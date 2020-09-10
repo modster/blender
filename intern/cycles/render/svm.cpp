@@ -117,7 +117,7 @@ void SVMShaderManager::device_update(Device *device,
     Shader *shader = scene->shaders[i];
 
     shader->clear_modified();
-    if (shader->use_mis && shader->has_surface_emission) {
+    if (shader->get_use_mis() && shader->has_surface_emission) {
       scene->light_manager->need_update = true;
     }
 
@@ -742,7 +742,7 @@ void SVMCompiler::compile_type(Shader *shader, ShaderGraph *graph, ShaderType ty
 
   /* for the bump shader we need add a node to store the shader state */
   bool need_bump_state = (type == SHADER_TYPE_BUMP) &&
-                         (shader->displacement_method == DISPLACE_BOTH);
+                         (shader->get_displacement_method() == DISPLACE_BOTH);
   int bump_state_offset = SVM_STACK_INVALID;
   if (need_bump_state) {
     bump_state_offset = stack_find_offset(SVM_BUMP_EVAL_STATE_SIZE);
@@ -833,7 +833,7 @@ void SVMCompiler::compile(Shader *shader, array<int4> &svm_nodes, int index, Sum
 
   const double time_start = time_dt();
 
-  bool has_bump = (shader->displacement_method != DISPLACE_TRUE) &&
+  bool has_bump = (shader->get_displacement_method() != DISPLACE_TRUE) &&
                   output->input("Surface")->link && output->input("Displacement")->link;
 
   /* finalize */
@@ -842,7 +842,7 @@ void SVMCompiler::compile(Shader *shader, array<int4> &svm_nodes, int index, Sum
     shader->graph->finalize(scene,
                             has_bump,
                             shader->has_integrator_dependency,
-                            shader->displacement_method == DISPLACE_BOTH);
+                            shader->get_displacement_method() == DISPLACE_BOTH);
   }
 
   current_shader = shader;
