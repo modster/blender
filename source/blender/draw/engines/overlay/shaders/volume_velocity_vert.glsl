@@ -85,7 +85,7 @@ vec3 get_vector(ivec3 cell_co)
   return vector;
 }
 
-/* interpolate MAC information for cell-centered vectors */
+/* Interpolate MAC information for cell-centered vectors. */
 vec3 get_vector_centered(ivec3 cell_co)
 {
   vec3 vector;
@@ -100,7 +100,7 @@ vec3 get_vector_centered(ivec3 cell_co)
   return vector;
 }
 
-/* interpolate cell-centered information for MAC vectors */
+/* Interpolate cell-centered information for MAC vectors. */
 vec3 get_vector_mac(ivec3 cell_co)
 {
   vec3 vector;
@@ -157,30 +157,33 @@ void main()
   vector = (isCellCentered) ? get_vector_mac(cell_co) : get_vector(cell_co);
 
   switch (gl_VertexID % 6) {
-    case 0: /* tail of X component */
+    case 0: /* Tail of X component. */
       pos.x += (drawMACX) ? -0.5 * cellSize.x : 0.0;
       color = vec3(1.0, 0.0, 0.0); /* red */
       break;
-    case 1: /* head of X component */
+    case 1: /* Head of X component. */
       pos.x += (drawMACX) ? (-0.5 + vector.x * displaySize) * cellSize.x : 0.0;
       color = vec3(1.0, 1.0, 0.0); /* yellow */
       break;
-    case 2: /* tail of Y component */
+    case 2: /* Tail of Y component. */
       pos.y += (drawMACY) ? -0.5 * cellSize.y : 0.0;
       color = vec3(0.0, 1.0, 0.0); /* green */
       break;
-    case 3: /* head of Y component */
+    case 3: /* Head of Y component. */
       pos.y += (drawMACY) ? (-0.5 + vector.y * displaySize) * cellSize.y : 0.0;
       color = vec3(1.0, 1.0, 0.0); /* yellow */
       break;
-    case 4: /* tail of Z component */
+    case 4: /* Tail of Z component. */
       pos.z += (drawMACZ) ? -0.5 * cellSize.z : 0.0;
       color = vec3(0.0, 0.0, 1.0); /* blue */
       break;
-    case 5: /* head of Z component */
+    case 5: /* Head of Z component. */
       pos.z += (drawMACZ) ? (-0.5 + vector.z * displaySize) * cellSize.z : 0.0;
       color = vec3(1.0, 1.0, 0.0); /* yellow */
       break;
+    default:
+      /* Should never get here. */
+      assert(false);
   }
 
   finalColor = vec4(color, 1.0);

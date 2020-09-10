@@ -1042,15 +1042,6 @@ static void rna_Fluid_flowtype_set(struct PointerRNA *ptr, int value)
   }
 }
 
-static void rna_Fluid_cobafield_set(struct PointerRNA *ptr, int value)
-{
-  FluidDomainSettings *settings = (FluidDomainSettings *)ptr->data;
-
-  if (value != settings->coba_field) {
-    settings->coba_field = value;
-  }
-}
-
 static const EnumPropertyItem *rna_Fluid_cobafield_itemf(bContext *UNUSED(C),
                                                          PointerRNA *ptr,
                                                          PropertyRNA *UNUSED(prop),
@@ -2558,7 +2549,7 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
   prop = RNA_def_property(srna, "color_ramp_field", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "coba_field");
   RNA_def_property_enum_items(prop, coba_field_items);
-  RNA_def_property_enum_funcs(prop, NULL, "rna_Fluid_cobafield_set", "rna_Fluid_cobafield_itemf");
+  RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_Fluid_cobafield_itemf");
   RNA_def_property_ui_text(prop, "Field", "Simulation field to color map");
   RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
 

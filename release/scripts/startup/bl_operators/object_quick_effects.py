@@ -526,7 +526,10 @@ class QuickLiquid(Operator):
         liquid_domain = obj.modifiers[-2]
 
         # set color mapping field to show phi grid for liquid
-        liquid_domain.domain_settings.coba_field = 'PHI'
+        liquid_domain.domain_settings.color_ramp_field = 'PHI'
+
+        # set slicing method to single
+        liquid_domain.domain_settings.axis_slice_method = 'SINGLE'
 
         # set display thickness to a lower value for more detailed display of phi grids
         liquid_domain.domain_settings.display_thickness = 0.02

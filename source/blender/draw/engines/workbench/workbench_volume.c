@@ -72,7 +72,6 @@ static void workbench_volume_modifier_cache_populate(WORKBENCH_Data *vedata,
   DefaultTextureList *dtxl = DRW_viewport_texture_list_get();
   DRWShadingGroup *grp = NULL;
 
-  /* Don't try to show liquid domains here */
   if (!fds->fluid) {
     return;
   }
@@ -101,9 +100,9 @@ static void workbench_volume_modifier_cache_populate(WORKBENCH_Data *vedata,
                              FLUID_DOMAIN_FIELD_PHI_OBSTACLE);
   const bool show_flags = (fds->coba_field == FLUID_DOMAIN_FIELD_FLAGS);
   const bool show_pressure = (fds->coba_field == FLUID_DOMAIN_FIELD_PRESSURE);
-  eWORKBENCH_VolumeInterpType interp_type = WORKBENCH_VOLUME_INTERP_CLOSEST;
+  eWORKBENCH_VolumeInterpType interp_type = WORKBENCH_VOLUME_INTERP_LINEAR;
 
-  switch (fds->interp_method) {
+  switch ((FLUID_DisplayInterpolationMethod)fds->interp_method) {
     case FLUID_DISPLAY_INTERP_LINEAR:
       interp_type = WORKBENCH_VOLUME_INTERP_LINEAR;
       break;
@@ -114,6 +113,7 @@ static void workbench_volume_modifier_cache_populate(WORKBENCH_Data *vedata,
       interp_type = WORKBENCH_VOLUME_INTERP_CLOSEST;
       break;
   }
+
   GPUShader *sh = workbench_shader_volume_get(use_slice, fds->use_coba, interp_type, true);
 
   if (use_slice) {
@@ -231,9 +231,9 @@ static void workbench_volume_object_cache_populate(WORKBENCH_Data *vedata,
 
   wpd->volumes_do = true;
   const bool use_slice = (volume->display.axis_slice_method == AXIS_SLICE_SINGLE);
-  eWORKBENCH_VolumeInterpType interp_type = WORKBENCH_VOLUME_INTERP_CLOSEST;
+  eWORKBENCH_VolumeInterpType interp_type = WORKBENCH_VOLUME_INTERP_LINEAR;
 
-  switch (volume->display.interpolation_method) {
+  switch ((VolumeDisplayInterpMethod)volume->display.interpolation_method) {
     case VOLUME_DISPLAY_INTERP_LINEAR:
       interp_type = WORKBENCH_VOLUME_INTERP_LINEAR;
       break;

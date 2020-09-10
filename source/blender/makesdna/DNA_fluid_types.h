@@ -81,11 +81,11 @@ enum {
 };
 
 /* Display interpolation method. */
-enum {
+typedef enum FLUID_DisplayInterpolationMethod {
   FLUID_DISPLAY_INTERP_LINEAR = 0,
   FLUID_DISPLAY_INTERP_CUBIC = 1,
   FLUID_DISPLAY_INTERP_CLOSEST = 2,
-};
+} FLUID_DisplayInterpolationMethod;
 
 enum {
   VECTOR_DRAW_NEEDLE = 0,
@@ -100,11 +100,11 @@ enum {
 };
 
 /* Fluid domain vector fields. */
-enum {
+typedef enum FLUID_DisplayVectorField {
   FLUID_DOMAIN_VECTOR_FIELD_VELOCITY = 0,
   FLUID_DOMAIN_VECTOR_FIELD_GUIDE_VELOCITY = 1,
   FLUID_DOMAIN_VECTOR_FIELD_FORCE = 2,
-};
+} FLUID_DisplayVectorField;
 
 enum {
   SNDPARTICLE_BOUNDARY_DELETE = 0,
@@ -148,7 +148,7 @@ enum {
   FLUID_GRIDLINE_COLOR_TYPE_RANGE = 2,
 };
 
-/* Fluid cell types  */
+/* Fluid cell types.  */
 enum {
   FLUID_CELL_TYPE_NONE = 0,
   FLUID_CELL_TYPE_FLUID = (1 << 0),

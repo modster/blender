@@ -5005,9 +5005,9 @@ void BKE_fluid_modifier_create_type_data(struct FluidModifierData *fmd)
     fmd->domain->timesteps_maximum = 4;
 
     /* display options */
-    fmd->domain->axis_slice_method = AXIS_SLICE_SINGLE;
+    fmd->domain->axis_slice_method = AXIS_SLICE_FULL;
     fmd->domain->slice_axis = 0;
-    fmd->domain->interp_method = FLUID_DISPLAY_INTERP_CLOSEST;
+    fmd->domain->interp_method = FLUID_DISPLAY_INTERP_LINEAR;
     fmd->domain->draw_velocity = false;
     fmd->domain->slice_per_voxel = 5.0f;
     fmd->domain->slice_depth = 0.5f;

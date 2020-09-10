@@ -394,7 +394,7 @@ static bool get_smoke_velocity_field(FluidDomainSettings *fds,
                                      float **r_velocity_z)
 {
   const char vector_field = fds->vector_field;
-  switch (vector_field) {
+  switch ((FLUID_DisplayVectorField)vector_field) {
     case FLUID_DOMAIN_VECTOR_FIELD_VELOCITY:
       *r_velocity_x = manta_get_velocity_x(fds->fluid);
       *r_velocity_y = manta_get_velocity_y(fds->fluid);
