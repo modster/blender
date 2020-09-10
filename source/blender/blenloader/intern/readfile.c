@@ -5589,6 +5589,9 @@ static void direct_link_region(BlendDataReader *reader, ARegion *region, int spa
 
   BLO_read_list(reader, &region->ui_lists);
 
+  /* The area's search filter is runtime only, so we need to clear the active flag on read. */
+  region->flag &= ~RGN_FLAG_SEARCH_FILTER_ACTIVE;
+
   LISTBASE_FOREACH (uiList *, ui_list, &region->ui_lists) {
     ui_list->type = NULL;
     ui_list->dyn_data = NULL;
@@ -5829,6 +5832,7 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
       sbuts->texuser = NULL;
       sbuts->mainbo = sbuts->mainb;
       sbuts->mainbuser = sbuts->mainb;
+      memset(&sbuts->runtime, 0x0, sizeof(sbuts->runtime));
     }
     else if (sl->spacetype == SPACE_CONSOLE) {
       SpaceConsole *sconsole = (SpaceConsole *)sl;
