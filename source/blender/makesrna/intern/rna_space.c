@@ -1825,7 +1825,7 @@ static void rna_SpaceProperties_search_filter_update(struct bContext *C,
   /* Update the search filter flag for the main region with the panels. */
   ARegion *main_region = BKE_area_find_region_type(area, RGN_TYPE_WINDOW);
   BLI_assert(main_region != NULL);
-  ED_region_search_filter_update(C, main_region);
+  ED_region_search_filter_update(area, main_region);
 }
 
 /* Space Console */
@@ -2982,10 +2982,10 @@ static void rna_def_space_outliner(BlenderRNA *brna)
        "View Layer",
        "Display collections and objects in the view layer"},
       {SO_SEQUENCE,
-         "SEQUENCE",
-         ICON_SEQUENCE,
-         "Video Sequencer",
-         "Display data belonging to the Video Sequencer"},
+       "SEQUENCE",
+       ICON_SEQUENCE,
+       "Video Sequencer",
+       "Display data belonging to the Video Sequencer"},
       {SO_LIBRARIES,
        "LIBRARIES",
        ICON_FILE_BLEND,

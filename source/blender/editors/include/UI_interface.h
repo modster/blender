@@ -677,6 +677,7 @@ void UI_block_emboss_set(uiBlock *block, char emboss);
 bool UI_block_has_search_filter(const uiBlock *block);
 bool UI_block_is_search_only(const uiBlock *block);
 void UI_block_set_search_only(uiBlock *block, bool search_only);
+void UI_block_set_search_filter(uiBlock *block, const char *search_filter);
 
 void UI_block_free(const struct bContext *C, uiBlock *block);
 void UI_blocklist_free(const struct bContext *C, struct ListBase *lb);

@@ -742,20 +742,22 @@ void ED_area_tag_refresh(ScrArea *area)
 /**
  * Returns the search string if the space type supports property search.
  */
-char *ED_area_search_filter_get(const bContext *C)
+const char *ED_area_search_filter_get(const ScrArea *area)
 {
-  SpaceProperties *sbuts = CTX_wm_space_properties(C);
-  if (sbuts != NULL) {
+  /* Only the properties editor has a search string for now. */
+  if (area->spacetype) {
+    SpaceProperties *sbuts = area->spacedata.first;
     return sbuts->search_string;
   }
+
   return NULL;
 }
 
-void ED_region_search_filter_update(const bContext *C, ARegion *region)
+void ED_region_search_filter_update(const ScrArea *area, ARegion *region)
 {
   region->flag |= RGN_FLAG_SEARCH_FILTER_UPDATE;
 
-  const char *search_filter = ED_area_search_filter_get(C);
+  const char *search_filter = ED_area_search_filter_get(area);
   SET_FLAG_FROM_TEST(region->flag, search_filter[0] != '\0', RGN_FLAG_SEARCH_FILTER_ACTIVE);
 }
 
@@ -2584,6 +2586,7 @@ static void ed_panel_draw(const bContext *C,
                           int w,
                           int em,
                           char *unique_panel_str,
+                          const char *search_filter,
                           bool search_only)
 {
   const uiStyle *style = UI_style_get_dpi();
@@ -2597,6 +2600,7 @@ static void ed_panel_draw(const bContext *C,
     strncat(block_name, unique_panel_str, INSTANCED_PANEL_UNIQUE_STR_LEN);
   }
   uiBlock *block = UI_block_begin(C, region, block_name, UI_EMBOSS);
+  UI_block_set_search_filter(block, search_filter);
   UI_block_set_search_only(block, search_only);
 
   bool open;
@@ -2705,8 +2709,16 @@ static void ed_panel_draw(const bContext *C,
       Panel *child_panel = UI_panel_find_by_type(&panel->children, child_pt);
 
       if (child_pt->draw && (!child_pt->poll || child_pt->poll(C, child_pt))) {
-        ed_panel_draw(
-            C, region, &panel->children, child_pt, child_panel, w, em, unique_panel_str, !open);
+        ed_panel_draw(C,
+                      region,
+                      &panel->children,
+                      child_pt,
+                      child_panel,
+                      w,
+                      em,
+                      unique_panel_str,
+                      search_filter,
+                      !open);
       }
     }
   }
@@ -2813,6 +2825,9 @@ void ED_region_panels_layout_ex(const bContext *C,
   /* create panels */
   UI_panels_begin(C, region);
 
+  /* Get search string for property search. */
+  const char *search_filter = ED_area_search_filter_get(area);
+
   /* set view2d view matrix  - UI_block_begin() stores it */
   UI_view2d_view_ortho(v2d);
 
@@ -2845,6 +2860,7 @@ void ED_region_panels_layout_ex(const bContext *C,
                   (pt->flag & PNL_DRAW_BOX) ? w_box_panel : w,
                   em,
                   NULL,
+                  search_filter,
                   false);
   }
 
@@ -2879,6 +2895,7 @@ void ED_region_panels_layout_ex(const bContext *C,
                     (panel->type->flag & PNL_DRAW_BOX) ? w_box_panel : w,
                     em,
                     unique_panel_str,
+                    search_filter,
                     false);
     }
   }
