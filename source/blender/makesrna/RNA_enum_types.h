@@ -26,6 +26,7 @@
 extern "C" {
 #endif
 
+struct ID;
 struct bNodeSocketType;
 struct bNodeTreeType;
 struct bNodeType;
@@ -118,6 +119,8 @@ extern const EnumPropertyItem rna_enum_motionpath_bake_location_items[];
 extern const EnumPropertyItem rna_enum_event_value_items[];
 extern const EnumPropertyItem rna_enum_event_type_items[];
 extern const EnumPropertyItem rna_enum_event_type_mask_items[];
+
+extern const EnumPropertyItem rna_enum_operator_type_flag_items[];
 extern const EnumPropertyItem rna_enum_operator_return_items[];
 extern const EnumPropertyItem rna_enum_operator_property_tags[];
 
@@ -229,6 +232,10 @@ extern const EnumPropertyItem rna_enum_context_mode_items[];
 
 extern const EnumPropertyItem rna_enum_curveprofile_preset_items[];
 extern const EnumPropertyItem rna_enum_preference_section_items[];
+
+extern const EnumPropertyItem rna_enum_attribute_type_items[];
+extern const EnumPropertyItem rna_enum_attribute_domain_items[];
+extern const EnumPropertyItem *rna_enum_attribute_domain_itemf(struct ID *id, bool *r_free);
 
 /* API calls */
 int rna_node_tree_type_to_enum(struct bNodeTreeType *typeinfo);
