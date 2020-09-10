@@ -211,7 +211,7 @@ static float sb_time_scale(Object *ob)
  * will cause unwanted responses of the softbody system (which does inter frame calculations )
  * so first 'cure' would be: interpolate linear in time ..
  * Q: why do i write this?
- * A: because it happened once, that some eger coder 'streamlined' code to fail.
+ * A: because it happened once, that some eager coder 'streamlined' code to fail.
  * We DO linear interpolation for goals .. and i think we should do on animated properties as well
  */
 
@@ -3209,16 +3209,16 @@ void sbObjectToSoftbody(Object *ob)
   free_softbody_intern(ob->soft);
 }
 
-static int object_has_edges(Object *ob)
+static bool object_has_edges(Object *ob)
 {
   if (ob->type == OB_MESH) {
     return ((Mesh *)ob->data)->totedge;
   }
   if (ob->type == OB_LATTICE) {
-    return 1;
+    return true;
   }
 
-  return 0;
+  return false;
 }
 
 /* SB global visible functions */

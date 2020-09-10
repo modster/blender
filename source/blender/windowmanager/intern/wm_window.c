@@ -1099,13 +1099,11 @@ static void wm_window_set_drawable(wmWindowManager *wm, wmWindow *win, bool acti
     GHOST_ActivateWindowDrawingContext(win->ghostwin);
   }
   GPU_context_active_set(win->gpuctx);
-  immActivate();
 }
 
 void wm_window_clear_drawable(wmWindowManager *wm)
 {
   if (wm->windrawable) {
-    immDeactivate();
     wm->windrawable = NULL;
   }
 }
@@ -2485,7 +2483,12 @@ void *WM_opengl_context_create(void)
    */
   BLI_assert(BLI_thread_is_main());
   BLI_assert(GPU_framebuffer_active_get() == GPU_framebuffer_back_get());
-  return GHOST_CreateOpenGLContext(g_system);
+
+  GHOST_GLSettings glSettings = {0};
+  if (G.debug & G_DEBUG_GPU) {
+    glSettings.flags |= GHOST_glDebugContext;
+  }
+  return GHOST_CreateOpenGLContext(g_system, glSettings);
 }
 
 void WM_opengl_context_dispose(void *context)

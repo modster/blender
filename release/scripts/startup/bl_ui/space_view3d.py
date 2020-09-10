@@ -920,9 +920,8 @@ class ShowHideMenu:
         layout.operator("%s.hide" % self._operator_name, text="Hide Unselected").unselected = True
 
 
-# Standard transforms which apply to all cases
-# NOTE: this doesn't seem to be able to be used directly
-class VIEW3D_MT_transform_base(Menu):
+# Standard transforms which apply to all cases (mix-in class, not used directly).
+class VIEW3D_MT_transform_base:
     bl_label = "Transform"
     bl_category = "View"
 
@@ -949,7 +948,7 @@ class VIEW3D_MT_transform_base(Menu):
 
 
 # Generic transform menu - geometry types
-class VIEW3D_MT_transform(VIEW3D_MT_transform_base):
+class VIEW3D_MT_transform(VIEW3D_MT_transform_base, Menu):
     def draw(self, context):
         # base menu
         VIEW3D_MT_transform_base.draw(self, context)
@@ -969,7 +968,7 @@ class VIEW3D_MT_transform(VIEW3D_MT_transform_base):
 
 
 # Object-specific extensions to Transform menu
-class VIEW3D_MT_transform_object(VIEW3D_MT_transform_base):
+class VIEW3D_MT_transform_object(VIEW3D_MT_transform_base, Menu):
     def draw(self, context):
         layout = self.layout
 
@@ -1001,7 +1000,7 @@ class VIEW3D_MT_transform_object(VIEW3D_MT_transform_base):
 
 
 # Armature EditMode extensions to Transform menu
-class VIEW3D_MT_transform_armature(VIEW3D_MT_transform_base):
+class VIEW3D_MT_transform_armature(VIEW3D_MT_transform_base, Menu):
     def draw(self, context):
         layout = self.layout
 
@@ -1074,10 +1073,7 @@ class VIEW3D_MT_uv_map(Menu):
     def draw(self, context):
         layout = self.layout
 
-        tool_settings = context.tool_settings
-
         layout.operator("uv.unwrap")
-        layout.prop(tool_settings, "use_edge_path_live_unwrap")
 
         layout.separator()
 
@@ -1370,7 +1366,7 @@ class VIEW3D_MT_select_object(Menu):
 
         layout.separator()
 
-        layout.operator_menu_enum("object.select_by_type", "type", text="Select All by Type...")
+        layout.operator_menu_enum("object.select_by_type", "type", text="Select All by Type")
         layout.operator("object.select_camera", text="Select Active Camera")
         layout.operator("object.select_mirror", text="Mirror Selection")
         layout.operator("object.select_random", text="Select Random")
@@ -3110,6 +3106,10 @@ class VIEW3D_MT_face_sets(Menu):
 
         op = layout.operator("sculpt.face_set_edit", text='Shrink Face Set')
         op.mode = 'SHRINK'
+
+        layout.separator()
+
+        op = layout.operator("mesh.face_set_extract", text='Extract Face Set')
 
         layout.separator()
 
@@ -6501,7 +6501,7 @@ class VIEW3D_PT_overlay_vertex_paint(Panel):
         col = layout.column()
         col.active = display_all
 
-        col.prop(overlay, "vertex_paint_mode_opacity", text="Opacity")
+        col.prop(overlay, "vertex_paint_mode_opacity")
         col.prop(overlay, "show_paint_wire")
 
 
@@ -7399,7 +7399,6 @@ classes = (
     VIEW3D_HT_tool_header,
     VIEW3D_MT_editor_menus,
     VIEW3D_MT_transform,
-    VIEW3D_MT_transform_base,
     VIEW3D_MT_transform_object,
     VIEW3D_MT_transform_armature,
     VIEW3D_MT_mirror,
