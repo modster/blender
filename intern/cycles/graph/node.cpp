@@ -140,7 +140,8 @@ void Node::set(const SocketType &input, Node *value)
   set_if_different(input, value);
 }
 
-// todo(kevin) : Light::set_shader does not select the overload taking Node* but the one with taking bool
+// todo(kevin) : Light::set_shader does not select the overload taking Node* but the one with
+// taking bool
 void Node::set(const SocketType &input, Shader *value)
 {
   assert(input.type == SocketType::NODE);
@@ -726,8 +727,7 @@ void Node::clear_modified()
   socket_modified = 0;
 }
 
-template <typename T>
-void Node::set_if_different(const SocketType &input, T value)
+template<typename T> void Node::set_if_different(const SocketType &input, T value)
 {
   if (get_socket_value<T>(this, input) == value) {
     return;
@@ -737,8 +737,7 @@ void Node::set_if_different(const SocketType &input, T value)
   socket_modified |= input.modified_flag_bit;
 }
 
-template <typename T>
-void Node::set_if_different(const SocketType &input, array<T> &value)
+template<typename T> void Node::set_if_different(const SocketType &input, array<T> &value)
 {
   if (!socket_is_modified(input)) {
     if (get_socket_value<array<T>>(this, input) == value) {

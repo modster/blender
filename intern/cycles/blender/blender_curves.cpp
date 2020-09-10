@@ -847,8 +847,7 @@ void BlenderSync::sync_hair(BL::Depsgraph b_depsgraph,
 
   /* Compares curve_keys rather than strands in order to handle quick hair
    * adjustments in dynamic BVH - other methods could probably do this better. */
-  const bool rebuild = (hair->curve_keys_is_modified() ||
-                        hair->curve_radius_is_modified());
+  const bool rebuild = (hair->curve_keys_is_modified() || hair->curve_radius_is_modified());
 
   hair->tag_update(scene, rebuild);
 }

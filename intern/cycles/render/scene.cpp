@@ -382,8 +382,8 @@ bool Scene::need_data_update()
   return (background->is_modified() || image_manager->need_update || object_manager->need_update ||
           geometry_manager->need_update || light_manager->need_update ||
           lookup_tables->need_update || integrator->is_modified() || shader_manager->need_update ||
-          particle_system_manager->need_update || bake_manager->need_update || film->is_modified() ||
-          procedural_manager->need_update);
+          particle_system_manager->need_update || bake_manager->need_update ||
+          film->is_modified() || procedural_manager->need_update);
 }
 
 bool Scene::need_reset()
@@ -460,7 +460,8 @@ DeviceRequestedFeatures Scene::get_requested_device_features()
   requested_features.use_background_light = light_manager->has_background_light(this);
 
   requested_features.use_baking = bake_manager->get_baking();
-  requested_features.use_integrator_branched = (integrator->get_method() == Integrator::BRANCHED_PATH);
+  requested_features.use_integrator_branched = (integrator->get_method() ==
+                                                Integrator::BRANCHED_PATH);
   if (film->get_denoising_data_pass()) {
     requested_features.use_denoising = true;
     requested_features.use_shadow_tricks = true;

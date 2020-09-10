@@ -270,7 +270,7 @@ void BlenderSync::sync_integrator()
 
   integrator->set_volume_max_steps(get_int(cscene, "volume_max_steps"));
   float volume_step_rate = (preview) ? get_float(cscene, "volume_preview_step_rate") :
-                                             get_float(cscene, "volume_step_rate");
+                                       get_float(cscene, "volume_step_rate");
   integrator->set_volume_step_rate(volume_step_rate);
 
   integrator->set_caustics_reflective(get_boolean(cscene, "caustics_reflective"));
@@ -285,7 +285,7 @@ void BlenderSync::sync_integrator()
        * but this is good enough for now.
        */
       seed += hash_uint2((int)(b_scene.frame_subframe() * (float)INT_MAX),
-                                     get_int(cscene, "seed"));
+                         get_int(cscene, "seed"));
     }
   }
 
@@ -382,10 +382,10 @@ void BlenderSync::sync_film(BL::SpaceView3D &b_v3d)
   }
 
   film->set_exposure(get_float(cscene, "film_exposure"));
-  film->set_filter_type((FilterType)get_enum(
-      cscene, "pixel_filter_type", FILTER_NUM_TYPES, FILTER_BLACKMAN_HARRIS));
+  film->set_filter_type(
+      (FilterType)get_enum(cscene, "pixel_filter_type", FILTER_NUM_TYPES, FILTER_BLACKMAN_HARRIS));
   float filter_width = (film->get_filter_type() == FILTER_BOX) ? 1.0f :
-                                                           get_float(cscene, "filter_width");
+                                                                 get_float(cscene, "filter_width");
   film->set_filter_width(filter_width);
 
   if (b_scene.world()) {
@@ -702,9 +702,10 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
   RNA_END;
 
   scene->film->set_denoising_data_pass(denoising.use || denoising.store_passes);
-  scene->film->set_denoising_clean_pass(scene->film->get_denoising_flags() & DENOISING_CLEAN_ALL_PASSES);
+  scene->film->set_denoising_clean_pass(scene->film->get_denoising_flags() &
+                                        DENOISING_CLEAN_ALL_PASSES);
   scene->film->set_denoising_prefiltered_pass(denoising.store_passes &&
-                                            denoising.type == DENOISER_NLM);
+                                              denoising.type == DENOISER_NLM);
 
   scene->film->set_pass_alpha_threshold(b_view_layer.pass_alpha_threshold());
   scene->film->tag_passes_update(scene, passes);

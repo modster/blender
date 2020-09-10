@@ -1062,8 +1062,7 @@ void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph,
   sync_mesh_fluid_motion(b_ob, scene, mesh);
 
   /* tag update */
-  bool rebuild = (mesh->triangles_is_modified()) ||
-                 (oldsubd_faces != mesh->get_subd_faces()) ||
+  bool rebuild = (mesh->triangles_is_modified()) || (oldsubd_faces != mesh->get_subd_faces()) ||
                  (mesh->subd_face_corners_is_modified());
 
   mesh->tag_update(scene, rebuild);

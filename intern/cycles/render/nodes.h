@@ -523,7 +523,7 @@ class ConvertNode : public ShaderNode {
   static bool register_types();
   static Node *create(const NodeType *type);
   static const NodeType *node_types[MAX_TYPE][MAX_TYPE];
-  static bool  initialized;
+  static bool initialized;
 };
 
 class BsdfBaseNode : public ShaderNode {
@@ -546,8 +546,8 @@ class BsdfBaseNode : public ShaderNode {
     return false;
   }
 
-  protected:
-   ClosureType closure;
+ protected:
+  ClosureType closure;
 };
 
 class BsdfNode : public BsdfBaseNode {
@@ -693,9 +693,9 @@ class GlossyBsdfNode : public BsdfNode {
   NODE_PUBLIC_API(float, roughness)
   NODE_PUBLIC_API(ClosureType, distribution)
 
-  private:
-   float roughness_orig;
-   ClosureType distribution_orig;
+ private:
+  float roughness_orig;
+  ClosureType distribution_orig;
 };
 
 class GlassBsdfNode : public BsdfNode {
@@ -713,9 +713,9 @@ class GlassBsdfNode : public BsdfNode {
   NODE_PUBLIC_API(float, IOR)
   NODE_PUBLIC_API(ClosureType, distribution)
 
-  private:
-   float roughness_orig;
-   ClosureType distribution_orig;
+ private:
+  float roughness_orig;
+  ClosureType distribution_orig;
 };
 
 class RefractionBsdfNode : public BsdfNode {
@@ -733,9 +733,9 @@ class RefractionBsdfNode : public BsdfNode {
   NODE_PUBLIC_API(float, IOR)
   NODE_PUBLIC_API(ClosureType, distribution)
 
-  private:
-   float roughness_orig;
-   ClosureType distribution_orig;
+ private:
+  float roughness_orig;
+  ClosureType distribution_orig;
 };
 
 class ToonBsdfNode : public BsdfNode {
@@ -869,7 +869,6 @@ class VolumeNode : public ShaderNode {
   ClosureType closure;
 
  public:
-
   virtual bool equals(const ShaderNode & /*other*/)
   {
     /* TODO(sergey): With some care Volume nodes can be de-duplicated. */

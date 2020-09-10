@@ -341,7 +341,8 @@ static ShaderNode *add_node(Scene *scene,
   else if (b_node.is_a(&RNA_ShaderNodeVectorRotate)) {
     BL::ShaderNodeVectorRotate b_vector_rotate_node(b_node);
     VectorRotateNode *vector_rotate_node = graph->create_node<VectorRotateNode>();
-    vector_rotate_node->set_rotate_type((NodeVectorRotateType)b_vector_rotate_node.rotation_type());
+    vector_rotate_node->set_rotate_type(
+        (NodeVectorRotateType)b_vector_rotate_node.rotation_type());
     vector_rotate_node->set_invert(b_vector_rotate_node.invert());
     node = vector_rotate_node;
   }
@@ -349,9 +350,10 @@ static ShaderNode *add_node(Scene *scene,
     BL::ShaderNodeVectorTransform b_vector_transform_node(b_node);
     VectorTransformNode *vtransform = graph->create_node<VectorTransformNode>();
     vtransform->set_transform_type((NodeVectorTransformType)b_vector_transform_node.vector_type());
-    vtransform->set_convert_from((NodeVectorTransformConvertSpace)
-                                   b_vector_transform_node.convert_from());
-    vtransform->set_convert_to((NodeVectorTransformConvertSpace)b_vector_transform_node.convert_to());
+    vtransform->set_convert_from(
+        (NodeVectorTransformConvertSpace)b_vector_transform_node.convert_from());
+    vtransform->set_convert_to(
+        (NodeVectorTransformConvertSpace)b_vector_transform_node.convert_to());
     node = vtransform;
   }
   else if (b_node.is_a(&RNA_ShaderNodeNormal)) {
@@ -525,11 +527,11 @@ static ShaderNode *add_node(Scene *scene,
   else if (b_node.is_a(&RNA_ShaderNodeBsdfHairPrincipled)) {
     BL::ShaderNodeBsdfHairPrincipled b_principled_hair_node(b_node);
     PrincipledHairBsdfNode *principled_hair = graph->create_node<PrincipledHairBsdfNode>();
-    principled_hair->set_parametrization((NodePrincipledHairParametrization)get_enum(
-        b_principled_hair_node.ptr,
-        "parametrization",
-        NODE_PRINCIPLED_HAIR_NUM,
-        NODE_PRINCIPLED_HAIR_REFLECTANCE));
+    principled_hair->set_parametrization(
+        (NodePrincipledHairParametrization)get_enum(b_principled_hair_node.ptr,
+                                                    "parametrization",
+                                                    NODE_PRINCIPLED_HAIR_NUM,
+                                                    NODE_PRINCIPLED_HAIR_REFLECTANCE));
     node = principled_hair;
   }
   else if (b_node.is_a(&RNA_ShaderNodeBsdfPrincipled)) {
@@ -699,8 +701,8 @@ static ShaderNode *add_node(Scene *scene,
             new BlenderImageLoader(b_image, image_frame), image->image_params());
       }
       else {
-        ustring filename = ustring(image_user_file_path(
-              b_image_user, b_image, b_scene.frame_current(), true));
+        ustring filename = ustring(
+            image_user_file_path(b_image_user, b_image, b_scene.frame_current(), true));
         image->set_filename(filename);
       }
     }
@@ -735,8 +737,8 @@ static ShaderNode *add_node(Scene *scene,
                                                       env->image_params());
       }
       else {
-        env->set_filename(ustring(image_user_file_path(
-            b_image_user, b_image, b_scene.frame_current(), false)));
+        env->set_filename(
+            ustring(image_user_file_path(b_image_user, b_image, b_scene.frame_current(), false)));
       }
     }
     node = env;
@@ -910,7 +912,7 @@ static ShaderNode *add_node(Scene *scene,
       float3 loc, size;
       point_density_texture_space(b_depsgraph, b_point_density_node, loc, size);
       point_density->set_tfm(transform_translate(-loc) * transform_scale(size) *
-                           transform_inverse(get_transform(b_ob.matrix_world())));
+                             transform_inverse(get_transform(b_ob.matrix_world())));
     }
   }
   else if (b_node.is_a(&RNA_ShaderNodeBevel)) {
@@ -1391,15 +1393,16 @@ void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d,
       mix_intensity->set_mix_type(NODE_MIX_MUL);
       mix_intensity->set_fac(1.0f);
       mix_intensity->set_color2(make_float3(new_viewport_parameters.studiolight_intensity,
-                                          new_viewport_parameters.studiolight_intensity,
-                                          new_viewport_parameters.studiolight_intensity));
+                                            new_viewport_parameters.studiolight_intensity,
+                                            new_viewport_parameters.studiolight_intensity));
       graph->add(mix_intensity);
 
       TextureCoordinateNode *texture_coordinate = graph->create_node<TextureCoordinateNode>();
       graph->add(texture_coordinate);
 
       MixNode *mix_background_with_environment = graph->create_node<MixNode>();
-      mix_background_with_environment->set_fac(new_viewport_parameters.studiolight_background_alpha);
+      mix_background_with_environment->set_fac(
+          new_viewport_parameters.studiolight_background_alpha);
       mix_background_with_environment->set_color1(world_color);
       graph->add(mix_background_with_environment);
 
@@ -1454,7 +1457,8 @@ void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d,
 
   if (background->get_transparent()) {
     background->set_transparent_glass(get_boolean(cscene, "film_transparent_glass"));
-    background->set_transparent_roughness_threshold(get_float(cscene, "film_transparent_roughness"));
+    background->set_transparent_roughness_threshold(
+        get_float(cscene, "film_transparent_roughness"));
   }
   else {
     background->set_transparent_glass(false);
@@ -1462,7 +1466,7 @@ void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d,
   }
 
   background->set_use_shader(view_layer.use_background_shader |
-                           viewport_parameters.custom_viewport_parameters());
+                             viewport_parameters.custom_viewport_parameters());
   background->set_use_ao(background->get_use_ao() && view_layer.use_background_ao);
 
   if (background->is_modified())

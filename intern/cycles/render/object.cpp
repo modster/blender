@@ -371,8 +371,8 @@ ObjectManager::~ObjectManager()
 }
 
 float ObjectManager::object_surface_area(UpdateObjectTransformState *state,
-                                 const Transform &tfm,
-                                 Geometry *geom)
+                                         const Transform &tfm,
+                                         Geometry *geom)
 {
   if (geom->geometry_type != Geometry::MESH && geom->geometry_type != Geometry::VOLUME) {
     return 0.0f;
@@ -381,7 +381,8 @@ float ObjectManager::object_surface_area(UpdateObjectTransformState *state,
   Mesh *mesh = static_cast<Mesh *>(geom);
   if (mesh->has_volume || geom->geometry_type == Geometry::VOLUME) {
     /* Volume density automatically adjust to object scale. */
-    if (geom->geometry_type == Geometry::VOLUME && static_cast<Volume *>(geom)->get_object_space()) {
+    if (geom->geometry_type == Geometry::VOLUME &&
+        static_cast<Volume *>(geom)->get_object_space()) {
       const float3 unit = normalize(make_float3(1.0f, 1.0f, 1.0f));
       return 1.0f / len(transform_direction(&tfm, unit));
     }
@@ -530,13 +531,15 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
   kobject.dupli_generated[0] = ob->dupli_generated[0];
   kobject.dupli_generated[1] = ob->dupli_generated[1];
   kobject.dupli_generated[2] = ob->dupli_generated[2];
-  kobject.numkeys = (geom->geometry_type == Geometry::HAIR) ? static_cast<Hair *>(geom)->get_curve_keys().size() :
-                                                     0;
+  kobject.numkeys = (geom->geometry_type == Geometry::HAIR) ?
+                        static_cast<Hair *>(geom)->get_curve_keys().size() :
+                        0;
   kobject.dupli_uv[0] = ob->dupli_uv[0];
   kobject.dupli_uv[1] = ob->dupli_uv[1];
   int totalsteps = geom->get_motion_steps();
   kobject.numsteps = (totalsteps - 1) / 2;
-  kobject.numverts = (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) ?
+  kobject.numverts = (geom->geometry_type == Geometry::MESH ||
+                      geom->geometry_type == Geometry::VOLUME) ?
                          static_cast<Mesh *>(geom)->verts.size() :
                          0;
   kobject.patch_map_offset = 0;

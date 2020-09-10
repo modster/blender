@@ -50,8 +50,9 @@ struct Transform;
   }
 
 #define NODE_PUBLIC_API_BASE(type_, name, string_name) \
-  protected: \
+ protected: \
   type_ name; \
+\
  public: \
   NODE_PUBLIC_API_BASE_METHODS(type_, name, string_name)
 
@@ -72,7 +73,7 @@ struct Transform;
   }
 
 #define NODE_PUBLIC_API_STRUCT_MEMBER(type_, name, member) \
-  NODE_PUBLIC_API_BASE_METHODS(type_, name##_##member, #name"."#member) \
+  NODE_PUBLIC_API_BASE_METHODS(type_, name##_##member, #name "." #member) \
   void set_##name##_##member(type_ value) \
   { \
     const SocketType *socket = get_##name##_##member##_socket(); \
@@ -183,11 +184,9 @@ struct Node {
 
   SocketModifiedFlags socket_modified;
 
-  template <typename T>
-  void set_if_different(const SocketType &input, T value);
+  template<typename T> void set_if_different(const SocketType &input, T value);
 
-  template <typename T>
-  void set_if_different(const SocketType &input, array<T> &value);
+  template<typename T> void set_if_different(const SocketType &input, array<T> &value);
 };
 
 CCL_NAMESPACE_END

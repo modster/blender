@@ -194,12 +194,12 @@ class Camera : public Node {
   KernelCamera kernel_camera;
   array<DecomposedTransform> kernel_camera_motion;
 
-  private:
+ private:
   int width;
   int height;
   int resolution;
 
-  public:
+ public:
   /* functions */
   Camera();
   ~Camera();

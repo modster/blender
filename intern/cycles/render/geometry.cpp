@@ -1237,7 +1237,8 @@ void GeometryManager::device_update(Device *device,
         geom->tag_modified();
     }
 
-    if (geom->is_modified() && (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME)) {
+    if (geom->is_modified() &&
+        (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME)) {
       Mesh *mesh = static_cast<Mesh *>(geom);
 
       /* Update normals. */

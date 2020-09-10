@@ -1070,7 +1070,8 @@ void Session::render(bool need_denoise)
   task.need_finish_queue = params.progressive_refine;
   task.integrator_branched = scene->integrator->get_method() == Integrator::BRANCHED_PATH;
 
-  task.adaptive_sampling.use = (scene->integrator->get_sampling_pattern() == SAMPLING_PATTERN_PMJ) &&
+  task.adaptive_sampling.use = (scene->integrator->get_sampling_pattern() ==
+                                SAMPLING_PATTERN_PMJ) &&
                                scene->dscene.data.film.pass_adaptive_aux_buffer;
   task.adaptive_sampling.min_samples = scene->dscene.data.integrator.adaptive_min_samples;
   task.adaptive_sampling.adaptive_step = scene->dscene.data.integrator.adaptive_step;

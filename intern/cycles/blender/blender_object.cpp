@@ -252,7 +252,8 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
   /* object sync
    * transform comparison should not be needed, but duplis don't work perfect
    * in the depsgraph and may not signal changes, so this is a workaround */
-  if (object->is_modified() || object_updated || (object->get_geometry() && object->get_geometry()->is_modified()) ||
+  if (object->is_modified() || object_updated ||
+      (object->get_geometry() && object->get_geometry()->is_modified()) ||
       tfm != object->get_tfm()) {
     object->name = b_ob.name().c_str();
     object->set_pass_id(b_ob.pass_index());
@@ -298,7 +299,7 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
     /* dupli texture coordinates and random_id */
     if (is_instance) {
       object->set_dupli_generated(0.5f * get_float3(b_instance.orco()) -
-                                make_float3(0.5f, 0.5f, 0.5f));
+                                  make_float3(0.5f, 0.5f, 0.5f));
       object->set_dupli_uv(get_float2(b_instance.uv()));
       object->set_random_id(b_instance.random_id());
     }

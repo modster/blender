@@ -6205,14 +6205,15 @@ void VectorRotateNode::compile(SVMCompiler &compiler)
   ShaderInput *angle_in = input("Angle");
   ShaderOutput *vector_out = output("Vector");
 
-  compiler.add_node(
-      NODE_VECTOR_ROTATE,
-      compiler.encode_uchar4(
-          rotate_type, compiler.stack_assign(vector_in), compiler.stack_assign(rotation_in), invert),
-      compiler.encode_uchar4(compiler.stack_assign(center_in),
-                             compiler.stack_assign(axis_in),
-                             compiler.stack_assign(angle_in)),
-      compiler.stack_assign(vector_out));
+  compiler.add_node(NODE_VECTOR_ROTATE,
+                    compiler.encode_uchar4(rotate_type,
+                                           compiler.stack_assign(vector_in),
+                                           compiler.stack_assign(rotation_in),
+                                           invert),
+                    compiler.encode_uchar4(compiler.stack_assign(center_in),
+                                           compiler.stack_assign(axis_in),
+                                           compiler.stack_assign(angle_in)),
+                    compiler.stack_assign(vector_out));
 }
 
 void VectorRotateNode::compile(OSLCompiler &compiler)

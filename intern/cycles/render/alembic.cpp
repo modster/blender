@@ -68,18 +68,19 @@ static Transform make_transform(const Abc::M44d &a)
 
 /* TODO: any attribute lookup should probably go through the AttributeRequests
  */
-static void read_uvs(const IV2fGeomParam &uvs, Geometry *node, const int *face_counts, const int num_faces)
+static void read_uvs(const IV2fGeomParam &uvs,
+                     Geometry *node,
+                     const int *face_counts,
+                     const int num_faces)
 {
   if (uvs.valid()) {
     switch (uvs.getScope()) {
       case kVaryingScope:
-      case kVertexScope:
-      {
+      case kVertexScope: {
         IV2fGeomParam::Sample uvsample = uvs.getExpandedValue();
         break;
       }
-      case kFacevaryingScope:
-      {
+      case kFacevaryingScope: {
         IV2fGeomParam::Sample uvsample = uvs.getIndexedValue();
 
         ustring name = ustring("UVMap");
@@ -108,8 +109,7 @@ static void read_uvs(const IV2fGeomParam &uvs, Geometry *node, const int *face_c
 
         break;
       }
-      default:
-      {
+      default: {
         break;
       }
     }

@@ -534,7 +534,8 @@ void BVHEmbree::add_instance(Object *ob, int i)
     }
   }
   else {
-    rtcSetGeometryTransform(geom_id, 0, RTC_FORMAT_FLOAT3X4_ROW_MAJOR, (const float *)&ob->get_tfm());
+    rtcSetGeometryTransform(
+        geom_id, 0, RTC_FORMAT_FLOAT3X4_ROW_MAJOR, (const float *)&ob->get_tfm());
   }
 
   pack.prim_index.push_back_slow(-1);

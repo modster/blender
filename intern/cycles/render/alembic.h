@@ -53,14 +53,14 @@ class AlembicObject : public Node {
   // TODO : this is only for Meshes at the moment
   // TODO : handle attributes as well
   struct DataCache {
-      bool dirty = false;
-      array<float3> vertices{};
-      array<int3> triangles{};
+    bool dirty = false;
+    array<float3> vertices{};
+    array<int3> triangles{};
   };
 
   DataCache &get_frame_data(int index);
 
-  private:
+ private:
   Object *object = nullptr;
   Geometry *geometry = nullptr;
 
@@ -83,7 +83,7 @@ class AlembicProcedural : public Procedural {
   NODE_PUBLIC_API(float, frame)
   NODE_PUBLIC_API(float, frame_rate)
 
-  array<AlembicObject *> objects; // todo : Node::set
+  array<AlembicObject *> objects;  // todo : Node::set
 
  private:
   void read_mesh(Scene *scene,
