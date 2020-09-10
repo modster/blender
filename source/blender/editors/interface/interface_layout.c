@@ -5279,14 +5279,6 @@ void UI_block_apply_search_filter(uiBlock *block)
 
   block_search_remove_search_only_roots(block);
 
-  if (UI_block_is_search_only(block)) {
-    /* Make sure all of the block's buttons are hidden. They might not have
-     * been hidden if a layout wasn't searched. */
-    LISTBASE_FOREACH (uiBut *, but, &block->buttons) {
-      but->flag |= UI_HIDDEN;
-    }
-  }
-
   if (block->panel != NULL) {
     ui_panel_set_search_filter_match(block->panel, has_result);
   }
