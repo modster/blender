@@ -710,14 +710,10 @@ struct ObjectPreviewData {
   int sizey;
 };
 
-static Object *object_preview_camera_create(Main *preview_main,
-                                            Scene *scene,
-                                            ViewLayer *view_layer,
-                                            Object *preview_object,
-                                            int sizex,
-                                            int sizey)
+static Object *object_preview_camera_create(
+    Main *preview_main, ViewLayer *view_layer, Object *preview_object, int sizex, int sizey)
 {
-  Object *camera = BKE_object_add(preview_main, scene, view_layer, OB_CAMERA, "Preview Camera");
+  Object *camera = BKE_object_add(preview_main, view_layer, OB_CAMERA, "Preview Camera");
 
   float rotmat[3][3];
   float dummyscale[3];
@@ -757,7 +753,6 @@ static Scene *object_preview_scene_create(const struct ObjectPreviewData *previe
   BKE_collection_object_add(preview_data->main, scene->master_collection, preview_object_copy);
 
   Object *camera_object = object_preview_camera_create(preview_data->main,
-                                                       scene,
                                                        view_layer,
                                                        preview_object_copy,
                                                        preview_data->sizex,
