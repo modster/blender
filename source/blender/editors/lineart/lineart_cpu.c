@@ -1885,7 +1885,7 @@ static int lineart_triangle_line_imagespace_intersection_v2(SpinLock *UNUSED(spl
       (MIN3(FBC0[0], FBC1[0], FBC2[0]) > MAX2(LFBC[0], RFBC[0])) ||
       (MAX3(FBC0[1], FBC1[1], FBC2[1]) < MIN2(LFBC[1], RFBC[1])) ||
       (MIN3(FBC0[1], FBC1[1], FBC2[1]) > MAX2(LFBC[1], RFBC[1])) ||
-      (MIN3(FBC0[1], FBC1[1], FBC2[1]) > MAX2(LFBC[2], RFBC[2]))) {
+      (MIN3(FBC0[2], FBC1[2], FBC2[2]) > MAX2(LFBC[2], RFBC[2]))) {
     return 0;
   }
 
