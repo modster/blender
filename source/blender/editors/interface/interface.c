@@ -3460,14 +3460,6 @@ uiBlock *UI_block_begin(const bContext *C, ARegion *region, const char *name, ch
   block->emboss = emboss;
   block->evil_C = (void *)C; /* XXX */
 
-  /* Set the search filter for the properties editor. */
-  ScrArea *area = CTX_wm_area(C);
-  if ((region && region->regiontype == RGN_TYPE_WINDOW) &&
-      (area && area->spacetype == SPACE_PROPERTIES)) {
-    SpaceProperties *sbuts = CTX_wm_space_properties(C);
-    block->search_filter = sbuts->search_string;
-  }
-
   if (scn) {
     /* store display device name, don't lookup for transformations yet
      * block could be used for non-color displays where looking up for transformation
@@ -3530,6 +3522,11 @@ bool UI_block_is_search_only(const uiBlock *block)
 void UI_block_set_search_only(uiBlock *block, bool search_only)
 {
   SET_FLAG_FROM_TEST(block->flag, search_only, UI_BLOCK_SEARCH_ONLY);
+}
+
+void UI_block_set_search_filter(uiBlock *block, const char *search_filter)
+{
+  block->search_filter = search_filter;
 }
 
 static void ui_but_build_drawstr_float(uiBut *but, double value)

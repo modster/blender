@@ -81,7 +81,10 @@ enum {
   UI_HAS_ICON = (1 << 3),
   UI_HIDDEN = (1 << 4),
   UI_SELECT_DRAW = (1 << 5), /* Display selected, doesn't impact interaction. */
-  /** The button matches the search filter, later used to deactivate it. */
+  /**
+   * The button matches the search filter. When property search is active, this
+   * is used to determine which items to keep enabled and which to disable.
+   */
   UI_SEARCH_FILTER_MATCHES = (1 << 12),
   /* warn: rest of uiBut->flag in UI_interface.h */
 };
@@ -527,7 +530,11 @@ struct uiBlock {
    */
   char display_device[64];
 
-  char *search_filter;
+  /**
+   * Pointer to the space's property search string.
+   * The block doesn't allocate this or change it.
+   */
+  const char *search_filter;
 
   struct PieMenuData pie_data;
 };
