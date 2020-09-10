@@ -187,8 +187,11 @@ typedef struct Object_Runtime {
 } Object_Runtime;
 
 typedef struct ObjectLineart {
-  int usage;
-  int _pad;
+  short usage;
+  short flags;
+
+  /** if OBJECT_LRT_OWN_CREASE is set */
+  float crease_threshold;
 } ObjectLineart;
 
 enum ObjectFeatureLine_Usage {
@@ -197,6 +200,10 @@ enum ObjectFeatureLine_Usage {
   OBJECT_LRT_OCCLUSION_ONLY = (1 << 1),
   OBJECT_LRT_EXCLUDE = (1 << 2),
   OBJECT_LRT_INTERSECTION_ONLY = (1 << 3),
+};
+
+enum ObjectFeatureLine_Flags {
+  OBJECT_LRT_OWN_CREASE = (1 << 0),
 };
 
 typedef struct Object {

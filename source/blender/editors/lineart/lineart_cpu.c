@@ -1567,6 +1567,12 @@ static void lineart_geometry_object_load(Object *ob,
                                                     sizeof(LineartRenderElementLinkNode));
     reln->element_count = bm->totedge;
     reln->object_ref = orig_ob;
+    if (ob->lineart.flags & OBJECT_LRT_OWN_CREASE) {
+      reln->crease_threshold = ob->lineart.crease_threshold;
+    }
+    else {
+      reln->crease_threshold = rb->crease_threshold;
+    }
 
     /* Temp solution for getting clean 2D text, future configuration will allow customizations. */
     if (ob->type == OB_FONT) {
@@ -2393,7 +2399,7 @@ static void lineart_main_get_view_vector(LineartRenderBuffer *rb)
   copy_v3db_v3fl(rb->view_vector, trans);
 }
 
-static void lineart_main_compute_scene_contours(LineartRenderBuffer *rb, const float threshold)
+static void lineart_main_compute_scene_contours(LineartRenderBuffer *rb)
 {
   double *view_vector = rb->view_vector;
   double dot_1 = 0, dot_2 = 0;
@@ -2407,87 +2413,95 @@ static void lineart_main_compute_scene_contours(LineartRenderBuffer *rb, const f
     lineart_main_get_view_vector(rb);
   }
 
-  LISTBASE_FOREACH (LineartRenderLine *, rl, &rb->all_render_lines) {
+  LISTBASE_FOREACH (LineartRenderElementLinkNode *, reln, &rb->line_buffer_pointers) {
+    LineartRenderLine *rl = (LineartRenderLine *)reln->pointer;
+    int amount = reln->element_count;
+    for (int i = 0; i < amount; i++) {
+      add = 0;
+      dot_1 = 0;
+      dot_2 = 0;
 
-    add = 0;
-    dot_1 = 0;
-    dot_2 = 0;
-
-    if (rb->cam_is_persp) {
-      sub_v3_v3v3_db(view_vector, rl->l->gloc, rb->camera_pos);
-    }
-
-    if (use_smooth_contour_modifier_contour) {
-      if (rl->flags & LRT_EDGE_FLAG_CONTOUR) {
-        add = 1;
+      if (rb->cam_is_persp) {
+        sub_v3_v3v3_db(view_vector, rl->l->gloc, rb->camera_pos);
       }
-    }
-    else {
-      if (rl->tl) {
-        dot_1 = dot_v3v3_db(view_vector, rl->tl->gn);
+
+      if (use_smooth_contour_modifier_contour) {
+        if (rl->flags & LRT_EDGE_FLAG_CONTOUR) {
+          add = 1;
+        }
       }
       else {
-        add = 1;
-      }
-      if (rl->tr) {
-        dot_2 = dot_v3v3_db(view_vector, rl->tr->gn);
-      }
-      else {
-        add = 1;
-      }
-    }
-
-    if (!add) {
-      if ((result = dot_1 * dot_2) < 0 && (dot_1 + dot_2)) {
-        add = 1;
-      }
-      else if (rb->use_crease && (dot_v3v3_db(rl->tl->gn, rl->tr->gn) < threshold)) {
-        if (rl->object_ref && rl->object_ref->type == OB_FONT) {
-          /* No internal lines in a text object. */
+        if (rl->tl) {
+          dot_1 = dot_v3v3_db(view_vector, rl->tl->gn);
         }
         else {
-          add = 2;
+          add = 1;
+        }
+        if (rl->tr) {
+          dot_2 = dot_v3v3_db(view_vector, rl->tr->gn);
+        }
+        else {
+          add = 1;
         }
       }
-      else if (rb->use_material &&
-               (rl->tl && rl->tr && rl->tl->material_id != rl->tr->material_id)) {
-        add = 3;
-      }
-    }
 
-    if (rb->use_contour && (add == 1)) {
-      rl->flags |= LRT_EDGE_FLAG_CONTOUR;
-      lineart_list_append_pointer_static(&rb->contours, &rb->render_data_pool, rl);
-      contour_count++;
-    }
-    else if (add == 2) {
-      rl->flags |= LRT_EDGE_FLAG_CREASE;
-      lineart_list_append_pointer_static(&rb->crease_lines, &rb->render_data_pool, rl);
-      crease_count++;
-    }
-    else if (rb->use_material && (add == 3)) {
-      rl->flags |= LRT_EDGE_FLAG_MATERIAL;
-      lineart_list_append_pointer_static(&rb->material_lines, &rb->render_data_pool, rl);
-      material_count++;
-    }
-    else if (rb->use_edge_marks && (rl->flags & LRT_EDGE_FLAG_EDGE_MARK)) {
-      /*  no need to mark again */
-      add = 4;
-      lineart_list_append_pointer_static(&rb->edge_marks, &rb->render_data_pool, rl);
-      /*  continue; */
-    }
-    if (add) {
-      int r1, r2, c1, c2, row, col;
-      if (lineart_get_line_bounding_areas(rb, rl, &r1, &r2, &c1, &c2)) {
-        for (row = r1; row != r2 + 1; row++) {
-          for (col = c1; col != c2 + 1; col++) {
-            lineart_bounding_area_link_line(rb, &rb->initial_bounding_areas[row * 4 + col], rl);
+      if (!add) {
+        if ((result = dot_1 * dot_2) < 0 && (dot_1 + dot_2)) {
+          add = 1;
+        }
+        else if (rb->use_crease &&
+                 (dot_v3v3_db(rl->tl->gn, rl->tr->gn) < reln->crease_threshold)) {
+          if (rl->object_ref && rl->object_ref->type == OB_FONT) {
+            /* No internal lines in a text object. */
+          }
+          else {
+            add = 2;
+          }
+        }
+        else if (rb->use_material &&
+                 (rl->tl && rl->tr && rl->tl->material_id != rl->tr->material_id)) {
+          add = 3;
+        }
+      }
+
+      if (rb->use_contour && (add == 1)) {
+        rl->flags |= LRT_EDGE_FLAG_CONTOUR;
+        lineart_list_append_pointer_static(&rb->contours, &rb->render_data_pool, rl);
+        contour_count++;
+      }
+      else if (add == 2) {
+        rl->flags |= LRT_EDGE_FLAG_CREASE;
+        lineart_list_append_pointer_static(&rb->crease_lines, &rb->render_data_pool, rl);
+        crease_count++;
+      }
+      else if (rb->use_material && (add == 3)) {
+        rl->flags |= LRT_EDGE_FLAG_MATERIAL;
+        lineart_list_append_pointer_static(&rb->material_lines, &rb->render_data_pool, rl);
+        material_count++;
+      }
+      else if (rb->use_edge_marks && (rl->flags & LRT_EDGE_FLAG_EDGE_MARK)) {
+        /*  no need to mark again */
+        add = 4;
+        lineart_list_append_pointer_static(&rb->edge_marks, &rb->render_data_pool, rl);
+        /*  continue; */
+      }
+      if (add) {
+        int r1, r2, c1, c2, row, col;
+        if (lineart_get_line_bounding_areas(rb, rl, &r1, &r2, &c1, &c2)) {
+          for (row = r1; row != r2 + 1; row++) {
+            for (col = c1; col != c2 + 1; col++) {
+              lineart_bounding_area_link_line(rb, &rb->initial_bounding_areas[row * 4 + col], rl);
+            }
           }
         }
       }
-    }
 
-    /*  line count reserved for feature such as progress feedback */
+      /*  line count reserved for feature such as progress feedback */
+      rl++;
+    }
+  }
+
+  LISTBASE_FOREACH (LineartRenderLine *, rl, &rb->all_render_lines) {
   }
 }
 
@@ -2597,6 +2611,7 @@ LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene)
     rb->shift_y = (asp <= 1) ? c->shifty : c->shifty * asp;
   }
 
+  rb->crease_threshold = scene->lineart.crease_threshold;
   rb->angle_splitting_threshold = scene->lineart.angle_splitting_threshold;
   rb->chaining_image_threshold = scene->lineart.chaining_image_threshold;
   rb->chaining_geometry_threshold = scene->lineart.chaining_geometry_threshold;
@@ -3702,7 +3717,7 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
   }
 
   if (!intersections_only) {
-    lineart_main_compute_scene_contours(rb, lineart->crease_threshold);
+    lineart_main_compute_scene_contours(rb);
   }
 
   LRT_CANCEL_STAGE

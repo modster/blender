@@ -2621,6 +2621,15 @@ static void rna_def_object_lineart(BlenderRNA *brna)
   prop = RNA_def_property(srna, "usage", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, prop_feature_line_usage_items);
   RNA_def_property_ui_text(prop, "Usage", "How to use this object");
+
+  prop = RNA_def_property(srna, "own_crease", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", OBJECT_LRT_OWN_CREASE);
+  RNA_def_property_ui_text(prop, "Own Crease", "Use own crease setting to overwrite scene global");
+
+  prop = RNA_def_property(srna, "crease_threshold", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_range(prop, 0, 1);
+  RNA_def_property_float_default(prop, 0.9);
+  RNA_def_property_ui_text(prop, "Own Crease", "Use own crease setting to overwrite scene global");
 }
 
 static void rna_def_object(BlenderRNA *brna)

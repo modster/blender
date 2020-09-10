@@ -34,6 +34,9 @@ class OBJECT_PT_lineart(LineartButtonsPanel, Panel):
         lineart = context.object.lineart
         if context.object.type == 'MESH':
             layout.prop(lineart, 'usage')
+            layout.prop(lineart, "own_crease")
+            if lineart.own_crease:
+                layout.prop(lineart, "crease_threshold", slider=True)
 
 
 classes = (

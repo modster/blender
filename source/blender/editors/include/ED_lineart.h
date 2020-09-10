@@ -83,6 +83,9 @@ typedef struct LineartRenderElementLinkNode {
   int element_count;
   void *object_ref;
   eLineArtElementNodeFlag flags;
+
+  /* Per object value, always set, if not enabled by ObjectLineArt, then it's set to global. */
+  float crease_threshold;
 } LineartRenderElementLinkNode;
 
 typedef struct LineartRenderLineSegment {
@@ -257,6 +260,7 @@ typedef struct LineartRenderBuffer {
   double camera_pos[3];
   double near_clip, far_clip;
   float shift_x, shift_y;
+  float crease_threshold;
   float chaining_image_threshold;
   float chaining_geometry_threshold;
   float angle_splitting_threshold;
