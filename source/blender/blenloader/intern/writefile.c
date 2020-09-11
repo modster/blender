@@ -178,6 +178,7 @@
 #include "BKE_modifier.h"
 #include "BKE_node.h"
 #include "BKE_object.h"
+#include "BKE_packedFile.h"
 #include "BKE_pointcache.h"
 #include "BKE_report.h"
 #include "BKE_sequencer.h"
@@ -1393,178 +1394,6 @@ static void write_object(BlendWriter *writer, Object *ob, const void *id_address
   }
 }
 
-static void write_vfont(BlendWriter *writer, VFont *vf, const void *id_address)
-{
-  if (vf->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* Clean up, important in undo case to reduce false detection of changed datablocks. */
-    vf->data = NULL;
-    vf->temp_pf = NULL;
-
-    /* write LibData */
-    BLO_write_id_struct(writer, VFont, id_address, &vf->id);
-    BKE_id_blend_write(writer, &vf->id);
-
-    /* direct data */
-    if (vf->packedfile) {
-      PackedFile *pf = vf->packedfile;
-      BLO_write_struct(writer, PackedFile, pf);
-      BLO_write_raw(writer, pf->size, pf->data);
-    }
-  }
-}
-
-static void write_key(BlendWriter *writer, Key *key, const void *id_address)
-{
-  if (key->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* write LibData */
-    BLO_write_id_struct(writer, Key, id_address, &key->id);
-    BKE_id_blend_write(writer, &key->id);
-
-    if (key->adt) {
-      BKE_animdata_blend_write(writer, key->adt);
-    }
-
-    /* direct data */
-    LISTBASE_FOREACH (KeyBlock *, kb, &key->block) {
-      BLO_write_struct(writer, KeyBlock, kb);
-      if (kb->data) {
-        BLO_write_raw(writer, kb->totelem * key->elemsize, kb->data);
-      }
-    }
-  }
-}
-
-static void write_camera(BlendWriter *writer, Camera *cam, const void *id_address)
-{
-  if (cam->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* write LibData */
-    BLO_write_id_struct(writer, Camera, id_address, &cam->id);
-    BKE_id_blend_write(writer, &cam->id);
-
-    if (cam->adt) {
-      BKE_animdata_blend_write(writer, cam->adt);
-    }
-
-    LISTBASE_FOREACH (CameraBGImage *, bgpic, &cam->bg_images) {
-      BLO_write_struct(writer, CameraBGImage, bgpic);
-    }
-  }
-}
-
-static void write_mball(BlendWriter *writer, MetaBall *mb, const void *id_address)
-{
-  if (mb->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* Clean up, important in undo case to reduce false detection of changed datablocks. */
-    BLI_listbase_clear(&mb->disp);
-    mb->editelems = NULL;
-    /* Must always be cleared (meta's don't have their own edit-data). */
-    mb->needs_flush_to_id = 0;
-    mb->lastelem = NULL;
-    mb->batch_cache = NULL;
-
-    /* write LibData */
-    BLO_write_id_struct(writer, MetaBall, id_address, &mb->id);
-    BKE_id_blend_write(writer, &mb->id);
-
-    /* direct data */
-    BLO_write_pointer_array(writer, mb->totcol, mb->mat);
-    if (mb->adt) {
-      BKE_animdata_blend_write(writer, mb->adt);
-    }
-
-    LISTBASE_FOREACH (MetaElem *, ml, &mb->elems) {
-      BLO_write_struct(writer, MetaElem, ml);
-    }
-  }
-}
-
-static void write_curve(BlendWriter *writer, Curve *cu, const void *id_address)
-{
-  if (cu->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* Clean up, important in undo case to reduce false detection of changed datablocks. */
-    cu->editnurb = NULL;
-    cu->editfont = NULL;
-    cu->batch_cache = NULL;
-
-    /* write LibData */
-    BLO_write_id_struct(writer, Curve, id_address, &cu->id);
-    BKE_id_blend_write(writer, &cu->id);
-
-    /* direct data */
-    BLO_write_pointer_array(writer, cu->totcol, cu->mat);
-    if (cu->adt) {
-      BKE_animdata_blend_write(writer, cu->adt);
-    }
-
-    if (cu->vfont) {
-      BLO_write_raw(writer, cu->len + 1, cu->str);
-      BLO_write_struct_array(writer, CharInfo, cu->len_char32 + 1, cu->strinfo);
-      BLO_write_struct_array(writer, TextBox, cu->totbox, cu->tb);
-    }
-    else {
-      /* is also the order of reading */
-      LISTBASE_FOREACH (Nurb *, nu, &cu->nurb) {
-        BLO_write_struct(writer, Nurb, nu);
-      }
-      LISTBASE_FOREACH (Nurb *, nu, &cu->nurb) {
-        if (nu->type == CU_BEZIER) {
-          BLO_write_struct_array(writer, BezTriple, nu->pntsu, nu->bezt);
-        }
-        else {
-
-          BLO_write_struct_array(writer, BPoint, nu->pntsu * nu->pntsv, nu->bp);
-          if (nu->knotsu) {
-            BLO_write_float_array(writer, KNOTSU(nu), nu->knotsu);
-          }
-          if (nu->knotsv) {
-            BLO_write_float_array(writer, KNOTSV(nu), nu->knotsv);
-          }
-        }
-      }
-    }
-  }
-}
-
-static void write_image(BlendWriter *writer, Image *ima, const void *id_address)
-{
-  if (ima->id.us > 0 || BLO_write_is_undo(writer)) {
-    ImagePackedFile *imapf;
-
-    /* Some trickery to keep forward compatibility of packed images. */
-    BLI_assert(ima->packedfile == NULL);
-    if (ima->packedfiles.first != NULL) {
-      imapf = ima->packedfiles.first;
-      ima->packedfile = imapf->packedfile;
-    }
-
-    /* write LibData */
-    BLO_write_id_struct(writer, Image, id_address, &ima->id);
-    BKE_id_blend_write(writer, &ima->id);
-
-    for (imapf = ima->packedfiles.first; imapf; imapf = imapf->next) {
-      BLO_write_struct(writer, ImagePackedFile, imapf);
-      if (imapf->packedfile) {
-        PackedFile *pf = imapf->packedfile;
-        BLO_write_struct(writer, PackedFile, pf);
-        BLO_write_raw(writer, pf->size, pf->data);
-      }
-    }
-
-    BKE_previewimg_blend_write(writer, ima->preview);
-
-    LISTBASE_FOREACH (ImageView *, iv, &ima->views) {
-      BLO_write_struct(writer, ImageView, iv);
-    }
-    BLO_write_struct(writer, Stereo3dFormat, ima->stereo3d_format);
-
-    BLO_write_struct_list(writer, ImageTile, &ima->tiles);
-
-    ima->packedfile = NULL;
-
-    BLO_write_struct_list(writer, RenderSlot, &ima->renderslots);
-  }
-}
-
 static void write_texture(BlendWriter *writer, Tex *tex, const void *id_address)
 {
   if (tex->id.us > 0 || BLO_write_is_undo(writer)) {
@@ -1588,85 +1417,6 @@ static void write_texture(BlendWriter *writer, Tex *tex, const void *id_address)
     }
 
     BKE_previewimg_blend_write(writer, tex->preview);
-  }
-}
-
-static void write_material(BlendWriter *writer, Material *ma, const void *id_address)
-{
-  if (ma->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* Clean up, important in undo case to reduce false detection of changed datablocks. */
-    ma->texpaintslot = NULL;
-    BLI_listbase_clear(&ma->gpumaterial);
-
-    /* write LibData */
-    BLO_write_id_struct(writer, Material, id_address, &ma->id);
-    BKE_id_blend_write(writer, &ma->id);
-
-    if (ma->adt) {
-      BKE_animdata_blend_write(writer, ma->adt);
-    }
-
-    /* nodetree is integral part of material, no libdata */
-    if (ma->nodetree) {
-      BLO_write_struct(writer, bNodeTree, ma->nodetree);
-      ntreeBlendWrite(writer, ma->nodetree);
-    }
-
-    BKE_previewimg_blend_write(writer, ma->preview);
-
-    /* grease pencil settings */
-    if (ma->gp_style) {
-      BLO_write_struct(writer, MaterialGPencilStyle, ma->gp_style);
-    }
-  }
-}
-
-static void write_world(BlendWriter *writer, World *wrld, const void *id_address)
-{
-  if (wrld->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* Clean up, important in undo case to reduce false detection of changed datablocks. */
-    BLI_listbase_clear(&wrld->gpumaterial);
-
-    /* write LibData */
-    BLO_write_id_struct(writer, World, id_address, &wrld->id);
-    BKE_id_blend_write(writer, &wrld->id);
-
-    if (wrld->adt) {
-      BKE_animdata_blend_write(writer, wrld->adt);
-    }
-
-    /* nodetree is integral part of world, no libdata */
-    if (wrld->nodetree) {
-      BLO_write_struct(writer, bNodeTree, wrld->nodetree);
-      ntreeBlendWrite(writer, wrld->nodetree);
-    }
-
-    BKE_previewimg_blend_write(writer, wrld->preview);
-  }
-}
-
-static void write_light(BlendWriter *writer, Light *la, const void *id_address)
-{
-  if (la->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* write LibData */
-    BLO_write_id_struct(writer, Light, id_address, &la->id);
-    BKE_id_blend_write(writer, &la->id);
-
-    if (la->adt) {
-      BKE_animdata_blend_write(writer, la->adt);
-    }
-
-    if (la->curfalloff) {
-      BKE_curvemapping_blend_write(writer, la->curfalloff);
-    }
-
-    /* Node-tree is integral part of lights, no libdata. */
-    if (la->nodetree) {
-      BLO_write_struct(writer, bNodeTree, la->nodetree);
-      ntreeBlendWrite(writer, la->nodetree);
-    }
-
-    BKE_previewimg_blend_write(writer, la->preview);
   }
 }
 
@@ -2374,93 +2124,6 @@ static void write_screen(BlendWriter *writer, bScreen *screen, const void *id_ad
   }
 }
 
-static void write_bone(BlendWriter *writer, Bone *bone)
-{
-  /* PATCH for upward compatibility after 2.37+ armature recode */
-  bone->size[0] = bone->size[1] = bone->size[2] = 1.0f;
-
-  /* Write this bone */
-  BLO_write_struct(writer, Bone, bone);
-
-  /* Write ID Properties -- and copy this comment EXACTLY for easy finding
-   * of library blocks that implement this.*/
-  if (bone->prop) {
-    IDP_BlendWrite(writer, bone->prop);
-  }
-
-  /* Write Children */
-  LISTBASE_FOREACH (Bone *, cbone, &bone->childbase) {
-    write_bone(writer, cbone);
-  }
-}
-
-static void write_armature(BlendWriter *writer, bArmature *arm, const void *id_address)
-{
-  if (arm->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* Clean up, important in undo case to reduce false detection of changed datablocks. */
-    arm->bonehash = NULL;
-    arm->edbo = NULL;
-    /* Must always be cleared (armatures don't have their own edit-data). */
-    arm->needs_flush_to_id = 0;
-    arm->act_edbone = NULL;
-
-    BLO_write_id_struct(writer, bArmature, id_address, &arm->id);
-    BKE_id_blend_write(writer, &arm->id);
-
-    if (arm->adt) {
-      BKE_animdata_blend_write(writer, arm->adt);
-    }
-
-    /* Direct data */
-    LISTBASE_FOREACH (Bone *, bone, &arm->bonebase) {
-      write_bone(writer, bone);
-    }
-  }
-}
-
-static void write_text(BlendWriter *writer, Text *text, const void *id_address)
-{
-  /* Note: we are clearing local temp data here, *not* the flag in the actual 'real' ID. */
-  if ((text->flags & TXT_ISMEM) && (text->flags & TXT_ISEXT)) {
-    text->flags &= ~TXT_ISEXT;
-  }
-
-  /* Clean up, important in undo case to reduce false detection of changed datablocks. */
-  text->compiled = NULL;
-
-  /* write LibData */
-  BLO_write_id_struct(writer, Text, id_address, &text->id);
-  BKE_id_blend_write(writer, &text->id);
-
-  if (text->filepath) {
-    BLO_write_string(writer, text->filepath);
-  }
-
-  if (!(text->flags & TXT_ISEXT)) {
-    /* now write the text data, in two steps for optimization in the readfunction */
-    LISTBASE_FOREACH (TextLine *, tmp, &text->lines) {
-      BLO_write_struct(writer, TextLine, tmp);
-    }
-
-    LISTBASE_FOREACH (TextLine *, tmp, &text->lines) {
-      BLO_write_raw(writer, tmp->len + 1, tmp->line);
-    }
-  }
-}
-
-static void write_speaker(BlendWriter *writer, Speaker *spk, const void *id_address)
-{
-  if (spk->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* write LibData */
-    BLO_write_id_struct(writer, Speaker, id_address, &spk->id);
-    BKE_id_blend_write(writer, &spk->id);
-
-    if (spk->adt) {
-      BKE_animdata_blend_write(writer, spk->adt);
-    }
-  }
-}
-
 static void write_sound(BlendWriter *writer, bSound *sound, const void *id_address)
 {
   if (sound->id.us > 0 || BLO_write_is_undo(writer)) {
@@ -2474,215 +2137,7 @@ static void write_sound(BlendWriter *writer, bSound *sound, const void *id_addre
     BLO_write_id_struct(writer, bSound, id_address, &sound->id);
     BKE_id_blend_write(writer, &sound->id);
 
-    if (sound->packedfile) {
-      PackedFile *pf = sound->packedfile;
-      BLO_write_struct(writer, PackedFile, pf);
-      BLO_write_raw(writer, pf->size, pf->data);
-    }
-  }
-}
-
-static void write_probe(BlendWriter *writer, LightProbe *prb, const void *id_address)
-{
-  if (prb->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* write LibData */
-    BLO_write_id_struct(writer, LightProbe, id_address, &prb->id);
-    BKE_id_blend_write(writer, &prb->id);
-
-    if (prb->adt) {
-      BKE_animdata_blend_write(writer, prb->adt);
-    }
-  }
-}
-
-static void write_brush(BlendWriter *writer, Brush *brush, const void *id_address)
-{
-  if (brush->id.us > 0 || BLO_write_is_undo(writer)) {
-    BLO_write_id_struct(writer, Brush, id_address, &brush->id);
-    BKE_id_blend_write(writer, &brush->id);
-
-    if (brush->curve) {
-      BKE_curvemapping_blend_write(writer, brush->curve);
-    }
-
-    if (brush->gpencil_settings) {
-      BLO_write_struct(writer, BrushGpencilSettings, brush->gpencil_settings);
-
-      if (brush->gpencil_settings->curve_sensitivity) {
-        BKE_curvemapping_blend_write(writer, brush->gpencil_settings->curve_sensitivity);
-      }
-      if (brush->gpencil_settings->curve_strength) {
-        BKE_curvemapping_blend_write(writer, brush->gpencil_settings->curve_strength);
-      }
-      if (brush->gpencil_settings->curve_jitter) {
-        BKE_curvemapping_blend_write(writer, brush->gpencil_settings->curve_jitter);
-      }
-      if (brush->gpencil_settings->curve_rand_pressure) {
-        BKE_curvemapping_blend_write(writer, brush->gpencil_settings->curve_rand_pressure);
-      }
-      if (brush->gpencil_settings->curve_rand_strength) {
-        BKE_curvemapping_blend_write(writer, brush->gpencil_settings->curve_rand_strength);
-      }
-      if (brush->gpencil_settings->curve_rand_uv) {
-        BKE_curvemapping_blend_write(writer, brush->gpencil_settings->curve_rand_uv);
-      }
-      if (brush->gpencil_settings->curve_rand_hue) {
-        BKE_curvemapping_blend_write(writer, brush->gpencil_settings->curve_rand_hue);
-      }
-      if (brush->gpencil_settings->curve_rand_saturation) {
-        BKE_curvemapping_blend_write(writer, brush->gpencil_settings->curve_rand_saturation);
-      }
-      if (brush->gpencil_settings->curve_rand_value) {
-        BKE_curvemapping_blend_write(writer, brush->gpencil_settings->curve_rand_value);
-      }
-    }
-    if (brush->gradient) {
-      BLO_write_struct(writer, ColorBand, brush->gradient);
-    }
-  }
-}
-
-static void write_palette(BlendWriter *writer, Palette *palette, const void *id_address)
-{
-  if (palette->id.us > 0 || BLO_write_is_undo(writer)) {
-    PaletteColor *color;
-    BLO_write_id_struct(writer, Palette, id_address, &palette->id);
-    BKE_id_blend_write(writer, &palette->id);
-
-    for (color = palette->colors.first; color; color = color->next) {
-      BLO_write_struct(writer, PaletteColor, color);
-    }
-  }
-}
-
-static void write_paintcurve(BlendWriter *writer, PaintCurve *pc, const void *id_address)
-{
-  if (pc->id.us > 0 || BLO_write_is_undo(writer)) {
-    BLO_write_id_struct(writer, PaintCurve, id_address, &pc->id);
-    BKE_id_blend_write(writer, &pc->id);
-
-    BLO_write_struct_array(writer, PaintCurvePoint, pc->tot_points, pc->points);
-  }
-}
-
-static void write_movieTracks(BlendWriter *writer, ListBase *tracks)
-{
-  MovieTrackingTrack *track;
-
-  track = tracks->first;
-  while (track) {
-    BLO_write_struct(writer, MovieTrackingTrack, track);
-
-    if (track->markers) {
-      BLO_write_struct_array(writer, MovieTrackingMarker, track->markersnr, track->markers);
-    }
-
-    track = track->next;
-  }
-}
-
-static void write_moviePlaneTracks(BlendWriter *writer, ListBase *plane_tracks_base)
-{
-  MovieTrackingPlaneTrack *plane_track;
-
-  for (plane_track = plane_tracks_base->first; plane_track; plane_track = plane_track->next) {
-    BLO_write_struct(writer, MovieTrackingPlaneTrack, plane_track);
-
-    BLO_write_pointer_array(writer, plane_track->point_tracksnr, plane_track->point_tracks);
-    BLO_write_struct_array(
-        writer, MovieTrackingPlaneMarker, plane_track->markersnr, plane_track->markers);
-  }
-}
-
-static void write_movieReconstruction(BlendWriter *writer,
-                                      MovieTrackingReconstruction *reconstruction)
-{
-  if (reconstruction->camnr) {
-    BLO_write_struct_array(
-        writer, MovieReconstructedCamera, reconstruction->camnr, reconstruction->cameras);
-  }
-}
-
-static void write_movieclip(BlendWriter *writer, MovieClip *clip, const void *id_address)
-{
-  if (clip->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* Clean up, important in undo case to reduce false detection of changed datablocks. */
-    clip->anim = NULL;
-    clip->tracking_context = NULL;
-    clip->tracking.stats = NULL;
-
-    MovieTracking *tracking = &clip->tracking;
-    MovieTrackingObject *object;
-
-    BLO_write_id_struct(writer, MovieClip, id_address, &clip->id);
-    BKE_id_blend_write(writer, &clip->id);
-
-    if (clip->adt) {
-      BKE_animdata_blend_write(writer, clip->adt);
-    }
-
-    write_movieTracks(writer, &tracking->tracks);
-    write_moviePlaneTracks(writer, &tracking->plane_tracks);
-    write_movieReconstruction(writer, &tracking->reconstruction);
-
-    object = tracking->objects.first;
-    while (object) {
-      BLO_write_struct(writer, MovieTrackingObject, object);
-
-      write_movieTracks(writer, &object->tracks);
-      write_moviePlaneTracks(writer, &object->plane_tracks);
-      write_movieReconstruction(writer, &object->reconstruction);
-
-      object = object->next;
-    }
-  }
-}
-
-static void write_mask(BlendWriter *writer, Mask *mask, const void *id_address)
-{
-  if (mask->id.us > 0 || BLO_write_is_undo(writer)) {
-    MaskLayer *masklay;
-
-    BLO_write_id_struct(writer, Mask, id_address, &mask->id);
-    BKE_id_blend_write(writer, &mask->id);
-
-    if (mask->adt) {
-      BKE_animdata_blend_write(writer, mask->adt);
-    }
-
-    for (masklay = mask->masklayers.first; masklay; masklay = masklay->next) {
-      MaskSpline *spline;
-      MaskLayerShape *masklay_shape;
-
-      BLO_write_struct(writer, MaskLayer, masklay);
-
-      for (spline = masklay->splines.first; spline; spline = spline->next) {
-        int i;
-
-        void *points_deform = spline->points_deform;
-        spline->points_deform = NULL;
-
-        BLO_write_struct(writer, MaskSpline, spline);
-        BLO_write_struct_array(writer, MaskSplinePoint, spline->tot_point, spline->points);
-
-        spline->points_deform = points_deform;
-
-        for (i = 0; i < spline->tot_point; i++) {
-          MaskSplinePoint *point = &spline->points[i];
-
-          if (point->tot_uw) {
-            BLO_write_struct_array(writer, MaskSplinePointUW, point->tot_uw, point->uw);
-          }
-        }
-      }
-
-      for (masklay_shape = masklay->splines_shapes.first; masklay_shape;
-           masklay_shape = masklay_shape->next) {
-        BLO_write_struct(writer, MaskLayerShape, masklay_shape);
-        BLO_write_float_array(
-            writer, masklay_shape->tot_vert * MASK_OBJECT_SHAPE_ELEM_SIZE, masklay_shape->data);
-      }
-    }
+    BKE_packedfile_blend_write(writer, sound->packedfile);
   }
 }
 
@@ -2792,11 +2247,7 @@ static void write_volume(BlendWriter *writer, Volume *volume, const void *id_add
       BKE_animdata_blend_write(writer, volume->adt);
     }
 
-    if (volume->packedfile) {
-      PackedFile *pf = volume->packedfile;
-      BLO_write_struct(writer, PackedFile, pf);
-      BLO_write_raw(writer, pf->size, pf->data);
-    }
+    BKE_packedfile_blend_write(writer, volume->packedfile);
   }
 }
 
@@ -2898,9 +2349,7 @@ static void write_libraries(WriteData *wd, Main *main)
       BKE_id_blend_write(&writer, &main->curlib->id);
 
       if (main->curlib->packedfile) {
-        PackedFile *pf = main->curlib->packedfile;
-        writestruct(wd, DATA, PackedFile, 1, pf);
-        writedata(wd, DATA, pf->size, pf->data);
+        BKE_packedfile_blend_write(&writer, main->curlib->packedfile);
         if (wd->use_memfile == false) {
           printf("write packed .blend: %s\n", main->curlib->filepath);
         }
@@ -3121,47 +2570,8 @@ static bool write_file_handle(Main *mainvar,
           case ID_SCR:
             write_screen(&writer, (bScreen *)id_buffer, id);
             break;
-          case ID_MC:
-            write_movieclip(&writer, (MovieClip *)id_buffer, id);
-            break;
-          case ID_MSK:
-            write_mask(&writer, (Mask *)id_buffer, id);
-            break;
           case ID_SCE:
             write_scene(&writer, (Scene *)id_buffer, id);
-            break;
-          case ID_CU:
-            write_curve(&writer, (Curve *)id_buffer, id);
-            break;
-          case ID_MB:
-            write_mball(&writer, (MetaBall *)id_buffer, id);
-            break;
-          case ID_IM:
-            write_image(&writer, (Image *)id_buffer, id);
-            break;
-          case ID_CA:
-            write_camera(&writer, (Camera *)id_buffer, id);
-            break;
-          case ID_LA:
-            write_light(&writer, (Light *)id_buffer, id);
-            break;
-          case ID_VF:
-            write_vfont(&writer, (VFont *)id_buffer, id);
-            break;
-          case ID_KE:
-            write_key(&writer, (Key *)id_buffer, id);
-            break;
-          case ID_WO:
-            write_world(&writer, (World *)id_buffer, id);
-            break;
-          case ID_TXT:
-            write_text(&writer, (Text *)id_buffer, id);
-            break;
-          case ID_SPK:
-            write_speaker(&writer, (Speaker *)id_buffer, id);
-            break;
-          case ID_LP:
-            write_probe(&writer, (LightProbe *)id_buffer, id);
             break;
           case ID_SO:
             write_sound(&writer, (bSound *)id_buffer, id);
@@ -3169,29 +2579,14 @@ static bool write_file_handle(Main *mainvar,
           case ID_GR:
             write_collection(&writer, (Collection *)id_buffer, id);
             break;
-          case ID_AR:
-            write_armature(&writer, (bArmature *)id_buffer, id);
-            break;
           case ID_OB:
             write_object(&writer, (Object *)id_buffer, id);
-            break;
-          case ID_MA:
-            write_material(&writer, (Material *)id_buffer, id);
             break;
           case ID_TE:
             write_texture(&writer, (Tex *)id_buffer, id);
             break;
           case ID_PA:
             write_particlesettings(&writer, (ParticleSettings *)id_buffer, id);
-            break;
-          case ID_BR:
-            write_brush(&writer, (Brush *)id_buffer, id);
-            break;
-          case ID_PAL:
-            write_palette(&writer, (Palette *)id_buffer, id);
-            break;
-          case ID_PC:
-            write_paintcurve(&writer, (PaintCurve *)id_buffer, id);
             break;
           case ID_GD:
             write_gpencil(&writer, (bGPdata *)id_buffer, id);
@@ -3216,6 +2611,24 @@ static bool write_file_handle(Main *mainvar,
           case ID_AC:
           case ID_NT:
           case ID_LS:
+          case ID_TXT:
+          case ID_VF:
+          case ID_MC:
+          case ID_PC:
+          case ID_PAL:
+          case ID_BR:
+          case ID_IM:
+          case ID_LA:
+          case ID_MA:
+          case ID_MB:
+          case ID_CU:
+          case ID_CA:
+          case ID_WO:
+          case ID_MSK:
+          case ID_SPK:
+          case ID_AR:
+          case ID_LP:
+          case ID_KE:
             /* Do nothing, handled in IDTypeInfo callback. */
             break;
           case ID_LI:
