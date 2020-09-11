@@ -664,6 +664,23 @@ static LineartRenderElementLinkNode *lineart_memory_get_vert_space(LineartRender
   return reln;
 }
 
+static LineartRenderElementLinkNode *lineart_memory_get_line_space(LineartRenderBuffer *rb)
+{
+  LineartRenderElementLinkNode *reln;
+
+  LineartRenderLine *render_lines = lineart_mem_aquire(&rb->render_data_pool,
+                                                       sizeof(LineartRenderLine) * 64);
+
+  reln = lineart_list_append_pointer_static_sized(&rb->line_buffer_pointers,
+                                                  &rb->render_data_pool,
+                                                  render_lines,
+                                                  sizeof(LineartRenderElementLinkNode));
+  reln->element_count = 64;
+  reln->flags |= LRT_ELEMENT_IS_ADDITIONAL;
+
+  return reln;
+}
+
 static void lineart_render_line_assign_with_triangle(LineartRenderTriangle *rt)
 {
   if (rt->rl[0]->tl == NULL) {
@@ -741,15 +758,15 @@ static bool lineart_triangle_adjacent_line_set(LineartRenderTriangle *rt,
  */
 static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
 {
-  LineartRenderLine *rl;
+  LineartRenderLine *rl, *new_rl;
   LineartRenderTriangle *rt, *rt1, *rt2, *rt_next_to;
   LineartRenderVert *rv;
-  LineartRenderElementLinkNode *veln, *teln;
+  LineartRenderElementLinkNode *veln, *teln, *leln;
   LineartRenderLineSegment *rls;
   double(*vp)[4] = rb->view_projection;
   int i;
   double a;
-  int v_count = 0, t_count = 0;
+  int v_count = 0, t_count = 0, l_count = 0;
   Object *ob;
   bool added;
   double cam_pos[3];
@@ -775,8 +792,18 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
 
   veln = lineart_memory_get_vert_space(rb);
   teln = lineart_memory_get_triangle_space(rb);
+  leln = lineart_memory_get_line_space(rb);
+
   rv = &((LineartRenderVert *)veln->pointer)[v_count];
   rt1 = (void *)(((unsigned char *)teln->pointer) + rb->triangle_size * t_count);
+  new_rl = &((LineartRenderLine *)leln->pointer)[l_count];
+
+#define INCREASE_RL \
+  l_count++; \
+  new_rl = &((LineartRenderLine *)leln->pointer)[l_count]; \
+  rl = new_rl; \
+  rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment)); \
+  BLI_addtail(&rl->segments, rls);
 
   LISTBASE_FOREACH (LineartRenderElementLinkNode *, reln, &rb->triangle_buffer_pointers) {
     if (reln->flags & LRT_ELEMENT_IS_ADDITIONAL) {
@@ -827,12 +854,25 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
         teln = lineart_memory_get_triangle_space(rb);
         t_count = 0;
       }
+      if (l_count > 60) {
+        leln->element_count = l_count;
+        leln = lineart_memory_get_line_space(rb);
+        l_count = 0;
+      }
 
       rv = &((LineartRenderVert *)veln->pointer)[v_count];
       rt1 = (void *)(((unsigned char *)teln->pointer) + rb->triangle_size * t_count);
       rt2 = (void *)(((unsigned char *)teln->pointer) + rb->triangle_size * (t_count + 1));
 
       double vv1[3], vv2[3], dot1, dot2;
+
+#define REMOVE_ORIGINAL_LINES \
+  BLI_remlink(&rb->all_render_lines, (void *)rt->rl[0]); \
+  rt->rl[0]->next = rt->rl[0]->prev = 0; \
+  BLI_remlink(&rb->all_render_lines, (void *)rt->rl[1]); \
+  rt->rl[1]->next = rt->rl[1]->prev = 0; \
+  BLI_remlink(&rb->all_render_lines, (void *)rt->rl[2]); \
+  rt->rl[2]->next = rt->rl[2]->prev = 0;
 
       switch (in0 + in1 + in2) {
         case 0: /* ignore this triangle. */
@@ -842,12 +882,9 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
            * also remove render lines form being computed.
            */
           lineart_triangle_set_cull_flag(rt, LRT_CULL_DISCARD);
-          BLI_remlink(&rb->all_render_lines, (void *)rt->rl[0]);
-          rt->rl[0]->next = rt->rl[0]->prev = 0;
-          BLI_remlink(&rb->all_render_lines, (void *)rt->rl[1]);
-          rt->rl[1]->next = rt->rl[1]->prev = 0;
-          BLI_remlink(&rb->all_render_lines, (void *)rt->rl[2]);
-          rt->rl[2]->next = rt->rl[2]->prev = 0;
+
+          REMOVE_ORIGINAL_LINES
+
           continue;
         case 2:
           /** Two points behind near plane, cut those and
@@ -892,18 +929,10 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             interp_v3_v3v3_db(rv[1].gloc, rt->v[0]->gloc, rt->v[1]->gloc, a);
             mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
 
-            /* remove all original render lines */
-            BLI_remlink(&rb->all_render_lines, (void *)rt->rl[0]);
-            rt->rl[0]->next = rt->rl[0]->prev = 0;
-            BLI_remlink(&rb->all_render_lines, (void *)rt->rl[1]);
-            rt->rl[1]->next = rt->rl[1]->prev = 0;
-            BLI_remlink(&rb->all_render_lines, (void *)rt->rl[2]);
-            rt->rl[2]->next = rt->rl[2]->prev = 0;
+            REMOVE_ORIGINAL_LINES
 
             /* New line connecting two new points */
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             BLI_addtail(&rb->all_render_lines, rl);
             /** note: inverting rl->l/r (left/right point) doesn't matter as long as
              * rt->rl and rt->v has the same sequence. and the winding direction
@@ -918,9 +947,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             rl->object_ref = ob;
 
             /* new line connecting original point 0 and a new point */
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             rl->l = &rv[1];
             rl->r = rt->v[0];
             rl->flags |= LRT_EDGE_FLAG_CLIPPED;
@@ -936,9 +963,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             }
 
             /* new line connecting original point 0 and another new point */
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             rl->l = rt->v[0];
             rl->r = &rv[0];
             rl->flags |= LRT_EDGE_FLAG_CLIPPED;
@@ -981,16 +1006,9 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             interp_v3_v3v3_db(rv[1].gloc, rt->v[2]->gloc, rt->v[1]->gloc, a);
             mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
 
-            BLI_remlink(&rb->all_render_lines, (void *)rt->rl[0]);
-            rt->rl[0]->next = rt->rl[0]->prev = 0;
-            BLI_remlink(&rb->all_render_lines, (void *)rt->rl[1]);
-            rt->rl[1]->next = rt->rl[1]->prev = 0;
-            BLI_remlink(&rb->all_render_lines, (void *)rt->rl[2]);
-            rt->rl[2]->next = rt->rl[2]->prev = 0;
+            REMOVE_ORIGINAL_LINES
 
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             BLI_addtail(&rb->all_render_lines, rl);
             rl->l = &rv[0];
             rl->r = &rv[1];
@@ -998,9 +1016,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             rt1->rl[0] = rl;
             rl->object_ref = ob;
 
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             rl->l = &rv[1];
             rl->r = rt->v[2];
             rl->flags |= LRT_EDGE_FLAG_CLIPPED;
@@ -1014,9 +1030,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
               BLI_addtail(&rb->all_render_lines, rl);
             }
 
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             rl->l = rt->v[2];
             rl->r = &rv[0];
             rl->flags |= LRT_EDGE_FLAG_CLIPPED;
@@ -1057,16 +1071,9 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             interp_v3_v3v3_db(rv[1].gloc, rt->v[1]->gloc, rt->v[0]->gloc, a);
             mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
 
-            BLI_remlink(&rb->all_render_lines, (void *)rt->rl[0]);
-            rt->rl[0]->next = rt->rl[0]->prev = 0;
-            BLI_remlink(&rb->all_render_lines, (void *)rt->rl[1]);
-            rt->rl[1]->next = rt->rl[1]->prev = 0;
-            BLI_remlink(&rb->all_render_lines, (void *)rt->rl[2]);
-            rt->rl[2]->next = rt->rl[2]->prev = 0;
+            REMOVE_ORIGINAL_LINES
 
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             BLI_addtail(&rb->all_render_lines, rl);
             rl->l = &rv[1];
             rl->r = &rv[0];
@@ -1074,9 +1081,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             rt1->rl[2] = rl;
             rl->object_ref = ob;
 
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             rl->l = &rv[0];
             rl->r = rt->v[1];
             rl->flags |= LRT_EDGE_FLAG_CLIPPED;
@@ -1090,9 +1095,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
               BLI_addtail(&rb->all_render_lines, rl);
             }
 
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             rl->l = rt->v[1];
             rl->r = &rv[1];
             rl->flags |= LRT_EDGE_FLAG_CLIPPED;
@@ -1170,9 +1173,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             rt->rl[2]->next = rt->rl[2]->prev = 0;
 
             /* New line connects two new points */
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             BLI_addtail(&rb->all_render_lines, rl);
             rl->l = &rv[1];
             rl->r = &rv[0];
@@ -1183,9 +1184,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             /** New line connects new point 0 and old point 1,
              * this is a border line.
              */
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             rl->l = &rv[0];
             rl->r = rt->v[1];
             rl->flags |= LRT_EDGE_FLAG_CLIPPED;
@@ -1202,9 +1201,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             /** New line connects new point 1 and old point 1,
              * this is a inner line separating newly generated triangles.
              */
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             BLI_addtail(&rb->all_render_lines, rl);
             rl->l = rt->v[1];
             rl->r = &rv[1];
@@ -1223,9 +1220,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             /** New line connects new point 1 and old point 2,
              * this is also a border line.
              */
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             rl->l = rt->v[2];
             rl->r = &rv[1];
             rl->flags |= LRT_EDGE_FLAG_CLIPPED;
@@ -1275,9 +1270,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             BLI_remlink(&rb->all_render_lines, (void *)rt->rl[1]);
             rt->rl[1]->next = rt->rl[1]->prev = 0;
 
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             BLI_addtail(&rb->all_render_lines, rl);
             rl->l = &rv[1];
             rl->r = &rv[0];
@@ -1285,9 +1278,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             rt1->rl[1] = rl;
             rl->object_ref = ob;
 
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             rl->l = &rv[0];
             rl->r = rt->v[2];
             rl->flags |= LRT_EDGE_FLAG_CLIPPED;
@@ -1301,9 +1292,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
               BLI_addtail(&rb->all_render_lines, rl);
             }
 
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             BLI_addtail(&rb->all_render_lines, rl);
             rl->l = rt->v[2];
             rl->r = &rv[1];
@@ -1318,9 +1307,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             rt1->v[1] = &rv[1];
             rt1->v[2] = &rv[0];
 
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             rl->l = rt->v[0];
             rl->r = &rv[1];
             rl->flags |= LRT_EDGE_FLAG_CLIPPED;
@@ -1369,9 +1356,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             BLI_remlink(&rb->all_render_lines, (void *)rt->rl[2]);
             rt->rl[2]->next = rt->rl[2]->prev = 0;
 
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             BLI_addtail(&rb->all_render_lines, rl);
             rl->l = &rv[1];
             rl->r = &rv[0];
@@ -1379,9 +1364,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             rt1->rl[1] = rl;
             rl->object_ref = ob;
 
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             rl->l = &rv[0];
             rl->r = rt->v[0];
             rl->flags |= LRT_EDGE_FLAG_CLIPPED;
@@ -1395,9 +1378,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
               BLI_addtail(&rb->all_render_lines, rl);
             }
 
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             BLI_addtail(&rb->all_render_lines, rl);
             rl->l = rt->v[0];
             rl->r = &rv[1];
@@ -1412,9 +1393,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             rt1->v[1] = &rv[1];
             rt1->v[2] = &rv[0];
 
-            rl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
-            rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
-            BLI_addtail(&rl->segments, rls);
+            INCREASE_RL
             rl->l = rt->v[1];
             rl->r = &rv[1];
             rl->flags |= LRT_EDGE_FLAG_CLIPPED;
