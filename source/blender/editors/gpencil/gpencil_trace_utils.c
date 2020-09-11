@@ -280,8 +280,8 @@ void ED_gpencil_trace_data_to_strokes(Main *bmain,
     gp_style->fill_rgba[3] = 0.0f;
     gp_style->flag |= GP_MATERIAL_STROKE_SHOW;
     gp_style->flag |= GP_MATERIAL_FILL_SHOW;
-    gp_style->flag |= GP_MATERIAL_IS_STROKE_MASK;
-    gp_style->flag |= GP_MATERIAL_IS_FILL_MASK;
+    gp_style->flag |= GP_MATERIAL_IS_STROKE_HOLDOUT;
+    gp_style->flag |= GP_MATERIAL_IS_FILL_HOLDOUT;
     mat_mask_idx = ob->totcol - 1;
   }
 
