@@ -5170,39 +5170,44 @@ static bool button_matches_search_filter(uiBut *but, const char *search_filter)
 }
 
 /**
- * Apply the search filter, tagging all buttons with whether they match or not.
+ * Test for a search result within the block. Tag every button
+ * in the group as a search match if any button matches.
+ *
+ * \return Whether the group has a match.
  */
-static bool block_search_filter_tag_buttons(uiBlock *block)
+static bool button_group_tag_search_matches(uiButtonGroup *button_group, const char *search_filter)
 {
   bool has_result = false;
-  LISTBASE_FOREACH (uiBut *, but, &block->buttons) {
-    /* First match regular buttons. */
-    if (!ELEM(but->type, UI_BTYPE_LABEL) &&
-        button_matches_search_filter(but, block->search_filter)) {
+  LISTBASE_FOREACH (uiBut *, but, &button_group->buttons) {
+    if (button_matches_search_filter(but, search_filter)) {
       has_result = true;
-      but->flag |= UI_SEARCH_FILTER_MATCHES;
-    }
-    /* Then match their labels. */
-    if (but->label_but != NULL &&
-        button_matches_search_filter(but->label_but, block->search_filter)) {
-      has_result = true;
-      but->flag |= UI_SEARCH_FILTER_MATCHES;
+      break;
     }
   }
-
-  /* Remove filter from labels and decorators that correspond to un-filtered buttons. */
-  LISTBASE_FOREACH (uiBut *, but, &block->buttons) {
-    if (but->flag & UI_SEARCH_FILTER_MATCHES) {
-      if (but->label_but != NULL) {
-        but->label_but->flag |= UI_SEARCH_FILTER_MATCHES;
-      }
-      if (but->decorator_but != NULL) {
-        but->decorator_but->flag |= UI_SEARCH_FILTER_MATCHES;
-      }
+  if (has_result) {
+    LISTBASE_FOREACH (uiBut *, but, &button_group->buttons) {
+      but->flag |= UI_SEARCH_FILTER_MATCHES;
     }
   }
 
   return has_result;
+}
+
+/**
+ * Apply the search filter, tagging all buttons with whether they match or not.
+ *
+ * \return Whether the block has any search results.
+ */
+static bool block_search_filter_tag_buttons(uiBlock *block)
+{
+  LISTBASE_FOREACH (uiLayoutRoot *, root, &block->layouts) {
+    LISTBASE_FOREACH (uiButtonGroup *, button_group, &root->button_groups) {
+      if (button_group_tag_search_matches(button_group, block->search_filter)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 static void block_search_deactivate_buttons(uiBlock *block)
@@ -5502,7 +5507,7 @@ static void layout_root_new_button_group(uiLayoutRoot *root)
   BLI_addtail(&root->button_groups, new_group);
 }
 
-static void button_group_add_but(uiLayoutRoot *root, const uiBut *but)
+static void button_group_add_but(uiLayoutRoot *root, uiBut *but)
 {
   uiButtonGroup *current_button_group = root->button_groups.last;
 
