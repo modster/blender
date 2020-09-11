@@ -253,6 +253,7 @@ typedef struct LineartRenderBuffer {
   char use_intersections;
   char fuzzy_intersections;
   char fuzzy_everything;
+  char allow_boundaries;
 
   /** Keep an copy of these data so the scene can be freed when lineart is runnning. */
   char cam_is_persp;

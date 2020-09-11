@@ -768,7 +768,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
   double a;
   int v_count = 0, t_count = 0, l_count = 0;
   Object *ob;
-  bool added;
+  bool added, allow_boundaries = rb->allow_boundaries;
   double cam_pos[3];
   double clip_start = rb->near_clip, clip_end = rb->far_clip;
   double view_dir[3], clip_advance[3];
@@ -933,7 +933,9 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
 
             /* New line connecting two new points */
             INCREASE_RL
-            BLI_addtail(&rb->all_render_lines, rl);
+            if (allow_boundaries) {
+              BLI_addtail(&rb->all_render_lines, rl);
+            }
             /** note: inverting rl->l/r (left/right point) doesn't matter as long as
              * rt->rl and rt->v has the same sequence. and the winding direction
              * can be either CW or CCW but needs to be consistent throughout the calculation.
@@ -1009,7 +1011,9 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             REMOVE_ORIGINAL_LINES
 
             INCREASE_RL
-            BLI_addtail(&rb->all_render_lines, rl);
+            if (allow_boundaries) {
+              BLI_addtail(&rb->all_render_lines, rl);
+            }
             rl->l = &rv[0];
             rl->r = &rv[1];
             rl->tl = rt1;
@@ -1074,7 +1078,9 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             REMOVE_ORIGINAL_LINES
 
             INCREASE_RL
-            BLI_addtail(&rb->all_render_lines, rl);
+            if (allow_boundaries) {
+              BLI_addtail(&rb->all_render_lines, rl);
+            }
             rl->l = &rv[1];
             rl->r = &rv[0];
             rl->tl = rt1;
@@ -1174,7 +1180,9 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
 
             /* New line connects two new points */
             INCREASE_RL
-            BLI_addtail(&rb->all_render_lines, rl);
+            if (allow_boundaries) {
+              BLI_addtail(&rb->all_render_lines, rl);
+            }
             rl->l = &rv[1];
             rl->r = &rv[0];
             rl->tl = rt1;
@@ -1271,7 +1279,9 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             rt->rl[1]->next = rt->rl[1]->prev = 0;
 
             INCREASE_RL
-            BLI_addtail(&rb->all_render_lines, rl);
+            if (allow_boundaries) {
+              BLI_addtail(&rb->all_render_lines, rl);
+            }
             rl->l = &rv[1];
             rl->r = &rv[0];
             rl->tl = rt1;
@@ -1357,7 +1367,9 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
             rt->rl[2]->next = rt->rl[2]->prev = 0;
 
             INCREASE_RL
-            BLI_addtail(&rb->all_render_lines, rl);
+            if (allow_boundaries) {
+              BLI_addtail(&rb->all_render_lines, rl);
+            }
             rl->l = &rv[1];
             rl->r = &rv[0];
             rl->tl = rt1;
@@ -2597,11 +2609,15 @@ LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene)
       return NULL;
     }
     Camera *c = scene->camera->data;
+    double clipping_offset = 0;
+    if (scene->lineart.flags & LRT_ALLOW_CLIPPING_BOUNDARIES) {
+      clipping_offset = 0.0001;
+    }
     copy_v3db_v3fl(rb->camera_pos, scene->camera->obmat[3]);
     copy_m4_m4(rb->cam_obmat, scene->camera->obmat);
     rb->cam_is_persp = (c->type == CAM_PERSP);
-    rb->near_clip = c->clip_start;
-    rb->far_clip = c->clip_end;
+    rb->near_clip = c->clip_start + clipping_offset;
+    rb->far_clip = c->clip_end - clipping_offset;
     rb->w = scene->r.xsch;
     rb->h = scene->r.ysch;
 
@@ -2617,6 +2633,7 @@ LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene)
 
   rb->fuzzy_intersections = (scene->lineart.flags & LRT_INTERSECTION_AS_CONTOUR) != 0;
   rb->fuzzy_everything = (scene->lineart.flags & LRT_EVERYTHING_AS_CONTOUR) != 0;
+  rb->allow_boundaries = (scene->lineart.flags & LRT_ALLOW_CLIPPING_BOUNDARIES) != 0;
 
   rb->use_contour = (scene->lineart.line_types & LRT_EDGE_FLAG_CONTOUR) != 0;
   rb->use_crease = (scene->lineart.line_types & LRT_EDGE_FLAG_CREASE) != 0;
