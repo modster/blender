@@ -87,8 +87,8 @@
  * highlighted together.
  */
 typedef struct uiButtonGroup {
-  uiButtonGroup *next, *prev;
-  ListBase *buttons;
+  void *next, *prev;
+  ListBase buttons;
 } uiButtonGroup;
 
 typedef struct uiLayoutRoot {
@@ -423,6 +423,32 @@ static void ui_item_move(uiItem *item, int delta_xmin, int delta_xmax)
       litem->w += delta_xmax;
     }
   }
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Button Groups
+ * \{ */
+
+/**
+ * Every function that adds a set of buttons must create another group,
+ * then #ui_def_but adds buttons to the current group (the last).
+ */
+static void layout_root_new_button_group(uiLayoutRoot *root)
+{
+  uiButtonGroup *new_group = MEM_mallocN(sizeof(uiButtonGroup), __func__);
+  BLI_listbase_clear(&new_group->buttons);
+  BLI_addtail(&root->button_groups, new_group);
+}
+
+static void button_group_add_but(uiLayoutRoot *root, uiBut *but)
+{
+  uiButtonGroup *current_button_group = root->button_groups.last;
+
+  BLI_assert(current_button_group != NULL);
+
+  BLI_addtail(&current_button_group->buttons, but);
 }
 
 /** \} */
@@ -2859,6 +2885,7 @@ static uiBut *ui_item_menu(uiLayout *layout,
   int w, h;
 
   UI_block_layout_set_current(block, layout);
+  layout_root_new_button_group(layout->root);
 
   if (!name) {
     name = "";
@@ -3126,6 +3153,7 @@ static uiBut *uiItemL_(uiLayout *layout, const char *name, int icon)
   int w;
 
   UI_block_layout_set_current(block, layout);
+  layout_root_new_button_group(layout->root);
 
   if (!name) {
     name = "";
@@ -5298,26 +5326,6 @@ static void layout_root_free(uiLayoutRoot *root)
   MEM_freeN(root);
 }
 
-/**
- * Every function that adds a set of buttons must create another group,
- * then #ui_def_but adds buttons to the current group (the last).
- */
-static void layout_root_new_button_group(uiLayoutRoot *root)
-{
-  uiButtonGroup *new_group = MEM_mallocN(sizeof(uiButtonGroup), __func__);
-  BLI_listbase_clear(&new_group->buttons);
-  BLI_addtail(&root->button_groups, new_group);
-}
-
-static void button_group_add_but(uiLayoutRoot *root, const uiBut *but)
-{
-  uiButtonGroup *current_button_group = root->button_groups.last;
-
-  BLI_assert(current_button_group != NULL);
-
-  BLI_addtail(&current_button_group->buttons, but);
-}
-
 static void ui_layout_add_padding_button(uiLayoutRoot *root)
 {
   if (root->padding) {
@@ -5353,6 +5361,7 @@ uiLayout *UI_block_layout(uiBlock *block,
   root->opcontext = WM_OP_INVOKE_REGION_WIN;
 
   BLI_listbase_clear(&root->button_groups);
+  layout_root_new_button_group(root);
 
   layout = MEM_callocN(sizeof(uiLayout), "uiLayout");
   layout->item.type = (type == UI_LAYOUT_VERT_BAR) ? ITEM_LAYOUT_COLUMN : ITEM_LAYOUT_ROOT;
@@ -5505,13 +5514,24 @@ void UI_block_layout_resolve(uiBlock *block, int *r_x, int *r_y)
 
   block->curlayout = NULL;
 
-  LISTBASE_FOREACH_MUTABLE (uiLayoutRoot *, root, &block->layouts) {
+  LISTBASE_FOREACH (uiLayoutRoot *, root, &block->layouts) {
     ui_layout_add_padding_button(root);
 
     /* NULL in advance so we don't interfere when adding button */
     ui_layout_end(block, root->layout, r_x, r_y);
-    layout_root_free(root);
+    ui_layout_free(root->layout);
   }
+
+  BLI_freelistN(&block->layouts);
+  // LISTBASE_FOREACH_MUTABLE (uiLayoutRoot *, root, &block->layouts) {
+  //   ui_layout_add_padding_button(root);
+
+  //   /* NULL in advance so we don't interfere when adding button */
+  //   ui_layout_end(block, root->layout, r_x, r_y);
+  //   layout_root_free(root);
+  // }
+
+  // BLI_listbase_clear(&block->layouts);
 
   /* XXX silly trick, interface_templates.c doesn't get linked
    * because it's not used by other files in this module? */
