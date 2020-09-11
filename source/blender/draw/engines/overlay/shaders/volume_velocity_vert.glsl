@@ -181,9 +181,6 @@ void main()
       pos.z += (drawMACZ) ? (-0.5 + vector.z * displaySize) * cellSize.z : 0.0;
       color = vec3(1.0, 1.0, 0.0); /* yellow */
       break;
-    default:
-      /* Should never get here. */
-      assert(false);
   }
 
   finalColor = vec4(color, 1.0);
