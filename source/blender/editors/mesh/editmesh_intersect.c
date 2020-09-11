@@ -294,13 +294,11 @@ void MESH_OT_intersect(struct wmOperatorType *ot)
       {0, NULL, 0, NULL, NULL},
   };
 
-#ifdef WITH_GMP
   static const EnumPropertyItem isect_intersect_solver_items[] = {
       {ISECT_SOLVER_FAST, "FAST", 0, "Fast", "Faster Solver, some limitations"},
       {ISECT_SOLVER_EXACT, "EXACT", 0, "Exact", "Exact Solver, slower, handles more cases"},
       {0, NULL, 0, NULL, NULL},
   };
-#endif
 
   /* identifiers */
   ot->name = "Intersect (Knife)";
