@@ -87,8 +87,8 @@
  * highlighted together.
  */
 typedef struct uiButtonGroup {
-  uiButtonGroup *next, *prev;
-  ListBase *buttons;
+  void *next, *prev;
+  ListBase buttons; /* #LinkData with #uiBut data field. */
 } uiButtonGroup;
 
 typedef struct uiLayoutRoot {
@@ -430,6 +430,43 @@ static void ui_item_move(uiItem *item, int delta_xmin, int delta_xmax)
       litem->w += delta_xmax;
     }
   }
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Button Groups
+ * \{ */
+
+/**
+ * Every function that adds a set of buttons must create another group,
+ * then #ui_def_but adds buttons to the current group (the last).
+ */
+static void layout_root_new_button_group(uiLayoutRoot *root)
+{
+  uiButtonGroup *new_group = MEM_mallocN(sizeof(uiButtonGroup), __func__);
+  BLI_listbase_clear(&new_group->buttons);
+  BLI_addtail(&root->button_groups, new_group);
+}
+
+static void button_group_add_but(uiLayoutRoot *root, uiBut *but)
+{
+  BLI_assert(root != NULL);
+
+  uiButtonGroup *current_button_group = root->button_groups.last;
+  BLI_assert(current_button_group != NULL);
+
+  /* We can't use the button directly because adding it to
+   * this list would mess with its prev and next pointers. */
+  LinkData *button_link = MEM_mallocN(sizeof(LinkData), __func__);
+  button_link->data = but;
+  BLI_addtail(&current_button_group->buttons, button_link);
+}
+
+static void button_group_free(uiButtonGroup *button_group)
+{
+  BLI_freelistN(&button_group->buttons);
+  MEM_freeN(button_group);
 }
 
 /** \} */
@@ -2866,6 +2903,7 @@ static uiBut *ui_item_menu(uiLayout *layout,
   int w, h;
 
   UI_block_layout_set_current(block, layout);
+  layout_root_new_button_group(layout->root);
 
   if (!name) {
     name = "";
@@ -3133,6 +3171,7 @@ static uiBut *uiItemL_(uiLayout *layout, const char *name, int icon)
   int w;
 
   UI_block_layout_set_current(block, layout);
+  layout_root_new_button_group(layout->root);
 
   if (!name) {
     name = "";
@@ -5170,44 +5209,44 @@ static bool button_matches_search_filter(uiBut *but, const char *search_filter)
 }
 
 /**
- * Test for a search result within the block. Tag every button
- * in the group as a search match if any button matches.
- *
- * \return Whether the group has a match.
+ * Test for a search result within the a specific button group.
  */
-static bool button_group_tag_search_matches(uiButtonGroup *button_group, const char *search_filter)
+static bool button_group_has_search_match(uiButtonGroup *button_group, const char *search_filter)
 {
-  bool has_result = false;
-  LISTBASE_FOREACH (uiBut *, but, &button_group->buttons) {
+  LISTBASE_FOREACH (LinkData *, link, &button_group->buttons) {
+    uiBut *but = link->data;
     if (button_matches_search_filter(but, search_filter)) {
-      has_result = true;
-      break;
-    }
-  }
-  if (has_result) {
-    LISTBASE_FOREACH (uiBut *, but, &button_group->buttons) {
-      but->flag |= UI_SEARCH_FILTER_MATCHES;
+      return true;
     }
   }
 
-  return has_result;
+  return false;
 }
 
 /**
  * Apply the search filter, tagging all buttons with whether they match or not.
+ * Tag every button in the group as a search match if any button matches.
+ *
+ * \note It would be great to return early here if we found a match, but because
+ * the results could be visible we have to continue searching the entire block.
  *
  * \return Whether the block has any search results.
  */
 static bool block_search_filter_tag_buttons(uiBlock *block)
 {
+  bool has_result = false;
   LISTBASE_FOREACH (uiLayoutRoot *, root, &block->layouts) {
     LISTBASE_FOREACH (uiButtonGroup *, button_group, &root->button_groups) {
-      if (button_group_tag_search_matches(button_group, block->search_filter)) {
-        return true;
+      if (button_group_has_search_match(button_group, block->search_filter)) {
+        LISTBASE_FOREACH (LinkData *, link, &button_group->buttons) {
+          uiBut *but = link->data;
+          but->flag |= UI_SEARCH_FILTER_MATCHES;
+        }
+        has_result = true;
       }
     }
   }
-  return false;
+  return has_result;
 }
 
 static void block_search_deactivate_buttons(uiBlock *block)
@@ -5491,29 +5530,12 @@ static void ui_layout_free(uiLayout *layout)
 
 static void layout_root_free(uiLayoutRoot *root)
 {
-  BLI_freelistN(&root->button_groups);
   ui_layout_free(root->layout);
+
+  LISTBASE_FOREACH_MUTABLE (uiButtonGroup *, button_group, &root->button_groups) {
+    button_group_free(button_group);
+  }
   MEM_freeN(root);
-}
-
-/**
- * Every function that adds a set of buttons must create another group,
- * then #ui_def_but adds buttons to the current group (the last).
- */
-static void layout_root_new_button_group(uiLayoutRoot *root)
-{
-  uiButtonGroup *new_group = MEM_mallocN(sizeof(uiButtonGroup), __func__);
-  BLI_listbase_clear(&new_group->buttons);
-  BLI_addtail(&root->button_groups, new_group);
-}
-
-static void button_group_add_but(uiLayoutRoot *root, uiBut *but)
-{
-  uiButtonGroup *current_button_group = root->button_groups.last;
-
-  BLI_assert(current_button_group != NULL);
-
-  BLI_addtail(&current_button_group->buttons, but);
 }
 
 static void ui_layout_add_padding_button(uiLayoutRoot *root)
@@ -5551,6 +5573,7 @@ uiLayout *UI_block_layout(uiBlock *block,
   root->opcontext = WM_OP_INVOKE_REGION_WIN;
 
   BLI_listbase_clear(&root->button_groups);
+  layout_root_new_button_group(root);
 
   layout = MEM_callocN(sizeof(uiLayout), "uiLayout");
   layout->item.type = (type == UI_LAYOUT_VERT_BAR) ? ITEM_LAYOUT_COLUMN : ITEM_LAYOUT_ROOT;
@@ -5713,6 +5736,8 @@ void UI_block_layout_resolve(uiBlock *block, int *r_x, int *r_y)
     ui_layout_end(block, root->layout, r_x, r_y);
     layout_root_free(root);
   }
+
+  BLI_listbase_clear(&block->layouts);
 
   /* XXX silly trick, interface_templates.c doesn't get linked
    * because it's not used by other files in this module? */
