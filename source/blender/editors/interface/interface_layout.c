@@ -80,6 +80,17 @@
 
 /* uiLayoutRoot */
 
+/**
+ * A group of button references, used by property search to keep track of sets of buttons that
+ * should be searched together. For example, in property split layouts number buttons and their
+ * labels (and even their decorators) are separate buttons, but they must be searched and
+ * highlighted together.
+ */
+typedef struct uiButtonGroup {
+  void *next, *prev;
+  ListBase buttons; /* #LinkData with #uiBut data field. */
+} uiButtonGroup;
+
 typedef struct uiLayoutRoot {
   struct uiLayoutRoot *next, *prev;
 
@@ -92,6 +103,8 @@ typedef struct uiLayoutRoot {
    * block-level tag isn't enough because there might be buttons in the header.
    */
   bool search_only;
+
+  ListBase button_groups; /* #uiButtonGroup. */
 
   int emw, emh;
   int padding;
@@ -226,8 +239,6 @@ typedef struct uiLayoutItemRoot {
 } uiLayoutItemRoot;
 
 /** \} */
-
-static uiBut *uiItemL_(uiLayout *layout, const char *name, int icon);
 
 /* -------------------------------------------------------------------- */
 /** \name Item
@@ -424,6 +435,43 @@ static void ui_item_move(uiItem *item, int delta_xmin, int delta_xmax)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Button Groups
+ * \{ */
+
+/**
+ * Every function that adds a set of buttons must create another group,
+ * then #ui_def_but adds buttons to the current group (the last).
+ */
+static void layout_root_new_button_group(uiLayoutRoot *root)
+{
+  uiButtonGroup *new_group = MEM_mallocN(sizeof(uiButtonGroup), __func__);
+  BLI_listbase_clear(&new_group->buttons);
+  BLI_addtail(&root->button_groups, new_group);
+}
+
+static void button_group_add_but(uiLayoutRoot *root, uiBut *but)
+{
+  BLI_assert(root != NULL);
+
+  uiButtonGroup *current_button_group = root->button_groups.last;
+  BLI_assert(current_button_group != NULL);
+
+  /* We can't use the button directly because adding it to
+   * this list would mess with its prev and next pointers. */
+  LinkData *button_link = MEM_mallocN(sizeof(LinkData), __func__);
+  button_link->data = but;
+  BLI_addtail(&current_button_group->buttons, button_link);
+}
+
+static void button_group_free(uiButtonGroup *button_group)
+{
+  BLI_freelistN(&button_group->buttons);
+  MEM_freeN(button_group);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Special RNA Items
  * \{ */
 
@@ -504,8 +552,7 @@ static void ui_item_array(uiLayout *layout,
                           int toggle,
                           bool icon_only,
                           bool compact,
-                          bool show_text,
-                          uiBut *label_but)
+                          bool show_text)
 {
   const uiStyle *style = layout->root->style;
   uiBut *but;
@@ -670,10 +717,7 @@ static void ui_item_array(uiLayout *layout,
 
     /* special case, boolean array in a menu, this could be used in a more generic way too */
     if (ELEM(subtype, PROP_COLOR, PROP_COLOR_GAMMA) && !expand && ELEM(len, 3, 4)) {
-      but = uiDefAutoButR(block, ptr, prop, -1, "", ICON_NONE, 0, 0, w, UI_UNIT_Y);
-      if (label_but != NULL) {
-        but->label_but = label_but;
-      }
+      uiDefAutoButR(block, ptr, prop, -1, "", ICON_NONE, 0, 0, w, UI_UNIT_Y);
     }
     else {
       bool *boolarr = NULL;
@@ -724,13 +768,6 @@ static void ui_item_array(uiLayout *layout,
         if ((a == 0) && (subtype == PROP_AXISANGLE)) {
           UI_but_unit_type_set(but, PROP_UNIT_ROTATION);
         }
-
-        /* Set the label button for the array item. */
-        if (label_but != NULL) {
-          but->label_but = label_but;
-          label_but = label_but->next;
-          BLI_assert(label_but != NULL);
-        }
       }
 
       if (boolarr) {
@@ -773,8 +810,7 @@ static void ui_item_enum_expand_elem_exec(uiLayout *layout,
                                           const eButType but_type,
                                           const bool icon_only,
                                           const EnumPropertyItem *item,
-                                          const bool is_first,
-                                          uiBut *label_but)
+                                          const bool is_first)
 {
   const char *name = (!uiname || uiname[0]) ? item->name : "";
   const int icon = item->icon;
@@ -813,10 +849,6 @@ static void ui_item_enum_expand_elem_exec(uiLayout *layout,
   if (but_type == UI_BTYPE_TAB) {
     but->flag |= UI_BUT_DRAG_LOCK;
   }
-
-  if (label_but != NULL) {
-    but->label_but = label_but;
-  }
 }
 
 static void ui_item_enum_expand_exec(uiLayout *layout,
@@ -826,8 +858,7 @@ static void ui_item_enum_expand_exec(uiLayout *layout,
                                      const char *uiname,
                                      const int h,
                                      const eButType but_type,
-                                     const bool icon_only,
-                                     uiBut *label_but)
+                                     const bool icon_only)
 {
   /* XXX: The way this function currently handles uiname parameter
    * is insane and inconsistent with general UI API:
@@ -903,7 +934,7 @@ static void ui_item_enum_expand_exec(uiLayout *layout,
     }
 
     ui_item_enum_expand_elem_exec(
-        layout, block, ptr, prop, uiname, h, but_type, icon_only, item, is_first, label_but);
+        layout, block, ptr, prop, uiname, h, but_type, icon_only, item, is_first);
   }
 
   UI_block_layout_set_current(block, layout);
@@ -918,11 +949,9 @@ static void ui_item_enum_expand(uiLayout *layout,
                                 PropertyRNA *prop,
                                 const char *uiname,
                                 const int h,
-                                const bool icon_only,
-                                uiBut *label_but)
+                                const bool icon_only)
 {
-  ui_item_enum_expand_exec(
-      layout, block, ptr, prop, uiname, h, UI_BTYPE_ROW, icon_only, label_but);
+  ui_item_enum_expand_exec(layout, block, ptr, prop, uiname, h, UI_BTYPE_ROW, icon_only);
 }
 static void ui_item_enum_expand_tabs(uiLayout *layout,
                                      bContext *C,
@@ -935,7 +964,7 @@ static void ui_item_enum_expand_tabs(uiLayout *layout,
 {
   uiBut *last = block->buttons.last;
 
-  ui_item_enum_expand_exec(layout, block, ptr, prop, uiname, h, UI_BTYPE_TAB, icon_only, NULL);
+  ui_item_enum_expand_exec(layout, block, ptr, prop, uiname, h, UI_BTYPE_TAB, icon_only);
   BLI_assert(last != block->buttons.last);
   for (uiBut *tab = last ? last->next : block->buttons.first; tab; tab = tab->next) {
     UI_but_drawflag_enable(tab, ui_but_align_opposite_to_area_align_get(CTX_wm_region(C)));
@@ -974,12 +1003,10 @@ static uiBut *ui_item_with_label(uiLayout *layout,
 {
   uiLayout *sub = layout;
   uiBut *but = NULL;
-  uiBut *label_but = NULL;
   PropertyType type;
   PropertySubType subtype;
   int prop_but_width = w_hint;
 #ifdef UI_PROP_DECORATE
-  uiBut *decorator_but = NULL;
   uiLayout *layout_prop_decorate = NULL;
   const bool use_prop_sep = ((layout->item.flag & UI_ITEM_PROP_SEP) != 0);
   const bool use_prop_decorate = use_prop_sep && (layout->item.flag & UI_ITEM_PROP_DECORATE) &&
@@ -1000,7 +1027,7 @@ static uiBut *ui_item_with_label(uiLayout *layout,
 #ifdef UI_PROP_DECORATE
   if (name[0]) {
     if (use_prop_sep) {
-      label_but = uiItemL_respect_property_split(layout, name, 0, &layout_prop_decorate);
+      layout_prop_decorate = uiItemL_respect_property_split(layout, name, 0);
     }
     else
 #endif
@@ -1016,8 +1043,7 @@ static uiBut *ui_item_with_label(uiLayout *layout,
       else {
         w_label = w_hint / 3;
       }
-      label_but = uiDefBut(
-          block, UI_BTYPE_LABEL, 0, name, x, y, w_label, h, NULL, 0.0, 0.0, 0, 0, "");
+      uiDefBut(block, UI_BTYPE_LABEL, 0, name, x, y, w_label, h, NULL, 0.0, 0.0, 0, 0, "");
     }
   }
 
@@ -1095,14 +1121,9 @@ static uiBut *ui_item_with_label(uiLayout *layout,
 #ifdef UI_PROP_DECORATE
   /* Only for alignment. */
   if (use_prop_decorate) { /* Note that sep flag may have been unset meanwhile. */
-    decorator_but = uiItemL_(layout_prop_decorate ? layout_prop_decorate : sub, NULL, ICON_BLANK1);
+    uiItemL(layout_prop_decorate ? layout_prop_decorate : sub, NULL, ICON_BLANK1);
   }
 #endif /* UI_PROP_DECORATE */
-
-  /* Set the button's label and decorator even if they are NULL. They can be changed
-   * further with the return value of this function anyway. */
-  but->label_but = label_but;
-  but->decorator_but = decorator_but;
 
   UI_block_layout_set_current(block, layout);
   return but;
@@ -1942,34 +1963,28 @@ static uiLayout *ui_layout_heading_find(uiLayout *cur_layout)
   return NULL;
 }
 
-/**
- * \return The label button added.
- */
-static uiBut *ui_layout_heading_label_add(uiLayout *layout,
-                                          uiLayout *heading_layout,
-                                          bool right_align,
-                                          bool respect_prop_split)
+static void ui_layout_heading_label_add(uiLayout *layout,
+                                        uiLayout *heading_layout,
+                                        bool right_align,
+                                        bool respect_prop_split)
 {
   const int prev_alignment = layout->alignment;
-  uiBut *label_but = NULL;
 
   if (right_align) {
     uiLayoutSetAlignment(layout, UI_LAYOUT_ALIGN_RIGHT);
   }
 
   if (respect_prop_split) {
-    label_but = uiItemL_respect_property_split(layout, heading_layout->heading, ICON_NONE, NULL);
+    uiItemL_respect_property_split(layout, heading_layout->heading, ICON_NONE);
   }
   else {
-    label_but = uiItemL_(layout, heading_layout->heading, ICON_NONE);
+    uiItemL(layout, heading_layout->heading, ICON_NONE);
   }
   /* After adding the heading label, we have to mark it somehow as added, so it's not added again
    * for other items in this layout. For now just clear it. */
   heading_layout->heading[0] = '\0';
 
   layout->alignment = prev_alignment;
-
-  return label_but;
 }
 
 /**
@@ -2030,6 +2045,7 @@ void uiItemFullR(uiLayout *layout,
 #endif /* UI_PROP_DECORATE */
 
   UI_block_layout_set_current(block, layout);
+  layout_root_new_button_group(layout->root);
 
   /* retrieve info */
   const PropertyType type = RNA_property_type(prop);
@@ -2151,10 +2167,6 @@ void uiItemFullR(uiLayout *layout,
   }
 
   uiBut *but = NULL;
-  /* Store the label to assign it to the button afterwards. This is the first
-   * label button if the item is an array and there are a series of buttons.
-   * Decorators are assigned as they are built later on. */
-  uiBut *label_but = NULL;
 
   /* Split the label / property. */
   uiLayout *layout_parent = layout;
@@ -2174,7 +2186,7 @@ void uiItemFullR(uiLayout *layout,
       layout = uiLayoutColumn(layout_row ? layout_row : layout, true);
       layout->space = 0;
       if (heading_layout) {
-        label_but = ui_layout_heading_label_add(layout, heading_layout, false, false);
+        ui_layout_heading_label_add(layout, heading_layout, false, false);
       }
     }
     else {
@@ -2201,43 +2213,39 @@ void uiItemFullR(uiLayout *layout,
             *s++ = str[0];
             *s++ = '\0';
           }
-          uiBut *new_label = uiDefBut(block,
-                                      UI_BTYPE_LABEL,
-                                      0,
-                                      use_prefix ? name_with_suffix : str,
-                                      0,
-                                      0,
-                                      w,
-                                      UI_UNIT_Y,
-                                      NULL,
-                                      0.0,
-                                      0.0,
-                                      0,
-                                      0,
-                                      "");
-          new_label->drawflag |= UI_BUT_TEXT_RIGHT;
-          new_label->drawflag &= ~UI_BUT_TEXT_LEFT;
+          but = uiDefBut(block,
+                         UI_BTYPE_LABEL,
+                         0,
+                         use_prefix ? name_with_suffix : str,
+                         0,
+                         0,
+                         w,
+                         UI_UNIT_Y,
+                         NULL,
+                         0.0,
+                         0.0,
+                         0,
+                         0,
+                         "");
+          but->drawflag |= UI_BUT_TEXT_RIGHT;
+          but->drawflag &= ~UI_BUT_TEXT_LEFT;
 
-          if (a == 0) {
-            label_but = new_label;
-          }
           label_added = true;
         }
       }
       else {
         if (name) {
-          label_but = uiDefBut(
+          but = uiDefBut(
               block, UI_BTYPE_LABEL, 0, name, 0, 0, w, UI_UNIT_Y, NULL, 0.0, 0.0, 0, 0, "");
-          label_but->drawflag |= UI_BUT_TEXT_RIGHT;
-          label_but->drawflag &= ~UI_BUT_TEXT_LEFT;
+          but->drawflag |= UI_BUT_TEXT_RIGHT;
+          but->drawflag &= ~UI_BUT_TEXT_LEFT;
 
           label_added = true;
         }
       }
 
       if (!label_added && heading_layout) {
-        label_but = ui_layout_heading_label_add(layout_sub, heading_layout, true, false);
-        label_added = true;
+        ui_layout_heading_label_add(layout_sub, heading_layout, true, false);
       }
 
       layout_split = ui_item_prop_split_layout_hack(layout_parent, layout_split);
@@ -2280,7 +2288,7 @@ void uiItemFullR(uiLayout *layout,
   else if (heading_layout) {
     /* Could not add heading to split layout, fallback to inserting it to the layout with the
      * heading itself. */
-    label_but = ui_layout_heading_label_add(heading_layout, heading_layout, false, false);
+    ui_layout_heading_label_add(heading_layout, heading_layout, false, false);
   }
 
   /* array property */
@@ -2307,29 +2315,26 @@ void uiItemFullR(uiLayout *layout,
                   toggle,
                   icon_only,
                   compact,
-                  !use_prop_sep_split_label,
-                  label_but);
+                  !use_prop_sep_split_label);
   }
   /* enum item */
   else if (type == PROP_ENUM && index == RNA_ENUM_VALUE) {
     if (icon && name[0] && !icon_only) {
-      but = uiDefIconTextButR_prop(
+      uiDefIconTextButR_prop(
           block, UI_BTYPE_ROW, 0, icon, name, 0, 0, w, h, ptr, prop, -1, 0, value, -1, -1, NULL);
     }
     else if (icon) {
-      but = uiDefIconButR_prop(
+      uiDefIconButR_prop(
           block, UI_BTYPE_ROW, 0, icon, 0, 0, w, h, ptr, prop, -1, 0, value, -1, -1, NULL);
     }
     else {
-      but = uiDefButR_prop(
+      uiDefButR_prop(
           block, UI_BTYPE_ROW, 0, name, 0, 0, w, h, ptr, prop, -1, 0, value, -1, -1, NULL);
     }
-    BLI_assert(but != NULL);
-    but->label_but = label_but;
   }
   /* expanded enum */
   else if (type == PROP_ENUM && expand) {
-    ui_item_enum_expand(layout, block, ptr, prop, name, h, icon_only, label_but);
+    ui_item_enum_expand(layout, block, ptr, prop, name, h, icon_only);
   }
   /* property with separate label */
   else if (type == PROP_ENUM || type == PROP_STRING || type == PROP_POINTER) {
@@ -2343,8 +2348,6 @@ void uiItemFullR(uiLayout *layout,
     if (layout->activate_init) {
       UI_but_flag_enable(but, UI_BUT_ACTIVATE_ON_INIT);
     }
-    BLI_assert(but != NULL);
-    but->label_but = label_but;
   }
   /* single button */
   else {
@@ -2378,8 +2381,6 @@ void uiItemFullR(uiLayout *layout,
     if (layout->activate_init) {
       UI_but_flag_enable(but, UI_BUT_ACTIVATE_ON_INIT);
     }
-
-    but->label_but = label_but;
   }
 
   /* The resulting button may have the icon set since boolean button drawing
@@ -2415,16 +2416,13 @@ void uiItemFullR(uiLayout *layout,
 
       /* The icons are set in 'ui_but_anim_flag' */
       uiItemDecoratorR_prop(layout_col, ptr_dec, prop_dec, but_decorate->rnaindex);
-      uiBut *decorator = block->buttons.last;
-      but_decorate->decorator_but = decorator;
+      but = block->buttons.last;
 
       /* Order the decorator after the button we decorate, this is used so we can always
        * do a quick lookup. */
-      BLI_remlink(&block->buttons, decorator);
-      BLI_insertlinkafter(&block->buttons, but_decorate, decorator);
-
-      /* Assign decorator to the property's button so that they can be filtered together. */
-      but_decorate = decorator->next;
+      BLI_remlink(&block->buttons, but);
+      BLI_insertlinkafter(&block->buttons, but_decorate, but);
+      but_decorate = but->next;
     }
     BLI_assert(ELEM(i, 1, ui_decorate.len));
 
@@ -2798,6 +2796,8 @@ void uiItemPointerR_prop(uiLayout *layout,
   char namestr[UI_MAX_NAME_STR];
   const bool use_prop_sep = ((layout->item.flag & UI_ITEM_PROP_SEP) != 0);
 
+  layout_root_new_button_group(layout->root);
+
   type = RNA_property_type(prop);
   if (!ELEM(type, PROP_POINTER, PROP_STRING, PROP_ENUM)) {
     RNA_warning("Property %s.%s must be a pointer, string or enum",
@@ -2903,6 +2903,7 @@ static uiBut *ui_item_menu(uiLayout *layout,
   int w, h;
 
   UI_block_layout_set_current(block, layout);
+  layout_root_new_button_group(layout->root);
 
   if (!name) {
     name = "";
@@ -3170,6 +3171,7 @@ static uiBut *uiItemL_(uiLayout *layout, const char *name, int icon)
   int w;
 
   UI_block_layout_set_current(block, layout);
+  layout_root_new_button_group(layout->root);
 
   if (!name) {
     name = "";
@@ -3253,42 +3255,29 @@ uiPropertySplitWrapper uiItemPropertySplitWrapperCreate(uiLayout *parent_layout)
   return split_wrapper;
 }
 
-/**
+/*
  * Helper to add a label and creates a property split layout if needed.
- *
- * \param r_layout: Returns a column to put decorators in if property separate is on, otherwise
- * returns the original layout.
  */
-uiBut *uiItemL_respect_property_split(uiLayout *layout,
-                                      const char *text,
-                                      int icon,
-                                      uiLayout **r_layout)
+uiLayout *uiItemL_respect_property_split(uiLayout *layout, const char *text, int icon)
 {
-  uiBut *label_but;
   if (layout->item.flag & UI_ITEM_PROP_SEP) {
     uiBlock *block = uiLayoutGetBlock(layout);
     const uiPropertySplitWrapper split_wrapper = uiItemPropertySplitWrapperCreate(layout);
     /* Further items added to 'layout' will automatically be added to split_wrapper.property_row */
 
-    label_but = uiItemL_(split_wrapper.label_column, text, icon);
+    uiItemL_(split_wrapper.label_column, text, icon);
     UI_block_layout_set_current(block, split_wrapper.property_row);
 
-    if (r_layout != NULL) {
-      *r_layout = split_wrapper.decorate_column;
-    }
+    return split_wrapper.decorate_column;
   }
-  else {
-    char namestr[UI_MAX_NAME_STR];
-    if (text) {
-      text = ui_item_name_add_colon(text, namestr);
-    }
-    label_but = uiItemL_(layout, text, icon);
 
-    if (r_layout != NULL) {
-      *r_layout = layout;
-    }
+  char namestr[UI_MAX_NAME_STR];
+  if (text) {
+    text = ui_item_name_add_colon(text, namestr);
   }
-  return label_but;
+  uiItemL_(layout, text, icon);
+
+  return layout;
 }
 
 void uiItemLDrag(uiLayout *layout, PointerRNA *ptr, const char *name, int icon)
@@ -5220,38 +5209,43 @@ static bool button_matches_search_filter(uiBut *but, const char *search_filter)
 }
 
 /**
+ * Test for a search result within the a specific button group.
+ */
+static bool button_group_has_search_match(uiButtonGroup *button_group, const char *search_filter)
+{
+  LISTBASE_FOREACH (LinkData *, link, &button_group->buttons) {
+    uiBut *but = link->data;
+    if (button_matches_search_filter(but, search_filter)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Apply the search filter, tagging all buttons with whether they match or not.
+ * Tag every button in the group as a search match if any button matches.
+ *
+ * \note It would be great to return early here if we found a match, but because
+ * the results could be visible we have to continue searching the entire block.
+ *
+ * \return Whether the block has any search results.
  */
 static bool block_search_filter_tag_buttons(uiBlock *block)
 {
   bool has_result = false;
-  LISTBASE_FOREACH (uiBut *, but, &block->buttons) {
-    /* First match regular buttons. */
-    if (!ELEM(but->type, UI_BTYPE_LABEL) &&
-        button_matches_search_filter(but, block->search_filter)) {
-      has_result = true;
-      but->flag |= UI_SEARCH_FILTER_MATCHES;
-    }
-    /* Then match their labels. */
-    if (but->label_but != NULL &&
-        button_matches_search_filter(but->label_but, block->search_filter)) {
-      has_result = true;
-      but->flag |= UI_SEARCH_FILTER_MATCHES;
-    }
-  }
-
-  /* Remove filter from labels and decorators that correspond to un-filtered buttons. */
-  LISTBASE_FOREACH (uiBut *, but, &block->buttons) {
-    if (but->flag & UI_SEARCH_FILTER_MATCHES) {
-      if (but->label_but != NULL) {
-        but->label_but->flag |= UI_SEARCH_FILTER_MATCHES;
-      }
-      if (but->decorator_but != NULL) {
-        but->decorator_but->flag |= UI_SEARCH_FILTER_MATCHES;
+  LISTBASE_FOREACH (uiLayoutRoot *, root, &block->layouts) {
+    LISTBASE_FOREACH (uiButtonGroup *, button_group, &root->button_groups) {
+      if (button_group_has_search_match(button_group, block->search_filter)) {
+        LISTBASE_FOREACH (LinkData *, link, &button_group->buttons) {
+          uiBut *but = link->data;
+          but->flag |= UI_SEARCH_FILTER_MATCHES;
+        }
+        has_result = true;
       }
     }
   }
-
   return has_result;
 }
 
@@ -5534,6 +5528,16 @@ static void ui_layout_free(uiLayout *layout)
   MEM_freeN(layout);
 }
 
+static void layout_root_free(uiLayoutRoot *root)
+{
+  ui_layout_free(root->layout);
+
+  LISTBASE_FOREACH_MUTABLE (uiButtonGroup *, button_group, &root->button_groups) {
+    button_group_free(button_group);
+  }
+  MEM_freeN(root);
+}
+
 static void ui_layout_add_padding_button(uiLayoutRoot *root)
 {
   if (root->padding) {
@@ -5567,6 +5571,9 @@ uiLayout *UI_block_layout(uiBlock *block,
   root->block = block;
   root->padding = padding;
   root->opcontext = WM_OP_INVOKE_REGION_WIN;
+
+  BLI_listbase_clear(&root->button_groups);
+  layout_root_new_button_group(root);
 
   layout = MEM_callocN(sizeof(uiLayout), "uiLayout");
   layout->item.type = (type == UI_LAYOUT_VERT_BAR) ? ITEM_LAYOUT_COLUMN : ITEM_LAYOUT_ROOT;
@@ -5652,6 +5659,8 @@ void ui_layout_add_but(uiLayout *layout, uiBut *but)
   if (layout->emboss != UI_EMBOSS_UNDEFINED) {
     but->emboss = layout->emboss;
   }
+
+  button_group_add_but(layout->root, but);
 }
 
 bool ui_layout_replace_but_ptr(uiLayout *layout, const void *old_but_ptr, uiBut *new_but)
@@ -5717,7 +5726,7 @@ void UI_block_layout_resolve(uiBlock *block, int *r_x, int *r_y)
 
   block->curlayout = NULL;
 
-  LISTBASE_FOREACH (uiLayoutRoot *, root, &block->layouts) {
+  LISTBASE_FOREACH_MUTABLE (uiLayoutRoot *, root, &block->layouts) {
     /* Seach only roots should be removed by #UI_block_apply_search_filter. */
     BLI_assert(!root->search_only);
 
@@ -5725,10 +5734,10 @@ void UI_block_layout_resolve(uiBlock *block, int *r_x, int *r_y)
 
     /* NULL in advance so we don't interfere when adding button */
     ui_layout_end(block, root->layout, r_x, r_y);
-    ui_layout_free(root->layout);
+    layout_root_free(root);
   }
 
-  BLI_freelistN(&block->layouts);
+  BLI_listbase_clear(&block->layouts);
 
   /* XXX silly trick, interface_templates.c doesn't get linked
    * because it's not used by other files in this module? */
