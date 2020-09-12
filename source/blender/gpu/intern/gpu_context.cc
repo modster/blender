@@ -34,6 +34,8 @@
 #include "BLI_assert.h"
 #include "BLI_utildefines.h"
 
+#include "BKE_global.h"
+
 #include "GPU_context.h"
 #include "GPU_framebuffer.h"
 
@@ -47,6 +49,11 @@
 #ifdef WITH_OPENGL_BACKEND
 #  include "gl_backend.hh"
 #  include "gl_context.hh"
+#endif
+
+#ifdef WITH_VULKAN
+#  include "vk_backend.hh"
+#  include "vk_context.hh"
 #endif
 
 #include <mutex>
@@ -100,7 +107,13 @@ GPUContext *GPU_context_create(void *ghost_window)
 {
   if (GPUBackend::get() == NULL) {
     /* TODO move where it make sense. */
-    GPU_backend_init(GPU_BACKEND_OPENGL);
+    eGPUBackendType type = GPU_BACKEND_OPENGL;
+#ifdef WITH_VULKAN
+    if (G.debug & G_DEBUG_VK_CONTEXT) {
+      type = GPU_BACKEND_OPENGL;
+    }
+#endif
+    GPU_backend_init(type);
   }
 
   Context *ctx = GPUBackend::get()->context_alloc(ghost_window);
@@ -172,6 +185,11 @@ void GPU_backend_init(eGPUBackendType backend_type)
 #if WITH_OPENGL_BACKEND
     case GPU_BACKEND_OPENGL:
       g_backend = new GLBackend;
+      break;
+#endif
+#if WITH_VULKAN
+    case GPU_BACKEND_VULKAN:
+      g_backend = new VKBackend;
       break;
 #endif
     default:

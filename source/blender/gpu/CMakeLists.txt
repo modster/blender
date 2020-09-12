@@ -30,6 +30,7 @@ set(INC
   .
   intern
   opengl
+  vulkan
   ../blenkernel
   ../blenlib
   ../bmesh
@@ -174,6 +175,28 @@ set(SRC
   opengl/gl_vertex_array.hh
   opengl/gl_vertex_buffer.hh
 )
+
+if(WITH_VULKAN)
+  list(APPEND SRC
+    vulkan/vk_backend.cc
+
+    vulkan/vk_backend.hh
+    vulkan/vk_batch.hh
+    vulkan/vk_context.hh
+    vulkan/vk_drawlist.hh
+    vulkan/vk_framebuffer.hh
+    vulkan/vk_immediate.hh
+    vulkan/vk_index_buffer.hh
+    vulkan/vk_primitive.hh
+    vulkan/vk_query.hh
+    vulkan/vk_shader_interface.hh
+    vulkan/vk_shader.hh
+    vulkan/vk_state.hh
+    vulkan/vk_texture.hh
+    vulkan/vk_uniform_buffer.hh
+    vulkan/vk_vertex_buffer.hh
+  )
+endif()
 
 set(LIB
   ${BLENDER_GL_LIBRARIES}

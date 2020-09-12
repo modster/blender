@@ -35,6 +35,9 @@ extern "C" {
 typedef enum eGPUBackendType {
   GPU_BACKEND_NONE = 0,
   GPU_BACKEND_OPENGL,
+#ifdef WITH_VULKAN
+  GPU_BACKEND_VULKAN,
+#endif
 } eGPUBackendType;
 
 void GPU_backend_init(eGPUBackendType backend);
