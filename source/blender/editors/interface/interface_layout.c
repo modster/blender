@@ -469,6 +469,22 @@ static void button_group_free(uiButtonGroup *button_group)
   MEM_freeN(button_group);
 }
 
+/* This function should be removed whenever #ui_layout_replace_but_ptr is removed. */
+void ui_button_group_replace_but_ptr(uiLayout *layout, const void *old_but_ptr, uiBut *new_but)
+{
+  LISTBASE_FOREACH (uiButtonGroup *, button_group, &layout->root->button_groups) {
+    LISTBASE_FOREACH (LinkData *, link, &button_group->buttons) {
+      if (link->data == old_but_ptr) {
+        link->data = new_but;
+        return;
+      }
+    }
+  }
+
+  /* The button should be in a group. */
+  BLI_assert(false);
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
