@@ -27,7 +27,6 @@
 #include "gpu_platform_private.hh"
 
 #include "vk_backend.hh"
-#include "vk_framebuffer.hh"
 
 namespace blender::gpu {
 
