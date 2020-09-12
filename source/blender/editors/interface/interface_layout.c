@@ -88,7 +88,7 @@
  */
 typedef struct uiButtonGroup {
   void *next, *prev;
-  ListBase buttons;
+  ListBase buttons; /* #LinkData with #uiBut data field. */
 } uiButtonGroup;
 
 typedef struct uiLayoutRoot {
@@ -444,11 +444,22 @@ static void layout_root_new_button_group(uiLayoutRoot *root)
 
 static void button_group_add_but(uiLayoutRoot *root, uiBut *but)
 {
-  uiButtonGroup *current_button_group = root->button_groups.last;
+  BLI_assert(root != NULL);
 
+  uiButtonGroup *current_button_group = root->button_groups.last;
   BLI_assert(current_button_group != NULL);
 
-  BLI_addtail(&current_button_group->buttons, but);
+  /* We can't use the button directly because adding it to
+   * this list would mess with its prev and next pointers. */
+  LinkData *button_link = MEM_mallocN(sizeof(LinkData), __func__);
+  button_link->data = but;
+  BLI_addtail(&current_button_group->buttons, button_link);
+}
+
+static void button_group_free(uiButtonGroup *button_group)
+{
+  BLI_freelistN(&button_group->buttons);
+  MEM_freeN(button_group);
 }
 
 /** \} */
@@ -5321,8 +5332,11 @@ static void ui_layout_free(uiLayout *layout)
 
 static void layout_root_free(uiLayoutRoot *root)
 {
-  BLI_freelistN(&root->button_groups);
   ui_layout_free(root->layout);
+
+  LISTBASE_FOREACH_MUTABLE (uiButtonGroup *, button_group, &root->button_groups) {
+    button_group_free(button_group);
+  }
   MEM_freeN(root);
 }
 
@@ -5514,24 +5528,15 @@ void UI_block_layout_resolve(uiBlock *block, int *r_x, int *r_y)
 
   block->curlayout = NULL;
 
-  LISTBASE_FOREACH (uiLayoutRoot *, root, &block->layouts) {
+  LISTBASE_FOREACH_MUTABLE (uiLayoutRoot *, root, &block->layouts) {
     ui_layout_add_padding_button(root);
 
     /* NULL in advance so we don't interfere when adding button */
     ui_layout_end(block, root->layout, r_x, r_y);
-    ui_layout_free(root->layout);
+    layout_root_free(root);
   }
 
-  BLI_freelistN(&block->layouts);
-  // LISTBASE_FOREACH_MUTABLE (uiLayoutRoot *, root, &block->layouts) {
-  //   ui_layout_add_padding_button(root);
-
-  //   /* NULL in advance so we don't interfere when adding button */
-  //   ui_layout_end(block, root->layout, r_x, r_y);
-  //   layout_root_free(root);
-  // }
-
-  // BLI_listbase_clear(&block->layouts);
+  BLI_listbase_clear(&block->layouts);
 
   /* XXX silly trick, interface_templates.c doesn't get linked
    * because it's not used by other files in this module? */
