@@ -89,13 +89,13 @@ void main()
   fragColor *= stroke_round_cap_mask(
       strokePt1, strokePt2, strokeAspect, strokeThickness, strokeHardeness);
 
-  /* Masking materials. */
+  /* Holdout materials. */
   if (GP_FLAG_TEST(matFlag, GP_STROKE_HOLDOUT | GP_FILL_HOLDOUT)) {
     revealColor = vec4(1.0 - fragColor.aaa, 1.0);
     fragColor = vec4(fragColor.rgb, 1.0);
   }
   else {
-    /* NOT masking materials.
+    /* NOT holdout materials.
      * For compatibility with colored alpha buffer.
      * Note that we are limited to mono-chromatic alpha blending here
      * because of the blend equation and the limit of 1 color target
