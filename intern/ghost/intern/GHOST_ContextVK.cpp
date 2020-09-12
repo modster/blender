@@ -24,13 +24,12 @@
  */
 
 #include "GHOST_ContextVK.h"
-#include "GHOST_SystemX11.h"
-
-#include <vulkan/vulkan.h>
 
 #ifdef _WIN32
 #  include <vulkan/vulkan_win32.h>
-#else
+#elif defined(__APPLE__)
+#  include <MoltenVK/vk_mvk_moltenvk.h>
+#else /* X11 */
 #  include <vulkan/vulkan_xlib.h>
 #endif
 
@@ -120,7 +119,9 @@ const int MAX_FRAMES_IN_FLIGHT = 2;
 GHOST_ContextVK::GHOST_ContextVK(bool stereoVisual,
 #ifdef _WIN32
                                  HWND hwnd,
-#else
+#elif defined(__APPLE__)
+                                 CAMetalLayer *metal_layer,
+#else /* X11 */
                                  Window window,
                                  Display *display,
 #endif
@@ -131,7 +132,9 @@ GHOST_ContextVK::GHOST_ContextVK(bool stereoVisual,
 #ifdef _WIN32
       m_hinstance(hinstance),
       m_hwnd(hwnd),
-#else
+#elif defined(__APPLE__)
+      m_metal_layer(metal_layer),
+#else /* X11 */
       m_display(display),
       m_window(window),
 #endif
@@ -607,7 +610,7 @@ GHOST_TSuccess GHOST_ContextVK::recordCommandBuffers(void)
           .offset = {0, 0},
           .extent = m_render_extent,
       };
-      VkClearValue clearColor = {0.0f, 0.5f, 0.3f, 1.0f};
+      VkClearValue clearColor = {{{0.0f, 0.5f, 0.3f, 1.0f}}};
       VkRenderPassBeginInfo render_pass_info = {
           .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
           .renderPass = m_render_pass,
@@ -805,7 +808,9 @@ GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
 {
 #ifdef _WIN32
   const bool use_window_surface = (m_hwnd != NULL);
-#else
+#elif defined(__APPLE__)
+  const bool use_window_surface = true;
+#else /* X11 */
   const bool use_window_surface = (m_display != NULL);
 #endif
 
@@ -823,7 +828,9 @@ GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
   if (use_window_surface) {
 #ifdef _WIN32
     const char *native_surface_extension_name = VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
-#else
+#elif defined(__APPLE__)
+    const char *native_surface_extension_name = VK_MVK_MACOS_SURFACE_EXTENSION_NAME;
+#else /* X11 */
     const char *native_surface_extension_name = VK_KHR_XLIB_SURFACE_EXTENSION_NAME;
 #endif
     requireExtension(extensions_available, extensions_enabled, "VK_KHR_surface");
@@ -860,6 +867,13 @@ GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
         hwnd = m_hwnd,
     };
     VK_CHECK(vkCreateWin32SurfaceKHR(m_instance, &surface_create_info, NULL, &m_surface));
+#elif defined(__APPLE__)
+    VkMacOSSurfaceCreateInfoMVK info = {};
+    info.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
+    info.pNext = NULL;
+    info.flags = 0;
+    info.pView = m_metal_layer;
+    VK_CHECK(vkCreateMacOSSurfaceMVK(m_instance, &info, nullptr, &m_surface));
 #else
     VkXlibSurfaceCreateInfoKHR surface_create_info = {
         .sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR,

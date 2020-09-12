@@ -169,6 +169,18 @@ elseif(APPLE AND NOT WITH_GHOST_X11)
     )
   endif()
 
+  if(WITH_VULKAN)
+    list(APPEND SRC
+      intern/GHOST_ContextVK.cpp
+
+      intern/GHOST_ContextVK.h
+    )
+
+    list(APPEND INC_SYS
+      ${Vulkan_INCLUDE_DIRS}
+    )
+  endif()
+
   if(WITH_INPUT_NDOF)
     list(APPEND SRC
       intern/GHOST_NDOFManagerCocoa.mm

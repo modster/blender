@@ -1005,7 +1005,7 @@ endif()
 # Configure Vulkan.
 
 if(WITH_VULKAN)
-  find_package(Vulkan)
+  find_package(Vulkan REQUIRED)
 
   list(APPEND BLENDER_GL_LIBRARIES ${Vulkan_LIBRARY})
 

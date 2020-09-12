@@ -28,6 +28,10 @@
 #  include "GHOST_ContextCGL.h"
 #endif
 
+#if defined(WITH_VULKAN)
+#  include "GHOST_ContextVK.h"
+#endif
+
 #include <Cocoa/Cocoa.h>
 #include <Metal/Metal.h>
 #include <QuartzCore/QuartzCore.h>
@@ -833,8 +837,21 @@ GHOST_TSuccess GHOST_WindowCocoa::setOrder(GHOST_TWindowOrder order)
 
 GHOST_Context *GHOST_WindowCocoa::newDrawingContext(GHOST_TDrawingContextType type)
 {
-  if (type == GHOST_kDrawingContextTypeOpenGL) {
+#ifdef WITH_VULKAN
+  if (type == GHOST_kDrawingContextTypeVulkan) {
+    GHOST_Context *context = new GHOST_ContextVK(m_wantStereoVisual, m_metalLayer, 1, 0, false);
 
+    if (context->initializeDrawingContext()) {
+      return context;
+    }
+
+    delete context;
+    /* Fallback to opengl. */
+    type = GHOST_kDrawingContextTypeOpenGL;
+  }
+#endif
+
+  if (type == GHOST_kDrawingContextTypeOpenGL) {
     GHOST_Context *context = new GHOST_ContextCGL(
         m_wantStereoVisual, m_metalView, m_metalLayer, m_openGLView);
 
