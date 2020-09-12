@@ -286,12 +286,14 @@ int BKE_mesh_nurbs_displist_to_mdata(Object *ob,
       }
     }
     else if (dl->type == DL_SURF) {
-      int tot;
-      totvert += dl->parts * dl->nr;
-      tot = (dl->parts - 1 + ((dl->flag & DL_CYCL_V) == 2)) *
-            (dl->nr - 1 + (dl->flag & DL_CYCL_U));
-      totpoly += tot;
-      totloop += tot * 4;
+      if (dl->parts != 0) {
+        int tot;
+        totvert += dl->parts * dl->nr;
+        tot = (((dl->flag & DL_CYCL_U) ? 1 : 0) + (dl->nr - 1)) *
+              (((dl->flag & DL_CYCL_V) ? 1 : 0) + (dl->parts - 1));
+        totpoly += tot;
+        totloop += tot * 4;
+      }
     }
     else if (dl->type == DL_INDEX3) {
       int tot;
@@ -312,11 +314,11 @@ int BKE_mesh_nurbs_displist_to_mdata(Object *ob,
   *r_allvert = mvert = MEM_calloc_arrayN(totvert, sizeof(MVert), "nurbs_init mvert");
   *r_alledge = medge = MEM_calloc_arrayN(totedge, sizeof(MEdge), "nurbs_init medge");
   *r_allloop = mloop = MEM_calloc_arrayN(
-      totpoly, 4 * sizeof(MLoop), "nurbs_init mloop");  // totloop
+      totpoly, sizeof(MLoop[4]), "nurbs_init mloop");  // totloop
   *r_allpoly = mpoly = MEM_calloc_arrayN(totpoly, sizeof(MPoly), "nurbs_init mloop");
 
   if (r_alluv) {
-    *r_alluv = mloopuv = MEM_calloc_arrayN(totpoly, 4 * sizeof(MLoopUV), "nurbs_init mloopuv");
+    *r_alluv = mloopuv = MEM_calloc_arrayN(totpoly, sizeof(MLoopUV[4]), "nurbs_init mloopuv");
   }
 
   /* verts and faces */
@@ -398,9 +400,7 @@ int BKE_mesh_nurbs_displist_to_mdata(Object *ob,
         mpoly->mat_nr = dl->col;
 
         if (mloopuv) {
-          int i;
-
-          for (i = 0; i < 3; i++, mloopuv++) {
+          for (int i = 0; i < 3; i++, mloopuv++) {
             mloopuv->uv[0] = (mloop[i].v - startvert) / (float)(dl->nr - 1);
             mloopuv->uv[1] = 0.0f;
           }
@@ -462,7 +462,6 @@ int BKE_mesh_nurbs_displist_to_mdata(Object *ob,
           if (mloopuv) {
             int orco_sizeu = dl->nr - 1;
             int orco_sizev = dl->parts - 1;
-            int i;
 
             /* exception as handled in convertblender.c too */
             if (dl->flag & DL_CYCL_U) {
@@ -475,7 +474,7 @@ int BKE_mesh_nurbs_displist_to_mdata(Object *ob,
               orco_sizev++;
             }
 
-            for (i = 0; i < 4; i++, mloopuv++) {
+            for (int i = 0; i < 4; i++, mloopuv++) {
               /* find uv based on vertex index into grid array */
               int v = mloop[i].v - startvert;
 
@@ -1109,15 +1108,7 @@ static Mesh *mesh_new_from_mesh_object_with_layers(Depsgraph *depsgraph, Object 
 
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
   CustomData_MeshMasks mask = CD_MASK_MESH;
-  Mesh *result;
-
-  if (DEG_get_mode(depsgraph) == DAG_EVAL_RENDER) {
-    result = mesh_create_eval_final_render(depsgraph, scene, &object_for_eval, &mask);
-  }
-  else {
-    result = mesh_create_eval_final_view(depsgraph, scene, &object_for_eval, &mask);
-  }
-
+  Mesh *result = mesh_create_eval_final(depsgraph, scene, &object_for_eval, &mask);
   return result;
 }
 
@@ -1296,11 +1287,11 @@ static void add_shapekey_layers(Mesh *mesh_dest, Mesh *mesh_src)
                  mesh_src->totvert,
                  kb->name,
                  kb->totelem);
-      array = MEM_calloc_arrayN((size_t)mesh_src->totvert, 3 * sizeof(float), __func__);
+      array = MEM_calloc_arrayN((size_t)mesh_src->totvert, sizeof(float[3]), __func__);
     }
     else {
-      array = MEM_malloc_arrayN((size_t)mesh_src->totvert, 3 * sizeof(float), __func__);
-      memcpy(array, kb->data, (size_t)mesh_src->totvert * 3 * sizeof(float));
+      array = MEM_malloc_arrayN((size_t)mesh_src->totvert, sizeof(float[3]), __func__);
+      memcpy(array, kb->data, sizeof(float[3]) * (size_t)mesh_src->totvert);
     }
 
     CustomData_add_layer_named(
@@ -1403,7 +1394,7 @@ static void shapekey_layers_to_keyblocks(Mesh *mesh_src, Mesh *mesh_dst, int act
     cos = CustomData_get_layer_n(&mesh_src->vdata, CD_SHAPEKEY, i);
     kb->totelem = mesh_src->totvert;
 
-    kb->data = kbcos = MEM_malloc_arrayN(kb->totelem, 3 * sizeof(float), __func__);
+    kb->data = kbcos = MEM_malloc_arrayN(kb->totelem, sizeof(float[3]), __func__);
     if (kb->uid == actshape_uid) {
       MVert *mvert = mesh_src->mvert;
 
@@ -1425,7 +1416,7 @@ static void shapekey_layers_to_keyblocks(Mesh *mesh_src, Mesh *mesh_dst, int act
       }
 
       kb->totelem = mesh_src->totvert;
-      kb->data = MEM_calloc_arrayN(kb->totelem, 3 * sizeof(float), __func__);
+      kb->data = MEM_calloc_arrayN(kb->totelem, sizeof(float[3]), __func__);
       CLOG_ERROR(&LOG, "lost a shapekey layer: '%s'! (bmesh internal error)", kb->name);
     }
   }

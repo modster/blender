@@ -398,7 +398,8 @@ GHOST_IWindow *GHOST_SystemX11::createWindow(const char *title,
  * Never explicitly delete the context, use disposeContext() instead.
  * \return  The new context (or 0 if creation failed).
  */
-GHOST_IContext *GHOST_SystemX11::createOffscreenContext(GHOST_TDrawingContextType type)
+GHOST_IContext *GHOST_SystemX11::createOffscreenContext(GHOST_TDrawingContextType type,
+                                                        GHOST_GLSettings glSettings)
 {
 #if defined(WITH_VULKAN)
   if (type == GHOST_kDrawingContextTypeVulkan) {
@@ -422,6 +423,8 @@ GHOST_IContext *GHOST_SystemX11::createOffscreenContext(GHOST_TDrawingContextTyp
     //   try 4.x core profile
     //   try 3.3 core profile
     //   no fallbacks
+
+    const bool debug_context = (glSettings.flags & GHOST_glDebugContext) != 0;
 
 #if defined(WITH_GL_PROFILE_CORE)
     {
@@ -493,7 +496,7 @@ GHOST_IContext *GHOST_SystemX11::createOffscreenContext(GHOST_TDrawingContextTyp
                                    3,
                                    3,
                                    GHOST_OPENGL_EGL_CONTEXT_FLAGS |
-                                       (false ? EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR : 0),
+                                       (debug_context ? EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR : 0),
                                    GHOST_OPENGL_EGL_RESET_NOTIFICATION_STRATEGY,
                                    EGL_OPENGL_API);
 #else
@@ -505,7 +508,7 @@ GHOST_IContext *GHOST_SystemX11::createOffscreenContext(GHOST_TDrawingContextTyp
                                    3,
                                    3,
                                    GHOST_OPENGL_GLX_CONTEXT_FLAGS |
-                                       (false ? GLX_CONTEXT_DEBUG_BIT_ARB : 0),
+                                       (debug_context ? GLX_CONTEXT_DEBUG_BIT_ARB : 0),
                                    GHOST_OPENGL_GLX_RESET_NOTIFICATION_STRATEGY);
 #endif
 
@@ -1061,7 +1064,7 @@ void GHOST_SystemX11::processEvent(XEvent *xe)
        *       is unmodified (or anyone swapping the keys with xmodmap).
        *
        *     - XLookupKeysym seems to always use first defined keymap (see T47228), which generates
-       *       keycodes unusable by ghost_key_from_keysym for non-latin-compatible keymaps.
+       *       keycodes unusable by ghost_key_from_keysym for non-Latin-compatible keymaps.
        *
        * To address this, we:
        *
@@ -1971,7 +1974,7 @@ void GHOST_SystemX11::getClipboard_xcout(const XEvent *evt,
   switch (*context) {
     /* There is no context, do an XConvertSelection() */
     case XCLIB_XCOUT_NONE:
-      /* Initialise return length to 0 */
+      /* Initialize return length to 0. */
       if (*len > 0) {
         free(*txt);
         *len = 0;
@@ -2189,7 +2192,7 @@ GHOST_TUns8 *GHOST_SystemX11::getClipboard(bool selection) const
     }
   }
   else if (owner == None)
-    return (NULL);
+    return NULL;
 
   /* Restore events so copy doesn't swallow other event types (keyboard/mouse). */
   vector<XEvent> restore_events;
@@ -2257,7 +2260,7 @@ GHOST_TUns8 *GHOST_SystemX11::getClipboard(bool selection) const
 
     return tmp_data;
   }
-  return (NULL);
+  return NULL;
 }
 
 void GHOST_SystemX11::putClipboard(GHOST_TInt8 *buffer, bool selection) const

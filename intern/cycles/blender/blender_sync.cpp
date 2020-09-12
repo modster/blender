@@ -55,11 +55,11 @@ BlenderSync::BlenderSync(BL::RenderEngine &b_engine,
     : b_engine(b_engine),
       b_data(b_data),
       b_scene(b_scene),
-      shader_map(&scene->shaders),
-      object_map(&scene->objects),
-      geometry_map(&scene->geometry),
-      light_map(&scene->lights),
-      particle_system_map(&scene->particle_systems),
+      shader_map(),
+      object_map(),
+      geometry_map(),
+      light_map(),
+      particle_system_map(),
       world_map(NULL),
       world_recalc(false),
       scene(scene),
@@ -239,7 +239,7 @@ void BlenderSync::sync_data(BL::RenderSettings &b_render,
 
   /* Shader sync done at the end, since object sync uses it.
    * false = don't delete unused shaders, not supported. */
-  shader_map.post_sync(false);
+  shader_map.post_sync(scene, false);
 
   free_data_after_sync(b_depsgraph);
 }
@@ -372,8 +372,10 @@ void BlenderSync::sync_film(BL::SpaceView3D &b_v3d)
   Film *film = scene->film;
   Film prevfilm = *film;
 
+  vector<Pass> prevpasses = scene->passes;
+
   if (b_v3d) {
-    film->display_pass = update_viewport_display_passes(b_v3d, film->passes);
+    film->display_pass = update_viewport_display_passes(b_v3d, scene->passes);
   }
 
   film->exposure = get_float(cscene, "film_exposure");
@@ -403,7 +405,11 @@ void BlenderSync::sync_film(BL::SpaceView3D &b_v3d)
 
   if (film->modified(prevfilm)) {
     film->tag_update(scene);
-    film->tag_passes_update(scene, prevfilm.passes, false);
+  }
+
+  if (!Pass::equals(prevpasses, scene->passes)) {
+    film->tag_passes_update(scene, prevpasses, false);
+    film->tag_update(scene);
   }
 }
 
@@ -697,6 +703,16 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
   }
   RNA_END;
 
+  scene->film->denoising_data_pass = denoising.use || denoising.store_passes;
+  scene->film->denoising_clean_pass = (scene->film->denoising_flags & DENOISING_CLEAN_ALL_PASSES);
+  scene->film->denoising_prefiltered_pass = denoising.store_passes &&
+                                            denoising.type == DENOISER_NLM;
+
+  scene->film->pass_alpha_threshold = b_view_layer.pass_alpha_threshold();
+  scene->film->tag_passes_update(scene, passes);
+  scene->film->tag_update(scene);
+  scene->integrator->tag_update(scene);
+
   return passes;
 }
 
@@ -707,7 +723,11 @@ void BlenderSync::free_data_after_sync(BL::Depsgraph &b_depsgraph)
    * footprint during synchronization process.
    */
   const bool is_interface_locked = b_engine.render() && b_engine.render().use_lock_interface();
-  const bool can_free_caches = BlenderSession::headless || is_interface_locked;
+  const bool can_free_caches = (BlenderSession::headless || is_interface_locked) &&
+                               /* Baking re-uses the depsgraph multiple times, clearing crashes
+                                * reading un-evaluated mesh data which isn't aligned with the
+                                * geometry we're baking, see T71012. */
+                               !scene->bake_manager->get_baking();
   if (!can_free_caches) {
     return;
   }

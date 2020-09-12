@@ -136,11 +136,12 @@ void GHOST_GetAllDisplayDimensions(GHOST_SystemHandle systemhandle,
 }
 
 GHOST_ContextHandle GHOST_CreateOpenGLContext(GHOST_SystemHandle systemhandle,
-                                              GHOST_TDrawingContextType type)
+                                              GHOST_TDrawingContextType type,
+                                              GHOST_GLSettings glSettings)
 {
   GHOST_ISystem *system = (GHOST_ISystem *)systemhandle;
 
-  return (GHOST_ContextHandle)system->createOffscreenContext(type);
+  return (GHOST_ContextHandle)system->createOffscreenContext(type, glSettings);
 }
 
 GHOST_TSuccess GHOST_DisposeOpenGLContext(GHOST_SystemHandle systemhandle,

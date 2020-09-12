@@ -22,8 +22,7 @@
 
 /* Private functions / structs of the draw manager */
 
-#ifndef __DRAW_MANAGER_H__
-#define __DRAW_MANAGER_H__
+#pragma once
 
 #include "DRW_engine.h"
 #include "DRW_render.h"
@@ -36,9 +35,10 @@
 
 #include "GPU_batch.h"
 #include "GPU_context.h"
+#include "GPU_drawlist.h"
 #include "GPU_framebuffer.h"
 #include "GPU_shader.h"
-#include "GPU_uniformbuffer.h"
+#include "GPU_uniform_buffer.h"
 #include "GPU_viewport.h"
 
 #include "draw_instance_data.h"
@@ -278,6 +278,8 @@ typedef enum {
   DRW_UNIFORM_FLOAT_COPY,
   DRW_UNIFORM_TEXTURE,
   DRW_UNIFORM_TEXTURE_REF,
+  DRW_UNIFORM_IMAGE,
+  DRW_UNIFORM_IMAGE_REF,
   DRW_UNIFORM_BLOCK,
   DRW_UNIFORM_BLOCK_REF,
   DRW_UNIFORM_TFEEDBACK_TARGET,
@@ -308,8 +310,8 @@ struct DRWUniform {
     };
     /* DRW_UNIFORM_BLOCK */
     union {
-      GPUUniformBuffer *block;
-      GPUUniformBuffer **block_ref;
+      GPUUniformBuf *block;
+      GPUUniformBuf **block_ref;
     };
     /* DRW_UNIFORM_FLOAT_COPY */
     float fvalue[4];
@@ -596,5 +598,3 @@ void drw_resource_buffer_finish(ViewportMemoryPool *vmempool);
 GPUBatch *drw_cache_procedural_points_get(void);
 GPUBatch *drw_cache_procedural_lines_get(void);
 GPUBatch *drw_cache_procedural_triangles_get(void);
-
-#endif /* __DRAW_MANAGER_H__ */

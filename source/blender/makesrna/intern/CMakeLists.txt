@@ -30,6 +30,7 @@ set(DEFSRC
   rna_animation.c
   rna_animviz.c
   rna_armature.c
+  rna_attribute.c
   rna_boid.c
   rna_brush.c
   rna_cachefile.c
@@ -47,7 +48,6 @@ set(DEFSRC
   rna_fluid.c
   rna_gpencil.c
   rna_gpencil_modifier.c
-  rna_hair.c
   rna_image.c
   rna_key.c
   rna_lattice.c
@@ -69,7 +69,6 @@ set(DEFSRC
   rna_packedfile.c
   rna_palette.c
   rna_particle.c
-  rna_pointcloud.c
   rna_pose.c
   rna_render.c
   rna_rigidbody.c
@@ -79,7 +78,6 @@ set(DEFSRC
   rna_sculpt_paint.c
   rna_sequencer.c
   rna_shader_fx.c
-  rna_simulation.c
   rna_sound.c
   rna_space.c
   rna_speaker.c
@@ -98,6 +96,16 @@ set(DEFSRC
   rna_world.c
   rna_xr.c
 )
+
+if(WITH_EXPERIMENTAL_FEATURES)
+  add_definitions(-DWITH_PARTICLE_NODES)
+  add_definitions(-DWITH_HAIR_NODES)
+  list(APPEND DEFSRC
+    rna_pointcloud.c
+    rna_simulation.c
+    rna_hair.c
+  )
+endif()
 
 set(APISRC
   rna_action_api.c
@@ -175,6 +183,7 @@ set(SRC
   ${DEFSRC}
   ${APISRC}
   ../../../../intern/clog/clog.c
+  ../../../../intern/guardedalloc/intern/leak_detector.cc
   ../../../../intern/guardedalloc/intern/mallocn.c
   ../../../../intern/guardedalloc/intern/mallocn_guarded_impl.c
   ../../../../intern/guardedalloc/intern/mallocn_lockfree_impl.c
@@ -344,6 +353,10 @@ if(WITH_XR_OPENXR)
   add_definitions(-DWITH_XR_OPENXR)
 endif()
 
+if(WITH_GMP)
+  add_definitions(-DWITH_GMP)
+endif()
+
 # Build makesrna executable
 blender_include_dirs(
   .
@@ -370,10 +383,6 @@ blender_include_dirs(
   ../../../../intern/guardedalloc
   ../../../../intern/memutil
   ../../../../intern/mantaflow/extern
-)
-
-blender_include_dirs_sys(
-  "${GLEW_INCLUDE_PATH}"
 )
 
 add_cc_flags_custom_test(makesrna)
@@ -430,7 +439,6 @@ set(LIB
   bf_editor_undo
 )
 
-add_definitions(${GL_DEFINITIONS})
 
 blender_add_lib(bf_rna "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 

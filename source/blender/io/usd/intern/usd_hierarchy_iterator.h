@@ -16,8 +16,7 @@
  * The Original Code is Copyright (C) 2019 Blender Foundation.
  * All rights reserved.
  */
-#ifndef __USD_HIERARCHY_ITERATOR_H__
-#define __USD_HIERARCHY_ITERATOR_H__
+#pragma once
 
 #include "IO_abstract_hierarchy_iterator.h"
 #include "usd.h"
@@ -32,9 +31,7 @@ struct Depsgraph;
 struct ID;
 struct Object;
 
-namespace blender {
-namespace io {
-namespace usd {
+namespace blender::io::usd {
 
 using blender::io::AbstractHierarchyIterator;
 using blender::io::AbstractHierarchyWriter;
@@ -72,8 +69,4 @@ class USDHierarchyIterator : public AbstractHierarchyIterator {
   USDExporterContext create_usd_export_context(const HierarchyContext *context);
 };
 
-}  // namespace usd
-}  // namespace io
-}  // namespace blender
-
-#endif /* __USD_HIERARCHY_ITERATOR_H__ */
+}  // namespace blender::io::usd

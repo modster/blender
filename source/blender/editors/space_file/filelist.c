@@ -943,11 +943,9 @@ void filelist_init_icons(void)
 
 void filelist_free_icons(void)
 {
-  int i;
-
   BLI_assert(G.background == false);
 
-  for (i = 0; i < SPECIAL_IMG_MAX; i++) {
+  for (int i = 0; i < SPECIAL_IMG_MAX; i++) {
     IMB_freeImBuf(gSpecialFileImages[i]);
     gSpecialFileImages[i] = NULL;
   }
@@ -1127,7 +1125,7 @@ static void parent_dir_until_exists_or_default_root(char *dir)
 {
   if (!BLI_path_parent_dir_until_exists(dir)) {
 #ifdef WIN32
-    get_default_root(dir);
+    BLI_windows_get_default_root_dir(dir);
 #else
     strcpy(dir, "/");
 #endif
@@ -2212,7 +2210,7 @@ static bool file_is_blend_backup(const char *str)
     }
   }
 
-  return (retval);
+  return retval;
 }
 
 /* TODO: Maybe we should move this to BLI?

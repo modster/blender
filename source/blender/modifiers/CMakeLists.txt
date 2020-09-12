@@ -156,9 +156,11 @@ if(WITH_OPENSUBDIV)
 endif()
 
 if(WITH_BULLET)
-  list(APPEND LIB
-    extern_bullet
-  )
+  if(NOT WITH_SYSTEM_BULLET)
+    list(APPEND LIB
+      extern_bullet
+    )
+  endif()
   add_definitions(-DWITH_BULLET)
 endif()
 
@@ -171,8 +173,11 @@ if(WITH_CYCLES)
   add_definitions(-DWITH_CYCLES)
 endif()
 
+if(WITH_GMP)
+  add_definitions(-DWITH_GMP)
+endif()
+
 # So we can have special tricks in modifier system.
-add_definitions(${GL_DEFINITIONS})
 
 blender_add_lib(bf_modifiers "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 

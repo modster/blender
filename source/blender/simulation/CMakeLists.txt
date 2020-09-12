@@ -43,8 +43,10 @@ set(SRC
   intern/implicit_eigen.cpp
   intern/particle_allocator.cc
   intern/particle_function.cc
+  intern/particle_mesh_emitter.cc
   intern/simulation_collect_influences.cc
   intern/simulation_solver.cc
+  intern/simulation_solver_influences.cc
   intern/simulation_update.cc
 
   intern/ConstrainedConjugateGradient.h
@@ -52,8 +54,10 @@ set(SRC
   intern/implicit.h
   intern/particle_allocator.hh
   intern/particle_function.hh
+  intern/particle_mesh_emitter.hh
   intern/simulation_collect_influences.hh
   intern/simulation_solver.hh
+  intern/simulation_solver_influences.hh
   intern/time_interval.hh
 
   SIM_mass_spring.h

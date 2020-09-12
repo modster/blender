@@ -2118,6 +2118,10 @@ class ExperimentalPanel:
 
     url_prefix = "https://developer.blender.org/"
 
+    @classmethod
+    def poll(cls, context):
+        return bpy.app.version_cycle == 'alpha'
+
     def _draw_items(self, context, items):
         prefs = context.preferences
         experimental = prefs.experimental
@@ -2160,6 +2164,7 @@ class USERPREF_PT_experimental_new_features(ExperimentalPanel, Panel):
             context, (
                 ({"property": "use_new_particle_system"}, "T73324"),
                 ({"property": "use_sculpt_vertex_colors"}, "T71947"),
+                ({"property": "use_tools_missing_icons"}, "T80331"),
             ),
         )
 
@@ -2178,11 +2183,18 @@ class USERPREF_PT_experimental_prototypes(ExperimentalPanel, Panel):
 class USERPREF_PT_experimental_debugging(ExperimentalPanel, Panel):
     bl_label = "Debugging"
 
+    @classmethod
+    def poll(cls, context):
+        # Unlike the other experimental panels, the debugging one is always visible
+        # even in beta or release.
+        return True
+
     def draw(self, context):
         self._draw_items(
             context, (
                 ({"property": "use_undo_legacy"}, "T60695"),
                 ({"property": "use_cycles_debug"}, None),
+                ({"property": "use_image_editor_legacy_drawing"}, "T67530"),
             ),
         )
 

@@ -24,8 +24,7 @@
  * Contains the doxygen documentation main page.
  */
 
-#ifndef __GHOST_ISYSTEM_H__
-#define __GHOST_ISYSTEM_H__
+#pragma once
 
 #include <stdlib.h>
 
@@ -266,7 +265,8 @@ class GHOST_ISystem {
    * Never explicitly delete the context, use disposeContext() instead.
    * \return  The new context (or 0 if creation failed).
    */
-  virtual GHOST_IContext *createOffscreenContext(GHOST_TDrawingContextType type) = 0;
+  virtual GHOST_IContext *createOffscreenContext(GHOST_TDrawingContextType type,
+                                                 GHOST_GLSettings glSettings) = 0;
 
   /**
    * Dispose of a context.
@@ -494,5 +494,3 @@ class GHOST_ISystem {
   MEM_CXX_CLASS_ALLOC_FUNCS("GHOST:GHOST_ISystem")
 #endif
 };
-
-#endif  // __GHOST_ISYSTEM_H__

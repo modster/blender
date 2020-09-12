@@ -17,8 +17,7 @@
  * All rights reserved.
  */
 
-#ifndef __BKE_ANIMSYS_H__
-#define __BKE_ANIMSYS_H__
+#pragma once
 
 /** \file
  * \ingroup bke
@@ -47,6 +46,10 @@ struct Scene;
 struct bAction;
 struct bActionGroup;
 struct bContext;
+struct BlendWriter;
+struct BlendDataReader;
+struct BlendLibReader;
+struct BlendExpander;
 
 /* Container for data required to do FCurve and Driver evaluation. */
 typedef struct AnimationEvalContext {
@@ -102,6 +105,13 @@ void BKE_keyingset_free(struct KeyingSet *ks);
 /* Free all the KeyingSets in the given list */
 void BKE_keyingsets_free(struct ListBase *list);
 
+void BKE_keyingsets_blend_write(struct BlendWriter *writer, struct ListBase *list);
+void BKE_keyingsets_blend_read_data(struct BlendDataReader *reader, struct ListBase *list);
+void BKE_keyingsets_blend_read_lib(struct BlendLibReader *reader,
+                                   struct ID *id,
+                                   struct ListBase *list);
+void BKE_keyingsets_blend_read_expand(struct BlendExpander *expander, struct ListBase *list);
+
 /* ************************************* */
 /* Path Fixing API */
 
@@ -148,16 +158,17 @@ bool BKE_animdata_fix_paths_remove(struct ID *id, const char *path);
 
 /* -------------------------------------- */
 
+typedef struct AnimationBasePathChange {
+  struct AnimationBasePathChange *next, *prev;
+  const char *src_basepath;
+  const char *dst_basepath;
+} AnimationBasePathChange;
+
 /* Move animation data from src to destination if it's paths are based on basepaths */
-void BKE_animdata_separate_by_basepath(struct Main *bmain,
+void BKE_animdata_transfer_by_basepath(struct Main *bmain,
                                        struct ID *srcID,
                                        struct ID *dstID,
                                        struct ListBase *basepaths);
-
-/* Move F-Curves from src to destination if it's path is based on basepath */
-void action_move_fcurves_by_basepath(struct bAction *srcAct,
-                                     struct bAction *dstAct,
-                                     const char basepath[]);
 
 char *BKE_animdata_driver_path_hack(struct bContext *C,
                                     struct PointerRNA *ptr,
@@ -275,5 +286,3 @@ void BKE_animsys_update_driver_array(struct ID *id);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __BKE_ANIMSYS_H__*/

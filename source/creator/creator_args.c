@@ -61,7 +61,8 @@
 #  endif
 
 #  ifdef WITH_PYTHON
-#    include "BPY_extern.h"
+#    include "BPY_extern_python.h"
+#    include "BPY_extern_run.h"
 #  endif
 
 #  include "RE_engine.h"
@@ -754,6 +755,25 @@ static int arg_handle_abort_handler_disable(int UNUSED(argc),
   return 0;
 }
 
+static void clog_abort_on_error_callback(void *fp)
+{
+  BLI_system_backtrace(fp);
+  fflush(fp);
+  abort();
+}
+
+static const char arg_handle_debug_exit_on_error_doc[] =
+    "\n\t"
+    "Immediately exit when internal errors are detected.";
+static int arg_handle_debug_exit_on_error(int UNUSED(argc),
+                                          const char **UNUSED(argv),
+                                          void *UNUSED(data))
+{
+  MEM_enable_fail_on_memleak();
+  CLG_error_fn_set(clog_abort_on_error_callback);
+  return 0;
+}
+
 static const char arg_handle_background_mode_set_doc[] =
     "\n\t"
     "Run in background (often used for UI-less rendering).";
@@ -1335,7 +1355,7 @@ static int arg_handle_register_extension(int UNUSED(argc), const char **UNUSED(a
   if (data) {
     G.background = 1;
   }
-  RegisterBlendExtension();
+  BLI_windows_register_blend_extension(G.background);
 #  else
   (void)data; /* unused */
 #  endif
@@ -1407,7 +1427,7 @@ static int arg_handle_output_set(int argc, const char **argv, void *data)
 static const char arg_handle_engine_set_doc[] =
     "<engine>\n"
     "\tSpecify the render engine.\n"
-    "\tUse '-E' help to list available engines.";
+    "\tUse '-E help' to list available engines.";
 static int arg_handle_engine_set(int argc, const char **argv, void *data)
 {
   bContext *C = data;
@@ -1815,7 +1835,7 @@ static int arg_handle_python_file_run(int argc, const char **argv, void *data)
     BLI_path_abs_from_cwd(filename, sizeof(filename));
 
     bool ok;
-    BPY_CTX_SETUP(ok = BPY_execute_filepath(C, filename, NULL));
+    BPY_CTX_SETUP(ok = BPY_run_filepath(C, filename, NULL));
     if (!ok && app_state.exit_code_on_error.python) {
       printf("\nError: script failed, file: '%s', exiting.\n", argv[1]);
       BPY_python_end();
@@ -1850,7 +1870,7 @@ static int arg_handle_python_text_run(int argc, const char **argv, void *data)
     bool ok;
 
     if (text) {
-      BPY_CTX_SETUP(ok = BPY_execute_text(C, text, NULL, false));
+      BPY_CTX_SETUP(ok = BPY_run_text(C, text, NULL, false));
     }
     else {
       printf("\nError: text block not found %s.\n", argv[1]);
@@ -1887,7 +1907,7 @@ static int arg_handle_python_expr_run(int argc, const char **argv, void *data)
   /* workaround for scripts not getting a bpy.context.scene, causes internal errors elsewhere */
   if (argc > 1) {
     bool ok;
-    BPY_CTX_SETUP(ok = BPY_execute_string_ex(C, NULL, argv[1], false));
+    BPY_CTX_SETUP(ok = BPY_run_string_exec(C, NULL, argv[1]));
     if (!ok && app_state.exit_code_on_error.python) {
       printf("\nError: script failed, expr: '%s', exiting.\n", argv[1]);
       BPY_python_end();
@@ -1914,7 +1934,7 @@ static int arg_handle_python_console_run(int UNUSED(argc), const char **argv, vo
 #  ifdef WITH_PYTHON
   bContext *C = data;
 
-  BPY_CTX_SETUP(BPY_execute_string(C, (const char *[]){"code", NULL}, "code.interact()"));
+  BPY_CTX_SETUP(BPY_run_string_eval(C, (const char *[]){"code", NULL}, "code.interact()"));
 
   return 0;
 #  else
@@ -1987,7 +2007,7 @@ static int arg_handle_addons_set(int argc, const char **argv, void *data)
     BLI_snprintf(str, slen, script_str, argv[1]);
 
     BLI_assert(strlen(str) + 1 == slen);
-    BPY_CTX_SETUP(BPY_execute_string_ex(C, NULL, str, false));
+    BPY_CTX_SETUP(BPY_run_string_exec(C, NULL, str));
     free(str);
 #  else
     UNUSED_VARS(argv, data);
@@ -2228,6 +2248,12 @@ void main_args_setup(bContext *C, bArgs *ba)
   BLI_argsAdd(ba,
               1,
               NULL,
+              "--debug-depsgraph-uuid",
+              CB_EX(arg_handle_debug_mode_generic_set, depsgraph_build),
+              (void *)G_DEBUG_DEPSGRAPH_UUID);
+  BLI_argsAdd(ba,
+              1,
+              NULL,
               "--debug-gpumem",
               CB_EX(arg_handle_debug_mode_generic_set, gpumem),
               (void *)G_DEBUG_GPU_MEM);
@@ -2243,6 +2269,7 @@ void main_args_setup(bContext *C, bArgs *ba)
               "--debug-gpu-force-workarounds",
               CB_EX(arg_handle_debug_mode_generic_set, gpumem),
               (void *)G_DEBUG_GPU_FORCE_WORKAROUNDS);
+  BLI_argsAdd(ba, 1, NULL, "--debug-exit-on-error", CB(arg_handle_debug_exit_on_error), NULL);
 
   BLI_argsAdd(ba, 1, NULL, "--verbose", CB(arg_handle_verbosity_set), NULL);
 

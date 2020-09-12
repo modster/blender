@@ -21,8 +21,7 @@
  * \brief GHOST C-API function and type declarations.
  */
 
-#ifndef __GHOST_C_API_H__
-#define __GHOST_C_API_H__
+#pragma once
 
 #include "GHOST_Types.h"
 
@@ -204,7 +203,8 @@ extern GHOST_WindowHandle GHOST_CreateDialogWindow(GHOST_SystemHandle systemhand
  * \return A handle to the new context ( == NULL if creation failed).
  */
 extern GHOST_ContextHandle GHOST_CreateOpenGLContext(GHOST_SystemHandle systemhandle,
-                                                     GHOST_TDrawingContextType type);
+                                                     GHOST_TDrawingContextType type,
+                                                     GHOST_GLSettings glSettings);
 
 /**
  * Dispose of a context.
@@ -1072,6 +1072,4 @@ GHOST_TSuccess GHOST_XrEventsHandle(GHOST_XrContextHandle xr_context);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

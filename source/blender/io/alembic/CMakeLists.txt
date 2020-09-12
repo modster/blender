@@ -63,6 +63,7 @@ set(SRC
   exporter/abc_writer_camera.cc
   exporter/abc_writer_curves.cc
   exporter/abc_writer_hair.cc
+  exporter/abc_writer_instance.cc
   exporter/abc_writer_mball.cc
   exporter/abc_writer_mesh.cc
   exporter/abc_writer_nurbs.cc
@@ -89,6 +90,7 @@ set(SRC
   exporter/abc_writer_camera.h
   exporter/abc_writer_curves.h
   exporter/abc_writer_hair.h
+  exporter/abc_writer_instance.h
   exporter/abc_writer_mball.h
   exporter/abc_writer_mesh.h
   exporter/abc_writer_nurbs.h
@@ -110,3 +112,17 @@ list(APPEND LIB
 )
 
 blender_add_lib(bf_alembic "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+if(WITH_GTESTS)
+  set(TEST_SRC
+    tests/abc_export_test.cc
+    tests/abc_matrix_test.cc
+  )
+  set(TEST_INC
+  )
+  set(TEST_LIB
+    bf_alembic
+  )
+  include(GTestTesting)
+  blender_add_test_lib(bf_io_alembic_tests "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")
+endif()
