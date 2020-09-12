@@ -63,7 +63,8 @@ class GHOST_ContextVK : public GHOST_Context {
 #ifdef _WIN32
                   HWND hwnd,
 #elif defined(__APPLE__)
-                  CAMetalLayer *metal_layer,
+                  /* FIXME CAMetalLayer but have issue with linking. */
+                  void *metal_layer,
 #else /* X11 */
                   Window window,
                   Display *display,
@@ -132,7 +133,8 @@ class GHOST_ContextVK : public GHOST_Context {
 #ifdef _WIN32
   HWND hwnd;
 #elif defined(__APPLE__)
-  CAMetalLayer *m_metal_layer;
+  /* FIXME CAMetalLayer but have issue with linking. */
+  void *m_metal_layer;
 #else /* X11 */
   Display *m_display;
   Window m_window;

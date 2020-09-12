@@ -809,7 +809,7 @@ GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
 #ifdef _WIN32
   const bool use_window_surface = (m_hwnd != NULL);
 #elif defined(__APPLE__)
-  const bool use_window_surface = true;
+  const bool use_window_surface = (m_metal_layer != NULL);
 #else /* X11 */
   const bool use_window_surface = (m_display != NULL);
 #endif
