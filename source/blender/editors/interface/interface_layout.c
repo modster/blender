@@ -5125,6 +5125,8 @@ void uiLayoutRootSetSearchOnly(uiLayout *layout, bool search_only)
 /** \name Block Layout Search Filtering
  * \{ */
 
+static void layout_root_free(uiLayoutRoot *root);
+
 // #define PROPERTY_SEARCH_USE_TOOLTIPS
 
 static bool block_search_panel_label_matches(const uiBlock *block)
@@ -5163,7 +5165,7 @@ static void block_search_remove_search_only_roots(uiBlock *block)
     if (root->search_only) {
       layout_free_and_hide_buttons(root->layout);
       BLI_remlink(&block->layouts, root);
-      MEM_freeN(root);
+      layout_root_free(root);
     }
   }
 }
@@ -5546,8 +5548,6 @@ static void ui_layout_free(uiLayout *layout)
 
 static void layout_root_free(uiLayoutRoot *root)
 {
-  ui_layout_free(root->layout);
-
   LISTBASE_FOREACH_MUTABLE (uiButtonGroup *, button_group, &root->button_groups) {
     button_group_free(button_group);
   }
@@ -5750,6 +5750,7 @@ void UI_block_layout_resolve(uiBlock *block, int *r_x, int *r_y)
 
     /* NULL in advance so we don't interfere when adding button */
     ui_layout_end(block, root->layout, r_x, r_y);
+    ui_layout_free(root->layout);
     layout_root_free(root);
   }
 
