@@ -389,10 +389,6 @@ blender_include_dirs(
   ../../../../intern/mantaflow/extern
 )
 
-blender_include_dirs_sys(
-  "${GLEW_INCLUDE_PATH}"
-)
-
 add_cc_flags_custom_test(makesrna)
 setup_platform_linker_flags()
 
