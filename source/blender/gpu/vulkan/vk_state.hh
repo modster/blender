@@ -37,7 +37,7 @@ namespace gpu {
  **/
 class VKStateManager : public StateManager {
  public:
-  VKStateManager();
+  VKStateManager(){};
 
   void apply_state(void) override{};
   void force_state(void) override{};

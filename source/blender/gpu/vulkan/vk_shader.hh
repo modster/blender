@@ -27,6 +27,9 @@
 
 #include "gpu_shader_private.hh"
 
+/* TODO move this deps to the .cc file. */
+#include "vk_shader_interface.hh"
+
 namespace blender {
 namespace gpu {
 
@@ -35,7 +38,10 @@ namespace gpu {
  **/
 class VKShader : public Shader {
  public:
-  VKShader(const char *name) : Shader(name){};
+  VKShader(const char *name) : Shader(name)
+  {
+    interface = new VKShaderInterface();
+  };
   ~VKShader(){};
 
   /* Return true on success. */

@@ -25,6 +25,11 @@
 
 #include "gpu_context_private.hh"
 
+/* TODO move these dependencies to the .cc file. */
+#include "vk_framebuffer.hh"
+#include "vk_immediate.hh"
+#include "vk_state.hh"
+
 #include "vk_state.hh"
 
 namespace blender {
@@ -37,11 +42,24 @@ class VKContext : public Context {
   /** Workarounds. */
 
  public:
-  VKContext(void *ghost_window){};
+  VKContext(void *ghost_window)
+  {
+    state_manager = new VKStateManager();
+    imm = new VKImmediate();
+
+    back_left = new VKFrameBuffer("Back Left");
+    active_fb = back_left;
+  };
   ~VKContext(){};
 
-  void activate(void) override{};
-  void deactivate(void) override{};
+  void activate(void) override
+  {
+    immActivate();
+  };
+  void deactivate(void) override
+  {
+    immDeactivate();
+  };
 
   void flush(void) override{};
   void finish(void) override{};

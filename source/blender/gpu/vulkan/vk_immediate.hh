@@ -32,11 +32,17 @@
 namespace blender::gpu {
 
 class VKImmediate : public Immediate {
+ private:
+  uchar data_[4 * 1024 * 1024];
+
  public:
   VKImmediate(){};
   ~VKImmediate(){};
 
-  uchar *begin(void) override{};
+  uchar *begin(void) override
+  {
+    return data_;
+  };
   void end(void) override{};
 };
 

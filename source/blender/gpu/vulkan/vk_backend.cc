@@ -46,6 +46,15 @@ void VKBackend::platform_init(void)
 #else
   GPG.os = GPU_OS_UNIX;
 #endif
+
+  GPG.device = GPU_DEVICE_ANY;
+  GPG.driver = GPU_DRIVER_ANY;
+
+  /* Detect support level */
+  GPG.support_level = GPU_SUPPORT_LEVEL_SUPPORTED;
+
+  GPG.create_key(GPG.support_level, "vendor", "renderer", "version");
+  GPG.create_gpu_name("vendor", "renderer", "version");
 }
 
 void VKBackend::platform_exit(void)
@@ -63,12 +72,12 @@ void VKBackend::platform_exit(void)
 void VKBackend::capabilities_init(void)
 {
   /* Common Capabilities. */
-  GCaps.max_texture_size = 0;
-  GCaps.max_texture_layers = 0;
-  GCaps.max_textures_frag = 0;
-  GCaps.max_textures_vert = 0;
-  GCaps.max_textures_geom = 0;
-  GCaps.max_textures = 0;
+  GCaps.max_texture_size = 2048;
+  GCaps.max_texture_layers = 64;
+  GCaps.max_textures_frag = 16;
+  GCaps.max_textures_vert = 16;
+  GCaps.max_textures_geom = 16;
+  GCaps.max_textures = 46;
   GCaps.mem_stats_support = false;
   GCaps.shader_image_load_store_support = false;
 }

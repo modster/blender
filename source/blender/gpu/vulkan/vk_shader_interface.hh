@@ -41,7 +41,11 @@ class GLVaoCache;
  **/
 class VKShaderInterface : public ShaderInterface {
  public:
-  VKShaderInterface(){};
+  VKShaderInterface()
+  {
+    inputs_ = (ShaderInput *)MEM_callocN(sizeof(*inputs_), __func__);
+    name_buffer_ = (char *)MEM_callocN(1, __func__);
+  };
   ~VKShaderInterface(){};
 
   MEM_CXX_CLASS_ALLOC_FUNCS("VKShaderInterface");

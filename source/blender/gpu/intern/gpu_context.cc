@@ -106,11 +106,11 @@ Context *Context::get(void)
 GPUContext *GPU_context_create(void *ghost_window)
 {
   if (GPUBackend::get() == NULL) {
-    /* TODO move where it make sense. */
+    /* FIXME We should get the context type from ghost instead of guessing it. */
     eGPUBackendType type = GPU_BACKEND_OPENGL;
 #ifdef WITH_VULKAN
     if (G.debug & G_DEBUG_VK_CONTEXT) {
-      type = GPU_BACKEND_OPENGL;
+      type = GPU_BACKEND_VULKAN;
     }
 #endif
     GPU_backend_init(type);
