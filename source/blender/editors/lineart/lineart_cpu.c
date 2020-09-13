@@ -387,7 +387,7 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb,
                                                            &l,
                                                            &r)) {
         lineart_render_line_cut(rb, rl, l, r, rt->base.transparency_mask);
-        if (G.debug_value == 4000 && (rl->flags & LRT_EDGE_FLAG_EDGE_MARK)) {
+        if (G.debug_value == 4000 && (rl->flags & LRT_EDGE_FLAG_INTERSECTION)) {
           printf("l,r %f %f   against %s(%d)   this rl is from %s(%d)\n",
                  l,
                  r,
@@ -1894,7 +1894,7 @@ static int lineart_triangle_line_imagespace_intersection_v2(SpinLock *UNUSED(spl
       (MIN3(FBC0[0], FBC1[0], FBC2[0]) > MAX2(LFBC[0], RFBC[0])) ||
       (MAX3(FBC0[1], FBC1[1], FBC2[1]) < MIN2(LFBC[1], RFBC[1])) ||
       (MIN3(FBC0[1], FBC1[1], FBC2[1]) > MAX2(LFBC[1], RFBC[1])) ||
-      (MIN3(FBC0[2], FBC1[2], FBC2[2]) > MAX2(LFBC[2], RFBC[2]))) {
+      (MIN3(FBC0[3], FBC1[3], FBC2[3]) > MAX2(LFBC[3], RFBC[3]))) {
     return 0;
   }
 
@@ -2510,9 +2510,6 @@ static void lineart_main_compute_scene_contours(LineartRenderBuffer *rb)
         }
       }
     }
-  }
-
-  LISTBASE_FOREACH (LineartRenderLine *, rl, &rb->all_render_lines) {
   }
 }
 
