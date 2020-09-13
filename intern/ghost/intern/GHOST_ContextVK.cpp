@@ -829,7 +829,7 @@ GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
 #ifdef _WIN32
     const char *native_surface_extension_name = VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
 #elif defined(__APPLE__)
-    const char *native_surface_extension_name = VK_MVK_MACOS_SURFACE_EXTENSION_NAME;
+    const char *native_surface_extension_name = VK_EXT_METAL_SURFACE_EXTENSION_NAME;
 #else /* X11 */
     const char *native_surface_extension_name = VK_KHR_XLIB_SURFACE_EXTENSION_NAME;
 #endif
@@ -868,12 +868,12 @@ GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
     };
     VK_CHECK(vkCreateWin32SurfaceKHR(m_instance, &surface_create_info, NULL, &m_surface));
 #elif defined(__APPLE__)
-    VkMacOSSurfaceCreateInfoMVK info = {};
-    info.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
+    VkMetalSurfaceCreateInfoEXT info = {};
+    info.sType = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT;
     info.pNext = NULL;
     info.flags = 0;
-    info.pView = m_metal_layer;
-    VK_CHECK(vkCreateMacOSSurfaceMVK(m_instance, &info, nullptr, &m_surface));
+    info.pLayer = m_metal_layer;
+    VK_CHECK(vkCreateMetalSurfaceEXT(m_instance, &info, nullptr, &m_surface));
 #else
     VkXlibSurfaceCreateInfoKHR surface_create_info = {
         .sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR,

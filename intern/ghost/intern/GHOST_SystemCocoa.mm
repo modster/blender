@@ -774,7 +774,8 @@ GHOST_IContext *GHOST_SystemCocoa::createOffscreenContext(GHOST_TDrawingContextT
 {
 #ifdef WITH_VULKAN
   if (type == GHOST_kDrawingContextTypeVulkan) {
-    GHOST_Context *context = new GHOST_ContextVK(false, NULL, 1, 0, false);
+    const bool debug_context = (glSettings.flags & GHOST_glDebugContext) != 0;
+    GHOST_Context *context = new GHOST_ContextVK(false, NULL, 1, 0, debug_context);
     if (context->initializeDrawingContext()) {
       return context;
     }

@@ -839,7 +839,7 @@ GHOST_Context *GHOST_WindowCocoa::newDrawingContext(GHOST_TDrawingContextType ty
 {
 #ifdef WITH_VULKAN
   if (type == GHOST_kDrawingContextTypeVulkan) {
-    GHOST_Context *context = new GHOST_ContextVK(m_wantStereoVisual, m_metalLayer, 1, 0, false);
+    GHOST_Context *context = new GHOST_ContextVK(m_wantStereoVisual, m_metalLayer, 1, 0, true);
 
     if (context->initializeDrawingContext()) {
       return context;
