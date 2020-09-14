@@ -3509,11 +3509,6 @@ void UI_block_theme_style_set(uiBlock *block, char theme_style)
   block->theme_style = theme_style;
 }
 
-bool UI_block_has_search_filter(const uiBlock *block)
-{
-  return block->search_filter != NULL && block->search_filter[0] != '\0';
-}
-
 bool UI_block_is_search_only(const uiBlock *block)
 {
   return block->flag & UI_BLOCK_SEARCH_ONLY;

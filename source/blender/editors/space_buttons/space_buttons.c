@@ -110,8 +110,7 @@ static void buttons_free(SpaceLink *sl)
     MEM_freeN(ct);
   }
 
-  BLI_assert(sbuts->runtime != NULL);
-  MEM_freeN(sbuts->runtime);
+  MEM_SAFE_FREE(sbuts->runtime);
 }
 
 /* spacetype; init callback */
