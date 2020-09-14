@@ -89,7 +89,7 @@ static int buttons_clear_filter_exec(bContext *C, wmOperator *UNUSED(op))
 {
   SpaceProperties *space = CTX_wm_space_properties(C);
 
-  space->runtime.search_string[0] = '\0';
+  space->runtime->search_string[0] = '\0';
 
   ScrArea *area = CTX_wm_area(C);
   ED_region_search_filter_update(area, CTX_wm_region(C));

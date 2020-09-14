@@ -3931,6 +3931,7 @@ uiBut *ui_but_change_type(uiBut *but, eButType new_type)
         const bool found_layout = ui_layout_replace_but_ptr(but->layout, old_but_ptr, but);
         BLI_assert(found_layout);
         UNUSED_VARS_NDEBUG(found_layout);
+        ui_button_group_replace_but_ptr(but->layout, old_but_ptr, but);
       }
     }
   }
@@ -6700,7 +6701,7 @@ static void operator_enum_search_update_fn(const struct bContext *C,
       }
     }
 
-    MEM_freeN(filtered_items);
+    MEM_freeN((void *)filtered_items);
     BLI_string_search_free(search);
 
     if (do_free) {

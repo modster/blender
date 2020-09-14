@@ -185,6 +185,19 @@ BoundBox *BKE_gpencil_boundbox_get(Object *ob)
 
   boundbox_gpencil(ob);
 
+  Object *ob_orig = (Object *)DEG_get_original_id(&ob->id);
+  /* Update orig object's boundbox with re-computed evaluated values. This function can be
+   * called with the evaluated object and need update the original object bound box data
+   * to keep both values synchronized. */
+  if ((ob_orig != NULL) && (ob != ob_orig)) {
+    if (ob_orig->runtime.bb == NULL) {
+      ob_orig->runtime.bb = MEM_callocN(sizeof(BoundBox), "GPencil boundbox");
+    }
+    for (int i = 0; i < 8; i++) {
+      copy_v3_v3(ob_orig->runtime.bb->vec[i], ob->runtime.bb->vec[i]);
+    }
+  }
+
   return ob->runtime.bb;
 }
 
@@ -2264,17 +2277,16 @@ static int gpencil_material_find_index_by_name(Object *ob, const char *name)
   return -1;
 }
 
-/* Create the name with the object name and a subfix. */
-static void make_element_name(char *obname, char *name, const int maxlen, char *r_name)
+/**
+ * Create the name with the object name and a suffix.
+ */
+static void make_element_name(const char *obname, const char *name, const int maxlen, char *r_name)
 {
   char str[256];
-  sprintf(str, "%s_%s", obname, name);
+  SNPRINTF(str, "%s_%s", obname, name);
+
   /* Replace any point by underscore. */
-  char *current_pos = strchr(str, '.');
-  while (current_pos) {
-    *current_pos = '_';
-    current_pos = strchr(current_pos, '.');
-  }
+  BLI_str_replace_char(str, '.', '_');
 
   BLI_strncpy_utf8(r_name, str, maxlen);
 }
