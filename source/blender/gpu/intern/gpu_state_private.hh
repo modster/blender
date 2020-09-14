@@ -26,6 +26,8 @@
 
 #include "GPU_state.h"
 
+#include "gpu_texture_private.hh"
+
 #include <cstring>
 
 namespace blender {
@@ -94,16 +96,8 @@ inline GPUState operator~(const GPUState &a)
 union GPUStateMutable {
   struct {
     /* Viewport State */
-    /** TODO put inside GPUFramebuffer. */
-    /** Offset + Extent of the drawable region inside the framebuffer. */
-    int viewport_rect[4];
-    /** Offset + Extent of the scissor region inside the framebuffer. */
-    int scissor_rect[4];
     /** TODO remove */
     float depth_range[2];
-    /** TODO remove, use explicit clear calls. */
-    float clear_color[4];
-    float clear_depth;
     /** Negative if using program point size. */
     /* TODO(fclem) should be passed as uniform to all shaders. */
     float point_size;
@@ -155,23 +149,29 @@ inline GPUStateMutable operator~(const GPUStateMutable &a)
  * State manager keeping track of the draw state and applying it before drawing.
  * Base class which is then specialized for each implementation (GL, VK, ...).
  **/
-class GPUStateManager {
+class StateManager {
  public:
   GPUState state;
   GPUStateMutable mutable_state;
 
  public:
-  GPUStateManager();
-  virtual ~GPUStateManager(){};
+  StateManager();
+  virtual ~StateManager(){};
 
-  virtual void set_state(const GPUState &state) = 0;
-  virtual void set_mutable_state(const GPUStateMutable &state) = 0;
+  virtual void apply_state(void) = 0;
+  virtual void force_state(void) = 0;
 
-  inline void apply_state(void)
-  {
-    this->set_state(this->state);
-    this->set_mutable_state(this->mutable_state);
-  };
+  virtual void issue_barrier(eGPUBarrier barrier_bits) = 0;
+
+  virtual void texture_bind(Texture *tex, eGPUSamplerState sampler, int unit) = 0;
+  virtual void texture_unbind(Texture *tex) = 0;
+  virtual void texture_unbind_all(void) = 0;
+
+  virtual void image_bind(Texture *tex, int unit) = 0;
+  virtual void image_unbind(Texture *tex) = 0;
+  virtual void image_unbind_all(void) = 0;
+
+  virtual void texture_unpack_row_length_set(uint len) = 0;
 };
 
 }  // namespace gpu

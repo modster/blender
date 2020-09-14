@@ -51,6 +51,7 @@
 #include "ED_screen.h"
 #include "ED_view3d.h"
 
+#include "GPU_batch_presets.h"
 #include "GPU_context.h"
 #include "GPU_framebuffer.h"
 #include "GPU_immediate.h"
@@ -309,7 +310,7 @@ static bool wm_region_use_viewport_by_type(short space_type, short region_type)
 {
   return (ELEM(space_type, SPACE_VIEW3D, SPACE_IMAGE, SPACE_NODE) &&
           region_type == RGN_TYPE_WINDOW) ||
-         ((space_type == SPACE_SEQ) && region_type == RGN_TYPE_PREVIEW);
+         ((space_type == SPACE_SEQ) && ELEM(region_type, RGN_TYPE_PREVIEW, RGN_TYPE_WINDOW));
 }
 
 bool WM_region_use_viewport(ScrArea *area, ARegion *region)
@@ -394,9 +395,6 @@ static void wm_draw_offscreen_texture_parameters(GPUOffScreen *offscreen)
 {
   /* Setup offscreen color texture for drawing. */
   GPUTexture *texture = GPU_offscreen_color_texture(offscreen);
-
-  /* We don't support multisample textures here. */
-  BLI_assert(GPU_texture_target(texture) == GL_TEXTURE_2D);
 
   /* No mipmaps or filtering. */
   GPU_texture_mipmap_mode(texture, false, false);
@@ -597,7 +595,9 @@ void wm_draw_region_blend(ARegion *region, int view, bool blend)
   GPU_shader_uniform_vector(shader, rect_geo_loc, 4, 1, rectg);
   GPU_shader_uniform_vector(shader, color_loc, 4, 1, (const float[4]){1, 1, 1, 1});
 
-  GPU_draw_primitive(GPU_PRIM_TRI_STRIP, 4);
+  GPUBatch *quad = GPU_batch_preset_quad();
+  GPU_batch_set_shader(quad, shader);
+  GPU_batch_draw(quad);
 
   GPU_texture_unbind(texture);
 
@@ -792,6 +792,7 @@ static void wm_draw_window_onscreen(bContext *C, wmWindow *win, int view)
   /* After area regions so we can do area 'overlay' drawing. */
   ED_screen_draw_edges(win);
   wm_draw_callbacks(win);
+  wmWindowViewport(win);
 
   /* Blend in floating regions (menus). */
   LISTBASE_FOREACH (ARegion *, region, &screen->regionbase) {
@@ -826,13 +827,11 @@ static void wm_draw_window(bContext *C, wmWindow *win)
   }
   else if (win->stereo3d_format->display_mode == S3D_DISPLAY_PAGEFLIP) {
     /* For pageflip we simply draw to both back buffers. */
-    GPU_backbuffer_bind(GPU_BACKBUFFER_LEFT);
-    wm_draw_window_onscreen(C, win, 0);
-
     GPU_backbuffer_bind(GPU_BACKBUFFER_RIGHT);
     wm_draw_window_onscreen(C, win, 1);
 
-    GPU_backbuffer_bind(GPU_BACKBUFFER);
+    GPU_backbuffer_bind(GPU_BACKBUFFER_LEFT);
+    wm_draw_window_onscreen(C, win, 0);
   }
   else if (ELEM(win->stereo3d_format->display_mode, S3D_DISPLAY_ANAGLYPH, S3D_DISPLAY_INTERLACE)) {
     /* For anaglyph and interlace, we draw individual regions with

@@ -29,7 +29,6 @@
 
 #include "BKE_global.h"
 
-#include "GPU_extensions.h"
 #include "GPU_platform.h"
 #include "GPU_shader.h"
 #include "GPU_state.h"
@@ -567,58 +566,6 @@ BLI_INLINE void draw_indirect_call(DRWShadingGroup *shgroup, DRWCommandsState *s
   }
 }
 
-#ifndef NDEBUG
-/**
- * Opengl specification is strict on buffer binding.
- *
- * " If any active uniform block is not backed by a
- * sufficiently large buffer object, the results of shader
- * execution are undefined, and may result in GL interruption or
- * termination. " - Opengl 3.3 Core Specification
- *
- * For now we only check if the binding is correct. Not the size of
- * the bound ubo.
- *
- * See T55475.
- * */
-static bool ubo_bindings_validate(DRWShadingGroup *shgroup)
-{
-  bool valid = true;
-#  ifdef DEBUG_UBO_BINDING
-  /* Check that all active uniform blocks have a non-zero buffer bound. */
-  GLint program = 0;
-  GLint active_blocks = 0;
-
-  glGetIntegerv(GL_CURRENT_PROGRAM, &program);
-  glGetProgramiv(program, GL_ACTIVE_UNIFORM_BLOCKS, &active_blocks);
-
-  for (uint i = 0; i < active_blocks; i++) {
-    int binding = 0;
-    int buffer = 0;
-
-    glGetActiveUniformBlockiv(program, i, GL_UNIFORM_BLOCK_BINDING, &binding);
-    glGetIntegeri_v(GL_UNIFORM_BUFFER_BINDING, binding, &buffer);
-
-    if (buffer == 0) {
-      char blockname[64];
-      glGetActiveUniformBlockName(program, i, sizeof(blockname), NULL, blockname);
-
-      if (valid) {
-        printf("Trying to draw with missing UBO binding.\n");
-        valid = false;
-      }
-
-      DRWPass *parent_pass = DRW_memblock_elem_from_handle(DST.vmempool->passes,
-                                                           &shgroup->pass_handle);
-
-      printf("Pass : %s, Block : %s, Binding %d\n", parent_pass->name, blockname, binding);
-    }
-  }
-#  endif
-  return valid;
-}
-#endif
-
 static void draw_update_uniforms(DRWShadingGroup *shgroup,
                                  DRWCommandsState *state,
                                  bool *use_tfeedback)
@@ -648,6 +595,12 @@ static void draw_update_uniforms(DRWShadingGroup *shgroup,
           break;
         case DRW_UNIFORM_TEXTURE_REF:
           GPU_texture_bind_ex(*uni->texture_ref, uni->sampler_state, uni->location, false);
+          break;
+        case DRW_UNIFORM_IMAGE:
+          GPU_texture_image_bind(uni->texture, uni->location);
+          break;
+        case DRW_UNIFORM_IMAGE_REF:
+          GPU_texture_image_bind(*uni->texture_ref, uni->location);
           break;
         case DRW_UNIFORM_BLOCK:
           GPU_uniformbuf_bind(uni->block, uni->location);
@@ -688,8 +641,6 @@ static void draw_update_uniforms(DRWShadingGroup *shgroup,
       }
     }
   }
-
-  BLI_assert(ubo_bindings_validate(shgroup));
 }
 
 BLI_INLINE void draw_select_buffer(DRWShadingGroup *shgroup,
@@ -700,9 +651,10 @@ BLI_INLINE void draw_select_buffer(DRWShadingGroup *shgroup,
   const bool is_instancing = (batch->inst[0] != NULL);
   int start = 0;
   int count = 1;
-  int tot = is_instancing ? batch->inst[0]->vertex_len : batch->verts[0]->vertex_len;
+  int tot = is_instancing ? GPU_vertbuf_get_vertex_len(batch->inst[0]) :
+                            GPU_vertbuf_get_vertex_len(batch->verts[0]);
   /* Hack : get "vbo" data without actually drawing. */
-  int *select_id = (void *)state->select_buf->data;
+  int *select_id = (void *)GPU_vertbuf_get_data(state->select_buf);
 
   /* Batching */
   if (!is_instancing) {
@@ -970,19 +922,14 @@ static void draw_shgroup(DRWShadingGroup *shgroup, DRWState pass_state)
 
       switch (cmd_type) {
         case DRW_CMD_CLEAR:
-          GPU_framebuffer_clear(
-#ifndef NDEBUG
-              GPU_framebuffer_active_get(),
-#else
-              NULL,
-#endif
-              cmd->clear.clear_channels,
-              (float[4]){cmd->clear.r / 255.0f,
-                         cmd->clear.g / 255.0f,
-                         cmd->clear.b / 255.0f,
-                         cmd->clear.a / 255.0f},
-              cmd->clear.depth,
-              cmd->clear.stencil);
+          GPU_framebuffer_clear(GPU_framebuffer_active_get(),
+                                cmd->clear.clear_channels,
+                                (float[4]){cmd->clear.r / 255.0f,
+                                           cmd->clear.g / 255.0f,
+                                           cmd->clear.b / 255.0f,
+                                           cmd->clear.a / 255.0f},
+                                cmd->clear.depth,
+                                cmd->clear.stencil);
           break;
         case DRW_CMD_DRWSTATE:
           state.drw_state_enabled |= cmd->state.enable;

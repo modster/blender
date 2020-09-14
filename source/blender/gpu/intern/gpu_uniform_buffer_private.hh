@@ -28,9 +28,9 @@ namespace blender {
 namespace gpu {
 
 #ifdef DEBUG
-#  define DEBUG_NAME_LEN 8
-#else
 #  define DEBUG_NAME_LEN 64
+#else
+#  define DEBUG_NAME_LEN 8
 #endif
 
 /**
@@ -62,6 +62,20 @@ class UniformBuf {
     data_ = data;
   }
 };
+
+/* Syntacting suggar. */
+static inline GPUUniformBuf *wrap(UniformBuf *vert)
+{
+  return reinterpret_cast<GPUUniformBuf *>(vert);
+}
+static inline UniformBuf *unwrap(GPUUniformBuf *vert)
+{
+  return reinterpret_cast<UniformBuf *>(vert);
+}
+static inline const UniformBuf *unwrap(const GPUUniformBuf *vert)
+{
+  return reinterpret_cast<const UniformBuf *>(vert);
+}
 
 #undef DEBUG_NAME_LEN
 

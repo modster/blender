@@ -63,6 +63,7 @@ class ShaderInterface {
   /** Enabled bindpoints that needs to be fed with data. */
   uint16_t enabled_attr_mask_ = 0;
   uint16_t enabled_ubo_mask_ = 0;
+  uint8_t enabled_ima_mask_ = 0;
   uint64_t enabled_tex_mask_ = 0;
   /** Location of builtin uniforms. Fast access, no lookup needed. */
   int32_t builtins_[GPU_NUM_UNIFORMS];
@@ -83,10 +84,24 @@ class ShaderInterface {
   {
     return input_lookup(inputs_ + attr_len_, ubo_len_, name);
   }
+  inline const ShaderInput *ubo_get(const int binding) const
+  {
+    return input_lookup(inputs_ + attr_len_, ubo_len_, binding);
+  }
 
   inline const ShaderInput *uniform_get(const char *name) const
   {
     return input_lookup(inputs_ + attr_len_ + ubo_len_, uniform_len_, name);
+  }
+
+  inline const ShaderInput *texture_get(const int binding) const
+  {
+    return input_lookup(inputs_ + attr_len_ + ubo_len_, uniform_len_, binding);
+  }
+
+  inline const char *input_name_get(const ShaderInput *input) const
+  {
+    return name_buffer_ + input->name_offset;
   }
 
   /* Returns uniform location. */
@@ -116,6 +131,10 @@ class ShaderInterface {
   inline const ShaderInput *input_lookup(const ShaderInput *const inputs,
                                          const uint inputs_len,
                                          const char *name) const;
+
+  inline const ShaderInput *input_lookup(const ShaderInput *const inputs,
+                                         const uint inputs_len,
+                                         const int binding) const;
 };
 
 inline const char *ShaderInterface::builtin_uniform_name(GPUUniformBuiltin u)
@@ -220,6 +239,19 @@ inline const ShaderInput *ShaderInterface::input_lookup(const ShaderInput *const
        * where the asked uniform that does not exist has the same hash
        * as a real uniform. */
       BLI_assert(STREQ(name, name_buffer_ + inputs[i].name_offset));
+      return inputs + i;
+    }
+  }
+  return NULL; /* not found */
+}
+
+inline const ShaderInput *ShaderInterface::input_lookup(const ShaderInput *const inputs,
+                                                        const uint inputs_len,
+                                                        const int binding) const
+{
+  /* Simple linear search for now. */
+  for (int i = inputs_len - 1; i >= 0; i--) {
+    if (inputs[i].binding == binding) {
       return inputs + i;
     }
   }

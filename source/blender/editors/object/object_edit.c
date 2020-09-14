@@ -145,6 +145,72 @@ Object *ED_object_active_context(const bContext *C)
   return ob;
 }
 
+/**
+ * Return an array of objects:
+ * - When in the property space, return the pinned or active object.
+ * - When in edit-mode/pose-mode, return an array of objects in the mode.
+ * - Otherwise return selected objects,
+ *   the callers \a filter_fn needs to check of they are editable
+ *   (assuming they need to be modified).
+ */
+Object **ED_object_array_in_mode_or_selected(bContext *C,
+                                             bool (*filter_fn)(Object *ob, void *user_data),
+                                             void *filter_user_data,
+                                             uint *r_objects_len)
+{
+  ScrArea *area = CTX_wm_area(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  Object *ob_active = OBACT(view_layer);
+  Object **objects;
+
+  Object *ob = NULL;
+  bool use_ob = true;
+  if (area && (area->spacetype == SPACE_PROPERTIES)) {
+    /* May return pinned object. */
+    ob = ED_object_context(C);
+  }
+  else if (ob_active && (ob_active->mode &
+                         (OB_MODE_ALL_PAINT | OB_MODE_ALL_SCULPT | OB_MODE_ALL_PAINT_GPENCIL))) {
+    /* When painting, limit to active. */
+    ob = ob_active;
+  }
+  else {
+    /* Otherwise use full selection. */
+    use_ob = false;
+  }
+
+  if (use_ob) {
+    if ((ob != NULL) && !filter_fn(ob, filter_user_data)) {
+      ob = NULL;
+    }
+    *r_objects_len = (ob != NULL) ? 1 : 0;
+    objects = MEM_mallocN(sizeof(*objects) * *r_objects_len, __func__);
+    if (ob != NULL) {
+      objects[0] = ob;
+    }
+  }
+  else {
+    const View3D *v3d = (area && area->spacetype == SPACE_VIEW3D) ? area->spacedata.first : NULL;
+    /* When in a mode that supports multiple active objects, use "objects in mode"
+     * instead of the object's selection. */
+    if ((ob_active != NULL) && (ob_active->mode & (OB_MODE_EDIT | OB_MODE_POSE))) {
+      objects = BKE_view_layer_array_from_objects_in_mode(
+          view_layer,
+          v3d,
+          r_objects_len,
+          {.no_dup_data = true, .filter_fn = filter_fn, .filter_userdata = filter_user_data});
+    }
+    else {
+      objects = BKE_view_layer_array_selected_objects(
+          view_layer,
+          v3d,
+          r_objects_len,
+          {.no_dup_data = true, .filter_fn = filter_fn, .filter_userdata = filter_user_data});
+    }
+  }
+  return objects;
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -703,14 +769,14 @@ bool ED_object_editmode_enter(bContext *C, int flag)
 
 static int editmode_toggle_exec(bContext *C, wmOperator *op)
 {
-  struct wmMsgBus *mbus = CTX_wm_message_bus(C);
-  const int mode_flag = OB_MODE_EDIT;
-  const bool is_mode_set = (CTX_data_edit_object(C) != NULL);
   Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);
-  ViewLayer *view_layer = CTX_data_view_layer(C);
   View3D *v3d = CTX_wm_view3d(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
   Object *obact = OBACT(view_layer);
+  const int mode_flag = OB_MODE_EDIT;
+  const bool is_mode_set = (obact->mode & mode_flag) != 0;
+  struct wmMsgBus *mbus = CTX_wm_message_bus(C);
 
   if (!is_mode_set) {
     if (!ED_object_mode_compat_set(C, obact, mode_flag, op->reports)) {
@@ -719,7 +785,7 @@ static int editmode_toggle_exec(bContext *C, wmOperator *op)
   }
 
   if (!is_mode_set) {
-    ED_object_editmode_enter(C, 0);
+    ED_object_editmode_enter_ex(bmain, scene, obact, 0);
     if (obact->mode & mode_flag) {
       FOREACH_SELECTED_OBJECT_BEGIN (view_layer, v3d, ob) {
         if ((ob != obact) && (ob->type == obact->type)) {
@@ -730,7 +796,8 @@ static int editmode_toggle_exec(bContext *C, wmOperator *op)
     }
   }
   else {
-    ED_object_editmode_exit(C, EM_FREEDATA);
+    ED_object_editmode_exit_ex(bmain, scene, obact, EM_FREEDATA);
+
     if ((obact->mode & mode_flag) == 0) {
       FOREACH_OBJECT_BEGIN (view_layer, ob) {
         if ((ob != obact) && (ob->type == obact->type)) {
@@ -793,6 +860,9 @@ void OBJECT_OT_editmode_toggle(wmOperatorType *ot)
 static int posemode_exec(bContext *C, wmOperator *op)
 {
   struct wmMsgBus *mbus = CTX_wm_message_bus(C);
+  struct Main *bmain = CTX_data_main(C);
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
   Base *base = CTX_data_active_base(C);
 
   /* If the base is NULL it means we have an active object, but the object itself is hidden. */
@@ -814,16 +884,17 @@ static int posemode_exec(bContext *C, wmOperator *op)
     return OPERATOR_PASS_THROUGH;
   }
 
-  if (obact == CTX_data_edit_object(C)) {
-    ED_object_editmode_exit(C, EM_FREEDATA);
-    is_mode_set = false;
+  {
+    Object *obedit = OBEDIT_FROM_VIEW_LAYER(view_layer);
+    if (obact == obedit) {
+      ED_object_editmode_exit_ex(bmain, scene, obedit, EM_FREEDATA);
+      is_mode_set = false;
+    }
   }
 
   if (is_mode_set) {
     bool ok = ED_object_posemode_exit(C, obact);
     if (ok) {
-      struct Main *bmain = CTX_data_main(C);
-      ViewLayer *view_layer = CTX_data_view_layer(C);
       FOREACH_OBJECT_BEGIN (view_layer, ob) {
         if ((ob != obact) && (ob->type == OB_ARMATURE) && (ob->mode & mode_flag)) {
           ED_object_posemode_exit_ex(bmain, ob);
@@ -835,9 +906,7 @@ static int posemode_exec(bContext *C, wmOperator *op)
   else {
     bool ok = ED_object_posemode_enter(C, obact);
     if (ok) {
-      struct Main *bmain = CTX_data_main(C);
-      ViewLayer *view_layer = CTX_data_view_layer(C);
-      View3D *v3d = CTX_wm_view3d(C);
+      const View3D *v3d = CTX_wm_view3d(C);
       FOREACH_SELECTED_OBJECT_BEGIN (view_layer, v3d, ob) {
         if ((ob != obact) && (ob->type == OB_ARMATURE) && (ob->mode == OB_MODE_OBJECT) &&
             (!ID_IS_LINKED(ob))) {

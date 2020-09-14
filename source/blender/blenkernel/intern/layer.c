@@ -931,6 +931,8 @@ void BKE_main_collection_sync(const Main *bmain)
   for (const Scene *scene = bmain->scenes.first; scene; scene = scene->id.next) {
     BKE_scene_collection_sync(scene);
   }
+
+  BKE_layer_collection_local_sync_all(bmain);
 }
 
 void BKE_main_collection_sync_remap(const Main *bmain)
@@ -1088,7 +1090,7 @@ bool BKE_base_is_visible(const View3D *v3d, const Base *base)
   return base->flag & BASE_VISIBLE_VIEWLAYER;
 }
 
-bool BKE_object_is_visible_in_viewport(const struct View3D *v3d, const struct Object *ob)
+bool BKE_object_is_visible_in_viewport(const View3D *v3d, const struct Object *ob)
 {
   BLI_assert(v3d != NULL);
 
@@ -1109,8 +1111,8 @@ bool BKE_object_is_visible_in_viewport(const struct View3D *v3d, const struct Ob
     return false;
   }
 
-  /* If not using local view or local collection the object may still be in a hidden collection. */
-  if (((v3d->localvd) == NULL) && ((v3d->flag & V3D_LOCAL_COLLECTIONS) == 0)) {
+  /* If not using local collection the object may still be in a hidden collection. */
+  if ((v3d->flag & V3D_LOCAL_COLLECTIONS) == 0) {
     return (ob->base_flag & BASE_VISIBLE_VIEWLAYER) != 0;
   }
 
@@ -1231,7 +1233,7 @@ static void layer_collection_local_sync(ViewLayer *view_layer,
   }
 }
 
-void BKE_layer_collection_local_sync(ViewLayer *view_layer, View3D *v3d)
+void BKE_layer_collection_local_sync(ViewLayer *view_layer, const View3D *v3d)
 {
   const unsigned short local_collections_uuid = v3d->local_collections_uuid;
 
@@ -1246,12 +1248,34 @@ void BKE_layer_collection_local_sync(ViewLayer *view_layer, View3D *v3d)
 }
 
 /**
+ * Sync the local collection for all the view-ports.
+ */
+void BKE_layer_collection_local_sync_all(const Main *bmain)
+{
+  LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+    LISTBASE_FOREACH (ViewLayer *, view_layer, &scene->view_layers) {
+      LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+        LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+          if (area->spacetype != SPACE_VIEW3D) {
+            continue;
+          }
+          View3D *v3d = area->spacedata.first;
+          if (v3d->flag & V3D_LOCAL_COLLECTIONS) {
+            BKE_layer_collection_local_sync(view_layer, v3d);
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
  * Isolate the collection locally
  *
  * Same as BKE_layer_collection_isolate_local but for a viewport
  */
 void BKE_layer_collection_isolate_local(ViewLayer *view_layer,
-                                        View3D *v3d,
+                                        const View3D *v3d,
                                         LayerCollection *lc,
                                         bool extend)
 {
@@ -1463,11 +1487,11 @@ bool BKE_scene_has_object(Scene *scene, Object *ob)
  * \{ */
 
 typedef struct LayerObjectBaseIteratorData {
-  View3D *v3d;
+  const View3D *v3d;
   Base *base;
 } LayerObjectBaseIteratorData;
 
-static bool object_bases_iterator_is_valid(View3D *v3d, Base *base, const int flag)
+static bool object_bases_iterator_is_valid(const View3D *v3d, Base *base, const int flag)
 {
   BLI_assert((v3d == NULL) || (v3d->spacetype == SPACE_VIEW3D));
 
@@ -1484,7 +1508,7 @@ static void object_bases_iterator_begin(BLI_Iterator *iter, void *data_in_v, con
 {
   ObjectsVisibleIteratorData *data_in = data_in_v;
   ViewLayer *view_layer = data_in->view_layer;
-  View3D *v3d = data_in->v3d;
+  const View3D *v3d = data_in->v3d;
   Base *base = view_layer->object_bases.first;
 
   /* when there are no objects */

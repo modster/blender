@@ -31,8 +31,11 @@
 #include "DNA_genfile.h"
 #include "DNA_gpencil_modifier_types.h"
 #include "DNA_gpencil_types.h"
+#include "DNA_hair_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
+#include "DNA_pointcloud_types.h"
+#include "DNA_rigidbody_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_shader_fx_types.h"
 
@@ -250,6 +253,25 @@ static void panels_remove_x_closed_flag_recursive(Panel *panel)
   }
 }
 
+static void do_versions_point_attributes(CustomData *pdata)
+{
+  /* Change to generic named float/float3 attributes. */
+  const int CD_LOCATION = 43;
+  const int CD_RADIUS = 44;
+
+  for (int i = 0; i < pdata->totlayer; i++) {
+    CustomDataLayer *layer = &pdata->layers[i];
+    if (layer->type == CD_LOCATION) {
+      STRNCPY(layer->name, "Position");
+      layer->type = CD_PROP_FLOAT3;
+    }
+    else if (layer->type == CD_RADIUS) {
+      STRNCPY(layer->name, "Radius");
+      layer->type = CD_PROP_FLOAT;
+    }
+  }
+}
+
 void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
 {
   UNUSED_VARS(fd);
@@ -460,7 +482,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
     }
 
-    /* Initialise additional velocity parameter for CacheFiles. */
+    /* Initialize additional velocity parameter for #CacheFile's. */
     if (!DNA_struct_elem_find(
             fd->filesdna, "MeshSeqCacheModifierData", "float", "velocity_scale")) {
       for (Object *object = bmain->objects.first; object != NULL; object = object->id.next) {
@@ -504,17 +526,22 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
         }
       }
     }
+  }
 
-    /* Initialize solver for Boolean. */
-    if (!DNA_struct_elem_find(fd->filesdna, "BooleanModifierData", "enum", "solver")) {
-      for (Object *object = bmain->objects.first; object != NULL; object = object->id.next) {
-        LISTBASE_FOREACH (ModifierData *, md, &object->modifiers) {
-          if (md->type == eModifierType_Boolean) {
-            BooleanModifierData *bmd = (BooleanModifierData *)md;
-            bmd->solver = eBooleanModifierSolver_Fast;
-          }
-        }
-      }
+  for (Scene *scene = bmain->scenes.first; scene; scene = scene->id.next) {
+    RigidBodyWorld *rbw = scene->rigidbody_world;
+
+    if (rbw == NULL) {
+      continue;
+    }
+
+    /* The substep method changed from "per second" to "per frame".
+     * To get the new value simply divide the old bullet sim fps with the scene fps.
+     */
+    rbw->substeps_per_frame /= FPS;
+
+    if (rbw->substeps_per_frame <= 0) {
+      rbw->substeps_per_frame = 1;
     }
   }
 
@@ -528,6 +555,49 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
    * \note Keep this message at the bottom of the function.
    */
   {
+    /* Set the minimum sequence interpolate for grease pencil. */
+    if (!DNA_struct_elem_find(fd->filesdna, "GP_Interpolate_Settings", "int", "step")) {
+      LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+        ToolSettings *ts = scene->toolsettings;
+        ts->gp_interpolate.step = 1;
+      }
+    }
+
+    /* Hair and PointCloud attributes. */
+    for (Hair *hair = bmain->hairs.first; hair != NULL; hair = hair->id.next) {
+      do_versions_point_attributes(&hair->pdata);
+    }
+    for (PointCloud *pointcloud = bmain->pointclouds.first; pointcloud != NULL;
+         pointcloud = pointcloud->id.next) {
+      do_versions_point_attributes(&pointcloud->pdata);
+    }
+
+    /* Show outliner mode column by default. */
+    LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+      LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+        LISTBASE_FOREACH (SpaceLink *, space, &area->spacedata) {
+          if (space->spacetype == SPACE_OUTLINER) {
+            SpaceOutliner *space_outliner = (SpaceOutliner *)space;
+
+            space_outliner->flag |= SO_MODE_COLUMN;
+          }
+        }
+      }
+    }
+
+    /* Solver and Collections for Boolean. */
+    if (!DNA_struct_elem_find(fd->filesdna, "BooleanModifierData", "char", "solver")) {
+      for (Object *object = bmain->objects.first; object != NULL; object = object->id.next) {
+        LISTBASE_FOREACH (ModifierData *, md, &object->modifiers) {
+          if (md->type == eModifierType_Boolean) {
+            BooleanModifierData *bmd = (BooleanModifierData *)md;
+            bmd->solver = eBooleanModifierSolver_Fast;
+            bmd->flag = eBooleanModifierFlag_Object;
+          }
+        }
+      }
+    }
+
     /* Keep this block, even when empty. */
   }
 }

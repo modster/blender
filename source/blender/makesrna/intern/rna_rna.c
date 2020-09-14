@@ -117,6 +117,7 @@ const EnumPropertyItem rna_enum_property_unit_items[] = {
     {PROP_UNIT_MASS, "MASS", 0, "Mass", ""},
     {PROP_UNIT_CAMERA, "CAMERA", 0, "Camera", ""},
     {PROP_UNIT_POWER, "POWER", 0, "Power", ""},
+    {PROP_UNIT_TEMPERATURE, "TEMPERATURE", 0, "Temperature", ""},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -1187,9 +1188,12 @@ static bool rna_property_override_diff_propptr_validate_diffing(PointerRNA *prop
    * This helps a lot in library override case, especially to detect inserted items in collections.
    */
   if (!no_prop_name && (is_valid_for_diffing || do_force_name)) {
-    PropertyRNA *nameprop_a = RNA_struct_name_property(propptr_a->type);
-    PropertyRNA *nameprop_b = (propptr_b != NULL) ? RNA_struct_name_property(propptr_b->type) :
-                                                    NULL;
+    PropertyRNA *nameprop_a = (propptr_a->type != NULL) ?
+                                  RNA_struct_name_property(propptr_a->type) :
+                                  NULL;
+    PropertyRNA *nameprop_b = (propptr_b != NULL && propptr_b->type != NULL) ?
+                                  RNA_struct_name_property(propptr_b->type) :
+                                  NULL;
 
     int propname_a_len = 0, propname_b_len = 0;
     char *propname_a = NULL;
@@ -1851,7 +1855,7 @@ int rna_property_override_diff_default(Main *bmain,
 
             if (is_first_insert) {
               /* We need to clean up all possible existing insertion operations,
-               * otherwise we'd end up with a mess of ops everytime something changes. */
+               * otherwise we'd end up with a mess of ops every time something changes. */
               for (IDOverrideLibraryPropertyOperation *opop = op->operations.first;
                    opop != NULL;) {
                 IDOverrideLibraryPropertyOperation *opop_next = opop->next;

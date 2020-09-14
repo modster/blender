@@ -199,10 +199,12 @@ static void drw_shgroup_uniform_create_ex(DRWShadingGroup *shgroup,
     case DRW_UNIFORM_BLOCK_REF:
       uni->block_ref = (GPUUniformBuf **)value;
       break;
+    case DRW_UNIFORM_IMAGE:
     case DRW_UNIFORM_TEXTURE:
       uni->texture = (GPUTexture *)value;
       uni->sampler_state = sampler_state;
       break;
+    case DRW_UNIFORM_IMAGE_REF:
     case DRW_UNIFORM_TEXTURE_REF:
       uni->texture_ref = (GPUTexture **)value;
       uni->sampler_state = sampler_state;
@@ -259,6 +261,20 @@ void DRW_shgroup_uniform_texture_ref_ex(DRWShadingGroup *shgroup,
 void DRW_shgroup_uniform_texture_ref(DRWShadingGroup *shgroup, const char *name, GPUTexture **tex)
 {
   DRW_shgroup_uniform_texture_ref_ex(shgroup, name, tex, GPU_SAMPLER_MAX);
+}
+
+void DRW_shgroup_uniform_image(DRWShadingGroup *shgroup, const char *name, const GPUTexture *tex)
+{
+  BLI_assert(tex != NULL);
+  int loc = GPU_shader_get_texture_binding(shgroup->shader, name);
+  drw_shgroup_uniform_create_ex(shgroup, loc, DRW_UNIFORM_IMAGE, tex, 0, 0, 1);
+}
+
+void DRW_shgroup_uniform_image_ref(DRWShadingGroup *shgroup, const char *name, GPUTexture **tex)
+{
+  BLI_assert(tex != NULL);
+  int loc = GPU_shader_get_texture_binding(shgroup->shader, name);
+  drw_shgroup_uniform_create_ex(shgroup, loc, DRW_UNIFORM_IMAGE_REF, tex, 0, 0, 1);
 }
 
 void DRW_shgroup_uniform_block(DRWShadingGroup *shgroup,
@@ -799,10 +815,10 @@ static void drw_shgroup_call_procedural_add_ex(DRWShadingGroup *shgroup,
   drw_command_draw_procedural(shgroup, geom, handle, vert_count);
 }
 
-void DRW_shgroup_call_procedural_points(DRWShadingGroup *shgroup, Object *ob, uint point_len)
+void DRW_shgroup_call_procedural_points(DRWShadingGroup *shgroup, Object *ob, uint point_count)
 {
   struct GPUBatch *geom = drw_cache_procedural_points_get();
-  drw_shgroup_call_procedural_add_ex(shgroup, geom, ob, point_len);
+  drw_shgroup_call_procedural_add_ex(shgroup, geom, ob, point_count);
 }
 
 void DRW_shgroup_call_procedural_lines(DRWShadingGroup *shgroup, Object *ob, uint line_count)
@@ -811,10 +827,10 @@ void DRW_shgroup_call_procedural_lines(DRWShadingGroup *shgroup, Object *ob, uin
   drw_shgroup_call_procedural_add_ex(shgroup, geom, ob, line_count * 2);
 }
 
-void DRW_shgroup_call_procedural_triangles(DRWShadingGroup *shgroup, Object *ob, uint tria_count)
+void DRW_shgroup_call_procedural_triangles(DRWShadingGroup *shgroup, Object *ob, uint tri_count)
 {
   struct GPUBatch *geom = drw_cache_procedural_triangles_get();
-  drw_shgroup_call_procedural_add_ex(shgroup, geom, ob, tria_count * 3);
+  drw_shgroup_call_procedural_add_ex(shgroup, geom, ob, tri_count * 3);
 }
 
 /* Should be removed */
@@ -1115,7 +1131,7 @@ DRWCallBuffer *DRW_shgroup_call_buffer_instance(DRWShadingGroup *shgroup,
 void DRW_buffer_add_entry_struct(DRWCallBuffer *callbuf, const void *data)
 {
   GPUVertBuf *buf = callbuf->buf;
-  const bool resize = (callbuf->count == buf->vertex_alloc);
+  const bool resize = (callbuf->count == GPU_vertbuf_get_vertex_alloc(buf));
 
   if (UNLIKELY(resize)) {
     GPU_vertbuf_data_resize(buf, callbuf->count + DRW_BUFFER_VERTS_CHUNK);
@@ -1136,9 +1152,9 @@ void DRW_buffer_add_entry_struct(DRWCallBuffer *callbuf, const void *data)
 void DRW_buffer_add_entry_array(DRWCallBuffer *callbuf, const void *attr[], uint attr_len)
 {
   GPUVertBuf *buf = callbuf->buf;
-  const bool resize = (callbuf->count == buf->vertex_alloc);
+  const bool resize = (callbuf->count == GPU_vertbuf_get_vertex_alloc(buf));
 
-  BLI_assert(attr_len == buf->format.attr_len);
+  BLI_assert(attr_len == GPU_vertbuf_get_format(buf)->attr_len);
   UNUSED_VARS_NDEBUG(attr_len);
 
   if (UNLIKELY(resize)) {
@@ -1756,7 +1772,7 @@ void DRW_view_update(DRWView *view,
                      const float (*culling_winmat)[4])
 {
   /* DO NOT UPDATE THE DEFAULT VIEW.
-   * Create subviews instead, or a copy. */
+   * Create sub-views instead, or a copy. */
   BLI_assert(view != DST.view_default);
   BLI_assert(view->parent == NULL);
 
@@ -1931,7 +1947,7 @@ DRWPass *DRW_pass_create(const char *name, DRWState state)
 {
   DRWPass *pass = BLI_memblock_alloc(DST.vmempool->passes);
   pass->state = state | DRW_STATE_PROGRAM_POINT_SIZE;
-  if (((G.debug_value > 20) && (G.debug_value < 30)) || (G.debug & G_DEBUG)) {
+  if (G.debug & G_DEBUG_GPU) {
     BLI_strncpy(pass->name, name, MAX_PASS_NAME);
   }
 
@@ -1946,6 +1962,8 @@ DRWPass *DRW_pass_create(const char *name, DRWState state)
   return pass;
 }
 
+/* Create an instance of the original pass that will execute the same drawcalls but with its own
+ * DRWState. */
 DRWPass *DRW_pass_create_instance(const char *name, DRWPass *original, DRWState state)
 {
   DRWPass *pass = DRW_pass_create(name, state);
@@ -1964,27 +1982,16 @@ void DRW_pass_link(DRWPass *first, DRWPass *second)
 
 bool DRW_pass_is_empty(DRWPass *pass)
 {
+  if (pass->original) {
+    return DRW_pass_is_empty(pass->original);
+  }
+
   LISTBASE_FOREACH (DRWShadingGroup *, shgroup, &pass->shgroups) {
     if (!DRW_shgroup_is_empty(shgroup)) {
       return false;
     }
   }
   return true;
-}
-
-void DRW_pass_state_set(DRWPass *pass, DRWState state)
-{
-  pass->state = state | DRW_STATE_PROGRAM_POINT_SIZE;
-}
-
-void DRW_pass_state_add(DRWPass *pass, DRWState state)
-{
-  pass->state |= state;
-}
-
-void DRW_pass_state_remove(DRWPass *pass, DRWState state)
-{
-  pass->state &= ~state;
 }
 
 void DRW_pass_foreach_shgroup(DRWPass *pass,

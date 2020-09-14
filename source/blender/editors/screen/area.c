@@ -2564,11 +2564,11 @@ static void ed_panel_draw(const bContext *C,
 
   /* Draw panel. */
 
-  char block_name[BKE_ST_MAXNAME + LIST_PANEL_UNIQUE_STR_LEN];
+  char block_name[BKE_ST_MAXNAME + INSTANCED_PANEL_UNIQUE_STR_LEN];
   strncpy(block_name, pt->idname, BKE_ST_MAXNAME);
   if (unique_panel_str != NULL) {
     /* Instanced panels should have already been added at this point. */
-    strncat(block_name, unique_panel_str, LIST_PANEL_UNIQUE_STR_LEN);
+    strncat(block_name, unique_panel_str, INSTANCED_PANEL_UNIQUE_STR_LEN);
   }
   uiBlock *block = UI_block_begin(C, region, block_name, UI_EMBOSS);
 
@@ -2837,7 +2837,7 @@ void ED_region_panels_layout_ex(const bContext *C,
 
       /* Use a unique identifier for instanced panels, otherwise an old block for a different
        * panel of the same type might be found. */
-      char unique_panel_str[8];
+      char unique_panel_str[INSTANCED_PANEL_UNIQUE_STR_LEN];
       UI_list_panel_unique_str(panel, unique_panel_str);
       ed_panel_draw(C,
                     region,
@@ -3303,7 +3303,6 @@ static void metadata_draw_imbuf(ImBuf *ibuf, const rctf *rect, int fontid, const
   char temp_str[MAX_METADATA_STR];
   int line_width;
   int ofs_y = 0;
-  short i;
   int len;
   const float height = BLF_height_max(fontid);
   const float margin = height / 8;
@@ -3317,7 +3316,7 @@ static void metadata_draw_imbuf(ImBuf *ibuf, const rctf *rect, int fontid, const
   const float ymax = (rect->ymax - margin) - descender;
 
   if (is_top) {
-    for (i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++) {
       /* first line */
       if (i == 0) {
         bool do_newline = false;
@@ -3382,7 +3381,7 @@ static void metadata_draw_imbuf(ImBuf *ibuf, const rctf *rect, int fontid, const
     IMB_metadata_foreach(ibuf, metadata_custom_draw_fields, &ctx);
     int ofs_x = 0;
     ofs_y = ctx.current_y;
-    for (i = 5; i < 10; i++) {
+    for (int i = 5; i < 10; i++) {
       len = BLI_snprintf_rlen(temp_str, MAX_METADATA_STR, "%s: ", meta_data_list[i]);
       if (metadata_is_valid(ibuf, temp_str, i, len)) {
         BLF_position(fontid, xmin + ofs_x, ymin + ofs_y, 0.0f);
