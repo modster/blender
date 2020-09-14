@@ -90,15 +90,11 @@ void main()
       strokePt1, strokePt2, strokeAspect, strokeThickness, strokeHardeness);
 
   /* Holdout materials. */
-  if (GP_FLAG_TEST(matFlag, GP_STROKE_HOLDOUT | GP_FILL_HOLDOUT)) {
-    /* If texture, use only the visible area of the texture for holdout. */
-    if (GP_FLAG_TEST(matFlag, GP_STROKE_TEXTURE_USE | GP_FILL_TEXTURE_USE)) {
-      revealColor = vec4(col.aaa * fragColor.aaa, 1.0);
-    }
-    else {
-      revealColor = vec4(1.0 - fragColor.aaa, 1.0);
-      fragColor = vec4(fragColor.rgb, 1.0);
-    }
+  if ((!GP_FLAG_TEST(matFlag, GP_STROKE_TEXTURE_USE) &&
+       GP_FLAG_TEST(matFlag, GP_STROKE_HOLDOUT)) ||
+      (GP_FLAG_TEST(matFlag, GP_FILL_HOLDOUT))) {
+    revealColor = vec4(1.0 - fragColor.aaa, 1.0);
+    fragColor = vec4(fragColor.rgb, 1.0);
   }
   else {
     /* NOT holdout materials.

@@ -169,7 +169,8 @@ class MATERIAL_PT_gpencil_strokecolor(GPMaterialButtonsPanel, Panel):
             if gpcolor.mode == 'LINE':
                 col.prop(gpcolor, "use_overlap_strokes")
 
-            col.prop(gpcolor, "use_stroke_holdout")
+            if gpcolor.stroke_style == 'SOLID':
+                col.prop(gpcolor, "use_stroke_holdout")
 
 
 class MATERIAL_PT_gpencil_fillcolor(GPMaterialButtonsPanel, Panel):
