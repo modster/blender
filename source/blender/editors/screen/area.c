@@ -748,7 +748,7 @@ const char *ED_area_search_filter_get(const ScrArea *area, const ARegion *region
   if (area->spacetype == SPACE_PROPERTIES) {
     SpaceProperties *sbuts = area->spacedata.first;
     if (region->regiontype == RGN_TYPE_WINDOW) {
-      return sbuts->runtime.search_string;
+      return sbuts->runtime->search_string;
     }
   }
 

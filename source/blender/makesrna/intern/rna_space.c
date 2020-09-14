@@ -4505,7 +4505,7 @@ static void rna_def_space_properties(BlenderRNA *brna)
       prop, NC_SPACE | ND_SPACE_PROPERTIES, "rna_SpaceProperties_context_update");
 
   prop = RNA_def_property(srna, "search_filter", PROP_STRING, PROP_NONE);
-  RNA_def_property_string_sdna(prop, NULL, "runtime.search_string");
+  RNA_def_property_string_sdna(prop, NULL, "runtime->search_string");
   RNA_def_property_ui_text(prop, "Display Filter", "Live search filtering string");
   RNA_def_property_flag(prop, PROP_TEXTEDIT_UPDATE);
   RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
