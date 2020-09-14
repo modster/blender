@@ -2610,6 +2610,8 @@ static void ed_panel_draw(const bContext *C,
   bool open;
   panel = UI_panel_begin(region, lb, block, pt, panel, &open);
 
+  const bool search_filter_active = search_filter != NULL && search_filter[0] != '\0';
+
   /* bad fixed values */
   int xco, yco, h = 0;
   int headerend = w - UI_UNIT_X;
@@ -2670,7 +2672,7 @@ static void ed_panel_draw(const bContext *C,
     panel->labelofs = 0;
   }
 
-  if (open || UI_block_has_search_filter(block) || search_only) {
+  if (open || search_filter_active) {
     short panelContext;
 
     /* panel context can either be toolbar region or normal panels region */
@@ -2710,11 +2712,10 @@ static void ed_panel_draw(const bContext *C,
   UI_block_end(C, block);
 
   /* Draw child panels. */
-  if (open || UI_block_has_search_filter(block)) {
+  if (open || search_filter_active) {
     LISTBASE_FOREACH (LinkData *, link, &pt->children) {
       PanelType *child_pt = link->data;
       Panel *child_panel = UI_panel_find_by_type(&panel->children, child_pt);
-
       if (child_pt->draw && (!child_pt->poll || child_pt->poll(C, child_pt))) {
         ed_panel_draw(C,
                       region,
@@ -2734,6 +2735,81 @@ static void ed_panel_draw(const bContext *C,
 }
 
 /**
+ * Check whether a panel should be added to the region's panel layout.
+ */
+static bool panel_add_check(const bContext *C,
+                            const WorkSpace *workspace,
+                            const char *contexts[],
+                            const char *category_override,
+                            PanelType *panel_type)
+{
+  /* Only add top level panels. */
+  if (panel_type->parent) {
+    return false;
+  }
+  /* Check the category override first. */
+  if (category_override) {
+    if (!STREQ(panel_type->category, category_override)) {
+      return false;
+    }
+  }
+
+  /* Verify context. */
+  if (contexts != NULL && panel_type->context[0]) {
+    if (!streq_array_any(panel_type->context, contexts)) {
+      return false;
+    }
+  }
+
+  /* If we're tagged, only use compatible. */
+  if (panel_type->owner_id[0]) {
+    if (!BKE_workspace_owner_id_check(workspace, panel_type->owner_id)) {
+      return false;
+    }
+  }
+
+  if (LIKELY(panel_type->draw)) {
+    if (panel_type->poll && !panel_type->poll(C, panel_type)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static bool region_uses_category_tabs(const ScrArea *area, const ARegion *region)
+{
+  /* XXX, should use some better check? */
+  /* For now also has hardcoded check for clip editor until it supports actual toolbar. */
+  return ((1 << region->regiontype) & RGN_TYPE_HAS_CATEGORY_MASK) ||
+         (region->regiontype == RGN_TYPE_TOOLS && area->spacetype == SPACE_CLIP);
+}
+
+static const char *region_panels_collect_categories(ARegion *region,
+                                                    LinkNode *panel_types_stack,
+                                                    bool *use_category_tabs)
+{
+  UI_panel_category_clear_all(region);
+
+  /* gather unique categories */
+  for (LinkNode *pt_link = panel_types_stack; pt_link; pt_link = pt_link->next) {
+    PanelType *pt = pt_link->link;
+    if (pt->category[0]) {
+      if (!UI_panel_category_find(region, pt->category)) {
+        UI_panel_category_add(region, pt->category);
+      }
+    }
+  }
+
+  if (UI_panel_category_is_visible(region)) {
+    return UI_panel_category_active_get(region, true);
+  }
+
+  *use_category_tabs = false;
+  return NULL;
+}
+
+/**
  * \param contexts: A NULL terminated array of context strings to match against.
  * Matching against any of these strings will draw the panel.
  * Can be NULL to skip context checks.
@@ -2748,29 +2824,7 @@ void ED_region_panels_layout_ex(const bContext *C,
   WorkSpace *workspace = CTX_wm_workspace(C);
   LinkNode *panel_types_stack = NULL;
   LISTBASE_FOREACH_BACKWARD (PanelType *, pt, paneltypes) {
-    /* Only draw top level panels. */
-    if (pt->parent) {
-      continue;
-    }
-
-    if (category_override) {
-      if (!STREQ(pt->category, category_override)) {
-        continue;
-      }
-    }
-
-    /* verify context */
-    if (contexts && pt->context[0] && !streq_array_any(pt->context, contexts)) {
-      continue;
-    }
-
-    /* If we're tagged, only use compatible. */
-    if (pt->owner_id[0] && BKE_workspace_owner_id_check(workspace, pt->owner_id) == false) {
-      continue;
-    }
-
-    /* draw panel */
-    if (pt->draw && (!pt->poll || pt->poll(C, pt))) {
+    if (panel_add_check(C, workspace, contexts, category_override, pt)) {
       BLI_linklist_prepend_alloca(&panel_types_stack, pt);
     }
   }
@@ -2781,12 +2835,7 @@ void ED_region_panels_layout_ex(const bContext *C,
   View2D *v2d = &region->v2d;
   int x, y, w, em;
 
-  /* XXX, should use some better check? */
-  /* For now also has hardcoded check for clip editor until it supports actual toolbar. */
-  bool use_category_tabs = (category_override == NULL) &&
-                           ((((1 << region->regiontype) & RGN_TYPE_HAS_CATEGORY_MASK) ||
-                             (region->regiontype == RGN_TYPE_TOOLS &&
-                              area->spacetype == SPACE_CLIP)));
+  bool use_category_tabs = (category_override == NULL) && region_uses_category_tabs(area, region);
   /* offset panels for small vertical tab area */
   const char *category = NULL;
   const int category_tabs_width = UI_PANEL_CATEGORY_MARGIN_WIDTH;
@@ -2802,25 +2851,10 @@ void ED_region_panels_layout_ex(const bContext *C,
 
   /* collect categories */
   if (use_category_tabs) {
-    UI_panel_category_clear_all(region);
-
-    /* gather unique categories */
-    for (LinkNode *pt_link = panel_types_stack; pt_link; pt_link = pt_link->next) {
-      PanelType *pt = pt_link->link;
-      if (pt->category[0]) {
-        if (!UI_panel_category_find(region, pt->category)) {
-          UI_panel_category_add(region, pt->category);
-        }
-      }
-    }
-
-    if (!UI_panel_category_is_visible(region)) {
-      use_category_tabs = false;
-    }
-    else {
-      category = UI_panel_category_active_get(region, true);
-      margin_x = category_tabs_width;
-    }
+    category = region_panels_collect_categories(region, panel_types_stack, &use_category_tabs);
+  }
+  if (use_category_tabs) {
+    margin_x = category_tabs_width;
   }
 
   w = BLI_rctf_size_x(&v2d->cur);
@@ -3032,6 +3066,144 @@ void ED_region_panels_init(wmWindowManager *wm, ARegion *region)
 
   keymap = WM_keymap_ensure(wm->defaultconf, "View2D Buttons List", 0, 0);
   WM_event_add_keymap_handler(&region->handlers, keymap);
+}
+
+static bool panel_property_search(const bContext *C,
+                                  ARegion *region,
+                                  const uiStyle *style,
+                                  Panel *panel,
+                                  PanelType *panel_type,
+                                  const char *search_filter)
+{
+  uiBlock *block = UI_block_begin(C, region, panel_type->idname, UI_EMBOSS);
+  UI_block_set_search_only(block, true);
+  UI_block_set_search_filter(block, search_filter);
+
+  if (panel == NULL) {
+    bool open;
+    panel = UI_panel_begin(region, &region->panels, block, panel_type, panel, &open);
+  }
+
+  /* Build the layouts. Because they are only used for search,
+   * they don't need any of the proper style or layout information. */
+  if (panel->type->draw_header_preset != NULL) {
+    panel->layout = UI_block_layout(
+        block, UI_LAYOUT_HORIZONTAL, UI_LAYOUT_HEADER, 0, 0, 0, 0, 0, style);
+    uiLayoutRootSetSearchOnly(panel->layout, true);
+    panel_type->draw_header_preset(C, panel);
+  }
+  if (panel->type->draw_header != NULL) {
+    panel->layout = UI_block_layout(
+        block, UI_LAYOUT_HORIZONTAL, UI_LAYOUT_HEADER, 0, 0, 0, 0, 0, style);
+    uiLayoutRootSetSearchOnly(panel->layout, true);
+    panel_type->draw_header(C, panel);
+  }
+  if (LIKELY(panel->type->draw != NULL)) {
+    panel->layout = UI_block_layout(
+        block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, 0, 0, 0, 0, 0, style);
+    uiLayoutRootSetSearchOnly(panel->layout, true);
+    panel_type->draw(C, panel);
+  }
+
+  /* We could check after each layout to increase the likelyhood of returning early,
+   * but that probably wouldn't make much of a difference anyway. */
+  if (UI_block_apply_search_filter(block)) {
+    return true;
+  }
+
+  LISTBASE_FOREACH (LinkData *, link, &panel_type->children) {
+    PanelType *panel_type_child = link->data;
+    if (LIKELY(panel->type->draw != NULL)) {
+      if (!panel_type_child->poll || panel_type_child->poll(C, panel_type_child)) {
+        /* Search for the existing child panel here because it might be an instanced
+         * child panel with a custom data field that will be needed to build the layout. */
+        Panel *child_panel = UI_panel_find_by_type(&panel->children, panel_type_child);
+        if (panel_property_search(
+                C, region, style, child_panel, panel_type_child, search_filter)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+bool ED_region_property_search(const bContext *C,
+                               ARegion *region,
+                               ListBase *paneltypes,
+                               const char *contexts[],
+                               const char *category_override)
+{
+  ScrArea *area = CTX_wm_area(C);
+  WorkSpace *workspace = CTX_wm_workspace(C);
+  const uiStyle *style = UI_style_get_dpi();
+  const char *search_filter = ED_area_search_filter_get(area, region);
+
+  LinkNode *panel_types_stack = NULL;
+  LISTBASE_FOREACH_BACKWARD (PanelType *, pt, paneltypes) {
+    if (panel_add_check(C, workspace, contexts, category_override, pt)) {
+      BLI_linklist_prepend_alloca(&panel_types_stack, pt);
+    }
+  }
+
+  const char *category = NULL;
+  bool use_category_tabs = (category_override == NULL) && region_uses_category_tabs(area, region);
+  if (use_category_tabs) {
+    category = region_panels_collect_categories(region, panel_types_stack, &use_category_tabs);
+  }
+
+  /* Run property search for each panel, stopping if a result is found. */
+  bool has_result = true;
+  bool has_instanced_panel = false;
+  for (LinkNode *pt_link = panel_types_stack; pt_link; pt_link = pt_link->next) {
+    PanelType *panel_type = pt_link->link;
+    /* Note that these checks are duplicated from #ED_region_panels_layout_ex. */
+    if (panel_type->flag & PNL_INSTANCED) {
+      has_instanced_panel = true;
+      continue;
+    }
+
+    if (use_category_tabs) {
+      if (panel_type->category[0] && !STREQ(category, panel_type->category)) {
+        continue;
+      }
+    }
+
+    /* We start property search with an empty panel list, so there's
+     * no point in trying to find an existing panel with this type. */
+    has_result = panel_property_search(C, region, style, NULL, panel_type, search_filter);
+    if (has_result) {
+      break;
+    }
+  }
+
+  /* Run property search for instanced panels (created in the layout calls of previous panels). */
+  if (!has_result && has_instanced_panel) {
+    LISTBASE_FOREACH (Panel *, panel, &region->panels) {
+      /* Note that these checks are duplicated from #ED_region_panels_layout_ex. */
+      if (panel->type == NULL || !(panel->type->flag & PNL_INSTANCED)) {
+        continue;
+      }
+      if (use_category_tabs) {
+        if (panel->type->category[0] && !STREQ(category, panel->type->category)) {
+          continue;
+        }
+      }
+
+      has_result = panel_property_search(C, region, style, panel, panel->type, search_filter);
+      if (has_result) {
+        break;
+      }
+    }
+  }
+
+  /* Free the panels and blocks, as they are only used for search. */
+  UI_blocklist_free(C, &region->uiblocks);
+  UI_panels_free_instanced(C, region);
+  BKE_area_region_panels_free(&region->panels);
+
+  return has_result;
 }
 
 void ED_region_header_layout(const bContext *C, ARegion *region)

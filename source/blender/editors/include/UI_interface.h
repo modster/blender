@@ -674,7 +674,6 @@ enum {
 void UI_block_theme_style_set(uiBlock *block, char theme_style);
 char UI_block_emboss_get(uiBlock *block);
 void UI_block_emboss_set(uiBlock *block, char emboss);
-bool UI_block_has_search_filter(const uiBlock *block);
 bool UI_block_is_search_only(const uiBlock *block);
 void UI_block_set_search_only(uiBlock *block, bool search_only);
 void UI_block_set_search_filter(uiBlock *block, const char *search_filter);
@@ -1719,8 +1718,6 @@ struct PointerRNA *UI_region_panel_custom_data_under_cursor(const struct bContex
                                                             const struct wmEvent *event);
 void UI_panel_custom_data_set(struct Panel *panel, struct PointerRNA *custom_data);
 
-void UI_region_panels_remove_handlers(const struct bContext *C, struct ARegion *region);
-
 /* Polyinstantiated panels for representing a list of data. */
 struct Panel *UI_panel_add_instanced(struct ARegion *region,
                                      struct ListBase *panels,
@@ -1874,7 +1871,7 @@ uiLayout *UI_block_layout(uiBlock *block,
 void UI_block_layout_set_current(uiBlock *block, uiLayout *layout);
 void UI_block_layout_resolve(uiBlock *block, int *r_x, int *r_y);
 
-void UI_block_apply_search_filter(uiBlock *block);
+bool UI_block_apply_search_filter(uiBlock *block);
 
 void UI_region_message_subscribe(struct ARegion *region, struct wmMsgBus *mbus);
 

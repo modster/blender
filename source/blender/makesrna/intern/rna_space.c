@@ -4496,6 +4496,7 @@ static void rna_def_space_properties(BlenderRNA *brna)
 
   /* Property search. */
   prop = RNA_def_property(srna, "context_search_filter_active", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "runtime->context_search_filter_active");
   RNA_def_property_enum_items(prop, buttons_context_items);
   RNA_def_property_flag(prop, PROP_ENUM_FLAG);
   RNA_def_property_enum_funcs(

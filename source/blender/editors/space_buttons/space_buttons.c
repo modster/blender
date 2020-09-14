@@ -111,8 +111,7 @@ static void buttons_free(SpaceLink *sl)
     MEM_freeN(ct);
   }
 
-  BLI_assert(sbuts->runtime != NULL);
-  MEM_freeN(sbuts->runtime);
+  MEM_SAFE_FREE(sbuts->runtime);
 }
 
 /* spacetype; init callback */
@@ -242,80 +241,71 @@ int ED_buttons_tabs_list(SpaceProperties *sbuts, int *context_tabs_array)
   return length;
 }
 
+static const char *buttons_main_region_context_string(const short mainb)
+{
+  switch (mainb) {
+    case BCONTEXT_SCENE:
+      return "scene";
+    case BCONTEXT_RENDER:
+      return "render";
+    case BCONTEXT_OUTPUT:
+      return "output";
+    case BCONTEXT_VIEW_LAYER:
+      return "view_layer";
+    case BCONTEXT_WORLD:
+      return "world";
+    case BCONTEXT_OBJECT:
+      return "object";
+    case BCONTEXT_DATA:
+      return "data";
+    case BCONTEXT_MATERIAL:
+      return "material";
+    case BCONTEXT_TEXTURE:
+      return "texture";
+    case BCONTEXT_PARTICLE:
+      return "particle";
+    case BCONTEXT_PHYSICS:
+      return "physics";
+    case BCONTEXT_BONE:
+      return "bone";
+    case BCONTEXT_MODIFIER:
+      return "modifier";
+    case BCONTEXT_SHADERFX:
+      return "shaderfx";
+    case BCONTEXT_CONSTRAINT:
+      return "constraint";
+    case BCONTEXT_BONE_CONSTRAINT:
+      return "bone_constraint";
+    case BCONTEXT_TOOL:
+      return "tool";
+  }
+
+  /* All the cases should be handled. */
+  BLI_assert(false);
+  return "";
+}
+
 static void buttons_main_region_layout_properties(const bContext *C,
                                                   SpaceProperties *sbuts,
                                                   ARegion *region)
 {
   buttons_context_compute(C, sbuts);
 
-  const char *contexts[2] = {NULL, NULL};
-
-  switch (sbuts->mainb) {
-    case BCONTEXT_SCENE:
-      contexts[0] = "scene";
-      break;
-    case BCONTEXT_RENDER:
-      contexts[0] = "render";
-      break;
-    case BCONTEXT_OUTPUT:
-      contexts[0] = "output";
-      break;
-    case BCONTEXT_VIEW_LAYER:
-      contexts[0] = "view_layer";
-      break;
-    case BCONTEXT_WORLD:
-      contexts[0] = "world";
-      break;
-    case BCONTEXT_OBJECT:
-      contexts[0] = "object";
-      break;
-    case BCONTEXT_DATA:
-      contexts[0] = "data";
-      break;
-    case BCONTEXT_MATERIAL:
-      contexts[0] = "material";
-      break;
-    case BCONTEXT_TEXTURE:
-      contexts[0] = "texture";
-      break;
-    case BCONTEXT_PARTICLE:
-      contexts[0] = "particle";
-      break;
-    case BCONTEXT_PHYSICS:
-      contexts[0] = "physics";
-      break;
-    case BCONTEXT_BONE:
-      contexts[0] = "bone";
-      break;
-    case BCONTEXT_MODIFIER:
-      contexts[0] = "modifier";
-      break;
-    case BCONTEXT_SHADERFX:
-      contexts[0] = "shaderfx";
-      break;
-    case BCONTEXT_CONSTRAINT:
-      contexts[0] = "constraint";
-      break;
-    case BCONTEXT_BONE_CONSTRAINT:
-      contexts[0] = "bone_constraint";
-      break;
-    case BCONTEXT_TOOL:
-      contexts[0] = "tool";
-      break;
-  }
+  const char *contexts[2] = {buttons_main_region_context_string(sbuts->mainb), NULL};
 
   ED_region_panels_layout_ex(C, region, &region->type->paneltypes, contexts, NULL);
 }
 
-static void main_region_layout_current_context(const bContext *C,
-                                               SpaceProperties *sbuts,
-                                               ARegion *region)
+static bool property_search_for_context(const bContext *C, ARegion *region, SpaceProperties *sbuts)
 {
+  const char *contexts[2] = {buttons_main_region_context_string(sbuts->mainb), NULL};
+
   if (sbuts->mainb == BCONTEXT_TOOL) {
-    ED_view3d_buttons_region_layout_ex(C, region, "Tool");
+    return false;
   }
   else {
-    buttons_main_region_layout_properties(C, sbuts, region);
+    buttons_context_compute(C, sbuts);
+    return ED_region_property_search(C, region, &region->type->paneltypes, contexts, NULL);
   }
 }
 
@@ -333,7 +323,7 @@ static void property_search_move_to_next_tab_with_results(SpaceProperties *sbuts
 
   /* Try the tabs after the current tab. */
   for (int i = current_tab_index; i < tabs_len; i++) {
-    if (sbuts->context_search_filter_active & (1 << i)) {
+    if (sbuts->runtime->context_search_filter_active & (1 << i)) {
       sbuts->mainbuser = context_tabs_array[i];
       return;
     }
@@ -341,7 +331,7 @@ static void property_search_move_to_next_tab_with_results(SpaceProperties *sbuts
 
   /* Try the tabs before the current tab. */
   for (int i = 0; i < current_tab_index; i++) {
-    if (sbuts->context_search_filter_active & (1 << i)) {
+    if (sbuts->runtime->context_search_filter_active & (1 << i)) {
       sbuts->mainbuser = context_tabs_array[i];
       return;
     }
@@ -350,66 +340,41 @@ static void property_search_move_to_next_tab_with_results(SpaceProperties *sbuts
 
 static void property_search_all_tabs(const bContext *C,
                                      SpaceProperties *sbuts,
-                                     ARegion *main_region)
+                                     ARegion *main_region,
+                                     const int *context_tabs_array,
+                                     const int tabs_len)
 {
-  sbuts->context_search_filter_active = 0;
+  sbuts->runtime->context_search_filter_active = 0;
 
   /* Duplicate space and region so we don't change any data for this space. */
   ScrArea *area_copy = MEM_dupallocN(CTX_wm_area(C));
-  ARegion *region_copy = BKE_area_region_copy(CTX_wm_area(C)->type, main_region);
+  ARegion *region_copy = BKE_area_region_copy(area_copy->type, main_region);
   BKE_area_region_panels_free(&region_copy->panels);
   bContext *C_copy = CTX_copy(C);
   CTX_wm_area_set(C_copy, area_copy);
   CTX_wm_region_set(C_copy, region_copy);
   SpaceProperties *sbuts_copy = MEM_dupallocN(sbuts);
 
-  int context_tabs_array[32];
-  int tabs_tot = ED_buttons_tabs_list(sbuts, context_tabs_array);
-
-  bool current_tab_has_search_match = false;
-
   /* Loop through the tabs added to the properties editor. */
-  for (int i = 0; i < tabs_tot; i++) {
+  for (int i = 0; i < tabs_len; i++) {
+    /* -1 corresponds to a spacer. */
     if (context_tabs_array[i] == -1) {
       continue;
     }
 
-    /* Run the layout with this tab set active. */
-    sbuts_copy->mainb = sbuts->mainbo = sbuts_copy->mainbuser = context_tabs_array[i];
-
-    /* Run the layout for the actual region if the tab matches to avoid doing it again later on. */
-    const bool use_actual_region = sbuts->mainb == sbuts_copy->mainb;
-    if (use_actual_region) {
-      main_region_layout_current_context(C, sbuts, main_region);
-    }
-    else {
-      main_region_layout_current_context(C_copy, sbuts_copy, region_copy);
+    /* Handle search for the current tab later in the normal layout pass. */
+    if (context_tabs_array[i] == sbuts->mainb) {
+      continue;
     }
 
-    /* Store whether this tab has any unfiltered panels left. */
-    bool tab_has_search_match = false;
-    LISTBASE_FOREACH (
-        Panel *, panel, use_actual_region ? &main_region->panels : &region_copy->panels) {
-      tab_has_search_match |= UI_panel_matches_search_filter(panel) && UI_panel_is_active(panel);
-    }
-    if (tab_has_search_match) {
-      sbuts->context_search_filter_active |= (1 << i);
-      if (use_actual_region) {
-        current_tab_has_search_match = tab_has_search_match;
-      }
-    }
+    sbuts_copy->mainb = sbuts_copy->mainbo = sbuts_copy->mainbuser = context_tabs_array[i];
 
-    /* Free data created during the layout process. */
-    UI_region_panels_remove_handlers(C_copy, region_copy);
-    BKE_area_region_panels_free(&region_copy->panels);
-    UI_blocklist_free(C_copy, &region_copy->uiblocks);
+    SET_FLAG_FROM_TEST(sbuts->runtime->context_search_filter_active,
+                       property_search_for_context(C_copy, region_copy, sbuts_copy),
+                       (1 << i));
   }
 
-  if (!current_tab_has_search_match && main_region->flag & RGN_FLAG_SEARCH_FILTER_UPDATE) {
-    property_search_move_to_next_tab_with_results(sbuts, context_tabs_array, tabs_tot);
-  }
-
-  BKE_area_region_free(CTX_wm_area(C_copy)->type, region_copy);
+  BKE_area_region_free(area_copy->type, region_copy);
   MEM_freeN(region_copy);
   MEM_freeN(sbuts_copy);
   MEM_freeN(area_copy);
@@ -421,11 +386,47 @@ static void buttons_main_region_layout(const bContext *C, ARegion *region)
   /* draw entirely, view changes should be handled here */
   SpaceProperties *sbuts = CTX_wm_space_properties(C);
 
-  if (region->flag & RGN_FLAG_SEARCH_FILTER_ACTIVE) {
-    property_search_all_tabs(C, sbuts, region);
+  if (sbuts->mainb == BCONTEXT_TOOL) {
+    ED_view3d_buttons_region_layout_ex(C, region, "Tool");
   }
   else {
-    main_region_layout_current_context(C, sbuts, region);
+    buttons_main_region_layout_properties(C, sbuts, region);
+  }
+
+  if (region->flag & RGN_FLAG_SEARCH_FILTER_ACTIVE) {
+    int context_tabs_array[32];
+    int tabs_len = ED_buttons_tabs_list(sbuts, context_tabs_array);
+
+    property_search_all_tabs(C, sbuts, region, context_tabs_array, tabs_len);
+
+    /* Check whether the current tab has a search match. */
+    bool current_tab_has_search_match = false;
+    LISTBASE_FOREACH (Panel *, panel, &region->panels) {
+      if (UI_panel_is_active(panel) && UI_panel_matches_search_filter(panel)) {
+        current_tab_has_search_match = true;
+      }
+    }
+
+    /* Find which index in the list the current tab corresponds to. */
+    int current_tab_index = -1;
+    for (int i = 0; i < tabs_len; i++) {
+      if (context_tabs_array[i] == sbuts->mainb) {
+        current_tab_index = i;
+      }
+    }
+    BLI_assert(current_tab_index != -1);
+
+    /* Update the tab search match flag for the current tab. */
+    SET_FLAG_FROM_TEST(sbuts->runtime->context_search_filter_active,
+                       current_tab_has_search_match,
+                       (1 << current_tab_index));
+
+    /* Move to the next tab with a result */
+    if (!current_tab_has_search_match) {
+      if (region->flag & RGN_FLAG_SEARCH_FILTER_UPDATE) {
+        property_search_move_to_next_tab_with_results(sbuts, context_tabs_array, tabs_len);
+      }
+    }
   }
 
   sbuts->mainbo = sbuts->mainb;
