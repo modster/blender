@@ -120,15 +120,18 @@ static void buttons_init(struct wmWindowManager *UNUSED(wm), ScrArea *area)
   SpaceProperties *sbuts = (SpaceProperties *)area->spacedata.first;
 
   sbuts->runtime = MEM_mallocN(sizeof(SpaceProperties_Runtime), __func__);
+  sbuts->runtime->search_string[0] = '\0';
 }
 
 static SpaceLink *buttons_duplicate(SpaceLink *sl)
 {
+  SpaceProperties *sfile_old = (SpaceProperties *)sl;
   SpaceProperties *sbutsn = MEM_dupallocN(sl);
 
   /* clear or remove stuff from old */
   sbutsn->path = NULL;
   sbutsn->texuser = NULL;
+  sbutsn->runtime = MEM_dupallocN(sfile_old->runtime);
   sbutsn->runtime->search_string[0] = '\0';
 
   return (SpaceLink *)sbutsn;
