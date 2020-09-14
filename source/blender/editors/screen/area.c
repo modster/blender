@@ -2610,6 +2610,8 @@ static void ed_panel_draw(const bContext *C,
   bool open;
   panel = UI_panel_begin(region, lb, block, pt, panel, &open);
 
+  const bool search_filter_active = search_filter != NULL && search_filter[0] != '\0';
+
   /* bad fixed values */
   int xco, yco, h = 0;
   int headerend = w - UI_UNIT_X;
@@ -2670,7 +2672,7 @@ static void ed_panel_draw(const bContext *C,
     panel->labelofs = 0;
   }
 
-  if (open || UI_block_has_search_filter(block) || search_only) {
+  if (open || search_filter_active) {
     short panelContext;
 
     /* panel context can either be toolbar region or normal panels region */
@@ -2710,7 +2712,7 @@ static void ed_panel_draw(const bContext *C,
   UI_block_end(C, block);
 
   /* Draw child panels. */
-  if (open || UI_block_has_search_filter(block)) {
+  if (open || search_filter_active) {
     LISTBASE_FOREACH (LinkData *, link, &pt->children) {
       PanelType *child_pt = link->data;
       Panel *child_panel = UI_panel_find_by_type(&panel->children, child_pt);
