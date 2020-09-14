@@ -2716,7 +2716,6 @@ static void ed_panel_draw(const bContext *C,
     LISTBASE_FOREACH (LinkData *, link, &pt->children) {
       PanelType *child_pt = link->data;
       Panel *child_panel = UI_panel_find_by_type(&panel->children, child_pt);
-
       if (child_pt->draw && (!child_pt->poll || child_pt->poll(C, child_pt))) {
         ed_panel_draw(C,
                       region,
@@ -2780,6 +2779,8 @@ static bool panel_add_check(const bContext *C,
 
 static bool region_uses_category_tabs(const ScrArea *area, const ARegion *region)
 {
+  /* XXX, should use some better check? */
+  /* For now also has hardcoded check for clip editor until it supports actual toolbar. */
   return ((1 << region->regiontype) & RGN_TYPE_HAS_CATEGORY_MASK) ||
          (region->regiontype == RGN_TYPE_TOOLS && area->spacetype == SPACE_CLIP);
 }
@@ -2834,8 +2835,6 @@ void ED_region_panels_layout_ex(const bContext *C,
   View2D *v2d = &region->v2d;
   int x, y, w, em;
 
-  /* XXX, should use some better check? */
-  /* For now also has hardcoded check for clip editor until it supports actual toolbar. */
   bool use_category_tabs = (category_override == NULL) && region_uses_category_tabs(area, region);
   /* offset panels for small vertical tab area */
   const char *category = NULL;
@@ -3085,42 +3084,42 @@ static bool panel_property_search(const bContext *C,
     panel = UI_panel_begin(region, &region->panels, block, panel_type, panel, &open);
   }
 
-  /* Check after each layout to increase the likelyhood of returning early. */
+  /* Build the layouts. Because they are only used for search,
+   * they don't need any of the proper style or layout information. */
   if (panel->type->draw_header_preset != NULL) {
     panel->layout = UI_block_layout(
         block, UI_LAYOUT_HORIZONTAL, UI_LAYOUT_HEADER, 0, 0, 0, 0, 0, style);
     uiLayoutRootSetSearchOnly(panel->layout, true);
     panel_type->draw_header_preset(C, panel);
-    if (UI_block_apply_search_filter(block)) {
-      return true;
-    }
   }
-
   if (panel->type->draw_header != NULL) {
     panel->layout = UI_block_layout(
         block, UI_LAYOUT_HORIZONTAL, UI_LAYOUT_HEADER, 0, 0, 0, 0, 0, style);
     uiLayoutRootSetSearchOnly(panel->layout, true);
     panel_type->draw_header(C, panel);
-    if (UI_block_apply_search_filter(block)) {
-      return true;
-    }
   }
-
   if (LIKELY(panel->type->draw != NULL)) {
     panel->layout = UI_block_layout(
         block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, 0, 0, 0, 0, 0, style);
     uiLayoutRootSetSearchOnly(panel->layout, true);
     panel_type->draw(C, panel);
-    if (UI_block_apply_search_filter(block)) {
-      return true;
-    }
+  }
+
+  /* We could check after each layout to increase the likelyhood of returning early,
+   * but that probably wouldn't make much of a difference anyway. */
+  if (UI_block_apply_search_filter(block)) {
+    return true;
   }
 
   LISTBASE_FOREACH (LinkData *, link, &panel_type->children) {
     PanelType *panel_type_child = link->data;
     if (LIKELY(panel->type->draw != NULL)) {
       if (!panel_type_child->poll || panel_type_child->poll(C, panel_type_child)) {
-        if (panel_property_search(C, region, style, NULL, panel_type_child, search_filter)) {
+        /* Search for the existing child panel here because it might be an instanced
+         * child panel with a custom data field that will be needed to build the layout. */
+        Panel *child_panel = UI_panel_find_by_type(&panel->children, panel_type_child);
+        if (panel_property_search(
+                C, region, style, child_panel, panel_type_child, search_filter)) {
           return true;
         }
       }
@@ -3139,7 +3138,7 @@ bool ED_region_property_search(const bContext *C,
   ScrArea *area = CTX_wm_area(C);
   WorkSpace *workspace = CTX_wm_workspace(C);
   const uiStyle *style = UI_style_get_dpi();
-  const char *search_filter = ED_area_search_filter_get(CTX_wm_area(C), region);
+  const char *search_filter = ED_area_search_filter_get(area, region);
 
   LinkNode *panel_types_stack = NULL;
   LISTBASE_FOREACH_BACKWARD (PanelType *, pt, paneltypes) {
@@ -3154,11 +3153,12 @@ bool ED_region_property_search(const bContext *C,
     category = region_panels_collect_categories(region, panel_types_stack, &use_category_tabs);
   }
 
+  /* Run property search for each panel, stopping if a result is found. */
   bool has_result = true;
   bool has_instanced_panel = false;
   for (LinkNode *pt_link = panel_types_stack; pt_link; pt_link = pt_link->next) {
     PanelType *panel_type = pt_link->link;
-
+    /* Note that these checks are duplicated from #ED_region_panels_layout_ex. */
     if (panel_type->flag & PNL_INSTANCED) {
       has_instanced_panel = true;
       continue;
@@ -3170,14 +3170,18 @@ bool ED_region_property_search(const bContext *C,
       }
     }
 
+    /* We start property search with an empty panel list, so there's
+     * no point in trying to find an existing panel with this type. */
     has_result = panel_property_search(C, region, style, NULL, panel_type, search_filter);
     if (has_result) {
       break;
     }
   }
 
+  /* Run property search for instanced panels (created in the layout calls of previous panels). */
   if (!has_result && has_instanced_panel) {
     LISTBASE_FOREACH (Panel *, panel, &region->panels) {
+      /* Note that these checks are duplicated from #ED_region_panels_layout_ex. */
       if (panel->type == NULL || !(panel->type->flag & PNL_INSTANCED)) {
         continue;
       }
@@ -3194,6 +3198,7 @@ bool ED_region_property_search(const bContext *C,
     }
   }
 
+  /* Free the panels and blocks, as they are only used for search. */
   UI_blocklist_free(C, &region->uiblocks);
   UI_panels_free_instanced(C, region);
   BKE_area_region_panels_free(&region->panels);

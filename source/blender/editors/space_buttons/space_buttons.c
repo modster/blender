@@ -111,8 +111,7 @@ static void buttons_free(SpaceLink *sl)
     MEM_freeN(ct);
   }
 
-  BLI_assert(sbuts->runtime != NULL);
-  MEM_freeN(sbuts->runtime);
+  MEM_SAFE_FREE(sbuts->runtime);
 }
 
 /* spacetype; init callback */
@@ -296,14 +295,15 @@ static void buttons_main_region_layout_properties(const bContext *C,
   ED_region_panels_layout_ex(C, region, &region->type->paneltypes, contexts, NULL);
 }
 
-static bool property_search_for_context(const bContext *C, ARegion *region, const short mainb)
+static bool property_search_for_context(const bContext *C, ARegion *region, SpaceProperties *sbuts)
 {
-  const char *contexts[2] = {buttons_main_region_context_string(mainb), NULL};
+  const char *contexts[2] = {buttons_main_region_context_string(sbuts->mainb), NULL};
 
-  if (mainb == BCONTEXT_TOOL) {
+  if (sbuts->mainb == BCONTEXT_TOOL) {
     return false;
   }
   else {
+    buttons_context_compute(C, sbuts);
     return ED_region_property_search(C, region, &region->type->paneltypes, contexts, NULL);
   }
 }
@@ -322,7 +322,7 @@ static void property_search_move_to_next_tab_with_results(SpaceProperties *sbuts
 
   /* Try the tabs after the current tab. */
   for (int i = current_tab_index; i < tabs_len; i++) {
-    if (sbuts->context_search_filter_active & (1 << i)) {
+    if (sbuts->runtime->context_search_filter_active & (1 << i)) {
       sbuts->mainbuser = context_tabs_array[i];
       return;
     }
@@ -330,7 +330,7 @@ static void property_search_move_to_next_tab_with_results(SpaceProperties *sbuts
 
   /* Try the tabs before the current tab. */
   for (int i = 0; i < current_tab_index; i++) {
-    if (sbuts->context_search_filter_active & (1 << i)) {
+    if (sbuts->runtime->context_search_filter_active & (1 << i)) {
       sbuts->mainbuser = context_tabs_array[i];
       return;
     }
@@ -343,12 +343,12 @@ static void property_search_all_tabs(const bContext *C,
                                      const int *context_tabs_array,
                                      const int tabs_len)
 {
-  sbuts->context_search_filter_active = 0;
+  sbuts->runtime->context_search_filter_active = 0;
 
   /* Duplicate space and region so we don't change any data for this space. */
   ScrArea *area_copy = MEM_dupallocN(CTX_wm_area(C));
-  ARegion *region_copy = BKE_area_region_copy(CTX_wm_area(C)->type, main_region);
-  BLI_listbase_clear(&region_copy->panels);
+  ARegion *region_copy = BKE_area_region_copy(area_copy->type, main_region);
+  BKE_area_region_panels_free(&region_copy->panels);
   bContext *C_copy = CTX_copy(C);
   CTX_wm_area_set(C_copy, area_copy);
   CTX_wm_region_set(C_copy, region_copy);
@@ -366,10 +366,10 @@ static void property_search_all_tabs(const bContext *C,
       continue;
     }
 
-    sbuts_copy->mainb = sbuts->mainbo = sbuts_copy->mainbuser = context_tabs_array[i];
+    sbuts_copy->mainb = sbuts_copy->mainbo = sbuts_copy->mainbuser = context_tabs_array[i];
 
-    SET_FLAG_FROM_TEST(sbuts->context_search_filter_active,
-                       property_search_for_context(C_copy, region_copy, sbuts_copy->mainb),
+    SET_FLAG_FROM_TEST(sbuts->runtime->context_search_filter_active,
+                       property_search_for_context(C_copy, region_copy, sbuts_copy),
                        (1 << i));
   }
 
@@ -398,6 +398,7 @@ static void buttons_main_region_layout(const bContext *C, ARegion *region)
 
     property_search_all_tabs(C, sbuts, region, context_tabs_array, tabs_len);
 
+    /* Check whether the current tab has a search match. */
     bool current_tab_has_search_match = false;
     LISTBASE_FOREACH (Panel *, panel, &region->panels) {
       if (UI_panel_is_active(panel) && UI_panel_matches_search_filter(panel)) {
@@ -405,8 +406,25 @@ static void buttons_main_region_layout(const bContext *C, ARegion *region)
       }
     }
 
-    if (!current_tab_has_search_match && region->flag & RGN_FLAG_SEARCH_FILTER_UPDATE) {
-      property_search_move_to_next_tab_with_results(sbuts, context_tabs_array, tabs_len);
+    /* Find which index in the list the current tab corresponds to. */
+    int current_tab_index = -1;
+    for (int i = 0; i < tabs_len; i++) {
+      if (context_tabs_array[i] == sbuts->mainb) {
+        current_tab_index = i;
+      }
+    }
+    BLI_assert(current_tab_index != -1);
+
+    /* Update the tab search match flag for the current tab. */
+    SET_FLAG_FROM_TEST(sbuts->runtime->context_search_filter_active,
+                       current_tab_has_search_match,
+                       (1 << current_tab_index));
+
+    /* Move to the next tab with a result */
+    if (!current_tab_has_search_match) {
+      if (region->flag & RGN_FLAG_SEARCH_FILTER_UPDATE) {
+        property_search_move_to_next_tab_with_results(sbuts, context_tabs_array, tabs_len);
+      }
     }
   }
 

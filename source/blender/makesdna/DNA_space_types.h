@@ -132,6 +132,13 @@ typedef enum eSpaceInfo_RptMask {
 typedef struct SpaceProperties_Runtime {
   /** For filtering properties displayed in the space. Length defined as UI_MAX_NAME_STR. */
   char search_string[128];
+  /**
+   * Bitfield flag (in the same order as the tabs) for whether each tab has properties
+   * that match the search filter. Only valid when #search_string is set.
+   */
+  int context_search_filter_active;
+
+  char _pad[4];
 } SpaceProperties_Runtime;
 
 /* Properties Editor */
@@ -152,12 +159,9 @@ typedef struct SpaceProperties {
 
   /** Context tabs. */
   short mainb, mainbo, mainbuser;
-  /** Runtime. Bitfield flag (in the same order as the tabs) for whether each tab has properties
-   * that match the search filter. Only valid when #search_string is set. */
-  int context_search_filter_active;
   /** Preview is signal to refresh. */
   short preview;
-  char _pad[1];
+  char _pad[5];
   char flag;
 
   /** Runtime. */
