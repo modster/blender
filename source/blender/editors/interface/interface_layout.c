@@ -5307,10 +5307,10 @@ static void block_search_deactivate_buttons(uiBlock *block)
  *
  * \note Must be run before #UI_block_layout_resolve.
  */
-void UI_block_apply_search_filter(uiBlock *block)
+bool UI_block_apply_search_filter(uiBlock *block)
 {
   if (!(block->search_filter && block->search_filter[0])) {
-    return;
+    return false;
   }
 
   const bool panel_label_matches = block_search_panel_label_matches(block);
@@ -5326,6 +5326,8 @@ void UI_block_apply_search_filter(uiBlock *block)
   if (!panel_label_matches) {
     block_search_deactivate_buttons(block);
   }
+
+  return has_result;
 }
 
 /** \} */
