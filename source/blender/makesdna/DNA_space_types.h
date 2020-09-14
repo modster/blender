@@ -165,7 +165,8 @@ typedef struct SpaceProperties {
 
   void *texuser;
 
-  SpaceProperties_Runtime runtime;
+  /* Doesn't necessarily need to be a pointer, but runtime structs are still written to files. */
+  SpaceProperties_Runtime *runtime;
 } SpaceProperties;
 
 /* button defines (deprecated) */

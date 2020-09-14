@@ -109,21 +109,30 @@ static void buttons_free(SpaceLink *sl)
     BLI_freelistN(&ct->users);
     MEM_freeN(ct);
   }
+
+  BLI_assert(sbuts->runtime != NULL);
+  MEM_freeN(sbuts->runtime);
 }
 
 /* spacetype; init callback */
-static void buttons_init(struct wmWindowManager *UNUSED(wm), ScrArea *UNUSED(area))
+static void buttons_init(struct wmWindowManager *UNUSED(wm), ScrArea *area)
 {
+  SpaceProperties *sbuts = (SpaceProperties *)area->spacedata.first;
+
+  sbuts->runtime = MEM_mallocN(sizeof(SpaceProperties_Runtime), __func__);
+  sbuts->runtime->search_string[0] = '\0';
 }
 
 static SpaceLink *buttons_duplicate(SpaceLink *sl)
 {
+  SpaceProperties *sfile_old = (SpaceProperties *)sl;
   SpaceProperties *sbutsn = MEM_dupallocN(sl);
 
   /* clear or remove stuff from old */
   sbutsn->path = NULL;
   sbutsn->texuser = NULL;
-  sbutsn->runtime.search_string[0] = '\0';
+  sbutsn->runtime = MEM_dupallocN(sfile_old->runtime);
+  sbutsn->runtime->search_string[0] = '\0';
 
   return (SpaceLink *)sbutsn;
 }

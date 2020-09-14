@@ -5139,6 +5139,10 @@ static bool block_search_panel_label_matches(const uiBlock *block)
   return false;
 }
 
+/**
+ * Buttons for search only layouts (closed panel subpanels) have still been added from the
+ * layout functions, but they need to be hidden. Theoretically they could be removed too.
+ */
 static void layout_free_and_hide_buttons(uiLayout *layout)
 {
   LISTBASE_FOREACH_MUTABLE (uiItem *, item, &layout->items) {
