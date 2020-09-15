@@ -31,7 +31,7 @@ struct bContext;
 struct View3D;
 
 /* Paper Size: A4, Letter. */
-static const float gpencil_export_paper_sizes[1][2] = {3508, 2480};
+static const float gpencil_export_paper_sizes[2] = {3508, 2480};
 
 struct GpencilExportParams {
   bContext *C;
@@ -52,7 +52,7 @@ struct GpencilExportParams {
   /** Select mode */
   uint16_t select;
   /** File subfix. */
-  char file_subfix[5];
+  char file_subfix[10];
   /** Stroke sampling. */
   float stroke_sample;
   /** Row and cols of storyboard. */

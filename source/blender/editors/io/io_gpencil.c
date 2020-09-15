@@ -410,12 +410,12 @@ static int wm_gpencil_export_stb_exec(bContext *C, wmOperator *op)
 
   float paper_size[2];
   if (RNA_enum_get(op->ptr, "page_type") == GP_EXPORT_PAPER_LANDSCAPE) {
-    paper_size[0] = gpencil_export_paper_sizes[0][0];
-    paper_size[1] = gpencil_export_paper_sizes[0][1];
+    paper_size[0] = gpencil_export_paper_sizes[0];
+    paper_size[1] = gpencil_export_paper_sizes[1];
   }
   else {
-    paper_size[0] = gpencil_export_paper_sizes[0][1];
-    paper_size[1] = gpencil_export_paper_sizes[0][0];
+    paper_size[0] = gpencil_export_paper_sizes[1];
+    paper_size[1] = gpencil_export_paper_sizes[0];
   }
 
   const int page_layout[2] = {RNA_int_get(op->ptr, "size_col"), RNA_int_get(op->ptr, "size_row")};
