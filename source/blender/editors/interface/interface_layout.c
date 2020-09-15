@@ -80,11 +80,24 @@
 
 /* uiLayoutRoot */
 
+/**
+ * A group of button references, used by property search to keep track of sets of buttons that
+ * should be searched together. For example, in property split layouts number buttons and their
+ * labels (and even their decorators) are separate buttons, but they must be searched and
+ * highlighted together.
+ */
+typedef struct uiButtonGroup {
+  void *next, *prev;
+  ListBase buttons; /* #LinkData with #uiBut data field. */
+} uiButtonGroup;
+
 typedef struct uiLayoutRoot {
   struct uiLayoutRoot *next, *prev;
 
   int type;
   int opcontext;
+
+  ListBase button_groups; /* #uiButtonGroup. */
 
   int emw, emh;
   int padding;
@@ -410,6 +423,58 @@ static void ui_item_move(uiItem *item, int delta_xmin, int delta_xmax)
       litem->w += delta_xmax;
     }
   }
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Button Groups
+ * \{ */
+
+/**
+ * Every function that adds a set of buttons must create another group,
+ * then #ui_def_but adds buttons to the current group (the last).
+ */
+static void layout_root_new_button_group(uiLayoutRoot *root)
+{
+  uiButtonGroup *new_group = MEM_mallocN(sizeof(uiButtonGroup), __func__);
+  BLI_listbase_clear(&new_group->buttons);
+  BLI_addtail(&root->button_groups, new_group);
+}
+
+static void button_group_add_but(uiLayoutRoot *root, uiBut *but)
+{
+  BLI_assert(root != NULL);
+
+  uiButtonGroup *current_button_group = root->button_groups.last;
+  BLI_assert(current_button_group != NULL);
+
+  /* We can't use the button directly because adding it to
+   * this list would mess with its prev and next pointers. */
+  LinkData *button_link = BLI_genericNodeN(but);
+  BLI_addtail(&current_button_group->buttons, button_link);
+}
+
+static void button_group_free(uiButtonGroup *button_group)
+{
+  BLI_freelistN(&button_group->buttons);
+  MEM_freeN(button_group);
+}
+
+/* This function should be removed whenever #ui_layout_replace_but_ptr is removed. */
+void ui_button_group_replace_but_ptr(uiLayout *layout, const void *old_but_ptr, uiBut *new_but)
+{
+  LISTBASE_FOREACH (uiButtonGroup *, button_group, &layout->root->button_groups) {
+    LISTBASE_FOREACH (LinkData *, link, &button_group->buttons) {
+      if (link->data == old_but_ptr) {
+        link->data = new_but;
+        return;
+      }
+    }
+  }
+
+  /* The button should be in a group. */
+  BLI_assert(false);
 }
 
 /** \} */
@@ -1214,6 +1279,10 @@ static uiBut *uiItemFullO_ptr_ex(uiLayout *layout,
     but->flag |= UI_SELECT_DRAW;
   }
 
+  if (flag & UI_ITEM_R_ICON_ONLY) {
+    UI_but_drawflag_disable(but, UI_BUT_ICON_LEFT);
+  }
+
   if (layout->redalert) {
     UI_but_flag_enable(but, UI_BUT_REDALERT);
   }
@@ -1434,6 +1503,26 @@ void uiItemsFullEnumO_items(uiLayout *layout,
   if (radial) {
     target = uiLayoutRadial(layout);
   }
+  else if ((uiLayoutGetLocalDir(layout) == UI_LAYOUT_HORIZONTAL) && (flag & UI_ITEM_R_ICON_ONLY)) {
+    target = layout;
+    UI_block_layout_set_current(block, target);
+
+    /* Add a blank button to the beginning of the row. */
+    uiDefIconBut(block,
+                 UI_BTYPE_LABEL,
+                 0,
+                 ICON_BLANK1,
+                 0,
+                 0,
+                 1.25f * UI_UNIT_X,
+                 UI_UNIT_Y,
+                 NULL,
+                 0,
+                 0,
+                 0,
+                 0,
+                 NULL);
+  }
   else {
     split = uiLayoutSplit(layout, 0.0f, false);
     target = uiLayoutColumn(split, layout->align);
@@ -1481,7 +1570,14 @@ void uiItemsFullEnumO_items(uiLayout *layout,
       }
       RNA_property_enum_set(&tptr, prop, item->value);
 
-      uiItemFullO_ptr(target, ot, item->name, item->icon, tptr.data, context, flag, NULL);
+      uiItemFullO_ptr(target,
+                      ot,
+                      (flag & UI_ITEM_R_ICON_ONLY) ? NULL : item->name,
+                      item->icon,
+                      tptr.data,
+                      context,
+                      flag,
+                      NULL);
 
       ui_but_tip_from_enum_item(block->buttons.last, item);
     }
@@ -1489,7 +1585,7 @@ void uiItemsFullEnumO_items(uiLayout *layout,
       if (item->name) {
         uiBut *but;
 
-        if (item != item_array && !radial) {
+        if (item != item_array && !radial && split != NULL) {
           target = uiLayoutColumn(split, layout->align);
 
           /* inconsistent, but menus with labels do not look good flipped */
@@ -1988,6 +2084,7 @@ void uiItemFullR(uiLayout *layout,
 #endif /* UI_PROP_DECORATE */
 
   UI_block_layout_set_current(block, layout);
+  layout_root_new_button_group(layout->root);
 
   /* retrieve info */
   const PropertyType type = RNA_property_type(prop);
@@ -2738,6 +2835,8 @@ void uiItemPointerR_prop(uiLayout *layout,
   char namestr[UI_MAX_NAME_STR];
   const bool use_prop_sep = ((layout->item.flag & UI_ITEM_PROP_SEP) != 0);
 
+  layout_root_new_button_group(layout->root);
+
   type = RNA_property_type(prop);
   if (!ELEM(type, PROP_POINTER, PROP_STRING, PROP_ENUM)) {
     RNA_warning("Property %s.%s must be a pointer, string or enum",
@@ -2843,6 +2942,7 @@ static uiBut *ui_item_menu(uiLayout *layout,
   int w, h;
 
   UI_block_layout_set_current(block, layout);
+  layout_root_new_button_group(layout->root);
 
   if (!name) {
     name = "";
@@ -3110,6 +3210,7 @@ static uiBut *uiItemL_(uiLayout *layout, const char *name, int icon)
   int w;
 
   UI_block_layout_set_current(block, layout);
+  layout_root_new_button_group(layout->root);
 
   if (!name) {
     name = "";
@@ -5275,6 +5376,16 @@ static void ui_layout_free(uiLayout *layout)
   MEM_freeN(layout);
 }
 
+static void layout_root_free(uiLayoutRoot *root)
+{
+  ui_layout_free(root->layout);
+
+  LISTBASE_FOREACH_MUTABLE (uiButtonGroup *, button_group, &root->button_groups) {
+    button_group_free(button_group);
+  }
+  MEM_freeN(root);
+}
+
 static void ui_layout_add_padding_button(uiLayoutRoot *root)
 {
   if (root->padding) {
@@ -5308,6 +5419,9 @@ uiLayout *UI_block_layout(uiBlock *block,
   root->block = block;
   root->padding = padding;
   root->opcontext = WM_OP_INVOKE_REGION_WIN;
+
+  BLI_listbase_clear(&root->button_groups);
+  layout_root_new_button_group(root);
 
   layout = MEM_callocN(sizeof(uiLayout), "uiLayout");
   layout->item.type = (type == UI_LAYOUT_VERT_BAR) ? ITEM_LAYOUT_COLUMN : ITEM_LAYOUT_ROOT;
@@ -5393,6 +5507,8 @@ void ui_layout_add_but(uiLayout *layout, uiBut *but)
   if (layout->emboss != UI_EMBOSS_UNDEFINED) {
     but->emboss = layout->emboss;
   }
+
+  button_group_add_but(layout->root, but);
 }
 
 bool ui_layout_replace_but_ptr(uiLayout *layout, const void *old_but_ptr, uiBut *new_but)
@@ -5458,15 +5574,15 @@ void UI_block_layout_resolve(uiBlock *block, int *r_x, int *r_y)
 
   block->curlayout = NULL;
 
-  LISTBASE_FOREACH (uiLayoutRoot *, root, &block->layouts) {
+  LISTBASE_FOREACH_MUTABLE (uiLayoutRoot *, root, &block->layouts) {
     ui_layout_add_padding_button(root);
 
     /* NULL in advance so we don't interfere when adding button */
     ui_layout_end(block, root->layout, r_x, r_y);
-    ui_layout_free(root->layout);
+    layout_root_free(root);
   }
 
-  BLI_freelistN(&block->layouts);
+  BLI_listbase_clear(&block->layouts);
 
   /* XXX silly trick, interface_templates.c doesn't get linked
    * because it's not used by other files in this module? */
