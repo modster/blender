@@ -313,13 +313,13 @@ void GpencilExporterSVG::export_gpencil_layers(void)
             sprintf(text, "#%d", shot_);
             break;
           case GP_EXPORT_TXT_FRAME:
-            sprintf(text, "%0004d", cfra_);
+            sprintf(text, "%04d", cfra_);
             break;
           case GP_EXPORT_TXT_SHOT_FRAME:
-            sprintf(text, "#%d/%0004d", shot_, cfra_);
+            sprintf(text, "#%d/%04d", shot_, cfra_);
             break;
           default:
-            sprintf(text, "%0004d", cfra_);
+            sprintf(text, "%04d", cfra_);
             break;
         }
 
