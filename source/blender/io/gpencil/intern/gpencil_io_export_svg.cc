@@ -75,6 +75,12 @@ GpencilExporterSVG::GpencilExporterSVG(const char *filename,
   invert_axis_[1] = true;
 }
 
+/* Destructor. */
+GpencilExporterSVG::~GpencilExporterSVG(void)
+{
+  /* Nothing to do yet. */
+}
+
 bool GpencilExporterSVG::add_newpage(void)
 {
   create_document_header();
