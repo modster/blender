@@ -186,7 +186,7 @@ void immEnd(void)
 
   if (imm->batch) {
     if (imm->vertex_idx < imm->vertex_len) {
-      GPU_vertbuf_data_resize(imm->batch->verts[0], imm->vertex_len);
+      GPU_vertbuf_data_resize(imm->batch->verts[0], imm->vertex_idx);
       /* TODO: resize only if vertex count is much smaller */
     }
     GPU_batch_set_shader(imm->batch, imm->shader);
@@ -416,7 +416,7 @@ static void immEndVertex(void) /* and move on to the next vertex */
         printf("copying %s from vertex %u to %u\n", a->name, imm->vertex_idx - 1, imm->vertex_idx);
 #endif
 
-        GLubyte *data = imm->vertex_data + a->offset;
+        uchar *data = imm->vertex_data + a->offset;
         memcpy(data, data - imm->vertex_format.stride, a->sz);
         /* TODO: consolidate copy of adjacent attributes */
       }

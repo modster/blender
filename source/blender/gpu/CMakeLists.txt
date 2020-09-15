@@ -93,6 +93,7 @@ set(SRC
   opengl/gl_context.cc
   opengl/gl_drawlist.cc
   opengl/gl_debug.cc
+  opengl/gl_debug_layer.cc
   opengl/gl_framebuffer.cc
   opengl/gl_immediate.cc
   opengl/gl_index_buffer.cc
@@ -115,7 +116,6 @@ set(SRC
   GPU_debug.h
   GPU_drawlist.h
   GPU_framebuffer.h
-  GPU_glew.h
   GPU_immediate.h
   GPU_immediate_util.h
   GPU_index_buffer.h
