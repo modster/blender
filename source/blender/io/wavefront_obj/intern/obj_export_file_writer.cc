@@ -55,7 +55,7 @@ void OBJWriter::write_vert_uv_normal_indices(Span<uint> vert_indices,
  * Write one line of polygon indices as f v1//vn1 v2//vn2 ... .
  */
 void OBJWriter::write_vert_normal_indices(Span<uint> vert_indices,
-                                          Span<uint> UNUSED(uv_indices),
+                                          Span<uint>,
                                           Span<uint> normal_indices,
                                           const uint tot_loop) const
 {
@@ -74,7 +74,7 @@ void OBJWriter::write_vert_normal_indices(Span<uint> vert_indices,
  */
 void OBJWriter::write_vert_uv_indices(Span<uint> vert_indices,
                                       Span<uint> uv_indices,
-                                      Span<uint> UNUSED(normal_indices),
+                                      Span<uint>,
                                       const uint tot_loop) const
 {
   fprintf(outfile_, "f");
@@ -91,8 +91,8 @@ void OBJWriter::write_vert_uv_indices(Span<uint> vert_indices,
  *  Write one line of polygon indices as f v1 v2 ... .
  */
 void OBJWriter::write_vert_indices(Span<uint> vert_indices,
-                                   Span<uint> UNUSED(uv_indices),
-                                   Span<uint> UNUSED(normal_indices),
+                                   Span<uint>,
+                                   Span<uint>,
                                    const uint tot_loop) const
 {
   fprintf(outfile_, "f");

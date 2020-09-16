@@ -100,16 +100,16 @@ class OBJWriter {
                                     Span<uint> normal_indices,
                                     const uint tot_loop) const;
   void write_vert_normal_indices(Span<uint> vert_indices,
-                                 Span<uint> UNUSED(uv_indices),
+                                 Span<uint>,
                                  Span<uint> normal_indices,
                                  const uint tot_loop) const;
   void write_vert_uv_indices(Span<uint> vert_indices,
                              Span<uint> uv_indices,
-                             Span<uint> UNUSED(normal_indices),
+                             Span<uint>,
                              const uint tot_loop) const;
   void write_vert_indices(Span<uint> vert_indices,
-                          Span<uint> UNUSED(uv_indices),
-                          Span<uint> UNUSED(normal_indices),
+                          Span<uint>,
+                          Span<uint>,
                           const uint tot_loop) const;
 };
 
