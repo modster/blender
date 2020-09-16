@@ -25,9 +25,11 @@
 
 #include "DNA_meshdata_types.h"
 
+#include "BLI_map.hh"
 #include "BLI_vector.hh"
 
 #include "IO_wavefront_obj.h"
+#include "obj_export_mtl.hh"
 
 namespace blender::io::obj {
 class OBJMesh;
@@ -120,5 +122,10 @@ class MTLWriter {
   ~MTLWriter();
 
   void append_materials(const OBJMesh &mesh_to_export);
+
+ private:
+  void write_bsdf_properties(const MTLMaterial &mtl_material);
+  void write_texture_map(const MTLMaterial &mtl_material,
+                         const Map<const std::string, tex_map_XX>::Item &texture_map);
 };
 }  // namespace blender::io::obj

@@ -461,10 +461,57 @@ MTLWriter::~MTLWriter()
               << std::endl;
   }
 }
+
+void MTLWriter::write_bsdf_properties(const blender::io::obj::MTLMaterial &mtl_material)
+{
+  fprintf(mtl_outfile_,
+          "Ni %0.6f\n"
+          "d %.6f\n"
+          "Ns %0.6f\n"
+          "illum %d\n",
+          mtl_material.Ni,
+          mtl_material.d,
+          mtl_material.Ns,
+          mtl_material.illum);
+  fprintf(mtl_outfile_, "Ka %s\n", float3_to_string(mtl_material.Ka).c_str());
+  fprintf(mtl_outfile_, "Kd %s\n", float3_to_string(mtl_material.Kd).c_str());
+  fprintf(mtl_outfile_, "Ks %s\n", float3_to_string(mtl_material.Ks).c_str());
+  fprintf(mtl_outfile_, "Ke %s\n", float3_to_string(mtl_material.Ke).c_str());
+}
+
+/**
+ * Write a texture map in the form "map_XX -s 1 1 1 -o 0 0 0 -bm 1 path/to/image" .
+ */
+void MTLWriter::write_texture_map(const MTLMaterial &mtl_material,
+                                  const Map<const std::string, tex_map_XX>::Item &texture_map)
+{
+  std::string map_bump_strength;
+  std::string scale;
+  std::string translation;
+  /* Optional strings should have their own leading spaces. */
+  if (texture_map.value.translation != float3{0.0f, 0.0f, 0.0f}) {
+    translation.append(" -s ").append(float3_to_string(texture_map.value.translation));
+  }
+  if (texture_map.value.scale != float3{1.0f, 1.0f, 1.0f}) {
+    scale.append(" -o ").append(float3_to_string(texture_map.value.scale));
+  }
+  if (texture_map.key == "map_Bump" && mtl_material.map_Bump_strength > 0.0001f) {
+    map_bump_strength.append(" -bm ").append(std::to_string(mtl_material.map_Bump_strength));
+  }
+
+  /* Always keep only one space between options since filepaths may have leading spaces too. */
+  fprintf(mtl_outfile_,
+          "%s%s%s%s %s\n",
+          texture_map.key.c_str(),
+          translation.c_str(),       /* Can be empty. */
+          scale.c_str(),             /* Can be empty. */
+          map_bump_strength.c_str(), /* Can be empty. */
+          texture_map.value.image_path.c_str());
 }
 
 void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
 {
+  assert(mtl_outfile_);
   if (!mtl_outfile_) {
     /* Error logging in constructor. */
     return;
@@ -473,10 +520,11 @@ void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
   MaterialWrap mat_wrap(mesh_to_export, mtl_materials);
   mat_wrap.fill_materials();
 
+#ifdef DEBUG
   auto all_items_positive = [](const float3 &triplet) {
     return triplet.x >= 0.0f && triplet.y >= 0.0f && triplet.z >= 0.0f;
   };
-
+#endif
   for (const MTLMaterial &mtl_material : mtl_materials) {
     fprintf(mtl_outfile_, "\nnewmtl %s\n", mtl_material.name.c_str());
     BLI_assert(all_items_positive({mtl_material.d, mtl_material.Ns, mtl_material.Ni}) &&
@@ -484,19 +532,7 @@ void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
     BLI_assert(all_items_positive(mtl_material.Ka) && all_items_positive(mtl_material.Kd) &&
                all_items_positive(mtl_material.Ks) && all_items_positive(mtl_material.Ke));
 
-    fprintf(mtl_outfile_,
-            "Ni %0.6f\n"
-            "d %.6f\n"
-            "Ns %0.6f\n"
-            "illum %d\n",
-            mtl_material.Ni,
-            mtl_material.d,
-            mtl_material.Ns,
-            mtl_material.illum);
-    fprintf(mtl_outfile_, "Ka %s\n", float3_to_string(mtl_material.Ka).c_str());
-    fprintf(mtl_outfile_, "Kd %s\n", float3_to_string(mtl_material.Kd).c_str());
-    fprintf(mtl_outfile_, "Ks %s\n", float3_to_string(mtl_material.Ks).c_str());
-    fprintf(mtl_outfile_, "Ke %s\n", float3_to_string(mtl_material.Ke).c_str());
+    write_bsdf_properties(mtl_material);
 
     /* Write image texture maps. */
     for (const Map<const std::string, tex_map_XX>::Item &texture_map :
@@ -504,29 +540,7 @@ void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
       if (texture_map.value.image_path.empty()) {
         continue;
       }
-
-      std::string map_bump_strength;
-      std::string scale;
-      std::string translation;
-      /* Texture map keys should have leading spaces. */
-      if (texture_map.key == "map_Bump" && mtl_material.map_Bump_strength > 0.0001f) {
-        map_bump_strength.append(" -bm ").append(std::to_string(mtl_material.map_Bump_strength));
-      }
-      if (texture_map.value.scale != float3{1.0f, 1.0f, 1.0f}) {
-        scale.append(" -o ").append(float3_to_string(texture_map.value.scale));
-      }
-      if (texture_map.value.translation != float3{0.0f, 0.0f, 0.0f}) {
-        translation.append(" -s ").append(float3_to_string(texture_map.value.translation));
-      }
-
-      /* Always keep only one space between options since filepaths may have leading spaces too. */
-      fprintf(mtl_outfile_,
-              "%s%s%s%s %s\n",
-              texture_map.key.c_str(),
-              translation.c_str(),       /* Can be empty. */
-              scale.c_str(),             /* Can be empty. */
-              map_bump_strength.c_str(), /* Can be empty. */
-              texture_map.value.image_path.c_str());
+      write_texture_map(mtl_material, texture_map);
     }
   }
 }
