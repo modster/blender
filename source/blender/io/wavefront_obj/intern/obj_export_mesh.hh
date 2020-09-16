@@ -39,6 +39,10 @@
 #include "IO_wavefront_obj.h"
 
 namespace blender::io::obj {
+/* Denote absence for usually non-negative numbers. */
+const int NOT_FOUND = -1;
+/* Any negative number other than -1 to initialise usually non-negative numbers. */
+const int NEGATIVE_INIT = -10;
 
 struct CustomBMeshDeleter {
   void operator()(BMesh *bmesh)
@@ -77,7 +81,7 @@ class OBJMesh : NonMovable, NonCopyable {
   /**
    * Total smooth groups in an object.
    */
-  uint tot_smooth_groups_ = -1;
+  int tot_smooth_groups_ = NEGATIVE_INIT;
   /**
    * Polygon aligned array of their smooth groups.
    */

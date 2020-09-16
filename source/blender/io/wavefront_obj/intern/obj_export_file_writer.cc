@@ -34,6 +34,10 @@
 
 namespace blender::io::obj {
 
+/* Default values of some parameters. */
+const int SMOOTH_GROUP_DISABLED = 0;
+const int SMOOTH_GROUP_DEFAULT = 1;
+
 /**
  * Write one line of polygon indices as f v1/vt1/vn1 v2/vt2/vn2 ... .
  */
@@ -204,32 +208,28 @@ void OBJWriter::write_poly_normals(OBJMesh &obj_mesh_data) const
 
 /**
  * Write smooth group if the polygon at given index is shaded smooth and export settings specify
- * so. If the polygon is not shaded smooth, write "off".
+ * so. If the polygon is not shaded smooth, write "0".
  */
 void OBJWriter::write_smooth_group(const OBJMesh &obj_mesh_data,
                                    const uint poly_index,
                                    int &r_last_face_smooth_group) const
 {
-  int curr_group = 0;
+  int current_group = SMOOTH_GROUP_DISABLED;
   if (!export_params_.export_smooth_groups && obj_mesh_data.is_ith_poly_smooth(poly_index)) {
     /* Smooth group calculation is disabled, but face is smooth. */
-    curr_group = 1;
+    current_group = SMOOTH_GROUP_DEFAULT;
   }
   else if (obj_mesh_data.is_ith_poly_smooth(poly_index)) {
     /* Smooth group calc enabled and face is smooth and so find the group. */
-    curr_group = obj_mesh_data.ith_smooth_group(poly_index);
+    current_group = obj_mesh_data.ith_smooth_group(poly_index);
   }
-  if (curr_group == r_last_face_smooth_group) {
-    /* Group has already been written including s off. */
+
+  if (current_group == r_last_face_smooth_group) {
+    /* Group has already been written, even if it is "s 0". */
     return;
   }
-  if (curr_group == 0) {
-    fprintf(outfile_, "s off\n");
-    r_last_face_smooth_group = curr_group;
-    return;
-  }
-  fprintf(outfile_, "s %d\n", curr_group);
-  r_last_face_smooth_group = curr_group;
+  fprintf(outfile_, "s %d\n", current_group);
+  r_last_face_smooth_group = current_group;
 }
 
 /**
@@ -286,8 +286,6 @@ void OBJWriter::write_vertex_group(const OBJMesh &obj_mesh_data,
 OBJWriter::func_vert_uv_normal_indices OBJWriter::get_poly_element_writer(
     const OBJMesh &obj_mesh_data)
 {
-  /* -1 has no significant value, it can be any negative number. */
-  int last_face_smooth_group = -1;
   /* -1 is used to denote face having no vertex group. It can be any _other_ negative
    * number. */
   short last_face_vertex_group = -2;
@@ -317,6 +315,7 @@ OBJWriter::func_vert_uv_normal_indices OBJWriter::get_poly_element_writer(
  */
 void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
 {
+  int last_face_smooth_group = NEGATIVE_INIT;
 
   Vector<uint> vertex_indices;
     const int totloop = obj_mesh_data.ith_poly_totloop(i);

@@ -181,8 +181,8 @@ short OBJMesh::tot_materials() const
  */
 uint OBJMesh::tot_smooth_groups() const
 {
-  BLI_assert(tot_smooth_groups_ != -1);
   /* Calculate smooth groups first: `OBJMesh::calc_smooth_groups`. */
+  BLI_assert(tot_smooth_groups_ != NEGATIVE_INIT);
   return tot_smooth_groups_;
 }
 
@@ -191,8 +191,8 @@ uint OBJMesh::tot_smooth_groups() const
  */
 int OBJMesh::ith_smooth_group(const int poly_index) const
 {
-  BLI_assert(tot_smooth_groups_ != -1);
   /* Calculate smooth groups first: `OBJMesh::calc_smooth_groups`. */
+  BLI_assert(tot_smooth_groups_ != -NEGATIVE_INIT);
   BLI_assert(poly_smooth_groups_);
   return poly_smooth_groups_[poly_index];
 }
