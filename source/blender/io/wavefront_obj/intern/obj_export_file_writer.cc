@@ -243,19 +243,20 @@ void OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
   if (!export_params_.export_materials || obj_mesh_data.tot_materials() <= 0) {
     return;
   }
-  const short mat_nr = obj_mesh_data.ith_poly_matnr(poly_index);
+  const short curr_mat_nr = obj_mesh_data.ith_poly_matnr(poly_index);
   /* Whenever a face with a new material is encountered, write its material and/or group, otherwise
    * pass. */
-  if (r_last_face_mat_nr != mat_nr) {
-    const char *mat_name = obj_mesh_data.get_object_material_name(mat_nr + 1);
-    if (export_params_.export_material_groups) {
-      const char *object_name = obj_mesh_data.get_object_name();
-      const char *object_mesh_name = obj_mesh_data.get_object_mesh_name();
-      fprintf(outfile_, "g %s_%s_%s\n", object_name, object_mesh_name, mat_name);
-    }
-    fprintf(outfile_, "usemtl %s\n", mat_name);
-    r_last_face_mat_nr = mat_nr;
+  if (r_last_face_mat_nr == curr_mat_nr) {
+    return;
   }
+  const char *mat_name = obj_mesh_data.get_object_material_name(curr_mat_nr);
+  if (export_params_.export_material_groups) {
+    const char *object_name = obj_mesh_data.get_object_name();
+    const char *object_mesh_name = obj_mesh_data.get_object_mesh_name();
+    fprintf(outfile_, "g %s_%s_%s\n", object_name, object_mesh_name, mat_name);
+  }
+  fprintf(outfile_, "usemtl %s\n", mat_name);
+  r_last_face_mat_nr = curr_mat_nr;
 }
 
 /**
@@ -289,9 +290,6 @@ void OBJWriter::write_vertex_group(const OBJMesh &obj_mesh_data,
 OBJWriter::func_vert_uv_normal_indices OBJWriter::get_poly_element_writer(
     const OBJMesh &obj_mesh_data)
 {
-  /* -1 has no significant value, it can be any negative number. */
-  short last_face_mat_nr = -1;
-
   if (export_params_.export_normals) {
     if (export_params_.export_uv && (obj_mesh_data.tot_uv_vertices() > 0)) {
       /* Write both normals and UV indices. */
@@ -317,6 +315,7 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
 {
   int last_face_smooth_group = NEGATIVE_INIT;
   short last_face_vertex_group = NEGATIVE_INIT;
+  short last_face_mat_nr = NEGATIVE_INIT;
 
   Vector<uint> vertex_indices;
     const int totloop = obj_mesh_data.ith_poly_totloop(i);
