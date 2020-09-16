@@ -109,6 +109,7 @@ bool OBJWriter::init_writer(const char *filepath)
 {
   outfile_ = fopen(filepath, "w");
   if (!outfile_) {
+    std::perror(std::string("Error in creating the file at: ").append(filepath).c_str());
     return false;
   }
   fprintf(outfile_, "# Blender %s\n# www.blender.org\n", BKE_blender_version_string());
@@ -448,14 +449,18 @@ MTLWriter::MTLWriter(const char *obj_filepath)
   BLI_path_extension_replace(mtl_filepath, FILE_MAX, ".mtl");
   mtl_outfile_ = fopen(mtl_filepath, "a");
   if (!mtl_outfile_) {
-    fprintf(stderr, "Error in opening file at %s\n", mtl_filepath);
+    std::perror(std::string("Error in creating the file at: ").append(mtl_filepath_).c_str());
     return;
   }
 }
 
 MTLWriter::~MTLWriter()
 {
-  fclose(mtl_outfile_);
+  if (mtl_outfile_ && fclose(mtl_outfile_)) {
+    std::cerr << "Error: could not close the MTL file properly, file may be corrupted."
+              << std::endl;
+  }
+}
 }
 
 void MTLWriter::append_materials(const OBJMesh &mesh_to_export)

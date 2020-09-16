@@ -112,7 +112,6 @@ static void export_frame(ViewLayer *view_layer,
 {
   OBJWriter frame_writer(export_params);
   if (!frame_writer.init_writer(filepath)) {
-    fprintf(stderr, "Error in creating the file: %s\n", filepath);
     return;
   }
 
