@@ -401,13 +401,12 @@ GHOST_IWindow *GHOST_SystemX11::createWindow(const char *title,
 GHOST_IContext *GHOST_SystemX11::createOffscreenContext(GHOST_TDrawingContextType type,
                                                         GHOST_GLSettings glSettings)
 {
+  const bool debug_context = (glSettings.flags & GHOST_glDebugContext) != 0;
+
 #if defined(WITH_VULKAN)
   if (type == GHOST_kDrawingContextTypeVulkan) {
-    /* Vulkan port
-     *   try vulkan
-     *   fallback to OGL */
-    /* TODO debug context. */
-    GHOST_Context *context = new GHOST_ContextVK(false, (Window)NULL, m_display, 1, 0, false);
+    GHOST_Context *context = new GHOST_ContextVK(
+        false, (Window)NULL, m_display, 1, 0, debug_context);
 
     if (context->initializeDrawingContext()) {
       return context;
@@ -423,8 +422,6 @@ GHOST_IContext *GHOST_SystemX11::createOffscreenContext(GHOST_TDrawingContextTyp
     //   try 4.x core profile
     //   try 3.3 core profile
     //   no fallbacks
-
-    const bool debug_context = (glSettings.flags & GHOST_glDebugContext) != 0;
 
 #if defined(WITH_GL_PROFILE_CORE)
     {
