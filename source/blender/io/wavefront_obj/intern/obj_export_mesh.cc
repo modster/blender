@@ -78,7 +78,7 @@ OBJMesh::OBJMesh(Depsgraph *depsgraph, const OBJExportParams &export_params, Obj
       break;
     }
   }
-  store_world_axes_transform(export_params.forward_axis, export_params.up_axis);
+  set_world_axes_transform(export_params.forward_axis, export_params.up_axis);
 }
 
 /**
@@ -104,9 +104,10 @@ void OBJMesh::triangulate_mesh_eval()
     mesh_eval_needs_free_ = false;
     return;
   }
-  struct BMeshCreateParams bm_create_params = {false};
-  /* If calc_face_normal is false, it triggers BLI_assert(BM_face_is_normal_valid(f)). */
-  struct BMeshFromMeshParams bm_convert_params = {true, 0, 0, 0};
+  const struct BMeshCreateParams bm_create_params = {false};
+  /* If `BMeshFromMeshParams.calc_face_normal` is false, it triggers
+   * BLI_assert(BM_face_is_normal_valid(f)). */
+  const struct BMeshFromMeshParams bm_convert_params = {true, 0, 0, 0};
   /* Lower threshold where triangulation of a face starts, i.e. a quadrilateral will be
    * triangulated here. */
   const int triangulate_min_verts = 4;
@@ -129,8 +130,8 @@ void OBJMesh::triangulate_mesh_eval()
  * Store the product of export axes settings and an object's world transform matrix in
  * world_and_axes_transform[4][4].
  */
-void OBJMesh::store_world_axes_transform(const eTransformAxisForward forward,
-                                         const eTransformAxisUp up)
+void OBJMesh::set_world_axes_transform(const eTransformAxisForward forward,
+                                       const eTransformAxisUp up)
 {
   float axes_transform[3][3];
   unit_m3(axes_transform);
@@ -175,7 +176,7 @@ uint OBJMesh::tot_edges() const
 /**
  * Total materials in the object to export.
  */
-short OBJMesh::tot_col() const
+short OBJMesh::tot_materials() const
 {
   return export_mesh_eval_->totcol;
 }
@@ -185,8 +186,8 @@ short OBJMesh::tot_col() const
  */
 uint OBJMesh::tot_smooth_groups() const
 {
-  /* Calculate smooth groups first. */
   BLI_assert(tot_smooth_groups_ != -1);
+  /* Calculate smooth groups first: `OBJMesh::calc_smooth_groups`. */
   return tot_smooth_groups_;
 }
 
@@ -195,8 +196,8 @@ uint OBJMesh::tot_smooth_groups() const
  */
 int OBJMesh::ith_smooth_group(const int poly_index) const
 {
-  /* Calculate smooth groups first. */
   BLI_assert(tot_smooth_groups_ != -1);
+  /* Calculate smooth groups first: `OBJMesh::calc_smooth_groups`. */
   BLI_assert(poly_smooth_groups_);
   return poly_smooth_groups_[poly_index];
 }
@@ -380,11 +381,11 @@ float3 OBJMesh::calc_poly_normal(const uint poly_index) const
 }
 
 /**
- * Calculate loop normal of a loop at the given index.
+ * Calculate loop normals of a polygon at the given index.
  *
- * Should be used when a polygon is shaded smooth.
+ * Should be used if a polygon is shaded smooth.
  */
-void OBJMesh::calc_loop_normal(const uint poly_index, Vector<float3> &r_loop_normals) const
+void OBJMesh::calc_loop_normals(const uint poly_index, Vector<float3> &r_loop_normals) const
 {
   r_loop_normals.clear();
   const MPoly &mpoly = export_mesh_eval_->mpoly[poly_index];
@@ -471,9 +472,10 @@ const char *OBJMesh::get_poly_deform_group_name(const uint poly_index,
 }
 
 /**
- * Only for curve converted to meshes and primitive circle: calculate vertex indices of one edge.
+ * Calculate vertex indices of an edge's corners if it is a loose edge.
  */
-std::optional<std::array<int, 2>> OBJMesh::calc_edge_vert_indices(const uint edge_index) const
+std::optional<std::array<int, 2>> OBJMesh::calc_loose_edge_vert_indices(
+    const uint edge_index) const
 {
   const MEdge &edge = export_mesh_eval_->medge[edge_index];
   if (edge.flag & ME_LOOSEEDGE) {

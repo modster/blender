@@ -314,8 +314,8 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
  */
 void MaterialWrap::fill_materials()
 {
-  for (short i = 0; i < obj_mesh_data_.tot_col(); i++) {
     export_mtl_ = obj_mesh_data_.get_object_material(i + 1);
+  for (short i = 0; i < obj_mesh_data_.tot_materials(); i++) {
     if (!export_mtl_) {
       continue;
     }
@@ -332,6 +332,6 @@ void MaterialWrap::fill_materials()
 MaterialWrap::MaterialWrap(const OBJMesh &obj_mesh_data, Vector<MTLMaterial> &r_mtl_materials)
     : obj_mesh_data_(obj_mesh_data), r_mtl_materials_(r_mtl_materials)
 {
-  r_mtl_materials.resize(obj_mesh_data.tot_col());
+  r_mtl_materials.resize(obj_mesh_data.tot_materials());
 }
 }  // namespace blender::io::obj

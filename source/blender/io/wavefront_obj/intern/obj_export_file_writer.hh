@@ -45,10 +45,13 @@ struct IndexOffsets {
   uint normal_offset;
 };
 
+/**
+ * Responsible for writing a .OBJ file.
+ */
 class OBJWriter {
  private:
   /**
-   * Destination OBJ file for one frame, and one writer instance.
+   * Destination .OBJ file.
    */
   FILE *outfile_;
   const OBJExportParams &export_params_;
@@ -92,7 +95,7 @@ class OBJWriter {
                           const uint poly_index,
                           short &r_last_face_vertex_group) const;
   void write_poly_elements(const OBJMesh &obj_mesh_data);
-  void write_loose_edges(const OBJMesh &obj_mesh_data) const;
+  void write_edges_indices(const OBJMesh &obj_mesh_data) const;
   void write_nurbs_curve(const OBJCurve &obj_nurbs_data) const;
 
   void update_index_offsets(const OBJMesh &obj_mesh_data);
@@ -116,6 +119,9 @@ class OBJWriter {
                           const uint tot_loop) const;
 };
 
+/**
+ * Responsible for writing a .MTL file.
+ */
 class MTLWriter {
  private:
   FILE *mtl_outfile_;

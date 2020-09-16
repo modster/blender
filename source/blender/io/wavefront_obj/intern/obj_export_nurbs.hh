@@ -48,7 +48,7 @@ class OBJCurve : NonMovable, NonCopyable {
   int get_nurbs_degree(const int index) const;
 
  private:
-  void store_world_axes_transform(const eTransformAxisForward forward, const eTransformAxisUp up);
+  void set_world_axes_transform(const eTransformAxisForward forward, const eTransformAxisUp up);
 };
 
 }  // namespace blender::io::obj

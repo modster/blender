@@ -149,7 +149,7 @@ static void export_frame(ViewLayer *view_layer,
       }
       frame_writer.write_poly_elements(*mesh_to_export);
     }
-    frame_writer.write_loose_edges(*mesh_to_export);
+    frame_writer.write_edges_indices(*mesh_to_export);
 
     frame_writer.update_index_offsets(*mesh_to_export);
   }

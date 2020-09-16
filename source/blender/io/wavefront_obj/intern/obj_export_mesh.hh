@@ -66,7 +66,7 @@ class OBJMesh : NonMovable, NonCopyable {
    */
   uint tot_smooth_groups_ = -1;
   /**
-   * Smooth group of all the polygons. 0 if the polygon is not shaded smooth.
+   * Polygon aligned array of their smooth groups.
    */
   int *poly_smooth_groups_ = nullptr;
 
@@ -79,7 +79,7 @@ class OBJMesh : NonMovable, NonCopyable {
   uint tot_uv_vertices() const;
   Span<uint> uv_indices(const int poly_index) const;
   uint tot_edges() const;
-  short tot_col() const;
+  short tot_materials() const;
   uint tot_smooth_groups() const;
   int ith_smooth_group(const int poly_index) const;
 
@@ -100,12 +100,13 @@ class OBJMesh : NonMovable, NonCopyable {
   void calc_poly_vertex_indices(const uint poly_index, Vector<uint> &r_poly_vertex_indices) const;
   void store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coords);
   float3 calc_poly_normal(const uint poly_index) const;
-  void calc_loop_normal(const uint poly_index, Vector<float3> &r_loop_normals) const;
   const char *get_poly_deform_group_name(const uint poly_index, short &r_last_vertex_group) const;
-  std::optional<std::array<int, 2>> calc_edge_vert_indices(const uint edge_index) const;
+  void calc_loop_normals(const uint poly_index, Vector<float3> &r_loop_normals) const;
+
+  std::optional<std::array<int, 2>> calc_loose_edge_vert_indices(const uint edge_index) const;
 
  private:
   void triangulate_mesh_eval();
-  void store_world_axes_transform(const eTransformAxisForward forward, const eTransformAxisUp up);
+  void set_world_axes_transform(const eTransformAxisForward forward, const eTransformAxisUp up);
 };
 }  // namespace blender::io::obj

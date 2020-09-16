@@ -33,11 +33,11 @@ class MaterialWrap {
   /**
    * One of the object's materials, to be exported.
    */
-  const Material *export_mtl_;
+  const Material *export_mtl_ = nullptr;
   /**
    * First Principled-BSDF node encountered in the object's node tree.
    */
-  bNode *bsdf_node_;
+  bNode *bsdf_node_ = nullptr;
 
  public:
   MaterialWrap(const OBJMesh &obj_mesh_data, Vector<MTLMaterial> &r_mtl_materials);

@@ -21,6 +21,8 @@
  * \ingroup obj
  */
 
+#include <cstdio>
+
 #include "BKE_blender_version.h"
 
 #include "obj_export_file_writer.hh"
@@ -104,6 +106,7 @@ void OBJWriter::write_vert_indices(Span<uint> vert_indices,
 
 /**
  * Open the OBJ file and write file header.
+ * \return Whether the destination file is writable.
  */
 bool OBJWriter::init_writer(const char *filepath)
 {
@@ -182,6 +185,7 @@ void OBJWriter::write_vertex_coords(const OBJMesh &obj_mesh_data) const
 void OBJWriter::write_uv_coords(OBJMesh &obj_mesh_data) const
 {
   Vector<std::array<float, 2>> uv_coords;
+  /* UV indices are calculated and stored in an OBJMesh member here. */
   obj_mesh_data.store_uv_coords_and_indices(uv_coords);
 
   for (const std::array<float, 2> &uv_vertex : uv_coords) {
@@ -198,13 +202,12 @@ void OBJWriter::write_poly_normals(OBJMesh &obj_mesh_data) const
   Vector<float3> lnormals;
   for (uint i = 0; i < obj_mesh_data.tot_polygons(); i++) {
     if (obj_mesh_data.is_ith_poly_smooth(i)) {
-      obj_mesh_data.calc_loop_normal(i, lnormals);
-      for (int j = 0; j < lnormals.size(); j++) {
-        fprintf(outfile_, "vn %f %f %f\n", lnormals[j][0], lnormals[j][1], lnormals[j][2]);
+      obj_mesh_data.calc_loop_normals(i, lnormals);
+      for (const float3 &lnormal : lnormals) {
+        fprintf(outfile_, "vn %f %f %f\n", lnormal[0], lnormal[1], lnormal[2]);
       }
     }
     else {
-      UNUSED_VARS(lnormals);
       float3 poly_normal = obj_mesh_data.calc_poly_normal(i);
       fprintf(outfile_, "vn %f %f %f\n", poly_normal[0], poly_normal[1], poly_normal[2]);
     }
@@ -249,7 +252,7 @@ void OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
                                     const uint poly_index,
                                     short &r_last_face_mat_nr) const
 {
-  if (!export_params_.export_materials || obj_mesh_data.tot_col() <= 0) {
+  if (!export_params_.export_materials || obj_mesh_data.tot_materials() <= 0) {
     return;
   }
   const short mat_nr = obj_mesh_data.ith_poly_matnr(poly_index);
@@ -363,13 +366,13 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
 }
 
 /**
- * Write loose edges of a mesh, a curve converted to mesh, or a primitive circle as l v1 v2 .
+ * Write loose edges of a mesh as l v1 v2 .
  */
-void OBJWriter::write_loose_edges(const OBJMesh &obj_mesh_data) const
+void OBJWriter::write_edges_indices(const OBJMesh &obj_mesh_data) const
 {
   obj_mesh_data.ensure_mesh_edges();
   for (uint edge_index = 0; edge_index < obj_mesh_data.tot_edges(); edge_index++) {
-    std::optional<std::array<int, 2>> vertex_indices = obj_mesh_data.calc_edge_vert_indices(
+    std::optional<std::array<int, 2>> vertex_indices = obj_mesh_data.calc_loose_edge_vert_indices(
         edge_index);
     if (!vertex_indices) {
       continue;
@@ -389,7 +392,7 @@ void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
   const int tot_nurbs = obj_nurbs_data.tot_nurbs();
   for (int i = 0; i < tot_nurbs; i++) {
     /* Total control points in a nurbs. */
-    int tot_points = obj_nurbs_data.get_nurbs_points(i);
+    const int tot_points = obj_nurbs_data.get_nurbs_points(i);
     for (int point_idx = 0; point_idx < tot_points; point_idx++) {
       float3 point_coord = obj_nurbs_data.calc_nurbs_point_coords(
           i, point_idx, export_params_.scaling_factor);
@@ -397,9 +400,7 @@ void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
     }
 
     const char *nurbs_name = obj_nurbs_data.get_curve_name();
-    int nurbs_degree = obj_nurbs_data.get_nurbs_degree(i);
-    /* Number of vertices in the curve + degree of the curve if it is cyclic. */
-    int curv_num = obj_nurbs_data.get_nurbs_num(i);
+    const int nurbs_degree = obj_nurbs_data.get_nurbs_degree(i);
 
     fprintf(outfile_, "g %s\ncstype bspline\ndeg %d\n", nurbs_name, nurbs_degree);
     /**
@@ -407,8 +408,11 @@ void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
      * 0.0 1.0 -1 -2 -3 -4 for a non-cyclic curve with 4 points.
      * 0.0 1.0 -1 -2 -3 -4 -1 -2 -3 for a cyclic curve with 4 points.
      */
+    /* Number of vertices in the curve + degree of the curve if it is cyclic. */
+    const int curv_num = obj_nurbs_data.get_nurbs_num(i);
     fprintf(outfile_, "curv 0.0 1.0");
     for (int i = 0; i < curv_num; i++) {
+      /* + 1 to keep indices one-based, even if they're negative. */
       fprintf(outfile_, " %d", -1 * ((i % tot_points) + 1));
     }
     fprintf(outfile_, "\n");
