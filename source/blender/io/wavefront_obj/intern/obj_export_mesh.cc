@@ -76,7 +76,7 @@ OBJMesh::~OBJMesh()
   if (poly_smooth_groups_) {
     MEM_freeN(poly_smooth_groups_);
   }
-  BLI_assert(!export_mesh_eval_);
+  BLI_assert(!(mesh_eval_needs_free_ && export_mesh_eval_));
 }
 
 void OBJMesh::free_mesh_if_needed()
@@ -345,7 +345,7 @@ void OBJMesh::store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coo
       if (tot_uv_vertices_ == 0) {
         return;
       }
-      const uint vertices_in_poly = (uint)mpoly[uv_vert->poly_index].totloop;
+      const int vertices_in_poly = mpoly[uv_vert->poly_index].totloop;
 
       /* Fill up UV vertex's coordinates. */
       r_uv_coords.resize(tot_uv_vertices_);
