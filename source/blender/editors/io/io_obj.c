@@ -54,14 +54,14 @@ const EnumPropertyItem io_obj_transform_axis_forward[] = {
     {OBJ_AXIS_Y_FORWARD, "Y_FORWARD", 0, "Y", "Positive Y axis"},
     {OBJ_AXIS_Z_FORWARD, "Z_FORWARD", 0, "Z", "Positive Z axis"},
     {OBJ_AXIS_NEGATIVE_X_FORWARD, "NEGATIVE_X_FORWARD", 0, "-X", "Negative X axis"},
-    {OBJ_AXIS_NEGATIVE_Y_FORWARD, "NEGATIVE_Y_FORWARD", 0, "-Y (Default)", "Negative Y axis"},
-    {OBJ_AXIS_NEGATIVE_Z_FORWARD, "NEGATIVE_Z_FORWARD", 0, "-Z", "Negative Z axis"},
+    {OBJ_AXIS_NEGATIVE_Y_FORWARD, "NEGATIVE_Y_FORWARD", 0, "-Y", "Negative Y axis"},
+    {OBJ_AXIS_NEGATIVE_Z_FORWARD, "NEGATIVE_Z_FORWARD", 0, "-Z (Default)", "Negative Z axis"},
     {0, NULL, 0, NULL, NULL}};
 
 const EnumPropertyItem io_obj_transform_axis_up[] = {
     {OBJ_AXIS_X_UP, "X_UP", 0, "X", "Positive X axis"},
-    {OBJ_AXIS_Y_UP, "Y_UP", 0, "Y", "Positive Y axis"},
-    {OBJ_AXIS_Z_UP, "Z_UP", 0, "Z (Default)", "Positive Z axis"},
+    {OBJ_AXIS_Y_UP, "Y_UP", 0, "Y (Default)", "Positive Y axis"},
+    {OBJ_AXIS_Z_UP, "Z_UP", 0, "Z", "Positive Z axis"},
     {OBJ_AXIS_NEGATIVE_X_UP, "NEGATIVE_X_UP", 0, "-X", "Negative X axis"},
     {OBJ_AXIS_NEGATIVE_Y_UP, "NEGATIVE_Y_UP", 0, "-Y", "Negative Y axis"},
     {OBJ_AXIS_NEGATIVE_Z_UP, "NEGATIVE_Z_UP", 0, "-Z", "Negative Z axis"},
@@ -303,10 +303,10 @@ void WM_OT_obj_export(struct wmOperatorType *ot)
   RNA_def_enum(ot->srna,
                "forward_axis",
                io_obj_transform_axis_forward,
-               OBJ_AXIS_NEGATIVE_Y_FORWARD,
+               OBJ_AXIS_NEGATIVE_Z_FORWARD,
                "Forward Axis",
                "");
-  RNA_def_enum(ot->srna, "up_axis", io_obj_transform_axis_up, OBJ_AXIS_Z_UP, "Up Axis", "");
+  RNA_def_enum(ot->srna, "up_axis", io_obj_transform_axis_up, OBJ_AXIS_Y_UP, "Up Axis", "");
   RNA_def_float(ot->srna,
                 "scaling_factor",
                 1.0f,
