@@ -397,6 +397,35 @@ void OBJMesh::calc_loop_normals(const uint poly_index, Vector<float3> &r_loop_no
 
 /**
  * Find the name of the vertex group with the maximum number of vertices in a poly.
+ * Calculate a polygon's face/loop normal indices.
+ * \param Number of normals of this Object written so far.
+ * \return Number of distinct normal indices.
+ */
+int OBJMesh::calc_poly_normal_indices(const uint poly_index,
+                                      const int object_tot_prev_normals,
+                                      Vector<uint> &r_face_normal_indices) const
+{
+  const MPoly &mpoly = export_mesh_eval_->mpoly[poly_index];
+  const int totloop = mpoly.totloop;
+  r_face_normal_indices.resize(totloop);
+
+  if (is_ith_poly_smooth(poly_index)) {
+    for (int face_loop_index = 0; face_loop_index < totloop; face_loop_index++) {
+      /* Using face loop index is fine because face/loop normals and their normal indices are
+       * written by looping over `Mpoly`s/`MLoop`s in the same order. */
+      r_face_normal_indices[face_loop_index] = object_tot_prev_normals + face_loop_index;
+    }
+    /* For a smooth-shaded face, `Mesh.totloop`-many loop normals are written. */
+    return totloop;
+  }
+  else {
+    for (int face_loop_index = 0; face_loop_index < totloop; face_loop_index++) {
+      r_face_normal_indices[face_loop_index] = object_tot_prev_normals;
+    }
+    /* For a flat-shaded face, one face normal is written.  */
+    return 1;
+  }
+}
  *
  * If no vertex belongs to any group, returned name is "off".
  * If two or more groups have the same number of vertices (maximum), group name depends on the

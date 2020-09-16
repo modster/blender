@@ -321,29 +321,20 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
   }
 
   Vector<uint> vertex_indices;
-  Vector<uint> normal_indices;
-  /* Reset for every object. */
-  tot_normals_ = 0;
-  for (uint i = 0; i < obj_mesh_data.tot_polygons(); i++) {
     const int totloop = obj_mesh_data.ith_poly_totloop(i);
-    normal_indices.resize(totloop);
     vertex_indices.resize(totloop);
     obj_mesh_data.calc_poly_vertex_indices(i, vertex_indices);
 
-    if (obj_mesh_data.is_ith_poly_smooth(i)) {
-      for (int j = 0; j < totloop; j++) {
-        /* This is guaranteed because normals are written
-         * by going over `MLoop`s in the same order. */
-        normal_indices[j] = tot_normals_ + j + 1;
-      }
-      tot_normals_ += totloop;
-    }
-    else {
-      for (int j = 0; j < totloop; j++) {
-        normal_indices[j] = tot_normals_ + 1;
-      }
-      tot_normals_ += 1;
-    }
+  Vector<uint> face_normal_indices;
+  /* Reset for every Object. */
+  per_object_tot_normals_ = 0;
+  const int tot_polygons = obj_mesh_data.tot_polygons();
+  for (uint i = 0; i < tot_polygons; i++) {
+    /* For an Object, a normal index depends on how many have been written before it.
+     * This is unknown because of smooth shading. So pass "per object total normals"
+     * and update it after each call. */
+    per_object_tot_normals_ += obj_mesh_data.calc_poly_normal_indices(
+        i, per_object_tot_normals_, face_normal_indices);
 
     write_smooth_group(obj_mesh_data, i, last_face_smooth_group);
     write_vertex_group(obj_mesh_data, i, last_face_vertex_group);
