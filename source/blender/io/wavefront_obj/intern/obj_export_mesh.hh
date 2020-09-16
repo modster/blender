@@ -29,6 +29,9 @@
 #include "BLI_utility_mixins.hh"
 #include "BLI_vector.hh"
 
+#include "bmesh.h"
+#include "bmesh_tools.h"
+
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -36,6 +39,17 @@
 #include "IO_wavefront_obj.h"
 
 namespace blender::io::obj {
+
+struct CustomBMeshDeleter {
+  void operator()(BMesh *bmesh)
+  {
+    if (bmesh) {
+      BM_mesh_free(bmesh);
+    }
+  }
+};
+
+using unique_bmesh_ptr = std::unique_ptr<BMesh, CustomBMeshDeleter>;
 class OBJMesh : NonMovable, NonCopyable {
  private:
   Depsgraph *depsgraph_;
@@ -106,7 +120,8 @@ class OBJMesh : NonMovable, NonCopyable {
   std::optional<std::array<int, 2>> calc_loose_edge_vert_indices(const uint edge_index) const;
 
  private:
-  void triangulate_mesh_eval();
+  void free_mesh_if_needed();
+  std::pair<Mesh *, bool> triangulate_mesh_eval();
   void set_world_axes_transform(const eTransformAxisForward forward, const eTransformAxisUp up);
 };
 }  // namespace blender::io::obj

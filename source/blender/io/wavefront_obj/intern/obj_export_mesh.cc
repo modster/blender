@@ -31,9 +31,6 @@
 #include "BLI_listbase.h"
 #include "BLI_math.h"
 
-#include "bmesh.h"
-#include "bmesh_tools.h"
-
 #include "DEG_depsgraph_query.h"
 
 #include "DNA_material_types.h"
@@ -57,26 +54,16 @@ OBJMesh::OBJMesh(Depsgraph *depsgraph, const OBJExportParams &export_params, Obj
   mesh_eval_needs_free_ = false;
 
   if (!export_mesh_eval_) {
-    /* Curves and NURBS surfaces need a new mesh when they're exported in the form of vertices and
-     * edges.
+    /* Curves and NURBS surfaces need a new mesh when they're
+     * exported in the form of vertices and edges.
      */
     export_mesh_eval_ = BKE_mesh_new_from_object(depsgraph_, export_object_eval_, true);
     /* Since a new mesh been allocated, it needs to be freed in the destructor. */
     mesh_eval_needs_free_ = true;
   }
-
-  switch (export_object_eval_->type) {
-    case OB_SURF:
-      ATTR_FALLTHROUGH;
-    case OB_MESH: {
-      if (export_params.export_triangulated_mesh) {
-        triangulate_mesh_eval();
-      }
-      break;
-    }
-    default: {
-      break;
-    }
+  if (export_params.export_triangulated_mesh &&
+      ELEM(export_object_eval_->type, OB_MESH, OB_SURF)) {
+    std::tie(export_mesh_eval_, mesh_eval_needs_free_) = triangulate_mesh_eval();
   }
   set_world_axes_transform(export_params.forward_axis, export_params.up_axis);
 }
@@ -86,23 +73,30 @@ OBJMesh::OBJMesh(Depsgraph *depsgraph, const OBJExportParams &export_params, Obj
  */
 OBJMesh::~OBJMesh()
 {
-  if (mesh_eval_needs_free_) {
-    BKE_id_free(NULL, export_mesh_eval_);
-  }
+  free_mesh_if_needed();
   if (poly_smooth_groups_) {
     MEM_freeN(poly_smooth_groups_);
+  }
+  BLI_assert(!export_mesh_eval_);
+}
+
+void OBJMesh::free_mesh_if_needed()
+{
+  if (mesh_eval_needs_free_ && export_mesh_eval_) {
+    BKE_id_free(NULL, export_mesh_eval_);
   }
 }
 
 /**
- * Triangulate and update OBJMesh evaluated mesh.
- * \note The new mesh created here needs to be freed.
+ * Allocate a new Mesh with triangulate polygons.
+ *
+ * The returned mesh can be the same as the old one.
+ * \return Owning pointer to the new Mesh, and whether a new Mesh was created.
  */
-void OBJMesh::triangulate_mesh_eval()
+std::pair<Mesh *, bool> OBJMesh::triangulate_mesh_eval()
 {
   if (export_mesh_eval_->totpoly <= 0) {
-    mesh_eval_needs_free_ = false;
-    return;
+    return {export_mesh_eval_, false};
   }
   const struct BMeshCreateParams bm_create_params = {false};
   /* If `BMeshFromMeshParams.calc_face_normal` is false, it triggers
@@ -112,8 +106,9 @@ void OBJMesh::triangulate_mesh_eval()
    * triangulated here. */
   const int triangulate_min_verts = 4;
 
-  BMesh *bmesh = BKE_mesh_to_bmesh_ex(export_mesh_eval_, &bm_create_params, &bm_convert_params);
-  BM_mesh_triangulate(bmesh,
+  unique_bmesh_ptr bmesh(
+      BKE_mesh_to_bmesh_ex(export_mesh_eval_, &bm_create_params, &bm_convert_params));
+  BM_mesh_triangulate(bmesh.get(),
                       MOD_TRIANGULATE_NGON_BEAUTY,
                       MOD_TRIANGULATE_QUAD_SHORTEDGE,
                       triangulate_min_verts,
@@ -121,9 +116,10 @@ void OBJMesh::triangulate_mesh_eval()
                       NULL,
                       NULL,
                       NULL);
-  export_mesh_eval_ = BKE_mesh_from_bmesh_for_eval_nomain(bmesh, NULL, export_mesh_eval_);
-  mesh_eval_needs_free_ = true;
-  BM_mesh_free(bmesh);
+
+  Mesh *triangulated = BKE_mesh_from_bmesh_for_eval_nomain(bmesh.get(), NULL, export_mesh_eval_);
+  free_mesh_if_needed();
+  return {triangulated, true};
 }
 
 /**
