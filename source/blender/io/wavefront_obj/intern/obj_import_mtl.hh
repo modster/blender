@@ -34,64 +34,9 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "obj_export_mtl.hh"
+
 namespace blender::io::obj {
-/**
- * Used for storing parameters for all kinds of texture maps from MTL file.
- */
-struct tex_map_XX {
-  tex_map_XX(StringRef to_socket_id) : dest_socket_id(to_socket_id){};
-
-  const std::string dest_socket_id{};
-  float3 translation = {0.0f, 0.0f, 0.0f};
-  float3 scale = {1.0f, 1.0f, 1.0f};
-  /* Only Flat and Smooth projections are supported. */
-  int projection_type = SHD_PROJ_FLAT;
-  std::string image_path{};
-  std::string mtl_dir_path;
-};
-
-/**
- * Store material data parsed from MTL file.
- */
-struct MTLMaterial {
-  MTLMaterial()
-  {
-    texture_maps.add("map_Kd", tex_map_XX("Base Color"));
-    texture_maps.add("map_Ks", tex_map_XX("Specular"));
-    texture_maps.add("map_Ns", tex_map_XX("Roughness"));
-    texture_maps.add("map_d", tex_map_XX("Alpha"));
-    texture_maps.add("map_refl", tex_map_XX("Metallic"));
-    texture_maps.add("map_Ke", tex_map_XX("Emission"));
-    texture_maps.add("map_Bump", tex_map_XX("Normal"));
-  }
-
-  /**
-   * Return a reference to the texture map corresponding to the given ID
-   * Caller must ensure that the lookup key given exists in the Map.
-   */
-  tex_map_XX &tex_map_of_type(StringRef map_string)
-  {
-    {
-      BLI_assert(texture_maps.contains_as(map_string));
-      return texture_maps.lookup_as(map_string);
-    }
-  }
-
-  std::string name{};
-  /* Always check for negative values while importing or exporting. Use defaults if
-   * any value is negative. */
-  float Ns{-1.0f};
-  float3 Ka{-1.0f};
-  float3 Kd{-1.0f};
-  float3 Ks{-1.0f};
-  float3 Ke{-1.0f};
-  float Ni{-1.0f};
-  float d{-1.0f};
-  int illum{-1};
-  Map<const std::string, tex_map_XX> texture_maps;
-  /** Only used for Normal Map node: map_Bump. */
-  float map_Bump_strength{-1.0f};
-};
 
 struct UniqueNodeDeleter {
   void operator()(bNode *node)

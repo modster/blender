@@ -29,6 +29,5 @@ void copy_string_to_float(Span<StringRef> src,
 void copy_string_to_int(StringRef src, const int fallback_value, int &r_dst);
 void copy_string_to_int(Span<StringRef> src, const int fallback_value, MutableSpan<int> r_dst);
 std::string replace_all_occurences(StringRef original, StringRef to_remove, StringRef to_add);
-std::string float3_to_string(const float3 &numbers);
 
 }  // namespace blender::io::obj

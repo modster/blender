@@ -29,8 +29,6 @@
 #include "obj_export_mesh.hh"
 #include "obj_export_mtl.hh"
 #include "obj_export_nurbs.hh"
-#include "obj_import_mtl.hh"
-#include "string_utils.hh"
 
 namespace blender::io::obj {
 
@@ -423,6 +421,17 @@ void OBJWriter::update_index_offsets(const OBJMesh &obj_mesh_data)
 /* -------------------------------------------------------------------- */
 /** \name MTL writers.
  * \{ */
+
+/**
+ * Converts float3 to space-separated number string with no leading or trailing space.
+ * Only to be used in NON performance-critical code.
+ */
+static std::string float3_to_string(const float3 &numbers)
+{
+  std::ostringstream r_string;
+  r_string << numbers[0] << " " << numbers[1] << " " << numbers[2];
+  return r_string.str();
+};
 
 /**
  * Open the MTL file in append mode.

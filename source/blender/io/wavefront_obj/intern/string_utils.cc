@@ -213,15 +213,4 @@ std::string replace_all_occurences(StringRef original, StringRef to_remove, Stri
   return clean;
 }
 
-/**
- * Converts float3 to space-separated number string with no leading or trailing space.
- * Only to be used in NON performance-critical code.
- */
-std::string float3_to_string(const float3 &numbers)
-{
-  std::ostringstream r_string;
-  r_string << numbers[0] << " " << numbers[1] << " " << numbers[2];
-  return r_string.str();
-};
-
 }  // namespace blender::io::obj
