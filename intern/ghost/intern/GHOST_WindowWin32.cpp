@@ -32,6 +32,10 @@
 #include "utf_winfunc.h"
 #include "utfconv.h"
 
+#if defined(WITH_VULKAN)
+#  include "GHOST_ContextVK.h"
+#endif
+
 #if defined(WITH_GL_EGL)
 #  include "GHOST_ContextEGL.h"
 #else
@@ -765,6 +769,18 @@ GHOST_Context *GHOST_WindowWin32::newDrawingContext(GHOST_TDrawingContextType ty
 
     return context;
   }
+#if defined(WITH_VULKAN)
+  else if (type == GHOST_kDrawingContextTypeVulkan) {
+    GHOST_Context *context = new GHOST_ContextVK(false, m_hWnd, 1, 0, m_debug_context);
+
+    if (context->initializeDrawingContext()) {
+      return context;
+    }
+    else {
+      delete context;
+    }
+  }
+#endif
 
   return NULL;
 }

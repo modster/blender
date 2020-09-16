@@ -131,7 +131,7 @@ class GHOST_ContextVK : public GHOST_Context {
 
  private:
 #ifdef _WIN32
-  HWND hwnd;
+  HWND m_hwnd;
 #elif defined(__APPLE__)
   /* FIXME CAMetalLayer but have issue with linking. */
   void *m_metal_layer;

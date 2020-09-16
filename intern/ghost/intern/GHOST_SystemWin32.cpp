@@ -49,6 +49,10 @@
 #include "GHOST_WindowManager.h"
 #include "GHOST_WindowWin32.h"
 
+#if defined(WITH_VULKAN)
+#  include "GHOST_ContextVK.h"
+#endif
+
 #if defined(WITH_GL_EGL)
 #  include "GHOST_ContextEGL.h"
 #else
@@ -328,10 +332,25 @@ GHOST_IWindow *GHOST_SystemWin32::createWindow(const char *title,
  * Never explicitly delete the window, use #disposeContext() instead.
  * \return The new context (or 0 if creation failed).
  */
-GHOST_IContext *GHOST_SystemWin32::createOffscreenContext(GHOST_TDrawingContextType /* type */,
+GHOST_IContext *GHOST_SystemWin32::createOffscreenContext(GHOST_TDrawingContextType type,
                                                           GHOST_GLSettings glSettings)
 {
   const bool debug_context = (glSettings.flags & GHOST_glDebugContext) != 0;
+
+#if defined(WITH_VULKAN)
+  /* Vulkan does not need a window. */
+  if (type == GHOST_kDrawingContextTypeVulkan) {
+    GHOST_Context *context = new GHOST_ContextVK(false, (HWND)0, 1, 0, debug_context);
+
+    if (context->initializeDrawingContext()) {
+      return context;
+    }
+    else {
+      delete context;
+      return NULL;
+    }
+  }
+#endif
 
   GHOST_Context *context;
 

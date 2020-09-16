@@ -130,7 +130,6 @@ GHOST_ContextVK::GHOST_ContextVK(bool stereoVisual,
                                  int debug)
     : GHOST_Context(stereoVisual),
 #ifdef _WIN32
-      m_hinstance(hinstance),
       m_hwnd(hwnd),
 #elif defined(__APPLE__)
       m_metal_layer(metal_layer),
@@ -246,30 +245,28 @@ GHOST_TSuccess GHOST_ContextVK::swapBuffers()
 
   VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
 
-  VkSubmitInfo submit_info{
-      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-      .waitSemaphoreCount = 1,
-      .pWaitSemaphores = &m_image_available_semaphores[m_currentFrame],
-      .pWaitDstStageMask = wait_stages,
-      .commandBufferCount = 1,
-      .pCommandBuffers = &m_command_buffers[image_id],
-      .signalSemaphoreCount = 1,
-      .pSignalSemaphores = &m_render_finished_semaphores[m_currentFrame],
-  };
+  VkSubmitInfo submit_info = {};
+  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submit_info.waitSemaphoreCount = 1;
+  submit_info.pWaitSemaphores = &m_image_available_semaphores[m_currentFrame];
+  submit_info.pWaitDstStageMask = wait_stages;
+  submit_info.commandBufferCount = 1;
+  submit_info.pCommandBuffers = &m_command_buffers[image_id];
+  submit_info.signalSemaphoreCount = 1;
+  submit_info.pSignalSemaphores = &m_render_finished_semaphores[m_currentFrame];
 
   vkResetFences(m_device, 1, &m_in_flight_fences[m_currentFrame]);
 
   VK_CHECK(vkQueueSubmit(m_graphic_queue, 1, &submit_info, m_in_flight_fences[m_currentFrame]));
 
-  VkPresentInfoKHR present_info{
-      .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-      .waitSemaphoreCount = 1,
-      .pWaitSemaphores = &m_render_finished_semaphores[m_currentFrame],
-      .swapchainCount = 1,
-      .pSwapchains = &m_swapchain,
-      .pImageIndices = &image_id,
-      .pResults = NULL,
-  };
+  VkPresentInfoKHR present_info{};
+  present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+  present_info.waitSemaphoreCount = 1;
+  present_info.pWaitSemaphores = &m_render_finished_semaphores[m_currentFrame];
+  present_info.swapchainCount = 1;
+  present_info.pSwapchains = &m_swapchain;
+  present_info.pImageIndices = &image_id;
+  present_info.pResults = NULL;
 
   result = vkQueuePresentKHR(m_present_queue, &present_info);
 
@@ -531,35 +528,31 @@ static GHOST_TSuccess create_render_pass(VkDevice device,
                                          VkFormat format,
                                          VkRenderPass *r_renderPass)
 {
-  VkAttachmentDescription colorAttachment = {
-      .format = format,
-      .samples = VK_SAMPLE_COUNT_1_BIT,
-      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-      .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-      .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-      .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-      .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-      .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-  };
+  VkAttachmentDescription colorAttachment = {};
+  colorAttachment.format = format;
+  colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+  colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+  colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-  VkAttachmentReference colorAttachmentRef = {
-      .attachment = 0,
-      .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-  };
+  VkAttachmentReference colorAttachmentRef = {};
+  colorAttachmentRef.attachment = 0;
+  colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-  VkSubpassDescription subpass = {
-      .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-      .colorAttachmentCount = 1,
-      .pColorAttachments = &colorAttachmentRef,
-  };
+  VkSubpassDescription subpass = {};
+  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+  subpass.colorAttachmentCount = 1;
+  subpass.pColorAttachments = &colorAttachmentRef;
 
-  VkRenderPassCreateInfo renderPassInfo = {
-      .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-      .attachmentCount = 1,
-      .pAttachments = &colorAttachment,
-      .subpassCount = 1,
-      .pSubpasses = &subpass,
-  };
+  VkRenderPassCreateInfo renderPassInfo = {};
+  renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+  renderPassInfo.attachmentCount = 1;
+  renderPassInfo.pAttachments = &colorAttachment;
+  renderPassInfo.subpassCount = 1;
+  renderPassInfo.pSubpasses = &subpass;
 
   VK_CHECK(vkCreateRenderPass(device, &renderPassInfo, NULL, r_renderPass));
 
@@ -598,27 +591,24 @@ static GHOST_TSuccess selectPresentMode(VkPhysicalDevice device,
 GHOST_TSuccess GHOST_ContextVK::recordCommandBuffers(void)
 {
   for (int i = 0; i < m_command_buffers.size(); i++) {
-    VkCommandBufferBeginInfo begin_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .flags = 0,
-        .pInheritanceInfo = NULL,
-    };
+    VkCommandBufferBeginInfo begin_info = {};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags = 0;
+    begin_info.pInheritanceInfo = NULL;
 
     VK_CHECK(vkBeginCommandBuffer(m_command_buffers[i], &begin_info));
     {
-      VkRect2D area = {
-          .offset = {0, 0},
-          .extent = m_render_extent,
-      };
+      VkRect2D area = {};
+      area.offset = {0, 0};
+      area.extent = m_render_extent;
       VkClearValue clearColor = {{{0.0f, 0.5f, 0.3f, 1.0f}}};
-      VkRenderPassBeginInfo render_pass_info = {
-          .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-          .renderPass = m_render_pass,
-          .framebuffer = m_swapchain_framebuffers[i],
-          .renderArea = area,
-          .clearValueCount = 1,
-          .pClearValues = &clearColor,
-      };
+      VkRenderPassBeginInfo render_pass_info = {};
+      render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+      render_pass_info.renderPass = m_render_pass;
+      render_pass_info.framebuffer = m_swapchain_framebuffers[i];
+      render_pass_info.renderArea = area;
+      render_pass_info.clearValueCount = 1;
+      render_pass_info.pClearValues = &clearColor;
 
       vkCmdBeginRenderPass(m_command_buffers[i], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -635,20 +625,18 @@ GHOST_TSuccess GHOST_ContextVK::createCommandBuffers(void)
 {
   m_command_buffers.resize(m_swapchain_image_views.size());
 
-  VkCommandPoolCreateInfo poolInfo = {
-      .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-      .flags = 0,
-      .queueFamilyIndex = m_queue_family_graphic,
-  };
+  VkCommandPoolCreateInfo poolInfo = {};
+  poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  poolInfo.flags = 0;
+  poolInfo.queueFamilyIndex = m_queue_family_graphic;
 
   VK_CHECK(vkCreateCommandPool(m_device, &poolInfo, NULL, &m_command_pool));
 
-  VkCommandBufferAllocateInfo alloc_info = {
-      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-      .commandPool = m_command_pool,
-      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-      .commandBufferCount = static_cast<uint32_t>(m_command_buffers.size()),
-  };
+  VkCommandBufferAllocateInfo alloc_info = {};
+  alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  alloc_info.commandPool = m_command_pool;
+  alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  alloc_info.commandBufferCount = static_cast<uint32_t>(m_command_buffers.size());
 
   VK_CHECK(vkAllocateCommandBuffers(m_device, &alloc_info, m_command_buffers.data()));
 
@@ -698,21 +686,20 @@ GHOST_TSuccess GHOST_ContextVK::createSwapchain(void)
     image_count = capabilities.maxImageCount;
   }
 
-  VkSwapchainCreateInfoKHR create_info = {
-      .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-      .surface = m_surface,
-      .minImageCount = image_count,
-      .imageFormat = format.format,
-      .imageColorSpace = format.colorSpace,
-      .imageExtent = m_render_extent,
-      .imageArrayLayers = 1,
-      .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-      .preTransform = capabilities.currentTransform,
-      .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-      .presentMode = present_mode,
-      .clipped = VK_TRUE,
-      .oldSwapchain = VK_NULL_HANDLE, /* TODO Window resize */
-  };
+  VkSwapchainCreateInfoKHR create_info = {};
+  create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+  create_info.surface = m_surface;
+  create_info.minImageCount = image_count;
+  create_info.imageFormat = format.format;
+  create_info.imageColorSpace = format.colorSpace;
+  create_info.imageExtent = m_render_extent;
+  create_info.imageArrayLayers = 1;
+  create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  create_info.preTransform = capabilities.currentTransform;
+  create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+  create_info.presentMode = present_mode;
+  create_info.clipped = VK_TRUE;
+  create_info.oldSwapchain = VK_NULL_HANDLE; /* TODO Window resize */
 
   uint32_t queueFamilyIndices[] = {m_queue_family_graphic, m_queue_family_present};
 
@@ -740,41 +727,35 @@ GHOST_TSuccess GHOST_ContextVK::createSwapchain(void)
   m_swapchain_image_views.resize(image_count);
   m_swapchain_framebuffers.resize(image_count);
   for (int i = 0; i < image_count; i++) {
-    VkImageViewCreateInfo view_create_info = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .image = m_swapchain_images[i],
-        .viewType = VK_IMAGE_VIEW_TYPE_2D,
-        .format = format.format,
-        .components =
-            {
-                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-            },
-        .subresourceRange =
-            {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
+    VkImageViewCreateInfo view_create_info = {};
+    view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_create_info.image = m_swapchain_images[i];
+    view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_create_info.format = format.format;
+    view_create_info.components = {
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
     };
+    view_create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    view_create_info.subresourceRange.baseMipLevel = 0;
+    view_create_info.subresourceRange.levelCount = 1;
+    view_create_info.subresourceRange.baseArrayLayer = 0;
+    view_create_info.subresourceRange.layerCount = 1;
 
     VK_CHECK(vkCreateImageView(m_device, &view_create_info, NULL, &m_swapchain_image_views[i]));
 
     VkImageView attachments[] = {m_swapchain_image_views[i]};
 
-    VkFramebufferCreateInfo fb_create_info = {
-        .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-        .renderPass = m_render_pass,
-        .attachmentCount = 1,
-        .pAttachments = attachments,
-        .width = m_render_extent.width,
-        .height = m_render_extent.height,
-        .layers = 1,
-    };
+    VkFramebufferCreateInfo fb_create_info = {};
+    fb_create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    fb_create_info.renderPass = m_render_pass;
+    fb_create_info.attachmentCount = 1;
+    fb_create_info.pAttachments = attachments;
+    fb_create_info.width = m_render_extent.width;
+    fb_create_info.height = m_render_extent.height;
+    fb_create_info.layers = 1;
 
     VK_CHECK(vkCreateFramebuffer(m_device, &fb_create_info, NULL, &m_swapchain_framebuffers[i]));
   }
@@ -784,17 +765,15 @@ GHOST_TSuccess GHOST_ContextVK::createSwapchain(void)
   m_in_flight_fences.resize(MAX_FRAMES_IN_FLIGHT);
   for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 
-    VkSemaphoreCreateInfo semaphore_info = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-    };
+    VkSemaphoreCreateInfo semaphore_info = {};
+    semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
     VK_CHECK(vkCreateSemaphore(m_device, &semaphore_info, NULL, &m_image_available_semaphores[i]));
     VK_CHECK(vkCreateSemaphore(m_device, &semaphore_info, NULL, &m_render_finished_semaphores[i]));
 
-    VkFenceCreateInfo fence_info = {
-        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-        .flags = VK_FENCE_CREATE_SIGNALED_BIT,
-    };
+    VkFenceCreateInfo fence_info = {};
+    fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
     VK_CHECK(vkCreateFence(m_device, &fence_info, NULL, &m_in_flight_fences[i]));
   }
@@ -839,33 +818,30 @@ GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
     extensions_device.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
   }
 
-  VkApplicationInfo app_info = {
-      .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-      .pApplicationName = "Blender",
-      .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-      .pEngineName = "Blender",
-      .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-      .apiVersion = VK_MAKE_VERSION(m_context_major_version, m_context_minor_version, 0),
-  };
+  VkApplicationInfo app_info = {};
+  app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+  app_info.pApplicationName = "Blender";
+  app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+  app_info.pEngineName = "Blender";
+  app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+  app_info.apiVersion = VK_MAKE_VERSION(m_context_major_version, m_context_minor_version, 0);
 
-  VkInstanceCreateInfo create_info = {
-      .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-      .pApplicationInfo = &app_info,
-      .enabledLayerCount = static_cast<uint32_t>(layers_enabled.size()),
-      .ppEnabledLayerNames = layers_enabled.data(),
-      .enabledExtensionCount = static_cast<uint32_t>(extensions_enabled.size()),
-      .ppEnabledExtensionNames = extensions_enabled.data(),
-  };
+  VkInstanceCreateInfo create_info = {};
+  create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+  create_info.pApplicationInfo = &app_info;
+  create_info.enabledLayerCount = static_cast<uint32_t>(layers_enabled.size());
+  create_info.ppEnabledLayerNames = layers_enabled.data();
+  create_info.enabledExtensionCount = static_cast<uint32_t>(extensions_enabled.size());
+  create_info.ppEnabledExtensionNames = extensions_enabled.data();
 
   VK_CHECK(vkCreateInstance(&create_info, NULL, &m_instance));
 
   if (use_window_surface) {
 #ifdef _WIN32
-    VkWin32SurfaceCreateInfoKHR surface_create_info = {
-        .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
-        hinstance = GetModuleHandle(NULL),
-        hwnd = m_hwnd,
-    };
+    VkWin32SurfaceCreateInfoKHR surface_create_info = {};
+    surface_create_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+    surface_create_info.hinstance = GetModuleHandle(NULL);
+    surface_create_info.hwnd = m_hwnd;
     VK_CHECK(vkCreateWin32SurfaceKHR(m_instance, &surface_create_info, NULL, &m_surface));
 #elif defined(__APPLE__)
     VkMetalSurfaceCreateInfoEXT info = {};
@@ -875,11 +851,10 @@ GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
     info.pLayer = m_metal_layer;
     VK_CHECK(vkCreateMetalSurfaceEXT(m_instance, &info, nullptr, &m_surface));
 #else
-    VkXlibSurfaceCreateInfoKHR surface_create_info = {
-        .sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR,
-        .dpy = m_display,
-        .window = m_window,
-    };
+    VkXlibSurfaceCreateInfoKHR surface_create_info = {};
+    surface_create_info.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
+    surface_create_info.dpy = m_display;
+    surface_create_info.window = m_window;
     VK_CHECK(vkCreateXlibSurfaceKHR(m_instance, &surface_create_info, NULL, &m_surface));
 #endif
   }
@@ -897,12 +872,11 @@ GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
     }
 
     float queue_priorities[] = {1.0f};
-    VkDeviceQueueCreateInfo graphic_queue_create_info = {
-        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-        .queueFamilyIndex = m_queue_family_graphic,
-        .queueCount = 1,
-        .pQueuePriorities = queue_priorities,
-    };
+    VkDeviceQueueCreateInfo graphic_queue_create_info = {};
+    graphic_queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    graphic_queue_create_info.queueFamilyIndex = m_queue_family_graphic;
+    graphic_queue_create_info.queueCount = 1;
+    graphic_queue_create_info.pQueuePriorities = queue_priorities;
     queue_create_infos.push_back(graphic_queue_create_info);
   }
 
@@ -913,36 +887,34 @@ GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
     }
 
     float queue_priorities[] = {1.0f};
-    VkDeviceQueueCreateInfo present_queue_create_info = {
-        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-        .queueFamilyIndex = m_queue_family_present,
-        .queueCount = 1,
-        .pQueuePriorities = queue_priorities,
-    };
+    VkDeviceQueueCreateInfo present_queue_create_info = {};
+    present_queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    present_queue_create_info.queueFamilyIndex = m_queue_family_present;
+    present_queue_create_info.queueCount = 1;
+    present_queue_create_info.pQueuePriorities = queue_priorities;
+
     /* Eash queue must be unique. */
     if (m_queue_family_graphic != m_queue_family_present) {
       queue_create_infos.push_back(present_queue_create_info);
     }
   }
 
-  VkPhysicalDeviceFeatures device_features = {
-      .geometryShader = VK_TRUE,
-      .dualSrcBlend = VK_TRUE,
-      .logicOp = VK_TRUE,
-  };
+  VkPhysicalDeviceFeatures device_features = {};
+  device_features.geometryShader = VK_TRUE;
+  device_features.dualSrcBlend = VK_TRUE;
+  device_features.logicOp = VK_TRUE;
 
-  VkDeviceCreateInfo device_create_info = {
-      .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size()),
-      .pQueueCreateInfos = queue_create_infos.data(),
-      /* layers_enabled are the same as instance extensions.
-       * This is only needed for 1.0 implementations. */
-      .enabledLayerCount = static_cast<uint32_t>(layers_enabled.size()),
-      .ppEnabledLayerNames = layers_enabled.data(),
-      .enabledExtensionCount = static_cast<uint32_t>(extensions_device.size()),
-      .ppEnabledExtensionNames = extensions_device.data(),
-      .pEnabledFeatures = &device_features,
-  };
+  VkDeviceCreateInfo device_create_info = {};
+  device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+  device_create_info.queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size());
+  device_create_info.pQueueCreateInfos = queue_create_infos.data();
+  /* layers_enabled are the same as instance extensions.
+   * This is only needed for 1.0 implementations. */
+  device_create_info.enabledLayerCount = static_cast<uint32_t>(layers_enabled.size());
+  device_create_info.ppEnabledLayerNames = layers_enabled.data();
+  device_create_info.enabledExtensionCount = static_cast<uint32_t>(extensions_device.size());
+  device_create_info.ppEnabledExtensionNames = extensions_device.data();
+  device_create_info.pEnabledFeatures = &device_features;
 
   VK_CHECK(vkCreateDevice(m_physical_device, &device_create_info, NULL, &m_device));
 
