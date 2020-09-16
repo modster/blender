@@ -19,6 +19,7 @@
 # ***** END GPL LICENSE BLOCK *****
 
 add_subdirectory(common)
+add_subdirectory(wavefront_obj)
 
 if(WITH_ALEMBIC)
   add_subdirectory(alembic)
@@ -35,5 +36,3 @@ endif()
 if(WITH_USD)
   add_subdirectory(usd)
 endif()
-
-add_subdirectory(wavefront_obj)

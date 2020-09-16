@@ -43,15 +43,15 @@ OBJCurve::OBJCurve(Depsgraph *depsgraph,
 {
   export_object_eval_ = DEG_get_evaluated_object(depsgraph_, export_object);
   export_curve_ = static_cast<Curve *>(export_object_eval_->data);
-  store_world_axes_transform(export_params.forward_axis, export_params.up_axis);
+  set_world_axes_transform(export_params.forward_axis, export_params.up_axis);
 }
 
 /**
  * Store the product of export axes settings and an object's world transform
  * matrix.
  */
-void OBJCurve::store_world_axes_transform(const eTransformAxisForward forward,
-                                          const eTransformAxisUp up)
+void OBJCurve::set_world_axes_transform(const eTransformAxisForward forward,
+                                        const eTransformAxisUp up)
 {
   float axes_transform[3][3];
   unit_m3(axes_transform);

@@ -67,12 +67,14 @@ const EnumPropertyItem io_obj_transform_axis_up[] = {
     {OBJ_AXIS_NEGATIVE_Z_UP, "NEGATIVE_Z_UP", 0, "-Z", "Negative Z axis"},
     {0, NULL, 0, NULL, NULL}};
 
+const int TOTAL_AXES = 3;
+
 const EnumPropertyItem io_obj_export_evaluation_mode[] = {
     {DAG_EVAL_RENDER,
      "DAG_EVAL_RENDER",
      0,
      "Render",
-     "Modifiers need to be applied for render properties to take effect"},
+     "Apply modifiers to objects for render properties to take effect"},
     {DAG_EVAL_VIEWPORT,
      "DAG_EVAL_VIEWPORT",
      0,
@@ -200,58 +202,57 @@ static void wm_obj_export_draw(bContext *UNUSED(C), wmOperator *op)
   ui_obj_export_settings(op->layout, &ptr);
 }
 
+/**
+ * Return true if any property in the UI is changed.
+ */
 static bool wm_obj_export_check(bContext *C, wmOperator *op)
 {
   char filepath[FILE_MAX];
   Scene *scene = CTX_data_scene(C);
-  bool ret = false;
+  bool changed = false;
   RNA_string_get(op->ptr, "filepath", filepath);
 
   if (!BLI_path_extension_check(filepath, ".obj")) {
     BLI_path_extension_ensure(filepath, FILE_MAX, ".obj");
     RNA_string_set(op->ptr, "filepath", filepath);
-    ret = true;
+    changed = true;
   }
 
   if (RNA_boolean_get(op->ptr, "export_animation")) {
-    const int start = RNA_int_get(op->ptr, "start_frame");
-    const int end = RNA_int_get(op->ptr, "end_frame");
+    int start = RNA_int_get(op->ptr, "start_frame");
+    int end = RNA_int_get(op->ptr, "end_frame");
     /* Set the defaults. */
-    if (start == -INT_MAX) {
-      RNA_int_set(op->ptr, "start_frame", SFRA);
+    if (start == INT_MIN) {
+      start = SFRA;
+      changed = true;
     }
     if (end == INT_MAX) {
-      RNA_int_set(op->ptr, "end_frame", EFRA);
-      ret = true;
+      end = EFRA;
+      changed = true;
     }
     /* Fix manual errors. */
     if (end < start) {
-      RNA_int_set(op->ptr, "end_frame", RNA_int_get(op->ptr, "start_frame"));
-      ret = true;
+      end = start;
+      changed = true;
     }
+    RNA_int_set(op->ptr, "start_frame", start);
+    RNA_int_set(op->ptr, "end_frame", end);
   }
   else {
     /* Set the default export frames to the current one in viewport. */
     RNA_int_set(op->ptr, "start_frame", CFRA);
     RNA_int_set(op->ptr, "end_frame", CFRA);
-    ret = true;
+    changed = true;
   }
 
   /* Both forward and up axes cannot be the same (or same except opposite sign). */
-  if ((RNA_enum_get(op->ptr, "forward_axis")) % 3 == (RNA_enum_get(op->ptr, "up_axis")) % 3) {
+  if (RNA_enum_get(op->ptr, "forward_axis") % TOTAL_AXES ==
+      (RNA_enum_get(op->ptr, "up_axis") % TOTAL_AXES)) {
     /* TODO (ankitm) Show a warning here. */
-    RNA_enum_set(op->ptr, "up_axis", RNA_enum_get(op->ptr, "up_axis") % 3 + 1);
-    ret = true;
+    RNA_enum_set(op->ptr, "up_axis", RNA_enum_get(op->ptr, "up_axis") % TOTAL_AXES + 1);
+    changed = true;
   }
-
-  /* One can enable smooth groups bitflags, then disable smooth groups, but smooth group bitflags
-   * remain enabled. This can be confusing.
-   */
-  if (!RNA_boolean_get(op->ptr, "export_smooth_groups")) {
-    RNA_boolean_set(op->ptr, "smooth_group_bitflags", false);
-    ret = true;
-  }
-  return ret;
+  return changed;
 }
 
 void WM_OT_obj_export(struct wmOperatorType *ot)
@@ -282,21 +283,21 @@ void WM_OT_obj_export(struct wmOperatorType *ot)
                   "Export multiple frames instead of the current frame only");
   RNA_def_int(ot->srna,
               "start_frame",
-              -INT_MAX, /* Check function uses this to set SFRA. */
-              -INT_MAX,
+              INT_MIN, /* wm_obj_export_check uses this to set SFRA. */
+              INT_MIN,
               INT_MAX,
               "Start Frame",
               "The first frame to be exported",
-              -INT_MAX,
+              INT_MIN,
               INT_MAX);
   RNA_def_int(ot->srna,
               "end_frame",
-              INT_MAX, /* Check function uses this to set EFRA. */
-              -INT_MAX,
+              INT_MAX, /* wm_obj_export_check uses this to set EFRA. */
+              INT_MIN,
               INT_MAX,
               "End Frame",
               "The last frame to be exported",
-              -INT_MAX,
+              INT_MIN,
               INT_MAX);
   /* Object transform options. */
   RNA_def_enum(ot->srna,
@@ -308,13 +309,13 @@ void WM_OT_obj_export(struct wmOperatorType *ot)
   RNA_def_enum(ot->srna, "up_axis", io_obj_transform_axis_up, OBJ_AXIS_Z_UP, "Up Axis", "");
   RNA_def_float(ot->srna,
                 "scaling_factor",
-                1.000f,
+                1.0f,
                 0.001f,
-                10 * 1000.000f,
+                10000.0f,
                 "Scale",
                 "Upscale the object by this factor",
                 0.01,
-                1000.000f);
+                1000.0f);
   /* File Writer options. */
   RNA_def_enum(ot->srna,
                "export_eval_mode",
@@ -352,7 +353,7 @@ void WM_OT_obj_export(struct wmOperatorType *ot)
                   "export_curves_as_nurbs",
                   false,
                   "Export Curves as NURBS",
-                  "Export curves in parametric form instead of vertices and edges");
+                  "Export curves in parametric form instead of exporting as mesh");
 
   RNA_def_boolean(ot->srna,
                   "export_object_groups",
@@ -377,11 +378,8 @@ void WM_OT_obj_export(struct wmOperatorType *ot)
       false,
       "Export Smooth Groups",
       "Every smooth-shaded face is assigned group \"1\" and every flat-shaded face \"off\"");
-  RNA_def_boolean(ot->srna,
-                  "smooth_group_bitflags",
-                  false,
-                  "Generate Bitflags for Smooth Groups",
-                  "Generates groups ranging from 2-32, but usually much less than 32");
+  RNA_def_boolean(
+      ot->srna, "smooth_group_bitflags", false, "Generate Bitflags for Smooth Groups", "");
 }
 
 static int wm_obj_import_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
