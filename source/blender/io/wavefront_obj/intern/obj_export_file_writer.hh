@@ -101,6 +101,12 @@ class OBJWriter {
   void update_index_offsets(const OBJMesh &obj_mesh_data);
 
  private:
+  /* Based on export paramters, a writer function with correct syntax is needed. */
+  typedef void (OBJWriter::*func_vert_uv_normal_indices)(Span<uint>,
+                                                         Span<uint>,
+                                                         Span<uint>,
+                                                         const uint) const;
+  func_vert_uv_normal_indices get_poly_element_writer(const OBJMesh &obj_mesh_data);
   void write_vert_uv_normal_indices(Span<uint> vert_indices,
                                     Span<uint> uv_indices,
                                     Span<uint> normal_indices,

@@ -281,11 +281,10 @@ void OBJWriter::write_vertex_group(const OBJMesh &obj_mesh_data,
 }
 
 /**
- * Define and write face elements with at least vertex indices, and conditionally with UV vertex
- * indices and face normal indices. Also write groups: smooth, vertex, material.
- *  \note UV indices are stored while writing UV vertices.
+ * Select which syntax to write polygon elements with.
  */
-void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
+OBJWriter::func_vert_uv_normal_indices OBJWriter::get_poly_element_writer(
+    const OBJMesh &obj_mesh_data)
 {
   /* -1 has no significant value, it can be any negative number. */
   int last_face_smooth_group = -1;
@@ -295,35 +294,35 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
   /* -1 has no significant value, it can be any negative number. */
   short last_face_mat_nr = -1;
 
-  void (OBJWriter::*func_vert_uv_normal_indices)(Span<uint> vert_indices,
-                                                 Span<uint> uv_indices,
-                                                 Span<uint> normal_indices,
-                                                 const uint tot_loop) const = nullptr;
   if (export_params_.export_normals) {
     if (export_params_.export_uv && (obj_mesh_data.tot_uv_vertices() > 0)) {
       /* Write both normals and UV indices. */
-      func_vert_uv_normal_indices = &OBJWriter::write_vert_uv_normal_indices;
+      return &OBJWriter::write_vert_uv_normal_indices;
     }
-    else {
-      /* Write normals indices. */
-      func_vert_uv_normal_indices = &OBJWriter::write_vert_normal_indices;
-    }
+    /* Write normals indices. */
+    return &OBJWriter::write_vert_normal_indices;
   }
-  else {
-    /* Write UV indices. */
-    if (export_params_.export_uv && (obj_mesh_data.tot_uv_vertices() > 0)) {
-      func_vert_uv_normal_indices = &OBJWriter::write_vert_uv_indices;
-    }
-    else {
-      /* Write neither normals nor UV indices. */
-      func_vert_uv_normal_indices = &OBJWriter::write_vert_indices;
-    }
+  /* Write UV indices. */
+  if (export_params_.export_uv && (obj_mesh_data.tot_uv_vertices() > 0)) {
+    return &OBJWriter::write_vert_uv_indices;
   }
+  /* Write neither normals nor UV indices. */
+  return &OBJWriter::write_vert_indices;
+}
+
+/**
+ * Define and write face elements with at least vertex indices, and conditionally with UV vertex
+ * indices and face normal indices. Also write groups: smooth, vertex, material.
+ *  \note UV indices are stored while writing UV vertices.
+ */
+void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
+{
 
   Vector<uint> vertex_indices;
     const int totloop = obj_mesh_data.ith_poly_totloop(i);
     vertex_indices.resize(totloop);
     obj_mesh_data.calc_poly_vertex_indices(i, vertex_indices);
+  func_vert_uv_normal_indices poly_element_writer = get_poly_element_writer(obj_mesh_data);
 
   Vector<uint> face_normal_indices;
   /* Reset for every Object. */
@@ -339,8 +338,8 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
     write_smooth_group(obj_mesh_data, i, last_face_smooth_group);
     write_vertex_group(obj_mesh_data, i, last_face_vertex_group);
     write_poly_material(obj_mesh_data, i, last_face_mat_nr);
-    (this->*func_vert_uv_normal_indices)(
-        vertex_indices, obj_mesh_data.uv_indices(i), normal_indices, totloop);
+    (this->*poly_element_writer)(
+        face_vertex_indices, obj_mesh_data.uv_indices(i), face_normal_indices, totloop);
   }
 }
 
