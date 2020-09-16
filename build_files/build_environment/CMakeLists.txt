@@ -30,7 +30,7 @@
 #   build_deps 2015 x64 / build_deps 2015 x86
 #
 # MAC OS X USAGE:
-#   Install with homebrew: brew install cmake autoconf automake libtool yasm nasm bison
+#   Install with homebrew: brew install autoconf automake bison cmake libtool pkg-config yasm
 #   Run "make deps" from main Blender directory
 #
 # LINUX USAGE:
@@ -88,6 +88,7 @@ include(cmake/python_site_packages.cmake)
 include(cmake/package_python.cmake)
 include(cmake/numpy.cmake)
 include(cmake/usd.cmake)
+include(cmake/potrace.cmake)
 # Boost needs to be included after python.cmake due to the PYTHON_BINARY variable being needed.
 include(cmake/boost.cmake)
 if(UNIX)
