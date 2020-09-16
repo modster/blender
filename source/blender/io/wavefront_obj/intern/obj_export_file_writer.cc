@@ -259,25 +259,28 @@ void OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
 }
 
 /**
- * Write the name of the deform group of a face. If no vertex group is found in the face, "off" is
- * written.
+ * Write the name of the deform group of a polygon. If no vertex group is found in
+ * the polygon, "off" is written.
  */
 void OBJWriter::write_vertex_group(const OBJMesh &obj_mesh_data,
                                    const uint poly_index,
-                                   short &last_face_vertex_group) const
+                                   short &r_last_poly_vertex_group) const
 {
   if (!export_params_.export_vertex_groups) {
     return;
   }
+  const short current_group = obj_mesh_data.get_poly_deform_group_index(poly_index);
 
-  const char *def_group_name = obj_mesh_data.get_poly_deform_group_name(poly_index,
-                                                                        last_face_vertex_group);
-  if (!def_group_name) {
-    /* Don't write the name of the group again. If set once, the group name changes only when a new
-     * one is encountered. */
+  if (current_group == r_last_poly_vertex_group) {
+    /* No vertex group found in this face, just like in the last iteration. */
     return;
   }
-  fprintf(outfile_, "g %s\n", def_group_name);
+  r_last_poly_vertex_group = current_group;
+  if (current_group == NOT_FOUND) {
+    fprintf(outfile_, "g off\n");
+    return;
+  }
+  fprintf(outfile_, "g %s\n", obj_mesh_data.get_poly_deform_group_name(current_group));
 }
 
 /**
@@ -286,9 +289,6 @@ void OBJWriter::write_vertex_group(const OBJMesh &obj_mesh_data,
 OBJWriter::func_vert_uv_normal_indices OBJWriter::get_poly_element_writer(
     const OBJMesh &obj_mesh_data)
 {
-  /* -1 is used to denote face having no vertex group. It can be any _other_ negative
-   * number. */
-  short last_face_vertex_group = -2;
   /* -1 has no significant value, it can be any negative number. */
   short last_face_mat_nr = -1;
 
@@ -316,6 +316,7 @@ OBJWriter::func_vert_uv_normal_indices OBJWriter::get_poly_element_writer(
 void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
 {
   int last_face_smooth_group = NEGATIVE_INIT;
+  short last_face_vertex_group = NEGATIVE_INIT;
 
   Vector<uint> vertex_indices;
     const int totloop = obj_mesh_data.ith_poly_totloop(i);
