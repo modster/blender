@@ -50,10 +50,9 @@ struct CustomBMeshDeleter {
 };
 
 using unique_bmesh_ptr = std::unique_ptr<BMesh, CustomBMeshDeleter>;
+
 class OBJMesh : NonMovable, NonCopyable {
  private:
-  Depsgraph *depsgraph_;
-
   Object *export_object_eval_;
   Mesh *export_mesh_eval_;
   /**

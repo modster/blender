@@ -47,9 +47,8 @@ namespace blender::io::obj {
  * meshes.
  */
 OBJMesh::OBJMesh(Depsgraph *depsgraph, const OBJExportParams &export_params, Object *export_object)
-    : depsgraph_(depsgraph), export_object_eval_(export_object)
 {
-  export_object_eval_ = DEG_get_evaluated_object(depsgraph_, export_object);
+  export_object_eval_ = DEG_get_evaluated_object(depsgraph, export_object);
   export_mesh_eval_ = BKE_object_get_evaluated_mesh(export_object_eval_);
   mesh_eval_needs_free_ = false;
 
@@ -57,7 +56,7 @@ OBJMesh::OBJMesh(Depsgraph *depsgraph, const OBJExportParams &export_params, Obj
     /* Curves and NURBS surfaces need a new mesh when they're
      * exported in the form of vertices and edges.
      */
-    export_mesh_eval_ = BKE_mesh_new_from_object(depsgraph_, export_object_eval_, true);
+    export_mesh_eval_ = BKE_mesh_new_from_object(depsgraph, export_object_eval_, true);
     /* Since a new mesh been allocated, it needs to be freed in the destructor. */
     mesh_eval_needs_free_ = true;
   }
@@ -217,20 +216,18 @@ void OBJMesh::ensure_mesh_edges() const
  */
 void OBJMesh::calc_smooth_groups(const bool use_bitflags)
 {
-  int tot_smooth_groups = 0;
   poly_smooth_groups_ = BKE_mesh_calc_smoothgroups(export_mesh_eval_->medge,
                                                    export_mesh_eval_->totedge,
                                                    export_mesh_eval_->mpoly,
                                                    export_mesh_eval_->totpoly,
                                                    export_mesh_eval_->mloop,
                                                    export_mesh_eval_->totloop,
-                                                   &tot_smooth_groups,
+                                                   &tot_smooth_groups_,
                                                    use_bitflags);
-  tot_smooth_groups_ = tot_smooth_groups;
 }
 
 /**
- * Return mat_nr-th material of the object.
+ * Return mat_nr-th material of the object. The given index should be zero-based.
  */
 const Material *OBJMesh::get_object_material(const short mat_nr) const
 {
@@ -306,7 +303,8 @@ void OBJMesh::calc_poly_vertex_indices(const uint poly_index,
 {
   const MPoly &mpoly = export_mesh_eval_->mpoly[poly_index];
   const MLoop *mloop = &export_mesh_eval_->mloop[mpoly.loopstart];
-  for (uint loop_index = 0; loop_index < mpoly.totloop; loop_index++) {
+  const int totloop = mpoly.totloop;
+  for (uint loop_index = 0; loop_index < totloop; loop_index++) {
     r_poly_vertex_indices[loop_index] = mloop[loop_index].v;
   }
 }

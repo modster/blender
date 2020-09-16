@@ -158,7 +158,8 @@ void OBJWriter::write_object_name(const OBJMesh &obj_mesh_data) const
  */
 void OBJWriter::write_vertex_coords(const OBJMesh &obj_mesh_data) const
 {
-  for (uint i = 0; i < obj_mesh_data.tot_vertices(); i++) {
+  const int tot_vertices = obj_mesh_data.tot_vertices();
+  for (uint i = 0; i < tot_vertices; i++) {
     float3 vertex = obj_mesh_data.calc_vertex_coords(i, export_params_.scaling_factor);
     fprintf(outfile_, "v %f %f %f\n", vertex[0], vertex[1], vertex[2]);
   }
@@ -186,7 +187,8 @@ void OBJWriter::write_poly_normals(OBJMesh &obj_mesh_data) const
 {
   obj_mesh_data.ensure_mesh_normals();
   Vector<float3> lnormals;
-  for (uint i = 0; i < obj_mesh_data.tot_polygons(); i++) {
+  const int tot_polygons = obj_mesh_data.tot_polygons();
+  for (uint i = 0; i < tot_polygons; i++) {
     if (obj_mesh_data.is_ith_poly_smooth(i)) {
       obj_mesh_data.calc_loop_normals(i, lnormals);
       for (const float3 &lnormal : lnormals) {
@@ -357,7 +359,8 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
 void OBJWriter::write_edges_indices(const OBJMesh &obj_mesh_data) const
 {
   obj_mesh_data.ensure_mesh_edges();
-  for (uint edge_index = 0; edge_index < obj_mesh_data.tot_edges(); edge_index++) {
+  const int tot_edges = obj_mesh_data.tot_edges();
+  for (uint edge_index = 0; edge_index < tot_edges; edge_index++) {
     std::optional<std::array<int, 2>> vertex_indices = obj_mesh_data.calc_loose_edge_vert_indices(
         edge_index);
     if (!vertex_indices) {
