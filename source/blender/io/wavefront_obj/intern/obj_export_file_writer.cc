@@ -440,7 +440,7 @@ MTLWriter::MTLWriter(const char *obj_filepath)
 {
   BLI_strncpy(mtl_filepath_, obj_filepath, FILE_MAX);
   BLI_path_extension_replace(mtl_filepath_, FILE_MAX, ".mtl");
-  mtl_outfile_ = fopen(mtl_filepath_, "a");
+  mtl_outfile_ = fopen(mtl_filepath_, "w");
   if (!mtl_outfile_) {
     std::perror(std::string("Error in creating the file at: ").append(mtl_filepath_).c_str());
     return;
