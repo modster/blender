@@ -247,6 +247,14 @@ void OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
   if (r_last_face_mat_nr == curr_mat_nr) {
     return;
   }
+  r_last_face_mat_nr = curr_mat_nr;
+  if (curr_mat_nr == NOT_FOUND) {
+    /* Once a material is assigned, it cannot be turned off; it can only be changed.
+     * If a material name is not specified, a white material is used.
+     * http://www.martinreddy.net/gfx/3d/OBJ.spec */
+    fprintf(outfile_, "usemtl\n");
+    return;
+  }
   const char *mat_name = obj_mesh_data.get_object_material_name(curr_mat_nr);
   if (export_params_.export_material_groups) {
     const char *object_name = obj_mesh_data.get_object_name();
@@ -254,7 +262,6 @@ void OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
     fprintf(outfile_, "g %s_%s_%s\n", object_name, object_mesh_name, mat_name);
   }
   fprintf(outfile_, "usemtl %s\n", mat_name);
-  r_last_face_mat_nr = curr_mat_nr;
 }
 
 /**

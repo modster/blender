@@ -240,10 +240,15 @@ bool OBJMesh::is_ith_poly_smooth(const uint poly_index) const
   return export_mesh_eval_->mpoly[poly_index].flag & ME_SMOOTH;
 }
 
+/**
+ * Returns a zero-based index of a polygon's material indexing into
+ * the Object's material slots.
+ */
 short OBJMesh::ith_poly_matnr(const uint poly_index) const
 {
   BLI_assert(poly_index < export_mesh_eval_->totpoly);
-  return export_mesh_eval_->mpoly[poly_index].mat_nr;
+  const short r_mat_nr = export_mesh_eval_->mpoly[poly_index].mat_nr;
+  return r_mat_nr > 0 ? r_mat_nr : NOT_FOUND;
 }
 
 int OBJMesh::ith_poly_totloop(const uint poly_index) const
