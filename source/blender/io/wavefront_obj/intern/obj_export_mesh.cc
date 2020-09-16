@@ -234,7 +234,8 @@ void OBJMesh::calc_smooth_groups(const bool use_bitflags)
  */
 const Material *OBJMesh::get_object_material(const short mat_nr) const
 {
-  return BKE_object_material_get(export_object_eval_, mat_nr);
+  /* "+ 1" as material getter needs one-based indices.  */
+  return BKE_object_material_get(export_object_eval_, mat_nr + 1);
 }
 
 bool OBJMesh::is_ith_poly_smooth(const uint poly_index) const
@@ -271,17 +272,18 @@ const char *OBJMesh::get_object_mesh_name() const
 }
 
 /**
- * Get object's material (at the given index) name.
+ * Get object's material (at the given index) name. The given index should be zero-based.
  */
-const char *OBJMesh::get_object_material_name(short mat_nr) const
+const char *OBJMesh::get_object_material_name(const short mat_nr) const
 {
-  const Material *mat = BKE_object_material_get(export_object_eval_, mat_nr);
-#ifdef DEBUG
+  const Material *mat = get_object_material(mat_nr);
   if (!mat) {
+#ifdef DEBUG
     std::cerr << "Material not found for mat_nr = " << mat_nr << std::endl;
-  }
 #endif
-  return mat ? mat->id.name + 2 : nullptr;
+    return nullptr;
+  }
+  return mat->id.name + 2;
 }
 
 /**

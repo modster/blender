@@ -314,12 +314,12 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
  */
 void MaterialWrap::fill_materials()
 {
-    export_mtl_ = obj_mesh_data_.get_object_material(i + 1);
   for (short i = 0; i < obj_mesh_data_.tot_materials(); i++) {
+    export_mtl_ = obj_mesh_data_.get_object_material(i);
     if (!export_mtl_) {
       continue;
     }
-    r_mtl_materials_[i].name = obj_mesh_data_.get_object_material_name(i + 1);
+    r_mtl_materials_[i].name = obj_mesh_data_.get_object_material_name(i);
     init_bsdf_node(obj_mesh_data_.get_object_name());
     store_bsdf_properties(r_mtl_materials_[i]);
     store_image_textures(r_mtl_materials_[i]);
