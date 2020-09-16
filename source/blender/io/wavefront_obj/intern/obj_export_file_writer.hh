@@ -35,11 +35,14 @@ namespace blender::io::obj {
 class OBJMesh;
 class OBJCurve;
 
-/* Types of index offsets. */
-enum eIndexOffsets {
-  VERTEX_OFF = 0,
-  UV_VERTEX_OFF = 1,
-  NORMAL_OFF = 2,
+/**
+ * For an Object, total vertices/ UV vertices/ Normals written by previous objects
+ * are added to its indices.
+ */
+struct IndexOffsets {
+  uint vertex_offset;
+  uint uv_vertex_offset;
+  uint normal_offset;
 };
 
 class OBJWriter {
@@ -49,15 +52,15 @@ class OBJWriter {
    */
   FILE *outfile_;
   const OBJExportParams &export_params_;
+
+  IndexOffsets index_offsets_{0, 0, 0};
   /**
-   * Vertex offset, UV vertex offset, face/loop normal offset respetively.
+   * Total normals of an Object. It is not that same as `Mesh.tot_poly` due
+   * to unknown smooth groups which add loop normals for smooth faces.
+   *
+   * Used for updating normal offset.
    */
-  uint index_offset_[3] = {0, 0, 0};
-  /**
-   * Keeps track of number of normals which depend of smooth shaded faces.
-   * Update index offset for normals using this.
-   */
-  int tot_normals_ = 0;
+  int per_object_tot_normals_ = 0;
 
  public:
   OBJWriter(const OBJExportParams &export_params) : export_params_(export_params)

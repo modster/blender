@@ -44,9 +44,9 @@ void OBJWriter::write_vert_uv_normal_indices(Span<uint> vert_indices,
   for (uint j = 0; j < tot_loop; j++) {
     fprintf(outfile_,
             " %u/%u/%u",
-            vert_indices[j] + index_offset_[VERTEX_OFF],
-            uv_indices[j] + index_offset_[UV_VERTEX_OFF],
-            normal_indices[j] + index_offset_[NORMAL_OFF]);
+            vert_indices[j] + index_offsets_.vertex_offset + 1,
+            uv_indices[j] + index_offsets_.uv_vertex_offset + 1,
+            normal_indices[j] + index_offsets_.normal_offset + 1);
   }
   fprintf(outfile_, "\n");
 }
@@ -63,8 +63,8 @@ void OBJWriter::write_vert_normal_indices(Span<uint> vert_indices,
   for (uint j = 0; j < tot_loop; j++) {
     fprintf(outfile_,
             " %u//%u",
-            vert_indices[j] + index_offset_[VERTEX_OFF],
-            normal_indices[j] + index_offset_[NORMAL_OFF]);
+            vert_indices[j] + index_offsets_.vertex_offset + 1,
+            normal_indices[j] + index_offsets_.normal_offset + 1);
   }
   fprintf(outfile_, "\n");
 }
@@ -81,8 +81,8 @@ void OBJWriter::write_vert_uv_indices(Span<uint> vert_indices,
   for (uint j = 0; j < tot_loop; j++) {
     fprintf(outfile_,
             " %u/%u",
-            vert_indices[j] + index_offset_[VERTEX_OFF],
-            uv_indices[j] + index_offset_[UV_VERTEX_OFF]);
+            vert_indices[j] + index_offsets_.vertex_offset + 1,
+            uv_indices[j] + index_offsets_.uv_vertex_offset + 1);
   }
   fprintf(outfile_, "\n");
 }
@@ -97,7 +97,7 @@ void OBJWriter::write_vert_indices(Span<uint> vert_indices,
 {
   fprintf(outfile_, "f");
   for (uint j = 0; j < tot_loop; j++) {
-    fprintf(outfile_, " %u", vert_indices[j] + index_offset_[VERTEX_OFF]);
+    fprintf(outfile_, " %u", vert_indices[j] + index_offsets_.vertex_offset + 1);
   }
   fprintf(outfile_, "\n");
 }
@@ -371,12 +371,13 @@ void OBJWriter::write_loose_edges(const OBJMesh &obj_mesh_data) const
   for (uint edge_index = 0; edge_index < obj_mesh_data.tot_edges(); edge_index++) {
     std::optional<std::array<int, 2>> vertex_indices = obj_mesh_data.calc_edge_vert_indices(
         edge_index);
-    if (vertex_indices) {
-      fprintf(outfile_,
-              "l %u %u\n",
-              (*vertex_indices)[0] + index_offset_[VERTEX_OFF],
-              (*vertex_indices)[1] + index_offset_[VERTEX_OFF]);
+    if (!vertex_indices) {
+      continue;
     }
+    fprintf(outfile_,
+            "l %u %u\n",
+            (*vertex_indices)[0] + index_offsets_.vertex_offset + 1,
+            (*vertex_indices)[1] + index_offsets_.vertex_offset + 1);
   }
 }
 
@@ -426,15 +427,16 @@ void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
 }
 
 /**
- *  When there are multiple objects in a frame, the indices of previous objects' coordinates or
+ * When there are multiple objects in a frame, the indices of previous objects' coordinates or
  * normals add up.
+ * Make sure to call this after an Object is exported.
  */
 void OBJWriter::update_index_offsets(const OBJMesh &obj_mesh_data)
 {
-  index_offset_[VERTEX_OFF] += obj_mesh_data.tot_vertices();
-  index_offset_[UV_VERTEX_OFF] += obj_mesh_data.tot_uv_vertices();
-  index_offset_[NORMAL_OFF] = tot_normals_;
-  tot_normals_ = 0;
+  index_offsets_.vertex_offset += obj_mesh_data.tot_vertices();
+  index_offsets_.uv_vertex_offset += obj_mesh_data.tot_uv_vertices();
+  index_offsets_.normal_offset += per_object_tot_normals_;
+  per_object_tot_normals_ = 0;
 }
 
 /* -------------------------------------------------------------------- */

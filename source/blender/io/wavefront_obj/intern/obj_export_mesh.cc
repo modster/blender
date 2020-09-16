@@ -308,7 +308,7 @@ void OBJMesh::calc_poly_vertex_indices(const uint poly_index,
   const MPoly &mpoly = export_mesh_eval_->mpoly[poly_index];
   const MLoop *mloop = &export_mesh_eval_->mloop[mpoly.loopstart];
   for (uint loop_index = 0; loop_index < mpoly.totloop; loop_index++) {
-    r_poly_vertex_indices[loop_index] = mloop[loop_index].v + 1;
+    r_poly_vertex_indices[loop_index] = mloop[loop_index].v;
   }
 }
 
@@ -358,7 +358,8 @@ void OBJMesh::store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coo
       r_uv_coords[tot_uv_vertices_ - 1][1] = vert_uv_coords[1];
 
       uv_indices_[uv_vert->poly_index].resize(vertices_in_poly);
-      uv_indices_[uv_vert->poly_index][uv_vert->loop_of_poly_index] = tot_uv_vertices_;
+      /* Keep indices zero-based and let the writer handle the + 1. */
+      uv_indices_[uv_vert->poly_index][uv_vert->loop_of_poly_index] = tot_uv_vertices_ - 1;
     }
   }
   BKE_mesh_uv_vert_map_free(uv_vert_map);
@@ -476,7 +477,7 @@ std::optional<std::array<int, 2>> OBJMesh::calc_edge_vert_indices(const uint edg
 {
   const MEdge &edge = export_mesh_eval_->medge[edge_index];
   if (edge.flag & ME_LOOSEEDGE) {
-    return std::array<int, 2>{static_cast<int>(edge.v1 + 1), static_cast<int>(edge.v2 + 1)};
+    return std::array<int, 2>{static_cast<int>(edge.v1), static_cast<int>(edge.v2)};
   }
   return {};
 }
