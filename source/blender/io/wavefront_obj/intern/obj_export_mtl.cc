@@ -136,26 +136,26 @@ static const bNode *get_node_of_type(Span<const nodes::OutputSocketRef *> socket
  */
 static const char *get_image_filepath(const bNode *tex_node)
 {
-  if (tex_node) {
-    Image *tex_image = reinterpret_cast<Image *>(tex_node->id);
-    if (!tex_image || !BKE_image_has_filepath(tex_image)) {
-      return nullptr;
-    }
-    const char *path = tex_image->filepath;
-    if (BKE_image_has_packedfile(tex_image)) {
-      /* Put image in the same directory as the MTL file. */
-      path = BLI_path_slash_rfind(path) + 1;
-      fprintf(stderr,
-              "Packed image found:'%s'. Unpack and place the image in the same "
-              "directory as the MTL file.\n",
-              path);
-    }
-    if (path[0] == '/' && path[1] == '/') {
-      path += 2;
-    }
-    return path;
+  if (!tex_node) {
+    return nullptr;
   }
-  return nullptr;
+  Image *tex_image = reinterpret_cast<Image *>(tex_node->id);
+  if (!tex_image || !BKE_image_has_filepath(tex_image)) {
+    return nullptr;
+  }
+  const char *path = tex_image->filepath;
+  if (BKE_image_has_packedfile(tex_image)) {
+    /* Put image in the same directory as the MTL file. */
+    path = BLI_path_slash_rfind(path) + 1;
+    fprintf(stderr,
+            "Packed image found:'%s'. Unpack and place the image in the same "
+            "directory as the MTL file.\n",
+            path);
+  }
+  if (path[0] == '/' && path[1] == '/') {
+    path += 2;
+  }
+  return path;
 }
 
 /**
@@ -282,6 +282,10 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
     if (!tex_node) {
       continue;
     }
+    const char *tex_image_filepath = get_image_filepath(tex_node);
+    if (!tex_image_filepath) {
+      continue;
+    }
 
     /* Find "Mapping" node if connected to texture node. */
     linked_sockets_to_dest_id(linked_sockets, tex_node, node_tree, "Vector");
@@ -297,10 +301,6 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
     }
     copy_property_from_node({map_translation, 3}, SOCK_VECTOR, mapping, "Location");
     copy_property_from_node({map_scale, 3}, SOCK_VECTOR, mapping, "Scale");
-    const char *tex_image_filepath = get_image_filepath(tex_node);
-    if (!tex_image_filepath) {
-      continue;
-    }
 
     texture_map.value.scale = map_scale;
     texture_map.value.translation = map_translation;

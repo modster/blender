@@ -149,16 +149,18 @@ void OBJWriter::write_object_name(const OBJMesh &obj_mesh_data) const
 {
   const char *object_name = obj_mesh_data.get_object_name();
 
-  if (export_params_.export_object_groups) {
+  if (!export_params_.export_object_groups) {
+    fprintf(outfile_, "o %s\n", object_name);
+  }
+  else {
     const char *object_mesh_name = obj_mesh_data.get_object_mesh_name();
     if (export_params_.export_materials && export_params_.export_material_groups) {
       const char *object_material_name = obj_mesh_data.get_object_material_name(0);
       fprintf(outfile_, "g %s_%s_%s\n", object_name, object_mesh_name, object_material_name);
     }
-    fprintf(outfile_, "g %s_%s\n", object_name, object_mesh_name);
-  }
-  else {
-    fprintf(outfile_, "o %s\n", object_name);
+    else {
+      fprintf(outfile_, "g %s_%s\n", object_name, object_mesh_name);
+    }
   }
 }
 
