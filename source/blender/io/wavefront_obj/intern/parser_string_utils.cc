@@ -26,7 +26,7 @@
 #include "BLI_string_ref.hh"
 #include "BLI_vector.hh"
 
-#include "string_utils.hh"
+#include "parser_string_utils.hh"
 
 namespace blender::io::obj {
 using std::string;

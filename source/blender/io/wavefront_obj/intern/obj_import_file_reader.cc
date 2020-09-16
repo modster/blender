@@ -30,7 +30,7 @@
 
 #include "obj_export_file_writer.hh"
 #include "obj_import_file_reader.hh"
-#include "string_utils.hh"
+#include "parser_string_utils.hh"
 
 namespace blender::io::obj {
 

@@ -25,7 +25,7 @@
 
 #include "DNA_curve_types.h"
 
-#include "mesh_utils.hh"
+#include "importer_mesh_utils.hh"
 #include "obj_import_nurbs.hh"
 #include "obj_import_objects.hh"
 

@@ -31,7 +31,7 @@
 #include "NOD_shader.h"
 
 #include "obj_import_mtl.hh"
-#include "string_utils.hh"
+#include "parser_string_utils.hh"
 
 namespace blender::io::obj {
 

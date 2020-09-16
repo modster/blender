@@ -23,8 +23,6 @@
 
 #include <array>
 
-#include "mesh_utils.hh"
-
 #include "BKE_displist.h"
 #include "BKE_mesh.h"
 
@@ -33,6 +31,8 @@
 #include "DNA_object_types.h"
 
 #include "IO_wavefront_obj.h"
+
+#include "importer_mesh_utils.hh"
 
 namespace blender::io::obj {
 
@@ -326,6 +326,9 @@ Vector<Vector<int>> ngon_tessellate(Span<float3> vertex_coords, Span<int> face_v
 
 /**
  * Apply axes transform to the Object, and clamp object dimensions to the specified value.
+ *
+ * Ideally, this should be a member of a base class which `MeshFromGeometry` and
+ * `CurveFromGeometry` derive from.
  */
 void transform_object(Object *object, const OBJImportParams &import_params)
 {
