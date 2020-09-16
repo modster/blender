@@ -650,6 +650,15 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
+  if (!MAIN_VERSION_ATLEAST(bmain, 291, 3)) {
+    LISTBASE_FOREACH (Collection *, collection, &bmain->collections) {
+      collection->color_tag = COLLECTION_COLOR_NONE;
+    }
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      scene->master_collection->color_tag = COLLECTION_COLOR_NONE;
+    }
+  }
+
   /**
    * Versioning code until next subversion bump goes here.
    *

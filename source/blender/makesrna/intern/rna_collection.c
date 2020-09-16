@@ -34,6 +34,19 @@
 
 #include "WM_types.h"
 
+const EnumPropertyItem rna_enum_collection_color_items[] = {
+    {COLLECTION_COLOR_NONE, "NONE", ICON_X, "None", "Assign no color tag to the collection"},
+    {COLLECTION_COLOR_01, "COLOR_01", ICON_COLLECTION_COLOR_01, "Color 01", ""},
+    {COLLECTION_COLOR_02, "COLOR_02", ICON_COLLECTION_COLOR_02, "Color 02", ""},
+    {COLLECTION_COLOR_03, "COLOR_03", ICON_COLLECTION_COLOR_03, "Color 03", ""},
+    {COLLECTION_COLOR_04, "COLOR_04", ICON_COLLECTION_COLOR_04, "Color 04", ""},
+    {COLLECTION_COLOR_05, "COLOR_05", ICON_COLLECTION_COLOR_05, "Color 05", ""},
+    {COLLECTION_COLOR_06, "COLOR_06", ICON_COLLECTION_COLOR_06, "Color 06", ""},
+    {COLLECTION_COLOR_07, "COLOR_07", ICON_COLLECTION_COLOR_07, "Color 07", ""},
+    {COLLECTION_COLOR_08, "COLOR_08", ICON_COLLECTION_COLOR_08, "Color 08", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
 #ifdef RNA_RUNTIME
 
 #  include "DNA_object_types.h"
@@ -497,6 +510,12 @@ void RNA_def_collections(BlenderRNA *brna)
   RNA_def_property_enum_items(prop, rna_collection_lineart_usage);
   RNA_def_property_ui_text(prop, "Usage", "How to use this collection in LRT");
   RNA_def_property_update(prop, NC_SCENE, NULL);
+  
+  prop = RNA_def_property(srna, "color_tag", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "color_tag");
+  RNA_def_property_enum_items(prop, rna_enum_collection_color_items);
+  RNA_def_property_ui_text(prop, "Collection Color", "Color tag for a collection");
+  RNA_def_property_update(prop, NC_SCENE | ND_LAYER_CONTENT, NULL);
 
   RNA_define_lib_overridable(false);
 }
