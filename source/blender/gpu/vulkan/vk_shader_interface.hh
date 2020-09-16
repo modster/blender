@@ -45,6 +45,12 @@ class VKShaderInterface : public ShaderInterface {
   {
     inputs_ = (ShaderInput *)MEM_callocN(sizeof(*inputs_), __func__);
     name_buffer_ = (char *)MEM_callocN(1, __func__);
+    for (int i = 0; i < GPU_NUM_UNIFORMS; i++) {
+      builtins_[i] = 0;
+    }
+    for (int i = 0; i < GPU_NUM_UNIFORM_BLOCKS; i++) {
+      builtin_blocks_[i] = 0;
+    }
   };
   ~VKShaderInterface(){};
 
