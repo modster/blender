@@ -41,6 +41,7 @@
 #include "BLI_math.h"
 #include "BLI_rect.h"
 #include "BLI_string.h"
+#include "BLI_string_search.h"
 #include "BLI_string_utf8.h"
 
 #include "BLI_utildefines.h"
@@ -366,6 +367,12 @@ void UI_block_translate(uiBlock *block, int x, int y)
   BLI_rctf_translate(&block->rect, x, y);
 }
 
+static bool ui_but_is_row_alignment_group(const uiBut *left, const uiBut *right)
+{
+  const bool is_same_align_group = (left->alignnr && (left->alignnr == right->alignnr));
+  return is_same_align_group && (left->rect.xmin < right->rect.xmin);
+}
+
 static void ui_block_bounds_calc_text(uiBlock *block, float offset)
 {
   const uiStyle *style = UI_style_get();
@@ -384,7 +391,26 @@ static void ui_block_bounds_calc_text(uiBlock *block, float offset)
       }
     }
 
-    if (bt->next && bt->rect.xmin < bt->next->rect.xmin) {
+    /* Skip all buttons that are in a horizontal alignment group.
+     * We don't want to split them apart (but still check the row's width and apply current
+     * offsets). */
+    if (bt->next && ui_but_is_row_alignment_group(bt, bt->next)) {
+      int width = 0;
+      int alignnr = bt->alignnr;
+      for (col_bt = bt; col_bt && col_bt->alignnr == alignnr; col_bt = col_bt->next) {
+        width += BLI_rctf_size_x(&col_bt->rect);
+        col_bt->rect.xmin += x1addval;
+        col_bt->rect.xmax += x1addval;
+      }
+      if (width > i) {
+        i = width;
+      }
+      /* Give the following code the last button in the alignment group, there might have to be a
+       * split immediately after. */
+      bt = col_bt ? col_bt->prev : NULL;
+    }
+
+    if (bt && bt->next && bt->rect.xmin < bt->next->rect.xmin) {
       /* End of this column, and it's not the last one. */
       for (col_bt = init_col_bt; col_bt->prev != bt; col_bt = col_bt->next) {
         col_bt->rect.xmin = x1addval;
@@ -402,6 +428,17 @@ static void ui_block_bounds_calc_text(uiBlock *block, float offset)
 
   /* Last column. */
   for (col_bt = init_col_bt; col_bt; col_bt = col_bt->next) {
+    /* Recognize a horizontally arranged alignment group and skip its items. */
+    if (col_bt->next && ui_but_is_row_alignment_group(col_bt, col_bt->next)) {
+      int alignnr = col_bt->alignnr;
+      for (; col_bt && col_bt->alignnr == alignnr; col_bt = col_bt->next) {
+        /* pass */
+      }
+    }
+    if (!col_bt) {
+      break;
+    }
+
     col_bt->rect.xmin = x1addval;
     col_bt->rect.xmax = max_ff(x1addval + i + block->bounds, offset + block->minbounds);
 
@@ -1958,8 +1995,12 @@ void UI_block_draw(const bContext *C, uiBlock *block)
         }
       }
     }
-    ui_draw_aligned_panel(
-        &style, block, &rect, UI_panel_category_is_visible(region), show_background);
+    ui_draw_aligned_panel(&style,
+                          block,
+                          &rect,
+                          UI_panel_category_is_visible(region),
+                          show_background,
+                          region->flag & RGN_FLAG_SEARCH_FILTER_ACTIVE);
   }
 
   BLF_batch_draw_begin();
@@ -2570,7 +2611,7 @@ void ui_but_convert_to_unit_alt_name(uiBut *but, char *str, size_t maxlen)
 
     orig_str = BLI_strdup(str);
 
-    bUnit_ToUnitAltName(str, maxlen, orig_str, unit->system, RNA_SUBTYPE_UNIT_VALUE(unit_type));
+    BKE_unit_name_to_alt(str, maxlen, orig_str, unit->system, RNA_SUBTYPE_UNIT_VALUE(unit_type));
 
     MEM_freeN(orig_str);
   }
@@ -2605,13 +2646,13 @@ static void ui_get_but_string_unit(
     precision = float_precision;
   }
 
-  bUnit_AsString2(str,
-                  len_max,
-                  ui_get_but_scale_unit(but, value),
-                  precision,
-                  RNA_SUBTYPE_UNIT_VALUE(unit_type),
-                  unit,
-                  pad);
+  BKE_unit_value_as_string(str,
+                           len_max,
+                           ui_get_but_scale_unit(but, value),
+                           precision,
+                           RNA_SUBTYPE_UNIT_VALUE(unit_type),
+                           unit,
+                           pad);
 }
 
 static float ui_get_but_step_unit(uiBut *but, float step_default)
@@ -2621,12 +2662,13 @@ static float ui_get_but_step_unit(uiBut *but, float step_default)
   /* Scaling up 'step_origg ' here is a bit arbitrary,
    * its just giving better scales from user POV */
   const double scale_step = ui_get_but_scale_unit(but, step_orig * 10);
-  const double step = bUnit_ClosestScalar(scale_step, but->block->unit->system, unit_type);
+  const double step = BKE_unit_closest_scalar(scale_step, but->block->unit->system, unit_type);
 
   /* -1 is an error value */
   if (step != -1.0) {
     const double scale_unit = ui_get_but_scale_unit(but, 1.0);
-    const double step_unit = bUnit_ClosestScalar(scale_unit, but->block->unit->system, unit_type);
+    const double step_unit = BKE_unit_closest_scalar(
+        scale_unit, but->block->unit->system, unit_type);
     double step_final;
 
     BLI_assert(step > 0.0);
@@ -3503,6 +3545,25 @@ void UI_block_theme_style_set(uiBlock *block, char theme_style)
   block->theme_style = theme_style;
 }
 
+bool UI_block_is_search_only(const uiBlock *block)
+{
+  return block->flag & UI_BLOCK_SEARCH_ONLY;
+}
+
+/**
+ * Use when a block must be searched to give accurate results
+ * for the whole region but shouldn't be displayed.
+ */
+void UI_block_set_search_only(uiBlock *block, bool search_only)
+{
+  SET_FLAG_FROM_TEST(block->flag, search_only, UI_BLOCK_SEARCH_ONLY);
+}
+
+void UI_block_set_search_filter(uiBlock *block, const char *search_filter)
+{
+  block->search_filter = search_filter;
+}
+
 static void ui_but_build_drawstr_float(uiBut *but, double value)
 {
   size_t slen = 0;
@@ -3905,6 +3966,7 @@ uiBut *ui_but_change_type(uiBut *but, eButType new_type)
         const bool found_layout = ui_layout_replace_but_ptr(but->layout, old_but_ptr, but);
         BLI_assert(found_layout);
         UNUSED_VARS_NDEBUG(found_layout);
+        ui_button_group_replace_but_ptr(but->layout, old_but_ptr, but);
       }
     }
   }
@@ -6651,30 +6713,34 @@ static void operator_enum_search_update_fn(const struct bContext *C,
   }
   else {
     PointerRNA *ptr = UI_but_operator_ptr_get(but); /* Will create it if needed! */
-    const EnumPropertyItem *item, *item_array;
+
     bool do_free;
+    const EnumPropertyItem *all_items;
+    RNA_property_enum_items_gettexted((bContext *)C, ptr, prop, &all_items, NULL, &do_free);
 
-    /* Prepare BLI_string_all_words_matched. */
-    const size_t str_len = strlen(str);
-    const int words_max = BLI_string_max_possible_word_count(str_len);
-    int(*words)[2] = BLI_array_alloca(words, words_max);
-    const int words_len = BLI_string_find_split_words(str, str_len, ' ', words, words_max);
+    StringSearch *search = BLI_string_search_new();
+    for (const EnumPropertyItem *item = all_items; item->identifier; item++) {
+      BLI_string_search_add(search, item->name, (void *)item);
+    }
 
-    RNA_property_enum_items_gettexted((bContext *)C, ptr, prop, &item_array, NULL, &do_free);
+    const EnumPropertyItem **filtered_items;
+    int filtered_amount = BLI_string_search_query(search, str, (void ***)&filtered_items);
 
-    for (item = item_array; item->identifier; item++) {
+    for (int i = 0; i < filtered_amount; i++) {
+      const EnumPropertyItem *item = filtered_items[i];
       /* note: need to give the index rather than the
        * identifier because the enum can be freed */
-      if (BLI_string_all_words_matched(item->name, str, words, words_len)) {
-        if (!UI_search_item_add(
-                items, item->name, POINTER_FROM_INT(item->value), item->icon, 0, 0)) {
-          break;
-        }
+      if (!UI_search_item_add(
+              items, item->name, POINTER_FROM_INT(item->value), item->icon, 0, 0)) {
+        break;
       }
     }
 
+    MEM_freeN((void *)filtered_items);
+    BLI_string_search_free(search);
+
     if (do_free) {
-      MEM_freeN((void *)item_array);
+      MEM_freeN((void *)all_items);
     }
   }
 }
@@ -6762,7 +6828,8 @@ void UI_but_number_precision_set(uiBut *but, float precision)
   BLI_assert(but->type == UI_BTYPE_NUM);
 
   but_number->precision = precision;
-  BLI_assert(precision > -1);
+  /* -1 is a valid value, UI code figures out an appropriate precision then. */
+  BLI_assert(precision > -2);
 }
 
 /**

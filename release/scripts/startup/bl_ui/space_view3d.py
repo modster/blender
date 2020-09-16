@@ -1073,10 +1073,7 @@ class VIEW3D_MT_uv_map(Menu):
     def draw(self, context):
         layout = self.layout
 
-        tool_settings = context.tool_settings
-
         layout.operator("uv.unwrap")
-        layout.prop(tool_settings, "use_edge_path_live_unwrap")
 
         layout.separator()
 
@@ -1369,7 +1366,7 @@ class VIEW3D_MT_select_object(Menu):
 
         layout.separator()
 
-        layout.operator_menu_enum("object.select_by_type", "type", text="Select All by Type...")
+        layout.operator_menu_enum("object.select_by_type", "type", text="Select All by Type")
         layout.operator("object.select_camera", text="Select Active Camera")
         layout.operator("object.select_mirror", text="Mirror Selection")
         layout.operator("object.select_random", text="Select Random")
@@ -1827,7 +1824,7 @@ class VIEW3D_MT_select_edit_armature(Menu):
 class VIEW3D_MT_select_gpencil(Menu):
     bl_label = "Select"
 
-    def draw(self, _context):
+    def draw(self, context):
         layout = self.layout
 
         layout.operator("gpencil.select_all", text="All").action = 'SELECT'
@@ -1845,7 +1842,7 @@ class VIEW3D_MT_select_gpencil(Menu):
         layout.operator("gpencil.select_alternate")
         layout.operator_menu_enum("gpencil.select_grouped", "type", text="Grouped")
 
-        if _context.mode == 'VERTEX_GPENCIL':
+        if context.mode == 'VERTEX_GPENCIL':
             layout.operator("gpencil.select_vertex_color", text="Vertex Color")
 
         layout.separator()
@@ -2701,14 +2698,14 @@ class VIEW3D_MT_object_constraints(Menu):
 class VIEW3D_MT_object_quick_effects(Menu):
     bl_label = "Quick Effects"
 
-    def draw(self, _context):
+    def draw(self, context):
         layout = self.layout
 
         layout.operator("object.quick_fur")
         layout.operator("object.quick_explode")
         layout.operator("object.quick_smoke")
         layout.operator("object.quick_liquid")
-        if _context.preferences.experimental.use_new_particle_system:
+        if context.preferences.experimental.use_new_particle_system:
             layout.operator("object.quick_particles")
 
 
@@ -4952,9 +4949,9 @@ class VIEW3D_MT_edit_gpencil(Menu):
 class VIEW3D_MT_edit_gpencil_stroke(Menu):
     bl_label = "Stroke"
 
-    def draw(self, _context):
+    def draw(self, context):
         layout = self.layout
-        settings = _context.tool_settings.gpencil_sculpt
+        settings = context.tool_settings.gpencil_sculpt
 
         layout.operator("gpencil.stroke_subdivide", text="Subdivide").only_selected = False
         layout.menu("VIEW3D_MT_gpencil_simplify")

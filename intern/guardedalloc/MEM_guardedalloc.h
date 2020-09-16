@@ -165,7 +165,7 @@ extern void (*MEM_set_error_callback)(void (*func)(const char *));
 /**
  * Are the start/end block markers still correct ?
  *
- * @retval true for correct memory, false for corrupted memory. */
+ * \retval true for correct memory, false for corrupted memory. */
 extern bool (*MEM_consistency_check)(void);
 
 /** Attempt to enforce OSX (or other OS's) to have malloc and stack nonzero */
@@ -214,6 +214,12 @@ extern const char *(*MEM_name_ptr)(void *vmemh);
 /** This should be called as early as possible in the program. When it has been called, information
  * about memory leaks will be printed on exit. */
 void MEM_init_memleak_detection(void);
+
+/**
+ * Use this if we want to call #exit during argument parsing for example,
+ * without having to free all data.
+ */
+void MEM_use_memleak_detection(bool enabled);
 
 /** When this has been called and memory leaks have been detected, the process will have an exit
  * code that indicates failure. This can be used for when checking for memory leaks with automated

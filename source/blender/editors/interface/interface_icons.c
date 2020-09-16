@@ -41,6 +41,7 @@
 #include "BLI_utildefines.h"
 
 #include "DNA_brush_types.h"
+#include "DNA_collection_types.h"
 #include "DNA_curve_types.h"
 #include "DNA_dynamicpaint_types.h"
 #include "DNA_gpencil_types.h"
@@ -256,7 +257,7 @@ static void def_internal_vicon(int icon_id, VectorDrawFunc drawFunc)
 
 /* Utilities */
 
-static void viconutil_set_point(GLint pt[2], int x, int y)
+static void viconutil_set_point(int pt[2], int x, int y)
 {
   pt[0] = x;
   pt[1] = y;
@@ -264,7 +265,7 @@ static void viconutil_set_point(GLint pt[2], int x, int y)
 
 static void vicon_small_tri_right_draw(int x, int y, int w, int UNUSED(h), float alpha)
 {
-  GLint pts[3][2];
+  int pts[3][2];
   const int cx = x + w / 2 - 4;
   const int cy = y + w / 2;
   const int d = w / 5, d2 = w / 7;
@@ -460,6 +461,33 @@ DEF_ICON_VECTOR_COLORSET_DRAW_NTH(19, 18)
 DEF_ICON_VECTOR_COLORSET_DRAW_NTH(20, 19)
 
 #  undef DEF_ICON_VECTOR_COLORSET_DRAW_NTH
+
+static void vicon_collection_color_draw(
+    short color_tag, int x, int y, int UNUSED(w), int UNUSED(h), float UNUSED(alpha))
+{
+  bTheme *btheme = UI_GetTheme();
+  const ThemeCollectionColor *collection_color = &btheme->collection_color[color_tag];
+
+  UI_icon_draw_ex(
+      x, y, ICON_OUTLINER_COLLECTION, U.inv_dpi_fac, 1.0f, 0.0f, collection_color->color, true);
+}
+
+#  define DEF_ICON_COLLECTION_COLOR_DRAW(index, color) \
+    static void vicon_collection_color_draw_##index(int x, int y, int w, int h, float alpha) \
+    { \
+      vicon_collection_color_draw(color, x, y, w, h, alpha); \
+    }
+
+DEF_ICON_COLLECTION_COLOR_DRAW(01, COLLECTION_COLOR_01);
+DEF_ICON_COLLECTION_COLOR_DRAW(02, COLLECTION_COLOR_02);
+DEF_ICON_COLLECTION_COLOR_DRAW(03, COLLECTION_COLOR_03);
+DEF_ICON_COLLECTION_COLOR_DRAW(04, COLLECTION_COLOR_04);
+DEF_ICON_COLLECTION_COLOR_DRAW(05, COLLECTION_COLOR_05);
+DEF_ICON_COLLECTION_COLOR_DRAW(06, COLLECTION_COLOR_06);
+DEF_ICON_COLLECTION_COLOR_DRAW(07, COLLECTION_COLOR_07);
+DEF_ICON_COLLECTION_COLOR_DRAW(08, COLLECTION_COLOR_08);
+
+#  undef DEF_ICON_COLLECTION_COLOR_DRAW
 
 /* Dynamically render icon instead of rendering a plain color to a texture/buffer
  * This is not strictly a "vicon", as it needs access to icon->obj to get the color info,
@@ -969,13 +997,22 @@ static void init_internal_icons(void)
   def_internal_vicon(ICON_COLORSET_18_VEC, vicon_colorset_draw_18);
   def_internal_vicon(ICON_COLORSET_19_VEC, vicon_colorset_draw_19);
   def_internal_vicon(ICON_COLORSET_20_VEC, vicon_colorset_draw_20);
+
+  def_internal_vicon(ICON_COLLECTION_COLOR_01, vicon_collection_color_draw_01);
+  def_internal_vicon(ICON_COLLECTION_COLOR_02, vicon_collection_color_draw_02);
+  def_internal_vicon(ICON_COLLECTION_COLOR_03, vicon_collection_color_draw_03);
+  def_internal_vicon(ICON_COLLECTION_COLOR_04, vicon_collection_color_draw_04);
+  def_internal_vicon(ICON_COLLECTION_COLOR_05, vicon_collection_color_draw_05);
+  def_internal_vicon(ICON_COLLECTION_COLOR_06, vicon_collection_color_draw_06);
+  def_internal_vicon(ICON_COLLECTION_COLOR_07, vicon_collection_color_draw_07);
+  def_internal_vicon(ICON_COLLECTION_COLOR_08, vicon_collection_color_draw_08);
 }
 
 static void init_iconfile_list(struct ListBase *list)
 {
   IconFile *ifile;
   struct direntry *dir;
-  int totfile, i, index = 1;
+  int index = 1;
   const char *icondir;
 
   BLI_listbase_clear(list);
@@ -985,9 +1022,9 @@ static void init_iconfile_list(struct ListBase *list)
     return;
   }
 
-  totfile = BLI_filelist_dir_contents(icondir, &dir);
+  int totfile = BLI_filelist_dir_contents(icondir, &dir);
 
-  for (i = 0; i < totfile; i++) {
+  for (int i = 0; i < totfile; i++) {
     if ((dir[i].type & S_IFREG)) {
       const char *filename = dir[i].relname;
 
@@ -2133,6 +2170,9 @@ int ui_id_icon_get(const bContext *C, ID *id, const bool big)
     case ID_SCR:
       iconid = ui_id_screen_get_icon(C, id);
       break;
+    case ID_GR:
+      iconid = UI_collection_color_icon_get((Collection *)id);
+      break;
     default:
       break;
   }
@@ -2292,6 +2332,47 @@ int UI_idcode_icon_get(const int idcode)
     default:
       return ICON_NONE;
   }
+}
+
+int UI_mode_icon_get(const int mode)
+{
+  switch (mode) {
+    case OB_MODE_OBJECT:
+      return ICON_OBJECT_DATAMODE;
+    case OB_MODE_EDIT:
+    case OB_MODE_EDIT_GPENCIL:
+      return ICON_EDITMODE_HLT;
+    case OB_MODE_SCULPT:
+    case OB_MODE_SCULPT_GPENCIL:
+      return ICON_SCULPTMODE_HLT;
+    case OB_MODE_VERTEX_PAINT:
+    case OB_MODE_VERTEX_GPENCIL:
+      return ICON_VPAINT_HLT;
+    case OB_MODE_WEIGHT_PAINT:
+    case OB_MODE_WEIGHT_GPENCIL:
+      return ICON_WPAINT_HLT;
+    case OB_MODE_TEXTURE_PAINT:
+      return ICON_TPAINT_HLT;
+    case OB_MODE_PARTICLE_EDIT:
+      return ICON_PARTICLEMODE;
+    case OB_MODE_POSE:
+      return ICON_POSE_HLT;
+    case OB_MODE_PAINT_GPENCIL:
+      return ICON_GREASEPENCIL;
+    default:
+      return ICON_NONE;
+  }
+}
+
+int UI_collection_color_icon_get(const Collection *collection)
+{
+  int icon = ICON_OUTLINER_COLLECTION;
+
+  if (collection->color_tag != COLLECTION_COLOR_NONE) {
+    icon = ICON_COLLECTION_COLOR_01 + collection->color_tag;
+  }
+
+  return icon;
 }
 
 /* draws icon with dpi scale factor */
