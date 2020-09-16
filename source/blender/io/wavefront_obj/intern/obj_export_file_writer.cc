@@ -317,17 +317,16 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
   short last_face_vertex_group = NEGATIVE_INIT;
   short last_face_mat_nr = NEGATIVE_INIT;
 
-  Vector<uint> vertex_indices;
-    const int totloop = obj_mesh_data.ith_poly_totloop(i);
-    vertex_indices.resize(totloop);
-    obj_mesh_data.calc_poly_vertex_indices(i, vertex_indices);
   func_vert_uv_normal_indices poly_element_writer = get_poly_element_writer(obj_mesh_data);
 
+  Vector<uint> face_vertex_indices;
   Vector<uint> face_normal_indices;
   /* Reset for every Object. */
   per_object_tot_normals_ = 0;
   const int tot_polygons = obj_mesh_data.tot_polygons();
   for (uint i = 0; i < tot_polygons; i++) {
+    const int totloop = obj_mesh_data.ith_poly_totloop(i);
+    obj_mesh_data.calc_poly_vertex_indices(i, face_vertex_indices);
     /* For an Object, a normal index depends on how many have been written before it.
      * This is unknown because of smooth shading. So pass "per object total normals"
      * and update it after each call. */

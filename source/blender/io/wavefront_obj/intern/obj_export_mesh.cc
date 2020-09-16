@@ -304,6 +304,7 @@ void OBJMesh::calc_poly_vertex_indices(const uint poly_index,
   const MPoly &mpoly = export_mesh_eval_->mpoly[poly_index];
   const MLoop *mloop = &export_mesh_eval_->mloop[mpoly.loopstart];
   const int totloop = mpoly.totloop;
+  r_poly_vertex_indices.resize(totloop);
   for (uint loop_index = 0; loop_index < totloop; loop_index++) {
     r_poly_vertex_indices[loop_index] = mloop[loop_index].v;
   }
