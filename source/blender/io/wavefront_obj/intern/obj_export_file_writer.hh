@@ -81,7 +81,7 @@ class OBJWriter {
   bool init_writer(const char *filepath);
 
   void write_object_name(const OBJMesh &obj_mesh_data) const;
-  void write_mtllib(const char *obj_filepath) const;
+  void write_mtllib_name(const char *obj_filepath) const;
   void write_vertex_coords(const OBJMesh &obj_mesh_data) const;
   void write_uv_coords(OBJMesh &obj_mesh_data) const;
   void write_poly_normals(OBJMesh &obj_mesh_data) const;
@@ -124,12 +124,15 @@ class OBJWriter {
  */
 class MTLWriter {
  private:
+  char mtl_filepath_[FILE_MAX];
   FILE *mtl_outfile_;
 
  public:
   MTLWriter(const char *obj_filepath);
   ~MTLWriter();
 
+  bool good() const;
+  const char *mtl_file_path() const;
   void append_materials(const OBJMesh &mesh_to_export);
 
  private:

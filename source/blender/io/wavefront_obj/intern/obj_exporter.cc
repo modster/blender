@@ -111,6 +111,7 @@ static void export_frame(ViewLayer *view_layer,
                          const char *filepath)
 {
   OBJWriter frame_writer(export_params);
+  std::unique_ptr<MTLWriter> mtl_writer = nullptr;
   if (!frame_writer.init_writer(filepath)) {
     return;
   }
@@ -123,8 +124,10 @@ static void export_frame(ViewLayer *view_layer,
       view_layer, depsgraph, export_params, exportable_as_mesh, exportable_as_nurbs);
 
   if (export_params.export_materials) {
-    /* Create an empty MTL file in the beginning, to be appended later. */
-    frame_writer.write_mtllib(filepath);
+    mtl_writer.reset(new MTLWriter(filepath));
+    if (mtl_writer->good()) {
+      frame_writer.write_mtllib_name(mtl_writer->mtl_file_path());
+    }
   }
   for (int i = 0; i < exportable_as_mesh.size(); i++) {
     /* Smooth groups and UV vertex indices may take huge memory, so objects should be freed right
@@ -143,9 +146,8 @@ static void export_frame(ViewLayer *view_layer,
       if (export_params.export_uv) {
         frame_writer.write_uv_coords(*mesh_to_export);
       }
-      if (export_params.export_materials) {
-        MTLWriter mtl_writer(filepath);
-        mtl_writer.append_materials(*mesh_to_export);
+      if (mtl_writer->good()) {
+        mtl_writer->append_materials(*mesh_to_export);
       }
       frame_writer.write_poly_elements(*mesh_to_export);
     }

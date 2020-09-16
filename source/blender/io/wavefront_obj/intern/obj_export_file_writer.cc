@@ -121,23 +121,9 @@ bool OBJWriter::init_writer(const char *filepath)
 
 /**
  * Write file name of Material Library in OBJ file.
- * Also create an empty Material Library file, or truncate the existing one.
  */
-void OBJWriter::write_mtllib(const char *obj_filepath) const
+void OBJWriter::write_mtllib_name(const char *mtl_filepath) const
 {
-  char mtl_filepath[FILE_MAX];
-  BLI_strncpy(mtl_filepath, obj_filepath, FILE_MAX);
-  BLI_path_extension_replace(mtl_filepath, FILE_MAX, ".mtl");
-
-  FILE *mtl_outfile = fopen(mtl_filepath, "w");
-  if (!mtl_outfile) {
-    fprintf(stderr, "Error opening Material Library file:%s", mtl_filepath);
-    return;
-  }
-  fprintf(stderr, "Material Library: %s\n", mtl_filepath);
-  fprintf(mtl_outfile, "# Blender %s\n# www.blender.org\n", BKE_blender_version_string());
-  fclose(mtl_outfile);
-
   /* Split MTL file path into parent directory and filename. */
   char mtl_file_name[FILE_MAXFILE];
   char mtl_dir_name[FILE_MAXDIR];
@@ -452,14 +438,15 @@ void OBJWriter::update_index_offsets(const OBJMesh &obj_mesh_data)
  */
 MTLWriter::MTLWriter(const char *obj_filepath)
 {
-  char mtl_filepath[FILE_MAX];
-  BLI_strncpy(mtl_filepath, obj_filepath, FILE_MAX);
-  BLI_path_extension_replace(mtl_filepath, FILE_MAX, ".mtl");
-  mtl_outfile_ = fopen(mtl_filepath, "a");
+  BLI_strncpy(mtl_filepath_, obj_filepath, FILE_MAX);
+  BLI_path_extension_replace(mtl_filepath_, FILE_MAX, ".mtl");
+  mtl_outfile_ = fopen(mtl_filepath_, "a");
   if (!mtl_outfile_) {
     std::perror(std::string("Error in creating the file at: ").append(mtl_filepath_).c_str());
     return;
   }
+  fprintf(stderr, "Material Library: %s\n", mtl_filepath_);
+  fprintf(mtl_outfile_, "# Blender %s\n# www.blender.org\n", BKE_blender_version_string());
 }
 
 MTLWriter::~MTLWriter()
@@ -468,6 +455,20 @@ MTLWriter::~MTLWriter()
     std::cerr << "Error: could not close the MTL file properly, file may be corrupted."
               << std::endl;
   }
+}
+
+/**
+ * \return if the MTL file is writable.
+ */
+bool MTLWriter::good() const
+{
+  return mtl_outfile_ != nullptr;
+}
+
+const char *MTLWriter::mtl_file_path() const
+{
+  BLI_assert(this->good());
+  return mtl_filepath_;
 }
 
 void MTLWriter::write_bsdf_properties(const blender::io::obj::MTLMaterial &mtl_material)
@@ -519,7 +520,7 @@ void MTLWriter::write_texture_map(const MTLMaterial &mtl_material,
 
 void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
 {
-  assert(mtl_outfile_);
+  BLI_assert(this->good());
   if (!mtl_outfile_) {
     /* Error logging in constructor. */
     return;
