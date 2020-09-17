@@ -640,26 +640,6 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
         }
       }
     }
-
-    /* Fix fcurves to allow for new bezier handles behaviour (T75881 and D8752). */
-    for (bAction *act = bmain->actions.first; act; act = act->id.next) {
-      for (FCurve *fcu = act->curves.first; fcu; fcu = fcu->next) {
-        /* Only need to fix Bezier curves with at least 2 keyframes. */
-        if (fcu->totvert < 2 || fcu->bezt == NULL) {
-          return;
-        }
-        do_versions_291_fcurve_handles_limit(fcu);
-      }
-    }
-  }
-
-  if (!MAIN_VERSION_ATLEAST(bmain, 291, 3)) {
-    LISTBASE_FOREACH (Collection *, collection, &bmain->collections) {
-      collection->color_tag = COLLECTION_COLOR_NONE;
-    }
-    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
-      scene->master_collection->color_tag = COLLECTION_COLOR_NONE;
-    }
   }
 
   if (!MAIN_VERSION_ATLEAST(bmain, 291, 4) && MAIN_VERSION_ATLEAST(bmain, 291, 1)) {
@@ -676,6 +656,42 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
                                                     sizeof(CustomDataLayer);
       mesh->pdata.totlayer = mesh->pdata.maxlayer = MEM_allocN_len(mesh->pdata.layers) /
                                                     sizeof(CustomDataLayer);
+    }
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 291, 5)) {
+    /* Fix fcurves to allow for new bezier handles behaviour (T75881 and D8752). */
+    for (bAction *act = bmain->actions.first; act; act = act->id.next) {
+      for (FCurve *fcu = act->curves.first; fcu; fcu = fcu->next) {
+        /* Only need to fix Bezier curves with at least 2 keyframes. */
+        if (fcu->totvert < 2 || fcu->bezt == NULL) {
+          continue;
+        }
+        do_versions_291_fcurve_handles_limit(fcu);
+      }
+    }
+
+    LISTBASE_FOREACH (Collection *, collection, &bmain->collections) {
+      collection->color_tag = COLLECTION_COLOR_NONE;
+    }
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      /* Old files do not have a master collection, but it will be created by
+       * `BKE_collection_master_add()`. */
+      if (scene->master_collection) {
+        scene->master_collection->color_tag = COLLECTION_COLOR_NONE;
+      }
+    }
+
+    /* Add custom profile and bevel mode to curve bevels. */
+    if (!DNA_struct_elem_find(fd->filesdna, "Curve", "char", "bevel_mode")) {
+      LISTBASE_FOREACH (Curve *, curve, &bmain->curves) {
+        if (curve->bevobj != NULL) {
+          curve->bevel_mode = CU_BEV_MODE_OBJECT;
+        }
+        else {
+          curve->bevel_mode = CU_BEV_MODE_ROUND;
+        }
+      }
     }
   }
 
