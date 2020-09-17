@@ -80,7 +80,7 @@ if(WITH_POTRACE)
   list(APPEND LIB
     ${POTRACE_LIBRARIES}
   )
-  add_compile_definitions(-DWITH_POTRACE)
+  add_definitions(-DWITH_POTRACE)
 endif()
 
 if(WITH_INTERNATIONAL)
