@@ -256,7 +256,7 @@ void ED_gpencil_trace_data_to_strokes(Main *bmain,
 #define MAX_LENGTH 100.0f
   /* Find materials and create them if not found.  */
   int32_t mat_fill_idx = BKE_gpencil_material_find_index_by_name_prefix(ob, "Stroke");
-  int32_t mat_mask_idx = BKE_gpencil_material_find_index_by_name_prefix(ob, "Mask");
+  int32_t mat_mask_idx = BKE_gpencil_material_find_index_by_name_prefix(ob, "Holdout");
 
   const float default_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
   int32_t r_idx;
@@ -270,9 +270,9 @@ void ED_gpencil_trace_data_to_strokes(Main *bmain,
     gp_style->flag |= GP_MATERIAL_FILL_SHOW;
     mat_fill_idx = ob->totcol - 1;
   }
-  /* Masking material. */
+  /* Holdout material. */
   if (mat_mask_idx == -1) {
-    Material *mat_gp = BKE_gpencil_object_material_new(bmain, ob, "Mask", &r_idx);
+    Material *mat_gp = BKE_gpencil_object_material_new(bmain, ob, "Holdout", &r_idx);
     MaterialGPencilStyle *gp_style = mat_gp->gp_style;
 
     linearrgb_to_srgb_v4(gp_style->stroke_rgba, default_color);
