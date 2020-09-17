@@ -53,8 +53,6 @@ set(SRC
   gpencil_primitive.c
   gpencil_sculpt_paint.c
   gpencil_select.c
-  gpencil_trace_ops.c
-  gpencil_trace_utils.c
   gpencil_undo.c
   gpencil_utils.c
   gpencil_uv.c
@@ -69,8 +67,21 @@ set(SRC
 set(LIB
   bf_blenkernel
   bf_blenlib
-  extern_potrace
 )
+
+if(WITH_POTRACE)
+  list(APPEND SRC
+    gpencil_trace_ops.c
+    gpencil_trace_utils.c
+  )
+  list(APPEND INC
+    ${POTRACE_INCLUDE_DIRS}
+  )
+  list(APPEND LIB
+    ${POTRACE_LIBRARIES}
+  )
+  add_compile_definitions(-DWITH_POTRACE)
+endif()
 
 if(WITH_INTERNATIONAL)
   add_definitions(-DWITH_INTERNATIONAL)

@@ -109,5 +109,3 @@ endif()
 if(WITH_MOD_FLUID)
   add_subdirectory(mantaflow)
 endif()
-
-add_subdirectory(potrace)
