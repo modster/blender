@@ -229,7 +229,6 @@ typedef struct GPENCIL_FramebufferList {
   struct GPUFrameBuffer *mask_fb;
   struct GPUFrameBuffer *smaa_edge_fb;
   struct GPUFrameBuffer *smaa_weight_fb;
-  struct GPUFrameBuffer *mat_mask_fb;
 } GPENCIL_FramebufferList;
 
 typedef struct GPENCIL_TextureList {
