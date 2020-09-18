@@ -245,6 +245,9 @@ static void bakeModifier(Main *UNUSED(bmain),
       ED_lineart_modifier_sync_flag_set(LRT_SYNC_WAITING, 1);
       BLI_spin_lock(&lineart_share.lock_loader);
       ED_lineart_compute_feature_lines_background(depsgraph, 1);
+      /* Wait for loading finish */
+      BLI_spin_lock(&lineart_share.lock_loader);
+      BLI_spin_unlock(&lineart_share.lock_loader);
     }
     while (!ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH) ||
            !ED_lineart_calculation_flag_check(LRT_RENDER_FINISHED)) {

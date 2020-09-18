@@ -1786,6 +1786,10 @@ static void lineart_main_load_geometries(Depsgraph *depsgraph,
     int usage = ED_lineart_object_collection_usage_check(scene->master_collection, ob);
 
     lineart_geometry_object_load(ob, view, proj, rb, usage);
+
+    if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
+      return;
+    }
   }
   DEG_OBJECT_ITER_END;
 }
@@ -3834,9 +3838,7 @@ void ED_lineart_compute_feature_lines_background(Depsgraph *dg, const int show_f
     if (G.debug_value == 4000) {
       printf("LRT: Canceling.\n");
     }
-    /* No need to lock anything as we are canceling anyway. Will there be any potential memory
-     * problem 'while' canceling? */
-    BLI_spin_unlock(&lineart_share.lock_loader);
+    /* Can't release the lock just right now, because loading function might still be canceling */
   }
 
   if (tp_read) {
@@ -4061,6 +4063,10 @@ static int lineart_gpencil_update_strokes_exec(bContext *C, wmOperator *UNUSED(o
 
   ED_lineart_compute_feature_lines_background(dg, 0);
 
+  /* Wait for loading finish */
+  BLI_spin_lock(&lineart_share.lock_loader);
+  BLI_spin_unlock(&lineart_share.lock_loader);
+
   WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED | ND_SPACE_PROPERTIES, NULL);
 
   return OPERATOR_FINISHED;
@@ -4100,6 +4106,11 @@ static int lineart_gpencil_bake_strokes_invoke(bContext *C,
 
     BLI_spin_lock(&lineart_share.lock_loader);
     ED_lineart_compute_feature_lines_background(dg, 0);
+
+    /* Wait for loading finish */
+    BLI_spin_lock(&lineart_share.lock_loader);
+    BLI_spin_unlock(&lineart_share.lock_loader);
+
     while (!ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH) ||
            !ED_lineart_calculation_flag_check(LRT_RENDER_FINISHED)) {
       /* Wait till it's done. */
@@ -4296,15 +4307,15 @@ void ED_lineart_update_render_progress(int nr, const char *info)
   if (lineart_share.main_window) {
     if (nr == 100) {
       /*WM_CURSOR_DEFAULT doesn't seem to work?*/
-      WM_cursor_set(lineart_share.main_window, WM_CURSOR_NW_ARROW);
-      WM_cursor_modal_restore(lineart_share.main_window);
+      // WM_cursor_set(lineart_share.main_window, WM_CURSOR_NW_ARROW);
+      // WM_cursor_modal_restore(lineart_share.main_window);
       WM_progress_clear(lineart_share.main_window);
     }
     else {
       /* Hack: this prevents XWindow cursor error crashes when this thread and an operator is
        * setting cursor at the same time. */
       if (!G.moving) {
-        WM_cursor_time(lineart_share.main_window, nr);
+        // WM_cursor_time(lineart_share.main_window, nr);
         WM_progress_set(lineart_share.main_window, (float)nr / 100);
       }
     }
