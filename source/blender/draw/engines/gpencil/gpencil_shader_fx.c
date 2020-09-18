@@ -636,7 +636,7 @@ void gpencil_vfx_cache_populate(GPENCIL_Data *vedata, Object *ob, GPENCIL_tObjec
     }
   }
 
-  if ((!pd->simplify_fx && tgp_ob->vfx.first != NULL) || tgp_ob->do_mat_masking) {
+  if ((!pd->simplify_fx && tgp_ob->vfx.first != NULL) || tgp_ob->do_mat_holdout) {
     /* We need an extra pass to combine result to main buffer. */
     iter.target_fb = &fbl->gpencil_fb;
 

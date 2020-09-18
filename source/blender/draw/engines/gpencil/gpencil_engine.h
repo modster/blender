@@ -197,8 +197,8 @@ typedef struct GPENCIL_tObject {
 
   bool is_drawmode3d;
 
-  /* Use Material Masking. */
-  bool do_mat_masking;
+  /* Use Material Holdout. */
+  bool do_mat_holdout;
 
 } GPENCIL_tObject;
 
