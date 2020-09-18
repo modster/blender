@@ -2562,7 +2562,7 @@ void ED_lineart_destroy_render_data(void)
   }
 
   if (G.debug_value == 4000) {
-    printf("LRT: Destroy render data.\n");
+    printf("LRT: Destroyed render data.\n");
   }
 }
 
@@ -2571,6 +2571,7 @@ void ED_lineart_destroy_render_data_external(void)
   if (!lineart_share.init_complete) {
     return;
   }
+
   while (ED_lineart_calculation_flag_check(LRT_RENDER_RUNNING)) {
     /* Wait to finish, XXX: should cancel here */
   }
@@ -2592,6 +2593,9 @@ LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene)
 {
   /* Re-init render_buffer_shared */
   if (lineart_share.render_buffer_shared) {
+    if (G.debug_value == 4000) {
+      printf("LRT: **** Destroy on create.\n");
+    }
     ED_lineart_destroy_render_data_external();
   }
 
@@ -3990,6 +3994,9 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *UNUSED(depsgraph),
     MEM_freeN(stroke_data);
   }
 
+  if (G.debug_value == 4000) {
+    printf("LRT: Generated strokes.\n");
+  }
   /* release render lock so cache is free to be manipulated. */
   BLI_spin_unlock(&lineart_share.lock_render_status);
 }
@@ -4235,6 +4242,11 @@ void ED_lineart_post_frame_update_external(bContext *C,
         lineart_share.main_window = NULL;
       }
 
+      if (G.debug_value == 4000) {
+        printf("LRT: ---- Post frame update called at LRT_SYNC_WAITING, %s.\n",
+               from_modifier ? "from modifier" : "from scene update");
+      }
+
       /** Lock caller thread before calling feature line computation.
        * This worker is not a background task, so we don't need to try another lock
        * to wait for the worker to finish. The lock will be released in the compute function.
@@ -4248,6 +4260,14 @@ void ED_lineart_post_frame_update_external(bContext *C,
     }
   }
   else if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH)) {
+    /* This code path is not working with motion blur on "render animation". not sure why, but here
+     * if we retain the data and restore the flag, results will be correct. (The wrong
+     * clearing happens when dg->mode == DAG_EVAL_VIEWPORT) so can't really catch it there.) */
+    if (scene->eevee.flag & SCE_EEVEE_MOTION_BLUR_ENABLED) {
+      ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, from_modifier);
+      return;
+    }
+
     /* To avoid double clearing. */
     ED_lineart_modifier_sync_flag_set(LRT_SYNC_CLEARING, from_modifier);
 
@@ -4257,8 +4277,12 @@ void ED_lineart_post_frame_update_external(bContext *C,
     /* Due to using GPencil modifiers, and the scene is updated each time some value is changed, we
      * really don't need to keep the buffer any longer. If in the future we want fast refresh on
      * parameter changes (e.g. thickness or picking different result in an already validated
-     * buffer), remove ED_lineart_destroy_render_data_external() below. */
+     * buffer), remove ED_lineart_destroy_render_data_external() below.*/
     if (!from_modifier) {
+      if (G.debug_value == 4000) {
+        printf("LRT: ---- Destroy on update (%d).\n", DEG_get_mode(dg));
+      }
+
       ED_lineart_destroy_render_data_external();
     }
 

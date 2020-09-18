@@ -93,6 +93,10 @@ static void generate_strokes_actual(
                              (lmd->line_types & LRT_EDGE_FLAG_INTERSECTION) :
                              lmd->line_types));
 #endif
+  if (G.debug_value == 4000) {
+    printf("LRT: Generating from modifier.\n");
+  }
+
   ED_lineart_gpencil_generate_strokes_direct(
       depsgraph,
       ob,
@@ -172,6 +176,10 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
     /* Don't have data yet, update line art. Note:  ED_lineart_post_frame_update_external will
      * automatically return when calculation is already in progress.*/
     if (is_render) {
+
+      if (G.debug_value == 4000) {
+        printf("LRT: -------- Modifier calls for update when idle.\n");
+      }
       ED_lineart_post_frame_update_external(
           NULL, DEG_get_evaluated_scene(depsgraph), depsgraph, true);
       while (!ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH) ||
@@ -184,6 +192,9 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
     }
   }
   else if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_WAITING)) {
+    if (G.debug_value == 4000) {
+      printf("LRT: -------- Modifier is waiting for data in LRT_SYNC_WAITING.\n");
+    }
     /* Calculation in process */
     /* Calculation already started. TODO: Cancel and restart in render update! */
     if (is_render) {
@@ -199,9 +210,6 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
 
   /* If we reach here, means calculation is finished (LRT_SYNC_FRESH), we grab cache. flag reset is
    * done by calculation function.*/
-  if (G.debug_value == 4000) {
-    printf("LRT: Generating from modifier.\n");
-  }
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
 
   WM_main_add_notifier(NA_EDITED | NC_GPENCIL, NULL);
