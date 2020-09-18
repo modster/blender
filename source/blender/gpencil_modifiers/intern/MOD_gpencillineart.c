@@ -41,6 +41,7 @@
 
 #include "BKE_collection.h"
 #include "BKE_context.h"
+#include "BKE_global.h"
 #include "BKE_gpencil.h"
 #include "BKE_gpencil_modifier.h"
 #include "BKE_lib_query.h"
@@ -198,7 +199,9 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
 
   /* If we reach here, means calculation is finished (LRT_SYNC_FRESH), we grab cache. flag reset is
    * done by calculation function.*/
-
+  if (G.debug_value == 4000) {
+    printf("LRT: Generating from modifier.\n");
+  }
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
 
   WM_main_add_notifier(NA_EDITED | NC_GPENCIL, NULL);

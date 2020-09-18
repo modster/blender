@@ -388,7 +388,7 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb,
                                                            &r)) {
         lineart_render_line_cut(rb, rl, l, r, rt->base.transparency_mask);
         if (G.debug_value == 4000 && (rl->flags & LRT_EDGE_FLAG_INTERSECTION)) {
-          printf("l,r %f %f   against %s(%d)   this rl is from %s(%d)\n",
+          printf("l,r %f %f   against %s(%d)`   this rl is from %s(%d)\n",
                  l,
                  r,
                  ((Object *)rt->base.rl[0]->object_ref)->id.name,
@@ -2560,6 +2560,10 @@ void ED_lineart_destroy_render_data(void)
     MEM_freeN(rb);
     lineart_share.render_buffer_shared = NULL;
   }
+
+  if (G.debug_value == 4000) {
+    printf("LRT: Destroy render data.\n");
+  }
 }
 
 void ED_lineart_destroy_render_data_external(void)
@@ -3823,6 +3827,9 @@ void ED_lineart_compute_feature_lines_background(Depsgraph *dg, const int show_f
   if (ED_lineart_calculation_flag_check(LRT_RENDER_RUNNING)) {
     /* Set CANCEL flag, and when operation is canceled, flag will become FINISHED. */
     ED_lineart_calculation_flag_set(LRT_RENDER_CANCELING);
+    if (G.debug_value == 4000) {
+      printf("LRT: Canceling.\n");
+    }
     /* No need to lock anything as we are canceling anyway. Will there be any potential memory
      * problem 'while' canceling? */
     BLI_spin_unlock(&lineart_share.lock_loader);
