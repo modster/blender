@@ -308,7 +308,7 @@ struct DupliObject *DRW_object_get_dupli(const Object *UNUSED(ob))
 /** \name Color Management
  * \{ */
 
-/* TODO(fclem) This should be a render engine callback to determine if we need CM or not. */
+/* TODO(fclem): This should be a render engine callback to determine if we need CM or not. */
 static void drw_viewport_colormanagement_set(void)
 {
   Scene *scene = DST.draw_ctx.scene;
@@ -525,7 +525,7 @@ static void draw_unit_state_create(void)
   infos->ob_flag = 1.0f;
   copy_v3_fl(infos->ob_color, 1.0f);
 
-  /* TODO(fclem) get rid of this. */
+  /* TODO(fclem): get rid of this. */
   culling->bsphere.radius = -1.0f;
   culling->user_data = NULL;
 
@@ -2409,23 +2409,21 @@ void DRW_draw_select_loop(struct Depsgraph *depsgraph,
 
   DRW_hair_update();
 
-  DRW_state_lock(DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_ALWAYS | DRW_STATE_DEPTH_LESS_EQUAL |
-                 DRW_STATE_DEPTH_EQUAL | DRW_STATE_DEPTH_GREATER | DRW_STATE_DEPTH_ALWAYS);
-
   /* Only 1-2 passes. */
   while (true) {
     if (!select_pass_fn(DRW_SELECT_PASS_PRE, select_pass_user_data)) {
       break;
     }
+    DRW_state_lock(DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_TEST_ENABLED);
 
     drw_engines_draw_scene();
+
+    DRW_state_lock(0);
 
     if (!select_pass_fn(DRW_SELECT_PASS_POST, select_pass_user_data)) {
       break;
     }
   }
-
-  DRW_state_lock(0);
 
   DRW_state_reset();
   drw_engines_disable();
@@ -2596,7 +2594,7 @@ void DRW_draw_select_id(Depsgraph *depsgraph, ARegion *region, View3D *v3d, cons
   GPUViewport *viewport = WM_draw_region_get_viewport(region);
   if (!viewport) {
     /* Selection engine requires a viewport.
-     * TODO (germano): This should be done internally in the engine. */
+     * TODO(germano): This should be done internally in the engine. */
     sel_ctx->is_dirty = true;
     sel_ctx->objects_drawn_len = 0;
     sel_ctx->index_drawn_len = 1;
