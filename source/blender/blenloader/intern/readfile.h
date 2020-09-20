@@ -24,8 +24,6 @@
 
 #pragma once
 
-#include "BLI_sys_types.h"
-
 #include "DNA_sdna_types.h"
 #include "DNA_space_types.h"
 #include "DNA_windowmanager_types.h" /* for ReportType */
