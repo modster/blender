@@ -59,6 +59,10 @@ typedef uint64_t u_int64_t;
 /* MSVC >= 2010 */
 #elif defined(_MSC_VER)
 #  include <stdint.h>
+
+#  include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+
 #else
 
 /* FreeBSD, Solaris */
