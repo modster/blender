@@ -21,8 +21,7 @@
  * \ingroup edobj
  */
 
-#ifndef __OBJECT_INTERN_H__
-#define __OBJECT_INTERN_H__
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -90,6 +89,8 @@ void OBJECT_OT_forcefield_toggle(struct wmOperatorType *ot);
 void OBJECT_OT_move_to_collection(struct wmOperatorType *ot);
 void OBJECT_OT_link_to_collection(struct wmOperatorType *ot);
 
+void OBJECT_OT_switch_object(struct wmOperatorType *ot);
+
 /* object_select.c */
 void OBJECT_OT_select_all(struct wmOperatorType *ot);
 void OBJECT_OT_select_random(struct wmOperatorType *ot);
@@ -118,6 +119,7 @@ void OBJECT_OT_speaker_add(struct wmOperatorType *ot);
 void OBJECT_OT_hair_add(struct wmOperatorType *ot);
 void OBJECT_OT_pointcloud_add(struct wmOperatorType *ot);
 void OBJECT_OT_collection_instance_add(struct wmOperatorType *ot);
+void OBJECT_OT_data_instance_add(struct wmOperatorType *ot);
 
 void OBJECT_OT_duplicates_make_real(struct wmOperatorType *ot);
 void OBJECT_OT_duplicate(struct wmOperatorType *ot);
@@ -150,8 +152,8 @@ void COLLECTION_OT_objects_remove_active(struct wmOperatorType *ot);
 bool edit_modifier_poll_generic(struct bContext *C,
                                 struct StructRNA *rna_type,
                                 int obtype_flag,
-                                const bool is_editmode_allowed);
-bool edit_modifier_poll(struct bContext *C);
+                                const bool is_editmode_allowed,
+                                const bool is_liboverride_allowed);
 void edit_modifier_properties(struct wmOperatorType *ot);
 bool edit_modifier_invoke_properties(struct bContext *C,
                                      struct wmOperator *op,
@@ -311,5 +313,3 @@ void OBJECT_OT_datalayout_transfer(struct wmOperatorType *ot);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __OBJECT_INTERN_H__ */

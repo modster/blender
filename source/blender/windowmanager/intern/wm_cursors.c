@@ -121,7 +121,7 @@ static GHOST_TStandardCursor convert_to_ghost_standard_cursor(WMCursorType curs)
 }
 
 static void window_set_custom_cursor(
-    wmWindow *win, const uchar mask[16][2], uchar bitmap[16][2], int hotx, int hoty)
+    wmWindow *win, const uchar mask[16][2], const uchar bitmap[16][2], int hotx, int hoty)
 {
   GHOST_SetCustomCursorShape(
       win->ghostwin, (GHOST_TUns8 *)bitmap, (GHOST_TUns8 *)mask, 16, 16, hotx, hoty, true);
@@ -149,18 +149,18 @@ void WM_cursor_set(wmWindow *win, int curs)
     curs = win->modalcursor;
   }
 
-  if (win->cursor == curs) {
-    return; /* Cursor is already set */
-  }
-
-  win->cursor = curs;
-
   if (curs == WM_CURSOR_NONE) {
     GHOST_SetCursorVisibility(win->ghostwin, 0);
     return;
   }
 
   GHOST_SetCursorVisibility(win->ghostwin, 1);
+
+  if (win->cursor == curs) {
+    return; /* Cursor is already set */
+  }
+
+  win->cursor = curs;
 
   if (curs < 0 || curs >= WM_CURSOR_NUM) {
     BLI_assert(!"Invalid cursor number");
@@ -319,15 +319,15 @@ bool wm_cursor_arrow_move(wmWindow *win, const wmEvent *event)
       wm_cursor_warp_relative(win, 0, fac);
       return 1;
     }
-    else if (event->type == EVT_DOWNARROWKEY) {
+    if (event->type == EVT_DOWNARROWKEY) {
       wm_cursor_warp_relative(win, 0, -fac);
       return 1;
     }
-    else if (event->type == EVT_LEFTARROWKEY) {
+    if (event->type == EVT_LEFTARROWKEY) {
       wm_cursor_warp_relative(win, -fac, 0);
       return 1;
     }
-    else if (event->type == EVT_RIGHTARROWKEY) {
+    if (event->type == EVT_RIGHTARROWKEY) {
       wm_cursor_warp_relative(win, fac, 0);
       return 1;
     }
@@ -374,6 +374,8 @@ void WM_cursor_time(wmWindow *win, int nr)
   }
 
   window_set_custom_cursor(win, mask, bitmap, 7, 7);
+  /* Unset current cursor value so it's properly reset to wmWindow.lastcursor. */
+  win->cursor = 0;
 }
 
 /**

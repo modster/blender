@@ -18,10 +18,11 @@
  * \ingroup RNA
  */
 
-#ifndef __RNA_INTERNAL_H__
-#define __RNA_INTERNAL_H__
+#pragma once
 
 #include "BLI_utildefines.h"
+
+#include "BLI_compiler_attrs.h"
 
 #include "rna_internal_types.h"
 
@@ -150,6 +151,7 @@ void RNA_def_action(struct BlenderRNA *brna);
 void RNA_def_animation(struct BlenderRNA *brna);
 void RNA_def_animviz(struct BlenderRNA *brna);
 void RNA_def_armature(struct BlenderRNA *brna);
+void RNA_def_attribute(struct BlenderRNA *brna);
 void RNA_def_boid(struct BlenderRNA *brna);
 void RNA_def_brush(struct BlenderRNA *brna);
 void RNA_def_cachefile(struct BlenderRNA *brna);
@@ -219,6 +221,13 @@ void RNA_def_mask(struct BlenderRNA *brna);
 void RNA_def_xr(struct BlenderRNA *brna);
 
 /* Common Define functions */
+
+void rna_def_attributes_common(struct StructRNA *srna);
+
+void rna_AttributeGroup_iterator_begin(CollectionPropertyIterator *iter, PointerRNA *ptr);
+void rna_AttributeGroup_iterator_next(CollectionPropertyIterator *iter);
+PointerRNA rna_AttributeGroup_iterator_get(CollectionPropertyIterator *iter);
+int rna_AttributeGroup_length(PointerRNA *ptr);
 
 void rna_def_animdata_common(struct StructRNA *srna);
 
@@ -454,10 +463,16 @@ void RNA_def_main_cachefiles(BlenderRNA *brna, PropertyRNA *cprop);
 void RNA_def_main_paintcurves(BlenderRNA *brna, PropertyRNA *cprop);
 void RNA_def_main_workspaces(BlenderRNA *brna, PropertyRNA *cprop);
 void RNA_def_main_lightprobes(BlenderRNA *brna, PropertyRNA *cprop);
+#ifdef WITH_HAIR_NODES
 void RNA_def_main_hairs(BlenderRNA *brna, PropertyRNA *cprop);
+#endif
+#ifdef WITH_PARTICLE_NODES
 void RNA_def_main_pointclouds(BlenderRNA *brna, PropertyRNA *cprop);
+#endif
 void RNA_def_main_volumes(BlenderRNA *brna, PropertyRNA *cprop);
+#ifdef WITH_PARTICLE_NODES
 void RNA_def_main_simulations(BlenderRNA *brna, PropertyRNA *cprop);
+#endif
 
 /* ID Properties */
 
@@ -478,9 +493,11 @@ extern StructRNA RNA_PropertyGroupItem;
 extern StructRNA RNA_PropertyGroup;
 #endif
 
-struct IDProperty *rna_idproperty_check(struct PropertyRNA **prop, struct PointerRNA *ptr);
+struct IDProperty *rna_idproperty_check(struct PropertyRNA **prop,
+                                        struct PointerRNA *ptr) ATTR_WARN_UNUSED_RESULT;
 struct PropertyRNA *rna_ensure_property_realdata(struct PropertyRNA **prop,
-                                                 struct PointerRNA *ptr);
+                                                 struct PointerRNA *ptr) ATTR_WARN_UNUSED_RESULT;
+struct PropertyRNA *rna_ensure_property(struct PropertyRNA *prop) ATTR_WARN_UNUSED_RESULT;
 
 /* Override default callbacks. */
 /* Default override callbacks for all types. */
@@ -489,12 +506,8 @@ struct PropertyRNA *rna_ensure_property_realdata(struct PropertyRNA **prop,
  *       Not obvious though, those are fairly more complicated than basic SDNA access.
  */
 int rna_property_override_diff_default(struct Main *bmain,
-                                       struct PointerRNA *ptr_a,
-                                       struct PointerRNA *ptr_b,
-                                       struct PropertyRNA *prop_a,
-                                       struct PropertyRNA *prop_b,
-                                       const int len_a,
-                                       const int len_b,
+                                       struct PropertyRNAOrID *prop_a,
+                                       struct PropertyRNAOrID *prop_b,
                                        const int mode,
                                        struct IDOverrideLibrary *override,
                                        const char *rna_path,
@@ -644,5 +657,3 @@ void rna_RenderPass_rect_set(PointerRNA *ptr, const float *values);
              : -FLT_MAX, double \
              : -DBL_MAX)
 #endif
-
-#endif /* __RNA_INTERNAL_H__ */

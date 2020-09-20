@@ -943,11 +943,9 @@ void filelist_init_icons(void)
 
 void filelist_free_icons(void)
 {
-  int i;
-
   BLI_assert(G.background == false);
 
-  for (i = 0; i < SPECIAL_IMG_MAX; i++) {
+  for (int i = 0; i < SPECIAL_IMG_MAX; i++) {
     IMB_freeImBuf(gSpecialFileImages[i]);
     gSpecialFileImages[i] = NULL;
   }
@@ -1106,7 +1104,7 @@ static int filelist_geticon_ex(FileDirEntry *file,
     return ICON_FILE_ARCHIVE;
   }
   if (typeflag & FILE_TYPE_BLENDERLIB) {
-    const int ret = UI_idcode_icon_get(file->blentype);
+    const int ret = UI_icon_from_idcode(file->blentype);
     if (ret != ICON_NONE) {
       return ret;
     }
@@ -1127,7 +1125,7 @@ static void parent_dir_until_exists_or_default_root(char *dir)
 {
   if (!BLI_path_parent_dir_until_exists(dir)) {
 #ifdef WIN32
-    get_default_root(dir);
+    BLI_windows_get_default_root_dir(dir);
 #else
     strcpy(dir, "/");
 #endif
@@ -2212,7 +2210,7 @@ static bool file_is_blend_backup(const char *str)
     }
   }
 
-  return (retval);
+  return retval;
 }
 
 /* TODO: Maybe we should move this to BLI?
@@ -2660,9 +2658,9 @@ static void filelist_readjob_main_recursive(Main *bmain, FileList *filelist)
   if (filelist->dir[0] == 0) {
     /* make directories */
 #  ifdef WITH_FREESTYLE
-		filelist->filelist.nbr_entries = 27;
+    filelist->filelist.nbr_entries = 27;
 #  else
-		filelist->filelist.nbr_entries = 26;
+    filelist->filelist.nbr_entries = 26;
 #  endif
     filelist_resize(filelist, filelist->filelist.nbr_entries);
 
@@ -2693,11 +2691,11 @@ static void filelist_readjob_main_recursive(Main *bmain, FileList *filelist)
     filelist->filelist.entries[20].entry->relpath = BLI_strdup("Action");
     filelist->filelist.entries[21].entry->relpath = BLI_strdup("NodeTree");
     filelist->filelist.entries[22].entry->relpath = BLI_strdup("Speaker");
-		filelist->filelist.entries[23].entry->relpath = BLI_strdup("Hair");
-		filelist->filelist.entries[24].entry->relpath = BLI_strdup("Point Cloud");
-		filelist->filelist.entries[25].entry->relpath = BLI_strdup("Volume");
+    filelist->filelist.entries[23].entry->relpath = BLI_strdup("Hair");
+    filelist->filelist.entries[24].entry->relpath = BLI_strdup("Point Cloud");
+    filelist->filelist.entries[25].entry->relpath = BLI_strdup("Volume");
 #  ifdef WITH_FREESTYLE
-		filelist->filelist.entries[26].entry->relpath = BLI_strdup("FreestyleLineStyle");
+    filelist->filelist.entries[26].entry->relpath = BLI_strdup("FreestyleLineStyle");
 #  endif
   }
   else {
@@ -2809,7 +2807,7 @@ static void filelist_readjob_main_recursive(Main *bmain, FileList *filelist)
 static void filelist_readjob_do(const bool do_lib,
                                 FileList *filelist,
                                 const char *main_name,
-                                short *stop,
+                                const short *stop,
                                 short *do_update,
                                 float *progress,
                                 ThreadMutex *lock)

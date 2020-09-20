@@ -20,8 +20,7 @@
  * \ingroup draw
  */
 
-#ifndef __DRAW_CACHE_EXTRACT_H__
-#define __DRAW_CACHE_EXTRACT_H__
+#pragma once
 
 struct TaskGraph;
 
@@ -56,10 +55,15 @@ typedef struct DRW_MeshCDMask {
   uint32_t sculpt_vcol : 8;
   uint32_t orco : 1;
   uint32_t tan_orco : 1;
+  uint32_t sculpt_overlays : 1;
   /** Edit uv layer is from the base edit mesh as
    *  modifiers could remove it. (see T68857) */
   uint32_t edit_uv : 1;
 } DRW_MeshCDMask;
+/* Keep `DRW_MeshCDMask` struct within an `uint64_t`.
+ * bit-wise and atomic operations are used to compare and update the struct.
+ * See `mesh_cd_layers_type_*` functions. */
+BLI_STATIC_ASSERT(sizeof(DRW_MeshCDMask) <= sizeof(uint64_t), "DRW_MeshCDMask exceeds 64 bits")
 
 typedef enum eMRIterType {
   MR_ITER_LOOPTRI = 1 << 0,
@@ -100,6 +104,7 @@ typedef struct MeshBufferCache {
     GPUVertBuf *uv;
     GPUVertBuf *tan;
     GPUVertBuf *vcol;
+    GPUVertBuf *sculpt_data;
     GPUVertBuf *orco;
     /* Only for edit mode. */
     GPUVertBuf *edit_data; /* extend */
@@ -166,8 +171,8 @@ typedef enum DRWBatchFlag {
   MBC_WIRE_EDGES = (1 << 23),
   MBC_WIRE_LOOPS = (1 << 24),
   MBC_WIRE_LOOPS_UVS = (1 << 25),
-  MBC_SURF_PER_MAT = (1 << 26),
-  MBC_SKIN_ROOTS = (1 << 27),
+  MBC_SKIN_ROOTS = (1 << 26),
+  MBC_SCULPT_OVERLAYS = (1 << 27),
 } DRWBatchFlag;
 
 #define MBC_EDITUV \
@@ -217,6 +222,7 @@ typedef struct MeshBatchCache {
     GPUBatch *wire_edges;     /* Individual edges with face normals. */
     GPUBatch *wire_loops;     /* Loops around faces. no edges between selected faces */
     GPUBatch *wire_loops_uvs; /* Same as wire_loops but only has uvs. */
+    GPUBatch *sculpt_overlays;
   } batch;
 
   GPUBatch **surface_per_mat;
@@ -258,6 +264,7 @@ void mesh_buffer_cache_create_requested(struct TaskGraph *task_graph,
                                         Mesh *me,
                                         const bool is_editmode,
                                         const bool is_paint_mode,
+                                        const bool is_mode_active,
                                         const float obmat[4][4],
                                         const bool do_final,
                                         const bool do_uvedit,
@@ -266,5 +273,3 @@ void mesh_buffer_cache_create_requested(struct TaskGraph *task_graph,
                                         const Scene *scene,
                                         const ToolSettings *ts,
                                         const bool use_hide);
-
-#endif /* __DRAW_CACHE_EXTRACT_H__ */

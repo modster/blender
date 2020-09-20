@@ -28,6 +28,7 @@
 #include "DNA_mesh_types.h"
 #include "DNA_meta_types.h"
 #include "DNA_object_types.h"
+#include "DNA_pointcloud_types.h"
 #include "DNA_scene_types.h"
 
 #include "BLI_edgehash.h"
@@ -53,6 +54,8 @@
 #include "BKE_curve.h"
 /* -- */
 #include "BKE_object.h"
+/* -- */
+#include "BKE_pointcloud.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
@@ -286,12 +289,14 @@ int BKE_mesh_nurbs_displist_to_mdata(Object *ob,
       }
     }
     else if (dl->type == DL_SURF) {
-      int tot;
-      totvert += dl->parts * dl->nr;
-      tot = (dl->parts - 1 + ((dl->flag & DL_CYCL_V) == 2)) *
-            (dl->nr - 1 + (dl->flag & DL_CYCL_U));
-      totpoly += tot;
-      totloop += tot * 4;
+      if (dl->parts != 0) {
+        int tot;
+        totvert += dl->parts * dl->nr;
+        tot = (((dl->flag & DL_CYCL_U) ? 1 : 0) + (dl->nr - 1)) *
+              (((dl->flag & DL_CYCL_V) ? 1 : 0) + (dl->parts - 1));
+        totpoly += tot;
+        totloop += tot * 4;
+      }
     }
     else if (dl->type == DL_INDEX3) {
       int tot;
@@ -312,11 +317,11 @@ int BKE_mesh_nurbs_displist_to_mdata(Object *ob,
   *r_allvert = mvert = MEM_calloc_arrayN(totvert, sizeof(MVert), "nurbs_init mvert");
   *r_alledge = medge = MEM_calloc_arrayN(totedge, sizeof(MEdge), "nurbs_init medge");
   *r_allloop = mloop = MEM_calloc_arrayN(
-      totpoly, 4 * sizeof(MLoop), "nurbs_init mloop");  // totloop
+      totpoly, sizeof(MLoop[4]), "nurbs_init mloop");  // totloop
   *r_allpoly = mpoly = MEM_calloc_arrayN(totpoly, sizeof(MPoly), "nurbs_init mloop");
 
   if (r_alluv) {
-    *r_alluv = mloopuv = MEM_calloc_arrayN(totpoly, 4 * sizeof(MLoopUV), "nurbs_init mloopuv");
+    *r_alluv = mloopuv = MEM_calloc_arrayN(totpoly, sizeof(MLoopUV[4]), "nurbs_init mloopuv");
   }
 
   /* verts and faces */
@@ -398,9 +403,7 @@ int BKE_mesh_nurbs_displist_to_mdata(Object *ob,
         mpoly->mat_nr = dl->col;
 
         if (mloopuv) {
-          int i;
-
-          for (i = 0; i < 3; i++, mloopuv++) {
+          for (int i = 0; i < 3; i++, mloopuv++) {
             mloopuv->uv[0] = (mloop[i].v - startvert) / (float)(dl->nr - 1);
             mloopuv->uv[1] = 0.0f;
           }
@@ -462,7 +465,6 @@ int BKE_mesh_nurbs_displist_to_mdata(Object *ob,
           if (mloopuv) {
             int orco_sizeu = dl->nr - 1;
             int orco_sizev = dl->parts - 1;
-            int i;
 
             /* exception as handled in convertblender.c too */
             if (dl->flag & DL_CYCL_U) {
@@ -475,7 +477,7 @@ int BKE_mesh_nurbs_displist_to_mdata(Object *ob,
               orco_sizev++;
             }
 
-            for (i = 0; i < 4; i++, mloopuv++) {
+            for (int i = 0; i < 4; i++, mloopuv++) {
               /* find uv based on vertex index into grid array */
               int v = mloop[i].v - startvert;
 
@@ -904,6 +906,100 @@ void BKE_mesh_to_curve(Main *bmain, Depsgraph *depsgraph, Scene *UNUSED(scene), 
   }
 }
 
+void BKE_pointcloud_from_mesh(Mesh *me, PointCloud *pointcloud)
+{
+  BLI_assert(me != NULL);
+
+  pointcloud->totpoint = me->totvert;
+  CustomData_realloc(&pointcloud->pdata, pointcloud->totpoint);
+
+  /* Copy over all attributes. */
+  const CustomData_MeshMasks mask = {
+      .vmask = CD_MASK_PROP_ALL,
+  };
+  CustomData_merge(&me->vdata, &pointcloud->pdata, mask.vmask, CD_DUPLICATE, me->totvert);
+  BKE_pointcloud_update_customdata_pointers(pointcloud);
+  CustomData_update_typemap(&pointcloud->pdata);
+
+  MVert *mvert;
+  mvert = me->mvert;
+  for (int i = 0; i < me->totvert; i++, mvert++) {
+    copy_v3_v3(pointcloud->co[i], mvert->co);
+  }
+}
+
+void BKE_mesh_to_pointcloud(Main *bmain, Depsgraph *depsgraph, Scene *UNUSED(scene), Object *ob)
+{
+  BLI_assert(ob->type == OB_MESH);
+
+  Scene *scene_eval = DEG_get_evaluated_scene(depsgraph);
+  Object *ob_eval = DEG_get_evaluated_object(depsgraph, ob);
+  Mesh *me_eval = mesh_get_eval_final(depsgraph, scene_eval, ob_eval, &CD_MASK_MESH);
+
+  PointCloud *pointcloud = BKE_pointcloud_add(bmain, ob->id.name + 2);
+
+  BKE_pointcloud_from_mesh(me_eval, pointcloud);
+
+  BKE_id_materials_copy(bmain, (ID *)ob->data, (ID *)pointcloud);
+
+  id_us_min(&((Mesh *)ob->data)->id);
+  ob->data = pointcloud;
+  ob->type = OB_POINTCLOUD;
+
+  BKE_object_free_derived_caches(ob);
+}
+
+void BKE_mesh_from_pointcloud(PointCloud *pointcloud, Mesh *me)
+{
+  BLI_assert(pointcloud != NULL);
+
+  me->totvert = pointcloud->totpoint;
+
+  /* Merge over all attributes. */
+  const CustomData_MeshMasks mask = {
+      .vmask = CD_MASK_PROP_ALL,
+  };
+  CustomData_merge(&pointcloud->pdata, &me->vdata, mask.vmask, CD_DUPLICATE, pointcloud->totpoint);
+
+  /* Convert the Position attribute to a mesh vertex. */
+  me->mvert = CustomData_add_layer(&me->vdata, CD_MVERT, CD_CALLOC, NULL, me->totvert);
+  CustomData_update_typemap(&me->vdata);
+
+  const int layer_idx = CustomData_get_named_layer_index(
+      &me->vdata, CD_PROP_FLOAT3, POINTCLOUD_ATTR_POSITION);
+  CustomDataLayer *pos_layer = &me->vdata.layers[layer_idx];
+  float(*positions)[3] = pos_layer->data;
+
+  MVert *mvert;
+  mvert = me->mvert;
+  for (int i = 0; i < me->totvert; i++, mvert++) {
+    copy_v3_v3(mvert->co, positions[i]);
+  }
+
+  /* Delete Position attribute since it is now in vertex coordinates. */
+  CustomData_free_layer(&me->vdata, CD_PROP_FLOAT3, me->totvert, layer_idx);
+}
+
+void BKE_pointcloud_to_mesh(Main *bmain, Depsgraph *depsgraph, Scene *UNUSED(scene), Object *ob)
+{
+  BLI_assert(ob->type == OB_POINTCLOUD);
+
+  Object *ob_eval = DEG_get_evaluated_object(depsgraph, ob);
+  PointCloud *pointcloud_eval = (PointCloud *)ob_eval->runtime.data_eval;
+
+  Mesh *me = BKE_mesh_add(bmain, ob->id.name + 2);
+
+  BKE_mesh_from_pointcloud(pointcloud_eval, me);
+
+  BKE_id_materials_copy(bmain, (ID *)ob->data, (ID *)me);
+
+  id_us_min(&((PointCloud *)ob->data)->id);
+  ob->data = me;
+  ob->type = OB_MESH;
+
+  BKE_object_free_derived_caches(ob);
+}
+
 /* Create a temporary object to be used for nurbs-to-mesh conversion.
  *
  * This is more complex that it should be because BKE_mesh_from_nurbs_displist() will do more than
@@ -1109,15 +1205,7 @@ static Mesh *mesh_new_from_mesh_object_with_layers(Depsgraph *depsgraph, Object 
 
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
   CustomData_MeshMasks mask = CD_MASK_MESH;
-  Mesh *result;
-
-  if (DEG_get_mode(depsgraph) == DAG_EVAL_RENDER) {
-    result = mesh_create_eval_final_render(depsgraph, scene, &object_for_eval, &mask);
-  }
-  else {
-    result = mesh_create_eval_final_view(depsgraph, scene, &object_for_eval, &mask);
-  }
-
+  Mesh *result = mesh_create_eval_final(depsgraph, scene, &object_for_eval, &mask);
   return result;
 }
 
@@ -1296,11 +1384,11 @@ static void add_shapekey_layers(Mesh *mesh_dest, Mesh *mesh_src)
                  mesh_src->totvert,
                  kb->name,
                  kb->totelem);
-      array = MEM_calloc_arrayN((size_t)mesh_src->totvert, 3 * sizeof(float), __func__);
+      array = MEM_calloc_arrayN((size_t)mesh_src->totvert, sizeof(float[3]), __func__);
     }
     else {
-      array = MEM_malloc_arrayN((size_t)mesh_src->totvert, 3 * sizeof(float), __func__);
-      memcpy(array, kb->data, (size_t)mesh_src->totvert * 3 * sizeof(float));
+      array = MEM_malloc_arrayN((size_t)mesh_src->totvert, sizeof(float[3]), __func__);
+      memcpy(array, kb->data, sizeof(float[3]) * (size_t)mesh_src->totvert);
     }
 
     CustomData_add_layer_named(
@@ -1403,7 +1491,7 @@ static void shapekey_layers_to_keyblocks(Mesh *mesh_src, Mesh *mesh_dst, int act
     cos = CustomData_get_layer_n(&mesh_src->vdata, CD_SHAPEKEY, i);
     kb->totelem = mesh_src->totvert;
 
-    kb->data = kbcos = MEM_malloc_arrayN(kb->totelem, 3 * sizeof(float), __func__);
+    kb->data = kbcos = MEM_malloc_arrayN(kb->totelem, sizeof(float[3]), __func__);
     if (kb->uid == actshape_uid) {
       MVert *mvert = mesh_src->mvert;
 
@@ -1425,7 +1513,7 @@ static void shapekey_layers_to_keyblocks(Mesh *mesh_src, Mesh *mesh_dst, int act
       }
 
       kb->totelem = mesh_src->totvert;
-      kb->data = MEM_calloc_arrayN(kb->totelem, 3 * sizeof(float), __func__);
+      kb->data = MEM_calloc_arrayN(kb->totelem, sizeof(float[3]), __func__);
       CLOG_ERROR(&LOG, "lost a shapekey layer: '%s'! (bmesh internal error)", kb->name);
     }
   }

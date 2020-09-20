@@ -21,8 +21,7 @@
  * \ingroup DNA
  */
 
-#ifndef __DNA_MESH_TYPES_H__
-#define __DNA_MESH_TYPES_H__
+#pragma once
 
 #include "DNA_ID.h"
 #include "DNA_customdata_types.h"
@@ -110,9 +109,12 @@ typedef struct Mesh_Runtime {
   /** Set by modifier stack if only deformed from original. */
   char deformed_only;
   /**
-   * Copied from edit-mesh (hint, draw with editmesh data).
-   * In the future we may leave the mesh-data empty
-   * since its not needed if we can use edit-mesh data. */
+   * Copied from edit-mesh (hint, draw with edit-mesh data when true).
+   *
+   * Modifiers that edit the mesh data in-place must set this to false
+   * (most #eModifierTypeType_NonGeometrical modifiers). Otherwise the edit-mesh
+   * data will be used for drawing, missing changes from modifiers. See T79517.
+   */
   char is_original;
 
   /** #eMeshWrapperType and others. */
@@ -189,6 +191,9 @@ typedef struct Mesh {
   int totpoly, totloop;
   /* END BMESH ONLY */
 
+  int attributes_active_index;
+  int _pad3;
+
   /* the last selected vertex/edge/face are used for the active face however
    * this means the active face must always be selected, this is to keep track
    * of the last selected face and is similar to the old active face flag where
@@ -216,7 +221,9 @@ typedef struct Mesh {
   float remesh_voxel_adaptivity;
   char remesh_mode;
 
-  char _pad1[3];
+  char symmetry;
+
+  char _pad1[2];
 
   int face_sets_color_seed;
   /* Stores the initial Face Set to be rendered white. This way the overlay can be enabled by
@@ -260,7 +267,7 @@ enum {
 
 /* me->editflag */
 enum {
-  ME_EDIT_MIRROR_X = 1 << 0,
+  ME_EDIT_VERTEX_GROUPS_X_SYMMETRY = 1 << 0,
   ME_EDIT_MIRROR_Y = 1 << 1, /* unused so far */
   ME_EDIT_MIRROR_Z = 1 << 2, /* unused so far */
 
@@ -315,10 +322,15 @@ enum {
   ME_SIMPLE_SUBSURF = 1,
 };
 
+/* me->symmetry */
+typedef enum eMeshSymmetryType {
+  ME_SYMMETRY_X = 1 << 0,
+  ME_SYMMETRY_Y = 1 << 1,
+  ME_SYMMETRY_Z = 1 << 2,
+} eMeshSymmetryType;
+
 #define MESH_MAX_VERTS 2000000000L
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

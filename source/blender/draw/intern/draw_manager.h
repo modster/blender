@@ -22,8 +22,7 @@
 
 /* Private functions / structs of the draw manager */
 
-#ifndef __DRAW_MANAGER_H__
-#define __DRAW_MANAGER_H__
+#pragma once
 
 #include "DRW_engine.h"
 #include "DRW_render.h"
@@ -36,9 +35,10 @@
 
 #include "GPU_batch.h"
 #include "GPU_context.h"
+#include "GPU_drawlist.h"
 #include "GPU_framebuffer.h"
 #include "GPU_shader.h"
-#include "GPU_uniformbuffer.h"
+#include "GPU_uniform_buffer.h"
 #include "GPU_viewport.h"
 
 #include "draw_instance_data.h"
@@ -278,6 +278,8 @@ typedef enum {
   DRW_UNIFORM_FLOAT_COPY,
   DRW_UNIFORM_TEXTURE,
   DRW_UNIFORM_TEXTURE_REF,
+  DRW_UNIFORM_IMAGE,
+  DRW_UNIFORM_IMAGE_REF,
   DRW_UNIFORM_BLOCK,
   DRW_UNIFORM_BLOCK_REF,
   DRW_UNIFORM_TFEEDBACK_TARGET,
@@ -308,8 +310,8 @@ struct DRWUniform {
     };
     /* DRW_UNIFORM_BLOCK */
     union {
-      GPUUniformBuffer *block;
-      GPUUniformBuffer **block_ref;
+      GPUUniformBuf *block;
+      GPUUniformBuf **block_ref;
     };
     /* DRW_UNIFORM_FLOAT_COPY */
     float fvalue[4];
@@ -380,6 +382,7 @@ typedef struct DRWViewUboStorage {
   float wininv[4][4];
 
   float clipplanes[6][4];
+  float viewvecs[2][4];
   /* Should not be here. Not view dependent (only main view). */
   float viewcamtexcofac[4];
 } DRWViewUboStorage;
@@ -492,7 +495,7 @@ typedef struct DRWManager {
   struct Object *dupli_origin;
   /** Ghash containing original objects. */
   struct GHash *dupli_ghash;
-  /** TODO(fclem) try to remove usage of this. */
+  /** TODO(fclem): try to remove usage of this. */
   DRWInstanceData *object_instance_data[MAX_INSTANCE_DATA_SIZE];
   /* Array of dupli_data (one for each enabled engine) to handle duplis. */
   void **dupli_datas;
@@ -539,7 +542,7 @@ typedef struct DRWManager {
   DRWView *view_active;
   DRWView *view_previous;
   uint primary_view_ct;
-  /** TODO(fclem) Remove this. Only here to support
+  /** TODO(fclem): Remove this. Only here to support
    * shaders without common_view_lib.glsl */
   DRWViewUboStorage view_storage_cpy;
 
@@ -564,7 +567,7 @@ typedef struct DRWManager {
   GPUDrawList *draw_list;
 
   struct {
-    /* TODO(fclem) optimize: use chunks. */
+    /* TODO(fclem): optimize: use chunks. */
     DRWDebugLine *lines;
     DRWDebugSphere *spheres;
   } debug;
@@ -583,7 +586,7 @@ void drw_state_set(DRWState state);
 void drw_debug_draw(void);
 void drw_debug_init(void);
 
-eDRWCommandType command_type_get(uint64_t *command_type_bits, int index);
+eDRWCommandType command_type_get(const uint64_t *command_type_bits, int index);
 
 void drw_batch_cache_validate(Object *ob);
 void drw_batch_cache_generate_requested(struct Object *ob);
@@ -595,5 +598,3 @@ void drw_resource_buffer_finish(ViewportMemoryPool *vmempool);
 GPUBatch *drw_cache_procedural_points_get(void);
 GPUBatch *drw_cache_procedural_lines_get(void);
 GPUBatch *drw_cache_procedural_triangles_get(void);
-
-#endif /* __DRAW_MANAGER_H__ */

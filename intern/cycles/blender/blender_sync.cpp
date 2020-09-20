@@ -37,6 +37,7 @@
 #include "util/util_debug.h"
 #include "util/util_foreach.h"
 #include "util/util_hash.h"
+#include "util/util_logging.h"
 #include "util/util_opengl.h"
 #include "util/util_openimagedenoise.h"
 
@@ -55,11 +56,11 @@ BlenderSync::BlenderSync(BL::RenderEngine &b_engine,
     : b_engine(b_engine),
       b_data(b_data),
       b_scene(b_scene),
-      shader_map(&scene->shaders),
-      object_map(&scene->objects),
-      geometry_map(&scene->geometry),
-      light_map(&scene->lights),
-      particle_system_map(&scene->particle_systems),
+      shader_map(),
+      object_map(),
+      geometry_map(),
+      light_map(),
+      particle_system_map(),
       world_map(NULL),
       world_recalc(false),
       scene(scene),
@@ -147,30 +148,43 @@ void BlenderSync::sync_recalc(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d
     /* Object */
     else if (b_id.is_a(&RNA_Object)) {
       BL::Object b_ob(b_id);
-      const bool updated_geometry = b_update->is_updated_geometry();
+      const bool is_geometry = object_is_geometry(b_ob);
+      const bool is_light = !is_geometry && object_is_light(b_ob);
 
-      if (b_update->is_updated_transform() || b_update->is_updated_shading()) {
-        object_map.set_recalc(b_ob);
-        light_map.set_recalc(b_ob);
-      }
+      if (is_geometry || is_light) {
+        const bool updated_geometry = b_update->is_updated_geometry();
 
-      if (object_is_mesh(b_ob)) {
-        if (updated_geometry ||
-            (object_subdivision_type(b_ob, preview, experimental) != Mesh::SUBDIVISION_NONE)) {
-          BL::ID key = BKE_object_is_modified(b_ob) ? b_ob : b_ob.data();
-          geometry_map.set_recalc(key);
+        /* Geometry (mesh, hair, volume). */
+        if (is_geometry) {
+          if (b_update->is_updated_transform() || b_update->is_updated_shading()) {
+            object_map.set_recalc(b_ob);
+          }
+
+          if (updated_geometry ||
+              (object_subdivision_type(b_ob, preview, experimental) != Mesh::SUBDIVISION_NONE)) {
+            BL::ID key = BKE_object_is_modified(b_ob) ? b_ob : b_ob.data();
+            geometry_map.set_recalc(key);
+          }
+
+          if (updated_geometry) {
+            BL::Object::particle_systems_iterator b_psys;
+            for (b_ob.particle_systems.begin(b_psys); b_psys != b_ob.particle_systems.end();
+                 ++b_psys) {
+              particle_system_map.set_recalc(b_ob);
+            }
+          }
         }
-      }
-      else if (object_is_light(b_ob)) {
-        if (updated_geometry) {
-          light_map.set_recalc(b_ob);
-        }
-      }
+        /* Light */
+        else if (is_light) {
+          if (b_update->is_updated_transform() || b_update->is_updated_shading()) {
+            object_map.set_recalc(b_ob);
+            light_map.set_recalc(b_ob);
+          }
 
-      if (updated_geometry) {
-        BL::Object::particle_systems_iterator b_psys;
-        for (b_ob.particle_systems.begin(b_psys); b_psys != b_ob.particle_systems.end(); ++b_psys)
-          particle_system_map.set_recalc(b_ob);
+          if (updated_geometry) {
+            light_map.set_recalc(b_ob);
+          }
+        }
       }
     }
     /* Mesh */
@@ -206,6 +220,8 @@ void BlenderSync::sync_data(BL::RenderSettings &b_render,
                             int height,
                             void **python_thread_state)
 {
+  scoped_timer timer;
+
   BL::ViewLayer b_view_layer = b_depsgraph.view_layer_eval();
 
   sync_view_layer(b_v3d, b_view_layer);
@@ -226,9 +242,11 @@ void BlenderSync::sync_data(BL::RenderSettings &b_render,
 
   /* Shader sync done at the end, since object sync uses it.
    * false = don't delete unused shaders, not supported. */
-  shader_map.post_sync(false);
+  shader_map.post_sync(scene, false);
 
   free_data_after_sync(b_depsgraph);
+
+  VLOG(1) << "Total time spent synchronizing data: " << timer.get_time();
 }
 
 /* Integrator */
@@ -359,8 +377,10 @@ void BlenderSync::sync_film(BL::SpaceView3D &b_v3d)
   Film *film = scene->film;
   Film prevfilm = *film;
 
+  vector<Pass> prevpasses = scene->passes;
+
   if (b_v3d) {
-    film->display_pass = update_viewport_display_passes(b_v3d, film->passes);
+    film->display_pass = update_viewport_display_passes(b_v3d, scene->passes);
   }
 
   film->exposure = get_float(cscene, "film_exposure");
@@ -390,7 +410,11 @@ void BlenderSync::sync_film(BL::SpaceView3D &b_v3d)
 
   if (film->modified(prevfilm)) {
     film->tag_update(scene);
-    film->tag_passes_update(scene, prevfilm.passes, false);
+  }
+
+  if (!Pass::equals(prevpasses, scene->passes)) {
+    film->tag_passes_update(scene, prevpasses, false);
+    film->tag_update(scene);
   }
 }
 
@@ -458,8 +482,10 @@ PassType BlenderSync::get_pass_type(BL::RenderPass &b_pass)
 {
   string name = b_pass.name();
 #define MAP_PASS(passname, passtype) \
-  if (name == passname) \
-    return passtype;
+  if (name == passname) { \
+    return passtype; \
+  } \
+  ((void)0)
   /* NOTE: Keep in sync with defined names from DNA_scene_types.h */
   MAP_PASS("Combined", PASS_COMBINED);
   MAP_PASS("Depth", PASS_DEPTH);
@@ -522,8 +548,10 @@ int BlenderSync::get_denoising_pass(BL::RenderPass &b_pass)
   name = name.substr(10);
 
 #define MAP_PASS(passname, offset) \
-  if (name == passname) \
-    return offset;
+  if (name == passname) { \
+    return offset; \
+  } \
+  ((void)0)
   MAP_PASS("Normal", DENOISING_PASS_PREFILTERED_NORMAL);
   MAP_PASS("Albedo", DENOISING_PASS_PREFILTERED_ALBEDO);
   MAP_PASS("Depth", DENOISING_PASS_PREFILTERED_DEPTH);
@@ -562,8 +590,10 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
   if (denoising.use || denoising.store_passes) {
     if (denoising.type == DENOISER_NLM) {
 #define MAP_OPTION(name, flag) \
-  if (!get_boolean(crl, name)) \
-    scene->film->denoising_flags |= flag;
+  if (!get_boolean(crl, name)) { \
+    scene->film->denoising_flags |= flag; \
+  } \
+  ((void)0)
       MAP_OPTION("denoising_diffuse_direct", DENOISING_CLEAN_DIFFUSE_DIR);
       MAP_OPTION("denoising_diffuse_indirect", DENOISING_CLEAN_DIFFUSE_IND);
       MAP_OPTION("denoising_glossy_direct", DENOISING_CLEAN_GLOSSY_DIR);
@@ -684,6 +714,16 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
   }
   RNA_END;
 
+  scene->film->denoising_data_pass = denoising.use || denoising.store_passes;
+  scene->film->denoising_clean_pass = (scene->film->denoising_flags & DENOISING_CLEAN_ALL_PASSES);
+  scene->film->denoising_prefiltered_pass = denoising.store_passes &&
+                                            denoising.type == DENOISER_NLM;
+
+  scene->film->pass_alpha_threshold = b_view_layer.pass_alpha_threshold();
+  scene->film->tag_passes_update(scene, passes);
+  scene->film->tag_update(scene);
+  scene->integrator->tag_update(scene);
+
   return passes;
 }
 
@@ -694,7 +734,11 @@ void BlenderSync::free_data_after_sync(BL::Depsgraph &b_depsgraph)
    * footprint during synchronization process.
    */
   const bool is_interface_locked = b_engine.render() && b_engine.render().use_lock_interface();
-  const bool can_free_caches = BlenderSession::headless || is_interface_locked;
+  const bool can_free_caches = (BlenderSession::headless || is_interface_locked) &&
+                               /* Baking re-uses the depsgraph multiple times, clearing crashes
+                                * reading un-evaluated mesh data which isn't aligned with the
+                                * geometry we're baking, see T71012. */
+                               !scene->bake_manager->get_baking();
   if (!can_free_caches) {
     return;
   }
@@ -941,7 +985,13 @@ DenoiseParams BlenderSync::get_denoise_params(BL::Scene &b_scene,
       denoising.strength = get_float(clayer, "denoising_strength");
       denoising.feature_strength = get_float(clayer, "denoising_feature_strength");
       denoising.relative_pca = get_boolean(clayer, "denoising_relative_pca");
-      denoising.optix_input_passes = get_enum(clayer, "denoising_optix_input_passes");
+
+      denoising.input_passes = (DenoiserInput)get_enum(
+          clayer,
+          (denoising.type == DENOISER_OPTIX) ? "denoising_optix_input_passes" :
+                                               "denoising_openimagedenoise_input_passes",
+          DENOISER_INPUT_NUM,
+          DENOISER_INPUT_RGB_ALBEDO_NORMAL);
 
       denoising.store_passes = get_boolean(clayer, "denoising_store_passes");
     }

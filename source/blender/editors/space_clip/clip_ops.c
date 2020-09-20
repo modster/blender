@@ -1403,6 +1403,8 @@ static void do_sequence_proxy(void *pjv,
                               int build_count,
                               int *build_undistort_sizes,
                               int build_undistort_count,
+                              /* Cannot be const, because it is assigned to a non-const variable.
+                               * NOLINTNEXTLINE: readability-non-const-parameter. */
                               short *stop,
                               short *do_update,
                               float *progress)
@@ -1410,17 +1412,16 @@ static void do_sequence_proxy(void *pjv,
   ProxyJob *pj = pjv;
   MovieClip *clip = pj->clip;
   Scene *scene = pj->scene;
-  TaskPool *task_pool;
   int sfra = SFRA, efra = EFRA;
   ProxyThread *handles;
-  int i, tot_thread = BLI_task_scheduler_num_threads();
+  int tot_thread = BLI_task_scheduler_num_threads();
   int width, height;
-  ProxyQueue queue;
 
   if (build_undistort_count) {
     BKE_movieclip_get_size(clip, NULL, &width, &height);
   }
 
+  ProxyQueue queue;
   BLI_spin_init(&queue.spin);
 
   queue.cfra = sfra;
@@ -1430,9 +1431,9 @@ static void do_sequence_proxy(void *pjv,
   queue.do_update = do_update;
   queue.progress = progress;
 
-  task_pool = BLI_task_pool_create(&queue, TASK_PRIORITY_LOW);
+  TaskPool *task_pool = BLI_task_pool_create(&queue, TASK_PRIORITY_LOW);
   handles = MEM_callocN(sizeof(ProxyThread) * tot_thread, "proxy threaded handles");
-  for (i = 0; i < tot_thread; i++) {
+  for (int i = 0; i < tot_thread; i++) {
     ProxyThread *handle = &handles[i];
 
     handle->clip = clip;
@@ -1454,7 +1455,7 @@ static void do_sequence_proxy(void *pjv,
   BLI_task_pool_free(task_pool);
 
   if (build_undistort_count) {
-    for (i = 0; i < tot_thread; i++) {
+    for (int i = 0; i < tot_thread; i++) {
       ProxyThread *handle = &handles[i];
       BKE_tracking_distortion_free(handle->distortion);
     }
@@ -1513,7 +1514,7 @@ static void proxy_endjob(void *pjv)
   }
 
   if (pj->clip->source == MCLIP_SRC_MOVIE) {
-    /* Timecode might have changed, so do a full reload to deal with this. */
+    /* Time-code might have changed, so do a full reload to deal with this. */
     DEG_id_tag_update(&pj->clip->id, ID_RECALC_SOURCE);
   }
   else {

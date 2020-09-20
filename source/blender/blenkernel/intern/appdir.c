@@ -56,7 +56,7 @@
 #  ifdef WITH_BINRELOC
 #    include "binreloc.h"
 #  endif
-/* mkdtemp on OSX (and probably all *BSD?), not worth making specific check for this OS. */
+/* #mkdtemp on OSX (and probably all *BSD?), not worth making specific check for this OS. */
 #  include <unistd.h>
 #endif /* WIN32 */
 
@@ -120,7 +120,7 @@ static char *blender_version_decimal(const int ver)
 }
 
 /**
- * Concatenates path_base, (optional) path_sep and (optional) folder_name into targetpath,
+ * Concatenates path_base, (optional) path_sep and (optional) folder_name into \a targetpath,
  * returning true if result points to a directory.
  */
 static bool test_path(char *targetpath,
@@ -138,14 +138,14 @@ static bool test_path(char *targetpath,
     BLI_strncpy(tmppath, path_base, sizeof(tmppath));
   }
 
-  /* rare cases folder_name is omitted (when looking for ~/.config/blender/2.xx dir only) */
+  /* Rare cases folder_name is omitted (when looking for `~/.config/blender/2.xx` dir only). */
   if (folder_name) {
     BLI_join_dirfile(targetpath, targetpath_len, tmppath, folder_name);
   }
   else {
     BLI_strncpy(targetpath, tmppath, targetpath_len);
   }
-  /* FIXME: why is "//" on front of tmppath expanded to "/" (by BLI_join_dirfile)
+  /* FIXME: why is "//" on front of \a tmppath expanded to "/" (by BLI_join_dirfile)
    * if folder_name is specified but not otherwise? */
 
   if (BLI_is_dir(targetpath)) {
@@ -190,7 +190,7 @@ static bool test_env_path(char *path, const char *envvar)
 
 /**
  * Constructs in \a targetpath the name of a directory relative to a version-specific
- * subdirectory in the parent directory of the Blender executable.
+ * sub-directory in the parent directory of the Blender executable.
  *
  * \param targetpath: String to return path
  * \param folder_name: Optional folder name within version-specific directory
@@ -307,7 +307,7 @@ static bool get_path_environment_notest(char *targetpath,
  * \param targetpath: String to return path
  * \param folder_name: default name of folder within user area
  * \param subfolder_name: optional name of subfolder within folder
- * \param ver: Blender version, used to construct a subdirectory name
+ * \param ver: Blender version, used to construct a sub-directory name
  * \return true if it was able to construct such a path.
  */
 static bool get_path_user(char *targetpath,
@@ -350,8 +350,8 @@ static bool get_path_user(char *targetpath,
  *
  * \param targetpath: String to return path
  * \param folder_name: default name of folder within installation area
- * \param subfolder_name: optional name of subfolder within folder
- * \param ver: Blender version, used to construct a subdirectory name
+ * \param subfolder_name: optional name of sub-folder within folder
+ * \param ver: Blender version, used to construct a sub-directory name
  * \return true if it was able to construct such a path.
  */
 static bool get_path_system(char *targetpath,
@@ -635,7 +635,7 @@ const char *BKE_appdir_folder_id_version(const int folder_id, const int ver, con
  * adds the correct extension (.com .exe etc) from
  * $PATHEXT if necessary. Also on Windows it translates
  * the name to its 8.3 version to prevent problems with
- * spaces and stuff. Final result is returned in fullname.
+ * spaces and stuff. Final result is returned in \a fullname.
  *
  * \param fullname: The full path and full name of the executable
  * (must be FILE_MAX minimum)
@@ -746,8 +746,6 @@ bool BKE_appdir_program_python_search(char *fullpath,
       python_ver,
       basename,
   };
-  int i;
-
   bool is_found = false;
 
   BLI_snprintf(python_ver, sizeof(python_ver), "%s%d.%d", basename, version_major, version_minor);
@@ -756,7 +754,7 @@ bool BKE_appdir_program_python_search(char *fullpath,
     const char *python_bin_dir = BKE_appdir_folder_id(BLENDER_SYSTEM_PYTHON, "bin");
     if (python_bin_dir) {
 
-      for (i = 0; i < ARRAY_SIZE(python_names); i++) {
+      for (int i = 0; i < ARRAY_SIZE(python_names); i++) {
         BLI_join_dirfile(fullpath, fullpath_len, python_bin_dir, python_names[i]);
 
         if (
@@ -774,7 +772,7 @@ bool BKE_appdir_program_python_search(char *fullpath,
   }
 
   if (is_found == false) {
-    for (i = 0; i < ARRAY_SIZE(python_names); i++) {
+    for (int i = 0; i < ARRAY_SIZE(python_names); i++) {
       if (BLI_path_program_search(fullpath, fullpath_len, python_names[i])) {
         is_found = true;
         break;
@@ -975,7 +973,7 @@ static void where_is_temp(char *fullname, char *basename, const size_t maxlen, c
 /**
  * Sets btempdir_base to userdir if specified and is a valid directory, otherwise
  * chooses a suitable OS-specific temporary directory.
- * Sets btempdir_session to a mkdtemp-generated sub-dir of btempdir_base.
+ * Sets btempdir_session to a #mkdtemp generated sub-dir of btempdir_base.
  *
  * \note On Window userdir will be set to the temporary directory!
  */
@@ -1019,7 +1017,11 @@ void BKE_tempdir_session_purge(void)
 }
 
 /* Gets a good default directory for fonts */
-bool BKE_appdir_font_folder_default(char *dir)
+
+bool BKE_appdir_font_folder_default(
+    /* This parameter can only be `const` on non-windows platforms.
+     * NOLINTNEXTLINE: readability-non-const-parameter. */
+    char *dir)
 {
   bool success = false;
 #ifdef WIN32

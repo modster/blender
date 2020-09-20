@@ -218,6 +218,15 @@ add_blender_test(
 )
 
 # ------------------------------------------------------------------------------
+# ANIMATION TESTS
+add_blender_test(
+  bl_animation_fcurves
+  --python ${CMAKE_CURRENT_LIST_DIR}/bl_animation_fcurves.py
+  --
+  --testdir "${TEST_SRC_DIR}/animation"
+)
+
+# ------------------------------------------------------------------------------
 # IO TESTS
 
 # OBJ Import tests
@@ -337,7 +346,7 @@ add_blender_test(
   --python ${CMAKE_CURRENT_LIST_DIR}/bl_test.py --
   --run={'FINISHED'}&bpy.ops.export_mesh.ply\(filepath='${TEST_OUT_DIR}/io_tests/export_ply_vertices.ply'\)
   --md5_source=${TEST_OUT_DIR}/io_tests/export_ply_vertices.ply
-  --md5=37faba0aa2014451b27f951afa92f870 --md5_method=FILE
+  --md5=ee6ce2e69c1d9a7418ff0548f6338f70 --md5_method=FILE
 )
 
 
@@ -662,8 +671,8 @@ if(WITH_ALEMBIC)
   get_filename_component(ALEMBIC_ROOT_DIR ${real_include_dir} DIRECTORY)
 
   add_python_test(
-    alembic_tests
-    ${CMAKE_CURRENT_LIST_DIR}/alembic_tests.py
+    alembic_export_tests
+    ${CMAKE_CURRENT_LIST_DIR}/alembic_export_tests.py
     --blender "${TEST_BLENDER_EXE}"
     --testdir "${TEST_SRC_DIR}/alembic"
     --alembic-root "${ALEMBIC_ROOT_DIR}"

@@ -28,6 +28,9 @@
 
 #include "MEM_guardedalloc.h"
 
+/* Allow using deprecated functionality for .blend file I/O. */
+#define DNA_DEPRECATED_ALLOW
+
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
 #include "DNA_constraint_types.h"
@@ -37,6 +40,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_ghash.h"
 #include "BLI_math.h"
+#include "BLI_session_uuid.h"
 #include "BLI_string_utils.h"
 #include "BLI_utildefines.h"
 
@@ -61,6 +65,8 @@
 #include "BIK_api.h"
 
 #include "RNA_access.h"
+
+#include "BLO_read_write.h"
 
 #include "CLG_log.h"
 
@@ -168,6 +174,105 @@ static void action_foreach_id(ID *id, LibraryForeachIDData *data)
   }
 }
 
+static void action_blend_write(BlendWriter *writer, ID *id, const void *id_address)
+{
+  bAction *act = (bAction *)id;
+  if (act->id.us > 0 || BLO_write_is_undo(writer)) {
+    BLO_write_id_struct(writer, bAction, id_address, &act->id);
+    BKE_id_blend_write(writer, &act->id);
+
+    BKE_fcurve_blend_write(writer, &act->curves);
+
+    LISTBASE_FOREACH (bActionGroup *, grp, &act->groups) {
+      BLO_write_struct(writer, bActionGroup, grp);
+    }
+
+    LISTBASE_FOREACH (TimeMarker *, marker, &act->markers) {
+      BLO_write_struct(writer, TimeMarker, marker);
+    }
+  }
+}
+
+static void action_blend_read_data(BlendDataReader *reader, ID *id)
+{
+  bAction *act = (bAction *)id;
+
+  BLO_read_list(reader, &act->curves);
+  BLO_read_list(reader, &act->chanbase);  // XXX deprecated - old animation system
+  BLO_read_list(reader, &act->groups);
+  BLO_read_list(reader, &act->markers);
+
+  // XXX deprecated - old animation system <<<
+  LISTBASE_FOREACH (bActionChannel *, achan, &act->chanbase) {
+    BLO_read_data_address(reader, &achan->grp);
+
+    BLO_read_list(reader, &achan->constraintChannels);
+  }
+  // >>> XXX deprecated - old animation system
+
+  BKE_fcurve_blend_read_data(reader, &act->curves);
+
+  LISTBASE_FOREACH (bActionGroup *, agrp, &act->groups) {
+    BLO_read_data_address(reader, &agrp->channels.first);
+    BLO_read_data_address(reader, &agrp->channels.last);
+  }
+}
+
+static void blend_read_lib_constraint_channels(BlendLibReader *reader, ID *id, ListBase *chanbase)
+{
+  LISTBASE_FOREACH (bConstraintChannel *, chan, chanbase) {
+    BLO_read_id_address(reader, id->lib, &chan->ipo);
+  }
+}
+
+static void action_blend_read_lib(BlendLibReader *reader, ID *id)
+{
+  bAction *act = (bAction *)id;
+
+  // XXX deprecated - old animation system <<<
+  LISTBASE_FOREACH (bActionChannel *, chan, &act->chanbase) {
+    BLO_read_id_address(reader, act->id.lib, &chan->ipo);
+    blend_read_lib_constraint_channels(reader, &act->id, &chan->constraintChannels);
+  }
+  // >>> XXX deprecated - old animation system
+
+  BKE_fcurve_blend_read_lib(reader, &act->id, &act->curves);
+
+  LISTBASE_FOREACH (TimeMarker *, marker, &act->markers) {
+    if (marker->camera) {
+      BLO_read_id_address(reader, act->id.lib, &marker->camera);
+    }
+  }
+}
+
+static void blend_read_expand_constraint_channels(BlendExpander *expander, ListBase *chanbase)
+{
+  LISTBASE_FOREACH (bConstraintChannel *, chan, chanbase) {
+    BLO_expand(expander, chan->ipo);
+  }
+}
+
+static void action_blend_read_expand(BlendExpander *expander, ID *id)
+{
+  bAction *act = (bAction *)id;
+
+  // XXX deprecated - old animation system --------------
+  LISTBASE_FOREACH (bActionChannel *, chan, &act->chanbase) {
+    BLO_expand(expander, chan->ipo);
+    blend_read_expand_constraint_channels(expander, &chan->constraintChannels);
+  }
+  // ---------------------------------------------------
+
+  /* F-Curves in Action */
+  BKE_fcurve_blend_read_expand(expander, &act->curves);
+
+  LISTBASE_FOREACH (TimeMarker *, marker, &act->markers) {
+    if (marker->camera) {
+      BLO_expand(expander, marker->camera);
+    }
+  }
+}
+
 IDTypeInfo IDType_ID_AC = {
     .id_code = ID_AC,
     .id_filter = FILTER_ID_AC,
@@ -183,6 +288,12 @@ IDTypeInfo IDType_ID_AC = {
     .free_data = action_free_data,
     .make_local = NULL,
     .foreach_id = action_foreach_id,
+    .foreach_cache = NULL,
+
+    .blend_write = action_blend_write,
+    .blend_read_data = action_blend_read_data,
+    .blend_read_lib = action_blend_read_lib,
+    .blend_read_expand = action_blend_read_expand,
 };
 
 /* ***************** Library data level operations on action ************** */
@@ -482,6 +593,11 @@ void action_groups_clear_tempflags(bAction *act)
 
 /* *************** Pose channels *************** */
 
+void BKE_pose_channel_session_uuid_generate(bPoseChannel *pchan)
+{
+  pchan->runtime.session_uuid = BLI_session_uuid_generate();
+}
+
 /**
  * Return a pointer to the pose channel of the given name
  * from this pose.
@@ -523,6 +639,8 @@ bPoseChannel *BKE_pose_channel_verify(bPose *pose, const char *name)
 
   /* If not, create it and add it */
   chan = MEM_callocN(sizeof(bPoseChannel), "verifyPoseChannel");
+
+  BKE_pose_channel_session_uuid_generate(chan);
 
   BLI_strncpy(chan->name, name, sizeof(chan->name));
 
@@ -698,6 +816,10 @@ void BKE_pose_copy_data_ex(bPose **dst,
       id_us_plus((ID *)pchan->custom);
     }
 
+    if ((flag & LIB_ID_CREATE_NO_MAIN) == 0) {
+      BKE_pose_channel_session_uuid_generate(pchan);
+    }
+
     /* warning, O(n2) here, if done without the hash, but these are rarely used features. */
     if (pchan->custom_tx) {
       pchan->custom_tx = BKE_pose_channel_find_name(outPose, pchan->custom_tx->name);
@@ -726,7 +848,7 @@ void BKE_pose_copy_data_ex(bPose **dst,
     pchan->draw_data = NULL; /* Drawing cache, no need to copy. */
 
     /* Runtime data, no need to copy. */
-    memset(&pchan->runtime, 0, sizeof(pchan->runtime));
+    BKE_pose_channel_runtime_reset_on_copy(&pchan->runtime);
   }
 
   /* for now, duplicate Bone Groups too when doing this */
@@ -954,6 +1076,14 @@ void BKE_pose_channel_free_ex(bPoseChannel *pchan, bool do_id_user)
 void BKE_pose_channel_runtime_reset(bPoseChannel_Runtime *runtime)
 {
   memset(runtime, 0, sizeof(*runtime));
+}
+
+/* Reset all non-persistent fields. */
+void BKE_pose_channel_runtime_reset_on_copy(bPoseChannel_Runtime *runtime)
+{
+  const SessionUUID uuid = runtime->session_uuid;
+  memset(runtime, 0, sizeof(*runtime));
+  runtime->session_uuid = uuid;
 }
 
 /** Deallocates runtime cache of a pose channel */
@@ -1512,8 +1642,10 @@ short action_get_item_transforms(bAction *act, Object *ob, bPoseChannel *pchan, 
 
 /* ************** Pose Management Tools ****************** */
 
-/* for do_all_pose_actions, clears the pose. Now also exported for proxy and tools */
-void BKE_pose_rest(bPose *pose)
+/**
+ * Zero the pose transforms for the entire pose or only for selected bones.
+ */
+void BKE_pose_rest(bPose *pose, bool selected_bones_only)
 {
   bPoseChannel *pchan;
 
@@ -1525,6 +1657,9 @@ void BKE_pose_rest(bPose *pose)
   memset(pose->cyclic_offset, 0, sizeof(pose->cyclic_offset));
 
   for (pchan = pose->chanbase.first; pchan; pchan = pchan->next) {
+    if (selected_bones_only && pchan->bone != NULL && (pchan->bone->flag & BONE_SELECTED) == 0) {
+      continue;
+    }
     zero_v3(pchan->loc);
     zero_v3(pchan->eul);
     unit_qt(pchan->quat);
@@ -1612,8 +1747,12 @@ void BKE_pose_tag_recalc(Main *bmain, bPose *pose)
 /* For the calculation of the effects of an Action at the given frame on an object
  * This is currently only used for the Action Constraint
  */
-void what_does_obaction(
-    Object *ob, Object *workob, bPose *pose, bAction *act, char groupname[], float cframe)
+void what_does_obaction(Object *ob,
+                        Object *workob,
+                        bPose *pose,
+                        bAction *act,
+                        char groupname[],
+                        const AnimationEvalContext *anim_eval_context)
 {
   bActionGroup *agrp = BKE_action_group_find_name(act, groupname);
 
@@ -1669,7 +1808,7 @@ void what_does_obaction(
     RNA_id_pointer_create(&workob->id, &id_ptr);
 
     /* execute action for this group only */
-    animsys_evaluate_action_group(&id_ptr, act, agrp, cframe);
+    animsys_evaluate_action_group(&id_ptr, act, agrp, anim_eval_context);
   }
   else {
     AnimData adt = {NULL};
@@ -1680,6 +1819,33 @@ void what_does_obaction(
     adt.action = act;
 
     /* execute effects of Action on to workob (or it's PoseChannels) */
-    BKE_animsys_evaluate_animdata(&workob->id, &adt, cframe, ADT_RECALC_ANIM, false);
+    BKE_animsys_evaluate_animdata(&workob->id, &adt, anim_eval_context, ADT_RECALC_ANIM, false);
   }
+}
+
+void BKE_pose_check_uuids_unique_and_report(const bPose *pose)
+{
+  if (pose == NULL) {
+    return;
+  }
+
+  struct GSet *used_uuids = BLI_gset_new(
+      BLI_session_uuid_ghash_hash, BLI_session_uuid_ghash_compare, "sequencer used uuids");
+
+  LISTBASE_FOREACH (bPoseChannel *, pchan, &pose->chanbase) {
+    const SessionUUID *session_uuid = &pchan->runtime.session_uuid;
+    if (!BLI_session_uuid_is_generated(session_uuid)) {
+      printf("Pose channel %s does not have UUID generated.\n", pchan->name);
+      continue;
+    }
+
+    if (BLI_gset_lookup(used_uuids, session_uuid) != NULL) {
+      printf("Pose channel %s has duplicate UUID generated.\n", pchan->name);
+      continue;
+    }
+
+    BLI_gset_insert(used_uuids, (void *)session_uuid);
+  }
+
+  BLI_gset_free(used_uuids, NULL);
 }

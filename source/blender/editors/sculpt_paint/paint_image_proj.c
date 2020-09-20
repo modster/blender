@@ -90,7 +90,7 @@
 #include "ED_view3d.h"
 #include "ED_view3d_offscreen.h"
 
-#include "GPU_extensions.h"
+#include "GPU_capabilities.h"
 #include "GPU_init_exit.h"
 
 #include "WM_api.h"
@@ -99,8 +99,6 @@
 #include "RNA_access.h"
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
-
-#include "GPU_draw.h"
 
 #include "IMB_colormanagement.h"
 
@@ -409,7 +407,6 @@ typedef struct ProjPaintState {
   SpinLock *tile_lock;
 
   Mesh *me_eval;
-  bool me_eval_free;
   int totlooptri_eval;
   int totloop_eval;
   int totpoly_eval;
@@ -1385,7 +1382,7 @@ static void insert_seam_vert_array(const ProjPaintState *ps,
   const int fidx[2] = {fidx1, ((fidx1 + 1) % 3)};
   float vec[2];
 
-  VertSeam *vseam = BLI_memarena_alloc(arena, sizeof(VertSeam) * 2);
+  VertSeam *vseam = BLI_memarena_alloc(arena, sizeof(VertSeam[2]));
 
   vseam->prev = NULL;
   vseam->next = NULL;
@@ -2679,7 +2676,6 @@ static void project_bucket_clip_face(const bool is_ortho,
     /* calc center */
     float cent[2] = {0.0f, 0.0f};
     /*float up[2] = {0.0f, 1.0f};*/
-    int i;
     bool doubles;
 
     (*tot) = 0;
@@ -2760,7 +2756,7 @@ static void project_bucket_clip_face(const bool is_ortho,
 
     /* now we have all points we need, collect their angles and sort them clockwise */
 
-    for (i = 0; i < (*tot); i++) {
+    for (int i = 0; i < (*tot); i++) {
       cent[0] += isectVCosSS[i][0];
       cent[1] += isectVCosSS[i][1];
     }
@@ -2770,7 +2766,7 @@ static void project_bucket_clip_face(const bool is_ortho,
     /* Collect angles for every point around the center point */
 
 #if 0 /* uses a few more cycles then the above loop */
-    for (i = 0; i < (*tot); i++) {
+    for (int i = 0; i < (*tot); i++) {
       isectVCosSS[i][2] = angle_2d_clockwise(up, cent, isectVCosSS[i]);
     }
 #endif
@@ -2779,7 +2775,7 @@ static void project_bucket_clip_face(const bool is_ortho,
     v1_clipSS[0] = cent[0];
     v1_clipSS[1] = cent[1] + 1.0f;
 
-    for (i = 0; i < (*tot); i++) {
+    for (int i = 0; i < (*tot); i++) {
       v2_clipSS[0] = isectVCosSS[i][0] - cent[0];
       v2_clipSS[1] = isectVCosSS[i][1] - cent[1];
       isectVCosSS[i][2] = atan2f(v1_clipSS[0] * v2_clipSS[1] - v1_clipSS[1] * v2_clipSS[0],
@@ -2787,21 +2783,20 @@ static void project_bucket_clip_face(const bool is_ortho,
     }
 
     if (flip) {
-      qsort(isectVCosSS, *tot, sizeof(float) * 3, float_z_sort_flip);
+      qsort(isectVCosSS, *tot, sizeof(float[3]), float_z_sort_flip);
     }
     else {
-      qsort(isectVCosSS, *tot, sizeof(float) * 3, float_z_sort);
+      qsort(isectVCosSS, *tot, sizeof(float[3]), float_z_sort);
     }
 
     doubles = true;
     while (doubles == true) {
       doubles = false;
 
-      for (i = 0; i < (*tot); i++) {
+      for (int i = 0; i < (*tot); i++) {
         if (fabsf(isectVCosSS[(i + 1) % *tot][0] - isectVCosSS[i][0]) < PROJ_PIXEL_TOLERANCE &&
             fabsf(isectVCosSS[(i + 1) % *tot][1] - isectVCosSS[i][1]) < PROJ_PIXEL_TOLERANCE) {
-          int j;
-          for (j = i; j < (*tot) - 1; j++) {
+          for (int j = i; j < (*tot) - 1; j++) {
             isectVCosSS[j][0] = isectVCosSS[j + 1][0];
             isectVCosSS[j][1] = isectVCosSS[j + 1][1];
           }
@@ -2820,13 +2815,13 @@ static void project_bucket_clip_face(const bool is_ortho,
     }
 
     if (is_ortho) {
-      for (i = 0; i < (*tot); i++) {
+      for (int i = 0; i < (*tot); i++) {
         barycentric_weights_v2(v1coSS, v2coSS, v3coSS, isectVCosSS[i], w);
         interp_v2_v2v2v2(bucket_bounds_uv[i], uv1co, uv2co, uv3co, w);
       }
     }
     else {
-      for (i = 0; i < (*tot); i++) {
+      for (int i = 0; i < (*tot); i++) {
         barycentric_weights_v2_persp(v1coSS, v2coSS, v3coSS, isectVCosSS[i], w);
         interp_v2_v2v2v2(bucket_bounds_uv[i], uv1co, uv2co, uv3co, w);
       }
@@ -2867,7 +2862,7 @@ static void project_bucket_clip_face(const bool is_ortho,
            uv3co[1]);
 
     printf("[");
-    for (i = 0; i < (*tot); i++) {
+    for (int i = 0; i < (*tot); i++) {
       printf("(%f, %f),", bucket_bounds_uv[i][0], bucket_bounds_uv[i][1]);
     }
     printf("]),\\\n");
@@ -2930,7 +2925,7 @@ static void project_bucket_clip_face(const bool is_ortho,
 
 /* checks if pt is inside a convex 2D polyline, the polyline must be ordered rotating clockwise
  * otherwise it would have to test for mixed (line_point_side_v2 > 0.0f) cases */
-static bool IsectPoly2Df(const float pt[2], float uv[][2], const int tot)
+static bool IsectPoly2Df(const float pt[2], const float uv[][2], const int tot)
 {
   int i;
   if (line_point_side_v2(uv[tot - 1], uv[0], pt) < 0.0f) {
@@ -2945,7 +2940,7 @@ static bool IsectPoly2Df(const float pt[2], float uv[][2], const int tot)
 
   return true;
 }
-static bool IsectPoly2Df_twoside(const float pt[2], float uv[][2], const int tot)
+static bool IsectPoly2Df_twoside(const float pt[2], const float uv[][2], const int tot)
 {
   const bool side = (line_point_side_v2(uv[tot - 1], uv[0], pt) > 0.0f);
 
@@ -3311,7 +3306,7 @@ static void project_paint_face_init(const ProjPaintState *ps,
 
                 has_x_isect = 0;
                 for (x = bounds_px.xmin; x < bounds_px.xmax; x++) {
-                  float puv[2] = {(float)x, (float)y};
+                  const float puv[2] = {(float)x, (float)y};
                   bool in_bounds;
                   // uv[0] = (((float)x) + 0.5f) / (float)ibuf->x;
                   /* use offset uvs instead */
@@ -3874,7 +3869,7 @@ static void proj_paint_state_cavity_init(ProjPaintState *ps)
 
   if (ps->do_mask_cavity) {
     int *counter = MEM_callocN(sizeof(int) * ps->totvert_eval, "counter");
-    float(*edges)[3] = MEM_callocN(sizeof(float) * 3 * ps->totvert_eval, "edges");
+    float(*edges)[3] = MEM_callocN(sizeof(float[3]) * ps->totvert_eval, "edges");
     ps->cavities = MEM_mallocN(sizeof(float) * ps->totvert_eval, "ProjectPaint Cavities");
     cavities = ps->cavities;
 
@@ -4035,27 +4030,14 @@ static bool proj_paint_state_mesh_eval_init(const bContext *C, ProjPaintState *p
   CustomData_MeshMasks cddata_masks = scene_eval->customdata_mask;
   cddata_masks.fmask |= CD_MASK_MTFACE;
   cddata_masks.lmask |= CD_MASK_MLOOPUV;
-
-  /* Workaround for subsurf selection, try the display mesh first */
-  if (ps->source == PROJ_SRC_IMAGE_CAM) {
-    /* using render mesh, assume only camera was rendered from */
-    ps->me_eval = mesh_create_eval_final_render(depsgraph, scene_eval, ob_eval, &cddata_masks);
-    ps->me_eval_free = true;
+  if (ps->do_face_sel) {
+    cddata_masks.vmask |= CD_MASK_ORIGINDEX;
+    cddata_masks.emask |= CD_MASK_ORIGINDEX;
+    cddata_masks.pmask |= CD_MASK_ORIGINDEX;
   }
-  else {
-    if (ps->do_face_sel) {
-      cddata_masks.vmask |= CD_MASK_ORIGINDEX;
-      cddata_masks.emask |= CD_MASK_ORIGINDEX;
-      cddata_masks.pmask |= CD_MASK_ORIGINDEX;
-    }
-    ps->me_eval = mesh_get_eval_final(depsgraph, scene_eval, ob_eval, &cddata_masks);
-    ps->me_eval_free = false;
-  }
+  ps->me_eval = mesh_get_eval_final(depsgraph, scene_eval, ob_eval, &cddata_masks);
 
   if (!CustomData_has_layer(&ps->me_eval->ldata, CD_MLOOPUV)) {
-    if (ps->me_eval_free) {
-      BKE_id_free(NULL, ps->me_eval);
-    }
     ps->me_eval = NULL;
     return false;
   }
@@ -4638,9 +4620,6 @@ static void project_paint_end(ProjPaintState *ps)
       MEM_freeN(ps->cavities);
     }
 
-    if (ps->me_eval_free) {
-      BKE_id_free(NULL, ps->me_eval);
-    }
     ps->me_eval = NULL;
   }
 
@@ -5758,7 +5737,7 @@ void paint_proj_stroke(const bContext *C,
     View3D *v3d = CTX_wm_view3d(C);
     ARegion *region = CTX_wm_region(C);
     float *cursor = scene->cursor.location;
-    int mval_i[2] = {(int)pos[0], (int)pos[1]};
+    const int mval_i[2] = {(int)pos[0], (int)pos[1]};
 
     view3d_operator_needs_opengl(C);
 
@@ -5893,8 +5872,6 @@ void *paint_proj_new_stroke(bContext *C, Object *ob, const float mouse[2], int m
   ProjStrokeHandle *ps_handle;
   Scene *scene = CTX_data_scene(C);
   ToolSettings *settings = scene->toolsettings;
-  int i;
-  bool is_multi_view;
   char symmetry_flag_views[ARRAY_SIZE(ps_handle->ps_views)] = {0};
 
   ps_handle = MEM_callocN(sizeof(ProjStrokeHandle), "ProjStrokeHandle");
@@ -5910,11 +5887,12 @@ void *paint_proj_new_stroke(bContext *C, Object *ob, const float mouse[2], int m
 
   ps_handle->orig_brush_size = BKE_brush_size_get(scene, ps_handle->brush);
 
-  ps_handle->symmetry_flags = settings->imapaint.paint.symmetry_flags & PAINT_SYMM_AXIS_ALL;
+  Mesh *mesh = BKE_mesh_from_object(ob);
+  ps_handle->symmetry_flags = mesh->symmetry;
   ps_handle->ps_views_tot = 1 + (pow_i(2, count_bits_i(ps_handle->symmetry_flags)) - 1);
-  is_multi_view = (ps_handle->ps_views_tot != 1);
+  bool is_multi_view = (ps_handle->ps_views_tot != 1);
 
-  for (i = 0; i < ps_handle->ps_views_tot; i++) {
+  for (int i = 0; i < ps_handle->ps_views_tot; i++) {
     ProjPaintState *ps = MEM_callocN(sizeof(ProjPaintState), "ProjectionPaintState");
     ps_handle->ps_views[i] = ps;
   }
@@ -5937,7 +5915,7 @@ void *paint_proj_new_stroke(bContext *C, Object *ob, const float mouse[2], int m
     BLI_assert(index == ps_handle->ps_views_tot);
   }
 
-  for (i = 0; i < ps_handle->ps_views_tot; i++) {
+  for (int i = 0; i < ps_handle->ps_views_tot; i++) {
     ProjPaintState *ps = ps_handle->ps_views[i];
 
     project_state_init(C, ob, ps, mode);
@@ -5955,7 +5933,7 @@ void *paint_proj_new_stroke(bContext *C, Object *ob, const float mouse[2], int m
 
   /* allocate and initialize spatial data structures */
 
-  for (i = 0; i < ps_handle->ps_views_tot; i++) {
+  for (int i = 0; i < ps_handle->ps_views_tot; i++) {
     ProjPaintState *ps = ps_handle->ps_views[i];
 
     ps->source = (ps->tool == PAINT_TOOL_FILL) ? PROJ_SRC_VIEW_FILL : PROJ_SRC_VIEW;
@@ -5980,7 +5958,7 @@ void *paint_proj_new_stroke(bContext *C, Object *ob, const float mouse[2], int m
   return ps_handle;
 
 fail:
-  for (i = 0; i < ps_handle->ps_views_tot; i++) {
+  for (int i = 0; i < ps_handle->ps_views_tot; i++) {
     ProjPaintState *ps = ps_handle->ps_views[i];
     MEM_freeN(ps);
   }
@@ -6114,8 +6092,6 @@ static int texture_paint_camera_project_exec(bContext *C, wmOperator *op)
 
   scene->toolsettings->imapaint.flag |= IMAGEPAINT_DRAWING;
 
-  ED_image_undo_push_begin(op->type->name, PAINT_MODE_TEXTURE_3D);
-
   /* allocate and initialize spatial data structures */
   project_paint_begin(C, &ps, false, 0);
 
@@ -6125,8 +6101,10 @@ static int texture_paint_camera_project_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  float pos[2] = {0.0, 0.0};
-  float lastpos[2] = {0.0, 0.0};
+  ED_image_undo_push_begin(op->type->name, PAINT_MODE_TEXTURE_3D);
+
+  const float pos[2] = {0.0, 0.0};
+  const float lastpos[2] = {0.0, 0.0};
   int a;
 
   project_paint_op(&ps, lastpos, pos);
@@ -6134,11 +6112,13 @@ static int texture_paint_camera_project_exec(bContext *C, wmOperator *op)
   project_image_refresh_tagged(&ps);
 
   for (a = 0; a < ps.image_tot; a++) {
-    GPU_free_image(ps.projImages[a].ima);
+    BKE_image_free_gputextures(ps.projImages[a].ima);
     WM_event_add_notifier(C, NC_IMAGE | NA_EDITED, ps.projImages[a].ima);
   }
 
   project_paint_end(&ps);
+
+  ED_image_undo_push_end();
 
   scene->toolsettings->imapaint.flag &= ~IMAGEPAINT_DRAWING;
   BKE_brush_size_set(scene, ps.brush, orig_brush_size);
@@ -6175,7 +6155,7 @@ static bool texture_paint_image_from_view_poll(bContext *C)
     CTX_wm_operator_poll_msg_set(C, "No 3D viewport found to create image from");
     return false;
   }
-  if (G.background || !GPU_is_initialized()) {
+  if (G.background || !GPU_is_init()) {
     return false;
   }
   return true;

@@ -782,10 +782,6 @@ class CYCLES_RENDER_PT_filter(CyclesButtonsPanel, Panel):
         col.prop(view_layer, "use_solid", text="Surfaces")
         col.prop(view_layer, "use_strand", text="Hair")
         col.prop(view_layer, "use_volumes", text="Volumes")
-        if with_freestyle:
-            sub = col.row(align=True)
-            sub.prop(view_layer, "use_freestyle", text="Freestyle")
-            sub.active = rd.use_freestyle
 
 
 class CYCLES_RENDER_PT_override(CyclesButtonsPanel, Panel):
@@ -1012,6 +1008,7 @@ class CYCLES_RENDER_PT_denoising(CyclesButtonsPanel, Panel):
             col.prop(cycles_view_layer, "denoising_optix_input_passes")
             return
         elif denoiser == 'OPENIMAGEDENOISE':
+            col.prop(cycles_view_layer, "denoising_openimagedenoise_input_passes")
             return
 
         col.prop(cycles_view_layer, "denoising_radius", text="Radius")
@@ -1574,14 +1571,16 @@ class CYCLES_WORLD_PT_mist(CyclesButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
+        layout.use_property_split = True
 
         world = context.world
 
-        split = layout.split(align=True)
-        split.prop(world.mist_settings, "start")
-        split.prop(world.mist_settings, "depth")
+        col = layout.column(align=True)
+        col.prop(world.mist_settings, "start")
+        col.prop(world.mist_settings, "depth")
 
-        layout.prop(world.mist_settings, "falloff")
+        col = layout.column()
+        col.prop(world.mist_settings, "falloff")
 
 
 class CYCLES_WORLD_PT_ray_visibility(CyclesButtonsPanel, Panel):

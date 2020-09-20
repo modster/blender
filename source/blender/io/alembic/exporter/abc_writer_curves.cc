@@ -41,9 +41,7 @@ using Alembic::AbcGeom::OInt16Property;
 using Alembic::AbcGeom::ON3fGeomParam;
 using Alembic::AbcGeom::OV2fGeomParam;
 
-namespace blender {
-namespace io {
-namespace alembic {
+namespace blender::io::alembic {
 
 const std::string ABC_CURVE_RESOLUTION_U_PROPNAME("blender:resolution");
 
@@ -63,9 +61,14 @@ void ABCCurveWriter::create_alembic_objects(const HierarchyContext *context)
   user_prop_resolu.set(cu->resolu);
 }
 
-const Alembic::Abc::OObject ABCCurveWriter::get_alembic_object() const
+Alembic::Abc::OObject ABCCurveWriter::get_alembic_object() const
 {
   return abc_curve_;
+}
+
+Alembic::Abc::OCompoundProperty ABCCurveWriter::abc_prop_for_custom_props()
+{
+  return abc_schema_prop_for_custom_props(abc_curve_schema_);
 }
 
 void ABCCurveWriter::do_write(HierarchyContext &context)
@@ -80,9 +83,9 @@ void ABCCurveWriter::do_write(HierarchyContext &context)
   std::vector<uint8_t> orders;
   Imath::V3f temp_vert;
 
-  Alembic::AbcGeom::BasisType curve_basis;
-  Alembic::AbcGeom::CurveType curve_type;
-  Alembic::AbcGeom::CurvePeriodicity periodicity;
+  Alembic::AbcGeom::BasisType curve_basis = Alembic::AbcGeom::kNoBasis;
+  Alembic::AbcGeom::CurveType curve_type = Alembic::AbcGeom::kVariableOrder;
+  Alembic::AbcGeom::CurvePeriodicity periodicity = Alembic::AbcGeom::kNonPeriodic;
 
   Nurb *nurbs = static_cast<Nurb *>(curve->nurb.first);
   for (; nurbs; nurbs = nurbs->next) {
@@ -196,6 +199,4 @@ Mesh *ABCCurveMeshWriter::get_export_mesh(Object *object_eval, bool &r_needsfree
   return BKE_mesh_new_nomain_from_curve(object_eval);
 }
 
-}  // namespace alembic
-}  // namespace io
-}  // namespace blender
+}  // namespace blender::io::alembic

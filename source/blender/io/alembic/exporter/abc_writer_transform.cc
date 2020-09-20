@@ -33,9 +33,7 @@
 #include "CLG_log.h"
 static CLG_LogRef LOG = {"io.alembic"};
 
-namespace blender {
-namespace io {
-namespace alembic {
+namespace blender::io::alembic {
 
 using Alembic::Abc::OObject;
 using Alembic::AbcGeom::OXform;
@@ -53,6 +51,17 @@ void ABCTransformWriter::create_alembic_objects(const HierarchyContext * /*conte
   CLOG_INFO(&LOG, 2, "exporting %s", args_.abc_path.c_str());
   abc_xform_ = OXform(args_.abc_parent, args_.abc_name, timesample_index_);
   abc_xform_schema_ = abc_xform_.getSchema();
+}
+
+Alembic::Abc::OCompoundProperty ABCTransformWriter::abc_prop_for_custom_props()
+{
+  return abc_schema_prop_for_custom_props<OXformSchema>(abc_xform_schema_);
+}
+
+const IDProperty *ABCTransformWriter::get_id_properties(const HierarchyContext &context) const
+{
+  const Object *object = context.object;
+  return object->id.properties;
 }
 
 void ABCTransformWriter::do_write(HierarchyContext &context)
@@ -92,9 +101,11 @@ void ABCTransformWriter::do_write(HierarchyContext &context)
   xform_sample.setMatrix(convert_matrix_datatype(parent_relative_matrix));
   xform_sample.setInheritsXforms(true);
   abc_xform_schema_.set(xform_sample);
+
+  write_visibility(context);
 }
 
-const OObject ABCTransformWriter::get_alembic_object() const
+OObject ABCTransformWriter::get_alembic_object() const
 {
   return abc_xform_;
 }
@@ -107,9 +118,10 @@ bool ABCTransformWriter::check_is_animated(const HierarchyContext &context) cons
      * depsgraph whether this object instance has a time source. */
     return true;
   }
+  if (check_has_physics(context)) {
+    return true;
+  }
   return BKE_object_moves_in_time(context.object, context.animation_check_include_parent);
 }
 
-}  // namespace alembic
-}  // namespace io
-}  // namespace blender
+}  // namespace blender::io::alembic

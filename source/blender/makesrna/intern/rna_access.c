@@ -558,9 +558,15 @@ static PropertyRNA *arraytypemap[IDP_NUMTYPES] = {
     (PropertyRNA *)&rna_PropertyGroupItem_double_array,
 };
 
-static void *rna_idproperty_check_ex(PropertyRNA **prop,
-                                     PointerRNA *ptr,
-                                     const bool return_rnaprop)
+/* This function initializes a PropertyRNAOrID with all required info, from a given PropertyRNA
+ * and PointerRNA data. It deals properly with the three cases (static RNA, runtime RNA, and
+ * IDProperty).
+ * WARNING: given `ptr` PointerRNA is assumed to be a valid data one here, calling code is
+ * responsible to ensure that.
+ */
+void rna_property_rna_or_id_get(PropertyRNA *prop,
+                                PointerRNA *ptr,
+                                PropertyRNAOrID *r_prop_rna_or_id)
 {
   /* This is quite a hack, but avoids some complexity in the API. we
    * pass IDProperty structs as PropertyRNA pointers to the outside.
@@ -568,36 +574,64 @@ static void *rna_idproperty_check_ex(PropertyRNA **prop,
    * distinguish it from IDProperty structs. If it is an ID property,
    * we look up an IDP PropertyRNA based on the type, and set the data
    * pointer to the IDProperty. */
+  memset(r_prop_rna_or_id, 0, sizeof(*r_prop_rna_or_id));
 
-  if ((*prop)->magic == RNA_MAGIC) {
-    if ((*prop)->flag & PROP_IDPROPERTY) {
-      IDProperty *idprop = rna_idproperty_find(ptr, (*prop)->identifier);
+  r_prop_rna_or_id->ptr = *ptr;
+  r_prop_rna_or_id->rawprop = prop;
 
-      if (idprop && !rna_idproperty_verify_valid(ptr, *prop, idprop)) {
+  if (prop->magic == RNA_MAGIC) {
+    r_prop_rna_or_id->rnaprop = prop;
+    r_prop_rna_or_id->identifier = prop->identifier;
+
+    r_prop_rna_or_id->is_array = prop->getlength || prop->totarraylength;
+    if (r_prop_rna_or_id->is_array) {
+      int arraylen[RNA_MAX_ARRAY_DIMENSION];
+      r_prop_rna_or_id->array_len = (prop->getlength && ptr->data) ?
+                                        (uint)prop->getlength(ptr, arraylen) :
+                                        prop->totarraylength;
+    }
+
+    if (prop->flag & PROP_IDPROPERTY) {
+      IDProperty *idprop = rna_idproperty_find(ptr, prop->identifier);
+
+      if (idprop != NULL && !rna_idproperty_verify_valid(ptr, prop, idprop)) {
         IDProperty *group = RNA_struct_idprops(ptr, 0);
 
         IDP_FreeFromGroup(group, idprop);
-        return NULL;
+        idprop = NULL;
       }
 
-      return idprop;
+      r_prop_rna_or_id->idprop = idprop;
+      r_prop_rna_or_id->is_set = idprop != NULL && (idprop->flag & IDP_FLAG_GHOST) == 0;
     }
     else {
-      return return_rnaprop ? *prop : NULL;
+      /* Full static RNA properties are always set. */
+      r_prop_rna_or_id->is_set = true;
     }
   }
+  else {
+    IDProperty *idprop = (IDProperty *)prop;
+    /* Given prop may come from the custom properties of another data, ensure we get the one from
+     * given data ptr. */
+    IDProperty *idprop_evaluated = rna_idproperty_find(ptr, idprop->name);
+    if (idprop_evaluated != NULL && idprop->type != idprop_evaluated->type) {
+      idprop_evaluated = NULL;
+    }
 
-  {
-    IDProperty *idprop = (IDProperty *)(*prop);
+    r_prop_rna_or_id->idprop = idprop_evaluated;
+    r_prop_rna_or_id->is_idprop = true;
+    /* Full IDProperties are always set, if it exists. */
+    r_prop_rna_or_id->is_set = (idprop_evaluated != NULL);
 
+    r_prop_rna_or_id->identifier = idprop->name;
     if (idprop->type == IDP_ARRAY) {
-      *prop = arraytypemap[(int)(idprop->subtype)];
+      r_prop_rna_or_id->rnaprop = arraytypemap[(int)(idprop->subtype)];
+      r_prop_rna_or_id->is_array = true;
+      r_prop_rna_or_id->array_len = idprop_evaluated != NULL ? (uint)idprop_evaluated->len : 0;
     }
     else {
-      *prop = typemap[(int)(idprop->type)];
+      r_prop_rna_or_id->rnaprop = typemap[(int)(idprop->type)];
     }
-
-    return idprop;
   }
 }
 
@@ -605,14 +639,26 @@ static void *rna_idproperty_check_ex(PropertyRNA **prop,
  * or NULL (in case IDProp could not be found, or prop is a real RNA property). */
 IDProperty *rna_idproperty_check(PropertyRNA **prop, PointerRNA *ptr)
 {
-  return rna_idproperty_check_ex(prop, ptr, false);
+  PropertyRNAOrID prop_rna_or_id;
+
+  rna_property_rna_or_id_get(*prop, ptr, &prop_rna_or_id);
+
+  *prop = prop_rna_or_id.rnaprop;
+  return prop_rna_or_id.idprop;
 }
 
 /* This function always return the valid, real data pointer, be it a regular RNA property one,
  * or an IDProperty one. */
 PropertyRNA *rna_ensure_property_realdata(PropertyRNA **prop, PointerRNA *ptr)
 {
-  return rna_idproperty_check_ex(prop, ptr, true);
+  PropertyRNAOrID prop_rna_or_id;
+
+  rna_property_rna_or_id_get(*prop, ptr, &prop_rna_or_id);
+
+  *prop = prop_rna_or_id.rnaprop;
+  return (prop_rna_or_id.is_idprop || prop_rna_or_id.idprop != NULL) ?
+             (PropertyRNA *)prop_rna_or_id.idprop :
+             prop_rna_or_id.rnaprop;
 }
 
 PropertyRNA *rna_ensure_property(PropertyRNA *prop)
@@ -2102,9 +2148,7 @@ bool RNA_property_editable_info(PointerRNA *ptr, PropertyRNA *prop, const char *
       return false;
     }
     if (ID_IS_OVERRIDE_LIBRARY(id)) {
-      /* We need the real data property in case of IDProperty here... */
-      PropertyRNA *real_prop = rna_ensure_property_realdata(&prop, ptr);
-      if (real_prop == NULL || !RNA_property_overridable_get(ptr, real_prop)) {
+      if (!RNA_property_overridable_get(ptr, prop)) {
         if (!(*r_info)[0]) {
           *r_info = N_("Can't edit this property from an override data-block");
         }
@@ -3944,18 +3988,67 @@ int RNA_property_collection_length(PointerRNA *ptr, PropertyRNA *prop)
   }
 }
 
+/* This helper checks whether given collection property itself is editable (we only currently
+ * support a limited set of operations, insertion of new items, and re-ordering of those new items
+ * exclusively). */
+static bool property_collection_liboverride_editable(PointerRNA *ptr,
+                                                     PropertyRNA *prop,
+                                                     bool *r_is_liboverride)
+{
+  ID *id = ptr->owner_id;
+  if (id == NULL) {
+    *r_is_liboverride = false;
+    return true;
+  }
+
+  const bool is_liboverride = *r_is_liboverride = ID_IS_OVERRIDE_LIBRARY(id);
+
+  if (!is_liboverride) {
+    /* We return True also for linked data, as it allows tricks like py scripts 'overriding' data
+     * of those.*/
+    return true;
+  }
+
+  if (!RNA_property_overridable_get(ptr, prop)) {
+    return false;
+  }
+
+  if (prop->magic != RNA_MAGIC || (prop->flag & PROP_IDPROPERTY) == 0) {
+    /* Insertion and such not supported for pure IDProperties for now, nor for pure RNA/DNA ones.
+     */
+    return false;
+  }
+  if ((prop->flag_override & PROPOVERRIDE_LIBRARY_INSERTION) == 0) {
+    return false;
+  }
+
+  /* No more checks to do, this collections is overridable. */
+  return true;
+}
+
 void RNA_property_collection_add(PointerRNA *ptr, PropertyRNA *prop, PointerRNA *r_ptr)
 {
   IDProperty *idprop;
-  /*  CollectionPropertyRNA *cprop = (CollectionPropertyRNA *)prop; */
+  /* CollectionPropertyRNA *cprop = (CollectionPropertyRNA *)prop; */
 
   BLI_assert(RNA_property_type(prop) == PROP_COLLECTION);
+
+  bool is_liboverride;
+  if (!property_collection_liboverride_editable(ptr, prop, &is_liboverride)) {
+    if (r_ptr) {
+      memset(r_ptr, 0, sizeof(*r_ptr));
+    }
+    return;
+  }
 
   if ((idprop = rna_idproperty_check(&prop, ptr))) {
     IDPropertyTemplate val = {0};
     IDProperty *item;
 
     item = IDP_New(IDP_GROUP, &val, "");
+    if (is_liboverride) {
+      item->flag |= IDP_FLAG_OVERRIDELIBRARY_LOCAL;
+    }
     IDP_AppendArray(idprop, item);
     /* IDP_AppendArray does a shallow copy (memcpy), only free memory  */
     /* IDP_FreePropertyContent(item); */
@@ -3972,6 +4065,9 @@ void RNA_property_collection_add(PointerRNA *ptr, PropertyRNA *prop, PointerRNA 
       IDP_AddToGroup(group, idprop);
 
       item = IDP_New(IDP_GROUP, &val, "");
+      if (is_liboverride) {
+        item->flag |= IDP_FLAG_OVERRIDELIBRARY_LOCAL;
+      }
       IDP_AppendArray(idprop, item);
       /* IDP_AppendArray does a shallow copy (memcpy), only free memory */
       /* IDP_FreePropertyContent(item); */
@@ -4020,6 +4116,11 @@ bool RNA_property_collection_remove(PointerRNA *ptr, PropertyRNA *prop, int key)
 
   BLI_assert(RNA_property_type(prop) == PROP_COLLECTION);
 
+  bool is_liboverride;
+  if (!property_collection_liboverride_editable(ptr, prop, &is_liboverride)) {
+    return false;
+  }
+
   if ((idprop = rna_idproperty_check(&prop, ptr))) {
     IDProperty tmp, *array;
     int len;
@@ -4028,6 +4129,11 @@ bool RNA_property_collection_remove(PointerRNA *ptr, PropertyRNA *prop, int key)
     array = IDP_IDPArray(idprop);
 
     if (key >= 0 && key < len) {
+      if (is_liboverride && (array[key].flag & IDP_FLAG_OVERRIDELIBRARY_LOCAL) == 0) {
+        /* We can only remove items that we actually inserted in the local override. */
+        return false;
+      }
+
       if (key + 1 < len) {
         /* move element to be removed to the back */
         memcpy(&tmp, &array[key], sizeof(IDProperty));
@@ -4074,6 +4180,11 @@ bool RNA_property_collection_move(PointerRNA *ptr, PropertyRNA *prop, int key, i
 
   BLI_assert(RNA_property_type(prop) == PROP_COLLECTION);
 
+  bool is_liboverride;
+  if (!property_collection_liboverride_editable(ptr, prop, &is_liboverride)) {
+    return false;
+  }
+
   if ((idprop = rna_idproperty_check(&prop, ptr))) {
     IDProperty tmp, *array;
     int len;
@@ -4082,6 +4193,11 @@ bool RNA_property_collection_move(PointerRNA *ptr, PropertyRNA *prop, int key, i
     array = IDP_IDPArray(idprop);
 
     if (key >= 0 && key < len && pos >= 0 && pos < len && key != pos) {
+      if (is_liboverride && (array[key].flag & IDP_FLAG_OVERRIDELIBRARY_LOCAL) == 0) {
+        /* We can only move items that we actually inserted in the local override. */
+        return false;
+      }
+
       memcpy(&tmp, &array[key], sizeof(IDProperty));
       if (pos < key) {
         memmove(array + pos + 1, array + pos, sizeof(IDProperty) * (key - pos));
@@ -4107,8 +4223,29 @@ void RNA_property_collection_clear(PointerRNA *ptr, PropertyRNA *prop)
 
   BLI_assert(RNA_property_type(prop) == PROP_COLLECTION);
 
+  bool is_liboverride;
+  if (!property_collection_liboverride_editable(ptr, prop, &is_liboverride)) {
+    return;
+  }
+
   if ((idprop = rna_idproperty_check(&prop, ptr))) {
-    IDP_ResizeIDPArray(idprop, 0);
+    if (is_liboverride) {
+      /* We can only move items that we actually inserted in the local override. */
+      int len = idprop->len;
+      IDProperty tmp, *array = IDP_IDPArray(idprop);
+      for (int i = 0; i < len; i++) {
+        if ((array[i].flag & IDP_FLAG_OVERRIDELIBRARY_LOCAL) != 0) {
+          memcpy(&tmp, &array[i], sizeof(IDProperty));
+          memmove(array + i, array + i + 1, sizeof(IDProperty) * (len - (i + 1)));
+          memcpy(&array[len - 1], &tmp, sizeof(IDProperty));
+          IDP_ResizeIDPArray(idprop, --len);
+          i--;
+        }
+      }
+    }
+    else {
+      IDP_ResizeIDPArray(idprop, 0);
+    }
     rna_idproperty_touch(idprop);
   }
 }
@@ -4172,10 +4309,8 @@ int RNA_property_collection_lookup_int(PointerRNA *ptr,
   }
 }
 
-int RNA_property_collection_lookup_string(PointerRNA *ptr,
-                                          PropertyRNA *prop,
-                                          const char *key,
-                                          PointerRNA *r_ptr)
+int RNA_property_collection_lookup_string_index(
+    PointerRNA *ptr, PropertyRNA *prop, const char *key, PointerRNA *r_ptr, int *r_index)
 {
   CollectionPropertyRNA *cprop = (CollectionPropertyRNA *)rna_ensure_property(prop);
 
@@ -4193,9 +4328,10 @@ int RNA_property_collection_lookup_string(PointerRNA *ptr,
     int found = 0;
     int keylen = strlen(key);
     int namelen;
+    int index = 0;
 
     RNA_property_collection_begin(ptr, prop, &iter);
-    for (; iter.valid; RNA_property_collection_next(&iter)) {
+    for (; iter.valid; RNA_property_collection_next(&iter), index++) {
       if (iter.ptr.data && iter.ptr.type->nameproperty) {
         nameprop = iter.ptr.type->nameproperty;
 
@@ -4219,10 +4355,23 @@ int RNA_property_collection_lookup_string(PointerRNA *ptr,
 
     if (!iter.valid) {
       memset(r_ptr, 0, sizeof(*r_ptr));
+      *r_index = -1;
+    }
+    else {
+      *r_index = index;
     }
 
     return iter.valid;
   }
+}
+
+int RNA_property_collection_lookup_string(PointerRNA *ptr,
+                                          PropertyRNA *prop,
+                                          const char *key,
+                                          PointerRNA *r_ptr)
+{
+  int index;
+  return RNA_property_collection_lookup_string_index(ptr, prop, key, r_ptr, &index);
 }
 
 /* zero return is an assignment error */

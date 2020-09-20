@@ -18,8 +18,7 @@
  * \ingroup DNA
  */
 
-#ifndef __DNA_VOLUME_TYPES_H__
-#define __DNA_VOLUME_TYPES_H__
+#pragma once
 
 #include "DNA_ID.h"
 
@@ -39,6 +38,10 @@ typedef struct VolumeDisplay {
   float density;
   int wireframe_type;
   int wireframe_detail;
+  int interpolation_method;
+  int axis_slice_method;
+  int slice_axis;
+  float slice_depth;
   int _pad[1];
 } VolumeDisplay;
 
@@ -120,7 +123,26 @@ typedef enum VolumeRenderSpace {
   VOLUME_SPACE_WORLD = 1,
 } VolumeRenderSpace;
 
+/* VolumeDisplay.interpolation_method */
+typedef enum VolumeDisplayInterpMethod {
+  VOLUME_DISPLAY_INTERP_LINEAR = 0,
+  VOLUME_DISPLAY_INTERP_CUBIC = 1,
+  VOLUME_DISPLAY_INTERP_CLOSEST = 2,
+} VolumeDisplayInterpMethod;
+
+/* VolumeDisplay.axis_slice_method */
+typedef enum AxisAlignedSlicingMethod {
+  VOLUME_AXIS_SLICE_FULL = 0,
+  VOLUME_AXIS_SLICE_SINGLE = 1,
+} AxisAlignedSlicingMethod;
+
+/* VolumeDisplay.slice_axis */
+typedef enum SliceAxis {
+  VOLUME_SLICE_AXIS_AUTO = 0,
+  VOLUME_SLICE_AXIS_X = 1,
+  VOLUME_SLICE_AXIS_Y = 2,
+  VOLUME_SLICE_AXIS_Z = 3,
+} SliceAxis;
+
 /* Only one material supported currently. */
 #define VOLUME_MATERIAL_NR 1
-
-#endif /* __DNA_VOLUME_TYPES_H__ */

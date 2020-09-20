@@ -284,7 +284,7 @@ static void viewops_data_alloc(bContext *C, wmOperator *op)
 }
 
 void view3d_orbit_apply_dyn_ofs(float r_ofs[3],
-                                const float ofs_init[3],
+                                const float ofs_old[3],
                                 const float viewquat_old[4],
                                 const float viewquat_new[4],
                                 const float dyn_ofs[3])
@@ -295,7 +295,7 @@ void view3d_orbit_apply_dyn_ofs(float r_ofs[3],
 
   invert_qt_normalized(q);
 
-  sub_v3_v3v3(r_ofs, ofs_init, dyn_ofs);
+  sub_v3_v3v3(r_ofs, ofs_old, dyn_ofs);
   mul_qt_v3(q, r_ofs);
   add_v3_v3(r_ofs, dyn_ofs);
 }
@@ -333,10 +333,9 @@ static bool view3d_orbit_calc_center(bContext *C, float r_dyn_ofs[3])
   else if (ob_act && (ob_act->mode & OB_MODE_EDIT) && (ob_act->type == OB_FONT)) {
     Curve *cu = ob_act_eval->data;
     EditFont *ef = cu->editfont;
-    int i;
 
     zero_v3(lastofs);
-    for (i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++) {
       add_v2_v2(lastofs, ef->textcurs[i]);
     }
     mul_v2_fl(lastofs, 1.0f / 4.0f);
@@ -822,7 +821,7 @@ static void viewrotate_apply(ViewOpsData *vod, const int event_xy[2])
     float xaxis[3];
 
     /* Radians per-pixel. */
-    const float sensitivity = U.view_rotate_sensitivity_turntable / U.pixelsize;
+    const float sensitivity = U.view_rotate_sensitivity_turntable / U.dpi_fac;
 
     /* Get the 3x3 matrix and its inverse from the quaternion */
     quat_to_mat3(m, vod->curr.viewquat);
@@ -2015,7 +2014,7 @@ static void view_zoom_to_window_xy_3d(ARegion *region, float dfac, const int zoo
 }
 
 static float viewzoom_scale_value(const rcti *winrct,
-                                  const short viewzoom,
+                                  const eViewZoom_Style viewzoom,
                                   const bool zoom_invert,
                                   const bool zoom_invert_force,
                                   const int xy_curr[2],
@@ -2038,7 +2037,7 @@ static float viewzoom_scale_value(const rcti *winrct,
       fac = (float)(xy_init[1] - xy_curr[1]);
     }
 
-    fac /= U.pixelsize;
+    fac /= U.dpi_fac;
 
     if (zoom_invert != zoom_invert_force) {
       fac = -fac;
@@ -2055,8 +2054,8 @@ static float viewzoom_scale_value(const rcti *winrct,
         BLI_rcti_cent_x(winrct),
         BLI_rcti_cent_y(winrct),
     };
-    float len_new = (5 * U.pixelsize) + ((float)len_v2v2_int(ctr, xy_curr) / U.pixelsize);
-    float len_old = (5 * U.pixelsize) + ((float)len_v2v2_int(ctr, xy_init) / U.pixelsize);
+    float len_new = (5 * U.dpi_fac) + ((float)len_v2v2_int(ctr, xy_curr) / U.dpi_fac);
+    float len_old = (5 * U.dpi_fac) + ((float)len_v2v2_int(ctr, xy_init) / U.dpi_fac);
 
     /* intentionally ignore 'zoom_invert' for scale */
     if (zoom_invert_force) {
@@ -2066,16 +2065,16 @@ static float viewzoom_scale_value(const rcti *winrct,
     zfac = val_orig * (len_old / max_ff(len_new, 1.0f)) / val;
   }
   else { /* USER_ZOOM_DOLLY */
-    float len_new = 5 * U.pixelsize;
-    float len_old = 5 * U.pixelsize;
+    float len_new = 5 * U.dpi_fac;
+    float len_old = 5 * U.dpi_fac;
 
     if (U.uiflag & USER_ZOOM_HORIZ) {
-      len_new += (winrct->xmax - (xy_curr[0])) / U.pixelsize;
-      len_old += (winrct->xmax - (xy_init[0])) / U.pixelsize;
+      len_new += (winrct->xmax - (xy_curr[0])) / U.dpi_fac;
+      len_old += (winrct->xmax - (xy_init[0])) / U.dpi_fac;
     }
     else {
-      len_new += (winrct->ymax - (xy_curr[1])) / U.pixelsize;
-      len_old += (winrct->ymax - (xy_init[1])) / U.pixelsize;
+      len_new += (winrct->ymax - (xy_curr[1])) / U.dpi_fac;
+      len_old += (winrct->ymax - (xy_init[1])) / U.dpi_fac;
     }
 
     if (zoom_invert != zoom_invert_force) {
@@ -2089,7 +2088,7 @@ static float viewzoom_scale_value(const rcti *winrct,
 }
 
 static float viewzoom_scale_value_offset(const rcti *winrct,
-                                         const short viewzoom,
+                                         const eViewZoom_Style viewzoom,
                                          const bool zoom_invert,
                                          const bool zoom_invert_force,
                                          const int xy_curr[2],
@@ -2120,7 +2119,7 @@ static float viewzoom_scale_value_offset(const rcti *winrct,
 
 static void viewzoom_apply_camera(ViewOpsData *vod,
                                   const int xy[2],
-                                  const short viewzoom,
+                                  const eViewZoom_Style viewzoom,
                                   const bool zoom_invert,
                                   const bool zoom_to_pos)
 {
@@ -2155,7 +2154,7 @@ static void viewzoom_apply_camera(ViewOpsData *vod,
 
 static void viewzoom_apply_3d(ViewOpsData *vod,
                               const int xy[2],
-                              const short viewzoom,
+                              const eViewZoom_Style viewzoom,
                               const bool zoom_invert,
                               const bool zoom_to_pos)
 {
@@ -2197,7 +2196,7 @@ static void viewzoom_apply_3d(ViewOpsData *vod,
 
 static void viewzoom_apply(ViewOpsData *vod,
                            const int xy[2],
-                           const short viewzoom,
+                           const eViewZoom_Style viewzoom,
                            const bool zoom_invert,
                            const bool zoom_to_pos)
 {
@@ -2248,7 +2247,7 @@ static int viewzoom_modal(bContext *C, wmOperator *op, const wmEvent *event)
     const bool use_cursor_init = RNA_boolean_get(op->ptr, "use_cursor_init");
     viewzoom_apply(vod,
                    &event->x,
-                   U.viewzoom,
+                   (eViewZoom_Style)U.viewzoom,
                    (U.uiflag & USER_ZOOM_INVERT) != 0,
                    (use_cursor_init && (U.uiflag & USER_ZOOM_TO_MOUSEPOS)));
     if (ED_screen_animation_playing(CTX_wm_manager(C))) {
@@ -2500,7 +2499,10 @@ static bool viewdolly_offset_lock_check(bContext *C, wmOperator *op)
   return false;
 }
 
-static void view_dolly_to_vector_3d(ARegion *region, float orig_ofs[3], float dvec[3], float dfac)
+static void view_dolly_to_vector_3d(ARegion *region,
+                                    const float orig_ofs[3],
+                                    const float dvec[3],
+                                    float dfac)
 {
   RegionView3D *rv3d = region->regiondata;
   madd_v3_v3v3fl(rv3d->ofs, orig_ofs, dvec, -(1.0f - dfac));
@@ -2786,6 +2788,25 @@ static bool view3d_object_skip_minmax(const View3D *v3d,
   return false;
 }
 
+static void view3d_object_calc_minmax(Depsgraph *depsgraph,
+                                      Scene *scene,
+                                      Object *ob_eval,
+                                      const bool only_center,
+                                      float min[3],
+                                      float max[3])
+{
+  /* Account for duplis. */
+  if (BKE_object_minmax_dupli(depsgraph, scene, ob_eval, min, max, false) == 0) {
+    /* Use if duplis aren't found. */
+    if (only_center) {
+      minmax_v3v3_v3(min, max, ob_eval->obmat[3]);
+    }
+    else {
+      BKE_object_minmax(ob_eval, min, max, false);
+    }
+  }
+}
+
 static void view3d_from_minmax(bContext *C,
                                View3D *v3d,
                                ARegion *region,
@@ -2899,7 +2920,7 @@ static int view3d_all_exec(bContext *C, wmOperator *op)
   View3D *v3d = CTX_wm_view3d(C);
   RegionView3D *rv3d = CTX_wm_region_view3d(C);
   Scene *scene = CTX_data_scene(C);
-  const Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   ViewLayer *view_layer_eval = DEG_get_evaluated_view_layer(depsgraph);
   Base *base_eval;
   const bool use_all_regions = RNA_boolean_get(op->ptr, "use_all_regions");
@@ -2933,18 +2954,15 @@ static int view3d_all_exec(bContext *C, wmOperator *op)
       if (view3d_object_skip_minmax(v3d, rv3d, ob, skip_camera, &only_center)) {
         continue;
       }
-
-      if (only_center) {
-        minmax_v3v3_v3(min, max, base_eval->object->obmat[3]);
-      }
-      else {
-        BKE_object_minmax(base_eval->object, min, max, false);
-      }
+      view3d_object_calc_minmax(depsgraph, scene, base_eval->object, only_center, min, max);
       changed = true;
     }
   }
 
   if (center) {
+    struct wmMsgBus *mbus = CTX_wm_message_bus(C);
+    WM_msg_publish_rna_prop(mbus, &scene->id, &scene->cursor, View3DCursor, location);
+
     DEG_id_tag_update(&scene->id, ID_RECALC_COPY_ON_WRITE);
   }
 
@@ -3097,18 +3115,7 @@ static int viewselected_exec(bContext *C, wmOperator *op)
         if (view3d_object_skip_minmax(v3d, rv3d, ob, skip_camera, &only_center)) {
           continue;
         }
-
-        /* account for duplis */
-        if (BKE_object_minmax_dupli(depsgraph, scene, base_eval->object, min, max, false) == 0) {
-          /* use if duplis not found */
-          if (only_center) {
-            minmax_v3v3_v3(min, max, base_eval->object->obmat[3]);
-          }
-          else {
-            BKE_object_minmax(base_eval->object, min, max, false);
-          }
-        }
-
+        view3d_object_calc_minmax(depsgraph, scene, base_eval->object, only_center, min, max);
         ok = 1;
       }
     }
@@ -3944,8 +3951,9 @@ static int view_axis_exec(bContext *C, wmOperator *op)
     Object *obact = CTX_data_active_object(C);
     if (obact != NULL) {
       float twmat[3][3];
+      Object *obedit = CTX_data_edit_object(C);
       /* same as transform gizmo when normal is set */
-      ED_getTransformOrientationMatrix(C, twmat, V3D_AROUND_ACTIVE);
+      ED_getTransformOrientationMatrix(C, obact, obedit, V3D_AROUND_ACTIVE, twmat);
       align_quat = align_quat_buf;
       mat3_to_quat(align_quat, twmat);
       invert_qt_normalized(align_quat);
@@ -4865,22 +4873,23 @@ void VIEW3D_OT_background_image_remove(wmOperatorType *ot)
  * Draw border or toggle off.
  * \{ */
 
-static void calc_local_clipping(float clip_local[6][4], BoundBox *clipbb, float mat[4][4])
+static void calc_local_clipping(float clip_local[6][4],
+                                const BoundBox *clipbb,
+                                const float mat[4][4])
 {
   BoundBox clipbb_local;
   float imat[4][4];
-  int i;
 
   invert_m4_m4(imat, mat);
 
-  for (i = 0; i < 8; i++) {
+  for (int i = 0; i < 8; i++) {
     mul_v3_m4v3(clipbb_local.vec[i], imat, clipbb->vec[i]);
   }
 
   ED_view3d_clipping_calc_from_boundbox(clip_local, &clipbb_local, is_negative_m4(mat));
 }
 
-void ED_view3d_clipping_local(RegionView3D *rv3d, float mat[4][4])
+void ED_view3d_clipping_local(RegionView3D *rv3d, const float mat[4][4])
 {
   if (rv3d->rflag & RV3D_CLIPPING) {
     calc_local_clipping(rv3d->clip_local, rv3d->clipbb, mat);

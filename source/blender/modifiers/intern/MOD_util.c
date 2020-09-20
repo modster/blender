@@ -143,10 +143,9 @@ void MOD_get_texture_coords(MappingInfoModifierData *dmd,
       MEM_freeN(done);
       return;
     }
-    else {
-      /* if there are no UVs, default to local */
-      texmapping = MOD_DISP_MAP_LOCAL;
-    }
+
+    /* if there are no UVs, default to local */
+    texmapping = MOD_DISP_MAP_LOCAL;
   }
 
   MVert *mv = mesh->mvert;
@@ -230,7 +229,7 @@ Mesh *MOD_deform_mesh_eval_get(Object *ob,
      * that's properly generated for curves. */
     mesh = BKE_mesh_new_nomain_from_curve(ob);
 
-    /* Currently, that may not be the case everytime
+    /* Currently, that may not be the case every time
      * (texts e.g. tend to give issues,
      * also when deforming curve points instead of generated curve geometry... ). */
     if (mesh != NULL && mesh->totvert != num_verts) {

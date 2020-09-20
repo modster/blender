@@ -157,8 +157,10 @@ static CustomData *rna_cd_from_layer(PointerRNA *ptr, CustomDataLayer *cdl)
 
   /* rely on negative values wrapping */
 #  define TEST_CDL(cmd) \
-    if ((void)(cd = cmd(me)), ARRAY_HAS_ITEM(cdl, cd->layers, cd->totlayer)) \
-    return cd
+    if ((void)(cd = cmd(me)), ARRAY_HAS_ITEM(cdl, cd->layers, cd->totlayer)) { \
+      return cd; \
+    } \
+    ((void)0)
 
   TEST_CDL(rna_mesh_vdata_helper);
   TEST_CDL(rna_mesh_edata_helper);
@@ -3200,6 +3202,9 @@ static void rna_def_mesh(BlenderRNA *brna)
   rna_def_paint_mask(brna, prop);
   /* End paint mask */
 
+  /* Attributes */
+  rna_def_attributes_common(srna);
+
   /* Remesh */
   prop = RNA_def_property(srna, "remesh_voxel_size", PROP_FLOAT, PROP_DISTANCE);
   RNA_def_property_float_sdna(prop, NULL, "remesh_voxel_size");
@@ -3268,6 +3273,29 @@ static void rna_def_mesh(BlenderRNA *brna)
 
   /* End remesh */
 
+  /* Symmetry */
+  prop = RNA_def_property(srna, "use_mirror_x", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "symmetry", ME_SYMMETRY_X);
+  RNA_def_property_ui_text(prop, "X", "Enable symmetry in the X axis");
+  RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
+
+  prop = RNA_def_property(srna, "use_mirror_y", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "symmetry", ME_SYMMETRY_Y);
+  RNA_def_property_ui_text(prop, "Y", "Enable symmetry in the Y axis");
+  RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
+
+  prop = RNA_def_property(srna, "use_mirror_z", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "symmetry", ME_SYMMETRY_Z);
+  RNA_def_property_ui_text(prop, "Z", "Enable symmetry in the Z axis");
+  RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
+
+  prop = RNA_def_property(srna, "use_mirror_vertex_group_x", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "editflag", ME_EDIT_VERTEX_GROUPS_X_SYMMETRY);
+  RNA_def_property_ui_text(
+      prop, "Vertex Groups X Symmetry", "Mirror the left/right vertex groups when painting");
+  RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
+  /* End Symmetry */
+
   prop = RNA_def_property(srna, "use_auto_smooth", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", ME_AUTOSMOOTH);
   RNA_def_property_ui_text(
@@ -3328,19 +3356,6 @@ static void rna_def_mesh(BlenderRNA *brna)
 #  endif
 
   /* editflag */
-  prop = RNA_def_property(srna, "use_mirror_x", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "editflag", ME_EDIT_MIRROR_X);
-  RNA_def_property_ui_text(prop, "X Mirror", "X Axis mirror editing");
-  RNA_def_property_update(prop, 0, "rna_Mesh_update_draw");
-
-  prop = RNA_def_property(srna, "use_mirror_y", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "editflag", ME_EDIT_MIRROR_Y);
-  RNA_def_property_ui_text(prop, "Y Mirror", "Y Axis mirror editing");
-
-  prop = RNA_def_property(srna, "use_mirror_z", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "editflag", ME_EDIT_MIRROR_Z);
-  RNA_def_property_ui_text(prop, "Z Mirror", "Z Axis mirror editing");
-
   prop = RNA_def_property(srna, "use_mirror_topology", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "editflag", ME_EDIT_MIRROR_TOPO);
   RNA_def_property_ui_text(prop,
@@ -3376,7 +3391,7 @@ static void rna_def_mesh(BlenderRNA *brna)
   /* readonly editmesh info - use for extrude menu */
   prop = RNA_def_property(srna, "total_vert_sel", PROP_INT, PROP_UNSIGNED);
   RNA_def_property_int_funcs(prop, "rna_Mesh_tot_vert_get", NULL, NULL);
-  RNA_def_property_ui_text(prop, "Selected Vert Total", "Selected vertex count in editmode");
+  RNA_def_property_ui_text(prop, "Selected Vertex Total", "Selected vertex count in editmode");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 
   prop = RNA_def_property(srna, "total_edge_sel", PROP_INT, PROP_UNSIGNED);

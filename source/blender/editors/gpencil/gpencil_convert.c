@@ -48,6 +48,7 @@
 #include "DNA_space_types.h"
 #include "DNA_view3d_types.h"
 
+#include "BKE_animsys.h"
 #include "BKE_collection.h"
 #include "BKE_context.h"
 #include "BKE_curve.h"
@@ -370,10 +371,9 @@ static void gpencil_stroke_path_animation_preprocess_gaps(tGpTimingData *gtd,
                                                           int *nbr_gaps,
                                                           float *tot_gaps_time)
 {
-  int i;
   float delta_time = 0.0f;
 
-  for (i = 0; i < gtd->num_points; i++) {
+  for (int i = 0; i < gtd->num_points; i++) {
     if (gtd->times[i] < 0 && i) {
       (*nbr_gaps)++;
       gtd->times[i] = -gtd->times[i] - delta_time;
@@ -399,6 +399,7 @@ static void gpencil_stroke_path_animation_preprocess_gaps(tGpTimingData *gtd,
 static void gpencil_stroke_path_animation_add_keyframes(ReportList *reports,
                                                         PointerRNA ptr,
                                                         PropertyRNA *prop,
+                                                        Depsgraph *depsgraph,
                                                         FCurve *fcu,
                                                         Curve *cu,
                                                         tGpTimingData *gtd,
@@ -418,14 +419,11 @@ static void gpencil_stroke_path_animation_add_keyframes(ReportList *reports,
   float delta_time = 0.0f, next_delta_time = 0.0f;
   int nbr_done_gaps = 0;
 
-  int i;
-  float cfra;
-
   /* This is a bit tricky, as:
    * - We can't add arbitrarily close points on FCurve (in time).
    * - We *must* have all "caps" points of all strokes in FCurve, as much as possible!
    */
-  for (i = 0; i < gtd->num_points; i++) {
+  for (int i = 0; i < gtd->num_points; i++) {
     /* If new stroke... */
     if (i > end_stroke_idx) {
       start_stroke_idx = i;
@@ -440,7 +438,7 @@ static void gpencil_stroke_path_animation_add_keyframes(ReportList *reports,
 
     /* Simple proportional stuff... */
     cu->ctime = gtd->dists[i] / gtd->tot_dist * cu->pathlen;
-    cfra = time_start + ((gtd->times[i] + delta_time) / gtd->tot_time * time_range);
+    float cfra = time_start + ((gtd->times[i] + delta_time) / gtd->tot_time * time_range);
 
     /* And now, the checks about timing... */
     if (i == start_stroke_idx) {
@@ -453,8 +451,16 @@ static void gpencil_stroke_path_animation_add_keyframes(ReportList *reports,
         if ((cfra - last_valid_time) < MIN_TIME_DELTA) {
           cfra = last_valid_time + MIN_TIME_DELTA;
         }
-        insert_keyframe_direct(
-            reports, ptr, prop, fcu, cfra, BEZT_KEYTYPE_KEYFRAME, NULL, INSERTKEY_FAST);
+        const AnimationEvalContext anim_eval_context = BKE_animsys_eval_context_construct(
+            depsgraph, cfra);
+        insert_keyframe_direct(reports,
+                               ptr,
+                               prop,
+                               fcu,
+                               &anim_eval_context,
+                               BEZT_KEYTYPE_KEYFRAME,
+                               NULL,
+                               INSERTKEY_FAST);
         last_valid_time = cfra;
       }
       else if (G.debug & G_DEBUG) {
@@ -466,8 +472,16 @@ static void gpencil_stroke_path_animation_add_keyframes(ReportList *reports,
       if ((cfra - last_valid_time) < MIN_TIME_DELTA) {
         cfra = last_valid_time + MIN_TIME_DELTA;
       }
-      insert_keyframe_direct(
-          reports, ptr, prop, fcu, cfra, BEZT_KEYTYPE_KEYFRAME, NULL, INSERTKEY_FAST);
+      const AnimationEvalContext anim_eval_context = BKE_animsys_eval_context_construct(depsgraph,
+                                                                                        cfra);
+      insert_keyframe_direct(reports,
+                             ptr,
+                             prop,
+                             fcu,
+                             &anim_eval_context,
+                             BEZT_KEYTYPE_KEYFRAME,
+                             NULL,
+                             INSERTKEY_FAST);
       last_valid_time = cfra;
     }
     else {
@@ -475,8 +489,16 @@ static void gpencil_stroke_path_animation_add_keyframes(ReportList *reports,
        * and also far enough from (not yet added!) end_stroke keyframe!
        */
       if ((cfra - last_valid_time) > MIN_TIME_DELTA && (end_stroke_time - cfra) > MIN_TIME_DELTA) {
-        insert_keyframe_direct(
-            reports, ptr, prop, fcu, cfra, BEZT_KEYTYPE_BREAKDOWN, NULL, INSERTKEY_FAST);
+        const AnimationEvalContext anim_eval_context = BKE_animsys_eval_context_construct(
+            depsgraph, cfra);
+        insert_keyframe_direct(reports,
+                               ptr,
+                               prop,
+                               fcu,
+                               &anim_eval_context,
+                               BEZT_KEYTYPE_BREAKDOWN,
+                               NULL,
+                               INSERTKEY_FAST);
         last_valid_time = cfra;
       }
       else if (G.debug & G_DEBUG) {
@@ -496,11 +518,12 @@ static void gpencil_stroke_path_animation(bContext *C,
 {
   Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);
+  Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
   bAction *act;
   FCurve *fcu;
   PointerRNA ptr;
   PropertyRNA *prop = NULL;
-  int nbr_gaps = 0, i;
+  int nbr_gaps = 0;
 
   if (gtd->mode == GP_STROKECONVERT_TIMING_NONE) {
     return;
@@ -524,7 +547,7 @@ static void gpencil_stroke_path_animation(bContext *C,
 
   if (G.debug & G_DEBUG) {
     printf("%s: tot len: %f\t\ttot time: %f\n", __func__, gtd->tot_dist, gtd->tot_time);
-    for (i = 0; i < gtd->num_points; i++) {
+    for (int i = 0; i < gtd->num_points; i++) {
       printf("\tpoint %d:\t\tlen: %f\t\ttime: %f\n", i, gtd->dists[i], gtd->times[i]);
     }
   }
@@ -537,8 +560,16 @@ static void gpencil_stroke_path_animation(bContext *C,
 
     cu->ctime = 0.0f;
     cfra = (float)gtd->start_frame;
-    insert_keyframe_direct(
-        reports, ptr, prop, fcu, cfra, BEZT_KEYTYPE_KEYFRAME, NULL, INSERTKEY_FAST);
+    AnimationEvalContext anim_eval_context_start = BKE_animsys_eval_context_construct(depsgraph,
+                                                                                      cfra);
+    insert_keyframe_direct(reports,
+                           ptr,
+                           prop,
+                           fcu,
+                           &anim_eval_context_start,
+                           BEZT_KEYTYPE_KEYFRAME,
+                           NULL,
+                           INSERTKEY_FAST);
 
     cu->ctime = cu->pathlen;
     if (gtd->realtime) {
@@ -547,8 +578,16 @@ static void gpencil_stroke_path_animation(bContext *C,
     else {
       cfra = (float)gtd->end_frame;
     }
-    insert_keyframe_direct(
-        reports, ptr, prop, fcu, cfra, BEZT_KEYTYPE_KEYFRAME, NULL, INSERTKEY_FAST);
+    AnimationEvalContext anim_eval_context_end = BKE_animsys_eval_context_construct(depsgraph,
+                                                                                    cfra);
+    insert_keyframe_direct(reports,
+                           ptr,
+                           prop,
+                           fcu,
+                           &anim_eval_context_end,
+                           BEZT_KEYTYPE_KEYFRAME,
+                           NULL,
+                           INSERTKEY_FAST);
   }
   else {
     /* Use actual recorded timing! */
@@ -575,7 +614,7 @@ static void gpencil_stroke_path_animation(bContext *C,
     }
 
     gpencil_stroke_path_animation_add_keyframes(
-        reports, ptr, prop, fcu, cu, gtd, rng, time_range, nbr_gaps, tot_gaps_time);
+        reports, ptr, prop, depsgraph, fcu, cu, gtd, rng, time_range, nbr_gaps, tot_gaps_time);
 
     BLI_rng_free(rng);
   }
@@ -585,7 +624,7 @@ static void gpencil_stroke_path_animation(bContext *C,
 
   if (G.debug & G_DEBUG) {
     printf("%s: \ntot len: %f\t\ttot time: %f\n", __func__, gtd->tot_dist, gtd->tot_time);
-    for (i = 0; i < gtd->num_points; i++) {
+    for (int i = 0; i < gtd->num_points; i++) {
       printf("\tpoint %d:\t\tlen: %f\t\ttime: %f\n", i, gtd->dists[i], gtd->times[i]);
     }
     printf("\n\n");
@@ -1208,12 +1247,10 @@ static void gpencil_stroke_finalize_curve_endpoints(Curve *cu)
 
 static void gpencil_stroke_norm_curve_weights(Curve *cu, const float minmax_weights[2])
 {
-  Nurb *nu;
   const float delta = minmax_weights[0];
-  float fac;
-  int i;
 
   /* when delta == minmax_weights[0] == minmax_weights[1], we get div by zero [#35686] */
+  float fac;
   if (IS_EQF(delta, minmax_weights[1])) {
     fac = 1.0f;
   }
@@ -1221,16 +1258,16 @@ static void gpencil_stroke_norm_curve_weights(Curve *cu, const float minmax_weig
     fac = 1.0f / (minmax_weights[1] - delta);
   }
 
-  for (nu = cu->nurb.first; nu; nu = nu->next) {
+  LISTBASE_FOREACH (Nurb *, nu, &cu->nurb) {
     if (nu->bezt) {
       BezTriple *bezt = nu->bezt;
-      for (i = 0; i < nu->pntsu; i++, bezt++) {
+      for (int i = 0; i < nu->pntsu; i++, bezt++) {
         bezt->weight = (bezt->weight - delta) * fac;
       }
     }
     else if (nu->bp) {
       BPoint *bp = nu->bp;
-      for (i = 0; i < nu->pntsu; i++, bp++) {
+      for (int i = 0; i < nu->pntsu; i++, bp++) {
         bp->weight = (bp->weight - delta) * fac;
       }
     }
@@ -1664,7 +1701,7 @@ void GPENCIL_OT_convert(wmOperatorType *ot)
               0,
               0,
               32,
-              "Bevel_Resolution",
+              "Bevel Resolution",
               "Bevel resolution when depth is non-zero",
               0,
               32);
@@ -1679,7 +1716,7 @@ void GPENCIL_OT_convert(wmOperatorType *ot)
                 1.0f,
                 0.0f,
                 1000.0f,
-                "Radius Fac",
+                "Radius Factor",
                 "Multiplier for the points' radii (set from stroke width)",
                 0.0f,
                 10.0f);

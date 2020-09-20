@@ -14,8 +14,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#ifndef __RNA_ENUM_TYPES_H__
-#define __RNA_ENUM_TYPES_H__
+#pragma once
 
 /** \file
  * \ingroup RNA
@@ -27,6 +26,7 @@
 extern "C" {
 #endif
 
+struct ID;
 struct bNodeSocketType;
 struct bNodeTreeType;
 struct bNodeType;
@@ -118,6 +118,8 @@ extern const EnumPropertyItem rna_enum_motionpath_bake_location_items[];
 extern const EnumPropertyItem rna_enum_event_value_items[];
 extern const EnumPropertyItem rna_enum_event_type_items[];
 extern const EnumPropertyItem rna_enum_event_type_mask_items[];
+
+extern const EnumPropertyItem rna_enum_operator_type_flag_items[];
 extern const EnumPropertyItem rna_enum_operator_return_items[];
 extern const EnumPropertyItem rna_enum_operator_property_tags[];
 
@@ -230,6 +232,12 @@ extern const EnumPropertyItem rna_enum_context_mode_items[];
 extern const EnumPropertyItem rna_enum_curveprofile_preset_items[];
 extern const EnumPropertyItem rna_enum_preference_section_items[];
 
+extern const EnumPropertyItem rna_enum_attribute_type_items[];
+extern const EnumPropertyItem rna_enum_attribute_domain_items[];
+extern const EnumPropertyItem *rna_enum_attribute_domain_itemf(struct ID *id, bool *r_free);
+
+extern const EnumPropertyItem rna_enum_collection_color_items[];
+
 /* API calls */
 int rna_node_tree_type_to_enum(struct bNodeTreeType *typeinfo);
 int rna_node_tree_idname_to_enum(const char *idname);
@@ -323,5 +331,3 @@ const EnumPropertyItem *RNA_enum_node_tree_types_itemf_impl(struct bContext *C, 
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __RNA_ENUM_TYPES_H__ */

@@ -251,6 +251,12 @@ static bNodeSocket *best_socket_output(bNodeTree *ntree,
     }
   }
 
+  /* Always allow linking to an reroute node. The socket type of the reroute sockets might change
+   * after the link has been created. */
+  if (node->type == NODE_REROUTE) {
+    return node->outputs.first;
+  }
+
   return NULL;
 }
 
@@ -316,7 +322,7 @@ static void snode_autoconnect(Main *bmain,
   ListBase *nodelist = MEM_callocN(sizeof(ListBase), "items_list");
   bNodeListItem *nli;
   bNode *node;
-  int i, numlinks = 0;
+  int numlinks = 0;
 
   for (node = ntree->nodes.first; node; node = node->next) {
     if (node->flag & NODE_SELECT) {
@@ -370,7 +376,7 @@ static void snode_autoconnect(Main *bmain,
       /* no selected inputs, connect by finding suitable match */
       int num_inputs = BLI_listbase_count(&node_to->inputs);
 
-      for (i = 0; i < num_inputs; i++) {
+      for (int i = 0; i < num_inputs; i++) {
 
         /* find the best guess input socket */
         sock_to = best_socket_input(ntree, node_to, i, replace);
@@ -663,6 +669,8 @@ static void node_link_exit(bContext *C, wmOperator *op, bool apply_links)
     }
   }
   ntree->is_updating = false;
+
+  do_tag_update |= ED_node_is_simulation(snode);
 
   ntreeUpdateTree(bmain, ntree);
   snode_notify(C, snode);
@@ -996,15 +1004,13 @@ void NODE_OT_link_make(wmOperatorType *ot)
 }
 
 /* ********************** Cut Link operator ***************** */
-static bool cut_links_intersect(bNodeLink *link, float mcoords[][2], int tot)
+static bool cut_links_intersect(bNodeLink *link, const float mcoords[][2], int tot)
 {
   float coord_array[NODE_LINK_RESOL + 1][2];
-  int i, b;
 
   if (node_link_bezier_points(NULL, NULL, link, coord_array, NODE_LINK_RESOL)) {
-
-    for (i = 0; i < tot - 1; i++) {
-      for (b = 0; b < NODE_LINK_RESOL; b++) {
+    for (int i = 0; i < tot - 1; i++) {
+      for (int b = 0; b < NODE_LINK_RESOL; b++) {
         if (isect_seg_seg_v2(mcoords[i], mcoords[i + 1], coord_array[b], coord_array[b + 1]) > 0) {
           return 1;
         }
@@ -1063,6 +1069,8 @@ static int cut_links_exec(bContext *C, wmOperator *op)
         nodeRemLink(snode->edittree, link);
       }
     }
+
+    do_tag_update |= ED_node_is_simulation(snode);
 
     if (found) {
       ntreeUpdateTree(CTX_data_main(C), snode->edittree);
@@ -1526,11 +1534,10 @@ void ED_node_link_intersect_test(ScrArea *area, int test)
 
     if (node_link_bezier_points(NULL, NULL, link, coord_array, NODE_LINK_RESOL)) {
       float dist = FLT_MAX;
-      int i;
 
       /* loop over link coords to find shortest dist to
        * upper left node edge of a intersected line segment */
-      for (i = 0; i < NODE_LINK_RESOL; i++) {
+      for (int i = 0; i < NODE_LINK_RESOL; i++) {
         /* check if the node rect intersetcts the line from this point to next one */
         if (BLI_rctf_isect_segment(&select->totr, coord_array[i], coord_array[i + 1])) {
           /* store the shortest distance to the upper left edge

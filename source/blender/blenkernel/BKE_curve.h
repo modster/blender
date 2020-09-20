@@ -16,8 +16,7 @@
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
  */
-#ifndef __BKE_CURVE_H__
-#define __BKE_CURVE_H__
+#pragma once
 
 /** \file
  * \ingroup bke
@@ -84,7 +83,7 @@ void BKE_curve_editfont_free(struct Curve *cu);
 void BKE_curve_init(struct Curve *cu, const short curve_type);
 struct Curve *BKE_curve_add(struct Main *bmain, const char *name, int type);
 struct Curve *BKE_curve_copy(struct Main *bmain, const struct Curve *cu);
-short BKE_curve_type_get(struct Curve *cu);
+short BKE_curve_type_get(const struct Curve *cu);
 void BKE_curve_type_test(struct Object *ob);
 void BKE_curve_curve_dimension_update(struct Curve *cu);
 
@@ -98,15 +97,15 @@ bool BKE_curve_minmax(struct Curve *cu, bool use_radius, float min[3], float max
 bool BKE_curve_center_median(struct Curve *cu, float cent[3]);
 bool BKE_curve_center_bounds(struct Curve *cu, float cent[3]);
 void BKE_curve_transform_ex(struct Curve *cu,
-                            float mat[4][4],
+                            const float mat[4][4],
                             const bool do_keys,
                             const bool do_props,
                             const float unit_scale);
 void BKE_curve_transform(struct Curve *cu,
-                         float mat[4][4],
+                         const float mat[4][4],
                          const bool do_keys,
                          const bool do_props);
-void BKE_curve_translate(struct Curve *cu, float offset[3], const bool do_keys);
+void BKE_curve_translate(struct Curve *cu, const float offset[3], const bool do_keys);
 void BKE_curve_material_index_remove(struct Curve *cu, int index);
 bool BKE_curve_material_index_used(struct Curve *cu, int index);
 void BKE_curve_material_index_clear(struct Curve *cu);
@@ -140,7 +139,7 @@ void BKE_curve_nurbs_vert_coords_apply(struct ListBase *lb,
 float (*BKE_curve_nurbs_key_vert_coords_alloc(struct ListBase *lb,
                                               float *key,
                                               int *r_vert_len))[3];
-void BKE_curve_nurbs_key_vert_tilts_apply(struct ListBase *lb, float *key);
+void BKE_curve_nurbs_key_vert_tilts_apply(struct ListBase *lb, const float *key);
 
 void BKE_curve_editNurb_keyIndex_delCV(struct GHash *keyindex, const void *cv);
 void BKE_curve_editNurb_keyIndex_free(struct GHash **keyindex);
@@ -172,11 +171,11 @@ void BKE_nurbList_duplicate(struct ListBase *lb1, const struct ListBase *lb2);
 void BKE_nurbList_handles_set(struct ListBase *editnurb, const char code);
 void BKE_nurbList_handles_recalculate(struct ListBase *editnurb,
                                       const bool calc_length,
-                                      const char flag);
+                                      const uint8_t flag);
 
-void BKE_nurbList_handles_autocalc(ListBase *editnurb, int flag);
-void BKE_nurbList_flag_set(ListBase *editnurb, short flag, bool set);
-bool BKE_nurbList_flag_set_from_flag(ListBase *editnurb, short from_flag, short flag);
+void BKE_nurbList_handles_autocalc(ListBase *editnurb, uint8_t flag);
+void BKE_nurbList_flag_set(ListBase *editnurb, uint8_t flag, bool set);
+bool BKE_nurbList_flag_set_from_flag(ListBase *editnurb, uint8_t from_flag, uint8_t flag);
 
 void BKE_nurb_free(struct Nurb *nu);
 struct Nurb *BKE_nurb_duplicate(const struct Nurb *nu);
@@ -261,7 +260,7 @@ void BKE_nurb_handle_calc_simple_auto(struct Nurb *nu, struct BezTriple *bezt);
 void BKE_nurb_handle_smooth_fcurve(struct BezTriple *bezt, int total, bool cyclic);
 
 void BKE_nurb_handles_calc(struct Nurb *nu);
-void BKE_nurb_handles_autocalc(struct Nurb *nu, int flag);
+void BKE_nurb_handles_autocalc(struct Nurb *nu, uint8_t flag);
 void BKE_nurb_bezt_handle_test(struct BezTriple *bezt,
                                const eBezTriple_Flag__Alias sel_flag,
                                const bool use_handle,
@@ -339,5 +338,3 @@ void BKE_curve_deform_co(const struct Object *ob_curve,
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __BKE_CURVE_H__ */

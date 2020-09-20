@@ -71,6 +71,8 @@ void ED_operatortypes_object(void)
   WM_operatortype_append(OBJECT_OT_paths_range_update);
   WM_operatortype_append(OBJECT_OT_forcefield_toggle);
 
+  WM_operatortype_append(OBJECT_OT_switch_object);
+
   WM_operatortype_append(OBJECT_OT_parent_set);
   WM_operatortype_append(OBJECT_OT_parent_no_inverse_set);
   WM_operatortype_append(OBJECT_OT_parent_clear);
@@ -117,6 +119,7 @@ void ED_operatortypes_object(void)
   WM_operatortype_append(OBJECT_OT_add_named);
   WM_operatortype_append(OBJECT_OT_effector_add);
   WM_operatortype_append(OBJECT_OT_collection_instance_add);
+  WM_operatortype_append(OBJECT_OT_data_instance_add);
   WM_operatortype_append(OBJECT_OT_metaball_add);
   WM_operatortype_append(OBJECT_OT_duplicates_make_real);
   WM_operatortype_append(OBJECT_OT_duplicate);
