@@ -772,6 +772,10 @@ static void gpencil_edit_curve_stroke_iter_cb(bGPDlayer *gpl,
                                               bGPDstroke *gps,
                                               void *thunk)
 {
+  if (gpl->flag & GP_LAYER_LOCKED) {
+    return;
+  }
+
   if (gps->editcurve == NULL) {
     return;
   }
