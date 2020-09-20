@@ -24,7 +24,9 @@
 
 #pragma once
 
-#include "BLI_winstuff.h"
+#ifdef WIN32
+#  include "BLI_winstuff.h"
+#endif
 
 #include "DNA_sdna_types.h"
 #include "DNA_space_types.h"
