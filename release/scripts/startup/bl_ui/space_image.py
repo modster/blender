@@ -1481,10 +1481,11 @@ class IMAGE_PT_uv_cursor(Panel):
 
         sima = context.space_data
 
-        col = layout.column()
+        layout.use_property_split = True
+        layout.use_property_decorate = False
 
         col = layout.column()
-        col.prop(sima, "cursor_location", text="Cursor Location")
+        col.prop(sima, "cursor_location", text="Location")
 
 
 class IMAGE_PT_udim_grid(Panel):
@@ -1504,6 +1505,9 @@ class IMAGE_PT_udim_grid(Panel):
 
         sima = context.space_data
         uvedit = sima.uv_editor
+
+        layout.use_property_split = True
+        layout.use_property_decorate = False
 
         col = layout.column()
         col.prop(uvedit, "tile_grid_shape", text="Grid Shape")
