@@ -112,6 +112,11 @@ static const EnumPropertyItem property_flag_override_collection_items[] = {
      0,
      "No Name",
      "Do not use the names of the items, only their indices in the collection"},
+    {PROPOVERRIDE_LIBRARY_INSERTION,
+     "USE_INSERTION",
+     0,
+     "Use Insertion",
+     "Allow users to add new items in that collection in library overrides"},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -1986,8 +1991,9 @@ static void bpy_prop_callback_assign_enum(struct PropertyRNA *prop,
   } \
   srna = srna_from_self(self, #_func "(...):"); \
   if (srna == NULL) { \
-    if (PyErr_Occurred()) \
+    if (PyErr_Occurred()) { \
       return NULL; \
+    } \
     return bpy_prop_deferred_return(pymeth_##_func, kw); \
   } \
   (void)0
