@@ -135,10 +135,6 @@ NODE_DEFINE(Mesh)
   SOCKET_INT_ARRAY(triangle_patch, "Triangle Patch", array<int>());
   SOCKET_POINT2_ARRAY(vert_patch_uv, "Patch UVs", array<float2>());
 
-  SOCKET_FLOAT(volume_clipping, "Volume Clipping", 0.001f);
-  SOCKET_FLOAT(volume_step_size, "Volume Step Size", 0.0f);
-  SOCKET_BOOLEAN(volume_object_space, "Volume Object Space", false);
-
   static NodeEnum subdivision_type_enum;
   subdivision_type_enum.insert("none", SUBDIVISION_NONE);
   subdivision_type_enum.insert("linear", SUBDIVISION_LINEAR);

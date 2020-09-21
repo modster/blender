@@ -145,10 +145,6 @@ class Mesh : public Geometry {
   NODE_PUBLIC_API_ARRAY(array<int>, triangle_patch) /* must be < 0 for non subd triangles */
   NODE_PUBLIC_API_ARRAY(array<float2>, vert_patch_uv)
 
-  NODE_PUBLIC_API(float, volume_clipping)
-  NODE_PUBLIC_API(float, volume_step_size)
-  NODE_PUBLIC_API(bool, volume_object_space)
-
   // NODE_PUBLIC_API_ARRAY(array<SubdFace>, subd_faces)
  protected:
   array<SubdFace> subd_faces;
