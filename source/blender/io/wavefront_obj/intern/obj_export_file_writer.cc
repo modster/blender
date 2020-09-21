@@ -133,25 +133,36 @@ void OBJWriter::write_mtllib_name(const char *mtl_filepath) const
 }
 
 /**
- * Write object name conditionally with mesh and material name.
+ * Write an Object's group with mesh and/or material name appended conditionally.
+ */
+void OBJWriter::write_object_group(const OBJMesh &obj_mesh_data) const
+{
+  BLI_assert(export_params_.export_object_groups);
+  if (!export_params_.export_object_groups) {
+    return;
+  }
+  const char *object_name = obj_mesh_data.get_object_name();
+  const char *object_mesh_name = obj_mesh_data.get_object_mesh_name();
+  const char *object_material_name = obj_mesh_data.get_object_material_name(0);
+  if (export_params_.export_materials && export_params_.export_material_groups &&
+      object_material_name) {
+    fprintf(outfile_, "g %s_%s_%s\n", object_name, object_mesh_name, object_material_name);
+    return;
+  }
+  fprintf(outfile_, "g %s_%s\n", object_name, object_mesh_name);
+}
+
+/**
+ * Write object name or group, if specified.
  */
 void OBJWriter::write_object_name(const OBJMesh &obj_mesh_data) const
 {
   const char *object_name = obj_mesh_data.get_object_name();
-
-  if (!export_params_.export_object_groups) {
-    fprintf(outfile_, "o %s\n", object_name);
+  if (export_params_.export_object_groups) {
+    write_object_group(obj_mesh_data);
+    return;
   }
-  else {
-    const char *object_mesh_name = obj_mesh_data.get_object_mesh_name();
-    if (export_params_.export_materials && export_params_.export_material_groups) {
-      const char *object_material_name = obj_mesh_data.get_object_material_name(0);
-      fprintf(outfile_, "g %s_%s_%s\n", object_name, object_mesh_name, object_material_name);
-    }
-    else {
-      fprintf(outfile_, "g %s_%s\n", object_name, object_mesh_name);
-    }
-  }
+  fprintf(outfile_, "o %s\n", object_name);
 }
 
 /**
@@ -255,10 +266,8 @@ void OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
     return;
   }
   const char *mat_name = obj_mesh_data.get_object_material_name(curr_mat_nr);
-  if (export_params_.export_material_groups) {
-    const char *object_name = obj_mesh_data.get_object_name();
-    const char *object_mesh_name = obj_mesh_data.get_object_mesh_name();
-    fprintf(outfile_, "g %s_%s_%s\n", object_name, object_mesh_name, mat_name);
+  if (export_params_.export_object_groups) {
+    write_object_group(obj_mesh_data);
   }
   fprintf(outfile_, "usemtl %s\n", mat_name);
 }

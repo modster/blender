@@ -78,6 +78,7 @@ class OBJWriter {
   bool init_writer(const char *filepath);
 
   void write_object_name(const OBJMesh &obj_mesh_data) const;
+  void write_object_group(const OBJMesh &obj_mesh_data) const;
   void write_mtllib_name(const char *obj_filepath) const;
   void write_vertex_coords(const OBJMesh &obj_mesh_data) const;
   void write_uv_coords(OBJMesh &obj_mesh_data) const;
