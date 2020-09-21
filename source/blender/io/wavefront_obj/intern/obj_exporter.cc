@@ -112,10 +112,10 @@ static void export_frame(ViewLayer *view_layer,
                          const char *filepath)
 {
   OBJWriter frame_writer(export_params);
-  std::unique_ptr<MTLWriter> mtl_writer = nullptr;
   if (!frame_writer.init_writer(filepath)) {
     return;
   }
+  std::unique_ptr<MTLWriter> mtl_writer = nullptr;
 
   /* Meshes, and curves to be exported in mesh form. */
   Vector<std::unique_ptr<OBJMesh>> exportable_as_mesh;
@@ -170,7 +170,9 @@ static void export_frame(ViewLayer *view_layer,
  *
  * \return Whether the filepath is in FILE_MAX limits.
  */
-static bool insert_frame_in_path(const char *filepath, char *r_filepath_with_frames, int frame)
+static bool insert_frame_in_path(const char *filepath,
+                                 const int frame,
+                                 char *r_filepath_with_frames)
 {
   BLI_strncpy(r_filepath_with_frames, filepath, FILE_MAX);
   BLI_path_extension_replace(r_filepath_with_frames, FILE_MAX, "");
@@ -207,7 +209,7 @@ void exporter_main(bContext *C, const OBJExportParams &export_params)
   const int original_frame = CFRA;
 
   for (int frame = export_params.start_frame; frame <= export_params.end_frame; frame++) {
-    bool filepath_ok = insert_frame_in_path(filepath, filepath_with_frames, frame);
+    bool filepath_ok = insert_frame_in_path(filepath, frame, filepath_with_frames);
     if (!filepath_ok) {
       fprintf(stderr, "Error: File Path too long.\n%s\n", filepath_with_frames);
       return;
