@@ -247,6 +247,9 @@ NODE_DEFINE(ImageTextureNode)
 
   SOCKET_FLOAT(projection_blend, "Projection Blend", 0.0f);
 
+  SOCKET_INT_ARRAY(tiles, "Tiles", array<int>());
+  SOCKET_BOOLEAN(animated, "Animated", false);
+
   SOCKET_IN_POINT(vector, "Vector", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_TEXTURE_UV);
 
   SOCKET_OUT_COLOR(color, "Color");
