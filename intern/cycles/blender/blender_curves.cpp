@@ -742,7 +742,7 @@ static void export_hair_curves_motion(Hair *hair, BL::Hair b_hair, int motion_st
   }
 
   /* Export motion keys. */
-  const int num_keys = hair->curve_keys.size();
+  const int num_keys = hair->get_curve_keys().size();
   float4 *mP = attr_mP->data_float4() + motion_step * num_keys;
   bool have_motion = false;
   int num_motion_keys = 0;
@@ -769,8 +769,8 @@ static void export_hair_curves_motion(Hair *hair, BL::Hair b_hair, int motion_st
           if (!have_motion) {
             /* TODO: use epsilon for comparison? Was needed for particles due to
              * transform, but ideally should not happen anymore. */
-            float4 curve_key = float3_to_float4(hair->curve_keys[i]);
-            curve_key.w = hair->curve_radius[i];
+            float4 curve_key = float3_to_float4(hair->get_curve_keys()[i]);
+            curve_key.w = hair->get_curve_radius()[i];
             have_motion = !(mP[i] == curve_key);
           }
         }
