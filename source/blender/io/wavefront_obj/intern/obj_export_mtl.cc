@@ -42,10 +42,10 @@ namespace blender::io::obj {
 /**
  * Copy a float property of the given type from the bNode to given buffer.
  */
-static void copy_property_from_node(MutableSpan<float> r_property,
-                                    eNodeSocketDatatype property_type,
+static void copy_property_from_node(const eNodeSocketDatatype property_type,
                                     const bNode *curr_node,
-                                    const char *identifier)
+                                    const char *identifier,
+                                    MutableSpan<float> r_property)
 {
   if (!curr_node) {
     return;
@@ -88,10 +88,10 @@ static void copy_property_from_node(MutableSpan<float> r_property,
 /**
  * Collect all the source sockets linked to the destination socket in a destination node.
  */
-static void linked_sockets_to_dest_id(Vector<const nodes::OutputSocketRef *> &r_linked_sockets,
-                                      const bNode *dest_node,
-                                      nodes::NodeTreeRef &node_tree,
-                                      StringRefNull dest_socket_id)
+static void linked_sockets_to_dest_id(const bNode *dest_node,
+                                      const nodes::NodeTreeRef &node_tree,
+                                      StringRefNull dest_socket_id,
+                                      Vector<const nodes::OutputSocketRef *> &r_linked_sockets)
 {
   if (!dest_node) {
     return;
@@ -194,19 +194,19 @@ void MaterialWrap::store_bsdf_properties(MTLMaterial &r_mtl_mat) const
   spec_exponent *= spec_exponent;
   /* If p-BSDF is not present, fallback to `Material *` of the object. */
   float specular = export_mtl_->spec;
-  copy_property_from_node({&specular, 1}, SOCK_FLOAT, bsdf_node_, "Specular");
+  copy_property_from_node(SOCK_FLOAT, bsdf_node_, "Specular", {&specular, 1});
   float metallic = export_mtl_->metallic;
-  copy_property_from_node({&metallic, 1}, SOCK_FLOAT, bsdf_node_, "Metallic");
+  copy_property_from_node(SOCK_FLOAT, bsdf_node_, "Metallic", {&metallic, 1});
   float refraction_index = 1.0f;
-  copy_property_from_node({&refraction_index, 1}, SOCK_FLOAT, bsdf_node_, "IOR");
+  copy_property_from_node(SOCK_FLOAT, bsdf_node_, "IOR", {&refraction_index, 1});
   float dissolved = export_mtl_->a;
-  copy_property_from_node({&dissolved, 1}, SOCK_FLOAT, bsdf_node_, "Alpha");
+  copy_property_from_node(SOCK_FLOAT, bsdf_node_, "Alpha", {&dissolved, 1});
   bool transparent = dissolved != 1.0f;
 
   float3 diffuse_col = {export_mtl_->r, export_mtl_->g, export_mtl_->b};
-  copy_property_from_node({diffuse_col, 3}, SOCK_RGBA, bsdf_node_, "Base Color");
-  float3 emission_col = {0.0f, 0.0f, 0.0f};
-  copy_property_from_node({emission_col, 3}, SOCK_RGBA, bsdf_node_, "Emission");
+  copy_property_from_node(SOCK_RGBA, bsdf_node_, "Base Color", {diffuse_col, 3});
+  float3 emission_col{0.0f};
+  copy_property_from_node(SOCK_RGBA, bsdf_node_, "Emission", {emission_col, 3});
 
   /* See https://wikipedia.org/wiki/Wavefront_.obj_file for all possible values of illum. */
   /* Highlight on. */
@@ -245,7 +245,7 @@ void MaterialWrap::store_bsdf_properties(MTLMaterial &r_mtl_mat) const
  */
 void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
 {
-  if (!export_mtl_->nodetree) {
+  if (!export_mtl_ || !export_mtl_->nodetree) {
     /* No nodetree, no images. */
     return;
   }
@@ -265,17 +265,17 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
 
     if (texture_map.key == "map_Bump") {
       /* Find sockets linked to destination "Normal" socket in p-bsdf node. */
-      linked_sockets_to_dest_id(linked_sockets, bsdf_node_, node_tree, "Normal");
+      linked_sockets_to_dest_id(bsdf_node_, node_tree, "Normal", linked_sockets);
       /* Among the linked sockets, find Normal Map shader node. */
       normal_map_node = get_node_of_type(linked_sockets, SH_NODE_NORMAL_MAP);
 
       /* Find sockets linked to "Color" socket in normal map node. */
-      linked_sockets_to_dest_id(linked_sockets, normal_map_node, node_tree, "Color");
+      linked_sockets_to_dest_id(normal_map_node, node_tree, "Color", linked_sockets);
     }
     else {
       /* Find sockets linked to the destination socket of interest, in p-bsdf node. */
       linked_sockets_to_dest_id(
-          linked_sockets, bsdf_node_, node_tree, texture_map.value.dest_socket_id);
+          bsdf_node_, node_tree, texture_map.value.dest_socket_id, linked_sockets);
     }
 
     /* Among the linked sockets, find Image Texture shader node. */
@@ -289,19 +289,19 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
     }
 
     /* Find "Mapping" node if connected to texture node. */
-    linked_sockets_to_dest_id(linked_sockets, tex_node, node_tree, "Vector");
+    linked_sockets_to_dest_id(tex_node, node_tree, "Vector", linked_sockets);
     const bNode *mapping = get_node_of_type(linked_sockets, SH_NODE_MAPPING);
 
     /* Texture transform options. Only translation (origin offset, "-o") and scale
      * ("-o") are supported. */
-    float3 map_translation = {0.0f, 0.0f, 0.0f};
-    float3 map_scale = {1.0f, 1.0f, 1.0f};
+    float3 map_translation{0.0f};
+    float3 map_scale{1.0f};
     float normal_map_strength = -1.0f;
     if (normal_map_node) {
-      copy_property_from_node({&normal_map_strength, 1}, SOCK_FLOAT, normal_map_node, "Strength");
+      copy_property_from_node(SOCK_FLOAT, normal_map_node, "Strength", {&normal_map_strength, 1});
     }
-    copy_property_from_node({map_translation, 3}, SOCK_VECTOR, mapping, "Location");
-    copy_property_from_node({map_scale, 3}, SOCK_VECTOR, mapping, "Scale");
+    copy_property_from_node(SOCK_VECTOR, mapping, "Location", {map_translation, 3});
+    copy_property_from_node(SOCK_VECTOR, mapping, "Scale", {map_scale, 3});
 
     texture_map.value.scale = map_scale;
     texture_map.value.translation = map_translation;
@@ -313,26 +313,23 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
 /**
  * Fill the given buffer with MTL material containers.
  */
-void MaterialWrap::fill_materials()
+void MaterialWrap::fill_materials(const OBJMesh &obj_mesh_data,
+                                  Vector<MTLMaterial> &r_mtl_materials)
 {
-  for (short i = 0; i < obj_mesh_data_.tot_materials(); i++) {
-    export_mtl_ = obj_mesh_data_.get_object_material(i);
+  r_mtl_materials.resize(obj_mesh_data.tot_materials());
+  for (int16_t i = 0; i < obj_mesh_data.tot_materials(); i++) {
+    export_mtl_ = obj_mesh_data.get_object_material(i);
     if (!export_mtl_) {
       continue;
     }
-    r_mtl_materials_[i].name = obj_mesh_data_.get_object_material_name(i);
-    init_bsdf_node(obj_mesh_data_.get_object_name());
-    store_bsdf_properties(r_mtl_materials_[i]);
-    store_image_textures(r_mtl_materials_[i]);
+    r_mtl_materials[i].name = obj_mesh_data.get_object_material_name(i);
+    init_bsdf_node(obj_mesh_data.get_object_name());
+    store_bsdf_properties(r_mtl_materials[i]);
+    if (!export_mtl_) {
+      continue;
+    }
+    store_image_textures(r_mtl_materials[i]);
   }
 }
 
-/**
- * Append an object's materials to the .mtl file.
- */
-MaterialWrap::MaterialWrap(const OBJMesh &obj_mesh_data, Vector<MTLMaterial> &r_mtl_materials)
-    : obj_mesh_data_(obj_mesh_data), r_mtl_materials_(r_mtl_materials)
-{
-  r_mtl_materials.resize(obj_mesh_data.tot_materials());
-}
 }  // namespace blender::io::obj

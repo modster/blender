@@ -546,19 +546,19 @@ void MTLWriter::write_texture_map(const MTLMaterial &mtl_material,
 void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
 {
   BLI_assert(this->good());
-  if (!mtl_outfile_) {
-    /* Error logging in constructor. */
+  if (!this->good()) {
     return;
   }
   Vector<MTLMaterial> mtl_materials;
-  MaterialWrap mat_wrap(mesh_to_export, mtl_materials);
-  mat_wrap.fill_materials();
+  MaterialWrap mat_wrap;
+  mat_wrap.fill_materials(mesh_to_export, mtl_materials);
 
 #ifdef DEBUG
   auto all_items_positive = [](const float3 &triplet) {
     return triplet.x >= 0.0f && triplet.y >= 0.0f && triplet.z >= 0.0f;
   };
 #endif
+
   for (const MTLMaterial &mtl_material : mtl_materials) {
     fprintf(mtl_outfile_, "\nnewmtl %s\n", mtl_material.name.c_str());
     /* At least one material property has not been modified since its initialisation. */

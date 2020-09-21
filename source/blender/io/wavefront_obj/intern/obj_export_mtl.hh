@@ -33,7 +33,6 @@
 #include "obj_export_mesh.hh"
 
 namespace blender::io::obj {
-
 /**
  * Used for storing parameters for all kinds of texture maps from MTL file.
  */
@@ -95,8 +94,6 @@ struct MTLMaterial {
 
 class MaterialWrap {
  private:
-  const OBJMesh &obj_mesh_data_;
-  Vector<MTLMaterial> &r_mtl_materials_;
   /**
    * One of the object's materials, to be exported.
    */
@@ -107,8 +104,7 @@ class MaterialWrap {
   bNode *bsdf_node_ = nullptr;
 
  public:
-  MaterialWrap(const OBJMesh &obj_mesh_data, Vector<MTLMaterial> &r_mtl_materials);
-  void fill_materials();
+  void fill_materials(const OBJMesh &obj_mesh_data, Vector<MTLMaterial> &r_mtl_materials);
 
  private:
   void init_bsdf_node(StringRefNull object_name);
