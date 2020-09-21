@@ -76,7 +76,6 @@ OBJMesh::~OBJMesh()
   if (poly_smooth_groups_) {
     MEM_freeN(poly_smooth_groups_);
   }
-  BLI_assert(!(mesh_eval_needs_free_ && export_mesh_eval_));
 }
 
 void OBJMesh::free_mesh_if_needed()
@@ -233,7 +232,13 @@ void OBJMesh::calc_smooth_groups(const bool use_bitflags)
 const Material *OBJMesh::get_object_material(const int16_t mat_nr) const
 {
   /* "+ 1" as material getter needs one-based indices.  */
-  return BKE_object_material_get(export_object_eval_, mat_nr + 1);
+  const Material *r_mat = BKE_object_material_get(export_object_eval_, mat_nr + 1);
+#ifdef DEBUG
+  if (!r_mat) {
+    std::cerr << "Material not found for mat_nr = " << mat_nr << std::endl;
+  }
+#endif
+  return r_mat;
 }
 
 bool OBJMesh::is_ith_poly_smooth(const int poly_index) const
@@ -252,12 +257,6 @@ int16_t OBJMesh::ith_poly_matnr(const int poly_index) const
   return r_mat_nr > 0 ? r_mat_nr : NOT_FOUND;
 }
 
-int OBJMesh::ith_poly_totloop(const int poly_index) const
-{
-  BLI_assert(poly_index < export_mesh_eval_->totpoly);
-  return export_mesh_eval_->mpoly[poly_index].totloop;
-}
-
 /**
  * Get object name as it appears in the outliner.
  */
@@ -267,7 +266,7 @@ const char *OBJMesh::get_object_name() const
 }
 
 /**
- * Get object's mesh name.
+ * Get Object's Mesh name.
  */
 const char *OBJMesh::get_object_mesh_name() const
 {
@@ -281,9 +280,6 @@ const char *OBJMesh::get_object_material_name(const int16_t mat_nr) const
 {
   const Material *mat = get_object_material(mat_nr);
   if (!mat) {
-#ifdef DEBUG
-    std::cerr << "Material not found for mat_nr = " << mat_nr << std::endl;
-#endif
     return nullptr;
   }
   return mat->id.name + 2;
@@ -349,15 +345,12 @@ void OBJMesh::store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coo
       if (uv_vert->separate) {
         tot_uv_vertices_ += 1;
       }
-      if (tot_uv_vertices_ == 0) {
-        return;
-      }
       const int vertices_in_poly = mpoly[uv_vert->poly_index].totloop;
 
       /* Fill up UV vertex's coordinates. */
       r_uv_coords.resize(tot_uv_vertices_);
       const int loopstart = mpoly[uv_vert->poly_index].loopstart;
-      const float(&vert_uv_coords)[2] = mloopuv[loopstart + uv_vert->loop_of_poly_index].uv;
+      Span<float> vert_uv_coords(mloopuv[loopstart + uv_vert->loop_of_poly_index].uv, 2);
       r_uv_coords[tot_uv_vertices_ - 1][0] = vert_uv_coords[0];
       r_uv_coords[tot_uv_vertices_ - 1][1] = vert_uv_coords[1];
 
@@ -504,6 +497,6 @@ std::optional<std::array<int, 2>> OBJMesh::calc_loose_edge_vert_indices(const in
   if (edge.flag & ME_LOOSEEDGE) {
     return std::array<int, 2>{static_cast<int>(edge.v1), static_cast<int>(edge.v2)};
   }
-  return {};
+  return std::nullopt;
 }
 }  // namespace blender::io::obj

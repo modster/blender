@@ -71,7 +71,7 @@ class OBJMesh : NonMovable, NonCopyable {
    * Final transform of an object obtained from export settings (up_axis, forward_axis) and world
    * transform matrix.
    */
-  float world_and_axes_transform_[4][4] = {};
+  float world_and_axes_transform_[4][4];
 
   /**
    * Total UV vertices in a mesh's texture map.
