@@ -33,15 +33,17 @@
 #include "obj_export_mesh.hh"
 
 namespace blender::io::obj {
+
 /**
- * Used for storing parameters for all kinds of texture maps from MTL file.
+ * Generic container for texture node properties.
  */
 struct tex_map_XX {
   tex_map_XX(StringRef to_socket_id) : dest_socket_id(to_socket_id){};
 
+  /** Target socket which this texture node connects to. */
   const std::string dest_socket_id{};
-  float3 translation = {0.0f, 0.0f, 0.0f};
-  float3 scale = {1.0f, 1.0f, 1.0f};
+  float3 translation{0.0f};
+  float3 scale{1.0f};
   /* Only Flat and Smooth projections are supported. */
   int projection_type = SHD_PROJ_FLAT;
   std::string image_path{};
@@ -49,8 +51,7 @@ struct tex_map_XX {
 };
 
 /**
- * Container for storing material data read from MTL file, as well as
- * to be written to MTL file.
+ * Container suited for storing Material data for/from a MTL file.
  */
 struct MTLMaterial {
   MTLMaterial()
@@ -92,6 +93,9 @@ struct MTLMaterial {
   float map_Bump_strength{-1.0f};
 };
 
+/**
+ * Get an Object's material properties from `Material` as well as `bNodeTree`.
+ */
 class MaterialWrap {
  private:
   /**
