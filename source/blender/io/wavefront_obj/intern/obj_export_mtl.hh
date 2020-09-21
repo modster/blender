@@ -33,6 +33,7 @@
 #include "obj_export_mesh.hh"
 
 namespace blender::io::obj {
+class OBJMesh;
 
 /**
  * Generic container for texture node properties.

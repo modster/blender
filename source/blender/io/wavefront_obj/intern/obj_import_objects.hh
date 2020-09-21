@@ -33,8 +33,6 @@
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 
-#include "obj_export_file_writer.hh"
-
 namespace blender::io::obj {
 
 /**
