@@ -48,7 +48,7 @@ struct MikkUserData {
                float *tangent_sign)
       : mesh(mesh), texface(NULL), orco(NULL), tangent(tangent), tangent_sign(tangent_sign)
   {
-    const AttributeSet &attributes = (mesh->get_subd_faces().size()) ? mesh->subd_attributes :
+    const AttributeSet &attributes = (mesh->num_subd_faces()) ? mesh->subd_attributes :
                                                                        mesh->attributes;
 
     Attribute *attr_vN = attributes.find(ATTR_STD_VERTEX_NORMAL);
@@ -85,8 +85,8 @@ struct MikkUserData {
 static int mikk_get_num_faces(const SMikkTSpaceContext *context)
 {
   const MikkUserData *userdata = (const MikkUserData *)context->m_pUserData;
-  if (userdata->mesh->get_subd_faces().size()) {
-    return userdata->mesh->get_subd_faces().size();
+  if (userdata->mesh->num_subd_faces()) {
+    return userdata->mesh->num_subd_faces();
   }
   else {
     return userdata->mesh->num_triangles();
@@ -96,9 +96,9 @@ static int mikk_get_num_faces(const SMikkTSpaceContext *context)
 static int mikk_get_num_verts_of_face(const SMikkTSpaceContext *context, const int face_num)
 {
   const MikkUserData *userdata = (const MikkUserData *)context->m_pUserData;
-  if (userdata->mesh->get_subd_faces().size()) {
+  if (userdata->mesh->num_subd_faces()) {
     const Mesh *mesh = userdata->mesh;
-    return mesh->get_subd_faces()[face_num].num_corners;
+    return mesh->get_subd_num_corners()[face_num];
   }
   else {
     return 3;
@@ -107,8 +107,8 @@ static int mikk_get_num_verts_of_face(const SMikkTSpaceContext *context, const i
 
 static int mikk_vertex_index(const Mesh *mesh, const int face_num, const int vert_num)
 {
-  if (mesh->get_subd_faces().size()) {
-    const Mesh::SubdFace &face = mesh->get_subd_faces()[face_num];
+  if (mesh->num_subd_faces()) {
+    const Mesh::SubdFace &face = mesh->get_subd_face(face_num);
     return mesh->get_subd_face_corners()[face.start_corner + vert_num];
   }
   else {
@@ -118,8 +118,8 @@ static int mikk_vertex_index(const Mesh *mesh, const int face_num, const int ver
 
 static int mikk_corner_index(const Mesh *mesh, const int face_num, const int vert_num)
 {
-  if (mesh->get_subd_faces().size()) {
-    const Mesh::SubdFace &face = mesh->get_subd_faces()[face_num];
+  if (mesh->num_subd_faces()) {
+    const Mesh::SubdFace &face = mesh->get_subd_face(face_num);
     return face.start_corner + vert_num;
   }
   else {
@@ -178,8 +178,8 @@ static void mikk_get_normal(const SMikkTSpaceContext *context,
   const MikkUserData *userdata = (const MikkUserData *)context->m_pUserData;
   const Mesh *mesh = userdata->mesh;
   float3 vN;
-  if (mesh->get_subd_faces().size()) {
-    const Mesh::SubdFace &face = mesh->get_subd_faces()[face_num];
+  if (mesh->num_subd_faces()) {
+    const Mesh::SubdFace &face = mesh->get_subd_face(face_num);
     if (face.smooth) {
       const int vertex_index = mikk_vertex_index(mesh, face_num, vert_num);
       vN = userdata->vertex_normal[vertex_index];
@@ -222,7 +222,7 @@ static void mikk_compute_tangents(
     const BL::Mesh &b_mesh, const char *layer_name, Mesh *mesh, bool need_sign, bool active_render)
 {
   /* Create tangent attributes. */
-  AttributeSet &attributes = (mesh->get_subd_faces().size()) ? mesh->subd_attributes :
+  AttributeSet &attributes = (mesh->num_subd_faces()) ? mesh->subd_attributes :
                                                                mesh->attributes;
   Attribute *attr;
   ustring name;
@@ -1023,10 +1023,6 @@ void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph,
     return;
   }
 
-  // todo(kevin) : we should use some API to set the new topology data
-  array<Mesh::SubdFace> oldsubd_faces;
-  oldsubd_faces.steal_data(mesh->get_subd_faces());
-
   mesh->clear();
   mesh->set_used_shaders(used_shaders);
   mesh->set_time_stamp(b_depsgraph.scene().frame_current());
@@ -1062,8 +1058,13 @@ void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph,
   sync_mesh_fluid_motion(b_ob, scene, mesh);
 
   /* tag update */
-  bool rebuild = (mesh->triangles_is_modified()) || (oldsubd_faces != mesh->get_subd_faces()) ||
-                 (mesh->subd_face_corners_is_modified());
+  bool rebuild = (mesh->triangles_is_modified()) ||
+      (mesh->subd_num_corners_is_modified()) ||
+      (mesh->subd_shader_is_modified()) ||
+      (mesh->subd_smooth_is_modified()) ||
+      (mesh->subd_ptex_offset_is_modified()) ||
+      (mesh->subd_start_corner_is_modified()) ||
+      (mesh->subd_face_corners_is_modified());
 
   mesh->tag_update(scene, rebuild);
 }

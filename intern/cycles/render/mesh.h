@@ -51,10 +51,6 @@ struct PackedPatchTable;
 
 /* Mesh */
 
-class MeshBuilder {
-
-};
-
 class Mesh : public Geometry {
  protected:
   Mesh(const NodeType *node_type_, Type geom_type_);
@@ -149,25 +145,12 @@ class Mesh : public Geometry {
   NODE_PUBLIC_API_ARRAY(array<int>, triangle_patch) /* must be < 0 for non subd triangles */
   NODE_PUBLIC_API_ARRAY(array<float2>, vert_patch_uv)
 
-  // NODE_PUBLIC_API_ARRAY(array<SubdFace>, subd_faces)
- protected:
-  array<SubdFace> subd_faces;
-
- public:
-  void set_subd_faces(array<SubdFace> &subd_faces_)
-  {
-    socket_modified = ~0u;
-    subd_faces.steal_data(subd_faces_);
-  }
-  array<SubdFace> &get_subd_faces()
-  {
-    socket_modified = ~0u;
-    return subd_faces;
-  }
-  array<SubdFace> const &get_subd_faces() const
-  {
-    return subd_faces;
-  }
+  /* SubdFaces */
+  NODE_PUBLIC_API_ARRAY(array<int>, subd_start_corner)
+  NODE_PUBLIC_API_ARRAY(array<int>, subd_num_corners)
+  NODE_PUBLIC_API_ARRAY(array<int>, subd_shader)
+  NODE_PUBLIC_API_ARRAY(array<bool>, subd_smooth)
+  NODE_PUBLIC_API_ARRAY(array<int>, subd_ptex_offset)
 
   NODE_PUBLIC_API_ARRAY(array<int>, subd_face_corners)
   NODE_PUBLIC_API(int, num_ngons)
@@ -254,6 +237,13 @@ class Mesh : public Geometry {
   void pack_patches(uint *patch_data, uint vert_offset, uint face_offset, uint corner_offset);
 
   void tessellate(DiagSplit *split);
+
+  Mesh::SubdFace get_subd_face(size_t index) const;
+
+  size_t num_subd_faces() const
+  {
+    return subd_shader.size();
+  }
 };
 
 CCL_NAMESPACE_END

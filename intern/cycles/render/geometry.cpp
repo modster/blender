@@ -435,7 +435,7 @@ void GeometryManager::update_svm_attributes(Device *,
 
       if (geom->is_mesh()) {
         Mesh *mesh = static_cast<Mesh *>(geom);
-        if (mesh->subd_faces.size()) {
+        if (mesh->num_subd_faces()) {
           attr_map[index].x = id;
           attr_map[index].y = req.subd_desc.element;
           attr_map[index].z = as_uint(req.subd_desc.offset);
@@ -810,8 +810,8 @@ void GeometryManager::mesh_calc_offset(Scene *scene)
       vert_size += mesh->verts.size();
       tri_size += mesh->num_triangles();
 
-      if (mesh->subd_faces.size()) {
-        Mesh::SubdFace &last = mesh->subd_faces[mesh->subd_faces.size() - 1];
+      if (mesh->num_subd_faces()) {
+        Mesh::SubdFace last = mesh->get_subd_face(mesh->num_subd_faces() - 1);
         patch_size += (last.ptex_offset + last.num_ptex_faces()) * 8;
 
         /* patch tables are stored in same array so include them in patch_size */
@@ -821,7 +821,7 @@ void GeometryManager::mesh_calc_offset(Scene *scene)
         }
       }
 
-      face_size += mesh->subd_faces.size();
+      face_size += mesh->num_subd_faces();
       corner_size += mesh->subd_face_corners.size();
 
       mesh->optix_prim_offset = optix_prim_size;
@@ -861,8 +861,8 @@ void GeometryManager::device_update_mesh(
       vert_size += mesh->verts.size();
       tri_size += mesh->num_triangles();
 
-      if (mesh->subd_faces.size()) {
-        Mesh::SubdFace &last = mesh->subd_faces[mesh->subd_faces.size() - 1];
+      if (mesh->num_subd_faces()) {
+        Mesh::SubdFace last = mesh->get_subd_face(mesh->num_subd_faces() - 1);
         patch_size += (last.ptex_offset + last.num_ptex_faces()) * 8;
 
         /* patch tables are stored in same array so include them in patch_size */

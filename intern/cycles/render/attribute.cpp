@@ -191,7 +191,7 @@ size_t Attribute::element_size(Geometry *geom, AttributePrimitive prim) const
           size = mesh->num_triangles();
         }
         else {
-          size = mesh->subd_faces.size() + mesh->num_ngons;
+          size = mesh->num_subd_faces() + mesh->num_ngons;
         }
       }
       break;

@@ -341,8 +341,8 @@ void DiagSplit::split_patches(Patch *patches, size_t patches_byte_stride)
 {
   int patch_index = 0;
 
-  for (int f = 0; f < params.mesh->subd_faces.size(); f++) {
-    Mesh::SubdFace &face = params.mesh->subd_faces[f];
+  for (int f = 0; f < params.mesh->num_subd_faces(); f++) {
+    Mesh::SubdFace face = params.mesh->get_subd_face(f);
 
     Patch *patch = (Patch *)(((char *)patches) + patch_index * patches_byte_stride);
 
