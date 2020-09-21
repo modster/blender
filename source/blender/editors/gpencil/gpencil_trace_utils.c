@@ -188,7 +188,7 @@ void ED_gpencil_trace_image_to_bitmap(ImBuf *ibuf,
 }
 
 /* Helper to add point to stroke. */
-static void add_point(bGPDstroke *gps, float scale, int32_t offset[2], float x, float y)
+static void add_point(bGPDstroke *gps, float scale, const int32_t offset[2], float x, float y)
 {
   int32_t idx = gps->totpoints;
   if (gps->totpoints == 0) {
@@ -233,15 +233,11 @@ static void add_bezier(bGPDstroke *gps,
 
 /**
  * Convert Potrace Bitmap to Grease Pencil strokes
- * \param bmain: Main pointer
  * \param st: Data with traced data
  * \param ob: Target grease pencil object
- * \param gpf: Currect grease pencil frame
  * \param offset: Offset to center
  * \param scale: Scale of the output
  * \param sample: Sample distance to distribute points
- * \param resolution: Resolution of curves
- * \param thickness: Thickness of the stroke
  */
 void ED_gpencil_trace_data_to_strokes(Main *bmain,
                                       potrace_state_t *st,
@@ -259,25 +255,25 @@ void ED_gpencil_trace_data_to_strokes(Main *bmain,
   int32_t mat_mask_idx = BKE_gpencil_material_find_index_by_name_prefix(ob, "Holdout");
 
   const float default_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
-  int32_t r_idx;
   /* Stroke and Fill material. */
   if (mat_fill_idx == -1) {
-    Material *mat_gp = BKE_gpencil_object_material_new(bmain, ob, "Stroke", &r_idx);
+    int32_t new_idx;
+    Material *mat_gp = BKE_gpencil_object_material_new(bmain, ob, "Stroke", &new_idx);
     MaterialGPencilStyle *gp_style = mat_gp->gp_style;
 
-    linearrgb_to_srgb_v4(gp_style->stroke_rgba, default_color);
+    copy_v4_v4(gp_style->stroke_rgba, default_color);
     gp_style->flag |= GP_MATERIAL_STROKE_SHOW;
     gp_style->flag |= GP_MATERIAL_FILL_SHOW;
     mat_fill_idx = ob->totcol - 1;
   }
   /* Holdout material. */
   if (mat_mask_idx == -1) {
-    Material *mat_gp = BKE_gpencil_object_material_new(bmain, ob, "Holdout", &r_idx);
+    int32_t new_idx;
+    Material *mat_gp = BKE_gpencil_object_material_new(bmain, ob, "Holdout", &new_idx);
     MaterialGPencilStyle *gp_style = mat_gp->gp_style;
 
-    linearrgb_to_srgb_v4(gp_style->stroke_rgba, default_color);
-    gp_style->stroke_rgba[3] = 0.0f;
-    gp_style->fill_rgba[3] = 0.0f;
+    copy_v4_v4(gp_style->stroke_rgba, default_color);
+    copy_v4_v4(gp_style->fill_rgba, default_color);
     gp_style->flag |= GP_MATERIAL_STROKE_SHOW;
     gp_style->flag |= GP_MATERIAL_FILL_SHOW;
     gp_style->flag |= GP_MATERIAL_IS_STROKE_HOLDOUT;
@@ -289,6 +285,8 @@ void ED_gpencil_trace_data_to_strokes(Main *bmain,
   int n, *tag;
   potrace_dpoint_t(*c)[3];
 
+  /* There isn't any rule here, only the result of lots of testing to get a value that gets
+   * good results using the Potrace data. */
   const float scalef = 0.008f * scale;
   /* Draw each curve. */
   path = st->plist;

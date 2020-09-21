@@ -2747,7 +2747,7 @@ void BKE_gpencil_update_layer_parent(const Depsgraph *depsgraph, Object *ob)
 }
 
 /**
- * Find materil by name prefix.
+ * Find material by name prefix.
  * \param ob: Object pointer
  * \param name_prefix: Prefix name of the material
  * \return  Index

@@ -57,6 +57,7 @@
 #include "ED_gpencil.h"
 #include "ED_object.h"
 
+#include "gpencil_intern.h"
 #include "gpencil_trace.h"
 #include "potracelib.h"
 
@@ -123,7 +124,10 @@ static bool gpencil_trace_image(
   offset[0] = ibuf->x / 2;
   offset[1] = ibuf->y / 2;
 
-  /* Scale correction for Potrace. */
+  /* Scale correction for Potrace.
+   * Really, there isn't documented in Potrace about how the scale is calculated,
+   * but after doing a lot of tests, it looks is using a VGA resolution (640) as a base.
+   * Maybe there are others ways to get the right scale conversion, but this solution works. */
   float scale_potrace = scale * (640.0f / (float)ibuf->x) * ((float)ibuf->x / (float)ibuf->y);
   if (ibuf->x > ibuf->y) {
     scale_potrace *= (float)ibuf->y / (float)ibuf->x;
@@ -149,6 +153,7 @@ static bool gpencil_trace_image_poll(bContext *C)
 {
   Object *ob = CTX_data_active_object(C);
   if ((ob == NULL) || (ob->type != OB_EMPTY) || (ob->data == NULL)) {
+    CTX_wm_operator_poll_msg_set(C, "No image empty selected");
     return false;
   }
 
@@ -228,7 +233,7 @@ void GPENCIL_OT_trace_image(wmOperatorType *ot)
        "BLACK",
        0,
        "Black",
-       "prefers to connect black (foreground) components"},
+       "Prefers to connect black (foreground) components"},
       {POTRACE_TURNPOLICY_WHITE,
        "WHITE",
        0,
@@ -240,13 +245,13 @@ void GPENCIL_OT_trace_image(wmOperatorType *ot)
        "MINORITY",
        0,
        "Minority",
-       "Prefers to connect the color (black or white) that occurs least frequently in a local "
+       "Prefers to connect the color (black or white) that occurs least frequently in the local "
        "neighborhood of the current position"},
       {POTRACE_TURNPOLICY_MAJORITY,
        "MAJORITY",
        0,
        "Majority",
-       "Prefers to connect the color (black or white) that occurs most frequently in a local "
+       "Prefers to connect the color (black or white) that occurs most frequently in the local "
        "neighborhood of the current position"},
       {POTRACE_TURNPOLICY_RANDOM, "RANDOM", 0, "Random", "Choose pseudo-randomly"},
       {0, NULL, 0, NULL, NULL},
