@@ -458,8 +458,8 @@ void WM_OT_obj_import(struct wmOperatorType *ot)
   RNA_def_enum(ot->srna,
                "forward_axis",
                io_obj_transform_axis_forward,
-               OBJ_AXIS_NEGATIVE_Y_FORWARD,
+               OBJ_AXIS_NEGATIVE_Z_FORWARD,
                "Forward Axis",
                "");
-  RNA_def_enum(ot->srna, "up_axis", io_obj_transform_axis_up, OBJ_AXIS_Z_UP, "Up Axis", "");
+  RNA_def_enum(ot->srna, "up_axis", io_obj_transform_axis_up, OBJ_AXIS_Y_UP, "Up Axis", "");
 }
