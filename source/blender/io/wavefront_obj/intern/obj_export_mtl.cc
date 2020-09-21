@@ -35,7 +35,6 @@
 
 #include "obj_export_mesh.hh"
 #include "obj_export_mtl.hh"
-#include "obj_import_mtl.hh"
 
 namespace blender::io::obj {
 

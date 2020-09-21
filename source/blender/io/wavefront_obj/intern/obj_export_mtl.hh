@@ -30,8 +30,6 @@
 
 #include "DNA_node_types.h"
 
-#include "obj_export_mesh.hh"
-
 namespace blender::io::obj {
 class OBJMesh;
 
