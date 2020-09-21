@@ -733,7 +733,7 @@ static void attr_create_random_per_island(Scene *scene,
 static void create_mesh(Scene *scene,
                         Mesh *mesh,
                         BL::Mesh &b_mesh,
-                        const array<Shader *> &used_shaders,
+                        const array<Node *> &used_shaders,
                         bool subdivision = false,
                         bool subdivide_uvs = true)
 {
@@ -876,7 +876,7 @@ static void create_subd_mesh(Scene *scene,
                              Mesh *mesh,
                              BL::Object &b_ob,
                              BL::Mesh &b_mesh,
-                             const array<Shader *> &used_shaders,
+                             const array<Node *> &used_shaders,
                              float dicing_rate,
                              int max_subdivisions)
 {
@@ -1017,7 +1017,7 @@ static void sync_mesh_fluid_motion(BL::Object &b_ob, Scene *scene, Mesh *mesh)
 void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph,
                             BL::Object b_ob,
                             Mesh *mesh,
-                            array<Shader *> &used_shaders)
+                            array<Node *> &used_shaders)
 {
   if (mesh->get_time_stamp() == b_depsgraph.scene().frame_current()) {
     return;

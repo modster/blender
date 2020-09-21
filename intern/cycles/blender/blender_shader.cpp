@@ -42,7 +42,7 @@ typedef map<string, ConvertNode *> ProxyMap;
 
 /* Find */
 
-void BlenderSync::find_shader(BL::ID &id, array<Shader *> &used_shaders, Shader *default_shader)
+void BlenderSync::find_shader(BL::ID &id, array<Node *> &used_shaders, Shader *default_shader)
 {
   Shader *shader = (id) ? shader_map.find(id) : default_shader;
 

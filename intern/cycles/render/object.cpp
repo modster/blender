@@ -217,7 +217,8 @@ void Object::tag_update(Scene *scene)
     if (geometry->transform_applied)
       geometry->tag_modified();
 
-    foreach (Shader *shader, geometry->get_used_shaders()) {
+    foreach (Node *node, geometry->get_used_shaders()) {
+      Shader *shader = static_cast<Shader *>(node);
       if (shader->get_use_mis() && shader->has_surface_emission)
         scene->light_manager->need_update = true;
     }
@@ -288,7 +289,8 @@ float Object::compute_volume_step_size() const
   /* Compute step rate from shaders. */
   float step_rate = FLT_MAX;
 
-  foreach (Shader *shader, mesh->used_shaders) {
+  foreach (Node *node, mesh->used_shaders) {
+    Shader *shader = static_cast<Shader *>(node);
     if (shader->has_volume) {
       if ((shader->get_heterogeneous_volume() && shader->has_volume_spatial_varying) ||
           (shader->has_volume_attribute_dependency)) {

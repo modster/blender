@@ -112,7 +112,6 @@ struct Node {
   void set(const SocketType &input, array<ustring> &value);
   void set(const SocketType &input, array<Transform> &value);
   void set(const SocketType &input, array<Node *> &value);
-  void set(const SocketType &input, array<Shader *> &value);
 
   /* get values */
   bool get_bool(const SocketType &input) const;

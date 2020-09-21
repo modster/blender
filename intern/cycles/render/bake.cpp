@@ -33,7 +33,8 @@ static int aa_samples(Scene *scene, Object *object, ShaderEvalType type)
   else if (type == SHADER_EVAL_NORMAL) {
     /* Only antialias normal if mesh has bump mapping. */
     if (object->get_geometry()) {
-      foreach (Shader *shader, object->get_geometry()->get_used_shaders()) {
+      foreach (Node *node, object->get_geometry()->get_used_shaders()) {
+        Shader *shader = static_cast<Shader *>(node);
         if (shader->has_bump) {
           return scene->integrator->get_aa_samples();
         }

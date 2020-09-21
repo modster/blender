@@ -325,7 +325,8 @@ void ImageTextureNode::cull_tiles(Scene *scene, ShaderGraph *graph)
    * be to have a cache in each mesh that is indexed by attribute.
    * Additionally, building a graph-to-meshes list once could help. */
   foreach (Geometry *geom, scene->geometry) {
-    foreach (Shader *shader, geom->get_used_shaders()) {
+    foreach (Node *node, geom->get_used_shaders()) {
+      Shader *shader = static_cast<Shader *>(node);
       if (shader->graph == graph) {
         geom->get_uv_tiles(attribute, used_tiles);
       }

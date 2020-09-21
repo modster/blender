@@ -115,9 +115,9 @@ void BlenderSync::sync_light(BL::Object &b_parent,
   light->set_tfm(tfm);
 
   /* shader */
-  array<Shader *> used_shaders;
+  array<Node *> used_shaders;
   find_shader(b_light, used_shaders, scene->default_light);
-  light->set_shader(used_shaders[0]);
+  light->set_shader(static_cast<Shader *>(used_shaders[0]));
 
   /* shadow */
   PointerRNA cscene = RNA_pointer_get(&b_scene.ptr, "cycles");

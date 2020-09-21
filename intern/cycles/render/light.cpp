@@ -266,7 +266,8 @@ bool LightManager::object_usable_as_light(Object *object)
    * iterate all geometry shaders twice (when counting and when calculating
    * triangle area.
    */
-  foreach (const Shader *shader, geom->get_used_shaders()) {
+  foreach (Node *node, geom->get_used_shaders()) {
+    Shader *shader = static_cast<Shader *>(node);
     if (shader->get_use_mis() && shader->has_surface_emission) {
       return true;
     }
@@ -312,7 +313,7 @@ void LightManager::device_update_distribution(Device *,
     for (size_t i = 0; i < mesh_num_triangles; i++) {
       int shader_index = mesh->shader[i];
       Shader *shader = (shader_index < mesh->get_used_shaders().size()) ?
-                           mesh->get_used_shaders()[shader_index] :
+                           static_cast<Shader *>(mesh->get_used_shaders()[shader_index]) :
                            scene->default_surface;
 
       if (shader->get_use_mis() && shader->has_surface_emission) {
@@ -368,7 +369,7 @@ void LightManager::device_update_distribution(Device *,
     for (size_t i = 0; i < mesh_num_triangles; i++) {
       int shader_index = mesh->shader[i];
       Shader *shader = (shader_index < mesh->get_used_shaders().size()) ?
-                           mesh->get_used_shaders()[shader_index] :
+                           static_cast<Shader *>(mesh->get_used_shaders()[shader_index]) :
                            scene->default_surface;
 
       if (shader->get_use_mis() && shader->has_surface_emission) {

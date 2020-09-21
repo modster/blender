@@ -474,7 +474,7 @@ void Hair::pack_curves(Scene *scene,
   for (size_t i = 0; i < curve_num; i++) {
     Curve curve = get_curve(i);
     int shader_id = curve_shader[i];
-    Shader *shader = (shader_id < used_shaders.size()) ? used_shaders[shader_id] :
+    Shader *shader = (shader_id < used_shaders.size()) ? static_cast<Shader *>(used_shaders[shader_id]) :
                                                          scene->default_surface;
     shader_id = scene->shader_manager->get_shader_id(shader, false);
 

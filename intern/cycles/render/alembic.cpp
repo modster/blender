@@ -322,7 +322,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
     mesh = scene->create_node<Mesh>();
     mesh->set_use_motion_blur(use_motion_blur);
 
-    array<Shader *> used_shaders = abc_object->get_used_shaders();
+    array<Node *> used_shaders = abc_object->get_used_shaders();
     mesh->set_used_shaders(used_shaders);
 
     /* create object*/
@@ -426,7 +426,7 @@ void AlembicProcedural::read_curves(Scene *scene,
     hair = scene->create_node<Hair>();
     hair->set_use_motion_blur(use_motion_blur);
 
-    array<Shader *> used_shaders = abc_object->get_used_shaders();
+    array<Node *> used_shaders = abc_object->get_used_shaders();
     hair->set_used_shaders(used_shaders);
 
     /* create object*/

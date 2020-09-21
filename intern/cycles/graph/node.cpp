@@ -185,12 +185,6 @@ void Node::set(const SocketType &input, array<Transform> &value)
 
 void Node::set(const SocketType &input, array<Node *> &value)
 {
-  assert(input.type == SocketType::TRANSFORM_ARRAY);
-  set_if_different(input, value);
-}
-
-void Node::set(const SocketType &input, array<Shader *> &value)
-{
   assert(input.type == SocketType::NODE_ARRAY);
   set_if_different(input, value);
 }

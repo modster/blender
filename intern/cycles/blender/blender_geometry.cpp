@@ -57,7 +57,7 @@ Geometry *BlenderSync::sync_geometry(BL::Depsgraph &b_depsgraph,
   Geometry::Type geom_type = determine_geom_type(b_ob, use_particle_hair);
 
   /* Find shader indices. */
-  array<Shader *> used_shaders;
+  array<Node *> used_shaders;
 
   BL::Object::material_slots_iterator slot;
   for (b_ob.material_slots.begin(slot); slot != b_ob.material_slots.end(); ++slot) {
@@ -113,7 +113,8 @@ Geometry *BlenderSync::sync_geometry(BL::Depsgraph &b_depsgraph,
        * because the shader needs different geometry attributes. */
       bool attribute_recalc = false;
 
-      foreach (Shader *shader, geom->get_used_shaders()) {
+      foreach (Node *node, geom->get_used_shaders()) {
+        Shader *shader = static_cast<Shader *>(node);
         if (shader->need_update_geometry) {
           attribute_recalc = true;
         }

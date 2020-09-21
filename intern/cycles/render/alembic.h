@@ -41,7 +41,7 @@ class AlembicObject : public Node {
   ~AlembicObject();
 
   NODE_PUBLIC_API(ustring, path)
-  NODE_PUBLIC_API_ARRAY(array<Shader *>, used_shaders)
+  NODE_PUBLIC_API_ARRAY(array<Node *>, used_shaders)
 
   void set_object(Object *object);
   Object *get_object();

@@ -97,9 +97,11 @@ bool Geometry::need_attribute(Scene *scene, AttributeStandard std)
   if (scene->need_global_attribute(std))
     return true;
 
-  foreach (Shader *shader, used_shaders)
+  foreach (Node *node, used_shaders) {
+    Shader *shader = static_cast<Shader *>(node);
     if (shader->attributes.find(std))
       return true;
+  }
 
   return false;
 }
@@ -109,9 +111,11 @@ bool Geometry::need_attribute(Scene * /*scene*/, ustring name)
   if (name == ustring())
     return false;
 
-  foreach (Shader *shader, used_shaders)
+  foreach (Node *node, used_shaders) {
+    Shader *shader = static_cast<Shader *>(node);
     if (shader->attributes.find(name))
       return true;
+   }
 
   return false;
 }
@@ -159,7 +163,8 @@ bool Geometry::is_instanced() const
 
 bool Geometry::has_true_displacement() const
 {
-  foreach (Shader *shader, used_shaders) {
+  foreach (Node *node, used_shaders) {
+    Shader *shader = static_cast<Shader *>(node);
     if (shader->has_displacement && shader->get_displacement_method() != DISPLACE_BUMP) {
       return true;
     }
@@ -249,9 +254,11 @@ void Geometry::tag_update(Scene *scene, bool rebuild)
     scene->light_manager->need_update = true;
   }
   else {
-    foreach (Shader *shader, used_shaders)
+    foreach (Node *node, used_shaders) {
+      Shader *shader = static_cast<Shader *>(node);
       if (shader->has_surface_emission)
         scene->light_manager->need_update = true;
+    }
   }
 
   scene->geometry_manager->need_update = true;
@@ -647,7 +654,8 @@ void GeometryManager::device_update_attributes(Device *device,
 
     scene->need_global_attributes(geom_attributes[i]);
 
-    foreach (Shader *shader, geom->get_used_shaders()) {
+    foreach (Node *node, geom->get_used_shaders()) {
+      Shader *shader = static_cast<Shader *>(node);
       geom_attributes[i].add(shader->attributes);
     }
   }
@@ -1114,7 +1122,8 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
   foreach (Geometry *geom, scene->geometry) {
     geom->has_volume = false;
 
-    foreach (const Shader *shader, geom->get_used_shaders()) {
+    foreach (Node *node, geom->get_used_shaders()) {
+      Shader *shader = static_cast<Shader *>(node);
       if (shader->has_volume) {
         geom->has_volume = true;
       }
@@ -1155,7 +1164,8 @@ void GeometryManager::device_update_displacement_images(Device *device,
   set<int> bump_images;
   foreach (Geometry *geom, scene->geometry) {
     if (geom->is_modified()) {
-      foreach (Shader *shader, geom->get_used_shaders()) {
+      foreach (Node *node, geom->get_used_shaders()) {
+        Shader *shader = static_cast<Shader *>(node);
         if (!shader->has_displacement || shader->get_displacement_method() == DISPLACE_BUMP) {
           continue;
         }
@@ -1232,7 +1242,8 @@ void GeometryManager::device_update(Device *device,
   size_t total_tess_needed = 0;
 
   foreach (Geometry *geom, scene->geometry) {
-    foreach (Shader *shader, geom->get_used_shaders()) {
+    foreach (Node *node, geom->get_used_shaders()) {
+      Shader *shader = static_cast<Shader *>(node);
       if (shader->need_update_geometry)
         geom->tag_modified();
     }

@@ -498,8 +498,10 @@ void ShaderManager::update_shaders_used(Scene *scene)
     scene->background->get_shader()->used = true;
 
   foreach (Geometry *geom, scene->geometry)
-    foreach (Shader *shader, geom->get_used_shaders())
+    foreach (Node *node, geom->get_used_shaders()) {
+      Shader *shader = static_cast<Shader *>(node);
       shader->used = true;
+    }
 
   foreach (Light *light, scene->lights)
     if (light->get_shader())

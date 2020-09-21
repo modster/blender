@@ -544,7 +544,9 @@ void GeometryManager::create_volume_mesh(Volume *volume, Progress &progress)
   Shader *volume_shader = NULL;
   int pad_size = 0;
 
-  foreach (Shader *shader, volume->used_shaders) {
+  foreach (Node *node, volume->get_used_shaders()) {
+    Shader *shader = static_cast<Shader *>(node);
+
     if (!shader->has_volume) {
       continue;
     }

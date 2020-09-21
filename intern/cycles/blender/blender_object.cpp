@@ -375,7 +375,7 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
   Shader *default_shader = (b_ob.type() == BL::Object::type_VOLUME) ? scene->default_volume :
                                                                       scene->default_surface;
   /* Find shader indices. */
-  array<Shader *> used_shaders;
+  array<Node *> used_shaders;
 
   BL::Object::material_slots_iterator slot;
   for (b_ob.material_slots.begin(slot); slot != b_ob.material_slots.end(); ++slot) {

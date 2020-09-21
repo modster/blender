@@ -820,7 +820,7 @@ void BlenderSync::sync_hair(Hair *hair, BL::Object &b_ob, bool motion, int motio
 void BlenderSync::sync_hair(BL::Depsgraph b_depsgraph,
                             BL::Object b_ob,
                             Hair *hair,
-                            array<Shader *> &used_shaders)
+                            array<Node *> &used_shaders)
 {
   hair->clear();
   hair->set_used_shaders(used_shaders);
