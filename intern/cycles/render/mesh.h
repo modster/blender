@@ -51,6 +51,10 @@ struct PackedPatchTable;
 
 /* Mesh */
 
+class MeshBuilder {
+
+};
+
 class Mesh : public Geometry {
  protected:
   Mesh(const NodeType *node_type_, Type geom_type_);
@@ -176,8 +180,6 @@ class Mesh : public Geometry {
   NODE_PUBLIC_API(int, subd_max_level)
   NODE_PUBLIC_API(Transform, subd_objecttoworld)
 
-  // NODE_PUBLIC_API(AttributeSet, subd_attributes)
-  // todo(kevin) deleted copy constructor so the macro is not working
   AttributeSet subd_attributes;
 
  private:
