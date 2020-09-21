@@ -314,12 +314,15 @@ void ShaderNodetreeWrap::set_bsdf_socket_values()
   float3 base_color = {std::max(0.0f, mtl_mat_.Kd[0]),
     std::max(0.0f, mtl_mat_.Kd[1]),
     std::max(0.0f, mtl_mat_.Kd[2])};
-  float3 emission = {std::max(0.0f, mtl_mat_.Ke[0]),
-    std::max(0.0f, mtl_mat_.Ke[1]),
-    std::max(0.0f, mtl_mat_.Ke[2])};
+  float3 emission_color = {std::max(0.0f, mtl_mat_.Ke[0]),
+                           std::max(0.0f, mtl_mat_.Ke[1]),
+                           std::max(0.0f, mtl_mat_.Ke[2])};
 
   set_property_of_socket(SOCK_RGBA, "Base Color", {base_color, 3}, bsdf_.get());
-  set_property_of_socket(SOCK_RGBA, "Emission", {emission, 3}, bsdf_.get());
+  set_property_of_socket(SOCK_RGBA, "Emission", {emission_color, 3}, bsdf_.get());
+  if (mtl_mat_.texture_maps.contains_as("Emission")) {
+    set_property_of_socket(SOCK_FLOAT, "Emission Strength", {1.0f}, bsdf_.get());
+  }
   set_property_of_socket(SOCK_FLOAT, "Specular", {specular}, bsdf_.get());
   set_property_of_socket(SOCK_FLOAT, "Roughness", {roughness}, bsdf_.get());
   set_property_of_socket(SOCK_FLOAT, "Metallic", {metallic}, bsdf_.get());
