@@ -35,9 +35,9 @@ namespace blender::io::obj {
 OBJCurve::OBJCurve(Depsgraph *depsgraph,
                    const OBJExportParams &export_params,
                    Object *export_object)
-    : depsgraph_(depsgraph), export_object_eval_(export_object)
+    : export_object_eval_(export_object)
 {
-  export_object_eval_ = DEG_get_evaluated_object(depsgraph_, export_object);
+  export_object_eval_ = DEG_get_evaluated_object(depsgraph, export_object);
   export_curve_ = static_cast<Curve *>(export_object_eval_->data);
   set_world_axes_transform(export_params.forward_axis, export_params.up_axis);
 }
@@ -84,9 +84,8 @@ float3 OBJCurve::calc_nurbs_point_coords(const int index,
 {
   const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, index));
   float3 r_coord;
-  BPoint *bpoint = nurb->bp;
-  bpoint += vert_index;
-  copy_v3_v3(r_coord, bpoint->vec);
+  const BPoint &bpoint = nurb->bp[vert_index];
+  copy_v3_v3(r_coord, bpoint.vec);
   mul_m4_v3(world_axes_transform_, r_coord);
   mul_v3_fl(r_coord, scaling_factor);
   return r_coord;

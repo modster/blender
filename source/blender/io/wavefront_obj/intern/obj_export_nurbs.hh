@@ -37,7 +37,6 @@ namespace blender::io::obj {
  */
 class OBJCurve : NonMovable, NonCopyable {
  private:
-  const Depsgraph *depsgraph_;
   const Object *export_object_eval_;
   const Curve *export_curve_;
   float world_axes_transform_[4][4];
