@@ -21,6 +21,10 @@
 
 #include "graph/node.h"
 
+/* included as Light::set_shader defined through NODE_PUBLIC_API does not select
+ * the right Node::set overload as it does not know that Shader is a Node */
+#include "render/shader.h"
+
 #include "util/util_ies.h"
 #include "util/util_thread.h"
 #include "util/util_types.h"

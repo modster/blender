@@ -140,14 +140,6 @@ void Node::set(const SocketType &input, Node *value)
   set_if_different(input, value);
 }
 
-// todo(kevin) : Light::set_shader does not select the overload taking Node* but the one with
-// taking bool
-void Node::set(const SocketType &input, Shader *value)
-{
-  assert(input.type == SocketType::NODE);
-  set_if_different(input, value);
-}
-
 /* set array values */
 void Node::set(const SocketType &input, array<bool> &value)
 {
