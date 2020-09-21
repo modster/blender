@@ -38,9 +38,9 @@ namespace blender::io::obj {
  * are added to its indices.
  */
 struct IndexOffsets {
-  uint vertex_offset;
-  uint uv_vertex_offset;
-  uint normal_offset;
+  int vertex_offset;
+  int uv_vertex_offset;
+  int normal_offset;
 };
 
 /**
@@ -83,14 +83,14 @@ class OBJWriter {
   void write_uv_coords(OBJMesh &obj_mesh_data) const;
   void write_poly_normals(OBJMesh &obj_mesh_data) const;
   void write_smooth_group(const OBJMesh &obj_mesh_data,
-                          uint poly_index,
+                          int poly_index,
                           int &r_last_face_smooth_group) const;
   void write_poly_material(const OBJMesh &obj_mesh_data,
-                           const uint poly_index,
-                           short &r_last_face_mat_nr) const;
+                           const int poly_index,
+                           int16_t &r_last_face_mat_nr) const;
   void write_vertex_group(const OBJMesh &obj_mesh_data,
-                          const uint poly_index,
-                          short &r_last_face_vertex_group) const;
+                          const int poly_index,
+                          int16_t &r_last_face_vertex_group) const;
   void write_poly_elements(const OBJMesh &obj_mesh_data);
   void write_edges_indices(const OBJMesh &obj_mesh_data) const;
   void write_nurbs_curve(const OBJCurve &obj_nurbs_data) const;
@@ -99,27 +99,17 @@ class OBJWriter {
 
  private:
   /* Based on export paramters, a writer function with correct syntax is needed. */
-  typedef void (OBJWriter::*func_vert_uv_normal_indices)(Span<uint>,
-                                                         Span<uint>,
-                                                         Span<uint>,
-                                                         const uint) const;
+  typedef void (OBJWriter::*func_vert_uv_normal_indices)(Span<int>, Span<int>, Span<int>) const;
+
   func_vert_uv_normal_indices get_poly_element_writer(const OBJMesh &obj_mesh_data);
-  void write_vert_uv_normal_indices(Span<uint> vert_indices,
-                                    Span<uint> uv_indices,
-                                    Span<uint> normal_indices,
-                                    const uint tot_loop) const;
-  void write_vert_normal_indices(Span<uint> vert_indices,
-                                 Span<uint>,
-                                 Span<uint> normal_indices,
-                                 const uint tot_loop) const;
-  void write_vert_uv_indices(Span<uint> vert_indices,
-                             Span<uint> uv_indices,
-                             Span<uint>,
-                             const uint tot_loop) const;
-  void write_vert_indices(Span<uint> vert_indices,
-                          Span<uint>,
-                          Span<uint>,
-                          const uint tot_loop) const;
+  void write_vert_uv_normal_indices(Span<int> vert_indices,
+                                    Span<int> uv_indices,
+                                    Span<int> normal_indices) const;
+  void write_vert_normal_indices(Span<int> vert_indices,
+                                 Span<int>,
+                                 Span<int> normal_indices) const;
+  void write_vert_uv_indices(Span<int> vert_indices, Span<int> uv_indices, Span<int>) const;
+  void write_vert_indices(Span<int> vert_indices, Span<int>, Span<int>) const;
 };
 
 /**

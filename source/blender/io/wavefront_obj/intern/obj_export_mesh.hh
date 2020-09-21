@@ -76,11 +76,11 @@ class OBJMesh : NonMovable, NonCopyable {
   /**
    * Total UV vertices in a mesh's texture map.
    */
-  uint tot_uv_vertices_ = 0;
+  int tot_uv_vertices_ = 0;
   /**
    * Per face per vertex UV vertex indices. Make sure to fill them while writing UV coordinates.
    */
-  Vector<Vector<uint>> uv_indices_;
+  Vector<Vector<int>> uv_indices_;
   /**
    * Total smooth groups in an object.
    */
@@ -94,40 +94,40 @@ class OBJMesh : NonMovable, NonCopyable {
   OBJMesh(Depsgraph *depsgraph, const OBJExportParams &export_params, Object *export_object);
   ~OBJMesh();
 
-  uint tot_vertices() const;
-  uint tot_polygons() const;
-  uint tot_uv_vertices() const;
-  Span<uint> uv_indices(const int poly_index) const;
-  uint tot_edges() const;
-  short tot_materials() const;
-  uint tot_smooth_groups() const;
-  int ith_smooth_group(const int poly_index) const;
+  int tot_vertices() const;
+  int tot_polygons() const;
+  int tot_uv_vertices() const;
+  Span<int> uv_indices(const int poly_index) const;
+  int tot_edges() const;
+
+  int16_t tot_materials() const;
+  const Material *get_object_material(const int16_t mat_nr) const;
+  int16_t ith_poly_matnr(const int poly_index) const;
 
   void ensure_mesh_normals() const;
   void ensure_mesh_edges() const;
-  void calc_smooth_groups(const bool use_bitflags);
-  const Material *get_object_material(const short mat_nr) const;
 
-  bool is_ith_poly_smooth(const uint poly_index) const;
-  short ith_poly_matnr(const uint poly_index) const;
-  int ith_poly_totloop(const uint poly_index) const;
+  void calc_smooth_groups(const bool use_bitflags);
+  int tot_smooth_groups() const;
+  int ith_smooth_group(const int poly_index) const;
+  bool is_ith_poly_smooth(const int poly_index) const;
 
   const char *get_object_name() const;
   const char *get_object_mesh_name() const;
-  const char *get_object_material_name(const short mat_nr) const;
+  const char *get_object_material_name(const int16_t mat_nr) const;
 
-  float3 calc_vertex_coords(const uint vert_index, const float scaling_factor) const;
-  void calc_poly_vertex_indices(const uint poly_index, Vector<uint> &r_poly_vertex_indices) const;
+  float3 calc_vertex_coords(const int vert_index, const float scaling_factor) const;
+  void calc_poly_vertex_indices(const int poly_index, Vector<int> &r_poly_vertex_indices) const;
   void store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coords);
-  float3 calc_poly_normal(const uint poly_index) const;
-  int calc_poly_normal_indices(const uint poly_index,
+  float3 calc_poly_normal(const int poly_index) const;
+  int calc_poly_normal_indices(const int poly_index,
                                const int object_tot_prev_normals,
-                               Vector<uint> &r_face_normal_indices) const;
-  void calc_loop_normals(const uint poly_index, Vector<float3> &r_loop_normals) const;
-  short get_poly_deform_group_index(const uint poly_index) const;
-  const char *get_poly_deform_group_name(const short def_group_index) const;
+                               Vector<int> &r_face_normal_indices) const;
+  void calc_loop_normals(const int poly_index, Vector<float3> &r_loop_normals) const;
+  int16_t get_poly_deform_group_index(const int poly_index) const;
+  const char *get_poly_deform_group_name(const int16_t def_group_index) const;
 
-  std::optional<std::array<int, 2>> calc_loose_edge_vert_indices(const uint edge_index) const;
+  std::optional<std::array<int, 2>> calc_loose_edge_vert_indices(const int edge_index) const;
 
  private:
   void free_mesh_if_needed();
