@@ -140,6 +140,7 @@ struct Node {
   void set_default_value(const SocketType &input);
   bool equals_value(const Node &other, const SocketType &input) const;
   void copy_value(const SocketType &input, const Node &other, const SocketType &other_input);
+  void set_value(const SocketType &input, const Node &other, const SocketType &other_input);
 
   /* equals */
   bool equals(const Node &other) const;

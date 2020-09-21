@@ -1023,39 +1023,52 @@ void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph,
     return;
   }
 
-  mesh->clear();
-  mesh->set_used_shaders(used_shaders);
-  mesh->set_time_stamp(b_depsgraph.scene().frame_current());
+  Mesh new_mesh;
+  new_mesh.set_used_shaders(used_shaders);
 
   if (view_layer.use_surfaces) {
     /* Adaptive subdivision setup. Not for baking since that requires
      * exact mapping to the Blender mesh. */
     if (!scene->bake_manager->get_baking()) {
-      mesh->set_subdivision_type(object_subdivision_type(b_ob, preview, experimental));
+      new_mesh.set_subdivision_type(object_subdivision_type(b_ob, preview, experimental));
     }
 
     /* For some reason, meshes do not need this... */
-    bool need_undeformed = mesh->need_attribute(scene, ATTR_STD_GENERATED);
+    bool need_undeformed = new_mesh.need_attribute(scene, ATTR_STD_GENERATED);
     BL::Mesh b_mesh = object_to_mesh(
-        b_data, b_ob, b_depsgraph, need_undeformed, mesh->get_subdivision_type());
+        b_data, b_ob, b_depsgraph, need_undeformed, new_mesh.get_subdivision_type());
 
     if (b_mesh) {
       /* Sync mesh itself. */
-      if (mesh->get_subdivision_type() != Mesh::SUBDIVISION_NONE)
+      if (new_mesh.get_subdivision_type() != Mesh::SUBDIVISION_NONE)
         create_subd_mesh(
-            scene, mesh, b_ob, b_mesh, mesh->get_used_shaders(), dicing_rate, max_subdivisions);
+            scene, &new_mesh, b_ob, b_mesh, new_mesh.get_used_shaders(), dicing_rate, max_subdivisions);
       else
-        create_mesh(scene, mesh, b_mesh, mesh->get_used_shaders(), false);
+        create_mesh(scene, &new_mesh, b_mesh, new_mesh.get_used_shaders(), false);
 
       free_object_to_mesh(b_data, b_ob, b_mesh);
     }
   }
 
   /* cached velocities (e.g. from alembic archive) */
-  sync_mesh_cached_velocities(b_ob, scene, mesh);
+  sync_mesh_cached_velocities(b_ob, scene, &new_mesh);
 
   /* mesh fluid motion mantaflow */
-  sync_mesh_fluid_motion(b_ob, scene, mesh);
+  sync_mesh_fluid_motion(b_ob, scene, &new_mesh);
+
+  for (const SocketType &socket : new_mesh.type->inputs) {
+    mesh->set_value(socket, new_mesh, socket);
+  }
+
+  foreach (Attribute &attr, new_mesh.attributes.attributes) {
+    mesh->attributes.attributes.push_back(std::move(attr));
+  }
+
+  foreach (Attribute &attr, new_mesh.subd_attributes.attributes) {
+    mesh->subd_attributes.attributes.push_back(std::move(attr));
+  }
+
+  mesh->set_time_stamp(b_depsgraph.scene().frame_current());
 
   /* tag update */
   bool rebuild = (mesh->triangles_is_modified()) ||
