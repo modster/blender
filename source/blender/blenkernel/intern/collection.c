@@ -622,11 +622,11 @@ ListBase BKE_collection_object_cache_get(Collection *collection)
 
 ListBase BKE_collection_object_cache_instanced_get(Collection *collection)
 {
-  if (!(collection->flag & COLLECTION_HAS_OBJECT_CACHE)) {
+  if (!(collection->flag & COLLECTION_HAS_OBJECT_CACHE_INSTANCED)) {
     static ThreadMutex cache_lock = BLI_MUTEX_INITIALIZER;
 
     BLI_mutex_lock(&cache_lock);
-    if (!(collection->flag & COLLECTION_HAS_OBJECT_CACHE)) {
+    if (!(collection->flag & COLLECTION_HAS_OBJECT_CACHE_INSTANCED)) {
       collection_object_cache_fill(&collection->object_cache_instanced, collection, 0, true);
       collection->flag |= COLLECTION_HAS_OBJECT_CACHE_INSTANCED;
     }
