@@ -17,8 +17,8 @@
  * All rights reserved.
  */
 
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 
 #include "BLI_float3.hh"

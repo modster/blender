@@ -36,7 +36,6 @@ namespace blender::io::obj {
 
 using std::string;
 
-
 /**
  * Based on the properties of the given Geometry instance, create a new Geometry instance
  * or return the previous one.

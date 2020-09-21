@@ -73,7 +73,6 @@ static void set_property_of_socket(eNodeSocketDatatype property_type,
   }
 }
 
-
 /**
  * Load image for Image Texture node and set the node properties.
  * Return success if Image can be loaded successfully.
@@ -119,8 +118,7 @@ static bool load_texture_image(Main *bmain, const tex_map_XX &tex_map, bNode *r_
  * Initialises a nodetree with a p-BSDF node's BSDF socket connected to shader output node's
  * surface socket.
  */
-ShaderNodetreeWrap::ShaderNodetreeWrap(Main *bmain, const MTLMaterial &mtl_mat)
-    : mtl_mat_(mtl_mat)
+ShaderNodetreeWrap::ShaderNodetreeWrap(Main *bmain, const MTLMaterial &mtl_mat) : mtl_mat_(mtl_mat)
 {
   nodetree_.reset(ntreeAddTree(nullptr, "Shader Nodetree", ntreeType_Shader->idname));
   bsdf_.reset(add_node_to_tree(SH_NODE_BSDF_PRINCIPLED));
@@ -312,8 +310,8 @@ void ShaderNodetreeWrap::set_bsdf_socket_values()
     }
   }
   float3 base_color = {std::max(0.0f, mtl_mat_.Kd[0]),
-    std::max(0.0f, mtl_mat_.Kd[1]),
-    std::max(0.0f, mtl_mat_.Kd[2])};
+                       std::max(0.0f, mtl_mat_.Kd[1]),
+                       std::max(0.0f, mtl_mat_.Kd[2])};
   float3 emission_color = {std::max(0.0f, mtl_mat_.Ke[0]),
                            std::max(0.0f, mtl_mat_.Ke[1]),
                            std::max(0.0f, mtl_mat_.Ke[2])};
