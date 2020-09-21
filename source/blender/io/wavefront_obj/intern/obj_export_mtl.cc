@@ -206,7 +206,10 @@ void MaterialWrap::store_bsdf_properties(MTLMaterial &r_mtl_mat) const
   float3 diffuse_col = {export_mtl_->r, export_mtl_->g, export_mtl_->b};
   copy_property_from_node(SOCK_RGBA, bsdf_node_, "Base Color", {diffuse_col, 3});
   float3 emission_col{0.0f};
+  float emission_strength = 0.0f;
+  copy_property_from_node(SOCK_FLOAT, bsdf_node_, "Emission Strength", {&emission_strength, 1});
   copy_property_from_node(SOCK_RGBA, bsdf_node_, "Emission", {emission_col, 3});
+  mul_v3_fl(emission_col, emission_strength);
 
   /* See https://wikipedia.org/wiki/Wavefront_.obj_file for all possible values of illum. */
   /* Highlight on. */
@@ -271,6 +274,14 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
 
       /* Find sockets linked to "Color" socket in normal map node. */
       linked_sockets_to_dest_id(normal_map_node, node_tree, "Color", linked_sockets);
+    }
+    else if (texture_map.key == "map_Ke") {
+      float emission_strength = 0.0f;
+      copy_property_from_node(
+          SOCK_FLOAT, bsdf_node_, "Emission Strength", {&emission_strength, 1});
+      if (emission_strength == 0.0f) {
+        continue;
+      }
     }
     else {
       /* Find sockets linked to the destination socket of interest, in p-bsdf node. */
