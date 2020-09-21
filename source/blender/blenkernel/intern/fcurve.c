@@ -617,11 +617,10 @@ static short get_fcurve_end_keyframes(FCurve *fcu,
   /* only include selected items? */
   if (do_sel_only) {
     BezTriple *bezt;
-    unsigned int i;
 
     /* find first selected */
     bezt = fcu->bezt;
-    for (i = 0; i < fcu->totvert; bezt++, i++) {
+    for (int i = 0; i < fcu->totvert; bezt++, i++) {
       if (BEZT_ISSEL_ANY(bezt)) {
         *first = bezt;
         found = true;
@@ -631,7 +630,7 @@ static short get_fcurve_end_keyframes(FCurve *fcu,
 
     /* find last selected */
     bezt = ARRAY_LAST_ITEM(fcu->bezt, BezTriple, fcu->totvert);
-    for (i = 0; i < fcu->totvert; bezt--, i++) {
+    for (int i = 0; i < fcu->totvert; bezt--, i++) {
       if (BEZT_ISSEL_ANY(bezt)) {
         *last = bezt;
         found = true;
@@ -661,7 +660,6 @@ bool BKE_fcurve_calc_bounds(FCurve *fcu,
   float xminv = 999999999.0f, xmaxv = -999999999.0f;
   float yminv = 999999999.0f, ymaxv = -999999999.0f;
   bool foundvert = false;
-  unsigned int i;
 
   if (fcu->totvert) {
     if (fcu->bezt) {
@@ -689,6 +687,7 @@ bool BKE_fcurve_calc_bounds(FCurve *fcu,
       if (ymin || ymax) {
         BezTriple *bezt, *prevbezt = NULL;
 
+        int i;
         for (bezt = fcu->bezt, i = 0; i < fcu->totvert; prevbezt = bezt, bezt++, i++) {
           if ((do_sel_only == false) || BEZT_ISSEL_ANY(bezt)) {
             /* keyframe itself */
@@ -726,6 +725,7 @@ bool BKE_fcurve_calc_bounds(FCurve *fcu,
       /* only loop over keyframes to find extents for values if needed */
       if (ymin || ymax) {
         FPoint *fpt;
+        int i;
 
         for (fpt = fcu->fpt, i = 0; i < fcu->totvert; fpt++, i++) {
           if (fpt->vec[1] < yminv) {
@@ -1308,7 +1308,7 @@ bool test_time_fcurve(FCurve *fcu)
 /** \name F-Curve Calculations
  * \{ */
 
-/* The total length of the handles is not allowed to be more
+/* The length of each handle is not allowed to be more
  * than the horizontal distance between (v1-v4).
  * This is to prevent curve loops.
  */
@@ -1316,14 +1316,14 @@ void correct_bezpart(const float v1[2], float v2[2], float v3[2], const float v4
 {
   float h1[2], h2[2], len1, len2, len, fac;
 
-  /* calculate handle deltas */
+  /* Calculate handle deltas. */
   h1[0] = v1[0] - v2[0];
   h1[1] = v1[1] - v2[1];
 
   h2[0] = v4[0] - v3[0];
   h2[1] = v4[1] - v3[1];
 
-  /* calculate distances:
+  /* Calculate distances:
    * - len  = span of time between keyframes
    * - len1 = length of handle of start key
    * - len2 = length of handle of end key
@@ -1332,20 +1332,21 @@ void correct_bezpart(const float v1[2], float v2[2], float v3[2], const float v4
   len1 = fabsf(h1[0]);
   len2 = fabsf(h2[0]);
 
-  /* if the handles have no length, no need to do any corrections */
+  /* If the handles have no length, no need to do any corrections. */
   if ((len1 + len2) == 0.0f) {
     return;
   }
 
-  /* the two handles cross over each other, so force them
-   * apart using the proportion they overlap
-   */
-  if ((len1 + len2) > len) {
-    fac = len / (len1 + len2);
-
+  /* To prevent looping or rewinding, handles cannot
+   * exceed the adjacent key-frames time position. */
+  if (len1 > len) {
+    fac = len / len1;
     v2[0] = (v1[0] - fac * h1[0]);
     v2[1] = (v1[1] - fac * h1[1]);
+  }
 
+  if (len2 > len) {
+    fac = len / len2;
     v3[0] = (v4[0] - fac * h2[0]);
     v3[1] = (v4[1] - fac * h2[1]);
   }

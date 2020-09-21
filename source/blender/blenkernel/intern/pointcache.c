@@ -295,9 +295,20 @@ static int ptcache_particle_write(int index, void *psys_v, void **data, int cfra
   float times[3];
   int step = psys->pointcache->step;
 
-  /* No need to store unborn or died particles outside cache step bounds */
-  if (data[BPHYS_DATA_INDEX] && (cfra < pa->time - step || cfra > pa->dietime + step)) {
-    return 0;
+  /* Skip some particles that are not stored in the cache. */
+  if (data[BPHYS_DATA_INDEX]) {
+    if (psys->part->flag & PART_DIED) {
+      /* Dead particles are stored when they are displayed. */
+      if (cfra < pa->time - step) {
+        return 0;
+      }
+    }
+    else {
+      /* Particles are only stored in their lifetime. */
+      if (cfra < pa->time - step || cfra > pa->dietime + step) {
+        return 0;
+      }
+    }
   }
 
   times[0] = pa->time;
@@ -485,8 +496,16 @@ static int ptcache_particle_totwrite(void *psys_v, int cfra)
     return psys->totpart;
   }
 
-  for (p = 0; p < psys->totpart; p++, pa++) {
-    totwrite += (cfra >= pa->time - step && cfra <= pa->dietime + step);
+  if (psys->part->flag & PART_DIED) {
+    /* Also store dead particles when they are displayed. */
+    for (p = 0; p < psys->totpart; p++, pa++) {
+      totwrite += (cfra >= pa->time - step);
+    }
+  }
+  else {
+    for (p = 0; p < psys->totpart; p++, pa++) {
+      totwrite += (cfra >= pa->time - step && cfra <= pa->dietime + step);
+    }
   }
 
   return totwrite;
@@ -1848,7 +1867,7 @@ void BKE_ptcache_id_from_rigidbody(PTCacheID *pid, Object *ob, RigidBodyWorld *r
 
   memset(pid, 0, sizeof(PTCacheID));
 
-  pid->owner_id = &ob->id;
+  pid->owner_id = ob != NULL ? &ob->id : NULL;
   pid->calldata = rbw;
   pid->type = PTCACHE_TYPE_RIGIDBODY;
   pid->cache = rbw->shared->pointcache;
@@ -1983,7 +2002,7 @@ static bool foreach_object_modifier_ptcache(Object *object,
       }
     }
     else if (md->type == eModifierType_Simulation) {
-      /* TODO(jacques) */
+      /* TODO(jacques): */
     }
   }
   return true;

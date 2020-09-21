@@ -44,6 +44,7 @@
 #include "BLI_path_util.h"
 #include "BLI_rect.h"
 #include "BLI_string.h"
+#include "BLI_string_search.h"
 #include "BLI_timecode.h"
 #include "BLI_utildefines.h"
 
@@ -330,67 +331,61 @@ static void template_ID_set_property_exec_fn(bContext *C, void *arg_template, vo
   }
 }
 
-static bool id_search_add(const bContext *C,
-                          TemplateID *template_ui,
-                          const int flag,
-                          const char *str,
-                          uiSearchItems *items,
-                          ID *id)
+static bool id_search_allows_id(TemplateID *template_ui, const int flag, ID *id, const char *query)
 {
   ID *id_from = template_ui->ptr.owner_id;
 
-  if (!((flag & PROP_ID_SELF_CHECK) && id == id_from)) {
+  /* Do self check. */
+  if ((flag & PROP_ID_SELF_CHECK) && id == id_from) {
+    return false;
+  }
 
-    /* use filter */
-    if (RNA_property_type(template_ui->prop) == PROP_POINTER) {
-      PointerRNA ptr;
-      RNA_id_pointer_create(id, &ptr);
-      if (RNA_property_pointer_poll(&template_ui->ptr, template_ui->prop, &ptr) == 0) {
-        return true;
-      }
-    }
-
-    /* hide dot-datablocks, but only if filter does not force it visible */
-    if (U.uiflag & USER_HIDE_DOT) {
-      if ((id->name[2] == '.') && (str[0] != '.')) {
-        return true;
-      }
-    }
-
-    /* Prepare BLI_string_all_words_matched. */
-    const size_t str_len = strlen(str);
-    const int words_max = BLI_string_max_possible_word_count(str_len);
-    int(*words)[2] = BLI_array_alloca(words, words_max);
-    const int words_len = BLI_string_find_split_words(str, str_len, ' ', words, words_max);
-
-    if (*str == '\0' || BLI_string_all_words_matched(id->name + 2, str, words, words_len)) {
-      /* +1 is needed because BKE_id_ui_prefix used 3 letter prefix
-       * followed by ID_NAME-2 characters from id->name
-       */
-      char name_ui[MAX_ID_FULL_NAME_UI];
-      int iconid = ui_id_icon_get(C, id, template_ui->preview);
-      const bool use_lib_prefix = template_ui->preview || iconid;
-      const bool has_sep_char = (id->lib != NULL);
-
-      /* When using previews, the library hint (linked, overridden, missing) is added with a
-       * character prefix, otherwise we can use a icon. */
-      int name_prefix_offset;
-      BKE_id_full_name_ui_prefix_get(
-          name_ui, id, use_lib_prefix, UI_SEP_CHAR, &name_prefix_offset);
-      if (!use_lib_prefix) {
-        iconid = UI_library_icon_get(id);
-      }
-
-      if (!UI_search_item_add(items,
-                              name_ui,
-                              id,
-                              iconid,
-                              has_sep_char ? UI_BUT_HAS_SEP_CHAR : 0,
-                              name_prefix_offset)) {
-        return false;
-      }
+  /* Use filter. */
+  if (RNA_property_type(template_ui->prop) == PROP_POINTER) {
+    PointerRNA ptr;
+    RNA_id_pointer_create(id, &ptr);
+    if (RNA_property_pointer_poll(&template_ui->ptr, template_ui->prop, &ptr) == 0) {
+      return false;
     }
   }
+
+  /* Hide dot-datablocks, but only if filter does not force them visible. */
+  if (U.uiflag & USER_HIDE_DOT) {
+    if ((id->name[2] == '.') && (query[0] != '.')) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static bool id_search_add(const bContext *C, TemplateID *template_ui, uiSearchItems *items, ID *id)
+{
+  /* +1 is needed because BKE_id_ui_prefix used 3 letter prefix
+   * followed by ID_NAME-2 characters from id->name
+   */
+  char name_ui[MAX_ID_FULL_NAME_UI];
+  int iconid = ui_id_icon_get(C, id, template_ui->preview);
+  const bool use_lib_prefix = template_ui->preview || iconid;
+  const bool has_sep_char = (id->lib != NULL);
+
+  /* When using previews, the library hint (linked, overridden, missing) is added with a
+   * character prefix, otherwise we can use a icon. */
+  int name_prefix_offset;
+  BKE_id_full_name_ui_prefix_get(name_ui, id, use_lib_prefix, UI_SEP_CHAR, &name_prefix_offset);
+  if (!use_lib_prefix) {
+    iconid = UI_icon_from_library(id);
+  }
+
+  if (!UI_search_item_add(items,
+                          name_ui,
+                          id,
+                          iconid,
+                          has_sep_char ? UI_BUT_HAS_SEP_CHAR : 0,
+                          name_prefix_offset)) {
+    return false;
+  }
+
   return true;
 }
 
@@ -404,12 +399,26 @@ static void id_search_cb(const bContext *C,
   ListBase *lb = template_ui->idlb;
   const int flag = RNA_property_flag(template_ui->prop);
 
+  StringSearch *search = BLI_string_search_new();
+
   /* ID listbase */
   LISTBASE_FOREACH (ID *, id, lb) {
-    if (!id_search_add(C, template_ui, flag, str, items, id)) {
+    if (id_search_allows_id(template_ui, flag, id, str)) {
+      BLI_string_search_add(search, id->name + 2, id);
+    }
+  }
+
+  ID **filtered_ids;
+  int filtered_amount = BLI_string_search_query(search, str, (void ***)&filtered_ids);
+
+  for (int i = 0; i < filtered_amount; i++) {
+    if (!id_search_add(C, template_ui, items, filtered_ids[i])) {
       break;
     }
   }
+
+  MEM_freeN(filtered_ids);
+  BLI_string_search_free(search);
 }
 
 /**
@@ -424,15 +433,29 @@ static void id_search_cb_tagged(const bContext *C,
   ListBase *lb = template_ui->idlb;
   const int flag = RNA_property_flag(template_ui->prop);
 
+  StringSearch *search = BLI_string_search_new();
+
   /* ID listbase */
   LISTBASE_FOREACH (ID *, id, lb) {
     if (id->tag & LIB_TAG_DOIT) {
-      if (!id_search_add(C, template_ui, flag, str, items, id)) {
-        break;
+      if (id_search_allows_id(template_ui, flag, id, str)) {
+        BLI_string_search_add(search, id->name + 2, id);
       }
       id->tag &= ~LIB_TAG_DOIT;
     }
   }
+
+  ID **filtered_ids;
+  int filtered_amount = BLI_string_search_query(search, str, (void ***)&filtered_ids);
+
+  for (int i = 0; i < filtered_amount; i++) {
+    if (!id_search_add(C, template_ui, items, filtered_ids[i])) {
+      break;
+    }
+  }
+
+  MEM_freeN(filtered_ids);
+  BLI_string_search_free(search);
 }
 
 /**
@@ -652,7 +675,7 @@ static void template_id_cb(bContext *C, void *arg_litem, void *arg_event)
 static const char *template_id_browse_tip(const StructRNA *type)
 {
   if (type) {
-    switch (RNA_type_to_ID_code(type)) {
+    switch ((ID_Type)RNA_type_to_ID_code(type)) {
       case ID_SCE:
         return N_("Browse Scene to be linked");
       case ID_OB:
@@ -721,6 +744,15 @@ static const char *template_id_browse_tip(const StructRNA *type)
         return N_("Browse Volume Data to be linked");
       case ID_SIM:
         return N_("Browse Simulation to be linked");
+
+      /* Use generic text. */
+      case ID_LI:
+      case ID_IP:
+      case ID_KE:
+      case ID_VF:
+      case ID_GR:
+      case ID_WM:
+        break;
     }
   }
   return N_("Browse ID data to be linked");
@@ -1917,13 +1949,6 @@ void uiTemplateModifiers(uiLayout *UNUSED(layout), bContext *C)
 
       panel = panel->next;
     }
-
-    /* The expansion might have been changed elsewhere, so we still need to set it. */
-    LISTBASE_FOREACH (Panel *, panel_iter, &region->panels) {
-      if ((panel_iter->type != NULL) && (panel_iter->type->flag & PNL_INSTANCED)) {
-        UI_panel_set_expand_from_list_data(C, panel_iter);
-      }
-    }
   }
 }
 
@@ -1946,27 +1971,6 @@ static bool constraint_panel_is_bone(Panel *panel)
 {
   return (panel->panelname[0] == 'B') && (panel->panelname[1] == 'O') &&
          (panel->panelname[2] == 'N') && (panel->panelname[3] == 'E');
-}
-
-/**
- * Get the constraints for the active pose bone or the active / pinned object.
- */
-static ListBase *get_constraints(const bContext *C, bool use_bone_constraints)
-{
-  ListBase *constraints = {NULL};
-  if (use_bone_constraints) {
-    bPoseChannel *pose_bone = CTX_data_pointer_get(C, "pose_bone").data;
-    if (pose_bone != NULL) {
-      constraints = &pose_bone->constraints;
-    }
-  }
-  else {
-    Object *ob = ED_object_active_context(C);
-    if (ob != NULL) {
-      constraints = &ob->constraints;
-    }
-  }
-  return constraints;
 }
 
 /**
@@ -2043,7 +2047,13 @@ void uiTemplateConstraints(uiLayout *UNUSED(layout), bContext *C, bool use_bone_
   ARegion *region = CTX_wm_region(C);
 
   Object *ob = ED_object_active_context(C);
-  ListBase *constraints = get_constraints(C, use_bone_constraints);
+  ListBase *constraints = {NULL};
+  if (use_bone_constraints) {
+    constraints = ED_object_pose_constraint_list(C);
+  }
+  else {
+    constraints = ED_object_constraint_active_list(ob);
+  }
 
   /* Switch between the bone panel ID function and the object panel ID function. */
   uiListPanelIDFromDataFunc panel_id_func = use_bone_constraints ? bone_constraint_panel_id :
@@ -2055,6 +2065,14 @@ void uiTemplateConstraints(uiLayout *UNUSED(layout), bContext *C, bool use_bone_
     UI_panels_free_instanced(C, region);
     bConstraint *con = (constraints == NULL) ? NULL : constraints->first;
     for (int i = 0; con; i++, con = con->next) {
+      /* Dont show temporary constraints (AutoIK and targetless IK constraints). */
+      if (con->type == CONSTRAINT_TYPE_KINEMATIC) {
+        bKinematicConstraint *data = con->data;
+        if (data->flag & CONSTRAINT_IK_TEMP) {
+          continue;
+        }
+      }
+
       char panel_idname[MAX_NAME];
       panel_id_func(con, panel_idname);
 
@@ -2078,6 +2096,14 @@ void uiTemplateConstraints(uiLayout *UNUSED(layout), bContext *C, bool use_bone_
     /* Assuming there's only one group of instanced panels, update the custom data pointers. */
     Panel *panel = region->panels.first;
     LISTBASE_FOREACH (bConstraint *, con, constraints) {
+      /* Dont show temporary constraints (AutoIK and targetless IK constraints). */
+      if (con->type == CONSTRAINT_TYPE_KINEMATIC) {
+        bKinematicConstraint *data = con->data;
+        if (data->flag & CONSTRAINT_IK_TEMP) {
+          continue;
+        }
+      }
+
       /* Move to the next instanced panel corresponding to the next constraint. */
       while ((panel->type == NULL) || !(panel->type->flag & PNL_INSTANCED)) {
         panel = panel->next;
@@ -2089,13 +2115,6 @@ void uiTemplateConstraints(uiLayout *UNUSED(layout), bContext *C, bool use_bone_
       UI_panel_custom_data_set(panel, con_ptr);
 
       panel = panel->next;
-    }
-
-    /* The expansion might have been changed elsewhere, so we still need to set it. */
-    LISTBASE_FOREACH (Panel *, panel_iter, &region->panels) {
-      if ((panel_iter->type != NULL) && (panel_iter->type->flag & PNL_INSTANCED)) {
-        UI_panel_set_expand_from_list_data(C, panel_iter);
-      }
     }
   }
 }
@@ -2171,13 +2190,6 @@ void uiTemplateGpencilModifiers(uiLayout *UNUSED(layout), bContext *C)
 
       panel = panel->next;
     }
-
-    /* The expansion might have been changed elsewhere, so we still need to set it. */
-    LISTBASE_FOREACH (Panel *, panel_iter, &region->panels) {
-      if ((panel_iter->type != NULL) && (panel_iter->type->flag & PNL_INSTANCED)) {
-        UI_panel_set_expand_from_list_data(C, panel_iter);
-      }
-    }
   }
 }
 
@@ -2252,13 +2264,6 @@ void uiTemplateShaderFx(uiLayout *UNUSED(layout), bContext *C)
       UI_panel_custom_data_set(panel, fx_ptr);
 
       panel = panel->next;
-    }
-
-    /* The expansion might have been changed elsewhere, so we still need to set it. */
-    LISTBASE_FOREACH (Panel *, panel_iter, &region->panels) {
-      if ((panel_iter->type != NULL) && (panel_iter->type->flag & PNL_INSTANCED)) {
-        UI_panel_set_expand_from_list_data(C, panel_iter);
-      }
     }
   }
 }
@@ -2697,14 +2702,6 @@ void uiTemplateConstraintHeader(uiLayout *layout, PointerRNA *ptr)
   }
 
   UI_block_lock_set(uiLayoutGetBlock(layout), (ob && ID_IS_LINKED(ob)), ERROR_LIBDATA_MESSAGE);
-
-  /* hrms, the temporal constraint should not draw! */
-  if (con->type == CONSTRAINT_TYPE_KINEMATIC) {
-    bKinematicConstraint *data = con->data;
-    if (data->flag & CONSTRAINT_IK_TEMP) {
-      return;
-    }
-  }
 
   draw_constraint_header(layout, ob, con);
 }
@@ -4247,7 +4244,7 @@ static void curvemap_buttons_layout(uiLayout *layout,
   uiBut *bt;
   const float dx = UI_UNIT_X;
   int icon, size;
-  int bg = -1, i;
+  int bg = -1;
 
   block = uiLayoutGetBlock(layout);
 
@@ -4456,7 +4453,7 @@ static void curvemap_buttons_layout(uiLayout *layout,
   curve_but->gradient_type = bg;
 
   /* sliders for selected point */
-  for (i = 0; i < cm->totpoint; i++) {
+  for (int i = 0; i < cm->totpoint; i++) {
     if (cm->curve[i].flag & CUMA_SELECT) {
       cmp = &cm->curve[i];
       break;
@@ -6264,7 +6261,7 @@ void uiTemplateList(uiLayout *layout,
 
           sub = uiLayoutRow(overlap, false);
 
-          icon = UI_rnaptr_icon_get(C, itemptr, rnaicon, false);
+          icon = UI_icon_from_rnaptr(C, itemptr, rnaicon, false);
           if (icon == ICON_DOT) {
             icon = ICON_NONE;
           }
@@ -6320,7 +6317,7 @@ void uiTemplateList(uiLayout *layout,
         PointerRNA *itemptr = &items_ptr[activei].item;
         const int org_i = items_ptr[activei].org_idx;
 
-        icon = UI_rnaptr_icon_get(C, itemptr, rnaicon, false);
+        icon = UI_icon_from_rnaptr(C, itemptr, rnaicon, false);
         if (icon == ICON_DOT) {
           icon = ICON_NONE;
         }
@@ -6404,7 +6401,7 @@ void uiTemplateList(uiLayout *layout,
 
           sub = uiLayoutRow(overlap, false);
 
-          icon = UI_rnaptr_icon_get(C, itemptr, rnaicon, false);
+          icon = UI_icon_from_rnaptr(C, itemptr, rnaicon, false);
           draw_item(ui_list,
                     C,
                     sub,

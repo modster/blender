@@ -2248,10 +2248,15 @@ static void widget_draw_extra_icons(const uiWidgetColors *wcol,
   /* inverse order, from right to left. */
   LISTBASE_FOREACH_BACKWARD (uiButExtraOpIcon *, op_icon, &but->extra_op_icons) {
     rcti temp = *rect;
+    float alpha_this = alpha;
 
     temp.xmin = temp.xmax - (BLI_rcti_size_y(rect) * 1.08f);
 
-    widget_draw_icon(but, op_icon->icon, alpha, &temp, wcol->text);
+    if (!op_icon->highlighted) {
+      alpha_this *= 0.75f;
+    }
+
+    widget_draw_icon(but, op_icon->icon, alpha_this, &temp, wcol->text);
 
     rect->xmax -= ICON_SIZE_FROM_BUTRECT(rect);
   }
@@ -2378,7 +2383,8 @@ static void widget_draw_text_icon(const uiFontStyle *fstyle,
         rect->xmin += 0.3f * U.widget_unit;
       }
     }
-    else if (ui_block_is_menu(but->block)) {
+    /* Menu items, but only if they are not icon-only (rare). */
+    else if (ui_block_is_menu(but->block) && but->drawstr[0]) {
       rect->xmin += 0.2f * U.widget_unit;
     }
 
@@ -5002,12 +5008,7 @@ static void draw_disk_shaded(float start,
                              bool shaded)
 {
   const float radius_ext_scale = (0.5f / radius_ext); /* 1 / (2 * radius_ext) */
-  int i;
 
-  float s, c;
-  float y1, y2;
-  float fac;
-  uchar r_col[4];
   uint pos, col;
 
   GPUVertFormat *format = immVertexFormat();
@@ -5022,24 +5023,24 @@ static void draw_disk_shaded(float start,
   }
 
   immBegin(GPU_PRIM_TRI_STRIP, subd * 2);
-  for (i = 0; i < subd; i++) {
-    float a;
-
-    a = start + ((i) / (float)(subd - 1)) * angle;
-    s = sinf(a);
-    c = cosf(a);
-    y1 = s * radius_int;
-    y2 = s * radius_ext;
+  for (int i = 0; i < subd; i++) {
+    float a = start + ((i) / (float)(subd - 1)) * angle;
+    float s = sinf(a);
+    float c = cosf(a);
+    float y1 = s * radius_int;
+    float y2 = s * radius_ext;
 
     if (shaded) {
-      fac = (y1 + radius_ext) * radius_ext_scale;
+      uchar r_col[4];
+      float fac = (y1 + radius_ext) * radius_ext_scale;
       color_blend_v4_v4v4(r_col, col1, col2, fac);
       immAttr4ubv(col, r_col);
     }
     immVertex2f(pos, c * radius_int, s * radius_int);
 
     if (shaded) {
-      fac = (y2 + radius_ext) * radius_ext_scale;
+      uchar r_col[4];
+      float fac = (y2 + radius_ext) * radius_ext_scale;
       color_blend_v4_v4v4(r_col, col1, col2, fac);
       immAttr4ubv(col, r_col);
     }

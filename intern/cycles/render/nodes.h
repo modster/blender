@@ -643,6 +643,7 @@ class PrincipledBsdfNode : public BsdfBaseNode {
   NODE_PUBLIC_API(ClosureType, distribution)
   NODE_PUBLIC_API(ClosureType, subsurface_method)
   NODE_PUBLIC_API(float3, emission)
+  NODE_PUBLIC_API(float, emission_strength)
   NODE_PUBLIC_API(float, alpha)
 
  private:

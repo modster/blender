@@ -570,8 +570,9 @@ bool ANIM_animdata_get_context(const bContext *C, bAnimContext *ac)
 // XXX: ale_statement stuff is really a hack for one special case. It shouldn't really be needed...
 #define ANIMCHANNEL_NEW_CHANNEL_FULL( \
     channel_data, channel_type, owner_id, fcurve_owner_id, ale_statement) \
-  if (filter_mode & ANIMFILTER_TMP_PEEK) \
+  if (filter_mode & ANIMFILTER_TMP_PEEK) { \
     return 1; \
+  } \
   { \
     bAnimListElem *ale = make_new_animlistelem( \
         channel_data, channel_type, (ID *)owner_id, fcurve_owner_id); \
@@ -1555,17 +1556,6 @@ static size_t animfilter_nla(bAnimContext *UNUSED(ac),
       next = nlt->next;
     }
 
-    /* If we're in NLA-tweak-mode, don't show this track if it was disabled
-     * (due to tweaking) for now:
-     * - active track should still get shown though (even though it has disabled flag set)
-     */
-    // FIXME: the channels after should still get drawn, just 'differently',
-    // and after an active-action channel.
-    if ((adt->flag & ADT_NLA_EDIT_ON) && (nlt->flag & NLATRACK_DISABLED) &&
-        (adt->act_track != nlt)) {
-      continue;
-    }
-
     /* only work with this channel and its subchannels if it is editable */
     if (!(filter_mode & ANIMFILTER_FOREDIT) || EDITABLE_NLT(nlt)) {
       /* only include this track if selected in a way consistent with the filtering requirements */
@@ -1715,11 +1705,18 @@ static size_t animdata_filter_shapekey(bAnimContext *ac,
   /* check if channels or only F-Curves */
   if (filter_mode & ANIMFILTER_LIST_CHANNELS) {
     KeyBlock *kb;
+    bDopeSheet *ads = ac->ads;
 
     /* loop through the channels adding ShapeKeys as appropriate */
     for (kb = key->block.first; kb; kb = kb->next) {
       /* skip the first one, since that's the non-animatable basis */
       if (kb == key->block.first) {
+        continue;
+      }
+
+      /* Skip shapekey if the name doesn't match the filter string. */
+      if (ads != NULL && ads->searchstr[0] != '\0' &&
+          name_matches_dopesheet_filter(ads, kb->name) == false) {
         continue;
       }
 

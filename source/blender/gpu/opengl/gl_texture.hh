@@ -46,6 +46,7 @@ namespace gpu {
 
 class GLTexture : public Texture {
   friend class GLStateManager;
+  friend class GLFrameBuffer;
 
  private:
   /** All samplers states. */
@@ -58,7 +59,7 @@ class GLTexture : public Texture {
   /** Legacy workaround for texture copy. Created when using framebuffer_get(). */
   struct GPUFrameBuffer *framebuffer_ = NULL;
   /** True if this texture is bound to at least one texture unit. */
-  /* TODO(fclem) How do we ensure thread safety here? */
+  /* TODO(fclem): How do we ensure thread safety here? */
   bool is_bound_ = false;
 
  public:
@@ -66,18 +67,18 @@ class GLTexture : public Texture {
   ~GLTexture();
 
   void update_sub(
-      int mip, int offset[3], int extent[3], eGPUDataFormat format, const void *data) override;
+      int mip, int offset[3], int extent[3], eGPUDataFormat type, const void *data) override;
 
   void generate_mipmap(void) override;
-  void copy_to(Texture *tex) override;
+  void copy_to(Texture *dst) override;
   void clear(eGPUDataFormat format, const void *data) override;
   void swizzle_set(const char swizzle_mask[4]) override;
   void mip_range_set(int min, int max) override;
-  void *read(int mip, eGPUDataFormat format) override;
+  void *read(int mip, eGPUDataFormat type) override;
 
   void check_feedback_loop(void);
 
-  /* TODO(fclem) Legacy. Should be removed at some point. */
+  /* TODO(fclem): Legacy. Should be removed at some point. */
   uint gl_bindcode_get(void) const override;
 
   static void samplers_init(void);

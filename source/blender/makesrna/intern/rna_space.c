@@ -1817,6 +1817,18 @@ static void rna_SpaceProperties_context_update(Main *UNUSED(bmain),
   }
 }
 
+static void rna_SpaceProperties_search_filter_update(Main *UNUSED(bmain),
+                                                     Scene *UNUSED(scene),
+                                                     PointerRNA *ptr)
+{
+  ScrArea *area = rna_area_from_space(ptr);
+
+  /* Update the search filter flag for the main region with the panels. */
+  ARegion *main_region = BKE_area_find_region_type(area, RGN_TYPE_WINDOW);
+  BLI_assert(main_region != NULL);
+  ED_region_search_filter_update(area, main_region);
+}
+
 /* Space Console */
 static void rna_ConsoleLine_body_get(PointerRNA *ptr, char *value)
 {
@@ -2606,9 +2618,10 @@ static void rna_FileBrowser_FSMenu_active_range(PointerRNA *UNUSED(ptr),
   *max = *softmax = ED_fsmenu_get_nentries(fsmenu, category) - 1;
 }
 
-static void rna_FileBrowser_FSMenu_active_update(struct bContext *C, PointerRNA *UNUSED(ptr))
+static void rna_FileBrowser_FSMenu_active_update(struct bContext *C, PointerRNA *ptr)
 {
-  ED_file_change_dir(C);
+  ScrArea *area = rna_area_from_space(ptr);
+  ED_file_change_dir_ex(C, (bScreen *)ptr->owner_id, area);
 }
 
 static int rna_FileBrowser_FSMenuSystem_active_get(PointerRNA *ptr)
@@ -2970,7 +2983,11 @@ static void rna_def_space_outliner(BlenderRNA *brna)
        ICON_RENDER_RESULT,
        "View Layer",
        "Display collections and objects in the view layer"},
-      {SO_SEQUENCE, "SEQUENCE", ICON_SEQUENCE, "Sequence", "Display sequence data-blocks"},
+      {SO_SEQUENCE,
+       "SEQUENCE",
+       ICON_SEQUENCE,
+       "Video Sequencer",
+       "Display data belonging to the Video Sequencer"},
       {SO_LIBRARIES,
        "LIBRARIES",
        ICON_FILE_BLEND,
@@ -3035,6 +3052,12 @@ static void rna_def_space_outliner(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "flag", SO_SYNC_SELECT);
   RNA_def_property_ui_text(
       prop, "Sync Outliner Selection", "Sync outliner selection with other editors");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_OUTLINER, NULL);
+
+  prop = RNA_def_property(srna, "show_mode_column", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", SO_MODE_COLUMN);
+  RNA_def_property_ui_text(
+      prop, "Show Mode Column", "Show the mode column for mode toggle and activation");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_OUTLINER, NULL);
 
   /* Granular restriction column option. */
@@ -3322,6 +3345,15 @@ static void rna_def_space_view3d_shading(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D | NS_VIEW3D_SHADING, NULL);
 
+  prop = RNA_def_property(srna, "use_studiolight_view_rotation", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(
+      prop, NULL, "flag", V3D_SHADING_STUDIOLIGHT_VIEW_ROTATION);
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_boolean_default(prop, false);
+  RNA_def_property_ui_text(
+      prop, "World Space Lighting", "Make the HDR rotation fixed and not follow the camera");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D | NS_VIEW3D_SHADING, NULL);
+
   prop = RNA_def_property(srna, "color_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "color_type");
   RNA_def_property_enum_items(prop, rna_enum_shading_color_type_items);
@@ -3582,6 +3614,20 @@ static void rna_def_space_view3d_overlay(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_ui_text(prop, "Face Orientation", "Show the Face Orientation Overlay");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+  prop = RNA_def_property(srna, "show_fade_inactive", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "overlay.flag", V3D_OVERLAY_FADE_INACTIVE);
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_ui_text(
+      prop, "Fade Inactive Objects", "Fade inactive geometry using the viewport background color");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+  prop = RNA_def_property(srna, "fade_inactive_alpha", PROP_FLOAT, PROP_FACTOR);
+  RNA_def_property_float_sdna(prop, NULL, "overlay.fade_alpha");
+  RNA_def_property_ui_text(prop, "Opacity", "Strength of the fade effect");
+  RNA_def_property_range(prop, 0.0f, 1.0f);
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_GPencil_update");
 
   prop = RNA_def_property(srna, "show_xray_bone", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "overlay.flag", V3D_OVERLAY_BONE_SELECT);
@@ -4471,6 +4517,14 @@ static void rna_def_space_properties(BlenderRNA *brna)
   prop = RNA_def_property(srna, "use_pin_id", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", SB_PIN_CONTEXT);
   RNA_def_property_ui_text(prop, "Pin ID", "Use the pinned context");
+
+  /* Property search. */
+  prop = RNA_def_property(srna, "search_filter", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "runtime->search_string");
+  RNA_def_property_ui_text(prop, "Display Filter", "Live search filtering string");
+  RNA_def_property_flag(prop, PROP_TEXTEDIT_UPDATE);
+  RNA_def_property_update(
+      prop, NC_SPACE | ND_SPACE_PROPERTIES, "rna_SpaceProperties_search_filter_update");
 }
 
 static void rna_def_space_image(BlenderRNA *brna)

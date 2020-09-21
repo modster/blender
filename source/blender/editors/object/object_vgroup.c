@@ -148,11 +148,9 @@ void ED_vgroup_data_clamp_range(ID *id, const int total)
   int dvert_tot;
 
   if (ED_vgroup_parray_alloc(id, &dvert_arr, &dvert_tot, false)) {
-    int i;
-    for (i = 0; i < dvert_tot; i++) {
+    for (int i = 0; i < dvert_tot; i++) {
       MDeformVert *dv = dvert_arr[i];
-      int j;
-      for (j = 0; j < dv->totweight; j++) {
+      for (int j = 0; j < dv->totweight; j++) {
         if (dv->dw[j].def_nr >= total) {
           BKE_defvert_remove_group(dv, &dv->dw[j]);
           j--;
@@ -213,18 +211,17 @@ bool ED_vgroup_parray_alloc(ID *id,
         if (me->dvert) {
           MVert *mvert = me->mvert;
           MDeformVert *dvert = me->dvert;
-          int i;
 
           *dvert_tot = me->totvert;
           *dvert_arr = MEM_mallocN(sizeof(void *) * me->totvert, "vgroup parray from me");
 
           if (use_vert_sel) {
-            for (i = 0; i < me->totvert; i++) {
+            for (int i = 0; i < me->totvert; i++) {
               (*dvert_arr)[i] = (mvert[i].flag & SELECT) ? &dvert[i] : NULL;
             }
           }
           else {
-            for (i = 0; i < me->totvert; i++) {
+            for (int i = 0; i < me->totvert; i++) {
               (*dvert_arr)[i] = me->dvert + i;
             }
           }
@@ -234,8 +231,6 @@ bool ED_vgroup_parray_alloc(ID *id,
         return false;
       }
       case ID_LT: {
-        int i = 0;
-
         Lattice *lt = (Lattice *)id;
         lt = (lt->editlatt) ? lt->editlatt->latt : lt;
 
@@ -245,12 +240,12 @@ bool ED_vgroup_parray_alloc(ID *id,
           *dvert_arr = MEM_mallocN(sizeof(void *) * (*dvert_tot), "vgroup parray from me");
 
           if (use_vert_sel) {
-            for (i = 0; i < *dvert_tot; i++) {
+            for (int i = 0; i < *dvert_tot; i++) {
               (*dvert_arr)[i] = (def->f1 & SELECT) ? &lt->dvert[i] : NULL;
             }
           }
           else {
-            for (i = 0; i < *dvert_tot; i++) {
+            for (int i = 0; i < *dvert_tot; i++) {
               (*dvert_arr)[i] = lt->dvert + i;
             }
           }
@@ -328,7 +323,6 @@ void ED_vgroup_parray_mirror_assign(Object *ob, MDeformVert **dvert_array, const
   BMEditMesh *em = BKE_editmesh_from_object(ob);
   MDeformVert **dvert_array_all = NULL;
   int dvert_tot_all;
-  int i;
 
   /* get an array of all verts, not only selected */
   if (ED_vgroup_parray_alloc(ob->data, &dvert_array_all, &dvert_tot_all, false) == false) {
@@ -340,7 +334,7 @@ void ED_vgroup_parray_mirror_assign(Object *ob, MDeformVert **dvert_array, const
     BM_mesh_elem_table_ensure(em->bm, BM_VERT);
   }
 
-  for (i = 0; i < dvert_tot; i++) {
+  for (int i = 0; i < dvert_tot; i++) {
     if (dvert_array[i] == NULL) {
       /* its unselected, check if its mirror is */
       int i_sel = ED_mesh_mirror_get_vert(ob, i);
@@ -362,17 +356,14 @@ void ED_vgroup_parray_remove_zero(MDeformVert **dvert_array,
                                   const bool keep_single)
 {
   MDeformVert *dv;
-  int i;
 
-  for (i = 0; i < dvert_tot; i++) {
-    int j;
-
+  for (int i = 0; i < dvert_tot; i++) {
     /* in case its not selected */
     if (!(dv = dvert_array[i])) {
       continue;
     }
 
-    j = dv->totweight;
+    int j = dv->totweight;
 
     while (j--) {
       MDeformWeight *dw;
@@ -482,9 +473,7 @@ void ED_vgroup_parray_to_weight_array(const MDeformVert **dvert_array,
                                       float *dvert_weights,
                                       const int def_nr)
 {
-  int i;
-
-  for (i = 0; i < dvert_tot; i++) {
+  for (int i = 0; i < dvert_tot; i++) {
     const MDeformVert *dv = dvert_array[i];
     dvert_weights[i] = dv ? BKE_defvert_find_weight(dv, def_nr) : 0.0f;
   }
@@ -589,7 +578,7 @@ void ED_vgroup_vert_active_mirror(Object *ob, int def_nr)
   BMEditMesh *em = me->edit_mesh;
   MDeformVert *dvert_act;
 
-  if (me->editflag & ME_EDIT_MIRROR_X) {
+  if (me->symmetry & ME_SYMMETRY_X) {
     if (em) {
       BMVert *eve_act;
       dvert_act = ED_mesh_active_dvert_get_em(ob, &eve_act);
@@ -645,7 +634,7 @@ static bool vgroup_normalize_active_vertex(Object *ob, eVGroupSelect subset_type
   BKE_defvert_normalize_subset(dvert_act, vgroup_validmap, vgroup_tot);
   MEM_freeN((void *)vgroup_validmap);
 
-  if (me->editflag & ME_EDIT_MIRROR_X) {
+  if (me->symmetry & ME_SYMMETRY_X) {
     if (em) {
       const int cd_dvert_offset = CustomData_get_offset(&em->bm->vdata, CD_MDEFORMVERT);
       ED_mesh_defvert_mirror_update_em(ob, eve_act, -1, -1, cd_dvert_offset);
@@ -678,7 +667,7 @@ static void vgroup_copy_active_to_sel(Object *ob, eVGroupSelect subset_type)
         if (BM_elem_flag_test(eve, BM_ELEM_SELECT) && eve != eve_act) {
           MDeformVert *dv = BM_ELEM_CD_GET_VOID_P(eve, cd_dvert_offset);
           BKE_defvert_copy_subset(dv, dvert_act, vgroup_validmap, vgroup_tot);
-          if (me->editflag & ME_EDIT_MIRROR_X) {
+          if (me->symmetry & ME_SYMMETRY_X) {
             ED_mesh_defvert_mirror_update_em(ob, eve, -1, i, cd_dvert_offset);
           }
         }
@@ -695,7 +684,7 @@ static void vgroup_copy_active_to_sel(Object *ob, eVGroupSelect subset_type)
       for (i = 0; i < me->totvert; i++, dv++) {
         if ((me->mvert[i].flag & SELECT) && dv != dvert_act) {
           BKE_defvert_copy_subset(dv, dvert_act, vgroup_validmap, vgroup_tot);
-          if (me->editflag & ME_EDIT_MIRROR_X) {
+          if (me->symmetry & ME_SYMMETRY_X) {
             ED_mesh_defvert_mirror_update_ob(ob, -1, i);
           }
         }
@@ -1163,7 +1152,7 @@ static bool vgroup_normalize(Object *ob)
 {
   MDeformWeight *dw;
   MDeformVert *dv, **dvert_array = NULL;
-  int i, dvert_tot = 0;
+  int dvert_tot = 0;
   const int def_nr = ob->actdef - 1;
 
   const bool use_vert_sel = vertex_group_use_vert_sel(ob);
@@ -1177,7 +1166,7 @@ static bool vgroup_normalize(Object *ob)
   if (dvert_array) {
     float weight_max = 0.0f;
 
-    for (i = 0; i < dvert_tot; i++) {
+    for (int i = 0; i < dvert_tot; i++) {
 
       /* in case its not selected */
       if (!(dv = dvert_array[i])) {
@@ -1191,7 +1180,7 @@ static bool vgroup_normalize(Object *ob)
     }
 
     if (weight_max > 0.0f) {
-      for (i = 0; i < dvert_tot; i++) {
+      for (int i = 0; i < dvert_tot; i++) {
 
         /* in case its not selected */
         if (!(dv = dvert_array[i])) {
@@ -1599,26 +1588,24 @@ static void vgroup_levels_subset(Object *ob,
 {
   MDeformWeight *dw;
   MDeformVert *dv, **dvert_array = NULL;
-  int i, dvert_tot = 0;
+  int dvert_tot = 0;
 
   const bool use_vert_sel = vertex_group_use_vert_sel(ob);
   const bool use_mirror = (ob->type == OB_MESH) ?
-                              (((Mesh *)ob->data)->editflag & ME_EDIT_MIRROR_X) != 0 :
+                              (((Mesh *)ob->data)->symmetry & ME_SYMMETRY_X) != 0 :
                               false;
 
   ED_vgroup_parray_alloc(ob->data, &dvert_array, &dvert_tot, use_vert_sel);
 
   if (dvert_array) {
 
-    for (i = 0; i < dvert_tot; i++) {
-      int j;
-
+    for (int i = 0; i < dvert_tot; i++) {
       /* in case its not selected */
       if (!(dv = dvert_array[i])) {
         continue;
       }
 
-      j = vgroup_tot;
+      int j = vgroup_tot;
       while (j--) {
         if (vgroup_validmap[j]) {
           dw = BKE_defvert_find_index(dv, j);
@@ -1760,7 +1747,7 @@ static bool *vgroup_selected_get(Object *ob)
     /* Mirror the selection if X Mirror is enabled. */
     Mesh *me = BKE_mesh_from_object(ob);
 
-    if (me && (me->editflag & ME_EDIT_MIRROR_X) != 0) {
+    if (me && (me->symmetry & ME_SYMMETRY_X) != 0) {
       BKE_object_defgroup_mirror_selection(ob, defbase_tot, mask, mask, &sel_count);
     }
   }
@@ -1857,24 +1844,22 @@ static void vgroup_invert_subset(Object *ob,
 {
   MDeformWeight *dw;
   MDeformVert *dv, **dvert_array = NULL;
-  int i, dvert_tot = 0;
+  int dvert_tot = 0;
   const bool use_vert_sel = vertex_group_use_vert_sel(ob);
   const bool use_mirror = (ob->type == OB_MESH) ?
-                              (((Mesh *)ob->data)->editflag & ME_EDIT_MIRROR_X) != 0 :
+                              (((Mesh *)ob->data)->symmetry & ME_SYMMETRY_X) != 0 :
                               false;
 
   ED_vgroup_parray_alloc(ob->data, &dvert_array, &dvert_tot, use_vert_sel);
 
   if (dvert_array) {
-    for (i = 0; i < dvert_tot; i++) {
-      int j;
-
+    for (int i = 0; i < dvert_tot; i++) {
       /* in case its not selected */
       if (!(dv = dvert_array[i])) {
         continue;
       }
 
-      j = vgroup_tot;
+      int j = vgroup_tot;
       while (j--) {
 
         if (vgroup_validmap[j]) {
@@ -1920,7 +1905,7 @@ static void vgroup_smooth_subset(Object *ob,
   int *vgroup_subset_map = BLI_array_alloca(vgroup_subset_map, subset_count);
   float *vgroup_subset_weights = BLI_array_alloca(vgroup_subset_weights, subset_count);
   const bool use_mirror = (ob->type == OB_MESH) ?
-                              (((Mesh *)ob->data)->editflag & ME_EDIT_MIRROR_X) != 0 :
+                              (((Mesh *)ob->data)->symmetry & ME_SYMMETRY_X) != 0 :
                               false;
   const bool use_select = vertex_group_use_vert_sel(ob);
   const bool use_hide = use_select;
@@ -2234,7 +2219,7 @@ static void vgroup_clean_subset(Object *ob,
   int dvert_tot = 0;
   const bool use_vert_sel = vertex_group_use_vert_sel(ob);
   const bool use_mirror = (ob->type == OB_MESH) ?
-                              (((Mesh *)ob->data)->editflag & ME_EDIT_MIRROR_X) != 0 :
+                              (((Mesh *)ob->data)->symmetry & ME_SYMMETRY_X) != 0 :
                               false;
 
   ED_vgroup_parray_alloc(ob->data, &dvert_array, &dvert_tot, use_vert_sel);
@@ -2264,28 +2249,27 @@ static void vgroup_quantize_subset(Object *ob,
   int dvert_tot = 0;
   const bool use_vert_sel = vertex_group_use_vert_sel(ob);
   const bool use_mirror = (ob->type == OB_MESH) ?
-                              (((Mesh *)ob->data)->editflag & ME_EDIT_MIRROR_X) != 0 :
+                              (((Mesh *)ob->data)->symmetry & ME_SYMMETRY_X) != 0 :
                               false;
   ED_vgroup_parray_alloc(ob->data, &dvert_array, &dvert_tot, use_vert_sel);
 
   if (dvert_array) {
     const float steps_fl = steps;
     MDeformVert *dv;
-    int i;
 
     if (use_mirror && use_vert_sel) {
       ED_vgroup_parray_mirror_assign(ob, dvert_array, dvert_tot);
     }
 
-    for (i = 0; i < dvert_tot; i++) {
+    for (int i = 0; i < dvert_tot; i++) {
       MDeformWeight *dw;
-      int j;
 
       /* in case its not selected */
       if (!(dv = dvert_array[i])) {
         continue;
       }
 
+      int j;
       for (j = 0, dw = dv->dw; j < dv->totweight; j++, dw++) {
         if ((dw->def_nr < vgroup_tot) && vgroup_validmap[dw->def_nr]) {
           dw->weight = floorf((dw->weight * steps_fl) + 0.5f) / steps_fl;
@@ -2628,18 +2612,14 @@ static void vgroup_assign_verts(Object *ob, const float weight)
       }
     }
     else {
-      MVert *mv;
-      MDeformVert *dv;
-      int i;
-
       if (!me->dvert) {
         BKE_object_defgroup_data_create(&me->id);
       }
 
-      mv = me->mvert;
-      dv = me->dvert;
+      MVert *mv = me->mvert;
+      MDeformVert *dv = me->dvert;
 
-      for (i = 0; i < me->totvert; i++, mv++, dv++) {
+      for (int i = 0; i < me->totvert; i++, mv++, dv++) {
         if (mv->flag & SELECT) {
           MDeformWeight *dw;
           dw = BKE_defvert_ensure_index(dv, def_nr);
@@ -4306,14 +4286,14 @@ static void vgroup_copy_active_to_sel_single(Object *ob, const int def_nr)
         if (dw) {
           dw->weight = weight_act;
 
-          if (me->editflag & ME_EDIT_MIRROR_X) {
+          if (me->symmetry & ME_SYMMETRY_X) {
             ED_mesh_defvert_mirror_update_em(ob, eve, -1, i, cd_dvert_offset);
           }
         }
       }
     }
 
-    if (me->editflag & ME_EDIT_MIRROR_X) {
+    if (me->symmetry & ME_SYMMETRY_X) {
       ED_mesh_defvert_mirror_update_em(ob, eve_act, -1, -1, cd_dvert_offset);
     }
   }
@@ -4333,14 +4313,14 @@ static void vgroup_copy_active_to_sel_single(Object *ob, const int def_nr)
         MDeformWeight *dw = BKE_defvert_find_index(dv, def_nr);
         if (dw) {
           dw->weight = weight_act;
-          if (me->editflag & ME_EDIT_MIRROR_X) {
+          if (me->symmetry & ME_SYMMETRY_X) {
             ED_mesh_defvert_mirror_update_ob(ob, -1, i);
           }
         }
       }
     }
 
-    if (me->editflag & ME_EDIT_MIRROR_X) {
+    if (me->symmetry & ME_SYMMETRY_X) {
       ED_mesh_defvert_mirror_update_ob(ob, -1, v_act);
     }
   }

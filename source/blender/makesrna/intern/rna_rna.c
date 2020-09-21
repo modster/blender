@@ -117,6 +117,7 @@ const EnumPropertyItem rna_enum_property_unit_items[] = {
     {PROP_UNIT_MASS, "MASS", 0, "Mass", ""},
     {PROP_UNIT_CAMERA, "CAMERA", 0, "Camera", ""},
     {PROP_UNIT_POWER, "POWER", 0, "Power", ""},
+    {PROP_UNIT_TEMPERATURE, "TEMPERATURE", 0, "Temperature", ""},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -127,6 +128,7 @@ const EnumPropertyItem rna_enum_property_unit_items[] = {
 #  include "BLI_string.h"
 #  include "MEM_guardedalloc.h"
 
+#  include "BKE_idprop.h"
 #  include "BKE_lib_override.h"
 
 /* Struct */
@@ -1187,9 +1189,12 @@ static bool rna_property_override_diff_propptr_validate_diffing(PointerRNA *prop
    * This helps a lot in library override case, especially to detect inserted items in collections.
    */
   if (!no_prop_name && (is_valid_for_diffing || do_force_name)) {
-    PropertyRNA *nameprop_a = RNA_struct_name_property(propptr_a->type);
-    PropertyRNA *nameprop_b = (propptr_b != NULL) ? RNA_struct_name_property(propptr_b->type) :
-                                                    NULL;
+    PropertyRNA *nameprop_a = (propptr_a->type != NULL) ?
+                                  RNA_struct_name_property(propptr_a->type) :
+                                  NULL;
+    PropertyRNA *nameprop_b = (propptr_b != NULL && propptr_b->type != NULL) ?
+                                  RNA_struct_name_property(propptr_b->type) :
+                                  NULL;
 
     int propname_a_len = 0, propname_b_len = 0;
     char *propname_a = NULL;
@@ -1851,7 +1856,7 @@ int rna_property_override_diff_default(Main *bmain,
 
             if (is_first_insert) {
               /* We need to clean up all possible existing insertion operations,
-               * otherwise we'd end up with a mess of ops everytime something changes. */
+               * otherwise we'd end up with a mess of ops every time something changes. */
               for (IDOverrideLibraryPropertyOperation *opop = op->operations.first;
                    opop != NULL;) {
                 IDOverrideLibraryPropertyOperation *opop_next = opop->next;
@@ -2524,8 +2529,75 @@ bool rna_property_override_apply_default(Main *UNUSED(bmain),
       return true;
     }
     case PROP_COLLECTION: {
-      BLI_assert(!"You need to define a specific override apply callback for enums.");
-      return false;
+      /* We only support IDProperty-based collection insertion here. */
+      const bool is_src_idprop = (prop_src->magic != RNA_MAGIC) ||
+                                 (prop_src->flag & PROP_IDPROPERTY) != 0;
+      const bool is_dst_idprop = (prop_dst->magic != RNA_MAGIC) ||
+                                 (prop_dst->flag & PROP_IDPROPERTY) != 0;
+      if (!(is_src_idprop && is_dst_idprop)) {
+        BLI_assert(0 && "You need to define a specific override apply callback for collections");
+        return false;
+      }
+
+      switch (override_op) {
+        case IDOVERRIDE_LIBRARY_OP_INSERT_AFTER: {
+          PointerRNA item_ptr_src, item_ptr_ref, item_ptr_dst;
+          int item_index_dst;
+          bool is_valid = false;
+          if (opop->subitem_local_name != NULL && opop->subitem_local_name[0] != '\0') {
+            /* Find from name. */
+            int item_index_src, item_index_ref;
+            if (RNA_property_collection_lookup_string_index(
+                    ptr_src, prop_src, opop->subitem_local_name, &item_ptr_src, &item_index_src) &&
+                RNA_property_collection_lookup_int(
+                    ptr_src, prop_src, item_index_src + 1, &item_ptr_src) &&
+                RNA_property_collection_lookup_string_index(
+                    ptr_dst, prop_dst, opop->subitem_local_name, &item_ptr_ref, &item_index_ref)) {
+              is_valid = true;
+              item_index_dst = item_index_ref + 1;
+            }
+          }
+          if (!is_valid && opop->subitem_local_index >= 0) {
+            /* Find from index. */
+            if (RNA_property_collection_lookup_int(
+                    ptr_src, prop_src, opop->subitem_local_index + 1, &item_ptr_src) &&
+                RNA_property_collection_lookup_int(
+                    ptr_dst, prop_dst, opop->subitem_local_index, &item_ptr_ref)) {
+              item_index_dst = opop->subitem_local_index + 1;
+              is_valid = true;
+            }
+          }
+          if (!is_valid) {
+            /* Assume it is inserted in first position. */
+            if (RNA_property_collection_lookup_int(ptr_src, prop_src, 0, &item_ptr_src)) {
+              item_index_dst = 0;
+              is_valid = true;
+            }
+          }
+          if (!is_valid) {
+            return false;
+          }
+
+          RNA_property_collection_add(ptr_dst, prop_dst, &item_ptr_dst);
+          const int item_index_added = RNA_property_collection_length(ptr_dst, prop_dst) - 1;
+          BLI_assert(item_index_added >= 0);
+
+          /* This is the section of code that makes it specific to IDProperties (the rest could be
+           * used with some regular RNA/DNA data too, if `RNA_property_collection_add` where
+           * actually implemented for those).
+           * Currently it is close to impossible to copy arbitrary 'real' RNA data between
+           * Collection items. */
+          IDProperty *item_idprop_src = item_ptr_src.data;
+          IDProperty *item_idprop_dst = item_ptr_dst.data;
+          IDP_CopyPropertyContent(item_idprop_dst, item_idprop_src);
+
+          return RNA_property_collection_move(ptr_dst, prop_dst, item_index_added, item_index_dst);
+          break;
+        }
+        default:
+          BLI_assert(0 && "Unsupported RNA override operation on collection");
+          return false;
+      }
     }
     default:
       BLI_assert(0);
