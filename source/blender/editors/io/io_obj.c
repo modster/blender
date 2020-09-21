@@ -67,8 +67,6 @@ const EnumPropertyItem io_obj_transform_axis_up[] = {
     {OBJ_AXIS_NEGATIVE_Z_UP, "NEGATIVE_Z_UP", 0, "-Z", "Negative Z axis"},
     {0, NULL, 0, NULL, NULL}};
 
-const int TOTAL_AXES = 3;
-
 const EnumPropertyItem io_obj_export_evaluation_mode[] = {
     {DAG_EVAL_RENDER,
      "DAG_EVAL_RENDER",

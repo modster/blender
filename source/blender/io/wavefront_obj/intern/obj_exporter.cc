@@ -34,16 +34,17 @@
 
 #include "ED_object.h"
 
-#include "obj_export_file_writer.hh"
 #include "obj_export_mesh.hh"
 #include "obj_export_nurbs.hh"
 #include "obj_exporter.hh"
 
+#include "obj_export_file_writer.hh"
 namespace blender::io::obj {
 /**
- * Scan objects in a scene to find exportable objects, as per export settings and object types, and
- * add them to the given Vectors.
- * \note Curves are also stored as OBJMesh if export settings specify so.
+ * Filter `Object`s in a Scene to find supported objects, as per export settings and object types,
+ * and add them to the given containers.
+ *
+ * \note Curves are also stored with Meshes if export settings specify so.
  */
 static void find_exportable_objects(ViewLayer *view_layer,
                                     Depsgraph *depsgraph,
@@ -103,7 +104,7 @@ static void find_exportable_objects(ViewLayer *view_layer,
 }
 
 /**
- * Traverses over and exports a single frame to a single OBJ file.
+ * Exports a single frame to an OBJ and MTL (conditional) pair.
  */
 static void export_frame(ViewLayer *view_layer,
                          Depsgraph *depsgraph,
@@ -131,7 +132,7 @@ static void export_frame(ViewLayer *view_layer,
   }
   for (int i = 0; i < exportable_as_mesh.size(); i++) {
     /* Smooth groups and UV vertex indices may take huge memory, so objects should be freed right
-     * after they're written, instead of waiting for Vector to clean up. */
+     * after they're written, instead of waiting for Vector to clean them up. */
     const std::unique_ptr<OBJMesh> mesh_to_export = std::move(exportable_as_mesh[i]);
     frame_writer.write_object_name(*mesh_to_export);
     frame_writer.write_vertex_coords(*mesh_to_export);
@@ -165,7 +166,9 @@ static void export_frame(ViewLayer *view_layer,
 }
 
 /**
- * Insert frame number in OBJ filepath for animation export.
+ * Insert the current frame number in OBJ filepath.
+ *
+ * \return Whether the filepath is in FILE_MAX limits.
  */
 static bool insert_frame_in_path(const char *filepath, char *r_filepath_with_frames, int frame)
 {
@@ -173,8 +176,7 @@ static bool insert_frame_in_path(const char *filepath, char *r_filepath_with_fra
   BLI_path_extension_replace(r_filepath_with_frames, FILE_MAX, "");
   int digits = frame == 0 ? 1 : integer_digits_i(abs(frame));
   BLI_path_frame(r_filepath_with_frames, frame, digits);
-  bool filepath_ok = BLI_path_extension_replace(r_filepath_with_frames, FILE_MAX, ".obj");
-  return filepath_ok;
+  return BLI_path_extension_replace(r_filepath_with_frames, FILE_MAX, ".obj");
 }
 
 /**
@@ -201,7 +203,7 @@ void exporter_main(bContext *C, const OBJExportParams &export_params)
   }
 
   char filepath_with_frames[FILE_MAX];
-  /* To reset the Scene to its original state. */
+  /* Needed to reset the Scene to its original state. */
   const int original_frame = CFRA;
 
   for (int frame = export_params.start_frame; frame <= export_params.end_frame; frame++) {

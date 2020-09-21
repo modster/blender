@@ -41,9 +41,12 @@
 namespace blender::io::obj {
 /* Denote absence for usually non-negative numbers. */
 const int NOT_FOUND = -1;
-/* Any negative number other than -1 to initialise usually non-negative numbers. */
+/* Any negative number other than `NOT_FOUND` to initialise usually non-negative numbers. */
 const int NEGATIVE_INIT = -10;
 
+/**
+ * std::unique_ptr deleter for BMesh.
+ */
 struct CustomBMeshDeleter {
   void operator()(BMesh *bmesh)
   {

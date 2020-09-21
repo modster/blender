@@ -78,6 +78,7 @@ static void copy_property_from_node(MutableSpan<float> r_property,
       break;
     }
     default: {
+      /* Other socket types are not handled here. */
       BLI_assert(0);
       break;
     }
@@ -118,7 +119,7 @@ static void linked_sockets_to_dest_id(Vector<const nodes::OutputSocketRef *> &r_
  * From a list of sockets, get the parent node which is of the given node type.
  */
 static const bNode *get_node_of_type(Span<const nodes::OutputSocketRef *> sockets_list,
-                                     int sh_node_type)
+                                     const int sh_node_type)
 {
   for (const nodes::SocketRef *sock : sockets_list) {
     const bNode *curr_node = sock->bnode();
@@ -132,7 +133,7 @@ static const bNode *get_node_of_type(Span<const nodes::OutputSocketRef *> socket
 /**
  * From a texture image shader node, get the image's filepath.
  * Returned filepath is stripped of inital "//". If packed image is found,
- * Only the leaf file name is given.
+ * only the file "name" is returned.
  */
 static const char *get_image_filepath(const bNode *tex_node)
 {
@@ -188,7 +189,7 @@ void MaterialWrap::init_bsdf_node(StringRefNull object_name)
  */
 void MaterialWrap::store_bsdf_properties(MTLMaterial &r_mtl_mat) const
 {
-  /* Empirical, and copied from original python exporter. */
+  /* Emperical approximation. Importer should use the inverse of this method. */
   float spec_exponent = (1.0f - export_mtl_->roughness) * 30;
   spec_exponent *= spec_exponent;
   /* If p-BSDF is not present, fallback to `Material *` of the object. */

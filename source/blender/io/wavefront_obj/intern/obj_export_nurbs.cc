@@ -32,10 +32,6 @@
 #include "obj_export_nurbs.hh"
 
 namespace blender::io::obj {
-/**
- * Store NURBS splines of a Curve which will be exported in parameter form,
- * and not converted to meshes.
- */
 OBJCurve::OBJCurve(Depsgraph *depsgraph,
                    const OBJExportParams &export_params,
                    Object *export_object)
@@ -80,7 +76,7 @@ int OBJCurve::get_nurbs_points(const int index) const
 }
 
 /**
- * Get coordinates of a vertex at given point index.
+ * Get coordinates of a vertex at the given index.
  */
 float3 OBJCurve::calc_nurbs_point_coords(const int index,
                                          const int vert_index,
@@ -97,7 +93,7 @@ float3 OBJCurve::calc_nurbs_point_coords(const int index,
 }
 
 /**
- * Get number of "curv" points of a nurb.
+ * Get number of "curv" points of the Nurb at the given index.
  */
 int OBJCurve::get_nurbs_num(const int index) const
 {
@@ -113,7 +109,7 @@ int OBJCurve::get_nurbs_num(const int index) const
 }
 
 /**
- * Get Nurb's degree.
+ * Get the degree of the Nurb at the given index.
  */
 int OBJCurve::get_nurbs_degree(const int index) const
 {

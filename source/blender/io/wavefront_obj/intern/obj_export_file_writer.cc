@@ -25,10 +25,11 @@
 
 #include "BKE_blender_version.h"
 
-#include "obj_export_file_writer.hh"
 #include "obj_export_mesh.hh"
 #include "obj_export_mtl.hh"
 #include "obj_export_nurbs.hh"
+
+#include "obj_export_file_writer.hh"
 
 namespace blender::io::obj {
 
@@ -354,8 +355,8 @@ void OBJWriter::write_edges_indices(const OBJMesh &obj_mesh_data) const
   obj_mesh_data.ensure_mesh_edges();
   const int tot_edges = obj_mesh_data.tot_edges();
   for (uint edge_index = 0; edge_index < tot_edges; edge_index++) {
-    std::optional<std::array<int, 2>> vertex_indices = obj_mesh_data.calc_loose_edge_vert_indices(
-        edge_index);
+    const std::optional<std::array<int, 2>> vertex_indices =
+        obj_mesh_data.calc_loose_edge_vert_indices(edge_index);
     if (!vertex_indices) {
       continue;
     }
@@ -376,7 +377,7 @@ void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
     /* Total control points in a nurbs. */
     const int tot_points = obj_nurbs_data.get_nurbs_points(i);
     for (int point_idx = 0; point_idx < tot_points; point_idx++) {
-      float3 point_coord = obj_nurbs_data.calc_nurbs_point_coords(
+      const float3 point_coord = obj_nurbs_data.calc_nurbs_point_coords(
           i, point_idx, export_params_.scaling_factor);
       fprintf(outfile_, "v %f %f %f\n", point_coord[0], point_coord[1], point_coord[2]);
     }
@@ -384,7 +385,12 @@ void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
     const char *nurbs_name = obj_nurbs_data.get_curve_name();
     const int nurbs_degree = obj_nurbs_data.get_nurbs_degree(i);
 
-    fprintf(outfile_, "g %s\ncstype bspline\ndeg %d\n", nurbs_name, nurbs_degree);
+    fprintf(outfile_,
+            "g %s\n"
+            "cstype bspline\n"
+            "deg %d\n",
+            nurbs_name,
+            nurbs_degree);
     /**
      * curv_num indices into the point vertices above, in relative indices.
      * 0.0 1.0 -1 -2 -3 -4 for a non-cyclic curve with 4 points.
@@ -478,7 +484,10 @@ const char *MTLWriter::mtl_file_path() const
   return mtl_filepath_;
 }
 
-void MTLWriter::write_bsdf_properties(const blender::io::obj::MTLMaterial &mtl_material)
+/**
+ * Write properties sourced from p-BSDF node or `Object.Material`.
+ */
+void MTLWriter::write_bsdf_properties(const MTLMaterial &mtl_material)
 {
   fprintf(mtl_outfile_,
           "Ni %0.6f\n"
@@ -501,9 +510,9 @@ void MTLWriter::write_bsdf_properties(const blender::io::obj::MTLMaterial &mtl_m
 void MTLWriter::write_texture_map(const MTLMaterial &mtl_material,
                                   const Map<const std::string, tex_map_XX>::Item &texture_map)
 {
-  std::string map_bump_strength;
-  std::string scale;
   std::string translation;
+  std::string scale;
+  std::string map_bump_strength;
   /* Optional strings should have their own leading spaces. */
   if (texture_map.value.translation != float3{0.0f, 0.0f, 0.0f}) {
     translation.append(" -s ").append(float3_to_string(texture_map.value.translation));
@@ -525,6 +534,9 @@ void MTLWriter::write_texture_map(const MTLMaterial &mtl_material,
           texture_map.value.image_path.c_str());
 }
 
+/**
+ * Append the `Material`(s) of the given Object to the MTL file.
+ */
 void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
 {
   BLI_assert(this->good());
@@ -543,6 +555,7 @@ void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
 #endif
   for (const MTLMaterial &mtl_material : mtl_materials) {
     fprintf(mtl_outfile_, "\nnewmtl %s\n", mtl_material.name.c_str());
+    /* At least one material property has not been modified since its initialisation. */
     BLI_assert(all_items_positive({mtl_material.d, mtl_material.Ns, mtl_material.Ni}) &&
                mtl_material.illum > 0);
     BLI_assert(all_items_positive(mtl_material.Ka) && all_items_positive(mtl_material.Kd) &&

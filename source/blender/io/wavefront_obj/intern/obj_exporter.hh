@@ -28,9 +28,6 @@
 #include "IO_wavefront_obj.h"
 
 namespace blender::io::obj {
-/**
- * Central internal function to call scene update & writer functions.
- */
 void exporter_main(bContext *C, const OBJExportParams &export_params);
 
 }  // namespace blender::io::obj

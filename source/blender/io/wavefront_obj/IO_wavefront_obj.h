@@ -49,23 +49,25 @@ typedef enum {
   OBJ_AXIS_NEGATIVE_Z_FORWARD = 5,
 } eTransformAxisForward;
 
+const int TOTAL_AXES = 3;
+
 struct OBJExportParams {
   /** Full path to the destination OBJ file to export. */
   char filepath[FILE_MAX];
 
-  /** Whether mutiple frames are to be exported or not. */
+  /** Whether export multiple frames. */
   bool export_animation;
   /** The first frame to be exported. */
   int start_frame;
   /** The last frame to be exported. */
   int end_frame;
 
-  /** Geometry Transform options. */
+  /* Geometry Transform options. */
   eTransformAxisForward forward_axis;
   eTransformAxisUp up_axis;
   float scaling_factor;
 
-  /** File Write Options. */
+  /* File Write Options. */
   bool export_selected_objects;
   eEvaluationMode export_eval_mode;
   bool export_uv;
@@ -74,7 +76,7 @@ struct OBJExportParams {
   bool export_triangulated_mesh;
   bool export_curves_as_nurbs;
 
-  /** Grouping options. */
+  /* Grouping options. */
   bool export_object_groups;
   bool export_material_groups;
   bool export_vertex_groups;
@@ -83,7 +85,7 @@ struct OBJExportParams {
    */
   bool export_smooth_groups;
   /**
-   * If true, generate bitflags for smooth groups' IDs. Generates upto 32 but usually much less.
+   * If true, generate bitflags for smooth groups' IDs.
    */
   bool smooth_groups_bitflags;
 };

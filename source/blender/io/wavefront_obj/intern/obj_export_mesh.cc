@@ -81,6 +81,7 @@ OBJMesh::~OBJMesh()
 
 void OBJMesh::free_mesh_if_needed()
 {
+  /* Don't free `Mesh`es in the Scene which we didn't create. */
   if (mesh_eval_needs_free_ && export_mesh_eval_) {
     BKE_id_free(NULL, export_mesh_eval_);
   }

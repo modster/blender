@@ -28,6 +28,13 @@
 #include "DNA_curve_types.h"
 
 namespace blender::io::obj {
+
+/**
+ * Provides access to the a Curve Object's properties.
+ * Only `CU_NURBS` type is supported.
+ *
+ * \note Used for Curves which will be exported in parameter form, and not converted to meshes.
+ */
 class OBJCurve : NonMovable, NonCopyable {
  private:
   const Depsgraph *depsgraph_;

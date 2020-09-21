@@ -32,8 +32,6 @@
 #include "obj_export_mtl.hh"
 
 namespace blender::io::obj {
-class OBJMesh;
-class OBJCurve;
 
 /**
  * For an Object, total vertices/ UV vertices/ Normals written by previous objects
