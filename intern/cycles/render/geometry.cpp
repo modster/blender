@@ -115,7 +115,7 @@ bool Geometry::need_attribute(Scene * /*scene*/, ustring name)
     Shader *shader = static_cast<Shader *>(node);
     if (shader->attributes.find(name))
       return true;
-   }
+  }
 
   return false;
 }

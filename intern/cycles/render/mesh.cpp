@@ -667,8 +667,9 @@ void Mesh::pack_shaders(Scene *scene, uint *tri_shader)
     if (shader_ptr[i] != last_shader || last_smooth != smooth[i]) {
       last_shader = shader_ptr[i];
       last_smooth = smooth[i];
-      Shader *shader = (last_shader < used_shaders.size()) ? static_cast<Shader *>(used_shaders[last_shader]) :
-                                                             scene->default_surface;
+      Shader *shader = (last_shader < used_shaders.size()) ?
+                           static_cast<Shader *>(used_shaders[last_shader]) :
+                           scene->default_surface;
       shader_id = scene->shader_manager->get_shader_id(shader, last_smooth);
     }
 

@@ -49,7 +49,7 @@ struct MikkUserData {
       : mesh(mesh), texface(NULL), orco(NULL), tangent(tangent), tangent_sign(tangent_sign)
   {
     const AttributeSet &attributes = (mesh->num_subd_faces()) ? mesh->subd_attributes :
-                                                                       mesh->attributes;
+                                                                mesh->attributes;
 
     Attribute *attr_vN = attributes.find(ATTR_STD_VERTEX_NORMAL);
     vertex_normal = attr_vN->data_float3();
@@ -222,8 +222,7 @@ static void mikk_compute_tangents(
     const BL::Mesh &b_mesh, const char *layer_name, Mesh *mesh, bool need_sign, bool active_render)
 {
   /* Create tangent attributes. */
-  AttributeSet &attributes = (mesh->num_subd_faces()) ? mesh->subd_attributes :
-                                                               mesh->attributes;
+  AttributeSet &attributes = (mesh->num_subd_faces()) ? mesh->subd_attributes : mesh->attributes;
   Attribute *attr;
   ustring name;
   if (layer_name != NULL) {
@@ -1041,8 +1040,13 @@ void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph,
     if (b_mesh) {
       /* Sync mesh itself. */
       if (new_mesh.get_subdivision_type() != Mesh::SUBDIVISION_NONE)
-        create_subd_mesh(
-            scene, &new_mesh, b_ob, b_mesh, new_mesh.get_used_shaders(), dicing_rate, max_subdivisions);
+        create_subd_mesh(scene,
+                         &new_mesh,
+                         b_ob,
+                         b_mesh,
+                         new_mesh.get_used_shaders(),
+                         dicing_rate,
+                         max_subdivisions);
       else
         create_mesh(scene, &new_mesh, b_mesh, new_mesh.get_used_shaders(), false);
 
@@ -1073,13 +1077,11 @@ void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph,
   mesh->set_time_stamp(b_depsgraph.scene().frame_current());
 
   /* tag update */
-  bool rebuild = (mesh->triangles_is_modified()) ||
-      (mesh->subd_num_corners_is_modified()) ||
-      (mesh->subd_shader_is_modified()) ||
-      (mesh->subd_smooth_is_modified()) ||
-      (mesh->subd_ptex_offset_is_modified()) ||
-      (mesh->subd_start_corner_is_modified()) ||
-      (mesh->subd_face_corners_is_modified());
+  bool rebuild = (mesh->triangles_is_modified()) || (mesh->subd_num_corners_is_modified()) ||
+                 (mesh->subd_shader_is_modified()) || (mesh->subd_smooth_is_modified()) ||
+                 (mesh->subd_ptex_offset_is_modified()) ||
+                 (mesh->subd_start_corner_is_modified()) ||
+                 (mesh->subd_face_corners_is_modified());
 
   mesh->tag_update(scene, rebuild);
 }
