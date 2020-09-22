@@ -86,6 +86,8 @@ class AlembicProcedural : public Procedural {
   array<AlembicObject *> objects;  // todo : Node::set
 
  private:
+  IArchive archive;
+
   void read_mesh(Scene *scene,
                  AlembicObject *abc_object,
                  Transform xform,

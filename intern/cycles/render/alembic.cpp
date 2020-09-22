@@ -250,15 +250,17 @@ void AlembicProcedural::generate(Scene *scene)
     return;
   }
 
-  Alembic::AbcCoreFactory::IFactory factory;
-  factory.setPolicy(Alembic::Abc::ErrorHandler::kQuietNoopPolicy);
-  IArchive archive = factory.getArchive(filepath.c_str());
-
   if (!archive.valid()) {
-    // avoid potential infinite update loops in viewport synchronization
-    clear_modified();
-    // TODO : error reporting
-    return;
+    Alembic::AbcCoreFactory::IFactory factory;
+    factory.setPolicy(Alembic::Abc::ErrorHandler::kQuietNoopPolicy);
+    archive = factory.getArchive(filepath.c_str());
+
+    if (!archive.valid()) {
+      // avoid potential infinite update loops in viewport synchronization
+      clear_modified();
+      // TODO : error reporting
+      return;
+    }
   }
 
   auto frame_time = (Abc::chrono_t)(frame / frame_rate);
