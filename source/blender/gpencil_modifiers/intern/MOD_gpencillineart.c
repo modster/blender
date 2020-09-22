@@ -208,6 +208,10 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
     }
   }
 
+  if (G.debug_value == 4000) {
+    printf("(is_render == %d) ", is_render);
+  }
+
   /* If we reach here, means calculation is finished (LRT_SYNC_FRESH), we grab cache. flag reset is
    * done by calculation function.*/
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
@@ -279,7 +283,7 @@ static void updateDepsgraph(GpencilModifierData *md,
     DEG_add_object_relation(
         ctx->node, lmd->source_object, DEG_OB_COMP_GEOMETRY, "Line Art Modifier");
     DEG_add_object_relation(
-        ctx->node, lmd->source_object, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
+        ctx->node, lmd->source_object, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
   }
   else {
     FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_BEGIN (ctx->scene->master_collection, ob, mode) {
@@ -287,7 +291,7 @@ static void updateDepsgraph(GpencilModifierData *md,
           ob->type == OB_SURF || ob->type == OB_FONT) {
         if (!(ob->lineart.usage & COLLECTION_LRT_EXCLUDE)) {
           DEG_add_object_relation(ctx->node, ob, DEG_OB_COMP_GEOMETRY, "Line Art Modifier");
-          DEG_add_object_relation(ctx->node, ob, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
+          DEG_add_object_relation(ctx->node, ob, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
         }
       }
     }
