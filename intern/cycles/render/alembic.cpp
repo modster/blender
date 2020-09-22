@@ -263,12 +263,37 @@ void AlembicProcedural::generate(Scene *scene)
     }
   }
 
+  if (!objects_loaded) {
+    load_objects();
+    objects_loaded = true;
+  }
+
+  auto frame_time = (Abc::chrono_t)(frame / frame_rate);
+
+  for (size_t i = 0; i < objects.size(); ++i) {
+    AlembicObject *object = objects[i];
+
+    if (IPolyMesh::matches(object->iobject.getHeader())) {
+      IPolyMesh mesh(object->iobject, Alembic::Abc::kWrapExisting);
+      read_mesh(scene, object, object->xform, mesh, frame_time);
+    }
+    else if (ICurves::matches(object->iobject.getHeader())) {
+      ICurves curves(object->iobject, Alembic::Abc::kWrapExisting);
+      read_curves(scene, object, object->xform, curves, frame_time);
+    }
+  }
+
+  clear_modified();
+}
+
+void AlembicProcedural::load_objects()
+{
   auto frame_time = (Abc::chrono_t)(frame / frame_rate);
 
   /* Traverse Alembic file hierarchy, avoiding recursion by
    * using an explicit stack
    *
-   * TODO : cache this traversal
+   * TODO : cache the transformations
    */
   std::stack<std::pair<IObject, Transform>> objstack;
   objstack.push(std::pair<IObject, Transform>(archive.getTop(), transform_identity()));
@@ -296,18 +321,18 @@ void AlembicProcedural::generate(Scene *scene)
     }
     else if (IPolyMesh::matches(obj.first.getHeader()) && object) {
       IPolyMesh mesh(obj.first, Alembic::Abc::kWrapExisting);
-      read_mesh(scene, object, currmatrix, mesh, frame_time);
+      object->iobject = obj.first;
+      object->xform = currmatrix;
     }
     else if (ICurves::matches(obj.first.getHeader()) && object) {
       ICurves curves(obj.first, Alembic::Abc::kWrapExisting);
-      read_curves(scene, object, currmatrix, curves, frame_time);
+      object->iobject = obj.first;
+      object->xform = currmatrix;
     }
 
     for (int i = 0; i < obj.first.getNumChildren(); i++)
       objstack.push(std::pair<IObject, Transform>(obj.first.getChild(i), currmatrix));
   }
-
-  clear_modified();
 }
 
 void AlembicProcedural::read_mesh(Scene *scene,

@@ -18,6 +18,7 @@
 
 #include "graph/node.h"
 #include "render/procedural.h"
+#include "util/util_transform.h"
 #include "util/util_vector.h"
 
 //#ifdef WITH_ALEMBIC
@@ -60,6 +61,9 @@ class AlembicObject : public Node {
 
   DataCache &get_frame_data(int index);
 
+  IObject iobject;
+  Transform xform;
+
  private:
   Object *object = nullptr;
   Geometry *geometry = nullptr;
@@ -87,6 +91,9 @@ class AlembicProcedural : public Procedural {
 
  private:
   IArchive archive;
+  bool objects_loaded = false;
+
+  void load_objects();
 
   void read_mesh(Scene *scene,
                  AlembicObject *abc_object,
