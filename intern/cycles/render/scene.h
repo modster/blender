@@ -36,7 +36,6 @@
 
 CCL_NAMESPACE_BEGIN
 
-class AlembicProcedural;
 class AttributeRequestSet;
 class Background;
 class Camera;
@@ -53,8 +52,6 @@ class Object;
 class ObjectManager;
 class ParticleSystemManager;
 class ParticleSystem;
-class Procedural;
-class ProceduralManager;
 class CurveSystemManager;
 class Shader;
 class ShaderManager;
@@ -236,7 +233,6 @@ class Scene : public NodeOwner {
   vector<Light *> lights;
   vector<ParticleSystem *> particle_systems;
   vector<Pass> passes;
-  vector<Procedural *> procedurals;
 
   /* data managers */
   ImageManager *image_manager;
@@ -246,7 +242,6 @@ class Scene : public NodeOwner {
   ObjectManager *object_manager;
   ParticleSystemManager *particle_system_manager;
   BakeManager *bake_manager;
-  ProceduralManager *procedural_manager;
 
   /* default shaders */
   Shader *default_surface;
@@ -321,8 +316,6 @@ class Scene : public NodeOwner {
     (void)owner;
   }
 
-  void update_procedurals(Progress &progress);
-
  protected:
   /* Check if some heavy data worth logging was updated.
    * Mainly used to suppress extra annoying logging.
@@ -366,8 +359,6 @@ template<> ParticleSystem *Scene::create_node<ParticleSystem>();
 
 template<> Shader *Scene::create_node<Shader>();
 
-template<> AlembicProcedural *Scene::create_node<AlembicProcedural>();
-
 template<> void Scene::delete_node_impl(Light *node);
 
 template<> void Scene::delete_node_impl(Mesh *node);
@@ -383,8 +374,6 @@ template<> void Scene::delete_node_impl(Object *node);
 template<> void Scene::delete_node_impl(ParticleSystem *node);
 
 template<> void Scene::delete_node_impl(Shader *node);
-
-template<> void Scene::delete_node_impl(AlembicProcedural *node);
 
 CCL_NAMESPACE_END
 

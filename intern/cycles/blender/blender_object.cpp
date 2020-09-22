@@ -29,8 +29,6 @@
 #include "blender/blender_sync.h"
 #include "blender/blender_util.h"
 
-#include "render/alembic.h"
-
 #include "util/util_foreach.h"
 #include "util/util_hash.h"
 #include "util/util_logging.h"
@@ -322,78 +320,6 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
 
 /* Object Loop */
 
-static BL::MeshSequenceCacheModifier object_alembic_cache_find(BL::Object b_ob)
-{
-  if (b_ob.modifiers.length() > 0) {
-    BL::Modifier b_mod = b_ob.modifiers[b_ob.modifiers.length() - 1];
-
-    if (b_mod.type() == BL::Modifier::type_MESH_SEQUENCE_CACHE) {
-      return BL::MeshSequenceCacheModifier(b_mod);
-    }
-  }
-
-  return BL::MeshSequenceCacheModifier(PointerRNA_NULL);
-}
-
-void BlenderSync::sync_procedural(BL::Object &b_ob,
-                                  BL::MeshSequenceCacheModifier &b_mesh_cache,
-                                  int frame_current,
-                                  float motion_time)
-{
-  bool motion = motion_time != 0.0f;
-
-  if (motion) {
-    return;
-  }
-
-  ObjectKey key(b_ob.parent(), NULL, b_ob, false);
-
-  AlembicProcedural *p = static_cast<AlembicProcedural *>(procedural_map.find(key));
-
-  if (!p) {
-    p = scene->create_node<AlembicProcedural>();
-    procedural_map.add(key, p);
-  }
-  else {
-    procedural_map.used(p);
-  }
-
-  p->set_frame(static_cast<float>(frame_current));
-  if (p->frame_is_modified()) {
-    scene->procedural_manager->need_update = true;
-  }
-
-  auto absolute_path = blender_absolute_path(b_data, b_ob, b_mesh_cache.cache_file().filepath());
-
-  p->set_filepath(ustring(absolute_path));
-
-  /* if the filepath was not modified, then we have already created the objects */
-  if (!p->filepath_is_modified()) {
-    return;
-  }
-
-  Shader *default_shader = (b_ob.type() == BL::Object::type_VOLUME) ? scene->default_volume :
-                                                                      scene->default_surface;
-  /* Find shader indices. */
-  array<Node *> used_shaders;
-
-  BL::Object::material_slots_iterator slot;
-  for (b_ob.material_slots.begin(slot); slot != b_ob.material_slots.end(); ++slot) {
-    BL::ID b_material(slot->material());
-    find_shader(b_material, used_shaders, default_shader);
-  }
-
-  if (used_shaders.size() == 0) {
-    used_shaders.push_back_slow(default_shader);
-  }
-
-  AlembicObject *abc_object = scene->create_node<AlembicObject>();
-  abc_object->set_path(ustring(b_mesh_cache.object_path()));
-  abc_object->set_used_shaders(used_shaders);
-
-  p->objects.push_back_slow(abc_object);
-}
-
 void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
                                BL::SpaceView3D &b_v3d,
                                float motion_time)
@@ -406,7 +332,6 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
     light_map.pre_sync();
     geometry_map.pre_sync();
     object_map.pre_sync();
-    procedural_map.pre_sync();
     particle_system_map.pre_sync();
     motion_times.clear();
   }
@@ -442,21 +367,14 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
 
     /* Object itself. */
     if (b_instance.show_self()) {
-      BL::MeshSequenceCacheModifier b_mesh_cache = object_alembic_cache_find(b_ob);
-
-      if (b_mesh_cache) {
-        sync_procedural(b_ob, b_mesh_cache, b_depsgraph.scene().frame_current(), motion_time);
-      }
-      else {
-        sync_object(b_depsgraph,
-                    b_view_layer,
-                    b_instance,
-                    motion_time,
-                    false,
-                    show_lights,
-                    culling,
-                    &use_portal);
-      }
+      sync_object(b_depsgraph,
+                  b_view_layer,
+                  b_instance,
+                  motion_time,
+                  false,
+                  show_lights,
+                  culling,
+                  &use_portal);
     }
 
     /* Particle hair as separate object. */
@@ -484,7 +402,6 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
     geometry_map.post_sync(scene);
     object_map.post_sync(scene);
     particle_system_map.post_sync(scene);
-    procedural_map.post_sync(scene);
   }
 
   if (motion)
