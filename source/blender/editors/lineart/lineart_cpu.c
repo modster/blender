@@ -1474,7 +1474,8 @@ static void lineart_vert_transform(
   mul_v4_m4v3_db(rv->fbcoord, mvp_mat, co);
 }
 
-static void lineart_geometry_object_load(Object *ob,
+static void lineart_geometry_object_load(Depsgraph *dg,
+                                         Object *ob,
                                          double (*mv_mat)[4],
                                          double (*mvp_mat)[4],
                                          LineartRenderBuffer *rb,
@@ -1509,7 +1510,7 @@ static void lineart_geometry_object_load(Object *ob,
       ob->type == OB_FONT) {
 
     if (ob->type == OB_MESH) {
-      use_mesh = ob->data;
+      use_mesh = DEG_get_evaluated_object(dg, ob)->data;
     }
     else {
       use_mesh = BKE_mesh_new_from_object(NULL, ob, false);
@@ -1785,7 +1786,7 @@ static void lineart_main_load_geometries(Depsgraph *depsgraph,
   DEG_OBJECT_ITER_BEGIN (depsgraph, ob, flags) {
     int usage = ED_lineart_object_collection_usage_check(scene->master_collection, ob);
 
-    lineart_geometry_object_load(ob, view, proj, rb, usage);
+    lineart_geometry_object_load(depsgraph, ob, view, proj, rb, usage);
 
     if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
       return;
@@ -2719,6 +2720,34 @@ bool ED_lineart_modifier_sync_flag_check(eLineartModifierSyncStatus flag)
   match = (lineart_share.flag_sync_staus == flag);
   BLI_spin_unlock(&lineart_share.lock_render_status);
   return match;
+}
+
+void ED_lineart_modifier_sync_add_customer()
+{
+  BLI_spin_lock(&lineart_share.lock_render_status);
+
+  lineart_share.customers++;
+
+  BLI_spin_unlock(&lineart_share.lock_render_status);
+}
+void ED_lineart_modifier_sync_remove_customer()
+{
+  BLI_spin_lock(&lineart_share.lock_render_status);
+
+  lineart_share.customers--;
+
+  BLI_spin_unlock(&lineart_share.lock_render_status);
+}
+
+bool ED_lineart_modifier_sync_still_has_customer()
+{
+  BLI_spin_lock(&lineart_share.lock_render_status);
+
+  bool non_zero = lineart_share.customers != 0;
+
+  BLI_spin_unlock(&lineart_share.lock_render_status);
+
+  return non_zero;
 }
 
 static int lineart_occlusion_get_max_level(Depsgraph *dg)
@@ -3914,8 +3943,7 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *UNUSED(depsgraph),
     /* lock the cache, prevent rendering job from starting */
     BLI_spin_lock(&lineart_share.lock_render_status);
   }
-  static int tempnum = 0;
-  tempnum++;
+  int stroke_count = 0;
   int color_idx = 0;
 
   Object *orig_ob = NULL;
@@ -3994,10 +4022,11 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *UNUSED(depsgraph),
     }
     BKE_gpencil_stroke_geometry_update(gps);
     MEM_freeN(stroke_data);
+    stroke_count++;
   }
 
   if (G.debug_value == 4000) {
-    printf("LRT: Generated strokes.\n");
+    printf("LRT: Generated %d strokes.\n", stroke_count);
   }
   /* release render lock so cache is free to be manipulated. */
   BLI_spin_unlock(&lineart_share.lock_render_status);
@@ -4233,6 +4262,9 @@ void ED_lineart_post_frame_update_external(bContext *C,
                                            Depsgraph *dg,
                                            bool from_modifier)
 {
+  if (G.debug_value == 4000) {
+    printf("LRT: ---- Post frame update (%d).\n", 0);
+  }
   if (!(scene->lineart.flags & LRT_AUTO_UPDATE)) {
     /* This way the modifier will update, removing remaing strokes in the viewport. */
     if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_WAITING)) {
@@ -4271,10 +4303,17 @@ void ED_lineart_post_frame_update_external(bContext *C,
     }
   }
   else if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH)) {
+    bool is_render = (DEG_get_mode(dg) == DAG_EVAL_RENDER);
+
+    /* No double caching during rendering. */
+    if (ED_lineart_modifier_sync_still_has_customer()) {
+      return;
+    }
+
     /* This code path is not working with motion blur on "render animation". not sure why, but here
      * if we retain the data and restore the flag, results will be correct. (The wrong
      * clearing happens when dg->mode == DAG_EVAL_VIEWPORT) so can't really catch it there.) */
-    if (scene->eevee.flag & SCE_EEVEE_MOTION_BLUR_ENABLED) {
+    if (is_render && (scene->eevee.flag & SCE_EEVEE_MOTION_BLUR_ENABLED)) {
       ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, from_modifier);
       return;
     }
@@ -4291,7 +4330,7 @@ void ED_lineart_post_frame_update_external(bContext *C,
      * buffer), remove ED_lineart_destroy_render_data_external() below.*/
     if (!from_modifier) {
       if (G.debug_value == 4000) {
-        printf("LRT: ---- Destroy on update (%d).\n", DEG_get_mode(dg));
+        printf("LRT: ---- Destroy on update (%d).\n", is_render);
       }
 
       ED_lineart_destroy_render_data_external();

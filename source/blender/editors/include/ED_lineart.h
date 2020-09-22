@@ -315,6 +315,8 @@ typedef struct LineartSharedResource {
   SpinLock lock_render_status;
   eLineartRenderStatus flag_render_status;
   eLineartModifierSyncStatus flag_sync_staus;
+  /** count of pending modifiers that is waiting for the data. */
+  int customers;
 
   int thread_count;
 
@@ -563,6 +565,9 @@ bool ED_lineart_calculation_flag_check(eLineartRenderStatus flag);
 
 void ED_lineart_modifier_sync_flag_set(eLineartModifierSyncStatus flag, bool is_from_modifier);
 bool ED_lineart_modifier_sync_flag_check(eLineartModifierSyncStatus flag);
+void ED_lineart_modifier_sync_add_customer();
+void ED_lineart_modifier_sync_remove_customer();
+bool ED_lineart_modifier_sync_still_has_customer();
 
 int ED_lineart_compute_feature_lines_internal(struct Depsgraph *depsgraph,
                                               const int show_frame_progress);

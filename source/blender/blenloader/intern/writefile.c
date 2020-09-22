@@ -1409,6 +1409,7 @@ static void write_collection(BlendWriter *writer, Collection *collection, const 
   if (collection->id.us > 0 || BLO_write_is_undo(writer)) {
     /* Clean up, important in undo case to reduce false detection of changed data-blocks. */
     collection->flag &= ~COLLECTION_HAS_OBJECT_CACHE;
+    collection->flag &= ~COLLECTION_HAS_OBJECT_CACHE_INSTANCED;
     collection->tag = 0;
     BLI_listbase_clear(&collection->object_cache);
     BLI_listbase_clear(&collection->object_cache_instanced);

@@ -130,7 +130,7 @@ static void rna_MaterialLineArt_update(Main *bmain, Scene *scene, PointerRNA *pt
 {
   rna_Material_update(bmain, scene, ptr);
   if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_IDLE)) {
-    ED_lineart_modifier_sync_flag_set(LRT_SYNC_WAITING, 0);
+    ED_lineart_modifier_sync_flag_set(LRT_SYNC_WAITING, false);
   }
 }
 

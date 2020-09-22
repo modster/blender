@@ -108,6 +108,7 @@ static void collection_copy_data(Main *bmain, ID *id_dst, const ID *id_src, cons
   }
 
   collection_dst->flag &= ~COLLECTION_HAS_OBJECT_CACHE;
+  collection_dst->flag &= ~COLLECTION_HAS_OBJECT_CACHE_INSTANCED;
   BLI_listbase_clear(&collection_dst->object_cache);
   BLI_listbase_clear(&collection_dst->object_cache_instanced);
 

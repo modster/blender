@@ -4155,6 +4155,7 @@ static void direct_link_collection(BlendDataReader *reader, Collection *collecti
   BKE_previewimg_blend_read(reader, collection->preview);
 
   collection->flag &= ~COLLECTION_HAS_OBJECT_CACHE;
+  collection->flag &= ~COLLECTION_HAS_OBJECT_CACHE_INSTANCED;
   collection->tag = 0;
   BLI_listbase_clear(&collection->object_cache);
   BLI_listbase_clear(&collection->object_cache_instanced);

@@ -246,7 +246,7 @@ static void bakeModifier(Main *UNUSED(bmain),
   if (scene->lineart.flags & LRT_AUTO_UPDATE) {
     if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_IDLE)) {
       /* Need to run it once again. */
-      ED_lineart_modifier_sync_flag_set(LRT_SYNC_WAITING, 1);
+      ED_lineart_modifier_sync_flag_set(LRT_SYNC_WAITING, true);
       BLI_spin_lock(&lineart_share.lock_loader);
       ED_lineart_compute_feature_lines_background(depsgraph, 1);
       /* Wait for loading finish */
@@ -279,26 +279,17 @@ static void updateDepsgraph(GpencilModifierData *md,
   DEG_add_object_relation(ctx->node, ctx->object, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
 
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
-  if (lmd->source_type == LRT_SOURCE_OBJECT && lmd->source_object) {
-    DEG_add_object_relation(
-        ctx->node, lmd->source_object, DEG_OB_COMP_GEOMETRY, "Line Art Modifier");
-    DEG_add_object_relation(
-        ctx->node, lmd->source_object, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
-  }
-  else {
-    FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_BEGIN (ctx->scene->master_collection, ob, mode) {
-      if (ob->type == OB_MESH || ob->type == OB_MBALL || ob->type == OB_CURVE ||
-          ob->type == OB_SURF || ob->type == OB_FONT) {
-        if (!(ob->lineart.usage & COLLECTION_LRT_EXCLUDE)) {
-          DEG_add_object_relation(ctx->node, ob, DEG_OB_COMP_GEOMETRY, "Line Art Modifier");
-          DEG_add_object_relation(ctx->node, ob, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
-        }
-      }
+
+  FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_BEGIN (ctx->scene->master_collection, ob, mode) {
+    if (ob->type == OB_MESH || ob->type == OB_MBALL || ob->type == OB_CURVE ||
+        ob->type == OB_SURF || ob->type == OB_FONT) {
+      // if (!(ob->lineart.usage & OBJECT_LRT_EXCLUDE)) {
+      DEG_add_object_relation(ctx->node, ob, DEG_OB_COMP_GEOMETRY, "Line Art Modifier");
+      DEG_add_object_relation(ctx->node, ob, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
+      //}
     }
-    FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_END;
   }
-  DEG_add_object_relation(
-      ctx->node, ctx->scene->camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
+  FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_END;
 }
 
 static void freeData(GpencilModifierData *UNUSED(md))
