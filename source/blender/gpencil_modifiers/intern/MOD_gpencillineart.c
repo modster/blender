@@ -279,17 +279,26 @@ static void updateDepsgraph(GpencilModifierData *md,
   DEG_add_object_relation(ctx->node, ctx->object, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
 
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
-
-  FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_BEGIN (ctx->scene->master_collection, ob, mode) {
-    if (ob->type == OB_MESH || ob->type == OB_MBALL || ob->type == OB_CURVE ||
-        ob->type == OB_SURF || ob->type == OB_FONT) {
-      // if (!(ob->lineart.usage & OBJECT_LRT_EXCLUDE)) {
-      DEG_add_object_relation(ctx->node, ob, DEG_OB_COMP_GEOMETRY, "Line Art Modifier");
-      DEG_add_object_relation(ctx->node, ob, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
-      //}
-    }
+  if (lmd->source_type == LRT_SOURCE_OBJECT && lmd->source_object) {
+    DEG_add_object_relation(
+        ctx->node, lmd->source_object, DEG_OB_COMP_GEOMETRY, "Line Art Modifier");
+    DEG_add_object_relation(
+        ctx->node, lmd->source_object, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
   }
-  FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_END;
+  else {
+    FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_BEGIN (ctx->scene->master_collection, ob, mode) {
+      if (ob->type == OB_MESH || ob->type == OB_MBALL || ob->type == OB_CURVE ||
+          ob->type == OB_SURF || ob->type == OB_FONT) {
+        if (!(ob->lineart.usage & COLLECTION_LRT_EXCLUDE)) {
+          DEG_add_object_relation(ctx->node, ob, DEG_OB_COMP_GEOMETRY, "Line Art Modifier");
+          DEG_add_object_relation(ctx->node, ob, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
+        }
+      }
+    }
+    FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_END;
+  }
+  DEG_add_object_relation(
+      ctx->node, ctx->scene->camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
 }
 
 static void freeData(GpencilModifierData *UNUSED(md))
