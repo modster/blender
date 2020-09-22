@@ -5305,10 +5305,7 @@ static void do_projectpaint_thread(TaskPool *__restrict UNUSED(pool), void *ph_v
         }
         else {
           if (is_floatbuf) {
-            if (UNLIKELY(ps->reproject_ibuf->rect_float == NULL)) {
-              IMB_float_from_rect(ps->reproject_ibuf);
-              ps->reproject_ibuf_free_float = true;
-            }
+            BLI_assert(ps->reproject_ibuf->rect_float != NULL);
 
             bicubic_interpolation_color(ps->reproject_ibuf,
                                         NULL,
@@ -5325,10 +5322,7 @@ static void do_projectpaint_thread(TaskPool *__restrict UNUSED(pool), void *ph_v
             }
           }
           else {
-            if (UNLIKELY(ps->reproject_ibuf->rect == NULL)) {
-              IMB_rect_from_float(ps->reproject_ibuf);
-              ps->reproject_ibuf_free_uchar = true;
-            }
+            BLI_assert(ps->reproject_ibuf->rect != NULL);
 
             bicubic_interpolation_color(ps->reproject_ibuf,
                                         projPixel->newColor.ch,
@@ -5576,6 +5570,32 @@ static bool project_paint_op(void *state, const float lastpos[2], const float po
   }
 
   image_pool = BKE_image_pool_new();
+
+  if (!ELEM(ps->source, PROJ_SRC_VIEW, PROJ_SRC_VIEW_FILL)) {
+    /* This means we are reprojecting an image, make sure the image has the needed data available.
+     */
+    bool float_dest = false;
+    bool uchar_dest = false;
+    /* Check if the destination images are float or uchar. */
+    for (i = 0; i < ps->image_tot; i++) {
+      if (ps->projImages[i].ibuf->rect != NULL) {
+        uchar_dest = true;
+      }
+      if (ps->projImages[i].ibuf->rect_float != NULL) {
+        float_dest = true;
+      }
+    }
+
+    /* Generate missing data if needed. */
+    if (float_dest && ps->reproject_ibuf->rect_float == NULL) {
+      IMB_float_from_rect(ps->reproject_ibuf);
+      ps->reproject_ibuf_free_float = true;
+    }
+    if (uchar_dest && ps->reproject_ibuf->rect == NULL) {
+      IMB_rect_from_float(ps->reproject_ibuf);
+      ps->reproject_ibuf_free_uchar = true;
+    }
+  }
 
   /* get the threads running */
   for (a = 0; a < ps->thread_tot; a++) {
@@ -6032,8 +6052,8 @@ static int texture_paint_camera_project_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  if (!BKE_paint_proj_mesh_data_check(scene, ob, &uvs, &mat, &tex, NULL)) {
-    BKE_paint_data_warning(op->reports, uvs, mat, tex, true);
+  if (!ED_paint_proj_mesh_data_check(scene, ob, &uvs, &mat, &tex, NULL)) {
+    ED_paint_data_warning(op->reports, uvs, mat, tex, true);
     WM_event_add_notifier(C, NC_SCENE | ND_TOOLSETTINGS, NULL);
     return OPERATOR_CANCELLED;
   }
@@ -6290,7 +6310,7 @@ void PAINT_OT_image_from_view(wmOperatorType *ot)
  * Data generation for projective texturing  *
  * *******************************************/
 
-void BKE_paint_data_warning(struct ReportList *reports, bool uvs, bool mat, bool tex, bool stencil)
+void ED_paint_data_warning(struct ReportList *reports, bool uvs, bool mat, bool tex, bool stencil)
 {
   BKE_reportf(reports,
               RPT_WARNING,
@@ -6303,7 +6323,7 @@ void BKE_paint_data_warning(struct ReportList *reports, bool uvs, bool mat, bool
 
 /* Make sure that active object has a material,
  * and assign UVs and image layers if they do not exist */
-bool BKE_paint_proj_mesh_data_check(
+bool ED_paint_proj_mesh_data_check(
     Scene *scene, Object *ob, bool *uvs, bool *mat, bool *tex, bool *stencil)
 {
   Mesh *me;
@@ -6333,19 +6353,15 @@ bool BKE_paint_proj_mesh_data_check(
       for (int i = 1; i < ob->totcol + 1; i++) {
         Material *ma = BKE_object_material_get(ob, i);
 
-        if (ma) {
+        if (ma && !ID_IS_LINKED(ma)) {
           hasmat = true;
-          if (!ma->texpaintslot) {
+          if (ma->texpaintslot == NULL) {
             /* refresh here just in case */
             BKE_texpaint_slot_refresh_cache(scene, ma);
-
-            /* if still no slots, we have to add */
-            if (ma->texpaintslot) {
-              hastex = true;
-              break;
-            }
           }
-          else {
+          if (ma->texpaintslot != NULL &&
+              (ma->texpaintslot[ma->paint_active_slot].ima == NULL ||
+               !ID_IS_LINKED(ma->texpaintslot[ma->paint_active_slot].ima))) {
             hastex = true;
             break;
           }
@@ -6354,7 +6370,7 @@ bool BKE_paint_proj_mesh_data_check(
     }
   }
   else if (imapaint->mode == IMAGEPAINT_MODE_IMAGE) {
-    if (imapaint->canvas == NULL) {
+    if (imapaint->canvas == NULL || ID_IS_LINKED(imapaint->canvas)) {
       hastex = false;
     }
   }
@@ -6618,7 +6634,7 @@ static bool proj_paint_add_slot(bContext *C, wmOperator *op)
     DEG_id_tag_update(&ma->id, ID_RECALC_SHADING);
     ED_area_tag_redraw(CTX_wm_area(C));
 
-    BKE_paint_proj_mesh_data_check(scene, ob, NULL, NULL, NULL, NULL);
+    ED_paint_proj_mesh_data_check(scene, ob, NULL, NULL, NULL, NULL);
 
     return true;
   }
@@ -6739,7 +6755,7 @@ static int add_simple_uvs_exec(bContext *C, wmOperator *UNUSED(op))
 
   ED_uvedit_add_simple_uvs(bmain, scene, ob);
 
-  BKE_paint_proj_mesh_data_check(scene, ob, NULL, NULL, NULL, NULL);
+  ED_paint_proj_mesh_data_check(scene, ob, NULL, NULL, NULL, NULL);
 
   DEG_id_tag_update(ob->data, 0);
   WM_event_add_notifier(C, NC_GEOM | ND_DATA, ob->data);
