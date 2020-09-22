@@ -515,6 +515,8 @@ NODE_DEFINE(EnvironmentTextureNode)
   projection_enum.insert("mirror_ball", NODE_ENVIRONMENT_MIRROR_BALL);
   SOCKET_ENUM(projection, "Projection", projection_enum, NODE_ENVIRONMENT_EQUIRECTANGULAR);
 
+  SOCKET_BOOLEAN(animated, "Animated", false);
+
   SOCKET_IN_POINT(vector, "Vector", make_float3(0.0f, 0.0f, 0.0f), SocketType::LINK_POSITION);
 
   SOCKET_OUT_COLOR(color, "Color");
