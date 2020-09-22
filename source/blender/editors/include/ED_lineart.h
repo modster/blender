@@ -467,7 +467,7 @@ BLI_INLINE int lineart_LineIntersectTest2d(
 
     if (fabs(a2[0] - a1[0]) > fabs(a2[1] - a1[1])) {
       *aRatio = ratiod(a1[0], a2[0], rx);
-      rr = ratiod(b1[0], b2[0], rx);
+      rr = ratiod(b1[1], b2[1], ry);
       if ((*aRatio) > 0 && (*aRatio) < 1 && rr > 0 && rr < 1) {
         return 1;
       }
