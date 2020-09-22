@@ -34,6 +34,7 @@
 #include "DNA_gpencil_types.h"
 #include "DNA_hair_types.h"
 #include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
 #include "DNA_pointcloud_types.h"
@@ -46,6 +47,7 @@
 #include "BKE_gpencil.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
+#include "BKE_mesh.h"
 #include "BKE_node.h"
 
 #include "MEM_guardedalloc.h"
@@ -327,6 +329,33 @@ static void do_versions_291_fcurve_handles_limit(FCurve *fcu)
 void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
 {
   UNUSED_VARS(fd);
+
+  if (MAIN_VERSION_ATLEAST(bmain, 290, 2) && MAIN_VERSION_OLDER(bmain, 291, 1)) {
+    /* In this range, the extrude manifold could generate meshes with degenerated face. */
+    LISTBASE_FOREACH (Mesh *, me, &bmain->meshes) {
+      for (MPoly *mp = me->mpoly, *mp_end = mp + me->totpoly; mp < mp_end; mp++) {
+        if (mp->totloop == 2) {
+          bool changed;
+          BKE_mesh_validate_arrays(me,
+                                   me->mvert,
+                                   me->totvert,
+                                   me->medge,
+                                   me->totedge,
+                                   me->mface,
+                                   me->totface,
+                                   me->mloop,
+                                   me->totloop,
+                                   me->mpoly,
+                                   me->totpoly,
+                                   me->dvert,
+                                   false,
+                                   true,
+                                   &changed);
+          break;
+        }
+      }
+    }
+  }
 
   /** Repair files from duplicate brushes added to blend files, see: T76738. */
   if (!MAIN_VERSION_ATLEAST(bmain, 290, 2)) {
@@ -706,5 +735,29 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
    */
   {
     /* Keep this block, even when empty. */
+
+    /* Darken Inactive Overlay. */
+    if (!DNA_struct_elem_find(fd->filesdna, "View3DOverlay", "float", "fade_alpha")) {
+      for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
+        LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+          LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+            if (sl->spacetype == SPACE_VIEW3D) {
+              View3D *v3d = (View3D *)sl;
+              v3d->overlay.fade_alpha = 0.40f;
+              v3d->overlay.flag |= V3D_OVERLAY_FADE_INACTIVE;
+            }
+          }
+        }
+      }
+    }
+
+    /* Unify symmetry as a mesh property. */
+    if (!DNA_struct_elem_find(fd->filesdna, "Mesh", "char", "symmetry")) {
+      LISTBASE_FOREACH (Mesh *, mesh, &bmain->meshes) {
+        /* The previous flags used to store mesh symmetry in edit-mode match the new ones that are
+         * used in #Mesh.symmetry. */
+        mesh->symmetry = mesh->editflag & (ME_SYMMETRY_X | ME_SYMMETRY_Y | ME_SYMMETRY_Z);
+      }
+    }
   }
 }

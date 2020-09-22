@@ -166,7 +166,7 @@ void bpy_context_clear(bContext *UNUSED(C), const PyGILState_STATE *gilstate)
 }
 
 /**
- * Use for `CTX_*_set(..)` funcitons need to set values which are later read back as expected.
+ * Use for `CTX_*_set(..)` functions need to set values which are later read back as expected.
  * In this case we don't want the Python context to override the values as it causes problems
  * see T66256.
  *
@@ -195,7 +195,9 @@ void BPY_context_dict_clear_members_array(void **dict_p,
   PyObject *dict = *dict_p;
   BLI_assert(PyDict_Check(dict));
   for (uint i = 0; i < context_members_len; i++) {
-    PyDict_DelItemString(dict, context_members[i]);
+    if (PyDict_DelItemString(dict, context_members[i])) {
+      PyErr_Clear();
+    }
   }
 
   if (use_gil) {
