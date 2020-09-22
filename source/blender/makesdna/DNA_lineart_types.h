@@ -50,6 +50,7 @@ typedef enum eLineartEdgeFlag {
   LRT_EDGE_FLAG_INTERSECTION = (1 << 4),
   /**  floating edge, unimplemented yet */
   LRT_EDGE_FLAG_FLOATING = (1 << 5),
+  /**  also used as discarded line mark */
   LRT_EDGE_FLAG_CHAIN_PICKED = (1 << 6),
   LRT_EDGE_FLAG_CLIPPED = (1 << 7),
   /* Maxed out for 8 bits, DON'T ADD ANYMORE until improvements on the data structure. */

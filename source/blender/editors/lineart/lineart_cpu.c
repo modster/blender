@@ -869,10 +869,13 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
 #define REMOVE_ORIGINAL_LINES \
   BLI_remlink(&rb->all_render_lines, (void *)rt->rl[0]); \
   rt->rl[0]->next = rt->rl[0]->prev = 0; \
+  rt->rl[0]->flags |= LRT_EDGE_FLAG_CHAIN_PICKED; \
   BLI_remlink(&rb->all_render_lines, (void *)rt->rl[1]); \
   rt->rl[1]->next = rt->rl[1]->prev = 0; \
+  rt->rl[1]->flags |= LRT_EDGE_FLAG_CHAIN_PICKED; \
   BLI_remlink(&rb->all_render_lines, (void *)rt->rl[2]); \
-  rt->rl[2]->next = rt->rl[2]->prev = 0;
+  rt->rl[2]->next = rt->rl[2]->prev = 0; \
+  rt->rl[2]->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;
 
       switch (in0 + in1 + in2) {
         case 0: /* ignore this triangle. */
@@ -1698,7 +1701,7 @@ int ED_lineart_object_collection_usage_check(Collection *c, Object *ob)
   }
 
   if (c->children.first == NULL) {
-    if (BKE_collection_has_object(c, ob)) {
+    if (BKE_collection_has_object(c, ob->id.orig_id)) {
       if (ob->lineart.usage == OBJECT_LRT_INHERENT) {
         if (c->lineart_usage == COLLECTION_LRT_OCCLUSION_ONLY) {
           return OBJECT_LRT_OCCLUSION_ONLY;
@@ -2436,7 +2439,7 @@ static void lineart_main_compute_scene_contours(LineartRenderBuffer *rb)
       dot_1 = 0;
       dot_2 = 0;
 
-      if (!rl->next && !rl->prev) {
+      if ((rl->flags & LRT_EDGE_FLAG_CHAIN_PICKED) || (!rl->l) || (!rl->r)) {
         continue;
       }
 
