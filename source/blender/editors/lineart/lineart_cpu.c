@@ -1761,6 +1761,9 @@ static void lineart_main_load_geometries(Depsgraph *depsgraph,
     double asp = ((double)rb->w / (double)rb->h);
 
     if (cam->type == CAM_PERSP) {
+      if (asp < 1) {
+        fov /= asp;
+      }
       lineart_matrix_perspective_44d(proj, fov, asp, cam->clip_start, cam->clip_end);
     }
     else if (cam->type == CAM_ORTHO) {
