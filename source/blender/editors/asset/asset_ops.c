@@ -56,7 +56,7 @@ static int asset_make_exec(bContext *C, wmOperator *op)
 
   id->asset_data = BKE_asset_data_create();
 
-  UI_id_icon_render(C, NULL, id, true, false);
+  UI_icon_render_id(C, NULL, id, true, false);
   /* Store reference to the ID's preview. */
   id->asset_data->preview = BKE_previewimg_id_get(id);
 
