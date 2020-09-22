@@ -822,25 +822,35 @@ void BlenderSync::sync_hair(BL::Depsgraph b_depsgraph,
                             Hair *hair,
                             array<Node *> &used_shaders)
 {
-  hair->clear();
-  hair->set_used_shaders(used_shaders);
+  Hair new_hair;
+  new_hair.set_used_shaders(used_shaders);
 
   if (view_layer.use_hair) {
     if (b_ob.type() == BL::Object::type_HAIR) {
       /* Hair object. */
-      sync_hair(hair, b_ob, false);
+      sync_hair(&new_hair, b_ob, false);
     }
     else {
       /* Particle hair. */
-      bool need_undeformed = hair->need_attribute(scene, ATTR_STD_GENERATED);
+      bool need_undeformed = new_hair.need_attribute(scene, ATTR_STD_GENERATED);
       BL::Mesh b_mesh = object_to_mesh(
           b_data, b_ob, b_depsgraph, need_undeformed, Mesh::SUBDIVISION_NONE);
 
       if (b_mesh) {
-        sync_particle_hair(hair, b_mesh, b_ob, false);
+        sync_particle_hair(&new_hair, b_mesh, b_ob, false);
         free_object_to_mesh(b_data, b_ob, b_mesh);
       }
     }
+  }
+
+  /* update original sockets */
+
+  for (const SocketType &socket : new_hair.type->inputs) {
+    hair->set_value(socket, new_hair, socket);
+  }
+
+  foreach (Attribute &attr, new_hair.attributes.attributes) {
+    hair->attributes.attributes.push_back(std::move(attr));
   }
 
   /* tag update */

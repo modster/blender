@@ -1056,6 +1056,8 @@ void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph,
   /* mesh fluid motion mantaflow */
   sync_mesh_fluid_motion(b_ob, scene, &new_mesh);
 
+  /* update original sockets */
+
   for (const SocketType &socket : new_mesh.type->inputs) {
     mesh->set_value(socket, new_mesh, socket);
   }
