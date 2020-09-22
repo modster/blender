@@ -1928,7 +1928,7 @@ static void outliner_draw_mode_column_toggle(uiBlock *block,
       const char *tip;
 
       if (draw_active_icon && ob->mode == tvc->obact->mode) {
-        icon = UI_mode_icon_get(active_mode);
+        icon = UI_icon_from_object_mode(active_mode);
         tip = TIP_("Remove from the current mode");
       }
       else {
@@ -3252,7 +3252,7 @@ static void outliner_draw_tree_element(bContext *C,
 
     if (ELEM(tselem->type, 0, TSE_LAYER_COLLECTION) ||
         ((tselem->type == TSE_RNA_STRUCT) && RNA_struct_is_ID(te->rnaptr.type))) {
-      const BIFIconID lib_icon = UI_library_icon_get(tselem->id);
+      const BIFIconID lib_icon = UI_icon_from_library(tselem->id);
       if (lib_icon != ICON_NONE) {
         UI_icon_draw_alpha(
             (float)startx + offsx + 2 * ufac, (float)*starty + 2 * ufac, lib_icon, alpha_fac);
@@ -3360,7 +3360,6 @@ static void outliner_draw_hierarchy_lines_recursive(uint pos,
 {
   bTheme *btheme = UI_GetTheme();
   int y = *starty;
-  short color_tag = COLLECTION_COLOR_NONE;
 
   /* Small vertical padding */
   const short line_padding = UI_UNIT_Y / 4.0f;
@@ -3371,8 +3370,9 @@ static void outliner_draw_hierarchy_lines_recursive(uint pos,
     TreeStoreElem *tselem = TREESTORE(te);
     draw_hierarchy_line = false;
     *starty -= UI_UNIT_Y;
+    short color_tag = COLLECTION_COLOR_NONE;
 
-    /* Only draw hierarchy lines for open collections. */
+    /* Only draw hierarchy lines for expanded collections and objects with children. */
     if (TSELEM_OPEN(tselem, space_outliner) && !BLI_listbase_is_empty(&te->subtree)) {
       if (tselem->type == TSE_LAYER_COLLECTION) {
         draw_hierarchy_line = true;
