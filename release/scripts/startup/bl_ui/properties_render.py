@@ -780,7 +780,10 @@ class RENDER_PT_lineart_baking(RenderButtonsPanel, Panel):
             col.prop(lineart, "baking_preview_start", text='Start')
             col.prop(lineart, "baking_preview_end", text='End')
 
-        layout.prop(lineart, "baking_skip")
+        layout.prop(lineart, "baking_keyframes_only")
+
+        if not lineart.baking_keyframes_only:
+            layout.prop(lineart, "baking_skip")
 
         layout.operator('scene.lineart_bake_strokes')
 

@@ -4121,10 +4121,13 @@ static int lineart_gpencil_bake_strokes_invoke(bContext *C,
                                                                lineart->baking_preview_end);
   int frame_total = frame_end - frame_begin;
   int frame_orig = scene->r.cfra;
-  int frame_increment = lineart->baking_skip + 1;
+  int frame_increment = ((lineart->flags & LRT_BAKING_KEYFRAMES_ONLY) ?
+                             1 :
+                             (lineart->baking_skip + 1));
   LineartGpencilModifierData *lmd;
   LineartRenderBuffer *rb;
   int use_types;
+  bool frame_updated;
 
   /* Needed for progress report. */
   lineart_share.wm = CTX_wm_manager(C);
@@ -4132,30 +4135,7 @@ static int lineart_gpencil_bake_strokes_invoke(bContext *C,
 
   for (frame = frame_begin; frame <= frame_end; frame += frame_increment) {
 
-    /* Reset flags. LRT_SYNC_IGNORE prevent any line art modifiers run calculation function when
-     * depsgraph calls for modifier evalurates. */
-    ED_lineart_modifier_sync_flag_set(LRT_SYNC_IGNORE, false);
-    ED_lineart_calculation_flag_set(LRT_RENDER_IDLE);
-
-    BKE_scene_frame_set(scene, frame);
-    BKE_scene_graph_update_for_newframe(dg);
-
-    ED_lineart_update_render_progress((int)((float)(frame - frame_begin) / frame_total * 100),
-                                      NULL);
-
-    BLI_spin_lock(&lineart_share.lock_loader);
-    ED_lineart_compute_feature_lines_background(dg, 0);
-
-    /* Wait for loading finish */
-    BLI_spin_lock(&lineart_share.lock_loader);
-    BLI_spin_unlock(&lineart_share.lock_loader);
-
-    while (!ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH) ||
-           !ED_lineart_calculation_flag_check(LRT_RENDER_FINISHED)) {
-      /* Wait till it's done. */
-    }
-
-    ED_lineart_chain_clear_picked_flag(lineart_share.render_buffer_shared);
+    frame_updated = false;
 
     FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_BEGIN (
         scene->master_collection, ob, DAG_EVAL_RENDER) {
@@ -4167,7 +4147,42 @@ static int lineart_gpencil_bake_strokes_invoke(bContext *C,
             lmd = (LineartGpencilModifierData *)md;
             bGPdata *gpd = ob->data;
             bGPDlayer *gpl = BKE_gpencil_layer_get_by_name(gpd, lmd->target_layer, 1);
-            bGPDframe *gpf = BKE_gpencil_layer_frame_get(gpl, frame, GP_GETFRAME_ADD_NEW);
+            bGPDframe *gpf = ((lineart->flags & LRT_BAKING_KEYFRAMES_ONLY) ?
+                                  BKE_gpencil_layer_frame_find(gpl, frame) :
+                                  BKE_gpencil_layer_frame_get(gpl, frame, GP_GETFRAME_ADD_NEW));
+
+            if (!gpf) {
+              continue; /* happens when it's keyframe only. */
+            }
+
+            if (!frame_updated) {
+              /* Reset flags. LRT_SYNC_IGNORE prevent any line art modifiers run calculation
+               * function when depsgraph calls for modifier evalurates. */
+              ED_lineart_modifier_sync_flag_set(LRT_SYNC_IGNORE, false);
+              ED_lineart_calculation_flag_set(LRT_RENDER_IDLE);
+
+              BKE_scene_frame_set(scene, frame);
+              BKE_scene_graph_update_for_newframe(dg);
+
+              ED_lineart_update_render_progress(
+                  (int)((float)(frame - frame_begin) / frame_total * 100), NULL);
+
+              BLI_spin_lock(&lineart_share.lock_loader);
+              ED_lineart_compute_feature_lines_background(dg, 0);
+
+              /* Wait for loading finish */
+              BLI_spin_lock(&lineart_share.lock_loader);
+              BLI_spin_unlock(&lineart_share.lock_loader);
+
+              while (!ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH) ||
+                     !ED_lineart_calculation_flag_check(LRT_RENDER_FINISHED)) {
+                /* Wait till it's done. */
+              }
+
+              ED_lineart_chain_clear_picked_flag(lineart_share.render_buffer_shared);
+
+              frame_updated = true;
+            }
 
             /* Clear original frame */
             if ((scene->lineart.flags & LRT_GPENCIL_OVERWRITE) && (!cleared)) {

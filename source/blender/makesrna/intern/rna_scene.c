@@ -7459,18 +7459,23 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_BAKING_FINAL_RANGE);
   RNA_def_property_boolean_default(prop, 1);
   RNA_def_property_ui_text(
-      prop, "Final Range", "Bake final frame ranges instead of preview range.");
+      prop, "Final Range", "Bake final frame ranges instead of preview range");
+
+  prop = RNA_def_property(srna, "baking_keyframes_only", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_BAKING_KEYFRAMES_ONLY);
+  RNA_def_property_boolean_default(prop, 0);
+  RNA_def_property_ui_text(prop, "Keyframes Only", "Only fill in existing gpencil key frames");
 
   prop = RNA_def_property(srna, "baking_preview_start", PROP_INT, PROP_NONE);
-  RNA_def_property_ui_text(prop, "Preview start", "First frame to be baked in preview.");
+  RNA_def_property_ui_text(prop, "Preview start", "First frame to be baked in preview");
   RNA_def_property_range(prop, 0, 100000);
 
   prop = RNA_def_property(srna, "baking_preview_end", PROP_INT, PROP_NONE);
-  RNA_def_property_ui_text(prop, "Preview end", "Last frame to be baked in preview.");
+  RNA_def_property_ui_text(prop, "Preview end", "Last frame to be baked in preview");
   RNA_def_property_range(prop, 0, 100000);
 
   prop = RNA_def_property(srna, "baking_skip", PROP_INT, PROP_NONE);
-  RNA_def_property_ui_text(prop, "Skip", "Skipping frames when baking.");
+  RNA_def_property_ui_text(prop, "Skip", "Skipping frames when baking");
   RNA_def_property_range(prop, 0, 1000);
 }
 
