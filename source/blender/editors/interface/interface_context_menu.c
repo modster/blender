@@ -957,6 +957,11 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
       ui_but_menu_add_path_operators(layout, ptr, prop);
       uiItemS(layout);
     }
+
+    if (RNA_struct_is_ID(but->rnapoin.type)) {
+      uiItemO(layout, NULL, ICON_NONE, "ASSET_OT_make");
+      uiItemS(layout);
+    }
   }
 
   /* Pointer properties and string properties with
