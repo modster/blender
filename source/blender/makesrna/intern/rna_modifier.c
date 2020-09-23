@@ -193,6 +193,11 @@ const EnumPropertyItem rna_enum_object_modifier_type_items[] = {
      ICON_MOD_WIREFRAME,
      "Wireframe",
      "Convert faces into thickened edges"},
+    {eModifierType_MeshToVolume,
+     "MESH_TO_VOLUME",
+     ICON_VOLUME_DATA,
+     "Mesh to Volume",
+     ""}, /* TODO: Use correct icon. */
     {0, "", 0, N_("Deform"), ""},
     {eModifierType_Armature,
      "ARMATURE",
@@ -726,6 +731,8 @@ static StructRNA *rna_Modifier_refine(struct PointerRNA *ptr)
 #  ifdef WITH_PARTICLE_NODES
       return &RNA_SimulationModifier;
 #  endif
+    case eModifierType_MeshToVolume:
+      return &RNA_MeshToVolumeModifier;
     /* Default */
     case eModifierType_Fluidsim: /* deprecated */
     case eModifierType_None:
@@ -7091,6 +7098,31 @@ static void rna_def_modifier_simulation(BlenderRNA *brna)
 }
 #  endif
 
+static void rna_def_modifier_mesh_to_volume(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  srna = RNA_def_struct(brna, "MeshToVolumeModifier", "Modifier");
+  RNA_def_struct_ui_text(srna, "Mesh to Volume Modifier", "");
+  RNA_def_struct_sdna(srna, "MeshToVolumeModifierData");
+  RNA_def_struct_ui_icon(srna, ICON_VOLUME_DATA); /* TODO: Use correct icon. */
+
+  RNA_define_lib_overridable(true);
+
+  prop = RNA_def_property(srna, "object", PROP_POINTER, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Object", "Object");
+  RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
+  RNA_def_property_update(prop, 0, "rna_Modifier_dependency_update");
+
+  prop = RNA_def_property(srna, "voxel_size", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_ui_text(
+      prop, "Voxel Size", "The smaller this number the higher the resolution of the output");
+  RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+  RNA_define_lib_overridable(false);
+}
+
 void RNA_def_modifier(BlenderRNA *brna)
 {
   StructRNA *srna;
@@ -7222,6 +7254,7 @@ void RNA_def_modifier(BlenderRNA *brna)
 #  ifdef WITH_PARTICLE_NODES
   rna_def_modifier_simulation(brna);
 #  endif
+  rna_def_modifier_mesh_to_volume(brna);
 }
 
 #endif

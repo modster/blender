@@ -67,6 +67,7 @@ set(SRC
   intern/MOD_laplaciansmooth.c
   intern/MOD_lattice.c
   intern/MOD_mask.cc
+  intern/MOD_mesh_to_volume.cc
   intern/MOD_meshcache.c
   intern/MOD_meshcache_mdd.c
   intern/MOD_meshcache_pc2.c

@@ -95,6 +95,7 @@ typedef enum ModifierType {
   eModifierType_Weld = 55,
   eModifierType_Fluid = 56,
   eModifierType_Simulation = 57,
+  eModifierType_MeshToVolume = 58,
   NUM_MODIFIER_TYPES,
 } ModifierType;
 
@@ -2208,6 +2209,13 @@ typedef struct SimulationModifierData {
   struct Simulation *simulation;
   char *data_path;
 } SimulationModifierData;
+
+typedef struct MeshToVolumeModifierData {
+  ModifierData modifier;
+  struct Object *object;
+  float voxel_size;
+  char _pad[4];
+} MeshToVolumeModifierData;
 
 #ifdef __cplusplus
 }
