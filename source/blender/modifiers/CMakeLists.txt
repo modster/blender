@@ -178,6 +178,20 @@ if(WITH_GMP)
   add_definitions(-DWITH_GMP)
 endif()
 
+if(WITH_OPENVDB)
+  list(APPEND INC
+     ../../../intern/openvdb
+  )
+  list(APPEND INC_SYS
+    ${OPENVDB_INCLUDE_DIRS}
+  )
+  list(APPEND LIB
+    bf_intern_openvdb
+    ${OPENVDB_LIBRARIES}
+  )
+  add_definitions(-DWITH_OPENVDB ${OPENVDB_DEFINITIONS})
+endif()
+
 # So we can have special tricks in modifier system.
 
 blender_add_lib(bf_modifiers "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

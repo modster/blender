@@ -18,8 +18,12 @@
  * \ingroup modifiers
  */
 
+#include <vector>
+
 #include "BKE_lib_query.h"
+#include "BKE_mesh_runtime.h"
 #include "BKE_modifier.h"
+#include "BKE_volume.h"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -39,6 +43,14 @@
 #include "MOD_modifiertypes.h"
 #include "MOD_ui_common.h"
 
+#include "BLI_float4x4.hh"
+#include "BLI_index_range.hh"
+
+#ifdef WITH_OPENVDB
+#  include <openvdb/openvdb.h>
+#  include <openvdb/tools/MeshToVolume.h>
+#endif
+
 static void initData(ModifierData *md)
 {
   MeshToVolumeModifierData *mvmd = reinterpret_cast<MeshToVolumeModifierData *>(md);
@@ -49,6 +61,7 @@ static void initData(ModifierData *md)
 static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
 {
   MeshToVolumeModifierData *mvmd = reinterpret_cast<MeshToVolumeModifierData *>(md);
+  DEG_add_modifier_to_transform_relation(ctx->node, "own transforms");
   if (mvmd->object) {
     DEG_add_object_relation(
         ctx->node, mvmd->object, DEG_OB_COMP_GEOMETRY, "Object that is converted to a volume");
@@ -85,14 +98,62 @@ static void panelRegister(ARegionType *region_type)
   modifier_panel_register(region_type, eModifierType_MeshToVolume, panel_draw);
 }
 
-static Volume *modifyVolume(ModifierData *md,
-                            const ModifierEvalContext *UNUSED(ctx),
-                            Volume *input_volume)
+static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Volume *input_volume)
 {
-  MeshToVolumeModifierData *mvmd = reinterpret_cast<MeshToVolumeModifierData *>(md);
-  printf("%f\n", mvmd->voxel_size);
+#ifdef WITH_OPENVDB
+  using namespace blender;
 
+  MeshToVolumeModifierData *mvmd = reinterpret_cast<MeshToVolumeModifierData *>(md);
+
+  if (mvmd->object == NULL) {
+    return input_volume;
+  }
+  if (mvmd->object->type != OB_MESH) {
+    return input_volume;
+  }
+
+  Mesh *mesh = static_cast<Mesh *>(mvmd->object->data);
+  const MLoopTri *looptris = BKE_mesh_runtime_looptri_ensure(mesh);
+  const int looptris_len = BKE_mesh_runtime_looptri_len(mesh);
+
+  float4x4 obmat = mvmd->object->obmat;
+  mul_m4_m4_pre(obmat.values, ctx->object->imat);
+  mul_m4_fl(obmat.values, 1.0f / mvmd->voxel_size);
+  obmat.values[3][3] = 1.0f;
+
+  std::vector<openvdb::Vec3s> vertices(mesh->totvert);
+  for (const int i : IndexRange(mesh->totvert)) {
+    float3 position = obmat * float3(mesh->mvert[i].co);
+    vertices[i] = &position.x;
+  }
+
+  std::vector<openvdb::Vec3I> triangle_indices(looptris_len);
+  for (const int i : IndexRange(looptris_len)) {
+    const MLoopTri &tri = looptris[i];
+    triangle_indices[i] = {
+        mesh->mloop[tri.tri[0]].v,
+        mesh->mloop[tri.tri[1]].v,
+        mesh->mloop[tri.tri[2]].v,
+    };
+  }
+
+  const openvdb::math::Transform xform;
+  openvdb::FloatGrid::Ptr new_grid = openvdb::tools::meshToLevelSet<openvdb::FloatGrid>(
+      xform, vertices, triangle_indices);
+
+  Volume *volume = BKE_volume_new_for_eval(input_volume);
+  VolumeGrid *c_density_grid = BKE_volume_grid_add(volume, "density", VOLUME_GRID_FLOAT);
+  openvdb::FloatGrid::Ptr density_grid = std::static_pointer_cast<openvdb::FloatGrid>(
+      BKE_volume_grid_openvdb_for_write(volume, c_density_grid, false));
+  density_grid->merge(*new_grid);
+  density_grid->transform().postScale(mvmd->voxel_size);
+
+  return volume;
+
+#else
+  UNUSED_VARS(md, ctx);
   return input_volume;
+#endif
 }
 
 ModifierTypeInfo modifierType_MeshToVolume = {
@@ -112,7 +173,7 @@ ModifierTypeInfo modifierType_MeshToVolume = {
     /* modifyPointCloud */ NULL,
     /* modifyVolume */ modifyVolume,
 
-    /* initData */ NULL,
+    /* initData */ initData,
     /* requiredDataMask */ NULL,
     /* freeData */ NULL,
     /* isDisabled */ NULL,
