@@ -1701,7 +1701,7 @@ int ED_lineart_object_collection_usage_check(Collection *c, Object *ob)
   }
 
   if (c->children.first == NULL) {
-    if (BKE_collection_has_object(c, ob->id.orig_id)) {
+    if (BKE_collection_has_object(c, (Object *)(ob->id.orig_id))) {
       if (ob->lineart.usage == OBJECT_LRT_INHERENT) {
         if (c->lineart_usage == COLLECTION_LRT_OCCLUSION_ONLY) {
           return OBJECT_LRT_OCCLUSION_ONLY;
