@@ -2607,6 +2607,9 @@ LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene)
     if (G.debug_value == 4000) {
       printf("LRT: **** Destroy on create.\n");
     }
+    while (ED_lineart_modifier_sync_flag_check(LRT_SYNC_CLEARING)) {
+      /* Don't race the clearing stage. */
+    }
     ED_lineart_destroy_render_data_external();
   }
 
