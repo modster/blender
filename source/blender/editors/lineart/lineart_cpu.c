@@ -30,6 +30,7 @@
 #include "BLI_task.h"
 #include "BLI_utildefines.h"
 
+#include "BKE_callbacks.h"
 #include "BKE_camera.h"
 #include "BKE_collection.h"
 #include "BKE_context.h"
@@ -2674,12 +2675,31 @@ LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene)
   return rb;
 }
 
+static void lineart_post_frame_update_render(struct Main *UNUSED(main),
+                                             struct PointerRNA **UNUSED(prna),
+                                             const int UNUSED(num_pointers),
+                                             void *UNUSED(arg))
+{
+  // if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH)) {
+  ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, false);
+  //}
+}
+static bCallbackFuncStore lineart_pre_frame_update = {
+    NULL,
+    NULL,                             /* next, prev */
+    lineart_post_frame_update_render, /* func */
+    NULL,                             /* arg */
+    0                                 /* alloc */
+};
+
 void ED_lineart_init_locks()
 {
   if (!(lineart_share.init_complete & LRT_INIT_LOCKS)) {
     BLI_spin_init(&lineart_share.lock_loader);
     BLI_spin_init(&lineart_share.lock_render_status);
     lineart_share.init_complete |= LRT_INIT_LOCKS;
+
+    BKE_callback_add(&lineart_pre_frame_update, BKE_CB_EVT_FRAME_CHANGE_PRE);
   }
 }
 
@@ -3163,9 +3183,9 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
     lineart_list_append_pointer_static(&root_ba->linked_triangles, &rb->render_data_pool, rt);
     root_ba->triangle_count++;
     /* If splitting doesn't improve triangle separation, then shouldn't allow splitting anymore.
-     * Here we use recursive limit. This is espetially useful in ortho render, where a lot of faces
-     * could easily line up perfectly in image space, which can not be separated by simply slicing
-     * the image tile. */
+     * Here we use recursive limit. This is espetially useful in ortho render, where a lot of
+     * faces could easily line up perfectly in image space, which can not be separated by simply
+     * slicing the image tile. */
     if (root_ba->triangle_count > 200 && recursive && recursive_level < 10) {
       lineart_bounding_area_split(rb, root_ba, recursive_level);
     }
@@ -3876,7 +3896,8 @@ void ED_lineart_compute_feature_lines_background(Depsgraph *dg, const int show_f
     if (G.debug_value == 4000) {
       printf("LRT: Canceling.\n");
     }
-    /* Can't release the lock just right now, because loading function might still be canceling */
+    /* Can't release the lock just right now, because loading function might still be canceling
+     */
   }
 
   if (tp_read) {
@@ -4000,8 +4021,9 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *UNUSED(depsgraph),
       }
     }
 
-    /* Modifier for different GP objects are not evaluated in order, thus picked flag doesn't quite
-     * make sense. Should have a batter solution if we don't want to pick the same stroke twice. */
+    /* Modifier for different GP objects are not evaluated in order, thus picked flag doesn't
+     * quite make sense. Should have a batter solution if we don't want to pick the same stroke
+     * twice. */
     /* rlc->picked = 1; */
 
     int array_idx = 0;
@@ -4338,11 +4360,11 @@ void ED_lineart_post_frame_update_external(bContext *C,
       return;
     }
 
-    /* This code path is not working with motion blur on "render animation". not sure why, but here
-     * if we retain the data and restore the flag, results will be correct. (The wrong
+    /* This code path is not working with motion blur on "render animation". not sure why, but
+     * here if we retain the data and restore the flag, results will be correct. (The wrong
      * clearing happens when dg->mode == DAG_EVAL_VIEWPORT) so can't really catch it there.) */
     if (is_render && (scene->eevee.flag & SCE_EEVEE_MOTION_BLUR_ENABLED)) {
-      ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, from_modifier);
+      // ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, from_modifier);
       return;
     }
 
@@ -4352,20 +4374,20 @@ void ED_lineart_post_frame_update_external(bContext *C,
     /* TODO in the future: the call below seems to cause crash (double free) when using eevee in
      * SOME files, not sure why but  */
 
-    /* Due to using GPencil modifiers, and the scene is updated each time some value is changed, we
-     * really don't need to keep the buffer any longer. If in the future we want fast refresh on
-     * parameter changes (e.g. thickness or picking different result in an already validated
+    /* Due to using GPencil modifiers, and the scene is updated each time some value is changed,
+     * we really don't need to keep the buffer any longer. If in the future we want fast refresh
+     * on parameter changes (e.g. thickness or picking different result in an already validated
      * buffer), remove ED_lineart_destroy_render_data_external() below.*/
     if (!from_modifier) {
       if (G.debug_value == 4000) {
         printf("LRT: ---- Destroy on update (%d).\n", is_render);
       }
 
-      ED_lineart_destroy_render_data_external();
+      // ED_lineart_destroy_render_data_external();
     }
 
     /* At this stage GP should have all the data. We clear the flag */
-    ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, from_modifier);
+    // ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, from_modifier);
   }
 }
 
