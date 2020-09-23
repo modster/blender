@@ -4112,12 +4112,16 @@ static int lineart_gpencil_bake_strokes_invoke(bContext *C,
                                                const wmEvent *UNUSED(event))
 {
   Scene *scene = CTX_data_scene(C);
+  SceneLineart *lineart = &scene->lineart;
   Depsgraph *dg = CTX_data_depsgraph_pointer(C);
   int frame;
-  int frame_begin = MAX2(scene->r.sfra, 1);
-  int frame_end = scene->r.efra;
+  int frame_begin = ((lineart->flags & LRT_BAKING_FINAL_RANGE) ? (scene->r.sfra, 1) :
+                                                                 lineart->baking_preview_start);
+  int frame_end = ((lineart->flags & LRT_BAKING_FINAL_RANGE) ? scene->r.efra :
+                                                               lineart->baking_preview_end);
   int frame_total = frame_end - frame_begin;
   int frame_orig = scene->r.cfra;
+  int frame_increment = lineart->baking_skip + 1;
   LineartGpencilModifierData *lmd;
   LineartRenderBuffer *rb;
   int use_types;
@@ -4126,7 +4130,7 @@ static int lineart_gpencil_bake_strokes_invoke(bContext *C,
   lineart_share.wm = CTX_wm_manager(C);
   lineart_share.main_window = CTX_wm_window(C);
 
-  for (frame = frame_begin; frame <= frame_end; frame++) {
+  for (frame = frame_begin; frame <= frame_end; frame += frame_increment) {
 
     /* Reset flags. LRT_SYNC_IGNORE prevent any line art modifiers run calculation function when
      * depsgraph calls for modifier evalurates. */

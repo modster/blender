@@ -772,6 +772,16 @@ class RENDER_PT_lineart_baking(RenderButtonsPanel, Panel):
         layout.use_property_decorate = False
 
         layout.prop(lineart, "gpencil_overwrite", text='Overwrite')
+
+        layout.prop(lineart, "baking_final_range")
+
+        if not lineart.baking_final_range:
+            col = layout.column(align=True)
+            col.prop(lineart, "baking_preview_start", text='Start')
+            col.prop(lineart, "baking_preview_end", text='End')
+
+        layout.prop(lineart, "baking_skip")
+
         layout.operator('scene.lineart_bake_strokes')
 
 

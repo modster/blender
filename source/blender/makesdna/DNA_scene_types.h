@@ -1673,6 +1673,7 @@ typedef enum eLineartMainFlags {
   LRT_ALLOW_DUPLI_OBJECTS = (1 << 9),
   LRT_ALLOW_OVERLAPPING_EDGES = (1 << 10),
   LRT_ALLOW_CLIPPING_BOUNDARIES = (1 << 11),
+  LRT_BAKING_FINAL_RANGE = (1 << 12),
 } eLineartMainFlags;
 
 typedef struct SceneLineart {
@@ -1690,14 +1691,17 @@ typedef struct SceneLineart {
   /** 0-1 range for cosine angle */
   float crease_threshold;
 
-  int _pad;
-
   /**  0-PI angle, for splitting strokes at sharp points */
   float angle_splitting_threshold;
 
   /* CPU mode */
   float chaining_geometry_threshold;
   float chaining_image_threshold;
+
+  /* Baking */
+  int baking_preview_start;
+  int baking_preview_end;
+  int baking_skip; /* 0 for every frame, 1 for every other frame and so on. */
 } SceneLineart;
 
 typedef struct SceneGpencil {

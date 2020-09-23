@@ -7454,6 +7454,24 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
   RNA_def_property_ui_range(prop, 0.0f, 0.3f, 0.001f, 4);
   RNA_def_property_range(prop, 0.0f, 1.0f);
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
+
+  prop = RNA_def_property(srna, "baking_final_range", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_BAKING_FINAL_RANGE);
+  RNA_def_property_boolean_default(prop, 1);
+  RNA_def_property_ui_text(
+      prop, "Final Range", "Bake final frame ranges instead of preview range.");
+
+  prop = RNA_def_property(srna, "baking_preview_start", PROP_INT, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Preview start", "First frame to be baked in preview.");
+  RNA_def_property_range(prop, 0, 100000);
+
+  prop = RNA_def_property(srna, "baking_preview_end", PROP_INT, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Preview end", "Last frame to be baked in preview.");
+  RNA_def_property_range(prop, 0, 100000);
+
+  prop = RNA_def_property(srna, "baking_skip", PROP_INT, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Skip", "Skipping frames when baking.");
+  RNA_def_property_range(prop, 0, 1000);
 }
 
 void RNA_def_scene(BlenderRNA *brna)
