@@ -45,10 +45,58 @@
 
 #include "BLI_float4x4.hh"
 #include "BLI_index_range.hh"
+#include "BLI_span.hh"
 
 #ifdef WITH_OPENVDB
 #  include <openvdb/openvdb.h>
 #  include <openvdb/tools/MeshToVolume.h>
+#endif
+
+#ifdef WITH_OPENVDB
+namespace blender {
+class OpenVDBMeshAdapter {
+ private:
+  Span<MVert> vertices_;
+  Span<MLoop> loops_;
+  Span<MLoopTri> looptris_;
+  float4x4 transform_;
+
+ public:
+  OpenVDBMeshAdapter(Mesh &mesh, float4x4 transform)
+      : vertices_(mesh.mvert, mesh.totvert),
+        loops_(mesh.mloop, mesh.totloop),
+        transform_(transform)
+  {
+    const MLoopTri *looptries = BKE_mesh_runtime_looptri_ensure(&mesh);
+    const int looptries_len = BKE_mesh_runtime_looptri_len(&mesh);
+    looptris_ = Span(looptries, looptries_len);
+  }
+
+  size_t polygonCount() const
+  {
+    return static_cast<size_t>(looptris_.size());
+  }
+
+  size_t pointCount() const
+  {
+    return static_cast<size_t>(vertices_.size());
+  }
+
+  size_t vertexCount(size_t UNUSED(polygon_index)) const
+  {
+    /* All polygons are triangles. */
+    return 3;
+  }
+
+  void getIndexSpacePoint(size_t polygon_index, size_t vertex_index, openvdb::Vec3d &pos) const
+  {
+    const MLoopTri &looptri = looptris_[polygon_index];
+    const MVert &vertex = vertices_[loops_[looptri.tri[vertex_index]].v];
+    const float3 transformed_co = transform_ * float3(vertex.co);
+    pos = &transformed_co.x;
+  }
+};
+}  // namespace blender
 #endif
 
 static void initData(ModifierData *md)
@@ -112,34 +160,20 @@ static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Vo
     return input_volume;
   }
 
-  Mesh *mesh = static_cast<Mesh *>(mvmd->object->data);
-  const MLoopTri *looptris = BKE_mesh_runtime_looptri_ensure(mesh);
-  const int looptris_len = BKE_mesh_runtime_looptri_len(mesh);
+  Object *object_to_convert = mvmd->object;
+  Mesh *mesh = static_cast<Mesh *>(object_to_convert->data);
+  const float voxel_size = mvmd->voxel_size;
+  UNUSED_VARS(voxel_size);
 
-  float4x4 obmat = mvmd->object->obmat;
-  mul_m4_m4_pre(obmat.values, ctx->object->imat);
-  mul_m4_fl(obmat.values, 1.0f / mvmd->voxel_size);
-  obmat.values[3][3] = 1.0f;
+  float4x4 transform;
+  scale_m4_fl(transform.values, 1.0f / voxel_size);
+  mul_m4_m4_post(transform.values, ctx->object->imat);
+  mul_m4_m4_post(transform.values, object_to_convert->obmat);
 
-  std::vector<openvdb::Vec3s> vertices(mesh->totvert);
-  for (const int i : IndexRange(mesh->totvert)) {
-    float3 position = obmat * float3(mesh->mvert[i].co);
-    vertices[i] = &position.x;
-  }
+  OpenVDBMeshAdapter mesh_adapter{*mesh, transform};
 
-  std::vector<openvdb::Vec3I> triangle_indices(looptris_len);
-  for (const int i : IndexRange(looptris_len)) {
-    const MLoopTri &tri = looptris[i];
-    triangle_indices[i] = {
-        mesh->mloop[tri.tri[0]].v,
-        mesh->mloop[tri.tri[1]].v,
-        mesh->mloop[tri.tri[2]].v,
-    };
-  }
-
-  const openvdb::math::Transform xform;
-  openvdb::FloatGrid::Ptr new_grid = openvdb::tools::meshToLevelSet<openvdb::FloatGrid>(
-      xform, vertices, triangle_indices);
+  openvdb::FloatGrid::Ptr new_grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
+      mesh_adapter, {}, 1.0f, 1.0f);
 
   Volume *volume = BKE_volume_new_for_eval(input_volume);
   VolumeGrid *c_density_grid = BKE_volume_grid_add(volume, "density", VOLUME_GRID_FLOAT);

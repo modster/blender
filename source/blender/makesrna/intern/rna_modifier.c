@@ -7118,7 +7118,7 @@ static void rna_def_modifier_mesh_to_volume(BlenderRNA *brna)
   prop = RNA_def_property(srna, "voxel_size", PROP_FLOAT, PROP_NONE);
   RNA_def_property_ui_text(
       prop, "Voxel Size", "The smaller this number the higher the resolution of the output");
-  RNA_def_property_range(prop, 0.001, FLT_MAX);
+  RNA_def_property_range(prop, 0.1, FLT_MAX);
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
   RNA_define_lib_overridable(false);
