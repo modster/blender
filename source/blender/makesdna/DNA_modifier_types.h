@@ -2212,12 +2212,42 @@ typedef struct SimulationModifierData {
 
 typedef struct MeshToVolumeModifierData {
   ModifierData modifier;
+
+  /** This is the object that is supposed to be converted to a volume. */
   struct Object *object;
+
+  /** MeshToVolumeModifierMode */
+  int mode;
+
+  /** MeshToVolumeModifierResolutionMode */
+  int resolution_mode;
+  /** Size of a voxel in object space. */
   float voxel_size;
+  /** The desired amount of voxels along one axis. The actual amount of voxels might be slightly
+   * different. */
+  int voxel_amount;
+
+  /** If true, every cell in the enclosed volume gets a density. Otherwise, the interior_bandwidth
+   * is used. */
+  char fill_volume;
+  char _pad1[3];
+  /** Bandwidths are on object space. */
   float interior_bandwidth;
   float exterior_bandwidth;
   char _pad[4];
 } MeshToVolumeModifierData;
+
+/* MeshToVolumeModifierData->mode */
+typedef enum MeshToVolumeModifierMode {
+  MESH_TO_VOLUME_MODE_VOLUME = 0,
+  MESH_TO_VOLUME_MODE_SURFACE = 1,
+} MeshToVolumeModifierMode;
+
+/* MeshToVolumeModifierData->resolution_mode */
+typedef enum MeshToVolumeModifierResolutionMode {
+  MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_AMOUNT = 0,
+  MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_SIZE = 1,
+} MeshToVolumeModifierResolutionMode;
 
 #ifdef __cplusplus
 }

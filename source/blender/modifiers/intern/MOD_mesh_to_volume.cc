@@ -23,6 +23,7 @@
 #include "BKE_lib_query.h"
 #include "BKE_mesh_runtime.h"
 #include "BKE_modifier.h"
+#include "BKE_object.h"
 #include "BKE_volume.h"
 
 #include "DNA_mesh_types.h"
@@ -103,7 +104,11 @@ static void initData(ModifierData *md)
 {
   MeshToVolumeModifierData *mvmd = reinterpret_cast<MeshToVolumeModifierData *>(md);
   mvmd->object = NULL;
+  mvmd->mode = MESH_TO_VOLUME_MODE_VOLUME;
+  mvmd->resolution_mode = MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_AMOUNT;
   mvmd->voxel_size = 0.1f;
+  mvmd->voxel_amount = 32;
+  mvmd->fill_volume = true;
   mvmd->interior_bandwidth = 1.0f;
   mvmd->exterior_bandwidth = 1.0f;
 }
@@ -133,14 +138,32 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   PointerRNA ob_ptr;
   PointerRNA *ptr = modifier_panel_get_property_pointers(panel, &ob_ptr);
+  MeshToVolumeModifierData *mvmd = static_cast<MeshToVolumeModifierData *>(ptr->data);
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
 
   uiItemR(layout, ptr, "object", 0, NULL, ICON_NONE);
-  uiItemR(layout, ptr, "voxel_size", 0, NULL, ICON_NONE);
-  uiItemR(layout, ptr, "interior_bandwidth", 0, NULL, ICON_NONE);
-  uiItemR(layout, ptr, "exterior_bandwidth", 0, NULL, ICON_NONE);
+
+  uiItemR(layout, ptr, "mode", 0, NULL, ICON_NONE);
+  if (mvmd->mode == MESH_TO_VOLUME_MODE_VOLUME) {
+    uiItemR(layout, ptr, "fill_volume", 0, NULL, ICON_NONE);
+    uiItemR(layout, ptr, "exterior_bandwidth", 0, NULL, ICON_NONE);
+    if (!mvmd->fill_volume) {
+      uiItemR(layout, ptr, "interior_bandwidth", 0, NULL, ICON_NONE);
+    }
+  }
+  else if (mvmd->mode == MESH_TO_VOLUME_MODE_SURFACE) {
+    uiItemR(layout, ptr, "exterior_bandwidth", 0, "Bandwidth", ICON_NONE);
+  }
+
+  uiItemR(layout, ptr, "resolution_mode", 0, NULL, ICON_NONE);
+  if (mvmd->resolution_mode == MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_AMOUNT) {
+    uiItemR(layout, ptr, "voxel_amount", 0, NULL, ICON_NONE);
+  }
+  else {
+    uiItemR(layout, ptr, "voxel_size", 0, NULL, ICON_NONE);
+  }
 
   modifier_panel_end(layout, ptr);
 }
@@ -148,6 +171,25 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 static void panelRegister(ARegionType *region_type)
 {
   modifier_panel_register(region_type, eModifierType_MeshToVolume, panel_draw);
+}
+
+static float compute_voxel_size(const MeshToVolumeModifierData *mvmd,
+                                const blender::float4x4 &transform)
+{
+  using namespace blender;
+
+  if (mvmd->resolution_mode == MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_SIZE) {
+    return MAX2(0.0001, mvmd->voxel_size);
+  }
+  BoundBox *bb = BKE_object_boundbox_get(mvmd->object);
+
+  float3 dimensions = float3(bb->vec[6]) - float3(bb->vec[0]);
+  const float3 transformed_dimensions = transform.ref_3x3() * dimensions;
+  const float max_dimension = std::max(
+      {transformed_dimensions.x, transformed_dimensions.y, transformed_dimensions.z});
+  const float approximate_volume_side_length = max_dimension + mvmd->exterior_bandwidth * 2.0f;
+  const float voxel_size = approximate_volume_side_length / MAX2(1, mvmd->voxel_amount);
+  return voxel_size;
 }
 
 static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Volume *input_volume)
@@ -165,28 +207,46 @@ static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Vo
   }
 
   Object *object_to_convert = mvmd->object;
+  const float4x4 mesh_to_own_object_space_transform = float4x4(ctx->object->imat) *
+                                                      float4x4(object_to_convert->obmat);
+  const float voxel_size = compute_voxel_size(mvmd, mesh_to_own_object_space_transform);
+
+  float4x4 mesh_to_index_space_transform;
+  scale_m4_fl(mesh_to_index_space_transform.values, 1.0f / voxel_size);
+  mul_m4_m4_post(mesh_to_index_space_transform.values, mesh_to_own_object_space_transform.values);
+
   Mesh *mesh = static_cast<Mesh *>(object_to_convert->data);
-  const float voxel_size = mvmd->voxel_size;
+  OpenVDBMeshAdapter mesh_adapter{*mesh, mesh_to_index_space_transform};
+
+  openvdb::FloatGrid::Ptr new_grid;
+
   const float exterior_bandwidth = MAX2(0.001f, mvmd->exterior_bandwidth / voxel_size);
   const float interior_bandwidth = MAX2(0.001f, mvmd->interior_bandwidth / voxel_size);
-  UNUSED_VARS(voxel_size);
-
-  float4x4 transform;
-  scale_m4_fl(transform.values, 1.0f / voxel_size);
-  mul_m4_m4_post(transform.values, ctx->object->imat);
-  mul_m4_m4_post(transform.values, object_to_convert->obmat);
-
-  OpenVDBMeshAdapter mesh_adapter{*mesh, transform};
-
-  openvdb::FloatGrid::Ptr new_grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
-      mesh_adapter, {}, exterior_bandwidth, interior_bandwidth);
+  if (mvmd->mode == MESH_TO_VOLUME_MODE_VOLUME) {
+    if (mvmd->fill_volume) {
+      new_grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
+          mesh_adapter, {}, exterior_bandwidth, FLT_MAX);
+    }
+    else {
+      new_grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
+          mesh_adapter, {}, exterior_bandwidth, interior_bandwidth);
+    }
+  }
+  else {
+    new_grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
+        mesh_adapter,
+        {},
+        exterior_bandwidth,
+        exterior_bandwidth,
+        openvdb::tools::UNSIGNED_DISTANCE_FIELD);
+  }
 
   Volume *volume = BKE_volume_new_for_eval(input_volume);
   VolumeGrid *c_density_grid = BKE_volume_grid_add(volume, "density", VOLUME_GRID_FLOAT);
   openvdb::FloatGrid::Ptr density_grid = std::static_pointer_cast<openvdb::FloatGrid>(
       BKE_volume_grid_openvdb_for_write(volume, c_density_grid, false));
   density_grid->merge(*new_grid);
-  density_grid->transform().postScale(mvmd->voxel_size);
+  density_grid->transform().postScale(voxel_size);
 
   openvdb::tools::foreach (
       density_grid->beginValueOn(),
