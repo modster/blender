@@ -7121,6 +7121,16 @@ static void rna_def_modifier_mesh_to_volume(BlenderRNA *brna)
   RNA_def_property_range(prop, 0.1, FLT_MAX);
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
+  prop = RNA_def_property(srna, "interior_bandwidth", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Interior Bandwidth", "Width of the volume inside of the mesh");
+  RNA_def_property_range(prop, 0.0, FLT_MAX);
+  RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+  prop = RNA_def_property(srna, "exterior_bandwidth", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Exterior Bandwidth", "Width of the volume outside of the mesh");
+  RNA_def_property_range(prop, 0.0, FLT_MAX);
+  RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
   RNA_define_lib_overridable(false);
 }
 

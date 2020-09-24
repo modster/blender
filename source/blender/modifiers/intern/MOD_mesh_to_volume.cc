@@ -104,6 +104,8 @@ static void initData(ModifierData *md)
   MeshToVolumeModifierData *mvmd = reinterpret_cast<MeshToVolumeModifierData *>(md);
   mvmd->object = NULL;
   mvmd->voxel_size = 0.1f;
+  mvmd->interior_bandwidth = 1.0f;
+  mvmd->exterior_bandwidth = 1.0f;
 }
 
 static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
@@ -137,6 +139,8 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiItemR(layout, ptr, "object", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "voxel_size", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "interior_bandwidth", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "exterior_bandwidth", 0, NULL, ICON_NONE);
 
   modifier_panel_end(layout, ptr);
 }
@@ -163,6 +167,8 @@ static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Vo
   Object *object_to_convert = mvmd->object;
   Mesh *mesh = static_cast<Mesh *>(object_to_convert->data);
   const float voxel_size = mvmd->voxel_size;
+  const float exterior_bandwidth = MAX2(0.001f, mvmd->exterior_bandwidth / voxel_size);
+  const float interior_bandwidth = MAX2(0.001f, mvmd->interior_bandwidth / voxel_size);
   UNUSED_VARS(voxel_size);
 
   float4x4 transform;
@@ -173,7 +179,7 @@ static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Vo
   OpenVDBMeshAdapter mesh_adapter{*mesh, transform};
 
   openvdb::FloatGrid::Ptr new_grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
-      mesh_adapter, {}, 1.0f, 1.0f);
+      mesh_adapter, {}, exterior_bandwidth, interior_bandwidth);
 
   Volume *volume = BKE_volume_new_for_eval(input_volume);
   VolumeGrid *c_density_grid = BKE_volume_grid_add(volume, "density", VOLUME_GRID_FLOAT);
@@ -181,6 +187,10 @@ static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Vo
       BKE_volume_grid_openvdb_for_write(volume, c_density_grid, false));
   density_grid->merge(*new_grid);
   density_grid->transform().postScale(mvmd->voxel_size);
+
+  openvdb::tools::foreach (
+      density_grid->beginValueOn(),
+      [](const openvdb::FloatGrid::ValueOnIter &iter) { iter.setValue(1.0f); });
 
   return volume;
 

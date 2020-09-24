@@ -2214,6 +2214,8 @@ typedef struct MeshToVolumeModifierData {
   ModifierData modifier;
   struct Object *object;
   float voxel_size;
+  float interior_bandwidth;
+  float exterior_bandwidth;
   char _pad[4];
 } MeshToVolumeModifierData;
 
