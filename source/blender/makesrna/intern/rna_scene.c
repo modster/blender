@@ -2608,6 +2608,19 @@ static void rna_lineart_update(Main *UNUSED(bmain), Scene *scene, PointerRNA *UN
   }
 }
 
+static void rna_lineart_auto_update_set(PointerRNA *ptr, bool value)
+{
+  Scene *data = (Scene *)ptr->data;
+
+  if (value) {
+    data->lineart.flags |= LRT_AUTO_UPDATE;
+  }
+  else {
+    data->lineart.flags &= (~LRT_AUTO_UPDATE);
+    ED_lineart_destroy_render_data_external();
+  }
+}
+
 static char *rna_FFmpegSettings_path(PointerRNA *UNUSED(ptr))
 {
   return BLI_strdup("render.ffmpeg");
@@ -7335,6 +7348,8 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
   RNA_def_property_boolean_default(prop, 0);
   RNA_def_property_ui_text(
       prop, "Auto Update", "Automatically update Line Art cache when frame changes");
+
+  RNA_def_property_boolean_funcs(prop, NULL, "rna_lineart_auto_update_set");
   /* Also use this update callback to trigger the modifier to clear the frame */
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 

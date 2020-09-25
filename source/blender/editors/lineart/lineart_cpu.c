@@ -4383,11 +4383,14 @@ void ED_lineart_post_frame_update_external(bContext *C,
         printf("LRT: ---- Destroy on update (%d).\n", is_render);
       }
 
-      // ED_lineart_destroy_render_data_external();
+      /* Currently the data is destroyed upon turning off line art. Destroying here post many
+       * problems as this function might get called during rendering for the viewport. */
+      /* ED_lineart_destroy_render_data_external(); */
     }
 
-    /* At this stage GP should have all the data. We clear the flag */
-    // ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, from_modifier);
+    /* At this stage GP should have all the data. We clear the flag. This is needed for real-time
+     * update on editing in the viewport. */
+    ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, from_modifier);
   }
 }
 
