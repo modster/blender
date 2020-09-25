@@ -48,6 +48,8 @@
 #include "BLI_index_range.hh"
 #include "BLI_span.hh"
 
+#include "RNA_access.h"
+
 #ifdef WITH_OPENVDB
 #  include <openvdb/openvdb.h>
 #  include <openvdb/tools/MeshToVolume.h>
@@ -282,8 +284,11 @@ ModifierTypeInfo modifierType_MeshToVolume = {
     /* name */ "Mesh to Volume",
     /* structName */ "MeshToVolumeModifierData",
     /* structSize */ sizeof(MeshToVolumeModifierData),
+    /* srna */ &RNA_MeshToVolumeModifier,
     /* type */ eModifierTypeType_Constructive,
     /* flags */ static_cast<ModifierTypeFlag>(0),
+    /* icon */ ICON_VOLUME_DATA, /* TODO: Use correct icon. */
+
     /* copyData */ BKE_modifier_copydata_generic,
 
     /* deformVerts */ NULL,
