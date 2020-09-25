@@ -2610,13 +2610,13 @@ static void rna_lineart_update(Main *UNUSED(bmain), Scene *scene, PointerRNA *UN
 
 static void rna_lineart_auto_update_set(PointerRNA *ptr, bool value)
 {
-  Scene *data = (Scene *)ptr->data;
+  SceneLineart *data = (SceneLineart *)ptr->data;
 
   if (value) {
-    data->lineart.flags |= LRT_AUTO_UPDATE;
+    data->flags |= LRT_AUTO_UPDATE;
   }
   else {
-    data->lineart.flags &= (~LRT_AUTO_UPDATE);
+    data->flags &= (~LRT_AUTO_UPDATE);
     ED_lineart_destroy_render_data_external();
   }
 }
