@@ -55,6 +55,8 @@
 
 #ifdef WITH_OPENVDB
 namespace blender {
+
+/* This class follows the MeshDataAdapter interface from openvdb. */
 class OpenVDBMeshAdapter {
  private:
   Span<MVert> vertices_;
@@ -134,6 +136,7 @@ static void foreachObjectLink(ModifierData *md, Object *ob, ObjectWalkFunc walk,
 
 static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
+  uiLayout *col;
   uiLayout *layout = panel->layout;
 
   PointerRNA ob_ptr;
@@ -145,24 +148,27 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiItemR(layout, ptr, "object", 0, NULL, ICON_NONE);
 
-  uiItemR(layout, ptr, "mode", 0, NULL, ICON_NONE);
+  col = uiLayoutColumn(layout, false);
+  uiItemR(col, ptr, "mode", 0, NULL, ICON_NONE);
   if (mvmd->mode == MESH_TO_VOLUME_MODE_VOLUME) {
-    uiItemR(layout, ptr, "fill_volume", 0, NULL, ICON_NONE);
-    uiItemR(layout, ptr, "exterior_bandwidth", 0, NULL, ICON_NONE);
-    if (!mvmd->fill_volume) {
-      uiItemR(layout, ptr, "interior_bandwidth", 0, NULL, ICON_NONE);
-    }
+    uiItemR(col, ptr, "fill_volume", 0, NULL, ICON_NONE);
+    uiItemR(col, ptr, "exterior_bandwidth", 0, NULL, ICON_NONE);
+
+    uiLayout *subcol = uiLayoutColumn(col, false);
+    uiLayoutSetEnabled(subcol, !mvmd->fill_volume);
+    uiItemR(subcol, ptr, "interior_bandwidth", 0, NULL, ICON_NONE);
   }
   else if (mvmd->mode == MESH_TO_VOLUME_MODE_SURFACE) {
-    uiItemR(layout, ptr, "exterior_bandwidth", 0, "Bandwidth", ICON_NONE);
+    uiItemR(col, ptr, "exterior_bandwidth", 0, "Bandwidth", ICON_NONE);
   }
 
-  uiItemR(layout, ptr, "resolution_mode", 0, NULL, ICON_NONE);
+  col = uiLayoutColumn(layout, false);
+  uiItemR(col, ptr, "resolution_mode", 0, NULL, ICON_NONE);
   if (mvmd->resolution_mode == MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_AMOUNT) {
-    uiItemR(layout, ptr, "voxel_amount", 0, NULL, ICON_NONE);
+    uiItemR(col, ptr, "voxel_amount", 0, NULL, ICON_NONE);
   }
   else {
-    uiItemR(layout, ptr, "voxel_size", 0, NULL, ICON_NONE);
+    uiItemR(col, ptr, "voxel_size", 0, NULL, ICON_NONE);
   }
 
   modifier_panel_end(layout, ptr);
@@ -198,15 +204,15 @@ static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Vo
   using namespace blender;
 
   MeshToVolumeModifierData *mvmd = reinterpret_cast<MeshToVolumeModifierData *>(md);
-
-  if (mvmd->object == NULL) {
-    return input_volume;
-  }
-  if (mvmd->object->type != OB_MESH) {
-    return input_volume;
-  }
-
   Object *object_to_convert = mvmd->object;
+
+  if (object_to_convert == NULL) {
+    return input_volume;
+  }
+  if (object_to_convert->type != OB_MESH) {
+    return input_volume;
+  }
+
   const float4x4 mesh_to_own_object_space_transform = float4x4(ctx->object->imat) *
                                                       float4x4(object_to_convert->obmat);
   const float voxel_size = compute_voxel_size(mvmd, mesh_to_own_object_space_transform);
@@ -218,12 +224,14 @@ static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Vo
   Mesh *mesh = static_cast<Mesh *>(object_to_convert->data);
   OpenVDBMeshAdapter mesh_adapter{*mesh, mesh_to_index_space_transform};
 
-  openvdb::FloatGrid::Ptr new_grid;
-
+  /* Convert the bandwidths from object in index space. */
   const float exterior_bandwidth = MAX2(0.001f, mvmd->exterior_bandwidth / voxel_size);
   const float interior_bandwidth = MAX2(0.001f, mvmd->interior_bandwidth / voxel_size);
+
+  openvdb::FloatGrid::Ptr new_grid;
   if (mvmd->mode == MESH_TO_VOLUME_MODE_VOLUME) {
     if (mvmd->fill_volume) {
+      /* Setting the interior bandwidth to FLT_MAX, will make it fill the entire volume. */
       new_grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
           mesh_adapter, {}, exterior_bandwidth, FLT_MAX);
     }
@@ -233,6 +241,7 @@ static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Vo
     }
   }
   else {
+    /* Create an unsigned field, because we don't assume that the mesh is closed. */
     new_grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
         mesh_adapter,
         {},
@@ -241,13 +250,22 @@ static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Vo
         openvdb::tools::UNSIGNED_DISTANCE_FIELD);
   }
 
+  /* Create a new volume object and add the density grid. */
   Volume *volume = BKE_volume_new_for_eval(input_volume);
   VolumeGrid *c_density_grid = BKE_volume_grid_add(volume, "density", VOLUME_GRID_FLOAT);
-  openvdb::FloatGrid::Ptr density_grid = std::static_pointer_cast<openvdb::FloatGrid>(
-      BKE_volume_grid_openvdb_for_write(volume, c_density_grid, false));
-  density_grid->merge(*new_grid);
-  density_grid->transform().postScale(voxel_size);
+  openvdb::FloatGrid::Ptr density_grid = BKE_volume_grid_openvdb_for_write<openvdb::FloatGrid>(
+      volume, c_density_grid, false);
 
+  /* Merge the generated grid into the density grid. I could not figure out how to simply replace
+   * it yet. */
+  density_grid->merge(*new_grid);
+
+  /* Change transform so that the index space is correctly transformed to object space. */
+  density_grid->transform().postScale(voxel_size);
+  /* Better align generated grid with the source mesh. */
+  density_grid->transform().postTranslate(openvdb::math::Vec3d(-voxel_size / 2.0f));
+
+  /* Give each grid cell a fixed density for now. */
   openvdb::tools::foreach (
       density_grid->beginValueOn(),
       [](const openvdb::FloatGrid::ValueOnIter &iter) { iter.setValue(1.0f); });
