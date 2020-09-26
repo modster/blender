@@ -19,10 +19,12 @@ set(INC
 )
 
 set(INC_SYS
+  ${ALEMBIC_INCLUDE_DIR}
   ${GLEW_INCLUDE_DIR}
 )
 
 set(SRC
+  alembic.cpp
   attribute.cpp
   background.cpp
   bake.cpp
@@ -48,6 +50,7 @@ set(SRC
   mesh_displace.cpp
   mesh_subdivision.cpp
   nodes.cpp
+  procedural.cpp
   object.cpp
   osl.cpp
   particles.cpp
@@ -64,6 +67,7 @@ set(SRC
 )
 
 set(SRC_HEADERS
+  alembic.h
   attribute.h
   bake.h
   background.h
@@ -90,6 +94,7 @@ set(SRC_HEADERS
   object.h
   osl.h
   particles.h
+  procedural.h
   curves.h
   scene.h
   session.h
