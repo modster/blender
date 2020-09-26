@@ -301,7 +301,7 @@ void BlenderSync::sync_integrator()
   if (!preview) {
     if (integrator->get_motion_blur() != r.use_motion_blur()) {
       scene->object_manager->tag_update(scene);
-      scene->camera->tag_update();
+      scene->camera->tag_modified();
     }
 
     integrator->set_motion_blur(r.use_motion_blur());

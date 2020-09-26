@@ -205,8 +205,8 @@ class OsdData {
     int num_local_points = patch_table->GetNumLocalPoints();
 
     verts.resize(num_refiner_verts + num_local_points);
-    for (int i = 0; i < mesh->verts.size(); i++) {
-      verts[i].value = mesh->verts[i];
+    for (int i = 0; i < mesh->get_verts().size(); i++) {
+      verts[i].value = mesh->get_verts()[i];
     }
 
     OsdValue<float3> *src = verts.data();
@@ -289,8 +289,8 @@ class OsdData {
     for (size_t i = 0; i < level.GetNumEdges(); i++) {
       Far::ConstIndexArray verts = level.GetEdgeVertices(i);
 
-      float3 a = mesh->verts[verts[0]];
-      float3 b = mesh->verts[verts[1]];
+      float3 a = mesh->get_verts()[verts[0]];
+      float3 b = mesh->get_verts()[verts[1]];
 
       float edge_len;
 

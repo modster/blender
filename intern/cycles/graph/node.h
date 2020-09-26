@@ -27,7 +27,7 @@ CCL_NAMESPACE_BEGIN
 class MD5Hash;
 struct Node;
 struct NodeType;
-struct Shader;
+class Shader;
 struct Transform;
 
 /* Note: in the following macros we use "type const &" instead of "const type &"

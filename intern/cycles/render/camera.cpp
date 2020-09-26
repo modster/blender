@@ -545,11 +545,6 @@ void Camera::device_free(Device * /*device*/, DeviceScene *dscene, Scene *scene)
   dscene->camera_motion.free();
 }
 
-void Camera::tag_update()
-{
-  socket_modified = ~0;
-}
-
 float3 Camera::transform_raster_to_world(float raster_x, float raster_y)
 {
   float3 D, P;
@@ -779,7 +774,7 @@ void Camera::set_screen_size_and_resolution(int width_, int height_, int resolut
     width = width_;
     height = height_;
     resolution = resolution_;
-    tag_update();
+    tag_modified();
   }
 }
 

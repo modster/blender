@@ -383,8 +383,8 @@ void Scene::reset()
   shader_manager->add_default(this);
 
   /* ensure all objects are updated */
-  camera->tag_update();
-  dicing_camera->tag_update();
+  camera->tag_modified();
+  dicing_camera->tag_modified();
   film->tag_update(this);
   background->tag_update(this);
   integrator->tag_update(this);

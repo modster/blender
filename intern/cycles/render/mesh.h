@@ -181,7 +181,6 @@ class Mesh : public Geometry {
   unordered_multimap<int, int>
       vert_stitching_map; /* stitching index -> multiple real vert indices */
 
-  friend class Attribute;
   friend class BVH;
   friend class BVHBuild;
   friend class BVHEmbree;
@@ -189,14 +188,10 @@ class Mesh : public Geometry {
   friend class DiagSplit;
   friend class EdgeDice;
   friend class GeometryManager;
-  friend class LightManager;
   friend class Object;
   friend class ObjectManager;
-  friend class OsdData;
 
   SubdParams *subd_params = nullptr;
-
-  SubdParams *get_subd_params();
 
  public:
   /* Functions */
@@ -238,11 +233,18 @@ class Mesh : public Geometry {
 
   void tessellate(DiagSplit *split);
 
-  Mesh::SubdFace get_subd_face(size_t index) const;
+  SubdFace get_subd_face(size_t index) const;
+
+  SubdParams *get_subd_params();
 
   size_t num_subd_faces() const
   {
     return subd_shader.size();
+  }
+
+  size_t get_num_subd_verts()
+  {
+    return num_subd_verts;
   }
 };
 

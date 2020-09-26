@@ -270,8 +270,6 @@ void Mesh::reserve_subd_creases(size_t num_creases)
 
 void Mesh::clear(bool preserve_voxel_data)
 {
-  // Node::reset(); // will also reset single properties that we might want to preserve like
-  // subdivision dicing rate
   Geometry::clear();
 
   /* clear all verts and triangles */

@@ -212,8 +212,6 @@ class Camera : public Node {
   void device_update_volume(Device *device, DeviceScene *dscene, Scene *scene);
   void device_free(Device *device, DeviceScene *dscene, Scene *scene);
 
-  void tag_update();
-
   /* Public utility functions. */
   BoundBox viewplane_bounds_get();
 

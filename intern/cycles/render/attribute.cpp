@@ -169,18 +169,18 @@ size_t Attribute::element_size(Geometry *geom, AttributePrimitive prim) const
     case ATTR_ELEMENT_VERTEX:
       if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
         Mesh *mesh = static_cast<Mesh *>(geom);
-        size = mesh->verts.size() + mesh->num_ngons;
+        size = mesh->get_verts().size() + mesh->get_num_ngons();
         if (prim == ATTR_PRIM_SUBD) {
-          size -= mesh->num_subd_verts;
+          size -= mesh->get_num_subd_verts();
         }
       }
       break;
     case ATTR_ELEMENT_VERTEX_MOTION:
       if (geom->geometry_type == Geometry::MESH) {
         Mesh *mesh = static_cast<Mesh *>(geom);
-        size = (mesh->verts.size() + mesh->num_ngons) * (mesh->motion_steps - 1);
+        size = (mesh->get_verts().size() + mesh->get_num_ngons()) * (mesh->get_motion_steps() - 1);
         if (prim == ATTR_PRIM_SUBD) {
-          size -= mesh->num_subd_verts * (mesh->motion_steps - 1);
+          size -= mesh->get_num_subd_verts() * (mesh->get_motion_steps() - 1);
         }
       }
       break;
@@ -191,7 +191,7 @@ size_t Attribute::element_size(Geometry *geom, AttributePrimitive prim) const
           size = mesh->num_triangles();
         }
         else {
-          size = mesh->num_subd_faces() + mesh->num_ngons;
+          size = mesh->num_subd_faces() + mesh->get_num_ngons();
         }
       }
       break;
@@ -203,7 +203,7 @@ size_t Attribute::element_size(Geometry *geom, AttributePrimitive prim) const
           size = mesh->num_triangles() * 3;
         }
         else {
-          size = mesh->subd_face_corners.size() + mesh->num_ngons;
+          size = mesh->get_subd_face_corners().size() + mesh->get_num_ngons();
         }
       }
       break;

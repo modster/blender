@@ -1273,10 +1273,8 @@ class OptiXDevice : public CUDADevice {
                 const float4 px = make_float4(keys[ka].x, keys[k0].x, keys[k1].x, keys[kb].x);
                 const float4 py = make_float4(keys[ka].y, keys[k0].y, keys[k1].y, keys[kb].y);
                 const float4 pz = make_float4(keys[ka].z, keys[k0].z, keys[k1].z, keys[kb].z);
-                const float4 pw = make_float4(curve_radius[ka],
-                                              curve_radius[k0],
-                                              curve_radius[k1],
-                                              curve_radius[kb]);
+                const float4 pw = make_float4(
+                    curve_radius[ka], curve_radius[k0], curve_radius[k1], curve_radius[kb]);
 
                 // Convert Catmull-Rom data to Bezier spline
                 static const float4 cr2bsp0 = make_float4(+7, -4, +5, -2) / 6.f;
@@ -1407,7 +1405,9 @@ class OptiXDevice : public CUDADevice {
 
         device_vector<int> index_data(this, "temp_index_data", MEM_READ_ONLY);
         index_data.alloc(mesh->get_triangles().size());
-        memcpy(index_data.data(), mesh->get_triangles().data(), mesh->get_triangles().size() * sizeof(int));
+        memcpy(index_data.data(),
+               mesh->get_triangles().data(),
+               mesh->get_triangles().size() * sizeof(int));
         device_vector<float3> vertex_data(this, "temp_vertex_data", MEM_READ_ONLY);
         vertex_data.alloc(num_verts * num_motion_steps);
 
@@ -1514,7 +1514,8 @@ class OptiXDevice : public CUDADevice {
         instance.visibilityMask |= 4;
 
 #  if OPTIX_ABI_VERSION >= 36
-        if (motion_blur && ob->get_geometry()->has_motion_blur() && DebugFlags().optix.curves_api &&
+        if (motion_blur && ob->get_geometry()->has_motion_blur() &&
+            DebugFlags().optix.curves_api &&
             static_cast<const Hair *>(ob->get_geometry())->curve_shape == CURVE_THICK) {
           // Select between motion blur and non-motion blur built-in intersection module
           instance.sbtOffset = PG_HITD_MOTION - PG_HITD;
@@ -1545,7 +1546,8 @@ class OptiXDevice : public CUDADevice {
 
         OptixSRTData *const srt_data = motion_transform.srtData;
         array<DecomposedTransform> decomp(ob->get_motion().size());
-        transform_motion_decompose(decomp.data(), ob->get_motion().data(), ob->get_motion().size());
+        transform_motion_decompose(
+            decomp.data(), ob->get_motion().data(), ob->get_motion().size());
 
         for (size_t i = 0; i < ob->get_motion().size(); ++i) {
           // Scale

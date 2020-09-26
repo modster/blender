@@ -203,8 +203,7 @@ TEST_F(RenderGraph, deduplicate_deep)
       .add_node(ShaderNodeBuilder<ValueNode>("Value2").set("Value", 0.8f))
       .add_node(ShaderNodeBuilder<NoiseTextureNode>("Noise1"))
       .add_node(ShaderNodeBuilder<NoiseTextureNode>("Noise2"))
-      .add_node(
-          ShaderNodeBuilder<MixNode>("Mix").set("Type", NODE_MIX_BLEND).set("Fac", 0.5f))
+      .add_node(ShaderNodeBuilder<MixNode>("Mix").set("Type", NODE_MIX_BLEND).set("Fac", 0.5f))
       .add_connection("Geometry1::Parametric", "Noise1::Vector")
       .add_connection("Value1::Value", "Noise1::Scale")
       .add_connection("Noise1::Color", "Mix::Color1")
@@ -1026,9 +1025,8 @@ static void build_math_partial_test_graph(ShaderGraphBuilder &builder,
                     .set("Value2", constval))
       .add_connection("Attribute::Fac", "Math_xC::Value1")
       /* output sum */
-      .add_node(ShaderNodeBuilder<MathNode>("Out")
-                    .set("Type", NODE_MATH_ADD)
-                    .set("Use Clamp", true))
+      .add_node(
+          ShaderNodeBuilder<MathNode>("Out").set("Type", NODE_MATH_ADD).set("Use Clamp", true))
       .add_connection("Math_Cx::Value", "Out::Value1")
       .add_connection("Math_xC::Value", "Out::Value2")
       .output_value("Out::Value");
@@ -1184,18 +1182,15 @@ static void build_vecmath_partial_test_graph(ShaderGraphBuilder &builder,
   builder
       .add_attribute("Attribute")
       /* constant on the left */
-      .add_node(ShaderNodeBuilder<VectorMathNode>("Math_Cx")
-                    .set("Type", type)
-                    .set("Vector1", constval))
+      .add_node(
+          ShaderNodeBuilder<VectorMathNode>("Math_Cx").set("Type", type).set("Vector1", constval))
       .add_connection("Attribute::Vector", "Math_Cx::Vector2")
       /* constant on the right */
-      .add_node(ShaderNodeBuilder<VectorMathNode>("Math_xC")
-                    .set("Type", type)
-                    .set("Vector2", constval))
+      .add_node(
+          ShaderNodeBuilder<VectorMathNode>("Math_xC").set("Type", type).set("Vector2", constval))
       .add_connection("Attribute::Vector", "Math_xC::Vector1")
       /* output sum */
-      .add_node(ShaderNodeBuilder<VectorMathNode>("Out").set("Type",
-                                                             NODE_VECTOR_MATH_ADD))
+      .add_node(ShaderNodeBuilder<VectorMathNode>("Out").set("Type", NODE_VECTOR_MATH_ADD))
       .add_connection("Math_Cx::Vector", "Out::Vector1")
       .add_connection("Math_xC::Vector", "Out::Vector2")
       .output_color("Out::Vector");
@@ -1517,9 +1512,8 @@ TEST_F(RenderGraph, constant_fold_convert_color_float_color)
   INVALID_INFO_MESSAGE(log, "Folding convert_float_to_color::");
 
   builder.add_attribute("Attribute")
-      .add_node(ShaderNodeBuilder<MathNode>("MathAdd")
-                    .set("Type", NODE_MATH_ADD)
-                    .set("Value2", 0.0f))
+      .add_node(
+          ShaderNodeBuilder<MathNode>("MathAdd").set("Type", NODE_MATH_ADD).set("Value2", 0.0f))
       .add_connection("Attribute::Color", "MathAdd::Value1")
       .output_color("MathAdd::Value");
 

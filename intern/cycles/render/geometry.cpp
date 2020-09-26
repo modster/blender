@@ -247,7 +247,7 @@ bool Geometry::has_voxel_attributes() const
 
 void Geometry::tag_update(Scene *scene, bool rebuild)
 {
-  socket_modified = ~0u;
+  tag_modified();
 
   if (rebuild) {
     need_update_rebuild = true;

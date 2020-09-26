@@ -416,9 +416,9 @@ float ObjectManager::object_surface_area(UpdateObjectTransformState *state,
       size_t num_triangles = mesh->num_triangles();
       for (size_t j = 0; j < num_triangles; j++) {
         Mesh::Triangle t = mesh->get_triangle(j);
-        float3 p1 = mesh->verts[t.v[0]];
-        float3 p2 = mesh->verts[t.v[1]];
-        float3 p3 = mesh->verts[t.v[2]];
+        float3 p1 = mesh->get_verts()[t.v[0]];
+        float3 p2 = mesh->get_verts()[t.v[1]];
+        float3 p3 = mesh->get_verts()[t.v[2]];
 
         surface_area += triangle_area(p1, p2, p3);
       }
@@ -437,9 +437,9 @@ float ObjectManager::object_surface_area(UpdateObjectTransformState *state,
     size_t num_triangles = mesh->num_triangles();
     for (size_t j = 0; j < num_triangles; j++) {
       Mesh::Triangle t = mesh->get_triangle(j);
-      float3 p1 = transform_point(&tfm, mesh->verts[t.v[0]]);
-      float3 p2 = transform_point(&tfm, mesh->verts[t.v[1]]);
-      float3 p3 = transform_point(&tfm, mesh->verts[t.v[2]]);
+      float3 p1 = transform_point(&tfm, mesh->get_verts()[t.v[0]]);
+      float3 p2 = transform_point(&tfm, mesh->get_verts()[t.v[1]]);
+      float3 p3 = transform_point(&tfm, mesh->get_verts()[t.v[2]]);
 
       surface_area += triangle_area(p1, p2, p3);
     }
@@ -542,7 +542,7 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
   kobject.numsteps = (totalsteps - 1) / 2;
   kobject.numverts = (geom->geometry_type == Geometry::MESH ||
                       geom->geometry_type == Geometry::VOLUME) ?
-                         static_cast<Mesh *>(geom)->verts.size() :
+                         static_cast<Mesh *>(geom)->get_verts().size() :
                          0;
   kobject.patch_map_offset = 0;
   kobject.attribute_map_offset = 0;
@@ -841,7 +841,7 @@ void ObjectManager::apply_static_transforms(DeviceScene *dscene, Scene *scene, P
 
     if (geom->geometry_type == Geometry::MESH) {
       Mesh *mesh = static_cast<Mesh *>(geom);
-      apply = apply && mesh->subdivision_type == Mesh::SUBDIVISION_NONE;
+      apply = apply && mesh->get_subdivision_type() == Mesh::SUBDIVISION_NONE;
     }
     else if (geom->geometry_type == Geometry::HAIR) {
       /* Can't apply non-uniform scale to curves, this can't be represented by
