@@ -166,11 +166,27 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema)
   frame_data.clear();
 
   // TODO : store other properties and have a better structure to store these arrays
+  auto geometry_ = object->get_geometry();
+
+  AttributeRequestSet requested_attributes;
+
+  foreach (Node *node, geometry_->get_used_shaders()) {
+    Shader *shader = static_cast<Shader *>(node);
+
+    foreach (const AttributeRequest &attr, shader->attributes.requests) {
+      if (attr.name != "") {
+        requested_attributes.add(attr.name);
+      }
+    }
+  }
+
   for (size_t i = 0; i < schema.getNumSamples(); ++i) {
     frame_data.emplace_back();
     AlembicObject::DataCache &data_cache = frame_data.back();
 
-    auto sample = schema.getValue(ISampleSelector(static_cast<index_t>(i)));
+    ISampleSelector iss = ISampleSelector(static_cast<index_t>(i));
+
+    auto sample = schema.getValue(iss);
 
     auto positions = sample.getPositions();
 
@@ -211,9 +227,73 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema)
         index_offset += face_counts_array[i];
       }
     }
+
+    foreach (const AttributeRequest &attr, requested_attributes.requests) {
+      read_attribute(schema.getArbGeomParams(), iss, attr.name, data_cache);
+    }
   }
 
   data_loaded = true;
+}
+
+void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params, const ISampleSelector &iss, const ustring &attr_name, DataCache &data_cache)
+{
+  for (size_t i = 0; i < arb_geom_params.getNumProperties(); ++i) {
+    const PropertyHeader &prop = arb_geom_params.getPropertyHeader(i);
+
+    if (prop.getName() != attr_name) {
+      continue;
+    }
+
+    if (IV2fProperty::matches(prop.getMetaData()) && Alembic::AbcGeom::isUV(prop)) {
+      // TODO : UV indices
+//      const IV2fGeomParam &param = IV2fGeomParam(arb_geom_params, prop.getName());
+
+//      IV2fGeomParam::Sample sample;
+//      param.getIndexed(sample, iss);
+
+//      if (param.getScope() == kFacevaryingScope) {
+//        V2fArraySamplePtr values = sample.getVals();
+//        UInt32ArraySamplePtr indices = sample.getIndices();
+
+//        AttributeData &attribute = data_cache.attributes.emplace_back();
+//        attribute.name = attr_name;
+//        attribute.std = ATTR_STD_UV;
+//      }
+    }
+    else if (IC3fProperty::matches(prop.getMetaData())) {
+      const IC3fGeomParam &param = IC3fGeomParam(arb_geom_params, prop.getName());
+
+      IC3fGeomParam::Sample sample;
+      param.getIndexed(sample, iss);
+
+      C3fArraySamplePtr values = sample.getVals();
+
+      AttributeData &attribute = data_cache.attributes.emplace_back();
+      attribute.name = attr_name;
+
+      if (param.getScope() == kVaryingScope) {
+        attribute.std = ATTR_STD_VERTEX_COLOR;
+        attribute.data.resize(data_cache.triangles.size() * 3 * sizeof(uchar4));
+
+        uchar4 *data_uchar4 = reinterpret_cast<uchar4 *>(attribute.data.data());
+
+        int offset = 0;
+        for (const int3 &tri : data_cache.triangles) {
+          auto v = (*values)[tri.x];
+          data_uchar4[offset + 0] = color_float_to_byte(make_float3(v.x, v.y, v.z));
+
+          v = (*values)[tri.y];
+          data_uchar4[offset + 1] = color_float_to_byte(make_float3(v.x, v.y, v.z));
+
+          v = (*values)[tri.z];
+          data_uchar4[offset + 2] = color_float_to_byte(make_float3(v.x, v.y, v.z));
+
+          offset += 3;
+        }
+      }
+    }
+  }
 }
 
 NODE_DEFINE(AlembicProcedural)
@@ -430,6 +510,11 @@ void AlembicProcedural::read_mesh(Scene *scene,
     Attribute *attr = mesh->attributes.add(ATTR_STD_GENERATED);
     memcpy(
         attr->data_float3(), mesh->get_verts().data(), sizeof(float3) * mesh->get_verts().size());
+  }
+
+  for (const AlembicObject::AttributeData &attribute : data.attributes) {
+    auto attr = mesh->attributes.add(attribute.std, attribute.name);
+    memcpy(attr->data_uchar4(), attribute.data.data(), attribute.data.size());
   }
 
   if (mesh->is_modified()) {

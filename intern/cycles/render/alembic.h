@@ -17,6 +17,7 @@
 #pragma once
 
 #include "graph/node.h"
+#include "render/attribute.h"
 #include "render/procedural.h"
 #include "util/util_transform.h"
 #include "util/util_vector.h"
@@ -53,10 +54,19 @@ class AlembicObject : public Node {
 
   // TODO : this is only for Meshes at the moment
   // TODO : handle attributes as well
+
+  struct AttributeData {
+      AttributeStandard std;
+      ustring name;
+      array<char> data;
+  };
+
   struct DataCache {
     bool dirty = false;
     array<float3> vertices{};
     array<int3> triangles{};
+
+    vector<AttributeData> attributes{};
   };
 
   DataCache &get_frame_data(int index);
@@ -72,6 +82,8 @@ class AlembicObject : public Node {
   bool data_loaded = false;
 
   vector<DataCache> frame_data;
+
+  void read_attribute(const ICompoundProperty &arb_geom_params, const ISampleSelector &iss, const ustring &attr_name, DataCache &data_cache);
 };
 
 class AlembicProcedural : public Procedural {
