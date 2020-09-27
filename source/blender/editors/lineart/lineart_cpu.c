@@ -1590,7 +1590,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
     reln->element_count = bm->totedge;
     reln->object_ref = orig_ob;
     if (ob->lineart.flags & OBJECT_LRT_OWN_CREASE) {
-      reln->crease_threshold = ob->lineart.crease_threshold;
+      reln->crease_threshold = cosf(DEG2RAD(180.0f - ob->lineart.crease_threshold));
     }
     else {
       reln->crease_threshold = rb->crease_threshold;
@@ -2664,7 +2664,7 @@ LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene)
     rb->shift_y = (asp <= 1) ? c->shifty : c->shifty * asp;
   }
 
-  rb->crease_threshold = scene->lineart.crease_threshold;
+  rb->crease_threshold = cos(DEG2RAD(180.0f - scene->lineart.crease_threshold));
   rb->angle_splitting_threshold = scene->lineart.angle_splitting_threshold;
   rb->chaining_image_threshold = scene->lineart.chaining_image_threshold;
   rb->chaining_geometry_threshold = scene->lineart.chaining_geometry_threshold;

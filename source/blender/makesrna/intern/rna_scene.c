@@ -7402,10 +7402,10 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
   prop = RNA_def_property(srna, "crease_threshold", PROP_FLOAT, PROP_NONE);
-  RNA_def_property_float_default(prop, 0.5f);
+  RNA_def_property_range(prop, 0, 180);
+  RNA_def_property_float_default(prop, 140);
+  RNA_def_property_ui_range(prop, 0.0f, 180.0f, 0.01f, 1);
   RNA_def_property_ui_text(prop, "Crease Threshold", "Cosine value of face angle");
-  RNA_def_property_ui_range(prop, 0.0f, 1.0f, 0.01f, 2);
-  RNA_def_property_flag(prop, PROP_EDITABLE);
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
   prop = RNA_def_property(srna, "angle_splitting_threshold", PROP_FLOAT, PROP_ANGLE);
@@ -7413,7 +7413,6 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Angle Splitting", "Angle splitting threshold");
   /*  Don't allow value very close to PI, or we get a lot of small segments.*/
   RNA_def_property_ui_range(prop, 0.0f, DEG2RAD(179), 0.01f, 2);
-  RNA_def_property_flag(prop, PROP_EDITABLE);
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
   /* types */
