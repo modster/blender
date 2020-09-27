@@ -1666,7 +1666,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       if (usage == OBJECT_LRT_INTERSECTION_ONLY) {
         rt->flags |= LRT_TRIANGLE_INTERSECTION_ONLY;
       }
-      else if (usage == OBJECT_LRT_NO_INTERSECTION) {
+      else if (usage == OBJECT_LRT_NO_INTERSECTION || usage == OBJECT_LRT_OCCLUSION_ONLY) {
         rt->flags |= LRT_TRIANGLE_NO_INTERSECTION;
       }
 
@@ -1691,7 +1691,8 @@ int ED_lineart_object_collection_usage_check(Collection *c, Object *ob)
 
   int object_is_used = (ob->lineart.usage == OBJECT_LRT_INCLUDE ||
                         ob->lineart.usage == OBJECT_LRT_INHERENT ||
-                        ob->lineart.usage == OBJECT_LRT_INTERSECTION_ONLY);
+                        ob->lineart.usage == OBJECT_LRT_INTERSECTION_ONLY ||
+                        ob->lineart.usage == OBJECT_LRT_NO_INTERSECTION);
 
   if (object_is_used && (c->lineart_usage != COLLECTION_LRT_INCLUDE)) {
     if (BKE_collection_has_object_recursive(c, (Object *)(ob->id.orig_id))) {
@@ -1703,6 +1704,9 @@ int ED_lineart_object_collection_usage_check(Collection *c, Object *ob)
       }
       else if (c->lineart_usage == COLLECTION_LRT_INTERSECTION_ONLY) {
         return OBJECT_LRT_INTERSECTION_ONLY;
+      }
+      else if (c->lineart_usage == COLLECTION_LRT_NO_INTERSECTION) {
+        return OBJECT_LRT_NO_INTERSECTION;
       }
     }
   }
@@ -1718,6 +1722,9 @@ int ED_lineart_object_collection_usage_check(Collection *c, Object *ob)
         }
         else if (c->lineart_usage == COLLECTION_LRT_INTERSECTION_ONLY) {
           return OBJECT_LRT_INTERSECTION_ONLY;
+        }
+        else if (c->lineart_usage == COLLECTION_LRT_NO_INTERSECTION) {
+          return OBJECT_LRT_NO_INTERSECTION;
         }
         else {
           return OBJECT_LRT_INHERENT;
@@ -3439,7 +3446,7 @@ static void lineart_main_add_triangles(LineartRenderBuffer *rb)
                                                 0,
                                                 1,
                                                 0,
-                                                (!(rt->flags & OBJECT_LRT_NO_INTERSECTION)));
+                                                (!(rt->flags & LRT_TRIANGLE_NO_INTERSECTION)));
           }
         }
         temp_count++;

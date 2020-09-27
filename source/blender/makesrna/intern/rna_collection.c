@@ -508,13 +508,18 @@ void RNA_def_collections(BlenderRNA *brna)
        0,
        "Intersection Only",
        "Only generate intersection lines with this collection"},
+      {COLLECTION_LRT_NO_INTERSECTION,
+       "NO_INTERSECTION",
+       0,
+       "No Intersection",
+       "Do not generate intersection lines for this collection"},
       {0, NULL, 0, NULL, NULL}};
 
   prop = RNA_def_property(srna, "lineart_usage", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_collection_lineart_usage);
   RNA_def_property_ui_text(prop, "Usage", "How to use this collection in LRT");
   RNA_def_property_update(prop, NC_SCENE, NULL);
-  
+
   prop = RNA_def_property(srna, "color_tag", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "color_tag");
   RNA_def_property_enum_items(prop, rna_enum_collection_color_items);
