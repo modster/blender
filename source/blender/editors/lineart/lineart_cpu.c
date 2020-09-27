@@ -807,6 +807,13 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
   rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment)); \
   BLI_addtail(&rl->segments, rls);
 
+  int use_w = 3;
+  if (!rb->cam_is_persp) {
+    clip_start = 0;
+    clip_end = 1;
+    use_w = 2;
+  }
+
   LISTBASE_FOREACH (LineartRenderElementLinkNode *, reln, &rb->triangle_buffer_pointers) {
     if (reln->flags & LRT_ELEMENT_IS_ADDITIONAL) {
       continue;
@@ -822,25 +829,25 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
 
       if (clip_far) {
         /* Point outside far plane */
-        if (rt->v[0]->fbcoord[3] > clip_end) {
+        if (rt->v[0]->fbcoord[use_w] > clip_end) {
           in0 = 1;
         }
-        if (rt->v[1]->fbcoord[3] > clip_end) {
+        if (rt->v[1]->fbcoord[use_w] > clip_end) {
           in1 = 1;
         }
-        if (rt->v[2]->fbcoord[3] > clip_end) {
+        if (rt->v[2]->fbcoord[use_w] > clip_end) {
           in2 = 1;
         }
       }
       else {
         /* Point inside near plane */
-        if (rt->v[0]->fbcoord[3] < clip_start) {
+        if (rt->v[0]->fbcoord[use_w] < clip_start) {
           in0 = 1;
         }
-        if (rt->v[1]->fbcoord[3] < clip_start) {
+        if (rt->v[1]->fbcoord[use_w] < clip_start) {
           in1 = 1;
         }
-        if (rt->v[2]->fbcoord[3] < clip_start) {
+        if (rt->v[2]->fbcoord[use_w] < clip_start) {
           in2 = 1;
         }
       }
@@ -2427,7 +2434,7 @@ static void lineart_main_compute_scene_contours(LineartRenderBuffer *rb)
   double *view_vector = rb->view_vector;
   double dot_1 = 0, dot_2 = 0;
   double result;
-  int add = 0;
+  int add = 0, added = 0;
   int contour_count = 0;
   int crease_count = 0;
   int material_count = 0;
@@ -2442,6 +2449,7 @@ static void lineart_main_compute_scene_contours(LineartRenderBuffer *rb)
     for (int i = 0; i < amount; i++) {
       rl = &((LineartRenderLine *)reln->pointer)[i];
       add = 0;
+      added = 0;
       dot_1 = 0;
       dot_2 = 0;
 
@@ -2493,27 +2501,35 @@ static void lineart_main_compute_scene_contours(LineartRenderBuffer *rb)
       }
 
       if (rb->use_contour && (add == 1)) {
+        rl->flags &= ~LRT_EDGE_FLAG_ALL_TYPE;
         rl->flags |= LRT_EDGE_FLAG_CONTOUR;
         lineart_list_append_pointer_static(&rb->contours, &rb->render_data_pool, rl);
+        added = 1;
         contour_count++;
       }
       else if (add == 2) {
+        rl->flags &= ~LRT_EDGE_FLAG_ALL_TYPE;
         rl->flags |= LRT_EDGE_FLAG_CREASE;
         lineart_list_append_pointer_static(&rb->crease_lines, &rb->render_data_pool, rl);
+        added = 1;
         crease_count++;
       }
       else if (rb->use_material && (add == 3)) {
+        rl->flags &= ~LRT_EDGE_FLAG_ALL_TYPE;
         rl->flags |= LRT_EDGE_FLAG_MATERIAL;
         lineart_list_append_pointer_static(&rb->material_lines, &rb->render_data_pool, rl);
+        added = 1;
         material_count++;
       }
       else if (rb->use_edge_marks && (rl->flags & LRT_EDGE_FLAG_EDGE_MARK)) {
-        /*  no need to mark again */
+        rl->flags &= ~LRT_EDGE_FLAG_ALL_TYPE;
+        rl->flags = LRT_EDGE_FLAG_EDGE_MARK;
         add = 4;
         lineart_list_append_pointer_static(&rb->edge_marks, &rb->render_data_pool, rl);
+        added = 1;
         /*  continue; */
       }
-      if (add) {
+      if (added) {
         int r1, r2, c1, c2, row, col;
         if (lineart_get_line_bounding_areas(rb, rl, &r1, &r2, &c1, &c2)) {
           for (row = r1; row != r2 + 1; row++) {
@@ -3949,6 +3965,17 @@ static void lineart_gpencil_notify_targets(Depsgraph *dg)
   DEG_OBJECT_ITER_END;
 }
 
+int lineart_rb_line_types(LineartRenderBuffer *rb)
+{
+  int types = 0;
+  types |= rb->use_contour ? LRT_EDGE_FLAG_CONTOUR : 0;
+  types |= rb->use_crease ? LRT_EDGE_FLAG_CREASE : 0;
+  types |= rb->use_material ? LRT_EDGE_FLAG_MATERIAL : 0;
+  types |= rb->use_edge_marks ? LRT_EDGE_FLAG_EDGE_MARK : 0;
+  types |= rb->use_intersections ? LRT_EDGE_FLAG_INTERSECTION : 0;
+  return types;
+}
+
 void ED_lineart_gpencil_generate_from_chain(Depsgraph *UNUSED(depsgraph),
                                             float **gp_obmat_inverse,
                                             bGPDlayer *UNUSED(gpl),
@@ -4001,12 +4028,14 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *UNUSED(depsgraph),
   float mat[4][4];
   unit_m4(mat);
 
+  int enabled_types = lineart_rb_line_types(rb);
+
   LISTBASE_FOREACH (LineartRenderLineChain *, rlc, &rb->chains) {
 
     if (rlc->picked) {
       continue;
     }
-    if (!(rlc->type & types)) {
+    if (!(rlc->type & (types & enabled_types))) {
       continue;
     }
     if (rlc->level > level_end || rlc->level < level_start) {
