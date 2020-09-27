@@ -1928,7 +1928,7 @@ static void outliner_draw_mode_column_toggle(uiBlock *block,
       const char *tip;
 
       if (draw_active_icon && ob->mode == tvc->obact->mode) {
-        icon = UI_mode_icon_get(active_mode);
+        icon = UI_icon_from_object_mode(active_mode);
         tip = TIP_("Remove from the current mode");
       }
       else {
@@ -2137,163 +2137,12 @@ TreeElementIcon tree_element_get_icon(TreeStoreElem *tselem, TreeElement *te)
 
         if (ob->type != OB_GPENCIL) {
           ModifierData *md = BLI_findlink(&ob->modifiers, tselem->nr);
-          switch ((ModifierType)md->type) {
-            case eModifierType_Subsurf:
-              data.icon = ICON_MOD_SUBSURF;
-              break;
-            case eModifierType_Armature:
-              data.icon = ICON_MOD_ARMATURE;
-              break;
-            case eModifierType_Lattice:
-              data.icon = ICON_MOD_LATTICE;
-              break;
-            case eModifierType_Curve:
-              data.icon = ICON_MOD_CURVE;
-              break;
-            case eModifierType_Build:
-              data.icon = ICON_MOD_BUILD;
-              break;
-            case eModifierType_Mirror:
-              data.icon = ICON_MOD_MIRROR;
-              break;
-            case eModifierType_Decimate:
-              data.icon = ICON_MOD_DECIM;
-              break;
-            case eModifierType_Wave:
-              data.icon = ICON_MOD_WAVE;
-              break;
-            case eModifierType_Hook:
-              data.icon = ICON_HOOK;
-              break;
-            case eModifierType_Softbody:
-              data.icon = ICON_MOD_SOFT;
-              break;
-            case eModifierType_Boolean:
-              data.icon = ICON_MOD_BOOLEAN;
-              break;
-            case eModifierType_ParticleSystem:
-              data.icon = ICON_MOD_PARTICLES;
-              break;
-            case eModifierType_ParticleInstance:
-              data.icon = ICON_MOD_PARTICLES;
-              break;
-            case eModifierType_EdgeSplit:
-              data.icon = ICON_MOD_EDGESPLIT;
-              break;
-            case eModifierType_Array:
-              data.icon = ICON_MOD_ARRAY;
-              break;
-            case eModifierType_UVProject:
-            case eModifierType_UVWarp: /* TODO, get own icon */
-              data.icon = ICON_MOD_UVPROJECT;
-              break;
-            case eModifierType_Displace:
-              data.icon = ICON_MOD_DISPLACE;
-              break;
-            case eModifierType_Shrinkwrap:
-              data.icon = ICON_MOD_SHRINKWRAP;
-              break;
-            case eModifierType_Cast:
-              data.icon = ICON_MOD_CAST;
-              break;
-            case eModifierType_MeshDeform:
-            case eModifierType_SurfaceDeform:
-              data.icon = ICON_MOD_MESHDEFORM;
-              break;
-            case eModifierType_Bevel:
-              data.icon = ICON_MOD_BEVEL;
-              break;
-            case eModifierType_Smooth:
-            case eModifierType_LaplacianSmooth:
-            case eModifierType_CorrectiveSmooth:
-              data.icon = ICON_MOD_SMOOTH;
-              break;
-            case eModifierType_SimpleDeform:
-              data.icon = ICON_MOD_SIMPLEDEFORM;
-              break;
-            case eModifierType_Mask:
-              data.icon = ICON_MOD_MASK;
-              break;
-            case eModifierType_Cloth:
-              data.icon = ICON_MOD_CLOTH;
-              break;
-            case eModifierType_Explode:
-              data.icon = ICON_MOD_EXPLODE;
-              break;
-            case eModifierType_Collision:
-            case eModifierType_Surface:
-              data.icon = ICON_MOD_PHYSICS;
-              break;
-            case eModifierType_Fluidsim: /* deprecated, old fluid modifier */
-              data.icon = ICON_MOD_FLUIDSIM;
-              break;
-            case eModifierType_Multires:
-              data.icon = ICON_MOD_MULTIRES;
-              break;
-            case eModifierType_Fluid:
-              data.icon = ICON_MOD_FLUID;
-              break;
-            case eModifierType_Solidify:
-              data.icon = ICON_MOD_SOLIDIFY;
-              break;
-            case eModifierType_Screw:
-              data.icon = ICON_MOD_SCREW;
-              break;
-            case eModifierType_Remesh:
-              data.icon = ICON_MOD_REMESH;
-              break;
-            case eModifierType_WeightVGEdit:
-            case eModifierType_WeightVGMix:
-            case eModifierType_WeightVGProximity:
-              data.icon = ICON_MOD_VERTEX_WEIGHT;
-              break;
-            case eModifierType_DynamicPaint:
-              data.icon = ICON_MOD_DYNAMICPAINT;
-              break;
-            case eModifierType_Ocean:
-              data.icon = ICON_MOD_OCEAN;
-              break;
-            case eModifierType_Warp:
-              data.icon = ICON_MOD_WARP;
-              break;
-            case eModifierType_Skin:
-              data.icon = ICON_MOD_SKIN;
-              break;
-            case eModifierType_Triangulate:
-              data.icon = ICON_MOD_TRIANGULATE;
-              break;
-            case eModifierType_MeshCache:
-              data.icon = ICON_MOD_MESHDEFORM; /* XXX, needs own icon */
-              break;
-            case eModifierType_MeshSequenceCache:
-              data.icon = ICON_MOD_MESHDEFORM; /* XXX, needs own icon */
-              break;
-            case eModifierType_Wireframe:
-              data.icon = ICON_MOD_WIREFRAME;
-              break;
-            case eModifierType_Weld:
-              data.icon = ICON_AUTOMERGE_OFF; /* XXX, needs own icon */
-              break;
-            case eModifierType_LaplacianDeform:
-              data.icon = ICON_MOD_MESHDEFORM; /* XXX, needs own icon */
-              break;
-            case eModifierType_DataTransfer:
-              data.icon = ICON_MOD_DATA_TRANSFER;
-              break;
-            case eModifierType_NormalEdit:
-            case eModifierType_WeightedNormal:
-              data.icon = ICON_MOD_NORMALEDIT;
-              break;
-            case eModifierType_Simulation:
-              data.icon = ICON_PHYSICS; /* TODO: Use correct icon. */
-              break;
-              /* Default */
-            case eModifierType_None:
-            case eModifierType_ShapeKey:
-
-            case NUM_MODIFIER_TYPES:
-              data.icon = ICON_DOT;
-              break;
+          const ModifierTypeInfo *modifier_type = BKE_modifier_get_info(md->type);
+          if (modifier_type != NULL) {
+            data.icon = modifier_type->icon;
+          }
+          else {
+            data.icon = ICON_DOT;
           }
         }
         else {
@@ -2769,42 +2618,37 @@ static void tselem_draw_icon(uiBlock *block,
                              const bool is_clickable)
 {
   TreeElementIcon data = tree_element_get_icon(tselem, te);
-
   if (data.icon == 0) {
     return;
   }
 
-  if (outliner_is_collection_tree_element(te)) {
-    Collection *collection = outliner_collection_from_tree_element(te);
+  const bool is_collection = outliner_is_collection_tree_element(te);
 
+  /* Collection colors and icons covered by restrict buttons. */
+  if (!is_clickable || x >= xmax || is_collection) {
     /* placement of icons, copied from interface_widgets.c */
     float aspect = (0.8f * UI_UNIT_Y) / ICON_DEFAULT_HEIGHT;
     x += 2.0f * aspect;
     y += 2.0f * aspect;
-    if (collection->color_tag != COLLECTION_COLOR_NONE) {
-      bTheme *btheme = UI_GetTheme();
-      UI_icon_draw_ex(x,
-                      y,
-                      data.icon,
-                      U.inv_dpi_fac,
-                      alpha,
-                      0.0f,
-                      btheme->collection_color[collection->color_tag].color,
-                      true);
+
+    if (is_collection) {
+      Collection *collection = outliner_collection_from_tree_element(te);
+      if (collection->color_tag != COLLECTION_COLOR_NONE) {
+        bTheme *btheme = UI_GetTheme();
+        UI_icon_draw_ex(x,
+                        y,
+                        data.icon,
+                        U.inv_dpi_fac,
+                        alpha,
+                        0.0f,
+                        btheme->collection_color[collection->color_tag].color,
+                        true);
+        return;
+      }
     }
-    else {
-      UI_icon_draw_ex(x, y, data.icon, U.inv_dpi_fac, alpha, 0.0f, NULL, true);
-    }
-  }
-  /* Icon is covered by restrict buttons */
-  else if (!is_clickable || x >= xmax) {
+
     /* Reduce alpha to match icon buttons */
     alpha *= 0.8f;
-
-    /* placement of icons, copied from interface_widgets.c */
-    float aspect = (0.8f * UI_UNIT_Y) / ICON_DEFAULT_HEIGHT;
-    x += 2.0f * aspect;
-    y += 2.0f * aspect;
 
     /* restrict column clip... it has been coded by simply overdrawing,
      * doesn't work for buttons */
@@ -3252,7 +3096,7 @@ static void outliner_draw_tree_element(bContext *C,
 
     if (ELEM(tselem->type, 0, TSE_LAYER_COLLECTION) ||
         ((tselem->type == TSE_RNA_STRUCT) && RNA_struct_is_ID(te->rnaptr.type))) {
-      const BIFIconID lib_icon = UI_library_icon_get(tselem->id);
+      const BIFIconID lib_icon = UI_icon_from_library(tselem->id);
       if (lib_icon != ICON_NONE) {
         UI_icon_draw_alpha(
             (float)startx + offsx + 2 * ufac, (float)*starty + 2 * ufac, lib_icon, alpha_fac);
@@ -3360,7 +3204,6 @@ static void outliner_draw_hierarchy_lines_recursive(uint pos,
 {
   bTheme *btheme = UI_GetTheme();
   int y = *starty;
-  short color_tag = COLLECTION_COLOR_NONE;
 
   /* Small vertical padding */
   const short line_padding = UI_UNIT_Y / 4.0f;
@@ -3371,8 +3214,9 @@ static void outliner_draw_hierarchy_lines_recursive(uint pos,
     TreeStoreElem *tselem = TREESTORE(te);
     draw_hierarchy_line = false;
     *starty -= UI_UNIT_Y;
+    short color_tag = COLLECTION_COLOR_NONE;
 
-    /* Only draw hierarchy lines for open collections. */
+    /* Only draw hierarchy lines for expanded collections and objects with children. */
     if (TSELEM_OPEN(tselem, space_outliner) && !BLI_listbase_is_empty(&te->subtree)) {
       if (tselem->type == TSE_LAYER_COLLECTION) {
         draw_hierarchy_line = true;

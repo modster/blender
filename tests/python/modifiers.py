@@ -216,6 +216,7 @@ def main():
                  [ModifierSpec("subdivision", 'SUBSURF', {"levels": 2})]),
 
         # 34
+
         MeshTest("SphereTriangulate", "testSphereTriangulate", "expectedSphereTriangulate",
                  [ModifierSpec('triangulate', 'TRIANGULATE', {})]),
         MeshTest("MonkeyWireframe", "testMonkeyWireframe", "expectedMonkeyWireframe",
@@ -228,9 +229,10 @@ def main():
         MeshTest("MergedWeld", "testMergedWeld", "expectedMergedWeld",
                  [ModifierSpec("weld", 'WELD', {"merge_threshold": 0.021})]),
         MeshTest("MergedAllWeld", "testMergedAllWeld", "expectedMergedAllWeld",
-                 [ModifierSpec("weld", 'WELD', {"merge_threshold": 1.1})]),
+                 [ModifierSpec("weld", 'WELD', {"merge_threshold": 1.8})]),
         MeshTest("MergedNoneWeld", "testMergedNoneWeld", "expectedMergedNoneWeld",
                  [ModifierSpec("weld", 'WELD', {"merge_threshold": 0.019})]),
+
 
         #############################################
         # One 'Deform' modifier on primitive meshes
