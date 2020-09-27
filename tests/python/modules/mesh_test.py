@@ -62,7 +62,7 @@ class ModifierSpec:
         :param modifier_name: str - name of object modifier, e.g. "myFirstSubsurfModif"
         :param modifier_type: str - type of object modifier, e.g. "SUBSURF"
         :param modifier_parameters: dict - {name : val} dictionary giving modifier parameters, e.g. {"quality" : 4}
-        :param frame_end:int - frame at which simulation needs to be baked or modifier needs to be applied.
+        :param frame_end: int - frame at which simulation needs to be baked or modifier needs to be applied.
         """
         self.modifier_name = modifier_name
         self.modifier_type = modifier_type
@@ -85,7 +85,7 @@ class ParticleSystemSpec:
         :param modifier_name: str - name of object modifier, e.g. "Particles"
         :param modifier_type: str - type of object modifier, e.g. "PARTICLE_SYSTEM"
         :param modifier_parameters: dict - {name : val} dictionary giving modifier parameters, e.g. {"seed" : 1}
-        :param frame_end:int - the last frame of the simulation at which the modifier is applied
+        :param frame_end: int - the last frame of the simulation at which the modifier is applied
         """
         self.modifier_name = modifier_name
         self.modifier_type = modifier_type
