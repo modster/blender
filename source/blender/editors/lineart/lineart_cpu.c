@@ -1689,30 +1689,14 @@ int ED_lineart_object_collection_usage_check(Collection *c, Object *ob)
     return OBJECT_LRT_INHERENT;
   }
 
-  int object_is_used = (ob->lineart.usage == OBJECT_LRT_INCLUDE ||
-                        ob->lineart.usage == OBJECT_LRT_INHERENT ||
-                        ob->lineart.usage == OBJECT_LRT_INTERSECTION_ONLY ||
-                        ob->lineart.usage == OBJECT_LRT_NO_INTERSECTION);
+  int object_is_used = (ob->lineart.usage != OBJECT_LRT_INHERENT);
 
-  if (object_is_used && (c->lineart_usage != COLLECTION_LRT_INCLUDE)) {
-    if (BKE_collection_has_object_recursive(c, (Object *)(ob->id.orig_id))) {
-      if (c->lineart_usage == COLLECTION_LRT_EXCLUDE) {
-        return OBJECT_LRT_EXCLUDE;
-      }
-      else if (c->lineart_usage == COLLECTION_LRT_OCCLUSION_ONLY) {
-        return OBJECT_LRT_OCCLUSION_ONLY;
-      }
-      else if (c->lineart_usage == COLLECTION_LRT_INTERSECTION_ONLY) {
-        return OBJECT_LRT_INTERSECTION_ONLY;
-      }
-      else if (c->lineart_usage == COLLECTION_LRT_NO_INTERSECTION) {
-        return OBJECT_LRT_NO_INTERSECTION;
-      }
-    }
+  if (object_is_used) {
+    return ob->lineart.usage;
   }
 
   if (c->children.first == NULL) {
-    if (BKE_collection_has_object(c, ob)) {
+    if (BKE_collection_has_object(c, (Object *)(ob->id.orig_id))) {
       if (ob->lineart.usage == OBJECT_LRT_INHERENT) {
         if (c->lineart_usage == COLLECTION_LRT_OCCLUSION_ONLY) {
           return OBJECT_LRT_OCCLUSION_ONLY;
@@ -2386,9 +2370,13 @@ static void lineart_triangle_intersections_in_bounding_area(LineartRenderBuffer 
     next_lip = lip->next;
     testing_triangle = lip->data;
     rtt = (LineartRenderTriangleThread *)testing_triangle;
+
+    /* Note: No self intersect because these triangles doesn't take part in occlusion. */
+
     if (testing_triangle == rt || rtt->testing[0] == (LineartRenderLine *)rt ||
-        //((rt->flags & LRT_CULL_GENERATED) && (testing_triangle->flags & LRT_CULL_GENERATED)) ||
         (testing_triangle->flags & LRT_TRIANGLE_NO_INTERSECTION) ||
+        ((testing_triangle->flags & LRT_TRIANGLE_INTERSECTION_ONLY) &&
+         (rt->flags & LRT_TRIANGLE_INTERSECTION_ONLY)) ||
         lineart_triangle_share_edge(rt, testing_triangle)) {
       continue;
     }
