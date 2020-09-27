@@ -200,6 +200,7 @@ enum ObjectFeatureLine_Usage {
   OBJECT_LRT_OCCLUSION_ONLY = (1 << 1),
   OBJECT_LRT_EXCLUDE = (1 << 2),
   OBJECT_LRT_INTERSECTION_ONLY = (1 << 3),
+  OBJECT_LRT_NO_INTERSECTION = (1 << 4),
 };
 
 enum ObjectFeatureLine_Flags {

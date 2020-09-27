@@ -110,7 +110,8 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
                                                 LineartRenderTriangle *rt,
                                                 double *LRUB,
                                                 int recursive,
-                                                int recursive_level);
+                                                int recursive_level,
+                                                bool do_intersection);
 
 static int lineart_triangle_line_imagespace_intersection_v2(SpinLock *spl,
                                                             const LineartRenderTriangle *rt,
@@ -1599,6 +1600,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
                                                     sizeof(LineartRenderElementLinkNode));
     reln->element_count = bm->totface;
     reln->object_ref = orig_ob;
+    reln->flags |= (usage == OBJECT_LRT_NO_INTERSECTION ? LRT_ELEMENT_NO_INTERSECTION : 0);
 
     for (i = 0; i < bm->totvert; i++) {
       v = BM_vert_at_index(bm, i);
@@ -1628,7 +1630,8 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       LineartRenderLineSegment *rls = lineart_mem_aquire(&rb->render_data_pool,
                                                          sizeof(LineartRenderLineSegment));
       BLI_addtail(&rl->segments, rls);
-      if (usage == OBJECT_LRT_INHERENT) {
+      if (usage == OBJECT_LRT_INHERENT || usage == OBJECT_LRT_INCLUDE ||
+          usage == OBJECT_LRT_NO_INTERSECTION) {
         BLI_addtail(&rb->all_render_lines, rl);
       }
       rl++;
@@ -1662,6 +1665,9 @@ static void lineart_geometry_object_load(Depsgraph *dg,
 
       if (usage == OBJECT_LRT_INTERSECTION_ONLY) {
         rt->flags |= LRT_TRIANGLE_INTERSECTION_ONLY;
+      }
+      else if (usage == OBJECT_LRT_NO_INTERSECTION) {
+        rt->flags |= LRT_TRIANGLE_NO_INTERSECTION;
       }
 
       rt = (LineartRenderTriangle *)(((unsigned char *)rt) + rb->triangle_size);
@@ -1702,7 +1708,7 @@ int ED_lineart_object_collection_usage_check(Collection *c, Object *ob)
   }
 
   if (c->children.first == NULL) {
-    if (BKE_collection_has_object(c, (Object *)(ob->id.orig_id))) {
+    if (BKE_collection_has_object(c, ob)) {
       if (ob->lineart.usage == OBJECT_LRT_INHERENT) {
         if (c->lineart_usage == COLLECTION_LRT_OCCLUSION_ONLY) {
           return OBJECT_LRT_OCCLUSION_ONLY;
@@ -2375,6 +2381,7 @@ static void lineart_triangle_intersections_in_bounding_area(LineartRenderBuffer 
     rtt = (LineartRenderTriangleThread *)testing_triangle;
     if (testing_triangle == rt || rtt->testing[0] == (LineartRenderLine *)rt ||
         //((rt->flags & LRT_CULL_GENERATED) && (testing_triangle->flags & LRT_CULL_GENERATED)) ||
+        (testing_triangle->flags & LRT_TRIANGLE_NO_INTERSECTION) ||
         lineart_triangle_share_edge(rt, testing_triangle)) {
       continue;
     }
@@ -3068,16 +3075,16 @@ static void lineart_bounding_area_split(LineartRenderBuffer *rb,
     b[2] = MAX3(rt->v[0]->fbcoord[1], rt->v[1]->fbcoord[1], rt->v[2]->fbcoord[1]);
     b[3] = MIN3(rt->v[0]->fbcoord[1], rt->v[1]->fbcoord[1], rt->v[2]->fbcoord[1]);
     if (LRT_BOUND_AREA_CROSSES(b, &cba[0].l)) {
-      lineart_bounding_area_link_triangle(rb, &cba[0], rt, b, 0, recursive_level + 1);
+      lineart_bounding_area_link_triangle(rb, &cba[0], rt, b, 0, recursive_level + 1, false);
     }
     if (LRT_BOUND_AREA_CROSSES(b, &cba[1].l)) {
-      lineart_bounding_area_link_triangle(rb, &cba[1], rt, b, 0, recursive_level + 1);
+      lineart_bounding_area_link_triangle(rb, &cba[1], rt, b, 0, recursive_level + 1, false);
     }
     if (LRT_BOUND_AREA_CROSSES(b, &cba[2].l)) {
-      lineart_bounding_area_link_triangle(rb, &cba[2], rt, b, 0, recursive_level + 1);
+      lineart_bounding_area_link_triangle(rb, &cba[2], rt, b, 0, recursive_level + 1, false);
     }
     if (LRT_BOUND_AREA_CROSSES(b, &cba[3].l)) {
-      lineart_bounding_area_link_triangle(rb, &cba[3], rt, b, 0, recursive_level + 1);
+      lineart_bounding_area_link_triangle(rb, &cba[3], rt, b, 0, recursive_level + 1, false);
     }
   }
 
@@ -3174,7 +3181,8 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
                                                 LineartRenderTriangle *rt,
                                                 double *LRUB,
                                                 int recursive,
-                                                int recursive_level)
+                                                int recursive_level,
+                                                bool do_intersection)
 {
   if (!lineart_bounding_area_triangle_covered(rb, rt, root_ba)) {
     return;
@@ -3189,7 +3197,7 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
     if (root_ba->triangle_count > 200 && recursive && recursive_level < 10) {
       lineart_bounding_area_split(rb, root_ba, recursive_level);
     }
-    if (recursive && rb->use_intersections) {
+    if (recursive && do_intersection && rb->use_intersections) {
       lineart_triangle_intersections_in_bounding_area(rb, rt, root_ba);
     }
   }
@@ -3205,16 +3213,20 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
       B1 = b;
     }
     if (LRT_BOUND_AREA_CROSSES(B1, &ba[0].l)) {
-      lineart_bounding_area_link_triangle(rb, &ba[0], rt, B1, recursive, recursive_level + 1);
+      lineart_bounding_area_link_triangle(
+          rb, &ba[0], rt, B1, recursive, recursive_level + 1, do_intersection);
     }
     if (LRT_BOUND_AREA_CROSSES(B1, &ba[1].l)) {
-      lineart_bounding_area_link_triangle(rb, &ba[1], rt, B1, recursive, recursive_level + 1);
+      lineart_bounding_area_link_triangle(
+          rb, &ba[1], rt, B1, recursive, recursive_level + 1, do_intersection);
     }
     if (LRT_BOUND_AREA_CROSSES(B1, &ba[2].l)) {
-      lineart_bounding_area_link_triangle(rb, &ba[2], rt, B1, recursive, recursive_level + 1);
+      lineart_bounding_area_link_triangle(
+          rb, &ba[2], rt, B1, recursive, recursive_level + 1, do_intersection);
     }
     if (LRT_BOUND_AREA_CROSSES(B1, &ba[3].l)) {
-      lineart_bounding_area_link_triangle(rb, &ba[3], rt, B1, recursive, recursive_level + 1);
+      lineart_bounding_area_link_triangle(
+          rb, &ba[3], rt, B1, recursive, recursive_level + 1, do_intersection);
     }
   }
 }
@@ -3421,8 +3433,13 @@ static void lineart_main_add_triangles(LineartRenderBuffer *rb)
       if (lineart_get_triangle_bounding_areas(rb, rt, &y1, &y2, &x1, &x2)) {
         for (co = x1; co <= x2; co++) {
           for (r = y1; r <= y2; r++) {
-            lineart_bounding_area_link_triangle(
-                rb, &rb->initial_bounding_areas[r * 4 + co], rt, 0, 1, 0);
+            lineart_bounding_area_link_triangle(rb,
+                                                &rb->initial_bounding_areas[r * 4 + co],
+                                                rt,
+                                                0,
+                                                1,
+                                                0,
+                                                (!(rt->flags & OBJECT_LRT_NO_INTERSECTION)));
           }
         }
         temp_count++;

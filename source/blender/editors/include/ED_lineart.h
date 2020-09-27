@@ -75,6 +75,7 @@ typedef struct LineartRenderTriangleThread {
 typedef enum eLineArtElementNodeFlag {
   LRT_ELEMENT_IS_ADDITIONAL = (1 << 0),
   LRT_ELEMENT_BORDER_ONLY = (1 << 1),
+  LRT_ELEMENT_NO_INTERSECTION = (1 << 2),
 } eLineArtElementNodeFlag;
 
 typedef struct LineartRenderElementLinkNode {
@@ -359,6 +360,7 @@ typedef enum eLineartTriangleFlags {
   LRT_CULL_DISCARD = (1 << 1),
   LRT_CULL_GENERATED = (1 << 2),
   LRT_TRIANGLE_INTERSECTION_ONLY = (1 << 3),
+  LRT_TRIANGLE_NO_INTERSECTION = (1 << 4),
 } eLineartTriangleFlags;
 
 /** Controls how many lines a worker thread is processing at one request.
@@ -565,9 +567,9 @@ bool ED_lineart_calculation_flag_check(eLineartRenderStatus flag);
 
 void ED_lineart_modifier_sync_flag_set(eLineartModifierSyncStatus flag, bool is_from_modifier);
 bool ED_lineart_modifier_sync_flag_check(eLineartModifierSyncStatus flag);
-void ED_lineart_modifier_sync_add_customer();
-void ED_lineart_modifier_sync_remove_customer();
-bool ED_lineart_modifier_sync_still_has_customer();
+void ED_lineart_modifier_sync_add_customer(void);
+void ED_lineart_modifier_sync_remove_customer(void);
+bool ED_lineart_modifier_sync_still_has_customer(void);
 
 int ED_lineart_compute_feature_lines_internal(struct Depsgraph *depsgraph,
                                               const int show_frame_progress);
