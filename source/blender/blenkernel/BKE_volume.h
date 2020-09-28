@@ -165,7 +165,7 @@ typename GridType::Ptr BKE_volume_grid_openvdb_for_write(const struct Volume *vo
 {
   openvdb::GridBase::Ptr openvdb_grid = BKE_volume_grid_openvdb_for_write(volume, grid, clear);
   BLI_assert(openvdb_grid->isType<GridType>());
-  typename GridType::Ptr typed_openvdb_grid = openvdb::StaticPtrCast<GridType>(openvdb_grid);
+  typename GridType::Ptr typed_openvdb_grid = openvdb::gridPtrCast<GridType>(openvdb_grid);
   return typed_openvdb_grid;
 }
 

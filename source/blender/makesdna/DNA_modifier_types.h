@@ -2228,7 +2228,7 @@ typedef struct MeshToVolumeModifierData {
   char fill_volume;
   char _pad1[3];
 
-  /** Bandwidths are on object space. */
+  /** Bandwidths are in object space. */
   float interior_bandwidth;
   float exterior_bandwidth;
 } MeshToVolumeModifierData;
