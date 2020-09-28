@@ -182,12 +182,12 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
   }
 
   for (size_t i = 0; i < schema.getNumSamples(); ++i) {
-	AlembicObject::DataCache &data_cache = frame_data.emplace_back();
+    AlembicObject::DataCache &data_cache = frame_data.emplace_back();
 
-	const ISampleSelector iss = ISampleSelector(static_cast<index_t>(i));
-	const IPolyMeshSchema::Sample sample = schema.getValue(iss);
+    const ISampleSelector iss = ISampleSelector(static_cast<index_t>(i));
+    const IPolyMeshSchema::Sample sample = schema.getValue(iss);
 
-	const P3fArraySamplePtr positions = sample.getPositions();
+    const P3fArraySamplePtr positions = sample.getPositions();
 
     if (positions) {
       data_cache.vertices.reserve(positions->size());
@@ -198,16 +198,16 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
       }
     }
 
-	Int32ArraySamplePtr face_counts = sample.getFaceCounts();
-	Int32ArraySamplePtr face_indices = sample.getFaceIndices();
+    Int32ArraySamplePtr face_counts = sample.getFaceCounts();
+    Int32ArraySamplePtr face_indices = sample.getFaceIndices();
 
     if (face_counts && face_indices) {
-	  const size_t num_faces = face_counts->size();
+      const size_t num_faces = face_counts->size();
       const int *face_counts_array = face_counts->get();
       const int *face_indices_array = face_indices->get();
 
-	  size_t num_triangles = 0;
-	  for (size_t i = 0; i < face_counts->size(); i++) {
+      size_t num_triangles = 0;
+      for (size_t i = 0; i < face_counts->size(); i++) {
         num_triangles += face_counts_array[i] - 2;
       }
 
@@ -228,7 +228,7 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
     }
 
     foreach (const AttributeRequest &attr, requested_attributes.requests) {
-	  read_attribute(schema.getArbGeomParams(), iss, attr.name, data_cache);
+      read_attribute(schema.getArbGeomParams(), iss, attr.name, data_cache);
     }
   }
 
@@ -279,7 +279,7 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params, con
 
         int offset = 0;
         for (const int3 &tri : data_cache.triangles) {
-		  Imath::C3f v = (*values)[tri.x];
+          Imath::C3f v = (*values)[tri.x];
           data_uchar4[offset + 0] = color_float_to_byte(make_float3(v.x, v.y, v.z));
 
           v = (*values)[tri.y];
