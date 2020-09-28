@@ -960,6 +960,7 @@ static float *gpencil_stroke_points_from_editcurve_adaptive_resolu(
     bGPDcurve_point *cpt_next = &curve_point_array[i + 1];
     float arclen = gpencil_approximate_curve_segment_arclength(cpt, cpt_next);
     int segment_resolu = (int)floorf(arclen * resolution);
+    CLAMP_MIN(segment_resolu, 1);
 
     segment_point_lengths[i] = segment_resolu;
     points_len += segment_resolu;
@@ -970,6 +971,7 @@ static float *gpencil_stroke_points_from_editcurve_adaptive_resolu(
     bGPDcurve_point *cpt_next = &curve_point_array[0];
     float arclen = gpencil_approximate_curve_segment_arclength(cpt, cpt_next);
     int segment_resolu = (int)floorf(arclen * resolution);
+    CLAMP_MIN(segment_resolu, 1);
 
     segment_point_lengths[cpt_last] = segment_resolu;
     points_len += segment_resolu;
