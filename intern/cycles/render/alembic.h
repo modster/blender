@@ -67,6 +67,7 @@ class AlembicObject : public Node {
     bool dirty = false;
     array<float3> vertices{};
     array<int3> triangles{};
+    array<int3> triangles_loops{};
 
     vector<AttributeData> attributes{};
   };

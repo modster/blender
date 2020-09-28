@@ -66,52 +66,42 @@ static Transform make_transform(const Abc::M44d &a)
   return trans;
 }
 
-/* TODO: any attribute lookup should probably go through the AttributeRequests
- */
-static void read_uvs(const IV2fGeomParam &uvs,
-                     Geometry *node,
-                     const int *face_counts,
-                     const int num_faces)
+static void read_default_uvs(const IV2fGeomParam &uvs, const ISampleSelector &iss, AlembicObject::DataCache &data_cache)
 {
-  if (uvs.valid()) {
-    switch (uvs.getScope()) {
-      case kVaryingScope:
-      case kVertexScope: {
-        IV2fGeomParam::Sample uvsample = uvs.getExpandedValue();
-        break;
+  switch (uvs.getScope()) {
+    case kFacevaryingScope: {
+      IV2fGeomParam::Sample uvsample = uvs.getIndexedValue(iss);
+
+      if (!uvsample.valid()) {
+        return;
       }
-      case kFacevaryingScope: {
-        IV2fGeomParam::Sample uvsample = uvs.getIndexedValue();
 
-        ustring name = ustring("UVMap");
-        Attribute *attr = node->attributes.add(ATTR_STD_UV, name);
-        float2 *fdata = attr->data_float2();
+      AlembicObject::AttributeData &attr = data_cache.attributes.emplace_back();
+      attr.std = ATTR_STD_UV;
+      attr.name = uvs.getName();
+      attr.data.resize(data_cache.triangles.size() * 3 * sizeof(float2));
 
-        /* loop over the triangles */
-        int index_offset = 0;
-        const unsigned int *uvIndices = uvsample.getIndices()->get();
-        const Imath::Vec2<float> *uvValues = uvsample.getVals()->get();
+      float2 *data_float2 = reinterpret_cast<float2 *>(attr.data.data());
 
-        for (size_t i = 0; i < num_faces; i++) {
-          for (int j = 0; j < face_counts[i] - 2; j++) {
-			unsigned int v0 = uvIndices[index_offset];
-			unsigned int v1 = uvIndices[index_offset + j + 1];
-			unsigned int v2 = uvIndices[index_offset + j + 2];
+      const unsigned int *indices = uvsample.getIndices()->get();
+      const Imath::Vec2<float> *values = uvsample.getVals()->get();
 
-            fdata[0] = make_float2(uvValues[v0][0], uvValues[v0][1]);
-            fdata[1] = make_float2(uvValues[v1][0], uvValues[v1][1]);
-            fdata[2] = make_float2(uvValues[v2][0], uvValues[v2][1]);
-            fdata += 3;
-          }
+      for (const int3 &loop : data_cache.triangles_loops) {
+        unsigned int v0 = indices[loop.x];
+        unsigned int v1 = indices[loop.y];
+        unsigned int v2 = indices[loop.z];
 
-          index_offset += face_counts[i];
-        }
-
-        break;
+        data_float2[0] = make_float2(values[v0][0], values[v0][1]);
+        data_float2[1] = make_float2(values[v1][0], values[v1][1]);
+        data_float2[2] = make_float2(values[v2][0], values[v2][1]);
+        data_float2 += 3;
       }
-      default: {
-        break;
-      }
+
+      break;
+    }
+    default: {
+      // not supported
+      break;
     }
   }
 }
@@ -212,6 +202,7 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
       }
 
       data_cache.triangles.reserve(num_triangles);
+      data_cache.triangles_loops.reserve(num_triangles);
       int index_offset = 0;
 
       for (size_t i = 0; i < num_faces; i++) {
@@ -221,10 +212,17 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
           int v2 = face_indices_array[index_offset + j + 2];
 
           data_cache.triangles.push_back_reserved(make_int3(v0, v1, v2));
+          data_cache.triangles_loops.push_back_reserved(make_int3(index_offset, index_offset + j + 1, index_offset + j + 2));
         }
 
         index_offset += face_counts_array[i];
       }
+    }
+
+    const IV2fGeomParam &uvs = schema.getUVsParam();
+
+    if (uvs.valid()) {
+      read_default_uvs(uvs, iss, data_cache);
     }
 
     foreach (const AttributeRequest &attr, requested_attributes.requests) {
@@ -245,20 +243,35 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params, con
     }
 
     if (IV2fProperty::matches(prop.getMetaData()) && Alembic::AbcGeom::isUV(prop)) {
-      // TODO : UV indices
-//      const IV2fGeomParam &param = IV2fGeomParam(arb_geom_params, prop.getName());
+      const IV2fGeomParam &param = IV2fGeomParam(arb_geom_params, prop.getName());
 
-//      IV2fGeomParam::Sample sample;
-//      param.getIndexed(sample, iss);
+      IV2fGeomParam::Sample sample;
+      param.getIndexed(sample, iss);
 
-//      if (param.getScope() == kFacevaryingScope) {
-//        V2fArraySamplePtr values = sample.getVals();
-//        UInt32ArraySamplePtr indices = sample.getIndices();
+      if (param.getScope() == kFacevaryingScope) {
+        V2fArraySamplePtr values = sample.getVals();
+        UInt32ArraySamplePtr indices = sample.getIndices();
 
-//        AttributeData &attribute = data_cache.attributes.emplace_back();
-//        attribute.name = attr_name;
-//        attribute.std = ATTR_STD_UV;
-//      }
+        AttributeData &attribute = data_cache.attributes.emplace_back();
+        attribute.std = ATTR_STD_NONE;
+        attribute.name = attr_name;
+        attribute.element = ATTR_ELEMENT_CORNER;
+        attribute.type_desc = TypeFloat2;
+        attribute.data.resize(data_cache.triangles.size() * 3 * sizeof(float2));
+
+        float2 *data_float2 = reinterpret_cast<float2 *>(attribute.data.data());
+
+        for (const int3 &loop : data_cache.triangles_loops) {
+          unsigned int v0 = (*indices)[loop.x];
+          unsigned int v1 = (*indices)[loop.y];
+          unsigned int v2 = (*indices)[loop.z];
+
+          data_float2[0] = make_float2((*values)[v0][0], (*values)[v0][1]);
+          data_float2[1] = make_float2((*values)[v1][0], (*values)[v1][1]);
+          data_float2[2] = make_float2((*values)[v2][0], (*values)[v2][1]);
+          data_float2 += 3;
+        }
+      }
     }
     else if (IC3fProperty::matches(prop.getMetaData())) {
       const IC3fGeomParam &param = IC3fGeomParam(arb_geom_params, prop.getName());
@@ -497,10 +510,6 @@ void AlembicProcedural::read_mesh(Scene *scene,
     mesh->set_smooth(smooth);
     mesh->set_shader(shader);
   }
-
-  IPolyMeshSchema::Sample samp = schema.getValue(sample_sel);
-  IV2fGeomParam uvs = polymesh.getSchema().getUVsParam();
-  read_uvs(uvs, mesh, samp.getFaceCounts()->get(), samp.getFaceCounts()->size());
 
   /* TODO: read normals from the archive if present */
   mesh->add_face_normals();
