@@ -313,6 +313,40 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
         }
       }
     }
+    else if (IC4fProperty::matches(prop.getMetaData())) {
+      const IC4fGeomParam &param = IC4fGeomParam(arb_geom_params, prop.getName());
+
+      IC4fGeomParam::Sample sample;
+      param.getIndexed(sample, iss);
+
+      C4fArraySamplePtr values = sample.getVals();
+
+      AttributeData &attribute = data_cache.attributes.emplace_back();
+      attribute.std = ATTR_STD_NONE;
+      attribute.name = attr_name;
+
+      if (param.getScope() == kVaryingScope) {
+        attribute.element = ATTR_ELEMENT_CORNER_BYTE;
+        attribute.type_desc = TypeRGBA;
+        attribute.data.resize(data_cache.triangles.size() * 3 * sizeof(uchar4));
+
+        uchar4 *data_uchar4 = reinterpret_cast<uchar4 *>(attribute.data.data());
+
+        int offset = 0;
+        for (const int3 &tri : data_cache.triangles) {
+          Imath::C4f v = (*values)[tri.x];
+          data_uchar4[offset + 0] = color_float4_to_uchar4(make_float4(v.r, v.g, v.b, v.a));
+
+          v = (*values)[tri.y];
+          data_uchar4[offset + 1] = color_float4_to_uchar4(make_float4(v.r, v.g, v.b, v.a));
+
+          v = (*values)[tri.z];
+          data_uchar4[offset + 2] = color_float4_to_uchar4(make_float4(v.r, v.g, v.b, v.a));
+
+          offset += 3;
+        }
+      }
+    }
   }
 }
 
