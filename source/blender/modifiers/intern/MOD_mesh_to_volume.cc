@@ -259,6 +259,8 @@ static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Vo
 
 #else
   UNUSED_VARS(md, ctx);
+  UNUSED_VARS(compute_voxel_size);
+  BKE_modifier_set_error(md, "Compiled without OpenVDB");
   return input_volume;
 #endif
 }
