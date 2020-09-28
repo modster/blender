@@ -57,6 +57,8 @@ class AlembicObject : public Node {
 
   struct AttributeData {
       AttributeStandard std;
+      AttributeElement element;
+      TypeDesc type_desc;
       ustring name;
       array<char> data;
   };

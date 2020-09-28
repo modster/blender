@@ -269,10 +269,12 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params, con
       C3fArraySamplePtr values = sample.getVals();
 
       AttributeData &attribute = data_cache.attributes.emplace_back();
+      attribute.std = ATTR_STD_NONE;
       attribute.name = attr_name;
 
       if (param.getScope() == kVaryingScope) {
-        attribute.std = ATTR_STD_VERTEX_COLOR;
+        attribute.element = ATTR_ELEMENT_CORNER_BYTE;
+        attribute.type_desc = TypeDesc::TypeColor;
         attribute.data.resize(data_cache.triangles.size() * 3 * sizeof(uchar4));
 
         uchar4 *data_uchar4 = reinterpret_cast<uchar4 *>(attribute.data.data());
@@ -512,8 +514,16 @@ void AlembicProcedural::read_mesh(Scene *scene,
   }
 
   for (const AlembicObject::AttributeData &attribute : data.attributes) {
-	Attribute *attr = mesh->attributes.add(attribute.std, attribute.name);
-    memcpy(attr->data_uchar4(), attribute.data.data(), attribute.data.size());
+    Attribute *attr = nullptr;
+    if (attribute.std != ATTR_STD_NONE) {
+      attr = mesh->attributes.add(attribute.std, attribute.name);
+    }
+    else {
+      attr = mesh->attributes.add(attribute.name, attribute.type_desc, attribute.element);
+    }
+    assert(attr);
+
+    memcpy(attr->data(), attribute.data.data(), attribute.data.size());
   }
 
   if (mesh->is_modified()) {
