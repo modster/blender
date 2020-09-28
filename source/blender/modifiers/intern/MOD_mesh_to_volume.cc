@@ -204,6 +204,7 @@ static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Vo
   if (object_to_convert == NULL) {
     return input_volume;
   }
+  /* TODO: Support other object types. */
   if (object_to_convert->type != OB_MESH) {
     return input_volume;
   }
