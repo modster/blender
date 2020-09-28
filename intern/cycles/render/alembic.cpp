@@ -56,7 +56,7 @@ static M44d convert_yup_zup(M44d const &mtx)
 
 static Transform make_transform(const Abc::M44d &a)
 {
-  auto m = convert_yup_zup(a);
+  M44d m = convert_yup_zup(a);
   Transform trans;
   for (int j = 0; j < 3; j++) {
     for (int i = 0; i < 4; i++) {
@@ -94,9 +94,9 @@ static void read_uvs(const IV2fGeomParam &uvs,
 
         for (size_t i = 0; i < num_faces; i++) {
           for (int j = 0; j < face_counts[i] - 2; j++) {
-            int v0 = uvIndices[index_offset];
-            int v1 = uvIndices[index_offset + j + 1];
-            int v2 = uvIndices[index_offset + j + 2];
+			unsigned int v0 = uvIndices[index_offset];
+			unsigned int v1 = uvIndices[index_offset + j + 1];
+			unsigned int v2 = uvIndices[index_offset + j + 2];
 
             fdata[0] = make_float2(uvValues[v0][0], uvValues[v0][1]);
             fdata[1] = make_float2(uvValues[v1][0], uvValues[v1][1]);
@@ -166,11 +166,12 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema)
   frame_data.clear();
 
   // TODO : store other properties and have a better structure to store these arrays
-  auto geometry_ = object->get_geometry();
+  Geometry *geometry = object->get_geometry();
+  assert(geometry);
 
   AttributeRequestSet requested_attributes;
 
-  foreach (Node *node, geometry_->get_used_shaders()) {
+  foreach (Node *node, geometry->get_used_shaders()) {
     Shader *shader = static_cast<Shader *>(node);
 
     foreach (const AttributeRequest &attr, shader->attributes.requests) {
@@ -181,14 +182,12 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema)
   }
 
   for (size_t i = 0; i < schema.getNumSamples(); ++i) {
-    frame_data.emplace_back();
-    AlembicObject::DataCache &data_cache = frame_data.back();
+	AlembicObject::DataCache &data_cache = frame_data.emplace_back();
 
-    ISampleSelector iss = ISampleSelector(static_cast<index_t>(i));
+	const ISampleSelector iss = ISampleSelector(static_cast<index_t>(i));
+	const IPolyMeshSchema::Sample sample = schema.getValue(iss);
 
-    auto sample = schema.getValue(iss);
-
-    auto positions = sample.getPositions();
+	const P3fArraySamplePtr positions = sample.getPositions();
 
     if (positions) {
       data_cache.vertices.reserve(positions->size());
@@ -199,16 +198,16 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema)
       }
     }
 
-    auto face_counts = sample.getFaceCounts();
-    auto face_indices = sample.getFaceIndices();
+	Int32ArraySamplePtr face_counts = sample.getFaceCounts();
+	Int32ArraySamplePtr face_indices = sample.getFaceIndices();
 
     if (face_counts && face_indices) {
-      int num_faces = face_counts->size();
+	  const size_t num_faces = face_counts->size();
       const int *face_counts_array = face_counts->get();
       const int *face_indices_array = face_indices->get();
 
-      int num_triangles = 0;
-      for (int i = 0; i < face_counts->size(); i++) {
+	  size_t num_triangles = 0;
+	  for (size_t i = 0; i < face_counts->size(); i++) {
         num_triangles += face_counts_array[i] - 2;
       }
 
@@ -229,7 +228,7 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema)
     }
 
     foreach (const AttributeRequest &attr, requested_attributes.requests) {
-      read_attribute(schema.getArbGeomParams(), iss, attr.name, data_cache);
+	  read_attribute(schema.getArbGeomParams(), iss, attr.name, data_cache);
     }
   }
 
@@ -280,7 +279,7 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params, con
 
         int offset = 0;
         for (const int3 &tri : data_cache.triangles) {
-          auto v = (*values)[tri.x];
+		  Imath::C3f v = (*values)[tri.x];
           data_uchar4[offset + 0] = color_float_to_byte(make_float3(v.x, v.y, v.z));
 
           v = (*values)[tri.y];
@@ -319,7 +318,7 @@ AlembicProcedural::AlembicProcedural() : Procedural(node_type)
 
 AlembicProcedural::~AlembicProcedural()
 {
-  for (auto i = 0; i < objects.size(); ++i) {
+  for (size_t i = 0; i < objects.size(); ++i) {
     delete objects[i];
   }
 }
@@ -348,7 +347,7 @@ void AlembicProcedural::generate(Scene *scene)
     objects_loaded = true;
   }
 
-  auto frame_time = (Abc::chrono_t)(frame / frame_rate);
+  Abc::chrono_t frame_time = (Abc::chrono_t)(frame / frame_rate);
 
   for (size_t i = 0; i < objects.size(); ++i) {
     AlembicObject *object = objects[i];
@@ -368,7 +367,7 @@ void AlembicProcedural::generate(Scene *scene)
 
 void AlembicProcedural::load_objects()
 {
-  auto frame_time = (Abc::chrono_t)(frame / frame_rate);
+  Abc::chrono_t frame_time = (Abc::chrono_t)(frame / frame_rate);
 
   /* Traverse Alembic file hierarchy, avoiding recursion by
    * using an explicit stack
@@ -458,7 +457,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
 
   ISampleSelector sample_sel = ISampleSelector(frame_time);
   int frame_index = sample_sel.getIndex(schema.getTimeSampling(), schema.getNumSamples());
-  auto &data = abc_object->get_frame_data(frame_index);
+  AlembicObject::DataCache &data = abc_object->get_frame_data(frame_index);
 
   // TODO : arrays are emptied when passed to the sockets, so we need to reload the data
   // perhaps we should just have a way to set the pointer
@@ -469,7 +468,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
 
   data.dirty = true;
   // TODO : animations like fluids will have different data on different frames
-  auto &triangle_data = abc_object->get_frame_data(0).triangles;
+  array<int3> &triangle_data = abc_object->get_frame_data(0).triangles;
 
   mesh->set_verts(data.vertices);
 
@@ -513,7 +512,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
   }
 
   for (const AlembicObject::AttributeData &attribute : data.attributes) {
-    auto attr = mesh->attributes.add(attribute.std, attribute.name);
+	Attribute *attr = mesh->attributes.add(attribute.std, attribute.name);
     memcpy(attr->data_uchar4(), attribute.data.data(), attribute.data.size());
   }
 
