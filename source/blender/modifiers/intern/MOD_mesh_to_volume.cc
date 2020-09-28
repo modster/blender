@@ -108,13 +108,12 @@ static void initData(ModifierData *md)
 {
   MeshToVolumeModifierData *mvmd = reinterpret_cast<MeshToVolumeModifierData *>(md);
   mvmd->object = NULL;
-  mvmd->mode = MESH_TO_VOLUME_MODE_VOLUME;
   mvmd->resolution_mode = MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_AMOUNT;
   mvmd->voxel_size = 0.1f;
   mvmd->voxel_amount = 32;
   mvmd->fill_volume = true;
-  mvmd->interior_bandwidth = 1.0f;
-  mvmd->exterior_bandwidth = 1.0f;
+  mvmd->interior_bandwidth = 0.1f;
+  mvmd->exterior_bandwidth = 0.1f;
 }
 
 static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
@@ -151,18 +150,12 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(layout, ptr, "object", 0, NULL, ICON_NONE);
 
   col = uiLayoutColumn(layout, false);
-  uiItemR(col, ptr, "mode", 0, NULL, ICON_NONE);
-  if (mvmd->mode == MESH_TO_VOLUME_MODE_VOLUME) {
-    uiItemR(col, ptr, "fill_volume", 0, NULL, ICON_NONE);
-    uiItemR(col, ptr, "exterior_bandwidth", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "fill_volume", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "exterior_bandwidth", 0, NULL, ICON_NONE);
 
-    uiLayout *subcol = uiLayoutColumn(col, false);
-    uiLayoutSetEnabled(subcol, !mvmd->fill_volume);
-    uiItemR(subcol, ptr, "interior_bandwidth", 0, NULL, ICON_NONE);
-  }
-  else if (mvmd->mode == MESH_TO_VOLUME_MODE_SURFACE) {
-    uiItemR(col, ptr, "exterior_bandwidth", 0, "Bandwidth", ICON_NONE);
-  }
+  uiLayout *subcol = uiLayoutColumn(col, false);
+  uiLayoutSetEnabled(subcol, !mvmd->fill_volume);
+  uiItemR(subcol, ptr, "interior_bandwidth", 0, NULL, ICON_NONE);
 
   col = uiLayoutColumn(layout, false);
   uiItemR(col, ptr, "resolution_mode", 0, NULL, ICON_NONE);
@@ -231,25 +224,14 @@ static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Vo
   const float interior_bandwidth = MAX2(0.001f, mvmd->interior_bandwidth / voxel_size);
 
   openvdb::FloatGrid::Ptr new_grid;
-  if (mvmd->mode == MESH_TO_VOLUME_MODE_VOLUME) {
-    if (mvmd->fill_volume) {
-      /* Setting the interior bandwidth to FLT_MAX, will make it fill the entire volume. */
-      new_grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
-          mesh_adapter, {}, exterior_bandwidth, FLT_MAX);
-    }
-    else {
-      new_grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
-          mesh_adapter, {}, exterior_bandwidth, interior_bandwidth);
-    }
+  if (mvmd->fill_volume) {
+    /* Setting the interior bandwidth to FLT_MAX, will make it fill the entire volume. */
+    new_grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
+        mesh_adapter, {}, exterior_bandwidth, FLT_MAX);
   }
   else {
-    /* Create an unsigned field, because we don't assume that the mesh is closed. */
     new_grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
-        mesh_adapter,
-        {},
-        exterior_bandwidth,
-        exterior_bandwidth,
-        openvdb::tools::UNSIGNED_DISTANCE_FIELD);
+        mesh_adapter, {}, exterior_bandwidth, interior_bandwidth);
   }
 
   /* Create a new volume object and add the density grid. */

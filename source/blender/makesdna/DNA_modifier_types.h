@@ -2215,9 +2215,6 @@ typedef struct MeshToVolumeModifierData {
   /** This is the object that is supposed to be converted to a volume. */
   struct Object *object;
 
-  /** MeshToVolumeModifierMode */
-  int mode;
-
   /** MeshToVolumeModifierResolutionMode */
   int resolution_mode;
   /** Size of a voxel in object space. */
@@ -2230,17 +2227,11 @@ typedef struct MeshToVolumeModifierData {
    * is used. */
   char fill_volume;
   char _pad1[3];
+
   /** Bandwidths are on object space. */
   float interior_bandwidth;
   float exterior_bandwidth;
-  char _pad[4];
 } MeshToVolumeModifierData;
-
-/* MeshToVolumeModifierData->mode */
-typedef enum MeshToVolumeModifierMode {
-  MESH_TO_VOLUME_MODE_VOLUME = 0,
-  MESH_TO_VOLUME_MODE_SURFACE = 1,
-} MeshToVolumeModifierMode;
 
 /* MeshToVolumeModifierData->resolution_mode */
 typedef enum MeshToVolumeModifierResolutionMode {

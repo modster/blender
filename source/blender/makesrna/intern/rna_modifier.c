@@ -6983,20 +6983,6 @@ static void rna_def_modifier_mesh_to_volume(BlenderRNA *brna)
   StructRNA *srna;
   PropertyRNA *prop;
 
-  static EnumPropertyItem mode_items[] = {
-      {MESH_TO_VOLUME_MODE_VOLUME,
-       "VOLUME",
-       0,
-       "Volume",
-       "Create a volume based on the volume that is enclosed by the mesh surface"},
-      {MESH_TO_VOLUME_MODE_SURFACE,
-       "SURFACE",
-       0,
-       "Surface",
-       "Create a volume based on the mesh surface"},
-      {0, NULL, 0, NULL, NULL},
-  };
-
   static EnumPropertyItem resolution_mode_items[] = {
       {MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_AMOUNT,
        "VOXEL_AMOUNT",
@@ -7022,11 +7008,6 @@ static void rna_def_modifier_mesh_to_volume(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Object", "Object");
   RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
   RNA_def_property_update(prop, 0, "rna_Modifier_dependency_update");
-
-  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, mode_items);
-  RNA_def_property_ui_text(prop, "Mode", "Mode for the mesh to volume conversion");
-  RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
   prop = RNA_def_property(srna, "resolution_mode", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, resolution_mode_items);
