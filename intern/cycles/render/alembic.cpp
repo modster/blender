@@ -293,7 +293,7 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
 
       if (param.getScope() == kVaryingScope) {
         attribute.element = ATTR_ELEMENT_CORNER_BYTE;
-        attribute.type_desc = TypeDesc::TypeColor;
+        attribute.type_desc = TypeRGBA;
         attribute.data.resize(data_cache.triangles.size() * 3 * sizeof(uchar4));
 
         uchar4 *data_uchar4 = reinterpret_cast<uchar4 *>(attribute.data.data());
