@@ -4732,6 +4732,7 @@ static int gpencil_stroke_simplify_fixed_exec(bContext *C, wmOperator *op)
     /* Go through each editable + selected stroke */
     GP_EDITABLE_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
       if (gps->flag & GP_STROKE_SELECT) {
+        changed |= true;
         for (int i = 0; i < steps; i++) {
           BKE_gpencil_stroke_simplify_fixed(gpd, gps);
         }
