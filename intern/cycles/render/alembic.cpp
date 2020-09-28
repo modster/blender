@@ -108,6 +108,73 @@ static void read_default_uvs(const IV2fGeomParam &uvs,
   }
 }
 
+static void read_default_normals(const IN3fGeomParam &normals,
+                                 const ISampleSelector &iss,
+                                 AlembicObject::DataCache &data_cache)
+{
+  switch (normals.getScope()) {
+    case kFacevaryingScope: {
+      IN3fGeomParam::Sample sample = normals.getExpandedValue(iss);
+
+      if (!sample.valid()) {
+        return;
+      }
+
+      AlembicObject::AttributeData &attr = data_cache.attributes.emplace_back();
+      attr.std = ATTR_STD_VERTEX_NORMAL;
+      attr.name = normals.getName();
+      attr.data.resize(data_cache.vertices.size() * sizeof(float3));
+
+      float3 *data_float3 = reinterpret_cast<float3 *>(attr.data.data());
+
+      for (size_t i = 0; i < data_cache.vertices.size(); ++i) {
+        data_float3[i] = make_float3(0.0f);
+      }
+
+      const Imath::V3f *values = sample.getVals()->get();
+
+      for (const int3 &tri : data_cache.triangles) {
+        const Imath::V3f &v0 = values[tri.x];
+        const Imath::V3f &v1 = values[tri.y];
+        const Imath::V3f &v2 = values[tri.z];
+
+        data_float3[tri.x] += make_float3_from_yup(v0);
+        data_float3[tri.y] += make_float3_from_yup(v1);
+        data_float3[tri.z] += make_float3_from_yup(v2);
+      }
+
+      break;
+    }
+    case kVaryingScope:
+    case kVertexScope: {
+      IN3fGeomParam::Sample sample = normals.getExpandedValue(iss);
+
+      if (!sample.valid()) {
+        return;
+      }
+
+      AlembicObject::AttributeData &attr = data_cache.attributes.emplace_back();
+      attr.std = ATTR_STD_VERTEX_NORMAL;
+      attr.name = normals.getName();
+      attr.data.resize(data_cache.vertices.size() * sizeof(float3));
+
+      float3 *data_float3 = reinterpret_cast<float3 *>(attr.data.data());
+
+      const Imath::V3f *values = sample.getVals()->get();
+
+      for (size_t i = 0; i < data_cache.vertices.size(); ++i) {
+        data_float3[i] = make_float3_from_yup(values[i]);
+      }
+
+      break;
+    }
+    default: {
+      // not supported
+      break;
+    }
+  }
+}
+
 NODE_DEFINE(AlembicObject)
 {
   NodeType *type = NodeType::add("alembic_object", create);
@@ -227,6 +294,12 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
     if (uvs.valid()) {
       read_default_uvs(uvs, iss, data_cache);
     }
+
+//    const IN3fGeomParam &normals = schema.getNormalsParam();
+
+//    if (normals.valid()) {
+//      read_default_normals(normals, iss, data_cache);
+//    }
 
     foreach (const AttributeRequest &attr, requested_attributes.requests) {
       read_attribute(schema.getArbGeomParams(), iss, attr.name, data_cache);
@@ -551,9 +624,6 @@ void AlembicProcedural::read_mesh(Scene *scene,
     mesh->set_shader(shader);
   }
 
-  /* TODO: read normals from the archive if present */
-  mesh->add_face_normals();
-
   /* we don't yet support arbitrary attributes, for now add vertex
    * coordinates as generated coordinates if requested */
   if (mesh->need_attribute(scene, ATTR_STD_GENERATED)) {
@@ -574,6 +644,9 @@ void AlembicProcedural::read_mesh(Scene *scene,
 
     memcpy(attr->data(), attribute.data.data(), attribute.data.size());
   }
+
+  /* TODO: read normals from the archive if present */
+  mesh->add_face_normals();
 
   if (mesh->is_modified()) {
     // TODO : check for modification of subdivision data (is a separate object in Alembic)
