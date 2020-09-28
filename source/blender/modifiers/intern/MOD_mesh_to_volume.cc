@@ -57,7 +57,6 @@
 
 #ifdef WITH_OPENVDB
 namespace blender {
-
 /* This class follows the MeshDataAdapter interface from openvdb. */
 class OpenVDBMeshAdapter {
  private:
@@ -119,25 +118,23 @@ static void initData(ModifierData *md)
 static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
 {
   MeshToVolumeModifierData *mvmd = reinterpret_cast<MeshToVolumeModifierData *>(md);
-  DEG_add_modifier_to_transform_relation(ctx->node, "own transforms");
+  DEG_add_modifier_to_transform_relation(ctx->node, "Mesh to Volume Modifier");
   if (mvmd->object) {
     DEG_add_object_relation(
-        ctx->node, mvmd->object, DEG_OB_COMP_GEOMETRY, "Object that is converted to a volume");
+        ctx->node, mvmd->object, DEG_OB_COMP_GEOMETRY, "Mesh to Volume Modifier");
     DEG_add_object_relation(
-        ctx->node, mvmd->object, DEG_OB_COMP_TRANSFORM, "Object that is converted to a volume");
+        ctx->node, mvmd->object, DEG_OB_COMP_TRANSFORM, "Mesh to Volume Modifier");
   }
 }
 
 static void foreachObjectLink(ModifierData *md, Object *ob, ObjectWalkFunc walk, void *userData)
 {
   MeshToVolumeModifierData *mvmd = reinterpret_cast<MeshToVolumeModifierData *>(md);
-
   walk(userData, ob, &mvmd->object, IDWALK_CB_NOP);
 }
 
 static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
-  uiLayout *col;
   uiLayout *layout = panel->layout;
 
   PointerRNA ob_ptr;
@@ -149,21 +146,24 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiItemR(layout, ptr, "object", 0, NULL, ICON_NONE);
 
-  col = uiLayoutColumn(layout, false);
-  uiItemR(col, ptr, "fill_volume", 0, NULL, ICON_NONE);
-  uiItemR(col, ptr, "exterior_bandwidth", 0, NULL, ICON_NONE);
+  {
+    uiLayout *col = uiLayoutColumn(layout, false);
+    uiItemR(col, ptr, "fill_volume", 0, NULL, ICON_NONE);
+    uiItemR(col, ptr, "exterior_bandwidth", 0, NULL, ICON_NONE);
 
-  uiLayout *subcol = uiLayoutColumn(col, false);
-  uiLayoutSetEnabled(subcol, !mvmd->fill_volume);
-  uiItemR(subcol, ptr, "interior_bandwidth", 0, NULL, ICON_NONE);
-
-  col = uiLayoutColumn(layout, false);
-  uiItemR(col, ptr, "resolution_mode", 0, NULL, ICON_NONE);
-  if (mvmd->resolution_mode == MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_AMOUNT) {
-    uiItemR(col, ptr, "voxel_amount", 0, NULL, ICON_NONE);
+    uiLayout *subcol = uiLayoutColumn(col, false);
+    uiLayoutSetEnabled(subcol, !mvmd->fill_volume);
+    uiItemR(subcol, ptr, "interior_bandwidth", 0, NULL, ICON_NONE);
   }
-  else {
-    uiItemR(col, ptr, "voxel_size", 0, NULL, ICON_NONE);
+  {
+    uiLayout *col = uiLayoutColumn(layout, false);
+    uiItemR(col, ptr, "resolution_mode", 0, NULL, ICON_NONE);
+    if (mvmd->resolution_mode == MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_AMOUNT) {
+      uiItemR(col, ptr, "voxel_amount", 0, NULL, ICON_NONE);
+    }
+    else {
+      uiItemR(col, ptr, "voxel_size", 0, NULL, ICON_NONE);
+    }
   }
 
   modifier_panel_end(layout, ptr);
