@@ -38,12 +38,12 @@
 
 CCL_NAMESPACE_BEGIN
 
-static float3 make_float3_from_yup(Imath::Vec3<float> const &v)
+static float3 make_float3_from_yup(const Imath::Vec3<float> &v)
 {
   return make_float3(v.x, -v.z, v.y);
 }
 
-static M44d convert_yup_zup(M44d const &mtx)
+static M44d convert_yup_zup(const M44d &mtx)
 {
   Imath::Vec3<double> scale, shear, rot, trans;
   extractSHRT(mtx, scale, shear, rot, trans);
@@ -161,7 +161,7 @@ AlembicObject::DataCache &AlembicObject::get_frame_data(int index)
   return frame_data[index];
 }
 
-void AlembicObject::load_all_data(IPolyMeshSchema &schema)
+void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
 {
   frame_data.clear();
 

@@ -48,7 +48,7 @@ class AlembicObject : public Node {
   void set_object(Object *object);
   Object *get_object();
 
-  void load_all_data(IPolyMeshSchema &schema);
+  void load_all_data(const IPolyMeshSchema &schema);
 
   bool has_data_loaded() const;
 
