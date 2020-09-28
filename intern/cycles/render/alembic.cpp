@@ -66,7 +66,9 @@ static Transform make_transform(const Abc::M44d &a)
   return trans;
 }
 
-static void read_default_uvs(const IV2fGeomParam &uvs, const ISampleSelector &iss, AlembicObject::DataCache &data_cache)
+static void read_default_uvs(const IV2fGeomParam &uvs,
+                             const ISampleSelector &iss,
+                             AlembicObject::DataCache &data_cache)
 {
   switch (uvs.getScope()) {
     case kFacevaryingScope: {
@@ -212,7 +214,8 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
           int v2 = face_indices_array[index_offset + j + 2];
 
           data_cache.triangles.push_back_reserved(make_int3(v0, v1, v2));
-          data_cache.triangles_loops.push_back_reserved(make_int3(index_offset, index_offset + j + 1, index_offset + j + 2));
+          data_cache.triangles_loops.push_back_reserved(
+              make_int3(index_offset, index_offset + j + 1, index_offset + j + 2));
         }
 
         index_offset += face_counts_array[i];
@@ -233,7 +236,10 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
   data_loaded = true;
 }
 
-void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params, const ISampleSelector &iss, const ustring &attr_name, DataCache &data_cache)
+void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
+                                   const ISampleSelector &iss,
+                                   const ustring &attr_name,
+                                   DataCache &data_cache)
 {
   for (size_t i = 0; i < arb_geom_params.getNumProperties(); ++i) {
     const PropertyHeader &prop = arb_geom_params.getPropertyHeader(i);

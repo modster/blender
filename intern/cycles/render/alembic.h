@@ -56,11 +56,11 @@ class AlembicObject : public Node {
   // TODO : handle attributes as well
 
   struct AttributeData {
-      AttributeStandard std;
-      AttributeElement element;
-      TypeDesc type_desc;
-      ustring name;
-      array<char> data;
+    AttributeStandard std;
+    AttributeElement element;
+    TypeDesc type_desc;
+    ustring name;
+    array<char> data;
   };
 
   struct DataCache {
@@ -86,7 +86,10 @@ class AlembicObject : public Node {
 
   vector<DataCache> frame_data;
 
-  void read_attribute(const ICompoundProperty &arb_geom_params, const ISampleSelector &iss, const ustring &attr_name, DataCache &data_cache);
+  void read_attribute(const ICompoundProperty &arb_geom_params,
+                      const ISampleSelector &iss,
+                      const ustring &attr_name,
+                      DataCache &data_cache);
 };
 
 class AlembicProcedural : public Procedural {
