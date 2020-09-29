@@ -23,8 +23,6 @@
 
 #pragma once
 
-#include "BKE_context.h"
-
 #include "IO_wavefront_obj.h"
 
 namespace blender::io::obj {

@@ -21,10 +21,7 @@
  * \ingroup obj
  */
 
-#include <iostream>
-
 #include "BLI_timeit.hh"
-#include "PIL_time.h"
 
 #include "IO_wavefront_obj.h"
 
@@ -32,12 +29,11 @@
 #include "obj_importer.hh"
 
 /**
- * Time the full export process.
- * TODO ankitm Collect errors in the export process and notify the user here.
+ * C-interface for the exporter.
  */
 void OBJ_export(bContext *C, const OBJExportParams *export_params)
 {
-  SCOPED_TIMER(__func__);
+  SCOPED_TIMER("OBJ export");
   blender::io::obj::exporter_main(C, *export_params);
 }
 
