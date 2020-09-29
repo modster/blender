@@ -121,7 +121,7 @@ void OBJWriter::write_vert_indices(Span<int> vert_indices, Span<int>, Span<int>)
 }
 
 /**
- * Open the OBJ file and write file header.
+ * Try to open the OBJ file and write file header.
  * \return Whether the destination file is writable.
  */
 bool OBJWriter::init_writer(const char *filepath)

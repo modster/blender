@@ -186,7 +186,7 @@ static bool insert_frame_in_path(const char *filepath,
  */
 void exporter_main(bContext *C, const OBJExportParams &export_params)
 {
-  /* TODO ankitm: find a better way to exit edit mode that doesn't hit assert
+  /* TODO(ankitm) find a better way to exit edit mode that doesn't hit assert
    * https://hastebin.com/mitihetagi in file F8653460 */
   ED_object_editmode_exit(C, EM_FREEDATA);
   Scene *scene = CTX_data_scene(C);

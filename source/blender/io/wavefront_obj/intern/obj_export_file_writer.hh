@@ -34,8 +34,8 @@
 namespace blender::io::obj {
 
 /**
- * For an Object, total vertices/ UV vertices/ Normals written by previous objects
- * are added to its indices.
+ * Total vertices/ UV vertices/ Normals written by previous Objects
+ * should be added to the current Object's indices.
  */
 struct IndexOffsets {
   int vertex_offset;
@@ -99,8 +99,10 @@ class OBJWriter {
   void update_index_offsets(const OBJMesh &obj_mesh_data);
 
  private:
-  /* Based on export paramters, a writer function with correct syntax is needed. */
-  typedef void (OBJWriter::*func_vert_uv_normal_indices)(Span<int>, Span<int>, Span<int>) const;
+  /* Based on export parameters, a writer function with correct OBJ syntax is needed. */
+  typedef void (OBJWriter::*func_vert_uv_normal_indices)(Span<int> vert_indices,
+                                                         Span<int> uv_indices,
+                                                         Span<int> normal_indices) const;
 
   func_vert_uv_normal_indices get_poly_element_writer(const OBJMesh &obj_mesh_data);
   void write_vert_uv_normal_indices(Span<int> vert_indices,
