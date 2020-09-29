@@ -39,19 +39,55 @@
 #include "obj_exporter.hh"
 
 #include "obj_export_file_writer.hh"
+
 namespace blender::io::obj {
+
+OBJDepsgraph::OBJDepsgraph(const bContext *C, const eEvaluationMode eval_mode)
+{
+  Scene *scene = CTX_data_scene(C);
+  Main *bmain = CTX_data_main(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  if (eval_mode == DAG_EVAL_RENDER) {
+    depsgraph_ = DEG_graph_new(bmain, scene, view_layer, DAG_EVAL_RENDER);
+    needs_free_ = true;
+    DEG_graph_build_for_all_objects(depsgraph_);
+    BKE_scene_graph_evaluated_ensure(depsgraph_, bmain);
+  }
+  else {
+    depsgraph_ = CTX_data_ensure_evaluated_depsgraph(C);
+    needs_free_ = false;
+  }
+}
+
+OBJDepsgraph::~OBJDepsgraph()
+{
+  if (needs_free_) {
+    DEG_graph_free(depsgraph_);
+  }
+}
+
+Depsgraph *OBJDepsgraph::get()
+{
+  return depsgraph_;
+}
+
+void OBJDepsgraph::update_for_newframe()
+{
+  BKE_scene_graph_update_for_newframe(depsgraph_);
+}
+
 /**
  * Filter `Object`s in a Scene to find supported objects, as per export settings and object types,
  * and add them to the given containers.
  *
  * \note Curves are also stored with Meshes if export settings specify so.
  */
-static void find_exportable_objects(ViewLayer *view_layer,
-                                    Depsgraph *depsgraph,
+static void find_exportable_objects(Depsgraph *depsgraph,
                                     const OBJExportParams &export_params,
                                     Vector<std::unique_ptr<OBJMesh>> &r_exportable_meshes,
                                     Vector<std::unique_ptr<OBJCurve>> &r_exportable_nurbs)
 {
+  ViewLayer *view_layer = DEG_get_input_view_layer(depsgraph);
   LISTBASE_FOREACH (Base *, base, &view_layer->object_bases) {
     Object *object_in_layer = base->object;
     if (export_params.export_selected_objects && !(object_in_layer->base_flag & BASE_SELECTED)) {
@@ -106,8 +142,7 @@ static void find_exportable_objects(ViewLayer *view_layer,
 /**
  * Exports a single frame to an OBJ and MTL (conditional) pair.
  */
-static void export_frame(ViewLayer *view_layer,
-                         Depsgraph *depsgraph,
+static void export_frame(Depsgraph *depsgraph,
                          const OBJExportParams &export_params,
                          const char *filepath)
 {
@@ -121,8 +156,7 @@ static void export_frame(ViewLayer *view_layer,
   Vector<std::unique_ptr<OBJMesh>> exportable_as_mesh;
   /* NURBS to be exported in parameter form. */
   Vector<std::unique_ptr<OBJCurve>> exportable_as_nurbs;
-  find_exportable_objects(
-      view_layer, depsgraph, export_params, exportable_as_mesh, exportable_as_nurbs);
+  find_exportable_objects(depsgraph, export_params, exportable_as_mesh, exportable_as_nurbs);
 
   if (export_params.export_materials) {
     mtl_writer.reset(new MTLWriter(filepath));
@@ -189,18 +223,14 @@ void exporter_main(bContext *C, const OBJExportParams &export_params)
   /* TODO(ankitm) find a better way to exit edit mode that doesn't hit assert
    * https://hastebin.com/mitihetagi in file F8653460 */
   ED_object_editmode_exit(C, EM_FREEDATA);
-  Scene *scene = CTX_data_scene(C);
-  Main *bmain = CTX_data_main(C);
-  ViewLayer *view_layer = CTX_data_view_layer(C);
-  Depsgraph *depsgraph = export_params.export_eval_mode == DAG_EVAL_RENDER ?
-                             DEG_graph_new(bmain, scene, view_layer, DAG_EVAL_RENDER) :
-                             CTX_data_ensure_evaluated_depsgraph(C);
+  OBJDepsgraph obj_depsgraph(C, export_params.export_eval_mode);
+  Scene *scene = DEG_get_input_scene(obj_depsgraph.get());
   const char *filepath = export_params.filepath;
 
   /* Single frame export, i.e. no amimation is to be exported. */
   if (!export_params.export_animation) {
     fprintf(stderr, "Writing to %s\n", filepath);
-    export_frame(view_layer, depsgraph, export_params, filepath);
+    export_frame(obj_depsgraph.get(), export_params, filepath);
     return;
   }
 
@@ -216,9 +246,9 @@ void exporter_main(bContext *C, const OBJExportParams &export_params)
     }
 
     CFRA = frame;
-    BKE_scene_graph_update_for_newframe(depsgraph);
+    obj_depsgraph.update_for_newframe();
     fprintf(stderr, "Writing to %s\n", filepath_with_frames);
-    export_frame(view_layer, depsgraph, export_params, filepath_with_frames);
+    export_frame(obj_depsgraph.get(), export_params, filepath_with_frames);
   }
   CFRA = original_frame;
 }

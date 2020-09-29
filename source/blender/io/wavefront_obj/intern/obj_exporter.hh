@@ -28,6 +28,23 @@
 #include "IO_wavefront_obj.h"
 
 namespace blender::io::obj {
+/**
+ * Behaves like `std::unique_ptr<Depsgraph, <custom_deleter>>`.
+ * Needed to free a new Depsgraph created for `DAG_EVAL_RENDER`.
+ */
+class OBJDepsgraph {
+ private:
+  Depsgraph *depsgraph_ = nullptr;
+  bool needs_free_ = false;
+
+ public:
+  OBJDepsgraph(const bContext *C, const eEvaluationMode eval_mode);
+  ~OBJDepsgraph();
+
+  Depsgraph *get();
+  void update_for_newframe();
+};
+
 void exporter_main(bContext *C, const OBJExportParams &export_params);
 
 }  // namespace blender::io::obj

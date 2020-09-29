@@ -32,7 +32,7 @@
 #include "obj_export_nurbs.hh"
 
 namespace blender::io::obj {
-OBJCurve::OBJCurve(Depsgraph *depsgraph,
+OBJCurve::OBJCurve(const Depsgraph *depsgraph,
                    const OBJExportParams &export_params,
                    Object *export_object)
     : export_object_eval_(export_object)

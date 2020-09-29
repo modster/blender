@@ -42,7 +42,9 @@ class OBJCurve : NonMovable, NonCopyable {
   float world_axes_transform_[4][4];
 
  public:
-  OBJCurve(Depsgraph *depsgraph, const OBJExportParams &export_params, Object *export_object);
+  OBJCurve(const Depsgraph *depsgraph,
+           const OBJExportParams &export_params,
+           Object *export_object);
 
   const char *get_curve_name() const;
   int tot_nurbs() const;

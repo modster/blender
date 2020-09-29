@@ -72,7 +72,7 @@ const EnumPropertyItem io_obj_export_evaluation_mode[] = {
      "DAG_EVAL_RENDER",
      0,
      "Render",
-     "Apply modifiers to objects for render properties to take effect"},
+     "Export objects as they appear in render"},
     {DAG_EVAL_VIEWPORT,
      "DAG_EVAL_VIEWPORT",
      0,
