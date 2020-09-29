@@ -34,7 +34,7 @@
 namespace blender::io::obj {
 
 /**
- * Total vertices/ UV vertices/ Normals written by previous Objects
+ * Total vertices/ UV vertices/ normals of previous Objects
  * should be added to the current Object's indices.
  */
 struct IndexOffsets {
