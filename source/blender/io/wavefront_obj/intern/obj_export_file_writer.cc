@@ -46,7 +46,7 @@ void OBJWriter::write_vert_uv_normal_indices(Span<int> vert_indices,
 {
   BLI_assert(vert_indices.size() == uv_indices.size() &&
              vert_indices.size() == normal_indices.size());
-  fprintf(outfile_, "f");
+  fputs("f", outfile_);
   for (int j = 0; j < vert_indices.size(); j++) {
     fprintf(outfile_,
             " %u/%u/%u",
@@ -54,7 +54,7 @@ void OBJWriter::write_vert_uv_normal_indices(Span<int> vert_indices,
             uv_indices[j] + index_offsets_.uv_vertex_offset + 1,
             normal_indices[j] + index_offsets_.normal_offset + 1);
   }
-  fprintf(outfile_, "\n");
+  fputs("\n", outfile_);
 }
 
 /**
@@ -65,14 +65,14 @@ void OBJWriter::write_vert_normal_indices(Span<int> vert_indices,
                                           Span<int> normal_indices) const
 {
   BLI_assert(vert_indices.size() == normal_indices.size());
-  fprintf(outfile_, "f");
+  fputs("f", outfile_);
   for (int j = 0; j < vert_indices.size(); j++) {
     fprintf(outfile_,
             " %u//%u",
             vert_indices[j] + index_offsets_.vertex_offset + 1,
             normal_indices[j] + index_offsets_.normal_offset + 1);
   }
-  fprintf(outfile_, "\n");
+  fputs("\n", outfile_);
 }
 
 /**
@@ -83,14 +83,14 @@ void OBJWriter::write_vert_uv_indices(Span<int> vert_indices,
                                       Span<int>) const
 {
   BLI_assert(vert_indices.size() == uv_indices.size());
-  fprintf(outfile_, "f");
+  fputs("f", outfile_);
   for (int j = 0; j < vert_indices.size(); j++) {
     fprintf(outfile_,
             " %u/%u",
             vert_indices[j] + index_offsets_.vertex_offset + 1,
             uv_indices[j] + index_offsets_.uv_vertex_offset + 1);
   }
-  fprintf(outfile_, "\n");
+  fputs("\n", outfile_);
 }
 
 /**
@@ -98,11 +98,11 @@ void OBJWriter::write_vert_uv_indices(Span<int> vert_indices,
  */
 void OBJWriter::write_vert_indices(Span<int> vert_indices, Span<int>, Span<int>) const
 {
-  fprintf(outfile_, "f");
+  fputs("f", outfile_);
   for (int j = 0; j < vert_indices.size(); j++) {
     fprintf(outfile_, " %u", vert_indices[j] + index_offsets_.vertex_offset + 1);
   }
-  fprintf(outfile_, "\n");
+  fputs("\n", outfile_);
 }
 
 /**
@@ -262,7 +262,7 @@ void OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
     /* Once a material is assigned, it cannot be turned off; it can only be changed.
      * If a material name is not specified, a white material is used.
      * http://www.martinreddy.net/gfx/3d/OBJ.spec */
-    fprintf(outfile_, "usemtl\n");
+    fputs("usemtl\n", outfile_);
     return;
   }
   const char *mat_name = obj_mesh_data.get_object_material_name(curr_mat_nr);
@@ -291,7 +291,7 @@ void OBJWriter::write_vertex_group(const OBJMesh &obj_mesh_data,
   }
   r_last_poly_vertex_group = current_group;
   if (current_group == NOT_FOUND) {
-    fprintf(outfile_, "g off\n");
+    fputs("g off\n", outfile_);
     return;
   }
   fprintf(outfile_, "g %s\n", obj_mesh_data.get_poly_deform_group_name(current_group));
@@ -404,23 +404,23 @@ void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
      */
     /* Number of vertices in the curve + degree of the curve if it is cyclic. */
     const int curv_num = obj_nurbs_data.get_nurbs_num(i);
-    fprintf(outfile_, "curv 0.0 1.0");
+    fputs("curv 0.0 1.0", outfile_);
     for (int i = 0; i < curv_num; i++) {
       /* + 1 to keep indices one-based, even if they're negative. */
       fprintf(outfile_, " %d", -1 * ((i % tot_points) + 1));
     }
-    fprintf(outfile_, "\n");
+    fputs("\n", outfile_);
 
     /**
      * In parm u line: between 0 and 1, curv_num + 2 equidistant numbers are inserted.
      */
-    fprintf(outfile_, "parm u 0.000000 ");
+    fputs("parm u 0.000000 ", outfile_);
     for (int i = 1; i <= curv_num + 2; i++) {
       fprintf(outfile_, "%f ", 1.0f * i / (curv_num + 2 + 1));
     }
-    fprintf(outfile_, "1.000000\n");
+    fputs("1.000000\n", outfile_);
 
-    fprintf(outfile_, "end\n");
+    fputs("end\n", outfile_);
   }
 }
 
