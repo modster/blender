@@ -321,8 +321,6 @@ class Scene : public NodeOwner {
     (void)owner;
   }
 
-  void update_procedurals(Progress &progress);
-
  protected:
   /* Check if some heavy data worth logging was updated.
    * Mainly used to suppress extra annoying logging.

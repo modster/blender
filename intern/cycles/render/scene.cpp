@@ -216,7 +216,10 @@ void Scene::device_update(Device *device_, Progress &progress)
    * - Lookup tables are done a second time to handle film tables
    */
 
-  update_procedurals(progress);
+  procedural_manager->update(this, progress);
+
+  if (progress.get_cancel())
+    return;
 
   progress.set_status("Updating Shaders");
   shader_manager->device_update(device, &dscene, this, progress);
@@ -328,11 +331,6 @@ void Scene::device_update(Device *device_, Progress &progress)
             << "  Peak: " << string_human_readable_number(mem_peak) << " ("
             << string_human_readable_size(mem_peak) << ")";
   }
-}
-
-void Scene::update_procedurals(Progress &progress)
-{
-  procedural_manager->update(this, progress);
 }
 
 Scene::MotionType Scene::need_motion()
@@ -476,7 +474,7 @@ bool Scene::update(Progress &progress, bool &kernel_switch_needed)
   if (need_update()) {
     /* Need to update the procedurals before tagging for used shaders as procedurals may create
      * geometry which is not in the scene yet. */
-    update_procedurals(progress);
+    procedural_manager->update(this, progress);
 
     /* Updated used shader tag so we know which features are need for the kernel. */
     shader_manager->update_shaders_used(this);
