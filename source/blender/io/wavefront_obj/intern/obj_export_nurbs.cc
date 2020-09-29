@@ -92,19 +92,18 @@ float3 OBJCurve::calc_nurbs_point_coords(const int index,
 }
 
 /**
- * Get number of "curv" points of the Nurb at the given index.
+ * Get number of control points of the Nurb at the given index.
  */
 int OBJCurve::get_nurbs_num(const int index) const
 {
   const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, index));
   const int r_nurbs_degree = nurb->orderu - 1;
-  /* "curv_num" is the number of control points in a nurbs.
-   * If it is cyclic, degree also adds up. */
-  int r_curv_num = nurb->pntsv * nurb->pntsu;
+  /* Number of points in the curve + (degree of the curve if it is cyclic). */
+  int r_control_points = nurb->pntsv * nurb->pntsu;
   if (nurb->flagu & CU_NURB_CYCLIC) {
-    r_curv_num += r_nurbs_degree;
+    r_control_points += r_nurbs_degree;
   }
-  return r_curv_num;
+  return r_control_points;
 }
 
 /**
