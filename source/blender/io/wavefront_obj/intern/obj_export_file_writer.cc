@@ -32,10 +32,25 @@
 #include "obj_export_file_writer.hh"
 
 namespace blender::io::obj {
-
-/* Default values of some parameters. */
+/**
+ * "To turn off smoothing
+ * groups, use a value of 0 or off. Polygonal elements use group
+ * numbers to put elements in different smoothing groups. For
+ * free-form surfaces, smoothing groups are either turned on or off;
+ * there is no difference between values greater than 0."
+ * http://www.martinreddy.net/gfx/3d/OBJ.spec
+ */
 const int SMOOTH_GROUP_DISABLED = 0;
 const int SMOOTH_GROUP_DEFAULT = 1;
+
+const char *DEFORM_GROUP_DISABLED = "off";
+/* There is no deform group default name. Use what the user set in the UI. */
+
+/* "Once a material is assigned, it cannot be turned off; it can only be changed.
+ * If a material name is not specified, a white material is used."
+ * So we specify an empty material name.
+ * http://www.martinreddy.net/gfx/3d/OBJ.spec */
+const char *MATERIAL_GROUP_DISABLED = "";
 
 /**
  * Write one line of polygon indices as f v1/vt1/vn1 v2/vt2/vn2 ... .
@@ -137,6 +152,9 @@ void OBJWriter::write_mtllib_name(const char *mtl_filepath) const
  */
 void OBJWriter::write_object_group(const OBJMesh &obj_mesh_data) const
 {
+  /* "o object_name" is not mandatory. A valid OBJ file may not contain "o name" and not
+   * "g group_name" either. http://www.martinreddy.net/gfx/3d/OBJ.spec
+   */
   BLI_assert(export_params_.export_object_groups);
   if (!export_params_.export_object_groups) {
     return;
@@ -259,10 +277,7 @@ void OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
   }
   r_last_face_mat_nr = curr_mat_nr;
   if (curr_mat_nr == NOT_FOUND) {
-    /* Once a material is assigned, it cannot be turned off; it can only be changed.
-     * If a material name is not specified, a white material is used.
-     * http://www.martinreddy.net/gfx/3d/OBJ.spec */
-    fputs("usemtl\n", outfile_);
+    fprintf(outfile_, "usemtl %s\n", MATERIAL_GROUP_DISABLED);
     return;
   }
   const char *mat_name = obj_mesh_data.get_object_material_name(curr_mat_nr);
@@ -273,8 +288,7 @@ void OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
 }
 
 /**
- * Write the name of the deform group of a polygon. If no vertex group is found in
- * the polygon, "off" is written.
+ * Write the name of the deform group of a polygon.
  */
 void OBJWriter::write_vertex_group(const OBJMesh &obj_mesh_data,
                                    const int poly_index,
@@ -291,7 +305,7 @@ void OBJWriter::write_vertex_group(const OBJMesh &obj_mesh_data,
   }
   r_last_poly_vertex_group = current_group;
   if (current_group == NOT_FOUND) {
-    fputs("g off\n", outfile_);
+    fprintf(outfile_, "g %s\n", DEFORM_GROUP_DISABLED);
     return;
   }
   fprintf(outfile_, "g %s\n", obj_mesh_data.get_poly_deform_group_name(current_group));
