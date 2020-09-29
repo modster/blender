@@ -216,7 +216,7 @@ static bool wm_obj_export_check(bContext *C, wmOperator *op)
     changed = true;
   }
 
-  if (RNA_boolean_get(op->ptr, "export_animation")) {
+  {
     int start = RNA_int_get(op->ptr, "start_frame");
     int end = RNA_int_get(op->ptr, "end_frame");
     /* Set the defaults. */
@@ -228,19 +228,13 @@ static bool wm_obj_export_check(bContext *C, wmOperator *op)
       end = EFRA;
       changed = true;
     }
-    /* Fix manual errors. */
+    /* Fix user errors. */
     if (end < start) {
       end = start;
       changed = true;
     }
     RNA_int_set(op->ptr, "start_frame", start);
     RNA_int_set(op->ptr, "end_frame", end);
-  }
-  else {
-    /* Set the default export frames to the current one in viewport. */
-    RNA_int_set(op->ptr, "start_frame", CFRA);
-    RNA_int_set(op->ptr, "end_frame", CFRA);
-    changed = true;
   }
 
   /* Both forward and up axes cannot be the same (or same except opposite sign). */
