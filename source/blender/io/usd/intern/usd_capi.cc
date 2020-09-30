@@ -19,10 +19,16 @@
 
 #include "usd.h"
 #include "usd_hierarchy_iterator.h"
+#include "usd_importer_context.h"
+#include "usd_reader_object.h"
+#include "usd_util.h"
 
 #include <pxr/base/plug/registry.h>
 #include <pxr/pxr.h>
 #include <pxr/usd/usd/stage.h>
+#include <pxr/usd/usd/prim.h>
+#include <pxr/usd/usd/primRange.h>
+#include <pxr/usd/usdGeom/metrics.h>
 #include <pxr/usd/usdGeom/tokens.h>
 
 #include "MEM_guardedalloc.h"
@@ -39,12 +45,36 @@
 #include "BKE_global.h"
 #include "BKE_scene.h"
 
+// XXX check the following
+#include "BKE_main.h"
+#include "BKE_material.h"
+#include "BKE_mesh.h"
+#include "BKE_modifier.h"
+#include "BKE_object.h"
+// XXX check the following
+#include "BKE_cachefile.h"
+#include "BKE_context.h"
+#include "BKE_curve.h"
+#include "BKE_global.h"
+#include "BKE_layer.h"
+#include "BKE_lib_id.h"
+#include "BKE_object.h"
+#include "BKE_scene.h"
+#include "BKE_screen.h"
+#include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
+
 #include "BLI_fileops.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
 
+#include "ED_undo.h"
+
 #include "WM_api.h"
 #include "WM_types.h"
+
+#include <iostream>
+
 
 namespace blender::io::usd {
 
@@ -183,6 +213,205 @@ static void export_endjob(void *customdata)
   WM_set_locked_interface(data->wm, false);
 }
 
+
+struct ImportJobData {
+  bContext *C;
+  Main *bmain;
+  Scene *scene;
+  ViewLayer *view_layer;
+  wmWindowManager *wm;
+
+  char filename[1024];
+
+  USDImportParams params;
+
+  short *stop;
+  short *do_update;
+  float *progress;
+
+  bool was_cancelled;
+  bool import_ok;
+  bool is_background_job;
+
+  pxr::UsdStageRefPtr stage;
+  UsdObjectReader::ptr_vector readers;
+};
+
+static void import_startjob(void *user_data, short *stop, short *do_update, float *progress)
+{
+  ImportJobData *data = static_cast<ImportJobData *>(user_data);
+
+  data->import_ok = false;
+  data->stop = stop;
+  data->do_update = do_update;
+  data->progress = progress;
+
+  Scene *scene = data->scene;
+
+  WM_set_locked_interface(data->wm, true);
+
+  *data->do_update = true;
+  *data->progress = 0.05f;
+
+  data->stage = pxr::UsdStage::Open(data->filename);
+  if (!data->stage) {
+    WM_reportf(
+      RPT_ERROR, "USD Export: couldn't open USD stage for file %s", data->filename);
+    return;
+  }
+
+  pxr::TfToken up_axis = pxr::UsdGeomGetStageUpAxis(data->stage);
+  USDImporterContext import_ctx{ up_axis, data->params };
+
+  // Optionally print the stage contents for debugging.
+  if (data->params.debug)
+  {
+    debug_traverse_stage(data->stage);
+  }
+
+  if (G.is_break) {
+    data->was_cancelled = true;
+    return;
+  }
+
+  *data->do_update = true;
+  *data->progress = 0.1f;
+
+  create_readers(data->stage, data->readers, import_ctx);
+
+  // Create objects
+
+  const float size = static_cast<float>(data->readers.size());
+  size_t i = 0;
+
+  double min_time = std::numeric_limits<double>::max();
+  double max_time = std::numeric_limits<double>::min();
+
+  double time = CFRA;
+
+  std::vector<UsdObjectReader *>::iterator iter;
+  for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
+    UsdObjectReader *reader = *iter;
+
+    if (reader->valid()) {
+      reader->readObjectData(data->bmain, time);
+
+      min_time = std::min(min_time, reader->minTime());
+      max_time = std::max(max_time, reader->maxTime());
+    }
+    else {
+      std::cerr << "Object " << reader->name() << " in USD file " << data->filename
+                << " is invalid.\n";
+    }
+
+    *data->progress = 0.1f + 0.3f * (++i / size);
+    *data->do_update = true;
+
+    if (G.is_break) {
+      data->was_cancelled = true;
+      return;
+    }
+  }
+
+  // Setup transformations.
+  i = 0;
+  for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
+    UsdObjectReader *reader = *iter;
+    reader->setupObjectTransform(time);
+
+    *data->progress = 0.7f + 0.3f * (++i / size);
+    *data->do_update = true;
+
+    if (G.is_break) {
+      data->was_cancelled = true;
+      return;
+    }
+  }
+}
+
+static void import_endjob(void *user_data)
+{
+  ImportJobData *data = static_cast<ImportJobData *>(user_data);
+
+  std::vector<UsdObjectReader *>::iterator iter;
+
+  ///* Delete objects on cancellation. */
+  if (data->was_cancelled) {
+    for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
+      Object *ob = (*iter)->object();
+
+      /* It's possible that cancellation occurred between the creation of
+       * the reader and the creation of the Blender object. */
+      if (ob != NULL) {
+        BKE_id_free_us(data->bmain, ob);
+      }
+    }
+  }
+  else {
+    /* Add object to scene. */
+    Base *base;
+    LayerCollection *lc;
+    ViewLayer *view_layer = data->view_layer;
+
+    BKE_view_layer_base_deselect_all(view_layer);
+
+    lc = BKE_layer_collection_get_active(view_layer);
+
+    for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
+      Object *ob = (*iter)->object();
+
+      if (!ob)
+      {
+        continue;
+      }
+
+      BKE_collection_object_add(data->bmain, lc->collection, ob);
+
+      base = BKE_view_layer_base_find(view_layer, ob);
+      /* TODO: is setting active needed? */
+      BKE_view_layer_base_select_and_set_active(view_layer, base);
+
+      DEG_id_tag_update(&lc->collection->id, ID_RECALC_COPY_ON_WRITE);
+      DEG_id_tag_update_ex(data->bmain,
+                           &ob->id,
+                           ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION |
+                           ID_RECALC_BASE_FLAGS);
+    }
+
+  DEG_id_tag_update(&data->scene->id, ID_RECALC_BASE_FLAGS);
+  DEG_relations_tag_update(data->bmain);
+
+    if (data->is_background_job) {
+      /* Blender already returned from the import operator, so we need to store our own extra undo
+       * step. */
+      ED_undo_push(data->C, "USD Import Finished");
+    }
+  }
+
+  for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
+    UsdObjectReader *reader = *iter;
+    reader->decref();
+
+    if (reader->refcount() == 0) {
+      delete reader;
+    }
+  }
+
+  data->readers.clear();
+
+  WM_set_locked_interface(data->wm, false);
+
+  data->import_ok = !data->was_cancelled;
+
+  WM_main_add_notifier(NC_SCENE | ND_FRAME, data->scene);
+}
+
+static void import_freejob(void *user_data)
+{
+  ImportJobData *data = static_cast<ImportJobData *>(user_data);
+  delete data;
+}
+
 }  // namespace blender::io::usd
 
 bool USD_export(bContext *C,
@@ -237,14 +466,76 @@ bool USD_export(bContext *C,
   return export_ok;
 }
 
+
+
+
+bool USD_import(bContext *C,
+                const char *filepath,
+                const struct USDImportParams *params,
+                bool as_background_job)
+{
+  blender::io::usd::ensure_usd_plugin_path_registered();
+
+  /* Using new here since MEM_* functions do not call constructor to properly initialize data. */
+  blender::io::usd::ImportJobData *job = new blender::io::usd::ImportJobData();
+  job->C = C;
+  job->bmain = CTX_data_main(C);
+  job->scene = CTX_data_scene(C);
+  job->view_layer = CTX_data_view_layer(C);
+  job->wm = CTX_wm_manager(C);
+  job->import_ok = false;
+  BLI_strncpy(job->filename, filepath, 1024);
+  job->params = *params;
+
+  job->was_cancelled = false;
+  job->is_background_job = as_background_job;
+
+  G.is_break = false;
+
+  bool import_ok = false;
+
+  if (as_background_job) {
+    wmJob *wm_job = WM_jobs_get(job->wm,
+                                CTX_wm_window(C),
+                                job->scene,
+                                "USD Import",
+                                WM_JOB_PROGRESS,
+                                WM_JOB_TYPE_ALEMBIC); // XXX -- Here and above, why TYPE_ALEMBIC?
+
+    /* setup job */
+    WM_jobs_customdata_set(wm_job, job, blender::io::usd::import_freejob);
+    WM_jobs_timer(wm_job, 0.1, NC_SCENE | ND_FRAME, NC_SCENE | ND_FRAME);
+    WM_jobs_callbacks(wm_job,
+                      blender::io::usd::import_startjob,
+                      nullptr,
+                      nullptr,
+                      blender::io::usd::import_endjob);
+
+    WM_jobs_start(CTX_wm_manager(C), wm_job);
+  }
+  else {
+    /* Fake a job context, so that we don't need NULL pointer checks while importing. */
+    short stop = 0, do_update = 0;
+    float progress = 0.f;
+
+    blender::io::usd::import_startjob(job, &stop, &do_update, &progress);
+    blender::io::usd::import_endjob(job);
+    import_ok = job->import_ok;
+
+    blender::io::usd::import_freejob(job);
+  }
+
+  return import_ok;
+}
+
 int USD_get_version(void)
 {
-  /* USD 19.11 defines:
+  /* USD 20.05 defines:
    *
    * #define PXR_MAJOR_VERSION 0
-   * #define PXR_MINOR_VERSION 19
-   * #define PXR_PATCH_VERSION 11
-   * #define PXR_VERSION 1911
+   * #define PXR_MINOR_VERSION 20
+   * #define PXR_PATCH_VERSION 05
+   * #define PXR_VERSION 2005
    *
    * So the major version is implicit/invisible in the public version number.
    */

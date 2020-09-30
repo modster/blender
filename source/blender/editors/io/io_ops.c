@@ -52,6 +52,7 @@ void ED_operatortypes_io(void)
 #endif
 #ifdef WITH_USD
   WM_operatortype_append(WM_OT_usd_export);
+  WM_operatortype_append(WM_OT_usd_import);
 #endif
 
   WM_operatortype_append(CACHEFILE_OT_open);

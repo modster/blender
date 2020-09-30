@@ -24,6 +24,8 @@
 #ifdef WITH_USD
 #  include "DNA_space_types.h"
 
+#  include "ED_object.h"
+
 #  include "BKE_context.h"
 #  include "BKE_main.h"
 #  include "BKE_report.h"
@@ -240,6 +242,117 @@ void WM_OT_usd_export(struct wmOperatorType *ot)
                "Use Settings for",
                "Determines visibility of objects, modifier settings, and other areas where there "
                "are different settings for viewport and rendering");
+}
+
+
+static int wm_usd_import_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  eUSDOperatorOptions *options = MEM_callocN(sizeof(eUSDOperatorOptions), "eUSDOperatorOptions");
+  options->as_background_job = true;
+  op->customdata = options;
+
+  return WM_operator_filesel(C, op, event);
+}
+
+static int wm_usd_import_exec(bContext *C, wmOperator *op)
+{
+  if (!RNA_struct_property_is_set(op->ptr, "filepath")) {
+    BKE_report(op->reports, RPT_ERROR, "No filename given");
+    return OPERATOR_CANCELLED;
+  }
+
+  char filename[FILE_MAX];
+  RNA_string_get(op->ptr, "filepath", filename);
+
+  eUSDOperatorOptions *options = (eUSDOperatorOptions *)op->customdata;
+  const bool as_background_job = (options != NULL && options->as_background_job);
+  MEM_SAFE_FREE(op->customdata);
+
+  const bool import_uvs = RNA_boolean_get(op->ptr, "import_uvs");
+
+  const float scale = RNA_float_get(op->ptr, "scale");
+
+  const bool debug = RNA_boolean_get(op->ptr, "debug");
+
+  /* Switch out of edit mode to avoid being stuck in it (T54326). */
+  Object *obedit = CTX_data_edit_object(C);
+  if (obedit) {
+    ED_object_mode_set(C, OB_MODE_OBJECT);
+  }
+
+  struct USDImportParams params = {
+    import_uvs,
+    scale,
+    debug
+  };
+
+  bool ok = USD_import(C, filename, &params, as_background_job);
+
+  return as_background_job || ok ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
+}
+
+
+static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
+{
+  uiLayout *layout = op->layout;
+  uiLayout *col;
+  struct PointerRNA *ptr = op->ptr;
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiLayout *box = uiLayoutBox(layout);
+
+  uiItemR(box, ptr, "scale", 0, NULL, ICON_NONE);
+
+  col = uiLayoutColumn(box, true);
+  uiItemR(col, ptr, "import_uvs", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "debug", 0, NULL, ICON_NONE);
+
+}
+
+void WM_OT_usd_import(wmOperatorType *ot)
+{
+  printf("WM_OT_usd_import\n");
+  ot->name = "Import USD";
+  ot->description = "Load a USD file";
+  ot->idname = "WM_OT_usd_import";
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  ot->invoke = wm_usd_export_invoke;
+  ot->exec = wm_usd_import_exec;
+  ot->poll = WM_operator_winactive;
+  ot->ui = wm_usd_import_draw;
+
+  WM_operator_properties_filesel(ot,
+                                 FILE_TYPE_FOLDER | FILE_TYPE_USD,
+                                 FILE_BLENDER,
+                                 FILE_OPENFILE,
+                                 WM_FILESEL_FILEPATH | WM_FILESEL_SHOW_PROPS,
+                                 FILE_DEFAULTDISPLAY,
+                                 FILE_SORT_ALPHA);
+
+  RNA_def_boolean(ot->srna,
+    "import_uvs",
+    true,
+    "uvs",
+    "When checked, import mesh uvs.");
+
+  RNA_def_float(
+    ot->srna,
+    "scale",
+    1.0f,
+    0.0001f,
+    1000.0f,
+    "Scale",
+    "Value by which to enlarge or shrink the objects with respect to the world's origin",
+    0.0001f,
+    1000.0f);
+
+  RNA_def_boolean(ot->srna,
+    "debug",
+    false,
+    "debug",
+    "When checked, output debug information to the shell.");
 }
 
 #endif /* WITH_USD */
