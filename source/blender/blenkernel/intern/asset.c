@@ -80,6 +80,13 @@ void BKE_assetdata_tag_remove(AssetData *asset_data, CustomTag *tag)
   BLI_freelinkN(&asset_data->tags, tag);
 }
 
+/* Queries -------------------------------------------- */
+
+PreviewImage *BKE_assetdata_preview_get_from_id(const AssetData *UNUSED(asset_data), const ID *id)
+{
+  return BKE_previewimg_id_get(id);
+}
+
 /* .blend file API -------------------------------------------- */
 
 void BKE_assetdata_write(BlendWriter *writer, AssetData *asset_data)

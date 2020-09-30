@@ -317,6 +317,10 @@ static void file_refresh(const bContext *C, ScrArea *area)
   if (!sfile->folders_prev) {
     sfile->folders_prev = folderlist_new();
   }
+  if (sfile->files && !filelist_matches_type(sfile->files, params->type)) {
+    filelist_free(sfile->files);
+    MEM_SAFE_FREE(sfile->files);
+  }
   if (!sfile->files) {
     sfile->files = filelist_new(params->type);
     params->highlight_file = -1; /* added this so it opens nicer (ton) */
@@ -347,7 +351,7 @@ static void file_refresh(const bContext *C, ScrArea *area)
     filelist_clear(sfile->files);
   }
 
-  if (filelist_empty(sfile->files)) {
+  if (filelist_needs_reading(sfile->files)) {
     if (!filelist_pending(sfile->files)) {
       filelist_readjob_start(sfile->files, C);
     }
@@ -493,7 +497,7 @@ static void file_main_region_draw(const bContext *C, ARegion *region)
   View2D *v2d = &region->v2d;
 
   /* Needed, because filelist is not initialized on loading */
-  if (!sfile->files || filelist_empty(sfile->files)) {
+  if (!sfile->files || filelist_needs_reading(sfile->files)) {
     file_refresh(C, NULL);
   }
 

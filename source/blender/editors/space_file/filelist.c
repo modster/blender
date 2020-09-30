@@ -53,13 +53,16 @@
 #  include "BLI_winstuff.h"
 #endif
 
+#include "BKE_asset.h"
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_icons.h"
 #include "BKE_idtype.h"
 #include "BKE_main.h"
+#include "BKE_main_idmap.h"
 #include "BLO_readfile.h"
 
+#include "DNA_asset_types.h"
 #include "DNA_space_types.h"
 
 #include "ED_datafiles.h"
@@ -117,6 +120,10 @@ void folderlist_popdir(struct ListBase *folderlist, char *dir)
 
 void folderlist_pushdir(ListBase *folderlist, const char *dir)
 {
+  if (!dir[0]) {
+    return;
+  }
+
   struct FolderList *folder, *previous_folder;
   previous_folder = folderlist->last;
 
@@ -215,6 +222,12 @@ typedef struct FileListInternEntry {
   /** not strictly needed, but used during sorting, avoids to have to recompute it there... */
   char *name;
 
+  /** When showing local IDs (FILE_MAIN, FILE_MAIN_ASSET), UUID of the ID this file represents. */
+  uint id_uuid;
+  /* For the few file types that have the preview already in memory. For others, there's delayed
+   * preview reading from disk. Non-owning pointer. */
+  PreviewImage *preview_image;
+
   /** Defined in BLI_fileops.h */
   eFileAttributes attributes;
   BLI_stat_t st;
@@ -295,6 +308,8 @@ enum {
 typedef struct FileList {
   FileDirEntryArr filelist;
 
+  eFileSelectType type;
+
   short prv_w;
   short prv_h;
 
@@ -316,6 +331,12 @@ typedef struct FileList {
    */
   GHash *selection_state;
 
+  /* If the file browser shows local IDs (FILE_MAIN, FILE_MAIN_ASSET), this is needed to keep safe
+   * references (safe over deletion or undo/redo) to the IDs. */
+  /* TODO could we use something more lighweight? Something that only stores IDs that are actually
+   * used. */
+  struct IDNameLib_Map *id_map;
+
   short max_recursion;
   short recursion_level;
 
@@ -327,7 +348,8 @@ typedef struct FileList {
   bool (*checkdirf)(struct FileList *, char *, const bool);
 
   /* Fill filelist (to be called by read job). */
-  void (*read_jobf)(struct FileList *, const char *, short *, short *, float *, ThreadMutex *);
+  void (*read_jobf)(
+      Main *, struct FileList *, const char *, short *, short *, float *, ThreadMutex *);
 
   /* Filter an entry of current filelist. */
   bool (*filterf)(struct FileListInternEntry *, const char *, FileListFilter *);
@@ -360,24 +382,34 @@ enum {
 
 static ImBuf *gSpecialFileImages[SPECIAL_IMG_MAX];
 
-static void filelist_readjob_main(FileList *filelist,
+static void filelist_readjob_main(Main *current_main,
+                                  FileList *filelist,
                                   const char *main_name,
                                   short *stop,
                                   short *do_update,
                                   float *progress,
                                   ThreadMutex *lock);
-static void filelist_readjob_lib(FileList *filelist,
+static void filelist_readjob_lib(Main *current_main,
+                                 FileList *filelist,
                                  const char *main_name,
                                  short *stop,
                                  short *do_update,
                                  float *progress,
                                  ThreadMutex *lock);
-static void filelist_readjob_dir(FileList *filelist,
+static void filelist_readjob_dir(Main *current_main,
+                                 FileList *filelist,
                                  const char *main_name,
                                  short *stop,
                                  short *do_update,
                                  float *progress,
                                  ThreadMutex *lock);
+static void filelist_readjob_main_assets(Main *current_main,
+                                         FileList *filelist,
+                                         const char *main_name,
+                                         short *stop,
+                                         short *do_update,
+                                         float *progress,
+                                         ThreadMutex *lock);
 
 /* helper, could probably go in BKE actually? */
 static int groupname_to_code(const char *group);
@@ -633,7 +665,7 @@ void filelist_setsorting(struct FileList *filelist, const short sort, bool inver
 /* ********** Filter helpers ********** */
 
 /* True if filename is meant to be hidden, eg. starting with period. */
-static bool is_hidden_dot_filename(const char *filename, FileListInternEntry *file)
+static bool is_hidden_dot_filename(const char *filename, const FileListInternEntry *file)
 {
   if (filename[0] == '.' && !ELEM(filename[1], '.', '\0')) {
     return true; /* ignore .file */
@@ -674,8 +706,8 @@ static bool is_hidden_dot_filename(const char *filename, FileListInternEntry *fi
 
 /* True if should be hidden, based on current filtering. */
 static bool is_filtered_hidden(const char *filename,
-                               FileListFilter *filter,
-                               FileListInternEntry *file)
+                               const FileListFilter *filter,
+                               const FileListInternEntry *file)
 {
   if ((filename[0] == '.') && (filename[1] == '\0')) {
     return true; /* Ignore . */
@@ -743,6 +775,51 @@ static bool is_filtered_file(FileListInternEntry *file,
   return is_filtered;
 }
 
+static bool is_filtered_id_file(const FileListInternEntry *file,
+                                const char *id_group,
+                                const char *name,
+                                const FileListFilter *filter)
+{
+  bool is_filtered = !is_filtered_hidden(file->relpath, filter, file);
+  if (is_filtered && !FILENAME_IS_CURRPAR(file->relpath)) {
+    /* We only check for types if some type are enabled in filtering. */
+    if ((filter->filter || filter->filter_id) && (filter->flags & FLF_DO_FILTER)) {
+      if (file->typeflag & FILE_TYPE_DIR) {
+        if (file->typeflag &
+            (FILE_TYPE_BLENDERLIB | FILE_TYPE_BLENDER | FILE_TYPE_BLENDER_BACKUP)) {
+          if (!(filter->filter & (FILE_TYPE_BLENDER | FILE_TYPE_BLENDER_BACKUP))) {
+            is_filtered = false;
+          }
+        }
+        else {
+          if (!(filter->filter & FILE_TYPE_FOLDER)) {
+            is_filtered = false;
+          }
+        }
+      }
+      if (is_filtered && id_group) {
+        if (!name && (filter->flags & FLF_HIDE_LIB_DIR)) {
+          is_filtered = false;
+        }
+        else {
+          uint64_t filter_id = groupname_to_filter_id(id_group);
+          if (!(filter_id & filter->filter_id)) {
+            is_filtered = false;
+          }
+        }
+      }
+    }
+    /* If there's a filter string, apply it as filter even if FLF_DO_FILTER is not set. */
+    if (is_filtered && (filter->filter_search[0] != '\0')) {
+      if (fnmatch(filter->filter_search, file->relpath, FNM_CASEFOLD) != 0) {
+        is_filtered = false;
+      }
+    }
+  }
+
+  return is_filtered;
+}
+
 static bool is_filtered_lib(FileListInternEntry *file, const char *root, FileListFilter *filter)
 {
   bool is_filtered;
@@ -751,42 +828,7 @@ static bool is_filtered_lib(FileListInternEntry *file, const char *root, FileLis
   BLI_join_dirfile(path, sizeof(path), root, file->relpath);
 
   if (BLO_library_path_explode(path, dir, &group, &name)) {
-    is_filtered = !is_filtered_hidden(file->relpath, filter, file);
-    if (is_filtered && !FILENAME_IS_CURRPAR(file->relpath)) {
-      /* We only check for types if some type are enabled in filtering. */
-      if ((filter->filter || filter->filter_id) && (filter->flags & FLF_DO_FILTER)) {
-        if (file->typeflag & FILE_TYPE_DIR) {
-          if (file->typeflag &
-              (FILE_TYPE_BLENDERLIB | FILE_TYPE_BLENDER | FILE_TYPE_BLENDER_BACKUP)) {
-            if (!(filter->filter & (FILE_TYPE_BLENDER | FILE_TYPE_BLENDER_BACKUP))) {
-              is_filtered = false;
-            }
-          }
-          else {
-            if (!(filter->filter & FILE_TYPE_FOLDER)) {
-              is_filtered = false;
-            }
-          }
-        }
-        if (is_filtered && group) {
-          if (!name && (filter->flags & FLF_HIDE_LIB_DIR)) {
-            is_filtered = false;
-          }
-          else {
-            uint64_t filter_id = groupname_to_filter_id(group);
-            if (!(filter_id & filter->filter_id)) {
-              is_filtered = false;
-            }
-          }
-        }
-      }
-      /* If there's a filter string, apply it as filter even if FLF_DO_FILTER is not set. */
-      if (is_filtered && (filter->filter_search[0] != '\0')) {
-        if (fnmatch(filter->filter_search, file->relpath, FNM_CASEFOLD) != 0) {
-          is_filtered = false;
-        }
-      }
-    }
+    is_filtered = is_filtered_id_file(file, group, name, filter);
   }
   else {
     is_filtered = is_filtered_file(file, root, filter);
@@ -802,6 +844,14 @@ static bool is_filtered_main(FileListInternEntry *file,
   return !is_filtered_hidden(file->relpath, filter, file);
 }
 
+static bool is_filtered_main_assets(FileListInternEntry *file,
+                                    const char *UNUSED(dir),
+                                    FileListFilter *filter)
+{
+  /* "Filtered" means *not* being filtered out... So return true if the file should be visible. */
+  return is_filtered_id_file(file, file->relpath, file->name, filter);
+}
+
 static void filelist_filter_clear(FileList *filelist)
 {
   filelist->flags |= FL_NEED_FILTERING;
@@ -813,7 +863,7 @@ void filelist_filter(FileList *filelist)
   const int num_files = filelist->filelist.nbr_entries;
   FileListInternEntry **filtered_tmp, *file;
 
-  if (filelist->filelist.nbr_entries == 0) {
+  if (filelist->filelist.nbr_entries <= 0) {
     return;
   }
 
@@ -1177,6 +1227,14 @@ static bool filelist_checkdir_main(struct FileList *filelist, char *r_dir, const
   return filelist_checkdir_lib(filelist, r_dir, do_change);
 }
 
+static bool filelist_checkdir_main_assets(struct FileList *UNUSED(filelist),
+                                          char *UNUSED(r_dir),
+                                          const bool UNUSED(do_change))
+{
+  /* Main is always valid. */
+  return true;
+}
+
 static void filelist_entry_clear(FileDirEntry *entry)
 {
   if (entry->name) {
@@ -1249,7 +1307,7 @@ static void filelist_direntryarr_free(FileDirEntryArr *array)
 #else
   BLI_assert(BLI_listbase_is_empty(&array->entries));
 #endif
-  array->nbr_entries = 0;
+  array->nbr_entries = -1;
   array->nbr_entries_filtered = -1;
   array->entry_idx_start = -1;
   array->entry_idx_end = -1;
@@ -1510,10 +1568,12 @@ FileList *filelist_new(short type)
 
   filelist_cache_init(&p->filelist_cache, FILELIST_ENTRYCACHESIZE_DEFAULT);
 
+  p->type = type;
   p->selection_state = BLI_ghash_new(
       BLI_ghashutil_uinthash_v4_p, BLI_ghashutil_uinthash_v4_cmp, __func__);
+  p->filelist.nbr_entries = -1;
 
-  switch (type) {
+  switch (p->type) {
     case FILE_MAIN:
       p->checkdirf = filelist_checkdir_main;
       p->read_jobf = filelist_readjob_main;
@@ -1524,6 +1584,12 @@ FileList *filelist_new(short type)
       p->read_jobf = filelist_readjob_lib;
       p->filterf = is_filtered_lib;
       break;
+    case FILE_MAIN_ASSET:
+      /* TODO this may not be thread safe, main data may change. */
+      p->checkdirf = filelist_checkdir_main_assets;
+      p->read_jobf = filelist_readjob_main_assets;
+      p->filterf = is_filtered_main_assets;
+      break;
     default:
       p->checkdirf = filelist_checkdir_dir;
       p->read_jobf = filelist_readjob_dir;
@@ -1533,7 +1599,10 @@ FileList *filelist_new(short type)
   return p;
 }
 
-void filelist_clear_ex(struct FileList *filelist, const bool do_cache, const bool do_selection)
+void filelist_clear_ex(struct FileList *filelist,
+                       const bool do_cache,
+                       const bool do_selection,
+                       const bool do_id_map)
 {
   if (!filelist) {
     return;
@@ -1552,11 +1621,16 @@ void filelist_clear_ex(struct FileList *filelist, const bool do_cache, const boo
   if (do_selection && filelist->selection_state) {
     BLI_ghash_clear(filelist->selection_state, MEM_freeN, NULL);
   }
+
+  if (do_id_map && filelist->id_map) {
+    BKE_main_idmap_destroy(filelist->id_map);
+    filelist->id_map = NULL;
+  }
 }
 
 void filelist_clear(struct FileList *filelist)
 {
-  filelist_clear_ex(filelist, true, true);
+  filelist_clear_ex(filelist, true, true, true);
 }
 
 void filelist_free(struct FileList *filelist)
@@ -1567,12 +1641,17 @@ void filelist_free(struct FileList *filelist)
   }
 
   /* No need to clear cache & selection_state, we free them anyway. */
-  filelist_clear_ex(filelist, false, false);
+  filelist_clear_ex(filelist, false, false, false);
   filelist_cache_free(&filelist->filelist_cache);
 
   if (filelist->selection_state) {
     BLI_ghash_free(filelist->selection_state, MEM_freeN, NULL);
     filelist->selection_state = NULL;
+  }
+
+  if (filelist->id_map) {
+    BKE_main_idmap_destroy(filelist->id_map);
+    filelist->id_map = NULL;
   }
 
   memset(&filelist->filter_data, 0, sizeof(filelist->filter_data));
@@ -1623,6 +1702,11 @@ static const char *fileentry_uiname(const char *root,
   BLI_assert(name);
 
   return name;
+}
+
+bool filelist_matches_type(const FileList *filelist, short type)
+{
+  return filelist->type == (eFileSelectType)type;
 }
 
 const char *filelist_dir(struct FileList *filelist)
@@ -1684,7 +1768,7 @@ bool filelist_pending(struct FileList *filelist)
  */
 int filelist_files_ensure(FileList *filelist)
 {
-  if (!filelist_force_reset(filelist) || !filelist_empty(filelist)) {
+  if (!filelist_force_reset(filelist) || !filelist_needs_reading(filelist)) {
     filelist_sort(filelist);
     filelist_filter(filelist);
   }
@@ -1716,6 +1800,11 @@ static FileDirEntry *filelist_file_create_entry(FileList *filelist, const int in
   ret->attributes = entry->attributes;
   if (entry->redirection_path) {
     ret->redirection_path = BLI_strdup(entry->redirection_path);
+  }
+  ret->id_uuid = entry->id_uuid;
+  /* For some file types the preview is already available. */
+  if (entry->preview_image) {
+    ret->image = BKE_previewimg_to_imbuf(entry->preview_image, ICON_SIZE_PREVIEW);
   }
   BLI_addtail(&cache->cached_entries, ret);
   return ret;
@@ -1802,6 +1891,18 @@ int filelist_file_findpath(struct FileList *filelist, const char *filename)
   }
 
   return -1;
+}
+
+/**
+ * Get the ID a file represents (if any). For #FILE_MAIN, #FILE_MAIN_ASSET.
+ */
+ID *filelist_file_get_id(const FileList *filelist, const FileDirEntry *file)
+{
+  if (file->id_uuid == 0 || !filelist->id_map) {
+    return NULL;
+  }
+
+  return BKE_main_idmap_lookup_uuid(filelist->id_map, file->id_uuid);
 }
 
 FileDirEntry *filelist_entry_find_uuid(struct FileList *filelist, const int uuid[4])
@@ -2329,9 +2430,9 @@ int ED_file_extension_icon(const char *path)
   }
 }
 
-int filelist_empty(struct FileList *filelist)
+int filelist_needs_reading(struct FileList *filelist)
 {
-  return (filelist->filelist.nbr_entries == 0);
+  return (filelist->filelist.nbr_entries == -1);
 }
 
 uint filelist_entry_select_set(const FileList *filelist,
@@ -2948,7 +3049,8 @@ static void filelist_readjob_do(const bool do_lib,
   BLI_stack_free(todo_dirs);
 }
 
-static void filelist_readjob_dir(FileList *filelist,
+static void filelist_readjob_dir(Main *UNUSED(current_main),
+                                 FileList *filelist,
                                  const char *main_name,
                                  short *stop,
                                  short *do_update,
@@ -2958,7 +3060,8 @@ static void filelist_readjob_dir(FileList *filelist,
   filelist_readjob_do(false, filelist, main_name, stop, do_update, progress, lock);
 }
 
-static void filelist_readjob_lib(FileList *filelist,
+static void filelist_readjob_lib(Main *UNUSED(current_main),
+                                 FileList *filelist,
                                  const char *main_name,
                                  short *stop,
                                  short *do_update,
@@ -2968,7 +3071,8 @@ static void filelist_readjob_lib(FileList *filelist,
   filelist_readjob_do(true, filelist, main_name, stop, do_update, progress, lock);
 }
 
-static void filelist_readjob_main(FileList *filelist,
+static void filelist_readjob_main(Main *current_main,
+                                  FileList *filelist,
                                   const char *main_name,
                                   short *stop,
                                   short *do_update,
@@ -2976,12 +3080,64 @@ static void filelist_readjob_main(FileList *filelist,
                                   ThreadMutex *lock)
 {
   /* TODO! */
-  filelist_readjob_dir(filelist, main_name, stop, do_update, progress, lock);
+  filelist_readjob_dir(current_main, filelist, main_name, stop, do_update, progress, lock);
+}
+
+static void filelist_readjob_main_assets(Main *current_main,
+                                         FileList *filelist,
+                                         const char *UNUSED(main_name),
+                                         short *UNUSED(stop),
+                                         short *do_update,
+                                         float *UNUSED(progress),
+                                         ThreadMutex *lock)
+{
+  BLI_assert(BLI_listbase_is_empty(&filelist->filelist.entries) &&
+             (filelist->filelist.nbr_entries == 0));
+
+  FileListInternEntry *entry;
+  ListBase tmp_entries = {0};
+  ID *id_iter;
+  int nbr_entries = 0;
+
+  FOREACH_MAIN_ID_BEGIN (current_main, id_iter) {
+    if (!id_iter->asset_data) {
+      continue;
+    }
+
+    const char *id_code_name = BKE_idtype_idcode_to_name(GS(id_iter->name));
+
+    entry = MEM_callocN(sizeof(*entry), __func__);
+    entry->relpath = BLI_strdup(id_code_name);
+    entry->name = BLI_strdup(id_iter->name + 2);
+    entry->typeflag |= FILE_TYPE_BLENDERLIB | FILE_TYPE_ASSET;
+    entry->blentype = GS(id_iter->name);
+    *((uint32_t *)entry->uuid) = atomic_add_and_fetch_uint32(
+        (uint32_t *)filelist->filelist_intern.curr_uuid, 1);
+    entry->preview_image = BKE_assetdata_preview_get_from_id(id_iter->asset_data, id_iter);
+    entry->id_uuid = id_iter->session_uuid;
+    nbr_entries++;
+    BLI_addtail(&tmp_entries, entry);
+  }
+  FOREACH_MAIN_ID_END;
+
+  if (nbr_entries) {
+    BLI_mutex_lock(lock);
+
+    *do_update = true;
+
+    BLI_movelisttolist(&filelist->filelist.entries, &tmp_entries);
+    filelist->filelist.nbr_entries += nbr_entries;
+    filelist->filelist.nbr_entries_filtered = filelist->filelist.entry_idx_start =
+        filelist->filelist.entry_idx_end = -1;
+
+    BLI_mutex_unlock(lock);
+  }
 }
 
 typedef struct FileListReadJob {
   ThreadMutex lock;
   char main_name[FILE_MAX];
+  Main *current_main;
   struct FileList *filelist;
   /** XXX We may use a simpler struct here... just a linked list and root path? */
   struct FileList *tmp_filelist;
@@ -3015,8 +3171,13 @@ static void filelist_readjob_startjob(void *flrjv, short *stop, short *do_update
 
   BLI_mutex_unlock(&flrj->lock);
 
-  flrj->tmp_filelist->read_jobf(
-      flrj->tmp_filelist, flrj->main_name, stop, do_update, progress, &flrj->lock);
+  flrj->tmp_filelist->read_jobf(flrj->current_main,
+                                flrj->tmp_filelist,
+                                flrj->main_name,
+                                stop,
+                                do_update,
+                                progress,
+                                &flrj->lock);
 }
 
 static void filelist_readjob_update(void *flrjv)
@@ -3031,7 +3192,7 @@ static void filelist_readjob_update(void *flrjv)
 
   BLI_mutex_lock(&flrj->lock);
 
-  if (flrj->tmp_filelist->filelist.nbr_entries) {
+  if (flrj->tmp_filelist->filelist.nbr_entries > 0) {
     /* We just move everything out of 'thread context' into final list. */
     new_nbr_entries = flrj->tmp_filelist->filelist.nbr_entries;
     BLI_movelisttolist(&new_entries, &flrj->tmp_filelist->filelist.entries);
@@ -3042,14 +3203,14 @@ static void filelist_readjob_update(void *flrjv)
 
   if (new_nbr_entries) {
     /* Do not clear selection cache, we can assume already 'selected' uuids are still valid! */
-    filelist_clear_ex(flrj->filelist, true, false);
+    filelist_clear_ex(flrj->filelist, true, false, false);
 
     flrj->filelist->flags |= (FL_NEED_SORTING | FL_NEED_FILTERING);
   }
 
   /* if no new_nbr_entries, this is NOP */
   BLI_movelisttolist(&fl_intern->entries, &new_entries);
-  flrj->filelist->filelist.nbr_entries = nbr_entries + new_nbr_entries;
+  flrj->filelist->filelist.nbr_entries = MAX2(nbr_entries, 0) + new_nbr_entries;
 }
 
 static void filelist_readjob_endjob(void *flrjv)
@@ -3074,6 +3235,9 @@ static void filelist_readjob_free(void *flrjv)
     BLI_assert(flrj->tmp_filelist->filelist.nbr_entries == 0);
     BLI_assert(BLI_listbase_is_empty(&flrj->tmp_filelist->filelist.entries));
 
+    /* Don't let this be free'd, the tmp list doesn't own it. */
+    flrj->tmp_filelist->id_map = NULL;
+
     filelist_freelib(flrj->tmp_filelist);
     filelist_free(flrj->tmp_filelist);
     MEM_freeN(flrj->tmp_filelist);
@@ -3093,10 +3257,13 @@ void filelist_readjob_start(FileList *filelist, const bContext *C)
   /* prepare job data */
   flrj = MEM_callocN(sizeof(*flrj), __func__);
   flrj->filelist = filelist;
+  flrj->current_main = bmain;
   BLI_strncpy(flrj->main_name, BKE_main_blendfile_path(bmain), sizeof(flrj->main_name));
 
+  BLI_assert(filelist->id_map == NULL);
   filelist->flags &= ~(FL_FORCE_RESET | FL_IS_READY);
   filelist->flags |= FL_IS_PENDING;
+  filelist->id_map = BKE_main_idmap_create(bmain, false, NULL, MAIN_IDMAP_TYPE_UUID);
 
   BLI_mutex_init(&flrj->lock);
 

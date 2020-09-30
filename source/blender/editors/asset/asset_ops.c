@@ -58,7 +58,8 @@ static int asset_make_exec(bContext *C, wmOperator *op)
 
   UI_icon_render_id(C, NULL, id, true, false);
   /* Store reference to the ID's preview. */
-  id->asset_data->preview = BKE_previewimg_id_get(id);
+  /* XXX get rid of this? File read will be a hassle and no real need for it right now. */
+  id->asset_data->preview = BKE_assetdata_preview_get_from_id(id->asset_data, id);
 
   BKE_reportf(op->reports, RPT_INFO, "Data-block '%s' is now an asset", id->name + 2);
 

@@ -523,6 +523,27 @@ void BKE_previewimg_ensure(PreviewImage *prv, const int size)
   }
 }
 
+/**
+ * Create an #ImBuf holding a copy of the preview image buffer in \a prv.
+ * \note The returned image buffer has to be free'd (#IMB_freeImBuf()).
+ */
+ImBuf *BKE_previewimg_to_imbuf(PreviewImage *prv, const int size)
+{
+  const unsigned int w = prv->w[size];
+  const unsigned int h = prv->h[size];
+  const unsigned int *rect = prv->rect[size];
+
+  ImBuf *ima = NULL;
+
+  if (w > 0 && h > 0 && rect) {
+    /* first allocate imbuf for copying preview into it */
+    ima = IMB_allocImBuf(w, h, 32, IB_rect);
+    memcpy(ima->rect, rect, w * h * sizeof(*ima->rect));
+  }
+
+  return ima;
+}
+
 void BKE_previewimg_blend_write(BlendWriter *writer, const PreviewImage *prv)
 {
   /* Note we write previews also for undo steps. It takes up some memory,

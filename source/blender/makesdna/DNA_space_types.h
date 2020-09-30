@@ -704,7 +704,7 @@ typedef struct FileSelectParams {
 
   /* short */
   /** XXXXX for now store type here, should be moved to the operator. */
-  short type;
+  short type; /* eFileSelectType */
   /** Settings for filter, hiding dots files. */
   short flag;
   /** Sort order. */
@@ -781,6 +781,11 @@ typedef enum eFileBrowse_Mode {
   FILE_BROWSE_MODE_ASSETS = 1,
 } eFileBrowse_Mode;
 
+typedef enum eFileAssetReporitory_Type {
+  FILE_ASSET_REPO_BUNDLED = 0,
+  FILE_ASSET_REPO_LOCAL = 1,
+} eFileAssetReporitory_Type;
+
 /* FileSelectParams.display */
 enum eFileDisplayType {
   FILE_DEFAULTDISPLAY = 0,
@@ -813,12 +818,15 @@ enum eFileDetails {
 #define FILE_MAX_LIBEXTRA (FILE_MAX + MAX_ID_NAME)
 
 /* filesel types */
-#define FILE_UNIX 8
-#define FILE_BLENDER 8 /* don't display relative paths */
-#define FILE_SPECIAL 9
+typedef enum eFileSelectType {
+  FILE_LOADLIB = 1,
+  FILE_MAIN = 2,
+  FILE_MAIN_ASSET = 3,
 
-#define FILE_LOADLIB 1
-#define FILE_MAIN 2
+  FILE_UNIX = 8,
+  FILE_BLENDER = 8, /* don't display relative paths */
+  FILE_SPECIAL = 9,
+} eFileSelectType;
 
 /* filesel op property -> action */
 typedef enum eFileSel_Action {
@@ -991,8 +999,8 @@ typedef struct FileDirEntry {
   /** Optional argument for shortcuts, aliases etc. */
   char *redirection_path;
 
-  /** TODO: make this a real ID pointer? */
-  void *poin;
+  /** When showing local IDs (FILE_MAIN, FILE_MAIN_ASSET), UUID of the ID this file represents. */
+  uint id_uuid;
   struct ImBuf *image;
 
   /* Tags are for info only, most of filtering is done in asset engine. */
@@ -1026,6 +1034,7 @@ typedef struct FileDirEntry {
 #
 typedef struct FileDirEntryArr {
   ListBase entries;
+  /* 0 is a valid value (files read but none to display), -1 means files have yet to be read. */
   int nbr_entries;
   int nbr_entries_filtered;
   int entry_idx_start, entry_idx_end;

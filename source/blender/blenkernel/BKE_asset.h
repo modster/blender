@@ -29,6 +29,8 @@ extern "C" {
 
 struct BlendWriter;
 struct BlendDataReader;
+struct ID;
+struct PreviewImage;
 
 struct AssetData *BKE_asset_data_create(void);
 void BKE_asset_data_free(struct AssetData *asset_data);
@@ -42,6 +44,9 @@ struct CustomTagEnsureResult {
 struct CustomTagEnsureResult BKE_assetdata_tag_ensure(struct AssetData *asset_data,
                                                       const char *name);
 void BKE_assetdata_tag_remove(struct AssetData *asset_data, struct CustomTag *tag);
+
+struct PreviewImage *BKE_assetdata_preview_get_from_id(const struct AssetData *asset_data,
+                                                       const struct ID *owner_id);
 
 void BKE_assetdata_write(struct BlendWriter *writer, struct AssetData *asset_data);
 void BKE_assetdata_read(struct BlendDataReader *reader, struct AssetData *asset_data);

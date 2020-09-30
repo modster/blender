@@ -5749,8 +5749,9 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
-  static const EnumPropertyItem asset_repository_dummy_items[] = {
-      {0, "BUNDLED", 0, "Bundled", "Show the default user assets"},
+  static const EnumPropertyItem asset_repository_items[] = {
+      {FILE_ASSET_REPO_BUNDLED, "BUNDLED", 0, "Bundled", "Show the default user assets"},
+      {FILE_ASSET_REPO_LOCAL, "LOCAL", 0, "Local", "Show the assets in the current file"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -5925,9 +5926,8 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_TEXTEDIT_UPDATE);
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
 
-  /* XXX dummy */
   prop = RNA_def_property(srna, "asset_repository", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, asset_repository_dummy_items);
+  RNA_def_property_enum_items(prop, asset_repository_items);
   RNA_def_property_ui_text(prop, "Asset Repository", "");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
 

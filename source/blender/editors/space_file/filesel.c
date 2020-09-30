@@ -77,9 +77,33 @@
 
 #define VERTLIST_MAJORCOLUMN_WIDTH (25 * UI_UNIT_X)
 
+static eFileSelectType fileselect_type_from_params_get(const FileSelectParams *params)
+{
+
+  return (params->asset_repository == FILE_ASSET_REPO_LOCAL) ? FILE_MAIN_ASSET : FILE_LOADLIB;
+}
+
 static bool fileselect_needs_refresh(const SpaceFile *sfile)
 {
-  return sfile->params && (sfile->params->browse_mode != sfile->browse_mode);
+  if (!sfile->params) {
+    return true;
+  }
+
+  if (sfile->params->browse_mode != sfile->browse_mode) {
+    return true;
+  }
+  /* Only if there's an operator, the regular file browsing mode can show anything but regular
+   * files (i.e. it can't browse into .blends or such). */
+  if (!sfile->op && (sfile->params->browse_mode == FILE_BROWSE_MODE_FILES) &&
+      (sfile->params->type != FILE_UNIX)) {
+    return true;
+  }
+  if (sfile->files &&
+      !filelist_matches_type(sfile->files, fileselect_type_from_params_get(sfile->params))) {
+    return true;
+  }
+
+  return false;
 }
 
 FileSelectParams *ED_fileselect_get_params(struct SpaceFile *sfile)
@@ -99,6 +123,7 @@ short ED_fileselect_set_params(SpaceFile *sfile)
 {
   FileSelectParams *params;
   wmOperator *op = sfile->op;
+  bool allow_null_dir = false;
 
   const char *blendfile_path = BKE_main_blendfile_path_from_global();
 
@@ -306,21 +331,28 @@ short ED_fileselect_set_params(SpaceFile *sfile)
     params->filter_glob[0] = '\0';
 
     if (ED_fileselect_is_asset_browser(params)) {
-      /* TODO Fixed file path. */
-      const char *doc_path = BKE_appdir_folder_default();
-
-      if (doc_path) {
-        const char *asset_blend_name = "assets.blend";
-        // const char *id_group_name = BKE_idtype_idcode_to_name(ID_OB);
-
-        BLI_join_dirfile(params->dir, sizeof(params->dir), doc_path, asset_blend_name);
-        // BLI_path_join(
-        //     params->dir, sizeof(params->dir), doc_path, asset_blend_name, id_group_name,
-        //     NULL);
+      if (params->asset_repository == FILE_ASSET_REPO_LOCAL) {
+        params->dir[0] = '\0';
         params->file[0] = '\0';
+        allow_null_dir = true;
+      }
+      else {
+        /* TODO Fixed file path. */
+        const char *doc_path = BKE_appdir_folder_default();
+
+        if (doc_path) {
+          const char *asset_blend_name = "assets.blend";
+          // const char *id_group_name = BKE_idtype_idcode_to_name(ID_OB);
+
+          BLI_join_dirfile(params->dir, sizeof(params->dir), doc_path, asset_blend_name);
+          // BLI_path_join(
+          //     params->dir, sizeof(params->dir), doc_path, asset_blend_name, id_group_name,
+          //     NULL);
+          params->file[0] = '\0';
+        }
       }
 
-      params->type = FILE_LOADLIB;
+      params->type = fileselect_type_from_params_get(params);
       /* TODO this way of using filters to realize categories is noticably slower than
        * specifying a "group" to read. That's because all types are read and filtering is applied
        * after the fact. */
@@ -343,7 +375,7 @@ short ED_fileselect_set_params(SpaceFile *sfile)
     sfile->folders_prev = folderlist_new();
   }
 
-  if (!sfile->params->dir[0]) {
+  if (!sfile->params->dir[0] && !allow_null_dir) {
     if (blendfile_path[0] != '\0') {
       BLI_split_dir_part(blendfile_path, sfile->params->dir, sizeof(sfile->params->dir));
     }

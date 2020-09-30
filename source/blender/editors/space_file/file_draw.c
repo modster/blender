@@ -38,6 +38,7 @@
 
 #include "BKE_context.h"
 #include "BKE_main.h"
+#include "BKE_main_idmap.h"
 
 #include "BLO_readfile.h"
 
@@ -134,6 +135,7 @@ static void draw_tile(int sx, int sy, int width, int height, int colorid, int sh
 }
 
 static void file_draw_icon(uiBlock *block,
+                           const struct FileList *files,
                            const FileDirEntry *file,
                            const char *rootpath,
                            const char *path,
@@ -159,7 +161,13 @@ static void file_draw_icon(uiBlock *block,
   UI_but_func_tooltip_set(but, file_draw_tooltip_func, BLI_strdup(path));
 
   if (drag) {
-    if (file->typeflag & FILE_TYPE_ASSET) {
+    /* TODO duplicated from file_draw_preview(). */
+    ID *id;
+
+    if ((id = filelist_file_get_id(files, file))) {
+      UI_but_drag_set_id(but, id);
+    }
+    else if (file->typeflag & FILE_TYPE_ASSET) {
       char *rootpath_cpy = BLI_strdup(rootpath);
       BLI_path_slash_rstrip(rootpath_cpy);
       UI_but_drag_set_asset(
@@ -220,6 +228,7 @@ void file_calc_previews(const bContext *C, ARegion *region)
 }
 
 static void file_draw_preview(uiBlock *block,
+                              const struct FileList *files,
                               const FileDirEntry *file,
                               const char *rootpath,
                               const char *path,
@@ -396,8 +405,13 @@ static void file_draw_preview(uiBlock *block,
 
   /* dragregion */
   if (drag) {
+    ID *id;
+
+    if ((id = filelist_file_get_id(files, file))) {
+      UI_but_drag_set_id(but, id);
+    }
     /* path is no more static, cannot give it directly to but... */
-    if (file->typeflag & FILE_TYPE_ASSET) {
+    else if (file->typeflag & FILE_TYPE_ASSET) {
       char *rootpath_cpy = BLI_strdup(rootpath);
       BLI_path_slash_rstrip(rootpath_cpy);
       UI_but_drag_set_asset(but, file->name, rootpath_cpy, file->blentype, icon, imb, scale);
@@ -838,6 +852,7 @@ void file_draw_list(const bContext *C, ARegion *region)
       }
 
       file_draw_preview(block,
+                        files,
                         file,
                         root,
                         path,
@@ -854,6 +869,7 @@ void file_draw_list(const bContext *C, ARegion *region)
     }
     else {
       file_draw_icon(block,
+                     files,
                      file,
                      root,
                      path,
