@@ -27,6 +27,7 @@
 extern "C" {
 #endif
 
+struct BlendDataReader;
 struct Brush;
 struct CurveMapping;
 struct Depsgraph;
@@ -49,7 +50,6 @@ struct bGPDspoint;
 struct bGPDstroke;
 struct bGPDcurve;
 struct bGPdata;
-struct BlendDataReader;
 
 #define GPENCIL_SIMPLIFY(scene) ((scene->r.simplify_gpencil & SIMPLIFY_GPENCIL_ENABLE))
 #define GPENCIL_SIMPLIFY_ONPLAY(playing) \
