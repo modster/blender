@@ -5949,6 +5949,29 @@ static void rna_def_userdef_keymap(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Key Config", "The name of the active key configuration");
 }
 
+static void rna_def_userdef_filepaths_asset_repository(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  srna = RNA_def_struct(brna, "PreferencesAssetRepository", NULL);
+  RNA_def_struct_sdna(srna, "bUserAssetRepository");
+  RNA_def_struct_clear_flag(srna, STRUCT_UNDO);
+  RNA_def_struct_ui_text(srna,
+                         "Asset Repository",
+                         "Settings to define a reusable repository for Asset Browsers to use");
+
+  prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+  RNA_def_property_ui_text(
+      prop, "Name", "Identifier (not necessarily unique) for the asset repository");
+  RNA_def_struct_name_property(srna, prop);
+  RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+  prop = RNA_def_property(srna, "path", PROP_STRING, PROP_FILEPATH);
+  RNA_def_property_ui_text(prop, "Path", "Path to a .blend file to use as an asset repository");
+  RNA_def_property_update(prop, 0, "rna_userdef_update");
+}
+
 static void rna_def_userdef_filepaths(BlenderRNA *brna)
 {
   PropertyRNA *prop;
@@ -6120,6 +6143,12 @@ static void rna_def_userdef_filepaths(BlenderRNA *brna)
   RNA_def_property_ui_text(prop,
                            "Save Preview Images",
                            "Enables automatic saving of preview images in the .blend file");
+
+  rna_def_userdef_filepaths_asset_repository(brna);
+
+  prop = RNA_def_property(srna, "asset_repositories", PROP_COLLECTION, PROP_NONE);
+  RNA_def_property_struct_type(prop, "PreferencesAssetRepository");
+  RNA_def_property_ui_text(prop, "Asset Repositories", "");
 }
 
 static void rna_def_userdef_experimental(BlenderRNA *brna)

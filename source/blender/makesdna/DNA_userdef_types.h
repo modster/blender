@@ -567,6 +567,13 @@ enum {
   USER_MENU_TYPE_PROP = 4,
 };
 
+typedef struct bUserAssetRepository {
+  struct bUserAssetRepository *next, *prev;
+
+  char name[64];   /* MAX_NAME */
+  char path[1024]; /* FILE_MAX */
+} bUserAssetRepository;
+
 typedef struct SolidLight {
   int flag;
   float smooth;
@@ -733,6 +740,8 @@ typedef struct UserDef {
   struct ListBase autoexec_paths;
   /** #bUserMenu. */
   struct ListBase user_menus;
+  /** #bUserAssetRepository */
+  struct ListBase asset_repositories;
 
   char keyconfigstr[64];
 

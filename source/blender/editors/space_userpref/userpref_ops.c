@@ -30,6 +30,7 @@
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_main.h"
+#include "BKE_preferences.h"
 #include "BKE_report.h"
 
 #include "RNA_access.h"
@@ -133,9 +134,69 @@ static void PREFERENCES_OT_autoexec_path_remove(wmOperatorType *ot)
 
 /** \} */
 
+/* -------------------------------------------------------------------- */
+/** \name Add Asset Repository Operator
+ * \{ */
+
+static int preferences_asset_repository_add_exec(bContext *UNUSED(C), wmOperator *UNUSED(op))
+{
+  BKE_preferences_asset_repository_add(&U, NULL, NULL);
+  U.runtime.is_dirty = true;
+  return OPERATOR_FINISHED;
+}
+
+static void PREFERENCES_OT_asset_repository_add(wmOperatorType *ot)
+{
+  ot->name = "Add Asset Repository";
+  ot->idname = "PREFERENCES_OT_asset_repository_add";
+  ot->description =
+      "Add a path to a .blend file to be used by the Asset Browser as source of assets";
+
+  ot->exec = preferences_asset_repository_add_exec;
+
+  ot->flag = OPTYPE_INTERNAL;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Remove Asset Repository Operator
+ * \{ */
+
+static int preferences_asset_repository_remove_exec(bContext *UNUSED(C), wmOperator *op)
+{
+  const int index = RNA_int_get(op->ptr, "index");
+  bUserAssetRepository *repository = BLI_findlink(&U.asset_repositories, index);
+  if (repository) {
+    BKE_preferences_asset_repository_remove(&U, repository);
+    U.runtime.is_dirty = true;
+  }
+  return OPERATOR_FINISHED;
+}
+
+static void PREFERENCES_OT_asset_repository_remove(wmOperatorType *ot)
+{
+  ot->name = "Remove Asset Repository";
+  ot->idname = "PREFERENCES_OT_asset_repository_remove";
+  ot->description =
+      "Remove a path to a .blend file, so the Asset Browser will not attempt to show it anymore";
+
+  ot->exec = preferences_asset_repository_remove_exec;
+
+  ot->flag = OPTYPE_INTERNAL;
+
+  RNA_def_int(ot->srna, "index", 0, 0, INT_MAX, "Index", "", 0, 1000);
+}
+
+/** \} */
+
 void ED_operatortypes_userpref(void)
 {
   WM_operatortype_append(PREFERENCES_OT_reset_default_theme);
+
   WM_operatortype_append(PREFERENCES_OT_autoexec_path_add);
   WM_operatortype_append(PREFERENCES_OT_autoexec_path_remove);
+
+  WM_operatortype_append(PREFERENCES_OT_asset_repository_add);
+  WM_operatortype_append(PREFERENCES_OT_asset_repository_remove);
 }

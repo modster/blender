@@ -43,6 +43,7 @@
 #include "BKE_idprop.h"
 #include "BKE_keyconfig.h"
 #include "BKE_main.h"
+#include "BKE_preferences.h"
 
 #include "BLO_readfile.h" /* Own include. */
 
@@ -785,6 +786,10 @@ void BLO_version_defaults_userpref_blend(Main *bmain, UserDef *userdef)
     if (userdef->collection_instance_empty_size == 0) {
       userdef->collection_instance_empty_size = 1.0f;
     }
+  }
+
+  if (!USER_VERSION_ATLEAST(291, 6)) {
+    BKE_preferences_asset_repository_default_add(userdef);
   }
 
   /**
