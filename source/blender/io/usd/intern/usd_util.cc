@@ -22,16 +22,16 @@
 #include "usd.h"
 #include "usd_hierarchy_iterator.h"
 #include "usd_importer_context.h"
-#include "usd_reader_object.h"
 #include "usd_reader_mesh.h"
+#include "usd_reader_object.h"
 
 #include <pxr/base/plug/registry.h>
 #include <pxr/pxr.h>
-#include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/primRange.h>
-#include <pxr/usd/usdGeom/tokens.h>
+#include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdGeom/mesh.h>
+#include <pxr/usd/usdGeom/tokens.h>
 #include <pxr/usd/usdGeom/xformable.h>
 
 #include "BKE_main.h"
@@ -57,14 +57,13 @@
 
 #include <map>
 
- /* TfToken objects are not cheap to construct, so we do it once. */
+/* TfToken objects are not cheap to construct, so we do it once. */
 namespace usdtokens {
 static const pxr::TfToken xform_type("Xform", pxr::TfToken::Immortal);
 static const pxr::TfToken mesh_type("Mesh", pxr::TfToken::Immortal);
 }  // namespace usdtokens
 
-namespace
-{
+namespace {
 /* Copy between Z-up and Y-up. */
 
 inline void copy_yup_from_zup(float yup[3], const float zup[3])
@@ -83,38 +82,23 @@ inline void copy_zup_from_yup(float zup[3], const float yup[3])
   zup[2] = old_yup1;
 }
 
-} // end anonymous namespace
+}  // end anonymous namespace
 
 namespace blender::io::usd {
 
 void debug_traverse_stage(const pxr::UsdStageRefPtr &usd_stage)
 {
-  if (!usd_stage)
-  {
+  if (!usd_stage) {
     return;
   }
 
-  pxr::UsdPrimRange prims = usd_stage->Traverse(pxr::UsdTraverseInstanceProxies(pxr::UsdPrimAllPrimsPredicate));
+  pxr::UsdPrimRange prims = usd_stage->Traverse(
+      pxr::UsdTraverseInstanceProxies(pxr::UsdPrimAllPrimsPredicate));
 
-  for (const pxr::UsdPrim &prim : prims)
-  {
+  for (const pxr::UsdPrim &prim : prims) {
     pxr::SdfPath path = prim.GetPath();
     printf("%s\n", path.GetString().c_str());
     printf("  Type: %s\n", prim.GetTypeName().GetString().c_str());
-  }
-}
-
-void split(const std::string &s, const char delim, std::vector<std::string> &tokens)
-{
-  tokens.clear();
-
-  std::stringstream ss(s);
-  std::string item;
-
-  while (std::getline(ss, item, delim)) {
-    if (!item.empty()) {
-      tokens.push_back(item);
-    }
   }
 }
 
@@ -130,19 +114,19 @@ void create_swapped_rotation_matrix(float rot_x_mat[3][3],
 
   /* Apply transformation */
   switch (mode) {
-  case USD_ZUP_FROM_YUP:
-    ry = -euler[2];
-    rz = euler[1];
-    break;
-  case USD_YUP_FROM_ZUP:
-    ry = euler[2];
-    rz = -euler[1];
-    break;
-  default:
-    ry = 0.0f;
-    rz = 0.0f;
-    BLI_assert(false);
-    break;
+    case USD_ZUP_FROM_YUP:
+      ry = -euler[2];
+      rz = euler[1];
+      break;
+    case USD_YUP_FROM_ZUP:
+      ry = euler[2];
+      rz = -euler[1];
+      break;
+    default:
+      ry = 0.0f;
+      rz = 0.0f;
+      BLI_assert(false);
+      break;
   }
 
   unit_m3(rot_x_mat);
@@ -187,7 +171,7 @@ void copy_m44_axis_swap(float dst_mat[4][4], float src_mat[4][4], UsdAxisSwapMod
    * scale and the child rotates). This is currently not taken into account
    * when axis-swapping. */
 
-   /* Extract translation, rotation, and scale form matrix. */
+  /* Extract translation, rotation, and scale form matrix. */
   mat4_to_loc_rot_size(src_trans, src_rot, src_scale, src_mat);
 
   /* Get euler angles from rotation matrix. */
@@ -209,14 +193,14 @@ void copy_m44_axis_swap(float dst_mat[4][4], float src_mat[4][4], UsdAxisSwapMod
 
   /* Apply translation */
   switch (mode) {
-  case USD_ZUP_FROM_YUP:
-    copy_zup_from_yup(dst_mat[3], src_trans);
-    break;
-  case USD_YUP_FROM_ZUP:
-    copy_yup_from_zup(dst_mat[3], src_trans);
-    break;
-  default:
-    BLI_assert(false);
+    case USD_ZUP_FROM_YUP:
+      copy_zup_from_yup(dst_mat[3], src_trans);
+      break;
+    case USD_YUP_FROM_ZUP:
+      copy_yup_from_zup(dst_mat[3], src_trans);
+      break;
+    default:
+      BLI_assert(false);
   }
 
   /* Apply scale matrix. Swaps y and z, but does not
@@ -229,33 +213,29 @@ void copy_m44_axis_swap(float dst_mat[4][4], float src_mat[4][4], UsdAxisSwapMod
   mul_m4_m4m4(dst_mat, dst_mat, dst_scale_mat);
 }
 
-
-
-void create_readers(const pxr::UsdStageRefPtr &usd_stage, std::vector<UsdObjectReader *> &r_readers, const USDImporterContext &context)
+void create_readers(const pxr::UsdStageRefPtr &usd_stage,
+                    std::vector<UsdObjectReader *> &r_readers,
+                    const USDImporterContext &context)
 {
-  if (!usd_stage)
-  {
+  if (!usd_stage) {
     return;
   }
 
-  pxr::UsdPrimRange prims = usd_stage->Traverse(pxr::UsdTraverseInstanceProxies(pxr::UsdPrimAllPrimsPredicate));
+  pxr::UsdPrimRange prims = usd_stage->Traverse(
+      pxr::UsdTraverseInstanceProxies(pxr::UsdPrimAllPrimsPredicate));
 
-  for (const pxr::UsdPrim &prim : prims)
-  {
+  for (const pxr::UsdPrim &prim : prims) {
     UsdObjectReader *reader = nullptr;
 
-    if (prim.GetTypeName() == usdtokens::mesh_type)
-    {
+    if (prim.GetTypeName() == usdtokens::mesh_type) {
       reader = new UsdMeshReader(prim, context);
     }
 
-    if (reader)
-    {
+    if (reader) {
       r_readers.push_back(reader);
       reader->incref();
     }
-
   }
 }
 
-} // namespace blender::io::usd
+} /* namespace blender::io::usd */

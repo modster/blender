@@ -12,6 +12,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * The Original Code is Copyright (C) 2029 Blender Foundation.
+ * All rights reserved.
  */
 
 #include "usd_reader_mesh.h"
@@ -37,8 +40,7 @@
 
 namespace {
 
-struct MeshSampleData
-{
+struct MeshSampleData {
   pxr::VtArray<pxr::GfVec3f> points;
   pxr::VtArray<int> vertex_counts;
   pxr::VtArray<int> vertex_indices;
@@ -50,7 +52,7 @@ struct MeshSampleData
   bool reverse_vert_order;
 };
 
-} // anonymous namespace
+}  // anonymous namespace
 
 static const pxr::TfToken st_primvar_name("st", pxr::TfToken::Immortal);
 
@@ -59,21 +61,17 @@ static void sample_uvs(const pxr::UsdGeomMesh &mesh,
                        pxr::TfToken primvar_name,
                        double time)
 {
-  if (!mesh)
-  {
+  if (!mesh) {
     return;
   }
 
   pxr::UsdGeomPrimvar st_primvar = mesh.GetPrimvar(primvar_name);
 
-  if (st_primvar &&
-      (st_primvar.GetTypeName() == pxr::SdfValueTypeNames->TexCoord2fArray ||
-       st_primvar.GetTypeName() == pxr::SdfValueTypeNames->Float2Array))
-  {
-    if (!st_primvar.Get(&mesh_data.uv_values, time))
-    {
-      std::cerr << "WARNING: Couldn't get uvs from primvar "
-        << primvar_name << " for prim " << mesh.GetPath() << std::endl;
+  if (st_primvar && (st_primvar.GetTypeName() == pxr::SdfValueTypeNames->TexCoord2fArray ||
+                     st_primvar.GetTypeName() == pxr::SdfValueTypeNames->Float2Array)) {
+    if (!st_primvar.Get(&mesh_data.uv_values, time)) {
+      std::cerr << "WARNING: Couldn't get uvs from primvar " << primvar_name << " for prim "
+                << mesh.GetPath() << std::endl;
     }
 
     st_primvar.GetIndices(&mesh_data.uv_indices, time);
@@ -81,29 +79,25 @@ static void sample_uvs(const pxr::UsdGeomMesh &mesh,
   }
 }
 
-
 static void read_mverts(MVert *mverts, const MeshSampleData &mesh_data)
 {
   for (int i = 0; i < mesh_data.points.size(); i++) {
     MVert &mvert = mverts[i];
     pxr::GfVec3f pt = mesh_data.points[i];
 
-    if (mesh_data.y_up)
-    {
+    if (mesh_data.y_up) {
       // Convert from y-up to z-up.
       mvert.co[0] = pt[0];
       mvert.co[1] = -pt[2];
       mvert.co[2] = pt[1];
     }
-    else
-    {
+    else {
       mvert.co[0] = pt[0];
       mvert.co[1] = pt[1];
       mvert.co[2] = pt[2];
     }
   }
 }
-
 
 static void *add_customdata(Mesh *mesh, const char *name, int data_type)
 {
@@ -130,11 +124,9 @@ static void *add_customdata(Mesh *mesh, const char *name, int data_type)
   return cd_ptr;
 }
 
-
 static void read_mpolys(Mesh *mesh, const MeshSampleData &mesh_data)
 {
-  if (!mesh || mesh->totloop == 0)
-  {
+  if (!mesh || mesh->totloop == 0) {
     return;
   }
 
@@ -144,10 +136,9 @@ static void read_mpolys(Mesh *mesh, const MeshSampleData &mesh_data)
 
   bool do_uvs = (mesh_data.uv_interpolation == pxr::UsdGeomTokens->faceVarying ||
                  mesh_data.uv_interpolation == pxr::UsdGeomTokens->vertex) &&
-                 !(mesh_data.uv_indices.empty() && mesh_data.uv_values.empty());
+                !(mesh_data.uv_indices.empty() && mesh_data.uv_values.empty());
 
-  if (do_uvs)
-  {
+  if (do_uvs) {
     void *cd_ptr = add_customdata(mesh, "uvMap", CD_MLOOPUV);
     mloopuvs = static_cast<MLoopUV *>(cd_ptr);
   }
@@ -167,12 +158,10 @@ static void read_mpolys(Mesh *mesh, const MeshSampleData &mesh_data)
 
       int loop_index = loop_start;
 
-      if (mesh_data.reverse_vert_order)
-      {
+      if (mesh_data.reverse_vert_order) {
         loop_index += face_size - 1 - f;
       }
-      else
-      {
+      else {
         loop_index += f;
       }
 
@@ -182,11 +171,12 @@ static void read_mpolys(Mesh *mesh, const MeshSampleData &mesh_data)
       if (mloopuvs) {
         MLoopUV &loopuv = mloopuvs[loop_index];
 
-        int uv_index = mesh_data.uv_interpolation == pxr::UsdGeomTokens->vertex ? loop.v : loop_index;
+        int uv_index = mesh_data.uv_interpolation == pxr::UsdGeomTokens->vertex ? loop.v :
+                                                                                  loop_index;
 
         uv_index = mesh_data.uv_indices.empty() ? uv_index : mesh_data.uv_indices[uv_index];
 
-        //  Sanity Check
+        /* Range check. */
         if (uv_index >= mesh_data.uv_values.size()) {
           std::cerr << "WARNING:  Out of bounds uv index " << uv_index << std::endl;
           continue;
@@ -202,15 +192,13 @@ static void read_mpolys(Mesh *mesh, const MeshSampleData &mesh_data)
 
   BKE_mesh_calc_edges(mesh, false, false);
 
-  // TODO:  Possibly check for invalid geometry.
+  /* TODO:  Possibly check for invalid geometry. */
 }
-
 
 namespace blender::io::usd {
 
 UsdMeshReader::UsdMeshReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
-  : UsdObjectReader(prim, context)
-  , m_mesh(prim)
+    : UsdObjectReader(prim, context), mesh_(prim)
 {
 }
 
@@ -220,7 +208,7 @@ UsdMeshReader::~UsdMeshReader()
 
 bool UsdMeshReader::valid() const
 {
-  return static_cast<bool>(m_mesh);
+  return static_cast<bool>(mesh_);
 }
 
 Mesh *UsdMeshReader::read_mesh(Mesh *existing_mesh,
@@ -228,10 +216,8 @@ Mesh *UsdMeshReader::read_mesh(Mesh *existing_mesh,
                                int read_flag,
                                const char **err_str)
 {
-  if (!this->m_mesh)
-  {
-    if (err_str)
-    {
+  if (!this->mesh_) {
+    if (err_str) {
       *err_str = "Error reading invalid mesh.";
     }
     return existing_mesh;
@@ -240,20 +226,20 @@ Mesh *UsdMeshReader::read_mesh(Mesh *existing_mesh,
   MeshSampleData mesh_data;
 
   pxr::TfToken orientation;
-  m_mesh.GetOrientationAttr().Get(&orientation);
+  mesh_.GetOrientationAttr().Get(&orientation);
 
   mesh_data.reverse_vert_order = orientation == pxr::UsdGeomTokens->leftHanded;
 
-  mesh_data.y_up = this->m_context.stage_up_axis == pxr::UsdGeomTokens->y;
+  mesh_data.y_up = this->context_.stage_up_axis == pxr::UsdGeomTokens->y;
 
-  m_mesh.GetPointsAttr().Get(&mesh_data.points, time);
-  m_mesh.GetFaceVertexCountsAttr().Get(&mesh_data.vertex_counts, time);
-  m_mesh.GetFaceVertexIndicesAttr().Get(&mesh_data.vertex_indices, time);
+  mesh_.GetPointsAttr().Get(&mesh_data.points, time);
+  mesh_.GetFaceVertexCountsAttr().Get(&mesh_data.vertex_counts, time);
+  mesh_.GetFaceVertexIndicesAttr().Get(&mesh_data.vertex_indices, time);
 
-  // For now, always return a new mesh.
-  // TODO: Add logic to handle the case where the topology
-  // hasn't chaged and we return the existing mesh with updated
-  // vert positions.
+  /* For now, always return a new mesh.
+   * TODO: Add logic to handle the cases where the topology
+   * hasn't chaged and we return the existing mesh with updated
+   * vert positions. */
 
   Mesh *new_mesh = nullptr;
 
@@ -264,59 +250,54 @@ Mesh *UsdMeshReader::read_mesh(Mesh *existing_mesh,
                                                mesh_data.vertex_indices.size(),
                                                mesh_data.vertex_counts.size());
 
-  if (read_flag & MOD_MESHSEQ_READ_VERT)
-  {
+  if (read_flag & MOD_MESHSEQ_READ_VERT) {
     read_mverts(new_mesh->mvert, mesh_data);
   }
 
-  if (read_flag & MOD_MESHSEQ_READ_POLY)
-  {
-    if ((read_flag & MOD_MESHSEQ_READ_UV) && this->m_context.import_params.import_uvs)
-    {
-      sample_uvs(m_mesh, mesh_data, st_primvar_name, time);
+  if (read_flag & MOD_MESHSEQ_READ_POLY) {
+    if ((read_flag & MOD_MESHSEQ_READ_UV) && this->context_.import_params.import_uvs) {
+      sample_uvs(mesh_, mesh_data, st_primvar_name, time);
     }
 
     read_mpolys(new_mesh, mesh_data);
     BKE_mesh_calc_normals(new_mesh);
   }
 
-  // TODO:  Handle case where topology hasn't changed.
+  /* TODO:  Handle case where topology hasn't changed. */
 
   return new_mesh;
 }
 
 void UsdMeshReader::readObjectData(Main *bmain, double time)
 {
-  if (!this->valid())
-  {
+  if (!this->valid()) {
     return;
   }
 
-  // Determine mesh visibility.
-  // TODO: Optimize to avoid this expensive call.
-  pxr::TfToken vis_tok = this->m_mesh.ComputeVisibility();
+  /* Determine mesh visibility.
+   * TODO: Consider optimizations to avoid this expensive call,
+   * for example, by determining visibility during stage traversal. */
+  pxr::TfToken vis_tok = this->mesh_.ComputeVisibility();
 
-  if (vis_tok == pxr::UsdGeomTokens->invisible)
-  {
+  if (vis_tok == pxr::UsdGeomTokens->invisible) {
     return;
   }
 
-  Mesh *mesh = BKE_mesh_add(bmain, m_data_name.c_str());
+  Mesh *mesh = BKE_mesh_add(bmain, data_name_.c_str());
 
-  m_object = BKE_object_add_only_object(bmain, OB_MESH, m_object_name.c_str());
-  m_object->data = mesh;
+  object_ = BKE_object_add_only_object(bmain, OB_MESH, object_name_.c_str());
+  object_->data = mesh;
 
   Mesh *read_mesh = this->read_mesh(mesh, time, MOD_MESHSEQ_READ_ALL, NULL);
   if (read_mesh != mesh) {
     /* XXX fixme after 2.80; mesh->flag isn't copied by BKE_mesh_nomain_to_mesh() */
     /* read_mesh can be freed by BKE_mesh_nomain_to_mesh(), so get the flag before that happens. */
     short autosmooth = (read_mesh->flag & ME_AUTOSMOOTH);
-    BKE_mesh_nomain_to_mesh(read_mesh, mesh, m_object, &CD_MASK_MESH, true);
+    BKE_mesh_nomain_to_mesh(read_mesh, mesh, object_, &CD_MASK_MESH, true);
     mesh->flag |= autosmooth;
   }
 
-  // TODO:  Read face sets and add modifier.
+  /* TODO:  Read face sets and add modifier. */
 }
-
 
 }  // namespace blender::io::usd

@@ -30,18 +30,13 @@ class UsdObjectReader;
 
 void debug_traverse_stage(const pxr::UsdStageRefPtr &usd_stage);
 
-// TODO:  This is a duplicate of the definition in abc_util.h.  Should
-// move this to a shared location.
-void split(const std::string &s, const char delim, std::vector<std::string> &tokens);
-
-// TOD:  copy_m44_axis_swap and create_swapped_rotation_matrix
-// below are duplicates of the declarations in abc_axis_conversion.h.
-// Should move this to a shared location.
+/* TODO:  copy_m44_axis_swap and create_swapped_rotation_matrix
+ * below are duplicates of the declarations in abc_axis_conversion.h.
+ * Should move this to a shared location. */
 typedef enum {
   USD_ZUP_FROM_YUP = 1,
   USD_YUP_FROM_ZUP = 2,
 } UsdAxisSwapMode;
-
 
 /* Create a rotation matrix for each axis from euler angles.
  * Euler angles are swapped to change coordinate system. */
@@ -53,6 +48,8 @@ void create_swapped_rotation_matrix(float rot_x_mat[3][3],
 
 void copy_m44_axis_swap(float dst_mat[4][4], float src_mat[4][4], UsdAxisSwapMode mode);
 
-void create_readers(const pxr::UsdStageRefPtr &usd_stage, std::vector<UsdObjectReader *> &r_readers, const USDImporterContext &context);
+void create_readers(const pxr::UsdStageRefPtr &usd_stage,
+                    std::vector<UsdObjectReader *> &r_readers,
+                    const USDImporterContext &context);
 
-} // namespace blender::io::usd
+} /* namespace blender::io::usd */

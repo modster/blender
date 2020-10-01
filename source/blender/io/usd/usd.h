@@ -54,14 +54,13 @@ bool USD_export(struct bContext *C,
                 const struct USDExportParams *params,
                 bool as_background_job);
 
-
 struct USDImportParams {
   bool import_uvs;
   float scale;
   bool debug;
 };
 
-/* The USD_import takes a as_background_job parameter, and returns a boolean.
+/* The USD_import function takes a as_background_job parameter, and returns a boolean.
  *
  * When as_background_job=true, returns false immediately after scheduling
  * a background job.

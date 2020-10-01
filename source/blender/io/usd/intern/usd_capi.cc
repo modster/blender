@@ -25,9 +25,9 @@
 
 #include <pxr/base/plug/registry.h>
 #include <pxr/pxr.h>
-#include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/primRange.h>
+#include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdGeom/metrics.h>
 #include <pxr/usd/usdGeom/tokens.h>
 
@@ -74,7 +74,6 @@
 #include "WM_types.h"
 
 #include <iostream>
-
 
 namespace blender::io::usd {
 
@@ -213,7 +212,6 @@ static void export_endjob(void *customdata)
   WM_set_locked_interface(data->wm, false);
 }
 
-
 struct ImportJobData {
   bContext *C;
   Main *bmain;
@@ -255,17 +253,15 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 
   data->stage = pxr::UsdStage::Open(data->filename);
   if (!data->stage) {
-    WM_reportf(
-      RPT_ERROR, "USD Export: couldn't open USD stage for file %s", data->filename);
+    WM_reportf(RPT_ERROR, "USD Export: couldn't open USD stage for file %s", data->filename);
     return;
   }
 
   pxr::TfToken up_axis = pxr::UsdGeomGetStageUpAxis(data->stage);
-  USDImporterContext import_ctx{ up_axis, data->params };
+  USDImporterContext import_ctx{up_axis, data->params};
 
   // Optionally print the stage contents for debugging.
-  if (data->params.debug)
-  {
+  if (data->params.debug) {
     debug_traverse_stage(data->stage);
   }
 
@@ -335,7 +331,7 @@ static void import_endjob(void *user_data)
 
   std::vector<UsdObjectReader *>::iterator iter;
 
-  ///* Delete objects on cancellation. */
+  /* Delete objects on cancellation. */
   if (data->was_cancelled) {
     for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
       Object *ob = (*iter)->object();
@@ -360,8 +356,7 @@ static void import_endjob(void *user_data)
     for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
       Object *ob = (*iter)->object();
 
-      if (!ob)
-      {
+      if (!ob) {
         continue;
       }
 
@@ -375,11 +370,11 @@ static void import_endjob(void *user_data)
       DEG_id_tag_update_ex(data->bmain,
                            &ob->id,
                            ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION |
-                           ID_RECALC_BASE_FLAGS);
+                               ID_RECALC_BASE_FLAGS);
     }
 
-  DEG_id_tag_update(&data->scene->id, ID_RECALC_BASE_FLAGS);
-  DEG_relations_tag_update(data->bmain);
+    DEG_id_tag_update(&data->scene->id, ID_RECALC_BASE_FLAGS);
+    DEG_relations_tag_update(data->bmain);
 
     if (data->is_background_job) {
       /* Blender already returned from the import operator, so we need to store our own extra undo
@@ -466,9 +461,6 @@ bool USD_export(bContext *C,
   return export_ok;
 }
 
-
-
-
 bool USD_import(bContext *C,
                 const char *filepath,
                 const struct USDImportParams *params,
@@ -500,7 +492,7 @@ bool USD_import(bContext *C,
                                 job->scene,
                                 "USD Import",
                                 WM_JOB_PROGRESS,
-                                WM_JOB_TYPE_ALEMBIC); // XXX -- Here and above, why TYPE_ALEMBIC?
+                                WM_JOB_TYPE_ALEMBIC);  // XXX -- Here and above, why TYPE_ALEMBIC?
 
     /* setup job */
     WM_jobs_customdata_set(wm_job, job, blender::io::usd::import_freejob);

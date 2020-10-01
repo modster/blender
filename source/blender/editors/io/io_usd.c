@@ -244,7 +244,6 @@ void WM_OT_usd_export(struct wmOperatorType *ot)
                "are different settings for viewport and rendering");
 }
 
-
 static int wm_usd_import_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   eUSDOperatorOptions *options = MEM_callocN(sizeof(eUSDOperatorOptions), "eUSDOperatorOptions");
@@ -280,17 +279,12 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
     ED_object_mode_set(C, OB_MODE_OBJECT);
   }
 
-  struct USDImportParams params = {
-    import_uvs,
-    scale,
-    debug
-  };
+  struct USDImportParams params = {import_uvs, scale, debug};
 
   bool ok = USD_import(C, filename, &params, as_background_job);
 
   return as_background_job || ok ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
 }
-
 
 static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
 {
@@ -307,7 +301,6 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   col = uiLayoutColumn(box, true);
   uiItemR(col, ptr, "import_uvs", 0, NULL, ICON_NONE);
   uiItemR(col, ptr, "debug", 0, NULL, ICON_NONE);
-
 }
 
 void WM_OT_usd_import(wmOperatorType *ot)
@@ -331,28 +324,21 @@ void WM_OT_usd_import(wmOperatorType *ot)
                                  FILE_DEFAULTDISPLAY,
                                  FILE_SORT_ALPHA);
 
-  RNA_def_boolean(ot->srna,
-    "import_uvs",
-    true,
-    "uvs",
-    "When checked, import mesh uvs.");
+  RNA_def_boolean(ot->srna, "import_uvs", true, "uvs", "When checked, import mesh uvs.");
 
   RNA_def_float(
-    ot->srna,
-    "scale",
-    1.0f,
-    0.0001f,
-    1000.0f,
-    "Scale",
-    "Value by which to enlarge or shrink the objects with respect to the world's origin",
-    0.0001f,
-    1000.0f);
+      ot->srna,
+      "scale",
+      1.0f,
+      0.0001f,
+      1000.0f,
+      "Scale",
+      "Value by which to enlarge or shrink the objects with respect to the world's origin",
+      0.0001f,
+      1000.0f);
 
-  RNA_def_boolean(ot->srna,
-    "debug",
-    false,
-    "debug",
-    "When checked, output debug information to the shell.");
+  RNA_def_boolean(
+      ot->srna, "debug", false, "debug", "When checked, output debug information to the shell.");
 }
 
 #endif /* WITH_USD */

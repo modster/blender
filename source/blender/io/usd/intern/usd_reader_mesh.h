@@ -12,6 +12,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * The Original Code is Copyright (C) 2020 Blender Foundation.
+ * All rights reserved.
  */
 #pragma once
 
@@ -22,10 +25,10 @@
 namespace blender::io::usd {
 
 class UsdMeshReader : public UsdObjectReader {
+ protected:
+  pxr::UsdGeomMesh mesh_;
 
-  pxr::UsdGeomMesh m_mesh;
-
-public:
+ public:
   UsdMeshReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
 
   virtual ~UsdMeshReader();

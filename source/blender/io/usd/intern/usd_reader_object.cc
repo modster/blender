@@ -12,6 +12,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * The Original Code is Copyright (C) 2020 Blender Foundation.
+ * All rights reserved.
  */
 
 #include "usd_reader_object.h"
@@ -37,36 +40,26 @@
 
 #include <iostream>
 
-
 namespace blender::io::usd {
 
 UsdObjectReader::UsdObjectReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
-  : m_name(""),
-  m_object_name(""),
-  m_data_name(""),
-  m_object(NULL),
-  m_prim(prim),
-  m_context(context),
-  m_min_time(std::numeric_limits<double>::max()),
-  m_max_time(std::numeric_limits<double>::min()),
-  m_refcount(0)
+    : name_(""),
+      object_name_(""),
+      data_name_(""),
+      object_(NULL),
+      prim_(prim),
+      context_(context),
+      min_time_(std::numeric_limits<double>::max()),
+      max_time_(std::numeric_limits<double>::min()),
+      refcount_(0)
 {
-  m_name = prim.GetPath().GetString();
+  name_ = prim.GetPath().GetString();
 
-  std::vector<std::string> parts;
-  split(m_name, '/', parts);
+  data_name_ = prim.GetName().GetString();
 
-  if (parts.size() >= 2)
-  {
-    m_object_name = parts[parts.size() - 2];
-    m_data_name = parts[parts.size() - 1];
-  }
-  else if (!parts.empty())
-  {
-    m_object_name = m_data_name = parts[parts.size() - 1];
-  }
+  pxr::UsdPrim parent = prim.GetParent();
+  object_name_ = parent ? parent.GetName().GetString() : data_name_;
 }
-
 
 UsdObjectReader::~UsdObjectReader()
 {
@@ -74,17 +67,17 @@ UsdObjectReader::~UsdObjectReader()
 
 const pxr::UsdPrim &UsdObjectReader::prim() const
 {
-  return m_prim;
+  return prim_;
 }
 
 Object *UsdObjectReader::object() const
 {
-  return m_object;
+  return object_;
 }
 
 void UsdObjectReader::setObject(Object *ob)
 {
-  m_object = ob;
+  object_ = ob;
 }
 
 struct Mesh *UsdObjectReader::read_mesh(struct Mesh *existing_mesh,
@@ -95,31 +88,29 @@ struct Mesh *UsdObjectReader::read_mesh(struct Mesh *existing_mesh,
   return existing_mesh;
 }
 
-bool UsdObjectReader::topology_changed(Mesh * /*existing_mesh*/,
-                                        double /*time*/)
+bool UsdObjectReader::topology_changed(Mesh * /*existing_mesh*/, double /*time*/)
 {
   /* The default implementation of read_mesh() just returns the original mesh, so never changes the
-    * topology. */
+   * topology. */
   return false;
 }
 
 void UsdObjectReader::setupObjectTransform(const double time)
 {
-  if (!this->m_object)
-  {
+  if (!this->object_) {
     return;
   }
 
   bool is_constant = false;
   float transform_from_usd[4][4];
 
-  this->read_matrix(transform_from_usd, time, this->m_context.import_params.scale, is_constant);
+  this->read_matrix(transform_from_usd, time, this->context_.import_params.scale, is_constant);
 
   /* Apply the matrix to the object. */
-  BKE_object_apply_mat4(m_object, transform_from_usd, true, false);
-  BKE_object_to_mat4(m_object, m_object->obmat);
+  BKE_object_apply_mat4(object_, transform_from_usd, true, false);
+  BKE_object_to_mat4(object_, object_->obmat);
 
-  // TODO:  Set up transform constraint if not constant.
+  /* TODO:  Set up transform constraint if not constant. */
 }
 
 void UsdObjectReader::read_matrix(float r_mat[4][4] /* local matrix */,
@@ -127,7 +118,7 @@ void UsdObjectReader::read_matrix(float r_mat[4][4] /* local matrix */,
                                   const float scale,
                                   bool &is_constant)
 {
-  pxr::UsdGeomXformable xformable(m_prim);
+  pxr::UsdGeomXformable xformable(prim_);
 
   if (!xformable) {
     unit_m4(r_mat);
@@ -135,7 +126,7 @@ void UsdObjectReader::read_matrix(float r_mat[4][4] /* local matrix */,
     return;
   }
 
-  // TODO:  Check for constant transform.
+  /* TODO:  Check for constant transform. */
 
   pxr::GfMatrix4d usd_local_to_world = xformable.ComputeLocalToWorldTransform(time);
 
@@ -143,17 +134,14 @@ void UsdObjectReader::read_matrix(float r_mat[4][4] /* local matrix */,
 
   usd_local_to_world.Get(double_mat);
 
-  for (int i = 0; i < 4; ++i)
-  {
-    for (int j = 0; j < 4; ++j)
-    {
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
       r_mat[i][j] = static_cast<float>(double_mat[i][j]);
     }
   }
 
-  if (this->m_context.stage_up_axis == pxr::UsdGeomTokens->y)
-  {
-    // Swap the matrix from y-up to z-up.
+  if (this->context_.stage_up_axis == pxr::UsdGeomTokens->y) {
+    /* Swap the matrix from y-up to z-up. */
     copy_m44_axis_swap(r_mat, r_mat, USD_ZUP_FROM_YUP);
   }
 
@@ -164,28 +152,28 @@ void UsdObjectReader::read_matrix(float r_mat[4][4] /* local matrix */,
 
 double UsdObjectReader::minTime() const
 {
-  return m_min_time;
+  return min_time_;
 }
 
 double UsdObjectReader::maxTime() const
 {
-  return m_max_time;
+  return max_time_;
 }
 
 int UsdObjectReader::refcount() const
 {
-  return m_refcount;
+  return refcount_;
 }
 
 void UsdObjectReader::incref()
 {
-  m_refcount++;
+  refcount_++;
 }
 
 void UsdObjectReader::decref()
 {
-  m_refcount--;
-  BLI_assert(m_refcount >= 0);
+  refcount_--;
+  BLI_assert(refcount_ >= 0);
 }
 
-}  // namespace blender::io::usd
+} /* namespace blender::io::usd */

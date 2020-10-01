@@ -12,6 +12,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * The Original Code is Copyright (C) 2020 Blender Foundation.
+ * All rights reserved.
  */
 #pragma once
 
@@ -30,23 +33,30 @@ struct Object;
 namespace blender::io::usd {
 
 class UsdObjectReader {
-protected:
-  std::string m_name;
-  std::string m_object_name;
-  std::string m_data_name;
-  Object *m_object;
-  pxr::UsdPrim m_prim;
+ protected:
+  /* The USD prim path. */
+  std::string name_;
 
-  USDImporterContext m_context;
+  /* The USD prim parent name. */
+  std::string object_name_;
 
-  double m_min_time;
-  double m_max_time;
+  /* The USD prim name. */
+  std::string data_name_;
+
+  Object *object_;
+  pxr::UsdPrim prim_;
+
+  USDImporterContext context_;
+
+  /* Not setting min/max time yet. */
+  double min_time_;
+  double max_time_;
 
   /* Use reference counting since the same reader may be used by multiple
-    * modifiers and/or constraints. */
-  int m_refcount;
+   * modifiers and/or constraints. */
+  int refcount_;
 
-public:
+ public:
   typedef std::vector<UsdObjectReader *> ptr_vector;
 
   explicit UsdObjectReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
@@ -61,15 +71,15 @@ public:
 
   const std::string &name() const
   {
-    return m_name;
+    return name_;
   }
   const std::string &object_name() const
   {
-    return m_object_name;
+    return object_name_;
   }
   const std::string &data_name() const
   {
-    return m_data_name;
+    return data_name_;
   }
 
   virtual bool valid() const = 0;
@@ -81,10 +91,9 @@ public:
                                  int read_flag,
                                  const char **err_str);
 
-  virtual bool topology_changed(Mesh *existing_mesh,
-                                double time);
+  virtual bool topology_changed(Mesh *existing_mesh, double time);
 
-  /** Reads the object matrix and sets up an object transform if animated. */
+  /* Reads the object matrix and sets up an object transform if animated. */
   void setupObjectTransform(const double time);
 
   double minTime() const;
@@ -95,7 +104,6 @@ public:
   void decref();
 
   void read_matrix(float r_mat[4][4], const double time, const float scale, bool &is_constant);
-
 };
 
-}  // namespace blender::io::alembic
+} /* namespace blender::io::usd */
