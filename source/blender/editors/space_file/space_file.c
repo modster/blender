@@ -225,7 +225,7 @@ static SpaceLink *file_duplicate(SpaceLink *sl)
   sfilen->smoothscroll_timer = NULL;
 
   if (sfileo->params) {
-    sfilen->files = filelist_new(sfileo->params->type);
+    sfilen->files = filelist_new(sfileo->params->type, &sfileo->params->asset_repository);
     sfilen->params = MEM_dupallocN(sfileo->params);
     filelist_setdir(sfilen->files, sfilen->params->dir);
   }
@@ -317,12 +317,16 @@ static void file_refresh(const bContext *C, ScrArea *area)
   if (!sfile->folders_prev) {
     sfile->folders_prev = folderlist_new();
   }
-  if (sfile->files && !filelist_matches_type(sfile->files, params->type)) {
+  /* TODO this filelist regeneration could be done better. Also kinda duplicated from
+   * fileselect_needs_refresh(). */
+  if (sfile->files &&
+      (!filelist_matches_type(sfile->files, params->type) ||
+       !filelist_matches_asset_repository(sfile->files, &params->asset_repository))) {
     filelist_free(sfile->files);
     MEM_SAFE_FREE(sfile->files);
   }
   if (!sfile->files) {
-    sfile->files = filelist_new(params->type);
+    sfile->files = filelist_new(params->type, &params->asset_repository);
     params->highlight_file = -1; /* added this so it opens nicer (ton) */
   }
   filelist_setdir(sfile->files, params->dir);

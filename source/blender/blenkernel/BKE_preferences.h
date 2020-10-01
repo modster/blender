@@ -39,6 +39,14 @@ void BKE_preferences_asset_repository_remove(struct UserDef *userdef,
                                              struct bUserAssetRepository *repository)
     ATTR_NONNULL();
 
+struct bUserAssetRepository *BKE_preferences_asset_repository_find_from_index(
+    const struct UserDef *userdef, int index) ATTR_NONNULL() ATTR_WARN_UNUSED_RESULT;
+struct bUserAssetRepository *BKE_preferences_asset_repository_find_from_name(
+    const struct UserDef *userdef, const char *name) ATTR_NONNULL() ATTR_WARN_UNUSED_RESULT;
+int BKE_preferences_asset_repository_get_index(const struct UserDef *userdef,
+                                               const struct bUserAssetRepository *repository)
+    ATTR_NONNULL() ATTR_WARN_UNUSED_RESULT;
+
 void BKE_preferences_asset_repository_default_add(struct UserDef *userdef) ATTR_NONNULL();
 
 #ifdef __cplusplus

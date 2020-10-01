@@ -58,6 +58,7 @@
 #include "BKE_context.h"
 #include "BKE_idtype.h"
 #include "BKE_main.h"
+#include "BKE_preferences.h"
 
 #include "BLF_api.h"
 
@@ -80,7 +81,7 @@
 static eFileSelectType fileselect_type_from_params_get(const FileSelectParams *params)
 {
 
-  return (params->asset_repository == FILE_ASSET_REPO_LOCAL) ? FILE_MAIN_ASSET : FILE_LOADLIB;
+  return (params->asset_repository.type == FILE_ASSET_REPO_LOCAL) ? FILE_MAIN_ASSET : FILE_LOADLIB;
 }
 
 static bool fileselect_needs_refresh(const SpaceFile *sfile)
@@ -100,6 +101,10 @@ static bool fileselect_needs_refresh(const SpaceFile *sfile)
   }
   if (sfile->files &&
       !filelist_matches_type(sfile->files, fileselect_type_from_params_get(sfile->params))) {
+    return true;
+  }
+  if (sfile->files &&
+      !filelist_matches_asset_repository(sfile->files, &sfile->params->asset_repository)) {
     return true;
   }
 
@@ -140,6 +145,8 @@ short ED_fileselect_set_params(SpaceFile *sfile)
     sfile->params->thumbnail_size = U_default.file_space_data.thumbnail_size;
     sfile->params->details_flags = U_default.file_space_data.details_flags;
     sfile->params->filter_id = U_default.file_space_data.filter_id;
+    /* Sane default. */
+    sfile->params->asset_repository.type = FILE_ASSET_REPO_LOCAL;
   }
 
   params = sfile->params;
@@ -331,26 +338,30 @@ short ED_fileselect_set_params(SpaceFile *sfile)
     params->filter_glob[0] = '\0';
 
     if (ED_fileselect_is_asset_browser(params)) {
-      if (params->asset_repository == FILE_ASSET_REPO_LOCAL) {
-        params->dir[0] = '\0';
-        params->file[0] = '\0';
-        allow_null_dir = true;
-      }
-      else {
-        /* TODO Fixed file path. */
-        const char *doc_path = BKE_appdir_folder_default();
+      /* Ensure valid repo, or fall-back to local one. */
+      eFileAssetReporitory_Type repo_type = params->asset_repository.type;
+      bUserAssetRepository *user_repository = NULL;
 
-        if (doc_path) {
-          const char *asset_blend_name = "assets.blend";
-          // const char *id_group_name = BKE_idtype_idcode_to_name(ID_OB);
-
-          BLI_join_dirfile(params->dir, sizeof(params->dir), doc_path, asset_blend_name);
-          // BLI_path_join(
-          //     params->dir, sizeof(params->dir), doc_path, asset_blend_name, id_group_name,
-          //     NULL);
-          params->file[0] = '\0';
+      if (repo_type == FILE_ASSET_REPO_CUSTOM) {
+        user_repository = BKE_preferences_asset_repository_find_from_name(
+            &U, params->asset_repository.idname);
+        if (!user_repository) {
+          repo_type = FILE_ASSET_REPO_LOCAL;
         }
       }
+
+      switch (repo_type) {
+        case FILE_ASSET_REPO_LOCAL:
+          params->dir[0] = '\0';
+          allow_null_dir = true;
+          break;
+        case FILE_ASSET_REPO_CUSTOM:
+          BLI_assert(user_repository);
+          BLI_strncpy(params->dir, user_repository->path, sizeof(params->dir));
+          break;
+      }
+      params->file[0] = '\0';
+      params->asset_repository.type = repo_type;
 
       params->type = fileselect_type_from_params_get(params);
       /* TODO this way of using filters to realize categories is noticably slower than

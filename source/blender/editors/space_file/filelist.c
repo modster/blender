@@ -309,6 +309,8 @@ typedef struct FileList {
   FileDirEntryArr filelist;
 
   eFileSelectType type;
+  /* The repository this list was created for. Stored here so we know when to re-read. */
+  FileSelectAssetRepositoryID asset_repository;
 
   short prv_w;
   short prv_h;
@@ -1562,7 +1564,7 @@ static void filelist_cache_clear(FileListEntryCache *cache, size_t new_size)
   BLI_listbase_clear(&cache->cached_entries);
 }
 
-FileList *filelist_new(short type)
+FileList *filelist_new(short type, const FileSelectAssetRepositoryID *asset_repository)
 {
   FileList *p = MEM_callocN(sizeof(*p), __func__);
 
@@ -1572,6 +1574,9 @@ FileList *filelist_new(short type)
   p->selection_state = BLI_ghash_new(
       BLI_ghashutil_uinthash_v4_p, BLI_ghashutil_uinthash_v4_cmp, __func__);
   p->filelist.nbr_entries = -1;
+  if (asset_repository) {
+    p->asset_repository = *asset_repository;
+  }
 
   switch (p->type) {
     case FILE_MAIN:
@@ -1707,6 +1712,13 @@ static const char *fileentry_uiname(const char *root,
 bool filelist_matches_type(const FileList *filelist, short type)
 {
   return filelist->type == (eFileSelectType)type;
+}
+
+bool filelist_matches_asset_repository(const FileList *filelist,
+                                       const FileSelectAssetRepositoryID *repository)
+{
+  return (filelist->asset_repository.type == repository->type) &&
+         STREQ(filelist->asset_repository.idname, repository->idname);
 }
 
 const char *filelist_dir(struct FileList *filelist)

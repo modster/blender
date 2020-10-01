@@ -512,6 +512,7 @@ static const EnumPropertyItem rna_enum_curve_display_handle_items[] = {
 #  include "BKE_layer.h"
 #  include "BKE_nla.h"
 #  include "BKE_paint.h"
+#  include "BKE_preferences.h"
 #  include "BKE_scene.h"
 #  include "BKE_screen.h"
 #  include "BKE_workspace.h"
@@ -2383,6 +2384,90 @@ static void rna_FileSelectPrams_filter_glob_set(PointerRNA *ptr, const char *val
 static PointerRNA rna_FileSelectParams_filter_id_get(PointerRNA *ptr)
 {
   return rna_pointer_inherit_refine(ptr, &RNA_FileSelectIDFilter, ptr->data);
+}
+
+static int rna_FileSelectParams_asset_repository_get(PointerRNA *ptr)
+{
+  FileSelectParams *params = ptr->data;
+
+  /* Simple case: Predefined repo, just set the value. */
+  if (params->asset_repository.type < FILE_ASSET_REPO_CUSTOM) {
+    return params->asset_repository.type;
+  }
+
+  /* TODO check if path exists? */
+  const bUserAssetRepository *user_repository = BKE_preferences_asset_repository_find_from_name(
+      &U, params->asset_repository.idname);
+  const int index = BKE_preferences_asset_repository_get_index(&U, user_repository);
+  if (index > -1) {
+    return FILE_ASSET_REPO_CUSTOM + index;
+  }
+
+  BLI_assert(0);
+  return FILE_ASSET_REPO_LOCAL;
+}
+
+static void rna_FileSelectParams_asset_repository_set(PointerRNA *ptr, int value)
+{
+  FileSelectParams *params = ptr->data;
+
+  /* Simple case: Predefined repo, just set the value. */
+  if (value < FILE_ASSET_REPO_CUSTOM) {
+    params->asset_repository.type = value;
+    params->asset_repository.idname[0] = '\0';
+    BLI_assert(ELEM(value, FILE_ASSET_REPO_LOCAL));
+    return;
+  }
+
+  const bUserAssetRepository *user_repository = BKE_preferences_asset_repository_find_from_index(
+      &U, value - FILE_ASSET_REPO_CUSTOM);
+
+  /* TODO check if path exists? */
+  const bool is_valid = (user_repository->name[0] && user_repository->path[0]);
+  if (user_repository && is_valid) {
+    BLI_strncpy(params->asset_repository.idname,
+                user_repository->name,
+                sizeof(params->asset_repository.idname));
+    params->asset_repository.type = FILE_ASSET_REPO_CUSTOM;
+  }
+}
+
+static const EnumPropertyItem *rna_FileSelectParams_asset_repository_itemf(
+    bContext *UNUSED(C), PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), bool *r_free)
+{
+  static const EnumPropertyItem predefined_items[] = {
+      /* For the future. */
+      // {FILE_ASSET_REPO_BUNDLED, "BUNDLED", 0, "Bundled", "Show the default user assets"},
+      {FILE_ASSET_REPO_LOCAL, "LOCAL", 0, "Local", "Show the assets in the current file"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  EnumPropertyItem *item = NULL;
+  int totitem = 0;
+
+  RNA_enum_items_add(&item, &totitem, predefined_items);
+
+  int i = 0;
+  for (bUserAssetRepository *user_repository = U.asset_repositories.first; user_repository;
+       user_repository = user_repository->next, i++) {
+    /* TODO check if path exists? */
+    const bool is_valid = (user_repository->name[0] && user_repository->path[0]);
+    if (!is_valid) {
+      continue;
+    }
+
+    /* Use repository path as description, it's a nice hint for users. */
+    EnumPropertyItem tmp = {FILE_ASSET_REPO_CUSTOM + i,
+                            user_repository->name,
+                            ICON_NONE,
+                            user_repository->name,
+                            user_repository->path};
+    RNA_enum_item_add(&item, &totitem, &tmp);
+  }
+
+  RNA_enum_item_end(&item, &totitem);
+  *r_free = true;
+  return item;
 }
 
 static void rna_FileSelectParams_asset_category_set(PointerRNA *ptr, uint64_t value)
@@ -5749,12 +5834,6 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
-  static const EnumPropertyItem asset_repository_items[] = {
-      {FILE_ASSET_REPO_BUNDLED, "BUNDLED", 0, "Bundled", "Show the default user assets"},
-      {FILE_ASSET_REPO_LOCAL, "LOCAL", 0, "Local", "Show the assets in the current file"},
-      {0, NULL, 0, NULL, NULL},
-  };
-
   srna = RNA_def_struct(brna, "FileSelectParams", NULL);
   RNA_def_struct_path_func(srna, "rna_FileSelectParams_path");
   RNA_def_struct_ui_text(srna, "File Select Parameters", "File Select Parameters");
@@ -5927,7 +6006,11 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
 
   prop = RNA_def_property(srna, "asset_repository", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, asset_repository_items);
+  RNA_def_property_enum_items(prop, DummyRNA_NULL_items);
+  RNA_def_property_enum_funcs(prop,
+                              "rna_FileSelectParams_asset_repository_get",
+                              "rna_FileSelectParams_asset_repository_set",
+                              "rna_FileSelectParams_asset_repository_itemf");
   RNA_def_property_ui_text(prop, "Asset Repository", "");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
 

@@ -5961,6 +5961,7 @@ static void rna_def_userdef_filepaths_asset_repository(BlenderRNA *brna)
                          "Asset Repository",
                          "Settings to define a reusable repository for Asset Browsers to use");
 
+  /* TODO ensure unique name, they are used as identifiers. */
   prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
   RNA_def_property_ui_text(
       prop, "Name", "Identifier (not necessarily unique) for the asset repository");

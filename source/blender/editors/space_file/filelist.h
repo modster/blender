@@ -30,6 +30,7 @@ extern "C" {
 struct BlendHandle;
 struct FileList;
 struct FileSelection;
+struct FileSelectAssetRepositoryID;
 struct wmWindowManager;
 
 struct FileDirEntry;
@@ -75,7 +76,8 @@ struct ImBuf *filelist_getimage(struct FileList *filelist, const int index);
 struct ImBuf *filelist_geticon_image(struct FileList *filelist, const int index);
 int filelist_geticon(struct FileList *filelist, const int index, const bool is_main);
 
-struct FileList *filelist_new(short type);
+struct FileList *filelist_new(short type,
+                              const struct FileSelectAssetRepositoryID *asset_repository);
 void filelist_clear(struct FileList *filelist);
 void filelist_clear_ex(struct FileList *filelist,
                        const bool do_cache,
@@ -84,6 +86,8 @@ void filelist_clear_ex(struct FileList *filelist,
 void filelist_free(struct FileList *filelist);
 
 bool filelist_matches_type(const struct FileList *filelist, short type);
+bool filelist_matches_asset_repository(const struct FileList *filelist,
+                                       const struct FileSelectAssetRepositoryID *repository);
 
 const char *filelist_dir(struct FileList *filelist);
 bool filelist_is_dir(struct FileList *filelist, const char *path);

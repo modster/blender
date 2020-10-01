@@ -667,6 +667,21 @@ typedef enum eSpaceSeq_OverlayType {
 /** \name File Selector
  * \{ */
 
+/**
+ * Information to identify a asset repository. May be either one of the predefined types (current
+ * 'Main', builtin repository, project repository), or a custom type as defined in the Preferences.
+ *
+ * If the type is set to #FILE_ASSET_REPO_CUSTOM, idname must have the name to identify the custom
+ * repository. Otherwise idname is not used.
+ */
+typedef struct FileSelectAssetRepositoryID {
+  short type;
+  char _pad[6];
+  /** If showing a custom asset repository (#FILE_ASSET_REPO_CUSTOM), this name has to be set to
+   * define which. Can be empty otherwise. */
+  char idname[64]; /* MAX_NAME */
+} FileSelectAssetRepositoryID;
+
 /* Config and Input for File Selector */
 typedef struct FileSelectParams {
   /** Title, also used for the text of the execute button. */
@@ -713,8 +728,10 @@ typedef struct FileSelectParams {
   short display;
   /** Details toggles (file size, creation date, etc.) */
   char details_flags;
-  char _pad2[1];
-  short asset_repository;
+  char _pad2[3];
+
+  FileSelectAssetRepositoryID asset_repository;
+
   /** Filter when (flags & FILE_FILTER) is true. */
   int filter;
 
@@ -782,8 +799,19 @@ typedef enum eFileBrowse_Mode {
 } eFileBrowse_Mode;
 
 typedef enum eFileAssetReporitory_Type {
-  FILE_ASSET_REPO_BUNDLED = 0,
+  /* For the future. Display assets bundled with Blender by default. */
+  // FILE_ASSET_REPO_BUNDLED = 0,
+  /** Display assets from the current session (current "Main"). */
   FILE_ASSET_REPO_LOCAL = 1,
+  /* For the future. Display assets for the current project. */
+  // FILE_ASSET_REPO_PROJECT = 2,
+
+  /** Display assets from custom asset repositories, as defined in the preferences
+   * (#bUserAssetRepository). The name will be taken from #FileSelectParams.asset_repository.idname
+   * then.
+   * In RNA, we add the index of the custom repository to this to identify it by index. So keep
+   * this last! */
+  FILE_ASSET_REPO_CUSTOM = 100,
 } eFileAssetReporitory_Type;
 
 /* FileSelectParams.display */

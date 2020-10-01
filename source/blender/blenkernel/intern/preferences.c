@@ -68,6 +68,24 @@ void BKE_preferences_asset_repository_remove(UserDef *userdef, bUserAssetReposit
   BLI_freelinkN(&userdef->asset_repositories, repository);
 }
 
+bUserAssetRepository *BKE_preferences_asset_repository_find_from_index(const UserDef *userdef,
+                                                                       int index)
+{
+  return BLI_findlink(&userdef->asset_repositories, index);
+}
+
+bUserAssetRepository *BKE_preferences_asset_repository_find_from_name(const UserDef *userdef,
+                                                                      const char *name)
+{
+  return BLI_findstring(&userdef->asset_repositories, name, offsetof(bUserAssetRepository, name));
+}
+
+int BKE_preferences_asset_repository_get_index(const UserDef *userdef,
+                                               const bUserAssetRepository *repository)
+{
+  return BLI_findindex(&userdef->asset_repositories, repository);
+}
+
 void BKE_preferences_asset_repository_default_add(UserDef *userdef)
 {
   const char *asset_blend_name = "assets.blend";
