@@ -36,6 +36,8 @@ class FILEBROWSER_HT_header(Header):
         FILEBROWSER_MT_editor_menus.draw_collapsible(context, layout)
 
         if panel_poll_is_asset_browsing(context):
+            layout.separator()
+
             layout.prop(params, "asset_repository", text="")
 
         # can be None when save/reload with a file selector open

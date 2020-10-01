@@ -2435,17 +2435,25 @@ static void rna_FileSelectParams_asset_repository_set(PointerRNA *ptr, int value
 static const EnumPropertyItem *rna_FileSelectParams_asset_repository_itemf(
     bContext *UNUSED(C), PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), bool *r_free)
 {
-  static const EnumPropertyItem predefined_items[] = {
+  const EnumPropertyItem predefined_items[] = {
       /* For the future. */
       // {FILE_ASSET_REPO_BUNDLED, "BUNDLED", 0, "Bundled", "Show the default user assets"},
-      {FILE_ASSET_REPO_LOCAL, "LOCAL", 0, "Local", "Show the assets in the current file"},
+      {FILE_ASSET_REPO_LOCAL,
+       "LOCAL",
+       ICON_BLENDER,
+       "Current File",
+       "Show the assets currently available in this Blender session"},
       {0, NULL, 0, NULL, NULL},
   };
 
   EnumPropertyItem *item = NULL;
   int totitem = 0;
 
-  RNA_enum_items_add(&item, &totitem, predefined_items);
+  /* Add separator if needed. */
+  if (!BLI_listbase_is_empty(&U.asset_repositories)) {
+    const EnumPropertyItem sepr = {0, "", 0, "Custom", NULL};
+    RNA_enum_item_add(&item, &totitem, &sepr);
+  }
 
   int i = 0;
   for (bUserAssetRepository *user_repository = U.asset_repositories.first; user_repository;
@@ -2464,6 +2472,14 @@ static const EnumPropertyItem *rna_FileSelectParams_asset_repository_itemf(
                             user_repository->path};
     RNA_enum_item_add(&item, &totitem, &tmp);
   }
+
+  if (totitem) {
+    const EnumPropertyItem sepr = {0, "", 0, "Built-in", NULL};
+    RNA_enum_item_add(&item, &totitem, &sepr);
+  }
+
+  /* Add predefined items. */
+  RNA_enum_items_add(&item, &totitem, predefined_items);
 
   RNA_enum_item_end(&item, &totitem);
   *r_free = true;
