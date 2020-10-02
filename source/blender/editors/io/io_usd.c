@@ -311,7 +311,7 @@ void WM_OT_usd_import(wmOperatorType *ot)
   ot->idname = "WM_OT_usd_import";
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
-  ot->invoke = wm_usd_export_invoke;
+  ot->invoke = wm_usd_import_invoke;
   ot->exec = wm_usd_import_exec;
   ot->poll = WM_operator_winactive;
   ot->ui = wm_usd_import_draw;
