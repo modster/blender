@@ -603,6 +603,7 @@ struct bGPDframe;
 struct GpencilModifierData;
 
 void ED_lineart_gpencil_generate_from_chain(struct Depsgraph *depsgraph,
+                                            Object *gpencil_object,
                                             float **gp_obmat_inverse,
                                             struct bGPDlayer *UNUSED(gpl),
                                             struct bGPDframe *gpf,
@@ -616,7 +617,10 @@ void ED_lineart_gpencil_generate_from_chain(struct Depsgraph *depsgraph,
                                             unsigned char transparency_mask,
                                             short thickness,
                                             float opacity,
-                                            float pre_sample_length);
+                                            float pre_sample_length,
+                                            const char *source_vgname,
+                                            const char *vgname,
+                                            bool invert_source);
 void ED_lineart_gpencil_generate_strokes_direct(struct Depsgraph *depsgraph,
                                                 struct Object *ob,
                                                 struct bGPDlayer *gpl,
@@ -631,7 +635,10 @@ void ED_lineart_gpencil_generate_strokes_direct(struct Depsgraph *depsgraph,
                                                 unsigned char transparency_mask,
                                                 short thickness,
                                                 float opacity,
-                                                float pre_sample_length);
+                                                float pre_sample_length,
+                                                const char *source_vgname,
+                                                const char *vgname,
+                                                bool invert_source);
 
 struct bContext;
 

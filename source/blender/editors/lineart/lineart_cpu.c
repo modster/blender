@@ -36,6 +36,7 @@
 #include "BKE_context.h"
 #include "BKE_curve.h"
 #include "BKE_customdata.h"
+#include "BKE_deform.h"
 #include "BKE_global.h"
 #include "BKE_gpencil.h"
 #include "BKE_gpencil_geom.h"
@@ -3977,7 +3978,8 @@ int lineart_rb_line_types(LineartRenderBuffer *rb)
   return types;
 }
 
-void ED_lineart_gpencil_generate_from_chain(Depsgraph *UNUSED(depsgraph),
+void ED_lineart_gpencil_generate_from_chain(Depsgraph *depsgraph,
+                                            Object *gpencil_object,
                                             float **gp_obmat_inverse,
                                             bGPDlayer *UNUSED(gpl),
                                             bGPDframe *gpf,
@@ -3991,7 +3993,10 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *UNUSED(depsgraph),
                                             unsigned char transparency_mask,
                                             short thickness,
                                             float opacity,
-                                            float pre_sample_length)
+                                            float pre_sample_length,
+                                            const char *source_vgname,
+                                            const char *vgname,
+                                            bool invert_source)
 {
   LineartRenderBuffer *rb = lineart_share.render_buffer_shared;
 
@@ -4086,7 +4091,35 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *UNUSED(depsgraph),
     }
 
     BKE_gpencil_stroke_add_points(gps, stroke_data, count, mat);
+    BKE_gpencil_dvert_ensure(gps);
     gps->mat_nr = material_nr;
+
+    if (source_vgname && vgname) {
+      Object *eval_ob = DEG_get_evaluated_object(depsgraph, rlc->object_ref);
+      int gpdg = -1;
+      if ((gpdg = BKE_object_defgroup_name_index(gpencil_object, vgname)) >= 0) {
+        if (eval_ob->type == OB_MESH) {
+          int dindex = 0;
+          LISTBASE_FOREACH (bDeformGroup *, db, &eval_ob->defbase) {
+            if (strstr(db->name, source_vgname) == db->name) {
+              Mesh *me = (Mesh *)eval_ob->data;
+              int sindex = 0, vindex;
+              LISTBASE_FOREACH (LineartRenderLineChainItem *, rlci, &rlc->chain) {
+                vindex = rlci->index;
+                MDeformWeight *mdw = BKE_defvert_find_index(&me->dvert[vindex], dindex);
+                if (mdw->weight > 0.999f) {
+                  MDeformWeight *gdw = BKE_defvert_find_index(&gps->dvert[sindex], gpdg);
+                  gdw->weight = 1.0f;
+                }
+                sindex++;
+              }
+            }
+            dindex++;
+          }
+        }
+      }
+    }
+
     if (pre_sample_length > 0.0001) {
       BKE_gpencil_stroke_sample(gps, pre_sample_length, false);
     }
@@ -4119,7 +4152,10 @@ void ED_lineart_gpencil_generate_strokes_direct(Depsgraph *depsgraph,
                                                 unsigned char transparency_mask,
                                                 short thickness,
                                                 float opacity,
-                                                float pre_sample_length)
+                                                float pre_sample_length,
+                                                const char *source_vgname,
+                                                const char *vgname,
+                                                bool invert_source)
 {
 
   if (!gpl || !gpf || !source_reference || !ob) {
@@ -4141,6 +4177,7 @@ void ED_lineart_gpencil_generate_strokes_direct(Depsgraph *depsgraph,
   float gp_obmat_inverse[16];
   invert_m4_m4(gp_obmat_inverse, ob->obmat);
   ED_lineart_gpencil_generate_from_chain(depsgraph,
+                                         ob,
                                          gp_obmat_inverse,
                                          gpl,
                                          gpf,
@@ -4154,7 +4191,10 @@ void ED_lineart_gpencil_generate_strokes_direct(Depsgraph *depsgraph,
                                          transparency_mask,
                                          thickness,
                                          opacity,
-                                         pre_sample_length);
+                                         pre_sample_length,
+                                         source_vgname,
+                                         vgname,
+                                         invert_source);
 }
 
 static int lineart_gpencil_update_strokes_exec(bContext *C, wmOperator *UNUSED(op))
@@ -4288,7 +4328,10 @@ static int lineart_gpencil_bake_strokes_invoke(bContext *C,
                 lmd->transparency_mask,
                 lmd->thickness,
                 lmd->opacity,
-                lmd->pre_sample_length);
+                lmd->pre_sample_length,
+                lmd->source_vertex_group,
+                lmd->vgname,
+                lmd->flags & LRT_GPENCIL_INVERT_SOURCE_VGROUP);
           }
         }
       }

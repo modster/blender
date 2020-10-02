@@ -113,7 +113,10 @@ static void generate_strokes_actual(
       lmd->transparency_mask,
       lmd->thickness,
       lmd->opacity,
-      lmd->pre_sample_length);
+      lmd->pre_sample_length,
+      lmd->source_vertex_group,
+      lmd->vgname,
+      lmd->flags & LRT_GPENCIL_INVERT_SOURCE_VGROUP);
 }
 
 static bool isModifierDisabled(GpencilModifierData *md)
