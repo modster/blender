@@ -2191,6 +2191,8 @@ class VIEW3D_MT_object_relations(Menu):
 
         layout.operator("object.make_override_library", text="Make Library Override...")
 
+        layout.operator("object.convert_proxy_to_override")
+
         layout.operator("object.make_dupli_face")
 
         layout.separator()
@@ -7130,7 +7132,8 @@ class VIEW3D_PT_gpencil_draw_context_menu(Panel):
         gp_settings = brush.gpencil_settings
 
         layout = self.layout
-        is_vertex = settings.color_mode == 'VERTEXCOLOR' or brush.gpencil_tool == 'TINT'
+        is_pin_vertex = gp_settings.brush_draw_mode == 'VERTEXCOLOR'
+        is_vertex = settings.color_mode == 'VERTEXCOLOR' or brush.gpencil_tool == 'TINT' or is_pin_vertex
 
         if brush.gpencil_tool not in {'ERASE', 'CUTTER', 'EYEDROPPER'} and is_vertex:
             split = layout.split(factor=0.1)
