@@ -132,6 +132,31 @@ static void deformStroke(GpencilModifierData *md,
     }
 
     float curvef = 1.0f;
+
+    float factor_depth = 1;
+    if (mmd->flag & GP_THICK_FADING) {
+      if (mmd->object) {
+        float gvert[3];
+        mul_v3_m4v3(gvert, ob->obmat, &pt->x);
+        float dist = len_v3v3(mmd->object->loc, gvert);
+        float fading_max = MAX2(mmd->fading_start, mmd->fading_end);
+        float fading_min = MIN2(mmd->fading_start, mmd->fading_end);
+
+        /* Better with ratiof() function from line art. */
+        if (dist > fading_max) {
+          factor_depth = 0;
+        }
+        else if (dist <= fading_max && dist > fading_min) {
+          factor_depth = (fading_max - dist) / (fading_max - fading_min);
+        }
+        else {
+          factor_depth = 1;
+        }
+      }
+    }
+
+    curvef *= factor_depth;
+
     if ((mmd->flag & GP_THICK_CUSTOM_CURVE) && (mmd->curve_thickness)) {
       /* Normalize value to evaluate curve. */
       float value = (float)i / (gps->totpoints - 1);
@@ -194,6 +219,14 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
     uiItemR(layout, ptr, "thickness_factor", 0, NULL, ICON_NONE);
   }
 
+  bool fading_enabled = RNA_boolean_get(ptr, "fading");
+  uiItemR(layout, ptr, "fading", 0, NULL, ICON_NONE);
+  if (fading_enabled) {
+    uiItemR(layout, ptr, "object", 0, NULL, ICON_CUBE);
+    uiLayout *sub = uiLayoutColumn(layout, true);
+    uiItemR(sub, ptr, "fading_start", 0, NULL, ICON_NONE);
+    uiItemR(sub, ptr, "fading_end", 0, NULL, ICON_NONE);
+  }
   gpencil_modifier_panel_end(layout, ptr);
 }
 
