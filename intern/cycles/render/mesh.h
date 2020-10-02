@@ -176,6 +176,7 @@ class Mesh : public Geometry {
   size_t corner_offset;
 
   size_t num_subd_verts;
+  size_t num_subd_faces;
 
   unordered_map<int, int> vert_to_stitching_key_map; /* real vert index -> stitching index */
   unordered_multimap<int, int>
@@ -239,7 +240,7 @@ class Mesh : public Geometry {
 
   size_t get_num_subd_faces() const
   {
-    return subd_shader.size();
+    return num_subd_faces;
   }
 
   size_t get_num_subd_verts()

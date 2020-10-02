@@ -186,6 +186,7 @@ Mesh::Mesh(const NodeType *node_type, Type geom_type_)
   corner_offset = 0;
 
   num_subd_verts = 0;
+  num_subd_faces = 0;
 
   num_ngons = 0;
 
@@ -245,6 +246,7 @@ void Mesh::resize_subd_faces(int numfaces, int num_ngons_, int numcorners)
   subd_ptex_offset.resize(numfaces);
   subd_face_corners.resize(numcorners);
   num_ngons = num_ngons_;
+  num_subd_faces = numfaces;
 
   subd_attributes.resize();
 }
@@ -258,6 +260,7 @@ void Mesh::reserve_subd_faces(int numfaces, int num_ngons_, int numcorners)
   subd_ptex_offset.reserve(numfaces);
   subd_face_corners.reserve(numcorners);
   num_ngons = num_ngons_;
+  num_subd_faces = numfaces;
 
   subd_attributes.resize(true);
 }
@@ -289,6 +292,7 @@ void Mesh::clear(bool preserve_voxel_data)
   subd_face_corners.clear();
 
   num_subd_verts = 0;
+  num_subd_faces = 0;
 
   subd_creases_edge.clear();
   subd_creases_weight.clear();
@@ -358,9 +362,9 @@ void Mesh::add_subd_face(int *corners, int num_corners, int shader_, bool smooth
   }
 
   int ptex_offset = 0;
-
-  if (get_num_subd_faces()) {
-    SubdFace s = get_subd_face(get_num_subd_faces() - 1);
+  // cannot use get_num_subd_faces here as it holds the total number of subd_faces, but we do not have the total amount of data yet
+  if (subd_shader.size()) {
+    SubdFace s = get_subd_face(subd_shader.size() - 1);
     ptex_offset = s.ptex_offset + s.num_ptex_faces();
   }
 

@@ -762,8 +762,11 @@ static void create_mesh(Scene *scene,
   }
 
   /* allocate memory */
+  if (subdivision) {
+    mesh->reserve_subd_faces(numfaces, numngons, numcorners);
+  }
+
   mesh->reserve_mesh(numverts, numtris);
-  mesh->reserve_subd_faces(numfaces, numngons, numcorners);
 
   /* create vertex coordinates and normals */
   BL::Mesh::vertices_iterator v;
