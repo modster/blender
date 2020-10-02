@@ -803,6 +803,10 @@ typedef enum eLineartGpencilModifierSource {
   LRT_SOURCE_OBJECT = 1,
 } eLineartGpencilModifierSource;
 
+typedef enum eLineArtGPencilModifierFlags {
+  LRT_GPENCIL_INVERT_SOURCE_VGROUP = (1 << 0),
+} eLineArtGPencilModifierFlags;
+
 typedef enum eLineartGpencilTransparencyFlags {
   LRT_GPENCIL_TRANSPARENCY_ENABLE = (1 << 0),
   /** Set to true means using "and" instead of "or" logic on mask bits. */
@@ -838,6 +842,8 @@ typedef struct LineartGpencilModifierData {
   unsigned char transparency_mask;
 
   float pre_sample_length;
-  int _pad2;
+
+  /* Additional Switches */
+  int flags;
 
 } LineartGpencilModifierData;

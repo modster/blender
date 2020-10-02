@@ -1509,7 +1509,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
   FreestyleEdge *fe;
   Object *orig_ob;
   int CanFindFreestyle = 0;
-  int i;
+  size_t i;
   Mesh *use_mesh;
 
   int usage = override_usage ? override_usage : ob->lineart.usage;
@@ -1612,6 +1612,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
     for (i = 0; i < bm->totvert; i++) {
       v = BM_vert_at_index(bm, i);
       lineart_vert_transform(v, i, orv, new_mv, new_mvp);
+      orv[i].index = i;
     }
 
     rl = orl;

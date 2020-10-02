@@ -2409,6 +2409,12 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Vertex Group", "Vertex group name for selected strokes");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
+  prop = RNA_def_property(srna, "invert_source_vertex_group", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_default(prop, 0);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_GPENCIL_INVERT_SOURCE_VGROUP);
+  RNA_def_property_ui_text(prop, "Invert Source", "Invert soource vertex group");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
   prop = RNA_def_property(srna, "thickness", PROP_INT, PROP_NONE);
   RNA_def_property_int_default(prop, 20);
   RNA_def_property_ui_text(prop, "Thickness", "The thickness that are used to generate strokes");

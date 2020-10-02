@@ -161,6 +161,7 @@ typedef struct LineartRenderLineChainItem {
   char line_type;
   char occlusion;
   unsigned char transparency_mask;
+  size_t index;
 } LineartRenderLineChainItem;
 
 typedef struct LineartChainRegisterEntry {

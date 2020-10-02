@@ -376,7 +376,7 @@ static void occlusion_panel_draw(const bContext *C, Panel *panel)
 {
   PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
 
-  uiLayout *layout = panel->layout;
+  uiLayout *layout = panel->layout, *sub;
 
   uiLayoutSetPropSep(layout, true);
 
@@ -420,13 +420,31 @@ static void occlusion_panel_draw(const bContext *C, Panel *panel)
   }
 }
 
+static void vgroup_panel_draw(const bContext *C, Panel *panel)
+{
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
+
+  uiLayout *layout = panel->layout, *row;
+
+  uiLayoutSetPropSep(layout, true);
+
+  row = uiLayoutRow(layout, true);
+  uiItemR(row, ptr, "source_vertex_group", 0, "Source", ICON_GROUP_VERTEX);
+  uiItemR(row, ptr, "invert_source_vertex_group", UI_ITEM_R_TOGGLE, "", ICON_ARROW_LEFTRIGHT);
+
+  uiItemPointerR(layout, ptr, "vertex_group", &ob_ptr, "vertex_groups", "Target", ICON_NONE);
+}
+
 static void panelRegister(ARegionType *region_type)
 {
   PanelType *panel_type = gpencil_modifier_panel_register(
       region_type, eGpencilModifierType_Lineart, panel_draw);
 
   gpencil_modifier_subpanel_register(
-      region_type, "settings", "Settings", NULL, occlusion_panel_draw, panel_type);
+      region_type, "occlusion", "Occlusion", NULL, occlusion_panel_draw, panel_type);
+  gpencil_modifier_subpanel_register(
+      region_type, "vgroup", "Vertex Group", NULL, vgroup_panel_draw, panel_type);
 }
 
 GpencilModifierTypeInfo modifierType_Gpencil_Lineart = {
