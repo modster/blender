@@ -2153,7 +2153,8 @@ static LineartRenderVert *lineart_triangle_line_intersection_test(LineartRenderB
   double gloc[3];
   LineartRenderVert *l = rl->l, *r = rl->r;
 
-  LISTBASE_FOREACH (LineartRenderVert *, rv, &testing->intersecting_verts) {
+  LISTBASE_FOREACH (LinkData *, ld, &testing->intersecting_verts) {
+    LineartRenderVert *rv = (LineartRenderVert *)ld->data;
     if (rv->intersecting_with == rt && rv->intersecting_line == rl) {
       return rv;
     }
@@ -2198,7 +2199,7 @@ static LineartRenderVert *lineart_triangle_line_intersection_test(LineartRenderB
 
   copy_v3_v3_db(result->gloc, gloc);
 
-  BLI_addtail(&testing->intersecting_verts, result);
+  lineart_list_append_pointer_static(&testing->intersecting_verts, &rb->render_data_pool, result);
 
   return result;
 }
@@ -2242,10 +2243,12 @@ static LineartRenderLine *lineart_triangle_generate_intersection_line_only(
       if (r == NULL) {
         return 0;
       }
-      BLI_addtail(&testing->intersecting_verts, new_share);
+      lineart_list_append_pointer_static(
+          &testing->intersecting_verts, &rb->render_data_pool, new_share);
     }
     else {
-      BLI_addtail(&rt->intersecting_verts, new_share);
+      lineart_list_append_pointer_static(
+          &rt->intersecting_verts, &rb->render_data_pool, new_share);
     }
   }
   else {
