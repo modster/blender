@@ -1260,7 +1260,9 @@ class OptiXDevice : public CUDADevice {
 
           for (size_t j = 0, i = 0; j < hair->num_curves(); ++j) {
             const Hair::Curve curve = hair->get_curve(j);
+#  if OPTIX_ABI_VERSION >= 36
             const array<float> &curve_radius = hair->get_curve_radius();
+#  endif
 
             for (int segment = 0; segment < curve.num_segments(); ++segment, ++i) {
 #  if OPTIX_ABI_VERSION >= 36
