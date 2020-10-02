@@ -48,7 +48,7 @@ struct MikkUserData {
                float *tangent_sign)
       : mesh(mesh), texface(NULL), orco(NULL), tangent(tangent), tangent_sign(tangent_sign)
   {
-    const AttributeSet &attributes = (mesh->num_subd_faces()) ? mesh->subd_attributes :
+    const AttributeSet &attributes = (mesh->get_num_subd_faces()) ? mesh->subd_attributes :
                                                                 mesh->attributes;
 
     Attribute *attr_vN = attributes.find(ATTR_STD_VERTEX_NORMAL);
@@ -85,8 +85,8 @@ struct MikkUserData {
 static int mikk_get_num_faces(const SMikkTSpaceContext *context)
 {
   const MikkUserData *userdata = (const MikkUserData *)context->m_pUserData;
-  if (userdata->mesh->num_subd_faces()) {
-    return userdata->mesh->num_subd_faces();
+  if (userdata->mesh->get_num_subd_faces()) {
+    return userdata->mesh->get_num_subd_faces();
   }
   else {
     return userdata->mesh->num_triangles();
@@ -96,7 +96,7 @@ static int mikk_get_num_faces(const SMikkTSpaceContext *context)
 static int mikk_get_num_verts_of_face(const SMikkTSpaceContext *context, const int face_num)
 {
   const MikkUserData *userdata = (const MikkUserData *)context->m_pUserData;
-  if (userdata->mesh->num_subd_faces()) {
+  if (userdata->mesh->get_num_subd_faces()) {
     const Mesh *mesh = userdata->mesh;
     return mesh->get_subd_num_corners()[face_num];
   }
@@ -107,7 +107,7 @@ static int mikk_get_num_verts_of_face(const SMikkTSpaceContext *context, const i
 
 static int mikk_vertex_index(const Mesh *mesh, const int face_num, const int vert_num)
 {
-  if (mesh->num_subd_faces()) {
+  if (mesh->get_num_subd_faces()) {
     const Mesh::SubdFace &face = mesh->get_subd_face(face_num);
     return mesh->get_subd_face_corners()[face.start_corner + vert_num];
   }
@@ -118,7 +118,7 @@ static int mikk_vertex_index(const Mesh *mesh, const int face_num, const int ver
 
 static int mikk_corner_index(const Mesh *mesh, const int face_num, const int vert_num)
 {
-  if (mesh->num_subd_faces()) {
+  if (mesh->get_num_subd_faces()) {
     const Mesh::SubdFace &face = mesh->get_subd_face(face_num);
     return face.start_corner + vert_num;
   }
@@ -178,7 +178,7 @@ static void mikk_get_normal(const SMikkTSpaceContext *context,
   const MikkUserData *userdata = (const MikkUserData *)context->m_pUserData;
   const Mesh *mesh = userdata->mesh;
   float3 vN;
-  if (mesh->num_subd_faces()) {
+  if (mesh->get_num_subd_faces()) {
     const Mesh::SubdFace &face = mesh->get_subd_face(face_num);
     if (face.smooth) {
       const int vertex_index = mikk_vertex_index(mesh, face_num, vert_num);
@@ -222,7 +222,7 @@ static void mikk_compute_tangents(
     const BL::Mesh &b_mesh, const char *layer_name, Mesh *mesh, bool need_sign, bool active_render)
 {
   /* Create tangent attributes. */
-  AttributeSet &attributes = (mesh->num_subd_faces()) ? mesh->subd_attributes : mesh->attributes;
+  AttributeSet &attributes = (mesh->get_num_subd_faces()) ? mesh->subd_attributes : mesh->attributes;
   Attribute *attr;
   ustring name;
   if (layer_name != NULL) {

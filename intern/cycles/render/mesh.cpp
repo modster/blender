@@ -212,7 +212,7 @@ void Mesh::resize_mesh(int numverts, int numtris)
   shader.resize(numtris);
   smooth.resize(numtris);
 
-  if (num_subd_faces()) {
+  if (get_num_subd_faces()) {
     triangle_patch.resize(numtris);
     vert_patch_uv.resize(numverts);
   }
@@ -228,7 +228,7 @@ void Mesh::reserve_mesh(int numverts, int numtris)
   shader.reserve(numtris);
   smooth.reserve(numtris);
 
-  if (num_subd_faces()) {
+  if (get_num_subd_faces()) {
     triangle_patch.reserve(numtris);
     vert_patch_uv.reserve(numverts);
   }
@@ -314,7 +314,7 @@ void Mesh::add_vertex(float3 P)
 {
   verts.push_back_reserved(P);
 
-  if (num_subd_faces()) {
+  if (get_num_subd_faces()) {
     vert_patch_uv.push_back_reserved(make_float2(0.0f, 0.0f));
   }
 }
@@ -325,7 +325,7 @@ void Mesh::add_vertex_slow(float3 P)
 
   socket_modified |= get_triangles_socket()->modified_flag_bit;
 
-  if (num_subd_faces()) {
+  if (get_num_subd_faces()) {
     vert_patch_uv.push_back_slow(make_float2(0.0f, 0.0f));
     socket_modified |= get_vert_patch_uv_socket()->modified_flag_bit;
   }
@@ -343,7 +343,7 @@ void Mesh::add_triangle(int v0, int v1, int v2, int shader_, bool smooth_)
   socket_modified |= get_shader_socket()->modified_flag_bit;
   socket_modified |= get_smooth_socket()->modified_flag_bit;
 
-  if (num_subd_faces()) {
+  if (get_num_subd_faces()) {
     triangle_patch.push_back_reserved(-1);
     socket_modified |= get_triangle_patch_socket()->modified_flag_bit;
   }
@@ -359,8 +359,8 @@ void Mesh::add_subd_face(int *corners, int num_corners, int shader_, bool smooth
 
   int ptex_offset = 0;
 
-  if (num_subd_faces()) {
-    SubdFace s = get_subd_face(num_subd_faces() - 1);
+  if (get_num_subd_faces()) {
+    SubdFace s = get_subd_face(get_num_subd_faces() - 1);
     ptex_offset = s.ptex_offset + s.num_ptex_faces();
   }
 
@@ -596,7 +596,7 @@ void Mesh::add_vertex_normals()
   }
 
   /* subd vertex normals */
-  if (!subd_attributes.find(ATTR_STD_VERTEX_NORMAL) && num_subd_faces()) {
+  if (!subd_attributes.find(ATTR_STD_VERTEX_NORMAL) && get_num_subd_faces()) {
     /* get attributes */
     Attribute *attr_vN = subd_attributes.add(ATTR_STD_VERTEX_NORMAL);
     float3 *vN = attr_vN->data_float3();
@@ -604,7 +604,7 @@ void Mesh::add_vertex_normals()
     /* compute vertex normals */
     memset(vN, 0, verts.size() * sizeof(float3));
 
-    for (size_t i = 0; i < num_subd_faces(); i++) {
+    for (size_t i = 0; i < get_num_subd_faces(); i++) {
       SubdFace face = get_subd_face(i);
       float3 fN = face.normal(this);
 
@@ -708,7 +708,7 @@ void Mesh::pack_verts(const vector<uint> &tri_prim_index,
 {
   size_t verts_size = verts.size();
 
-  if (verts_size && num_subd_faces()) {
+  if (verts_size && get_num_subd_faces()) {
     float2 *vert_patch_uv_ptr = vert_patch_uv.data();
 
     for (size_t i = 0; i < verts_size; i++) {
@@ -725,13 +725,13 @@ void Mesh::pack_verts(const vector<uint> &tri_prim_index,
                                t.v[2] + vert_offset,
                                tri_prim_index[i + tri_offset]);
 
-    tri_patch[i] = (!num_subd_faces()) ? -1 : (triangle_patch[i] * 8 + patch_offset);
+    tri_patch[i] = (!get_num_subd_faces()) ? -1 : (triangle_patch[i] * 8 + patch_offset);
   }
 }
 
 void Mesh::pack_patches(uint *patch_data, uint vert_offset, uint face_offset, uint corner_offset)
 {
-  size_t num_faces = num_subd_faces();
+  size_t num_faces = get_num_subd_faces();
   int ngons = 0;
 
   for (size_t f = 0; f < num_faces; f++) {

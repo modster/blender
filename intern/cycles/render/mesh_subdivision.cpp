@@ -47,9 +47,9 @@ bool TopologyRefinerFactory<ccl::Mesh>::resizeComponentTopology(TopologyRefiner 
                                                                 const ccl::Mesh &mesh)
 {
   setNumBaseVertices(refiner, mesh.get_verts().size());
-  setNumBaseFaces(refiner, mesh.num_subd_faces());
+  setNumBaseFaces(refiner, mesh.get_num_subd_faces());
 
-  for (int i = 0; i < mesh.num_subd_faces(); i++) {
+  for (int i = 0; i < mesh.get_num_subd_faces(); i++) {
     setNumBaseFaceVertices(refiner, i, mesh.get_subd_face_corners()[i]);
   }
 
@@ -64,7 +64,7 @@ bool TopologyRefinerFactory<ccl::Mesh>::assignComponentTopology(TopologyRefiner 
   const ccl::array<int> &subd_start_corner = mesh.get_subd_start_corner();
   const ccl::array<int> &subd_num_corners = mesh.get_subd_num_corners();
 
-  for (int i = 0; i < mesh.num_subd_faces(); i++) {
+  for (int i = 0; i < mesh.get_num_subd_faces(); i++) {
     IndexArray face_verts = getBaseFaceVertices(refiner, i);
 
     int start_corner = subd_start_corner[i];
@@ -376,7 +376,7 @@ void Mesh::tessellate(DiagSplit *split)
   bool need_packed_patch_table = false;
 
   if (subdivision_type == SUBDIVISION_CATMULL_CLARK) {
-    if (num_subd_faces()) {
+    if (get_num_subd_faces()) {
       osd_data.build_from_mesh(this);
     }
   }
@@ -394,7 +394,7 @@ void Mesh::tessellate(DiagSplit *split)
     }
   }
 
-  int num_faces = num_subd_faces();
+  int num_faces = get_num_subd_faces();
 
   Attribute *attr_vN = subd_attributes.find(ATTR_STD_VERTEX_NORMAL);
   float3 *vN = (attr_vN) ? attr_vN->data_float3() : NULL;
@@ -545,7 +545,7 @@ void Mesh::tessellate(DiagSplit *split)
         /* keep subdivision for corner attributes disabled for now */
         attr.flags &= ~ATTR_SUBDIVIDED;
       }
-      else if (num_subd_faces()) {
+      else if (get_num_subd_faces()) {
         osd_data.subdivide_attribute(attr);
 
         need_packed_patch_table = true;

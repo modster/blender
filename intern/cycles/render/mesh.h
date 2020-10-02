@@ -237,7 +237,7 @@ class Mesh : public Geometry {
 
   SubdParams *get_subd_params();
 
-  size_t num_subd_faces() const
+  size_t get_num_subd_faces() const
   {
     return subd_shader.size();
   }
