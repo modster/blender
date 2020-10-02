@@ -306,16 +306,6 @@ static void freeData(GpencilModifierData *UNUSED(md))
   return;
 }
 
-static void foreachObjectLink(GpencilModifierData *md,
-                              Object *ob,
-                              ObjectWalkFunc walk,
-                              void *userData)
-{
-  LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
-
-  walk(userData, ob, &lmd->source_object, IDWALK_CB_NOP);
-}
-
 static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
 {
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
@@ -323,7 +313,7 @@ static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, 
   walk(userData, ob, (ID **)&lmd->target_material, IDWALK_CB_USER);
   walk(userData, ob, (ID **)&lmd->source_collection, IDWALK_CB_NOP);
 
-  foreachObjectLink(md, ob, (ObjectWalkFunc)walk, userData);
+  walk(userData, ob, &lmd->source_object, IDWALK_CB_NOP);
 }
 
 static void panel_draw(const bContext *C, Panel *panel)
@@ -458,7 +448,6 @@ GpencilModifierTypeInfo modifierType_Gpencil_Lineart = {
     /* isDisabled */ isDisabled,
     /* updateDepsgraph */ updateDepsgraph,
     /* dependsOnTime */ NULL,
-    /* foreachObjectLink */ foreachObjectLink,
     /* foreachIDLink */ foreachIDLink,
     /* foreachTexLink */ NULL,
     /* panelRegister */ panelRegister,
