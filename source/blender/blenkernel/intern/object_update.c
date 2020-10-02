@@ -180,6 +180,7 @@ void BKE_object_handle_data_update(Depsgraph *depsgraph, Scene *scene, Object *o
 #ifdef WITH_FREESTYLE
       cddata_masks.emask |= CD_MASK_FREESTYLE_EDGE;
       cddata_masks.pmask |= CD_MASK_FREESTYLE_FACE;
+      cddata_masks.vmask |= CD_MASK_MDEFORMVERT;
 #endif
       if (DEG_get_mode(depsgraph) == DAG_EVAL_RENDER) {
         /* Always compute UVs, vertex colors as orcos for render. */

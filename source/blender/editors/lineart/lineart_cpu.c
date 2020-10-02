@@ -4103,15 +4103,22 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *depsgraph,
       if ((gpdg = BKE_object_defgroup_name_index(gpencil_object, vgname)) >= 0) {
         if (eval_ob->type == OB_MESH) {
           int dindex = 0;
+          Mesh *me = (Mesh *)eval_ob->data;
+          if (!me->dvert) {
+            continue;
+          }
           LISTBASE_FOREACH (bDeformGroup *, db, &eval_ob->defbase) {
             if (strstr(db->name, source_vgname) == db->name) {
-              Mesh *me = (Mesh *)eval_ob->data;
               int sindex = 0, vindex;
               LISTBASE_FOREACH (LineartRenderLineChainItem *, rlci, &rlc->chain) {
                 vindex = rlci->index;
-                MDeformWeight *mdw = BKE_defvert_find_index(&me->dvert[vindex], dindex);
+                /* XXX: Here doesn't have post-modifier dvert! */
+                if (vindex >= me->totvert) {
+                  break;
+                }
+                MDeformWeight *mdw = BKE_defvert_ensure_index(&me->dvert[vindex], dindex);
                 if (mdw->weight > 0.999f) {
-                  MDeformWeight *gdw = BKE_defvert_find_index(&gps->dvert[sindex], gpdg);
+                  MDeformWeight *gdw = BKE_defvert_ensure_index(&gps->dvert[sindex], gpdg);
                   gdw->weight = 1.0f;
                 }
                 sindex++;
