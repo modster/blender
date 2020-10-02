@@ -146,7 +146,7 @@ NODE_DEFINE(Mesh)
   SOCKET_INT_ARRAY(subd_face_corners, "Subdivision Face Corners", array<int>());
   SOCKET_INT_ARRAY(subd_start_corner, "Subdivision Face Start Corner", array<int>());
   SOCKET_INT_ARRAY(subd_num_corners, "Subdivision Face Corner Count", array<int>());
-  SOCKET_INT_ARRAY(subd_face_corners, "Subdivision Face Shader", array<int>());
+  SOCKET_INT_ARRAY(subd_shader, "Subdivision Face Shader", array<int>());
   SOCKET_BOOLEAN_ARRAY(subd_smooth, "Subdivision Face Smooth", array<bool>());
   SOCKET_INT_ARRAY(subd_ptex_offset, "Subdivision Face PTex Offset", array<int>());
   SOCKET_INT(num_ngons, "NGons Number", 0);
