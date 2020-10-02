@@ -450,8 +450,25 @@ void ED_area_do_mgs_subscribe_for_tool_ui(
     struct wmMsgBus *mbus)
 {
   BLI_assert(region->regiontype == RGN_TYPE_UI);
+  const char *panel_category_tool = "Tool";
   const char *category = UI_panel_category_active_get(region, false);
-  if (category && STREQ(category, "Tool")) {
+
+  bool update_region = false;
+  if (category && STREQ(category, panel_category_tool)) {
+    update_region = true;
+  }
+  else {
+    /* Check if a tool category panel is pinned and visible in another category. */
+    LISTBASE_FOREACH (Panel *, panel, &region->panels) {
+      if (UI_panel_is_active(panel) && panel->flag & PNL_PIN &&
+          STREQ(panel->type->category, panel_category_tool)) {
+        update_region = true;
+        break;
+      }
+    }
+  }
+
+  if (update_region) {
     wmMsgSubscribeValue msg_sub_value_region_tag_redraw = {
         .owner = region,
         .user_data = region,
@@ -2607,7 +2624,6 @@ static void ed_panel_draw(const bContext *C,
     strncat(block_name, unique_panel_str, INSTANCED_PANEL_UNIQUE_STR_LEN);
   }
   uiBlock *block = UI_block_begin(C, region, block_name, UI_EMBOSS);
-  UI_block_set_search_filter(block, search_filter);
   UI_block_set_search_only(block, search_only);
 
   bool open;
@@ -2634,7 +2650,7 @@ static void ed_panel_draw(const bContext *C,
 
     pt->draw_header_preset(C, panel);
 
-    UI_block_apply_search_filter(block);
+    UI_block_apply_search_filter(block, search_filter);
     UI_block_layout_resolve(block, &xco, &yco);
     UI_block_translate(block, headerend - xco, 0);
     panel->layout = NULL;
@@ -2666,7 +2682,7 @@ static void ed_panel_draw(const bContext *C,
 
     pt->draw_header(C, panel);
 
-    UI_block_apply_search_filter(block);
+    UI_block_apply_search_filter(block, search_filter);
     UI_block_layout_resolve(block, &xco, &yco);
     panel->labelofs = xco - labelx;
     panel->layout = NULL;
@@ -2703,7 +2719,7 @@ static void ed_panel_draw(const bContext *C,
 
     pt->draw(C, panel);
 
-    UI_block_apply_search_filter(block);
+    UI_block_apply_search_filter(block, search_filter);
     UI_block_layout_resolve(block, &xco, &yco);
     panel->layout = NULL;
 

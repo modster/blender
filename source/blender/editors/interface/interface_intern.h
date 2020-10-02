@@ -31,8 +31,8 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
-struct AnimationEvalContext;
 struct ARegion;
+struct AnimationEvalContext;
 struct CurveMapping;
 struct CurveProfile;
 struct ID;
@@ -523,12 +523,6 @@ struct uiBlock {
    * used by color widgets to transform colors from/to scene linear
    */
   char display_device[64];
-
-  /**
-   * Pointer to the space's property search string.
-   * The block doesn't allocate this or change it.
-   */
-  const char *search_filter;
 
   struct PieMenuData pie_data;
 };
