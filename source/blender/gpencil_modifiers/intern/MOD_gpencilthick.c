@@ -219,8 +219,8 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
     uiItemR(layout, ptr, "thickness_factor", 0, NULL, ICON_NONE);
   }
 
-  bool fading_enabled = RNA_boolean_get(ptr, "fading");
-  uiItemR(layout, ptr, "fading", 0, NULL, ICON_NONE);
+  bool fading_enabled = RNA_boolean_get(ptr, "use_fading");
+  uiItemR(layout, ptr, "use_fading", 0, NULL, ICON_NONE);
   if (fading_enabled) {
     uiItemR(layout, ptr, "object", 0, NULL, ICON_CUBE);
     uiLayout *sub = uiLayoutColumn(layout, true);

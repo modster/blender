@@ -892,9 +892,9 @@ static void rna_def_modifier_gpencilthick(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Thickness Factor", "Factor to multiply the thickness with");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
-  prop = RNA_def_property(srna, "fading", PROP_BOOLEAN, PROP_NONE);
+  prop = RNA_def_property(srna, "use_fading", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_THICK_FADING);
-  RNA_def_property_ui_text(prop, "Fading", "Fading effect");
+  RNA_def_property_ui_text(prop, "use_fading", "Fading effect");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   /* Distance reference object */
@@ -1412,9 +1412,9 @@ static void rna_def_modifier_gpencilopacity(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Hardness", "Factor of stroke hardness");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
-  prop = RNA_def_property(srna, "fading", PROP_BOOLEAN, PROP_NONE);
+  prop = RNA_def_property(srna, "use_fading", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_OPACITY_FADING);
-  RNA_def_property_ui_text(prop, "Fading", "Fading effect");
+  RNA_def_property_ui_text(prop, "use_fading", "Fading effect");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   /* Distance reference object */
