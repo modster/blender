@@ -147,7 +147,7 @@ static void deformStroke(GpencilModifierData *md,
         if (mmd->object) {
           float gvert[3];
           mul_v3_m4v3(gvert, ob->obmat, &pt->x);
-          float dist = len_v3v3(mmd->object->loc, gvert);
+          float dist = len_v3v3(mmd->object->obmat[3], gvert);
           float fading_max = MAX2(mmd->fading_start, mmd->fading_end);
           float fading_min = MIN2(mmd->fading_start, mmd->fading_end);
 
@@ -201,7 +201,7 @@ static void deformStroke(GpencilModifierData *md,
     if (mmd->flag & GP_OPACITY_FADING) {
       if (mmd->object) {
 
-        float dist = len_v3v3(mmd->object->loc, ob->loc);
+        float dist = len_v3v3(mmd->object->obmat[3], ob->obmat[3]);
         float fading_max = MAX2(mmd->fading_start, mmd->fading_end);
         float fading_min = MIN2(mmd->fading_start, mmd->fading_end);
 
@@ -254,6 +254,7 @@ static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, 
   OpacityGpencilModifierData *mmd = (OpacityGpencilModifierData *)md;
 
   walk(userData, ob, (ID **)&mmd->material, IDWALK_CB_USER);
+  walk(userData, ob, (ID **)&mmd->object, IDWALK_CB_USER);
 }
 
 static void panel_draw(const bContext *UNUSED(C), Panel *panel)
