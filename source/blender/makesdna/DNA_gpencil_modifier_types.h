@@ -826,6 +826,11 @@ typedef struct LineartGpencilModifierData {
   struct Material *target_material;
   char target_layer[64];
 
+  /** These two variables are to pass on vertex group information from mesh to strokes.
+   * vgname specifies which vertex groups our strokes from source_vertex_group will go to. */
+  char source_vertex_group[64];
+  char vgname[64];
+
   float opacity;
   short thickness;
 

@@ -51,7 +51,6 @@ typedef struct LineartStaticMemPool {
 } LineartStaticMemPool;
 
 typedef struct LineartRenderTriangle {
-  struct LineartRenderTriangle *next, *prev;
   struct LineartRenderVert *v[3];
   struct LineartRenderLine *rl[3];
   double gn[3];
@@ -105,9 +104,11 @@ typedef struct LineartRenderLineSegment {
 } LineartRenderLineSegment;
 
 typedef struct LineartRenderVert {
-  struct LineartRenderVert *next, *prev;
   double gloc[3];
   double fbcoord[4];
+
+  size_t index;
+
   /**  Used as "r" when intersecting */
   struct BMVert *v;
   struct LineartRenderLine *intersecting_line;
