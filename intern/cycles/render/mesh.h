@@ -243,6 +243,11 @@ class Mesh : public Geometry {
     return num_subd_faces;
   }
 
+  void set_num_subd_faces(size_t num_subd_faces_)
+  {
+    num_subd_faces = num_subd_faces_;
+  }
+
   size_t get_num_subd_verts()
   {
     return num_subd_verts;

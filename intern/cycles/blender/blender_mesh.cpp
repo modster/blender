@@ -1077,6 +1077,7 @@ void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph,
     mesh->subd_attributes.attributes.push_back(std::move(attr));
   }
 
+  mesh->set_num_subd_faces(new_mesh.get_num_subd_faces());
   mesh->set_time_stamp(b_depsgraph.scene().frame_current());
 
   /* tag update */
