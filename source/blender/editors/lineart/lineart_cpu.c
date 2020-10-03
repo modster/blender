@@ -4132,7 +4132,7 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *depsgraph,
               MDeformWeight *mdw = BKE_defvert_ensure_index(&me->dvert[vindex], dindex);
               MDeformWeight *gdw = BKE_defvert_ensure_index(&gps->dvert[sindex], gpdg);
               if (preserve_weight) {
-                gdw->weight = mdw->weight;
+                gdw->weight = MAX2(mdw->weight, gdw->weight);
               }
               else {
                 if (mdw->weight > 0.999f) {
