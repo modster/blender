@@ -18,6 +18,8 @@
  */
 #pragma once
 
+#include "BLI_compiler_compat.h"
+
 #include "pxr/usd/usd/common.h"
 
 #include <vector>
@@ -30,9 +32,9 @@ class UsdObjectReader;
 
 void debug_traverse_stage(const pxr::UsdStageRefPtr &usd_stage);
 
-/* TODO(makowalski):  copy_m44_axis_swap and create_swapped_rotation_matrix
- * below are duplicates of the declarations in abc_axis_conversion.h.
- * Should move this to a shared location. */
+/* TODO(makowalski):  copy_m44_axis_swap, create_swapped_rotation_matrix
+ * and copy_zup_from_yup below are duplicates of the declarations in
+ * abc_axis_conversion.h, and should be moved to a shared location. */
 typedef enum {
   USD_ZUP_FROM_YUP = 1,
   USD_YUP_FROM_ZUP = 2,
@@ -47,6 +49,14 @@ void create_swapped_rotation_matrix(float rot_x_mat[3][3],
                                     UsdAxisSwapMode mode);
 
 void copy_m44_axis_swap(float dst_mat[4][4], float src_mat[4][4], UsdAxisSwapMode mode);
+
+BLI_INLINE void copy_zup_from_yup(float zup[3], const float yup[3])
+{
+  const float old_yup1 = yup[1]; /* in case zup == yup */
+  zup[0] = yup[0];
+  zup[1] = -yup[2];
+  zup[2] = old_yup1;
+}
 
 void create_readers(const pxr::UsdStageRefPtr &usd_stage,
                     const USDImporterContext &context,

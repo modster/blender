@@ -90,10 +90,7 @@ static void read_mverts(MVert *mverts, const MeshSampleData &mesh_data)
     pxr::GfVec3f pt = mesh_data.points[i];
 
     if (mesh_data.y_up) {
-      // Convert from y-up to z-up.
-      mvert.co[0] = pt[0];
-      mvert.co[1] = -pt[2];
-      mvert.co[2] = pt[1];
+      blender::io::usd::copy_zup_from_yup(mvert.co, pt.GetArray());
     }
     else {
       mvert.co[0] = pt[0];
