@@ -4099,6 +4099,8 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *depsgraph,
     BKE_gpencil_dvert_ensure(gps);
     gps->mat_nr = material_nr;
 
+    MEM_freeN(stroke_data);
+
     if (source_vgname && vgname) {
       Object *eval_ob = DEG_get_evaluated_object(depsgraph, rlc->object_ref);
       int gpdg = -1;
@@ -4146,7 +4148,6 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *depsgraph,
       BKE_gpencil_stroke_set_random_color(gps);
     }
     BKE_gpencil_stroke_geometry_update(gps);
-    MEM_freeN(stroke_data);
     stroke_count++;
   }
 
