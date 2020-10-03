@@ -50,7 +50,7 @@ bool TopologyRefinerFactory<ccl::Mesh>::resizeComponentTopology(TopologyRefiner 
   setNumBaseFaces(refiner, mesh.get_num_subd_faces());
 
   for (int i = 0; i < mesh.get_num_subd_faces(); i++) {
-    setNumBaseFaceVertices(refiner, i, mesh.get_subd_face_corners()[i]);
+    setNumBaseFaceVertices(refiner, i, mesh.get_subd_num_corners()[i]);
   }
 
   return true;
