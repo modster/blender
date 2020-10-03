@@ -620,7 +620,7 @@ void ED_lineart_gpencil_generate_from_chain(struct Depsgraph *depsgraph,
                                             float pre_sample_length,
                                             const char *source_vgname,
                                             const char *vgname,
-                                            bool invert_source);
+                                            int modifier_flags);
 void ED_lineart_gpencil_generate_strokes_direct(struct Depsgraph *depsgraph,
                                                 struct Object *ob,
                                                 struct bGPDlayer *gpl,
@@ -638,7 +638,7 @@ void ED_lineart_gpencil_generate_strokes_direct(struct Depsgraph *depsgraph,
                                                 float pre_sample_length,
                                                 const char *source_vgname,
                                                 const char *vgname,
-                                                bool invert_source);
+                                                int modifier_flags);
 
 struct bContext;
 

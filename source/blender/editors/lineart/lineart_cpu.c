@@ -3999,7 +3999,7 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *depsgraph,
                                             float pre_sample_length,
                                             const char *source_vgname,
                                             const char *vgname,
-                                            bool invert_source)
+                                            int modifier_flags)
 {
   LineartRenderBuffer *rb = lineart_share.render_buffer_shared;
 
@@ -4038,6 +4038,8 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *depsgraph,
   unit_m4(mat);
 
   int enabled_types = lineart_rb_line_types(rb);
+  bool invert_input = modifier_flags & LRT_GPENCIL_INVERT_SOURCE_VGROUP;
+  bool match_output = modifier_flags & LRT_GPENCIL_MATCH_OUTPUT_VGROUP;
 
   LISTBASE_FOREACH (LineartRenderLineChain *, rlc, &rb->chains) {
 
@@ -4100,32 +4102,39 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *depsgraph,
     if (source_vgname && vgname) {
       Object *eval_ob = DEG_get_evaluated_object(depsgraph, rlc->object_ref);
       int gpdg = -1;
-      if ((gpdg = BKE_object_defgroup_name_index(gpencil_object, vgname)) >= 0) {
-        if (eval_ob->type == OB_MESH) {
-          int dindex = 0;
-          Mesh *me = (Mesh *)eval_ob->data;
-          if (!me->dvert) {
-            continue;
-          }
-          LISTBASE_FOREACH (bDeformGroup *, db, &eval_ob->defbase) {
-            if (strstr(db->name, source_vgname) == db->name) {
-              int sindex = 0, vindex;
-              LISTBASE_FOREACH (LineartRenderLineChainItem *, rlci, &rlc->chain) {
-                vindex = rlci->index;
-                /* XXX: Here doesn't have post-modifier dvert! */
-                if (vindex >= me->totvert) {
-                  break;
-                }
-                MDeformWeight *mdw = BKE_defvert_ensure_index(&me->dvert[vindex], dindex);
-                if (mdw->weight > 0.999f) {
-                  MDeformWeight *gdw = BKE_defvert_ensure_index(&gps->dvert[sindex], gpdg);
-                  gdw->weight = 1.0f;
-                }
-                sindex++;
+      if ((!match_output) && (gpdg = BKE_object_defgroup_name_index(gpencil_object, vgname)) < 0) {
+        continue;
+      }
+      if (eval_ob->type == OB_MESH) {
+        int dindex = 0;
+        Mesh *me = (Mesh *)eval_ob->data;
+        if (!me->dvert) {
+          continue;
+        }
+        LISTBASE_FOREACH (bDeformGroup *, db, &eval_ob->defbase) {
+          if (strstr(db->name, source_vgname) == db->name) {
+            if (match_output) {
+              gpdg = BKE_object_defgroup_name_index(gpencil_object, db->name);
+              if (gpdg < 0) {
+                continue;
               }
             }
-            dindex++;
+            int sindex = 0, vindex;
+            LISTBASE_FOREACH (LineartRenderLineChainItem *, rlci, &rlc->chain) {
+              vindex = rlci->index;
+              /* XXX: Here doesn't have post-modifier dvert! */
+              if (vindex >= me->totvert) {
+                break;
+              }
+              MDeformWeight *mdw = BKE_defvert_ensure_index(&me->dvert[vindex], dindex);
+              if (mdw->weight > 0.999f) {
+                MDeformWeight *gdw = BKE_defvert_ensure_index(&gps->dvert[sindex], gpdg);
+                gdw->weight = 1.0f;
+              }
+              sindex++;
+            }
           }
+          dindex++;
         }
       }
     }
@@ -4165,7 +4174,7 @@ void ED_lineart_gpencil_generate_strokes_direct(Depsgraph *depsgraph,
                                                 float pre_sample_length,
                                                 const char *source_vgname,
                                                 const char *vgname,
-                                                bool invert_source)
+                                                int modifier_flags)
 {
 
   if (!gpl || !gpf || !source_reference || !ob) {
@@ -4204,7 +4213,7 @@ void ED_lineart_gpencil_generate_strokes_direct(Depsgraph *depsgraph,
                                          pre_sample_length,
                                          source_vgname,
                                          vgname,
-                                         invert_source);
+                                         modifier_flags);
 }
 
 static int lineart_gpencil_update_strokes_exec(bContext *C, wmOperator *UNUSED(op))
@@ -4341,7 +4350,7 @@ static int lineart_gpencil_bake_strokes_invoke(bContext *C,
                 lmd->pre_sample_length,
                 lmd->source_vertex_group,
                 lmd->vgname,
-                lmd->flags & LRT_GPENCIL_INVERT_SOURCE_VGROUP);
+                lmd->flags);
           }
         }
       }

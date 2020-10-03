@@ -75,6 +75,7 @@ static void initData(GpencilModifierData *md)
   lmd->line_types = LRT_EDGE_FLAG_ALL_TYPE;
   lmd->thickness = 25;
   lmd->opacity = 1.0f;
+  lmd->flags |= LRT_GPENCIL_MATCH_OUTPUT_VGROUP;
 }
 
 static void copyData(const GpencilModifierData *md, GpencilModifierData *target)
@@ -116,7 +117,7 @@ static void generate_strokes_actual(
       lmd->pre_sample_length,
       lmd->source_vertex_group,
       lmd->vgname,
-      lmd->flags & LRT_GPENCIL_INVERT_SOURCE_VGROUP);
+      lmd->flags);
 }
 
 static bool isModifierDisabled(GpencilModifierData *md)
@@ -436,7 +437,12 @@ static void vgroup_panel_draw(const bContext *C, Panel *panel)
   uiItemR(row, ptr, "source_vertex_group", 0, "Source", ICON_GROUP_VERTEX);
   uiItemR(row, ptr, "invert_source_vertex_group", UI_ITEM_R_TOGGLE, "", ICON_ARROW_LEFTRIGHT);
 
-  uiItemPointerR(layout, ptr, "vertex_group", &ob_ptr, "vertex_groups", "Target", ICON_NONE);
+  uiItemR(layout, ptr, "match_output_vertex_group", 0, NULL, ICON_NONE);
+
+  bool match_output = RNA_boolean_get(ptr, "match_output_vertex_group");
+  if (!match_output) {
+    uiItemPointerR(layout, ptr, "vertex_group", &ob_ptr, "vertex_groups", "Target", ICON_NONE);
+  }
 }
 
 static void panelRegister(ARegionType *region_type)

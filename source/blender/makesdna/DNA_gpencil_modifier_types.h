@@ -805,6 +805,7 @@ typedef enum eLineartGpencilModifierSource {
 
 typedef enum eLineArtGPencilModifierFlags {
   LRT_GPENCIL_INVERT_SOURCE_VGROUP = (1 << 0),
+  LRT_GPENCIL_MATCH_OUTPUT_VGROUP = (1 << 1),
 } eLineArtGPencilModifierFlags;
 
 typedef enum eLineartGpencilTransparencyFlags {
