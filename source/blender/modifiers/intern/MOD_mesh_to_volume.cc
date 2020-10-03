@@ -120,7 +120,6 @@ static void initData(ModifierData *md)
 static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
 {
   MeshToVolumeModifierData *mvmd = reinterpret_cast<MeshToVolumeModifierData *>(md);
-  DEG_add_modifier_to_transform_relation(ctx->node, "Mesh to Volume Modifier");
   if (mvmd->object) {
     DEG_add_object_relation(
         ctx->node, mvmd->object, DEG_OB_COMP_GEOMETRY, "Mesh to Volume Modifier");
@@ -129,10 +128,10 @@ static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphConte
   }
 }
 
-static void foreachObjectLink(ModifierData *md, Object *ob, ObjectWalkFunc walk, void *userData)
+static void foreachIDLink(ModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
 {
   MeshToVolumeModifierData *mvmd = reinterpret_cast<MeshToVolumeModifierData *>(md);
-  walk(userData, ob, &mvmd->object, IDWALK_CB_NOP);
+  walk(userData, ob, (ID **)&mvmd->object, IDWALK_CB_NOP);
 }
 
 static void panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -198,7 +197,9 @@ static float compute_voxel_size(const MeshToVolumeModifierData *mvmd,
   return voxel_size;
 }
 
-static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Volume *input_volume)
+static Volume *modifyVolume(ModifierData *md,
+                            const ModifierEvalContext *UNUSED(ctx),
+                            Volume *input_volume)
 {
 #ifdef WITH_OPENVDB
   using namespace blender;
@@ -215,8 +216,7 @@ static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Vo
   }
   BKE_mesh_wrapper_ensure_mdata(mesh);
 
-  const float4x4 mesh_to_own_object_space_transform = float4x4(ctx->object->imat) *
-                                                      float4x4(object_to_convert->obmat);
+  const float4x4 mesh_to_own_object_space_transform = object_to_convert->obmat;
   const float voxel_size = compute_voxel_size(mvmd, mesh_to_own_object_space_transform);
 
   float4x4 mesh_to_index_space_transform;
@@ -263,7 +263,7 @@ static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Vo
   return volume;
 
 #else
-  UNUSED_VARS(md, ctx);
+  UNUSED_VARS(md);
   UNUSED_VARS(compute_voxel_size);
   BKE_modifier_set_error(md, "Compiled without OpenVDB");
   return input_volume;
@@ -297,8 +297,7 @@ ModifierTypeInfo modifierType_MeshToVolume = {
     /* updateDepsgraph */ updateDepsgraph,
     /* dependsOnTime */ NULL,
     /* dependsOnNormals */ NULL,
-    /* foreachObjectLink */ foreachObjectLink,
-    /* foreachIDLink */ NULL,
+    /* foreachIDLink */ foreachIDLink,
     /* foreachTexLink */ NULL,
     /* freeRuntimeData */ NULL,
     /* panelRegister */ panelRegister,

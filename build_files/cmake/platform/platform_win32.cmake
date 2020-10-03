@@ -768,4 +768,3 @@ if(WITH_POTRACE)
   set(POTRACE_LIBRARIES ${LIBDIR}/potrace/lib/potrace.lib)
   set(POTRACE_FOUND On)
 endif()
-
