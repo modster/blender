@@ -644,7 +644,6 @@ GpencilModifierTypeInfo modifierType_Gpencil_Build = {
     /* isDisabled */ NULL,
     /* updateDepsgraph */ NULL,
     /* dependsOnTime */ dependsOnTime,
-    /* foreachObjectLink */ NULL,
     /* foreachIDLink */ NULL,
     /* foreachTexLink */ NULL,
     /* panelRegister */ panelRegister,

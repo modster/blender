@@ -6405,6 +6405,7 @@ def km_3d_view_tool_sculpt_lasso_trim(params):
         ]},
     )
 
+
 def km_3d_view_tool_sculpt_line_mask(params):
     return (
         "3D View Tool: Sculpt, Line Mask",
@@ -6417,6 +6418,7 @@ def km_3d_view_tool_sculpt_line_mask(params):
         ]},
     )
 
+
 def km_3d_view_tool_sculpt_line_project(params):
     return (
         "3D View Tool: Sculpt, Line Project",
@@ -6426,6 +6428,7 @@ def km_3d_view_tool_sculpt_line_project(params):
              None),
         ]},
     )
+
 
 def km_3d_view_tool_sculpt_mesh_filter(params):
     return (
