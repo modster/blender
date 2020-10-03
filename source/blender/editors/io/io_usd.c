@@ -305,7 +305,6 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
 
 void WM_OT_usd_import(wmOperatorType *ot)
 {
-  printf("WM_OT_usd_import\n");
   ot->name = "Import USD";
   ot->description = "Load a USD file";
   ot->idname = "WM_OT_usd_import";
