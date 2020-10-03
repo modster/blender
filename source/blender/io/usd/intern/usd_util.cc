@@ -214,8 +214,8 @@ void copy_m44_axis_swap(float dst_mat[4][4], float src_mat[4][4], UsdAxisSwapMod
 }
 
 void create_readers(const pxr::UsdStageRefPtr &usd_stage,
-                    std::vector<UsdObjectReader *> &r_readers,
-                    const USDImporterContext &context)
+                    const USDImporterContext &context,
+                    std::vector<UsdObjectReader *> &r_readers)
 {
   if (!usd_stage) {
     return;

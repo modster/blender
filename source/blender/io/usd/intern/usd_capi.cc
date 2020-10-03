@@ -273,7 +273,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   *data->do_update = true;
   *data->progress = 0.1f;
 
-  create_readers(data->stage, data->readers, import_ctx);
+  create_readers(data->stage, import_ctx, data->readers);
 
   // Create objects
 

@@ -110,7 +110,7 @@ void UsdObjectReader::setupObjectTransform(const double time)
   BKE_object_apply_mat4(object_, transform_from_usd, true, false);
   BKE_object_to_mat4(object_, object_->obmat);
 
-  /* TODO:  Set up transform constraint if not constant. */
+  /* TODO(makowalski):  Set up transform constraint if not constant. */
 }
 
 void UsdObjectReader::read_matrix(float r_mat[4][4] /* local matrix */,
@@ -126,7 +126,7 @@ void UsdObjectReader::read_matrix(float r_mat[4][4] /* local matrix */,
     return;
   }
 
-  /* TODO:  Check for constant transform. */
+  /* TODO(makowalski):  Check for constant transform. */
 
   pxr::GfMatrix4d usd_local_to_world = xformable.ComputeLocalToWorldTransform(time);
 

@@ -67,8 +67,12 @@ static void sample_uvs(const pxr::UsdGeomMesh &mesh,
 
   pxr::UsdGeomPrimvar st_primvar = mesh.GetPrimvar(primvar_name);
 
-  if (st_primvar && (st_primvar.GetTypeName() == pxr::SdfValueTypeNames->TexCoord2fArray ||
-                     st_primvar.GetTypeName() == pxr::SdfValueTypeNames->Float2Array)) {
+  if (!st_primvar) {
+    return;
+  }
+
+  if (st_primvar.GetTypeName() == pxr::SdfValueTypeNames->TexCoord2fArray ||
+      st_primvar.GetTypeName() == pxr::SdfValueTypeNames->Float2Array) {
     if (!st_primvar.Get(&mesh_data.uv_values, time)) {
       std::cerr << "WARNING: Couldn't get uvs from primvar " << primvar_name << " for prim "
                 << mesh.GetPath() << std::endl;
@@ -134,9 +138,9 @@ static void read_mpolys(Mesh *mesh, const MeshSampleData &mesh_data)
   MLoop *mloops = mesh->mloop;
   MLoopUV *mloopuvs = nullptr;
 
-  bool do_uvs = (mesh_data.uv_interpolation == pxr::UsdGeomTokens->faceVarying ||
-                 mesh_data.uv_interpolation == pxr::UsdGeomTokens->vertex) &&
-                !(mesh_data.uv_indices.empty() && mesh_data.uv_values.empty());
+  const bool do_uvs = (mesh_data.uv_interpolation == pxr::UsdGeomTokens->faceVarying ||
+                       mesh_data.uv_interpolation == pxr::UsdGeomTokens->vertex) &&
+                      !(mesh_data.uv_indices.empty() && mesh_data.uv_values.empty());
 
   if (do_uvs) {
     void *cd_ptr = add_customdata(mesh, "uvMap", CD_MLOOPUV);
@@ -192,7 +196,7 @@ static void read_mpolys(Mesh *mesh, const MeshSampleData &mesh_data)
 
   BKE_mesh_calc_edges(mesh, false, false);
 
-  /* TODO:  Possibly check for invalid geometry. */
+  /* TODO(makowalski):  Possibly check for invalid geometry. */
 }
 
 namespace blender::io::usd {
@@ -237,7 +241,7 @@ Mesh *UsdMeshReader::read_mesh(Mesh *existing_mesh,
   mesh_.GetFaceVertexIndicesAttr().Get(&mesh_data.vertex_indices, time);
 
   /* For now, always return a new mesh.
-   * TODO: Add logic to handle the cases where the topology
+   * TODO(makowalski): Add logic to handle the cases where the topology
    * hasn't chaged and we return the existing mesh with updated
    * vert positions. */
 
@@ -263,7 +267,7 @@ Mesh *UsdMeshReader::read_mesh(Mesh *existing_mesh,
     BKE_mesh_calc_normals(new_mesh);
   }
 
-  /* TODO:  Handle case where topology hasn't changed. */
+  /* TODO(makowalski):  Handle case where topology hasn't changed. */
 
   return new_mesh;
 }
@@ -297,7 +301,7 @@ void UsdMeshReader::readObjectData(Main *bmain, double time)
     mesh->flag |= autosmooth;
   }
 
-  /* TODO:  Read face sets and add modifier. */
+  /* TODO(makowalski):  Read face sets and add modifier. */
 }
 
 }  // namespace blender::io::usd
