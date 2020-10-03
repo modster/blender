@@ -4040,6 +4040,7 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *depsgraph,
   int enabled_types = lineart_rb_line_types(rb);
   bool invert_input = modifier_flags & LRT_GPENCIL_INVERT_SOURCE_VGROUP;
   bool match_output = modifier_flags & LRT_GPENCIL_MATCH_OUTPUT_VGROUP;
+  bool preserve_weight = modifier_flags & LRT_GPENCIL_SOFT_SELECTION;
 
   LISTBASE_FOREACH (LineartRenderLineChain *, rlc, &rb->chains) {
 
@@ -4129,9 +4130,14 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *depsgraph,
                 break;
               }
               MDeformWeight *mdw = BKE_defvert_ensure_index(&me->dvert[vindex], dindex);
-              if (mdw->weight > 0.999f) {
-                MDeformWeight *gdw = BKE_defvert_ensure_index(&gps->dvert[sindex], gpdg);
-                gdw->weight = 1.0f;
+              MDeformWeight *gdw = BKE_defvert_ensure_index(&gps->dvert[sindex], gpdg);
+              if (preserve_weight) {
+                gdw->weight = mdw->weight;
+              }
+              else {
+                if (mdw->weight > 0.999f) {
+                  gdw->weight = 1.0f;
+                }
               }
               sindex++;
             }

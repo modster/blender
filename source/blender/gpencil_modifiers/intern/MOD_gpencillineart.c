@@ -433,6 +433,8 @@ static void vgroup_panel_draw(const bContext *C, Panel *panel)
 
   uiLayoutSetPropSep(layout, true);
 
+  uiItemR(layout, ptr, "soft_selection", 0, NULL, ICON_NONE);
+
   row = uiLayoutRow(layout, true);
   uiItemR(row, ptr, "source_vertex_group", 0, "Source", ICON_GROUP_VERTEX);
   uiItemR(row, ptr, "invert_source_vertex_group", UI_ITEM_R_TOGGLE, "", ICON_ARROW_LEFTRIGHT);

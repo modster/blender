@@ -314,9 +314,11 @@ RNA_GP_MOD_VGROUP_NAME_SET(Opacity, vgname);
 RNA_GP_MOD_VGROUP_NAME_SET(Lattice, vgname);
 RNA_GP_MOD_VGROUP_NAME_SET(Smooth, vgname);
 RNA_GP_MOD_VGROUP_NAME_SET(Hook, vgname);
+RNA_GP_MOD_VGROUP_NAME_SET(Tint, vgname);
 RNA_GP_MOD_VGROUP_NAME_SET(Offset, vgname);
 RNA_GP_MOD_VGROUP_NAME_SET(Armature, vgname);
 RNA_GP_MOD_VGROUP_NAME_SET(Texture, vgname);
+RNA_GP_MOD_VGROUP_NAME_SET(Lineart, vgname);
 
 #  undef RNA_GP_MOD_VGROUP_NAME_SET
 
@@ -1073,7 +1075,7 @@ static void rna_def_modifier_gpenciltint(BlenderRNA *brna)
   prop = RNA_def_property(srna, "vertex_group", PROP_STRING, PROP_NONE);
   RNA_def_property_string_sdna(prop, NULL, "vgname");
   RNA_def_property_ui_text(prop, "Vertex Group", "Vertex group name for modulating the deform");
-  RNA_def_property_string_funcs(prop, NULL, NULL, "rna_HookGpencilModifier_vgname_set");
+  RNA_def_property_string_funcs(prop, NULL, NULL, "rna_TintGpencilModifier_vgname_set");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "pass_index", PROP_INT, PROP_NONE);
@@ -2406,6 +2408,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "vertex_group", PROP_STRING, PROP_NONE);
   RNA_def_property_string_sdna(prop, NULL, "vgname");
+  RNA_def_property_string_funcs(prop, NULL, NULL, "rna_LineartGpencilModifier_vgname_set");
   RNA_def_property_ui_text(prop, "Vertex Group", "Vertex group name for selected strokes");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
@@ -2419,6 +2422,13 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_boolean_default(prop, 1);
   RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_GPENCIL_MATCH_OUTPUT_VGROUP);
   RNA_def_property_ui_text(prop, "Match Output", "Match output vertex group");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
+  prop = RNA_def_property(srna, "soft_selection", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_default(prop, 1);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_GPENCIL_SOFT_SELECTION);
+  RNA_def_property_ui_text(
+      prop, "Soft selection", "Preserve original vertex weight instead of clipping to 0/1");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "thickness", PROP_INT, PROP_NONE);
