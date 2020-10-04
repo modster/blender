@@ -529,7 +529,7 @@ void AbcMeshReader::readObjectData(Main *bmain, const Alembic::Abc::ISampleSelec
 
   readFaceSetsSample(bmain, mesh, sample_sel);
 
-  if (has_animations(m_schema, m_settings)) {
+  if (m_settings->force_modifier || has_animations(m_schema, m_settings)) {
     addCacheModifier();
   }
 }
@@ -881,7 +881,7 @@ void AbcSubDReader::readObjectData(Main *bmain, const Alembic::Abc::ISampleSelec
     BKE_mesh_validate(mesh, false, false);
   }
 
-  if (has_animations(m_schema, m_settings)) {
+  if (m_settings->force_modifier || has_animations(m_schema, m_settings)) {
     addCacheModifier();
   }
 }
