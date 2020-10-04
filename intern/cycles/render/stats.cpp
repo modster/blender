@@ -375,6 +375,7 @@ string SceneUpdateStats::full_report()
   result += "Particles:\n" + particles.full_report(1);
   result += "SVM:\n" + svm.full_report(1);
   result += "Tables:\n" + tables.full_report(1);
+  result += "Procedurals:\n" + procedurals.full_report(1);
   return result;
 }
 
@@ -394,6 +395,7 @@ void SceneUpdateStats::clear()
   scene.times.entries.clear();
   svm.times.entries.clear();
   tables.times.entries.clear();
+  procedurals.times.entries.clear();
 }
 
 CCL_NAMESPACE_END
