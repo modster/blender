@@ -24,10 +24,9 @@
 
 #include <vector>
 
-struct USDImporterContext;
-
 namespace blender::io::usd {
 
+struct USDImporterContext;
 class UsdObjectReader;
 
 void debug_traverse_stage(const pxr::UsdStageRefPtr &usd_stage);
