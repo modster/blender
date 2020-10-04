@@ -317,7 +317,7 @@ static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, 
   walk(userData, ob, (ID **)&lmd->target_material, IDWALK_CB_USER);
   walk(userData, ob, (ID **)&lmd->source_collection, IDWALK_CB_NOP);
 
-  walk(userData, ob, &lmd->source_object, IDWALK_CB_NOP);
+  walk(userData, ob, (ID **)&lmd->source_object, IDWALK_CB_NOP);
 }
 
 static void panel_draw(const bContext *C, Panel *panel)
@@ -380,7 +380,7 @@ static void occlusion_panel_draw(const bContext *C, Panel *panel)
 {
   PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
 
-  uiLayout *layout = panel->layout, *sub;
+  uiLayout *layout = panel->layout;
 
   uiLayoutSetPropSep(layout, true);
 
