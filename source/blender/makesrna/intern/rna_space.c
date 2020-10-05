@@ -2836,7 +2836,7 @@ static void rna_def_space_image_uv(BlenderRNA *brna)
        "SHARED_VERTEX",
        ICON_STICKY_UVS_VERT,
        "Shared Vertex",
-       "Select UVs that share mesh vertex, irrespective if they are in the same location"},
+       "Select UVs that share a mesh vertex, whether or not they are at the same location"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -2864,9 +2864,7 @@ static void rna_def_space_image_uv(BlenderRNA *brna)
   RNA_def_property_enum_sdna(prop, NULL, "sticky");
   RNA_def_property_enum_items(prop, sticky_mode_items);
   RNA_def_property_ui_text(
-      prop,
-      "Sticky Selection Mode",
-      "Automatically select also UVs sharing the same vertex as the ones being selected");
+      prop, "Sticky Selection Mode", "Method for extending UV vertex selection");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, NULL);
 
   /* drawing */
@@ -4705,13 +4703,13 @@ static void rna_def_space_sequencer(BlenderRNA *brna)
   };
 
   static const EnumPropertyItem proxy_render_size_items[] = {
-      {SEQ_PROXY_RENDER_SIZE_NONE, "NONE", 0, "No display", ""},
-      {SEQ_PROXY_RENDER_SIZE_SCENE, "SCENE", 0, "Scene render size", ""},
-      {SEQ_PROXY_RENDER_SIZE_25, "PROXY_25", 0, "Proxy size 25%", ""},
-      {SEQ_PROXY_RENDER_SIZE_50, "PROXY_50", 0, "Proxy size 50%", ""},
-      {SEQ_PROXY_RENDER_SIZE_75, "PROXY_75", 0, "Proxy size 75%", ""},
-      {SEQ_PROXY_RENDER_SIZE_100, "PROXY_100", 0, "Proxy size 100%", ""},
-      {SEQ_PROXY_RENDER_SIZE_FULL, "FULL", 0, "No proxy, full render", ""},
+      {SEQ_RENDER_SIZE_NONE, "NONE", 0, "No display", ""},
+      {SEQ_RENDER_SIZE_SCENE, "SCENE", 0, "Scene render size", ""},
+      {SEQ_RENDER_SIZE_PROXY_25, "PROXY_25", 0, "Proxy size 25%", ""},
+      {SEQ_RENDER_SIZE_PROXY_50, "PROXY_50", 0, "Proxy size 50%", ""},
+      {SEQ_RENDER_SIZE_PROXY_75, "PROXY_75", 0, "Proxy size 75%", ""},
+      {SEQ_RENDER_SIZE_PROXY_100, "PROXY_100", 0, "Proxy size 100%", ""},
+      {SEQ_RENDER_SIZE_FULL, "FULL", 0, "No proxy, full render", ""},
       {0, NULL, 0, NULL, NULL},
   };
 
