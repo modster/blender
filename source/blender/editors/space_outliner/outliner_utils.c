@@ -30,12 +30,12 @@
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
 
+#include "BKE_armature.h"
 #include "BKE_context.h"
 #include "BKE_layer.h"
 #include "BKE_object.h"
 #include "BKE_outliner_treehash.h"
 
-#include "ED_armature.h"
 #include "ED_outliner.h"
 #include "ED_screen.h"
 
@@ -358,6 +358,9 @@ float outliner_restrict_columns_width(const SpaceOutliner *space_outliner)
       num_columns = 3;
       break;
     case SO_VIEW_LAYER:
+      if (space_outliner->show_restrict_flags & SO_RESTRICT_ENABLE) {
+        num_columns++;
+      }
       if (space_outliner->show_restrict_flags & SO_RESTRICT_HOLDOUT) {
         num_columns++;
       }
