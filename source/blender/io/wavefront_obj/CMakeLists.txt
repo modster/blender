@@ -20,6 +20,8 @@
 
 set(INC
   .
+  ./exporter
+  ./importer
   ../../blenkernel
   ../../blenlib
   ../../bmesh
@@ -38,35 +40,35 @@ set(INC_SYS
 )
 
 set(SRC
-  intern/importer_mesh_utils.cc
-  intern/obj_exporter.cc
-  intern/obj_export_mesh.cc
-  intern/obj_export_mtl.cc
-  intern/obj_export_nurbs.cc
-  intern/obj_export_file_writer.cc
-  intern/obj_import_file_reader.cc
-  intern/obj_importer.cc
-  intern/obj_import_mesh.cc
-  intern/obj_import_mtl.cc
-  intern/obj_import_nurbs.cc
-  intern/obj_import_objects.cc
-  intern/parser_string_utils.cc
-  intern/wavefront_obj.cc
+  IO_wavefront_obj.cc
+  exporter/obj_exporter.cc
+  exporter/obj_export_mesh.cc
+  exporter/obj_export_mtl.cc
+  exporter/obj_export_nurbs.cc
+  exporter/obj_export_file_writer.cc
+  importer/importer_mesh_utils.cc
+  importer/obj_import_file_reader.cc
+  importer/obj_importer.cc
+  importer/obj_import_mesh.cc
+  importer/obj_import_mtl.cc
+  importer/obj_import_nurbs.cc
+  importer/obj_import_objects.cc
+  importer/parser_string_utils.cc
 
   IO_wavefront_obj.h
-  intern/importer_mesh_utils.hh
-  intern/obj_exporter.hh
-  intern/obj_export_mesh.hh
-  intern/obj_export_mtl.hh
-  intern/obj_export_nurbs.hh
-  intern/obj_export_file_writer.hh
-  intern/obj_import_file_reader.hh
-  intern/obj_importer.hh
-  intern/obj_import_mesh.hh
-  intern/obj_import_mtl.hh
-  intern/obj_import_nurbs.hh
-  intern/parser_string_utils.hh
-  intern/obj_import_objects.hh
+  exporter/obj_exporter.hh
+  exporter/obj_export_mesh.hh
+  exporter/obj_export_mtl.hh
+  exporter/obj_export_nurbs.hh
+  exporter/obj_export_file_writer.hh
+  importer/importer_mesh_utils.hh
+  importer/obj_import_file_reader.hh
+  importer/obj_importer.hh
+  importer/obj_import_mesh.hh
+  importer/obj_import_mtl.hh
+  importer/obj_import_nurbs.hh
+  importer/obj_import_objects.hh
+  importer/parser_string_utils.hh
 )
 
 set(LIB
