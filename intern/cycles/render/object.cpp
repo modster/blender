@@ -109,7 +109,7 @@ NODE_DEFINE(Object)
   SOCKET_BOOLEAN(is_shadow_catcher, "Shadow Catcher", false);
 
   SOCKET_NODE(particle_system, "Particle System", &ParticleSystem::node_type);
-  SOCKET_INT(particle_index, "Particle System Index", 0);
+  SOCKET_INT(particle_index, "Particle Index", 0);
 
   return type;
 }
