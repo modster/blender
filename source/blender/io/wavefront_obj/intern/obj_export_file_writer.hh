@@ -55,13 +55,6 @@ class OBJWriter {
   const OBJExportParams &export_params_;
 
   IndexOffsets index_offsets_{0, 0, 0};
-  /**
-   * Total normals of an Object. It is not that same as `Mesh.tot_poly` due
-   * to unknown smooth groups which add loop normals for smooth faces.
-   *
-   * Used for updating normal offset.
-   */
-  int per_object_tot_normals_ = 0;
 
  public:
   OBJWriter(const OBJExportParams &export_params) : export_params_(export_params)

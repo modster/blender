@@ -348,16 +348,16 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
 
   Vector<int> face_vertex_indices;
   Vector<int> face_normal_indices;
-  /* Reset for every Object. */
-  per_object_tot_normals_ = 0;
+  /** Number of normals may not be equal to number of polygons due to smooth shading. */
+  int per_object_tot_normals = 0;
   const int tot_polygons = obj_mesh_data.tot_polygons();
   for (int i = 0; i < tot_polygons; i++) {
     obj_mesh_data.calc_poly_vertex_indices(i, face_vertex_indices);
     /* For an Object, a normal index depends on how many have been written before it.
      * This is unknown because of smooth shading. So pass "per object total normals"
      * and update it after each call. */
-    per_object_tot_normals_ += obj_mesh_data.calc_poly_normal_indices(
-        i, per_object_tot_normals_, face_normal_indices);
+    per_object_tot_normals += obj_mesh_data.calc_poly_normal_indices(
+        i, per_object_tot_normals, face_normal_indices);
 
     write_smooth_group(obj_mesh_data, i, last_face_smooth_group);
     write_vertex_group(obj_mesh_data, i, last_face_vertex_group);
@@ -365,6 +365,7 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
     (this->*poly_element_writer)(
         face_vertex_indices, obj_mesh_data.uv_indices(i), face_normal_indices);
   }
+  index_offsets_.normal_offset += per_object_tot_normals;
 }
 
 /**
@@ -447,8 +448,7 @@ void OBJWriter::update_index_offsets(const OBJMesh &obj_mesh_data)
 {
   index_offsets_.vertex_offset += obj_mesh_data.tot_vertices();
   index_offsets_.uv_vertex_offset += obj_mesh_data.tot_uv_vertices();
-  index_offsets_.normal_offset += per_object_tot_normals_;
-  per_object_tot_normals_ = 0;
+  /* Normal index is updated right after writing the normals. */
 }
 
 /* -------------------------------------------------------------------- */
