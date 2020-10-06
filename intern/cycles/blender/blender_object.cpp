@@ -288,12 +288,13 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
       if (motion_steps) {
         motion[motion_steps / 2] = tfm;
 
+        /* update motion socket before trying to access object->motion_time */
+        object->set_motion(motion);
+
         for (size_t step = 0; step < motion_steps; step++) {
           motion_times.insert(object->motion_time(step));
         }
       }
-
-      object->set_motion(motion);
     }
 
     /* dupli texture coordinates and random_id */
