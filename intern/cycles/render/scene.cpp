@@ -413,7 +413,7 @@ void Scene::reset()
   /* ensure all objects are updated */
   camera->tag_modified();
   dicing_camera->tag_modified();
-  film->tag_update(this);
+  film->tag_modified();
   background->tag_update(this);
   integrator->tag_update(this);
   object_manager->tag_update(this);

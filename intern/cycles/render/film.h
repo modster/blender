@@ -99,7 +99,6 @@ class Film : public Node {
   void device_free(Device *device, DeviceScene *dscene, Scene *scene);
 
   void tag_passes_update(Scene *scene, const vector<Pass> &passes_, bool update_passes = true);
-  void tag_update(Scene *scene);
 
   int get_aov_offset(Scene *scene, string name, bool &is_color);
 

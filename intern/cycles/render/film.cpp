@@ -705,11 +705,6 @@ void Film::tag_passes_update(Scene *scene, const vector<Pass> &passes_, bool upd
   }
 }
 
-void Film::tag_update(Scene * /*scene*/)
-{
-  tag_modified();
-}
-
 int Film::get_aov_offset(Scene *scene, string name, bool &is_color)
 {
   int num_color = 0, num_value = 0;

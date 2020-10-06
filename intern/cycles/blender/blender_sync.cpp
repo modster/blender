@@ -414,7 +414,7 @@ void BlenderSync::sync_film(BL::SpaceView3D &b_v3d)
 
   if (!Pass::equals(prevpasses, scene->passes)) {
     film->tag_passes_update(scene, prevpasses, false);
-    film->tag_update(scene);
+    film->tag_modified();
   }
 }
 
