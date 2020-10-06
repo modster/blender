@@ -18,10 +18,12 @@
  * \ingroup wm
  */
 
+#include "BKE_callbacks.h"
 #include "BKE_context.h"
 #include "BKE_main.h"
 #include "BKE_scene.h"
 
+#include "BLI_ghash.h"
 #include "BLI_listbase.h"
 #include "BLI_math.h"
 
@@ -40,6 +42,7 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
+#include "wm_event_system.h"
 #include "wm_surface.h"
 #include "wm_window.h"
 #include "wm_xr_intern.h"
@@ -49,11 +52,24 @@ static CLG_LogRef LOG = {"wm.xr"};
 
 /* -------------------------------------------------------------------- */
 
+static void wm_xr_session_create_cb(wmXrData *xr)
+{
+  Main *bmain = CTX_data_main(xr->runtime->bcontext);
+
+  /* Get action set data from Python. */
+  BKE_callback_exec_null(bmain, BKE_CB_EVT_XR_SESSION_START_PRE);
+
+  wm_xr_session_actions_init(xr);
+}
+
 static void wm_xr_session_exit_cb(void *customdata)
 {
   wmXrData *xr_data = customdata;
 
   xr_data->runtime->session_state.is_started = false;
+
+  wm_xr_session_actions_uninit(xr_data);
+
   if (xr_data->runtime->exit_fn) {
     xr_data->runtime->exit_fn(xr_data);
   }
@@ -65,13 +81,19 @@ static void wm_xr_session_exit_cb(void *customdata)
 static void wm_xr_session_begin_info_create(wmXrData *xr_data,
                                             GHOST_XrSessionBeginInfo *r_begin_info)
 {
+  /* Callback for when the session is created. This is needed to create and bind OpenXR actions
+   * after the session is created but before it is started. */
+  r_begin_info->create_fn = wm_xr_session_create_cb;
+  r_begin_info->create_customdata = xr_data;
+
   /* WM-XR exit function, does some own stuff and calls callback passed to wm_xr_session_toggle(),
    * to allow external code to execute its own session-exit logic. */
   r_begin_info->exit_fn = wm_xr_session_exit_cb;
   r_begin_info->exit_customdata = xr_data;
 }
 
-void wm_xr_session_toggle(wmWindowManager *wm,
+void wm_xr_session_toggle(bContext *C,
+                          wmWindowManager *wm,
                           wmWindow *session_root_win,
                           wmXrSessionExitFn session_exit_fn)
 {
@@ -83,6 +105,7 @@ void wm_xr_session_toggle(wmWindowManager *wm,
   else {
     GHOST_XrSessionBeginInfo begin_info;
 
+    xr_data->runtime->bcontext = C;
     xr_data->runtime->session_root_win = session_root_win;
     xr_data->runtime->session_state.is_started = true;
     xr_data->runtime->exit_fn = session_exit_fn;
@@ -321,6 +344,8 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
                      fov_to_focallength(draw_view->fov.angle_right - draw_view->fov.angle_left,
                                         DEFAULT_SENSOR_WIDTH);
 
+  memcpy(&state->prev_base_pose, &draw_data->base_pose, sizeof(GHOST_XrPose));
+  memcpy(&state->prev_local_pose, &draw_view->local_pose, sizeof(GHOST_XrPose));
   copy_v3_v3(state->prev_eye_position_ofs, draw_data->eye_position_ofs);
   state->prev_settings_flag = settings->flag;
   state->prev_base_pose_type = settings->base_pose_type;
@@ -371,6 +396,313 @@ bool WM_xr_session_state_viewer_pose_matrix_info_get(const wmXrData *xr,
   *r_focal_len = xr->runtime->session_state.focal_len;
 
   return true;
+}
+
+bool WM_xr_session_state_controller_pose_location_get(const wmXrData *xr,
+                                                      unsigned int subaction_idx,
+                                                      float r_location[3])
+{
+  if (!WM_xr_session_is_ready(xr) || !xr->runtime->session_state.is_view_data_set ||
+      subaction_idx > 1) {
+    zero_v3(r_location);
+    return false;
+  }
+
+  copy_v3_v3(r_location, xr->runtime->session_state.controllers[subaction_idx].pose.position);
+  return true;
+}
+
+bool WM_xr_session_state_controller_pose_rotation_get(const wmXrData *xr,
+                                                      unsigned int subaction_idx,
+                                                      float r_rotation[4])
+{
+  if (!WM_xr_session_is_ready(xr) || !xr->runtime->session_state.is_view_data_set ||
+      subaction_idx > 1) {
+    unit_qt(r_rotation);
+    return false;
+  }
+
+  copy_v4_v4(r_rotation,
+             xr->runtime->session_state.controllers[subaction_idx].pose.orientation_quat);
+  return true;
+}
+
+void wm_xr_session_actions_init(wmXrData *xr)
+{
+  GHash *action_sets = xr->runtime->session_state.action_sets;
+  bool attach_actions = false;
+
+  /* Check if there are any created actions. */
+  if (action_sets && BLI_ghash_len(action_sets) > 0) {
+    GHashIterator *ghi = BLI_ghashIterator_new(action_sets);
+    GHASH_ITER (*ghi, action_sets) {
+      wmXrActionSet *action_set = BLI_ghashIterator_getValue(ghi);
+      if (action_set && action_set->actions && BLI_ghash_len(action_set->actions) > 0) {
+        attach_actions = true;
+        break;
+      }
+    }
+    BLI_ghashIterator_free(ghi);
+  }
+
+  if (attach_actions) {
+    GHOST_XrAttachActionSets(xr->runtime->context);
+  }
+}
+
+static void wm_xr_session_controller_mats_update(const XrSessionSettings *settings,
+                                                 const wmXrAction *controller_pose_action,
+                                                 wmXrSessionState *state)
+{
+  const unsigned int count = min(controller_pose_action->count_subaction_paths, 2);
+
+  float view_ofs[3];
+  float base_inv[4][4];
+  float tmp[4][4];
+
+  copy_v3_v3(view_ofs, state->prev_eye_position_ofs);
+  if ((settings->flag & XR_SESSION_USE_POSITION_TRACKING) == 0) {
+    add_v3_v3(view_ofs, state->prev_local_pose.position);
+  }
+
+  wm_xr_pose_to_viewmat(&state->prev_base_pose, base_inv);
+  invert_m4(base_inv);
+
+  for (unsigned int i = 0; i < count; ++i) {
+    wmXrControllerData *controller = &state->controllers[i];
+
+    /* Calculate controller matrix in world space. */
+    wm_xr_controller_pose_to_mat(&((GHOST_XrPose *)controller_pose_action->states)[i], tmp);
+
+    /* Apply eye position and base pose offsets. */
+    sub_v3_v3(tmp[3], view_ofs);
+    mul_m4_m4m4(controller->mat, base_inv, tmp);
+
+    /* Save final pose. */
+    mat4_to_loc_quat(
+        controller->pose.position, controller->pose.orientation_quat, controller->mat);
+  }
+}
+
+static const GHOST_XrPose *wm_xr_session_controller_pose_find(const wmXrSessionState *state,
+                                                              const char *subaction_path)
+{
+  for (unsigned int i = 0; i < 2; ++i) {
+    if (STREQ(state->controllers[i].subaction_path, subaction_path)) {
+      return &state->controllers[i].pose;
+    }
+  }
+
+  return NULL;
+}
+
+/* Dispatch events to XR surface / window queues. */
+static void wm_xr_session_events_dispatch(GHash *actions,
+                                          wmXrSessionState *session_state,
+                                          wmSurface *surface,
+                                          wmWindow *win)
+{
+  GHashIterator *ghi = BLI_ghashIterator_new(actions);
+  GHASH_ITER (*ghi, actions) {
+    wmXrAction *action = BLI_ghashIterator_getValue(ghi);
+    if (action && action->ot) {
+      bool modal = action->ot->modal ? true : false;
+
+      for (unsigned int i = 0; i < action->count_subaction_paths; ++i) {
+        short val = KM_ANY;
+        bool press_start;
+
+        switch (action->type) {
+          case GHOST_kXrActionTypeBooleanInput: {
+            const bool *state = &((bool *)action->states)[i];
+            bool *state_prev = &((bool *)action->states_prev)[i];
+            if (*state) {
+              if (!*state_prev) {
+                if (modal || action->op_flag == XR_OP_PRESS) {
+                  val = KM_PRESS;
+                  press_start = true;
+                }
+              }
+              else if (modal) {
+                val = KM_PRESS;
+                press_start = false;
+              }
+            }
+            else if (*state_prev) {
+              if (modal || action->op_flag == XR_OP_RELEASE) {
+                val = KM_RELEASE;
+                press_start = false;
+              }
+            }
+            *state_prev = *state;
+            break;
+          }
+          case GHOST_kXrActionTypeFloatInput: {
+            const float *state = &((float *)action->states)[i];
+            float *state_prev = &((float *)action->states_prev)[i];
+            if (*state) {
+              if (!*state_prev) {
+                if (modal || action->op_flag == XR_OP_PRESS) {
+                  val = KM_PRESS;
+                  press_start = true;
+                }
+              }
+              else if (modal) {
+                val = KM_PRESS;
+                press_start = false;
+              }
+            }
+            else if (*state_prev) {
+              if (modal || action->op_flag == XR_OP_RELEASE) {
+                val = KM_RELEASE;
+                press_start = false;
+              }
+            }
+            *state_prev = *state;
+            break;
+          }
+          case GHOST_kXrActionTypeVector2fInput: {
+            const float(*state)[2] = &((float(*)[2])action->states)[i];
+            float(*state_prev)[2] = &((float(*)[2])action->states_prev)[i];
+            if (*state[0] || *state[1]) {
+              if (!*state_prev[0] && !*state_prev[1]) {
+                if (modal || action->op_flag == XR_OP_PRESS) {
+                  val = KM_PRESS;
+                  press_start = true;
+                }
+              }
+              else if (modal) {
+                val = KM_PRESS;
+                press_start = false;
+              }
+            }
+            else if (*state_prev[0] || *state_prev[1]) {
+              if (modal || action->op_flag == XR_OP_RELEASE) {
+                val = KM_RELEASE;
+                press_start = false;
+              }
+            }
+            memcpy(state_prev, state, sizeof(float[2]));
+            break;
+          }
+          default: {
+            break;
+          }
+        }
+
+        if (val != KM_ANY) {
+          const GHOST_XrPose *pose = wm_xr_session_controller_pose_find(
+              session_state, action->subaction_paths[i]);
+          wm_event_add_xrevent(action, pose, surface, win, i, val, press_start);
+        }
+      }
+    }
+  }
+
+  BLI_ghashIterator_free(ghi);
+}
+
+static void wm_xr_session_action_set_update(const XrSessionSettings *settings,
+                                            GHOST_XrContextHandle xr_context,
+                                            wmXrSessionState *state,
+                                            wmXrActionSet *action_set,
+                                            wmSurface *surface,
+                                            wmWindow *win)
+{
+  GHash *actions = action_set->actions;
+  if (!actions) {
+    return;
+  }
+
+  const unsigned int count = BLI_ghash_len(actions);
+  if (count < 1) {
+    return;
+  }
+
+  /* Create an aligned list of action infos. */
+  /* TODO_XR: Store array and number of actions to avoid allocation on each call. */
+  GHOST_XrActionInfo **infos = MEM_callocN(sizeof(GHOST_XrActionInfo *) * count, __func__);
+
+  GHashIterator *ghi = BLI_ghashIterator_new(actions);
+  unsigned int i = 0;
+  GHASH_ITER (*ghi, actions) {
+    BLI_STATIC_ASSERT(sizeof(wmXrAction) == sizeof(GHOST_XrActionInfo),
+                      "wmXrAction and GHOST_XrActionInfo sizes do not match.");
+    infos[i] = BLI_ghashIterator_getValue(
+        ghi); /* TODO_XR: Avoid casting wmXrAction to GHOST_XrActionInfo. */
+    ++i;
+  }
+  BLI_ghashIterator_free(ghi);
+
+  int ret = GHOST_XrGetActionStates(xr_context, action_set->name, count, infos);
+  MEM_freeN(infos);
+
+  if (ret &&
+      (action_set == state->active_action_set)) { /* Only dispatch events for active action set. */
+    if (action_set->controller_pose_action) {
+      wm_xr_session_controller_mats_update(settings, action_set->controller_pose_action, state);
+    }
+
+    if (surface && win) {
+      wm_xr_session_events_dispatch(actions, state, surface, win);
+    }
+  }
+}
+
+void wm_xr_session_actions_update(wmXrData *xr)
+{
+  if (!xr->runtime) {
+    return;
+  }
+
+  GHOST_XrContextHandle xr_context = xr->runtime->context;
+  wmXrSessionState *state = &xr->runtime->session_state;
+
+  GHash *action_sets = state->action_sets;
+  if (!action_sets) {
+    return;
+  }
+  wmXrActionSet *active_action_set = state->active_action_set;
+
+  int ret = GHOST_XrSyncActions(xr_context, active_action_set ? active_action_set->name : NULL);
+  if (!ret) {
+    return;
+  }
+
+  const XrSessionSettings *settings = &xr->session_settings;
+  wmSurface *surface = (g_xr_surface && g_xr_surface->customdata) ? g_xr_surface : NULL;
+  wmWindow *win = xr->runtime->session_root_win;
+
+  if (active_action_set) {
+    wm_xr_session_action_set_update(settings, xr_context, state, active_action_set, surface, win);
+  }
+  else {
+    GHashIterator *ghi_set = BLI_ghashIterator_new(action_sets);
+    GHASH_ITER (*ghi_set, action_sets) {
+      wmXrActionSet *action_set = BLI_ghashIterator_getValue(ghi_set);
+      if (action_set) {
+        wm_xr_session_action_set_update(settings, xr_context, state, action_set, surface, win);
+      }
+    }
+
+    BLI_ghashIterator_free(ghi_set);
+  }
+}
+
+void wm_xr_session_actions_uninit(wmXrData *xr)
+{
+  GHash *action_sets = xr->runtime->session_state.action_sets;
+
+  if (action_sets) {
+    GHashIterator *ghi = BLI_ghashIterator_new(action_sets);
+    GHASH_ITER (*ghi, action_sets) {
+      wmXrActionSet *action_set = BLI_ghashIterator_getValue(ghi);
+      WM_xr_action_set_destroy(xr, action_set->name, false);
+    }
+    BLI_ghashIterator_free(ghi);
+
+    BLI_ghash_free(action_sets, NULL, NULL);
+  }
 }
 
 /* -------------------------------------------------------------------- */
@@ -482,6 +814,7 @@ static wmSurface *wm_xr_session_surface_create(void)
 
   surface->ghost_ctx = DRW_xr_opengl_context_get();
   surface->gpu_ctx = DRW_xr_gpu_context_get();
+  surface->is_xr = true;
 
   surface->customdata = data;
 

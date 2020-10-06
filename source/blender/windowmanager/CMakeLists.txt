@@ -199,6 +199,7 @@ if(WITH_XR_OPENXR)
     xr/intern/wm_xr.c
     xr/intern/wm_xr_draw.c
     xr/intern/wm_xr_session.c
+    xr/intern/wm_xr_actions.c
 
     xr/wm_xr.h
     xr/intern/wm_xr_intern.h

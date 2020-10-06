@@ -51,12 +51,16 @@ static void wm_xr_error_handler(const GHOST_XrError *error)
   wmXrErrorHandlerData *handler_data = error->customdata;
   wmWindowManager *wm = handler_data->wm;
 
-  BKE_reports_clear(&wm->reports);
+  if (error->destroy_runtime) {
+    /* Ok to clear reports list since the runtime will be destroyed and
+     * another XR error will likely not be reported. */
+    BKE_reports_clear(&wm->reports);
+  }
   WM_report(RPT_ERROR, error->user_message);
   WM_report_banner_show();
 
-  if (wm->xr.runtime) {
-    /* Just play safe and destroy the entire runtime data, including context. */
+  if (error->destroy_runtime && wm->xr.runtime) {
+    /* Destroy the entire runtime data, including context. */
     wm_xr_runtime_data_free(&wm->xr.runtime);
   }
 }
@@ -127,6 +131,11 @@ bool wm_xr_events_handle(wmWindowManager *wm)
 {
   if (wm->xr.runtime && wm->xr.runtime->context) {
     GHOST_XrEventsHandle(wm->xr.runtime->context);
+
+    /* Process OpenXR action events and dispatch to XR surface / window queues. */
+    if (WM_xr_session_exists) {
+      wm_xr_session_actions_update(&wm->xr);
+    }
 
     /* wm_window_process_events() uses the return value to determine if it can put the main thread
      * to sleep for some milliseconds. We never want that to happen while the VR session runs on

@@ -423,6 +423,47 @@ bool WM_event_is_tablet(const struct wmEvent *event)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name XR Input Access
+ * \{ */
+
+void WM_event_xr_data(const wmEvent *event,
+                      char **name,
+                      char *type,
+                      float state[2],
+                      float controller_loc[3],
+                      float controller_rot[4])
+{
+  const wmXrActionData *data = event->customdata;
+
+  if (name) {
+    strcpy(*name, data->name);
+  }
+
+  if (type) {
+    *type = data->type;
+  }
+
+  if (state) {
+    memcpy(state, data->state, sizeof(float[2]));
+  }
+
+  if (controller_loc) {
+    memcpy(controller_loc, data->controller_loc, sizeof(float[3]));
+  }
+
+  if (controller_rot) {
+    memcpy(controller_rot, data->controller_rot, sizeof(float[4]));
+  }
+}
+
+bool WM_event_is_xr(const struct wmEvent *event)
+{
+  return (event->custom == EVT_DATA_XR);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Event IME Input Access
  * \{ */
 

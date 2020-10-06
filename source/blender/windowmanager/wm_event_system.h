@@ -31,7 +31,10 @@
 
 struct ARegion;
 struct GHOST_TabletData;
+struct GHOST_XrPose;
 struct ScrArea;
+struct wmSurface;
+struct wmXrAction;
 
 #ifdef __cplusplus
 extern "C" {
@@ -147,6 +150,13 @@ void wm_event_free_handler(wmEventHandler *handler);
 void wm_event_do_handlers(bContext *C);
 
 void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void *customdata);
+void wm_event_add_xrevent(const struct wmXrAction *action,
+                          const struct GHOST_XrPose *controller_pose,
+                          struct wmSurface *surface,
+                          wmWindow *win,
+                          unsigned int subaction_idx,
+                          short val,
+                          bool press_start);
 
 void wm_event_do_depsgraph(bContext *C, bool is_after_open_file);
 void wm_event_do_refresh_wm_and_depsgraph(bContext *C);

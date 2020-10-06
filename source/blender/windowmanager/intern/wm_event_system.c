@@ -82,7 +82,10 @@
 #include "wm.h"
 #include "wm_event_system.h"
 #include "wm_event_types.h"
+#include "wm_surface.h"
 #include "wm_window.h"
+
+#include "xr/intern/wm_xr_intern.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
@@ -3172,6 +3175,97 @@ static void wm_event_free_and_remove_from_queue_if_valid(wmEvent *event)
  * Handle events for all windows, run from the #WM_main event loop.
  * \{ */
 
+static void wm_event_surface_free_all(wmXrSurfaceData *surface_data)
+{
+  ListBase *events = &surface_data->events;
+  if (!BLI_listbase_is_empty(events)) {
+    LISTBASE_FOREACH (wmEvent *, event, events) {
+      MEM_freeN(event->customdata);
+    }
+    BLI_freelistN(events);
+  }
+}
+
+static void wm_event_do_surface_handlers(bContext *C, wmSurface *surface)
+{
+  wmWindowManager *wm = CTX_wm_manager(C);
+  wmXrData *xr = &wm->xr;
+  if (!xr->runtime || !surface->is_xr) {
+    return;
+  }
+
+  wmXrSurfaceData *surface_data = surface->customdata;
+  if (!surface_data || BLI_listbase_is_empty(&surface_data->events)) {
+    return;
+  }
+
+  /* TODO_XR: Currently assumes that the XR surface is the
+   * same as the one for the runtime. In the future this
+   * might not always be the case. */
+  wmWindow *win = xr->runtime->session_root_win;
+  bScreen *screen = WM_window_get_active_screen(win);
+
+  /* some safety checks - these should always be set! */
+  BLI_assert(WM_window_get_active_scene(win));
+  BLI_assert(WM_window_get_active_screen(win));
+  BLI_assert(WM_window_get_active_workspace(win));
+
+  if (!screen) {
+    if (surface_data) {
+      wm_event_surface_free_all(surface_data);
+    }
+    return;
+  }
+
+  ARegion *xr_region = NULL;
+
+  CTX_wm_window_set(C, win);
+  wm_window_make_drawable(wm, win);
+
+  /* Set up a valid context for executing XR operations. */
+  ED_screen_areas_iter (win, screen, area) {
+    CTX_wm_area_set(C, area);
+
+    LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
+      if (WM_region_use_viewport(area, region)) {
+        CTX_wm_region_set(C, region);
+
+        ListBase *events = &surface_data->events;
+
+        LISTBASE_FOREACH (wmEvent *, event, events) {
+          wmXrActionData *action_data = event->customdata;
+          if (action_data->ot->modal) {
+            /* Invoke operator, transferring responsibility to window modal handlers. */
+            wm_operator_invoke(C, action_data->ot, event, NULL, NULL, false, false);
+          }
+          else {
+            /* Execute operator. */
+            wmOperator *op = wm_operator_create(wm, action_data->ot, NULL, NULL);
+            if ((WM_operator_call(C, op) & OPERATOR_HANDLED) == 0) {
+              WM_operator_free(op);
+            }
+          }
+
+          MEM_freeN(action_data);
+        }
+
+        BLI_freelistN(events);
+
+        CTX_wm_region_set(C, NULL);
+        xr_region = region;
+        break;
+      }
+    }
+
+    CTX_wm_area_set(C, area);
+    if (xr_region) {
+      break;
+    }
+  }
+
+  CTX_wm_window_set(C, NULL);
+}
+
 /* called in main loop */
 /* goes over entire hierarchy:  events -> window -> screen -> area -> region */
 void wm_event_do_handlers(bContext *C)
@@ -3437,6 +3531,9 @@ void wm_event_do_handlers(bContext *C)
 
     CTX_wm_window_set(C, NULL);
   }
+
+  /* Handle surface events. */
+  wm_surfaces_iter(C, wm_event_do_surface_handlers);
 
   /* update key configuration after handling events */
   WM_keyconfig_update(wm);
@@ -4751,6 +4848,74 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void 
 #if 0
   WM_event_print(&event);
 #endif
+}
+
+void wm_event_add_xrevent(const wmXrAction *action,
+                          const GHOST_XrPose *controller_pose,
+                          wmSurface *surface,
+                          wmWindow *win,
+                          unsigned int subaction_idx,
+                          short val,
+                          bool press_start)
+{
+  if (!surface->is_xr || !surface->customdata || (val != KM_PRESS && val != KM_RELEASE)) {
+    return;
+  }
+  wmXrSurfaceData *surface_data = surface->customdata;
+
+  bool add_win_event = (action->ot->modal &&
+                        ((val == KM_PRESS && !press_start) || val == KM_RELEASE));
+
+  wmEvent _event;
+  wmEvent *event = add_win_event ? &_event : MEM_callocN(sizeof(wmEvent), __func__);
+  event->type = EVT_XR_ACTION;
+  event->val = val;
+
+  wmXrActionData *data = MEM_callocN(sizeof(wmXrActionData), __func__);
+  strcpy(data->name, action->name);
+  data->type = action->type;
+
+  switch (action->type) {
+    case GHOST_kXrActionTypeBooleanInput: {
+      data->state[0] = (float)((bool *)action->states)[subaction_idx]; /* Cast bool to float. */
+      break;
+    }
+    case GHOST_kXrActionTypeFloatInput: {
+      data->state[0] = ((float *)action->states)[subaction_idx];
+      break;
+    }
+    case GHOST_kXrActionTypeVector2fInput: {
+      memcpy(data->state, ((float(*)[2])action->states)[subaction_idx], sizeof(float[2]));
+      break;
+    }
+    default: {
+      return;
+    }
+  }
+
+  if (controller_pose) {
+    copy_v3_v3(data->controller_loc, controller_pose->position);
+    copy_qt_qt(data->controller_rot, controller_pose->orientation_quat);
+  }
+  else {
+    data->controller_rot[0] = 1.0f;
+  }
+
+  data->ot = action->ot;
+
+  event->custom = EVT_DATA_XR;
+  event->customdata = data;
+  event->customdatafree = 1;
+
+  if (add_win_event) {
+    /* Events with active modal handlers will be handled by the window. */
+    wm_event_add(win, event);
+  }
+  else {
+    /* Operators will be called by the surface. For modal operators, this will
+     * create the modal handlers to later be handled by the window. */
+    BLI_addtail(&surface_data->events, event);
+  }
 }
 
 /** \} */

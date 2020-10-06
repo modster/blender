@@ -1446,6 +1446,28 @@ void DRW_draw_callbacks_post_scene(void)
 
     GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
   }
+  else if ((v3d->flag2 & V3D_XR_SHOW_CONTROLLERS) != 0) {
+    DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
+
+    DRW_state_reset();
+
+    GPU_framebuffer_bind(dfbl->overlay_fb);
+
+    GPU_matrix_projection_set(rv3d->winmat);
+    GPU_matrix_set(rv3d->viewmat);
+
+    /* Annotations. */
+    if (do_annotations) {
+      GPU_depth_test(false);
+      ED_annotation_draw_view3d(DEG_get_input_scene(depsgraph), depsgraph, v3d, region, true);
+      GPU_depth_test(true);
+    }
+
+    /* Controllers. */
+    WM_xr_draw_controllers();
+
+    DRW_state_reset();
+  }
 }
 
 struct DRWTextStore *DRW_text_cache_ensure(void)

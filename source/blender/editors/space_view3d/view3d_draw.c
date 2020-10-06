@@ -1787,23 +1787,29 @@ void ED_view3d_draw_offscreen_simple(Depsgraph *depsgraph,
     v3d.shading.flag = V3D_SHADING_SCENE_WORLD | V3D_SHADING_SCENE_LIGHTS;
   }
 
-  if (draw_flags & V3D_OFSDRAW_SHOW_ANNOTATION) {
-    v3d.flag2 |= V3D_SHOW_ANNOTATION;
-  }
-  if (draw_flags & V3D_OFSDRAW_SHOW_GRIDFLOOR) {
-    v3d.gridflag |= V3D_SHOW_FLOOR | V3D_SHOW_X | V3D_SHOW_Y;
-    v3d.grid = 1.0f;
-    v3d.gridlines = 16;
-    v3d.gridsubdiv = 10;
-
-    /* Show grid, disable other overlays (set all available _HIDE_ flags). */
-    v3d.overlay.flag |= V3D_OVERLAY_HIDE_CURSOR | V3D_OVERLAY_HIDE_TEXT |
-                        V3D_OVERLAY_HIDE_MOTION_PATHS | V3D_OVERLAY_HIDE_BONES |
-                        V3D_OVERLAY_HIDE_OBJECT_XTRAS | V3D_OVERLAY_HIDE_OBJECT_ORIGINS;
-    v3d.flag |= V3D_HIDE_HELPLINES;
+  if ((draw_flags & (V3D_OFSDRAW_SHOW_ANNOTATION | V3D_OFSDRAW_XR_SHOW_CONTROLLERS |
+                     V3D_OFSDRAW_SHOW_GRIDFLOOR)) == 0) {
+    v3d.flag2 = V3D_HIDE_OVERLAYS;
   }
   else {
-    v3d.flag2 = V3D_HIDE_OVERLAYS;
+    if (draw_flags & V3D_OFSDRAW_SHOW_ANNOTATION) {
+      v3d.flag2 |= V3D_SHOW_ANNOTATION;
+    }
+    if (draw_flags & V3D_OFSDRAW_XR_SHOW_CONTROLLERS) {
+      v3d.flag2 |= V3D_XR_SHOW_CONTROLLERS;
+    }
+    if (draw_flags & V3D_OFSDRAW_SHOW_GRIDFLOOR) {
+      v3d.gridflag |= V3D_SHOW_FLOOR | V3D_SHOW_X | V3D_SHOW_Y;
+      v3d.grid = 1.0f;
+      v3d.gridlines = 16;
+      v3d.gridsubdiv = 10;
+
+      /* Show grid, disable other overlays (set all available _HIDE_ flags). */
+      v3d.overlay.flag |= V3D_OVERLAY_HIDE_CURSOR | V3D_OVERLAY_HIDE_TEXT |
+                          V3D_OVERLAY_HIDE_MOTION_PATHS | V3D_OVERLAY_HIDE_BONES |
+                          V3D_OVERLAY_HIDE_OBJECT_XTRAS | V3D_OVERLAY_HIDE_OBJECT_ORIGINS;
+      v3d.flag |= V3D_HIDE_HELPLINES;
+    }
   }
 
   rv3d.persp = RV3D_PERSP;

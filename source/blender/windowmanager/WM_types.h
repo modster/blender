@@ -113,6 +113,7 @@ struct ImBuf;
 struct bContext;
 struct wmEvent;
 struct wmOperator;
+struct wmOperatorType;
 struct wmWindowManager;
 
 #include "BLI_compiler_attrs.h"
@@ -625,6 +626,26 @@ typedef struct wmNDOFMotionData {
   wmProgress progress;
 } wmNDOFMotionData;
 #endif /* WITH_INPUT_NDOF */
+
+typedef enum wmXrOpFlag {
+  XR_OP_PRESS = 0,
+  XR_OP_RELEASE = 1,
+  XR_OP_MODAL = 2,
+} wmXrOpFlag;
+
+typedef struct wmXrActionData {
+  /** Name. */
+  char name[64];
+  /** Type (GHOST_XrActionType). */
+  char type;
+  /** State. Set appropriately based on type. */
+  float state[2];
+  /** Controller pose corresponding to the action's subaction path. */
+  float controller_loc[3];
+  float controller_rot[4];
+  /** Operator. */
+  struct wmOperatorType *ot;
+} wmXrActionData;
 
 /** Timer flags. */
 typedef enum {
