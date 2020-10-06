@@ -18,6 +18,11 @@
 #define __OBJECT_H__
 
 #include "graph/node.h"
+
+/* included as Object::set_particle_system defined through NODE_PUBLIC_API does
+ * not select the right Node::set overload as it does not know that ParticleSystem
+ * is a Node */
+#include "render/particles.h"
 #include "render/scene.h"
 
 #include "util/util_array.h"
