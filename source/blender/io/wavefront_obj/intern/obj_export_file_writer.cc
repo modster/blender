@@ -320,7 +320,7 @@ void OBJWriter::write_vertex_group(const OBJMesh &obj_mesh_data,
 }
 
 /**
- * Select which syntax to write polygon elements with.
+ * Select which OBJ syntax to write polygon elements with.
  */
 OBJWriter::func_vert_uv_normal_indices OBJWriter::get_poly_element_writer(
     const OBJMesh &obj_mesh_data)
@@ -420,21 +420,22 @@ void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
             nurbs_name,
             nurbs_degree);
     /**
-     * The numbers here are indices into the point vertex coordinates written above.
+     * The numbers here are indices into the vertex coordinates written
+     * above, relative to the line that is going to be written.
+     * [0.0 - 1.0] is the curve parameter range.
      * 0.0 1.0 -1 -2 -3 -4 for a non-cyclic curve with 4 points.
      * 0.0 1.0 -1 -2 -3 -4 -1 -2 -3 for a cyclic curve with 4 points.
      */
     const int total_control_points = obj_nurbs_data.get_nurbs_num(i);
-    /* [0.0 - 1.0] is the curve parameter range. */
     fputs("curv 0.0 1.0", outfile_);
     for (int i = 0; i < total_control_points; i++) {
-      /* + 1 to keep indices one-based, even if they're negative. */
+      /* "+1" to keep indices one-based, even if they're negative. */
       fprintf(outfile_, " %d", -((i % tot_points) + 1));
     }
     fputs("\n", outfile_);
 
     /**
-     * In "parm u 0 0.1 .." line:, total control points + 2 equidistant numbers in the paramter
+     * In "parm u 0 0.1 .." line:, total control points + 2 equidistant numbers in the parameter
      * range are inserted.
      */
     fputs("parm u 0.000000 ", outfile_);

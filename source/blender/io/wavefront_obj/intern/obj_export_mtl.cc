@@ -131,7 +131,7 @@ static const bNode *get_node_of_type(Span<const nodes::OutputSocketRef *> socket
 
 /**
  * From a texture image shader node, get the image's filepath.
- * Returned filepath is stripped of inital "//". If packed image is found,
+ * Returned filepath is stripped of initial "//". If packed image is found,
  * only the file "name" is returned.
  */
 static const char *get_image_filepath(const bNode *tex_node)
@@ -159,7 +159,7 @@ static const char *get_image_filepath(const bNode *tex_node)
 }
 
 /**
- * Find the Principled-BSDF from the object's node tree & initialise class member.
+ * Find the Principled-BSDF from the object's node tree & initialize class member.
  */
 void MaterialWrap::init_bsdf_node(StringRefNull object_name)
 {
