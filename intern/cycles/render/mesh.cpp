@@ -362,7 +362,8 @@ void Mesh::add_subd_face(int *corners, int num_corners, int shader_, bool smooth
   }
 
   int ptex_offset = 0;
-  // cannot use get_num_subd_faces here as it holds the total number of subd_faces, but we do not have the total amount of data yet
+  // cannot use get_num_subd_faces here as it holds the total number of subd_faces, but we do not
+  // have the total amount of data yet
   if (subd_shader.size()) {
     SubdFace s = get_subd_face(subd_shader.size() - 1);
     ptex_offset = s.ptex_offset + s.num_ptex_faces();

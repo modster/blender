@@ -49,7 +49,7 @@ struct MikkUserData {
       : mesh(mesh), texface(NULL), orco(NULL), tangent(tangent), tangent_sign(tangent_sign)
   {
     const AttributeSet &attributes = (mesh->get_num_subd_faces()) ? mesh->subd_attributes :
-                                                                mesh->attributes;
+                                                                    mesh->attributes;
 
     Attribute *attr_vN = attributes.find(ATTR_STD_VERTEX_NORMAL);
     vertex_normal = attr_vN->data_float3();
@@ -222,7 +222,8 @@ static void mikk_compute_tangents(
     const BL::Mesh &b_mesh, const char *layer_name, Mesh *mesh, bool need_sign, bool active_render)
 {
   /* Create tangent attributes. */
-  AttributeSet &attributes = (mesh->get_num_subd_faces()) ? mesh->subd_attributes : mesh->attributes;
+  AttributeSet &attributes = (mesh->get_num_subd_faces()) ? mesh->subd_attributes :
+                                                            mesh->attributes;
   Attribute *attr;
   ustring name;
   if (layer_name != NULL) {

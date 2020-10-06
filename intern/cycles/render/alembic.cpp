@@ -295,11 +295,11 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
       read_default_uvs(uvs, iss, data_cache);
     }
 
-//    const IN3fGeomParam &normals = schema.getNormalsParam();
+    //    const IN3fGeomParam &normals = schema.getNormalsParam();
 
-//    if (normals.valid()) {
-//      read_default_normals(normals, iss, data_cache);
-//    }
+    //    if (normals.valid()) {
+    //      read_default_normals(normals, iss, data_cache);
+    //    }
 
     foreach (const AttributeRequest &attr, requested_attributes.requests) {
       read_attribute(schema.getArbGeomParams(), iss, attr.name, data_cache);
