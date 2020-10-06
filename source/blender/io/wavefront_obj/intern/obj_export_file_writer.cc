@@ -120,6 +120,14 @@ void OBJWriter::write_vert_indices(Span<int> vert_indices, Span<int>, Span<int>)
   fputs("\n", outfile_);
 }
 
+OBJWriter::~OBJWriter()
+{
+  if (outfile_ && fclose(outfile_)) {
+    std::cerr << "Error: could not close the OBJ file properly, file may be corrupted."
+              << std::endl;
+  }
+}
+
 /**
  * Try to open the OBJ file and write file header.
  * \return Whether the destination file is writable.

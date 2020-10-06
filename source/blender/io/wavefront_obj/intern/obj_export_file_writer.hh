@@ -60,13 +60,7 @@ class OBJWriter {
   OBJWriter(const OBJExportParams &export_params) : export_params_(export_params)
   {
   }
-  ~OBJWriter()
-  {
-    if (outfile_ && fclose(outfile_)) {
-      std::cerr << "Error: could not close the OBJ file properly, file may be corrupted."
-                << std::endl;
-    }
-  }
+  ~OBJWriter();
 
   bool init_writer(const char *filepath);
 
