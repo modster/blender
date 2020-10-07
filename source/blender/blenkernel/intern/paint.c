@@ -133,7 +133,7 @@ IDTypeInfo IDType_ID_PAL = {
     .name = "Palette",
     .name_plural = "palettes",
     .translation_context = BLT_I18NCONTEXT_ID_PALETTE,
-    .flags = 0,
+    .flags = IDTYPE_FLAGS_NO_ANIMDATA,
 
     .init_data = palette_init_data,
     .copy_data = palette_copy_data,
@@ -194,7 +194,7 @@ IDTypeInfo IDType_ID_PC = {
     .name = "PaintCurve",
     .name_plural = "paint_curves",
     .translation_context = BLT_I18NCONTEXT_ID_PAINTCURVE,
-    .flags = 0,
+    .flags = IDTYPE_FLAGS_NO_ANIMDATA,
 
     .init_data = NULL,
     .copy_data = paint_curve_copy_data,
@@ -677,13 +677,6 @@ PaintCurve *BKE_paint_curve_add(Main *bmain, const char *name)
   return pc;
 }
 
-PaintCurve *BKE_paint_curve_copy(Main *bmain, const PaintCurve *pc)
-{
-  PaintCurve *pc_copy;
-  BKE_id_copy(bmain, &pc->id, (ID **)&pc_copy);
-  return pc_copy;
-}
-
 Palette *BKE_paint_palette(Paint *p)
 {
   return p ? p->palette : NULL;
@@ -739,13 +732,6 @@ Palette *BKE_palette_add(Main *bmain, const char *name)
 {
   Palette *palette = BKE_id_new(bmain, ID_PAL, name);
   return palette;
-}
-
-Palette *BKE_palette_copy(Main *bmain, const Palette *palette)
-{
-  Palette *palette_copy;
-  BKE_id_copy(bmain, &palette->id, (ID **)&palette_copy);
-  return palette_copy;
 }
 
 PaletteColor *BKE_palette_color_add(Palette *palette)
@@ -1312,7 +1298,9 @@ void BKE_sculptsession_free_vwpaint_data(struct SculptSession *ss)
   MEM_SAFE_FREE(gmap->poly_map_mem);
 }
 
-/* Write out the sculpt dynamic-topology BMesh to the Mesh */
+/**
+ * Write out the sculpt dynamic-topology #BMesh to the #Mesh.
+ */
 static void sculptsession_bm_to_me_update_data_only(Object *ob, bool reorder)
 {
   SculptSession *ss = ob->sculpt;
@@ -1609,14 +1597,10 @@ static void sculpt_update_object(Depsgraph *depsgraph,
   /* Sculpt Face Sets. */
   if (use_face_sets) {
     if (!CustomData_has_layer(&me->pdata, CD_SCULPT_FACE_SETS)) {
-      ss->face_sets = CustomData_add_layer(
-          &me->pdata, CD_SCULPT_FACE_SETS, CD_CALLOC, NULL, me->totpoly);
-      for (int i = 0; i < me->totpoly; i++) {
-        ss->face_sets[i] = 1;
-      }
-
-      /* Set the default face set color if the datalayer did not exist. */
-      me->face_sets_color_default = 1;
+      /* By checking here if the data-layer already exist this avoids copying the visibility from
+       * the mesh and looping over all vertices on every sculpt editing operation, using this
+       * function only the first time the Face Sets data-layer needs to be created. */
+      BKE_sculpt_face_sets_ensure_from_base_mesh_visibility(me);
     }
     ss->face_sets = CustomData_get_layer(&me->pdata, CD_SCULPT_FACE_SETS);
   }
@@ -1881,6 +1865,57 @@ static bool check_sculpt_object_deformed(Object *object, const bool for_construc
   return deformed;
 }
 
+void BKE_sculpt_face_sets_ensure_from_base_mesh_visibility(Mesh *mesh)
+{
+  const int face_sets_default_visible_id = 1;
+  const int face_sets_default_hidden_id = -(face_sets_default_visible_id + 1);
+
+  bool initialize_new_face_sets = false;
+
+  if (CustomData_has_layer(&mesh->pdata, CD_SCULPT_FACE_SETS)) {
+    /* Make everything visible. */
+    int *current_face_sets = CustomData_get_layer(&mesh->pdata, CD_SCULPT_FACE_SETS);
+    for (int i = 0; i < mesh->totpoly; i++) {
+      current_face_sets[i] = abs(current_face_sets[i]);
+    }
+  }
+  else {
+    initialize_new_face_sets = true;
+    int *new_face_sets = CustomData_add_layer(
+        &mesh->pdata, CD_SCULPT_FACE_SETS, CD_CALLOC, NULL, mesh->totpoly);
+
+    /* Initialize the new Face Set data-layer with a default valid visible ID and set the default
+     * color to render it white. */
+    for (int i = 0; i < mesh->totpoly; i++) {
+      new_face_sets[i] = face_sets_default_visible_id;
+    }
+    mesh->face_sets_color_default = face_sets_default_visible_id;
+  }
+
+  int *face_sets = CustomData_get_layer(&mesh->pdata, CD_SCULPT_FACE_SETS);
+
+  /* Show the only the face sets that have all visible vertices. */
+  for (int i = 0; i < mesh->totpoly; i++) {
+    for (int l = 0; l < mesh->mpoly[i].totloop; l++) {
+      MLoop *loop = &mesh->mloop[mesh->mpoly[i].loopstart + l];
+      if (mesh->mvert[loop->v].flag & ME_HIDE) {
+        if (initialize_new_face_sets) {
+          /* When initializing a new Face Set data-layer, assign a new hidden Face Set ID to hidden
+           * vertices. This way, we get at initial split in two Face Sets between hidden and
+           * visible vertices based on the previous mesh visibly from other mode that can be
+           * useful in some cases. */
+          face_sets[i] = face_sets_default_hidden_id;
+        }
+        else {
+          /* Otherwise, set the already existing Face Set ID to hidden. */
+          face_sets[i] = -abs(face_sets[i]);
+        }
+        break;
+      }
+    }
+  }
+}
+
 static void sculpt_sync_face_sets_visibility_to_base_mesh(Mesh *mesh)
 {
   int *face_sets = CustomData_get_layer(&mesh->pdata, CD_SCULPT_FACE_SETS);
@@ -1889,7 +1924,7 @@ static void sculpt_sync_face_sets_visibility_to_base_mesh(Mesh *mesh)
   }
 
   /* Enabled if the vertex should be visible according to the Face Sets. */
-  BLI_bitmap *visibile_vertex = BLI_BITMAP_NEW(mesh->totvert, "visible vertices");
+  BLI_bitmap *visible_vertex = BLI_BITMAP_NEW(mesh->totvert, "visible vertices");
   /* Enabled if the visibility of this vertex can be affected by the Face Sets to avoid modifying
    * disconnected geometry. */
   BLI_bitmap *modified_vertex = BLI_BITMAP_NEW(mesh->totvert, "modified vertices");
@@ -1899,19 +1934,19 @@ static void sculpt_sync_face_sets_visibility_to_base_mesh(Mesh *mesh)
     for (int l = 0; l < mesh->mpoly[i].totloop; l++) {
       MLoop *loop = &mesh->mloop[mesh->mpoly[i].loopstart + l];
       if (is_face_set_visible) {
-        BLI_BITMAP_ENABLE(visibile_vertex, loop->v);
+        BLI_BITMAP_ENABLE(visible_vertex, loop->v);
       }
       BLI_BITMAP_ENABLE(modified_vertex, loop->v);
     }
   }
 
   for (int i = 0; i < mesh->totvert; i++) {
-    if (BLI_BITMAP_TEST(modified_vertex, i) && !BLI_BITMAP_TEST(visibile_vertex, i)) {
+    if (BLI_BITMAP_TEST(modified_vertex, i) && !BLI_BITMAP_TEST(visible_vertex, i)) {
       mesh->mvert[i].flag |= ME_HIDE;
     }
   }
 
-  MEM_SAFE_FREE(visibile_vertex);
+  MEM_SAFE_FREE(visible_vertex);
   MEM_SAFE_FREE(modified_vertex);
 }
 
@@ -1948,6 +1983,7 @@ static void sculpt_sync_face_sets_visibility_to_grids(Mesh *mesh, SubdivCCG *sub
 
 void BKE_sculpt_sync_face_set_visibility(struct Mesh *mesh, struct SubdivCCG *subdiv_ccg)
 {
+  BKE_sculpt_face_sets_ensure_from_base_mesh_visibility(mesh);
   sculpt_sync_face_sets_visibility_to_base_mesh(mesh);
   sculpt_sync_face_sets_visibility_to_grids(mesh, subdiv_ccg);
 }

@@ -3540,12 +3540,12 @@ static void hair_step(ParticleSimulationData *sim, float cfra, const bool use_re
     }
   }
 
-  /* dynamics with cloth simulation, psys->particles can be NULL with 0 particles [#25519] */
+  /* dynamics with cloth simulation, psys->particles can be NULL with 0 particles T25519. */
   if (psys->part->type == PART_HAIR && psys->flag & PSYS_HAIR_DYNAMICS && psys->particles) {
     do_hair_dynamics(sim);
   }
 
-  /* following lines were removed r29079 but cause bug [#22811], see report for details */
+  /* following lines were removed r29079 but cause bug T22811, see report for details */
   psys_update_effectors(sim);
   psys_update_path_cache(sim, cfra, use_render_params);
 
@@ -4744,9 +4744,8 @@ static int hair_needs_recalc(ParticleSystem *psys)
 
 static ParticleSettings *particle_settings_localize(ParticleSettings *particle_settings)
 {
-  ParticleSettings *particle_settings_local;
-  BKE_id_copy_ex(
-      NULL, (ID *)&particle_settings->id, (ID **)&particle_settings_local, LIB_ID_COPY_LOCALIZE);
+  ParticleSettings *particle_settings_local = (ParticleSettings *)BKE_id_copy_ex(
+      NULL, (ID *)&particle_settings->id, NULL, LIB_ID_COPY_LOCALIZE);
   return particle_settings_local;
 }
 

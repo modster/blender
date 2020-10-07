@@ -360,9 +360,9 @@ static void object_make_local(Main *bmain, ID *id, const int flags)
       }
     }
     else {
-      Object *ob_new = BKE_object_copy(bmain, ob);
+      Object *ob_new = (Object *)BKE_id_copy(bmain, &ob->id);
+      id_us_min(&ob_new->id);
 
-      ob_new->id.us = 0;
       ob_new->proxy = ob_new->proxy_from = ob_new->proxy_group = NULL;
 
       /* setting newid is mandatory for complex make_lib_local logic... */
@@ -660,7 +660,7 @@ bool BKE_object_support_modifier_type_check(const Object *ob, int modifier_type)
 
   mti = BKE_modifier_get_info(modifier_type);
 
-  /* Only geometry objects should be able to get modifiers [#25291] */
+  /* Only geometry objects should be able to get modifiers T25291. */
   if (ob->type == OB_HAIR) {
     return (mti->modifyHair != NULL) || (mti->flags & eModifierTypeFlag_AcceptsVertexCosOnly);
   }
@@ -1786,20 +1786,6 @@ void BKE_object_transform_copy(Object *ob_tar, const Object *ob_src)
 }
 
 /**
- * Copy objects, will re-initialize cached simulation data.
- */
-Object *BKE_object_copy(Main *bmain, const Object *ob)
-{
-  Object *ob_copy;
-  BKE_id_copy(bmain, &ob->id, (ID **)&ob_copy);
-
-  /* We increase object user count when linking to Collections. */
-  id_us_min(&ob_copy->id);
-
-  return ob_copy;
-}
-
-/**
  * Perform deep-copy of object and its 'children' data-blocks (obdata, materials, actions, etc.).
  *
  * \param dupflag: Controls which sub-data are also duplicated
@@ -1829,8 +1815,7 @@ Object *BKE_object_duplicate(Main *bmain,
 
   Material ***matarar;
 
-  Object *obn;
-  BKE_id_copy(bmain, &ob->id, (ID **)&obn);
+  Object *obn = (Object *)BKE_id_copy(bmain, &ob->id);
   id_us_min(&obn->id);
   if (is_subprocess) {
     ID_NEW_SET(ob, obn);
@@ -4563,8 +4548,8 @@ bool BKE_object_modifier_use_time(Object *ob, ModifierData *md)
 
     /* This here allows modifier properties to get driven and still update properly
      *
-     * Workaround to get [#26764] (e.g. subsurf levels not updating when animated/driven)
-     * working, without the updating problems ([#28525] [#28690] [#28774] [#28777]) caused
+     * Workaround to get T26764 (e.g. subsurf levels not updating when animated/driven)
+     * working, without the updating problems (T28525 T28690 T28774 T28777) caused
      * by the RNA updates cache introduced in r.38649
      */
     for (fcu = (FCurve *)adt->drivers.first; fcu != NULL; fcu = (FCurve *)fcu->next) {

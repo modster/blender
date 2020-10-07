@@ -36,8 +36,8 @@ struct BMesh;
 struct Brush;
 struct CurveMapping;
 struct Depsgraph;
-struct EnumPropertyItem;
 struct EdgeSet;
+struct EnumPropertyItem;
 struct GHash;
 struct GridPaintMask;
 struct ImagePool;
@@ -137,7 +137,6 @@ void BKE_paint_set_overlay_override(enum eOverlayFlags flag);
 
 /* palettes */
 struct Palette *BKE_palette_add(struct Main *bmain, const char *name);
-struct Palette *BKE_palette_copy(struct Main *bmain, const struct Palette *palette);
 struct PaletteColor *BKE_palette_color_add(struct Palette *palette);
 bool BKE_palette_is_empty(const struct Palette *palette);
 void BKE_palette_color_remove(struct Palette *palette, struct PaletteColor *color);
@@ -154,7 +153,6 @@ bool BKE_palette_from_hash(struct Main *bmain,
 
 /* paint curves */
 struct PaintCurve *BKE_paint_curve_add(struct Main *bmain, const char *name);
-struct PaintCurve *BKE_paint_curve_copy(struct Main *bmain, const struct PaintCurve *pc);
 
 bool BKE_paint_ensure(struct ToolSettings *ts, struct Paint **r_paint);
 void BKE_paint_init(struct Main *bmain, struct Scene *sce, ePaintMode mode, const char col[3]);
@@ -256,6 +254,18 @@ typedef struct SculptPoseIKChain {
 
 /* Cloth Brush */
 
+/* Cloth Simulation. */
+typedef enum eSculptClothNodeSimState {
+  /* Constraints were not built for this node, so it can't be simulated. */
+  SCULPT_CLOTH_NODE_UNINITIALIZED,
+
+  /* There are constraints for the geometry in this node, but it should not be simulated. */
+  SCULPT_CLOTH_NODE_INACTIVE,
+
+  /* There are constraints for this node and they should be used by the solver. */
+  SCULPT_CLOTH_NODE_ACTIVE,
+} eSculptClothNodeSimState;
+
 typedef enum eSculptClothConstraintType {
   /* Constraint that creates the structure of the cloth. */
   SCULPT_CLOTH_CONSTRAINT_STRUCTURAL = 0,
@@ -281,6 +291,10 @@ typedef struct SculptClothLengthConstraint {
 
   float length;
   float strength;
+
+  /* Index in SculptClothSimulation.node_state of the node from where this constraint was created.
+   * This constraints will only be used by the solver if the state is active. */
+  int node;
 
   eSculptClothConstraintType type;
 } SculptClothLengthConstraint;
@@ -308,6 +322,11 @@ typedef struct SculptClothSimulation {
   float (*last_iteration_pos)[3];
 
   struct ListBase *collider_list;
+
+  int totnode;
+  /* PBVHNode pointer as a key, index in SculptClothSimulation.node_state as value. */
+  struct GHash *node_state_index;
+  eSculptClothNodeSimState *node_state;
 } SculptClothSimulation;
 
 typedef struct SculptPersistentBase {
@@ -582,6 +601,11 @@ void BKE_sculpt_bvh_update_from_ccg(struct PBVH *pbvh, struct SubdivCCG *subdiv_
 /* This ensure that all elements in the mesh (both vertices and grids) have their visibility
  * updated according to the face sets. */
 void BKE_sculpt_sync_face_set_visibility(struct Mesh *mesh, struct SubdivCCG *subdiv_ccg);
+
+/* Ensures that a Face Set data-layers exists. If it does not, it creates one respecting the
+ * visibility stored in the vertices of the mesh. If it does, it copies the visibility from the
+ * mesh to the Face Sets. */
+void BKE_sculpt_face_sets_ensure_from_base_mesh_visibility(struct Mesh *mesh);
 
 bool BKE_sculptsession_use_pbvh_draw(const struct Object *ob, const struct View3D *v3d);
 

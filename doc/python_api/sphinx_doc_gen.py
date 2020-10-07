@@ -41,8 +41,7 @@ Sphinx: HTML generation
   After you have built doc/python_api/sphinx-in (see above),
   generate html docs by running:
 
-    cd doc/python_api
-    sphinx-build sphinx-in sphinx-out
+    sphinx-build doc/python_api/sphinx-in doc/python_api/sphinx-out
 
 
 Sphinx: PDF generation
@@ -98,6 +97,7 @@ SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 #
 # See: D6261 for reference.
 USE_ONLY_BUILTIN_RNA_TYPES = True
+
 
 def handle_args():
     '''
@@ -1204,7 +1204,7 @@ def pyrna_enum2sphinx(prop, use_empty_descriptions=False):
                 identifier,
                 # Account for multi-line enum descriptions, allowing this to be a block of text.
                 indent(", ".join(escape_rst(val) for val in (name, description) if val) or "Undocumented", "  "),
-             )
+            )
             for identifier, name, description in prop.enum_items
         ])
     else:
@@ -2227,7 +2227,7 @@ def main():
                 shutil.rmtree(REFERENCE_PATH, True)
 
             # copy SPHINX_OUT to the REFERENCE_PATH
-            ignores = ('.doctrees', 'objects.inv', '.buildinfo')
+            ignores = ('.doctrees', '.buildinfo')
             shutil.copytree(SPHINX_OUT,
                             REFERENCE_PATH,
                             ignore=shutil.ignore_patterns(*ignores))

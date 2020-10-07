@@ -49,6 +49,7 @@
 
 #include "BKE_anim_data.h"
 #include "BKE_animsys.h"
+#include "BKE_armature.h"
 #include "BKE_collection.h"
 #include "BKE_constraint.h"
 #include "BKE_context.h"
@@ -69,7 +70,6 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
 
-#include "ED_armature.h"
 #include "ED_object.h"
 #include "ED_outliner.h"
 #include "ED_scene.h"
@@ -394,11 +394,8 @@ static void outliner_do_libdata_operation(bContext *C,
                                           outliner_operation_fn operation_fn,
                                           void *user_data)
 {
-  TreeElement *te;
-  TreeStoreElem *tselem;
-
-  for (te = lb->first; te; te = te->next) {
-    tselem = TREESTORE(te);
+  LISTBASE_FOREACH (TreeElement *, te, lb) {
+    TreeStoreElem *tselem = TREESTORE(te);
     if (tselem->flag & TSE_SELECTED) {
       if ((tselem->type == 0 && te->idcode != 0) || tselem->type == TSE_LAYER_COLLECTION) {
         TreeStoreElem *tsep = te->parent ? TREESTORE(te->parent) : NULL;
@@ -433,12 +430,10 @@ static bool outliner_do_scene_operation(
     ListBase *lb,
     bool (*operation_fn)(bContext *, eOutliner_PropSceneOps, TreeElement *, TreeStoreElem *))
 {
-  TreeElement *te;
-  TreeStoreElem *tselem;
   bool success = false;
 
-  for (te = lb->first; te; te = te->next) {
-    tselem = TREESTORE(te);
+  LISTBASE_FOREACH (TreeElement *, te, lb) {
+    TreeStoreElem *tselem = TREESTORE(te);
     if (tselem->flag & TSE_SELECTED) {
       if (operation_fn(C, event, te, tselem)) {
         success = true;
@@ -1034,8 +1029,7 @@ void outliner_do_object_operation_ex(bContext *C,
                                      void *user_data,
                                      bool recurse_selected)
 {
-  TreeElement *te;
-  for (te = lb->first; te; te = te->next) {
+  LISTBASE_FOREACH (TreeElement *, te, lb) {
     TreeStoreElem *tselem = TREESTORE(te);
     bool select_handled = false;
     if (tselem->flag & TSE_SELECTED) {
@@ -1122,11 +1116,10 @@ static void refreshdrivers_animdata_fn(int UNUSED(event),
                                        void *UNUSED(arg))
 {
   IdAdtTemplate *iat = (IdAdtTemplate *)tselem->id;
-  FCurve *fcu;
 
   /* Loop over drivers, performing refresh
    * (i.e. check graph_buttons.c and rna_fcurve.c for details). */
-  for (fcu = iat->adt->drivers.first; fcu; fcu = fcu->next) {
+  LISTBASE_FOREACH (FCurve *, fcu, &iat->adt->drivers) {
     fcu->flag &= ~FCURVE_DISABLED;
 
     if (fcu->driver) {
@@ -1341,11 +1334,8 @@ static void outliner_do_data_operation(
     void (*operation_fn)(int, TreeElement *, TreeStoreElem *, void *),
     void *arg)
 {
-  TreeElement *te;
-  TreeStoreElem *tselem;
-
-  for (te = lb->first; te; te = te->next) {
-    tselem = TREESTORE(te);
+  LISTBASE_FOREACH (TreeElement *, te, lb) {
+    TreeStoreElem *tselem = TREESTORE(te);
     if (tselem->flag & TSE_SELECTED) {
       if (tselem->type == type) {
         operation_fn(event, te, tselem, arg);
@@ -2289,11 +2279,8 @@ static void outliner_do_id_set_operation(
     ID *newid,
     void (*operation_fn)(TreeElement *, TreeStoreElem *, TreeStoreElem *, ID *))
 {
-  TreeElement *te;
-  TreeStoreElem *tselem;
-
-  for (te = lb->first; te; te = te->next) {
-    tselem = TREESTORE(te);
+  LISTBASE_FOREACH (TreeElement *, te, lb) {
+    TreeStoreElem *tselem = TREESTORE(te);
     if (tselem->flag & TSE_SELECTED) {
       if (tselem->type == type) {
         TreeStoreElem *tsep = te->parent ? TREESTORE(te->parent) : NULL;
