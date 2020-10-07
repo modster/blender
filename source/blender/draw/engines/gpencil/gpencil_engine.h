@@ -80,6 +80,8 @@ typedef struct gpMaterial {
 #define GP_STROKE_TEXTURE_STENCIL (1 << 4)
 #define GP_STROKE_TEXTURE_PREMUL (1 << 5)
 #define GP_STROKE_DOTS (1 << 6)
+#define GP_STROKE_HOLDOUT (1 << 7)
+#define GP_FILL_HOLDOUT (1 << 8)
 #define GP_FILL_TEXTURE_USE (1 << 10)
 #define GP_FILL_TEXTURE_PREMUL (1 << 11)
 #define GP_FILL_TEXTURE_CLIP (1 << 12)
@@ -194,6 +196,10 @@ typedef struct GPENCIL_tObject {
   float plane_mat[4][4];
 
   bool is_drawmode3d;
+
+  /* Use Material Holdout. */
+  bool do_mat_holdout;
+
 } GPENCIL_tObject;
 
 /* *********** LISTS *********** */
@@ -393,7 +399,7 @@ void gpencil_material_resources_get(GPENCIL_MaterialPool *first_pool,
                                     struct GPUUniformBuf **r_ubo_mat);
 
 void gpencil_light_ambient_add(GPENCIL_LightPool *lightpool, const float color[3]);
-void gpencil_light_pool_populate(GPENCIL_LightPool *matpool, Object *ob);
+void gpencil_light_pool_populate(GPENCIL_LightPool *lightpool, Object *ob);
 GPENCIL_LightPool *gpencil_light_pool_add(GPENCIL_PrivateData *pd);
 GPENCIL_LightPool *gpencil_light_pool_create(GPENCIL_PrivateData *pd, Object *ob);
 

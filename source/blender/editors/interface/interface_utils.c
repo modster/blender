@@ -21,7 +21,6 @@
  * \ingroup edinterface
  */
 
-#include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +29,7 @@
 #include "DNA_object_types.h"
 #include "DNA_screen_types.h"
 
+#include "BLI_alloca.h"
 #include "BLI_listbase.h"
 #include "BLI_math.h"
 #include "BLI_string.h"
@@ -52,18 +52,6 @@
 #include "WM_types.h"
 
 #include "interface_intern.h"
-
-bool ui_str_has_word_prefix(const char *haystack, const char *needle, size_t needle_len)
-{
-  const char *match = BLI_strncasestr(haystack, needle, needle_len);
-  if (match) {
-    if ((match == haystack) || (*(match - 1) == ' ') || ispunct(*(match - 1))) {
-      return true;
-    }
-    return ui_str_has_word_prefix(match + 1, needle, needle_len);
-  }
-  return false;
-}
 
 /*************************** RNA Utilities ******************************/
 
@@ -175,7 +163,7 @@ uiBut *uiDefAutoButR(uiBlock *block,
       }
       else {
         but = uiDefButR_prop(
-            block, UI_BTYPE_NUM, 0, name, x1, y1, x2, y2, ptr, prop, index, 0, 0, -1, -1, NULL);
+            block, UI_BTYPE_NUM, 0, name, x1, y1, x2, y2, ptr, prop, index, 0, 0, 0, 0, NULL);
       }
 
       if (RNA_property_flag(prop) & PROP_TEXTEDIT_UPDATE) {
@@ -417,6 +405,12 @@ void ui_rna_collection_search_update_fn(const struct bContext *C,
   char *name;
   bool has_id_icon = false;
 
+  /* Prepare matching all words. */
+  const size_t str_len = strlen(str);
+  const int words_max = BLI_string_max_possible_word_count(str_len);
+  int(*words)[2] = BLI_array_alloca(words, words_max);
+  const int words_len = BLI_string_find_split_words(str, str_len, ' ', words, words_max);
+
   /* build a temporary list of relevant items first */
   RNA_PROP_BEGIN (&data->search_ptr, itemptr, data->search_prop) {
 
@@ -462,7 +456,8 @@ void ui_rna_collection_search_update_fn(const struct bContext *C,
     }
 
     if (name) {
-      if (skip_filter || BLI_strcasestr(name + name_prefix_offset, str)) {
+      if (skip_filter ||
+          BLI_string_all_words_matched(name + name_prefix_offset, str, words, words_len)) {
         cis = MEM_callocN(sizeof(CollItemSearch), "CollectionItemSearch");
         cis->data = itemptr.data;
         cis->name = BLI_strdup(name);
@@ -490,7 +485,7 @@ void ui_rna_collection_search_update_fn(const struct bContext *C,
      * name prefix for showing the library status. */
     int name_prefix_offset = cis->name_prefix_offset;
     if (!has_id_icon && cis->is_id && !requires_exact_data_name) {
-      cis->iconid = UI_library_icon_get(cis->data);
+      cis->iconid = UI_icon_from_library(cis->data);
       /* No need to re-allocate, string should be shorter than before (lib status prefix is
        * removed). */
       BKE_id_full_name_ui_prefix_get(name_buf, cis->data, false, UI_SEP_CHAR, &name_prefix_offset);

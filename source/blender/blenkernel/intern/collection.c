@@ -166,7 +166,7 @@ IDTypeInfo IDType_ID_GR = {
     .name = "Collection",
     .name_plural = "collections",
     .translation_context = BLT_I18NCONTEXT_ID_COLLECTION,
-    .flags = 0,
+    .flags = IDTYPE_FLAGS_NO_ANIMDATA,
 
     .init_data = NULL,
     .copy_data = collection_copy_data,
@@ -204,6 +204,7 @@ static Collection *collection_add(Main *bmain,
 
   /* Create new collection. */
   Collection *collection = BKE_libblock_alloc(bmain, ID_GR, name, 0);
+  collection->color_tag = COLLECTION_COLOR_NONE;
 
   /* We increase collection user count when linking to Collections. */
   id_us_min(&collection->id);
@@ -649,6 +650,7 @@ Collection *BKE_collection_master_add()
   STRNCPY(master_collection->id.name, "GRMaster Collection");
   master_collection->id.flag |= LIB_EMBEDDED_DATA;
   master_collection->flag |= COLLECTION_IS_MASTER;
+  master_collection->color_tag = COLLECTION_COLOR_NONE;
   return master_collection;
 }
 
@@ -1182,10 +1184,10 @@ static bool collection_instance_find_recursive(Collection *collection,
 /**
  * Find potential cycles in collections.
  *
- * \param new_ancestor the potential new owner of given \a collection, or the collection to check
- *                     if the later is NULL.
- * \param collection the collection we want to add to \a new_ancestor, may be NULL if we just want
- *                   to ensure \a new_ancestor does not already have cycles.
+ * \param new_ancestor: the potential new owner of given \a collection,
+ * or the collection to check if the later is NULL.
+ * \param collection: the collection we want to add to \a new_ancestor,
+ * may be NULL if we just want to ensure \a new_ancestor does not already have cycles.
  * \return true if a cycle is found.
  */
 bool BKE_collection_cycle_find(Collection *new_ancestor, Collection *collection)
@@ -1254,7 +1256,7 @@ static bool collection_cycle_fix_recursive(Main *bmain,
 /**
  * Find and fix potential cycles in collections.
  *
- * \param collection the collection to check for existing cycles.
+ * \param collection: The collection to check for existing cycles.
  * \return true if cycles are found and fixed.
  */
 bool BKE_collection_cycles_fix(Main *bmain, Collection *collection)

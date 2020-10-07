@@ -42,6 +42,7 @@
 
 #include "BLT_translation.h"
 
+#include "BKE_armature.h"
 #include "BKE_blender_version.h"
 #include "BKE_context.h"
 #include "BKE_curve.h"
@@ -59,12 +60,11 @@
 
 #include "DEG_depsgraph_query.h"
 
-#include "ED_armature.h"
 #include "ED_info.h"
 
 #include "UI_resources.h"
 
-#include "GPU_extensions.h"
+#include "GPU_capabilities.h"
 
 #define MAX_INFO_NUM_LEN 16
 

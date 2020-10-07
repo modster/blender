@@ -86,7 +86,7 @@
 #  define USE_XINPUT_HOTPLUG
 #endif
 
-/* see [#34039] Fix Alt key glitch on Unity desktop */
+/* see T34039 Fix Alt key glitch on Unity desktop */
 #define USE_UNITY_WORKAROUND
 
 /* Fix 'shortcut' part of keyboard reading code only ever using first defined keymap
@@ -1043,7 +1043,7 @@ void GHOST_SystemX11::processEvent(XEvent *xe)
        *       is unmodified (or anyone swapping the keys with xmodmap).
        *
        *     - XLookupKeysym seems to always use first defined keymap (see T47228), which generates
-       *       keycodes unusable by ghost_key_from_keysym for non-latin-compatible keymaps.
+       *       keycodes unusable by ghost_key_from_keysym for non-Latin-compatible keymaps.
        *
        * To address this, we:
        *

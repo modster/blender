@@ -33,6 +33,7 @@
 #include "DNA_particle_types.h"
 
 #include "BKE_customdata.h"
+#include "BKE_mesh_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -347,7 +348,7 @@ void copy_particle_key(struct ParticleKey *to, struct ParticleKey *from, int tim
 void psys_emitter_customdata_mask(struct ParticleSystem *psys,
                                   struct CustomData_MeshMasks *r_cddata_masks);
 void psys_particle_on_emitter(struct ParticleSystemModifierData *psmd,
-                              int distr,
+                              int from,
                               int index,
                               int index_dmcache,
                               float fuv[4],
@@ -370,8 +371,6 @@ struct ModifierData *object_copy_particle_system(struct Main *bmain,
                                                  const struct ParticleSystem *psys_orig);
 void object_remove_particle_system(struct Main *bmain, struct Scene *scene, struct Object *ob);
 struct ParticleSettings *BKE_particlesettings_add(struct Main *bmain, const char *name);
-struct ParticleSettings *BKE_particlesettings_copy(struct Main *bmain,
-                                                   const struct ParticleSettings *part);
 void psys_reset(struct ParticleSystem *psys, int mode);
 
 void psys_find_parents(struct ParticleSimulationData *sim, const bool use_render_params);
@@ -395,7 +394,7 @@ int do_guides(struct Depsgraph *depsgraph,
               struct ParticleSettings *part,
               struct ListBase *effectors,
               ParticleKey *state,
-              int pa_num,
+              int index,
               float time);
 void precalc_guides(struct ParticleSimulationData *sim, struct ListBase *effectors);
 float psys_get_timestep(struct ParticleSimulationData *sim);
@@ -621,10 +620,11 @@ void BKE_particle_system_eval_init(struct Depsgraph *depsgraph, struct Object *o
 enum {
   BKE_PARTICLE_BATCH_DIRTY_ALL = 0,
 };
-void BKE_particle_batch_cache_dirty_tag(struct ParticleSystem *psys, int mode);
+void BKE_particle_batch_cache_dirty_tag(struct ParticleSystem *psys, eMeshBatchDirtyMode mode);
 void BKE_particle_batch_cache_free(struct ParticleSystem *psys);
 
-extern void (*BKE_particle_batch_cache_dirty_tag_cb)(struct ParticleSystem *psys, int mode);
+extern void (*BKE_particle_batch_cache_dirty_tag_cb)(struct ParticleSystem *psys,
+                                                     eMeshBatchDirtyMode mode);
 extern void (*BKE_particle_batch_cache_free_cb)(struct ParticleSystem *psys);
 
 #ifdef __cplusplus

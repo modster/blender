@@ -1484,7 +1484,7 @@ void ED_screen_animation_timer(bContext *C, int redraws, int sync, int enable)
     screen->animtimer = WM_event_add_timer(wm, win, TIMER0, (1.0 / FPS));
 
     sad->region = CTX_wm_region(C);
-    /* if startframe is larger than current frame, we put currentframe on startframe.
+    /* If start-frame is larger than current frame, we put current-frame on start-frame.
      * note: first frame then is not drawn! (ton) */
     if (PRVRANGEON) {
       if (scene->r.psfra > scene->r.cfra) {
@@ -1520,6 +1520,9 @@ void ED_screen_animation_timer(bContext *C, int redraws, int sync, int enable)
 
     screen->animtimer->customdata = sad;
   }
+
+  /* Seek audio to ensure playback in preview range with AV sync. */
+  DEG_id_tag_update(&scene->id, ID_RECALC_AUDIO_SEEK);
 
   /* notifier catched by top header, for button */
   WM_event_add_notifier(C, NC_SCREEN | ND_ANIMPLAY, NULL);

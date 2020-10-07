@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "BKE_mesh_types.h"
+
 /** \file
  * \ingroup bke
  * \brief General operations for hairs.
@@ -25,6 +27,7 @@ extern "C" {
 #endif
 
 struct BoundBox;
+struct CustomDataLayer;
 struct Depsgraph;
 struct Hair;
 struct Main;
@@ -32,11 +35,11 @@ struct Object;
 struct Scene;
 
 void *BKE_hair_add(struct Main *bmain, const char *name);
-struct Hair *BKE_hair_copy(struct Main *bmain, const struct Hair *hair);
 
 struct BoundBox *BKE_hair_boundbox_get(struct Object *ob);
 
 void BKE_hair_update_customdata_pointers(struct Hair *hair);
+bool BKE_hair_customdata_required(struct Hair *hair, struct CustomDataLayer *layer);
 
 /* Depsgraph */
 
@@ -51,10 +54,10 @@ enum {
   BKE_HAIR_BATCH_DIRTY_ALL = 0,
 };
 
-void BKE_hair_batch_cache_dirty_tag(struct Hair *hair, int mode);
+void BKE_hair_batch_cache_dirty_tag(struct Hair *hair, eMeshBatchDirtyMode mode);
 void BKE_hair_batch_cache_free(struct Hair *hair);
 
-extern void (*BKE_hair_batch_cache_dirty_tag_cb)(struct Hair *hair, int mode);
+extern void (*BKE_hair_batch_cache_dirty_tag_cb)(struct Hair *hair, eMeshBatchDirtyMode mode);
 extern void (*BKE_hair_batch_cache_free_cb)(struct Hair *hair);
 
 #ifdef __cplusplus

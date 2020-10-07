@@ -245,38 +245,27 @@ static void graph_panel_properties(const bContext *C, Panel *panel)
 /* ******************* active Keyframe ************** */
 
 /* get 'active' keyframe for panel editing */
-static bool get_active_fcurve_keyframe_edit(FCurve *fcu, BezTriple **bezt, BezTriple **prevbezt)
+static bool get_active_fcurve_keyframe_edit(const FCurve *fcu,
+                                            BezTriple **r_bezt,
+                                            BezTriple **r_prevbezt)
 {
-  BezTriple *b;
-  int i;
-
   /* zero the pointers */
-  *bezt = *prevbezt = NULL;
+  *r_bezt = *r_prevbezt = NULL;
 
-  /* sanity checks */
-  if ((fcu->bezt == NULL) || (fcu->totvert == 0)) {
+  const int active_keyframe_index = BKE_fcurve_active_keyframe_index(fcu);
+  if (active_keyframe_index == FCURVE_ACTIVE_KEYFRAME_NONE) {
     return false;
   }
 
-  /* find first selected keyframe for now, and call it the active one
-   * - this is a reasonable assumption, given that whenever anyone
-   *   wants to edit numerically, there is likely to only be 1 vert selected
-   */
-  for (i = 0, b = fcu->bezt; i < fcu->totvert; i++, b++) {
-    if (BEZT_ISSEL_ANY(b)) {
-      /* found
-       * - 'previous' is either the one before, of the keyframe itself (which is still fine)
-       *   XXX: we can just make this null instead if needed
-       */
-      *prevbezt = (i > 0) ? b - 1 : b;
-      *bezt = b;
+  /* The active keyframe should be selected. */
+  BLI_assert(BEZT_ISSEL_ANY(&fcu->bezt[active_keyframe_index]));
 
-      return true;
-    }
-  }
+  *r_bezt = &fcu->bezt[active_keyframe_index];
+  /* Previous is either one before the active, or the point itself if it's the first. */
+  const int prev_index = max_ii(active_keyframe_index - 1, 0);
+  *r_prevbezt = &fcu->bezt[prev_index];
 
-  /* not found */
-  return false;
+  return true;
 }
 
 /* update callback for active keyframe properties - base updates stuff */
@@ -447,8 +436,8 @@ static void graph_panel_key_properties(const bContext *C, Panel *panel)
                       0,
                       0,
                       0,
-                      -1,
-                      -1,
+                      0,
+                      0,
                       NULL);
 
       uiItemL_respect_property_split(col, IFACE_("Value"), ICON_NONE);
@@ -465,8 +454,8 @@ static void graph_panel_key_properties(const bContext *C, Panel *panel)
                       1,
                       0,
                       0,
-                      -1,
-                      -1,
+                      0,
+                      0,
                       NULL);
       UI_but_func_set(but, graphedit_activekey_update_cb, fcu, bezt);
       UI_but_unit_type_set(but, unit);
@@ -511,8 +500,8 @@ static void graph_panel_key_properties(const bContext *C, Panel *panel)
                       0,
                       0,
                       0,
-                      -1,
-                      -1,
+                      0,
+                      0,
                       NULL);
       UI_but_func_set(but, graphedit_activekey_left_handle_coord_cb, fcu, bezt);
 
@@ -530,8 +519,8 @@ static void graph_panel_key_properties(const bContext *C, Panel *panel)
                       1,
                       0,
                       0,
-                      -1,
-                      -1,
+                      0,
+                      0,
                       NULL);
       UI_but_func_set(but, graphedit_activekey_left_handle_coord_cb, fcu, bezt);
       UI_but_unit_type_set(but, unit);
@@ -575,8 +564,8 @@ static void graph_panel_key_properties(const bContext *C, Panel *panel)
                       0,
                       0,
                       0,
-                      -1,
-                      -1,
+                      0,
+                      0,
                       NULL);
       UI_but_func_set(but, graphedit_activekey_right_handle_coord_cb, fcu, bezt);
 
@@ -594,8 +583,8 @@ static void graph_panel_key_properties(const bContext *C, Panel *panel)
                       1,
                       0,
                       0,
-                      -1,
-                      -1,
+                      0,
+                      0,
                       NULL);
       UI_but_func_set(but, graphedit_activekey_right_handle_coord_cb, fcu, bezt);
       UI_but_unit_type_set(but, unit);
@@ -743,7 +732,7 @@ static bool graph_panel_drivers_poll(const bContext *C, PanelType *UNUSED(pt))
   SpaceGraph *sipo = CTX_wm_space_graph(C);
 
   if (sipo->mode != SIPO_MODE_DRIVERS) {
-    return 0;
+    return false;
   }
 
   return graph_panel_context(C, NULL, NULL);

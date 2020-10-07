@@ -25,6 +25,7 @@
  * Also some operator reports utility functions.
  */
 
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -327,7 +328,7 @@ void wm_event_do_depsgraph(bContext *C, bool is_after_open_file)
   if (wm->is_interface_locked) {
     return;
   }
-  /* Combine datamasks so 1 win doesn't disable UV's in another [#26448]. */
+  /* Combine datamasks so 1 win doesn't disable UV's in another T26448. */
   CustomData_MeshMasks win_combine_v3d_datamask = {0};
   LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
     const Scene *scene = WM_window_get_active_scene(win);
@@ -342,7 +343,7 @@ void wm_event_do_depsgraph(bContext *C, bool is_after_open_file)
     Main *bmain = CTX_data_main(C);
     /* Copied to set's in scene_update_tagged_recursive() */
     scene->customdata_mask = win_combine_v3d_datamask;
-    /* XXX, hack so operators can enforce datamasks [#26482], gl render */
+    /* XXX, hack so operators can enforce datamasks T26482, gl render */
     CustomData_MeshMasks_update(&scene->customdata_mask, &scene->customdata_mask_modal);
     /* TODO(sergey): For now all dependency graphs which are evaluated from
      * workspace are considered active. This will work all fine with "locked"
@@ -460,7 +461,7 @@ void wm_event_do_notifiers(bContext *C)
           else if (note->data == ND_LAYOUTBROWSE) {
             bScreen *ref_screen = BKE_workspace_layout_screen_get(note->reference);
 
-            /* free popup handlers only [#35434] */
+            /* free popup handlers only T35434. */
             UI_popup_handlers_remove_all(C, &win->modalhandlers);
 
             ED_screen_change(C, ref_screen); /* XXX hrms, think this over! */
@@ -1060,7 +1061,8 @@ static int wm_operator_exec_notest(bContext *C, wmOperator *op)
  *
  * \param store: Store settings for re-use.
  *
- * warning: do not use this within an operator to call its self! [#29537] */
+ * \warning do not use this within an operator to call its self! T29537.
+ */
 int WM_operator_call_ex(bContext *C, wmOperator *op, const bool store)
 {
   return wm_operator_exec(C, op, false, store);
@@ -1816,7 +1818,7 @@ static bool wm_eventmatch(const wmEvent *winevent, const wmKeyMapItem *kmi)
   if (kmitype == KM_TEXTINPUT) {
     if (winevent->val == KM_PRESS) { /* prevent double clicks */
       /* NOT using ISTEXTINPUT anymore because (at least on Windows) some key codes above 255
-       * could have printable ascii keys - BUG [#30479] */
+       * could have printable ascii keys - BUG T30479. */
       if (ISKEYBOARD(winevent->type) && (winevent->ascii || winevent->utf8_buf[0])) {
         return true;
       }
@@ -2712,7 +2714,7 @@ static int wm_handlers_do_intern(bContext *C, wmEvent *event, ListBase *handlers
    * note: check 'handlers->first' because in rare cases the handlers can be cleared
    * by the event that's called, for eg:
    *
-   * Calling a python script which changes the area.type, see [#32232] */
+   * Calling a python script which changes the area.type, see T32232. */
   for (wmEventHandler *handler_base = handlers->first, *handler_base_next;
        handler_base && handlers->first;
        handler_base = handler_base_next) {
@@ -3230,7 +3232,7 @@ void wm_event_do_handlers(bContext *C)
           if (is_playing_sound == 0) {
             const double time = BKE_sound_sync_scene(scene_eval);
             if (isfinite(time)) {
-              int ncfra = time * FPS + 0.5;
+              int ncfra = round(time * FPS);
               if (ncfra != scene->r.cfra) {
                 scene->r.cfra = ncfra;
                 ED_update_for_newframe(CTX_data_main(C), depsgraph);
@@ -3362,7 +3364,7 @@ void wm_event_do_handlers(bContext *C)
 
                   action |= wm_handlers_do(C, event, &region->handlers);
 
-                  /* fileread case (python), [#29489] */
+                  /* fileread case (python), T29489. */
                   if (CTX_wm_window(C) == NULL) {
                     wm_event_free_and_remove_from_queue_if_valid(event);
                     return;

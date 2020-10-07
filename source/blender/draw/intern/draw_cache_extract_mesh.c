@@ -53,13 +53,14 @@
 #include "BKE_mesh_tangent.h"
 #include "BKE_modifier.h"
 #include "BKE_object_deform.h"
+#include "BKE_paint.h"
 
 #include "atomic_ops.h"
 
 #include "bmesh.h"
 
 #include "GPU_batch.h"
-#include "GPU_extensions.h"
+#include "GPU_capabilities.h"
 
 #include "DRW_render.h"
 
@@ -1923,7 +1924,7 @@ static void *extract_pos_nor_init(const MeshRenderData *mr,
   /* Pack normals per vert, reduce amount of computation. */
   size_t packed_nor_len = sizeof(GPUPackedNormal) * mr->vert_len;
   MeshExtract_PosNor_Data *data = MEM_mallocN(sizeof(*data) + packed_nor_len, __func__);
-  data->vbo_data = (PosNorLoop *)vbo->data;
+  data->vbo_data = (PosNorLoop *)GPU_vertbuf_get_data(vbo);
 
   /* Quicker than doing it for each loop. */
   if (mr->extract_type == MR_EXTRACT_BMESH) {
@@ -2096,7 +2097,7 @@ static void *extract_lnor_hq_init(const MeshRenderData *mr,
   GPU_vertbuf_init_with_format(vbo, &format);
   GPU_vertbuf_data_alloc(vbo, mr->loop_len);
 
-  return vbo->data;
+  return GPU_vertbuf_get_data(vbo);
 }
 
 static void extract_lnor_hq_iter_poly_bm(const MeshRenderData *mr,
@@ -2184,7 +2185,7 @@ static void *extract_lnor_init(const MeshRenderData *mr,
   GPU_vertbuf_init_with_format(vbo, &format);
   GPU_vertbuf_data_alloc(vbo, mr->loop_len);
 
-  return vbo->data;
+  return GPU_vertbuf_get_data(vbo);
 }
 
 static void extract_lnor_iter_poly_bm(const MeshRenderData *mr,
@@ -2319,7 +2320,7 @@ static void *extract_uv_init(const MeshRenderData *mr, struct MeshBatchCache *ca
   GPU_vertbuf_init_with_format(vbo, &format);
   GPU_vertbuf_data_alloc(vbo, v_len);
 
-  float(*uv_data)[2] = (float(*)[2])vbo->data;
+  float(*uv_data)[2] = (float(*)[2])GPU_vertbuf_get_data(vbo);
   for (int i = 0; i < MAX_MTFACE; i++) {
     if (uv_layers & (1 << i)) {
       if (mr->extract_type == MR_EXTRACT_BMESH) {
@@ -2487,7 +2488,7 @@ static void extract_tan_ex(const MeshRenderData *mr,
   GPU_vertbuf_data_alloc(vbo, v_len);
 
   if (do_hq) {
-    short(*tan_data)[4] = (short(*)[4])vbo->data;
+    short(*tan_data)[4] = (short(*)[4])GPU_vertbuf_get_data(vbo);
     for (int i = 0; i < tan_len; i++) {
       const char *name = tangent_names[i];
       float(*layer_data)[4] = (float(*)[4])CustomData_get_layer_named(
@@ -2508,7 +2509,7 @@ static void extract_tan_ex(const MeshRenderData *mr,
     }
   }
   else {
-    GPUPackedNormal *tan_data = (GPUPackedNormal *)vbo->data;
+    GPUPackedNormal *tan_data = (GPUPackedNormal *)GPU_vertbuf_get_data(vbo);
     for (int i = 0; i < tan_len; i++) {
       const char *name = tangent_names[i];
       float(*layer_data)[4] = (float(*)[4])CustomData_get_layer_named(
@@ -2559,6 +2560,106 @@ static void *extract_tan_hq_init(const MeshRenderData *mr, struct MeshBatchCache
 static const MeshExtract extract_tan_hq = {
     .init = extract_tan_hq_init,
     .data_flag = MR_DATA_POLY_NOR | MR_DATA_TAN_LOOP_NOR | MR_DATA_LOOPTRI,
+    .use_threading = false,
+};
+
+/** \} */
+
+/* ---------------------------------------------------------------------- */
+/** \name Extract Sculpt Data
+ * \{ */
+
+static void *extract_sculpt_data_init(const MeshRenderData *mr,
+                                      struct MeshBatchCache *UNUSED(cache),
+                                      void *buf)
+{
+  GPUVertFormat format = {0};
+
+  CustomData *cd_ldata = (mr->extract_type == MR_EXTRACT_BMESH) ? &mr->bm->ldata : &mr->me->ldata;
+  CustomData *cd_vdata = (mr->extract_type == MR_EXTRACT_BMESH) ? &mr->bm->vdata : &mr->me->vdata;
+  CustomData *cd_pdata = (mr->extract_type == MR_EXTRACT_BMESH) ? &mr->bm->pdata : &mr->me->pdata;
+
+  float *cd_mask = CustomData_get_layer(cd_vdata, CD_PAINT_MASK);
+  int *cd_face_set = CustomData_get_layer(cd_pdata, CD_SCULPT_FACE_SETS);
+
+  if (format.attr_len == 0) {
+    GPU_vertformat_attr_add(&format, "fset", GPU_COMP_U8, 4, GPU_FETCH_INT_TO_FLOAT_UNIT);
+    GPU_vertformat_attr_add(&format, "msk", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
+  }
+
+  GPUVertBuf *vbo = buf;
+  GPU_vertbuf_init_with_format(vbo, &format);
+  GPU_vertbuf_data_alloc(vbo, mr->loop_len);
+
+  typedef struct gpuSculptData {
+    uint8_t face_set_color[4];
+    float mask;
+  } gpuSculptData;
+
+  gpuSculptData *vbo_data = (gpuSculptData *)GPU_vertbuf_get_data(vbo);
+  MLoop *loops = CustomData_get_layer(cd_ldata, CD_MLOOP);
+
+  if (mr->extract_type == MR_EXTRACT_BMESH) {
+    int cd_mask_ofs = CustomData_get_offset(cd_vdata, CD_PAINT_MASK);
+    int cd_face_set_ofs = CustomData_get_offset(cd_pdata, CD_SCULPT_FACE_SETS);
+    BMIter f_iter;
+    BMFace *efa;
+    BM_ITER_MESH (efa, &f_iter, mr->bm, BM_FACES_OF_MESH) {
+      BMLoop *l_iter, *l_first;
+      l_iter = l_first = BM_FACE_FIRST_LOOP(efa);
+      do {
+        float v_mask = 0.0f;
+        if (cd_mask) {
+          v_mask = BM_ELEM_CD_GET_FLOAT(l_iter->v, cd_mask_ofs);
+        }
+        vbo_data->mask = v_mask;
+        uchar face_set_color[4] = {UCHAR_MAX, UCHAR_MAX, UCHAR_MAX, UCHAR_MAX};
+        if (cd_face_set) {
+          const int face_set_id = BM_ELEM_CD_GET_INT(l_iter->f, cd_face_set_ofs);
+          if (face_set_id != mr->me->face_sets_color_default) {
+            BKE_paint_face_set_overlay_color_get(
+                face_set_id, mr->me->face_sets_color_seed, face_set_color);
+          }
+        }
+        copy_v3_v3_uchar(vbo_data->face_set_color, face_set_color);
+        vbo_data++;
+      } while ((l_iter = l_iter->next) != l_first);
+    }
+  }
+  else {
+    int mp_loop = 0;
+    for (int mp_index = 0; mp_index < mr->poly_len; mp_index++) {
+      const MPoly *p = &mr->mpoly[mp_index];
+      for (int l = 0; l < p->totloop; l++) {
+        float v_mask = 0.0f;
+        if (cd_mask) {
+          v_mask = cd_mask[loops[mp_loop].v];
+        }
+        vbo_data->mask = v_mask;
+
+        uchar face_set_color[4] = {UCHAR_MAX, UCHAR_MAX, UCHAR_MAX, UCHAR_MAX};
+        if (cd_face_set) {
+          const int face_set_id = cd_face_set[mp_index];
+          /* Skip for the default color Face Set to render it white. */
+          if (face_set_id != mr->me->face_sets_color_default) {
+            BKE_paint_face_set_overlay_color_get(
+                face_set_id, mr->me->face_sets_color_seed, face_set_color);
+          }
+        }
+        copy_v3_v3_uchar(vbo_data->face_set_color, face_set_color);
+        mp_loop++;
+        vbo_data++;
+      }
+    }
+  }
+
+  return NULL;
+}
+
+static const MeshExtract extract_sculpt_data = {
+    .init = extract_sculpt_data_init,
+    .data_flag = 0,
+    /* TODO: enable threading. */
     .use_threading = false,
 };
 
@@ -2639,7 +2740,7 @@ static void *extract_vcol_init(const MeshRenderData *mr, struct MeshBatchCache *
     ushort r, g, b, a;
   } gpuMeshVcol;
 
-  gpuMeshVcol *vcol_data = (gpuMeshVcol *)vbo->data;
+  gpuMeshVcol *vcol_data = (gpuMeshVcol *)GPU_vertbuf_get_data(vbo);
   MLoop *loops = CustomData_get_layer(cd_ldata, CD_MLOOP);
 
   for (int i = 0; i < MAX_MCOL; i++) {
@@ -2743,7 +2844,7 @@ static void *extract_orco_init(const MeshRenderData *mr,
   CustomData *cd_vdata = &mr->me->vdata;
 
   MeshExtract_Orco_Data *data = MEM_mallocN(sizeof(*data), __func__);
-  data->vbo_data = (float(*)[4])vbo->data;
+  data->vbo_data = (float(*)[4])GPU_vertbuf_get_data(vbo);
   data->orco = CustomData_get_layer(cd_vdata, CD_ORCO);
   /* Make sure `orco` layer was requested only if needed! */
   BLI_assert(data->orco);
@@ -2859,7 +2960,7 @@ static void *extract_edge_fac_init(const MeshRenderData *mr,
     data->use_edge_render = true;
   }
 
-  data->vbo_data = vbo->data;
+  data->vbo_data = GPU_vertbuf_get_data(vbo);
   return data;
 }
 
@@ -2969,14 +3070,14 @@ static void extract_edge_fac_finish(const MeshRenderData *mr,
       GPU_vertformat_attr_add(&format, "wd", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
     }
     /* We keep the data reference in data->vbo_data. */
-    vbo->data = NULL;
+    data->vbo_data = GPU_vertbuf_steal_data(vbo);
     GPU_vertbuf_clear(vbo);
 
     int buf_len = mr->loop_len + mr->loop_loose_len;
     GPU_vertbuf_init_with_format(vbo, &format);
     GPU_vertbuf_data_alloc(vbo, buf_len);
 
-    float *fdata = (float *)vbo->data;
+    float *fdata = (float *)GPU_vertbuf_get_data(vbo);
     for (int ml_index = 0; ml_index < buf_len; ml_index++, fdata++) {
       *fdata = data->vbo_data[ml_index] / 255.0f;
     }
@@ -3075,7 +3176,7 @@ static void *extract_weights_init(const MeshRenderData *mr,
   GPU_vertbuf_data_alloc(vbo, mr->loop_len + mr->loop_loose_len);
 
   MeshExtract_Weight_Data *data = MEM_callocN(sizeof(*data), __func__);
-  data->vbo_data = (float *)vbo->data;
+  data->vbo_data = (float *)GPU_vertbuf_get_data(vbo);
   data->wstate = &cache->weight_state;
 
   if (data->wstate->defgroup_active == -1) {
@@ -3313,7 +3414,7 @@ static void *extract_edit_data_init(const MeshRenderData *mr,
   GPUVertBuf *vbo = buf;
   GPU_vertbuf_init_with_format(vbo, &format);
   GPU_vertbuf_data_alloc(vbo, mr->loop_len + mr->loop_loose_len);
-  return vbo->data;
+  return GPU_vertbuf_get_data(vbo);
 }
 
 static void extract_edit_data_iter_poly_bm(const MeshRenderData *mr,
@@ -3471,7 +3572,7 @@ static void *extract_edituv_data_init(const MeshRenderData *mr,
   CustomData *cd_ldata = (mr->extract_type == MR_EXTRACT_BMESH) ? &mr->bm->ldata : &mr->me->ldata;
 
   MeshExtract_EditUVData_Data *data = MEM_callocN(sizeof(*data), __func__);
-  data->vbo_data = (EditLoopData *)vbo->data;
+  data->vbo_data = (EditLoopData *)GPU_vertbuf_get_data(vbo);
   data->cd_ofs = CustomData_get_offset(cd_ldata, CD_MLOOPUV);
   return data;
 }
@@ -3635,7 +3736,7 @@ static void mesh_stretch_area_finish(const MeshRenderData *mr,
 
   /* Copy face data for each loop. */
   GPUVertBuf *vbo = buf;
-  uint16_t *loop_stretch = (uint16_t *)vbo->data;
+  uint16_t *loop_stretch = (uint16_t *)GPU_vertbuf_get_data(vbo);
 
   if (mr->extract_type == MR_EXTRACT_BMESH) {
     BMFace *efa;
@@ -3746,7 +3847,7 @@ static void *extract_stretch_angle_init(const MeshRenderData *mr,
   GPU_vertbuf_data_alloc(vbo, mr->loop_len);
 
   MeshExtract_StretchAngle_Data *data = MEM_callocN(sizeof(*data), __func__);
-  data->vbo_data = (UVStretchAngle *)vbo->data;
+  data->vbo_data = (UVStretchAngle *)GPU_vertbuf_get_data(vbo);
 
   /* Special iterator needed to save about half of the computing cost. */
   if (mr->extract_type == MR_EXTRACT_BMESH) {
@@ -4167,7 +4268,7 @@ static void statvis_calc_intersect(const MeshRenderData *mr, float *r_intersect)
     BM_mesh_elem_index_ensure(bm, BM_FACE);
 
     struct BMBVHTree *bmtree = BKE_bmbvh_new_from_editmesh(em, 0, NULL, false);
-    BVHTreeOverlap *overlap = BKE_bmbvh_overlap(bmtree, bmtree, &overlap_len);
+    BVHTreeOverlap *overlap = BKE_bmbvh_overlap_self(bmtree, &overlap_len);
 
     if (overlap) {
       for (int i = 0; i < overlap_len; i++) {
@@ -4446,7 +4547,7 @@ static void extract_mesh_analysis_finish(const MeshRenderData *mr,
   BLI_assert(mr->edit_bmesh);
 
   GPUVertBuf *vbo = buf;
-  float *l_weight = (float *)vbo->data;
+  float *l_weight = (float *)GPU_vertbuf_get_data(vbo);
 
   switch (mr->toolsettings->statvis.type) {
     case SCE_STATVIS_OVERHANG:
@@ -4493,7 +4594,7 @@ static void *extract_fdots_pos_init(const MeshRenderData *mr,
   GPUVertBuf *vbo = buf;
   GPU_vertbuf_init_with_format(vbo, &format);
   GPU_vertbuf_data_alloc(vbo, mr->poly_len);
-  return vbo->data;
+  return GPU_vertbuf_get_data(vbo);
 }
 
 static void extract_fdots_pos_iter_poly_bm(const MeshRenderData *mr,
@@ -4592,7 +4693,7 @@ static void extract_fdots_nor_finish(const MeshRenderData *mr,
 {
   static float invalid_normal[3] = {0.0f, 0.0f, 0.0f};
   GPUVertBuf *vbo = buf;
-  GPUPackedNormal *nor = (GPUPackedNormal *)vbo->data;
+  GPUPackedNormal *nor = (GPUPackedNormal *)GPU_vertbuf_get_data(vbo);
   BMFace *efa;
 
   /* Quicker than doing it for each loop. */
@@ -4669,11 +4770,11 @@ static void *extract_fdots_uv_init(const MeshRenderData *mr,
 
   if (!mr->use_subsurf_fdots) {
     /* Clear so we can accumulate on it. */
-    memset(vbo->data, 0x0, mr->poly_len * vbo->format.stride);
+    memset(GPU_vertbuf_get_data(vbo), 0x0, mr->poly_len * GPU_vertbuf_get_format(vbo)->stride);
   }
 
   MeshExtract_FdotUV_Data *data = MEM_callocN(sizeof(*data), __func__);
-  data->vbo_data = (float(*)[2])vbo->data;
+  data->vbo_data = (float(*)[2])GPU_vertbuf_get_data(vbo);
 
   if (mr->extract_type == MR_EXTRACT_BMESH) {
     data->cd_ofs = CustomData_get_offset(&mr->bm->ldata, CD_MLOOPUV);
@@ -4763,7 +4864,7 @@ static void *extract_fdots_edituv_data_init(const MeshRenderData *mr,
   GPU_vertbuf_data_alloc(vbo, mr->poly_len);
 
   MeshExtract_EditUVFdotData_Data *data = MEM_callocN(sizeof(*data), __func__);
-  data->vbo_data = (EditLoopData *)vbo->data;
+  data->vbo_data = (EditLoopData *)GPU_vertbuf_get_data(vbo);
   data->cd_ofs = CustomData_get_offset(&mr->bm->ldata, CD_MLOOPUV);
   return data;
 }
@@ -4842,7 +4943,7 @@ static void *extract_skin_roots_init(const MeshRenderData *mr,
   GPU_vertbuf_init_with_format(vbo, &format);
   GPU_vertbuf_data_alloc(vbo, mr->bm->totvert);
 
-  SkinRootData *vbo_data = (SkinRootData *)vbo->data;
+  SkinRootData *vbo_data = (SkinRootData *)GPU_vertbuf_get_data(vbo);
 
   int root_len = 0;
   int cd_ofs = CustomData_get_offset(&mr->bm->vdata, CD_MVERT_SKIN);
@@ -4889,7 +4990,7 @@ static void *extract_select_idx_init(const MeshRenderData *mr,
   GPUVertBuf *vbo = buf;
   GPU_vertbuf_init_with_format(vbo, &format);
   GPU_vertbuf_data_alloc(vbo, mr->loop_len + mr->loop_loose_len);
-  return vbo->data;
+  return GPU_vertbuf_get_data(vbo);
 }
 
 /* TODO Use #glVertexID to get loop index and use the data structure on the CPU to retrieve the
@@ -5083,7 +5184,7 @@ static void *extract_select_fdot_idx_init(const MeshRenderData *mr,
   GPUVertBuf *vbo = buf;
   GPU_vertbuf_init_with_format(vbo, &format);
   GPU_vertbuf_data_alloc(vbo, mr->poly_len);
-  return vbo->data;
+  return GPU_vertbuf_get_data(vbo);
 }
 
 static void extract_fdot_idx_iter_poly_bm(const MeshRenderData *mr,
@@ -5598,6 +5699,7 @@ void mesh_buffer_cache_create_requested(struct TaskGraph *task_graph,
   TEST_ASSIGN(VBO, vbo, uv);
   TEST_ASSIGN(VBO, vbo, tan);
   TEST_ASSIGN(VBO, vbo, vcol);
+  TEST_ASSIGN(VBO, vbo, sculpt_data);
   TEST_ASSIGN(VBO, vbo, orco);
   TEST_ASSIGN(VBO, vbo, edge_fac);
   TEST_ASSIGN(VBO, vbo, weights);
@@ -5691,6 +5793,7 @@ void mesh_buffer_cache_create_requested(struct TaskGraph *task_graph,
   EXTRACT(vbo, uv);
   EXTRACT(vbo, tan);
   EXTRACT(vbo, vcol);
+  EXTRACT(vbo, sculpt_data);
   EXTRACT(vbo, orco);
   EXTRACT(vbo, edge_fac);
   EXTRACT(vbo, weights);

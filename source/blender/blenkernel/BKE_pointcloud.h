@@ -20,23 +20,33 @@
  * \ingroup bke
  * \brief General operations for point-clouds.
  */
+
+#include "BKE_mesh_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 struct BoundBox;
+struct CustomDataLayer;
 struct Depsgraph;
 struct Main;
 struct Object;
 struct PointCloud;
 struct Scene;
 
+/* PointCloud datablock */
+extern const char *POINTCLOUD_ATTR_POSITION;
+extern const char *POINTCLOUD_ATTR_RADIUS;
+
 void *BKE_pointcloud_add(struct Main *bmain, const char *name);
-struct PointCloud *BKE_pointcloud_copy(struct Main *bmain, const struct PointCloud *pointcloud);
+void *BKE_pointcloud_add_default(struct Main *bmain, const char *name);
 
 struct BoundBox *BKE_pointcloud_boundbox_get(struct Object *ob);
 
 void BKE_pointcloud_update_customdata_pointers(struct PointCloud *pointcloud);
+bool BKE_pointcloud_customdata_required(struct PointCloud *pointcloud,
+                                        struct CustomDataLayer *layer);
 
 /* Dependency Graph */
 
@@ -54,10 +64,11 @@ enum {
   BKE_POINTCLOUD_BATCH_DIRTY_ALL = 0,
 };
 
-void BKE_pointcloud_batch_cache_dirty_tag(struct PointCloud *pointcloud, int mode);
+void BKE_pointcloud_batch_cache_dirty_tag(struct PointCloud *pointcloud, eMeshBatchDirtyMode mode);
 void BKE_pointcloud_batch_cache_free(struct PointCloud *pointcloud);
 
-extern void (*BKE_pointcloud_batch_cache_dirty_tag_cb)(struct PointCloud *pointcloud, int mode);
+extern void (*BKE_pointcloud_batch_cache_dirty_tag_cb)(struct PointCloud *pointcloud,
+                                                       eMeshBatchDirtyMode mode);
 extern void (*BKE_pointcloud_batch_cache_free_cb)(struct PointCloud *pointcloud);
 
 #ifdef __cplusplus

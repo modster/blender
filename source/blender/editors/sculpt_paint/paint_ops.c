@@ -70,7 +70,7 @@ static int brush_add_exec(bContext *C, wmOperator *UNUSED(op))
   ePaintMode mode = BKE_paintmode_get_active_from_context(C);
 
   if (br) {
-    br = BKE_brush_copy(bmain, br);
+    br = (Brush *)BKE_id_copy(bmain, &br->id);
   }
   else {
     br = BKE_brush_add(bmain, "Brush", BKE_paint_object_mode_from_paintmode(mode));
@@ -105,7 +105,7 @@ static int brush_add_gpencil_exec(bContext *C, wmOperator *UNUSED(op))
   Main *bmain = CTX_data_main(C);
 
   if (br) {
-    br = BKE_brush_copy(bmain, br);
+    br = (Brush *)BKE_id_copy(bmain, &br->id);
   }
   else {
     br = BKE_brush_add(bmain, "Brush", OB_MODE_PAINT_GPENCIL);
@@ -1357,6 +1357,7 @@ void ED_operatortypes_paint(void)
   WM_operatortype_append(PAINT_OT_mask_flood_fill);
   WM_operatortype_append(PAINT_OT_mask_lasso_gesture);
   WM_operatortype_append(PAINT_OT_mask_box_gesture);
+  WM_operatortype_append(PAINT_OT_mask_line_gesture);
 }
 
 void ED_keymap_paint(wmKeyConfig *keyconf)

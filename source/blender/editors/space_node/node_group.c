@@ -286,7 +286,7 @@ static int node_group_ungroup(Main *bmain, bNodeTree *ntree, bNode *gnode)
 
     /* firstly, wgroup needs to temporary dummy action
      * that can be destroyed, as it shares copies */
-    waction = wgroup->adt->action = BKE_action_copy(bmain, wgroup->adt->action);
+    waction = wgroup->adt->action = (bAction *)BKE_id_copy(bmain, &wgroup->adt->action->id);
 
     /* now perform the moving */
     BKE_animdata_transfer_by_basepath(bmain, &wgroup->id, &ntree->id, &anim_basepaths);
@@ -578,7 +578,7 @@ static int node_group_separate_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
   /* get node tree offset */
-  snode_group_offset(snode, &offx, &offy);
+  space_node_group_offset(snode, &offx, &offy);
 
   switch (type) {
     case NODE_GS_COPY:

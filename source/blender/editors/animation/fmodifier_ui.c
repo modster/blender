@@ -404,18 +404,15 @@ static void generator_panel_draw(const bContext *UNUSED(C), Panel *panel)
       uiLayout *col = uiLayoutColumn(layout, true);
       /* The value gets a "Coefficient" label. */
       BLI_strncpy(xval, "Coefficient", sizeof(xval));
-      for (int co = 0; co < data->arraysize; co++) {
+      for (int i = 0; i < data->arraysize; i++) {
         PropertyRNA *prop = RNA_struct_find_property(ptr, "coefficients");
-        uiItemFullR(col, ptr, prop, co, 0, 0, IFACE_(xval), ICON_NONE);
-        BLI_snprintf(xval, sizeof(xval), "x^%d", co + 1);
+        uiItemFullR(col, ptr, prop, i, 0, 0, IFACE_(xval), ICON_NONE);
+        BLI_snprintf(xval, sizeof(xval), "x^%d", i + 1);
       }
       break;
     }
     case FCM_GENERATOR_POLYNOMIAL_FACTORISED: /* Factorized polynomial expression */
     {
-      float *cp = NULL;
-      uint i;
-
       /* draw polynomial order selector */
       row = uiLayoutRow(layout, false);
       uiBlock *block = uiLayoutGetBlock(row);
@@ -423,8 +420,8 @@ static void generator_panel_draw(const bContext *UNUSED(C), Panel *panel)
       /* Update depsgraph when values change */
       UI_block_func_set(block, deg_update, fcurve_owner_id, NULL);
 
-      cp = data->coefficients;
-      for (i = 0; (i < data->poly_order) && (cp); i++, cp += 2) {
+      float *cp = data->coefficients;
+      for (uint i = 0; (i < data->poly_order) && (cp); i++, cp += 2) {
         /* To align with first line */
         if (i) {
           uiDefBut(block,
@@ -463,20 +460,22 @@ static void generator_panel_draw(const bContext *UNUSED(C), Panel *panel)
             block, UI_BTYPE_LABEL, 1, "(", 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL, 0.0, 0.0, 0, 0, "");
 
         /* coefficients */
-        uiDefButF(block,
-                  UI_BTYPE_NUM,
-                  B_FMODIFIER_REDRAW,
-                  "",
-                  0,
-                  0,
-                  5 * UI_UNIT_X,
-                  UI_UNIT_Y,
-                  cp,
-                  -UI_FLT_MAX,
-                  UI_FLT_MAX,
-                  10,
-                  3,
-                  TIP_("Coefficient of x"));
+        uiBut *but = uiDefButF(block,
+                               UI_BTYPE_NUM,
+                               B_FMODIFIER_REDRAW,
+                               "",
+                               0,
+                               0,
+                               5 * UI_UNIT_X,
+                               UI_UNIT_Y,
+                               cp,
+                               -UI_FLT_MAX,
+                               UI_FLT_MAX,
+                               0,
+                               0,
+                               TIP_("Coefficient of x"));
+        UI_but_number_step_size_set(but, 10);
+        UI_but_number_precision_set(but, 3);
 
         uiDefBut(block,
                  UI_BTYPE_LABEL,
@@ -493,20 +492,22 @@ static void generator_panel_draw(const bContext *UNUSED(C), Panel *panel)
                  0,
                  "");
 
-        uiDefButF(block,
-                  UI_BTYPE_NUM,
-                  B_FMODIFIER_REDRAW,
-                  "",
-                  0,
-                  0,
-                  5 * UI_UNIT_X,
-                  UI_UNIT_Y,
-                  cp + 1,
-                  -UI_FLT_MAX,
-                  UI_FLT_MAX,
-                  10,
-                  3,
-                  TIP_("Second coefficient"));
+        but = uiDefButF(block,
+                        UI_BTYPE_NUM,
+                        B_FMODIFIER_REDRAW,
+                        "",
+                        0,
+                        0,
+                        5 * UI_UNIT_X,
+                        UI_UNIT_Y,
+                        cp + 1,
+                        -UI_FLT_MAX,
+                        UI_FLT_MAX,
+                        0,
+                        0,
+                        TIP_("Second coefficient"));
+        UI_but_number_step_size_set(but, 10);
+        UI_but_number_precision_set(but, 3);
 
         /* closing bracket and multiplication sign */
         if ((i != (data->poly_order - 1)) || ((i == 0) && data->poly_order == 2)) {
@@ -1024,21 +1025,10 @@ void ANIM_fmodifier_panels(const bContext *C,
       PointerRNA *fcm_ptr = MEM_mallocN(sizeof(PointerRNA), "panel customdata");
       RNA_pointer_create(owner_id, &RNA_FModifier, fcm, fcm_ptr);
 
-      Panel *new_panel = UI_panel_add_instanced(region, &region->panels, panel_idname, fcm_ptr);
-
-      if (new_panel != NULL) {
-        UI_panel_set_expand_from_list_data(C, new_panel);
-      }
+      UI_panel_add_instanced(C, region, &region->panels, panel_idname, fcm_ptr);
     }
   }
   else {
-    /* The expansion might have been changed elsewhere, so we still need to set it. */
-    LISTBASE_FOREACH (Panel *, panel, &region->panels) {
-      if ((panel->type != NULL) && (panel->type->flag & PNL_INSTANCED)) {
-        UI_panel_set_expand_from_list_data(C, panel);
-      }
-    }
-
     /* Assuming there's only one group of instanced panels, update the custom data pointers. */
     Panel *panel = region->panels.first;
     LISTBASE_FOREACH (FModifier *, fcm, fmodifiers) {

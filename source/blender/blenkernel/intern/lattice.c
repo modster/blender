@@ -246,14 +246,13 @@ int BKE_lattice_index_flip(
 }
 
 void BKE_lattice_bitmap_from_flag(
-    Lattice *lt, BLI_bitmap *bitmap, const short flag, const bool clear, const bool respecthide)
+    Lattice *lt, BLI_bitmap *bitmap, const uint8_t flag, const bool clear, const bool respecthide)
 {
   const unsigned int tot = lt->pntsu * lt->pntsv * lt->pntsw;
-  unsigned int i;
   BPoint *bp;
 
   bp = lt->def;
-  for (i = 0; i < tot; i++, bp++) {
+  for (int i = 0; i < tot; i++, bp++) {
     if ((bp->f1 & flag) && (!respecthide || !bp->hide)) {
       BLI_BITMAP_ENABLE(bitmap, i);
     }
@@ -402,13 +401,6 @@ Lattice *BKE_lattice_add(Main *bmain, const char *name)
   return lt;
 }
 
-Lattice *BKE_lattice_copy(Main *bmain, const Lattice *lt)
-{
-  Lattice *lt_copy;
-  BKE_id_copy(bmain, &lt->id, (ID **)&lt_copy);
-  return lt_copy;
-}
-
 bool object_deform_mball(Object *ob, ListBase *dispbase)
 {
   if (ob->parent && ob->parent->type == OB_LATTICE && ob->partype == PARSKEL) {
@@ -524,12 +516,12 @@ float (*BKE_lattice_vert_coords_alloc(const Lattice *lt, int *r_vert_len))[3]
 }
 
 void BKE_lattice_vert_coords_apply_with_mat4(struct Lattice *lt,
-                                             const float (*vertexCos)[3],
+                                             const float (*vert_coords)[3],
                                              const float mat[4][4])
 {
   int i, numVerts = lt->pntsu * lt->pntsv * lt->pntsw;
   for (i = 0; i < numVerts; i++) {
-    mul_v3_m4v3(lt->def[i].vec, mat, vertexCos[i]);
+    mul_v3_m4v3(lt->def[i].vec, mat, vert_coords[i]);
   }
 }
 
@@ -809,10 +801,10 @@ void BKE_lattice_eval_geometry(struct Depsgraph *UNUSED(depsgraph), Lattice *UNU
 }
 
 /* Draw Engine */
-void (*BKE_lattice_batch_cache_dirty_tag_cb)(Lattice *lt, int mode) = NULL;
+void (*BKE_lattice_batch_cache_dirty_tag_cb)(Lattice *lt, eMeshBatchDirtyMode mode) = NULL;
 void (*BKE_lattice_batch_cache_free_cb)(Lattice *lt) = NULL;
 
-void BKE_lattice_batch_cache_dirty_tag(Lattice *lt, int mode)
+void BKE_lattice_batch_cache_dirty_tag(Lattice *lt, eMeshBatchDirtyMode mode)
 {
   if (lt->batch_cache) {
     BKE_lattice_batch_cache_dirty_tag_cb(lt, mode);

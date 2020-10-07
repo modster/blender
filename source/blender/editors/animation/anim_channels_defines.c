@@ -4254,20 +4254,26 @@ short ANIM_channel_setting_get(bAnimContext *ac, bAnimListElem *ale, eAnimChanne
 #define ACF_SETTING_SET(sval, sflag, smode) \
   { \
     if (negflag) { \
-      if (smode == ACHANNEL_SETFLAG_INVERT) \
+      if (smode == ACHANNEL_SETFLAG_INVERT) { \
         (sval) ^= (sflag); \
-      else if (smode == ACHANNEL_SETFLAG_ADD) \
+      } \
+      else if (smode == ACHANNEL_SETFLAG_ADD) { \
         (sval) &= ~(sflag); \
-      else \
+      } \
+      else { \
         (sval) |= (sflag); \
+      } \
     } \
     else { \
-      if (smode == ACHANNEL_SETFLAG_INVERT) \
+      if (smode == ACHANNEL_SETFLAG_INVERT) { \
         (sval) ^= (sflag); \
-      else if (smode == ACHANNEL_SETFLAG_ADD) \
+      } \
+      else if (smode == ACHANNEL_SETFLAG_ADD) { \
         (sval) |= (sflag); \
-      else \
+      } \
+      else { \
         (sval) &= ~(sflag); \
+      } \
     } \
   } \
   (void)0
@@ -4406,7 +4412,7 @@ void ANIM_channel_draw(
   }
 
   /* step 4) draw special toggles  .................................
-   * - in Graph Editor, checkboxes for visibility in curves area
+   * - in Graph Editor, check-boxes for visibility in curves area
    * - in NLA Editor, glowing dots for solo/not solo...
    * - in Grease Pencil mode, color swatches for layer color
    */
@@ -5324,9 +5330,12 @@ void ANIM_channel_draw_widgets(const bContext *C,
      *   and wouldn't be able to auto-keyframe.
      * - Slider should start before the toggles (if they're visible)
      *   to keep a clean line down the side.
+     * - Sliders are always drawn in Shapekey mode now. Prior to this
+     *   the SACTION_SLIDERS flag would be set when changing into Shapekey mode.
      */
-    if ((draw_sliders) &&
-        ELEM(ale->type, ANIMTYPE_FCURVE, ANIMTYPE_NLACURVE, ANIMTYPE_SHAPEKEY, ANIMTYPE_GPLAYER)) {
+    if (((draw_sliders)
+        && ELEM(ale->type, ANIMTYPE_FCURVE, ANIMTYPE_NLACURVE, ANIMTYPE_SHAPEKEY, ANIMTYPE_GPLAYER))
+        || ale->type == ANIMTYPE_SHAPEKEY) {
       /* adjust offset */
       /* TODO: make slider width dynamic,
        * so that they can be easier to use when the view is wide enough. */
