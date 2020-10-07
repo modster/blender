@@ -347,13 +347,14 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
     return;
   }
 
-  ObjectKey key(b_ob.parent(), NULL, b_ob, false);
+  BL::CacheFile cache_file = b_mesh_cache.cache_file();
+  void *cache_file_key = cache_file.ptr.data;
 
-  AlembicProcedural *p = static_cast<AlembicProcedural *>(procedural_map.find(key));
+  AlembicProcedural *p = static_cast<AlembicProcedural *>(procedural_map.find(cache_file_key));
 
   if (!p) {
     p = scene->create_node<AlembicProcedural>();
-    procedural_map.add(key, p);
+    procedural_map.add(cache_file_key, p);
   }
   else {
     procedural_map.used(p);
