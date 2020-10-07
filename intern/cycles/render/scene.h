@@ -179,6 +179,7 @@ class SceneParams {
   CurveShapeType hair_shape;
   bool persistent_data;
   int texture_limit;
+  bool use_bvh_refit;
 
   bool background;
 
@@ -195,6 +196,7 @@ class SceneParams {
     persistent_data = false;
     texture_limit = 0;
     background = true;
+    use_bvh_refit = false;
   }
 
   bool modified(const SceneParams &params)
@@ -206,6 +208,13 @@ class SceneParams {
              num_bvh_time_steps == params.num_bvh_time_steps &&
              hair_subdivisions == params.hair_subdivisions && hair_shape == params.hair_shape &&
              persistent_data == params.persistent_data && texture_limit == params.texture_limit);
+  }
+
+  bool update_params(const SceneParams &params)
+  {
+    /* We do not want to include use_bvh_refit in the modified detection as this will recreate the entire scene. */
+    use_bvh_refit = params.use_bvh_refit;
+    return modified(params);
   }
 
   int curve_subdivisions()

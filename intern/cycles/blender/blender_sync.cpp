@@ -774,6 +774,14 @@ SceneParams BlenderSync::get_scene_params(BL::Scene &b_scene, bool background)
   params.use_bvh_unaligned_nodes = RNA_boolean_get(&cscene, "debug_use_hair_bvh");
   params.num_bvh_time_steps = RNA_int_get(&cscene, "debug_bvh_time_steps");
 
+  int bvh_rebuild_rate = RNA_int_get(&cscene, "bvh_rebuild_rate");
+  if (bvh_rebuild_rate < 1) {
+    bvh_rebuild_rate = 1;
+  }
+
+  int frame_delta = b_scene.frame_current() - b_scene.frame_start();
+  params.use_bvh_refit = (frame_delta % bvh_rebuild_rate) != 0;
+
   PointerRNA csscene = RNA_pointer_get(&b_scene.ptr, "cycles_curves");
   params.hair_subdivisions = get_int(csscene, "subdivisions");
   params.hair_shape = (CurveShapeType)get_enum(

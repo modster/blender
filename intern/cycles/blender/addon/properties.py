@@ -675,6 +675,12 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
         items=enum_bvh_types,
         default='DYNAMIC_BVH',
     )
+    bvh_rebuild_rate: IntProperty(
+        name="BVH Rebuild Rate",
+        description="Only rebuild the BVH every N frame, for faster updates on frame change in the viewport",
+        default=1,
+        min=1,
+    )
     debug_use_spatial_splits: BoolProperty(
         name="Use Spatial Splits",
         description="Use BVH spatial splits: longer builder time, faster render",

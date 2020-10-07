@@ -212,7 +212,7 @@ void BlenderSession::reset_session(BL::BlendData &b_data, BL::Depsgraph &b_depsg
       b_engine, b_userpref, b_scene, background);
   SceneParams scene_params = BlenderSync::get_scene_params(b_scene, background);
 
-  if (scene->params.modified(scene_params) || session->params.modified(session_params) ||
+  if (scene->params.update_params(scene_params) || session->params.modified(session_params) ||
       !scene_params.persistent_data) {
     /* if scene or session parameters changed, it's easier to simply re-create
      * them rather than trying to distinguish which settings need to be updated
@@ -783,7 +783,7 @@ void BlenderSession::synchronize(BL::Depsgraph &b_depsgraph_)
   SceneParams scene_params = BlenderSync::get_scene_params(b_scene, background);
   bool session_pause = BlenderSync::get_session_pause(b_scene, background);
 
-  if (session->params.modified(session_params) || scene->params.modified(scene_params)) {
+  if (session->params.modified(session_params) || scene->params.update_params(scene_params)) {
     free_session();
     create_session();
   }
