@@ -44,6 +44,7 @@
 #include "BLI_math.h"
 
 #include "BKE_action.h"
+#include "BKE_armature.h"
 #include "BKE_constraint.h"
 #include "BKE_context.h"
 #include "BKE_customdata.h"
@@ -58,7 +59,6 @@
 #include "BKE_object.h"
 #include "BKE_scene.h"
 
-#include "ED_armature.h"
 #include "ED_node.h"
 #include "ED_object.h"
 #include "ED_screen.h"
@@ -246,7 +246,7 @@ Mesh *bc_get_mesh_copy(BlenderContext &blender_context,
     tmpmesh = (Mesh *)ob->data;
   }
 
-  BKE_id_copy_ex(NULL, &tmpmesh->id, (ID **)&tmpmesh, LIB_ID_COPY_LOCALIZE);
+  tmpmesh = (Mesh *)BKE_id_copy_ex(NULL, &tmpmesh->id, NULL, LIB_ID_COPY_LOCALIZE);
 
   if (triangulate) {
     bc_triangulate_mesh(tmpmesh);

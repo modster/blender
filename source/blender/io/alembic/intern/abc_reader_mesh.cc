@@ -43,7 +43,10 @@
 
 using Alembic::Abc::Int32ArraySamplePtr;
 using Alembic::Abc::P3fArraySamplePtr;
+using Alembic::Abc::PropertyHeader;
 
+using Alembic::AbcGeom::IC3fGeomParam;
+using Alembic::AbcGeom::IC4fGeomParam;
 using Alembic::AbcGeom::IFaceSet;
 using Alembic::AbcGeom::IFaceSetSchema;
 using Alembic::AbcGeom::IN3fGeomParam;
@@ -155,8 +158,8 @@ static void read_mverts(CDStreamConfig &config, const AbcMeshData &mesh_data)
   MVert *mverts = config.mvert;
   const P3fArraySamplePtr &positions = mesh_data.positions;
 
-  if (config.weight != 0.0f && mesh_data.ceil_positions != NULL &&
-      mesh_data.ceil_positions->size() == positions->size()) {
+  if (config.use_vertex_interpolation && config.weight != 0.0f &&
+      mesh_data.ceil_positions != NULL && mesh_data.ceil_positions->size() == positions->size()) {
     read_mverts_interp(mverts, positions, mesh_data.ceil_positions, config.weight);
     return;
   }
@@ -457,7 +460,7 @@ static void read_mesh_sample(const std::string &iobject_full_name,
   }
 }
 
-CDStreamConfig get_config(Mesh *mesh)
+CDStreamConfig get_config(Mesh *mesh, const bool use_vertex_interpolation)
 {
   CDStreamConfig config;
 
@@ -471,6 +474,7 @@ CDStreamConfig get_config(Mesh *mesh)
   config.totpoly = mesh->totpoly;
   config.loopdata = &mesh->ldata;
   config.add_customdata_cb = add_customdata_cb;
+  config.use_vertex_interpolation = use_vertex_interpolation;
 
   return config;
 }
@@ -493,6 +497,39 @@ bool AbcMeshReader::valid() const
   return m_schema.valid();
 }
 
+template<class typedGeomParam>
+bool is_valid_animated(const ICompoundProperty arbGeomParams, const PropertyHeader &prop_header)
+{
+  if (!typedGeomParam::matches(prop_header)) {
+    return false;
+  }
+
+  typedGeomParam geom_param(arbGeomParams, prop_header.getName());
+  return geom_param.valid() && !geom_param.isConstant();
+}
+
+static bool has_animated_geom_params(const ICompoundProperty arbGeomParams)
+{
+  if (!arbGeomParams.valid()) {
+    return false;
+  }
+
+  const int num_props = arbGeomParams.getNumProperties();
+  for (int i = 0; i < num_props; i++) {
+    const PropertyHeader &prop_header = arbGeomParams.getPropertyHeader(i);
+
+    /* These are interpreted as vertex colors later (see 'read_custom_data'). */
+    if (is_valid_animated<IC3fGeomParam>(arbGeomParams, prop_header)) {
+      return true;
+    }
+    if (is_valid_animated<IC4fGeomParam>(arbGeomParams, prop_header)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /* Specialisation of has_animations() as defined in abc_reader_object.h. */
 template<> bool has_animations(Alembic::AbcGeom::IPolyMeshSchema &schema, ImportSettings *settings)
 {
@@ -501,9 +538,21 @@ template<> bool has_animations(Alembic::AbcGeom::IPolyMeshSchema &schema, Import
   }
 
   IV2fGeomParam uvsParam = schema.getUVsParam();
+  if (uvsParam.valid() && !uvsParam.isConstant()) {
+    return true;
+  }
+
   IN3fGeomParam normalsParam = schema.getNormalsParam();
-  return (uvsParam.valid() && !uvsParam.isConstant()) ||
-         (normalsParam.valid() && !normalsParam.isConstant());
+  if (normalsParam.valid() && !normalsParam.isConstant()) {
+    return true;
+  }
+
+  ICompoundProperty arbGeomParams = schema.getArbGeomParams();
+  if (has_animated_geom_params(arbGeomParams)) {
+    return true;
+  }
+
+  return false;
 }
 
 void AbcMeshReader::readObjectData(Main *bmain, const Alembic::Abc::ISampleSelector &sample_sel)
@@ -646,7 +695,9 @@ Mesh *AbcMeshReader::read_mesh(Mesh *existing_mesh,
     }
   }
 
-  CDStreamConfig config = get_config(new_mesh ? new_mesh : existing_mesh);
+  Mesh *mesh_to_export = new_mesh ? new_mesh : existing_mesh;
+  const bool use_vertex_interpolation = read_flag & MOD_MESHSEQ_INTERPOLATE_VERTICES;
+  CDStreamConfig config = get_config(mesh_to_export, use_vertex_interpolation);
   config.time = sample_sel.getRequestedTime();
   config.modifier_error_message = err_str;
 
@@ -936,11 +987,13 @@ Mesh *AbcSubDReader::read_mesh(Mesh *existing_mesh,
   }
 
   /* Only read point data when streaming meshes, unless we need to create new ones. */
-  CDStreamConfig config = get_config(new_mesh ? new_mesh : existing_mesh);
+  Mesh *mesh_to_export = new_mesh ? new_mesh : existing_mesh;
+  const bool use_vertex_interpolation = read_flag & MOD_MESHSEQ_INTERPOLATE_VERTICES;
+  CDStreamConfig config = get_config(mesh_to_export, use_vertex_interpolation);
   config.time = sample_sel.getRequestedTime();
   read_subd_sample(m_iobject.getFullName(), &settings, m_schema, sample_sel, config);
 
-  return config.mesh;
+  return mesh_to_export;
 }
 
 }  // namespace blender::io::alembic

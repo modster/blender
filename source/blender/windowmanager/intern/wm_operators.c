@@ -24,7 +24,6 @@
  * as well as some generic operators and shared operator properties.
  */
 
-#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <float.h>
@@ -1408,7 +1407,7 @@ static uiBlock *wm_block_dialog_create(bContext *C, ARegion *region, void *userD
   /* clear so the OK button is left alone */
   UI_block_func_set(block, NULL, NULL, NULL);
 
-  /* new column so as not to interfere with custom layouts [#26436] */
+  /* new column so as not to interfere with custom layouts T26436. */
   {
     uiBlock *col_block;
     uiLayout *col;
@@ -1624,7 +1623,7 @@ static int wm_debug_menu_exec(bContext *C, wmOperator *op)
 static int wm_debug_menu_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
 {
   RNA_int_set(op->ptr, "debug_value", G.debug_value);
-  return WM_operator_props_dialog_popup(C, op, 180);
+  return WM_operator_props_dialog_popup(C, op, 250);
 }
 
 static void WM_OT_debug_menu(wmOperatorType *ot)
@@ -3905,6 +3904,7 @@ static void gesture_box_modal_keymap(wmKeyConfig *keyconf)
   WM_modalkeymap_assign(keymap, "SCULPT_OT_face_set_box_gesture");
   WM_modalkeymap_assign(keymap, "SCULPT_OT_trim_box_gesture");
   WM_modalkeymap_assign(keymap, "PAINT_OT_mask_line_gesture");
+  WM_modalkeymap_assign(keymap, "SCULPT_OT_project_line_gesture");
   WM_modalkeymap_assign(keymap, "VIEW2D_OT_zoom_border");
   WM_modalkeymap_assign(keymap, "VIEW3D_OT_clip_border");
   WM_modalkeymap_assign(keymap, "VIEW3D_OT_render_border");

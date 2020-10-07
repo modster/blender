@@ -330,7 +330,13 @@ static World *preview_get_localized_world(ShaderPreview *sp, World *world)
   if (sp->worldcopy != NULL) {
     return sp->worldcopy;
   }
-  sp->worldcopy = BKE_world_localize(world);
+
+  ID *id_copy = BKE_id_copy_ex(NULL,
+                               &world->id,
+                               NULL,
+                               LIB_ID_CREATE_LOCAL | LIB_ID_COPY_LOCALIZE |
+                                   LIB_ID_COPY_NO_ANIMDATA);
+  sp->worldcopy = (World *)id_copy;
   BLI_addtail(&sp->pr_main->worlds, sp->worldcopy);
   return sp->worldcopy;
 }
@@ -344,13 +350,13 @@ static ID *duplicate_ids(ID *id, bool allow_failure)
 
   switch (GS(id->name)) {
     case ID_MA:
-      return (ID *)BKE_material_localize((Material *)id);
     case ID_TE:
-      return (ID *)BKE_texture_localize((Tex *)id);
     case ID_LA:
-      return (ID *)BKE_light_localize((Light *)id);
-    case ID_WO:
-      return (ID *)BKE_world_localize((World *)id);
+    case ID_WO: {
+      ID *id_copy = BKE_id_copy_ex(
+          NULL, id, NULL, LIB_ID_CREATE_LOCAL | LIB_ID_COPY_LOCALIZE | LIB_ID_COPY_NO_ANIMDATA);
+      return id_copy;
+    }
     case ID_IM:
     case ID_BR:
     case ID_SCR:
@@ -744,8 +750,9 @@ static Scene *object_preview_scene_create(const struct ObjectPreviewData *previe
 
   /* FIXME For now just create a copy of the object for the new main, until we have a better way to
    * obtain the ID in a different Main (i.e. read from asset file). */
-  Object *preview_object_copy;
-  if (!BKE_id_copy(preview_data->main, &preview_data->object->id, (ID **)&preview_object_copy)) {
+  Object *preview_object_copy = (Object *)BKE_id_copy(preview_data->main,
+                                                      &preview_data->object->id);
+  if (!preview_object_copy) {
     BLI_assert(false);
     return NULL;
   }

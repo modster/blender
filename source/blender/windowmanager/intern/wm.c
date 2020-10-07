@@ -106,7 +106,8 @@ IDTypeInfo IDType_ID_WM = {
     .name = "WindowManager",
     .name_plural = "window_managers",
     .translation_context = BLT_I18NCONTEXT_ID_WINDOWMANAGER,
-    .flags = IDTYPE_FLAGS_NO_COPY | IDTYPE_FLAGS_NO_LIBLINKING | IDTYPE_FLAGS_NO_MAKELOCAL,
+    .flags = IDTYPE_FLAGS_NO_COPY | IDTYPE_FLAGS_NO_LIBLINKING | IDTYPE_FLAGS_NO_MAKELOCAL |
+             IDTYPE_FLAGS_NO_ANIMDATA,
 
     .init_data = NULL,
     .copy_data = NULL,
@@ -395,7 +396,7 @@ void wm_add_default(Main *bmain, bContext *C)
   win->scene = CTX_data_scene(C);
   STRNCPY(win->view_layer_name, CTX_data_view_layer(C)->name);
   BKE_workspace_active_set(win->workspace_hook, workspace);
-  BKE_workspace_active_layout_set(win->workspace_hook, workspace, layout);
+  BKE_workspace_active_layout_set(win->workspace_hook, win->winid, workspace, layout);
   screen->winid = win->winid;
 
   wm->winactive = win;

@@ -687,6 +687,8 @@ typedef struct MovieClipCache {
     float polynomial_k[3];
     float division_k[2];
     float nuke_k[2];
+    float brown_k[4];
+    float brown_p[2];
     short distortion_model;
     bool undistortion_used;
 
@@ -1134,7 +1136,15 @@ static bool check_undistortion_cache_flags(const MovieClip *clip)
   if (!equals_v2v2(&camera->division_k1, cache->postprocessed.division_k)) {
     return false;
   }
+
   if (!equals_v2v2(&camera->nuke_k1, cache->postprocessed.nuke_k)) {
+    return false;
+  }
+
+  if (!equals_v4v4(&camera->brown_k1, cache->postprocessed.brown_k)) {
+    return false;
+  }
+  if (!equals_v2v2(&camera->brown_p1, cache->postprocessed.brown_p)) {
     return false;
   }
 
@@ -1240,6 +1250,8 @@ static void put_postprocessed_frame_to_cache(
     copy_v3_v3(cache->postprocessed.polynomial_k, &camera->k1);
     copy_v2_v2(cache->postprocessed.division_k, &camera->division_k1);
     copy_v2_v2(cache->postprocessed.nuke_k, &camera->nuke_k1);
+    copy_v4_v4(cache->postprocessed.brown_k, &camera->brown_k1);
+    copy_v2_v2(cache->postprocessed.brown_p, &camera->brown_p1);
     cache->postprocessed.undistortion_used = true;
   }
   else {
@@ -1904,13 +1916,6 @@ void BKE_movieclip_build_proxy_frame_for_ibuf(MovieClip *clip,
       IMB_freeImBuf(tmpibuf);
     }
   }
-}
-
-MovieClip *BKE_movieclip_copy(Main *bmain, const MovieClip *clip)
-{
-  MovieClip *clip_copy;
-  BKE_id_copy(bmain, &clip->id, (ID **)&clip_copy);
-  return clip_copy;
 }
 
 float BKE_movieclip_remap_scene_to_clip_frame(const MovieClip *clip, float framenr)

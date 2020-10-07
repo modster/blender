@@ -535,6 +535,11 @@ if(WITH_OPENVDB)
   set(OPENVDB_DEFINITIONS -DNOMINMAX -D_USE_MATH_DEFINES)
 endif()
 
+if(WITH_NANOVDB)
+  set(NANOVDB ${LIBDIR}/nanoVDB)
+  set(NANOVDB_INCLUDE_DIR ${NANOVDB}/include)
+endif()
+
 if(WITH_OPENIMAGEDENOISE)
   set(OPENIMAGEDENOISE ${LIBDIR}/OpenImageDenoise)
   set(OPENIMAGEDENOISE_LIBPATH ${LIBDIR}/OpenImageDenoise/lib)
@@ -766,4 +771,3 @@ if(WITH_POTRACE)
   set(POTRACE_LIBRARIES ${LIBDIR}/potrace/lib/potrace.lib)
   set(POTRACE_FOUND On)
 endif()
-

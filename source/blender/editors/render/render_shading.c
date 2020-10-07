@@ -218,7 +218,7 @@ static int material_slot_remove_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  /* Removing material slots in edit mode screws things up, see bug #21822.*/
+  /* Removing material slots in edit mode screws things up, see bug T21822.*/
   if (ob == CTX_data_edit_object(C)) {
     BKE_report(op->reports, RPT_ERROR, "Unable to remove material slot in edit mode");
     return OPERATOR_CANCELLED;
@@ -664,7 +664,7 @@ void OBJECT_OT_material_slot_move(wmOperatorType *ot)
 
 static int material_slot_remove_unused_exec(bContext *C, wmOperator *op)
 {
-  /* Removing material slots in edit mode screws things up, see bug #21822.*/
+  /* Removing material slots in edit mode screws things up, see bug T21822. */
   Object *ob_active = CTX_data_active_object(C);
   if (ob_active && BKE_object_is_in_editmode(ob_active)) {
     BKE_report(op->reports, RPT_ERROR, "Unable to remove material slot in edit mode");
@@ -751,8 +751,8 @@ static int new_material_exec(bContext *C, wmOperator *UNUSED(op))
 
   /* add or copy material */
   if (ma) {
-    Material *new_ma = NULL;
-    BKE_id_copy_ex(bmain, &ma->id, (ID **)&new_ma, LIB_ID_COPY_DEFAULT | LIB_ID_COPY_ACTIONS);
+    Material *new_ma = (Material *)BKE_id_copy_ex(
+        bmain, &ma->id, NULL, LIB_ID_COPY_DEFAULT | LIB_ID_COPY_ACTIONS);
     ma = new_ma;
   }
   else {
@@ -820,7 +820,7 @@ static int new_texture_exec(bContext *C, wmOperator *UNUSED(op))
 
   /* add or copy texture */
   if (tex) {
-    tex = BKE_texture_copy(bmain, tex);
+    tex = (Tex *)BKE_id_copy(bmain, &tex->id);
   }
   else {
     tex = BKE_texture_add(bmain, DATA_("Texture"));
@@ -873,7 +873,9 @@ static int new_world_exec(bContext *C, wmOperator *UNUSED(op))
 
   /* add or copy world */
   if (wo) {
-    wo = BKE_world_copy(bmain, wo);
+    World *new_wo = (World *)BKE_id_copy_ex(
+        bmain, &wo->id, NULL, LIB_ID_COPY_DEFAULT | LIB_ID_COPY_ACTIONS);
+    wo = new_wo;
   }
   else {
     wo = BKE_world_add(bmain, DATA_("World"));
@@ -1121,8 +1123,7 @@ static int light_cache_bake_invoke(bContext *C, wmOperator *op, const wmEvent *U
 
   /* store actual owner of job, so modal operator could check for it,
    * the reason of this is that active scene could change when rendering
-   * several layers from compositor [#31800]
-   */
+   * several layers from compositor T31800. */
   op->customdata = scene;
 
   WM_jobs_start(wm, wm_job);
@@ -1661,7 +1662,7 @@ static int freestyle_linestyle_new_exec(bContext *C, wmOperator *op)
   }
   if (lineset->linestyle) {
     id_us_min(&lineset->linestyle->id);
-    lineset->linestyle = BKE_linestyle_copy(bmain, lineset->linestyle);
+    lineset->linestyle = (FreestyleLineStyle *)BKE_id_copy(bmain, &lineset->linestyle->id);
   }
   else {
     lineset->linestyle = BKE_linestyle_new(bmain, "LineStyle");

@@ -27,6 +27,7 @@
 extern "C" {
 #endif
 
+struct BlendDataReader;
 struct Brush;
 struct CurveMapping;
 struct Depsgraph;
@@ -48,7 +49,6 @@ struct bGPDlayer_Mask;
 struct bGPDspoint;
 struct bGPDstroke;
 struct bGPdata;
-struct BlendDataReader;
 
 #define GPENCIL_SIMPLIFY(scene) ((scene->r.simplify_gpencil & SIMPLIFY_GPENCIL_ENABLE))
 #define GPENCIL_SIMPLIFY_ONPLAY(playing) \
@@ -112,8 +112,6 @@ struct bGPDframe *BKE_gpencil_frame_duplicate(const struct bGPDframe *gpf_src);
 struct bGPDlayer *BKE_gpencil_layer_duplicate(const struct bGPDlayer *gpl_src);
 void BKE_gpencil_frame_copy_strokes(struct bGPDframe *gpf_src, struct bGPDframe *gpf_dst);
 struct bGPDstroke *BKE_gpencil_stroke_duplicate(struct bGPDstroke *gps_src, const bool dup_points);
-
-struct bGPdata *BKE_gpencil_copy(struct Main *bmain, const struct bGPdata *gpd);
 
 struct bGPdata *BKE_gpencil_data_duplicate(struct Main *bmain,
                                            const struct bGPdata *gpd,

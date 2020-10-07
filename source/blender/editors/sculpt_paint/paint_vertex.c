@@ -883,7 +883,7 @@ static void do_weight_paint_vertex_single(
     dw->weight = weight;
 
     /* WATCH IT: take care of the ordering of applying mirror -> normalize,
-     * can give wrong results [#26193], least confusing if normalize is done last */
+     * can give wrong results T26193, least confusing if normalize is done last */
 
     /* apply mirror */
     if (index_mirr != -1) {
@@ -2173,8 +2173,8 @@ static void wpaint_paint_leaves(bContext *C,
 
   /* NOTE: current mirroring code cannot be run in parallel */
   TaskParallelSettings settings;
-  BKE_pbvh_parallel_range_settings(
-      &settings, !(me->flag & ME_EDIT_VERTEX_GROUPS_X_SYMMETRY), totnode);
+  const bool use_threading = ((me->editflag & ME_EDIT_VERTEX_GROUPS_X_SYMMETRY) == 0);
+  BKE_pbvh_parallel_range_settings(&settings, use_threading, totnode);
 
   switch ((eBrushWeightPaintTool)brush->weightpaint_tool) {
     case WPAINT_TOOL_AVERAGE:
