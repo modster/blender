@@ -281,15 +281,15 @@ void id_us_min(ID *id)
     const int limit = ID_FAKE_USERS(id);
 
     if (id->us <= limit) {
-      CLOG_ERROR(&LOG,
-                 "ID user decrement error: %s (from '%s'): %d <= %d",
-                 id->name,
-                 id->lib ? id->lib->filepath_abs : "[Main]",
-                 id->us,
-                 limit);
       if (GS(id->name) != ID_IP) {
         /* Do not assert on deprecated ID types, we cannot really ensure that their ID refcounting
          * is valid... */
+        CLOG_ERROR(&LOG,
+                   "ID user decrement error: %s (from '%s'): %d <= %d",
+                   id->name,
+                   id->lib ? id->lib->filepath_abs : "[Main]",
+                   id->us,
+                   limit);
         BLI_assert(0);
       }
       id->us = limit;
@@ -1035,6 +1035,8 @@ void *BKE_libblock_alloc_notest(short type)
 void *BKE_libblock_alloc(Main *bmain, short type, const char *name, const int flag)
 {
   BLI_assert((flag & LIB_ID_CREATE_NO_ALLOCATE) == 0);
+  BLI_assert((flag & LIB_ID_CREATE_NO_MAIN) != 0 || bmain != NULL);
+  BLI_assert((flag & LIB_ID_CREATE_NO_MAIN) != 0 || (flag & LIB_ID_CREATE_LOCAL) == 0);
 
   ID *id = BKE_libblock_alloc_notest(type);
 
@@ -1044,6 +1046,9 @@ void *BKE_libblock_alloc(Main *bmain, short type, const char *name, const int fl
     }
     if ((flag & LIB_ID_CREATE_NO_USER_REFCOUNT) != 0) {
       id->tag |= LIB_TAG_NO_USER_REFCOUNT;
+    }
+    if (flag & LIB_ID_CREATE_LOCAL) {
+      id->tag |= LIB_TAG_LOCALIZED;
     }
 
     id->icon_id = 0;
@@ -1180,6 +1185,7 @@ void BKE_libblock_copy_ex(Main *bmain, const ID *id, ID **r_newid, const int ori
 
   BLI_assert((flag & LIB_ID_CREATE_NO_MAIN) != 0 || bmain != NULL);
   BLI_assert((flag & LIB_ID_CREATE_NO_MAIN) != 0 || (flag & LIB_ID_CREATE_NO_ALLOCATE) == 0);
+  BLI_assert((flag & LIB_ID_CREATE_NO_MAIN) != 0 || (flag & LIB_ID_CREATE_LOCAL) == 0);
   if (!is_private_id_data) {
     /* When we are handling private ID data, we might still want to manage usercounts, even
      * though that ID data-block is actually outside of Main... */

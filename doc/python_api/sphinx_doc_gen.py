@@ -41,8 +41,7 @@ Sphinx: HTML generation
   After you have built doc/python_api/sphinx-in (see above),
   generate html docs by running:
 
-    cd doc/python_api
-    sphinx-build sphinx-in sphinx-out
+    sphinx-build doc/python_api/sphinx-in doc/python_api/sphinx-out
 
 
 Sphinx: PDF generation
@@ -2228,7 +2227,7 @@ def main():
                 shutil.rmtree(REFERENCE_PATH, True)
 
             # copy SPHINX_OUT to the REFERENCE_PATH
-            ignores = ('.doctrees', 'objects.inv', '.buildinfo')
+            ignores = ('.doctrees', '.buildinfo')
             shutil.copytree(SPHINX_OUT,
                             REFERENCE_PATH,
                             ignore=shutil.ignore_patterns(*ignores))
