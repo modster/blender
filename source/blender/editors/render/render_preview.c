@@ -750,8 +750,9 @@ static Scene *object_preview_scene_create(const struct ObjectPreviewData *previe
 
   /* FIXME For now just create a copy of the object for the new main, until we have a better way to
    * obtain the ID in a different Main (i.e. read from asset file). */
-  Object *preview_object_copy;
-  if (!BKE_id_copy(preview_data->main, &preview_data->object->id, (ID **)&preview_object_copy)) {
+  Object *preview_object_copy = (Object *)BKE_id_copy(preview_data->main,
+                                                      &preview_data->object->id);
+  if (!preview_object_copy) {
     BLI_assert(false);
     return NULL;
   }
