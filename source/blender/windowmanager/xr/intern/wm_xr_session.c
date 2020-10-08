@@ -487,7 +487,7 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
 static const GHOST_XrPose *wm_xr_session_controller_pose_find(const wmXrSessionState *state,
                                                               const char *subaction_path)
 {
-  for (unsigned int i = 0; i < 2; ++i) {
+  for (unsigned int i = 0; i < (unsigned int)ARRAY_SIZE(state->controllers); ++i) {
     if (STREQ(state->controllers[i].subaction_path, subaction_path)) {
       return &state->controllers[i].pose;
     }
