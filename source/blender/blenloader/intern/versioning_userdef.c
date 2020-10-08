@@ -799,10 +799,6 @@ void blo_do_versions_userdef(UserDef *userdef)
     }
   }
 
-  if (!USER_VERSION_ATLEAST(291, 6)) {
-    BKE_preferences_asset_repository_default_add(userdef);
-  }
-
   /**
    * Versioning code until next subversion bump goes here.
    *
@@ -814,6 +810,9 @@ void blo_do_versions_userdef(UserDef *userdef)
    */
   {
     /* Keep this block, even when empty. */
+    if (BLI_listbase_is_empty(&userdef->asset_repositories)) {
+      BKE_preferences_asset_repository_default_add(userdef);
+    }
   }
 
   if (userdef->pixelsize == 0.0f) {
