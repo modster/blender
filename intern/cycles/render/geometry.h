@@ -56,30 +56,26 @@ class Geometry : public Node {
     VOLUME,
   };
 
-  /* Maximum number of motion steps supported (due to Embree). */
-  static const uint MAX_MOTION_STEPS = 129;
+  Type geometry_type;
+
+  /* Attributes */
+  AttributeSet attributes;
+
+  /* Shaders */
+  NODE_PUBLIC_API_ARRAY(array<Node *>, used_shaders)
+
+  /* Transform */
+  BoundBox bounds;
+  bool transform_applied;
+  bool transform_negative_scaled;
+  Transform transform_normal;
 
   /* Motion Blur */
   NODE_PUBLIC_API(uint, motion_steps)
   NODE_PUBLIC_API(bool, use_motion_blur)
 
-  /* Attributes */
-  AttributeSet attributes;  // @api
-
-  /* Shaders */
-  NODE_PUBLIC_API_ARRAY(array<Node *>, used_shaders)
-
-  /* Update Flags */
-  bool need_update_rebuild;
-
-  bool transform_applied;
-
-  Type geometry_type;  // should not be public as it is read-only after creation
-
-  /* Transform */
-  BoundBox bounds;
-  bool transform_negative_scaled;
-  Transform transform_normal;
+  /* Maximum number of motion steps supported (due to Embree). */
+  static const uint MAX_MOTION_STEPS = 129;
 
   /* BVH */
   BVH *bvh;
@@ -91,7 +87,9 @@ class Geometry : public Node {
   bool has_volume;         /* Set in the device_update_flags(). */
   bool has_surface_bssrdf; /* Set in the device_update_flags(). */
 
- public:
+  /* Update Flags */
+  bool need_update_rebuild;
+
   /* Constructor/Destructor */
   explicit Geometry(const NodeType *node_type, const Type type);
   virtual ~Geometry();

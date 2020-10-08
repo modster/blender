@@ -373,9 +373,9 @@ ObjectManager::~ObjectManager()
 {
 }
 
-float ObjectManager::object_surface_area(UpdateObjectTransformState *state,
-                                         const Transform &tfm,
-                                         Geometry *geom)
+static float object_surface_area(UpdateObjectTransformState *state,
+                                 const Transform &tfm,
+                                 Geometry *geom)
 {
   if (geom->geometry_type != Geometry::MESH && geom->geometry_type != Geometry::VOLUME) {
     return 0.0f;

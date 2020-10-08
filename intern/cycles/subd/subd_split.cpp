@@ -364,16 +364,16 @@ void DiagSplit::split_patches(Patch *patches, size_t patches_byte_stride)
   post_split();
 }
 
-Edge *DiagSplit::create_edge_from_corner(DiagSplit *split,
-                                         const Mesh *mesh,
-                                         const Mesh::SubdFace &face,
-                                         int corner,
-                                         bool &reversed,
-                                         int v0,
-                                         int v1)
+static Edge *create_edge_from_corner(DiagSplit *split,
+                                     const Mesh *mesh,
+                                     const Mesh::SubdFace &face,
+                                     int corner,
+                                     bool &reversed,
+                                     int v0,
+                                     int v1)
 {
-  int a = mesh->subd_face_corners[face.start_corner + mod(corner + 0, face.num_corners)];
-  int b = mesh->subd_face_corners[face.start_corner + mod(corner + 1, face.num_corners)];
+  int a = mesh->get_subd_face_corners()[face.start_corner + mod(corner + 0, face.num_corners)];
+  int b = mesh->get_subd_face_corners()[face.start_corner + mod(corner + 1, face.num_corners)];
 
   reversed = !(b < a);
 
@@ -431,20 +431,20 @@ void DiagSplit::split_quad(const Mesh::SubdFace &face, Patch *patch)
   split(subpatch, -2);
 }
 
-Edge *DiagSplit::create_split_edge_from_corner(DiagSplit *split,
-                                               const Mesh *mesh,
-                                               const Mesh::SubdFace &face,
-                                               int corner,
-                                               int side,
-                                               bool &reversed,
-                                               int v0,
-                                               int v1,
-                                               int vc)
+static Edge *create_split_edge_from_corner(DiagSplit *split,
+                                           const Mesh *mesh,
+                                           const Mesh::SubdFace &face,
+                                           int corner,
+                                           int side,
+                                           bool &reversed,
+                                           int v0,
+                                           int v1,
+                                           int vc)
 {
   Edge *edge = split->alloc_edge();
 
-  int a = mesh->subd_face_corners[face.start_corner + mod(corner + 0, face.num_corners)];
-  int b = mesh->subd_face_corners[face.start_corner + mod(corner + 1, face.num_corners)];
+  int a = mesh->get_subd_face_corners()[face.start_corner + mod(corner + 0, face.num_corners)];
+  int b = mesh->get_subd_face_corners()[face.start_corner + mod(corner + 1, face.num_corners)];
 
   if (b < a) {
     edge->stitch_edge_key = {b, a};

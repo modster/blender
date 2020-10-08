@@ -149,11 +149,6 @@ class ObjectManager {
   bool device_update_object_transform_pop_work(UpdateObjectTransformState *state,
                                                int *start_index,
                                                int *num_objects);
-
- private:
-  static float object_surface_area(UpdateObjectTransformState *state,
-                                   const Transform &tfm,
-                                   Geometry *geom);
 };
 
 CCL_NAMESPACE_END

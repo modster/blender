@@ -68,25 +68,6 @@ class DiagSplit {
   void split_ngon(const Mesh::SubdFace &face, Patch *patches, size_t patches_byte_stride);
 
   void post_split();
-
- private:
-  static Edge *create_edge_from_corner(DiagSplit *split,
-                                       const Mesh *mesh,
-                                       const Mesh::SubdFace &face,
-                                       int corner,
-                                       bool &reversed,
-                                       int v0,
-                                       int v1);
-
-  static Edge *create_split_edge_from_corner(DiagSplit *split,
-                                             const Mesh *mesh,
-                                             const Mesh::SubdFace &face,
-                                             int corner,
-                                             int side,
-                                             bool &reversed,
-                                             int v0,
-                                             int v1,
-                                             int vc);
 };
 
 CCL_NAMESPACE_END

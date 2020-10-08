@@ -44,7 +44,7 @@ namespace OPENSUBDIV_VERSION {
 namespace Far {
 template<>
 bool TopologyRefinerFactory<ccl::Mesh>::resizeComponentTopology(TopologyRefiner &refiner,
-                                                                const ccl::Mesh &mesh)
+                                                                ccl::Mesh const &mesh)
 {
   setNumBaseVertices(refiner, mesh.get_verts().size());
   setNumBaseFaces(refiner, mesh.get_num_subd_faces());
@@ -58,7 +58,7 @@ bool TopologyRefinerFactory<ccl::Mesh>::resizeComponentTopology(TopologyRefiner 
 
 template<>
 bool TopologyRefinerFactory<ccl::Mesh>::assignComponentTopology(TopologyRefiner &refiner,
-                                                                const ccl::Mesh &mesh)
+                                                                ccl::Mesh const &mesh)
 {
   const ccl::array<int> &subd_face_corners = mesh.get_subd_face_corners();
   const ccl::array<int> &subd_start_corner = mesh.get_subd_start_corner();
@@ -80,7 +80,7 @@ bool TopologyRefinerFactory<ccl::Mesh>::assignComponentTopology(TopologyRefiner 
 
 template<>
 bool TopologyRefinerFactory<ccl::Mesh>::assignComponentTags(TopologyRefiner &refiner,
-                                                            const ccl::Mesh &mesh)
+                                                            ccl::Mesh const &mesh)
 {
   size_t num_creases = mesh.get_subd_creases_weight().size();
 
