@@ -42,6 +42,11 @@ struct Transform;
     const SocketType *socket = get_##name##_socket(); \
     return socket_is_modified(*socket); \
   } \
+  void tag_##name##_modified() \
+  { \
+    const SocketType *socket = get_##name##_socket(); \
+    socket_modified |= socket->modified_flag_bit; \
+  } \
   type_ const &get_##name() const \
   { \
     const SocketType *socket = get_##name##_socket(); \

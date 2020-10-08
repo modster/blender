@@ -317,21 +317,22 @@ void Mesh::clear()
 void Mesh::add_vertex(float3 P)
 {
   verts.push_back_reserved(P);
+  tag_verts_modified();
 
   if (get_num_subd_faces()) {
     vert_patch_uv.push_back_reserved(make_float2(0.0f, 0.0f));
+    tag_vert_patch_uv_modified();
   }
 }
 
 void Mesh::add_vertex_slow(float3 P)
 {
   verts.push_back_slow(P);
-
-  socket_modified |= get_triangles_socket()->modified_flag_bit;
+  tag_verts_modified();
 
   if (get_num_subd_faces()) {
     vert_patch_uv.push_back_slow(make_float2(0.0f, 0.0f));
-    socket_modified |= get_vert_patch_uv_socket()->modified_flag_bit;
+    tag_vert_patch_uv_modified();
   }
 }
 
@@ -343,13 +344,13 @@ void Mesh::add_triangle(int v0, int v1, int v2, int shader_, bool smooth_)
   shader.push_back_reserved(shader_);
   smooth.push_back_reserved(smooth_);
 
-  socket_modified |= get_triangles_socket()->modified_flag_bit;
-  socket_modified |= get_shader_socket()->modified_flag_bit;
-  socket_modified |= get_smooth_socket()->modified_flag_bit;
+  tag_triangles_modified();
+  tag_shader_modified();
+  tag_smooth_modified();
 
   if (get_num_subd_faces()) {
     triangle_patch.push_back_reserved(-1);
-    socket_modified |= get_triangle_patch_socket()->modified_flag_bit;
+    tag_triangle_patch_modified();
   }
 }
 
@@ -374,6 +375,13 @@ void Mesh::add_subd_face(int *corners, int num_corners, int shader_, bool smooth
   subd_shader.push_back_reserved(shader_);
   subd_smooth.push_back_reserved(smooth_);
   subd_ptex_offset.push_back_reserved(ptex_offset);
+
+  tag_subd_face_corners_modified();
+  tag_subd_start_corner_modified();
+  tag_subd_num_corners_modified();
+  tag_subd_shader_modified();
+  tag_subd_smooth_modified();
+  tag_subd_ptex_offset_modified();
 }
 
 Mesh::SubdFace Mesh::get_subd_face(size_t index) const
@@ -392,6 +400,10 @@ void ccl::Mesh::add_crease(int v0, int v1, float weight)
   subd_creases_edge.push_back_slow(v0);
   subd_creases_edge.push_back_slow(v1);
   subd_creases_weight.push_back_slow(weight);
+
+  tag_subd_creases_edge_modified();
+  tag_subd_creases_edge_modified();
+  tag_subd_creases_weight_modified();
 }
 
 void Mesh::copy_center_to_motion_step(const int motion_step)
