@@ -24,6 +24,7 @@
 #include "usd_importer_context.h"
 #include "usd_reader_mesh.h"
 #include "usd_reader_object.h"
+#include "usd_reader_transform.h"
 
 #include <pxr/base/plug/registry.h>
 #include <pxr/pxr.h>
@@ -55,6 +56,7 @@
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 
+#include <iostream>
 #include <map>
 
 /* TfToken objects are not cheap to construct, so we do it once. */
@@ -85,6 +87,20 @@ inline void copy_zup_from_yup(float zup[3], const float yup[3])
 }  // end anonymous namespace
 
 namespace blender::io::usd {
+
+static UsdObjectReader *get_reader(const pxr::UsdPrim &prim, const USDImporterContext &context)
+{
+  UsdObjectReader *result = nullptr;
+
+  if (prim.GetTypeName() == usdtokens::mesh_type) {
+    result = new UsdMeshReader(prim, context);
+  }
+  else if (prim.GetTypeName() == usdtokens::xform_type) {
+    result = new UsdTransformReader(prim, context);
+  }
+
+  return result;
+}
 
 void debug_traverse_stage(const pxr::UsdStageRefPtr &usd_stage)
 {
@@ -221,21 +237,93 @@ void create_readers(const pxr::UsdStageRefPtr &usd_stage,
     return;
   }
 
+  /* Map a USD prim path to the corresponding reader,
+   * for keeping track of which prims have been processed
+   * and for setting parenting relationships when we are
+   * done with the traversal. */
+  std::map<std::string, UsdObjectReader *> readers_map;
+
   pxr::UsdPrimRange prims = usd_stage->Traverse(
       pxr::UsdTraverseInstanceProxies(pxr::UsdPrimAllPrimsPredicate));
 
   for (const pxr::UsdPrim &prim : prims) {
-    UsdObjectReader *reader = nullptr;
 
-    if (prim.GetTypeName() == usdtokens::mesh_type) {
-      reader = new UsdMeshReader(prim, context);
+    std::string prim_path = prim.GetPath().GetString();
+
+    std::map<std::string, UsdObjectReader *>::const_iterator prim_entry = readers_map.find(prim_path);
+
+    if (prim_entry != readers_map.end())
+    {
+      /* We already processed the reader for this prim, probably when merging it with its parent. */
+      continue;
+    }
+
+    UsdObjectReader *reader = nullptr;
+    bool merge_reader = false;
+
+    if (prim.GetTypeName() == usdtokens::xform_type) {
+
+      /* Check if the Xform and prim should be merged. */
+
+      pxr::UsdPrimSiblingRange children = prim.GetFilteredChildren(pxr::UsdTraverseInstanceProxies(pxr::UsdPrimAllPrimsPredicate));
+
+      size_t num_children = boost::size(children);
+
+      /* Merge only if the Xform has a single Mesh child. */
+      if (num_children == 1)
+      {
+        pxr::UsdPrim child_prim = children.front();
+ 
+        if (child_prim && child_prim.GetTypeName() == usdtokens::mesh_type)
+        {
+          /* We don't create a reader for the current Xform prim, but instead
+           * make a single reader that will merge the Xform and its child. */
+
+          merge_reader = true;
+          reader = get_reader(child_prim, context);
+          prim_path = child_prim.GetPath().GetString();
+
+          if (reader) {
+            reader->set_merged_with_parent(true);
+          } else {
+            std::cerr << "WARNING:  Couldn't get reader when merging child prim." << std::endl;
+          }
+        }
+      }
+    }
+
+    if (!merge_reader) {
+      reader = get_reader(prim, context);
     }
 
     if (reader) {
+      readers_map.insert(std::make_pair(prim_path, reader));
       r_readers.push_back(reader);
       reader->incref();
     }
   }
+
+  /* Set parenting. */
+  for (std::vector<UsdObjectReader*>::iterator it = r_readers.begin(); it != r_readers.end(); ++it) {
+
+    pxr::UsdPrim parent = (*it)->prim().GetParent();
+
+    if (parent && (*it)->merged_with_parent()) {
+      /* If we are merging, we use the grandparent. */
+      parent = parent.GetParent();
+    }
+
+    if (parent) {
+      std::string parent_path = parent.GetPath().GetString();
+
+      std::map<std::string, UsdObjectReader *>::const_iterator parent_entry = readers_map.find(parent_path);
+
+      if (parent_entry != readers_map.end()) {
+        (*it)->set_parent(parent_entry->second);
+      }
+    }
+  }
+
 }
 
 } /* namespace blender::io::usd */

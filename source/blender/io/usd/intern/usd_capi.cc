@@ -296,7 +296,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
       max_time = std::max(max_time, reader->maxTime());
     }
     else {
-      std::cerr << "Object " << reader->name() << " in USD file " << data->filename
+      std::cerr << "Object " << reader->prim_path() << " in USD file " << data->filename
                 << " is invalid.\n";
     }
 
@@ -309,7 +309,22 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
     }
   }
 
-  // Setup transformations.
+  /* Setup parenthood. */
+  for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
+    const UsdObjectReader *reader = *iter;
+
+    Object *ob = reader->object();
+
+    if (!ob) {
+      continue;
+    }
+
+    const UsdObjectReader *parent_reader = reader->parent();
+
+    ob->parent = parent_reader ? parent_reader->object() : nullptr;
+  }
+
+  /* Setup transformations. */
   i = 0;
   for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
     UsdObjectReader *reader = *iter;

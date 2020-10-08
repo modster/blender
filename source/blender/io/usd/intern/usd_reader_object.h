@@ -33,15 +33,18 @@ struct Object;
 namespace blender::io::usd {
 
 class UsdObjectReader {
+public:
+  typedef std::vector<UsdObjectReader *> ptr_vector;
+
  protected:
   /* The USD prim path. */
-  std::string name_;
+  std::string prim_path_;
 
   /* The USD prim parent name. */
-  std::string object_name_;
+  std::string prim_parent_name_;
 
   /* The USD prim name. */
-  std::string data_name_;
+  std::string prim_name_;
 
   Object *object_;
   pxr::UsdPrim prim_;
@@ -56,8 +59,11 @@ class UsdObjectReader {
    * modifiers and/or constraints. */
   int refcount_;
 
+  UsdObjectReader *parent_;
+
+  bool merged_with_parent_;
+
  public:
-  typedef std::vector<UsdObjectReader *> ptr_vector;
 
   explicit UsdObjectReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
 
@@ -69,17 +75,35 @@ class UsdObjectReader {
 
   void setObject(Object *ob);
 
-  const std::string &name() const
+  UsdObjectReader *parent() const
   {
-    return name_;
+    return parent_;
   }
-  const std::string &object_name() const
+
+  void set_parent(UsdObjectReader *par)
   {
-    return object_name_;
+    parent_ = par;
   }
-  const std::string &data_name() const
+
+  void set_merged_with_parent(bool flag) {
+    merged_with_parent_ = flag;
+  }
+
+  bool merged_with_parent() const {
+    return merged_with_parent_;
+  }
+
+  const std::string &prim_path() const
   {
-    return data_name_;
+    return prim_path_;
+  }
+  const std::string &prim_parent_name() const
+  {
+    return prim_parent_name_;
+  }
+  const std::string &prim_name() const
+  {
+    return prim_name_;
   }
 
   virtual bool valid() const = 0;

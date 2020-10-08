@@ -57,6 +57,7 @@ set(SRC
   intern/usd_hierarchy_iterator.cc
   intern/usd_reader_mesh.cc
   intern/usd_reader_object.cc
+  intern/usd_reader_transform.cc
   intern/usd_util.cc
   intern/usd_writer_abstract.cc
   intern/usd_writer_camera.cc
@@ -72,6 +73,7 @@ set(SRC
   intern/usd_importer_context.h
   intern/usd_reader_mesh.h
   intern/usd_reader_object.h
+  intern/usd_reader_transform.h
   intern/usd_util.h
   intern/usd_writer_abstract.h
   intern/usd_writer_camera.h

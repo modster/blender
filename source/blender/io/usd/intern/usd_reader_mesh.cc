@@ -276,7 +276,7 @@ void UsdMeshReader::readObjectData(Main *bmain, double time)
   }
 
   /* Determine mesh visibility.
-   * TODO: Consider optimizations to avoid this expensive call,
+   * TODO(makowalski): Consider optimizations to avoid this expensive call,
    * for example, by determining visibility during stage traversal. */
   pxr::TfToken vis_tok = this->mesh_.ComputeVisibility();
 
@@ -284,9 +284,11 @@ void UsdMeshReader::readObjectData(Main *bmain, double time)
     return;
   }
 
-  Mesh *mesh = BKE_mesh_add(bmain, data_name_.c_str());
+  Mesh *mesh = BKE_mesh_add(bmain, prim_name_.c_str());
 
-  object_ = BKE_object_add_only_object(bmain, OB_MESH, object_name_.c_str());
+  std::string obj_name = merged_with_parent_ ? prim_parent_name_ : prim_name_;
+
+  object_ = BKE_object_add_only_object(bmain, OB_MESH, obj_name.c_str());
   object_->data = mesh;
 
   Mesh *read_mesh = this->read_mesh(mesh, time, MOD_MESHSEQ_READ_ALL, NULL);

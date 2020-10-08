@@ -43,22 +43,23 @@
 namespace blender::io::usd {
 
 UsdObjectReader::UsdObjectReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
-    : name_(""),
-      object_name_(""),
-      data_name_(""),
-      object_(NULL),
+    : prim_path_(""),
+      prim_parent_name_(""),
+      prim_name_(""),
+      object_(nullptr),
       prim_(prim),
       context_(context),
       min_time_(std::numeric_limits<double>::max()),
       max_time_(std::numeric_limits<double>::min()),
-      refcount_(0)
+      refcount_(0),
+      parent_(nullptr),
+      merged_with_parent_(false)
 {
-  name_ = prim.GetPath().GetString();
-
-  data_name_ = prim.GetName().GetString();
+  prim_path_ = prim.GetPath().GetString();
+  prim_name_ = prim.GetName().GetString();
 
   pxr::UsdPrim parent = prim.GetParent();
-  object_name_ = parent ? parent.GetName().GetString() : data_name_;
+  prim_parent_name_ = parent ? parent.GetName().GetString() : prim_name_;
 }
 
 UsdObjectReader::~UsdObjectReader()
@@ -128,11 +129,24 @@ void UsdObjectReader::read_matrix(float r_mat[4][4] /* local matrix */,
 
   /* TODO(makowalski):  Check for constant transform. */
 
-  pxr::GfMatrix4d usd_local_to_world = xformable.ComputeLocalToWorldTransform(time);
+  pxr::GfMatrix4d usd_local_xf;
+  bool reset_xform_stack;
+  xformable.GetLocalTransformation(&usd_local_xf, &reset_xform_stack, time);
+
+  if (merged_with_parent_) {
+    /* Take into account the parent's local xform. */
+    pxr::UsdGeomXformable parent_xformable(prim_.GetParent());
+
+    if (parent_xformable) {
+      pxr::GfMatrix4d usd_parent_local_xf;
+      parent_xformable.GetLocalTransformation(&usd_parent_local_xf, &reset_xform_stack, time);
+
+      usd_local_xf = usd_parent_local_xf * usd_local_xf;
+    }
+  }
 
   double double_mat[4][4];
-
-  usd_local_to_world.Get(double_mat);
+  usd_local_xf.Get(double_mat);
 
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < 4; ++j) {
