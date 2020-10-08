@@ -159,7 +159,7 @@ NODE_DEFINE(Mesh)
   return type;
 }
 
-ccl::SubdParams *ccl::Mesh::get_subd_params()
+SubdParams *Mesh::get_subd_params()
 {
   if (subdivision_type == SubdivisionType::SUBDIVISION_NONE) {
     return nullptr;
@@ -395,7 +395,7 @@ Mesh::SubdFace Mesh::get_subd_face(size_t index) const
   return s;
 }
 
-void ccl::Mesh::add_crease(int v0, int v1, float weight)
+void Mesh::add_crease(int v0, int v1, float weight)
 {
   subd_creases_edge.push_back_slow(v0);
   subd_creases_edge.push_back_slow(v1);
