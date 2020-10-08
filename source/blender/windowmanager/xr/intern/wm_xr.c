@@ -133,7 +133,7 @@ bool wm_xr_events_handle(wmWindowManager *wm)
     GHOST_XrEventsHandle(wm->xr.runtime->context);
 
     /* Process OpenXR action events and dispatch to XR surface / window queues. */
-    if (WM_xr_session_exists) {
+    if (WM_xr_session_is_ready(&wm->xr)) {
       wm_xr_session_actions_update(&wm->xr);
     }
 
