@@ -27,7 +27,6 @@ CCL_NAMESPACE_BEGIN
 class MD5Hash;
 struct Node;
 struct NodeType;
-class Shader;
 struct Transform;
 
 /* Note: in the following macros we use "type const &" instead of "const type &"
@@ -133,7 +132,6 @@ struct Node {
   const array<ustring> &get_string_array(const SocketType &input) const;
   const array<Transform> &get_transform_array(const SocketType &input) const;
   const array<Node *> &get_node_array(const SocketType &input) const;
-  const array<Shader *> &get_shader_array(const SocketType &input) const;
 
   /* generic values operations */
   bool has_default_value(const SocketType &input) const;

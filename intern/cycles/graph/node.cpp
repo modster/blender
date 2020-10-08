@@ -332,17 +332,6 @@ static void copy_array(const Node *node,
   *dst = *src;
 }
 
-template<typename T>
-static void steal_array(const Node *node,
-                        const SocketType &socket,
-                        const Node *other,
-                        const SocketType &other_socket)
-{
-  array<T> *src = (array<T> *)(((char *)other) + other_socket.struct_offset);
-  array<T> *dst = (array<T> *)(((char *)node) + socket.struct_offset);
-  dst->steal_data(*src);
-}
-
 void Node::copy_value(const SocketType &socket, const Node &other, const SocketType &other_socket)
 {
   assert(socket.type == other_socket.type);
