@@ -744,10 +744,9 @@ def pyprop2sphinx(ident, fw, identifier, py_prop):
     else:
         fw(ident + ".. attribute:: %s\n\n" % identifier)
     write_indented_lines(ident + "   ", fw, py_prop.__doc__)
+    fw("\n")
     if py_prop.fset is None:
         fw(ident + "   (readonly)\n\n")
-    else:
-        fw("\n")
 
 
 def pymodule2sphinx(basepath, module_name, module, title):
@@ -1312,7 +1311,7 @@ def pyrna2sphinx(basepath):
 
         fw(title_string(title, "="))
 
-        fw(".. module:: %s\n\n" % struct_module_name)
+        fw(".. currentmodule:: %s\n\n" % struct_module_name)
 
         # docs first?, ok
         write_example_ref("", fw, "%s.%s" % (struct_module_name, struct_id))
@@ -1543,8 +1542,7 @@ def pyrna2sphinx(basepath):
 
             fw(title_string(class_name, "="))
 
-            fw(".. module:: %s\n" % class_module_name)
-            fw("\n")
+            fw(".. currentmodule:: %s\n\n" % class_module_name)
 
             if use_subclasses:
                 subclass_ids = [
@@ -1558,7 +1556,7 @@ def pyrna2sphinx(basepath):
             fw(".. class:: %s\n\n" % class_name)
             fw("   %s\n\n" % descr_str)
             fw("   .. note::\n\n")
-            fw("      Note that %s.%s is not actually available from within Blender,\n"
+            fw("      Note that :class:`%s.%s` is not actually available from within Blender,\n"
                "      it only exists for the purpose of documentation.\n\n" % (class_module_name, class_name))
 
             descr_items = [
@@ -1673,15 +1671,26 @@ def write_sphinx_conf_py(basepath):
     fw("]\n\n")
 
     fw("html_title = 'Blender Python API'\n")
-    fw("html_theme = 'sphinx_rtd_theme'\n")
-    fw("html_theme_options = {\n")
-    fw("    'canonical_url': 'https://docs.blender.org/api/current/',\n")
-    # fw("    'analytics_id': '',\n")
-    # fw("    'collapse_navigation': True,\n")
-    fw("    'sticky_navigation': False,\n")
-    fw("    'navigation_depth': 1,\n")
-    # fw("    'includehidden': True,\n")
-    # fw("    'titles_only': False\n")
+
+    fw("html_theme = 'default'\n")
+    # The theme 'sphinx_rtd_theme' is no longer distributed with sphinx by default, only use when available.
+    fw(r"""
+try:
+    __import__('sphinx_rtd_theme')
+    html_theme = 'sphinx_rtd_theme'
+except ModuleNotFoundError:
+    pass
+""")
+
+    fw("if html_theme == 'sphinx_rtd_theme':\n")
+    fw("    html_theme_options = {\n")
+    fw("        'canonical_url': 'https://docs.blender.org/api/current/',\n")
+    # fw("        'analytics_id': '',\n")
+    # fw("        'collapse_navigation': True,\n")
+    fw("        'sticky_navigation': False,\n")
+    fw("        'navigation_depth': 1,\n")
+    # fw("        'includehidden': True,\n")
+    # fw("        'titles_only': False\n")
     fw("    }\n\n")
 
     # not helpful since the source is generated, adds to upload size.
@@ -1843,6 +1852,7 @@ def write_rst_types_index(basepath):
         file = open(filepath, "w", encoding="utf-8")
         fw = file.write
         fw(title_string("Types (bpy.types)", "="))
+        fw(".. module:: bpy.types\n\n")
         fw(".. toctree::\n")
         fw("   :glob:\n\n")
         fw("   bpy.types.*\n\n")
@@ -1858,6 +1868,7 @@ def write_rst_ops_index(basepath):
         file = open(filepath, "w", encoding="utf-8")
         fw = file.write
         fw(title_string("Operators (bpy.ops)", "="))
+        fw(".. module:: bpy.ops\n\n")
         write_example_ref("", fw, "bpy.ops")
         fw(".. toctree::\n")
         fw("   :glob:\n\n")
@@ -1899,7 +1910,7 @@ def write_rst_data(basepath):
         file = open(filepath, "w", encoding="utf-8")
         fw = file.write
         fw(title_string("Data Access (bpy.data)", "="))
-        fw(".. module:: bpy\n")
+        fw(".. module:: bpy.data\n")
         fw("\n")
         fw("This module is used for all Blender/Python access.\n")
         fw("\n")

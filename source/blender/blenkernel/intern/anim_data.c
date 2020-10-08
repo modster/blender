@@ -342,8 +342,8 @@ AnimData *BKE_animdata_copy(Main *bmain, AnimData *adt, const int flag)
                                  flag;
     BLI_assert(bmain != NULL);
     BLI_assert(dadt->action == NULL || dadt->action != dadt->tmpact);
-    BKE_id_copy_ex(bmain, (ID *)dadt->action, (ID **)&dadt->action, id_copy_flag);
-    BKE_id_copy_ex(bmain, (ID *)dadt->tmpact, (ID **)&dadt->tmpact, id_copy_flag);
+    dadt->action = (bAction *)BKE_id_copy_ex(bmain, (ID *)dadt->action, NULL, id_copy_flag);
+    dadt->tmpact = (bAction *)BKE_id_copy_ex(bmain, (ID *)dadt->tmpact, NULL, id_copy_flag);
   }
   else if (do_id_user) {
     id_us_plus((ID *)dadt->action);
@@ -397,13 +397,13 @@ static void animdata_copy_id_action(Main *bmain,
   if (adt) {
     if (adt->action && (do_linked_id || !ID_IS_LINKED(adt->action))) {
       id_us_min((ID *)adt->action);
-      adt->action = set_newid ? ID_NEW_SET(adt->action, BKE_action_copy(bmain, adt->action)) :
-                                BKE_action_copy(bmain, adt->action);
+      adt->action = set_newid ? ID_NEW_SET(adt->action, BKE_id_copy(bmain, &adt->action->id)) :
+                                BKE_id_copy(bmain, &adt->action->id);
     }
     if (adt->tmpact && (do_linked_id || !ID_IS_LINKED(adt->tmpact))) {
       id_us_min((ID *)adt->tmpact);
-      adt->tmpact = set_newid ? ID_NEW_SET(adt->tmpact, BKE_action_copy(bmain, adt->tmpact)) :
-                                BKE_action_copy(bmain, adt->tmpact);
+      adt->tmpact = set_newid ? ID_NEW_SET(adt->tmpact, BKE_id_copy(bmain, &adt->tmpact->id)) :
+                                BKE_id_copy(bmain, &adt->tmpact->id);
     }
   }
   bNodeTree *ntree = ntreeFromID(id);
@@ -452,8 +452,8 @@ void BKE_animdata_merge_copy(
   /* handle actions... */
   if (action_mode == ADT_MERGECOPY_SRC_COPY) {
     /* make a copy of the actions */
-    dst->action = BKE_action_copy(bmain, src->action);
-    dst->tmpact = BKE_action_copy(bmain, src->tmpact);
+    dst->action = (bAction *)BKE_id_copy(bmain, &src->action->id);
+    dst->tmpact = (bAction *)BKE_id_copy(bmain, &src->tmpact->id);
   }
   else if (action_mode == ADT_MERGECOPY_SRC_REF) {
     /* make a reference to it */

@@ -251,13 +251,6 @@ void *BKE_hair_add(Main *bmain, const char *name)
   return hair;
 }
 
-Hair *BKE_hair_copy(Main *bmain, const Hair *hair)
-{
-  Hair *hair_copy;
-  BKE_id_copy(bmain, &hair->id, (ID **)&hair_copy);
-  return hair_copy;
-}
-
 BoundBox *BKE_hair_boundbox_get(Object *ob)
 {
   BLI_assert(ob->type == OB_HAIR);
@@ -330,8 +323,7 @@ Hair *BKE_hair_copy_for_eval(Hair *hair_src, bool reference)
     flags |= LIB_ID_COPY_CD_REFERENCE;
   }
 
-  Hair *result;
-  BKE_id_copy_ex(NULL, &hair_src->id, (ID **)&result, flags);
+  Hair *result = (Hair *)BKE_id_copy_ex(NULL, &hair_src->id, NULL, flags);
   return result;
 }
 

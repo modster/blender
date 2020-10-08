@@ -230,13 +230,6 @@ void *BKE_pointcloud_add_default(Main *bmain, const char *name)
   return pointcloud;
 }
 
-PointCloud *BKE_pointcloud_copy(Main *bmain, const PointCloud *pointcloud)
-{
-  PointCloud *pointcloud_copy;
-  BKE_id_copy(bmain, &pointcloud->id, (ID **)&pointcloud_copy);
-  return pointcloud_copy;
-}
-
 BoundBox *BKE_pointcloud_boundbox_get(Object *ob)
 {
   BLI_assert(ob->type == OB_POINTCLOUD);
@@ -309,8 +302,7 @@ PointCloud *BKE_pointcloud_copy_for_eval(struct PointCloud *pointcloud_src, bool
     flags |= LIB_ID_COPY_CD_REFERENCE;
   }
 
-  PointCloud *result;
-  BKE_id_copy_ex(NULL, &pointcloud_src->id, (ID **)&result, flags);
+  PointCloud *result = (PointCloud *)BKE_id_copy_ex(NULL, &pointcloud_src->id, NULL, flags);
   return result;
 }
 

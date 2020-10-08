@@ -401,13 +401,6 @@ Lattice *BKE_lattice_add(Main *bmain, const char *name)
   return lt;
 }
 
-Lattice *BKE_lattice_copy(Main *bmain, const Lattice *lt)
-{
-  Lattice *lt_copy;
-  BKE_id_copy(bmain, &lt->id, (ID **)&lt_copy);
-  return lt_copy;
-}
-
 bool object_deform_mball(Object *ob, ListBase *dispbase)
 {
   if (ob->parent && ob->parent->type == OB_LATTICE && ob->partype == PARSKEL) {

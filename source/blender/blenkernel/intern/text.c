@@ -516,13 +516,6 @@ Text *BKE_text_load(Main *bmain, const char *file, const char *relpath)
   return BKE_text_load_ex(bmain, file, relpath, false);
 }
 
-Text *BKE_text_copy(Main *bmain, const Text *ta)
-{
-  Text *ta_copy;
-  BKE_id_copy(bmain, &ta->id, (ID **)&ta_copy);
-  return ta_copy;
-}
-
 void BKE_text_clear(Text *text) /* called directly from rna */
 {
   txt_sel_all(text);
