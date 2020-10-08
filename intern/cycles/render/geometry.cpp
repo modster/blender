@@ -247,8 +247,6 @@ bool Geometry::has_voxel_attributes() const
 
 void Geometry::tag_update(Scene *scene, bool rebuild)
 {
-  tag_modified();
-
   if (rebuild) {
     need_update_rebuild = true;
     scene->light_manager->need_update = true;
