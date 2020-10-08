@@ -317,13 +317,6 @@ Material *BKE_gpencil_material_add(Main *bmain, const char *name)
   return ma;
 }
 
-Material *BKE_material_copy(Main *bmain, const Material *ma)
-{
-  Material *ma_copy;
-  BKE_id_copy(bmain, &ma->id, (ID **)&ma_copy);
-  return ma_copy;
-}
-
 Material ***BKE_object_material_array_p(Object *ob)
 {
   if (ob->type == OB_MESH) {

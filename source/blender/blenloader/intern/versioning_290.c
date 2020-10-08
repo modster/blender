@@ -806,6 +806,20 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
         }
       }
     }
+
+    /* UV/Image show overlay option. */
+    if (!DNA_struct_find(fd->filesdna, "SpaceImageOverlay")) {
+      LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+        LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+          LISTBASE_FOREACH (SpaceLink *, space, &area->spacedata) {
+            if (space->spacetype == SPACE_IMAGE) {
+              SpaceImage *sima = (SpaceImage *)space;
+              sima->overlay.flag = SI_OVERLAY_SHOW_OVERLAYS;
+            }
+          }
+        }
+      }
+    }
     /* Init grease pencil default curve resolution. */
     if (!DNA_struct_elem_find(fd->filesdna, "bGPdata", "int", "curve_edit_resolution")) {
       LISTBASE_FOREACH (bGPdata *, gpd, &bmain->gpencils) {

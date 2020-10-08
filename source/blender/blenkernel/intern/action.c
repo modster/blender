@@ -310,13 +310,6 @@ bAction *BKE_action_add(Main *bmain, const char name[])
 
 /* .................................. */
 
-bAction *BKE_action_copy(Main *bmain, const bAction *act_src)
-{
-  bAction *act_copy;
-  BKE_id_copy(bmain, &act_src->id, (ID **)&act_copy);
-  return act_copy;
-}
-
 /* *************** Action Groups *************** */
 
 /* Get the active action-group for an Action */

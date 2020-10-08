@@ -119,8 +119,6 @@ struct bGPDstroke *BKE_gpencil_stroke_duplicate(struct bGPDstroke *gps_src,
                                                 const bool dup_points,
                                                 const bool dup_curve);
 
-struct bGPdata *BKE_gpencil_copy(struct Main *bmain, const struct bGPdata *gpd);
-
 struct bGPdata *BKE_gpencil_data_duplicate(struct Main *bmain,
                                            const struct bGPdata *gpd,
                                            bool internal_copy);
