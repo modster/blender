@@ -691,7 +691,7 @@ void Film::tag_passes_update(Scene *scene, const vector<Pass> &passes_, bool upd
     scene->geometry_manager->tag_update(scene);
 
     foreach (Shader *shader, scene->shaders)
-      shader->need_update_geometry = true;
+      shader->need_update_uvs = true;
   }
   else if (Pass::contains(scene->passes, PASS_MOTION) != Pass::contains(passes_, PASS_MOTION)) {
     scene->geometry_manager->tag_update(scene);

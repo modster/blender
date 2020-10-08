@@ -1257,8 +1257,20 @@ void GeometryManager::device_update(Device *device,
     foreach (Geometry *geom, scene->geometry) {
       foreach (Node *node, geom->get_used_shaders()) {
         Shader *shader = static_cast<Shader *>(node);
-        if (shader->need_update_geometry)
+        if (shader->need_update_uvs) {
+          // todo: attributes
           geom->tag_modified();
+        }
+
+        if (shader->need_update_attribute) {
+          // todo: attributes
+          geom->tag_modified();
+        }
+
+        if (shader->need_update_displacement) {
+          // todo: tag all displacement related sockets as modified
+          geom->tag_modified();
+        }
       }
 
       if (geom->is_modified() &&
@@ -1447,7 +1459,9 @@ void GeometryManager::device_update(Device *device,
   }
 
   foreach (Shader *shader, scene->shaders) {
-    shader->need_update_geometry = false;
+    shader->need_update_uvs = false;
+    shader->need_update_attribute = false;
+    shader->need_update_displacement = false;
   }
 
   Scene::MotionType need_motion = scene->need_motion();

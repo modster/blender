@@ -100,7 +100,9 @@ class Shader : public Node {
   float prev_volume_step_rate;
 
   /* synchronization */
-  bool need_update_geometry;
+  bool need_update_uvs;
+  bool need_update_attribute;
+  bool need_update_displacement ;
 
   /* If the shader has only volume components, the surface is assumed to
    * be transparent.
@@ -152,6 +154,8 @@ class Shader : public Node {
   void set_graph(ShaderGraph *graph);
   void tag_update(Scene *scene);
   void tag_used(Scene *scene);
+
+  bool need_update_geometry() const;
 };
 
 /* Shader Manager virtual base class

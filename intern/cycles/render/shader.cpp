@@ -218,7 +218,9 @@ Shader::Shader() : Node(node_type)
   id = -1;
   used = false;
 
-  need_update_geometry = true;
+  need_update_uvs = true;
+  need_update_attribute = true;
+  need_update_displacement = true;
 }
 
 Shader::~Shader()
@@ -291,7 +293,7 @@ void Shader::set_graph(ShaderGraph *graph_)
     const char *new_hash = (graph_) ? graph_->displacement_hash.c_str() : "";
 
     if (strcmp(old_hash, new_hash) != 0) {
-      need_update_geometry = true;
+      need_update_displacement = true;
     }
   }
 
@@ -354,7 +356,7 @@ void Shader::tag_update(Scene *scene)
   /* compare if the attributes changed, mesh manager will check
    * need_update_geometry, update the relevant meshes and clear it. */
   if (attributes.modified(prev_attributes)) {
-    need_update_geometry = true;
+    need_update_attribute = true;
     scene->geometry_manager->need_update = true;
   }
 
@@ -373,6 +375,11 @@ void Shader::tag_used(Scene *scene)
     tag_modified();
     scene->shader_manager->need_update = true;
   }
+}
+
+bool Shader::need_update_geometry() const
+{
+  return need_update_uvs || need_update_attribute || need_update_displacement;
 }
 
 /* Shader Manager */
