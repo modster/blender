@@ -78,9 +78,9 @@
 
 #define VERTLIST_MAJORCOLUMN_WIDTH (25 * UI_UNIT_X)
 
-static eFileSelectType fileselect_type_from_params_get(const FileSelectParams *params)
+static eFileSelectType fileselect_type_from_asset_params_get(const FileSelectParams *params)
 {
-
+  BLI_assert(ED_fileselect_is_asset_browser(params));
   return (params->asset_repository.type == FILE_ASSET_REPO_LOCAL) ? FILE_MAIN_ASSET : FILE_LOADLIB;
 }
 
@@ -99,13 +99,14 @@ static bool fileselect_needs_refresh(const SpaceFile *sfile)
       (sfile->params->type != FILE_UNIX)) {
     return true;
   }
-  if (sfile->files &&
-      !filelist_matches_type(sfile->files, fileselect_type_from_params_get(sfile->params))) {
-    return true;
-  }
-  if (sfile->files &&
-      !filelist_matches_asset_repository(sfile->files, &sfile->params->asset_repository)) {
-    return true;
+  if (sfile->files && ED_fileselect_is_asset_browser(sfile->params)) {
+    if (!filelist_matches_type(sfile->files,
+                               fileselect_type_from_asset_params_get(sfile->params))) {
+      return true;
+    }
+    if (!filelist_matches_asset_repository(sfile->files, &sfile->params->asset_repository)) {
+      return true;
+    }
   }
 
   return false;
@@ -363,7 +364,7 @@ short ED_fileselect_set_params(SpaceFile *sfile)
       params->file[0] = '\0';
       params->asset_repository.type = repo_type;
 
-      params->type = fileselect_type_from_params_get(params);
+      params->type = fileselect_type_from_asset_params_get(params);
       /* TODO this way of using filters to realize categories is noticably slower than
        * specifying a "group" to read. That's because all types are read and filtering is applied
        * after the fact. */

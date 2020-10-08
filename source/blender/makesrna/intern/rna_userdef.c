@@ -5961,7 +5961,7 @@ static void rna_def_userdef_filepaths_asset_repository(BlenderRNA *brna)
   StructRNA *srna;
   PropertyRNA *prop;
 
-  srna = RNA_def_struct(brna, "PreferencesAssetRepository", NULL);
+  srna = RNA_def_struct(brna, "UserAssetRepository", NULL);
   RNA_def_struct_sdna(srna, "bUserAssetRepository");
   RNA_def_struct_clear_flag(srna, STRUCT_UNDO);
   RNA_def_struct_ui_text(srna,
@@ -6155,7 +6155,7 @@ static void rna_def_userdef_filepaths(BlenderRNA *brna)
   rna_def_userdef_filepaths_asset_repository(brna);
 
   prop = RNA_def_property(srna, "asset_repositories", PROP_COLLECTION, PROP_NONE);
-  RNA_def_property_struct_type(prop, "PreferencesAssetRepository");
+  RNA_def_property_struct_type(prop, "UserAssetRepository");
   RNA_def_property_ui_text(prop, "Asset Repositories", "");
 }
 
