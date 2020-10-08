@@ -250,11 +250,12 @@ void create_readers(const pxr::UsdStageRefPtr &usd_stage,
 
     std::string prim_path = prim.GetPath().GetString();
 
-    std::map<std::string, UsdObjectReader *>::const_iterator prim_entry = readers_map.find(prim_path);
+    std::map<std::string, UsdObjectReader *>::const_iterator prim_entry = readers_map.find(
+        prim_path);
 
-    if (prim_entry != readers_map.end())
-    {
-      /* We already processed the reader for this prim, probably when merging it with its parent. */
+    if (prim_entry != readers_map.end()) {
+      /* We already processed the reader for this prim, probably when merging it with its parent.
+       */
       continue;
     }
 
@@ -265,17 +266,16 @@ void create_readers(const pxr::UsdStageRefPtr &usd_stage,
 
       /* Check if the Xform and prim should be merged. */
 
-      pxr::UsdPrimSiblingRange children = prim.GetFilteredChildren(pxr::UsdTraverseInstanceProxies(pxr::UsdPrimAllPrimsPredicate));
+      pxr::UsdPrimSiblingRange children = prim.GetFilteredChildren(
+          pxr::UsdTraverseInstanceProxies(pxr::UsdPrimAllPrimsPredicate));
 
       size_t num_children = boost::size(children);
 
       /* Merge only if the Xform has a single Mesh child. */
-      if (num_children == 1)
-      {
+      if (num_children == 1) {
         pxr::UsdPrim child_prim = children.front();
- 
-        if (child_prim && child_prim.GetTypeName() == usdtokens::mesh_type)
-        {
+
+        if (child_prim && child_prim.GetTypeName() == usdtokens::mesh_type) {
           /* We don't create a reader for the current Xform prim, but instead
            * make a single reader that will merge the Xform and its child. */
 
@@ -285,7 +285,8 @@ void create_readers(const pxr::UsdStageRefPtr &usd_stage,
 
           if (reader) {
             reader->set_merged_with_parent(true);
-          } else {
+          }
+          else {
             std::cerr << "WARNING:  Couldn't get reader when merging child prim." << std::endl;
           }
         }
@@ -304,7 +305,8 @@ void create_readers(const pxr::UsdStageRefPtr &usd_stage,
   }
 
   /* Set parenting. */
-  for (std::vector<UsdObjectReader*>::iterator it = r_readers.begin(); it != r_readers.end(); ++it) {
+  for (std::vector<UsdObjectReader *>::iterator it = r_readers.begin(); it != r_readers.end();
+       ++it) {
 
     pxr::UsdPrim parent = (*it)->prim().GetParent();
 
@@ -316,14 +318,14 @@ void create_readers(const pxr::UsdStageRefPtr &usd_stage,
     if (parent) {
       std::string parent_path = parent.GetPath().GetString();
 
-      std::map<std::string, UsdObjectReader *>::const_iterator parent_entry = readers_map.find(parent_path);
+      std::map<std::string, UsdObjectReader *>::const_iterator parent_entry = readers_map.find(
+          parent_path);
 
       if (parent_entry != readers_map.end()) {
         (*it)->set_parent(parent_entry->second);
       }
     }
   }
-
 }
 
 } /* namespace blender::io::usd */

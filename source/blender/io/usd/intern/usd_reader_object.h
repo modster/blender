@@ -33,7 +33,7 @@ struct Object;
 namespace blender::io::usd {
 
 class UsdObjectReader {
-public:
+ public:
   typedef std::vector<UsdObjectReader *> ptr_vector;
 
  protected:
@@ -64,7 +64,6 @@ public:
   bool merged_with_parent_;
 
  public:
-
   explicit UsdObjectReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
 
   virtual ~UsdObjectReader();
@@ -85,11 +84,13 @@ public:
     parent_ = par;
   }
 
-  void set_merged_with_parent(bool flag) {
+  void set_merged_with_parent(bool flag)
+  {
     merged_with_parent_ = flag;
   }
 
-  bool merged_with_parent() const {
+  bool merged_with_parent() const
+  {
     return merged_with_parent_;
   }
 

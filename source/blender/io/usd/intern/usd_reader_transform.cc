@@ -22,13 +22,11 @@
 #include "BKE_object.h"
 #include "DNA_object_types.h"
 
-
 namespace blender::io::usd {
 
 UsdTransformReader::UsdTransformReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
-  : UsdObjectReader(prim, context), xform_(prim)
+    : UsdObjectReader(prim, context), xform_(prim)
 {
-
 }
 
 bool UsdTransformReader::valid() const
