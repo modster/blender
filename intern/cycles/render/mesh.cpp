@@ -190,6 +190,9 @@ Mesh::Mesh(const NodeType *node_type, Type geom_type_)
 
   num_ngons = 0;
 
+  previous_verts_count = 0;
+  previous_triangles_count = 0;
+
   subdivision_type = SUBDIVISION_NONE;
   subd_params = NULL;
 

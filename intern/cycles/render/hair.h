@@ -140,6 +140,9 @@ class Hair : public Geometry {
     return curve_keys.size() - curve_first_key.size();
   }
 
+  size_t previous_keys_num;
+  size_t previous_curves_num;
+
   /* UDIM */
   void get_uv_tiles(ustring map, unordered_set<int> &tiles) override;
 

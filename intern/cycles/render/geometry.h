@@ -154,6 +154,17 @@ class Geometry : public Node {
 /* Geometry Manager */
 
 class GeometryManager {
+  using DeviceUpdateFlags = uint32_t;
+
+  enum {
+    DEVICE_VERTEX_NEEDS_REALLOC     = (1 << 0),
+    DEVICE_TRIANGLES_NEEDS_REALLOC  = (1 << 1),
+    DEVICE_CURVES_NEEDS_REALLOC     = (1 << 2),
+    DEVICE_CURVE_KEYS_NEEDS_REALLOC = (1 << 3),
+  };
+
+  DeviceUpdateFlags device_update_flags;
+
  public:
   /* Update Flags */
   bool need_update;
