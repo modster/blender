@@ -225,7 +225,6 @@ void Geometry::compute_bvh(
     }
   }
 
-  clear_modified();
   need_update_rebuild = false;
 }
 
@@ -1502,6 +1501,10 @@ void GeometryManager::device_update(Device *device,
     device_update_mesh(device, dscene, scene, false, progress);
     if (progress.get_cancel())
       return;
+  }
+
+  foreach (Geometry *geom, scene->geometry) {
+    geom->clear_modified();
   }
 
   need_update = false;
