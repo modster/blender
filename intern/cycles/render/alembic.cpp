@@ -555,6 +555,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
   if (!abc_object->get_object()) {
     mesh = scene->create_node<Mesh>();
     mesh->set_use_motion_blur(use_motion_blur);
+    mesh->name = abc_object->iobject.getName();
 
     array<Node *> used_shaders = abc_object->get_used_shaders();
     mesh->set_used_shaders(used_shaders);
@@ -563,6 +564,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
     Object *object = scene->create_node<Object>();
     object->set_geometry(mesh);
     object->set_tfm(xform);
+    object->name = abc_object->iobject.getName();
 
     abc_object->set_object(object);
   }
@@ -668,6 +670,7 @@ void AlembicProcedural::read_curves(Scene *scene,
   if (!abc_object->get_object()) {
     hair = scene->create_node<Hair>();
     hair->set_use_motion_blur(use_motion_blur);
+    hair->name = abc_object->iobject.getName();
 
     array<Node *> used_shaders = abc_object->get_used_shaders();
     hair->set_used_shaders(used_shaders);
@@ -676,6 +679,7 @@ void AlembicProcedural::read_curves(Scene *scene,
     Object *object = scene->create_node<Object>();
     object->set_geometry(hair);
     object->set_tfm(xform);
+    object->name = abc_object->iobject.getName();
 
     abc_object->set_object(object);
   }
