@@ -34,3 +34,6 @@ void wm_xr_session_toggle(struct bContext *C,
                           wmWindow *win,
                           wmXrSessionExitFn session_exit_fn);
 bool wm_xr_events_handle(wmWindowManager *wm);
+
+/* wm_xr_operators.c */
+void wm_xr_operatortypes_register(void);
