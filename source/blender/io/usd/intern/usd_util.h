@@ -61,4 +61,9 @@ void create_readers(const pxr::UsdStageRefPtr &usd_stage,
                     const USDImporterContext &context,
                     std::vector<UsdObjectReader *> &r_readers);
 
+void create_readers(const pxr::UsdPrim &root,
+                    const USDImporterContext &context,
+                    std::vector<UsdObjectReader *> &r_readers,
+                    std::vector<UsdObjectReader *> &r_child_readers);
+
 } /* namespace blender::io::usd */

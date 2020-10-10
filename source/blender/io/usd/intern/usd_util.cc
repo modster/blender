@@ -63,6 +63,7 @@
 namespace usdtokens {
 static const pxr::TfToken xform_type("Xform", pxr::TfToken::Immortal);
 static const pxr::TfToken mesh_type("Mesh", pxr::TfToken::Immortal);
+static const pxr::TfToken scope_type("Scope", pxr::TfToken::Immortal);
 }  // namespace usdtokens
 
 namespace {
@@ -299,18 +300,26 @@ void create_readers(const pxr::UsdStageRefPtr &usd_stage,
 
     if (reader) {
       readers_map.insert(std::make_pair(prim_path, reader));
+
+      /* If we merged, we also add the reader to the map under the parent prim path. */
+      if (merge_reader) {
+        std::string parent_path = prim.GetPath().GetString();
+        if (readers_map.insert(std::make_pair(parent_path, reader)).second == false) {
+          std::cerr << "Programmer error: couldn't insert merged prim into reader map with parent path key." << std::endl;
+        }
+      }
+
       r_readers.push_back(reader);
       reader->incref();
     }
   }
 
   /* Set parenting. */
-  for (std::vector<UsdObjectReader *>::iterator it = r_readers.begin(); it != r_readers.end();
-       ++it) {
+  for (UsdObjectReader *r : r_readers) {
 
-    pxr::UsdPrim parent = (*it)->prim().GetParent();
+    pxr::UsdPrim parent = r->prim().GetParent();
 
-    if (parent && (*it)->merged_with_parent()) {
+    if (parent && r->merged_with_parent()) {
       /* If we are merging, we use the grandparent. */
       parent = parent.GetParent();
     }
@@ -322,10 +331,78 @@ void create_readers(const pxr::UsdStageRefPtr &usd_stage,
           parent_path);
 
       if (parent_entry != readers_map.end()) {
-        (*it)->set_parent(parent_entry->second);
+        r->set_parent(parent_entry->second);
       }
     }
   }
+}
+
+void create_readers(const pxr::UsdPrim &prim,
+                    const USDImporterContext &context,
+                    std::vector<UsdObjectReader *> &r_readers,
+                    std::vector<UsdObjectReader *> &r_child_readers)
+{
+  if (!prim) {
+    return;
+  }
+
+  std::string prim_path = prim.GetPath().GetString();
+
+  bool is_root = prim.GetTypeName().IsEmpty();
+
+  std::vector<UsdObjectReader *> child_readers;
+
+  /* Recursively create readers for the child prims. */
+  pxr::UsdPrimSiblingRange child_prims = prim.GetFilteredChildren(
+    pxr::UsdTraverseInstanceProxies(pxr::UsdPrimAllPrimsPredicate));
+
+  for (const pxr::UsdPrim &child_prim : child_prims) {
+    create_readers(child_prim, context, r_readers, child_readers);
+  }
+
+  if (is_root) {
+    /* We're at the pseudo root, so we're done. */
+    return;
+  }
+
+  /* We prune away empty transform or scope hierarchies (we can add an import flag to make this
+   * behavior optional).  Therefore, we skip this prim if it's an Xform or Scope and if
+   * it has no corresponding child readers. */
+  if ((prim.GetTypeName() == usdtokens::xform_type || prim.GetTypeName() == usdtokens::scope_type)
+    && child_readers.empty()) {
+    return;
+  }
+
+  /* If this is an Xform prim, see if we can merge with the child reader.
+   * We only merge if the Xform has a single child of Mesh type.
+   * The list of child types that can be merged will be expanded as we
+   * support more reader types (e.g., for lights, curves, etc.). */
+
+  if (prim.GetTypeName() == usdtokens::xform_type &&
+      child_readers.size() == 1 &&
+      child_readers.front()->prim().GetTypeName() == usdtokens::mesh_type) {
+    child_readers.front()->set_merged_with_parent(true);
+    // We don't create a reader for the Xform but, instead, we return the grandchild
+    // that we merged.
+    r_child_readers.push_back(child_readers.front());
+    return;
+  }
+
+  UsdObjectReader *reader = get_reader(prim, context);
+
+  if (reader) {
+    for (UsdObjectReader *child_reader : child_readers)
+    {
+      child_reader->set_parent(reader);
+    }
+    r_child_readers.push_back(reader);
+    r_readers.push_back(reader);
+  } else {
+    /* No reader was allocated for this prim, so we pass our child readers back to the caller,
+     * for possible handling by a parent reader. */
+    r_child_readers.insert(r_child_readers.end(), child_readers.begin(), child_readers.end());
+  }
+
 }
 
 } /* namespace blender::io::usd */

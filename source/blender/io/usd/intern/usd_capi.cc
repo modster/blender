@@ -273,7 +273,8 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   *data->do_update = true;
   *data->progress = 0.1f;
 
-  create_readers(data->stage, import_ctx, data->readers);
+  std::vector<UsdObjectReader *> child_readers;
+  create_readers(data->stage->GetPseudoRoot(), import_ctx, data->readers, child_readers);
 
   // Create objects
 
