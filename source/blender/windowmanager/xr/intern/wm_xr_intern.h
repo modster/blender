@@ -28,12 +28,14 @@ struct wmXrActionSet;
 struct GHash;
 
 typedef struct wmXrControllerData {
-  /* OpenXR path identifier. */
+  /** OpenXR path identifier. */
   char subaction_path[64];
   /** Last known controller pose (in world space) stored for queries. */
   GHOST_XrPose pose;
   /** The last known controller matrix, calculated from above's controller pose. */
   float mat[4][4];
+  /** Mesh object, used to render the controller. */
+  Object *ob;
 } wmXrControllerData;
 
 typedef struct wmXrSessionState {
@@ -153,6 +155,8 @@ void wm_xr_session_gpu_binding_context_destroy(GHOST_ContextHandle context);
 void wm_xr_session_actions_init(wmXrData *xr);
 void wm_xr_session_actions_update(wmXrData *xr);
 void wm_xr_session_actions_uninit(wmXrData *xr);
+void wm_xr_session_controller_data_create(wmXrData *xr);
+void wm_xr_session_controller_data_free(wmXrData *xr);
 
 void wm_xr_pose_to_viewmat(const GHOST_XrPose *pose, float r_viewmat[4][4]);
 void wm_xr_controller_pose_to_mat(const GHOST_XrPose *pose, float r_mat[4][4]);

@@ -263,10 +263,6 @@ void WM_xr_actions_destroy(wmXrData *xr,
 
   if (!action_find(action_set, controller_pose_name)) {
     action_set->controller_pose_action = NULL;
-
-    /* Update controller data. */
-    wmXrSessionState *session_state = &xr->runtime->session_state;
-    memset(session_state->controllers, 0, sizeof(session_state->controllers));
   }
 }
 
@@ -333,14 +329,6 @@ bool WM_xr_controller_pose_action_set(wmXrData *xr,
   }
 
   action_set->controller_pose_action = action;
-
-  /* Update controller data. */
-  wmXrSessionState *session_state = &xr->runtime->session_state;
-  memset(session_state->controllers, 0, sizeof(session_state->controllers));
-  const unsigned int count = min((unsigned int)ARRAY_SIZE(session_state->controllers), action->count_subaction_paths);
-  for (unsigned int i = 0; i < count; ++i) {
-    strcpy(session_state->controllers[i].subaction_path, action->subaction_paths[i]);
-  }
 
   return true;
 }

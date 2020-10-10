@@ -30,8 +30,11 @@
 #include "DEG_depsgraph.h"
 
 #include "DNA_camera_types.h"
+#include "DNA_object_types.h"
 
 #include "DRW_engine.h"
+
+#include "ED_object.h"
 
 #include "GHOST_C-api.h"
 
@@ -447,6 +450,8 @@ void wm_xr_session_actions_init(wmXrData *xr)
 
   if (attach_actions) {
     GHOST_XrAttachActionSets(xr->runtime->context);
+
+    wm_xr_session_controller_data_create(xr);
   }
 }
 
@@ -481,6 +486,13 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
     /* Save final pose. */
     mat4_to_loc_quat(
         controller->pose.position, controller->pose.orientation_quat, controller->mat);
+
+    /* TODO_XR: Check if object was deleted by user. */
+    if (controller->ob) {
+      copy_v3_v3(controller->ob->loc, controller->pose.position);
+      quat_to_eul(controller->ob->rot, controller->pose.orientation_quat);
+      DEG_id_tag_update(&controller->ob->id, ID_RECALC_TRANSFORM);
+    }
   }
 }
 
@@ -702,6 +714,63 @@ void wm_xr_session_actions_uninit(wmXrData *xr)
     BLI_ghashIterator_free(ghi);
 
     BLI_ghash_free(action_sets, NULL, NULL);
+  }
+
+  wm_xr_session_controller_data_free(xr);
+}
+
+void wm_xr_session_controller_data_create(wmXrData *xr)
+{
+  bContext *C = xr->runtime->bcontext;
+  wmXrSessionState *session_state = &xr->runtime->session_state;
+  wmXrActionSet *active_action_set = session_state->active_action_set;
+
+  /* Only create controller data for active action set. */
+  if (!active_action_set || !active_action_set->controller_pose_action) {
+    return;
+  }
+  wmXrAction *action = active_action_set->controller_pose_action;
+
+  const unsigned int count = min((unsigned int)ARRAY_SIZE(session_state->controllers), action->count_subaction_paths);
+  for (unsigned int i = 0; i < count; ++i) {
+    wmXrControllerData *c = &session_state->controllers[i];
+    strcpy(c->subaction_path, action->subaction_paths[i]);
+    memset(&c->pose, 0, sizeof(c->pose));
+    memset(c->mat, 0, sizeof(c->mat));
+    if (!c->ob) {
+      /* Just use zeroed-out pose.position for loc and rot. */
+      c->ob = ED_object_add_type(C, OB_MESH, "xr_controller", c->pose.position, c->pose.position, false, 0);
+      if (c->ob) {
+        c->ob->runtime.is_xr = true;
+      }
+    }
+  }
+}
+
+void wm_xr_session_controller_data_free(wmXrData *xr)
+{
+  bContext *C = xr->runtime->bcontext;
+  Main *bmain = CTX_data_main(C);
+  Scene *scene = CTX_data_scene(C);
+  Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
+  wmXrSessionState *session_state = &xr->runtime->session_state;
+  bool notify = false;
+
+  for (unsigned int i = 0; i < (unsigned int)ARRAY_SIZE(session_state->controllers); ++i) {
+    Object *ob = session_state->controllers[i].ob;
+    /* TODO_XR: Check if object was deleted by user. */
+    if (ob) {
+      ED_object_base_free_and_unlink(bmain, scene, ob);
+      DEG_graph_id_tag_update(bmain, depsgraph, &ob->id, 0);
+      notify = true;
+    }
+  }
+  memset(session_state->controllers, 0, sizeof(session_state->controllers));
+
+  if (notify) {
+    DEG_id_tag_update(&scene->id, ID_RECALC_SELECT);
+    WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
+    WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
   }
 }
 

@@ -1458,15 +1458,16 @@ void DRW_draw_callbacks_post_scene(void)
 
     /* Annotations. */
     if (do_annotations) {
-      GPU_depth_test(false);
+      GPU_depth_test(GPU_DEPTH_NONE);
       ED_annotation_draw_view3d(DEG_get_input_scene(depsgraph), depsgraph, v3d, region, true);
-      GPU_depth_test(true);
+      GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
     }
 
     /* Controllers. */
+    GPU_depth_test(GPU_DEPTH_ALWAYS);
     WM_xr_draw_controllers();
 
-    DRW_state_reset();
+    GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
   }
 }
 
