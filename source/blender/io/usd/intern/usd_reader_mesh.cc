@@ -47,6 +47,8 @@ struct MeshSampleData {
   pxr::VtVec2fArray uv_values;
   pxr::VtArray<int> uv_indices;
   pxr::TfToken uv_interpolation;
+  pxr::VtArray<pxr::GfVec3f> normals;
+  pxr::TfToken normals_interpolation;
 
   bool y_up;
   bool reverse_vert_order;
@@ -196,6 +198,116 @@ static void read_mpolys(Mesh *mesh, const MeshSampleData &mesh_data)
   /* TODO(makowalski):  Possibly check for invalid geometry. */
 }
 
+static void process_no_normals(Mesh *mesh)
+{
+  /* Absense of normals in the USD mesh is interpreted as 'smooth'. */
+  BKE_mesh_calc_normals(mesh);
+}
+
+static void process_loop_normals(Mesh *mesh, const MeshSampleData &mesh_data)
+{
+  if (!mesh) {
+    return;
+  }
+
+  size_t loop_count = mesh_data.normals.size();
+
+  if (loop_count == 0) {
+    process_no_normals(mesh);
+    return;
+  }
+
+  if (loop_count != mesh->totloop) {
+    std::cerr << "WARNING: loop normal count mismatch." << std::endl;
+    process_no_normals(mesh);
+    return;
+  }
+
+  float(*lnors)[3] = static_cast<float(*)[3]>(
+    MEM_malloc_arrayN(loop_count, sizeof(float[3]), "USD::FaceNormals"));
+
+  for (int i = 0; i < loop_count; ++i) {
+
+     if (mesh_data.y_up)
+     {
+       blender::io::usd::copy_zup_from_yup(lnors[i], mesh_data.normals[i].data());
+     }
+     else {
+       lnors[i][0] = mesh_data.normals[i].data()[0];
+       lnors[i][1] = mesh_data.normals[i].data()[1];
+       lnors[i][2] = mesh_data.normals[i].data()[2];
+     }
+
+     if (mesh_data.reverse_vert_order) {
+       lnors[i][0] = -lnors[i][0];
+       lnors[i][1] = -lnors[i][1];
+       lnors[i][2] = -lnors[i][2];
+     }
+  }
+
+  mesh->flag |= ME_AUTOSMOOTH;
+  BKE_mesh_set_custom_normals(mesh, lnors);
+
+  MEM_freeN(lnors);
+}
+
+static void process_vertex_normals(Mesh *mesh, const MeshSampleData &mesh_data)
+{
+  if (!mesh) {
+    return;
+  }
+
+  size_t normals_count = mesh_data.normals.size();
+  if (normals_count == 0) {
+    std::cerr << "WARNING: vertex normal count mismatch." << std::endl;
+    process_no_normals(mesh);
+    return;
+  }
+
+  float(*vnors)[3] = static_cast<float(*)[3]>(
+    MEM_malloc_arrayN(normals_count, sizeof(float[3]), "USD::VertexNormals"));
+
+  for (int i = 0; i < normals_count; ++i) {
+
+    if (mesh_data.y_up)
+    {
+      blender::io::usd::copy_zup_from_yup(vnors[i], mesh_data.normals[i].data());
+    }
+    else {
+      vnors[i][0] = mesh_data.normals[i].data()[0];
+      vnors[i][1] = mesh_data.normals[i].data()[1];
+      vnors[i][2] = mesh_data.normals[i].data()[2];
+    }
+
+    if (mesh_data.reverse_vert_order) {
+      vnors[i][0] = -vnors[i][0];
+      vnors[i][1] = -vnors[i][1];
+      vnors[i][2] = -vnors[i][2];
+    }
+  }
+
+  mesh->flag |= ME_AUTOSMOOTH;
+  BKE_mesh_set_custom_normals_from_vertices(mesh, vnors);
+  MEM_freeN(vnors);
+}
+
+static void process_normals(Mesh *mesh, const MeshSampleData &mesh_data)
+{
+  if (!mesh || mesh_data.normals.empty() ) {
+    process_no_normals(mesh);
+    return;
+  }
+
+  if (mesh_data.normals_interpolation == pxr::UsdGeomTokens->faceVarying) {
+    process_loop_normals(mesh, mesh_data);  /* 'vertex normals' in Houdini. */
+  } else if (mesh_data.normals_interpolation == pxr::UsdGeomTokens->vertex) {
+    process_vertex_normals(mesh, mesh_data); /* 'point normals' in Houdini. */
+  } else {
+    process_no_normals(mesh);
+  }
+}
+
+
 namespace blender::io::usd {
 
 UsdMeshReader::UsdMeshReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
@@ -261,7 +373,15 @@ Mesh *UsdMeshReader::read_mesh(Mesh *existing_mesh,
     }
 
     read_mpolys(new_mesh, mesh_data);
-    BKE_mesh_calc_normals(new_mesh);
+
+    if (this->context_.import_params.import_normals) {
+      mesh_.GetNormalsAttr().Get(&mesh_data.normals, time);
+      mesh_data.normals_interpolation = mesh_.GetNormalsInterpolation();
+
+      process_normals(new_mesh, mesh_data);
+    } else {
+      process_no_normals(new_mesh);
+    }
   }
 
   /* TODO(makowalski):  Handle case where topology hasn't changed. */

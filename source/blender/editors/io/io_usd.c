@@ -269,6 +269,8 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
 
   const bool import_uvs = RNA_boolean_get(op->ptr, "import_uvs");
 
+  const bool import_normals = RNA_boolean_get(op->ptr, "import_normals");
+
   const float scale = RNA_float_get(op->ptr, "scale");
 
   const bool debug = RNA_boolean_get(op->ptr, "debug");
@@ -279,7 +281,7 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
     ED_object_mode_set(C, OB_MODE_OBJECT);
   }
 
-  struct USDImportParams params = {import_uvs, scale, debug};
+  struct USDImportParams params = {import_uvs, import_normals, scale, debug};
 
   bool ok = USD_import(C, filename, &params, as_background_job);
 
@@ -300,6 +302,7 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
 
   col = uiLayoutColumn(box, true);
   uiItemR(col, ptr, "import_uvs", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "import_normals", 0, NULL, ICON_NONE);
   uiItemR(col, ptr, "debug", 0, NULL, ICON_NONE);
 }
 
@@ -324,6 +327,8 @@ void WM_OT_usd_import(wmOperatorType *ot)
                                  FILE_SORT_ALPHA);
 
   RNA_def_boolean(ot->srna, "import_uvs", true, "uvs", "When checked, import mesh uvs.");
+
+  RNA_def_boolean(ot->srna, "import_normals", true, "normals", "When checked, import mesh normals.");
 
   RNA_def_float(
       ot->srna,
