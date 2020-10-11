@@ -31,9 +31,10 @@ void OVERLAY_xr_cache_init(OVERLAY_Data *vedata)
   OVERLAY_PassList *psl = vedata->psl;
   OVERLAY_PrivateData *pd = vedata->stl->pd;
   DRWShadingGroup *grp;
-  const float color[4] = { 0.211f, 0.219f, 0.223f, 0.4f };
+  const float color[4] = {0.211f, 0.219f, 0.223f, 0.4f};
 
-  DRWState state = DRW_STATE_WRITE_DEPTH | DRW_STATE_WRITE_COLOR | DRW_STATE_DEPTH_LESS_EQUAL | DRW_STATE_BLEND_ALPHA;
+  DRWState state = DRW_STATE_WRITE_DEPTH | DRW_STATE_WRITE_COLOR | DRW_STATE_DEPTH_LESS_EQUAL |
+                   DRW_STATE_BLEND_ALPHA;
   DRW_PASS_CREATE(psl->xr_controllers_ps, state | pd->clipping_state);
 
   GPUShader *sh = OVERLAY_shader_uniform_color();
@@ -46,12 +47,13 @@ void OVERLAY_xr_cache_populate(OVERLAY_Data *vedata, Object *ob)
   OVERLAY_PrivateData *pd = vedata->stl->pd;
   GPUBatch *xr_controllers = DRW_cache_mesh_all_verts_get(ob);
 
-  if (xr_controllers && xr_controllers->verts[0] && (GPU_vertbuf_get_vertex_len(xr_controllers->verts[0]) > 0)) {
+  if (xr_controllers && xr_controllers->verts[0] &&
+      (GPU_vertbuf_get_vertex_len(xr_controllers->verts[0]) > 0)) {
     DRW_shgroup_call_obmat(pd->xr_controllers_grp, xr_controllers, ob->obmat);
   }
   else {
     /* Fallback to primitive sphere. */
-    const float scale[3] = { 0.05f, 0.05f, 0.05f };
+    const float scale[3] = {0.05f, 0.05f, 0.05f};
     float obmat[4][4];
     copy_m4_m4(obmat, ob->obmat);
     rescale_m4(obmat, scale);

@@ -3188,6 +3188,9 @@ static void wm_event_surface_free_all(wmXrSurfaceData *surface_data)
 
 static void wm_event_do_surface_handlers(bContext *C, wmSurface *surface)
 {
+  /* TODO_XR: Currently assumes that the XR surface is the
+   * same as the one for the XR runtime. In the future this
+   * might not always be the case. */
   wmWindowManager *wm = CTX_wm_manager(C);
   wmXrData *xr = &wm->xr;
   if (!xr->runtime || !surface->is_xr) {
@@ -3199,13 +3202,9 @@ static void wm_event_do_surface_handlers(bContext *C, wmSurface *surface)
     return;
   }
 
-  /* TODO_XR: Currently assumes that the XR surface is the
-   * same as the one for the runtime. In the future this
-   * might not always be the case. */
-  wmWindow *win = xr->runtime->session_root_win;
+  wmWindow *win = wm_xr_session_root_window_or_fallback_get(wm, xr->runtime);
   bScreen *screen = WM_window_get_active_screen(win);
 
-  /* some safety checks - these should always be set! */
   BLI_assert(WM_window_get_active_scene(win));
   BLI_assert(WM_window_get_active_screen(win));
   BLI_assert(WM_window_get_active_workspace(win));

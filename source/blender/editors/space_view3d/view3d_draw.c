@@ -1807,8 +1807,8 @@ void ED_view3d_draw_offscreen_simple(Depsgraph *depsgraph,
     }
     /* Disable other overlays (set all available _HIDE_ flags). */
     v3d.overlay.flag |= V3D_OVERLAY_HIDE_CURSOR | V3D_OVERLAY_HIDE_TEXT |
-      V3D_OVERLAY_HIDE_MOTION_PATHS | V3D_OVERLAY_HIDE_BONES |
-      V3D_OVERLAY_HIDE_OBJECT_XTRAS | V3D_OVERLAY_HIDE_OBJECT_ORIGINS;
+                        V3D_OVERLAY_HIDE_MOTION_PATHS | V3D_OVERLAY_HIDE_BONES |
+                        V3D_OVERLAY_HIDE_OBJECT_XTRAS | V3D_OVERLAY_HIDE_OBJECT_ORIGINS;
     v3d.flag |= V3D_HIDE_HELPLINES;
   }
 

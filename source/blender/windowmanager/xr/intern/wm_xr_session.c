@@ -20,6 +20,7 @@
 
 #include "BKE_callbacks.h"
 #include "BKE_context.h"
+#include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_scene.h"
 
@@ -191,8 +192,8 @@ static void wm_xr_session_draw_data_populate(wmXrData *xr_data,
   wm_xr_session_base_pose_calc(r_draw_data->scene, settings, &r_draw_data->base_pose);
 }
 
-static wmWindow *wm_xr_session_root_window_or_fallback_get(const wmWindowManager *wm,
-                                                           const wmXrRuntimeData *runtime_data)
+wmWindow *wm_xr_session_root_window_or_fallback_get(const wmWindowManager *wm,
+                                                    const wmXrRuntimeData *runtime_data)
 {
   if (runtime_data->session_root_win &&
       BLI_findindex(&wm->windows, runtime_data->session_root_win) != -1) {
@@ -462,7 +463,8 @@ void wm_xr_session_actions_init(wmXrData *xr)
 
 static void wm_xr_session_controller_mats_update(const XrSessionSettings *settings,
                                                  const wmXrAction *controller_pose_action,
-                                                 wmXrSessionState *state)
+                                                 wmXrSessionState *state,
+                                                 ViewLayer *view_layer)
 {
   const unsigned int count = min(controller_pose_action->count_subaction_paths, 2);
 
@@ -492,11 +494,14 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
     mat4_to_loc_quat(
         controller->pose.position, controller->pose.orientation_quat, controller->mat);
 
-    /* TODO_XR: Check if object was deleted by user. */
     if (controller->ob) {
-      copy_v3_v3(controller->ob->loc, controller->pose.position);
-      quat_to_eul(controller->ob->rot, controller->pose.orientation_quat);
-      DEG_id_tag_update(&controller->ob->id, ID_RECALC_TRANSFORM);
+      /* TODO_XR: Handle case where object was deleted but then undone. */
+      Base *base = BKE_view_layer_base_find(view_layer, controller->ob);
+      if (base) {
+        copy_v3_v3(controller->ob->loc, controller->pose.position);
+        quat_to_eul(controller->ob->rot, controller->pose.orientation_quat);
+        DEG_id_tag_update(&controller->ob->id, ID_RECALC_TRANSFORM);
+      }
     }
   }
 }
@@ -623,6 +628,7 @@ static void wm_xr_session_action_set_update(const XrSessionSettings *settings,
                                             GHOST_XrContextHandle xr_context,
                                             wmXrSessionState *state,
                                             wmXrActionSet *action_set,
+                                            ViewLayer *view_layer,
                                             wmSurface *surface,
                                             wmWindow *win)
 {
@@ -657,7 +663,8 @@ static void wm_xr_session_action_set_update(const XrSessionSettings *settings,
   if (ret &&
       (action_set == state->active_action_set)) { /* Only dispatch events for active action set. */
     if (action_set->controller_pose_action) {
-      wm_xr_session_controller_mats_update(settings, action_set->controller_pose_action, state);
+      wm_xr_session_controller_mats_update(
+          settings, action_set->controller_pose_action, state, view_layer);
     }
 
     if (surface && win) {
@@ -672,13 +679,13 @@ void wm_xr_session_actions_update(wmXrData *xr)
     return;
   }
 
-  GHOST_XrContextHandle xr_context = xr->runtime->context;
   wmXrSessionState *state = &xr->runtime->session_state;
-
   GHash *action_sets = state->action_sets;
   if (!action_sets) {
     return;
   }
+
+  GHOST_XrContextHandle xr_context = xr->runtime->context;
   wmXrActionSet *active_action_set = state->active_action_set;
 
   int ret = GHOST_XrSyncActions(xr_context, active_action_set ? active_action_set->name : NULL);
@@ -687,18 +694,23 @@ void wm_xr_session_actions_update(wmXrData *xr)
   }
 
   const XrSessionSettings *settings = &xr->session_settings;
+  bContext *C = xr->runtime->bcontext;
+  wmWindowManager *wm = CTX_wm_manager(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
   wmSurface *surface = (g_xr_surface && g_xr_surface->customdata) ? g_xr_surface : NULL;
-  wmWindow *win = xr->runtime->session_root_win;
+  wmWindow *win = wm_xr_session_root_window_or_fallback_get(wm, xr->runtime);
 
   if (active_action_set) {
-    wm_xr_session_action_set_update(settings, xr_context, state, active_action_set, surface, win);
+    wm_xr_session_action_set_update(
+        settings, xr_context, state, active_action_set, view_layer, surface, win);
   }
   else {
     GHashIterator *ghi_set = BLI_ghashIterator_new(action_sets);
     GHASH_ITER (*ghi_set, action_sets) {
       wmXrActionSet *action_set = BLI_ghashIterator_getValue(ghi_set);
       if (action_set) {
-        wm_xr_session_action_set_update(settings, xr_context, state, action_set, surface, win);
+        wm_xr_session_action_set_update(
+            settings, xr_context, state, action_set, view_layer, surface, win);
       }
     }
 
@@ -753,6 +765,7 @@ void wm_xr_session_controller_data_clear(unsigned int count_subaction_paths,
 {
   Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
   Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
   bool notify = false;
 
@@ -761,11 +774,14 @@ void wm_xr_session_controller_data_clear(unsigned int count_subaction_paths,
 
   for (unsigned int i = 0; i < count; ++i) {
     Object *ob = state->controllers[i].ob;
-    /* TODO_XR: Check if object was deleted by user. */
     if (ob) {
-      ED_object_base_free_and_unlink(bmain, scene, ob);
-      DEG_graph_id_tag_update(bmain, depsgraph, &ob->id, 0);
-      notify = true;
+      /* TODO_XR: Handle case where object was deleted but then undone. */
+      Base *base = BKE_view_layer_base_find(view_layer, ob);
+      if (base) {
+        ED_object_base_free_and_unlink(bmain, scene, ob);
+        DEG_graph_id_tag_update(bmain, depsgraph, &ob->id, 0);
+        notify = true;
+      }
     }
     memset(&state->controllers[i], 0, sizeof(state->controllers[i]));
   }
