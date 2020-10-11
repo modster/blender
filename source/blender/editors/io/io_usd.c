@@ -328,7 +328,8 @@ void WM_OT_usd_import(wmOperatorType *ot)
 
   RNA_def_boolean(ot->srna, "import_uvs", true, "uvs", "When checked, import mesh uvs.");
 
-  RNA_def_boolean(ot->srna, "import_normals", true, "normals", "When checked, import mesh normals.");
+  RNA_def_boolean(
+      ot->srna, "import_normals", true, "normals", "When checked, import mesh normals.");
 
   RNA_def_float(
       ot->srna,

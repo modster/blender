@@ -224,25 +224,24 @@ static void process_loop_normals(Mesh *mesh, const MeshSampleData &mesh_data)
   }
 
   float(*lnors)[3] = static_cast<float(*)[3]>(
-    MEM_malloc_arrayN(loop_count, sizeof(float[3]), "USD::FaceNormals"));
+      MEM_malloc_arrayN(loop_count, sizeof(float[3]), "USD::FaceNormals"));
 
   for (int i = 0; i < loop_count; ++i) {
 
-     if (mesh_data.y_up)
-     {
-       blender::io::usd::copy_zup_from_yup(lnors[i], mesh_data.normals[i].data());
-     }
-     else {
-       lnors[i][0] = mesh_data.normals[i].data()[0];
-       lnors[i][1] = mesh_data.normals[i].data()[1];
-       lnors[i][2] = mesh_data.normals[i].data()[2];
-     }
+    if (mesh_data.y_up) {
+      blender::io::usd::copy_zup_from_yup(lnors[i], mesh_data.normals[i].data());
+    }
+    else {
+      lnors[i][0] = mesh_data.normals[i].data()[0];
+      lnors[i][1] = mesh_data.normals[i].data()[1];
+      lnors[i][2] = mesh_data.normals[i].data()[2];
+    }
 
-     if (mesh_data.reverse_vert_order) {
-       lnors[i][0] = -lnors[i][0];
-       lnors[i][1] = -lnors[i][1];
-       lnors[i][2] = -lnors[i][2];
-     }
+    if (mesh_data.reverse_vert_order) {
+      lnors[i][0] = -lnors[i][0];
+      lnors[i][1] = -lnors[i][1];
+      lnors[i][2] = -lnors[i][2];
+    }
   }
 
   mesh->flag |= ME_AUTOSMOOTH;
@@ -265,12 +264,11 @@ static void process_vertex_normals(Mesh *mesh, const MeshSampleData &mesh_data)
   }
 
   float(*vnors)[3] = static_cast<float(*)[3]>(
-    MEM_malloc_arrayN(normals_count, sizeof(float[3]), "USD::VertexNormals"));
+      MEM_malloc_arrayN(normals_count, sizeof(float[3]), "USD::VertexNormals"));
 
   for (int i = 0; i < normals_count; ++i) {
 
-    if (mesh_data.y_up)
-    {
+    if (mesh_data.y_up) {
       blender::io::usd::copy_zup_from_yup(vnors[i], mesh_data.normals[i].data());
     }
     else {
@@ -293,20 +291,21 @@ static void process_vertex_normals(Mesh *mesh, const MeshSampleData &mesh_data)
 
 static void process_normals(Mesh *mesh, const MeshSampleData &mesh_data)
 {
-  if (!mesh || mesh_data.normals.empty() ) {
+  if (!mesh || mesh_data.normals.empty()) {
     process_no_normals(mesh);
     return;
   }
 
   if (mesh_data.normals_interpolation == pxr::UsdGeomTokens->faceVarying) {
-    process_loop_normals(mesh, mesh_data);  /* 'vertex normals' in Houdini. */
-  } else if (mesh_data.normals_interpolation == pxr::UsdGeomTokens->vertex) {
+    process_loop_normals(mesh, mesh_data); /* 'vertex normals' in Houdini. */
+  }
+  else if (mesh_data.normals_interpolation == pxr::UsdGeomTokens->vertex) {
     process_vertex_normals(mesh, mesh_data); /* 'point normals' in Houdini. */
-  } else {
+  }
+  else {
     process_no_normals(mesh);
   }
 }
-
 
 namespace blender::io::usd {
 
@@ -379,7 +378,8 @@ Mesh *UsdMeshReader::read_mesh(Mesh *existing_mesh,
       mesh_data.normals_interpolation = mesh_.GetNormalsInterpolation();
 
       process_normals(new_mesh, mesh_data);
-    } else {
+    }
+    else {
       process_no_normals(new_mesh);
     }
   }

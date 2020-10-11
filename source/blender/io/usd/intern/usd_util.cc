@@ -305,7 +305,9 @@ void create_readers(const pxr::UsdStageRefPtr &usd_stage,
       if (merge_reader) {
         std::string parent_path = prim.GetPath().GetString();
         if (readers_map.insert(std::make_pair(parent_path, reader)).second == false) {
-          std::cerr << "Programmer error: couldn't insert merged prim into reader map with parent path key." << std::endl;
+          std::cerr << "Programmer error: couldn't insert merged prim into reader map with parent "
+                       "path key."
+                    << std::endl;
         }
       }
 
@@ -354,7 +356,7 @@ void create_readers(const pxr::UsdPrim &prim,
 
   /* Recursively create readers for the child prims. */
   pxr::UsdPrimSiblingRange child_prims = prim.GetFilteredChildren(
-    pxr::UsdTraverseInstanceProxies(pxr::UsdPrimAllPrimsPredicate));
+      pxr::UsdTraverseInstanceProxies(pxr::UsdPrimAllPrimsPredicate));
 
   for (const pxr::UsdPrim &child_prim : child_prims) {
     create_readers(child_prim, context, r_readers, child_readers);
@@ -368,8 +370,9 @@ void create_readers(const pxr::UsdPrim &prim,
   /* We prune away empty transform or scope hierarchies (we can add an import flag to make this
    * behavior optional).  Therefore, we skip this prim if it's an Xform or Scope and if
    * it has no corresponding child readers. */
-  if ((prim.GetTypeName() == usdtokens::xform_type || prim.GetTypeName() == usdtokens::scope_type)
-    && child_readers.empty()) {
+  if ((prim.GetTypeName() == usdtokens::xform_type ||
+       prim.GetTypeName() == usdtokens::scope_type) &&
+      child_readers.empty()) {
     return;
   }
 
@@ -378,8 +381,7 @@ void create_readers(const pxr::UsdPrim &prim,
    * The list of child types that can be merged will be expanded as we
    * support more reader types (e.g., for lights, curves, etc.). */
 
-  if (prim.GetTypeName() == usdtokens::xform_type &&
-      child_readers.size() == 1 &&
+  if (prim.GetTypeName() == usdtokens::xform_type && child_readers.size() == 1 &&
       child_readers.front()->prim().GetTypeName() == usdtokens::mesh_type) {
     child_readers.front()->set_merged_with_parent(true);
     // We don't create a reader for the Xform but, instead, we return the grandchild
@@ -391,18 +393,17 @@ void create_readers(const pxr::UsdPrim &prim,
   UsdObjectReader *reader = get_reader(prim, context);
 
   if (reader) {
-    for (UsdObjectReader *child_reader : child_readers)
-    {
+    for (UsdObjectReader *child_reader : child_readers) {
       child_reader->set_parent(reader);
     }
     r_child_readers.push_back(reader);
     r_readers.push_back(reader);
-  } else {
+  }
+  else {
     /* No reader was allocated for this prim, so we pass our child readers back to the caller,
      * for possible handling by a parent reader. */
     r_child_readers.insert(r_child_readers.end(), child_readers.begin(), child_readers.end());
   }
-
 }
 
 } /* namespace blender::io::usd */
