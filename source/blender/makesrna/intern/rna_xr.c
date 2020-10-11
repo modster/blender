@@ -588,7 +588,13 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   RNA_def_function_flag(func, FUNC_NO_SELF);
   parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_string(func, "name", NULL, 64, "Action Set", "Action set name");
+  parm = RNA_def_string(func,
+                        "name",
+                        NULL,
+                        64,
+                        "Action Set",
+                        "Action set name (must not contain upper case letters or special "
+                        "characters other than '-', '_', or '.'");
   RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
   parm = RNA_def_boolean(func, "result", 0, "Result", "");
   RNA_def_function_return(func, parm);
@@ -600,7 +606,13 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action_set_name", NULL, 64, "Action Set", "Action set name");
   RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
-  parm = RNA_def_string(func, "name", NULL, 64, "Action", "Action name");
+  parm = RNA_def_string(func,
+                        "name",
+                        NULL,
+                        64,
+                        "Action",
+                        "Action name (must not contain upper case letters or special characters "
+                        "other than '-', '_', or '.'");
   RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
   parm = RNA_def_enum(func, "type", action_types, 0, "Type", "Action type");
   RNA_def_parameter_flags(parm, PROP_ENUM, PARM_REQUIRED);

@@ -184,22 +184,30 @@ void WM_xr_action_set_destroy(wmXrData *xr, const char *action_set_name, bool re
   wmXrSessionState *session_state = &xr->runtime->session_state;
   GHash *action_sets = session_state->action_sets;
   wmXrActionSet *action_set = BLI_ghash_lookup(action_sets, action_set_name);
+  if (!action_set) {
+    return;
+  }
 
-  if (action_set) {
-    if (action_set->actions) {
-      BLI_ghash_free(action_set->actions, NULL, action_destroy);
+  if (action_set == session_state->active_action_set) {
+    if (action_set->controller_pose_action) {
+      wm_xr_session_controller_data_clear(
+          action_set->controller_pose_action->count_subaction_paths,
+          xr->runtime->bcontext,
+          &xr->runtime->session_state);
+      action_set->controller_pose_action = NULL;
     }
+    session_state->active_action_set = NULL;
+  }
 
-    if (session_state->active_action_set == action_set) {
-      session_state->active_action_set = NULL;
-    }
+  if (action_set->actions) {
+    BLI_ghash_free(action_set->actions, NULL, action_destroy);
+  }
 
-    if (remove_reference) {
-      BLI_ghash_remove(action_sets, action_set_name, NULL, action_set_destroy);
-    }
-    else {
-      action_set_destroy(action_set);
-    }
+  if (remove_reference) {
+    BLI_ghash_remove(action_sets, action_set_name, NULL, action_set_destroy);
+  }
+  else {
+    action_set_destroy(action_set);
   }
 }
 
@@ -255,6 +263,8 @@ void WM_xr_actions_destroy(wmXrData *xr,
   /* Save name of controller pose action in case the action is removed from the GHash. */
   char controller_pose_name[64];
   strcpy(controller_pose_name, action_set->controller_pose_action->name);
+  const unsigned int controller_pose_count =
+      action_set->controller_pose_action->count_subaction_paths;
 
   GHash *actions = action_set->actions;
   for (unsigned int i = 0; i < count; ++i) {
@@ -262,6 +272,10 @@ void WM_xr_actions_destroy(wmXrData *xr,
   }
 
   if (!action_find(action_set, controller_pose_name)) {
+    if (action_set == xr->runtime->session_state.active_action_set) {
+      wm_xr_session_controller_data_clear(
+          controller_pose_count, xr->runtime->bcontext, &xr->runtime->session_state);
+    }
     action_set->controller_pose_action = NULL;
   }
 }
@@ -311,6 +325,12 @@ bool WM_xr_active_action_set_set(wmXrData *xr, const char *action_set_name)
   }
 
   xr->runtime->session_state.active_action_set = action_set;
+
+  if (action_set->controller_pose_action) {
+    wm_xr_session_controller_data_populate(
+        action_set->controller_pose_action, xr->runtime->bcontext, &xr->runtime->session_state);
+  }
+
   return true;
 }
 
@@ -329,6 +349,11 @@ bool WM_xr_controller_pose_action_set(wmXrData *xr,
   }
 
   action_set->controller_pose_action = action;
+
+  if (action_set == xr->runtime->session_state.active_action_set) {
+    wm_xr_session_controller_data_populate(
+        action, xr->runtime->bcontext, &xr->runtime->session_state);
+  }
 
   return true;
 }

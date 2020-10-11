@@ -430,6 +430,13 @@ bool WM_xr_session_state_controller_pose_rotation_get(const wmXrData *xr,
   return true;
 }
 
+/* -------------------------------------------------------------------- */
+/** \name XR-Session Actions
+ *
+ * XR action processing and event dispatching.
+ *
+ * \{ */
+
 void wm_xr_session_actions_init(wmXrData *xr)
 {
   GHash *action_sets = xr->runtime->session_state.action_sets;
@@ -450,8 +457,6 @@ void wm_xr_session_actions_init(wmXrData *xr)
 
   if (attach_actions) {
     GHOST_XrAttachActionSets(xr->runtime->context);
-
-    wm_xr_session_controller_data_create(xr);
   }
 }
 
@@ -715,31 +720,24 @@ void wm_xr_session_actions_uninit(wmXrData *xr)
 
     BLI_ghash_free(action_sets, NULL, NULL);
   }
-
-  wm_xr_session_controller_data_free(xr);
 }
 
-void wm_xr_session_controller_data_create(wmXrData *xr)
+void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_action,
+                                            bContext *C,
+                                            wmXrSessionState *state)
 {
-  bContext *C = xr->runtime->bcontext;
-  wmXrSessionState *session_state = &xr->runtime->session_state;
-  wmXrActionSet *active_action_set = session_state->active_action_set;
+  const unsigned int count = min((unsigned int)ARRAY_SIZE(state->controllers),
+                                 controller_pose_action->count_subaction_paths);
 
-  /* Only create controller data for active action set. */
-  if (!active_action_set || !active_action_set->controller_pose_action) {
-    return;
-  }
-  wmXrAction *action = active_action_set->controller_pose_action;
-
-  const unsigned int count = min((unsigned int)ARRAY_SIZE(session_state->controllers), action->count_subaction_paths);
   for (unsigned int i = 0; i < count; ++i) {
-    wmXrControllerData *c = &session_state->controllers[i];
-    strcpy(c->subaction_path, action->subaction_paths[i]);
+    wmXrControllerData *c = &state->controllers[i];
+    strcpy(c->subaction_path, controller_pose_action->subaction_paths[i]);
     memset(&c->pose, 0, sizeof(c->pose));
     memset(c->mat, 0, sizeof(c->mat));
     if (!c->ob) {
       /* Just use zeroed-out pose.position for loc and rot. */
-      c->ob = ED_object_add_type(C, OB_MESH, "xr_controller", c->pose.position, c->pose.position, false, 0);
+      c->ob = ED_object_add_type(
+          C, OB_MESH, "xr_controller", c->pose.position, c->pose.position, false, 0);
       if (c->ob) {
         c->ob->runtime.is_xr = true;
       }
@@ -747,25 +745,28 @@ void wm_xr_session_controller_data_create(wmXrData *xr)
   }
 }
 
-void wm_xr_session_controller_data_free(wmXrData *xr)
+void wm_xr_session_controller_data_clear(unsigned int count_subaction_paths,
+                                         bContext *C,
+                                         wmXrSessionState *state)
 {
-  bContext *C = xr->runtime->bcontext;
   Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);
   Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
-  wmXrSessionState *session_state = &xr->runtime->session_state;
   bool notify = false;
 
-  for (unsigned int i = 0; i < (unsigned int)ARRAY_SIZE(session_state->controllers); ++i) {
-    Object *ob = session_state->controllers[i].ob;
+  const unsigned int count = min((unsigned int)ARRAY_SIZE(state->controllers),
+                                 count_subaction_paths);
+
+  for (unsigned int i = 0; i < count; ++i) {
+    Object *ob = state->controllers[i].ob;
     /* TODO_XR: Check if object was deleted by user. */
     if (ob) {
       ED_object_base_free_and_unlink(bmain, scene, ob);
       DEG_graph_id_tag_update(bmain, depsgraph, &ob->id, 0);
       notify = true;
     }
+    memset(&state->controllers[i], 0, sizeof(state->controllers[i]));
   }
-  memset(session_state->controllers, 0, sizeof(session_state->controllers));
 
   if (notify) {
     DEG_id_tag_update(&scene->id, ID_RECALC_SELECT);
@@ -773,6 +774,8 @@ void wm_xr_session_controller_data_free(wmXrData *xr)
     WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
   }
 }
+
+/** \} */ /* XR-Session Actions */
 
 /* -------------------------------------------------------------------- */
 /** \name XR-Session Surface

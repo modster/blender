@@ -39,22 +39,6 @@
 #include "wm_xr_intern.h"
 
 /* -------------------------------------------------------------------- */
-/** \name Operator Callbacks
- * \{ */
-
-/* op->poll */
-static bool wm_xr_operator_sessionactive(bContext *C)
-{
-  wmWindowManager *wm = CTX_wm_manager(C);
-  if (WM_xr_session_is_ready(&wm->xr)) {
-    return true;
-  }
-  return false;
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name XR Session Toggle
  *
  * Toggles an XR session, creating an XR context if necessary.
@@ -65,8 +49,8 @@ static void wm_xr_session_update_screen(Main *bmain, const wmXrData *xr_data)
   const bool session_exists = WM_xr_session_exists(xr_data);
 
   for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
-    LISTBASE_FOREACH(ScrArea *, area, &screen->areabase) {
-      LISTBASE_FOREACH(SpaceLink *, slink, &area->spacedata) {
+    LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+      LISTBASE_FOREACH (SpaceLink *, slink, &area->spacedata) {
         if (slink->spacetype == SPACE_VIEW3D) {
           View3D *v3d = (View3D *)slink;
 
@@ -125,8 +109,8 @@ static void WM_OT_xr_session_toggle(wmOperatorType *ot)
   ot->name = "Toggle VR Session";
   ot->idname = "WM_OT_xr_session_toggle";
   ot->description =
-    "Open a view for use with virtual reality headsets, or close it if already "
-    "opened";
+      "Open a view for use with virtual reality headsets, or close it if already "
+      "opened";
 
   /* callbacks */
   ot->exec = wm_xr_session_toggle_exec;

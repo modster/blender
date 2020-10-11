@@ -609,7 +609,10 @@ bool GHOST_XrSession::createActionSet(const GHOST_XrActionSetInfo *info)
 
   OpenXRActionSet action_set;
   CHECK_XR_ND_BUF(xrCreateActionSet(m_context->getInstance(), &action_set_info, &action_set.set),
-                  (std::string("Failed to create action set \"") + info->name + "\".").c_str(),
+                  (std::string("Failed to create action set \"") + info->name + "\".\n" +
+                   "Name must not contain upper case letters or special characters other than "
+                   "'-', '_', or '.'.")
+                      .c_str(),
                   g_error_msg_buf);
 
   std::map<std::string, OpenXRActionSet> &action_sets = m_oxr->action_sets;
@@ -708,7 +711,11 @@ bool GHOST_XrSession::createActions(const char *action_set_name,
 
     OpenXRAction action;
     CHECK_XR_ND_BUF(xrCreateAction(action_set->set, &action_info, &action.action),
-                    (std::string("Failed to create action \"") + info.name + "\".").c_str(),
+                    (std::string("Failed to create action \"") + info.name + "\".\n" +
+                     "Action name and/or paths are invalid.\n" +
+                     "Name must not contain upper case letters or special characters other than "
+                     "'-', '_', or '.'.")
+                        .c_str(),
                     g_error_msg_buf);
 
     if (actions.find(info.name) == actions.end()) {
@@ -917,7 +924,8 @@ bool GHOST_XrSession::createActionBindings(const char *action_set_name,
 
     CHECK_XR_ND_BUF(xrSuggestInteractionProfileBindings(instance, &bindings_info),
                     (std::string("Failed to create bindings for profile \"") +
-                     interaction_profile_path + "\".")
+                     interaction_profile_path + "\".\n" +
+                     "Are the profile and action paths correct?")
                         .c_str(),
                     g_error_msg_buf);
 
@@ -1026,7 +1034,7 @@ void GHOST_XrSession::destroyActionBindings(const char *action_set_name,
 
     CHECK_XR_BUF(xrSuggestInteractionProfileBindings(instance, &bindings_info),
                  (std::string("Failed to destroy bindings for profile \"") +
-                  interaction_profile_path + "\".")
+                  interaction_profile_path + "\".\n" + "Are the profile and action paths correct?")
                      .c_str(),
                  g_error_msg_buf);
 
@@ -1078,7 +1086,7 @@ bool GHOST_XrSession::attachActionSets()
   attach_info.actionSets = action_sets.data();
 
   CHECK_XR_ND(xrAttachSessionActionSets(m_oxr->session, &attach_info),
-              "Failed to attach action sets.");
+              "Failed to attach XR action sets.");
 
   return true;
 }
@@ -1097,7 +1105,7 @@ bool GHOST_XrSession::syncActions(const char *action_set_name)
   std::vector<XrActiveActionSet> active_action_sets(sync_info.countActiveActionSets);
   if (action_set_name != nullptr) {
     OpenXRActionSet *action_set = find_action_set(m_oxr.get(), action_set_name);
-    if (action_set == nullptr) {
+    if (action_set == nullptr || action_set->actions.size() < 1) {
       return false;
     }
 
@@ -1108,15 +1116,25 @@ bool GHOST_XrSession::syncActions(const char *action_set_name)
   else {
     uint32_t i = 0;
     for (auto &action_set : action_sets) {
+      if (action_set.second.actions.size() < 1) {
+        active_action_sets.pop_back();
+        --sync_info.countActiveActionSets;
+        continue;
+      }
+
       XrActiveActionSet &active_action_set = active_action_sets[i];
       active_action_set.actionSet = action_set.second.set;
       active_action_set.subactionPath = XR_NULL_PATH;
       ++i;
     }
+
+    if (sync_info.countActiveActionSets < 1) {
+      return false;
+    }
   }
   sync_info.activeActionSets = active_action_sets.data();
 
-  CHECK_XR(xrSyncActions(m_oxr->session, &sync_info), "Failed to sync actions.");
+  CHECK_XR(xrSyncActions(m_oxr->session, &sync_info), "Failed to synchronize XR actions.");
 
   return true;
 }
