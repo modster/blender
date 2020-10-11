@@ -734,6 +734,7 @@ void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_ac
     strcpy(c->subaction_path, controller_pose_action->subaction_paths[i]);
     memset(&c->pose, 0, sizeof(c->pose));
     memset(c->mat, 0, sizeof(c->mat));
+#if 1
     if (!c->ob) {
       /* Just use zeroed-out pose.position for loc and rot. */
       c->ob = ED_object_add_type(
@@ -742,6 +743,7 @@ void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_ac
         c->ob->runtime.is_xr = true;
       }
     }
+#endif
   }
 }
 

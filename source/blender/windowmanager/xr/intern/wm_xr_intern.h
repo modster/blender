@@ -34,7 +34,7 @@ typedef struct wmXrControllerData {
   GHOST_XrPose pose;
   /** The last known controller matrix, calculated from above's controller pose. */
   float mat[4][4];
-  /** Mesh object, used to render the controller. */
+  /** Mesh object, used to draw the controller. */
   Object *ob;
 } wmXrControllerData;
 
