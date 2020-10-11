@@ -364,6 +364,7 @@ typedef struct View3D {
 #define V3D_HIDE_HELPLINES (1 << 2)
 #define V3D_INVALID_BACKBUF (1 << 3)
 #define V3D_XR_SESSION_MIRROR (1 << 4)
+#define V3D_XR_SESSION_SURFACE (1 << 5)
 
 #define V3D_FLAG_UNUSED_10 (1 << 10) /* cleared */
 #define V3D_SELECT_OUTLINE (1 << 11)

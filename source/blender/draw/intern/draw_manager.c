@@ -1446,7 +1446,7 @@ void DRW_draw_callbacks_post_scene(void)
 
     GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
   }
-  else if ((v3d->flag2 & V3D_XR_SHOW_CONTROLLERS) != 0) {
+  else if ((v3d->flag & V3D_XR_SESSION_SURFACE) != 0) {
     DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
 
     DRW_state_reset();
@@ -1460,12 +1460,13 @@ void DRW_draw_callbacks_post_scene(void)
     if (do_annotations) {
       GPU_depth_test(GPU_DEPTH_NONE);
       ED_annotation_draw_view3d(DEG_get_input_scene(depsgraph), depsgraph, v3d, region, true);
-      GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
     }
 
     /* Controllers. */
-    GPU_depth_test(GPU_DEPTH_ALWAYS);
-    WM_xr_draw_controllers();
+    if ((v3d->flag2 & V3D_XR_SHOW_CONTROLLERS) != 0) {
+      GPU_depth_test(GPU_DEPTH_ALWAYS);
+      WM_xr_draw_controllers();
+    }
 
     GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
   }

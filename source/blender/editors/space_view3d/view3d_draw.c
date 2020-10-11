@@ -1749,7 +1749,7 @@ void ED_view3d_draw_offscreen(Depsgraph *depsgraph,
 void ED_view3d_draw_offscreen_simple(Depsgraph *depsgraph,
                                      Scene *scene,
                                      View3DShading *shading_override,
-                                     int drawtype,
+                                     eDrawType drawtype,
                                      int winx,
                                      int winy,
                                      uint draw_flags,
@@ -1757,6 +1757,7 @@ void ED_view3d_draw_offscreen_simple(Depsgraph *depsgraph,
                                      const float winmat[4][4],
                                      float clip_start,
                                      float clip_end,
+                                     bool is_xr_surface,
                                      bool is_image_render,
                                      bool do_sky,
                                      bool is_persp,
@@ -1803,13 +1804,16 @@ void ED_view3d_draw_offscreen_simple(Depsgraph *depsgraph,
       v3d.grid = 1.0f;
       v3d.gridlines = 16;
       v3d.gridsubdiv = 10;
-
-      /* Show grid, disable other overlays (set all available _HIDE_ flags). */
-      v3d.overlay.flag |= V3D_OVERLAY_HIDE_CURSOR | V3D_OVERLAY_HIDE_TEXT |
-                          V3D_OVERLAY_HIDE_MOTION_PATHS | V3D_OVERLAY_HIDE_BONES |
-                          V3D_OVERLAY_HIDE_OBJECT_XTRAS | V3D_OVERLAY_HIDE_OBJECT_ORIGINS;
-      v3d.flag |= V3D_HIDE_HELPLINES;
     }
+    /* Disable other overlays (set all available _HIDE_ flags). */
+    v3d.overlay.flag |= V3D_OVERLAY_HIDE_CURSOR | V3D_OVERLAY_HIDE_TEXT |
+      V3D_OVERLAY_HIDE_MOTION_PATHS | V3D_OVERLAY_HIDE_BONES |
+      V3D_OVERLAY_HIDE_OBJECT_XTRAS | V3D_OVERLAY_HIDE_OBJECT_ORIGINS;
+    v3d.flag |= V3D_HIDE_HELPLINES;
+  }
+
+  if (is_xr_surface) {
+    v3d.flag |= V3D_XR_SESSION_SURFACE;
   }
 
   rv3d.persp = RV3D_PERSP;
