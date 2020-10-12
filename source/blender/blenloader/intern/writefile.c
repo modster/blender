@@ -1312,6 +1312,13 @@ static void write_shaderfxs(BlendWriter *writer, ListBase *fxbase)
 
 static void write_object(BlendWriter *writer, Object *ob, const void *id_address)
 {
+#if 1
+  /* Don't write XR objects. */
+  if (ob->runtime.is_xr) {
+    return;
+  }
+#endif
+
   const bool is_undo = BLO_write_is_undo(writer);
   if (ob->id.us > 0 || is_undo) {
     /* Clean up, important in undo case to reduce false detection of changed data-blocks. */

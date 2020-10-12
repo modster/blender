@@ -136,7 +136,10 @@ typedef struct Object_Runtime {
    */
   char is_data_eval_owned;
 
-  /** Identifies whether the object is an XR object (used for drawing). */
+  /**
+   * Denotes whether the object is tied to the lifetime of an XR session. This is used for
+   * drawing and also to prevent temporary XR objects from being saved in files.
+   */
   char is_xr;
 
   /** Axis aligned boundbox (in localspace). */
