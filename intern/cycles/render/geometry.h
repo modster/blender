@@ -62,7 +62,7 @@ class Geometry : public Node {
   AttributeSet attributes;
 
   /* Shaders */
-  NODE_PUBLIC_API_ARRAY(array<Node *>, used_shaders)
+  NODE_SOCKET_API_ARRAY(array<Node *>, used_shaders)
 
   /* Transform */
   BoundBox bounds;
@@ -71,8 +71,8 @@ class Geometry : public Node {
   Transform transform_normal;
 
   /* Motion Blur */
-  NODE_PUBLIC_API(uint, motion_steps)
-  NODE_PUBLIC_API(bool, use_motion_blur)
+  NODE_SOCKET_API(uint, motion_steps)
+  NODE_SOCKET_API(bool, use_motion_blur)
 
   /* Maximum number of motion steps supported (due to Embree). */
   static const uint MAX_MOTION_STEPS = 129;

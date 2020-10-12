@@ -21,7 +21,7 @@
 
 #include "graph/node.h"
 
-/* included as Light::set_shader defined through NODE_PUBLIC_API does not select
+/* included as Light::set_shader defined through NODE_SOCKET_API does not select
  * the right Node::set overload as it does not know that Shader is a Node */
 #include "render/shader.h"
 
@@ -45,41 +45,41 @@ class Light : public Node {
 
   Light();
 
-  NODE_PUBLIC_API(LightType, light_type)
-  NODE_PUBLIC_API(float3, strength)
-  NODE_PUBLIC_API(float3, co)
+  NODE_SOCKET_API(LightType, light_type)
+  NODE_SOCKET_API(float3, strength)
+  NODE_SOCKET_API(float3, co)
 
-  NODE_PUBLIC_API(float3, dir)
-  NODE_PUBLIC_API(float, size)
-  NODE_PUBLIC_API(float, angle)
+  NODE_SOCKET_API(float3, dir)
+  NODE_SOCKET_API(float, size)
+  NODE_SOCKET_API(float, angle)
 
-  NODE_PUBLIC_API(float3, axisu)
-  NODE_PUBLIC_API(float, sizeu)
-  NODE_PUBLIC_API(float3, axisv)
-  NODE_PUBLIC_API(float, sizev)
-  NODE_PUBLIC_API(bool, round)
+  NODE_SOCKET_API(float3, axisu)
+  NODE_SOCKET_API(float, sizeu)
+  NODE_SOCKET_API(float3, axisv)
+  NODE_SOCKET_API(float, sizev)
+  NODE_SOCKET_API(bool, round)
 
-  NODE_PUBLIC_API(Transform, tfm)
+  NODE_SOCKET_API(Transform, tfm)
 
-  NODE_PUBLIC_API(int, map_resolution)
+  NODE_SOCKET_API(int, map_resolution)
 
-  NODE_PUBLIC_API(float, spot_angle)
-  NODE_PUBLIC_API(float, spot_smooth)
+  NODE_SOCKET_API(float, spot_angle)
+  NODE_SOCKET_API(float, spot_smooth)
 
-  NODE_PUBLIC_API(bool, cast_shadow)
-  NODE_PUBLIC_API(bool, use_mis)
-  NODE_PUBLIC_API(bool, use_diffuse)
-  NODE_PUBLIC_API(bool, use_glossy)
-  NODE_PUBLIC_API(bool, use_transmission)
-  NODE_PUBLIC_API(bool, use_scatter)
+  NODE_SOCKET_API(bool, cast_shadow)
+  NODE_SOCKET_API(bool, use_mis)
+  NODE_SOCKET_API(bool, use_diffuse)
+  NODE_SOCKET_API(bool, use_glossy)
+  NODE_SOCKET_API(bool, use_transmission)
+  NODE_SOCKET_API(bool, use_scatter)
 
-  NODE_PUBLIC_API(bool, is_portal)
-  NODE_PUBLIC_API(bool, is_enabled)
+  NODE_SOCKET_API(bool, is_portal)
+  NODE_SOCKET_API(bool, is_enabled)
 
-  NODE_PUBLIC_API(Shader *, shader)
-  NODE_PUBLIC_API(int, samples)
-  NODE_PUBLIC_API(int, max_bounces)
-  NODE_PUBLIC_API(uint, random_id)
+  NODE_SOCKET_API(Shader *, shader)
+  NODE_SOCKET_API(int, samples)
+  NODE_SOCKET_API(int, max_bounces)
+  NODE_SOCKET_API(uint, random_id)
 
   void tag_update(Scene *scene);
 

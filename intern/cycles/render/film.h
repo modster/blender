@@ -60,27 +60,27 @@ class Film : public Node {
  public:
   NODE_DECLARE
 
-  NODE_PUBLIC_API(float, exposure)
-  NODE_PUBLIC_API(bool, denoising_data_pass)
-  NODE_PUBLIC_API(bool, denoising_clean_pass)
-  NODE_PUBLIC_API(bool, denoising_prefiltered_pass)
-  NODE_PUBLIC_API(int, denoising_flags)
-  NODE_PUBLIC_API(float, pass_alpha_threshold)
+  NODE_SOCKET_API(float, exposure)
+  NODE_SOCKET_API(bool, denoising_data_pass)
+  NODE_SOCKET_API(bool, denoising_clean_pass)
+  NODE_SOCKET_API(bool, denoising_prefiltered_pass)
+  NODE_SOCKET_API(int, denoising_flags)
+  NODE_SOCKET_API(float, pass_alpha_threshold)
 
-  NODE_PUBLIC_API(PassType, display_pass)
+  NODE_SOCKET_API(PassType, display_pass)
 
-  NODE_PUBLIC_API(FilterType, filter_type)
-  NODE_PUBLIC_API(float, filter_width)
+  NODE_SOCKET_API(FilterType, filter_type)
+  NODE_SOCKET_API(float, filter_width)
 
-  NODE_PUBLIC_API(float, mist_start)
-  NODE_PUBLIC_API(float, mist_depth)
-  NODE_PUBLIC_API(float, mist_falloff)
+  NODE_SOCKET_API(float, mist_start)
+  NODE_SOCKET_API(float, mist_depth)
+  NODE_SOCKET_API(float, mist_falloff)
 
-  NODE_PUBLIC_API(bool, use_light_visibility)
-  NODE_PUBLIC_API(CryptomatteType, cryptomatte_passes)
-  NODE_PUBLIC_API(int, cryptomatte_depth)
+  NODE_SOCKET_API(bool, use_light_visibility)
+  NODE_SOCKET_API(CryptomatteType, cryptomatte_passes)
+  NODE_SOCKET_API(int, cryptomatte_depth)
 
-  NODE_PUBLIC_API(bool, use_adaptive_sampling)
+  NODE_SOCKET_API(bool, use_adaptive_sampling)
 
  private:
   int pass_stride;

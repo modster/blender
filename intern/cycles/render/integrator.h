@@ -31,52 +31,52 @@ class Integrator : public Node {
  public:
   NODE_DECLARE
 
-  NODE_PUBLIC_API(int, min_bounce)
-  NODE_PUBLIC_API(int, max_bounce)
+  NODE_SOCKET_API(int, min_bounce)
+  NODE_SOCKET_API(int, max_bounce)
 
-  NODE_PUBLIC_API(int, max_diffuse_bounce)
-  NODE_PUBLIC_API(int, max_glossy_bounce)
-  NODE_PUBLIC_API(int, max_transmission_bounce)
-  NODE_PUBLIC_API(int, max_volume_bounce)
+  NODE_SOCKET_API(int, max_diffuse_bounce)
+  NODE_SOCKET_API(int, max_glossy_bounce)
+  NODE_SOCKET_API(int, max_transmission_bounce)
+  NODE_SOCKET_API(int, max_volume_bounce)
 
-  NODE_PUBLIC_API(int, transparent_min_bounce)
-  NODE_PUBLIC_API(int, transparent_max_bounce)
+  NODE_SOCKET_API(int, transparent_min_bounce)
+  NODE_SOCKET_API(int, transparent_max_bounce)
 
-  NODE_PUBLIC_API(int, ao_bounces)
+  NODE_SOCKET_API(int, ao_bounces)
 
-  NODE_PUBLIC_API(int, volume_max_steps)
-  NODE_PUBLIC_API(float, volume_step_rate)
+  NODE_SOCKET_API(int, volume_max_steps)
+  NODE_SOCKET_API(float, volume_step_rate)
 
-  NODE_PUBLIC_API(bool, caustics_reflective)
-  NODE_PUBLIC_API(bool, caustics_refractive)
-  NODE_PUBLIC_API(float, filter_glossy)
+  NODE_SOCKET_API(bool, caustics_reflective)
+  NODE_SOCKET_API(bool, caustics_refractive)
+  NODE_SOCKET_API(float, filter_glossy)
 
-  NODE_PUBLIC_API(int, seed)
+  NODE_SOCKET_API(int, seed)
 
-  NODE_PUBLIC_API(float, sample_clamp_direct)
-  NODE_PUBLIC_API(float, sample_clamp_indirect)
-  NODE_PUBLIC_API(bool, motion_blur)
+  NODE_SOCKET_API(float, sample_clamp_direct)
+  NODE_SOCKET_API(float, sample_clamp_indirect)
+  NODE_SOCKET_API(bool, motion_blur)
 
   /* Maximum number of samples, beyond which we are likely to run into
    * precision issues for sampling patterns. */
   static const int MAX_SAMPLES = (1 << 24);
 
-  NODE_PUBLIC_API(int, aa_samples)
-  NODE_PUBLIC_API(int, diffuse_samples)
-  NODE_PUBLIC_API(int, glossy_samples)
-  NODE_PUBLIC_API(int, transmission_samples)
-  NODE_PUBLIC_API(int, ao_samples)
-  NODE_PUBLIC_API(int, mesh_light_samples)
-  NODE_PUBLIC_API(int, subsurface_samples)
-  NODE_PUBLIC_API(int, volume_samples)
-  NODE_PUBLIC_API(int, start_sample)
+  NODE_SOCKET_API(int, aa_samples)
+  NODE_SOCKET_API(int, diffuse_samples)
+  NODE_SOCKET_API(int, glossy_samples)
+  NODE_SOCKET_API(int, transmission_samples)
+  NODE_SOCKET_API(int, ao_samples)
+  NODE_SOCKET_API(int, mesh_light_samples)
+  NODE_SOCKET_API(int, subsurface_samples)
+  NODE_SOCKET_API(int, volume_samples)
+  NODE_SOCKET_API(int, start_sample)
 
-  NODE_PUBLIC_API(bool, sample_all_lights_direct)
-  NODE_PUBLIC_API(bool, sample_all_lights_indirect)
-  NODE_PUBLIC_API(float, light_sampling_threshold)
+  NODE_SOCKET_API(bool, sample_all_lights_direct)
+  NODE_SOCKET_API(bool, sample_all_lights_indirect)
+  NODE_SOCKET_API(float, light_sampling_threshold)
 
-  NODE_PUBLIC_API(int, adaptive_min_samples)
-  NODE_PUBLIC_API(float, adaptive_threshold)
+  NODE_SOCKET_API(int, adaptive_min_samples)
+  NODE_SOCKET_API(float, adaptive_threshold)
 
   enum Method {
     BRANCHED_PATH = 0,
@@ -85,9 +85,9 @@ class Integrator : public Node {
     NUM_METHODS,
   };
 
-  NODE_PUBLIC_API(Method, method)
+  NODE_SOCKET_API(Method, method)
 
-  NODE_PUBLIC_API(SamplingPattern, sampling_pattern)
+  NODE_SOCKET_API(SamplingPattern, sampling_pattern)
 
   Integrator();
   ~Integrator();

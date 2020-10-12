@@ -73,92 +73,92 @@ class Camera : public Node {
   };
 
   /* motion blur */
-  NODE_PUBLIC_API(float, shuttertime)
-  NODE_PUBLIC_API(MotionPosition, motion_position)
-  NODE_PUBLIC_API_ARRAY(array<float>, shutter_curve)
+  NODE_SOCKET_API(float, shuttertime)
+  NODE_SOCKET_API(MotionPosition, motion_position)
+  NODE_SOCKET_API_ARRAY(array<float>, shutter_curve)
   size_t shutter_table_offset;
 
   /* ** Rolling shutter effect. ** */
   /* Defines rolling shutter effect type. */
-  NODE_PUBLIC_API(RollingShutterType, rolling_shutter_type)
+  NODE_SOCKET_API(RollingShutterType, rolling_shutter_type)
   /* Specifies exposure time of scanlines when using
    * rolling shutter effect.
    */
-  NODE_PUBLIC_API(float, rolling_shutter_duration)
+  NODE_SOCKET_API(float, rolling_shutter_duration)
 
   /* depth of field */
-  NODE_PUBLIC_API(float, focaldistance)
-  NODE_PUBLIC_API(float, aperturesize)
-  NODE_PUBLIC_API(uint, blades)
-  NODE_PUBLIC_API(float, bladesrotation)
+  NODE_SOCKET_API(float, focaldistance)
+  NODE_SOCKET_API(float, aperturesize)
+  NODE_SOCKET_API(uint, blades)
+  NODE_SOCKET_API(float, bladesrotation)
 
   /* type */
-  NODE_PUBLIC_API(CameraType, camera_type)
-  NODE_PUBLIC_API(float, fov)
+  NODE_SOCKET_API(CameraType, camera_type)
+  NODE_SOCKET_API(float, fov)
 
   /* panorama */
-  NODE_PUBLIC_API(PanoramaType, panorama_type)
-  NODE_PUBLIC_API(float, fisheye_fov)
-  NODE_PUBLIC_API(float, fisheye_lens)
-  NODE_PUBLIC_API(float, latitude_min)
-  NODE_PUBLIC_API(float, latitude_max)
-  NODE_PUBLIC_API(float, longitude_min)
-  NODE_PUBLIC_API(float, longitude_max)
+  NODE_SOCKET_API(PanoramaType, panorama_type)
+  NODE_SOCKET_API(float, fisheye_fov)
+  NODE_SOCKET_API(float, fisheye_lens)
+  NODE_SOCKET_API(float, latitude_min)
+  NODE_SOCKET_API(float, latitude_max)
+  NODE_SOCKET_API(float, longitude_min)
+  NODE_SOCKET_API(float, longitude_max)
 
   /* panorama stereo */
-  NODE_PUBLIC_API(StereoEye, stereo_eye)
-  NODE_PUBLIC_API(bool, use_spherical_stereo)
-  NODE_PUBLIC_API(float, interocular_distance)
-  NODE_PUBLIC_API(float, convergence_distance)
-  NODE_PUBLIC_API(bool, use_pole_merge)
-  NODE_PUBLIC_API(float, pole_merge_angle_from)
-  NODE_PUBLIC_API(float, pole_merge_angle_to)
+  NODE_SOCKET_API(StereoEye, stereo_eye)
+  NODE_SOCKET_API(bool, use_spherical_stereo)
+  NODE_SOCKET_API(float, interocular_distance)
+  NODE_SOCKET_API(float, convergence_distance)
+  NODE_SOCKET_API(bool, use_pole_merge)
+  NODE_SOCKET_API(float, pole_merge_angle_from)
+  NODE_SOCKET_API(float, pole_merge_angle_to)
 
   /* anamorphic lens bokeh */
-  NODE_PUBLIC_API(float, aperture_ratio)
+  NODE_SOCKET_API(float, aperture_ratio)
 
   /* sensor */
-  NODE_PUBLIC_API(float, sensorwidth)
-  NODE_PUBLIC_API(float, sensorheight)
+  NODE_SOCKET_API(float, sensorwidth)
+  NODE_SOCKET_API(float, sensorheight)
 
   /* clipping */
-  NODE_PUBLIC_API(float, nearclip)
-  NODE_PUBLIC_API(float, farclip)
+  NODE_SOCKET_API(float, nearclip)
+  NODE_SOCKET_API(float, farclip)
 
   /* screen */
   BoundBox2D viewplane;
-  NODE_PUBLIC_API_STRUCT_MEMBER(float, viewplane, left)
-  NODE_PUBLIC_API_STRUCT_MEMBER(float, viewplane, right)
-  NODE_PUBLIC_API_STRUCT_MEMBER(float, viewplane, bottom)
-  NODE_PUBLIC_API_STRUCT_MEMBER(float, viewplane, top)
+  NODE_SOCKET_API_STRUCT_MEMBER(float, viewplane, left)
+  NODE_SOCKET_API_STRUCT_MEMBER(float, viewplane, right)
+  NODE_SOCKET_API_STRUCT_MEMBER(float, viewplane, bottom)
+  NODE_SOCKET_API_STRUCT_MEMBER(float, viewplane, top)
 
   /* width and height change during preview, so we need these for calculating dice rates. */
-  NODE_PUBLIC_API(int, full_width)
-  NODE_PUBLIC_API(int, full_height)
+  NODE_SOCKET_API(int, full_width)
+  NODE_SOCKET_API(int, full_height)
   /* controls how fast the dicing rate falls off for geometry out side of view */
-  NODE_PUBLIC_API(float, offscreen_dicing_scale)
+  NODE_SOCKET_API(float, offscreen_dicing_scale)
 
   /* border */
   BoundBox2D border;
-  NODE_PUBLIC_API_STRUCT_MEMBER(float, border, left)
-  NODE_PUBLIC_API_STRUCT_MEMBER(float, border, right)
-  NODE_PUBLIC_API_STRUCT_MEMBER(float, border, bottom)
-  NODE_PUBLIC_API_STRUCT_MEMBER(float, border, top)
+  NODE_SOCKET_API_STRUCT_MEMBER(float, border, left)
+  NODE_SOCKET_API_STRUCT_MEMBER(float, border, right)
+  NODE_SOCKET_API_STRUCT_MEMBER(float, border, bottom)
+  NODE_SOCKET_API_STRUCT_MEMBER(float, border, top)
 
   BoundBox2D viewport_camera_border;
-  NODE_PUBLIC_API_STRUCT_MEMBER(float, viewport_camera_border, left)
-  NODE_PUBLIC_API_STRUCT_MEMBER(float, viewport_camera_border, right)
-  NODE_PUBLIC_API_STRUCT_MEMBER(float, viewport_camera_border, bottom)
-  NODE_PUBLIC_API_STRUCT_MEMBER(float, viewport_camera_border, top)
+  NODE_SOCKET_API_STRUCT_MEMBER(float, viewport_camera_border, left)
+  NODE_SOCKET_API_STRUCT_MEMBER(float, viewport_camera_border, right)
+  NODE_SOCKET_API_STRUCT_MEMBER(float, viewport_camera_border, bottom)
+  NODE_SOCKET_API_STRUCT_MEMBER(float, viewport_camera_border, top)
 
   /* transformation */
-  NODE_PUBLIC_API(Transform, matrix)
+  NODE_SOCKET_API(Transform, matrix)
 
   /* motion */
-  NODE_PUBLIC_API_ARRAY(array<Transform>, motion)
-  NODE_PUBLIC_API(bool, use_perspective_motion)
-  NODE_PUBLIC_API(float, fov_pre)
-  NODE_PUBLIC_API(float, fov_post)
+  NODE_SOCKET_API_ARRAY(array<Transform>, motion)
+  NODE_SOCKET_API(bool, use_perspective_motion)
+  NODE_SOCKET_API(float, fov_pre)
+  NODE_SOCKET_API(float, fov_post)
 
   /* computed camera parameters */
   ProjectionTransform screentoworld;

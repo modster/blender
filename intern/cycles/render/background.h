@@ -32,20 +32,20 @@ class Background : public Node {
  public:
   NODE_DECLARE
 
-  NODE_PUBLIC_API(float, ao_factor)
-  NODE_PUBLIC_API(float, ao_distance)
+  NODE_SOCKET_API(float, ao_factor)
+  NODE_SOCKET_API(float, ao_distance)
 
-  NODE_PUBLIC_API(bool, use_shader)
-  NODE_PUBLIC_API(bool, use_ao)
+  NODE_SOCKET_API(bool, use_shader)
+  NODE_SOCKET_API(bool, use_ao)
 
-  NODE_PUBLIC_API(uint, visibility)
-  NODE_PUBLIC_API(Shader *, shader)
+  NODE_SOCKET_API(uint, visibility)
+  NODE_SOCKET_API(Shader *, shader)
 
-  NODE_PUBLIC_API(bool, transparent)
-  NODE_PUBLIC_API(bool, transparent_glass)
-  NODE_PUBLIC_API(float, transparent_roughness_threshold)
+  NODE_SOCKET_API(bool, transparent)
+  NODE_SOCKET_API(bool, transparent_glass)
+  NODE_SOCKET_API(float, transparent_roughness_threshold)
 
-  NODE_PUBLIC_API(float, volume_step_size)
+  NODE_SOCKET_API(float, volume_step_size)
 
   Background();
   ~Background();

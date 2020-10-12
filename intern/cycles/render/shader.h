@@ -84,18 +84,18 @@ class Shader : public Node {
   /* shader graph */
   ShaderGraph *graph;
 
-  NODE_PUBLIC_API(int, pass_id)
+  NODE_SOCKET_API(int, pass_id)
 
   /* sampling */
-  NODE_PUBLIC_API(bool, use_mis)
-  NODE_PUBLIC_API(bool, use_transparent_shadow)
-  NODE_PUBLIC_API(bool, heterogeneous_volume)
-  NODE_PUBLIC_API(VolumeSampling, volume_sampling_method)
-  NODE_PUBLIC_API(int, volume_interpolation_method)
-  NODE_PUBLIC_API(float, volume_step_rate)
+  NODE_SOCKET_API(bool, use_mis)
+  NODE_SOCKET_API(bool, use_transparent_shadow)
+  NODE_SOCKET_API(bool, heterogeneous_volume)
+  NODE_SOCKET_API(VolumeSampling, volume_sampling_method)
+  NODE_SOCKET_API(int, volume_interpolation_method)
+  NODE_SOCKET_API(float, volume_step_rate)
 
   /* displacement */
-  NODE_PUBLIC_API(DisplacementMethod, displacement_method)
+  NODE_SOCKET_API(DisplacementMethod, displacement_method)
 
   float prev_volume_step_rate;
 

@@ -136,35 +136,35 @@ class Mesh : public Geometry {
     SUBDIVISION_CATMULL_CLARK,
   };
 
-  NODE_PUBLIC_API(SubdivisionType, subdivision_type)
+  NODE_SOCKET_API(SubdivisionType, subdivision_type)
 
   /* Mesh Data */
-  NODE_PUBLIC_API_ARRAY(array<int>, triangles)
-  NODE_PUBLIC_API_ARRAY(array<float3>, verts)
-  NODE_PUBLIC_API_ARRAY(array<int>, shader)
-  NODE_PUBLIC_API_ARRAY(array<bool>, smooth)
+  NODE_SOCKET_API_ARRAY(array<int>, triangles)
+  NODE_SOCKET_API_ARRAY(array<float3>, verts)
+  NODE_SOCKET_API_ARRAY(array<int>, shader)
+  NODE_SOCKET_API_ARRAY(array<bool>, smooth)
 
   /* used for storing patch info for subd triangles, only allocated if there are patches */
-  NODE_PUBLIC_API_ARRAY(array<int>, triangle_patch) /* must be < 0 for non subd triangles */
-  NODE_PUBLIC_API_ARRAY(array<float2>, vert_patch_uv)
+  NODE_SOCKET_API_ARRAY(array<int>, triangle_patch) /* must be < 0 for non subd triangles */
+  NODE_SOCKET_API_ARRAY(array<float2>, vert_patch_uv)
 
   /* SubdFaces */
-  NODE_PUBLIC_API_ARRAY(array<int>, subd_start_corner)
-  NODE_PUBLIC_API_ARRAY(array<int>, subd_num_corners)
-  NODE_PUBLIC_API_ARRAY(array<int>, subd_shader)
-  NODE_PUBLIC_API_ARRAY(array<bool>, subd_smooth)
-  NODE_PUBLIC_API_ARRAY(array<int>, subd_ptex_offset)
+  NODE_SOCKET_API_ARRAY(array<int>, subd_start_corner)
+  NODE_SOCKET_API_ARRAY(array<int>, subd_num_corners)
+  NODE_SOCKET_API_ARRAY(array<int>, subd_shader)
+  NODE_SOCKET_API_ARRAY(array<bool>, subd_smooth)
+  NODE_SOCKET_API_ARRAY(array<int>, subd_ptex_offset)
 
-  NODE_PUBLIC_API_ARRAY(array<int>, subd_face_corners)
-  NODE_PUBLIC_API(int, num_ngons)
+  NODE_SOCKET_API_ARRAY(array<int>, subd_face_corners)
+  NODE_SOCKET_API(int, num_ngons)
 
-  NODE_PUBLIC_API_ARRAY(array<int>, subd_creases_edge)
-  NODE_PUBLIC_API_ARRAY(array<float>, subd_creases_weight)
+  NODE_SOCKET_API_ARRAY(array<int>, subd_creases_edge)
+  NODE_SOCKET_API_ARRAY(array<float>, subd_creases_weight)
 
   /* Subdivisions parameters */
-  NODE_PUBLIC_API(float, subd_dicing_rate)
-  NODE_PUBLIC_API(int, subd_max_level)
-  NODE_PUBLIC_API(Transform, subd_objecttoworld)
+  NODE_SOCKET_API(float, subd_dicing_rate)
+  NODE_SOCKET_API(int, subd_max_level)
+  NODE_SOCKET_API(Transform, subd_objecttoworld)
 
   AttributeSet subd_attributes;
 
