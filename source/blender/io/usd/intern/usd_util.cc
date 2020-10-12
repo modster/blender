@@ -377,15 +377,17 @@ void create_readers(const pxr::UsdPrim &prim,
   }
 
   /* If this is an Xform prim, see if we can merge with the child reader.
-   * We only merge if the Xform has a single child of Mesh type.
-   * The list of child types that can be merged will be expanded as we
-   * support more reader types (e.g., for lights, curves, etc.). */
+   * We only merge if the child reader hasn't yet been merged
+   * and if it corresponds to a mesh prim.  The list of child types that
+   * can be merged will be expanded as we support more reader types
+   * (e.g., for lights, curves, etc.). */
 
   if (prim.GetTypeName() == usdtokens::xform_type && child_readers.size() == 1 &&
+      !child_readers.front()->merged_with_parent() &&
       child_readers.front()->prim().GetTypeName() == usdtokens::mesh_type) {
     child_readers.front()->set_merged_with_parent(true);
-    // We don't create a reader for the Xform but, instead, we return the grandchild
-    // that we merged.
+    /* Don't create a reader for the Xform but, instead, return the grandchild
+     * that we merged. */
     r_child_readers.push_back(child_readers.front());
     return;
   }
