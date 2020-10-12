@@ -174,13 +174,13 @@ static void world_blend_read_data(BlendDataReader *reader, ID *id)
 static void world_blend_read_lib(BlendLibReader *reader, ID *id)
 {
   World *wrld = (World *)id;
-  BLO_read_id_address(reader, wrld->id.lib, &wrld->ipo);  // XXX deprecated - old animation system
+  BLO_read_id_address(reader, wrld->id.lib, &wrld->ipo); /* XXX deprecated, old animation system */
 }
 
 static void world_blend_read_expand(BlendExpander *expander, ID *id)
 {
   World *wrld = (World *)id;
-  BLO_expand(expander, wrld->ipo);  // XXX deprecated - old animation system
+  BLO_expand(expander, wrld->ipo); /* XXX deprecated, old animation system */
 }
 
 IDTypeInfo IDType_ID_WO = {
@@ -210,9 +210,7 @@ World *BKE_world_add(Main *bmain, const char *name)
 {
   World *wrld;
 
-  wrld = BKE_libblock_alloc(bmain, ID_WO, name, 0);
-
-  world_init_data(&wrld->id);
+  wrld = BKE_id_new(bmain, ID_WO, name);
 
   return wrld;
 }

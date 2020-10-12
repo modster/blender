@@ -1594,7 +1594,7 @@ static int gpencil_strokes_copy_exec(bContext *C, wmOperator *op)
   }
 
   /* updates (to ensure operator buttons are refreshed, when used via hotkeys) */
-  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA, NULL);  // XXX?
+  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA, NULL); /* XXX? */
 
   /* done */
   return OPERATOR_FINISHED;
@@ -1909,11 +1909,11 @@ void GPENCIL_OT_move_to_layer(wmOperatorType *ot)
   ot->name = "Move Strokes to Layer";
   ot->idname = "GPENCIL_OT_move_to_layer";
   ot->description =
-      "Move selected strokes to another layer";  // XXX: allow moving individual points too?
+      "Move selected strokes to another layer"; /* XXX: allow moving individual points too? */
 
   /* callbacks */
   ot->exec = gpencil_move_to_layer_exec;
-  ot->poll = gpencil_stroke_edit_poll;  // XXX?
+  ot->poll = gpencil_stroke_edit_poll; /* XXX? */
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
@@ -3223,7 +3223,7 @@ static int gpencil_snap_to_grid(bContext *C, wmOperator *UNUSED(op))
           }
         }
         else {
-          // TODO: if entire stroke is selected, offset entire stroke by same amount?
+          /* TODO: if entire stroke is selected, offset entire stroke by same amount? */
           for (int i = 0; i < gps->totpoints; i++) {
             bGPDspoint *pt = &gps->points[i];
             /* only if point is selected */
