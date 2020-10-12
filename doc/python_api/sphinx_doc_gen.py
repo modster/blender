@@ -92,7 +92,7 @@ SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 # For now, ignore add-ons and internal subclasses of 'bpy.types.PropertyGroup'.
 #
 # Besides disabling this line, the main change will be to add a
-# 'toctree' to 'write_rst_contents' which contains the generated rst files.
+# 'toctree' to 'write_rst_index' which contains the generated rst files.
 # This 'toctree' can be generated automatically.
 #
 # See: D6261 for reference.
@@ -244,6 +244,7 @@ else:
         "bpy.types",  # supports filtering
         "bpy.utils",
         "bpy.utils.previews",
+        "bpy.utils.units",
         "bpy_extras",
         "gpu",
         "gpu.types",
@@ -493,6 +494,13 @@ if _BPY_STRUCT_FAKE:
     bpy_struct = bpy.types.bpy_struct
 else:
     bpy_struct = None
+
+
+def import_value_from_module(module_name, import_name):
+    ns = {}
+    exec_str = "from %s import %s as value" % (module_name, import_name)
+    exec(exec_str, ns, ns)
+    return ns["value"]
 
 
 def escape_rst(text):
@@ -749,7 +757,7 @@ def pyprop2sphinx(ident, fw, identifier, py_prop):
         fw(ident + "   (readonly)\n\n")
 
 
-def pymodule2sphinx(basepath, module_name, module, title):
+def pymodule2sphinx(basepath, module_name, module, title, module_all_extra):
     import types
     attribute_set = set()
     filepath = os.path.join(basepath, module_name + ".rst")
@@ -796,41 +804,50 @@ def pymodule2sphinx(basepath, module_name, module, title):
         fw(module.__doc__.strip())
         fw("\n\n")
 
-    write_example_ref("", fw, module_name)
-
     # write submodules
     # we could also scan files but this ensures __all__ is used correctly
-    if module_all is not None:
+    if module_all or module_all_extra:
         submod_name = None
         submod = None
         submod_ls = []
-        for submod_name in module_all:
-            ns = {}
-            exec_str = "from %s import %s as submod" % (module.__name__, submod_name)
-            exec(exec_str, ns, ns)
-            submod = ns["submod"]
+        for submod_name in (module_all or ()):
+            submod = import_value_from_module(module_name, submod_name)
             if type(submod) == types.ModuleType:
                 submod_ls.append((submod_name, submod))
+
+        for submod_name in module_all_extra:
+            if submod_name in attribute_set:
+                continue
+            submod = import_value_from_module(module_name, submod_name)
+            # No type checks, since there are non-module types we treat as modules
+            # such as `bpy.app.translations` & `bpy.app.handlers`.
+            submod_ls.append((submod_name, submod))
 
         del submod_name
         del submod
 
         if submod_ls:
             fw(".. toctree::\n")
-            fw("   :maxdepth: 1\n\n")
+            fw("   :maxdepth: 1\n")
+            fw("   :caption: Submodules\n\n")
 
             for submod_name, submod in submod_ls:
                 submod_name_full = "%s.%s" % (module_name, submod_name)
-                fw("   %s.rst\n\n" % submod_name_full)
+                fw("   %s.rst\n" % submod_name_full)
 
-                pymodule2sphinx(basepath, submod_name_full, submod, "%s submodule" % module_name)
+                pymodule2sphinx(basepath, submod_name_full, submod, "%s submodule" % module_name, ())
+            fw("\n")
         del submod_ls
     # done writing submodules!
+
+    write_example_ref("", fw, module_name)
 
     # write members of the module
     # only tested with PyStructs which are not exactly modules
     for key, descr in sorted(type(module).__dict__.items()):
         if key.startswith("__"):
+            continue
+        if key in module_all_extra:
             continue
         # naughty, we also add getset's into PyStructs, this is not typical py but also not incorrect.
 
@@ -854,6 +871,8 @@ def pymodule2sphinx(basepath, module_name, module, title):
     # sort by the valye type
     descr_sorted.sort(key=lambda descr_data: str(descr_data[3]))
     for key, descr, value, value_type in descr_sorted:
+        if key in module_all_extra:
+            continue
 
         # must be documented as a submodule
         if is_struct_seq(value):
@@ -895,6 +914,9 @@ def pymodule2sphinx(basepath, module_name, module, title):
     module_dir_value_type.sort(key=lambda triple: str(triple[2]))
 
     for attribute, value, value_type in module_dir_value_type:
+        if attribute in module_all_extra:
+            continue
+
         if value_type == FunctionType:
             pyfunc2sphinx("", fw, module_name, None, attribute, value, is_class=False)
         # both the same at the moment but to be future proof
@@ -1739,7 +1761,7 @@ def execfile(filepath):
     file_handle.close()
 
 
-def write_rst_contents(basepath):
+def write_rst_index(basepath):
     '''
     Write the rst file of the main page, needed for sphinx (index.html)
     '''
@@ -1779,7 +1801,6 @@ def write_rst_contents(basepath):
 
         # py modules
         "bpy.utils",
-        "bpy.utils.previews",
         "bpy.path",
         "bpy.app",
 
@@ -1816,6 +1837,10 @@ def write_rst_contents(basepath):
         if mod not in EXCLUDE_MODULES:
             fw("   %s\n" % mod)
     fw("\n")
+
+    fw(title_string("Indices", "="))
+    fw("* :ref:`genindex`\n")
+    fw("* :ref:`modindex`\n\n")
 
     # special case, this 'bmesh.ops.rst' is extracted from C source
     if "bmesh.ops" not in EXCLUDE_MODULES:
@@ -1871,6 +1896,7 @@ def write_rst_ops_index(basepath):
         fw(".. module:: bpy.ops\n\n")
         write_example_ref("", fw, "bpy.ops")
         fw(".. toctree::\n")
+        fw("   :caption: Submodules\n")
         fw("   :glob:\n\n")
         fw("   bpy.ops.*\n\n")
         file.close()
@@ -1895,7 +1921,7 @@ def write_rst_msgbus(basepath):
     file.close()
 
     # Write the contents.
-    pymodule2sphinx(basepath, 'bpy.msgbus', bpy.msgbus, 'Message Bus')
+    pymodule2sphinx(basepath, 'bpy.msgbus', bpy.msgbus, 'Message Bus', ())
     EXAMPLE_SET_USED.add("bpy.msgbus")
 
 
@@ -1947,6 +1973,7 @@ def write_rst_importable_modules(basepath):
         "gpu.select": "GPU Select",
         "gpu.shader": "GPU Shader",
         "bmesh": "BMesh Module",
+        "bmesh.ops": "BMesh Operators",
         "bmesh.types": "BMesh Types",
         "bmesh.utils": "BMesh Utilities",
         "bmesh.geometry": "BMesh Geometry Utilities",
@@ -1972,11 +1999,32 @@ def write_rst_importable_modules(basepath):
         "freestyle.shaders": "Freestyle Shaders",
         "freestyle.utils": "Freestyle Utilities",
     }
+
+    # This is needed since some of the sub-modules listed above are not actual modules.
+    # Examples include `bpy.app.translations` & `bpy.app.handlers`.
+    #
+    # Most of these are `PyStructSequence` internally,
+    # however we don't want to document all of these as modules since some only contain
+    # a few values (version number for e.g).
+    #
+    # If we remove this logic and document all `PyStructSequence` as sub-modules it means
+    # `bpy.app.timers` for example would be presented on the same level as library information
+    # access such as `bpy.app.sdl` which doesn't seem useful since it hides more useful
+    # module-like objects among library data access.
+    importable_modules_parent_map = {}
+    for mod_name in importable_modules.keys():
+        if mod_name in EXCLUDE_MODULES:
+            continue
+        if "." in mod_name:
+            mod_name, submod_name = mod_name.rsplit(".", 1)
+            importable_modules_parent_map.setdefault(mod_name, []).append(submod_name)
+
     for mod_name, mod_descr in importable_modules.items():
-        if mod_name not in EXCLUDE_MODULES:
-            module = __import__(mod_name,
-                                fromlist=[mod_name.rsplit(".", 1)[-1]])
-            pymodule2sphinx(basepath, mod_name, module, mod_descr)
+        if mod_name in EXCLUDE_MODULES:
+            continue
+        module_all_extra = importable_modules_parent_map.get(mod_name, ())
+        module = __import__(mod_name, fromlist=[mod_name.rsplit(".", 1)[-1]])
+        pymodule2sphinx(basepath, mod_name, module, mod_descr, module_all_extra)
 
 
 def copy_handwritten_rsts(basepath):
@@ -2041,7 +2089,7 @@ def rna2sphinx(basepath):
     write_sphinx_conf_py(basepath)
 
     # main page
-    write_rst_contents(basepath)
+    write_rst_index(basepath)
 
     # context
     if "bpy.context" not in EXCLUDE_MODULES:

@@ -603,9 +603,7 @@ void BKE_volume_init_grids(Volume *volume)
 
 void *BKE_volume_add(Main *bmain, const char *name)
 {
-  Volume *volume = (Volume *)BKE_libblock_alloc(bmain, ID_VO, name, 0);
-
-  volume_init_data(&volume->id);
+  Volume *volume = (Volume *)BKE_id_new(bmain, ID_VO, name);
 
   return volume;
 }
@@ -1027,10 +1025,10 @@ void BKE_volume_grids_backup_restore(Volume *volume, VolumeGridVector *grids, co
 
 /* Draw Cache */
 
-void (*BKE_volume_batch_cache_dirty_tag_cb)(Volume *volume, eMeshBatchDirtyMode mode) = NULL;
+void (*BKE_volume_batch_cache_dirty_tag_cb)(Volume *volume, int mode) = NULL;
 void (*BKE_volume_batch_cache_free_cb)(Volume *volume) = NULL;
 
-void BKE_volume_batch_cache_dirty_tag(Volume *volume, eMeshBatchDirtyMode mode)
+void BKE_volume_batch_cache_dirty_tag(Volume *volume, int mode)
 {
   if (volume->batch_cache) {
     BKE_volume_batch_cache_dirty_tag_cb(volume, mode);

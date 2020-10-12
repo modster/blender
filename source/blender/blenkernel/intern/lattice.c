@@ -394,9 +394,7 @@ Lattice *BKE_lattice_add(Main *bmain, const char *name)
 {
   Lattice *lt;
 
-  lt = BKE_libblock_alloc(bmain, ID_LT, name, 0);
-
-  lattice_init_data(&lt->id);
+  lt = BKE_id_new(bmain, ID_LT, name);
 
   return lt;
 }
@@ -801,10 +799,10 @@ void BKE_lattice_eval_geometry(struct Depsgraph *UNUSED(depsgraph), Lattice *UNU
 }
 
 /* Draw Engine */
-void (*BKE_lattice_batch_cache_dirty_tag_cb)(Lattice *lt, eMeshBatchDirtyMode mode) = NULL;
+void (*BKE_lattice_batch_cache_dirty_tag_cb)(Lattice *lt, int mode) = NULL;
 void (*BKE_lattice_batch_cache_free_cb)(Lattice *lt) = NULL;
 
-void BKE_lattice_batch_cache_dirty_tag(Lattice *lt, eMeshBatchDirtyMode mode)
+void BKE_lattice_batch_cache_dirty_tag(Lattice *lt, int mode)
 {
   if (lt->batch_cache) {
     BKE_lattice_batch_cache_dirty_tag_cb(lt, mode);
