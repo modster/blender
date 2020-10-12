@@ -159,23 +159,27 @@ static void read_mpolys(Mesh *mesh, const MeshSampleData &mesh_data)
 
     for (int f = 0; f < face_size; ++f) {
 
-      int loop_index = loop_start;
+      int loop_index = loop_start + f;
+
+      /* Index into the USD data, corresponding to the loop index,
+       * but taking reversed winding order into account. */
+      int usd_index = loop_start;
 
       if (mesh_data.reverse_vert_order) {
-        loop_index += face_size - 1 - f;
+        usd_index += face_size - 1 - f;
       }
       else {
-        loop_index += f;
+        usd_index += f;
       }
 
       MLoop &loop = mloops[loop_index];
-      loop.v = mesh_data.vertex_indices[loop_index];
+      loop.v = mesh_data.vertex_indices[usd_index];
 
       if (mloopuvs) {
         MLoopUV &loopuv = mloopuvs[loop_index];
 
         int uv_index = mesh_data.uv_interpolation == pxr::UsdGeomTokens->vertex ? loop.v :
-                                                                                  loop_index;
+                                                                                  usd_index;
 
         uv_index = mesh_data.uv_indices.empty() ? uv_index : mesh_data.uv_indices[uv_index];
 
@@ -226,15 +230,30 @@ static void process_loop_normals(Mesh *mesh, const MeshSampleData &mesh_data)
   float(*lnors)[3] = static_cast<float(*)[3]>(
       MEM_malloc_arrayN(loop_count, sizeof(float[3]), "USD::FaceNormals"));
 
-  for (int i = 0; i < loop_count; ++i) {
+  MPoly *mpoly = mesh->mpoly;
 
-    if (mesh_data.y_up) {
-      blender::io::usd::copy_zup_from_yup(lnors[i], mesh_data.normals[i].data());
-    }
-    else {
-      lnors[i][0] = mesh_data.normals[i].data()[0];
-      lnors[i][1] = mesh_data.normals[i].data()[1];
-      lnors[i][2] = mesh_data.normals[i].data()[2];
+  for (int p = 0; p < mesh->totpoly; ++p, ++mpoly) {
+
+    for (int l = 0; l < mpoly->totloop; ++l) {
+      int blender_index = mpoly->loopstart + l;
+      int usd_index = mpoly->loopstart;
+
+      if (mesh_data.reverse_vert_order) {
+        usd_index += mpoly->totloop - 1 - l;
+      }
+      else {
+        usd_index += l;
+      }
+
+      if (mesh_data.y_up) {
+        blender::io::usd::copy_zup_from_yup(lnors[blender_index],
+                                            mesh_data.normals[usd_index].data());
+      }
+      else {
+        lnors[blender_index][0] = mesh_data.normals[usd_index].data()[0];
+        lnors[blender_index][1] = mesh_data.normals[usd_index].data()[1];
+        lnors[blender_index][2] = mesh_data.normals[usd_index].data()[2];
+      }
     }
   }
 
