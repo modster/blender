@@ -236,12 +236,6 @@ static void process_loop_normals(Mesh *mesh, const MeshSampleData &mesh_data)
       lnors[i][1] = mesh_data.normals[i].data()[1];
       lnors[i][2] = mesh_data.normals[i].data()[2];
     }
-
-    if (mesh_data.reverse_vert_order) {
-      lnors[i][0] = -lnors[i][0];
-      lnors[i][1] = -lnors[i][1];
-      lnors[i][2] = -lnors[i][2];
-    }
   }
 
   mesh->flag |= ME_AUTOSMOOTH;
@@ -275,12 +269,6 @@ static void process_vertex_normals(Mesh *mesh, const MeshSampleData &mesh_data)
       vnors[i][0] = mesh_data.normals[i].data()[0];
       vnors[i][1] = mesh_data.normals[i].data()[1];
       vnors[i][2] = mesh_data.normals[i].data()[2];
-    }
-
-    if (mesh_data.reverse_vert_order) {
-      vnors[i][0] = -vnors[i][0];
-      vnors[i][1] = -vnors[i][1];
-      vnors[i][2] = -vnors[i][2];
     }
   }
 
