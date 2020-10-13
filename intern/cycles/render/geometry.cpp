@@ -58,7 +58,7 @@ NODE_ABSTRACT_DEFINE(Geometry)
 }
 
 Geometry::Geometry(const NodeType *node_type, const Type type)
-    : Node(node_type), attributes(this, ATTR_PRIM_GEOMETRY), geometry_type(type)
+    : Node(node_type), geometry_type(type), attributes(this, ATTR_PRIM_GEOMETRY)
 {
   need_update_rebuild = false;
 
