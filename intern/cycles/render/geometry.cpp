@@ -1247,7 +1247,7 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
       }
     }
 
-    if (need_update && geom->geometry_type == Geometry::VOLUME) {
+    if (geom->need_update_rebuild && geom->geometry_type == Geometry::VOLUME) {
       /* Create volume meshes if there is voxel data. */
       if (!volume_images_updated) {
         progress.set_status("Updating Meshes Volume Bounds");

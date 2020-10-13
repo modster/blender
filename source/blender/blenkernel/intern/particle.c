@@ -4195,7 +4195,7 @@ float psys_get_child_size(ParticleSystem *psys,
                           float *UNUSED(pa_time))
 {
   ParticleSettings *part = psys->part;
-  float size;  // time XXX
+  float size; /* time XXX */
 
   if (part->childtype == PART_CHILD_FACES) {
     int w = 0;
@@ -4934,11 +4934,10 @@ void psys_apply_hair_lattice(Depsgraph *depsgraph, Scene *scene, Object *ob, Par
 }
 
 /* Draw Engine */
-void (*BKE_particle_batch_cache_dirty_tag_cb)(ParticleSystem *psys,
-                                              eMeshBatchDirtyMode mode) = NULL;
+void (*BKE_particle_batch_cache_dirty_tag_cb)(ParticleSystem *psys, int mode) = NULL;
 void (*BKE_particle_batch_cache_free_cb)(ParticleSystem *psys) = NULL;
 
-void BKE_particle_batch_cache_dirty_tag(ParticleSystem *psys, eMeshBatchDirtyMode mode)
+void BKE_particle_batch_cache_dirty_tag(ParticleSystem *psys, int mode)
 {
   if (psys->batch_cache) {
     BKE_particle_batch_cache_dirty_tag_cb(psys, mode);

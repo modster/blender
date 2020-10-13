@@ -742,15 +742,6 @@ bool BKE_volume_load(Volume *volume, Main *bmain)
     return false;
   }
 
-  /* Test if file exists. */
-  if (!BLI_exists(grids.filepath)) {
-    char filename[FILE_MAX];
-    BLI_split_file_part(grids.filepath, filename, sizeof(filename));
-    grids.error_msg = filename + std::string(" not found");
-    CLOG_INFO(&LOG, 1, "Volume %s: %s", volume_name, grids.error_msg.c_str());
-    return false;
-  }
-
   /* Open OpenVDB file. */
   openvdb::io::File file(grids.filepath);
   openvdb::GridPtrVec vdb_grids;
@@ -1025,10 +1016,10 @@ void BKE_volume_grids_backup_restore(Volume *volume, VolumeGridVector *grids, co
 
 /* Draw Cache */
 
-void (*BKE_volume_batch_cache_dirty_tag_cb)(Volume *volume, eMeshBatchDirtyMode mode) = NULL;
+void (*BKE_volume_batch_cache_dirty_tag_cb)(Volume *volume, int mode) = NULL;
 void (*BKE_volume_batch_cache_free_cb)(Volume *volume) = NULL;
 
-void BKE_volume_batch_cache_dirty_tag(Volume *volume, eMeshBatchDirtyMode mode)
+void BKE_volume_batch_cache_dirty_tag(Volume *volume, int mode)
 {
   if (volume->batch_cache) {
     BKE_volume_batch_cache_dirty_tag_cb(volume, mode);
