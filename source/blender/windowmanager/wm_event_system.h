@@ -152,6 +152,8 @@ void wm_event_do_handlers(bContext *C);
 void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void *customdata);
 void wm_event_add_xrevent(const struct wmXrAction *action,
                           const struct GHOST_XrPose *controller_pose,
+                          const float viewmat[4][4],
+                          const float winmat[4][4],
                           struct wmSurface *surface,
                           wmWindow *win,
                           unsigned int subaction_idx,

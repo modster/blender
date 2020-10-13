@@ -431,28 +431,32 @@ void WM_event_xr_data(const wmEvent *event,
                       char *type,
                       float state[2],
                       float controller_loc[3],
-                      float controller_rot[4])
+                      float controller_rot[4],
+                      float viewmat[4][4],
+                      float winmat[4][4])
 {
   const wmXrActionData *data = event->customdata;
 
   if (name) {
     strcpy(*name, data->name);
   }
-
   if (type) {
     *type = data->type;
   }
-
   if (state) {
-    memcpy(state, data->state, sizeof(float[2]));
+    copy_v2_v2(state, data->state);
   }
-
   if (controller_loc) {
-    memcpy(controller_loc, data->controller_loc, sizeof(float[3]));
+    copy_v3_v3(controller_loc, data->controller_loc);
   }
-
   if (controller_rot) {
-    memcpy(controller_rot, data->controller_rot, sizeof(float[4]));
+    copy_v4_v4(controller_rot, data->controller_rot);
+  }
+  if (viewmat) {
+    copy_m4_m4(viewmat, data->viewmat);
+  }
+  if (winmat) {
+    copy_m4_m4(winmat, data->winmat);
   }
 }
 

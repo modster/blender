@@ -686,7 +686,7 @@ static void rna_Event_xr_action_get(PointerRNA *ptr, char *value)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, &value, NULL, NULL, NULL, NULL);
+    WM_event_xr_data(event, &value, NULL, NULL, NULL, NULL, NULL, NULL);
   }
   else {
     value[0] = '\0';
@@ -710,7 +710,7 @@ static int rna_Event_xr_type_get(PointerRNA *ptr)
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
     GHOST_XrActionType type;
-    WM_event_xr_data(event, NULL, (char *)&type, NULL, NULL, NULL);
+    WM_event_xr_data(event, NULL, (char *)&type, NULL, NULL, NULL, NULL, NULL);
     return type;
   }
   else {
@@ -722,7 +722,7 @@ static void rna_Event_xr_state_get(PointerRNA *ptr, float *value)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, NULL, NULL, value, NULL, NULL);
+    WM_event_xr_data(event, NULL, NULL, value, NULL, NULL, NULL, NULL);
   }
   else {
     memset(value, 0, sizeof(float[2]));
@@ -733,7 +733,7 @@ static void rna_Event_xr_controller_location_get(PointerRNA *ptr, float *value)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, NULL, NULL, NULL, value, NULL);
+    WM_event_xr_data(event, NULL, NULL, NULL, value, NULL, NULL, NULL);
   }
   else {
     memset(value, 0, sizeof(float[3]));
@@ -744,11 +744,33 @@ static void rna_Event_xr_controller_rotation_get(PointerRNA *ptr, float *value)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, NULL, NULL, NULL, NULL, value);
+    WM_event_xr_data(event, NULL, NULL, NULL, NULL, value, NULL, NULL);
   }
   else {
     value[0] = 1.0f;
     value[1] = value[2] = value[3] = 0.0f;
+  }
+}
+
+static void rna_Event_xr_view_matrix_get(PointerRNA *ptr, float values[16])
+{
+  const wmEvent *event = ptr->data;
+  if (WM_event_is_xr(event)) {
+    WM_event_xr_data(event, NULL, NULL, NULL, NULL, NULL, (float(*)[4])values, NULL);
+  }
+  else {
+    memset(values, 0, sizeof(float[16]));
+  }
+}
+
+static void rna_Event_xr_projection_matrix_get(PointerRNA *ptr, float values[16])
+{
+  const wmEvent *event = ptr->data;
+  if (WM_event_is_xr(event)) {
+    WM_event_xr_data(event, NULL, NULL, NULL, NULL, NULL, NULL, (float(*)[4])values);
+  }
+  else {
+    memset(values, 0, sizeof(float[16]));
   }
 }
 
@@ -2324,8 +2346,8 @@ static void rna_def_event(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "xr_controller_location", PROP_FLOAT, PROP_TRANSLATION);
   RNA_def_property_array(prop, 3);
-  RNA_def_property_float_funcs(prop, "rna_Event_xr_controller_location_get", NULL, NULL);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_float_funcs(prop, "rna_Event_xr_controller_location_get", NULL, NULL);
   RNA_def_property_ui_text(
       prop,
       "XR Controller Location",
@@ -2333,12 +2355,25 @@ static void rna_def_event(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "xr_controller_rotation", PROP_FLOAT, PROP_QUATERNION);
   RNA_def_property_array(prop, 4);
-  RNA_def_property_float_funcs(prop, "rna_Event_xr_controller_rotation_get", NULL, NULL);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_float_funcs(prop, "rna_Event_xr_controller_rotation_get", NULL, NULL);
   RNA_def_property_ui_text(
       prop,
       "XR Controller Rotation",
       "Rotation of the action's corresponding controller pose in world space");
+
+  prop = RNA_def_property(srna, "xr_view_matrix", PROP_FLOAT, PROP_MATRIX);
+  RNA_def_property_array(prop, 16);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_float_funcs(prop, "rna_Event_xr_view_matrix_get", NULL, NULL);
+  RNA_def_property_ui_text(prop, "XR View Matrix", "View matrix of the XR viewer centroid");
+
+  prop = RNA_def_property(srna, "xr_projection_matrix", PROP_FLOAT, PROP_MATRIX);
+  RNA_def_property_array(prop, 16);
+  RNA_def_property_float_funcs(prop, "rna_Event_xr_projection_matrix_get", NULL, NULL);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(
+      prop, "XR Projection Matrix", "Projection matrix of the XR viewer centroid");
 
   RNA_define_verify_sdna(1); /* not in sdna */
 }

@@ -45,6 +45,8 @@ typedef struct wmXrSessionState {
   GHOST_XrPose viewer_pose;
   /** The last known view matrix, calculated from above's viewer pose. */
   float viewer_viewmat[4][4];
+  /** The last known window (projection) matrix. */
+  float viewer_winmat[4][4];
   float focal_len;
 
   /** Copy of XrSessionSettings.base_pose_ data to detect changes that need
@@ -148,6 +150,7 @@ void wm_xr_session_draw_data_update(const wmXrSessionState *state,
 void wm_xr_session_state_update(const XrSessionSettings *settings,
                                 const wmXrDrawData *draw_data,
                                 const GHOST_XrDrawViewInfo *draw_view,
+                                const float winmat[4][4],
                                 wmXrSessionState *state);
 bool wm_xr_session_surface_offscreen_ensure(wmXrSurfaceData *surface_data,
                                             const GHOST_XrDrawViewInfo *draw_view);

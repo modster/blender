@@ -643,6 +643,9 @@ typedef struct wmXrActionData {
   /** Controller pose corresponding to the action's subaction path. */
   float controller_loc[3];
   float controller_rot[4];
+  /** Viewmat and winmat of the XR viewer centroid. */
+  float viewmat[4][4];
+  float winmat[4][4];
   /** Operator. */
   struct wmOperatorType *ot;
 } wmXrActionData;
@@ -721,6 +724,14 @@ typedef struct wmOperatorType {
                 const struct wmEvent *) ATTR_WARN_UNUSED_RESULT;
 
   /**
+   * Same as invoke() but intended to be called from an XR session.
+   * The event type should be EVT_XR_ACTION and custom data type EVT_DATA_XR.
+   */
+  int (*invoke_3d)(struct bContext *,
+                   struct wmOperator *,
+                   const struct wmEvent *) ATTR_WARN_UNUSED_RESULT;
+
+  /**
    * Called when a modal operator is canceled (not used often).
    * Internal cleanup can be done here if needed.
    */
@@ -735,6 +746,14 @@ typedef struct wmOperatorType {
   int (*modal)(struct bContext *,
                struct wmOperator *,
                const struct wmEvent *) ATTR_WARN_UNUSED_RESULT;
+
+  /**
+   * Same as modal() but intended to be called from an XR session.
+   * The event type should be EVT_XR_ACTION and custom data type EVT_DATA_XR.
+   */
+  int (*modal_3d)(struct bContext *,
+                  struct wmOperator *,
+                  const struct wmEvent *) ATTR_WARN_UNUSED_RESULT;
 
   /**
    * Verify if the operator can be executed in the current context, note

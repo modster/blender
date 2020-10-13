@@ -865,7 +865,9 @@ void WM_event_xr_data(const struct wmEvent *event,
                       char *type,
                       float state[2],
                       float controller_loc[3],
-                      float controller_rot[4]);
+                      float controller_rot[4],
+                      float viewmat[4][4],
+                      float winmat[4][4]);
 bool WM_event_is_xr(const struct wmEvent *event);
 
 #ifdef WITH_INPUT_IME

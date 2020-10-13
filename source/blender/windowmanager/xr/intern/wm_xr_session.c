@@ -316,10 +316,12 @@ void wm_xr_session_draw_data_update(const wmXrSessionState *state,
 /**
  * Update information that is only stored for external state queries. E.g. for Python API to
  * request the current (as in, last known) viewer pose.
+ * Controller data and action sets will be updated separately via wm_xr_session_actions_update().
  */
 void wm_xr_session_state_update(const XrSessionSettings *settings,
                                 const wmXrDrawData *draw_data,
                                 const GHOST_XrDrawViewInfo *draw_view,
+                                const float winmat[4][4],
                                 wmXrSessionState *state)
 {
   GHOST_XrPose viewer_pose;
@@ -343,6 +345,7 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
   copy_v3_v3(state->viewer_pose.position, viewer_pose.position);
   copy_qt_qt(state->viewer_pose.orientation_quat, viewer_pose.orientation_quat);
   wm_xr_pose_to_viewmat(&viewer_pose, state->viewer_viewmat);
+  copy_m4_m4(state->viewer_winmat, winmat);
   /* No idea why, but multiplying by two seems to make it match the VR view more. */
   state->focal_len = 2.0f *
                      fov_to_focallength(draw_view->fov.angle_right - draw_view->fov.angle_left,
@@ -351,6 +354,7 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
   memcpy(&state->prev_base_pose, &draw_data->base_pose, sizeof(GHOST_XrPose));
   memcpy(&state->prev_local_pose, &draw_view->local_pose, sizeof(GHOST_XrPose));
   copy_v3_v3(state->prev_eye_position_ofs, draw_data->eye_position_ofs);
+
   state->prev_settings_flag = settings->flag;
   state->prev_base_pose_type = settings->base_pose_type;
   state->prev_base_pose_object = settings->base_pose_object;
@@ -615,7 +619,15 @@ static void wm_xr_session_events_dispatch(GHash *actions,
         if (val != KM_ANY) {
           const GHOST_XrPose *pose = wm_xr_session_controller_pose_find(
               session_state, action->subaction_paths[i]);
-          wm_event_add_xrevent(action, pose, surface, win, i, val, press_start);
+          wm_event_add_xrevent(action,
+                               pose,
+                               session_state->viewer_viewmat,
+                               session_state->viewer_winmat,
+                               surface,
+                               win,
+                               i,
+                               val,
+                               press_start);
         }
       }
     }

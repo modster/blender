@@ -1296,7 +1296,19 @@ static int wm_operator_invoke(bContext *C,
                 ot->idname);
     }
 
-    if (op->type->invoke && event) {
+    if (op->type->invoke_3d && event && (event->type == EVT_XR_ACTION)) {
+      if (op->type->flag & OPTYPE_UNDO) {
+        wm->op_undo_depth++;
+      }
+
+      retval = op->type->invoke_3d(C, op, event);
+      OPERATOR_RETVAL_CHECK(retval);
+
+      if (op->type->flag & OPTYPE_UNDO && CTX_wm_manager(C) == wm) {
+        wm->op_undo_depth--;
+      }
+    }
+    else if (op->type->invoke && event) {
       wm_region_mouse_co(C, event);
 
       if (op->type->flag & OPTYPE_UNDO) {
@@ -3233,8 +3245,9 @@ static void wm_event_do_surface_handlers(bContext *C, wmSurface *surface)
 
         LISTBASE_FOREACH (wmEvent *, event, events) {
           wmXrActionData *action_data = event->customdata;
-          if (action_data->ot->modal) {
-            /* Invoke operator, transferring responsibility to window modal handlers. */
+          if (action_data->ot->invoke) {
+            /* Invoke operator, either executing operator or transferring responsibility to window
+             * modal handlers. */
             wm_operator_invoke(C, action_data->ot, event, NULL, NULL, false, false);
           }
           else {
@@ -4851,6 +4864,8 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void 
 
 void wm_event_add_xrevent(const wmXrAction *action,
                           const GHOST_XrPose *controller_pose,
+                          const float viewmat[4][4],
+                          const float winmat[4][4],
                           wmSurface *surface,
                           wmWindow *win,
                           unsigned int subaction_idx,
@@ -4899,6 +4914,8 @@ void wm_event_add_xrevent(const wmXrAction *action,
   else {
     data->controller_rot[0] = 1.0f;
   }
+  copy_m4_m4(data->viewmat, viewmat);
+  copy_m4_m4(data->winmat, winmat);
 
   data->ot = action->ot;
 
