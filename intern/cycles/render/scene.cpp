@@ -618,6 +618,7 @@ template<> Mesh *Scene::create_node<Mesh>()
   node->set_owner(this);
   geometry.push_back(node);
   geometry_manager->tag_update(this);
+  geometry_manager->update_flags |= GeometryManager::MESH_ADDED;
   return node;
 }
 
@@ -627,6 +628,7 @@ template<> Hair *Scene::create_node<Hair>()
   node->set_owner(this);
   geometry.push_back(node);
   geometry_manager->tag_update(this);
+  geometry_manager->update_flags |= GeometryManager::HAIR_ADDED;
   return node;
 }
 
@@ -636,6 +638,7 @@ template<> Volume *Scene::create_node<Volume>()
   node->set_owner(this);
   geometry.push_back(node);
   geometry_manager->tag_update(this);
+  geometry_manager->update_flags |= GeometryManager::MESH_ADDED;
   return node;
 }
 
@@ -698,22 +701,32 @@ template<> void Scene::delete_node_impl(Mesh *node)
 {
   delete_node_from_array(geometry, static_cast<Geometry *>(node));
   geometry_manager->tag_update(this);
+  geometry_manager->update_flags |= GeometryManager::MESH_REMOVED;
 }
 
 template<> void Scene::delete_node_impl(Hair *node)
 {
   delete_node_from_array(geometry, static_cast<Geometry *>(node));
   geometry_manager->tag_update(this);
+  geometry_manager->update_flags |= GeometryManager::HAIR_REMOVED;
 }
 
 template<> void Scene::delete_node_impl(Volume *node)
 {
   delete_node_from_array(geometry, static_cast<Geometry *>(node));
   geometry_manager->tag_update(this);
+  geometry_manager->update_flags |= GeometryManager::MESH_REMOVED;
 }
 
 template<> void Scene::delete_node_impl(Geometry *node)
 {
+  if (node->is_hair()) {
+    geometry_manager->update_flags |= GeometryManager::HAIR_REMOVED;
+  }
+  else {
+    geometry_manager->update_flags |= GeometryManager::MESH_REMOVED;
+  }
+
   delete_node_from_array(geometry, node);
   geometry_manager->tag_update(this);
 }

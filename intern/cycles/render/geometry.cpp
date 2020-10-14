@@ -953,7 +953,7 @@ void GeometryManager::device_update_mesh(
       if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
         Mesh *mesh = static_cast<Mesh *>(geom);
 
-        if (mesh->shader_is_modified() || mesh->smooth_is_modified() || mesh->triangles_is_modified() || (device_update_flags & (DEVICE_TRIANGLES_NEEDS_REALLOC | DEVICE_VERTEX_NEEDS_REALLOC))) {
+        if (mesh->shader_is_modified() || mesh->smooth_is_modified() || mesh->triangles_is_modified() || (device_update_flags & DEVICE_CURVE_DATA_NEEDS_REALLOC)) {
           //std::cerr << "-- pack shaders for : " << mesh->name << '\n';
           //number_packed_shaders += 1;
           tri_shader_modified = true;
@@ -965,7 +965,7 @@ void GeometryManager::device_update_mesh(
         tri_patch_uv_modified |= mesh->vert_patch_uv_is_modified();
         vnormal_modified |= mesh->triangles_is_modified() || mesh->verts_is_modified();
 
-        if (mesh->triangles_is_modified() || mesh->verts_is_modified() || (device_update_flags & (DEVICE_TRIANGLES_NEEDS_REALLOC | DEVICE_VERTEX_NEEDS_REALLOC))) {
+        if (mesh->triangles_is_modified() || mesh->verts_is_modified() || (device_update_flags & DEVICE_MESH_DATA_NEEDS_REALLOC)) {
           //std::cerr << "-- pack verts for : " << mesh->name << '\n';
           //number_packed_verts += 1;
           mesh->pack_normals(&vnormal[mesh->vert_offset]);
@@ -1258,8 +1258,7 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
       Volume *volume = static_cast<Volume *>(geom);
       create_volume_mesh(volume, progress);
 
-      device_update_flags |= DEVICE_VERTEX_NEEDS_REALLOC;
-      device_update_flags |= DEVICE_TRIANGLES_NEEDS_REALLOC;
+      device_update_flags |= DEVICE_MESH_DATA_NEEDS_REALLOC;
     }
 
     if (geom->is_hair()) {
@@ -1278,7 +1277,7 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
       }
     }
 
-    //geom->print_modified_sockets();
+    geom->print_modified_sockets();
 
     if (geom->is_mesh()) {
       Mesh *mesh = static_cast<Mesh *>(geom);
@@ -1295,7 +1294,15 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
     }
   }
 
-  //std::cerr << "device_update_flags: " << device_update_flags << '\n';
+  if (update_flags & (MESH_ADDED | MESH_REMOVED)) {
+    device_update_flags |= DEVICE_MESH_DATA_NEEDS_REALLOC;
+  }
+
+  if (update_flags & (HAIR_ADDED | HAIR_REMOVED)) {
+    device_update_flags |= DEVICE_CURVE_DATA_NEEDS_REALLOC;
+  }
+
+  std::cerr << "device_update_flags: " << device_update_flags << '\n';
 
   need_flags_update = false;
 }
@@ -1409,7 +1416,9 @@ void GeometryManager::device_update(Device *device,
 
         if (shader->need_update_displacement) {
           // todo: tag all displacement related sockets as modified
-          geom->tag_modified();
+          if (geom->is_mesh()) {
+            geom->tag_modified();
+          }
         }
       }
 
@@ -1426,8 +1435,7 @@ void GeometryManager::device_update(Device *device,
         }
 
         /* Test if we need tessellation. */
-        if (mesh->subdivision_type != Mesh::SUBDIVISION_NONE && mesh->num_subd_verts == 0 &&
-            mesh->get_subd_params()) {
+        if (mesh->subdivision_type != Mesh::SUBDIVISION_NONE && mesh->get_subd_params() && (mesh->verts_is_modified() || mesh->subd_dicing_rate_is_modified() || mesh->subd_max_level_is_modified())) {
           total_tess_needed++;
         }
 
@@ -1463,8 +1471,7 @@ void GeometryManager::device_update(Device *device,
       }
 
       Mesh *mesh = static_cast<Mesh *>(geom);
-      if (mesh->subdivision_type != Mesh::SUBDIVISION_NONE && mesh->num_subd_verts == 0 &&
-          mesh->get_subd_params()) {
+      if (mesh->subdivision_type != Mesh::SUBDIVISION_NONE && mesh->get_subd_params() && (mesh->verts_is_modified() || mesh->subd_dicing_rate_is_modified() || mesh->subd_max_level_is_modified())) {
         string msg = "Tessellating ";
         if (mesh->name == "")
           msg += string_printf("%u/%u", (uint)(i + 1), (uint)total_tess_needed);
@@ -1477,6 +1484,8 @@ void GeometryManager::device_update(Device *device,
         mesh->subd_params->camera = dicing_camera;
         DiagSplit dsplit(*mesh->subd_params);
         mesh->tessellate(&dsplit);
+
+        device_update_flags |= DEVICE_MESH_DATA_NEEDS_REALLOC;
 
         i++;
 
@@ -1651,6 +1660,7 @@ void GeometryManager::device_update(Device *device,
   }
 
   need_update = false;
+  update_flags = 0;
 
   if (true_displacement_used) {
     /* Re-tag flags for update, so they're re-evaluated
