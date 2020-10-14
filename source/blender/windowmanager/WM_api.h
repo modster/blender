@@ -912,7 +912,7 @@ void WM_generic_user_data_free(struct wmGenericUserData *wm_userdata);
 bool WM_region_use_viewport(struct ScrArea *area, struct ARegion *region);
 
 #ifdef WITH_XR_OPENXR
-/* wm_xr.c */
+/* wm_xr_session.c */
 bool WM_xr_session_exists(const wmXrData *xr);
 bool WM_xr_session_is_ready(const wmXrData *xr);
 struct wmXrSessionState *WM_xr_session_state_handle_get(const wmXrData *xr);
@@ -953,8 +953,7 @@ void WM_xr_action_spaces_destroy(wmXrData *xr,
 bool WM_xr_action_bindings_create(wmXrData *xr,
                                   const char *action_set_name,
                                   unsigned int count,
-                                  const struct GHOST_XrActionBindingsInfo *infos,
-                                  bool replace_existing);
+                                  const struct GHOST_XrActionBindingsInfo *infos);
 void WM_xr_action_bindings_destroy(wmXrData *xr,
                                    const char *action_set_name,
                                    unsigned int count,

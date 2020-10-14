@@ -68,8 +68,7 @@ class GHOST_XrSession {
                            const GHOST_XrActionSpaceInfo *infos);
   bool createActionBindings(const char *action_set_name,
                             uint32_t count,
-                            const GHOST_XrActionBindingsInfo *infos,
-                            bool replace_existing);
+                            const GHOST_XrActionBindingsInfo *infos);
   void destroyActionBindings(const char *action_set_name,
                              uint32_t count,
                              const GHOST_XrActionBindingsInfo *infos);

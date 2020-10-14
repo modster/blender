@@ -300,13 +300,9 @@ void WM_xr_action_spaces_destroy(wmXrData *xr,
 bool WM_xr_action_bindings_create(wmXrData *xr,
                                   const char *action_set_name,
                                   unsigned int count,
-                                  const GHOST_XrActionBindingsInfo *infos,
-                                  bool replace_existing)
+                                  const GHOST_XrActionBindingsInfo *infos)
 {
-  return GHOST_XrCreateActionBindings(
-             xr->runtime->context, action_set_name, count, infos, replace_existing ? 1 : 0) ?
-             true :
-             false;
+  return GHOST_XrCreateActionBindings(xr->runtime->context, action_set_name, count, infos);
 }
 
 void WM_xr_action_bindings_destroy(wmXrData *xr,

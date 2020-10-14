@@ -183,8 +183,7 @@ bool rna_XrSessionState_action_binding_create(bContext *C,
                                               const char *profile,
                                               const char *action_name,
                                               const char *interaction_path0,
-                                              const char *interaction_path1,
-                                              bool replace_existing)
+                                              const char *interaction_path1)
 {
 #  ifdef WITH_XR_OPENXR
   wmWindowManager *wm = CTX_wm_manager(C);
@@ -216,7 +215,7 @@ bool rna_XrSessionState_action_binding_create(bContext *C,
   }
   info.bindings = bindings;
 
-  return WM_xr_action_bindings_create(&wm->xr, action_set_name, 1, &info, replace_existing);
+  return WM_xr_action_bindings_create(&wm->xr, action_set_name, 1, &info);
 #  else
   UNUSED_VARS(C, action_set_name, profile, action_name, interaction_path0, interaction_path1);
   return false;
@@ -701,13 +700,6 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
                         "Interaction Path 1",
                         "OpenXR interaction (user + component) path 1");
   RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
-  parm = RNA_def_boolean(
-      func,
-      "replace_existing",
-      false,
-      "Replace Existing",
-      "Replace all existing bindings for the action that belong to the specified profile");
-  RNA_def_parameter_flags(parm, PROP_BOOLEAN, PARM_REQUIRED);
   parm = RNA_def_boolean(func, "result", 0, "Result", "");
   RNA_def_function_return(func, parm);
 

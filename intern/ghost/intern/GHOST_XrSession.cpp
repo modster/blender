@@ -855,8 +855,7 @@ void GHOST_XrSession::destroyActionSpaces(const char *action_set_name,
 
 bool GHOST_XrSession::createActionBindings(const char *action_set_name,
                                            uint32_t count,
-                                           const GHOST_XrActionBindingsInfo *infos,
-                                           bool replace_existing)
+                                           const GHOST_XrActionBindingsInfo *infos)
 {
   OpenXRActionSet *action_set = find_action_set(m_oxr.get(), action_set_name);
   if (action_set == nullptr) {
@@ -897,25 +896,23 @@ bool GHOST_XrSession::createActionBindings(const char *action_set_name,
 
       nbindings.insert({binding.interaction_path, sbinding.binding});
     }
-    if (!replace_existing) {
-      /* Since xrSuggestInteractionProfileBindings() overwrites all bindings, we
-       * need to re-add any existing bindings for the interaction profile. */
-      for (auto &action : action_set->actions) {
-        OpenXRActionProfile *profile = find_action_profile(&action.second,
-                                                           interaction_profile_path);
-        if (profile == nullptr) {
+
+    /* Since xrSuggestInteractionProfileBindings() overwrites all bindings, we
+     * need to re-add any existing bindings for the interaction profile. */
+    for (auto &action : action_set->actions) {
+      OpenXRActionProfile *profile = find_action_profile(&action.second, interaction_profile_path);
+      if (profile == nullptr) {
+        continue;
+      }
+      for (auto &binding : profile->bindings) {
+        if (nbindings.find(binding.first) != nbindings.end()) {
           continue;
         }
-        for (auto &binding : profile->bindings) {
-          if (nbindings.find(binding.first) != nbindings.end()) {
-            continue;
-          }
-          XrActionSuggestedBinding sbinding;
-          sbinding.action = action.second.action;
-          sbinding.binding = binding.second;
+        XrActionSuggestedBinding sbinding;
+        sbinding.action = action.second.action;
+        sbinding.binding = binding.second;
 
-          sbindings.push_back(std::move(sbinding));
-        }
+        sbindings.push_back(std::move(sbinding));
       }
     }
 

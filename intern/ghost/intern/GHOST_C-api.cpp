@@ -1031,13 +1031,11 @@ void GHOST_XrDestroyActionSpaces(GHOST_XrContextHandle xr_contexthandle,
 int GHOST_XrCreateActionBindings(GHOST_XrContextHandle xr_contexthandle,
                                  const char *action_set_name,
                                  GHOST_TUns32 count,
-                                 const GHOST_XrActionBindingsInfo *infos,
-                                 int replace_existing)
+                                 const GHOST_XrActionBindingsInfo *infos)
 {
   GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
   GHOST_XrSession *xr_session = xr_context->getSession();
-  GHOST_XR_CAPI_CALL_RET(xr_session->createActionBindings(
-                             action_set_name, count, infos, replace_existing ? true : false),
+  GHOST_XR_CAPI_CALL_RET(xr_session->createActionBindings(action_set_name, count, infos),
                          xr_context);
   return 0;
 }

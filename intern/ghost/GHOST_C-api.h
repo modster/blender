@@ -1120,8 +1120,7 @@ void GHOST_XrDestroyActionSpaces(GHOST_XrContextHandle xr_context,
 int GHOST_XrCreateActionBindings(GHOST_XrContextHandle xr_context,
                                  const char *action_set_name,
                                  GHOST_TUns32 count,
-                                 const GHOST_XrActionBindingsInfo *infos,
-                                 int replace_existing);
+                                 const GHOST_XrActionBindingsInfo *infos);
 
 /**
  * Destroy previously created bindings for OpenXR actions.
