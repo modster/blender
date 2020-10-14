@@ -130,13 +130,36 @@ static int lineart_triangle_line_imagespace_intersection_v2(SpinLock *spl,
 
 int use_smooth_contour_modifier_contour = 0; /*  debug purpose */
 
+static void lineart_render_line_discard_segment(LineartRenderBuffer* rb, LineartRenderLineSegment* rls){
+  BLI_spin_lock(&rb->lock_cuts);
+
+  memset(rls,0,sizeof(LineartRenderLineSegment));
+  BLI_addtail(&rb->wasted_cuts, rls);
+
+  BLI_spin_unlock(&rb->lock_cuts);
+}
+
+static LineartRenderLineSegment* lineart_render_line_give_segment(LineartRenderBuffer* rb){
+  BLI_spin_lock(&rb->lock_cuts);
+  
+  if(rb->wasted_cuts.first){
+    LineartRenderLineSegment* rls = (LineartRenderLineSegment*)BLI_pophead(&rb->wasted_cuts);
+    BLI_spin_unlock(&rb->lock_cuts);
+    memset(rls,0,sizeof(LineartRenderLineSegment));
+    return rls;
+  }else{
+    BLI_spin_unlock(&rb->lock_cuts);
+    return (LineartRenderLineSegment*)lineart_mem_aquire_thread(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
+  }
+}
+
 static void lineart_render_line_cut(LineartRenderBuffer *rb,
                                     LineartRenderLine *rl,
                                     double start,
                                     double end,
                                     unsigned char transparency_mask)
 {
-  LineartRenderLineSegment *rls, *irls;
+  LineartRenderLineSegment *rls, *irls, *next_rls, *prev_rls;
   LineartRenderLineSegment *start_segment = 0, *end_segment = 0;
   LineartRenderLineSegment *ns = 0, *ns2 = 0;
   int untouched = 0;
@@ -198,13 +221,13 @@ static void lineart_render_line_cut(LineartRenderBuffer *rb,
     }
     else if (rls->at > end) {
       end_segment = rls;
-      ns2 = lineart_mem_aquire_thread(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
+      ns2 = lineart_render_line_give_segment(rb);
       break;
     }
   }
 
   if (ns == NULL) {
-    ns = lineart_mem_aquire_thread(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
+    ns = lineart_render_line_give_segment(rb);
   }
   if (ns2 == NULL) {
     if (untouched) {
@@ -212,7 +235,7 @@ static void lineart_render_line_cut(LineartRenderBuffer *rb,
       end_segment = ns2;
     }
     else
-      ns2 = lineart_mem_aquire_thread(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
+      ns2 = lineart_render_line_give_segment(rb);
   }
 
   if (start_segment) {
@@ -250,8 +273,19 @@ static void lineart_render_line_cut(LineartRenderBuffer *rb,
   }
 
   char min_occ = 127;
-  LISTBASE_FOREACH (LineartRenderLineSegment *, iirls, &rl->segments) {
-    min_occ = MIN2(min_occ, iirls->occlusion);
+  prev_rls = NULL;
+  for (rls = rl->segments.first; rls; rls = next_rls) {
+    next_rls = rls->next;
+
+    if(prev_rls && prev_rls->occlusion == rls->occlusion && prev_rls->transparency_mask == rls->transparency_mask){
+      BLI_remlink(&rl->segments, rls);
+      lineart_render_line_discard_segment(rb, rls);
+      continue;
+    }
+
+    min_occ = MIN2(min_occ, rls->occlusion);
+
+    prev_rls = rls;
   }
   rl->min_occ = min_occ;
 }
@@ -2575,12 +2609,14 @@ static void lineart_destroy_render_data(void)
   BLI_listbase_clear(&rb->edge_marks);
   BLI_listbase_clear(&rb->all_render_lines);
   BLI_listbase_clear(&rb->chains);
+  BLI_listbase_clear(&rb->wasted_cuts);
 
   BLI_listbase_clear(&rb->vertex_buffer_pointers);
   BLI_listbase_clear(&rb->line_buffer_pointers);
   BLI_listbase_clear(&rb->triangle_buffer_pointers);
 
   BLI_spin_end(&rb->lock_task);
+  BLI_spin_end(&rb->lock_cuts);
   BLI_spin_end(&rb->render_data_pool.lock_mem);
 
   lineart_mem_destroy(&rb->render_data_pool);
@@ -2685,6 +2721,7 @@ LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene)
   rb->use_intersections = (scene->lineart.line_types & LRT_EDGE_FLAG_INTERSECTION) != 0;
 
   BLI_spin_init(&rb->lock_task);
+  BLI_spin_init(&rb->lock_cuts);
   BLI_spin_init(&rb->render_data_pool.lock_mem);
 
   lineart_share.allow_overlapping_edges = (scene->lineart.flags & LRT_ALLOW_OVERLAPPING_EDGES) !=

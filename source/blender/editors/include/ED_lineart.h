@@ -201,6 +201,8 @@ typedef struct LineartRenderBuffer {
   ListBase intersecting_vertex_buffer;
   /** Use the one comes with Line Art. */
   LineartStaticMemPool render_data_pool;
+  ListBase wasted_cuts;
+  SpinLock lock_cuts;
 
   struct Material *material_pointers[2048];
 
