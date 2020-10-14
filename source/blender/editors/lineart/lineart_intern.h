@@ -70,4 +70,7 @@ void lineart_matrix_perspective_44d(
 
 int lineart_count_intersection_segment_count(struct LineartRenderBuffer *rb);
 
+
+void lineart_count_and_print_render_buffer_memory(LineartRenderBuffer* rb);
+
 #endif

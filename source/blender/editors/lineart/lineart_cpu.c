@@ -3919,6 +3919,9 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
 
 #undef LRT_PROGRESS
 #undef LRT_CANCEL_STAGE
+  if(G.debug_value == 4000){
+    lineart_count_and_print_render_buffer_memory(rb);
+  }
 
   return OPERATOR_FINISHED;
 }
