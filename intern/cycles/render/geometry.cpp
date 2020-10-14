@@ -946,16 +946,11 @@ void GeometryManager::device_update_mesh(
     bool tri_patch_uv_modified = (device_update_flags & DEVICE_VERTEX_NEEDS_REALLOC);
     bool vnormal_modified = (device_update_flags & DEVICE_VERTEX_NEEDS_REALLOC);
 
-    //int number_packed_shaders = 0;
-    //int number_packed_verts = 0;
-
     foreach (Geometry *geom, scene->geometry) {
       if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
         Mesh *mesh = static_cast<Mesh *>(geom);
 
         if (mesh->shader_is_modified() || mesh->smooth_is_modified() || mesh->triangles_is_modified() || (device_update_flags & DEVICE_CURVE_DATA_NEEDS_REALLOC)) {
-          //std::cerr << "-- pack shaders for : " << mesh->name << '\n';
-          //number_packed_shaders += 1;
           tri_shader_modified = true;
           mesh->pack_shaders(scene, &tri_shader[mesh->prim_offset]);
         }
@@ -966,8 +961,6 @@ void GeometryManager::device_update_mesh(
         vnormal_modified |= mesh->triangles_is_modified() || mesh->verts_is_modified();
 
         if (mesh->triangles_is_modified() || mesh->verts_is_modified() || (device_update_flags & DEVICE_MESH_DATA_NEEDS_REALLOC)) {
-          //std::cerr << "-- pack verts for : " << mesh->name << '\n';
-          //number_packed_verts += 1;
           mesh->pack_normals(&vnormal[mesh->vert_offset]);
           mesh->pack_verts(tri_prim_index,
                            &tri_vindex[mesh->prim_offset],
@@ -982,47 +975,24 @@ void GeometryManager::device_update_mesh(
       }
     }
 
-//    std::cerr << "packed verts : " << number_packed_verts << '\n';
-//    std::cerr << "packed verts : " << number_packed_shaders << '\n';
-
     /* vertex coordinates */
     progress.set_status("Updating Mesh", "Copying Mesh to device");
 
-    size_t total_data_size = dscene->tri_shader.memory_size();
-    total_data_size += dscene->tri_vnormal.memory_size();
-    total_data_size += dscene->tri_vindex.memory_size();
-    total_data_size += dscene->tri_patch.memory_size();
-    total_data_size += dscene->tri_patch_uv.memory_size();
-
-    size_t data_transfered = 0;
-
     if (tri_shader_modified) {
-      //std::cerr << "sending tri_shader...\n";
       dscene->tri_shader.copy_to_device();
-      data_transfered += dscene->tri_shader.memory_size();
     }
     if (vnormal_modified) {
-      //std::cerr << "sending tri_vnormal...\n";
       dscene->tri_vnormal.copy_to_device();
-      data_transfered += dscene->tri_vnormal.memory_size();
     }
     if (tri_vindex_modified) {
-      //std::cerr << "sending tri_vindex...\n";
       dscene->tri_vindex.copy_to_device();
-      data_transfered += dscene->tri_vindex.memory_size();
     }
     if (tri_patch_modified) {
-      //std::cerr << "sending tri_patch...\n";
       dscene->tri_patch.copy_to_device();
-      data_transfered += dscene->tri_patch.memory_size();
     }
     if (tri_patch_uv_modified) {
-      //std::cerr << "sending tri_patch_uv...\n";
       dscene->tri_patch_uv.copy_to_device();
-      data_transfered += dscene->tri_patch_uv.memory_size();
     }
-
-    //std::cerr << "data transfered : " << data_transfered << " / " << total_data_size << '\n';
   }
 
   if (curve_size != 0) {
@@ -1277,8 +1247,6 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
       }
     }
 
-    geom->print_modified_sockets();
-
     if (geom->is_mesh()) {
       Mesh *mesh = static_cast<Mesh *>(geom);
 
@@ -1301,8 +1269,6 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
   if (update_flags & (HAIR_ADDED | HAIR_REMOVED)) {
     device_update_flags |= DEVICE_CURVE_DATA_NEEDS_REALLOC;
   }
-
-  std::cerr << "device_update_flags: " << device_update_flags << '\n';
 
   need_flags_update = false;
 }
@@ -1696,14 +1662,12 @@ void GeometryManager::device_free(Device *device, DeviceScene *dscene)
   dscene->prim_time.free();
 
   if (device_update_flags & DEVICE_TRIANGLES_NEEDS_REALLOC) {
-    //std::cerr << "realloc triangles arrays\n";
     dscene->tri_shader.free();
     dscene->tri_vindex.free();
     dscene->tri_patch.free();
   }
 
   if (device_update_flags & DEVICE_VERTEX_NEEDS_REALLOC) {
-    //std::cerr << "realloc vertex arrays\n";
     dscene->tri_vnormal.free();
     dscene->tri_patch_uv.free();
   }
