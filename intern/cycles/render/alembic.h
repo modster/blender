@@ -42,8 +42,8 @@ class AlembicObject : public Node {
   AlembicObject();
   ~AlembicObject();
 
-  NODE_PUBLIC_API(ustring, path)
-  NODE_PUBLIC_API_ARRAY(array<Node *>, used_shaders)
+  NODE_SOCKET_API(ustring, path)
+  NODE_SOCKET_API_ARRAY(array<Node *>, used_shaders)
 
   void set_object(Object *object);
   Object *get_object();
@@ -100,10 +100,10 @@ class AlembicProcedural : public Procedural {
   ~AlembicProcedural();
   void generate(Scene *scene);
 
-  NODE_PUBLIC_API(bool, use_motion_blur)
-  NODE_PUBLIC_API(ustring, filepath)
-  NODE_PUBLIC_API(float, frame)
-  NODE_PUBLIC_API(float, frame_rate)
+  NODE_SOCKET_API(bool, use_motion_blur)
+  NODE_SOCKET_API(ustring, filepath)
+  NODE_SOCKET_API(float, frame)
+  NODE_SOCKET_API(float, frame_rate)
 
   array<AlembicObject *> objects;  // todo : Node::set
 
