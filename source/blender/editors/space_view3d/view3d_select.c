@@ -2507,35 +2507,27 @@ static int view3d_select_invoke(bContext *C, wmOperator *op, const wmEvent *even
   return view3d_select_exec(C, op);
 }
 
-static void controller_loc_to_mval(const float loc[3],
-                                   const float viewmat[4][4],
-                                   const float winmat[4][4],
-                                   short winx,
-                                   short winy,
-                                   int r_mval[2])
-{
-  float persmat[4][4];
-  float tmp[3];
-
-  mul_m4_m4m4(persmat, winmat, viewmat);
-  copy_v3_v3(tmp, loc);
-  mul_project_m4_v3(persmat, tmp);
-  r_mval[0] = (int)(((float)winx / 2.0f) * (1.0f + tmp[0]));
-  r_mval[1] = (int)(((float)winy / 2.0f) * (1.0f + tmp[1]));
-}
-
 static int view3d_select_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
 {
   BLI_assert(event->type == EVT_XR_ACTION);
   BLI_assert(event->custom == EVT_DATA_XR);
   BLI_assert(event->customdata);
 
-  ARegion *ar = CTX_wm_region(C);
-  RegionView3D *rv3d = ar->regiondata;
+  ARegion *region = CTX_wm_region(C);
+  RegionView3D *rv3d = region->regiondata;
   wmXrActionData *customdata = event->customdata;
   float viewmat_prev[4][4];
   float winmat_prev[4][4];
   int mval[2];
+
+  WM_xr_controller_loc_to_mval(customdata->controller_loc,
+                               customdata->viewmat,
+                               customdata->winmat,
+                               region->winx,
+                               region->winy,
+                               mval);
+
+  RNA_int_set_array(op->ptr, "location", mval);
 
   /* Since this function is called in a window context, we need to replace the
    * window viewmat and winmat with the XR surface counterparts to get a correct
@@ -2544,15 +2536,6 @@ static int view3d_select_invoke_3d(bContext *C, wmOperator *op, const wmEvent *e
   copy_m4_m4(winmat_prev, rv3d->winmat);
   copy_m4_m4(rv3d->viewmat, customdata->viewmat);
   copy_m4_m4(rv3d->winmat, customdata->winmat);
-
-  controller_loc_to_mval(customdata->controller_loc,
-                         customdata->viewmat,
-                         customdata->winmat,
-                         ar->winx,
-                         ar->winy,
-                         mval);
-
-  RNA_int_set_array(op->ptr, "location", mval);
 
   int retval = view3d_select_exec(C, op);
   copy_m4_m4(rv3d->viewmat, viewmat_prev);
@@ -3431,8 +3414,10 @@ void VIEW3D_OT_select_box(wmOperatorType *ot)
 
   /* api callbacks */
   ot->invoke = WM_gesture_box_invoke;
+  ot->invoke_3d = WM_gesture_box_invoke_3d;
   ot->exec = view3d_box_select_exec;
   ot->modal = WM_gesture_box_modal;
+  ot->modal_3d = WM_gesture_box_modal_3d;
   ot->poll = view3d_selectable_data;
   ot->cancel = WM_gesture_box_cancel;
 

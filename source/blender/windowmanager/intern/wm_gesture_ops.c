@@ -198,6 +198,33 @@ int WM_gesture_box_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   return OPERATOR_RUNNING_MODAL;
 }
 
+int WM_gesture_box_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  BLI_assert(event->type == EVT_XR_ACTION);
+  BLI_assert(event->custom == EVT_DATA_XR);
+  BLI_assert(event->customdata);
+
+  wmEvent event_mut;
+  memcpy(&event_mut, event, sizeof(wmEvent));
+
+  ARegion *region = CTX_wm_region(C);
+  wmXrActionData *customdata = event->customdata;
+  int mval[2];
+
+  WM_xr_controller_loc_to_mval(customdata->controller_loc,
+                               customdata->viewmat,
+                               customdata->winmat,
+                               region->winx,
+                               region->winy,
+                               mval);
+  event_mut.x = mval[0];
+  event_mut.y = mval[1];
+
+  RNA_boolean_set(op->ptr, "wait_for_input", false);
+
+  return WM_gesture_box_invoke(C, op, &event_mut);
+}
+
 int WM_gesture_box_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
   wmWindow *win = CTX_wm_window(C);
@@ -259,6 +286,65 @@ int WM_gesture_box_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
   gesture->is_active_prev = gesture->is_active;
   return OPERATOR_RUNNING_MODAL;
+}
+
+int WM_gesture_box_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  BLI_assert(event->type == EVT_XR_ACTION);
+  BLI_assert(event->custom == EVT_DATA_XR);
+  BLI_assert(event->customdata);
+
+  wmEvent event_mut;
+  memcpy(&event_mut, event, sizeof(wmEvent));
+
+  ARegion *region = CTX_wm_region(C);
+  RegionView3D *rv3d = region->regiondata;
+  wmXrActionData *customdata = event->customdata;
+  int mval[2];
+
+  WM_xr_controller_loc_to_mval(customdata->controller_loc,
+                               customdata->viewmat,
+                               customdata->winmat,
+                               region->winx,
+                               region->winy,
+                               mval);
+
+  if (event->val == KM_PRESS) {
+    event_mut.type = MOUSEMOVE;
+    {
+      wmGesture *gesture = op->customdata;
+      gesture->is_active = true;
+    }
+    event_mut.x = mval[0];
+    event_mut.y = mval[1];
+  }
+  else if (event->val == KM_RELEASE) {
+    event_mut.type = EVT_MODAL_MAP;
+    event_mut.val = GESTURE_MODAL_SELECT;
+
+    /* Since this function is called in a window context, we need to replace the
+     * window viewmat and winmat with the XR surface counterparts to get a correct
+     * result for some operators (e.g. GPU select).
+     * TODO_XR: There may be some cases where we don't want to replace the window mats? */
+    float viewmat_prev[4][4];
+    float winmat_prev[4][4];
+    copy_m4_m4(viewmat_prev, rv3d->viewmat);
+    copy_m4_m4(winmat_prev, rv3d->winmat);
+    copy_m4_m4(rv3d->viewmat, customdata->viewmat);
+    copy_m4_m4(rv3d->winmat, customdata->winmat);
+
+    int retval = WM_gesture_box_modal(C, op, &event_mut);
+    copy_m4_m4(rv3d->viewmat, viewmat_prev);
+    copy_m4_m4(rv3d->winmat, winmat_prev);
+
+    return retval;
+  }
+  else {
+    /* XR events currently only support press and release. */
+    BLI_assert(false);
+  }
+
+  return WM_gesture_box_modal(C, op, &event_mut);
 }
 
 void WM_gesture_box_cancel(bContext *C, wmOperator *op)

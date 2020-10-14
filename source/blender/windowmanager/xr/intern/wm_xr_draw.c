@@ -55,6 +55,24 @@ void wm_xr_controller_pose_to_mat(const GHOST_XrPose *pose, float r_mat[4][4])
   copy_v3_v3(r_mat[3], pose->position);
 }
 
+/* Project 3D controller coordinates (in world space) to 2D mouse coordinates. */
+void WM_xr_controller_loc_to_mval(const float loc[3],
+                                  const float viewmat[4][4],
+                                  const float winmat[4][4],
+                                  short winx,
+                                  short winy,
+                                  int r_mval[2])
+{
+  float persmat[4][4];
+  float tmp[3];
+
+  mul_m4_m4m4(persmat, winmat, viewmat);
+  copy_v3_v3(tmp, loc);
+  mul_project_m4_v3(persmat, tmp);
+  r_mval[0] = (int)(((float)winx / 2.0f) * (1.0f + tmp[0]));
+  r_mval[1] = (int)(((float)winy / 2.0f) * (1.0f + tmp[1]));
+}
+
 static void wm_xr_draw_matrices_create(const wmXrDrawData *draw_data,
                                        const GHOST_XrDrawViewInfo *draw_view,
                                        const XrSessionSettings *session_settings,

@@ -614,7 +614,13 @@ void WM_paneltype_remove(struct PanelType *pt);
 
 /* wm_gesture_ops.c */
 int WM_gesture_box_invoke(struct bContext *C, struct wmOperator *op, const struct wmEvent *event);
+int WM_gesture_box_invoke_3d(struct bContext *C,
+                             struct wmOperator *op,
+                             const struct wmEvent *event);
 int WM_gesture_box_modal(struct bContext *C, struct wmOperator *op, const struct wmEvent *event);
+int WM_gesture_box_modal_3d(struct bContext *C,
+                            struct wmOperator *op,
+                            const struct wmEvent *event);
 void WM_gesture_box_cancel(struct bContext *C, struct wmOperator *op);
 int WM_gesture_circle_invoke(struct bContext *C,
                              struct wmOperator *op,
@@ -986,6 +992,12 @@ void WM_xr_haptic_action_stop(wmXrData *xr,
                               const char *const *subaction_paths);
 
 /* wm_xr_draw.c */
+void WM_xr_controller_loc_to_mval(const float loc[3],
+                                  const float viewmat[4][4],
+                                  const float winmat[4][4],
+                                  short winx,
+                                  short winy,
+                                  int r_mval[2]);
 void WM_xr_draw_controllers(void /*const struct wmXrSessionState *state*/);
 #endif
 

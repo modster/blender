@@ -2032,7 +2032,7 @@ static int wm_handler_operator_call(bContext *C,
        * nothing to do in this case.
        */
     }
-    else if (ot->modal) {
+    else if (ot->modal || ot->modal_3d) {
       /* we set context to where modal handler came from */
       wmWindowManager *wm = CTX_wm_manager(C);
       ScrArea *area = CTX_wm_area(C);
@@ -2048,7 +2048,15 @@ static int wm_handler_operator_call(bContext *C,
       }
 
       /* warning, after this call all context data and 'event' may be freed. see check below */
-      retval = ot->modal(C, op, event);
+      if (ot->modal_3d && event->type == EVT_XR_ACTION) {
+        retval = ot->modal_3d(C, op, event);
+      }
+      else if (ot->modal) {
+        retval = ot->modal(C, op, event);
+      }
+      else {
+        /* Pass through. An "XR operator" (only modal_3d) received a non-XR event.*/
+      }
       OPERATOR_RETVAL_CHECK(retval);
 
       /* when this is _not_ the case the modal modifier may have loaded
