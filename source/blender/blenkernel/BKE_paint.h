@@ -137,7 +137,6 @@ void BKE_paint_set_overlay_override(enum eOverlayFlags flag);
 
 /* palettes */
 struct Palette *BKE_palette_add(struct Main *bmain, const char *name);
-struct Palette *BKE_palette_copy(struct Main *bmain, const struct Palette *palette);
 struct PaletteColor *BKE_palette_color_add(struct Palette *palette);
 bool BKE_palette_is_empty(const struct Palette *palette);
 void BKE_palette_color_remove(struct Palette *palette, struct PaletteColor *color);
@@ -154,7 +153,6 @@ bool BKE_palette_from_hash(struct Main *bmain,
 
 /* paint curves */
 struct PaintCurve *BKE_paint_curve_add(struct Main *bmain, const char *name);
-struct PaintCurve *BKE_paint_curve_copy(struct Main *bmain, const struct PaintCurve *pc);
 
 bool BKE_paint_ensure(struct ToolSettings *ts, struct Paint **r_paint);
 void BKE_paint_init(struct Main *bmain, struct Scene *sce, ePaintMode mode, const char col[3]);
@@ -272,10 +270,13 @@ typedef enum eSculptClothConstraintType {
   /* Constraint that creates the structure of the cloth. */
   SCULPT_CLOTH_CONSTRAINT_STRUCTURAL = 0,
   /* Constraint that references the position of a vertex and a position in deformation_pos which
-     can be deformed by the tools. */
+   * can be deformed by the tools. */
   SCULPT_CLOTH_CONSTRAINT_DEFORMATION = 1,
-  /* Constarint that references the vertex position and its initial position. */
+  /* Constraint that references the vertex position and a editable soft-body position for
+   * plasticity. */
   SCULPT_CLOTH_CONSTRAINT_SOFTBODY = 2,
+  /* Constraint that references the vertex position and its initial position. */
+  SCULPT_CLOTH_CONSTRAINT_PIN = 3,
 } eSculptClothConstraintType;
 
 typedef struct SculptClothLengthConstraint {
@@ -294,7 +295,7 @@ typedef struct SculptClothLengthConstraint {
   float length;
   float strength;
 
-  /* Index in SculptClothSimulation.node_state of the node from where this constraint was created.
+  /* Index in #SculptClothSimulation.node_state of the node from where this constraint was created.
    * This constraints will only be used by the solver if the state is active. */
   int node;
 
@@ -316,17 +317,19 @@ typedef struct SculptClothSimulation {
 
   float mass;
   float damping;
+  float softbody_strength;
 
   float (*acceleration)[3];
   float (*pos)[3];
   float (*init_pos)[3];
+  float (*softbody_pos)[3];
   float (*prev_pos)[3];
   float (*last_iteration_pos)[3];
 
   struct ListBase *collider_list;
 
   int totnode;
-  /* PBVHNode pointer as a key, index in SculptClothSimulation.node_state as value. */
+  /** #PBVHNode pointer as a key, index in #SculptClothSimulation.node_state as value. */
   struct GHash *node_state_index;
   eSculptClothNodeSimState *node_state;
 } SculptClothSimulation;
@@ -338,7 +341,7 @@ typedef struct SculptPersistentBase {
 } SculptPersistentBase;
 
 typedef struct SculptVertexInfo {
-  /* Idexed by vertex, stores and ID of its topologycally connected component. */
+  /* Indexed by vertex, stores and ID of its topologically connected component. */
   int *connected_component;
 
   /* Indexed by base mesh vertex index, stores if that vertex is a boundary. */
@@ -426,7 +429,7 @@ typedef struct SculptFakeNeighbors {
   /* Max distance used to calculate neighborhood information. */
   float current_max_distance;
 
-  /* Idexed by vertex, stores the vertex index of its fake neighbor if available. */
+  /* Indexed by vertex, stores the vertex index of its fake neighbor if available. */
   int *fake_neighbor_index;
 
 } SculptFakeNeighbors;

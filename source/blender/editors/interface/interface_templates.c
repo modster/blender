@@ -98,7 +98,8 @@
 
 #include "PIL_time.h"
 
-// #define USE_OP_RESET_BUT  // we may want to make this optional, disable for now.
+/* we may want to make this optional, disable for now. */
+// #define USE_OP_RESET_BUT
 
 /* defines for templateID/TemplateSearch */
 #define TEMPLATE_SEARCH_TEXTBUT_WIDTH (UI_UNIT_X * 6)
@@ -1229,7 +1230,7 @@ static void template_ID_tabs(const bContext *C,
 
   LISTBASE_FOREACH (LinkData *, link, &ordered) {
     ID *id = link->data;
-    const int name_width = UI_fontstyle_string_width(&style->widgetlabel, id->name + 2);
+    const int name_width = UI_fontstyle_string_width(&style->widget, id->name + 2);
     const int but_width = name_width + UI_UNIT_X;
 
     uiButTab *tab = (uiButTab *)uiDefButR_prop(block,
