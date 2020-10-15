@@ -80,6 +80,8 @@
 #include "BLI_memarena.h"
 #include "BLI_utildefines.h"
 
+#include "IMB_imbuf.h"
+
 #include "DNA_defaults.h"
 
 #include "DNA_armature_types.h"
@@ -87,7 +89,9 @@
 #include "DNA_cachefile_types.h"
 #include "DNA_camera_types.h"
 #include "DNA_cloth_types.h"
+#include "DNA_collection_types.h"
 #include "DNA_curve_types.h"
+#include "DNA_fluid_types.h"
 #include "DNA_hair_types.h"
 #include "DNA_image_types.h"
 #include "DNA_key_types.h"
@@ -99,7 +103,9 @@
 #include "DNA_mesh_types.h"
 #include "DNA_meta_types.h"
 #include "DNA_modifier_types.h"
+#include "DNA_movieclip_types.h"
 #include "DNA_object_types.h"
+#include "DNA_particle_types.h"
 #include "DNA_pointcloud_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_simulation_types.h"
@@ -109,10 +115,13 @@
 #include "DNA_volume_types.h"
 #include "DNA_world_types.h"
 
+#include "DNA_armature_defaults.h"
 #include "DNA_brush_defaults.h"
 #include "DNA_cachefile_defaults.h"
 #include "DNA_camera_defaults.h"
+#include "DNA_collection_defaults.h"
 #include "DNA_curve_defaults.h"
+#include "DNA_fluid_defaults.h"
 #include "DNA_hair_defaults.h"
 #include "DNA_image_defaults.h"
 #include "DNA_lattice_defaults.h"
@@ -123,7 +132,9 @@
 #include "DNA_mesh_defaults.h"
 #include "DNA_meta_defaults.h"
 #include "DNA_modifier_defaults.h"
+#include "DNA_movieclip_defaults.h"
 #include "DNA_object_defaults.h"
+#include "DNA_particle_defaults.h"
 #include "DNA_pointcloud_defaults.h"
 #include "DNA_scene_defaults.h"
 #include "DNA_simulation_defaults.h"
@@ -135,6 +146,9 @@
 #define SDNA_DEFAULT_DECL_STRUCT(struct_name) \
   static const struct_name DNA_DEFAULT_##struct_name = _DNA_DEFAULT_##struct_name
 
+/* DNA_armature_defaults.h */
+SDNA_DEFAULT_DECL_STRUCT(bArmature);
+
 /* DNA_brush_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(Brush);
 
@@ -144,8 +158,16 @@ SDNA_DEFAULT_DECL_STRUCT(CacheFile);
 /* DNA_camera_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(Camera);
 
+/* DNA_collection_defaults.h */
+SDNA_DEFAULT_DECL_STRUCT(Collection);
+
 /* DNA_curve_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(Curve);
+
+/* DNA_fluid_defaults.h */
+SDNA_DEFAULT_DECL_STRUCT(FluidDomainSettings);
+SDNA_DEFAULT_DECL_STRUCT(FluidFlowSettings);
+SDNA_DEFAULT_DECL_STRUCT(FluidEffectorSettings);
 
 /* DNA_image_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(Image);
@@ -174,8 +196,14 @@ SDNA_DEFAULT_DECL_STRUCT(Mesh);
 /* DNA_meta_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(MetaBall);
 
+/* DNA_movieclip_defaults.h */
+SDNA_DEFAULT_DECL_STRUCT(MovieClip);
+
 /* DNA_object_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(Object);
+
+/* DNA_particle_defaults.h */
+SDNA_DEFAULT_DECL_STRUCT(ParticleSettings);
 
 /* DNA_pointcloud_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(PointCloud);
@@ -288,6 +316,9 @@ extern const bTheme U_theme_default;
 /** Keep headers sorted. */
 const void *DNA_default_table[SDNA_TYPE_MAX] = {
 
+    /* DNA_arnature_defaults.h */
+    SDNA_DEFAULT_DECL(bArmature),
+
     /* DNA_brush_defaults.h */
     SDNA_DEFAULT_DECL(Brush),
 
@@ -299,8 +330,16 @@ const void *DNA_default_table[SDNA_TYPE_MAX] = {
     SDNA_DEFAULT_DECL_EX(CameraDOFSettings, Camera.dof),
     SDNA_DEFAULT_DECL_EX(CameraStereoSettings, Camera.stereo),
 
+    /* DNA_collection_defaults.h */
+    SDNA_DEFAULT_DECL(Collection),
+
     /* DNA_curve_defaults.h */
     SDNA_DEFAULT_DECL(Curve),
+
+    /* DNA_fluid_defaults.h */
+    SDNA_DEFAULT_DECL(FluidDomainSettings),
+    SDNA_DEFAULT_DECL(FluidFlowSettings),
+    SDNA_DEFAULT_DECL(FluidEffectorSettings),
 
     /* DNA_image_defaults.h */
     SDNA_DEFAULT_DECL(Image),
@@ -329,8 +368,14 @@ const void *DNA_default_table[SDNA_TYPE_MAX] = {
     /* DNA_meta_defaults.h */
     SDNA_DEFAULT_DECL(MetaBall),
 
+    /* DNA_movieclip_defaults.h */
+    SDNA_DEFAULT_DECL(MovieClip),
+
     /* DNA_object_defaults.h */
     SDNA_DEFAULT_DECL(Object),
+
+    /* DNA_particle_defaults.h */
+    SDNA_DEFAULT_DECL(ParticleSettings),
 
     /* DNA_pointcloud_defaults.h */
     SDNA_DEFAULT_DECL(PointCloud),
