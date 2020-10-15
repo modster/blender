@@ -159,9 +159,12 @@ void UsdObjectReader::read_matrix(float r_mat[4][4] /* local matrix */,
     copy_m44_axis_swap(r_mat, r_mat, USD_ZUP_FROM_YUP);
   }
 
-  float scale_mat[4][4];
-  scale_m4_fl(scale_mat, scale);
-  mul_m4_m4m4(r_mat, scale_mat, r_mat);
+  /* Apply scaling only to root objects, parenting will propagate it. */
+  if (!this->parent_) {
+    float scale_mat[4][4];
+    scale_m4_fl(scale_mat, scale);
+    mul_m4_m4m4(r_mat, scale_mat, r_mat);
+  }
 }
 
 double UsdObjectReader::minTime() const
