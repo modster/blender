@@ -4516,6 +4516,7 @@ void BKE_fluid_particle_system_create(struct Main *bmain,
   part->totpart = 0;
   part->draw_size = 0.01f; /* Make fluid particles more subtle in viewport. */
   part->draw_col = PART_DRAW_COL_VEL;
+  part->phystype = PART_PHYS_NO; /* No physics needed, part system only used to display data. */
   psys->part = part;
   psys->pointcache = BKE_ptcache_add(&psys->ptcaches);
   BLI_strncpy(psys->name, parts_name, sizeof(psys->name));
@@ -4864,12 +4865,12 @@ void BKE_fluid_modifier_create_type_data(struct FluidModifierData *fmd)
 
     /* Turn off incompatible options. */
 #ifndef WITH_OPENVDB
-    fmd->domain.cache_data_format = FLUID_DOMAIN_FILE_UNI;
-    fmd->domain.cache_particle_format = FLUID_DOMAIN_FILE_UNI;
-    fmd->domain.cache_noise_format = FLUID_DOMAIN_FILE_UNI;
+    fmd->domain->cache_data_format = FLUID_DOMAIN_FILE_UNI;
+    fmd->domain->cache_particle_format = FLUID_DOMAIN_FILE_UNI;
+    fmd->domain->cache_noise_format = FLUID_DOMAIN_FILE_UNI;
 #endif
 #ifndef WITH_OPENVDB_BLOSC
-    fmd->domain.openvdb_compression = VDB_COMPRESSION_ZIP;
+    fmd->domain->openvdb_compression = VDB_COMPRESSION_ZIP;
 #endif
 
     fmd->domain->effector_weights = BKE_effector_add_weights(NULL);
