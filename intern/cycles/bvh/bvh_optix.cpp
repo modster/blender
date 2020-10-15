@@ -216,8 +216,7 @@ void BVHOptiX::pack_nodes(const BVHNode *)
 
 void BVHOptiX::refit_nodes()
 {
-  // TODO(pmours): Implement?
-  VLOG(1) << "Refit is not yet implemented for OptiX BVH.";
+  geometry[0]->do_optix_refit = true;
 }
 
 BVHNode *BVHOptiX::widen_children_nodes(const BVHNode *)

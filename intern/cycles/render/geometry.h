@@ -90,6 +90,9 @@ class Geometry : public Node {
   /* Update Flags */
   bool need_update;
   bool need_update_rebuild;
+  bool do_optix_refit;
+  unsigned long long optix_handle;
+  unsigned long long optix_data_handle;
 
   /* Index into scene->geometry (only valid during update) */
   size_t index;

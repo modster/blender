@@ -74,6 +74,9 @@ Geometry::Geometry(const NodeType *node_type, const Type type)
   attr_map_offset = 0;
   optix_prim_offset = 0;
   prim_offset = 0;
+  do_optix_refit = false;
+  optix_handle = 0;
+  optix_data_handle = 0;
 }
 
 Geometry::~Geometry()
