@@ -419,13 +419,11 @@ int OBJMesh::calc_poly_normal_indices(const int poly_index,
     /* For a smooth-shaded face, `Mesh.totloop`-many loop normals are written. */
     return totloop;
   }
-  else {
-    for (int face_loop_index = 0; face_loop_index < totloop; face_loop_index++) {
-      r_face_normal_indices[face_loop_index] = object_tot_prev_normals;
-    }
-    /* For a flat-shaded face, one face normal is written.  */
-    return 1;
+  for (int face_loop_index = 0; face_loop_index < totloop; face_loop_index++) {
+    r_face_normal_indices[face_loop_index] = object_tot_prev_normals;
   }
+  /* For a flat-shaded face, one face normal is written.  */
+  return 1;
 }
 
 /**

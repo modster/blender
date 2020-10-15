@@ -66,7 +66,7 @@ class OBJWriter {
 
   void write_object_name(const OBJMesh &obj_mesh_data) const;
   void write_object_group(const OBJMesh &obj_mesh_data) const;
-  void write_mtllib_name(const char *obj_filepath) const;
+  void write_mtllib_name(const char *mtl_filepath) const;
   void write_vertex_coords(const OBJMesh &obj_mesh_data) const;
   void write_uv_coords(OBJMesh &obj_mesh_data) const;
   void write_poly_normals(OBJMesh &obj_mesh_data) const;
@@ -78,7 +78,7 @@ class OBJWriter {
                            int16_t &r_last_face_mat_nr) const;
   void write_vertex_group(const OBJMesh &obj_mesh_data,
                           const int poly_index,
-                          int16_t &r_last_face_vertex_group) const;
+                          int16_t &r_last_poly_vertex_group) const;
   void write_poly_elements(const OBJMesh &obj_mesh_data);
   void write_edges_indices(const OBJMesh &obj_mesh_data) const;
   void write_nurbs_curve(const OBJCurve &obj_nurbs_data) const;
@@ -86,7 +86,8 @@ class OBJWriter {
   void update_index_offsets(const OBJMesh &obj_mesh_data);
 
  private:
-  /* Based on export parameters, a writer function with appropriate OBJ syntax is needed. */
+  /* Based on export parameters, a writer function with appropriate
+   * OBJ polygon-element syntax is needed. */
   typedef void (OBJWriter::*func_vert_uv_normal_indices)(Span<int> vert_indices,
                                                          Span<int> uv_indices,
                                                          Span<int> normal_indices) const;
@@ -96,10 +97,14 @@ class OBJWriter {
                                     Span<int> uv_indices,
                                     Span<int> normal_indices) const;
   void write_vert_normal_indices(Span<int> vert_indices,
-                                 Span<int>,
+                                 Span<int> /*uv_indices*/,
                                  Span<int> normal_indices) const;
-  void write_vert_uv_indices(Span<int> vert_indices, Span<int> uv_indices, Span<int>) const;
-  void write_vert_indices(Span<int> vert_indices, Span<int>, Span<int>) const;
+  void write_vert_uv_indices(Span<int> vert_indices,
+                             Span<int> uv_indices,
+                             Span<int> /*normal_indices*/) const;
+  void write_vert_indices(Span<int> vert_indices,
+                          Span<int> /*uv_indices*/,
+                          Span<int> /*normal_indices*/) const;
 };
 
 /**
