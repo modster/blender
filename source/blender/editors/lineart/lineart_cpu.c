@@ -713,6 +713,7 @@ static LineartRenderElementLinkNode *lineart_memory_get_line_space(LineartRender
                                                   render_lines,
                                                   sizeof(LineartRenderElementLinkNode));
   reln->element_count = 64;
+  reln->crease_threshold = rb->crease_threshold;
   reln->flags |= LRT_ELEMENT_IS_ADDITIONAL;
 
   return reln;
