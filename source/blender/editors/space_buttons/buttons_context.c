@@ -914,6 +914,10 @@ int /*eContextResult*/ buttons_context(const bContext *C,
     ButsContextTexture *ct = sbuts->texuser;
 
     if (ct) {
+      if (ct->texture == NULL) {
+        return CTX_RESULT_NO_DATA;
+      }
+
       CTX_data_pointer_set(result, &ct->texture->id, &RNA_Texture, ct->texture);
     }
 
