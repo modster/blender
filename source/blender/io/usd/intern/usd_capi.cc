@@ -17,9 +17,9 @@
  * All rights reserved.
  */
 
+#include "import/usd_import_util.h"
 #include "import/usd_importer_context.h"
 #include "import/usd_reader_object.h"
-#include "import/usd_import_util.h"
 #include "usd.h"
 #include "usd_hierarchy_iterator.h"
 
