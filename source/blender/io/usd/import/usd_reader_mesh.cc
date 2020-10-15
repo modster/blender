@@ -18,7 +18,7 @@
  */
 
 #include "usd_reader_mesh.h"
-#include "usd_util.h"
+#include "usd_import_util.h"
 
 #include "MEM_guardedalloc.h"
 

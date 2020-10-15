@@ -18,7 +18,7 @@
  */
 
 #include "usd_reader_object.h"
-#include "usd_util.h"
+#include "usd_import_util.h"
 
 #include "DNA_cachefile_types.h"
 #include "DNA_constraint_types.h"
