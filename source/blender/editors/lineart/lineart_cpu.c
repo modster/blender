@@ -913,13 +913,13 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
 #define REMOVE_ORIGINAL_LINES \
   BLI_remlink(&rb->all_render_lines, (void *)rt->rl[0]); \
   rt->rl[0]->next = rt->rl[0]->prev = 0; \
-  rt->rl[0]->flags |= LRT_EDGE_FLAG_CHAIN_PICKED; \
+  rt->rl[0]->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;\
   BLI_remlink(&rb->all_render_lines, (void *)rt->rl[1]); \
   rt->rl[1]->next = rt->rl[1]->prev = 0; \
-  rt->rl[1]->flags |= LRT_EDGE_FLAG_CHAIN_PICKED; \
+  rt->rl[1]->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;\
   BLI_remlink(&rb->all_render_lines, (void *)rt->rl[2]); \
   rt->rl[2]->next = rt->rl[2]->prev = 0; \
-  rt->rl[2]->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;
+  rt->rl[2]->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;\
 
       switch (in0 + in1 + in2) {
         case 0: /* ignore this triangle. */
@@ -1811,7 +1811,7 @@ static void lineart_main_load_geometries(Depsgraph *depsgraph,
       double w = cam->ortho_scale / 2;
       lineart_matrix_ortho_44d(proj, -w, w, -w / asp, w / asp, cam->clip_start, cam->clip_end);
     }
-    invert_m4_m4(inv, camera->obmat);
+    invert_m4_m4(inv, rb->cam_obmat);
     mul_m4db_m4db_m4fl_uniq(result, proj, inv);
     copy_m4_m4_db(proj, result);
     copy_m4_m4_db(rb->view_projection, proj);
@@ -2449,6 +2449,8 @@ static void lineart_main_get_view_vector(LineartRenderBuffer *rb)
   float direction[3] = {0, 0, 1};
   float trans[3];
   float inv[4][4];
+  float obmat_no_scale[4][4];
+  float scale[3];
 
   BLI_spin_lock(&lineart_share.lock_render_status);
   if (lineart_share.viewport_camera_override) {
@@ -2460,11 +2462,16 @@ static void lineart_main_get_view_vector(LineartRenderBuffer *rb)
     }
   }
   else {
-    invert_m4_m4(inv, rb->cam_obmat);
+    copy_m4_m4(obmat_no_scale,rb->cam_obmat);
   }
   BLI_spin_unlock(&lineart_share.lock_render_status);
+  normalize_v3(obmat_no_scale[0]);
+  normalize_v3(obmat_no_scale[1]);
+  normalize_v3(obmat_no_scale[2]);
+  invert_m4_m4(inv, obmat_no_scale);
   transpose_m4(inv);
   mul_v3_mat3_m4v3(trans, inv, direction);
+  copy_m4_m4(rb->cam_obmat,obmat_no_scale);
   copy_v3db_v3fl(rb->view_vector, trans);
 }
 
@@ -3840,6 +3847,7 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
 
   LRT_PROGRESS(0, "LRT: Loading geometries.");
 
+  lineart_main_get_view_vector(rb);
   lineart_main_load_geometries(depsgraph, scene, scene->camera, rb);
 
   /** We had everything we need,
@@ -3854,7 +3862,6 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
 
   LRT_CANCEL_STAGE
 
-  lineart_main_get_view_vector(rb);
   lineart_main_cull_triangles(rb, false);
   lineart_main_cull_triangles(rb, true);
 
