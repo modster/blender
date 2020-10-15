@@ -141,7 +141,7 @@ void UsdObjectReader::read_matrix(float r_mat[4][4] /* local matrix */,
       pxr::GfMatrix4d usd_parent_local_xf;
       parent_xformable.GetLocalTransformation(&usd_parent_local_xf, &reset_xform_stack, time);
 
-      usd_local_xf = usd_parent_local_xf * usd_local_xf;
+      usd_local_xf = usd_local_xf * usd_parent_local_xf;
     }
   }
 
