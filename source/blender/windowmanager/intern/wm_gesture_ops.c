@@ -35,6 +35,8 @@
 
 #include "BKE_context.h"
 
+#include "DEG_depsgraph.h"
+
 #include "WM_api.h"
 #include "WM_types.h"
 
@@ -44,6 +46,7 @@
 
 #include "ED_screen.h"
 #include "ED_select_utils.h"
+#include "ED_view3d.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -209,20 +212,39 @@ int WM_gesture_box_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
 
   ARegion *region = CTX_wm_region(C);
   wmXrActionData *customdata = event->customdata;
+  short winx_prev, winy_prev;
+  rcti winrct_prev;
   int mval[2];
 
   WM_xr_controller_loc_to_mval(customdata->controller_loc,
-                               customdata->viewmat,
-                               customdata->winmat,
-                               region->winx,
-                               region->winy,
+                               customdata->eye_viewmat,
+                               customdata->eye_winmat,
+                               customdata->eye_width,
+                               customdata->eye_height,
                                mval);
   event_mut.x = mval[0];
   event_mut.y = mval[1];
 
+  /* Replace window dimensions with XR surface dimensions. */
+  winx_prev = region->winx;
+  winy_prev = region->winy;
+  winrct_prev = region->winrct;
+
+  region->winrct.xmin = 0;
+  region->winrct.ymin = 0;
+  region->winrct.xmax = region->winx = customdata->eye_width;
+  region->winrct.ymax = region->winy = customdata->eye_height;
+
   RNA_boolean_set(op->ptr, "wait_for_input", false);
 
-  return WM_gesture_box_invoke(C, op, &event_mut);
+  int ret = WM_gesture_box_invoke(C, op, &event_mut);
+
+  /* Restore window dimensions. */
+  region->winx = winx_prev;
+  region->winy = winy_prev;
+  region->winrct = winrct_prev;
+
+  return ret;
 }
 
 int WM_gesture_box_modal(bContext *C, wmOperator *op, const wmEvent *event)
@@ -303,10 +325,10 @@ int WM_gesture_box_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
   int mval[2];
 
   WM_xr_controller_loc_to_mval(customdata->controller_loc,
-                               customdata->viewmat,
-                               customdata->winmat,
-                               region->winx,
-                               region->winy,
+                               customdata->eye_viewmat,
+                               customdata->eye_winmat,
+                               customdata->eye_width,
+                               customdata->eye_height,
                                mval);
 
   if (event->val == KM_PRESS) {
@@ -323,19 +345,41 @@ int WM_gesture_box_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
     event_mut.val = GESTURE_MODAL_SELECT;
 
     /* Since this function is called in a window context, we need to replace the
-     * window viewmat and winmat with the XR surface counterparts to get a correct
-     * result for some operators (e.g. GPU select).
-     * TODO_XR: There may be some cases where we don't want to replace the window mats? */
+     * window view parameters with the XR surface counterparts to get a correct
+     * result for some operators (e.g. GPU select). */
+    Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+    Scene *scene = CTX_data_scene(C);
+    View3D *v3d = CTX_wm_view3d(C);
+    short winx_prev, winy_prev;
+    rcti winrct_prev;
+    float lens_prev;
     float viewmat_prev[4][4];
     float winmat_prev[4][4];
+
+    winx_prev = region->winx;
+    winy_prev = region->winy;
+    winrct_prev = region->winrct;
+    lens_prev = v3d->lens;
     copy_m4_m4(viewmat_prev, rv3d->viewmat);
     copy_m4_m4(winmat_prev, rv3d->winmat);
-    copy_m4_m4(rv3d->viewmat, customdata->viewmat);
-    copy_m4_m4(rv3d->winmat, customdata->winmat);
+
+    region->winrct.xmin = 0;
+    region->winrct.ymin = 0;
+    region->winrct.xmax = region->winx = customdata->eye_width;
+    region->winrct.ymax = region->winy = customdata->eye_height;
+    v3d->lens = customdata->eye_lens;
+    copy_m4_m4(rv3d->viewmat, customdata->eye_viewmat);
+    copy_m4_m4(rv3d->winmat, customdata->eye_winmat);
 
     int retval = WM_gesture_box_modal(C, op, &event_mut);
-    copy_m4_m4(rv3d->viewmat, viewmat_prev);
-    copy_m4_m4(rv3d->winmat, winmat_prev);
+
+    /* Restore window view. */
+    region->winx = winx_prev;
+    region->winy = winy_prev;
+    region->winrct = winrct_prev;
+    v3d->lens = lens_prev;
+    ED_view3d_update_viewmat(
+        depsgraph, scene, v3d, region, viewmat_prev, winmat_prev, NULL, false);
 
     return retval;
   }

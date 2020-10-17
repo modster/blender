@@ -872,8 +872,11 @@ void WM_event_xr_data(const struct wmEvent *event,
                       float state[2],
                       float controller_loc[3],
                       float controller_rot[4],
-                      float viewmat[4][4],
-                      float winmat[4][4]);
+                      int *eye_width,
+                      int *eye_height,
+                      float *eye_lens,
+                      float eye_viewmat[4][4],
+                      float eye_winmat[4][4]);
 bool WM_event_is_xr(const struct wmEvent *event);
 
 #ifdef WITH_INPUT_IME
@@ -926,6 +929,7 @@ void WM_xr_session_base_pose_reset(wmXrData *xr);
 bool WM_xr_session_state_viewer_pose_location_get(const wmXrData *xr, float r_location[3]);
 bool WM_xr_session_state_viewer_pose_rotation_get(const wmXrData *xr, float r_rotation[4]);
 bool WM_xr_session_state_viewer_pose_matrix_info_get(const wmXrData *xr,
+                                                     bool from_selection_eye,
                                                      float r_viewmat[4][4],
                                                      float *r_focal_len);
 bool WM_xr_session_state_controller_pose_location_get(const wmXrData *xr,
@@ -995,8 +999,8 @@ void WM_xr_haptic_action_stop(wmXrData *xr,
 void WM_xr_controller_loc_to_mval(const float loc[3],
                                   const float viewmat[4][4],
                                   const float winmat[4][4],
-                                  short winx,
-                                  short winy,
+                                  int winx,
+                                  int winy,
                                   int r_mval[2]);
 void WM_xr_draw_controllers(void /*const struct wmXrSessionState *state*/);
 #endif

@@ -640,12 +640,19 @@ typedef struct wmXrActionData {
   char type;
   /** State. Set appropriately based on type. */
   float state[2];
+
   /** Controller pose corresponding to the action's subaction path. */
   float controller_loc[3];
   float controller_rot[4];
-  /** Viewmat and winmat of the XR viewer centroid. */
-  float viewmat[4][4];
-  float winmat[4][4];
+
+  /** Viewport dimensions of the eye (view) used for selection (3D-to-2D projection). */
+  int eye_width, eye_height;
+  /** Lens (focal length) of the selection eye. */
+  float eye_lens;
+  /** Viewmat and winmat of the selection eye. */
+  float eye_viewmat[4][4];
+  float eye_winmat[4][4];
+
   /** Operator. */
   struct wmOperatorType *ot;
 } wmXrActionData;

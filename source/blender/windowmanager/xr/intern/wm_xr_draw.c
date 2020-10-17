@@ -59,18 +59,16 @@ void wm_xr_controller_pose_to_mat(const GHOST_XrPose *pose, float r_mat[4][4])
 void WM_xr_controller_loc_to_mval(const float loc[3],
                                   const float viewmat[4][4],
                                   const float winmat[4][4],
-                                  short winx,
-                                  short winy,
+                                  int winx,
+                                  int winy,
                                   int r_mval[2])
 {
   float persmat[4][4];
-  float tmp[3];
-
+  float vec[3];
   mul_m4_m4m4(persmat, winmat, viewmat);
-  copy_v3_v3(tmp, loc);
-  mul_project_m4_v3(persmat, tmp);
-  r_mval[0] = (int)(((float)winx / 2.0f) * (1.0f + tmp[0]));
-  r_mval[1] = (int)(((float)winy / 2.0f) * (1.0f + tmp[1]));
+  mul_v3_project_m4_v3(vec, persmat, loc);
+  r_mval[0] = (int)(((float)winx / 2.0f) * (1.0f + vec[0]));
+  r_mval[1] = (int)(((float)winy / 2.0f) * (1.0f + vec[1]));
 }
 
 static void wm_xr_draw_matrices_create(const wmXrDrawData *draw_data,
@@ -145,7 +143,7 @@ void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata)
 
   wm_xr_session_draw_data_update(session_state, settings, draw_view, draw_data);
   wm_xr_draw_matrices_create(draw_data, draw_view, settings, viewmat, winmat);
-  wm_xr_session_state_update(settings, draw_data, draw_view, winmat, session_state);
+  wm_xr_session_state_update(settings, draw_data, draw_view, viewmat, winmat, session_state);
 
   if (!wm_xr_session_surface_offscreen_ensure(surface_data, draw_view)) {
     return;

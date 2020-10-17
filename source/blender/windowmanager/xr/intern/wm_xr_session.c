@@ -321,11 +321,13 @@ void wm_xr_session_draw_data_update(const wmXrSessionState *state,
 void wm_xr_session_state_update(const XrSessionSettings *settings,
                                 const wmXrDrawData *draw_data,
                                 const GHOST_XrDrawViewInfo *draw_view,
+                                const float viewmat[4][4],
                                 const float winmat[4][4],
                                 wmXrSessionState *state)
 {
   GHOST_XrPose viewer_pose;
   const bool use_position_tracking = settings->flag & XR_SESSION_USE_POSITION_TRACKING;
+  wmXrEyeData *eye = &state->eyes[draw_view->view];
 
   mul_qt_qtqt(viewer_pose.orientation_quat,
               draw_data->base_pose.orientation_quat,
@@ -345,11 +347,15 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
   copy_v3_v3(state->viewer_pose.position, viewer_pose.position);
   copy_qt_qt(state->viewer_pose.orientation_quat, viewer_pose.orientation_quat);
   wm_xr_pose_to_viewmat(&viewer_pose, state->viewer_viewmat);
-  copy_m4_m4(state->viewer_winmat, winmat);
+
+  eye->width = draw_view->width;
+  eye->height = draw_view->height;
   /* No idea why, but multiplying by two seems to make it match the VR view more. */
-  state->focal_len = 2.0f *
-                     fov_to_focallength(draw_view->fov.angle_right - draw_view->fov.angle_left,
-                                        DEFAULT_SENSOR_WIDTH);
+  eye->focal_len = 2.0f *
+                   fov_to_focallength(draw_view->fov.angle_right - draw_view->fov.angle_left,
+                                      DEFAULT_SENSOR_WIDTH);
+  copy_m4_m4(eye->viewmat, viewmat);
+  copy_m4_m4(eye->winmat, winmat);
 
   memcpy(&state->prev_base_pose, &draw_data->base_pose, sizeof(GHOST_XrPose));
   memcpy(&state->prev_local_pose, &draw_view->local_pose, sizeof(GHOST_XrPose));
@@ -391,6 +397,7 @@ bool WM_xr_session_state_viewer_pose_rotation_get(const wmXrData *xr, float r_ro
 }
 
 bool WM_xr_session_state_viewer_pose_matrix_info_get(const wmXrData *xr,
+                                                     bool from_selection_eye,
                                                      float r_viewmat[4][4],
                                                      float *r_focal_len)
 {
@@ -400,8 +407,15 @@ bool WM_xr_session_state_viewer_pose_matrix_info_get(const wmXrData *xr,
     return false;
   }
 
-  copy_m4_m4(r_viewmat, xr->runtime->session_state.viewer_viewmat);
-  *r_focal_len = xr->runtime->session_state.focal_len;
+  const wmXrEyeData *eye = &xr->runtime->session_state.eyes[xr->session_settings.selection_eye];
+  if (from_selection_eye) {
+    copy_m4_m4(r_viewmat, eye->viewmat);
+  }
+  else {
+    copy_m4_m4(r_viewmat, xr->runtime->session_state.viewer_viewmat);
+  }
+  /* Since eye centroid does not have a focal length, just take it from selection eye. */
+  *r_focal_len = eye->focal_len;
 
   return true;
 }
@@ -523,7 +537,8 @@ static const GHOST_XrPose *wm_xr_session_controller_pose_find(const wmXrSessionS
 }
 
 /* Dispatch events to XR surface / window queues. */
-static void wm_xr_session_events_dispatch(GHash *actions,
+static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
+                                          GHash *actions,
                                           wmXrSessionState *session_state,
                                           wmSurface *surface,
                                           wmWindow *win)
@@ -621,8 +636,7 @@ static void wm_xr_session_events_dispatch(GHash *actions,
               session_state, action->subaction_paths[i]);
           wm_event_add_xrevent(action,
                                pose,
-                               session_state->viewer_viewmat,
-                               session_state->viewer_winmat,
+                               &session_state->eyes[settings->selection_eye],
                                surface,
                                win,
                                i,
@@ -680,7 +694,7 @@ static void wm_xr_session_action_set_update(const XrSessionSettings *settings,
     }
 
     if (surface && win) {
-      wm_xr_session_events_dispatch(actions, state, surface, win);
+      wm_xr_session_events_dispatch(settings, actions, state, surface, win);
     }
   }
 }

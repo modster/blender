@@ -4872,8 +4872,7 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void 
 
 void wm_event_add_xrevent(const wmXrAction *action,
                           const GHOST_XrPose *controller_pose,
-                          const float viewmat[4][4],
-                          const float winmat[4][4],
+                          const wmXrEyeData *eye_data,
                           wmSurface *surface,
                           wmWindow *win,
                           unsigned int subaction_idx,
@@ -4883,10 +4882,10 @@ void wm_event_add_xrevent(const wmXrAction *action,
   if (!surface->is_xr || !surface->customdata || (val != KM_PRESS && val != KM_RELEASE)) {
     return;
   }
-  wmXrSurfaceData *surface_data = surface->customdata;
 
-  bool add_win_event = (action->ot->modal &&
-                        ((val == KM_PRESS && !press_start) || val == KM_RELEASE));
+  wmXrSurfaceData *surface_data = surface->customdata;
+  const bool add_win_event = (action->ot->modal &&
+                              ((val == KM_PRESS && !press_start) || val == KM_RELEASE));
 
   wmEvent _event;
   wmEvent *event = add_win_event ? &_event : MEM_callocN(sizeof(wmEvent), __func__);
@@ -4922,8 +4921,14 @@ void wm_event_add_xrevent(const wmXrAction *action,
   else {
     data->controller_rot[0] = 1.0f;
   }
-  copy_m4_m4(data->viewmat, viewmat);
-  copy_m4_m4(data->winmat, winmat);
+
+  if (eye_data) {
+    data->eye_width = eye_data->width;
+    data->eye_height = eye_data->height;
+    data->eye_lens = eye_data->focal_len;
+    copy_m4_m4(data->eye_viewmat, eye_data->viewmat);
+    copy_m4_m4(data->eye_winmat, eye_data->winmat);
+  }
 
   data->ot = action->ot;
 

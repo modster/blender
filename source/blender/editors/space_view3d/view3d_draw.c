@@ -331,8 +331,13 @@ static void view3d_xr_mirror_setup(const wmWindowManager *wm,
   RegionView3D *rv3d = region->regiondata;
   float viewmat[4][4];
   const float lens_old = v3d->lens;
+  /* Here we need to use the viewmat from the selection eye instead of the eye centroid because
+   * this function may be called from a GPU select operation. In that case we need to match the
+   * selection eye's view, which was used to project 3D to 2D, for a correct result. */
+  const bool from_selection_eye = true;
 
-  if (!WM_xr_session_state_viewer_pose_matrix_info_get(&wm->xr, viewmat, &v3d->lens)) {
+  if (!WM_xr_session_state_viewer_pose_matrix_info_get(
+          &wm->xr, from_selection_eye, viewmat, &v3d->lens)) {
     /* Can't get info from XR session, use fallback values. */
     copy_m4_m4(viewmat, rv3d->viewmat);
     v3d->lens = lens_old;

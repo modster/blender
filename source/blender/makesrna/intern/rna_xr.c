@@ -459,6 +459,20 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
+  static const EnumPropertyItem selection_eyes[] = {
+      {XR_EYE_LEFT,
+       "EYE_LEFT",
+       0,
+       "Left Eye",
+       "Use the left eye's perspective when selecting in VR"},
+      {XR_EYE_RIGHT,
+       "EYE_RIGHT",
+       0,
+       "Right Eye",
+       "Use the right eye's perspective when selecting in VR"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   srna = RNA_def_struct(brna, "XrSessionSettings", NULL);
   RNA_def_struct_ui_text(srna, "XR Session Settings", "");
 
@@ -518,6 +532,15 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "draw_flags", V3D_OFSDRAW_XR_SHOW_CONTROLLERS);
   RNA_def_property_ui_text(
       prop, "Show Controllers", "Show VR controllers (requires VR action for controller poses)");
+  RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
+
+  prop = RNA_def_property(srna, "selection_eye", PROP_ENUM, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_enum_items(prop, selection_eyes);
+  RNA_def_property_ui_text(
+      prop,
+      "Selection Eye",
+      "Which eye's perspective will be used when selecting with VR controllers");
   RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
 
   prop = RNA_def_property(srna, "clip_start", PROP_FLOAT, PROP_DISTANCE);
@@ -784,7 +807,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
   parm = RNA_def_string(func, "user_path0", NULL, 64, "User Path 0", "OpenXR user path 0");
   RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
-  parm = RNA_def_string(func, "user_path1", NULL, 64, "User Path 1", "OpenXR user path 0");
+  parm = RNA_def_string(func, "user_path1", NULL, 64, "User Path 1", "OpenXR user path 1");
   RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
   parm = RNA_def_float(func,
                        "duration",

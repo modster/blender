@@ -35,6 +35,7 @@ struct GHOST_XrPose;
 struct ScrArea;
 struct wmSurface;
 struct wmXrAction;
+struct wmXrEyeData;
 
 #ifdef __cplusplus
 extern "C" {
@@ -152,8 +153,7 @@ void wm_event_do_handlers(bContext *C);
 void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void *customdata);
 void wm_event_add_xrevent(const struct wmXrAction *action,
                           const struct GHOST_XrPose *controller_pose,
-                          const float viewmat[4][4],
-                          const float winmat[4][4],
+                          const struct wmXrEyeData *eye_data,
                           struct wmSurface *surface,
                           wmWindow *win,
                           unsigned int subaction_idx,

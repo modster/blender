@@ -27,6 +27,13 @@
 struct wmXrActionSet;
 struct GHash;
 
+typedef struct wmXrEyeData {
+  int width, height;
+  float focal_len;
+  float viewmat[4][4];
+  float winmat[4][4];
+} wmXrEyeData;
+
 typedef struct wmXrControllerData {
   /** OpenXR path identifier. */
   char subaction_path[64];
@@ -45,9 +52,8 @@ typedef struct wmXrSessionState {
   GHOST_XrPose viewer_pose;
   /** The last known view matrix, calculated from above's viewer pose. */
   float viewer_viewmat[4][4];
-  /** The last known window (projection) matrix. */
-  float viewer_winmat[4][4];
-  float focal_len;
+  /** Last known eye data. */
+  wmXrEyeData eyes[2];
 
   /** Copy of XrSessionSettings.base_pose_ data to detect changes that need
    * resetting to base pose. */
@@ -65,6 +71,7 @@ typedef struct wmXrSessionState {
   bool force_reset_to_base_pose;
   bool is_view_data_set;
 
+  /** Last known controller data. */
   wmXrControllerData controllers[2];
 
   struct GHash *action_sets; /* wmXrActionSet */
@@ -150,6 +157,7 @@ void wm_xr_session_draw_data_update(const wmXrSessionState *state,
 void wm_xr_session_state_update(const XrSessionSettings *settings,
                                 const wmXrDrawData *draw_data,
                                 const GHOST_XrDrawViewInfo *draw_view,
+                                const float viewmat[4][4],
                                 const float winmat[4][4],
                                 wmXrSessionState *state);
 bool wm_xr_session_surface_offscreen_ensure(wmXrSurfaceData *surface_data,
