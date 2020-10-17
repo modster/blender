@@ -347,15 +347,13 @@ void create_readers(const pxr::UsdPrim &prim,
     return;
   }
 
-  std::string prim_path = prim.GetPath().GetString();
-
   bool is_root = prim.GetTypeName().IsEmpty();
 
   std::vector<UsdObjectReader *> child_readers;
 
   /* Recursively create readers for the child prims. */
   pxr::UsdPrimSiblingRange child_prims = prim.GetFilteredChildren(
-      pxr::UsdTraverseInstanceProxies(pxr::UsdPrimAllPrimsPredicate));
+      pxr::UsdTraverseInstanceProxies(pxr::UsdPrimDefaultPredicate));
 
   for (const pxr::UsdPrim &child_prim : child_prims) {
     create_readers(child_prim, context, r_readers, child_readers);
