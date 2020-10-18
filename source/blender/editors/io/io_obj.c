@@ -68,11 +68,7 @@ const EnumPropertyItem io_obj_transform_axis_up[] = {
     {0, NULL, 0, NULL, NULL}};
 
 const EnumPropertyItem io_obj_export_evaluation_mode[] = {
-    {DAG_EVAL_RENDER,
-     "DAG_EVAL_RENDER",
-     0,
-     "Render",
-     "Export objects as they appear in render"},
+    {DAG_EVAL_RENDER, "DAG_EVAL_RENDER", 0, "Render", "Export objects as they appear in render"},
     {DAG_EVAL_VIEWPORT,
      "DAG_EVAL_VIEWPORT",
      0,
