@@ -107,7 +107,6 @@ class OBJMesh : NonMovable, NonCopyable {
   void ensure_mesh_edges() const;
 
   void calc_smooth_groups(const bool use_bitflags);
-  int tot_smooth_groups() const;
   int ith_smooth_group(const int poly_index) const;
   bool is_ith_poly_smooth(const int poly_index) const;
 

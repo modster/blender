@@ -173,16 +173,6 @@ int16_t OBJMesh::tot_materials() const
 }
 
 /**
- * Total smooth groups in the object to export.
- */
-int OBJMesh::tot_smooth_groups() const
-{
-  /* Calculate smooth groups first: `OBJMesh::calc_smooth_groups`. */
-  BLI_assert(tot_smooth_groups_ != NEGATIVE_INIT);
-  return tot_smooth_groups_;
-}
-
-/**
  * \return Smooth group of the polygon at the given index.
  */
 int OBJMesh::ith_smooth_group(const int poly_index) const
