@@ -52,10 +52,10 @@ typedef enum {
 const int TOTAL_AXES = 3;
 
 struct OBJExportParams {
-  /** Full path to the destination OBJ file to export. */
+  /** Full path to the destination .OBJ file. */
   char filepath[FILE_MAX];
 
-  /** Whether export multiple frames. */
+  /** Whether multiple frames should be exported. */
   bool export_animation;
   /** The first frame to be exported. */
   int start_frame;
@@ -85,7 +85,7 @@ struct OBJExportParams {
    */
   bool export_smooth_groups;
   /**
-   * If true, generate bitflags for smooth groups' IDs.
+   * Create bitflags instead of the default "0"/"1" group IDs.
    */
   bool smooth_groups_bitflags;
 };

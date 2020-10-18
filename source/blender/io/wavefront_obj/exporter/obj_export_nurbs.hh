@@ -31,9 +31,9 @@ namespace blender::io::obj {
 
 /**
  * Provides access to the a Curve Object's properties.
- * Only `CU_NURBS` type is supported.
+ * Only #CU_NURBS type is supported.
  *
- * \note Used for Curves which will be exported in parameter form, and not converted to meshes.
+ * \note Used for Curves to be exported in parameter form, not converted to meshes.
  */
 class OBJCurve : NonMovable, NonCopyable {
  private:
@@ -42,18 +42,16 @@ class OBJCurve : NonMovable, NonCopyable {
   float world_axes_transform_[4][4];
 
  public:
-  OBJCurve(const Depsgraph *depsgraph,
-           const OBJExportParams &export_params,
-           Object *export_object);
+  OBJCurve(const Depsgraph *depsgraph, const OBJExportParams &export_params, Object *curve_object);
 
   const char *get_curve_name() const;
   int tot_nurbs() const;
-  int get_nurbs_points(const int index) const;
-  float3 calc_nurbs_point_coords(const int index,
-                                 const int vert_index,
-                                 const float scaling_factor) const;
-  int get_nurbs_num(const int index) const;
-  int get_nurbs_degree(const int index) const;
+  int get_nurbs_points(const int nurb_index) const;
+  float3 get_nurbs_point_coords(const int nurb_index,
+                                const int vert_index,
+                                const float scaling_factor) const;
+  int get_nurbs_num(const int nurb_index) const;
+  int get_nurbs_degree(const int nurb_index) const;
 
  private:
   void set_world_axes_transform(const eTransformAxisForward forward, const eTransformAxisUp up);

@@ -34,28 +34,27 @@
 namespace blender::io::obj {
 OBJCurve::OBJCurve(const Depsgraph *depsgraph,
                    const OBJExportParams &export_params,
-                   Object *export_object)
-    : export_object_eval_(export_object)
+                   Object *curve_object)
+    : export_object_eval_(curve_object)
 {
-  export_object_eval_ = DEG_get_evaluated_object(depsgraph, export_object);
+  export_object_eval_ = DEG_get_evaluated_object(depsgraph, curve_object);
   export_curve_ = static_cast<Curve *>(export_object_eval_->data);
   set_world_axes_transform(export_params.forward_axis, export_params.up_axis);
 }
 
 /**
- * Store the product of export axes settings and an object's world transform
- * matrix.
+ * Set the final transform after applying axes settings and an Object's world transform.
  */
 void OBJCurve::set_world_axes_transform(const eTransformAxisForward forward,
                                         const eTransformAxisUp up)
 {
   float axes_transform[3][3];
   unit_m3(axes_transform);
-  /* -Y-forward and +Z-up are the default Blender axis settings. */
+  /* -Y-forward and +Z-up are the Blender's default axis settings. */
   mat3_from_axis_conversion(
       OBJ_AXIS_NEGATIVE_Y_FORWARD, OBJ_AXIS_Z_UP, forward, up, axes_transform);
   mul_m4_m3m4(world_axes_transform_, axes_transform, export_object_eval_->obmat);
-  /* mul_m4_m3m4 does not copy last row of obmat, i.e. location data. */
+  /* #mul_m4_m3m4 does not copy last row of #Object.obmat, i.e. location data. */
   copy_v4_v4(world_axes_transform_[3], export_object_eval_->obmat[3]);
 }
 
@@ -69,20 +68,20 @@ int OBJCurve::tot_nurbs() const
   return BLI_listbase_count(&export_curve_->nurb);
 }
 
-int OBJCurve::get_nurbs_points(const int index) const
+int OBJCurve::get_nurbs_points(const int nurb_index) const
 {
-  const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, index));
+  const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, nurb_index));
   return nurb->pntsu * nurb->pntsv;
 }
 
 /**
- * Get coordinates of a vertex at the given index.
+ * Get coordinates of the vertex at the given index.
  */
-float3 OBJCurve::calc_nurbs_point_coords(const int index,
-                                         const int vert_index,
-                                         const float scaling_factor) const
+float3 OBJCurve::get_nurbs_point_coords(const int nurb_index,
+                                        const int vert_index,
+                                        const float scaling_factor) const
 {
-  const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, index));
+  const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, nurb_index));
   float3 r_coord;
   const BPoint &bpoint = nurb->bp[vert_index];
   copy_v3_v3(r_coord, bpoint.vec);
@@ -92,26 +91,27 @@ float3 OBJCurve::calc_nurbs_point_coords(const int index,
 }
 
 /**
- * Get number of control points of the Nurb at the given index.
+ * Get total control points of the NURBS Curve at the given index.
  */
-int OBJCurve::get_nurbs_num(const int index) const
+int OBJCurve::get_nurbs_num(const int nurb_index) const
 {
-  const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, index));
+  const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, nurb_index));
   const int r_nurbs_degree = nurb->orderu - 1;
-  /* Number of points in the curve + (degree of the curve if it is cyclic). */
-  int r_control_points = nurb->pntsv * nurb->pntsu;
+  /* Total control points = Number of points in the curve (+ degree of the
+   * curve if it is cyclic). */
+  int r_tot_control_points = nurb->pntsv * nurb->pntsu;
   if (nurb->flagu & CU_NURB_CYCLIC) {
-    r_control_points += r_nurbs_degree;
+    r_tot_control_points += r_nurbs_degree;
   }
-  return r_control_points;
+  return r_tot_control_points;
 }
 
 /**
- * Get the degree of the Nurb at the given index.
+ * Get the degree of the NURBS Curve at the given index.
  */
-int OBJCurve::get_nurbs_degree(const int index) const
+int OBJCurve::get_nurbs_degree(const int nurb_index) const
 {
-  const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, index));
+  const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, nurb_index));
   return nurb->orderu - 1;
 }
 

@@ -45,7 +45,7 @@ const int NOT_FOUND = -1;
 const int NEGATIVE_INIT = -10;
 
 /**
- * std::unique_ptr deleter for BMesh.
+ * #std::unique_ptr deleter for BMesh.
  */
 struct CustomBMeshDeleter {
   void operator()(BMesh *bmesh)
@@ -63,13 +63,12 @@ class OBJMesh : NonMovable, NonCopyable {
   Object *export_object_eval_;
   Mesh *export_mesh_eval_;
   /**
-   * For curves which are converted to mesh, and triangulated meshes, a new mesh is allocated
-   * which needs to be freed later.
+   * For curves which are converted to mesh, and triangulated meshes, a new mesh is allocated.
    */
   bool mesh_eval_needs_free_ = false;
   /**
-   * Final transform of an object obtained from export settings (up_axis, forward_axis) and world
-   * transform matrix.
+   * Final transform of an object obtained from export settings (up_axis, forward_axis) and the
+   * object's world transform matrix.
    */
   float world_and_axes_transform_[4][4];
 
@@ -78,7 +77,7 @@ class OBJMesh : NonMovable, NonCopyable {
    */
   int tot_uv_vertices_ = 0;
   /**
-   * Per face per vertex UV vertex indices. Make sure to fill them while writing UV coordinates.
+   * Per-polygon-per-vertex UV vertex indices.
    */
   Vector<Vector<int>> uv_indices_;
   /**
@@ -91,7 +90,7 @@ class OBJMesh : NonMovable, NonCopyable {
   int *poly_smooth_groups_ = nullptr;
 
  public:
-  OBJMesh(Depsgraph *depsgraph, const OBJExportParams &export_params, Object *export_object);
+  OBJMesh(Depsgraph *depsgraph, const OBJExportParams &export_params, Object *mesh_object);
   ~OBJMesh();
 
   int tot_vertices() const;
@@ -122,7 +121,7 @@ class OBJMesh : NonMovable, NonCopyable {
   float3 calc_poly_normal(const int poly_index) const;
   int calc_poly_normal_indices(const int poly_index,
                                const int object_tot_prev_normals,
-                               Vector<int> &r_face_normal_indices) const;
+                               Vector<int> &r_poly_normal_indices) const;
   void calc_loop_normals(const int poly_index, Vector<float3> &r_loop_normals) const;
   int16_t get_poly_deform_group_index(const int poly_index) const;
   const char *get_poly_deform_group_name(const int16_t def_group_index) const;

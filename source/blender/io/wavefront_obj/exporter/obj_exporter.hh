@@ -27,8 +27,8 @@
 
 namespace blender::io::obj {
 /**
- * Behaves like `std::unique_ptr<Depsgraph, <custom_deleter>>`.
- * Needed to free a new Depsgraph created for `DAG_EVAL_RENDER`.
+ * Behaves like `std::unique_ptr<Depsgraph, custom_deleter>`.
+ * Needed to free a new Depsgraph created for #DAG_EVAL_RENDER.
  */
 class OBJDepsgraph {
  private:

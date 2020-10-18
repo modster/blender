@@ -50,7 +50,7 @@ struct tex_map_XX {
 };
 
 /**
- * Container suited for storing Material data for/from a MTL file.
+ * Container suited for storing Material data for/from a .MTL file.
  */
 struct MTLMaterial {
   MTLMaterial()
@@ -65,8 +65,8 @@ struct MTLMaterial {
   }
 
   /**
-   * Return a reference to the texture map corresponding to the given ID
-   * Caller must ensure that the lookup key given exists in the Map.
+   * Caller must ensure that the given lookup key exists in the Map.
+   * \return Texture map corresponding to the given ID.
    */
   tex_map_XX &tex_map_of_type(StringRef map_string)
   {
@@ -88,12 +88,12 @@ struct MTLMaterial {
   float d{-1.0f};
   int illum{-1};
   Map<const std::string, tex_map_XX> texture_maps;
-  /** Only used for Normal Map node: map_Bump. */
+  /** Only used for Normal Map node: "map_Bump". */
   float map_Bump_strength{-1.0f};
 };
 
 /**
- * Get an Object's material properties from `Material` as well as `bNodeTree`.
+ * Get an Object's material properties from #Object.Material as well as #bNodeTree.
  */
 class MaterialWrap {
  private:

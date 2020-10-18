@@ -48,12 +48,12 @@ const char *DEFORM_GROUP_DISABLED = "off";
 
 /* "Once a material is assigned, it cannot be turned off; it can only be changed.
  * If a material name is not specified, a white material is used."
- * So we specify an empty material name.
- * http://www.martinreddy.net/gfx/3d/OBJ.spec */
+ * http://www.martinreddy.net/gfx/3d/OBJ.spec
+ * So an empty material name is written. */
 const char *MATERIAL_GROUP_DISABLED = "";
 
 /**
- * Write one line of polygon indices as f v1/vt1/vn1 v2/vt2/vn2 ... .
+ * Write one line of polygon indices as "f v1/vt1/vn1 v2/vt2/vn2 ...".
  */
 void OBJWriter::write_vert_uv_normal_indices(Span<int> vert_indices,
                                              Span<int> uv_indices,
@@ -73,7 +73,7 @@ void OBJWriter::write_vert_uv_normal_indices(Span<int> vert_indices,
 }
 
 /**
- * Write one line of polygon indices as f v1//vn1 v2//vn2 ... .
+ * Write one line of polygon indices as "f v1//vn1 v2//vn2 ...".
  */
 void OBJWriter::write_vert_normal_indices(Span<int> vert_indices,
                                           Span<int> /*uv_indices*/,
@@ -91,7 +91,7 @@ void OBJWriter::write_vert_normal_indices(Span<int> vert_indices,
 }
 
 /**
- * Write one line of polygon indices as f v1/vt1 v2/vt2 ... .
+ * Write one line of polygon indices as "f v1/vt1 v2/vt2 ...".
  */
 void OBJWriter::write_vert_uv_indices(Span<int> vert_indices,
                                       Span<int> uv_indices,
@@ -109,7 +109,7 @@ void OBJWriter::write_vert_uv_indices(Span<int> vert_indices,
 }
 
 /**
- *  Write one line of polygon indices as f v1 v2 ... .
+ * Write one line of polygon indices as "f v1 v2 ...".
  */
 void OBJWriter::write_vert_indices(Span<int> vert_indices,
                                    Span<int> /*uv_indices*/,
@@ -131,7 +131,7 @@ OBJWriter::~OBJWriter()
 }
 
 /**
- * Try to open the OBJ file and write file header.
+ * Try to open the .OBJ file and write file header.
  * \return Whether the destination file is writable.
  */
 bool OBJWriter::init_writer(const char *filepath)
@@ -146,11 +146,11 @@ bool OBJWriter::init_writer(const char *filepath)
 }
 
 /**
- * Write file name of Material Library in OBJ file.
+ * Write file name of Material Library in .OBJ file.
  */
 void OBJWriter::write_mtllib_name(const char *mtl_filepath) const
 {
-  /* Split MTL file path into parent directory and filename. */
+  /* Split .MTL file path into parent directory and filename. */
   char mtl_file_name[FILE_MAXFILE];
   char mtl_dir_name[FILE_MAXDIR];
   BLI_split_dirfile(mtl_filepath, mtl_dir_name, mtl_file_name, FILE_MAXDIR, FILE_MAXFILE);
@@ -158,13 +158,12 @@ void OBJWriter::write_mtllib_name(const char *mtl_filepath) const
 }
 
 /**
- * Write an Object's group with mesh and/or material name appended conditionally.
+ * Write an object's group with mesh and/or material name appended conditionally.
  */
 void OBJWriter::write_object_group(const OBJMesh &obj_mesh_data) const
 {
-  /* "o object_name" is not mandatory. A valid OBJ file may not contain "o name" and not
-   * "g group_name" either. http://www.martinreddy.net/gfx/3d/OBJ.spec
-   */
+  /* "o object_name" is not mandatory. A valid .OBJ file may contain neither
+   * "o name" nor "g group_name". */
   BLI_assert(export_params_.export_object_groups);
   if (!export_params_.export_object_groups) {
     return;
@@ -181,7 +180,7 @@ void OBJWriter::write_object_group(const OBJMesh &obj_mesh_data) const
 }
 
 /**
- * Write object name or group, if specified.
+ * Write object's name or group.
  */
 void OBJWriter::write_object_name(const OBJMesh &obj_mesh_data) const
 {
@@ -194,7 +193,7 @@ void OBJWriter::write_object_name(const OBJMesh &obj_mesh_data) const
 }
 
 /**
- * Write vertex coordinates for all vertices as v x y z .
+ * Write vertex coordinates for all vertices as "v x y z".
  */
 void OBJWriter::write_vertex_coords(const OBJMesh &obj_mesh_data) const
 {
@@ -206,7 +205,7 @@ void OBJWriter::write_vertex_coords(const OBJMesh &obj_mesh_data) const
 }
 
 /**
- * Write UV vertex coordinates for all vertices as vt u v .
+ * Write UV vertex coordinates for all vertices as "vt u v".
  * \note UV indices are stored here, but written later.
  */
 void OBJWriter::write_uv_coords(OBJMesh &obj_mesh_data) const
@@ -243,8 +242,7 @@ void OBJWriter::write_poly_normals(OBJMesh &obj_mesh_data) const
 }
 
 /**
- * Write smooth group if the polygon at given index is shaded smooth and export settings specify
- * so. If the polygon is not shaded smooth, write "0".
+ * Write smooth group if polygon at the given index is shaded smooth else "s 0"
  */
 void OBJWriter::write_smooth_group(const OBJMesh &obj_mesh_data,
                                    const int poly_index,
@@ -252,11 +250,11 @@ void OBJWriter::write_smooth_group(const OBJMesh &obj_mesh_data,
 {
   int current_group = SMOOTH_GROUP_DISABLED;
   if (!export_params_.export_smooth_groups && obj_mesh_data.is_ith_poly_smooth(poly_index)) {
-    /* Smooth group calculation is disabled, but face is smooth. */
+    /* Smooth group calculation is disabled, but polygon is smooth-shaded. */
     current_group = SMOOTH_GROUP_DEFAULT;
   }
   else if (obj_mesh_data.is_ith_poly_smooth(poly_index)) {
-    /* Smooth group calc enabled and face is smooth and so find the group. */
+    /* Smooth group calc is enabled and polygon is smooth–shaded, so find the group. */
     current_group = obj_mesh_data.ith_smooth_group(poly_index);
   }
 
@@ -269,7 +267,7 @@ void OBJWriter::write_smooth_group(const OBJMesh &obj_mesh_data,
 }
 
 /**
- * Write material name and material group of a face in the OBJ file.
+ * Write material name and material group of a polygon in the .OBJ file.
  * \note It doesn't write to the material library.
  */
 void OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
@@ -280,8 +278,8 @@ void OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
     return;
   }
   const int16_t curr_mat_nr = obj_mesh_data.ith_poly_matnr(poly_index);
-  /* Whenever a face with a new material is encountered, write its material and/or group, otherwise
-   * pass. */
+  /* Whenever a face with a new material is encountered, write its material
+   * and/or group, otherwise pass. */
   if (r_last_face_mat_nr == curr_mat_nr) {
     return;
   }
@@ -322,7 +320,7 @@ void OBJWriter::write_vertex_group(const OBJMesh &obj_mesh_data,
 }
 
 /**
- * Select which OBJ syntax to write polygon elements with.
+ * \return Writer function with appropriate polygon-element syntax.
  */
 OBJWriter::func_vert_uv_normal_indices OBJWriter::get_poly_element_writer(
     const OBJMesh &obj_mesh_data)
@@ -344,9 +342,9 @@ OBJWriter::func_vert_uv_normal_indices OBJWriter::get_poly_element_writer(
 }
 
 /**
- * Define and write face elements with at least vertex indices, and conditionally with UV vertex
+ * Write face elements with at least vertex indices, and conditionally with UV vertex
  * indices and face normal indices. Also write groups: smooth, vertex, material.
- *  \note UV indices are stored while writing UV vertices.
+ * \note UV indices were stored while writing UV vertices.
  */
 void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
 {
@@ -379,7 +377,7 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
 }
 
 /**
- * Write loose edges of a mesh as l v1 v2 .
+ * Write loose edges of a mesh as "l v1 v2".
  */
 void OBJWriter::write_edges_indices(const OBJMesh &obj_mesh_data) const
 {
@@ -399,7 +397,7 @@ void OBJWriter::write_edges_indices(const OBJMesh &obj_mesh_data) const
 }
 
 /**
- * Write a NURBS curve to the OBJ file in parameter form.
+ * Write a NURBS curve to the .OBJ file in parameter form.
  */
 void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
 {
@@ -408,7 +406,7 @@ void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
     /* Total control points in a nurbs. */
     const int tot_points = obj_nurbs_data.get_nurbs_points(i);
     for (int point_idx = 0; point_idx < tot_points; point_idx++) {
-      const float3 point_coord = obj_nurbs_data.calc_nurbs_point_coords(
+      const float3 point_coord = obj_nurbs_data.get_nurbs_point_coords(
           i, point_idx, export_params_.scaling_factor);
       fprintf(outfile_, "v %f %f %f\n", point_coord[0], point_coord[1], point_coord[2]);
     }
@@ -453,7 +451,6 @@ void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
 /**
  * When there are multiple objects in a frame, the indices of previous objects' coordinates or
  * normals add up.
- * Make sure to call this after an Object is exported.
  */
 void OBJWriter::update_index_offsets(const OBJMesh &obj_mesh_data)
 {
@@ -463,12 +460,12 @@ void OBJWriter::update_index_offsets(const OBJMesh &obj_mesh_data)
 }
 
 /* -------------------------------------------------------------------- */
-/** \name MTL writers.
+/** \name .MTL writers.
  * \{ */
 
 /**
- * Converts float3 to space-separated number string with no leading or trailing space.
- * Only to be used in NON performance-critical code.
+ * Convert #float3 to string of space-separated numbers, with no leading or trailing space.
+ * Only to be used in NON-performance-critical code.
  */
 static std::string float3_to_string(const float3 &numbers)
 {
@@ -478,7 +475,7 @@ static std::string float3_to_string(const float3 &numbers)
 };
 
 /**
- * Open the MTL file in append mode.
+ * Open the .MTL file in append mode.
  */
 MTLWriter::MTLWriter(const char *obj_filepath)
 {
@@ -502,7 +499,7 @@ MTLWriter::~MTLWriter()
 }
 
 /**
- * \return if the MTL file is writable.
+ * \return If the .MTL file is writable.
  */
 bool MTLWriter::good() const
 {
@@ -516,7 +513,7 @@ const char *MTLWriter::mtl_file_path() const
 }
 
 /**
- * Write properties sourced from p-BSDF node or `Object.Material`.
+ * Write properties sourced from p-BSDF node or #Object.Material.
  */
 void MTLWriter::write_bsdf_properties(const MTLMaterial &mtl_material)
 {
@@ -536,7 +533,7 @@ void MTLWriter::write_bsdf_properties(const MTLMaterial &mtl_material)
 }
 
 /**
- * Write a texture map in the form "map_XX -s 1 1 1 -o 0 0 0 -bm 1 path/to/image" .
+ * Write a texture map in the form "map_XX -s 1 1 1 -o 0 0 0 -bm 1 path/to/image".
  */
 void MTLWriter::write_texture_map(const MTLMaterial &mtl_material,
                                   const Map<const std::string, tex_map_XX>::Item &texture_map)
@@ -555,7 +552,7 @@ void MTLWriter::write_texture_map(const MTLMaterial &mtl_material,
     map_bump_strength.append(" -bm ").append(std::to_string(mtl_material.map_Bump_strength));
   }
 
-  /* Always keep only one space between options since filepaths may have leading spaces too. */
+  /* Keep only one space between options since filepaths may have leading spaces too. */
   fprintf(mtl_outfile_,
           "%s%s%s%s %s\n",
           texture_map.key.c_str(),
@@ -566,7 +563,7 @@ void MTLWriter::write_texture_map(const MTLMaterial &mtl_material,
 }
 
 /**
- * Append the `Material`(s) of the given Object to the MTL file.
+ * Append the materials of the given object to the .MTL file.
  */
 void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
 {

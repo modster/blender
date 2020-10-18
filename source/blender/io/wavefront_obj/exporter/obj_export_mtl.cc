@@ -42,14 +42,14 @@ namespace blender::io::obj {
  * Copy a float property of the given type from the bNode to given buffer.
  */
 static void copy_property_from_node(const eNodeSocketDatatype property_type,
-                                    const bNode *curr_node,
+                                    const bNode *node,
                                     const char *identifier,
                                     MutableSpan<float> r_property)
 {
-  if (!curr_node) {
+  if (!node) {
     return;
   }
-  bNodeSocket *socket{nodeFindSocket(curr_node, SOCK_IN, identifier)};
+  bNodeSocket *socket{nodeFindSocket(node, SOCK_IN, identifier)};
   BLI_assert(socket && socket->type == property_type);
   if (!socket) {
     return;
@@ -145,11 +145,11 @@ static const char *get_image_filepath(const bNode *tex_node)
   }
   const char *path = tex_image->filepath;
   if (BKE_image_has_packedfile(tex_image)) {
-    /* Put image in the same directory as the MTL file. */
+    /* Put image in the same directory as the .MTL file. */
     path = BLI_path_slash_rfind(path) + 1;
     fprintf(stderr,
             "Packed image found:'%s'. Unpack and place the image in the same "
-            "directory as the MTL file.\n",
+            "directory as the .MTL file.\n",
             path);
   }
   if (path[0] == '/' && path[1] == '/') {
@@ -159,7 +159,7 @@ static const char *get_image_filepath(const bNode *tex_node)
 }
 
 /**
- * Find the Principled-BSDF from the object's node tree & initialize class member.
+ * Find the Principled-BSDF in the object's node tree.
  */
 void MaterialWrap::init_bsdf_node(StringRefNull object_name)
 {
@@ -184,14 +184,14 @@ void MaterialWrap::init_bsdf_node(StringRefNull object_name)
 }
 
 /**
- * Store properties found either in p-BSDF node or `Material` of the object.
+ * Store properties found either in p-BSDF node or #Object.Material.
  */
 void MaterialWrap::store_bsdf_properties(MTLMaterial &r_mtl_mat) const
 {
   /* Emperical approximation. Importer should use the inverse of this method. */
   float spec_exponent = (1.0f - export_mtl_->roughness) * 30;
   spec_exponent *= spec_exponent;
-  /* If p-BSDF is not present, fallback to `Material *` of the object. */
+  /* If p-BSDF is not present, fallback to #Object.Material. */
   float specular = export_mtl_->spec;
   copy_property_from_node(SOCK_FLOAT, bsdf_node_, "Specular", {&specular, 1});
   float metallic = export_mtl_->metallic;
@@ -200,7 +200,7 @@ void MaterialWrap::store_bsdf_properties(MTLMaterial &r_mtl_mat) const
   copy_property_from_node(SOCK_FLOAT, bsdf_node_, "IOR", {&refraction_index, 1});
   float dissolved = export_mtl_->a;
   copy_property_from_node(SOCK_FLOAT, bsdf_node_, "Alpha", {&dissolved, 1});
-  bool transparent = dissolved != 1.0f;
+  const bool transparent = dissolved != 1.0f;
 
   float3 diffuse_col = {export_mtl_->r, export_mtl_->g, export_mtl_->b};
   copy_property_from_node(SOCK_RGBA, bsdf_node_, "Base Color", {diffuse_col, 3});
@@ -251,7 +251,7 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
     /* No nodetree, no images. */
     return;
   }
-  /* Need to create a NodeTreeRef for a faster way to find linked sockets, as opposed to
+  /* Need to create a #NodeTreeRef for a faster way to find linked sockets, as opposed to
    * looping over all the links in a node tree to match two sockets of our interest. */
   nodes::NodeTreeRef node_tree(export_mtl_->nodetree);
 
@@ -321,7 +321,7 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
 }
 
 /**
- * Fill the given buffer with MTL material containers.
+ * Get the Material data of an Object, for an .MTL file.
  */
 void MaterialWrap::fill_materials(const OBJMesh &obj_mesh_data,
                                   Vector<MTLMaterial> &r_mtl_materials)
