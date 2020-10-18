@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "BLI_utility_mixins.hh"
+
 #include "IO_wavefront_obj.h"
 
 namespace blender::io::obj {
@@ -30,7 +32,7 @@ namespace blender::io::obj {
  * Behaves like `std::unique_ptr<Depsgraph, custom_deleter>`.
  * Needed to free a new Depsgraph created for #DAG_EVAL_RENDER.
  */
-class OBJDepsgraph {
+class OBJDepsgraph : NonMovable, NonCopyable {
  private:
   Depsgraph *depsgraph_ = nullptr;
   bool needs_free_ = false;

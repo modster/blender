@@ -493,8 +493,8 @@ MTLWriter::MTLWriter(const char *obj_filepath)
 MTLWriter::~MTLWriter()
 {
   if (mtl_outfile_ && fclose(mtl_outfile_)) {
-    std::cerr << "Error: could not close the MTL file properly, file may be corrupted."
-              << std::endl;
+    std::cerr << "Error: could not close the '" << mtl_file_path()
+              << "' file properly, it may be corrupted." << std::endl;
   }
 }
 

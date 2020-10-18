@@ -46,12 +46,12 @@ struct IndexOffsets {
 /**
  * Responsible for writing a .OBJ file.
  */
-class OBJWriter {
+class OBJWriter : NonMovable, NonCopyable {
  private:
   /**
    * Destination .OBJ file.
    */
-  FILE *outfile_;
+  FILE *outfile_ = nullptr;
   const OBJExportParams &export_params_;
 
   IndexOffsets index_offsets_{0, 0, 0};
@@ -108,7 +108,7 @@ class OBJWriter {
 /**
  * Responsible for writing a .MTL file.
  */
-class MTLWriter {
+class MTLWriter : NonMovable, NonCopyable {
  private:
   char mtl_filepath_[FILE_MAX];
   FILE *mtl_outfile_;
