@@ -77,8 +77,7 @@ void OBJDepsgraph::update_for_newframe()
 }
 
 /**
- * Filter `Object`s in a Scene to find supported objects, as per export settings and object types,
- * and add them to the given containers.
+ * Filter supported objects from the Scene.
  *
  * \note Curves are also stored with Meshes if export settings specify so.
  */
@@ -87,8 +86,8 @@ static void find_exportable_objects(Depsgraph *depsgraph,
                                     Vector<std::unique_ptr<OBJMesh>> &r_exportable_meshes,
                                     Vector<std::unique_ptr<OBJCurve>> &r_exportable_nurbs)
 {
-  ViewLayer *view_layer = DEG_get_input_view_layer(depsgraph);
-  LISTBASE_FOREACH (Base *, base, &view_layer->object_bases) {
+  const ViewLayer *view_layer = DEG_get_input_view_layer(depsgraph);
+  LISTBASE_FOREACH (const Base *, base, &view_layer->object_bases) {
     Object *object_in_layer = base->object;
     if (export_params.export_selected_objects && !(object_in_layer->base_flag & BASE_SELECTED)) {
       continue;
@@ -139,34 +138,21 @@ static void find_exportable_objects(Depsgraph *depsgraph,
   }
 }
 
-/**
- * Exports a single frame to an OBJ and MTL (conditional) pair.
- */
-static void export_frame(Depsgraph *depsgraph,
-                         const OBJExportParams &export_params,
-                         const char *filepath)
+static void write_mesh_object(Vector<std::unique_ptr<OBJMesh>> exportable_as_mesh,
+                              OBJWriter &frame_writer,
+                              const OBJExportParams &export_params)
 {
-  OBJWriter frame_writer(export_params);
-  if (!frame_writer.init_writer(filepath)) {
-    return;
-  }
   std::unique_ptr<MTLWriter> mtl_writer = nullptr;
-
-  /* Meshes, and curves to be exported in mesh form. */
-  Vector<std::unique_ptr<OBJMesh>> exportable_as_mesh;
-  /* NURBS to be exported in parameter form. */
-  Vector<std::unique_ptr<OBJCurve>> exportable_as_nurbs;
-  find_exportable_objects(depsgraph, export_params, exportable_as_mesh, exportable_as_nurbs);
-
   if (export_params.export_materials) {
-    mtl_writer.reset(new MTLWriter(filepath));
+    mtl_writer.reset(new MTLWriter(export_params.filepath));
     if (mtl_writer->good()) {
       frame_writer.write_mtllib_name(mtl_writer->mtl_file_path());
     }
   }
+
   for (int i = 0; i < exportable_as_mesh.size(); i++) {
-    /* Smooth groups and UV vertex indices may take huge memory, so objects should be freed right
-     * after they're written, instead of waiting for Vector to clean them up. */
+    /* Smooth groups and UV vertex indices can take massive memory, so they should be freed
+     * right after they're written, instead of waiting for #blender::Vector to clean them up. */
     const std::unique_ptr<OBJMesh> mesh_to_export = std::move(exportable_as_mesh[i]);
     frame_writer.write_object_name(*mesh_to_export);
     frame_writer.write_vertex_coords(*mesh_to_export);
@@ -190,33 +176,61 @@ static void export_frame(Depsgraph *depsgraph,
 
     frame_writer.update_index_offsets(*mesh_to_export);
   }
+}
 
-  /* Export nurbs in parm form, not as vertices and edges. */
+/** Export NURBS Curves in parameter form, not as vertices and edges. */
+static void write_nurbs_curve_object(const Vector<std::unique_ptr<OBJCurve>> &exportable_as_nurbs,
+                                     const OBJWriter &frame_writer)
+{
   for (const std::unique_ptr<OBJCurve> &nurbs_to_export : exportable_as_nurbs) {
-    /* Curves don't have any dynamically allocated memory, so it's fine
-     * to wait for Vector to clean the objects up. */
+    /* #OBJCurve don't have any dynamically allocated memory, so it's fine
+     * to wait for #blender::Vector to clean the objects up. */
     frame_writer.write_nurbs_curve(*nurbs_to_export);
   }
 }
 
 /**
- * Insert the current frame number in OBJ filepath.
+ * Export a single frame to a .OBJ file.
  *
- * \return Whether the filepath is in FILE_MAX limits.
+ * Conditionally write a .MTL file also.
  */
-static bool insert_frame_in_path(const char *filepath,
-                                 const int frame,
-                                 char *r_filepath_with_frames)
+static void export_frame(Depsgraph *depsgraph,
+                         const OBJExportParams &export_params,
+                         const char *filepath)
+{
+  OBJWriter frame_writer(export_params);
+  if (!frame_writer.init_writer(filepath)) {
+    return;
+  }
+
+  /* Meshes, and curves to be exported in mesh form. */
+  Vector<std::unique_ptr<OBJMesh>> exportable_as_mesh;
+  /* NURBS to be exported in parameter form. */
+  Vector<std::unique_ptr<OBJCurve>> exportable_as_nurbs;
+  find_exportable_objects(depsgraph, export_params, exportable_as_mesh, exportable_as_nurbs);
+
+  write_mesh_object(std::move(exportable_as_mesh), frame_writer, export_params);
+  write_nurbs_curve_object(std::move(exportable_as_nurbs), frame_writer);
+}
+
+/**
+ * Append the current frame number in the .OBJ file name.
+ *
+ * \return Whether the filepath is in #FILE_MAX limits.
+ */
+static bool append_frame_to_filename(const char *filepath,
+                                     const int frame,
+                                     char *r_filepath_with_frames)
 {
   BLI_strncpy(r_filepath_with_frames, filepath, FILE_MAX);
   BLI_path_extension_replace(r_filepath_with_frames, FILE_MAX, "");
-  int digits = frame == 0 ? 1 : integer_digits_i(abs(frame));
+  const int digits = frame == 0 ? 1 : integer_digits_i(abs(frame));
   BLI_path_frame(r_filepath_with_frames, frame, digits);
   return BLI_path_extension_replace(r_filepath_with_frames, FILE_MAX, ".obj");
 }
 
 /**
- * Central internal function to call scene update & writer functions.
+ * Central internal function to call Scene update & writer functions.
  */
 void exporter_main(bContext *C, const OBJExportParams &export_params)
 {
@@ -227,7 +241,7 @@ void exporter_main(bContext *C, const OBJExportParams &export_params)
   Scene *scene = DEG_get_input_scene(obj_depsgraph.get());
   const char *filepath = export_params.filepath;
 
-  /* Single frame export, i.e. no amimation is to be exported. */
+  /* Single frame export, i.e. no animation. */
   if (!export_params.export_animation) {
     fprintf(stderr, "Writing to %s\n", filepath);
     export_frame(obj_depsgraph.get(), export_params, filepath);
@@ -235,11 +249,11 @@ void exporter_main(bContext *C, const OBJExportParams &export_params)
   }
 
   char filepath_with_frames[FILE_MAX];
-  /* Needed to reset the Scene to its original state. */
+  /* Used to reset the Scene to its original state. */
   const int original_frame = CFRA;
 
   for (int frame = export_params.start_frame; frame <= export_params.end_frame; frame++) {
-    bool filepath_ok = insert_frame_in_path(filepath, frame, filepath_with_frames);
+    const bool filepath_ok = append_frame_to_filename(filepath, frame, filepath_with_frames);
     if (!filepath_ok) {
       fprintf(stderr, "Error: File Path too long.\n%s\n", filepath_with_frames);
       return;
