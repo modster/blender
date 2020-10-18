@@ -934,7 +934,9 @@ bool WM_xr_session_state_viewer_pose_rotation_get(const wmXrData *xr, float r_ro
 bool WM_xr_session_state_viewer_pose_matrix_info_get(const wmXrData *xr,
                                                      bool from_selection_eye,
                                                      float r_viewmat[4][4],
-                                                     float *r_focal_len);
+                                                     float *r_focal_len,
+                                                     float *r_clip_start,
+                                                     float *r_clip_end);
 bool WM_xr_session_state_controller_pose_location_get(const wmXrData *xr,
                                                       unsigned int subaction_idx,
                                                       float r_location[3]);

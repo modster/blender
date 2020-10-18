@@ -2518,22 +2518,23 @@ static int view3d_select_invoke_3d(bContext *C, wmOperator *op, const wmEvent *e
   View3D *v3d = CTX_wm_view3d(C);
   ARegion *region = CTX_wm_region(C);
   RegionView3D *rv3d = region->regiondata;
+  wmWindowManager *wm = CTX_wm_manager(C);
+  wmXrData *xr = &wm->xr;
   wmXrActionData *customdata = event->customdata;
   short winx_prev, winy_prev;
   rcti winrct_prev;
   float lens_prev;
+  float clip_start_prev, clip_end_prev;
   float viewmat_prev[4][4];
-  float winmat_prev[4][4];
   int mval[2];
+  int retval;
 
-  map_to_pixel(mval,
-               customdata->controller_loc,
-               customdata->eye_viewmat,
-               customdata->eye_winmat,
-               customdata->eye_width,
-               customdata->eye_height);
-
-  RNA_int_set_array(op->ptr, "location", mval);
+#if 1
+  /* TODO_XR: Currently fails in edit mode. */
+  if (CTX_data_edit_object(C)) {
+    return OPERATOR_FINISHED;
+  }
+#endif
 
   /* Since this function is called in a window context, we need to replace the
    * window view parameters with the XR surface counterparts to get a correct
@@ -2542,25 +2543,39 @@ static int view3d_select_invoke_3d(bContext *C, wmOperator *op, const wmEvent *e
   winy_prev = region->winy;
   winrct_prev = region->winrct;
   lens_prev = v3d->lens;
+  clip_start_prev = v3d->clip_start;
+  clip_end_prev = v3d->clip_end;
   copy_m4_m4(viewmat_prev, rv3d->viewmat);
-  copy_m4_m4(winmat_prev, rv3d->winmat);
 
   region->winrct.xmin = 0;
   region->winrct.ymin = 0;
   region->winrct.xmax = region->winx = customdata->eye_width;
   region->winrct.ymax = region->winy = customdata->eye_height;
   v3d->lens = customdata->eye_lens;
+  v3d->clip_start = xr->session_settings.clip_start;
+  v3d->clip_end = xr->session_settings.clip_end;
   copy_m4_m4(rv3d->viewmat, customdata->eye_viewmat);
-  copy_m4_m4(rv3d->winmat, customdata->eye_winmat);
+  view3d_winmatrix_set(depsgraph, region, v3d, NULL);
 
-  int retval = view3d_select_exec(C, op);
+  map_to_pixel(mval,
+               customdata->controller_loc,
+               customdata->eye_viewmat,
+               rv3d->winmat,
+               customdata->eye_width,
+               customdata->eye_height);
+
+  RNA_int_set_array(op->ptr, "location", mval);
+
+  retval = view3d_select_exec(C, op);
 
   /* Restore window view. */
   region->winx = winx_prev;
   region->winy = winy_prev;
   region->winrct = winrct_prev;
   v3d->lens = lens_prev;
-  ED_view3d_update_viewmat(depsgraph, scene, v3d, region, viewmat_prev, winmat_prev, NULL, false);
+  v3d->clip_start = clip_start_prev;
+  v3d->clip_end = clip_end_prev;
+  ED_view3d_update_viewmat(depsgraph, scene, v3d, region, viewmat_prev, NULL, NULL, false);
 
   return retval;
 }

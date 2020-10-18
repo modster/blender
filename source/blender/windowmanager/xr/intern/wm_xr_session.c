@@ -400,11 +400,13 @@ bool WM_xr_session_state_viewer_pose_rotation_get(const wmXrData *xr, float r_ro
 bool WM_xr_session_state_viewer_pose_matrix_info_get(const wmXrData *xr,
                                                      bool from_selection_eye,
                                                      float r_viewmat[4][4],
-                                                     float *r_focal_len)
+                                                     float *r_focal_len,
+                                                     float *r_clip_start,
+                                                     float *r_clip_end)
 {
   if (!WM_xr_session_is_ready(xr) || !xr->runtime->session_state.is_view_data_set) {
     unit_m4(r_viewmat);
-    *r_focal_len = 0.0f;
+    *r_focal_len = *r_clip_start = *r_clip_end = 0.0f;
     return false;
   }
 
@@ -417,6 +419,8 @@ bool WM_xr_session_state_viewer_pose_matrix_info_get(const wmXrData *xr,
   }
   /* Since eye centroid does not have a focal length, just take it from selection eye. */
   *r_focal_len = eye->focal_len;
+  *r_clip_start = xr->session_settings.clip_start;
+  *r_clip_end = xr->session_settings.clip_end;
 
   return true;
 }
