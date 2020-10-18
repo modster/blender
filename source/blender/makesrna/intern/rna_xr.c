@@ -335,7 +335,7 @@ bool rna_XrSessionState_haptic_action_apply(bContext *C,
     }
   }
 
-  unsigned long long duration_msec = (unsigned long long)(duration * 1000.0f);
+  long long duration_msec = (long long)(duration * 1000.0f);
 
   return WM_xr_haptic_action_apply(&wm->xr,
                                    action_set_name,
@@ -460,16 +460,12 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
   };
 
   static const EnumPropertyItem selection_eyes[] = {
-      {XR_EYE_LEFT,
-       "EYE_LEFT",
-       0,
-       "Left Eye",
-       "Use the left eye's perspective when selecting in VR"},
+      {XR_EYE_LEFT, "EYE_LEFT", 0, "Left Eye", "Use the left eye's perspective for VR selection"},
       {XR_EYE_RIGHT,
        "EYE_RIGHT",
        0,
        "Right Eye",
-       "Use the right eye's perspective when selecting in VR"},
+       "Use the right eye's perspective for VR selection"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -538,9 +534,7 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_enum_items(prop, selection_eyes);
   RNA_def_property_ui_text(
-      prop,
-      "Selection Eye",
-      "Which eye's perspective will be used when selecting with VR controllers");
+      prop, "Selection Eye", "Which eye's perspective to use when selecting in VR");
   RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
 
   prop = RNA_def_property(srna, "clip_start", PROP_FLOAT, PROP_DISTANCE);
@@ -622,7 +616,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
                         "Action Set",
                         "Action set name (must not contain upper case letters or special "
                         "characters other than '-', '_', or '.'");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_boolean(func, "result", 0, "Result", "");
   RNA_def_function_return(func, parm);
 
@@ -632,7 +626,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action_set_name", NULL, 64, "Action Set", "Action set name");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func,
                         "name",
                         NULL,
@@ -640,22 +634,22 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
                         "Action",
                         "Action name (must not contain upper case letters or special characters "
                         "other than '-', '_', or '.'");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_enum(func, "type", action_types, 0, "Type", "Action type");
-  RNA_def_parameter_flags(parm, PROP_ENUM, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_string(func, "user_path0", NULL, 64, "User Path 0", "User path 0");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "user_path1", NULL, 64, "User Path 1", "User path 1");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "op", NULL, OP_MAX_TYPENAME, "Operator", "Operator to execute");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_enum(func,
                       "op_flag",
                       op_flags,
                       0,
                       "Operator Flag",
                       "When to execute the operator (press, release, or modal)");
-  RNA_def_parameter_flags(parm, PROP_ENUM, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_boolean(func, "result", 0, "Result", "");
   RNA_def_function_return(func, parm);
 
@@ -665,13 +659,13 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action_set_name", NULL, 64, "Action Set", "Action set name");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action_name", NULL, 64, "Action", "Action name");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "user_path0", NULL, 64, "User Path 0", "OpenXR user path 0");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "user_path1", NULL, 64, "User Path 1", "OpenXR user path 1");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_float_translation(func,
                                    "location",
                                    3,
@@ -682,7 +676,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
                                    "Location offset",
                                    -FLT_MAX,
                                    FLT_MAX);
-  RNA_def_parameter_flags(parm, PROP_FLOAT, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_float_rotation(func,
                                 "rotation",
                                 3,
@@ -693,7 +687,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
                                 "Rotation offset",
                                 -2 * M_PI,
                                 2 * M_PI);
-  RNA_def_parameter_flags(parm, PROP_FLOAT, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_boolean(func, "result", 0, "Result", "");
   RNA_def_function_return(func, parm);
 
@@ -704,25 +698,25 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action_set_name", NULL, 64, "Action Set", "Action set name");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "profile", NULL, 256, "Profile", "OpenXR interaction profile path");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action_name", NULL, 64, "Action", "Action name");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func,
                         "interaction_path0",
                         NULL,
                         256,
                         "Interaction Path 0",
                         "OpenXR interaction (user + component) path 0");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func,
                         "interaction_path1",
                         NULL,
                         256,
                         "Interaction Path 1",
                         "OpenXR interaction (user + component) path 1");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_boolean(func, "result", 0, "Result", "");
   RNA_def_function_return(func, parm);
 
@@ -733,7 +727,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action_set", NULL, 64, "Action Set", "Action set name");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_boolean(func, "result", 0, "Result", "");
   RNA_def_function_return(func, parm);
 
@@ -746,7 +740,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   parm = RNA_def_string(func, "action_set", NULL, 64, "Action Set", "Action set name");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action", NULL, 64, "Action", "Action name");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_boolean(func, "result", 0, "Result", "");
   RNA_def_function_return(func, parm);
 
@@ -756,11 +750,11 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action_set_name", NULL, 64, "Action Set", "Action set name");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action_name", NULL, 64, "Action", "Action name");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "user_path", NULL, 64, "User Path", "OpenXR user path");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_float(func,
                        "state",
                        0.0f,
@@ -770,7 +764,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
                        "Current state of the VR action",
                        -FLT_MAX,
                        FLT_MAX);
-  RNA_def_parameter_flags(parm, PROP_FLOAT, PARM_OUTPUT);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_OUTPUT);
 
   func = RNA_def_function(
       srna, "get_pose_action_state", "rna_XrSessionState_pose_action_state_get");
@@ -779,11 +773,11 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action_set_name", NULL, 64, "Action Set", "Action set name");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action_name", NULL, 64, "Action", "Action name");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "user_path", NULL, 64, "User Path", "OpenXR user path");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_float_array(func,
                              "state",
                              7,
@@ -794,7 +788,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
                              "Location + quaternion rotation",
                              -FLT_MAX,
                              FLT_MAX);
-  RNA_def_parameter_flags(parm, PROP_TRANSLATION, PARM_OUTPUT);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_OUTPUT);
 
   func = RNA_def_function(srna, "apply_haptic_action", "rna_XrSessionState_haptic_action_apply");
   RNA_def_function_ui_description(func, "Apply a VR haptic action");
@@ -802,13 +796,13 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action_set_name", NULL, 64, "Action Set", "Action set name");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "action_name", NULL, 64, "Action", "Action name");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "user_path0", NULL, 64, "User Path 0", "OpenXR user path 0");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "user_path1", NULL, 64, "User Path 1", "OpenXR user path 1");
-  RNA_def_parameter_flags(parm, PROP_STRING, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_float(func,
                        "duration",
                        0.0f,
@@ -818,7 +812,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
                        "Haptic duration in seconds, 0 = minimum supported duration",
                        0.0f,
                        FLT_MAX);
-  RNA_def_parameter_flags(parm, PROP_FLOAT, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_float(func,
                        "frequency",
                        0.0f,
@@ -828,10 +822,10 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
                        "Haptic frequency, 0 = default frequency",
                        0.0f,
                        FLT_MAX);
-  RNA_def_parameter_flags(parm, PROP_FLOAT, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_float(
       func, "amplitude", 1.0f, 0.0f, 1.0f, "Amplitude", "Haptic amplitude (0 ~ 1)", 0.0f, 1.0f);
-  RNA_def_parameter_flags(parm, PROP_FLOAT, PARM_REQUIRED);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_boolean(func, "result", 0, "Result", "");
   RNA_def_function_return(func, parm);
 

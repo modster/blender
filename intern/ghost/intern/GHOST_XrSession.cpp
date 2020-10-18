@@ -1242,7 +1242,7 @@ bool GHOST_XrSession::applyHapticAction(const char *action_set_name,
                                         const char *action_name,
                                         uint32_t count,
                                         const char *const *subaction_paths,
-                                        const int64_t *duration,
+                                        const GHOST_TInt64 *duration,
                                         const float *frequency,
                                         const float *amplitude)
 {
@@ -1260,7 +1260,8 @@ bool GHOST_XrSession::applyHapticAction(const char *action_set_name,
   XrSession &session = m_oxr->session;
 
   XrHapticVibration vibration{XR_TYPE_HAPTIC_VIBRATION};
-  vibration.duration = (*duration == 0) ? XR_MIN_HAPTIC_DURATION : *duration;
+  vibration.duration = (*duration == 0) ? XR_MIN_HAPTIC_DURATION :
+                                          static_cast<XrDuration>(*duration);
   vibration.frequency = *frequency;
   vibration.amplitude = *amplitude;
 

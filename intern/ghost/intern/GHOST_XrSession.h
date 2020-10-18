@@ -85,7 +85,7 @@ class GHOST_XrSession {
                          const char *action_name,
                          uint32_t count,
                          const char *const *subaction_paths,
-                         const int64_t *duration,
+                         const GHOST_TInt64 *duration,
                          const float *frequency,
                          const float *amplitude);
   void stopHapticAction(const char *action_set_name,

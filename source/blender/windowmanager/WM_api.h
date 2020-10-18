@@ -986,7 +986,7 @@ bool WM_xr_haptic_action_apply(wmXrData *xr,
                                const char *action_name,
                                unsigned int count,
                                const char *const *subaction_paths,
-                               const unsigned long long *duration,
+                               const long long *duration,
                                const float *frequency,
                                const float *amplitude);
 void WM_xr_haptic_action_stop(wmXrData *xr,

@@ -57,8 +57,10 @@ static wmXrActionSet *action_set_create(const GHOST_XrActionSetInfo *info)
   return action_set;
 }
 
-static void action_set_destroy(wmXrActionSet *action_set)
+static void action_set_destroy(void *val)
 {
+  wmXrActionSet *action_set = val;
+
   if (action_set->name) {
     MEM_freeN(action_set->name);
   }
@@ -119,11 +121,9 @@ static wmXrAction *action_create(const GHOST_XrActionInfo *info)
   return action;
 }
 
-static void action_destroy(wmXrAction *action)
+static void action_destroy(void *val)
 {
-  if (!action) {
-    return;
-  }
+  wmXrAction *action = val;
 
   if (action->name) {
     MEM_freeN(action->name);
@@ -424,7 +424,7 @@ bool WM_xr_haptic_action_apply(wmXrData *xr,
                                const char *action_name,
                                unsigned int count,
                                const char *const *subaction_paths,
-                               const unsigned long long *duration,
+                               const long long *duration,
                                const float *frequency,
                                const float *amplitude)
 {

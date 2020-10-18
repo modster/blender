@@ -56,14 +56,15 @@ static CLG_LogRef LOG = {"wm.xr"};
 
 /* -------------------------------------------------------------------- */
 
-static void wm_xr_session_create_cb(wmXrData *xr)
+static void wm_xr_session_create_cb(void *customdata)
 {
-  Main *bmain = CTX_data_main(xr->runtime->bcontext);
+  wmXrData *xr_data = customdata;
+  Main *bmain = CTX_data_main(xr_data->runtime->bcontext);
 
   /* Get action set data from Python. */
   BKE_callback_exec_null(bmain, BKE_CB_EVT_XR_SESSION_START_PRE);
 
-  wm_xr_session_actions_init(xr);
+  wm_xr_session_actions_init(xr_data);
 }
 
 static void wm_xr_session_exit_cb(void *customdata)
@@ -484,7 +485,8 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
                                                  wmXrSessionState *state,
                                                  ViewLayer *view_layer)
 {
-  const unsigned int count = min(controller_pose_action->count_subaction_paths, 2);
+  const unsigned int count = (unsigned int)min_ii(
+      (int)controller_pose_action->count_subaction_paths, 2);
 
   float view_ofs[3];
   float base_inv[4][4];
@@ -764,8 +766,8 @@ void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_ac
                                             bContext *C,
                                             wmXrSessionState *state)
 {
-  const unsigned int count = min((unsigned int)ARRAY_SIZE(state->controllers),
-                                 controller_pose_action->count_subaction_paths);
+  const unsigned int count = (unsigned int)min_ii(
+      (int)ARRAY_SIZE(state->controllers), (int)controller_pose_action->count_subaction_paths);
 
   for (unsigned int i = 0; i < count; ++i) {
     wmXrControllerData *c = &state->controllers[i];
@@ -781,6 +783,8 @@ void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_ac
         c->ob->runtime.is_xr = true;
       }
     }
+#else
+    UNUSED_VARS(C);
 #endif
   }
 }
@@ -795,8 +799,8 @@ void wm_xr_session_controller_data_clear(unsigned int count_subaction_paths,
   Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
   bool notify = false;
 
-  const unsigned int count = min((unsigned int)ARRAY_SIZE(state->controllers),
-                                 count_subaction_paths);
+  const unsigned int count = (unsigned int)min_ii((int)ARRAY_SIZE(state->controllers),
+                                                  (int)count_subaction_paths);
 
   for (unsigned int i = 0; i < count; ++i) {
     Object *ob = state->controllers[i].ob;
