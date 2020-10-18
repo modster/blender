@@ -44,6 +44,7 @@ struct MeshSampleData {
   pxr::VtArray<pxr::GfVec3f> points;
   pxr::VtArray<int> vertex_counts;
   pxr::VtArray<int> vertex_indices;
+  pxr::TfToken uv_primvar_name;
   pxr::VtVec2fArray uv_values;
   pxr::VtArray<int> uv_indices;
   pxr::TfToken uv_interpolation;
@@ -80,6 +81,7 @@ static void sample_uvs(const pxr::UsdGeomMesh &mesh,
                 << mesh.GetPath() << std::endl;
     }
 
+    mesh_data.uv_primvar_name = primvar_name;
     st_primvar.GetIndices(&mesh_data.uv_indices, time);
     mesh_data.uv_interpolation = st_primvar.GetInterpolation();
   }
@@ -139,10 +141,11 @@ static void read_mpolys(Mesh *mesh, const MeshSampleData &mesh_data)
 
   const bool do_uvs = (mesh_data.uv_interpolation == pxr::UsdGeomTokens->faceVarying ||
                        mesh_data.uv_interpolation == pxr::UsdGeomTokens->vertex) &&
-                      !(mesh_data.uv_indices.empty() && mesh_data.uv_values.empty());
+                      !(mesh_data.uv_indices.empty() && mesh_data.uv_values.empty()) &&
+                      !mesh_data.uv_primvar_name.IsEmpty();
 
   if (do_uvs) {
-    void *cd_ptr = add_customdata(mesh, "uvMap", CD_MLOOPUV);
+    void *cd_ptr = add_customdata(mesh, mesh_data.uv_primvar_name.GetString().c_str(), CD_MLOOPUV);
     mloopuvs = static_cast<MLoopUV *>(cd_ptr);
   }
 
