@@ -216,12 +216,12 @@ int WM_gesture_box_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
   rcti winrct_prev;
   int mval[2];
 
-  WM_xr_controller_loc_to_mval(customdata->controller_loc,
-                               customdata->eye_viewmat,
-                               customdata->eye_winmat,
-                               customdata->eye_width,
-                               customdata->eye_height,
-                               mval);
+  map_to_pixel(mval,
+               customdata->controller_loc,
+               customdata->eye_viewmat,
+               customdata->eye_winmat,
+               customdata->eye_width,
+               customdata->eye_height);
   event_mut.x = mval[0];
   event_mut.y = mval[1];
 
@@ -324,12 +324,12 @@ int WM_gesture_box_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
   wmXrActionData *customdata = event->customdata;
   int mval[2];
 
-  WM_xr_controller_loc_to_mval(customdata->controller_loc,
-                               customdata->eye_viewmat,
-                               customdata->eye_winmat,
-                               customdata->eye_width,
-                               customdata->eye_height,
-                               mval);
+  map_to_pixel(mval,
+               customdata->controller_loc,
+               customdata->eye_viewmat,
+               customdata->eye_winmat,
+               customdata->eye_width,
+               customdata->eye_height);
 
   if (event->val == KM_PRESS) {
     event_mut.type = MOUSEMOVE;

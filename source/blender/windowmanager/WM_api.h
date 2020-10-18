@@ -66,10 +66,13 @@ struct wmOperator;
 struct wmOperatorType;
 struct wmPaintCursor;
 struct wmTabletData;
+
+#ifdef WITH_XR_OPENXR
 struct GHOST_XrActionSetInfo;
 struct GHOST_XrActionInfo;
 struct GHOST_XrActionSpaceInfo;
 struct GHOST_XrActionBindingsInfo;
+#endif
 
 #ifdef WITH_INPUT_NDOF
 struct wmNDOFMotionData;
@@ -996,12 +999,6 @@ void WM_xr_haptic_action_stop(wmXrData *xr,
                               const char *const *subaction_paths);
 
 /* wm_xr_draw.c */
-void WM_xr_controller_loc_to_mval(const float loc[3],
-                                  const float viewmat[4][4],
-                                  const float winmat[4][4],
-                                  int winx,
-                                  int winy,
-                                  int r_mval[2]);
 void WM_xr_draw_controllers(void /*const struct wmXrSessionState *state*/);
 #endif
 

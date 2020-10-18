@@ -29,7 +29,9 @@
 
 #include "WM_types.h"
 
-#include "../ghost/GHOST_Types.h"
+#ifdef WITH_XR_OPENXR
+#  include "../ghost/GHOST_Types.h"
+#endif
 
 #include "rna_internal.h"
 
@@ -565,11 +567,19 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   PropertyRNA *parm, *prop;
 
   static const EnumPropertyItem action_types[] = {
-      {GHOST_kXrActionTypeFloatInput, "BUTTON", 0, "Button", "Button state action"},
-      {GHOST_kXrActionTypePoseInput, "POSE", 0, "Pose", "3D pose action"},
-      {GHOST_kXrActionTypeVibrationOutput, "HAPTIC", 0, "Haptic", "Haptic output action"},
+      {2, "BUTTON", 0, "Button", "Button state action"},
+      {4, "POSE", 0, "Pose", "3D pose action"},
+      {100, "HAPTIC", 0, "Haptic", "Haptic output action"},
       {0, NULL, 0, NULL, NULL},
   };
+#  ifdef WITH_XR_OPENXR
+  BLI_STATIC_ASSERT(GHOST_kXrActionTypeFloatInput == 2,
+                    "Float action type does not match GHOST_XrActionType value");
+  BLI_STATIC_ASSERT(GHOST_kXrActionTypePoseInput == 4,
+                    "Pose action type does not match GHOST_XrActionType value");
+  BLI_STATIC_ASSERT(GHOST_kXrActionTypeVibrationOutput == 100,
+                    "Haptic action type does not match GHOST_XrActionType value");
+#  endif
 
   static const EnumPropertyItem op_flags[] = {
       {XR_OP_PRESS,

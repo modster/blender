@@ -40,7 +40,9 @@
 
 #include "WM_types.h"
 
-#include "../ghost/GHOST_Types.h"
+#ifdef WITH_XR_OPENXR
+#  include "../ghost/GHOST_Types.h"
+#endif
 
 #ifdef RNA_RUNTIME
 
@@ -709,7 +711,7 @@ static int rna_Event_xr_type_get(PointerRNA *ptr)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    GHOST_XrActionType type;
+    int type;
     WM_event_xr_data(event, NULL, (char *)&type, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
     return type;
   }
@@ -2236,11 +2238,19 @@ static void rna_def_event(BlenderRNA *brna)
   PropertyRNA *prop;
 
   static const EnumPropertyItem xr_types[] = {
-      {GHOST_kXrActionTypeBooleanInput, "BOOLEAN", 0, "Boolean", "Boolean value"},
-      {GHOST_kXrActionTypeFloatInput, "FLOAT", 0, "Float", "Float value"},
-      {GHOST_kXrActionTypeVector2fInput, "VEC2F", 0, "Vector2f", "2D float vector value"},
+      {1, "BOOLEAN", 0, "Boolean", "Boolean value"},
+      {2, "FLOAT", 0, "Float", "Float value"},
+      {3, "VEC2F", 0, "Vector2f", "2D float vector value"},
       {0, NULL, 0, NULL, NULL},
   };
+#  ifdef WITH_XR_OPENXR
+  BLI_STATIC_ASSERT(GHOST_kXrActionTypeBooleanInput == 1,
+                    "Boolean action type does not match GHOST_XrActionType value");
+  BLI_STATIC_ASSERT(GHOST_kXrActionTypeFloatInput == 2,
+                    "Float action type does not match GHOST_XrActionType value");
+  BLI_STATIC_ASSERT(GHOST_kXrActionTypeVector2fInput == 3,
+                    "Vector2f action type does not match GHOST_XrActionType value");
+#  endif
 
   srna = RNA_def_struct(brna, "Event", NULL);
   RNA_def_struct_ui_text(srna, "Event", "Window Manager Event");

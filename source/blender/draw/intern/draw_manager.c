@@ -1462,11 +1462,13 @@ void DRW_draw_callbacks_post_scene(void)
       ED_annotation_draw_view3d(DEG_get_input_scene(depsgraph), depsgraph, v3d, region, true);
     }
 
+#ifdef WITH_XR_OPENXR
     /* Controllers. */
     if ((v3d->flag2 & V3D_XR_SHOW_CONTROLLERS) != 0) {
       GPU_depth_test(GPU_DEPTH_ALWAYS);
       WM_xr_draw_controllers();
     }
+#endif
 
     GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
   }

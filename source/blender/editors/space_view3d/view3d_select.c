@@ -2526,12 +2526,12 @@ static int view3d_select_invoke_3d(bContext *C, wmOperator *op, const wmEvent *e
   float winmat_prev[4][4];
   int mval[2];
 
-  WM_xr_controller_loc_to_mval(customdata->controller_loc,
-                               customdata->eye_viewmat,
-                               customdata->eye_winmat,
-                               customdata->eye_width,
-                               customdata->eye_height,
-                               mval);
+  map_to_pixel(mval,
+               customdata->controller_loc,
+               customdata->eye_viewmat,
+               customdata->eye_winmat,
+               customdata->eye_width,
+               customdata->eye_height);
 
   RNA_int_set_array(op->ptr, "location", mval);
 

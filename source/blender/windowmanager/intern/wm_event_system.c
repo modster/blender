@@ -85,7 +85,9 @@
 #include "wm_surface.h"
 #include "wm_window.h"
 
-#include "xr/intern/wm_xr_intern.h"
+#ifdef WITH_XR_OPENXR
+#  include "xr/intern/wm_xr_intern.h"
+#endif
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
@@ -3167,6 +3169,7 @@ static void wm_event_free_and_remove_from_queue_if_valid(wmEvent *event)
  * Handle events for all windows, run from the #WM_main event loop.
  * \{ */
 
+#ifdef WITH_XR_OPENXR
 static void wm_event_surface_free_all(wmXrSurfaceData *surface_data)
 {
   ListBase *events = &surface_data->events;
@@ -3257,6 +3260,7 @@ static void wm_event_do_surface_handlers(bContext *C, wmSurface *surface)
 
   CTX_wm_window_set(C, NULL);
 }
+#endif /* WITH_XR_OPENXR */
 
 /* Called in main loop. */
 /* Goes over entire hierarchy:  events -> window -> screen -> area -> region. */
@@ -3522,8 +3526,10 @@ void wm_event_do_handlers(bContext *C)
     CTX_wm_window_set(C, NULL);
   }
 
+#ifdef WITH_XR_OPENXR
   /* Handle surface events. */
   wm_surfaces_iter(C, wm_event_do_surface_handlers);
+#endif
 
   /* Update key configuration after handling events. */
   WM_keyconfig_update(wm);
@@ -4834,6 +4840,7 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void 
 #endif
 }
 
+#ifdef WITH_XR_OPENXR
 void wm_event_add_xrevent(const wmXrAction *action,
                           const GHOST_XrPose *controller_pose,
                           const wmXrEyeData *eye_data,
@@ -4910,6 +4917,7 @@ void wm_event_add_xrevent(const wmXrAction *action,
     BLI_addtail(&surface_data->events, event);
   }
 }
+#endif /* WITH_XR_OPENXR */
 
 /** \} */
 
