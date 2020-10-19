@@ -222,7 +222,7 @@ static PanelType *fmodifier_subpanel_register(ARegionType *region_type,
 /** \name General UI Callbacks and Drawing
  * \{ */
 
-// XXX! --------------------------------
+/* XXX! -------------------------------- */
 /* Temporary definition for limits of float number buttons
  * (FLT_MAX tends to infinity with old system). */
 #define UI_FLT_MAX 10000.0f
@@ -716,7 +716,7 @@ static void fmod_envelope_addpoint_cb(bContext *C, void *fcm_dv, void *UNUSED(ar
   /* init template data */
   fed.min = -1.0f;
   fed.max = 1.0f;
-  fed.time = (float)scene->r.cfra;  // XXX make this int for ease of use?
+  fed.time = (float)scene->r.cfra; /* XXX make this int for ease of use? */
   fed.f1 = fed.f2 = 0;
 
   /* check that no data exists for the current frame... */
@@ -761,7 +761,7 @@ static void fmod_envelope_addpoint_cb(bContext *C, void *fcm_dv, void *UNUSED(ar
 }
 
 /* callback to remove envelope data point */
-// TODO: should we have a separate file for things like this?
+/* TODO: should we have a separate file for things like this? */
 static void fmod_envelope_deletepoint_cb(bContext *UNUSED(C), void *fcm_dv, void *ind_v)
 {
   FMod_Envelope *env = (FMod_Envelope *)fcm_dv;

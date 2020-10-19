@@ -22,8 +22,6 @@
  * \ingroup bke
  */
 
-#include "BKE_mesh_types.h"
-
 #include "DNA_scene_types.h"
 
 #ifdef __cplusplus
@@ -160,6 +158,8 @@ void BKE_curve_rect_from_textbox(const struct Curve *cu,
                                  const struct TextBox *tb,
                                  struct rctf *r_rect);
 
+void BKE_curve_correct_bezpart(const float v1[2], float v2[2], float v3[2], const float v4[2]);
+
 /* ** Nurbs ** */
 
 bool BKE_nurbList_index_get_co(struct ListBase *editnurb, const int index, float r_co[3]);
@@ -277,10 +277,10 @@ enum {
   BKE_CURVE_BATCH_DIRTY_ALL = 0,
   BKE_CURVE_BATCH_DIRTY_SELECT,
 };
-void BKE_curve_batch_cache_dirty_tag(struct Curve *cu, eMeshBatchDirtyMode mode);
+void BKE_curve_batch_cache_dirty_tag(struct Curve *cu, int mode);
 void BKE_curve_batch_cache_free(struct Curve *cu);
 
-extern void (*BKE_curve_batch_cache_dirty_tag_cb)(struct Curve *cu, eMeshBatchDirtyMode mode);
+extern void (*BKE_curve_batch_cache_dirty_tag_cb)(struct Curve *cu, int mode);
 extern void (*BKE_curve_batch_cache_free_cb)(struct Curve *cu);
 
 /* -------------------------------------------------------------------- */

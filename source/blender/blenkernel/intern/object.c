@@ -1346,6 +1346,7 @@ Object *BKE_object_add_only_object(Main *bmain, int type, const char *name)
     name = get_obdata_defname(type);
   }
 
+  /* We cannot use #BKE_id_new here as we need some custom initialization code. */
   ob = BKE_libblock_alloc(bmain, ID_OB, name, 0);
 
   /* We increase object user count when linking to Collections. */
@@ -2059,8 +2060,8 @@ void BKE_object_make_proxy(Main *bmain, Object *ob, Object *target, Object *cob)
   }
 
   ob->proxy = target;
+  id_us_plus(&target->id);
   ob->proxy_group = cob;
-  id_lib_extern(&target->id);
 
   DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION);
   DEG_id_tag_update(&target->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION);
