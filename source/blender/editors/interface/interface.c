@@ -2879,7 +2879,7 @@ char *ui_but_string_get_dynamic(uiBut *but, int *r_str_size)
 
 /**
  * Report a generic error prefix when evaluating a string with #BPY_run_string_as_number
- * as the Python error on it's own doesn't provide enough context.
+ * as the Python error on its own doesn't provide enough context.
  */
 #define UI_NUMBER_EVAL_ERROR_PREFIX IFACE_("Error evaluating number, see Info editor for details")
 
@@ -4384,7 +4384,7 @@ static void ui_but_submenu_enable(uiBlock *block, uiBut *but)
  * avoid an extra lookup on 'prop' when its already available.
  *
  * When this kind of change won't disrupt branches, best look into making more
- * of our UI functions take prop rather then propname.
+ * of our UI functions take prop rather than propname.
  */
 static uiBut *ui_def_but_rna(uiBlock *block,
                              int type,

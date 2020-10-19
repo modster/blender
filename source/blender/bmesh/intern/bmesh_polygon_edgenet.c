@@ -521,7 +521,7 @@ bool BM_face_split_edgenet(BMesh *bm,
 
   /* Note: 'VERT_IN_QUEUE' is often not needed at all,
    * however in rare cases verts are added multiple times to the queue,
-   * that on it's own is harmless but in _very_ rare cases,
+   * that on its own is harmless but in _very_ rare cases,
    * the queue will overflow its maximum size,
    * so we better be strict about this! see: T51539 */
 
@@ -1667,7 +1667,7 @@ finally:
     } while ((tvp = tvp->next));
 
     /* Remove edges which have become doubles since splicing vertices together,
-     * its less trouble then detecting future-doubles on edge-creation. */
+     * its less trouble than detecting future-doubles on edge-creation. */
     for (uint i = edge_net_init_len; i < edge_net_new_len; i++) {
       while (BM_edge_find_double(edge_net_new[i])) {
         BM_edge_kill(bm, edge_net_new[i]);
