@@ -587,8 +587,8 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
           case GHOST_kXrActionTypeFloatInput: {
             const float *state = &((float *)action->states)[i];
             float *state_prev = &((float *)action->states_prev)[i];
-            if (*state) {
-              if (!*state_prev) {
+            if (*state > action->threshold) {
+              if (*state_prev <= action->threshold) {
                 if (modal || action->op_flag == XR_OP_PRESS) {
                   val = KM_PRESS;
                   press_start = true;
@@ -599,7 +599,7 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
                 press_start = false;
               }
             }
-            else if (*state_prev) {
+            else if (*state_prev > action->threshold) {
               if (modal || action->op_flag == XR_OP_RELEASE) {
                 val = KM_RELEASE;
                 press_start = false;
@@ -611,8 +611,8 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
           case GHOST_kXrActionTypeVector2fInput: {
             const float(*state)[2] = &((float(*)[2])action->states)[i];
             float(*state_prev)[2] = &((float(*)[2])action->states_prev)[i];
-            if (*state[0] || *state[1]) {
-              if (!*state_prev[0] && !*state_prev[1]) {
+            if ((*state)[0] > action->threshold || (*state)[1] > action->threshold) {
+              if ((*state_prev)[0] <= action->threshold && (*state_prev)[1] <= action->threshold) {
                 if (modal || action->op_flag == XR_OP_PRESS) {
                   val = KM_PRESS;
                   press_start = true;
@@ -623,7 +623,8 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
                 press_start = false;
               }
             }
-            else if (*state_prev[0] || *state_prev[1]) {
+            else if ((*state_prev)[0] > action->threshold ||
+                     (*state_prev)[1] > action->threshold) {
               if (modal || action->op_flag == XR_OP_RELEASE) {
                 val = KM_RELEASE;
                 press_start = false;

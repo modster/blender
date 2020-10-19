@@ -115,6 +115,9 @@ static wmXrAction *action_create(const GHOST_XrActionInfo *info)
   action->states = MEM_calloc_arrayN(count, size, __func__);
   action->states_prev = MEM_calloc_arrayN(count, size, __func__);
 
+  action->threshold = info->threshold;
+  CLAMP(action->threshold, 0.0f, 1.0f);
+
   action->ot = info->ot;
   action->op_flag = info->op_flag;
 

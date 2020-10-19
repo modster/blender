@@ -82,6 +82,7 @@ static bool rna_XrSessionState_action_create(bContext *C,
                                              int type,
                                              const char *user_path0,
                                              const char *user_path1,
+                                             float threshold,
                                              const char *op,
                                              int op_flag)
 {
@@ -91,6 +92,7 @@ static bool rna_XrSessionState_action_create(bContext *C,
       .name = name,
       .type = type,
       .count_subaction_paths = 0,
+      .threshold = threshold,
       .ot = NULL,
       .op_flag = 0,
   };
@@ -651,6 +653,16 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func, "user_path1", NULL, 64, "User Path 1", "User path 1");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_float(func,
+                       "threshold",
+                       0.3f,
+                       0.0f,
+                       1.0f,
+                       "Threshold",
+                       "Input threshold for button actions",
+                       0.0f,
+                       1.0f);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_string(func, "op", NULL, OP_MAX_TYPENAME, "Operator", "Operator to execute");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_enum(func,

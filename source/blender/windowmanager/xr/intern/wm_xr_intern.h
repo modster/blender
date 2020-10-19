@@ -131,6 +131,9 @@ typedef struct wmXrAction {
   /** Previous states, stored to determine XR events. */
   void *states_prev;
 
+  /** Input threshold for float actions. */
+  float threshold;
+
   /** Operator to be called on XR events. */
   struct wmOperatorType *ot;
   char op_flag; /* wmXrOpFlag */
