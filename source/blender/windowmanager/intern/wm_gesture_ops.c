@@ -344,9 +344,6 @@ int WM_gesture_box_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
   BLI_assert(event->custom == EVT_DATA_XR);
   BLI_assert(event->customdata);
 
-  /* XR events currently only support press and release. */
-  BLI_assert(event->val == KM_PRESS || event->val == KM_RELEASE);
-
   const bool release = (event->val == KM_RELEASE);
 
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
