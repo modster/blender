@@ -35,6 +35,8 @@ struct ListBase;
 struct ARegion;
 struct ARegionType;
 struct Main;
+struct NlaStrip;
+struct FModifier;
 struct PanelType;
 struct ReportList;
 struct ScrArea;
@@ -677,8 +679,8 @@ void ANIM_draw_framerange(struct Scene *scene, struct View2D *v2d);
 
 /* ------------- UI Panel Drawing -------------- */
 
-ListBase *ANIM_nla_context_fmodifiers(const struct bContext *C);
-ListBase *ANIM_graph_context_fmodifiers(const struct bContext *C);
+struct NlaStrip *ANIM_nla_context_strip(const struct bContext *C);
+struct FCurve *ANIM_graph_context_fcurve(const struct bContext *C);
 
 typedef bool (*PanelTypePollFn)(const struct bContext *C, struct PanelType *pt);
 typedef void (*uiListPanelIDFromDataFunc)(void *data_link, char *r_idname);
@@ -691,9 +693,9 @@ void ANIM_fmodifier_panels(const struct bContext *C,
 void ANIM_fmodifiers_generator_panel_register(struct ARegionType *region_type,
                                               const char *id_prefix,
                                               PanelTypePollFn poll_fn);
-void ANIM_fmodifiers_generator_panel_register(struct ARegionType *region_type,
-                                              const char *id_prefix,
-                                              PanelTypePollFn poll_fn);
+void ANIM_fmodifiers_fn_generator_panel_register(struct ARegionType *region_type,
+                                                 const char *id_prefix,
+                                                 PanelTypePollFn poll_fn);
 void ANIM_fmodifiers_cycles_panel_register(struct ARegionType *region_type,
                                            const char *id_prefix,
                                            PanelTypePollFn poll_fn);

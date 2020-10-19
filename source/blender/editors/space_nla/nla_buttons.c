@@ -185,7 +185,7 @@ bool nla_panel_context(const bContext *C,
   return (found != 0);
 }
 
-ListBase *ANIM_nla_context_fmodifiers(const bContext *C)
+NlaStrip *ANIM_nla_context_strip(const bContext *C)
 {
   PointerRNA strip_ptr;
   if (!nla_panel_context(C, NULL, NULL, &strip_ptr)) {
@@ -193,7 +193,7 @@ ListBase *ANIM_nla_context_fmodifiers(const bContext *C)
   }
   NlaStrip *strip = strip_ptr.data;
 
-  return &strip->modifiers;
+  return strip;
 }
 
 #if 0
@@ -679,7 +679,8 @@ void nla_buttons_register(ARegionType *art)
 
   const char *modifier_panel_prefix = NLA_FMODIFIER_PANEL_PREFIX;
   ANIM_fmodifiers_generator_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
-  ANIM_fmodifiers_generator_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
+  ANIM_fmodifiers_fn_generator_panel_register(
+      art, modifier_panel_prefix, nla_strip_eval_panel_poll);
   ANIM_fmodifiers_noise_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
   ANIM_fmodifiers_envelope_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
   ANIM_fmodifers_limits_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);

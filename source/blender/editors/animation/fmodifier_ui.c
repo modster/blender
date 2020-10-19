@@ -28,6 +28,7 @@
 
 #include "DNA_anim_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_space_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -61,12 +62,43 @@ static void fmodifier_panel_header(const bContext *C, Panel *panel);
 /** \name Panel Registering and Panel Callbacks
  * \{ */
 
-static PointerRNA *fmodifier_get_pointers(const Panel *panel, ID **r_owner_id)
+/**
+ * Get the list of FModifiers from the context (either the NLA or graph editor).
+ */
+static ListBase *fmodifier_list_space_specific(const bContext *C)
+{
+  ScrArea *area = CTX_wm_area(C);
+
+  if (area->spacetype == SPACE_GRAPH) {
+    FCurve *fcu = ANIM_graph_context_fcurve(C);
+    return &fcu->modifiers;
+  }
+
+  if (area->spacetype == SPACE_NLA) {
+    NlaStrip *strip = ANIM_nla_context_strip(C);
+    return &strip->modifiers;
+  }
+
+  /* This should not be called in any other space. */
+  BLI_assert(false);
+  return NULL;
+}
+
+/**
+ * Get a pointer to the panel's FModifier, and also its owner ID if \a r_owner_id is not NULL.
+ * Also in the graph editor, gray out the panel if the FModifier's FCurve has modifiers turned off.
+ */
+static PointerRNA *fmodifier_get_pointers(const bContext *C, const Panel *panel, ID **r_owner_id)
 {
   PointerRNA *ptr = UI_panel_custom_data_get(panel);
 
   if (r_owner_id != NULL) {
     *r_owner_id = ptr->owner_id;
+  }
+
+  if (C != NULL && CTX_wm_space_graph(C)) {
+    FCurve *fcu = ANIM_graph_context_fcurve(C);
+    uiLayoutSetActive(panel->layout, !(fcu->flag & FCURVE_MOD_OFF));
   }
 
   return ptr;
@@ -78,7 +110,7 @@ static PointerRNA *fmodifier_get_pointers(const Panel *panel, ID **r_owner_id)
 static void fmodifier_reorder(bContext *C, Panel *panel, int new_index)
 {
   ID *fcurve_owner_id;
-  PointerRNA *ptr = fmodifier_get_pointers(panel, &fcurve_owner_id);
+  PointerRNA *ptr = fmodifier_get_pointers(NULL, panel, &fcurve_owner_id);
   FModifier *fcm = ptr->data;
 
   /* Cycles modifier has to be the first, so make sure it's kept that way. */
@@ -87,13 +119,7 @@ static void fmodifier_reorder(bContext *C, Panel *panel, int new_index)
     return;
   }
 
-  ListBase *modifiers;
-  if (CTX_wm_space_graph(C)) {
-    modifiers = ANIM_graph_context_fmodifiers(C);
-  }
-  else if (CTX_wm_space_nla(C)) {
-    modifiers = ANIM_nla_context_fmodifiers(C);
-  }
+  ListBase *modifiers = fmodifier_list_space_specific(C);
 
   /* Again, make sure we don't move a modifier before a cycles modifier. */
   FModifier *fcm_first = modifiers->first;
@@ -122,7 +148,7 @@ static void fmodifier_reorder(bContext *C, Panel *panel, int new_index)
 
 static short get_fmodifier_expand_flag(const bContext *UNUSED(C), Panel *panel)
 {
-  PointerRNA *ptr = fmodifier_get_pointers(panel, NULL);
+  PointerRNA *ptr = fmodifier_get_pointers(NULL, panel, NULL);
   FModifier *fcm = (FModifier *)ptr->data;
 
   return fcm->ui_expand_flag;
@@ -130,7 +156,7 @@ static short get_fmodifier_expand_flag(const bContext *UNUSED(C), Panel *panel)
 
 static void set_fmodifier_expand_flag(const bContext *UNUSED(C), Panel *panel, short expand_flag)
 {
-  PointerRNA *ptr = fmodifier_get_pointers(panel, NULL);
+  PointerRNA *ptr = fmodifier_get_pointers(NULL, panel, NULL);
   FModifier *fcm = (FModifier *)ptr->data;
 
   fcm->ui_expand_flag = expand_flag;
@@ -265,21 +291,21 @@ static void fmodifier_influence_draw(uiLayout *layout, PointerRNA *ptr)
   uiItemR(sub, ptr, "influence", 0, "", ICON_NONE);
 }
 
-static void fmodifier_frame_range_header_draw(const bContext *UNUSED(C), Panel *panel)
+static void fmodifier_frame_range_header_draw(const bContext *C, Panel *panel)
 {
   uiLayout *layout = panel->layout;
 
-  PointerRNA *ptr = fmodifier_get_pointers(panel, NULL);
+  PointerRNA *ptr = fmodifier_get_pointers(C, panel, NULL);
 
-  uiItemR(layout, ptr, "use_restricted_range", 0, "", ICON_NONE);
+  uiItemR(layout, ptr, "use_restricted_range", 0, NULL, ICON_NONE);
 }
 
-static void fmodifier_frame_range_draw(const bContext *UNUSED(C), Panel *panel)
+static void fmodifier_frame_range_draw(const bContext *C, Panel *panel)
 {
   uiLayout *col;
   uiLayout *layout = panel->layout;
 
-  PointerRNA *ptr = fmodifier_get_pointers(panel, NULL);
+  PointerRNA *ptr = fmodifier_get_pointers(C, panel, NULL);
 
   uiLayoutSetPropSep(layout, true);
 
@@ -300,7 +326,7 @@ static void fmodifier_panel_header(const bContext *C, Panel *panel)
   uiLayout *layout = panel->layout;
 
   ID *fcurve_owner_id;
-  PointerRNA *ptr = fmodifier_get_pointers(panel, &fcurve_owner_id);
+  PointerRNA *ptr = fmodifier_get_pointers(C, panel, &fcurve_owner_id);
   FModifier *fcm = (FModifier *)ptr->data;
   const FModifierTypeInfo *fmi = fmodifier_get_typeinfo(fcm);
 
@@ -343,17 +369,12 @@ static void fmodifier_panel_header(const bContext *C, Panel *panel)
                             0.0,
                             0.0,
                             0.0,
-                            TIP_("Delete F-Curve Modifier"));
-  FModifierDeleteContext *ctx = MEM_mallocN(sizeof(FModifierDeleteContext), "fmodifier ctx");
+                            TIP_("Delete Modifier"));
+  FModifierDeleteContext *ctx = MEM_mallocN(sizeof(FModifierDeleteContext), __func__);
   ctx->fcurve_owner_id = fcurve_owner_id;
-
-  if (CTX_wm_space_graph(C)) {
-    ctx->modifiers = ANIM_graph_context_fmodifiers(C);
-  }
-  else if (CTX_wm_space_nla(C)) {
-    ctx->modifiers = ANIM_nla_context_fmodifiers(C);
-  }
+  ctx->modifiers = fmodifier_list_space_specific(C);
   BLI_assert(ctx->modifiers != NULL);
+
   UI_but_funcN_set(but, delete_fmodifier_cb, ctx, fcm);
 
   uiItemS(layout);
@@ -365,13 +386,13 @@ static void fmodifier_panel_header(const bContext *C, Panel *panel)
 /** \name Generator Modifier
  * \{ */
 
-static void generator_panel_draw(const bContext *UNUSED(C), Panel *panel)
+static void generator_panel_draw(const bContext *C, Panel *panel)
 {
   uiLayout *row;
   uiLayout *layout = panel->layout;
 
   ID *fcurve_owner_id;
-  PointerRNA *ptr = fmodifier_get_pointers(panel, &fcurve_owner_id);
+  PointerRNA *ptr = fmodifier_get_pointers(C, panel, &fcurve_owner_id);
   FModifier *fcm = (FModifier *)ptr->data;
   FMod_Generator *data = (FMod_Generator *)fcm->data;
 
@@ -551,7 +572,7 @@ void ANIM_fmodifiers_generator_panel_register(ARegionType *region_type,
       region_type, FMODIFIER_TYPE_GENERATOR, generator_panel_draw, poll_fn, id_prefix);
   fmodifier_subpanel_register(region_type,
                               "frame_range",
-                              "Restrict Frame Range",
+                              "",
                               fmodifier_frame_range_header_draw,
                               fmodifier_frame_range_draw,
                               poll_fn,
@@ -564,12 +585,12 @@ void ANIM_fmodifiers_generator_panel_register(ARegionType *region_type,
 /** \name Function Generator Modifier
  * \{ */
 
-static void fn_generator_panel_draw(const bContext *UNUSED(C), Panel *panel)
+static void fn_generator_panel_draw(const bContext *C, Panel *panel)
 {
   uiLayout *col;
   uiLayout *layout = panel->layout;
 
-  PointerRNA *ptr = fmodifier_get_pointers(panel, NULL);
+  PointerRNA *ptr = fmodifier_get_pointers(C, panel, NULL);
 
   uiItemR(layout, ptr, "function_type", 0, "", ICON_NONE);
 
@@ -587,15 +608,15 @@ static void fn_generator_panel_draw(const bContext *UNUSED(C), Panel *panel)
   fmodifier_influence_draw(layout, ptr);
 }
 
-void ANIM_fmodifiers_generator_panel_register(ARegionType *region_type,
-                                              const char *id_prefix,
-                                              PanelTypePollFn poll_fn)
+void ANIM_fmodifiers_fn_generator_panel_register(ARegionType *region_type,
+                                                 const char *id_prefix,
+                                                 PanelTypePollFn poll_fn)
 {
   PanelType *panel_type = fmodifier_panel_register(
       region_type, FMODIFIER_TYPE_FN_GENERATOR, fn_generator_panel_draw, poll_fn, id_prefix);
   fmodifier_subpanel_register(region_type,
                               "frame_range",
-                              "Restrict Frame Range",
+                              "",
                               fmodifier_frame_range_header_draw,
                               fmodifier_frame_range_draw,
                               poll_fn,
@@ -608,12 +629,12 @@ void ANIM_fmodifiers_generator_panel_register(ARegionType *region_type,
 /** \name Cycles Modifier
  * \{ */
 
-static void cycles_panel_draw(const bContext *UNUSED(C), Panel *panel)
+static void cycles_panel_draw(const bContext *C, Panel *panel)
 {
   uiLayout *col;
   uiLayout *layout = panel->layout;
 
-  PointerRNA *ptr = fmodifier_get_pointers(panel, NULL);
+  PointerRNA *ptr = fmodifier_get_pointers(C, panel, NULL);
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
@@ -639,7 +660,7 @@ void ANIM_fmodifiers_cycles_panel_register(ARegionType *region_type,
       region_type, FMODIFIER_TYPE_CYCLES, cycles_panel_draw, poll_fn, id_prefix);
   fmodifier_subpanel_register(region_type,
                               "frame_range",
-                              "Restrict Frame Range",
+                              "",
                               fmodifier_frame_range_header_draw,
                               fmodifier_frame_range_draw,
                               poll_fn,
@@ -652,12 +673,12 @@ void ANIM_fmodifiers_cycles_panel_register(ARegionType *region_type,
 /** \name Noise Modifier
  * \{ */
 
-static void noise_panel_draw(const bContext *UNUSED(C), Panel *panel)
+static void noise_panel_draw(const bContext *C, Panel *panel)
 {
   uiLayout *col;
   uiLayout *layout = panel->layout;
 
-  PointerRNA *ptr = fmodifier_get_pointers(panel, NULL);
+  PointerRNA *ptr = fmodifier_get_pointers(C, panel, NULL);
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
@@ -682,7 +703,7 @@ void ANIM_fmodifiers_noise_panel_register(ARegionType *region_type,
       region_type, FMODIFIER_TYPE_NOISE, noise_panel_draw, poll_fn, id_prefix);
   fmodifier_subpanel_register(region_type,
                               "frame_range",
-                              "Restrict Frame Range",
+                              "",
                               fmodifier_frame_range_header_draw,
                               fmodifier_frame_range_draw,
                               poll_fn,
@@ -783,13 +804,13 @@ static void fmod_envelope_deletepoint_cb(bContext *UNUSED(C), void *fcm_dv, void
 }
 
 /* draw settings for envelope modifier */
-static void envelope_panel_draw(const bContext *UNUSED(C), Panel *panel)
+static void envelope_panel_draw(const bContext *C, Panel *panel)
 {
   uiLayout *row, *col;
   uiLayout *layout = panel->layout;
 
   ID *fcurve_owner_id;
-  PointerRNA *ptr = fmodifier_get_pointers(panel, &fcurve_owner_id);
+  PointerRNA *ptr = fmodifier_get_pointers(C, panel, &fcurve_owner_id);
   FModifier *fcm = (FModifier *)ptr->data;
   FMod_Envelope *env = (FMod_Envelope *)fcm->data;
 
@@ -867,7 +888,7 @@ void ANIM_fmodifiers_envelope_panel_register(ARegionType *region_type,
       region_type, FMODIFIER_TYPE_ENVELOPE, envelope_panel_draw, poll_fn, id_prefix);
   fmodifier_subpanel_register(region_type,
                               "frame_range",
-                              "Restrict Frame Range",
+                              "",
                               fmodifier_frame_range_header_draw,
                               fmodifier_frame_range_draw,
                               poll_fn,
@@ -880,12 +901,12 @@ void ANIM_fmodifiers_envelope_panel_register(ARegionType *region_type,
 /** \name Limits Modifier
  * \{ */
 
-static void limits_panel_draw(const bContext *UNUSED(C), Panel *panel)
+static void limits_panel_draw(const bContext *C, Panel *panel)
 {
   uiLayout *col, *row, *sub;
   uiLayout *layout = panel->layout;
 
-  PointerRNA *ptr = fmodifier_get_pointers(panel, NULL);
+  PointerRNA *ptr = fmodifier_get_pointers(C, panel, NULL);
 
   uiLayoutSetPropSep(layout, true);
 
@@ -928,7 +949,7 @@ void ANIM_fmodifers_limits_panel_register(ARegionType *region_type,
       region_type, FMODIFIER_TYPE_LIMITS, limits_panel_draw, poll_fn, id_prefix);
   fmodifier_subpanel_register(region_type,
                               "frame_range",
-                              "Restrict Frame Range",
+                              "",
                               fmodifier_frame_range_header_draw,
                               fmodifier_frame_range_draw,
                               poll_fn,
@@ -941,12 +962,12 @@ void ANIM_fmodifers_limits_panel_register(ARegionType *region_type,
 /** \name Stepped Interpolation Modifier
  * \{ */
 
-static void stepped_panel_draw(const bContext *UNUSED(C), Panel *panel)
+static void stepped_panel_draw(const bContext *C, Panel *panel)
 {
   uiLayout *col, *sub, *row;
   uiLayout *layout = panel->layout;
 
-  PointerRNA *ptr = fmodifier_get_pointers(panel, NULL);
+  PointerRNA *ptr = fmodifier_get_pointers(C, panel, NULL);
 
   uiLayoutSetPropSep(layout, true);
 
@@ -980,7 +1001,7 @@ void ANIM_fmodifiers_stepped_panel_register(ARegionType *region_type,
       region_type, FMODIFIER_TYPE_STEPPED, stepped_panel_draw, poll_fn, id_prefix);
   fmodifier_subpanel_register(region_type,
                               "frame_range",
-                              "Restrict Frame Range",
+                              "",
                               fmodifier_frame_range_header_draw,
                               fmodifier_frame_range_draw,
                               poll_fn,

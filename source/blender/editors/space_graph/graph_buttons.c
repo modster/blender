@@ -105,14 +105,14 @@ static bool graph_panel_context(const bContext *C, bAnimListElem **ale, FCurve *
   return true;
 }
 
-ListBase *ANIM_graph_context_fmodifiers(const bContext *C)
+FCurve *ANIM_graph_context_fcurve(const bContext *C)
 {
   FCurve *fcu;
   if (!graph_panel_context(C, NULL, &fcu)) {
     return NULL;
   }
 
-  return &fcu->modifiers;
+  return fcu;
 }
 
 static bool graph_panel_poll(const bContext *C, PanelType *UNUSED(pt))
@@ -1444,7 +1444,7 @@ void graph_buttons_register(ARegionType *art)
 
   const char *fmodifier_panel_prefix = GRAPH_FMODIFIER_PANEL_PREFIX;
   ANIM_fmodifiers_generator_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
-  ANIM_fmodifiers_generator_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
+  ANIM_fmodifiers_fn_generator_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
   ANIM_fmodifiers_cycles_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
   ANIM_fmodifiers_noise_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
   ANIM_fmodifiers_envelope_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
