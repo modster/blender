@@ -130,26 +130,31 @@ static int lineart_triangle_line_imagespace_intersection_v2(SpinLock *spl,
 
 int use_smooth_contour_modifier_contour = 0; /*  debug purpose */
 
-static void lineart_render_line_discard_segment(LineartRenderBuffer* rb, LineartRenderLineSegment* rls){
+static void lineart_render_line_discard_segment(LineartRenderBuffer *rb,
+                                                LineartRenderLineSegment *rls)
+{
   BLI_spin_lock(&rb->lock_cuts);
 
-  memset(rls,0,sizeof(LineartRenderLineSegment));
+  memset(rls, 0, sizeof(LineartRenderLineSegment));
   BLI_addtail(&rb->wasted_cuts, rls);
 
   BLI_spin_unlock(&rb->lock_cuts);
 }
 
-static LineartRenderLineSegment* lineart_render_line_give_segment(LineartRenderBuffer* rb){
+static LineartRenderLineSegment *lineart_render_line_give_segment(LineartRenderBuffer *rb)
+{
   BLI_spin_lock(&rb->lock_cuts);
-  
-  if(rb->wasted_cuts.first){
-    LineartRenderLineSegment* rls = (LineartRenderLineSegment*)BLI_pophead(&rb->wasted_cuts);
+
+  if (rb->wasted_cuts.first) {
+    LineartRenderLineSegment *rls = (LineartRenderLineSegment *)BLI_pophead(&rb->wasted_cuts);
     BLI_spin_unlock(&rb->lock_cuts);
-    memset(rls,0,sizeof(LineartRenderLineSegment));
+    memset(rls, 0, sizeof(LineartRenderLineSegment));
     return rls;
-  }else{
+  }
+  else {
     BLI_spin_unlock(&rb->lock_cuts);
-    return (LineartRenderLineSegment*)lineart_mem_aquire_thread(&rb->render_data_pool, sizeof(LineartRenderLineSegment));
+    return (LineartRenderLineSegment *)lineart_mem_aquire_thread(&rb->render_data_pool,
+                                                                 sizeof(LineartRenderLineSegment));
   }
 }
 
@@ -277,7 +282,8 @@ static void lineart_render_line_cut(LineartRenderBuffer *rb,
   for (rls = rl->segments.first; rls; rls = next_rls) {
     next_rls = rls->next;
 
-    if(prev_rls && prev_rls->occlusion == rls->occlusion && prev_rls->transparency_mask == rls->transparency_mask){
+    if (prev_rls && prev_rls->occlusion == rls->occlusion &&
+        prev_rls->transparency_mask == rls->transparency_mask) {
       BLI_remlink(&rl->segments, rls);
       lineart_render_line_discard_segment(rb, rls);
       continue;
@@ -845,7 +851,7 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
 
   int use_w = 3;
   if (!rb->cam_is_persp) {
-    clip_start = 0;
+    clip_start = -1;
     clip_end = 1;
     use_w = 2;
   }
@@ -914,13 +920,13 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
 #define REMOVE_ORIGINAL_LINES \
   BLI_remlink(&rb->all_render_lines, (void *)rt->rl[0]); \
   rt->rl[0]->next = rt->rl[0]->prev = 0; \
-  rt->rl[0]->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;\
+  rt->rl[0]->flags |= LRT_EDGE_FLAG_CHAIN_PICKED; \
   BLI_remlink(&rb->all_render_lines, (void *)rt->rl[1]); \
   rt->rl[1]->next = rt->rl[1]->prev = 0; \
-  rt->rl[1]->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;\
+  rt->rl[1]->flags |= LRT_EDGE_FLAG_CHAIN_PICKED; \
   BLI_remlink(&rb->all_render_lines, (void *)rt->rl[2]); \
   rt->rl[2]->next = rt->rl[2]->prev = 0; \
-  rt->rl[2]->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;\
+  rt->rl[2]->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;
 
       switch (in0 + in1 + in2) {
         case 0: /* ignore this triangle. */
@@ -2463,7 +2469,7 @@ static void lineart_main_get_view_vector(LineartRenderBuffer *rb)
     }
   }
   else {
-    copy_m4_m4(obmat_no_scale,rb->cam_obmat);
+    copy_m4_m4(obmat_no_scale, rb->cam_obmat);
   }
   BLI_spin_unlock(&lineart_share.lock_render_status);
   normalize_v3(obmat_no_scale[0]);
@@ -2472,7 +2478,7 @@ static void lineart_main_get_view_vector(LineartRenderBuffer *rb)
   invert_m4_m4(inv, obmat_no_scale);
   transpose_m4(inv);
   mul_v3_mat3_m4v3(trans, inv, direction);
-  copy_m4_m4(rb->cam_obmat,obmat_no_scale);
+  copy_m4_m4(rb->cam_obmat, obmat_no_scale);
   copy_v3db_v3fl(rb->view_vector, trans);
 }
 
@@ -3927,7 +3933,7 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
 
 #undef LRT_PROGRESS
 #undef LRT_CANCEL_STAGE
-  if(G.debug_value == 4000){
+  if (G.debug_value == 4000) {
     lineart_count_and_print_render_buffer_memory(rb);
   }
 
