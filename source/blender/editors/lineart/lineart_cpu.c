@@ -4195,7 +4195,7 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *depsgraph,
           continue;
         }
         LISTBASE_FOREACH (bDeformGroup *, db, &eval_ob->defbase) {
-          if (strstr(db->name, source_vgname) == db->name) {
+          if ((!source_vgname) || strstr(db->name, source_vgname) == db->name) {
             if (match_output) {
               gpdg = BKE_object_defgroup_name_index(gpencil_object, db->name);
               if (gpdg < 0) {

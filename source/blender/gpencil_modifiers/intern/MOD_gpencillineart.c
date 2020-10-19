@@ -433,10 +433,7 @@ static void vgroup_panel_draw(const bContext *C, Panel *panel)
 
   uiLayoutSetPropSep(layout, true);
 
-  uiItemR(layout, ptr, "soft_selection", 0, NULL, ICON_NONE);
-
   row = uiLayoutRow(layout, true);
-  uiItemR(row, ptr, "source_vertex_group", 0, "Source", ICON_GROUP_VERTEX);
   uiItemR(row, ptr, "invert_source_vertex_group", UI_ITEM_R_TOGGLE, "", ICON_ARROW_LEFTRIGHT);
 
   uiItemR(layout, ptr, "match_output_vertex_group", 0, NULL, ICON_NONE);
@@ -445,6 +442,9 @@ static void vgroup_panel_draw(const bContext *C, Panel *panel)
   if (!match_output) {
     uiItemPointerR(layout, ptr, "vertex_group", &ob_ptr, "vertex_groups", "Target", ICON_NONE);
   }
+
+  uiItemR(layout, ptr, "soft_selection", 0, NULL, ICON_NONE);
+  uiItemR(row, ptr, "source_vertex_group", 0, "Filter source", ICON_GROUP_VERTEX);
 }
 
 static void panelRegister(ARegionType *region_type)
@@ -455,7 +455,7 @@ static void panelRegister(ARegionType *region_type)
   gpencil_modifier_subpanel_register(
       region_type, "occlusion", "Occlusion", NULL, occlusion_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
-      region_type, "vgroup", "Vertex Group", NULL, vgroup_panel_draw, panel_type);
+      region_type, "vgroup", "Vertex Weight Transfer", NULL, vgroup_panel_draw, panel_type);
 }
 
 GpencilModifierTypeInfo modifierType_Gpencil_Lineart = {

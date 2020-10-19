@@ -2385,9 +2385,10 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "source_vertex_group", PROP_STRING, PROP_NONE);
-  RNA_def_property_ui_text(prop,
-                           "Source Vertex Group",
-                           "Matches the beginning of names of vertex groups from mesh objects");
+  RNA_def_property_ui_text(
+      prop,
+      "Source Vertex Group",
+      "Matches the beginning of vertex group names from mesh objects, match all when left empty");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "vertex_group", PROP_STRING, PROP_NONE);
