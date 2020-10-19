@@ -183,35 +183,36 @@ void lineart_matrix_ortho_44d(double (*mProjection)[4],
   mProjection[3][3] = 1.0f;
 }
 
-void lineart_count_and_print_render_buffer_memory(LineartRenderBuffer* rb){
-  int i=0;
+void lineart_count_and_print_render_buffer_memory(LineartRenderBuffer *rb)
+{
+  int i = 0;
   size_t total = 0;
   size_t sum_this = 0;
   size_t count_this = 0;
 
-  LISTBASE_FOREACH(LineartStaticMemPoolNode *, smpn, &rb->render_data_pool.pools){
+  LISTBASE_FOREACH (LineartStaticMemPoolNode *, smpn, &rb->render_data_pool.pools) {
     count_this++;
-    sum_this+=LRT_MEMORY_POOL_64MB;
+    sum_this += LRT_MEMORY_POOL_64MB;
   }
-  printf("LANPR Memory allocated %lu Standalone nodes, total %lu Bytes.\n",count_this,sum_this);
+  printf("LANPR Memory allocated %lu Standalone nodes, total %lu Bytes.\n", count_this, sum_this);
   total += sum_this;
   sum_this = 0;
   count_this = 0;
 
-  LISTBASE_FOREACH(LineartRenderElementLinkNode *, reln, &rb->line_buffer_pointers){
+  LISTBASE_FOREACH (LineartRenderElementLinkNode *, reln, &rb->line_buffer_pointers) {
     count_this++;
-    sum_this+=reln->element_count*sizeof(LineartRenderLine);
+    sum_this += reln->element_count * sizeof(LineartRenderLine);
   }
-  printf("             allocated %lu edge blocks, total %lu Bytes.\n",count_this,sum_this);
+  printf("             allocated %lu edge blocks, total %lu Bytes.\n", count_this, sum_this);
   total += sum_this;
   sum_this = 0;
   count_this = 0;
 
-  LISTBASE_FOREACH(LineartRenderElementLinkNode *, reln, &rb->triangle_buffer_pointers){
+  LISTBASE_FOREACH (LineartRenderElementLinkNode *, reln, &rb->triangle_buffer_pointers) {
     count_this++;
-    sum_this+=reln->element_count*rb->triangle_size;
+    sum_this += reln->element_count * rb->triangle_size;
   }
-  printf("             allocated %lu triangle blocks, total %lu Bytes.\n",count_this,sum_this);
+  printf("             allocated %lu triangle blocks, total %lu Bytes.\n", count_this, sum_this);
   total += sum_this;
   sum_this = 0;
   count_this = 0;
