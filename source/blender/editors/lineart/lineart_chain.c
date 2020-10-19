@@ -770,6 +770,28 @@ static LineartChainRegisterEntry *lineart_chain_get_closest_cre(LineartRenderBuf
       }
     }
   }
+  float adjacent_new_len=dist; /* We want a closer point anyway. So using modified dist is fine. */
+  LineartChainRegisterEntry* adjacent_closest;
+
+#define LRT_TEST_ADJACENT_AREAS(dist_to, list)\
+  if(dist_to<dist && dist_to>0){\
+    LISTBASE_FOREACH(LinkData* ,ld,list){\
+      adjacent_closest = lineart_chain_get_closest_cre(rb,(LineartBoundingArea*)ld->data,rlc,rlci,occlusion,transparency_mask,dist,do_geometry_space,&adjacent_new_len);\
+      if(adjacent_new_len < dist){\
+        dist=  adjacent_new_len;\
+        closest_cre = adjacent_closest;\
+      }\
+    }\
+  }
+  if(!do_geometry_space){
+    LRT_TEST_ADJACENT_AREAS(rlci->pos[0] - ba->l, &ba->lp);
+    LRT_TEST_ADJACENT_AREAS(ba->r - rlci->pos[0], &ba->rp);
+    LRT_TEST_ADJACENT_AREAS(ba->u - rlci->pos[1], &ba->up);
+    LRT_TEST_ADJACENT_AREAS(rlci->pos[1] - ba->b, &ba->bp);
+  }
+  if (result_new_len) {
+    (*result_new_len) = dist;
+  }
   return closest_cre;
 }
 
