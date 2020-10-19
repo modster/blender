@@ -21,7 +21,6 @@
  * \ingroup edinterface
  */
 
-#include <assert.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -3046,7 +3045,7 @@ void ui_draw_gradient(const rcti *rect,
       copy_v3_v3(col1[3], col1[2]);
       break;
     default:
-      assert(!"invalid 'type' argument");
+      BLI_assert(!"invalid 'type' argument");
       hsv_to_rgb(1.0, 1.0, 1.0, &col1[2][0], &col1[2][1], &col1[2][2]);
       copy_v3_v3(col1[0], col1[2]);
       copy_v3_v3(col1[1], col1[2]);
@@ -4200,7 +4199,7 @@ static void widget_tab(uiWidgetColors *wcol, rcti *rect, int state, int roundbox
 
   /* Draw shaded outline - Disabled for now,
    * seems incorrect and also looks nicer without it imho ;) */
-  //#define USE_TAB_SHADED_HIGHLIGHT
+  // #define USE_TAB_SHADED_HIGHLIGHT
 
   uiWidgetBase wtb;
   uchar theme_col_tab_highlight[3];
@@ -4957,7 +4956,7 @@ static void ui_draw_popover_back_impl(const uiWidgetColors *wcol,
 
     GPU_blend(GPU_BLEND_ALPHA);
     immBegin(GPU_PRIM_TRIS, 3);
-    immUniformColor4ub(UNPACK3(wcol->outline), 166);
+    immUniformColor4ubv(wcol->outline);
     immVertex2f(pos, cent_x - unit_half, y);
     immVertex2f(pos, cent_x + unit_half, y);
     immVertex2f(pos, cent_x, y + sign * unit_half);
