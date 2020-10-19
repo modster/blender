@@ -890,7 +890,7 @@ static void rna_def_modifier_gpencilthick(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "use_fading", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_THICK_FADING);
-  RNA_def_property_ui_text(prop, "use_fading", "Fading effect");
+  RNA_def_property_ui_text(prop, "Fading", "Fading effect");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   /* Distance reference object */
@@ -911,6 +911,13 @@ static void rna_def_modifier_gpencilthick(BlenderRNA *brna)
   RNA_def_property_float_sdna(prop, NULL, "fading_end");
   RNA_def_property_ui_range(prop, 0, 1000.0, 1.0, 2);
   RNA_def_property_ui_text(prop, "Fading End", "End distance of fading effect");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
+  prop = RNA_def_property(srna, "fading_end_factor", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "fading_end_factor");
+  RNA_def_property_range(prop, 0.0, FLT_MAX);
+  RNA_def_property_ui_range(prop, 0.0, 10.0, 0.1, 3);
+  RNA_def_property_ui_text(prop, "End Factor", "Fading end thickness factor");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "pass_index", PROP_INT, PROP_NONE);
@@ -1404,7 +1411,7 @@ static void rna_def_modifier_gpencilopacity(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "use_fading", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_OPACITY_FADING);
-  RNA_def_property_ui_text(prop, "use_fading", "Fading effect");
+  RNA_def_property_ui_text(prop, "Fading", "Fading effect");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   /* Distance reference object */
@@ -1425,6 +1432,13 @@ static void rna_def_modifier_gpencilopacity(BlenderRNA *brna)
   RNA_def_property_float_sdna(prop, NULL, "fading_end");
   RNA_def_property_ui_range(prop, 0, 1000.0, 1.0, 2);
   RNA_def_property_ui_text(prop, "Fading End", "End distance of fading effect");
+  RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
+
+  prop = RNA_def_property(srna, "fading_end_factor", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "fading_end_factor");
+  RNA_def_property_range(prop, 0.0, FLT_MAX);
+  RNA_def_property_ui_range(prop, 0.0, 10.0, 0.1, 3);
+  RNA_def_property_ui_text(prop, "End Factor", "Fading end thickness factor");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "pass_index", PROP_INT, PROP_NONE);

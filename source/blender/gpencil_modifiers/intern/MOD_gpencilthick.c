@@ -155,8 +155,6 @@ static void deformStroke(GpencilModifierData *md,
       }
     }
 
-    curvef *= factor_depth;
-
     if ((mmd->flag & GP_THICK_CUSTOM_CURVE) && (mmd->curve_thickness)) {
       /* Normalize value to evaluate curve. */
       float value = (float)i / (gps->totpoints - 1);
@@ -172,6 +170,9 @@ static void deformStroke(GpencilModifierData *md,
       target = pt->pressure * mmd->thickness_fac;
       weight *= curvef;
     }
+
+    float fac_begin = mmd->flag & GP_THICK_NORMALIZE ? 1 : mmd->thickness_fac;
+    target *= interpf(fac_begin, mmd->fading_end_factor, factor_depth);
 
     pt->pressure = interpf(target, pt->pressure, weight);
 
@@ -227,6 +228,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
     uiLayout *sub = uiLayoutColumn(layout, true);
     uiItemR(sub, ptr, "fading_start", 0, NULL, ICON_NONE);
     uiItemR(sub, ptr, "fading_end", 0, NULL, ICON_NONE);
+    uiItemR(layout, ptr, "fading_end_factor", 0, NULL, ICON_NONE);
   }
   gpencil_modifier_panel_end(layout, ptr);
 }

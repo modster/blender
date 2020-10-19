@@ -180,9 +180,9 @@ typedef struct ThickGpencilModifierData {
   /** Start/end distances of the fading effect. */
   float fading_start;
   float fading_end;
+  float fading_end_factor;
   /** Custom index for passes. */
   int layer_pass;
-  char _pad[4];
   struct CurveMapping *curve_thickness;
 } ThickGpencilModifierData;
 
@@ -293,9 +293,10 @@ typedef struct OpacityGpencilModifierData {
   /** Start/end distances of the fading effect. */
   float fading_start;
   float fading_end;
+  float fading_end_factor;
   /** Modify stroke, fill or both. */
   char modify_color;
-  char _pad1[7];
+  char _pad1[3];
   /** Custom index for passes. */
   int layer_pass;
 

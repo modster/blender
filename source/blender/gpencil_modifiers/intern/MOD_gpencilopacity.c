@@ -87,6 +87,37 @@ static void copyData(const GpencilModifierData *md, GpencilModifierData *target)
   tgmd->curve_intensity = BKE_curvemapping_copy(gmd->curve_intensity);
 }
 
+static float give_opacity_fading_factor(OpacityGpencilModifierData *mmd,
+                                        Object *ob_this,
+                                        float *pos,
+                                        bool apply_obmat)
+{
+  float factor_depth = 1;
+  if (mmd->flag & GP_OPACITY_FADING) {
+    if (mmd->object) {
+      float gvert[3];
+      if (apply_obmat) {
+        mul_v3_m4v3(gvert, ob_this->obmat, pos);
+      }
+      float dist = len_v3v3(mmd->object->obmat[3], gvert);
+      float fading_max = MAX2(mmd->fading_start, mmd->fading_end);
+      float fading_min = MIN2(mmd->fading_start, mmd->fading_end);
+
+      /* Better with ratiof() function from line art. */
+      if (dist > fading_max) {
+        factor_depth = 0;
+      }
+      else if (dist <= fading_max && dist > fading_min) {
+        factor_depth = (fading_max - dist) / (fading_max - fading_min);
+      }
+      else {
+        factor_depth = 1;
+      }
+    }
+  }
+  return factor_depth;
+}
+
 /* opacity strokes */
 static void deformStroke(GpencilModifierData *md,
                          Depsgraph *UNUSED(depsgraph),
@@ -140,29 +171,8 @@ static void deformStroke(GpencilModifierData *md,
         factor_curve *= BKE_curvemapping_evaluateF(mmd->curve_intensity, 0, value);
       }
 
-      float factor_depth = 1;
-      if (mmd->flag & GP_OPACITY_FADING) {
-        if (mmd->object) {
-          float gvert[3];
-          mul_v3_m4v3(gvert, ob->obmat, &pt->x);
-          float dist = len_v3v3(mmd->object->obmat[3], gvert);
-          float fading_max = MAX2(mmd->fading_start, mmd->fading_end);
-          float fading_min = MIN2(mmd->fading_start, mmd->fading_end);
-
-          /* Better with ratiof() function from line art. */
-          if (dist > fading_max) {
-            factor_depth = 0;
-          }
-          else if (dist <= fading_max && dist > fading_min) {
-            factor_depth = (fading_max - dist) / (fading_max - fading_min);
-          }
-          else {
-            factor_depth = 1;
-          }
-        }
-      }
-
-      factor_curve *= factor_depth;
+      float factor_depth = give_opacity_fading_factor(mmd, ob, &pt->x, true);
+      factor_curve = interpf(mmd->factor, mmd->fading_end_factor, factor_depth);
 
       if (def_nr < 0) {
         if (mmd->flag & GP_OPACITY_NORMALIZE) {
@@ -195,28 +205,8 @@ static void deformStroke(GpencilModifierData *md,
 
     gps->fill_opacity_fac = mmd->factor;
 
-    float factor_depth = 1;
-    if (mmd->flag & GP_OPACITY_FADING) {
-      if (mmd->object) {
-
-        float dist = len_v3v3(mmd->object->obmat[3], ob->obmat[3]);
-        float fading_max = MAX2(mmd->fading_start, mmd->fading_end);
-        float fading_min = MIN2(mmd->fading_start, mmd->fading_end);
-
-        /* Better with ratiof() function from line art. */
-        if (dist > fading_max) {
-          factor_depth = 0;
-        }
-        else if (dist <= fading_max && dist > fading_min) {
-          factor_depth = (fading_max - dist) / (fading_max - fading_min);
-        }
-        else {
-          factor_depth = 1;
-        }
-      }
-    }
-
-    gps->fill_opacity_fac *= factor_depth;
+    float factor_depth = give_opacity_fading_factor(mmd, ob, ob->obmat[3], true);
+    gps->fill_opacity_fac = interpf(mmd->factor, mmd->fading_end_factor, factor_depth);
 
     CLAMP(gps->fill_opacity_fac, 0.0f, 1.0f);
   }
@@ -284,6 +274,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
     uiLayout *sub = uiLayoutColumn(layout, true);
     uiItemR(sub, ptr, "fading_start", 0, NULL, ICON_NONE);
     uiItemR(sub, ptr, "fading_end", 0, NULL, ICON_NONE);
+    uiItemR(layout, ptr, "fading_end_factor", 0, NULL, ICON_NONE);
   }
 
   gpencil_modifier_panel_end(layout, ptr);
