@@ -5115,16 +5115,6 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
     }
 
-    for (Scene *scene = bmain->scenes.first; scene; scene = scene->id.next) {
-      if (!DNA_struct_find(fd->filesdna, "SceneLineart")) {
-        for (Scene *scene = bmain->scenes.first; scene; scene = scene->id.next) {
-          scene->lineart.crease_threshold = 145.0f; /* in degrees. */
-          scene->lineart.line_types |= LRT_EDGE_FLAG_ALL_TYPE;
-          scene->lineart.flags |= LRT_ALLOW_DUPLI_OBJECTS;
-        }
-      }
-    }
-
     for (wmWindowManager *wm = bmain->wm.first; wm; wm = wm->id.next) {
       /* Don't rotate light with the viewer by default, make it fixed. Shading settings can't be
        * edited and this flag should always be set. So we can always execute this. */

@@ -760,6 +760,7 @@ class RENDER_PT_lineart_line_types(RenderButtonsPanel, Panel):
         layout.prop(lineart, "allow_duplication", text="Allow Instances")
         layout.prop(lineart, "allow_overlapping_edges")
         layout.prop(lineart, "allow_clipping_boundaries")
+        layout.prop(lineart, "remove_doubles")
 
 
 class RENDER_PT_lineart_baking(RenderButtonsPanel, Panel):

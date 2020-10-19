@@ -37,6 +37,7 @@
 #include "BKE_curve.h"
 #include "BKE_customdata.h"
 #include "BKE_deform.h"
+#include "BKE_editmesh.h"
 #include "BKE_global.h"
 #include "BKE_gpencil.h"
 #include "BKE_gpencil_geom.h"
@@ -1592,6 +1593,30 @@ static void lineart_geometry_object_load(Depsgraph *dg,
                        &((struct BMeshFromMeshParams){
                            .calc_face_normal = true,
                        }));
+
+    if (rb->remove_doubles) {
+      BMEditMesh *em = BKE_editmesh_create(bm, false);
+      BMOperator findop, weldop;
+      BMO_op_initf(bm,
+                   &findop,
+                   BMO_FLAG_DEFAULTS,
+                   "find_doubles verts=%av keep_verts=%Hv dist=%f",
+                   BM_ELEM_SELECT,
+                   0.0001);
+
+      BMO_op_exec(bm, &findop);
+
+      /* weld the vertices */
+      BMO_op_init(bm, &weldop, BMO_FLAG_DEFAULTS, "weld_verts");
+      BMO_slot_copy(&findop, slots_out, "targetmap.out", &weldop, slots_in, "targetmap");
+      BMO_op_exec(bm, &weldop);
+
+      BMO_op_finish(bm, &findop);
+      BMO_op_finish(bm, &weldop);
+
+      MEM_freeN(em);
+    }
+
     BM_mesh_elem_hflag_disable_all(bm, BM_FACE | BM_EDGE, BM_ELEM_TAG, false);
     BM_mesh_triangulate(
         bm, MOD_TRIANGULATE_QUAD_BEAUTY, MOD_TRIANGULATE_NGON_BEAUTY, 4, false, NULL, NULL, NULL);
@@ -2727,6 +2752,7 @@ LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene)
   rb->fuzzy_intersections = (scene->lineart.flags & LRT_INTERSECTION_AS_CONTOUR) != 0;
   rb->fuzzy_everything = (scene->lineart.flags & LRT_EVERYTHING_AS_CONTOUR) != 0;
   rb->allow_boundaries = (scene->lineart.flags & LRT_ALLOW_CLIPPING_BOUNDARIES) != 0;
+  rb->remove_doubles = (scene->lineart.flags & LRT_REMOVE_DOUBLES) != 0;
 
   rb->use_contour = (scene->lineart.line_types & LRT_EDGE_FLAG_CONTOUR) != 0;
   rb->use_crease = (scene->lineart.line_types & LRT_EDGE_FLAG_CREASE) != 0;

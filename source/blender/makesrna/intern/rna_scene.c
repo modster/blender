@@ -7444,6 +7444,13 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
   RNA_def_property_ui_range(prop, 0.0f, DEG2RAD(179), 0.01f, 2);
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
+  prop = RNA_def_property(srna, "remove_doubles", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_REMOVE_DOUBLES);
+  RNA_def_property_boolean_default(prop, 0);
+  RNA_def_property_ui_text(
+      prop, "Remove Doubles", "Remove doubles internally when running line art");
+  RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
+
   /* types */
   prop = RNA_def_property(srna, "use_contour", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "line_types", LRT_EDGE_FLAG_CONTOUR);
