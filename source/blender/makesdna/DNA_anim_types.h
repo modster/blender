@@ -100,8 +100,10 @@ typedef enum eFModifier_Types {
 typedef enum eFModifier_Flags {
   /** Modifier is not able to be evaluated for some reason, and should be skipped (internal). */
   FMODIFIER_FLAG_DISABLED = (1 << 0),
+#ifdef DNA_DEPRECATED_ALLOW
   /** Modifier's data is expanded (in UI). */
-  FMODIFIER_FLAG_EXPANDED_DEPRECATED = (1 << 1),
+  FMODIFIER_FLAG_EXPANDED = (1 << 1),
+#endif
   /** Modifier is active one (in UI) for editing purposes. */
   FMODIFIER_FLAG_ACTIVE = (1 << 2),
   /** User wants modifier to be skipped. */

@@ -63,15 +63,11 @@ static void fmodifier_panel_header(const bContext *C, Panel *panel);
 
 static PointerRNA *fmodifier_get_pointers(const Panel *panel, ID **r_owner_id)
 {
-  /* TODO(Hans): Use #UI_panel_custom_data_get. */
-  PointerRNA *ptr = panel->runtime.custom_data_ptr;
+  PointerRNA *ptr = UI_panel_custom_data_get(panel);
 
   if (r_owner_id != NULL) {
     *r_owner_id = ptr->owner_id;
   }
-
-  // FModifier *fcm = (FModifier *)ptr->data;
-  // uiLayoutSetActive(panel->layout, !(fcu->flag & FCURVE_MOD_OFF));
 
   return ptr;
 }
@@ -148,16 +144,15 @@ static PanelType *fmodifier_panel_register(ARegionType *region_type,
 {
   /* Get the name for the modifier's panel. */
   char panel_idname[BKE_ST_MAXNAME];
-  snprintf(panel_idname, BKE_ST_MAXNAME, "%s_PT_", id_prefix);
   const FModifierTypeInfo *fmi = get_fmodifier_typeinfo(type);
-  strcat(panel_idname, fmi->name);
+  BLI_snprintf(panel_idname, BKE_ST_MAXNAME, "%s_PT_%s", id_prefix, fmi->name);
 
   PanelType *panel_type = MEM_callocN(sizeof(PanelType), panel_idname);
 
-  strcpy(panel_type->idname, panel_idname);
-  strcpy(panel_type->label, "");
-  strcpy(panel_type->category, "Modifiers");
-  strcpy(panel_type->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
+  /* Intentionally leave the label field blank. The header is filled with buttons. */
+  BLI_strncpy(panel_type->idname, panel_idname, BKE_ST_MAXNAME);
+  BLI_strncpy(panel_type->category, "Modifiers", BKE_ST_MAXNAME);
+  BLI_strncpy(panel_type->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA, BKE_ST_MAXNAME);
 
   panel_type->draw_header = fmodifier_panel_header;
   panel_type->draw = draw;
@@ -191,16 +186,14 @@ static PanelType *fmodifier_subpanel_register(ARegionType *region_type,
 {
   /* Create the subpanel's ID name. */
   char panel_idname[BKE_ST_MAXNAME];
-  strcpy(panel_idname, parent->idname);
-  strcat(panel_idname, "_");
-  strcat(panel_idname, name);
+  BLI_snprintf(panel_idname, BKE_ST_MAXNAME, "%s_%s", parent->idname, name);
 
   PanelType *panel_type = MEM_callocN(sizeof(PanelType), panel_idname);
 
-  strcpy(panel_type->idname, panel_idname);
-  strcpy(panel_type->label, label);
-  strcpy(panel_type->category, "Modifiers");
-  strcpy(panel_type->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
+  BLI_strncpy(panel_type->idname, panel_idname, BKE_ST_MAXNAME);
+  BLI_strncpy(panel_type->label, label, BKE_ST_MAXNAME);
+  BLI_strncpy(panel_type->category, "Modifiers", BKE_ST_MAXNAME);
+  BLI_strncpy(panel_type->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA, BKE_ST_MAXNAME);
 
   panel_type->draw_header = draw_header;
   panel_type->draw = draw;
@@ -208,7 +201,7 @@ static PanelType *fmodifier_subpanel_register(ARegionType *region_type,
   panel_type->flag = (PNL_DEFAULT_CLOSED | PNL_DRAW_BOX);
 
   BLI_assert(parent != NULL);
-  strcpy(panel_type->parent_id, parent->idname);
+  BLI_strncpy(panel_type->parent_id, parent->idname, BKE_ST_MAXNAME);
   panel_type->parent = parent;
   BLI_addtail(&parent->children, BLI_genericNodeN(panel_type));
   BLI_addtail(&region_type->paneltypes, panel_type);
@@ -311,12 +304,11 @@ static void fmodifier_panel_header(const bContext *C, Panel *panel)
   FModifier *fcm = (FModifier *)ptr->data;
   const FModifierTypeInfo *fmi = fmodifier_get_typeinfo(fcm);
 
-  uiBlock *block = uiLayoutGetBlock(layout);  // err...
+  uiBlock *block = uiLayoutGetBlock(layout);
 
   uiLayout *sub = uiLayoutRow(layout, true);
   uiLayoutSetAlignment(sub, UI_LAYOUT_ALIGN_LEFT);
-
-  UI_block_emboss_set(block, UI_EMBOSS_NONE);
+  uiLayoutSetEmboss(sub, UI_EMBOSS_NONE);
 
   /* Checkbox for 'active' status (for now). */
   uiItemR(sub, ptr, "active", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
@@ -332,11 +324,10 @@ static void fmodifier_panel_header(const bContext *C, Panel *panel)
   /* Right align. */
   sub = uiLayoutRow(layout, true);
   uiLayoutSetAlignment(sub, UI_LAYOUT_ALIGN_RIGHT);
+  uiLayoutSetEmboss(sub, UI_EMBOSS_NONE);
 
   /* 'Mute' button. */
   uiItemR(sub, ptr, "mute", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
-
-  UI_block_emboss_set(block, UI_EMBOSS_NONE);
 
   /* Delete button. */
   uiBut *but = uiDefIconBut(block,
@@ -364,8 +355,6 @@ static void fmodifier_panel_header(const bContext *C, Panel *panel)
   }
   BLI_assert(ctx->modifiers != NULL);
   UI_but_funcN_set(but, delete_fmodifier_cb, ctx, fcm);
-
-  UI_block_emboss_set(block, UI_EMBOSS);
 
   uiItemS(layout);
 }
@@ -554,9 +543,9 @@ static void generator_panel_draw(const bContext *UNUSED(C), Panel *panel)
   fmodifier_influence_draw(layout, ptr);
 }
 
-void ANIM_fcm_generator_panel_register(ARegionType *region_type,
-                                       const char *id_prefix,
-                                       PanelTypePollFn poll_fn)
+void ANIM_fmodifiers_generator_panel_register(ARegionType *region_type,
+                                              const char *id_prefix,
+                                              PanelTypePollFn poll_fn)
 {
   PanelType *panel_type = fmodifier_panel_register(
       region_type, FMODIFIER_TYPE_GENERATOR, generator_panel_draw, poll_fn, id_prefix);
@@ -598,9 +587,9 @@ static void fn_generator_panel_draw(const bContext *UNUSED(C), Panel *panel)
   fmodifier_influence_draw(layout, ptr);
 }
 
-void ANIM_fcm_fn_generator_panel_register(ARegionType *region_type,
-                                          const char *id_prefix,
-                                          PanelTypePollFn poll_fn)
+void ANIM_fmodifiers_generator_panel_register(ARegionType *region_type,
+                                              const char *id_prefix,
+                                              PanelTypePollFn poll_fn)
 {
   PanelType *panel_type = fmodifier_panel_register(
       region_type, FMODIFIER_TYPE_FN_GENERATOR, fn_generator_panel_draw, poll_fn, id_prefix);
@@ -642,9 +631,9 @@ static void cycles_panel_draw(const bContext *UNUSED(C), Panel *panel)
   fmodifier_influence_draw(layout, ptr);
 }
 
-void ANIM_fcm_cycles_panel_register(ARegionType *region_type,
-                                    const char *id_prefix,
-                                    PanelTypePollFn poll_fn)
+void ANIM_fmodifiers_cycles_panel_register(ARegionType *region_type,
+                                           const char *id_prefix,
+                                           PanelTypePollFn poll_fn)
 {
   PanelType *panel_type = fmodifier_panel_register(
       region_type, FMODIFIER_TYPE_CYCLES, cycles_panel_draw, poll_fn, id_prefix);
@@ -685,9 +674,9 @@ static void noise_panel_draw(const bContext *UNUSED(C), Panel *panel)
   fmodifier_influence_draw(layout, ptr);
 }
 
-void ANIM_fcm_noise_panel_register(ARegionType *region_type,
-                                   const char *id_prefix,
-                                   PanelTypePollFn poll_fn)
+void ANIM_fmodifiers_noise_panel_register(ARegionType *region_type,
+                                          const char *id_prefix,
+                                          PanelTypePollFn poll_fn)
 {
   PanelType *panel_type = fmodifier_panel_register(
       region_type, FMODIFIER_TYPE_NOISE, noise_panel_draw, poll_fn, id_prefix);
@@ -870,9 +859,9 @@ static void envelope_panel_draw(const bContext *UNUSED(C), Panel *panel)
   fmodifier_influence_draw(layout, ptr);
 }
 
-void ANIM_fcm_envelope_panel_register(ARegionType *region_type,
-                                      const char *id_prefix,
-                                      PanelTypePollFn poll_fn)
+void ANIM_fmodifiers_envelope_panel_register(ARegionType *region_type,
+                                             const char *id_prefix,
+                                             PanelTypePollFn poll_fn)
 {
   PanelType *panel_type = fmodifier_panel_register(
       region_type, FMODIFIER_TYPE_ENVELOPE, envelope_panel_draw, poll_fn, id_prefix);
@@ -931,9 +920,9 @@ static void limits_panel_draw(const bContext *UNUSED(C), Panel *panel)
   fmodifier_influence_draw(layout, ptr);
 }
 
-void ANIM_fcm_limits_panel_register(ARegionType *region_type,
-                                    const char *id_prefix,
-                                    PanelTypePollFn poll_fn)
+void ANIM_fmodifers_limits_panel_register(ARegionType *region_type,
+                                          const char *id_prefix,
+                                          PanelTypePollFn poll_fn)
 {
   PanelType *panel_type = fmodifier_panel_register(
       region_type, FMODIFIER_TYPE_LIMITS, limits_panel_draw, poll_fn, id_prefix);
@@ -983,9 +972,9 @@ static void stepped_panel_draw(const bContext *UNUSED(C), Panel *panel)
   fmodifier_influence_draw(layout, ptr);
 }
 
-void ANIM_fcm_stepped_panel_register(ARegionType *region_type,
-                                     const char *id_prefix,
-                                     PanelTypePollFn poll_fn)
+void ANIM_fmodifiers_stepped_panel_register(ARegionType *region_type,
+                                            const char *id_prefix,
+                                            PanelTypePollFn poll_fn)
 {
   PanelType *panel_type = fmodifier_panel_register(
       region_type, FMODIFIER_TYPE_STEPPED, stepped_panel_draw, poll_fn, id_prefix);

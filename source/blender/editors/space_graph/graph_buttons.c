@@ -1329,9 +1329,8 @@ static void graph_fmodifier_panel_id(void *fcm_link, char *r_name)
 {
   FModifier *fcm = (FModifier *)fcm_link;
   eFModifier_Types type = fcm->type;
-  snprintf(r_name, BKE_ST_MAXNAME, "%s_PT_", GRAPH_FMODIFIER_PANEL_PREFIX);
   const FModifierTypeInfo *fmi = get_fmodifier_typeinfo(type);
-  strcat(r_name, fmi->name);
+  BLI_snprintf(r_name, BKE_ST_MAXNAME, "%s_PT_%s", GRAPH_FMODIFIER_PANEL_PREFIX, fmi->name);
 }
 
 static void do_graph_region_modifier_buttons(bContext *C, void *UNUSED(arg), int event)
@@ -1444,13 +1443,13 @@ void graph_buttons_register(ARegionType *art)
   BLI_addtail(&art->paneltypes, pt);
 
   const char *fmodifier_panel_prefix = GRAPH_FMODIFIER_PANEL_PREFIX;
-  ANIM_fcm_generator_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
-  ANIM_fcm_fn_generator_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
-  ANIM_fcm_cycles_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
-  ANIM_fcm_noise_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
-  ANIM_fcm_envelope_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
-  ANIM_fcm_limits_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
-  ANIM_fcm_stepped_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
+  ANIM_fmodifiers_generator_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
+  ANIM_fmodifiers_generator_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
+  ANIM_fmodifiers_cycles_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
+  ANIM_fmodifiers_noise_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
+  ANIM_fmodifiers_envelope_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
+  ANIM_fmodifers_limits_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
+  ANIM_fmodifiers_stepped_panel_register(art, fmodifier_panel_prefix, graph_panel_poll);
 
   pt = MEM_callocN(sizeof(PanelType), "spacetype graph panel view");
   strcpy(pt->idname, "GRAPH_PT_view");

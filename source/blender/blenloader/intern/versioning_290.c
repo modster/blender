@@ -880,7 +880,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
     LISTBASE_FOREACH (bAction *, act, &bmain->actions) {
       LISTBASE_FOREACH (FCurve *, fcu, &act->curves) {
         LISTBASE_FOREACH (FModifier *, fcm, &fcu->modifiers) {
-          if (fcm->flag & FMODIFIER_FLAG_EXPANDED_DEPRECATED) {
+          if (fcm->flag & FMODIFIER_FLAG_EXPANDED) {
             fcm->ui_expand_flag = 1;
           }
           else {

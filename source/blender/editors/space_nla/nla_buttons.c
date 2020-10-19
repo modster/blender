@@ -555,7 +555,7 @@ static void nla_fmodifier_panel_id(void *fcm_link, char *r_name)
   eFModifier_Types type = fcm->type;
   snprintf(r_name, BKE_ST_MAXNAME, "%s_PT_", NLA_FMODIFIER_PANEL_PREFIX);
   const FModifierTypeInfo *fmi = get_fmodifier_typeinfo(type);
-  strcat(r_name, fmi->name);
+  BLI_snprintf(r_name, BKE_ST_MAXNAME, "%s_PT_%s", NLA_FMODIFIER_PANEL_PREFIX, fmi->name);
 }
 
 /* F-Modifiers for active NLA-Strip */
@@ -678,10 +678,10 @@ void nla_buttons_register(ARegionType *art)
   BLI_addtail(&art->paneltypes, pt);
 
   const char *modifier_panel_prefix = NLA_FMODIFIER_PANEL_PREFIX;
-  ANIM_fcm_generator_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
-  ANIM_fcm_fn_generator_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
-  ANIM_fcm_noise_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
-  ANIM_fcm_envelope_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
-  ANIM_fcm_limits_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
-  ANIM_fcm_stepped_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
+  ANIM_fmodifiers_generator_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
+  ANIM_fmodifiers_generator_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
+  ANIM_fmodifiers_noise_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
+  ANIM_fmodifiers_envelope_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
+  ANIM_fmodifers_limits_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
+  ANIM_fmodifiers_stepped_panel_register(art, modifier_panel_prefix, nla_strip_eval_panel_poll);
 }
