@@ -35,6 +35,9 @@ set(INC
   ../windowmanager
   ../../../intern/eigen
   ../../../intern/guardedalloc
+
+  # dna_type_offsets.h in BLO_read_write.h
+  ${CMAKE_BINARY_DIR}/source/blender/makesdna/intern
 )
 
 set(INC_SYS
@@ -84,3 +87,5 @@ endif()
 add_definitions(${GL_DEFINITIONS})
 
 blender_add_lib(bf_gpencil_modifiers "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+add_dependencies(bf_gpencil_modifiers bf_dna)
