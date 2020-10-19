@@ -31,6 +31,7 @@
 #include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdGeom/mesh.h>
+#include <pxr/usd/usdGeom/scope.h>
 #include <pxr/usd/usdGeom/tokens.h>
 #include <pxr/usd/usdGeom/xformable.h>
 
@@ -92,10 +93,10 @@ static UsdObjectReader *get_reader(const pxr::UsdPrim &prim, const USDImporterCo
 {
   UsdObjectReader *result = nullptr;
 
-  if (prim.GetTypeName() == usdtokens::mesh_type) {
+  if (prim.IsA<pxr::UsdGeomMesh>()) {
     result = new UsdMeshReader(prim, context);
   }
-  else if (prim.GetTypeName() == usdtokens::xform_type) {
+  else if (prim.IsA<pxr::UsdGeomXform>()) {
     result = new UsdTransformReader(prim, context);
   }
 
@@ -347,7 +348,7 @@ void create_readers(const pxr::UsdPrim &prim,
     return;
   }
 
-  bool is_root = prim.GetTypeName().IsEmpty();
+  bool is_root = prim.IsPseudoRoot();
 
   std::vector<UsdObjectReader *> child_readers;
 
@@ -367,9 +368,7 @@ void create_readers(const pxr::UsdPrim &prim,
   /* We prune away empty transform or scope hierarchies (we can add an import flag to make this
    * behavior optional).  Therefore, we skip this prim if it's an Xform or Scope and if
    * it has no corresponding child readers. */
-  if ((prim.GetTypeName() == usdtokens::xform_type ||
-       prim.GetTypeName() == usdtokens::scope_type) &&
-      child_readers.empty()) {
+  if ((prim.IsA<pxr::UsdGeomXform>() || prim.IsA<pxr::UsdGeomScope>()) && child_readers.empty()) {
     return;
   }
 
@@ -379,9 +378,9 @@ void create_readers(const pxr::UsdPrim &prim,
    * can be merged will be expanded as we support more reader types
    * (e.g., for lights, curves, etc.). */
 
-  if (prim.GetTypeName() == usdtokens::xform_type && child_readers.size() == 1 &&
+  if (prim.IsA<pxr::UsdGeomXform>() && child_readers.size() == 1 &&
       !child_readers.front()->merged_with_parent() &&
-      child_readers.front()->prim().GetTypeName() == usdtokens::mesh_type) {
+      child_readers.front()->prim().IsA<pxr::UsdGeomMesh>()) {
     child_readers.front()->set_merged_with_parent(true);
     /* Don't create a reader for the Xform but, instead, return the grandchild
      * that we merged. */
