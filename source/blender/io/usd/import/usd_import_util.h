@@ -57,10 +57,6 @@ BLI_INLINE void copy_zup_from_yup(float zup[3], const float yup[3])
   zup[2] = old_yup1;
 }
 
-void create_readers(const pxr::UsdStageRefPtr &usd_stage,
-                    const USDImporterContext &context,
-                    std::vector<UsdObjectReader *> &r_readers);
-
 void create_readers(const pxr::UsdPrim &root,
                     const USDImporterContext &context,
                     std::vector<UsdObjectReader *> &r_readers,
