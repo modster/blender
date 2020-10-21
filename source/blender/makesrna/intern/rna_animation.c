@@ -134,6 +134,23 @@ static void rna_AnimData_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *p
   ANIM_id_update(bmain, id);
 }
 
+static void rna_AnimData_upper_stack_evaluation_set(PointerRNA *ptr, const bool value)
+{
+  AnimData *adt = (AnimData *)ptr->data;
+  if ((adt->flag & ADT_NLA_EDIT_ON) && adt->act_track) {
+
+    if (value) {
+      for (NlaTrack *nlt = adt->act_track; nlt; nlt = nlt->next) {
+        nlt->flag &= ~NLATRACK_DISABLED;
+      }
+    }
+    else {
+      for (NlaTrack *nlt = adt->act_track; nlt; nlt = nlt->next) {
+        nlt->flag |= NLATRACK_DISABLED;
+      }
+    }
+  }
+}
 static void rna_AnimData_dependency_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
   DEG_relations_tag_update(bmain);
@@ -1384,8 +1401,14 @@ static void rna_def_animdata(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Pin in Graph Editor", "");
   RNA_def_property_update(prop, NC_ANIMATION | ND_ANIMCHAN | NA_EDITED, NULL);
 
-  RNA_define_lib_overridable(false);
+  prop = RNA_def_property(srna, "use_upper_stack_evaluation", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", ADT_NLA_EVAL_UPPER_TRACKS);
+  RNA_def_property_boolean_funcs(prop, NULL, "rna_AnimData_upper_stack_evaluation_set");
+  RNA_def_property_ui_text(prop, "Evaluate tracks above tweaked strip. ", "");
+  RNA_def_property_update(
+      prop, NC_ANIMATION | ND_ANIMCHAN | NA_EDITED | ND_NLA, "rna_AnimData_update");
 
+  RNA_define_lib_overridable(false);
   /* Animation Data API */
   RNA_api_animdata(srna);
 }

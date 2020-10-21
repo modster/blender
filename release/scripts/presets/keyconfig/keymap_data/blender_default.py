@@ -2167,6 +2167,9 @@ def km_nla_generic(_params):
          {"properties": [("isolate_action", True)]}),
         ("nla.tweakmode_exit", {"type": 'TAB', "value": 'PRESS', "shift": True},
          {"properties": [("isolate_action", True)]}),
+        ("nla.tweakmode_enter", {"type": 'TAB', "value": 'PRESS', "ctrl": True},
+         {"properties": [("use_upper_stack_evaluation", False)]}),
+        ("nla.tweakmode_exit", {"type": 'TAB', "value": 'PRESS', "ctrl": True},None),
         ("anim.channels_find", {"type": 'F', "value": 'PRESS', "ctrl": True}, None),
     ])
 

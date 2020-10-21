@@ -217,8 +217,10 @@ struct NlaKeyframingContext *BKE_animsys_get_nla_keyframing_context(
     const struct AnimationEvalContext *anim_eval_context,
     const bool flush_to_original);
 bool BKE_animsys_nla_remap_keyframe_values(struct NlaKeyframingContext *context,
+                                           const AnimationEvalContext *anim_eval_context,
                                            struct PointerRNA *prop_ptr,
                                            struct PropertyRNA *prop,
+                                           char rna_path[],
                                            float *values,
                                            int count,
                                            int index,

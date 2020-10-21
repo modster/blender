@@ -79,6 +79,15 @@ typedef struct NlaValidMask {
 typedef struct NlaEvalChannelSnapshot {
   struct NlaEvalChannel *channel;
 
+  /** Only used for keyframe remapping for inverting through a transition. Bit set if raw value was
+   * written so we know where the channel value comes from (whether it's the property's default or
+   * from the strip). */
+  NlaValidMask raw_value_sampled;
+
+  /** Only used for keyframe remapping to know whether channel value can be further inverted to
+   * solve for tweak strip value. */
+  NlaValidMask invertible;
+
   int length;   /* Number of values in the property. */
   bool is_base; /* Base snapshot of the channel. */
 
@@ -155,7 +164,11 @@ typedef struct NlaKeyframingContext {
   /* Data of the currently edited strip (copy, or fake strip for the main action). */
   NlaStrip strip;
   NlaEvalStrip *eval_strip;
+  /** Storage for the non-stashed action as a strip. Only used for keyframing. */
+  NlaStrip nonuser_act_strip;
 
+  /* Strips above tweaked strip. */
+  ListBase upper_estrips;
   /* Evaluated NLA stack below the tweak strip. */
   NlaEvalData lower_nla_channels;
 } NlaKeyframingContext;
@@ -181,6 +194,21 @@ void nlastrip_evaluate(PointerRNA *ptr,
                        NlaEvalSnapshot *snapshot,
                        const struct AnimationEvalContext *anim_eval_context,
                        const bool flush_to_original);
+void nlastrip_evaluate_invert_get_lower_values(
+    PointerRNA *ptr,
+    NlaEvalData *upper_eval_data,
+    ListBase *modifiers,
+    NlaEvalStrip *nes,
+    NlaEvalSnapshot *snapshot,
+    const struct AnimationEvalContext *anim_eval_context);
+void nlastrip_evaluate_raw_value(PointerRNA *ptr,
+                                 NlaEvalData *upper_eval_data,
+                                 ListBase *modifiers,
+                                 NlaEvalStrip *nes,
+                                 NlaEvalSnapshot *snapshot,
+                                 const struct AnimationEvalContext *anim_eval_context,
+                                 short *r_blendmode,
+                                 float *r_influence);
 void nladata_flush_channels(PointerRNA *ptr,
                             NlaEvalData *channels,
                             NlaEvalSnapshot *snapshot,

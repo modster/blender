@@ -1116,8 +1116,10 @@ static float *visualkey_get_values(
 static float *get_keyframe_values(ReportList *reports,
                                   PointerRNA ptr,
                                   PropertyRNA *prop,
+                                  char rna_path[],
                                   int index,
                                   struct NlaKeyframingContext *nla_context,
+                                  const AnimationEvalContext *anim_eval_context,
                                   eInsertKeyFlags flag,
                                   float *buffer,
                                   int buffer_size,
@@ -1139,8 +1141,15 @@ static float *get_keyframe_values(ReportList *reports,
   }
 
   /* adjust the value for NLA factors */
-  if (!BKE_animsys_nla_remap_keyframe_values(
-          nla_context, &ptr, prop, values, *r_count, index, r_force_all)) {
+  if (!BKE_animsys_nla_remap_keyframe_values(nla_context,
+                                             anim_eval_context,
+                                             &ptr,
+                                             prop,
+                                             rna_path,
+                                             values,
+                                             *r_count,
+                                             index,
+                                             r_force_all)) {
     BKE_report(
         reports, RPT_ERROR, "Could not insert keyframe due to zero NLA influence or base value");
 
@@ -1300,8 +1309,10 @@ bool insert_keyframe_direct(ReportList *reports,
   float *values = get_keyframe_values(reports,
                                       ptr,
                                       prop,
+                                      fcu->rna_path,
                                       index,
                                       nla_context,
+                                      anim_eval_context,
                                       flag,
                                       value_buffer,
                                       RNA_MAX_ARRAY_LENGTH,
@@ -1474,8 +1485,10 @@ int insert_keyframe(Main *bmain,
   float *values = get_keyframe_values(reports,
                                       ptr,
                                       prop,
+                                      rna_path,
                                       array_index,
                                       nla_context,
+                                      anim_eval_context,
                                       flag,
                                       value_buffer,
                                       RNA_MAX_ARRAY_LENGTH,
