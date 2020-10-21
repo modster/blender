@@ -130,6 +130,12 @@ void lineart_mem_destroy(LineartStaticMemPool *smp)
   }
 }
 
+void lineart_prepend_line_direct(LineartRenderLine** first, void* node){
+  LineartRenderLine* ln = (LineartRenderLine*)node;
+  ln->next = (*first);
+  (*first) = ln;
+}
+
 /* =======================================================================[str] */
 
 void lineart_matrix_perspective_44d(

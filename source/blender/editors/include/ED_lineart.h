@@ -126,7 +126,8 @@ typedef struct LineartRenderVert {
 } LineartRenderVert;
 
 typedef struct LineartRenderLine {
-  struct LineartRenderLine *next, *prev; /* Maybe we won't need this anymore, just use another flag. */
+  /* We only need link node kind of list here. */
+  struct LineartRenderLine* next;
   struct LineartRenderVert *l, *r;
   struct LineartRenderTriangle *tl, *tr;
   ListBase segments;
@@ -202,7 +203,6 @@ typedef struct LineartRenderBuffer {
   ListBase vertex_buffer_pointers;
   ListBase line_buffer_pointers;
   ListBase triangle_buffer_pointers;
-  ListBase all_render_lines;
 
   ListBase intersecting_vertex_buffer;
   /** Use the one comes with Line Art. */
@@ -219,28 +219,29 @@ typedef struct LineartRenderBuffer {
 
   unsigned int contour_count;
   unsigned int contour_processed;
-  LinkData *contour_managed;
-  ListBase contours;
+  LineartRenderLine *contour_managed;
+  /* Now changed to linknodes. */
+  LineartRenderLine *contours;
 
   unsigned int intersection_count;
   unsigned int intersection_processed;
-  LinkData *intersection_managed;
-  ListBase intersection_lines;
+  LineartRenderLine *intersection_managed;
+  LineartRenderLine *intersection_lines;
 
   unsigned int crease_count;
   unsigned int crease_processed;
-  LinkData *crease_managed;
-  ListBase crease_lines;
+  LineartRenderLine *crease_managed;
+  LineartRenderLine *crease_lines;
 
   unsigned int material_line_count;
   unsigned int material_processed;
-  LinkData *material_managed;
-  ListBase material_lines;
+  LineartRenderLine *material_managed;
+  LineartRenderLine *material_lines;
 
   unsigned int edge_mark_count;
   unsigned int edge_mark_processed;
-  LinkData *edge_mark_managed;
-  ListBase edge_marks;
+  LineartRenderLine *edge_mark_managed;
+  LineartRenderLine *edge_marks;
 
   ListBase chains;
 
@@ -382,20 +383,20 @@ typedef enum eLineartTriangleFlags {
 typedef struct LineartRenderTaskInfo {
   int thread_id;
 
-  LinkData *contour;
-  ListBase contour_pointers;
+  LineartRenderLine *contour;
+  LineartRenderLine *contour_end;
 
-  LinkData *intersection;
-  ListBase intersection_pointers;
+  LineartRenderLine *intersection;
+  LineartRenderLine *intersection_end;
 
-  LinkData *crease;
-  ListBase crease_pointers;
+  LineartRenderLine *crease;
+  LineartRenderLine *crease_end;
 
-  LinkData *material;
-  ListBase material_pointers;
+  LineartRenderLine *material;
+  LineartRenderLine *material_end;
 
-  LinkData *edge_mark;
-  ListBase edge_mark_pointers;
+  LineartRenderLine *edge_mark;
+  LineartRenderLine *edge_mark_end;
 
 } LineartRenderTaskInfo;
 

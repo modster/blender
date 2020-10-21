@@ -299,91 +299,32 @@ static void lineart_render_line_cut(LineartRenderBuffer *rb,
 
 static int lineart_occlusion_make_task_info(LineartRenderBuffer *rb, LineartRenderTaskInfo *rti)
 {
-  LinkData *data;
+  LineartRenderLine *data;
   int i;
   int res = 0;
 
   BLI_spin_lock(&rb->lock_task);
 
-  if (rb->contour_managed) {
-    data = rb->contour_managed;
-    rti->contour = (void *)data;
-    rti->contour_pointers.first = data;
-    for (i = 0; i < LRT_THREAD_LINE_COUNT && data; i++) {
-      data = data->next;
-    }
-    rb->contour_managed = data;
-    rti->contour_pointers.last = data ? data->prev : rb->contours.last;
-    res = 1;
-  }
-  else {
-    BLI_listbase_clear(&rti->contour_pointers);
-    rti->contour = 0;
-  }
-
-  if (rb->intersection_managed) {
-    data = rb->intersection_managed;
-    rti->intersection = (void *)data;
-    rti->intersection_pointers.first = data;
-    for (i = 0; i < LRT_THREAD_LINE_COUNT && data; i++) {
-      data = data->next;
-    }
-    rb->intersection_managed = data;
-    rti->intersection_pointers.last = data ? data->prev : rb->intersection_lines.last;
-    res = 1;
-  }
-  else {
-    BLI_listbase_clear(&rti->intersection_pointers);
-    rti->intersection = 0;
+#define LRT_ASSIGN_OCCLUSION_TASK(name)\
+  if (rb->name##_managed) {\
+    data = rb->name##_managed;\
+    rti->name = (void *)data;\
+    for (i = 0; i < LRT_THREAD_LINE_COUNT && data; i++) {\
+      data = data->next;\
+    }\
+    rti->name##_end = data;\
+    rb->name##_managed = data;\
+    res = 1;\
+  }\
+  else {\
+    rti->name = NULL;\
   }
 
-  if (rb->crease_managed) {
-    data = rb->crease_managed;
-    rti->crease = (void *)data;
-    rti->crease_pointers.first = data;
-    for (i = 0; i < LRT_THREAD_LINE_COUNT && data; i++) {
-      data = data->next;
-    }
-    rb->crease_managed = data;
-    rti->crease_pointers.last = data ? data->prev : rb->crease_lines.last;
-    res = 1;
-  }
-  else {
-    BLI_listbase_clear(&rti->crease_pointers);
-    rti->crease = 0;
-  }
-
-  if (rb->material_managed) {
-    data = rb->material_managed;
-    rti->material = (void *)data;
-    rti->material_pointers.first = data;
-    for (i = 0; i < LRT_THREAD_LINE_COUNT && data; i++) {
-      data = data->next;
-    }
-    rb->material_managed = data;
-    rti->material_pointers.last = data ? data->prev : rb->material_lines.last;
-    res = 1;
-  }
-  else {
-    BLI_listbase_clear(&rti->material_pointers);
-    rti->material = 0;
-  }
-
-  if (rb->edge_mark_managed) {
-    data = rb->edge_mark_managed;
-    rti->edge_mark = (void *)data;
-    rti->edge_mark_pointers.first = data;
-    for (i = 0; i < LRT_THREAD_LINE_COUNT && data; i++) {
-      data = data->next;
-    }
-    rb->edge_mark_managed = data;
-    rti->edge_mark_pointers.last = data ? data->prev : rb->edge_marks.last;
-    res = 1;
-  }
-  else {
-    BLI_listbase_clear(&rti->edge_mark_pointers);
-    rti->edge_mark = 0;
-  }
+  LRT_ASSIGN_OCCLUSION_TASK(contour);
+  LRT_ASSIGN_OCCLUSION_TASK(intersection);
+  LRT_ASSIGN_OCCLUSION_TASK(crease);
+  LRT_ASSIGN_OCCLUSION_TASK(material);
+  LRT_ASSIGN_OCCLUSION_TASK(edge_mark);
 
   BLI_spin_unlock(&rb->lock_task);
 
@@ -443,13 +384,13 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb,
 static void lineart_occlusion_worker(TaskPool *__restrict UNUSED(pool), LineartRenderTaskInfo *rti)
 {
   LineartRenderBuffer *rb = lineart_share.render_buffer_shared;
-  LinkData *lip;
+  LineartRenderLine *lip;
 
   while (lineart_occlusion_make_task_info(rb, rti)) {
 
-    for (lip = (void *)rti->contour; lip && lip->prev != rti->contour_pointers.last;
+    for (lip = (void *)rti->contour; lip && lip != rti->contour_end;
          lip = lip->next) {
-      lineart_occlusion_single_line(rb, lip->data, rti->thread_id);
+      lineart_occlusion_single_line(rb, lip, rti->thread_id);
     }
 
     /* Monitoring cancelation flag every once a while. */
@@ -457,35 +398,35 @@ static void lineart_occlusion_worker(TaskPool *__restrict UNUSED(pool), LineartR
       return;
     }
 
-    for (lip = (void *)rti->crease; lip && lip->prev != rti->crease_pointers.last;
+    for (lip = (void *)rti->crease; lip && lip != rti->crease_end;
          lip = lip->next) {
-      lineart_occlusion_single_line(rb, lip->data, rti->thread_id);
+      lineart_occlusion_single_line(rb, lip, rti->thread_id);
     }
 
     if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
       return;
     }
 
-    for (lip = (void *)rti->intersection; lip && lip->prev != rti->intersection_pointers.last;
+    for (lip = (void *)rti->intersection; lip && lip != rti->intersection_end;
          lip = lip->next) {
-      lineart_occlusion_single_line(rb, lip->data, rti->thread_id);
+      lineart_occlusion_single_line(rb, lip, rti->thread_id);
     }
 
     if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
       return;
     }
 
-    for (lip = (void *)rti->material; lip && lip->prev != rti->material_pointers.last;
+    for (lip = (void *)rti->material; lip && lip != rti->material_end;
          lip = lip->next) {
-      lineart_occlusion_single_line(rb, lip->data, rti->thread_id);
+      lineart_occlusion_single_line(rb, lip, rti->thread_id);
     }
     if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
       return;
     }
 
-    for (lip = (void *)rti->edge_mark; lip && lip->prev != rti->edge_mark_pointers.last;
+    for (lip = (void *)rti->edge_mark; lip && lip != rti->edge_mark_end;
          lip = lip->next) {
-      lineart_occlusion_single_line(rb, lip->data, rti->thread_id);
+      lineart_occlusion_single_line(rb, lip, rti->thread_id);
     }
 
     if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
@@ -501,11 +442,11 @@ static void lineart_main_occlusion_begin(LineartRenderBuffer *rb)
                                            "Task Pool");
   int i;
 
-  rb->contour_managed = rb->contours.first;
-  rb->crease_managed = rb->crease_lines.first;
-  rb->intersection_managed = rb->intersection_lines.first;
-  rb->material_managed = rb->material_lines.first;
-  rb->edge_mark_managed = rb->edge_marks.first;
+  rb->contour_managed = rb->contours;
+  rb->crease_managed = rb->crease_lines;
+  rb->intersection_managed = rb->intersection_lines;
+  rb->material_managed = rb->material_lines;
+  rb->edge_mark_managed = rb->edge_marks;
 
   TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
 
@@ -730,23 +671,444 @@ static void lineart_triangle_set_cull_flag(LineartRenderTriangle *rt, unsigned c
   rt->flags |= intersection_only;
 }
 
+static void lineart_triangle_cull_single(LineartRenderBuffer *rb, LineartRenderTriangle* rt, int in0, int in1, int in2,
+                                         double* cam_pos, double* view_dir, bool allow_boundaries, double(*vp)[4], LineartRenderLine* given_line, Object* ob,
+                                         int* r_v_count, int* r_l_count, int* r_t_count,
+                                         LineartRenderElementLinkNode* veln,
+                                         LineartRenderElementLinkNode* leln,
+                                         LineartRenderElementLinkNode* teln){
+  double vv1[3], vv2[3], dot1, dot2;
+  double a;
+  int v_count = *r_v_count;
+  int l_count = *r_l_count;
+  int t_count = *r_t_count;
+
+  LineartRenderLine* new_rl, *rl;
+  LineartRenderLineSegment* rls;
+
+  LineartRenderVert* rv = &((LineartRenderVert *)veln->pointer)[v_count];
+  LineartRenderTriangle* rt1 = (void *)(((unsigned char *)teln->pointer) + rb->triangle_size * t_count);
+  LineartRenderTriangle* rt2 = (void *)(((unsigned char *)teln->pointer) + rb->triangle_size * (t_count + 1));
+
+  new_rl = &((LineartRenderLine *)leln->pointer)[l_count];
+
+#define INCREASE_RL \
+  l_count++; \
+  new_rl = &((LineartRenderLine *)leln->pointer)[l_count]; \
+  rl = new_rl; \
+  rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment)); \
+  BLI_addtail(&rl->segments, rls);
+
+  switch (in0 + in1 + in2) {
+    case 0: /* ignore this triangle. */
+      return;
+    case 3:
+      /** triangle completely behind near plane, throw it away
+       * also remove render lines form being computed.
+       */
+      lineart_triangle_set_cull_flag(rt, LRT_CULL_DISCARD);
+
+      return;
+    case 2:
+      /** Two points behind near plane, cut those and
+       * generate 2 new points, 3 lines and 1 triangle */
+      lineart_triangle_set_cull_flag(rt, LRT_CULL_USED);
+
+      /** (!in0) means "when point 0 is visible".
+       * conditons for point 1, 2 are the same idea.
+       * 1-----|-------0
+       * |     |   ---
+       * |     |---
+       * |  ---|
+       * 2--   |
+       *     (near)---------->(far)
+       * Will become:
+       *       |N******0
+       *       |*  ***
+       *       |N**
+       *       |
+       *       |
+       *     (near)---------->(far)
+       */
+      if (!in0) {
+
+        /* cut point for line 2---|-----0 */
+        sub_v3_v3v3_db(vv1, rt->v[0]->gloc, cam_pos);
+        sub_v3_v3v3_db(vv2, cam_pos, rt->v[2]->gloc);
+        dot1 = dot_v3v3_db(vv1, view_dir);
+        dot2 = dot_v3v3_db(vv2, view_dir);
+        a = dot1 / (dot1 + dot2);
+        /* assign it to a new point */
+        interp_v3_v3v3_db(rv[0].gloc, rt->v[0]->gloc, rt->v[2]->gloc, a);
+        mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
+
+        /* cut point for line 1---|-----0 */
+        sub_v3_v3v3_db(vv1, rt->v[0]->gloc, cam_pos);
+        sub_v3_v3v3_db(vv2, cam_pos, rt->v[1]->gloc);
+        dot1 = dot_v3v3_db(vv1, view_dir);
+        dot2 = dot_v3v3_db(vv2, view_dir);
+        a = dot1 / (dot1 + dot2);
+        /* assign it to another new point */
+        interp_v3_v3v3_db(rv[1].gloc, rt->v[0]->gloc, rt->v[1]->gloc, a);
+        mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
+
+        /* New line connecting two new points */
+        INCREASE_RL
+        if (allow_boundaries) {
+          lineart_prepend_direct(&rb->contours, rl);
+        }
+        /** note: inverting rl->l/r (left/right point) doesn't matter as long as
+         * rt->rl and rt->v has the same sequence. and the winding direction
+         * can be either CW or CCW but needs to be consistent throughout the calculation.
+         */
+        rl->l = &rv[1];
+        rl->r = &rv[0];
+        /* only one adjacent triangle, because the other side is the near plane */
+        /* use tl or tr doesn't matter. */
+        rl->tl = rt1;
+        rl->object_ref = ob;
+
+        /* new line connecting original point 0 and a new point */
+        INCREASE_RL
+        rl->l = &rv[1];
+        rl->r = rt->v[0];
+        rl->flags |= LRT_EDGE_FLAG_CLIPPED;
+        rl->object_ref = ob;
+
+        /* new line connecting original point 0 and another new point */
+        INCREASE_RL
+        rl->l = rt->v[0];
+        rl->r = &rv[0];
+        rl->flags |= LRT_EDGE_FLAG_CLIPPED;
+        rl->object_ref = ob;
+
+        /* re-assign triangle point array to two new points. */
+        rt1->v[0] = rt->v[0];
+        rt1->v[1] = &rv[1];
+        rt1->v[2] = &rv[0];
+
+        lineart_triangle_post(rt1, rt);
+
+        v_count += 2;
+        t_count += 1;
+      }
+      else if (!in2) {
+        sub_v3_v3v3_db(vv1, rt->v[2]->gloc, cam_pos);
+        sub_v3_v3v3_db(vv2, cam_pos, rt->v[0]->gloc);
+        dot1 = dot_v3v3_db(vv1, view_dir);
+        dot2 = dot_v3v3_db(vv2, view_dir);
+        a = dot1 / (dot1 + dot2);
+        interp_v3_v3v3_db(rv[0].gloc, rt->v[2]->gloc, rt->v[0]->gloc, a);
+        mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
+
+        sub_v3_v3v3_db(vv1, rt->v[2]->gloc, cam_pos);
+        sub_v3_v3v3_db(vv2, cam_pos, rt->v[1]->gloc);
+        dot1 = dot_v3v3_db(vv1, view_dir);
+        dot2 = dot_v3v3_db(vv2, view_dir);
+        a = dot1 / (dot1 + dot2);
+        interp_v3_v3v3_db(rv[1].gloc, rt->v[2]->gloc, rt->v[1]->gloc, a);
+        mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
+
+        INCREASE_RL
+        if (allow_boundaries) {
+          lineart_prepend_direct(&rb->contours, rl);
+        }
+        rl->l = &rv[0];
+        rl->r = &rv[1];
+        rl->tl = rt1;
+        rl->object_ref = ob;
+
+        INCREASE_RL
+        rl->l = &rv[1];
+        rl->r = rt->v[2];
+        rl->flags |= LRT_EDGE_FLAG_CLIPPED;
+        rl->object_ref = ob;
+
+        INCREASE_RL
+        rl->l = rt->v[2];
+        rl->r = &rv[0];
+        rl->flags |= LRT_EDGE_FLAG_CLIPPED;
+        rl->object_ref = ob;
+
+        rt1->v[0] = &rv[0];   /*&rv[1];*/
+        rt1->v[1] = &rv[1];   /*rt->v[2];*/
+        rt1->v[2] = rt->v[2]; /*&rv[0];*/
+
+        lineart_triangle_post(rt1, rt);
+
+        v_count += 2;
+        t_count += 1;
+      }
+      else if (!in1) {
+        sub_v3_v3v3_db(vv1, rt->v[1]->gloc, cam_pos);
+        sub_v3_v3v3_db(vv2, cam_pos, rt->v[2]->gloc);
+        dot1 = dot_v3v3_db(vv1, view_dir);
+        dot2 = dot_v3v3_db(vv2, view_dir);
+        a = dot1 / (dot1 + dot2);
+        interp_v3_v3v3_db(rv[0].gloc, rt->v[1]->gloc, rt->v[2]->gloc, a);
+        mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
+
+        sub_v3_v3v3_db(vv1, rt->v[1]->gloc, cam_pos);
+        sub_v3_v3v3_db(vv2, cam_pos, rt->v[0]->gloc);
+        dot1 = dot_v3v3_db(vv1, view_dir);
+        dot2 = dot_v3v3_db(vv2, view_dir);
+        a = dot1 / (dot1 + dot2);
+        interp_v3_v3v3_db(rv[1].gloc, rt->v[1]->gloc, rt->v[0]->gloc, a);
+        mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
+
+        INCREASE_RL
+        if (allow_boundaries) {
+          lineart_prepend_direct(&rb->contours, rl);
+        }
+        rl->l = &rv[1];
+        rl->r = &rv[0];
+        rl->tl = rt1;
+        rl->object_ref = ob;
+
+        INCREASE_RL
+        rl->l = &rv[0];
+        rl->r = rt->v[1];
+        rl->flags |= LRT_EDGE_FLAG_CLIPPED;
+        rl->object_ref = ob;
+
+        INCREASE_RL
+        rl->l = rt->v[1];
+        rl->r = &rv[1];
+        rl->flags |= LRT_EDGE_FLAG_CLIPPED;
+        rl->object_ref = ob;
+
+        rt1->v[0] = &rv[0];   /*rt->v[1];*/
+        rt1->v[1] = rt->v[1]; /*&rv[1];*/
+        rt1->v[2] = &rv[1];   /*&rv[0];*/
+
+        lineart_triangle_post(rt1, rt);
+
+        v_count += 2;
+        t_count += 1;
+      }
+      break;
+    case 1:
+      /** Two points behind near plane, cut those and
+       * generate 2 new points, 4 lines and 2 triangles */
+      lineart_triangle_set_cull_flag(rt, LRT_CULL_USED);
+
+      /** (in0) means "when point 0 is invisible".
+       * conditons for point 1, 2 are the same idea.
+       * 0------|----------1
+       *   --   |          |
+       *     ---|          |
+       *        |--        |
+       *        |  ---     |
+       *        |     ---  |
+       *        |        --2
+       *      (near)---------->(far)
+       * Will become:
+       *        |N*********1
+       *        |*     *** |
+       *        |*  ***    |
+       *        |N**       |
+       *        |  ***     |
+       *        |     ***  |
+       *        |        **2
+       *      (near)---------->(far)
+       */
+      if (in0) {
+        /* Cut point for line 0---|------1 */
+        sub_v3_v3v3_db(vv1, rt->v[1]->gloc, cam_pos);
+        sub_v3_v3v3_db(vv2, cam_pos, rt->v[0]->gloc);
+        dot1 = dot_v3v3_db(vv1, view_dir);
+        dot2 = dot_v3v3_db(vv2, view_dir);
+        a = dot2 / (dot1 + dot2);
+        /* Assign to a new point */
+        interp_v3_v3v3_db(rv[0].gloc, rt->v[0]->gloc, rt->v[1]->gloc, a);
+        mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
+
+        /* Cut point for line 0---|------2 */
+        sub_v3_v3v3_db(vv1, rt->v[2]->gloc, cam_pos);
+        sub_v3_v3v3_db(vv2, cam_pos, rt->v[0]->gloc);
+        dot1 = dot_v3v3_db(vv1, view_dir);
+        dot2 = dot_v3v3_db(vv2, view_dir);
+        a = dot2 / (dot1 + dot2);
+        /* Assign to aother new point */
+        interp_v3_v3v3_db(rv[1].gloc, rt->v[0]->gloc, rt->v[2]->gloc, a);
+        mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
+
+        /* New line connects two new points */
+        INCREASE_RL
+        if (allow_boundaries) {
+          lineart_prepend_direct(&rb->contours, rl);
+        }
+        rl->l = &rv[1];
+        rl->r = &rv[0];
+        rl->tl = rt1;
+        rl->object_ref = ob;
+
+        /** New line connects new point 0 and old point 1,
+         * this is a border line.
+         */
+        INCREASE_RL
+        rl->l = &rv[0];
+        rl->r = rt->v[1];
+        rl->flags |= LRT_EDGE_FLAG_CLIPPED;
+        rl->tl = rt1;
+        rl->object_ref = ob;
+
+        /* We now have one triangle closed. */
+        rt1->v[0] = rt->v[1];
+        rt1->v[1] = &rv[1];
+        rt1->v[2] = &rv[0];
+
+        /** New line connects new point 1 and old point 2,
+         * this is also a border line.
+         */
+        INCREASE_RL
+        rl->l = rt->v[2];
+        rl->r = &rv[1];
+        rl->flags |= LRT_EDGE_FLAG_CLIPPED;
+        rl->tl = rt2;
+        rl->object_ref = ob;
+
+        /* Close the second triangle. */
+        rt2->v[0] = &rv[1];
+        rt2->v[1] = rt->v[1];
+        rt2->v[2] = rt->v[2];
+
+        lineart_triangle_post(rt1, rt);
+        lineart_triangle_post(rt2, rt);
+
+        v_count += 2;
+        t_count += 2;
+      }
+      else if (in1) {
+
+        sub_v3_v3v3_db(vv1, rt->v[1]->gloc, cam_pos);
+        sub_v3_v3v3_db(vv2, cam_pos, rt->v[2]->gloc);
+        dot1 = dot_v3v3_db(vv1, view_dir);
+        dot2 = dot_v3v3_db(vv2, view_dir);
+        a = dot1 / (dot1 + dot2);
+        interp_v3_v3v3_db(rv[0].gloc, rt->v[1]->gloc, rt->v[2]->gloc, a);
+        mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
+
+        sub_v3_v3v3_db(vv1, rt->v[1]->gloc, cam_pos);
+        sub_v3_v3v3_db(vv2, cam_pos, rt->v[0]->gloc);
+        dot1 = dot_v3v3_db(vv1, view_dir);
+        dot2 = dot_v3v3_db(vv2, view_dir);
+        a = dot1 / (dot1 + dot2);
+        interp_v3_v3v3_db(rv[1].gloc, rt->v[1]->gloc, rt->v[0]->gloc, a);
+        mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
+
+        INCREASE_RL
+        if (allow_boundaries) {
+          lineart_prepend_direct(&rb->contours, rl);
+        }
+        rl->l = &rv[1];
+        rl->r = &rv[0];
+        rl->tl = rt1;
+        rl->object_ref = ob;
+
+        INCREASE_RL
+        rl->l = &rv[0];
+        rl->r = rt->v[2];
+        rl->flags |= LRT_EDGE_FLAG_CLIPPED;
+        rl->tl = rt1;
+        rl->object_ref = ob;
+
+        rt1->v[0] = rt->v[2];
+        rt1->v[1] = &rv[1];
+        rt1->v[2] = &rv[0];
+
+        INCREASE_RL
+        rl->l = rt->v[0];
+        rl->r = &rv[1];
+        rl->flags |= LRT_EDGE_FLAG_CLIPPED;
+        rl->tl = rt2;
+        rl->object_ref = ob;
+
+        rt2->v[0] = &rv[1];
+        rt2->v[1] = rt->v[2];
+        rt2->v[2] = rt->v[0];
+
+        lineart_triangle_post(rt1, rt);
+        lineart_triangle_post(rt2, rt);
+
+        v_count += 2;
+        t_count += 2;
+      }
+      else if (in2) {
+
+        sub_v3_v3v3_db(vv1, rt->v[2]->gloc, cam_pos);
+        sub_v3_v3v3_db(vv2, cam_pos, rt->v[0]->gloc);
+        dot1 = dot_v3v3_db(vv1, view_dir);
+        dot2 = dot_v3v3_db(vv2, view_dir);
+        a = dot1 / (dot1 + dot2);
+        interp_v3_v3v3_db(rv[0].gloc, rt->v[2]->gloc, rt->v[0]->gloc, a);
+        mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
+
+        sub_v3_v3v3_db(vv1, rt->v[2]->gloc, cam_pos);
+        sub_v3_v3v3_db(vv2, cam_pos, rt->v[1]->gloc);
+        dot1 = dot_v3v3_db(vv1, view_dir);
+        dot2 = dot_v3v3_db(vv2, view_dir);
+        a = dot1 / (dot1 + dot2);
+        interp_v3_v3v3_db(rv[1].gloc, rt->v[2]->gloc, rt->v[1]->gloc, a);
+        mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
+
+        INCREASE_RL
+        if (allow_boundaries) {
+          lineart_prepend_direct(&rb->contours, rl);
+        }
+        rl->l = &rv[1];
+        rl->r = &rv[0];
+        rl->tl = rt1;
+        rl->object_ref = ob;
+
+        INCREASE_RL
+        rl->l = &rv[0];
+        rl->r = rt->v[0];
+        rl->flags |= LRT_EDGE_FLAG_CLIPPED;
+        rl->tl = rt1;
+        rl->object_ref = ob;
+
+        rt1->v[0] = rt->v[0];
+        rt1->v[1] = &rv[1];
+        rt1->v[2] = &rv[0];
+
+        INCREASE_RL
+        rl->l = rt->v[1];
+        rl->r = &rv[1];
+        rl->flags |= LRT_EDGE_FLAG_CLIPPED;
+        rl->tl = rt2;
+        rl->object_ref = ob;
+
+        rt2->v[0] = &rv[1];
+        rt2->v[1] = rt->v[0];
+        rt2->v[2] = rt->v[1];
+
+        lineart_triangle_post(rt1, rt);
+        lineart_triangle_post(rt2, rt);
+
+        v_count += 2;
+        t_count += 2;
+      }
+      break;
+  }
+  *r_v_count = v_count;
+  *r_l_count = l_count;
+  *r_t_count = t_count;
+}
+
 /** This function cuts triangles that are (partially or fully) behind near clipping plane.
  * for triangles that crossing the near plane, it will generate new 1 or 2 triangles with
  * new topology that represents the trimmed triangle. (which then became a triangle or square)
  */
 static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far, LineartRenderLine* given_line)
 {
-  LineartRenderLine *rl, *new_rl;
-  LineartRenderTriangle *rt, *rt1, *rt2, *rt_next_to;
-  LineartRenderVert *rv;
+  LineartRenderTriangle *rt;
   LineartRenderElementLinkNode *veln, *teln, *leln;
-  LineartRenderLineSegment *rls;
   double(*vp)[4] = rb->view_projection;
   int i;
-  double a;
   int v_count = 0, t_count = 0, l_count = 0;
   Object *ob;
-  bool added, allow_boundaries = rb->allow_boundaries;
+  bool allow_boundaries = rb->allow_boundaries;
   double cam_pos[3];
   double clip_start = rb->near_clip, clip_end = rb->far_clip;
   double view_dir[3], clip_advance[3];
@@ -772,17 +1134,6 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far, 
   teln = lineart_memory_get_triangle_space(rb);
   leln = lineart_memory_get_line_space(rb);
 
-  rv = &((LineartRenderVert *)veln->pointer)[v_count];
-  rt1 = (void *)(((unsigned char *)teln->pointer) + rb->triangle_size * t_count);
-  new_rl = &((LineartRenderLine *)leln->pointer)[l_count];
-
-#define INCREASE_RL \
-  l_count++; \
-  new_rl = &((LineartRenderLine *)leln->pointer)[l_count]; \
-  rl = new_rl; \
-  rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment)); \
-  BLI_addtail(&rl->segments, rls);
-
   int use_w = 3;
   if (!rb->cam_is_persp) {
     clip_start = -1;
@@ -796,12 +1147,11 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far, 
     }
     ob = reln->object_ref;
     for (i = 0; i < reln->element_count; i++) {
+      /* Select the triangle in the array. */
+      rt = (void *)(((unsigned char *)reln->pointer) + rb->triangle_size * i);
 
       /* These three represents points that are in the clipping range or not*/
       int in0 = 0, in1 = 0, in2 = 0;
-
-      /* Select the triangle in the array. */
-      rt = (void *)(((unsigned char *)reln->pointer) + rb->triangle_size * i);
 
       if (clip_far) {
         /* Point outside far plane */
@@ -845,444 +1195,8 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far, 
         l_count = 0;
       }
 
-      rv = &((LineartRenderVert *)veln->pointer)[v_count];
-      rt1 = (void *)(((unsigned char *)teln->pointer) + rb->triangle_size * t_count);
-      rt2 = (void *)(((unsigned char *)teln->pointer) + rb->triangle_size * (t_count + 1));
+      lineart_triangle_cull_single(rb,rt,in0,in1,in2,cam_pos,view_dir,allow_boundaries,vp,given_line,ob,&v_count,&l_count,&t_count,veln,leln,teln);
 
-      double vv1[3], vv2[3], dot1, dot2;
-
-      switch (in0 + in1 + in2) {
-        case 0: /* ignore this triangle. */
-          continue;
-        case 3:
-          /** triangle completely behind near plane, throw it away
-           * also remove render lines form being computed.
-           */
-          lineart_triangle_set_cull_flag(rt, LRT_CULL_DISCARD);
-
-          continue;
-        case 2:
-          /** Two points behind near plane, cut those and
-           * generate 2 new points, 3 lines and 1 triangle */
-          lineart_triangle_set_cull_flag(rt, LRT_CULL_USED);
-
-          /** (!in0) means "when point 0 is visible".
-           * conditons for point 1, 2 are the same idea.
-           * 1-----|-------0
-           * |     |   ---
-           * |     |---
-           * |  ---|
-           * 2--   |
-           *     (near)---------->(far)
-           * Will become:
-           *       |N******0
-           *       |*  ***
-           *       |N**
-           *       |
-           *       |
-           *     (near)---------->(far)
-           */
-          if (!in0) {
-
-            /* cut point for line 2---|-----0 */
-            sub_v3_v3v3_db(vv1, rt->v[0]->gloc, cam_pos);
-            sub_v3_v3v3_db(vv2, cam_pos, rt->v[2]->gloc);
-            dot1 = dot_v3v3_db(vv1, view_dir);
-            dot2 = dot_v3v3_db(vv2, view_dir);
-            a = dot1 / (dot1 + dot2);
-            /* assign it to a new point */
-            interp_v3_v3v3_db(rv[0].gloc, rt->v[0]->gloc, rt->v[2]->gloc, a);
-            mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
-
-            /* cut point for line 1---|-----0 */
-            sub_v3_v3v3_db(vv1, rt->v[0]->gloc, cam_pos);
-            sub_v3_v3v3_db(vv2, cam_pos, rt->v[1]->gloc);
-            dot1 = dot_v3v3_db(vv1, view_dir);
-            dot2 = dot_v3v3_db(vv2, view_dir);
-            a = dot1 / (dot1 + dot2);
-            /* assign it to another new point */
-            interp_v3_v3v3_db(rv[1].gloc, rt->v[0]->gloc, rt->v[1]->gloc, a);
-            mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
-
-            /* New line connecting two new points */
-            INCREASE_RL
-            if (allow_boundaries) {
-              BLI_addtail(&rb->all_render_lines, rl);
-            }
-            /** note: inverting rl->l/r (left/right point) doesn't matter as long as
-             * rt->rl and rt->v has the same sequence. and the winding direction
-             * can be either CW or CCW but needs to be consistent throughout the calculation.
-             */
-            rl->l = &rv[1];
-            rl->r = &rv[0];
-            /* only one adjacent triangle, because the other side is the near plane */
-            /* use tl or tr doesn't matter. */
-            rl->tl = rt1;
-            rl->object_ref = ob;
-
-            /* new line connecting original point 0 and a new point */
-            INCREASE_RL
-            rl->l = &rv[1];
-            rl->r = rt->v[0];
-            rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-            rl->object_ref = ob;
-
-            /* new line connecting original point 0 and another new point */
-            INCREASE_RL
-            rl->l = rt->v[0];
-            rl->r = &rv[0];
-            rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-            rl->object_ref = ob;
-
-            /* re-assign triangle point array to two new points. */
-            rt1->v[0] = rt->v[0];
-            rt1->v[1] = &rv[1];
-            rt1->v[2] = &rv[0];
-
-            lineart_triangle_post(rt1, rt);
-
-            v_count += 2;
-            t_count += 1;
-            continue;
-          }
-          else if (!in2) {
-            sub_v3_v3v3_db(vv1, rt->v[2]->gloc, cam_pos);
-            sub_v3_v3v3_db(vv2, cam_pos, rt->v[0]->gloc);
-            dot1 = dot_v3v3_db(vv1, view_dir);
-            dot2 = dot_v3v3_db(vv2, view_dir);
-            a = dot1 / (dot1 + dot2);
-            interp_v3_v3v3_db(rv[0].gloc, rt->v[2]->gloc, rt->v[0]->gloc, a);
-            mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
-
-            sub_v3_v3v3_db(vv1, rt->v[2]->gloc, cam_pos);
-            sub_v3_v3v3_db(vv2, cam_pos, rt->v[1]->gloc);
-            dot1 = dot_v3v3_db(vv1, view_dir);
-            dot2 = dot_v3v3_db(vv2, view_dir);
-            a = dot1 / (dot1 + dot2);
-            interp_v3_v3v3_db(rv[1].gloc, rt->v[2]->gloc, rt->v[1]->gloc, a);
-            mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
-
-            INCREASE_RL
-            if (allow_boundaries) {
-              BLI_addtail(&rb->all_render_lines, rl);
-            }
-            rl->l = &rv[0];
-            rl->r = &rv[1];
-            rl->tl = rt1;
-            rl->object_ref = ob;
-
-            INCREASE_RL
-            rl->l = &rv[1];
-            rl->r = rt->v[2];
-            rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-            rl->object_ref = ob;
-
-            INCREASE_RL
-            rl->l = rt->v[2];
-            rl->r = &rv[0];
-            rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-            rl->object_ref = ob;
-
-            rt1->v[0] = &rv[0];   /*&rv[1];*/
-            rt1->v[1] = &rv[1];   /*rt->v[2];*/
-            rt1->v[2] = rt->v[2]; /*&rv[0];*/
-
-            lineart_triangle_post(rt1, rt);
-
-            v_count += 2;
-            t_count += 1;
-            continue;
-          }
-          else if (!in1) {
-            sub_v3_v3v3_db(vv1, rt->v[1]->gloc, cam_pos);
-            sub_v3_v3v3_db(vv2, cam_pos, rt->v[2]->gloc);
-            dot1 = dot_v3v3_db(vv1, view_dir);
-            dot2 = dot_v3v3_db(vv2, view_dir);
-            a = dot1 / (dot1 + dot2);
-            interp_v3_v3v3_db(rv[0].gloc, rt->v[1]->gloc, rt->v[2]->gloc, a);
-            mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
-
-            sub_v3_v3v3_db(vv1, rt->v[1]->gloc, cam_pos);
-            sub_v3_v3v3_db(vv2, cam_pos, rt->v[0]->gloc);
-            dot1 = dot_v3v3_db(vv1, view_dir);
-            dot2 = dot_v3v3_db(vv2, view_dir);
-            a = dot1 / (dot1 + dot2);
-            interp_v3_v3v3_db(rv[1].gloc, rt->v[1]->gloc, rt->v[0]->gloc, a);
-            mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
-
-            INCREASE_RL
-            if (allow_boundaries) {
-              BLI_addtail(&rb->all_render_lines, rl);
-            }
-            rl->l = &rv[1];
-            rl->r = &rv[0];
-            rl->tl = rt1;
-            rl->object_ref = ob;
-
-            INCREASE_RL
-            rl->l = &rv[0];
-            rl->r = rt->v[1];
-            rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-            rl->object_ref = ob;
-
-            INCREASE_RL
-            rl->l = rt->v[1];
-            rl->r = &rv[1];
-            rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-            rl->object_ref = ob;
-
-            rt1->v[0] = &rv[0];   /*rt->v[1];*/
-            rt1->v[1] = rt->v[1]; /*&rv[1];*/
-            rt1->v[2] = &rv[1];   /*&rv[0];*/
-
-            lineart_triangle_post(rt1, rt);
-
-            v_count += 2;
-            t_count += 1;
-            continue;
-          }
-          break;
-        case 1:
-          /** Two points behind near plane, cut those and
-           * generate 2 new points, 4 lines and 2 triangles */
-          lineart_triangle_set_cull_flag(rt, LRT_CULL_USED);
-
-          /** (in0) means "when point 0 is invisible".
-           * conditons for point 1, 2 are the same idea.
-           * 0------|----------1
-           *   --   |          |
-           *     ---|          |
-           *        |--        |
-           *        |  ---     |
-           *        |     ---  |
-           *        |        --2
-           *      (near)---------->(far)
-           * Will become:
-           *        |N*********1
-           *        |*     *** |
-           *        |*  ***    |
-           *        |N**       |
-           *        |  ***     |
-           *        |     ***  |
-           *        |        **2
-           *      (near)---------->(far)
-           */
-          if (in0) {
-            /* Cut point for line 0---|------1 */
-            sub_v3_v3v3_db(vv1, rt->v[1]->gloc, cam_pos);
-            sub_v3_v3v3_db(vv2, cam_pos, rt->v[0]->gloc);
-            dot1 = dot_v3v3_db(vv1, view_dir);
-            dot2 = dot_v3v3_db(vv2, view_dir);
-            a = dot2 / (dot1 + dot2);
-            /* Assign to a new point */
-            interp_v3_v3v3_db(rv[0].gloc, rt->v[0]->gloc, rt->v[1]->gloc, a);
-            mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
-
-            /* Cut point for line 0---|------2 */
-            sub_v3_v3v3_db(vv1, rt->v[2]->gloc, cam_pos);
-            sub_v3_v3v3_db(vv2, cam_pos, rt->v[0]->gloc);
-            dot1 = dot_v3v3_db(vv1, view_dir);
-            dot2 = dot_v3v3_db(vv2, view_dir);
-            a = dot2 / (dot1 + dot2);
-            /* Assign to aother new point */
-            interp_v3_v3v3_db(rv[1].gloc, rt->v[0]->gloc, rt->v[2]->gloc, a);
-            mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
-
-            /* New line connects two new points */
-            INCREASE_RL
-            if (allow_boundaries) {
-              BLI_addtail(&rb->all_render_lines, rl);
-            }
-            rl->l = &rv[1];
-            rl->r = &rv[0];
-            rl->tl = rt1;
-            rl->object_ref = ob;
-
-            /** New line connects new point 0 and old point 1,
-             * this is a border line.
-             */
-            INCREASE_RL
-            rl->l = &rv[0];
-            rl->r = rt->v[1];
-            rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-            rl->tl = rt1;
-            rl->object_ref = ob;
-
-            /** New line connects new point 1 and old point 1,
-             * this is a inner line separating newly generated triangles.
-             */
-            INCREASE_RL
-            BLI_addtail(&rb->all_render_lines, rl);
-            rl->l = rt->v[1];
-            rl->r = &rv[1];
-            rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-            rl->tl = rt1;
-            rl->tr = rt2;
-            rl->object_ref = ob;
-
-            /* We now have one triangle closed. */
-            rt1->v[0] = rt->v[1];
-            rt1->v[1] = &rv[1];
-            rt1->v[2] = &rv[0];
-
-            /** New line connects new point 1 and old point 2,
-             * this is also a border line.
-             */
-            INCREASE_RL
-            rl->l = rt->v[2];
-            rl->r = &rv[1];
-            rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-            rl->tl = rt2;
-            rl->object_ref = ob;
-
-            /* Close the second triangle. */
-            rt2->v[0] = &rv[1];
-            rt2->v[1] = rt->v[1];
-            rt2->v[2] = rt->v[2];
-
-            lineart_triangle_post(rt1, rt);
-            lineart_triangle_post(rt2, rt);
-
-            v_count += 2;
-            t_count += 2;
-            continue;
-          }
-          else if (in1) {
-
-            sub_v3_v3v3_db(vv1, rt->v[1]->gloc, cam_pos);
-            sub_v3_v3v3_db(vv2, cam_pos, rt->v[2]->gloc);
-            dot1 = dot_v3v3_db(vv1, view_dir);
-            dot2 = dot_v3v3_db(vv2, view_dir);
-            a = dot1 / (dot1 + dot2);
-            interp_v3_v3v3_db(rv[0].gloc, rt->v[1]->gloc, rt->v[2]->gloc, a);
-            mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
-
-            sub_v3_v3v3_db(vv1, rt->v[1]->gloc, cam_pos);
-            sub_v3_v3v3_db(vv2, cam_pos, rt->v[0]->gloc);
-            dot1 = dot_v3v3_db(vv1, view_dir);
-            dot2 = dot_v3v3_db(vv2, view_dir);
-            a = dot1 / (dot1 + dot2);
-            interp_v3_v3v3_db(rv[1].gloc, rt->v[1]->gloc, rt->v[0]->gloc, a);
-            mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
-
-            INCREASE_RL
-            if (allow_boundaries) {
-              BLI_addtail(&rb->all_render_lines, rl);
-            }
-            rl->l = &rv[1];
-            rl->r = &rv[0];
-            rl->tl = rt1;
-            rl->object_ref = ob;
-
-            INCREASE_RL
-            rl->l = &rv[0];
-            rl->r = rt->v[2];
-            rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-            rl->tl = rt1;
-            rl->object_ref = ob;
-
-            INCREASE_RL
-            BLI_addtail(&rb->all_render_lines, rl);
-            rl->l = rt->v[2];
-            rl->r = &rv[1];
-            rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-            rl->tl = rt1;
-            rl->tr = rt2;
-            rl->object_ref = ob;
-
-            rt1->v[0] = rt->v[2];
-            rt1->v[1] = &rv[1];
-            rt1->v[2] = &rv[0];
-
-            INCREASE_RL
-            rl->l = rt->v[0];
-            rl->r = &rv[1];
-            rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-            rl->tl = rt2;
-            rl->object_ref = ob;
-            added = lineart_triangle_adjacent_line_set(rt, rt_next_to, rt2);
-            if (!added) {
-              BLI_addtail(&rb->all_render_lines, rl);
-            }
-
-            rt2->v[0] = &rv[1];
-            rt2->v[1] = rt->v[2];
-            rt2->v[2] = rt->v[0];
-
-            lineart_triangle_post(rt1, rt);
-            lineart_triangle_post(rt2, rt);
-
-            v_count += 2;
-            t_count += 2;
-            continue;
-          }
-          else if (in2) {
-
-            sub_v3_v3v3_db(vv1, rt->v[2]->gloc, cam_pos);
-            sub_v3_v3v3_db(vv2, cam_pos, rt->v[0]->gloc);
-            dot1 = dot_v3v3_db(vv1, view_dir);
-            dot2 = dot_v3v3_db(vv2, view_dir);
-            a = dot1 / (dot1 + dot2);
-            interp_v3_v3v3_db(rv[0].gloc, rt->v[2]->gloc, rt->v[0]->gloc, a);
-            mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
-
-            sub_v3_v3v3_db(vv1, rt->v[2]->gloc, cam_pos);
-            sub_v3_v3v3_db(vv2, cam_pos, rt->v[1]->gloc);
-            dot1 = dot_v3v3_db(vv1, view_dir);
-            dot2 = dot_v3v3_db(vv2, view_dir);
-            a = dot1 / (dot1 + dot2);
-            interp_v3_v3v3_db(rv[1].gloc, rt->v[2]->gloc, rt->v[1]->gloc, a);
-            mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
-
-            INCREASE_RL
-            if (allow_boundaries) {
-              BLI_addtail(&rb->all_render_lines, rl);
-            }
-            rl->l = &rv[1];
-            rl->r = &rv[0];
-            rl->tl = rt1;
-            rl->object_ref = ob;
-
-            INCREASE_RL
-            rl->l = &rv[0];
-            rl->r = rt->v[0];
-            rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-            rl->tl = rt1;
-            rl->object_ref = ob;
-
-            INCREASE_RL
-            BLI_addtail(&rb->all_render_lines, rl);
-            rl->l = rt->v[0];
-            rl->r = &rv[1];
-            rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-            rl->tl = rt1;
-            rl->tr = rt2;
-            rl->object_ref = ob;
-
-            rt1->v[0] = rt->v[0];
-            rt1->v[1] = &rv[1];
-            rt1->v[2] = &rv[0];
-
-            INCREASE_RL
-            rl->l = rt->v[1];
-            rl->r = &rv[1];
-            rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-            rl->tl = rt2;
-            rl->object_ref = ob;
-
-            rt2->v[0] = &rv[1];
-            rt2->v[1] = rt->v[0];
-            rt2->v[2] = rt->v[1];
-
-            lineart_triangle_post(rt1, rt);
-            lineart_triangle_post(rt2, rt);
-
-            v_count += 2;
-            t_count += 2;
-            continue;
-          }
-          break;
-      }
     }
     teln->element_count = t_count;
     veln->element_count = v_count;
@@ -1324,7 +1238,7 @@ static void lineart_vert_transform(
   mul_v4_m4v3_db(rv->fbcoord, mvp_mat, co);
 }
 
-static unsigned char lineart_test_feature_line(LineartRenderBuffer* rb, BMEdge* e, LineartRenderTriangle* rt_array,LineartRenderVert* rv_array, float crease_threshold, bool no_crease, bool count_freestyle, BMesh* bm_if_freestyle){
+static char lineart_test_feature_line(LineartRenderBuffer* rb, BMEdge* e, LineartRenderTriangle* rt_array,LineartRenderVert* rv_array, float crease_threshold, bool no_crease, bool count_freestyle, BMesh* bm_if_freestyle){
   BMLoop* ll,*lr;
   ll = e->l;
   lr = e->l->radial_next;
@@ -1340,18 +1254,12 @@ static unsigned char lineart_test_feature_line(LineartRenderBuffer* rb, BMEdge* 
   rt1 = &rt_array[BM_elem_index_get(ll)];
   rt2 = &rt_array[BM_elem_index_get(lr)];
 
-  l = &rt_array[BM_elem_index_get(e->v1)];
-  r = &rt_array[BM_elem_index_get(e->v2)];
+  l = &rv_array[BM_elem_index_get(e->v1)];
+  r = &rv_array[BM_elem_index_get(e->v2)];
 
-  double view_vector[3];
   double view_vector[3];
   double dot_1 = 0, dot_2 = 0;
   double result;
-  int add = 0, added = 0;
-  int add = 0;
-  int added = 0;
-  double dot_1 = 0;
-  double dot_2 = 0;
   FreestyleEdge* fe;
 
   if (rb->cam_is_persp) {
@@ -1382,18 +1290,6 @@ static unsigned char lineart_test_feature_line(LineartRenderBuffer* rb, BMEdge* 
     }
   }
   return 0;
-
-      ///-----------------------------------------------------------------
-      if (added) {
-        int r1, r2, c1, c2, row, col;
-        if (lineart_get_line_bounding_areas(rb, rl, &r1, &r2, &c1, &c2)) {
-          for (row = r1; row != r2 + 1; row++) {
-            for (col = c1; col != c2 + 1; col++) {
-              lineart_bounding_area_link_line(rb, &rb->initial_bounding_areas[row * 4 + col], rl);
-            }
-          }
-        }
-      }
 
 }
 
@@ -1507,7 +1403,6 @@ static void lineart_geometry_object_load(Depsgraph *dg,
 
     orv = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderVert) * bm->totvert);
     ort = lineart_mem_aquire(&rb->render_data_pool, bm->totface * rb->triangle_size);
-    orl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine) * bm->totedge);
 
     orig_ob = ob->id.orig_id ? (Object *)ob->id.orig_id : ob;
 
@@ -1571,7 +1466,6 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       copy_v3db_v3fl(gn, f->no);
       mul_v3_mat3_m4v3_db(rt->gn, normal, gn);
       normalize_v3_db(rt->gn);
-      lineart_render_line_assign_with_triangle(rt);
 
       if (usage == OBJECT_LRT_INTERSECTION_ONLY) {
         rt->flags |= LRT_TRIANGLE_INTERSECTION_ONLY;
@@ -1586,19 +1480,27 @@ static void lineart_geometry_object_load(Depsgraph *dg,
 
     /* use BM_ELEM_TAG in f->head.hflag to store needed faces in the first iteration. */
 
-    rl = orl;
+    int allocate_rl = 0;
     for (i = 0; i < bm->totedge; i++) {
       e = BM_edge_at_index(bm, i);
-      if (CanFindFreestyle) {
-        fe = CustomData_bmesh_get(&bm->edata, e->head.data, CD_FREESTYLE_EDGE);
-        if (fe->flag & FREESTYLE_EDGE_MARK) {
-          rl->flags |= LRT_EDGE_FLAG_EDGE_MARK;
-        }
+
+      /* Because e->head.hflag is char, so line type flags should not exceed positive 7 bits. */
+      char eflag = lineart_test_feature_line(rb,e,ort,orv,reln->crease_threshold, ob->type==OB_FONT, CanFindFreestyle, bm);
+      if(eflag){
+        allocate_rl++;
       }
-      if (use_smooth_contour_modifier_contour) {
-        if (BM_elem_flag_test(e->v1, BM_ELEM_SELECT) && BM_elem_flag_test(e->v2, BM_ELEM_SELECT)) {
-          rl->flags |= LRT_EDGE_FLAG_CONTOUR;
-        }
+      /* Here we just use bm's flag for convenience, it's deleted after loading anyway. Always set the flag, so we don't need to clean it. */
+      e->head.hflag = eflag;
+    }
+
+
+    orl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine) * allocate_rl);
+    rl = orl;
+    for(i=0;i<bm->totedge;i++){
+      e = BM_edge_at_index(bm, i);
+
+      if(!e->head.hflag){
+        continue;
       }
 
       rl->l = &orv[BM_elem_index_get(e->v1)];
@@ -1611,8 +1513,9 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       BLI_addtail(&rl->segments, rls);
       if (usage == OBJECT_LRT_INHERENT || usage == OBJECT_LRT_INCLUDE ||
           usage == OBJECT_LRT_NO_INTERSECTION) {
-        BLI_addtail(&rb->all_render_lines, rl);
+        //BLI_addtail(&rb->all_render_lines, rl);
       }
+      
       rl++;
     }
 
@@ -2122,7 +2025,7 @@ static LineartRenderVert *lineart_triangle_2v_intersection_test(LineartRenderBuf
 
   LISTBASE_FOREACH (LinkData *, ld, &testing->intersecting_verts) {
     LineartRenderVert *rv = (LineartRenderVert *)ld->data;
-    if (rv->intersecting_with == rt && lineart_vert_intersected_this_line(rv,l,r)) {
+    if (rv->intersecting_with == rt && lineart_vert_already_intersected_2v(rv,l,r)) {
       return rv;
     }
   }
@@ -2181,6 +2084,7 @@ static LineartRenderLine *lineart_triangle_generate_intersection_line_only(
   LineartRenderVert *TE0 = 0;
   LineartRenderVert *TE1 = 0;
   LineartRenderVert *TE2 = 0;
+  LineartRenderVert *sv1,*sv2;
   double cl[3];
 
   double ZMin, ZMax;
@@ -2191,7 +2095,7 @@ static LineartRenderLine *lineart_triangle_generate_intersection_line_only(
 
   if (share) {
     LineartRenderVert *new_share;
-    LineartRenderLine *rl = lineart_another_edge(rt, share);
+    lineart_another_edge_2v(rt, share, &sv1, &sv2);
 
     l = new_share = lineart_mem_aquire(&rb->render_data_pool, (sizeof(LineartRenderVert)));
 
@@ -2200,11 +2104,11 @@ static LineartRenderLine *lineart_triangle_generate_intersection_line_only(
         r; /*  Caution!  BMVert* result->v is reused to save a intersecting render vert. */
     copy_v3_v3_db(new_share->gloc, share->gloc);
 
-    r = lineart_triangle_line_intersection_test(rb, rl, rt, testing, 0);
+    r = lineart_triangle_2v_intersection_test(rb, sv1, sv2, rt, testing, 0);
 
     if (r == NULL) {
-      rl = lineart_another_edge(testing, share);
-      r = lineart_triangle_line_intersection_test(rb, rl, testing, rt, 0);
+      lineart_another_edge_2v(rt, share, &sv1, &sv2);
+      r = lineart_triangle_2v_intersection_test(rb, sv1,sv2, testing, rt, 0);
       if (r == NULL) {
         return 0;
       }
@@ -2217,20 +2121,20 @@ static LineartRenderLine *lineart_triangle_generate_intersection_line_only(
     }
   }
   else {
-    E0T = lineart_triangle_line_intersection_test(rb, rt->v[0],rt->v[1], rt, testing, 0);
+    E0T = lineart_triangle_2v_intersection_test(rb, rt->v[0],rt->v[1], rt, testing, 0);
     if (E0T && (!(*next))) {
       (*next) = E0T;
       lineart_vert_set_intersection_2v((*next),rt->v[0],rt->v[1]);
       next = &r;
     }
-    E1T = lineart_triangle_line_intersection_test(rb, rt->v[1],rt->v[2], rt, testing, l);
+    E1T = lineart_triangle_2v_intersection_test(rb, rt->v[1],rt->v[2], rt, testing, l);
     if (E1T && (!(*next))) {
       (*next) = E1T;
       lineart_vert_set_intersection_2v((*next),rt->v[1],rt->v[2]);
       next = &r;
     }
     if (!(*next)) {
-      E2T = lineart_triangle_line_intersection_test(rb, rt->v[2],rt->v[0], rt, testing, l);
+      E2T = lineart_triangle_2v_intersection_test(rb, rt->v[2],rt->v[0], rt, testing, l);
     }
     if (E2T && (!(*next))) {
       (*next) = E2T;
@@ -2239,7 +2143,7 @@ static LineartRenderLine *lineart_triangle_generate_intersection_line_only(
     }
 
     if (!(*next)) {
-      TE0 = lineart_triangle_line_intersection_test(rb, testing->v[0],testing->v[1], testing, rt, l);
+      TE0 = lineart_triangle_2v_intersection_test(rb, testing->v[0],testing->v[1], testing, rt, l);
     }
     if (TE0 && (!(*next))) {
       (*next) = TE0;
@@ -2247,7 +2151,7 @@ static LineartRenderLine *lineart_triangle_generate_intersection_line_only(
       next = &r;
     }
     if (!(*next)) {
-      TE1 = lineart_triangle_line_intersection_test(rb, testing->v[1],testing->v[2], testing, rt, l);
+      TE1 = lineart_triangle_2v_intersection_test(rb, testing->v[1],testing->v[2], testing, rt, l);
     }
     if (TE1 && (!(*next))) {
       (*next) = TE1;
@@ -2255,7 +2159,7 @@ static LineartRenderLine *lineart_triangle_generate_intersection_line_only(
       next = &r;
     }
     if (!(*next)) {
-      TE2 = lineart_triangle_line_intersection_test(rb, testing->v[2],testing->v[0], testing, rt, l);
+      TE2 = lineart_triangle_2v_intersection_test(rb, testing->v[2],testing->v[0], testing, rt, l);
     }
     if (TE2 && (!(*next))) {
       (*next) = TE2;
@@ -2300,9 +2204,8 @@ static LineartRenderLine *lineart_triangle_generate_intersection_line_only(
   LineartRenderLineSegment *rls = lineart_mem_aquire(&rb->render_data_pool,
                                                      sizeof(LineartRenderLineSegment));
   BLI_addtail(&result->segments, rls);
-  BLI_addtail(&rb->all_render_lines, result);
+  lineart_prepend_direct(&rb->intersection_lines, result);
   result->flags |= LRT_EDGE_FLAG_INTERSECTION;
-  lineart_list_append_pointer_static(&rb->intersection_lines, &rb->render_data_pool, result);
   int r1, r2, c1, c2, row, col;
   if (lineart_get_line_bounding_areas(rb, result, &r1, &r2, &c1, &c2)) {
     for (row = r1; row != r2 + 1; row++) {
@@ -2410,22 +2313,22 @@ static void lineart_destroy_render_data(void)
   }
 
   rb->contour_count = 0;
-  rb->contour_managed = 0;
+  rb->contour_managed = NULL;
   rb->intersection_count = 0;
-  rb->intersection_managed = 0;
+  rb->intersection_managed = NULL;
   rb->material_line_count = 0;
-  rb->material_managed = 0;
+  rb->material_managed = NULL;
   rb->crease_count = 0;
-  rb->crease_managed = 0;
+  rb->crease_managed = NULL;
   rb->edge_mark_count = 0;
-  rb->edge_mark_managed = 0;
+  rb->edge_mark_managed = NULL;
 
-  BLI_listbase_clear(&rb->contours);
-  BLI_listbase_clear(&rb->intersection_lines);
-  BLI_listbase_clear(&rb->crease_lines);
-  BLI_listbase_clear(&rb->material_lines);
-  BLI_listbase_clear(&rb->edge_marks);
-  BLI_listbase_clear(&rb->all_render_lines);
+  rb->contours = NULL;
+  rb->intersection_lines = NULL;
+  rb->crease_lines = NULL;
+  rb->material_lines = NULL;
+  rb->edge_marks = NULL;
+
   BLI_listbase_clear(&rb->chains);
   BLI_listbase_clear(&rb->wasted_cuts);
 
@@ -3675,9 +3578,6 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
   LRT_CANCEL_STAGE
 
   lineart_main_bounding_area_make_initial(rb);
-  if (!intersections_only) {
-    lineart_main_compute_scene_contours(rb);
-  }
 
   lineart_main_cull_triangles(rb, false);
   lineart_main_cull_triangles(rb, true);
@@ -3823,7 +3723,7 @@ static void lineart_gpencil_notify_targets(Depsgraph *dg)
   DEG_OBJECT_ITER_END;
 }
 
-int lineart_rb_line_types(LineartRenderBuffer *rb)
+static int lineart_rb_line_types(LineartRenderBuffer *rb)
 {
   int types = 0;
   types |= rb->use_contour ? LRT_EDGE_FLAG_CONTOUR : 0;
@@ -4101,7 +4001,7 @@ static int lineart_gpencil_bake_strokes_invoke(bContext *C,
   SceneLineart *lineart = &scene->lineart;
   Depsgraph *dg = CTX_data_depsgraph_pointer(C);
   int frame;
-  int frame_begin = ((lineart->flags & LRT_BAKING_FINAL_RANGE) ? (scene->r.sfra, 1) :
+  int frame_begin = ((lineart->flags & LRT_BAKING_FINAL_RANGE) ? MAX2(scene->r.sfra, 1) :
                                                                  lineart->baking_preview_start);
   int frame_end = ((lineart->flags & LRT_BAKING_FINAL_RANGE) ? scene->r.efra :
                                                                lineart->baking_preview_end);
