@@ -113,7 +113,7 @@ typedef struct NlaEvalChannel {
   NlaEvalChannelSnapshot *blend_snapshot;
 
   /* Mask of array items controlled by NLA. */
-  NlaValidMask valid;
+  NlaValidMask domain;
 
   /* Base set of values. */
   NlaEvalChannelSnapshot base_snapshot;
@@ -156,8 +156,8 @@ typedef struct NlaKeyframingContext {
   NlaStrip strip;
   NlaEvalStrip *eval_strip;
 
-  /* Evaluated NLA stack below the current strip. */
-  NlaEvalData nla_channels;
+  /* Evaluated NLA stack below the tweak strip. */
+  NlaEvalData lower_nla_channels;
 } NlaKeyframingContext;
 
 /* --------------- NLA Functions (not to be used as a proper API) ----------------------- */
