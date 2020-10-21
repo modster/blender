@@ -50,7 +50,7 @@ class Geometry {
   Mesh *extract_mesh()
   {
     Mesh *mesh = mesh_;
-    mesh_ = mesh;
+    mesh_ = nullptr;
     return mesh;
   }
 };

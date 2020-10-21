@@ -58,7 +58,7 @@ class GeoNodeInput {
 
   template<typename T> T &get(StringRef name)
   {
-    return *builder_.values_.lookup(name).get<T>();
+    return *this->get(name).get<T>();
   }
 };
 
@@ -72,6 +72,16 @@ class GeoNodeOutputCollector {
  public:
   GeoNodeOutputCollector(LinearAllocator<> &allocator) : allocator_(allocator)
   {
+  }
+
+  GMutablePointer get(StringRef name)
+  {
+    return values_.lookup(name);
+  }
+
+  template<typename T> T &get(StringRef name)
+  {
+    return *this->get(name).get<T>();
   }
 };
 

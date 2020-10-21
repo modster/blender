@@ -38,11 +38,14 @@ namespace blender::nodes {
 static void geo_triangulate_exec(bNode *UNUSED(node), GeoNodeInput input, GeoNodeOutput output)
 {
   Geometry *geometry = input.get<GeometryP>("Geometry").p;
-  Mesh *old_mesh = geometry->extract_mesh();
-  delete geometry;
-  Mesh *new_mesh = triangulate_mesh(old_mesh, 3, 0, 4, 0);
-  Geometry *new_geometry = Geometry::from_mesh(new_mesh);
-  output.set("Geometry", GeometryP{new_geometry});
+  if (geometry != nullptr) {
+    Mesh *old_mesh = geometry->extract_mesh();
+    if (old_mesh != nullptr) {
+      Mesh *new_mesh = triangulate_mesh(old_mesh, 3, 0, 4, 0);
+      geometry = Geometry::from_mesh(new_mesh);
+    }
+  }
+  output.set("Geometry", GeometryP{geometry});
 }
 }  // namespace blender::nodes
 

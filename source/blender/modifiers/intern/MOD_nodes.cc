@@ -63,6 +63,9 @@
 #include "MOD_modifiertypes.h"
 #include "MOD_ui_common.h"
 
+#include "NOD_derived_node_tree.hh"
+#include "NOD_geometry_exec.hh"
+
 using blender::float3;
 
 static void initData(ModifierData *md)
@@ -107,12 +110,97 @@ static PointCloud *modifyPointCloud(ModifierData *md,
   return pointcloud;
 }
 
+using namespace blender;
+using namespace blender::nodes;
+using namespace blender::fn;
+using namespace blender::bke;
+
+static Geometry *compute_geometry(const DOutputSocket *group_input,
+                                  Geometry *group_input_geometry,
+                                  const DInputSocket &socket_to_compute)
+{
+  Span<const DOutputSocket *> from_sockets = socket_to_compute.linked_sockets();
+  Span<const DGroupInput *> from_group_inputs = socket_to_compute.linked_group_inputs();
+  const int total_inputs = from_sockets.size() + from_group_inputs.size();
+  if (total_inputs != 1) {
+    return nullptr;
+  }
+  if (!from_group_inputs.is_empty()) {
+    return nullptr;
+  }
+
+  const DOutputSocket &from_socket = *from_sockets[0];
+  if (&from_socket == group_input) {
+    return group_input_geometry;
+  }
+  if (from_socket.idname() != "NodeSocketGeometry") {
+    return nullptr;
+  }
+
+  const DNode &from_node = from_socket.node();
+  if (from_node.inputs().size() != 1) {
+    return nullptr;
+  }
+
+  Geometry *input_geometry = compute_geometry(
+      group_input, group_input_geometry, from_node.input(0));
+
+  bNode *bnode = from_node.node_ref().bnode();
+  GeometryNodeExecFunction execute = bnode->typeinfo->geometry_node_execute;
+
+  LinearAllocator<> allocator;
+  GeoNodeInputBuilder input_builder;
+  GeometryP geometry_p{input_geometry};
+  input_builder.add("Geometry", CPPType::get<GeometryP>(), &geometry_p);
+  GeoNodeOutputCollector output_collector{allocator};
+  execute(bnode, input_builder, output_collector);
+
+  Geometry *output_geometry =
+      output_collector.get<GeometryP>(from_socket.socket_ref().bsocket()->identifier).p;
+  return output_geometry;
+}
+
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx), Mesh *mesh)
 {
   NodesModifierData *nmd = reinterpret_cast<NodesModifierData *>(md);
-  UNUSED_VARS(nmd);
-  std::cout << __func__ << "\n";
-  return mesh;
+  if (nmd->node_tree == nullptr) {
+    return mesh;
+  }
+
+  NodeTreeRefMap tree_refs;
+  DerivedNodeTree tree{nmd->node_tree, tree_refs};
+
+  Span<const DNode *> input_nodes = tree.nodes_by_type("NodeGroupInput");
+  Span<const DNode *> output_nodes = tree.nodes_by_type("NodeGroupOutput");
+
+  if (input_nodes.size() > 1) {
+    return mesh;
+  }
+  if (output_nodes.size() != 1) {
+    return mesh;
+  }
+
+  Span<const DOutputSocket *> group_inputs = (input_nodes.size() == 1) ?
+                                                 input_nodes[0]->outputs().drop_back(1) :
+                                                 Span<const DOutputSocket *>{};
+  Span<const DInputSocket *> group_outputs = output_nodes[0]->inputs().drop_back(1);
+
+  if (group_outputs.size() != 1) {
+    return mesh;
+  }
+
+  const DInputSocket *group_output = group_outputs[0];
+  if (group_output->idname() != "NodeSocketGeometry") {
+    return mesh;
+  }
+
+  Geometry *input_geometry = Geometry::from_mesh(mesh);
+  Geometry *new_geometry = compute_geometry(group_inputs[0], input_geometry, *group_outputs[0]);
+  if (new_geometry == nullptr) {
+    return mesh;
+  }
+  Mesh *new_mesh = new_geometry->extract_mesh();
+  return new_mesh;
 }
 
 static void panel_draw(const bContext *UNUSED(C), Panel *panel)

@@ -123,7 +123,7 @@ class MFDataType;
 using NodeExpandInMFNetworkFunction = void (*)(blender::nodes::NodeMFNetworkBuilder &builder);
 using SocketGetMFDataTypeFunction = blender::fn::MFDataType (*)();
 using SocketExpandInMFNetworkFunction = void (*)(blender::nodes::SocketMFNetworkBuilder &builder);
-using GeometryNodeExecFunction = void (*)(struct bNode *,
+using GeometryNodeExecFunction = void (*)(struct bNode *node,
                                           blender::nodes::GeoNodeInput input,
                                           blender::nodes::GeoNodeOutput output);
 
