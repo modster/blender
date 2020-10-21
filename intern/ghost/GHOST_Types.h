@@ -678,7 +678,7 @@ typedef struct GHOST_XrDrawViewInfo {
 typedef struct GHOST_XrError {
   const char *user_message;
 
-  /* Whether to destroy the runtime when the error is handled.
+  /** Whether to destroy the runtime when the error is handled.
    * Some errors (in particular those related to OpenXR actions)
    * may not warrant aborting the current context / session. */
   char destroy_runtime;
@@ -688,11 +688,11 @@ typedef struct GHOST_XrError {
 
 typedef struct GHOST_XrActionSetInfo {
   const char *name;
-  /* Larger values take precedence over smaller values. */
+  /** Larger values take precedence over smaller values. */
   GHOST_TUns32 priority;
 } GHOST_XrActionSetInfo;
 
-/* XR action type. Enum values match those in OpenXR's
+/** XR action type. Enum values match those in OpenXR's
  * XrActionType enum for consistency. */
 typedef enum GHOST_XrActionType {
   GHOST_kXrActionTypeBooleanInput = 1,
@@ -707,15 +707,15 @@ typedef struct GHOST_XrActionInfo {
   GHOST_XrActionType type;
   GHOST_TUns32 count_subaction_paths;
   const char **subaction_paths;
-  /* States for each subaction path. */
+  /** States for each subaction path. */
   void *states;
-  /* Previous states, stored to determine XR events. */
+  /** Previous states, stored to determine XR events. */
   void *states_prev;
 
-  /* Input threshold for float actions. */
+  /** Input threshold for float actions. */
   float threshold;
 
-  /* wmOperatorType and wmXrOpFlag, only used by wm. */
+  /** wmOperatorType and wmXrOpFlag, only used by wm. */
   void *ot;
   char op_flag;
 } GHOST_XrActionInfo;
@@ -724,13 +724,13 @@ typedef struct GHOST_XrActionSpaceInfo {
   const char *action_name;
   GHOST_TUns32 count_subaction_paths;
   const char **subaction_paths;
-  /* Poses for each subaction path. */
+  /** Poses for each subaction path. */
   GHOST_XrPose *poses;
 } GHOST_XrActionSpaceInfo;
 
 typedef struct GHOST_XrActionBinding {
   const char *action_name;
-  /* Interaction path: User (subaction) path + component path. */
+  /** Interaction path: User (subaction) path + component path. */
   const char *interaction_path;
 } GHOST_XrActionBinding;
 

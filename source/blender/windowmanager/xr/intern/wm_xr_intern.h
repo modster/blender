@@ -126,7 +126,7 @@ typedef struct wmXrDrawData {
   float eye_position_ofs[3]; /* Local/view space. */
 } wmXrDrawData;
 
-/* Same as GHOST_XrActionInfo but with non-const strings. */
+/** Same as GHOST_XrActionInfo but with non-const strings. */
 typedef struct wmXrAction {
   char *name;
   GHOST_XrActionType type;

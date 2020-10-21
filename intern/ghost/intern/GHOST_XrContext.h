@@ -74,7 +74,7 @@ class GHOST_XrContext : public GHOST_IXrContext {
   bool isSessionRunning() const override;
   void drawSessionViews(void *draw_customdata) override;
 
-  /* Needed for the GHOST C api. */
+  /** Needed for the GHOST C api. */
   GHOST_XrSession *getSession() override;
   const GHOST_XrSession *getSession() const override;
 
