@@ -3905,11 +3905,6 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
   LRT_CANCEL_STAGE
   LRT_PROGRESS(10, "LRT: Contour lines.");
 
-  if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
-    LRT_PROGRESS(100, "LRT: Finished.");
-    return OPERATOR_FINISHED;
-  }
-
   if (!intersections_only) {
     lineart_main_compute_scene_contours(rb);
   }
