@@ -206,7 +206,8 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
   int last_occlusion;
   unsigned char last_transparency;
 
-  LRT_ITER_ALL_LINES_BEGIN{
+  LRT_ITER_ALL_LINES_BEGIN
+  {
 
     if ((!(rl->flags & LRT_EDGE_FLAG_ALL_TYPE)) || (rl->flags & LRT_EDGE_FLAG_CHAIN_PICKED)) {
       continue;
@@ -489,15 +490,8 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
     else {
       rlc->type = (rl->flags & LRT_EDGE_FLAG_ALL_TYPE);
     }
-    if(!next_rl){
-      if(current_list == rb->contours){current_list = rb->crease_lines;}
-      else if(current_list == rb->crease_lines){current_list = rb->material_lines;}
-      else if(current_list == rb->material_lines){current_list = rb->edge_marks;}
-      else if(current_list == rb->edge_marks){current_list = rb->intersection_lines;}
-      else {current_list=NULL;}
-      next_rl = current_list;
-    }
-  }LRT_ITER_ALL_LINES_END
+  }
+  LRT_ITER_ALL_LINES_END
 }
 
 static LineartBoundingArea *lineart_bounding_area_get_rlci_recursive(
@@ -736,13 +730,14 @@ static LineartChainRegisterEntry *lineart_chain_get_closest_cre(LineartRenderBuf
     next_cre = cre->next;
     if (cre->rlc->object_ref != rlc->object_ref) {
       if (!rb->fuzzy_everything) {
-        if(rb->fuzzy_intersections){
+        if (rb->fuzzy_intersections) {
           /* If none of those are intersection lines... */
           if ((!(cre->rlc->type & LRT_EDGE_FLAG_INTERSECTION)) &&
               (!(rlc->type & LRT_EDGE_FLAG_INTERSECTION))) {
             continue; /* We don't want to chain along different objects at the moment. */
           }
-        }else {
+        }
+        else {
           continue;
         }
       }
@@ -779,21 +774,31 @@ static LineartChainRegisterEntry *lineart_chain_get_closest_cre(LineartRenderBuf
       }
     }
   }
-  float adjacent_new_len=dist; /* We want a closer point anyway. So using modified dist is fine. */
-  LineartChainRegisterEntry* adjacent_closest;
+  float adjacent_new_len =
+      dist; /* We want a closer point anyway. So using modified dist is fine. */
+  LineartChainRegisterEntry *adjacent_closest;
 
-#define LRT_TEST_ADJACENT_AREAS(dist_to, list)\
-  if(dist_to<dist && dist_to>0){\
-    LISTBASE_FOREACH(LinkData* ,ld,list){\
-      LineartBoundingArea* sba = (LineartBoundingArea*)ld->data;\
-      adjacent_closest = lineart_chain_get_closest_cre(rb,sba,rlc,rlci,occlusion,transparency_mask,dist,do_geometry_space,&adjacent_new_len, ba);\
-      if(adjacent_new_len < dist){\
-        dist=  adjacent_new_len;\
-        closest_cre = adjacent_closest;\
-      }\
-    }\
+#define LRT_TEST_ADJACENT_AREAS(dist_to, list) \
+  if (dist_to < dist && dist_to > 0) { \
+    LISTBASE_FOREACH (LinkData *, ld, list) { \
+      LineartBoundingArea *sba = (LineartBoundingArea *)ld->data; \
+      adjacent_closest = lineart_chain_get_closest_cre(rb, \
+                                                       sba, \
+                                                       rlc, \
+                                                       rlci, \
+                                                       occlusion, \
+                                                       transparency_mask, \
+                                                       dist, \
+                                                       do_geometry_space, \
+                                                       &adjacent_new_len, \
+                                                       ba); \
+      if (adjacent_new_len < dist) { \
+        dist = adjacent_new_len; \
+        closest_cre = adjacent_closest; \
+      } \
+    } \
   }
-  if(!do_geometry_space && !caller_ba){
+  if (!do_geometry_space && !caller_ba) {
     LRT_TEST_ADJACENT_AREAS(rlci->pos[0] - ba->l, &ba->lp);
     LRT_TEST_ADJACENT_AREAS(ba->r - rlci->pos[0], &ba->rp);
     LRT_TEST_ADJACENT_AREAS(ba->u - rlci->pos[1], &ba->up);
@@ -843,10 +848,26 @@ void ED_lineart_chain_connect(LineartRenderBuffer *rb, const int do_geometry_spa
     rlci_r = rlc->chain.last;
     while ((ba_l = lineart_bounding_area_get_end_point(rb, rlci_l)) &&
            (ba_r = lineart_bounding_area_get_end_point(rb, rlci_r))) {
-      closest_cre_l = lineart_chain_get_closest_cre(
-          rb, ba_l, rlc, rlci_l, occlusion, transparency_mask, dist, do_geometry_space, &dist_l, NULL);
-      closest_cre_r = lineart_chain_get_closest_cre(
-          rb, ba_r, rlc, rlci_r, occlusion, transparency_mask, dist, do_geometry_space, &dist_r, NULL);
+      closest_cre_l = lineart_chain_get_closest_cre(rb,
+                                                    ba_l,
+                                                    rlc,
+                                                    rlci_l,
+                                                    occlusion,
+                                                    transparency_mask,
+                                                    dist,
+                                                    do_geometry_space,
+                                                    &dist_l,
+                                                    NULL);
+      closest_cre_r = lineart_chain_get_closest_cre(rb,
+                                                    ba_r,
+                                                    rlc,
+                                                    rlci_r,
+                                                    occlusion,
+                                                    transparency_mask,
+                                                    dist,
+                                                    do_geometry_space,
+                                                    &dist_r,
+                                                    NULL);
       if (closest_cre_l && closest_cre_r) {
         if (dist_l < dist_r) {
           closest_cre = closest_cre_l;

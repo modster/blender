@@ -76,19 +76,19 @@ void lineart_count_and_print_render_buffer_memory(LineartRenderBuffer *rb);
 
 
 #define LRT_ITER_ALL_LINES_BEGIN\
-  LineartRenderLine* rl, *next_rl, *current_list;\
+  LineartRenderLine* rl, *next_rl, **current_list;\
   rl = rb->contours;\
-  for (current_list = rb->contours; rl; rl = next_rl) {\
+  for (current_list = &rb->contours; rl; rl = next_rl) {\
     next_rl = rl->next;
 
 #define LRT_ITER_ALL_LINES_END\
-    if(!next_rl){\
-      if(current_list == rb->contours){current_list = rb->crease_lines;}\
-      else if(current_list == rb->crease_lines){current_list = rb->material_lines;}\
-      else if(current_list == rb->material_lines){current_list = rb->edge_marks;}\
-      else if(current_list == rb->edge_marks){current_list = rb->intersection_lines;}\
-      else {current_list=NULL;}\
-      next_rl = current_list;\
+    while(!next_rl){\
+      if(current_list == &rb->contours){current_list = &rb->crease_lines;}\
+      else if(current_list == &rb->crease_lines){current_list = &rb->material_lines;}\
+      else if(current_list == &rb->material_lines){current_list = &rb->edge_marks;}\
+      else if(current_list == &rb->edge_marks){current_list = &rb->intersection_lines;}\
+      else { break; }\
+      next_rl = *current_list;\
     }\
   }\
 
