@@ -1681,7 +1681,7 @@ bool BLO_library_path_explode(const char *path, char *r_dir, char **r_group, cha
 {
   /* We might get some data names with slashes,
    * so we have to go up in path until we find blend file itself,
-   * then we now next path item is group, and everything else is data name. */
+   * then we know next path item is group, and everything else is data name. */
   char *slash = NULL, *prev_slash = NULL, c = '\0';
 
   r_dir[0] = '\0';
@@ -3308,7 +3308,7 @@ static void lib_link_object(BlendLibReader *reader, Object *ob)
    * the material list size gets out of sync. T22663. */
   if (ob->data && ob->id.lib != ((ID *)ob->data)->lib) {
     const short *totcol_data = BKE_object_material_len_p(ob);
-    /* Only expand so as not to loose any object materials that might be set. */
+    /* Only expand so as not to lose any object materials that might be set. */
     if (totcol_data && (*totcol_data > ob->totcol)) {
       /* printf("'%s' %d -> %d\n", ob->id.name, ob->totcol, *totcol_data); */
       BKE_object_material_resize(reader->main, ob, *totcol_data, false);

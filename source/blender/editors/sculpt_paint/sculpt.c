@@ -1047,6 +1047,21 @@ bool SCULPT_is_vertex_inside_brush_radius_symm(const float vertex[3],
   return false;
 }
 
+void SCULPT_tag_update_overlays(bContext *C)
+{
+  ARegion *region = CTX_wm_region(C);
+  ED_region_tag_redraw(region);
+
+  Object *ob = CTX_data_active_object(C);
+  WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, ob);
+
+  DEG_id_tag_update(&ob->id, ID_RECALC_SHADING);
+  View3D *v3d = CTX_wm_view3d(C);
+  if (!BKE_sculptsession_use_pbvh_draw(ob, v3d)) {
+    DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
+  }
+}
+
 /* Sculpt Flood Fill API
  *
  * Iterate over connected vertices, starting from one or more initial vertices. */
@@ -2795,6 +2810,12 @@ void SCULPT_tilt_apply_to_normal(float r_normal[3], StrokeCache *cache, const fl
   normalize_v3(r_normal);
 }
 
+void SCULPT_tilt_effective_normal_get(const SculptSession *ss, const Brush *brush, float r_no[3])
+{
+  copy_v3_v3(r_no, ss->cache->sculpt_normal_symm);
+  SCULPT_tilt_apply_to_normal(r_no, ss->cache, brush->tilt_strength_factor);
+}
+
 static void update_brush_local_mat(Sculpt *sd, Object *ob)
 {
   StrokeCache *cache = ob->sculpt->cache;
@@ -3104,8 +3125,9 @@ static void do_draw_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode)
   const float bstrength = ss->cache->bstrength;
 
   /* Offset with as much as possible factored in already. */
-  mul_v3_v3fl(offset, ss->cache->sculpt_normal_symm, ss->cache->radius);
-  SCULPT_tilt_apply_to_normal(offset, ss->cache, brush->tilt_strength_factor);
+  float effective_normal[3];
+  SCULPT_tilt_effective_normal_get(ss, brush, effective_normal);
+  mul_v3_v3fl(offset, effective_normal, ss->cache->radius);
   mul_v3_v3(offset, ss->cache->scale);
   mul_v3_fl(offset, bstrength);
 
@@ -3182,8 +3204,9 @@ static void do_draw_sharp_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int to
   const float bstrength = ss->cache->bstrength;
 
   /* Offset with as much as possible factored in already. */
-  mul_v3_v3fl(offset, ss->cache->sculpt_normal_symm, ss->cache->radius);
-  SCULPT_tilt_apply_to_normal(offset, ss->cache, brush->tilt_strength_factor);
+  float effective_normal[3];
+  SCULPT_tilt_effective_normal_get(ss, brush, effective_normal);
+  mul_v3_v3fl(offset, effective_normal, ss->cache->radius);
   mul_v3_v3(offset, ss->cache->scale);
   mul_v3_fl(offset, bstrength);
 

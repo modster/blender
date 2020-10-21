@@ -150,7 +150,6 @@ static void mask_flood_fill_task_cb(void *__restrict userdata,
 
 static int mask_flood_fill_exec(bContext *C, wmOperator *op)
 {
-  ARegion *region = CTX_wm_region(C);
   Object *ob = CTX_data_active_object(C);
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   PaintMaskFloodMode mode;
@@ -196,9 +195,7 @@ static int mask_flood_fill_exec(bContext *C, wmOperator *op)
     MEM_freeN(nodes);
   }
 
-  ED_region_tag_redraw(region);
-
-  WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, ob);
+  SCULPT_tag_update_overlays(C);
 
   return OPERATOR_FINISHED;
 }
@@ -484,7 +481,11 @@ static SculptGestureContext *sculpt_gesture_init_from_line(bContext *C, wmOperat
   if (!sgcontext->vc.rv3d->is_persp) {
     mul_v3_fl(normal, -1.0f);
   }
-  plane_from_point_normal_v3(sgcontext->line.true_plane, plane_points[0], normal);
+  mul_v3_mat3_m4v3(normal, sgcontext->vc.obact->imat, normal);
+  float plane_point_object_space[3];
+  mul_v3_m4v3(plane_point_object_space, sgcontext->vc.obact->imat, plane_points[0]);
+  plane_from_point_normal_v3(sgcontext->line.true_plane, plane_point_object_space, normal);
+
   return sgcontext;
 }
 
@@ -849,7 +850,7 @@ static EnumPropertyItem prop_trim_operation_types[] = {
      "JOIN",
      0,
      "Join",
-     "Join the new mesh as separate geometry, without preforming any boolean operation"},
+     "Join the new mesh as separate geometry, without performing any boolean operation"},
     {0, NULL, 0, NULL, NULL},
 };
 
