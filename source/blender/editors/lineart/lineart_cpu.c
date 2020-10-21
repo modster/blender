@@ -1529,6 +1529,94 @@ static void lineart_vert_transform(
   mul_v4_m4v3_db(rv->fbcoord, mvp_mat, co);
 }
 
+static void lineart_main_compute_scene_contours(LineartRenderBuffer *rb)
+{
+  
+  if(!rb->cam_is_persp){
+      copy_v3_v3_db(view_vector, rb->view_vector);
+  }
+
+  LISTBASE_FOREACH (LineartRenderElementLinkNode *, reln, &rb->line_buffer_pointers) {
+    LineartRenderLine *rl = (LineartRenderLine *)reln->pointer;
+    int amount = reln->element_count;
+    
+  }
+}
+
+
+static unsigned char lineart_test_feature_line(LineartRenderBuffer* rb, BMEdge* e, LineartRenderTriangle* rt_array,LineartRenderVert* rv_array, float crease_threshold, bool no_crease, bool count_freestyle, BMesh* bm_if_freestyle){
+  BMLoop* ll,*lr;
+  ll = e->l;
+  lr = e->l->radial_next;
+  
+  if(ll == lr){
+    return LRT_EDGE_FLAG_CONTOUR;
+  }
+
+  LineartRenderTriangle *rt1, *rt2;
+  LineartRenderVert* l,*r;
+
+  /* We can do so because mesh is already triangulated. */
+  rt1 = &rt_array[BM_elem_index_get(ll)];
+  rt2 = &rt_array[BM_elem_index_get(lr)];
+
+  l = &rt_array[BM_elem_index_get(e->v1)];
+  r = &rt_array[BM_elem_index_get(e->v2)];
+
+  double view_vector[3];
+  double view_vector[3];
+  double dot_1 = 0, dot_2 = 0;
+  double result;
+  int add = 0, added = 0;
+  int add = 0;
+  int added = 0;
+  double dot_1 = 0;
+  double dot_2 = 0;
+  FreestyleEdge* fe;
+
+  if (rb->cam_is_persp) {
+    sub_v3_v3v3_db(view_vector, l->gloc, rb->camera_pos);
+  }
+
+  // currently not compatible with use_smooth_contour_modifier_contour
+
+  dot_1 = dot_v3v3_db(view_vector, rt1->gn);
+  dot_2 = dot_v3v3_db(view_vector, rt2->gn);
+
+  if ((result = dot_1 * dot_2) < 0 && (dot_1 + dot_2)) {
+    return LRT_EDGE_FLAG_CONTOUR;
+  }
+  else if (rb->use_crease &&
+            (dot_v3v3_db(rt1->gn, rt2->gn) < crease_threshold)) {
+    if(!no_crease) {
+    return LRT_EDGE_FLAG_CREASE;
+    }
+  }
+  else if (rb->use_material &&
+            (rt1->material_id != rt2->material_id)) {
+    return LRT_EDGE_FLAG_MATERIAL;
+  }else if (count_freestyle && rb->use_edge_marks) {
+    fe = CustomData_bmesh_get(&bm_if_freestyle->edata, e->head.data, CD_FREESTYLE_EDGE);
+    if (fe->flag & FREESTYLE_EDGE_MARK) {
+      return LRT_EDGE_FLAG_EDGE_MARK;
+    }
+  }
+  return 0;
+
+      ///-----------------------------------------------------------------
+      if (added) {
+        int r1, r2, c1, c2, row, col;
+        if (lineart_get_line_bounding_areas(rb, rl, &r1, &r2, &c1, &c2)) {
+          for (row = r1; row != r2 + 1; row++) {
+            for (col = c1; col != c2 + 1; col++) {
+              lineart_bounding_area_link_line(rb, &rb->initial_bounding_areas[row * 4 + col], rl);
+            }
+          }
+        }
+      }
+
+}
+
 static void lineart_geometry_object_load(Depsgraph *dg,
                                          Object *ob,
                                          double (*mv_mat)[4],
@@ -1682,35 +1770,6 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       orv[i].index = i;
     }
 
-    rl = orl;
-    for (i = 0; i < bm->totedge; i++) {
-      e = BM_edge_at_index(bm, i);
-      if (CanFindFreestyle) {
-        fe = CustomData_bmesh_get(&bm->edata, e->head.data, CD_FREESTYLE_EDGE);
-        if (fe->flag & FREESTYLE_EDGE_MARK) {
-          rl->flags |= LRT_EDGE_FLAG_EDGE_MARK;
-        }
-      }
-      if (use_smooth_contour_modifier_contour) {
-        if (BM_elem_flag_test(e->v1, BM_ELEM_SELECT) && BM_elem_flag_test(e->v2, BM_ELEM_SELECT)) {
-          rl->flags |= LRT_EDGE_FLAG_CONTOUR;
-        }
-      }
-
-      rl->l = &orv[BM_elem_index_get(e->v1)];
-      rl->r = &orv[BM_elem_index_get(e->v2)];
-
-      rl->object_ref = orig_ob;
-
-      LineartRenderLineSegment *rls = lineart_mem_aquire(&rb->render_data_pool,
-                                                         sizeof(LineartRenderLineSegment));
-      BLI_addtail(&rl->segments, rls);
-      if (usage == OBJECT_LRT_INHERENT || usage == OBJECT_LRT_INCLUDE ||
-          usage == OBJECT_LRT_NO_INTERSECTION) {
-        BLI_addtail(&rb->all_render_lines, rl);
-      }
-      rl++;
-    }
 
     rt = ort;
     for (i = 0; i < bm->totface; i++) {
@@ -1747,6 +1806,40 @@ static void lineart_geometry_object_load(Depsgraph *dg,
 
       rt = (LineartRenderTriangle *)(((unsigned char *)rt) + rb->triangle_size);
     }
+
+
+    /* use BM_ELEM_TAG in f->head.hflag to store needed faces in the first iteration. */
+
+    rl = orl;
+    for (i = 0; i < bm->totedge; i++) {
+      e = BM_edge_at_index(bm, i);
+      if (CanFindFreestyle) {
+        fe = CustomData_bmesh_get(&bm->edata, e->head.data, CD_FREESTYLE_EDGE);
+        if (fe->flag & FREESTYLE_EDGE_MARK) {
+          rl->flags |= LRT_EDGE_FLAG_EDGE_MARK;
+        }
+      }
+      if (use_smooth_contour_modifier_contour) {
+        if (BM_elem_flag_test(e->v1, BM_ELEM_SELECT) && BM_elem_flag_test(e->v2, BM_ELEM_SELECT)) {
+          rl->flags |= LRT_EDGE_FLAG_CONTOUR;
+        }
+      }
+
+      rl->l = &orv[BM_elem_index_get(e->v1)];
+      rl->r = &orv[BM_elem_index_get(e->v2)];
+
+      rl->object_ref = orig_ob;
+
+      LineartRenderLineSegment *rls = lineart_mem_aquire(&rb->render_data_pool,
+                                                         sizeof(LineartRenderLineSegment));
+      BLI_addtail(&rl->segments, rls);
+      if (usage == OBJECT_LRT_INHERENT || usage == OBJECT_LRT_INCLUDE ||
+          usage == OBJECT_LRT_NO_INTERSECTION) {
+        BLI_addtail(&rb->all_render_lines, rl);
+      }
+      rl++;
+    }
+
 
     BM_mesh_free(bm);
 
@@ -2505,120 +2598,6 @@ static void lineart_main_get_view_vector(LineartRenderBuffer *rb)
   mul_v3_mat3_m4v3(trans, inv, direction);
   copy_m4_m4(rb->cam_obmat, obmat_no_scale);
   copy_v3db_v3fl(rb->view_vector, trans);
-}
-
-static void lineart_main_compute_scene_contours(LineartRenderBuffer *rb)
-{
-  double view_vector[3];
-  double dot_1 = 0, dot_2 = 0;
-  double result;
-  int add = 0, added = 0;
-  int contour_count = 0;
-  int crease_count = 0;
-  int material_count = 0;
-  
-  if(!rb->cam_is_persp){
-      copy_v3_v3_db(view_vector, rb->view_vector);
-  }
-
-  LISTBASE_FOREACH (LineartRenderElementLinkNode *, reln, &rb->line_buffer_pointers) {
-    LineartRenderLine *rl = (LineartRenderLine *)reln->pointer;
-    int amount = reln->element_count;
-    for (int i = 0; i < amount; i++) {
-      rl = &((LineartRenderLine *)reln->pointer)[i];
-      add = 0;
-      added = 0;
-      dot_1 = 0;
-      dot_2 = 0;
-
-      if ((rl->flags & LRT_EDGE_FLAG_CHAIN_PICKED) || (!rl->l) || (!rl->r)) {
-        continue;
-      }
-
-      if (rb->cam_is_persp) {
-        sub_v3_v3v3_db(view_vector, rl->l->gloc, rb->camera_pos);
-      }
-
-      if (use_smooth_contour_modifier_contour) {
-        if (rl->flags & LRT_EDGE_FLAG_CONTOUR) {
-          add = 1;
-        }
-      }
-      else {
-        if (rl->tl) {
-          dot_1 = dot_v3v3_db(view_vector, rl->tl->gn);
-        }
-        else {
-          add = 1;
-        }
-        if (rl->tr) {
-          dot_2 = dot_v3v3_db(view_vector, rl->tr->gn);
-        }
-        else {
-          add = 1;
-        }
-      }
-
-      if (!add) {
-        if ((result = dot_1 * dot_2) < 0 && (dot_1 + dot_2)) {
-          add = 1;
-        }
-        else if (rb->use_crease &&
-                 (dot_v3v3_db(rl->tl->gn, rl->tr->gn) < reln->crease_threshold)) {
-          if (rl->object_ref && rl->object_ref->type == OB_FONT) {
-            /* No internal lines in a text object. */
-          }
-          else {
-            add = 2;
-          }
-        }
-        else if (rb->use_material &&
-                 (rl->tl && rl->tr && rl->tl->material_id != rl->tr->material_id)) {
-          add = 3;
-        }
-      }
-
-      if (rb->use_contour && (add == 1)) {
-        rl->flags &= ~LRT_EDGE_FLAG_ALL_TYPE;
-        rl->flags |= LRT_EDGE_FLAG_CONTOUR;
-        lineart_list_append_pointer_static(&rb->contours, &rb->render_data_pool, rl);
-        added = 1;
-        contour_count++;
-      }
-      else if (add == 2) {
-        rl->flags &= ~LRT_EDGE_FLAG_ALL_TYPE;
-        rl->flags |= LRT_EDGE_FLAG_CREASE;
-        lineart_list_append_pointer_static(&rb->crease_lines, &rb->render_data_pool, rl);
-        added = 1;
-        crease_count++;
-      }
-      else if (rb->use_material && (add == 3)) {
-        rl->flags &= ~LRT_EDGE_FLAG_ALL_TYPE;
-        rl->flags |= LRT_EDGE_FLAG_MATERIAL;
-        lineart_list_append_pointer_static(&rb->material_lines, &rb->render_data_pool, rl);
-        added = 1;
-        material_count++;
-      }
-      else if (rb->use_edge_marks && (rl->flags & LRT_EDGE_FLAG_EDGE_MARK)) {
-        rl->flags &= ~LRT_EDGE_FLAG_ALL_TYPE;
-        rl->flags = LRT_EDGE_FLAG_EDGE_MARK;
-        add = 4;
-        lineart_list_append_pointer_static(&rb->edge_marks, &rb->render_data_pool, rl);
-        added = 1;
-        /*  continue; */
-      }
-      if (added) {
-        int r1, r2, c1, c2, row, col;
-        if (lineart_get_line_bounding_areas(rb, rl, &r1, &r2, &c1, &c2)) {
-          for (row = r1; row != r2 + 1; row++) {
-            for (col = c1; col != c2 + 1; col++) {
-              lineart_bounding_area_link_line(rb, &rb->initial_bounding_areas[row * 4 + col], rl);
-            }
-          }
-        }
-      }
-    }
-  }
 }
 
 /* Buffer operations */

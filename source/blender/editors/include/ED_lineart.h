@@ -109,18 +109,21 @@ typedef struct LineartRenderVert {
 
   size_t index;
 
+  /** This will used in future acceleration for intersection processing.
+   * Add intersection data flag here, when intersecting vert flag is set,
+   * size of the struct is extended to include intersection data.
+   */
+  char edge_used;
+
   /**  Used as "r" when intersecting */
   struct BMVert *v;
   struct LineartRenderLine *intersecting_line;
   struct LineartRenderLine *intersecting_line2;
   struct LineartRenderTriangle *intersecting_with;
-
-  /** This will used in future acceleration for intersection processing. */
-  char edge_used;
 } LineartRenderVert;
 
 typedef struct LineartRenderLine {
-  struct LineartRenderLine *next, *prev;
+  struct LineartRenderLine *next, *prev; /* Maybe we won't need this anymore, just use another flag. */
   struct LineartRenderVert *l, *r;
   struct LineartRenderTriangle *tl, *tr;
   ListBase segments;
