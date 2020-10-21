@@ -33,6 +33,7 @@
 #include "DNA_volume_types.h"
 
 #include "DEG_depsgraph_build.h"
+#include "DEG_depsgraph_query.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -136,8 +137,8 @@ static void panelRegister(ARegionType *region_type)
 
 static openvdb::Mat4s matrix_to_openvdb(const float m[4][4])
 {
-  /* Openvdb matrices are transposed Blender matrices, i.e. the translation is in the last row
-   * instead of in the last column. However, the layout in memory is the same, because openvdb
+  /* OpenVDB matrices are transposed Blender matrices, i.e. the translation is in the last row
+   * instead of in the last column. However, the layout in memory is the same, because OpenVDB
    * matrices are row major (compared to Blender's column major matrices). */
   openvdb::Mat4s new_matrix{reinterpret_cast<const float *>(m)};
   return new_matrix;
@@ -290,6 +291,7 @@ static Volume *modifyVolume(ModifierData *md, const ModifierEvalContext *ctx, Vo
   VolumeDisplaceModifierData *vdmd = reinterpret_cast<VolumeDisplaceModifierData *>(md);
 
   /* Iterate over all grids and displace them one by one. */
+  BKE_volume_load(volume, DEG_get_bmain(ctx->depsgraph));
   const int grid_amount = BKE_volume_num_grids(volume);
   for (int grid_index = 0; grid_index < grid_amount; grid_index++) {
     VolumeGrid *volume_grid = BKE_volume_grid_get(volume, grid_index);

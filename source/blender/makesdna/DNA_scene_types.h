@@ -862,7 +862,7 @@ typedef struct PaintToolSlot {
 typedef struct Paint {
   struct Brush *brush;
 
-  /* Each tool has it's own active brush,
+  /* Each tool has its own active brush,
    * The currently active tool is defined by the current 'brush'. */
   struct PaintToolSlot *tool_slots;
   int tool_slots_len;
@@ -1635,8 +1635,10 @@ typedef struct SceneEEVEE {
   int motion_blur_samples DNA_DEPRECATED;
   int motion_blur_max;
   int motion_blur_steps;
+  int motion_blur_position;
   float motion_blur_shutter;
   float motion_blur_depth_scale;
+  char _pad0[4];
 
   int shadow_method DNA_DEPRECATED;
   int shadow_cube_size;
@@ -2403,6 +2405,13 @@ enum {
   SHADOW_ESM = 1,
   /* SHADOW_VSM = 2, */        /* UNUSED */
   /* SHADOW_METHOD_MAX = 3, */ /* UNUSED */
+};
+
+/* SceneEEVEE->motion_blur_position */
+enum {
+  SCE_EEVEE_MB_CENTER = 0,
+  SCE_EEVEE_MB_START = 1,
+  SCE_EEVEE_MB_END = 2,
 };
 
 /* SceneDisplay->render_aa, SceneDisplay->viewport_aa */

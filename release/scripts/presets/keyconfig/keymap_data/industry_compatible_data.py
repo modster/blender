@@ -462,7 +462,8 @@ def km_outliner(params):
 
     items.extend([
         ("outliner.item_rename", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK'}, None),
-        ("outliner.item_rename", {"type": 'RET', "value": 'PRESS'}, None),
+        ("outliner.item_rename", {"type": 'RET', "value": 'PRESS'},
+         {"properties": [("use_active", True)]}),
         ("wm.search_menu", {"type": 'TAB', "value": 'PRESS'}, None),
         ("outliner.highlight_update", {"type": 'MOUSEMOVE', "value": 'ANY', "any": True}, None),
         ("outliner.item_activate", {"type": 'LEFTMOUSE', "value": 'CLICK'},
@@ -2138,7 +2139,7 @@ def km_frames(params):
          {"properties": [("end", True)]}),
         ("screen.frame_jump", {"type": 'MEDIA_FIRST', "value": 'PRESS'},
          {"properties": [("end", False)]}),
-        ("screen.animation_play", {"type": 'SPACE', "value": 'PRESS'}, None),
+        ("screen.animation_play", {"type": 'SPACE', "value": 'PRESS', "repeat": False}, None),
         ("screen.animation_cancel", {"type": 'ESC', "value": 'PRESS'}, None),
         ("screen.animation_play", {"type": 'MEDIA_PLAY', "value": 'PRESS'}, None),
         ("screen.animation_cancel", {"type": 'MEDIA_STOP', "value": 'PRESS'}, None),

@@ -99,7 +99,7 @@ static void bm_loop_attrs_copy(
  * If \a no_double is true, then a check is done to see if a face
  * with these vertices already exists and returns it instead.
  *
- * If a pointer to an example face is provided, it's custom data
+ * If a pointer to an example face is provided, its custom data
  * and properties will be copied to the new face.
  *
  * \note The winding of the face is determined by the order
@@ -612,8 +612,8 @@ void BM_mesh_copy_init_customdata(BMesh *bm_dst, BMesh *bm_src, const BMAllocTem
  *
  * \param bm_dst: BMesh whose custom-data layers will be added.
  * \param bm_src: BMesh whose custom-data layers will be copied.
- * \param htype: Specifies which custom-datas will be initiated.
- * \param allocsize: Estimated number of elements to init the mempool.
+ * \param htype: Specifies which custom-data layers will be initiated.
+ * \param allocsize: Initialize the the memory-pool before use (may be an estimate).
  */
 void BM_mesh_copy_init_customdata_all_layers(BMesh *bm_dst,
                                              BMesh *bm_src,
@@ -641,7 +641,8 @@ void BM_mesh_copy_init_customdata_all_layers(BMesh *bm_dst,
     const int size = *(&allocsize->totvert + i);
 
     for (int l = 0; l < src->totlayer; l++) {
-      CustomData_add_layer(dst, src->layers[l].type, CD_CALLOC, NULL, 0);
+      CustomData_add_layer_named(
+          dst, src->layers[l].type, CD_CALLOC, NULL, 0, src->layers[l].name);
     }
     CustomData_bmesh_init_pool(dst, size, htypes[i]);
   }

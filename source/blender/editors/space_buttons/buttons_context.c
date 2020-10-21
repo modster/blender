@@ -73,11 +73,11 @@ static int set_pointer_type(ButsContextPath *path, bContextDataResult *result, S
 
     if (RNA_struct_is_a(ptr->type, type)) {
       CTX_data_pointer_set(result, ptr->owner_id, ptr->type, ptr->data);
-      return 1;
+      return CTX_RESULT_OK;
     }
   }
 
-  return 0;
+  return CTX_RESULT_MEMBER_NOT_FOUND;
 }
 
 static PointerRNA *get_pointer_type(ButsContextPath *path, StructRNA *type)
@@ -244,7 +244,7 @@ static bool buttons_context_path_data(ButsContextPath *path, int type)
     return true;
   }
 #endif
-#ifdef WITH_PARTICLE_NODES
+#ifdef WITH_POINT_CLOUD
   if (RNA_struct_is_a(ptr->type, &RNA_PointCloud) && (type == -1 || type == OB_POINTCLOUD)) {
     return true;
   }
@@ -773,7 +773,7 @@ const char *buttons_context_dir[] = {
 #ifdef WITH_HAIR_NODES
     "hair",
 #endif
-#ifdef WITH_PARTICLE_NODES
+#ifdef WITH_POINT_CLOUD
     "pointcloud",
 #endif
     "volume",
@@ -862,7 +862,7 @@ int /*eContextResult*/ buttons_context(const bContext *C,
     return CTX_RESULT_OK;
   }
 #endif
-#ifdef WITH_PARTICLE_NODES
+#ifdef WITH_POINT_CLOUD
   if (CTX_data_equals(member, "pointcloud")) {
     set_pointer_type(path, result, &RNA_PointCloud);
     return CTX_RESULT_OK;
@@ -880,6 +880,10 @@ int /*eContextResult*/ buttons_context(const bContext *C,
     ButsContextTexture *ct = sbuts->texuser;
 
     if (ct) {
+      if (ct->texture == NULL) {
+        return CTX_RESULT_NO_DATA;
+      }
+
       CTX_data_pointer_set(result, &ct->texture->id, &RNA_Texture, ct->texture);
     }
 
@@ -907,7 +911,7 @@ int /*eContextResult*/ buttons_context(const bContext *C,
     ButsContextTexture *ct = sbuts->texuser;
 
     if (!ct) {
-      return -1;
+      return CTX_RESULT_NO_DATA;
     }
 
     if (ct->user && ct->user->ptr.data) {
@@ -921,7 +925,7 @@ int /*eContextResult*/ buttons_context(const bContext *C,
     ButsContextTexture *ct = sbuts->texuser;
 
     if (!ct) {
-      return -1;
+      return CTX_RESULT_NO_DATA;
     }
 
     if (ct->user && ct->user->ptr.data) {
@@ -958,7 +962,7 @@ int /*eContextResult*/ buttons_context(const bContext *C,
       }
     }
     else if (ct) {
-      return 0; /* new shading system */
+      return CTX_RESULT_MEMBER_NOT_FOUND; /* new shading system */
     }
     else if ((ptr = get_pointer_type(path, &RNA_FreestyleLineStyle))) {
       FreestyleLineStyle *ls = ptr->data;
