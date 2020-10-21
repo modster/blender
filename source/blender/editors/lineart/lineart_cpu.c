@@ -127,6 +127,8 @@ static int lineart_triangle_line_imagespace_intersection_v2(SpinLock *spl,
                                                             double *from,
                                                             double *to);
 
+static void lineart_add_line_to_list(LineartRenderBuffer *rb, LineartRenderLine *rl);
+
 /* Geometry */
 
 int use_smooth_contour_modifier_contour = 0; /*  debug purpose */
@@ -666,6 +668,12 @@ static void lineart_triangle_set_cull_flag(LineartRenderTriangle *rt, unsigned c
   rt->flags |= intersection_only;
 }
 
+static bool lineart_line_match(LineartRenderTriangle *rt, LineartRenderLine *rl, int v1, int v2)
+{
+  return ((rt->v[v1] == rl->l && rt->v[v2] == rl->r) ||
+          (rt->v[v2] == rl->l && rt->v[v1] == rl->r));
+}
+
 static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
                                          LineartRenderTriangle *rt,
                                          int in0,
@@ -689,6 +697,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
   int v_count = *r_v_count;
   int l_count = *r_l_count;
   int t_count = *r_t_count;
+  char new_flag = 0;
 
   LineartRenderLine *new_rl, *rl;
   LineartRenderLineSegment *rls;
@@ -711,6 +720,20 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
   rl = new_rl; \
   rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment)); \
   BLI_addtail(&rl->segments, rls);
+
+#define SELECT_RL(v1, v2, llink, rlink) \
+  if (given_line) { \
+    if (lineart_line_match(rt, given_line, v1, v2)) { \
+      new_flag = given_line->flags; \
+      given_line->flags = LRT_EDGE_FLAG_CHAIN_PICKED; \
+      INCREASE_RL \
+      rl->l = (llink); \
+      rl->r = (rlink); \
+      rl->flags = new_flag; \
+      rl->object_ref = ob; \
+      lineart_add_line_to_list(rb, rl); \
+    } \
+  }
 
   switch (in0 + in1 + in2) {
     case 0: /* ignore this triangle. */
@@ -782,19 +805,11 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         rl->tl = rt1;
         rl->object_ref = ob;
 
-        /* new line connecting original point 0 and a new point */
-        INCREASE_RL
-        rl->l = &rv[1];
-        rl->r = rt->v[0];
-        rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-        rl->object_ref = ob;
+        /* new line connecting original point 0 and a new point, only when it's a selected line */
+        SELECT_RL(0, 1, &rv[1], rt->v[0])
 
         /* new line connecting original point 0 and another new point */
-        INCREASE_RL
-        rl->l = rt->v[0];
-        rl->r = &rv[0];
-        rl->flags |= LRT_EDGE_FLAG_CLIPPED;
-        rl->object_ref = ob;
+        SELECT_RL(0, 2, rt->v[0], &rv[0])
 
         /* re-assign triangle point array to two new points. */
         rt1->v[0] = rt->v[0];
@@ -1354,11 +1369,13 @@ static char lineart_test_feature_line(LineartRenderBuffer *rb,
                                       bool count_freestyle,
                                       BMesh *bm_if_freestyle)
 {
-  BMLoop *ll, *lr;
+  BMLoop *ll, *lr = NULL;
   ll = e->l;
-  lr = e->l->radial_next;
+  if (ll) {
+    lr = e->l->radial_next;
+  }
 
-  if (ll == lr) {
+  if (ll == lr || !lr) {
     return LRT_EDGE_FLAG_CONTOUR;
   }
 
@@ -1646,9 +1663,9 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       rl->r = &orv[BM_elem_index_get(e->v2)];
       if (e->l) {
         rl->tl = lineart_triangle_from_index(rb, ort, BM_elem_index_get(e->l->f));
-      }
-      if (e->l->radial_next && e->l->radial_next != e->l) {
-        rl->tr = lineart_triangle_from_index(rb, ort, BM_elem_index_get(e->l->radial_next->f));
+        if (e->l->radial_next && e->l->radial_next != e->l) {
+          rl->tr = lineart_triangle_from_index(rb, ort, BM_elem_index_get(e->l->radial_next->f));
+        }
       }
       rl->flags = e->head.hflag;
       rl->object_ref = orig_ob;
@@ -2092,23 +2109,36 @@ static bool lineart_triangle_share_edge(const LineartRenderTriangle *l,
                                         const LineartRenderTriangle *r)
 {
   if (l->v[0] == r->v[0]) {
-    return (l->v[1] == r->v[1] || l->v[1] == r->v[2] || l->v[2] == r->v[2] || l->v[2] == r->v[1]);
+    if (l->v[1] == r->v[1] || l->v[1] == r->v[2] || l->v[2] == r->v[2] || l->v[2] == r->v[1]) {
+      return true;
+    }
   }
   if (l->v[0] == r->v[1]) {
-    return (l->v[1] == r->v[0] || l->v[1] == r->v[2] || l->v[2] == r->v[2] || l->v[2] == r->v[0]);
+    if (l->v[1] == r->v[0] || l->v[1] == r->v[2] || l->v[2] == r->v[2] || l->v[2] == r->v[0]) {
+      return true;
+    }
   }
   if (l->v[0] == r->v[2]) {
-    return (l->v[1] == r->v[1] || l->v[1] == r->v[0] || l->v[2] == r->v[0] || l->v[2] == r->v[1]);
+    if (l->v[1] == r->v[1] || l->v[1] == r->v[0] || l->v[2] == r->v[0] || l->v[2] == r->v[1]) {
+      return true;
+    }
   }
   if (l->v[1] == r->v[0]) {
-    return (l->v[2] == r->v[1] || l->v[2] == r->v[2] || l->v[0] == r->v[2] || l->v[0] == r->v[1]);
+    if (l->v[2] == r->v[1] || l->v[2] == r->v[2] || l->v[0] == r->v[2] || l->v[0] == r->v[1]) {
+      return true;
+    }
   }
   if (l->v[1] == r->v[1]) {
-    return (l->v[2] == r->v[0] || l->v[2] == r->v[2] || l->v[0] == r->v[2] || l->v[0] == r->v[0]);
+    if (l->v[2] == r->v[0] || l->v[2] == r->v[2] || l->v[0] == r->v[2] || l->v[0] == r->v[0]) {
+      return true;
+    }
   }
   if (l->v[1] == r->v[2]) {
-    return (l->v[2] == r->v[1] || l->v[2] == r->v[0] || l->v[0] == r->v[0] || l->v[0] == r->v[1]);
+    if (l->v[2] == r->v[1] || l->v[2] == r->v[0] || l->v[0] == r->v[0] || l->v[0] == r->v[1]) {
+      return true;
+    }
   }
+
   /* otherwise not possible */
   return false;
 }
@@ -2259,7 +2289,7 @@ static LineartRenderLine *lineart_triangle_generate_intersection_line_only(
     r = lineart_triangle_2v_intersection_test(rb, sv1, sv2, rt, testing, 0);
 
     if (r == NULL) {
-      lineart_another_edge_2v(rt, share, &sv1, &sv2);
+      lineart_another_edge_2v(testing, share, &sv1, &sv2);
       r = lineart_triangle_2v_intersection_test(rb, sv1, sv2, testing, rt, 0);
       if (r == NULL) {
         return 0;
