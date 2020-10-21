@@ -1401,7 +1401,7 @@ void GeometryManager::device_update(Device *device,
         }
 
         /* Test if we need tessellation. */
-        if (mesh->subdivision_type != Mesh::SUBDIVISION_NONE && mesh->get_subd_params() && (mesh->verts_is_modified() || mesh->subd_dicing_rate_is_modified() || mesh->subd_max_level_is_modified())) {
+        if (mesh->need_tesselation()) {
           total_tess_needed++;
         }
 
@@ -1437,7 +1437,7 @@ void GeometryManager::device_update(Device *device,
       }
 
       Mesh *mesh = static_cast<Mesh *>(geom);
-      if (mesh->subdivision_type != Mesh::SUBDIVISION_NONE && mesh->get_subd_params() && (mesh->verts_is_modified() || mesh->subd_dicing_rate_is_modified() || mesh->subd_max_level_is_modified())) {
+      if (mesh->need_tesselation()) {
         string msg = "Tessellating ";
         if (mesh->name == "")
           msg += string_printf("%u/%u", (uint)(i + 1), (uint)total_tess_needed);

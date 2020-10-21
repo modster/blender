@@ -176,6 +176,12 @@ SubdParams *Mesh::get_subd_params()
   return subd_params;
 }
 
+bool Mesh::need_tesselation()
+{
+  return get_subd_params() && (verts_is_modified() || subd_dicing_rate_is_modified() ||
+                               subd_objecttoworld_is_modified() || subd_max_level_is_modified());
+}
+
 Mesh::Mesh(const NodeType *node_type, Type geom_type_)
     : Geometry(node_type, geom_type_), subd_attributes(this, ATTR_PRIM_SUBD)
 {

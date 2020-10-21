@@ -371,6 +371,10 @@ struct OsdPatch : Patch {
 
 void Mesh::tessellate(DiagSplit *split)
 {
+  /* reset the number of subdivision vertices, in case the Mesh was not cleared
+   * between calls or data updates */
+  num_subd_verts = 0;
+
 #ifdef WITH_OPENSUBDIV
   OsdData osd_data;
   bool need_packed_patch_table = false;
