@@ -755,7 +755,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb, LineartRenderT
         /* New line connecting two new points */
         INCREASE_RL
         if (allow_boundaries) {
-          lineart_prepend_direct(&rb->contours, rl);
+          lineart_prepend_line_direct(&rb->contours, rl);
         }
         /** note: inverting rl->l/r (left/right point) doesn't matter as long as
          * rt->rl and rt->v has the same sequence. and the winding direction
@@ -811,7 +811,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb, LineartRenderT
 
         INCREASE_RL
         if (allow_boundaries) {
-          lineart_prepend_direct(&rb->contours, rl);
+          lineart_prepend_line_direct(&rb->contours, rl);
         }
         rl->l = &rv[0];
         rl->r = &rv[1];
@@ -858,7 +858,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb, LineartRenderT
 
         INCREASE_RL
         if (allow_boundaries) {
-          lineart_prepend_direct(&rb->contours, rl);
+          lineart_prepend_line_direct(&rb->contours, rl);
         }
         rl->l = &rv[1];
         rl->r = &rv[0];
@@ -936,7 +936,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb, LineartRenderT
         /* New line connects two new points */
         INCREASE_RL
         if (allow_boundaries) {
-          lineart_prepend_direct(&rb->contours, rl);
+          lineart_prepend_line_direct(&rb->contours, rl);
         }
         rl->l = &rv[1];
         rl->r = &rv[0];
@@ -999,7 +999,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb, LineartRenderT
 
         INCREASE_RL
         if (allow_boundaries) {
-          lineart_prepend_direct(&rb->contours, rl);
+          lineart_prepend_line_direct(&rb->contours, rl);
         }
         rl->l = &rv[1];
         rl->r = &rv[0];
@@ -1054,7 +1054,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb, LineartRenderT
 
         INCREASE_RL
         if (allow_boundaries) {
-          lineart_prepend_direct(&rb->contours, rl);
+          lineart_prepend_line_direct(&rb->contours, rl);
         }
         rl->l = &rv[1];
         rl->r = &rv[0];
@@ -1100,7 +1100,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb, LineartRenderT
  * for triangles that crossing the near plane, it will generate new 1 or 2 triangles with
  * new topology that represents the trimmed triangle. (which then became a triangle or square)
  */
-static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far, LineartRenderLine* given_line)
+static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
 {
   LineartRenderTriangle *rt;
   LineartRenderElementLinkNode *veln, *teln, *leln;
@@ -1134,13 +1134,83 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far, 
   teln = lineart_memory_get_triangle_space(rb);
   leln = lineart_memory_get_line_space(rb);
 
+  /* Additional memory space for storing generated points and triangles */
+#define LRT_CULL_ENSURE_MEMORY\
+  if (v_count > 60) {\
+    veln->element_count = v_count;\
+    veln = lineart_memory_get_vert_space(rb);\
+    v_count = 0;\
+  }\
+  if (t_count > 60) {\
+    teln->element_count = t_count;\
+    teln = lineart_memory_get_triangle_space(rb);\
+    t_count = 0;\
+  }\
+  if (l_count > 60) {\
+    leln->element_count = l_count;\
+    leln = lineart_memory_get_line_space(rb);\
+    l_count = 0;\
+  }
+
+#define LRT_CULL_DECIDE_INSIDE\
+  /* These three represents points that are in the clipping range or not*/\
+  in0 = 0, in1 = 0, in2 = 0;\
+  if (clip_far) {\
+    /* Point outside far plane */\
+    if (rt->v[0]->fbcoord[use_w] > clip_end) {\
+      in0 = 1;\
+    }\
+    if (rt->v[1]->fbcoord[use_w] > clip_end) {\
+      in1 = 1;\
+    }\
+    if (rt->v[2]->fbcoord[use_w] > clip_end) {\
+      in2 = 1;\
+    }\
+  }\
+  else {\
+    /* Point inside near plane */\
+    if (rt->v[0]->fbcoord[use_w] < clip_start) {\
+      in0 = 1;\
+    }\
+    if (rt->v[1]->fbcoord[use_w] < clip_start) {\
+      in1 = 1;\
+    }\
+    if (rt->v[2]->fbcoord[use_w] < clip_start) {\
+      in2 = 1;\
+    }\
+  }\
+
   int use_w = 3;
+  int in0 = 0, in1 = 0, in2 = 0;
+
   if (!rb->cam_is_persp) {
     clip_start = -1;
     clip_end = 1;
     use_w = 2;
   }
 
+  /* Cull line-adjacent triangles first, because triangles now doesn't have adjacent line info. */
+  LRT_ITER_ALL_LINES_BEGIN{
+
+      rt = rl->tl;
+      LRT_CULL_DECIDE_INSIDE
+      LRT_CULL_ENSURE_MEMORY
+      lineart_triangle_cull_single(rb,rt,in0,in1,in2,cam_pos,view_dir,allow_boundaries,vp,rl,ob,&v_count,&l_count,&t_count,veln,leln,teln);
+
+      teln->element_count = t_count;
+      veln->element_count = v_count;
+
+      rt = rl->tr;
+      LRT_CULL_DECIDE_INSIDE
+      LRT_CULL_ENSURE_MEMORY
+      lineart_triangle_cull_single(rb,rt,in0,in1,in2,cam_pos,view_dir,allow_boundaries,vp,rl,ob,&v_count,&l_count,&t_count,veln,leln,teln);
+
+      teln->element_count = t_count;
+      veln->element_count = v_count;
+    
+  }LRT_ITER_ALL_LINES_END
+
+  /* Then go through all the other triangles. */
   LISTBASE_FOREACH (LineartRenderElementLinkNode *, reln, &rb->triangle_buffer_pointers) {
     if (reln->flags & LRT_ELEMENT_IS_ADDITIONAL) {
       continue;
@@ -1150,53 +1220,9 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far, 
       /* Select the triangle in the array. */
       rt = (void *)(((unsigned char *)reln->pointer) + rb->triangle_size * i);
 
-      /* These three represents points that are in the clipping range or not*/
-      int in0 = 0, in1 = 0, in2 = 0;
-
-      if (clip_far) {
-        /* Point outside far plane */
-        if (rt->v[0]->fbcoord[use_w] > clip_end) {
-          in0 = 1;
-        }
-        if (rt->v[1]->fbcoord[use_w] > clip_end) {
-          in1 = 1;
-        }
-        if (rt->v[2]->fbcoord[use_w] > clip_end) {
-          in2 = 1;
-        }
-      }
-      else {
-        /* Point inside near plane */
-        if (rt->v[0]->fbcoord[use_w] < clip_start) {
-          in0 = 1;
-        }
-        if (rt->v[1]->fbcoord[use_w] < clip_start) {
-          in1 = 1;
-        }
-        if (rt->v[2]->fbcoord[use_w] < clip_start) {
-          in2 = 1;
-        }
-      }
-
-      /* Additional memory space for storing generated points and triangles */
-      if (v_count > 60) {
-        veln->element_count = v_count;
-        veln = lineart_memory_get_vert_space(rb);
-        v_count = 0;
-      }
-      if (t_count > 60) {
-        teln->element_count = t_count;
-        teln = lineart_memory_get_triangle_space(rb);
-        t_count = 0;
-      }
-      if (l_count > 60) {
-        leln->element_count = l_count;
-        leln = lineart_memory_get_line_space(rb);
-        l_count = 0;
-      }
-
-      lineart_triangle_cull_single(rb,rt,in0,in1,in2,cam_pos,view_dir,allow_boundaries,vp,given_line,ob,&v_count,&l_count,&t_count,veln,leln,teln);
-
+      LRT_CULL_DECIDE_INSIDE
+      LRT_CULL_ENSURE_MEMORY
+      lineart_triangle_cull_single(rb,rt,in0,in1,in2,cam_pos,view_dir,allow_boundaries,vp,NULL,ob,&v_count,&l_count,&t_count,veln,leln,teln);
     }
     teln->element_count = t_count;
     veln->element_count = v_count;
@@ -2204,7 +2230,7 @@ static LineartRenderLine *lineart_triangle_generate_intersection_line_only(
   LineartRenderLineSegment *rls = lineart_mem_aquire(&rb->render_data_pool,
                                                      sizeof(LineartRenderLineSegment));
   BLI_addtail(&result->segments, rls);
-  lineart_prepend_direct(&rb->intersection_lines, result);
+  lineart_prepend_line_direct(&rb->intersection_lines, result);
   result->flags |= LRT_EDGE_FLAG_INTERSECTION;
   int r1, r2, c1, c2, row, col;
   if (lineart_get_line_bounding_areas(rb, result, &r1, &r2, &c1, &c2)) {

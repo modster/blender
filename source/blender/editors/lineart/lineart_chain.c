@@ -199,7 +199,6 @@ static LineartRenderLineChainItem *lineart_chain_push_point(LineartRenderBuffer 
 
 void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
 {
-  LineartRenderLine* rl, *next_rl, *current_list;
   LineartRenderLineChain *rlc;
   LineartRenderLineChainItem *rlci;
   LineartBoundingArea *ba;
@@ -207,9 +206,7 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
   int last_occlusion;
   unsigned char last_transparency;
 
-  rl = rb->contours;
-  for (current_list = rb->contours; rl; rl = next_rl) {
-    next_rl = rl->next;
+  LRT_ITER_ALL_LINES_BEGIN{
 
     if ((!(rl->flags & LRT_EDGE_FLAG_ALL_TYPE)) || (rl->flags & LRT_EDGE_FLAG_CHAIN_PICKED)) {
       continue;
@@ -500,7 +497,7 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
       else {current_list=NULL;}
       next_rl = current_list;
     }
-  }
+  }LRT_ITER_ALL_LINES_END
 }
 
 static LineartBoundingArea *lineart_bounding_area_get_rlci_recursive(
