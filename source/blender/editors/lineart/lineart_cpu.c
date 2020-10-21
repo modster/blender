@@ -2509,16 +2509,16 @@ static void lineart_main_get_view_vector(LineartRenderBuffer *rb)
 
 static void lineart_main_compute_scene_contours(LineartRenderBuffer *rb)
 {
-  double *view_vector = rb->view_vector;
+  double view_vector[3];
   double dot_1 = 0, dot_2 = 0;
   double result;
   int add = 0, added = 0;
   int contour_count = 0;
   int crease_count = 0;
   int material_count = 0;
-
-  if (!rb->cam_is_persp) {
-    lineart_main_get_view_vector(rb);
+  
+  if(!rb->cam_is_persp){
+      copy_v3_v3_db(view_vector, rb->view_vector);
   }
 
   LISTBASE_FOREACH (LineartRenderElementLinkNode *, reln, &rb->line_buffer_pointers) {
@@ -3895,19 +3895,18 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
 
   LRT_CANCEL_STAGE
 
+  lineart_main_bounding_area_make_initial(rb);
+  if (!intersections_only) {
+    lineart_main_compute_scene_contours(rb);
+  }
+
   lineart_main_cull_triangles(rb, false);
   lineart_main_cull_triangles(rb, true);
 
   lineart_main_perspective_division(rb);
 
-  lineart_main_bounding_area_make_initial(rb);
-
   LRT_CANCEL_STAGE
   LRT_PROGRESS(10, "LRT: Contour lines.");
-
-  if (!intersections_only) {
-    lineart_main_compute_scene_contours(rb);
-  }
 
   LRT_CANCEL_STAGE
   LRT_PROGRESS(25, "LRT: Intersections.");
