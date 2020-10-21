@@ -165,6 +165,7 @@ class NLA_MT_edit(Menu):
         layout.separator()
         layout.operator("nla.duplicate", text="Duplicate").linked = False
         layout.operator("nla.duplicate", text="Linked Duplicate").linked = True
+        layout.operator("nla.resample_strips")
         layout.operator("nla.split")
         layout.operator("nla.delete")
         layout.operator("nla.tracks_delete")
@@ -270,6 +271,10 @@ class NLA_MT_context_menu(Menu):
 
         layout.separator()
 
+        col = layout.column()
+        col.operator_context="INVOKE_DEFAULT"
+        col.operator("nla.resample_strips")
+        
         layout.operator("nla.split")
         layout.operator("nla.delete")
 

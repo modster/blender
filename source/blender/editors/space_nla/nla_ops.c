@@ -143,6 +143,7 @@ void nla_operatortypes(void)
   WM_operatortype_append(NLA_OT_duplicate);
   WM_operatortype_append(NLA_OT_delete);
   WM_operatortype_append(NLA_OT_split);
+  WM_operatortype_append(NLA_OT_resample_strips);
 
   WM_operatortype_append(NLA_OT_mute_toggle);
 

@@ -193,7 +193,8 @@ void nlastrip_evaluate(PointerRNA *ptr,
                        NlaEvalStrip *nes,
                        NlaEvalSnapshot *snapshot,
                        const struct AnimationEvalContext *anim_eval_context,
-                       const bool flush_to_original);
+                       const bool flush_to_original,
+                       bool allow_alloc_channels);
 void nlastrip_evaluate_invert_get_lower_values(
     PointerRNA *ptr,
     NlaEvalData *upper_eval_data,

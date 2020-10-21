@@ -226,6 +226,15 @@ bool BKE_animsys_nla_remap_keyframe_values(struct NlaKeyframingContext *context,
                                            int index,
                                            bool *r_force_all);
 void BKE_animsys_free_nla_keyframing_context_cache(struct ListBase *cache);
+struct NlaTrack *BKE_animsys_resample_selected_strips(struct Main *main,
+                                                      struct Depsgraph *depsgraph,
+                                                      struct AnimData *adt,
+                                                      struct PointerRNA *id_ptr,
+                                                      char resample_name[],
+                                                      short resample_blendmode,
+                                                      float resample_influence,
+                                                      int resample_insertion_nlt_index,
+                                                      bool insert_track_lower);
 
 /* ************************************* */
 /* Evaluation API */

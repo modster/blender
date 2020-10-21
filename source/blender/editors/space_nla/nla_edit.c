@@ -1452,6 +1452,278 @@ void NLA_OT_split(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
+/* ******************** Resample Strips Operator ***************************** */
+/** Resample the selected NLA-Strips into a single strip, preserving the overall NLA stack
+ * animation.
+ */
+
+/** Enum used for resample operator. */
+typedef enum eNlaTrackInsertion_Location {
+  NLT_INSERT_ABOVE_SELECTED_STRIPS = 0,
+  NLT_INSERT_BELOW_SELECTED_STRIPS,
+  NLT_INSERT_ABOVE_ACTIVE_STRIP,
+  NLT_INSERT_BELOW_ACTIVE_STRIP,
+  NLT_INSERT_ABOVE_SELECTED_TRACKS,
+  NLT_INSERT_BELOW_SELECTED_TRACKS,
+  NLT_INSERT_ABOVE_ACTIVE_TRACK,
+  NLT_INSERT_BELOW_ACTIVE_TRACK,
+} eNlaTrackInsertion_Location;
+
+const EnumPropertyItem rna_enum_nla_insertion_location[] = {
+    {NLT_INSERT_ABOVE_ACTIVE_TRACK,
+     "ABOVE_ACTIVE_TRACK",
+     0,
+     "Above Active Track",
+     "Insert track above active track"},
+    {NLT_INSERT_ABOVE_SELECTED_TRACKS,
+     "ABOVE_SELECTED_TRACKS",
+     0,
+     "Above Selected Tracks",
+     "Insert track above all selected tracks"},
+    {NLT_INSERT_ABOVE_ACTIVE_STRIP,
+     "ABOVE_ACTIVE_STRIP",
+     0,
+     "Above Active Strip",
+     "Insert track above active strip"},
+    {NLT_INSERT_ABOVE_SELECTED_STRIPS,
+     "ABOVE_SELECTED_STRIPS",
+     0,
+     "Above Selected Strips",
+     "Insert track above all selected strips"},
+    {NLT_INSERT_BELOW_ACTIVE_TRACK,
+     "BELOW_ACTIVE_TRACK",
+     0,
+     "Below Active Track",
+     "Insert track below active track"},
+    {NLT_INSERT_BELOW_SELECTED_TRACKS,
+     "BELOW_SELECTED_TRACKS",
+     0,
+     "Below Selected Tracks",
+     "Insert track below all selected tracks"},
+    {NLT_INSERT_BELOW_ACTIVE_STRIP,
+     "BELOW_ACTIVE_STRIP",
+     0,
+     "Below Active Strip",
+     "Insert track below active strip"},
+    {NLT_INSERT_BELOW_SELECTED_STRIPS,
+     "BELOW_SELECTED_STRIPS",
+     0,
+     "Below Selected Strips",
+     "Insert track below all selected strips"},
+    {0, NULL, 0, NULL, NULL},
+};
+
+static void resample_strips_get_insertion_index(ListBase *nla_tracks,
+                                                int insertion_location,
+                                                int *r_insertion_index,
+                                                bool *r_insert_below)
+{
+
+  int active_strip_nlt_index = -1;
+  int lowest_selected_strip_nlt_index = -1;
+  int highest_selected_strip_nlt_index = -1;
+
+  int active_nlt_index = -1;
+  int lowest_selected_nlt_index = -1;
+  int highest_selected_nlt_index = -1;
+
+  /** Obtain indices for each variable above.
+   *
+   * \note We don't care if insertion location based on track or strip that is not evaluated or
+   * muted. We only care about selection. This allows user to choose resample location without
+   * having to first create dummy tracks or strips.
+   */
+  int nlt_index;
+  LISTBASE_FOREACH_INDEX (NlaTrack *, nlt, nla_tracks, nlt_index) {
+
+    if ((nlt->flag & NLATRACK_SELECTED) != 0) {
+      highest_selected_nlt_index = nlt_index;
+
+      if (lowest_selected_nlt_index == -1) {
+        lowest_selected_nlt_index = nlt_index;
+      }
+    }
+
+    if (nlt->flag & NLATRACK_ACTIVE) {
+      active_nlt_index = nlt_index;
+    }
+
+    for (NlaStrip *strip = nlt->strips.first; strip; strip = strip->next) {
+
+      if ((strip->flag & NLASTRIP_FLAG_SELECT) != 0) {
+        highest_selected_strip_nlt_index = nlt_index;
+
+        if (lowest_selected_strip_nlt_index == -1) {
+          lowest_selected_strip_nlt_index = nlt_index;
+        }
+      }
+
+      if (strip->flag & NLASTRIP_FLAG_ACTIVE) {
+        active_strip_nlt_index = nlt_index;
+      }
+    }
+  }
+
+  /** Write outputs.  */
+  switch (insertion_location) {
+
+    case NLT_INSERT_ABOVE_ACTIVE_STRIP:
+      *r_insertion_index = active_strip_nlt_index;
+      *r_insert_below = false;
+
+      break;
+    case NLT_INSERT_BELOW_ACTIVE_STRIP:
+      *r_insertion_index = active_strip_nlt_index;
+      *r_insert_below = true;
+      break;
+
+    case NLT_INSERT_ABOVE_SELECTED_STRIPS:
+      *r_insertion_index = highest_selected_strip_nlt_index;
+      *r_insert_below = false;
+      break;
+
+    case NLT_INSERT_BELOW_SELECTED_STRIPS:
+      *r_insertion_index = lowest_selected_strip_nlt_index;
+      *r_insert_below = true;
+      break;
+
+    case NLT_INSERT_ABOVE_ACTIVE_TRACK:
+      *r_insertion_index = active_nlt_index;
+      *r_insert_below = false;
+
+      break;
+    case NLT_INSERT_BELOW_ACTIVE_TRACK:
+      *r_insertion_index = active_nlt_index;
+      *r_insert_below = true;
+      break;
+
+    case NLT_INSERT_ABOVE_SELECTED_TRACKS:
+      *r_insertion_index = highest_selected_nlt_index;
+      *r_insert_below = false;
+      break;
+
+    case NLT_INSERT_BELOW_SELECTED_TRACKS:
+      *r_insertion_index = lowest_selected_nlt_index;
+      *r_insert_below = true;
+      break;
+
+    default:
+      *r_insertion_index = -1;
+      break;
+  }
+}
+
+static int nlaedit_resample_strips_exec(bContext *C, wmOperator *op)
+{
+  char resample_name[MAX_NAME];
+  RNA_string_get(op->ptr, "name", resample_name);
+  int insertion_location = RNA_enum_get(op->ptr, "insertion_location");
+  short resample_blendmode = RNA_enum_get(op->ptr, "blendmode");
+  float resample_influence = RNA_float_get(op->ptr, "influence");
+
+  bAnimContext ac;
+  if (ANIM_animdata_get_context(C, &ac) == 0) {
+    return OPERATOR_CANCELLED;
+  }
+
+  /* Get a list of AnimDatas being shown in the NLA. */
+  ListBase anim_data = {NULL, NULL};
+  int filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_ANIMDATA);
+  ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
+
+  PointerRNA id_ptr;
+  bool any_resample_succeeded = false;
+  for (bAnimListElem *ale = anim_data.first; ale; ale = ale->next) {
+
+    int resample_insertion_index;
+    bool insert_below;
+    resample_strips_get_insertion_index(
+        &ale->adt->nla_tracks, insertion_location, &resample_insertion_index, &insert_below);
+
+    if (resample_insertion_index == -1) {
+      /** No strip selected. */
+      BKE_report(op->reports, RPT_ERROR, "Insertion Location not found!");
+      continue;
+    }
+
+    RNA_id_pointer_create(ale->id, &id_ptr);
+    NlaTrack *resampled_nlt = BKE_animsys_resample_selected_strips(ac.bmain,
+                                                                   ac.depsgraph,
+                                                                   ale->adt,
+                                                                   &id_ptr,
+                                                                   resample_name,
+                                                                   resample_blendmode,
+                                                                   resample_influence,
+                                                                   resample_insertion_index,
+                                                                   insert_below);
+    if (resampled_nlt) {
+      any_resample_succeeded = true;
+    }
+  }
+
+  /* Free temp data. */
+  ANIM_animdata_freelist(&anim_data);
+
+  if (!any_resample_succeeded) {
+    /** Avoid pushing undo. */
+    return OPERATOR_CANCELLED;
+  }
+
+  /* Refresh auto strip properties. */
+  ED_nla_postop_refresh(&ac);
+
+  /* New f-curves were added, meaning it's possible that it affects dependency graph components
+   * which weren't previously animated. */
+  DEG_relations_tag_update(ac.bmain);
+
+  WM_event_add_notifier(C, NC_ANIMATION | ND_NLA | NA_EDITED, NULL);
+
+  return OPERATOR_FINISHED;
+}
+
+void NLA_OT_resample_strips(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Resample Strips To New";
+  ot->idname = "NLA_OT_resample_strips";
+  ot->description = "Resample selected strips into new strip";
+
+  /* api callbacks */
+
+  ot->invoke = WM_operator_props_popup_confirm;
+  ot->exec = nlaedit_resample_strips_exec;
+  ot->poll = nlaop_poll_tweakmode_off;
+
+  /* own properties */
+  PropertyRNA *prop;
+
+  prop = RNA_def_string(
+      ot->srna, "name", "Resample", sizeof(((NlaTrack *)NULL)->name), "Name", "");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+
+  prop = RNA_def_enum(ot->srna,
+                      "blendmode",
+                      rna_enum_nla_mode_blend_items,
+                      NLASTRIP_MODE_REPLACE,
+                      "Blend Mode",
+                      "");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+
+  prop = RNA_def_float_factor(ot->srna, "influence", 1, 0, 1, "Influence", "", 0, 1);
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+
+  prop = RNA_def_enum(ot->srna,
+                      "insertion_location",
+                      rna_enum_nla_insertion_location,
+                      NLT_INSERT_BELOW_SELECTED_STRIPS,
+                      "Insertion Location",
+                      "");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
 /* *********************************************** */
 /* NLA Editing Operations (Modifying) */
 

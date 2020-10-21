@@ -2253,6 +2253,7 @@ def km_nla_editor(params):
         ("nla.delete", {"type": 'X', "value": 'PRESS'}, None),
         ("nla.delete", {"type": 'DEL', "value": 'PRESS'}, None),
         ("nla.split", {"type": 'Y', "value": 'PRESS'}, None),
+        ("NLA_OT_resample_strips", {"type": 'M', "value":  'PRESS',"shift":True},None),
         ("nla.mute_toggle", {"type": 'H', "value": 'PRESS'}, None),
         ("nla.swap", {"type": 'F', "value": 'PRESS', "alt": True}, None),
         ("nla.move_up", {"type": 'PAGE_UP', "value": 'PRESS', "repeat": True}, None),

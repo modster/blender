@@ -2061,12 +2061,16 @@ static bool is_fcurve_evaluatable(FCurve *fcu)
   return true;
 }
 
-/** Evaluate action-clip strip and accumulate within snapshot. */
+/** Evaluate action-clip strip and accumulate within snapshot.
+ * \param allow_alloc_channels: If true, new NlaEvalChannels allocated and evaluated if needed.
+ * Otherwise only channels existing within the NlaEvalData are evaluated.
+ */
 static void nlastrip_evaluate_actionclip(PointerRNA *ptr,
                                          NlaEvalData *channels,
                                          ListBase *modifiers,
                                          NlaEvalStrip *nes,
-                                         NlaEvalSnapshot *snapshot)
+                                         NlaEvalSnapshot *snapshot,
+                                         bool allow_alloc_channels)
 {
   ListBase tmp_modifiers = {NULL, NULL};
   NlaStrip *strip = nes->strip;
@@ -2109,6 +2113,23 @@ static void nlastrip_evaluate_actionclip(PointerRNA *ptr,
       continue;
     }
 
+    /* Get an NLA evaluation channel to work with, and accumulate the evaluated value with the
+     * value(s) stored in this channel if it has been used already. */
+    NlaEvalChannel *nec = NULL;
+    if (allow_alloc_channels) {
+      /** Guarantees NlaEvalChannel. */
+      nec = nlaevalchan_verify(ptr, channels, fcu->rna_path);
+    }
+    else {
+      /** Only get NlaEvalChannel if it exists. */
+      nlaevalchan_try_get(channels, fcu->rna_path, &nec);
+    }
+
+    if (!nec) {
+      /** Skip since caller only wants to fill values for existing channels in snapshot. */
+      continue;
+    }
+
     /* Evaluate the F-Curve's value for the time given in the strip
      * NOTE: we use the modified time here, since strip's F-Curve Modifiers
      * are applied on top of this.
@@ -2120,11 +2141,6 @@ static void nlastrip_evaluate_actionclip(PointerRNA *ptr,
      * (as per standard F-Curve eval).
      */
     evaluate_value_fmodifiers(&storage, &tmp_modifiers, fcu, &value, strip->strip_time);
-
-    /* Get an NLA evaluation channel to work with,
-     * and accumulate the evaluated value with the value(s)
-     * stored in this channel if it has been used already. */
-    NlaEvalChannel *nec = nlaevalchan_verify(ptr, channels, fcu->rna_path);
 
     nlaeval_blend_value(&blend, nec, fcu->array_index, value);
   }
@@ -2311,7 +2327,8 @@ static void nlastrip_evaluate_transition(PointerRNA *ptr,
                                          NlaEvalStrip *nes,
                                          NlaEvalSnapshot *snapshot,
                                          const AnimationEvalContext *anim_eval_context,
-                                         const bool flush_to_original)
+                                         const bool flush_to_original,
+                                         bool allow_alloc_channels)
 {
   ListBase tmp_modifiers = {NULL, NULL};
   NlaEvalSnapshot snapshot1, snapshot2;
@@ -2353,16 +2370,28 @@ static void nlastrip_evaluate_transition(PointerRNA *ptr,
   tmp_nes.strip = s1;
   tmp_nes.strip_time = s1->strip_time;
   nlaeval_snapshot_init(&snapshot1, channels, snapshot);
-  nlastrip_evaluate(
-      ptr, channels, &tmp_modifiers, &tmp_nes, &snapshot1, anim_eval_context, flush_to_original);
+  nlastrip_evaluate(ptr,
+                    channels,
+                    &tmp_modifiers,
+                    &tmp_nes,
+                    &snapshot1,
+                    anim_eval_context,
+                    flush_to_original,
+                    allow_alloc_channels);
 
   /* second strip */
   tmp_nes.strip_mode = NES_TIME_TRANSITION_END;
   tmp_nes.strip = s2;
   tmp_nes.strip_time = s2->strip_time;
   nlaeval_snapshot_init(&snapshot2, channels, snapshot);
-  nlastrip_evaluate(
-      ptr, channels, &tmp_modifiers, &tmp_nes, &snapshot2, anim_eval_context, flush_to_original);
+  nlastrip_evaluate(ptr,
+                    channels,
+                    &tmp_modifiers,
+                    &tmp_nes,
+                    &snapshot2,
+                    anim_eval_context,
+                    flush_to_original,
+                    allow_alloc_channels);
 
   /* accumulate temp-buffer and full-buffer, using the 'real' strip */
   nlaeval_snapshot_mix_and_free(channels, snapshot, &snapshot1, &snapshot2, nes->strip_time);
@@ -2757,7 +2786,8 @@ static void nlastrip_evaluate_meta(PointerRNA *ptr,
                                    NlaEvalStrip *nes,
                                    NlaEvalSnapshot *snapshot,
                                    const AnimationEvalContext *anim_eval_context,
-                                   const bool flush_to_original)
+                                   const bool flush_to_original,
+                                   bool allow_alloc_channels)
 {
   ListBase tmp_modifiers = {NULL, NULL};
   NlaStrip *strip = nes->strip;
@@ -2785,8 +2815,14 @@ static void nlastrip_evaluate_meta(PointerRNA *ptr,
    * - there's no need to use a temporary buffer (as it causes issues [T40082])
    */
   if (tmp_nes) {
-    nlastrip_evaluate(
-        ptr, channels, &tmp_modifiers, tmp_nes, snapshot, &child_context, flush_to_original);
+    nlastrip_evaluate(ptr,
+                      channels,
+                      &tmp_modifiers,
+                      tmp_nes,
+                      snapshot,
+                      &child_context,
+                      flush_to_original,
+                      allow_alloc_channels);
 
     /* free temp eval-strip */
     MEM_freeN(tmp_nes);
@@ -2903,7 +2939,8 @@ void nlastrip_evaluate(PointerRNA *ptr,
                        NlaEvalStrip *nes,
                        NlaEvalSnapshot *snapshot,
                        const AnimationEvalContext *anim_eval_context,
-                       const bool flush_to_original)
+                       const bool flush_to_original,
+                       bool allow_alloc_channels)
 {
   NlaStrip *strip = nes->strip;
 
@@ -2922,15 +2959,27 @@ void nlastrip_evaluate(PointerRNA *ptr,
   /* actions to take depend on the type of strip */
   switch (strip->type) {
     case NLASTRIP_TYPE_CLIP: /* action-clip */
-      nlastrip_evaluate_actionclip(ptr, channels, modifiers, nes, snapshot);
+      nlastrip_evaluate_actionclip(ptr, channels, modifiers, nes, snapshot, allow_alloc_channels);
       break;
     case NLASTRIP_TYPE_TRANSITION: /* transition */
-      nlastrip_evaluate_transition(
-          ptr, channels, modifiers, nes, snapshot, anim_eval_context, flush_to_original);
+      nlastrip_evaluate_transition(ptr,
+                                   channels,
+                                   modifiers,
+                                   nes,
+                                   snapshot,
+                                   anim_eval_context,
+                                   flush_to_original,
+                                   allow_alloc_channels);
       break;
     case NLASTRIP_TYPE_META: /* meta */
-      nlastrip_evaluate_meta(
-          ptr, channels, modifiers, nes, snapshot, anim_eval_context, flush_to_original);
+      nlastrip_evaluate_meta(ptr,
+                             channels,
+                             modifiers,
+                             nes,
+                             snapshot,
+                             anim_eval_context,
+                             flush_to_original,
+                             allow_alloc_channels);
       break;
 
     default: /* do nothing */
@@ -3423,7 +3472,8 @@ static bool animsys_evaluate_nla_for_flush(NlaEvalData *echannels,
                       nes,
                       &echannels->eval_snapshot,
                       anim_eval_context,
-                      flush_to_original);
+                      flush_to_original,
+                      true);
   }
 
   /* Free temporary evaluation data that's not used elsewhere. */
@@ -3564,7 +3614,8 @@ static void animsys_evaluate_nla_for_keyframing(NlaKeyframingContext *r_context,
                       nes,
                       &r_context->lower_nla_channels.eval_snapshot,
                       anim_eval_context,
-                      false);
+                      false,
+                      true);
   }
 
   /* Free temporary evaluation data that's not used elsewhere. */
@@ -3843,6 +3894,747 @@ void BKE_animsys_free_nla_keyframing_context_cache(struct ListBase *cache)
   }
 
   BLI_freelistN(cache);
+}
+
+/** Allocates per added action clip strip.
+ * TODO: Wayde Moss: place this in proper location, so other functions may use it in future.
+ */
+void nlastrip_append_actionclip_recursive(ListBase *dst, NlaStrip *strip)
+{
+  BLI_assert(!ELEM(NULL, dst, strip));
+
+  switch (strip->type) {
+    case NLASTRIP_TYPE_CLIP: {
+      LinkData *ld = MEM_callocN(sizeof(LinkData), __func__);
+      ld->data = strip;
+      BLI_addtail(dst, ld);
+
+      break;
+    }
+
+    case NLASTRIP_TYPE_TRANSITION:
+      /** NOTE: Transitions never reference other transitions so this only results in infinite
+       * recursion when there's a bug elsewhere. */
+      if (strip->prev && strip->next) {
+        nlastrip_append_actionclip_recursive(dst, strip->prev);
+        nlastrip_append_actionclip_recursive(dst, strip->next);
+      }
+      break;
+
+    case NLASTRIP_TYPE_META:
+      LISTBASE_FOREACH (NlaStrip *, inner_strip, &strip->strips) {
+        nlastrip_append_actionclip_recursive(dst, inner_strip);
+      }
+      break;
+
+    default:
+      break;
+  }
+}
+
+/** Mute selected NLA strips and resample into a new track. The final Nla stack result will be
+ * preserved when possible. New resampled strip will be selected. Previously selected strips will
+ * be muted and deselected afterward.
+ *
+ * \param resample_blendmode: Resulting resampled strip's blend mode.
+ * \param resample_influence: Resulting resampled strip's influence. above.
+ * \param resample_insertion_nlt_index: NlaTrack to insert the resample track above or below.
+ * \param insert_track_lower: Side of resample_insertion_nlt_index to place resample track.
+ * \returns: The new resample track. Returns NULL and does nothing if in tweak mode, resample
+ * influence zero, or no fcurves are involved in the resample.
+ */
+NlaTrack *BKE_animsys_resample_selected_strips(Main *main,
+                                               Depsgraph *depsgraph,
+                                               AnimData *adt,
+                                               PointerRNA *id_ptr,
+                                               char resample_name[],
+                                               short resample_blendmode,
+                                               float resample_influence,
+                                               int resample_insertion_nlt_index,
+                                               bool insert_track_lower)
+{
+
+  /**
+   * ***************************** Intended Uses ******************************************
+   *
+   * Merge Strips: User selects a block of NlaStrips and Resamples.
+   *
+   * Convert Strips: User selects a single NlaStrip and Resamples with a different blendmode and/or
+   * influence.
+   *
+   * ********************* Potential improvements/changes *********************************
+   *
+   * For frames where user had a keyframe, make them non-selected. Select non-user keys. This
+   * allows a follow-up op to do an Fcurve simplify or decimate of only the baked keyframes.
+   * Effectively it allows a follow-up Smart Bake that preserves user keys. Perhaps this can be
+   * done by the caller.
+   *
+   * Allow user to somehow select channels to be resampled. Currently all channels found in all
+   * selected strips are resampled. Though a simple work around is to delete the undesired channels
+   * after the resample.
+   *
+   * ********************* Limitations and potential problems *****************************
+   *
+   * Design: When resample strip value not valid, what should we do? Currently we write a default
+   * value. Nothing we write will preserve the animation. This leaves the problem as a "Known
+   * Issue".
+   *
+   * This function will not properly resample outside of the resample bounds. Generally, it's not
+   * possible since multiple strips with non-None extend modes can not be represented by a single
+   * strip of any extend mode.. Maybe it's possible by properly setting the pre and post
+   * extrapolation for individual fcurves?
+   */
+
+  /**
+   * General Resample Implementation:
+   *
+   * 1) Get evaluatable tracks and selected strips, excluding non-evaluated strips.
+   *
+   * 2) resampled_bounds: Calculate bounds of strips. For initial implementation, we take the
+   * simple approach. This will be a single range that includes intervals where none of the
+   * selected strips evaluate.
+   *
+   * 3) Create a new track and strip for the resample data using resample_bounds. We use a new
+   * track to ensure there is sufficient horizontal space for all the keyframes. Resample track
+   * used as marker for lower and upper evaluation stacks.
+   *
+   * 4) Calculate resample keyframes. Per frame in resample_bounds:
+   *
+   * whole_snapshot: Evaluate the whole NLA stack. Selected strips are included since we're
+   * preserving this snapshot result.
+   *
+   * lower_snapshot: Evaluate the NLA stack from the base track up to the resample track, excluding
+   * selected tracks and the resampled track.
+   *
+   * upper_strips: The strips from the resampled strip, exclusive, to the topmost track, excluding
+   * selected strips.
+   *
+   * With these three sets of data, we can solve for the value that resample strip must evaluate
+   * to that satisfies whole_snapshot when the selected strips are muted. It's the same way
+   * keyframe remapping works where the tweak strip is substituted with the resample strip.
+   */
+
+  BLI_assert(!ELEM(NULL, main, depsgraph, adt, id_ptr));
+
+  if (IS_EQF(0, resample_influence) || (adt->flag & ADT_NLA_EDIT_ON) != 0) {
+    return NULL;
+  }
+
+  if (strlen(resample_name) == 0) {
+    resample_name = "Resample";
+  }
+
+  /*************** 1) Get evaluatable selected strips that will be resampled.************ */
+
+  ListBase evaluatable_tracks = {NULL, NULL};
+  LinkData *insertion_track_target_ld = NULL;
+  int nlt_index;
+  LISTBASE_FOREACH_INDEX (NlaTrack *, nlt, &adt->nla_tracks, nlt_index) {
+
+    /** Insertion index may not refer to evaluatable track. We add it to the list anyways
+     * so we can properly place the resample track in the list. If it's not evaluateable, it
+     * will be removed from the list later. */
+    if (nlt_index == resample_insertion_nlt_index) {
+
+      LinkData *ld = MEM_callocN(sizeof(LinkData), __func__);
+      ld->data = nlt;
+      BLI_addtail(&evaluatable_tracks, ld);
+
+      insertion_track_target_ld = ld;
+      continue;
+    }
+
+    if (!is_nlatrack_evaluatable(adt, nlt) || !nlt->strips.first) {
+      continue;
+    }
+
+    LinkData *ld = MEM_callocN(sizeof(LinkData), __func__);
+    ld->data = nlt;
+    BLI_addtail(&evaluatable_tracks, ld);
+  }
+  BLI_assert(insertion_track_target_ld);
+
+  ListBase selected_strips = {NULL, NULL};
+  LISTBASE_FOREACH (LinkData *, ld, &evaluatable_tracks) {
+    NlaTrack *nlt = ld->data;
+
+    for (NlaStrip *strip = nlt->strips.first; strip; strip = strip->next) {
+      if ((strip->flag & NLASTRIP_FLAG_SELECT) != 0 && (strip->flag & NLASTRIP_FLAG_MUTED) == 0) {
+
+        LinkData *ld = MEM_callocN(sizeof(LinkData), __func__);
+        ld->data = strip;
+        BLI_addtail(&selected_strips, ld);
+
+        // printf("selected strip: %s\n", strip->name);
+      }
+    }
+  }
+
+  /** Early Out. No selected strips to resample. */
+  if (BLI_listbase_count(&selected_strips) == 0) {
+    // printf("\n Early out. No strips selected.\n");
+    BLI_freelistN(&evaluatable_tracks);
+    return NULL;
+  }
+
+  /********* (Earlier than used) Create NlaEvalData, NlaEvalSnapshots, bActionGroup hashes. *****/
+  /** NOTE: We obtain the following data this early to prevent allocating the resample track and
+   * strip prematurely. It's mostly out of preference. Otherwise, this block can be placed right
+   * before calculating the resample keyframe values. */
+
+  NlaEvalData eval_data_buffer;
+  NlaEvalData *eval_data = &eval_data_buffer;
+  nlaeval_init(eval_data);
+  NlaEvalSnapshot *whole_snapshot = &eval_data->eval_snapshot;
+
+  NlaEvalSnapshot lower_snapshot_buffer = {0};
+  NlaEvalSnapshot *lower_snapshot = &lower_snapshot_buffer;
+  nlaeval_snapshot_init(lower_snapshot, eval_data, NULL);
+
+  /** Key: NlaEvalChannel's rna_path
+   *  Value: array of original fcurves*/
+  GHash *nec_to_fcurve_array = BLI_ghash_str_new("nec_to_fcurve_array");
+  /** Key: group name
+   *  Value: bActionGroup */
+  GHash *groupname_to_group = BLI_ghash_str_new("groupname_to_group");
+
+  /** Visit all the involved fcurves. An fcurve pair (rna_path, array_index) may be visited
+   * multiple times.
+   *
+   * Allocate all the necessary NlaEvalChannels and NlaEvalChannelSnapshots. This is the only time
+   * we allow new NlaEvalChannels and snapshots to be allocated.
+   *
+   * NlaEvalChannel->domain bitmap will be used to store whether the fcurve channel exists
+   * among the selected strips. Effectively it marks whether the fcurve is involved in the
+   * resample. For Quaternions, all 4 fcurves are marked as involved if any exists. Later, we only
+   * allocate enough memory to store resample values for involved fcurves.
+   *
+   * We use hashes to preserve fcurve groups. For NlaEvalChannels, we assume that not all elements
+   * may be in the same bActionGroup. It's an unlikely case but still possible. For now we just
+   * store the original bActionGroup and later we'll duplicate it.
+   **/
+  LISTBASE_FOREACH (LinkData *, link_data, &selected_strips) {
+    NlaStrip *outter_strip = link_data->data;
+
+    ListBase action_clips = {NULL, NULL};
+    nlastrip_append_actionclip_recursive(&action_clips, outter_strip);
+
+    LISTBASE_FOREACH (LinkData *, ld_clip, &action_clips) {
+      NlaStrip *strip = ld_clip->data;
+
+      if (!strip->act) {
+        continue;
+      }
+
+      LISTBASE_FOREACH (FCurve *, fcurve, &strip->act->curves) {
+
+        if (!is_fcurve_evaluatable(fcurve)) {
+          continue;
+        }
+
+        NlaEvalChannel *nec = nlaevalchan_verify(id_ptr, eval_data, fcurve->rna_path);
+        nlaeval_snapshot_ensure_channel(whole_snapshot, nec);
+        nlaeval_snapshot_ensure_channel(lower_snapshot, nec);
+
+        if (nec->mix_mode == NEC_MIX_QUATERNION) {
+          BLI_bitmap_set_all(nec->domain.ptr, true, 4);
+        }
+        else {
+          BLI_BITMAP_ENABLE(nec->domain.ptr, fcurve->array_index);
+        }
+
+        if (fcurve->grp) {
+
+          FCurve ***p_fcurve_array;
+          if (!BLI_ghash_ensure_p(
+                  nec_to_fcurve_array, fcurve->rna_path, (void ***)&p_fcurve_array)) {
+            *p_fcurve_array = MEM_callocN(sizeof(FCurve *) * nec->base_snapshot.length, __func__);
+          }
+
+          if (nlaevalchan_validate_index_ex(nec, fcurve->array_index)) {
+            FCurve **fcurve_array = *p_fcurve_array;
+            fcurve_array[fcurve->array_index] = fcurve;
+          }
+
+          bActionGroup **p_group;
+          if (!BLI_ghash_ensure_p(groupname_to_group, fcurve->grp->name, (void ***)&p_group)) {
+            *p_group = fcurve->grp;
+          }
+        }
+      }
+    }
+
+    BLI_freelistN(&action_clips);
+  }
+
+  /** Count the total number of fcurves involve in the resample.
+   *
+   * We have to do this separately from the above loop because the above will visit the same fcurve
+   * (rna_path, array_index) pair multiple times. */
+  int total_fcurves = 0;
+  LISTBASE_FOREACH (NlaEvalChannel *, nec, &eval_data->channels) {
+    for (int array_index = 0; array_index < nec->base_snapshot.length; array_index++) {
+      if (BLI_BITMAP_TEST_BOOL(nec->domain.ptr, array_index)) {
+        total_fcurves++;
+      }
+    }
+  }
+
+  /** Early Out. No evaluatable FCurves to resample. */
+  if (total_fcurves == 0) {
+    // printf("Early out. No fcurves involved in resample.\n");
+    BLI_freelistN(&evaluatable_tracks);
+    BLI_freelistN(&selected_strips);
+    nlaeval_free(eval_data);
+    nlaeval_snapshot_free_data(lower_snapshot);
+    BLI_ghash_free(nec_to_fcurve_array, NULL, MEM_freeN);
+    BLI_ghash_free(groupname_to_group, NULL, NULL);
+    return NULL;
+  }
+
+  // printf("total fcurves resampled: %i\n", total_fcurves);
+
+  /*************** 2) Calculate resample bounds of selected strips.***************** */
+
+  /** REFACTOR: as BKE_nlastrips_calculate_bounds() */
+  int resample_start = INT_MAX;
+  int resample_end = INT_MIN;
+  LISTBASE_FOREACH (LinkData *, link_data, &selected_strips) {
+    NlaStrip *strip = link_data->data;
+
+    resample_start = min(resample_start, strip->start);
+    resample_end = max(resample_end, strip->end);
+  }
+
+  /************** 3) Allocate resample strip. *************************************** */
+
+  NlaTrack *resample_track = BKE_nlatrack_add(adt, NULL);
+  bAction *resample_action = BKE_action_add(main, resample_name);
+  NlaStrip *resample_strip = BKE_nlastrip_new(resample_action);
+  BKE_nlatrack_add_strip(resample_track, resample_strip);
+
+  /** REFACTOR: as BKE_nla_track_rename() */
+  strcpy(resample_track->name, resample_name);
+  BLI_uniquename(&adt->nla_tracks,
+                 resample_track,
+                 DATA_("NlaTrack"),
+                 '.',
+                 offsetof(NlaTrack, name),
+                 sizeof(resample_track->name));
+
+  /** REFACTOR: as BKE_nlastrip_rename() */
+  strcpy(resample_strip->name, resample_name);
+  BKE_nlastrip_validate_name(adt, resample_strip);
+
+  resample_strip->blendmode = resample_blendmode;
+  resample_strip->start = resample_strip->actstart = resample_start;
+  resample_strip->end = resample_strip->actend = resample_end;
+  resample_strip->influence = resample_influence;
+  resample_strip->extendmode = NLASTRIP_EXTEND_NOTHING;
+
+  /** REFACTOR: as BKE_nlastrip_set_influence */
+  if (!IS_EQF(1, resample_influence)) {
+    resample_strip->flag |= NLASTRIP_FLAG_USR_INFLUENCE;
+  }
+
+  /** Insert resample track to correct location to relevant lists. Resample track added to
+   * evaluatable_tracks to mark and separate the lower and upper evaluated strips. */
+  LinkData *resample_track_link = MEM_callocN(sizeof(LinkData), __func__);
+  resample_track_link->data = resample_track;
+
+  BLI_poptail(&adt->nla_tracks);
+  if (insert_track_lower) {
+    BLI_insertlinkbefore(&adt->nla_tracks, insertion_track_target_ld->data, resample_track);
+    BLI_insertlinkbefore(&evaluatable_tracks, insertion_track_target_ld, resample_track_link);
+  }
+  else {
+    BLI_insertlinkafter(&adt->nla_tracks, insertion_track_target_ld->data, resample_track);
+    BLI_insertlinkafter(&evaluatable_tracks, insertion_track_target_ld, resample_track_link);
+  }
+
+  if (!is_nlatrack_evaluatable(adt, insertion_track_target_ld->data)) {
+    BLI_remlink(&evaluatable_tracks, insertion_track_target_ld);
+    MEM_freeN(insertion_track_target_ld);
+  }
+
+  /**************  4) Calculate resample keyframes. ***************************** */
+
+  /** Instead of calculating the resample strip value and creating a keyframe (and fcurve) for it
+   * per iteration, we create a buffer of all the resample values and create the keyframes after
+   * the resampling completes. This is partly for optimization and partly to simplify the code
+   * involved in the loop.
+   *
+   * Memory layout:
+   *
+   *   foreach(NlaEvalChannel nec){
+   *      foreach(involved fcurve){
+   *         foreach(frame from start..end){
+   *             memory: value0, value1, ..., valueN
+   *         }
+   *      }
+   *    }
+   *
+   * So we store all the keyframe co values for an fcurve as a single contiguous block. That way
+   * we can create the fcurve and sequentially write all of its co values in one go. For our
+   * current implementation, each write is offsetted by total_frames amount of floats. A
+   * potential efficiency improvement would be to calculate the eval data in the same order and
+   * optimizing the eval calculation for single channels (4 channels for quaternions).
+   */
+  const int total_frames = resample_end - resample_start + 1;
+  const int total_allocated_values = total_fcurves * total_frames;
+  float *const resample_values_buffer = MEM_mallocN(total_allocated_values * sizeof(float),
+                                                    "nla_resample_values");
+  /** If there are no involved fcurves, then we would've early outted already. The min total
+   * frames is one. At this point, we're always asking for nonzero memory to be allocated. */
+  BLI_assert(resample_values_buffer);
+  // printf("total frames: %i\n", total_frames);
+  // printf("total allocated resample values: %i\n", total_allocated_values);
+
+  const int fcurve_stride = total_frames;
+  const bool full_replace = ELEM(resample_blendmode, NLASTRIP_MODE_REPLACE) &&
+                            IS_EQF(resample_influence, 1);
+  ListBase upper_estrips = {NULL, NULL};
+  ListBase lower_estrips = {NULL, NULL};
+
+  NlaStrip action_strip = {0};
+  nonstrip_action_fill_strip_data(adt, &action_strip, false);
+
+  /** XXX: Proceeding code assumes no NlaEvalChannel/Snapshot ever created or deleted. Doing so
+   * is unexpected and will lead to a crash since resample_values_buffer is not allocated for non
+   * resampled channels.
+   *
+   * The only allocated data per frame are NlaEvalStrips into upper_estrips and lower_estrips,
+   * freed per iteration. A more optimal solution is noted inside at the end of the loop. */
+  const int total_eval_channels = eval_data->num_channels;
+  for (int cfra = resample_start; cfra <= resample_end; cfra++) {
+
+    AnimationEvalContext cfra_context = BKE_animsys_eval_context_construct(depsgraph, cfra);
+    /************** Gather upper and lower evaluated NlaEvalStrips. *************/
+    {
+      LinkData *ld;
+      /* Get the lower stack of strips to evaluate at current time (influence calculated here).
+       */
+      for (ld = evaluatable_tracks.first; ld; ld = ld->next) {
+        NlaTrack *nlt = ld->data;
+
+        /* Resample strip should not be evaluated by any snapshot. */
+        if (nlt == resample_track) {
+          break;
+        }
+
+        nlastrips_ctime_get_strip(&lower_estrips, &nlt->strips, -1, &cfra_context, false);
+      }
+
+      /* Skip resampled strip. */
+      ld = ld->next;
+
+      /* Get the upper stack of strips to evaluate at current time (influence calculated here).
+       */
+      for (; ld; ld = ld->next) {
+        NlaTrack *nlt = ld->data;
+        nlastrips_ctime_get_strip(&upper_estrips, &nlt->strips, -1, &cfra_context, false);
+      }
+
+      nlastrips_ctime_get_strip_single(&upper_estrips, &action_strip, &cfra_context, false);
+    }
+
+    /************** Calculate snapshots. ***************************** */
+    {
+      /** Reset snapshot channels.
+       *
+       * REFACTOR: as animsys_reset_snapshot_channels()
+       */
+      LISTBASE_FOREACH (NlaEvalChannel *, nec, &eval_data->channels) {
+        int nec_index = nec->index;
+
+        BLI_assert(nec_index >= 0 && nec_index < whole_snapshot->size);
+        BLI_assert(nec_index >= 0 && nec_index < lower_snapshot->size);
+
+        nlaevalchan_snapshot_copy(whole_snapshot->channels[nec_index], &nec->base_snapshot);
+        nlaevalchan_snapshot_copy(lower_snapshot->channels[nec_index], &nec->base_snapshot);
+      }
+
+      /** Calculate the whole_snapshot.
+       *
+       * Whole snapshot generally cannot use lower snapshot as starting point since whole
+       * snapshot must include the selected strips, which are excluded from the lower
+       * snapshot. */
+      for (NlaEvalStrip *nes = lower_estrips.first; nes; nes = nes->next) {
+        nlastrip_evaluate(
+            id_ptr, eval_data, NULL, nes, whole_snapshot, &cfra_context, false, false);
+      }
+      for (NlaEvalStrip *nes = upper_estrips.first; nes; nes = nes->next) {
+        nlastrip_evaluate(
+            id_ptr, eval_data, NULL, nes, whole_snapshot, &cfra_context, false, false);
+      }
+
+      /** Calculate lower_eval_data. Exclude selected strips.
+       *
+       * Optimization: If resample strip is full REPLACE, then lower strips not needed to solve for
+       * resample result. This works because resample strip will replace every channel in the lower
+       * strips. */
+      if (!full_replace) {
+        for (NlaEvalStrip *nes = lower_estrips.first; nes; nes = nes->next) {
+          if ((nes->strip->flag & NLASTRIP_FLAG_SELECT) == 0) {
+            nlastrip_evaluate(
+                id_ptr, eval_data, NULL, nes, lower_snapshot, &cfra_context, false, false);
+          }
+        }
+      }
+    }
+
+    /************** Solve for resample values. ***************************** */
+    {
+      /** Mark bitmaps, used to know which indices were successfully inverted. */
+      LISTBASE_FOREACH (NlaEvalChannel *, nec, &eval_data->channels) {
+        int nec_index = nec->index;
+        BLI_assert(nec_index >= 0 && nec_index < whole_snapshot->size);
+
+        NlaEvalChannelSnapshot *necs = whole_snapshot->channels[nec_index];
+        BLI_bitmap_set_all(necs->invertible.ptr, true, necs->length);
+      }
+
+      /** Per iteration, remove effect of current strip which gives output of strip below it.
+       *
+       * REFACTOR: as animsys_snapshot_invert_upper_strips()
+       */
+      LISTBASE_FOREACH_BACKWARD (NlaEvalStrip *, nes, &upper_estrips) {
+        if ((nes->strip->flag & NLASTRIP_FLAG_SELECT) == 0) {
+          /** This will disable nec_snapshot->invertible bits if an upper strip is not invertible
+           * (full replace, multiply zero, or non-invertible transition). Then there is no
+           * inversion solution. */
+          nlastrip_evaluate_invert_get_lower_values(
+              id_ptr, eval_data, NULL, nes, whole_snapshot, &cfra_context);
+        }
+      }
+
+      /** XXX: Proceeding code assumes no eval channel ever created or deleted. Doing so is
+       * unexpected and will lead to a crash since resample_values_buffer is not allocated for
+       * non-resampled channels. */
+      BLI_assert(eval_data->num_channels == total_eval_channels);
+
+      /** Since each NlaEvalChannel can be associated with a different varying number of
+       * fcurve channels we have to track the write offset. (NlaEvalChannelSnapshot->length
+       * varies and so does the total fcurves actually involved for resampling, tagged by
+       * NlaEvalChannel->domain.) */
+      int running_keyframe_write_offset = cfra - resample_start;
+      LISTBASE_FOREACH (NlaEvalChannel *, nec, &eval_data->channels) {
+        int nec_index = nec->index;
+
+        BLI_assert(nec_index >= 0 && nec_index < whole_snapshot->size);
+        BLI_assert(nec_index >= 0 && nec_index < lower_snapshot->size);
+
+        NlaEvalChannelSnapshot *upper_nec_snapshot = whole_snapshot->channels[nec_index];
+        NlaEvalChannelSnapshot *lower_nec_snapshot = lower_snapshot->channels[nec_index];
+
+        const short blendmode = resample_blendmode;
+        const float influence = resample_influence;
+        const short mix_mode = nec->mix_mode;
+        const int count = lower_nec_snapshot->length;
+        float *const base_values = nec->base_snapshot.values;
+        float *const values = upper_nec_snapshot->values;
+        float *const old_lower_values = lower_nec_snapshot->values;
+        float *const r_values = values;
+
+        BLI_assert(ELEM(
+            lower_nec_snapshot->length, upper_nec_snapshot->length, nec->base_snapshot.length));
+
+        /** REFACTOR: void nlastrip_invert_remove_lower_stack(...) */
+        if (blendmode == NLASTRIP_MODE_COMBINE) {
+          /* Quaternion combine handles all sub-channels as a unit. */
+          if (mix_mode == NEC_MIX_QUATERNION) {
+            if (!nla_combine_quaternion_invert_get_fcurve_values(
+                    old_lower_values, values, influence, values)) {
+              BLI_bitmap_set_all(upper_nec_snapshot->invertible.ptr, false, 4);
+            }
+          }
+          else {
+            for (int i = 0; i < count; i++) {
+              if (!nla_combine_value_invert_get_fcurve_value(mix_mode,
+                                                             base_values[i],
+                                                             old_lower_values[i],
+                                                             values[i],
+                                                             influence,
+                                                             &values[i])) {
+                BLI_BITMAP_DISABLE(upper_nec_snapshot->invertible.ptr, i);
+              }
+            }
+          }
+        }
+        else {
+          for (int i = 0; i < count; i++) {
+            if (!nla_blend_value_invert_get_fcurve_value(
+                    blendmode, old_lower_values[i], values[i], influence, &values[i])) {
+              BLI_BITMAP_DISABLE(upper_nec_snapshot->invertible.ptr, i);
+            }
+          }
+        }
+
+        /** Store the resample value. We'll add them as keyframes later. */
+        for (int fcurve_array_index = 0; fcurve_array_index < count; fcurve_array_index++) {
+          /** We do not write the value if the associated fcurve array index has no resample
+           * memory allocated for it. */
+          if (!BLI_BITMAP_TEST_BOOL(nec->domain.ptr, fcurve_array_index)) {
+            continue;
+          }
+
+          BLI_assert(running_keyframe_write_offset >= 0 &&
+                     running_keyframe_write_offset < total_allocated_values);
+
+          if (BLI_BITMAP_TEST_BOOL(upper_nec_snapshot->invertible.ptr, fcurve_array_index)) {
+            resample_values_buffer[running_keyframe_write_offset] = r_values[fcurve_array_index];
+          }
+          else {
+            resample_values_buffer[running_keyframe_write_offset] =
+                base_values[fcurve_array_index];
+          }
+
+          running_keyframe_write_offset += fcurve_stride;
+        }
+      }
+    }
+
+    /************** Free data. ***************************** */
+
+    /** Potential optimization: Instead of freeing the list, we can maintain a dynamic
+     * list. Strips would be added and removed as the current frame passes their bounds.
+     * Currently every NlaEvalStrip is searched for and found per frame. Reminder that
+     * we would still have to calculate estrip->strip_time and influence every frame if it's
+     * animated (can it be driven?). */
+    BLI_freelistN(&upper_estrips);
+    BLI_freelistN(&lower_estrips);
+  }
+
+  /** Create bActionGroups by duplicating and replacing the original in the hash. */
+  GHashIterator gh_iter;
+  GHASH_ITER (gh_iter, groupname_to_group) {
+    bActionGroup *original_group = BLI_ghashIterator_getValue(&gh_iter);
+    bActionGroup *resample_group = action_groups_add_new(resample_action, original_group->name);
+    BLI_ghash_reinsert(groupname_to_group, original_group->name, resample_group, NULL, NULL);
+
+    resample_group->flag = 0;
+    resample_group->customCol = original_group->customCol;
+    action_group_colors_sync(resample_group, original_group);
+  }
+
+  /** Create fcurves and add resampled keyframes. */
+  int running_keyframe_read_offset = 0;
+  LISTBASE_FOREACH (NlaEvalChannel *, nec, &eval_data->channels) {
+    for (int array_index = 0; array_index < nec->base_snapshot.length; array_index++) {
+      if (BLI_BITMAP_TEST_BOOL(nec->domain.ptr, array_index)) {
+
+        FCurve *fcurve = BKE_fcurve_create();
+        BLI_assert(fcurve);
+        fcurve->rna_path = BLI_strdup(nec->rna_path);
+        fcurve->array_index = array_index;
+
+        /** Assign fcurve group. Validity check since we only allocated for valid indices. */
+        FCurve *original_fcurve = NULL;
+        bActionGroup *action_group = NULL;
+        FCurve **fcurve_array = BLI_ghash_lookup(nec_to_fcurve_array, fcurve->rna_path);
+        if (nlaevalchan_validate_index_ex(nec, fcurve->array_index)) {
+          original_fcurve = fcurve_array[fcurve->array_index];
+
+          if (original_fcurve->grp) {
+            action_group = BLI_ghash_lookup(groupname_to_group, original_fcurve->grp->name);
+          }
+        }
+
+        /** Copy some data from original fcurve. */
+        if (original_fcurve) {
+          /** Only these two flags are important to copy from the original. */
+          fcurve->flag = (original_fcurve->flag &
+                          (FCURVE_INT_VALUES | FCURVE_DISCRETE_VALUES | FCURVE_VISIBLE));
+          fcurve->extend = original_fcurve->extend;
+          fcurve->auto_smoothing = original_fcurve->auto_smoothing;
+          fcurve->color_mode = original_fcurve->color_mode;
+          for (int i = 0; i < sizeof(fcurve->color) / sizeof(float); i++) {
+            fcurve->color[i] = original_fcurve->color[i];
+          }
+        }
+
+        if (action_group) {
+          action_groups_add_channel(resample_action, action_group, fcurve);
+        }
+        else {
+          BLI_addtail(&resample_action->curves, fcurve);
+        }
+
+        /** Add Keyframes. */
+        fcurve->bezt = MEM_callocN(sizeof(BezTriple) * total_frames, "beztriple");
+        BLI_assert(fcurve->bezt);
+        fcurve->totvert = total_frames;
+        for (int cfra = resample_start; cfra <= resample_end; cfra++) {
+          const int index_cfra = cfra - resample_start;
+
+          BLI_assert(running_keyframe_read_offset >= 0 &&
+                     running_keyframe_read_offset < total_allocated_values);
+          BLI_assert(index_cfra >= 0 && index_cfra < fcurve->totvert);
+
+          BezTriple *beztr = (fcurve->bezt + index_cfra);
+          beztr->h1 = beztr->h2 = HD_AUTO_ANIM;
+          beztr->ipo = BEZT_IPO_BEZ;
+          /** TODO: What's convention for creating macros? Should I take it out of ED_anim_api.h
+           * and put it in here? What about things that rely on the same file for that define?
+           * Should I recreate the define in this file? Seems worst to copy what Macro does, but
+           * I can ask that question in the patch.
+           */
+          // BEZKEYTYPE(&beztr) = keyframe_type;
+          beztr->hide = BEZT_KEYTYPE_KEYFRAME;
+
+          float y = resample_values_buffer[running_keyframe_read_offset];
+          beztr->vec[0][0] = cfra - 1.0f;
+          beztr->vec[0][1] = y;
+          beztr->vec[1][0] = cfra;
+          beztr->vec[1][1] = y;
+          beztr->vec[2][0] = cfra + 1.0f;
+          beztr->vec[2][1] = y;
+          running_keyframe_read_offset++;
+        }
+      }
+    }
+  }
+
+  for (FCurve *fcurve = resample_action->curves.first; fcurve; fcurve = fcurve->next) {
+    calchandles_fcurve(fcurve);
+  }
+
+  /** Deselect all tracks and strips. */
+  LISTBASE_FOREACH (NlaTrack *, nlt, &adt->nla_tracks) {
+    nlt->flag &= ~(NLATRACK_SELECTED | NLATRACK_ACTIVE);
+    LISTBASE_FOREACH (NlaStrip *, strip, &nlt->strips) {
+      strip->flag &= ~(NLASTRIP_FLAG_SELECT | NLASTRIP_FLAG_ACTIVE);
+    }
+  }
+
+  /**  Mute the prior selected strips that has been resampled. */
+  LISTBASE_FOREACH (LinkData *, link_data, &selected_strips) {
+    NlaStrip *strip = link_data->data;
+    strip->flag |= NLASTRIP_FLAG_MUTED;
+  }
+
+  /** Select resampled tracka and strip. */
+  resample_track->flag |= NLATRACK_ACTIVE | NLATRACK_SELECTED;
+  resample_strip->flag |= NLASTRIP_FLAG_ACTIVE | NLASTRIP_FLAG_SELECT;
+
+  BLI_freelistN(&selected_strips);
+  BLI_freelistN(&evaluatable_tracks);
+
+  /** This occurs per frame above. Comment left as reminder. */
+  // BLI_freelistN(&upper_estrips);
+  // BLI_freelistN(&lower_estrips);
+
+  MEM_freeN(resample_values_buffer);
+
+  nlaeval_free(eval_data);
+  nlaeval_snapshot_free_data(lower_snapshot);
+  /** Whole snapshot already freed when eval_data freed. Comment left as reminder. */
+  // nlaeval_snapshot_free_data(whole_snapshot);
+
+  BLI_ghash_free(nec_to_fcurve_array, NULL, MEM_freeN);
+  BLI_ghash_free(groupname_to_group, NULL, NULL);
+
+  return resample_track;
 }
 
 /* ***************************************** */
