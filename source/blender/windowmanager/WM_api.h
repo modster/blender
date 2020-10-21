@@ -944,6 +944,8 @@ bool WM_xr_session_state_controller_pose_rotation_get(const wmXrData *xr,
                                                       unsigned int subaction_idx,
                                                       float r_rotation[4]);
 
+struct ARegionType *WM_xr_surface_region_type_get(void);
+
 /* wm_xr_actions.c */
 /* XR action functions to be called pre-XR session start.
  * Note: The "destroy" functions can also be called post-session start. */
@@ -999,9 +1001,6 @@ void WM_xr_haptic_action_stop(wmXrData *xr,
                               const char *action_name,
                               unsigned int count,
                               const char *const *subaction_paths);
-
-/* wm_xr_draw.c */
-void WM_xr_draw_controllers(void /*const struct wmXrSessionState *state*/);
 #endif
 
 #ifdef __cplusplus

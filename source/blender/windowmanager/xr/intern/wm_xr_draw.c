@@ -24,6 +24,8 @@
 
 #include <string.h>
 
+#include "BKE_context.h"
+
 #include "BLI_math.h"
 
 #include "ED_view3d_offscreen.h"
@@ -37,9 +39,6 @@
 
 #include "wm_surface.h"
 #include "wm_xr_intern.h"
-
-/* TODO_XR: Remove this (see WM_xr_draw_controllers()). */
-wmXrSessionState *g_session_state = NULL;
 
 void wm_xr_pose_to_viewmat(const GHOST_XrPose *pose, float r_viewmat[4][4])
 {
@@ -138,9 +137,6 @@ void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata)
   /* Some systems have drawing glitches without this. */
   GPU_clear_depth(1.0f);
 
-  /* TODO_XR: Remove this. */
-  g_session_state = session_state;
-
   /* Draws the view into the surface_data->viewport's framebuffers */
   ED_view3d_draw_offscreen_simple(draw_data->depsgraph,
                                   draw_data->scene,
@@ -175,16 +171,12 @@ void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata)
   wm_xr_draw_viewport_buffers_to_active_framebuffer(xr_data->runtime, surface_data, draw_view);
 }
 
-/* This function is called from the post-scene callback portion of the offscreen render loop.
- * TODO_XR: Find a way to pass the session state (needed to access the controller matrices)
- * through the render loop. */
-void WM_xr_draw_controllers(void /*const wmXrSessionState *state*/)
+void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), void *customdata)
 {
-  /* TODO_XR: Remove this. */
-  if (!g_session_state) {
-    return;
-  }
-  const wmXrSessionState *state = g_session_state;
+  const wmXrSessionState *state = customdata;
+
+  const eGPUDepthTest depth_test_prev = GPU_depth_test_get();
+  GPU_depth_test(GPU_DEPTH_ALWAYS);
 
   /* For now, just draw controller axes. In the future this can be replaced
    * with actual controller geometry. */
@@ -238,4 +230,6 @@ void WM_xr_draw_controllers(void /*const wmXrSessionState *state*/)
   }
 
   immUnbindProgram();
+
+  GPU_depth_test(depth_test_prev);
 }

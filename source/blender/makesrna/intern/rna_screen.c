@@ -46,6 +46,7 @@ const EnumPropertyItem rna_enum_region_type_items[] = {
     {RGN_TYPE_EXECUTE, "EXECUTE", 0, "Execute Buttons", ""},
     {RGN_TYPE_FOOTER, "FOOTER", 0, "Footer", ""},
     {RGN_TYPE_TOOL_HEADER, "TOOL_HEADER", 0, "Tool Header", ""},
+    {RGN_TYPE_XR_DISPLAY, "XR_DISPLAY", 0, "XR Display", ""},
     {0, NULL, 0, NULL, NULL},
 };
 

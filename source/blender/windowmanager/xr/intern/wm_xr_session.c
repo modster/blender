@@ -23,6 +23,7 @@
 #include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_scene.h"
+#include "BKE_screen.h"
 
 #include "BLI_ghash.h"
 #include "BLI_listbase.h"
@@ -36,6 +37,7 @@
 #include "DRW_engine.h"
 
 #include "ED_object.h"
+#include "ED_space_api.h"
 
 #include "GHOST_C-api.h"
 
@@ -792,6 +794,17 @@ void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_ac
     UNUSED_VARS(C);
 #endif
   }
+
+  /* Activate draw callback. */
+  if (g_xr_surface) {
+    wmXrSurfaceData *surface_data = g_xr_surface->customdata;
+    if (surface_data && !surface_data->controller_draw_handle) {
+      if (surface_data->art) {
+        surface_data->controller_draw_handle = ED_region_draw_cb_activate(
+            surface_data->art, wm_xr_draw_controllers, state, REGION_DRAW_POST_VIEW);
+      }
+    }
+  }
 }
 
 void wm_xr_session_controller_data_clear(unsigned int count_subaction_paths,
@@ -825,6 +838,17 @@ void wm_xr_session_controller_data_clear(unsigned int count_subaction_paths,
     DEG_id_tag_update(&scene->id, ID_RECALC_SELECT);
     WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
     WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
+  }
+
+  /* Deactivate draw callback. */
+  if (g_xr_surface) {
+    wmXrSurfaceData *surface_data = g_xr_surface->customdata;
+    if (surface_data && surface_data->controller_draw_handle) {
+      if (surface_data->art) {
+        ED_region_draw_cb_exit(surface_data->art, surface_data->controller_draw_handle);
+      }
+      surface_data->controller_draw_handle = NULL;
+    }
   }
 }
 
@@ -916,6 +940,10 @@ static void wm_xr_session_surface_free_data(wmSurface *surface)
   if (data->offscreen) {
     GPU_offscreen_free(data->offscreen);
   }
+  if (data->art) {
+    BLI_freelistN(&data->art->drawcalls);
+    MEM_freeN(data->art);
+  }
 
   MEM_freeN(surface->customdata);
 
@@ -931,6 +959,7 @@ static wmSurface *wm_xr_session_surface_create(void)
 
   wmSurface *surface = MEM_callocN(sizeof(*surface), __func__);
   wmXrSurfaceData *data = MEM_callocN(sizeof(*data), "XrSurfaceData");
+  data->art = MEM_callocN(sizeof(*(data->art)), "XrRegionType");
 
   surface->draw = wm_xr_session_surface_draw;
   surface->free_data = wm_xr_session_surface_free_data;
@@ -941,6 +970,7 @@ static wmSurface *wm_xr_session_surface_create(void)
   surface->gpu_ctx = DRW_xr_gpu_context_get();
   surface->is_xr = true;
 
+  data->art->regionid = RGN_TYPE_XR_DISPLAY;
   surface->customdata = data;
 
   g_xr_surface = surface;
@@ -972,6 +1002,16 @@ void wm_xr_session_gpu_binding_context_destroy(GHOST_ContextHandle UNUSED(contex
   /* Some regions may need to redraw with updated session state after the session is entirely
    * stopped. */
   WM_main_add_notifier(NC_WM | ND_XR_DATA_CHANGED, NULL);
+}
+
+ARegionType *WM_xr_surface_region_type_get(void)
+{
+  if (g_xr_surface) {
+    wmXrSurfaceData *data = g_xr_surface->customdata;
+    return data->art;
+  }
+
+  return NULL;
 }
 
 /** \} */ /* XR-Session Surface */

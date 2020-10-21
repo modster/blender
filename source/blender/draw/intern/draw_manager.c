@@ -51,6 +51,7 @@
 #include "BKE_pbvh.h"
 #include "BKE_pointcache.h"
 #include "BKE_pointcloud.h"
+#include "BKE_screen.h"
 #include "BKE_volume.h"
 
 #include "DNA_camera_types.h"
@@ -1462,13 +1463,18 @@ void DRW_draw_callbacks_post_scene(void)
       ED_annotation_draw_view3d(DEG_get_input_scene(depsgraph), depsgraph, v3d, region, true);
     }
 
-#ifdef WITH_XR_OPENXR
-    /* Controllers. */
+    /* Callbacks (controllers, custom draw functions). */
     if ((v3d->flag2 & V3D_XR_SHOW_CONTROLLERS) != 0) {
-      GPU_depth_test(GPU_DEPTH_ALWAYS);
-      WM_xr_draw_controllers();
+      ARegionType *art = WM_xr_surface_region_type_get();
+      if (art) {
+        GPU_depth_test(GPU_DEPTH_NONE);
+        GPU_apply_state();
+
+        ED_region_surface_draw_cb_draw(art, REGION_DRAW_POST_VIEW);
+
+        DRW_state_reset();
+      }
     }
-#endif
 
     GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
   }

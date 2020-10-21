@@ -100,8 +100,14 @@ typedef struct wmXrRuntimeData {
 typedef struct {
   struct GPUOffScreen *offscreen;
   struct GPUViewport *viewport;
+
   /** XR events. */
   ListBase events;
+
+  /** Dummy region type. Used to add draw callbacks. */
+  struct ARegionType *art;
+  /** Controller draw callback handle. */
+  void *controller_draw_handle;
 } wmXrSurfaceData;
 
 typedef struct wmXrDrawData {
@@ -181,3 +187,4 @@ void wm_xr_session_controller_data_clear(unsigned int count_subaction_paths,
 void wm_xr_pose_to_viewmat(const GHOST_XrPose *pose, float r_viewmat[4][4]);
 void wm_xr_controller_pose_to_mat(const GHOST_XrPose *pose, float r_mat[4][4]);
 void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata);
+void wm_xr_draw_controllers(const struct bContext *C, struct ARegion *region, void *customdata);
