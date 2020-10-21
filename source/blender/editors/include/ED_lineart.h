@@ -52,13 +52,17 @@ typedef struct LineartStaticMemPool {
 
 typedef struct LineartRenderTriangle {
   struct LineartRenderVert *v[3];
-  struct LineartRenderLine *rl[3];
+  //struct LineartRenderLine *rl[3];
+  /* first culled in line list to use adjacent triangle info, then go through triangle list. */
   double gn[3];
-  /*  struct BMFace *F; */
-  short material_id;
-  ListBase intersecting_verts;
+
+  /* Material flag is removed to save space. */
   unsigned char transparency_mask;
   unsigned char flags; /* eLineartTriangleFlags */
+
+  /* These two should only be allocated when intersection is enabled, using a pointer. */
+  ListBase intersecting_verts;
+  struct Object* object_ref; 
 } LineartRenderTriangle;
 
 typedef struct LineartRenderTriangleThread {
@@ -117,8 +121,7 @@ typedef struct LineartRenderVert {
 
   /**  Used as "r" when intersecting */
   struct BMVert *v;
-  struct LineartRenderLine *intersecting_line;
-  struct LineartRenderLine *intersecting_line2;
+  struct LineartRenderVert *isec1,*isec2;
   struct LineartRenderTriangle *intersecting_with;
 } LineartRenderVert;
 
