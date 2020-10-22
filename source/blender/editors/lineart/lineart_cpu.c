@@ -333,6 +333,15 @@ static int lineart_occlusion_make_task_info(LineartRenderBuffer *rb, LineartRend
   return res;
 }
 
+BLI_INLINE bool lineart_occlusion_is_adjacent_intersection(LineartRenderLine *rl,
+                                                           LineartRenderTriangle *rt)
+{
+  LineartRenderVertIntersection *l = (void *)rl->l;
+  LineartRenderVertIntersection *r = (void *)rl->r;
+  return ((l->base.flag && l->intersecting_with == (void *)rt) ||
+          (r->base.flag && r->intersecting_with == (void *)rt));
+}
+
 static void lineart_occlusion_single_line(LineartRenderBuffer *rb,
                                           LineartRenderLine *rl,
                                           int thread_id)
@@ -356,9 +365,8 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb,
 
     LISTBASE_FOREACH (LinkData *, lip, &nba->linked_triangles) {
       rt = lip->data;
-      if (rt->testing[thread_id] == rl || rl->l->intersecting_with == (void *)rt ||
-          rl->r->intersecting_with == (void *)rt ||
-          (rt->base.flags & LRT_TRIANGLE_INTERSECTION_ONLY)) {
+      if (rt->testing[thread_id] == rl || (rt->base.flags & LRT_TRIANGLE_INTERSECTION_ONLY) ||
+          lineart_occlusion_is_adjacent_intersection(rl, rt)) {
         continue;
       }
       rt->testing[thread_id] = rl;
@@ -2198,19 +2206,21 @@ static LineartRenderVert *lineart_triangle_share_point(const LineartRenderTriang
   return NULL;
 }
 
-static bool lineart_vert_already_intersected_2v(LineartRenderVert *rv,
-                                                LineartRenderVert *v1,
-                                                LineartRenderVert *v2)
+static bool lineart_vert_already_intersected_2v(LineartRenderVertIntersection *rv,
+                                                LineartRenderVertIntersection *v1,
+                                                LineartRenderVertIntersection *v2)
 {
-  return ((rv->isec1 == v1 && rv->isec2 == v2) || (rv->isec2 == v2 && rv->isec1 == v1));
+  return ((rv->isec1 == (void *)v1 && rv->isec2 == (void *)v2) ||
+          (rv->isec2 == (void *)v2 && rv->isec1 == (void *)v1));
 }
 
 static void lineart_vert_set_intersection_2v(LineartRenderVert *rv,
                                              LineartRenderVert *v1,
                                              LineartRenderVert *v2)
 {
-  rv->isec1 = v1;
-  rv->isec2 = v2;
+  LineartRenderVertIntersection *irv = (LineartRenderVertIntersection *)rv;
+  irv->isec1 = v1;
+  irv->isec2 = v2;
 }
 
 static LineartRenderVert *lineart_triangle_2v_intersection_test(LineartRenderBuffer *rb,
@@ -2228,8 +2238,10 @@ static LineartRenderVert *lineart_triangle_2v_intersection_test(LineartRenderBuf
   LineartRenderVert *l = v1, *r = v2;
 
   LISTBASE_FOREACH (LinkData *, ld, &testing->intersecting_verts) {
-    LineartRenderVert *rv = (LineartRenderVert *)ld->data;
-    if (rv->intersecting_with == rt && lineart_vert_already_intersected_2v(rv, l, r)) {
+    LineartRenderVertIntersection *rv = (LineartRenderVert *)ld->data;
+    if (rv->intersecting_with == rt &&
+        lineart_vert_already_intersected_2v(
+            rv, (LineartRenderVertIntersection *)l, (LineartRenderVertIntersection *)r)) {
       return rv;
     }
   }
@@ -2260,14 +2272,9 @@ static LineartRenderVert *lineart_triangle_2v_intersection_test(LineartRenderBuf
     return NULL;
   }
 
-  result = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderVert));
+  result = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderVertIntersection));
 
-  result->edge_used = 1;
-
-  /** Caution! BMVert* result->v is reused to save a intersecting render vert.
-   * this saves memory when the scene is very large.
-   */
-  result->v = (void *)r;
+  result->flag = LRT_VERT_HAS_INTERSECTION_DATA;
 
   copy_v3_v3_db(result->gloc, gloc);
 
@@ -2301,11 +2308,11 @@ static LineartRenderLine *lineart_triangle_generate_intersection_line_only(
     LineartRenderVert *new_share;
     lineart_another_edge_2v(rt, share, &sv1, &sv2);
 
-    l = new_share = lineart_mem_aquire(&rb->render_data_pool, (sizeof(LineartRenderVert)));
+    l = new_share = lineart_mem_aquire(&rb->render_data_pool,
+                                       (sizeof(LineartRenderVertIntersection)));
 
-    new_share->edge_used = 1;
-    new_share->v = (void *)
-        r; /*  Caution!  BMVert* result->v is reused to save a intersecting render vert. */
+    new_share->flag = LRT_VERT_HAS_INTERSECTION_DATA;
+
     copy_v3_v3_db(new_share->gloc, share->gloc);
 
     r = lineart_triangle_2v_intersection_test(rb, sv1, sv2, rt, testing, 0);
@@ -2395,8 +2402,8 @@ static LineartRenderLine *lineart_triangle_generate_intersection_line_only(
   l->fbcoord[2] = ZMin * ZMax / (ZMax - fabs(l->fbcoord[2]) * (ZMax - ZMin));
   r->fbcoord[2] = ZMin * ZMax / (ZMax - fabs(r->fbcoord[2]) * (ZMax - ZMin));
 
-  l->intersecting_with = rt;
-  r->intersecting_with = testing;
+  ((LineartRenderVertIntersection *)l)->intersecting_with = rt;
+  ((LineartRenderVertIntersection *)r)->intersecting_with = testing;
 
   result = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine));
   result->l = l;

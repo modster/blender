@@ -52,7 +52,7 @@ typedef struct LineartStaticMemPool {
 
 typedef struct LineartRenderTriangle {
   struct LineartRenderVert *v[3];
-  //struct LineartRenderLine *rl[3];
+  // struct LineartRenderLine *rl[3];
   /* first culled in line list to use adjacent triangle info, then go through triangle list. */
   double gn[3];
 
@@ -62,7 +62,7 @@ typedef struct LineartRenderTriangle {
 
   /* These two should only be allocated when intersection is enabled, using a pointer. */
   ListBase intersecting_verts;
-  struct Object* object_ref; 
+  struct Object *object_ref;
 } LineartRenderTriangle;
 
 typedef struct LineartRenderTriangleThread {
@@ -113,21 +113,28 @@ typedef struct LineartRenderVert {
 
   int index;
 
-  /** This will used in future acceleration for intersection processing.
-   * Add intersection data flag here, when intersecting vert flag is set,
+  /** Intersection data flag is here, when LRT_VERT_HAS_INTERSECTION_DATA is set,
    * size of the struct is extended to include intersection data.
+   * See eLineArtVertFlags.
    */
-  char edge_used;
+  char flag;
 
-  /**  Used as "r" when intersecting */
-  struct BMVert *v;
-  struct LineartRenderVert *isec1,*isec2;
-  struct LineartRenderTriangle *intersecting_with;
 } LineartRenderVert;
+
+typedef struct LineartRenderVertIntersection {
+  struct LineartRenderVert base;
+  struct LineartRenderVert *isec1, *isec2;
+  struct LineartRenderTriangle *intersecting_with;
+} LineartRenderVertIntersection;
+
+typedef enum eLineArtVertFlags {
+  LRT_VERT_HAS_INTERSECTION_DATA = (1 << 0),
+  LRT_VERT_EDGE_USED = (1 << 1),
+} eLineArtVertFlags;
 
 typedef struct LineartRenderLine {
   /* We only need link node kind of list here. */
-  struct LineartRenderLine* next;
+  struct LineartRenderLine *next;
   struct LineartRenderVert *l, *r;
   struct LineartRenderTriangle *tl, *tr;
   ListBase segments;
