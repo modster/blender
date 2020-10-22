@@ -4062,44 +4062,42 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *depsgraph,
     if (source_vgname && vgname) {
       Object *eval_ob = DEG_get_evaluated_object(depsgraph, rlc->object_ref);
       int gpdg = -1;
-      if ((!match_output) && (gpdg = BKE_object_defgroup_name_index(gpencil_object, vgname)) < 0) {
-        continue;
-      }
-      if (eval_ob->type == OB_MESH) {
-        int dindex = 0;
-        Mesh *me = (Mesh *)eval_ob->data;
-        if (!me->dvert) {
-          continue;
-        }
-        LISTBASE_FOREACH (bDeformGroup *, db, &eval_ob->defbase) {
-          if ((!source_vgname) || strstr(db->name, source_vgname) == db->name) {
-            if (match_output) {
-              gpdg = BKE_object_defgroup_name_index(gpencil_object, db->name);
-              if (gpdg < 0) {
-                continue;
-              }
-            }
-            int sindex = 0, vindex;
-            LISTBASE_FOREACH (LineartRenderLineChainItem *, rlci, &rlc->chain) {
-              vindex = rlci->index;
-              /* XXX: Here doesn't have post-modifier dvert! */
-              if (vindex >= me->totvert) {
-                break;
-              }
-              MDeformWeight *mdw = BKE_defvert_ensure_index(&me->dvert[vindex], dindex);
-              MDeformWeight *gdw = BKE_defvert_ensure_index(&gps->dvert[sindex], gpdg);
-              if (preserve_weight) {
-                gdw->weight = MAX2(mdw->weight, gdw->weight);
-              }
-              else {
-                if (mdw->weight > 0.999f) {
-                  gdw->weight = 1.0f;
+      if ((match_output || (gpdg = BKE_object_defgroup_name_index(gpencil_object, vgname)) >= 0)) {
+        if (eval_ob->type == OB_MESH) {
+          int dindex = 0;
+          Mesh *me = (Mesh *)eval_ob->data;
+          if (me->dvert) {
+            LISTBASE_FOREACH (bDeformGroup *, db, &eval_ob->defbase) {
+              if ((!source_vgname) || strstr(db->name, source_vgname) == db->name) {
+                if (match_output) {
+                  gpdg = BKE_object_defgroup_name_index(gpencil_object, db->name);
+                  if (gpdg < 0) {
+                    continue;
+                  }
+                }
+                int sindex = 0, vindex;
+                LISTBASE_FOREACH (LineartRenderLineChainItem *, rlci, &rlc->chain) {
+                  vindex = rlci->index;
+                  /* XXX: Here doesn't have post-modifier dvert! */
+                  if (vindex >= me->totvert) {
+                    break;
+                  }
+                  MDeformWeight *mdw = BKE_defvert_ensure_index(&me->dvert[vindex], dindex);
+                  MDeformWeight *gdw = BKE_defvert_ensure_index(&gps->dvert[sindex], gpdg);
+                  if (preserve_weight) {
+                    gdw->weight = MAX2(mdw->weight, gdw->weight);
+                  }
+                  else {
+                    if (mdw->weight > 0.999f) {
+                      gdw->weight = 1.0f;
+                    }
+                  }
+                  sindex++;
                 }
               }
-              sindex++;
+              dindex++;
             }
           }
-          dindex++;
         }
       }
     }
