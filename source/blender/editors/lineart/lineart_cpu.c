@@ -1465,7 +1465,8 @@ static void lineart_geometry_object_load(Depsgraph *dg,
                                          double (*mv_mat)[4],
                                          double (*mvp_mat)[4],
                                          LineartRenderBuffer *rb,
-                                         int override_usage)
+                                         int override_usage,
+                                         int *global_vindex)
 {
   BMesh *bm;
   BMVert *v;
@@ -1483,7 +1484,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
   FreestyleEdge *fe;
   Object *orig_ob;
   int CanFindFreestyle = 0;
-  size_t i;
+  int i, global_i = (*global_vindex);
   Mesh *use_mesh;
   float use_crease = 0;
 
@@ -1604,8 +1605,9 @@ static void lineart_geometry_object_load(Depsgraph *dg,
     for (i = 0; i < bm->totvert; i++) {
       v = BM_vert_at_index(bm, i);
       lineart_vert_transform(v, i, orv, new_mv, new_mvp);
-      orv[i].index = i;
+      orv[i].index = i + global_i;
     }
+    (*global_vindex) += bm->totvert;
 
     rt = ort;
     for (i = 0; i < bm->totface; i++) {
@@ -1807,10 +1809,12 @@ static void lineart_main_load_geometries(Depsgraph *depsgraph,
     flags |= DEG_ITER_OBJECT_FLAG_DUPLI;
   }
 
+  int global_i = 0;
+
   DEG_OBJECT_ITER_BEGIN (depsgraph, ob, flags) {
     int usage = ED_lineart_object_collection_usage_check(scene->master_collection, ob);
 
-    lineart_geometry_object_load(depsgraph, ob, view, proj, rb, usage);
+    lineart_geometry_object_load(depsgraph, ob, view, proj, rb, usage, &global_i);
 
     if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
       return;
