@@ -267,7 +267,7 @@ static bool buttons_context_path_data(ButsContextPath *path, int type)
     return true;
   }
 #endif
-#ifdef WITH_PARTICLE_NODES
+#ifdef WITH_POINT_CLOUD
   if (RNA_struct_is_a(ptr->type, &RNA_PointCloud) && (type == -1 || type == OB_POINTCLOUD)) {
     return true;
   }
@@ -803,7 +803,7 @@ const char *buttons_context_dir[] = {
 #ifdef WITH_HAIR_NODES
     "hair",
 #endif
-#ifdef WITH_PARTICLE_NODES
+#ifdef WITH_POINT_CLOUD
     "pointcloud",
 #endif
     "volume",
@@ -896,7 +896,7 @@ int /*eContextResult*/ buttons_context(const bContext *C,
     return CTX_RESULT_OK;
   }
 #endif
-#ifdef WITH_PARTICLE_NODES
+#ifdef WITH_POINT_CLOUD
   if (CTX_data_equals(member, "pointcloud")) {
     set_pointer_type(path, result, &RNA_PointCloud);
     return CTX_RESULT_OK;
@@ -1197,6 +1197,15 @@ static void buttons_panel_context_draw(const bContext *C, Panel *panel)
 
     first = false;
   }
+
+  uiLayout *pin_row = uiLayoutRow(row, false);
+  uiLayoutSetAlignment(pin_row, UI_LAYOUT_ALIGN_RIGHT);
+  uiItemSpacer(pin_row);
+  uiLayoutSetEmboss(pin_row, UI_EMBOSS_NONE);
+  uiItemO(pin_row,
+          "",
+          (sbuts->flag & SB_PIN_CONTEXT) ? ICON_PINNED : ICON_UNPINNED,
+          "BUTTONS_OT_toggle_pin");
 }
 
 void buttons_context_register(ARegionType *art)
