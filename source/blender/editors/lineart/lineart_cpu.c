@@ -2210,8 +2210,8 @@ static bool lineart_vert_already_intersected_2v(LineartRenderVertIntersection *r
                                                 LineartRenderVertIntersection *v1,
                                                 LineartRenderVertIntersection *v2)
 {
-  return ((rv->isec1 == (void *)v1 && rv->isec2 == (void *)v2) ||
-          (rv->isec2 == (void *)v2 && rv->isec1 == (void *)v1));
+  return ((rv->isec1 == v1->base.index && rv->isec2 == v2->base.index) ||
+          (rv->isec2 == v2->base.index && rv->isec1 == v1->base.index));
 }
 
 static void lineart_vert_set_intersection_2v(LineartRenderVert *rv,
@@ -2219,8 +2219,8 @@ static void lineart_vert_set_intersection_2v(LineartRenderVert *rv,
                                              LineartRenderVert *v2)
 {
   LineartRenderVertIntersection *irv = (LineartRenderVertIntersection *)rv;
-  irv->isec1 = v1;
-  irv->isec2 = v2;
+  irv->isec1 = v1->index;
+  irv->isec2 = v2->index;
 }
 
 static LineartRenderVert *lineart_triangle_2v_intersection_test(LineartRenderBuffer *rb,

@@ -122,7 +122,8 @@ typedef struct LineartRenderVert {
 
 typedef struct LineartRenderVertIntersection {
   struct LineartRenderVert base;
-  struct LineartRenderVert *isec1, *isec2;
+  /* Use vert index because we only use this to check vertex equal. This way we save 8 Bytes. */
+  int isec1, isec2;
   struct LineartRenderTriangle *intersecting_with;
 } LineartRenderVertIntersection;
 
