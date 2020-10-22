@@ -322,10 +322,10 @@ typedef struct ThemeSpace {
   unsigned char grid_levels;
 
   /* syntax for textwindow and nodes */
-  unsigned char syntaxl[4], syntaxs[4];  // in nodespace used for backdrop matte
-  unsigned char syntaxb[4], syntaxn[4];  // in nodespace used for color input
-  unsigned char syntaxv[4], syntaxc[4];  // in nodespace used for converter group
-  unsigned char syntaxd[4], syntaxr[4];  // in nodespace used for distort
+  unsigned char syntaxl[4], syntaxs[4]; /* in nodespace used for backdrop matte */
+  unsigned char syntaxb[4], syntaxn[4]; /* in nodespace used for color input */
+  unsigned char syntaxv[4], syntaxc[4]; /* in nodespace used for converter group */
+  unsigned char syntaxd[4], syntaxr[4]; /* in nodespace used for distort */
 
   unsigned char line_numbers[4];
   char _pad6[3];
@@ -626,16 +626,18 @@ typedef struct UserDef_Experimental {
   /* Debug options, always available. */
   char use_undo_legacy;
   char use_cycles_debug;
-  char use_image_editor_legacy_drawing;
   char SANITIZE_AFTER_HERE;
   /* The following options are automatically sanitized (set to 0)
    * when the release cycle is not alpha. */
-  char use_new_particle_system;
+  char use_new_geometry_nodes;
   char use_new_hair_type;
+  char use_new_point_cloud_type;
   char use_sculpt_vertex_colors;
   char use_tools_missing_icons;
   char use_switch_object_operator;
-  char _pad[7];
+  char use_sculpt_tools_tilt;
+  char _pad[6];
+  /** `makesdna` does not allow empty structs. */
 } UserDef_Experimental;
 
 #define USER_EXPERIMENTAL_TEST(userdef, member) \

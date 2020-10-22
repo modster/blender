@@ -390,7 +390,7 @@ static const uint g_shape_preset_hold_action_face[2][3] = {{2, 0, 1}, {3, 5, 4}}
  *
  * In order to speed up UI drawing we create some batches that are then
  * modified by specialized shaders to draw certain elements really fast.
- * TODO: find a better place. Maybe it's own file?
+ * TODO: find a better place. Maybe its own file?
  *
  * \{ */
 
@@ -4199,7 +4199,7 @@ static void widget_tab(uiWidgetColors *wcol, rcti *rect, int state, int roundbox
 
   /* Draw shaded outline - Disabled for now,
    * seems incorrect and also looks nicer without it imho ;) */
-  //#define USE_TAB_SHADED_HIGHLIGHT
+  // #define USE_TAB_SHADED_HIGHLIGHT
 
   uiWidgetBase wtb;
   uchar theme_col_tab_highlight[3];
@@ -4956,7 +4956,7 @@ static void ui_draw_popover_back_impl(const uiWidgetColors *wcol,
 
     GPU_blend(GPU_BLEND_ALPHA);
     immBegin(GPU_PRIM_TRIS, 3);
-    immUniformColor4ub(UNPACK3(wcol->outline), 166);
+    immUniformColor4ubv(wcol->outline);
     immVertex2f(pos, cent_x - unit_half, y);
     immVertex2f(pos, cent_x + unit_half, y);
     immVertex2f(pos, cent_x, y + sign * unit_half);

@@ -1877,7 +1877,7 @@ static int file_next_exec(bContext *C, wmOperator *UNUSED(unused))
     folderlist_pushdir(sfile->folders_prev, sfile->params->dir);
     folderlist_popdir(sfile->folders_next, sfile->params->dir);
 
-    // update folders_prev so we can check for it in folderlist_clear_next()
+    /* update folders_prev so we can check for it in #folderlist_clear_next() */
     folderlist_pushdir(sfile->folders_prev, sfile->params->dir);
 
     ED_file_change_dir(C);
@@ -2415,7 +2415,7 @@ void file_directory_enter_handle(bContext *C, void *UNUSED(arg_unused), void *UN
         WM_operator_properties_create_ptr(&ptr, ot);
         RNA_string_set(&ptr, "directory", sfile->params->dir);
         RNA_boolean_set(&ptr, "open", true);
-        /* Enable confirmation prompt, else it's too easy to accidentaly create new directories. */
+        /* Enable confirmation prompt, else it's too easy to accidentally create new directories. */
         RNA_boolean_set(&ptr, "confirm", true);
 
         if (lastdir) {

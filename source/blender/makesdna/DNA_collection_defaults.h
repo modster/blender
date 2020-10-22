@@ -14,26 +14,24 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "node_simulation_util.h"
+/** \file
+ * \ingroup DNA
+ */
 
-static bNodeSocketTemplate sim_node_particle_simulation_in[] = {
-    {SOCK_EMITTERS, N_("Emitters")},
-    {SOCK_EVENTS, N_("Events")},
-    {SOCK_FORCES, N_("Forces")},
-    {-1, ""},
-};
+#pragma once
 
-static bNodeSocketTemplate sim_node_particle_simulation_out[] = {
-    {-1, ""},
-};
+/* Struct members on own line. */
+/* clang-format off */
 
-void register_node_type_sim_particle_simulation()
-{
-  static bNodeType ntype;
+/* -------------------------------------------------------------------- */
+/** \name Collection Struct
+ * \{ */
 
-  sim_node_type_base(
-      &ntype, SIM_NODE_PARTICLE_SIMULATION, "Particle Simulation", NODE_CLASS_OUTPUT, 0);
-  node_type_socket_templates(
-      &ntype, sim_node_particle_simulation_in, sim_node_particle_simulation_out);
-  nodeRegisterType(&ntype);
-}
+#define _DNA_DEFAULT_Collection \
+  { \
+    .color_tag = COLLECTION_COLOR_NONE, \
+  }
+
+/** \} */
+
+/* clang-format on */

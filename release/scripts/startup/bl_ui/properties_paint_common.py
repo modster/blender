@@ -485,7 +485,7 @@ class DisplayPanel(BrushPanel):
 
         col.prop(brush, "cursor_color_add", text="Cursor Color")
         if mode == 'SCULPT' and brush.sculpt_capabilities.has_secondary_color:
-            col.prop(brush, "cursor_color_subtract", text="Inverse Cursor Color")
+            col.prop(brush, "cursor_color_subtract", text="Inverse Color")
 
         col.separator()
 
@@ -546,6 +546,10 @@ def brush_settings(layout, context, brush, popover=False):
 
         # normal_radius_factor
         layout.prop(brush, "normal_radius_factor", slider=True)
+
+        if context.preferences.experimental.use_sculpt_tools_tilt and capabilities.has_tilt:
+            layout.prop(brush, "tilt_strength_factor", slider=True)
+
 
         row = layout.row(align=True)
         row.prop(brush, "hardness", slider=True)

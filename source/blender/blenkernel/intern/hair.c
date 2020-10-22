@@ -244,9 +244,7 @@ static void hair_random(Hair *hair)
 
 void *BKE_hair_add(Main *bmain, const char *name)
 {
-  Hair *hair = BKE_libblock_alloc(bmain, ID_HA, name, 0);
-
-  hair_init_data(&hair->id);
+  Hair *hair = BKE_id_new(bmain, ID_HA, name);
 
   return hair;
 }
@@ -404,10 +402,10 @@ void BKE_hair_data_update(struct Depsgraph *depsgraph, struct Scene *scene, Obje
 }
 
 /* Draw Cache */
-void (*BKE_hair_batch_cache_dirty_tag_cb)(Hair *hair, eMeshBatchDirtyMode mode) = NULL;
+void (*BKE_hair_batch_cache_dirty_tag_cb)(Hair *hair, int mode) = NULL;
 void (*BKE_hair_batch_cache_free_cb)(Hair *hair) = NULL;
 
-void BKE_hair_batch_cache_dirty_tag(Hair *hair, eMeshBatchDirtyMode mode)
+void BKE_hair_batch_cache_dirty_tag(Hair *hair, int mode)
 {
   if (hair->batch_cache) {
     BKE_hair_batch_cache_dirty_tag_cb(hair, mode);

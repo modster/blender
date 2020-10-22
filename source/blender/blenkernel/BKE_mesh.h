@@ -22,9 +22,8 @@
  * \ingroup bke
  */
 
-/* defines BLI_INLINE */
 #include "BKE_mesh_types.h"
-#include "BLI_compiler_compat.h"
+#include "BLI_utildefines.h"
 
 struct BLI_Stack;
 struct BMEditMesh;
@@ -673,7 +672,7 @@ void BKE_mesh_strip_loose_edges(struct Mesh *me);
 
 void BKE_mesh_calc_edges_legacy(struct Mesh *me, const bool use_old);
 void BKE_mesh_calc_edges_loose(struct Mesh *mesh);
-void BKE_mesh_calc_edges(struct Mesh *mesh, bool update, const bool select);
+void BKE_mesh_calc_edges(struct Mesh *mesh, bool keep_existing_edges, const bool select_new_edges);
 void BKE_mesh_calc_edges_tessface(struct Mesh *mesh);
 
 /* In DerivedMesh.c */

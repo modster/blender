@@ -41,6 +41,7 @@ using_mesh_s$ID$       = $USING_MESH$\n\
 using_final_mesh_s$ID$ = $USING_IMPROVED_MESH$\n\
 using_fractions_s$ID$  = $USING_FRACTIONS$\n\
 fracThreshold_s$ID$    = $FRACTIONS_THRESHOLD$\n\
+fracDistance_s$ID$     = $FRACTIONS_DISTANCE$\n\
 flipRatio_s$ID$        = $FLIP_RATIO$\n\
 concaveUpper_s$ID$     = $MESH_CONCAVE_UPPER$\n\
 concaveLower_s$ID$     = $MESH_CONCAVE_LOWER$\n\
@@ -243,11 +244,16 @@ def liquid_step_$ID$():\n\
     pp_s$ID$.advectInGrid(flags=flags_s$ID$, vel=vel_s$ID$, integrationMode=IntRK4, deleteInObstacle=deleteInObstacle_s$ID$, stopInObstacle=False, skipNew=True)\n\
     \n\
     mantaMsg('Pushing particles out of obstacles')\n\
+    if using_obstacle_s$ID$ and using_fractions_s$ID$ and fracDistance_s$ID$ > 0:\n\
+        # Optional: Increase distance between fluid and obstacles (only obstacles, not borders)\n\
+        pushOutofObs(parts=pp_s$ID$, flags=flags_s$ID$, phiObs=phiObsIn_s$ID$, thresh=fracDistance_s$ID$)\n\
     pushOutofObs(parts=pp_s$ID$, flags=flags_s$ID$, phiObs=phiObs_s$ID$)\n\
     \n\
     # save original states for later (used during mesh / secondary particle creation)\n\
-    phiTmp_s$ID$.copyFrom(phi_s$ID$)\n\
-    velTmp_s$ID$.copyFrom(vel_s$ID$)\n\
+    # but only save the state at the beginning of an adaptive frame\n\
+    if not s$ID$.timePerFrame:\n\
+        phiTmp_s$ID$.copyFrom(phi_s$ID$)\n\
+        velTmp_s$ID$.copyFrom(vel_s$ID$)\n\
     \n\
     mantaMsg('Advecting phi')\n\
     advectSemiLagrange(flags=flags_s$ID$, vel=vel_s$ID$, grid=phi_s$ID$, order=1) # first order is usually enough\n\
@@ -302,7 +308,7 @@ def liquid_step_$ID$():\n\
         PD_fluid_guiding(vel=vel_s$ID$, velT=velT_s$ID$, flags=flags_s$ID$, phi=phi_s$ID$, curv=curvature_s$ID$, surfTens=surfaceTension_s$ID$, fractions=fractions_s$ID$, weight=weightGuide_s$ID$, blurRadius=beta_sg$ID$, pressure=pressure_s$ID$, tau=tau_sg$ID$, sigma=sigma_sg$ID$, theta=theta_sg$ID$, zeroPressureFixing=domainClosed_s$ID$)\n\
     else:\n\
         mantaMsg('Pressure')\n\
-        solvePressure(flags=flags_s$ID$, vel=vel_s$ID$, pressure=pressure_s$ID$, phi=phi_s$ID$, curv=curvature_s$ID$, surfTens=surfaceTension_s$ID$, fractions=fractions_s$ID$, obvel=obvel_s$ID$ if using_fractions_s$ID$ else None, zeroPressureFixing=domainClosed_s$ID$)\n\
+        solvePressure(flags=flags_s$ID$, vel=vel_s$ID$, pressure=pressure_s$ID$, curv=curvature_s$ID$, surfTens=surfaceTension_s$ID$, fractions=fractions_s$ID$, obvel=obvel_s$ID$ if using_fractions_s$ID$ else None, zeroPressureFixing=domainClosed_s$ID$)\n\
     \n\
     extrapolateMACSimple(flags=flags_s$ID$, vel=vel_s$ID$, distance=4, intoObs=True if using_fractions_s$ID$ else False)\n\
     setWallBcs(flags=flags_s$ID$, vel=vel_s$ID$, obvel=None if using_fractions_s$ID$ else obvel_s$ID$, phiObs=phiObs_s$ID$, fractions=fractions_s$ID$)\n\

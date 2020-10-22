@@ -311,7 +311,7 @@ void BKE_lattice_resize(Lattice *lt, int uNew, int vNew, int wNew, Object *ltOb)
   calc_lat_fudu(lt->flag, vNew, &fv, &dv);
   calc_lat_fudu(lt->flag, wNew, &fw, &dw);
 
-  /* If old size is different then resolution changed in interface,
+  /* If old size is different than resolution changed in interface,
    * try to do clever reinit of points. Pretty simply idea, we just
    * deform new verts by old lattice, but scaling them to match old
    * size first.
@@ -394,9 +394,7 @@ Lattice *BKE_lattice_add(Main *bmain, const char *name)
 {
   Lattice *lt;
 
-  lt = BKE_libblock_alloc(bmain, ID_LT, name, 0);
-
-  lattice_init_data(&lt->id);
+  lt = BKE_id_new(bmain, ID_LT, name);
 
   return lt;
 }
@@ -801,10 +799,10 @@ void BKE_lattice_eval_geometry(struct Depsgraph *UNUSED(depsgraph), Lattice *UNU
 }
 
 /* Draw Engine */
-void (*BKE_lattice_batch_cache_dirty_tag_cb)(Lattice *lt, eMeshBatchDirtyMode mode) = NULL;
+void (*BKE_lattice_batch_cache_dirty_tag_cb)(Lattice *lt, int mode) = NULL;
 void (*BKE_lattice_batch_cache_free_cb)(Lattice *lt) = NULL;
 
-void BKE_lattice_batch_cache_dirty_tag(Lattice *lt, eMeshBatchDirtyMode mode)
+void BKE_lattice_batch_cache_dirty_tag(Lattice *lt, int mode)
 {
   if (lt->batch_cache) {
     BKE_lattice_batch_cache_dirty_tag_cb(lt, mode);

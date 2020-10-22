@@ -302,14 +302,14 @@ function(blender_add_lib__impl
   #
   # What this code does it traverses library_deps and extracts information about whether
   # library is to provided as general, debug or optimized. This is a little state machine which
-  # keeps track of whiuch build type library is to provided for:
+  # keeps track of which build type library is to provided for:
   #
   # - If "debug" or "optimized" word is found, the next element in the list is expected to be
   #   a library which will be passed to target_link_libraries() under corresponding build type.
   #
   # - If there is no "debug" or "optimized" used library is specified for all build types.
   #
-  # NOTE: If separated libraries for debug and release ar eneeded every library is the list are
+  # NOTE: If separated libraries for debug and release are needed every library is the list are
   # to be prefixed explicitly.
   #
   #  Use: "optimized libfoo optimized libbar debug libfoo_d debug libbar_d"
@@ -477,8 +477,8 @@ function(SETUP_LIBDIRS)
 
   # NOTE: For all new libraries, use absolute library paths.
   # This should eventually be phased out.
-
-  if(NOT MSVC)
+  # APPLE plaform uses full paths for linking libraries, and avoids link_directories.
+  if(NOT MSVC AND NOT APPLE)
     link_directories(${JPEG_LIBPATH} ${PNG_LIBPATH} ${ZLIB_LIBPATH} ${FREETYPE_LIBPATH})
 
     if(WITH_PYTHON)  #  AND NOT WITH_PYTHON_MODULE  # WIN32 needs
@@ -1241,8 +1241,16 @@ endmacro()
 
 macro(without_system_libs_begin)
   set(CMAKE_IGNORE_PATH "${CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES};${CMAKE_SYSTEM_INCLUDE_PATH};${CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES};${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES}")
+  if(APPLE)
+    # Avoid searching for headers in frameworks (like Mono), and libraries in LIBDIR.
+    set(CMAKE_FIND_FRAMEWORK NEVER)
+  endif()
 endmacro()
 
 macro(without_system_libs_end)
   unset(CMAKE_IGNORE_PATH)
+  if(APPLE)
+    # FIRST is the default.
+    set(CMAKE_FIND_FRAMEWORK FIRST)
+  endif()
 endmacro()

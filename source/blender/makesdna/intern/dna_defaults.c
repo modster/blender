@@ -80,6 +80,8 @@
 #include "BLI_memarena.h"
 #include "BLI_utildefines.h"
 
+#include "IMB_imbuf.h"
+
 #include "DNA_defaults.h"
 
 #include "DNA_armature_types.h"
@@ -88,7 +90,10 @@
 #include "DNA_cachefile_types.h"
 #include "DNA_camera_types.h"
 #include "DNA_cloth_types.h"
+#include "DNA_collection_types.h"
 #include "DNA_curve_types.h"
+#include "DNA_fluid_types.h"
+#include "DNA_gpencil_modifier_types.h"
 #include "DNA_hair_types.h"
 #include "DNA_image_types.h"
 #include "DNA_key_types.h"
@@ -100,7 +105,9 @@
 #include "DNA_mesh_types.h"
 #include "DNA_meta_types.h"
 #include "DNA_modifier_types.h"
+#include "DNA_movieclip_types.h"
 #include "DNA_object_types.h"
+#include "DNA_particle_types.h"
 #include "DNA_pointcloud_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_simulation_types.h"
@@ -114,7 +121,10 @@
 #include "DNA_brush_defaults.h"
 #include "DNA_cachefile_defaults.h"
 #include "DNA_camera_defaults.h"
+#include "DNA_collection_defaults.h"
 #include "DNA_curve_defaults.h"
+#include "DNA_fluid_defaults.h"
+#include "DNA_gpencil_modifier_defaults.h"
 #include "DNA_hair_defaults.h"
 #include "DNA_image_defaults.h"
 #include "DNA_lattice_defaults.h"
@@ -125,7 +135,9 @@
 #include "DNA_mesh_defaults.h"
 #include "DNA_meta_defaults.h"
 #include "DNA_modifier_defaults.h"
+#include "DNA_movieclip_defaults.h"
 #include "DNA_object_defaults.h"
+#include "DNA_particle_defaults.h"
 #include "DNA_pointcloud_defaults.h"
 #include "DNA_scene_defaults.h"
 #include "DNA_simulation_defaults.h"
@@ -149,8 +161,16 @@ SDNA_DEFAULT_DECL_STRUCT(CacheFile);
 /* DNA_camera_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(Camera);
 
+/* DNA_collection_defaults.h */
+SDNA_DEFAULT_DECL_STRUCT(Collection);
+
 /* DNA_curve_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(Curve);
+
+/* DNA_fluid_defaults.h */
+SDNA_DEFAULT_DECL_STRUCT(FluidDomainSettings);
+SDNA_DEFAULT_DECL_STRUCT(FluidFlowSettings);
+SDNA_DEFAULT_DECL_STRUCT(FluidEffectorSettings);
 
 /* DNA_image_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(Image);
@@ -179,8 +199,14 @@ SDNA_DEFAULT_DECL_STRUCT(Mesh);
 /* DNA_meta_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(MetaBall);
 
+/* DNA_movieclip_defaults.h */
+SDNA_DEFAULT_DECL_STRUCT(MovieClip);
+
 /* DNA_object_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(Object);
+
+/* DNA_particle_defaults.h */
+SDNA_DEFAULT_DECL_STRUCT(ParticleSettings);
 
 /* DNA_pointcloud_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(PointCloud);
@@ -266,6 +292,26 @@ SDNA_DEFAULT_DECL_STRUCT(WeightVGProximityModifierData);
 SDNA_DEFAULT_DECL_STRUCT(WeldModifierData);
 SDNA_DEFAULT_DECL_STRUCT(WireframeModifierData);
 
+/* DNA_gpencil_modifier_defaults.h */
+SDNA_DEFAULT_DECL_STRUCT(ArmatureGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(ArrayGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(BuildGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(ColorGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(HookGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(LatticeGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(MirrorGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(MultiplyGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(NoiseGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(OffsetGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(OpacityGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(SimplifyGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(SmoothGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(SubdivGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(TextureGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(ThickGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(TimeGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(TintGpencilModifierData);
+
 #undef SDNA_DEFAULT_DECL_STRUCT
 
 /* Reuse existing definitions. */
@@ -307,8 +353,16 @@ const void *DNA_default_table[SDNA_TYPE_MAX] = {
     SDNA_DEFAULT_DECL_EX(CameraDOFSettings, Camera.dof),
     SDNA_DEFAULT_DECL_EX(CameraStereoSettings, Camera.stereo),
 
+    /* DNA_collection_defaults.h */
+    SDNA_DEFAULT_DECL(Collection),
+
     /* DNA_curve_defaults.h */
     SDNA_DEFAULT_DECL(Curve),
+
+    /* DNA_fluid_defaults.h */
+    SDNA_DEFAULT_DECL(FluidDomainSettings),
+    SDNA_DEFAULT_DECL(FluidFlowSettings),
+    SDNA_DEFAULT_DECL(FluidEffectorSettings),
 
     /* DNA_image_defaults.h */
     SDNA_DEFAULT_DECL(Image),
@@ -337,8 +391,14 @@ const void *DNA_default_table[SDNA_TYPE_MAX] = {
     /* DNA_meta_defaults.h */
     SDNA_DEFAULT_DECL(MetaBall),
 
+    /* DNA_movieclip_defaults.h */
+    SDNA_DEFAULT_DECL(MovieClip),
+
     /* DNA_object_defaults.h */
     SDNA_DEFAULT_DECL(Object),
+
+    /* DNA_particle_defaults.h */
+    SDNA_DEFAULT_DECL(ParticleSettings),
 
     /* DNA_pointcloud_defaults.h */
     SDNA_DEFAULT_DECL(PointCloud),
@@ -451,6 +511,26 @@ const void *DNA_default_table[SDNA_TYPE_MAX] = {
     SDNA_DEFAULT_DECL(WeightVGProximityModifierData),
     SDNA_DEFAULT_DECL(WeldModifierData),
     SDNA_DEFAULT_DECL(WireframeModifierData),
+
+    /* DNA_gpencil_modifier_defaults.h */
+    SDNA_DEFAULT_DECL(ArmatureGpencilModifierData),
+    SDNA_DEFAULT_DECL(ArrayGpencilModifierData),
+    SDNA_DEFAULT_DECL(BuildGpencilModifierData),
+    SDNA_DEFAULT_DECL(ColorGpencilModifierData),
+    SDNA_DEFAULT_DECL(HookGpencilModifierData),
+    SDNA_DEFAULT_DECL(LatticeGpencilModifierData),
+    SDNA_DEFAULT_DECL(MirrorGpencilModifierData),
+    SDNA_DEFAULT_DECL(MultiplyGpencilModifierData),
+    SDNA_DEFAULT_DECL(NoiseGpencilModifierData),
+    SDNA_DEFAULT_DECL(OffsetGpencilModifierData),
+    SDNA_DEFAULT_DECL(OpacityGpencilModifierData),
+    SDNA_DEFAULT_DECL(SimplifyGpencilModifierData),
+    SDNA_DEFAULT_DECL(SmoothGpencilModifierData),
+    SDNA_DEFAULT_DECL(SubdivGpencilModifierData),
+    SDNA_DEFAULT_DECL(TextureGpencilModifierData),
+    SDNA_DEFAULT_DECL(ThickGpencilModifierData),
+    SDNA_DEFAULT_DECL(TimeGpencilModifierData),
+    SDNA_DEFAULT_DECL(TintGpencilModifierData),
 };
 #undef SDNA_DEFAULT_DECL
 #undef SDNA_DEFAULT_DECL_EX

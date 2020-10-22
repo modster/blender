@@ -33,11 +33,11 @@
 
 #include "BLI_utildefines.h"
 #ifndef WIN32
-#  include <unistd.h>  // for read close
+#  include <unistd.h> /* for read close */
 #else
 #  include "BLI_winstuff.h"
 #  include "winsock2.h"
-#  include <io.h>  // for open close read
+#  include <io.h> /* for open close read */
 #endif
 
 /* allow readfile to use deprecated functionality */
@@ -128,7 +128,7 @@
 #include "BKE_fcurve.h"
 #include "BKE_fcurve_driver.h"
 #include "BKE_fluid.h"
-#include "BKE_global.h"  // for G
+#include "BKE_global.h" /* for G */
 #include "BKE_gpencil.h"
 #include "BKE_gpencil_modifier.h"
 #include "BKE_hair.h"
@@ -140,15 +140,15 @@
 #include "BKE_lib_id.h"
 #include "BKE_lib_override.h"
 #include "BKE_lib_query.h"
-#include "BKE_main.h"  // for Main
+#include "BKE_main.h" /* for Main */
 #include "BKE_main_idmap.h"
 #include "BKE_material.h"
-#include "BKE_mesh.h"  // for ME_ defines (patching)
+#include "BKE_mesh.h" /* for ME_ defines (patching) */
 #include "BKE_mesh_runtime.h"
 #include "BKE_modifier.h"
 #include "BKE_multires.h"
 #include "BKE_nla.h"
-#include "BKE_node.h"  // for tree type defines
+#include "BKE_node.h" /* for tree type defines */
 #include "BKE_object.h"
 #include "BKE_packedFile.h"
 #include "BKE_paint.h"
@@ -296,7 +296,7 @@ typedef struct BHeadN {
  * This function ensures that reports are printed,
  * in the case of library linking errors this is important!
  *
- * bit kludge but better then doubling up on prints,
+ * bit kludge but better than doubling up on prints,
  * we could alternatively have a versions of a report function which forces printing - campbell
  */
 void blo_reportf_wrap(ReportList *reports, ReportType type, const char *format, ...)
@@ -768,7 +768,7 @@ static void switch_endian_bh8(BHead8 *bhead)
   }
 }
 
-static void bh4_from_bh8(BHead *bhead, BHead8 *bhead8, int do_endian_swap)
+static void bh4_from_bh8(BHead *bhead, BHead8 *bhead8, bool do_endian_swap)
 {
   BHead4 *bhead4 = (BHead4 *)bhead;
   int64_t old;
@@ -861,7 +861,7 @@ static BHeadN *get_bhead(FileData *fd)
           }
 
           if (fd->flags & FD_FLAGS_POINTSIZE_DIFFERS) {
-            bh4_from_bh8(&bhead, &bhead8, (fd->flags & FD_FLAGS_SWITCH_ENDIAN));
+            bh4_from_bh8(&bhead, &bhead8, (fd->flags & FD_FLAGS_SWITCH_ENDIAN) != 0);
           }
           else {
             /* MIN2 is only to quiet '-Warray-bounds' compiler warning. */
@@ -1244,7 +1244,7 @@ static ssize_t fd_read_from_memory(FileData *filedata,
                                    size_t size,
                                    bool *UNUSED(r_is_memchunck_identical))
 {
-  /* don't read more bytes then there are available in the buffer */
+  /* don't read more bytes than there are available in the buffer */
   ssize_t readsize = (ssize_t)MIN2(size, filedata->buffersize - (size_t)filedata->file_offset);
 
   memcpy(buffer, filedata->buffer + filedata->file_offset, (size_t)readsize);
@@ -1501,7 +1501,7 @@ static ssize_t fd_read_gzip_from_memory(FileData *filedata,
   filedata->strm.next_out = (Bytef *)buffer;
   filedata->strm.avail_out = (uint)size;
 
-  // Inflate another chunk.
+  /* Inflate another chunk. */
   err = inflate(&filedata->strm, Z_SYNC_FLUSH);
 
   if (err == Z_STREAM_END) {
@@ -1692,7 +1692,7 @@ bool BLO_library_path_explode(const char *path, char *r_dir, char **r_group, cha
 {
   /* We might get some data names with slashes,
    * so we have to go up in path until we find blend file itself,
-   * then we now next path item is group, and everything else is data name. */
+   * then we know next path item is group, and everything else is data name. */
   char *slash = NULL, *prev_slash = NULL, c = '\0';
 
   r_dir[0] = '\0';
@@ -2506,7 +2506,7 @@ static void direct_link_id_common(
 /** \name Read Animation (legacy for version patching)
  * \{ */
 
-// XXX deprecated - old animation system
+/* XXX deprecated - old animation system */
 static void lib_link_ipo(BlendLibReader *reader, Ipo *ipo)
 {
   LISTBASE_FOREACH (IpoCurve *, icu, &ipo->curve) {
@@ -2516,7 +2516,7 @@ static void lib_link_ipo(BlendLibReader *reader, Ipo *ipo)
   }
 }
 
-// XXX deprecated - old animation system
+/* XXX deprecated - old animation system */
 static void direct_link_ipo(BlendDataReader *reader, Ipo *ipo)
 {
   BLO_read_list(reader, &(ipo->curve));
@@ -2525,10 +2525,36 @@ static void direct_link_ipo(BlendDataReader *reader, Ipo *ipo)
     BLO_read_data_address(reader, &icu->bezt);
     BLO_read_data_address(reader, &icu->bp);
     BLO_read_data_address(reader, &icu->driver);
+
+    /* Undo generic endian switching. */
+    if (BLO_read_requires_endian_switch(reader)) {
+      BLI_endian_switch_int16(&icu->blocktype);
+      if (icu->driver != NULL) {
+
+        /* Undo generic endian switching. */
+        if (BLO_read_requires_endian_switch(reader)) {
+          BLI_endian_switch_int16(&icu->blocktype);
+          if (icu->driver != NULL) {
+            BLI_endian_switch_int16(&icu->driver->blocktype);
+          }
+        }
+      }
+
+      /* Undo generic endian switching. */
+      if (BLO_read_requires_endian_switch(reader)) {
+        BLI_endian_switch_int16(&ipo->blocktype);
+        BLI_endian_switch_int16(&icu->driver->blocktype);
+      }
+    }
+  }
+
+  /* Undo generic endian switching. */
+  if (BLO_read_requires_endian_switch(reader)) {
+    BLI_endian_switch_int16(&ipo->blocktype);
   }
 }
 
-// XXX deprecated - old animation system
+/* XXX deprecated - old animation system */
 static void lib_link_nlastrips(BlendLibReader *reader, ID *id, ListBase *striplist)
 {
   LISTBASE_FOREACH (bActionStrip *, strip, striplist) {
@@ -2541,7 +2567,7 @@ static void lib_link_nlastrips(BlendLibReader *reader, ID *id, ListBase *stripli
   }
 }
 
-// XXX deprecated - old animation system
+/* XXX deprecated - old animation system */
 static void direct_link_nlastrips(BlendDataReader *reader, ListBase *strips)
 {
   BLO_read_list(reader, strips);
@@ -2551,7 +2577,7 @@ static void direct_link_nlastrips(BlendDataReader *reader, ListBase *strips)
   }
 }
 
-// XXX deprecated - old animation system
+/* XXX deprecated - old animation system */
 static void lib_link_constraint_channels(BlendLibReader *reader, ID *id, ListBase *chanbase)
 {
   LISTBASE_FOREACH (bConstraintChannel *, chan, chanbase) {
@@ -2670,7 +2696,7 @@ static void lib_link_constraints(BlendLibReader *reader, ID *id, ListBase *conli
       con->type = CONSTRAINT_TYPE_NULL;
     }
     /* own ipo, all constraints have it */
-    BLO_read_id_address(reader, id->lib, &con->ipo);  // XXX deprecated - old animation system
+    BLO_read_id_address(reader, id->lib, &con->ipo); /* XXX deprecated - old animation system */
 
     /* If linking from a library, clear 'local' library override flag. */
     if (id->lib != NULL) {
@@ -2819,14 +2845,14 @@ void blo_do_versions_key_uidgen(Key *key)
 
 /* update this also to writefile.c */
 static const char *ptcache_data_struct[] = {
-    "",          // BPHYS_DATA_INDEX
-    "",          // BPHYS_DATA_LOCATION
-    "",          // BPHYS_DATA_VELOCITY
-    "",          // BPHYS_DATA_ROTATION
-    "",          // BPHYS_DATA_AVELOCITY / BPHYS_DATA_XCONST */
-    "",          // BPHYS_DATA_SIZE:
-    "",          // BPHYS_DATA_TIMES:
-    "BoidData",  // case BPHYS_DATA_BOIDS:
+    "",         /* BPHYS_DATA_INDEX */
+    "",         /* BPHYS_DATA_LOCATION */
+    "",         /* BPHYS_DATA_VELOCITY */
+    "",         /* BPHYS_DATA_ROTATION */
+    "",         /* BPHYS_DATA_AVELOCITY / BPHYS_DATA_XCONST */
+    "",         /* BPHYS_DATA_SIZE: */
+    "",         /* BPHYS_DATA_TIMES: */
+    "BoidData", /* case BPHYS_DATA_BOIDS: */
 };
 
 static void direct_link_pointcache_cb(BlendDataReader *reader, void *data)
@@ -2913,7 +2939,8 @@ static void lib_link_partdeflect(BlendLibReader *reader, ID *id, PartDeflect *pd
 
 static void lib_link_particlesettings(BlendLibReader *reader, ParticleSettings *part)
 {
-  BLO_read_id_address(reader, part->id.lib, &part->ipo);  // XXX deprecated - old animation system
+  BLO_read_id_address(
+      reader, part->id.lib, &part->ipo); /* XXX deprecated - old animation system */
 
   BLO_read_id_address(reader, part->id.lib, &part->instance_object);
   BLO_read_id_address(reader, part->id.lib, &part->instance_collection);
@@ -3212,10 +3239,10 @@ static void lib_link_object(BlendLibReader *reader, Object *ob)
 {
   bool warn = false;
 
-  // XXX deprecated - old animation system <<<
+  /* XXX deprecated - old animation system <<< */
   BLO_read_id_address(reader, ob->id.lib, &ob->ipo);
   BLO_read_id_address(reader, ob->id.lib, &ob->action);
-  // >>> XXX deprecated - old animation system
+  /* >>> XXX deprecated - old animation system */
 
   BLO_read_id_address(reader, ob->id.lib, &ob->parent);
   BLO_read_id_address(reader, ob->id.lib, &ob->track);
@@ -3278,7 +3305,7 @@ static void lib_link_object(BlendLibReader *reader, Object *ob)
       /* we can't call #BKE_pose_free() here because of library linking
        * freeing will recurse down into every pose constraints ID pointers
        * which are not always valid, so for now free directly and suffer
-       * some leaked memory rather then crashing immediately
+       * some leaked memory rather than crashing immediately
        * while bad this _is_ an exceptional case - campbell */
 #if 0
       BKE_pose_free(ob->pose);
@@ -3297,7 +3324,7 @@ static void lib_link_object(BlendLibReader *reader, Object *ob)
    * the material list size gets out of sync. T22663. */
   if (ob->data && ob->id.lib != ((ID *)ob->data)->lib) {
     const short *totcol_data = BKE_object_material_len_p(ob);
-    /* Only expand so as not to loose any object materials that might be set. */
+    /* Only expand so as not to lose any object materials that might be set. */
     if (totcol_data && (*totcol_data > ob->totcol)) {
       /* printf("'%s' %d -> %d\n", ob->id.name, ob->totcol, *totcol_data); */
       BKE_object_material_resize(reader->main, ob, *totcol_data, false);
@@ -3312,10 +3339,10 @@ static void lib_link_object(BlendLibReader *reader, Object *ob)
   lib_link_pose(reader, ob, ob->pose);
   lib_link_constraints(reader, &ob->id, &ob->constraints);
 
-  // XXX deprecated - old animation system <<<
+  /* XXX deprecated - old animation system <<< */
   lib_link_constraint_channels(reader, &ob->id, &ob->constraintChannels);
   lib_link_nlastrips(reader, &ob->id, &ob->nlastrips);
-  // >>> XXX deprecated - old animation system
+  /* >>> XXX deprecated - old animation system */
 
   LISTBASE_FOREACH (PartEff *, paf, &ob->effect) {
     if (paf->type == EFF_PARTICLE) {
@@ -3329,7 +3356,7 @@ static void lib_link_object(BlendLibReader *reader, Object *ob)
 
     if (fluidmd && fluidmd->fss) {
       BLO_read_id_address(
-          reader, ob->id.lib, &fluidmd->fss->ipo);  // XXX deprecated - old animation system
+          reader, ob->id.lib, &fluidmd->fss->ipo); /* XXX deprecated - old animation system */
     }
   }
 
@@ -3844,18 +3871,17 @@ static void direct_link_object(BlendDataReader *reader, Object *ob)
    * so for now play safe. */
   ob->proxy_from = NULL;
 
-  /* loading saved files with editmode enabled works, but for undo we like
-   * to stay in object mode during undo presses so keep editmode disabled.
-   *
-   * Also when linking in a file don't allow edit and pose modes.
-   * See [T34776, T42780] for more information.
-   */
   const bool is_undo = BLO_read_data_is_undo(reader);
-  if (is_undo || (ob->id.tag & (LIB_TAG_EXTERN | LIB_TAG_INDIRECT))) {
+  if (ob->id.tag & (LIB_TAG_EXTERN | LIB_TAG_INDIRECT)) {
+    /* Do not allow any non-object mode for linked data.
+     * See T34776, T42780, T81027 for more information. */
+    ob->mode &= ~OB_MODE_ALL_MODE_DATA;
+  }
+  else if (is_undo) {
+    /* For undo we want to stay in object mode during undo presses, so keep some edit modes
+     * disabled.
+     * TODO: Check if we should not disable more edit modes here? */
     ob->mode &= ~(OB_MODE_EDIT | OB_MODE_PARTICLE_EDIT);
-    if (!is_undo) {
-      ob->mode &= ~OB_MODE_POSE;
-    }
   }
 
   BLO_read_data_address(reader, &ob->adt);
@@ -3871,10 +3897,10 @@ static void direct_link_object(BlendDataReader *reader, Object *ob)
 
   BLO_read_list(reader, &ob->defbase);
   BLO_read_list(reader, &ob->fmaps);
-  // XXX deprecated - old animation system <<<
+  /* XXX deprecated - old animation system <<< */
   direct_link_nlastrips(reader, &ob->nlastrips);
   BLO_read_list(reader, &ob->constraintChannels);
-  // >>> XXX deprecated - old animation system
+  /* >>> XXX deprecated - old animation system */
 
   BLO_read_pointer_array(reader, (void **)&ob->mat);
   BLO_read_data_address(reader, &ob->matbits);
@@ -3941,7 +3967,7 @@ static void direct_link_object(BlendDataReader *reader, Object *ob)
   if (ob->soft) {
     SoftBody *sb = ob->soft;
 
-    sb->bpoint = NULL;  // init pointers so it gets rebuilt nicely
+    sb->bpoint = NULL; /* init pointers so it gets rebuilt nicely */
     sb->bspring = NULL;
     sb->scratch = NULL;
     /* although not used anymore */
@@ -4438,7 +4464,7 @@ static void lib_link_scene(BlendLibReader *reader, Scene *sce)
 
     if (seq->ipo) {
       BLO_read_id_address(
-          reader, sce->id.lib, &seq->ipo);  // XXX deprecated - old animation system
+          reader, sce->id.lib, &seq->ipo); /* XXX deprecated - old animation system */
     }
     seq->scene_sound = NULL;
     if (seq->scene) {
@@ -4485,7 +4511,7 @@ static void lib_link_scene(BlendLibReader *reader, Scene *sce)
     }
   }
 
-  /* rigidbody world relies on it's linked collections */
+  /* rigidbody world relies on its linked collections */
   if (sce->rigidbody_world) {
     RigidBodyWorld *rbw = sce->rigidbody_world;
     if (rbw->group) {
@@ -5129,7 +5155,7 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
           }
         }
         /* we only saved what was used */
-        space_outliner->storeflag |= SO_TREESTORE_CLEANUP;  // at first draw
+        space_outliner->storeflag |= SO_TREESTORE_CLEANUP; /* at first draw */
       }
       space_outliner->treehash = NULL;
       space_outliner->tree.first = space_outliner->tree.last = NULL;
@@ -5209,9 +5235,6 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
 
       BLO_read_list(reader, &sconsole->scrollback);
       BLO_read_list(reader, &sconsole->history);
-
-      // for (cl= sconsole->scrollback.first; cl; cl= cl->next)
-      //  cl->line= newdataadr(fd, cl->line);
 
       /* comma expressions, (e.g. expr1, expr2, expr3) evaluate each expression,
        * from left to right.  the right-most expression sets the result of the comma
@@ -6885,7 +6908,7 @@ static void link_global(FileData *fd, BlendFileData *bfd)
   bfd->cur_view_layer = blo_read_get_new_globaldata_address(fd, bfd->cur_view_layer);
   bfd->curscreen = newlibadr(fd, NULL, bfd->curscreen);
   bfd->curscene = newlibadr(fd, NULL, bfd->curscene);
-  // this happens in files older than 2.35
+  /* this happens in files older than 2.35 */
   if (bfd->curscene == NULL) {
     if (bfd->curscreen) {
       bfd->curscene = bfd->curscreen->scene;
@@ -7187,7 +7210,7 @@ static BHead *read_userdef(BlendFileData *bfd, FileData *fd, BHead *bhead)
     IDP_BlendDataRead(reader, &addon->prop);
   }
 
-  // XXX
+  /* XXX */
   user->uifonts.first = user->uifonts.last = NULL;
 
   BLO_read_list(reader, &user->uistyles);
@@ -7565,7 +7588,7 @@ static void expand_doit_library(void *fdhandle, Main *mainvar, void *old)
       /* ID has not been read yet, add placeholder to the main of the
        * library it belongs to, so that it will be read later. */
       read_libblock(fd, libmain, bhead, LIB_TAG_INDIRECT, false, NULL);
-      // commented because this can print way too much
+      /* commented because this can print way too much */
       // if (G.debug & G_DEBUG) printf("expand_doit: other lib %s\n", lib->filepath);
 
       /* for outliner dependency only */
@@ -7632,7 +7655,7 @@ static void expand_doit_library(void *fdhandle, Main *mainvar, void *old)
        * and another append happens which invokes same ID...
        * in that case the lookup table needs this entry */
       oldnewmap_insert(fd->libmap, bhead->old, id, bhead->code);
-      // commented because this can print way too much
+      /* commented because this can print way too much */
       // if (G.debug & G_DEBUG) printf("expand: already read %s\n", id->name);
     }
   }
@@ -7650,7 +7673,7 @@ static void expand_ipo(BlendExpander *expander, Ipo *ipo)
   }
 }
 
-// XXX deprecated - old animation system
+/* XXX deprecated - old animation system */
 static void expand_constraint_channels(BlendExpander *expander, ListBase *chanbase)
 {
   LISTBASE_FOREACH (bConstraintChannel *, chan, chanbase) {
@@ -7778,7 +7801,7 @@ static void expand_constraints(BlendExpander *expander, ListBase *lb)
   /* deprecated manual expansion stuff */
   LISTBASE_FOREACH (bConstraint *, curcon, lb) {
     if (curcon->ipo) {
-      BLO_expand(expander, curcon->ipo);  // XXX deprecated - old animation system
+      BLO_expand(expander, curcon->ipo); /* XXX deprecated - old animation system */
     }
   }
 }
@@ -7830,7 +7853,7 @@ static void expand_object(BlendExpander *expander, Object *ob)
 
   BLO_expand(expander, ob->gpd);
 
-  // XXX deprecated - old animation system (for version patching only)
+  /* XXX deprecated - old animation system (for version patching only) */
   BLO_expand(expander, ob->ipo);
   BLO_expand(expander, ob->action);
 
@@ -7841,7 +7864,7 @@ static void expand_object(BlendExpander *expander, Object *ob)
     BLO_expand(expander, strip->act);
     BLO_expand(expander, strip->ipo);
   }
-  // XXX deprecated - old animation system (for version patching only)
+  /* XXX deprecated - old animation system (for version patching only) */
 
   for (int a = 0; a < ob->totcol; a++) {
     BLO_expand(expander, ob->mat[a]);
@@ -8065,7 +8088,7 @@ void BLO_expand_main(void *fdhandle, Main *mainvar)
               expand_collection(&expander, (Collection *)id);
               break;
             case ID_IP:
-              expand_ipo(&expander, (Ipo *)id);  // XXX deprecated - old animation system
+              expand_ipo(&expander, (Ipo *)id); /* XXX deprecated - old animation system */
               break;
             case ID_PA:
               expand_particlesettings(&expander, (ParticleSettings *)id);
@@ -8136,7 +8159,7 @@ static void add_loose_objects_to_scene(Main *mainvar,
         if (ob->id.us == 0) {
           do_it = true;
         }
-        else if ((ob->id.lib == lib) && (object_in_any_collection(bmain, ob) == 0)) {
+        else if ((ob->id.lib == lib) && !object_in_any_collection(bmain, ob)) {
           /* When appending, make sure any indirectly loaded object gets a base,
            * when they are not part of any collection yet. */
           do_it = true;
