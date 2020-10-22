@@ -366,7 +366,7 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb,
     LISTBASE_FOREACH (LinkData *, lip, &nba->linked_triangles) {
       rt = lip->data;
       if (rt->testing[thread_id] == rl || (rt->base.flags & LRT_TRIANGLE_INTERSECTION_ONLY) ||
-          lineart_occlusion_is_adjacent_intersection(rl, rt)) {
+          lineart_occlusion_is_adjacent_intersection(rl, (LineartRenderTriangle *)rt)) {
         continue;
       }
       rt->testing[thread_id] = rl;
@@ -2242,7 +2242,7 @@ static LineartRenderVert *lineart_triangle_2v_intersection_test(LineartRenderBuf
     if (rv->intersecting_with == rt &&
         lineart_vert_already_intersected_2v(
             rv, (LineartRenderVertIntersection *)l, (LineartRenderVertIntersection *)r)) {
-      return rv;
+      return (LineartRenderVert *)rv;
     }
   }
 
