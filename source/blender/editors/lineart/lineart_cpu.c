@@ -777,6 +777,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         /* assign it to a new point */
         interp_v3_v3v3_db(rv[0].gloc, rt->v[0]->gloc, rt->v[2]->gloc, a);
         mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
+        rv[0].index = rt->v[2]->index;
 
         /* cut point for line 1---|-----0 */
         sub_v3_v3v3_db(vv1, rt->v[0]->gloc, cam_pos);
@@ -787,6 +788,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         /* assign it to another new point */
         interp_v3_v3v3_db(rv[1].gloc, rt->v[0]->gloc, rt->v[1]->gloc, a);
         mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
+        rv[1].index = rt->v[1]->index;
 
         /* New line connecting two new points */
         INCREASE_RL
@@ -829,6 +831,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         a = dot1 / (dot1 + dot2);
         interp_v3_v3v3_db(rv[0].gloc, rt->v[2]->gloc, rt->v[0]->gloc, a);
         mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
+        rv[0].index = rt->v[0]->index;
 
         sub_v3_v3v3_db(vv1, rt->v[2]->gloc, cam_pos);
         sub_v3_v3v3_db(vv2, cam_pos, rt->v[1]->gloc);
@@ -837,6 +840,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         a = dot1 / (dot1 + dot2);
         interp_v3_v3v3_db(rv[1].gloc, rt->v[2]->gloc, rt->v[1]->gloc, a);
         mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
+        rv[1].index = rt->v[1]->index;
 
         INCREASE_RL
         if (allow_boundaries) {
@@ -877,6 +881,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         a = dot1 / (dot1 + dot2);
         interp_v3_v3v3_db(rv[0].gloc, rt->v[1]->gloc, rt->v[2]->gloc, a);
         mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
+        rv[0].index = rt->v[2]->index;
 
         sub_v3_v3v3_db(vv1, rt->v[1]->gloc, cam_pos);
         sub_v3_v3v3_db(vv2, cam_pos, rt->v[0]->gloc);
@@ -885,6 +890,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         a = dot1 / (dot1 + dot2);
         interp_v3_v3v3_db(rv[1].gloc, rt->v[1]->gloc, rt->v[0]->gloc, a);
         mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
+        rv[1].index = rt->v[0]->index;
 
         INCREASE_RL
         if (allow_boundaries) {
@@ -953,6 +959,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         /* Assign to a new point */
         interp_v3_v3v3_db(rv[0].gloc, rt->v[0]->gloc, rt->v[1]->gloc, a);
         mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
+        rv[0].index = rt->v[0]->index;
 
         /* Cut point for line 0---|------2 */
         sub_v3_v3v3_db(vv1, rt->v[2]->gloc, cam_pos);
@@ -963,6 +970,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         /* Assign to aother new point */
         interp_v3_v3v3_db(rv[1].gloc, rt->v[0]->gloc, rt->v[2]->gloc, a);
         mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
+        rv[1].index = rt->v[0]->index;
 
         /* New line connects two new points */
         INCREASE_RL
@@ -1020,6 +1028,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         a = dot1 / (dot1 + dot2);
         interp_v3_v3v3_db(rv[0].gloc, rt->v[1]->gloc, rt->v[2]->gloc, a);
         mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
+        rv[0].index = rt->v[1]->index;
 
         sub_v3_v3v3_db(vv1, rt->v[1]->gloc, cam_pos);
         sub_v3_v3v3_db(vv2, cam_pos, rt->v[0]->gloc);
@@ -1028,6 +1037,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         a = dot1 / (dot1 + dot2);
         interp_v3_v3v3_db(rv[1].gloc, rt->v[1]->gloc, rt->v[0]->gloc, a);
         mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
+        rv[1].index = rt->v[1]->index;
 
         INCREASE_RL
         if (allow_boundaries) {
@@ -1076,6 +1086,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         a = dot1 / (dot1 + dot2);
         interp_v3_v3v3_db(rv[0].gloc, rt->v[2]->gloc, rt->v[0]->gloc, a);
         mul_v4_m4v3_db(rv[0].fbcoord, vp, rv[0].gloc);
+        rv[0].index = rt->v[2]->index;
 
         sub_v3_v3v3_db(vv1, rt->v[2]->gloc, cam_pos);
         sub_v3_v3v3_db(vv2, cam_pos, rt->v[1]->gloc);
@@ -1084,6 +1095,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         a = dot1 / (dot1 + dot2);
         interp_v3_v3v3_db(rv[1].gloc, rt->v[2]->gloc, rt->v[1]->gloc, a);
         mul_v4_m4v3_db(rv[1].fbcoord, vp, rv[1].gloc);
+        rv[1].index = rt->v[2]->index;
 
         INCREASE_RL
         if (allow_boundaries) {
@@ -2108,33 +2120,39 @@ static int lineart_triangle_line_imagespace_intersection_v2(SpinLock *UNUSED(spl
 static bool lineart_triangle_share_edge(const LineartRenderTriangle *l,
                                         const LineartRenderTriangle *r)
 {
-  if (l->v[0] == r->v[0]) {
-    if (l->v[1] == r->v[1] || l->v[1] == r->v[2] || l->v[2] == r->v[2] || l->v[2] == r->v[1]) {
+  if (l->v[0]->index == r->v[0]->index) {
+    if (l->v[1]->index == r->v[1]->index || l->v[1]->index == r->v[2]->index ||
+        l->v[2]->index == r->v[2]->index || l->v[2]->index == r->v[1]->index) {
       return true;
     }
   }
-  if (l->v[0] == r->v[1]) {
-    if (l->v[1] == r->v[0] || l->v[1] == r->v[2] || l->v[2] == r->v[2] || l->v[2] == r->v[0]) {
+  if (l->v[0]->index == r->v[1]->index) {
+    if (l->v[1]->index == r->v[0]->index || l->v[1]->index == r->v[2]->index ||
+        l->v[2]->index == r->v[2]->index || l->v[2]->index == r->v[0]->index) {
       return true;
     }
   }
-  if (l->v[0] == r->v[2]) {
-    if (l->v[1] == r->v[1] || l->v[1] == r->v[0] || l->v[2] == r->v[0] || l->v[2] == r->v[1]) {
+  if (l->v[0]->index == r->v[2]->index) {
+    if (l->v[1]->index == r->v[1]->index || l->v[1]->index == r->v[0]->index ||
+        l->v[2]->index == r->v[0]->index || l->v[2]->index == r->v[1]->index) {
       return true;
     }
   }
-  if (l->v[1] == r->v[0]) {
-    if (l->v[2] == r->v[1] || l->v[2] == r->v[2] || l->v[0] == r->v[2] || l->v[0] == r->v[1]) {
+  if (l->v[1]->index == r->v[0]->index) {
+    if (l->v[2]->index == r->v[1]->index || l->v[2]->index == r->v[2]->index ||
+        l->v[0]->index == r->v[2]->index || l->v[0]->index == r->v[1]->index) {
       return true;
     }
   }
-  if (l->v[1] == r->v[1]) {
-    if (l->v[2] == r->v[0] || l->v[2] == r->v[2] || l->v[0] == r->v[2] || l->v[0] == r->v[0]) {
+  if (l->v[1]->index == r->v[1]->index) {
+    if (l->v[2]->index == r->v[0]->index || l->v[2]->index == r->v[2]->index ||
+        l->v[0]->index == r->v[2]->index || l->v[0]->index == r->v[0]->index) {
       return true;
     }
   }
-  if (l->v[1] == r->v[2]) {
-    if (l->v[2] == r->v[1] || l->v[2] == r->v[0] || l->v[0] == r->v[0] || l->v[0] == r->v[1]) {
+  if (l->v[1]->index == r->v[2]->index) {
+    if (l->v[2]->index == r->v[1]->index || l->v[2]->index == r->v[0]->index ||
+        l->v[0]->index == r->v[0]->index || l->v[0]->index == r->v[1]->index) {
       return true;
     }
   }

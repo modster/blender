@@ -111,7 +111,7 @@ typedef struct LineartRenderVert {
   double gloc[3];
   double fbcoord[4];
 
-  size_t index;
+  int index;
 
   /** This will used in future acceleration for intersection processing.
    * Add intersection data flag here, when intersecting vert flag is set,
