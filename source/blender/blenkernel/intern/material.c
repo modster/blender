@@ -225,7 +225,7 @@ static void material_blend_read_data(BlendDataReader *reader, ID *id)
 static void material_blend_read_lib(BlendLibReader *reader, ID *id)
 {
   Material *ma = (Material *)id;
-  BLO_read_id_address(reader, ma->id.lib, &ma->ipo);  // XXX deprecated - old animation system
+  BLO_read_id_address(reader, ma->id.lib, &ma->ipo); /* XXX deprecated - old animation system */
 
   /* relink grease pencil settings */
   if (ma->gp_style != NULL) {
@@ -242,7 +242,7 @@ static void material_blend_read_lib(BlendLibReader *reader, ID *id)
 static void material_blend_read_expand(BlendExpander *expander, ID *id)
 {
   Material *ma = (Material *)id;
-  BLO_expand(expander, ma->ipo);  // XXX deprecated - old animation system
+  BLO_expand(expander, ma->ipo); /* XXX deprecated - old animation system */
 
   if (ma->gp_style) {
     MaterialGPencilStyle *gp_style = ma->gp_style;
@@ -297,9 +297,7 @@ Material *BKE_material_add(Main *bmain, const char *name)
 {
   Material *ma;
 
-  ma = BKE_libblock_alloc(bmain, ID_MA, name, 0);
-
-  material_init_data(&ma->id);
+  ma = BKE_id_new(bmain, ID_MA, name);
 
   return ma;
 }

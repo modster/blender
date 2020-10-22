@@ -14,28 +14,27 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "node_simulation_util.h"
+/** \file
+ * \ingroup DNA
+ */
 
-#include "float.h"
+#pragma once
 
-static bNodeSocketTemplate sim_node_particle_mesh_emitter_in[] = {
-    {SOCK_OBJECT, N_("Object")},
-    {SOCK_FLOAT, N_("Rate"), 100.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
-    {SOCK_CONTROL_FLOW, N_("Execute")},
-    {-1, ""},
-};
+/* Struct members on own line. */
+/* clang-format off */
 
-static bNodeSocketTemplate sim_node_particle_mesh_emitter_out[] = {
-    {SOCK_EMITTERS, N_("Emitter")},
-    {-1, ""},
-};
+/* -------------------------------------------------------------------- */
+/** \name bArmature Struct
+ * \{ */
 
-void register_node_type_sim_particle_mesh_emitter()
-{
-  static bNodeType ntype;
+#define _DNA_DEFAULT_bArmature \
+  { \
+    .deformflag = ARM_DEF_VGROUP | ARM_DEF_ENVELOPE, \
+    .flag = ARM_COL_CUSTOM,  /* custom bone-group colors */ \
+    .layer = 1, \
+    .drawtype = ARM_OCTA, \
+  }
 
-  sim_node_type_base(&ntype, SIM_NODE_PARTICLE_MESH_EMITTER, "Mesh Emitter", 0, 0);
-  node_type_socket_templates(
-      &ntype, sim_node_particle_mesh_emitter_in, sim_node_particle_mesh_emitter_out);
-  nodeRegisterType(&ntype);
-}
+/** \} */
+
+/* clang-format on */

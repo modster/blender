@@ -243,6 +243,10 @@ static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
     copy_v3_v3_uchar(btheme->space_node.grid, btheme->space_node.back);
   }
 
+  if (!USER_VERSION_ATLEAST(291, 9)) {
+    FROM_DEFAULT_V4_UCHAR(space_graph.vertex_active);
+  }
+
   /**
    * Versioning code until next subversion bump goes here.
    *
@@ -254,8 +258,6 @@ static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
    */
   {
     /* Keep this block, even when empty. */
-
-    FROM_DEFAULT_V4_UCHAR(space_graph.vertex_active);
   }
 
 #undef FROM_DEFAULT_V4_UCHAR

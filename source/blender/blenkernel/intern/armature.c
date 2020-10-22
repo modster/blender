@@ -38,6 +38,8 @@
 #include "BLI_utildefines.h"
 #include "BLT_translation.h"
 
+#include "DNA_defaults.h"
+
 #include "DNA_armature_types.h"
 #include "DNA_constraint_types.h"
 #include "DNA_listBase.h"
@@ -86,6 +88,14 @@ static void copy_bonechildren_custom_handles(Bone *bone_dst, bArmature *arm_dst)
 /* -------------------------------------------------------------------- */
 /** \name Armature Data-block
  * \{ */
+
+static void armature_init_data(ID *id)
+{
+  bArmature *armature = (bArmature *)id;
+  BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(armature, id));
+
+  MEMCPY_STRUCT_AFTER(armature, DNA_struct_default_get(bArmature), id);
+}
 
 /**
  * Only copy internal data of Armature ID from source
@@ -308,7 +318,7 @@ IDTypeInfo IDType_ID_AR = {
     .translation_context = BLT_I18NCONTEXT_ID_ARMATURE,
     .flags = 0,
 
-    .init_data = NULL,
+    .init_data = armature_init_data,
     .copy_data = armature_copy_data,
     .free_data = armature_free_data,
     .make_local = NULL,
@@ -331,10 +341,7 @@ bArmature *BKE_armature_add(Main *bmain, const char *name)
 {
   bArmature *arm;
 
-  arm = BKE_libblock_alloc(bmain, ID_AR, name, 0);
-  arm->deformflag = ARM_DEF_VGROUP | ARM_DEF_ENVELOPE;
-  arm->flag = ARM_COL_CUSTOM; /* custom bone-group colors */
-  arm->layer = 1;
+  arm = BKE_id_new(bmain, ID_AR, name);
   return arm;
 }
 
@@ -400,7 +407,7 @@ static void copy_bonechildren(Bone *bone_dst,
   /* Copy this bone's list */
   BLI_duplicatelist(&bone_dst->childbase, &bone_src->childbase);
 
-  /* For each child in the list, update it's children */
+  /* For each child in the list, update its children */
   for (bone_src_child = bone_src->childbase.first, bone_dst_child = bone_dst->childbase.first;
        bone_src_child;
        bone_src_child = bone_src_child->next, bone_dst_child = bone_dst_child->next) {
@@ -719,7 +726,7 @@ bool bone_autoside_name(
    * - The extension to append is based upon the axis that we are working on.
    * - If head happens to be on 0, then we must consider the tail position as well to decide
    *   which side the bone is on
-   *   -> If tail is 0, then it's bone is considered to be on axis, so no extension should be added
+   *   -> If tail is 0, then its bone is considered to be on axis, so no extension should be added
    *   -> Otherwise, extension is added from perspective of object based on which side tail goes to
    * - If head is non-zero, extension is added from perspective of object based on side head is on
    */
@@ -1234,7 +1241,7 @@ void BKE_pchan_bbone_handles_compute(const BBoneSplineParameters *param,
     /* Extra curve x / y */
     /* NOTE:
      * Scale correction factors here are to compensate for some random floating-point glitches
-     * when scaling up the bone or it's parent by a factor of approximately 8.15/6, which results
+     * when scaling up the bone or its parent by a factor of approximately 8.15/6, which results
      * in the bone length getting scaled up too (from 1 to 8), causing the curve to flatten out.
      */
     const float xscale_correction = (param->do_scale) ? param->scale[0] : 1.0f;
@@ -1877,7 +1884,7 @@ void BKE_armature_mat_pose_to_bone_ex(struct Depsgraph *depsgraph,
   BKE_pose_where_is_bone(depsgraph, NULL, ob, &work_pchan, 0.0f, false);
 
   /* find the matrix, need to remove the bone transforms first so this is
-   * calculated as a matrix to set rather then a difference ontop of what's
+   * calculated as a matrix to set rather than a difference ontop of what's
    * already there. */
   unit_m4(outmat);
   BKE_pchan_apply_mat4(&work_pchan, outmat, false);
@@ -2533,6 +2540,13 @@ void BKE_pose_rebuild(Main *bmain, Object *ob, bArmature *arm, const bool do_id_
   for (pchan = pose->chanbase.first; pchan; pchan = pchan->next) {
     /* Find the custom B-Bone handles. */
     BKE_pchan_rebuild_bbone_handles(pose, pchan);
+    /* Re-validate that we are still using a valid pchan form custom transform. */
+    /* Note that we could store pointers of freed pchan in a GSet to speed this up, however this is
+     * supposed to be a rarely used feature, so for now assuming that always building that GSet
+     * would be less optimal. */
+    if (pchan->custom_tx != NULL && BLI_findindex(&pose->chanbase, pchan->custom_tx) == -1) {
+      pchan->custom_tx = NULL;
+    }
   }
 
   /* printf("rebuild pose %s, %d bones\n", ob->id.name, counter); */

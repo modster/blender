@@ -210,9 +210,7 @@ MetaBall *BKE_mball_add(Main *bmain, const char *name)
 {
   MetaBall *mb;
 
-  mb = BKE_libblock_alloc(bmain, ID_MB, name, 0);
-
-  metaball_init_data(&mb->id);
+  mb = BKE_id_new(bmain, ID_MB, name);
 
   return mb;
 }
@@ -380,7 +378,7 @@ float *BKE_mball_make_orco(Object *ob, ListBase *dispbase)
  *
  * This is a can of worms.
  *
- * This really needs a rewrite/refactor its totally broken in anything other then basic cases
+ * This really needs a rewrite/refactor its totally broken in anything other than basic cases
  * Multiple Scenes + Set Scenes & mixing meta-ball basis _should_ work but fails to update the
  * depsgraph on rename and linking into scenes or removal of basis meta-ball.
  * So take care when changing this code.
@@ -739,10 +737,10 @@ bool BKE_mball_select_swap_multi_ex(Base **bases, int bases_len)
 
 /* Draw Engine */
 
-void (*BKE_mball_batch_cache_dirty_tag_cb)(MetaBall *mb, eMeshBatchDirtyMode mode) = NULL;
+void (*BKE_mball_batch_cache_dirty_tag_cb)(MetaBall *mb, int mode) = NULL;
 void (*BKE_mball_batch_cache_free_cb)(MetaBall *mb) = NULL;
 
-void BKE_mball_batch_cache_dirty_tag(MetaBall *mb, eMeshBatchDirtyMode mode)
+void BKE_mball_batch_cache_dirty_tag(MetaBall *mb, int mode)
 {
   if (mb->batch_cache) {
     BKE_mball_batch_cache_dirty_tag_cb(mb, mode);

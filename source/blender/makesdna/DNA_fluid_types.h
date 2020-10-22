@@ -463,6 +463,7 @@ enum {
 enum {
   VDB_PRECISION_HALF_FLOAT = 0,
   VDB_PRECISION_FULL_FLOAT = 1,
+  VDB_PRECISION_MINI_FLOAT = 2,
 };
 
 /* Deprecated values (i.e. all defines and enums below this line up until typedefs). */
@@ -585,10 +586,11 @@ typedef struct FluidDomainSettings {
   float particle_radius;
   float particle_band_width;
   float fractions_threshold;
+  float fractions_distance;
   float flip_ratio;
   int sys_particle_maximum;
   short simulation_method;
-  char _pad4[2];
+  char _pad4[6];
 
   /* Diffusion options. */
   float surface_tension;

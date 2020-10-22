@@ -232,7 +232,7 @@ void ED_view3d_smooth_view_ex(
       /* grid draw as floor */
       if ((RV3D_LOCK_FLAGS(rv3d) & RV3D_LOCK_ROTATION) == 0) {
         /* use existing if exists, means multiple calls to smooth view
-         * wont loose the original 'view' setting */
+         * wont lose the original 'view' setting */
         rv3d->view = RV3D_VIEW_USER;
       }
 
@@ -997,10 +997,10 @@ int view3d_opengl_select(ViewContext *vc,
   }
 
   if (is_pick_select) {
-    if (is_pick_select && select_mode == VIEW3D_SELECT_PICK_NEAREST) {
+    if (select_mode == VIEW3D_SELECT_PICK_NEAREST) {
       gpu_select_mode = GPU_SELECT_PICK_NEAREST;
     }
-    else if (is_pick_select && select_mode == VIEW3D_SELECT_PICK_ALL) {
+    else if (select_mode == VIEW3D_SELECT_PICK_ALL) {
       gpu_select_mode = GPU_SELECT_PICK_ALL;
     }
     else {
@@ -1075,7 +1075,7 @@ int view3d_opengl_select(ViewContext *vc,
   UI_Theme_Store(&theme_state);
   UI_SetTheme(SPACE_VIEW3D, RGN_TYPE_WINDOW);
 
-  /* Re-use cache (rect must be smaller then the cached)
+  /* Re-use cache (rect must be smaller than the cached)
    * other context is assumed to be unchanged */
   if (GPU_select_is_cached()) {
     GPU_select_begin(buffer, bufsize, &rect, gpu_select_mode, 0);
@@ -1207,7 +1207,7 @@ static uint free_localview_bit(Main *bmain)
 
   ushort local_view_bits = 0;
 
-  /* sometimes we loose a localview: when an area is closed */
+  /* sometimes we lose a localview: when an area is closed */
   /* check all areas: which localviews are in use? */
   for (screen = bmain->screens.first; screen; screen = screen->id.next) {
     for (area = screen->areabase.first; area; area = area->next) {
@@ -1760,8 +1760,8 @@ bool ED_view3d_is_region_xr_mirror_active(const wmWindowManager *wm,
                                           const ARegion *region)
 {
   return (v3d->flag & V3D_XR_SESSION_MIRROR) &&
-         /* The free region (e.g. the camera region in quad-view) is always the last in the list
-            base. We don't want any other to be affected. */
+         /* The free region (e.g. the camera region in quad-view) is always
+          * the last in the list base. We don't want any other to be affected. */
          !region->next &&  //
          WM_xr_session_is_ready(&wm->xr);
 }

@@ -455,9 +455,7 @@ Brush *BKE_brush_add(Main *bmain, const char *name, const eObjectMode ob_mode)
 {
   Brush *brush;
 
-  brush = BKE_libblock_alloc(bmain, ID_BR, name, 0);
-
-  brush_init_data(&brush->id);
+  brush = BKE_id_new(bmain, ID_BR, name);
 
   brush->ob_mode = ob_mode;
 
@@ -1709,11 +1707,10 @@ void BKE_brush_sculpt_reset(Brush *br)
     case SCULPT_TOOL_SCRAPE:
     case SCULPT_TOOL_FILL:
       br->alpha = 0.7f;
-      br->area_radius_factor = 1.0f;
+      br->area_radius_factor = 0.5f;
       br->spacing = 7;
       br->flag |= BRUSH_ACCUMULATE;
       br->flag |= BRUSH_INVERT_TO_SCRAPE_FILL;
-      br->flag2 |= BRUSH_AREA_RADIUS_PRESSURE;
       break;
     case SCULPT_TOOL_ROTATE:
       br->alpha = 1.0;

@@ -261,7 +261,7 @@ static void read_mpolys(CDStreamConfig &config, const AbcMeshData &mesh_data)
 
 static void process_no_normals(CDStreamConfig &config)
 {
-  /* Absense of normals in the Alembic mesh is interpreted as 'smooth'. */
+  /* Absence of normals in the Alembic mesh is interpreted as 'smooth'. */
   BKE_mesh_calc_normals(config.mesh);
 }
 
@@ -339,11 +339,11 @@ static void process_normals(CDStreamConfig &config,
   Alembic::AbcGeom::GeometryScope scope = normals.getScope();
 
   switch (scope) {
-    case Alembic::AbcGeom::kFacevaryingScope:  // 'Vertex Normals' in Houdini.
+    case Alembic::AbcGeom::kFacevaryingScope: /* 'Vertex Normals' in Houdini. */
       process_loop_normals(config, normsamp.getVals());
       break;
     case Alembic::AbcGeom::kVertexScope:
-    case Alembic::AbcGeom::kVaryingScope:  // 'Point Normals' in Houdini.
+    case Alembic::AbcGeom::kVaryingScope: /* 'Point Normals' in Houdini. */
       process_vertex_normals(config, normsamp.getVals());
       break;
     case Alembic::AbcGeom::kConstantScope:
@@ -614,7 +614,7 @@ bool AbcMeshReader::topology_changed(Mesh *existing_mesh, const ISampleSelector 
            m_schema.getName().c_str(),
            sample_sel.getRequestedTime(),
            ex.what());
-    // A similar error in read_mesh() would just return existing_mesh.
+    /* A similar error in read_mesh() would just return existing_mesh. */
     return false;
   }
 

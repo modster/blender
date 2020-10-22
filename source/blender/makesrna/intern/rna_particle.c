@@ -2017,7 +2017,7 @@ static void rna_def_fluid_settings(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop,
       "Elastic Limit",
-      "How much the spring has to be stretched/compressed in order to change it's rest length");
+      "How much the spring has to be stretched/compressed in order to change its rest length");
   RNA_def_property_update(prop, 0, "rna_Particle_reset");
 
   prop = RNA_def_property(srna, "spring_frames", PROP_INT, PROP_NONE);
@@ -2944,7 +2944,6 @@ static void rna_def_particle_settings(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "courant_target", PROP_FLOAT, PROP_NONE);
   RNA_def_property_range(prop, 0.0001, 10);
-  RNA_def_property_float_default(prop, 0.1);
   RNA_def_property_ui_text(
       prop,
       "Adaptive Subframe Threshold",

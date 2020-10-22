@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include "BKE_mesh_types.h"
-
 /** \file
  * \ingroup bke
  * \brief Volume datablock.
@@ -66,11 +64,10 @@ enum {
   BKE_VOLUME_BATCH_DIRTY_ALL = 0,
 };
 
-void BKE_volume_batch_cache_dirty_tag(struct Volume *volume, eMeshBatchDirtyMode mode);
+void BKE_volume_batch_cache_dirty_tag(struct Volume *volume, int mode);
 void BKE_volume_batch_cache_free(struct Volume *volume);
 
-extern void (*BKE_volume_batch_cache_dirty_tag_cb)(struct Volume *volume,
-                                                   eMeshBatchDirtyMode mode);
+extern void (*BKE_volume_batch_cache_dirty_tag_cb)(struct Volume *volume, int mode);
 extern void (*BKE_volume_batch_cache_free_cb)(struct Volume *volume);
 
 /* Grids
@@ -143,6 +140,10 @@ struct VolumeGrid *BKE_volume_grid_add(struct Volume *volume,
                                        VolumeGridType type);
 void BKE_volume_grid_remove(struct Volume *volume, struct VolumeGrid *grid);
 
+/* Simplify */
+int BKE_volume_simplify_level(const struct Depsgraph *depsgraph);
+float BKE_volume_simplify_factor(const struct Depsgraph *depsgraph);
+
 /* File Save */
 bool BKE_volume_save(struct Volume *volume,
                      struct Main *bmain,
@@ -169,16 +170,7 @@ openvdb::GridBase::Ptr BKE_volume_grid_openvdb_for_write(const struct Volume *vo
                                                          struct VolumeGrid *grid,
                                                          const bool clear);
 
-template<typename GridType>
-typename GridType::Ptr BKE_volume_grid_openvdb_for_write(const struct Volume *volume,
-                                                         struct VolumeGrid *grid,
-                                                         const bool clear)
-{
-  openvdb::GridBase::Ptr openvdb_grid = BKE_volume_grid_openvdb_for_write(volume, grid, clear);
-  BLI_assert(openvdb_grid->isType<GridType>());
-  typename GridType::Ptr typed_openvdb_grid = openvdb::gridPtrCast<GridType>(openvdb_grid);
-  return typed_openvdb_grid;
-}
+VolumeGridType BKE_volume_grid_type_openvdb(const openvdb::GridBase::Ptr &grid);
 
 template<typename OpType>
 auto BKE_volume_grid_type_operation(const VolumeGridType grid_type, OpType &&op)
@@ -214,5 +206,10 @@ auto BKE_volume_grid_type_operation(const VolumeGridType grid_type, OpType &&op)
   BLI_assert(!"should never be reached");
   return op.template operator()<openvdb::FloatGrid>();
 }
+
+openvdb::GridBase::Ptr BKE_volume_grid_create_with_changed_resolution(
+    const VolumeGridType grid_type,
+    const openvdb::GridBase &old_grid,
+    const float resolution_factor);
 
 #endif
