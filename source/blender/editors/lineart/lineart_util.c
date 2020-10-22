@@ -32,7 +32,7 @@
 
 /* Line art memory and list helper */
 
-void *lineart_list_append_pointer_static(ListBase *h, LineartStaticMemPool *smp, void *data)
+void *lineart_list_append_pointer_pool(ListBase *h, LineartStaticMemPool *smp, void *data)
 {
   LinkData *lip;
   if (h == NULL) {
@@ -43,10 +43,10 @@ void *lineart_list_append_pointer_static(ListBase *h, LineartStaticMemPool *smp,
   BLI_addtail(h, lip);
   return lip;
 }
-void *lineart_list_append_pointer_static_sized(ListBase *h,
-                                               LineartStaticMemPool *smp,
-                                               void *data,
-                                               int size)
+void *lineart_list_append_pointer_pool_sized(ListBase *h,
+                                             LineartStaticMemPool *smp,
+                                             void *data,
+                                             int size)
 {
   LinkData *lip;
   if (h == NULL) {
@@ -130,9 +130,18 @@ void lineart_mem_destroy(LineartStaticMemPool *smp)
   }
 }
 
-void lineart_prepend_line_direct(LineartRenderLine** first, void* node){
-  LineartRenderLine* ln = (LineartRenderLine*)node;
+void lineart_prepend_line_direct(LineartRenderLine **first, void *node)
+{
+  LineartRenderLine *ln = (LineartRenderLine *)node;
   ln->next = (*first);
+  (*first) = ln;
+}
+
+void lineart_prepend_pool(LinkNode **first, LineartStaticMemPool *smp, void *link)
+{
+  LinkNode *ln = lineart_mem_aquire_thread(smp, sizeof(LinkNode));
+  ln->next = (*first);
+  ln->link = link;
   (*first) = ln;
 }
 

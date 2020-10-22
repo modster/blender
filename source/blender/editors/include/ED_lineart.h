@@ -60,9 +60,8 @@ typedef struct LineartRenderTriangle {
   unsigned char transparency_mask;
   unsigned char flags; /* eLineartTriangleFlags */
 
-  /* These two should only be allocated when intersection is enabled, using a pointer. */
-  ListBase intersecting_verts;
-  struct Object *object_ref;
+  /* Now only use single link list, because we don't need to go back in order. */
+  struct LinkNode *intersecting_verts;
 } LineartRenderTriangle;
 
 typedef struct LineartRenderTriangleThread {
@@ -143,7 +142,10 @@ typedef struct LineartRenderLine {
   /**  Also for line type determination on chainning */
   unsigned char flags;
 
-  /**  Still need this entry because culled lines will not add to object reln node */
+  /**  Still need this entry because culled lines will not add to object reln node,
+   * TODO: If really need more savings, we can allocate this in a "extended" way too, but we need
+   * another bit in flags to be able to show the difference.
+   */
   struct Object *object_ref;
 } LineartRenderLine;
 

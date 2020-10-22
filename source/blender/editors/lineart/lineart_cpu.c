@@ -618,10 +618,10 @@ static LineartRenderElementLinkNode *lineart_memory_get_triangle_space(LineartRe
       &rb->render_data_pool,
       64 * rb->triangle_size); /*  CreateNewBuffer(LineartRenderTriangle, 64); */
 
-  reln = lineart_list_append_pointer_static_sized(&rb->triangle_buffer_pointers,
-                                                  &rb->render_data_pool,
-                                                  render_triangles,
-                                                  sizeof(LineartRenderElementLinkNode));
+  reln = lineart_list_append_pointer_pool_sized(&rb->triangle_buffer_pointers,
+                                                &rb->render_data_pool,
+                                                render_triangles,
+                                                sizeof(LineartRenderElementLinkNode));
   reln->element_count = 64;
   reln->flags |= LRT_ELEMENT_IS_ADDITIONAL;
 
@@ -635,10 +635,10 @@ static LineartRenderElementLinkNode *lineart_memory_get_vert_space(LineartRender
   LineartRenderVert *render_vertices = lineart_mem_aquire(&rb->render_data_pool,
                                                           sizeof(LineartRenderVert) * 64);
 
-  reln = lineart_list_append_pointer_static_sized(&rb->vertex_buffer_pointers,
-                                                  &rb->render_data_pool,
-                                                  render_vertices,
-                                                  sizeof(LineartRenderElementLinkNode));
+  reln = lineart_list_append_pointer_pool_sized(&rb->vertex_buffer_pointers,
+                                                &rb->render_data_pool,
+                                                render_vertices,
+                                                sizeof(LineartRenderElementLinkNode));
   reln->element_count = 64;
   reln->flags |= LRT_ELEMENT_IS_ADDITIONAL;
 
@@ -652,10 +652,10 @@ static LineartRenderElementLinkNode *lineart_memory_get_line_space(LineartRender
   LineartRenderLine *render_lines = lineart_mem_aquire(&rb->render_data_pool,
                                                        sizeof(LineartRenderLine) * 64);
 
-  reln = lineart_list_append_pointer_static_sized(&rb->line_buffer_pointers,
-                                                  &rb->render_data_pool,
-                                                  render_lines,
-                                                  sizeof(LineartRenderElementLinkNode));
+  reln = lineart_list_append_pointer_pool_sized(&rb->line_buffer_pointers,
+                                                &rb->render_data_pool,
+                                                render_lines,
+                                                sizeof(LineartRenderElementLinkNode));
   reln->element_count = 64;
   reln->crease_threshold = rb->crease_threshold;
   reln->flags |= LRT_ELEMENT_IS_ADDITIONAL;
@@ -1583,10 +1583,10 @@ static void lineart_geometry_object_load(Depsgraph *dg,
 
     orig_ob = ob->id.orig_id ? (Object *)ob->id.orig_id : ob;
 
-    reln = lineart_list_append_pointer_static_sized(&rb->vertex_buffer_pointers,
-                                                    &rb->render_data_pool,
-                                                    orv,
-                                                    sizeof(LineartRenderElementLinkNode));
+    reln = lineart_list_append_pointer_pool_sized(&rb->vertex_buffer_pointers,
+                                                  &rb->render_data_pool,
+                                                  orv,
+                                                  sizeof(LineartRenderElementLinkNode));
     reln->element_count = bm->totvert;
     reln->object_ref = orig_ob;
 
@@ -1602,10 +1602,10 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       reln->flags |= LRT_ELEMENT_BORDER_ONLY;
     }
 
-    reln = lineart_list_append_pointer_static_sized(&rb->triangle_buffer_pointers,
-                                                    &rb->render_data_pool,
-                                                    ort,
-                                                    sizeof(LineartRenderElementLinkNode));
+    reln = lineart_list_append_pointer_pool_sized(&rb->triangle_buffer_pointers,
+                                                  &rb->render_data_pool,
+                                                  ort,
+                                                  sizeof(LineartRenderElementLinkNode));
     reln->element_count = bm->totface;
     reln->object_ref = orig_ob;
     reln->flags |= (usage == OBJECT_LRT_NO_INTERSECTION ? LRT_ELEMENT_NO_INTERSECTION : 0);
@@ -1666,10 +1666,10 @@ static void lineart_geometry_object_load(Depsgraph *dg,
     }
 
     orl = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLine) * allocate_rl);
-    reln = lineart_list_append_pointer_static_sized(&rb->line_buffer_pointers,
-                                                    &rb->render_data_pool,
-                                                    orl,
-                                                    sizeof(LineartRenderElementLinkNode));
+    reln = lineart_list_append_pointer_pool_sized(&rb->line_buffer_pointers,
+                                                  &rb->render_data_pool,
+                                                  orl,
+                                                  sizeof(LineartRenderElementLinkNode));
     reln->element_count = allocate_rl;
     reln->object_ref = orig_ob;
 
@@ -2237,8 +2237,8 @@ static LineartRenderVert *lineart_triangle_2v_intersection_test(LineartRenderBuf
   double gloc[3];
   LineartRenderVert *l = v1, *r = v2;
 
-  LISTBASE_FOREACH (LinkData *, ld, &testing->intersecting_verts) {
-    LineartRenderVertIntersection *rv = (LineartRenderVert *)ld->data;
+  for (LinkNode *ln = (void *)testing->intersecting_verts; ln; ln = ln->next) {
+    LineartRenderVertIntersection *rv = ln->link;
     if (rv->intersecting_with == rt &&
         lineart_vert_already_intersected_2v(
             rv, (LineartRenderVertIntersection *)l, (LineartRenderVertIntersection *)r)) {
@@ -2278,7 +2278,7 @@ static LineartRenderVert *lineart_triangle_2v_intersection_test(LineartRenderBuf
 
   copy_v3_v3_db(result->gloc, gloc);
 
-  lineart_list_append_pointer_static(&testing->intersecting_verts, &rb->render_data_pool, result);
+  lineart_prepend_pool(&testing->intersecting_verts, &rb->render_data_pool, result);
 
   return result;
 }
@@ -2323,12 +2323,10 @@ static LineartRenderLine *lineart_triangle_generate_intersection_line_only(
       if (r == NULL) {
         return 0;
       }
-      lineart_list_append_pointer_static(
-          &testing->intersecting_verts, &rb->render_data_pool, new_share);
+      lineart_prepend_pool(&testing->intersecting_verts, &rb->render_data_pool, new_share);
     }
     else {
-      lineart_list_append_pointer_static(
-          &rt->intersecting_verts, &rb->render_data_pool, new_share);
+      lineart_prepend_pool(&rt->intersecting_verts, &rb->render_data_pool, new_share);
     }
   }
   else {
@@ -2411,9 +2409,9 @@ static LineartRenderLine *lineart_triangle_generate_intersection_line_only(
   result->tl = rt;
   result->tr = testing;
 
-  /* Currently we can only store one object_ref. Todo in the future: allow selection of object
-   * pairs when using intersection lines. */
-  result->object_ref = rt->object_ref;
+  /** TODO: Use bit flags similar to transparency_mask to select intersection pairs, or to use rt
+   * address as rt's are continuously allocated in memory for each object. object_ref is removed */
+  /* result->object_ref = rt->object_ref; */
 
   LineartRenderLineSegment *rls = lineart_mem_aquire(&rb->render_data_pool,
                                                      sizeof(LineartRenderLineSegment));
@@ -2856,19 +2854,19 @@ static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
       ba->cy = (ba->u + ba->b) / 2;
 
       if (row) {
-        lineart_list_append_pointer_static(
+        lineart_list_append_pointer_pool(
             &ba->up, &rb->render_data_pool, &rb->initial_bounding_areas[(row - 1) * 4 + col]);
       }
       if (col) {
-        lineart_list_append_pointer_static(
+        lineart_list_append_pointer_pool(
             &ba->lp, &rb->render_data_pool, &rb->initial_bounding_areas[row * 4 + col - 1]);
       }
       if (row != sp_h - 1) {
-        lineart_list_append_pointer_static(
+        lineart_list_append_pointer_pool(
             &ba->bp, &rb->render_data_pool, &rb->initial_bounding_areas[(row + 1) * 4 + col]);
       }
       if (col != sp_w - 1) {
-        lineart_list_append_pointer_static(
+        lineart_list_append_pointer_pool(
             &ba->rp, &rb->render_data_pool, &rb->initial_bounding_areas[row * 4 + col + 1]);
       }
     }
@@ -2882,14 +2880,14 @@ static void lineart_bounding_areas_connect_new(LineartRenderBuffer *rb, LineartB
   LineartStaticMemPool *mph = &rb->render_data_pool;
 
   /* Inter-connection with newly created 4 child bounding areas. */
-  lineart_list_append_pointer_static(&ba[1].rp, mph, &ba[0]);
-  lineart_list_append_pointer_static(&ba[0].lp, mph, &ba[1]);
-  lineart_list_append_pointer_static(&ba[1].bp, mph, &ba[2]);
-  lineart_list_append_pointer_static(&ba[2].up, mph, &ba[1]);
-  lineart_list_append_pointer_static(&ba[2].rp, mph, &ba[3]);
-  lineart_list_append_pointer_static(&ba[3].lp, mph, &ba[2]);
-  lineart_list_append_pointer_static(&ba[3].up, mph, &ba[0]);
-  lineart_list_append_pointer_static(&ba[0].bp, mph, &ba[3]);
+  lineart_list_append_pointer_pool(&ba[1].rp, mph, &ba[0]);
+  lineart_list_append_pointer_pool(&ba[0].lp, mph, &ba[1]);
+  lineart_list_append_pointer_pool(&ba[1].bp, mph, &ba[2]);
+  lineart_list_append_pointer_pool(&ba[2].up, mph, &ba[1]);
+  lineart_list_append_pointer_pool(&ba[2].rp, mph, &ba[3]);
+  lineart_list_append_pointer_pool(&ba[3].lp, mph, &ba[2]);
+  lineart_list_append_pointer_pool(&ba[3].up, mph, &ba[0]);
+  lineart_list_append_pointer_pool(&ba[0].bp, mph, &ba[3]);
 
   /** Connect 4 child bounding areas to other areas that are
    * adjacent to their original parents */
@@ -2904,45 +2902,45 @@ static void lineart_bounding_areas_connect_new(LineartRenderBuffer *rb, LineartB
      * the two new areas on the left side of the parent,
      * then add them to the adjacent list as well. */
     if (ba[1].u > tba->b && ba[1].b < tba->u) {
-      lineart_list_append_pointer_static(&ba[1].lp, mph, tba);
-      lineart_list_append_pointer_static(&tba->rp, mph, &ba[1]);
+      lineart_list_append_pointer_pool(&ba[1].lp, mph, tba);
+      lineart_list_append_pointer_pool(&tba->rp, mph, &ba[1]);
     }
     if (ba[2].u > tba->b && ba[2].b < tba->u) {
-      lineart_list_append_pointer_static(&ba[2].lp, mph, tba);
-      lineart_list_append_pointer_static(&tba->rp, mph, &ba[2]);
+      lineart_list_append_pointer_pool(&ba[2].lp, mph, tba);
+      lineart_list_append_pointer_pool(&tba->rp, mph, &ba[2]);
     }
   }
   LISTBASE_FOREACH (LinkData *, lip, &root->rp) {
     tba = lip->data;
     if (ba[0].u > tba->b && ba[0].b < tba->u) {
-      lineart_list_append_pointer_static(&ba[0].rp, mph, tba);
-      lineart_list_append_pointer_static(&tba->lp, mph, &ba[0]);
+      lineart_list_append_pointer_pool(&ba[0].rp, mph, tba);
+      lineart_list_append_pointer_pool(&tba->lp, mph, &ba[0]);
     }
     if (ba[3].u > tba->b && ba[3].b < tba->u) {
-      lineart_list_append_pointer_static(&ba[3].rp, mph, tba);
-      lineart_list_append_pointer_static(&tba->lp, mph, &ba[3]);
+      lineart_list_append_pointer_pool(&ba[3].rp, mph, tba);
+      lineart_list_append_pointer_pool(&tba->lp, mph, &ba[3]);
     }
   }
   LISTBASE_FOREACH (LinkData *, lip, &root->up) {
     tba = lip->data;
     if (ba[0].r > tba->l && ba[0].l < tba->r) {
-      lineart_list_append_pointer_static(&ba[0].up, mph, tba);
-      lineart_list_append_pointer_static(&tba->bp, mph, &ba[0]);
+      lineart_list_append_pointer_pool(&ba[0].up, mph, tba);
+      lineart_list_append_pointer_pool(&tba->bp, mph, &ba[0]);
     }
     if (ba[1].r > tba->l && ba[1].l < tba->r) {
-      lineart_list_append_pointer_static(&ba[1].up, mph, tba);
-      lineart_list_append_pointer_static(&tba->bp, mph, &ba[1]);
+      lineart_list_append_pointer_pool(&ba[1].up, mph, tba);
+      lineart_list_append_pointer_pool(&tba->bp, mph, &ba[1]);
     }
   }
   LISTBASE_FOREACH (LinkData *, lip, &root->bp) {
     tba = lip->data;
     if (ba[2].r > tba->l && ba[2].l < tba->r) {
-      lineart_list_append_pointer_static(&ba[2].bp, mph, tba);
-      lineart_list_append_pointer_static(&tba->up, mph, &ba[2]);
+      lineart_list_append_pointer_pool(&ba[2].bp, mph, tba);
+      lineart_list_append_pointer_pool(&tba->up, mph, &ba[2]);
     }
     if (ba[3].r > tba->l && ba[3].l < tba->r) {
-      lineart_list_append_pointer_static(&ba[3].bp, mph, tba);
-      lineart_list_append_pointer_static(&tba->up, mph, &ba[3]);
+      lineart_list_append_pointer_pool(&ba[3].bp, mph, tba);
+      lineart_list_append_pointer_pool(&tba->up, mph, &ba[3]);
     }
   }
 
@@ -2955,10 +2953,10 @@ static void lineart_bounding_areas_connect_new(LineartRenderBuffer *rb, LineartB
       if (tba == root) {
         lineart_list_remove_pointer_item_no_free(&((LineartBoundingArea *)lip->data)->rp, lip2);
         if (ba[1].u > tba->b && ba[1].b < tba->u) {
-          lineart_list_append_pointer_static(&tba->rp, mph, &ba[1]);
+          lineart_list_append_pointer_pool(&tba->rp, mph, &ba[1]);
         }
         if (ba[2].u > tba->b && ba[2].b < tba->u) {
-          lineart_list_append_pointer_static(&tba->rp, mph, &ba[2]);
+          lineart_list_append_pointer_pool(&tba->rp, mph, &ba[2]);
         }
       }
     }
@@ -2970,10 +2968,10 @@ static void lineart_bounding_areas_connect_new(LineartRenderBuffer *rb, LineartB
       if (tba == root) {
         lineart_list_remove_pointer_item_no_free(&((LineartBoundingArea *)lip->data)->lp, lip2);
         if (ba[0].u > tba->b && ba[0].b < tba->u) {
-          lineart_list_append_pointer_static(&tba->lp, mph, &ba[0]);
+          lineart_list_append_pointer_pool(&tba->lp, mph, &ba[0]);
         }
         if (ba[3].u > tba->b && ba[3].b < tba->u) {
-          lineart_list_append_pointer_static(&tba->lp, mph, &ba[3]);
+          lineart_list_append_pointer_pool(&tba->lp, mph, &ba[3]);
         }
       }
     }
@@ -2985,10 +2983,10 @@ static void lineart_bounding_areas_connect_new(LineartRenderBuffer *rb, LineartB
       if (tba == root) {
         lineart_list_remove_pointer_item_no_free(&((LineartBoundingArea *)lip->data)->bp, lip2);
         if (ba[0].r > tba->l && ba[0].l < tba->r) {
-          lineart_list_append_pointer_static(&tba->up, mph, &ba[0]);
+          lineart_list_append_pointer_pool(&tba->up, mph, &ba[0]);
         }
         if (ba[1].r > tba->l && ba[1].l < tba->r) {
-          lineart_list_append_pointer_static(&tba->up, mph, &ba[1]);
+          lineart_list_append_pointer_pool(&tba->up, mph, &ba[1]);
         }
       }
     }
@@ -3000,10 +2998,10 @@ static void lineart_bounding_areas_connect_new(LineartRenderBuffer *rb, LineartB
       if (tba == root) {
         lineart_list_remove_pointer_item_no_free(&((LineartBoundingArea *)lip->data)->up, lip2);
         if (ba[2].r > tba->l && ba[2].l < tba->r) {
-          lineart_list_append_pointer_static(&tba->bp, mph, &ba[2]);
+          lineart_list_append_pointer_pool(&tba->bp, mph, &ba[2]);
         }
         if (ba[3].r > tba->l && ba[3].l < tba->r) {
-          lineart_list_append_pointer_static(&tba->bp, mph, &ba[3]);
+          lineart_list_append_pointer_pool(&tba->bp, mph, &ba[3]);
         }
       }
     }
@@ -3178,7 +3176,7 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
     return;
   }
   if (root_ba->child == NULL) {
-    lineart_list_append_pointer_static(&root_ba->linked_triangles, &rb->render_data_pool, rt);
+    lineart_list_append_pointer_pool(&root_ba->linked_triangles, &rb->render_data_pool, rt);
     root_ba->triangle_count++;
     /* If splitting doesn't improve triangle separation, then shouldn't allow splitting anymore.
      * Here we use recursive limit. This is espetially useful in ortho render, where a lot of
@@ -3225,7 +3223,7 @@ static void lineart_bounding_area_link_line(LineartRenderBuffer *rb,
                                             LineartRenderLine *rl)
 {
   if (root_ba->child == NULL) {
-    lineart_list_append_pointer_static(&root_ba->linked_lines, &rb->render_data_pool, rl);
+    lineart_list_append_pointer_pool(&root_ba->linked_lines, &rb->render_data_pool, rl);
   }
   else {
     if (lineart_bounding_area_line_crossed(

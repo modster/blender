@@ -546,7 +546,7 @@ static void lineart_bounding_area_link_point_recursive(LineartRenderBuffer *rb,
                                                        LineartRenderLineChainItem *rlci)
 {
   if (root->child == NULL) {
-    LineartChainRegisterEntry *cre = lineart_list_append_pointer_static_sized(
+    LineartChainRegisterEntry *cre = lineart_list_append_pointer_pool_sized(
         &root->linked_chains, &rb->render_data_pool, rlc, sizeof(LineartChainRegisterEntry));
 
     cre->rlci = rlci;
