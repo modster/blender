@@ -55,7 +55,6 @@ static void geo_transform_exec(bNode *UNUSED(node), GValueByName &inputs, GValue
 
   geometry_out = GeometryPtr{new Geometry()};
   Mesh *mesh_out = BKE_mesh_copy_for_eval(mesh_in, false);
-  const float translation_c[3] = {translation.x, translation.y, translation.z};
 
   /* Use only translation if rotation and scale are zero. */
   if (translation.length() > 0.0f && rotation.length() == 0.0f && scale.length() == 0.0f) {
