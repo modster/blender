@@ -57,6 +57,7 @@ bool USD_export(struct bContext *C,
 struct USDImportParams {
   bool import_uvs;
   bool import_normals;
+  bool import_materials;
   float scale;
   bool debug;
 };

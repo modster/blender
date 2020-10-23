@@ -41,6 +41,9 @@ class UsdMeshReader : public UsdObjectReader {
                          double time,
                          int read_flag,
                          const char **err_str) override;
+
+ protected:
+  void assign_materials(Main *bmain, Mesh *mesh, double time);
 };
 
 }  // namespace blender::io::usd
