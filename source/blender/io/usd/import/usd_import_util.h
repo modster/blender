@@ -27,7 +27,7 @@
 namespace blender::io::usd {
 
 struct USDImporterContext;
-class UsdObjectReader;
+class USDObjectReader;
 
 void debug_traverse_stage(const pxr::UsdStageRefPtr &usd_stage);
 
@@ -59,7 +59,7 @@ BLI_INLINE void copy_zup_from_yup(float zup[3], const float yup[3])
 
 void create_readers(const pxr::UsdPrim &root,
                     const USDImporterContext &context,
-                    std::vector<UsdObjectReader *> &r_readers,
-                    std::vector<UsdObjectReader *> &r_child_readers);
+                    std::vector<USDObjectReader *> &r_readers,
+                    std::vector<USDObjectReader *> &r_child_readers);
 
 } /* namespace blender::io::usd */

@@ -330,21 +330,21 @@ static void build_mtl_map(const Main *bmain, std::map<std::string, Material *> &
 
 namespace blender::io::usd {
 
-UsdMeshReader::UsdMeshReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
-    : UsdObjectReader(prim, context), mesh_(prim)
+USDMeshReader::USDMeshReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
+    : USDObjectReader(prim, context), mesh_(prim)
 {
 }
 
-UsdMeshReader::~UsdMeshReader()
+USDMeshReader::~USDMeshReader()
 {
 }
 
-bool UsdMeshReader::valid() const
+bool USDMeshReader::valid() const
 {
   return static_cast<bool>(mesh_);
 }
 
-Mesh *UsdMeshReader::read_mesh(Mesh *existing_mesh,
+Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
                                double time,
                                int read_flag,
                                const char **err_str)
@@ -410,7 +410,7 @@ Mesh *UsdMeshReader::read_mesh(Mesh *existing_mesh,
   return new_mesh;
 }
 
-void UsdMeshReader::readObjectData(Main *bmain, double time)
+void USDMeshReader::readObjectData(Main *bmain, double time)
 {
   if (!this->valid()) {
     return;
@@ -448,7 +448,7 @@ void UsdMeshReader::readObjectData(Main *bmain, double time)
   /* TODO(makowalski):  Add modifier. */
 }
 
-void UsdMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)
+void USDMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)
 {
   if (!bmain || !mesh || !object_ || !mesh_) {
     return;

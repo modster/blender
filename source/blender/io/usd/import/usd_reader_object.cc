@@ -42,7 +42,7 @@
 
 namespace blender::io::usd {
 
-UsdObjectReader::UsdObjectReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
+USDObjectReader::USDObjectReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
     : prim_path_(""),
       prim_parent_name_(""),
       prim_name_(""),
@@ -62,26 +62,26 @@ UsdObjectReader::UsdObjectReader(const pxr::UsdPrim &prim, const USDImporterCont
   prim_parent_name_ = parent ? parent.GetName().GetString() : prim_name_;
 }
 
-UsdObjectReader::~UsdObjectReader()
+USDObjectReader::~USDObjectReader()
 {
 }
 
-const pxr::UsdPrim &UsdObjectReader::prim() const
+const pxr::UsdPrim &USDObjectReader::prim() const
 {
   return prim_;
 }
 
-Object *UsdObjectReader::object() const
+Object *USDObjectReader::object() const
 {
   return object_;
 }
 
-void UsdObjectReader::setObject(Object *ob)
+void USDObjectReader::setObject(Object *ob)
 {
   object_ = ob;
 }
 
-struct Mesh *UsdObjectReader::read_mesh(struct Mesh *existing_mesh,
+struct Mesh *USDObjectReader::read_mesh(struct Mesh *existing_mesh,
                                         double UNUSED(time),
                                         int UNUSED(read_flag),
                                         const char **UNUSED(err_str))
@@ -89,14 +89,14 @@ struct Mesh *UsdObjectReader::read_mesh(struct Mesh *existing_mesh,
   return existing_mesh;
 }
 
-bool UsdObjectReader::topology_changed(Mesh * /*existing_mesh*/, double /*time*/)
+bool USDObjectReader::topology_changed(Mesh * /*existing_mesh*/, double /*time*/)
 {
   /* The default implementation of read_mesh() just returns the original mesh, so never changes the
    * topology. */
   return false;
 }
 
-void UsdObjectReader::setupObjectTransform(const double time)
+void USDObjectReader::setupObjectTransform(const double time)
 {
   if (!this->object_) {
     return;
@@ -114,7 +114,7 @@ void UsdObjectReader::setupObjectTransform(const double time)
   /* TODO(makowalski):  Set up transform constraint if not constant. */
 }
 
-void UsdObjectReader::read_matrix(float r_mat[4][4] /* local matrix */,
+void USDObjectReader::read_matrix(float r_mat[4][4] /* local matrix */,
                                   const double time,
                                   const float scale,
                                   bool &is_constant)
@@ -167,27 +167,27 @@ void UsdObjectReader::read_matrix(float r_mat[4][4] /* local matrix */,
   }
 }
 
-double UsdObjectReader::minTime() const
+double USDObjectReader::minTime() const
 {
   return min_time_;
 }
 
-double UsdObjectReader::maxTime() const
+double USDObjectReader::maxTime() const
 {
   return max_time_;
 }
 
-int UsdObjectReader::refcount() const
+int USDObjectReader::refcount() const
 {
   return refcount_;
 }
 
-void UsdObjectReader::incref()
+void USDObjectReader::incref()
 {
   refcount_++;
 }
 
-void UsdObjectReader::decref()
+void USDObjectReader::decref()
 {
   refcount_--;
   BLI_assert(refcount_ >= 0);

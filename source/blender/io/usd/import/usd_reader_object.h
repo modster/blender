@@ -32,9 +32,9 @@ struct Object;
 
 namespace blender::io::usd {
 
-class UsdObjectReader {
+class USDObjectReader {
  public:
-  typedef std::vector<UsdObjectReader *> ptr_vector;
+  typedef std::vector<USDObjectReader *> ptr_vector;
 
  protected:
   /* The USD prim path. */
@@ -59,14 +59,14 @@ class UsdObjectReader {
    * modifiers and/or constraints. */
   int refcount_;
 
-  UsdObjectReader *parent_;
+  USDObjectReader *parent_;
 
   bool merged_with_parent_;
 
  public:
-  explicit UsdObjectReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
+  explicit USDObjectReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
 
-  virtual ~UsdObjectReader();
+  virtual ~USDObjectReader();
 
   const pxr::UsdPrim &prim() const;
 
@@ -74,12 +74,12 @@ class UsdObjectReader {
 
   void setObject(Object *ob);
 
-  UsdObjectReader *parent() const
+  USDObjectReader *parent() const
   {
     return parent_;
   }
 
-  void set_parent(UsdObjectReader *par)
+  void set_parent(USDObjectReader *par)
   {
     parent_ = par;
   }

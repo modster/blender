@@ -24,12 +24,12 @@
 
 namespace blender::io::usd {
 
-class UsdTransformReader : public UsdObjectReader {
+class USDTransformReader : public USDObjectReader {
 
   pxr::UsdGeomXform xform_;
 
  public:
-  UsdTransformReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
+  USDTransformReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
 
   bool valid() const override;
 

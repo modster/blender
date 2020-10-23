@@ -232,7 +232,7 @@ struct ImportJobData {
   bool is_background_job;
 
   pxr::UsdStageRefPtr stage;
-  UsdObjectReader::ptr_vector readers;
+  USDObjectReader::ptr_vector readers;
 };
 
 static void import_startjob(void *user_data, short *stop, short *do_update, float *progress)
@@ -273,7 +273,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   *data->do_update = true;
   *data->progress = 0.1f;
 
-  std::vector<UsdObjectReader *> child_readers;
+  std::vector<USDObjectReader *> child_readers;
   create_readers(data->stage->GetPseudoRoot(), import_ctx, data->readers, child_readers);
 
   // Create objects
@@ -286,9 +286,9 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 
   double time = CFRA;
 
-  std::vector<UsdObjectReader *>::iterator iter;
+  std::vector<USDObjectReader *>::iterator iter;
   for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-    UsdObjectReader *reader = *iter;
+    USDObjectReader *reader = *iter;
 
     if (reader->valid()) {
       reader->readObjectData(data->bmain, time);
@@ -312,7 +312,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 
   /* Setup parenthood. */
   for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-    const UsdObjectReader *reader = *iter;
+    const USDObjectReader *reader = *iter;
 
     Object *ob = reader->object();
 
@@ -320,7 +320,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
       continue;
     }
 
-    const UsdObjectReader *parent_reader = reader->parent();
+    const USDObjectReader *parent_reader = reader->parent();
 
     ob->parent = parent_reader ? parent_reader->object() : nullptr;
   }
@@ -328,7 +328,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   /* Setup transformations. */
   i = 0;
   for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-    UsdObjectReader *reader = *iter;
+    USDObjectReader *reader = *iter;
     reader->setupObjectTransform(time);
 
     *data->progress = 0.7f + 0.3f * (++i / size);
@@ -345,7 +345,7 @@ static void import_endjob(void *user_data)
 {
   ImportJobData *data = static_cast<ImportJobData *>(user_data);
 
-  std::vector<UsdObjectReader *>::iterator iter;
+  std::vector<USDObjectReader *>::iterator iter;
 
   /* Delete objects on cancellation. */
   if (data->was_cancelled) {
@@ -400,7 +400,7 @@ static void import_endjob(void *user_data)
   }
 
   for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-    UsdObjectReader *reader = *iter;
+    USDObjectReader *reader = *iter;
     reader->decref();
 
     if (reader->refcount() == 0) {

@@ -24,14 +24,14 @@
 
 namespace blender::io::usd {
 
-class UsdMeshReader : public UsdObjectReader {
+class USDMeshReader : public USDObjectReader {
  protected:
   pxr::UsdGeomMesh mesh_;
 
  public:
-  UsdMeshReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
+  USDMeshReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
 
-  virtual ~UsdMeshReader();
+  virtual ~USDMeshReader();
 
   bool valid() const override;
 

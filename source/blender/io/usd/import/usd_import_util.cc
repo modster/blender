@@ -89,15 +89,15 @@ inline void copy_zup_from_yup(float zup[3], const float yup[3])
 
 namespace blender::io::usd {
 
-static UsdObjectReader *get_reader(const pxr::UsdPrim &prim, const USDImporterContext &context)
+static USDObjectReader *get_reader(const pxr::UsdPrim &prim, const USDImporterContext &context)
 {
-  UsdObjectReader *result = nullptr;
+  USDObjectReader *result = nullptr;
 
   if (prim.IsA<pxr::UsdGeomMesh>()) {
-    result = new UsdMeshReader(prim, context);
+    result = new USDMeshReader(prim, context);
   }
   else if (prim.IsA<pxr::UsdGeomXform>()) {
-    result = new UsdTransformReader(prim, context);
+    result = new USDTransformReader(prim, context);
   }
 
   return result;
@@ -232,8 +232,8 @@ void copy_m44_axis_swap(float dst_mat[4][4], float src_mat[4][4], UsdAxisSwapMod
 
 void create_readers(const pxr::UsdPrim &prim,
                     const USDImporterContext &context,
-                    std::vector<UsdObjectReader *> &r_readers,
-                    std::vector<UsdObjectReader *> &r_child_readers)
+                    std::vector<USDObjectReader *> &r_readers,
+                    std::vector<USDObjectReader *> &r_child_readers)
 {
   if (!prim) {
     return;
@@ -241,7 +241,7 @@ void create_readers(const pxr::UsdPrim &prim,
 
   bool is_root = prim.IsPseudoRoot();
 
-  std::vector<UsdObjectReader *> child_readers;
+  std::vector<USDObjectReader *> child_readers;
 
   /* Recursively create readers for the child prims. */
   pxr::UsdPrimSiblingRange child_prims = prim.GetFilteredChildren(
@@ -279,10 +279,10 @@ void create_readers(const pxr::UsdPrim &prim,
     return;
   }
 
-  UsdObjectReader *reader = get_reader(prim, context);
+  USDObjectReader *reader = get_reader(prim, context);
 
   if (reader) {
-    for (UsdObjectReader *child_reader : child_readers) {
+    for (USDObjectReader *child_reader : child_readers) {
       child_reader->set_parent(reader);
     }
     r_child_readers.push_back(reader);
