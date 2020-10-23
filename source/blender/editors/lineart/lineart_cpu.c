@@ -4030,7 +4030,7 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *depsgraph,
       Object *eval_ob = DEG_get_evaluated_object(depsgraph, rlc->object_ref);
       int gpdg = -1;
       if ((match_output || (gpdg = BKE_object_defgroup_name_index(gpencil_object, vgname)) >= 0)) {
-        if (eval_ob->type == OB_MESH) {
+        if (eval_ob && eval_ob->type == OB_MESH) {
           int dindex = 0;
           Mesh *me = (Mesh *)eval_ob->data;
           if (me->dvert) {
