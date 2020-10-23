@@ -50,6 +50,10 @@ typedef struct LineartStaticMemPool {
   SpinLock lock_mem;
 } LineartStaticMemPool;
 
+typedef struct LineartRenderTriangleAdjacent {
+  struct LineartRenderLine *rl[3];
+} LineartRenderTriangleAdjacent;
+
 typedef struct LineartRenderTriangle {
   struct LineartRenderVert *v[3];
   // struct LineartRenderLine *rl[3];
@@ -213,6 +217,9 @@ typedef struct LineartRenderBuffer {
   ListBase vertex_buffer_pointers;
   ListBase line_buffer_pointers;
   ListBase triangle_buffer_pointers;
+
+  /* This one's memory is not from main pool and is free()ed after culling stage. */
+  ListBase triangle_adjacent_pointers;
 
   ListBase intersecting_vertex_buffer;
   /** Use the one comes with Line Art. */
