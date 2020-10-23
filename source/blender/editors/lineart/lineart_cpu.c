@@ -754,6 +754,17 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
     old_rl->tr = ((old_rl->tr == rt) ? (newrt) : (old_rl->tr)); \
   }
 
+#define REMOVE_TRIANGLE_RL \
+  if (rta->rl[0]) { \
+    rta->rl[0]->flags = LRT_EDGE_FLAG_CHAIN_PICKED; \
+  } \
+  if (rta->rl[1]) { \
+    rta->rl[1]->flags = LRT_EDGE_FLAG_CHAIN_PICKED; \
+  } \
+  if (rta->rl[2]) { \
+    rta->rl[2]->flags = LRT_EDGE_FLAG_CHAIN_PICKED; \
+  }
+
   switch (in0 + in1 + in2) {
     case 0: /* ignore this triangle. */
       return;
@@ -762,7 +773,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
        * also remove render lines form being computed.
        */
       lineart_triangle_set_cull_flag(rt, LRT_CULL_DISCARD);
-
+      REMOVE_TRIANGLE_RL
       return;
     case 2:
       /** Two points behind near plane, cut those and
