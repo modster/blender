@@ -497,13 +497,19 @@ void UsdMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)
       return;
     }
 
-    std::string mtl_name = bound_mtl.GetPrim().GetName().GetString();
+    /* We have a material bound to the mesh prim. */
+
+    /* Add a material slot to the object .*/
 
     if (!BKE_object_material_slot_add(bmain, object_)) {
       std::cerr << "WARNING:  Couldn't add material slot for mesh prim " << this->prim_path_
                 << std::endl;
       return;
     }
+
+    /* Check if a material with the same name already exists. */
+
+    std::string mtl_name = bound_mtl.GetPrim().GetName().GetString();
 
     Material *mtl = static_cast<Material *>(bmain->materials.first);
     Material *blen_mtl = nullptr;
@@ -517,6 +523,7 @@ void UsdMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)
     }
 
     if (!blen_mtl) {
+      /* No existing material, so add it now. */
       blen_mtl = BKE_material_add(bmain, mtl_name.c_str());
     }
 
@@ -525,6 +532,7 @@ void UsdMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)
                 << this->prim_path_ << std::endl;
     }
 
+    /* Set the material IDs on the polys. */
     for (int p = 0; p < mesh->totpoly; ++p) {
       mesh->mpoly[p].mat_nr = 0;
     }
@@ -554,8 +562,9 @@ void UsdMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)
     std::map<std::string, Material *> blen_mtl_map;
     build_mtl_map(bmain, blen_mtl_map);
 
-    std::map<std::string, Material *>::iterator blen_mtl_iter = blen_mtl_map.begin();
-
+    /* Iterate over the USD materials and add corresponding
+     * Blender materials of the same name, if they don't
+     * already exist. */
     usd_mtl_iter = usd_mtl_map.begin();
     int idx = 0;
 
@@ -564,7 +573,8 @@ void UsdMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)
 
       std::string mtl_name = usd_mtl_iter->first.c_str();
 
-      blen_mtl_iter = blen_mtl_map.find(mtl_name);
+      std::map<std::string, Material *>::const_iterator blen_mtl_iter = blen_mtl_map.find(
+          mtl_name);
 
       if (blen_mtl_iter != blen_mtl_map.end()) {
         blen_mtl = blen_mtl_iter->second;
@@ -584,6 +594,8 @@ void UsdMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)
       }
 
       BKE_object_material_assign(bmain, object_, blen_mtl, idx + 1, BKE_MAT_ASSIGN_OBDATA);
+
+      /* Record this material's index. */
       mtl_index_map.insert(std::make_pair(usd_mtl_iter->first, idx));
     }
 
@@ -591,6 +603,7 @@ void UsdMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)
 
     for (const std::pair<pxr::UsdGeomSubset, std::string> &sub_mtl : subset_mtls) {
 
+      /* Find the index of the current material. */
       std::map<std::string, int>::const_iterator mtl_index_iter = mtl_index_map.find(
           sub_mtl.second);
 
@@ -600,11 +613,12 @@ void UsdMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)
       }
 
       int mtl_idx = mtl_index_iter->second;
-      const pxr::UsdGeomSubset &sub = sub_mtl.first;
 
+      /* Query the subset membership. */
       pxr::VtIntArray indices;
-      sub.GetIndicesAttr().Get(&indices, time);
+      sub_mtl.first.GetIndicesAttr().Get(&indices, time);
 
+      /* Assign the poly material indices. */
       for (int face_idx : indices) {
         if (mtl_idx > mesh->totpoly) {
           std::cerr << "WARNING:  Out of bounds material index." << std::endl;
