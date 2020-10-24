@@ -3745,6 +3745,7 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
   }
 
   LRT_CANCEL_STAGE
+  LRT_PROGRESS(10, "LRT: Culling.");
 
   lineart_main_bounding_area_make_initial(rb);
 
@@ -3754,9 +3755,6 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
   lineart_main_free_adjacent_data(rb);
 
   lineart_main_perspective_division(rb);
-
-  LRT_CANCEL_STAGE
-  LRT_PROGRESS(10, "LRT: Contour lines.");
 
   LRT_CANCEL_STAGE
   LRT_PROGRESS(25, "LRT: Intersections.");
