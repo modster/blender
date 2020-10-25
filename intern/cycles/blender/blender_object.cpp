@@ -463,6 +463,11 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
     /* Load per-object culling data. */
     culling.init_object(scene, b_ob);
 
+    /* Ensure the object geom supporting the hair is processed before adding
+     * the hair processing task to the task pool, calling .to_mesh() on the
+     * same object in parallel does not work. */
+    const bool sync_hair = b_instance.show_particles() && object_has_particle_hair(b_ob);
+
     /* Object itself. */
     if (b_instance.show_self()) {
       BL::MeshSequenceCacheModifier b_mesh_cache = object_alembic_cache_find(b_ob);
@@ -470,21 +475,21 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
       if (b_mesh_cache) {
         sync_procedural(b_ob, b_mesh_cache, b_depsgraph.scene().frame_current(), motion_time);
       }
-	  else {
-		  sync_object(b_depsgraph,
-					  b_view_layer,
-					  b_instance,
-					  motion_time,
-					  false,
-					  show_lights,
-					  culling,
-					  &use_portal,
-					  &geom_task_pool);
-	  }
+      else {
+        sync_object(b_depsgraph,
+                    b_view_layer,
+                    b_instance,
+                    motion_time,
+                    false,
+                    show_lights,
+                    culling,
+                    &use_portal,
+                    sync_hair ? NULL : &geom_task_pool);
+      }
     }
 
     /* Particle hair as separate object. */
-    if (b_instance.show_particles() && object_has_particle_hair(b_ob)) {
+    if (sync_hair) {
       sync_object(b_depsgraph,
                   b_view_layer,
                   b_instance,
