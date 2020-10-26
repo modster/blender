@@ -184,6 +184,7 @@ static const EnumPropertyItem rna_enum_userdef_viewport_aa_items[] = {
 #  include "BKE_mesh_runtime.h"
 #  include "BKE_paint.h"
 #  include "BKE_pbvh.h"
+#  include "BKE_preferences.h"
 #  include "BKE_screen.h"
 
 #  include "DEG_depsgraph.h"
@@ -332,6 +333,12 @@ static void rna_userdef_language_update(Main *UNUSED(bmain),
   }
 
   USERDEF_TAG_DIRTY;
+}
+
+static void rna_userdef_asset_repository_name_set(PointerRNA *ptr, const char *value)
+{
+  bUserAssetRepository *repository = (bUserAssetRepository *)ptr->data;
+  BKE_preferences_asset_repository_name_set(&U, repository, value);
 }
 
 static void rna_userdef_script_autoexec_update(Main *UNUSED(bmain),
@@ -5968,10 +5975,10 @@ static void rna_def_userdef_filepaths_asset_repository(BlenderRNA *brna)
                          "Asset Repository",
                          "Settings to define a reusable repository for Asset Browsers to use");
 
-  /* TODO ensure unique name, they are used as identifiers. */
   prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
   RNA_def_property_ui_text(
       prop, "Name", "Identifier (not necessarily unique) for the asset repository");
+  RNA_def_property_string_funcs(prop, NULL, NULL, "rna_userdef_asset_repository_name_set");
   RNA_def_struct_name_property(srna, prop);
   RNA_def_property_update(prop, 0, "rna_userdef_update");
 

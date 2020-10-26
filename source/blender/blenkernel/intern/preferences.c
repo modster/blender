@@ -27,6 +27,8 @@
 #include "BLI_listbase.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
+#include "BLI_string_utf8.h"
+#include "BLI_string_utils.h"
 
 #include "BKE_appdir.h"
 #include "BKE_preferences.h"
@@ -50,13 +52,26 @@ bUserAssetRepository *BKE_preferences_asset_repository_add(UserDef *userdef,
   BLI_addtail(&userdef->asset_repositories, repository);
 
   if (name) {
-    BLI_strncpy(repository->name, IFACE_("Default"), sizeof(repository->name));
+    BKE_preferences_asset_repository_name_set(userdef, repository, name);
   }
   if (path) {
     BLI_strncpy(repository->path, path, sizeof(repository->path));
   }
 
   return repository;
+}
+
+void BKE_preferences_asset_repository_name_set(UserDef *userdef,
+                                               bUserAssetRepository *repository,
+                                               const char *name)
+{
+  BLI_strncpy_utf8(repository->name, name, sizeof(repository->name));
+  BLI_uniquename(&userdef->asset_repositories,
+                 repository,
+                 name,
+                 '.',
+                 offsetof(bUserAssetRepository, name),
+                 sizeof(repository->name));
 }
 
 /**

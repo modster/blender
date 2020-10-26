@@ -35,6 +35,10 @@ struct bUserAssetRepository *BKE_preferences_asset_repository_add(struct UserDef
                                                                   const char *name,
                                                                   const char *path)
     ATTR_NONNULL(1);
+void BKE_preferences_asset_repository_name_set(struct UserDef *userdef,
+                                               struct bUserAssetRepository *repository,
+                                               const char *name) ATTR_NONNULL();
+
 void BKE_preferences_asset_repository_remove(struct UserDef *userdef,
                                              struct bUserAssetRepository *repository)
     ATTR_NONNULL();
