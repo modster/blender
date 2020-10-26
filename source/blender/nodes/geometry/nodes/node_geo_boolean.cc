@@ -16,13 +16,15 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_alloca.h"
+#include "BLI_math_matrix.h"
+
 #include "DNA_mesh_types.h"
 #include "DNA_modifier_types.h"
 
-#include "BKE_mesh.h"
+#include "RNA_enum_types.h"
 
-#include "BLI_alloca.h"
-#include "BLI_math_matrix.h"
+#include "BKE_mesh.h"
 
 #include "bmesh.h"
 #include "tools/bmesh_boolean.h"
@@ -45,7 +47,7 @@ static int bm_face_isect_pair(BMFace *f, void *UNUSED(user_data))
   return BM_elem_flag_test(f, BM_ELEM_DRAW) ? 1 : 0;
 }
 
-static Mesh *BM_mesh_boolean_calc(Mesh *mesh_a, Mesh *mesh_b, int boolean_mode)
+static Mesh *mesh_boolean_calc(Mesh *mesh_a, Mesh *mesh_b, int boolean_mode)
 {
   const BMAllocTemplate allocsize = BMALLOC_TEMPLATE_FROM_ME(mesh_a, mesh_b);
 
@@ -58,40 +60,31 @@ static Mesh *BM_mesh_boolean_calc(Mesh *mesh_a, Mesh *mesh_b, int boolean_mode)
   {
     struct BMeshFromMeshParams bmesh_from_mesh_params = {.calc_face_normal = true};
     BM_mesh_bm_from_me(bm, mesh_a, &bmesh_from_mesh_params);
-
     BM_mesh_bm_from_me(bm, mesh_b, &bmesh_from_mesh_params);
   }
 
   const int looptris_tot = poly_to_tri_count(bm->totface, bm->totloop);
   int tottri;
-  BMLoop *(*looptris)[3];
-  looptris = (BMLoop * (*)[3])(MEM_malloc_arrayN(looptris_tot, sizeof(*looptris), __func__));
+  BMLoop *(*looptris)[3] = (BMLoop *
+                            (*)[3])(MEM_malloc_arrayN(looptris_tot, sizeof(*looptris), __func__));
   BM_mesh_calc_tessellation_beauty(bm, looptris, &tottri);
 
-  BMIter iter;
-  int i;
   const int i_faces_end = mesh_a->totpoly;
 
   /* We need face normals because of 'BM_face_split_edgenet'
    * we could calculate on the fly too (before calling split). */
 
-  const short ob_src_totcol = mesh_a->totcol;
-  short *material_remap = BLI_array_alloca(material_remap, ob_src_totcol ? ob_src_totcol : 1);
-
+  int i = 0;
+  BMIter iter;
   BMFace *bm_face;
-  i = 0;
   BM_ITER_MESH (bm_face, &iter, bm, BM_FACES_OF_MESH) {
     normalize_v3(bm_face->no);
 
     /* Temp tag to test which side split faces are from. */
     BM_elem_flag_enable(bm_face, BM_ELEM_DRAW);
 
-    /* Remap material. */
-    if (bm_face->mat_nr < ob_src_totcol) {
-      bm_face->mat_nr = material_remap[bm_face->mat_nr];
-    }
-
-    if (++i == i_faces_end) {
+    i++;
+    if (i == i_faces_end) {
       break;
     }
   }
@@ -101,17 +94,13 @@ static Mesh *BM_mesh_boolean_calc(Mesh *mesh_a, Mesh *mesh_b, int boolean_mode)
   Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh_a);
   BM_mesh_free(bm);
   result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+  MEM_freeN(looptris);
 
   return result;
 }
 
-// Mesh *mesh_boolean_calc(Mesh *mesh_a, Mesh *UNUSED(mesh_b), int UNUSED(boolean_mode))
-// {
-//   return mesh_a;
-// }
-
 namespace blender::nodes {
-static void geo_boolean_exec(bNode *UNUSED(node), GValueByName &inputs, GValueByName &outputs)
+static void geo_boolean_exec(bNode *node, GValueByName &inputs, GValueByName &outputs)
 {
   GeometryPtr geometry_in_a = inputs.extract<GeometryPtr>("Geometry A");
   GeometryPtr geometry_in_b = inputs.extract<GeometryPtr>("Geometry B");
@@ -129,9 +118,16 @@ static void geo_boolean_exec(bNode *UNUSED(node), GValueByName &inputs, GValueBy
     return;
   }
 
+  GeometryNodeBooleanOperation operation = (GeometryNodeBooleanOperation)node->custom1;
+  if (operation < 0 || operation > 2) {
+    BLI_assert(false);
+    outputs.move_in("Geometry", std::move(geometry_out));
+    return;
+  }
+
   geometry_out = GeometryPtr{new Geometry()};
 
-  Mesh *mesh_out = BM_mesh_boolean_calc(mesh_in_a, mesh_in_b, eBooleanModifierOp_Difference);
+  Mesh *mesh_out = mesh_boolean_calc(mesh_in_a, mesh_in_b, operation);
 
   geometry_out->mesh_set_and_transfer_ownership(mesh_out);
 
