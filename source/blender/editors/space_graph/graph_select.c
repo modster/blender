@@ -501,6 +501,24 @@ void GRAPH_OT_select_all(wmOperatorType *ot)
  * The selection backend is also reused for the Lasso and Circle select operators.
  */
 
+static short fcurve_activate_keyframe(KeyframeEditData *ked, struct BezTriple *bezt)
+{
+  BKE_fcurve_active_keyframe_set(ked->fcu, bezt);
+  return 0;
+}
+
+/* Mark the last-selected keyframe as "active".
+ * Does nothing when the FCurve already has an active keyframe. */
+static void fcurve_activate_last_selected_key(KeyframeEditData *ked,
+                                              FCurve *fcu,
+                                              const KeyframeEditFunc ok_cb)
+{
+  if (BKE_fcurve_active_keyframe_index(fcu) != FCURVE_ACTIVE_KEYFRAME_NONE) {
+    return;
+  }
+  ANIM_fcurve_keyframes_loop(ked, fcu, ok_cb, fcurve_activate_keyframe, NULL);
+}
+
 /* Box Select only selects keyframes now, as overshooting handles often get caught too,
  * which means that they may be inadvertently moved as well. However, incl_handles overrides
  * this, and allow handles to be considered independently too.
@@ -611,6 +629,10 @@ static void box_select_graphkeys(bAnimContext *ac,
         if (selectmode == SELECT_ADD) {
           fcu->flag |= FCURVE_SELECTED;
         }
+      }
+
+      if (ELEM(selectmode, SELECT_ADD, SELECT_REPLACE)) {
+        fcurve_activate_last_selected_key(&ked, fcu, ok_cb);
       }
     }
 
