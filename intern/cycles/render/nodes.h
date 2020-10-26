@@ -505,7 +505,7 @@ class ConvertNode : public ShaderNode {
 
   void constant_fold(const ConstantFolder &folder);
 
-private:
+ private:
   SocketType::Type from, to;
 
   union {

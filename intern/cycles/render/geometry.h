@@ -137,12 +137,12 @@ class Geometry : public Node {
   bool has_motion_blur() const;
   bool has_voxel_attributes() const;
 
-  inline bool is_mesh() const
+  bool is_mesh() const
   {
     return geometry_type == MESH;
   }
 
-  inline bool is_hair() const
+  bool is_hair() const
   {
     return geometry_type == HAIR;
   }

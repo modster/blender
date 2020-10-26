@@ -206,8 +206,8 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
         object->set_motion(motion);
       }
 
-	  /* mesh deformation */
-	  if (object->get_geometry())
+      /* mesh deformation */
+      if (object->get_geometry())
         sync_geometry_motion(b_depsgraph,
                              b_ob_instance,
                              object,
@@ -230,11 +230,11 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
    * b_ob_instance is the original object and will remain valid for deferred geometry
    * sync. */
   Geometry *geometry = sync_geometry(b_depsgraph,
-                                   b_ob_instance,
-                                   b_ob_instance,
-                                   object_updated,
-                                   use_particle_hair,
-                                   object_geom_task_pool);
+                                     b_ob_instance,
+                                     b_ob_instance,
+                                     object_updated,
+                                     use_particle_hair,
+                                     object_geom_task_pool);
   object->set_geometry(geometry);
 
   /* special case not tracked by object update flags */
