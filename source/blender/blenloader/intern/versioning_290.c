@@ -705,14 +705,12 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
 
     /* Solver and Collections for Boolean. */
-    if (!DNA_struct_elem_find(fd->filesdna, "BooleanModifierData", "char", "solver")) {
-      for (Object *object = bmain->objects.first; object != NULL; object = object->id.next) {
-        LISTBASE_FOREACH (ModifierData *, md, &object->modifiers) {
-          if (md->type == eModifierType_Boolean) {
-            BooleanModifierData *bmd = (BooleanModifierData *)md;
-            bmd->solver = eBooleanModifierSolver_Fast;
-            bmd->flag = eBooleanModifierFlag_Object;
-          }
+    for (Object *object = bmain->objects.first; object != NULL; object = object->id.next) {
+      LISTBASE_FOREACH (ModifierData *, md, &object->modifiers) {
+        if (md->type == eModifierType_Boolean) {
+          BooleanModifierData *bmd = (BooleanModifierData *)md;
+          bmd->solver = eBooleanModifierSolver_Fast;
+          bmd->flag = eBooleanModifierFlag_Object;
         }
       }
     }
@@ -885,18 +883,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
-  /**
-   * Versioning code until next subversion bump goes here.
-   *
-   * \note Be sure to check when bumping the version:
-   * - "versioning_userdef.c", #blo_do_versions_userdef
-   * - "versioning_userdef.c", #do_versions_theme
-   *
-   * \note Keep this message at the bottom of the function.
-   */
-  {
-    /* Keep this block, even when empty. */
-
+  if (!MAIN_VERSION_ATLEAST(bmain, 291, 9)) {
     /* Remove options of legacy UV/Image editor */
     for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
       LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
@@ -924,5 +911,18 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
         }
       }
     }
+  }
+
+  /**
+   * Versioning code until next subversion bump goes here.
+   *
+   * \note Be sure to check when bumping the version:
+   * - "versioning_userdef.c", #blo_do_versions_userdef
+   * - "versioning_userdef.c", #do_versions_theme
+   *
+   * \note Keep this message at the bottom of the function.
+   */
+  {
+    /* Keep this block, even when empty. */
   }
 }

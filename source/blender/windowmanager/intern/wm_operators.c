@@ -3691,7 +3691,7 @@ static void gesture_circle_modal_keymap(wmKeyConfig *keyconf)
       {GESTURE_MODAL_CIRCLE_SIZE, "SIZE", 0, "Size", ""},
 
       {GESTURE_MODAL_SELECT, "SELECT", 0, "Select", ""},
-      {GESTURE_MODAL_DESELECT, "DESELECT", 0, "DeSelect", ""},
+      {GESTURE_MODAL_DESELECT, "DESELECT", 0, "Deselect", ""},
       {GESTURE_MODAL_NOP, "NOP", 0, "No Operation", ""},
 
       {0, NULL, 0, NULL, NULL},
@@ -3727,6 +3727,7 @@ static void gesture_straightline_modal_keymap(wmKeyConfig *keyconf)
       {GESTURE_MODAL_BEGIN, "BEGIN", 0, "Begin", ""},
       {GESTURE_MODAL_MOVE, "MOVE", 0, "Move", ""},
       {GESTURE_MODAL_SNAP, "SNAP", 0, "Snap", ""},
+      {GESTURE_MODAL_FLIP, "FLIP", 0, "Flip", ""},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -3753,7 +3754,7 @@ static void gesture_box_modal_keymap(wmKeyConfig *keyconf)
   static const EnumPropertyItem modal_items[] = {
       {GESTURE_MODAL_CANCEL, "CANCEL", 0, "Cancel", ""},
       {GESTURE_MODAL_SELECT, "SELECT", 0, "Select", ""},
-      {GESTURE_MODAL_DESELECT, "DESELECT", 0, "DeSelect", ""},
+      {GESTURE_MODAL_DESELECT, "DESELECT", 0, "Deselect", ""},
       {GESTURE_MODAL_BEGIN, "BEGIN", 0, "Begin", ""},
       {GESTURE_MODAL_MOVE, "MOVE", 0, "Move", ""},
       {0, NULL, 0, NULL, NULL},
