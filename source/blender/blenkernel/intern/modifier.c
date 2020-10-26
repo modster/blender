@@ -389,7 +389,7 @@ bool BKE_modifier_is_non_geometrical(ModifierData *md)
   return (mti->type == eModifierTypeType_NonGeometrical);
 }
 
-void BKE_modifier_set_error(ModifierData *md, const char *_format, ...)
+void BKE_modifier_set_error(const Object *ob, ModifierData *md, const char *_format, ...)
 {
   char buffer[512];
   va_list ap;
@@ -406,7 +406,16 @@ void BKE_modifier_set_error(ModifierData *md, const char *_format, ...)
 
   md->error = BLI_strdup(buffer);
 
-  CLOG_STR_ERROR(&LOG, md->error);
+#ifndef NDEBUG
+  if ((md->mode & eModifierMode_Virtual) == 0) {
+    /* Ensure correct object is passed in. */
+    const Object *ob_orig = (Object *)DEG_get_original_id((ID *)&ob->id);
+    const ModifierData *md_orig = md->orig_modifier_data ? md->orig_modifier_data : md;
+    BLI_assert(BLI_findindex(&ob_orig->modifiers, md_orig) != -1);
+  }
+#endif
+
+  CLOG_ERROR(&LOG, "Object: \"%s\", Modifier: \"%s\", %s", ob->id.name + 2, md->name, md->error);
 }
 
 /* used for buttons, to find out if the 'draw deformed in editmode' option is
@@ -926,7 +935,7 @@ const char *BKE_modifier_path_relbase(Main *bmain, Object *ob)
     return ID_BLEND_PATH(bmain, &ob->id);
   }
 
-  /* last resort, better then using "" which resolves to the current
+  /* last resort, better than using "" which resolves to the current
    * working directory */
   return BKE_tempdir_session();
 }
@@ -937,7 +946,7 @@ const char *BKE_modifier_path_relbase_from_global(Object *ob)
     return ID_BLEND_PATH_FROM_GLOBAL(&ob->id);
   }
 
-  /* last resort, better then using "" which resolves to the current
+  /* last resort, better than using "" which resolves to the current
    * working directory */
   return BKE_tempdir_session();
 }
