@@ -142,6 +142,7 @@ typedef struct wmXrAction {
 
   /** Operator to be called on XR events. */
   struct wmOperatorType *ot;
+  IDProperty *op_properties;
   char op_flag; /* wmXrOpFlag */
 } wmXrAction;
 

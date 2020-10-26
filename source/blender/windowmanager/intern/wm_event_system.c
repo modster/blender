@@ -3229,14 +3229,16 @@ static void wm_event_do_surface_handlers(bContext *C, wmSurface *surface)
 
         LISTBASE_FOREACH (wmEvent *, event, events) {
           wmXrActionData *action_data = event->customdata;
+          PointerRNA properties = { .type = action_data->ot->srna, .data = action_data->op_properties };
+
           if (action_data->ot->invoke) {
             /* Invoke operator, either executing operator or transferring responsibility to window
              * modal handlers. */
-            wm_operator_invoke(C, action_data->ot, event, NULL, NULL, false, false);
+            wm_operator_invoke(C, action_data->ot, event, action_data->op_properties ? &properties : NULL, NULL, false, false);
           }
           else {
             /* Execute operator. */
-            wmOperator *op = wm_operator_create(wm, action_data->ot, NULL, NULL);
+            wmOperator *op = wm_operator_create(wm, action_data->ot, action_data->op_properties ? &properties : NULL, NULL);
             if ((WM_operator_call(C, op) & OPERATOR_HANDLED) == 0) {
               WM_operator_free(op);
             }
@@ -4903,6 +4905,7 @@ void wm_event_add_xrevent(const wmXrAction *action,
   }
 
   data->ot = action->ot;
+  data->op_properties = action->op_properties;
 
   event->custom = EVT_DATA_XR;
   event->customdata = data;

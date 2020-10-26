@@ -712,11 +712,12 @@ typedef struct GHOST_XrActionInfo {
   /** Previous states, stored to determine XR events. */
   void *states_prev;
 
-  /** Input threshold for float actions. */
+  /** Input threshold for float actions (only used by wm). */
   float threshold;
 
-  /** wmOperatorType and wmXrOpFlag, only used by wm. */
+  /** Operator to be called on XR events (only used by wm). */
   void *ot;
+  void *op_properties;
   char op_flag;
 } GHOST_XrActionInfo;
 

@@ -109,6 +109,7 @@
 #pragma once
 
 struct ID;
+struct IDProperty;
 struct ImBuf;
 struct bContext;
 struct wmEvent;
@@ -660,6 +661,7 @@ typedef struct wmXrActionData {
 
   /** Operator. */
   struct wmOperatorType *ot;
+  struct IDProperty *op_properties;
 } wmXrActionData;
 
 /** Timer flags. */

@@ -970,7 +970,7 @@ static wmSurface *wm_xr_session_surface_create(void)
   surface->gpu_ctx = DRW_xr_gpu_context_get();
   surface->is_xr = true;
 
-  data->art->regionid = RGN_TYPE_XR_DISPLAY;
+  data->art->regionid = RGN_TYPE_XR;
   surface->customdata = data;
 
   g_xr_surface = surface;

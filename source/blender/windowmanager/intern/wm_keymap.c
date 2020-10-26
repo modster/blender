@@ -176,6 +176,7 @@ static bool wm_keymap_item_equals(wmKeyMapItem *a, wmKeyMapItem *b)
   return (wm_keymap_item_equals_result(a, b) && a->type == b->type && a->val == b->val &&
           a->shift == b->shift && a->ctrl == b->ctrl && a->alt == b->alt && a->oskey == b->oskey &&
           a->keymodifier == b->keymodifier && a->maptype == b->maptype &&
+          STREQ(a->xr_action_set, b->xr_action_set) && STREQ(a->xr_action, b->xr_action) &&
           ((ISKEYBOARD(a->type) == 0) ||
            (a->flag & KMI_REPEAT_IGNORE) == (b->flag & KMI_REPEAT_IGNORE)));
 }
@@ -214,6 +215,9 @@ int WM_keymap_item_map_type_get(const wmKeyMapItem *kmi)
   }
   if (kmi->type == KM_TEXTINPUT) {
     return KMI_TYPE_TEXTINPUT;
+  }
+  if (ISXR(kmi->type)) {
+    return KMI_TYPE_XR;
   }
   if (ELEM(kmi->type, TABLET_STYLUS, TABLET_ERASER)) {
     return KMI_TYPE_MOUSE;
@@ -1734,6 +1738,14 @@ bool WM_keymap_item_compare(wmKeyMapItem *k1, wmKeyMapItem *k2)
     return 0;
   }
 
+  if (!STREQ(k1->xr_action_set, k2->xr_action_set)) {
+    return 0;
+  }
+
+  if (!STREQ(k1->xr_action, k2->xr_action)) {
+    return 0;
+  }
+
   return 1;
 }
 
@@ -2034,6 +2046,19 @@ wmKeyMapItem *WM_keymap_item_find_id(wmKeyMap *keymap, int id)
 
   for (kmi = keymap->items.first; kmi; kmi = kmi->next) {
     if (kmi->id == id) {
+      return kmi;
+    }
+  }
+
+  return NULL;
+}
+
+wmKeyMapItem *WM_keymap_item_find_xr(wmKeyMap *keymap, const char *action_set, const char *action)
+{
+  wmKeyMapItem *kmi;
+
+  for (kmi = keymap->items.first; kmi; kmi = kmi->next) {
+    if ((kmi->type == EVT_XR_ACTION) && STREQ(kmi->xr_action_set, action_set) && STREQ(kmi->xr_action, action)) {
       return kmi;
     }
   }

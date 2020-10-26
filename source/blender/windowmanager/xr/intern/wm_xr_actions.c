@@ -119,6 +119,7 @@ static wmXrAction *action_create(const GHOST_XrActionInfo *info)
   CLAMP(action->threshold, 0.0f, 1.0f);
 
   action->ot = info->ot;
+  action->op_properties = info->op_properties;
   action->op_flag = info->op_flag;
 
   return action;

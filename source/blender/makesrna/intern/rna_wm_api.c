@@ -221,6 +221,8 @@ static wmKeyMapItem *rna_KeyMap_item_new(wmKeyMap *km,
                                          bool alt,
                                          bool oskey,
                                          int keymodifier,
+                                         const char *xr_action_set,
+                                         const char *xr_action,
                                          bool repeat,
                                          bool head)
 {
@@ -256,6 +258,13 @@ static wmKeyMapItem *rna_KeyMap_item_new(wmKeyMap *km,
 
   /* create keymap item */
   kmi = WM_keymap_add_item(km, idname_bl, type, value, modifier, keymodifier);
+
+  if (xr_action_set) {
+    strcpy(kmi->xr_action_set, xr_action_set);
+  }
+  if (xr_action) {
+    strcpy(kmi->xr_action, xr_action);
+  }
 
   if (!repeat) {
     kmi->flag |= KMI_REPEAT_IGNORE;
@@ -1134,6 +1143,8 @@ void RNA_api_keymapitems(StructRNA *srna)
   RNA_def_boolean(func, "alt", 0, "Alt", "");
   RNA_def_boolean(func, "oskey", 0, "OS Key", "");
   RNA_def_enum(func, "key_modifier", rna_enum_event_type_items, 0, "Key Modifier", "");
+  RNA_def_string(func, "xr_action_set", NULL, 0, "XR Action Set", "");
+  RNA_def_string(func, "xr_action", NULL, 0, "XR Action", "");
   RNA_def_boolean(func, "repeat", true, "Repeat", "When set, accept key-repeat events");
   RNA_def_boolean(func,
                   "head",
@@ -1180,6 +1191,16 @@ void RNA_api_keymapitems(StructRNA *srna)
   parm = RNA_def_property(func, "id", PROP_INT, PROP_NONE);
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   RNA_def_property_ui_text(parm, "id", "ID of the item");
+  parm = RNA_def_pointer(func, "item", "KeyMapItem", "Item", "");
+  RNA_def_function_return(func, parm);
+
+  func = RNA_def_function(srna, "from_xr", "WM_keymap_item_find_xr");
+  parm = RNA_def_property(func, "xr_action_set", PROP_STRING, PROP_NONE);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  RNA_def_property_ui_text(parm, "xr_action_set", "XR action set name");
+  parm = RNA_def_property(func, "xr_action", PROP_STRING, PROP_NONE);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  RNA_def_property_ui_text(parm, "xr_action", "XR action name");
   parm = RNA_def_pointer(func, "item", "KeyMapItem", "Item", "");
   RNA_def_function_return(func, parm);
 

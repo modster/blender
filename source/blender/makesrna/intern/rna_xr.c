@@ -20,6 +20,7 @@
 
 #include "BLI_math.h"
 
+#include "DNA_space_types.h"
 #include "DNA_view3d_types.h"
 #include "DNA_windowmanager_types.h"
 #include "DNA_xr_types.h"
@@ -66,7 +67,6 @@ static bool rna_XrSessionState_action_set_create(bContext *C, const char *name)
   wmWindowManager *wm = CTX_wm_manager(C);
   GHOST_XrActionSetInfo info = {
       .name = name,
-      .priority = 0,
   };
 
   return WM_xr_action_set_create(&wm->xr, &info);
@@ -91,17 +91,26 @@ static bool rna_XrSessionState_action_create(bContext *C,
   GHOST_XrActionInfo info = {
       .name = name,
       .type = type,
-      .count_subaction_paths = 0,
       .threshold = threshold,
-      .ot = NULL,
-      .op_flag = 0,
   };
 
   if (op[0] && (type == GHOST_kXrActionTypeFloatInput)) {
     char idname[OP_MAX_TYPENAME];
     WM_operator_bl_idname(idname, op);
-    info.ot = WM_operatortype_find(idname, true);
-    info.op_flag = op_flag;
+    wmOperatorType *ot = WM_operatortype_find(idname, true);
+    if (ot) {
+      info.ot = ot;
+      /* Get properties from add-on key map for XR session. */
+      wmKeyMap *km = WM_keymap_list_find(
+          &wm->addonconf->keymaps, "XR Session", SPACE_EMPTY, RGN_TYPE_XR);
+      if (km) {
+        wmKeyMapItem *kmi = WM_keymap_item_find_xr(km, action_set_name, name);
+        if (kmi && STREQ(kmi->idname, idname)) {
+          info.op_properties = kmi->properties;
+        }
+      }
+      info.op_flag = op_flag;
+    }
   }
 
   const char *subaction_paths[2];
@@ -144,7 +153,6 @@ bool rna_XrSessionState_action_space_create(bContext *C,
   wmWindowManager *wm = CTX_wm_manager(C);
   GHOST_XrActionSpaceInfo info = {
       .action_name = action_name,
-      .count_subaction_paths = 0,
   };
 
   const char *subaction_paths[2];
@@ -193,7 +201,6 @@ bool rna_XrSessionState_action_binding_create(bContext *C,
   wmWindowManager *wm = CTX_wm_manager(C);
   GHOST_XrActionBindingsInfo info = {
       .interaction_profile_path = profile,
-      .count_bindings = 0,
   };
 
   GHOST_XrActionBinding bindings[2];
