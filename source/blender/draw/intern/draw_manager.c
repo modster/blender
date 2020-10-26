@@ -1447,6 +1447,7 @@ void DRW_draw_callbacks_post_scene(void)
 
     GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
   }
+#ifdef WITH_XR_OPENXR
   else if ((v3d->flag & V3D_XR_SESSION_SURFACE) != 0) {
     DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
 
@@ -1478,6 +1479,7 @@ void DRW_draw_callbacks_post_scene(void)
 
     GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
   }
+#endif
 }
 
 struct DRWTextStore *DRW_text_cache_ensure(void)
