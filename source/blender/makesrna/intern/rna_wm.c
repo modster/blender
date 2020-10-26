@@ -3022,9 +3022,9 @@ static void rna_def_keyconfig(BlenderRNA *brna)
   RNA_def_property_string_sdna(prop, NULL, "xr_action_set");
   RNA_def_property_ui_text(prop, "XR Action Set", "XR action set name");
   RNA_def_property_string_funcs(prop,
-    "rna_wmKeyMapItem_xr_action_set_get",
-    "rna_wmKeyMapItem_xr_action_set_length",
-    "rna_wmKeyMapItem_xr_action_set_set");
+                                "rna_wmKeyMapItem_xr_action_set_get",
+                                "rna_wmKeyMapItem_xr_action_set_length",
+                                "rna_wmKeyMapItem_xr_action_set_set");
   RNA_def_struct_name_property(srna, prop);
   RNA_def_property_update(prop, 0, "rna_KeyMapItem_update");
 
@@ -3032,9 +3032,9 @@ static void rna_def_keyconfig(BlenderRNA *brna)
   RNA_def_property_string_sdna(prop, NULL, "xr_action");
   RNA_def_property_ui_text(prop, "XR Action", "XR action name");
   RNA_def_property_string_funcs(prop,
-    "rna_wmKeyMapItem_xr_action_get",
-    "rna_wmKeyMapItem_xr_action_length",
-    "rna_wmKeyMapItem_xr_action_set");
+                                "rna_wmKeyMapItem_xr_action_get",
+                                "rna_wmKeyMapItem_xr_action_length",
+                                "rna_wmKeyMapItem_xr_action_set");
   RNA_def_struct_name_property(srna, prop);
   RNA_def_property_update(prop, 0, "rna_KeyMapItem_update");
 

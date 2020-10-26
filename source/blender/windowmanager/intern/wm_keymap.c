@@ -2058,7 +2058,8 @@ wmKeyMapItem *WM_keymap_item_find_xr(wmKeyMap *keymap, const char *action_set, c
   wmKeyMapItem *kmi;
 
   for (kmi = keymap->items.first; kmi; kmi = kmi->next) {
-    if ((kmi->type == EVT_XR_ACTION) && STREQ(kmi->xr_action_set, action_set) && STREQ(kmi->xr_action, action)) {
+    if ((kmi->type == EVT_XR_ACTION) && STREQ(kmi->xr_action_set, action_set) &&
+        STREQ(kmi->xr_action, action)) {
       return kmi;
     }
   }
