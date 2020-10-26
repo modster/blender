@@ -628,6 +628,7 @@ static void box_select_graphkeys(bAnimContext *ac,
         /* select the curve too now that curve will be touched */
         if (selectmode == SELECT_ADD) {
           fcu->flag |= FCURVE_SELECTED;
+          ANIM_set_active_channel(ac, ac->data, ac->datatype, filter, fcu, ANIMTYPE_FCURVE);
         }
       }
 
