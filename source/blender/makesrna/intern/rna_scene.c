@@ -2620,6 +2620,7 @@ static void rna_lineart_auto_update_set(PointerRNA *ptr, bool value)
   }
   else {
     data->flags &= (~LRT_AUTO_UPDATE);
+    ED_lineart_calculation_flag_set(LRT_RENDER_CANCELING);
     ED_lineart_destroy_render_data_external();
   }
 }
