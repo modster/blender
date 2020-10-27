@@ -3060,6 +3060,7 @@ void DRW_render_context_disable(Render *render)
 
 /** \} */
 
+/* -------------------------------------------------------------------- */
 /** \name Init/Exit (DRW_opengl_ctx)
  * \{ */
 
@@ -3206,6 +3207,7 @@ void DRW_xr_drawing_end(void)
 
 #endif
 
+/* -------------------------------------------------------------------- */
 /** \name Internal testing API for gtests
  * \{ */
 
