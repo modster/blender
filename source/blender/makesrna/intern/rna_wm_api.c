@@ -221,9 +221,9 @@ static wmKeyMapItem *rna_KeyMap_item_new(wmKeyMap *km,
                                          bool alt,
                                          bool oskey,
                                          int keymodifier,
+                                         bool repeat,
                                          const char *xr_action_set,
                                          const char *xr_action,
-                                         bool repeat,
                                          bool head)
 {
   /*  wmWindowManager *wm = CTX_wm_manager(C); */
@@ -259,15 +259,15 @@ static wmKeyMapItem *rna_KeyMap_item_new(wmKeyMap *km,
   /* create keymap item */
   kmi = WM_keymap_add_item(km, idname_bl, type, value, modifier, keymodifier);
 
-  if (xr_action_set) {
-    strcpy(kmi->xr_action_set, xr_action_set);
-  }
-  if (xr_action) {
-    strcpy(kmi->xr_action, xr_action);
-  }
-
   if (!repeat) {
     kmi->flag |= KMI_REPEAT_IGNORE;
+  }
+
+  if (xr_action_set) {
+    BLI_strncpy(kmi->xr_action_set, xr_action_set, sizeof(kmi->xr_action_set));
+  }
+  if (xr_action) {
+    BLI_strncpy(kmi->xr_action, xr_action, sizeof(kmi->xr_action));
   }
 
   /* T32437 allow scripts to define hotkeys that get added to start of keymap
@@ -1144,9 +1144,9 @@ void RNA_api_keymapitems(StructRNA *srna)
   RNA_def_boolean(func, "alt", 0, "Alt", "");
   RNA_def_boolean(func, "oskey", 0, "OS Key", "");
   RNA_def_enum(func, "key_modifier", rna_enum_event_type_items, 0, "Key Modifier", "");
+  RNA_def_boolean(func, "repeat", false, "Repeat", "When set, accept key-repeat events");
   RNA_def_string(func, "xr_action_set", NULL, 0, "XR Action Set", "");
   RNA_def_string(func, "xr_action", NULL, 0, "XR Action", "");
-  RNA_def_boolean(func, "repeat", false, "Repeat", "When set, accept key-repeat events");
   RNA_def_boolean(func,
                   "head",
                   0,

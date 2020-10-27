@@ -4883,6 +4883,7 @@ void wm_event_add_xrevent(const wmXrAction *action,
   wmEvent *event = add_win_event ? &_event : MEM_callocN(sizeof(wmEvent), __func__);
   event->type = EVT_XR_ACTION;
   event->val = val;
+  event->is_repeat = false;
 
   wmXrActionData *data = MEM_callocN(sizeof(wmXrActionData), __func__);
   strcpy(data->name, action->name);
