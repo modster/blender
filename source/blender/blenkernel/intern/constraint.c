@@ -1814,6 +1814,10 @@ static void rotlike_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *tar
   if (VALID_CONS_TARGET(ct)) {
     float loc[3], size[3], oldrot[3][3], newrot[3][3];
     float eul[3], obeul[3], defeul[3];
+    float mat[4][4];
+
+    copy_m4_m4(mat, ct->matrix);
+    orthogonalize_m4_stable(mat, 1, true);
 
     mat4_to_loc_rot_size(loc, oldrot, size, cob->matrix);
 
@@ -1828,7 +1832,7 @@ static void rotlike_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *tar
     mat4_to_eulO(obeul, rot_order, cob->matrix);
     /* We must get compatible eulers from the beginning because
      * some of them can be modified below (see bug T21875). */
-    mat4_to_compatible_eulO(eul, obeul, rot_order, ct->matrix);
+    mat4_to_compatible_eulO(eul, obeul, rot_order, mat);
 
     /* Prepare the copied euler rotation. */
     bool legacy_offset = false;
