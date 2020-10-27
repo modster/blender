@@ -18,6 +18,7 @@
 #ifdef WITH_OPTIX
 
 #  include "bvh/bvh.h"
+#  include "bvh/bvh_optix.h"
 #  include "device/cuda/device_cuda.h"
 #  include "device/device_denoising.h"
 #  include "device/device_intern.h"
@@ -1079,7 +1080,7 @@ class OptiXDevice : public CUDADevice {
   bool build_optix_bvh(const OptixBuildInput &build_input,
                        uint16_t num_motion_steps,
                        OptixTraversableHandle &out_handle,
-                       CUdeviceptr &out_data_ptr,
+                       CUdeviceptr &out_data,
                        OptixBuildOperation operation)
   {
     const CUDAContextScope scope(cuContext);
@@ -1119,13 +1120,8 @@ class OptiXDevice : public CUDADevice {
       move_textures_to_host(size - free, false);
     }
 
-    CUdeviceptr out_data = 0;
     if (operation == OPTIX_BUILD_OPERATION_BUILD) {
       check_result_cuda_ret(cuMemAlloc(&out_data, sizes.outputSizeInBytes));
-      out_data_ptr = out_data;
-    }
-    else {
-      out_data = out_data_ptr;
     }
 
     as_mem.push_back(out_data);
@@ -1199,7 +1195,7 @@ class OptiXDevice : public CUDADevice {
 
     for (Geometry *geom : bvh->geometry) {
       if (geom->do_optix_refit) {
-        refit_mem.insert(geom->optix_data_handle);
+        refit_mem.insert(static_cast<BVHOptiX *>(geom->bvh)->optix_data_handle);
       }
     }
 
@@ -1224,8 +1220,8 @@ class OptiXDevice : public CUDADevice {
       CUdeviceptr out_data;
       // Refit is only possible in viewport for now.
       if (ob->geometry->do_optix_refit && !background) {
-        out_data = geom->optix_data_handle;
-        handle = geom->optix_handle;
+        out_data = static_cast<BVHOptiX *>(geom->bvh)->optix_data_handle;
+        handle = static_cast<BVHOptiX *>(geom->bvh)->optix_handle;
         operation = OPTIX_BUILD_OPERATION_UPDATE;
       }
       else {
@@ -1399,8 +1395,8 @@ class OptiXDevice : public CUDADevice {
         // Allocate memory for new BLAS and build it
         if (build_optix_bvh(build_input, num_motion_steps, handle, out_data, operation)) {
           geometry.insert({ob->geometry, handle});
-          geom->optix_data_handle = out_data;
-          geom->optix_handle = handle;
+          static_cast<BVHOptiX *>(geom->bvh)->optix_data_handle = out_data;
+          static_cast<BVHOptiX *>(geom->bvh)->optix_handle = handle;
           geom->do_optix_refit = false;
         }
         else {
@@ -1473,8 +1469,8 @@ class OptiXDevice : public CUDADevice {
         // Allocate memory for new BLAS and build it
         if (build_optix_bvh(build_input, num_motion_steps, handle, out_data, operation)) {
           geometry.insert({ob->geometry, handle});
-          geom->optix_data_handle = out_data;
-          geom->optix_handle = handle;
+          static_cast<BVHOptiX *>(geom->bvh)->optix_data_handle = out_data;
+          static_cast<BVHOptiX *>(geom->bvh)->optix_handle = handle;
           geom->do_optix_refit = false;
         }
         else {

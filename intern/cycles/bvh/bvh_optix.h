@@ -32,7 +32,10 @@ class Optix;
 class BVHOptiX : public BVH {
   friend class BVH;
 
- public:
+ public:  
+  unsigned long long optix_handle;
+  unsigned long long optix_data_handle;
+
   BVHOptiX(const BVHParams &params,
            const vector<Geometry *> &geometry,
            const vector<Object *> &objects);

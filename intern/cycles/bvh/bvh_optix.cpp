@@ -37,6 +37,8 @@ BVHOptiX::BVHOptiX(const BVHParams &params_,
                    const vector<Object *> &objects_)
     : BVH(params_, geometry_, objects_)
 {
+  optix_handle = 0;
+  optix_data_handle = 0;
 }
 
 BVHOptiX::~BVHOptiX()
