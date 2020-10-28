@@ -617,7 +617,6 @@ void ED_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb)
       if (rlci->occlusion != fixed_occ || rlci->transparency_mask != fixed_mask) {
         if (next_rlci) {
           if (lineart_point_overlapping(next_rlci, rlci->pos[0], rlci->pos[1], 1e-5)) {
-            // next_rlci = next_rlci->next;
             continue;
           }
         }
@@ -743,7 +742,6 @@ static LineartChainRegisterEntry *lineart_chain_get_closest_cre(LineartRenderBuf
       }
     }
     if (cre->rlc->picked || cre->picked) {
-      // BLI_remlink(&ba->linked_chains, cre);
       continue;
     }
     if (cre->rlc == rlc || (!cre->rlc->chain.first) || (cre->rlc->level != occlusion) ||

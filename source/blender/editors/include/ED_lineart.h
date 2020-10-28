@@ -56,7 +56,7 @@ typedef struct LineartRenderTriangleAdjacent {
 
 typedef struct LineartRenderTriangle {
   struct LineartRenderVert *v[3];
-  // struct LineartRenderLine *rl[3];
+
   /* first culled in line list to use adjacent triangle info, then go through triangle list. */
   double gn[3];
 

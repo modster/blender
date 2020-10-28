@@ -546,8 +546,6 @@ static int lineart_point_triangle_relation(double v[2], double v0[2], double v1[
   if ((r = c * cl) < 0) {
     return 0;
   }
-  /*  else if(r == 0) return 1; // removed, point could still be on the extention line of some edge
-   */
   else
     c = cl;
 
@@ -555,7 +553,6 @@ static int lineart_point_triangle_relation(double v[2], double v0[2], double v1[
   if ((r = c * cl) < 0) {
     return 0;
   }
-  /*  else if(r == 0) return 1; */
   else
     c = cl;
 
@@ -1354,8 +1351,6 @@ static char lineart_test_feature_line(LineartRenderBuffer *rb,
     view_vector = rb->view_vector;
   }
 
-  // currently not compatible with use_smooth_contour_modifier_contour
-
   dot_1 = dot_v3v3_db(view_vector, rt1->gn);
   dot_2 = dot_v3v3_db(view_vector, rt2->gn);
 
@@ -1558,7 +1553,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
     reln->object_ref = orig_ob;
     reln->flags |= (usage == OBJECT_LRT_NO_INTERSECTION ? LRT_ELEMENT_NO_INTERSECTION : 0);
 
-    /* Note this memory is not from pool. */
+    /* Note this memory is not from pool, will be deleted after culling. */
     orta = MEM_callocN(sizeof(LineartRenderTriangleAdjacent) * bm->totface,
                        "LineartRenderTriangleAdjacent");
     /* Link is minimal so we use pool anyway */
@@ -2640,9 +2635,7 @@ static void lineart_post_frame_update_render(struct Main *UNUSED(main),
                                              const int UNUSED(num_pointers),
                                              void *UNUSED(arg))
 {
-  // if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH)) {
   ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, false);
-  //}
 }
 static bCallbackFuncStore lineart_pre_frame_update = {
     NULL,
@@ -4216,15 +4209,11 @@ void ED_lineart_post_frame_update_external(bContext *C,
      * here if we retain the data and restore the flag, results will be correct. (The wrong
      * clearing happens when dg->mode == DAG_EVAL_VIEWPORT) so can't really catch it there.) */
     if (is_render && (scene->eevee.flag & SCE_EEVEE_MOTION_BLUR_ENABLED)) {
-      // ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, from_modifier);
       return;
     }
 
     /* To avoid double clearing. */
     ED_lineart_modifier_sync_flag_set(LRT_SYNC_CLEARING, from_modifier);
-
-    /* TODO in the future: the call below seems to cause crash (double free) when using eevee in
-     * SOME files, not sure why but  */
 
     /* Due to using GPencil modifiers, and the scene is updated each time some value is changed,
      * we really don't need to keep the buffer any longer. If in the future we want fast refresh
@@ -4248,20 +4237,16 @@ void ED_lineart_post_frame_update_external(bContext *C,
 
 void ED_lineart_update_render_progress(int nr, const char *info)
 {
+  /* WM_cursor_set() should not be called in a background thread, need an alternative way of
+   * showing the progress. */
   if (lineart_share.main_window) {
     if (nr == 100) {
-      /*WM_CURSOR_DEFAULT doesn't seem to work?*/
-      // WM_cursor_set(lineart_share.main_window, WM_CURSOR_NW_ARROW);
-      // WM_cursor_modal_restore(lineart_share.main_window);
-      WM_progress_clear(lineart_share.main_window);
+      /* just setting WM_CURSOR_DEFAULT doesn't seem to work on linux. */
+      /* WM_cursor_set(lineart_share.main_window, WM_CURSOR_NW_ARROW); */
     }
     else {
-      /* Hack: this prevents XWindow cursor error crashes when this thread and an operator is
-       * setting cursor at the same time. */
-      if (!G.moving) {
-        // WM_cursor_time(lineart_share.main_window, nr);
-        WM_progress_set(lineart_share.main_window, (float)nr / 100);
-      }
+      WM_cursor_time(lineart_share.main_window, nr);
+      WM_progress_set(lineart_share.main_window, (float)nr / 100);
     }
   }
 
