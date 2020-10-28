@@ -40,6 +40,9 @@
 
 #include <iostream>
 
+namespace blender::io::usd {
+
+/* Anonymous namespace for helper functions and definitions. */
 namespace {
 
 struct MeshSampleData {
@@ -57,14 +60,12 @@ struct MeshSampleData {
   bool reverse_vert_order;
 };
 
-}  // anonymous namespace
+const pxr::TfToken st_primvar_name("st", pxr::TfToken::Immortal);
 
-static const pxr::TfToken st_primvar_name("st", pxr::TfToken::Immortal);
-
-static void sample_uvs(const pxr::UsdGeomMesh &mesh,
-                       MeshSampleData &mesh_data,
-                       pxr::TfToken primvar_name,
-                       double time)
+void sample_uvs(const pxr::UsdGeomMesh &mesh,
+                MeshSampleData &mesh_data,
+                pxr::TfToken primvar_name,
+                double time)
 {
   if (!mesh) {
     return;
@@ -89,14 +90,14 @@ static void sample_uvs(const pxr::UsdGeomMesh &mesh,
   }
 }
 
-static void read_mverts(MVert *mverts, const MeshSampleData &mesh_data)
+void read_mverts(MVert *mverts, const MeshSampleData &mesh_data)
 {
   for (int i = 0; i < mesh_data.points.size(); i++) {
     MVert &mvert = mverts[i];
     pxr::GfVec3f pt = mesh_data.points[i];
 
     if (mesh_data.y_up) {
-      blender::io::usd::copy_zup_from_yup(mvert.co, pt.GetArray());
+      copy_zup_from_yup(mvert.co, pt.GetArray());
     }
     else {
       mvert.co[0] = pt[0];
@@ -106,7 +107,7 @@ static void read_mverts(MVert *mverts, const MeshSampleData &mesh_data)
   }
 }
 
-static void *add_customdata(Mesh *mesh, const char *name, int data_type)
+void *add_customdata(Mesh *mesh, const char *name, int data_type)
 {
   CustomDataType cd_data_type = static_cast<CustomDataType>(data_type);
   void *cd_ptr;
@@ -131,7 +132,7 @@ static void *add_customdata(Mesh *mesh, const char *name, int data_type)
   return cd_ptr;
 }
 
-static void read_mpolys(Mesh *mesh, const MeshSampleData &mesh_data)
+void read_mpolys(Mesh *mesh, const MeshSampleData &mesh_data)
 {
   if (!mesh || mesh->totloop == 0) {
     return;
@@ -207,13 +208,13 @@ static void read_mpolys(Mesh *mesh, const MeshSampleData &mesh_data)
   /* TODO(makowalski):  Possibly check for invalid geometry. */
 }
 
-static void process_no_normals(Mesh *mesh)
+void process_no_normals(Mesh *mesh)
 {
   /* Absense of normals in the USD mesh is interpreted as 'smooth'. */
   BKE_mesh_calc_normals(mesh);
 }
 
-static void process_loop_normals(Mesh *mesh, const MeshSampleData &mesh_data)
+void process_loop_normals(Mesh *mesh, const MeshSampleData &mesh_data)
 {
   if (!mesh) {
     return;
@@ -251,8 +252,7 @@ static void process_loop_normals(Mesh *mesh, const MeshSampleData &mesh_data)
       }
 
       if (mesh_data.y_up) {
-        blender::io::usd::copy_zup_from_yup(lnors[blender_index],
-                                            mesh_data.normals[usd_index].data());
+        copy_zup_from_yup(lnors[blender_index], mesh_data.normals[usd_index].data());
       }
       else {
         lnors[blender_index][0] = mesh_data.normals[usd_index].data()[0];
@@ -268,7 +268,7 @@ static void process_loop_normals(Mesh *mesh, const MeshSampleData &mesh_data)
   MEM_freeN(lnors);
 }
 
-static void process_vertex_normals(Mesh *mesh, const MeshSampleData &mesh_data)
+void process_vertex_normals(Mesh *mesh, const MeshSampleData &mesh_data)
 {
   if (!mesh) {
     return;
@@ -287,7 +287,7 @@ static void process_vertex_normals(Mesh *mesh, const MeshSampleData &mesh_data)
   for (int i = 0; i < normals_count; ++i) {
 
     if (mesh_data.y_up) {
-      blender::io::usd::copy_zup_from_yup(vnors[i], mesh_data.normals[i].data());
+      copy_zup_from_yup(vnors[i], mesh_data.normals[i].data());
     }
     else {
       vnors[i][0] = mesh_data.normals[i].data()[0];
@@ -301,7 +301,7 @@ static void process_vertex_normals(Mesh *mesh, const MeshSampleData &mesh_data)
   MEM_freeN(vnors);
 }
 
-static void process_normals(Mesh *mesh, const MeshSampleData &mesh_data)
+void process_normals(Mesh *mesh, const MeshSampleData &mesh_data)
 {
   if (!mesh || mesh_data.normals.empty()) {
     process_no_normals(mesh);
@@ -319,7 +319,7 @@ static void process_normals(Mesh *mesh, const MeshSampleData &mesh_data)
   }
 }
 
-static void build_mtl_map(const Main *bmain, std::map<std::string, Material *> &mat_map)
+void build_mtl_map(const Main *bmain, std::map<std::string, Material *> &mat_map)
 {
   Material *material = static_cast<Material *>(bmain->materials.first);
 
@@ -328,7 +328,7 @@ static void build_mtl_map(const Main *bmain, std::map<std::string, Material *> &
   }
 }
 
-namespace blender::io::usd {
+}  // anonymous namespace
 
 USDMeshReader::USDMeshReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
     : USDObjectReader(prim, context), mesh_(prim)
