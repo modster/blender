@@ -93,28 +93,30 @@ static float give_opacity_fading_factor(OpacityGpencilModifierData *mmd,
                                         bool apply_obmat)
 {
   float factor_depth = 1;
-  if (mmd->flag & GP_OPACITY_FADING) {
-    if (mmd->object) {
-      float gvert[3];
-      if (apply_obmat) {
-        mul_v3_m4v3(gvert, ob_this->obmat, pos);
-      }
-      float dist = len_v3v3(mmd->object->obmat[3], gvert);
-      float fading_max = MAX2(mmd->fading_start, mmd->fading_end);
-      float fading_min = MIN2(mmd->fading_start, mmd->fading_end);
 
-      /* Better with ratiof() function from line art. */
-      if (dist > fading_max) {
-        factor_depth = 0;
-      }
-      else if (dist <= fading_max && dist > fading_min) {
-        factor_depth = (fading_max - dist) / (fading_max - fading_min);
-      }
-      else {
-        factor_depth = 1;
-      }
-    }
+  if (((mmd->flag & GP_OPACITY_FADING) == 0) || ((mmd->object) == NULL)) {
+    return factor_depth;
   }
+
+  float gvert[3];
+  if (apply_obmat) {
+    mul_v3_m4v3(gvert, ob_this->obmat, pos);
+  }
+  float dist = len_v3v3(mmd->object->obmat[3], gvert);
+  float fading_max = MAX2(mmd->fading_start, mmd->fading_end);
+  float fading_min = MIN2(mmd->fading_start, mmd->fading_end);
+
+  /* Better with ratiof() function from line art. */
+  if (dist > fading_max) {
+    factor_depth = 0;
+  }
+  else if (dist <= fading_max && dist > fading_min) {
+    factor_depth = (fading_max - dist) / (fading_max - fading_min);
+  }
+  else {
+    factor_depth = 1;
+  }
+
   return factor_depth;
 }
 
