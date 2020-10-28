@@ -33,10 +33,8 @@ class GPENCIL_MT_material_context_menu(Menu):
     def draw(self, _context):
         layout = self.layout
 
-        layout.operator("gpencil.material_reveal",
-                        icon='RESTRICT_VIEW_OFF', text="Show All")
-        layout.operator("gpencil.material_hide", icon='RESTRICT_VIEW_ON',
-                        text="Hide Others").unselected = True
+        layout.operator("gpencil.material_reveal", icon='RESTRICT_VIEW_OFF', text="Show All")
+        layout.operator("gpencil.material_hide", icon='RESTRICT_VIEW_ON', text="Hide Others").unselected = True
 
         layout.separator()
 
@@ -52,10 +50,8 @@ class GPENCIL_MT_material_context_menu(Menu):
         layout.operator("gpencil.stroke_merge_material", text="Merge Similar")
 
         layout.separator()
-        layout.operator("gpencil.material_to_vertex_color",
-                        text="Convert Materials to Vertex Color")
-        layout.operator("gpencil.extract_palette_vertex",
-                        text="Extract Palette from Vertex Color")
+        layout.operator("gpencil.material_to_vertex_color", text="Convert Materials to Vertex Color")
+        layout.operator("gpencil.extract_palette_vertex", text="Extract Palette from Vertex Color")
 
 
 class GPENCIL_UL_matslots(UIList):
@@ -163,8 +159,7 @@ class MATERIAL_PT_gpencil_strokecolor(GPMaterialButtonsPanel, Panel):
 
             if gpcolor.stroke_style == 'TEXTURE':
                 row = col.row()
-                row.prop(gpcolor, "mix_stroke_factor",
-                         text="Blend", slider=True)
+                row.prop(gpcolor, "mix_stroke_factor", text="Blend", slider=True)
                 if gpcolor.mode == 'LINE':
                     col.prop(gpcolor, "pixel_size", text="UV Factor")
 

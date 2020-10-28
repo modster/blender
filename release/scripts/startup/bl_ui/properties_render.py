@@ -76,8 +76,7 @@ class RENDER_PT_color_management(RenderButtonsPanel, Panel):
         scene = context.scene
         view = scene.view_settings
 
-        flow = layout.grid_flow(row_major=True, columns=0,
-                                even_columns=False, even_rows=False, align=True)
+        flow = layout.grid_flow(row_major=True, columns=0, even_columns=False, even_rows=False, align=True)
 
         col = flow.column()
         col.prop(scene.display_settings, "display_device")
@@ -120,8 +119,7 @@ class RENDER_PT_color_management_curves(RenderButtonsPanel, Panel):
 
         layout.enabled = view.use_curve_mapping
 
-        layout.template_curve_mapping(
-            view, "curve_mapping", type='COLOR', levels=True)
+        layout.template_curve_mapping(view, "curve_mapping", type='COLOR', levels=True)
 
 
 class RENDER_PT_eevee_ambient_occlusion(RenderButtonsPanel, Panel):
@@ -422,10 +420,8 @@ class RENDER_PT_eevee_indirect_lighting(RenderButtonsPanel, Panel):
         props = scene.eevee
 
         col = layout.column()
-        col.operator("scene.light_cache_bake",
-                     text="Bake Indirect Lighting", icon='RENDER_STILL')
-        col.operator("scene.light_cache_bake", text="Bake Cubemap Only",
-                     icon='LIGHTPROBE_CUBEMAP').subset = 'CUBEMAPS'
+        col.operator("scene.light_cache_bake", text="Bake Indirect Lighting", icon='RENDER_STILL')
+        col.operator("scene.light_cache_bake", text="Bake Cubemap Only", icon='LIGHTPROBE_CUBEMAP').subset = 'CUBEMAPS'
         col.operator("scene.light_cache_free", text="Delete Lighting Cache")
 
         cache_info = scene.eevee.gi_cache_info
@@ -654,8 +650,7 @@ class RENDER_PT_simplify_viewport(RenderButtonsPanel, Panel):
 
         layout.active = rd.use_simplify
 
-        flow = layout.grid_flow(row_major=True, columns=0,
-                                even_columns=False, even_rows=False, align=True)
+        flow = layout.grid_flow(row_major=True, columns=0, even_columns=False, even_rows=False, align=True)
 
         col = flow.column()
         col.prop(rd, "simplify_subdivision", text="Max Subdivision")
@@ -680,22 +675,19 @@ class RENDER_PT_simplify_render(RenderButtonsPanel, Panel):
 
         layout.active = rd.use_simplify
 
-        flow = layout.grid_flow(row_major=True, columns=0,
-                                even_columns=False, even_rows=False, align=True)
+        flow = layout.grid_flow(row_major=True, columns=0, even_columns=False, even_rows=False, align=True)
 
         col = flow.column()
         col.prop(rd, "simplify_subdivision_render", text="Max Subdivision")
 
         col = flow.column()
-        col.prop(rd, "simplify_child_particles_render",
-                 text="Max Child Particles")
+        col.prop(rd, "simplify_child_particles_render", text="Max Child Particles")
 
 
 class RENDER_PT_simplify_greasepencil(RenderButtonsPanel, Panel, GreasePencilSimplifyPanel):
     bl_label = "Grease Pencil"
     bl_parent_id = "RENDER_PT_simplify"
-    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME',
-                      'BLENDER_CLAY', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME', 'BLENDER_CLAY', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
     bl_options = {'DEFAULT_CLOSED'}
 
 
@@ -746,6 +738,21 @@ class RENDER_PT_lineart_line_types(RenderButtonsPanel, Panel):
         layout.prop(lineart, "use_edge_mark", text='Edge Marks')
         layout.prop(lineart, "use_intersections", text='Intersections')
 
+
+class RENDER_PT_lineart_extras(RenderButtonsPanel, Panel):
+    bl_label = "Extras"
+    bl_parent_id = "RENDER_PT_lineart"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
+
+    def draw(self, context):
+        scene = context.scene
+        lineart = scene.lineart
+
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
         layout.label(text="Fuzzy chaining:")
 
         if lineart.use_intersections:
@@ -756,7 +763,7 @@ class RENDER_PT_lineart_line_types(RenderButtonsPanel, Panel):
         row = layout.row(align=False)
         row.prop(lineart, "fuzzy_everything")
 
-        layout.label(text="Extras:")
+        layout.label(text="Algorithm Options:")
         layout.prop(lineart, "allow_duplication", text="Allow Instances")
         layout.prop(lineart, "allow_overlapping_edges")
         layout.prop(lineart, "allow_clipping_boundaries",
@@ -826,8 +833,10 @@ classes = (
     RENDER_PT_simplify_viewport,
     RENDER_PT_simplify_render,
     RENDER_PT_simplify_greasepencil,
+
     RENDER_PT_lineart,
     RENDER_PT_lineart_line_types,
+    RENDER_PT_lineart_extras,
     RENDER_PT_lineart_baking,
 )
 
