@@ -45,7 +45,6 @@
 #include "BKE_material.h"
 #include "BKE_mesh.h"
 #include "BKE_object.h"
-#include "BKE_report.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
 #include "BKE_text.h"
@@ -73,15 +72,11 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
-#include "UI_resources.h"
-
 #include "lineart_intern.h"
 
 LineartSharedResource lineart_share;
 
-/* Own functions */
-
-/* 2D Bounding area accelerator structure */
+/* static function declarations */
 
 static LineartBoundingArea *linear_bounding_areat_first_possible(LineartRenderBuffer *rb,
                                                                  LineartRenderLine *rl);
@@ -1787,31 +1782,6 @@ static void lineart_main_load_geometries(Depsgraph *depsgraph,
   DEG_OBJECT_ITER_END;
 }
 
-#define INTERSECT_SORT_MIN_TO_MAX_3(ia, ib, ic, lst) \
-  { \
-    lst[0] = LRT_MIN3_INDEX(ia, ib, ic); \
-    lst[1] = (((ia <= ib && ib <= ic) || (ic <= ib && ib <= ia)) ? \
-                  1 : \
-                  (((ic <= ia && ia <= ib) || (ib < ia && ia <= ic)) ? 0 : 2)); \
-    lst[2] = LRT_MAX3_INDEX(ia, ib, ic); \
-  }
-
-/*  ia ib ic are ordered */
-#define INTERSECT_JUST_GREATER(is, order, num, index) \
-  { \
-    index = (num < is[order[0]] ? \
-                 order[0] : \
-                 (num < is[order[1]] ? order[1] : (num < is[order[2]] ? order[2] : order[2]))); \
-  }
-
-/*  ia ib ic are ordered */
-#define INTERSECT_JUST_SMALLER(is, order, num, index) \
-  { \
-    index = (num > is[order[2]] ? \
-                 order[2] : \
-                 (num > is[order[1]] ? order[1] : (num > is[order[0]] ? order[0] : order[0]))); \
-  }
-
 static bool lineart_another_edge_2v(const LineartRenderTriangle *rt,
                                     const LineartRenderVert *rv,
                                     LineartRenderVert **l,
@@ -1858,6 +1828,31 @@ static int lineart_edge_from_triangle(const LineartRenderTriangle *rt, const Lin
   }
   return 0;
 }
+
+#define INTERSECT_SORT_MIN_TO_MAX_3(ia, ib, ic, lst) \
+  { \
+    lst[0] = LRT_MIN3_INDEX(ia, ib, ic); \
+    lst[1] = (((ia <= ib && ib <= ic) || (ic <= ib && ib <= ia)) ? \
+                  1 : \
+                  (((ic <= ia && ia <= ib) || (ib < ia && ia <= ic)) ? 0 : 2)); \
+    lst[2] = LRT_MAX3_INDEX(ia, ib, ic); \
+  }
+
+/*  ia ib ic are ordered */
+#define INTERSECT_JUST_GREATER(is, order, num, index) \
+  { \
+    index = (num < is[order[0]] ? \
+                 order[0] : \
+                 (num < is[order[1]] ? order[1] : (num < is[order[2]] ? order[2] : order[2]))); \
+  }
+
+/*  ia ib ic are ordered */
+#define INTERSECT_JUST_SMALLER(is, order, num, index) \
+  { \
+    index = (num > is[order[2]] ? \
+                 order[2] : \
+                 (num > is[order[1]] ? order[1] : (num > is[order[0]] ? order[0] : order[0]))); \
+  }
 
 /** This is the main function to calculate
  * the occlusion status between 1(one) triangle and 1(one) line.
@@ -2084,6 +2079,10 @@ static int lineart_triangle_line_imagespace_intersection_v2(SpinLock *UNUSED(spl
     return 0;
   return 1;
 }
+
+#undef INTERSECT_SORT_MIN_TO_MAX_3
+#undef INTERSECT_JUST_GREATER
+#undef INTERSECT_JUST_SMALLER
 
 static bool lineart_triangle_share_edge(const LineartRenderTriangle *l,
                                         const LineartRenderTriangle *r)
@@ -3903,25 +3902,25 @@ static int lineart_rb_line_types(LineartRenderBuffer *rb)
   return types;
 }
 
-void ED_lineart_gpencil_generate_from_chain(Depsgraph *depsgraph,
-                                            Object *gpencil_object,
-                                            float **gp_obmat_inverse,
-                                            bGPDlayer *UNUSED(gpl),
-                                            bGPDframe *gpf,
-                                            int level_start,
-                                            int level_end,
-                                            int material_nr,
-                                            Object *source_object,
-                                            Collection *source_collection,
-                                            int types,
-                                            unsigned char transparency_flags,
-                                            unsigned char transparency_mask,
-                                            short thickness,
-                                            float opacity,
-                                            float pre_sample_length,
-                                            const char *source_vgname,
-                                            const char *vgname,
-                                            int modifier_flags)
+void ED_lineart_gpencil_generate(Depsgraph *depsgraph,
+                                 Object *gpencil_object,
+                                 float **gp_obmat_inverse,
+                                 bGPDlayer *UNUSED(gpl),
+                                 bGPDframe *gpf,
+                                 int level_start,
+                                 int level_end,
+                                 int material_nr,
+                                 Object *source_object,
+                                 Collection *source_collection,
+                                 int types,
+                                 unsigned char transparency_flags,
+                                 unsigned char transparency_mask,
+                                 short thickness,
+                                 float opacity,
+                                 float pre_sample_length,
+                                 const char *source_vgname,
+                                 const char *vgname,
+                                 int modifier_flags)
 {
   LineartRenderBuffer *rb = lineart_share.render_buffer_shared;
 
@@ -4084,24 +4083,24 @@ void ED_lineart_gpencil_generate_from_chain(Depsgraph *depsgraph,
   BLI_spin_unlock(&lineart_share.lock_render_status);
 }
 
-void ED_lineart_gpencil_generate_strokes_direct(Depsgraph *depsgraph,
-                                                Object *ob,
-                                                bGPDlayer *gpl,
-                                                bGPDframe *gpf,
-                                                char source_type,
-                                                void *source_reference,
-                                                int level_start,
-                                                int level_end,
-                                                int mat_nr,
-                                                short line_types,
-                                                unsigned char transparency_flags,
-                                                unsigned char transparency_mask,
-                                                short thickness,
-                                                float opacity,
-                                                float pre_sample_length,
-                                                const char *source_vgname,
-                                                const char *vgname,
-                                                int modifier_flags)
+void ED_lineart_gpencil_generate_with_type(Depsgraph *depsgraph,
+                                           Object *ob,
+                                           bGPDlayer *gpl,
+                                           bGPDframe *gpf,
+                                           char source_type,
+                                           void *source_reference,
+                                           int level_start,
+                                           int level_end,
+                                           int mat_nr,
+                                           short line_types,
+                                           unsigned char transparency_flags,
+                                           unsigned char transparency_mask,
+                                           short thickness,
+                                           float opacity,
+                                           float pre_sample_length,
+                                           const char *source_vgname,
+                                           const char *vgname,
+                                           int modifier_flags)
 {
 
   if (!gpl || !gpf || !source_reference || !ob) {
@@ -4122,220 +4121,25 @@ void ED_lineart_gpencil_generate_strokes_direct(Depsgraph *depsgraph,
   }
   float gp_obmat_inverse[16];
   invert_m4_m4(gp_obmat_inverse, ob->obmat);
-  ED_lineart_gpencil_generate_from_chain(depsgraph,
-                                         ob,
-                                         gp_obmat_inverse,
-                                         gpl,
-                                         gpf,
-                                         level_start,
-                                         level_end,
-                                         mat_nr,
-                                         source_object,
-                                         source_collection,
-                                         use_types,
-                                         transparency_flags,
-                                         transparency_mask,
-                                         thickness,
-                                         opacity,
-                                         pre_sample_length,
-                                         source_vgname,
-                                         vgname,
-                                         modifier_flags);
-}
-
-static int lineart_gpencil_update_strokes_exec(bContext *C, wmOperator *UNUSED(op))
-{
-  Depsgraph *dg = CTX_data_depsgraph_pointer(C);
-
-  BLI_spin_lock(&lineart_share.lock_loader);
-
-  ED_lineart_compute_feature_lines_background(dg, 0);
-
-  /* Wait for loading finish */
-  BLI_spin_lock(&lineart_share.lock_loader);
-  BLI_spin_unlock(&lineart_share.lock_loader);
-
-  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED | ND_SPACE_PROPERTIES, NULL);
-
-  return OPERATOR_FINISHED;
-}
-
-static int lineart_gpencil_bake_strokes_invoke(bContext *C,
-                                               wmOperator *op,
-                                               const wmEvent *UNUSED(event))
-{
-  Scene *scene = CTX_data_scene(C);
-  SceneLineart *lineart = &scene->lineart;
-  Depsgraph *dg = CTX_data_depsgraph_pointer(C);
-  int frame;
-  int frame_begin = ((lineart->flags & LRT_BAKING_FINAL_RANGE) ? MAX2(scene->r.sfra, 1) :
-                                                                 lineart->baking_preview_start);
-  int frame_end = ((lineart->flags & LRT_BAKING_FINAL_RANGE) ? scene->r.efra :
-                                                               lineart->baking_preview_end);
-  int frame_total = frame_end - frame_begin;
-  int frame_orig = scene->r.cfra;
-  int frame_increment = ((lineart->flags & LRT_BAKING_KEYFRAMES_ONLY) ?
-                             1 :
-                             (lineart->baking_skip + 1));
-  LineartGpencilModifierData *lmd;
-  LineartRenderBuffer *rb;
-  int use_types;
-  bool frame_updated;
-
-  /* Needed for progress report. */
-  lineart_share.wm = CTX_wm_manager(C);
-  lineart_share.main_window = CTX_wm_window(C);
-
-  for (frame = frame_begin; frame <= frame_end; frame += frame_increment) {
-
-    frame_updated = false;
-
-    FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_BEGIN (
-        scene->master_collection, ob, DAG_EVAL_RENDER) {
-
-      int cleared = 0;
-      if (ob->type == OB_GPENCIL) {
-        LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
-          if (md->type == eGpencilModifierType_Lineart) {
-            lmd = (LineartGpencilModifierData *)md;
-            bGPdata *gpd = ob->data;
-            bGPDlayer *gpl = BKE_gpencil_layer_get_by_name(gpd, lmd->target_layer, 1);
-            bGPDframe *gpf = ((lineart->flags & LRT_BAKING_KEYFRAMES_ONLY) ?
-                                  BKE_gpencil_layer_frame_find(gpl, frame) :
-                                  BKE_gpencil_layer_frame_get(gpl, frame, GP_GETFRAME_ADD_NEW));
-
-            if (!gpf) {
-              continue; /* happens when it's keyframe only. */
-            }
-
-            if (!frame_updated) {
-              /* Reset flags. LRT_SYNC_IGNORE prevent any line art modifiers run calculation
-               * function when depsgraph calls for modifier evalurates. */
-              ED_lineart_modifier_sync_flag_set(LRT_SYNC_IGNORE, false);
-              ED_lineart_calculation_flag_set(LRT_RENDER_IDLE);
-
-              BKE_scene_frame_set(scene, frame);
-              BKE_scene_graph_update_for_newframe(dg);
-
-              ED_lineart_update_render_progress(
-                  (int)((float)(frame - frame_begin) / frame_total * 100), NULL);
-
-              BLI_spin_lock(&lineart_share.lock_loader);
-              ED_lineart_compute_feature_lines_background(dg, 0);
-
-              /* Wait for loading finish */
-              BLI_spin_lock(&lineart_share.lock_loader);
-              BLI_spin_unlock(&lineart_share.lock_loader);
-
-              while (!ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH) ||
-                     !ED_lineart_calculation_flag_check(LRT_RENDER_FINISHED)) {
-                /* Wait till it's done. */
-              }
-
-              ED_lineart_chain_clear_picked_flag(lineart_share.render_buffer_shared);
-
-              frame_updated = true;
-            }
-
-            /* Clear original frame */
-            if ((scene->lineart.flags & LRT_GPENCIL_OVERWRITE) && (!cleared)) {
-              BKE_gpencil_layer_frame_delete(gpl, gpf);
-              gpf = BKE_gpencil_layer_frame_get(gpl, frame, GP_GETFRAME_ADD_NEW);
-              cleared = 1;
-            }
-
-            rb = lineart_share.render_buffer_shared;
-
-            if (rb->fuzzy_everything) {
-              use_types = LRT_EDGE_FLAG_CONTOUR;
-            }
-            else if (rb->fuzzy_intersections) {
-              use_types = lmd->line_types | LRT_EDGE_FLAG_INTERSECTION;
-            }
-            else {
-              use_types = lmd->line_types;
-            }
-
-            ED_lineart_gpencil_generate_strokes_direct(
-                dg,
-                ob,
-                gpl,
-                gpf,
-                lmd->source_type,
-                lmd->source_type == LRT_SOURCE_OBJECT ? (void *)lmd->source_object :
-                                                        (void *)lmd->source_collection,
-                lmd->level_start,
-                lmd->use_multiple_levels ? lmd->level_end : lmd->level_start,
-                lmd->target_material ?
-                    BKE_gpencil_object_material_index_get(ob, lmd->target_material) :
-                    0,
-                use_types,
-                lmd->transparency_flags,
-                lmd->transparency_mask,
-                lmd->thickness,
-                lmd->opacity,
-                lmd->pre_sample_length,
-                lmd->source_vertex_group,
-                lmd->vgname,
-                lmd->flags);
-          }
-        }
-      }
-    }
-    FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_END;
-  }
-
-  /* Restore original frame. */
-  BKE_scene_frame_set(scene, frame_orig);
-  BKE_scene_graph_update_for_newframe(dg);
-
-  ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, false);
-  ED_lineart_calculation_flag_set(LRT_RENDER_FINISHED);
-
-  BKE_report(op->reports, RPT_INFO, "Line Art baking is complete.");
-  WM_operator_confirm_message_ex(C,
-                                 op,
-                                 "Line Art baking is complete.",
-                                 ICON_MOD_WIREFRAME,
-                                 "Disable Line Art master switch",
-                                 WM_OP_EXEC_REGION_WIN);
-
-  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED | ND_SPACE_PROPERTIES, NULL);
-
-  ED_lineart_update_render_progress(100, NULL);
-
-  return OPERATOR_FINISHED;
-}
-
-static int lineart_gpencil_bake_strokes_exec(bContext *C, wmOperator *UNUSED(op))
-{
-  Scene *scene = CTX_data_scene(C);
-
-  /* If confirmed in the dialog, then just turn off the master switch upon finished baking. */
-  scene->lineart.flags &= (~LRT_AUTO_UPDATE);
-
-  return OPERATOR_FINISHED;
-}
-
-/* Blocking 1 frame update */
-void SCENE_OT_lineart_update_strokes(wmOperatorType *ot)
-{
-  ot->name = "Update Line Art Strokes";
-  ot->description = "Update strokes for Line Art grease pencil targets";
-  ot->idname = "SCENE_OT_lineart_update_strokes";
-
-  ot->exec = lineart_gpencil_update_strokes_exec;
-}
-
-/* All frames in range */
-void SCENE_OT_lineart_bake_strokes(wmOperatorType *ot)
-{
-  ot->name = "Bake Line Art Strokes";
-  ot->description = "Bake Line Art into grease pencil strokes for all frames";
-  ot->idname = "SCENE_OT_lineart_bake_strokes";
-
-  ot->invoke = lineart_gpencil_bake_strokes_invoke;
-  ot->exec = lineart_gpencil_bake_strokes_exec;
+  ED_lineart_gpencil_generate(depsgraph,
+                              ob,
+                              gp_obmat_inverse,
+                              gpl,
+                              gpf,
+                              level_start,
+                              level_end,
+                              mat_nr,
+                              source_object,
+                              source_collection,
+                              use_types,
+                              transparency_flags,
+                              transparency_mask,
+                              thickness,
+                              opacity,
+                              pre_sample_length,
+                              source_vgname,
+                              vgname,
+                              modifier_flags);
 }
 
 void ED_lineart_post_frame_update_external(bContext *C,

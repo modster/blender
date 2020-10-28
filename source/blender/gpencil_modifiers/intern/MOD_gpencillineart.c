@@ -98,7 +98,7 @@ static void generate_strokes_actual(
     printf("LRT: Generating from modifier.\n");
   }
 
-  ED_lineart_gpencil_generate_strokes_direct(
+  ED_lineart_gpencil_generate_with_type(
       depsgraph,
       ob,
       gpl,
