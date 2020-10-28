@@ -138,9 +138,9 @@ static void find_exportable_objects(Depsgraph *depsgraph,
   }
 }
 
-static void write_mesh_object(Vector<std::unique_ptr<OBJMesh>> exportable_as_mesh,
-                              OBJWriter &frame_writer,
-                              const OBJExportParams &export_params)
+static void write_mesh_objects(Vector<std::unique_ptr<OBJMesh>> exportable_as_mesh,
+                               OBJWriter &frame_writer,
+                               const OBJExportParams &export_params)
 {
   std::unique_ptr<MTLWriter> mtl_writer = nullptr;
   if (export_params.export_materials) {
@@ -178,9 +178,11 @@ static void write_mesh_object(Vector<std::unique_ptr<OBJMesh>> exportable_as_mes
   }
 }
 
-/** Export NURBS Curves in parameter form, not as vertices and edges. */
-static void write_nurbs_curve_object(const Vector<std::unique_ptr<OBJCurve>> &exportable_as_nurbs,
-                                     const OBJWriter &frame_writer)
+/**
+ * Export NURBS Curves in parameter form, not as vertices and edges.
+ */
+static void write_nurbs_curve_objects(const Vector<std::unique_ptr<OBJCurve>> &exportable_as_nurbs,
+                                      const OBJWriter &frame_writer)
 {
   for (const std::unique_ptr<OBJCurve> &nurbs_to_export : exportable_as_nurbs) {
     /* #OBJCurve don't have any dynamically allocated memory, so it's fine
@@ -209,8 +211,8 @@ static void export_frame(Depsgraph *depsgraph,
   Vector<std::unique_ptr<OBJCurve>> exportable_as_nurbs;
   find_exportable_objects(depsgraph, export_params, exportable_as_mesh, exportable_as_nurbs);
 
-  write_mesh_object(std::move(exportable_as_mesh), frame_writer, export_params);
-  write_nurbs_curve_object(std::move(exportable_as_nurbs), frame_writer);
+  write_mesh_objects(std::move(exportable_as_mesh), frame_writer, export_params);
+  write_nurbs_curve_objects(std::move(exportable_as_nurbs), frame_writer);
 }
 
 /**
