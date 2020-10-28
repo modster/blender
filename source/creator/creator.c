@@ -404,7 +404,7 @@ int main(int argc,
   MEM_use_memleak_detection(false);
 
   /* Parse environment handling arguments. */
-  BLI_argsParse(ba, 0, NULL, NULL);
+  BLI_argsParse(ba, ARG_PASS_ENVIRONMENT, NULL, NULL);
 
 #else
   /* Using preferences or user startup makes no sense for #WITH_PYTHON_MODULE. */
@@ -419,7 +419,7 @@ int main(int argc,
 
 #ifndef WITH_PYTHON_MODULE
   /* First test for background-mode (#Global.background) */
-  BLI_argsParse(ba, 1, NULL, NULL);
+  BLI_argsParse(ba, ARG_PASS_SETTINGS, NULL, NULL);
 
   main_signal_setup();
 #endif
@@ -428,6 +428,7 @@ int main(int argc,
   BLI_task_scheduler_init();
 
 #ifdef WITH_FFMPEG
+  /* Keep after #ARG_PASS_SETTINGS since debug flags are checked. */
   IMB_ffmpeg_init();
 #endif
 
@@ -457,20 +458,15 @@ int main(int argc,
 
   BKE_materials_init();
 
+#ifndef WITH_PYTHON_MODULE
   if (G.background == 0) {
-#ifndef WITH_PYTHON_MODULE
-    BLI_argsParse(ba, 2, NULL, NULL);
-    BLI_argsParse(ba, 3, NULL, NULL);
-#endif
-    WM_init(C, argc, (const char **)argv);
+    BLI_argsParse(ba, ARG_PASS_SETTINGS_GUI, NULL, NULL);
   }
-  else {
-#ifndef WITH_PYTHON_MODULE
-    BLI_argsParse(ba, 3, NULL, NULL);
+  BLI_argsParse(ba, ARG_PASS_SETTINGS_FORCE, NULL, NULL);
 #endif
 
-    WM_init(C, argc, (const char **)argv);
-  }
+  WM_init(C, argc, (const char **)argv);
+
 #ifndef WITH_PYTHON
   printf(
       "\n* WARNING * - Blender compiled without Python!\n"
@@ -488,6 +484,7 @@ int main(int argc,
 
   /* OK we are ready for it */
 #ifndef WITH_PYTHON_MODULE
+  /* Handles #ARG_PASS_FINAL. */
   main_args_setup_post(C, ba);
 #endif
 
