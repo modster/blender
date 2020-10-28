@@ -50,6 +50,8 @@
 #include "BKE_screen.h"
 
 #include "DEG_depsgraph.h"
+#include "DEG_depsgraph_build.h"
+#include "DEG_depsgraph_query.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -247,6 +249,15 @@ static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, 
   walk(userData, ob, (ID **)&mmd->object, IDWALK_CB_USER);
 }
 
+static void updateDepsgraph(GpencilModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
+{
+  OpacityGpencilModifierData *mmd = (OpacityGpencilModifierData *)md;
+  if (mmd->object != NULL) {
+    DEG_add_object_relation(ctx->node, mmd->object, DEG_OB_COMP_TRANSFORM, "Opacity Modifier");
+  }
+  DEG_add_object_relation(ctx->node, ctx->object, DEG_OB_COMP_TRANSFORM, "Opacity Modifier");
+}
+
 static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
@@ -269,17 +280,21 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
     uiItemR(layout, ptr, "factor", 0, text, ICON_NONE);
   }
 
-  bool fading_enabled = RNA_boolean_get(ptr, "use_fading");
-  uiItemR(layout, ptr, "use_fading", 0, NULL, ICON_NONE);
-  if (fading_enabled) {
-    uiItemR(layout, ptr, "object", 0, NULL, ICON_CUBE);
-    uiLayout *sub = uiLayoutColumn(layout, true);
-    uiItemR(sub, ptr, "fading_start", 0, NULL, ICON_NONE);
-    uiItemR(sub, ptr, "fading_end", 0, NULL, ICON_NONE);
-    uiItemR(layout, ptr, "fading_end_factor", 0, NULL, ICON_NONE);
-  }
-
   gpencil_modifier_panel_end(layout, ptr);
+}
+
+static void fading_header_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
+
+  uiItemR(layout, ptr, "use_fading", 0, NULL, ICON_NONE);
+}
+
+static void fading_panel_draw(const bContext *C, Panel *panel)
+{
+  gpencil_modifier_fading_draw(C, panel);
 }
 
 static void mask_panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -320,6 +335,8 @@ static void panelRegister(ARegionType *region_type)
 {
   PanelType *panel_type = gpencil_modifier_panel_register(
       region_type, eGpencilModifierType_Opacity, panel_draw);
+  PanelType *fading_panel_type = gpencil_modifier_subpanel_register(
+      region_type, "fading", "", fading_header_draw, fading_panel_draw, panel_type);
   PanelType *mask_panel_type = gpencil_modifier_subpanel_register(
       region_type, "mask", "Influence", NULL, mask_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
@@ -343,7 +360,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Opacity = {
     /* initData */ initData,
     /* freeData */ freeData,
     /* isDisabled */ NULL,
-    /* updateDepsgraph */ NULL,
+    /* updateDepsgraph */ updateDepsgraph,
     /* dependsOnTime */ NULL,
     /* foreachIDLink */ foreachIDLink,
     /* foreachTexLink */ NULL,
