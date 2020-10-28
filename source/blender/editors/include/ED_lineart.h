@@ -380,8 +380,7 @@ typedef struct LineartSharedResource {
 #define DBL_TRIANGLE_LIM 1e-8
 #define DBL_EDGE_LIM 1e-9
 
-#define LRT_MEMORY_POOL_1MB 1048576
-#define LRT_MEMORY_POOL_64MB 67108864
+#define LRT_MEMORY_POOL_64MB (1 << 26)
 
 typedef enum eLineartTriangleFlags {
   LRT_CULL_DONT_CARE = 0,
@@ -621,6 +620,7 @@ struct Scene;
 LineartBoundingArea *ED_lineart_get_point_bounding_area(LineartRenderBuffer *rb,
                                                         double x,
                                                         double y);
+
 LineartBoundingArea *ED_lineart_get_point_bounding_area_deep(LineartRenderBuffer *rb,
                                                              double x,
                                                              double y);
@@ -648,6 +648,7 @@ void ED_lineart_gpencil_generate(struct Depsgraph *depsgraph,
                                  const char *source_vgname,
                                  const char *vgname,
                                  int modifier_flags);
+
 void ED_lineart_gpencil_generate_with_type(struct Depsgraph *depsgraph,
                                            struct Object *ob,
                                            struct bGPDlayer *gpl,

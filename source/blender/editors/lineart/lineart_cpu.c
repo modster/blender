@@ -323,6 +323,8 @@ static int lineart_occlusion_make_task_info(LineartRenderBuffer *rb, LineartRend
   LRT_ASSIGN_OCCLUSION_TASK(material);
   LRT_ASSIGN_OCCLUSION_TASK(edge_mark);
 
+#undef LRT_ASSIGN_OCCLUSION_TASK
+
   BLI_spin_unlock(&rb->lock_task);
 
   return res;
@@ -1113,6 +1115,11 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
   *r_v_count = v_count;
   *r_l_count = l_count;
   *r_t_count = t_count;
+
+#undef INCREASE_RL
+#undef SELECT_RL
+#undef RELINK_RL
+#undef REMOVE_TRIANGLE_RL
 }
 
 /** This function cuts triangles that are (partially or fully) behind near clipping plane.
@@ -1240,6 +1247,9 @@ static void lineart_main_cull_triangles(LineartRenderBuffer *rb, bool clip_far)
     teln->element_count = t_count;
     veln->element_count = v_count;
   }
+
+#undef LRT_CULL_ENSURE_MEMORY
+#undef LRT_CULL_DECIDE_INSIDE
 }
 
 static void lineart_main_free_adjacent_data(LineartRenderBuffer *rb)
@@ -2775,9 +2785,6 @@ static int lineart_triangle_size_get(LineartRenderBuffer *rb, const Scene *scene
          (sizeof(LineartRenderLine *) * lineart_share.thread_count);
 }
 
-#define LRT_BOUND_AREA_CROSSES(b1, b2) \
-  ((b1)[0] < (b2)[1] && (b1)[1] > (b2)[0] && (b1)[3] < (b2)[2] && (b1)[2] > (b2)[3])
-
 static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
 {
   int sp_w = 4; /*  20; */
@@ -3086,6 +3093,7 @@ static int lineart_bounding_area_line_crossed(LineartRenderBuffer *UNUSED(fb),
 
   return 0;
 }
+
 static int lineart_bounding_area_triangle_covered(LineartRenderBuffer *fb,
                                                   LineartRenderTriangle *rt,
                                                   LineartBoundingArea *ba)
@@ -3119,6 +3127,7 @@ static int lineart_bounding_area_triangle_covered(LineartRenderBuffer *fb,
 
   return 0;
 }
+
 static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
                                                 LineartBoundingArea *root_ba,
                                                 LineartRenderTriangle *rt,
@@ -3173,6 +3182,7 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
     }
   }
 }
+
 static void lineart_bounding_area_link_line(LineartRenderBuffer *rb,
                                             LineartBoundingArea *root_ba,
                                             LineartRenderLine *rl)
@@ -3199,6 +3209,7 @@ static void lineart_bounding_area_link_line(LineartRenderBuffer *rb,
     }
   }
 }
+
 static int lineart_get_triangle_bounding_areas(LineartRenderBuffer *rb,
                                                LineartRenderTriangle *rt,
                                                int *rowbegin,
@@ -3242,6 +3253,7 @@ static int lineart_get_triangle_bounding_areas(LineartRenderBuffer *rb,
 
   return 1;
 }
+
 static int lineart_get_line_bounding_areas(LineartRenderBuffer *rb,
                                            LineartRenderLine *rl,
                                            int *rowbegin,
@@ -3291,6 +3303,7 @@ static int lineart_get_line_bounding_areas(LineartRenderBuffer *rb,
 
   return 1;
 }
+
 LineartBoundingArea *ED_lineart_get_point_bounding_area(LineartRenderBuffer *rb,
                                                         double x,
                                                         double y)
@@ -3320,6 +3333,7 @@ LineartBoundingArea *ED_lineart_get_point_bounding_area(LineartRenderBuffer *rb,
 
   return &rb->initial_bounding_areas[row * 4 + col];
 }
+
 static LineartBoundingArea *lineart_get_point_bounding_area_recursive(LineartBoundingArea *ba,
                                                                       double x,
                                                                       double y)
@@ -3345,7 +3359,9 @@ static LineartBoundingArea *lineart_get_point_bounding_area_recursive(LineartBou
     }
   }
   return NULL;
+#undef IN_BOUND
 }
+
 LineartBoundingArea *ED_lineart_get_point_bounding_area_deep(LineartRenderBuffer *rb,
                                                              double x,
                                                              double y)
@@ -3654,6 +3670,7 @@ static LineartBoundingArea *lineart_get_bounding_area(LineartRenderBuffer *rb, d
   }
   return iba;
 }
+
 static LineartBoundingArea *linear_bounding_areat_first_possible(LineartRenderBuffer *rb,
                                                                  LineartRenderLine *rl)
 {
