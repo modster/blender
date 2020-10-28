@@ -339,17 +339,16 @@ void BPY_python_start(bContext *C, int argc, const char **argv)
   /* Initialize Python (also acquires lock). */
   Py_Initialize();
 
-  // PySys_SetArgv(argc, argv);  /* broken in py3, not a huge deal */
-  /* sigh, why do python guys not have a (char **) version anymore? */
+  /* We could convert to #wchar_t then pass to #PySys_SetArgv (or use #PyConfig in Python 3.8+).
+   * However this risks introducing subtle changes in encoding that are hard to track down.
+   *
+   * So rely on #PyC_UnicodeFromByte since it's a tried & true way of getting paths
+   * that include non `utf-8` compatible characters, see: T20021. */
   {
-    int i;
     PyObject *py_argv = PyList_New(argc);
-    for (i = 0; i < argc; i++) {
-      /* should fix bug T20021 - utf path name problems, by replacing
-       * PyUnicode_FromString, with this one */
+    for (int i = 0; i < argc; i++) {
       PyList_SET_ITEM(py_argv, i, PyC_UnicodeFromByte(argv[i]));
     }
-
     PySys_SetObject("argv", py_argv);
     Py_DECREF(py_argv);
   }
@@ -670,7 +669,7 @@ static void bpy_module_delay_init(PyObject *bpy_proxy)
   const int argc = 1;
   const char *argv[2];
 
-  /* updating the module dict below will loose the reference to __file__ */
+  /* updating the module dict below will lose the reference to __file__ */
   PyObject *filename_obj = PyModule_GetFilenameObject(bpy_proxy);
 
   const char *filename_rel = _PyUnicode_AsString(filename_obj); /* can be relative */
