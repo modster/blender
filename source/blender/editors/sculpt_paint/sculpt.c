@@ -1159,6 +1159,7 @@ void SCULPT_floodfill_free(SculptFloodFill *flood)
   flood->queue = NULL;
 }
 
+/* -------------------------------------------------------------------- */
 /** \name Tool Capabilities
  *
  * Avoid duplicate checks, internal logic only,
@@ -1380,6 +1381,7 @@ static void sculpt_project_v3_normal_align(SculptSession *ss,
       grab_delta, ss->cache->sculpt_normal_symm, (len_signed * normal_weight) * len_view_scale);
 }
 
+/* -------------------------------------------------------------------- */
 /** \name SculptProjectVector
  *
  * Fast-path for #project_plane_v3_v3v3
@@ -1887,6 +1889,7 @@ static float calc_symmetry_feather(Sculpt *sd, StrokeCache *cache)
   return 1.0f;
 }
 
+/* -------------------------------------------------------------------- */
 /** \name Calculate Normal and Center
  *
  * Calculate geometry surrounding the brush center.
@@ -3007,6 +3010,7 @@ static void do_mask_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode)
   }
 }
 
+/* -------------------------------------------------------------------- */
 /** \name Sculpt Multires Displacement Eraser Brush
  * \{ */
 
@@ -3229,7 +3233,6 @@ static void do_draw_sharp_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int to
 }
 
 /* -------------------------------------------------------------------- */
-
 /** \name Sculpt Topology Brush
  * \{ */
 
@@ -3805,20 +3808,33 @@ static void do_grab_brush_task_cb_ex(void *__restrict userdata,
       ss, &test, data->brush->falloff_shape);
   const int thread_id = BLI_task_parallel_thread_id(tls);
 
+  const bool grab_silhouette = brush->flag2 & BRUSH_GRAB_SILHOUETTE;
+
   BKE_pbvh_vertex_iter_begin(ss->pbvh, data->nodes[n], vd, PBVH_ITER_UNIQUE)
   {
     SCULPT_orig_vert_data_update(&orig_data, &vd);
 
     if (sculpt_brush_test_sq_fn(&test, orig_data.co)) {
-      const float fade = bstrength * SCULPT_brush_strength_factor(ss,
-                                                                  brush,
-                                                                  orig_data.co,
-                                                                  sqrtf(test.dist),
-                                                                  orig_data.no,
-                                                                  NULL,
-                                                                  vd.mask ? *vd.mask : 0.0f,
-                                                                  vd.index,
-                                                                  thread_id);
+      float fade = bstrength * SCULPT_brush_strength_factor(ss,
+                                                            brush,
+                                                            orig_data.co,
+                                                            sqrtf(test.dist),
+                                                            orig_data.no,
+                                                            NULL,
+                                                            vd.mask ? *vd.mask : 0.0f,
+                                                            vd.index,
+                                                            thread_id);
+
+      if (grab_silhouette) {
+        float silhouette_test_dir[3];
+        normalize_v3_v3(silhouette_test_dir, grab_delta);
+        if (dot_v3v3(ss->cache->initial_normal, ss->cache->grab_delta_symmetry) < 0.0f) {
+          mul_v3_fl(silhouette_test_dir, -1.0f);
+        }
+        float vno[3];
+        normal_short_to_float_v3(vno, orig_data.no);
+        fade *= max_ff(dot_v3v3(vno, silhouette_test_dir), 0.0f);
+      }
 
       mul_v3_v3fl(proxy[vd.i], grab_delta, fade);
 
@@ -4752,7 +4768,6 @@ static void do_flatten_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totno
 }
 
 /* -------------------------------------------------------------------- */
-
 /** \name Sculpt Clay Brush
  * \{ */
 
@@ -5277,7 +5292,6 @@ static void do_scrape_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnod
 }
 
 /* -------------------------------------------------------------------- */
-
 /** \name Sculpt Clay Thumb Brush
  * \{ */
 
@@ -5666,15 +5680,11 @@ static void do_brush_action(Sculpt *sd, Object *ob, Brush *brush, UnifiedPaintSe
   /* Check for unsupported features. */
   PBVHType type = BKE_pbvh_type(ss->pbvh);
   if (brush->sculpt_tool == SCULPT_TOOL_PAINT && type != PBVH_FACES) {
-    if (!U.experimental.use_sculpt_vertex_colors) {
-      return;
-    }
+    return;
   }
 
   if (brush->sculpt_tool == SCULPT_TOOL_SMEAR && type != PBVH_FACES) {
-    if (!U.experimental.use_sculpt_vertex_colors) {
-      return;
-    }
+    return;
   }
 
   /* Build a list of all nodes that are potentially within the brush's area of influence */
@@ -7186,7 +7196,7 @@ float SCULPT_raycast_init(ViewContext *vc,
 
   if ((rv3d->is_persp == false) &&
       /* If the ray is clipped, don't adjust its start/end. */
-      RV3D_CLIPPING_ENABLED(v3d, rv3d)) {
+      !RV3D_CLIPPING_ENABLED(v3d, rv3d)) {
     BKE_pbvh_raycast_project_ray_root(ob->sculpt->pbvh, original, ray_start, ray_end, ray_normal);
 
     /* rRecalculate the normal. */
@@ -8123,6 +8133,7 @@ static void SCULPT_OT_symmetrize(wmOperatorType *ot)
 
 /**** Toggle operator for turning sculpt mode on or off ****/
 
+/** \warning Expects a fully evaluated depsgraph. */
 static void sculpt_init_session(Depsgraph *depsgraph, Scene *scene, Object *ob)
 {
   /* Create persistent sculpt mode data. */
@@ -8187,16 +8198,13 @@ void ED_object_sculptmode_enter_ex(Main *bmain,
 
   if (flush_recalc) {
     DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
+    BKE_scene_graph_evaluated_ensure(depsgraph, bmain);
   }
 
   /* Create sculpt mode session data. */
   if (ob->sculpt) {
     BKE_sculptsession_free(ob);
   }
-
-  /* Make sure derived final from original object does not reference possibly
-   * freed memory. */
-  BKE_object_free_derived_caches(ob);
 
   /* Copy the current mesh visibility to the Face Sets. */
   BKE_sculpt_face_sets_ensure_from_base_mesh_visibility(me);

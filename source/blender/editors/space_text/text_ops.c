@@ -409,7 +409,7 @@ void TEXT_OT_open(wmOperatorType *ot)
                                  FILE_DEFAULTDISPLAY,
                                  FILE_SORT_ALPHA); /* TODO: relative_path. */
   RNA_def_boolean(
-      ot->srna, "internal", 0, "Make internal", "Make text file internal after loading");
+      ot->srna, "internal", 0, "Make Internal", "Make text file internal after loading");
 }
 
 /** \} */
@@ -573,17 +573,6 @@ void TEXT_OT_make_internal(wmOperatorType *ot)
 /** \name Save Operator
  * \{ */
 
-static bool text_save_poll(bContext *C)
-{
-  Text *text = CTX_data_edit_text(C);
-
-  if (!text_edit_poll(C)) {
-    return 0;
-  }
-
-  return (text->filepath != NULL && !(text->flags & TXT_ISMEM));
-}
-
 static void txt_write_file(Main *bmain, Text *text, ReportList *reports)
 {
   FILE *fp;
@@ -593,6 +582,13 @@ static void txt_write_file(Main *bmain, Text *text, ReportList *reports)
 
   BLI_strncpy(filepath, text->filepath, FILE_MAX);
   BLI_path_abs(filepath, BKE_main_blendfile_path(bmain));
+
+  /* Check if file write permission is ok. */
+  if (BLI_exists(filepath) && !BLI_file_is_writable(filepath)) {
+    BKE_reportf(
+        reports, RPT_ERROR, "Cannot save text file, path \"%s\" is not writable", filepath);
+    return;
+  }
 
   fp = BLI_fopen(filepath, "w");
   if (fp == NULL) {
@@ -616,8 +612,8 @@ static void txt_write_file(Main *bmain, Text *text, ReportList *reports)
   if (BLI_stat(filepath, &st) == 0) {
     text->mtime = st.st_mtime;
 
-    /* report since this can be called from key-shortcuts */
-    BKE_reportf(reports, RPT_INFO, "Saved Text '%s'", filepath);
+    /* Report since this can be called from key shortcuts. */
+    BKE_reportf(reports, RPT_INFO, "Saved text \"%s\"", filepath);
   }
   else {
     text->mtime = 0;
@@ -644,6 +640,18 @@ static int text_save_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
+static int text_save_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+{
+  Text *text = CTX_data_edit_text(C);
+
+  /* Internal and texts without a filepath will go to "Save As". */
+  if (text->filepath == NULL || (text->flags & TXT_ISMEM)) {
+    WM_operator_name_call(C, "TEXT_OT_save_as", WM_OP_INVOKE_DEFAULT, NULL);
+    return OPERATOR_CANCELLED;
+  }
+  return text_save_exec(C, op);
+}
+
 void TEXT_OT_save(wmOperatorType *ot)
 {
   /* identifiers */
@@ -653,7 +661,8 @@ void TEXT_OT_save(wmOperatorType *ot)
 
   /* api callbacks */
   ot->exec = text_save_exec;
-  ot->poll = text_save_poll;
+  ot->invoke = text_save_invoke;
+  ot->poll = text_edit_poll;
 }
 
 /** \} */
@@ -3693,7 +3702,7 @@ void TEXT_OT_replace(wmOperatorType *ot)
 
   /* properties */
   PropertyRNA *prop;
-  prop = RNA_def_boolean(ot->srna, "all", false, "Replace all", "Replace all occurrences");
+  prop = RNA_def_boolean(ot->srna, "all", false, "Replace All", "Replace all occurrences");
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
@@ -3780,6 +3789,17 @@ static const EnumPropertyItem resolution_items[] = {
     {RESOLVE_MAKE_INTERNAL, "MAKE_INTERNAL", 0, "Make Internal", ""},
     {0, NULL, 0, NULL, NULL},
 };
+
+static bool text_resolve_conflict_poll(bContext *C)
+{
+  Text *text = CTX_data_edit_text(C);
+
+  if (!text_edit_poll(C)) {
+    return false;
+  }
+
+  return ((text->filepath != NULL) && !(text->flags & TXT_ISMEM));
+}
 
 static int text_resolve_conflict_exec(bContext *C, wmOperator *op)
 {
@@ -3872,7 +3892,7 @@ void TEXT_OT_resolve_conflict(wmOperatorType *ot)
   /* api callbacks */
   ot->exec = text_resolve_conflict_exec;
   ot->invoke = text_resolve_conflict_invoke;
-  ot->poll = text_save_poll;
+  ot->poll = text_resolve_conflict_poll;
 
   /* properties */
   RNA_def_enum(ot->srna,
