@@ -26,11 +26,6 @@
 
 namespace blender::io::usd {
 
-struct USDImporterContext;
-class USDObjectReader;
-
-void debug_traverse_stage(const pxr::UsdStageRefPtr &usd_stage);
-
 /* TODO(makowalski):  copy_m44_axis_swap, create_swapped_rotation_matrix
  * and copy_zup_from_yup below are duplicates of the declarations in
  * abc_axis_conversion.h, and should be moved to a shared location. */
@@ -56,10 +51,5 @@ BLI_INLINE void copy_zup_from_yup(float zup[3], const float yup[3])
   zup[1] = -yup[2];
   zup[2] = old_yup1;
 }
-
-void create_readers(const pxr::UsdPrim &root,
-                    const USDImporterContext &context,
-                    std::vector<USDObjectReader *> &r_readers,
-                    std::vector<USDObjectReader *> &r_child_readers);
 
 } /* namespace blender::io::usd */

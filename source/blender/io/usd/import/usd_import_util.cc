@@ -59,13 +59,6 @@
 #include <iostream>
 #include <map>
 
-/* TfToken objects are not cheap to construct, so we do it once. */
-namespace usdtokens {
-static const pxr::TfToken xform_type("Xform", pxr::TfToken::Immortal);
-static const pxr::TfToken mesh_type("Mesh", pxr::TfToken::Immortal);
-static const pxr::TfToken scope_type("Scope", pxr::TfToken::Immortal);
-}  // namespace usdtokens
-
 namespace {
 /* Copy between Z-up and Y-up. */
 
@@ -88,36 +81,6 @@ inline void copy_zup_from_yup(float zup[3], const float yup[3])
 }  // end anonymous namespace
 
 namespace blender::io::usd {
-
-static USDObjectReader *get_reader(const pxr::UsdPrim &prim, const USDImporterContext &context)
-{
-  USDObjectReader *result = nullptr;
-
-  if (prim.IsA<pxr::UsdGeomMesh>()) {
-    result = new USDMeshReader(prim, context);
-  }
-  else if (prim.IsA<pxr::UsdGeomXform>()) {
-    result = new USDTransformReader(prim, context);
-  }
-
-  return result;
-}
-
-void debug_traverse_stage(const pxr::UsdStageRefPtr &usd_stage)
-{
-  if (!usd_stage) {
-    return;
-  }
-
-  pxr::UsdPrimRange prims = usd_stage->Traverse(
-      pxr::UsdTraverseInstanceProxies(pxr::UsdPrimAllPrimsPredicate));
-
-  for (const pxr::UsdPrim &prim : prims) {
-    pxr::SdfPath path = prim.GetPath();
-    printf("%s\n", path.GetString().c_str());
-    printf("  Type: %s\n", prim.GetTypeName().GetString().c_str());
-  }
-}
 
 void create_swapped_rotation_matrix(float rot_x_mat[3][3],
                                     float rot_y_mat[3][3],
@@ -228,71 +191,6 @@ void copy_m44_axis_swap(float dst_mat[4][4], float src_mat[4][4], UsdAxisSwapMod
 
   size_to_mat4(dst_scale_mat, dst_scale);
   mul_m4_m4m4(dst_mat, dst_mat, dst_scale_mat);
-}
-
-void create_readers(const pxr::UsdPrim &prim,
-                    const USDImporterContext &context,
-                    std::vector<USDObjectReader *> &r_readers,
-                    std::vector<USDObjectReader *> &r_child_readers)
-{
-  if (!prim) {
-    return;
-  }
-
-  bool is_root = prim.IsPseudoRoot();
-
-  std::vector<USDObjectReader *> child_readers;
-
-  /* Recursively create readers for the child prims. */
-  pxr::UsdPrimSiblingRange child_prims = prim.GetFilteredChildren(
-      pxr::UsdTraverseInstanceProxies(pxr::UsdPrimDefaultPredicate));
-
-  for (const pxr::UsdPrim &child_prim : child_prims) {
-    create_readers(child_prim, context, r_readers, child_readers);
-  }
-
-  if (is_root) {
-    /* We're at the pseudo root, so we're done. */
-    return;
-  }
-
-  /* We prune away empty transform or scope hierarchies (we can add an import flag to make this
-   * behavior optional).  Therefore, we skip this prim if it's an Xform or Scope and if
-   * it has no corresponding child readers. */
-  if ((prim.IsA<pxr::UsdGeomXform>() || prim.IsA<pxr::UsdGeomScope>()) && child_readers.empty()) {
-    return;
-  }
-
-  /* If this is an Xform prim, see if we can merge with the child reader.
-   * We only merge if the child reader hasn't yet been merged
-   * and if it corresponds to a mesh prim.  The list of child types that
-   * can be merged will be expanded as we support more reader types
-   * (e.g., for lights, curves, etc.). */
-
-  if (prim.IsA<pxr::UsdGeomXform>() && child_readers.size() == 1 &&
-      !child_readers.front()->merged_with_parent() &&
-      child_readers.front()->prim().IsA<pxr::UsdGeomMesh>()) {
-    child_readers.front()->set_merged_with_parent(true);
-    /* Don't create a reader for the Xform but, instead, return the grandchild
-     * that we merged. */
-    r_child_readers.push_back(child_readers.front());
-    return;
-  }
-
-  USDObjectReader *reader = get_reader(prim, context);
-
-  if (reader) {
-    for (USDObjectReader *child_reader : child_readers) {
-      child_reader->set_parent(reader);
-    }
-    r_child_readers.push_back(reader);
-    r_readers.push_back(reader);
-  }
-  else {
-    /* No reader was allocated for this prim, so we pass our child readers back to the caller,
-     * for possible handling by a parent reader. */
-    r_child_readers.insert(r_child_readers.end(), child_readers.begin(), child_readers.end());
-  }
 }
 
 } /* namespace blender::io::usd */

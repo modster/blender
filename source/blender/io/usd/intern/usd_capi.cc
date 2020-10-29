@@ -17,8 +17,8 @@
  * All rights reserved.
  */
 
-#include "import/usd_import_util.h"
 #include "import/usd_importer_context.h"
+#include "import/usd_prim_iterator.h"
 #include "import/usd_reader_object.h"
 #include "usd.h"
 #include "usd_hierarchy_iterator.h"
@@ -262,7 +262,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 
   // Optionally print the stage contents for debugging.
   if (data->params.debug) {
-    debug_traverse_stage(data->stage);
+    USDPrimIterator::debug_traverse_stage(data->stage);
   }
 
   if (G.is_break) {
@@ -274,7 +274,8 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   *data->progress = 0.1f;
 
   std::vector<USDObjectReader *> child_readers;
-  create_readers(data->stage->GetPseudoRoot(), import_ctx, data->readers, child_readers);
+  USDPrimIterator::create_readers(
+      data->stage->GetPseudoRoot(), import_ctx, data->readers, child_readers);
 
   // Create objects
 
