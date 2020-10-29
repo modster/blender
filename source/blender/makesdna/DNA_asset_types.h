@@ -35,6 +35,8 @@ typedef struct CustomTag {
 
 #ifdef WITH_ASSET_REPO_INFO
 typedef struct AssetCatalog {
+  struct AssetCatalog *next, *prev;
+
   char name[64]; /* MAX_NAME */
 } AssetCatalog;
 

@@ -2209,10 +2209,14 @@ static void write_thumb(WriteData *wd, const BlendThumbnail *thumb)
 }
 
 #ifdef WITH_ASSET_REPO_INFO
-static void write_asset_repository_info(WriteData *wd, const AssetRepositoryInfo *repository_info)
+static void write_asset_repository_info(BlendWriter *writer,
+                                        const AssetRepositoryInfo *repository_info)
 {
   if (repository_info) {
-    writestruct(wd, ASSET_REPOSITORY_INFO, AssetRepositoryInfo, 1, repository_info);
+    writestruct(writer->wd, ASSET_REPOSITORY_INFO, AssetRepositoryInfo, 1, repository_info);
+    LISTBASE_FOREACH (const AssetCatalog *, catalog, &repository_info->catalogs) {
+      BLO_write_struct(writer, AssetCatalog, catalog);
+    }
   }
 }
 #endif
@@ -2258,7 +2262,7 @@ static bool write_file_handle(Main *mainvar,
   write_renderinfo(wd, mainvar);
   write_thumb(wd, thumb);
 #ifdef WITH_ASSET_REPO_INFO
-  write_asset_repository_info(wd, repository_info);
+  write_asset_repository_info(&writer, repository_info);
 #endif
   write_global(wd, write_flags, mainvar);
 

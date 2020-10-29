@@ -39,6 +39,9 @@ void BKE_asset_repository_info_global_free(void);
 void BKE_asset_repository_info_update_for_file_read(struct AssetRepositoryInfo **repository_info);
 #endif
 
+struct AssetCatalog *BKE_asset_repository_catalog_create(const char *name);
+void BKE_asset_repository_catalog_free(struct AssetCatalog *catalog);
+
 struct AssetData *BKE_asset_data_create(void);
 void BKE_asset_data_free(struct AssetData *asset_data);
 

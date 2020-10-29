@@ -49,6 +49,14 @@ AssetRepositoryInfo *BKE_asset_repository_info_global_ensure(void)
 
 void BKE_asset_repository_info_free(AssetRepositoryInfo **repository_info)
 {
+  if (!*repository_info) {
+    return;
+  }
+
+  LISTBASE_FOREACH_MUTABLE (AssetCatalog *, catalog, &(*repository_info)->catalogs) {
+    BLI_remlink(&(*repository_info)->catalogs, catalog);
+    BKE_asset_repository_catalog_free(catalog);
+  }
   MEM_SAFE_FREE(*repository_info);
 }
 
@@ -64,6 +72,19 @@ void BKE_asset_repository_info_update_for_file_read(AssetRepositoryInfo **old_re
 }
 
 #endif
+
+AssetCatalog *BKE_asset_repository_catalog_create(const char *name)
+{
+  AssetCatalog *catalog = MEM_callocN(sizeof(*catalog), __func__);
+
+  BLI_strncpy(catalog->name, name, sizeof(catalog->name));
+  return catalog;
+}
+
+void BKE_asset_repository_catalog_free(AssetCatalog *catalog)
+{
+  MEM_freeN(catalog);
+}
 
 AssetData *BKE_asset_data_create(void)
 {

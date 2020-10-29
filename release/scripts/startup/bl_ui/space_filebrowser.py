@@ -222,6 +222,10 @@ class FILEBROWSER_PT_asset_navigation_bar(Panel):
         col.scale_y = 1.3
         col.prop(space_file.params, "asset_category", expand=True)
 
+        col.separator()
+
+        col.operator("asset.catalog_add", text="Add Catalog", icon='ADD')
+
 
 class FILEBROWSER_UL_dir(UIList):
     def draw_item(self, _context, layout, _data, item, icon, _active_data, _active_propname, _index):
