@@ -4237,15 +4237,15 @@ void ED_lineart_post_frame_update_external(bContext *C,
 
 void ED_lineart_update_render_progress(int nr, const char *info)
 {
-  /* WM_cursor_set() should not be called in a background thread, need an alternative way of
-   * showing the progress. */
+  /* WM_cursor_set() and WM_cursor_time() should not be called in a background thread, need an
+   * alternative way of showing the progress. */
   if (lineart_share.main_window) {
     if (nr == 100) {
       /* just setting WM_CURSOR_DEFAULT doesn't seem to work on linux. */
       /* WM_cursor_set(lineart_share.main_window, WM_CURSOR_NW_ARROW); */
     }
     else {
-      WM_cursor_time(lineart_share.main_window, nr);
+      /* WM_cursor_time(lineart_share.main_window, nr); */
       WM_progress_set(lineart_share.main_window, (float)nr / 100);
     }
   }
