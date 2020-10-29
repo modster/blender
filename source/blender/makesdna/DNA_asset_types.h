@@ -33,6 +33,18 @@ typedef struct CustomTag {
   char name[64]; /* MAX_NAME */
 } CustomTag;
 
+#ifdef WITH_ASSET_REPO_INFO
+typedef struct AssetCatalog {
+  char name[64]; /* MAX_NAME */
+} AssetCatalog;
+
+typedef struct AssetRepositoryInfo {
+  ListBase catalogs;
+} AssetRepositoryInfo;
+
+extern AssetRepositoryInfo *G_asset_repository_info;
+#endif
+
 typedef struct AssetData {
   /** Thumbnail image of the data-block. Duplicate of the referenced ID preview. */
   struct PreviewImage *preview;

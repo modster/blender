@@ -64,6 +64,18 @@ enum {
    * (written to #BLENDER_STARTUP_FILE & #BLENDER_USERPREF_FILE).
    */
   USER = BLEND_MAKE_ID('U', 'S', 'E', 'R'),
+#ifdef WITH_ASSET_REPO_INFO
+  /**
+   * Used for #AssetRepositoryInfo, meta-data to add to repositories for files containing assets.
+   *
+   * If the blend contains any asset data-blocks, it becomes a potential repository, or part of
+   * one. So #AssetRepositoryInfo is added to the file, allowing assets to be queried together with
+   * the meta-data they want to add to the repository. A repositories meta-data is then established
+   * by creating a union of all meta-data written into all the repository's .blend files (possibly
+   * extended by an Asset Manager Bride add-on).
+   */
+  ASSET_REPOSITORY_INFO = BLEND_MAKE_ID('A', 'R', 'E', 'P'),
+#endif
   /**
    * Terminate reading (no data).
    */

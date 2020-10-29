@@ -58,6 +58,9 @@ struct BlendFileWriteParams {
   uint use_save_as_copy : 1;
   uint use_userdef : 1;
   const struct BlendThumbnail *thumb;
+#ifdef WITH_ASSET_REPO_INFO
+  const struct AssetRepositoryInfo *asset_repository_info;
+#endif
 };
 
 extern bool BLO_write_file(struct Main *mainvar,

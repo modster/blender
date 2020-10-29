@@ -6918,6 +6918,30 @@ static void link_global(FileData *fd, BlendFileData *bfd)
 
 /** \} */
 
+#ifdef WITH_ASSET_REPO_INFO
+/* -------------------------------------------------------------------- */
+/** \name Read Asset Repository Data
+ * \{ */
+
+static BHead *read_asset_repository_info(BlendFileData *bfd, FileData *fd, BHead *bhead)
+{
+  AssetRepositoryInfo *repository_info = read_struct(fd, bhead, "asset repository info");
+
+  bfd->asset_repository_info = repository_info;
+
+  bhead = read_data_into_datamap(fd, bhead, "asset repository data");
+
+  BlendDataReader reader_ = {fd};
+  BlendDataReader *reader = &reader_;
+
+  BLO_read_list(reader, &repository_info->catalogs);
+
+  return bhead;
+}
+
+/** \} */
+#endif
+
 /* -------------------------------------------------------------------- */
 /** \name Versioning
  * \{ */
@@ -7299,6 +7323,11 @@ BlendFileData *blo_read_file_internal(FileData *fd, const char *filepath)
           bhead = read_userdef(bfd, fd, bhead);
         }
         break;
+#ifdef WITH_ASSET_REPO_INFO
+      case ASSET_REPOSITORY_INFO:
+        bhead = read_asset_repository_info(bfd, fd, bhead);
+        break;
+#endif
       case ENDB:
         bhead = NULL;
         break;

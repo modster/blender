@@ -54,6 +54,9 @@ static int asset_make_exec(bContext *C, wmOperator *op)
 
   id_fake_user_set(id);
 
+#ifdef WITH_ASSET_REPO_INFO
+  BKE_asset_repository_info_global_ensure();
+#endif
   id->asset_data = BKE_asset_data_create();
 
   UI_icon_render_id(C, NULL, id, true, false);

@@ -68,6 +68,9 @@ typedef enum eBlenFileType {
 typedef struct BlendFileData {
   struct Main *main;
   struct UserDef *user;
+#ifdef WITH_ASSET_REPO_INFO
+  struct AssetRepositoryInfo *asset_repository_info;
+#endif
 
   int fileflags;
   int globalf;

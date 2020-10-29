@@ -62,6 +62,9 @@
 
 #include "BLF_api.h"
 
+#ifdef WITH_ASSET_REPO_INFO
+#  include "DNA_asset_types.h"
+#endif
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
@@ -1502,16 +1505,20 @@ static bool wm_file_write(bContext *C,
   /* XXX temp solution to solve bug, real fix coming (ton) */
   bmain->recovered = 0;
 
-  if (BLO_write_file(CTX_data_main(C),
-                     filepath,
-                     fileflags,
-                     &(const struct BlendFileWriteParams){
-                         .remap_mode = remap_mode,
-                         .use_save_versions = true,
-                         .use_save_as_copy = use_save_as_copy,
-                         .thumb = thumb,
-                     },
-                     reports)) {
+  if (BLO_write_file(
+          CTX_data_main(C),
+          filepath,
+          fileflags,
+          &(const struct BlendFileWriteParams){.remap_mode = remap_mode,
+                                               .use_save_versions = true,
+                                               .use_save_as_copy = use_save_as_copy,
+                                               .thumb = thumb
+#ifdef WITH_ASSET_REPO_INFO
+                                               ,
+                                               .asset_repository_info = G_asset_repository_info
+#endif
+          },
+          reports)) {
     const bool do_history_file_update = (G.background == false) &&
                                         (CTX_wm_manager(C)->op_undo_depth == 0);
 

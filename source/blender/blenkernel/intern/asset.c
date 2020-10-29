@@ -35,6 +35,36 @@
 
 #include "MEM_guardedalloc.h"
 
+#ifdef WITH_ASSET_REPO_INFO
+AssetRepositoryInfo *G_asset_repository_info;
+
+AssetRepositoryInfo *BKE_asset_repository_info_global_ensure(void)
+{
+  if (!G_asset_repository_info) {
+    G_asset_repository_info = MEM_callocN(sizeof(*G_asset_repository_info), __func__);
+  }
+
+  return G_asset_repository_info;
+}
+
+void BKE_asset_repository_info_free(AssetRepositoryInfo **repository_info)
+{
+  MEM_SAFE_FREE(*repository_info);
+}
+
+void BKE_asset_repository_info_global_free(void)
+{
+  BKE_asset_repository_info_free(&G_asset_repository_info);
+}
+
+void BKE_asset_repository_info_update_for_file_read(AssetRepositoryInfo **old_repository_info)
+{
+  /* Force recreation of the repository info. */
+  BKE_asset_repository_info_free(old_repository_info);
+}
+
+#endif
+
 AssetData *BKE_asset_data_create(void)
 {
   AssetData *asset_data = MEM_callocN(sizeof(AssetData), __func__);

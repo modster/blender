@@ -32,6 +32,13 @@ struct BlendDataReader;
 struct ID;
 struct PreviewImage;
 
+#ifdef WITH_ASSET_REPO_INFO
+struct AssetRepositoryInfo *BKE_asset_repository_info_global_ensure(void);
+void BKE_asset_repository_info_free(struct AssetRepositoryInfo **repository_info);
+void BKE_asset_repository_info_global_free(void);
+void BKE_asset_repository_info_update_for_file_read(struct AssetRepositoryInfo **repository_info);
+#endif
+
 struct AssetData *BKE_asset_data_create(void);
 void BKE_asset_data_free(struct AssetData *asset_data);
 
