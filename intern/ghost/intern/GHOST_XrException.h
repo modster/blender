@@ -27,7 +27,7 @@ class GHOST_XrException : public std::exception {
 
  public:
   GHOST_XrException(const char *msg, int result = 0, bool destroy_runtime = true)
-      : std::exception(), m_msg(msg), m_result(result), m_destroy_runtime(destroy_runtime)
+      : std::exception(), m_msg(msg), m_result(result)
   {
   }
 
@@ -39,5 +39,4 @@ class GHOST_XrException : public std::exception {
  private:
   const char *m_msg;
   int m_result;
-  bool m_destroy_runtime;
 };

@@ -678,11 +678,6 @@ typedef struct GHOST_XrDrawViewInfo {
 typedef struct GHOST_XrError {
   const char *user_message;
 
-  /** Whether to destroy the runtime when the error is handled.
-   * Some errors (in particular those related to OpenXR actions)
-   * may not warrant aborting the current context / session. */
-  char destroy_runtime;
-
   void *customdata;
 } GHOST_XrError;
 

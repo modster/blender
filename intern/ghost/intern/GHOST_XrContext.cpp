@@ -250,7 +250,6 @@ void GHOST_XrContext::dispatchErrorMessage(const GHOST_XrException *exception) c
   GHOST_XrError error;
 
   error.user_message = exception->m_msg;
-  error.destroy_runtime = exception->m_destroy_runtime;
   error.customdata = s_error_handler_customdata;
 
   if (isDebugMode()) {

@@ -36,20 +36,6 @@
   (void)0
 
 /**
- * Variation of CHECK_XR() that copies a runtime string to a static error message buffer. Useful
- * when runtime information (e.g. OpenXR action names) should be included in the message.
- */
-#define CHECK_XR_BUF(call, error_msg, buf) \
-  { \
-    XrResult _res = call; \
-    if (XR_FAILED(_res)) { \
-      strcpy(buf, error_msg); \
-      throw GHOST_XrException(buf, _res); \
-    } \
-  } \
-  (void)0
-
-/**
  * Variation of CHECK_XR() that doesn't throw, but asserts for success. Especially useful for
  * destructors, which shouldn't throw.
  */
@@ -58,32 +44,5 @@
     XrResult _res = call; \
     assert(_res == XR_SUCCESS); \
     (void)_res; \
-  } \
-  (void)0
-
-/**
- * Variation of CHECK_XR() that throws but doesn't destroy the runtime. Useful for
- * OpenXR errors (in particular those related to OpenXR actions) that do not warrant
- * aborting the current context / session.
- */
-#define CHECK_XR_ND(call, error_msg) \
-  { \
-    XrResult _res = call; \
-    if (XR_FAILED(_res)) { \
-      throw GHOST_XrException(error_msg, _res, false); \
-    } \
-  } \
-  (void)0
-
-/**
- * Buffer variation of CHECK_XR_ND().
- */
-#define CHECK_XR_ND_BUF(call, error_msg, buf) \
-  { \
-    XrResult _res = call; \
-    if (XR_FAILED(_res)) { \
-      strcpy(buf, error_msg); \
-      throw GHOST_XrException(buf, _res, false); \
-    } \
   } \
   (void)0

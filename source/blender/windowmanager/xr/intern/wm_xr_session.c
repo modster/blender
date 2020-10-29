@@ -465,6 +465,10 @@ bool WM_xr_session_state_controller_pose_rotation_get(const wmXrData *xr,
 
 void wm_xr_session_actions_init(wmXrData *xr)
 {
+  if (!xr->runtime) {
+    return;
+  }
+
   GHash *action_sets = xr->runtime->session_state.action_sets;
   bool attach_actions = false;
 

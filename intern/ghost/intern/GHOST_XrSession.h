@@ -107,6 +107,9 @@ class GHOST_XrSession {
   /** Rendering information. Set when drawing starts. */
   std::unique_ptr<GHOST_XrDrawInfo> m_draw_info;
 
+  /** String to hold runtime-generated error messages. */
+  std::string m_error_msg;
+
   void initSystem();
   void beginSession();
   void endSession();
