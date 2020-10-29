@@ -648,8 +648,10 @@ typedef enum wmXrOpFlag {
 } wmXrOpFlag;
 
 typedef struct wmXrActionData {
-  /** Name. */
-  char name[64];
+  /** Action set name. */
+  char action_set[64];
+  /** Action name. */
+  char action[64];
   /** Type (GHOST_XrActionType). */
   char type;
   /** State. Set appropriately based on type. */

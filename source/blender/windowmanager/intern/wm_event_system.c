@@ -1893,6 +1893,14 @@ static bool wm_eventmatch(const wmEvent *winevent, const wmKeyMapItem *kmi)
     }
   }
 
+  if (ISXR(kmitype)) {
+    wmXrActionData *customdata = winevent->customdata;
+    if (!STREQ(kmi->xr_action_set, customdata->action_set) ||
+        !STREQ(kmi->xr_action, customdata->action)) {
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -4862,7 +4870,8 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void 
 }
 
 #ifdef WITH_XR_OPENXR
-void wm_event_add_xrevent(const wmXrAction *action,
+void wm_event_add_xrevent(const char *action_set_name,
+                          const wmXrAction *action,
                           const GHOST_XrPose *controller_pose,
                           const wmXrEyeData *eye_data,
                           wmSurface *surface,
@@ -4871,9 +4880,8 @@ void wm_event_add_xrevent(const wmXrAction *action,
                           short val,
                           bool press_start)
 {
-  if (!surface->is_xr || !surface->customdata || (val != KM_PRESS && val != KM_RELEASE)) {
-    return;
-  }
+  BLI_assert(surface->is_xr && surface->customdata);
+  BLI_assert(val == KM_PRESS || val == KM_RELEASE);
 
   wmXrSurfaceData *surface_data = surface->customdata;
   const bool add_win_event = (action->ot->modal &&
@@ -4886,7 +4894,8 @@ void wm_event_add_xrevent(const wmXrAction *action,
   event->is_repeat = false;
 
   wmXrActionData *data = MEM_callocN(sizeof(wmXrActionData), __func__);
-  strcpy(data->name, action->name);
+  strcpy(data->action_set, action_set_name);
+  strcpy(data->action, action->name);
   data->type = action->type;
 
   switch (action->type) {

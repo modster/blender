@@ -156,7 +156,8 @@ void wm_event_do_handlers(bContext *C);
 void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void *customdata);
 
 #ifdef WITH_XR_OPENXR
-void wm_event_add_xrevent(const struct wmXrAction *action,
+void wm_event_add_xrevent(const char *action_set_name,
+                          const struct wmXrAction *action,
                           const struct GHOST_XrPose *controller_pose,
                           const struct wmXrEyeData *eye_data,
                           struct wmSurface *surface,

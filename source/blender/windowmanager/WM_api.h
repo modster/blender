@@ -870,7 +870,8 @@ float WM_event_tablet_data(const struct wmEvent *event, int *pen_flip, float til
 bool WM_event_is_tablet(const struct wmEvent *event);
 
 void WM_event_xr_data(const struct wmEvent *event,
-                      char **name,
+                      char **action_set,
+                      char **action,
                       char *type,
                       float state[2],
                       float controller_loc[3],

@@ -427,7 +427,8 @@ bool WM_event_is_tablet(const struct wmEvent *event)
  * \{ */
 
 void WM_event_xr_data(const wmEvent *event,
-                      char **name,
+                      char **action_set,
+                      char **action,
                       char *type,
                       float state[2],
                       float controller_loc[3],
@@ -440,8 +441,11 @@ void WM_event_xr_data(const wmEvent *event,
 {
   const wmXrActionData *data = event->customdata;
 
-  if (name) {
-    strcpy(*name, data->name);
+  if (action_set) {
+    strcpy(*action_set, data->action_set);
+  }
+  if (action) {
+    strcpy(*action, data->action);
   }
   if (type) {
     *type = data->type;

@@ -546,6 +546,7 @@ static const GHOST_XrPose *wm_xr_session_controller_pose_find(const wmXrSessionS
 
 /* Dispatch events to XR surface / window queues. */
 static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
+                                          const char *action_set_name,
                                           GHash *actions,
                                           wmXrSessionState *session_state,
                                           wmSurface *surface,
@@ -643,7 +644,8 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
         if (val != KM_ANY) {
           const GHOST_XrPose *pose = wm_xr_session_controller_pose_find(
               session_state, action->subaction_paths[i]);
-          wm_event_add_xrevent(action,
+          wm_event_add_xrevent(action_set_name,
+                               action,
                                pose,
                                &session_state->eyes[settings->selection_eye],
                                surface,
@@ -703,7 +705,7 @@ static void wm_xr_session_action_set_update(const XrSessionSettings *settings,
     }
 
     if (surface && win) {
-      wm_xr_session_events_dispatch(settings, actions, state, surface, win);
+      wm_xr_session_events_dispatch(settings, action_set->name, actions, state, surface, win);
     }
   }
 }
