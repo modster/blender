@@ -214,13 +214,11 @@ void gpencil_modifier_fading_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetPropSep(layout, true);
 
   bool fading_enabled = RNA_boolean_get(ptr, "use_fading");
-  if (fading_enabled) {
-    uiItemR(layout, ptr, "object", 0, NULL, ICON_CUBE);
-    uiLayout *sub = uiLayoutColumn(layout, true);
-    uiItemR(sub, ptr, "fading_start", 0, NULL, ICON_NONE);
-    uiItemR(sub, ptr, "fading_end", 0, IFACE_("End"), ICON_NONE);
-    uiItemR(layout, ptr, "fading_end_factor", 0, NULL, ICON_NONE);
-  }
+  uiItemR(layout, ptr, "object", 0, NULL, ICON_CUBE);
+  uiLayout *sub = uiLayoutColumn(layout, true);
+  uiItemR(sub, ptr, "fading_start", 0, NULL, ICON_NONE);
+  uiItemR(sub, ptr, "fading_end", 0, IFACE_("End"), ICON_NONE);
+  uiItemR(layout, ptr, "fading_end_factor", 0, NULL, ICON_NONE);
 }
 
 /**
