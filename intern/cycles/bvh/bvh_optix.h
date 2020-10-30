@@ -32,7 +32,7 @@ class Optix;
 class BVHOptiX : public BVH {
   friend class BVH;
 
- public:  
+ public:
   uint64_t optix_handle;
   uint64_t optix_data_handle;
   bool do_refit;
