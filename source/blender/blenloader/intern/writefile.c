@@ -156,6 +156,7 @@
 #include "BKE_packedFile.h"
 #include "BKE_pointcache.h"
 #include "BKE_report.h"
+#include "BKE_screen.h"
 #include "BKE_sequencer.h"
 #include "BKE_shader_fx.h"
 #include "BKE_subsurf.h"
@@ -809,41 +810,6 @@ static void write_userdef(BlendWriter *writer, const UserDef *userdef)
   }
 }
 
-static void write_boid_state(BlendWriter *writer, BoidState *state)
-{
-  BLO_write_struct(writer, BoidState, state);
-
-  LISTBASE_FOREACH (BoidRule *, rule, &state->rules) {
-    switch (rule->type) {
-      case eBoidRuleType_Goal:
-      case eBoidRuleType_Avoid:
-        BLO_write_struct(writer, BoidRuleGoalAvoid, rule);
-        break;
-      case eBoidRuleType_AvoidCollision:
-        BLO_write_struct(writer, BoidRuleAvoidCollision, rule);
-        break;
-      case eBoidRuleType_FollowLeader:
-        BLO_write_struct(writer, BoidRuleFollowLeader, rule);
-        break;
-      case eBoidRuleType_AverageSpeed:
-        BLO_write_struct(writer, BoidRuleAverageSpeed, rule);
-        break;
-      case eBoidRuleType_Fight:
-        BLO_write_struct(writer, BoidRuleFight, rule);
-        break;
-      default:
-        BLO_write_struct(writer, BoidRule, rule);
-        break;
-    }
-  }
-#if 0
-  BoidCondition *cond = state->conditions.first;
-  for (; cond; cond = cond->next) {
-    BLO_write_struct(writer, BoidCondition, cond);
-  }
-#endif
-}
-
 /* update this also to readfile.c */
 static const char *ptcache_data_struct[] = {
     "",          // BPHYS_DATA_INDEX
@@ -889,68 +855,6 @@ static void write_pointcaches(BlendWriter *writer, ListBase *ptcaches)
           BLO_write_struct_array_by_name(
               writer, ptcache_extra_struct[extra->type], extra->totdata, extra->data);
         }
-      }
-    }
-  }
-}
-
-static void write_particlesettings(BlendWriter *writer,
-                                   ParticleSettings *part,
-                                   const void *id_address)
-{
-  if (part->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* write LibData */
-    BLO_write_id_struct(writer, ParticleSettings, id_address, &part->id);
-    BKE_id_blend_write(writer, &part->id);
-
-    if (part->adt) {
-      BKE_animdata_blend_write(writer, part->adt);
-    }
-    BLO_write_struct(writer, PartDeflect, part->pd);
-    BLO_write_struct(writer, PartDeflect, part->pd2);
-    BLO_write_struct(writer, EffectorWeights, part->effector_weights);
-
-    if (part->clumpcurve) {
-      BKE_curvemapping_blend_write(writer, part->clumpcurve);
-    }
-    if (part->roughcurve) {
-      BKE_curvemapping_blend_write(writer, part->roughcurve);
-    }
-    if (part->twistcurve) {
-      BKE_curvemapping_blend_write(writer, part->twistcurve);
-    }
-
-    LISTBASE_FOREACH (ParticleDupliWeight *, dw, &part->instance_weights) {
-      /* update indices, but only if dw->ob is set (can be NULL after loading e.g.) */
-      if (dw->ob != NULL) {
-        dw->index = 0;
-        if (part->instance_collection) { /* can be NULL if lining fails or set to None */
-          FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (part->instance_collection, object) {
-            if (object == dw->ob) {
-              break;
-            }
-            dw->index++;
-          }
-          FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
-        }
-      }
-      BLO_write_struct(writer, ParticleDupliWeight, dw);
-    }
-
-    if (part->boids && part->phystype == PART_PHYS_BOIDS) {
-      BLO_write_struct(writer, BoidSettings, part->boids);
-
-      LISTBASE_FOREACH (BoidState *, state, &part->boids->states) {
-        write_boid_state(writer, state);
-      }
-    }
-    if (part->fluid && part->phystype == PART_PHYS_FLUID) {
-      BLO_write_struct(writer, SPHFluidSettings, part->fluid);
-    }
-
-    for (int a = 0; a < MAX_MTEX; a++) {
-      if (part->mtex[a]) {
-        BLO_write_struct(writer, MTex, part->mtex[a]);
       }
     }
   }
@@ -1389,37 +1293,6 @@ static void write_object(BlendWriter *writer, Object *ob, const void *id_address
   }
 }
 
-static void write_collection_nolib(BlendWriter *writer, Collection *collection)
-{
-  /* Shared function for collection data-blocks and scene master collection. */
-  BKE_previewimg_blend_write(writer, collection->preview);
-
-  LISTBASE_FOREACH (CollectionObject *, cob, &collection->gobject) {
-    BLO_write_struct(writer, CollectionObject, cob);
-  }
-
-  LISTBASE_FOREACH (CollectionChild *, child, &collection->children) {
-    BLO_write_struct(writer, CollectionChild, child);
-  }
-}
-
-static void write_collection(BlendWriter *writer, Collection *collection, const void *id_address)
-{
-  if (collection->id.us > 0 || BLO_write_is_undo(writer)) {
-    /* Clean up, important in undo case to reduce false detection of changed data-blocks. */
-    collection->flag &= ~COLLECTION_HAS_OBJECT_CACHE;
-    collection->tag = 0;
-    BLI_listbase_clear(&collection->object_cache);
-    BLI_listbase_clear(&collection->parents);
-
-    /* write LibData */
-    BLO_write_id_struct(writer, Collection, id_address, &collection->id);
-    BKE_id_blend_write(writer, &collection->id);
-
-    write_collection_nolib(writer, collection);
-  }
-}
-
 static void write_sequence_modifiers(BlendWriter *writer, ListBase *modbase)
 {
   LISTBASE_FOREACH (SequenceModifierData *, smd, modbase) {
@@ -1449,13 +1322,6 @@ static void write_view_settings(BlendWriter *writer, ColorManagedViewSettings *v
 {
   if (view_settings->curve_mapping) {
     BKE_curvemapping_blend_write(writer, view_settings->curve_mapping);
-  }
-}
-
-static void write_view3dshading(BlendWriter *writer, View3DShading *shading)
-{
-  if (shading->prop) {
-    IDP_BlendWrite(writer, shading->prop);
   }
 }
 
@@ -1750,7 +1616,7 @@ static void write_scene(BlendWriter *writer, Scene *sce, const void *id_address)
 
   if (sce->master_collection) {
     BLO_write_struct(writer, Collection, sce->master_collection);
-    write_collection_nolib(writer, sce->master_collection);
+    BKE_collection_blend_write_nolib(writer, sce->master_collection);
   }
 
   /* Eevee Lightcache */
@@ -1759,7 +1625,7 @@ static void write_scene(BlendWriter *writer, Scene *sce, const void *id_address)
     write_lightcache(writer, sce->eevee.light_cache_data);
   }
 
-  write_view3dshading(writer, &sce->display.shading);
+  BKE_screen_view3d_shading_blend_write(writer, &sce->display.shading);
 
   /* Freed on doversion. */
   BLI_assert(sce->layer_properties == NULL);
@@ -1767,7 +1633,7 @@ static void write_scene(BlendWriter *writer, Scene *sce, const void *id_address)
 
 static void write_wm_xr_data(BlendWriter *writer, wmXrData *xr_data)
 {
-  write_view3dshading(writer, &xr_data->session_settings.shading);
+  BKE_screen_view3d_shading_blend_write(writer, &xr_data->session_settings.shading);
 }
 
 static void write_region(BlendWriter *writer, ARegion *region, int spacetype)
@@ -1894,7 +1760,7 @@ static void write_area_regions(BlendWriter *writer, ScrArea *area)
         BLO_write_struct(writer, View3D, v3d->localvd);
       }
 
-      write_view3dshading(writer, &v3d->shading);
+      BKE_screen_view3d_shading_blend_write(writer, &v3d->shading);
     }
     else if (sl->spacetype == SPACE_GRAPH) {
       SpaceGraph *sipo = (SpaceGraph *)sl;
@@ -2361,15 +2227,11 @@ static bool write_file_handle(Main *mainvar,
           case ID_SCE:
             write_scene(&writer, (Scene *)id_buffer, id);
             break;
-          case ID_GR:
-            write_collection(&writer, (Collection *)id_buffer, id);
-            break;
           case ID_OB:
             write_object(&writer, (Object *)id_buffer, id);
             break;
           case ID_PA:
-            write_particlesettings(&writer, (ParticleSettings *)id_buffer, id);
-            break;
+          case ID_GR:
           case ID_ME:
           case ID_LT:
           case ID_AC:
