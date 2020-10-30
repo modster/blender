@@ -33,8 +33,9 @@ class BVHOptiX : public BVH {
   friend class BVH;
 
  public:  
-  unsigned long long optix_handle;
-  unsigned long long optix_data_handle;
+  uint64_t optix_handle;
+  uint64_t optix_data_handle;
+  bool do_refit;
 
   BVHOptiX(const BVHParams &params,
            const vector<Geometry *> &geometry,

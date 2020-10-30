@@ -1194,7 +1194,7 @@ class OptiXDevice : public CUDADevice {
     std::set<CUdeviceptr> refit_mem;
 
     for (Geometry *geom : bvh->geometry) {
-      if (geom->do_optix_refit) {
+      if (static_cast<BVHOptiX *>(geom->bvh)->do_refit) {
         refit_mem.insert(static_cast<BVHOptiX *>(geom->bvh)->optix_data_handle);
       }
     }
@@ -1219,7 +1219,7 @@ class OptiXDevice : public CUDADevice {
       OptixBuildOperation operation;
       CUdeviceptr out_data;
       // Refit is only possible in viewport for now.
-      if (ob->geometry->do_optix_refit && !background) {
+      if (static_cast<BVHOptiX *>(geom->bvh)->do_refit && !background) {
         out_data = static_cast<BVHOptiX *>(geom->bvh)->optix_data_handle;
         handle = static_cast<BVHOptiX *>(geom->bvh)->optix_handle;
         operation = OPTIX_BUILD_OPERATION_UPDATE;
@@ -1397,7 +1397,7 @@ class OptiXDevice : public CUDADevice {
           geometry.insert({ob->geometry, handle});
           static_cast<BVHOptiX *>(geom->bvh)->optix_data_handle = out_data;
           static_cast<BVHOptiX *>(geom->bvh)->optix_handle = handle;
-          geom->do_optix_refit = false;
+          static_cast<BVHOptiX *>(geom->bvh)->do_refit = false;
         }
         else {
           return false;
@@ -1471,7 +1471,7 @@ class OptiXDevice : public CUDADevice {
           geometry.insert({ob->geometry, handle});
           static_cast<BVHOptiX *>(geom->bvh)->optix_data_handle = out_data;
           static_cast<BVHOptiX *>(geom->bvh)->optix_handle = handle;
-          geom->do_optix_refit = false;
+          static_cast<BVHOptiX *>(geom->bvh)->do_refit = false;
         }
         else {
           return false;

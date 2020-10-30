@@ -39,6 +39,7 @@ BVHOptiX::BVHOptiX(const BVHParams &params_,
 {
   optix_handle = 0;
   optix_data_handle = 0;
+  do_refit = false;
 }
 
 BVHOptiX::~BVHOptiX()
@@ -218,7 +219,7 @@ void BVHOptiX::pack_nodes(const BVHNode *)
 
 void BVHOptiX::refit_nodes()
 {
-  geometry[0]->do_optix_refit = true;
+  do_refit = true;
 }
 
 BVHNode *BVHOptiX::widen_children_nodes(const BVHNode *)
