@@ -696,6 +696,33 @@ typedef enum eFCurve_Smoothing {
 
 /* NLA Strips ------------------------------------- */
 
+typedef struct NlaStripPreBlendTransform {
+  /** Used for Strip Alignment of bones: This applies a transform to strip bone channels before
+   * blending. This allows the animator to align traversal bones (like root bone) so that blending
+   * will occur in the proper blend space. Otherwise, blending a Run midway through a Walk cycle,
+   * where the root travels, results in the root blending to Run frame0, where the root is at zero.
+   */
+  float location[3];
+  float euler[3];
+  float scale[3];
+  float _pad;
+  // char transform_target;
+  // char _pad0[3];
+
+  /*Element: NlaStripPreBlendTransform_BoneName*/
+  ListBase bones;
+} NlaStripPreBlendTransform;
+
+typedef struct NlaStripPreBlendTransform_BoneName {
+  char name[MAX_ID_NAME];
+} NlaStripPreBlendTransform_BoneName;
+
+/* NlaStripPreBlendTransform Flags */
+typedef enum eNlaStripPreBlendTransform_Target {
+  NLASTRIP_XFORM_OBJECT = 0,
+  NLASTRIP_XFORM_BONES = 1,
+} eNlaStrip_Blend_Mode;
+
 /**
  * NLA Strip (strip)
  *
@@ -755,6 +782,9 @@ typedef struct NlaStrip {
   /* Pointer to an original NLA strip. */
   struct NlaStrip *orig_strip;
 
+  /*Element: NlaStripPreBlendTransform */
+  ListBase preblend_transforms;
+
   void *_pad3;
 } NlaStrip;
 
@@ -797,6 +827,7 @@ typedef enum eNlaStrip_Flag {
   NLASTRIP_FLAG_USR_INFLUENCE = (1 << 5),
   NLASTRIP_FLAG_USR_TIME = (1 << 6),
   NLASTRIP_FLAG_USR_TIME_CYCLIC = (1 << 7),
+  NLASTRIP_FLAG_ALIGNED = (1 << 8),
 
   /** NLA strip length is synced to the length of the referenced action */
   NLASTRIP_FLAG_SYNC_LENGTH = (1 << 9),
