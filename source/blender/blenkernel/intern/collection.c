@@ -194,8 +194,10 @@ static void collection_blend_write(BlendWriter *writer, ID *id, const void *id_a
   if (collection->id.us > 0 || BLO_write_is_undo(writer)) {
     /* Clean up, important in undo case to reduce false detection of changed data-blocks. */
     collection->flag &= ~COLLECTION_HAS_OBJECT_CACHE;
+    collection->flag &= ~COLLECTION_HAS_OBJECT_CACHE_INSTANCED;
     collection->tag = 0;
     BLI_listbase_clear(&collection->object_cache);
+    BLI_listbase_clear(&collection->object_cache_instanced);
     BLI_listbase_clear(&collection->parents);
 
     /* write LibData */
@@ -227,8 +229,10 @@ void BKE_collection_blend_read_data(BlendDataReader *reader, Collection *collect
   BKE_previewimg_blend_read(reader, collection->preview);
 
   collection->flag &= ~COLLECTION_HAS_OBJECT_CACHE;
+  collection->flag &= ~COLLECTION_HAS_OBJECT_CACHE_INSTANCED;
   collection->tag = 0;
   BLI_listbase_clear(&collection->object_cache);
+  BLI_listbase_clear(&collection->object_cache_instanced);
   BLI_listbase_clear(&collection->parents);
 
 #ifdef USE_COLLECTION_COMPAT_28
