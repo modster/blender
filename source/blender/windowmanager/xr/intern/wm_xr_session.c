@@ -439,7 +439,7 @@ bool WM_xr_session_state_controller_pose_location_get(const wmXrData *xr,
                                                       float r_location[3])
 {
   if (!WM_xr_session_is_ready(xr) || !xr->runtime->session_state.is_view_data_set ||
-      subaction_idx > 1) {
+      subaction_idx >= ARRAY_SIZE(xr->runtime->session_state.controllers)) {
     zero_v3(r_location);
     return false;
   }
@@ -453,7 +453,7 @@ bool WM_xr_session_state_controller_pose_rotation_get(const wmXrData *xr,
                                                       float r_rotation[4])
 {
   if (!WM_xr_session_is_ready(xr) || !xr->runtime->session_state.is_view_data_set ||
-      subaction_idx > 1) {
+      subaction_idx >= ARRAY_SIZE(xr->runtime->session_state.controllers)) {
     unit_qt(r_rotation);
     return false;
   }

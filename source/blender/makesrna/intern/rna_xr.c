@@ -400,7 +400,7 @@ static void rna_XrSessionState_viewer_pose_rotation_get(PointerRNA *ptr, float *
 #  endif
 }
 
-static void rna_XrSessionState_controller_pose_location0_get(PointerRNA *ptr, float *r_values)
+static void rna_XrSessionState_controller_pose0_location_get(PointerRNA *ptr, float *r_values)
 {
 #  ifdef WITH_XR_OPENXR
   const wmXrData *xr = rna_XrSessionState_wm_xr_data_get(ptr);
@@ -411,7 +411,7 @@ static void rna_XrSessionState_controller_pose_location0_get(PointerRNA *ptr, fl
 #  endif
 }
 
-static void rna_XrSessionState_controller_pose_rotation0_get(PointerRNA *ptr, float *r_values)
+static void rna_XrSessionState_controller_pose0_rotation_get(PointerRNA *ptr, float *r_values)
 {
 #  ifdef WITH_XR_OPENXR
   const wmXrData *xr = rna_XrSessionState_wm_xr_data_get(ptr);
@@ -422,7 +422,7 @@ static void rna_XrSessionState_controller_pose_rotation0_get(PointerRNA *ptr, fl
 #  endif
 }
 
-static void rna_XrSessionState_controller_pose_location1_get(PointerRNA *ptr, float *r_values)
+static void rna_XrSessionState_controller_pose1_location_get(PointerRNA *ptr, float *r_values)
 {
 #  ifdef WITH_XR_OPENXR
   const wmXrData *xr = rna_XrSessionState_wm_xr_data_get(ptr);
@@ -433,7 +433,7 @@ static void rna_XrSessionState_controller_pose_location1_get(PointerRNA *ptr, fl
 #  endif
 }
 
-static void rna_XrSessionState_controller_pose_rotation1_get(PointerRNA *ptr, float *r_values)
+static void rna_XrSessionState_controller_pose1_rotation_get(PointerRNA *ptr, float *r_values)
 {
 #  ifdef WITH_XR_OPENXR
   const wmXrData *xr = rna_XrSessionState_wm_xr_data_get(ptr);
@@ -900,40 +900,40 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
       "Viewer Pose Rotation",
       "Last known rotation of the viewer pose (center between the eyes) in world space");
 
-  prop = RNA_def_property(srna, "controller_pose_location0", PROP_FLOAT, PROP_TRANSLATION);
+  prop = RNA_def_property(srna, "controller_pose0_location", PROP_FLOAT, PROP_TRANSLATION);
   RNA_def_property_array(prop, 3);
   RNA_def_property_float_funcs(
-      prop, "rna_XrSessionState_controller_pose_location0_get", NULL, NULL);
+      prop, "rna_XrSessionState_controller_pose0_location_get", NULL, NULL);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop,
-                           "Controller Pose Location 0",
+                           "Controller Pose 0 Location",
                            "Last known location of the first controller pose in world space");
 
-  prop = RNA_def_property(srna, "controller_pose_rotation0", PROP_FLOAT, PROP_QUATERNION);
+  prop = RNA_def_property(srna, "controller_pose0_rotation", PROP_FLOAT, PROP_QUATERNION);
   RNA_def_property_array(prop, 4);
   RNA_def_property_float_funcs(
-      prop, "rna_XrSessionState_controller_pose_rotation0_get", NULL, NULL);
+      prop, "rna_XrSessionState_controller_pose0_rotation_get", NULL, NULL);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop,
-                           "Controller Pose Rotation 0",
+                           "Controller Pose 0 Rotation",
                            "Last known rotation of the first controller pose in world space");
 
-  prop = RNA_def_property(srna, "controller_pose_location1", PROP_FLOAT, PROP_TRANSLATION);
+  prop = RNA_def_property(srna, "controller_pose1_location", PROP_FLOAT, PROP_TRANSLATION);
   RNA_def_property_array(prop, 3);
   RNA_def_property_float_funcs(
-      prop, "rna_XrSessionState_controller_pose_location1_get", NULL, NULL);
+      prop, "rna_XrSessionState_controller_pose1_location_get", NULL, NULL);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop,
                            "Controller Pose Location 1",
                            "Last known location of the second controller pose in world space");
 
-  prop = RNA_def_property(srna, "controller_pose_rotation1", PROP_FLOAT, PROP_QUATERNION);
+  prop = RNA_def_property(srna, "controller_pose1_rotation", PROP_FLOAT, PROP_QUATERNION);
   RNA_def_property_array(prop, 4);
   RNA_def_property_float_funcs(
-      prop, "rna_XrSessionState_controller_pose_rotation1_get", NULL, NULL);
+      prop, "rna_XrSessionState_controller_pose1_rotation_get", NULL, NULL);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop,
-                           "Controller Pose Rotation 1",
+                           "Controller Pose 1 Rotation",
                            "Last known rotation of the second controller pose in world space");
 }
 
