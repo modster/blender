@@ -3295,6 +3295,7 @@ static void wm_event_do_surface_handlers(bContext *C, wmSurface *surface)
 void wm_event_do_handlers(bContext *C)
 {
   wmWindowManager *wm = CTX_wm_manager(C);
+  BLI_assert(ED_undo_is_state_valid(C));
 
   /* Update key configuration before handling events. */
   WM_keyconfig_update(wm);
