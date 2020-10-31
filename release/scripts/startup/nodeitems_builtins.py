@@ -491,7 +491,12 @@ geometry_node_categories = [
         NodeItem("GeometryNodeTransform"),
         NodeItem("GeometryNodeBoolean"),
         NodeItem("GeometryNodePointDistribute"),
-    ]),    
+    ]),
+    GeometryNodeCategory("GEO_ATTRIBUTES", "Attributes", items=[
+        NodeItem("GeometryNodeCreateAttribute"),
+        NodeItem("GeometryNodeRandomAttribute"),
+        NodeItem("GeometryNodeAttributeMath"),
+    ]),
     GeometryNodeCategory("GEO_POINTCLOUD", "Pointcloud", items=[
         NodeItem("GeometryNodePointDistribute"),
         NodeItem("GeometryNodePointInstance"),

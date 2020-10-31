@@ -3145,11 +3145,32 @@ static void node_geometry_buts_boolean_math(uiLayout *layout, bContext *UNUSED(C
   uiItemR(layout, ptr, "operation", DEFAULT_FLAGS, "", ICON_NONE);
 }
 
+static void node_geometry_buts_attribute_create(uiLayout *layout,
+                                                bContext *UNUSED(C),
+                                                PointerRNA *ptr)
+{
+  uiItemR(layout, ptr, "data_type", DEFAULT_FLAGS, "", ICON_NONE);
+  uiItemR(layout, ptr, "domain", DEFAULT_FLAGS, "", ICON_NONE);
+}
+
+static void node_geometry_buts_attribute_math(uiLayout *layout,
+                                              bContext *UNUSED(C),
+                                              PointerRNA *ptr)
+{
+  uiItemR(layout, ptr, "operation", DEFAULT_FLAGS, "", ICON_NONE);
+}
+
 static void node_geometry_set_butfunc(bNodeType *ntype)
 {
   switch (ntype->type) {
     case GEO_NODE_BOOLEAN:
       ntype->draw_buttons = node_geometry_buts_boolean_math;
+      break;
+    case GEO_NODE_ATTRIBUTE_CREATE:
+      ntype->draw_buttons = node_geometry_buts_attribute_create;
+      break;
+    case GEO_NODE_ATTRIBUTE_MATH:
+      ntype->draw_buttons = node_geometry_buts_attribute_math;
       break;
   }
 }

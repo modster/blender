@@ -272,6 +272,9 @@ DefNode(GeometryNode, GEO_NODE_TRANSFORM, 0, "TRANSFORM", Transform, "Transform"
 DefNode(GeometryNode, GEO_NODE_BOOLEAN, def_geo_boolean, "BOOLEAN", Boolean, "Boolean", "")
 DefNode(GeometryNode, GEO_NODE_POINT_DISTRIBUTE, 0, "POINT_DISTRIBUTE", PointDistribute, "Point Distribute", "")
 DefNode(GeometryNode, GEO_NODE_POINT_INSTANCE, 0, "POINT_INSTANCE", PointInstance, "Point Instance", "")
+DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_RANDOM, 0, "ATTRIBUTE_RANDOM", RandomAttribute, "Random Attribute", "")
+DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_MATH, def_geo_attribute_math, "ATTRIBUTE_MATH", AttributeMath, "Attribute Math", "")
+DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_CREATE, def_geo_attribute_create, "ATTRIBUTE_CREATE", CreateAttribute, "Create Attribute", "")
 
 
 /* undefine macros */
