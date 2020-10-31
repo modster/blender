@@ -235,6 +235,17 @@
                     SCE_EEVEE_GTAO_BOUNCE | SCE_EEVEE_TAA_REPROJECTION | \
                     SCE_EEVEE_SSR_HALF_RESOLUTION | SCE_EEVEE_SHADOW_SOFT, \
   }
+  
+
+
+#define _DNA_DEFAULT_SceneLineArt \
+  { \
+    .crease_threshold = 140.0f,\
+    .angle_splitting_threshold = 0.5f,\
+    .chaining_geometry_threshold = 0.1f,\
+    .chaining_image_threshold = 0.01f,\
+  }
+
 
 #define _DNA_DEFAULT_Scene \
   { \
@@ -249,6 +260,7 @@
     .safe_areas = _DNA_DEFAULT_DisplaySafeAreas, \
  \
     .eevee = _DNA_DEFAULT_SceneEEVEE, \
+    .lineart = _DNA_DEFAULT_SceneLineArt, \
   }
 
 /** \} */

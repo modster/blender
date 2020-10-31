@@ -7421,28 +7421,30 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
   RNA_def_property_boolean_default(prop, 1);
   RNA_def_property_ui_text(prop,
                            "Allow Overlapping Edges",
-                           "Allow lines from edge split to show properly, may run slower.");
+                           "Allow lines from edge split to show properly, may run slower");
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
   prop = RNA_def_property(srna, "allow_clipping_boundaries", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_ALLOW_CLIPPING_BOUNDARIES);
   RNA_def_property_boolean_default(prop, 1);
   RNA_def_property_ui_text(
-      prop, "Clipping Boundaries", "Allow lines on near/far clipping plane to be shown.");
+      prop, "Clipping Boundaries", "Allow lines on near/far clipping plane to be shown");
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
   prop = RNA_def_property(srna, "crease_threshold", PROP_FLOAT, PROP_NONE);
   RNA_def_property_range(prop, 0, 180);
-  RNA_def_property_float_default(prop, 140);
+  RNA_def_property_float_default(prop, 140.0f);
   RNA_def_property_ui_range(prop, 0.0f, 180.0f, 0.01f, 1);
-  RNA_def_property_ui_text(prop, "Crease Threshold", "Cosine value of face angle");
+  RNA_def_property_ui_text(
+      prop, "Crease Threshold", "Angle smaller than this value will be treated as a crease line");
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
   prop = RNA_def_property(srna, "angle_splitting_threshold", PROP_FLOAT, PROP_ANGLE);
   RNA_def_property_float_default(prop, 0.5f);
-  RNA_def_property_ui_text(prop, "Angle Splitting", "Angle splitting threshold");
+  RNA_def_property_ui_text(
+      prop, "Angle Splitting", "A 2D angle, below which a long stroke is split into two");
   /*  Don't allow value very close to PI, or we get a lot of small segments.*/
-  RNA_def_property_ui_range(prop, 0.0f, DEG2RAD(179), 0.01f, 2);
+  RNA_def_property_ui_range(prop, 0.0f, 180.0f, 0.01f, 1);
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
   prop = RNA_def_property(srna, "remove_doubles", PROP_BOOLEAN, PROP_NONE);
