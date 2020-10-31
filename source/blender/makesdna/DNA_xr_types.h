@@ -46,6 +46,12 @@ typedef struct XrSessionSettings {
   float clip_start, clip_end;
 
   int flag;
+
+  /** Objects whose location and rotation will be constrained to the XR headset / controller poses.
+   */
+  Object *headset_object;
+  Object *controller0_object;
+  Object *controller1_object;
 } XrSessionSettings;
 
 typedef enum eXrSessionFlag {

@@ -331,6 +331,7 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
   GHOST_XrPose viewer_pose;
   const bool use_position_tracking = settings->flag & XR_SESSION_USE_POSITION_TRACKING;
   wmXrEyeData *eye = &state->eyes[draw_view->view];
+  Object *ob_constraint = settings->headset_object;
 
   mul_qt_qtqt(viewer_pose.orientation_quat,
               draw_data->base_pose.orientation_quat,
@@ -350,6 +351,12 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
   copy_v3_v3(state->viewer_pose.position, viewer_pose.position);
   copy_qt_qt(state->viewer_pose.orientation_quat, viewer_pose.orientation_quat);
   wm_xr_pose_to_viewmat(&viewer_pose, state->viewer_viewmat);
+
+  if (ob_constraint) {
+    copy_v3_v3(ob_constraint->loc, viewer_pose.position);
+    quat_to_eul(ob_constraint->rot, viewer_pose.orientation_quat);
+    DEG_id_tag_update(&ob_constraint->id, ID_RECALC_TRANSFORM);
+  }
 
   eye->width = draw_view->width;
   eye->height = draw_view->height;
@@ -496,7 +503,7 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
                                                  ViewLayer *view_layer)
 {
   const unsigned int count = (unsigned int)min_ii(
-      (int)controller_pose_action->count_subaction_paths, 2);
+      (int)controller_pose_action->count_subaction_paths, ARRAY_SIZE(state->controllers));
 
   float view_ofs[3];
   float base_inv[4][4];
@@ -512,6 +519,7 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
 
   for (unsigned int i = 0; i < count; ++i) {
     wmXrControllerData *controller = &state->controllers[i];
+    Object *ob_constraint = (i == 0) ? settings->controller0_object : settings->controller1_object;
 
     /* Calculate controller matrix in world space. */
     wm_xr_controller_pose_to_mat(&((GHOST_XrPose *)controller_pose_action->states)[i], tmp);
@@ -524,6 +532,13 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
     mat4_to_loc_quat(
         controller->pose.position, controller->pose.orientation_quat, controller->mat);
 
+    if (ob_constraint) {
+      copy_v3_v3(ob_constraint->loc, controller->pose.position);
+      quat_to_eul(ob_constraint->rot, controller->pose.orientation_quat);
+      DEG_id_tag_update(&ob_constraint->id, ID_RECALC_TRANSFORM);
+    }
+
+    /* Update controller representation object. */
     if (controller->ob) {
       /* TODO_XR: Handle case where object was deleted but then undone. */
       Base *base = BKE_view_layer_base_find(view_layer, controller->ob);

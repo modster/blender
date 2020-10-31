@@ -567,6 +567,30 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
       "Positional Tracking",
       "Allow VR headsets to affect the location in virtual space, in addition to the rotation");
   RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
+
+  prop = RNA_def_property(srna, "headset_object", PROP_POINTER, PROP_NONE);
+  RNA_def_property_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(
+      prop,
+      "Headset Object",
+      "Object whose location and rotation will be constrained to the VR headset's pose");
+  RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
+
+  prop = RNA_def_property(srna, "controller0_object", PROP_POINTER, PROP_NONE);
+  RNA_def_property_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(
+      prop,
+      "Controller 0 Object",
+      "Object whose location and rotation will be constrained to the first VR controller's pose");
+  RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
+
+  prop = RNA_def_property(srna, "controller1_object", PROP_POINTER, PROP_NONE);
+  RNA_def_property_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(
+      prop,
+      "Controller 1 Object",
+      "Object whose location and rotation will be constrained to the second VR controller's pose");
+  RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
 }
 
 static void rna_def_xr_session_state(BlenderRNA *brna)
