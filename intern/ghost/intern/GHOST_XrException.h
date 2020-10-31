@@ -26,7 +26,7 @@ class GHOST_XrException : public std::exception {
   friend class GHOST_XrContext;
 
  public:
-  GHOST_XrException(const char *msg, int result = 0, bool destroy_runtime = true)
+  GHOST_XrException(const char *msg, int result = 0)
       : std::exception(), m_msg(msg), m_result(result)
   {
   }
