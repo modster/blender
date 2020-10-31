@@ -344,17 +344,14 @@ bool USDMeshReader::valid() const
   return static_cast<bool>(mesh_);
 }
 
-Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
-                               double time,
-                               int read_flag,
-                               const char **err_str)
+Mesh *USDMeshReader::read_mesh(Main *bmain, double time)
 {
   if (!this->mesh_) {
-    if (err_str) {
-      *err_str = "Error reading invalid mesh.";
-    }
-    return existing_mesh;
+    std::cerr << "Error reading invalid mesh schema for " << this->prim_path_ << std::endl;
+    return nullptr;
   }
+
+  Mesh *mesh = BKE_mesh_add(bmain, prim_name_.c_str());
 
   MeshSampleData mesh_data;
 
@@ -366,48 +363,43 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
   mesh_data.y_up = this->context_.stage_up_axis == pxr::UsdGeomTokens->y;
 
   mesh_.GetPointsAttr().Get(&mesh_data.points, time);
+
+  if (mesh_data.points.empty()) {
+    return mesh;
+  }
+
   mesh_.GetFaceVertexCountsAttr().Get(&mesh_data.vertex_counts, time);
   mesh_.GetFaceVertexIndicesAttr().Get(&mesh_data.vertex_indices, time);
 
-  /* For now, always return a new mesh.
-   * TODO(makowalski): Add logic to handle the cases where the topology
-   * hasn't chaged and we return the existing mesh with updated
-   * vert positions. */
+  mesh->totvert = mesh_data.points.size();
+  mesh->mvert = (MVert *)CustomData_add_layer(
+      &mesh->vdata, CD_MVERT, CD_CALLOC, NULL, mesh_data.points.size());
 
-  Mesh *new_mesh = nullptr;
+  mesh->totpoly = mesh_data.vertex_counts.size();
+  mesh->totloop = mesh_data.vertex_indices.size();
+  mesh->mpoly = (MPoly *)CustomData_add_layer(
+      &mesh->pdata, CD_MPOLY, CD_CALLOC, NULL, mesh->totpoly);
+  mesh->mloop = (MLoop *)CustomData_add_layer(
+      &mesh->ldata, CD_MLOOP, CD_CALLOC, NULL, mesh->totloop);
 
-  new_mesh = BKE_mesh_new_nomain_from_template(existing_mesh,
-                                               mesh_data.points.size(),
-                                               0,
-                                               0,
-                                               mesh_data.vertex_indices.size(),
-                                               mesh_data.vertex_counts.size());
+  read_mverts(mesh->mvert, mesh_data);
 
-  if (read_flag & MOD_MESHSEQ_READ_VERT) {
-    read_mverts(new_mesh->mvert, mesh_data);
+  if (this->context_.import_params.import_uvs) {
+    sample_uvs(mesh_, mesh_data, st_primvar_name, time);
   }
 
-  if (read_flag & MOD_MESHSEQ_READ_POLY) {
-    if ((read_flag & MOD_MESHSEQ_READ_UV) && this->context_.import_params.import_uvs) {
-      sample_uvs(mesh_, mesh_data, st_primvar_name, time);
-    }
+  read_mpolys(mesh, mesh_data);
 
-    read_mpolys(new_mesh, mesh_data);
-
-    if (this->context_.import_params.import_normals) {
-      mesh_.GetNormalsAttr().Get(&mesh_data.normals, time);
-      mesh_data.normals_interpolation = mesh_.GetNormalsInterpolation();
-
-      process_normals(new_mesh, mesh_data);
-    }
-    else {
-      process_no_normals(new_mesh);
-    }
+  if (this->context_.import_params.import_normals) {
+    mesh_.GetNormalsAttr().Get(&mesh_data.normals, time);
+    mesh_data.normals_interpolation = mesh_.GetNormalsInterpolation();
+    process_normals(mesh, mesh_data);
+  }
+  else {
+    process_no_normals(mesh);
   }
 
-  /* TODO(makowalski):  Handle case where topology hasn't changed. */
-
-  return new_mesh;
+  return mesh;
 }
 
 void USDMeshReader::readObjectData(Main *bmain, double time)
@@ -425,27 +417,15 @@ void USDMeshReader::readObjectData(Main *bmain, double time)
     return;
   }
 
-  Mesh *mesh = BKE_mesh_add(bmain, prim_name_.c_str());
-
   std::string obj_name = merged_with_parent_ ? prim_parent_name_ : prim_name_;
 
   object_ = BKE_object_add_only_object(bmain, OB_MESH, obj_name.c_str());
+  Mesh *mesh = this->read_mesh(bmain, time);
   object_->data = mesh;
-
-  Mesh *read_mesh = this->read_mesh(mesh, time, MOD_MESHSEQ_READ_ALL, NULL);
-  if (read_mesh != mesh) {
-    /* XXX fixme after 2.80; mesh->flag isn't copied by BKE_mesh_nomain_to_mesh() */
-    /* read_mesh can be freed by BKE_mesh_nomain_to_mesh(), so get the flag before that happens. */
-    short autosmooth = (read_mesh->flag & ME_AUTOSMOOTH);
-    BKE_mesh_nomain_to_mesh(read_mesh, mesh, object_, &CD_MASK_MESH, true);
-    mesh->flag |= autosmooth;
-  }
 
   if (this->context_.import_params.import_materials) {
     assign_materials(bmain, mesh, time);
   }
-
-  /* TODO(makowalski):  Add modifier. */
 }
 
 void USDMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)

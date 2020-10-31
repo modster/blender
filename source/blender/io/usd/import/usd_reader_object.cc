@@ -81,12 +81,9 @@ void USDObjectReader::setObject(Object *ob)
   object_ = ob;
 }
 
-struct Mesh *USDObjectReader::read_mesh(struct Mesh *existing_mesh,
-                                        double UNUSED(time),
-                                        int UNUSED(read_flag),
-                                        const char **UNUSED(err_str))
+struct Mesh *USDObjectReader::read_mesh(Main *UNUSED(bmain), double UNUSED(time))
 {
-  return existing_mesh;
+  return nullptr;
 }
 
 bool USDObjectReader::topology_changed(Mesh * /*existing_mesh*/, double /*time*/)

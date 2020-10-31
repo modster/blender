@@ -111,10 +111,7 @@ class USDObjectReader {
 
   virtual void readObjectData(Main *bmain, double time) = 0;
 
-  virtual struct Mesh *read_mesh(struct Mesh *mesh,
-                                 double time,
-                                 int read_flag,
-                                 const char **err_str);
+  virtual struct Mesh *read_mesh(Main *bmain, double time);
 
   virtual bool topology_changed(Mesh *existing_mesh, double time);
 

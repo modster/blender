@@ -37,10 +37,7 @@ class USDMeshReader : public USDObjectReader {
 
   void readObjectData(Main *bmain, double time) override;
 
-  struct Mesh *read_mesh(struct Mesh *existing_mesh,
-                         double time,
-                         int read_flag,
-                         const char **err_str) override;
+  struct Mesh *read_mesh(Main *bmain, double time) override;
 
  protected:
   void assign_materials(Main *bmain, Mesh *mesh, double time);
