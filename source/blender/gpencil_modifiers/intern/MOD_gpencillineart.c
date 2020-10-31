@@ -376,7 +376,7 @@ static void panel_draw(const bContext *C, Panel *panel)
   gpencil_modifier_panel_end(layout, ptr);
 }
 
-static void occlusion_panel_draw(const bContext *C, Panel *panel)
+static void style_panel_draw(const bContext *C, Panel *panel)
 {
   PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
 
@@ -385,9 +385,19 @@ static void occlusion_panel_draw(const bContext *C, Panel *panel)
   uiLayoutSetPropSep(layout, true);
 
   uiItemR(layout, ptr, "thickness", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+
   uiItemR(layout, ptr, "opacity", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 
   uiItemR(layout, ptr, "pre_sample_length", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+}
+
+static void occlusion_panel_draw(const bContext *C, Panel *panel)
+{
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
+
+  uiLayout *layout = panel->layout;
+
+  uiLayoutSetPropSep(layout, true);
 
   bool use_multiple_levels = RNA_boolean_get(ptr, "use_multiple_levels");
   bool use_transparency = RNA_boolean_get(ptr, "use_transparency");
@@ -434,6 +444,7 @@ static void vgroup_panel_draw(const bContext *C, Panel *panel)
   uiLayoutSetPropSep(layout, true);
 
   row = uiLayoutRow(layout, true);
+  uiItemR(row, ptr, "source_vertex_group", 0, "Filter Source", ICON_GROUP_VERTEX);
   uiItemR(row, ptr, "invert_source_vertex_group", UI_ITEM_R_TOGGLE, "", ICON_ARROW_LEFTRIGHT);
 
   uiItemR(layout, ptr, "match_output_vertex_group", 0, NULL, ICON_NONE);
@@ -444,7 +455,6 @@ static void vgroup_panel_draw(const bContext *C, Panel *panel)
   }
 
   uiItemR(layout, ptr, "soft_selection", 0, NULL, ICON_NONE);
-  uiItemR(row, ptr, "source_vertex_group", 0, "Filter source", ICON_GROUP_VERTEX);
 }
 
 static void panelRegister(ARegionType *region_type)
@@ -452,6 +462,8 @@ static void panelRegister(ARegionType *region_type)
   PanelType *panel_type = gpencil_modifier_panel_register(
       region_type, eGpencilModifierType_Lineart, panel_draw);
 
+  gpencil_modifier_subpanel_register(
+      region_type, "style", "Style", NULL, style_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "occlusion", "Occlusion", NULL, occlusion_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(

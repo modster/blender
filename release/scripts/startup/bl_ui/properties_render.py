@@ -711,18 +711,24 @@ class RENDER_PT_lineart(RenderButtonsPanel, Panel):
             col.label(text="No active camera.")
 
         else:
-            layout.prop(lineart, "crease_threshold", slider=True)
-            layout.prop(lineart, "angle_splitting_threshold", slider=True)
-
-            layout.prop(lineart, "chaining_image_threshold")
-            layout.prop(lineart, "chaining_geometry_threshold")
+            layout.prop(lineart, "use_contour", text='Contour')
+            layout.prop(lineart, "use_material", text='Material Separation')
+            layout.prop(lineart, "use_edge_mark", text='Edge Marks')
 
 
-class RENDER_PT_lineart_line_types(RenderButtonsPanel, Panel):
+class RENDER_PT_lineart_crease(RenderButtonsPanel, Panel):
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
-    bl_label = "Line Types"
+    bl_label = "Crease Lines"
     bl_parent_id = "RENDER_PT_lineart"
     bl_options = {'DEFAULT_CLOSED'}
+
+
+    def draw_header(self, context):
+        scene = context.scene
+        lineart = scene.lineart
+
+        self.layout.prop(lineart, "use_crease", text='')
+
 
     def draw(self, context):
         scene = context.scene
@@ -732,11 +738,34 @@ class RENDER_PT_lineart_line_types(RenderButtonsPanel, Panel):
         layout.active = lineart.auto_update
         layout.use_property_split = True
 
-        layout.prop(lineart, "use_contour", text='Contour')
-        layout.prop(lineart, "use_crease", text='Crease')
-        layout.prop(lineart, "use_material", text='Material Separation')
-        layout.prop(lineart, "use_edge_mark", text='Edge Marks')
-        layout.prop(lineart, "use_intersections", text='Intersections')
+        layout.prop(lineart, "crease_threshold", slider=True)
+
+
+class RENDER_PT_lineart_intersection(RenderButtonsPanel, Panel):
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
+    bl_label = "Intersection Lines"
+    bl_parent_id = "RENDER_PT_lineart"
+    bl_options = {'DEFAULT_CLOSED'}
+
+
+    def draw_header(self, context):
+        scene = context.scene
+        lineart = scene.lineart
+
+        self.layout.prop(lineart, "use_intersections", text='')
+
+
+    def draw(self, context):
+        scene = context.scene
+        lineart = scene.lineart
+
+        layout = self.layout
+        layout.active = lineart.auto_update
+        layout.use_property_split = True
+
+        row = layout.row(align=False)
+        row.active = not lineart.fuzzy_everything
+        row.prop(lineart, "fuzzy_intersections")
 
 
 class RENDER_PT_lineart_extras(RenderButtonsPanel, Panel):
@@ -753,17 +782,13 @@ class RENDER_PT_lineart_extras(RenderButtonsPanel, Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
 
-        layout.label(text="Fuzzy chaining:")
+        layout.prop(lineart, "angle_splitting_threshold", slider=True)
 
-        if lineart.use_intersections:
-            row = layout.row(align=False)
-            row.active = not lineart.fuzzy_everything
-            row.prop(lineart, "fuzzy_intersections")
+        layout.prop(lineart, "chaining_image_threshold")
+        layout.prop(lineart, "chaining_geometry_threshold")
 
-        row = layout.row(align=False)
-        row.prop(lineart, "fuzzy_everything")
-
-        layout.label(text="Algorithm Options:")
+        layout.label(text="Advanced Options:")
+        layout.prop(lineart, "fuzzy_everything")
         layout.prop(lineart, "allow_duplication", text="Allow Instances")
         layout.prop(lineart, "allow_overlapping_edges")
         layout.prop(lineart, "allow_clipping_boundaries",
@@ -835,7 +860,8 @@ classes = (
     RENDER_PT_simplify_greasepencil,
 
     RENDER_PT_lineart,
-    RENDER_PT_lineart_line_types,
+    RENDER_PT_lineart_crease,
+    RENDER_PT_lineart_intersection,
     RENDER_PT_lineart_extras,
     RENDER_PT_lineart_baking,
 )

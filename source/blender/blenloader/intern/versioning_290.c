@@ -898,16 +898,6 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
         part->phystype = PART_PHYS_NO;
       }
     }
-
-    for (Scene *scene = bmain->scenes.first; scene; scene = scene->id.next) {
-      if (!DNA_struct_find(fd->filesdna, "SceneLineart")) {
-        for (Scene *scene = bmain->scenes.first; scene; scene = scene->id.next) {
-          scene->lineart.crease_threshold = 145.0f; /* in degrees. */
-          scene->lineart.line_types |= LRT_EDGE_FLAG_ALL_TYPE;
-          scene->lineart.flags |= (LRT_ALLOW_DUPLI_OBJECTS | LRT_REMOVE_DOUBLES);
-        }
-      }
-    }
   }
 
   if (!MAIN_VERSION_ATLEAST(bmain, 291, 9)) {
@@ -979,6 +969,18 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
    * \note Keep this message at the bottom of the function.
    */
   {
-    /* Keep this block, even when empty. */
+
+    for (Scene *scene = bmain->scenes.first; scene; scene = scene->id.next) {
+      if (!DNA_struct_find(fd->filesdna, "SceneLineart")) {
+        for (Scene *scene = bmain->scenes.first; scene; scene = scene->id.next) {
+          scene->lineart.crease_threshold = 140.0f;
+          scene->lineart.line_types |= LRT_EDGE_FLAG_ALL_TYPE;
+          scene->lineart.flags |= (LRT_ALLOW_DUPLI_OBJECTS | LRT_REMOVE_DOUBLES);
+          scene->lineart.angle_splitting_threshold = DEG2RAD(60.0f);
+          scene->lineart.chaining_geometry_threshold = 0.1f;
+          scene->lineart.chaining_image_threshold = 0.01f;
+        }
+      }
+    }
   }
 }

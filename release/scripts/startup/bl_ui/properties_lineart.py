@@ -29,14 +29,18 @@ class LineartButtonsPanel:
 class OBJECT_PT_lineart(LineartButtonsPanel, Panel):
     bl_label = "Line Art Settings"
 
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        return (ob.type in {'MESH', 'FONT', 'CURVE', 'SURFACE'})
+
     def draw(self, context):
         layout = self.layout
         lineart = context.object.lineart
-        if context.object.type == 'MESH':
-            layout.prop(lineart, 'usage')
-            layout.prop(lineart, "own_crease")
-            if lineart.own_crease:
-                layout.prop(lineart, "crease_threshold", slider=True)
+        layout.prop(lineart, 'usage')
+        layout.prop(lineart, "own_crease", text='Use Own Crease')
+        if lineart.own_crease:
+            layout.prop(lineart, "crease_threshold", slider=True)
 
 
 classes = (
