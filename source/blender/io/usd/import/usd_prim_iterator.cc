@@ -25,6 +25,7 @@
 #include "usd_reader_object.h"
 #include "usd_reader_transform.h"
 
+#include <iostream>
 #include <pxr/base/plug/registry.h>
 #include <pxr/pxr.h>
 #include <pxr/usd/usd/prim.h>
@@ -34,11 +35,11 @@
 #include <pxr/usd/usdGeom/scope.h>
 #include <pxr/usd/usdGeom/tokens.h>
 #include <pxr/usd/usdGeom/xformable.h>
-#include <iostream>
 
 namespace blender::io::usd {
 
-USDObjectReader *USDPrimIterator::get_reader(const pxr::UsdPrim &prim, const USDImporterContext &context)
+USDObjectReader *USDPrimIterator::get_reader(const pxr::UsdPrim &prim,
+                                             const USDImporterContext &context)
 {
   USDObjectReader *result = nullptr;
 
@@ -122,11 +123,12 @@ void USDPrimIterator::debug_traverse_stage(const pxr::UsdStageRefPtr &usd_stage)
   }
 
   pxr::UsdPrimRange prims = usd_stage->Traverse(
-    pxr::UsdTraverseInstanceProxies(pxr::UsdPrimAllPrimsPredicate));
+      pxr::UsdTraverseInstanceProxies(pxr::UsdPrimAllPrimsPredicate));
 
   for (const pxr::UsdPrim &prim : prims) {
     std::cout << prim.GetPath() << std::endl;
-    std::cout << "  Type: " << prim.GetTypeName() << std::endl;;
+    std::cout << "  Type: " << prim.GetTypeName() << std::endl;
+    ;
   }
 }
 

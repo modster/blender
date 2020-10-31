@@ -27,12 +27,9 @@ namespace blender::io::usd {
 struct USDImporterContext;
 class USDObjectReader;
 
-class USDPrimIterator
-{
-  public:
-
-  static USDObjectReader *get_reader(const pxr::UsdPrim &prim,
-                                     const USDImporterContext &context);
+class USDPrimIterator {
+ public:
+  static USDObjectReader *get_reader(const pxr::UsdPrim &prim, const USDImporterContext &context);
 
   static void create_readers(const pxr::UsdPrim &root,
                              const USDImporterContext &context,
