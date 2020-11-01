@@ -490,6 +490,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeEdgeSplit"),
         NodeItem("GeometryNodeTransform"),
         NodeItem("GeometryNodeBoolean"),
+        NodeItem("GeometryNodeSubdivisionSurface"),
     ]),
     GeometryNodeCategory("GEO_ATTRIBUTES", "Attributes", items=[
         NodeItem("GeometryNodeCreateAttribute"),

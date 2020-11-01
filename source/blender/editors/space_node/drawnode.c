@@ -3140,11 +3140,6 @@ static void node_texture_set_butfunc(bNodeType *ntype)
 
 /* ****************** BUTTON CALLBACKS FOR GEOMETRY NODES ***************** */
 
-static void node_geometry_buts_boolean_math(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
-{
-  uiItemR(layout, ptr, "operation", DEFAULT_FLAGS, "", ICON_NONE);
-}
-
 static void node_geometry_buts_attribute_create(uiLayout *layout,
                                                 bContext *UNUSED(C),
                                                 PointerRNA *ptr)
@@ -3160,17 +3155,36 @@ static void node_geometry_buts_attribute_math(uiLayout *layout,
   uiItemR(layout, ptr, "operation", DEFAULT_FLAGS, "", ICON_NONE);
 }
 
+static void node_geometry_buts_boolean_math(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+  uiItemR(layout, ptr, "operation", DEFAULT_FLAGS, "", ICON_NONE);
+}
+
+static void node_geometry_buts_subdivision_surface(uiLayout *layout,
+                                                   bContext *UNUSED(C),
+                                                   PointerRNA *UNUSED(ptr))
+{
+#ifndef WITH_OPENSUBDIV
+  uiItemL(layout, IFACE_("Disabled, built without OpenSubdiv"), ICON_ERROR);
+#else
+  UNUSED_VARS(layout);
+#endif
+}
+
 static void node_geometry_set_butfunc(bNodeType *ntype)
 {
   switch (ntype->type) {
-    case GEO_NODE_BOOLEAN:
-      ntype->draw_buttons = node_geometry_buts_boolean_math;
-      break;
     case GEO_NODE_ATTRIBUTE_CREATE:
       ntype->draw_buttons = node_geometry_buts_attribute_create;
       break;
     case GEO_NODE_ATTRIBUTE_MATH:
       ntype->draw_buttons = node_geometry_buts_attribute_math;
+      break;
+    case GEO_NODE_BOOLEAN:
+      ntype->draw_buttons = node_geometry_buts_boolean_math;
+      break;
+    case GEO_NODE_SUBDIVISION_SURFACE:
+      ntype->draw_buttons = node_geometry_buts_subdivision_surface;
       break;
   }
 }
