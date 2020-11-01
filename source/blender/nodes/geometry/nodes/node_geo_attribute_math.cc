@@ -47,9 +47,9 @@ static void geo_attribute_math_exec(bNode *UNUSED(node),
 
   make_geometry_mutable(geometry);
 
-  // Mesh *mesh = geometry->get_mesh_for_write();
-  // const char *attribute_name_a = inputs.extract<const char *>("Attribute A");
-  // const char *attribute_name_b = inputs.extract<const char *>("Attribute B");
+  Mesh *mesh = geometry->get_mesh_for_write();
+  std::string attribute_name_a = inputs.extract<std::string>("Attribute A");
+  std::string attribute_name_b = inputs.extract<std::string>("Attribute B");
 
   outputs.set("Geometry", std::move(geometry));
 }

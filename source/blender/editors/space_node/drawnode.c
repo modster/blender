@@ -3155,6 +3155,14 @@ static void node_geometry_buts_attribute_math(uiLayout *layout,
   uiItemR(layout, ptr, "operation", DEFAULT_FLAGS, "", ICON_NONE);
 }
 
+static void node_geometry_buts_attribute_random(uiLayout *layout,
+                                                bContext *UNUSED(C),
+                                                PointerRNA *ptr)
+{
+  uiItemR(layout, ptr, "data_type", DEFAULT_FLAGS, "", ICON_NONE);
+  uiItemR(layout, ptr, "domain", DEFAULT_FLAGS, "", ICON_NONE);
+}
+
 static void node_geometry_buts_boolean_math(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "operation", DEFAULT_FLAGS, "", ICON_NONE);

@@ -8173,7 +8173,7 @@ static void def_geo_boolean(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
-static void def_geo_attribute_create(StructRNA *srna)
+static void def_geo_attribute_common(StructRNA *srna)
 {
   PropertyRNA *prop;
 
@@ -8192,6 +8192,11 @@ static void def_geo_attribute_create(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
+static void def_geo_attribute_create(StructRNA *srna)
+{
+  def_geo_attribute_common(srna);
+}
+
 static void def_geo_attribute_math(StructRNA *srna)
 {
   PropertyRNA *prop;
@@ -8202,6 +8207,11 @@ static void def_geo_attribute_math(StructRNA *srna)
   RNA_def_property_enum_default(prop, NODE_VECTOR_MATH_ADD);
   RNA_def_property_ui_text(prop, "Operation", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
+
+static void def_geo_attribute_random(StructRNA *srna)
+{
+  def_geo_attribute_common(srna);
 }
 
 /* -------------------------------------------------------------------------- */

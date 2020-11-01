@@ -41,9 +41,7 @@ static void geo_attribute_random_init(bNodeTree *UNUSED(tree), bNode *node)
 }
 
 namespace blender::nodes {
-static void geo_attribute_random_exec(bNode *UNUSED(node),
-                                      GeoNodeInputs inputs,
-                                      GeoNodeOutputs outputs)
+static void geo_attribute_random_exec(bNode *node, GeoNodeInputs inputs, GeoNodeOutputs outputs)
 {
   GeometryPtr geometry = inputs.extract<GeometryPtr>("Geometry");
 
@@ -54,9 +52,16 @@ static void geo_attribute_random_exec(bNode *UNUSED(node),
 
   make_geometry_mutable(geometry);
 
-  // RandomNumberGenerator rng(0);
-  // Mesh *mesh = geometry->get_mesh_for_write();
-  // const char *attribute_name = inputs.extract<const char *>("Attribute");
+  RandomNumberGenerator rng(0);
+  Mesh *mesh = geometry->get_mesh_for_write();
+  std::string attribute_name = inputs.extract<std::string>("Attribute");
+
+  CustomDataType data_type = static_cast<CustomDataType>(node->custom1);
+  AttributeDomain domain = static_cast<AttributeDomain>(node->custom2);
+
+  ReportList report_list_dummy;
+  CustomDataLayer *custom_data = BKE_id_attribute_new(
+      reinterpret_cast<ID *>(mesh), attribute_name.c_str(), data_type, domain, &report_list_dummy);
 
   outputs.set("Geometry", std::move(geometry));
 }
