@@ -1149,6 +1149,38 @@ static PyObject *BPy_IDGroup_get(BPy_IDProperty *self, PyObject *args)
   return def;
 }
 
+PyDoc_STRVAR(BPy_IDGroup_update_rna_doc,
+             ".. method:: update_rna(key, "
+             "min=None, "
+             "max=None, "
+             "soft_min=None, "
+             "soft_max=None, "
+             "precision=None, "
+             "step=None, "
+             "default_value=None, "
+             "description=None)\n"
+             "\n"
+             "   Update the RNA type information of the IDProperty used for interaction and drawing
+             in the user interface. The property specified by the key must be a direct child of the
+             group.\n ");
+static void BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args)
+{
+  const char *key;
+
+  if (!PyArg_ParseTuple(args, "s|O:get", &key)) {
+    return NULL;
+  }
+
+  IDProperty *idprop = IDP_GetPropertyFromGroup(self->prop, key);
+
+  if (idprop) {
+    PyObject *pyobj = BPy_IDGroup_WrapData(self->id, idprop, self->prop);
+    if (pyobj) {
+      return pyobj;
+    }
+  }
+}
+
 static struct PyMethodDef BPy_IDGroup_methods[] = {
     {"pop", (PyCFunction)BPy_IDGroup_pop, METH_VARARGS, BPy_IDGroup_pop_doc},
     {"iteritems", (PyCFunction)BPy_IDGroup_iter_items, METH_NOARGS, BPy_IDGroup_iter_items_doc},
@@ -1159,6 +1191,7 @@ static struct PyMethodDef BPy_IDGroup_methods[] = {
     {"get", (PyCFunction)BPy_IDGroup_get, METH_VARARGS, BPy_IDGroup_get_doc},
     {"to_dict", (PyCFunction)BPy_IDGroup_to_dict, METH_NOARGS, BPy_IDGroup_to_dict_doc},
     {"clear", (PyCFunction)BPy_IDGroup_clear, METH_NOARGS, BPy_IDGroup_clear_doc},
+    {"update_rna", (PyCFunction)BPY_IDGroup_update_rna, XXXXXXXXXXX, BPy_IDGroup_update_rna_doc},
     {NULL, NULL, 0, NULL},
 };
 
@@ -1691,7 +1724,6 @@ static PyObject *IDGroup_Iter_repr(BPy_IDGroup_Iter *self)
 
 static PyObject *BPy_Group_Iter_Next(BPy_IDGroup_Iter *self)
 {
-
   if (self->cur) {
     PyObject *ret;
     IDProperty *cur;

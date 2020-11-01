@@ -58,6 +58,58 @@ typedef struct DrawDataList {
   struct DrawData *first, *last;
 } DrawDataList;
 
+typedef struct IDPropertyUIData {
+  /** Tooltip / property description pointer. Owned by the IDProperty. */
+  char *description;
+  /** RNA subtype, used for every type except sting properties. Uses PropertySubType enum. */
+  int rna_subtype;
+
+  int _pad;
+} IDPropertyUIData;
+
+/** UI information for #IDP_INT. */
+typedef struct IDPropertyUIDataInt {
+  IDPropertyUIData generic_ui_data;
+
+  int min;
+  int max;
+  int soft_min;
+  int soft_max;
+  int step;
+  int default_value;
+} IDPropertyUIDataInt;
+
+/** UI information for #IDP_FLOAT and #IDP_DOUBLE. */
+typedef struct IDPropertyUIDataFloat {
+  IDPropertyUIData generic_ui_data;
+  void *_pad1;
+  float step;
+  float precision;
+
+  double min;
+  double max;
+  double soft_min;
+  double soft_max;
+  double default_value;
+} IDPropertyUIDataFloat;
+
+/** UI information for #IDP_ARRAY. */
+typedef struct IDPropertyUIDataArray {
+  IDPropertyUIData generic_ui_data;
+
+  void *default_value_array;
+  int default_array_len;
+
+  int default_value_int;
+  double default_value_double; /* For subtypes IDP_FLOAT and IDP_DOUBLE. */
+} IDPropertyUIDataArray;
+
+/** UI information for #IDP_STRING. */
+typedef struct IDPropertyUIDataString {
+  IDPropertyUIData generic_ui_data;
+  char *default_value;
+} IDPropertyUIDataString;
+
 typedef struct IDPropertyData {
   void *pointer;
   ListBase group;
@@ -86,6 +138,8 @@ typedef struct IDProperty {
   /* totallen is total length of allocated array/string, including a buffer.
    * Note that the buffering is mild; the code comes from python's list implementation. */
   int totallen;
+
+  IDPropertyUIData *ui_data;
 } IDProperty;
 
 #define MAX_IDPROP_NAME 64
