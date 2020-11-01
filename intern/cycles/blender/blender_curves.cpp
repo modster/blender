@@ -846,6 +846,10 @@ void BlenderSync::sync_hair(BL::Depsgraph b_depsgraph,
   /* update original sockets */
 
   for (const SocketType &socket : new_hair.type->inputs) {
+    /* Those sockets are updated in sync_object, so do not modify them. */
+    if (socket.name == "use_motion_blur" || socket.name == "motion_steps") {
+      continue;
+    }
     hair->set_value(socket, new_hair, socket);
   }
 

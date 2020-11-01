@@ -57,12 +57,12 @@ BlenderSync::BlenderSync(BL::RenderEngine &b_engine,
     : b_engine(b_engine),
       b_data(b_data),
       b_scene(b_scene),
-      shader_map(),
-      object_map(),
-      procedural_map(),
-      geometry_map(),
-      light_map(),
-      particle_system_map(),
+      shader_map(scene),
+      object_map(scene),
+      procedural_map(scene),
+      geometry_map(scene),
+      light_map(scene),
+      particle_system_map(scene),
       world_map(NULL),
       world_recalc(false),
       scene(scene),
@@ -249,7 +249,7 @@ void BlenderSync::sync_data(BL::RenderSettings &b_render,
 
   /* Shader sync done at the end, since object sync uses it.
    * false = don't delete unused shaders, not supported. */
-  shader_map.post_sync(scene, false);
+  shader_map.post_sync(false);
 
   free_data_after_sync(b_depsgraph);
 
@@ -301,9 +301,6 @@ void BlenderSync::sync_integrator()
 
   integrator->set_seed(seed);
 
-  integrator->set_sampling_pattern((SamplingPattern)get_enum(
-      cscene, "sampling_pattern", SAMPLING_NUM_PATTERNS, SAMPLING_PATTERN_SOBOL));
-
   integrator->set_sample_clamp_direct(get_float(cscene, "sample_clamp_direct"));
   integrator->set_sample_clamp_indirect(get_float(cscene, "sample_clamp_indirect"));
   if (!preview) {
@@ -322,15 +319,21 @@ void BlenderSync::sync_integrator()
   integrator->set_sample_all_lights_indirect(get_boolean(cscene, "sample_all_lights_indirect"));
   integrator->set_light_sampling_threshold(get_float(cscene, "light_sampling_threshold"));
 
+  SamplingPattern sampling_pattern = (SamplingPattern)get_enum(
+        cscene, "sampling_pattern", SAMPLING_NUM_PATTERNS, SAMPLING_PATTERN_SOBOL);
+
+  int adaptive_min_samples = INT_MAX;
+
   if (RNA_boolean_get(&cscene, "use_adaptive_sampling")) {
-    integrator->set_sampling_pattern(SAMPLING_PATTERN_PMJ);
-    integrator->set_adaptive_min_samples(get_int(cscene, "adaptive_min_samples"));
+    sampling_pattern = SAMPLING_PATTERN_PMJ;
+    adaptive_min_samples = get_int(cscene, "adaptive_min_samples");
     integrator->set_adaptive_threshold(get_float(cscene, "adaptive_threshold"));
   }
   else {
-    integrator->set_adaptive_min_samples(INT_MAX);
     integrator->set_adaptive_threshold(0.0f);
   }
+
+  integrator->set_sampling_pattern(sampling_pattern);
 
   int diffuse_samples = get_int(cscene, "diffuse_samples");
   int glossy_samples = get_int(cscene, "glossy_samples");
@@ -348,8 +351,7 @@ void BlenderSync::sync_integrator()
     integrator->set_mesh_light_samples(mesh_light_samples * mesh_light_samples);
     integrator->set_subsurface_samples(subsurface_samples * subsurface_samples);
     integrator->set_volume_samples(volume_samples * volume_samples);
-    integrator->set_adaptive_min_samples(min(
-        integrator->get_adaptive_min_samples() * integrator->get_adaptive_min_samples(), INT_MAX));
+    adaptive_min_samples = min(adaptive_min_samples * adaptive_min_samples, INT_MAX);
   }
   else {
     integrator->set_diffuse_samples(diffuse_samples);
@@ -360,6 +362,8 @@ void BlenderSync::sync_integrator()
     integrator->set_subsurface_samples(subsurface_samples);
     integrator->set_volume_samples(volume_samples);
   }
+
+  integrator->set_adaptive_min_samples(adaptive_min_samples);
 
   if (b_scene.render().use_simplify()) {
     if (preview) {

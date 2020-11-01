@@ -3749,7 +3749,7 @@ void GeometryNode::compile(SVMCompiler &compiler)
   if (!out->links.empty()) {
     if (compiler.output_type() != SHADER_TYPE_VOLUME) {
       compiler.add_node(
-          attr_node, ATTR_STD_POINTINESS, compiler.stack_assign(out), NODE_ATTR_FLOAT);
+          attr_node, ATTR_STD_POINTINESS, compiler.stack_assign(out), NODE_ATTR_OUTPUT_FLOAT);
     }
     else {
       compiler.add_node(NODE_VALUE_F, __float_as_int(0.0f), compiler.stack_assign(out));
@@ -3759,8 +3759,10 @@ void GeometryNode::compile(SVMCompiler &compiler)
   out = output("Random Per Island");
   if (!out->links.empty()) {
     if (compiler.output_type() != SHADER_TYPE_VOLUME) {
-      compiler.add_node(
-          attr_node, ATTR_STD_RANDOM_PER_ISLAND, compiler.stack_assign(out), NODE_ATTR_FLOAT);
+      compiler.add_node(attr_node,
+                        ATTR_STD_RANDOM_PER_ISLAND,
+                        compiler.stack_assign(out),
+                        NODE_ATTR_OUTPUT_FLOAT);
     }
     else {
       compiler.add_node(NODE_VALUE_F, __float_as_int(0.0f), compiler.stack_assign(out));
@@ -3878,7 +3880,7 @@ void TextureCoordinateNode::compile(SVMCompiler &compiler)
       }
       else {
         int attr = compiler.attribute(ATTR_STD_GENERATED);
-        compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_FLOAT3);
+        compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_OUTPUT_FLOAT3);
       }
     }
   }
@@ -3895,7 +3897,7 @@ void TextureCoordinateNode::compile(SVMCompiler &compiler)
     }
     else {
       int attr = compiler.attribute(ATTR_STD_UV);
-      compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_FLOAT3);
+      compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_OUTPUT_FLOAT3);
     }
   }
 
@@ -4013,7 +4015,7 @@ void UVMapNode::compile(SVMCompiler &compiler)
       else
         attr = compiler.attribute(ATTR_STD_UV);
 
-      compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_FLOAT3);
+      compiler.add_node(attr_node, attr, compiler.stack_assign(out), NODE_ATTR_OUTPUT_FLOAT3);
     }
   }
 }
@@ -4409,7 +4411,7 @@ void HairInfoNode::compile(SVMCompiler &compiler)
   out = output("Intercept");
   if (!out->links.empty()) {
     int attr = compiler.attribute(ATTR_STD_CURVE_INTERCEPT);
-    compiler.add_node(NODE_ATTR, attr, compiler.stack_assign(out), NODE_ATTR_FLOAT);
+    compiler.add_node(NODE_ATTR, attr, compiler.stack_assign(out), NODE_ATTR_OUTPUT_FLOAT);
   }
 
   out = output("Thickness");
@@ -4430,7 +4432,7 @@ void HairInfoNode::compile(SVMCompiler &compiler)
   out = output("Random");
   if (!out->links.empty()) {
     int attr = compiler.attribute(ATTR_STD_CURVE_RANDOM);
-    compiler.add_node(NODE_ATTR, attr, compiler.stack_assign(out), NODE_ATTR_FLOAT);
+    compiler.add_node(NODE_ATTR, attr, compiler.stack_assign(out), NODE_ATTR_OUTPUT_FLOAT);
   }
 }
 
@@ -5392,6 +5394,7 @@ NODE_DEFINE(AttributeNode)
   SOCKET_OUT_COLOR(color, "Color");
   SOCKET_OUT_VECTOR(vector, "Vector");
   SOCKET_OUT_FLOAT(fac, "Fac");
+  SOCKET_OUT_FLOAT(alpha, "Alpha");
 
   return type;
 }
@@ -5405,8 +5408,10 @@ void AttributeNode::attributes(Shader *shader, AttributeRequestSet *attributes)
   ShaderOutput *color_out = output("Color");
   ShaderOutput *vector_out = output("Vector");
   ShaderOutput *fac_out = output("Fac");
+  ShaderOutput *alpha_out = output("Alpha");
 
-  if (!color_out->links.empty() || !vector_out->links.empty() || !fac_out->links.empty()) {
+  if (!color_out->links.empty() || !vector_out->links.empty() || !fac_out->links.empty() ||
+      !alpha_out->links.empty()) {
     attributes->add_standard(attribute);
   }
 
@@ -5422,6 +5427,7 @@ void AttributeNode::compile(SVMCompiler &compiler)
   ShaderOutput *color_out = output("Color");
   ShaderOutput *vector_out = output("Vector");
   ShaderOutput *fac_out = output("Fac");
+  ShaderOutput *alpha_out = output("Alpha");
   ShaderNodeType attr_node = NODE_ATTR;
   int attr = compiler.attribute_standard(attribute);
 
@@ -5432,15 +5438,22 @@ void AttributeNode::compile(SVMCompiler &compiler)
 
   if (!color_out->links.empty() || !vector_out->links.empty()) {
     if (!color_out->links.empty()) {
-      compiler.add_node(attr_node, attr, compiler.stack_assign(color_out), NODE_ATTR_FLOAT3);
+      compiler.add_node(
+          attr_node, attr, compiler.stack_assign(color_out), NODE_ATTR_OUTPUT_FLOAT3);
     }
     if (!vector_out->links.empty()) {
-      compiler.add_node(attr_node, attr, compiler.stack_assign(vector_out), NODE_ATTR_FLOAT3);
+      compiler.add_node(
+          attr_node, attr, compiler.stack_assign(vector_out), NODE_ATTR_OUTPUT_FLOAT3);
     }
   }
 
   if (!fac_out->links.empty()) {
-    compiler.add_node(attr_node, attr, compiler.stack_assign(fac_out), NODE_ATTR_FLOAT);
+    compiler.add_node(attr_node, attr, compiler.stack_assign(fac_out), NODE_ATTR_OUTPUT_FLOAT);
+  }
+
+  if (!alpha_out->links.empty()) {
+    compiler.add_node(
+        attr_node, attr, compiler.stack_assign(alpha_out), NODE_ATTR_OUTPUT_FLOAT_ALPHA);
   }
 }
 
@@ -5762,6 +5775,7 @@ NODE_DEFINE(MapRangeNode)
   SOCKET_IN_FLOAT(to_min, "To Min", 0.0f);
   SOCKET_IN_FLOAT(to_max, "To Max", 1.0f);
   SOCKET_IN_FLOAT(steps, "Steps", 4.0f);
+  SOCKET_IN_BOOLEAN(clamp, "Clamp", false);
 
   SOCKET_OUT_FLOAT(result, "Result");
 
