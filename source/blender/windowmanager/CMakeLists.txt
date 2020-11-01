@@ -27,6 +27,7 @@ set(INC
   ../blenlib
   ../blenloader
   ../blentranslation
+  ../bmesh
   ../compositor
   ../depsgraph
   ../editors/include

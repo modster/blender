@@ -503,7 +503,7 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
                                                  ViewLayer *view_layer)
 {
   const unsigned int count = (unsigned int)min_ii(
-      (int)controller_pose_action->count_subaction_paths, ARRAY_SIZE(state->controllers));
+      (int)controller_pose_action->count_subaction_paths, (int)ARRAY_SIZE(state->controllers));
 
   float view_ofs[3];
   float base_inv[4][4];
@@ -575,7 +575,7 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
   GHASH_ITER (*ghi, actions) {
     wmXrAction *action = BLI_ghashIterator_getValue(ghi);
     if (action && action->ot) {
-      bool modal = action->ot->modal ? true : false;
+      bool modal = (action->ot->modal || action->ot->modal_3d) ? true : false;
 
       for (unsigned int i = 0; i < action->count_subaction_paths; ++i) {
         short val = KM_ANY;

@@ -3249,7 +3249,7 @@ static void wm_event_do_surface_handlers(bContext *C, wmSurface *surface)
           PointerRNA properties = {.type = action_data->ot->srna,
                                    .data = action_data->op_properties};
 
-          if (action_data->ot->invoke) {
+          if (action_data->ot->invoke || action_data->ot->invoke_3d) {
             /* Invoke operator, either executing operator or transferring responsibility to window
              * modal handlers. */
             wm_operator_invoke(C,
@@ -4885,7 +4885,7 @@ void wm_event_add_xrevent(const char *action_set_name,
   BLI_assert(val == KM_PRESS || val == KM_RELEASE);
 
   wmXrSurfaceData *surface_data = surface->customdata;
-  const bool add_win_event = (action->ot->modal &&
+  const bool add_win_event = ((action->ot->modal || action->ot->modal_3d) &&
                               ((val == KM_PRESS && !press_start) || val == KM_RELEASE));
 
   wmEvent _event;

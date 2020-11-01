@@ -168,7 +168,7 @@ static bool object_deselect_all_visible(ViewLayer *view_layer, View3D *v3d)
 }
 
 /* deselect all except b */
-static bool object_deselect_all_except(ViewLayer *view_layer, Base *b)
+bool object_deselect_all_except(ViewLayer *view_layer, Base *b)
 {
   bool changed = false;
   LISTBASE_FOREACH (Base *, base, &view_layer->object_bases) {

@@ -556,6 +556,7 @@ void ED_view3d_viewcontext_init(struct bContext *C,
 void ED_view3d_viewcontext_init_object(struct ViewContext *vc, struct Object *obact);
 void view3d_operator_needs_opengl(const struct bContext *C);
 void view3d_region_operator_needs_opengl(struct wmWindow *win, struct ARegion *region);
+bool object_deselect_all_except(struct ViewLayer *view_layer, struct Base *b);
 
 /* XXX should move to BLI_math */
 bool edge_inside_circle(const float cent[2],
