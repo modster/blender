@@ -237,6 +237,7 @@ void Geometry::compute_bvh(
     }
   }
 
+  clear_modified();
   need_update_rebuild = false;
 }
 
@@ -258,6 +259,8 @@ bool Geometry::has_voxel_attributes() const
 
 void Geometry::tag_update(Scene *scene, bool rebuild)
 {
+  tag_modified();
+
   if (rebuild) {
     need_update_rebuild = true;
     scene->light_manager->need_update = true;
@@ -1037,61 +1040,23 @@ void GeometryManager::device_update_mesh(
     /* normals */
     progress.set_status("Updating Mesh", "Computing normals");
 
-    uint *tri_shader;
-    uint4 *tri_vindex;
-    uint *tri_patch;
-    if (device_update_flags & DEVICE_TRIANGLES_NEEDS_REALLOC) {
-      tri_shader = dscene->tri_shader.alloc(tri_size);
-      tri_vindex = dscene->tri_vindex.alloc(tri_size);
-      tri_patch = dscene->tri_patch.alloc(tri_size);
-    }
-    else {
-      tri_shader = dscene->tri_shader.data();
-      tri_vindex = dscene->tri_vindex.data();
-      tri_patch = dscene->tri_patch.data();
-    }
-
-    float4 *vnormal;
-    float2 *tri_patch_uv;
-    if (device_update_flags & DEVICE_VERTEX_NEEDS_REALLOC) {
-      vnormal = dscene->tri_vnormal.alloc(vert_size);
-      tri_patch_uv = dscene->tri_patch_uv.alloc(vert_size);
-    }
-    else {
-      vnormal = dscene->tri_vnormal.data();
-      tri_patch_uv = dscene->tri_patch_uv.data();
-    }
-
-    bool tri_shader_modified = (device_update_flags & DEVICE_TRIANGLES_NEEDS_REALLOC);
-    bool tri_vindex_modified = (device_update_flags & DEVICE_TRIANGLES_NEEDS_REALLOC);
-    bool tri_patch_modified = (device_update_flags & DEVICE_TRIANGLES_NEEDS_REALLOC);
-    bool tri_patch_uv_modified = (device_update_flags & DEVICE_VERTEX_NEEDS_REALLOC);
-    bool vnormal_modified = (device_update_flags & DEVICE_VERTEX_NEEDS_REALLOC);
+    uint *tri_shader = dscene->tri_shader.alloc(tri_size);
+    float4 *vnormal = dscene->tri_vnormal.alloc(vert_size);
+    uint4 *tri_vindex = dscene->tri_vindex.alloc(tri_size);
+    uint *tri_patch = dscene->tri_patch.alloc(tri_size);
+    float2 *tri_patch_uv = dscene->tri_patch_uv.alloc(vert_size);
 
     foreach (Geometry *geom, scene->geometry) {
       if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
         Mesh *mesh = static_cast<Mesh *>(geom);
-
-        if (mesh->shader_is_modified() || mesh->smooth_is_modified() || mesh->triangles_is_modified() || (device_update_flags & DEVICE_CURVE_DATA_NEEDS_REALLOC)) {
-          tri_shader_modified = true;
-          mesh->pack_shaders(scene, &tri_shader[mesh->prim_offset]);
-        }
-
-        tri_vindex_modified |= mesh->triangles_is_modified();
-        tri_patch_modified |= mesh->triangles_is_modified();
-        tri_patch_uv_modified |= mesh->vert_patch_uv_is_modified();
-        vnormal_modified |= mesh->triangles_is_modified() || mesh->verts_is_modified();
-
-        if (mesh->triangles_is_modified() || mesh->verts_is_modified() || (device_update_flags & DEVICE_MESH_DATA_NEEDS_REALLOC)) {
-          mesh->pack_normals(&vnormal[mesh->vert_offset]);
-          mesh->pack_verts(tri_prim_index,
-                           &tri_vindex[mesh->prim_offset],
-                           &tri_patch[mesh->prim_offset],
-                           &tri_patch_uv[mesh->vert_offset],
-                           mesh->vert_offset,
-                           mesh->prim_offset);
-        }
-
+        mesh->pack_shaders(scene, &tri_shader[mesh->prim_offset]);
+        mesh->pack_normals(&vnormal[mesh->vert_offset]);
+        mesh->pack_verts(tri_prim_index,
+                         &tri_vindex[mesh->prim_offset],
+                         &tri_patch[mesh->prim_offset],
+                         &tri_patch_uv[mesh->vert_offset],
+                         mesh->vert_offset,
+                         mesh->prim_offset);
         if (progress.get_cancel())
           return;
       }
@@ -1100,60 +1065,22 @@ void GeometryManager::device_update_mesh(
     /* vertex coordinates */
     progress.set_status("Updating Mesh", "Copying Mesh to device");
 
-    if (tri_shader_modified) {
-      dscene->tri_shader.copy_to_device();
-    }
-    if (vnormal_modified) {
-      dscene->tri_vnormal.copy_to_device();
-    }
-    if (tri_vindex_modified) {
-      dscene->tri_vindex.copy_to_device();
-    }
-    if (tri_patch_modified) {
-      dscene->tri_patch.copy_to_device();
-    }
-    if (tri_patch_uv_modified) {
-      dscene->tri_patch_uv.copy_to_device();
-    }
+    dscene->tri_shader.copy_to_device();
+    dscene->tri_vnormal.copy_to_device();
+    dscene->tri_vindex.copy_to_device();
+    dscene->tri_patch.copy_to_device();
+    dscene->tri_patch_uv.copy_to_device();
   }
 
   if (curve_size != 0) {
     progress.set_status("Updating Mesh", "Copying Strands to device");
 
-    float4 *curve_keys;
-    float4 *curves;
-
-    if (device_update_flags & DEVICE_CURVE_KEYS_NEEDS_REALLOC) {
-      curve_keys = dscene->curve_keys.alloc(curve_key_size);
-    }
-    else {
-      curve_keys = dscene->curve_keys.data();
-    }
-
-    if (device_update_flags & DEVICE_CURVES_NEEDS_REALLOC) {
-      curves = dscene->curves.alloc(curve_size);
-    }
-    else {
-      curves = dscene->curves.data();
-    }
-
-    bool curve_keys_modified = (device_update_flags & DEVICE_CURVE_KEYS_NEEDS_REALLOC);
-    bool curves_modified = (device_update_flags & DEVICE_CURVES_NEEDS_REALLOC);
+    float4 *curve_keys = dscene->curve_keys.alloc(curve_key_size);
+    float4 *curves = dscene->curves.alloc(curve_size);
 
     foreach (Geometry *geom, scene->geometry) {
       if (geom->is_hair()) {
         Hair *hair = static_cast<Hair *>(geom);
-
-        bool curve_keys_co_modified = hair->curve_radius_is_modified() || hair->curve_keys_is_modified();
-        bool curve_data_modified = hair->curve_shader_is_modified() || hair->curve_first_key_is_modified();
-
-        if (!curve_keys_co_modified && !curve_data_modified && (device_update_flags & (DEVICE_CURVES_NEEDS_REALLOC | DEVICE_CURVE_KEYS_NEEDS_REALLOC)) == 0) {
-          continue;
-        }
-
-        curve_keys_modified |= curve_keys_co_modified;
-        curves_modified |= curve_data_modified;
-
         hair->pack_curves(scene,
                           &curve_keys[hair->curvekey_offset],
                           &curves[hair->prim_offset],
@@ -1163,12 +1090,8 @@ void GeometryManager::device_update_mesh(
       }
     }
 
-    if (curve_keys_modified) {
-      dscene->curve_keys.copy_to_device();
-    }
-    if (curves_modified) {
-      dscene->curves.copy_to_device();
-    }
+    dscene->curve_keys.copy_to_device();
+    dscene->curves.copy_to_device();
   }
 
   if (patch_size != 0) {
@@ -1313,8 +1236,6 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
     return;
   }
 
-  device_update_flags = 0;
-
   scoped_callback_timer timer([scene](double time) {
     if (scene->update_stats) {
       scene->update_stats->geometry.times.add_entry({"device_update_preprocess", time});
@@ -1352,47 +1273,13 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
 
       Volume *volume = static_cast<Volume *>(geom);
       create_volume_mesh(volume, progress);
-
-      device_update_flags |= DEVICE_MESH_DATA_NEEDS_REALLOC;
     }
 
     if (geom->is_hair()) {
       /* Set curve shape, still a global scene setting for now. */
       Hair *hair = static_cast<Hair *>(geom);
       hair->curve_shape = scene->params.hair_shape;
-
-      if (hair->previous_keys_num != hair->num_keys()) {
-        device_update_flags |= DEVICE_CURVE_KEYS_NEEDS_REALLOC;
-        hair->previous_keys_num = hair->num_keys();
-      }
-
-      if (hair->previous_curves_num != hair->num_curves()) {
-        device_update_flags |= DEVICE_CURVES_NEEDS_REALLOC;
-        hair->previous_curves_num = hair->num_curves();
-      }
     }
-
-    if (geom->is_mesh()) {
-      Mesh *mesh = static_cast<Mesh *>(geom);
-
-      if (mesh->previous_verts_count != mesh->get_verts().size()) {
-        device_update_flags |= DEVICE_VERTEX_NEEDS_REALLOC;
-        mesh->previous_verts_count = mesh->get_verts().size();
-      }
-
-      if (mesh->previous_triangles_count != mesh->get_triangles().size()) {
-        device_update_flags |= DEVICE_TRIANGLES_NEEDS_REALLOC;
-        mesh->previous_triangles_count = mesh->get_triangles().size();
-      }
-    }
-  }
-
-  if (update_flags & (MESH_ADDED | MESH_REMOVED)) {
-    device_update_flags |= DEVICE_MESH_DATA_NEEDS_REALLOC;
-  }
-
-  if (update_flags & (HAIR_ADDED | HAIR_REMOVED)) {
-    device_update_flags |= DEVICE_CURVE_DATA_NEEDS_REALLOC;
   }
 
   need_flags_update = false;
@@ -1576,8 +1463,6 @@ void GeometryManager::device_update(Device *device,
         DiagSplit dsplit(*mesh->subd_params);
         mesh->tessellate(&dsplit);
 
-        device_update_flags |= DEVICE_MESH_DATA_NEEDS_REALLOC;
-
         i++;
 
         if (progress.get_cancel())
@@ -1746,12 +1631,7 @@ void GeometryManager::device_update(Device *device,
       return;
   }
 
-  foreach (Geometry *geom, scene->geometry) {
-    geom->clear_modified();
-  }
-
   need_update = false;
-  update_flags = 0;
 
   if (true_displacement_used) {
     /* Re-tag flags for update, so they're re-evaluated
@@ -1778,33 +1658,19 @@ void GeometryManager::device_free(Device *device, DeviceScene *dscene)
   dscene->bvh_leaf_nodes.free();
   dscene->object_node.free();
   dscene->prim_tri_verts.free();
-
   dscene->prim_tri_index.free();
   dscene->prim_type.free();
   dscene->prim_visibility.free();
   dscene->prim_index.free();
   dscene->prim_object.free();
   dscene->prim_time.free();
-
-  if (device_update_flags & DEVICE_TRIANGLES_NEEDS_REALLOC) {
-    dscene->tri_shader.free();
-    dscene->tri_vindex.free();
-    dscene->tri_patch.free();
-  }
-
-  if (device_update_flags & DEVICE_VERTEX_NEEDS_REALLOC) {
-    dscene->tri_vnormal.free();
-    dscene->tri_patch_uv.free();
-  }
-
-  if (device_update_flags & DEVICE_CURVES_NEEDS_REALLOC) {
-    dscene->curves.free();
-  }
-
-  if (device_update_flags & DEVICE_CURVE_KEYS_NEEDS_REALLOC) {
-    dscene->curve_keys.free();
-  }
-
+  dscene->tri_shader.free();
+  dscene->tri_vnormal.free();
+  dscene->tri_vindex.free();
+  dscene->tri_patch.free();
+  dscene->tri_patch_uv.free();
+  dscene->curves.free();
+  dscene->curve_keys.free();
   dscene->patches.free();
   dscene->attributes_map.free();
   dscene->attributes_float.free();

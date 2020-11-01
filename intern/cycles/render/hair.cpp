@@ -295,8 +295,6 @@ Hair::Hair() : Geometry(node_type, Geometry::HAIR)
 {
   curvekey_offset = 0;
   curve_shape = CURVE_RIBBON;
-  previous_keys_num = 0;
-  previous_curves_num = 0;
 }
 
 Hair::~Hair()

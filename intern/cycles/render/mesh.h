@@ -55,9 +55,6 @@ class Mesh : public Geometry {
  protected:
   Mesh(const NodeType *node_type_, Type geom_type_);
 
-  size_t previous_verts_count;
-  size_t previous_triangles_count;
-
  public:
   NODE_DECLARE
 
