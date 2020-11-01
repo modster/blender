@@ -661,11 +661,6 @@ static int transform_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event
                customdata->eye_width,
                customdata->eye_height);
 
-  PropertyRNA *prop = RNA_struct_find_property(op->ptr, "orient_type");
-  if (prop) {
-    RNA_property_enum_set(op->ptr, prop, V3D_ORIENT_VIEW);
-  }
-
   retval = transform_invoke(C, op, &event_mut);
 
   /* Restore window view. */
