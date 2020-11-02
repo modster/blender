@@ -977,7 +977,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
           scene->lineart.line_types |= LRT_EDGE_FLAG_ALL_TYPE;
           scene->lineart.flags |= (LRT_ALLOW_DUPLI_OBJECTS | LRT_REMOVE_DOUBLES);
           scene->lineart.angle_splitting_threshold = DEG2RAD(60.0f);
-          scene->lineart.chaining_geometry_threshold = 0.1f;
+          scene->lineart.chaining_geometry_threshold = 0.01f;
           scene->lineart.chaining_image_threshold = 0.01f;
         }
       }

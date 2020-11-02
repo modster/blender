@@ -7490,7 +7490,7 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
   /* Below these two are only for grease pencil, thus no viewport updates. */
 
   prop = RNA_def_property(srna, "chaining_geometry_threshold", PROP_FLOAT, PROP_NONE);
-  RNA_def_property_float_default(prop, 0.1f);
+  RNA_def_property_float_default(prop, 0.01f);
   RNA_def_property_ui_text(prop,
                            "Geometry Threshold",
                            "Segments where their geometric distance between them lower than this "
