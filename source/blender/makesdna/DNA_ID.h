@@ -61,16 +61,16 @@ typedef struct DrawDataList {
 typedef struct IDPropertyUIData {
   /** Tooltip / property description pointer. Owned by the IDProperty. */
   char *description;
-  /** RNA subtype, used for every type except sting properties. Uses PropertySubType enum. */
+  /** RNA subtype, used for every type except string properties (PropertySubType). */
   int rna_subtype;
 
   int _pad;
 } IDPropertyUIData;
 
-/** UI information for #IDP_INT. */
+/** UI information for IDP_INT or IDP_ARRAY with subtype IDP_INT. */
 typedef struct IDPropertyUIDataInt {
   IDPropertyUIData generic_ui_data;
-
+  int *default_value_array; /* Only for array properties. */
   int min;
   int max;
   int soft_min;
@@ -79,10 +79,10 @@ typedef struct IDPropertyUIDataInt {
   int default_value;
 } IDPropertyUIDataInt;
 
-/** UI information for #IDP_FLOAT and #IDP_DOUBLE. */
+/** UI information for IDP_FLOAT and IDP_DOUBLE or IDP_ARRAY properties with those subtypes. */
 typedef struct IDPropertyUIDataFloat {
   IDPropertyUIData generic_ui_data;
-  void *_pad1;
+  double *default_value_array; /* Only for array properties. */
   float step;
   float precision;
 
@@ -92,17 +92,6 @@ typedef struct IDPropertyUIDataFloat {
   double soft_max;
   double default_value;
 } IDPropertyUIDataFloat;
-
-/** UI information for #IDP_ARRAY. */
-typedef struct IDPropertyUIDataArray {
-  IDPropertyUIData generic_ui_data;
-
-  void *default_value_array;
-  int default_array_len;
-
-  int default_value_int;
-  double default_value_double; /* For subtypes IDP_FLOAT and IDP_DOUBLE. */
-} IDPropertyUIDataArray;
 
 /** UI information for #IDP_STRING. */
 typedef struct IDPropertyUIDataString {

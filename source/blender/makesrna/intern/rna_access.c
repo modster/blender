@@ -243,33 +243,6 @@ void rna_idproperty_touch(IDProperty *idprop)
   idprop->flag &= ~IDP_FLAG_GHOST;
 }
 
-static IDPropertyUIData *rna_idproperty_ui_data_ensure(IDProperty *idprop)
-{
-  if (idprop->ui_data) {
-    return idprop->ui_data;
-  }
-
-  switch (idprop->type) {
-    case IDP_INT:
-      idprop->ui_data = MEM_callocN(sizeof(IDPropertyUIDataInt), "IDPropertyUIDataInt");
-      break;
-    case IDP_DOUBLE:
-      idprop->ui_data = MEM_callocN(sizeof(IDPropertyUIDataFloat), "IDPropertyUIDataFloat");
-      break;
-    case IDP_STRING:
-      idprop->ui_data = MEM_callocN(sizeof(IDPropertyUIDataInt), "IDPropertyUIDataIDP_STRING");
-      break;
-    case IDP_ARRAY:
-      idprop->ui_data = MEM_callocN(sizeof(IDPropertyUIDataInt), "IDPropertyUIDataArray");
-      break;
-    default:
-      /* UI data for type not supported. */
-      BLI_assert(false);
-      break;
-  }
-  return idprop->ui_data;
-}
-
 IDProperty *RNA_struct_idprops(PointerRNA *ptr, bool create)
 {
   StructRNA *type = ptr->type;
@@ -2742,7 +2715,7 @@ bool RNA_property_int_set_default(PropertyRNA *prop, int value)
   IDProperty *idprop = (IDProperty *)prop;
   BLI_assert(idprop->type == IDP_INT);
 
-  IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)rna_idproperty_ui_data_ensure(idprop);
+  IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)IDP_ui_data_ensure(idprop);
 
   ui_data->default_value = value;
 
@@ -3113,7 +3086,7 @@ bool RNA_property_float_set_default(PropertyRNA *prop, float value)
   IDProperty *idprop = (IDProperty *)prop;
   BLI_assert(idprop->type == IDP_INT);
 
-  IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)rna_idproperty_ui_data_ensure(idprop);
+  IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)IDP_ui_data_ensure(idprop);
 
   ui_data->default_value = (double)value;
 

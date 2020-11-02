@@ -24,11 +24,15 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_string.h"
 #include "BLI_utildefines.h"
 
 #include "idprop_py_api.h"
 
 #include "BKE_idprop.h"
+
+#include "RNA_access.h"
+#include "RNA_enum_types.h"
 
 #define USE_STRING_COERCE
 
@@ -1151,33 +1155,105 @@ static PyObject *BPy_IDGroup_get(BPy_IDProperty *self, PyObject *args)
 
 PyDoc_STRVAR(BPy_IDGroup_update_rna_doc,
              ".. method:: update_rna(key, "
-             "min=None, "
-             "max=None, "
-             "soft_min=None, "
-             "soft_max=None, "
-             "precision=None, "
-             "step=None, "
-             "default_value=None, "
-             "description=None)\n"
+             "                       subtype=None "
+             "                       min=None, "
+             "                       max=None, "
+             "                       soft_min=None, "
+             "                       soft_max=None, "
+             "                       precision=None, "
+             "                       step=None, "
+             "                       default_value=None, "
+             "                       description=None)\n"
              "\n"
-             "   Update the RNA type information of the IDProperty used for interaction and drawing
-             in the user interface. The property specified by the key must be a direct child of the
-             group.\n ");
-static void BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args)
+             "   Update the RNA type information of the IDProperty used for interaction and "
+             "drawing in the user interface. The property specified by the key must be a direct "
+             "child of the group.\n ");
+static void BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObject *kwargs)
 {
   const char *key;
+  const char *rna_subtype = NULL;
+  PyObject *min = NULL;
+  PyObject *max = NULL;
+  PyObject *soft_min = NULL;
+  PyObject *soft_max = NULL;
+  PyObject *precision = NULL;
+  PyObject *step = NULL;
+  PyObject *default_value = NULL;
+  const char *description = NULL;
 
-  if (!PyArg_ParseTuple(args, "s|O:get", &key)) {
-    return NULL;
+  static char *kwlist[] = {"key",
+                           "subtype",
+                           "min",
+                           "max",
+                           "soft_min",
+                           "soft_max",
+                           "precision",
+                           "step",
+                           "default_value",
+                           "description",
+                           NULL};
+
+  if (!PyArg_ParseTupleAndKeywords(args,
+                                   kwargs,
+                                   "s|sOOOOO!OOs:update_rna",
+                                   kwlist,
+                                   &key,
+                                   &rna_subtype,
+                                   &min,
+                                   &max,
+                                   &soft_min,
+                                   &soft_max,
+                                   &PyFloatObject,
+                                   &precision,
+                                   &step,
+                                   &default_value,
+                                   &desciption)) {
+    return;
   }
 
   IDProperty *idprop = IDP_GetPropertyFromGroup(self->prop, key);
+  IDPropertyUIData *ui_data = IDP_ui_data_ensure(idprop);
 
-  if (idprop) {
-    PyObject *pyobj = BPy_IDGroup_WrapData(self->id, idprop, self->prop);
-    if (pyobj) {
-      return pyobj;
+  if (rna_subtype != NULL) {
+    int result = PROP_NONE;
+    RNA_enum_value_from_id(rna_enum_property_subtype_items, rna_subtype, &result);
+    ui_data->rna_subtype = result;
+  }
+  if (min != NULL) {
+  }
+  if (max != NULL) {
+  }
+  if (soft_min != NULL) {
+  }
+  if (soft_max != NULL) {
+  }
+  if (precision != NULL) {
+    IDPropertyUIDataFloat *ui_data_float = (IDPropertyUIDataFloat *)ui_data;
+    if (ELEM(idprop->type, IDP_FLOAT, IDP_DOUBLE) ||
+        ((idprop->type == IDP_ARRAY) && ELEM(idprop->subtype, IDP_FLOAT, IDP_DOUBLE))) {
+      BLI_assert(PyFloat_Check(precision));
+      ui_data_float->precision = (float)PyFloat_AsDouble(precision);
     }
+    else {
+      PyErr_SetString(PyExc_ValueError,
+                      "Precision is only supported for float, double, and integer properties");
+    }
+  }
+  if (step != NULL) {
+    if (ELEM(idprop->type, IDP_FLOAT, IDP_DOUBLE)
+      if (!(ELEM(idprop->type, IDP_FLOAT, IDP_DOUBLE) ||
+            ((idprop->type == IDP_ARRAY) && ELEM(idprop->subtype, IDP_FLOAT, IDP_DOUBLE)))) {
+      PyErr_SetString(
+          PyExc_ValueError,
+          "Precision argument is only supported for float, double, and int properties");
+      }
+      else if (PyFloat_Check(step)) {
+      }
+  }
+  if (default_value != NULL) {
+  }
+  if (description != NULL) {
+    ui_data->description = BLI_strdup(description)
   }
 }
 
@@ -1191,7 +1267,10 @@ static struct PyMethodDef BPy_IDGroup_methods[] = {
     {"get", (PyCFunction)BPy_IDGroup_get, METH_VARARGS, BPy_IDGroup_get_doc},
     {"to_dict", (PyCFunction)BPy_IDGroup_to_dict, METH_NOARGS, BPy_IDGroup_to_dict_doc},
     {"clear", (PyCFunction)BPy_IDGroup_clear, METH_NOARGS, BPy_IDGroup_clear_doc},
-    {"update_rna", (PyCFunction)BPY_IDGroup_update_rna, XXXXXXXXXXX, BPy_IDGroup_update_rna_doc},
+    {"update_rna",
+     (PyCFunction)BPY_IDGroup_update_rna,
+     METH_VARARGS | METH_KEYWORDS,
+     BPy_IDGroup_update_rna_doc},
     {NULL, NULL, 0, NULL},
 };
 

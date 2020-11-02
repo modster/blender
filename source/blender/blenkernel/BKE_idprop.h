@@ -34,6 +34,7 @@ struct BlendLibReader;
 struct BlendWriter;
 struct ID;
 struct IDProperty;
+struct IDPropertyUIData;
 
 typedef union IDPropertyTemplate {
   int i;
@@ -206,6 +207,8 @@ void IDP_BlendReadData_impl(struct BlendDataReader *reader,
 #define IDP_BlendDataRead(reader, prop) IDP_BlendReadData_impl(reader, prop, __func__)
 void IDP_BlendReadLib(struct BlendLibReader *reader, IDProperty *prop);
 void IDP_BlendReadExpand(struct BlendExpander *expander, IDProperty *prop);
+
+struct IDPropertyUIData *IDP_ui_data_ensure(IDProperty *idprop);
 
 #ifdef __cplusplus
 }

@@ -1398,4 +1398,45 @@ void IDP_BlendReadExpand(struct BlendExpander *expander, IDProperty *prop)
   }
 }
 
+IDPropertyUIData *IDP_ui_data_ensure(IDProperty *idprop)
+{
+  if (idprop->ui_data) {
+    return idprop->ui_data;
+  }
+
+  size_t alloc_size = 0;
+
+  switch (idprop->type) {
+    case IDP_STRING:
+      alloc_size = sizeof(IDPropertyUIDataString);
+    case IDP_INT:
+      alloc_size = sizeof(IDPropertyUIDataInt);
+      break;
+    case IDP_ARRAY:
+      switch (idprop->subtype) {
+        case IDP_INT:
+          alloc_size = sizeof(IDPropertyUIDataInt);
+        case IDP_FLOAT:
+        case IDP_DOUBLE:
+          alloc_size = sizeof(IDPropertyUIDataFloat);
+        default:
+          /* UI data isn't supported for array properties with other subtypes. */
+          BLI_assert(false);
+          return;
+      }
+    case IDP_FLOAT:
+    case IDP_DOUBLE:
+      alloc_size = sizeof(IDPropertyUIDataFloat);
+      break;
+    default:
+      /* UI data for type not supported. */
+      BLI_assert(false);
+      return;
+  }
+
+  idprop->ui_data = MEM_callocN(alloc_size, __func__);
+
+  return idprop->ui_data;
+}
+
 /** \} */
