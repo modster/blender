@@ -1425,14 +1425,13 @@ static void lineart_geometry_object_load(Depsgraph *dg,
   BMLoop *loop;
   LineartRenderLine *rl;
   LineartRenderTriangle *rt;
-  LineartRenderTriangleAdjacent *orta, *rta;
+  LineartRenderTriangleAdjacent *orta;
   double new_mvp[4][4], new_mv[4][4], normal[4][4];
   float imat[4][4];
   LineartRenderElementLinkNode *reln;
   LineartRenderVert *orv;
   LineartRenderLine *orl;
   LineartRenderTriangle *ort;
-  FreestyleEdge *fe;
   Object *orig_ob;
   int CanFindFreestyle = 0;
   int i, global_i = (*global_vindex);
@@ -1440,6 +1439,13 @@ static void lineart_geometry_object_load(Depsgraph *dg,
   float use_crease = 0;
 
   int usage = override_usage ? override_usage : ob->lineart.usage;
+
+#define LRT_MESH_FINISH \
+  BM_mesh_free(bm); \
+  if (ob->type != OB_MESH) { \
+    BKE_mesh_free(use_mesh); \
+    MEM_freeN(use_mesh); \
+  }
 
   if (usage == OBJECT_LRT_EXCLUDE) {
     return;
@@ -1450,6 +1456,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
 
     if (ob->type == OB_MESH) {
       use_mesh = DEG_get_evaluated_object(dg, ob)->data;
+      use_mesh->edit_mesh->bm;
     }
     else {
       use_mesh = BKE_mesh_new_from_object(NULL, ob, false);
@@ -1467,16 +1474,21 @@ static void lineart_geometry_object_load(Depsgraph *dg,
     transpose_m4(imat);
     copy_m4d_m4(normal, imat);
 
-    const BMAllocTemplate allocsize = BMALLOC_TEMPLATE_FROM_ME(((Mesh *)(use_mesh)));
-    bm = BM_mesh_create(&allocsize,
-                        &((struct BMeshCreateParams){
-                            .use_toolflags = true,
-                        }));
-    BM_mesh_bm_from_me(bm,
-                       use_mesh,
-                       &((struct BMeshFromMeshParams){
-                           .calc_face_normal = true,
-                       }));
+    if (use_mesh->edit_mesh) {
+      bm = BM_mesh_copy(use_mesh->edit_mesh->bm);
+    }
+    else {
+      const BMAllocTemplate allocsize = BMALLOC_TEMPLATE_FROM_ME(((Mesh *)(use_mesh)));
+      bm = BM_mesh_create(&allocsize,
+                          &((struct BMeshCreateParams){
+                              .use_toolflags = true,
+                          }));
+      BM_mesh_bm_from_me(bm,
+                         use_mesh,
+                         &((struct BMeshFromMeshParams){
+                             .calc_face_normal = true,
+                         }));
+    }
 
     if (rb->remove_doubles) {
       BMEditMesh *em = BKE_editmesh_create(bm, false);
@@ -1513,11 +1525,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
     }
 
     if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
-      BM_mesh_free(bm);
-      if (ob->type != OB_MESH) {
-        BKE_mesh_free(use_mesh);
-        MEM_freeN(use_mesh);
-      }
+      LRT_MESH_FINISH
       return;
     }
 
@@ -1659,13 +1667,10 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       rl++;
     }
 
-    BM_mesh_free(bm);
-
-    if (ob->type != OB_MESH) {
-      BKE_mesh_free(use_mesh);
-      MEM_freeN(use_mesh);
-    }
+    LRT_MESH_FINISH
   }
+
+#undef LRT_MESH_FINISH
 }
 
 int ED_lineart_object_collection_usage_check(Collection *c, Object *ob)
@@ -2451,7 +2456,6 @@ static void lineart_main_get_view_vector(LineartRenderBuffer *rb)
   float trans[3];
   float inv[4][4];
   float obmat_no_scale[4][4];
-  float scale[3];
 
   BLI_spin_lock(&lineart_share.lock_render_status);
   if (lineart_share.viewport_camera_override) {
