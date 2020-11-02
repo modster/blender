@@ -161,7 +161,6 @@
 #include "BKE_pointcache.h"
 #include "BKE_report.h"
 #include "BKE_screen.h"
-#include "BKE_sequencer.h"
 #include "BKE_shader_fx.h"
 #include "BKE_subsurf.h"
 #include "BKE_workspace.h"
@@ -172,6 +171,8 @@
 #include "BLO_readfile.h"
 #include "BLO_undofile.h"
 #include "BLO_writefile.h"
+
+#include "SEQ_sequencer.h"
 
 #include "readfile.h"
 

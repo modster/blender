@@ -682,7 +682,6 @@ const EnumPropertyItem rna_enum_transform_orientation_items[] = {
 #  include "BKE_pointcache.h"
 #  include "BKE_scene.h"
 #  include "BKE_screen.h"
-#  include "BKE_sequencer.h"
 #  include "BKE_unit.h"
 
 #  include "ED_image.h"
@@ -695,6 +694,8 @@ const EnumPropertyItem rna_enum_transform_orientation_items[] = {
 
 #  include "DEG_depsgraph_build.h"
 #  include "DEG_depsgraph_query.h"
+
+#  include "SEQ_sequencer.h"
 
 #  ifdef WITH_FREESTYLE
 #    include "FRS_freestyle.h"
