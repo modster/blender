@@ -795,4 +795,10 @@ template<> void Scene::delete_nodes(const set<Shader *> & /*nodes*/, const NodeO
   /* don't delete unused shaders, not supported */
 }
 
+template<> void Scene::delete_nodes(const set<Procedural *> &nodes, const NodeOwner *owner)
+{
+  remove_nodes_in_set(nodes, procedurals, owner);
+  procedural_manager->need_update = true;
+}
+
 CCL_NAMESPACE_END

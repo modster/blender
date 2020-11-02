@@ -421,6 +421,8 @@ template<> void Scene::delete_nodes(const set<ParticleSystem *> &nodes, const No
 
 template<> void Scene::delete_nodes(const set<Shader *> &nodes, const NodeOwner *owner);
 
+template<> void Scene::delete_nodes(const set<Procedural *> &nodes, const NodeOwner *owner);
+
 CCL_NAMESPACE_END
 
 #endif /*  __SCENE_H__ */

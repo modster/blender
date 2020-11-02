@@ -184,11 +184,6 @@ struct Node {
     return (T &)*(((char *)node) + socket.struct_offset);
   }
 
-  template<typename T> static T &get_socket_value(const Node *node, const SocketType &socket)
-  {
-    return (T &)*(((char *)node) + socket.struct_offset);
-  }
-
   SocketModifiedFlags socket_modified;
 
   template<typename T> void set_if_different(const SocketType &input, T value);
