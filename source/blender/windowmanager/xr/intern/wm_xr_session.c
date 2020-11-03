@@ -36,7 +36,9 @@
 
 #include "DRW_engine.h"
 
+#include "ED_keyframing.h"
 #include "ED_object.h"
+#include "ED_screen.h"
 #include "ED_space_api.h"
 
 #include "GHOST_C-api.h"
@@ -44,6 +46,9 @@
 #include "GPU_viewport.h"
 
 #include "MEM_guardedalloc.h"
+
+#include "../transform/transform.h"
+#include "../transform/transform_convert.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -331,7 +336,6 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
   GHOST_XrPose viewer_pose;
   const bool use_position_tracking = settings->flag & XR_SESSION_USE_POSITION_TRACKING;
   wmXrEyeData *eye = &state->eyes[draw_view->view];
-  Object *ob_constraint = settings->headset_object;
 
   mul_qt_qtqt(viewer_pose.orientation_quat,
               draw_data->base_pose.orientation_quat,
@@ -351,12 +355,6 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
   copy_v3_v3(state->viewer_pose.position, viewer_pose.position);
   copy_qt_qt(state->viewer_pose.orientation_quat, viewer_pose.orientation_quat);
   wm_xr_pose_to_viewmat(&viewer_pose, state->viewer_viewmat);
-
-  if (ob_constraint) {
-    copy_v3_v3(ob_constraint->loc, viewer_pose.position);
-    quat_to_eul(ob_constraint->rot, viewer_pose.orientation_quat);
-    DEG_id_tag_update(&ob_constraint->id, ID_RECALC_TRANSFORM);
-  }
 
   eye->width = draw_view->width;
   eye->height = draw_view->height;
@@ -497,14 +495,63 @@ void wm_xr_session_actions_init(wmXrData *xr)
   }
 }
 
+static void wm_xr_session_object_autokey(
+    bContext *C, Scene *scene, ViewLayer *view_layer, wmWindow *win, Object *ob, bool notify)
+{
+  /* Poll functions in keyingsets_utils.py require an active window and object. */
+  wmWindow *win_prev = CTX_wm_window(C);
+  CTX_wm_window_set(C, win);
+
+  Object *obact = CTX_data_active_object(C);
+  if (!obact) {
+    Base *base = BKE_view_layer_base_find(view_layer, ob);
+    if (base) {
+      ED_object_base_select(base, BA_SELECT);
+      ED_object_base_activate(C, base);
+    }
+  }
+
+  bScreen *screen = CTX_wm_screen(C);
+  if (screen && screen->animtimer && (IS_AUTOKEY_FLAG(scene, INSERTAVAIL) == 0) &&
+      ((scene->toolsettings->autokey_flag & ANIMRECORD_FLAG_WITHNLA) != 0)) {
+    TransInfo t;
+    t.scene = scene;
+    t.animtimer = screen->animtimer;
+    animrecord_check_state(&t, ob);
+  }
+
+  autokeyframe_object(C, scene, view_layer, ob, TFM_TRANSLATION);
+  if (IS_AUTOKEY_FLAG(scene, INSERTNEEDED)) {
+    autokeyframe_object(C, scene, view_layer, ob, TFM_ROTATION);
+  }
+
+  if (motionpath_need_update_object(scene, ob)) {
+    ED_objects_recalculate_paths(C, scene, OBJECT_PATH_CALC_RANGE_CURRENT_FRAME);
+  }
+
+  if (notify) {
+    WM_event_add_notifier(C, NC_OBJECT | ND_KEYS, NULL);
+    WM_main_add_notifier(NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
+  }
+
+  CTX_wm_window_set(C, win_prev);
+}
+
 static void wm_xr_session_controller_mats_update(const XrSessionSettings *settings,
                                                  const wmXrAction *controller_pose_action,
+                                                 bContext *C,
                                                  wmXrSessionState *state,
-                                                 ViewLayer *view_layer)
+                                                 wmWindow *win)
 {
   const unsigned int count = (unsigned int)min_ii(
       (int)controller_pose_action->count_subaction_paths, (int)ARRAY_SIZE(state->controllers));
 
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  wmWindowManager *wm = CTX_wm_manager(C);
+  bScreen *screen_anim = ED_screen_animation_playing(wm);
+  Object *ob_constraint = NULL;
+  char ob_flag;
   float view_ofs[3];
   float base_inv[4][4];
   float tmp[4][4];
@@ -519,7 +566,14 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
 
   for (unsigned int i = 0; i < count; ++i) {
     wmXrControllerData *controller = &state->controllers[i];
-    Object *ob_constraint = (i == 0) ? settings->controller0_object : settings->controller1_object;
+    if (i == 0) {
+      ob_constraint = settings->controller0_object;
+      ob_flag = settings->controller0_flag;
+    }
+    else {
+      ob_constraint = settings->controller1_object;
+      ob_flag = settings->controller1_flag;
+    }
 
     /* Calculate controller matrix in world space. */
     wm_xr_controller_pose_to_mat(&((GHOST_XrPose *)controller_pose_action->states)[i], tmp);
@@ -532,10 +586,16 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
     mat4_to_loc_quat(
         controller->pose.position, controller->pose.orientation_quat, controller->mat);
 
-    if (ob_constraint) {
+    if (ob_constraint && ((ob_flag & XR_OBJECT_ENABLE) != 0)) {
       copy_v3_v3(ob_constraint->loc, controller->pose.position);
       quat_to_eul(ob_constraint->rot, controller->pose.orientation_quat);
       DEG_id_tag_update(&ob_constraint->id, ID_RECALC_TRANSFORM);
+
+      if (((ob_flag & XR_OBJECT_AUTOKEY) != 0) && screen_anim &&
+          autokeyframe_cfra_can_key(scene, &ob_constraint->id)) {
+        wm_xr_session_object_autokey(
+            C, scene, view_layer, win, ob_constraint, (i == 0) ? true : false);
+      }
     }
 
     /* Update controller representation object. */
@@ -682,9 +742,9 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
 
 static void wm_xr_session_action_set_update(const XrSessionSettings *settings,
                                             GHOST_XrContextHandle xr_context,
+                                            bContext *C,
                                             wmXrSessionState *state,
                                             wmXrActionSet *action_set,
-                                            ViewLayer *view_layer,
                                             wmSurface *surface,
                                             wmWindow *win)
 {
@@ -720,7 +780,7 @@ static void wm_xr_session_action_set_update(const XrSessionSettings *settings,
       (action_set == state->active_action_set)) { /* Only dispatch events for active action set. */
     if (action_set->controller_pose_action) {
       wm_xr_session_controller_mats_update(
-          settings, action_set->controller_pose_action, state, view_layer);
+          settings, action_set->controller_pose_action, C, state, win);
     }
 
     if (surface && win) {
@@ -735,7 +795,33 @@ void wm_xr_session_actions_update(wmXrData *xr)
     return;
   }
 
+  const XrSessionSettings *settings = &xr->session_settings;
+  bContext *C = xr->runtime->bcontext;
+  wmWindowManager *wm = CTX_wm_manager(C);
+  wmWindow *win = wm_xr_session_root_window_or_fallback_get(wm, xr->runtime);
   wmXrSessionState *state = &xr->runtime->session_state;
+
+  /* Update headset constraint object (if any). */
+  Object *ob_constraint = settings->headset_object;
+  char ob_flag = settings->headset_flag;
+
+  if (ob_constraint && ((ob_flag & XR_OBJECT_ENABLE) != 0)) {
+    copy_v3_v3(ob_constraint->loc, state->viewer_pose.position);
+    quat_to_eul(ob_constraint->rot, state->viewer_pose.orientation_quat);
+    DEG_id_tag_update(&ob_constraint->id, ID_RECALC_TRANSFORM);
+
+    if ((ob_flag & XR_OBJECT_AUTOKEY) != 0) {
+      bScreen *screen_anim = ED_screen_animation_playing(wm);
+      if (screen_anim) {
+        Scene *scene = CTX_data_scene(C);
+        if (autokeyframe_cfra_can_key(scene, &ob_constraint->id)) {
+          ViewLayer *view_layer = CTX_data_view_layer(C);
+          wm_xr_session_object_autokey(C, scene, view_layer, win, ob_constraint, true);
+        }
+      }
+    }
+  }
+
   GHash *action_sets = state->action_sets;
   if (!action_sets) {
     return;
@@ -749,24 +835,18 @@ void wm_xr_session_actions_update(wmXrData *xr)
     return;
   }
 
-  const XrSessionSettings *settings = &xr->session_settings;
-  bContext *C = xr->runtime->bcontext;
-  wmWindowManager *wm = CTX_wm_manager(C);
-  ViewLayer *view_layer = CTX_data_view_layer(C);
   wmSurface *surface = (g_xr_surface && g_xr_surface->customdata) ? g_xr_surface : NULL;
-  wmWindow *win = wm_xr_session_root_window_or_fallback_get(wm, xr->runtime);
 
   if (active_action_set) {
     wm_xr_session_action_set_update(
-        settings, xr_context, state, active_action_set, view_layer, surface, win);
+        settings, xr_context, C, state, active_action_set, surface, win);
   }
   else {
     GHashIterator *ghi_set = BLI_ghashIterator_new(action_sets);
     GHASH_ITER (*ghi_set, action_sets) {
       wmXrActionSet *action_set = BLI_ghashIterator_getValue(ghi_set);
       if (action_set) {
-        wm_xr_session_action_set_update(
-            settings, xr_context, state, action_set, view_layer, surface, win);
+        wm_xr_session_action_set_update(settings, xr_context, C, state, action_set, surface, win);
       }
     }
 

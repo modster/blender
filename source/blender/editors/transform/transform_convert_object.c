@@ -784,8 +784,7 @@ void createTransTexspace(TransInfo *t)
  * \note Context may not always be available,
  * so must check before using it as it's a luxury for a few cases.
  */
-static void autokeyframe_object(
-    bContext *C, Scene *scene, ViewLayer *view_layer, Object *ob, int tmode)
+void autokeyframe_object(bContext *C, Scene *scene, ViewLayer *view_layer, Object *ob, int tmode)
 {
   Main *bmain = CTX_data_main(C);
   ID *id = &ob->id;
@@ -906,7 +905,7 @@ static void autokeyframe_object(
 
 /* Return if we need to update motion paths, only if they already exist,
  * and we will insert a keyframe at the end of transform. */
-static bool motionpath_need_update_object(Scene *scene, Object *ob)
+bool motionpath_need_update_object(Scene *scene, Object *ob)
 {
   /* XXX: there's potential here for problems with unkeyed rotations/scale,
    *      but for now (until proper data-locality for baking operations),

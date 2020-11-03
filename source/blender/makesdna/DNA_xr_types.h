@@ -52,6 +52,11 @@ typedef struct XrSessionSettings {
   Object *headset_object;
   Object *controller0_object;
   Object *controller1_object;
+
+  char headset_flag;
+  char controller0_flag;
+  char controller1_flag;
+  char _pad3[5];
 } XrSessionSettings;
 
 typedef enum eXrSessionFlag {
@@ -68,3 +73,8 @@ typedef enum eXrSessionEye {
   XR_EYE_LEFT = 0,
   XR_EYE_RIGHT = 1,
 } eXrSessionEye;
+
+typedef enum eXrSessionObjectFlag {
+  XR_OBJECT_ENABLE = (1 << 0),
+  XR_OBJECT_AUTOKEY = (1 << 1),
+} eXrSessionObjectFlag;

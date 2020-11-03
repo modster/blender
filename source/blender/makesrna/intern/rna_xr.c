@@ -40,6 +40,177 @@
 
 #  include "WM_api.h"
 
+#  ifdef WITH_XR_OPENXR
+static wmXrData *rna_XrSession_wm_xr_data_get(PointerRNA *ptr)
+{
+  /* Callers could also get XrSessionState pointer through ptr->data, but prefer if we just
+   * consistently pass wmXrData pointers to the WM_xr_xxx() API. */
+
+  BLI_assert((ptr->type == &RNA_XrSessionSettings) || (ptr->type == &RNA_XrSessionState));
+
+  wmWindowManager *wm = (wmWindowManager *)ptr->owner_id;
+  BLI_assert(wm && (GS(wm->id.name) == ID_WM));
+
+  return &wm->xr;
+}
+#  endif
+
+static bool rna_XrSessionSettings_headset_object_enable_get(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  return (xr->session_settings.headset_flag & XR_OBJECT_ENABLE) != 0;
+#  else
+  UNUSED_VARS(ptr);
+  return false;
+#  endif
+}
+
+static void rna_XrSessionSettings_headset_object_enable_set(PointerRNA *ptr, bool value)
+{
+#  ifdef WITH_XR_OPENXR
+  wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  if (value) {
+    xr->session_settings.headset_flag |= XR_OBJECT_ENABLE;
+  }
+  else {
+    xr->session_settings.headset_flag &= (~XR_OBJECT_ENABLE);
+  }
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
+static bool rna_XrSessionSettings_headset_object_autokey_get(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  return (xr->session_settings.headset_flag & XR_OBJECT_AUTOKEY) != 0;
+#  else
+  UNUSED_VARS(ptr);
+  return false;
+#  endif
+}
+
+static void rna_XrSessionSettings_headset_object_autokey_set(PointerRNA *ptr, bool value)
+{
+#  ifdef WITH_XR_OPENXR
+  wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  if (value) {
+    xr->session_settings.headset_flag |= XR_OBJECT_AUTOKEY;
+  }
+  else {
+    xr->session_settings.headset_flag &= (~XR_OBJECT_AUTOKEY);
+  }
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
+static bool rna_XrSessionSettings_controller0_object_enable_get(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  return (xr->session_settings.controller0_flag & XR_OBJECT_ENABLE) != 0;
+#  else
+  UNUSED_VARS(ptr);
+  return false;
+#  endif
+}
+
+static void rna_XrSessionSettings_controller0_object_enable_set(PointerRNA *ptr, bool value)
+{
+#  ifdef WITH_XR_OPENXR
+  wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  if (value) {
+    xr->session_settings.controller0_flag |= XR_OBJECT_ENABLE;
+  }
+  else {
+    xr->session_settings.controller0_flag &= (~XR_OBJECT_ENABLE);
+  }
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
+static bool rna_XrSessionSettings_controller0_object_autokey_get(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  return (xr->session_settings.controller0_flag & XR_OBJECT_AUTOKEY) != 0;
+#  else
+  UNUSED_VARS(ptr);
+  return false;
+#  endif
+}
+
+static void rna_XrSessionSettings_controller0_object_autokey_set(PointerRNA *ptr, bool value)
+{
+#  ifdef WITH_XR_OPENXR
+  wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  if (value) {
+    xr->session_settings.controller0_flag |= XR_OBJECT_AUTOKEY;
+  }
+  else {
+    xr->session_settings.controller0_flag &= (~XR_OBJECT_AUTOKEY);
+  }
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
+static bool rna_XrSessionSettings_controller1_object_enable_get(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  return (xr->session_settings.controller1_flag & XR_OBJECT_ENABLE) != 0;
+#  else
+  UNUSED_VARS(ptr);
+  return false;
+#  endif
+}
+
+static void rna_XrSessionSettings_controller1_object_enable_set(PointerRNA *ptr, bool value)
+{
+#  ifdef WITH_XR_OPENXR
+  wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  if (value) {
+    xr->session_settings.controller1_flag |= XR_OBJECT_ENABLE;
+  }
+  else {
+    xr->session_settings.controller1_flag &= (~XR_OBJECT_ENABLE);
+  }
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
+static bool rna_XrSessionSettings_controller1_object_autokey_get(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  return (xr->session_settings.controller1_flag & XR_OBJECT_AUTOKEY) != 0;
+#  else
+  UNUSED_VARS(ptr);
+  return false;
+#  endif
+}
+
+static void rna_XrSessionSettings_controller1_object_autokey_set(PointerRNA *ptr, bool value)
+{
+#  ifdef WITH_XR_OPENXR
+  wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  if (value) {
+    xr->session_settings.controller1_flag |= XR_OBJECT_AUTOKEY;
+  }
+  else {
+    xr->session_settings.controller1_flag &= (~XR_OBJECT_AUTOKEY);
+  }
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
 static bool rna_XrSessionState_is_running(bContext *C)
 {
 #  ifdef WITH_XR_OPENXR
@@ -363,25 +534,10 @@ bool rna_XrSessionState_haptic_action_apply(bContext *C,
 #  endif
 }
 
-#  ifdef WITH_XR_OPENXR
-static wmXrData *rna_XrSessionState_wm_xr_data_get(PointerRNA *ptr)
-{
-  /* Callers could also get XrSessionState pointer through ptr->data, but prefer if we just
-   * consistently pass wmXrData pointers to the WM_xr_xxx() API. */
-
-  BLI_assert(ptr->type == &RNA_XrSessionState);
-
-  wmWindowManager *wm = (wmWindowManager *)ptr->owner_id;
-  BLI_assert(wm && (GS(wm->id.name) == ID_WM));
-
-  return &wm->xr;
-}
-#  endif
-
 static void rna_XrSessionState_viewer_pose_location_get(PointerRNA *ptr, float *r_values)
 {
 #  ifdef WITH_XR_OPENXR
-  const wmXrData *xr = rna_XrSessionState_wm_xr_data_get(ptr);
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
   WM_xr_session_state_viewer_pose_location_get(xr, r_values);
 #  else
   UNUSED_VARS(ptr);
@@ -392,7 +548,7 @@ static void rna_XrSessionState_viewer_pose_location_get(PointerRNA *ptr, float *
 static void rna_XrSessionState_viewer_pose_rotation_get(PointerRNA *ptr, float *r_values)
 {
 #  ifdef WITH_XR_OPENXR
-  const wmXrData *xr = rna_XrSessionState_wm_xr_data_get(ptr);
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
   WM_xr_session_state_viewer_pose_rotation_get(xr, r_values);
 #  else
   UNUSED_VARS(ptr);
@@ -403,7 +559,7 @@ static void rna_XrSessionState_viewer_pose_rotation_get(PointerRNA *ptr, float *
 static void rna_XrSessionState_controller_pose0_location_get(PointerRNA *ptr, float *r_values)
 {
 #  ifdef WITH_XR_OPENXR
-  const wmXrData *xr = rna_XrSessionState_wm_xr_data_get(ptr);
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
   WM_xr_session_state_controller_pose_location_get(xr, 0, r_values);
 #  else
   UNUSED_VARS(ptr);
@@ -414,7 +570,7 @@ static void rna_XrSessionState_controller_pose0_location_get(PointerRNA *ptr, fl
 static void rna_XrSessionState_controller_pose0_rotation_get(PointerRNA *ptr, float *r_values)
 {
 #  ifdef WITH_XR_OPENXR
-  const wmXrData *xr = rna_XrSessionState_wm_xr_data_get(ptr);
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
   WM_xr_session_state_controller_pose_rotation_get(xr, 0, r_values);
 #  else
   UNUSED_VARS(ptr);
@@ -425,7 +581,7 @@ static void rna_XrSessionState_controller_pose0_rotation_get(PointerRNA *ptr, fl
 static void rna_XrSessionState_controller_pose1_location_get(PointerRNA *ptr, float *r_values)
 {
 #  ifdef WITH_XR_OPENXR
-  const wmXrData *xr = rna_XrSessionState_wm_xr_data_get(ptr);
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
   WM_xr_session_state_controller_pose_location_get(xr, 1, r_values);
 #  else
   UNUSED_VARS(ptr);
@@ -436,7 +592,7 @@ static void rna_XrSessionState_controller_pose1_location_get(PointerRNA *ptr, fl
 static void rna_XrSessionState_controller_pose1_rotation_get(PointerRNA *ptr, float *r_values)
 {
 #  ifdef WITH_XR_OPENXR
-  const wmXrData *xr = rna_XrSessionState_wm_xr_data_get(ptr);
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
   WM_xr_session_state_controller_pose_rotation_get(xr, 1, r_values);
 #  else
   UNUSED_VARS(ptr);
@@ -590,6 +746,56 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
       prop,
       "Controller 1 Object",
       "Object whose location and rotation will be constrained to the second VR controller's pose");
+  RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
+
+  prop = RNA_def_property(srna, "headset_object_enable", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop,
+                                 "rna_XrSessionSettings_headset_object_enable_get",
+                                 "rna_XrSessionSettings_headset_object_enable_set");
+  RNA_def_property_ui_text(prop, "Enable Headset Object", "Enable headset object");
+  RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
+
+  prop = RNA_def_property(srna, "headset_object_autokey", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop,
+                                 "rna_XrSessionSettings_headset_object_autokey_get",
+                                 "rna_XrSessionSettings_headset_object_autokey_set");
+  RNA_def_property_ui_text(prop,
+                           "Auto Key Headset Object",
+                           "Auto-insert keyframes for the headset object on animation playback");
+  RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
+
+  prop = RNA_def_property(srna, "controller0_object_enable", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop,
+                                 "rna_XrSessionSettings_controller0_object_enable_get",
+                                 "rna_XrSessionSettings_controller0_object_enable_set");
+  RNA_def_property_ui_text(prop, "Enable Controller 0 Object", "Enable first controller object");
+  RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
+
+  prop = RNA_def_property(srna, "controller0_object_autokey", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop,
+                                 "rna_XrSessionSettings_controller0_object_autokey_get",
+                                 "rna_XrSessionSettings_controller0_object_autokey_set");
+  RNA_def_property_ui_text(
+      prop,
+      "Auto Key Controller 0 Object",
+      "Auto-insert keyframes for the first controlller object on animation playback");
+  RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
+
+  prop = RNA_def_property(srna, "controller1_object_enable", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop,
+                                 "rna_XrSessionSettings_controller1_object_enable_get",
+                                 "rna_XrSessionSettings_controller1_object_enable_set");
+  RNA_def_property_ui_text(prop, "Enable Controller 1 Object", "Enable second controller object");
+  RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
+
+  prop = RNA_def_property(srna, "controller1_object_autokey", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop,
+                                 "rna_XrSessionSettings_controller1_object_autokey_get",
+                                 "rna_XrSessionSettings_controller1_object_autokey_set");
+  RNA_def_property_ui_text(
+      prop,
+      "Auto Key Controller 1 Object",
+      "Auto-insert keyframes for the second controlller object on animation playback");
   RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
 }
 
