@@ -236,9 +236,7 @@ static bool append_frame_to_filename(const char *filepath,
  */
 void exporter_main(bContext *C, const OBJExportParams &export_params)
 {
-  /* TODO(ankitm) find a better way to exit edit mode that doesn't hit assert
-   * https://hastebin.com/mitihetagi in file F8653460 */
-  ED_object_editmode_exit(C, EM_FREEDATA);
+  ED_object_mode_set(C, OB_MODE_OBJECT);
   OBJDepsgraph obj_depsgraph(C, export_params.export_eval_mode);
   Scene *scene = DEG_get_input_scene(obj_depsgraph.get());
   const char *filepath = export_params.filepath;
