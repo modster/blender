@@ -689,6 +689,7 @@ void AlembicProcedural::read_curves(Scene *scene,
 
   ICurvesSchema::Sample samp = curves.getSchema().getValue(ISampleSelector(frame_time));
 
+  hair->clear();
   hair->reserve_curves(samp.getNumCurves(), samp.getPositions()->size());
 
   Abc::Int32ArraySamplePtr curveNumVerts = samp.getCurvesNumVertices();
