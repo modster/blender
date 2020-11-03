@@ -70,15 +70,15 @@ class OBJWriter : NonMovable, NonCopyable {
   void write_vertex_coords(const OBJMesh &obj_mesh_data) const;
   void write_uv_coords(OBJMesh &obj_mesh_data) const;
   void write_poly_normals(OBJMesh &obj_mesh_data) const;
-  void write_smooth_group(const OBJMesh &obj_mesh_data,
-                          int poly_index,
-                          int &r_last_face_smooth_group) const;
-  void write_poly_material(const OBJMesh &obj_mesh_data,
-                           const int poly_index,
-                           int16_t &r_last_face_mat_nr) const;
-  void write_vertex_group(const OBJMesh &obj_mesh_data,
-                          const int poly_index,
-                          int16_t &r_last_poly_vertex_group) const;
+  int write_smooth_group(const OBJMesh &obj_mesh_data,
+                         int poly_index,
+                         const int last_poly_smooth_group) const;
+  int16_t write_poly_material(const OBJMesh &obj_mesh_data,
+                              const int poly_index,
+                              const int16_t last_face_mat_nr) const;
+  int16_t write_vertex_group(const OBJMesh &obj_mesh_data,
+                             const int poly_index,
+                             const int16_t last_poly_vertex_group) const;
   void write_poly_elements(const OBJMesh &obj_mesh_data);
   void write_edges_indices(const OBJMesh &obj_mesh_data) const;
   void write_nurbs_curve(const OBJCurve &obj_nurbs_data) const;

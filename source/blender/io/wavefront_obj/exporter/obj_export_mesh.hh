@@ -58,7 +58,7 @@ struct CustomBMeshDeleter {
 
 using unique_bmesh_ptr = std::unique_ptr<BMesh, CustomBMeshDeleter>;
 
-class OBJMesh : NonMovable, NonCopyable {
+class OBJMesh : NonCopyable {
  private:
   Object *export_object_eval_;
   Mesh *export_mesh_eval_;
@@ -115,12 +115,11 @@ class OBJMesh : NonMovable, NonCopyable {
   const char *get_object_material_name(const int16_t mat_nr) const;
 
   float3 calc_vertex_coords(const int vert_index, const float scaling_factor) const;
-  void calc_poly_vertex_indices(const int poly_index, Vector<int> &r_poly_vertex_indices) const;
+  Vector<int> calc_poly_vertex_indices(const int poly_index) const;
   void store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coords);
   float3 calc_poly_normal(const int poly_index) const;
-  int calc_poly_normal_indices(const int poly_index,
-                               const int object_tot_prev_normals,
-                               Vector<int> &r_poly_normal_indices) const;
+  std::pair<int, Vector<int>> calc_poly_normal_indices(const int poly_index,
+                                                       const int object_tot_prev_normals) const;
   void calc_loop_normals(const int poly_index, Vector<float3> &r_loop_normals) const;
   int16_t get_poly_deform_group_index(const int poly_index) const;
   const char *get_poly_deform_group_name(const int16_t def_group_index) const;

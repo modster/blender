@@ -77,9 +77,11 @@ OBJMesh::~OBJMesh()
   }
 }
 
+/**
+ * Free the mesh if _the exporter_ created it.
+ */
 void OBJMesh::free_mesh_if_needed()
 {
-  /* Don't free Meshes in the Scene which _the exporter_ didn't create. */
   if (mesh_eval_needs_free_ && export_mesh_eval_) {
     BKE_id_free(NULL, export_mesh_eval_);
   }
@@ -285,16 +287,16 @@ float3 OBJMesh::calc_vertex_coords(const int vert_index, const float scaling_fac
 /**
  * Calculate vertex indices of all vertices of the polygon at the given index.
  */
-void OBJMesh::calc_poly_vertex_indices(const int poly_index,
-                                       Vector<int> &r_poly_vertex_indices) const
+Vector<int> OBJMesh::calc_poly_vertex_indices(const int poly_index) const
 {
   const MPoly &mpoly = export_mesh_eval_->mpoly[poly_index];
   const MLoop *mloop = &export_mesh_eval_->mloop[mpoly.loopstart];
   const int totloop = mpoly.totloop;
-  r_poly_vertex_indices.resize(totloop);
+  Vector<int> r_poly_vertex_indices(totloop);
   for (int loop_index = 0; loop_index < totloop; loop_index++) {
     r_poly_vertex_indices[loop_index] = mloop[loop_index].v;
   }
+  return r_poly_vertex_indices;
 }
 
 /**
@@ -389,13 +391,12 @@ void OBJMesh::calc_loop_normals(const int poly_index, Vector<float3> &r_loop_nor
  * \param object_tot_prev_normals Number of normals of this Object written so far.
  * \return Number of distinct normal indices.
  */
-int OBJMesh::calc_poly_normal_indices(const int poly_index,
-                                      const int object_tot_prev_normals,
-                                      Vector<int> &r_poly_normal_indices) const
+std::pair<int, Vector<int>> OBJMesh::calc_poly_normal_indices(
+    const int poly_index, const int object_tot_prev_normals) const
 {
   const MPoly &mpoly = export_mesh_eval_->mpoly[poly_index];
   const int totloop = mpoly.totloop;
-  r_poly_normal_indices.resize(totloop);
+  Vector<int> r_poly_normal_indices(totloop);
 
   if (is_ith_poly_smooth(poly_index)) {
     for (int poly_loop_index = 0; poly_loop_index < totloop; poly_loop_index++) {
@@ -404,13 +405,13 @@ int OBJMesh::calc_poly_normal_indices(const int poly_index,
       r_poly_normal_indices[poly_loop_index] = object_tot_prev_normals + poly_loop_index;
     }
     /* For a smooth-shaded polygon, #Mesh.totloop -many loop normals are written. */
-    return totloop;
+    return {totloop, r_poly_normal_indices};
   }
   for (int poly_loop_index = 0; poly_loop_index < totloop; poly_loop_index++) {
     r_poly_normal_indices[poly_loop_index] = object_tot_prev_normals;
   }
   /* For a flat-shaded polygon, one polygon normal is written.  */
-  return 1;
+  return {1, r_poly_normal_indices};
 }
 
 /**

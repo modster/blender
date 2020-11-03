@@ -107,7 +107,7 @@ class MaterialWrap {
   bNode *bsdf_node_ = nullptr;
 
  public:
-  void fill_materials(const OBJMesh &obj_mesh_data, Vector<MTLMaterial> &r_mtl_materials);
+  Vector<MTLMaterial> fill_materials(const OBJMesh &obj_mesh_data);
 
  private:
   void init_bsdf_node(StringRefNull object_name);

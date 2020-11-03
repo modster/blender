@@ -35,7 +35,7 @@ namespace blender::io::obj {
  *
  * \note Used for Curves to be exported in parameter form, not converted to meshes.
  */
-class OBJCurve : NonMovable, NonCopyable {
+class OBJCurve : NonCopyable {
  private:
   const Object *export_object_eval_;
   const Curve *export_curve_;

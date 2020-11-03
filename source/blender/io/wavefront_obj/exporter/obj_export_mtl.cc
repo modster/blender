@@ -323,9 +323,9 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
 /**
  * Get the Material data of an Object, for an .MTL file.
  */
-void MaterialWrap::fill_materials(const OBJMesh &obj_mesh_data,
-                                  Vector<MTLMaterial> &r_mtl_materials)
+Vector<MTLMaterial> MaterialWrap::fill_materials(const OBJMesh &obj_mesh_data)
 {
+  Vector<MTLMaterial> r_mtl_materials;
   r_mtl_materials.resize(obj_mesh_data.tot_materials());
   for (int16_t i = 0; i < obj_mesh_data.tot_materials(); i++) {
     export_mtl_ = obj_mesh_data.get_object_material(i);
@@ -340,6 +340,7 @@ void MaterialWrap::fill_materials(const OBJMesh &obj_mesh_data,
     }
     store_image_textures(r_mtl_materials[i]);
   }
+  return r_mtl_materials;
 }
 
 }  // namespace blender::io::obj

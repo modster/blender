@@ -81,11 +81,11 @@ void OBJDepsgraph::update_for_newframe()
  *
  * \note Curves are also stored with Meshes if export settings specify so.
  */
-static void find_exportable_objects(Depsgraph *depsgraph,
-                                    const OBJExportParams &export_params,
-                                    Vector<std::unique_ptr<OBJMesh>> &r_exportable_meshes,
-                                    Vector<std::unique_ptr<OBJCurve>> &r_exportable_nurbs)
+static std::pair<Vector<std::unique_ptr<OBJMesh>>, Vector<std::unique_ptr<OBJCurve>>>
+find_exportable_objects(Depsgraph *depsgraph, const OBJExportParams &export_params)
 {
+  Vector<std::unique_ptr<OBJMesh>> r_exportable_meshes;
+  Vector<std::unique_ptr<OBJCurve>> r_exportable_nurbs;
   const ViewLayer *view_layer = DEG_get_input_view_layer(depsgraph);
   LISTBASE_FOREACH (const Base *, base, &view_layer->object_bases) {
     Object *object_in_layer = base->object;
@@ -136,6 +136,7 @@ static void find_exportable_objects(Depsgraph *depsgraph,
       }
     }
   }
+  return {std::move(r_exportable_meshes), std::move(r_exportable_nurbs)};
 }
 
 static void write_mesh_objects(Vector<std::unique_ptr<OBJMesh>> exportable_as_mesh,
@@ -204,12 +205,13 @@ static void export_frame(Depsgraph *depsgraph,
   if (!frame_writer.init_writer(filepath)) {
     return;
   }
-
-  /* Meshes, and curves to be exported in mesh form. */
-  Vector<std::unique_ptr<OBJMesh>> exportable_as_mesh;
-  /* NURBS to be exported in parameter form. */
-  Vector<std::unique_ptr<OBJCurve>> exportable_as_nurbs;
-  find_exportable_objects(depsgraph, export_params, exportable_as_mesh, exportable_as_nurbs);
+  //
+  //  /* Meshes, and curves to be exported in mesh form. */
+  //  Vector<std::unique_ptr<OBJMesh>> exportable_as_mesh;
+  //  /* NURBS to be exported in parameter form. */
+  //  Vector<std::unique_ptr<OBJCurve>> exportable_as_nurbs;
+  auto [exportable_as_mesh, exportable_as_nurbs] = find_exportable_objects(depsgraph,
+                                                                           export_params);
 
   write_mesh_objects(std::move(exportable_as_mesh), frame_writer, export_params);
   write_nurbs_curve_objects(std::move(exportable_as_nurbs), frame_writer);

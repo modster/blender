@@ -220,7 +220,7 @@ void OBJWriter::write_uv_coords(OBJMesh &obj_mesh_data) const
 }
 
 /**
- * Write loop normals for smooth-shaded polygons, and face normals otherwise, as vn x y z .
+ * Write loop normals for smooth-shaded polygons, and polygon normals otherwise, as vn x y z .
  */
 void OBJWriter::write_poly_normals(OBJMesh &obj_mesh_data) const
 {
@@ -244,9 +244,9 @@ void OBJWriter::write_poly_normals(OBJMesh &obj_mesh_data) const
 /**
  * Write smooth group if polygon at the given index is shaded smooth else "s 0"
  */
-void OBJWriter::write_smooth_group(const OBJMesh &obj_mesh_data,
-                                   const int poly_index,
-                                   int &r_last_face_smooth_group) const
+int OBJWriter::write_smooth_group(const OBJMesh &obj_mesh_data,
+                                  const int poly_index,
+                                  const int last_poly_smooth_group) const
 {
   int current_group = SMOOTH_GROUP_DISABLED;
   if (!export_params_.export_smooth_groups && obj_mesh_data.is_ith_poly_smooth(poly_index)) {
@@ -258,65 +258,66 @@ void OBJWriter::write_smooth_group(const OBJMesh &obj_mesh_data,
     current_group = obj_mesh_data.ith_smooth_group(poly_index);
   }
 
-  if (current_group == r_last_face_smooth_group) {
+  if (current_group == last_poly_smooth_group) {
     /* Group has already been written, even if it is "s 0". */
-    return;
+    return current_group;
   }
   fprintf(outfile_, "s %d\n", current_group);
-  r_last_face_smooth_group = current_group;
+  return current_group;
 }
 
 /**
  * Write material name and material group of a polygon in the .OBJ file.
+ * \return #mat_nr of the polygon at the given index.
  * \note It doesn't write to the material library.
  */
-void OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
-                                    const int poly_index,
-                                    int16_t &r_last_face_mat_nr) const
+int16_t OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
+                                       const int poly_index,
+                                       const int16_t last_poly_mat_nr) const
 {
   if (!export_params_.export_materials || obj_mesh_data.tot_materials() <= 0) {
-    return;
+    return last_poly_mat_nr;
   }
-  const int16_t curr_mat_nr = obj_mesh_data.ith_poly_matnr(poly_index);
-  /* Whenever a face with a new material is encountered, write its material
+  const int16_t current_mat_nr = obj_mesh_data.ith_poly_matnr(poly_index);
+  /* Whenever a polygon with a new material is encountered, write its material
    * and/or group, otherwise pass. */
-  if (r_last_face_mat_nr == curr_mat_nr) {
-    return;
+  if (last_poly_mat_nr == current_mat_nr) {
+    return current_mat_nr;
   }
-  r_last_face_mat_nr = curr_mat_nr;
-  if (curr_mat_nr == NOT_FOUND) {
+  if (current_mat_nr == NOT_FOUND) {
     fprintf(outfile_, "usemtl %s\n", MATERIAL_GROUP_DISABLED);
-    return;
+    return current_mat_nr;
   }
-  const char *mat_name = obj_mesh_data.get_object_material_name(curr_mat_nr);
+  const char *mat_name = obj_mesh_data.get_object_material_name(current_mat_nr);
   if (export_params_.export_object_groups) {
     write_object_group(obj_mesh_data);
   }
   fprintf(outfile_, "usemtl %s\n", mat_name);
+  return current_mat_nr;
 }
 
 /**
  * Write the name of the deform group of a polygon.
  */
-void OBJWriter::write_vertex_group(const OBJMesh &obj_mesh_data,
-                                   const int poly_index,
-                                   int16_t &r_last_poly_vertex_group) const
+int16_t OBJWriter::write_vertex_group(const OBJMesh &obj_mesh_data,
+                                      const int poly_index,
+                                      const int16_t last_poly_vertex_group) const
 {
   if (!export_params_.export_vertex_groups) {
-    return;
+    return last_poly_vertex_group;
   }
   const int16_t current_group = obj_mesh_data.get_poly_deform_group_index(poly_index);
 
-  if (current_group == r_last_poly_vertex_group) {
-    /* No vertex group found in this face, just like in the last iteration. */
-    return;
+  if (current_group == last_poly_vertex_group) {
+    /* No vertex group found in this polygon, just like in the last iteration. */
+    return current_group;
   }
-  r_last_poly_vertex_group = current_group;
   if (current_group == NOT_FOUND) {
     fprintf(outfile_, "g %s\n", DEFORM_GROUP_DISABLED);
-    return;
+    return current_group;
   }
   fprintf(outfile_, "g %s\n", obj_mesh_data.get_poly_deform_group_name(current_group));
+  return current_group;
 }
 
 /**
@@ -342,36 +343,37 @@ OBJWriter::func_vert_uv_normal_indices OBJWriter::get_poly_element_writer(
 }
 
 /**
- * Write face elements with at least vertex indices, and conditionally with UV vertex
- * indices and face normal indices. Also write groups: smooth, vertex, material.
+ * Write polygon elements with at least vertex indices, and conditionally with UV vertex
+ * indices and polygon normal indices. Also write groups: smooth, vertex, material.
  * \note UV indices were stored while writing UV vertices.
  */
 void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
 {
-  int last_face_smooth_group = NEGATIVE_INIT;
-  int16_t last_face_vertex_group = NEGATIVE_INIT;
-  int16_t last_face_mat_nr = NEGATIVE_INIT;
+  int last_poly_smooth_group = NEGATIVE_INIT;
+  int16_t last_poly_vertex_group = NEGATIVE_INIT;
+  int16_t last_poly_mat_nr = NEGATIVE_INIT;
 
   func_vert_uv_normal_indices poly_element_writer = get_poly_element_writer(obj_mesh_data);
 
-  Vector<int> face_vertex_indices;
-  Vector<int> face_normal_indices;
-  /** Number of normals may not be equal to number of polygons due to smooth shading. */
+  /* Number of normals may not be equal to number of polygons due to smooth shading. */
   int per_object_tot_normals = 0;
   const int tot_polygons = obj_mesh_data.tot_polygons();
   for (int i = 0; i < tot_polygons; i++) {
-    obj_mesh_data.calc_poly_vertex_indices(i, face_vertex_indices);
-    /* For an Object, a normal index depends on how many have been written before it.
-     * This is unknown because of smooth shading. So pass "per object total normals"
+    Vector<int> poly_vertex_indices = obj_mesh_data.calc_poly_vertex_indices(i);
+    /* For an Object, a normal index depends on how many of its normals have been written before
+     * it. This is unknown because of smooth shading. So pass "per object total normals"
      * and update it after each call. */
-    per_object_tot_normals += obj_mesh_data.calc_poly_normal_indices(
-        i, per_object_tot_normals, face_normal_indices);
+    int new_normals = 0;
+    Vector<int> poly_normal_indices;
+    std::tie(new_normals, poly_normal_indices) = obj_mesh_data.calc_poly_normal_indices(
+        i, per_object_tot_normals);
+    per_object_tot_normals += new_normals;
 
-    write_smooth_group(obj_mesh_data, i, last_face_smooth_group);
-    write_vertex_group(obj_mesh_data, i, last_face_vertex_group);
-    write_poly_material(obj_mesh_data, i, last_face_mat_nr);
+    last_poly_smooth_group = write_smooth_group(obj_mesh_data, i, last_poly_smooth_group);
+    last_poly_vertex_group = write_vertex_group(obj_mesh_data, i, last_poly_vertex_group);
+    last_poly_mat_nr = write_poly_material(obj_mesh_data, i, last_poly_mat_nr);
     (this->*poly_element_writer)(
-        face_vertex_indices, obj_mesh_data.uv_indices(i), face_normal_indices);
+        poly_vertex_indices, obj_mesh_data.uv_indices(i), poly_normal_indices);
   }
   index_offsets_.normal_offset += per_object_tot_normals;
 }
@@ -571,9 +573,8 @@ void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
   if (!this->good()) {
     return;
   }
-  Vector<MTLMaterial> mtl_materials;
   MaterialWrap mat_wrap;
-  mat_wrap.fill_materials(mesh_to_export, mtl_materials);
+  Vector<MTLMaterial> mtl_materials = mat_wrap.fill_materials(mesh_to_export);
 
 #ifdef DEBUG
   auto all_items_positive = [](const float3 &triplet) {
