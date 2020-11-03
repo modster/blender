@@ -159,7 +159,7 @@ static void WM_OT_xr_session_toggle(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name XR Raycast Select Operator
+/** \name XR Raycast Select
  *
  * Casts a ray from an XR controller's pose and selects any hit geometry.
  * \{ */
@@ -607,6 +607,99 @@ static void WM_OT_xr_select_raycast(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name XR Constraints Toggle
+ *
+ * Toggles enabled / auto key behavior for XR constraint objects.
+ * \{ */
+
+static void wm_xr_constraint_toggle(char *flag, bool enable, bool autokey)
+{
+  if (enable) {
+    if ((*flag & XR_OBJECT_ENABLE) != 0) {
+      *flag &= ~(XR_OBJECT_ENABLE);
+    }
+    else {
+      *flag |= XR_OBJECT_ENABLE;
+    }
+  }
+
+  if (autokey) {
+    if ((*flag & XR_OBJECT_AUTOKEY) != 0) {
+      *flag &= ~(XR_OBJECT_AUTOKEY);
+    }
+    else {
+      *flag |= XR_OBJECT_AUTOKEY;
+    }
+  }
+}
+
+static int wm_xr_constraints_toggle_exec(bContext *C, wmOperator *op)
+{
+  wmWindowManager *wm = CTX_wm_manager(C);
+  XrSessionSettings *settings = &wm->xr.session_settings;
+  PropertyRNA *prop = NULL;
+  bool headset, controller0, controller1, enable, autokey;
+
+  prop = RNA_struct_find_property(op->ptr, "headset");
+  headset = prop ? RNA_property_boolean_get(op->ptr, prop) : true;
+
+  prop = RNA_struct_find_property(op->ptr, "controller0");
+  controller0 = prop ? RNA_property_boolean_get(op->ptr, prop) : true;
+
+  prop = RNA_struct_find_property(op->ptr, "controller1");
+  controller1 = prop ? RNA_property_boolean_get(op->ptr, prop) : true;
+
+  prop = RNA_struct_find_property(op->ptr, "enable");
+  enable = prop ? RNA_property_boolean_get(op->ptr, prop) : true;
+
+  prop = RNA_struct_find_property(op->ptr, "autokey");
+  autokey = prop ? RNA_property_boolean_get(op->ptr, prop) : true;
+
+  if (headset) {
+    wm_xr_constraint_toggle(&settings->headset_flag, enable, autokey);
+  }
+  if (controller0) {
+    wm_xr_constraint_toggle(&settings->controller0_flag, enable, autokey);
+  }
+  if (controller1) {
+    wm_xr_constraint_toggle(&settings->controller1_flag, enable, autokey);
+  }
+
+  WM_event_add_notifier(C, NC_WM | ND_XR_DATA_CHANGED, NULL);
+
+  return OPERATOR_FINISHED;
+}
+
+static void WM_OT_xr_constraints_toggle(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "XR Constraints Toggle";
+  ot->idname = "WM_OT_xr_constraints_toggle";
+  ot->description = "Toggles enabled / auto key behavior for VR constraint objects";
+
+  /* callbacks */
+  ot->exec = wm_xr_constraints_toggle_exec;
+  ot->poll = wm_xr_operator_sessionactive;
+
+  /* properties */
+  RNA_def_boolean(ot->srna, "headset", true, "Headset", "Toggle behavior for the headset object");
+  RNA_def_boolean(ot->srna,
+                  "controller0",
+                  true,
+                  "Controller 0",
+                  "Toggle behavior for the first controller object ");
+  RNA_def_boolean(ot->srna,
+                  "controller1",
+                  true,
+                  "Controller 1",
+                  "Toggle behavior for the second controller object");
+  RNA_def_boolean(ot->srna, "enable", true, "Enable", "Toggle constraint enabled behavior");
+  RNA_def_boolean(ot->srna, "autokey", false, "Auto Key", "Toggle auto keying behavior");
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Operator Registration
  * \{ */
 
@@ -614,6 +707,7 @@ void wm_xr_operatortypes_register(void)
 {
   WM_operatortype_append(WM_OT_xr_session_toggle);
   WM_operatortype_append(WM_OT_xr_select_raycast);
+  WM_operatortype_append(WM_OT_xr_constraints_toggle);
 }
 
 /** \} */
