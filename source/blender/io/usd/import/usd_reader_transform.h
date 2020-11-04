@@ -24,7 +24,7 @@
 
 namespace blender::io::usd {
 
-class USDTransformReader : public USDObjectReader {
+class USDTransformReader : public USDXformableReader {
 
   pxr::UsdGeomXform xform_;
 
@@ -33,7 +33,7 @@ class USDTransformReader : public USDObjectReader {
 
   bool valid() const override;
 
-  void readObjectData(Main *bmain, double time) override;
+  void create_object(Main *bmain, double time) override;
 };
 
 }  // namespace blender::io::usd

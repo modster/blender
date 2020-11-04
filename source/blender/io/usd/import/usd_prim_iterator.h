@@ -25,16 +25,17 @@
 namespace blender::io::usd {
 
 struct USDImporterContext;
-class USDObjectReader;
+class USDXformableReader;
 
 class USDPrimIterator {
  public:
-  static USDObjectReader *get_reader(const pxr::UsdPrim &prim, const USDImporterContext &context);
+  static USDXformableReader *get_reader(const pxr::UsdPrim &prim,
+                                        const USDImporterContext &context);
 
   static void create_readers(const pxr::UsdPrim &root,
                              const USDImporterContext &context,
-                             std::vector<USDObjectReader *> &r_readers,
-                             std::vector<USDObjectReader *> &r_child_readers);
+                             std::vector<USDXformableReader *> &r_readers,
+                             std::vector<USDXformableReader *> &r_child_readers);
 
   static void debug_traverse_stage(const pxr::UsdStageRefPtr &usd_stage);
 };

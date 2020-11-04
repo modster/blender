@@ -36,47 +36,26 @@
 
 namespace blender::io::usd {
 
-USDObjectReader::USDObjectReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
-    : USDPrimReader(prim, context),
-      prim_parent_name_(""),
-      prim_name_(""),
-      object_(nullptr),
-      parent_(nullptr),
-      merged_with_parent_(false)
-{
-  prim_name_ = prim.GetName().GetString();
-
-  pxr::UsdPrim parent = prim.GetParent();
-  prim_parent_name_ = parent ? parent.GetName().GetString() : prim_name_;
-}
-
-USDObjectReader::~USDObjectReader()
+USDXformableReader::USDXformableReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
+    : USDPrimReader(prim, context), object_(nullptr), parent_(nullptr), merged_with_parent_(false)
 {
 }
 
-Object *USDObjectReader::object() const
+USDXformableReader::~USDXformableReader()
+{
+}
+
+Object *USDXformableReader::object() const
 {
   return object_;
 }
 
-void USDObjectReader::setObject(Object *ob)
-{
-  object_ = ob;
-}
-
-struct Mesh *USDObjectReader::read_mesh(Main *UNUSED(bmain), double UNUSED(time))
+struct Mesh *USDXformableReader::read_mesh(Main *UNUSED(bmain), double UNUSED(time))
 {
   return nullptr;
 }
 
-bool USDObjectReader::topology_changed(Mesh * /*existing_mesh*/, double /*time*/)
-{
-  /* The default implementation of read_mesh() just returns the original mesh, so never changes the
-   * topology. */
-  return false;
-}
-
-void USDObjectReader::setupObjectTransform(const double time)
+void USDXformableReader::setup_object_transform(const double time)
 {
   if (!this->object_) {
     return;
@@ -94,10 +73,10 @@ void USDObjectReader::setupObjectTransform(const double time)
   /* TODO(makowalski):  Set up transform constraint if not constant. */
 }
 
-void USDObjectReader::read_matrix(float r_mat[4][4] /* local matrix */,
-                                  const double time,
-                                  const float scale,
-                                  bool &is_constant)
+void USDXformableReader::read_matrix(float r_mat[4][4] /* local matrix */,
+                                     const double time,
+                                     const float scale,
+                                     bool &is_constant)
 {
   pxr::UsdGeomXformable xformable(prim_);
 

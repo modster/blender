@@ -27,10 +27,11 @@ namespace blender::io::usd {
 
 class USDPrimReader {
 
-protected:
+ protected:
   pxr::UsdPrim prim_;
 
-  /* The USD prim path. */
+  /* The USD prim path, cached to help debug if
+   * prim becomes invalid. */
   std::string prim_path_;
 
   USDImporterContext context_;
@@ -40,10 +41,10 @@ protected:
   double max_time_;
 
   /* Use reference counting since the same reader may be used by multiple
-  * modifiers and/or constraints. */
+   * modifiers and/or constraints. */
   int refcount_;
 
-public:
+ public:
   explicit USDPrimReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
 
   virtual ~USDPrimReader();
@@ -53,6 +54,20 @@ public:
   const std::string &prim_path() const
   {
     return prim_path_;
+  }
+
+  std::string prim_name() const
+  {
+    return prim_ ? prim_.GetName().GetString() : std::string();
+  }
+
+  std::string parent_prim_name() const
+  {
+    if (!prim_) {
+      return std::string();
+    }
+    pxr::UsdPrim parent = prim_.GetParent();
+    return parent ? parent.GetName().GetString() : std::string();
   }
 
   virtual bool valid() const = 0;

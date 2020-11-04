@@ -31,38 +31,28 @@ struct Object;
 
 namespace blender::io::usd {
 
-class USDObjectReader : public USDPrimReader {
- public:
-  typedef std::vector<USDObjectReader *> ptr_vector;
+class USDXformableReader : public USDPrimReader {
 
  protected:
-  /* The USD prim parent name. */
-  std::string prim_parent_name_;
-
-  /* The USD prim name. */
-  std::string prim_name_;
-
   Object *object_;
 
-  USDObjectReader *parent_;
+  USDXformableReader *parent_;
 
   bool merged_with_parent_;
 
  public:
-  explicit USDObjectReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
+  explicit USDXformableReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
 
-  virtual ~USDObjectReader();
+  virtual ~USDXformableReader();
 
   Object *object() const;
 
-  void setObject(Object *ob);
-
-  USDObjectReader *parent() const
+  USDXformableReader *parent() const
   {
     return parent_;
   }
 
-  void set_parent(USDObjectReader *par)
+  void set_parent(USDXformableReader *par)
   {
     parent_ = par;
   }
@@ -77,25 +67,14 @@ class USDObjectReader : public USDPrimReader {
     return merged_with_parent_;
   }
 
-  const std::string &prim_parent_name() const
-  {
-    return prim_parent_name_;
-  }
-  const std::string &prim_name() const
-  {
-    return prim_name_;
-  }
-
   virtual bool valid() const = 0;
 
-  virtual void readObjectData(Main *bmain, double time) = 0;
+  virtual void create_object(Main *bmain, double time) = 0;
 
   virtual struct Mesh *read_mesh(Main *bmain, double time);
 
-  virtual bool topology_changed(Mesh *existing_mesh, double time);
-
-  /* Reads the object matrix and sets up an object transform if animated. */
-  void setupObjectTransform(const double time);
+  /* Reads the object matrix. */
+  void setup_object_transform(const double time);
 
   void read_matrix(float r_mat[4][4], const double time, const float scale, bool &is_constant);
 };

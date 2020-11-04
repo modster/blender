@@ -232,7 +232,7 @@ struct ImportJobData {
   bool is_background_job;
 
   pxr::UsdStageRefPtr stage;
-  USDObjectReader::ptr_vector readers;
+  std::vector<USDXformableReader *> readers;
 };
 
 static void import_startjob(void *user_data, short *stop, short *do_update, float *progress)
@@ -273,7 +273,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   *data->do_update = true;
   *data->progress = 0.1f;
 
-  std::vector<USDObjectReader *> child_readers;
+  std::vector<USDXformableReader *> child_readers;
   USDPrimIterator::create_readers(
       data->stage->GetPseudoRoot(), import_ctx, data->readers, child_readers);
 
@@ -284,12 +284,12 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 
   double time = CFRA;
 
-  std::vector<USDObjectReader *>::iterator iter;
+  std::vector<USDXformableReader *>::iterator iter;
   for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-    USDObjectReader *reader = *iter;
+    USDXformableReader *reader = *iter;
 
     if (reader->valid()) {
-      reader->readObjectData(data->bmain, time);
+      reader->create_object(data->bmain, time);
     }
     else {
       std::cerr << "Object " << reader->prim_path() << " in USD file " << data->filename
@@ -307,7 +307,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 
   /* Setup parenthood. */
   for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-    const USDObjectReader *reader = *iter;
+    const USDXformableReader *reader = *iter;
 
     Object *ob = reader->object();
 
@@ -315,7 +315,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
       continue;
     }
 
-    const USDObjectReader *parent_reader = reader->parent();
+    const USDXformableReader *parent_reader = reader->parent();
 
     ob->parent = parent_reader ? parent_reader->object() : nullptr;
   }
@@ -323,8 +323,8 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   /* Setup transformations. */
   i = 0;
   for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-    USDObjectReader *reader = *iter;
-    reader->setupObjectTransform(time);
+    USDXformableReader *reader = *iter;
+    reader->setup_object_transform(time);
 
     *data->progress = 0.7f + 0.3f * (++i / size);
     *data->do_update = true;
@@ -340,7 +340,7 @@ static void import_endjob(void *user_data)
 {
   ImportJobData *data = static_cast<ImportJobData *>(user_data);
 
-  std::vector<USDObjectReader *>::iterator iter;
+  std::vector<USDXformableReader *>::iterator iter;
 
   /* Delete objects on cancellation. */
   if (data->was_cancelled) {
@@ -395,7 +395,7 @@ static void import_endjob(void *user_data)
   }
 
   for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-    USDObjectReader *reader = *iter;
+    USDXformableReader *reader = *iter;
     reader->decref();
 
     if (reader->refcount() == 0) {

@@ -22,10 +22,12 @@
 #include "BKE_object.h"
 #include "DNA_object_types.h"
 
+#include <iostream>
+
 namespace blender::io::usd {
 
 USDTransformReader::USDTransformReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
-    : USDObjectReader(prim, context), xform_(prim)
+    : USDXformableReader(prim, context), xform_(prim)
 {
 }
 
@@ -34,7 +36,7 @@ bool USDTransformReader::valid() const
   return static_cast<bool>(xform_);
 }
 
-void USDTransformReader::readObjectData(Main *bmain, double time)
+void USDTransformReader::create_object(Main *bmain, double time)
 {
   if (!this->valid()) {
     return;
@@ -49,8 +51,15 @@ void USDTransformReader::readObjectData(Main *bmain, double time)
     return;
   }
 
-  this->object_ = BKE_object_add_only_object(bmain, OB_EMPTY, this->prim_name_.c_str());
-  this->object_->data = NULL;
+  std::string obj_name = this->prim_name();
+
+  if (obj_name.empty()) {
+    /* Sanity check. */
+    std::cerr << "Warning: couldn't determine object name for " << this->prim_path() << std::endl;
+  }
+
+  this->object_ = BKE_object_add_only_object(bmain, OB_EMPTY, obj_name.c_str());
+  this->object_->data = nullptr;
 }
 
 }  // namespace blender::io::usd

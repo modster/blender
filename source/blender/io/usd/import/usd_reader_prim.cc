@@ -23,12 +23,12 @@
 namespace blender::io::usd {
 
 USDPrimReader::USDPrimReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
-  : prim_(prim),
-    prim_path_(""),
-    context_(context),
-    min_time_(std::numeric_limits<double>::max()),
-    max_time_(std::numeric_limits<double>::min()),
-    refcount_(0)
+    : prim_(prim),
+      prim_path_(""),
+      context_(context),
+      min_time_(std::numeric_limits<double>::max()),
+      max_time_(std::numeric_limits<double>::min()),
+      refcount_(0)
 {
   if (prim) {
     prim_path_ = prim.GetPath().GetString();

@@ -331,7 +331,7 @@ void build_mtl_map(const Main *bmain, std::map<std::string, Material *> &mat_map
 }  // anonymous namespace
 
 USDMeshReader::USDMeshReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
-    : USDObjectReader(prim, context), mesh_(prim)
+    : USDXformableReader(prim, context), mesh_(prim)
 {
 }
 
@@ -351,7 +351,14 @@ Mesh *USDMeshReader::read_mesh(Main *bmain, double time)
     return nullptr;
   }
 
-  Mesh *mesh = BKE_mesh_add(bmain, prim_name_.c_str());
+  std::string mesh_name = this->prim_name();
+
+  if (mesh_name.empty()) {
+    /* Sanity check. */
+    std::cerr << "Warning: couldn't determine mesh name for " << this->prim_path() << std::endl;
+  }
+
+  Mesh *mesh = BKE_mesh_add(bmain, mesh_name.c_str());
 
   MeshSampleData mesh_data;
 
@@ -402,7 +409,7 @@ Mesh *USDMeshReader::read_mesh(Main *bmain, double time)
   return mesh;
 }
 
-void USDMeshReader::readObjectData(Main *bmain, double time)
+void USDMeshReader::create_object(Main *bmain, double time)
 {
   if (!this->valid()) {
     return;
@@ -417,7 +424,12 @@ void USDMeshReader::readObjectData(Main *bmain, double time)
     return;
   }
 
-  std::string obj_name = merged_with_parent_ ? prim_parent_name_ : prim_name_;
+  std::string obj_name = merged_with_parent_ ? this->parent_prim_name() : this->prim_name();
+
+  if (obj_name.empty()) {
+    /* Sanity check. */
+    std::cerr << "Warning: couldn't determine object name for " << this->prim_path() << std::endl;
+  }
 
   object_ = BKE_object_add_only_object(bmain, OB_MESH, obj_name.c_str());
   Mesh *mesh = this->read_mesh(bmain, time);

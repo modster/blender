@@ -38,10 +38,10 @@
 
 namespace blender::io::usd {
 
-USDObjectReader *USDPrimIterator::get_reader(const pxr::UsdPrim &prim,
-                                             const USDImporterContext &context)
+USDXformableReader *USDPrimIterator::get_reader(const pxr::UsdPrim &prim,
+                                                const USDImporterContext &context)
 {
-  USDObjectReader *result = nullptr;
+  USDXformableReader *result = nullptr;
 
   if (prim.IsA<pxr::UsdGeomMesh>()) {
     result = new USDMeshReader(prim, context);
@@ -55,14 +55,14 @@ USDObjectReader *USDPrimIterator::get_reader(const pxr::UsdPrim &prim,
 
 void USDPrimIterator::create_readers(const pxr::UsdPrim &prim,
                                      const USDImporterContext &context,
-                                     std::vector<USDObjectReader *> &r_readers,
-                                     std::vector<USDObjectReader *> &r_child_readers)
+                                     std::vector<USDXformableReader *> &r_readers,
+                                     std::vector<USDXformableReader *> &r_child_readers)
 {
   if (!prim) {
     return;
   }
 
-  std::vector<USDObjectReader *> child_readers;
+  std::vector<USDXformableReader *> child_readers;
 
   /* Recursively create readers for the child prims. */
   pxr::UsdPrimSiblingRange child_prims = prim.GetFilteredChildren(
@@ -100,10 +100,10 @@ void USDPrimIterator::create_readers(const pxr::UsdPrim &prim,
     return;
   }
 
-  USDObjectReader *reader = get_reader(prim, context);
+  USDXformableReader *reader = get_reader(prim, context);
 
   if (reader) {
-    for (USDObjectReader *child_reader : child_readers) {
+    for (USDXformableReader *child_reader : child_readers) {
       child_reader->set_parent(reader);
     }
     r_child_readers.push_back(reader);

@@ -24,7 +24,7 @@
 
 namespace blender::io::usd {
 
-class USDMeshReader : public USDObjectReader {
+class USDMeshReader : public USDXformableReader {
  protected:
   pxr::UsdGeomMesh mesh_;
 
@@ -35,7 +35,7 @@ class USDMeshReader : public USDObjectReader {
 
   bool valid() const override;
 
-  void readObjectData(Main *bmain, double time) override;
+  void create_object(Main *bmain, double time) override;
 
   struct Mesh *read_mesh(Main *bmain, double time) override;
 
