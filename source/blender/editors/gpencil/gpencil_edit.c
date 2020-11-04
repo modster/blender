@@ -3150,7 +3150,7 @@ static bool gpencil_snap_poll(bContext *C)
 static int gpencil_snap_to_grid(bContext *C, wmOperator *UNUSED(op))
 {
   bGPdata *gpd = ED_gpencil_data_get_active(C);
-  RegionView3D *rv3d = CTX_wm_region_data(C);
+  ARegion *region = CTX_wm_region(C);
   View3D *v3d = CTX_wm_view3d(C);
   Scene *scene = CTX_data_scene(C);
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
@@ -4070,8 +4070,10 @@ static int gpencil_stroke_join_exec(bContext *C, wmOperator *op)
   bGPdata *gpd = ED_gpencil_data_get_active(C);
   bGPDlayer *activegpl = BKE_gpencil_layer_active_get(gpd);
   Object *ob = CTX_data_active_object(C);
-  /* Limit the number of strokes to join. */
-  const int max_join_strokes = 64;
+  /* Limit the number of strokes to join. It makes no sense to allow an very high number of strokes
+   * for CPU time and because to have a stroke with thousands of points is unpractical, so limit
+   * this number avoid to joining a full frame scene in one single stroke. */
+  const int max_join_strokes = 128;
 
   const int type = RNA_enum_get(op->ptr, "type");
   const bool leave_gaps = RNA_boolean_get(op->ptr, "leave_gaps");
