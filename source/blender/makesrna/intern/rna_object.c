@@ -2635,9 +2635,9 @@ static void rna_def_object_lineart(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
-  srna = RNA_def_struct(brna, "ObjectLineart", NULL);
+  srna = RNA_def_struct(brna, "ObjectLineArt", NULL);
   RNA_def_struct_ui_text(srna, "Object Line Art", "Object lineart settings");
-  RNA_def_struct_sdna(srna, "ObjectLineart");
+  RNA_def_struct_sdna(srna, "ObjectLineArt");
 
   prop = RNA_def_property(srna, "usage", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, prop_feature_line_usage_items);
@@ -3418,7 +3418,7 @@ static void rna_def_object(BlenderRNA *brna)
 
   /* Line Art */
   prop = RNA_def_property(srna, "lineart", PROP_POINTER, PROP_NONE);
-  RNA_def_property_struct_type(prop, "ObjectLineart");
+  RNA_def_property_struct_type(prop, "ObjectLineArt");
   RNA_def_property_ui_text(prop, "LRT", "LRT settings for the object");
 
   RNA_define_lib_overridable(false);

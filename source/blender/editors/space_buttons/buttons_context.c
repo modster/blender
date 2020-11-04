@@ -155,13 +155,13 @@ static bool buttons_context_path_world(ButsContextPath *path)
   return false;
 }
 
-static int buttons_context_path_collection(ButsContextPath *path, wmWindow *window)
+static bool buttons_context_path_collection(ButsContextPath *path, wmWindow *window)
 {
   PointerRNA *ptr = &path->ptr[path->len - 1];
 
   /* if we already have a (pinned) collection, we're done */
   if (RNA_struct_is_a(ptr->type, &RNA_Collection)) {
-    return 1;
+    return true;
   }
   /* if we have a view layer, use the view layer's active collection */
   else if (buttons_context_path_view_layer(path, window)) {
@@ -170,12 +170,12 @@ static int buttons_context_path_collection(ButsContextPath *path, wmWindow *wind
     if (c) {
       RNA_id_pointer_create(&c->id, &path->ptr[path->len]);
       path->len++;
-      return 1;
+      return true;
     }
   }
 
   /* no path to a collection possible */
-  return 0;
+  return false;
 }
 
 static bool buttons_context_path_linestyle(ButsContextPath *path, wmWindow *window)
@@ -598,7 +598,7 @@ static bool buttons_context_path(
 #ifdef WITH_LINEART
       found = buttons_context_path_collection(path, window);
 #else
-      BLI_assert(!"'WITH_LINEART' disabled - should not possible to access 'BCONTEXT_COLLECTION'");
+      BLI_assert(!"'WITH_LINEART' is off. See buttons_context.c");
 #endif
       break;
     case BCONTEXT_TOOL:

@@ -87,13 +87,7 @@ static void generate_strokes_actual(
     GpencilModifierData *md, Depsgraph *depsgraph, Object *ob, bGPDlayer *gpl, bGPDframe *gpf)
 {
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
-#if 0
-  int line_types = ((scene->flag & LRT_EVERYTHING_AS_CONTOUR) ?
-                        LRT_EDGE_FLAG_ALL_TYPE :
-                        ((scene->flag & LRT_INTERSECTION_AS_CONTOUR) ?
-                             (lmd->line_types & LRT_EDGE_FLAG_INTERSECTION) :
-                             lmd->line_types));
-#endif
+
   if (G.debug_value == 4000) {
     printf("LRT: Generating from modifier.\n");
   }
@@ -150,12 +144,12 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
 
   /* Guard early, don't trigger calculation when no gpencil frame is present. Probably should
    * disable in the isModifierDisabled() function but we need addtional arg for depsgraph and
-   * gpd.*/
+   * gpd. */
   bGPDlayer *gpl = BKE_gpencil_layer_get_by_name(gpd, lmd->target_layer, 1);
   if (gpl == NULL) {
     return;
   }
-  /* Need to call this or we don't get active frame? */
+  /* Need to call this or we don't get active frame (user may haven't selected any one). */
   BKE_gpencil_frame_active_set(depsgraph, gpd);
   bGPDframe *gpf = gpl->actframe;
   if (gpf == NULL) {
@@ -233,11 +227,6 @@ static void bakeModifier(Main *UNUSED(bmain),
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
 
-  /* Check all parameters required are filled. */
-  if (isModifierDisabled(md)) {
-    return;
-  }
-
   bGPDlayer *gpl = BKE_gpencil_layer_get_by_name(gpd, lmd->target_layer, 1);
   if (gpl == NULL) {
     return;
@@ -305,11 +294,6 @@ static void updateDepsgraph(GpencilModifierData *md,
       ctx->node, ctx->scene->camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
 }
 
-static void freeData(GpencilModifierData *UNUSED(md))
-{
-  return;
-}
-
 static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
 {
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
@@ -347,24 +331,25 @@ static void panel_draw(const bContext *C, Panel *panel)
     uiItemL(layout, "Line types are fuzzy", ICON_NONE);
   }
   else {
+    uiLayout *column = uiLayoutColumn(layout, true);
     if (scene->lineart.line_types & LRT_EDGE_FLAG_CONTOUR) {
-      uiItemR(layout, ptr, "use_contour", 0, NULL, ICON_NONE);
+      uiItemR(column, ptr, "use_contour", 0, NULL, ICON_NONE);
     }
     if (scene->lineart.line_types & LRT_EDGE_FLAG_CREASE) {
-      uiItemR(layout, ptr, "use_crease", 0, "Crease", ICON_NONE);
+      uiItemR(column, ptr, "use_crease", 0, "Crease", ICON_NONE);
     }
     if (scene->lineart.line_types & LRT_EDGE_FLAG_MATERIAL) {
-      uiItemR(layout, ptr, "use_material", 0, "Material", ICON_NONE);
+      uiItemR(column, ptr, "use_material", 0, "Material", ICON_NONE);
     }
     if (scene->lineart.line_types & LRT_EDGE_FLAG_EDGE_MARK) {
-      uiItemR(layout, ptr, "use_edge_mark", 0, "Edge Marks", ICON_NONE);
+      uiItemR(column, ptr, "use_edge_mark", 0, "Edge Marks", ICON_NONE);
     }
     if (scene->lineart.flags & LRT_INTERSECTION_AS_CONTOUR) {
-      uiItemL(layout, "Intersection is fuzzy", ICON_NONE);
+      uiItemL(column, "Intersection is fuzzy", ICON_NONE);
     }
     else {
       if (scene->lineart.line_types & LRT_EDGE_FLAG_INTERSECTION) {
-        uiItemR(layout, ptr, "use_intersection", 0, "Intersection", ICON_NONE);
+        uiItemR(column, ptr, "use_intersection", 0, "Intersection", ICON_NONE);
       }
     }
   }
@@ -384,11 +369,13 @@ static void style_panel_draw(const bContext *C, Panel *panel)
 
   uiLayoutSetPropSep(layout, true);
 
-  uiItemR(layout, ptr, "thickness", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+  uiLayout *column = uiLayoutColumn(layout, true);
 
-  uiItemR(layout, ptr, "opacity", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+  uiItemR(column, ptr, "thickness", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 
-  uiItemR(layout, ptr, "pre_sample_length", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+  uiItemR(column, ptr, "opacity", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+
+  uiItemR(column, ptr, "pre_sample_length", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 }
 
 static void occlusion_panel_draw(const bContext *C, Panel *panel)
@@ -413,16 +400,16 @@ static void occlusion_panel_draw(const bContext *C, Panel *panel)
     uiItemR(layout, ptr, "level_start", 0, "Level", ICON_NONE);
   }
 
-  uiLayout *row = uiLayoutRow(layout, false);
+  uiItemR(layout, ptr, "use_transparency", 0, "Transparency", ICON_NONE);
 
-  uiItemR(row, ptr, "use_transparency", 0, "Transparency", ICON_NONE);
+  uiLayout *column = uiLayoutRow(layout, true);
 
   if (use_transparency) {
-    uiItemR(row, ptr, "transparency_match", 0, "Match", ICON_NONE);
+    uiItemR(column, ptr, "transparency_match", 0, "Match", ICON_NONE);
   }
 
   if (use_transparency) {
-    row = uiLayoutRow(layout, true);
+    uiLayout *row = uiLayoutRow(column, true);
     uiItemR(row, ptr, "transparency_mask_0", UI_ITEM_R_TOGGLE, "0", ICON_NONE);
     uiItemR(row, ptr, "transparency_mask_1", UI_ITEM_R_TOGGLE, "1", ICON_NONE);
     uiItemR(row, ptr, "transparency_mask_2", UI_ITEM_R_TOGGLE, "2", ICON_NONE);
@@ -443,15 +430,17 @@ static void vgroup_panel_draw(const bContext *C, Panel *panel)
 
   uiLayoutSetPropSep(layout, true);
 
-  row = uiLayoutRow(layout, true);
+  uiLayout *column = uiLayoutColumn(layout, true);
+
+  row = uiLayoutRow(column, true);
   uiItemR(row, ptr, "source_vertex_group", 0, "Filter Source", ICON_GROUP_VERTEX);
   uiItemR(row, ptr, "invert_source_vertex_group", UI_ITEM_R_TOGGLE, "", ICON_ARROW_LEFTRIGHT);
 
-  uiItemR(layout, ptr, "match_output_vertex_group", 0, NULL, ICON_NONE);
+  uiItemR(column, ptr, "match_output_vertex_group", 0, NULL, ICON_NONE);
 
   bool match_output = RNA_boolean_get(ptr, "match_output_vertex_group");
   if (!match_output) {
-    uiItemPointerR(layout, ptr, "vertex_group", &ob_ptr, "vertex_groups", "Target", ICON_NONE);
+    uiItemPointerR(column, ptr, "vertex_group", &ob_ptr, "vertex_groups", "Target", ICON_NONE);
   }
 
   uiItemR(layout, ptr, "soft_selection", 0, NULL, ICON_NONE);
@@ -485,7 +474,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Lineart = {
     /* remapTime */ NULL,
 
     /* initData */ initData,
-    /* freeData */ freeData,
+    /* freeData */ NULL,
     /* isDisabled */ isDisabled,
     /* updateDepsgraph */ updateDepsgraph,
     /* dependsOnTime */ NULL,

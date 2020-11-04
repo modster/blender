@@ -110,7 +110,9 @@ void ED_render_scene_update(const DEGEditorUpdateContext *update_ctx, int update
   wm = bmain->wm.first;
 
 #ifdef WITH_LINEART
-  /* Temporary solution for updating Line Art GPencil targets. */
+  /* TODO: Needs some specific flag in the render pipeline that marks line art for update, that way
+   * we could avoid some unecessary updating.
+   */
   if (updated) {
     ED_lineart_post_frame_update_external(C, scene, update_ctx->depsgraph, false);
   }

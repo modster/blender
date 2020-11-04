@@ -186,13 +186,13 @@ typedef struct Object_Runtime {
   short _pad2[3];
 } Object_Runtime;
 
-typedef struct ObjectLineart {
+typedef struct ObjectLineArt {
   short usage;
   short flags;
 
   /** if OBJECT_LRT_OWN_CREASE is set */
   float crease_threshold;
-} ObjectLineart;
+} ObjectLineArt;
 
 enum ObjectFeatureLine_Usage {
   OBJECT_LRT_INHERENT = 0,
@@ -412,7 +412,7 @@ typedef struct Object {
 
   struct PreviewImage *preview;
 
-  ObjectLineart lineart;
+  ObjectLineArt lineart;
 
   /** Runtime evaluation data (keep last). */
   Object_Runtime runtime;
