@@ -7434,7 +7434,6 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
   prop = RNA_def_property(srna, "crease_threshold", PROP_FLOAT, PROP_ANGLE);
-  RNA_def_property_float_default(prop, DEG2RAD(140.0f));
   RNA_def_property_range(prop, 0, DEG2RAD(180.0f));
   RNA_def_property_ui_range(prop, 0.0f, DEG2RAD(180.0f), 0.01f, 1);
   RNA_def_property_ui_text(

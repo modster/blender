@@ -1542,7 +1542,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
     reln->object_ref = orig_ob;
 
     if (ob->lineart.flags & OBJECT_LRT_OWN_CREASE) {
-      use_crease = cosf(DEG2RAD(180.0f - ob->lineart.crease_threshold));
+      use_crease = cosf(M_PI - ob->lineart.crease_threshold);
     }
     else {
       use_crease = rb->crease_threshold;

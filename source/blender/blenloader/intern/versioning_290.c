@@ -1141,7 +1141,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
 
     if (!DNA_struct_find(fd->filesdna, "SceneLineArt")) {
       LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
-        scene->lineart.crease_threshold = 140.0f;
+        scene->lineart.crease_threshold = DEG2RAD(140.0f);
         scene->lineart.line_types |= LRT_EDGE_FLAG_ALL_TYPE;
         scene->lineart.flags |= (LRT_ALLOW_DUPLI_OBJECTS | LRT_REMOVE_DOUBLES);
         scene->lineart.angle_splitting_threshold = DEG2RAD(60.0f);
