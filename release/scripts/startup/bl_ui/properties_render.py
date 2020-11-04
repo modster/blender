@@ -708,7 +708,7 @@ class RENDER_PT_lineart(RenderButtonsPanel, Panel):
         layout.use_property_split = True
 
         if not scene.camera:
-            col.label(text="No active camera.")
+            layout.label(text="No active camera.")
 
         else:
             layout.prop(lineart, "use_contour", text='Contour')
@@ -722,13 +722,16 @@ class RENDER_PT_lineart_crease(RenderButtonsPanel, Panel):
     bl_parent_id = "RENDER_PT_lineart"
     bl_options = {'DEFAULT_CLOSED'}
 
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene
+        return (scene.camera is not None)
 
     def draw_header(self, context):
         scene = context.scene
         lineart = scene.lineart
 
         self.layout.prop(lineart, "use_crease", text='')
-
 
     def draw(self, context):
         scene = context.scene
@@ -747,13 +750,16 @@ class RENDER_PT_lineart_intersection(RenderButtonsPanel, Panel):
     bl_parent_id = "RENDER_PT_lineart"
     bl_options = {'DEFAULT_CLOSED'}
 
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene
+        return (scene.camera is not None)
+
 
     def draw_header(self, context):
         scene = context.scene
         lineart = scene.lineart
-
         self.layout.prop(lineart, "use_intersections", text='')
-
 
     def draw(self, context):
         scene = context.scene
@@ -773,6 +779,11 @@ class RENDER_PT_lineart_extras(RenderButtonsPanel, Panel):
     bl_parent_id = "RENDER_PT_lineart"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
+
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene
+        return (scene.camera is not None)
 
     def draw(self, context):
         scene = context.scene
@@ -801,6 +812,11 @@ class RENDER_PT_lineart_baking(RenderButtonsPanel, Panel):
     bl_parent_id = "RENDER_PT_lineart"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
+
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene
+        return (scene.camera is not None)
 
     def draw(self, context):
         scene = context.scene
