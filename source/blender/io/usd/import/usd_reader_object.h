@@ -71,8 +71,6 @@ class USDXformableReader : public USDPrimReader {
 
   virtual void create_object(Main *bmain, double time) = 0;
 
-  virtual struct Mesh *read_mesh(Main *bmain, double time);
-
   /* Reads the object matrix. */
   void setup_object_transform(const double time);
 

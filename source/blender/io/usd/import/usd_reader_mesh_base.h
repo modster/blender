@@ -18,25 +18,25 @@
  */
 #pragma once
 
-#include "usd_reader_mesh_base.h"
-
-#include <pxr/usd/usdGeom/mesh.h>
+#include "usd_reader_object.h"
 
 namespace blender::io::usd {
 
-class USDMeshReader : public USDMeshReaderBase {
+class USDMeshReaderBase : public USDXformableReader {
  protected:
-  pxr::UsdGeomMesh mesh_;
 
  public:
-  USDMeshReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
+  USDMeshReaderBase(const pxr::UsdPrim &prim, const USDImporterContext &context);
 
-  virtual ~USDMeshReader();
+  virtual ~USDMeshReaderBase();
 
-  bool valid() const override;
+  void create_object(Main *bmain, double time) override;
 
-  struct Mesh *create_mesh(Main *bmain, double time) override;
-  void assign_materials(Main *bmain, Mesh *mesh, double time);
+  struct Mesh *read_mesh(Main *bmain, double time);
+
+  virtual struct Mesh *create_mesh(Main *bmain, double time) = 0;
+  virtual void assign_materials(Main *bmain, Mesh *mesh, double time) = 0;
+
 };
 
 }  // namespace blender::io::usd

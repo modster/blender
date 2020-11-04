@@ -50,11 +50,6 @@ Object *USDXformableReader::object() const
   return object_;
 }
 
-struct Mesh *USDXformableReader::read_mesh(Main *UNUSED(bmain), double UNUSED(time))
-{
-  return nullptr;
-}
-
 void USDXformableReader::setup_object_transform(const double time)
 {
   if (!this->object_) {

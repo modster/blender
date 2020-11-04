@@ -57,6 +57,7 @@ set(SRC
   import/usd_import_util.cc
   import/usd_prim_iterator.cc
   import/usd_reader_mesh.cc
+  import/usd_reader_mesh_base.cc
   import/usd_reader_prim.cc
   import/usd_reader_object.cc
   import/usd_reader_transform.cc
@@ -75,6 +76,7 @@ set(SRC
   import/usd_import_util.h
   import/usd_prim_iterator.h
   import/usd_reader_mesh.h
+  import/usd_reader_mesh_base.h
   import/usd_reader_prim.h
   import/usd_reader_object.h
   import/usd_reader_transform.h

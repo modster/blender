@@ -331,7 +331,7 @@ void build_mtl_map(const Main *bmain, std::map<std::string, Material *> &mat_map
 }  // anonymous namespace
 
 USDMeshReader::USDMeshReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
-    : USDXformableReader(prim, context), mesh_(prim)
+    : USDMeshReaderBase(prim, context), mesh_(prim)
 {
 }
 
@@ -344,7 +344,7 @@ bool USDMeshReader::valid() const
   return static_cast<bool>(mesh_);
 }
 
-Mesh *USDMeshReader::read_mesh(Main *bmain, double time)
+Mesh *USDMeshReader::create_mesh(Main *bmain, double time)
 {
   if (!this->mesh_) {
     std::cerr << "Error reading invalid mesh schema for " << this->prim_path_ << std::endl;
@@ -407,37 +407,6 @@ Mesh *USDMeshReader::read_mesh(Main *bmain, double time)
   }
 
   return mesh;
-}
-
-void USDMeshReader::create_object(Main *bmain, double time)
-{
-  if (!this->valid()) {
-    return;
-  }
-
-  /* Determine mesh visibility.
-   * TODO(makowalski): Consider optimizations to avoid this expensive call,
-   * for example, by determining visibility during stage traversal. */
-  pxr::TfToken vis_tok = this->mesh_.ComputeVisibility();
-
-  if (vis_tok == pxr::UsdGeomTokens->invisible) {
-    return;
-  }
-
-  std::string obj_name = merged_with_parent_ ? this->parent_prim_name() : this->prim_name();
-
-  if (obj_name.empty()) {
-    /* Sanity check. */
-    std::cerr << "Warning: couldn't determine object name for " << this->prim_path() << std::endl;
-  }
-
-  object_ = BKE_object_add_only_object(bmain, OB_MESH, obj_name.c_str());
-  Mesh *mesh = this->read_mesh(bmain, time);
-  object_->data = mesh;
-
-  if (this->context_.import_params.import_materials) {
-    assign_materials(bmain, mesh, time);
-  }
 }
 
 void USDMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)
