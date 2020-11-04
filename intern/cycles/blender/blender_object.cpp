@@ -415,7 +415,7 @@ static float4 lookup_instance_property(BL::DepsgraphObjectInstance &b_instance,
 bool BlenderSync::sync_object_attributes(BL::DepsgraphObjectInstance &b_instance, Object *object)
 {
   /* Find which attributes are needed. */
-  AttributeRequestSet requests = object->geometry->needed_attributes();
+  AttributeRequestSet requests = object->get_geometry()->needed_attributes();
 
   /* Delete attributes that became unnecessary. */
   vector<ParamValue> &attributes = object->attributes;

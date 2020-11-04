@@ -140,7 +140,7 @@ Geometry *BlenderSync::sync_geometry(BL::Depsgraph &b_depsgraph,
   geom->name = ustring(b_ob_data.name().c_str());
 
   /* Store the shaders immediately for the object attribute code. */
-  geom->used_shaders = used_shaders;
+  geom->set_used_shaders(used_shaders);
 
   auto sync_func = [=]() mutable {
     if (progress.get_cancel())

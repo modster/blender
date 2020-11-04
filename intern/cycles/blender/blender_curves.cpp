@@ -529,8 +529,7 @@ bool BlenderSync::object_has_particle_hair(BL::Object b_ob)
 }
 
 /* Old particle hair. */
-void BlenderSync::sync_particle_hair(
-    Hair *hair, BL::Mesh &b_mesh, BL::Object &b_ob, bool motion, int motion_step)
+void BlenderSync::sync_particle_hair(Hair *hair, BL::Mesh &b_mesh, BL::Object &b_ob, bool motion, int motion_step)
 {
   /* obtain general settings */
   if (b_ob.mode() == b_ob.mode_PARTICLE_EDIT || b_ob.mode() == b_ob.mode_EDIT) {
@@ -820,6 +819,7 @@ void BlenderSync::sync_hair(Hair *hair, BL::Object &b_ob, bool motion, int motio
 void BlenderSync::sync_hair(BL::Depsgraph b_depsgraph, BL::Object b_ob, Hair *hair)
 {
   Hair new_hair;
+  new_hair.set_used_shaders(hair->get_used_shaders());
 
   if (view_layer.use_hair) {
     if (b_ob.type() == BL::Object::type_HAIR) {
