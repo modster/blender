@@ -20,15 +20,9 @@
 #include "usd_reader_object.h"
 #include "usd_import_util.h"
 
-#include "DNA_cachefile_types.h"
-#include "DNA_constraint_types.h"
-#include "DNA_modifier_types.h"
-#include "DNA_space_types.h" /* for FILE_MAX */
-
-#include "BKE_constraint.h"
 #include "BKE_lib_id.h"
-#include "BKE_modifier.h"
 #include "BKE_object.h"
+#include "DNA_object_types.h"
 
 #include "BLI_listbase.h"
 #include "BLI_math_geom.h"
@@ -43,19 +37,13 @@
 namespace blender::io::usd {
 
 USDObjectReader::USDObjectReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
-    : prim_path_(""),
+    : USDPrimReader(prim, context),
       prim_parent_name_(""),
       prim_name_(""),
       object_(nullptr),
-      prim_(prim),
-      context_(context),
-      min_time_(std::numeric_limits<double>::max()),
-      max_time_(std::numeric_limits<double>::min()),
-      refcount_(0),
       parent_(nullptr),
       merged_with_parent_(false)
 {
-  prim_path_ = prim.GetPath().GetString();
   prim_name_ = prim.GetName().GetString();
 
   pxr::UsdPrim parent = prim.GetParent();
@@ -64,11 +52,6 @@ USDObjectReader::USDObjectReader(const pxr::UsdPrim &prim, const USDImporterCont
 
 USDObjectReader::~USDObjectReader()
 {
-}
-
-const pxr::UsdPrim &USDObjectReader::prim() const
-{
-  return prim_;
 }
 
 Object *USDObjectReader::object() const
@@ -162,32 +145,6 @@ void USDObjectReader::read_matrix(float r_mat[4][4] /* local matrix */,
     scale_m4_fl(scale_mat, scale);
     mul_m4_m4m4(r_mat, scale_mat, r_mat);
   }
-}
-
-double USDObjectReader::minTime() const
-{
-  return min_time_;
-}
-
-double USDObjectReader::maxTime() const
-{
-  return max_time_;
-}
-
-int USDObjectReader::refcount() const
-{
-  return refcount_;
-}
-
-void USDObjectReader::incref()
-{
-  refcount_++;
-}
-
-void USDObjectReader::decref()
-{
-  refcount_--;
-  BLI_assert(refcount_ >= 0);
 }
 
 } /* namespace blender::io::usd */

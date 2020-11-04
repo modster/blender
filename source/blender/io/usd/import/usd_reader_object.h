@@ -20,8 +20,7 @@
 
 #include "usd.h"
 #include "usd_importer_context.h"
-
-#include <pxr/usd/usd/prim.h>
+#include "usd_reader_prim.h"
 
 #include <string>
 #include <vector>
@@ -32,14 +31,11 @@ struct Object;
 
 namespace blender::io::usd {
 
-class USDObjectReader {
+class USDObjectReader : public USDPrimReader {
  public:
   typedef std::vector<USDObjectReader *> ptr_vector;
 
  protected:
-  /* The USD prim path. */
-  std::string prim_path_;
-
   /* The USD prim parent name. */
   std::string prim_parent_name_;
 
@@ -47,17 +43,6 @@ class USDObjectReader {
   std::string prim_name_;
 
   Object *object_;
-  pxr::UsdPrim prim_;
-
-  USDImporterContext context_;
-
-  /* Not setting min/max time yet. */
-  double min_time_;
-  double max_time_;
-
-  /* Use reference counting since the same reader may be used by multiple
-   * modifiers and/or constraints. */
-  int refcount_;
 
   USDObjectReader *parent_;
 
@@ -67,8 +52,6 @@ class USDObjectReader {
   explicit USDObjectReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
 
   virtual ~USDObjectReader();
-
-  const pxr::UsdPrim &prim() const;
 
   Object *object() const;
 
@@ -94,10 +77,6 @@ class USDObjectReader {
     return merged_with_parent_;
   }
 
-  const std::string &prim_path() const
-  {
-    return prim_path_;
-  }
   const std::string &prim_parent_name() const
   {
     return prim_parent_name_;
@@ -117,13 +96,6 @@ class USDObjectReader {
 
   /* Reads the object matrix and sets up an object transform if animated. */
   void setupObjectTransform(const double time);
-
-  double minTime() const;
-  double maxTime() const;
-
-  int refcount() const;
-  void incref();
-  void decref();
 
   void read_matrix(float r_mat[4][4], const double time, const float scale, bool &is_constant);
 };

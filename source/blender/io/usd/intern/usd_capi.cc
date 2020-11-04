@@ -282,9 +282,6 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   const float size = static_cast<float>(data->readers.size());
   size_t i = 0;
 
-  double min_time = std::numeric_limits<double>::max();
-  double max_time = std::numeric_limits<double>::min();
-
   double time = CFRA;
 
   std::vector<USDObjectReader *>::iterator iter;
@@ -293,9 +290,6 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 
     if (reader->valid()) {
       reader->readObjectData(data->bmain, time);
-
-      min_time = std::min(min_time, reader->minTime());
-      max_time = std::max(max_time, reader->maxTime());
     }
     else {
       std::cerr << "Object " << reader->prim_path() << " in USD file " << data->filename
