@@ -1317,7 +1317,7 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
       mul_v3_fl(mat[1], radius);
       mul_v3_fl(mat[2], radius);
 
-      ED_gpencil_create_lineart(C, ob, mat);
+      ED_gpencil_create_lineart(C, ob);
 
       gpd = ob->data;
 
@@ -1371,10 +1371,10 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-const EnumPropertyItem *object_gpencil_add_options(bContext *C,
-                                                   PointerRNA *UNUSED(ptr),
-                                                   PropertyRNA *UNUSED(prop),
-                                                   bool *r_free)
+static const EnumPropertyItem *object_gpencil_add_options(bContext *C,
+                                                          PointerRNA *UNUSED(ptr),
+                                                          PropertyRNA *UNUSED(prop),
+                                                          bool *r_free)
 {
   EnumPropertyItem *item = NULL, *item_ref = rna_enum_object_gpencil_type_items;
   int totitem = 0;

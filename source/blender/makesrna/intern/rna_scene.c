@@ -2605,7 +2605,7 @@ static char *rna_UnitSettings_path(PointerRNA *UNUSED(ptr))
 
 /* lineart */
 
-static void rna_lineart_update(Main *UNUSED(bmain), Scene *scene, PointerRNA *UNUSED(ptr))
+static void rna_lineart_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *UNUSED(ptr))
 {
   if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_IDLE)) {
     ED_lineart_modifier_sync_flag_set(LRT_SYNC_WAITING, false);

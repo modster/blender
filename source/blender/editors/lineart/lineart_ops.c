@@ -21,8 +21,6 @@
  * \ingroup editors
  */
 
-#pragma once
-
 #include <stdlib.h>
 
 #include "BKE_collection.h"
@@ -58,7 +56,7 @@ static int lineart_gpencil_update_strokes_exec(bContext *C, wmOperator *UNUSED(o
 
   ED_lineart_compute_feature_lines_background(dg, 0);
 
-  /* Wait for loading finish */
+  /* Wait for loading finish. */
   BLI_spin_lock(&lineart_share.lock_loader);
   BLI_spin_unlock(&lineart_share.lock_loader);
 
@@ -130,7 +128,7 @@ static int lineart_gpencil_bake_strokes_invoke(bContext *C,
               BLI_spin_lock(&lineart_share.lock_loader);
               ED_lineart_compute_feature_lines_background(dg, 0);
 
-              /* Wait for loading finish */
+              /* Wait for loading finish. */
               BLI_spin_lock(&lineart_share.lock_loader);
               BLI_spin_unlock(&lineart_share.lock_loader);
 
@@ -144,7 +142,7 @@ static int lineart_gpencil_bake_strokes_invoke(bContext *C,
               frame_updated = true;
             }
 
-            /* Clear original frame */
+            /* Clear original frame. */
             if ((scene->lineart.flags & LRT_GPENCIL_OVERWRITE) && (!cleared)) {
               BKE_gpencil_layer_frame_delete(gpl, gpf);
               gpf = BKE_gpencil_layer_frame_get(gpl, frame, GP_GETFRAME_ADD_NEW);
@@ -224,7 +222,7 @@ static int lineart_gpencil_bake_strokes_exec(bContext *C, wmOperator *UNUSED(op)
   return OPERATOR_FINISHED;
 }
 
-/* Blocking 1 frame update */
+/* Blocking 1 frame update. */
 void SCENE_OT_lineart_update_strokes(wmOperatorType *ot)
 {
   ot->name = "Update Line Art Strokes";
@@ -234,7 +232,7 @@ void SCENE_OT_lineart_update_strokes(wmOperatorType *ot)
   ot->exec = lineart_gpencil_update_strokes_exec;
 }
 
-/* All frames in range */
+/* All frames in range. */
 void SCENE_OT_lineart_bake_strokes(wmOperatorType *ot)
 {
   ot->name = "Bake Line Art Strokes";

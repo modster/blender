@@ -200,7 +200,6 @@ void lineart_matrix_ortho_44d(double (*mProjection)[4],
 
 void lineart_count_and_print_render_buffer_memory(LineartRenderBuffer *rb)
 {
-  int i = 0;
   size_t total = 0;
   size_t sum_this = 0;
   size_t count_this = 0;

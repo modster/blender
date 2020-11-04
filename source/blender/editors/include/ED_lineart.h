@@ -631,7 +631,7 @@ struct GpencilModifierData;
 
 void ED_lineart_gpencil_generate(struct Depsgraph *depsgraph,
                                  Object *gpencil_object,
-                                 float **gp_obmat_inverse,
+                                 float (*gp_obmat_inverse)[4],
                                  struct bGPDlayer *UNUSED(gpl),
                                  struct bGPDframe *gpf,
                                  int level_start,

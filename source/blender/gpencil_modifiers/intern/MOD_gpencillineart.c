@@ -169,7 +169,7 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
 
   if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_IDLE)) {
     /* Update triggered when nothing's happening, means DG update, so we request a refresh on line
-     * art cache, meanwhile waiting for result. Update will trigger agian */
+     * art cache, meanwhile waiting for result. Update will trigger agian. */
     ED_lineart_modifier_sync_flag_set(LRT_SYNC_WAITING, true);
     /* Don't have data yet, update line art. Note:  ED_lineart_post_frame_update_external will
      * automatically return when calculation is already in progress.*/
@@ -193,8 +193,7 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
     if (G.debug_value == 4000) {
       printf("LRT: -------- Modifier is waiting for data in LRT_SYNC_WAITING.\n");
     }
-    /* Calculation in process */
-    /* Calculation already started. TODO: Cancel and restart in render update! */
+    /* Calculation in process. */
     if (is_render) {
       while (!ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH) ||
              !ED_lineart_calculation_flag_check(LRT_RENDER_FINISHED)) {
@@ -242,7 +241,7 @@ static void bakeModifier(Main *UNUSED(bmain),
       ED_lineart_modifier_sync_flag_set(LRT_SYNC_WAITING, true);
       BLI_spin_lock(&lineart_share.lock_loader);
       ED_lineart_compute_feature_lines_background(depsgraph, 1);
-      /* Wait for loading finish */
+      /* Wait for loading finish. */
       BLI_spin_lock(&lineart_share.lock_loader);
       BLI_spin_unlock(&lineart_share.lock_loader);
     }
@@ -361,7 +360,7 @@ static void panel_draw(const bContext *C, Panel *panel)
   gpencil_modifier_panel_end(layout, ptr);
 }
 
-static void style_panel_draw(const bContext *C, Panel *panel)
+static void style_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
 
@@ -378,7 +377,7 @@ static void style_panel_draw(const bContext *C, Panel *panel)
   uiItemR(column, ptr, "pre_sample_length", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 }
 
-static void occlusion_panel_draw(const bContext *C, Panel *panel)
+static void occlusion_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
 
@@ -421,7 +420,7 @@ static void occlusion_panel_draw(const bContext *C, Panel *panel)
   }
 }
 
-static void vgroup_panel_draw(const bContext *C, Panel *panel)
+static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   PointerRNA ob_ptr;
   PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
@@ -460,25 +459,25 @@ static void panelRegister(ARegionType *region_type)
 }
 
 GpencilModifierTypeInfo modifierType_Gpencil_Lineart = {
-    /* name */ "Line Art",
-    /* structName */ "LineartGpencilModifierData",
-    /* structSize */ sizeof(LineartGpencilModifierData),
-    /* type */ eGpencilModifierTypeType_Gpencil,
-    /* flags */ eGpencilModifierTypeFlag_SupportsEditmode,
+    /* name. */ "Line Art",
+    /* structName. */ "LineartGpencilModifierData",
+    /* structSize. */ sizeof(LineartGpencilModifierData),
+    /* type. */ eGpencilModifierTypeType_Gpencil,
+    /* flags. */ eGpencilModifierTypeFlag_SupportsEditmode,
 
-    /* copyData */ copyData,
+    /* copyData. */ copyData,
 
-    /* deformStroke */ NULL,
-    /* generateStrokes */ generateStrokes,
-    /* bakeModifier */ bakeModifier,
-    /* remapTime */ NULL,
+    /* deformStroke. */ NULL,
+    /* generateStrokes. */ generateStrokes,
+    /* bakeModifier. */ bakeModifier,
+    /* remapTime. */ NULL,
 
-    /* initData */ initData,
-    /* freeData */ NULL,
-    /* isDisabled */ isDisabled,
-    /* updateDepsgraph */ updateDepsgraph,
-    /* dependsOnTime */ NULL,
-    /* foreachIDLink */ foreachIDLink,
-    /* foreachTexLink */ NULL,
-    /* panelRegister */ panelRegister,
+    /* initData. */ initData,
+    /* freeData. */ NULL,
+    /* isDisabled. */ isDisabled,
+    /* updateDepsgraph. */ updateDepsgraph,
+    /* dependsOnTime. */ NULL,
+    /* foreachIDLink. */ foreachIDLink,
+    /* foreachTexLink. */ NULL,
+    /* panelRegister. */ panelRegister,
 };

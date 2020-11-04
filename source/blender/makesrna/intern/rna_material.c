@@ -685,14 +685,6 @@ static void rna_def_material_lineart(BlenderRNA *brna)
   StructRNA *srna;
   PropertyRNA *prop;
 
-  /* mode type styles */
-  static EnumPropertyItem gpcolordata_mode_types_items[] = {
-      {GP_MATERIAL_MODE_LINE, "LINE", 0, "Line", "Draw strokes using a continuous line"},
-      {GP_MATERIAL_MODE_DOT, "DOTS", 0, "Dots", "Draw strokes using separated dots"},
-      {GP_MATERIAL_MODE_SQUARE, "BOX", 0, "Squares", "Draw strokes using separated squares"},
-      {0, NULL, 0, NULL, NULL},
-  };
-
   srna = RNA_def_struct(brna, "MaterialLineArt", NULL);
   RNA_def_struct_sdna(srna, "MaterialLineArt");
   RNA_def_struct_ui_text(srna, "Material Line Art", "");
