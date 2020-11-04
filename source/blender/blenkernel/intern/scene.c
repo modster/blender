@@ -347,9 +347,6 @@ static void scene_copy_data(Main *bmain, ID *id_dst, const ID *id_src, const int
     scene_dst->preview = NULL;
   }
 
-  /*  Line Art  data */
-  BKE_lineart_copy_data(scene_src, scene_dst);
-
   BKE_scene_copy_data_eevee(scene_dst, scene_src);
 }
 
@@ -446,9 +443,6 @@ static void scene_free_data(ID *id)
     IDP_FreeProperty(scene->display.shading.prop);
     scene->display.shading.prop = NULL;
   }
-
-  /* Line Art data */
-  BKE_lineart_free_everything(scene);
 
   /* These are freed on doversion. */
   BLI_assert(scene->layer_properties == NULL);
@@ -1135,9 +1129,6 @@ Scene *BKE_scene_duplicate(Main *bmain, Scene *sce, eSceneCopyMethod type)
     remove_sequencer_fcurves(sce_copy);
     BKE_sequencer_editing_free(sce_copy, true);
   }
-
-  /*  Line Art  data */
-  BKE_lineart_copy_data(sce, sce_copy);
 
   return sce_copy;
 }

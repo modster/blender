@@ -7534,7 +7534,7 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "baking_skip", PROP_INT, PROP_NONE);
   RNA_def_property_ui_text(prop, "Skip", "Number of frames to skip per baked frame");
-  RNA_def_property_ui_range(prop, 0, 1000);
+  RNA_def_property_ui_range(prop, 0, 100, 1, 1);
 }
 
 void RNA_def_scene(BlenderRNA *brna)

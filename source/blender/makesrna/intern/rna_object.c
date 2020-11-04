@@ -36,6 +36,7 @@
 #include "DNA_shader_fx_types.h"
 #include "DNA_workspace_types.h"
 
+#include "BLI_math.h"
 #include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
