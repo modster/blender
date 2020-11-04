@@ -2346,7 +2346,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "use_crease", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "line_types", LRT_EDGE_FLAG_CREASE);
-  RNA_def_property_ui_text(prop, "Use Crease", "Include crease lines in the result");
+  RNA_def_property_ui_text(prop, "Use Crease", "Include sharp edges in the result");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "use_material", PROP_BOOLEAN, PROP_NONE);
