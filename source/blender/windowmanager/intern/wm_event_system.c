@@ -3250,47 +3250,51 @@ static void wm_event_do_surface_handlers(bContext *C, wmSurface *surface)
   /* Set up a valid context for executing XR operations. */
   ED_screen_areas_iter (win, screen, area) {
     CTX_wm_area_set(C, area);
+    if (!CTX_wm_view3d(C)) {
+      continue;
+    }
 
     LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
-      if (WM_region_use_viewport(area, region)) {
-        CTX_wm_region_set(C, region);
+      if (!WM_region_use_viewport(area, region)) {
+        continue;
+      }
+      CTX_wm_region_set(C, region);
 
-        ListBase *events = &surface_data->events;
+      ListBase *events = &surface_data->events;
 
-        LISTBASE_FOREACH (wmEvent *, event, events) {
-          wmXrActionData *action_data = event->customdata;
-          PointerRNA properties = {.type = action_data->ot->srna,
-                                   .data = action_data->op_properties};
+      LISTBASE_FOREACH (wmEvent *, event, events) {
+        wmXrActionData *action_data = event->customdata;
+        PointerRNA properties = {.type = action_data->ot->srna,
+                                  .data = action_data->op_properties};
 
-          if (action_data->ot->invoke || action_data->ot->invoke_3d) {
-            /* Invoke operator, either executing operator or transferring responsibility to window
-             * modal handlers. */
-            wm_operator_invoke(C,
-                               action_data->ot,
-                               event,
-                               action_data->op_properties ? &properties : NULL,
-                               NULL,
-                               false,
-                               false);
+        if (action_data->ot->invoke || action_data->ot->invoke_3d) {
+          /* Invoke operator, either executing operator or transferring responsibility to window
+            * modal handlers. */
+          wm_operator_invoke(C,
+                              action_data->ot,
+                              event,
+                              action_data->op_properties ? &properties : NULL,
+                              NULL,
+                              false,
+                              false);
+        }
+        else {
+          /* Execute operator. */
+          wmOperator *op = wm_operator_create(
+              wm, action_data->ot, action_data->op_properties ? &properties : NULL, NULL);
+          if ((WM_operator_call(C, op) & OPERATOR_HANDLED) == 0) {
+            WM_operator_free(op);
           }
-          else {
-            /* Execute operator. */
-            wmOperator *op = wm_operator_create(
-                wm, action_data->ot, action_data->op_properties ? &properties : NULL, NULL);
-            if ((WM_operator_call(C, op) & OPERATOR_HANDLED) == 0) {
-              WM_operator_free(op);
-            }
-          }
-
-          MEM_freeN(action_data);
         }
 
-        BLI_freelistN(events);
-
-        CTX_wm_region_set(C, NULL);
-        xr_region = region;
-        break;
+        MEM_freeN(action_data);
       }
+
+      BLI_freelistN(events);
+
+      CTX_wm_region_set(C, NULL);
+      xr_region = region;
+      break;
     }
 
     CTX_wm_area_set(C, area);
