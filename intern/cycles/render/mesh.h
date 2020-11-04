@@ -206,8 +206,7 @@ class Mesh : public Geometry {
   void resize_subd_faces(int numfaces, int num_ngons, int numcorners);
   void reserve_subd_faces(int numfaces, int num_ngons, int numcorners);
   void reserve_subd_creases(size_t num_creases);
-  void clear(bool preserve_voxel_data);
-  void clear() override;
+  void clear(bool preserve_shaders = false) override;
   void add_vertex(float3 P);
   void add_vertex_slow(float3 P);
   void add_triangle(int v0, int v1, int v2, int shader, bool smooth);
@@ -254,6 +253,9 @@ class Mesh : public Geometry {
   {
     return num_subd_verts;
   }
+
+ protected:
+  void clear(bool preserve_shaders, bool preserve_voxel_data);
 };
 
 CCL_NAMESPACE_END

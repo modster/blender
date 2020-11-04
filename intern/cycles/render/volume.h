@@ -32,7 +32,7 @@ class Volume : public Mesh {
   NODE_SOCKET_API(float, step_size)
   NODE_SOCKET_API(bool, object_space)
 
-  virtual void clear() override;
+  virtual void clear(bool preserve_shaders = false) override;
 };
 
 CCL_NAMESPACE_END
