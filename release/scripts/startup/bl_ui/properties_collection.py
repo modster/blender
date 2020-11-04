@@ -24,11 +24,6 @@ class CollectionButtonsPanel:
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "collection"
-    COMPAT_ENGINES = {'BLENDER_EEVEE', 'BLENDER_WORKBENCH', 'CYCLES'}
-
-    @classmethod
-    def poll(cls, context):
-        return (context.engine in cls.COMPAT_ENGINES)
 
 
 def lineart_make_line_type_entry(col, line_type, text_disp, expand, search_from):
@@ -42,33 +37,32 @@ def lineart_make_line_type_entry(col, line_type, text_disp, expand, search_from)
 
 class COLLECTION_PT_collection_flags(CollectionButtonsPanel, Panel):
     bl_label = "Collection Flags"
-    COMPAT_ENGINES = {'BLENDER_EEVEE', 'BLENDER_WORKBENCH', 'CYCLES'}
+
+    @classmethod
+    def poll(cls, context):
+        vl = context.view_layer
+        vlc = vl.active_layer_collection
+        return (vlc.name != 'Master Collection')
 
     def draw(self, context):
         layout = self.layout
         collection = context.collection
         vl = context.view_layer
         vlc = vl.active_layer_collection
-        if vlc.name == 'Master Collection':
-            row = layout.row()
-            row.label(text="This is the master collection")
-            return
 
         row = layout.row()
         col = row.column(align=True)
-        col.prop(vlc, "hide_viewport")
-        col.prop(vlc, "holdout")
-        col.prop(vlc, "indirect_only")
+        col.prop(vlc, "holdout", toggle=False)
+        col.prop(vlc, "indirect_only", toggle=False)
         row = layout.row()
         col = row.column(align=True)
-        col.prop(collection, "hide_select")
-        col.prop(collection, "hide_viewport")
-        col.prop(collection, "hide_render")
+        col.prop(collection, "hide_select", text="Selectable", toggle=False, invert_checkbox=True)
+        col.prop(collection, "hide_viewport", toggle=False)
+        col.prop(collection, "hide_render", toggle=False)
 
 
 class COLLECTION_PT_lineart_collection(CollectionButtonsPanel, Panel):
     bl_label = "Collection Line Art"
-    COMPAT_ENGINES = {'BLENDER_EEVEE', 'BLENDER_WORKBENCH', 'CYCLES'}
 
     def draw(self, context):
         layout = self.layout
