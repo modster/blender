@@ -291,7 +291,7 @@ float Object::compute_volume_step_size() const
   /* Compute step rate from shaders. */
   float step_rate = FLT_MAX;
 
-  foreach (Node *node, mesh->used_shaders) {
+  foreach (Node *node, mesh->get_used_shaders()) {
     Shader *shader = static_cast<Shader *>(node);
     if (shader->has_volume) {
       if ((shader->get_heterogeneous_volume() && shader->has_volume_spatial_varying) ||

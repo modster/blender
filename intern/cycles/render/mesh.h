@@ -191,7 +191,6 @@ class Mesh : public Geometry {
   friend class DiagSplit;
   friend class EdgeDice;
   friend class GeometryManager;
-  friend class Object;
   friend class ObjectManager;
 
   SubdParams *subd_params = nullptr;
