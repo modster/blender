@@ -22,8 +22,8 @@
 #include "usd.h"
 #include "usd_importer_context.h"
 #include "usd_reader_mesh.h"
-#include "usd_reader_object.h"
-#include "usd_reader_transform.h"
+#include "usd_reader_xform.h"
+#include "usd_reader_xformable.h"
 
 #include <iostream>
 #include <pxr/base/plug/registry.h>

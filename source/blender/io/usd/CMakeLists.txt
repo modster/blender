@@ -59,8 +59,8 @@ set(SRC
   import/usd_reader_mesh.cc
   import/usd_reader_mesh_base.cc
   import/usd_reader_prim.cc
-  import/usd_reader_object.cc
-  import/usd_reader_transform.cc
+  import/usd_reader_xform.cc
+  import/usd_reader_xformable.cc
   intern/usd_capi.cc
   intern/usd_hierarchy_iterator.cc
   intern/usd_writer_abstract.cc
@@ -78,8 +78,8 @@ set(SRC
   import/usd_reader_mesh.h
   import/usd_reader_mesh_base.h
   import/usd_reader_prim.h
-  import/usd_reader_object.h
-  import/usd_reader_transform.h
+  import/usd_reader_xform.h
+  import/usd_reader_xformable.h
   intern/usd_exporter_context.h
   intern/usd_hierarchy_iterator.h
   intern/usd_writer_abstract.h

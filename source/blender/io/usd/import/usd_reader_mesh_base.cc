@@ -34,7 +34,7 @@
 namespace blender::io::usd {
 
 USDMeshReaderBase::USDMeshReaderBase(const pxr::UsdPrim &prim, const USDImporterContext &context)
-  : USDXformableReader(prim, context)
+    : USDXformableReader(prim, context)
 {
 }
 

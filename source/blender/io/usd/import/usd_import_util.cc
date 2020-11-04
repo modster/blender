@@ -19,45 +19,8 @@
 
 #include "usd_import_util.h"
 
-#include "usd.h"
-#include "usd_importer_context.h"
-#include "usd_reader_mesh.h"
-#include "usd_reader_object.h"
-#include "usd_reader_transform.h"
-
-#include <pxr/base/plug/registry.h>
-#include <pxr/pxr.h>
-#include <pxr/usd/usd/prim.h>
-#include <pxr/usd/usd/primRange.h>
-#include <pxr/usd/usd/stage.h>
-#include <pxr/usd/usdGeom/mesh.h>
-#include <pxr/usd/usdGeom/scope.h>
-#include <pxr/usd/usdGeom/tokens.h>
-#include <pxr/usd/usdGeom/xformable.h>
-
-#include "BKE_main.h"
-#include "BKE_material.h"
-#include "BKE_mesh.h"
-#include "BKE_modifier.h"
-#include "BKE_object.h"
-
-#include "BKE_cachefile.h"
-#include "BKE_context.h"
-#include "BKE_curve.h"
-#include "BKE_global.h"
-#include "BKE_layer.h"
-#include "BKE_lib_id.h"
-#include "BKE_object.h"
-#include "BKE_scene.h"
-#include "BKE_screen.h"
-
 #include "BLI_math_geom.h"
-
-#include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
-
-#include <iostream>
-#include <map>
+#include "DNA_action_types.h"
 
 namespace {
 /* Copy between Z-up and Y-up. */

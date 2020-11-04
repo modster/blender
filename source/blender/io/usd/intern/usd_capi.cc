@@ -19,7 +19,7 @@
 
 #include "import/usd_importer_context.h"
 #include "import/usd_prim_iterator.h"
-#include "import/usd_reader_object.h"
+#include "import/usd_reader_xformable.h"
 #include "usd.h"
 #include "usd_hierarchy_iterator.h"
 

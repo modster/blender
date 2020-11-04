@@ -17,7 +17,7 @@
  * All rights reserved.
  */
 
-#include "usd_reader_object.h"
+#include "usd_reader_xformable.h"
 #include "usd_import_util.h"
 
 #include "BKE_lib_id.h"

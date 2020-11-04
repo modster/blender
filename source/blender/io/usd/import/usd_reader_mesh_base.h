@@ -18,13 +18,12 @@
  */
 #pragma once
 
-#include "usd_reader_object.h"
+#include "usd_reader_xformable.h"
 
 namespace blender::io::usd {
 
 class USDMeshReaderBase : public USDXformableReader {
  protected:
-
  public:
   USDMeshReaderBase(const pxr::UsdPrim &prim, const USDImporterContext &context);
 
@@ -36,7 +35,6 @@ class USDMeshReaderBase : public USDXformableReader {
 
   virtual struct Mesh *create_mesh(Main *bmain, double time) = 0;
   virtual void assign_materials(Main *bmain, Mesh *mesh, double time) = 0;
-
 };
 
 }  // namespace blender::io::usd

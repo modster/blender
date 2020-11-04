@@ -18,7 +18,7 @@
  */
 #pragma once
 
-#include "usd_reader_object.h"
+#include "usd_reader_xformable.h"
 
 #include <pxr/usd/usdGeom/xform.h>
 

@@ -17,7 +17,7 @@
  * All rights reserved.
  */
 
-#include "usd_reader_transform.h"
+#include "usd_reader_xform.h"
 
 #include "BKE_object.h"
 #include "DNA_object_types.h"
