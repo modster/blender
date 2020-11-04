@@ -472,17 +472,14 @@ static int transform_modal(bContext *C, wmOperator *op, const wmEvent *event)
   return exit_code;
 }
 
-/* Use viewmat from when transform was invoked to project controller coordinates.
- * Otherwise, any headset movement will cause unwanted shifts in the transformation.
- * TODO_XR: Store this in customdata. */
-static float viewmat_invoke[4][4];
-
 static int transform_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
 {
   BLI_assert(event->type == EVT_XR_ACTION);
   BLI_assert(event->custom == EVT_DATA_XR);
   BLI_assert(event->customdata);
 
+  const wmXrActionData *actiondata = event->customdata;
+  TransInfo *t = op->customdata;
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   Scene *scene = CTX_data_scene(C);
   View3D *v3d = CTX_wm_view3d(C);
@@ -490,7 +487,6 @@ static int transform_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
   RegionView3D *rv3d = region->regiondata;
   wmWindowManager *wm = CTX_wm_manager(C);
   wmXrData *xr = &wm->xr;
-  wmXrActionData *customdata = event->customdata;
   short winx_prev, winy_prev;
   rcti winrct_prev;
   float lens_prev;
@@ -512,19 +508,19 @@ static int transform_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
 
   region->winrct.xmin = 0;
   region->winrct.ymin = 0;
-  region->winrct.xmax = region->winx = customdata->eye_width;
-  region->winrct.ymax = region->winy = customdata->eye_height;
-  v3d->lens = customdata->eye_lens;
+  region->winrct.xmax = region->winx = actiondata->eye_width;
+  region->winrct.ymax = region->winy = actiondata->eye_height;
+  v3d->lens = actiondata->eye_lens;
   v3d->clip_start = xr->session_settings.clip_start;
   v3d->clip_end = xr->session_settings.clip_end;
-  ED_view3d_update_viewmat(depsgraph, scene, v3d, region, viewmat_invoke, NULL, NULL, false);
+  ED_view3d_update_viewmat(depsgraph, scene, v3d, region, t->viewmat, NULL, NULL, false);
 
   map_to_pixel(event_mut.mval,
-               customdata->controller_loc,
-               viewmat_invoke,
+               actiondata->controller_loc,
+               t->viewmat,
                rv3d->winmat,
-               customdata->eye_width,
-               customdata->eye_height);
+               actiondata->eye_width,
+               actiondata->eye_height);
 
   if (event->val == KM_PRESS) {
     event_mut.type = MOUSEMOVE;
@@ -616,6 +612,7 @@ static int transform_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event
   BLI_assert(event->custom == EVT_DATA_XR);
   BLI_assert(event->customdata);
 
+  const wmXrActionData *actiondata = event->customdata;
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   Scene *scene = CTX_data_scene(C);
   View3D *v3d = CTX_wm_view3d(C);
@@ -623,7 +620,6 @@ static int transform_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event
   RegionView3D *rv3d = region->regiondata;
   wmWindowManager *wm = CTX_wm_manager(C);
   wmXrData *xr = &wm->xr;
-  wmXrActionData *customdata = event->customdata;
   short winx_prev, winy_prev;
   rcti winrct_prev;
   float lens_prev;
@@ -646,20 +642,20 @@ static int transform_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event
 
   region->winrct.xmin = 0;
   region->winrct.ymin = 0;
-  region->winrct.xmax = region->winx = customdata->eye_width;
-  region->winrct.ymax = region->winy = customdata->eye_height;
-  v3d->lens = customdata->eye_lens;
+  region->winrct.xmax = region->winx = actiondata->eye_width;
+  region->winrct.ymax = region->winy = actiondata->eye_height;
+  v3d->lens = actiondata->eye_lens;
   v3d->clip_start = xr->session_settings.clip_start;
   v3d->clip_end = xr->session_settings.clip_end;
   ED_view3d_update_viewmat(
-      depsgraph, scene, v3d, region, customdata->eye_viewmat, NULL, NULL, false);
+      depsgraph, scene, v3d, region, actiondata->eye_viewmat, NULL, NULL, false);
 
   map_to_pixel(event_mut.mval,
-               customdata->controller_loc,
-               customdata->eye_viewmat,
+               actiondata->controller_loc,
+               actiondata->eye_viewmat,
                rv3d->winmat,
-               customdata->eye_width,
-               customdata->eye_height);
+               actiondata->eye_width,
+               actiondata->eye_height);
 
   retval = transform_invoke(C, op, &event_mut);
 
@@ -671,9 +667,6 @@ static int transform_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event
   v3d->clip_start = clip_start_prev;
   v3d->clip_end = clip_end_prev;
   ED_view3d_update_viewmat(depsgraph, scene, v3d, region, viewmat_prev, NULL, NULL, false);
-
-  /* Save viewmat for modal_3d(). */
-  copy_m4_m4(viewmat_invoke, customdata->eye_viewmat);
 
   return retval;
 }
