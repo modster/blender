@@ -1139,7 +1139,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
    */
   {
 
-    if (!DNA_struct_find(fd->filesdna, "SceneLineart")) {
+    if (!DNA_struct_find(fd->filesdna, "SceneLineArt")) {
       LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
         scene->lineart.crease_threshold = 140.0f;
         scene->lineart.line_types |= LRT_EDGE_FLAG_ALL_TYPE;

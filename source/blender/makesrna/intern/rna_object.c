@@ -2649,10 +2649,10 @@ static void rna_def_object_lineart(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Own Crease", "Use own crease setting to overwrite scene global");
   RNA_def_property_update(prop, 0, "rna_object_lineart_update");
 
-  prop = RNA_def_property(srna, "crease_threshold", PROP_FLOAT, PROP_NONE);
-  RNA_def_property_float_default(prop, 140);
-  RNA_def_property_range(prop, 0, 180);
-  RNA_def_property_ui_range(prop, 0.0f, 180.0f, 0.01f, 1);
+  prop = RNA_def_property(srna, "crease_threshold", PROP_FLOAT, PROP_ANGLE);
+  RNA_def_property_float_default(prop, DEG2RAD(140.0f));
+  RNA_def_property_range(prop, 0, DEG2RAD(180.0f));
+  RNA_def_property_ui_range(prop, 0.0f, DEG2RAD(180.0f), 0.01f, 1);
   RNA_def_property_ui_text(prop, "Own Crease", "Use own crease setting to overwrite scene global");
   RNA_def_property_update(prop, 0, "rna_object_lineart_update");
 }
@@ -3419,7 +3419,7 @@ static void rna_def_object(BlenderRNA *brna)
   /* Line Art */
   prop = RNA_def_property(srna, "lineart", PROP_POINTER, PROP_NONE);
   RNA_def_property_struct_type(prop, "ObjectLineArt");
-  RNA_def_property_ui_text(prop, "LRT", "LRT settings for the object");
+  RNA_def_property_ui_text(prop, "Line Art", "Line Art settings for the object");
 
   RNA_define_lib_overridable(false);
 

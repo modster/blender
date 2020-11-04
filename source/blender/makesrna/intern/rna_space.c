@@ -451,7 +451,7 @@ static const EnumPropertyItem buttons_context_items[] = {
      "CONSTRAINT",
      ICON_CONSTRAINT,
      "Constraints",
-     "Object Constraints Properties"},
+     "Object Constraint Properties"},
     {BCONTEXT_MODIFIER, "MODIFIER", ICON_MODIFIER, "Modifiers", "Modifiers Properties"},
     {BCONTEXT_DATA, "DATA", ICON_NONE, "Data", "Object Data Properties"},
     {BCONTEXT_BONE, "BONE", ICON_BONE_DATA, "Bone", "Bone Properties"},

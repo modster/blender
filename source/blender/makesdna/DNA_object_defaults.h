@@ -66,7 +66,7 @@
     .preview = NULL, \
     .duplicator_visibility_flag = OB_DUPLI_FLAG_VIEWPORT | OB_DUPLI_FLAG_RENDER, \
     .pc_ids = {NULL, NULL}, \
-    .lineart = { .crease_threshold = 140.0f }, \
+    .lineart = { .crease_threshold = DEG2RAD(140.0f) }, \
   }
 
 /** \} */

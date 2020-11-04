@@ -580,7 +580,7 @@ BLI_INLINE int lineart_LineIntersectTest2d(
 int ED_lineart_point_inside_triangled(double v[2], double v0[2], double v1[2], double v2[2]);
 
 struct Depsgraph;
-struct SceneLineart;
+struct SceneLineArt;
 struct Scene;
 struct LineartRenderBuffer;
 
@@ -675,7 +675,7 @@ void ED_lineart_post_frame_update_external(struct bContext *C,
                                            struct Depsgraph *dg,
                                            bool from_modifier);
 
-struct SceneLineart;
+struct SceneLineArt;
 
 void ED_lineart_update_render_progress(int nr, const char *info);
 

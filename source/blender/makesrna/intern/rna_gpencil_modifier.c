@@ -2335,7 +2335,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_struct_type(prop, "Collection");
   RNA_def_property_override_flag(prop, PROPOVERRIDE_OVERRIDABLE_LIBRARY);
   RNA_def_property_ui_text(
-      prop, "Source Collection", "Source collection that this modifier grabs data from");
+      prop, "Source Collection", "Source collection that this modifier uses data from");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_dependency_update");
 
   /* types */
@@ -2373,13 +2373,15 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "level_start", PROP_INT, PROP_NONE);
   RNA_def_property_int_default(prop, 0);
-  RNA_def_property_ui_text(prop, "Level Start", "Occlusion level start");
+  RNA_def_property_ui_text(
+      prop, "Level Start", "Minimum level of occlusion level that gets selected");
   RNA_def_property_range(prop, 0, 128);
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "level_end", PROP_INT, PROP_NONE);
   RNA_def_property_int_default(prop, 0);
-  RNA_def_property_ui_text(prop, "Level End", "Occlusion level end");
+  RNA_def_property_ui_text(
+      prop, "Level End", "Maximum level of occlusion level that gets selected");
   RNA_def_property_range(prop, 0, 128);
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
@@ -2387,11 +2389,13 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
   RNA_def_property_struct_type(prop, "Material");
   RNA_def_property_override_flag(prop, PROPOVERRIDE_OVERRIDABLE_LIBRARY);
-  RNA_def_property_ui_text(prop, "Target Material", "Target material that generated strokes use");
+  RNA_def_property_ui_text(
+      prop, "Target Material", "Grease Pencil material assigned to the generated strokes");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "target_layer", PROP_STRING, PROP_NONE);
-  RNA_def_property_ui_text(prop, "Target Layer", "Grease pencil layer that strokes goes into");
+  RNA_def_property_ui_text(
+      prop, "Target Layer", "Grease Pencil layer assigned to the generated strokes");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "source_vertex_group", PROP_STRING, PROP_NONE);
@@ -2410,7 +2414,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   prop = RNA_def_property(srna, "invert_source_vertex_group", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_default(prop, 0);
   RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_GPENCIL_INVERT_SOURCE_VGROUP);
-  RNA_def_property_ui_text(prop, "Invert Source", "Invert soource vertex group");
+  RNA_def_property_ui_text(prop, "Invert Source", "Invert source vertex group values");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "match_output_vertex_group", PROP_BOOLEAN, PROP_NONE);
@@ -2428,14 +2432,14 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "thickness", PROP_INT, PROP_NONE);
   RNA_def_property_int_default(prop, 20);
-  RNA_def_property_ui_text(prop, "Thickness", "The thickness that are used to generate strokes");
+  RNA_def_property_ui_text(prop, "Thickness", "The thickness that used to generate strokes");
   RNA_def_property_ui_range(prop, 1, 100, 1, 1);
   RNA_def_property_range(prop, 1, 200);
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
-  prop = RNA_def_property(srna, "opacity", PROP_FLOAT, PROP_NONE);
+  prop = RNA_def_property(srna, "opacity", PROP_FLOAT, PROP_FACTOR);
   RNA_def_property_float_default(prop, 0.1f);
-  RNA_def_property_ui_text(prop, "opacity", "The strength value used to generate strokes");
+  RNA_def_property_ui_text(prop, "Opacity", "The strength value used to generate strokes");
   RNA_def_property_ui_range(prop, 0.0f, 1.0f, 0.01f, 2);
   RNA_def_property_range(prop, 0.0f, 1.0f);
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");

@@ -279,7 +279,7 @@ static const char *buttons_main_region_context_string(const short mainb)
 #ifdef WITH_LINEART
       return "collection";
 #else
-      BLI_assert(!"'WITH_LINEART' is off. See buttons_context.c");
+      BLI_assert(!"'WITH_LINEART' is off.");
 #endif
     case BCONTEXT_OBJECT:
       return "object";

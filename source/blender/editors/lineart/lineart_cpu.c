@@ -2603,7 +2603,7 @@ LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene)
     rb->shift_y = (asp <= 1) ? c->shifty : c->shifty * asp;
   }
 
-  rb->crease_threshold = cos(DEG2RAD(180.0f - scene->lineart.crease_threshold));
+  rb->crease_threshold = cos(M_PI - scene->lineart.crease_threshold);
   rb->angle_splitting_threshold = scene->lineart.angle_splitting_threshold;
   rb->chaining_image_threshold = scene->lineart.chaining_image_threshold;
   rb->chaining_geometry_threshold = scene->lineart.chaining_geometry_threshold;
@@ -3711,7 +3711,7 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
 {
   LineartRenderBuffer *rb;
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
-  SceneLineart *lineart = &scene->lineart;
+  SceneLineArt *lineart = &scene->lineart;
   int intersections_only = 0; /* Not used right now, but preserve for future. */
 
   if ((lineart->flags & LRT_AUTO_UPDATE) == 0 || !scene->camera) {

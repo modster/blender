@@ -2614,7 +2614,7 @@ static void rna_lineart_update(Main *UNUSED(bmain), Scene *scene, PointerRNA *UN
 
 static void rna_lineart_auto_update_set(PointerRNA *ptr, bool value)
 {
-  SceneLineart *data = (SceneLineart *)ptr->data;
+  SceneLineArt *data = (SceneLineArt *)ptr->data;
 
   if (value) {
     data->flags |= LRT_AUTO_UPDATE;
@@ -7370,9 +7370,9 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
   StructRNA *srna;
   PropertyRNA *prop;
 
-  srna = RNA_def_struct(brna, "SceneLineart", NULL);
-  RNA_def_struct_sdna(srna, "SceneLineart");
-  RNA_def_struct_ui_text(srna, "Scene Line Art Config", "Line Art global config");
+  srna = RNA_def_struct(brna, "SceneLineArt", NULL);
+  RNA_def_struct_sdna(srna, "SceneLineArt");
+  RNA_def_struct_ui_text(srna, "Scene Line Art Config", "Line Art global settings");
 
   prop = RNA_def_property(srna, "auto_update", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_AUTO_UPDATE);
@@ -7381,15 +7381,16 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
       prop, "Auto Update", "Automatically update Line Art cache when frame changes");
 
   RNA_def_property_boolean_funcs(prop, NULL, "rna_lineart_auto_update_set");
-  /* Also use this update callback to trigger the modifier to clear the frame */
+  /* Also use this update callback to trigger the modifier to clear the frame. */
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
   prop = RNA_def_property(srna, "gpencil_overwrite", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_GPENCIL_OVERWRITE);
   RNA_def_property_boolean_default(prop, 0);
-  RNA_def_property_ui_text(prop,
-                           "GPencil Overwrite",
-                           "Overwrite existing strokes in the current frame of target GP objects");
+  RNA_def_property_ui_text(
+      prop,
+      "GPencil Overwrite",
+      "Overwrite existing strokes in existing frames of target GPencil objects");
 
   prop = RNA_def_property(srna, "fuzzy_intersections", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_INTERSECTION_AS_CONTOUR);
@@ -7404,7 +7405,7 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_EVERYTHING_AS_CONTOUR);
   RNA_def_property_boolean_default(prop, 0);
   RNA_def_property_ui_text(prop,
-                           "Everything As Contour",
+                           "All Lines As Contour",
                            "Treat all lines as contour so those lines can be chained together");
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
@@ -7413,7 +7414,7 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
   RNA_def_property_boolean_default(prop, 1);
   RNA_def_property_ui_text(
       prop,
-      "Duplicated Objects",
+      "Instanced Objects",
       "Allow particle objects and face/vertiex duplication to show in line art");
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
@@ -7421,7 +7422,7 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_ALLOW_OVERLAPPING_EDGES);
   RNA_def_property_boolean_default(prop, 1);
   RNA_def_property_ui_text(prop,
-                           "Allow Overlapping Edges",
+                           "Handle Overlapping Edges",
                            "Allow lines from edge split to show properly, may run slower");
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
@@ -7432,40 +7433,42 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
       prop, "Clipping Boundaries", "Allow lines on near/far clipping plane to be shown");
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
-  prop = RNA_def_property(srna, "crease_threshold", PROP_FLOAT, PROP_NONE);
-  RNA_def_property_range(prop, 0, 180);
-  RNA_def_property_float_default(prop, 140.0f);
-  RNA_def_property_ui_range(prop, 0.0f, 180.0f, 0.01f, 1);
+  prop = RNA_def_property(srna, "crease_threshold", PROP_FLOAT, PROP_ANGLE);
+  RNA_def_property_float_default(prop, DEG2RAD(140.0f));
+  RNA_def_property_range(prop, 0, DEG2RAD(180.0f));
+  RNA_def_property_ui_range(prop, 0.0f, DEG2RAD(180.0f), 0.01f, 1);
   RNA_def_property_ui_text(
-      prop, "Crease Threshold", "Angle smaller than this value will be treated as a crease line");
+      prop, "Crease Threshold", "Angles smaller than this will be treated as creases");
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
   prop = RNA_def_property(srna, "angle_splitting_threshold", PROP_FLOAT, PROP_ANGLE);
   RNA_def_property_float_default(prop, DEG2RAD(60.0f));
   RNA_def_property_ui_text(
-      prop, "Angle Splitting", "A 2D angle, below which a long stroke is split into two");
+      prop, "Angle Splitting", "Angle in screen space below which a stroke is split in two");
   /*  Don't allow value very close to PI, or we get a lot of small segments.*/
   RNA_def_property_ui_range(prop, 0.0f, DEG2RAD(179.5f), 0.01f, 1);
+  RNA_def_property_range(prop, 0.0f, DEG2RAD(180.0f));
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
   prop = RNA_def_property(srna, "remove_doubles", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_REMOVE_DOUBLES);
   RNA_def_property_boolean_default(prop, 0);
   RNA_def_property_ui_text(
-      prop, "Remove Doubles", "Remove doubles internally when running line art");
+      prop, "Remove Doubles", "Remove doubles when line art is loading geometries");
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
   /* types */
   prop = RNA_def_property(srna, "use_contour", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "line_types", LRT_EDGE_FLAG_CONTOUR);
   RNA_def_property_boolean_default(prop, true);
-  RNA_def_property_ui_text(prop, "Use Contour", "Include contour lines in the result");
+  RNA_def_property_ui_text(
+      prop, "Use Contour", "Include lines from object silhouettes in the result");
   RNA_def_property_update(prop, 0, "rna_lineart_update");
 
   prop = RNA_def_property(srna, "use_crease", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "line_types", LRT_EDGE_FLAG_CREASE);
   RNA_def_property_boolean_default(prop, true);
-  RNA_def_property_ui_text(prop, "Use Crease", "Include crease lines in the result");
+  RNA_def_property_ui_text(prop, "Use Crease", "Include sharp edges in the result");
   RNA_def_property_update(prop, 0, "rna_lineart_update");
 
   prop = RNA_def_property(srna, "use_material", PROP_BOOLEAN, PROP_NONE);
@@ -7484,12 +7487,13 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
   prop = RNA_def_property(srna, "use_intersections", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "line_types", LRT_EDGE_FLAG_INTERSECTION);
   RNA_def_property_boolean_default(prop, true);
-  RNA_def_property_ui_text(prop, "Calculate Intersections", "Calculate Intersections or not");
+  RNA_def_property_ui_text(
+      prop, "Calculate Intersections", "Calculate intersections lines when enabled");
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
   /* Below these two are only for grease pencil, thus no viewport updates. */
 
-  prop = RNA_def_property(srna, "chaining_geometry_threshold", PROP_FLOAT, PROP_NONE);
+  prop = RNA_def_property(srna, "chaining_geometry_threshold", PROP_FLOAT, PROP_DISTANCE);
   RNA_def_property_float_default(prop, 0.01f);
   RNA_def_property_ui_text(prop,
                            "Geometry Threshold",
@@ -7499,12 +7503,12 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
   RNA_def_property_range(prop, 0.0f, 1.0f);
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
-  prop = RNA_def_property(srna, "chaining_image_threshold", PROP_FLOAT, PROP_NONE);
+  prop = RNA_def_property(srna, "chaining_image_threshold", PROP_FLOAT, PROP_DISTANCE);
   RNA_def_property_float_default(prop, 0.01f);
   RNA_def_property_ui_text(
       prop,
       "Image Threshold",
-      "Segments where their image distance between them lower than this will be chained together");
+      "Segments with an image distance smaller than this will be chained together");
   RNA_def_property_ui_range(prop, 0.0f, 0.3f, 0.001f, 4);
   RNA_def_property_range(prop, 0.0f, 1.0f);
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
@@ -7513,7 +7517,7 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_BAKING_FINAL_RANGE);
   RNA_def_property_boolean_default(prop, 1);
   RNA_def_property_ui_text(
-      prop, "Final Range", "Bake final frame ranges instead of preview range");
+      prop, "Final Range", "Bake with the scene frame range instead of a preview range");
 
   prop = RNA_def_property(srna, "baking_keyframes_only", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_BAKING_KEYFRAMES_ONLY);
@@ -7522,15 +7526,15 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "baking_preview_start", PROP_INT, PROP_NONE);
   RNA_def_property_ui_text(prop, "Preview start", "First frame to be baked in preview");
-  RNA_def_property_range(prop, 0, 100000);
+  RNA_def_property_range(prop, 0, MAXFRAME);
 
   prop = RNA_def_property(srna, "baking_preview_end", PROP_INT, PROP_NONE);
   RNA_def_property_ui_text(prop, "Preview end", "Last frame to be baked in preview");
-  RNA_def_property_range(prop, 0, 100000);
+  RNA_def_property_range(prop, 0, MAXFRAME);
 
   prop = RNA_def_property(srna, "baking_skip", PROP_INT, PROP_NONE);
-  RNA_def_property_ui_text(prop, "Skip", "Skipping frames when baking");
-  RNA_def_property_range(prop, 0, 1000);
+  RNA_def_property_ui_text(prop, "Skip", "Number of frames to skip per baked frame");
+  RNA_def_property_ui_range(prop, 0, 1000);
 }
 
 void RNA_def_scene(BlenderRNA *brna)
@@ -8010,7 +8014,7 @@ void RNA_def_scene(BlenderRNA *brna)
 
   /* Line Art */
   prop = RNA_def_property(srna, "lineart", PROP_POINTER, PROP_NONE);
-  RNA_def_property_struct_type(prop, "SceneLineart");
+  RNA_def_property_struct_type(prop, "SceneLineArt");
   RNA_def_property_ui_text(prop, "Line Art", "Line Art settings for the scene");
 
   /* Grease Pencil */

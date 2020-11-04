@@ -598,7 +598,7 @@ static bool buttons_context_path(
 #ifdef WITH_LINEART
       found = buttons_context_path_collection(path, window);
 #else
-      BLI_assert(!"'WITH_LINEART' is off. See buttons_context.c");
+      BLI_assert(!"'WITH_LINEART' is off.");
 #endif
       break;
     case BCONTEXT_TOOL:
