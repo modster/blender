@@ -721,12 +721,11 @@ static LineartChainRegisterEntry *lineart_chain_get_closest_cre(LineartRenderBuf
                                                                 LineartBoundingArea *caller_ba)
 {
 
-  LineartChainRegisterEntry *cre, *next_cre, *closest_cre = NULL;
+  LineartChainRegisterEntry *closest_cre = NULL;
 
   /* Keep using for loop because cre could be removed from the iteration before getting to the
    * next one. */
-  for (cre = ba->linked_chains.first; cre; cre = next_cre) {
-    next_cre = cre->next;
+  LISTBASE_FOREACH_MUTABLE (LineartChainRegisterEntry *, cre, &ba->linked_chains) {
     if (cre->rlc->object_ref != rlc->object_ref) {
       if (!rb->fuzzy_everything) {
         if (rb->fuzzy_intersections) {

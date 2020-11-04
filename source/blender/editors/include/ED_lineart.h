@@ -275,18 +275,18 @@ typedef struct LineartRenderBuffer {
   int draw_material_preview;
   double material_transparency;
 
-  char use_contour;
-  char use_crease;
-  char use_material;
-  char use_edge_marks;
-  char use_intersections;
-  char fuzzy_intersections;
-  char fuzzy_everything;
-  char allow_boundaries;
-  char remove_doubles;
+  bool use_contour;
+  bool use_crease;
+  bool use_material;
+  bool use_edge_marks;
+  bool use_intersections;
+  bool fuzzy_intersections;
+  bool fuzzy_everything;
+  bool allow_boundaries;
+  bool remove_doubles;
 
   /** Keep an copy of these data so the scene can be freed when lineart is runnning. */
-  char cam_is_persp;
+  bool cam_is_persp;
   float cam_obmat[4][4];
   double camera_pos[3];
   double near_clip, far_clip;
