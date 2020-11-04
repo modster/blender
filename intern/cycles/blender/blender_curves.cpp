@@ -529,7 +529,8 @@ bool BlenderSync::object_has_particle_hair(BL::Object b_ob)
 }
 
 /* Old particle hair. */
-void BlenderSync::sync_particle_hair(Hair *hair, BL::Mesh &b_mesh, BL::Object &b_ob, bool motion, int motion_step)
+void BlenderSync::sync_particle_hair(
+    Hair *hair, BL::Mesh &b_mesh, BL::Object &b_ob, bool motion, int motion_step)
 {
   /* obtain general settings */
   if (b_ob.mode() == b_ob.mode_PARTICLE_EDIT || b_ob.mode() == b_ob.mode_EDIT) {

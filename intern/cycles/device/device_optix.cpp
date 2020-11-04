@@ -1230,7 +1230,7 @@ class OptiXDevice : public CUDADevice {
         operation = OPTIX_BUILD_OPERATION_BUILD;
       }
 
-	  if (geom->geometry_type == Geometry::HAIR) {
+      if (geom->geometry_type == Geometry::HAIR) {
         // Build BLAS for curve primitives
         Hair *const hair = static_cast<Hair *const>(ob->get_geometry());
         if (hair->num_curves() == 0) {
@@ -1395,7 +1395,7 @@ class OptiXDevice : public CUDADevice {
 
         // Allocate memory for new BLAS and build it
         if (build_optix_bvh(build_input, num_motion_steps, handle, out_data, operation)) {
-		  geometry.insert({ob->get_geometry(), handle});
+          geometry.insert({ob->get_geometry(), handle});
           static_cast<BVHOptiX *>(geom->bvh)->optix_data_handle = out_data;
           static_cast<BVHOptiX *>(geom->bvh)->optix_handle = handle;
           static_cast<BVHOptiX *>(geom->bvh)->do_refit = false;
@@ -1470,11 +1470,11 @@ class OptiXDevice : public CUDADevice {
         build_input.triangleArray.primitiveIndexOffset = mesh->optix_prim_offset;
 
         // Allocate memory for new BLAS and build it
-		if (build_optix_bvh(build_input, num_motion_steps, handle, out_data, operation)) {
-		  geometry.insert({ob->get_geometry(), handle});
-		  static_cast<BVHOptiX *>(geom->bvh)->optix_data_handle = out_data;
-		  static_cast<BVHOptiX *>(geom->bvh)->optix_handle = handle;
-		  static_cast<BVHOptiX *>(geom->bvh)->do_refit = false;
+        if (build_optix_bvh(build_input, num_motion_steps, handle, out_data, operation)) {
+          geometry.insert({ob->get_geometry(), handle});
+          static_cast<BVHOptiX *>(geom->bvh)->optix_data_handle = out_data;
+          static_cast<BVHOptiX *>(geom->bvh)->optix_handle = handle;
+          static_cast<BVHOptiX *>(geom->bvh)->do_refit = false;
         }
         else {
           return false;

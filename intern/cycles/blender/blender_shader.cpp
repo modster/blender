@@ -432,7 +432,8 @@ static ShaderNode *add_node(Scene *scene,
   else if (b_node.is_a(&RNA_ShaderNodeAttribute)) {
     BL::ShaderNodeAttribute b_attr_node(b_node);
     AttributeNode *attr = graph->create_node<AttributeNode>();
-	attr->set_attribute(blender_attribute_name_add_type(b_attr_node.attribute_name(), b_attr_node.attribute_type()));
+    attr->set_attribute(blender_attribute_name_add_type(b_attr_node.attribute_name(),
+                                                        b_attr_node.attribute_type()));
     node = attr;
   }
   else if (b_node.is_a(&RNA_ShaderNodeBackground)) {
