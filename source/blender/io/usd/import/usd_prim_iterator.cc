@@ -47,7 +47,7 @@ USDXformableReader *USDPrimIterator::get_reader(const pxr::UsdPrim &prim,
     result = new USDMeshReader(prim, context);
   }
   else if (prim.IsA<pxr::UsdGeomXform>()) {
-    result = new USDTransformReader(prim, context);
+    result = new USDXformReader(prim, context);
   }
 
   return result;

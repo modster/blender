@@ -26,17 +26,17 @@
 
 namespace blender::io::usd {
 
-USDTransformReader::USDTransformReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
+USDXformReader::USDXformReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
     : USDXformableReader(prim, context), xform_(prim)
 {
 }
 
-bool USDTransformReader::valid() const
+bool USDXformReader::valid() const
 {
   return static_cast<bool>(xform_);
 }
 
-void USDTransformReader::create_object(Main *bmain, double time)
+void USDXformReader::create_object(Main *bmain, double time)
 {
   if (!this->valid()) {
     return;
