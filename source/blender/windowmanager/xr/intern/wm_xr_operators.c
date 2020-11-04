@@ -171,9 +171,9 @@ typedef struct XrRaycastSelectData {
   void *draw_handle;
 } XrRaycastSelectData;
 
-void wm_xr_select_raycast_draw(const bContext *UNUSED(C),
-                               ARegion *UNUSED(region),
-                               void *customdata)
+static void wm_xr_select_raycast_draw(const bContext *UNUSED(C),
+                                      ARegion *UNUSED(region),
+                                      void *customdata)
 {
   const XrRaycastSelectData *data = customdata;
 
@@ -197,7 +197,7 @@ void wm_xr_select_raycast_draw(const bContext *UNUSED(C),
   GPU_depth_test(depth_test_prev);
 }
 
-static void wm_xr_select_raycast_init(bContext *C, wmOperator *op)
+static void wm_xr_select_raycast_init(wmOperator *op)
 {
   BLI_assert(op->customdata == NULL);
 
@@ -210,7 +210,7 @@ static void wm_xr_select_raycast_init(bContext *C, wmOperator *op)
   }
 }
 
-static void wm_xr_select_raycast_uninit(bContext *C, wmOperator *op)
+static void wm_xr_select_raycast_uninit(wmOperator *op)
 {
   if (op->customdata) {
     ARegionType *art = WM_xr_surface_region_type_get();
@@ -490,7 +490,7 @@ static int wm_xr_select_raycast_invoke_3d(bContext *C, wmOperator *op, const wmE
   BLI_assert(event->custom == EVT_DATA_XR);
   BLI_assert(event->customdata);
 
-  wm_xr_select_raycast_init(C, op);
+  wm_xr_select_raycast_init(op);
 
   int retval = op->type->modal_3d(C, op, event);
 
@@ -563,14 +563,14 @@ static int wm_xr_select_raycast_modal_3d(bContext *C, wmOperator *op, const wmEv
     ret = wm_xr_select_raycast(
         C, data->origin, data->direction, &ray_dist, select_op, deselect_all);
 
-    wm_xr_select_raycast_uninit(C, op);
+    wm_xr_select_raycast_uninit(op);
 
     return ret ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
   }
 
   /* XR events currently only support press and release. */
   BLI_assert(false);
-  wm_xr_select_raycast_uninit(C, op);
+  wm_xr_select_raycast_uninit(op);
   return OPERATOR_CANCELLED;
 }
 

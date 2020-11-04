@@ -307,7 +307,7 @@ static bool rna_XrSessionState_action_create(bContext *C,
 
   return WM_xr_actions_create(&wm->xr, action_set_name, 1, &info);
 #  else
-  UNUSED_VARS(C, action_set_name, name, type, user_path0, user_path1, op, op_flag);
+  UNUSED_VARS(C, action_set_name, name, type, user_path0, user_path1, threshold, op, op_flag);
   return false;
 #  endif
 }
