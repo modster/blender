@@ -2644,7 +2644,7 @@ static void rna_def_object_lineart(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Usage", "How to use this object");
   RNA_def_property_update(prop, 0, "rna_object_lineart_update");
 
-  prop = RNA_def_property(srna, "own_crease", PROP_BOOLEAN, PROP_NONE);
+  prop = RNA_def_property(srna, "use_crease_override", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flags", OBJECT_LRT_OWN_CREASE);
   RNA_def_property_ui_text(prop, "Own Crease", "Use own crease setting to overwrite scene global");
   RNA_def_property_update(prop, 0, "rna_object_lineart_update");

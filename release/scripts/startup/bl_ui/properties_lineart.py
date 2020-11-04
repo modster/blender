@@ -27,7 +27,7 @@ class LineartButtonsPanel:
 
 
 class OBJECT_PT_lineart(LineartButtonsPanel, Panel):
-    bl_label = "Line Art Settings"
+    bl_label = "Line Art"
 
     @classmethod
     def poll(cls, context):
@@ -37,10 +37,15 @@ class OBJECT_PT_lineart(LineartButtonsPanel, Panel):
     def draw(self, context):
         layout = self.layout
         lineart = context.object.lineart
+
+        layout.use_property_split = True
+
         layout.prop(lineart, 'usage')
-        layout.prop(lineart, "own_crease", text='Use Own Crease')
-        if lineart.own_crease:
-            layout.prop(lineart, "crease_threshold", slider=True)
+        layout.use_property_split = True
+
+        row = layout.row(heading="Override Crease")
+        row.prop(lineart, "use_crease_override", text="")
+        row.prop(lineart, "crease_threshold", slider=True, text="")
 
 
 classes = (

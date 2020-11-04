@@ -800,7 +800,7 @@ class RENDER_PT_lineart_extras(RenderButtonsPanel, Panel):
 
         layout.label(text="Advanced Options:")
         layout.prop(lineart, "fuzzy_everything")
-        layout.prop(lineart, "allow_duplication", text="Allow Instances")
+        layout.prop(lineart, "allow_duplication", text="Instancing")
         layout.prop(lineart, "allow_overlapping_edges")
         layout.prop(lineart, "allow_clipping_boundaries",
                     text="Show Clipping Boundaries")
