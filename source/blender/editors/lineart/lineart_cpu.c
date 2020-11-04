@@ -4164,6 +4164,9 @@ void ED_lineart_post_frame_update_external(bContext *C,
   if (G.debug_value == 4000) {
     printf("LRT: ---- Post frame update (%d).\n", 0);
   }
+  if (!scene->camera) {
+    ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, false);
+  }
   if (!(scene->lineart.flags & LRT_AUTO_UPDATE)) {
     /* This way the modifier will update, removing remaing strokes in the viewport. */
     if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_WAITING)) {
