@@ -1639,55 +1639,53 @@ bool UI_panel_is_dragging(const struct Panel *panel)
 }
 
 /**
- * \note about sorting:
- * The #Panel.sortorder has a lower value for new panels being added.
+ * \note about sorting;
+ * the #Panel.sortorder has a lower value for new panels being added.
  * however, that only works to insert a single panel, when more new panels get
  * added the coordinates of existing panels and the previously stored to-be-inserted
- * panels do not match for sorting.
+ * panels do not match for sorting
  */
 
-static int find_highest_panel(const void *a, const void *b)
+static int find_highest_panel(const void *a1, const void *a2)
 {
-  const Panel *panel_a = ((PanelSort *)a)->panel;
-  const Panel *panel_b = ((PanelSort *)b)->panel;
+  const PanelSort *ps1 = a1, *ps2 = a2;
 
-  /* Stick uppermost header-less panels to the top of the region -
-   * prevent them from being sorted (multiple header-less panels have to be sorted though). */
-  if (panel_a->type->flag & PNL_NO_HEADER && panel_b->type->flag & PNL_NO_HEADER) {
+  /* stick uppermost header-less panels to the top of the region -
+   * prevent them from being sorted (multiple header-less panels have to be sorted though) */
+  if (ps1->panel->type->flag & PNL_NO_HEADER && ps2->panel->type->flag & PNL_NO_HEADER) {
     /* Skip and check for `ofsy` and #Panel.sortorder below. */
   }
-  if (panel_a->type->flag & PNL_NO_HEADER) {
+  if (ps1->panel->type->flag & PNL_NO_HEADER) {
     return -1;
   }
-  if (panel_b->type->flag & PNL_NO_HEADER) {
+  if (ps2->panel->type->flag & PNL_NO_HEADER) {
     return 1;
   }
 
-  if (panel_a->ofsy + panel_a->sizey < panel_b->ofsy + panel_b->sizey) {
+  if (ps1->panel->ofsy + ps1->panel->sizey < ps2->panel->ofsy + ps2->panel->sizey) {
     return 1;
   }
-  if (panel_a->ofsy + panel_a->sizey > panel_b->ofsy + panel_b->sizey) {
+  if (ps1->panel->ofsy + ps1->panel->sizey > ps2->panel->ofsy + ps2->panel->sizey) {
     return -1;
   }
-  if (panel_a->sortorder > panel_b->sortorder) {
+  if (ps1->panel->sortorder > ps2->panel->sortorder) {
     return 1;
   }
-  if (panel_a->sortorder < panel_b->sortorder) {
+  if (ps1->panel->sortorder < ps2->panel->sortorder) {
     return -1;
   }
 
   return 0;
 }
 
-static int compare_panel(const void *a, const void *b)
+static int compare_panel(const void *a1, const void *a2)
 {
-  const Panel *panel_a = ((PanelSort *)a)->panel;
-  const Panel *panel_b = ((PanelSort *)b)->panel;
+  const PanelSort *ps1 = a1, *ps2 = a2;
 
-  if (panel_a->sortorder > panel_b->sortorder) {
+  if (ps1->panel->sortorder > ps2->panel->sortorder) {
     return 1;
   }
-  if (panel_a->sortorder < panel_b->sortorder) {
+  if (ps1->panel->sortorder < ps2->panel->sortorder) {
     return -1;
   }
 
