@@ -162,6 +162,8 @@ void BVHOptiX::pack_tlas()
   foreach (Geometry *geom, geometry) {
     PackedBVH &bvh_pack = geom->bvh->pack;
 
+    geom->bvh->pack_verts_offset = pack_verts_offset;
+
     // Merge visibility flags of all objects and fix object indices for non-instanced geometry
     int object_index = 0;  // Unused for instanced geometry
     int object_visibility = 0;

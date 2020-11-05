@@ -1230,96 +1230,111 @@ void GeometryManager::device_update_bvh(Device *device,
 {
   /* bvh build */
   progress.set_status("Updating Scene BVH", "Building");
+  {
+    scoped_callback_timer timer([scene](double time) {
+      if (scene->update_stats) {
+        scene->update_stats->geometry.times.add_entry({"device_update (build scene BVH)", time});
+      }
+    });
+    BVHParams bparams;
+    bparams.top_level = true;
+    bparams.bvh_layout = BVHParams::best_bvh_layout(scene->params.bvh_layout,
+                                                    device->get_bvh_layout_mask());
+    bparams.use_spatial_split = scene->params.use_bvh_spatial_split;
+    bparams.use_unaligned_nodes = dscene->data.bvh.have_curves &&
+        scene->params.use_bvh_unaligned_nodes;
+    bparams.num_motion_triangle_steps = scene->params.num_bvh_time_steps;
+    bparams.num_motion_curve_steps = scene->params.num_bvh_time_steps;
+    bparams.bvh_type = scene->params.bvh_type;
+    bparams.curve_subdivisions = scene->params.curve_subdivisions();
 
-  BVHParams bparams;
-  bparams.top_level = true;
-  bparams.bvh_layout = BVHParams::best_bvh_layout(scene->params.bvh_layout,
-                                                  device->get_bvh_layout_mask());
-  bparams.use_spatial_split = scene->params.use_bvh_spatial_split;
-  bparams.use_unaligned_nodes = dscene->data.bvh.have_curves &&
-                                scene->params.use_bvh_unaligned_nodes;
-  bparams.num_motion_triangle_steps = scene->params.num_bvh_time_steps;
-  bparams.num_motion_curve_steps = scene->params.num_bvh_time_steps;
-  bparams.bvh_type = scene->params.bvh_type;
-  bparams.curve_subdivisions = scene->params.curve_subdivisions();
+    VLOG(1) << "Using " << bvh_layout_name(bparams.bvh_layout) << " layout.";
 
-  VLOG(1) << "Using " << bvh_layout_name(bparams.bvh_layout) << " layout.";
-
-  if (bvh && !(device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-    bvh->pack = {};
-    bvh->refit(progress);
-  }
-
-  if (!bvh || (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-    bvh = BVH::create(bparams, scene->geometry, scene->objects, device);
-  }
-
-  bvh->build(progress, &device->stats);
-
-  if (progress.get_cancel()) {
-#ifdef WITH_EMBREE
-    if (dscene->data.bvh.scene) {
-      BVHEmbree::destroy(dscene->data.bvh.scene);
-      dscene->data.bvh.scene = NULL;
+    if (bvh && !(device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
+      bvh->pack = {};
+      bvh->refit(progress);
     }
+
+    if (!bvh || (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
+      bvh = BVH::create(bparams, scene->geometry, scene->objects, device);
+    }
+
+    bvh->build(progress, &device->stats);
+
+    if (progress.get_cancel()) {
+#ifdef WITH_EMBREE
+      if (dscene->data.bvh.scene) {
+        BVHEmbree::destroy(dscene->data.bvh.scene);
+        dscene->data.bvh.scene = NULL;
+      }
 #endif
-    delete bvh;
-    bvh = nullptr;
-    return;
+      delete bvh;
+      bvh = nullptr;
+      return;
+    }
+
+    /* copy to device */
+    progress.set_status("Updating Scene BVH", "Copying BVH to device");
+
+    PackedBVH &pack = bvh->pack;
+
+    if (pack.nodes.size()) {
+      dscene->bvh_nodes.steal_data(pack.nodes);
+      dscene->bvh_nodes.copy_to_device();
+    }
+    if (pack.leaf_nodes.size()) {
+      dscene->bvh_leaf_nodes.steal_data(pack.leaf_nodes);
+      dscene->bvh_leaf_nodes.copy_to_device();
+    }
+    if (pack.object_node.size()) {
+      dscene->object_node.steal_data(pack.object_node);
+      dscene->object_node.copy_to_device();
+    }
+    if (pack.prim_tri_index.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
+      dscene->prim_tri_index.steal_data(pack.prim_tri_index);
+      dscene->prim_tri_index.copy_to_device();
+    }
+    if (pack.prim_tri_verts.size()) {
+      dscene->prim_tri_verts.steal_data(pack.prim_tri_verts);
+      dscene->prim_tri_verts.copy_to_device();
+
+      bvh->prim_vert_pointer = dscene->prim_tri_verts.device_pointer;
+    }
+    if (pack.prim_type.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
+      dscene->prim_type.steal_data(pack.prim_type);
+      dscene->prim_type.copy_to_device();
+    }
+    if (pack.prim_visibility.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
+      dscene->prim_visibility.steal_data(pack.prim_visibility);
+      dscene->prim_visibility.copy_to_device();
+    }
+    if (pack.prim_index.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
+      dscene->prim_index.steal_data(pack.prim_index);
+      dscene->prim_index.copy_to_device();
+    }
+    if (pack.prim_object.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
+      dscene->prim_object.steal_data(pack.prim_object);
+      dscene->prim_object.copy_to_device();
+    }
+    if (pack.prim_time.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
+      dscene->prim_time.steal_data(pack.prim_time);
+      dscene->prim_time.copy_to_device();
+    }
+
+    dscene->data.bvh.root = pack.root_index;
+    dscene->data.bvh.bvh_layout = bparams.bvh_layout;
+    dscene->data.bvh.use_bvh_steps = (scene->params.num_bvh_time_steps != 0);
+    dscene->data.bvh.curve_subdivisions = scene->params.curve_subdivisions();
   }
 
-  /* copy to device */
-  progress.set_status("Updating Scene BVH", "Copying BVH to device");
-
-  PackedBVH &pack = bvh->pack;
-
-  if (pack.nodes.size()) {
-    dscene->bvh_nodes.steal_data(pack.nodes);
-    dscene->bvh_nodes.copy_to_device();
+  {
+    scoped_callback_timer timer([scene](double time) {
+      if (scene->update_stats) {
+        scene->update_stats->geometry.times.add_entry({"device_update (copy BVH to device)", time});
+      }
+    });
+    bvh->copy_to_device(progress, dscene);
   }
-  if (pack.leaf_nodes.size()) {
-    dscene->bvh_leaf_nodes.steal_data(pack.leaf_nodes);
-    dscene->bvh_leaf_nodes.copy_to_device();
-  }
-  if (pack.object_node.size()) {
-    dscene->object_node.steal_data(pack.object_node);
-    dscene->object_node.copy_to_device();
-  }
-  if (pack.prim_tri_index.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-    dscene->prim_tri_index.steal_data(pack.prim_tri_index);
-    dscene->prim_tri_index.copy_to_device();
-  }
-  if (pack.prim_tri_verts.size()) {
-    dscene->prim_tri_verts.steal_data(pack.prim_tri_verts);
-    dscene->prim_tri_verts.copy_to_device();
-  }
-  if (pack.prim_type.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-    dscene->prim_type.steal_data(pack.prim_type);
-    dscene->prim_type.copy_to_device();
-  }
-  if (pack.prim_visibility.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-    dscene->prim_visibility.steal_data(pack.prim_visibility);
-    dscene->prim_visibility.copy_to_device();
-  }
-  if (pack.prim_index.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-    dscene->prim_index.steal_data(pack.prim_index);
-    dscene->prim_index.copy_to_device();
-  }
-  if (pack.prim_object.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-    dscene->prim_object.steal_data(pack.prim_object);
-    dscene->prim_object.copy_to_device();
-  }
-  if (pack.prim_time.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-    dscene->prim_time.steal_data(pack.prim_time);
-    dscene->prim_time.copy_to_device();
-  }
-
-  dscene->data.bvh.root = pack.root_index;
-  dscene->data.bvh.bvh_layout = bparams.bvh_layout;
-  dscene->data.bvh.use_bvh_steps = (scene->params.num_bvh_time_steps != 0);
-  dscene->data.bvh.curve_subdivisions = scene->params.curve_subdivisions();
-
-  bvh->copy_to_device(progress, dscene);
 }
 
 void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Progress &progress)
@@ -1743,11 +1758,6 @@ void GeometryManager::device_update(Device *device,
     return;
 
   {
-    scoped_callback_timer timer([scene](double time) {
-      if (scene->update_stats) {
-        scene->update_stats->geometry.times.add_entry({"device_update (build scene BVH)", time});
-      }
-    });
     device_update_bvh(device, dscene, scene, progress);
     if (progress.get_cancel())
       return;
