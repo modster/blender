@@ -66,7 +66,6 @@ static LineartRenderLine *lineart_line_get_connected(LineartBoundingArea *ba,
 
     /*  always chain connected lines for now. */
     /*  simplification will take care of the sharp points. */
-    /*  if(cosine whatever) continue;. */
 
     if (rv != nrl->l && rv != nrl->r) {
       if (nrl->flags & LRT_EDGE_FLAG_INTERSECTION) {
@@ -163,7 +162,7 @@ static LineartRenderLineChainItem *lineart_chain_push_point(LineartRenderBuffer 
 {
   LineartRenderLineChainItem *rlci;
 
-  if (lineart_point_overlapping(rlc->chain.first, fbcoord[1], fbcoord[2], 1e-5)) {
+  if (lineart_point_overlapping(rlc->chain.first, fbcoord[0], fbcoord[1], 1e-5)) {
     return rlc->chain.first;
   }
 
@@ -598,7 +597,11 @@ void ED_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb)
           }
         }
         else {
-          break; /* No need to split at the last point anyway.*/
+          /* Set the same occlusion level for the end vertex, so when further connection is needed
+           * the backwards occlusion info is also correct.  */
+          rlci->occlusion = fixed_occ;
+          /* No need to split at the last point anyway. */
+          break;
         }
         new_rlc = lineart_chain_create(rb);
         new_rlc->chain.first = rlci;
@@ -619,6 +622,7 @@ void ED_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb)
                                    rlci->index);
         new_rlc->object_ref = rlc->object_ref;
         new_rlc->type = rlc->type;
+        new_rlc->level = rlci->occlusion;
         rlc = new_rlc;
         fixed_occ = rlci->occlusion;
         fixed_mask = rlci->transparency_mask;
@@ -812,8 +816,8 @@ void ED_lineart_chain_connect(LineartRenderBuffer *rb, const int do_geometry_spa
     }
     BLI_addtail(&rb->chains, rlc);
 
-    occlusion = ((LineartRenderLineChainItem *)rlc->chain.first)->occlusion;
-    transparency_mask = ((LineartRenderLineChainItem *)rlc->chain.first)->transparency_mask;
+    occlusion = rlc->level;
+    transparency_mask = rlc->transparency_mask;
 
     rlci_l = rlc->chain.first;
     rlci_r = rlc->chain.last;
