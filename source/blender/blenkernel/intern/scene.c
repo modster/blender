@@ -1595,7 +1595,7 @@ int BKE_scene_orientation_slot_get_index(const TransformOrientationSlot *orient_
 
 /** \} */
 
-static bool check_rendered_viewport_visible(Main *bmain)
+bool check_rendered_viewport_visible(Main *bmain)
 {
   wmWindowManager *wm = bmain->wm.first;
   wmWindow *window;

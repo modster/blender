@@ -116,11 +116,16 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   Mesh *me = (ctx->object->type == OB_MESH) ? ctx->object->data : NULL;
   Mesh *org_mesh = mesh;
 
+  struct Main *bmain = DEG_get_bmain(ctx->depsgraph);
   Scene *scene = DEG_get_evaluated_scene(ctx->depsgraph);
   CacheFile *cache_file = mcmd->cache_file;
   const float frame = DEG_get_ctime(ctx->depsgraph);
   const float time = BKE_cachefile_time_offset(cache_file, frame, FPS);
   const char *err_str = NULL;
+
+  if (check_rendered_viewport_visible(bmain) || (ctx->flag & MOD_APPLY_RENDER)) {
+    return mesh;
+  }
 
   if (!mcmd->reader || !STREQ(mcmd->reader_object_path, mcmd->object_path)) {
     STRNCPY(mcmd->reader_object_path, mcmd->object_path);

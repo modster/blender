@@ -5171,6 +5171,10 @@ static void transformcache_evaluate(bConstraint *con, bConstraintOb *cob, ListBa
     return;
   }
 
+  if (check_rendered_viewport_visible(DEG_get_bmain(cob->depsgraph))) {
+    return;
+  }
+
   const float frame = DEG_get_ctime(cob->depsgraph);
   const float time = BKE_cachefile_time_offset(cache_file, frame, FPS);
 
