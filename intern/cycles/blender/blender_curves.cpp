@@ -819,8 +819,12 @@ void BlenderSync::sync_hair(Hair *hair, BL::Object &b_ob, bool motion, int motio
 
 void BlenderSync::sync_hair(BL::Depsgraph b_depsgraph, BL::Object b_ob, Hair *hair)
 {
+  /* make a copy of the shaders as the caller in the main thread still need them for syncing the
+   * attributes */
+  array<Node *> used_shaders = hair->get_used_shaders();
+
   Hair new_hair;
-  new_hair.set_used_shaders(hair->get_used_shaders());
+  new_hair.set_used_shaders(used_shaders);
 
   if (view_layer.use_hair) {
     if (b_ob.type() == BL::Object::type_HAIR) {
@@ -844,7 +848,7 @@ void BlenderSync::sync_hair(BL::Depsgraph b_depsgraph, BL::Object b_ob, Hair *ha
 
   for (const SocketType &socket : new_hair.type->inputs) {
     /* Those sockets are updated in sync_object, so do not modify them. */
-    if (socket.name == "use_motion_blur" || socket.name == "motion_steps") {
+    if (socket.name == "use_motion_blur" || socket.name == "motion_steps" || socket.name == "used_shaders") {
       continue;
     }
     hair->set_value(socket, new_hair, socket);
