@@ -25,6 +25,8 @@
 
 namespace blender::io::usd {
 
+/* Abstract base class of all USD readers.  It wraps a single UsdPrim. */
+
 class USDPrimReader {
 
  protected:

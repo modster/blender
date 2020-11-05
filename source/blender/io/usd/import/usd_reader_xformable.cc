@@ -50,7 +50,7 @@ Object *USDXformableReader::object() const
   return object_;
 }
 
-void USDXformableReader::setup_object_transform(const double time)
+void USDXformableReader::set_object_transform(const double time)
 {
   if (!this->object_) {
     return;

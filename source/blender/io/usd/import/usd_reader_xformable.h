@@ -31,6 +31,9 @@ struct Object;
 
 namespace blender::io::usd {
 
+/* Wraps the UsdGeomXformable schema. Abstract base class for all readers
+ * that create a Blender object and compute its transform. */
+
 class USDXformableReader : public USDPrimReader {
 
  protected:
@@ -71,8 +74,7 @@ class USDXformableReader : public USDPrimReader {
 
   virtual void create_object(Main *bmain, double time) = 0;
 
-  /* Reads the object matrix. */
-  void setup_object_transform(const double time);
+  void set_object_transform(const double time);
 
   void read_matrix(float r_mat[4][4], const double time, const float scale, bool &is_constant);
 };

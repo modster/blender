@@ -24,6 +24,8 @@
 
 namespace blender::io::usd {
 
+/* Wraps the UsdGeomXform schema. Creates a Blender Empty object. */
+
 class USDXformReader : public USDXformableReader {
 
   pxr::UsdGeomXform xform_;

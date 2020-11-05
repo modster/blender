@@ -22,6 +22,10 @@
 
 namespace blender::io::usd {
 
+/* Abstract base class of readers that can create a Blender mesh object.
+ * Subclasses must define the create_mesh() and assign_materials() virtual
+ * functions to implement the logic for creating the Mesh data and materials. */
+
 class USDMeshReaderBase : public USDXformableReader {
  protected:
  public:

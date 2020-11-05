@@ -24,6 +24,9 @@
 
 namespace blender::io::usd {
 
+/* Wraps the UsdGeomMesh schema. Defines the logic for reading
+ * Mesh data for the object created by USDMeshReaderBase. */
+
 class USDMeshReader : public USDMeshReaderBase {
  protected:
   pxr::UsdGeomMesh mesh_;
