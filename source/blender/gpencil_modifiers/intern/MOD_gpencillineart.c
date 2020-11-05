@@ -323,7 +323,7 @@ static void panel_draw(const bContext *C, Panel *panel)
     uiItemR(layout, ptr, "source_object", 0, NULL, ICON_CUBE);
   }
   else if (source_type == LRT_SOURCE_COLLECTION) {
-    uiItemR(layout, ptr, "source_collection", 0, NULL, ICON_GROUP);
+    uiItemR(layout, ptr, "source_collection", 0, NULL, ICON_OUTLINER_COLLECTION);
   }
 
   if (scene->lineart.flags & LRT_EVERYTHING_AS_CONTOUR) {
