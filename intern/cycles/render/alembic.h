@@ -27,8 +27,6 @@
 #include <Alembic/AbcCoreFactory/All.h>
 #include <Alembic/AbcGeom/All.h>
 
-using namespace Alembic::AbcGeom;
-
 CCL_NAMESPACE_BEGIN
 
 class Geometry;
@@ -48,7 +46,7 @@ class AlembicObject : public Node {
   void set_object(Object *object);
   Object *get_object();
 
-  void load_all_data(const IPolyMeshSchema &schema);
+  void load_all_data(const Alembic::AbcGeom::IPolyMeshSchema &schema);
 
   bool has_data_loaded() const;
 
@@ -74,7 +72,7 @@ class AlembicObject : public Node {
 
   DataCache &get_frame_data(int index);
 
-  IObject iobject;
+  Alembic::AbcGeom::IObject iobject;
   Transform xform;
 
  private:
@@ -86,8 +84,8 @@ class AlembicObject : public Node {
 
   vector<DataCache> frame_data;
 
-  void read_attribute(const ICompoundProperty &arb_geom_params,
-                      const ISampleSelector &iss,
+  void read_attribute(const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
+                      const Alembic::AbcGeom::ISampleSelector &iss,
                       const ustring &attr_name,
                       DataCache &data_cache);
 };
@@ -108,7 +106,7 @@ class AlembicProcedural : public Procedural {
   array<AlembicObject *> objects;  // todo : Node::set
 
  private:
-  IArchive archive;
+  Alembic::AbcGeom::IArchive archive;
   bool objects_loaded = false;
 
   void load_objects();
@@ -116,14 +114,14 @@ class AlembicProcedural : public Procedural {
   void read_mesh(Scene *scene,
                  AlembicObject *abc_object,
                  Transform xform,
-                 IPolyMesh &mesh,
-                 Abc::chrono_t frame_time);
+                 Alembic::AbcGeom::IPolyMesh &mesh,
+                 Alembic::AbcGeom::Abc::chrono_t frame_time);
 
   void read_curves(Scene *scene,
                    AlembicObject *abc_object,
                    Transform xform,
-                   ICurves &curves,
-                   Abc::chrono_t frame_time);
+                   Alembic::AbcGeom::ICurves &curves,
+                   Alembic::AbcGeom::Abc::chrono_t frame_time);
 };
 
 CCL_NAMESPACE_END

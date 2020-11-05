@@ -36,6 +36,8 @@
 #include "util/util_transform.h"
 #include "util/util_vector.h"
 
+using namespace Alembic::AbcGeom;
+
 CCL_NAMESPACE_BEGIN
 
 static float3 make_float3_from_yup(const Imath::Vec3<float> &v)
