@@ -30,6 +30,7 @@
 #include "BLI_utildefines.h"
 
 #include <pxr/base/gf/matrix4d.h>
+#include <pxr/base/gf/matrix4f.h>
 #include <pxr/usd/usdGeom/xformable.h>
 
 #include <iostream>
@@ -99,14 +100,9 @@ void USDXformableReader::read_matrix(float r_mat[4][4] /* local matrix */,
     }
   }
 
-  double double_mat[4][4];
-  usd_local_xf.Get(double_mat);
-
-  for (int i = 0; i < 4; ++i) {
-    for (int j = 0; j < 4; ++j) {
-      r_mat[i][j] = static_cast<float>(double_mat[i][j]);
-    }
-  }
+  // Convert the result to a float matrix.
+  pxr::GfMatrix4f mat4f = pxr::GfMatrix4f(usd_local_xf);
+  mat4f.Get(r_mat);
 
   if (this->context_.stage_up_axis == pxr::UsdGeomTokens->y) {
     /* Swap the matrix from y-up to z-up. */

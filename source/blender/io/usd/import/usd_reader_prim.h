@@ -52,8 +52,8 @@ class USDPrimReader {
   virtual ~USDPrimReader();
 
   // Disallow assignment and copying.
-  USDPrimReader(const USDPrimReader&) = delete;
-  USDPrimReader& operator=(const USDPrimReader&) = delete;
+  USDPrimReader(const USDPrimReader &) = delete;
+  USDPrimReader &operator=(const USDPrimReader &) = delete;
 
   const pxr::UsdPrim &prim() const;
 
