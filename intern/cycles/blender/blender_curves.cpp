@@ -855,7 +855,16 @@ void BlenderSync::sync_hair(BL::Depsgraph b_depsgraph, BL::Object b_ob, Hair *ha
   }
 
   foreach (Attribute &attr, new_hair.attributes.attributes) {
-    hair->attributes.attributes.push_back(std::move(attr));
+    Attribute *nattr = nullptr;
+
+    if (attr.std != ATTR_STD_NONE) {
+      nattr = hair->attributes.add(attr.std, attr.name);
+    }
+    else {
+      nattr = hair->attributes.add(attr.name, attr.type, attr.element);
+    }
+
+    nattr->set_data_from(attr);
   }
 
   /* tag update */

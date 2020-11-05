@@ -54,6 +54,8 @@ class Attribute {
   AttributeElement element;
   uint flags; /* enum AttributeFlag */
 
+  bool modified;
+
   Attribute(ustring name,
             TypeDesc type,
             AttributeElement element,
@@ -158,6 +160,8 @@ class Attribute {
   void add(const uchar4 &f);
   void add(const Transform &tfm);
   void add(const char *data);
+
+  void set_data_from(Attribute &other);
 
   static bool same_storage(TypeDesc a, TypeDesc b);
   static const char *standard_name(AttributeStandard std);

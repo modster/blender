@@ -196,6 +196,9 @@ Mesh::Mesh(const NodeType *node_type, Type geom_type_)
 
   num_ngons = 0;
 
+  previous_verts_count = 0;
+  previous_triangles_count = 0;
+
   subdivision_type = SUBDIVISION_NONE;
   subd_params = NULL;
 
@@ -741,14 +744,16 @@ void Mesh::pack_verts(const vector<uint> &tri_prim_index,
 
   size_t triangles_size = num_triangles();
 
-  for (size_t i = 0; i < triangles_size; i++) {
-    Triangle t = get_triangle(i);
-    tri_vindex[i] = make_uint4(t.v[0] + vert_offset,
-                               t.v[1] + vert_offset,
-                               t.v[2] + vert_offset,
-                               tri_prim_index[i + tri_offset]);
+  if (triangles_is_modified()) {
+    for (size_t i = 0; i < triangles_size; i++) {
+      Triangle t = get_triangle(i);
+      tri_vindex[i] = make_uint4(t.v[0] + vert_offset,
+                                 t.v[1] + vert_offset,
+                                 t.v[2] + vert_offset,
+                                 tri_prim_index[i + tri_offset]);
 
-    tri_patch[i] = (!get_num_subd_faces()) ? -1 : (triangle_patch[i] * 8 + patch_offset);
+      tri_patch[i] = (!get_num_subd_faces()) ? -1 : (triangle_patch[i] * 8 + patch_offset);
+    }
   }
 }
 

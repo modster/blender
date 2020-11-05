@@ -28,7 +28,7 @@ CCL_NAMESPACE_BEGIN
 
 Attribute::Attribute(
     ustring name, TypeDesc type, AttributeElement element, Geometry *geom, AttributePrimitive prim)
-    : name(name), std(ATTR_STD_NONE), type(type), element(element), flags(0)
+    : name(name), std(ATTR_STD_NONE), type(type), element(element), flags(0), modified(true)
 {
   /* string and matrix not supported! */
   assert(type == TypeDesc::TypeFloat || type == TypeDesc::TypeColor ||
@@ -82,6 +82,8 @@ void Attribute::add(const float &f)
 
   for (size_t i = 0; i < size; i++)
     buffer.push_back(data[i]);
+
+  modified = true;
 }
 
 void Attribute::add(const uchar4 &f)
@@ -93,6 +95,8 @@ void Attribute::add(const uchar4 &f)
 
   for (size_t i = 0; i < size; i++)
     buffer.push_back(data[i]);
+
+  modified = true;
 }
 
 void Attribute::add(const float2 &f)
@@ -104,6 +108,8 @@ void Attribute::add(const float2 &f)
 
   for (size_t i = 0; i < size; i++)
     buffer.push_back(data[i]);
+
+  modified = true;
 }
 
 void Attribute::add(const float3 &f)
@@ -115,6 +121,8 @@ void Attribute::add(const float3 &f)
 
   for (size_t i = 0; i < size; i++)
     buffer.push_back(data[i]);
+
+  modified = true;
 }
 
 void Attribute::add(const Transform &f)
@@ -126,6 +134,8 @@ void Attribute::add(const Transform &f)
 
   for (size_t i = 0; i < size; i++)
     buffer.push_back(data[i]);
+
+  modified = true;
 }
 
 void Attribute::add(const char *data)
@@ -134,6 +144,20 @@ void Attribute::add(const char *data)
 
   for (size_t i = 0; i < size; i++)
     buffer.push_back(data[i]);
+
+  modified = true;
+}
+
+void Attribute::set_data_from(Attribute &other)
+{
+  assert(other.std == std);
+  assert(other.type == type);
+  assert(other.element == element);
+
+  if (memcmp(this->data(), other.data(), other.buffer.size()) != 0) {
+    modified = true;
+    this->buffer = other.buffer;
+  }
 }
 
 size_t Attribute::data_sizeof() const

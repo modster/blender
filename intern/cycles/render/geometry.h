@@ -159,8 +159,39 @@ class Geometry : public Node {
 /* Geometry Manager */
 
 class GeometryManager {
+  using DeviceUpdateFlags = uint32_t;
+
+  enum {
+    DEVICE_VERTEX_NEEDS_REALLOC     = (1 << 0),
+    DEVICE_TRIANGLES_NEEDS_REALLOC  = (1 << 1),
+    DEVICE_CURVES_NEEDS_REALLOC     = (1 << 2),
+    DEVICE_CURVE_KEYS_NEEDS_REALLOC = (1 << 3),
+
+    ATTR_FLOAT_NEEDS_REALLOC        = (1 << 4),
+    ATTR_FLOAT2_NEEDS_REALLOC       = (1 << 5),
+    ATTR_FLOAT3_NEEDS_REALLOC       = (1 << 6),
+    ATTR_UCHAR4_NEEDS_REALLOC       = (1 << 7),
+
+    ATTRS_NEED_REALLOC              = (ATTR_FLOAT_NEEDS_REALLOC | ATTR_FLOAT2_NEEDS_REALLOC | ATTR_FLOAT3_NEEDS_REALLOC | ATTR_UCHAR4_NEEDS_REALLOC),
+    DEVICE_MESH_DATA_NEEDS_REALLOC  = (DEVICE_VERTEX_NEEDS_REALLOC | DEVICE_TRIANGLES_NEEDS_REALLOC | ATTRS_NEED_REALLOC),
+    DEVICE_CURVE_DATA_NEEDS_REALLOC  = (DEVICE_CURVES_NEEDS_REALLOC | DEVICE_CURVE_KEYS_NEEDS_REALLOC | ATTRS_NEED_REALLOC),
+    DEVICE_DATA_NEEDS_REALLOC = (DEVICE_MESH_DATA_NEEDS_REALLOC | DEVICE_CURVE_DATA_NEEDS_REALLOC),
+  };
+
+  DeviceUpdateFlags device_update_flags;
+
+  BVH *bvh;
+
  public:
+  enum {
+    MESH_ADDED   = (1 << 0),
+    MESH_REMOVED = (1 << 1),
+    HAIR_ADDED   = (1 << 2),
+    HAIR_REMOVED = (1 << 3),
+  };
+
   /* Update Flags */
+  uint32_t update_flags = 0;
   bool need_update;
   bool need_flags_update;
 

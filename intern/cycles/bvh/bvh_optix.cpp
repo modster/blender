@@ -29,6 +29,7 @@
 #  include "util/util_foreach.h"
 #  include "util/util_logging.h"
 #  include "util/util_progress.h"
+#  include "util/util_task.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -147,24 +148,19 @@ void BVHOptiX::pack_tlas()
   size_t pack_verts_offset = 0;
 
   pack.prim_type.resize(prim_index_size);
-  int *pack_prim_type = pack.prim_type.data();
   pack.prim_index.resize(prim_index_size);
-  int *pack_prim_index = pack.prim_index.data();
   pack.prim_object.resize(prim_index_size);
-  int *pack_prim_object = pack.prim_object.data();
   pack.prim_visibility.resize(prim_index_size);
-  uint *pack_prim_visibility = pack.prim_visibility.data();
   pack.prim_tri_index.resize(prim_index_size);
-  uint *pack_prim_tri_index = pack.prim_tri_index.data();
   pack.prim_tri_verts.resize(prim_tri_verts_size);
-  float4 *pack_prim_tri_verts = pack.prim_tri_verts.data();
+
+  TaskPool pool;
 
   // Top-level BVH should only contain instances, see 'Geometry::need_build_bvh'
   // Iterate over scene mesh list instead of objects, since the 'prim_offset' is calculated based
   // on that list, which may be ordered differently from the object list.
   foreach (Geometry *geom, geometry) {
     PackedBVH &bvh_pack = geom->bvh->pack;
-    int geom_prim_offset = geom->prim_offset;
 
     // Merge visibility flags of all objects and fix object indices for non-instanced geometry
     int object_index = 0;  // Unused for instanced geometry
@@ -179,37 +175,62 @@ void BVHOptiX::pack_tlas()
       }
     }
 
-    // Merge primitive, object and triangle indexes
+    pool.push(function_bind(&BVHOptiX::pack_instance, this, geom, pack_offset, pack_verts_offset, object_index, object_visibility));
+
     if (!bvh_pack.prim_index.empty()) {
-      int *bvh_prim_type = &bvh_pack.prim_type[0];
-      int *bvh_prim_index = &bvh_pack.prim_index[0];
-      uint *bvh_prim_tri_index = &bvh_pack.prim_tri_index[0];
-      uint *bvh_prim_visibility = &bvh_pack.prim_visibility[0];
-
-      for (size_t i = 0; i < bvh_pack.prim_index.size(); i++, pack_offset++) {
-        if (bvh_pack.prim_type[i] & PRIMITIVE_ALL_CURVE) {
-          pack_prim_index[pack_offset] = bvh_prim_index[i] + geom_prim_offset;
-          pack_prim_tri_index[pack_offset] = -1;
-        }
-        else {
-          pack_prim_index[pack_offset] = bvh_prim_index[i] + geom_prim_offset;
-          pack_prim_tri_index[pack_offset] = bvh_prim_tri_index[i] + pack_verts_offset;
-        }
-
-        pack_prim_type[pack_offset] = bvh_prim_type[i];
-        pack_prim_object[pack_offset] = object_index;
-        pack_prim_visibility[pack_offset] = bvh_prim_visibility[i] | object_visibility;
-      }
+      pack_offset += bvh_pack.prim_index.size();
     }
 
-    // Merge triangle vertex data
     if (!bvh_pack.prim_tri_verts.empty()) {
-      const size_t prim_tri_size = bvh_pack.prim_tri_verts.size();
-      memcpy(pack_prim_tri_verts + pack_verts_offset,
-             bvh_pack.prim_tri_verts.data(),
-             prim_tri_size * sizeof(float4));
-      pack_verts_offset += prim_tri_size;
+      pack_verts_offset += bvh_pack.prim_tri_verts.size();
     }
+  }
+
+  pool.wait_work();
+}
+
+void BVHOptiX::pack_instance(Geometry *geom, size_t pack_offset, size_t pack_verts_offset, int object_index, int object_visibility)
+{
+  int *pack_prim_type = pack.prim_type.data();
+  int *pack_prim_index = pack.prim_index.data();
+  int *pack_prim_object = pack.prim_object.data();
+  uint *pack_prim_visibility = pack.prim_visibility.data();
+  uint *pack_prim_tri_index = pack.prim_tri_index.data();
+  float4 *pack_prim_tri_verts = pack.prim_tri_verts.data();
+
+  PackedBVH &bvh_pack = geom->bvh->pack;
+  int geom_prim_offset = geom->prim_offset;
+
+  // Merge primitive, object and triangle indexes
+  if (!bvh_pack.prim_index.empty()) {
+    int *bvh_prim_type = &bvh_pack.prim_type[0];
+    int *bvh_prim_index = &bvh_pack.prim_index[0];
+    uint *bvh_prim_tri_index = &bvh_pack.prim_tri_index[0];
+    uint *bvh_prim_visibility = &bvh_pack.prim_visibility[0];
+
+    for (size_t i = 0; i < bvh_pack.prim_index.size(); i++, pack_offset++) {
+      if (bvh_pack.prim_type[i] & PRIMITIVE_ALL_CURVE) {
+        pack_prim_index[pack_offset] = bvh_prim_index[i] + geom_prim_offset;
+        pack_prim_tri_index[pack_offset] = -1;
+      }
+      else {
+        pack_prim_index[pack_offset] = bvh_prim_index[i] + geom_prim_offset;
+        pack_prim_tri_index[pack_offset] = bvh_prim_tri_index[i] + pack_verts_offset;
+      }
+
+      pack_prim_type[pack_offset] = bvh_prim_type[i];
+      pack_prim_object[pack_offset] = object_index;
+      pack_prim_visibility[pack_offset] = bvh_prim_visibility[i] | object_visibility;
+    }
+  }
+
+  // Merge triangle vertex data
+  if (!bvh_pack.prim_tri_verts.empty()) {
+    const size_t prim_tri_size = bvh_pack.prim_tri_verts.size();
+    memcpy(pack_prim_tri_verts + pack_verts_offset,
+           bvh_pack.prim_tri_verts.data(),
+           prim_tri_size * sizeof(float4));
+    pack_verts_offset += prim_tri_size;
   }
 }
 

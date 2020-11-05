@@ -624,6 +624,11 @@ void ObjectManager::device_update_transforms(DeviceScene *dscene, Scene *scene, 
                [&](const blocked_range<size_t> &r) {
                  for (size_t i = r.begin(); i != r.end(); i++) {
                    Object *ob = state.scene->objects[i];
+
+                   if (!ob->is_modified() && !(device_flags & DEVICE_DATA_NEEDS_REALLOC)) {
+                     continue;
+                   }
+
                    device_update_object_transform(&state, ob);
                  }
                });
@@ -632,7 +637,10 @@ void ObjectManager::device_update_transforms(DeviceScene *dscene, Scene *scene, 
     return;
   }
 
-  dscene->objects.copy_to_device();
+  if (device_flags & DEVICE_DATA_MODIFIED) {
+    dscene->objects.copy_to_device();
+  }
+
   if (state.need_motion == Scene::MOTION_PASS) {
     dscene->object_motion_pass.copy_to_device();
   }
@@ -652,6 +660,12 @@ void ObjectManager::device_update(Device *device,
   if (!need_update)
     return;
 
+  device_flags = 0;
+
+  if (update_flags & (OBJECT_WAS_ADDED | OBJECT_WAS_REMOVED)) {
+    device_flags |= DEVICE_DATA_NEEDS_REALLOC;
+  }
+
   VLOG(1) << "Total " << scene->objects.size() << " objects.";
 
   device_free(device, dscene);
@@ -670,6 +684,10 @@ void ObjectManager::device_update(Device *device,
     int index = 0;
     foreach (Object *object, scene->objects) {
       object->index = index++;
+
+      if (object->is_modified()) {
+        device_flags |= DEVICE_DATA_MODIFIED;
+      }
     }
   }
 
@@ -706,6 +724,8 @@ void ObjectManager::device_update(Device *device,
   foreach (Object *object, scene->objects) {
     object->clear_modified();
   }
+
+  update_flags = 0;
 }
 
 void ObjectManager::device_update_flags(
@@ -839,6 +859,10 @@ void ObjectManager::device_update_mesh_offsets(Device *, DeviceScene *dscene, Sc
 
 void ObjectManager::device_free(Device *, DeviceScene *dscene)
 {
+  if (!(device_flags & DEVICE_DATA_NEEDS_REALLOC)) {
+    return;
+  }
+
   dscene->objects.free();
   dscene->object_motion_pass.free();
   dscene->object_motion.free();

@@ -122,9 +122,23 @@ class Object : public Node {
 /* Object Manager */
 
 class ObjectManager {
+  uint32_t device_flags;
+
+  enum {
+    DEVICE_DATA_NEEDS_REALLOC = (1 << 0),
+    DEVICE_DATA_MODIFIED      = (1 << 1),
+  };
+
  public:
   bool need_update;
   bool need_flags_update;
+
+  uint32_t update_flags;
+
+  enum {
+    OBJECT_WAS_ADDED   = (1 << 0),
+    OBJECT_WAS_REMOVED = (1 << 1),
+  };
 
   ObjectManager();
   ~ObjectManager();

@@ -1193,8 +1193,17 @@ class OptiXDevice : public CUDADevice {
     // Free all previous acceleration structures which can not be refit
     std::set<CUdeviceptr> refit_mem;
 
+    if (static_cast<BVHOptiX *>(bvh)->do_refit) {
+      refit_mem.insert(static_cast<BVHOptiX *>(bvh)->optix_data_handle);
+    }
+
     for (Geometry *geom : bvh->geometry) {
       if (static_cast<BVHOptiX *>(geom->bvh)->do_refit) {
+        refit_mem.insert(static_cast<BVHOptiX *>(geom->bvh)->optix_data_handle);
+      }
+
+      if (!geom->is_modified()) {
+        static_cast<BVHOptiX *>(geom->bvh)->do_refit = true;
         refit_mem.insert(static_cast<BVHOptiX *>(geom->bvh)->optix_data_handle);
       }
     }
@@ -1228,6 +1237,12 @@ class OptiXDevice : public CUDADevice {
         out_data = 0;
         handle = 0;
         operation = OPTIX_BUILD_OPERATION_BUILD;
+      }
+
+      if (operation == OPTIX_BUILD_OPERATION_UPDATE && !geom->is_modified()) {
+        geometry.insert({ob->get_geometry(), static_cast<BVHOptiX *>(geom->bvh)->optix_handle});
+        as_mem.push_back(static_cast<BVHOptiX *>(geom->bvh)->optix_data_handle);
+        continue;
       }
 
       if (geom->geometry_type == Geometry::HAIR) {
@@ -1652,7 +1667,24 @@ class OptiXDevice : public CUDADevice {
 
     CUdeviceptr out_data = 0;
     tlas_handle = 0;
-    return build_optix_bvh(build_input, 0, tlas_handle, out_data, OPTIX_BUILD_OPERATION_BUILD);
+    OptixBuildOperation operation;
+    if (static_cast<BVHOptiX *>(bvh)->do_refit) {
+      tlas_handle = static_cast<BVHOptiX *>(bvh)->optix_handle;
+      out_data = static_cast<BVHOptiX *>(bvh)->optix_data_handle;
+      operation = OPTIX_BUILD_OPERATION_UPDATE;
+    }
+    else {
+      operation = OPTIX_BUILD_OPERATION_BUILD;
+    }
+
+    if (build_optix_bvh(build_input, 0, tlas_handle, out_data, operation)) {
+      static_cast<BVHOptiX *>(bvh)->optix_data_handle = out_data;
+      static_cast<BVHOptiX *>(bvh)->optix_handle = tlas_handle;
+      static_cast<BVHOptiX *>(bvh)->do_refit = false;
+      return true;
+    }
+
+    return false;
   }
 
   void const_copy_to(const char *name, void *host, size_t size) override

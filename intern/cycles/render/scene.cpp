@@ -88,6 +88,62 @@ DeviceScene::DeviceScene(Device *device)
   memset((void *)&data, 0, sizeof(data));
 }
 
+void DeviceScene::print_data_transfered()
+{
+  std::cerr << "Data transfered :\n";
+
+  size_t data_transfered = 0;
+  size_t data_amount = 0;
+
+#define ACCUMULATE_DATA_TRANSFERED(x) \
+  if (x.data_copied != 0) { std::cerr << "    transfered " << x.name << ", " << string_human_readable_size(x.data_copied) << '\n'; } \
+  data_transfered += x.data_copied; data_amount += x.byte_size(); x.data_copied = 0
+
+  ACCUMULATE_DATA_TRANSFERED(bvh_nodes);
+  ACCUMULATE_DATA_TRANSFERED(bvh_leaf_nodes);
+  ACCUMULATE_DATA_TRANSFERED(object_node);
+  ACCUMULATE_DATA_TRANSFERED(prim_tri_index);
+  ACCUMULATE_DATA_TRANSFERED(prim_tri_verts);
+  ACCUMULATE_DATA_TRANSFERED(prim_type);
+  ACCUMULATE_DATA_TRANSFERED(prim_visibility);
+  ACCUMULATE_DATA_TRANSFERED(prim_index);
+  ACCUMULATE_DATA_TRANSFERED(prim_object);
+  ACCUMULATE_DATA_TRANSFERED(prim_time);
+  ACCUMULATE_DATA_TRANSFERED(tri_shader);
+  ACCUMULATE_DATA_TRANSFERED(tri_vnormal);
+  ACCUMULATE_DATA_TRANSFERED(tri_vindex);
+  ACCUMULATE_DATA_TRANSFERED(tri_patch);
+  ACCUMULATE_DATA_TRANSFERED(tri_patch_uv);
+  ACCUMULATE_DATA_TRANSFERED(curves);
+  ACCUMULATE_DATA_TRANSFERED(curve_keys);
+  ACCUMULATE_DATA_TRANSFERED(patches);
+  ACCUMULATE_DATA_TRANSFERED(objects);
+  ACCUMULATE_DATA_TRANSFERED(object_motion_pass);
+  ACCUMULATE_DATA_TRANSFERED(object_motion);
+  ACCUMULATE_DATA_TRANSFERED(object_flag);
+  ACCUMULATE_DATA_TRANSFERED(object_volume_step);
+  ACCUMULATE_DATA_TRANSFERED(camera_motion);
+  ACCUMULATE_DATA_TRANSFERED(attributes_map);
+  ACCUMULATE_DATA_TRANSFERED(attributes_float);
+  ACCUMULATE_DATA_TRANSFERED(attributes_float2);
+  ACCUMULATE_DATA_TRANSFERED(attributes_float3);
+  ACCUMULATE_DATA_TRANSFERED(attributes_uchar4);
+  ACCUMULATE_DATA_TRANSFERED(light_distribution);
+  ACCUMULATE_DATA_TRANSFERED(lights);
+  ACCUMULATE_DATA_TRANSFERED(light_background_marginal_cdf);
+  ACCUMULATE_DATA_TRANSFERED(light_background_conditional_cdf);
+  ACCUMULATE_DATA_TRANSFERED(particles);
+  ACCUMULATE_DATA_TRANSFERED(svm_nodes);
+  ACCUMULATE_DATA_TRANSFERED(shaders);
+  ACCUMULATE_DATA_TRANSFERED(lookup_table);
+  ACCUMULATE_DATA_TRANSFERED(sample_pattern_lut);
+  ACCUMULATE_DATA_TRANSFERED(ies_lights);
+
+#undef ACCUMULATE_DATA_TRANSFERED
+
+  std::cerr << "    " << string_human_readable_size(data_transfered) << " / " << string_human_readable_size(data_amount) << '\n';
+}
+
 Scene::Scene(const SceneParams &params_, Device *device)
     : name("Scene"),
       default_surface(NULL),
@@ -129,6 +185,8 @@ Scene::Scene(const SceneParams &params_, Device *device)
     shader_manager = ShaderManager::create(SHADINGSYSTEM_SVM);
 
   shader_manager->add_default(this);
+
+  enable_update_stats();
 }
 
 Scene::~Scene()
@@ -217,6 +275,7 @@ void Scene::device_update(Device *device_, Progress &progress)
 
       if (print_stats) {
         printf("Update statistics:\n%s\n", update_stats->full_report().c_str());
+        dscene.print_data_transfered();
       }
     }
   });
@@ -346,6 +405,10 @@ void Scene::device_update(Device *device_, Progress &progress)
             << string_human_readable_size(mem_used) << ")\n"
             << "  Peak: " << string_human_readable_number(mem_peak) << " ("
             << string_human_readable_size(mem_peak) << ")";
+
+    if (!update_stats) {
+      dscene.print_data_transfered();
+    }
   }
 }
 
@@ -618,6 +681,7 @@ template<> Mesh *Scene::create_node<Mesh>()
   node->set_owner(this);
   geometry.push_back(node);
   geometry_manager->tag_update(this);
+  geometry_manager->update_flags |= GeometryManager::MESH_ADDED;
   return node;
 }
 
@@ -627,6 +691,7 @@ template<> Hair *Scene::create_node<Hair>()
   node->set_owner(this);
   geometry.push_back(node);
   geometry_manager->tag_update(this);
+  geometry_manager->update_flags |= GeometryManager::HAIR_ADDED;
   return node;
 }
 
@@ -636,6 +701,7 @@ template<> Volume *Scene::create_node<Volume>()
   node->set_owner(this);
   geometry.push_back(node);
   geometry_manager->tag_update(this);
+  geometry_manager->update_flags |= GeometryManager::MESH_ADDED;
   return node;
 }
 
@@ -645,6 +711,7 @@ template<> Object *Scene::create_node<Object>()
   node->set_owner(this);
   objects.push_back(node);
   object_manager->tag_update(this);
+  object_manager->update_flags |= ObjectManager::OBJECT_WAS_ADDED;
   return node;
 }
 
@@ -698,22 +765,32 @@ template<> void Scene::delete_node_impl(Mesh *node)
 {
   delete_node_from_array(geometry, static_cast<Geometry *>(node));
   geometry_manager->tag_update(this);
+  geometry_manager->update_flags |= GeometryManager::MESH_REMOVED;
 }
 
 template<> void Scene::delete_node_impl(Hair *node)
 {
   delete_node_from_array(geometry, static_cast<Geometry *>(node));
   geometry_manager->tag_update(this);
+  geometry_manager->update_flags |= GeometryManager::HAIR_REMOVED;
 }
 
 template<> void Scene::delete_node_impl(Volume *node)
 {
   delete_node_from_array(geometry, static_cast<Geometry *>(node));
   geometry_manager->tag_update(this);
+  geometry_manager->update_flags |= GeometryManager::MESH_REMOVED;
 }
 
 template<> void Scene::delete_node_impl(Geometry *node)
 {
+  if (node->is_hair()) {
+    geometry_manager->update_flags |= GeometryManager::HAIR_REMOVED;
+  }
+  else {
+    geometry_manager->update_flags |= GeometryManager::MESH_REMOVED;
+  }
+
   delete_node_from_array(geometry, node);
   geometry_manager->tag_update(this);
 }
@@ -722,6 +799,7 @@ template<> void Scene::delete_node_impl(Object *node)
 {
   delete_node_from_array(objects, node);
   object_manager->tag_update(this);
+  object_manager->update_flags |= ObjectManager::OBJECT_WAS_REMOVED;
 }
 
 template<> void Scene::delete_node_impl(ParticleSystem *node)
@@ -776,12 +854,14 @@ template<> void Scene::delete_nodes(const set<Geometry *> &nodes, const NodeOwne
 {
   remove_nodes_in_set(nodes, geometry, owner);
   geometry_manager->tag_update(this);
+  geometry_manager->update_flags |= (GeometryManager::MESH_REMOVED | GeometryManager::HAIR_REMOVED);
 }
 
 template<> void Scene::delete_nodes(const set<Object *> &nodes, const NodeOwner *owner)
 {
   remove_nodes_in_set(nodes, objects, owner);
   object_manager->tag_update(this);
+  object_manager->update_flags |= ObjectManager::OBJECT_WAS_REMOVED;
 }
 
 template<> void Scene::delete_nodes(const set<ParticleSystem *> &nodes, const NodeOwner *owner)

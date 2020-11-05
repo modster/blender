@@ -130,8 +130,9 @@ void Background::device_free(Device * /*device*/, DeviceScene * /*dscene*/)
 
 void Background::tag_update(Scene *scene)
 {
-  scene->integrator->tag_update(scene);
-  tag_modified();
+  if (is_modified()) {
+    scene->integrator->tag_update(scene);
+  }
 }
 
 Shader *Background::get_shader(const Scene *scene)

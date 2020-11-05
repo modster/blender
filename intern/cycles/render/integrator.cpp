@@ -242,26 +242,28 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
   int dimensions = PRNG_BASE_NUM + max_samples * PRNG_BOUNCE_NUM;
   dimensions = min(dimensions, SOBOL_MAX_DIMENSIONS);
 
-  if (sampling_pattern == SAMPLING_PATTERN_SOBOL) {
-    uint *directions = dscene->sample_pattern_lut.alloc(SOBOL_BITS * dimensions);
+  if (sampling_pattern_is_modified()) {
+    if (sampling_pattern == SAMPLING_PATTERN_SOBOL) {
+      uint *directions = dscene->sample_pattern_lut.alloc(SOBOL_BITS * dimensions);
 
-    sobol_generate_direction_vectors((uint(*)[SOBOL_BITS])directions, dimensions);
+      sobol_generate_direction_vectors((uint(*)[SOBOL_BITS])directions, dimensions);
 
-    dscene->sample_pattern_lut.copy_to_device();
-  }
-  else {
-    constexpr int sequence_size = NUM_PMJ_SAMPLES;
-    constexpr int num_sequences = NUM_PMJ_PATTERNS;
-    float2 *directions = (float2 *)dscene->sample_pattern_lut.alloc(sequence_size * num_sequences *
-                                                                    2);
-    TaskPool pool;
-    for (int j = 0; j < num_sequences; ++j) {
-      float2 *sequence = directions + j * sequence_size;
-      pool.push(
-          function_bind(&progressive_multi_jitter_02_generate_2D, sequence, sequence_size, j));
+      dscene->sample_pattern_lut.copy_to_device();
     }
-    pool.wait_work();
-    dscene->sample_pattern_lut.copy_to_device();
+    else {
+      constexpr int sequence_size = NUM_PMJ_SAMPLES;
+      constexpr int num_sequences = NUM_PMJ_PATTERNS;
+      float2 *directions = (float2 *)dscene->sample_pattern_lut.alloc(sequence_size * num_sequences *
+                                                                      2);
+      TaskPool pool;
+      for (int j = 0; j < num_sequences; ++j) {
+        float2 *sequence = directions + j * sequence_size;
+        pool.push(
+            function_bind(&progressive_multi_jitter_02_generate_2D, sequence, sequence_size, j));
+      }
+      pool.wait_work();
+      dscene->sample_pattern_lut.copy_to_device();
+    }
   }
 
   clear_modified();
@@ -269,18 +271,24 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
 
 void Integrator::device_free(Device *, DeviceScene *dscene)
 {
+  if (!sampling_pattern_is_modified()) {
+    return;
+  }
+
   dscene->sample_pattern_lut.free();
 }
 
 void Integrator::tag_update(Scene *scene)
 {
-  foreach (Shader *shader, scene->shaders) {
-    if (shader->has_integrator_dependency) {
-      scene->shader_manager->need_update = true;
-      break;
+  if (filter_glossy_is_modified()) {
+    foreach (Shader *shader, scene->shaders) {
+      if (shader->has_integrator_dependency) {
+        scene->shader_manager->need_update = true;
+        break;
+      }
     }
   }
-  tag_modified();
+  //tag_modified();
 }
 
 CCL_NAMESPACE_END

@@ -135,6 +135,8 @@ class DeviceScene {
   KernelData data;
 
   DeviceScene(Device *device);
+
+  void print_data_transfered();
 };
 
 /* Scene Parameters */

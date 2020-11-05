@@ -324,11 +324,15 @@ template<typename T> class device_only_memory : public device_memory {
 
 template<typename T> class device_vector : public device_memory {
  public:
+  bool modified;
+  size_t data_copied = 0;
+
   device_vector(Device *device, const char *name, MemoryType type)
       : device_memory(device, name, type)
   {
     data_type = device_type_traits<T>::data_type;
     data_elements = device_type_traits<T>::num_elements;
+    modified = true;
 
     assert(data_elements > 0);
   }
@@ -347,6 +351,7 @@ template<typename T> class device_vector : public device_memory {
       device_free();
       host_free();
       host_pointer = host_alloc(sizeof(T) * new_size);
+      modified = true;
       assert(device_pointer == 0);
     }
 
@@ -411,10 +416,11 @@ template<typename T> class device_vector : public device_memory {
     data_height = 0;
     data_depth = 0;
     host_pointer = 0;
+    modified = true;
     assert(device_pointer == 0);
   }
 
-  size_t size()
+  size_t size() const
   {
     return data_size;
   }
@@ -433,6 +439,13 @@ template<typename T> class device_vector : public device_memory {
   void copy_to_device()
   {
     device_copy_to();
+    modified = false;
+    data_copied = byte_size();
+  }
+
+  size_t byte_size() const
+  {
+    return size() * sizeof(T);
   }
 
   void copy_from_device()

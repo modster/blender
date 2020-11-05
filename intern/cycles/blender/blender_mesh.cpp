@@ -1076,11 +1076,29 @@ void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph, BL::Object b_ob, Mesh *me
   }
 
   foreach (Attribute &attr, new_mesh.attributes.attributes) {
-    mesh->attributes.attributes.push_back(std::move(attr));
+    Attribute *nattr = nullptr;
+
+    if (attr.std != ATTR_STD_NONE) {
+      nattr = mesh->attributes.add(attr.std, attr.name);
+    }
+    else {
+      nattr = mesh->attributes.add(attr.name, attr.type, attr.element);
+    }
+
+    nattr->set_data_from(attr);
   }
 
   foreach (Attribute &attr, new_mesh.subd_attributes.attributes) {
-    mesh->subd_attributes.attributes.push_back(std::move(attr));
+    Attribute *nattr = nullptr;
+
+    if (attr.std != ATTR_STD_NONE) {
+      nattr = mesh->subd_attributes.add(attr.std, attr.name);
+    }
+    else {
+      nattr = mesh->subd_attributes.add(attr.name, attr.type, attr.element);
+    }
+
+    nattr->set_data_from(attr);
   }
 
   mesh->set_num_subd_faces(new_mesh.get_num_subd_faces());
