@@ -169,7 +169,7 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
 
   if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_IDLE)) {
     /* Update triggered when nothing's happening, means DG update, so we request a refresh on line
-     * art cache, meanwhile waiting for result. Update will trigger agian. */
+     * art cache, meanwhile waiting for result. Update will trigger again. */
     ED_lineart_modifier_sync_flag_set(LRT_SYNC_WAITING, true);
     /* Don't have data yet, update line art. Note:  ED_lineart_post_frame_update_external will
      * automatically return when calculation is already in progress.*/
