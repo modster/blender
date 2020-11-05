@@ -1643,19 +1643,19 @@ bool UI_panel_is_dragging(const struct Panel *panel)
 }
 
 /**
- * \note about sorting;
- * the #Panel.sortorder has a lower value for new panels being added.
+ * \note about sorting:
+ * The #Panel.sortorder has a lower value for new panels being added.
  * however, that only works to insert a single panel, when more new panels get
  * added the coordinates of existing panels and the previously stored to-be-inserted
- * panels do not match for sorting
+ * panels do not match for sorting.
  */
 
 static int find_highest_panel(const void *a1, const void *a2)
 {
   const PanelSort *ps1 = a1, *ps2 = a2;
 
-  /* stick uppermost header-less panels to the top of the region -
-   * prevent them from being sorted (multiple header-less panels have to be sorted though) */
+  /* Stick uppermost header-less panels to the top of the region -
+   * prevent them from being sorted (multiple header-less panels have to be sorted though). */
   if (ps1->panel->type->flag & PNL_NO_HEADER && ps2->panel->type->flag & PNL_NO_HEADER) {
     /* Skip and check for `ofsy` and #Panel.sortorder below. */
   }
@@ -1723,10 +1723,12 @@ static bool uiAlignPanelStep(ARegion *region, const float factor, const bool dra
   int active_panels_len = 0;
   LISTBASE_FOREACH (Panel *, panel, &region->panels) {
     if (panel->runtime_flag & PANEL_ACTIVE) {
+      /* These panels should have types since they are currently displayed to the user. */
+      BLI_assert(panel->type != NULL);
+
       active_panels_len++;
     }
   }
-
   if (active_panels_len == 0) {
     return false;
   }
