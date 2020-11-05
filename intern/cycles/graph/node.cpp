@@ -386,6 +386,7 @@ void Node::copy_value(const SocketType &socket, const Node &other, const SocketT
 void Node::set_value(const SocketType &socket, const Node &other, const SocketType &other_socket)
 {
   assert(socket.type == other_socket.type);
+  (void)other_socket;
 
   if (socket.is_array()) {
     switch (socket.type) {

@@ -277,9 +277,9 @@ void Mesh::reserve_subd_creases(size_t num_creases)
   subd_creases_weight.reserve(num_creases);
 }
 
-void Mesh::clear(bool preserve_voxel_data)
+void Mesh::clear(bool preserve_shaders, bool preserve_voxel_data)
 {
-  Geometry::clear();
+  Geometry::clear(preserve_shaders);
 
   /* clear all verts and triangles */
   verts.clear();
@@ -315,9 +315,9 @@ void Mesh::clear(bool preserve_voxel_data)
   patch_table = NULL;
 }
 
-void Mesh::clear()
+void Mesh::clear(bool preserve_shaders)
 {
-  clear(false);
+  clear(preserve_shaders, false);
 }
 
 void Mesh::add_vertex(float3 P)

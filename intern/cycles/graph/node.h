@@ -74,6 +74,11 @@ struct Transform;
   { \
     const SocketType *socket = get_##name##_socket(); \
     this->set(*socket, value); \
+  } \
+  type_ &get_##name() \
+  { \
+    const SocketType *socket = get_##name##_socket(); \
+    return get_socket_value<type_>(this, *socket); \
   }
 
 #define NODE_SOCKET_API_STRUCT_MEMBER(type_, name, member) \

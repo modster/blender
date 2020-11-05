@@ -291,7 +291,7 @@ float Object::compute_volume_step_size() const
   /* Compute step rate from shaders. */
   float step_rate = FLT_MAX;
 
-  foreach (Node *node, mesh->used_shaders) {
+  foreach (Node *node, mesh->get_used_shaders()) {
     Shader *shader = static_cast<Shader *>(node);
     if (shader->has_volume) {
       if ((shader->get_heterogeneous_volume() && shader->has_volume_spatial_varying) ||
@@ -324,8 +324,13 @@ float Object::compute_volume_step_size() const
 
         if (voxel_step_size == 0.0f) {
           /* Auto detect step size. */
-          float3 size = make_float3(
-              1.0f / metadata.width, 1.0f / metadata.height, 1.0f / metadata.depth);
+          float3 size = make_float3(1.0f, 1.0f, 1.0f);
+#ifdef WITH_NANOVDB
+          /* Dimensions were not applied to image transform with NanOVDB (see image_vdb.cpp) */
+          if (metadata.type != IMAGE_DATA_TYPE_NANOVDB_FLOAT &&
+              metadata.type != IMAGE_DATA_TYPE_NANOVDB_FLOAT3)
+#endif
+            size /= make_float3(metadata.width, metadata.height, metadata.depth);
 
           /* Step size is transformed from voxel to world space. */
           Transform voxel_tfm = tfm;

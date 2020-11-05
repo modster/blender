@@ -320,12 +320,11 @@ static vector<int> get_voxel_image_slots(Mesh *mesh)
   return slots;
 }
 
-void BlenderSync::sync_volume(BL::Object &b_ob, Volume *volume, array<Node *> &used_shaders)
+void BlenderSync::sync_volume(BL::Object &b_ob, Volume *volume)
 {
   vector<int> old_voxel_slots = get_voxel_image_slots(volume);
 
-  volume->clear();
-  volume->set_used_shaders(used_shaders);
+  volume->clear(true);
 
   if (view_layer.use_volumes) {
     if (b_ob.type() == BL::Object::type_VOLUME) {
