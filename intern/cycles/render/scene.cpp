@@ -186,7 +186,7 @@ Scene::Scene(const SceneParams &params_, Device *device)
 
   shader_manager->add_default(this);
 
-  enable_update_stats();
+  //enable_update_stats();
 }
 
 Scene::~Scene()
@@ -275,7 +275,7 @@ void Scene::device_update(Device *device_, Progress &progress)
 
       if (print_stats) {
         printf("Update statistics:\n%s\n", update_stats->full_report().c_str());
-        dscene.print_data_transfered();
+        //dscene.print_data_transfered();
       }
     }
   });
@@ -407,7 +407,7 @@ void Scene::device_update(Device *device_, Progress &progress)
             << string_human_readable_size(mem_peak) << ")";
 
     if (!update_stats) {
-      dscene.print_data_transfered();
+      //dscene.print_data_transfered();
     }
   }
 }
