@@ -1307,6 +1307,7 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
       break;
     }
 #ifdef WITH_LINEART
+    case GP_LRT_SCENE:
     case GP_LRT_COLLECTION:
     case GP_LRT_OBJECT: {
       float radius = RNA_float_get(op->ptr, "radius");
@@ -1331,9 +1332,13 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
         md->source_type = LRT_SOURCE_COLLECTION;
         md->source_collection = CTX_data_collection(C);
       }
-      else {
+      else if (type == GP_LRT_OBJECT) {
         md->source_type = LRT_SOURCE_OBJECT;
         md->source_object = ob_orig;
+      }
+      else {
+        /* Whole scene. */
+        md->source_type = LRT_SOURCE_SCENE;
       }
       /* Only created one layer and one material. */
       strcpy(md->target_layer, ((bGPDlayer *)gpd->layers.first)->info);
@@ -1379,9 +1384,10 @@ static const EnumPropertyItem *object_gpencil_add_options(bContext *C,
 
   /* Default types. */
   for (i = 0; i < orig_count; i++) {
-    if (item_ref[i].value == GP_LRT_OBJECT || item_ref[i].value == GP_LRT_COLLECTION) {
+    if (item_ref[i].value == GP_LRT_OBJECT || item_ref[i].value == GP_LRT_COLLECTION ||
+        item_ref[i].value == GP_LRT_SCENE) {
 #ifdef WITH_LINEART
-      if (item_ref[i].value == GP_LRT_COLLECTION) {
+      if (item_ref[i].value == GP_LRT_SCENE) {
         /* separator before line art types */
         RNA_enum_item_add_separator(&item, &totitem);
       }

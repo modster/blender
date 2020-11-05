@@ -3969,6 +3969,9 @@ void ED_lineart_gpencil_generate(Depsgraph *depsgraph,
     orig_col = source_collection->id.orig_id ? (Collection *)source_collection->id.orig_id :
                                                source_collection;
   }
+
+  /* if(!orig_col && !orig_ob) means the whole scene is selected. */
+
   float mat[4][4];
   unit_m4(mat);
 
@@ -4121,7 +4124,7 @@ void ED_lineart_gpencil_generate_with_type(Depsgraph *depsgraph,
                                            int modifier_flags)
 {
 
-  if (!gpl || !gpf || !source_reference || !ob) {
+  if (!gpl || !gpf || !ob) {
     return;
   }
 
@@ -4129,12 +4132,22 @@ void ED_lineart_gpencil_generate_with_type(Depsgraph *depsgraph,
   Collection *source_collection = NULL;
   short use_types = 0;
   if (source_type == LRT_SOURCE_OBJECT) {
+    if (!source_reference) {
+      return;
+    }
     source_object = (Object *)source_reference;
     /* Note that intersection lines will only be in collection. */
     use_types = line_types & (~LRT_EDGE_FLAG_INTERSECTION);
   }
-  else {
+  else if (source_type == LRT_SOURCE_COLLECTION) {
+    if (!source_reference) {
+      return;
+    }
     source_collection = (Collection *)source_reference;
+    use_types = line_types;
+  }
+  else {
+    /* Whole scene. */
     use_types = line_types;
   }
   float gp_obmat_inverse[4][4];

@@ -602,8 +602,9 @@ enum {
   GP_EMPTY = 0,
   GP_STROKE = 1,
   GP_MONKEY = 2,
-  GP_LRT_OBJECT = 3,
-  GP_LRT_COLLECTION = 4,
+  GP_LRT_SCENE = 3,
+  GP_LRT_OBJECT = 4,
+  GP_LRT_COLLECTION = 5,
 };
 
 /* boundtype */

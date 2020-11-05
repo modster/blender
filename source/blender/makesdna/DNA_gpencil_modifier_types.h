@@ -807,6 +807,7 @@ typedef enum eTextureGpencil_Mode {
 typedef enum eLineartGpencilModifierSource {
   LRT_SOURCE_COLLECTION = 0,
   LRT_SOURCE_OBJECT = 1,
+  LRT_SOURCE_SCENE = 2,
 } eLineartGpencilModifierSource;
 
 typedef enum eLineArtGPencilModifierFlags {

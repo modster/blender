@@ -2308,6 +2308,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   static const EnumPropertyItem modifier_lineart_source_type[] = {
       {LRT_SOURCE_COLLECTION, "COLLECTION", 0, "Collection", ""},
       {LRT_SOURCE_OBJECT, "OBJECT", 0, "Object", ""},
+      {LRT_SOURCE_SCENE, "SCENE", 0, "Scene", ""},
       {0, NULL, 0, NULL, NULL},
   };
 
