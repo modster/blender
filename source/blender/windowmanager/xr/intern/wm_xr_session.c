@@ -241,7 +241,7 @@ typedef enum wmXrSessionStateEvent {
   SESSION_STATE_EVENT_NONE = 0,
   SESSION_STATE_EVENT_START,
   SESSION_STATE_EVENT_RESET_TO_BASE_POSE,
-  SESSION_STATE_EVENT_POSITON_TRACKING_TOGGLE,
+  SESSION_STATE_EVENT_POSITION_TRACKING_TOGGLE,
 } wmXrSessionStateEvent;
 
 static bool wm_xr_session_draw_data_needs_reset_to_base_pose(const wmXrSessionState *state,
@@ -269,7 +269,7 @@ static wmXrSessionStateEvent wm_xr_session_state_to_event(const wmXrSessionState
                                            XR_SESSION_USE_POSITION_TRACKING) !=
                                           (settings->flag & XR_SESSION_USE_POSITION_TRACKING));
   if (position_tracking_toggled) {
-    return SESSION_STATE_EVENT_POSITON_TRACKING_TOGGLE;
+    return SESSION_STATE_EVENT_POSITION_TRACKING_TOGGLE;
   }
 
   return SESSION_STATE_EVENT_NONE;
@@ -304,7 +304,7 @@ void wm_xr_session_draw_data_update(const wmXrSessionState *state,
         copy_v3_fl(draw_data->eye_position_ofs, 0.0f);
       }
       break;
-    case SESSION_STATE_EVENT_POSITON_TRACKING_TOGGLE:
+    case SESSION_STATE_EVENT_POSITION_TRACKING_TOGGLE:
       if (use_position_tracking) {
         /* Keep the current position, and let the user move from there. */
         copy_v3_v3(draw_data->eye_position_ofs, state->prev_eye_position_ofs);
@@ -335,6 +335,7 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
 {
   GHOST_XrPose viewer_pose;
   const bool use_position_tracking = settings->flag & XR_SESSION_USE_POSITION_TRACKING;
+  const bool use_absolute_tracking = settings->flag & XR_SESSION_USE_ABSOLUTE_TRACKING;
   wmXrEyeData *eye = &state->eyes[draw_view->view];
 
   mul_qt_qtqt(viewer_pose.orientation_quat,
@@ -343,9 +344,11 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
   copy_v3_v3(viewer_pose.position, draw_data->base_pose.position);
   /* The local pose and the eye pose (which is copied from an earlier local pose) both are view
    * space, so Y-up. In this case we need them in regular Z-up. */
-  viewer_pose.position[0] -= draw_data->eye_position_ofs[0];
-  viewer_pose.position[1] += draw_data->eye_position_ofs[2];
-  viewer_pose.position[2] -= draw_data->eye_position_ofs[1];
+  if (!use_absolute_tracking) {
+    viewer_pose.position[0] -= draw_data->eye_position_ofs[0];
+    viewer_pose.position[1] += draw_data->eye_position_ofs[2];
+    viewer_pose.position[2] -= draw_data->eye_position_ofs[1];
+  }
   if (use_position_tracking) {
     viewer_pose.position[0] += draw_view->local_pose.position[0];
     viewer_pose.position[1] -= draw_view->local_pose.position[2];
@@ -552,11 +555,13 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
   bScreen *screen_anim = ED_screen_animation_playing(wm);
   Object *ob_constraint = NULL;
   char ob_flag;
-  float view_ofs[3];
+  float view_ofs[3] = {0};
   float base_inv[4][4];
   float tmp[4][4];
 
-  copy_v3_v3(view_ofs, state->prev_eye_position_ofs);
+  if ((settings->flag & XR_SESSION_USE_ABSOLUTE_TRACKING) == 0) {
+    copy_v3_v3(view_ofs, state->prev_eye_position_ofs);
+  }
   if ((settings->flag & XR_SESSION_USE_POSITION_TRACKING) == 0) {
     add_v3_v3(view_ofs, state->prev_local_pose.position);
   }
@@ -694,7 +699,8 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
             const float(*state)[2] = &((float(*)[2])action->states)[i];
             float(*state_prev)[2] = &((float(*)[2])action->states_prev)[i];
             if (fabsf((*state)[0]) > action->threshold || fabsf((*state)[1]) > action->threshold) {
-              if (fabsf((*state_prev)[0]) <= action->threshold && fabsf((*state_prev)[1]) <= action->threshold) {
+              if (fabsf((*state_prev)[0]) <= action->threshold &&
+                  fabsf((*state_prev)[1]) <= action->threshold) {
                 if (modal || action->op_flag == XR_OP_PRESS) {
                   val = KM_PRESS;
                   press_start = true;

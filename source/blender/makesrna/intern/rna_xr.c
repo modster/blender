@@ -55,6 +55,58 @@ static wmXrData *rna_XrSession_wm_xr_data_get(PointerRNA *ptr)
 }
 #  endif
 
+static bool rna_XrSessionSettings_use_positional_tracking_get(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  return (xr->session_settings.flag & XR_SESSION_USE_POSITION_TRACKING) != 0;
+#  else
+  UNUSED_VARS(ptr);
+  return false;
+#  endif
+}
+
+static void rna_XrSessionSettings_use_positional_tracking_set(PointerRNA *ptr, bool value)
+{
+#  ifdef WITH_XR_OPENXR
+  wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  if (value) {
+    xr->session_settings.flag |= XR_SESSION_USE_POSITION_TRACKING;
+  }
+  else {
+    xr->session_settings.flag &= (~XR_SESSION_USE_POSITION_TRACKING);
+  }
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
+static bool rna_XrSessionSettings_use_absolute_tracking_get(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  const wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  return (xr->session_settings.flag & XR_SESSION_USE_ABSOLUTE_TRACKING) != 0;
+#  else
+  UNUSED_VARS(ptr);
+  return false;
+#  endif
+}
+
+static void rna_XrSessionSettings_use_absolute_tracking_set(PointerRNA *ptr, bool value)
+{
+#  ifdef WITH_XR_OPENXR
+  wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  if (value) {
+    xr->session_settings.flag |= XR_SESSION_USE_ABSOLUTE_TRACKING;
+  }
+  else {
+    xr->session_settings.flag &= (~XR_SESSION_USE_ABSOLUTE_TRACKING);
+  }
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
 static bool rna_XrSessionSettings_headset_object_enable_get(PointerRNA *ptr)
 {
 #  ifdef WITH_XR_OPENXR
@@ -717,11 +769,21 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
   RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
 
   prop = RNA_def_property(srna, "use_positional_tracking", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "flag", XR_SESSION_USE_POSITION_TRACKING);
+  RNA_def_property_boolean_funcs(prop,
+                                 "rna_XrSessionSettings_use_positional_tracking_get",
+                                 "rna_XrSessionSettings_use_positional_tracking_set");
   RNA_def_property_ui_text(
       prop,
       "Positional Tracking",
       "Allow VR headsets to affect the location in virtual space, in addition to the rotation");
+  RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
+
+  prop = RNA_def_property(srna, "use_absolute_tracking", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_funcs(prop,
+                                 "rna_XrSessionSettings_use_absolute_tracking_get",
+                                 "rna_XrSessionSettings_use_absolute_tracking_set");
+  RNA_def_property_ui_text(
+      prop, "Absolute Tracking", "Use unadjusted location/rotation as defined by the XR runtime");
   RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
 
   prop = RNA_def_property(srna, "headset_object", PROP_POINTER, PROP_NONE);
