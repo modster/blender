@@ -265,15 +265,18 @@ void Geometry::tag_update(Scene *scene, bool rebuild)
     scene->light_manager->tag_update(scene, LightManager::MESH_NEED_REBUILD);
   }
   else {
-    if (is_modified()) {
-      foreach (Node *node, used_shaders) {
-        Shader *shader = static_cast<Shader *>(node);
-        if (shader->has_surface_emission) {
-          scene->light_manager->tag_update(scene, LightManager::EMISSIVE_MESH_MODIFIED);
-          break;
-        }
+    foreach (Node *node, used_shaders) {
+      Shader *shader = static_cast<Shader *>(node);
+      if (shader->has_surface_emission) {
+        scene->light_manager->tag_update(scene, LightManager::EMISSIVE_MESH_MODIFIED);
+        break;
       }
     }
+  }
+
+  if (!is_modified()) {
+    scene->geometry_manager->need_flags_update = true;
+    return;
   }
 
   scene->geometry_manager->need_update = true;
@@ -1427,6 +1430,10 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
 
   if (update_flags & (HAIR_ADDED | HAIR_REMOVED)) {
     device_update_flags |= DEVICE_CURVE_DATA_NEEDS_REALLOC;
+  }
+
+  if (device_update_flags != 0) {
+    need_update = true;
   }
 
   need_flags_update = false;
