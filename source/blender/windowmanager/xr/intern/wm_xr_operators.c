@@ -515,14 +515,19 @@ static int wm_xr_select_raycast_modal_3d(bContext *C, wmOperator *op, const wmEv
   wmWindowManager *wm = CTX_wm_manager(C);
   wmXrActionData *actiondata = event->customdata;
   XrRaycastSelectData *data = op->customdata;
+  float axis[3];
 
-#if 1
-  /* Use the "grip" pose forward axis. */
-  float axis[3] = {0.0f, 0.0f, -1.0f};
-#else
-  /* Use the "aim" pose forward axis. */
-  float axis[3] = {0.0f, 1.0f, 0.0f};
-#endif
+  PropertyRNA *prop = RNA_struct_find_property(op->ptr, "axis");
+  if (prop) {
+    RNA_property_float_get_array(op->ptr, prop, axis);
+    normalize_v3(axis);
+  }
+  else {
+    axis[0] = 0.0f;
+    axis[1] = 0.0f;
+    axis[2] = -1.0f;
+  }
+
   copy_v3_v3(data->origin, actiondata->controller_loc);
 
   mul_qt_v3(actiondata->controller_rot, axis);
@@ -535,7 +540,6 @@ static int wm_xr_select_raycast_modal_3d(bContext *C, wmOperator *op, const wmEv
     return OPERATOR_RUNNING_MODAL;
   }
   else if (event->val == KM_RELEASE) {
-    PropertyRNA *prop = NULL;
     float ray_dist;
     eSelectOp select_op = SEL_OP_SET;
     bool deselect_all;
@@ -602,6 +606,18 @@ static void WM_OT_xr_select_raycast(wmOperatorType *ot)
                 "Maximum distance",
                 0.0,
                 BVH_RAYCAST_DIST_MAX);
+
+  static const float default_axis[3] = {0.0f, 0.0f, -1.0f};
+  RNA_def_float_vector(ot->srna,
+                       "axis",
+                       3,
+                       default_axis,
+                       -1.0f,
+                       1.0f,
+                       "Axis",
+                       "Normalized raycast axis in controller space",
+                       -1.0f,
+                       1.0f);
 }
 
 /** \} */
@@ -637,10 +653,9 @@ static int wm_xr_constraints_toggle_exec(bContext *C, wmOperator *op)
 {
   wmWindowManager *wm = CTX_wm_manager(C);
   XrSessionSettings *settings = &wm->xr.session_settings;
-  PropertyRNA *prop = NULL;
   bool headset, controller0, controller1, enable, autokey;
 
-  prop = RNA_struct_find_property(op->ptr, "headset");
+  PropertyRNA *prop = RNA_struct_find_property(op->ptr, "headset");
   headset = prop ? RNA_property_boolean_get(op->ptr, prop) : true;
 
   prop = RNA_struct_find_property(op->ptr, "controller0");
