@@ -56,7 +56,6 @@
 #include "BKE_particle.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
-#include "BKE_sequencer.h"
 #include "BKE_shader_fx.h"
 #include "BKE_workspace.h"
 
@@ -72,6 +71,8 @@
 #include "ED_select_utils.h"
 #include "ED_sequencer.h"
 #include "ED_undo.h"
+
+#include "SEQ_sequencer.h"
 
 #include "WM_api.h"
 #include "WM_toolsystem.h"
@@ -1434,7 +1435,7 @@ static bool do_outliner_range_select_recursive(ListBase *lb,
     }
 
     /* Set state for selection */
-    if (te == active || te == cursor) {
+    if (ELEM(te, active, cursor)) {
       selecting = !selecting;
     }
 
