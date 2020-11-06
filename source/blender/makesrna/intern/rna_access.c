@@ -2735,17 +2735,17 @@ void RNA_property_int_get_default_array(PointerRNA *ptr, PropertyRNA *prop, int 
     const IDProperty *idprop = (const IDProperty *)prop;
     if (idprop->ui_data) {
       BLI_assert(idprop->type == IDP_ARRAY);
-      const IDPropertyUIDataArray *ui_data = (const IDPropertyUIDataArray *)idprop->ui_data;
-      if (ui_data->default_value_array) {
-        rna_property_int_fill_default_array_values(ui_data->default_value_array,
+      const IDPropertyUIDataInt *ui_data = (const IDPropertyUIDataInt *)idprop->ui_data;
+      if (ui_data->default_array) {
+        rna_property_int_fill_default_array_values(ui_data->default_array,
                                                    ui_data->default_array_len,
-                                                   ui_data->default_value_int,
+                                                   ui_data->default_value,
                                                    length,
                                                    values);
       }
       else {
         rna_property_int_fill_default_array_values(
-            NULL, 0, ui_data->default_value_int, length, values);
+            NULL, 0, ui_data->default_value, length, values);
       }
     }
   }
@@ -3106,27 +3106,18 @@ void RNA_property_float_get_default_array(PointerRNA *ptr, PropertyRNA *prop, fl
     const IDProperty *idprop = (const IDProperty *)prop;
     if (idprop->ui_data) {
       BLI_assert(idprop->type == IDP_ARRAY);
-      const IDPropertyUIDataArray *ui_data = (const IDPropertyUIDataArray *)idprop->ui_data;
-      if (ui_data->default_value_array) {
-        if (idprop->subtype == IDP_DOUBLE) {
-          /* A version of #rna_property_float_fill_default_array_values for doubles. */
-          const double *default_value_array = ui_data->default_value_array;
-          for (int i = 0; i < length; i++) {
-            values[i] = (i < ui_data->default_array_len) ? (float)default_value_array[i] :
-                                                           (float)ui_data->default_value_double;
-          }
-        }
-        else {
-          rna_property_float_fill_default_array_values(ui_data->default_value_array,
-                                                       ui_data->default_array_len,
-                                                       (float)ui_data->default_value_double,
-                                                       length,
-                                                       values);
+      const IDPropertyUIDataFloat *ui_data = (const IDPropertyUIDataFloat *)idprop->ui_data;
+      if (ui_data->default_array) {
+        /* A version of #rna_property_float_fill_default_array_values for a double array. */
+        const double *default_array = ui_data->default_array;
+        for (int i = 0; i < length; i++) {
+          values[i] = (i < ui_data->default_array_len) ? (float)default_array[i] :
+                                                         (float)ui_data->default_value;
         }
       }
       else {
         rna_property_float_fill_default_array_values(
-            NULL, 0, (float)ui_data->default_value_double, length, values);
+            NULL, 0, (float)ui_data->default_value, length, values);
       }
     }
   }

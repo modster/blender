@@ -21,6 +21,7 @@ set(INC
   ../../blenlib
   ../../gpu
   ../../makesdna
+  ../../makesrna
   ../../../../intern/glew-mx
   ../../../../intern/guardedalloc
 )
