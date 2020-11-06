@@ -349,7 +349,7 @@ int main(int argc,
 
 #if defined(__APPLE__) && !defined(WITH_PYTHON_MODULE) && !defined(WITH_HEADLESS)
   /* Patch to ignore argument finder gives us (PID?) */
-  if (argc == 2 && STREQLEN(argv[1], "-psn_", 5)) {
+  if (argc == 2 && STRPREFIX(argv[1], "-psn_")) {
     extern int GHOST_HACK_getFirstFile(char buf[]);
     static char firstfilebuf[512];
 
@@ -437,8 +437,8 @@ int main(int argc,
   RNA_init();
 
   RE_engines_init();
-  init_nodesystem();
-  psys_init_rng();
+  BKE_node_system_init();
+  BKE_particle_init_rng();
   /* End second initialization. */
 
 #if defined(WITH_PYTHON_MODULE) || defined(WITH_HEADLESS)
