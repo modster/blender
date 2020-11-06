@@ -677,10 +677,10 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
         items=enum_bvh_types,
         default='DYNAMIC_BVH',
     )
-    bvh_rebuild_rate: IntProperty(
-        name="BVH Rebuild Rate",
-        description="Only rebuild the BVH every N frame, for faster updates on frame change in the viewport",
-        default=1,
+    max_bvh_refits: IntProperty(
+        name="Max BVH Refits",
+        description="Maximum number of times a BVH is refitted",
+        default=10,
         min=1,
     )
     debug_use_spatial_splits: BoolProperty(

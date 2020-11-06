@@ -89,6 +89,7 @@ class BVH {
 
   device_ptr prim_vert_pointer;
   size_t pack_verts_offset;
+  int num_refits;
 
   static BVH *create(const BVHParams &params,
                      const vector<Geometry *> &geometry,

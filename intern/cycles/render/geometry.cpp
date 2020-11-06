@@ -212,7 +212,7 @@ void Geometry::compute_bvh(
     vector<Object *> objects;
     objects.push_back(&object);
 
-    if (bvh && (!need_update_rebuild || params->use_bvh_refit)) {
+    if (bvh && !need_update_rebuild && bvh->num_refits < params->max_bvh_refits) {
       progress->set_status(msg, "Refitting BVH");
 
       bvh->geometry = geometry;

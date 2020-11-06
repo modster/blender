@@ -92,7 +92,7 @@ int BVHStackEntry::encodeIdx() const
 BVH::BVH(const BVHParams &params_,
          const vector<Geometry *> &geometry_,
          const vector<Object *> &objects_)
-    : params(params_), geometry(geometry_), objects(objects_)
+    : params(params_), geometry(geometry_), objects(objects_), num_refits(0)
 {
 }
 
@@ -191,6 +191,7 @@ void BVH::refit(Progress &progress)
 
   progress.set_substatus("Refitting BVH nodes");
   refit_nodes();
+  num_refits += 1;
 }
 
 void BVH::refit_primitives(int start, int end, BoundBox &bbox, uint &visibility)

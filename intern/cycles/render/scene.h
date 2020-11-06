@@ -181,7 +181,7 @@ class SceneParams {
   CurveShapeType hair_shape;
   bool persistent_data;
   int texture_limit;
-  bool use_bvh_refit;
+  int max_bvh_refits;
 
   bool background;
 
@@ -198,7 +198,7 @@ class SceneParams {
     persistent_data = false;
     texture_limit = 0;
     background = true;
-    use_bvh_refit = false;
+    max_bvh_refits = 10;
   }
 
   bool modified(const SceneParams &params)
@@ -215,7 +215,7 @@ class SceneParams {
   bool update_params(const SceneParams &params)
   {
     /* We do not want to include use_bvh_refit in the modified detection as this will recreate the entire scene. */
-    use_bvh_refit = params.use_bvh_refit;
+    max_bvh_refits = params.max_bvh_refits;
     return modified(params);
   }
 
