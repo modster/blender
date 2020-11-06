@@ -4933,11 +4933,8 @@ void wm_event_add_xrevent(const char *action_set_name,
   }
 
   if (eye_data) {
-    data->eye_width = eye_data->width;
-    data->eye_height = eye_data->height;
-    data->eye_lens = eye_data->focal_len;
     copy_m4_m4(data->eye_viewmat, eye_data->viewmat);
-    copy_m4_m4(data->eye_winmat, eye_data->winmat);
+    data->eye_lens = eye_data->focal_len;
   }
 
   data->ot = action->ot;

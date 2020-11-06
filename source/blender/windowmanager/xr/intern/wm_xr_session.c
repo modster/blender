@@ -330,7 +330,6 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
                                 const wmXrDrawData *draw_data,
                                 const GHOST_XrDrawViewInfo *draw_view,
                                 const float viewmat[4][4],
-                                const float winmat[4][4],
                                 wmXrSessionState *state)
 {
   GHOST_XrPose viewer_pose;
@@ -359,14 +358,11 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
   copy_qt_qt(state->viewer_pose.orientation_quat, viewer_pose.orientation_quat);
   wm_xr_pose_to_viewmat(&viewer_pose, state->viewer_viewmat);
 
-  eye->width = draw_view->width;
-  eye->height = draw_view->height;
   /* No idea why, but multiplying by two seems to make it match the VR view more. */
   eye->focal_len = 2.0f *
                    fov_to_focallength(draw_view->fov.angle_right - draw_view->fov.angle_left,
                                       DEFAULT_SENSOR_WIDTH);
   copy_m4_m4(eye->viewmat, viewmat);
-  copy_m4_m4(eye->winmat, winmat);
 
   memcpy(&state->prev_base_pose, &draw_data->base_pose, sizeof(GHOST_XrPose));
   memcpy(&state->prev_local_pose, &draw_view->local_pose, sizeof(GHOST_XrPose));
@@ -555,12 +551,15 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
   bScreen *screen_anim = ED_screen_animation_playing(wm);
   Object *ob_constraint = NULL;
   char ob_flag;
-  float view_ofs[3] = {0};
+  float view_ofs[3];
   float base_inv[4][4];
   float tmp[4][4];
 
   if ((settings->flag & XR_SESSION_USE_ABSOLUTE_TRACKING) == 0) {
     copy_v3_v3(view_ofs, state->prev_eye_position_ofs);
+  }
+  else {
+    zero_v3(view_ofs);
   }
   if ((settings->flag & XR_SESSION_USE_POSITION_TRACKING) == 0) {
     add_v3_v3(view_ofs, state->prev_local_pose.position);

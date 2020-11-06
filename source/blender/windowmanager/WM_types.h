@@ -661,13 +661,10 @@ typedef struct wmXrActionData {
   float controller_loc[3];
   float controller_rot[4];
 
-  /** Viewport dimensions of the eye (view) used for selection (3D-to-2D projection). */
-  int eye_width, eye_height;
+  /** Viewmat of the selection eye. */
+  float eye_viewmat[4][4];
   /** Lens (focal length) of the selection eye. */
   float eye_lens;
-  /** Viewmat and winmat of the selection eye. */
-  float eye_viewmat[4][4];
-  float eye_winmat[4][4];
 
   /** Operator. */
   struct wmOperatorType *ot;

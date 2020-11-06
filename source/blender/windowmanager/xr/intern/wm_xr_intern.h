@@ -28,10 +28,8 @@ struct wmXrActionSet;
 struct GHash;
 
 typedef struct wmXrEyeData {
-  int width, height;
-  float focal_len;
   float viewmat[4][4];
-  float winmat[4][4];
+  float focal_len;
 } wmXrEyeData;
 
 typedef struct wmXrControllerData {
@@ -168,7 +166,6 @@ void wm_xr_session_state_update(const XrSessionSettings *settings,
                                 const wmXrDrawData *draw_data,
                                 const GHOST_XrDrawViewInfo *draw_view,
                                 const float viewmat[4][4],
-                                const float winmat[4][4],
                                 wmXrSessionState *state);
 bool wm_xr_session_surface_offscreen_ensure(wmXrSurfaceData *surface_data,
                                             const GHOST_XrDrawViewInfo *draw_view);

@@ -487,8 +487,6 @@ static int transform_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
   RegionView3D *rv3d = region->regiondata;
   wmWindowManager *wm = CTX_wm_manager(C);
   wmXrData *xr = &wm->xr;
-  short winx_prev, winy_prev;
-  rcti winrct_prev;
   float lens_prev;
   float clip_start_prev, clip_end_prev;
   float viewmat_prev[4][4];
@@ -498,18 +496,11 @@ static int transform_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
   memcpy(&event_mut, event, sizeof(wmEvent));
 
   /* Replace window view parameters with XR surface counterparts. */
-  winx_prev = region->winx;
-  winy_prev = region->winy;
-  winrct_prev = region->winrct;
   lens_prev = v3d->lens;
   clip_start_prev = v3d->clip_start;
   clip_end_prev = v3d->clip_end;
   copy_m4_m4(viewmat_prev, rv3d->viewmat);
 
-  region->winrct.xmin = 0;
-  region->winrct.ymin = 0;
-  region->winrct.xmax = region->winx = actiondata->eye_width;
-  region->winrct.ymax = region->winy = actiondata->eye_height;
   v3d->lens = actiondata->eye_lens;
   v3d->clip_start = xr->session_settings.clip_start;
   v3d->clip_end = xr->session_settings.clip_end;
@@ -519,8 +510,8 @@ static int transform_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
                actiondata->controller_loc,
                t->viewmat,
                rv3d->winmat,
-               actiondata->eye_width,
-               actiondata->eye_height);
+               region->winx,
+               region->winy);
 
   if (event->val == KM_PRESS) {
     event_mut.type = MOUSEMOVE;
@@ -536,9 +527,6 @@ static int transform_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
   retval = transform_modal(C, op, &event_mut);
 
   /* Restore window view. */
-  region->winx = winx_prev;
-  region->winy = winy_prev;
-  region->winrct = winrct_prev;
   v3d->lens = lens_prev;
   v3d->clip_start = clip_start_prev;
   v3d->clip_end = clip_end_prev;
@@ -620,8 +608,6 @@ static int transform_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event
   RegionView3D *rv3d = region->regiondata;
   wmWindowManager *wm = CTX_wm_manager(C);
   wmXrData *xr = &wm->xr;
-  short winx_prev, winy_prev;
-  rcti winrct_prev;
   float lens_prev;
   float clip_start_prev, clip_end_prev;
   float viewmat_prev[4][4];
@@ -632,18 +618,11 @@ static int transform_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event
   event_mut.type = LEFTMOUSE;
 
   /* Replace window view parameters with XR surface counterparts. */
-  winx_prev = region->winx;
-  winy_prev = region->winy;
-  winrct_prev = region->winrct;
   lens_prev = v3d->lens;
   clip_start_prev = v3d->clip_start;
   clip_end_prev = v3d->clip_end;
   copy_m4_m4(viewmat_prev, rv3d->viewmat);
 
-  region->winrct.xmin = 0;
-  region->winrct.ymin = 0;
-  region->winrct.xmax = region->winx = actiondata->eye_width;
-  region->winrct.ymax = region->winy = actiondata->eye_height;
   v3d->lens = actiondata->eye_lens;
   v3d->clip_start = xr->session_settings.clip_start;
   v3d->clip_end = xr->session_settings.clip_end;
@@ -654,15 +633,12 @@ static int transform_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event
                actiondata->controller_loc,
                actiondata->eye_viewmat,
                rv3d->winmat,
-               actiondata->eye_width,
-               actiondata->eye_height);
+               region->winx,
+               region->winy);
 
   retval = transform_invoke(C, op, &event_mut);
 
   /* Restore window view. */
-  region->winx = winx_prev;
-  region->winy = winy_prev;
-  region->winrct = winrct_prev;
   v3d->lens = lens_prev;
   v3d->clip_start = clip_start_prev;
   v3d->clip_end = clip_end_prev;

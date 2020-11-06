@@ -693,7 +693,7 @@ static void rna_Event_xr_action_set_get(PointerRNA *ptr, char *value)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, &value, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+    WM_event_xr_data(event, &value, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
   }
   else {
     value[0] = '\0';
@@ -716,7 +716,7 @@ static void rna_Event_xr_action_get(PointerRNA *ptr, char *value)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, NULL, &value, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+    WM_event_xr_data(event, NULL, &value, NULL, NULL, NULL, NULL, NULL, NULL);
   }
   else {
     value[0] = '\0';
@@ -740,8 +740,7 @@ static int rna_Event_xr_type_get(PointerRNA *ptr)
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
     int type;
-    WM_event_xr_data(
-        event, NULL, NULL, (char *)&type, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+    WM_event_xr_data(event, NULL, NULL, (char *)&type, NULL, NULL, NULL, NULL, NULL);
     return type;
   }
   else {
@@ -753,7 +752,7 @@ static void rna_Event_xr_state_get(PointerRNA *ptr, float *value)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, NULL, NULL, NULL, value, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+    WM_event_xr_data(event, NULL, NULL, NULL, value, NULL, NULL, NULL, NULL);
   }
   else {
     memset(value, 0, sizeof(float[2]));
@@ -764,7 +763,7 @@ static void rna_Event_xr_controller_location_get(PointerRNA *ptr, float *value)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, NULL, NULL, NULL, NULL, value, NULL, NULL, NULL, NULL, NULL, NULL);
+    WM_event_xr_data(event, NULL, NULL, NULL, NULL, value, NULL, NULL, NULL);
   }
   else {
     memset(value, 0, sizeof(float[3]));
@@ -775,7 +774,7 @@ static void rna_Event_xr_controller_rotation_get(PointerRNA *ptr, float *value)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    WM_event_xr_data(event, NULL, NULL, NULL, NULL, NULL, value, NULL, NULL, NULL, NULL, NULL);
+    WM_event_xr_data(event, NULL, NULL, NULL, NULL, NULL, value, NULL, NULL);
   }
   else {
     value[0] = 1.0f;
@@ -783,29 +782,14 @@ static void rna_Event_xr_controller_rotation_get(PointerRNA *ptr, float *value)
   }
 }
 
-static int rna_Event_xr_viewport_width_get(PointerRNA *ptr)
+static void rna_Event_xr_view_matrix_get(PointerRNA *ptr, float values[16])
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
-    int width;
-    WM_event_xr_data(event, NULL, NULL, NULL, NULL, NULL, NULL, &width, NULL, NULL, NULL, NULL);
-    return width;
+    WM_event_xr_data(event, NULL, NULL, NULL, NULL, NULL, NULL, (float(*)[4])values, NULL);
   }
   else {
-    return 0;
-  }
-}
-
-static int rna_Event_xr_viewport_height_get(PointerRNA *ptr)
-{
-  const wmEvent *event = ptr->data;
-  if (WM_event_is_xr(event)) {
-    int height;
-    WM_event_xr_data(event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &height, NULL, NULL, NULL);
-    return height;
-  }
-  else {
-    return 0;
+    memset(values, 0, sizeof(float[16]));
   }
 }
 
@@ -814,36 +798,11 @@ static float rna_Event_xr_focal_length_get(PointerRNA *ptr)
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
     float focal_len;
-    WM_event_xr_data(
-        event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &focal_len, NULL, NULL);
+    WM_event_xr_data(event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &focal_len);
     return focal_len;
   }
   else {
     return 0.0f;
-  }
-}
-
-static void rna_Event_xr_view_matrix_get(PointerRNA *ptr, float values[16])
-{
-  const wmEvent *event = ptr->data;
-  if (WM_event_is_xr(event)) {
-    WM_event_xr_data(
-        event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, (float(*)[4])values, NULL);
-  }
-  else {
-    memset(values, 0, sizeof(float[16]));
-  }
-}
-
-static void rna_Event_xr_projection_matrix_get(PointerRNA *ptr, float values[16])
-{
-  const wmEvent *event = ptr->data;
-  if (WM_event_is_xr(event)) {
-    WM_event_xr_data(
-        event, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, (float(*)[4])values);
-  }
-  else {
-    memset(values, 0, sizeof(float[16]));
   }
 }
 
@@ -2498,33 +2457,16 @@ static void rna_def_event(BlenderRNA *brna)
       "XR Controller Rotation",
       "Rotation of the action's corresponding controller pose in world space");
 
-  prop = RNA_def_property(srna, "xr_viewport_width", PROP_INT, PROP_NONE);
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_int_funcs(prop, "rna_Event_xr_viewport_width_get", NULL, NULL);
-  RNA_def_property_ui_text(prop, "XR Viewport Width", "Width of the XR selection eye viewport");
-
-  prop = RNA_def_property(srna, "xr_viewport_height", PROP_INT, PROP_NONE);
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_int_funcs(prop, "rna_Event_xr_viewport_height_get", NULL, NULL);
-  RNA_def_property_ui_text(prop, "XR Viewport Height", "Height of the XR selection eye viewport");
-
-  prop = RNA_def_property(srna, "xr_focal_length", PROP_FLOAT, PROP_NONE);
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_float_funcs(prop, "rna_Event_xr_focal_length_get", NULL, NULL);
-  RNA_def_property_ui_text(prop, "XR Focal Length", "Focal length of the XR selection eye");
-
   prop = RNA_def_property(srna, "xr_view_matrix", PROP_FLOAT, PROP_MATRIX);
   RNA_def_property_array(prop, 16);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_float_funcs(prop, "rna_Event_xr_view_matrix_get", NULL, NULL);
   RNA_def_property_ui_text(prop, "XR View Matrix", "View matrix of the XR selection eye");
 
-  prop = RNA_def_property(srna, "xr_projection_matrix", PROP_FLOAT, PROP_MATRIX);
-  RNA_def_property_array(prop, 16);
-  RNA_def_property_float_funcs(prop, "rna_Event_xr_projection_matrix_get", NULL, NULL);
+  prop = RNA_def_property(srna, "xr_focal_length", PROP_FLOAT, PROP_NONE);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_ui_text(
-      prop, "XR Projection Matrix", "Projection matrix of the XR selection eye");
+  RNA_def_property_float_funcs(prop, "rna_Event_xr_focal_length_get", NULL, NULL);
+  RNA_def_property_ui_text(prop, "XR Focal Length", "Focal length of the XR selection eye");
 
   RNA_define_verify_sdna(1); /* not in sdna */
 }

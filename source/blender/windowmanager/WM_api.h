@@ -877,11 +877,8 @@ void WM_event_xr_data(const struct wmEvent *event,
                       float state[2],
                       float controller_loc[3],
                       float controller_rot[4],
-                      int *eye_width,
-                      int *eye_height,
-                      float *eye_lens,
                       float eye_viewmat[4][4],
-                      float eye_winmat[4][4]);
+                      float *eye_lens);
 bool WM_event_is_xr(const struct wmEvent *event);
 
 #ifdef WITH_INPUT_IME
