@@ -1879,8 +1879,9 @@ void GeometryManager::device_free(Device *device, DeviceScene *dscene)
 #endif
 }
 
-void GeometryManager::tag_update(Scene *scene)
+void GeometryManager::tag_update(Scene *scene, uint32_t flag)
 {
+  update_flags |= flag;
   need_update = true;
   scene->object_manager->need_update = true;
 }
