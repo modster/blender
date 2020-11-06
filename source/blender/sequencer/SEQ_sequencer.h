@@ -36,6 +36,7 @@ struct Main;
 struct Mask;
 struct ReportList;
 struct Scene;
+struct SeqIndexBuildContext;
 struct Sequence;
 struct SequenceModifierData;
 struct Stereo3dFormat;
@@ -43,7 +44,6 @@ struct StripElem;
 struct TextVars;
 struct bContext;
 struct bSound;
-struct SeqIndexBuildContext;
 
 /* Wipe effect */
 enum {
@@ -257,7 +257,7 @@ void BKE_sequencer_cache_iterate(struct Scene *scene,
                                  bool callback_init(void *userdata, size_t item_count),
                                  bool callback_iter(void *userdata,
                                                     struct Sequence *seq,
-                                                    int cfra,
+                                                    int timeline_frame,
                                                     int cache_type,
                                                     float cost));
 

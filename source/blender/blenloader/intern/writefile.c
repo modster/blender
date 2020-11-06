@@ -153,6 +153,7 @@
 #include "BKE_node.h"
 #include "BKE_object.h"
 #include "BKE_packedFile.h"
+#include "BKE_paint.h"
 #include "BKE_pointcache.h"
 #include "BKE_report.h"
 #include "BKE_screen.h"
@@ -1328,42 +1329,6 @@ static void write_view_settings(BlendWriter *writer, ColorManagedViewSettings *v
   }
 }
 
-static void write_paint(BlendWriter *writer, Paint *p)
-{
-  if (p->cavity_curve) {
-    BKE_curvemapping_blend_write(writer, p->cavity_curve);
-  }
-  BLO_write_struct_array(writer, PaintToolSlot, p->tool_slots_len, p->tool_slots);
-}
-
-static void write_layer_collections(BlendWriter *writer, ListBase *lb)
-{
-  LISTBASE_FOREACH (LayerCollection *, lc, lb) {
-    BLO_write_struct(writer, LayerCollection, lc);
-
-    write_layer_collections(writer, &lc->layer_collections);
-  }
-}
-
-static void write_view_layer(BlendWriter *writer, ViewLayer *view_layer)
-{
-  BLO_write_struct(writer, ViewLayer, view_layer);
-  BLO_write_struct_list(writer, Base, &view_layer->object_bases);
-
-  if (view_layer->id_properties) {
-    IDP_BlendWrite(writer, view_layer->id_properties);
-  }
-
-  LISTBASE_FOREACH (FreestyleModuleConfig *, fmc, &view_layer->freestyle_config.modules) {
-    BLO_write_struct(writer, FreestyleModuleConfig, fmc);
-  }
-
-  LISTBASE_FOREACH (FreestyleLineSet *, fls, &view_layer->freestyle_config.linesets) {
-    BLO_write_struct(writer, FreestyleLineSet, fls);
-  }
-  write_layer_collections(writer, &view_layer->layer_collections);
-}
-
 static void write_lightcache_texture(BlendWriter *writer, LightCacheTexture *tex)
 {
   if (tex->data) {
@@ -1421,35 +1386,35 @@ static void write_scene(BlendWriter *writer, Scene *sce, const void *id_address)
   BLO_write_struct(writer, ToolSettings, tos);
   if (tos->vpaint) {
     BLO_write_struct(writer, VPaint, tos->vpaint);
-    write_paint(writer, &tos->vpaint->paint);
+    BKE_paint_blend_write(writer, &tos->vpaint->paint);
   }
   if (tos->wpaint) {
     BLO_write_struct(writer, VPaint, tos->wpaint);
-    write_paint(writer, &tos->wpaint->paint);
+    BKE_paint_blend_write(writer, &tos->wpaint->paint);
   }
   if (tos->sculpt) {
     BLO_write_struct(writer, Sculpt, tos->sculpt);
-    write_paint(writer, &tos->sculpt->paint);
+    BKE_paint_blend_write(writer, &tos->sculpt->paint);
   }
   if (tos->uvsculpt) {
     BLO_write_struct(writer, UvSculpt, tos->uvsculpt);
-    write_paint(writer, &tos->uvsculpt->paint);
+    BKE_paint_blend_write(writer, &tos->uvsculpt->paint);
   }
   if (tos->gp_paint) {
     BLO_write_struct(writer, GpPaint, tos->gp_paint);
-    write_paint(writer, &tos->gp_paint->paint);
+    BKE_paint_blend_write(writer, &tos->gp_paint->paint);
   }
   if (tos->gp_vertexpaint) {
     BLO_write_struct(writer, GpVertexPaint, tos->gp_vertexpaint);
-    write_paint(writer, &tos->gp_vertexpaint->paint);
+    BKE_paint_blend_write(writer, &tos->gp_vertexpaint->paint);
   }
   if (tos->gp_sculptpaint) {
     BLO_write_struct(writer, GpSculptPaint, tos->gp_sculptpaint);
-    write_paint(writer, &tos->gp_sculptpaint->paint);
+    BKE_paint_blend_write(writer, &tos->gp_sculptpaint->paint);
   }
   if (tos->gp_weightpaint) {
     BLO_write_struct(writer, GpWeightPaint, tos->gp_weightpaint);
-    write_paint(writer, &tos->gp_weightpaint->paint);
+    BKE_paint_blend_write(writer, &tos->gp_weightpaint->paint);
   }
   /* write grease-pencil custom ipo curve to file */
   if (tos->gp_interpolate.custom_ipo) {
@@ -1468,7 +1433,7 @@ static void write_scene(BlendWriter *writer, Scene *sce, const void *id_address)
     BKE_curveprofile_blend_write(writer, tos->custom_bevel_profile_preset);
   }
 
-  write_paint(writer, &tos->imapaint.paint);
+  BKE_paint_blend_write(writer, &tos->imapaint.paint);
 
   Editing *ed = sce->ed;
   if (ed) {
@@ -1614,7 +1579,7 @@ static void write_scene(BlendWriter *writer, Scene *sce, const void *id_address)
   BKE_curvemapping_curves_blend_write(writer, &sce->r.mblur_shutter_curve);
 
   LISTBASE_FOREACH (ViewLayer *, view_layer, &sce->view_layers) {
-    write_view_layer(writer, view_layer);
+    BKE_view_layer_blend_write(writer, view_layer);
   }
 
   if (sce->master_collection) {
@@ -1632,32 +1597,6 @@ static void write_scene(BlendWriter *writer, Scene *sce, const void *id_address)
 
   /* Freed on doversion. */
   BLI_assert(sce->layer_properties == NULL);
-}
-
-static void write_wm_xr_data(BlendWriter *writer, wmXrData *xr_data)
-{
-  BKE_screen_view3d_shading_blend_write(writer, &xr_data->session_settings.shading);
-}
-
-static void write_windowmanager(BlendWriter *writer, wmWindowManager *wm, const void *id_address)
-{
-  BLO_write_id_struct(writer, wmWindowManager, id_address, &wm->id);
-  BKE_id_blend_write(writer, &wm->id);
-  write_wm_xr_data(writer, &wm->xr);
-
-  LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
-    /* update deprecated screen member (for so loading in 2.7x uses the correct screen) */
-    win->screen = BKE_workspace_active_screen_get(win->workspace_hook);
-
-    BLO_write_struct(writer, wmWindow, win);
-    BLO_write_struct(writer, WorkSpaceInstanceHook, win->workspace_hook);
-    BLO_write_struct(writer, Stereo3dFormat, win->stereo3d_format);
-
-    BKE_screen_area_map_blend_write(writer, &win->global_areas);
-
-    /* data is written, clear deprecated data again */
-    win->screen = NULL;
-  }
 }
 
 /* Keep it last of write_foodata functions. */
@@ -1918,15 +1857,13 @@ static bool write_file_handle(Main *mainvar,
         }
 
         switch ((ID_Type)GS(id->name)) {
-          case ID_WM:
-            write_windowmanager(&writer, (wmWindowManager *)id_buffer, id);
-            break;
           case ID_SCE:
             write_scene(&writer, (Scene *)id_buffer, id);
             break;
           case ID_OB:
             write_object(&writer, (Object *)id_buffer, id);
             break;
+          case ID_WM:
           case ID_WS:
           case ID_SCR:
           case ID_PA:

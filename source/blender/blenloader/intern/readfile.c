@@ -2569,21 +2569,6 @@ static void lib_link_constraint_channels(BlendLibReader *reader, ID *id, ListBas
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Read ID: WorkSpace
- * \{ */
-
-static void lib_link_workspace_instance_hook(BlendLibReader *reader,
-                                             WorkSpaceInstanceHook *hook,
-                                             ID *id)
-{
-  WorkSpace *workspace = BKE_workspace_active_get(hook);
-  BLO_read_id_address(reader, id->lib, &workspace);
-  BKE_workspace_active_set(hook, workspace);
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name Read ID: Armature
  * \{ */
 
@@ -2661,8 +2646,8 @@ static void direct_link_constraints(BlendDataReader *reader, ListBase *lb)
       case CONSTRAINT_TYPE_KINEMATIC: {
         bKinematicConstraint *data = con->data;
 
-        con->lin_error = 0.f;
-        con->rot_error = 0.f;
+        con->lin_error = 0.0f;
+        con->rot_error = 0.0f;
 
         /* version patch for runtime flag, was not cleared in some case */
         data->flag &= ~CONSTRAINT_IK_AUTO;
@@ -4196,39 +4181,13 @@ static void link_recurs_seq(BlendDataReader *reader, ListBase *lb)
   }
 }
 
-static void direct_link_paint(BlendDataReader *reader, const Scene *scene, Paint *p)
-{
-  if (p->num_input_samples < 1) {
-    p->num_input_samples = 1;
-  }
-
-  BLO_read_data_address(reader, &p->cavity_curve);
-  if (p->cavity_curve) {
-    BKE_curvemapping_blend_read(reader, p->cavity_curve);
-  }
-  else {
-    BKE_paint_cavity_curve_preset(p, CURVE_PRESET_LINE);
-  }
-
-  BLO_read_data_address(reader, &p->tool_slots);
-
-  /* Workaround for invalid data written in older versions. */
-  const size_t expected_size = sizeof(PaintToolSlot) * p->tool_slots_len;
-  if (p->tool_slots && MEM_allocN_len(p->tool_slots) < expected_size) {
-    MEM_freeN(p->tool_slots);
-    p->tool_slots = MEM_callocN(expected_size, "PaintToolSlot");
-  }
-
-  BKE_paint_runtime_init(scene->toolsettings, p);
-}
-
 static void direct_link_paint_helper(BlendDataReader *reader, const Scene *scene, Paint **paint)
 {
   /* TODO. is this needed */
   BLO_read_data_address(reader, paint);
 
   if (*paint) {
-    direct_link_paint(reader, scene, *paint);
+    BKE_paint_blend_read_data(reader, scene, *paint);
   }
 }
 
@@ -4295,7 +4254,7 @@ static void direct_link_scene(BlendDataReader *reader, Scene *sce)
     direct_link_paint_helper(reader, sce, (Paint **)&sce->toolsettings->gp_sculptpaint);
     direct_link_paint_helper(reader, sce, (Paint **)&sce->toolsettings->gp_weightpaint);
 
-    direct_link_paint(reader, sce, &sce->toolsettings->imapaint.paint);
+    BKE_paint_blend_read_data(reader, sce, &sce->toolsettings->imapaint.paint);
 
     sce->toolsettings->particle.paintcursor = NULL;
     sce->toolsettings->particle.scene = NULL;
@@ -4567,132 +4526,9 @@ static void direct_link_scene(BlendDataReader *reader, Scene *sce)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name XR-data
- * \{ */
-
-static void direct_link_wm_xr_data(BlendDataReader *reader, wmXrData *xr_data)
-{
-  BKE_screen_view3d_shading_blend_read_data(reader, &xr_data->session_settings.shading);
-}
-
-static void lib_link_wm_xr_data(BlendLibReader *reader, ID *parent_id, wmXrData *xr_data)
-{
-  BLO_read_id_address(reader, parent_id->lib, &xr_data->session_settings.base_pose_object);
   BLO_read_id_address(reader, parent_id->lib, &xr_data->session_settings.headset_object);
   BLO_read_id_address(reader, parent_id->lib, &xr_data->session_settings.controller0_object);
   BLO_read_id_address(reader, parent_id->lib, &xr_data->session_settings.controller1_object);
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Read ID: Window Manager
- * \{ */
-
-static void direct_link_windowmanager(BlendDataReader *reader, wmWindowManager *wm)
-{
-  id_us_ensure_real(&wm->id);
-  BLO_read_list(reader, &wm->windows);
-
-  LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
-    BLO_read_data_address(reader, &win->parent);
-
-    WorkSpaceInstanceHook *hook = win->workspace_hook;
-    BLO_read_data_address(reader, &win->workspace_hook);
-
-    /* This will be NULL for any pre-2.80 blend file. */
-    if (win->workspace_hook != NULL) {
-      /* We need to restore a pointer to this later when reading workspaces,
-       * so store in global oldnew-map.
-       * Note that this is only needed for versioning of older .blend files now.. */
-      oldnewmap_insert(reader->fd->globmap, hook, win->workspace_hook, 0);
-      /* Cleanup pointers to data outside of this data-block scope. */
-      win->workspace_hook->act_layout = NULL;
-      win->workspace_hook->temp_workspace_store = NULL;
-      win->workspace_hook->temp_layout_store = NULL;
-    }
-
-    BKE_screen_area_map_blend_read_data(reader, &win->global_areas);
-
-    win->ghostwin = NULL;
-    win->gpuctx = NULL;
-    win->eventstate = NULL;
-    win->cursor_keymap_status = NULL;
-    win->tweak = NULL;
-#ifdef WIN32
-    win->ime_data = NULL;
-#endif
-
-    BLI_listbase_clear(&win->queue);
-    BLI_listbase_clear(&win->handlers);
-    BLI_listbase_clear(&win->modalhandlers);
-    BLI_listbase_clear(&win->gesture);
-
-    win->active = 0;
-
-    win->cursor = 0;
-    win->lastcursor = 0;
-    win->modalcursor = 0;
-    win->grabcursor = 0;
-    win->addmousemove = true;
-    BLO_read_data_address(reader, &win->stereo3d_format);
-
-    /* Multi-view always fallback to anaglyph at file opening
-     * otherwise quad-buffer saved files can break Blender. */
-    if (win->stereo3d_format) {
-      win->stereo3d_format->display_mode = S3D_DISPLAY_ANAGLYPH;
-    }
-  }
-
-  direct_link_wm_xr_data(reader, &wm->xr);
-
-  BLI_listbase_clear(&wm->timers);
-  BLI_listbase_clear(&wm->operators);
-  BLI_listbase_clear(&wm->paintcursors);
-  BLI_listbase_clear(&wm->queue);
-  BKE_reports_init(&wm->reports, RPT_STORE);
-
-  BLI_listbase_clear(&wm->keyconfigs);
-  wm->defaultconf = NULL;
-  wm->addonconf = NULL;
-  wm->userconf = NULL;
-  wm->undo_stack = NULL;
-
-  wm->message_bus = NULL;
-
-  wm->xr.runtime = NULL;
-
-  BLI_listbase_clear(&wm->jobs);
-  BLI_listbase_clear(&wm->drags);
-
-  wm->windrawable = NULL;
-  wm->winactive = NULL;
-  wm->initialized = 0;
-  wm->op_undo_depth = 0;
-  wm->is_interface_locked = 0;
-}
-
-static void lib_link_windowmanager(BlendLibReader *reader, wmWindowManager *wm)
-{
-  LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
-    if (win->workspace_hook) { /* NULL for old files */
-      lib_link_workspace_instance_hook(reader, win->workspace_hook, &wm->id);
-    }
-    BLO_read_id_address(reader, wm->id.lib, &win->scene);
-    /* deprecated, but needed for versioning (will be NULL'ed then) */
-    BLO_read_id_address(reader, NULL, &win->screen);
-
-    LISTBASE_FOREACH (ScrArea *, area, &win->global_areas.areabase) {
-      BKE_screen_area_blend_read_lib(reader, &wm->id, area);
-    }
-
-    lib_link_wm_xr_data(reader, &wm->id, &wm->xr);
-  }
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name Read ID: Screen
  * \{ */
 
@@ -5443,9 +5279,6 @@ static bool direct_link_id(FileData *fd, Main *main, const int tag, ID *id, ID *
   bool success = true;
 
   switch (GS(id->name)) {
-    case ID_WM:
-      direct_link_windowmanager(&reader, (wmWindowManager *)id);
-      break;
     case ID_SCR:
       success = direct_link_screen(&reader, (bScreen *)id);
       break;
@@ -5461,6 +5294,7 @@ static bool direct_link_id(FileData *fd, Main *main, const int tag, ID *id, ID *
     case ID_LI:
       direct_link_library(fd, (Library *)id, main);
       break;
+    case ID_WM:
     case ID_WS:
     case ID_PA:
     case ID_GR:
@@ -6075,9 +5909,6 @@ static void lib_link_all(FileData *fd, Main *bmain)
      * Please keep order of entries in that switch matching that order, it's easier to quickly see
      * whether something is wrong then. */
     switch (GS(id->name)) {
-      case ID_WM:
-        lib_link_windowmanager(&reader, (wmWindowManager *)id);
-        break;
       case ID_SCE:
         lib_link_scene(&reader, (Scene *)id);
         break;
@@ -6091,6 +5922,7 @@ static void lib_link_all(FileData *fd, Main *bmain)
       case ID_LI:
         lib_link_library(&reader, (Library *)id); /* Only init users. */
         break;
+      case ID_WM:
       case ID_WS:
       case ID_SCR:
       case ID_PA:
@@ -7081,6 +6913,31 @@ static bool object_in_any_collection(Main *bmain, Object *ob)
   return false;
 }
 
+/**
+ * Shared operations to perform on the object's base after adding it to the scene.
+ */
+static void object_base_instance_init(
+    Object *ob, bool set_selected, bool set_active, ViewLayer *view_layer, const View3D *v3d)
+{
+  Base *base = BKE_view_layer_base_find(view_layer, ob);
+
+  if (v3d != NULL) {
+    base->local_view_bits |= v3d->local_view_uuid;
+  }
+
+  if (set_selected) {
+    if (base->flag & BASE_SELECTABLE) {
+      base->flag |= BASE_SELECTED;
+    }
+  }
+
+  if (set_active) {
+    view_layer->basact = base;
+  }
+
+  BKE_scene_object_base_flag_sync_from_base(base);
+}
+
 static void add_loose_objects_to_scene(Main *mainvar,
                                        Main *bmain,
                                        Scene *scene,
@@ -7126,19 +6983,12 @@ static void add_loose_objects_to_scene(Main *mainvar,
         ob->mode = OB_MODE_OBJECT;
 
         BKE_collection_object_add(bmain, active_collection, ob);
-        Base *base = BKE_view_layer_base_find(view_layer, ob);
 
-        if (v3d != NULL) {
-          base->local_view_bits |= v3d->local_view_uuid;
-        }
-
-        if ((flag & FILE_AUTOSELECT) && (base->flag & BASE_SELECTABLE)) {
-          /* Do NOT make base active here! screws up GUI stuff,
-           * if you want it do it at the editor level. */
-          base->flag |= BASE_SELECTED;
-        }
-
-        BKE_scene_object_base_flag_sync_from_base(base);
+        const bool set_selected = (flag & FILE_AUTOSELECT) != 0;
+        /* Do NOT make base active here! screws up GUI stuff,
+         * if you want it do it at the editor level. */
+        const bool set_active = false;
+        object_base_instance_init(ob, set_selected, set_active, view_layer, v3d);
 
         ob->id.tag &= ~LIB_TAG_INDIRECT;
         ob->id.flag &= ~LIB_INDIRECT_WEAK_LINK;
@@ -7184,19 +7034,12 @@ static void add_loose_object_data_to_scene(Main *mainvar,
         BKE_object_materials_test(bmain, ob, ob->data);
 
         BKE_collection_object_add(bmain, active_collection, ob);
-        Base *base = BKE_view_layer_base_find(view_layer, ob);
 
-        if (v3d != NULL) {
-          base->local_view_bits |= v3d->local_view_uuid;
-        }
-
-        if ((flag & FILE_AUTOSELECT) && (base->flag & BASE_SELECTABLE)) {
-          /* Do NOT make base active here! screws up GUI stuff,
-           * if you want it do it at the editor level. */
-          base->flag |= BASE_SELECTED;
-        }
-
-        BKE_scene_object_base_flag_sync_from_base(base);
+        const bool set_selected = (flag & FILE_AUTOSELECT) != 0;
+        /* Do NOT make base active here! screws up GUI stuff,
+         * if you want it do it at the editor level. */
+        bool set_active = false;
+        object_base_instance_init(ob, set_selected, set_active, view_layer, v3d);
 
         copy_v3_v3(ob->loc, scene->cursor.location);
       }
@@ -7230,22 +7073,14 @@ static void add_collections_to_scene(Main *mainvar,
       ob->empty_drawsize = U.collection_instance_empty_size;
 
       BKE_collection_object_add(bmain, active_collection, ob);
-      Base *base = BKE_view_layer_base_find(view_layer, ob);
 
-      if (v3d != NULL) {
-        base->local_view_bits |= v3d->local_view_uuid;
-      }
+      const bool set_selected = (flag & FILE_AUTOSELECT) != 0;
+      /* TODO: why is it OK to make this active here but not in other situations?
+       * See other callers of #object_base_instance_init */
+      const bool set_active = set_selected;
+      object_base_instance_init(ob, set_selected, set_active, view_layer, v3d);
 
-      if ((flag & FILE_AUTOSELECT) && (base->flag & BASE_SELECTABLE)) {
-        base->flag |= BASE_SELECTED;
-      }
-
-      BKE_scene_object_base_flag_sync_from_base(base);
       DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION);
-
-      if (flag & FILE_AUTOSELECT) {
-        view_layer->basact = base;
-      }
 
       /* Assign the collection. */
       ob->instance_collection = collection;
@@ -8168,6 +8003,11 @@ void BLO_read_pointer_array(BlendDataReader *reader, void **ptr_p)
 bool BLO_read_data_is_undo(BlendDataReader *reader)
 {
   return reader->fd->memfile != NULL;
+}
+
+void BLO_read_data_globmap_add(BlendDataReader *reader, void *oldaddr, void *newaddr)
+{
+  oldnewmap_insert(reader->fd->globmap, oldaddr, newaddr, 0);
 }
 
 bool BLO_read_lib_is_undo(BlendLibReader *reader)

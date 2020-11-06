@@ -42,7 +42,7 @@ namespace blender::gpu {
 /** \name GLStateManager
  * \{ */
 
-GLStateManager::GLStateManager(void) : StateManager()
+GLStateManager::GLStateManager(void)
 {
   /* Set other states that never change. */
   glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
@@ -435,6 +435,13 @@ void GLStateManager::set_blend(const eGPUBlend value)
       dst_alpha = GL_SRC1_ALPHA;
       break;
     }
+  }
+
+  if (value == GPU_BLEND_SUBTRACT) {
+    glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
+  }
+  else {
+    glBlendEquation(GL_FUNC_ADD);
   }
 
   /* Always set the blend function. This avoid a rendering error when blending is disabled but
