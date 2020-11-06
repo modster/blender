@@ -809,56 +809,6 @@ static void write_userdef(BlendWriter *writer, const UserDef *userdef)
   }
 }
 
-/* update this also to readfile.c */
-static const char *ptcache_data_struct[] = {
-    "",          // BPHYS_DATA_INDEX
-    "",          // BPHYS_DATA_LOCATION
-    "",          // BPHYS_DATA_VELOCITY
-    "",          // BPHYS_DATA_ROTATION
-    "",          // BPHYS_DATA_AVELOCITY / BPHYS_DATA_XCONST */
-    "",          // BPHYS_DATA_SIZE:
-    "",          // BPHYS_DATA_TIMES:
-    "BoidData",  // case BPHYS_DATA_BOIDS:
-};
-static const char *ptcache_extra_struct[] = {
-    "",
-    "ParticleSpring",
-    "vec3f",
-};
-static void write_pointcaches(BlendWriter *writer, ListBase *ptcaches)
-{
-  LISTBASE_FOREACH (PointCache *, cache, ptcaches) {
-    BLO_write_struct(writer, PointCache, cache);
-
-    if ((cache->flag & PTCACHE_DISK_CACHE) == 0) {
-      LISTBASE_FOREACH (PTCacheMem *, pm, &cache->mem_cache) {
-        BLO_write_struct(writer, PTCacheMem, pm);
-
-        for (int i = 0; i < BPHYS_TOT_DATA; i++) {
-          if (pm->data[i] && pm->data_types & (1 << i)) {
-            if (ptcache_data_struct[i][0] == '\0') {
-              BLO_write_raw(writer, MEM_allocN_len(pm->data[i]), pm->data[i]);
-            }
-            else {
-              BLO_write_struct_array_by_name(
-                  writer, ptcache_data_struct[i], pm->totpoint, pm->data[i]);
-            }
-          }
-        }
-
-        LISTBASE_FOREACH (PTCacheExtra *, extra, &pm->extradata) {
-          if (ptcache_extra_struct[extra->type][0] == '\0') {
-            continue;
-          }
-          BLO_write_struct(writer, PTCacheExtra, extra);
-          BLO_write_struct_array_by_name(
-              writer, ptcache_extra_struct[extra->type], extra->totdata, extra->data);
-        }
-      }
-    }
-  }
-}
-
 static void write_particlesystems(BlendWriter *writer, ListBase *particles)
 {
   LISTBASE_FOREACH (ParticleSystem *, psys, particles) {
@@ -899,7 +849,7 @@ static void write_particlesystems(BlendWriter *writer, ListBase *particles)
       BLO_write_struct(writer, ClothCollSettings, psys->clmd->coll_parms);
     }
 
-    write_pointcaches(writer, &psys->ptcaches);
+    BKE_ptcache_blend_write(writer, &psys->ptcaches);
   }
 }
 
@@ -1055,7 +1005,7 @@ static void write_modifiers(BlendWriter *writer, ListBase *modbase)
       BLO_write_struct(writer, ClothSimSettings, clmd->sim_parms);
       BLO_write_struct(writer, ClothCollSettings, clmd->coll_parms);
       BLO_write_struct(writer, EffectorWeights, clmd->sim_parms->effector_weights);
-      write_pointcaches(writer, &clmd->ptcaches);
+      BKE_ptcache_blend_write(writer, &clmd->ptcaches);
     }
     else if (md->type == eModifierType_Fluid) {
       FluidModifierData *fmd = (FluidModifierData *)md;
@@ -1064,14 +1014,14 @@ static void write_modifiers(BlendWriter *writer, ListBase *modbase)
         BLO_write_struct(writer, FluidDomainSettings, fmd->domain);
 
         if (fmd->domain) {
-          write_pointcaches(writer, &(fmd->domain->ptcaches[0]));
+          BKE_ptcache_blend_write(writer, &(fmd->domain->ptcaches[0]));
 
           /* create fake pointcache so that old blender versions can read it */
           fmd->domain->point_cache[1] = BKE_ptcache_add(&fmd->domain->ptcaches[1]);
           fmd->domain->point_cache[1]->flag |= PTCACHE_DISK_CACHE | PTCACHE_FAKE_SMOKE;
           fmd->domain->point_cache[1]->step = 1;
 
-          write_pointcaches(writer, &(fmd->domain->ptcaches[1]));
+          BKE_ptcache_blend_write(writer, &(fmd->domain->ptcaches[1]));
 
           if (fmd->domain->coba) {
             BLO_write_struct(writer, ColorBand, fmd->domain->coba);
@@ -1108,7 +1058,7 @@ static void write_modifiers(BlendWriter *writer, ListBase *modbase)
         }
         /* write caches and effector weights */
         LISTBASE_FOREACH (DynamicPaintSurface *, surface, &pmd->canvas->surfaces) {
-          write_pointcaches(writer, &(surface->ptcaches));
+          BKE_ptcache_blend_write(writer, &(surface->ptcaches));
 
           BLO_write_struct(writer, EffectorWeights, surface->effector_weights);
         }
@@ -1272,7 +1222,7 @@ static void write_object(BlendWriter *writer, Object *ob, const void *id_address
       ob->soft->ptcaches = ob->soft->shared->ptcaches;
       BLO_write_struct(writer, SoftBody, ob->soft);
       BLO_write_struct(writer, SoftBody_Shared, ob->soft->shared);
-      write_pointcaches(writer, &(ob->soft->shared->ptcaches));
+      BKE_ptcache_blend_write(writer, &(ob->soft->shared->ptcaches));
       BLO_write_struct(writer, EffectorWeights, ob->soft->effector_weights);
     }
 
@@ -1297,273 +1247,6 @@ static void write_object(BlendWriter *writer, Object *ob, const void *id_address
 
     BKE_previewimg_blend_write(writer, ob->preview);
   }
-}
-
-static void write_sequence_modifiers(BlendWriter *writer, ListBase *modbase)
-{
-  LISTBASE_FOREACH (SequenceModifierData *, smd, modbase) {
-    const SequenceModifierTypeInfo *smti = BKE_sequence_modifier_type_info_get(smd->type);
-
-    if (smti) {
-      BLO_write_struct_by_name(writer, smti->struct_name, smd);
-
-      if (smd->type == seqModifierType_Curves) {
-        CurvesModifierData *cmd = (CurvesModifierData *)smd;
-
-        BKE_curvemapping_blend_write(writer, &cmd->curve_mapping);
-      }
-      else if (smd->type == seqModifierType_HueCorrect) {
-        HueCorrectModifierData *hcmd = (HueCorrectModifierData *)smd;
-
-        BKE_curvemapping_blend_write(writer, &hcmd->curve_mapping);
-      }
-    }
-    else {
-      BLO_write_struct(writer, SequenceModifierData, smd);
-    }
-  }
-}
-
-static void write_view_settings(BlendWriter *writer, ColorManagedViewSettings *view_settings)
-{
-  if (view_settings->curve_mapping) {
-    BKE_curvemapping_blend_write(writer, view_settings->curve_mapping);
-  }
-}
-
-static void write_scene(BlendWriter *writer, Scene *sce, const void *id_address)
-{
-  if (BLO_write_is_undo(writer)) {
-    /* Clean up, important in undo case to reduce false detection of changed data-blocks. */
-    /* XXX This UI data should not be stored in Scene at all... */
-    memset(&sce->cursor, 0, sizeof(sce->cursor));
-  }
-
-  /* write LibData */
-  BLO_write_id_struct(writer, Scene, id_address, &sce->id);
-  BKE_id_blend_write(writer, &sce->id);
-
-  if (sce->adt) {
-    BKE_animdata_blend_write(writer, sce->adt);
-  }
-  BKE_keyingsets_blend_write(writer, &sce->keyingsets);
-
-  /* direct data */
-  ToolSettings *tos = sce->toolsettings;
-  BLO_write_struct(writer, ToolSettings, tos);
-  if (tos->vpaint) {
-    BLO_write_struct(writer, VPaint, tos->vpaint);
-    BKE_paint_blend_write(writer, &tos->vpaint->paint);
-  }
-  if (tos->wpaint) {
-    BLO_write_struct(writer, VPaint, tos->wpaint);
-    BKE_paint_blend_write(writer, &tos->wpaint->paint);
-  }
-  if (tos->sculpt) {
-    BLO_write_struct(writer, Sculpt, tos->sculpt);
-    BKE_paint_blend_write(writer, &tos->sculpt->paint);
-  }
-  if (tos->uvsculpt) {
-    BLO_write_struct(writer, UvSculpt, tos->uvsculpt);
-    BKE_paint_blend_write(writer, &tos->uvsculpt->paint);
-  }
-  if (tos->gp_paint) {
-    BLO_write_struct(writer, GpPaint, tos->gp_paint);
-    BKE_paint_blend_write(writer, &tos->gp_paint->paint);
-  }
-  if (tos->gp_vertexpaint) {
-    BLO_write_struct(writer, GpVertexPaint, tos->gp_vertexpaint);
-    BKE_paint_blend_write(writer, &tos->gp_vertexpaint->paint);
-  }
-  if (tos->gp_sculptpaint) {
-    BLO_write_struct(writer, GpSculptPaint, tos->gp_sculptpaint);
-    BKE_paint_blend_write(writer, &tos->gp_sculptpaint->paint);
-  }
-  if (tos->gp_weightpaint) {
-    BLO_write_struct(writer, GpWeightPaint, tos->gp_weightpaint);
-    BKE_paint_blend_write(writer, &tos->gp_weightpaint->paint);
-  }
-  /* write grease-pencil custom ipo curve to file */
-  if (tos->gp_interpolate.custom_ipo) {
-    BKE_curvemapping_blend_write(writer, tos->gp_interpolate.custom_ipo);
-  }
-  /* write grease-pencil multiframe falloff curve to file */
-  if (tos->gp_sculpt.cur_falloff) {
-    BKE_curvemapping_blend_write(writer, tos->gp_sculpt.cur_falloff);
-  }
-  /* write grease-pencil primitive curve to file */
-  if (tos->gp_sculpt.cur_primitive) {
-    BKE_curvemapping_blend_write(writer, tos->gp_sculpt.cur_primitive);
-  }
-  /* Write the curve profile to the file. */
-  if (tos->custom_bevel_profile_preset) {
-    BKE_curveprofile_blend_write(writer, tos->custom_bevel_profile_preset);
-  }
-
-  BKE_paint_blend_write(writer, &tos->imapaint.paint);
-
-  Editing *ed = sce->ed;
-  if (ed) {
-    Sequence *seq;
-
-    BLO_write_struct(writer, Editing, ed);
-
-    /* reset write flags too */
-
-    SEQ_ALL_BEGIN (ed, seq) {
-      if (seq->strip) {
-        seq->strip->done = false;
-      }
-      BLO_write_struct(writer, Sequence, seq);
-    }
-    SEQ_ALL_END;
-
-    SEQ_ALL_BEGIN (ed, seq) {
-      if (seq->strip && seq->strip->done == 0) {
-        /* write strip with 'done' at 0 because readfile */
-
-        if (seq->effectdata) {
-          switch (seq->type) {
-            case SEQ_TYPE_COLOR:
-              BLO_write_struct(writer, SolidColorVars, seq->effectdata);
-              break;
-            case SEQ_TYPE_SPEED:
-              BLO_write_struct(writer, SpeedControlVars, seq->effectdata);
-              break;
-            case SEQ_TYPE_WIPE:
-              BLO_write_struct(writer, WipeVars, seq->effectdata);
-              break;
-            case SEQ_TYPE_GLOW:
-              BLO_write_struct(writer, GlowVars, seq->effectdata);
-              break;
-            case SEQ_TYPE_TRANSFORM:
-              BLO_write_struct(writer, TransformVars, seq->effectdata);
-              break;
-            case SEQ_TYPE_GAUSSIAN_BLUR:
-              BLO_write_struct(writer, GaussianBlurVars, seq->effectdata);
-              break;
-            case SEQ_TYPE_TEXT:
-              BLO_write_struct(writer, TextVars, seq->effectdata);
-              break;
-            case SEQ_TYPE_COLORMIX:
-              BLO_write_struct(writer, ColorMixVars, seq->effectdata);
-              break;
-          }
-        }
-
-        BLO_write_struct(writer, Stereo3dFormat, seq->stereo3d_format);
-
-        Strip *strip = seq->strip;
-        BLO_write_struct(writer, Strip, strip);
-        if (strip->crop) {
-          BLO_write_struct(writer, StripCrop, strip->crop);
-        }
-        if (strip->transform) {
-          BLO_write_struct(writer, StripTransform, strip->transform);
-        }
-        if (strip->proxy) {
-          BLO_write_struct(writer, StripProxy, strip->proxy);
-        }
-        if (seq->type == SEQ_TYPE_IMAGE) {
-          BLO_write_struct_array(writer,
-                                 StripElem,
-                                 MEM_allocN_len(strip->stripdata) / sizeof(struct StripElem),
-                                 strip->stripdata);
-        }
-        else if (ELEM(seq->type, SEQ_TYPE_MOVIE, SEQ_TYPE_SOUND_RAM, SEQ_TYPE_SOUND_HD)) {
-          BLO_write_struct(writer, StripElem, strip->stripdata);
-        }
-
-        strip->done = true;
-      }
-
-      if (seq->prop) {
-        IDP_BlendWrite(writer, seq->prop);
-      }
-
-      write_sequence_modifiers(writer, &seq->modifiers);
-    }
-    SEQ_ALL_END;
-
-    /* new; meta stack too, even when its nasty restore code */
-    LISTBASE_FOREACH (MetaStack *, ms, &ed->metastack) {
-      BLO_write_struct(writer, MetaStack, ms);
-    }
-  }
-
-  if (sce->r.avicodecdata) {
-    BLO_write_struct(writer, AviCodecData, sce->r.avicodecdata);
-    if (sce->r.avicodecdata->lpFormat) {
-      BLO_write_raw(writer, (size_t)sce->r.avicodecdata->cbFormat, sce->r.avicodecdata->lpFormat);
-    }
-    if (sce->r.avicodecdata->lpParms) {
-      BLO_write_raw(writer, (size_t)sce->r.avicodecdata->cbParms, sce->r.avicodecdata->lpParms);
-    }
-  }
-  if (sce->r.ffcodecdata.properties) {
-    IDP_BlendWrite(writer, sce->r.ffcodecdata.properties);
-  }
-
-  /* writing dynamic list of TimeMarkers to the blend file */
-  LISTBASE_FOREACH (TimeMarker *, marker, &sce->markers) {
-    BLO_write_struct(writer, TimeMarker, marker);
-
-    if (marker->prop != NULL) {
-      IDP_BlendWrite(writer, marker->prop);
-    }
-  }
-
-  /* writing dynamic list of TransformOrientations to the blend file */
-  LISTBASE_FOREACH (TransformOrientation *, ts, &sce->transform_spaces) {
-    BLO_write_struct(writer, TransformOrientation, ts);
-  }
-
-  /* writing MultiView to the blend file */
-  LISTBASE_FOREACH (SceneRenderView *, srv, &sce->r.views) {
-    BLO_write_struct(writer, SceneRenderView, srv);
-  }
-
-  if (sce->nodetree) {
-    BLO_write_struct(writer, bNodeTree, sce->nodetree);
-    ntreeBlendWrite(writer, sce->nodetree);
-  }
-
-  write_view_settings(writer, &sce->view_settings);
-
-  /* writing RigidBodyWorld data to the blend file */
-  if (sce->rigidbody_world) {
-    /* Set deprecated pointers to prevent crashes of older Blenders */
-    sce->rigidbody_world->pointcache = sce->rigidbody_world->shared->pointcache;
-    sce->rigidbody_world->ptcaches = sce->rigidbody_world->shared->ptcaches;
-    BLO_write_struct(writer, RigidBodyWorld, sce->rigidbody_world);
-
-    BLO_write_struct(writer, RigidBodyWorld_Shared, sce->rigidbody_world->shared);
-    BLO_write_struct(writer, EffectorWeights, sce->rigidbody_world->effector_weights);
-    write_pointcaches(writer, &(sce->rigidbody_world->shared->ptcaches));
-  }
-
-  BKE_previewimg_blend_write(writer, sce->preview);
-  BKE_curvemapping_curves_blend_write(writer, &sce->r.mblur_shutter_curve);
-
-  LISTBASE_FOREACH (ViewLayer *, view_layer, &sce->view_layers) {
-    BKE_view_layer_blend_write(writer, view_layer);
-  }
-
-  if (sce->master_collection) {
-    BLO_write_struct(writer, Collection, sce->master_collection);
-    BKE_collection_blend_write_nolib(writer, sce->master_collection);
-  }
-
-  /* Eevee Lightcache */
-  if (sce->eevee.light_cache_data && !BLO_write_is_undo(writer)) {
-    BLO_write_struct(writer, LightCache, sce->eevee.light_cache_data);
-    EEVEE_lightcache_blend_write(writer, sce->eevee.light_cache_data);
-  }
-
-  BKE_screen_view3d_shading_blend_write(writer, &sce->display.shading);
-
-  /* Freed on doversion. */
-  BLI_assert(sce->layer_properties == NULL);
 }
 
 /* Keep it last of write_foodata functions. */
@@ -1824,12 +1507,10 @@ static bool write_file_handle(Main *mainvar,
         }
 
         switch ((ID_Type)GS(id->name)) {
-          case ID_SCE:
-            write_scene(&writer, (Scene *)id_buffer, id);
-            break;
           case ID_OB:
             write_object(&writer, (Object *)id_buffer, id);
             break;
+          case ID_SCE:
           case ID_WM:
           case ID_WS:
           case ID_SCR:
