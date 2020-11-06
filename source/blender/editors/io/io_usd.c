@@ -277,13 +277,16 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
 
   const bool debug = RNA_boolean_get(op->ptr, "debug");
 
+  const bool use_instancing = RNA_boolean_get(op->ptr, "use_instancing");
+
   /* Switch out of edit mode to avoid being stuck in it (T54326). */
   Object *obedit = CTX_data_edit_object(C);
   if (obedit) {
     ED_object_mode_set(C, OB_MODE_OBJECT);
   }
 
-  struct USDImportParams params = {import_uvs, import_normals, import_materials, scale, debug};
+  struct USDImportParams params = {
+      import_uvs, import_normals, import_materials, scale, debug, use_instancing};
 
   bool ok = USD_import(C, filename, &params, as_background_job);
 
@@ -307,6 +310,10 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   uiItemR(col, ptr, "import_normals", 0, NULL, ICON_NONE);
   uiItemR(col, ptr, "import_materials", 0, NULL, ICON_NONE);
   uiItemR(col, ptr, "debug", 0, NULL, ICON_NONE);
+
+  box = uiLayoutBox(layout);
+  uiItemL(box, IFACE_("Experimental"), ICON_NONE);
+  uiItemR(box, ptr, "use_instancing", 0, NULL, ICON_NONE);
 }
 
 void WM_OT_usd_import(wmOperatorType *ot)
@@ -350,6 +357,14 @@ void WM_OT_usd_import(wmOperatorType *ot)
 
   RNA_def_boolean(
       ot->srna, "debug", false, "debug", "When checked, output debug information to the shell.");
+
+  RNA_def_boolean(
+      ot->srna,
+      "use_instancing",
+      false,
+      "Instancing",
+      "When checked, instanced USD references are imported as shared data in Blender. "
+      "When unchecked, instanced USD reference are imported as unique data in Blender.");
 }
 
 #endif /* WITH_USD */

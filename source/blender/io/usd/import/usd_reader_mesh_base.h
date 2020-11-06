@@ -20,6 +20,10 @@
 
 #include "usd_reader_xformable.h"
 
+#include <map>
+
+struct Mesh;
+
 namespace blender::io::usd {
 
 /* Abstract base class of readers that can create a Blender mesh object.
@@ -28,6 +32,9 @@ namespace blender::io::usd {
 
 class USDMeshReaderBase : public USDXformableReader {
  protected:
+  /* Shared meshes for instancing. */
+  static std::map<pxr::SdfPath, Mesh *> s_prototype_meshes;
+
  public:
   USDMeshReaderBase(const pxr::UsdPrim &prim, const USDImporterContext &context);
 
@@ -39,6 +46,15 @@ class USDMeshReaderBase : public USDXformableReader {
 
   virtual struct Mesh *create_mesh(Main *bmain, double time) = 0;
   virtual void assign_materials(Main *bmain, Mesh *mesh, double time) = 0;
+
+  static const std::map<pxr::SdfPath, Mesh *> &prototype_meshes()
+  {
+    return s_prototype_meshes;
+  }
+  static void clear_prototype_meshes()
+  {
+    s_prototype_meshes.clear();
+  }
 };
 
 }  // namespace blender::io::usd

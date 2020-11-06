@@ -19,6 +19,7 @@
 
 #include "import/usd_importer_context.h"
 #include "import/usd_prim_iterator.h"
+#include "import/usd_reader_mesh_base.h"
 #include "import/usd_reader_xformable.h"
 #include "usd.h"
 #include "usd_hierarchy_iterator.h"
@@ -233,6 +234,7 @@ struct ImportJobData {
 
   pxr::UsdStageRefPtr stage;
   std::vector<USDXformableReader *> readers;
+  std::map<pxr::SdfPath, USDXformableReader *> proto_readers;
 };
 
 static void import_startjob(void *user_data, short *stop, short *do_update, float *progress)
@@ -258,7 +260,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   }
 
   pxr::TfToken up_axis = pxr::UsdGeomGetStageUpAxis(data->stage);
-  USDImporterContext import_ctx{up_axis, data->params};
+  USDImporterContext import_ctx{up_axis, data->params, &data->proto_readers};
 
   USDPrimIterator usd_prim_iter(data->stage);
 
@@ -275,6 +277,12 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   *data->do_update = true;
   *data->progress = 0.1f;
 
+  /* Optionally get the prototype prim readers for instancing. */
+  if (data->params.use_instancing) {
+    usd_prim_iter.create_prototype_object_readers(import_ctx, data->proto_readers);
+  }
+
+  /* Get the xformable prim readers. */
   usd_prim_iter.create_object_readers(import_ctx, data->readers);
 
   // Create objects
@@ -394,11 +402,23 @@ static void import_endjob(void *user_data)
     }
   }
 
+  /* Delete the reders. */
+
   for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
     delete *iter;
   }
 
   data->readers.clear();
+
+  for (ObjectReaderMap::iterator map_iter = data->proto_readers.begin();
+       map_iter != data->proto_readers.end();
+       ++map_iter) {
+    delete map_iter->second;
+  }
+
+  data->proto_readers.clear();
+
+  USDMeshReaderBase::clear_prototype_meshes();
 
   WM_set_locked_interface(data->wm, false);
 

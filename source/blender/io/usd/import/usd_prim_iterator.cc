@@ -52,6 +52,33 @@ void USDPrimIterator::create_object_readers(const USDImporterContext &context,
   create_object_readers(stage_->GetPseudoRoot(), context, r_readers, child_readers);
 }
 
+void USDPrimIterator::create_prototype_object_readers(
+    const USDImporterContext &context,
+    std::map<pxr::SdfPath, USDXformableReader *> &r_proto_readers) const
+{
+  if (!stage_) {
+    return;
+  }
+
+  std::vector<pxr::UsdPrim> protos = stage_->GetMasters();
+
+  for (const pxr::UsdPrim &proto_prim : protos) {
+    std::vector<USDXformableReader *> proto_readers;
+    std::vector<USDXformableReader *> child_readers;
+
+    create_object_readers(proto_prim, context, proto_readers, child_readers);
+
+    for (USDXformableReader *reader : proto_readers) {
+      if (reader) {
+        pxr::UsdPrim reader_prim = reader->prim();
+        if (reader_prim) {
+          r_proto_readers.insert(std::make_pair(reader_prim.GetPath(), reader));
+        }
+      }
+    }
+  }
+}
+
 void USDPrimIterator::debug_traverse_stage() const
 {
   debug_traverse_stage(stage_);
@@ -147,7 +174,12 @@ void USDPrimIterator::debug_traverse_stage(const pxr::UsdStageRefPtr &usd_stage)
   for (const pxr::UsdPrim &prim : prims) {
     std::cout << prim.GetPath() << std::endl;
     std::cout << "  Type: " << prim.GetTypeName() << std::endl;
-    ;
+    if (prim.IsInstanceProxy()) {
+      pxr::UsdPrim proto_prim = prim.GetPrimInMaster();
+      if (proto_prim) {
+        std::cout << "  Prototype prim: " << proto_prim.GetPath() << std::endl;
+      }
+    }
   }
 }
 

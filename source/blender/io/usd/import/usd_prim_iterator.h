@@ -20,6 +20,7 @@
 
 #include "pxr/usd/usd/common.h"
 
+#include <map>
 #include <vector>
 
 namespace blender::io::usd {
@@ -36,6 +37,10 @@ class USDPrimIterator {
 
   void create_object_readers(const USDImporterContext &context,
                              std::vector<USDXformableReader *> &r_readers) const;
+
+  void create_prototype_object_readers(
+      const USDImporterContext &context,
+      std::map<pxr::SdfPath, USDXformableReader *> &r_proto_readers) const;
 
   void debug_traverse_stage() const;
 
