@@ -454,6 +454,16 @@ static bool wm_xr_select_raycast(bContext *C,
       }
     }
   }
+  else if (vc.obedit) {
+    if (deselect_all && (select_op == SEL_OP_SET)) {
+      changed = EDBM_mesh_deselect_all_multi(C);
+    }
+
+    if (changed) {
+      DEG_id_tag_update((ID *)vc.obedit->data, ID_RECALC_SELECT);
+      WM_event_add_notifier(C, NC_GEOM | ND_SELECT, vc.obedit->data);
+    }
+  }
   else {
     if (ob) {
       hit = true;
