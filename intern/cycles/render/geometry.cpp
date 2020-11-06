@@ -1714,6 +1714,7 @@ void GeometryManager::device_update(Device *device,
       return;
   }
 
+  bool need_update_scene_bvh = false;
   {
     scoped_callback_timer timer([scene](double time) {
       if (scene->update_stats) {
@@ -1725,6 +1726,7 @@ void GeometryManager::device_update(Device *device,
     size_t i = 0;
     foreach (Geometry *geom, scene->geometry) {
       if (geom->is_modified()) {
+        need_update_scene_bvh = true;
         pool.push(function_bind(
             &Geometry::compute_bvh, geom, device, dscene, &scene->params, &progress, i, num_bvh));
         if (geom->need_build_bvh(bvh_layout)) {
@@ -1763,7 +1765,7 @@ void GeometryManager::device_update(Device *device,
   if (progress.get_cancel())
     return;
 
-  {
+  if (need_update_scene_bvh) {
     device_update_bvh(device, dscene, scene, progress);
     if (progress.get_cancel())
       return;
