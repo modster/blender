@@ -122,6 +122,7 @@ class Object : public Node {
 /* Object Manager */
 
 class ObjectManager {
+  uint32_t update_flags;
   uint32_t device_flags;
 
   enum {
@@ -133,11 +134,17 @@ class ObjectManager {
   bool need_update;
   bool need_flags_update;
 
-  uint32_t update_flags;
-
   enum {
-    OBJECT_WAS_ADDED   = (1 << 0),
-    OBJECT_WAS_REMOVED = (1 << 1),
+    OBJECT_ADDED         = (1 << 0),
+    OBJECT_REMOVED       = (1 << 1),
+    GEOMETRY_MODIFIED    = (1 << 2),
+    GEOMETRY_MANAGER     = (1 << 3),
+    OBJECT_MODIFIED      = (1 << 4),
+    PARTICLE_MODIFIED    = (1 << 5),
+    HOLDOUT_MODIFIED     = (1 << 6),
+    MOTION_BLUR_MODIFIED = (1 << 7),
+
+    UPDATE_ALL = ~0u,
   };
 
   ObjectManager();
@@ -155,7 +162,7 @@ class ObjectManager {
 
   void device_free(Device *device, DeviceScene *dscene);
 
-  void tag_update(Scene *scene);
+  void tag_update(Scene *scene, uint32_t flag);
 
   void apply_static_transforms(DeviceScene *dscene, Scene *scene, Progress &progress);
 

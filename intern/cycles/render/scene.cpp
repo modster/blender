@@ -482,7 +482,7 @@ void Scene::reset()
 
   background->tag_update(this);
   integrator->tag_update(this, 0);
-  object_manager->tag_update(this);
+  object_manager->tag_update(this, ObjectManager::UPDATE_ALL);
   geometry_manager->tag_update(this, GeometryManager::UPDATE_ALL);
   light_manager->tag_update(this, LightManager::UPDATE_ALL);
   particle_system_manager->tag_update(this);
@@ -710,8 +710,7 @@ template<> Object *Scene::create_node<Object>()
   Object *node = new Object();
   node->set_owner(this);
   objects.push_back(node);
-  object_manager->tag_update(this);
-  object_manager->update_flags |= ObjectManager::OBJECT_WAS_ADDED;
+  object_manager->tag_update(this, ObjectManager::OBJECT_ADDED);
   return node;
 }
 
@@ -796,8 +795,7 @@ template<> void Scene::delete_node_impl(Geometry *node)
 template<> void Scene::delete_node_impl(Object *node)
 {
   delete_node_from_array(objects, node);
-  object_manager->tag_update(this);
-  object_manager->update_flags |= ObjectManager::OBJECT_WAS_REMOVED;
+  object_manager->tag_update(this, ObjectManager::OBJECT_REMOVED);
 }
 
 template<> void Scene::delete_node_impl(ParticleSystem *node)
@@ -857,8 +855,7 @@ template<> void Scene::delete_nodes(const set<Geometry *> &nodes, const NodeOwne
 template<> void Scene::delete_nodes(const set<Object *> &nodes, const NodeOwner *owner)
 {
   remove_nodes_in_set(nodes, objects, owner);
-  object_manager->tag_update(this);
-  object_manager->update_flags |= ObjectManager::OBJECT_WAS_REMOVED;
+  object_manager->tag_update(this, ObjectManager::OBJECT_REMOVED);
 }
 
 template<> void Scene::delete_nodes(const set<ParticleSystem *> &nodes, const NodeOwner *owner)

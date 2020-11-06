@@ -277,7 +277,7 @@ void Geometry::tag_update(Scene *scene, bool rebuild)
   }
 
   scene->geometry_manager->need_update = true;
-  scene->object_manager->need_update = true;
+  scene->object_manager->tag_update(scene, ObjectManager::GEOMETRY_MODIFIED);
 }
 
 /* Geometry Manager */
@@ -1887,7 +1887,7 @@ void GeometryManager::tag_update(Scene *scene, uint32_t flag)
 {
   update_flags |= flag;
   need_update = true;
-  scene->object_manager->need_update = true;
+  scene->object_manager->tag_update(scene, ObjectManager::GEOMETRY_MANAGER);
 }
 
 void GeometryManager::collect_statistics(const Scene *scene, RenderStats *stats)

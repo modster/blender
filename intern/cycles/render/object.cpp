@@ -232,7 +232,7 @@ void Object::tag_update(Scene *scene)
 
   scene->camera->need_flags_update = true;
   scene->geometry_manager->need_update = true;
-  scene->object_manager->need_update = true;
+  scene->object_manager->tag_update(scene, ObjectManager::OBJECT_MODIFIED);
 }
 
 bool Object::use_motion() const
@@ -666,7 +666,7 @@ void ObjectManager::device_update(Device *device,
 
   device_flags = 0;
 
-  if (update_flags & (OBJECT_WAS_ADDED | OBJECT_WAS_REMOVED)) {
+  if (update_flags & (OBJECT_ADDED | OBJECT_REMOVED)) {
     device_flags |= DEVICE_DATA_NEEDS_REALLOC;
   }
 
@@ -942,9 +942,10 @@ void ObjectManager::apply_static_transforms(DeviceScene *dscene, Scene *scene, P
   }
 }
 
-void ObjectManager::tag_update(Scene *scene)
+void ObjectManager::tag_update(Scene *scene, uint32_t flag)
 {
   need_update = true;
+  update_flags |= flag;
   scene->geometry_manager->need_update = true;
   scene->light_manager->tag_update(scene, LightManager::OBJECT_MANAGER);
 }

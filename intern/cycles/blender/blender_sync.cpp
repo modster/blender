@@ -305,7 +305,7 @@ void BlenderSync::sync_integrator()
   integrator->set_sample_clamp_indirect(get_float(cscene, "sample_clamp_indirect"));
   if (!preview) {
     if (integrator->get_motion_blur() != r.use_motion_blur()) {
-      scene->object_manager->tag_update(scene);
+      scene->object_manager->tag_update(scene, ObjectManager::MOTION_BLUR_MODIFIED);
       scene->camera->tag_modified();
     }
 
