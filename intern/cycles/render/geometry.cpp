@@ -274,11 +274,6 @@ void Geometry::tag_update(Scene *scene, bool rebuild)
     }
   }
 
-  if (!is_modified()) {
-    scene->geometry_manager->need_flags_update = true;
-    return;
-  }
-
   scene->geometry_manager->need_update = true;
   scene->object_manager->tag_update(scene, ObjectManager::GEOMETRY_MODIFIED);
 }
