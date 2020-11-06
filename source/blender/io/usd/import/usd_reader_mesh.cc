@@ -228,7 +228,7 @@ void process_loop_normals(Mesh *mesh, const MeshSampleData &mesh_data)
   }
 
   if (loop_count != mesh->totloop) {
-    std::cerr << "WARNING: loop normal count mismatch." << std::endl;
+    std::cerr << "WARNING: loop normal count mismatch for mesh " << mesh->id.name << std::endl;
     process_no_normals(mesh);
     return;
   }
@@ -276,7 +276,12 @@ void process_vertex_normals(Mesh *mesh, const MeshSampleData &mesh_data)
 
   size_t normals_count = mesh_data.normals.size();
   if (normals_count == 0) {
-    std::cerr << "WARNING: vertex normal count mismatch." << std::endl;
+    process_no_normals(mesh);
+    return;
+  }
+
+  if (normals_count != mesh->totvert) {
+    std::cerr << "WARNING: vertex normal count mismatch for mesh " << mesh->id.name << std::endl;
     process_no_normals(mesh);
     return;
   }
