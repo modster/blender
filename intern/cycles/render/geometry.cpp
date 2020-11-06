@@ -262,13 +262,17 @@ void Geometry::tag_update(Scene *scene, bool rebuild)
 {
   if (rebuild) {
     need_update_rebuild = true;
-    scene->light_manager->need_update = true;
+    scene->light_manager->tag_update(scene, LightManager::MESH_NEED_REBUILD);
   }
   else {
-    foreach (Node *node, used_shaders) {
-      Shader *shader = static_cast<Shader *>(node);
-      if (shader->has_surface_emission)
-        scene->light_manager->need_update = true;
+    if (is_modified()) {
+      foreach (Node *node, used_shaders) {
+        Shader *shader = static_cast<Shader *>(node);
+        if (shader->has_surface_emission) {
+          scene->light_manager->tag_update(scene, LightManager::EMISSIVE_MESH_MODIFIED);
+          break;
+        }
+      }
     }
   }
 

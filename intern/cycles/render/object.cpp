@@ -226,7 +226,7 @@ void Object::tag_update(Scene *scene)
     foreach (Node *node, geometry->get_used_shaders()) {
       Shader *shader = static_cast<Shader *>(node);
       if (shader->get_use_mis() && shader->has_surface_emission)
-        scene->light_manager->need_update = true;
+        scene->light_manager->tag_update(scene, LightManager::EMISSIVE_MESH_MODIFIED);
     }
   }
 
@@ -946,7 +946,7 @@ void ObjectManager::tag_update(Scene *scene)
 {
   need_update = true;
   scene->geometry_manager->need_update = true;
-  scene->light_manager->need_update = true;
+  scene->light_manager->tag_update(scene, LightManager::OBJECT_MANAGER);
 }
 
 string ObjectManager::get_cryptomatte_objects(Scene *scene)

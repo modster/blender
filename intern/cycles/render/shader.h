@@ -165,6 +165,12 @@ class Shader : public Node {
 
 class ShaderManager {
  public:
+  enum {
+    INTEGRATOR_MODIFIED = (1 << 0),
+    SHADER_ADDED = (1 << 1),
+    SHADER_MODIFIED = (1 << 2),
+  };
+
   bool need_update;
 
   static ShaderManager *create(int shadingsystem);
@@ -207,6 +213,8 @@ class ShaderManager {
   float linear_rgb_to_gray(float3 c);
 
   string get_cryptomatte_materials(Scene *scene);
+
+  void tag_update(Scene *scene, uint32_t flag);
 
  protected:
   ShaderManager();

@@ -132,7 +132,7 @@ void OSLShaderManager::device_update(Device *device,
     compiler.compile(og, shader);
 
     if (shader->get_use_mis() && shader->has_surface_emission)
-      scene->light_manager->need_update = true;
+      scene->light_manager->tag_update(scene, LightManager::SHADER_COMPILED);
   }
 
   /* setup shader engine */

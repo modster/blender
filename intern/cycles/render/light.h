@@ -91,8 +91,21 @@ class Light : public Node {
 
 class LightManager {
  public:
-  bool use_light_visibility;
+  enum {
+    LIGHT_MODIFIED = (1 << 0),
+    LIGHT_ADDED = (1 << 1),
+    LIGHT_REMOVED = (1 << 2),
+    MESH_NEED_REBUILD = (1 << 3),
+    EMISSIVE_MESH_MODIFIED = (1 << 4),
+    OBJECT_MANAGER = (1 << 5),
+    SHADER_COMPILED = (1 << 6),
+    SHADER_MODIFIED = (1 << 7),
+
+    UPDATE_ALL = ~0u,
+  };
+
   bool need_update;
+  bool use_light_visibility;
 
   /* Need to update background (including multiple importance map) */
   bool need_update_background;
@@ -108,7 +121,7 @@ class LightManager {
   void device_update(Device *device, DeviceScene *dscene, Scene *scene, Progress &progress);
   void device_free(Device *device, DeviceScene *dscene, const bool free_background = true);
 
-  void tag_update(Scene *scene);
+  void tag_update(Scene *scene, uint32_t flag);
 
   /* Check whether there is a background light. */
   bool has_background_light(Scene *scene);

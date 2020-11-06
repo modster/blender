@@ -484,7 +484,7 @@ void Scene::reset()
   integrator->tag_update(this, 0);
   object_manager->tag_update(this);
   geometry_manager->tag_update(this, GeometryManager::UPDATE_ALL);
-  light_manager->tag_update(this);
+  light_manager->tag_update(this, LightManager::UPDATE_ALL);
   particle_system_manager->tag_update(this);
   procedural_manager->need_update = true;
 }
@@ -674,7 +674,7 @@ template<> Light *Scene::create_node<Light>()
   Light *node = new Light();
   node->set_owner(this);
   lights.push_back(node);
-  light_manager->tag_update(this);
+  light_manager->tag_update(this, LightManager::LIGHT_ADDED);
   return node;
 }
 
@@ -729,7 +729,7 @@ template<> Shader *Scene::create_node<Shader>()
   Shader *node = new Shader();
   node->set_owner(this);
   shaders.push_back(node);
-  shader_manager->need_update = true;
+  shader_manager->tag_update(this, ShaderManager::SHADER_ADDED);
   return node;
 }
 
@@ -758,7 +758,7 @@ template<typename T> void delete_node_from_array(vector<T> &nodes, T node)
 template<> void Scene::delete_node_impl(Light *node)
 {
   delete_node_from_array(lights, node);
-  light_manager->tag_update(this);
+  light_manager->tag_update(this, LightManager::LIGHT_REMOVED);
 }
 
 template<> void Scene::delete_node_impl(Mesh *node)
@@ -845,7 +845,7 @@ static void remove_nodes_in_set(const set<T *> &nodes_set,
 template<> void Scene::delete_nodes(const set<Light *> &nodes, const NodeOwner *owner)
 {
   remove_nodes_in_set(nodes, lights, owner);
-  light_manager->tag_update(this);
+  light_manager->tag_update(this, LightManager::LIGHT_REMOVED);
 }
 
 template<> void Scene::delete_nodes(const set<Geometry *> &nodes, const NodeOwner *owner)

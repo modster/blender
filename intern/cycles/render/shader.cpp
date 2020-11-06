@@ -310,13 +310,14 @@ void Shader::tag_update(Scene *scene)
 {
   /* update tag */
   tag_modified();
-  scene->shader_manager->need_update = true;
+
+  scene->shader_manager->tag_update(scene, ShaderManager::SHADER_MODIFIED);
 
   /* if the shader previously was emissive, update light distribution,
    * if the new shader is emissive, a light manager update tag will be
    * done in the shader manager device update. */
   if (use_mis && has_surface_emission)
-    scene->light_manager->need_update = true;
+    scene->light_manager->tag_update(scene, LightManager::SHADER_MODIFIED);
 
   /* Special handle of background MIS light for now: for some reason it
    * has use_mis set to false. We are quite close to release now, so
@@ -325,7 +326,7 @@ void Shader::tag_update(Scene *scene)
   if (this == scene->background->get_shader(scene)) {
     scene->light_manager->need_update_background = true;
     if (scene->light_manager->has_background_light(scene)) {
-      scene->light_manager->need_update = true;
+      scene->light_manager->tag_update(scene, LightManager::SHADER_MODIFIED);
     }
   }
 
@@ -373,7 +374,7 @@ void Shader::tag_used(Scene *scene)
    * recompiled because it was skipped for compilation before */
   if (!used) {
     tag_modified();
-    scene->shader_manager->need_update = true;
+    scene->shader_manager->tag_update(scene, ShaderManager::SHADER_MODIFIED);
   }
 }
 
@@ -791,6 +792,11 @@ string ShaderManager::get_cryptomatte_materials(Scene *scene)
   }
   manifest[manifest.size() - 1] = '}';
   return manifest;
+}
+
+void ShaderManager::tag_update(Scene */*scene*/, uint32_t /*flag*/)
+{
+  need_update = true;
 }
 
 CCL_NAMESPACE_END

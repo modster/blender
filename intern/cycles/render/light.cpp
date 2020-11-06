@@ -162,7 +162,9 @@ Light::Light() : Node(node_type)
 
 void Light::tag_update(Scene *scene)
 {
-  scene->light_manager->need_update = is_modified();
+  if (is_modified()) {
+    scene->light_manager->tag_update(scene, LightManager::LIGHT_MODIFIED);
+  }
 }
 
 bool Light::has_contribution(Scene *scene)
@@ -1013,7 +1015,7 @@ void LightManager::device_free(Device *, DeviceScene *dscene, const bool free_ba
   dscene->ies_lights.free();
 }
 
-void LightManager::tag_update(Scene * /*scene*/)
+void LightManager::tag_update(Scene * /*scene*/, uint32_t /*flag*/)
 {
   need_update = true;
 }
