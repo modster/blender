@@ -765,16 +765,15 @@ static void wm_xr_session_action_set_update(const XrSessionSettings *settings,
   }
 
   /* Create an aligned list of action infos. */
-  /* TODO_XR: Store array and number of actions to avoid allocation on each call. */
   GHOST_XrActionInfo **infos = MEM_callocN(sizeof(GHOST_XrActionInfo *) * count, __func__);
 
   GHashIterator *ghi = BLI_ghashIterator_new(actions);
   unsigned int i = 0;
   GHASH_ITER (*ghi, actions) {
+    /* Cast wmXrAction to GHOST_XrActionInfo. */
     BLI_STATIC_ASSERT(sizeof(wmXrAction) == sizeof(GHOST_XrActionInfo),
                       "wmXrAction and GHOST_XrActionInfo sizes do not match.");
-    infos[i] = BLI_ghashIterator_getValue(
-        ghi); /* TODO_XR: Avoid casting wmXrAction to GHOST_XrActionInfo. */
+    infos[i] = BLI_ghashIterator_getValue(ghi);
     ++i;
   }
   BLI_ghashIterator_free(ghi);

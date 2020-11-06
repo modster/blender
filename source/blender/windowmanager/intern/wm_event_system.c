@@ -3214,7 +3214,7 @@ static void wm_event_surface_free_all(wmXrSurfaceData *surface_data)
 
 static void wm_event_do_surface_handlers(bContext *C, wmSurface *surface)
 {
-  /* TODO_XR: Currently assumes that the XR surface is the
+  /* Note: Currently assumes that the XR surface is the
    * same as the one for the XR runtime. In the future this
    * might not always be the case. */
   wmWindowManager *wm = CTX_wm_manager(C);
@@ -3265,18 +3265,18 @@ static void wm_event_do_surface_handlers(bContext *C, wmSurface *surface)
       LISTBASE_FOREACH (wmEvent *, event, events) {
         wmXrActionData *action_data = event->customdata;
         PointerRNA properties = {.type = action_data->ot->srna,
-                                  .data = action_data->op_properties};
+                                 .data = action_data->op_properties};
 
         if (action_data->ot->invoke || action_data->ot->invoke_3d) {
           /* Invoke operator, either executing operator or transferring responsibility to window
-            * modal handlers. */
+           * modal handlers. */
           wm_operator_invoke(C,
-                              action_data->ot,
-                              event,
-                              action_data->op_properties ? &properties : NULL,
-                              NULL,
-                              false,
-                              false);
+                             action_data->ot,
+                             event,
+                             action_data->op_properties ? &properties : NULL,
+                             NULL,
+                             false,
+                             false);
         }
         else {
           /* Execute operator. */

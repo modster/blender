@@ -1062,9 +1062,7 @@ bool GHOST_XrSession::attachActionSets()
   XrSessionActionSetsAttachInfo attach_info{XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};
   attach_info.countActionSets = (uint32_t)m_oxr->action_sets.size();
 
-  /* Create an aligned copy of the action sets to pass to xrAttachSessionActionSets().
-   * Not that much of a performance concern since attachActionSets() should only be called once
-   * per session. */
+  /* Create an aligned copy of the action sets to pass to xrAttachSessionActionSets(). */
   std::vector<XrActionSet> action_sets(attach_info.countActionSets);
   uint32_t i = 0;
   for (auto &action_set : m_oxr->action_sets) {
