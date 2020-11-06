@@ -697,7 +697,7 @@ void Film::tag_passes_update(Scene *scene, const vector<Pass> &passes_, bool upd
     scene->geometry_manager->tag_update(scene, GeometryManager::MOTION_PASS_NEEDED);
   }
   else if (Pass::contains(scene->passes, PASS_AO) != Pass::contains(passes_, PASS_AO)) {
-    scene->integrator->tag_update(scene);
+    scene->integrator->tag_update(scene, Integrator::AO_PASS_MODIFIED);
   }
 
   if (update_passes) {

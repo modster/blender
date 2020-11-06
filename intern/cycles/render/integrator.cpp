@@ -278,8 +278,13 @@ void Integrator::device_free(Device *, DeviceScene *dscene)
   dscene->sample_pattern_lut.free();
 }
 
-void Integrator::tag_update(Scene *scene)
+void Integrator::tag_update(Scene *scene, uint32_t flag)
 {
+  if (flag & (AO_PASS_MODIFIED | BACKGROUND_AO_MODIFIED)) {
+    /* tag only the ao_bounces socket as modified so we avoid updating sample_pattern_lut unnecessarily */
+    tag_ao_bounces_modified();
+  }
+
   if (filter_glossy_is_modified()) {
     foreach (Shader *shader, scene->shaders) {
       if (shader->has_integrator_dependency) {
@@ -288,7 +293,6 @@ void Integrator::tag_update(Scene *scene)
       }
     }
   }
-  //tag_modified();
 }
 
 CCL_NAMESPACE_END

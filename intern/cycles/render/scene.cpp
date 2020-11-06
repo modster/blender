@@ -477,8 +477,11 @@ void Scene::reset()
   camera->tag_modified();
   dicing_camera->tag_modified();
   film->tag_modified();
+  background->tag_modified();
+  integrator->tag_modified();
+
   background->tag_update(this);
-  integrator->tag_update(this);
+  integrator->tag_update(this, 0);
   object_manager->tag_update(this);
   geometry_manager->tag_update(this, GeometryManager::UPDATE_ALL);
   light_manager->tag_update(this);
