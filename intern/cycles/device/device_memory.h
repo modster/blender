@@ -405,6 +405,19 @@ template<typename T> class device_vector : public device_memory {
     assert(device_pointer == 0);
   }
 
+  void give_data(array<T> &to)
+  {
+    device_free();
+
+    to.set_data((T *)host_pointer, data_size);
+    data_size = 0;
+    data_width = 0;
+    data_height = 0;
+    data_depth = 0;
+    host_pointer = 0;
+    assert(device_pointer == 0);
+  }
+
   /* Free device and host memory. */
   void free()
   {
