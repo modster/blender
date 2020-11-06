@@ -147,7 +147,7 @@ static void create_reference_spaces(OpenXRSessionData &oxr, const GHOST_XrPose &
   XrReferenceSpaceCreateInfo create_info = {XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
   create_info.poseInReferenceSpace.orientation.w = 1.0f;
 
-  create_info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
+  create_info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
 #if 0
 /* TODO
  *
@@ -171,8 +171,28 @@ static void create_reference_spaces(OpenXRSessionData &oxr, const GHOST_XrPose &
   (void)base_pose;
 #endif
 
-  CHECK_XR(xrCreateReferenceSpace(oxr.session, &create_info, &oxr.reference_space),
-           "Failed to create reference space.");
+  XrResult result = xrCreateReferenceSpace(oxr.session, &create_info, &oxr.reference_space);
+
+  if (XR_FAILED(result)) {
+    /* One of the rare cases where we don't want to immediately throw an exception on failure,
+       since runtimes are not required to support the stage reference space. Although we need the
+       stage reference space for absolute tracking, if the runtime doesn't support it then just
+       fallback to the local space. */
+    if (result == XR_ERROR_REFERENCE_SPACE_UNSUPPORTED) {
+      /* TODO_XR: Log to Info editor instead of stdout to warn the user that absolute tracking is
+       * disabled. */
+      printf(
+          "XR runtime does not support stage reference space, absolute tracking will be "
+          "disabled\n");
+
+      create_info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
+      CHECK_XR(xrCreateReferenceSpace(oxr.session, &create_info, &oxr.reference_space),
+               "Failed to create local reference space.");
+    }
+    else {
+      throw GHOST_XrException("Failed to create stage reference space.", result);
+    }
+  }
 
   create_info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
   CHECK_XR(xrCreateReferenceSpace(oxr.session, &create_info, &oxr.view_space),
