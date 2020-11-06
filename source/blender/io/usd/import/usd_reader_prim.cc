@@ -27,8 +27,7 @@ USDPrimReader::USDPrimReader(const pxr::UsdPrim &prim, const USDImporterContext 
       prim_path_(""),
       context_(context),
       min_time_(std::numeric_limits<double>::max()),
-      max_time_(std::numeric_limits<double>::min()),
-      refcount_(0)
+      max_time_(std::numeric_limits<double>::min())
 {
   if (prim) {
     prim_path_ = prim.GetPath().GetString();
@@ -52,22 +51,6 @@ double USDPrimReader::min_time() const
 double USDPrimReader::max_time() const
 {
   return max_time_;
-}
-
-int USDPrimReader::refcount() const
-{
-  return refcount_;
-}
-
-void USDPrimReader::incref()
-{
-  refcount_++;
-}
-
-void USDPrimReader::decref()
-{
-  refcount_--;
-  BLI_assert(refcount_ >= 0);
 }
 
 } /* namespace blender::io::usd */

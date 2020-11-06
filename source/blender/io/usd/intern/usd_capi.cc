@@ -395,12 +395,7 @@ static void import_endjob(void *user_data)
   }
 
   for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-    USDXformableReader *reader = *iter;
-    reader->decref();
-
-    if (reader->refcount() == 0) {
-      delete reader;
-    }
+    delete *iter;
   }
 
   data->readers.clear();
