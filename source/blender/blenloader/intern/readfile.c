@@ -4526,9 +4526,6 @@ static void direct_link_scene(BlendDataReader *reader, Scene *sce)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-  BLO_read_id_address(reader, parent_id->lib, &xr_data->session_settings.headset_object);
-  BLO_read_id_address(reader, parent_id->lib, &xr_data->session_settings.controller0_object);
-  BLO_read_id_address(reader, parent_id->lib, &xr_data->session_settings.controller1_object);
 /** \name Read ID: Screen
  * \{ */
 

@@ -224,6 +224,9 @@ static void window_manager_blend_read_data(BlendDataReader *reader, ID *id)
 static void lib_link_wm_xr_data(BlendLibReader *reader, ID *parent_id, wmXrData *xr_data)
 {
   BLO_read_id_address(reader, parent_id->lib, &xr_data->session_settings.base_pose_object);
+  BLO_read_id_address(reader, parent_id->lib, &xr_data->session_settings.headset_object);
+  BLO_read_id_address(reader, parent_id->lib, &xr_data->session_settings.controller0_object);
+  BLO_read_id_address(reader, parent_id->lib, &xr_data->session_settings.controller1_object);
 }
 
 static void lib_link_workspace_instance_hook(BlendLibReader *reader,
