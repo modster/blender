@@ -28,14 +28,24 @@ struct USDImporterContext;
 class USDXformableReader;
 
 class USDPrimIterator {
- public:
-  static USDXformableReader *get_reader(const pxr::UsdPrim &prim,
-                                        const USDImporterContext &context);
+ protected:
+  pxr::UsdStageRefPtr stage_;
 
-  static void create_readers(const pxr::UsdPrim &root,
-                             const USDImporterContext &context,
-                             std::vector<USDXformableReader *> &r_readers,
-                             std::vector<USDXformableReader *> &r_child_readers);
+ public:
+  USDPrimIterator(pxr::UsdStageRefPtr stage);
+
+  void create_object_readers(const USDImporterContext &context,
+                             std::vector<USDXformableReader *> &r_readers) const;
+
+  void debug_traverse_stage() const;
+
+  static USDXformableReader *get_object_reader(const pxr::UsdPrim &prim,
+                                               const USDImporterContext &context);
+
+  static void create_object_readers(const pxr::UsdPrim &root,
+                                    const USDImporterContext &context,
+                                    std::vector<USDXformableReader *> &r_readers,
+                                    std::vector<USDXformableReader *> &r_child_readers);
 
   static void debug_traverse_stage(const pxr::UsdStageRefPtr &usd_stage);
 };

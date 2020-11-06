@@ -26,7 +26,6 @@
 #include "usd_reader_xformable.h"
 
 #include <iostream>
-#include <pxr/base/plug/registry.h>
 #include <pxr/pxr.h>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/primRange.h>
@@ -38,8 +37,28 @@
 
 namespace blender::io::usd {
 
-USDXformableReader *USDPrimIterator::get_reader(const pxr::UsdPrim &prim,
-                                                const USDImporterContext &context)
+USDPrimIterator::USDPrimIterator(pxr::UsdStageRefPtr stage) : stage_(stage)
+{
+}
+
+void USDPrimIterator::create_object_readers(const USDImporterContext &context,
+                                            std::vector<USDXformableReader *> &r_readers) const
+{
+  if (!stage_) {
+    return;
+  }
+  std::vector<USDXformableReader *> child_readers;
+
+  create_object_readers(stage_->GetPseudoRoot(), context, r_readers, child_readers);
+}
+
+void USDPrimIterator::debug_traverse_stage() const
+{
+  debug_traverse_stage(stage_);
+}
+
+USDXformableReader *USDPrimIterator::get_object_reader(const pxr::UsdPrim &prim,
+                                                       const USDImporterContext &context)
 {
   USDXformableReader *result = nullptr;
 
@@ -53,10 +72,10 @@ USDXformableReader *USDPrimIterator::get_reader(const pxr::UsdPrim &prim,
   return result;
 }
 
-void USDPrimIterator::create_readers(const pxr::UsdPrim &prim,
-                                     const USDImporterContext &context,
-                                     std::vector<USDXformableReader *> &r_readers,
-                                     std::vector<USDXformableReader *> &r_child_readers)
+void USDPrimIterator::create_object_readers(const pxr::UsdPrim &prim,
+                                            const USDImporterContext &context,
+                                            std::vector<USDXformableReader *> &r_readers,
+                                            std::vector<USDXformableReader *> &r_child_readers)
 {
   if (!prim) {
     return;
@@ -69,7 +88,7 @@ void USDPrimIterator::create_readers(const pxr::UsdPrim &prim,
       pxr::UsdTraverseInstanceProxies(pxr::UsdPrimDefaultPredicate));
 
   for (const pxr::UsdPrim &child_prim : child_prims) {
-    create_readers(child_prim, context, r_readers, child_readers);
+    create_object_readers(child_prim, context, r_readers, child_readers);
   }
 
   if (prim.IsPseudoRoot()) {
@@ -100,7 +119,7 @@ void USDPrimIterator::create_readers(const pxr::UsdPrim &prim,
     return;
   }
 
-  USDXformableReader *reader = get_reader(prim, context);
+  USDXformableReader *reader = get_object_reader(prim, context);
 
   if (reader) {
     for (USDXformableReader *child_reader : child_readers) {

@@ -260,9 +260,11 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   pxr::TfToken up_axis = pxr::UsdGeomGetStageUpAxis(data->stage);
   USDImporterContext import_ctx{up_axis, data->params};
 
+  USDPrimIterator usd_prim_iter(data->stage);
+
   // Optionally print the stage contents for debugging.
   if (data->params.debug) {
-    USDPrimIterator::debug_traverse_stage(data->stage);
+    usd_prim_iter.debug_traverse_stage();
   }
 
   if (G.is_break) {
@@ -273,9 +275,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   *data->do_update = true;
   *data->progress = 0.1f;
 
-  std::vector<USDXformableReader *> child_readers;
-  USDPrimIterator::create_readers(
-      data->stage->GetPseudoRoot(), import_ctx, data->readers, child_readers);
+  usd_prim_iter.create_object_readers(import_ctx, data->readers);
 
   // Create objects
 
