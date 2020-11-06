@@ -1252,12 +1252,16 @@ void GeometryManager::device_update_bvh(Device *device,
 
     VLOG(1) << "Using " << bvh_layout_name(bparams.bvh_layout) << " layout.";
 
-    if (bvh && !(device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
+    if (bvh) {
       bvh->pack = {};
-      bvh->refit(progress);
+
+      if (!(device_update_flags & DEVICE_DATA_NEEDS_REALLOC) && bparams.bvh_layout == BVHLayout::BVH_LAYOUT_OPTIX) {
+        bvh->refit(progress);
+      }
     }
 
     if (!bvh || (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
+      delete bvh;
       bvh = BVH::create(bparams, scene->geometry, scene->objects, device);
     }
 
@@ -1817,8 +1821,12 @@ void GeometryManager::device_free(Device *device, DeviceScene *dscene)
 {
 #ifdef WITH_EMBREE
   if (dscene->data.bvh.scene) {
-    if (dscene->data.bvh.bvh_layout == BVH_LAYOUT_EMBREE)
+    if (dscene->data.bvh.bvh_layout == BVH_LAYOUT_EMBREE) {
       BVHEmbree::destroy(dscene->data.bvh.scene);
+      if (bvh) {
+        static_cast<BVHEmbree *>(bvh)->scene = NULL;
+      }
+    }
     dscene->data.bvh.scene = NULL;
   }
 #endif
