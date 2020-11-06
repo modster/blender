@@ -1258,7 +1258,6 @@ class WM_OT_properties_edit(Operator):
             rna_idprop_ui_prop_get,
             rna_idprop_ui_prop_clear,
             rna_idprop_ui_prop_update,
-            rna_idprop_ui_prop_default_set,
             rna_idprop_value_item_type,
         )
 
@@ -1297,27 +1296,15 @@ class WM_OT_properties_edit(Operator):
         prop_type_new = type(prop_value)
         prop_type, is_array = rna_idprop_value_item_type(prop_value)
 
-        prop_ui = rna_idprop_ui_prop_get(item, prop)
-
         if prop_type in {float, int}:
-            prop_ui["min"] = prop_type(self.min)
-            prop_ui["max"] = prop_type(self.max)
-
-            if self.use_soft_limits:
-                prop_ui["soft_min"] = prop_type(self.soft_min)
-                prop_ui["soft_max"] = prop_type(self.soft_max)
-            else:
-                prop_ui["soft_min"] = prop_type(self.min)
-                prop_ui["soft_max"] = prop_type(self.max)
-
-        if prop_type == float and is_array and self.subtype != 'NONE':
-            prop_ui["subtype"] = self.subtype
-        else:
-            prop_ui.pop("subtype", None)
-
-        prop_ui["description"] = self.description
-
-        rna_idprop_ui_prop_default_set(item, prop, default_eval)
+            item.update_rna(prop, subtype=self.subtype, 
+                                  min=self.min, 
+                                  max=self.max, 
+                                  soft_min=self.soft_min, 
+                                  soft_max=self.soft_max,
+                                  description=self.description)
+        if prop_type in {float, int, str}:
+            item.update_rna(prop, default=default_eval)
 
         # If we have changed the type of the property, update its potential anim curves!
         if prop_type_old != prop_type_new:
