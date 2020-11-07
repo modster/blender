@@ -1082,7 +1082,7 @@ static void gpencil_add_move_points(bGPdata *gpd, bGPDframe *gpf, bGPDstroke *gp
   /* review points in the middle of stroke to create new strokes */
   for (int i = 0; i < gps->totpoints; i++) {
     /* skip first and last point */
-    if ((i == 0) || (i == gps->totpoints - 1)) {
+    if (ELEM(i, 0, gps->totpoints - 1)) {
       continue;
     }
 
@@ -3759,13 +3759,13 @@ static int gpencil_stroke_caps_set_exec(bContext *C, wmOperator *op)
       short prev_first = gps->caps[0];
       short prev_last = gps->caps[1];
 
-      if ((type == GP_STROKE_CAPS_TOGGLE_BOTH) || (type == GP_STROKE_CAPS_TOGGLE_START)) {
+      if (ELEM(type, GP_STROKE_CAPS_TOGGLE_BOTH, GP_STROKE_CAPS_TOGGLE_START)) {
         ++gps->caps[0];
         if (gps->caps[0] >= GP_STROKE_CAP_MAX) {
           gps->caps[0] = GP_STROKE_CAP_ROUND;
         }
       }
-      if ((type == GP_STROKE_CAPS_TOGGLE_BOTH) || (type == GP_STROKE_CAPS_TOGGLE_END)) {
+      if (ELEM(type, GP_STROKE_CAPS_TOGGLE_BOTH, GP_STROKE_CAPS_TOGGLE_END)) {
         ++gps->caps[1];
         if (gps->caps[1] >= GP_STROKE_CAP_MAX) {
           gps->caps[1] = GP_STROKE_CAP_ROUND;
@@ -5043,7 +5043,7 @@ static int gpencil_stroke_separate_exec(bContext *C, wmOperator *op)
   ob_dst->data = (bGPdata *)gpd_dst;
 
   /* Loop old data-block and separate parts. */
-  if ((mode == GP_SEPARATE_POINT) || (mode == GP_SEPARATE_STROKE)) {
+  if (ELEM(mode, GP_SEPARATE_POINT, GP_SEPARATE_STROKE)) {
     CTX_DATA_BEGIN (C, bGPDlayer *, gpl, editable_gpencil_layers) {
       gpl_dst = NULL;
       bGPDframe *init_gpf = (is_multiedit) ? gpl->frames.first : gpl->actframe;
