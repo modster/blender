@@ -350,6 +350,15 @@ static void view3d_xr_mirror_setup(const wmWindowManager *wm,
   if ((wm->xr.session_settings.draw_flags & V3D_OFSDRAW_XR_SHOW_CONTROLLERS) != 0) {
     v3d->flag2 |= V3D_XR_SHOW_CONTROLLERS;
   }
+  else {
+    v3d->flag2 &= ~V3D_XR_SHOW_CONTROLLERS;
+  }
+  if ((wm->xr.session_settings.draw_flags & V3D_OFSDRAW_XR_SHOW_CUSTOM_OVERLAYS) != 0) {
+    v3d->flag2 |= V3D_XR_SHOW_CUSTOM_OVERLAYS;
+  }
+  else {
+    v3d->flag2 &= ~V3D_XR_SHOW_CUSTOM_OVERLAYS;
+  }
 
   /* Reset overridden View3D data */
   v3d->lens = lens_old;
@@ -1804,8 +1813,7 @@ void ED_view3d_draw_offscreen_simple(Depsgraph *depsgraph,
     v3d.shading.flag = V3D_SHADING_SCENE_WORLD | V3D_SHADING_SCENE_LIGHTS;
   }
 
-  if ((draw_flags & (V3D_OFSDRAW_SHOW_ANNOTATION | V3D_OFSDRAW_SHOW_GRIDFLOOR |
-                     V3D_OFSDRAW_SHOW_SELECTION | V3D_OFSDRAW_XR_SHOW_CONTROLLERS)) == 0) {
+  if ((draw_flags & ~V3D_OFSDRAW_OVERRIDE_SCENE_SETTINGS) == V3D_OFSDRAW_NONE) {
     v3d.flag2 = V3D_HIDE_OVERLAYS;
   }
   else {
@@ -1823,6 +1831,9 @@ void ED_view3d_draw_offscreen_simple(Depsgraph *depsgraph,
     }
     if (draw_flags & V3D_OFSDRAW_XR_SHOW_CONTROLLERS) {
       v3d.flag2 |= V3D_XR_SHOW_CONTROLLERS;
+    }
+    if (draw_flags & V3D_OFSDRAW_XR_SHOW_CUSTOM_OVERLAYS) {
+      v3d.flag2 |= V3D_XR_SHOW_CUSTOM_OVERLAYS;
     }
     /* Disable other overlays (set all available _HIDE_ flags). */
     v3d.overlay.flag |= V3D_OVERLAY_HIDE_CURSOR | V3D_OVERLAY_HIDE_TEXT |

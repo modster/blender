@@ -456,6 +456,7 @@ enum {
 #define V3D_FLAG2_UNUSED_14 (1 << 14) /* cleared */
 #define V3D_FLAG2_UNUSED_15 (1 << 15) /* cleared */
 #define V3D_XR_SHOW_CONTROLLERS (1 << 16)
+#define V3D_XR_SHOW_CUSTOM_OVERLAYS (1 << 17)
 
 /** #View3D.gp_flag (short) */
 #define V3D_GP_FADE_OBJECTS (1 << 0) /* Fade all non GP objects */

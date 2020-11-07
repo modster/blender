@@ -102,8 +102,8 @@ typedef struct {
   /** XR events. */
   ListBase events;
 
-  /** Dummy region type. Used to add draw callbacks. */
-  struct ARegionType *art;
+  /** Dummy region type for controller draw callback. */
+  struct ARegionType *controller_art;
   /** Controller draw callback handle. */
   void *controller_draw_handle;
 } wmXrSurfaceData;

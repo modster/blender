@@ -203,19 +203,25 @@ static void wm_xr_select_raycast_init(wmOperator *op)
 
   op->customdata = MEM_callocN(sizeof(XrRaycastSelectData), __func__);
 
-  ARegionType *art = WM_xr_surface_region_type_get();
-  if (art) {
-    ((XrRaycastSelectData *)op->customdata)->draw_handle = ED_region_draw_cb_activate(
-        art, wm_xr_select_raycast_draw, op->customdata, REGION_DRAW_POST_VIEW);
+  SpaceType *st = BKE_spacetype_from_id(SPACE_VIEW3D);
+  if (st) {
+    ARegionType *art = BKE_regiontype_from_id(st, RGN_TYPE_XR);
+    if (art) {
+      ((XrRaycastSelectData *)op->customdata)->draw_handle = ED_region_draw_cb_activate(
+          art, wm_xr_select_raycast_draw, op->customdata, REGION_DRAW_POST_VIEW);
+    }
   }
 }
 
 static void wm_xr_select_raycast_uninit(wmOperator *op)
 {
   if (op->customdata) {
-    ARegionType *art = WM_xr_surface_region_type_get();
-    if (art) {
-      ED_region_draw_cb_exit(art, ((XrRaycastSelectData *)op->customdata)->draw_handle);
+    SpaceType *st = BKE_spacetype_from_id(SPACE_VIEW3D);
+    if (st) {
+      ARegionType *art = BKE_regiontype_from_id(st, RGN_TYPE_XR);
+      if (art) {
+        ED_region_draw_cb_exit(art, ((XrRaycastSelectData *)op->customdata)->draw_handle);
+      }
     }
 
     MEM_freeN(op->customdata);

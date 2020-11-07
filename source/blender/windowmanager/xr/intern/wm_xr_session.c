@@ -904,9 +904,9 @@ void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_ac
   if (g_xr_surface) {
     wmXrSurfaceData *surface_data = g_xr_surface->customdata;
     if (surface_data && !surface_data->controller_draw_handle) {
-      if (surface_data->art) {
+      if (surface_data->controller_art) {
         surface_data->controller_draw_handle = ED_region_draw_cb_activate(
-            surface_data->art, wm_xr_draw_controllers, state, REGION_DRAW_POST_VIEW);
+            surface_data->controller_art, wm_xr_draw_controllers, state, REGION_DRAW_POST_VIEW);
       }
     }
   }
@@ -949,8 +949,8 @@ void wm_xr_session_controller_data_clear(unsigned int count_subaction_paths,
   if (g_xr_surface) {
     wmXrSurfaceData *surface_data = g_xr_surface->customdata;
     if (surface_data && surface_data->controller_draw_handle) {
-      if (surface_data->art) {
-        ED_region_draw_cb_exit(surface_data->art, surface_data->controller_draw_handle);
+      if (surface_data->controller_art) {
+        ED_region_draw_cb_exit(surface_data->controller_art, surface_data->controller_draw_handle);
       }
       surface_data->controller_draw_handle = NULL;
     }
@@ -1045,9 +1045,9 @@ static void wm_xr_session_surface_free_data(wmSurface *surface)
   if (data->offscreen) {
     GPU_offscreen_free(data->offscreen);
   }
-  if (data->art) {
-    BLI_freelistN(&data->art->drawcalls);
-    MEM_freeN(data->art);
+  if (data->controller_art) {
+    BLI_freelistN(&data->controller_art->drawcalls);
+    MEM_freeN(data->controller_art);
   }
 
   MEM_freeN(surface->customdata);
@@ -1064,7 +1064,7 @@ static wmSurface *wm_xr_session_surface_create(void)
 
   wmSurface *surface = MEM_callocN(sizeof(*surface), __func__);
   wmXrSurfaceData *data = MEM_callocN(sizeof(*data), "XrSurfaceData");
-  data->art = MEM_callocN(sizeof(*(data->art)), "XrRegionType");
+  data->controller_art = MEM_callocN(sizeof(*(data->controller_art)), "XrControllerRegionType");
 
   surface->draw = wm_xr_session_surface_draw;
   surface->free_data = wm_xr_session_surface_free_data;
@@ -1075,7 +1075,7 @@ static wmSurface *wm_xr_session_surface_create(void)
   surface->gpu_ctx = DRW_xr_gpu_context_get();
   surface->is_xr = true;
 
-  data->art->regionid = RGN_TYPE_XR;
+  data->controller_art->regionid = RGN_TYPE_XR;
   surface->customdata = data;
 
   g_xr_surface = surface;
@@ -1109,11 +1109,11 @@ void wm_xr_session_gpu_binding_context_destroy(GHOST_ContextHandle UNUSED(contex
   WM_main_add_notifier(NC_WM | ND_XR_DATA_CHANGED, NULL);
 }
 
-ARegionType *WM_xr_surface_region_type_get(void)
+ARegionType *WM_xr_surface_controller_region_type_get(void)
 {
   if (g_xr_surface) {
     wmXrSurfaceData *data = g_xr_surface->customdata;
-    return data->art;
+    return data->controller_art;
   }
 
   return NULL;

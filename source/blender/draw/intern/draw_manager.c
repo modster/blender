@@ -1413,13 +1413,26 @@ void DRW_draw_callbacks_post_scene(void)
 
     ED_region_draw_cb_draw(DST.draw_ctx.evil_C, DST.draw_ctx.region, REGION_DRAW_POST_VIEW);
 
-    if (((v3d->flag & V3D_XR_SESSION_MIRROR) != 0) &&
-        ((v3d->flag2 & V3D_XR_SHOW_CONTROLLERS) != 0)) {
-      ARegionType *art = WM_xr_surface_region_type_get();
-      if (art) {
-        ED_region_surface_draw_cb_draw(art, REGION_DRAW_POST_VIEW);
+#ifdef WITH_XR_OPENXR
+    /* XR callbacks (controllers, custom draw functions). */
+    if ((v3d->flag & V3D_XR_SESSION_MIRROR) != 0) {
+      if ((v3d->flag2 & V3D_XR_SHOW_CONTROLLERS) != 0) {
+        ARegionType *art = WM_xr_surface_controller_region_type_get();
+        if (art) {
+          ED_region_surface_draw_cb_draw(art, REGION_DRAW_POST_VIEW);
+        }
+      }
+      if ((v3d->flag2 & V3D_XR_SHOW_CUSTOM_OVERLAYS) != 0) {
+        SpaceType *st = BKE_spacetype_from_id(SPACE_VIEW3D);
+        if (st) {
+          ARegionType *art = BKE_regiontype_from_id(st, RGN_TYPE_XR);
+          if (art) {
+            ED_region_surface_draw_cb_draw(art, REGION_DRAW_POST_VIEW);
+          }
+        }
       }
     }
+#endif
 
     /* Callback can be nasty and do whatever they want with the state.
      * Don't trust them! */
@@ -1478,16 +1491,28 @@ void DRW_draw_callbacks_post_scene(void)
     }
 
     /* Callbacks (controllers, custom draw functions). */
-    if ((v3d->flag2 & V3D_XR_SHOW_CONTROLLERS) != 0) {
-      ARegionType *art = WM_xr_surface_region_type_get();
-      if (art) {
-        GPU_depth_test(GPU_DEPTH_NONE);
-        GPU_apply_state();
+    if (((v3d->flag2 & V3D_XR_SHOW_CONTROLLERS) != 0) ||
+        ((v3d->flag2 & V3D_XR_SHOW_CUSTOM_OVERLAYS) != 0)) {
+      GPU_depth_test(GPU_DEPTH_NONE);
+      GPU_apply_state();
 
-        ED_region_surface_draw_cb_draw(art, REGION_DRAW_POST_VIEW);
-
-        DRW_state_reset();
+      if ((v3d->flag2 & V3D_XR_SHOW_CONTROLLERS) != 0) {
+        ARegionType *art = WM_xr_surface_controller_region_type_get();
+        if (art) {
+          ED_region_surface_draw_cb_draw(art, REGION_DRAW_POST_VIEW);
+        }
       }
+      if ((v3d->flag2 & V3D_XR_SHOW_CUSTOM_OVERLAYS) != 0) {
+        SpaceType *st = BKE_spacetype_from_id(SPACE_VIEW3D);
+        if (st) {
+          ARegionType *art = BKE_regiontype_from_id(st, RGN_TYPE_XR);
+          if (art) {
+            ED_region_surface_draw_cb_draw(art, REGION_DRAW_POST_VIEW);
+          }
+        }
+      }
+
+      DRW_state_reset();
     }
 
     GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
