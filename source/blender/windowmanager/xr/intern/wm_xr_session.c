@@ -32,7 +32,6 @@
 #include "DEG_depsgraph.h"
 
 #include "DNA_camera_types.h"
-#include "DNA_object_types.h"
 
 #include "DRW_engine.h"
 
@@ -601,17 +600,6 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
             C, scene, view_layer, win, ob_constraint, (i == 0) ? true : false);
       }
     }
-
-    /* Update controller representation object. */
-    if (controller->ob) {
-      /* TODO_XR: Handle case where object was deleted but then undone. */
-      Base *base = BKE_view_layer_base_find(view_layer, controller->ob);
-      if (base) {
-        copy_v3_v3(controller->ob->loc, controller->pose.position);
-        quat_to_eul(controller->ob->rot, controller->pose.orientation_quat);
-        DEG_id_tag_update(&controller->ob->id, ID_RECALC_TRANSFORM);
-      }
-    }
   }
 }
 
@@ -875,7 +863,6 @@ void wm_xr_session_actions_uninit(wmXrData *xr)
 }
 
 void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_action,
-                                            bContext *C,
                                             wmXrSessionState *state)
 {
   const unsigned int count = (unsigned int)min_ii(
@@ -885,19 +872,7 @@ void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_ac
     wmXrControllerData *c = &state->controllers[i];
     strcpy(c->subaction_path, controller_pose_action->subaction_paths[i]);
     memset(&c->pose, 0, sizeof(c->pose));
-    memset(c->mat, 0, sizeof(c->mat));
-#if 0
-    if (!c->ob) {
-      /* Just use zeroed-out pose.position for loc and rot. */
-      c->ob = ED_object_add_type(
-          C, OB_MESH, "xr_controller", c->pose.position, c->pose.position, false, 0);
-      if (c->ob) {
-        c->ob->runtime.is_xr = true;
-      }
-    }
-#else
-    UNUSED_VARS(C);
-#endif
+    zero_m4(c->mat);
   }
 
   /* Activate draw callback. */
@@ -912,38 +887,9 @@ void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_ac
   }
 }
 
-void wm_xr_session_controller_data_clear(unsigned int count_subaction_paths,
-                                         bContext *C,
-                                         wmXrSessionState *state)
+void wm_xr_session_controller_data_clear(wmXrSessionState *state)
 {
-  Main *bmain = CTX_data_main(C);
-  Scene *scene = CTX_data_scene(C);
-  ViewLayer *view_layer = CTX_data_view_layer(C);
-  Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
-  bool notify = false;
-
-  const unsigned int count = (unsigned int)min_ii((int)ARRAY_SIZE(state->controllers),
-                                                  (int)count_subaction_paths);
-
-  for (unsigned int i = 0; i < count; ++i) {
-    Object *ob = state->controllers[i].ob;
-    if (ob) {
-      /* TODO_XR: Handle case where object was deleted but then undone. */
-      Base *base = BKE_view_layer_base_find(view_layer, ob);
-      if (base) {
-        ED_object_base_free_and_unlink(bmain, scene, ob);
-        DEG_graph_id_tag_update(bmain, depsgraph, &ob->id, 0);
-        notify = true;
-      }
-    }
-    memset(&state->controllers[i], 0, sizeof(state->controllers[i]));
-  }
-
-  if (notify) {
-    DEG_id_tag_update(&scene->id, ID_RECALC_SELECT);
-    WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
-    WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
-  }
+  memset(state->controllers, 0, sizeof(state->controllers));
 
   /* Deactivate draw callback. */
   if (g_xr_surface) {

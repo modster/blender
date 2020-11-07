@@ -209,7 +209,6 @@ static void OVERLAY_cache_init(void *vedata)
   OVERLAY_particle_cache_init(vedata);
   OVERLAY_wireframe_cache_init(vedata);
   OVERLAY_volume_cache_init(vedata);
-  OVERLAY_xr_cache_init(vedata);
 }
 
 BLI_INLINE OVERLAY_DupliData *OVERLAY_duplidata_get(Object *ob, void *vedata, bool *do_init)
@@ -420,10 +419,6 @@ static void OVERLAY_cache_populate(void *vedata, Object *ob)
 
   if (draw_motion_paths) {
     OVERLAY_motion_path_cache_populate(vedata, ob);
-  }
-
-  if (ob->runtime.is_xr) {
-    OVERLAY_xr_cache_populate(vedata, ob);
   }
 
   if (!pd->hide_overlays) {
@@ -650,8 +645,6 @@ static void OVERLAY_draw_scene(void *vedata)
     default:
       break;
   }
-
-  OVERLAY_xr_draw(vedata);
 
   OVERLAY_antialiasing_end(vedata);
 }

@@ -39,8 +39,6 @@ typedef struct wmXrControllerData {
   GHOST_XrPose pose;
   /** The last known controller matrix, calculated from above's controller pose. */
   float mat[4][4];
-  /** Mesh object, used to draw the controller. */
-  Object *ob;
 } wmXrControllerData;
 
 typedef struct wmXrSessionState {
@@ -176,11 +174,8 @@ void wm_xr_session_actions_init(wmXrData *xr);
 void wm_xr_session_actions_update(wmXrData *xr);
 void wm_xr_session_actions_uninit(wmXrData *xr);
 void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_action,
-                                            struct bContext *C,
                                             wmXrSessionState *state);
-void wm_xr_session_controller_data_clear(unsigned int count_subaction_paths,
-                                         struct bContext *C,
-                                         wmXrSessionState *state);
+void wm_xr_session_controller_data_clear(wmXrSessionState *state);
 
 void wm_xr_pose_to_viewmat(const GHOST_XrPose *pose, float r_viewmat[4][4]);
 void wm_xr_controller_pose_to_mat(const GHOST_XrPose *pose, float r_mat[4][4]);
