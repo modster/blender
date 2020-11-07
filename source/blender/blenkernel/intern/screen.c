@@ -293,6 +293,8 @@ IDTypeInfo IDType_ID_SCR = {
     .blend_read_data = NULL,
     .blend_read_lib = screen_blend_read_lib,
     .blend_read_expand = NULL,
+
+    .blend_read_undo_preserve = NULL,
 };
 
 /* ************ Spacetype/regiontype handling ************** */
@@ -960,7 +962,7 @@ ARegion *BKE_area_find_region_xy(ScrArea *area, const int regiontype, int x, int
   if (area) {
     ARegion *region;
     for (region = area->regionbase.first; region; region = region->next) {
-      if ((regiontype == RGN_TYPE_ANY) || (region->regiontype == regiontype)) {
+      if (ELEM(regiontype, RGN_TYPE_ANY, region->regiontype)) {
         if (BLI_rcti_isect_pt(&region->winrct, x, y)) {
           region_found = region;
           break;
@@ -978,7 +980,7 @@ ARegion *BKE_screen_find_region_xy(bScreen *screen, const int regiontype, int x,
 {
   ARegion *region_found = NULL;
   LISTBASE_FOREACH (ARegion *, region, &screen->regionbase) {
-    if ((regiontype == RGN_TYPE_ANY) || (region->regiontype == regiontype)) {
+    if (ELEM(regiontype, RGN_TYPE_ANY, region->regiontype)) {
       if (BLI_rcti_isect_pt(&region->winrct, x, y)) {
         region_found = region;
         break;
@@ -1015,7 +1017,7 @@ ScrArea *BKE_screen_find_big_area(bScreen *screen, const int spacetype, const sh
   int size, maxsize = 0;
 
   for (area = screen->areabase.first; area; area = area->next) {
-    if ((spacetype == SPACE_TYPE_ANY) || (area->spacetype == spacetype)) {
+    if (ELEM(spacetype, SPACE_TYPE_ANY, area->spacetype)) {
       if (min <= area->winx && min <= area->winy) {
         size = area->winx * area->winy;
         if (size > maxsize) {
@@ -1036,7 +1038,7 @@ ScrArea *BKE_screen_area_map_find_area_xy(const ScrAreaMap *areamap,
 {
   LISTBASE_FOREACH (ScrArea *, area, &areamap->areabase) {
     if (BLI_rcti_isect_pt(&area->totrct, x, y)) {
-      if ((spacetype == SPACE_TYPE_ANY) || (area->spacetype == spacetype)) {
+      if (ELEM(spacetype, SPACE_TYPE_ANY, area->spacetype)) {
         return area;
       }
       break;
