@@ -1234,7 +1234,7 @@ void DepsgraphRelationBuilder::build_constraints(ID *id,
         }
       }
       if (cti->flush_constraint_targets) {
-        cti->flush_constraint_targets(con, &targets, 1);
+        cti->flush_constraint_targets(con, &targets, true);
       }
     }
   }
@@ -2204,7 +2204,7 @@ void DepsgraphRelationBuilder::build_object_data_geometry_datablock(ID *obdata)
 
       /* Layer parenting need react to the parent object transformation. */
       LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
-        if (gpl->parent != NULL) {
+        if (gpl->parent != nullptr) {
           ComponentKey gpd_geom_key(&gpd->id, NodeType::GEOMETRY);
 
           if (gpl->partype == PARBONE) {
