@@ -2184,6 +2184,22 @@ static void bevel_list_calc_bisect(BevList *bl)
     bevp1 = bevp2;
     bevp2++;
   }
+
+  if (is_cyclic == false) {
+    bevp0 = &bl->bevpoints[0];
+    bevp1 = &bl->bevpoints[1];
+    sub_v3_v3v3(bevp0->dir, bevp1->vec, bevp0->vec);
+    if (normalize_v3(bevp0->dir) == 0.0f) {
+      copy_v3_v3(bevp0->dir, bevp1->dir);
+    }
+
+    bevp0 = &bl->bevpoints[bl->nr - 2];
+    bevp1 = &bl->bevpoints[bl->nr - 1];
+    sub_v3_v3v3(bevp1->dir, bevp1->vec, bevp0->vec);
+    if (normalize_v3(bevp1->dir) == 0.0f) {
+      copy_v3_v3(bevp1->dir, bevp0->dir);
+    }
+  }
 }
 static void bevel_list_flip_tangents(BevList *bl)
 {
@@ -2853,15 +2869,15 @@ void BKE_curve_bevelList_make(Object *ob, ListBase *nurbs, bool for_render)
 
           /* indicate with handlecodes double points */
           if (prevbezt->h1 == prevbezt->h2) {
-            if (prevbezt->h1 == 0 || prevbezt->h1 == HD_VECT) {
+            if (ELEM(prevbezt->h1, 0, HD_VECT)) {
               bevp->split_tag = true;
             }
           }
           else {
-            if (prevbezt->h1 == 0 || prevbezt->h1 == HD_VECT) {
+            if (ELEM(prevbezt->h1, 0, HD_VECT)) {
               bevp->split_tag = true;
             }
-            else if (prevbezt->h2 == 0 || prevbezt->h2 == HD_VECT) {
+            else if (ELEM(prevbezt->h2, 0, HD_VECT)) {
               bevp->split_tag = true;
             }
           }
@@ -4945,7 +4961,7 @@ bool BKE_nurb_type_convert(Nurb *nu,
     }
   }
   else if (nu->type == CU_BEZIER) { /* Bezier */
-    if (type == CU_POLY || type == CU_NURBS) {
+    if (ELEM(type, CU_POLY, CU_NURBS)) {
       nr = use_handles ? (3 * nu->pntsu) : nu->pntsu;
       nu->bp = MEM_calloc_arrayN(nr, sizeof(BPoint), "setsplinetype");
       a = nu->pntsu;
