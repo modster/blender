@@ -328,7 +328,6 @@ static void view3d_xr_mirror_setup(const wmWindowManager *wm,
                                    ARegion *region,
                                    const rcti *rect)
 {
-  RegionView3D *rv3d = region->regiondata;
   float viewmat[4][4];
   const float lens_old = v3d->lens;
   const float clip_start_old = v3d->clip_start;
@@ -341,12 +340,16 @@ static void view3d_xr_mirror_setup(const wmWindowManager *wm,
   if (!WM_xr_session_state_viewer_pose_matrix_info_get(
           &wm->xr, from_selection_eye, viewmat, &v3d->lens, &v3d->clip_start, &v3d->clip_end)) {
     /* Can't get info from XR session, use fallback values. */
-    copy_m4_m4(viewmat, rv3d->viewmat);
+    copy_m4_m4(viewmat, ((RegionView3D *)region->regiondata)->viewmat);
     v3d->lens = lens_old;
     v3d->clip_start = clip_start_old;
     v3d->clip_end = clip_end_old;
   }
   view3d_main_region_setup_view(depsgraph, scene, v3d, region, viewmat, NULL, rect);
+
+  if ((wm->xr.session_settings.draw_flags & V3D_OFSDRAW_XR_SHOW_CONTROLLERS) != 0) {
+    v3d->flag2 |= V3D_XR_SHOW_CONTROLLERS;
+  }
 
   /* Reset overridden View3D data */
   v3d->lens = lens_old;

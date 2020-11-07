@@ -1413,6 +1413,14 @@ void DRW_draw_callbacks_post_scene(void)
 
     ED_region_draw_cb_draw(DST.draw_ctx.evil_C, DST.draw_ctx.region, REGION_DRAW_POST_VIEW);
 
+    if (((v3d->flag & V3D_XR_SESSION_MIRROR) != 0) &&
+        ((v3d->flag2 & V3D_XR_SHOW_CONTROLLERS) != 0)) {
+      ARegionType *art = WM_xr_surface_region_type_get();
+      if (art) {
+        ED_region_surface_draw_cb_draw(art, REGION_DRAW_POST_VIEW);
+      }
+    }
+
     /* Callback can be nasty and do whatever they want with the state.
      * Don't trust them! */
     DRW_state_reset();
