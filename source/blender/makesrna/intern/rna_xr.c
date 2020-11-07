@@ -424,30 +424,34 @@ bool rna_XrSessionState_action_binding_create(bContext *C,
   wmWindowManager *wm = CTX_wm_manager(C);
   GHOST_XrActionBindingsInfo info = {
       .interaction_profile_path = profile,
+      .count_bindings = 1,
+  };
+  GHOST_XrActionBinding binding = {
+      .action_name = action_name,
+      .count_interaction_paths = 0,
   };
 
-  GHOST_XrActionBinding bindings[2];
+  const char *interaction_paths[2];
   if (interaction_path0 && !STREQ(interaction_path0, "")) {
-    bindings[0].action_name = action_name;
-    bindings[0].interaction_path = interaction_path0;
-    ++info.count_bindings;
+    interaction_paths[0] = interaction_path0;
+    ++binding.count_interaction_paths;
 
     if (interaction_path1 && !STREQ(interaction_path1, "")) {
-      bindings[1].action_name = action_name;
-      bindings[1].interaction_path = interaction_path1;
-      ++info.count_bindings;
+      interaction_paths[1] = interaction_path1;
+      ++binding.count_interaction_paths;
     }
   }
   else {
     if (interaction_path1 && !STREQ(interaction_path1, "")) {
-      bindings[0].action_name = action_name;
-      bindings[0].interaction_path = interaction_path1;
+      interaction_paths[0] = interaction_path1;
+      ++binding.count_interaction_paths;
     }
     else {
       return false;
     }
   }
-  info.bindings = bindings;
+  binding.interaction_paths = interaction_paths;
+  info.bindings = &binding;
 
   return WM_xr_action_bindings_create(&wm->xr, action_set_name, 1, &info);
 #  else

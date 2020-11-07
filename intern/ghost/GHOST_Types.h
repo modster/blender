@@ -727,8 +727,9 @@ typedef struct GHOST_XrActionSpaceInfo {
 
 typedef struct GHOST_XrActionBinding {
   const char *action_name;
+  GHOST_TUns32 count_interaction_paths;
   /** Interaction path: User (subaction) path + component path. */
-  const char *interaction_path;
+  const char **interaction_paths;
 } GHOST_XrActionBinding;
 
 typedef struct GHOST_XrActionBindingsInfo {

@@ -649,7 +649,7 @@ bool GHOST_XrSession::createActionSet(const GHOST_XrActionSetInfo *info)
   OpenXRActionSet action_set;
   CHECK_XR(xrCreateActionSet(m_context->getInstance(), &action_set_info, &action_set.set),
            (m_error_msg = std::string("Failed to create action set \"") + info->name +
-                          "\".\nName must not contain upper case letters or special characters "
+                          "\". Name must not contain upper case letters or special characters "
                           "other than '-', '_', or '.'.")
                .c_str());
 
@@ -750,7 +750,7 @@ bool GHOST_XrSession::createActions(const char *action_set_name,
     CHECK_XR(
         xrCreateAction(action_set->set, &action_info, &action.action),
         (m_error_msg = std::string("Failed to create action \"") + info.name +
-                       "\".\nAction name and/or paths are invalid.\nName must not contain upper "
+                       "\". Action name and/or paths are invalid. Name must not contain upper "
                        "case letters or special characters other than '-', '_', or '.'.")
             .c_str());
 
@@ -908,8 +908,8 @@ bool GHOST_XrSession::createActionBindings(const char *action_set_name,
                             interaction_profile_path + "\".")
                  .c_str());
 
-    std::vector<XrActionSuggestedBinding> sbindings(info.count_bindings); /* suggested bindings */
-    std::map<std::string, XrPath> nbindings;                              /* new bindings */
+    std::vector<XrActionSuggestedBinding> sbindings; /* suggested bindings */
+    std::map<std::string, XrPath> nbindings;         /* new bindings */
 
     for (uint32_t binding_idx = 0; binding_idx < info.count_bindings; ++binding_idx) {
       const GHOST_XrActionBinding &binding = info.bindings[binding_idx];
@@ -920,14 +920,20 @@ bool GHOST_XrSession::createActionBindings(const char *action_set_name,
         continue;
       }
 
-      XrActionSuggestedBinding &sbinding = sbindings[binding_idx];
-      sbinding.action = action->action;
-      CHECK_XR(xrStringToPath(instance, binding.interaction_path, &sbinding.binding),
-               (m_error_msg = std::string("Failed to get interaction path \"") +
-                              binding.interaction_path + "\".")
-                   .c_str());
+      for (uint32_t interaction_idx = 0; interaction_idx < binding.count_interaction_paths;
+           ++interaction_idx) {
+        const char *interaction_path = binding.interaction_paths[interaction_idx];
+        XrActionSuggestedBinding sbinding;
+        sbinding.action = action->action;
 
-      nbindings.insert({binding.interaction_path, sbinding.binding});
+        CHECK_XR(xrStringToPath(instance, interaction_path, &sbinding.binding),
+                 (m_error_msg = std::string("Failed to get interaction path \"") +
+                                interaction_path + "\".")
+                     .c_str());
+
+        nbindings.insert({interaction_path, sbinding.binding});
+        sbindings.push_back(std::move(sbinding));
+      }
     }
 
     /* Since xrSuggestInteractionProfileBindings() overwrites all bindings, we
@@ -953,39 +959,47 @@ bool GHOST_XrSession::createActionBindings(const char *action_set_name,
     bindings_info.suggestedBindings = sbindings.data();
 
     CHECK_XR(xrSuggestInteractionProfileBindings(instance, &bindings_info),
-             (m_error_msg = std::string("Failed to create bindings for profile \"") +
-                            interaction_profile_path + "\".\n" +
-                            "Are the profile and action paths correct?")
+             (m_error_msg = (info.count_bindings == 1) ?
+                                std::string("Failed to create binding for profile \"") +
+                                    interaction_profile_path + "\" and action \"" +
+                                    info.bindings[0].action_name +
+                                    "\". Are the profile and action paths correct?" :
+                                std::string("Failed to create bindings for profile \"") +
+                                    interaction_profile_path +
+                                    "\". Are the profile and action paths correct?")
                  .c_str());
 
     for (uint32_t binding_idx = 0; binding_idx < info.count_bindings; ++binding_idx) {
       const GHOST_XrActionBinding &binding = info.bindings[binding_idx];
 
-      auto nbinding = nbindings.find(binding.interaction_path);
-      if (nbinding == nbindings.end()) {
-        continue;
-      }
+      for (uint32_t interaction_idx = 0; interaction_idx < binding.count_interaction_paths;
+           ++interaction_idx) {
+        auto nbinding = nbindings.find(binding.interaction_paths[interaction_idx]);
+        if (nbinding == nbindings.end()) {
+          continue;
+        }
 
-      OpenXRAction *action = find_action(action_set, binding.action_name);
-      if (action == nullptr) {
-        continue;
-      }
+        OpenXRAction *action = find_action(action_set, binding.action_name);
+        if (action == nullptr) {
+          continue;
+        }
 
-      OpenXRActionProfile *profile = find_action_profile(action, interaction_profile_path);
-      if (profile == nullptr) {
-        OpenXRActionProfile p;
-        p.profile = bindings_info.interactionProfile;
-        p.bindings.insert({nbinding->first, nbinding->second});
+        OpenXRActionProfile *profile = find_action_profile(action, interaction_profile_path);
+        if (profile == nullptr) {
+          OpenXRActionProfile p;
+          p.profile = bindings_info.interactionProfile;
+          p.bindings.insert({nbinding->first, nbinding->second});
 
-        action->profiles.insert({interaction_profile_path, std::move(p)});
-      }
-      else {
-        std::map<std::string, XrPath> &bindings = profile->bindings;
-        if (bindings.find(nbinding->first) == bindings.end()) {
-          bindings.insert({nbinding->first, nbinding->second});
+          action->profiles.insert({interaction_profile_path, std::move(p)});
         }
         else {
-          bindings[interaction_profile_path] = nbinding->second;
+          std::map<std::string, XrPath> &bindings = profile->bindings;
+          if (bindings.find(nbinding->first) == bindings.end()) {
+            bindings.insert({nbinding->first, nbinding->second});
+          }
+          else {
+            bindings[interaction_profile_path] = nbinding->second;
+          }
         }
       }
     }
@@ -1032,11 +1046,15 @@ void GHOST_XrSession::destroyActionBindings(const char *action_set_name,
         continue;
       }
 
-      if (profile->bindings.find(binding.interaction_path) == profile->bindings.end()) {
-        continue;
-      }
+      for (uint32_t interaction_idx = 0; interaction_idx < binding.count_interaction_paths;
+           ++interaction_idx) {
+        if (profile->bindings.find(binding.interaction_paths[interaction_idx]) ==
+            profile->bindings.end()) {
+          continue;
+        }
 
-      dbindings.insert({binding.interaction_path});
+        dbindings.insert({binding.interaction_paths[interaction_idx]});
+      }
     }
 
     /* Create list of suggested bindings that excludes deleted bindings. */
@@ -1063,36 +1081,39 @@ void GHOST_XrSession::destroyActionBindings(const char *action_set_name,
 
     CHECK_XR(xrSuggestInteractionProfileBindings(instance, &bindings_info),
              (m_error_msg = std::string("Failed to destroy bindings for profile \"") +
-                            interaction_profile_path + "\".\n" +
-                            "Are the profile and action paths correct?")
+                            interaction_profile_path +
+                            "\". Are the profile and action paths correct?")
                  .c_str());
 
     for (uint32_t binding_idx = 0; binding_idx < info.count_bindings; ++binding_idx) {
       const GHOST_XrActionBinding &binding = info.bindings[binding_idx];
 
-      auto dbinding = dbindings.find(binding.interaction_path);
-      if (dbinding == dbindings.end()) {
-        continue;
-      }
+      for (uint32_t interaction_idx = 0; interaction_idx < binding.count_interaction_paths;
+           ++interaction_idx) {
+        auto dbinding = dbindings.find(binding.interaction_paths[interaction_idx]);
+        if (dbinding == dbindings.end()) {
+          continue;
+        }
 
-      OpenXRAction *action = find_action(action_set, binding.action_name);
-      if (action == nullptr) {
-        continue;
-      }
+        OpenXRAction *action = find_action(action_set, binding.action_name);
+        if (action == nullptr) {
+          continue;
+        }
 
-      OpenXRActionProfile *profile = find_action_profile(action, interaction_profile_path);
-      if (profile == nullptr) {
-        continue;
-      }
+        OpenXRActionProfile *profile = find_action_profile(action, interaction_profile_path);
+        if (profile == nullptr) {
+          continue;
+        }
 
-      std::map<std::string, XrPath> &bindings = profile->bindings;
-      if (bindings.find(*dbinding) == bindings.end()) {
-        continue;
-      }
-      bindings.erase(*dbinding);
+        std::map<std::string, XrPath> &bindings = profile->bindings;
+        if (bindings.find(*dbinding) == bindings.end()) {
+          continue;
+        }
+        bindings.erase(*dbinding);
 
-      if (bindings.size() < 1) {
-        action->profiles.erase(interaction_profile_path);
+        if (bindings.size() < 1) {
+          action->profiles.erase(interaction_profile_path);
+        }
       }
     }
   }
