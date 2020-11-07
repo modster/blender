@@ -83,7 +83,7 @@ OBJMesh::~OBJMesh()
 void OBJMesh::free_mesh_if_needed()
 {
   if (mesh_eval_needs_free_ && export_mesh_eval_) {
-    BKE_id_free(NULL, export_mesh_eval_);
+    BKE_id_free(nullptr, export_mesh_eval_);
   }
 }
 
@@ -111,11 +111,12 @@ std::pair<Mesh *, bool> OBJMesh::triangulate_mesh_eval()
                       MOD_TRIANGULATE_QUAD_SHORTEDGE,
                       triangulate_min_verts,
                       false,
-                      NULL,
-                      NULL,
-                      NULL);
+                      nullptr,
+                      nullptr,
+                      nullptr);
 
-  Mesh *triangulated = BKE_mesh_from_bmesh_for_eval_nomain(bmesh.get(), NULL, export_mesh_eval_);
+  Mesh *triangulated = BKE_mesh_from_bmesh_for_eval_nomain(
+      bmesh.get(), nullptr, export_mesh_eval_);
   free_mesh_if_needed();
   return {triangulated, true};
 }

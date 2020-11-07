@@ -75,7 +75,7 @@ class OBJWriter : NonMovable, NonCopyable {
                          const int last_poly_smooth_group) const;
   int16_t write_poly_material(const OBJMesh &obj_mesh_data,
                               const int poly_index,
-                              const int16_t last_face_mat_nr) const;
+                              const int16_t last_poly_mat_nr) const;
   int16_t write_vertex_group(const OBJMesh &obj_mesh_data,
                              const int poly_index,
                              const int16_t last_poly_vertex_group) const;
