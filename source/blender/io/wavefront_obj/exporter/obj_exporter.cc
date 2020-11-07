@@ -98,7 +98,7 @@ find_exportable_objects(Depsgraph *depsgraph, const OBJExportParams &export_para
         ATTR_FALLTHROUGH;
       case OB_MESH: {
         r_exportable_meshes.append(
-            std::unique_ptr<OBJMesh>(new OBJMesh(depsgraph, export_params, object_in_layer)));
+            std::make_unique<OBJMesh>(depsgraph, export_params, object_in_layer));
         break;
       }
       case OB_CURVE: {
@@ -108,20 +108,20 @@ find_exportable_objects(Depsgraph *depsgraph, const OBJExportParams &export_para
           case CU_NURBS: {
             if (export_params.export_curves_as_nurbs) {
               /* Export in parameter form: control points. */
-              r_exportable_nurbs.append(std::unique_ptr<OBJCurve>(
-                  new OBJCurve(depsgraph, export_params, object_in_layer)));
+              r_exportable_nurbs.append(
+                  std::make_unique<OBJCurve>(depsgraph, export_params, object_in_layer));
             }
             else {
               /* Export in mesh form: edges and vertices. */
-              r_exportable_meshes.append(std::unique_ptr<OBJMesh>(
-                  new OBJMesh(depsgraph, export_params, object_in_layer)));
+              r_exportable_meshes.append(
+                  std::make_unique<OBJMesh>(depsgraph, export_params, object_in_layer));
             }
             break;
           }
           case CU_BEZIER: {
             /* Always export in mesh form: edges and vertices. */
             r_exportable_meshes.append(
-                std::unique_ptr<OBJMesh>(new OBJMesh(depsgraph, export_params, object_in_layer)));
+                std::make_unique<OBJMesh>(depsgraph, export_params, object_in_layer));
             break;
           }
           default: {
