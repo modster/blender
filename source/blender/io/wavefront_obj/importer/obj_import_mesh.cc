@@ -204,7 +204,7 @@ void MeshFromGeometry::dissolve_edges(const Set<std::pair<int, int>> &fgon_edges
                false,
                false);
   unique_mesh_ptr to_free = std::move(blender_mesh_);
-  blender_mesh_.reset(BKE_mesh_from_bmesh_for_eval_nomain(bmesh, NULL, to_free.get()));
+  blender_mesh_.reset(BKE_mesh_from_bmesh_for_eval_nomain(bmesh, nullptr, to_free.get()));
   to_free.reset();
   BM_mesh_free(bmesh);
 }

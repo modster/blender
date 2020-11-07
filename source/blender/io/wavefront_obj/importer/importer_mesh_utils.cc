@@ -110,7 +110,7 @@ static void tessellate_polygon(const Vector<Vector<float3>> &polyLineSeq,
 {
   int64_t totpoints = 0;
   /* Display #ListBase. */
-  ListBase dispbase = {NULL, NULL};
+  ListBase dispbase = {nullptr, nullptr};
   const int64_t len_polylines{polyLineSeq.size()};
 
   for (int i = 0; i < len_polylines; i++) {
@@ -138,7 +138,7 @@ static void tessellate_polygon(const Vector<Vector<float3>> &polyLineSeq,
 
   if (totpoints) {
     /* now make the list to fill */
-    BKE_displist_fill(&dispbase, &dispbase, NULL, false);
+    BKE_displist_fill(&dispbase, &dispbase, nullptr, false);
 
     /* The faces are stored in a new DisplayList
      * that's added to the head of the #ListBase. */
