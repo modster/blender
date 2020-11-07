@@ -140,6 +140,9 @@ typedef struct LineartRenderLine {
   /* We only need link node kind of list here. */
   struct LineartRenderLine *next;
   struct LineartRenderVert *l, *r;
+  /* Local vertex index for two ends, not puting in RenderVert because all verts are loaded, so as
+   * long as fewer than half of the mesh edges are becoming a feature line, we save more memory. */
+  int l_obindex, r_obindex;
   struct LineartRenderTriangle *tl, *tr;
   ListBase segments;
   char min_occ;

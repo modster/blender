@@ -244,7 +244,7 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                              rl->flags,
                              rls->occlusion,
                              rls->transparency_mask,
-                             new_rv->index);
+                             rl->l_obindex);
     while (ba && (new_rl = lineart_line_get_connected(ba, new_rv, &new_rv, rl->flags))) {
       new_rl->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;
 
@@ -279,7 +279,7 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                    new_rl->flags,
                                    rls->occlusion,
                                    rls->transparency_mask,
-                                   new_rv->index);
+                                   new_rl->l_obindex);
           last_occlusion = rls->occlusion;
           last_transparency = rls->transparency_mask;
         }
@@ -304,7 +304,7 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                    new_rl->flags,
                                    last_occlusion,
                                    last_transparency,
-                                   new_rv->index);
+                                   new_rl->r_obindex);
           last_occlusion = rls->occlusion;
           last_transparency = rls->transparency_mask;
         }
@@ -317,7 +317,7 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                  new_rl->flags,
                                  last_occlusion,
                                  last_transparency,
-                                 new_rv->index);
+                                 new_rl->r_obindex);
       }
       ba = ED_lineart_get_point_bounding_area_deep(rb, new_rv->fbcoord[0], new_rv->fbcoord[1]);
     }
@@ -356,7 +356,7 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                  rl->flags,
                                  rls->occlusion,
                                  rls->transparency_mask,
-                                 rl->l->index);
+                                 rl->l_obindex);
       last_occlusion = rls->occlusion;
     }
     VERT_COORD_TO_FLOAT(rl->r)
@@ -368,7 +368,7 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                rl->flags,
                                last_occlusion,
                                last_transparency,
-                               rl->r->index);
+                               rl->r_obindex);
 
     /*  step 3: grow right. */
     ba = ED_lineart_get_point_bounding_area_deep(rb, rl->r->fbcoord[0], rl->r->fbcoord[1]);
@@ -419,7 +419,7 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                      new_rl->flags,
                                      last_occlusion,
                                      last_transparency,
-                                     new_rv->index);
+                                     new_rl->l_obindex);
         }
       }
       else if (new_rv == new_rl->r) {
@@ -443,7 +443,7 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                      new_rl->flags,
                                      rls->occlusion,
                                      rls->transparency_mask,
-                                     new_rv->index);
+                                     new_rl->r_obindex);
           last_occlusion = rls->occlusion;
           last_transparency = rls->transparency_mask;
         }
@@ -456,7 +456,7 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                    new_rl->flags,
                                    last_occlusion,
                                    last_transparency,
-                                   new_rv->index);
+                                   new_rl->r_obindex);
       }
       ba = ED_lineart_get_point_bounding_area_deep(rb, new_rv->fbcoord[0], new_rv->fbcoord[1]);
     }

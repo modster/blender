@@ -698,6 +698,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
   int v_count = *r_v_count;
   int l_count = *r_l_count;
   int t_count = *r_t_count;
+  int l_obi, r_obi;
   char new_flag = 0;
 
   LineartRenderLine *new_rl, *rl, *old_rl;
@@ -721,8 +722,12 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
 
 #define INCREASE_RL \
   l_count++; \
+  l_obi = rl->l_obindex; \
+  r_obi = rl->r_obindex; \
   new_rl = &((LineartRenderLine *)leln->pointer)[l_count]; \
   rl = new_rl; \
+  rl->l_obindex = l_obi; \
+  rl->r_obindex = r_obi; \
   rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderLineSegment)); \
   BLI_addtail(&rl->segments, rls);
 
@@ -1641,6 +1646,8 @@ static void lineart_geometry_object_load(Depsgraph *dg,
 
       rl->l = &orv[BM_elem_index_get(e->v1)];
       rl->r = &orv[BM_elem_index_get(e->v2)];
+      rl->l_obindex = rl->l->index - global_i;
+      rl->r_obindex = rl->r->index - global_i;
       if (e->l) {
         int findex = BM_elem_index_get(e->l->f);
         rl->tl = lineart_triangle_from_index(rb, ort, findex);
