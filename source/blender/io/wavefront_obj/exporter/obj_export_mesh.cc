@@ -98,8 +98,8 @@ std::pair<Mesh *, bool> OBJMesh::triangulate_mesh_eval()
   if (export_mesh_eval_->totpoly <= 0) {
     return {export_mesh_eval_, false};
   }
-  const struct BMeshCreateParams bm_create_params = {false};
-  const struct BMeshFromMeshParams bm_convert_params = {true, 0, 0, 0};
+  const struct BMeshCreateParams bm_create_params = {0u};
+  const struct BMeshFromMeshParams bm_convert_params = {1u, 0, 0, 0};
   /* Lower threshold where triangulation of a polygon starts, i.e. a quadrilateral will be
    * triangulated here. */
   const int triangulate_min_verts = 4;

@@ -147,7 +147,7 @@ static void write_mesh_objects(Vector<std::unique_ptr<OBJMesh>> exportable_as_me
 {
   std::unique_ptr<MTLWriter> mtl_writer = nullptr;
   if (export_params.export_materials) {
-    mtl_writer.reset(new MTLWriter(export_params.filepath));
+    mtl_writer = std::make_unique<MTLWriter>(export_params.filepath);
     if (mtl_writer->good()) {
       obj_writer.write_mtllib_name(mtl_writer->mtl_file_path());
     }

@@ -208,11 +208,11 @@ void OBJWriter::write_vertex_coords(const OBJMesh &obj_mesh_data) const
  * Write UV vertex coordinates for all vertices as "vt u v".
  * \note UV indices are stored here, but written later.
  */
-void OBJWriter::write_uv_coords(OBJMesh &obj_mesh_data) const
+void OBJWriter::write_uv_coords(OBJMesh &r_obj_mesh_data) const
 {
   Vector<std::array<float, 2>> uv_coords;
   /* UV indices are calculated and stored in an OBJMesh member here. */
-  obj_mesh_data.store_uv_coords_and_indices(uv_coords);
+  r_obj_mesh_data.store_uv_coords_and_indices(uv_coords);
 
   for (const std::array<float, 2> &uv_vertex : uv_coords) {
     fprintf(outfile_, "vt %f %f\n", uv_vertex[0], uv_vertex[1]);
@@ -222,7 +222,7 @@ void OBJWriter::write_uv_coords(OBJMesh &obj_mesh_data) const
 /**
  * Write loop normals for smooth-shaded polygons, and polygon normals otherwise, as vn x y z .
  */
-void OBJWriter::write_poly_normals(OBJMesh &obj_mesh_data) const
+void OBJWriter::write_poly_normals(const OBJMesh &obj_mesh_data) const
 {
   obj_mesh_data.ensure_mesh_normals();
   Vector<float3> lnormals;
@@ -324,7 +324,7 @@ int16_t OBJWriter::write_vertex_group(const OBJMesh &obj_mesh_data,
  * \return Writer function with appropriate polygon-element syntax.
  */
 OBJWriter::func_vert_uv_normal_indices OBJWriter::get_poly_element_writer(
-    const OBJMesh &obj_mesh_data)
+    const OBJMesh &obj_mesh_data) const
 {
   if (export_params_.export_normals) {
     if (export_params_.export_uv && (obj_mesh_data.tot_uv_vertices() > 0)) {

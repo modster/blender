@@ -69,7 +69,7 @@ class OBJWriter : NonMovable, NonCopyable {
   void write_mtllib_name(const char *mtl_filepath) const;
   void write_vertex_coords(const OBJMesh &obj_mesh_data) const;
   void write_uv_coords(OBJMesh &obj_mesh_data) const;
-  void write_poly_normals(OBJMesh &obj_mesh_data) const;
+  void write_poly_normals(const OBJMesh &obj_mesh_data) const;
   int write_smooth_group(const OBJMesh &obj_mesh_data,
                          int poly_index,
                          const int last_poly_smooth_group) const;
@@ -89,7 +89,7 @@ class OBJWriter : NonMovable, NonCopyable {
   typedef void (OBJWriter::*func_vert_uv_normal_indices)(Span<int> vert_indices,
                                                          Span<int> uv_indices,
                                                          Span<int> normal_indices) const;
-  func_vert_uv_normal_indices get_poly_element_writer(const OBJMesh &obj_mesh_data);
+  func_vert_uv_normal_indices get_poly_element_writer(const OBJMesh &obj_mesh_data) const;
 
   void write_vert_uv_normal_indices(Span<int> vert_indices,
                                     Span<int> uv_indices,
