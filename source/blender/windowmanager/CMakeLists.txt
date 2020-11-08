@@ -37,7 +37,7 @@ set(INC
   ../makesdna
   ../makesrna
   ../nodes
-  ../render/extern/include
+  ../render
   ../sequencer
   ../../../intern/clog
   ../../../intern/ghost
