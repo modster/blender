@@ -184,9 +184,9 @@ void MeshFromGeometry::dissolve_edges(const Set<std::pair<int, int>> &fgon_edges
   if (fgon_edges.is_empty()) {
     return;
   }
-  struct BMeshCreateParams bm_create_params = {true};
+  const struct BMeshCreateParams bm_create_params = {1u};
   /* If calc_face_normal is false, it triggers BLI_assert(BM_face_is_normal_valid(f)). */
-  struct BMeshFromMeshParams bm_convert_params = {true, 0, 0, 0};
+  const struct BMeshFromMeshParams bm_convert_params = {1u, 0, 0, 0};
 
   BMesh *bmesh = BKE_mesh_to_bmesh_ex(blender_mesh_.get(), &bm_create_params, &bm_convert_params);
 
@@ -201,8 +201,8 @@ void MeshFromGeometry::dissolve_edges(const Set<std::pair<int, int>> &fgon_edges
                BMO_FLAG_DEFAULTS,
                "dissolve_edges edges=%eb use_verts=%b use_face_split=%b",
                edges.data(),
-               false,
-               false);
+               0,
+               0);
   unique_mesh_ptr to_free = std::move(blender_mesh_);
   blender_mesh_.reset(BKE_mesh_from_bmesh_for_eval_nomain(bmesh, nullptr, to_free.get()));
   to_free.reset();

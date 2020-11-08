@@ -307,11 +307,10 @@ Vector<Vector<int>> ngon_tessellate(Span<float3> vertex_coords, Span<int> face_v
       }
     }
     if (flip == 1) {
-      for (int i = 0; i < fill_indices.size(); i++) {
-        Span<int> fi = fill_indices[i];
-        Vector<int> rev_face(fi.size());
+      for (Span<int> fill_index : fill_indices) {
+        Vector<int> rev_face(fill_index.size());
         for (int j = 0; j < rev_face.size(); j++) {
-          rev_face[j] = fi[rev_face.size() - 1 - j];
+          rev_face[j] = fill_index[rev_face.size() - 1 - j];
         }
         fill_indices_reversed.append(rev_face);
       }
@@ -349,10 +348,10 @@ void transform_object(Object *object, const OBJImportParams &import_params)
     float3 max_coord(-INT_MAX);
     float3 min_coord(INT_MAX);
     BoundBox *bb = BKE_mesh_boundbox_get(object);
-    for (int i = 0; i < 8; i++) {
-      for (int j = 0; j < 3; j++) {
-        max_coord[j] = max_ff(max_coord[j], bb->vec[i][j]);
-        min_coord[j] = min_ff(min_coord[j], bb->vec[i][j]);
+    for (const float (&vertex)[3] : bb->vec) {
+      for (int axis = 0; axis < 3; axis++) {
+        max_coord[axis] = max_ff(max_coord[axis], vertex[axis]);
+        min_coord[axis] = min_ff(min_coord[axis], vertex[axis]);
       }
     }
     const float max_diff = max_fff(
