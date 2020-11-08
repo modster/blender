@@ -28,6 +28,25 @@
 #include "IO_wavefront_obj.h"
 
 namespace blender::io::obj {
+
+/**
+ * Steal elements' ownership in a range-based for-loop.
+ */
+template<typename T> struct Steal {
+  std::unique_ptr<T> owning;
+  Steal(std::unique_ptr<T> &owning) : owning(std::move(owning))
+  {
+  }
+  T *operator->()
+  {
+    return owning.operator->();
+  }
+  T &operator*()
+  {
+    return owning.operator*();
+  }
+};
+
 /**
  * Behaves like `std::unique_ptr<Depsgraph, custom_deleter>`.
  * Needed to free a new Depsgraph created for #DAG_EVAL_RENDER.

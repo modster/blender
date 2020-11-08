@@ -23,6 +23,8 @@
 
 #include <stdio.h>
 
+#include <memory>
+
 #include "BKE_scene.h"
 
 #include "BLI_path_util.h"
@@ -140,42 +142,42 @@ find_exportable_objects(Depsgraph *depsgraph, const OBJExportParams &export_para
 }
 
 static void write_mesh_objects(Vector<std::unique_ptr<OBJMesh>> exportable_as_mesh,
-                               OBJWriter &frame_writer,
+                               OBJWriter &obj_writer,
                                const OBJExportParams &export_params)
 {
   std::unique_ptr<MTLWriter> mtl_writer = nullptr;
   if (export_params.export_materials) {
     mtl_writer.reset(new MTLWriter(export_params.filepath));
     if (mtl_writer->good()) {
-      frame_writer.write_mtllib_name(mtl_writer->mtl_file_path());
+      obj_writer.write_mtllib_name(mtl_writer->mtl_file_path());
     }
   }
 
-  for (int i = 0; i < exportable_as_mesh.size(); i++) {
-    /* Smooth groups and UV vertex indices can take massive memory, so they should be freed
-     * right after they're written, instead of waiting for #blender::Vector to clean them up. */
-    const std::unique_ptr<OBJMesh> mesh_to_export = std::move(exportable_as_mesh[i]);
-    frame_writer.write_object_name(*mesh_to_export);
-    frame_writer.write_vertex_coords(*mesh_to_export);
+  /* Smooth groups and UV vertex indices may make huge memory allocations, so they should be freed
+   * right after they're written, instead of waiting for #blender::Vector to clean them up after
+   * all the objects are exported. */
+  for (Steal<OBJMesh> obj_mesh : exportable_as_mesh) {
+    obj_writer.write_object_name(*obj_mesh);
+    obj_writer.write_vertex_coords(*obj_mesh);
 
-    if (mesh_to_export->tot_polygons() > 0) {
+    if (obj_mesh->tot_polygons() > 0) {
       if (export_params.export_smooth_groups) {
-        mesh_to_export->calc_smooth_groups(export_params.smooth_groups_bitflags);
+        obj_mesh->calc_smooth_groups(export_params.smooth_groups_bitflags);
       }
       if (export_params.export_normals) {
-        frame_writer.write_poly_normals(*mesh_to_export);
+        obj_writer.write_poly_normals(*obj_mesh);
       }
       if (export_params.export_uv) {
-        frame_writer.write_uv_coords(*mesh_to_export);
+        obj_writer.write_uv_coords(*obj_mesh);
       }
       if (mtl_writer->good()) {
-        mtl_writer->append_materials(*mesh_to_export);
+        mtl_writer->append_materials(*obj_mesh);
       }
-      frame_writer.write_poly_elements(*mesh_to_export);
+      obj_writer.write_poly_elements(*obj_mesh);
     }
-    frame_writer.write_edges_indices(*mesh_to_export);
+    obj_writer.write_edges_indices(*obj_mesh);
 
-    frame_writer.update_index_offsets(*mesh_to_export);
+    obj_writer.update_index_offsets(*obj_mesh);
   }
 }
 
@@ -183,12 +185,12 @@ static void write_mesh_objects(Vector<std::unique_ptr<OBJMesh>> exportable_as_me
  * Export NURBS Curves in parameter form, not as vertices and edges.
  */
 static void write_nurbs_curve_objects(const Vector<std::unique_ptr<OBJCurve>> &exportable_as_nurbs,
-                                      const OBJWriter &frame_writer)
+                                      const OBJWriter &obj_writer)
 {
-  for (const std::unique_ptr<OBJCurve> &nurbs_to_export : exportable_as_nurbs) {
-    /* #OBJCurve don't have any dynamically allocated memory, so it's fine
-     * to wait for #blender::Vector to clean the objects up. */
-    frame_writer.write_nurbs_curve(*nurbs_to_export);
+  /* #OBJCurve doesn't have any dynamically allocated memory, so it's fine
+   * to wait for #blender::Vector to clean the objects up. */
+  for (const std::unique_ptr<OBJCurve> &obj_curve : exportable_as_nurbs) {
+    obj_writer.write_nurbs_curve(*obj_curve);
   }
 }
 

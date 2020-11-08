@@ -116,8 +116,8 @@ void OBJWriter::write_vert_indices(Span<int> vert_indices,
                                    Span<int> /*normal_indices*/) const
 {
   fputs("f", outfile_);
-  for (int j = 0; j < vert_indices.size(); j++) {
-    fprintf(outfile_, " %u", vert_indices[j] + index_offsets_.vertex_offset + 1);
+  for (const int vert_index : vert_indices) {
+    fprintf(outfile_, " %u", vert_index + index_offsets_.vertex_offset + 1);
   }
   fputs("\n", outfile_);
 }
