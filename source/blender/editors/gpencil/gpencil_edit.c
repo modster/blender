@@ -3155,7 +3155,7 @@ static int gpencil_snap_to_grid(bContext *C, wmOperator *UNUSED(op))
   Scene *scene = CTX_data_scene(C);
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   Object *obact = CTX_data_active_object(C);
-  const float gridf = ED_view3d_grid_view_scale(scene, v3d, rv3d, NULL);
+  const float gridf = ED_view3d_grid_view_scale(scene, v3d, region, NULL);
   const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
 
   bool changed = false;
@@ -4146,7 +4146,7 @@ static int gpencil_stroke_join_exec(bContext *C, wmOperator *op)
   elem->used = true;
 
   /* Create a new stroke. */
-  bGPDstroke *gps_new = BKE_gpencil_stroke_duplicate(elem->gps, true);
+  bGPDstroke *gps_new = BKE_gpencil_stroke_duplicate(elem->gps, true, true);
   gps_new->flag &= ~GP_STROKE_CYCLIC;
   BLI_insertlinkbefore(&elem->gpf->strokes, elem->gps, gps_new);
 
@@ -4163,7 +4163,7 @@ static int gpencil_stroke_join_exec(bContext *C, wmOperator *op)
   }
 
   /* Calc geometry data for new stroke. */
-  BKE_gpencil_stroke_geometry_update(gps_new);
+  BKE_gpencil_stroke_geometry_update(gpd, gps_new);
 
   /* If join only, delete old strokes. */
   if (type == GP_STROKE_JOIN) {
