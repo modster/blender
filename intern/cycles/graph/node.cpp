@@ -35,7 +35,7 @@ Node::Node(const NodeType *type_, ustring name_) : name(name_), type(type_)
   assert(type);
 
   owner = nullptr;
-  socket_modified = ~0;
+  tag_modified();
   time_stamp = -1;
 
   /* assign non-empty name, convenient for debugging */
@@ -786,7 +786,7 @@ bool Node::is_modified()
 
 void Node::tag_modified()
 {
-  socket_modified = ~0u;
+  socket_modified = ~0ull;
 }
 
 void Node::clear_modified()
