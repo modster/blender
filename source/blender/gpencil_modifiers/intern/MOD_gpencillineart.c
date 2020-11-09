@@ -401,7 +401,7 @@ static void occlusion_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiItemR(layout, ptr, "use_transparency", 0, "Transparency", ICON_NONE);
 
-  uiLayout *column = uiLayoutRow(layout, true);
+  uiLayout *column = uiLayoutColumn(layout, true);
 
   if (use_transparency) {
     uiItemR(column, ptr, "transparency_match", 0, "Match", ICON_NONE);
