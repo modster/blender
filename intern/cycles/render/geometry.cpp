@@ -1133,22 +1133,8 @@ void GeometryManager::device_update_mesh(
   if (curve_size != 0) {
     progress.set_status("Updating Mesh", "Copying Strands to device");
 
-    float4 *curve_keys;
-    float4 *curves;
-
-    if (device_update_flags & DEVICE_CURVE_KEYS_NEEDS_REALLOC) {
-      curve_keys = dscene->curve_keys.alloc(curve_key_size);
-    }
-    else {
-      curve_keys = dscene->curve_keys.data();
-    }
-
-    if (device_update_flags & DEVICE_CURVES_NEEDS_REALLOC) {
-      curves = dscene->curves.alloc(curve_size);
-    }
-    else {
-      curves = dscene->curves.data();
-    }
+    float4 *curve_keys = dscene->curve_keys.alloc(curve_key_size);
+    float4 *curves = dscene->curves.alloc(curve_size);
 
     foreach (Geometry *geom, scene->geometry) {
       if (geom->is_hair()) {
