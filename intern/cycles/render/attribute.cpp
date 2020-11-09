@@ -157,6 +157,7 @@ void Attribute::set_data_from(Attribute &other)
   if (memcmp(this->data(), other.data(), other.buffer.size()) != 0) {
     modified = true;
     this->buffer = other.buffer;
+    this->flags = other.flags;
   }
 }
 
