@@ -575,11 +575,6 @@ void AlembicProcedural::read_mesh(Scene *scene,
   }
 
   // TODO : properly check if and what data needs to be rebuild
-  if (mesh->get_time_stamp() == static_cast<int>(frame)) {
-    return;
-  }
-
-  mesh->set_time_stamp(static_cast<int>(frame));
 
   IPolyMeshSchema schema = polymesh.getSchema();
 

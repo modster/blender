@@ -171,9 +171,6 @@ struct Node {
 
   void print_modified_sockets() const;
 
-  int get_time_stamp() const;
-  void set_time_stamp(int time_stamp_);
-
   ustring name;
   const NodeType *type;
 
@@ -182,7 +179,6 @@ struct Node {
 
  protected:
   const NodeOwner *owner;
-  int time_stamp;
 
   template<typename T> static T &get_socket_value(const Node *node, const SocketType &socket)
   {

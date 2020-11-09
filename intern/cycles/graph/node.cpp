@@ -36,7 +36,6 @@ Node::Node(const NodeType *type_, ustring name_) : name(name_), type(type_)
 
   owner = nullptr;
   tag_modified();
-  time_stamp = -1;
 
   /* assign non-empty name, convenient for debugging */
   if (name.empty()) {
@@ -824,16 +823,6 @@ void Node::print_modified_sockets() const
       printf("-- socket modified : %s\n", socket.name.c_str());
     }
   }
-}
-
-int Node::get_time_stamp() const
-{
-  return time_stamp;
-}
-
-void Node::set_time_stamp(int time_stamp_)
-{
-  time_stamp = time_stamp_;
 }
 
 CCL_NAMESPACE_END

@@ -1019,10 +1019,6 @@ static void sync_mesh_fluid_motion(BL::Object &b_ob, Scene *scene, Mesh *mesh)
 
 void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph, BL::Object b_ob, Mesh *mesh)
 {
-  if (mesh->get_time_stamp() == b_depsgraph.scene().frame_current()) {
-    return;
-  }
-
   /* make a copy of the shaders as the caller in the main thread still need them for syncing the
    * attributes */
   array<Node *> used_shaders = mesh->get_used_shaders();
@@ -1103,7 +1099,6 @@ void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph, BL::Object b_ob, Mesh *me
   }
 
   mesh->set_num_subd_faces(new_mesh.get_num_subd_faces());
-  mesh->set_time_stamp(b_depsgraph.scene().frame_current());
 
   /* tag update */
   bool rebuild = (mesh->triangles_is_modified()) || (mesh->subd_num_corners_is_modified()) ||
