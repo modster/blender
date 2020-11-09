@@ -177,7 +177,9 @@ void BVHOptiX::pack_tlas()
       }
     }
 
-    pool.push(function_bind(&BVHOptiX::pack_instance, this, geom, pack_offset, pack_verts_offset, object_index, object_visibility));
+    if (geom->is_modified()) {
+      pool.push(function_bind(&BVHOptiX::pack_instance, this, geom, pack_offset, pack_verts_offset, object_index, object_visibility));
+    }
 
     if (!bvh_pack.prim_index.empty()) {
       pack_offset += bvh_pack.prim_index.size();
@@ -191,7 +193,7 @@ void BVHOptiX::pack_tlas()
   pool.wait_work();
 }
 
-void BVHOptiX::pack_instance(Geometry *geom, size_t pack_offset, size_t pack_verts_offset, int object_index, int object_visibility)
+void BVHOptiX::pack_instance(Geometry *geom, size_t pack_offset, size_t pack_verts_offset_, int object_index, int object_visibility)
 {
   int *pack_prim_type = pack.prim_type.data();
   int *pack_prim_index = pack.prim_index.data();
@@ -210,29 +212,40 @@ void BVHOptiX::pack_instance(Geometry *geom, size_t pack_offset, size_t pack_ver
     uint *bvh_prim_tri_index = &bvh_pack.prim_tri_index[0];
     uint *bvh_prim_visibility = &bvh_pack.prim_visibility[0];
 
-    for (size_t i = 0; i < bvh_pack.prim_index.size(); i++, pack_offset++) {
-      if (bvh_pack.prim_type[i] & PRIMITIVE_ALL_CURVE) {
-        pack_prim_index[pack_offset] = bvh_prim_index[i] + geom_prim_offset;
-        pack_prim_tri_index[pack_offset] = -1;
-      }
-      else {
-        pack_prim_index[pack_offset] = bvh_prim_index[i] + geom_prim_offset;
-        pack_prim_tri_index[pack_offset] = bvh_prim_tri_index[i] + pack_verts_offset;
-      }
+    bool prims_have_changed = true;
 
-      pack_prim_type[pack_offset] = bvh_prim_type[i];
-      pack_prim_object[pack_offset] = object_index;
-      pack_prim_visibility[pack_offset] = bvh_prim_visibility[i] | object_visibility;
+    if (geom->is_mesh()) {
+      Mesh *mesh = static_cast<Mesh *>(geom);
+
+      if (!mesh->triangles_is_modified()) {
+        prims_have_changed = false;
+      }
+    }
+
+    if (prims_have_changed) {
+      for (size_t i = 0; i < bvh_pack.prim_index.size(); i++, pack_offset++) {
+        if (bvh_pack.prim_type[i] & PRIMITIVE_ALL_CURVE) {
+          pack_prim_index[pack_offset] = bvh_prim_index[i] + geom_prim_offset;
+          pack_prim_tri_index[pack_offset] = -1;
+        }
+        else {
+          pack_prim_index[pack_offset] = bvh_prim_index[i] + geom_prim_offset;
+          pack_prim_tri_index[pack_offset] = bvh_prim_tri_index[i] + pack_verts_offset_;
+        }
+
+        pack_prim_type[pack_offset] = bvh_prim_type[i];
+        pack_prim_object[pack_offset] = object_index;
+        pack_prim_visibility[pack_offset] = bvh_prim_visibility[i] | object_visibility;
+      }
     }
   }
 
   // Merge triangle vertex data
   if (!bvh_pack.prim_tri_verts.empty()) {
     const size_t prim_tri_size = bvh_pack.prim_tri_verts.size();
-    memcpy(pack_prim_tri_verts + pack_verts_offset,
+    memcpy(pack_prim_tri_verts + pack_verts_offset_,
            bvh_pack.prim_tri_verts.data(),
            prim_tri_size * sizeof(float4));
-    pack_verts_offset += prim_tri_size;
   }
 }
 

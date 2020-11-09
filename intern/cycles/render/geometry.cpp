@@ -1245,12 +1245,15 @@ void GeometryManager::device_update_bvh(Device *device,
         bvh->refit(progress);
       }
 
-#if 0
+#if 1
       PackedBVH &pack = bvh->pack;
-      dscene->bvh_nodes.give_data(pack.nodes);
-      dscene->bvh_leaf_nodes.give_data(pack.leaf_nodes);
-      dscene->object_node.give_data(pack.object_node);
-      dscene->prim_tri_index.give_data(pack.prim_tri_index);
+      dscene->prim_tri_verts.give_data(pack.prim_tri_verts);
+#else
+      PackedBVH &pack = bvh->pack;
+      //dscene->bvh_nodes.give_data(pack.nodes);
+      //dscene->bvh_leaf_nodes.give_data(pack.leaf_nodes);
+      //dscene->object_node.give_data(pack.object_node);
+      dscene->prim_tri_index.give_data(pack.prim_tri_index);      
       dscene->prim_tri_verts.give_data(pack.prim_tri_verts);
       dscene->prim_type.give_data(pack.prim_type);
       dscene->prim_visibility.give_data(pack.prim_visibility);
