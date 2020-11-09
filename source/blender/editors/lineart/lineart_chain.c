@@ -622,7 +622,6 @@ void ED_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb)
                                    rlci->index);
         new_rlc->object_ref = rlc->object_ref;
         new_rlc->type = rlc->type;
-        new_rlc->level = rlci->occlusion;
         rlc = new_rlc;
         fixed_occ = rlci->occlusion;
         fixed_mask = rlci->transparency_mask;
@@ -977,6 +976,7 @@ void ED_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshold
         new_rlc->object_ref = rlc->object_ref;
         new_rlc->type = rlc->type;
         new_rlc->level = rlc->level;
+        new_rlc->transparency_mask = rlc->transparency_mask;
         rlc = new_rlc;
       }
     }
