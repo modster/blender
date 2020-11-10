@@ -280,6 +280,10 @@ void Integrator::device_free(Device *, DeviceScene *dscene)
 
 void Integrator::tag_update(Scene *scene, uint32_t flag)
 {
+  if (flag & UPDATE_ALL) {
+    tag_modified();
+  }
+
   if (flag & (AO_PASS_MODIFIED | BACKGROUND_AO_MODIFIED)) {
     /* tag only the ao_bounces socket as modified so we avoid updating sample_pattern_lut unnecessarily */
     tag_ao_bounces_modified();

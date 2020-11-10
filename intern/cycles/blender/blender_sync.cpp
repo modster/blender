@@ -377,7 +377,7 @@ void BlenderSync::sync_integrator()
     integrator->set_ao_bounces(0);
   }
 
-  integrator->tag_update(scene, 0);
+  integrator->tag_update(scene, Integrator::UPDATE_ALL);
 }
 
 /* Film */
@@ -730,7 +730,7 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
 
   scene->film->set_pass_alpha_threshold(b_view_layer.pass_alpha_threshold());
   scene->film->tag_passes_update(scene, passes);
-  scene->integrator->tag_update(scene, 0);
+  scene->integrator->tag_update(scene, Integrator::UPDATE_ALL);
 
   return passes;
 }

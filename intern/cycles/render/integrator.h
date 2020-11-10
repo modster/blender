@@ -92,6 +92,7 @@ class Integrator : public Node {
   enum {
     AO_PASS_MODIFIED = (1 << 0),
     BACKGROUND_AO_MODIFIED = (1 << 1),
+    UPDATE_ALL = ~0u,
   };
 
   Integrator();
