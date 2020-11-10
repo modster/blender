@@ -355,7 +355,7 @@ void Shader::tag_update(Scene *scene)
   }
 
   /* compare if the attributes changed, mesh manager will check
-   * need_update_geometry, update the relevant meshes and clear it. */
+   * need_update_attribute, update the relevant meshes and clear it. */
   if (attributes.modified(prev_attributes)) {
     need_update_attribute = true;
     scene->geometry_manager->tag_update(scene, GeometryManager::SHADER_ATTRIBUTE_MODIFIED);
