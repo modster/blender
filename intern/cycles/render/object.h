@@ -131,7 +131,6 @@ class ObjectManager {
   };
 
  public:
-  bool need_update;
   bool need_flags_update;
 
   enum {
@@ -163,6 +162,8 @@ class ObjectManager {
   void device_free(Device *device, DeviceScene *dscene);
 
   void tag_update(Scene *scene, uint32_t flag);
+
+  bool need_update() const;
 
   void apply_static_transforms(DeviceScene *dscene, Scene *scene, Progress &progress);
 

@@ -104,7 +104,6 @@ class LightManager {
     UPDATE_ALL = ~0u,
   };
 
-  bool need_update;
   bool use_light_visibility;
 
   /* Need to update background (including multiple importance map) */
@@ -122,6 +121,8 @@ class LightManager {
   void device_free(Device *device, DeviceScene *dscene, const bool free_background = true);
 
   void tag_update(Scene *scene, uint32_t flag);
+
+  bool need_update() const;
 
   /* Check whether there is a background light. */
   bool has_background_light(Scene *scene);
@@ -158,6 +159,8 @@ class LightManager {
 
   bool last_background_enabled;
   int last_background_resolution;
+
+  uint32_t update_flags;
 };
 
 CCL_NAMESPACE_END

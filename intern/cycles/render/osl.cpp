@@ -96,7 +96,7 @@ void OSLShaderManager::device_update(Device *device,
                                      Scene *scene,
                                      Progress &progress)
 {
-  if (!need_update)
+  if (!need_update())
     return;
 
   scoped_callback_timer timer([scene](double time) {
@@ -147,7 +147,7 @@ void OSLShaderManager::device_update(Device *device,
   foreach (Shader *shader, scene->shaders)
     shader->clear_modified();
 
-  need_update = false;
+  update_flags = 0;
 
   /* add special builtin texture types */
   services->textures.insert(ustring("@ao"), new OSLTextureHandle(OSLTextureHandle::AO));

@@ -456,10 +456,10 @@ bool Scene::need_update()
 
 bool Scene::need_data_update()
 {
-  return (background->is_modified() || image_manager->need_update || object_manager->need_update ||
-          geometry_manager->need_update || light_manager->need_update ||
-          lookup_tables->need_update || integrator->is_modified() || shader_manager->need_update ||
-          particle_system_manager->need_update || bake_manager->need_update ||
+  return (background->is_modified() || image_manager->need_update() || object_manager->need_update() ||
+          geometry_manager->need_update() || light_manager->need_update() ||
+          lookup_tables->need_update() || integrator->is_modified() || shader_manager->need_update() ||
+          particle_system_manager->need_update() || bake_manager->need_update() ||
           film->is_modified() || procedural_manager->need_update);
 }
 

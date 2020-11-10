@@ -274,15 +274,14 @@ void Geometry::tag_update(Scene *scene, bool rebuild)
     }
   }
 
-  scene->geometry_manager->need_update = true;
-  scene->object_manager->tag_update(scene, ObjectManager::GEOMETRY_MODIFIED);
+  scene->geometry_manager->tag_update(scene, GeometryManager::GEOMETRY_MODIFIED);
 }
 
 /* Geometry Manager */
 
 GeometryManager::GeometryManager()
 {
-  need_update = true;
+  update_flags = UPDATE_ALL;
   need_flags_update = true;
   bvh = nullptr;
 }
@@ -1348,7 +1347,7 @@ void GeometryManager::device_update_bvh(Device *device,
 
 void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Progress &progress)
 {
-  if (!need_update && !need_flags_update) {
+  if (!need_update() && !need_flags_update) {
     return;
   }
 
@@ -1434,10 +1433,6 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
     device_update_flags |= DEVICE_CURVE_DATA_NEEDS_REALLOC;
   }
 
-  if (device_update_flags != 0) {
-    need_update = true;
-  }
-
   need_flags_update = false;
 }
 
@@ -1520,7 +1515,7 @@ void GeometryManager::device_update(Device *device,
                                     Scene *scene,
                                     Progress &progress)
 {
-  if (!need_update)
+  if (!need_update())
     return;
 
   VLOG(1) << "Total " << scene->geometry.size() << " meshes.";
@@ -1806,7 +1801,6 @@ void GeometryManager::device_update(Device *device,
     }
   }
 
-  need_update = false;
   update_flags = 0;
 
   if (true_displacement_used) {
@@ -1901,8 +1895,15 @@ void GeometryManager::device_free(Device *device, DeviceScene *dscene)
 void GeometryManager::tag_update(Scene *scene, uint32_t flag)
 {
   update_flags |= flag;
-  need_update = true;
-  scene->object_manager->tag_update(scene, ObjectManager::GEOMETRY_MANAGER);
+
+  if ((flag & OBJECT_MANAGER) == 0) {
+    scene->object_manager->tag_update(scene, ObjectManager::GEOMETRY_MANAGER);
+  }
+}
+
+bool GeometryManager::need_update() const
+{
+  return update_flags != 0;
 }
 
 void GeometryManager::collect_statistics(const Scene *scene, RenderStats *stats)

@@ -358,7 +358,7 @@ void Shader::tag_update(Scene *scene)
    * need_update_geometry, update the relevant meshes and clear it. */
   if (attributes.modified(prev_attributes)) {
     need_update_attribute = true;
-    scene->geometry_manager->need_update = true;
+    scene->geometry_manager->tag_update(scene, GeometryManager::SHADER_ATTRIBUTE_MODIFIED);
   }
 
   if (has_volume != prev_has_volume || volume_step_rate != prev_volume_step_rate) {
@@ -387,7 +387,7 @@ bool Shader::need_update_geometry() const
 
 ShaderManager::ShaderManager()
 {
-  need_update = true;
+  update_flags = UPDATE_ALL;
   beckmann_table_offset = TABLE_OFFSET_INVALID;
 
   xyz_to_r = make_float3(3.2404542f, -1.5371385f, -0.4985314f);
@@ -485,7 +485,7 @@ int ShaderManager::get_shader_id(Shader *shader, bool smooth)
 
 void ShaderManager::update_shaders_used(Scene *scene)
 {
-  if (!need_update) {
+  if (!need_update()) {
     return;
   }
 
@@ -796,7 +796,13 @@ string ShaderManager::get_cryptomatte_materials(Scene *scene)
 
 void ShaderManager::tag_update(Scene */*scene*/, uint32_t /*flag*/)
 {
-  need_update = true;
+  /* update everything for now */
+  update_flags = UPDATE_ALL;
+}
+
+bool ShaderManager::need_update() const
+{
+  return update_flags != 0;
 }
 
 CCL_NAMESPACE_END

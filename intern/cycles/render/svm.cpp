@@ -74,7 +74,7 @@ void SVMShaderManager::device_update(Device *device,
                                      Scene *scene,
                                      Progress &progress)
 {
-  if (!need_update)
+  if (!need_update())
     return;
 
   scoped_callback_timer timer([scene](double time) {
@@ -159,7 +159,7 @@ void SVMShaderManager::device_update(Device *device,
 
   device_update_common(device, dscene, scene, progress);
 
-  need_update = false;
+  update_flags = 0;
 
   VLOG(1) << "Shader manager updated " << num_shaders << " shaders in " << time_dt() - start_time
           << " seconds.";

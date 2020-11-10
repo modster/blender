@@ -169,9 +169,8 @@ class ShaderManager {
     INTEGRATOR_MODIFIED = (1 << 0),
     SHADER_ADDED = (1 << 1),
     SHADER_MODIFIED = (1 << 2),
+    UPDATE_ALL  = ~0u,
   };
-
-  bool need_update;
 
   static ShaderManager *create(int shadingsystem);
   virtual ~ShaderManager();
@@ -216,8 +215,12 @@ class ShaderManager {
 
   void tag_update(Scene *scene, uint32_t flag);
 
+  bool need_update() const;
+
  protected:
   ShaderManager();
+
+  uint32_t update_flags;
 
   typedef unordered_map<ustring, uint, ustringHash> AttributeIDMap;
   AttributeIDMap unique_attribute_id;

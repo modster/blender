@@ -191,12 +191,14 @@ class GeometryManager {
     HAIR_REMOVED = (1 << 3),
     UV_PASS_NEEDED = (1 << 4),
     MOTION_PASS_NEEDED = (1 << 5),
+    SHADER_ATTRIBUTE_MODIFIED = (1 << 6),
+    OBJECT_MANAGER = (1 << 7),
+    GEOMETRY_MODIFIED = (1 << 8),
 
     UPDATE_ALL = ~0u,
   };
 
   /* Update Flags */
-  bool need_update;
   bool need_flags_update;
 
   /* Constructor/Destructor */
@@ -210,6 +212,8 @@ class GeometryManager {
 
   /* Updates */
   void tag_update(Scene *scene, uint32_t flag);
+
+  bool need_update() const;
 
   /* Statistics */
   void collect_statistics(const Scene *scene, RenderStats *stats);

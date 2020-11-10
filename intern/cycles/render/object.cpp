@@ -231,7 +231,6 @@ void Object::tag_update(Scene *scene)
   }
 
   scene->camera->need_flags_update = true;
-  scene->geometry_manager->need_update = true;
   scene->object_manager->tag_update(scene, ObjectManager::OBJECT_MODIFIED);
 }
 
@@ -375,7 +374,7 @@ int Object::get_device_index() const
 
 ObjectManager::ObjectManager()
 {
-  need_update = true;
+  update_flags = UPDATE_ALL;
   need_flags_update = true;
 }
 
@@ -661,7 +660,7 @@ void ObjectManager::device_update(Device *device,
                                   Scene *scene,
                                   Progress &progress)
 {
-  if (!need_update)
+  if (!need_update())
     return;
 
   device_flags = 0;
@@ -735,7 +734,7 @@ void ObjectManager::device_update(Device *device,
 void ObjectManager::device_update_flags(
     Device *, DeviceScene *dscene, Scene *scene, Progress & /*progress*/, bool bounds_valid)
 {
-  if (!need_update && !need_flags_update)
+  if (!need_update() && !need_flags_update)
     return;
 
   scoped_callback_timer timer([scene](double time) {
@@ -744,7 +743,7 @@ void ObjectManager::device_update_flags(
     }
   });
 
-  need_update = false;
+  update_flags = 0;
   need_flags_update = false;
 
   if (scene->objects.size() == 0)
@@ -944,10 +943,19 @@ void ObjectManager::apply_static_transforms(DeviceScene *dscene, Scene *scene, P
 
 void ObjectManager::tag_update(Scene *scene, uint32_t flag)
 {
-  need_update = true;
   update_flags |= flag;
-  scene->geometry_manager->need_update = true;
+
+  /* avoid infinite loops if the geometry manager tagged us for an update */
+  if ((flag & ObjectManager::GEOMETRY_MANAGER) == 0) {
+    scene->geometry_manager->tag_update(scene, GeometryManager::OBJECT_MANAGER);
+  }
+
   scene->light_manager->tag_update(scene, LightManager::OBJECT_MANAGER);
+}
+
+bool ObjectManager::need_update() const
+{
+  return update_flags != 0;
 }
 
 string ObjectManager::get_cryptomatte_objects(Scene *scene)

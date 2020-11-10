@@ -57,8 +57,9 @@ class ParticleSystem : public Node {
 /* ParticleSystem Manager */
 
 class ParticleSystemManager {
+  bool need_update_;
+
  public:
-  bool need_update;
 
   ParticleSystemManager();
   ~ParticleSystemManager();
@@ -71,6 +72,8 @@ class ParticleSystemManager {
   void device_free(Device *device, DeviceScene *dscene);
 
   void tag_update(Scene *scene);
+
+  bool need_update() const;
 };
 
 CCL_NAMESPACE_END
