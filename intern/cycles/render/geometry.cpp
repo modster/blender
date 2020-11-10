@@ -262,19 +262,19 @@ void Geometry::tag_update(Scene *scene, bool rebuild)
 {
   if (rebuild) {
     need_update_rebuild = true;
-    scene->light_manager->tag_update(scene, LightManager::MESH_NEED_REBUILD);
+    scene->light_manager->tag_update(scene, MESH_NEED_REBUILD);
   }
   else {
     foreach (Node *node, used_shaders) {
       Shader *shader = static_cast<Shader *>(node);
       if (shader->has_surface_emission) {
-        scene->light_manager->tag_update(scene, LightManager::EMISSIVE_MESH_MODIFIED);
+        scene->light_manager->tag_update(scene, EMISSIVE_MESH_MODIFIED);
         break;
       }
     }
   }
 
-  scene->geometry_manager->tag_update(scene, GeometryManager::GEOMETRY_MODIFIED);
+  scene->geometry_manager->tag_update(scene, GEOMETRY_MODIFIED);
 }
 
 /* Geometry Manager */
@@ -1801,7 +1801,7 @@ void GeometryManager::device_update(Device *device,
     }
   }
 
-  update_flags = 0;
+  update_flags = UPDATE_NONE;
 
   if (true_displacement_used) {
     /* Re-tag flags for update, so they're re-evaluated
@@ -1892,18 +1892,19 @@ void GeometryManager::device_free(Device *device, DeviceScene *dscene)
 #endif
 }
 
-void GeometryManager::tag_update(Scene *scene, uint32_t flag)
+void GeometryManager::tag_update(Scene *scene, UpdateFlags flag)
 {
   update_flags |= flag;
 
+  /* do not tag the object manager for an update if it the one who tagged us */
   if ((flag & OBJECT_MANAGER) == 0) {
-    scene->object_manager->tag_update(scene, ObjectManager::GEOMETRY_MANAGER);
+    scene->object_manager->tag_update(scene, GEOMETRY_MANAGER);
   }
 }
 
 bool GeometryManager::need_update() const
 {
-  return update_flags != 0;
+  return update_flags != UPDATE_NONE;
 }
 
 void GeometryManager::collect_statistics(const Scene *scene, RenderStats *stats)

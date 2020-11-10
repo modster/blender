@@ -44,6 +44,7 @@ class Scene;
 struct Transform;
 struct UpdateObjectTransformState;
 class ObjectManager;
+enum UpdateFlags : uint32_t;
 
 /* Object */
 
@@ -122,7 +123,7 @@ class Object : public Node {
 /* Object Manager */
 
 class ObjectManager {
-  uint32_t update_flags;
+  UpdateFlags update_flags;
   uint32_t device_flags;
 
   enum {
@@ -132,19 +133,6 @@ class ObjectManager {
 
  public:
   bool need_flags_update;
-
-  enum {
-    OBJECT_ADDED         = (1 << 0),
-    OBJECT_REMOVED       = (1 << 1),
-    GEOMETRY_MODIFIED    = (1 << 2),
-    GEOMETRY_MANAGER     = (1 << 3),
-    OBJECT_MODIFIED      = (1 << 4),
-    PARTICLE_MODIFIED    = (1 << 5),
-    HOLDOUT_MODIFIED     = (1 << 6),
-    MOTION_BLUR_MODIFIED = (1 << 7),
-
-    UPDATE_ALL = ~0u,
-  };
 
   ObjectManager();
   ~ObjectManager();
@@ -161,7 +149,7 @@ class ObjectManager {
 
   void device_free(Device *device, DeviceScene *dscene);
 
-  void tag_update(Scene *scene, uint32_t flag);
+  void tag_update(Scene *scene, UpdateFlags flag);
 
   bool need_update() const;
 

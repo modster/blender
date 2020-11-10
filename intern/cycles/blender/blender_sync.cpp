@@ -305,7 +305,7 @@ void BlenderSync::sync_integrator()
   integrator->set_sample_clamp_indirect(get_float(cscene, "sample_clamp_indirect"));
   if (!preview) {
     if (integrator->get_motion_blur() != r.use_motion_blur()) {
-      scene->object_manager->tag_update(scene, ObjectManager::MOTION_BLUR_MODIFIED);
+      scene->object_manager->tag_update(scene, MOTION_BLUR_MODIFIED);
       scene->camera->tag_modified();
     }
 
@@ -377,7 +377,8 @@ void BlenderSync::sync_integrator()
     integrator->set_ao_bounces(0);
   }
 
-  integrator->tag_update(scene, Integrator::UPDATE_ALL);
+  /* UPDATE_NONE as we don't want to tag the integrator as modified, just tag dependant things */
+  integrator->tag_update(scene, UPDATE_NONE);
 }
 
 /* Film */
@@ -730,7 +731,7 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
 
   scene->film->set_pass_alpha_threshold(b_view_layer.pass_alpha_threshold());
   scene->film->tag_passes_update(scene, passes);
-  scene->integrator->tag_update(scene, Integrator::UPDATE_ALL);
+  scene->integrator->tag_update(scene, UPDATE_ALL);
 
   return passes;
 }

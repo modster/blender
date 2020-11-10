@@ -38,6 +38,7 @@ class Object;
 class Progress;
 class Scene;
 class Shader;
+enum UpdateFlags : uint32_t;
 
 class Light : public Node {
  public:
@@ -91,19 +92,6 @@ class Light : public Node {
 
 class LightManager {
  public:
-  enum {
-    LIGHT_MODIFIED = (1 << 0),
-    LIGHT_ADDED = (1 << 1),
-    LIGHT_REMOVED = (1 << 2),
-    MESH_NEED_REBUILD = (1 << 3),
-    EMISSIVE_MESH_MODIFIED = (1 << 4),
-    OBJECT_MANAGER = (1 << 5),
-    SHADER_COMPILED = (1 << 6),
-    SHADER_MODIFIED = (1 << 7),
-
-    UPDATE_ALL = ~0u,
-  };
-
   bool use_light_visibility;
 
   /* Need to update background (including multiple importance map) */
@@ -160,7 +148,7 @@ class LightManager {
   bool last_background_enabled;
   int last_background_resolution;
 
-  uint32_t update_flags;
+  UpdateFlags update_flags;
 };
 
 CCL_NAMESPACE_END

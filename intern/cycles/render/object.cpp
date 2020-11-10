@@ -226,12 +226,12 @@ void Object::tag_update(Scene *scene)
     foreach (Node *node, geometry->get_used_shaders()) {
       Shader *shader = static_cast<Shader *>(node);
       if (shader->get_use_mis() && shader->has_surface_emission)
-        scene->light_manager->tag_update(scene, LightManager::EMISSIVE_MESH_MODIFIED);
+        scene->light_manager->tag_update(scene, EMISSIVE_MESH_MODIFIED);
     }
   }
 
   scene->camera->need_flags_update = true;
-  scene->object_manager->tag_update(scene, ObjectManager::OBJECT_MODIFIED);
+  scene->object_manager->tag_update(scene, OBJECT_MODIFIED);
 }
 
 bool Object::use_motion() const
@@ -728,7 +728,7 @@ void ObjectManager::device_update(Device *device,
     object->clear_modified();
   }
 
-  update_flags = 0;
+  update_flags = UPDATE_NONE;
 }
 
 void ObjectManager::device_update_flags(
@@ -743,7 +743,7 @@ void ObjectManager::device_update_flags(
     }
   });
 
-  update_flags = 0;
+  update_flags = UPDATE_NONE;
   need_flags_update = false;
 
   if (scene->objects.size() == 0)
@@ -941,21 +941,21 @@ void ObjectManager::apply_static_transforms(DeviceScene *dscene, Scene *scene, P
   }
 }
 
-void ObjectManager::tag_update(Scene *scene, uint32_t flag)
+void ObjectManager::tag_update(Scene *scene, UpdateFlags flag)
 {
   update_flags |= flag;
 
   /* avoid infinite loops if the geometry manager tagged us for an update */
-  if ((flag & ObjectManager::GEOMETRY_MANAGER) == 0) {
-    scene->geometry_manager->tag_update(scene, GeometryManager::OBJECT_MANAGER);
+  if ((flag & GEOMETRY_MANAGER) == 0) {
+    scene->geometry_manager->tag_update(scene, OBJECT_MANAGER);
   }
 
-  scene->light_manager->tag_update(scene, LightManager::OBJECT_MANAGER);
+  scene->light_manager->tag_update(scene, OBJECT_MANAGER);
 }
 
 bool ObjectManager::need_update() const
 {
-  return update_flags != 0;
+  return update_flags != UPDATE_NONE;
 }
 
 string ObjectManager::get_cryptomatte_objects(Scene *scene)

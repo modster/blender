@@ -163,7 +163,7 @@ Light::Light() : Node(node_type)
 void Light::tag_update(Scene *scene)
 {
   if (is_modified()) {
-    scene->light_manager->tag_update(scene, LightManager::LIGHT_MODIFIED);
+    scene->light_manager->tag_update(scene, LIGHT_MODIFIED);
   }
 }
 
@@ -1000,7 +1000,7 @@ void LightManager::device_update(Device *device,
 
   scene->film->set_use_light_visibility(use_light_visibility);
 
-  update_flags = 0;
+  update_flags = UPDATE_NONE;
   need_update_background = false;
 }
 
@@ -1022,7 +1022,7 @@ void LightManager::tag_update(Scene * /*scene*/, uint32_t /*flag*/)
 
 bool LightManager::need_update() const
 {
-  return update_flags != 0;
+  return update_flags != UPDATE_NONE;
 }
 
 int LightManager::add_ies_from_file(const string &filename)

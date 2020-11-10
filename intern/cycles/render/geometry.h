@@ -41,6 +41,7 @@ class Scene;
 class SceneParams;
 class Shader;
 class Volume;
+enum UpdateFlags : uint32_t;
 
 /* Geometry
  *
@@ -179,25 +180,11 @@ class GeometryManager {
   };
 
   DeviceUpdateFlags device_update_flags;
-  uint32_t update_flags = 0;
+  UpdateFlags update_flags;
 
   BVH *bvh;
 
  public:
-  enum {
-    MESH_ADDED   = (1 << 0),
-    MESH_REMOVED = (1 << 1),
-    HAIR_ADDED   = (1 << 2),
-    HAIR_REMOVED = (1 << 3),
-    UV_PASS_NEEDED = (1 << 4),
-    MOTION_PASS_NEEDED = (1 << 5),
-    SHADER_ATTRIBUTE_MODIFIED = (1 << 6),
-    OBJECT_MANAGER = (1 << 7),
-    GEOMETRY_MODIFIED = (1 << 8),
-
-    UPDATE_ALL = ~0u,
-  };
-
   /* Update Flags */
   bool need_flags_update;
 
@@ -211,7 +198,7 @@ class GeometryManager {
   void device_free(Device *device, DeviceScene *dscene);
 
   /* Updates */
-  void tag_update(Scene *scene, uint32_t flag);
+  void tag_update(Scene *scene, UpdateFlags flag);
 
   bool need_update() const;
 

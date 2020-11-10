@@ -125,7 +125,7 @@ void SVMShaderManager::device_update(Device *device,
 
     shader->clear_modified();
     if (shader->get_use_mis() && shader->has_surface_emission) {
-      scene->light_manager->tag_update(scene, LightManager::SHADER_COMPILED);
+      scene->light_manager->tag_update(scene, SHADER_COMPILED);
     }
 
     /* Update the global jump table.
@@ -159,7 +159,7 @@ void SVMShaderManager::device_update(Device *device,
 
   device_update_common(device, dscene, scene, progress);
 
-  update_flags = 0;
+  update_flags = UPDATE_NONE;
 
   VLOG(1) << "Shader manager updated " << num_shaders << " shaders in " << time_dt() - start_time
           << " seconds.";

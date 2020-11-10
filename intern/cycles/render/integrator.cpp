@@ -278,7 +278,7 @@ void Integrator::device_free(Device *, DeviceScene *dscene)
   dscene->sample_pattern_lut.free();
 }
 
-void Integrator::tag_update(Scene *scene, uint32_t flag)
+void Integrator::tag_update(Scene *scene, UpdateFlags flag)
 {
   if (flag & UPDATE_ALL) {
     tag_modified();
@@ -292,7 +292,7 @@ void Integrator::tag_update(Scene *scene, uint32_t flag)
   if (filter_glossy_is_modified()) {
     foreach (Shader *shader, scene->shaders) {
       if (shader->has_integrator_dependency) {
-        scene->shader_manager->tag_update(scene, ShaderManager::INTEGRATOR_MODIFIED);
+        scene->shader_manager->tag_update(scene, INTEGRATOR_MODIFIED);
         break;
       }
     }
