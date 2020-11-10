@@ -110,7 +110,7 @@ inline UpdateFlags operator | (UpdateFlags flag1, UpdateFlags flag2)
 
 inline UpdateFlags &operator |= (UpdateFlags &flag, uint32_t v)
 {
-  flag |= static_cast<uint32_t>(flag) | v;
+  flag = static_cast<UpdateFlags>(static_cast<uint32_t>(flag) | v);
   return flag;
 }
 
