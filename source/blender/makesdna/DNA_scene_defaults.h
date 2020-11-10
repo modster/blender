@@ -242,7 +242,7 @@
   { \
     .crease_threshold = DEG2RAD(140.0f),\
     .angle_splitting_threshold = DEG2RAD(60.0f),\
-    .chaining_geometry_threshold = 0.01f,\
+    .chaining_geometry_threshold = 0.001f,\
     .chaining_image_threshold = 0.01f,\
   }
 

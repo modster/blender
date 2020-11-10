@@ -7499,8 +7499,8 @@ static void rna_def_scene_lineart(BlenderRNA *brna)
                            "Geometry Threshold",
                            "Segments where their geometric distance between them lower than this "
                            "will be chained together");
-  RNA_def_property_ui_range(prop, 0.0f, 1.0f, 0.01f, 3);
-  RNA_def_property_range(prop, 0.0f, 1.0f);
+  RNA_def_property_ui_range(prop, 0.0f, 0.5f, 0.001f, 3);
+  RNA_def_property_range(prop, 0.0f, 0.5f);
   RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
 
   prop = RNA_def_property(srna, "chaining_image_threshold", PROP_FLOAT, PROP_DISTANCE);
