@@ -108,7 +108,7 @@ class LightManager {
   void device_update(Device *device, DeviceScene *dscene, Scene *scene, Progress &progress);
   void device_free(Device *device, DeviceScene *dscene, const bool free_background = true);
 
-  void tag_update(Scene *scene, uint32_t flag);
+  void tag_update(Scene *scene, UpdateFlags flag);
 
   bool need_update() const;
 

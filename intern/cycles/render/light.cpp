@@ -980,13 +980,24 @@ void LightManager::device_update(Device *device,
 
   use_light_visibility = false;
 
-  device_update_points(device, dscene, scene);
-  if (progress.get_cancel())
-    return;
+  bool need_update_points = true;
 
-  device_update_distribution(device, dscene, scene, progress);
-  if (progress.get_cancel())
-    return;
+  if (need_update_points) {
+    device_update_points(device, dscene, scene);
+    if (progress.get_cancel())
+      return;
+  }
+
+  bool need_update_distribution = true;
+  need_update_distribution |= (update_flags & (SHADER_MODIFIED | SHADER_COMPILED)) != 0;
+  need_update_distribution |= (update_flags & (OBJECT_ADDED | OBJECT_REMOVED)) != 0;
+  need_update_distribution |= (update_flags & (LIGHT_ADDED | LIGHT_REMOVED)) != 0;
+
+  if (need_update_distribution) {
+    device_update_distribution(device, dscene, scene, progress);
+    if (progress.get_cancel())
+      return;
+  }
 
   if (need_update_background) {
     device_update_background(device, dscene, scene, progress);
@@ -994,9 +1005,13 @@ void LightManager::device_update(Device *device,
       return;
   }
 
-  device_update_ies(dscene);
-  if (progress.get_cancel())
-    return;
+  bool need_update_ies = true;
+
+  if (need_update_ies) {
+    device_update_ies(dscene);
+    if (progress.get_cancel())
+      return;
+  }
 
   scene->film->set_use_light_visibility(use_light_visibility);
 
@@ -1015,9 +1030,23 @@ void LightManager::device_free(Device *, DeviceScene *dscene, const bool free_ba
   dscene->ies_lights.free();
 }
 
-void LightManager::tag_update(Scene * /*scene*/, uint32_t /*flag*/)
+void LightManager::tag_update(Scene * /*scene*/, UpdateFlags flag)
 {
-  update_flags |= UPDATE_ALL;
+  /* todo(kevin)
+   *
+   * dscene->lights
+   * - light->is_enabled (strength, light_type, shader)
+   * - light->is_portal
+   *
+   * dscene->light_distribution
+   * - light->is_enabled (strength, light_type, shader)
+   * - light->is_portal
+   * - object_useable_as_light, but needs valid bounds to know in advance what is needed
+   * - shader modified or compiled
+   *
+   * dscene->ies_lights, just a special flag would be enough
+   */
+  update_flags |= flag;
 }
 
 bool LightManager::need_update() const
