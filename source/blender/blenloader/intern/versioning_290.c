@@ -1146,7 +1146,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
         sc->lineart.flags |= (LRT_ALLOW_DUPLI_OBJECTS | LRT_REMOVE_DOUBLES);
         sc->lineart.angle_splitting_threshold = DEG2RAD(60.0f);
         sc->lineart.chaining_geometry_threshold = 0.001f;
-        sc->lineart.chaining_image_threshold = 0.01f;
+        sc->lineart.chaining_image_threshold = 0.001f;
       }
     }
   }
