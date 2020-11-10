@@ -245,9 +245,6 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
 
   /* holdout */
   object->set_use_holdout(use_holdout);
-  if (object->use_holdout_is_modified()) {
-    scene->object_manager->tag_update(scene, HOLDOUT_MODIFIED);
-  }
 
   object->set_visibility(visibility);
 

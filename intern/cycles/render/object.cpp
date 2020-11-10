@@ -231,7 +231,14 @@ void Object::tag_update(Scene *scene)
   }
 
   scene->camera->need_flags_update = true;
-  scene->object_manager->tag_update(scene, OBJECT_MODIFIED);
+
+  UpdateFlags flag = OBJECT_MODIFIED;
+
+  if (use_holdout_is_modified()) {
+    flag |= HOLDOUT_MODIFIED;
+  }
+
+  scene->object_manager->tag_update(scene, flag);
 }
 
 bool Object::use_motion() const
@@ -563,9 +570,6 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
   kobject.shadow_terminator_offset = 1.0f / (1.0f - 0.5f * ob->shadow_terminator_offset);
 
   /* Object flag. */
-  if (ob->use_holdout) {
-    flag |= SD_OBJECT_HOLDOUT_MASK;
-  }
   state->object_flag[ob->index] = flag;
   state->object_volume_step[ob->index] = FLT_MAX;
 
@@ -791,6 +795,18 @@ void ObjectManager::device_update_flags(
       object_flag[object->index] &= ~SD_OBJECT_SHADOW_CATCHER;
     }
 
+    if (object->use_holdout) {
+      object_flag[object->index] |= SD_OBJECT_HOLDOUT_MASK;
+    }
+
+    if (object->geometry->transform_applied) {
+      object_flag[object->index] |= SD_OBJECT_TRANSFORM_APPLIED;
+
+      if (object->geometry->transform_negative_scaled) {
+        object_flag[object->index] |= SD_OBJECT_NEGATIVE_SCALE_APPLIED;
+      }
+    }
+
     if (bounds_valid) {
       foreach (Object *volume_object, volume_objects) {
         if (object == volume_object) {
@@ -930,10 +946,6 @@ void ObjectManager::apply_static_transforms(DeviceScene *dscene, Scene *scene, P
           if (progress.get_cancel())
             return;
         }
-
-        object_flag[i] |= SD_OBJECT_TRANSFORM_APPLIED;
-        if (geom->transform_negative_scaled)
-          object_flag[i] |= SD_OBJECT_NEGATIVE_SCALE_APPLIED;
       }
     }
 
@@ -943,6 +955,11 @@ void ObjectManager::apply_static_transforms(DeviceScene *dscene, Scene *scene, P
 
 void ObjectManager::tag_update(Scene *scene, UpdateFlags flag)
 {
+  /* todo:
+   * HOLDOUT_MODIFIED
+   * PARTICLE_MODIFIED
+   * GEOMETRY_MANAGER
+   */
   update_flags |= flag;
 
   /* avoid infinite loops if the geometry manager tagged us for an update */
