@@ -104,7 +104,7 @@ class MaterialWrap {
   /**
    * First Principled-BSDF node encountered in the object's node tree.
    */
-  bNode *bsdf_node_ = nullptr;
+  const bNode *bsdf_node_ = nullptr;
 
  public:
   Vector<MTLMaterial> fill_materials(const OBJMesh &obj_mesh_data);

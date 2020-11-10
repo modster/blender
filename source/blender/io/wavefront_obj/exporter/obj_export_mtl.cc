@@ -92,6 +92,7 @@ static void linked_sockets_to_dest_id(const bNode *dest_node,
                                       StringRefNull dest_socket_id,
                                       Vector<const nodes::OutputSocketRef *> &r_linked_sockets)
 {
+  r_linked_sockets.clear();
   if (!dest_node) {
     return;
   }
@@ -109,21 +110,18 @@ static void linked_sockets_to_dest_id(const bNode *dest_node,
     r_linked_sockets.resize(linked_sockets.size());
     r_linked_sockets = linked_sockets;
   }
-  else {
-    r_linked_sockets.clear();
-  }
 }
 
 /**
  * From a list of sockets, get the parent node which is of the given node type.
  */
 static const bNode *get_node_of_type(Span<const nodes::OutputSocketRef *> sockets_list,
-                                     const int sh_node_type)
+                                     const int node_type)
 {
-  for (const nodes::SocketRef *sock : sockets_list) {
-    const bNode *curr_node = sock->bnode();
-    if (curr_node->typeinfo->type == sh_node_type) {
-      return curr_node;
+  for (const nodes::SocketRef *socket : sockets_list) {
+    const bNode *parent_node = socket->bnode();
+    if (parent_node->typeinfo->type == node_type) {
+      return parent_node;
     }
   }
   return nullptr;
@@ -167,11 +165,10 @@ void MaterialWrap::init_bsdf_node(StringRefNull object_name)
     fprintf(stderr,
             "No Principled-BSDF node found in the shader node tree of: '%s'.\n",
             object_name.c_str());
-    bsdf_node_ = nullptr;
     return;
   }
   ListBase *nodes = &export_mtl_->nodetree->nodes;
-  LISTBASE_FOREACH (bNode *, curr_node, nodes) {
+  LISTBASE_FOREACH (const bNode *, curr_node, nodes) {
     if (curr_node->typeinfo->type == SH_NODE_BSDF_PRINCIPLED) {
       bsdf_node_ = curr_node;
       return;
@@ -180,7 +177,6 @@ void MaterialWrap::init_bsdf_node(StringRefNull object_name)
   fprintf(stderr,
           "No Principled-BSDF node found in the shader node tree of: '%s'.\n",
           object_name.c_str());
-  bsdf_node_ = nullptr;
 }
 
 /**
@@ -302,21 +298,16 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
     linked_sockets_to_dest_id(tex_node, node_tree, "Vector", linked_sockets);
     const bNode *mapping = get_node_of_type(linked_sockets, SH_NODE_MAPPING);
 
+    if (normal_map_node) {
+      copy_property_from_node(
+          SOCK_FLOAT, normal_map_node, "Strength", {&r_mtl_mat.map_Bump_strength, 1});
+    }
     /* Texture transform options. Only translation (origin offset, "-o") and scale
      * ("-o") are supported. */
-    float3 map_translation{0.0f};
-    float3 map_scale{1.0f};
-    float normal_map_strength = -1.0f;
-    if (normal_map_node) {
-      copy_property_from_node(SOCK_FLOAT, normal_map_node, "Strength", {&normal_map_strength, 1});
-    }
-    copy_property_from_node(SOCK_VECTOR, mapping, "Location", {map_translation, 3});
-    copy_property_from_node(SOCK_VECTOR, mapping, "Scale", {map_scale, 3});
+    copy_property_from_node(SOCK_VECTOR, mapping, "Location", {texture_map.value.translation, 3});
+    copy_property_from_node(SOCK_VECTOR, mapping, "Scale", {texture_map.value.scale, 3});
 
-    texture_map.value.scale = map_scale;
-    texture_map.value.translation = map_translation;
     texture_map.value.image_path = tex_image_filepath;
-    r_mtl_mat.map_Bump_strength = normal_map_strength;
   }
 }
 

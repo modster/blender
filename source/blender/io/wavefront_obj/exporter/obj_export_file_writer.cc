@@ -353,7 +353,7 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
   int16_t last_poly_vertex_group = NEGATIVE_INIT;
   int16_t last_poly_mat_nr = NEGATIVE_INIT;
 
-  func_vert_uv_normal_indices poly_element_writer = get_poly_element_writer(obj_mesh_data);
+  const func_vert_uv_normal_indices poly_element_writer = get_poly_element_writer(obj_mesh_data);
 
   /* Number of normals may not be equal to number of polygons due to smooth shading. */
   int per_object_tot_normals = 0;
