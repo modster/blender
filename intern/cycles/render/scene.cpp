@@ -196,47 +196,51 @@ Scene::~Scene()
 
 void Scene::free_memory(bool final)
 {
-  foreach (Shader *s, shaders)
-    delete s;
-  foreach (Geometry *g, geometry)
-    delete g;
-  foreach (Object *o, objects)
-    delete o;
-  foreach (Light *l, lights)
-    delete l;
-  foreach (ParticleSystem *p, particle_systems)
-    delete p;
-  foreach (Procedural *p, procedurals)
-    delete p;
+  if (!params.persistent_data || final) {
+    foreach (Shader *s, shaders)
+      delete s;
+    foreach (Geometry *g, geometry)
+      delete g;
+    foreach (Object *o, objects)
+      delete o;
+    foreach (Light *l, lights)
+      delete l;
+    foreach (ParticleSystem *p, particle_systems)
+      delete p;
+    foreach (Procedural *p, procedurals)
+      delete p;
 
-  shaders.clear();
-  geometry.clear();
-  objects.clear();
-  lights.clear();
-  particle_systems.clear();
-  procedurals.clear();
+    shaders.clear();
+    geometry.clear();
+    objects.clear();
+    lights.clear();
+    particle_systems.clear();
+    procedurals.clear();
+  }
 
   if (device) {
-    camera->device_free(device, &dscene, this);
-    film->device_free(device, &dscene, this);
-    background->device_free(device, &dscene);
-    integrator->device_free(device, &dscene);
+    if (!params.persistent_data || final) {
+      camera->device_free(device, &dscene, this);
+      film->device_free(device, &dscene, this);
+      background->device_free(device, &dscene);
+      integrator->device_free(device, &dscene);
 
-    object_manager->device_free(device, &dscene);
-    geometry_manager->device_free(device, &dscene);
-    shader_manager->device_free(device, &dscene, this);
-    light_manager->device_free(device, &dscene);
+      object_manager->device_free(device, &dscene);
+      geometry_manager->device_free(device, &dscene);
+      shader_manager->device_free(device, &dscene, this);
+      light_manager->device_free(device, &dscene);
 
-    particle_system_manager->device_free(device, &dscene);
+      particle_system_manager->device_free(device, &dscene);
 
-    bake_manager->device_free(device, &dscene);
+      bake_manager->device_free(device, &dscene);
 
-    if (!params.persistent_data || final)
       image_manager->device_free(device);
-    else
-      image_manager->device_free_builtin(device);
 
-    lookup_tables->device_free(device, &dscene);
+      lookup_tables->device_free(device, &dscene);
+    }
+    else {
+      image_manager->device_free_builtin(device);
+    }
   }
 
   if (final) {

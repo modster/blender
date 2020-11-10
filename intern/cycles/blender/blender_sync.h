@@ -65,7 +65,7 @@ class BlenderSync {
   void reset(BL::BlendData &b_data, BL::Scene &b_scene);
 
   /* sync */
-  void sync_recalc(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d);
+  void sync_recalc(BL::Depsgraph &b_depsgraph, BL::SpaceView3D *b_v3d);
   void sync_data(BL::RenderSettings &b_render,
                  BL::Depsgraph &b_depsgraph,
                  BL::SpaceView3D &b_v3d,
