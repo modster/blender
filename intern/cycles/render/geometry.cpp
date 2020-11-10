@@ -1372,8 +1372,30 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
       if (shader->has_volume) {
         geom->has_volume = true;
       }
+
       if (shader->has_surface_bssrdf) {
         geom->has_surface_bssrdf = true;
+      }
+
+      if (shader->need_update_uvs) {
+        // todo: attributes
+        geom->tag_modified();
+      }
+
+      if (shader->need_update_attribute) {
+        // todo: attributes
+        geom->tag_modified();
+      }
+
+      if (shader->need_update_displacement) {
+        // tag displacement related sockets as modified
+        if (geom->is_mesh()) {
+          Mesh *mesh = static_cast<Mesh *>(geom);
+          mesh->tag_verts_modified();
+          mesh->tag_subd_dicing_rate_modified();
+          mesh->tag_subd_max_level_modified();
+          mesh->tag_subd_objecttoworld_modified();
+        }
       }
     }
 
@@ -1531,30 +1553,6 @@ void GeometryManager::device_update(Device *device,
     });
 
     foreach (Geometry *geom, scene->geometry) {
-      foreach (Node *node, geom->get_used_shaders()) {
-        Shader *shader = static_cast<Shader *>(node);
-        if (shader->need_update_uvs) {
-          // todo: attributes
-          geom->tag_modified();
-        }
-
-        if (shader->need_update_attribute) {
-          // todo: attributes
-          geom->tag_modified();
-        }
-
-        if (shader->need_update_displacement) {
-          // tag displacement related sockets as modified
-          if (geom->is_mesh()) {
-            Mesh *mesh = static_cast<Mesh *>(geom);
-            mesh->tag_verts_modified();
-            mesh->tag_subd_dicing_rate_modified();
-            mesh->tag_subd_max_level_modified();
-            mesh->tag_subd_objecttoworld_modified();
-          }
-        }
-      }
-
       if (geom->is_modified() &&
           (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME)) {
         Mesh *mesh = static_cast<Mesh *>(geom);
