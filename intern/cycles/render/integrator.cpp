@@ -253,8 +253,8 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
     else {
       constexpr int sequence_size = NUM_PMJ_SAMPLES;
       constexpr int num_sequences = NUM_PMJ_PATTERNS;
-      float2 *directions = (float2 *)dscene->sample_pattern_lut.alloc(sequence_size * num_sequences *
-                                                                      2);
+      float2 *directions = (float2 *)dscene->sample_pattern_lut.alloc(sequence_size *
+                                                                      num_sequences * 2);
       TaskPool pool;
       for (int j = 0; j < num_sequences; ++j) {
         float2 *sequence = directions + j * sequence_size;
@@ -285,7 +285,8 @@ void Integrator::tag_update(Scene *scene, UpdateFlags flag)
   }
 
   if (flag & (AO_PASS_MODIFIED | BACKGROUND_AO_MODIFIED)) {
-    /* tag only the ao_bounces socket as modified so we avoid updating sample_pattern_lut unnecessarily */
+    /* tag only the ao_bounces socket as modified so we avoid updating sample_pattern_lut
+     * unnecessarily */
     tag_ao_bounces_modified();
   }
 

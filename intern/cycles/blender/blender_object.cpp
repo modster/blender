@@ -213,7 +213,7 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
                              object,
                              motion_time,
                              use_particle_hair,
-							 object_geom_task_pool);
+                             object_geom_task_pool);
     }
 
     return object;

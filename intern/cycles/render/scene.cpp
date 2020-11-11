@@ -96,8 +96,13 @@ void DeviceScene::print_data_transfered()
   size_t data_amount = 0;
 
 #define ACCUMULATE_DATA_TRANSFERED(x) \
-  if (x.data_copied != 0) { std::cerr << "    transfered " << x.name << ", " << string_human_readable_size(x.data_copied) << '\n'; } \
-  data_transfered += x.data_copied; data_amount += x.byte_size(); x.data_copied = 0
+  if (x.data_copied != 0) { \
+    std::cerr << "    transfered " << x.name << ", " << string_human_readable_size(x.data_copied) \
+              << '\n'; \
+  } \
+  data_transfered += x.data_copied; \
+  data_amount += x.byte_size(); \
+  x.data_copied = 0
 
   ACCUMULATE_DATA_TRANSFERED(bvh_nodes);
   ACCUMULATE_DATA_TRANSFERED(bvh_leaf_nodes);
@@ -141,7 +146,8 @@ void DeviceScene::print_data_transfered()
 
 #undef ACCUMULATE_DATA_TRANSFERED
 
-  std::cerr << "    " << string_human_readable_size(data_transfered) << " / " << string_human_readable_size(data_amount) << '\n';
+  std::cerr << "    " << string_human_readable_size(data_transfered) << " / "
+            << string_human_readable_size(data_amount) << '\n';
 }
 
 Scene::Scene(const SceneParams &params_, Device *device)
@@ -186,7 +192,7 @@ Scene::Scene(const SceneParams &params_, Device *device)
 
   shader_manager->add_default(this);
 
-  //enable_update_stats();
+  // enable_update_stats();
 }
 
 Scene::~Scene()
@@ -279,7 +285,7 @@ void Scene::device_update(Device *device_, Progress &progress)
 
       if (print_stats) {
         printf("Update statistics:\n%s\n", update_stats->full_report().c_str());
-        //dscene.print_data_transfered();
+        // dscene.print_data_transfered();
       }
     }
   });
@@ -411,7 +417,7 @@ void Scene::device_update(Device *device_, Progress &progress)
             << string_human_readable_size(mem_peak) << ")";
 
     if (!update_stats) {
-      //dscene.print_data_transfered();
+      // dscene.print_data_transfered();
     }
   }
 }
@@ -460,9 +466,10 @@ bool Scene::need_update()
 
 bool Scene::need_data_update()
 {
-  return (background->is_modified() || image_manager->need_update() || object_manager->need_update() ||
-          geometry_manager->need_update() || light_manager->need_update() ||
-          lookup_tables->need_update() || integrator->is_modified() || shader_manager->need_update() ||
+  return (background->is_modified() || image_manager->need_update() ||
+          object_manager->need_update() || geometry_manager->need_update() ||
+          light_manager->need_update() || lookup_tables->need_update() ||
+          integrator->is_modified() || shader_manager->need_update() ||
           particle_system_manager->need_update() || bake_manager->need_update() ||
           film->is_modified() || procedural_manager->need_update);
 }

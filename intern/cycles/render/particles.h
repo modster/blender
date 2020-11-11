@@ -60,7 +60,6 @@ class ParticleSystemManager {
   bool need_update_;
 
  public:
-
   ParticleSystemManager();
   ~ParticleSystemManager();
 

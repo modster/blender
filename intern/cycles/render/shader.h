@@ -103,7 +103,7 @@ class Shader : public Node {
   /* synchronization */
   bool need_update_uvs;
   bool need_update_attribute;
-  bool need_update_displacement ;
+  bool need_update_displacement;
 
   /* If the shader has only volume components, the surface is assumed to
    * be transparent.

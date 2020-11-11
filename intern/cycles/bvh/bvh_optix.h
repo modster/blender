@@ -49,7 +49,11 @@ class BVHOptiX : public BVH {
   void pack_blas();
   void pack_tlas();
 
-  void pack_instance(Geometry *geom, size_t pack_offset, size_t pack_verts_offset, int object_index, int object_visibility);
+  void pack_instance(Geometry *geom,
+                     size_t pack_offset,
+                     size_t pack_verts_offset,
+                     int object_index,
+                     int object_visibility);
 
   virtual void pack_nodes(const BVHNode *) override;
   virtual void refit_nodes() override;

@@ -1084,16 +1084,20 @@ void GeometryManager::device_update_mesh(
       if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
         Mesh *mesh = static_cast<Mesh *>(geom);
 
-        if (mesh->shader_is_modified() || mesh->smooth_is_modified() || mesh->triangles_is_modified() || (device_update_flags & DEVICE_CURVE_DATA_NEEDS_REALLOC)) {
+        if (mesh->shader_is_modified() || mesh->smooth_is_modified() ||
+            mesh->triangles_is_modified() ||
+            (device_update_flags & DEVICE_CURVE_DATA_NEEDS_REALLOC)) {
           dscene->tri_shader.modified = true;
           mesh->pack_shaders(scene, &tri_shader[mesh->prim_offset]);
         }
 
-        if (mesh->triangles_is_modified() || mesh->verts_is_modified() || (device_update_flags & DEVICE_MESH_DATA_NEEDS_REALLOC)) {
+        if (mesh->triangles_is_modified() || mesh->verts_is_modified() ||
+            (device_update_flags & DEVICE_MESH_DATA_NEEDS_REALLOC)) {
           dscene->tri_vindex.modified |= mesh->triangles_is_modified();
           dscene->tri_patch.modified |= mesh->triangle_patch_is_modified();
           dscene->tri_patch_uv.modified |= mesh->vert_patch_uv_is_modified();
-          dscene->tri_vnormal.modified |= (mesh->triangles_is_modified() || mesh->verts_is_modified());
+          dscene->tri_vnormal.modified |= (mesh->triangles_is_modified() ||
+                                           mesh->verts_is_modified());
 
           mesh->pack_normals(&vnormal[mesh->vert_offset]);
           mesh->pack_verts(tri_prim_index,
@@ -1139,10 +1143,13 @@ void GeometryManager::device_update_mesh(
       if (geom->is_hair()) {
         Hair *hair = static_cast<Hair *>(geom);
 
-        bool curve_keys_co_modified = hair->curve_radius_is_modified() || hair->curve_keys_is_modified();
-        bool curve_data_modified = hair->curve_shader_is_modified() || hair->curve_first_key_is_modified();
+        bool curve_keys_co_modified = hair->curve_radius_is_modified() ||
+                                      hair->curve_keys_is_modified();
+        bool curve_data_modified = hair->curve_shader_is_modified() ||
+                                   hair->curve_first_key_is_modified();
 
-        if (!curve_keys_co_modified && !curve_data_modified && (device_update_flags & DEVICE_CURVE_DATA_NEEDS_REALLOC) == 0) {
+        if (!curve_keys_co_modified && !curve_data_modified &&
+            (device_update_flags & DEVICE_CURVE_DATA_NEEDS_REALLOC) == 0) {
           continue;
         }
 
@@ -1229,7 +1236,7 @@ void GeometryManager::device_update_bvh(Device *device,
                                                     device->get_bvh_layout_mask());
     bparams.use_spatial_split = scene->params.use_bvh_spatial_split;
     bparams.use_unaligned_nodes = dscene->data.bvh.have_curves &&
-        scene->params.use_bvh_unaligned_nodes;
+                                  scene->params.use_bvh_unaligned_nodes;
     bparams.num_motion_triangle_steps = scene->params.num_bvh_time_steps;
     bparams.num_motion_curve_steps = scene->params.num_bvh_time_steps;
     bparams.bvh_type = scene->params.bvh_type;
@@ -1240,7 +1247,8 @@ void GeometryManager::device_update_bvh(Device *device,
     if (bvh) {
       bvh->pack = {};
 
-      if (!(device_update_flags & DEVICE_DATA_NEEDS_REALLOC) && bparams.bvh_layout == BVHLayout::BVH_LAYOUT_OPTIX) {
+      if (!(device_update_flags & DEVICE_DATA_NEEDS_REALLOC) &&
+          bparams.bvh_layout == BVHLayout::BVH_LAYOUT_OPTIX) {
         bvh->refit(progress);
       }
 
@@ -1249,10 +1257,10 @@ void GeometryManager::device_update_bvh(Device *device,
       dscene->prim_tri_verts.give_data(pack.prim_tri_verts);
 #else
       PackedBVH &pack = bvh->pack;
-      //dscene->bvh_nodes.give_data(pack.nodes);
-      //dscene->bvh_leaf_nodes.give_data(pack.leaf_nodes);
-      //dscene->object_node.give_data(pack.object_node);
-      dscene->prim_tri_index.give_data(pack.prim_tri_index);      
+      // dscene->bvh_nodes.give_data(pack.nodes);
+      // dscene->bvh_leaf_nodes.give_data(pack.leaf_nodes);
+      // dscene->object_node.give_data(pack.object_node);
+      dscene->prim_tri_index.give_data(pack.prim_tri_index);
       dscene->prim_tri_verts.give_data(pack.prim_tri_verts);
       dscene->prim_type.give_data(pack.prim_type);
       dscene->prim_visibility.give_data(pack.prim_visibility);
@@ -1338,7 +1346,8 @@ void GeometryManager::device_update_bvh(Device *device,
   {
     scoped_callback_timer timer([scene](double time) {
       if (scene->update_stats) {
-        scene->update_stats->geometry.times.add_entry({"device_update (copy BVH to device)", time});
+        scene->update_stats->geometry.times.add_entry(
+            {"device_update (copy BVH to device)", time});
       }
     });
     bvh->copy_to_device(progress, dscene);

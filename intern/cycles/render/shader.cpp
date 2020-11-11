@@ -794,7 +794,7 @@ string ShaderManager::get_cryptomatte_materials(Scene *scene)
   return manifest;
 }
 
-void ShaderManager::tag_update(Scene */*scene*/, UpdateFlags /*flag*/)
+void ShaderManager::tag_update(Scene * /*scene*/, UpdateFlags /*flag*/)
 {
   /* update everything for now */
   update_flags = UpdateFlags::UPDATE_ALL;

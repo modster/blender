@@ -178,7 +178,13 @@ void BVHOptiX::pack_tlas()
     }
 
     if (geom->is_modified()) {
-      pool.push(function_bind(&BVHOptiX::pack_instance, this, geom, pack_offset, pack_verts_offset, object_index, object_visibility));
+      pool.push(function_bind(&BVHOptiX::pack_instance,
+                              this,
+                              geom,
+                              pack_offset,
+                              pack_verts_offset,
+                              object_index,
+                              object_visibility));
     }
 
     if (!bvh_pack.prim_index.empty()) {
@@ -193,7 +199,11 @@ void BVHOptiX::pack_tlas()
   pool.wait_work();
 }
 
-void BVHOptiX::pack_instance(Geometry *geom, size_t pack_offset, size_t pack_verts_offset_, int object_index, int object_visibility)
+void BVHOptiX::pack_instance(Geometry *geom,
+                             size_t pack_offset,
+                             size_t pack_verts_offset_,
+                             int object_index,
+                             int object_visibility)
 {
   int *pack_prim_type = pack.prim_type.data();
   int *pack_prim_index = pack.prim_index.data();

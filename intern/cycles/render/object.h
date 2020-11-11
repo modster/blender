@@ -128,7 +128,7 @@ class ObjectManager {
 
   enum {
     DEVICE_DATA_NEEDS_REALLOC = (1 << 0),
-    DEVICE_DATA_MODIFIED      = (1 << 1),
+    DEVICE_DATA_MODIFIED = (1 << 1),
   };
 
  public:

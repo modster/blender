@@ -1432,7 +1432,7 @@ class OptiXDevice : public CUDADevice {
           num_motion_steps = mesh->get_motion_steps();
         }
 
-#if 0
+#  if 0
         const size_t num_verts = mesh->get_verts().size();
 
         device_vector<int> index_data(this, "temp_index_data", MEM_READ_ONLY);
@@ -1484,10 +1484,11 @@ class OptiXDevice : public CUDADevice {
         // one and rely on that having the same meaning in this case.
         build_input.triangleArray.numSbtRecords = 1;
         build_input.triangleArray.primitiveIndexOffset = mesh->optix_prim_offset;
-#else
+#  else
         vector<device_ptr> vertex_ptrs;
         vertex_ptrs.reserve(num_motion_steps);
-        vertex_ptrs.push_back(bvh->prim_vert_pointer + geom->bvh->pack_verts_offset * sizeof(float3));
+        vertex_ptrs.push_back(bvh->prim_vert_pointer +
+                              geom->bvh->pack_verts_offset * sizeof(float3));
 
         // Force a single any-hit call, so shadow record-all behavior works correctly
         unsigned int build_flags = OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL;
@@ -1499,7 +1500,7 @@ class OptiXDevice : public CUDADevice {
         build_input.triangleArray.vertexStrideInBytes = sizeof(float3);
         build_input.triangleArray.indexBuffer = 0;
         build_input.triangleArray.numIndexTriplets = 0;
-        //build_input.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+        // build_input.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
         build_input.triangleArray.indexStrideInBytes = 0;
         build_input.triangleArray.flags = &build_flags;
         // The SBT does not store per primitive data since Cycles already allocates separate
@@ -1507,7 +1508,7 @@ class OptiXDevice : public CUDADevice {
         // one and rely on that having the same meaning in this case.
         build_input.triangleArray.numSbtRecords = 1;
         build_input.triangleArray.primitiveIndexOffset = mesh->optix_prim_offset;
-#endif
+#  endif
 
         // Allocate memory for new BLAS and build it
         if (build_optix_bvh(build_input, num_motion_steps, handle, out_data, operation)) {
