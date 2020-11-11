@@ -745,8 +745,6 @@ void ObjectManager::device_update(Device *device,
   foreach (Object *object, scene->objects) {
     object->clear_modified();
   }
-
-  update_flags = UPDATE_NONE;
 }
 
 void ObjectManager::device_update_flags(
@@ -903,7 +901,9 @@ void ObjectManager::device_free(Device *, DeviceScene *dscene)
   dscene->object_volume_step.free();
 }
 
-void ObjectManager::apply_static_transforms(DeviceScene *dscene, Scene *scene, Progress &progress)
+void ObjectManager::apply_static_transforms(DeviceScene * /*dscene*/,
+                                            Scene *scene,
+                                            Progress &progress)
 {
   /* todo: normals and displacement should be done before applying transform! */
   /* todo: create objects/geometry in right order! */
@@ -926,8 +926,6 @@ void ObjectManager::apply_static_transforms(DeviceScene *dscene, Scene *scene, P
 
   if (progress.get_cancel())
     return;
-
-  uint *object_flag = dscene->object_flag.data();
 
   /* apply transforms for objects with single user geometry */
   foreach (Object *object, scene->objects) {

@@ -1118,7 +1118,7 @@ void LightManager::remove_ies(int slot)
   /* If the slot has no more users, update the device to remove it. */
   if (ies_slots[slot]->users == 0) {
     update_flags |= UPDATE_ALL;
-    need_update_background |= need_update();
+    need_update_background = true;
   }
 }
 

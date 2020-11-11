@@ -1247,27 +1247,28 @@ void GeometryManager::device_update_bvh(Device *device,
     if (bvh) {
       bvh->pack = {};
 
-      if (!(device_update_flags & DEVICE_DATA_NEEDS_REALLOC) &&
-          bparams.bvh_layout == BVHLayout::BVH_LAYOUT_OPTIX) {
-        bvh->refit(progress);
-      }
-
+      if (!(device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
+        if (bparams.bvh_layout == BVHLayout::BVH_LAYOUT_OPTIX) {
+          std::cerr << "Tag BVH for refit\n";
+          bvh->refit(progress);
+        }
 #if 1
-      PackedBVH &pack = bvh->pack;
-      dscene->prim_tri_verts.give_data(pack.prim_tri_verts);
+        PackedBVH &pack = bvh->pack;
+        dscene->prim_tri_verts.give_data(pack.prim_tri_verts);
 #else
-      PackedBVH &pack = bvh->pack;
-      // dscene->bvh_nodes.give_data(pack.nodes);
-      // dscene->bvh_leaf_nodes.give_data(pack.leaf_nodes);
-      // dscene->object_node.give_data(pack.object_node);
-      dscene->prim_tri_index.give_data(pack.prim_tri_index);
-      dscene->prim_tri_verts.give_data(pack.prim_tri_verts);
-      dscene->prim_type.give_data(pack.prim_type);
-      dscene->prim_visibility.give_data(pack.prim_visibility);
-      dscene->prim_index.give_data(pack.prim_index);
-      dscene->prim_object.give_data(pack.prim_object);
-      dscene->prim_time.give_data(pack.prim_time);
+        PackedBVH &pack = bvh->pack;
+        // dscene->bvh_nodes.give_data(pack.nodes);
+        // dscene->bvh_leaf_nodes.give_data(pack.leaf_nodes);
+        // dscene->object_node.give_data(pack.object_node);
+        dscene->prim_tri_index.give_data(pack.prim_tri_index);
+        dscene->prim_tri_verts.give_data(pack.prim_tri_verts);
+        dscene->prim_type.give_data(pack.prim_type);
+        dscene->prim_visibility.give_data(pack.prim_visibility);
+        dscene->prim_index.give_data(pack.prim_index);
+        dscene->prim_object.give_data(pack.prim_object);
+        dscene->prim_time.give_data(pack.prim_time);
 #endif
+      }
     }
 
     if (!bvh || (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
@@ -1723,7 +1724,9 @@ void GeometryManager::device_update(Device *device,
       return;
   }
 
-  bool need_update_scene_bvh = false;
+  /* update the bvh even when there is no geometry so the bvh data in the kernel is still valid,
+   * especially when removing all the objects in interactive rendering */
+  bool need_update_scene_bvh = scene->geometry.size() == 0;
   {
     scoped_callback_timer timer([scene](double time) {
       if (scene->update_stats) {

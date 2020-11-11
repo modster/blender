@@ -17,9 +17,11 @@
 #include "render/integrator.h"
 #include "device/device.h"
 #include "render/background.h"
+#include "render/camera.h"
 #include "render/film.h"
 #include "render/jitter.h"
 #include "render/light.h"
+#include "render/object.h"
 #include "render/scene.h"
 #include "render/shader.h"
 #include "render/sobol.h"
@@ -297,6 +299,11 @@ void Integrator::tag_update(Scene *scene, UpdateFlags flag)
         break;
       }
     }
+  }
+
+  if (motion_blur_is_modified()) {
+    scene->object_manager->tag_update(scene, MOTION_BLUR_MODIFIED);
+    scene->camera->tag_modified();
   }
 }
 
