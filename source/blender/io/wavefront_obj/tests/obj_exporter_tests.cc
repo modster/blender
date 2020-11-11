@@ -103,23 +103,23 @@ TEST_F(Export_OBJ, filter_objects_selected)
   EXPECT_EQ(objcurves.size(), 2);
 }
 
-TEST_F(Export_OBJ, append_negative_frame_to_filename)
+TEST(Export_OBJ_utils, append_negative_frame_to_filename)
 {
-  const char path_original[1024] = "/my_file.obj";
-  const char path_expected[1024] = "/my_file-123.obj";
+  const char path_original[FILE_MAX] = "/my_file.obj";
+  const char path_expected[FILE_MAX] = "/my_file-123.obj";
   const int frame = -123;
-  char path_with_frame[1024] = {0};
+  char path_with_frame[FILE_MAX] = {0};
   const bool ok = append_frame_to_filename(path_original, frame, path_with_frame);
   EXPECT_TRUE(ok);
   EXPECT_EQ_ARRAY(path_with_frame, path_expected, BLI_strlen_utf8(path_expected));
 }
 
-TEST_F(Export_OBJ, append_positive_frame_to_filename)
+TEST(Export_OBJ_utils, append_positive_frame_to_filename)
 {
-  const char path_original[1024] = "/my_file.obj";
-  const char path_expected[1024] = "/my_file123.obj";
+  const char path_original[FILE_MAX] = "/my_file.obj";
+  const char path_expected[FILE_MAX] = "/my_file123.obj";
   const int frame = 123;
-  char path_with_frame[1024] = {0};
+  char path_with_frame[FILE_MAX] = {0};
   const bool ok = append_frame_to_filename(path_original, frame, path_with_frame);
   EXPECT_TRUE(ok);
   EXPECT_EQ_ARRAY(path_with_frame, path_expected, BLI_strlen_utf8(path_expected));
