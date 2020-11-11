@@ -153,6 +153,11 @@ class Geometry : public Node {
     return geometry_type == HAIR;
   }
 
+  bool is_volume() const
+  {
+    return geometry_type == VOLUME;
+  }
+
   /* Updates */
   void tag_update(Scene *scene, bool rebuild);
 };

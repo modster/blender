@@ -238,6 +238,20 @@ void Object::tag_update(Scene *scene)
     flag |= HOLDOUT_MODIFIED;
   }
 
+  if (tfm_is_modified()) {
+    /* tag the geometry as modified so the BVH is updated, but do not tag everything as modified */
+    if (geometry) {
+      if (geometry->is_mesh() || geometry->is_volume()) {
+        Mesh *mesh = static_cast<Mesh *>(geometry);
+        mesh->tag_verts_modified();
+      }
+      else if (geometry->is_hair()) {
+        Hair *hair = static_cast<Hair *>(geometry);
+        hair->tag_curve_keys_modified();
+      }
+    }
+  }
+
   scene->object_manager->tag_update(scene, flag);
 }
 
