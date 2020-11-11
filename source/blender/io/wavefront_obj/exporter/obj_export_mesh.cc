@@ -360,10 +360,10 @@ void OBJMesh::store_uv_coords_and_indices(Vector<std::array<float, 2>> &r_uv_coo
 float3 OBJMesh::calc_poly_normal(const int poly_index) const
 {
   float3 r_poly_normal;
-  const MPoly &poly_to_write = export_mesh_eval_->mpoly[poly_index];
-  const MLoop &mloop = export_mesh_eval_->mloop[poly_to_write.loopstart];
+  const MPoly &poly = export_mesh_eval_->mpoly[poly_index];
+  const MLoop &mloop = export_mesh_eval_->mloop[poly.loopstart];
   const MVert &mvert = *(export_mesh_eval_->mvert);
-  BKE_mesh_calc_poly_normal(&poly_to_write, &mloop, &mvert, r_poly_normal);
+  BKE_mesh_calc_poly_normal(&poly, &mloop, &mvert, r_poly_normal);
   mul_mat3_m4_v3(world_and_axes_transform_, r_poly_normal);
   return r_poly_normal;
 }
