@@ -80,7 +80,7 @@
 #  include "DEG_depsgraph.h"
 #  include "DEG_depsgraph_query.h"
 
-#  include "RE_shader_ext.h"
+#  include "RE_texture.h"
 
 #  include "CLG_log.h"
 
@@ -3207,9 +3207,12 @@ static void update_effectors_task_cb(void *__restrict userdata,
       data->force_y[index] = retvel[1];
       data->force_z[index] = retvel[2];
 
-#  if DEBUG_PRINT
+#  ifdef DEBUG_PRINT
       /* Debugging: Print forces. */
-      printf("setting force: [%f, %f, %f]\n", data->force_x[index], data->force_y[index], data->force_z[index]);
+      printf("setting force: [%f, %f, %f]\n",
+             data->force_x[index],
+             data->force_y[index],
+             data->force_z[index]);
 #  endif
     }
   }
