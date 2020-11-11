@@ -76,3 +76,26 @@ set(LIB
 )
 
 blender_add_lib(bf_wavefront_obj "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+if(WITH_GTESTS)
+  set(TEST_SRC
+    tests/obj_exporter_tests.cc
+  )
+
+  set(TEST_INC
+    ${INC}
+
+    ../../blenloader
+    ../../../../tests/gtests
+  )
+
+  set(TEST_LIB
+    ${LIB}
+
+    bf_blenloader_tests
+    bf_wavefront_obj
+  )
+
+  include(GTestTesting)
+  blender_add_test_lib(bf_wavefront_obj_tests "${TEST_SRC}" "${TEST_INC}" "${INC_SYS}" "${TEST_LIB}")
+endif()
