@@ -83,7 +83,7 @@ void OBJDepsgraph::update_for_newframe()
  *
  * \note Curves are also stored with Meshes if export settings specify so.
  */
-static std::pair<Vector<std::unique_ptr<OBJMesh>>, Vector<std::unique_ptr<OBJCurve>>>
+std::pair<Vector<std::unique_ptr<OBJMesh>>, Vector<std::unique_ptr<OBJCurve>>>
 find_exportable_objects(Depsgraph *depsgraph, const OBJExportParams &export_params)
 {
   Vector<std::unique_ptr<OBJMesh>> r_exportable_meshes;
@@ -224,9 +224,7 @@ static void export_frame(Depsgraph *depsgraph,
  *
  * \return Whether the filepath is in #FILE_MAX limits.
  */
-static bool append_frame_to_filename(const char *filepath,
-                                     const int frame,
-                                     char *r_filepath_with_frames)
+bool append_frame_to_filename(const char *filepath, const int frame, char *r_filepath_with_frames)
 {
   BLI_strncpy(r_filepath_with_frames, filepath, FILE_MAX);
   BLI_path_extension_replace(r_filepath_with_frames, FILE_MAX, "");

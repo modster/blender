@@ -25,6 +25,8 @@
 
 #include "BLI_utility_mixins.hh"
 
+#include "BLI_vector.hh"
+
 #include "IO_wavefront_obj.h"
 
 namespace blender::io::obj {
@@ -66,4 +68,11 @@ class OBJDepsgraph : NonMovable, NonCopyable {
 
 void exporter_main(bContext *C, const OBJExportParams &export_params);
 
+class OBJMesh;
+class OBJCurve;
+
+std::pair<Vector<std::unique_ptr<OBJMesh>>, Vector<std::unique_ptr<OBJCurve>>>
+find_exportable_objects(Depsgraph *depsgraph, const OBJExportParams &export_params);
+
+bool append_frame_to_filename(const char *filepath, const int frame, char *r_filepath_with_frames);
 }  // namespace blender::io::obj
