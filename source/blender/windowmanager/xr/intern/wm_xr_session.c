@@ -493,12 +493,14 @@ void wm_xr_session_actions_init(wmXrData *xr)
   }
 }
 
-static void wm_xr_session_object_autokey(
+void wm_xr_session_object_autokey(
     bContext *C, Scene *scene, ViewLayer *view_layer, wmWindow *win, Object *ob, bool notify)
 {
   /* Poll functions in keyingsets_utils.py require an active window and object. */
-  wmWindow *win_prev = CTX_wm_window(C);
-  CTX_wm_window_set(C, win);
+  wmWindow *win_prev = win ? CTX_wm_window(C) : NULL;
+  if (win) {
+    CTX_wm_window_set(C, win);
+  }
 
   Object *obact = CTX_data_active_object(C);
   if (!obact) {
@@ -532,7 +534,9 @@ static void wm_xr_session_object_autokey(
     WM_main_add_notifier(NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
   }
 
-  CTX_wm_window_set(C, win_prev);
+  if (win) {
+    CTX_wm_window_set(C, win_prev);
+  }
 }
 
 static void wm_xr_session_controller_mats_update(const XrSessionSettings *settings,
@@ -580,6 +584,7 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
 
     /* Calculate controller matrix in world space. */
     wm_xr_controller_pose_to_mat(&((GHOST_XrPose *)controller_pose_action->states)[i], tmp);
+    rotate_m4(tmp, 'X', -90.0f); /* Convert to Z-up coordinates. */
 
     /* Apply eye position and base pose offsets. */
     sub_v3_v3(tmp[3], view_ofs);

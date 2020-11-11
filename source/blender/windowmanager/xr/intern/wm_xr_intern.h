@@ -176,6 +176,12 @@ void wm_xr_session_actions_uninit(wmXrData *xr);
 void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_action,
                                             wmXrSessionState *state);
 void wm_xr_session_controller_data_clear(wmXrSessionState *state);
+void wm_xr_session_object_autokey(struct bContext *C,
+                                  struct Scene *scene,
+                                  struct ViewLayer *view_layer,
+                                  wmWindow *win,
+                                  Object *ob,
+                                  bool notify);
 
 void wm_xr_pose_to_viewmat(const GHOST_XrPose *pose, float r_viewmat[4][4]);
 void wm_xr_controller_pose_to_mat(const GHOST_XrPose *pose, float r_mat[4][4]);

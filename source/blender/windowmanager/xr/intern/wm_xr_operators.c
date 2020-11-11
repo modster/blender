@@ -37,6 +37,7 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
 
+#include "ED_keyframing.h"
 #include "ED_mesh.h"
 #include "ED_object.h"
 #include "ED_screen.h"
@@ -611,6 +612,8 @@ static void WM_OT_xr_select_raycast(wmOperatorType *ot)
   ot->flag = OPTYPE_UNDO;
 
   /* properties */
+  static const float default_axis[3] = {0.0f, 0.0f, -1.0f};
+
   WM_operator_properties_mouse_select(ot);
 
   RNA_def_float(ot->srna,
@@ -622,8 +625,6 @@ static void WM_OT_xr_select_raycast(wmOperatorType *ot)
                 "Maximum distance",
                 0.0,
                 BVH_RAYCAST_DIST_MAX);
-
-  static const float default_axis[3] = {0.0f, 0.0f, -1.0f};
   RNA_def_float_vector(ot->srna,
                        "axis",
                        3,
@@ -634,6 +635,285 @@ static void WM_OT_xr_select_raycast(wmOperatorType *ot)
                        "Normalized raycast axis in controller space",
                        -1.0f,
                        1.0f);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name XR Grab
+ *
+ * Transforms location and rotation of selected objects relative to an XR controller's pose.
+ * \{ */
+
+typedef struct XrGrabData {
+  float mat_prev[4][4];
+} XrGrabData;
+
+static void wm_xr_grab_init(wmOperator *op)
+{
+  BLI_assert(op->customdata == NULL);
+
+  op->customdata = MEM_callocN(sizeof(XrGrabData), __func__);
+}
+
+static void wm_xr_grab_uninit(wmOperator *op)
+{
+  if (op->customdata) {
+    MEM_freeN(op->customdata);
+  }
+}
+
+static int wm_xr_grab_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  BLI_assert(event->type == EVT_XR_ACTION);
+  BLI_assert(event->custom == EVT_DATA_XR);
+  BLI_assert(event->customdata);
+
+  bool loc_lock, rot_lock;
+  float loc_t, rot_t;
+  float loc_ofs[3], rot_ofs[4];
+  bool loc_ofs_set = false;
+  bool rot_ofs_set = false;
+
+  PropertyRNA *prop = RNA_struct_find_property(op->ptr, "location_lock");
+  loc_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
+  if (!loc_lock) {
+    prop = RNA_struct_find_property(op->ptr, "location_interpolation");
+    loc_t = prop ? RNA_property_float_get(op->ptr, prop) : 1.0f;
+    prop = RNA_struct_find_property(op->ptr, "location_offset");
+    if (prop && RNA_property_is_set(op->ptr, prop)) {
+      RNA_property_float_get_array(op->ptr, prop, loc_ofs);
+      loc_ofs_set = true;
+    }
+  }
+
+  prop = RNA_struct_find_property(op->ptr, "rotation_lock");
+  rot_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
+  if (!rot_lock) {
+    prop = RNA_struct_find_property(op->ptr, "rotation_interpolation");
+    rot_t = prop ? RNA_property_float_get(op->ptr, prop) : 1.0f;
+    prop = RNA_struct_find_property(op->ptr, "rotation_offset");
+    if (prop && RNA_property_is_set(op->ptr, prop)) {
+      float tmp[3];
+      RNA_property_float_get_array(op->ptr, prop, tmp);
+      eul_to_quat(rot_ofs, tmp);
+      normalize_qt(rot_ofs);
+      rot_ofs_set = true;
+    }
+  }
+
+  if (loc_lock && rot_lock) {
+    return OPERATOR_CANCELLED;
+  }
+
+  const wmXrActionData *actiondata = event->customdata;
+  float tmp0[4], tmp1[4], tmp2[4];
+  bool selected = false;
+
+  if (loc_ofs_set) {
+    /* Convert to controller space. */
+    float tmp[3][3];
+    quat_to_mat3(tmp, actiondata->controller_rot);
+    mul_m3_v3(tmp, loc_ofs);
+  }
+  if (rot_ofs_set) {
+    /* Convert to controller space. */
+    invert_qt_qt_normalized(tmp0, rot_ofs);
+    mul_qt_qtqt(rot_ofs, actiondata->controller_rot, tmp0);
+    normalize_qt(rot_ofs);
+  }
+
+  CTX_DATA_BEGIN (C, Object *, ob, selected_objects) {
+    if (!loc_lock) {
+      if (loc_t > 0.0f) {
+        ob->loc[0] += loc_t * (actiondata->controller_loc[0] - ob->loc[0]);
+        ob->loc[1] += loc_t * (actiondata->controller_loc[1] - ob->loc[1]);
+        ob->loc[2] += loc_t * (actiondata->controller_loc[2] - ob->loc[2]);
+      }
+      if (loc_ofs_set) {
+        add_v3_v3(ob->loc, loc_ofs);
+      }
+    }
+
+    if (!rot_lock) {
+      if (rot_t > 0.0f) {
+        eul_to_quat(tmp1, ob->rot);
+        interp_qt_qtqt(tmp0, tmp1, actiondata->controller_rot, rot_t);
+        if (!rot_ofs_set) {
+          quat_to_eul(ob->rot, tmp0);
+        }
+      }
+      else if (rot_ofs_set) {
+        eul_to_quat(tmp0, ob->rot);
+      }
+      if (rot_ofs_set) {
+        rotation_between_quats_to_quat(tmp1, rot_ofs, tmp0);
+        mul_qt_qtqt(tmp0, rot_ofs, tmp1);
+        normalize_qt(tmp0);
+        mul_qt_qtqt(tmp2, actiondata->controller_rot, tmp1);
+        normalize_qt(tmp2);
+        rotation_between_quats_to_quat(tmp1, tmp0, tmp2);
+
+        mul_qt_qtqt(tmp2, tmp0, tmp1);
+        normalize_qt(tmp2);
+        quat_to_eul(ob->rot, tmp2);
+      }
+    }
+
+    DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
+
+    selected = true;
+  }
+  CTX_DATA_END;
+
+  if (!selected) {
+    wm_xr_grab_uninit(op);
+    return OPERATOR_CANCELLED;
+  }
+
+  wm_xr_grab_init(op);
+
+  XrGrabData *data = op->customdata;
+  quat_to_mat4(data->mat_prev, actiondata->controller_rot);
+  copy_v3_v3(data->mat_prev[3], actiondata->controller_loc);
+
+  WM_event_add_modal_handler(C, op);
+
+  return OPERATOR_RUNNING_MODAL;
+}
+
+static int wm_xr_grab_exec(bContext *UNUSED(C), wmOperator *UNUSED(op))
+{
+  return OPERATOR_CANCELLED;
+}
+
+static int wm_xr_grab_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  BLI_assert(event->type == EVT_XR_ACTION);
+  BLI_assert(event->custom == EVT_DATA_XR);
+  BLI_assert(event->customdata);
+
+  const wmXrActionData *actiondata = event->customdata;
+  XrGrabData *data = op->customdata;
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  wmWindowManager *wm = CTX_wm_manager(C);
+  bScreen *screen_anim = ED_screen_animation_playing(wm);
+  bool loc_lock, rot_lock;
+  bool selected = false;
+  float delta[4][4], tmp[4][4];
+
+  PropertyRNA *prop = RNA_struct_find_property(op->ptr, "location_lock");
+  loc_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
+  prop = RNA_struct_find_property(op->ptr, "rotation_lock");
+  rot_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
+
+  invert_m4_m4(tmp, data->mat_prev);
+  quat_to_mat4(data->mat_prev, actiondata->controller_rot);
+  copy_v3_v3(data->mat_prev[3], actiondata->controller_loc);
+  mul_m4_m4m4(delta, data->mat_prev, tmp);
+
+  CTX_DATA_BEGIN (C, Object *, ob, selected_objects) {
+    if (!loc_lock || !rot_lock) {
+      copy_m4_m4(tmp, ob->obmat);
+      mul_m4_m4m4(ob->obmat, delta, tmp);
+
+      if (!loc_lock) {
+        copy_v3_v3(ob->loc, ob->obmat[3]);
+      }
+      if (!rot_lock) {
+        mat4_to_eul(ob->rot, ob->obmat);
+      }
+
+      DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
+    }
+
+    if (screen_anim && autokeyframe_cfra_can_key(scene, &ob->id)) {
+      wm_xr_session_object_autokey(C, scene, view_layer, NULL, ob, true);
+    }
+
+    selected = true;
+  }
+  CTX_DATA_END;
+
+  if (!selected || (event->val == KM_RELEASE)) {
+    wm_xr_grab_uninit(op);
+    WM_event_add_notifier(C, NC_SCENE | ND_TRANSFORM_DONE, scene);
+    return OPERATOR_FINISHED;
+  }
+  else if (event->val == KM_PRESS) {
+    return OPERATOR_RUNNING_MODAL;
+  }
+
+  /* XR events currently only support press and release. */
+  BLI_assert(false);
+  wm_xr_grab_uninit(op);
+  WM_event_add_notifier(C, NC_SCENE | ND_TRANSFORM_DONE, scene);
+  return OPERATOR_FINISHED;
+}
+
+static void WM_OT_xr_grab(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "XR Grab";
+  ot->idname = "WM_OT_xr_grab";
+  ot->description =
+      "Transform location and rotation of selected objects relative to a VR controller's pose";
+
+  /* callbacks */
+  ot->invoke_3d = wm_xr_grab_invoke_3d;
+  ot->exec = wm_xr_grab_exec;
+  ot->modal_3d = wm_xr_grab_modal_3d;
+  ot->poll = wm_xr_operator_sessionactive;
+
+  /* flags */
+  ot->flag = OPTYPE_UNDO;
+
+  /* properties */
+  static const float default_offset[3] = {0};
+
+  RNA_def_boolean(
+      ot->srna, "location_lock", false, "Lock Location", "Preserve objects' original location");
+  RNA_def_float(ot->srna,
+                "location_interpolation",
+                0.0f,
+                0.0f,
+                1.0f,
+                "Location Interpolation",
+                "Interpolation factor between object and controller locations",
+                0.0f,
+                1.0f);
+  RNA_def_float_translation(ot->srna,
+                            "location_offset",
+                            3,
+                            default_offset,
+                            -FLT_MAX,
+                            FLT_MAX,
+                            "Location Offset",
+                            "Additional location offset in controller space",
+                            -FLT_MAX,
+                            FLT_MAX);
+  RNA_def_boolean(
+      ot->srna, "rotation_lock", false, "Lock Rotation", "Preserve objects' original rotation");
+  RNA_def_float(ot->srna,
+                "rotation_interpolation",
+                0.0f,
+                0.0f,
+                1.0f,
+                "Rotation Interpolation",
+                "Interpolation factor between object and controller rotations",
+                0.0f,
+                1.0f);
+  RNA_def_float_rotation(ot->srna,
+                         "rotation_offset",
+                         3,
+                         default_offset,
+                         -2 * M_PI,
+                         2 * M_PI,
+                         "Rotation Offset",
+                         "Additional rotation offset in controller space",
+                         -2 * M_PI,
+                         2 * M_PI);
 }
 
 /** \} */
@@ -738,6 +1018,7 @@ void wm_xr_operatortypes_register(void)
 {
   WM_operatortype_append(WM_OT_xr_session_toggle);
   WM_operatortype_append(WM_OT_xr_select_raycast);
+  WM_operatortype_append(WM_OT_xr_grab);
   WM_operatortype_append(WM_OT_xr_constraints_toggle);
 }
 
