@@ -4542,6 +4542,9 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, void 
       event.prevx = event.x - pd->deltaX;
       event.prevy = event.y - (-pd->deltaY);
 
+      /* The direction is inverted from the device due to system preferences. */
+      event.is_direction_inverted = pd->isDirectionInverted;
+
       wm_event_add(win, &event);
       break;
     }

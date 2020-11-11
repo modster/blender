@@ -870,6 +870,9 @@ void WM_event_ndof_to_quat(const struct wmNDOFMotionData *ndof, float q[4]);
 float WM_event_tablet_data(const struct wmEvent *event, int *pen_flip, float tilt[2]);
 bool WM_event_is_tablet(const struct wmEvent *event);
 
+int WM_event_absolute_delta_x(const struct wmEvent *event);
+int WM_event_absolute_delta_y(const struct wmEvent *event);
+
 void WM_event_xr_data(const struct wmEvent *event,
                       char **action_set,
                       char **action,
