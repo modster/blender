@@ -1073,6 +1073,7 @@ void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph, BL::Object b_ob, Mesh *me
     mesh->set_value(socket, new_mesh, socket);
   }
 
+  mesh->attributes.clear();
   foreach (Attribute &attr, new_mesh.attributes.attributes) {
     Attribute *nattr = nullptr;
 
@@ -1086,6 +1087,7 @@ void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph, BL::Object b_ob, Mesh *me
     nattr->set_data_from(attr);
   }
 
+  mesh->subd_attributes.clear();
   foreach (Attribute &attr, new_mesh.subd_attributes.attributes) {
     Attribute *nattr = nullptr;
 

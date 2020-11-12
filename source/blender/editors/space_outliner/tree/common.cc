@@ -15,24 +15,27 @@
  */
 
 /** \file
- * \ingroup imbdds
+ * \ingroup spoutliner
+ *
+ * Functions and helpers shared between tree-display types or other tree related code.
  */
 
-#pragma once
+#include "BKE_idtype.h"
 
-#include "../../IMB_imbuf.h"
+#include "RNA_access.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "tree_display.hh"
 
-bool imb_is_a_dds(const unsigned char *mem, const size_t size);
-bool imb_save_dds(struct ImBuf *ibuf, const char *name, int flags);
-struct ImBuf *imb_load_dds(const unsigned char *mem,
-                           size_t size,
-                           int flags,
-                           char colorspace[IM_MAX_SPACE]);
+/* -------------------------------------------------------------------- */
+/** \name ID Helpers.
+ *
+ * \{ */
 
-#ifdef __cplusplus
+const char *outliner_idcode_to_plural(short idcode)
+{
+  const char *propname = BKE_idtype_idcode_to_name_plural(idcode);
+  PropertyRNA *prop = RNA_struct_type_find_property(&RNA_BlendData, propname);
+  return (prop) ? RNA_property_ui_name(prop) : "UNKNOWN";
 }
-#endif
+
+/** \} */
