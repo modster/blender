@@ -1697,16 +1697,6 @@ typedef struct SceneLineArt {
   /** Reserved for suggestive contour */
   float contour_fade;
 
-  /** 0-1 range for cosine angle */
-  float crease_threshold;
-
-  /**  0-PI angle, for splitting strokes at sharp points */
-  float angle_splitting_threshold;
-
-  /* CPU mode */
-  float chaining_geometry_threshold;
-  float chaining_image_threshold;
-
   /* Baking */
   int baking_preview_start;
   int baking_preview_end;

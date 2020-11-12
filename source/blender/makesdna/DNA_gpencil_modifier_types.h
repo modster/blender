@@ -827,6 +827,16 @@ typedef struct LineartGpencilModifierData {
 
   short line_types; /* line type enable flags, bits in eLineartEdgeFlag */
 
+  /** 0-1 range for cosine angle */
+  float crease_threshold;
+
+  /**  0-PI angle, for splitting strokes at sharp points */
+  float angle_splitting_threshold;
+
+  /* CPU mode */
+  float chaining_geometry_threshold;
+  float chaining_image_threshold;
+
   char source_type; /* Object or Collection, from eLineartGpencilModifierSource */
 
   char use_multiple_levels;
@@ -852,7 +862,10 @@ typedef struct LineartGpencilModifierData {
 
   float pre_sample_length;
 
-  /* Additional Switches */
+  /* Ported from SceneLineArt flags. */
+  int calculation_flags;
+
+  /* Additional Switches. */
   int flags;
 
 } LineartGpencilModifierData;

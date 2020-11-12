@@ -16,7 +16,6 @@
 # ***** END GPL LICENSE BLOCK *****
 
 set(INC
-  ../include
   ../../blenkernel
   ../../blenlib
   ../../bmesh

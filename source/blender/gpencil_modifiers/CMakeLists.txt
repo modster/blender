@@ -82,6 +82,7 @@ endif()
 
 if(WITH_LINEART)
   add_definitions(-DWITH_LINEART)
+  add_subdirectory(lineart)
 endif()
 
 add_definitions(${GL_DEFINITIONS})
