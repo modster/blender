@@ -160,10 +160,6 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
 
   bool is_render = (DEG_get_mode(depsgraph) == DAG_EVAL_RENDER);
 
-  if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_IGNORE)) {
-    return;
-  }
-
   /* Check all parameters required are filled. */
   if (isModifierDisabled(md)) {
     return;
@@ -171,9 +167,9 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
 
   ED_lineart_compute_feature_lines_internal(depsgraph, lmd, 1);
 
-  /* If we reach here, means calculation is finished (LRT_SYNC_FRESH), we grab cache. flag
-   * reset is done by calculation function.*/
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
+
+  ED_lineart_destroy_render_data();
 
   WM_main_add_notifier(NA_EDITED | NC_GPENCIL, NULL);
 }
@@ -200,6 +196,8 @@ static void bakeModifier(Main *UNUSED(bmain),
   ED_lineart_compute_feature_lines_internal(depsgraph, lmd, 1);
 
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
+
+  ED_lineart_destroy_render_data();
 }
 
 static bool isDisabled(GpencilModifierData *md, int UNUSED(userRenderParams))

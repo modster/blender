@@ -2527,6 +2527,8 @@ static void lineart_destroy_render_data(void)
   BLI_spin_end(&rb->lock_cuts);
   BLI_spin_end(&rb->render_data_pool.lock_mem);
 
+  BLI_spin_end(lineart_share.lock_render_status);
+
   lineart_mem_destroy(&rb->render_data_pool);
 }
 
@@ -2547,10 +2549,6 @@ void ED_lineart_destroy_render_data(void)
 
 void ED_lineart_destroy_render_data_external(void)
 {
-  if (!lineart_share.init_complete) {
-    return;
-  }
-
   while (ED_lineart_calculation_flag_check(LRT_RENDER_RUNNING)) {
     /* Wait to finish, XXX: should cancel here. */
   }
@@ -2572,12 +2570,6 @@ LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene, LineartGpenci
 {
   /* Re-init render_buffer_shared. */
   if (lineart_share.render_buffer_shared) {
-    if (G.debug_value == 4000) {
-      printf("LRT: **** Destroy on create.\n");
-    }
-    while (ED_lineart_modifier_sync_flag_check(LRT_SYNC_CLEARING)) {
-      /* Don't race the clearing stage. */
-    }
     ED_lineart_destroy_render_data_external();
   }
 
@@ -2647,7 +2639,6 @@ LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene, LineartGpenci
 void ED_lineart_init_locks()
 {
   if (!(lineart_share.init_complete & LRT_INIT_LOCKS)) {
-    BLI_spin_init(&lineart_share.lock_loader);
     BLI_spin_init(&lineart_share.lock_render_status);
     lineart_share.init_complete |= LRT_INIT_LOCKS;
   }
@@ -2674,59 +2665,6 @@ bool ED_lineart_calculation_flag_check(eLineartRenderStatus flag)
   match = (lineart_share.flag_render_status == flag);
   BLI_spin_unlock(&lineart_share.lock_render_status);
   return match;
-}
-
-void ED_lineart_modifier_sync_flag_set(eLineartModifierSyncStatus flag,
-                                       bool UNUSED(is_from_modifier))
-{
-  BLI_spin_lock(&lineart_share.lock_render_status);
-
-  if (flag != LRT_SYNC_IDLE) {
-    while (lineart_share.flag_sync_staus == LRT_SYNC_CLEARING) {
-      /* Waiting, no double clearing in a new call. */
-    }
-  }
-
-  lineart_share.flag_sync_staus = flag;
-
-  BLI_spin_unlock(&lineart_share.lock_render_status);
-}
-
-bool ED_lineart_modifier_sync_flag_check(eLineartModifierSyncStatus flag)
-{
-  bool match;
-  BLI_spin_lock(&lineart_share.lock_render_status);
-  match = (lineart_share.flag_sync_staus == flag);
-  BLI_spin_unlock(&lineart_share.lock_render_status);
-  return match;
-}
-
-void ED_lineart_modifier_sync_add_customer()
-{
-  BLI_spin_lock(&lineart_share.lock_render_status);
-
-  lineart_share.customers++;
-
-  BLI_spin_unlock(&lineart_share.lock_render_status);
-}
-void ED_lineart_modifier_sync_remove_customer()
-{
-  BLI_spin_lock(&lineart_share.lock_render_status);
-
-  lineart_share.customers--;
-
-  BLI_spin_unlock(&lineart_share.lock_render_status);
-}
-
-bool ED_lineart_modifier_sync_still_has_customer()
-{
-  BLI_spin_lock(&lineart_share.lock_render_status);
-
-  bool non_zero = lineart_share.customers != 0;
-
-  BLI_spin_unlock(&lineart_share.lock_render_status);
-
-  return non_zero;
 }
 
 static int lineart_occlusion_get_max_level(Depsgraph *dg)
@@ -3708,21 +3646,15 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph,
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
   int intersections_only = 0; /* Not used right now, but preserve for future. */
 
+  ED_lineart_init_locks();
+
   if (!scene->camera) {
-    /* Release lock when early return. */
-    BLI_spin_unlock(&lineart_share.lock_loader);
     return OPERATOR_CANCELLED;
   }
 
 #define LRT_PROGRESS(progress, message) \
   if (show_frame_progress) { \
     ED_lineart_update_render_progress(progress, message); \
-  }
-
-#define LRT_CANCEL_STAGE \
-  if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) { \
-    LRT_PROGRESS(100, "LRT: Finished."); \
-    return OPERATOR_FINISHED; \
   }
 
   rb = ED_lineart_create_render_buffer(scene, lmd);
@@ -3734,7 +3666,7 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph,
 
   rb->triangle_size = lineart_triangle_size_get(scene);
 
-  rb->max_occlusion_level = lineart_occlusion_get_max_level(depsgraph);
+  rb->max_occlusion_level = MAX2(lmd->level_start, lmd->level_end);
 
   LRT_PROGRESS(0, "LRT: Loading geometries.");
 
@@ -3742,17 +3674,12 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph,
   lineart_main_load_geometries(
       depsgraph, scene, scene->camera, rb, lmd->calculation_flags & LRT_ALLOW_DUPLI_OBJECTS);
 
-  /** We had everything we need,
-   * Unlock parent thread, it'scene safe to run independently from now. */
-  BLI_spin_unlock(&lineart_share.lock_loader);
-
   if (!rb->vertex_buffer_pointers.first) {
     /* Nothing loaded, early return. */
     LRT_PROGRESS(100, "LRT: Finished.");
     return OPERATOR_FINISHED;
   }
 
-  LRT_CANCEL_STAGE
   LRT_PROGRESS(10, "LRT: Culling.");
 
   lineart_main_bounding_area_make_initial(rb);
@@ -3764,19 +3691,16 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph,
 
   lineart_main_perspective_division(rb);
 
-  LRT_CANCEL_STAGE
   LRT_PROGRESS(25, "LRT: Intersections.");
 
   lineart_main_add_triangles(rb);
 
-  LRT_CANCEL_STAGE
   LRT_PROGRESS(50, "LRT: Occlusion.");
 
   if (!intersections_only) {
     lineart_main_occlusion_begin(rb);
   }
 
-  LRT_CANCEL_STAGE
   LRT_PROGRESS(75, "LRT: Chaining.");
 
   /* intersection_only is preserved for furure functions.*/
@@ -3808,12 +3732,13 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph,
   LRT_PROGRESS(100, "LRT: Finished.");
 
 #undef LRT_PROGRESS
-#undef LRT_CANCEL_STAGE
   if (G.debug_value == 4000) {
     lineart_count_and_print_render_buffer_memory(rb);
   }
 
   ED_lineart_calculation_flag_set(LRT_RENDER_FINISHED);
+
+  ED_lineart_chain_clear_picked_flag(rb);
 
   return OPERATOR_FINISHED;
 }
@@ -3882,17 +3807,6 @@ void ED_lineart_gpencil_generate(Depsgraph *depsgraph,
     return;
   }
 
-  if ((!lineart_share.init_complete) || !ED_lineart_calculation_flag_check(LRT_RENDER_FINISHED)) {
-    /* cache not ready. */
-    if (G.debug_value == 4000) {
-      printf("Line art cache isn't ready!\n");
-    }
-    return;
-  }
-  else {
-    /* lock the cache, prevent rendering job from starting. */
-    BLI_spin_lock(&lineart_share.lock_render_status);
-  }
   int stroke_count = 0;
   int color_idx = 0;
 

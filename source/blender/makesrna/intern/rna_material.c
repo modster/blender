@@ -128,12 +128,12 @@ static void rna_MaterialGpencil_update(Main *bmain, Scene *scene, PointerRNA *pt
   WM_main_add_notifier(NC_GPENCIL | ND_DATA, ma);
 }
 
-static void rna_MaterialLineArt_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_MaterialLineArt_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
-  rna_Material_update(bmain, scene, ptr);
-  if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_IDLE)) {
-    ED_lineart_modifier_sync_flag_set(LRT_SYNC_WAITING, false);
-  }
+  Material *ma = (Material *)ptr->owner_id;
+  /* Need to tag geometry for line art modifier updates. */
+  DEG_id_tag_update(&ma->id, ID_RECALC_GEOMETRY);
+  WM_main_add_notifier(NC_MATERIAL | ND_SHADING_DRAW, ma);
 }
 
 static void rna_Material_draw_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
