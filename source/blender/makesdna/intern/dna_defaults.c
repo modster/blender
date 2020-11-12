@@ -117,6 +117,7 @@
 #include "DNA_volume_types.h"
 #include "DNA_world_types.h"
 
+#include "DNA_armature_defaults.h"
 #include "DNA_asset_defaults.h"
 #include "DNA_brush_defaults.h"
 #include "DNA_cachefile_defaults.h"
@@ -151,6 +152,9 @@
 
 /* DNA_asset_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(AssetData);
+
+/* DNA_armature_defaults.h */
+SDNA_DEFAULT_DECL_STRUCT(bArmature);
 
 /* DNA_brush_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(Brush);
@@ -341,6 +345,9 @@ const void *DNA_default_table[SDNA_TYPE_MAX] = {
 
     /* DNA_asset_defaults.h */
     SDNA_DEFAULT_DECL(AssetData),
+
+    /* DNA_armature_defaults.h */
+    SDNA_DEFAULT_DECL(bArmature),
 
     /* DNA_brush_defaults.h */
     SDNA_DEFAULT_DECL(Brush),
