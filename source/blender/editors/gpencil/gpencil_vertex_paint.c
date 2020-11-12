@@ -1019,7 +1019,7 @@ static bool gpencil_vertexpaint_brush_do_frame(bContext *C,
     /* Check points below the brush. */
     bool hit = gpencil_vertexpaint_select_stroke(gso, gps, tool, diff_mat);
 
-    /* If stroke was hit and has an editcurve the curve needs an update */
+    /* If stroke was hit and has an editcurve the curve needs an update. */
     bGPDstroke *gps_active = (gps->runtime.gps_orig) ? gps->runtime.gps_orig : gps;
     if (gps_active->editcurve != NULL && hit) {
       gps_active->editcurve->flag |= GP_CURVE_NEEDS_STROKE_UPDATE;
