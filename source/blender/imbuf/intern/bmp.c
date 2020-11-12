@@ -72,13 +72,17 @@ typedef struct BMPHEADER {
    CHECK_HEADER_FIELD(_mem, "CI") || CHECK_HEADER_FIELD(_mem, "CP") || \
    CHECK_HEADER_FIELD(_mem, "IC") || CHECK_HEADER_FIELD(_mem, "PT"))
 
-static int checkbmp(const uchar *mem)
+static bool checkbmp(const uchar *mem, const size_t size)
 {
-  if (!CHECK_HEADER_FIELD_BMP(mem)) {
-    return 0;
+  if (size < BMP_FILEHEADER_SIZE) {
+    return false;
   }
 
-  int ret_val = 0;
+  if (!CHECK_HEADER_FIELD_BMP(mem)) {
+    return false;
+  }
+
+  bool ok = false;
   BMPINFOHEADER bmi;
   uint u;
 
@@ -94,17 +98,17 @@ static int checkbmp(const uchar *mem)
     if (bmi.biCompression == 0) {
       u = LITTLE_SHORT(bmi.biBitCount);
       if (u > 0 && u <= 32) {
-        ret_val = 1;
+        ok = true;
       }
     }
   }
 
-  return ret_val;
+  return ok;
 }
 
-int imb_is_a_bmp(const uchar *buf)
+bool imb_is_a_bmp(const uchar *buf, size_t size)
 {
-  return checkbmp(buf);
+  return checkbmp(buf, size);
 }
 
 ImBuf *imb_bmp_decode(const uchar *mem, size_t size, int flags, char colorspace[IM_MAX_SPACE])
@@ -120,7 +124,7 @@ ImBuf *imb_bmp_decode(const uchar *mem, size_t size, int flags, char colorspace[
 
   (void)size; /* unused */
 
-  if (checkbmp(mem) == 0) {
+  if (checkbmp(mem, size) == 0) {
     return NULL;
   }
 
@@ -292,7 +296,7 @@ static int putShortLSB(ushort us, FILE *ofile)
 }
 
 /* Found write info at http://users.ece.gatech.edu/~slabaugh/personal/c/bitmapUnix.c */
-int imb_savebmp(ImBuf *ibuf, const char *filepath, int UNUSED(flags))
+bool imb_savebmp(ImBuf *ibuf, const char *filepath, int UNUSED(flags))
 {
   BMPINFOHEADER infoheader;
 
