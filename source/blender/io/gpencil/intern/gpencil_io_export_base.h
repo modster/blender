@@ -130,15 +130,15 @@ class GpencilExporter {
   void set_out_filename(const char *filename);
 
  private:
-  struct bGPDlayer *gpl_cur;
-  struct bGPDframe *gpf_cur;
-  struct bGPDstroke *gps_cur;
-  struct MaterialGPencilStyle *gp_style;
-  bool is_stroke;
-  bool is_fill;
-  float avg_opacity;
-  bool is_camera;
-  rctf select_boundbox;
+  struct bGPDlayer *_gpl_cur;
+  struct bGPDframe *_gpf_cur;
+  struct bGPDstroke *_gps_cur;
+  struct MaterialGPencilStyle *_gp_style;
+  bool _is_stroke;
+  bool _is_fill;
+  float _avg_opacity;
+  bool _is_camera;
+  rctf _select_boundbox;
 };
 
 }  // namespace blender::io::gpencil

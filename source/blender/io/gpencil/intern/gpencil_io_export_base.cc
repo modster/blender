@@ -108,13 +108,13 @@ GpencilExporter::GpencilExporter(const struct GpencilExportParams *iparams)
                                  rv3d,
                                  &camera_rect_,
                                  true);
-    is_camera = true;
+    _is_camera = true;
     camera_ratio_ = render_x_ / (camera_rect_.xmax - camera_rect_.xmin);
     offset_[0] = camera_rect_.xmin;
     offset_[1] = camera_rect_.ymin;
   }
   else {
-    is_camera = false;
+    _is_camera = false;
     if (!is_storyboard && (ob_list_.size() == 1)) {
       /* Calc selected object boundbox. Need set initial value to some variables. */
       camera_ratio_ = 1.0f;
@@ -157,7 +157,7 @@ void GpencilExporter::create_object_list(void)
     }
 
     /* Save z-depth from view to sort from back to front. */
-    if (is_camera) {
+    if (_is_camera) {
       float camera_z = dot_v3v3(camera_z_axis, object->obmat[3]);
       ObjectZ obz = {camera_z, object};
       ob_list_.push_back(obz);
@@ -370,59 +370,59 @@ std::string GpencilExporter::to_lower_string(char *input_text)
 
 struct bGPDlayer *GpencilExporter::gpl_current_get(void)
 {
-  return gpl_cur;
+  return _gpl_cur;
 }
 
 void GpencilExporter::gpl_current_set(struct bGPDlayer *gpl)
 {
-  gpl_cur = gpl;
+  _gpl_cur = gpl;
   BKE_gpencil_parent_matrix_get(depsgraph, params_.obact, gpl, diff_mat_);
 }
 
 struct bGPDframe *GpencilExporter::gpf_current_get(void)
 {
-  return gpf_cur;
+  return _gpf_cur;
 }
 
 void GpencilExporter::gpf_current_set(struct bGPDframe *gpf)
 {
-  gpf_cur = gpf;
+  _gpf_cur = gpf;
 }
 struct bGPDstroke *GpencilExporter::gps_current_get(void)
 {
-  return gps_cur;
+  return _gps_cur;
 }
 
 void GpencilExporter::gps_current_set(struct Object *ob,
                                       struct bGPDstroke *gps,
                                       const bool set_colors)
 {
-  gps_cur = gps;
+  _gps_cur = gps;
   if (set_colors) {
-    gp_style = BKE_gpencil_material_settings(ob, gps->mat_nr + 1);
+    _gp_style = BKE_gpencil_material_settings(ob, gps->mat_nr + 1);
 
-    is_stroke = ((gp_style->flag & GP_MATERIAL_STROKE_SHOW) &&
-                 (gp_style->stroke_rgba[3] > GPENCIL_ALPHA_OPACITY_THRESH));
-    is_fill = ((gp_style->flag & GP_MATERIAL_FILL_SHOW) &&
-               (gp_style->fill_rgba[3] > GPENCIL_ALPHA_OPACITY_THRESH));
+    _is_stroke = ((_gp_style->flag & GP_MATERIAL_STROKE_SHOW) &&
+                  (_gp_style->stroke_rgba[3] > GPENCIL_ALPHA_OPACITY_THRESH));
+    _is_fill = ((_gp_style->flag & GP_MATERIAL_FILL_SHOW) &&
+                (_gp_style->fill_rgba[3] > GPENCIL_ALPHA_OPACITY_THRESH));
 
     /* Stroke color. */
-    copy_v4_v4(stroke_color_, gp_style->stroke_rgba);
-    avg_opacity = 0;
+    copy_v4_v4(stroke_color_, _gp_style->stroke_rgba);
+    _avg_opacity = 0;
     /* Get average vertex color and apply. */
     float avg_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     for (uint32_t i = 0; i < gps->totpoints; i++) {
       bGPDspoint *pt = &gps->points[i];
       add_v4_v4(avg_color, pt->vert_color);
-      avg_opacity += pt->strength;
+      _avg_opacity += pt->strength;
     }
 
     mul_v4_v4fl(avg_color, avg_color, 1.0f / (float)gps->totpoints);
     interp_v3_v3v3(stroke_color_, stroke_color_, avg_color, avg_color[3]);
-    avg_opacity /= (float)gps->totpoints;
+    _avg_opacity /= (float)gps->totpoints;
 
     /* Fill color. */
-    copy_v4_v4(fill_color_, gp_style->fill_rgba);
+    copy_v4_v4(fill_color_, _gp_style->fill_rgba);
     /* Apply vertex color for fill. */
     interp_v3_v3v3(fill_color_, fill_color_, gps->vert_color_fill, gps->vert_color_fill[3]);
   }
@@ -430,27 +430,27 @@ void GpencilExporter::gps_current_set(struct Object *ob,
 
 struct MaterialGPencilStyle *GpencilExporter::gp_style_current_get(void)
 {
-  return gp_style;
+  return _gp_style;
 }
 
 bool GpencilExporter::material_is_stroke(void)
 {
-  return is_stroke;
+  return _is_stroke;
 }
 
 bool GpencilExporter::material_is_fill(void)
 {
-  return is_fill;
+  return _is_fill;
 }
 
 float GpencilExporter::stroke_average_opacity_get(void)
 {
-  return avg_opacity;
+  return _avg_opacity;
 }
 
 bool GpencilExporter::is_camera_mode(void)
 {
-  return is_camera;
+  return _is_camera;
 }
 
 /* Calc selected strokes boundbox. */
@@ -497,18 +497,18 @@ void GpencilExporter::selected_objects_boundbox_set(void)
   add_v2_fl(r_min, gap * -1.0f);
   add_v2_fl(r_max, gap);
 
-  select_boundbox.xmin = r_min[0];
-  select_boundbox.ymin = r_min[1];
-  select_boundbox.xmax = r_max[0];
-  select_boundbox.ymax = r_max[1];
+  _select_boundbox.xmin = r_min[0];
+  _select_boundbox.ymin = r_min[1];
+  _select_boundbox.xmax = r_max[0];
+  _select_boundbox.ymax = r_max[1];
 }
 
 void GpencilExporter::selected_objects_boundbox_get(rctf *boundbox)
 {
-  boundbox->xmin = select_boundbox.xmin;
-  boundbox->xmax = select_boundbox.xmax;
-  boundbox->ymin = select_boundbox.ymin;
-  boundbox->ymax = select_boundbox.ymax;
+  boundbox->xmin = _select_boundbox.xmin;
+  boundbox->xmax = _select_boundbox.xmax;
+  boundbox->ymin = _select_boundbox.ymin;
+  boundbox->ymax = _select_boundbox.ymax;
 }
 
 void GpencilExporter::set_frame_number(int value)
