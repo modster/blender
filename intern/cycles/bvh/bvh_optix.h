@@ -53,7 +53,9 @@ class BVHOptiX : public BVH {
                      size_t pack_offset,
                      size_t pack_verts_offset,
                      int object_index,
-                     int object_visibility);
+                     int object_visibility,
+                     bool force_pack,
+                     bool visibility_modified);
 
   virtual void pack_nodes(const BVHNode *) override;
   virtual void refit_nodes() override;

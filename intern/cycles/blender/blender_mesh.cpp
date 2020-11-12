@@ -1073,33 +1073,8 @@ void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph, BL::Object b_ob, Mesh *me
     mesh->set_value(socket, new_mesh, socket);
   }
 
-  mesh->attributes.clear();
-  foreach (Attribute &attr, new_mesh.attributes.attributes) {
-    Attribute *nattr = nullptr;
-
-    if (attr.std != ATTR_STD_NONE) {
-      nattr = mesh->attributes.add(attr.std, attr.name);
-    }
-    else {
-      nattr = mesh->attributes.add(attr.name, attr.type, attr.element);
-    }
-
-    nattr->set_data_from(attr);
-  }
-
-  mesh->subd_attributes.clear();
-  foreach (Attribute &attr, new_mesh.subd_attributes.attributes) {
-    Attribute *nattr = nullptr;
-
-    if (attr.std != ATTR_STD_NONE) {
-      nattr = mesh->subd_attributes.add(attr.std, attr.name);
-    }
-    else {
-      nattr = mesh->subd_attributes.add(attr.name, attr.type, attr.element);
-    }
-
-    nattr->set_data_from(attr);
-  }
+  mesh->attributes.update(new_mesh.attributes);
+  mesh->subd_attributes.update(new_mesh.subd_attributes);
 
   mesh->set_num_subd_faces(new_mesh.get_num_subd_faces());
 

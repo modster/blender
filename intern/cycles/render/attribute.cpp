@@ -154,10 +154,15 @@ void Attribute::set_data_from(Attribute &other)
   assert(other.type == type);
   assert(other.element == element);
 
-  if (memcmp(this->data(), other.data(), other.buffer.size()) != 0) {
-    modified = true;
+  this->flags = other.flags;
+
+  if (this->buffer.size() != other.buffer.size()) {
     this->buffer = other.buffer;
-    this->flags = other.flags;
+    modified = true;
+  }
+  else if (memcmp(this->data(), other.data(), other.buffer.size()) != 0) {
+    this->buffer = other.buffer;
+    modified = true;
   }
 }
 
@@ -649,6 +654,42 @@ void AttributeSet::clear(bool preserve_voxel_data)
   }
   else {
     attributes.clear();
+  }
+}
+
+void AttributeSet::update(AttributeSet &new_attributes)
+{
+  /* add or update old_attributes based on the new_attributes */
+  foreach (Attribute &attr, new_attributes.attributes) {
+    Attribute *nattr = nullptr;
+
+    if (attr.std != ATTR_STD_NONE) {
+      nattr = add(attr.std, attr.name);
+    }
+    else {
+      nattr = add(attr.name, attr.type, attr.element);
+    }
+
+    nattr->set_data_from(attr);
+  }
+
+  /* remove any attributes not on new_attributes */
+  list<Attribute>::iterator it;
+  for (it = attributes.begin(); it != attributes.end();) {
+    if (it->std != ATTR_STD_NONE) {
+      if (new_attributes.find(it->std) == nullptr) {
+        attributes.erase(it++);
+        continue;
+      }
+    }
+    else if (it->name != "") {
+      if (new_attributes.find(it->name) == nullptr) {
+        attributes.erase(it++);
+        continue;
+      }
+    }
+
+    it++;
   }
 }
 

@@ -1426,14 +1426,13 @@ class OptiXDevice : public CUDADevice {
           continue;
         }
 
+        const size_t num_verts = mesh->get_verts().size();
+
         size_t num_motion_steps = 1;
         Attribute *motion_keys = mesh->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
         if (motion_blur && mesh->get_use_motion_blur() && motion_keys) {
           num_motion_steps = mesh->get_motion_steps();
         }
-
-#  if 0
-        const size_t num_verts = mesh->get_verts().size();
 
         device_vector<int> index_data(this, "temp_index_data", MEM_READ_ONLY);
         index_data.alloc(mesh->get_triangles().size());
@@ -1484,31 +1483,6 @@ class OptiXDevice : public CUDADevice {
         // one and rely on that having the same meaning in this case.
         build_input.triangleArray.numSbtRecords = 1;
         build_input.triangleArray.primitiveIndexOffset = mesh->optix_prim_offset;
-#  else
-        vector<device_ptr> vertex_ptrs;
-        vertex_ptrs.reserve(num_motion_steps);
-        vertex_ptrs.push_back(bvh->prim_vert_pointer +
-                              geom->bvh->pack_verts_offset * sizeof(float3));
-
-        // Force a single any-hit call, so shadow record-all behavior works correctly
-        unsigned int build_flags = OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL;
-        OptixBuildInput build_input = {};
-        build_input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
-        build_input.triangleArray.vertexBuffers = (CUdeviceptr *)vertex_ptrs.data();
-        build_input.triangleArray.numVertices = mesh->num_triangles() * 3;
-        build_input.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
-        build_input.triangleArray.vertexStrideInBytes = sizeof(float3);
-        build_input.triangleArray.indexBuffer = 0;
-        build_input.triangleArray.numIndexTriplets = 0;
-        // build_input.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-        build_input.triangleArray.indexStrideInBytes = 0;
-        build_input.triangleArray.flags = &build_flags;
-        // The SBT does not store per primitive data since Cycles already allocates separate
-        // buffers for that purpose. OptiX does not allow this to be zero though, so just pass in
-        // one and rely on that having the same meaning in this case.
-        build_input.triangleArray.numSbtRecords = 1;
-        build_input.triangleArray.primitiveIndexOffset = mesh->optix_prim_offset;
-#  endif
 
         // Allocate memory for new BLAS and build it
         if (build_optix_bvh(build_input, num_motion_steps, handle, out_data, operation)) {

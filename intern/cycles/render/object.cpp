@@ -658,7 +658,7 @@ void ObjectManager::device_update_transforms(DeviceScene *dscene, Scene *scene, 
     return;
   }
 
-  if (device_flags & DEVICE_DATA_MODIFIED) {
+  if (device_flags & (DEVICE_DATA_MODIFIED | DEVICE_DATA_NEEDS_REALLOC)) {
     dscene->objects.copy_to_device();
   }
 

@@ -288,7 +288,7 @@ GeometryManager::GeometryManager()
 
 GeometryManager::~GeometryManager()
 {
-  delete bvh;
+  free_bvh(nullptr);
 }
 
 void GeometryManager::update_osl_attributes(Device *device,
@@ -808,18 +808,10 @@ void GeometryManager::device_update_attributes(Device *device,
     }
   }
 
-  if (device_update_flags & ATTR_FLOAT_NEEDS_REALLOC) {
-    dscene->attributes_float.alloc(attr_float_size);
-  }
-  if (device_update_flags & ATTR_FLOAT2_NEEDS_REALLOC) {
-    dscene->attributes_float2.alloc(attr_float2_size);
-  }
-  if (device_update_flags & ATTR_FLOAT3_NEEDS_REALLOC) {
-    dscene->attributes_float3.alloc(attr_float3_size);
-  }
-  if (device_update_flags & ATTR_UCHAR4_NEEDS_REALLOC) {
-    dscene->attributes_uchar4.alloc(attr_uchar4_size);
-  }
+  dscene->attributes_float.alloc(attr_float_size);
+  dscene->attributes_float2.alloc(attr_float2_size);
+  dscene->attributes_float3.alloc(attr_float3_size);
+  dscene->attributes_uchar4.alloc(attr_uchar4_size);
 
   size_t attr_float_offset = 0;
   size_t attr_float2_offset = 0;
@@ -1241,6 +1233,7 @@ void GeometryManager::device_update_bvh(Device *device,
     bparams.num_motion_curve_steps = scene->params.num_bvh_time_steps;
     bparams.bvh_type = scene->params.bvh_type;
     bparams.curve_subdivisions = scene->params.curve_subdivisions();
+    bparams.pack_all_data = !bvh || (device_update_flags & DEVICE_DATA_NEEDS_REALLOC);
 
     VLOG(1) << "Using " << bvh_layout_name(bparams.bvh_layout) << " layout.";
 
@@ -1249,44 +1242,26 @@ void GeometryManager::device_update_bvh(Device *device,
 
       if (!(device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
         if (bparams.bvh_layout == BVHLayout::BVH_LAYOUT_OPTIX) {
-          std::cerr << "Tag BVH for refit\n";
           bvh->refit(progress);
         }
-#if 1
+
         PackedBVH &pack = bvh->pack;
+
+        /* get back the vertices if the size is still the same, we can safely update this array
+         * with the new coordinates */
         dscene->prim_tri_verts.give_data(pack.prim_tri_verts);
-#else
-        PackedBVH &pack = bvh->pack;
-        // dscene->bvh_nodes.give_data(pack.nodes);
-        // dscene->bvh_leaf_nodes.give_data(pack.leaf_nodes);
-        // dscene->object_node.give_data(pack.object_node);
-        dscene->prim_tri_index.give_data(pack.prim_tri_index);
-        dscene->prim_tri_verts.give_data(pack.prim_tri_verts);
-        dscene->prim_type.give_data(pack.prim_type);
-        dscene->prim_visibility.give_data(pack.prim_visibility);
-        dscene->prim_index.give_data(pack.prim_index);
-        dscene->prim_object.give_data(pack.prim_object);
-        dscene->prim_time.give_data(pack.prim_time);
-#endif
       }
     }
 
     if (!bvh || (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-      delete bvh;
+      free_bvh(dscene);
       bvh = BVH::create(bparams, scene->geometry, scene->objects, device);
     }
 
     bvh->build(progress, &device->stats);
 
     if (progress.get_cancel()) {
-#ifdef WITH_EMBREE
-      if (dscene->data.bvh.scene) {
-        BVHEmbree::destroy(dscene->data.bvh.scene);
-        dscene->data.bvh.scene = NULL;
-      }
-#endif
-      delete bvh;
-      bvh = nullptr;
+      free_bvh(dscene);
       return;
     }
 
@@ -1314,8 +1289,6 @@ void GeometryManager::device_update_bvh(Device *device,
     if (pack.prim_tri_verts.size()) {
       dscene->prim_tri_verts.steal_data(pack.prim_tri_verts);
       dscene->prim_tri_verts.copy_to_device();
-
-      bvh->prim_vert_pointer = dscene->prim_tri_verts.device_pointer;
     }
     if (pack.prim_type.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
       dscene->prim_type.steal_data(pack.prim_type);
@@ -1542,6 +1515,19 @@ void GeometryManager::device_update_volume_images(Device *device, Scene *scene, 
   pool.wait_work();
 }
 
+void GeometryManager::free_bvh(DeviceScene *dscene)
+{
+#ifdef WITH_EMBREE
+  if (dscene && dscene->data.bvh.scene) {
+    BVHEmbree::destroy(dscene->data.bvh.scene);
+    dscene->data.bvh.scene = nullptr;
+  }
+#endif
+
+  delete bvh;
+  bvh = nullptr;
+}
+
 void GeometryManager::device_update(Device *device,
                                     DeviceScene *dscene,
                                     Scene *scene,
@@ -1724,9 +1710,10 @@ void GeometryManager::device_update(Device *device,
       return;
   }
 
-  /* update the bvh even when there is no geometry so the bvh data in the kernel is still valid,
+  /* update the bvh even when there is no geometry so the kernel bvh data is still valid,
    * especially when removing all the objects in interactive rendering */
-  bool need_update_scene_bvh = scene->geometry.size() == 0;
+  bool need_update_scene_bvh = scene->geometry.size() == 0 ||
+                               (device_update_flags & DEVICE_MESH_DATA_NEEDS_REALLOC);
   {
     scoped_callback_timer timer([scene](double time) {
       if (scene->update_stats) {

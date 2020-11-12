@@ -250,6 +250,8 @@ class GeometryManager {
 
   void device_update_volume_images(Device *device, Scene *scene, Progress &progress);
 
+  void free_bvh(DeviceScene *dscene);
+
  private:
   static void update_attribute_element_offset(Geometry *geom,
                                               device_vector<float> &attr_float,

@@ -198,6 +198,10 @@ class AttributeSet {
 
   void resize(bool reserve_only = false);
   void clear(bool preserve_voxel_data = false);
+
+  /* Update the attributes in this AttributeSet with the ones from the new set,
+   * and remove any attribute not found on the new set from this. */
+  void update(AttributeSet &new_attributes);
 };
 
 /* AttributeRequest

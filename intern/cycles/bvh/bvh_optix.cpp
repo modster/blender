@@ -162,14 +162,16 @@ void BVHOptiX::pack_tlas()
   foreach (Geometry *geom, geometry) {
     PackedBVH &bvh_pack = geom->bvh->pack;
 
-    geom->bvh->pack_verts_offset = pack_verts_offset;
-
     // Merge visibility flags of all objects and fix object indices for non-instanced geometry
     int object_index = 0;  // Unused for instanced geometry
     int object_visibility = 0;
+    bool visibility_modified = false;
     foreach (Object *ob, objects) {
       if (ob->get_geometry() == geom) {
         object_visibility |= ob->visibility_for_tracing();
+        visibility_modified |= ob->visibility_is_modified();
+        visibility_modified |= ob->is_shadow_catcher_is_modified();
+
         if (!geom->is_instanced()) {
           object_index = ob->get_device_index();
           break;
@@ -177,14 +179,16 @@ void BVHOptiX::pack_tlas()
       }
     }
 
-    if (geom->is_modified()) {
+    if (geom->is_modified() || params.pack_all_data) {
       pool.push(function_bind(&BVHOptiX::pack_instance,
                               this,
                               geom,
                               pack_offset,
                               pack_verts_offset,
                               object_index,
-                              object_visibility));
+                              object_visibility,
+                              params.pack_all_data,
+                              visibility_modified));
     }
 
     if (!bvh_pack.prim_index.empty()) {
@@ -203,7 +207,9 @@ void BVHOptiX::pack_instance(Geometry *geom,
                              size_t pack_offset,
                              size_t pack_verts_offset_,
                              int object_index,
-                             int object_visibility)
+                             int object_visibility,
+                             bool force_pack,
+                             bool visibility_modified)
 {
   int *pack_prim_type = pack.prim_type.data();
   int *pack_prim_index = pack.prim_index.data();
@@ -222,15 +228,18 @@ void BVHOptiX::pack_instance(Geometry *geom,
     uint *bvh_prim_tri_index = &bvh_pack.prim_tri_index[0];
     uint *bvh_prim_visibility = &bvh_pack.prim_visibility[0];
 
+    /* default to true for volumes and curves */
     bool prims_have_changed = true;
 
     if (geom->is_mesh()) {
       Mesh *mesh = static_cast<Mesh *>(geom);
 
-      if (!mesh->triangles_is_modified()) {
+      if (!mesh->triangles_is_modified() && !force_pack) {
         prims_have_changed = false;
       }
     }
+
+    prims_have_changed |= visibility_modified;
 
     if (prims_have_changed) {
       for (size_t i = 0; i < bvh_pack.prim_index.size(); i++, pack_offset++) {
