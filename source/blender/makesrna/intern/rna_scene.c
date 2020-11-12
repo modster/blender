@@ -48,7 +48,6 @@
 #include "BKE_volume.h"
 
 #include "ED_gpencil.h"
-#include "ED_lineart.h"
 #include "ED_object.h"
 
 #include "RNA_define.h"
@@ -7840,7 +7839,6 @@ void RNA_def_scene(BlenderRNA *brna)
   rna_def_display_safe_areas(brna);
   rna_def_scene_display(brna);
   rna_def_scene_eevee(brna);
-  rna_def_scene_lineart(brna);
   rna_def_view_layer_eevee(brna);
   rna_def_scene_gpencil(brna);
   RNA_define_animate_sdna(true);

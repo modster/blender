@@ -143,9 +143,6 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
   bGPdata *gpd = ob->data;
 
   Scene *s = DEG_get_evaluated_scene(depsgraph);
-  if (!(s->lineart.flags & LRT_AUTO_UPDATE)) {
-    return;
-  }
 
   /* Guard early, don't trigger calculation when no gpencil frame is present. Probably should
    * disable in the isModifierDisabled() function but we need addtional arg for depsgraph and
@@ -172,50 +169,10 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
     return;
   }
 
-  if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_IDLE)) {
-    /* Update triggered when nothing's happening, means DG update, so we request a refresh on line
-     * art cache, meanwhile waiting for result. Update will trigger again. */
-    ED_lineart_modifier_sync_flag_set(LRT_SYNC_WAITING, true);
-    /* Don't have data yet, update line art. Note:  ED_lineart_post_frame_update_external will
-     * automatically return when calculation is already in progress.*/
-    if (is_render) {
+  ED_lineart_compute_feature_lines_internal(depsgraph, lmd, 1);
 
-      if (G.debug_value == 4000) {
-        printf("LRT: -------- Modifier calls for update when idle.\n");
-      }
-      ED_lineart_post_frame_update_external(
-          NULL, DEG_get_evaluated_scene(depsgraph), depsgraph, true);
-      while (!ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH) ||
-             !ED_lineart_calculation_flag_check(LRT_RENDER_FINISHED)) {
-        /* Wait till it's done. */
-      }
-    }
-    else {
-      return;
-    }
-  }
-  else if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_WAITING)) {
-    if (G.debug_value == 4000) {
-      printf("LRT: -------- Modifier is waiting for data in LRT_SYNC_WAITING.\n");
-    }
-    /* Calculation in process. */
-    if (is_render) {
-      while (!ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH) ||
-             !ED_lineart_calculation_flag_check(LRT_RENDER_FINISHED)) {
-        /* Wait till it's done. */
-      }
-    }
-    else {
-      return;
-    }
-  }
-
-  if (G.debug_value == 4000) {
-    printf("(is_render == %d) ", is_render);
-  }
-
-  /* If we reach here, means calculation is finished (LRT_SYNC_FRESH), we grab cache. flag reset is
-   * done by calculation function.*/
+  /* If we reach here, means calculation is finished (LRT_SYNC_FRESH), we grab cache. flag
+   * reset is done by calculation function.*/
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
 
   WM_main_add_notifier(NA_EDITED | NC_GPENCIL, NULL);
@@ -240,26 +197,7 @@ static void bakeModifier(Main *UNUSED(bmain),
     return;
   }
 
-  if (scene->lineart.flags & LRT_AUTO_UPDATE) {
-    if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_IDLE)) {
-      /* Need to run it once again. */
-      ED_lineart_modifier_sync_flag_set(LRT_SYNC_WAITING, true);
-      BLI_spin_lock(&lineart_share.lock_loader);
-      ED_lineart_compute_feature_lines_background(depsgraph, 1);
-      /* Wait for loading finish. */
-      BLI_spin_lock(&lineart_share.lock_loader);
-      BLI_spin_unlock(&lineart_share.lock_loader);
-    }
-    while (!ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH) ||
-           !ED_lineart_calculation_flag_check(LRT_RENDER_FINISHED)) {
-      /* Wait till it's done. */
-    }
-  }
-  else if (!ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH) ||
-           !ED_lineart_modifier_sync_flag_check(LRT_SYNC_IDLE)) {
-    /* If not auto updating, and the cache isn't available, then do not generate strokes. */
-    return;
-  }
+  ED_lineart_compute_feature_lines_internal(depsgraph, lmd, 1);
 
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
 }
@@ -330,33 +268,17 @@ static void panel_draw(const bContext *C, Panel *panel)
   else if (source_type == LRT_SOURCE_COLLECTION) {
     uiItemR(layout, ptr, "source_collection", 0, NULL, ICON_OUTLINER_COLLECTION);
   }
-
-  if (scene->lineart.flags & LRT_EVERYTHING_AS_CONTOUR) {
-    uiItemL(layout, "Line types are fuzzy", ICON_NONE);
-  }
   else {
-    uiLayout *column = uiLayoutColumn(layout, true);
-    if (scene->lineart.line_types & LRT_EDGE_FLAG_CONTOUR) {
-      uiItemR(column, ptr, "use_contour", 0, NULL, ICON_NONE);
-    }
-    if (scene->lineart.line_types & LRT_EDGE_FLAG_CREASE) {
-      uiItemR(column, ptr, "use_crease", 0, "Crease", ICON_NONE);
-    }
-    if (scene->lineart.line_types & LRT_EDGE_FLAG_MATERIAL) {
-      uiItemR(column, ptr, "use_material", 0, "Material", ICON_NONE);
-    }
-    if (scene->lineart.line_types & LRT_EDGE_FLAG_EDGE_MARK) {
-      uiItemR(column, ptr, "use_edge_mark", 0, "Edge Marks", ICON_NONE);
-    }
-    if (scene->lineart.flags & LRT_INTERSECTION_AS_CONTOUR) {
-      uiItemL(column, "Intersection is fuzzy", ICON_NONE);
-    }
-    else {
-      if (scene->lineart.line_types & LRT_EDGE_FLAG_INTERSECTION) {
-        uiItemR(column, ptr, "use_intersection", 0, "Intersection", ICON_NONE);
-      }
-    }
+    /* Source is Scene. */
   }
+
+  uiLayout *column = uiLayoutColumn(layout, true);
+
+  uiItemR(column, ptr, "use_contour", 0, NULL, ICON_NONE);
+  uiItemR(column, ptr, "use_crease", 0, "Crease", ICON_NONE);
+  uiItemR(column, ptr, "use_material", 0, "Material", ICON_NONE);
+  uiItemR(column, ptr, "use_edge_mark", 0, "Edge Marks", ICON_NONE);
+  uiItemR(column, ptr, "use_intersection", 0, "Intersection", ICON_NONE);
 
   uiItemPointerR(layout, ptr, "target_layer", &obj_data_ptr, "layers", NULL, ICON_GREASEPENCIL);
   uiItemPointerR(

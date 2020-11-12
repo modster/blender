@@ -59,7 +59,6 @@
 
 #include "ED_armature.h"
 #include "ED_image.h"
-#include "ED_lineart.h"
 #include "ED_mesh.h"
 #include "ED_node.h"
 #include "ED_object.h"
@@ -187,11 +186,6 @@ void ED_editors_init(bContext *C)
 
   SWAP(int, reports->flag, reports_flag_prev);
   wm->op_undo_depth--;
-
-  /* Line Art data lock duing async calculation */
-#ifdef WITH_LINEART
-  ED_lineart_init_locks();
-#endif
 }
 
 /* frees all editmode stuff */
@@ -232,11 +226,6 @@ void ED_editors_exit(Main *bmain, bool do_undo_system)
   /* global in meshtools... */
   ED_mesh_mirror_spatial_table_end(NULL);
   ED_mesh_mirror_topo_table_end(NULL);
-
-  /* Line Art data*/
-#ifdef WITH_LINEART
-  ED_lineart_destroy_render_data_external();
-#endif
 }
 
 bool ED_editors_flush_edits_for_object_ex(Main *bmain,

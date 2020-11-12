@@ -16,14 +16,16 @@
 # ***** END GPL LICENSE BLOCK *****
 
 set(INC
-  ../../blenkernel
-  ../../blenlib
-  ../../bmesh
-  ../../depsgraph
-  ../../makesdna
-  ../../makesrna
-  ../../windowmanager
-  ../../../../intern/guardedalloc
+  ../../../blenkernel
+  ../../../blenlib
+  ../../../bmesh
+  ../../../depsgraph
+  ../../../makesdna
+  ../../../makesrna
+  ../../../windowmanager
+  ../../../editors/include
+  ../../../../../intern/guardedalloc
+  ../../
 )
 
 set(INC_SYS
@@ -37,9 +39,10 @@ set(SRC
   lineart_util.c
 
   lineart_intern.h
+  ED_lineart.h
 )
 
 set(LIB
 )
 
-blender_add_lib(bf_editor_lineart "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+blender_add_lib(bf_gpencil_lineart "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

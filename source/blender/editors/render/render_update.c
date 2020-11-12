@@ -60,10 +60,6 @@
 #include "ED_render.h"
 #include "ED_view3d.h"
 
-#ifdef WITH_LINEART
-#  include "ED_lineart.h"
-#endif
-
 #include "DEG_depsgraph.h"
 
 #include "WM_api.h"
@@ -108,15 +104,6 @@ void ED_render_scene_update(const DEGEditorUpdateContext *update_ctx, int update
 
   CTX_wm_manager_set(C, bmain->wm.first);
   wm = bmain->wm.first;
-
-#ifdef WITH_LINEART
-  /* TODO: Needs some specific flag in the render pipeline that marks line art for update, that way
-   * we could avoid some unecessary updating.
-   */
-  if (updated) {
-    ED_lineart_post_frame_update_external(C, scene, update_ctx->depsgraph, false);
-  }
-#endif
 
   for (win = wm->windows.first; win; win = win->next) {
     bScreen *screen = WM_window_get_active_screen(win);

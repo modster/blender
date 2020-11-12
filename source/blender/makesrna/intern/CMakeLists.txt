@@ -382,6 +382,7 @@ blender_include_dirs(
   ../../simulation
   ../../windowmanager
   ../../editors/include
+  ../../gpencil_modifiers/intern/lineart
   ../../render
   ../../../../intern/cycles/blender
   ../../../../intern/atomic
@@ -447,7 +448,7 @@ set(LIB
 
 if(WITH_LINEART)
   list(APPEND LIB
-    bf_editor_lineart
+    bf_gpencil_lineart
   )
 endif()
 

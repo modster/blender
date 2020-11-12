@@ -1349,7 +1349,6 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
 
       /* Turn on Line Art auto update to show the result. */
       Scene *scene = CTX_data_scene(C);
-      scene->lineart.flags |= LRT_AUTO_UPDATE;
     }
 #endif
     case GP_EMPTY:

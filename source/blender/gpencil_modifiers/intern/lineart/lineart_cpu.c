@@ -72,6 +72,8 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
+#include "MOD_gpencil_modifiertypes.h"
+
 #include "lineart_intern.h"
 
 extern LineartSharedResource lineart_share;
@@ -1733,7 +1735,8 @@ static void lineart_main_load_geometries(
     Depsgraph *depsgraph,
     Scene *scene,
     Object *camera /* Still use camera arg for convenience. */,
-    LineartRenderBuffer *rb)
+    LineartRenderBuffer *rb,
+    bool allow_duplicates)
 {
   double proj[4][4], view[4][4], result[4][4];
   float inv[4][4];
@@ -1780,7 +1783,7 @@ static void lineart_main_load_geometries(
   int flags = DEG_ITER_OBJECT_FLAG_LINKED_DIRECTLY | DEG_ITER_OBJECT_FLAG_LINKED_VIA_SET |
               DEG_ITER_OBJECT_FLAG_VISIBLE;
 
-  if (scene->lineart.flags & LRT_ALLOW_DUPLI_OBJECTS) {
+  if (allow_duplicates) {
     flags |= DEG_ITER_OBJECT_FLAG_DUPLI;
   }
 
@@ -2565,7 +2568,7 @@ void ED_lineart_destroy_render_data_external(void)
   ED_lineart_destroy_render_data();
 }
 
-LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene)
+LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene, LineartGpencilModifierData *lmd)
 {
   /* Re-init render_buffer_shared. */
   if (lineart_share.render_buffer_shared) {
@@ -2594,7 +2597,7 @@ LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene)
     }
     Camera *c = scene->camera->data;
     double clipping_offset = 0;
-    if (scene->lineart.flags & LRT_ALLOW_CLIPPING_BOUNDARIES) {
+    if (lmd->calculation_flags & LRT_ALLOW_CLIPPING_BOUNDARIES) {
       clipping_offset = 0.0001;
     }
     copy_v3db_v3fl(rb->camera_pos, scene->camera->obmat[3]);
@@ -2610,27 +2613,27 @@ LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene)
     rb->shift_y = (asp <= 1) ? c->shifty : c->shifty * asp;
   }
 
-  rb->crease_threshold = cos(M_PI - scene->lineart.crease_threshold);
-  rb->angle_splitting_threshold = scene->lineart.angle_splitting_threshold;
-  rb->chaining_image_threshold = scene->lineart.chaining_image_threshold;
-  rb->chaining_geometry_threshold = scene->lineart.chaining_geometry_threshold;
+  rb->crease_threshold = cos(M_PI - lmd->crease_threshold);
+  rb->angle_splitting_threshold = lmd->angle_splitting_threshold;
+  rb->chaining_image_threshold = lmd->chaining_image_threshold;
+  rb->chaining_geometry_threshold = lmd->chaining_geometry_threshold;
 
-  rb->fuzzy_intersections = (scene->lineart.flags & LRT_INTERSECTION_AS_CONTOUR) != 0;
-  rb->fuzzy_everything = (scene->lineart.flags & LRT_EVERYTHING_AS_CONTOUR) != 0;
-  rb->allow_boundaries = (scene->lineart.flags & LRT_ALLOW_CLIPPING_BOUNDARIES) != 0;
-  rb->remove_doubles = (scene->lineart.flags & LRT_REMOVE_DOUBLES) != 0;
+  rb->fuzzy_intersections = (lmd->calculation_flags & LRT_INTERSECTION_AS_CONTOUR) != 0;
+  rb->fuzzy_everything = (lmd->calculation_flags & LRT_EVERYTHING_AS_CONTOUR) != 0;
+  rb->allow_boundaries = (lmd->calculation_flags & LRT_ALLOW_CLIPPING_BOUNDARIES) != 0;
+  rb->remove_doubles = (lmd->calculation_flags & LRT_REMOVE_DOUBLES) != 0;
 
-  rb->use_contour = (scene->lineart.line_types & LRT_EDGE_FLAG_CONTOUR) != 0;
-  rb->use_crease = (scene->lineart.line_types & LRT_EDGE_FLAG_CREASE) != 0;
-  rb->use_material = (scene->lineart.line_types & LRT_EDGE_FLAG_MATERIAL) != 0;
-  rb->use_edge_marks = (scene->lineart.line_types & LRT_EDGE_FLAG_EDGE_MARK) != 0;
-  rb->use_intersections = (scene->lineart.line_types & LRT_EDGE_FLAG_INTERSECTION) != 0;
+  rb->use_contour = (lmd->line_types & LRT_EDGE_FLAG_CONTOUR) != 0;
+  rb->use_crease = (lmd->line_types & LRT_EDGE_FLAG_CREASE) != 0;
+  rb->use_material = (lmd->line_types & LRT_EDGE_FLAG_MATERIAL) != 0;
+  rb->use_edge_marks = (lmd->line_types & LRT_EDGE_FLAG_EDGE_MARK) != 0;
+  rb->use_intersections = (lmd->line_types & LRT_EDGE_FLAG_INTERSECTION) != 0;
 
   BLI_spin_init(&rb->lock_task);
   BLI_spin_init(&rb->lock_cuts);
   BLI_spin_init(&rb->render_data_pool.lock_mem);
 
-  lineart_share.allow_overlapping_edges = (scene->lineart.flags & LRT_ALLOW_OVERLAPPING_EDGES) !=
+  lineart_share.allow_overlapping_edges = (lmd->calculation_flags & LRT_ALLOW_OVERLAPPING_EDGES) !=
                                           0;
 
   BLI_spin_lock(&lineart_share.lock_render_status);
@@ -2641,29 +2644,12 @@ LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene)
   return rb;
 }
 
-static void lineart_post_frame_update_render(struct Main *UNUSED(main),
-                                             struct PointerRNA **UNUSED(prna),
-                                             const int UNUSED(num_pointers),
-                                             void *UNUSED(arg))
-{
-  ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, false);
-}
-static bCallbackFuncStore lineart_pre_frame_update = {
-    NULL,
-    NULL,                             /* next, prev. */
-    lineart_post_frame_update_render, /* func. */
-    NULL,                             /* arg. */
-    0                                 /* alloc. */
-};
-
 void ED_lineart_init_locks()
 {
   if (!(lineart_share.init_complete & LRT_INIT_LOCKS)) {
     BLI_spin_init(&lineart_share.lock_loader);
     BLI_spin_init(&lineart_share.lock_render_status);
     lineart_share.init_complete |= LRT_INIT_LOCKS;
-
-    BKE_callback_add(&lineart_pre_frame_update, BKE_CB_EVT_FRAME_CHANGE_PRE);
   }
 }
 
@@ -3714,13 +3700,15 @@ static LineartBoundingArea *linear_bounding_areat_first_possible(LineartRenderBu
 /* Calculations. */
 
 /** Parent thread locking should be done before this very function is called. */
-int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int show_frame_progress)
+int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph,
+                                              LineartGpencilModifierData *lmd,
+                                              const int show_frame_progress)
 {
   LineartRenderBuffer *rb;
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
   int intersections_only = 0; /* Not used right now, but preserve for future. */
 
-  if ((lineart->flags & LRT_AUTO_UPDATE) == 0 || !scene->camera) {
+  if (!scene->camera) {
     /* Release lock when early return. */
     BLI_spin_unlock(&lineart_share.lock_loader);
     return OPERATOR_CANCELLED;
@@ -3737,7 +3725,7 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
     return OPERATOR_FINISHED; \
   }
 
-  rb = ED_lineart_create_render_buffer(scene);
+  rb = ED_lineart_create_render_buffer(scene, lmd);
 
   /* Has to be set after render buffer creation, to avoid locking from editor undo. */
   ED_lineart_calculation_flag_set(LRT_RENDER_RUNNING);
@@ -3751,7 +3739,8 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
   LRT_PROGRESS(0, "LRT: Loading geometries.");
 
   lineart_main_get_view_vector(rb);
-  lineart_main_load_geometries(depsgraph, scene, scene->camera, rb);
+  lineart_main_load_geometries(
+      depsgraph, scene, scene->camera, rb, lmd->calculation_flags & LRT_ALLOW_DUPLI_OBJECTS);
 
   /** We had everything we need,
    * Unlock parent thread, it'scene safe to run independently from now. */
@@ -3792,8 +3781,8 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
 
   /* intersection_only is preserved for furure functions.*/
   if (!intersections_only) {
-    float t_image = scene->lineart.chaining_image_threshold;
-    float t_geom = scene->lineart.chaining_geometry_threshold;
+    float t_image = lmd->chaining_image_threshold;
+    float t_geom = lmd->chaining_geometry_threshold;
 
     ED_lineart_chain_feature_lines(rb);
 
@@ -3824,6 +3813,8 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
     lineart_count_and_print_render_buffer_memory(rb);
   }
 
+  ED_lineart_calculation_flag_set(LRT_RENDER_FINISHED);
+
   return OPERATOR_FINISHED;
 }
 
@@ -3832,66 +3823,6 @@ typedef struct LRT_FeatureLineWorker {
   int intersection_only;
   int show_frame_progress;
 } LRT_FeatureLineWorker;
-
-static void lineart_gpencil_notify_targets(Depsgraph *dg);
-
-static void lineart_compute_feature_lines_worker(TaskPool *__restrict UNUSED(pool),
-                                                 LRT_FeatureLineWorker *worker_data)
-{
-
-  ED_lineart_compute_feature_lines_internal(worker_data->dg, worker_data->show_frame_progress);
-
-  if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
-    ED_lineart_calculation_flag_set(LRT_RENDER_FINISHED);
-    return;
-  }
-
-  ED_lineart_chain_clear_picked_flag(lineart_share.render_buffer_shared);
-
-  /* Calculation is done, give fresh data. */
-  ED_lineart_modifier_sync_flag_set(LRT_SYNC_FRESH, false);
-
-  lineart_gpencil_notify_targets(worker_data->dg);
-
-  ED_lineart_calculation_flag_set(LRT_RENDER_FINISHED);
-}
-
-void ED_lineart_compute_feature_lines_background(Depsgraph *dg, const int show_frame_progress)
-{
-  TaskPool *tp_read;
-  BLI_spin_lock(&lineart_share.lock_render_status);
-  tp_read = lineart_share.pending_render_task;
-  BLI_spin_unlock(&lineart_share.lock_render_status);
-
-  /* If the calculation is already started then bypass it. */
-  if (ED_lineart_calculation_flag_check(LRT_RENDER_RUNNING)) {
-    /* Set CANCEL flag, and when operation is canceled, flag will become FINISHED. */
-    ED_lineart_calculation_flag_set(LRT_RENDER_CANCELING);
-    if (G.debug_value == 4000) {
-      printf("LRT: Canceling.\n");
-    }
-    /* Can't release the lock just right now, because loading function might still be canceling
- . */
-  }
-
-  if (tp_read) {
-    BLI_spin_unlock(&lineart_share.lock_loader);
-    return;
-  }
-
-  LRT_FeatureLineWorker *flw = MEM_callocN(sizeof(LRT_FeatureLineWorker), "Line Art Worker");
-
-  flw->dg = dg;
-  flw->intersection_only = 0 /* Not used for CPU. */;
-  flw->show_frame_progress = show_frame_progress;
-
-  TaskPool *tp = BLI_task_pool_create_background(0, TASK_PRIORITY_HIGH);
-  BLI_spin_lock(&lineart_share.lock_render_status);
-  lineart_share.pending_render_task = tp;
-  BLI_spin_unlock(&lineart_share.lock_render_status);
-
-  BLI_task_pool_push(tp, (TaskRunFunction)lineart_compute_feature_lines_worker, flw, true, NULL);
-}
 
 /* Grease Pencil bindings. */
 
@@ -4177,92 +4108,6 @@ void ED_lineart_gpencil_generate_with_type(Depsgraph *depsgraph,
                               source_vgname,
                               vgname,
                               modifier_flags);
-}
-
-void ED_lineart_post_frame_update_external(bContext *C,
-                                           Scene *scene,
-                                           Depsgraph *dg,
-                                           bool from_modifier)
-{
-  if (G.debug_value == 4000) {
-    printf("LRT: ---- Post frame update (%d).\n", 0);
-  }
-  if (!scene->camera) {
-    ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, false);
-  }
-  if (!(scene->lineart.flags & LRT_AUTO_UPDATE)) {
-    /* This way the modifier will update, removing remaing strokes in the viewport. */
-    if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_WAITING)) {
-      ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, false);
-      lineart_gpencil_notify_targets(dg);
-    }
-    return;
-  }
-  if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_WAITING)) {
-    /* Modifier is waiting for data, trigger update (will wait/cancel if already running). */
-    if (scene->lineart.flags & LRT_AUTO_UPDATE) {
-      if (C) {
-        lineart_share.wm = CTX_wm_manager(C);
-        lineart_share.main_window = lineart_share.wm->windows.first;
-      }
-      else {
-        lineart_share.wm = NULL;
-        lineart_share.main_window = NULL;
-      }
-
-      if (G.debug_value == 4000) {
-        printf("LRT: ---- Post frame update called at LRT_SYNC_WAITING, %s.\n",
-               from_modifier ? "from modifier" : "from scene update");
-      }
-
-      /** Lock caller thread before calling feature line computation.
-       * This worker is not a background task, so we don't need to try another lock
-       * to wait for the worker to finish. The lock will be released in the compute function.
- . */
-      BLI_spin_lock(&lineart_share.lock_loader);
-      ED_lineart_compute_feature_lines_background(dg, 1);
-
-      /* Wait for loading finish. */
-      BLI_spin_lock(&lineart_share.lock_loader);
-      BLI_spin_unlock(&lineart_share.lock_loader);
-    }
-  }
-  else if (ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH)) {
-    bool is_render = (DEG_get_mode(dg) == DAG_EVAL_RENDER);
-
-    /* No double caching during rendering. */
-    if (ED_lineart_modifier_sync_still_has_customer()) {
-      return;
-    }
-
-    /* This code path is not working with motion blur on "render animation". not sure why, but
-     * here if we retain the data and restore the flag, results will be correct. (The wrong
-     * clearing happens when dg->mode == DAG_EVAL_VIEWPORT) so can't really catch it there.). */
-    if (is_render && (scene->eevee.flag & SCE_EEVEE_MOTION_BLUR_ENABLED)) {
-      return;
-    }
-
-    /* To avoid double clearing. */
-    ED_lineart_modifier_sync_flag_set(LRT_SYNC_CLEARING, from_modifier);
-
-    /* Due to using GPencil modifiers, and the scene is updated each time some value is changed,
-     * we really don't need to keep the buffer any longer. If in the future we want fast refresh
-     * on parameter changes (e.g. thickness or picking different result in an already validated
-     * buffer), remove ED_lineart_destroy_render_data_external() below.*/
-    if (!from_modifier) {
-      if (G.debug_value == 4000) {
-        printf("LRT: ---- Destroy on update (%d).\n", is_render);
-      }
-
-      /* Currently the data is destroyed upon turning off line art. Destroying here post many
-       * problems as this function might get called during rendering for the viewport. */
-      /* ED_lineart_destroy_render_data_external();. */
-    }
-
-    /* At this stage GP should have all the data. We clear the flag. This is needed for real-time
-     * update on editing in the viewport. */
-    ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, from_modifier);
-  }
 }
 
 void ED_lineart_update_render_progress(int nr, const char *info)

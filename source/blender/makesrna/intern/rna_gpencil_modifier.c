@@ -2325,7 +2325,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
       prop,
       "Intersection As Contour",
       "Treat intersection lines as contour so those lines can be chained together");
-  RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
+  RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "fuzzy_everything", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_EVERYTHING_AS_CONTOUR);
@@ -2333,7 +2333,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_ui_text(prop,
                            "All Lines As Contour",
                            "Treat all lines as contour so those lines can be chained together");
-  RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
+  RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "allow_duplication", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_ALLOW_DUPLI_OBJECTS);
@@ -2342,7 +2342,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
       prop,
       "Instanced Objects",
       "Allow particle objects and face/vertiex duplication to show in line art");
-  RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
+  RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "allow_overlapping_edges", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_ALLOW_OVERLAPPING_EDGES);
@@ -2350,21 +2350,21 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_ui_text(prop,
                            "Handle Overlapping Edges",
                            "Allow lines from edge split to show properly, may run slower");
-  RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
+  RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "allow_clipping_boundaries", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_ALLOW_CLIPPING_BOUNDARIES);
   RNA_def_property_boolean_default(prop, 1);
   RNA_def_property_ui_text(
       prop, "Clipping Boundaries", "Allow lines on near/far clipping plane to be shown");
-  RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
+  RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "crease_threshold", PROP_FLOAT, PROP_ANGLE);
   RNA_def_property_range(prop, 0, DEG2RAD(180.0f));
   RNA_def_property_ui_range(prop, 0.0f, DEG2RAD(180.0f), 0.01f, 1);
   RNA_def_property_ui_text(
       prop, "Crease Threshold", "Angles smaller than this will be treated as creases");
-  RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
+  RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "angle_splitting_threshold", PROP_FLOAT, PROP_ANGLE);
   RNA_def_property_float_default(prop, DEG2RAD(60.0f));
@@ -2373,14 +2373,14 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   /*  Don't allow value very close to PI, or we get a lot of small segments.*/
   RNA_def_property_ui_range(prop, 0.0f, DEG2RAD(179.5f), 0.01f, 1);
   RNA_def_property_range(prop, 0.0f, DEG2RAD(180.0f));
-  RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
+  RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "remove_doubles", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_REMOVE_DOUBLES);
   RNA_def_property_boolean_default(prop, 0);
   RNA_def_property_ui_text(
       prop, "Remove Doubles", "Remove doubles when line art is loading geometries");
-  RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
+  RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "chaining_geometry_threshold", PROP_FLOAT, PROP_DISTANCE);
   RNA_def_property_float_default(prop, 0.01f);
@@ -2390,7 +2390,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
                            "will be chained together");
   RNA_def_property_ui_range(prop, 0.0f, 0.5f, 0.001f, 3);
   RNA_def_property_range(prop, 0.0f, 0.5f);
-  RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
+  RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "chaining_image_threshold", PROP_FLOAT, PROP_DISTANCE);
   RNA_def_property_float_default(prop, 0.01f);
@@ -2400,7 +2400,7 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
       "Segments with an image distance smaller than this will be chained together");
   RNA_def_property_ui_range(prop, 0.0f, 0.3f, 0.001f, 4);
   RNA_def_property_range(prop, 0.0f, 0.3f);
-  RNA_def_property_update(prop, NC_SCENE, "rna_lineart_update");
+  RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "source_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, modifier_lineart_source_type);

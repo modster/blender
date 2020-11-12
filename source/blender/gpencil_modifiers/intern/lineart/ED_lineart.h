@@ -585,9 +585,11 @@ int ED_lineart_point_inside_triangled(double v[2], double v0[2], double v1[2], d
 struct Depsgraph;
 struct Scene;
 struct LineartRenderBuffer;
+struct LineartGpencilModifierData;
 
 void ED_lineart_init_locks(void);
-struct LineartRenderBuffer *ED_lineart_create_render_buffer(struct Scene *s);
+struct LineartRenderBuffer *ED_lineart_create_render_buffer(
+    struct Scene *s, struct LineartGpencilModifierData *lmd);
 void ED_lineart_destroy_render_data(void);
 void ED_lineart_destroy_render_data_external(void);
 
@@ -612,6 +614,7 @@ void ED_lineart_modifier_sync_remove_customer(void);
 bool ED_lineart_modifier_sync_still_has_customer(void);
 
 int ED_lineart_compute_feature_lines_internal(struct Depsgraph *depsgraph,
+                                              struct LineartGpencilModifierData *lmd,
                                               const int show_frame_progress);
 
 void ED_lineart_compute_feature_lines_background(struct Depsgraph *dg,
