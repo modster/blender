@@ -1229,7 +1229,8 @@ static void gpencil_curve_extrude_points(bGPdata *gpd,
       /* select last point */
       bGPDcurve_point *gpc_pt_last = &new_gpc->curve_points[1];
       gpc_pt_last->flag |= GP_CURVE_POINT_SELECT;
-      BEZT_SEL_ALL(&gpc_pt_last->bezt);
+      BEZT_SEL_IDX(&gpc_pt_last->bezt, 1);
+      gps_new->editcurve->flag |= GP_CURVE_SELECT;
 
       BLI_insertlinkafter(&gpf->strokes, gps, gps_new);
 
@@ -1267,7 +1268,7 @@ static void gpencil_curve_extrude_points(bGPdata *gpd,
 
       bGPDcurve_point *old_first = &gpc->curve_points[1];
 
-      old_first->flag &= GP_CURVE_POINT_SELECT;
+      old_first->flag &= ~GP_CURVE_POINT_SELECT;
       BEZT_DESEL_ALL(&old_first->bezt);
     }
 
@@ -1276,7 +1277,7 @@ static void gpencil_curve_extrude_points(bGPdata *gpd,
       bGPDcurve_point *new_last = &gpc->curve_points[gpc->tot_curve_points - 1];
       memcpy(new_last, old_last, sizeof(bGPDcurve_point));
 
-      old_last->flag &= GP_CURVE_POINT_SELECT;
+      old_last->flag &= ~GP_CURVE_POINT_SELECT;
       BEZT_DESEL_ALL(&old_last->bezt);
     }
 
