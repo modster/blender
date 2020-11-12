@@ -74,7 +74,7 @@
 
 #include "lineart_intern.h"
 
-LineartSharedResource lineart_share;
+extern LineartSharedResource lineart_share;
 
 /* static function declarations. */
 

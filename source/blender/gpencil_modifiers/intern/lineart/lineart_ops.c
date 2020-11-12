@@ -48,6 +48,8 @@
 
 extern LineartSharedResource lineart_share;
 
+#ifdef LINEART_WITH_BAKE
+
 static int lineart_gpencil_update_strokes_exec(bContext *C, wmOperator *UNUSED(op))
 {
   Depsgraph *dg = CTX_data_depsgraph_pointer(C);
@@ -242,8 +244,10 @@ void SCENE_OT_lineart_bake_strokes(wmOperatorType *ot)
   ot->exec = lineart_gpencil_bake_strokes_exec;
 }
 
+#endif
+
 void ED_operatortypes_lineart(void)
 {
-  WM_operatortype_append(SCENE_OT_lineart_update_strokes);
-  WM_operatortype_append(SCENE_OT_lineart_bake_strokes);
+  // WM_operatortype_append(SCENE_OT_lineart_update_strokes);
+  // WM_operatortype_append(SCENE_OT_lineart_bake_strokes);
 }

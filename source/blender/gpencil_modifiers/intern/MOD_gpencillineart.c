@@ -67,7 +67,7 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
-extern LineartSharedResource lineart_share;
+LineartSharedResource lineart_share;
 
 static void initData(GpencilModifierData *md)
 {
