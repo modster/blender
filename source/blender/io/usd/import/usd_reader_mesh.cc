@@ -356,7 +356,7 @@ Mesh *USDMeshReader::create_mesh(Main *bmain, double time)
     return nullptr;
   }
 
-  std::string mesh_name = this->prim_name();
+  std::string mesh_name = this->get_data_name();
 
   if (mesh_name.empty()) {
     /* Sanity check. */

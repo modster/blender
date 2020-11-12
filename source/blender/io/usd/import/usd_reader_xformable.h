@@ -70,9 +70,24 @@ class USDXformableReader : public USDPrimReader {
     return merged_with_parent_;
   }
 
+  std::string get_object_name() const
+  {
+    return merged_with_parent_ ? this->parent_prim_name() : this->prim_name();
+  }
+
+  std::string get_data_name() const
+  {
+    return this->prim_name();
+  }
+
   virtual bool valid() const = 0;
 
   virtual void create_object(Main *bmain, double time) = 0;
+
+  virtual bool can_merge_with_parent() const
+  {
+    return true;
+  }
 
   void set_object_transform(const double time);
 

@@ -20,25 +20,20 @@
 
 #include "usd_reader_xformable.h"
 
-#include <pxr/usd/usdGeom/xform.h>
+#include <pxr/usd/usdGeom/camera.h>
 
 namespace blender::io::usd {
 
-/* Wraps the UsdGeomXform schema. Creates a Blender Empty object. */
+/* Wraps the UsdGeomCamera schema. Creates a Blender Camera object. */
 
-class USDXformReader : public USDXformableReader {
+class USDCameraReader : public USDXformableReader {
 
-  pxr::UsdGeomXform xform_;
+  pxr::UsdGeomCamera camera_;
 
  public:
-  USDXformReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
+  USDCameraReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
 
   bool valid() const override;
-
-  bool can_merge_with_parent() const override
-  {
-    return false;
-  }
 
   void create_object(Main *bmain, double time) override;
 };

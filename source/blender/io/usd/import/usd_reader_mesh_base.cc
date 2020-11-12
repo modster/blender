@@ -68,7 +68,7 @@ void USDMeshReaderBase::create_object(Main *bmain, double time)
     return;
   }
 
-  std::string obj_name = merged_with_parent_ ? this->parent_prim_name() : this->prim_name();
+  std::string obj_name = get_object_name();
 
   if (obj_name.empty()) {
     /* Sanity check. */

@@ -21,6 +21,7 @@
 
 #include "usd.h"
 #include "usd_importer_context.h"
+#include "usd_reader_camera.h"
 #include "usd_reader_mesh.h"
 #include "usd_reader_xform.h"
 #include "usd_reader_xformable.h"
@@ -30,6 +31,7 @@
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usd/stage.h>
+#include <pxr/usd/usdGeom/camera.h>
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/usd/usdGeom/scope.h>
 #include <pxr/usd/usdGeom/tokens.h>
@@ -89,7 +91,10 @@ USDXformableReader *USDPrimIterator::get_object_reader(const pxr::UsdPrim &prim,
 {
   USDXformableReader *result = nullptr;
 
-  if (prim.IsA<pxr::UsdGeomMesh>()) {
+  if (prim.IsA<pxr::UsdGeomCamera>()) {
+    result = new USDCameraReader(prim, context);
+  }
+  else if (prim.IsA<pxr::UsdGeomMesh>()) {
     result = new USDMeshReader(prim, context);
   }
   else if (prim.IsA<pxr::UsdGeomXform>()) {
@@ -130,15 +135,11 @@ void USDPrimIterator::create_object_readers(const pxr::UsdPrim &prim,
     return;
   }
 
-  /* If this is an Xform prim, see if we can merge with the child reader.
-   * We only merge if the child reader hasn't yet been merged
-   * and if it corresponds to a mesh prim.  The list of child types that
-   * can be merged will be expanded as we support more reader types
-   * (e.g., for lights, curves, etc.). */
+  /* If this is an Xform prim, see if we can merge with the child reader. */
 
   if (prim.IsA<pxr::UsdGeomXform>() && child_readers.size() == 1 &&
       !child_readers.front()->merged_with_parent() &&
-      child_readers.front()->prim().IsA<pxr::UsdGeomMesh>()) {
+      child_readers.front()->can_merge_with_parent()) {
     child_readers.front()->set_merged_with_parent(true);
     /* Don't create a reader for the Xform but, instead, return the child
      * that we merged. */
