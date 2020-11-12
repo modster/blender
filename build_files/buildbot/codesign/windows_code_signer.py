@@ -67,15 +67,26 @@ class WindowsCodeSigner(BaseCodeSigner):
         codesign_output = self.check_output_or_mock(command, util.Platform.WINDOWS)
         logger_server.info(f'signtool output:\n{codesign_output}')
 
+        got_number_of_success = False
+
         for line in codesign_output.split('\n'):
             line_clean = line.strip()
             line_clean_lower = line_clean.lower()
+
             if line_clean_lower.startswith('number of warnings') or \
                line_clean_lower.startswith('number of errors'):
-                 tokens = line_clean_lower.split(':')
-                 number = int(tokens[1])
+                 number = int(line_clean_lower.split(':')[1])
                  if number != 0:
                      raise SigntoolException('Non-clean success of signtool')
+
+            if line_clean_lower.startswith('number of files successfully signed'):
+                 got_number_of_success = True
+                 number = int(line_clean_lower.split(':')[1])
+                 if number != 1:
+                     raise SigntoolException('Signtool did not consider codesign a success')
+
+        if not got_number_of_success:
+            raise SigntoolException('Signtool did not report number of files signed')
 
 
     def sign_all_files(self, files: List[AbsoluteAndRelativeFileName]) -> None:
