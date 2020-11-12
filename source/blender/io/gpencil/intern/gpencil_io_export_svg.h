@@ -25,7 +25,7 @@
 
 #include "DNA_material_types.h"
 
-#include "gpencil_io_export_base.hh"
+#include "gpencil_io_export_base.h"
 #include "pugixml.hpp"
 
 struct GpencilExportParams;
@@ -62,11 +62,11 @@ class GpencilExporterSVG : public GpencilExporter {
 
  private:
   /* XML doc. */
-  pugi::xml_document main_doc;
+  pugi::xml_document _main_doc;
   /* Main document node. */
-  pugi::xml_node main_node;
+  pugi::xml_node _main_node;
   /** Frame node  */
-  pugi::xml_node frame_node;
+  pugi::xml_node _frame_node;
   void create_document_header(void);
   void export_gpencil_layers(void);
 

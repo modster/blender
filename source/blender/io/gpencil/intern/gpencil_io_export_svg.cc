@@ -57,7 +57,7 @@
 
 #include "ED_view3d.h"
 
-#include "gpencil_io_export_svg.hh"
+#include "gpencil_io_export_svg.h"
 #include "gpencil_io_exporter.h"
 
 #include "pugixml.hpp"
@@ -112,11 +112,11 @@ bool GpencilExporterSVG::write(std::string subfix)
 
   UTF16_ENCODE(filename_cstr);
   std::wstring wstr(filename_cstr_16);
-  result = main_doc.save_file(wstr.c_str());
+  result = _main_doc.save_file(wstr.c_str());
 
   UTF16_UN_ENCODE(filename_cstr);
 #else
-  result = main_doc.save_file(frame_file.c_str());
+  result = _main_doc.save_file(frame_file.c_str());
 #endif
 
   return result;
@@ -126,24 +126,24 @@ bool GpencilExporterSVG::write(std::string subfix)
 void GpencilExporterSVG::create_document_header(void)
 {
   /* Add a custom document declaration node. */
-  pugi::xml_node decl = main_doc.prepend_child(pugi::node_declaration);
+  pugi::xml_node decl = _main_doc.prepend_child(pugi::node_declaration);
   decl.append_attribute("version") = "1.0";
   decl.append_attribute("encoding") = "UTF-8";
 
-  pugi::xml_node comment = main_doc.append_child(pugi::node_comment);
+  pugi::xml_node comment = _main_doc.append_child(pugi::node_comment);
   char txt[128];
   sprintf(txt, " Generator: Blender, %s - %s ", SVG_EXPORTER_NAME, SVG_EXPORTER_VERSION);
   comment.set_value(txt);
 
-  pugi::xml_node doctype = main_doc.append_child(pugi::node_doctype);
+  pugi::xml_node doctype = _main_doc.append_child(pugi::node_doctype);
   doctype.set_value(
       "svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" "
       "\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\"");
 
-  main_node = main_doc.append_child("svg");
-  main_node.append_attribute("version").set_value("1.0");
-  main_node.append_attribute("x").set_value("0px");
-  main_node.append_attribute("y").set_value("0px");
+  _main_node = _main_doc.append_child("svg");
+  _main_node.append_attribute("version").set_value("1.0");
+  _main_node.append_attribute("x").set_value("0px");
+  _main_node.append_attribute("y").set_value("0px");
 
   std::string width;
   std::string height;
@@ -157,10 +157,10 @@ void GpencilExporterSVG::create_document_header(void)
     height = std::to_string(render_y_);
   }
 
-  main_node.append_attribute("width").set_value((width + "px").c_str());
-  main_node.append_attribute("height").set_value((height + "px").c_str());
+  _main_node.append_attribute("width").set_value((width + "px").c_str());
+  _main_node.append_attribute("height").set_value((height + "px").c_str());
   std::string viewbox = "0 0 " + width + " " + height;
-  main_node.append_attribute("viewBox").set_value(viewbox.c_str());
+  _main_node.append_attribute("viewBox").set_value(viewbox.c_str());
 
   /* Scene name. */
   if ((params_.flag & GP_EXPORT_STORYBOARD_MODE) != 0) {
@@ -168,7 +168,7 @@ void GpencilExporterSVG::create_document_header(void)
     sprintf(scenetxt, "Scene: %s", scene->id.name + 2);
 
     add_text(
-        main_node, 30.0f, params_.paper_size[1] - 30.0f, std::string(scenetxt), 12.0f, "#000000");
+        _main_node, 30.0f, params_.paper_size[1] - 30.0f, std::string(scenetxt), 12.0f, "#000000");
   }
 }
 
@@ -188,7 +188,7 @@ void GpencilExporterSVG::export_gpencil_layers(void)
 
     /* Camera clipping. */
     if (is_clipping) {
-      pugi::xml_node clip_node = main_node.append_child("clipPath");
+      pugi::xml_node clip_node = _main_node.append_child("clipPath");
       clip_node.append_attribute("id").set_value(("clip-path" + std::to_string(cfra_)).c_str());
 
       if ((params_.flag & GP_EXPORT_STORYBOARD_MODE) != 0) {
@@ -205,17 +205,17 @@ void GpencilExporterSVG::export_gpencil_layers(void)
       }
     }
 
-    frame_node = main_node.append_child("g");
+    _frame_node = _main_node.append_child("g");
     std::string frametxt = "blender_frame_" + std::to_string(cfra_);
-    frame_node.append_attribute("id").set_value(frametxt.c_str());
+    _frame_node.append_attribute("id").set_value(frametxt.c_str());
 
     /* Clip area. */
     if (is_clipping) {
-      frame_node.append_attribute("clip-path")
+      _frame_node.append_attribute("clip-path")
           .set_value(("url(#clip-path" + std::to_string(cfra_) + ")").c_str());
     }
 
-    pugi::xml_node ob_node = frame_node.append_child("g");
+    pugi::xml_node ob_node = _frame_node.append_child("g");
 
     char obtxt[96];
     sprintf(obtxt, "blender_object_%s", ob->id.name + 2);
@@ -303,7 +303,7 @@ void GpencilExporterSVG::export_gpencil_layers(void)
 
     /* Frame border. */
     if ((params_.flag & GP_EXPORT_STORYBOARD_MODE) != 0) {
-      add_rect(main_node,
+      add_rect(_main_node,
                frame_offset_[0],
                frame_offset_[1],
                frame_box_[0],
@@ -330,7 +330,7 @@ void GpencilExporterSVG::export_gpencil_layers(void)
         }
 
         const float font_size = 30.0f;
-        add_text(main_node,
+        add_text(_main_node,
                  frame_offset_[0] + 5.0f,
                  frame_offset_[1] + frame_box_[1] + font_size,
                  std::string(text),
