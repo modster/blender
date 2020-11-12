@@ -1005,9 +1005,11 @@ static int gpencil_duplicate_exec(bContext *C, wmOperator *op)
     CTX_DATA_END;
   }
 
-  /* updates */
-  DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
-  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
+  if (changed) {
+    /* updates */
+    DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
+    WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
+  }
 
   return OPERATOR_FINISHED;
 }
@@ -2846,9 +2848,7 @@ static void gpencil_curve_delete_tagged_points(bGPdata *gpd,
                                                bGPDstroke *gps,
                                                bGPDstroke *next_stroke,
                                                bGPDcurve *gpc,
-                                               int tag_flags,
-                                               bool select,
-                                               int limit)
+                                               int tag_flags)
 {
   if (gpc == NULL) {
     return;
@@ -2987,7 +2987,7 @@ static int gpencil_delete_selected_points(bContext *C)
             if (is_curve_edit) {
               bGPDcurve *gpc = gps->editcurve;
               gpencil_curve_delete_tagged_points(
-                  gpd, gpf, gps, gps->next, gpc, GP_CURVE_POINT_SELECT, false, 0);
+                  gpd, gpf, gps, gps->next, gpc, GP_CURVE_POINT_SELECT);
             }
             else {
               /* delete unwanted points by splitting stroke into several smaller ones */
@@ -3433,7 +3433,7 @@ static bool gpencil_stroke_points_centroid(Depsgraph *depsgraph,
             add_v3_v3(r_centroid, fpt);
             minmax_v3v3_v3(r_min, r_max, fpt);
 
-            *count++;
+            (*count)++;
           }
         }
 

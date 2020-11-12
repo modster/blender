@@ -1563,6 +1563,7 @@ typedef bool (*GPencilTestFn)(ARegion *region,
                               const float pt[3],
                               GP_SelectUserData *user_data);
 
+#if 0
 static bool gpencil_stroke_fill_isect_rect(ARegion *region,
                                            bGPDstroke *gps,
                                            const float diff_mat[4][4],
@@ -1624,11 +1625,12 @@ static bool gpencil_stroke_fill_isect_rect(ARegion *region,
   MEM_freeN(points2d);
   return hit;
 }
+#endif
 
 static bool gpencil_generic_curve_select(bContext *C,
-                                         Object *ob,
+                                         Object *UNUSED(ob),
                                          GPencilTestFn is_inside_fn,
-                                         rcti box,
+                                         rcti UNUSED(box),
                                          GP_SelectUserData *user_data,
                                          const bool strokemode,
                                          const eSelectOp sel_op)
@@ -1726,16 +1728,18 @@ static bool gpencil_generic_curve_select(bContext *C,
       }
     }
 
-    // if (!hit) {
-    //   /* check if we selected the inside of a filled curve */
-    //   MaterialGPencilStyle *gp_style = BKE_gpencil_material_settings(ob, gps->mat_nr + 1);
-    //   if ((gp_style->flag & GP_MATERIAL_FILL_SHOW) == 0) {
-    //     continue;
-    //   }
+    /* TODO: Fix selection for filled in curves. */
+#if 0
+    if (!hit) {
+      /* check if we selected the inside of a filled curve */
+      MaterialGPencilStyle *gp_style = BKE_gpencil_material_settings(ob, gps->mat_nr + 1);
+      if ((gp_style->flag & GP_MATERIAL_FILL_SHOW) == 0) {
+        continue;
+      }
 
-    //   whole = gpencil_stroke_fill_isect_rect(region, gps, gps_iter.diff_mat, box);
-    // }
-
+      whole = gpencil_stroke_fill_isect_rect(region, gps, gps_iter.diff_mat, box);
+    }
+#endif
     /* select the entire curve */
     if (strokemode || whole) {
       const int sel_op_result = ED_select_op_action_deselected(sel_op, any_select, hit || whole);
