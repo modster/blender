@@ -46,8 +46,6 @@
 
 #include "lineart_intern.h"
 
-extern LineartSharedResource lineart_share;
-
 #ifdef LINEART_WITH_BAKE
 
 static int lineart_gpencil_update_strokes_exec(bContext *C, wmOperator *UNUSED(op))
@@ -138,7 +136,7 @@ static int lineart_gpencil_bake_strokes_invoke(bContext *C,
                 /* Wait till it's done. */
               }
 
-              ED_lineart_chain_clear_picked_flag(lineart_share.render_buffer_shared);
+              ED_lineart_chain_clear_picked_flag(lineart_share.render_buffer);
 
               frame_updated = true;
             }
@@ -150,7 +148,7 @@ static int lineart_gpencil_bake_strokes_invoke(bContext *C,
               cleared = 1;
             }
 
-            rb = lineart_share.render_buffer_shared;
+            rb = lineart_share.render_buffer;
 
             if (rb->fuzzy_everything) {
               use_types = LRT_EDGE_FLAG_CONTOUR;

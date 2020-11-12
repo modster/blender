@@ -202,8 +202,7 @@ typedef struct LineartChainRegisterEntry {
 typedef struct LineartRenderBuffer {
   struct LineartRenderBuffer *prev, *next;
 
-  /** For render. */
-  int is_copied;
+  int thread_count;
 
   int w, h;
   int tile_size_w, tile_size_h;
@@ -273,7 +272,6 @@ typedef struct LineartRenderBuffer {
   int max_occlusion_level;
   double crease_angle;
   double crease_cos;
-  int thread_count;
 
   int draw_material_preview;
   double material_transparency;
@@ -288,7 +286,7 @@ typedef struct LineartRenderBuffer {
   bool allow_boundaries;
   bool remove_doubles;
 
-  /** Keep an copy of these data so the scene can be freed when lineart is runnning. */
+  /** Keep an copy of these data so when line art is running it's self-contained. */
   bool cam_is_persp;
   float cam_obmat[4][4];
   double camera_pos[3];
@@ -298,6 +296,9 @@ typedef struct LineartRenderBuffer {
   float chaining_image_threshold;
   float chaining_geometry_threshold;
   float angle_splitting_threshold;
+
+  /** For showing the progress with mouse cursor and stuff. */
+  wmWindow *main_window;
 } LineartRenderBuffer;
 
 typedef enum eLineartRenderStatus {
@@ -321,65 +322,6 @@ typedef enum eLineartModifierSyncStatus {
   LRT_SYNC_CLEARING = 4,
 } eLineartModifierSyncStatus;
 
-typedef struct LineartSharedResource {
-
-  /* We only allocate once for all */
-  LineartRenderBuffer *render_buffer_shared;
-
-  /* Don't put this in render buffer as the checker function doesn't have rb pointer, this design
-   * is for performance. */
-  char allow_overlapping_edges;
-
-  /* cache */
-  struct BLI_mempool *mp_sample;
-  struct BLI_mempool *mp_line_strip;
-  struct BLI_mempool *mp_line_strip_point;
-  struct BLI_mempool *mp_batch_list;
-
-  struct TaskPool *background_render_task;
-  struct TaskPool *pending_render_task;
-
-  eLineartInitStatus init_complete;
-
-  /** To bypass or cancel rendering.
-   * This status flag should be kept in lineart_share not render_buffer,
-   * because render_buffer will get re-initialized every frame.
-   */
-  SpinLock lock_render_status;
-  eLineartRenderStatus flag_render_status;
-  eLineartModifierSyncStatus flag_sync_staus;
-  /** count of pending modifiers that is waiting for the data. */
-  int customers;
-
-  int thread_count;
-
-  /** To determine whether all threads are completely canceled. Each thread add 1 into this value
-   * before return, until it reaches thread count. Not needed for the implementation at the moment
-   * as occlusion thread is work-and-wait, preserved for future usages. */
-  int canceled_thread_accumulator;
-
-  /** Geometry loading is done in the worker thread,
-   * Lock the render thread until loading is done, so that
-   * we can avoid depsgrapgh deleting the scene before
-   * LRT finishes loading. Also keep this in lineart_share.
-   */
-  SpinLock lock_loader;
-
-  /** When drawing in the viewport, use the following values. */
-  /** Set to override to -1 before creating lineart render buffer to use scene camera. */
-  int viewport_camera_override;
-  char camera_is_persp;
-  float camera_pos[3];
-  float near_clip, far_clip;
-  float viewinv[4][4];
-  float persp[4][4];
-  float viewquat[4];
-
-  /* Use these to set cursor and progress. */
-  wmWindowManager *wm;
-  wmWindow *main_window;
-} LineartSharedResource;
-
 #define DBL_TRIANGLE_LIM 1e-8
 #define DBL_EDGE_LIM 1e-9
 
@@ -400,6 +342,8 @@ typedef enum eLineartTriangleFlags {
 #define LRT_THREAD_LINE_COUNT 1000
 
 typedef struct LineartRenderTaskInfo {
+  struct LineartRenderBuffer *rb;
+
   int thread_id;
 
   LineartRenderLine *contour;
@@ -590,8 +534,7 @@ struct LineartGpencilModifierData;
 void ED_lineart_init_locks(void);
 struct LineartRenderBuffer *ED_lineart_create_render_buffer(
     struct Scene *s, struct LineartGpencilModifierData *lmd);
-void ED_lineart_destroy_render_data(void);
-void ED_lineart_destroy_render_data_external(void);
+void ED_lineart_destroy_render_data(struct LineartGpencilModifierData *lmd);
 
 int ED_lineart_object_collection_usage_check(struct Collection *c, struct Object *o);
 
@@ -604,9 +547,6 @@ void ED_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshold
 int ED_lineart_chain_count(const LineartRenderLineChain *rlc);
 void ED_lineart_chain_clear_picked_flag(struct LineartRenderBuffer *rb);
 
-void ED_lineart_calculation_flag_set(eLineartRenderStatus flag);
-bool ED_lineart_calculation_flag_check(eLineartRenderStatus flag);
-
 void ED_lineart_modifier_sync_flag_set(eLineartModifierSyncStatus flag, bool is_from_modifier);
 bool ED_lineart_modifier_sync_flag_check(eLineartModifierSyncStatus flag);
 void ED_lineart_modifier_sync_add_customer(void);
@@ -614,11 +554,7 @@ void ED_lineart_modifier_sync_remove_customer(void);
 bool ED_lineart_modifier_sync_still_has_customer(void);
 
 int ED_lineart_compute_feature_lines_internal(struct Depsgraph *depsgraph,
-                                              struct LineartGpencilModifierData *lmd,
-                                              const int show_frame_progress);
-
-void ED_lineart_compute_feature_lines_background(struct Depsgraph *dg,
-                                                 const int show_frame_progress);
+                                              struct LineartGpencilModifierData *lmd);
 
 struct Scene;
 
@@ -634,7 +570,8 @@ struct bGPDlayer;
 struct bGPDframe;
 struct GpencilModifierData;
 
-void ED_lineart_gpencil_generate(struct Depsgraph *depsgraph,
+void ED_lineart_gpencil_generate(LineartRenderBuffer *rb,
+                                 struct Depsgraph *depsgraph,
                                  Object *gpencil_object,
                                  float (*gp_obmat_inverse)[4],
                                  struct bGPDlayer *UNUSED(gpl),
@@ -654,7 +591,8 @@ void ED_lineart_gpencil_generate(struct Depsgraph *depsgraph,
                                  const char *vgname,
                                  int modifier_flags);
 
-void ED_lineart_gpencil_generate_with_type(struct Depsgraph *depsgraph,
+void ED_lineart_gpencil_generate_with_type(LineartRenderBuffer *rb,
+                                           struct Depsgraph *depsgraph,
                                            struct Object *ob,
                                            struct bGPDlayer *gpl,
                                            struct bGPDframe *gpf,
@@ -679,8 +617,6 @@ void ED_lineart_post_frame_update_external(struct bContext *C,
                                            struct Scene *s,
                                            struct Depsgraph *dg,
                                            bool from_modifier);
-
-void ED_lineart_update_render_progress(int nr, const char *info);
 
 float ED_lineart_chain_compute_length(LineartRenderLineChain *rlc);
 

@@ -870,4 +870,7 @@ typedef struct LineartGpencilModifierData {
 
   int _pad;
 
+  /* Runtime only. */
+  void *render_buffer;
+
 } LineartGpencilModifierData;

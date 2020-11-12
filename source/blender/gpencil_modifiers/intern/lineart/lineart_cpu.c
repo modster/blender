@@ -76,8 +76,6 @@
 
 #include "lineart_intern.h"
 
-extern LineartSharedResource lineart_share;
-
 /* static function declarations. */
 
 static LineartBoundingArea *linear_bounding_areat_first_possible(LineartRenderBuffer *rb,
@@ -392,7 +390,7 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb,
 
 static void lineart_occlusion_worker(TaskPool *__restrict UNUSED(pool), LineartRenderTaskInfo *rti)
 {
-  LineartRenderBuffer *rb = lineart_share.render_buffer_shared;
+  LineartRenderBuffer *rb = rti->rb;
   LineartRenderLine *lip;
 
   while (lineart_occlusion_make_task_info(rb, rti)) {
@@ -401,47 +399,27 @@ static void lineart_occlusion_worker(TaskPool *__restrict UNUSED(pool), LineartR
       lineart_occlusion_single_line(rb, lip, rti->thread_id);
     }
 
-    /* Monitoring cancelation flag every once a while. */
-    if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
-      return;
-    }
-
     for (lip = (void *)rti->crease; lip && lip != rti->crease_end; lip = lip->next) {
       lineart_occlusion_single_line(rb, lip, rti->thread_id);
-    }
-
-    if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
-      return;
     }
 
     for (lip = (void *)rti->intersection; lip && lip != rti->intersection_end; lip = lip->next) {
       lineart_occlusion_single_line(rb, lip, rti->thread_id);
     }
 
-    if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
-      return;
-    }
-
     for (lip = (void *)rti->material; lip && lip != rti->material_end; lip = lip->next) {
       lineart_occlusion_single_line(rb, lip, rti->thread_id);
-    }
-    if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
-      return;
     }
 
     for (lip = (void *)rti->edge_mark; lip && lip != rti->edge_mark_end; lip = lip->next) {
       lineart_occlusion_single_line(rb, lip, rti->thread_id);
-    }
-
-    if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
-      return;
     }
   }
 }
 
 static void lineart_main_occlusion_begin(LineartRenderBuffer *rb)
 {
-  int thread_count = lineart_share.thread_count;
+  int thread_count = rb->thread_count;
   LineartRenderTaskInfo *rti = MEM_callocN(sizeof(LineartRenderTaskInfo) * thread_count,
                                            "Task Pool");
   int i;
@@ -456,6 +434,7 @@ static void lineart_main_occlusion_begin(LineartRenderBuffer *rb)
 
   for (i = 0; i < thread_count; i++) {
     rti[i].thread_id = i;
+    rti[i].rb = rb;
     BLI_task_pool_push(tp, (TaskRunFunction)lineart_occlusion_worker, &rti[i], 0, NULL);
   }
   BLI_task_pool_work_and_wait(tp);
@@ -1529,11 +1508,6 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       CanFindFreestyle = 1;
     }
 
-    if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
-      LRT_MESH_FINISH
-      return;
-    }
-
     orv = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartRenderVert) * bm->totvert);
     ort = lineart_mem_aquire(&rb->render_data_pool, bm->totface * rb->triangle_size);
 
@@ -1741,39 +1715,28 @@ static void lineart_main_load_geometries(
   double proj[4][4], view[4][4], result[4][4];
   float inv[4][4];
 
-  /* lock becore accessing shared status data. */
-  BLI_spin_lock(&lineart_share.lock_render_status);
-
   memset(rb->material_pointers, 0, sizeof(void *) * 2048);
 
-  if (lineart_share.viewport_camera_override) {
-    copy_m4d_m4(proj, lineart_share.persp);
-    invert_m4_m4(inv, lineart_share.viewinv);
-    copy_m4_m4_db(rb->view_projection, proj);
-  }
-  else {
-    Camera *cam = camera->data;
-    float sensor = BKE_camera_sensor_size(cam->sensor_fit, cam->sensor_x, cam->sensor_y);
-    double fov = focallength_to_fov(cam->lens, sensor);
+  Camera *cam = camera->data;
+  float sensor = BKE_camera_sensor_size(cam->sensor_fit, cam->sensor_x, cam->sensor_y);
+  double fov = focallength_to_fov(cam->lens, sensor);
 
-    double asp = ((double)rb->w / (double)rb->h);
+  double asp = ((double)rb->w / (double)rb->h);
 
-    if (cam->type == CAM_PERSP) {
-      if (asp < 1) {
-        fov /= asp;
-      }
-      lineart_matrix_perspective_44d(proj, fov, asp, cam->clip_start, cam->clip_end);
+  if (cam->type == CAM_PERSP) {
+    if (asp < 1) {
+      fov /= asp;
     }
-    else if (cam->type == CAM_ORTHO) {
-      double w = cam->ortho_scale / 2;
-      lineart_matrix_ortho_44d(proj, -w, w, -w / asp, w / asp, cam->clip_start, cam->clip_end);
-    }
-    invert_m4_m4(inv, rb->cam_obmat);
-    mul_m4db_m4db_m4fl_uniq(result, proj, inv);
-    copy_m4_m4_db(proj, result);
-    copy_m4_m4_db(rb->view_projection, proj);
+    lineart_matrix_perspective_44d(proj, fov, asp, cam->clip_start, cam->clip_end);
   }
-  BLI_spin_unlock(&lineart_share.lock_render_status);
+  else if (cam->type == CAM_ORTHO) {
+    double w = cam->ortho_scale / 2;
+    lineart_matrix_ortho_44d(proj, -w, w, -w / asp, w / asp, cam->clip_start, cam->clip_end);
+  }
+  invert_m4_m4(inv, rb->cam_obmat);
+  mul_m4db_m4db_m4fl_uniq(result, proj, inv);
+  copy_m4_m4_db(proj, result);
+  copy_m4_m4_db(rb->view_projection, proj);
 
   unit_m4_db(view);
 
@@ -1793,10 +1756,6 @@ static void lineart_main_load_geometries(
     int usage = ED_lineart_object_collection_usage_check(scene->master_collection, ob);
 
     lineart_geometry_object_load(depsgraph, ob, view, proj, rb, usage, &global_i);
-
-    if (ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
-      return;
-    }
   }
   DEG_OBJECT_ITER_END;
 }
@@ -1824,12 +1783,16 @@ static bool lineart_another_edge_2v(const LineartRenderTriangle *rt,
   return false;
 }
 
+/* We put this here so we don't need to pass another extra pointer to lineart_edge_from_triangle()
+ * which is very frequently called. */
+static bool _lineart_allow_overlapping_edges;
+
 static int lineart_edge_from_triangle(const LineartRenderTriangle *rt, const LineartRenderLine *rl)
 {
   if (rl->tl == rt || rl->tr == rt) {
     return 1;
   }
-  if (lineart_share.allow_overlapping_edges) {
+  if (_lineart_allow_overlapping_edges) {
 #define LRT_TRI_SAME_POINT(rt, i, pt) \
   ((LRT_DOUBLE_CLOSE_ENOUGH(rt->v[i]->gloc[0], pt->gloc[0]) && \
     LRT_DOUBLE_CLOSE_ENOUGH(rt->v[i]->gloc[1], pt->gloc[1]) && \
@@ -2467,19 +2430,8 @@ static void lineart_main_get_view_vector(LineartRenderBuffer *rb)
   float inv[4][4];
   float obmat_no_scale[4][4];
 
-  BLI_spin_lock(&lineart_share.lock_render_status);
-  if (lineart_share.viewport_camera_override) {
-    if (lineart_share.camera_is_persp) {
-      invert_m4_m4(inv, lineart_share.viewinv);
-    }
-    else {
-      quat_to_mat4(inv, lineart_share.viewquat);
-    }
-  }
-  else {
-    copy_m4_m4(obmat_no_scale, rb->cam_obmat);
-  }
-  BLI_spin_unlock(&lineart_share.lock_render_status);
+  copy_m4_m4(obmat_no_scale, rb->cam_obmat);
+
   normalize_v3(obmat_no_scale[0]);
   normalize_v3(obmat_no_scale[1]);
   normalize_v3(obmat_no_scale[2]);
@@ -2492,9 +2444,8 @@ static void lineart_main_get_view_vector(LineartRenderBuffer *rb)
 
 /* Buffer operations. */
 
-static void lineart_destroy_render_data(void)
+static void lineart_destroy_render_data(LineartRenderBuffer *rb)
 {
-  LineartRenderBuffer *rb = lineart_share.render_buffer_shared;
   if (rb == NULL) {
     return;
   }
@@ -2527,19 +2478,18 @@ static void lineart_destroy_render_data(void)
   BLI_spin_end(&rb->lock_cuts);
   BLI_spin_end(&rb->render_data_pool.lock_mem);
 
-  BLI_spin_end(lineart_share.lock_render_status);
-
   lineart_mem_destroy(&rb->render_data_pool);
 }
 
-void ED_lineart_destroy_render_data(void)
+void ED_lineart_destroy_render_data(LineartGpencilModifierData *lmd)
 {
+  LineartRenderBuffer *rb = lmd->render_buffer;
 
-  lineart_destroy_render_data();
-  LineartRenderBuffer *rb = lineart_share.render_buffer_shared;
+  lineart_destroy_render_data(rb);
+
   if (rb) {
     MEM_freeN(rb);
-    lineart_share.render_buffer_shared = NULL;
+    lmd->render_buffer = NULL;
   }
 
   if (G.debug_value == 4000) {
@@ -2547,63 +2497,31 @@ void ED_lineart_destroy_render_data(void)
   }
 }
 
-void ED_lineart_destroy_render_data_external(void)
-{
-  while (ED_lineart_calculation_flag_check(LRT_RENDER_RUNNING)) {
-    /* Wait to finish, XXX: should cancel here. */
-  }
-
-  BLI_spin_lock(&lineart_share.lock_render_status);
-  TaskPool *tp_read = lineart_share.background_render_task;
-  BLI_spin_unlock(&lineart_share.lock_render_status);
-
-  if (tp_read) {
-    BLI_task_pool_work_and_wait(lineart_share.background_render_task);
-    BLI_task_pool_free(lineart_share.background_render_task);
-    lineart_share.background_render_task = NULL;
-  }
-
-  ED_lineart_destroy_render_data();
-}
-
 LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene, LineartGpencilModifierData *lmd)
 {
-  /* Re-init render_buffer_shared. */
-  if (lineart_share.render_buffer_shared) {
-    ED_lineart_destroy_render_data_external();
-  }
-
   LineartRenderBuffer *rb = MEM_callocN(sizeof(LineartRenderBuffer), "Line Art render buffer");
 
-  lineart_share.render_buffer_shared = rb;
-  if (lineart_share.viewport_camera_override) {
-    copy_v3db_v3fl(rb->camera_pos, lineart_share.camera_pos);
-    rb->cam_is_persp = lineart_share.camera_is_persp;
-    rb->near_clip = lineart_share.near_clip;
-    rb->far_clip = lineart_share.far_clip;
-    rb->shift_x = rb->shift_y = 0.0f;
-  }
-  else {
-    if (!scene || !scene->camera) {
-      return NULL;
-    }
-    Camera *c = scene->camera->data;
-    double clipping_offset = 0;
-    if (lmd->calculation_flags & LRT_ALLOW_CLIPPING_BOUNDARIES) {
-      clipping_offset = 0.0001;
-    }
-    copy_v3db_v3fl(rb->camera_pos, scene->camera->obmat[3]);
-    copy_m4_m4(rb->cam_obmat, scene->camera->obmat);
-    rb->cam_is_persp = (c->type == CAM_PERSP);
-    rb->near_clip = c->clip_start + clipping_offset;
-    rb->far_clip = c->clip_end - clipping_offset;
-    rb->w = scene->r.xsch;
-    rb->h = scene->r.ysch;
+  lmd->render_buffer = rb;
 
-    double asp = ((double)rb->w / (double)rb->h);
-    rb->shift_x = (asp >= 1) ? c->shiftx : c->shiftx * asp;
-    rb->shift_y = (asp <= 1) ? c->shifty : c->shifty * asp;
+  if (!scene || !scene->camera) {
+    return NULL;
   }
+  Camera *c = scene->camera->data;
+  double clipping_offset = 0;
+  if (lmd->calculation_flags & LRT_ALLOW_CLIPPING_BOUNDARIES) {
+    clipping_offset = 0.0001;
+  }
+  copy_v3db_v3fl(rb->camera_pos, scene->camera->obmat[3]);
+  copy_m4_m4(rb->cam_obmat, scene->camera->obmat);
+  rb->cam_is_persp = (c->type == CAM_PERSP);
+  rb->near_clip = c->clip_start + clipping_offset;
+  rb->far_clip = c->clip_end - clipping_offset;
+  rb->w = scene->r.xsch;
+  rb->h = scene->r.ysch;
+
+  double asp = ((double)rb->w / (double)rb->h);
+  rb->shift_x = (asp >= 1) ? c->shiftx : c->shiftx * asp;
+  rb->shift_y = (asp <= 1) ? c->shifty : c->shifty * asp;
 
   rb->crease_threshold = cos(M_PI - lmd->crease_threshold);
   rb->angle_splitting_threshold = lmd->angle_splitting_threshold;
@@ -2625,92 +2543,18 @@ LineartRenderBuffer *ED_lineart_create_render_buffer(Scene *scene, LineartGpenci
   BLI_spin_init(&rb->lock_cuts);
   BLI_spin_init(&rb->render_data_pool.lock_mem);
 
-  lineart_share.allow_overlapping_edges = (lmd->calculation_flags & LRT_ALLOW_OVERLAPPING_EDGES) !=
-                                          0;
-
-  BLI_spin_lock(&lineart_share.lock_render_status);
-  lineart_share.background_render_task = lineart_share.pending_render_task;
-  lineart_share.pending_render_task = NULL;
-  BLI_spin_unlock(&lineart_share.lock_render_status);
+  /* this is a global variable, see lineart_edge_from_triangle(). */
+  _lineart_allow_overlapping_edges = (lmd->calculation_flags & LRT_ALLOW_OVERLAPPING_EDGES) != 0;
 
   return rb;
 }
 
-void ED_lineart_init_locks()
+static int lineart_triangle_size_get(const Scene *scene, LineartRenderBuffer *rb)
 {
-  if (!(lineart_share.init_complete & LRT_INIT_LOCKS)) {
-    BLI_spin_init(&lineart_share.lock_render_status);
-    lineart_share.init_complete |= LRT_INIT_LOCKS;
+  if (rb->thread_count == 0) {
+    rb->thread_count = BKE_render_num_threads(&scene->r);
   }
-}
-
-void ED_lineart_calculation_flag_set(eLineartRenderStatus flag)
-{
-  BLI_spin_lock(&lineart_share.lock_render_status);
-
-  if (flag == LRT_RENDER_FINISHED && lineart_share.flag_render_status == LRT_RENDER_INCOMPELTE) {
-    ; /* Don't set the finished flag when it'scene canceled from any one of the thread.*/
-  }
-  else {
-    lineart_share.flag_render_status = flag;
-  }
-
-  BLI_spin_unlock(&lineart_share.lock_render_status);
-}
-
-bool ED_lineart_calculation_flag_check(eLineartRenderStatus flag)
-{
-  bool match;
-  BLI_spin_lock(&lineart_share.lock_render_status);
-  match = (lineart_share.flag_render_status == flag);
-  BLI_spin_unlock(&lineart_share.lock_render_status);
-  return match;
-}
-
-static int lineart_occlusion_get_max_level(Depsgraph *dg)
-{
-  LineartGpencilModifierData *lmd;
-  int max_occ = 0;
-  int max;
-  int mode = DEG_get_mode(dg);
-
-  DEG_OBJECT_ITER_BEGIN (dg,
-                         ob,
-                         DEG_ITER_OBJECT_FLAG_LINKED_DIRECTLY | DEG_ITER_OBJECT_FLAG_VISIBLE |
-                             DEG_ITER_OBJECT_FLAG_DUPLI | DEG_ITER_OBJECT_FLAG_LINKED_VIA_SET) {
-    if (ob->type == OB_GPENCIL) {
-      Object *use_ob = ob->id.orig_id ? (Object *)ob->id.orig_id : ob;
-      LISTBASE_FOREACH (GpencilModifierData *, md, &use_ob->greasepencil_modifiers) {
-        if (md->type == eGpencilModifierType_Lineart) {
-          if (mode == DAG_EVAL_RENDER) {
-            if (!(md->mode & eGpencilModifierMode_Render)) {
-              continue;
-            }
-          }
-          else {
-            if (!(md->mode & eGpencilModifierMode_Realtime)) {
-              continue;
-            }
-          }
-          lmd = (LineartGpencilModifierData *)md;
-          max = MAX2(lmd->level_start, lmd->level_end);
-          max_occ = MAX2(max, max_occ);
-        }
-      }
-    }
-  }
-  DEG_OBJECT_ITER_END;
-
-  return max_occ;
-}
-
-static int lineart_triangle_size_get(const Scene *scene)
-{
-  if (lineart_share.thread_count == 0) {
-    lineart_share.thread_count = BKE_render_num_threads(&scene->r);
-  }
-  return sizeof(LineartRenderTriangle) +
-         (sizeof(LineartRenderLine *) * lineart_share.thread_count);
+  return sizeof(LineartRenderTriangle) + (sizeof(LineartRenderLine *) * (rb->thread_count));
 }
 
 static void lineart_main_bounding_area_make_initial(LineartRenderBuffer *rb)
@@ -3307,7 +3151,6 @@ static void lineart_main_add_triangles(LineartRenderBuffer *rb)
   int i, lim;
   int x1, x2, y1, y2;
   int r, co;
-  int temp_count = 0;
 
   LISTBASE_FOREACH (LineartRenderElementLinkNode *, reln, &rb->triangle_buffer_pointers) {
     rt = reln->pointer;
@@ -3329,12 +3172,8 @@ static void lineart_main_add_triangles(LineartRenderBuffer *rb)
                                                 (!(rt->flags & LRT_TRIANGLE_NO_INTERSECTION)));
           }
         }
-        temp_count++;
       } /* else throw away. */
       rt = (void *)(((unsigned char *)rt) + rb->triangle_size);
-      if ((!(temp_count % 1000)) && ED_lineart_calculation_flag_check(LRT_RENDER_CANCELING)) {
-        return;
-      }
     }
   }
 }
@@ -3639,36 +3478,21 @@ static LineartBoundingArea *linear_bounding_areat_first_possible(LineartRenderBu
 
 /** Parent thread locking should be done before this very function is called. */
 int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph,
-                                              LineartGpencilModifierData *lmd,
-                                              const int show_frame_progress)
+                                              LineartGpencilModifierData *lmd)
 {
   LineartRenderBuffer *rb;
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
   int intersections_only = 0; /* Not used right now, but preserve for future. */
 
-  ED_lineart_init_locks();
-
   if (!scene->camera) {
     return OPERATOR_CANCELLED;
   }
 
-#define LRT_PROGRESS(progress, message) \
-  if (show_frame_progress) { \
-    ED_lineart_update_render_progress(progress, message); \
-  }
-
   rb = ED_lineart_create_render_buffer(scene, lmd);
 
-  /* Has to be set after render buffer creation, to avoid locking from editor undo. */
-  ED_lineart_calculation_flag_set(LRT_RENDER_RUNNING);
-
-  lineart_share.render_buffer_shared = rb;
-
-  rb->triangle_size = lineart_triangle_size_get(scene);
+  rb->triangle_size = lineart_triangle_size_get(scene, rb);
 
   rb->max_occlusion_level = MAX2(lmd->level_start, lmd->level_end);
-
-  LRT_PROGRESS(0, "LRT: Loading geometries.");
 
   lineart_main_get_view_vector(rb);
   lineart_main_load_geometries(
@@ -3676,11 +3500,8 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph,
 
   if (!rb->vertex_buffer_pointers.first) {
     /* Nothing loaded, early return. */
-    LRT_PROGRESS(100, "LRT: Finished.");
     return OPERATOR_FINISHED;
   }
-
-  LRT_PROGRESS(10, "LRT: Culling.");
 
   lineart_main_bounding_area_make_initial(rb);
 
@@ -3691,17 +3512,11 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph,
 
   lineart_main_perspective_division(rb);
 
-  LRT_PROGRESS(25, "LRT: Intersections.");
-
   lineart_main_add_triangles(rb);
-
-  LRT_PROGRESS(50, "LRT: Occlusion.");
 
   if (!intersections_only) {
     lineart_main_occlusion_begin(rb);
   }
-
-  LRT_PROGRESS(75, "LRT: Chaining.");
 
   /* intersection_only is preserved for furure functions.*/
   if (!intersections_only) {
@@ -3729,43 +3544,16 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph,
     }
   }
 
-  LRT_PROGRESS(100, "LRT: Finished.");
-
-#undef LRT_PROGRESS
   if (G.debug_value == 4000) {
     lineart_count_and_print_render_buffer_memory(rb);
   }
-
-  ED_lineart_calculation_flag_set(LRT_RENDER_FINISHED);
 
   ED_lineart_chain_clear_picked_flag(rb);
 
   return OPERATOR_FINISHED;
 }
 
-typedef struct LRT_FeatureLineWorker {
-  Depsgraph *dg;
-  int intersection_only;
-  int show_frame_progress;
-} LRT_FeatureLineWorker;
-
 /* Grease Pencil bindings. */
-
-static void lineart_gpencil_notify_targets(Depsgraph *dg)
-{
-  DEG_OBJECT_ITER_BEGIN (dg,
-                         ob,
-                         DEG_ITER_OBJECT_FLAG_LINKED_DIRECTLY | DEG_ITER_OBJECT_FLAG_VISIBLE |
-                             DEG_ITER_OBJECT_FLAG_DUPLI | DEG_ITER_OBJECT_FLAG_LINKED_VIA_SET) {
-    if (ob->type == OB_GPENCIL) {
-      if (BKE_gpencil_modifiers_findby_type(ob, eGpencilModifierType_Lineart)) {
-        bGPdata *gpd = ((Object *)ob->id.orig_id)->data;
-        DEG_id_tag_update(&gpd->id, ID_RECALC_GEOMETRY);
-      }
-    }
-  }
-  DEG_OBJECT_ITER_END;
-}
 
 static int lineart_rb_line_types(LineartRenderBuffer *rb)
 {
@@ -3778,7 +3566,8 @@ static int lineart_rb_line_types(LineartRenderBuffer *rb)
   return types;
 }
 
-void ED_lineart_gpencil_generate(Depsgraph *depsgraph,
+void ED_lineart_gpencil_generate(LineartRenderBuffer *rb,
+                                 Depsgraph *depsgraph,
                                  Object *gpencil_object,
                                  float (*gp_obmat_inverse)[4],
                                  bGPDlayer *UNUSED(gpl),
@@ -3798,8 +3587,6 @@ void ED_lineart_gpencil_generate(Depsgraph *depsgraph,
                                  const char *vgname,
                                  int modifier_flags)
 {
-  LineartRenderBuffer *rb = lineart_share.render_buffer_shared;
-
   if (rb == NULL) {
     if (G.debug_value == 4000) {
       printf("NULL Lineart rb!\n");
@@ -3951,11 +3738,10 @@ void ED_lineart_gpencil_generate(Depsgraph *depsgraph,
   if (G.debug_value == 4000) {
     printf("LRT: Generated %d strokes.\n", stroke_count);
   }
-  /* release render lock so cache is free to be manipulated. */
-  BLI_spin_unlock(&lineart_share.lock_render_status);
 }
 
-void ED_lineart_gpencil_generate_with_type(Depsgraph *depsgraph,
+void ED_lineart_gpencil_generate_with_type(LineartRenderBuffer *rb,
+                                           Depsgraph *depsgraph,
                                            Object *ob,
                                            bGPDlayer *gpl,
                                            bGPDframe *gpf,
@@ -4003,7 +3789,8 @@ void ED_lineart_gpencil_generate_with_type(Depsgraph *depsgraph,
   }
   float gp_obmat_inverse[4][4];
   invert_m4_m4(gp_obmat_inverse, ob->obmat);
-  ED_lineart_gpencil_generate(depsgraph,
+  ED_lineart_gpencil_generate(rb,
+                              depsgraph,
                               ob,
                               gp_obmat_inverse,
                               gpl,
@@ -4022,26 +3809,4 @@ void ED_lineart_gpencil_generate_with_type(Depsgraph *depsgraph,
                               source_vgname,
                               vgname,
                               modifier_flags);
-}
-
-void ED_lineart_update_render_progress(int nr, const char *info)
-{
-  /* WM_cursor_set() and WM_cursor_time() should not be called in a background thread, need an
-   * alternative way of showing the progress. */
-  if (lineart_share.main_window) {
-    if (nr == 100) {
-      /* just setting WM_CURSOR_DEFAULT doesn't seem to work on linux. */
-      /* WM_cursor_set(lineart_share.main_window, WM_CURSOR_NW_ARROW);. */
-    }
-    else {
-      /* WM_cursor_time(lineart_share.main_window, nr);. */
-      WM_progress_set(lineart_share.main_window, (float)nr / 100);
-    }
-  }
-
-  if (G.debug_value == 4000) {
-    if (info) {
-      printf("%s\n", info);
-    }
-  }
 }

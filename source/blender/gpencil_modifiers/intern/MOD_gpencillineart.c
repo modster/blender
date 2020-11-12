@@ -67,8 +67,6 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
-LineartSharedResource lineart_share;
-
 static void initData(GpencilModifierData *md)
 {
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
@@ -98,6 +96,7 @@ static void generate_strokes_actual(
   }
 
   ED_lineart_gpencil_generate_with_type(
+      lmd->render_buffer,
       depsgraph,
       ob,
       gpl,
@@ -142,8 +141,6 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
   bGPdata *gpd = ob->data;
 
-  Scene *s = DEG_get_evaluated_scene(depsgraph);
-
   /* Guard early, don't trigger calculation when no gpencil frame is present. Probably should
    * disable in the isModifierDisabled() function but we need addtional arg for depsgraph and
    * gpd. */
@@ -158,18 +155,16 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
     return;
   }
 
-  bool is_render = (DEG_get_mode(depsgraph) == DAG_EVAL_RENDER);
-
   /* Check all parameters required are filled. */
   if (isModifierDisabled(md)) {
     return;
   }
 
-  ED_lineart_compute_feature_lines_internal(depsgraph, lmd, 1);
+  ED_lineart_compute_feature_lines_internal(depsgraph, lmd);
 
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
 
-  ED_lineart_destroy_render_data();
+  ED_lineart_destroy_render_data(lmd);
 
   WM_main_add_notifier(NA_EDITED | NC_GPENCIL, NULL);
 }
@@ -182,7 +177,6 @@ static void bakeModifier(Main *UNUSED(bmain),
 
   bGPdata *gpd = ob->data;
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
-  Scene *scene = DEG_get_evaluated_scene(depsgraph);
 
   bGPDlayer *gpl = BKE_gpencil_layer_get_by_name(gpd, lmd->target_layer, 1);
   if (gpl == NULL) {
@@ -193,11 +187,11 @@ static void bakeModifier(Main *UNUSED(bmain),
     return;
   }
 
-  ED_lineart_compute_feature_lines_internal(depsgraph, lmd, 1);
+  ED_lineart_compute_feature_lines_internal(depsgraph, lmd);
 
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
 
-  ED_lineart_destroy_render_data();
+  ED_lineart_destroy_render_data(lmd);
 }
 
 static bool isDisabled(GpencilModifierData *md, int UNUSED(userRenderParams))
@@ -244,10 +238,9 @@ static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, 
   walk(userData, ob, (ID **)&lmd->source_object, IDWALK_CB_NOP);
 }
 
-static void panel_draw(const bContext *C, Panel *panel)
+static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
-  Scene *scene = CTX_data_scene(C);
 
   PointerRNA ob_ptr;
   PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
