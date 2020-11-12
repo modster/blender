@@ -76,6 +76,11 @@ static void initData(GpencilModifierData *md)
   lmd->thickness = 25;
   lmd->opacity = 1.0f;
   lmd->flags |= LRT_GPENCIL_MATCH_OUTPUT_VGROUP;
+  lmd->crease_threshold = DEG2RAD(140.0f);
+  lmd->calculation_flags |= (LRT_ALLOW_DUPLI_OBJECTS | LRT_REMOVE_DOUBLES);
+  lmd->angle_splitting_threshold = DEG2RAD(60.0f);
+  lmd->chaining_geometry_threshold = 0.001f;
+  lmd->chaining_image_threshold = 0.001f;
 }
 
 static void copyData(const GpencilModifierData *md, GpencilModifierData *target)

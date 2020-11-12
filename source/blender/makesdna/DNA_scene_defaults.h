@@ -237,16 +237,6 @@
   }
   
 
-
-#define _DNA_DEFAULT_SceneLineArt \
-  { \
-    .crease_threshold = DEG2RAD(140.0f),\
-    .angle_splitting_threshold = DEG2RAD(60.0f),\
-    .chaining_geometry_threshold = 0.001f,\
-    .chaining_image_threshold = 0.001f,\
-  }
-
-
 #define _DNA_DEFAULT_Scene \
   { \
     .cursor = _DNA_DEFAULT_View3DCursor, \
@@ -260,7 +250,6 @@
     .safe_areas = _DNA_DEFAULT_DisplaySafeAreas, \
  \
     .eevee = _DNA_DEFAULT_SceneEEVEE, \
-    .lineart = _DNA_DEFAULT_SceneLineArt, \
   }
 
 /** \} */

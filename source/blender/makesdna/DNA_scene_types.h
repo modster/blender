@@ -1685,24 +1685,6 @@ typedef enum eLineartMainFlags {
   LRT_REMOVE_DOUBLES = (1 << 14),
 } eLineartMainFlags;
 
-typedef struct SceneLineArt {
-  int flags;
-
-  /** line_types is used to select line types in global scope, especially when Fuzzy chaining is
-   * enabled. See DNA_lineart_types.h for edge flags.
-   */
-  int line_types;
-
-  /* Shared */
-  /** Reserved for suggestive contour */
-  float contour_fade;
-
-  /* Baking */
-  int baking_preview_start;
-  int baking_preview_end;
-  int baking_skip; /* 0 for every frame, 1 for every other frame and so on. */
-} SceneLineArt;
-
 typedef struct SceneGpencil {
   float smaa_threshold;
   char _pad[4];
@@ -1840,7 +1822,6 @@ typedef struct Scene {
   struct SceneDisplay display;
   struct SceneEEVEE eevee;
   struct SceneGpencil grease_pencil_settings;
-  struct SceneLineArt lineart;
 } Scene;
 
 /* **************** RENDERDATA ********************* */

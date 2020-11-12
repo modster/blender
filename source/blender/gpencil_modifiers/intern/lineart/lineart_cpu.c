@@ -3718,7 +3718,6 @@ int ED_lineart_compute_feature_lines_internal(Depsgraph *depsgraph, const int sh
 {
   LineartRenderBuffer *rb;
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
-  SceneLineArt *lineart = &scene->lineart;
   int intersections_only = 0; /* Not used right now, but preserve for future. */
 
   if ((lineart->flags & LRT_AUTO_UPDATE) == 0 || !scene->camera) {

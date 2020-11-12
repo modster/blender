@@ -1138,16 +1138,5 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
    * \note Keep this message at the bottom of the function.
    */
   {
-
-    if (!DNA_struct_find(fd->filesdna, "SceneLineArt")) {
-      LISTBASE_FOREACH (Scene *, sc, &bmain->scenes) {
-        sc->lineart.crease_threshold = DEG2RAD(140.0f);
-        sc->lineart.line_types |= LRT_EDGE_FLAG_ALL_TYPE;
-        sc->lineart.flags |= (LRT_ALLOW_DUPLI_OBJECTS | LRT_REMOVE_DOUBLES);
-        sc->lineart.angle_splitting_threshold = DEG2RAD(60.0f);
-        sc->lineart.chaining_geometry_threshold = 0.001f;
-        sc->lineart.chaining_image_threshold = 0.001f;
-      }
-    }
   }
 }

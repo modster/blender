@@ -70,7 +70,6 @@ static int lineart_gpencil_bake_strokes_invoke(bContext *C,
                                                const wmEvent *UNUSED(event))
 {
   Scene *scene = CTX_data_scene(C);
-  SceneLineArt *lineart = &scene->lineart;
   Depsgraph *dg = CTX_data_depsgraph_pointer(C);
   int frame;
   int frame_begin = ((lineart->flags & LRT_BAKING_FINAL_RANGE) ? MAX2(scene->r.sfra, 1) :
