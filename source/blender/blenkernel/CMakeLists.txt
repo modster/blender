@@ -39,7 +39,7 @@ set(INC
   ../sequencer
   ../shader_fx
   ../simulation
-  ../render/extern/include
+  ../render
   ../../../intern/ghost
   ../../../intern/glew-mx
   ../../../intern/guardedalloc
@@ -211,7 +211,7 @@ set(SRC
   intern/pbvh.c
   intern/pbvh_bmesh.c
   intern/pointcache.c
-  intern/pointcloud.c
+  intern/pointcloud.cc
   intern/preferences.c
   intern/report.c
   intern/rigidbody.c
@@ -710,7 +710,7 @@ endif()
 
 # # Warnings as errors, this is too strict!
 # if(MSVC)
-#    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /WX")
+#    string(APPEND CMAKE_C_FLAGS " /WX")
 # endif()
 
 blender_add_lib(bf_blenkernel "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
