@@ -127,7 +127,7 @@ Nurb *ED_curve_add_nurbs_primitive(
   float fac;
   int a, b;
   const float grid = 1.0f;
-  const int cutype = (type & CU_TYPE);  // poly, bezier, nurbs, etc
+  const int cutype = (type & CU_TYPE); /* poly, bezier, nurbs, etc */
   const int stype = (type & CU_PRIMITIVE);
 
   unit_m4(umat);
@@ -141,7 +141,7 @@ Nurb *ED_curve_add_nurbs_primitive(
   BKE_nurbList_flag_set(editnurb, SELECT, false);
 
   /* these types call this function to return a Nurb */
-  if (stype != CU_PRIM_TUBE && stype != CU_PRIM_DONUT) {
+  if (!ELEM(stype, CU_PRIM_TUBE, CU_PRIM_DONUT)) {
     nu = (Nurb *)MEM_callocN(sizeof(Nurb), "addNurbprim");
     nu->type = cutype;
     nu->resolu = cu->resolu;
@@ -397,8 +397,8 @@ Nurb *ED_curve_add_nurbs_primitive(
       break;
     case CU_PRIM_SPHERE: /* sphere */
       if (cutype == CU_NURBS) {
-        const float tmp_cent[3] = {0.f, 0.f, 0.f};
-        const float tmp_vec[3] = {0.f, 0.f, 1.f};
+        const float tmp_cent[3] = {0.0f, 0.0f, 0.0f};
+        const float tmp_vec[3] = {0.0f, 0.0f, 1.0f};
 
         nu->pntsu = 5;
         nu->pntsv = 1;
@@ -451,8 +451,8 @@ Nurb *ED_curve_add_nurbs_primitive(
       break;
     case CU_PRIM_DONUT: /* torus */
       if (cutype == CU_NURBS) {
-        const float tmp_cent[3] = {0.f, 0.f, 0.f};
-        const float tmp_vec[3] = {0.f, 0.f, 1.f};
+        const float tmp_cent[3] = {0.0f, 0.0f, 0.0f};
+        const float tmp_vec[3] = {0.0f, 0.0f, 1.0f};
 
         xzproj = 1;
         nu = ED_curve_add_nurbs_primitive(C, obedit, mat, CU_NURBS | CU_PRIM_CIRCLE, 0);
@@ -508,7 +508,10 @@ Nurb *ED_curve_add_nurbs_primitive(
 
 static int curvesurf_prim_add(bContext *C, wmOperator *op, int type, int isSurf)
 {
-  Object *obedit = CTX_data_edit_object(C);
+  struct Main *bmain = CTX_data_main(C);
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  Object *obedit = OBEDIT_FROM_VIEW_LAYER(view_layer);
   ListBase *editnurb;
   Nurb *nu;
   bool newob = false;
@@ -565,7 +568,7 @@ static int curvesurf_prim_add(bContext *C, wmOperator *op, int type, int isSurf)
 
   /* userdef */
   if (newob && !enter_editmode) {
-    ED_object_editmode_exit(C, EM_FREEDATA);
+    ED_object_editmode_exit_ex(bmain, scene, obedit, EM_FREEDATA);
   }
 
   WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obedit);

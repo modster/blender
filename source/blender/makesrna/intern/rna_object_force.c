@@ -26,6 +26,7 @@
 #include "DNA_object_types.h"
 #include "DNA_particle_types.h"
 #include "DNA_pointcache_types.h"
+#include "DNA_rigidbody_types.h"
 #include "DNA_scene_types.h"
 
 #include "RNA_define.h"
@@ -777,7 +778,18 @@ static char *rna_EffectorWeight_path(PointerRNA *ptr)
     }
   }
   else {
-    Object *ob = (Object *)ptr->owner_id;
+    ID *id = ptr->owner_id;
+
+    if (id && GS(id->name) == ID_SCE) {
+      const Scene *scene = (Scene *)id;
+      const RigidBodyWorld *rbw = scene->rigidbody_world;
+
+      if (rbw->effector_weights == ew) {
+        return BLI_strdup("rigidbody_world.effector_weights");
+      }
+    }
+
+    Object *ob = (Object *)id;
     ModifierData *md;
 
     /* check softbody modifier */
@@ -2019,7 +2031,8 @@ static void rna_def_softbody(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "use_estimate_matrix", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "solverflags", SBSO_ESTIMATEIPO);
-  RNA_def_property_ui_text(prop, "Estimate Matrix", "Estimate matrix... split to COM, ROT, SCALE");
+  RNA_def_property_ui_text(
+      prop, "Estimate Transforms", "Store the estimated transforms in the soft body settings");
 
   /***********************************************************************************/
   /* these are not exactly settings, but reading calculated results*/
@@ -2035,7 +2048,7 @@ static void rna_def_softbody(BlenderRNA *brna)
   prop = RNA_def_property(srna, "rotation_estimate", PROP_FLOAT, PROP_MATRIX);
   RNA_def_property_float_sdna(prop, NULL, "lrot");
   RNA_def_property_multi_array(prop, 2, rna_matrix_dimsize_3x3);
-  RNA_def_property_ui_text(prop, "Rot Matrix", "Estimated rotation matrix");
+  RNA_def_property_ui_text(prop, "Rotation Matrix", "Estimated rotation matrix");
 
   prop = RNA_def_property(srna, "scale_estimate", PROP_FLOAT, PROP_MATRIX);
   RNA_def_property_float_sdna(prop, NULL, "lscale");

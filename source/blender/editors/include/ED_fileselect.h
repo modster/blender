@@ -35,6 +35,7 @@ struct SpaceFile;
 struct bContext;
 struct bScreen;
 struct uiBlock;
+struct wmOperator;
 struct wmWindow;
 struct wmWindowManager;
 
@@ -145,11 +146,15 @@ void ED_fileselect_window_params_get(const struct wmWindow *win,
                                      int win_size[2],
                                      bool *is_maximized);
 
+struct ScrArea *ED_fileselect_handler_area_find(const struct wmWindow *win,
+                                                const struct wmOperator *file_operator);
+
 int ED_path_extension_type(const char *path);
 int ED_file_extension_icon(const char *path);
 
 void ED_file_read_bookmarks(void);
 
+void ED_file_change_dir_ex(struct bContext *C, struct bScreen *screen, struct ScrArea *area);
 void ED_file_change_dir(struct bContext *C);
 
 void ED_file_path_button(struct bScreen *screen,

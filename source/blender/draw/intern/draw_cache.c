@@ -159,7 +159,7 @@ void DRW_shape_cache_free(void)
 GPUBatch *drw_cache_procedural_points_get(void)
 {
   if (!SHC.drw_procedural_verts) {
-    /* TODO(fclem) get rid of this dummy VBO. */
+    /* TODO(fclem): get rid of this dummy VBO. */
     GPUVertFormat format = {0};
     GPU_vertformat_attr_add(&format, "dummy", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
     GPUVertBuf *vbo = GPU_vertbuf_create_with_format(&format);
@@ -173,7 +173,7 @@ GPUBatch *drw_cache_procedural_points_get(void)
 GPUBatch *drw_cache_procedural_lines_get(void)
 {
   if (!SHC.drw_procedural_lines) {
-    /* TODO(fclem) get rid of this dummy VBO. */
+    /* TODO(fclem): get rid of this dummy VBO. */
     GPUVertFormat format = {0};
     GPU_vertformat_attr_add(&format, "dummy", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
     GPUVertBuf *vbo = GPU_vertbuf_create_with_format(&format);
@@ -187,7 +187,7 @@ GPUBatch *drw_cache_procedural_lines_get(void)
 GPUBatch *drw_cache_procedural_triangles_get(void)
 {
   if (!SHC.drw_procedural_tris) {
-    /* TODO(fclem) get rid of this dummy VBO. */
+    /* TODO(fclem): get rid of this dummy VBO. */
     GPUVertFormat format = {0};
     GPU_vertformat_attr_add(&format, "dummy", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
     GPUVertBuf *vbo = GPU_vertbuf_create_with_format(&format);
@@ -1694,8 +1694,8 @@ GPUBatch *DRW_cache_speaker_get(void)
       copy_v3_fl3(v, r, 0.0f, z);
       GPU_vertbuf_attr_set(vbo, attr_id.pos, vidx++, v);
       for (int i = 1; i < segments; i++) {
-        float x = cosf(2.f * (float)M_PI * i / segments) * r;
-        float y = sinf(2.f * (float)M_PI * i / segments) * r;
+        float x = cosf(2.0f * (float)M_PI * i / segments) * r;
+        float y = sinf(2.0f * (float)M_PI * i / segments) * r;
         copy_v3_fl3(v, x, y, z);
         GPU_vertbuf_attr_set(vbo, attr_id.pos, vidx++, v);
         GPU_vertbuf_attr_set(vbo, attr_id.pos, vidx++, v);
@@ -2389,7 +2389,7 @@ GPUBatch *DRW_cache_bone_stick_get(void)
     /* Bone rectangle */
     pos[0] = 0.0f;
     for (int i = 0; i < 6; i++) {
-      pos[1] = (i == 0 || i == 3) ? 0.0f : ((i < 3) ? 1.0f : -1.0f);
+      pos[1] = (ELEM(i, 0, 3)) ? 0.0f : ((i < 3) ? 1.0f : -1.0f);
       flag = ((i < 2 || i > 4) ? POS_HEAD : POS_TAIL) | ((i == 0 || i == 3) ? 0 : COL_WIRE) |
              COL_BONE | POS_BONE;
       GPU_vertbuf_attr_set(vbo, attr_id.pos, v, pos);
@@ -2463,14 +2463,14 @@ static float axis_marker[8][2] = {
     {-1.0f * S_X, -1.0f * S_Y},
     {-1.0f * S_X, 1.0f * S_Y}
 #else /* diamond */
-    {-S_X, 0.f},
-    {0.f, S_Y},
-    {0.f, S_Y},
-    {S_X, 0.f},
-    {S_X, 0.f},
-    {0.f, -S_Y},
-    {0.f, -S_Y},
-    {-S_X, 0.f}
+    {-S_X, 0.0f},
+    {0.0f, S_Y},
+    {0.0f, S_Y},
+    {S_X, 0.0f},
+    {S_X, 0.0f},
+    {0.0f, -S_Y},
+    {0.0f, -S_Y},
+    {-S_X, 0.0f}
 #endif
 };
 #define MARKER_LEN (sizeof(axis_marker) / (sizeof(float[2])))
@@ -3277,6 +3277,12 @@ GPUBatch *DRW_cache_volume_face_wireframe_get(Object *ob)
 {
   BLI_assert(ob->type == OB_VOLUME);
   return DRW_volume_batch_cache_get_wireframes_face(ob->data);
+}
+
+GPUBatch *DRW_cache_volume_selection_surface_get(Object *ob)
+{
+  BLI_assert(ob->type == OB_VOLUME);
+  return DRW_volume_batch_cache_get_selection_surface(ob->data);
 }
 
 /** \} */
