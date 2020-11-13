@@ -84,7 +84,7 @@ void OBJDepsgraph::update_for_newframe()
  * \note Curves are also stored with Meshes if export settings specify so.
  */
 std::pair<Vector<std::unique_ptr<OBJMesh>>, Vector<std::unique_ptr<OBJCurve>>>
-find_exportable_objects(Depsgraph *depsgraph, const OBJExportParams &export_params)
+filter_supported_objects(Depsgraph *depsgraph, const OBJExportParams &export_params)
 {
   Vector<std::unique_ptr<OBJMesh>> r_exportable_meshes;
   Vector<std::unique_ptr<OBJCurve>> r_exportable_nurbs;
@@ -156,7 +156,7 @@ static void write_mesh_objects(Vector<std::unique_ptr<OBJMesh>> exportable_as_me
   /* Smooth groups and UV vertex indices may make huge memory allocations, so they should be freed
    * right after they're written, instead of waiting for #blender::Vector to clean them up after
    * all the objects are exported. */
-  for (Steal<OBJMesh> obj_mesh : exportable_as_mesh) {
+  for (StealUniquePtr<OBJMesh> obj_mesh : exportable_as_mesh) {
     obj_writer.write_object_name(*obj_mesh);
     obj_writer.write_vertex_coords(*obj_mesh);
 
@@ -212,8 +212,8 @@ static void export_frame(Depsgraph *depsgraph,
   //  Vector<std::unique_ptr<OBJMesh>> exportable_as_mesh;
   //  /* NURBS to be exported in parameter form. */
   //  Vector<std::unique_ptr<OBJCurve>> exportable_as_nurbs;
-  auto [exportable_as_mesh, exportable_as_nurbs] = find_exportable_objects(depsgraph,
-                                                                           export_params);
+  auto [exportable_as_mesh, exportable_as_nurbs] = filter_supported_objects(depsgraph,
+                                                                            export_params);
 
   write_mesh_objects(std::move(exportable_as_mesh), frame_writer, export_params);
   write_nurbs_curve_objects(std::move(exportable_as_nurbs), frame_writer);

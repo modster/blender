@@ -34,9 +34,9 @@ namespace blender::io::obj {
 /**
  * Steal elements' ownership in a range-based for-loop.
  */
-template<typename T> struct Steal {
+template<typename T> struct StealUniquePtr {
   std::unique_ptr<T> owning;
-  Steal(std::unique_ptr<T> &owning) : owning(std::move(owning))
+  StealUniquePtr(std::unique_ptr<T> &owning) : owning(std::move(owning))
   {
   }
   T *operator->()
@@ -72,7 +72,7 @@ class OBJMesh;
 class OBJCurve;
 
 std::pair<Vector<std::unique_ptr<OBJMesh>>, Vector<std::unique_ptr<OBJCurve>>>
-find_exportable_objects(Depsgraph *depsgraph, const OBJExportParams &export_params);
+filter_supported_objects(Depsgraph *depsgraph, const OBJExportParams &export_params);
 
 bool append_frame_to_filename(const char *filepath, const int frame, char *r_filepath_with_frames);
 }  // namespace blender::io::obj

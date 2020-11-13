@@ -45,13 +45,13 @@ class OBJCurve : NonCopyable {
   OBJCurve(const Depsgraph *depsgraph, const OBJExportParams &export_params, Object *curve_object);
 
   const char *get_curve_name() const;
-  int tot_nurbs() const;
-  int get_nurbs_points(const int nurb_index) const;
-  float3 get_nurbs_point_coords(const int nurb_index,
-                                const int vert_index,
+  int total_splines() const;
+  int total_nurbs_points(const int spline_index) const;
+  float3 get_nurbs_point_coords(const int spline_index,
+                                const int vertex_index,
                                 const float scaling_factor) const;
-  int get_nurbs_num(const int nurb_index) const;
-  int get_nurbs_degree(const int nurb_index) const;
+  int get_nurbs_num(const int spline_index) const;
+  int get_nurbs_degree(const int spline_index) const;
 
  private:
   void set_world_axes_transform(const eTransformAxisForward forward, const eTransformAxisUp up);

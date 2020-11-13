@@ -403,10 +403,10 @@ void OBJWriter::write_edges_indices(const OBJMesh &obj_mesh_data) const
  */
 void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
 {
-  const int tot_nurbs = obj_nurbs_data.tot_nurbs();
+  const int tot_nurbs = obj_nurbs_data.total_splines();
   for (int i = 0; i < tot_nurbs; i++) {
     /* Total control points in a nurbs. */
-    const int tot_points = obj_nurbs_data.get_nurbs_points(i);
+    const int tot_points = obj_nurbs_data.total_nurbs_points(i);
     for (int point_idx = 0; point_idx < tot_points; point_idx++) {
       const float3 point_coord = obj_nurbs_data.get_nurbs_point_coords(
           i, point_idx, export_params_.scaling_factor);
