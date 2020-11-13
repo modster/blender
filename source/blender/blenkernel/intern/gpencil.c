@@ -155,6 +155,11 @@ static void greasepencil_blend_write(BlendWriter *writer, ID *id, const void *id
           BLO_write_struct_array(writer, bGPDspoint, gps->totpoints, gps->points);
           BLO_write_struct_array(writer, bGPDtriangle, gps->tot_triangles, gps->triangles);
           BKE_defvert_blend_write(writer, gps->totpoints, gps->dvert);
+          if (gps->editcurve != NULL) {
+            bGPDcurve *gpc = gps->editcurve;
+            BLO_write_struct(writer, bGPDcurve, gpc);
+            BLO_write_struct_array(writer, bGPDcurve_point, gpc->tot_curve_points, gpc->curve_points);
+          }
         }
       }
     }
