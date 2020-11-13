@@ -584,7 +584,6 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
 
     /* Calculate controller matrix in world space. */
     wm_xr_controller_pose_to_mat(&((GHOST_XrPose *)controller_pose_action->states)[i], tmp);
-    rotate_m4(tmp, 'X', -90.0f); /* Convert to Z-up coordinates. */
 
     /* Apply eye position and base pose offsets. */
     sub_v3_v3(tmp[3], view_ofs);
