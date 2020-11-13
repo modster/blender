@@ -80,6 +80,7 @@ blender_add_lib(bf_wavefront_obj "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 if(WITH_GTESTS)
   set(TEST_SRC
     tests/obj_exporter_tests.cc
+    tests/obj_exporter_tests.hh
   )
 
   set(TEST_INC
