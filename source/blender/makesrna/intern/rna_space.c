@@ -173,7 +173,7 @@ const EnumPropertyItem rna_enum_space_sequencer_view_type_items[] = {
 
 const EnumPropertyItem rna_enum_space_file_browse_mode_items[] = {
     {FILE_BROWSE_MODE_FILES, "FILES", ICON_FILEBROWSER, "File Browser", ""},
-    {FILE_BROWSE_MODE_ASSETS, "ASSETS", ICON_FUND, "Asset Browser", ""},
+    {FILE_BROWSE_MODE_ASSETS, "ASSETS", ICON_ASSET_MANAGER, "Asset Browser", ""},
     {0, NULL, 0, NULL, NULL},
 };
 
