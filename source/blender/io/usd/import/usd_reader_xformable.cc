@@ -57,10 +57,9 @@ void USDXformableReader::set_object_transform(const double time)
     return;
   }
 
-  bool is_constant = false;
   float transform_from_usd[4][4];
 
-  this->read_matrix(transform_from_usd, time, this->context_.import_params.scale, is_constant);
+  this->read_matrix(transform_from_usd, time, this->context_.import_params.scale);
 
   /* Apply the matrix to the object. */
   BKE_object_apply_mat4(object_, transform_from_usd, true, false);
@@ -71,18 +70,14 @@ void USDXformableReader::set_object_transform(const double time)
 
 void USDXformableReader::read_matrix(float r_mat[4][4] /* local matrix */,
                                      const double time,
-                                     const float scale,
-                                     bool &is_constant)
+                                     const float scale) const
 {
   pxr::UsdGeomXformable xformable(prim_);
 
   if (!xformable) {
     unit_m4(r_mat);
-    is_constant = true;
     return;
   }
-
-  /* TODO(makowalski):  Check for constant transform. */
 
   pxr::GfMatrix4d usd_local_xf;
   bool reset_xform_stack;

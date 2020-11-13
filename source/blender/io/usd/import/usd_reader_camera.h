@@ -36,6 +36,8 @@ class USDCameraReader : public USDXformableReader {
   bool valid() const override;
 
   void create_object(Main *bmain, double time) override;
+
+  void read_matrix(float r_mat[4][4], const double time, const float scale) const override;
 };
 
 }  // namespace blender::io::usd

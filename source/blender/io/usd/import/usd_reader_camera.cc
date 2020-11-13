@@ -25,6 +25,10 @@
 #include "BKE_camera.h"
 #include "BKE_object.h"
 
+#include "BLI_math_base.h"
+#include "BLI_math_matrix.h"
+#include "BLI_math_rotation.h"
+
 #include <iostream>
 
 namespace blender::io::usd {
@@ -84,6 +88,8 @@ void USDCameraReader::create_object(Main *bmain, double time)
   const float v_film_offset = usd_cam.GetVerticalApertureOffset();
   const float film_aspect = apperture_x / apperture_y;
 
+  bcam->type = usd_cam.GetProjection() == pxr::GfCamera::Perspective ? CAM_PERSP : CAM_ORTHO;
+
   bcam->lens = usd_cam.GetFocalLength();
 
   bcam->sensor_x = apperture_x;
@@ -100,6 +106,21 @@ void USDCameraReader::create_object(Main *bmain, double time)
   bcam->dof.aperture_fstop = usd_cam.GetFStop();
 
   this->object_->data = bcam;
+}
+
+void USDCameraReader::read_matrix(float r_mat[4][4] /* local matrix */,
+                                  const double time,
+                                  const float scale) const
+{
+  USDXformableReader::read_matrix(r_mat, time, scale);
+
+  /* Conveting from y-up to z-up requires adjusting
+   * the camera rotation. */
+  if (this->context_.stage_up_axis == pxr::UsdGeomTokens->y) {
+    float camera_rotation[4][4];
+    axis_angle_to_mat4_single(camera_rotation, 'X', M_PI_2);
+    mul_m4_m4m4(r_mat, r_mat, camera_rotation);
+  }
 }
 
 }  // namespace blender::io::usd

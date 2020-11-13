@@ -91,7 +91,7 @@ class USDXformableReader : public USDPrimReader {
 
   void set_object_transform(const double time);
 
-  void read_matrix(float r_mat[4][4], const double time, const float scale, bool &is_constant);
+  virtual void read_matrix(float r_mat[4][4], const double time, const float scale) const;
 };
 
 } /* namespace blender::io::usd */
