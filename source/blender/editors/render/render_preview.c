@@ -354,13 +354,15 @@ static ID *duplicate_ids(ID *id, bool allow_failure)
     case ID_TE:
     case ID_LA:
     case ID_WO: {
+      BLI_assert(BKE_previewimg_id_supports_jobs(id));
       ID *id_copy = BKE_id_copy_ex(
           NULL, id, NULL, LIB_ID_CREATE_LOCAL | LIB_ID_COPY_LOCALIZE | LIB_ID_COPY_NO_ANIMDATA);
       return id_copy;
     }
+    /* These support threading, but don't need duplicating. */
     case ID_IM:
     case ID_BR:
-    case ID_SCR:
+      BLI_assert(BKE_previewimg_id_supports_jobs(id));
       return NULL;
     default:
       if (!allow_failure) {
@@ -1556,6 +1558,8 @@ void ED_preview_shader_job(const bContext *C,
   ShaderPreview *sp;
   Scene *scene = CTX_data_scene(C);
   short id_type = GS(id->name);
+
+  BLI_assert(BKE_previewimg_id_supports_jobs(id));
 
   /* Use workspace render only for buttons Window,
    * since the other previews are related to the datablock. */

@@ -370,6 +370,11 @@ PreviewImage *BKE_previewimg_id_ensure(ID *id)
   return NULL;
 }
 
+bool BKE_previewimg_id_supports_jobs(const ID *id)
+{
+  return ELEM(GS(id->name), ID_OB, ID_MA, ID_TE, ID_LA, ID_WO, ID_IM, ID_BR);
+}
+
 PreviewImage *BKE_previewimg_cached_get(const char *name)
 {
   return BLI_ghash_lookup(gCachedPreviews, name);

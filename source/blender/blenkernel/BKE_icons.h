@@ -131,6 +131,8 @@ void BKE_previewimg_clear_single(struct PreviewImage *prv, enum eIconSizes size)
 struct PreviewImage **BKE_previewimg_id_get_p(const struct ID *id);
 struct PreviewImage *BKE_previewimg_id_get(const struct ID *id);
 
+bool BKE_previewimg_id_supports_jobs(const struct ID *id);
+
 /* free the preview image belonging to the id */
 void BKE_previewimg_id_free(struct ID *id);
 

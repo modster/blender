@@ -1384,8 +1384,12 @@ void ui_icon_ensure_deferred(const bContext *C, const int icon_id, const bool bi
   }
 }
 
-/* only called when icon has changed */
-/* only call with valid pointer from UI_icon_draw */
+/**
+ * * Only call with valid pointer from UI_icon_draw.
+ * * Only called when icon has changed.
+ *
+ * Note that if an ID doesn't support jobs for preview creation, \a use_job will be ignored.
+ */
 static void icon_set_image(const bContext *C,
                            Scene *scene,
                            ID *id,
@@ -1408,7 +1412,7 @@ static void icon_set_image(const bContext *C,
   const bool delay = prv_img->rect[size] != NULL;
   icon_create_rect(prv_img, size);
 
-  if (use_job) {
+  if (use_job && BKE_previewimg_id_supports_jobs(id)) {
     /* Job (background) version */
     ED_preview_icon_job(
         C, prv_img, id, prv_img->rect[size], prv_img->w[size], prv_img->h[size], delay);
@@ -1937,6 +1941,9 @@ static void ui_id_preview_image_render_size(
   }
 }
 
+/**
+ * Note that if an ID doesn't support jobs for preview creation, \a use_job will be ignored.
+ */
 void UI_icon_render_id(const bContext *C, Scene *scene, ID *id, const bool big, const bool use_job)
 {
   PreviewImage *pi = BKE_previewimg_id_ensure(id);
