@@ -336,6 +336,7 @@ static bool wm_xr_select_raycast(bContext *C,
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   ViewContext vc;
   ED_view3d_viewcontext_init(C, &vc, depsgraph);
+  vc.em = (vc.obedit && (vc.obedit->type == OB_MESH)) ? BKE_editmesh_from_object(vc.obedit) : NULL;
 
   float location[3];
   float normal[3];
@@ -365,103 +366,99 @@ static bool wm_xr_select_raycast(bContext *C,
   bool hit = false;
   bool changed = false;
 
-  if (ob && BKE_object_is_in_editmode(ob)) {
-    vc.em = BKE_editmesh_from_object(ob);
+  if (ob && vc.em && (ob->id.orig_id == &vc.obedit->id)) { /* TODO_XR: Non-mesh objects. */
+    BMesh *bm = vc.em->bm;
+    BMFace *f = NULL;
+    BMEdge *e = NULL;
+    BMVert *v = NULL;
 
-    if (vc.em) {
-      BMesh *bm = vc.em->bm;
-      BMFace *f = NULL;
-      BMEdge *e = NULL;
-      BMVert *v = NULL;
+    if (index != -1) {
+      ToolSettings *ts = vc.scene->toolsettings;
+      float co[3];
+      f = BM_face_at_index(bm, index);
 
-      if (index != -1) {
-        ToolSettings *ts = vc.scene->toolsettings;
-        float co[3];
-        f = BM_face_at_index(bm, index);
-
-        if ((ts->selectmode & SCE_SELECT_VERTEX) != 0) {
-          /* Find nearest vertex. */
-          float dist_max = *ray_dist;
-          float dist;
-          BMLoop *l = f->l_first;
-          for (int i = 0; i < f->len; ++i, l = l->next) {
-            mul_v3_m4v3(co, obmat, l->v->co);
-            if ((dist = len_manhattan_v3v3(location, co)) < dist_max) {
-              v = l->v;
-              dist_max = dist;
-            }
-          }
-          if (v) {
-            hit = true;
+      if ((ts->selectmode & SCE_SELECT_VERTEX) != 0) {
+        /* Find nearest vertex. */
+        float dist_max = *ray_dist;
+        float dist;
+        BMLoop *l = f->l_first;
+        for (int i = 0; i < f->len; ++i, l = l->next) {
+          mul_v3_m4v3(co, obmat, l->v->co);
+          if ((dist = len_manhattan_v3v3(location, co)) < dist_max) {
+            v = l->v;
+            dist_max = dist;
           }
         }
-        if ((ts->selectmode & SCE_SELECT_EDGE) != 0) {
-          /* Find nearest edge. */
-          float dist_max = *ray_dist;
-          float dist;
-          BMLoop *l = f->l_first;
-          for (int i = 0; i < f->len; ++i, l = l->next) {
-            add_v3_v3v3(co, l->e->v1->co, l->e->v2->co);
-            mul_v3_fl(co, 0.5f);
-            mul_m4_v3(obmat, co);
-            if ((dist = len_manhattan_v3v3(location, co)) < dist_max) {
-              e = l->e;
-              dist_max = dist;
-            }
-          }
-          if (e) {
-            hit = true;
-          }
-        }
-        if ((ts->selectmode & SCE_SELECT_FACE) != 0) {
+        if (v) {
           hit = true;
         }
-        else {
-          f = NULL;
-        }
       }
-
-      if (!hit) {
-        if (deselect_all && (select_op == SEL_OP_SET)) {
-          changed = EDBM_mesh_deselect_all_multi(C);
-        }
-      }
-      else {
-        bool set_v = false;
-        bool set_e = false;
-        bool set_f = false;
-
-        if (v) {
-          wm_xr_select_op_apply(v, bm, XR_SEL_VERTEX, select_op, &changed, &set_v);
+      if ((ts->selectmode & SCE_SELECT_EDGE) != 0) {
+        /* Find nearest edge. */
+        float dist_max = *ray_dist;
+        float dist;
+        BMLoop *l = f->l_first;
+        for (int i = 0; i < f->len; ++i, l = l->next) {
+          add_v3_v3v3(co, l->e->v1->co, l->e->v2->co);
+          mul_v3_fl(co, 0.5f);
+          mul_m4_v3(obmat, co);
+          if ((dist = len_manhattan_v3v3(location, co)) < dist_max) {
+            e = l->e;
+            dist_max = dist;
+          }
         }
         if (e) {
-          wm_xr_select_op_apply(e, bm, XR_SEL_EDGE, select_op, &changed, &set_e);
-        }
-        if (f) {
-          wm_xr_select_op_apply(f, bm, XR_SEL_FACE, select_op, &changed, &set_f);
-        }
-
-        if (set_v || set_e || set_f) {
-          EDBM_mesh_deselect_all_multi(C);
-          if (set_v) {
-            BM_vert_select_set(bm, v, true);
-          }
-          if (set_e) {
-            BM_edge_select_set(bm, e, true);
-          }
-          if (set_f) {
-            BM_face_select_set(bm, f, true);
-          }
+          hit = true;
         }
       }
-
-      if (changed) {
-        DEG_id_tag_update((ID *)vc.obedit->data, ID_RECALC_SELECT);
-        WM_event_add_notifier(C, NC_GEOM | ND_SELECT, vc.obedit->data);
+      if ((ts->selectmode & SCE_SELECT_FACE) != 0) {
+        hit = true;
+      }
+      else {
+        f = NULL;
       }
     }
+
+    if (!hit) {
+      if (deselect_all && (select_op == SEL_OP_SET)) {
+        changed = EDBM_mesh_deselect_all_multi(C);
+      }
+    }
+    else {
+      bool set_v = false;
+      bool set_e = false;
+      bool set_f = false;
+
+      if (v) {
+        wm_xr_select_op_apply(v, bm, XR_SEL_VERTEX, select_op, &changed, &set_v);
+      }
+      if (e) {
+        wm_xr_select_op_apply(e, bm, XR_SEL_EDGE, select_op, &changed, &set_e);
+      }
+      if (f) {
+        wm_xr_select_op_apply(f, bm, XR_SEL_FACE, select_op, &changed, &set_f);
+      }
+
+      if (set_v || set_e || set_f) {
+        EDBM_mesh_deselect_all_multi(C);
+        if (set_v) {
+          BM_vert_select_set(bm, v, true);
+        }
+        if (set_e) {
+          BM_edge_select_set(bm, e, true);
+        }
+        if (set_f) {
+          BM_face_select_set(bm, f, true);
+        }
+      }
+    }
+
+    if (changed) {
+      DEG_id_tag_update((ID *)vc.obedit->data, ID_RECALC_SELECT);
+      WM_event_add_notifier(C, NC_GEOM | ND_SELECT, vc.obedit->data);
+    }
   }
-  else if (vc.obedit) {
+  else if (vc.em) {
     if (deselect_all && (select_op == SEL_OP_SET)) {
       changed = EDBM_mesh_deselect_all_multi(C);
     }
