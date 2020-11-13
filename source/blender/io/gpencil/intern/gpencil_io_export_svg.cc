@@ -252,7 +252,7 @@ void GpencilExporterSVG::export_gpencil_layers(void)
           continue;
         }
         /* Duplicate the stroke to apply any layer thickness change. */
-        bGPDstroke *gps_duplicate = BKE_gpencil_stroke_duplicate(gps, true);
+        bGPDstroke *gps_duplicate = BKE_gpencil_stroke_duplicate(gps, true, false);
 
         gps_current_set(ob, gps_duplicate, true);
 
@@ -287,7 +287,7 @@ void GpencilExporterSVG::export_gpencil_layers(void)
 
               /* Sample stroke. */
               if (params_.stroke_sample > 0.0f) {
-                BKE_gpencil_stroke_sample(gps_perimeter, params_.stroke_sample, false);
+                BKE_gpencil_stroke_sample(gpd_eval, gps_perimeter, params_.stroke_sample, false);
               }
 
               export_stroke_to_path(gpl_node, false);
@@ -440,7 +440,7 @@ void GpencilExporterSVG::export_stroke_to_polyline(pugi::xml_node gpl_node, cons
   }
 
   /* Get the thickness in pixels using a simple 1 point stroke. */
-  bGPDstroke *gps_temp = BKE_gpencil_stroke_duplicate(gps, false);
+  bGPDstroke *gps_temp = BKE_gpencil_stroke_duplicate(gps, false, false);
   gps_temp->totpoints = 1;
   gps_temp->points = (bGPDspoint *)MEM_callocN(sizeof(bGPDspoint), "gp_stroke_points");
   bGPDspoint *pt_src = &gps->points[0];

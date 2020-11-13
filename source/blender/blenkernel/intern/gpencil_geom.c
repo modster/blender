@@ -3104,7 +3104,7 @@ static ListBase *gpencil_stroke_perimeter_ex(const bGPdata *gpd,
  * \return: bGPDstroke pointer to stroke perimeter
  */
 bGPDstroke *BKE_gpencil_stroke_perimeter_from_view(struct RegionView3D *rv3d,
-                                                   const bGPdata *gpd,
+                                                   bGPdata *gpd,
                                                    const bGPDlayer *gpl,
                                                    bGPDstroke *gps,
                                                    int subdivisions,
@@ -3113,7 +3113,7 @@ bGPDstroke *BKE_gpencil_stroke_perimeter_from_view(struct RegionView3D *rv3d,
   if (gps->totpoints == 0) {
     return NULL;
   }
-  bGPDstroke *gps_temp = BKE_gpencil_stroke_duplicate(gps, true);
+  bGPDstroke *gps_temp = BKE_gpencil_stroke_duplicate(gps, true, false);
 
   BKE_gpencil_stroke_to_view_space(rv3d, gps_temp, diff_mat);
   int num_perimeter_points = 0;
@@ -3150,7 +3150,7 @@ bGPDstroke *BKE_gpencil_stroke_perimeter_from_view(struct RegionView3D *rv3d,
   MEM_freeN(perimeter_points);
 
   /* triangles cache needs to be recalculated */
-  BKE_gpencil_stroke_geometry_update(perimeter_stroke);
+  BKE_gpencil_stroke_geometry_update(gpd, perimeter_stroke);
 
   perimeter_stroke->flag |= GP_STROKE_SELECT | GP_STROKE_CYCLIC;
 

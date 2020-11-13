@@ -149,7 +149,7 @@ void BKE_gpencil_stroke_from_view_space(struct RegionView3D *rv3d,
                                         struct bGPDstroke *gps,
                                         float diff_mat[4][4]);
 struct bGPDstroke *BKE_gpencil_stroke_perimeter_from_view(struct RegionView3D *rv3d,
-                                                          const struct bGPdata *gpd,
+                                                          struct bGPdata *gpd,
                                                           const struct bGPDlayer *gpl,
                                                           struct bGPDstroke *gps,
                                                           int subdivisions,
