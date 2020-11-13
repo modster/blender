@@ -184,7 +184,7 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
    * with actual controller geometry. */
   GPUVertFormat *format = immVertexFormat();
   uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
-  GPU_line_width(2.0f);
+  GPU_line_width(3.0f);
 
   immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 
