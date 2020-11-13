@@ -6125,6 +6125,7 @@ class VIEW3D_PT_overlay_geometry(Panel):
         sub = row.row()
         sub.active = overlay.show_wireframes or is_wireframes
         sub.prop(overlay, "wireframe_threshold", text="Wireframe")
+        sub.prop(overlay, "wireframe_opacity", text="Opacity")
 
         row = col.row(align=True)
         if context.mode not in {
