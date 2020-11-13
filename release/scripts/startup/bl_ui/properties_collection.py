@@ -36,7 +36,7 @@ def lineart_make_line_type_entry(col, line_type, text_disp, expand, search_from)
 
 
 class COLLECTION_PT_collection_flags(CollectionButtonsPanel, Panel):
-    bl_label = "Collection Flags"
+    bl_label = "Restrictions"
 
     @classmethod
     def poll(cls, context):
