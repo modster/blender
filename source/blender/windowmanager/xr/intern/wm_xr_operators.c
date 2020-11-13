@@ -704,6 +704,8 @@ static int wm_xr_grab_invoke_3d(bContext *C, wmOperator *op, const wmEvent *even
   }
 
   const wmXrActionData *actiondata = event->customdata;
+  Object *obedit = CTX_data_edit_object(C);
+  BMEditMesh *em = (obedit && (obedit->type == OB_MESH)) ? BKE_editmesh_from_object(obedit) : NULL;
   float tmp0[4], tmp1[4], tmp2[4];
   bool selected = false;
 
@@ -720,48 +722,88 @@ static int wm_xr_grab_invoke_3d(bContext *C, wmOperator *op, const wmEvent *even
     normalize_qt(rot_ofs);
   }
 
-  CTX_DATA_BEGIN (C, Object *, ob, selected_objects) {
-    if (!loc_lock) {
-      if (loc_t > 0.0f) {
-        ob->loc[0] += loc_t * (actiondata->controller_loc[0] - ob->loc[0]);
-        ob->loc[1] += loc_t * (actiondata->controller_loc[1] - ob->loc[1]);
-        ob->loc[2] += loc_t * (actiondata->controller_loc[2] - ob->loc[2]);
-      }
-      if (loc_ofs_set) {
-        add_v3_v3(ob->loc, loc_ofs);
-      }
-    }
-
-    if (!rot_lock) {
-      if (rot_t > 0.0f) {
-        eul_to_quat(tmp1, ob->rot);
-        interp_qt_qtqt(tmp0, tmp1, actiondata->controller_rot, rot_t);
-        if (!rot_ofs_set) {
-          quat_to_eul(ob->rot, tmp0);
+  if (em) { /* TODO_XR: Non-mesh objects. */
+    /* Check for selection. */
+    Scene *scene = CTX_data_scene(C);
+    ToolSettings *ts = scene->toolsettings;
+    BMesh *bm = em->bm;
+    BMIter iter;
+    if ((ts->selectmode & SCE_SELECT_FACE) != 0) {
+      BMFace *f;
+      BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
+        if (BM_elem_flag_test(f, BM_ELEM_SELECT)) {
+          selected = true;
+          break;
         }
       }
-      else if (rot_ofs_set) {
-        eul_to_quat(tmp0, ob->rot);
+    }
+    if (!selected) {
+      if ((ts->selectmode & SCE_SELECT_EDGE) != 0) {
+        BMEdge *e;
+        BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
+          if (BM_elem_flag_test(e, BM_ELEM_SELECT)) {
+            selected = true;
+            break;
+          }
+        }
       }
-      if (rot_ofs_set) {
-        rotation_between_quats_to_quat(tmp1, rot_ofs, tmp0);
-        mul_qt_qtqt(tmp0, rot_ofs, tmp1);
-        normalize_qt(tmp0);
-        mul_qt_qtqt(tmp2, actiondata->controller_rot, tmp1);
-        normalize_qt(tmp2);
-        rotation_between_quats_to_quat(tmp1, tmp0, tmp2);
-
-        mul_qt_qtqt(tmp2, tmp0, tmp1);
-        normalize_qt(tmp2);
-        quat_to_eul(ob->rot, tmp2);
+      if (!selected) {
+        if ((ts->selectmode & SCE_SELECT_VERTEX) != 0) {
+          BMVert *v;
+          BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
+            if (BM_elem_flag_test(v, BM_ELEM_SELECT)) {
+              selected = true;
+              break;
+            }
+          }
+        }
       }
     }
-
-    DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
-
-    selected = true;
   }
-  CTX_DATA_END;
+  else {
+    CTX_DATA_BEGIN (C, Object *, ob, selected_objects) {
+      if (!loc_lock) {
+        if (loc_t > 0.0f) {
+          ob->loc[0] += loc_t * (actiondata->controller_loc[0] - ob->loc[0]);
+          ob->loc[1] += loc_t * (actiondata->controller_loc[1] - ob->loc[1]);
+          ob->loc[2] += loc_t * (actiondata->controller_loc[2] - ob->loc[2]);
+        }
+        if (loc_ofs_set) {
+          add_v3_v3(ob->loc, loc_ofs);
+        }
+      }
+
+      if (!rot_lock) {
+        if (rot_t > 0.0f) {
+          eul_to_quat(tmp1, ob->rot);
+          interp_qt_qtqt(tmp0, tmp1, actiondata->controller_rot, rot_t);
+          if (!rot_ofs_set) {
+            quat_to_eul(ob->rot, tmp0);
+          }
+        }
+        else if (rot_ofs_set) {
+          eul_to_quat(tmp0, ob->rot);
+        }
+        if (rot_ofs_set) {
+          rotation_between_quats_to_quat(tmp1, rot_ofs, tmp0);
+          mul_qt_qtqt(tmp0, rot_ofs, tmp1);
+          normalize_qt(tmp0);
+          mul_qt_qtqt(tmp2, actiondata->controller_rot, tmp1);
+          normalize_qt(tmp2);
+          rotation_between_quats_to_quat(tmp1, tmp0, tmp2);
+
+          mul_qt_qtqt(tmp2, tmp0, tmp1);
+          normalize_qt(tmp2);
+          quat_to_eul(ob->rot, tmp2);
+        }
+      }
+
+      DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
+
+      selected = true;
+    }
+    CTX_DATA_END;
+  }
 
   if (!selected) {
     wm_xr_grab_uninit(op);
@@ -794,6 +836,8 @@ static int wm_xr_grab_modal_3d(bContext *C, wmOperator *op, const wmEvent *event
   XrGrabData *data = op->customdata;
   Scene *scene = CTX_data_scene(C);
   ViewLayer *view_layer = CTX_data_view_layer(C);
+  Object *obedit = CTX_data_edit_object(C);
+  BMEditMesh *em = (obedit && (obedit->type == OB_MESH)) ? BKE_editmesh_from_object(obedit) : NULL;
   wmWindowManager *wm = CTX_wm_manager(C);
   bScreen *screen_anim = ED_screen_animation_playing(wm);
   bool loc_lock, rot_lock;
@@ -805,37 +849,158 @@ static int wm_xr_grab_modal_3d(bContext *C, wmOperator *op, const wmEvent *event
   prop = RNA_struct_find_property(op->ptr, "rotation_lock");
   rot_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
 
-  invert_m4_m4(tmp, data->mat_prev);
-  quat_to_mat4(data->mat_prev, actiondata->controller_rot);
-  copy_v3_v3(data->mat_prev[3], actiondata->controller_loc);
-  mul_m4_m4m4(delta, data->mat_prev, tmp);
-
-  CTX_DATA_BEGIN (C, Object *, ob, selected_objects) {
+  if (em) { /* TODO_XR: Non-mesh objects. */
     if (!loc_lock || !rot_lock) {
-      copy_m4_m4(tmp, ob->obmat);
-      mul_m4_m4m4(ob->obmat, delta, tmp);
+      Scene *scene = CTX_data_scene(C);
+      ToolSettings *ts = scene->toolsettings;
+      BMesh *bm = em->bm;
+      BMIter iter;
+      float tmp0[4][4], tmp1[4][4];
 
-      if (!loc_lock) {
-        copy_v3_v3(ob->loc, ob->obmat[3]);
+      if (rot_lock) {
+        unit_m4(tmp);
+        copy_v3_v3(tmp[3], data->mat_prev[3]);
+        mul_m4_m4m4(tmp0, obedit->imat, tmp);
+        invert_m4(tmp0);
+
+        quat_to_mat4(data->mat_prev, actiondata->controller_rot);
+        copy_v3_v3(data->mat_prev[3], actiondata->controller_loc);
+        copy_v3_v3(tmp[3], data->mat_prev[3]);
+        mul_m4_m4m4(tmp1, obedit->imat, tmp);
+
+        mul_m4_m4m4(delta, tmp1, tmp0);
       }
-      if (!rot_lock) {
-        mat4_to_eul(ob->rot, ob->obmat);
+      else {
+        copy_m4_m4(tmp, data->mat_prev);
+        mul_m4_m4m4(tmp0, obedit->imat, tmp);
+        invert_m4(tmp0);
+
+        quat_to_mat4(data->mat_prev, actiondata->controller_rot);
+        copy_v3_v3(data->mat_prev[3], actiondata->controller_loc);
+        copy_m4_m4(tmp, data->mat_prev);
+        mul_m4_m4m4(tmp1, obedit->imat, tmp);
+
+        mul_m4_m4m4(delta, tmp1, tmp0);
+
+        if (loc_lock) {
+          zero_v3(delta[3]);
+        }
       }
 
-      DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
+      if ((ts->selectmode & SCE_SELECT_VERTEX) != 0) {
+        BMVert *v;
+        BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
+          if (BM_elem_flag_test(v, BM_ELEM_SELECT) &&
+              !BM_elem_flag_test(v, BM_ELEM_INTERNAL_TAG)) {
+            mul_m4_v3(delta, v->co);
+            BM_elem_flag_enable(v, BM_ELEM_INTERNAL_TAG);
+          }
+        }
+      }
+      if ((ts->selectmode & SCE_SELECT_EDGE) != 0) {
+        BMEdge *e;
+        BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
+          if (BM_elem_flag_test(e, BM_ELEM_SELECT)) {
+            if (!BM_elem_flag_test(e->v1, BM_ELEM_INTERNAL_TAG)) {
+              mul_m4_v3(delta, e->v1->co);
+              BM_elem_flag_enable(e->v1, BM_ELEM_INTERNAL_TAG);
+            }
+            if (!BM_elem_flag_test(e->v2, BM_ELEM_INTERNAL_TAG)) {
+              mul_m4_v3(delta, e->v2->co);
+              BM_elem_flag_enable(e->v2, BM_ELEM_INTERNAL_TAG);
+            }
+          }
+        }
+      }
+      if ((ts->selectmode & SCE_SELECT_FACE) != 0) {
+        BMFace *f;
+        BMLoop *l;
+        BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
+          if (BM_elem_flag_test(f, BM_ELEM_SELECT)) {
+            l = f->l_first;
+            for (int i = 0; i < f->len; ++i, l = l->next) {
+              if (!BM_elem_flag_test(l->v, BM_ELEM_INTERNAL_TAG)) {
+                mul_m4_v3(delta, l->v->co);
+                BM_elem_flag_enable(l->v, BM_ELEM_INTERNAL_TAG);
+              }
+            }
+          }
+        }
+      }
+
+      BM_mesh_elem_hflag_disable_all(bm, BM_VERT, BM_ELEM_INTERNAL_TAG, false);
+      EDBM_mesh_normals_update(em);
+      DEG_id_tag_update(&obedit->id, ID_RECALC_GEOMETRY);
     }
-
-    if (screen_anim && autokeyframe_cfra_can_key(scene, &ob->id)) {
-      wm_xr_session_object_autokey(C, scene, view_layer, NULL, ob, true);
+    else {
+      quat_to_mat4(data->mat_prev, actiondata->controller_rot);
+      copy_v3_v3(data->mat_prev[3], actiondata->controller_loc);
     }
 
     selected = true;
   }
-  CTX_DATA_END;
+  else {
+    if (!loc_lock || !rot_lock) {
+      if (rot_lock) {
+        float tmp0[4][4];
+        unit_m4(tmp0);
+        copy_v3_v3(tmp0[3], data->mat_prev[3]);
+        invert_m4_m4(tmp, tmp0);
+
+        quat_to_mat4(data->mat_prev, actiondata->controller_rot);
+        copy_v3_v3(data->mat_prev[3], actiondata->controller_loc);
+        copy_v3_v3(tmp0[3], data->mat_prev[3]);
+
+        mul_m4_m4m4(delta, tmp0, tmp);
+      }
+      else {
+        invert_m4_m4(tmp, data->mat_prev);
+        quat_to_mat4(data->mat_prev, actiondata->controller_rot);
+        copy_v3_v3(data->mat_prev[3], actiondata->controller_loc);
+        mul_m4_m4m4(delta, data->mat_prev, tmp);
+
+        if (loc_lock) {
+          zero_v3(delta[3]);
+        }
+      }
+    }
+    else {
+      quat_to_mat4(data->mat_prev, actiondata->controller_rot);
+      copy_v3_v3(data->mat_prev[3], actiondata->controller_loc);
+    }
+
+    CTX_DATA_BEGIN (C, Object *, ob, selected_objects) {
+      if (!loc_lock || !rot_lock) {
+        copy_m4_m4(tmp, ob->obmat);
+        mul_m4_m4m4(ob->obmat, delta, tmp);
+
+        if (!loc_lock) {
+          copy_v3_v3(ob->loc, ob->obmat[3]);
+        }
+        if (!rot_lock) {
+          mat4_to_eul(ob->rot, ob->obmat);
+        }
+
+        DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
+      }
+
+      if (screen_anim && autokeyframe_cfra_can_key(scene, &ob->id)) {
+        wm_xr_session_object_autokey(C, scene, view_layer, NULL, ob, true);
+      }
+
+      selected = true;
+    }
+    CTX_DATA_END;
+  }
 
   if (!selected || (event->val == KM_RELEASE)) {
     wm_xr_grab_uninit(op);
-    WM_event_add_notifier(C, NC_SCENE | ND_TRANSFORM_DONE, scene);
+    if (obedit && em) {
+      WM_event_add_notifier(C, NC_GEOM | ND_DATA, obedit->data);
+    }
+    else {
+      WM_event_add_notifier(C, NC_SCENE | ND_TRANSFORM_DONE, scene);
+    }
     return OPERATOR_FINISHED;
   }
   else if (event->val == KM_PRESS) {
@@ -845,7 +1010,12 @@ static int wm_xr_grab_modal_3d(bContext *C, wmOperator *op, const wmEvent *event
   /* XR events currently only support press and release. */
   BLI_assert(false);
   wm_xr_grab_uninit(op);
-  WM_event_add_notifier(C, NC_SCENE | ND_TRANSFORM_DONE, scene);
+  if (obedit && em) {
+    WM_event_add_notifier(C, NC_GEOM | ND_DATA, obedit->data);
+  }
+  else {
+    WM_event_add_notifier(C, NC_SCENE | ND_TRANSFORM_DONE, scene);
+  }
   return OPERATOR_FINISHED;
 }
 
