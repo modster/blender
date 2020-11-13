@@ -349,6 +349,7 @@ static ID *duplicate_ids(ID *id, bool allow_failure)
   }
 
   switch (GS(id->name)) {
+    case ID_OB:
     case ID_MA:
     case ID_TE:
     case ID_LA:
@@ -710,7 +711,8 @@ void ED_preview_draw(const bContext *C, void *idp, void *parentp, void *slotp, r
 struct ObjectPreviewData {
   /* The main for the preview, not of the current file. */
   Main *main;
-  /* The original object to create the preview for. */
+  /* Copy of the object to create the preview for. The copy is for thread safety (and to insert it
+   * into an own main). */
   Object *object;
   int sizex;
   int sizey;
@@ -748,20 +750,14 @@ static Scene *object_preview_scene_create(const struct ObjectPreviewData *previe
   ViewLayer *view_layer = scene->view_layers.first;
   Depsgraph *depsgraph = DEG_graph_new(preview_data->main, scene, view_layer, DAG_EVAL_VIEWPORT);
 
-  /* FIXME For now just create a copy of the object for the new main, until we have a better way to
-   * obtain the ID in a different Main (i.e. read from asset file). */
-  Object *preview_object_copy = (Object *)BKE_id_copy(preview_data->main,
-                                                      &preview_data->object->id);
-  if (!preview_object_copy) {
-    BLI_assert(false);
-    return NULL;
-  }
+  BLI_assert(preview_data->object != NULL);
+  BLI_addtail(&preview_data->main->objects, preview_data->object);
 
-  BKE_collection_object_add(preview_data->main, scene->master_collection, preview_object_copy);
+  BKE_collection_object_add(preview_data->main, scene->master_collection, preview_data->object);
 
   Object *camera_object = object_preview_camera_create(preview_data->main,
                                                        view_layer,
-                                                       preview_object_copy,
+                                                       preview_data->object,
                                                        preview_data->sizex,
                                                        preview_data->sizey);
 
@@ -770,7 +766,7 @@ static Scene *object_preview_scene_create(const struct ObjectPreviewData *previe
   scene->r.ysch = preview_data->sizey;
   scene->r.size = 100;
 
-  Base *preview_base = BKE_view_layer_base_find(view_layer, preview_object_copy);
+  Base *preview_base = BKE_view_layer_base_find(view_layer, preview_data->object);
   /* For 'view selected' below. */
   preview_base->flag |= BASE_SELECTED;
 
@@ -791,14 +787,20 @@ static void object_preview_render(IconPreview *preview, IconPreviewSize *preview
   const float pixelsize_old = U.pixelsize;
   char err_out[256] = "unknown";
 
+  BLI_assert(preview->id_copy && (preview->id_copy != preview->id));
+
   struct ObjectPreviewData preview_data = {
       .main = preview_main,
-      .object = (Object *)preview->id,
+      /* Act on a copy. */
+      .object = (Object *)preview->id_copy,
       .sizex = preview_sized->sizex,
       .sizey = preview_sized->sizey,
   };
   Depsgraph *depsgraph;
   Scene *scene = object_preview_scene_create(&preview_data, &depsgraph);
+
+  /* Ownership is now ours. */
+  preview->id_copy = NULL;
 
   U.pixelsize = 2.0f;
 
