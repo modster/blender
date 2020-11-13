@@ -698,11 +698,10 @@ typedef struct MultiplyGpencilModifierData {
   float fading_thickness;
   float fading_opacity;
 
-  /* char _pad[4]; */
 } MultiplyGpencilModifierData;
 
 typedef enum eMultiplyGpencil_Flag {
-  GP_MULTIPLY_ENABLE_ANGLE_SPLITTING = (1 << 1),
+  /* GP_MULTIPLY_ENABLE_ANGLE_SPLITTING = (1 << 1),  Deprecated. */
   GP_MULTIPLY_ENABLE_FADING = (1 << 2),
 } eMultiplyGpencil_Flag;
 
