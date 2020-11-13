@@ -235,7 +235,6 @@
                     SCE_EEVEE_GTAO_BOUNCE | SCE_EEVEE_TAA_REPROJECTION | \
                     SCE_EEVEE_SSR_HALF_RESOLUTION | SCE_EEVEE_SHADOW_SOFT, \
   }
-  
 
 #define _DNA_DEFAULT_Scene \
   { \

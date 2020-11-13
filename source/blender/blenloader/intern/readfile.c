@@ -49,7 +49,6 @@
 #include "DNA_genfile.h"
 #include "DNA_key_types.h"
 #include "DNA_layer_types.h"
-#include "DNA_lineart_types.h"
 #include "DNA_node_types.h"
 #include "DNA_packedFile_types.h"
 #include "DNA_sdna_types.h"

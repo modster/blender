@@ -1138,5 +1138,6 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
    * \note Keep this message at the bottom of the function.
    */
   {
+    /* Keep this block, even when empty. */
   }
 }

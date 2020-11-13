@@ -24,7 +24,6 @@
 #include "DNA_collection_types.h"
 #include "DNA_gpencil_types.h"
 #include "DNA_layer_types.h"
-#include "DNA_lineart_types.h"
 #include "DNA_linestyle_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_particle_types.h"

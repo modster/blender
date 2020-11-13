@@ -138,11 +138,6 @@ void DRW_draw_select_id(struct Depsgraph *depsgraph,
 bool DRW_render_check_grease_pencil(struct Depsgraph *depsgraph);
 void DRW_render_gpencil(struct RenderEngine *engine, struct Depsgraph *depsgraph);
 
-/* Line Art calls */
-#ifdef WITH_LINEART
-void DRW_scene_lineart_freecache(struct Scene *sce);
-#endif
-
 /* This is here because GPUViewport needs it */
 struct DRWInstanceDataList *DRW_instance_data_list_create(void);
 void DRW_instance_data_list_free(struct DRWInstanceDataList *idatalist);
