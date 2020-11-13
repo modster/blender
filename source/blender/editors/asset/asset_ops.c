@@ -69,7 +69,8 @@ static int asset_make_exec(bContext *C, wmOperator *op)
 
   BKE_reportf(op->reports, RPT_INFO, "Data-block '%s' is now an asset", id->name + 2);
 
-  WM_event_add_notifier(C, NC_ID | NA_EDITED, NULL);
+  WM_main_add_notifier(NC_ID | NA_EDITED, NULL);
+  WM_main_add_notifier(NC_ASSET | NA_ADDED, NULL);
 
   return OPERATOR_FINISHED;
 }

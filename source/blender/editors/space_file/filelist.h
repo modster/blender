@@ -101,7 +101,8 @@ FileDirEntry *filelist_entry_find_uuid(struct FileList *filelist, const int uuid
 void filelist_file_cache_slidingwindow_set(struct FileList *filelist, size_t window_size);
 bool filelist_file_cache_block(struct FileList *filelist, const int index);
 
-bool filelist_force_reset(struct FileList *filelist);
+bool filelist_needs_force_reset(struct FileList *filelist);
+void filelist_tag_force_reset(struct FileList *filelist);
 bool filelist_pending(struct FileList *filelist);
 bool filelist_is_ready(struct FileList *filelist);
 

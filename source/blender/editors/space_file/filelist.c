@@ -1749,9 +1749,14 @@ void filelist_setrecursion(struct FileList *filelist, const int recursion_level)
   }
 }
 
-bool filelist_force_reset(struct FileList *filelist)
+bool filelist_needs_force_reset(FileList *filelist)
 {
   return (filelist->flags & FL_FORCE_RESET) != 0;
+}
+
+void filelist_tag_force_reset(FileList *filelist)
+{
+  filelist->flags |= FL_FORCE_RESET;
 }
 
 bool filelist_is_ready(struct FileList *filelist)
@@ -1772,7 +1777,7 @@ bool filelist_pending(struct FileList *filelist)
  */
 int filelist_files_ensure(FileList *filelist)
 {
-  if (!filelist_force_reset(filelist) || !filelist_needs_reading(filelist)) {
+  if (!filelist_needs_force_reset(filelist) || !filelist_needs_reading(filelist)) {
     filelist_sort(filelist);
     filelist_filter(filelist);
   }

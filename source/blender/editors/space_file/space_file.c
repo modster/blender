@@ -306,6 +306,15 @@ static void file_ensure_valid_region_state(bContext *C,
   }
 }
 
+/**
+ * Tag the space to recreate the file-list.
+ */
+static void file_tag_reset_list(ScrArea *area, SpaceFile *sfile)
+{
+  filelist_tag_force_reset(sfile->files);
+  ED_area_tag_refresh(area);
+}
+
 static void file_refresh(const bContext *C, ScrArea *area)
 {
   wmWindowManager *wm = CTX_wm_manager(C);
@@ -350,7 +359,7 @@ static void file_refresh(const bContext *C, ScrArea *area)
   sfile->bookmarknr = fsmenu_get_active_indices(fsmenu, FS_CATEGORY_BOOKMARKS, params->dir);
   sfile->recentnr = fsmenu_get_active_indices(fsmenu, FS_CATEGORY_RECENT, params->dir);
 
-  if (filelist_force_reset(sfile->files)) {
+  if (filelist_needs_force_reset(sfile->files)) {
     filelist_readjob_stop(wm, CTX_data_scene(C));
     filelist_clear(sfile->files);
   }
@@ -413,6 +422,14 @@ static void file_listener(wmWindow *UNUSED(win),
             ED_area_tag_refresh(area);
           }
           break;
+      }
+      break;
+    case NC_ASSET:
+      if (sfile->params && ED_fileselect_is_asset_browser(sfile->params) &&
+          (sfile->params->asset_repository.type == FILE_ASSET_REPO_LOCAL)) {
+        /* Full refresh of the file list if local asset data was changed. Refreshing this view is
+         * cheap and users expect this to be updated immediately. */
+        file_tag_reset_list(area, sfile);
       }
       break;
   }
