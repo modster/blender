@@ -70,16 +70,34 @@ void USDCameraReader::create_object(Main *bmain, double time)
     std::cerr << "Warning: couldn't determine camera name for " << this->prim_path() << std::endl;
   }
 
+  /* TODO(makowalski): The following application of
+   * settings is taken from the ABC importer.  Verify
+   * that this logic makes sense for USD. */
+
   Camera *bcam = static_cast<Camera *>(BKE_camera_add(bmain, cam_name.c_str()));
 
   pxr::GfCamera usd_cam = camera_.GetCamera(time);
 
+  const float apperture_x = usd_cam.GetHorizontalAperture();
+  const float apperture_y = usd_cam.GetVerticalAperture();
+  const float h_film_offset = usd_cam.GetHorizontalApertureOffset();
+  const float v_film_offset = usd_cam.GetVerticalApertureOffset();
+  const float film_aspect = apperture_x / apperture_y;
+
   bcam->lens = usd_cam.GetFocalLength();
 
-  pxr::GfRange1f usd_clip_range = usd_cam.GetClippingRange();
+  bcam->sensor_x = apperture_x;
+  bcam->sensor_y = apperture_y;
 
+  bcam->shiftx = h_film_offset / apperture_x;
+  bcam->shifty = v_film_offset / apperture_y / film_aspect;
+
+  pxr::GfRange1f usd_clip_range = usd_cam.GetClippingRange();
   bcam->clip_start = usd_clip_range.GetMin();
   bcam->clip_end = usd_clip_range.GetMax();
+
+  bcam->dof.focus_distance = usd_cam.GetFocusDistance();
+  bcam->dof.aperture_fstop = usd_cam.GetFStop();
 
   this->object_->data = bcam;
 }
