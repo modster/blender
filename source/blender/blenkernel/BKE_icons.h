@@ -151,6 +151,9 @@ void BKE_previewimg_ensure(struct PreviewImage *prv, const int size);
 
 struct ImBuf *BKE_previewimg_to_imbuf(struct PreviewImage *prv, const int size);
 
+void BKE_previewimg_finish(struct PreviewImage *prv, const int size);
+bool BKE_previewimg_is_finished(const struct PreviewImage *prv, const int size);
+
 struct PreviewImage *BKE_previewimg_cached_get(const char *name);
 
 struct PreviewImage *BKE_previewimg_cached_ensure(const char *name);

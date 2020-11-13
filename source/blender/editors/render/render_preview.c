@@ -1347,6 +1347,22 @@ static void icon_preview_add_size(IconPreview *ip, uint *rect, int sizex, int si
   BLI_addtail(&ip->sizes, new_size);
 }
 
+/**
+ * Find the index to map \a ip to data in \a preview_image.
+ */
+static int icon_previewimg_size_index_get(const IconPreviewSize *icon_size,
+                                          const PreviewImage *prv_img)
+{
+  for (int i = 0; i < NUM_ICON_SIZES; i++) {
+    if ((prv_img->w[i] == icon_size->sizex) && (prv_img->h[i] == icon_size->sizey)) {
+      return i;
+    }
+  }
+
+  BLI_assert(false);
+  return -1;
+}
+
 static void icon_preview_startjob_all_sizes(void *customdata,
                                             short *stop,
                                             short *do_update,
@@ -1370,6 +1386,13 @@ static void icon_preview_startjob_all_sizes(void *customdata,
     if (!check_engine_supports_preview(ip->scene)) {
       continue;
     }
+
+#ifndef NDEBUG
+    {
+      int size_index = icon_previewimg_size_index_get(cur_size, prv);
+      BLI_assert(!BKE_previewimg_is_finished(prv, size_index));
+    }
+#endif
 
     if (ELEM(GS(ip->id->name), ID_OB)) {
       object_preview_render(ip, cur_size);
@@ -1443,6 +1466,12 @@ static void icon_preview_endjob(void *customdata)
   if (ip->owner) {
     PreviewImage *prv_img = ip->owner;
     prv_img->tag &= ~PRV_TAG_DEFFERED_RENDERING;
+
+    LISTBASE_FOREACH (IconPreviewSize *, icon_size, &ip->sizes) {
+      int size_index = icon_previewimg_size_index_get(icon_size, prv_img);
+      BKE_previewimg_finish(prv_img, size_index);
+    }
+
     if (prv_img->tag & PRV_TAG_DEFFERED_DELETE) {
       BLI_assert(prv_img->tag & PRV_TAG_DEFFERED);
       BKE_previewimg_cached_release_pointer(prv_img);

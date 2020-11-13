@@ -361,6 +361,7 @@ enum eIconSizes {
 enum ePreviewImage_Flag {
   PRV_CHANGED = (1 << 0),
   PRV_USER_EDITED = (1 << 1), /* if user-edited, do not auto-update this anymore! */
+  PRV_UNFINISHED = (1 << 2),  /* The preview is not done rendering yet. */
 };
 
 /* for PreviewImage->tag */
@@ -374,8 +375,9 @@ typedef struct PreviewImage {
   /* All values of 2 are really NUM_ICON_SIZES */
   unsigned int w[2];
   unsigned int h[2];
-  short flag[2];
+  int flag[2];
   short changed_timestamp[2];
+  char _pad1[4];
   unsigned int *rect[2];
 
   /* Runtime-only data. */

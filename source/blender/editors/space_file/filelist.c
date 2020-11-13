@@ -279,6 +279,10 @@ typedef struct FileListEntryPreview {
   char path[FILE_MAX];
   uint64_t flags;
   int index;
+  /* Some file types load the memory from runtime data, not from disk. We just wait until it's done
+   * generating (BKE_previewimg_is_finished()). */
+  PreviewImage *in_memory_preview;
+
   ImBuf *img;
 } FileListEntryPreview;
 
@@ -1340,37 +1344,50 @@ static void filelist_cache_preview_runf(TaskPool *__restrict pool, void *taskdat
   FileListEntryPreview *preview = preview_taskdata->preview;
 
   ThumbSource source = 0;
+  bool done = false;
 
   //  printf("%s: Start (%d)...\n", __func__, threadid);
 
-  //  printf("%s: %d - %s - %p\n", __func__, preview->index, preview->path, preview->img);
-  BLI_assert(preview->flags &
-             (FILE_TYPE_IMAGE | FILE_TYPE_MOVIE | FILE_TYPE_FTFONT | FILE_TYPE_BLENDER |
-              FILE_TYPE_BLENDER_BACKUP | FILE_TYPE_BLENDERLIB));
+  if (preview->in_memory_preview) {
+    if (BKE_previewimg_is_finished(preview->in_memory_preview, ICON_SIZE_PREVIEW)) {
+      preview->img = BKE_previewimg_to_imbuf(preview->in_memory_preview, ICON_SIZE_PREVIEW);
+      done = true;
+    }
+  }
+  else {
+    //  printf("%s: %d - %s - %p\n", __func__, preview->index, preview->path, preview->img);
+    BLI_assert(preview->flags &
+               (FILE_TYPE_IMAGE | FILE_TYPE_MOVIE | FILE_TYPE_FTFONT | FILE_TYPE_BLENDER |
+                FILE_TYPE_BLENDER_BACKUP | FILE_TYPE_BLENDERLIB));
 
-  if (preview->flags & FILE_TYPE_IMAGE) {
-    source = THB_SOURCE_IMAGE;
-  }
-  else if (preview->flags &
-           (FILE_TYPE_BLENDER | FILE_TYPE_BLENDER_BACKUP | FILE_TYPE_BLENDERLIB)) {
-    source = THB_SOURCE_BLEND;
-  }
-  else if (preview->flags & FILE_TYPE_MOVIE) {
-    source = THB_SOURCE_MOVIE;
-  }
-  else if (preview->flags & FILE_TYPE_FTFONT) {
-    source = THB_SOURCE_FONT;
+    if (preview->flags & FILE_TYPE_IMAGE) {
+      source = THB_SOURCE_IMAGE;
+    }
+    else if (preview->flags &
+             (FILE_TYPE_BLENDER | FILE_TYPE_BLENDER_BACKUP | FILE_TYPE_BLENDERLIB)) {
+      source = THB_SOURCE_BLEND;
+    }
+    else if (preview->flags & FILE_TYPE_MOVIE) {
+      source = THB_SOURCE_MOVIE;
+    }
+    else if (preview->flags & FILE_TYPE_FTFONT) {
+      source = THB_SOURCE_FONT;
+    }
+
+    IMB_thumb_path_lock(preview->path);
+    /* Always generate biggest preview size for now, it's simpler and avoids having to re-generate
+     * in case user switch to a bigger preview size. */
+    preview->img = IMB_thumb_manage(preview->path, THB_LARGE, source);
+    IMB_thumb_path_unlock(preview->path);
+
+    done = true;
   }
 
-  IMB_thumb_path_lock(preview->path);
-  /* Always generate biggest preview size for now, it's simpler and avoids having to re-generate in
-   * case user switch to a bigger preview size. */
-  preview->img = IMB_thumb_manage(preview->path, THB_LARGE, source);
-  IMB_thumb_path_unlock(preview->path);
-
-  /* That way task freeing function won't free th preview, since it does not own it anymore. */
-  atomic_cas_ptr((void **)&preview_taskdata->preview, preview, NULL);
-  BLI_thread_queue_push(cache->previews_done, preview);
+  if (done) {
+    /* That way task freeing function won't free th preview, since it does not own it anymore. */
+    atomic_cas_ptr((void **)&preview_taskdata->preview, preview, NULL);
+    BLI_thread_queue_push(cache->previews_done, preview);
+  }
 
   //  printf("%s: End (%d)...\n", __func__, threadid);
 }
@@ -1446,6 +1463,7 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
       (entry->typeflag & (FILE_TYPE_IMAGE | FILE_TYPE_MOVIE | FILE_TYPE_FTFONT |
                           FILE_TYPE_BLENDER | FILE_TYPE_BLENDER_BACKUP | FILE_TYPE_BLENDERLIB))) {
     FileListEntryPreview *preview = MEM_mallocN(sizeof(*preview), __func__);
+    FileListInternEntry *intern_entry = filelist->filelist_intern.filtered[index];
 
     if (entry->redirection_path) {
       BLI_strncpy(preview->path, entry->redirection_path, FILE_MAXDIR);
@@ -1457,6 +1475,7 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
 
     preview->index = index;
     preview->flags = entry->typeflag;
+    preview->in_memory_preview = intern_entry->preview_image;
     preview->img = NULL;
     //      printf("%s: %d - %s - %p\n", __func__, preview->index, preview->path, preview->img);
 
@@ -1812,7 +1831,8 @@ static FileDirEntry *filelist_file_create_entry(FileList *filelist, const int in
   }
   ret->id_uuid = entry->id_uuid;
   /* For some file types the preview is already available. */
-  if (entry->preview_image) {
+  if (entry->preview_image &&
+      BKE_previewimg_is_finished(entry->preview_image, ICON_SIZE_PREVIEW)) {
     ret->image = BKE_previewimg_to_imbuf(entry->preview_image, ICON_SIZE_PREVIEW);
   }
   BLI_addtail(&cache->cached_entries, ret);

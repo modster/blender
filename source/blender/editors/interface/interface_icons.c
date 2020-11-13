@@ -1262,7 +1262,7 @@ static void icon_create_rect(struct PreviewImage *prv_img, enum eIconSizes size)
   else if (!prv_img->rect[size]) {
     prv_img->w[size] = render_size;
     prv_img->h[size] = render_size;
-    prv_img->flag[size] |= PRV_CHANGED;
+    prv_img->flag[size] |= (PRV_CHANGED | PRV_UNFINISHED);
     prv_img->changed_timestamp[size] = 0;
     prv_img->rect[size] = MEM_callocN(render_size * render_size * sizeof(uint), "prv_rect");
   }
