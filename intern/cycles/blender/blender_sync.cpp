@@ -92,7 +92,7 @@ void BlenderSync::reset(BL::BlendData &b_data, BL::Scene &b_scene)
 
 /* Sync */
 
-void BlenderSync::sync_recalc(BL::Depsgraph &b_depsgraph, BL::SpaceView3D *b_v3d)
+void BlenderSync::sync_recalc(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d)
 {
   /* Sync recalc flags from blender to cycles. Actual update is done separate,
    * so we can do it later on if doing it immediate is not suitable. */
@@ -214,7 +214,7 @@ void BlenderSync::sync_recalc(BL::Depsgraph &b_depsgraph, BL::SpaceView3D *b_v3d
   }
 
   if (b_v3d) {
-    BlenderViewportParameters new_viewport_parameters(*b_v3d);
+    BlenderViewportParameters new_viewport_parameters(b_v3d);
     if (viewport_parameters.modified(new_viewport_parameters)) {
       world_recalc = true;
     }

@@ -246,7 +246,8 @@ void BlenderSession::reset_session(BL::BlendData &b_data, BL::Depsgraph &b_depsg
     sync = new BlenderSync(b_engine, b_data, b_scene, scene, !background, session->progress);
   }
   else {
-    sync->sync_recalc(b_depsgraph, nullptr);
+    /* b_v3d should be null here, sync_recalc will check for nullity */
+    sync->sync_recalc(b_depsgraph, b_v3d);
   }
 
   BL::SpaceView3D b_null_space_view3d(PointerRNA_NULL);
@@ -817,7 +818,7 @@ void BlenderSession::synchronize(BL::Depsgraph &b_depsgraph_)
 
   /* copy recalc flags, outside of mutex so we can decide to do the real
    * synchronization at a later time to not block on running updates */
-  sync->sync_recalc(b_depsgraph_, &b_v3d);
+  sync->sync_recalc(b_depsgraph_, b_v3d);
 
   /* don't do synchronization if on pause */
   if (session_pause) {
