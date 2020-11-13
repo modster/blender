@@ -25,10 +25,7 @@
 
 #include "gpu_context_private.hh"
 
-/* TODO move these dependencies to the .cc file. */
-#include "vk_framebuffer.hh"
-#include "vk_immediate.hh"
-#include "vk_state.hh"
+#include <vulkan/vulkan.h>
 
 #include "vk_state.hh"
 
@@ -41,25 +38,22 @@ class VKContext : public Context {
   /** Extensions. */
   /** Workarounds. */
 
- public:
-  VKContext(void *ghost_window)
-  {
-    state_manager = new VKStateManager();
-    imm = new VKImmediate();
+ private:
+  /** Copies of the handles owned by the GHOST context. */
+  VkInstance instance_ = VK_NULL_HANDLE;
+  VkPhysicalDevice physical_device_ = VK_NULL_HANDLE;
+  VkDevice device_ = VK_NULL_HANDLE;
+  uint32_t graphic_queue_familly_ = 0;
+  /** Last used framebuffer ghost UUID.
+   * This is used to detect when to recreate the #VKFrameBuffer. */
+  uint32_t fb_id_ = -1;
 
-    back_left = new VKFrameBuffer("Back Left");
-    active_fb = back_left;
-  };
+ public:
+  VKContext(void *ghost_window, void *ghost_context);
   ~VKContext(){};
 
-  void activate(void) override
-  {
-    immActivate();
-  };
-  void deactivate(void) override
-  {
-    immDeactivate();
-  };
+  void activate(void) override;
+  void deactivate(void) override;
 
   void flush(void) override{};
   void finish(void) override{};

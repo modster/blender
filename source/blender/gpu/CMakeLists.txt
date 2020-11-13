@@ -181,8 +181,13 @@ set(SRC
 )
 
 if(WITH_VULKAN)
+  list(APPEND INC_SYS
+    ${Vulkan_INCLUDE_DIRS}
+  )
+
   list(APPEND SRC
     vulkan/vk_backend.cc
+    vulkan/vk_framebuffer.cc
 
     vulkan/vk_backend.hh
     vulkan/vk_batch.hh

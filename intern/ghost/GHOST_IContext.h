@@ -56,6 +56,11 @@ class GHOST_IContext {
 
   virtual unsigned int getDefaultFramebuffer() = 0;
 
+  virtual GHOST_TSuccess getVulkanHandles(void *, void *, void *, GHOST_TUns32 *) = 0;
+
+  virtual GHOST_TSuccess getVulkanBackbuffer(
+      void *, void *, void *, void *, void *, GHOST_TUns32 *) = 0;
+
   virtual GHOST_TSuccess swapBuffers() = 0;
 
 #ifdef WITH_CXX_GUARDEDALLOC

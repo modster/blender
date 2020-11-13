@@ -970,3 +970,37 @@ int GHOST_XrSessionNeedsUpsideDownDrawing(const GHOST_XrContextHandle xr_context
 }
 
 #endif
+
+#ifdef WITH_VULKAN
+
+/**
+ * Return vulkan handles for the given contest.
+ */
+void GHOST_GetVulkanHandles(GHOST_ContextHandle contexthandle,
+                            void *r_instance,
+                            void *r_physical_device,
+                            void *r_device,
+                            GHOST_TUns32 *r_graphic_queue_familly)
+{
+  GHOST_IContext *context = (GHOST_IContext *)contexthandle;
+
+  context->getVulkanHandles(r_instance, r_physical_device, r_device, r_graphic_queue_familly);
+}
+
+/**
+ * Return vulkan backbuffer resources handles for the given window.
+ */
+void GHOST_GetVulkanBackbuffer(GHOST_WindowHandle windowhandle,
+                               void *image,
+                               void *framebuffer,
+                               void *command_buffer,
+                               void *render_pass,
+                               void *extent,
+                               GHOST_TUns32 *fb_id)
+{
+  GHOST_IWindow *window = (GHOST_IWindow *)windowhandle;
+
+  window->getVulkanBackbuffer(image, framebuffer, command_buffer, render_pass, extent, fb_id);
+}
+
+#endif /* WITH_VULKAN */

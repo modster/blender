@@ -135,6 +135,33 @@ class GHOST_Context : public GHOST_IContext {
     return 0;
   }
 
+  /**
+   * Gets the Vulkan context related resource handles.
+   * \return  A boolean success indicator.
+   */
+  virtual GHOST_TSuccess getVulkanHandles(void * /*r_instance*/,
+                                          void * /*r_physical_device*/,
+                                          void * /*r_device*/,
+                                          GHOST_TUns32 * /*r_graphic_queue_familly*/)
+  {
+    return GHOST_kFailure;
+  };
+
+  /**
+   * Gets the Vulkan framebuffer related resource handles associated with the Vulkan context.
+   * Needs to be called after each swap events as the framebuffer will change.
+   * \return  A boolean success indicator.
+   */
+  virtual GHOST_TSuccess getVulkanBackbuffer(void * /*image*/,
+                                             void * /*framebuffer*/,
+                                             void * /*command_buffer*/,
+                                             void * /*render_pass*/,
+                                             void * /*extent*/,
+                                             GHOST_TUns32 * /*fb_id*/)
+  {
+    return GHOST_kFailure;
+  }
+
  protected:
   void initContextGLEW();
 

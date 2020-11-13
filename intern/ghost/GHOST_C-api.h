@@ -1070,6 +1070,30 @@ int GHOST_XrSessionNeedsUpsideDownDrawing(const GHOST_XrContextHandle xr_context
 GHOST_TSuccess GHOST_XrEventsHandle(GHOST_XrContextHandle xr_context);
 #endif
 
+#ifdef WITH_VULKAN
+
+/**
+ * Return vulkan handles for the given contest.
+ */
+void GHOST_GetVulkanHandles(GHOST_ContextHandle context,
+                            void *r_instance,
+                            void *r_physical_device,
+                            void *r_device,
+                            GHOST_TUns32 *r_graphic_queue_familly);
+
+/**
+ * Return vulkan backbuffer resources handles for the given window.
+ */
+void GHOST_GetVulkanBackbuffer(GHOST_WindowHandle windowhandle,
+                               void *image,
+                               void *framebuffer,
+                               void *command_buffer,
+                               void *render_pass,
+                               void *extent,
+                               uint32_t *fb_id);
+
+#endif
+
 #ifdef __cplusplus
 }
 #endif

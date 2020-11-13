@@ -110,6 +110,26 @@ class GHOST_ContextVK : public GHOST_Context {
   GHOST_TSuccess releaseNativeHandles();
 
   /**
+   * Gets the Vulkan context related resource handles.
+   * \return  A boolean success indicator.
+   */
+  GHOST_TSuccess getVulkanHandles(void *r_instance,
+                                  void *r_physical_device,
+                                  void *r_device,
+                                  GHOST_TUns32 *r_graphic_queue_familly);
+  /**
+   * Gets the Vulkan framebuffer related resource handles associated with the Vulkan context.
+   * Needs to be called after each swap events as the framebuffer will change.
+   * \return  A boolean success indicator.
+   */
+  GHOST_TSuccess getVulkanBackbuffer(void *image,
+                                     void *framebuffer,
+                                     void *command_buffer,
+                                     void *render_pass,
+                                     void *extent,
+                                     GHOST_TUns32 *fb_id);
+
+  /**
    * Sets the swap interval for swapBuffers.
    * \param interval The swap interval to use.
    * \return A boolean success indicator.
@@ -168,7 +188,12 @@ class GHOST_ContextVK : public GHOST_Context {
   std::vector<VkSemaphore> m_render_finished_semaphores;
   std::vector<VkFence> m_in_flight_fences;
   std::vector<VkFence> m_in_flight_images;
+  /** frame modulo swapchain_len. Used as index for sync objects. */
   int m_currentFrame = 0;
+  /** Image index in the swapchain. Used as index for render objects. */
+  int m_currentImage = 0;
+  /** Used to unique framebuffer ids to return when swapchain is recreated. */
+  uint32_t m_swapchain_id = 0;
 
   GHOST_TSuccess pickPhysicalDevice(std::vector<const char *> required_exts);
   GHOST_TSuccess createSwapchain(void);

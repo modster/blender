@@ -55,14 +55,14 @@ class VKBackend : public GPUBackend {
 
   static VKBackend *get(void)
   {
-    return nullptr;
+    return static_cast<VKBackend *>(GPUBackend::get());
   };
 
   void samplers_update(void) override{};
 
-  Context *context_alloc(void *ghost_window) override
+  Context *context_alloc(void *ghost_window, void *ghost_context) override
   {
-    return new VKContext(ghost_window);
+    return new VKContext(ghost_window, ghost_context);
   };
 
   Batch *batch_alloc(void) override

@@ -96,6 +96,21 @@ class GHOST_Window : public GHOST_IWindow {
   }
 
   /**
+   * Gets the Vulkan framebuffer related resource handles associated with the Vulkan context.
+   * Needs to be called after each swap events as the framebuffer will change.
+   * \return  A boolean success indicator.
+   */
+  GHOST_TSuccess getVulkanBackbuffer(void *image,
+                                     void *framebuffer,
+                                     void *command_buffer,
+                                     void *render_pass,
+                                     void *extent,
+                                     GHOST_TUns32 *fb_id)
+  {
+    m_context->getVulkanBackbuffer(image, framebuffer, command_buffer, render_pass, extent, fb_id);
+  };
+
+  /**
    * Returns the associated OS object/handle
    * \return The associated OS object/handle
    */

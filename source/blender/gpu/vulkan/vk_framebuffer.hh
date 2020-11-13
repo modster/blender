@@ -27,19 +27,45 @@
 
 #include "MEM_guardedalloc.h"
 
+#include <vulkan/vulkan.h>
+
 #include "gpu_framebuffer_private.hh"
 
 namespace blender::gpu {
 
+class VKContext;
+
+#define VK_MAX_ATTACHMENT (GPU_FB_MAX_COLOR_ATTACHMENT + 1)
+
 /**
- * Implementation of FrameBuffer object using OpenGL.
+ * Implementation of FrameBuffer object using Vulkan.
  **/
 class VKFrameBuffer : public FrameBuffer {
+ private:
+  /* Vulkan object handle. */
+  VkFramebuffer vk_fb_ = VK_NULL_HANDLE;
+  /* Vulkan device who created the handle. */
+  VkDevice vk_device_ = VK_NULL_HANDLE;
+  /* Base render pass used for framebuffer creation. */
+  VkRenderPass render_pass_ = VK_NULL_HANDLE;
+  /* Number of layers if the attachments are layered textures. */
+  int depth_ = 1;
+
  public:
   /**
    * Create a conventional framebuffer to attach texture to.
    **/
-  VKFrameBuffer(const char *name) : FrameBuffer(name){};
+  VKFrameBuffer(const char *name);
+
+  /**
+   * Special frame-buffer encapsulating internal window frame-buffer.
+   * This just act as a wrapper, the actual allocations are done by GHOST_ContextVK.
+   **/
+  VKFrameBuffer(const char *name,
+                VkFramebuffer framebuffer,
+                VkCommandBuffer command_buffer,
+                VkRenderPass render_pass,
+                VkExtent2D extent);
 
   ~VKFrameBuffer(){};
 
