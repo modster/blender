@@ -349,7 +349,7 @@ static bool wm_xr_select_raycast(bContext *C,
   ED_transform_snap_object_project_ray_ex(sctx,
                                           depsgraph,
                                           &(const struct SnapObjectParams){
-                                              .snap_select = SNAP_ALL,
+                                              .snap_select = vc.em ? SNAP_SELECTED : SNAP_ALL,
                                           },
                                           origin,
                                           direction,
@@ -366,7 +366,8 @@ static bool wm_xr_select_raycast(bContext *C,
   bool hit = false;
   bool changed = false;
 
-  if (ob && vc.em && (ob->id.orig_id == &vc.obedit->id)) { /* TODO_XR: Non-mesh objects. */
+  if (ob && vc.em &&
+      ((ob == vc.obedit) || (ob->id.orig_id == &vc.obedit->id))) { /* TODO_XR: Non-mesh objects. */
     BMesh *bm = vc.em->bm;
     BMFace *f = NULL;
     BMEdge *e = NULL;

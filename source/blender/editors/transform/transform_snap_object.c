@@ -413,6 +413,11 @@ static void iter_snap_objects(SnapObjectContext *sctx,
         continue;
       }
     }
+    else if (snap_select == SNAP_SELECTED) {
+      if (!(base->flag & BASE_SELECTED) && !(base->flag_legacy & BA_WAS_SEL)) {
+        continue;
+      }
+    }
 
     Object *obj_eval = DEG_get_evaluated_object(depsgraph, base->object);
     if (obj_eval->transflag & OB_DUPLI) {
