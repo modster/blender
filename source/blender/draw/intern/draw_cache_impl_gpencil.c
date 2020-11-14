@@ -772,7 +772,7 @@ static char gpencil_beztriple_vflag_get(char flag,
 }
 
 static void gpencil_edit_curve_stroke_iter_cb(bGPDlayer *gpl,
-                                              bGPDframe *gpf,
+                                              bGPDframe *UNUSED(gpf),
                                               bGPDstroke *gps,
                                               void *thunk)
 {
