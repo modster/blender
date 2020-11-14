@@ -387,9 +387,8 @@ bool WM_xr_action_states_get(const wmXrData *xr,
                 break;
               }
               case GHOST_kXrActionTypeVector2fInput: {
-                memcpy(((float(*)[2])info->states)[ist_idx],
-                       ((float(*)[2])action->states)[ast_idx],
-                       sizeof(float[2]));
+                copy_v2_v2(((float(*)[2])info->states)[ist_idx],
+                           ((float(*)[2])action->states)[ast_idx]);
                 break;
               }
               case GHOST_kXrActionTypePoseInput: {

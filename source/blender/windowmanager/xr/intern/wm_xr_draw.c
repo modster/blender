@@ -193,9 +193,7 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
   const float b[4] = {0.157f, 0.565f, 1.0f, 1.0f};
 
   const float scale = 0.1f;
-  float x_axis[3];
-  float y_axis[3];
-  float z_axis[3];
+  float x_axis[3], y_axis[3], z_axis[3];
 
   for (int i = 0; i < 2; ++i) {
     const float(*mat)[4] = state->controllers[i].mat;

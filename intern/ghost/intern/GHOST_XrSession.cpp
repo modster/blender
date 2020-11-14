@@ -179,7 +179,6 @@ static void create_reference_spaces(OpenXRSessionData &oxr, const GHOST_XrPose &
        stage reference space for absolute tracking, if the runtime doesn't support it then just
        fallback to the local space. */
     if (result == XR_ERROR_REFERENCE_SPACE_UNSUPPORTED) {
-      /* TODO_XR: Log to Info editor instead of stdout. */
       printf(
           "Warning: XR runtime does not support stage reference space, disabling absolute "
           "tracking.\n");
@@ -199,7 +198,6 @@ static void create_reference_spaces(OpenXRSessionData &oxr, const GHOST_XrPose &
     CHECK_XR(xrGetReferenceSpaceBoundsRect(oxr.session, XR_REFERENCE_SPACE_TYPE_STAGE, &extents),
              "Failed to get stage reference space bounds.");
     if (extents.width == 0.0f || extents.height == 0.0f) {
-      /* TODO_XR: Log to Info editor. */
       printf(
           "Warning: Invalid stage reference space bounds, disabling absolute tracking. To use "
           "absolute tracking, please define a tracking space via the XR runtime.\n");

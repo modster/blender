@@ -630,7 +630,7 @@ static void WM_OT_xr_select_raycast(wmOperatorType *ot)
                        -1.0f,
                        1.0f,
                        "Axis",
-                       "Normalized raycast axis in controller space",
+                       "Raycast axis in controller space",
                        -1.0f,
                        1.0f);
 }
@@ -677,7 +677,7 @@ static int wm_xr_grab_invoke_3d(bContext *C, wmOperator *op, const wmEvent *even
   loc_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
   if (!loc_lock) {
     prop = RNA_struct_find_property(op->ptr, "location_interpolation");
-    loc_t = prop ? RNA_property_float_get(op->ptr, prop) : 1.0f;
+    loc_t = prop ? RNA_property_float_get(op->ptr, prop) : 0.0f;
     prop = RNA_struct_find_property(op->ptr, "location_offset");
     if (prop && RNA_property_is_set(op->ptr, prop)) {
       RNA_property_float_get_array(op->ptr, prop, loc_ofs);
@@ -689,7 +689,7 @@ static int wm_xr_grab_invoke_3d(bContext *C, wmOperator *op, const wmEvent *even
   rot_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
   if (!rot_lock) {
     prop = RNA_struct_find_property(op->ptr, "rotation_interpolation");
-    rot_t = prop ? RNA_property_float_get(op->ptr, prop) : 1.0f;
+    rot_t = prop ? RNA_property_float_get(op->ptr, prop) : 0.0f;
     prop = RNA_struct_find_property(op->ptr, "rotation_offset");
     if (prop && RNA_property_is_set(op->ptr, prop)) {
       float tmp[3];
@@ -762,15 +762,20 @@ static int wm_xr_grab_invoke_3d(bContext *C, wmOperator *op, const wmEvent *even
     }
   }
   else {
+    /* Apply interpolation and offsets. */
     CTX_DATA_BEGIN (C, Object *, ob, selected_objects) {
+      bool update = false;
+
       if (!loc_lock) {
         if (loc_t > 0.0f) {
           ob->loc[0] += loc_t * (actiondata->controller_loc[0] - ob->loc[0]);
           ob->loc[1] += loc_t * (actiondata->controller_loc[1] - ob->loc[1]);
           ob->loc[2] += loc_t * (actiondata->controller_loc[2] - ob->loc[2]);
+          update = true;
         }
         if (loc_ofs_set) {
           add_v3_v3(ob->loc, loc_ofs);
+          update = true;
         }
       }
 
@@ -781,6 +786,7 @@ static int wm_xr_grab_invoke_3d(bContext *C, wmOperator *op, const wmEvent *even
           if (!rot_ofs_set) {
             quat_to_eul(ob->rot, tmp0);
           }
+          update = true;
         }
         else if (rot_ofs_set) {
           eul_to_quat(tmp0, ob->rot);
@@ -796,11 +802,13 @@ static int wm_xr_grab_invoke_3d(bContext *C, wmOperator *op, const wmEvent *even
           mul_qt_qtqt(tmp2, tmp0, tmp1);
           normalize_qt(tmp2);
           quat_to_eul(ob->rot, tmp2);
+          update = true;
         }
       }
 
-      DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
-
+      if (update) {
+        DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
+      }
       selected = true;
     }
     CTX_DATA_END;
@@ -843,7 +851,7 @@ static int wm_xr_grab_modal_3d(bContext *C, wmOperator *op, const wmEvent *event
   bScreen *screen_anim = ED_screen_animation_playing(wm);
   bool loc_lock, rot_lock;
   bool selected = false;
-  float delta[4][4], tmp[4][4];
+  float delta[4][4], tmp0[4][4], tmp1[4][4], tmp2[4][4];
 
   PropertyRNA *prop = RNA_struct_find_property(op->ptr, "location_lock");
   loc_lock = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
@@ -852,36 +860,34 @@ static int wm_xr_grab_modal_3d(bContext *C, wmOperator *op, const wmEvent *event
 
   if (em) { /* TODO_XR: Non-mesh objects. */
     if (!loc_lock || !rot_lock) {
-      Scene *scene = CTX_data_scene(C);
       ToolSettings *ts = scene->toolsettings;
       BMesh *bm = em->bm;
       BMIter iter;
-      float tmp0[4][4], tmp1[4][4];
 
       if (rot_lock) {
-        unit_m4(tmp);
-        copy_v3_v3(tmp[3], data->mat_prev[3]);
-        mul_m4_m4m4(tmp0, obedit->imat, tmp);
-        invert_m4(tmp0);
+        unit_m4(tmp0);
+        copy_v3_v3(tmp0[3], data->mat_prev[3]);
+        mul_m4_m4m4(tmp1, obedit->imat, tmp0);
+        invert_m4(tmp1);
 
         quat_to_mat4(data->mat_prev, actiondata->controller_rot);
         copy_v3_v3(data->mat_prev[3], actiondata->controller_loc);
-        copy_v3_v3(tmp[3], data->mat_prev[3]);
-        mul_m4_m4m4(tmp1, obedit->imat, tmp);
+        copy_v3_v3(tmp0[3], data->mat_prev[3]);
+        mul_m4_m4m4(tmp2, obedit->imat, tmp0);
 
-        mul_m4_m4m4(delta, tmp1, tmp0);
+        mul_m4_m4m4(delta, tmp2, tmp1);
       }
       else {
-        copy_m4_m4(tmp, data->mat_prev);
-        mul_m4_m4m4(tmp0, obedit->imat, tmp);
-        invert_m4(tmp0);
+        copy_m4_m4(tmp0, data->mat_prev);
+        mul_m4_m4m4(tmp1, obedit->imat, tmp0);
+        invert_m4(tmp1);
 
         quat_to_mat4(data->mat_prev, actiondata->controller_rot);
         copy_v3_v3(data->mat_prev[3], actiondata->controller_loc);
-        copy_m4_m4(tmp, data->mat_prev);
-        mul_m4_m4m4(tmp1, obedit->imat, tmp);
+        copy_m4_m4(tmp0, data->mat_prev);
+        mul_m4_m4m4(tmp2, obedit->imat, tmp0);
 
-        mul_m4_m4m4(delta, tmp1, tmp0);
+        mul_m4_m4m4(delta, tmp2, tmp1);
 
         if (loc_lock) {
           zero_v3(delta[3]);
@@ -943,22 +949,21 @@ static int wm_xr_grab_modal_3d(bContext *C, wmOperator *op, const wmEvent *event
   else {
     if (!loc_lock || !rot_lock) {
       if (rot_lock) {
-        float tmp0[4][4];
         unit_m4(tmp0);
         copy_v3_v3(tmp0[3], data->mat_prev[3]);
-        invert_m4_m4(tmp, tmp0);
+        invert_m4_m4(tmp1, tmp0);
 
         quat_to_mat4(data->mat_prev, actiondata->controller_rot);
         copy_v3_v3(data->mat_prev[3], actiondata->controller_loc);
         copy_v3_v3(tmp0[3], data->mat_prev[3]);
 
-        mul_m4_m4m4(delta, tmp0, tmp);
+        mul_m4_m4m4(delta, tmp0, tmp1);
       }
       else {
-        invert_m4_m4(tmp, data->mat_prev);
+        invert_m4_m4(tmp0, data->mat_prev);
         quat_to_mat4(data->mat_prev, actiondata->controller_rot);
         copy_v3_v3(data->mat_prev[3], actiondata->controller_loc);
-        mul_m4_m4m4(delta, data->mat_prev, tmp);
+        mul_m4_m4m4(delta, data->mat_prev, tmp0);
 
         if (loc_lock) {
           zero_v3(delta[3]);
@@ -972,14 +977,13 @@ static int wm_xr_grab_modal_3d(bContext *C, wmOperator *op, const wmEvent *event
 
     CTX_DATA_BEGIN (C, Object *, ob, selected_objects) {
       if (!loc_lock || !rot_lock) {
-        copy_m4_m4(tmp, ob->obmat);
-        mul_m4_m4m4(ob->obmat, delta, tmp);
+        mul_m4_m4m4(tmp0, delta, ob->obmat);
 
         if (!loc_lock) {
-          copy_v3_v3(ob->loc, ob->obmat[3]);
+          copy_v3_v3(ob->loc, tmp0[3]);
         }
         if (!rot_lock) {
-          mat4_to_eul(ob->rot, ob->obmat);
+          mat4_to_eul(ob->rot, tmp0);
         }
 
         DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
@@ -996,6 +1000,7 @@ static int wm_xr_grab_modal_3d(bContext *C, wmOperator *op, const wmEvent *event
 
   if (!selected || (event->val == KM_RELEASE)) {
     wm_xr_grab_uninit(op);
+
     if (obedit && em) {
       WM_event_add_notifier(C, NC_GEOM | ND_DATA, obedit->data);
     }
@@ -1011,13 +1016,7 @@ static int wm_xr_grab_modal_3d(bContext *C, wmOperator *op, const wmEvent *event
   /* XR events currently only support press and release. */
   BLI_assert(false);
   wm_xr_grab_uninit(op);
-  if (obedit && em) {
-    WM_event_add_notifier(C, NC_GEOM | ND_DATA, obedit->data);
-  }
-  else {
-    WM_event_add_notifier(C, NC_SCENE | ND_TRANSFORM_DONE, scene);
-  }
-  return OPERATOR_FINISHED;
+  return OPERATOR_CANCELLED;
 }
 
 static void WM_OT_xr_grab(wmOperatorType *ot)
@@ -1089,7 +1088,7 @@ static void WM_OT_xr_grab(wmOperatorType *ot)
 /* -------------------------------------------------------------------- */
 /** \name XR Constraints Toggle
  *
- * Toggles enabled / auto key behavior for XR constraint objects.
+ * Toggles enabled/auto key behavior for XR constraint objects.
  * \{ */
 
 static void wm_xr_constraint_toggle(char *flag, bool enable, bool autokey)
@@ -1132,7 +1131,7 @@ static int wm_xr_constraints_toggle_exec(bContext *C, wmOperator *op)
   enable = prop ? RNA_property_boolean_get(op->ptr, prop) : true;
 
   prop = RNA_struct_find_property(op->ptr, "autokey");
-  autokey = prop ? RNA_property_boolean_get(op->ptr, prop) : true;
+  autokey = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
 
   if (headset) {
     wm_xr_constraint_toggle(&settings->headset_flag, enable, autokey);
@@ -1154,7 +1153,7 @@ static void WM_OT_xr_constraints_toggle(wmOperatorType *ot)
   /* identifiers */
   ot->name = "XR Constraints Toggle";
   ot->idname = "WM_OT_xr_constraints_toggle";
-  ot->description = "Toggles enabled / auto key behavior for VR constraint objects";
+  ot->description = "Toggles enabled/auto key behavior for VR constraint objects";
 
   /* callbacks */
   ot->exec = wm_xr_constraints_toggle_exec;

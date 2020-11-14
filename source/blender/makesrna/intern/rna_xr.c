@@ -971,7 +971,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
                        0.0f,
                        1.0f,
                        "Threshold",
-                       "Input threshold for button actions",
+                       "Input threshold for button/axis actions",
                        0.0f,
                        1.0f);
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);

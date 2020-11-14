@@ -47,7 +47,7 @@ typedef struct XrSessionSettings {
 
   int flag;
 
-  /** Objects whose location and rotation will be constrained to the XR headset / controller poses.
+  /** Objects whose location and rotation will be constrained to the XR headset/controller poses.
    */
   Object *headset_object;
   Object *controller0_object;
