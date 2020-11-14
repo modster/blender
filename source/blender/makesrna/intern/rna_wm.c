@@ -2278,7 +2278,7 @@ static void rna_def_event(BlenderRNA *brna)
   static const EnumPropertyItem xr_types[] = {
       {1, "BOOLEAN", 0, "Boolean", "Boolean value"},
       {2, "FLOAT", 0, "Float", "Float value"},
-      {3, "VEC2F", 0, "Vector2f", "2D float vector value"},
+      {3, "VECTOR2F", 0, "Vector2f", "2D float vector value"},
       {0, NULL, 0, NULL, NULL},
   };
 #  ifdef WITH_XR_OPENXR

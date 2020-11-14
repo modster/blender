@@ -4911,7 +4911,7 @@ void wm_event_add_xrevent(const char *action_set_name,
 
   switch (action->type) {
     case GHOST_kXrActionTypeBooleanInput: {
-      data->state[0] = (float)((bool *)action->states)[subaction_idx]; /* Cast bool to float. */
+      data->state[0] = ((bool *)action->states)[subaction_idx] ? 1.0f : 0.0f;
       break;
     }
     case GHOST_kXrActionTypeFloatInput: {
@@ -4919,7 +4919,7 @@ void wm_event_add_xrevent(const char *action_set_name,
       break;
     }
     case GHOST_kXrActionTypeVector2fInput: {
-      memcpy(data->state, ((float(*)[2])action->states)[subaction_idx], sizeof(float[2]));
+      copy_v2_v2(data->state, ((float(*)[2])action->states)[subaction_idx]);
       break;
     }
     default: {

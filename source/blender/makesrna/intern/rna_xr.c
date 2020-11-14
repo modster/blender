@@ -317,7 +317,8 @@ static bool rna_XrSessionState_action_create(bContext *C,
       .threshold = threshold,
   };
 
-  if (op[0] && (type == GHOST_kXrActionTypeFloatInput)) {
+  if (op[0] &&
+      ((type == GHOST_kXrActionTypeFloatInput) || type == GHOST_kXrActionTypeVector2fInput)) {
     char idname[OP_MAX_TYPENAME];
     WM_operator_bl_idname(idname, op);
     wmOperatorType *ot = WM_operatortype_find(idname, true);
@@ -877,7 +878,8 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   PropertyRNA *parm, *prop;
 
   static const EnumPropertyItem action_types[] = {
-      {2, "BUTTON", 0, "Button", "Button state action"},
+      {2, "BUTTON", 0, "Button", "Button action"},
+      {3, "AXIS", 0, "Axis", "2D axis action"},
       {4, "POSE", 0, "Pose", "3D pose action"},
       {100, "HAPTIC", 0, "Haptic", "Haptic output action"},
       {0, NULL, 0, NULL, NULL},
@@ -885,6 +887,8 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
 #  ifdef WITH_XR_OPENXR
   BLI_STATIC_ASSERT(GHOST_kXrActionTypeFloatInput == 2,
                     "Float action type does not match GHOST_XrActionType value");
+  BLI_STATIC_ASSERT(GHOST_kXrActionTypeVector2fInput == 3,
+                    "Vector2f action type does not match GHOST_XrActionType value");
   BLI_STATIC_ASSERT(GHOST_kXrActionTypePoseInput == 4,
                     "Pose action type does not match GHOST_XrActionType value");
   BLI_STATIC_ASSERT(GHOST_kXrActionTypeVibrationOutput == 100,

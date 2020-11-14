@@ -689,9 +689,8 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
           case GHOST_kXrActionTypeVector2fInput: {
             const float(*state)[2] = &((float(*)[2])action->states)[i];
             float(*state_prev)[2] = &((float(*)[2])action->states_prev)[i];
-            if (fabsf((*state)[0]) > action->threshold || fabsf((*state)[1]) > action->threshold) {
-              if (fabsf((*state_prev)[0]) <= action->threshold &&
-                  fabsf((*state_prev)[1]) <= action->threshold) {
+            if (len_v2(*state) > action->threshold) {
+              if (len_v2(*state_prev) <= action->threshold) {
                 if (modal || action->op_flag == XR_OP_PRESS) {
                   val = KM_PRESS;
                   press_start = true;
@@ -702,14 +701,13 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
                 press_start = false;
               }
             }
-            else if (fabsf((*state_prev)[0]) > action->threshold ||
-                     fabsf((*state_prev)[1]) > action->threshold) {
+            else if (len_v2(*state_prev) > action->threshold) {
               if (modal || action->op_flag == XR_OP_RELEASE) {
                 val = KM_RELEASE;
                 press_start = false;
               }
             }
-            memcpy(state_prev, state, sizeof(float[2]));
+            copy_v2_v2(*state_prev, *state);
             break;
           }
           default: {
