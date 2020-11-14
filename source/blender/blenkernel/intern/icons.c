@@ -554,7 +554,7 @@ ImBuf *BKE_previewimg_to_imbuf(PreviewImage *prv, const int size)
 void BKE_previewimg_finish(PreviewImage *prv, const int size)
 {
   /* Previews may be calculated on a thread. */
-  atomic_fetch_and_or_int32(&prv->flag[size], ~PRV_UNFINISHED);
+  atomic_fetch_and_and_int32(&prv->flag[size], ~PRV_UNFINISHED);
 }
 
 bool BKE_previewimg_is_finished(const PreviewImage *prv, const int size)
