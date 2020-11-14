@@ -13,7 +13,6 @@
 
 #include "DEG_depsgraph.h"
 
-#include "IO_wavefront_obj.h"
 #include "obj_export_mesh.hh"
 #include "obj_export_nurbs.hh"
 #include "obj_exporter.hh"
@@ -41,7 +40,7 @@ class Export_OBJ : public BlendfileLoadingBaseTest {
 const std::string all_objects_file = "io_tests/blend_scene/all_objects_2_92.blend";
 const std::string all_curve_objects_file = "io_tests/blend_scene/all_curves_2_92.blend";
 
-TEST_F(Export_OBJ, filter_objects_as_mesh)
+TEST_F(Export_OBJ, filter_objects_curves_as_mesh)
 {
   OBJExportParamsDefault _export;
   if (!load_file_and_depsgraph(all_objects_file)) {
@@ -53,7 +52,7 @@ TEST_F(Export_OBJ, filter_objects_as_mesh)
   EXPECT_EQ(objcurves.size(), 0);
 }
 
-TEST_F(Export_OBJ, filter_objects_as_curves)
+TEST_F(Export_OBJ, filter_objects_curves_as_nurbs)
 {
   OBJExportParamsDefault _export;
   if (!load_file_and_depsgraph(all_objects_file)) {
@@ -128,11 +127,11 @@ TEST_F(Export_OBJ, OBJCurve)
     for (int spline_index : IndexRange(objcurve->total_splines())) {
       EXPECT_EQ(objcurve->total_nurbs_points(spline_index),
                 nurbs_truth->total_nurbs_points(spline_index));
-      for (int vertex : IndexRange(objcurve->total_nurbs_points(spline_index))) {
-        EXPECT_V3_NEAR(
-            objcurve->get_nurbs_point_coords(spline_index, vertex, _export.params.scaling_factor),
-            nurbs_truth->get_nurbs_point_coords(spline_index, vertex),
-            0.000001f);
+      for (int vertex_index : IndexRange(objcurve->total_nurbs_points(spline_index))) {
+        EXPECT_V3_NEAR(objcurve->get_nurbs_point_coords(
+                           spline_index, vertex_index, _export.params.scaling_factor),
+                       nurbs_truth->get_nurbs_point_coords(spline_index, vertex_index),
+                       0.000001f);
       }
     }
   }

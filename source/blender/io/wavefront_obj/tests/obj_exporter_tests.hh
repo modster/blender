@@ -12,18 +12,24 @@
 #include <string>
 #include <vector>
 
+#include "IO_wavefront_obj.h"
+
 namespace blender::io::obj {
 
-using arr_float_3 = std::array<float, 3>;
+using array_float_3 = std::array<float, 3>;
 
+/**
+ * This matches OBJCurve's member functions, except that all the numbers and names are known
+ * constants. Used to store expected values of NURBS objects.
+ */
 class NurbsObject {
  private:
   std::string nurbs_name_;
-  std::vector<std::vector<arr_float_3>> coordinates_;
+  std::vector<std::vector<array_float_3>> coordinates_;
 
  public:
   NurbsObject(const std::string nurbs_name,
-              const std::vector<std::vector<arr_float_3>> coordinates)
+              const std::vector<std::vector<array_float_3>> coordinates)
       : nurbs_name_(nurbs_name), coordinates_(coordinates)
   {
   }
@@ -77,12 +83,12 @@ struct OBJExportParamsDefault {
   }
 };
 
-const std::vector<std::vector<arr_float_3>> coordinates_NurbsCurve{
+const std::vector<std::vector<array_float_3>> coordinates_NurbsCurve{
     {{9.947419, 0.000000, 0.000000},
      {9.447419, 0.000000, 1.000000},
      {7.447419, 0.000000, 1.000000},
      {6.947419, 0.000000, 0.000000}}};
-const std::vector<std::vector<arr_float_3>> coordinates_NurbsCircle{
+const std::vector<std::vector<array_float_3>> coordinates_NurbsCircle{
     {{11.463165, 0.000000, -1.000000},
      {12.463165, 0.000000, -1.000000},
      {12.463165, 0.000000, 0.000000},
@@ -91,7 +97,7 @@ const std::vector<std::vector<arr_float_3>> coordinates_NurbsCircle{
      {10.463165, 0.000000, 1.000000},
      {10.463165, 0.000000, 0.000000},
      {10.463165, 0.000000, -1.000000}}};
-const std::vector<std::vector<arr_float_3>> coordinates_NurbsPath{
+const std::vector<std::vector<array_float_3>> coordinates_NurbsPath{
     {{17.690557, 0.000000, 0.000000},
      {16.690557, 0.000000, 0.000000},
      {15.690557, 0.000000, 0.000000},
