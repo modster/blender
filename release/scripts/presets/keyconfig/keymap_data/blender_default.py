@@ -3248,6 +3248,9 @@ def km_grease_pencil_stroke_edit_mode(params):
          {"properties": [("mode", 'GPENCIL_OPACITY')]}),
         # Proportional editing.
         *_template_items_proportional_editing(connected=True),
+        # Curve edit mode toggle.
+        ("wm.context_toggle", {"type": 'U', "value": 'PRESS'},
+         {"properties": [("data_path", 'gpencil_data.use_curve_edit')]}),
         # Add menu
         ("object.gpencil_add", {"type": 'A', "value": 'PRESS', "shift": True}, None),
         # Vertex group menu
@@ -3275,6 +3278,20 @@ def km_grease_pencil_stroke_edit_mode(params):
 
     return keymap
 
+def km_grease_pencil_stroke_curve_edit_mode(params):
+    items = []
+    keymap = (
+        "Grease Pencil Stroke Curve Edit Mode",
+        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
+        {"items": items},
+    )
+
+    items.extend([
+        # Set handle type
+        ("gpencil.stroke_editcurve_set_handle_type", {"type": 'V', "value": 'PRESS'}, None),
+    ])
+
+    return keymap
 
 def km_grease_pencil_stroke_paint_mode(params):
     items = []
@@ -6914,6 +6931,7 @@ def generate_keymaps(params=None):
 
         # Modes.
         km_grease_pencil(params),
+        km_grease_pencil_stroke_curve_edit_mode(params),
         km_grease_pencil_stroke_edit_mode(params),
         km_grease_pencil_stroke_paint_mode(params),
         km_grease_pencil_stroke_paint_draw_brush(params),
