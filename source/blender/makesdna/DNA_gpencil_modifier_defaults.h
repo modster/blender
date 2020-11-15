@@ -52,7 +52,7 @@
     .layer_pass = 0, \
   }
 
-/* Deliberately set this range to the half the default frame-range 
+/* Deliberately set this range to the half the default frame-range
  * to have an immediate effect to suggest use-cases. */
 #define _DNA_DEFAULT_BuildGpencilModifierData \
   { \
