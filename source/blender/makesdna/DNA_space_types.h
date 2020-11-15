@@ -675,8 +675,10 @@ typedef enum eSpaceSeq_OverlayType {
 typedef struct FileSelectAssetRepositoryID {
   short type;
   char _pad[6];
-  /** If showing a custom asset repository (#FILE_ASSET_REPO_CUSTOM), this name has to be set to
-   * define which. Can be empty otherwise. */
+  /**
+   * If showing a custom asset repository (#FILE_ASSET_REPO_CUSTOM), this name has to be set to
+   * define which. Can be empty otherwise.
+   */
   char idname[64]; /* MAX_NAME */
 } FileSelectAssetRepositoryID;
 
@@ -710,10 +712,7 @@ typedef struct FileSelectParams {
   int sel_first;
   int sel_last;
   unsigned short thumbnail_size;
-  char _pad1[1];
-
-  /* The browse mode these params were created for (e.g. asset vs file browsing). */
-  char browse_mode; /* eFileBrowse_Mode */
+  char _pad1[2];
 
   /* short */
   /** XXXXX for now store type here, should be moved to the operator. */
@@ -727,8 +726,6 @@ typedef struct FileSelectParams {
   /** Details toggles (file size, creation date, etc.) */
   char details_flags;
   char _pad2[3];
-
-  FileSelectAssetRepositoryID asset_repository;
 
   /** Filter when (flags & FILE_FILTER) is true. */
   int filter;
@@ -744,6 +741,32 @@ typedef struct FileSelectParams {
 
   /* XXX --- end unused -- */
 } FileSelectParams;
+
+/**
+ * File selection parameters for asset browsing mode, with #FileSelectParams as base.
+ */
+typedef struct FileAssetSelectParams {
+  FileSelectParams base_params;
+
+  FileSelectAssetRepositoryID asset_repository;
+} FileAssetSelectParams;
+
+/**
+ * A wrapper to store previous and next folder lists (#FolderList) for a specific browse mode
+ * (#eFileBrowse_Mode).
+ */
+typedef struct FileFolderHistory {
+  struct FileFolderLists *next, *prev;
+
+  /** The browse mode this prev/next folder-lists are created for. */
+  char browse_mode; /* eFileBrowse_Mode */
+  char _pad[7];
+
+  /** Holds the list of previous directories to show. */
+  ListBase folders_prev;
+  /** Holds the list of next directories (pushed from previous) to show. */
+  ListBase folders_next;
+} FileFolderHistory;
 
 /* File Browser */
 typedef struct SpaceFile {
@@ -761,16 +784,31 @@ typedef struct SpaceFile {
   char _pad1[3];
   int scroll_offset;
 
-  /** Config and input for file select. */
-  struct FileSelectParams *params;
+  /** Config and input for file select. One for each browse-mode, to keep them independent. */
+  FileSelectParams *params;
+  FileAssetSelectParams *asset_params;
 
-  /** Holds the list of files to show. */
+  /**
+   * Holds the list of files to show.
+   * Currently recreated when browse-mode changes. Could be per browse-mode to avoid refreshes.
+   */
   struct FileList *files;
 
-  /** Holds the list of previous directories to show. */
+  /**
+   * Holds the list of previous directories to show. Owned by `folder_histories` below.
+   */
   ListBase *folders_prev;
-  /** Holds the list of next directories (pushed from previous) to show. */
+  /**
+   * Holds the list of next directories (pushed from previous) to show. Owned by
+   * `folder_histories` below.
+   */
   ListBase *folders_next;
+
+  /**
+   * This actually owns the prev/next folder-lists above. On browse-mode change, the lists of the
+   * new mode get assigned to the above.
+   */
+  ListBase folder_histories; /* FileFolderHistory */
 
   /* operator that is invoking fileselect
    * op->exec() will be called on the 'Load' button.

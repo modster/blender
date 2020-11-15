@@ -1128,24 +1128,6 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
-  {
-    if (!DNA_struct_find(fd->filesdna, "FileSelectAssetRepositoryID")) {
-      /* Remove options of legacy UV/Image editor */
-      for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
-        LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
-          LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
-            if (sl->spacetype == SPACE_FILE) {
-              SpaceFile *sfile = (SpaceFile *)sl;
-              if (sfile->params) {
-                sfile->params->asset_repository.type = FILE_ASSET_REPO_LOCAL;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
   /**
    * Versioning code until next subversion bump goes here.
    *

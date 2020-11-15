@@ -2433,7 +2433,7 @@ static PointerRNA rna_FileSelectParams_filter_id_get(PointerRNA *ptr)
 
 static int rna_FileSelectParams_asset_repository_get(PointerRNA *ptr)
 {
-  FileSelectParams *params = ptr->data;
+  FileAssetSelectParams *params = ptr->data;
 
   /* Simple case: Predefined repo, just set the value. */
   if (params->asset_repository.type < FILE_ASSET_REPO_CUSTOM) {
@@ -2454,7 +2454,7 @@ static int rna_FileSelectParams_asset_repository_get(PointerRNA *ptr)
 
 static void rna_FileSelectParams_asset_repository_set(PointerRNA *ptr, int value)
 {
-  FileSelectParams *params = ptr->data;
+  FileAssetSelectParams *params = ptr->data;
 
   /* Simple case: Predefined repo, just set the value. */
   if (value < FILE_ASSET_REPO_CUSTOM) {
@@ -2541,6 +2541,18 @@ static uint64_t rna_FileSelectParams_asset_category_get(PointerRNA *ptr)
 {
   FileSelectParams *params = ptr->data;
   return params->filter_id;
+}
+
+static PointerRNA rna_FileBrowser_params_get(PointerRNA *ptr)
+{
+  SpaceFile *sfile = ptr->data;
+  FileSelectParams *params = ED_fileselect_get_active_params(sfile);
+
+  if (params) {
+    return rna_pointer_inherit_refine(ptr, &RNA_FileSelectParams, params);
+  }
+
+  return rna_pointer_inherit_refine(ptr, NULL, NULL);
 }
 
 static void rna_FileBrowser_FSMenuEntry_path_get(PointerRNA *ptr, char *value)
@@ -6173,7 +6185,8 @@ static void rna_def_space_filebrowser(BlenderRNA *brna)
   RNA_def_property_update(prop, 0, "rna_SpaceFileBrowser_browse_mode_update");
 
   prop = RNA_def_property(srna, "params", PROP_POINTER, PROP_NONE);
-  RNA_def_property_pointer_sdna(prop, NULL, "params");
+  RNA_def_property_struct_type(prop, "FileSelectParams");
+  RNA_def_property_pointer_funcs(prop, "rna_FileBrowser_params_get", NULL, NULL, NULL);
   RNA_def_property_ui_text(
       prop, "Filebrowser Parameter", "Parameters and Settings for the Filebrowser");
 

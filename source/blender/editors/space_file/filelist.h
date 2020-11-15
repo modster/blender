@@ -47,13 +47,15 @@ typedef enum FileCheckType {
   CHECK_ALL = 3,
 } FileCheckType;
 
-struct ListBase *folderlist_new(void);
 void folderlist_free(struct ListBase *folderlist);
-struct ListBase *folderlist_duplicate(ListBase *folderlist);
 void folderlist_popdir(struct ListBase *folderlist, char *dir);
 void folderlist_pushdir(struct ListBase *folderlist, const char *dir);
 const char *folderlist_peeklastdir(struct ListBase *folderlist);
 int folderlist_clear_next(struct SpaceFile *sfile);
+
+void folder_history_list_ensure_for_active_browse_mode(struct SpaceFile *sfile);
+void folder_history_list_free(struct SpaceFile *sfile);
+struct ListBase folder_history_list_duplicate(struct ListBase *listbase);
 
 void filelist_setsorting(struct FileList *filelist, const short sort, bool invert_sort);
 void filelist_sort(struct FileList *filelist);
@@ -68,6 +70,8 @@ void filelist_setfilter_options(struct FileList *filelist,
                                 const char *filter_glob,
                                 const char *filter_search);
 void filelist_filter(struct FileList *filelist);
+void filelist_setrepository(struct FileList *filelist,
+                            const struct FileSelectAssetRepositoryID *asset_repository);
 
 void filelist_init_icons(void);
 void filelist_free_icons(void);
@@ -75,18 +79,14 @@ struct ImBuf *filelist_getimage(struct FileList *filelist, const int index);
 struct ImBuf *filelist_geticon_image(struct FileList *filelist, const int index);
 int filelist_geticon(struct FileList *filelist, const int index, const bool is_main);
 
-struct FileList *filelist_new(short type,
-                              const struct FileSelectAssetRepositoryID *asset_repository);
+struct FileList *filelist_new(short type);
+void filelist_settype(struct FileList *filelist, short type);
 void filelist_clear(struct FileList *filelist);
 void filelist_clear_ex(struct FileList *filelist,
                        const bool do_cache,
                        const bool do_selection,
                        const bool do_id_map);
 void filelist_free(struct FileList *filelist);
-
-bool filelist_matches_type(const struct FileList *filelist, short type);
-bool filelist_matches_asset_repository(const struct FileList *filelist,
-                                       const struct FileSelectAssetRepositoryID *repository);
 
 const char *filelist_dir(struct FileList *filelist);
 bool filelist_is_dir(struct FileList *filelist, const char *path);

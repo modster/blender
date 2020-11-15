@@ -92,12 +92,6 @@ typedef struct FolderList {
   char *foldername;
 } FolderList;
 
-ListBase *folderlist_new(void)
-{
-  ListBase *p = MEM_callocN(sizeof(*p), __func__);
-  return p;
-}
-
 void folderlist_popdir(struct ListBase *folderlist, char *dir)
 {
   const char *prev_dir;
@@ -156,17 +150,18 @@ const char *folderlist_peeklastdir(ListBase *folderlist)
 
 int folderlist_clear_next(struct SpaceFile *sfile)
 {
+  const FileSelectParams *params = ED_fileselect_get_active_params(sfile);
   struct FolderList *folder;
 
   /* if there is no folder_next there is nothing we can clear */
-  if (!sfile->folders_next) {
+  if (BLI_listbase_is_empty(sfile->folders_next)) {
     return 0;
   }
 
   /* if previous_folder, next_folder or refresh_folder operators are executed
    * it doesn't clear folder_next */
   folder = sfile->folders_prev->last;
-  if ((!folder) || (BLI_path_cmp(folder->foldername, sfile->params->dir) == 0)) {
+  if ((!folder) || (BLI_path_cmp(folder->foldername, params->dir) == 0)) {
     return 0;
   }
 
@@ -186,21 +181,77 @@ void folderlist_free(ListBase *folderlist)
   }
 }
 
-ListBase *folderlist_duplicate(ListBase *folderlist)
+static ListBase folderlist_duplicate(ListBase *folderlist)
 {
+  ListBase folderlistn = {NULL};
 
-  if (folderlist) {
-    ListBase *folderlistn = MEM_callocN(sizeof(*folderlistn), __func__);
-    FolderList *folder;
+  BLI_duplicatelist(&folderlistn, folderlist);
 
-    BLI_duplicatelist(folderlistn, folderlist);
-
-    for (folder = folderlistn->first; folder; folder = folder->next) {
-      folder->foldername = MEM_dupallocN(folder->foldername);
-    }
-    return folderlistn;
+  for (FolderList *folder = folderlistn.first; folder; folder = folder->next) {
+    folder->foldername = MEM_dupallocN(folder->foldername);
   }
+  return folderlistn;
+}
+
+/* ----------------- Folder-History (wraps/owns file list above) -------------- */
+
+static FileFolderHistory *folder_history_find(const SpaceFile *sfile, eFileBrowse_Mode browse_mode)
+{
+  LISTBASE_FOREACH (FileFolderHistory *, history, &sfile->folder_histories) {
+    if (history->browse_mode == browse_mode) {
+      return history;
+    }
+  }
+
   return NULL;
+}
+
+void folder_history_list_ensure_for_active_browse_mode(SpaceFile *sfile)
+{
+  FileFolderHistory *history = folder_history_find(sfile, sfile->browse_mode);
+
+  if (!history) {
+    history = MEM_callocN(sizeof(*history), __func__);
+    BLI_addtail(&sfile->folder_histories, history);
+  }
+
+  sfile->folders_next = &history->folders_next;
+  sfile->folders_prev = &history->folders_prev;
+}
+
+static void folder_history_entry_free(SpaceFile *sfile, FileFolderHistory *history)
+{
+  folderlist_free(&history->folders_prev);
+  folderlist_free(&history->folders_next);
+  BLI_freelinkN(&sfile->folder_histories, history);
+
+  if (sfile->folders_prev == &history->folders_prev) {
+    sfile->folders_prev = NULL;
+  }
+  if (sfile->folders_next == &history->folders_next) {
+    sfile->folders_next = NULL;
+  }
+}
+
+void folder_history_list_free(SpaceFile *sfile)
+{
+  LISTBASE_FOREACH_MUTABLE (FileFolderHistory *, history, &sfile->folder_histories) {
+    folder_history_entry_free(sfile, history);
+  }
+}
+
+ListBase folder_history_list_duplicate(ListBase *listbase)
+{
+  ListBase histories = {NULL};
+
+  LISTBASE_FOREACH (FileFolderHistory *, history, listbase) {
+    FileFolderHistory *history_new = MEM_dupallocN(history);
+    history_new->folders_prev = folderlist_duplicate(&history->folders_prev);
+    history_new->folders_next = folderlist_duplicate(&history->folders_next);
+    BLI_addtail(&histories, history_new);
+  }
+
+  return histories;
 }
 
 /* ------------------FILELIST------------------------ */
@@ -314,7 +365,7 @@ typedef struct FileList {
 
   eFileSelectType type;
   /* The repository this list was created for. Stored here so we know when to re-read. */
-  FileSelectAssetRepositoryID asset_repository;
+  FileSelectAssetRepositoryID *asset_repository;
 
   short flags;
 
@@ -967,6 +1018,34 @@ void filelist_setfilter_options(FileList *filelist,
   }
 }
 
+/**
+ * \param asset_repository: May be NULL to unset the repository.
+ */
+void filelist_setrepository(FileList *filelist,
+                            const FileSelectAssetRepositoryID *asset_repository)
+{
+  /* Unset if needed. */
+  if (!asset_repository) {
+    if (filelist->asset_repository) {
+      MEM_SAFE_FREE(filelist->asset_repository);
+      filelist->flags |= FL_FORCE_RESET;
+    }
+    return;
+  }
+
+  if (!filelist->asset_repository) {
+    filelist->asset_repository = MEM_mallocN(sizeof(*filelist->asset_repository),
+                                             "filelist asset repository");
+    *filelist->asset_repository = *asset_repository;
+
+    filelist->flags |= FL_FORCE_RESET;
+  }
+  else if (memcmp(filelist->asset_repository, asset_repository, sizeof(*asset_repository)) != 0) {
+    *filelist->asset_repository = *asset_repository;
+    filelist->flags |= FL_FORCE_RESET;
+  }
+}
+
 /* ********** Icon/image helpers ********** */
 
 void filelist_init_icons(void)
@@ -1576,44 +1655,52 @@ static void filelist_cache_clear(FileListEntryCache *cache, size_t new_size)
   BLI_listbase_clear(&cache->cached_entries);
 }
 
-FileList *filelist_new(short type, const FileSelectAssetRepositoryID *asset_repository)
+FileList *filelist_new(short type)
 {
   FileList *p = MEM_callocN(sizeof(*p), __func__);
 
   filelist_cache_init(&p->filelist_cache, FILELIST_ENTRYCACHESIZE_DEFAULT);
 
-  p->type = type;
   p->selection_state = BLI_ghash_new(
       BLI_ghashutil_uinthash_v4_p, BLI_ghashutil_uinthash_v4_cmp, __func__);
   p->filelist.nbr_entries = -1;
-  if (asset_repository) {
-    p->asset_repository = *asset_repository;
+  filelist_settype(p, type);
+
+  return p;
+}
+
+void filelist_settype(FileList *filelist, short type)
+{
+  if (filelist->type == type) {
+    return;
   }
 
-  switch (p->type) {
+  filelist->type = type;
+  switch (filelist->type) {
     case FILE_MAIN:
-      p->checkdirf = filelist_checkdir_main;
-      p->read_jobf = filelist_readjob_main;
-      p->filterf = is_filtered_main;
+      filelist->checkdirf = filelist_checkdir_main;
+      filelist->read_jobf = filelist_readjob_main;
+      filelist->filterf = is_filtered_main;
       break;
     case FILE_LOADLIB:
-      p->checkdirf = filelist_checkdir_lib;
-      p->read_jobf = filelist_readjob_lib;
-      p->filterf = is_filtered_lib;
+      filelist->checkdirf = filelist_checkdir_lib;
+      filelist->read_jobf = filelist_readjob_lib;
+      filelist->filterf = is_filtered_lib;
       break;
     case FILE_MAIN_ASSET:
       /* TODO this may not be thread safe, main data may change. */
-      p->checkdirf = filelist_checkdir_main_assets;
-      p->read_jobf = filelist_readjob_main_assets;
-      p->filterf = is_filtered_main_assets;
+      filelist->checkdirf = filelist_checkdir_main_assets;
+      filelist->read_jobf = filelist_readjob_main_assets;
+      filelist->filterf = is_filtered_main_assets;
       break;
     default:
-      p->checkdirf = filelist_checkdir_dir;
-      p->read_jobf = filelist_readjob_dir;
-      p->filterf = is_filtered_file;
+      filelist->checkdirf = filelist_checkdir_dir;
+      filelist->read_jobf = filelist_readjob_dir;
+      filelist->filterf = is_filtered_file;
       break;
   }
-  return p;
+
+  filelist->flags |= FL_FORCE_RESET;
 }
 
 void filelist_clear_ex(struct FileList *filelist,
@@ -1671,6 +1758,8 @@ void filelist_free(struct FileList *filelist)
     filelist->id_map = NULL;
   }
 
+  MEM_SAFE_FREE(filelist->asset_repository);
+
   memset(&filelist->filter_data, 0, sizeof(filelist->filter_data));
 
   filelist->flags &= ~(FL_NEED_SORTING | FL_NEED_FILTERING);
@@ -1718,18 +1807,6 @@ static const char *fileentry_uiname(const char *root,
   BLI_assert(name);
 
   return name;
-}
-
-bool filelist_matches_type(const FileList *filelist, short type)
-{
-  return filelist->type == (eFileSelectType)type;
-}
-
-bool filelist_matches_asset_repository(const FileList *filelist,
-                                       const FileSelectAssetRepositoryID *repository)
-{
-  return (filelist->asset_repository.type == repository->type) &&
-         STREQ(filelist->asset_repository.idname, repository->idname);
 }
 
 const char *filelist_dir(struct FileList *filelist)
@@ -3201,6 +3278,7 @@ static void filelist_readjob_startjob(void *flrjv, short *stop, short *do_update
   flrj->tmp_filelist->libfiledata = NULL;
   memset(&flrj->tmp_filelist->filelist_cache, 0, sizeof(flrj->tmp_filelist->filelist_cache));
   flrj->tmp_filelist->selection_state = NULL;
+  flrj->tmp_filelist->asset_repository = NULL;
 
   BLI_mutex_unlock(&flrj->lock);
 
