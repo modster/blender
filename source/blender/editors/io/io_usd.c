@@ -279,14 +279,21 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
 
   const bool use_instancing = RNA_boolean_get(op->ptr, "use_instancing");
 
+  const float light_intensity_scale = RNA_float_get(op->ptr, "light_intensity_scale");
+
   /* Switch out of edit mode to avoid being stuck in it (T54326). */
   Object *obedit = CTX_data_edit_object(C);
   if (obedit) {
     ED_object_mode_set(C, OB_MODE_OBJECT);
   }
 
-  struct USDImportParams params = {
-      import_uvs, import_normals, import_materials, scale, debug, use_instancing};
+  struct USDImportParams params = {import_uvs,
+                                   import_normals,
+                                   import_materials,
+                                   scale,
+                                   debug,
+                                   use_instancing,
+                                   light_intensity_scale};
 
   bool ok = USD_import(C, filename, &params, as_background_job);
 
@@ -309,6 +316,7 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   uiItemR(col, ptr, "import_uvs", 0, NULL, ICON_NONE);
   uiItemR(col, ptr, "import_normals", 0, NULL, ICON_NONE);
   uiItemR(col, ptr, "import_materials", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "light_intensity_scale", 0, NULL, ICON_NONE);
   uiItemR(col, ptr, "debug", 0, NULL, ICON_NONE);
 
   box = uiLayoutBox(layout);
@@ -365,6 +373,16 @@ void WM_OT_usd_import(wmOperatorType *ot)
       "Instancing",
       "When checked, instanced USD references are imported as shared data in Blender. "
       "When unchecked, instanced USD reference are imported as unique data in Blender.");
+
+  RNA_def_float(ot->srna,
+                "light_intensity_scale",
+                1.0f,
+                0.0001f,
+                10000.0f,
+                "Light Intensity Scale",
+                "Value by which to scale the intensity of imported lights",
+                0.0001f,
+                1000.0f);
 }
 
 #endif /* WITH_USD */

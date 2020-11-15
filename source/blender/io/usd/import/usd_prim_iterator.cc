@@ -22,6 +22,7 @@
 #include "usd.h"
 #include "usd_importer_context.h"
 #include "usd_reader_camera.h"
+#include "usd_reader_light.h"
 #include "usd_reader_mesh.h"
 #include "usd_reader_xform.h"
 #include "usd_reader_xformable.h"
@@ -36,6 +37,7 @@
 #include <pxr/usd/usdGeom/scope.h>
 #include <pxr/usd/usdGeom/tokens.h>
 #include <pxr/usd/usdGeom/xformable.h>
+#include <pxr/usd/usdLux/light.h>
 
 namespace blender::io::usd {
 
@@ -99,6 +101,9 @@ USDXformableReader *USDPrimIterator::get_object_reader(const pxr::UsdPrim &prim,
   }
   else if (prim.IsA<pxr::UsdGeomXform>()) {
     result = new USDXformReader(prim, context);
+  }
+  else if (prim.IsA<pxr::UsdLuxLight>()) {
+    result = new USDLightReader(prim, context);
   }
 
   return result;
