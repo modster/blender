@@ -3726,12 +3726,12 @@ void ED_lineart_gpencil_generate(LineartRenderBuffer *rb,
     }
 
     if (pre_sample_length > 0.0001) {
-      BKE_gpencil_stroke_sample(gps, pre_sample_length, false);
+      BKE_gpencil_stroke_sample(gpencil_object->data, gps, pre_sample_length, false);
     }
     if (G.debug_value == 4000) {
       BKE_gpencil_stroke_set_random_color(gps);
     }
-    BKE_gpencil_stroke_geometry_update(gps);
+    BKE_gpencil_stroke_geometry_update(gpencil_object->data, gps);
     stroke_count++;
   }
 
