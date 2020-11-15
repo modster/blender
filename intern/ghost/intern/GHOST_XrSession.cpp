@@ -914,7 +914,6 @@ bool GHOST_XrSession::createActionBindings(const char *action_set_name,
 
       OpenXRAction *action = find_action(action_set, binding.action_name);
       if (action == nullptr) {
-        sbindings.pop_back();
         continue;
       }
 
@@ -934,28 +933,11 @@ bool GHOST_XrSession::createActionBindings(const char *action_set_name,
       }
     }
 
-    /* Since xrSuggestInteractionProfileBindings() overwrites all bindings, we
-     * need to re-add any existing bindings for the interaction profile. */
-    for (auto &action : action_set->actions) {
-      OpenXRActionProfile *profile = find_action_profile(&action.second, interaction_profile_path);
-      if (profile == nullptr) {
-        continue;
-      }
-      for (auto &binding : profile->bindings) {
-        if (nbindings.find(binding.first) != nbindings.end()) {
-          continue;
-        }
-        XrActionSuggestedBinding sbinding;
-        sbinding.action = action.second.action;
-        sbinding.binding = binding.second;
-
-        sbindings.push_back(std::move(sbinding));
-      }
-    }
-
     bindings_info.countSuggestedBindings = (uint32_t)sbindings.size();
     bindings_info.suggestedBindings = sbindings.data();
 
+    /* Although the bindings will be re-suggested in attachActionSets(), it greatly improves error
+     * checking to suggest them here first. */
     CHECK_XR(xrSuggestInteractionProfileBindings(instance, &bindings_info),
              (m_error_msg = (info.count_bindings == 1) ?
                                 std::string("Failed to create binding for profile \"") +
@@ -1028,8 +1010,7 @@ void GHOST_XrSession::destroyActionBindings(const char *action_set_name,
                             interaction_profile_path + "\".")
                  .c_str());
 
-    std::vector<XrActionSuggestedBinding> sbindings; /* suggested bindings */
-    std::set<std::string> dbindings;                 /* deleted bindings */
+    std::set<std::string> dbindings; /* deleted bindings */
 
     for (uint32_t binding_idx = 0; binding_idx < info.count_bindings; ++binding_idx) {
       const GHOST_XrActionBinding &binding = info.bindings[binding_idx];
@@ -1054,34 +1035,6 @@ void GHOST_XrSession::destroyActionBindings(const char *action_set_name,
         dbindings.insert({binding.interaction_paths[interaction_idx]});
       }
     }
-
-    /* Create list of suggested bindings that excludes deleted bindings. */
-    for (auto &action : action_set->actions) {
-      OpenXRActionProfile *profile = find_action_profile(&action.second, interaction_profile_path);
-      if (profile == nullptr) {
-        continue;
-      }
-
-      for (auto &binding : profile->bindings) {
-        if (dbindings.find(binding.first) != dbindings.end()) {
-          continue;
-        }
-        XrActionSuggestedBinding sbinding;
-        sbinding.action = action.second.action;
-        sbinding.binding = binding.second;
-
-        sbindings.push_back(std::move(sbinding));
-      }
-    }
-
-    bindings_info.countSuggestedBindings = (uint32_t)sbindings.size();
-    bindings_info.suggestedBindings = sbindings.data();
-
-    CHECK_XR(xrSuggestInteractionProfileBindings(instance, &bindings_info),
-             (m_error_msg = std::string("Failed to destroy bindings for profile \"") +
-                            interaction_profile_path +
-                            "\". Are the profile and action paths correct?")
-                 .c_str());
 
     for (uint32_t binding_idx = 0; binding_idx < info.count_bindings; ++binding_idx) {
       const GHOST_XrActionBinding &binding = info.bindings[binding_idx];
@@ -1119,6 +1072,46 @@ void GHOST_XrSession::destroyActionBindings(const char *action_set_name,
 
 bool GHOST_XrSession::attachActionSets()
 {
+  /* Suggest action bindings for all action sets. */
+  XrInteractionProfileSuggestedBinding bindings_info{
+      XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
+  std::map<XrPath, std::vector<XrActionSuggestedBinding>> profile_bindings;
+
+  XrInstance instance = m_context->getInstance();
+
+  for (auto &action_set : m_oxr->action_sets) {
+    for (auto &action : action_set.second.actions) {
+      for (auto &profile : action.second.profiles) {
+        auto p = profile_bindings.find(profile.second.profile);
+        if (p == profile_bindings.end()) {
+          std::vector<XrActionSuggestedBinding> sbindings;
+          p = profile_bindings.insert({profile.second.profile, std::move(sbindings)}).first;
+        }
+
+        std::vector<XrActionSuggestedBinding> &sbindings = p->second;
+
+        for (auto &binding : profile.second.bindings) {
+          XrActionSuggestedBinding sbinding;
+          sbinding.action = action.second.action;
+          sbinding.binding = binding.second;
+
+          sbindings.push_back(std::move(sbinding));
+        }
+      }
+    }
+  }
+
+  for (auto &profile : profile_bindings) {
+    bindings_info.interactionProfile = profile.first;
+    bindings_info.countSuggestedBindings = (uint32_t)profile.second.size();
+    bindings_info.suggestedBindings = profile.second.data();
+
+    CHECK_XR(
+        xrSuggestInteractionProfileBindings(instance, &bindings_info),
+        (m_error_msg = std::string("Failed to suggest interaction profile bindings.")).c_str());
+  }
+
+  /* Attach action sets. */
   XrSessionActionSetsAttachInfo attach_info{XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};
   attach_info.countActionSets = (uint32_t)m_oxr->action_sets.size();
 
