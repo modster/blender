@@ -21,6 +21,7 @@
  * \ingroup bke
  */
 
+#include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1406,36 +1407,32 @@ IDPropertyUIData *IDP_ui_data_ensure(IDProperty *idprop)
 
   size_t alloc_size = 0;
 
-  switch (idprop->type) {
-    case IDP_STRING:
-      alloc_size = sizeof(IDPropertyUIDataString);
-      break;
-    case IDP_INT:
-      alloc_size = sizeof(IDPropertyUIDataInt);
-      break;
-    case IDP_ARRAY:
-      switch (idprop->subtype) {
-        case IDP_INT:
-          alloc_size = sizeof(IDPropertyUIDataInt);
-          break;
-        case IDP_FLOAT:
-        case IDP_DOUBLE:
-          alloc_size = sizeof(IDPropertyUIDataFloat);
-          break;
-        default:
-          /* UI data isn't supported for array properties with other subtypes. */
-          BLI_assert(false);
-          break;
-      }
-      break;
-    case IDP_FLOAT:
-    case IDP_DOUBLE:
-      alloc_size = sizeof(IDPropertyUIDataFloat);
-      break;
-    default:
-      /* UI data for type not supported. */
-      BLI_assert(false);
-      break;
+  if (idprop->type == IDP_STRING) {
+    idprop->ui_data = MEM_callocN(sizeof(IDPropertyUIDataString), __func__);
+  }
+  else if (idprop->type == IDP_INT || (idprop->type == IDP_ARRAY && idprop->subtype == IDP_INT)) {
+    IDPropertyUIDataInt *ui_data = MEM_callocN(sizeof(IDPropertyUIDataInt), __func__);
+    ui_data->min = INT_MIN;
+    ui_data->min = INT_MAX;
+    ui_data->soft_min = INT_MIN;
+    ui_data->soft_max = INT_MAX;
+    ui_data->step = 1;
+    idprop->ui_data = (IDPropertyUIData *)ui_data;
+  }
+  else if (ELEM(idprop->type, IDP_FLOAT, IDP_DOUBLE) ||
+           (idprop->type == IDP_ARRAY && ELEM(idprop->subtype, IDP_FLOAT, IDP_DOUBLE))) {
+    IDPropertyUIDataFloat *ui_data = MEM_callocN(sizeof(IDPropertyUIDataFloat), __func__);
+    ui_data->min = FLT_MIN;
+    ui_data->min = FLT_MIN;
+    ui_data->soft_min = FLT_MIN;
+    ui_data->soft_max = FLT_MAX;
+    ui_data->step = 1.0f;
+    ui_data->step = 3.0f;
+    idprop->ui_data = (IDPropertyUIData *)ui_data;
+  }
+  else {
+    /* UI data not supported for remaining types, this shouldn't be called in those cases. */
+    BLI_assert(false);
   }
 
   if (alloc_size > 0) {
