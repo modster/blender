@@ -1067,7 +1067,7 @@ GHOST_TSuccess GHOST_XrEventsHandle(GHOST_XrContextHandle xr_context);
 
 /* actions */
 /**
- * Create an OpenXR action set for input / output.
+ * Create an OpenXR action set for input/output.
  */
 int GHOST_XrCreateActionSet(GHOST_XrContextHandle xr_context, const GHOST_XrActionSetInfo *info);
 
@@ -1077,7 +1077,7 @@ int GHOST_XrCreateActionSet(GHOST_XrContextHandle xr_context, const GHOST_XrActi
 void GHOST_XrDestroyActionSet(GHOST_XrContextHandle xr_context, const char *action_set_name);
 
 /**
- * Create OpenXR input / output actions.
+ * Create OpenXR input/output actions.
  */
 int GHOST_XrCreateActions(GHOST_XrContextHandle xr_context,
                           const char *action_set_name,
@@ -1109,10 +1109,7 @@ void GHOST_XrDestroyActionSpaces(GHOST_XrContextHandle xr_context,
                                  const GHOST_XrActionSpaceInfo *infos);
 
 /**
- * Create input / output path bindings for OpenXR actions.
- *
- * \param replace_existing: Whether to replace all existing bindings for the profiles
- * specified in infos.
+ * Create input/output path bindings for OpenXR actions.
  */
 int GHOST_XrCreateActionBindings(GHOST_XrContextHandle xr_context,
                                  const char *action_set_name,
@@ -1133,7 +1130,7 @@ void GHOST_XrDestroyActionBindings(GHOST_XrContextHandle xr_context,
 int GHOST_XrAttachActionSets(GHOST_XrContextHandle xr_context);
 
 /**
- * Update button / tracking states for OpenXR actions.
+ * Update button/tracking states for OpenXR actions.
  *
  * \param action_set_name: The name of the action set to sync. If NULL, all action sets
  * attached to the session will be synced.
