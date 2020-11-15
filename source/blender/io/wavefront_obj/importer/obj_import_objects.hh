@@ -72,7 +72,7 @@ struct VertexIndexOffset {
 struct FaceCorner {
   /* These indices range from zero to total vertices in the OBJ file. */
   int vert_index;
-  /* -1 is to indicate abscense of UV vertices. Only < 0 condition should be checked since
+  /* -1 is to indicate absence of UV vertices. Only < 0 condition should be checked since
    * it can be less than -1 too. */
   int uv_vert_index = -1;
   int vertex_normal_index;
@@ -116,7 +116,7 @@ class Geometry {
   std::string geometry_name_{};
   VectorSet<std::string> material_names_{};
   /**
-   * Indices in the vector range from zero to total vertices in a geomery.
+   * Indices in the vector range from zero to total vertices in a geometry.
    * Values range from zero to total coordinates in the global list.
    */
   Vector<int> vertex_indices_;

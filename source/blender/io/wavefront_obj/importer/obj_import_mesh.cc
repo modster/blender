@@ -234,7 +234,7 @@ void MeshFromGeometry::create_vertices()
  * Create polygons for the Mesh, set smooth shading flag, deform group name, assigned material
  * also.
  *
- * It must recieve all polygons to be added to the mesh. Remove holes from polygons before
+ * It must receive all polygons to be added to the mesh. Remove holes from polygons before
  * calling this.
  */
 void MeshFromGeometry::create_polys_loops(Span<FaceElement> all_faces)

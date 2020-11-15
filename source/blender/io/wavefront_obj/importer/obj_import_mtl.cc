@@ -115,7 +115,7 @@ static bool load_texture_image(Main *bmain, const tex_map_XX &tex_map, bNode *r_
 }
 
 /**
- * Initialises a nodetree with a p-BSDF node's BSDF socket connected to shader output node's
+ * Initializes a nodetree with a p-BSDF node's BSDF socket connected to shader output node's
  * surface socket.
  */
 ShaderNodetreeWrap::ShaderNodetreeWrap(Main *bmain, const MTLMaterial &mtl_mat) : mtl_mat_(mtl_mat)
