@@ -1164,6 +1164,8 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
             }
           }
         }
+      }
+    }
 
     if (!DNA_struct_find(fd->filesdna, "SceneLineArt")) {
       LISTBASE_FOREACH (Scene *, sc, &bmain->scenes) {
