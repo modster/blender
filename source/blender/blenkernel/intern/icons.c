@@ -630,7 +630,7 @@ void BKE_icon_changed(const int icon_id)
     /* If we have previews, they all are now invalid changed. */
     if (p_prv && *p_prv) {
       for (int i = 0; i < NUM_ICON_SIZES; i++) {
-        (*p_prv)->flag[i] |= PRV_CHANGED;
+        (*p_prv)->flag[i] |= (PRV_CHANGED | PRV_UNFINISHED);
         (*p_prv)->changed_timestamp[i]++;
       }
     }
