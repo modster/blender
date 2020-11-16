@@ -4228,11 +4228,15 @@ static PyObject *pyrna_struct_dir(BPy_StructRNA *self)
   return ret;
 }
 
+PyDoc_STRVAR(pyrna_struct_custom_properties_doc,
+             ".. classmethod:: custom_properties(struct)\n"
+             "   :return: the custom IDProperties for an RNA struct.\n"
+             "   :rtype: :class:`bpy.types.IDProperty`\n"); /* HANS-TODO: Proper name. */
 static PyObject *pyrna_struct_custom_properties(BPy_StructRNA *self)
 {
   PYRNA_STRUCT_CHECK_OBJ(self);
 
-  IDProperty *idprops = RNA_struct_idprops(self->ptr, false);
+  IDProperty *idprops = RNA_struct_idprops(&self->ptr, false);
 
   if (idprops == NULL) {
     return NULL;
@@ -5727,7 +5731,7 @@ static struct PyMethodDef pyrna_struct_methods[] = {
     {"custom_properties",
      (PyCFunction)pyrna_struct_custom_properties,
      METH_NOARGS,
-     pyrna_custom_properties},
+     pyrna_struct_custom_properties_doc},
 
 /* experimental */
 /* unused for now */

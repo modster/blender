@@ -1375,8 +1375,8 @@ class WM_OT_properties_edit(Operator):
 
         # setup defaults
         props = item.custom_properties()
-        props.update_rna()
-        self.min = self.property.min
+        props.update_rna(self.property)
+        self.min = self.property.min # HANS-TODO: This doesn't work, self.property is a STRING
         self.max = self.property.max
         self.soft_min = self.property.soft_min
         self.soft_max = self.property.soft_max

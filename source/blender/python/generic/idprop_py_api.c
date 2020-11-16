@@ -1340,7 +1340,7 @@ PyDoc_STRVAR(BPy_IDGroup_update_rna_doc,
 static void BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObject *kwargs)
 {
   const char *key;
-  const char *rna_subtype = NULL;
+  PyObject *rna_subtype = NULL;
   PyObject *min = NULL;
   PyObject *max = NULL;
   PyObject *soft_min = NULL;
@@ -1348,7 +1348,7 @@ static void BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObjec
   PyObject *precision = NULL;
   PyObject *step = NULL;
   PyObject *default_value = NULL;
-  const char *description = NULL;
+  PyObject *description = NULL;
 
   static const char *kwlist[] = {"key",
                                  "subtype",
@@ -1358,13 +1358,13 @@ static void BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObjec
                                  "soft_max",
                                  "precision",
                                  "step",
-                                 "default_value",
+                                 "default",
                                  "description",
                                  NULL};
 
   if (!PyArg_ParseTupleAndKeywords(args,
                                    kwargs,
-                                   "s|sOOOOOOOs:update_rna",
+                                   "s|OOOOOOOOO:update_rna",
                                    (char **)kwlist,
                                    &key,
                                    &rna_subtype,
@@ -1390,12 +1390,23 @@ static void BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObjec
   IDP_ui_data_ensure(idprop);
 
   if (rna_subtype != NULL) {
-    int result = PROP_NONE;
-    RNA_enum_value_from_id(rna_enum_property_subtype_items, rna_subtype, &result);
-    idprop->ui_data->rna_subtype = result;
+    if (PyUnicode_Check(rna_subtype)) {
+      const char *subtype_string = _PyUnicode_AsString(rna_subtype);
+      int result = PROP_NONE;
+      RNA_enum_value_from_id(rna_enum_property_subtype_items, subtype_string, &result);
+      idprop->ui_data->rna_subtype = result;
+    }
+    else if (rna_subtype != Py_None) {
+      PyErr_SetString(PyExc_TypeError, "RNA subtype must be a string object");
+    }
   }
   if (description != NULL) {
-    idprop->ui_data->description = BLI_strdup(description);
+    if (PyUnicode_Check(rna_subtype)) {
+      idprop->ui_data->description = BLI_strdup(_PyUnicode_AsString(rna_subtype));
+    }
+    else if (description != Py_None) {
+      PyErr_SetString(PyExc_TypeError, "Property description must be a string object");
+    }
   }
   if (idprop->type == IDP_INT || (idprop->type == IDP_ARRAY && idprop->subtype == IDP_INT)) {
     idprop_update_rna_ui_data_int(idprop, min, max, soft_min, soft_max, step, default_value);
