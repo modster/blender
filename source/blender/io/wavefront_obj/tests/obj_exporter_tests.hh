@@ -25,12 +25,20 @@ using array_float_3 = std::array<float, 3>;
 class NurbsObject {
  private:
   std::string nurbs_name_;
+  /* The indices in these vectors are spline indices. */
   std::vector<std::vector<array_float_3>> coordinates_;
+  std::vector<int> degrees_;
+  std::vector<int> control_points_;
 
  public:
   NurbsObject(const std::string nurbs_name,
-              const std::vector<std::vector<array_float_3>> coordinates)
-      : nurbs_name_(nurbs_name), coordinates_(coordinates)
+              const std::vector<std::vector<array_float_3>> coordinates,
+              const std::vector<int> degrees,
+              const std::vector<int> control_points)
+      : nurbs_name_(nurbs_name),
+        coordinates_(coordinates),
+        degrees_(degrees),
+        control_points_(control_points)
   {
   }
 
@@ -51,6 +59,16 @@ class NurbsObject {
   const float *vertex_coordinates(const int spline_index, const int vertex_index) const
   {
     return coordinates_[spline_index][vertex_index].data();
+  }
+
+  int get_nurbs_degree(const int spline_index) const
+  {
+    return degrees_[spline_index];
+  }
+
+  int total_spline_control_points(const int spline_index) const
+  {
+    return control_points_[spline_index];
   }
 };
 
@@ -97,7 +115,7 @@ const std::vector<std::vector<array_float_3>> coordinates_NurbsCircle{
      {10.463165, 0.000000, 1.000000},
      {10.463165, 0.000000, 0.000000},
      {10.463165, 0.000000, -1.000000}}};
-const std::vector<std::vector<array_float_3>> coordinates_NurbsPath{
+const std::vector<std::vector<array_float_3>> coordinates_NurbsPathCurve{
     {{17.690557, 0.000000, 0.000000},
      {16.690557, 0.000000, 0.000000},
      {15.690557, 0.000000, 0.000000},
@@ -110,12 +128,21 @@ const std::vector<std::vector<array_float_3>> coordinates_NurbsPath{
 
 const std::map<std::string, std::unique_ptr<NurbsObject>> all_nurbs_truth = []() {
   std::map<std::string, std::unique_ptr<NurbsObject>> all_nurbs;
-  all_nurbs.emplace("NurbsCurve",
-                    std::make_unique<NurbsObject>("NurbsCurve", coordinates_NurbsCurve));
-  all_nurbs.emplace("NurbsCircle",
-                    std::make_unique<NurbsObject>("NurbsCircle", coordinates_NurbsCircle));
-  all_nurbs.emplace("NurbsPath",
-                    std::make_unique<NurbsObject>("NurbsPath", coordinates_NurbsPath));
+  all_nurbs.emplace(
+      "NurbsCurve",
+      /* Name, coordinates, degrees of splines, control points of splines. */
+      std::make_unique<NurbsObject>(
+          "NurbsCurve", coordinates_NurbsCurve, std::vector<int>{3}, std::vector<int>{4}));
+  all_nurbs.emplace(
+      "NurbsCircle",
+      std::make_unique<NurbsObject>(
+          "NurbsCircle", coordinates_NurbsCircle, std::vector<int>{3}, std::vector<int>{11}));
+  /* This is actually an Object containing a NurbsPath and a NurbsCurve spline.  */
+  all_nurbs.emplace("NurbsPathCurve",
+                    std::make_unique<NurbsObject>("NurbsPathCurve",
+                                                  coordinates_NurbsPathCurve,
+                                                  std::vector<int>{3, 3},
+                                                  std::vector<int>{5, 4}));
   return all_nurbs;
 }();
 }  // namespace blender::io::obj

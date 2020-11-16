@@ -105,6 +105,35 @@ TEST(obj_exporter_test_utils, append_positive_frame_to_filename)
   EXPECT_EQ_ARRAY(path_with_frame, path_truth, BLI_strlen_utf8(path_truth));
 }
 
+TEST_F(obj_exporter_test, OBJCurve_nurbs_points)
+{
+  if (!load_file_and_depsgraph(all_curve_objects_file)) {
+    ADD_FAILURE();
+    return;
+  }
+
+  OBJExportParamsDefault _export;
+  _export.params.export_curves_as_nurbs = true;
+  auto [objmeshes_unused, objcurves]{filter_supported_objects(depsgraph, _export.params)};
+
+  for (StealUniquePtr<OBJCurve> objcurve : objcurves) {
+    if (all_nurbs_truth.count(objcurve->get_curve_name()) != 1) {
+      ADD_FAILURE();
+      return;
+    }
+    const NurbsObject *const nurbs_truth = all_nurbs_truth.at(objcurve->get_curve_name()).get();
+    EXPECT_EQ(objcurve->total_splines(), nurbs_truth->total_splines());
+    for (int spline_index : IndexRange(objcurve->total_splines())) {
+      EXPECT_EQ(objcurve->total_spline_vertices(spline_index),
+                nurbs_truth->total_spline_vertices(spline_index));
+      EXPECT_EQ(objcurve->get_nurbs_degree(spline_index),
+                nurbs_truth->get_nurbs_degree(spline_index));
+      EXPECT_EQ(objcurve->total_spline_control_points(spline_index),
+                nurbs_truth->total_spline_control_points(spline_index));
+    }
+  }
+}
+
 TEST_F(obj_exporter_test, OBJCurve_coordinates)
 {
   if (!load_file_and_depsgraph(all_curve_objects_file)) {
