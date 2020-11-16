@@ -21,7 +21,8 @@
 
 namespace blender::io::obj {
 
-class Export_OBJ : public BlendfileLoadingBaseTest {
+/* This is also the test name. */
+class obj_exporter_test : public BlendfileLoadingBaseTest {
  public:
   /**
    * \param filepath: relative to "tests" directory.
@@ -37,10 +38,12 @@ class Export_OBJ : public BlendfileLoadingBaseTest {
   }
 };
 
+// https://developer.blender.org/F9260238
 const std::string all_objects_file = "io_tests/blend_scene/all_objects_2_92.blend";
+// https://developer.blender.org/F9278970
 const std::string all_curve_objects_file = "io_tests/blend_scene/all_curves_2_92.blend";
 
-TEST_F(Export_OBJ, filter_objects_curves_as_mesh)
+TEST_F(obj_exporter_test, filter_objects_curves_as_mesh)
 {
   OBJExportParamsDefault _export;
   if (!load_file_and_depsgraph(all_objects_file)) {
@@ -53,7 +56,7 @@ TEST_F(Export_OBJ, filter_objects_curves_as_mesh)
   EXPECT_EQ(objcurves.size(), 0);
 }
 
-TEST_F(Export_OBJ, filter_objects_curves_as_nurbs)
+TEST_F(obj_exporter_test, filter_objects_curves_as_nurbs)
 {
   OBJExportParamsDefault _export;
   if (!load_file_and_depsgraph(all_objects_file)) {
@@ -66,7 +69,7 @@ TEST_F(Export_OBJ, filter_objects_curves_as_nurbs)
   EXPECT_EQ(objcurves.size(), 4);
 }
 
-TEST_F(Export_OBJ, filter_objects_selected)
+TEST_F(obj_exporter_test, filter_objects_selected)
 {
   OBJExportParamsDefault _export;
   if (!load_file_and_depsgraph(all_objects_file)) {
@@ -80,7 +83,7 @@ TEST_F(Export_OBJ, filter_objects_selected)
   EXPECT_EQ(objcurves.size(), 2);
 }
 
-TEST(Export_OBJ_utils, append_negative_frame_to_filename)
+TEST(obj_exporter_test_utils, append_negative_frame_to_filename)
 {
   const char path_original[FILE_MAX] = "/my_file.obj";
   const char path_truth[FILE_MAX] = "/my_file-123.obj";
@@ -91,7 +94,7 @@ TEST(Export_OBJ_utils, append_negative_frame_to_filename)
   EXPECT_EQ_ARRAY(path_with_frame, path_truth, BLI_strlen_utf8(path_truth));
 }
 
-TEST(Export_OBJ_utils, append_positive_frame_to_filename)
+TEST(obj_exporter_test_utils, append_positive_frame_to_filename)
 {
   const char path_original[FILE_MAX] = "/my_file.obj";
   const char path_truth[FILE_MAX] = "/my_file123.obj";
@@ -102,7 +105,7 @@ TEST(Export_OBJ_utils, append_positive_frame_to_filename)
   EXPECT_EQ_ARRAY(path_with_frame, path_truth, BLI_strlen_utf8(path_truth));
 }
 
-TEST_F(Export_OBJ, OBJCurve)
+TEST_F(obj_exporter_test, OBJCurve_coordinates)
 {
   if (!load_file_and_depsgraph(all_curve_objects_file)) {
     ADD_FAILURE();
