@@ -1255,7 +1255,6 @@ class WM_OT_properties_edit(Operator):
 
     def execute(self, context):
         from rna_prop_ui import (
-            rna_idprop_ui_prop_get,
             rna_idprop_ui_prop_clear,
             rna_idprop_ui_prop_update,
             rna_idprop_value_item_type,
@@ -1345,7 +1344,6 @@ class WM_OT_properties_edit(Operator):
 
     def invoke(self, context, _event):
         from rna_prop_ui import (
-            rna_idprop_ui_prop_get,
             rna_idprop_value_to_python,
             rna_idprop_value_item_type
         )
@@ -1376,26 +1374,13 @@ class WM_OT_properties_edit(Operator):
             self.default = ""
 
         # setup defaults
-        prop_ui = rna_idprop_ui_prop_get(item, self.property, False)  # don't create
-        if prop_ui:
-            self.min = prop_ui.get("min", -1000000000)
-            self.max = prop_ui.get("max", 1000000000)
-            self.description = prop_ui.get("description", "")
-
-            defval = prop_ui.get("default", None)
-            if defval is not None:
-                self.default = str(rna_idprop_value_to_python(defval))
-
-            self.soft_min = prop_ui.get("soft_min", self.min)
-            self.soft_max = prop_ui.get("soft_max", self.max)
-            self.use_soft_limits = (
-                self.min != self.soft_min or
-                self.max != self.soft_max
-            )
-
-            subtype = prop_ui.get("subtype", None)
-        else:
-            subtype = None
+        props = item.custom_properties()
+        props.update_rna()
+        self.min = self.property.min
+        self.max = self.property.max
+        self.soft_min = self.property.soft_min
+        self.soft_max = self.property.soft_max
+        self.subtype = self.property.subtype
 
         self._init_subtype(prop_type, is_array, subtype)
 

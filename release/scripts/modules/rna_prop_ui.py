@@ -49,17 +49,14 @@ def rna_idprop_ui_prop_update(item, prop):
 
 
 def rna_idprop_ui_prop_clear(item, prop, remove=True):
-    rna_ui = rna_idprop_ui_get(item, False)
-
-    if rna_ui is None:
-        return
-
-    try:
-        del rna_ui[prop]
-    except KeyError:
-        pass
-    if remove and len(item.keys()) == 1:
-        rna_idprop_ui_del(item)
+    # HANS-TODO: Add a clear method to the API
+    item.update_rna(prop, subtype="", 
+                        min=None, 
+                        max=None, 
+                        soft_min=None, 
+                        soft_max=None,
+                        description="",
+                        default=None)
 
 
 def rna_idprop_context_value(context, context_member, property_type):

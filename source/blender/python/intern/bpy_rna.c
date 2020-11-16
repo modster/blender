@@ -4228,6 +4228,23 @@ static PyObject *pyrna_struct_dir(BPy_StructRNA *self)
   return ret;
 }
 
+static PyObject *pyrna_struct_custom_properties(BPy_StructRNA *self)
+{
+  PYRNA_STRUCT_CHECK_OBJ(self);
+
+  IDProperty *idprops = RNA_struct_idprops(self->ptr, false);
+
+  if (idprops == NULL) {
+    return NULL;
+  }
+
+  BPy_IDProperty *group = PyObject_New(BPy_IDProperty, &BPy_IDGroup_Type);
+  group->id = self->ptr.owner_id;
+  group->prop = idprops;
+  group->parent = NULL; /* can be NULL */
+  return (PyObject *)group;
+}
+
 /* ---------------getattr-------------------------------------------- */
 static PyObject *pyrna_struct_getattro(BPy_StructRNA *self, PyObject *pyname)
 {
@@ -5707,6 +5724,10 @@ static struct PyMethodDef pyrna_struct_methods[] = {
      METH_VARARGS | METH_CLASS,
      pyrna_struct_bl_rna_get_subclass_doc},
     {"__dir__", (PyCFunction)pyrna_struct_dir, METH_NOARGS, NULL},
+    {"custom_properties",
+     (PyCFunction)pyrna_struct_custom_properties,
+     METH_NOARGS,
+     pyrna_custom_properties},
 
 /* experimental */
 /* unused for now */
