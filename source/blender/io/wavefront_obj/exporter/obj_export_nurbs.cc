@@ -68,20 +68,24 @@ int OBJCurve::total_splines() const
   return BLI_listbase_count(&export_curve_->nurb);
 }
 
-int OBJCurve::total_nurbs_points(const int spline_index) const
+/**
+ * \param spline_index: Zero-based index of spline of interest.
+ * \return: Total vertices in a spline.
+ */
+int OBJCurve::total_spline_vertices(const int spline_index) const
 {
-  const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, spline_index));
+  const Nurb *const nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, spline_index));
   return nurb->pntsu * nurb->pntsv;
 }
 
 /**
- * Get coordinates of the vertex at the given index.
+ * Get coordinates of the vertex at the given index on the given spline.
  */
-float3 OBJCurve::get_nurbs_point_coords(const int spline_index,
-                                        const int vertex_index,
-                                        const float scaling_factor) const
+float3 OBJCurve::vertex_coordinates(const int spline_index,
+                                    const int vertex_index,
+                                    const float scaling_factor) const
 {
-  const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, spline_index));
+  const Nurb *const nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, spline_index));
   float3 r_coord;
   const BPoint &bpoint = nurb->bp[vertex_index];
   copy_v3_v3(r_coord, bpoint.vec);
@@ -91,11 +95,12 @@ float3 OBJCurve::get_nurbs_point_coords(const int spline_index,
 }
 
 /**
- * Get total control points of the NURBS Curve at the given index.
+ * Get total control points of the NURBS spline at the given index. This is different than total
+ * vertices of a spline.
  */
-int OBJCurve::get_nurbs_num(const int spline_index) const
+int OBJCurve::total_spline_control_points(const int spline_index) const
 {
-  const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, spline_index));
+  const Nurb *const nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, spline_index));
   const int r_nurbs_degree = nurb->orderu - 1;
   /* Total control points = Number of points in the curve (+ degree of the
    * curve if it is cyclic). */
@@ -107,11 +112,11 @@ int OBJCurve::get_nurbs_num(const int spline_index) const
 }
 
 /**
- * Get the degree of the NURBS Curve at the given index.
+ * Get the degree of the NURBS spline at the given index.
  */
 int OBJCurve::get_nurbs_degree(const int spline_index) const
 {
-  const Nurb *nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, spline_index));
+  const Nurb *const nurb = static_cast<Nurb *>(BLI_findlink(&export_curve_->nurb, spline_index));
   return nurb->orderu - 1;
 }
 

@@ -403,18 +403,17 @@ void OBJWriter::write_edges_indices(const OBJMesh &obj_mesh_data) const
  */
 void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
 {
-  const int tot_nurbs = obj_nurbs_data.total_splines();
-  for (int i = 0; i < tot_nurbs; i++) {
-    /* Total control points in a nurbs. */
-    const int tot_points = obj_nurbs_data.total_nurbs_points(i);
-    for (int point_idx = 0; point_idx < tot_points; point_idx++) {
-      const float3 point_coord = obj_nurbs_data.get_nurbs_point_coords(
-          i, point_idx, export_params_.scaling_factor);
-      fprintf(outfile_, "v %f %f %f\n", point_coord[0], point_coord[1], point_coord[2]);
+  const int total_splines = obj_nurbs_data.total_splines();
+  for (int spline_idx = 0; spline_idx < total_splines; spline_idx++) {
+    const int total_vertices = obj_nurbs_data.total_spline_vertices(spline_idx);
+    for (int vertex_idx = 0; vertex_idx < total_vertices; vertex_idx++) {
+      const float3 vertex_coords = obj_nurbs_data.vertex_coordinates(
+          spline_idx, vertex_idx, export_params_.scaling_factor);
+      fprintf(outfile_, "v %f %f %f\n", vertex_coords[0], vertex_coords[1], vertex_coords[2]);
     }
 
     const char *nurbs_name = obj_nurbs_data.get_curve_name();
-    const int nurbs_degree = obj_nurbs_data.get_nurbs_degree(i);
+    const int nurbs_degree = obj_nurbs_data.get_nurbs_degree(spline_idx);
     fprintf(outfile_,
             "g %s\n"
             "cstype bspline\n"
@@ -422,22 +421,23 @@ void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
             nurbs_name,
             nurbs_degree);
     /**
-     * The numbers here are indices into the vertex coordinates written
-     * above, relative to the line that is going to be written.
+     * The numbers written here are indices into the vertex coordinates written
+     * earlier, relative to the line that is going to be written.
      * [0.0 - 1.0] is the curve parameter range.
-     * 0.0 1.0 -1 -2 -3 -4 for a non-cyclic curve with 4 points.
-     * 0.0 1.0 -1 -2 -3 -4 -1 -2 -3 for a cyclic curve with 4 points.
+     * 0.0 1.0 -1 -2 -3 -4 for a non-cyclic curve with 4 vertices.
+     * 0.0 1.0 -1 -2 -3 -4 -1 -2 -3 for a cyclic curve with 4 vertices.
      */
-    const int total_control_points = obj_nurbs_data.get_nurbs_num(i);
+    const int total_control_points = obj_nurbs_data.total_spline_control_points(spline_idx);
     fputs("curv 0.0 1.0", outfile_);
     for (int i = 0; i < total_control_points; i++) {
-      /* "+1" to keep indices one-based, even if they're negative. */
-      fprintf(outfile_, " %d", -((i % tot_points) + 1));
+      /* "+1" to keep indices one-based, even if they're negative: i.e., -1 refers to the last
+       * vertex coordinate, -2 second last. */
+      fprintf(outfile_, " %d", -((i % total_vertices) + 1));
     }
     fputs("\n", outfile_);
 
     /**
-     * In "parm u 0 0.1 .." line:, total control points + 2 equidistant numbers in the parameter
+     * In "parm u 0 0.1 .." line:, (total control points + 2) equidistant numbers in the parameter
      * range are inserted.
      */
     fputs("parm u 0.000000 ", outfile_);

@@ -125,12 +125,10 @@ TEST_F(Export_OBJ, OBJCurve)
     const NurbsObject *const nurbs_truth = all_nurbs_truth.at(objcurve->get_curve_name()).get();
     EXPECT_EQ(objcurve->total_splines(), nurbs_truth->total_splines());
     for (int spline_index : IndexRange(objcurve->total_splines())) {
-      EXPECT_EQ(objcurve->total_nurbs_points(spline_index),
-                nurbs_truth->total_nurbs_points(spline_index));
-      for (int vertex_index : IndexRange(objcurve->total_nurbs_points(spline_index))) {
-        EXPECT_V3_NEAR(objcurve->get_nurbs_point_coords(
+      for (int vertex_index : IndexRange(objcurve->total_spline_vertices(spline_index))) {
+        EXPECT_V3_NEAR(objcurve->vertex_coordinates(
                            spline_index, vertex_index, _export.params.scaling_factor),
-                       nurbs_truth->get_nurbs_point_coords(spline_index, vertex_index),
+                       nurbs_truth->vertex_coordinates(spline_index, vertex_index),
                        0.000001f);
       }
     }

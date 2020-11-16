@@ -19,8 +19,8 @@ namespace blender::io::obj {
 using array_float_3 = std::array<float, 3>;
 
 /**
- * This matches OBJCurve's member functions, except that all the numbers and names are known
- * constants. Used to store expected values of NURBS objects.
+ * This matches #OBJCurve's member functions, except that all the numbers and names are known
+ * constants. Used to store expected values of NURBS Curve sobjects.
  */
 class NurbsObject {
  private:
@@ -39,7 +39,7 @@ class NurbsObject {
     return coordinates_.size();
   }
 
-  int total_nurbs_points(const int spline_index) const
+  int total_spline_vertices(const int spline_index) const
   {
     if (spline_index >= coordinates_.size()) {
       ADD_FAILURE();
@@ -48,7 +48,7 @@ class NurbsObject {
     return coordinates_[spline_index].size();
   }
 
-  const float *get_nurbs_point_coords(const int spline_index, const int vertex_index) const
+  const float *vertex_coordinates(const int spline_index, const int vertex_index) const
   {
     return coordinates_[spline_index][vertex_index].data();
   }

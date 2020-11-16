@@ -33,7 +33,7 @@ namespace blender::io::obj {
  * Provides access to the a Curve Object's properties.
  * Only #CU_NURBS type is supported.
  *
- * \note Used for Curves to be exported in parameter form, not converted to meshes.
+ * \note Used for Curves to be exported in parameter form, and not converted to meshes.
  */
 class OBJCurve : NonCopyable {
  private:
@@ -46,11 +46,11 @@ class OBJCurve : NonCopyable {
 
   const char *get_curve_name() const;
   int total_splines() const;
-  int total_nurbs_points(const int spline_index) const;
-  float3 get_nurbs_point_coords(const int spline_index,
-                                const int vertex_index,
-                                const float scaling_factor) const;
-  int get_nurbs_num(const int spline_index) const;
+  int total_spline_vertices(const int spline_index) const;
+  float3 vertex_coordinates(const int spline_index,
+                            const int vertex_index,
+                            const float scaling_factor) const;
+  int total_spline_control_points(const int spline_index) const;
   int get_nurbs_degree(const int spline_index) const;
 
  private:
