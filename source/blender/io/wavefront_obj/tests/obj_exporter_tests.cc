@@ -44,6 +44,7 @@ TEST_F(Export_OBJ, filter_objects_curves_as_mesh)
 {
   OBJExportParamsDefault _export;
   if (!load_file_and_depsgraph(all_objects_file)) {
+    ADD_FAILURE();
     return;
   }
 
@@ -56,6 +57,7 @@ TEST_F(Export_OBJ, filter_objects_curves_as_nurbs)
 {
   OBJExportParamsDefault _export;
   if (!load_file_and_depsgraph(all_objects_file)) {
+    ADD_FAILURE();
     return;
   }
   _export.params.export_curves_as_nurbs = true;
@@ -68,6 +70,7 @@ TEST_F(Export_OBJ, filter_objects_selected)
 {
   OBJExportParamsDefault _export;
   if (!load_file_and_depsgraph(all_objects_file)) {
+    ADD_FAILURE();
     return;
   }
   _export.params.export_selected_objects = true;
@@ -102,16 +105,9 @@ TEST(Export_OBJ_utils, append_positive_frame_to_filename)
 TEST_F(Export_OBJ, OBJCurve)
 {
   if (!load_file_and_depsgraph(all_curve_objects_file)) {
+    ADD_FAILURE();
     return;
   }
-  const std::map<std::string, std::unique_ptr<NurbsObject>> all_nurbs_truth = []() {
-    std::map<std::string, std::unique_ptr<NurbsObject>> t;
-    t.emplace("NurbsCurve", std::make_unique<NurbsObject>("NurbsCurve", coordinates_NurbsCurve));
-    t.emplace("NurbsCircle",
-              std::make_unique<NurbsObject>("NurbsCircle", coordinates_NurbsCircle));
-    t.emplace("NurbsPath", std::make_unique<NurbsObject>("NurbsPath", coordinates_NurbsPath));
-    return t;
-  }();
 
   OBJExportParamsDefault _export;
   _export.params.export_curves_as_nurbs = true;

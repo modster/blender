@@ -107,4 +107,15 @@ const std::vector<std::vector<array_float_3>> coordinates_NurbsPath{
      {16.688307, 0.000000, 1.000000},
      {14.688307, 0.000000, 1.000000},
      {14.188307, 0.000000, 0.000000}}};
+
+const std::map<std::string, std::unique_ptr<NurbsObject>> all_nurbs_truth = []() {
+  std::map<std::string, std::unique_ptr<NurbsObject>> all_nurbs;
+  all_nurbs.emplace("NurbsCurve",
+                    std::make_unique<NurbsObject>("NurbsCurve", coordinates_NurbsCurve));
+  all_nurbs.emplace("NurbsCircle",
+                    std::make_unique<NurbsObject>("NurbsCircle", coordinates_NurbsCircle));
+  all_nurbs.emplace("NurbsPath",
+                    std::make_unique<NurbsObject>("NurbsPath", coordinates_NurbsPath));
+  return all_nurbs;
+}();
 }  // namespace blender::io::obj
