@@ -33,6 +33,7 @@ set(INC
   ../../../../intern/clog
   ../../../../intern/guardedalloc
   ../../../../intern/utfconv
+  D:/MyBlender/Otros/libharu_lib/include
 )
 
 set(INC_SYS
@@ -44,16 +45,17 @@ set(SRC
  intern/gpencil_io_export_base.cc
  intern/gpencil_io_export_svg.cc
 
+ gpencil_io_importer.h
  gpencil_io_exporter.h
  intern/gpencil_io_export_svg.h
-intern/gpencil_io_export_base.h
+ intern/gpencil_io_export_base.h
 )
 
 set(LIB
   bf_blenkernel
   bf_blenlib
   bf_io_common
-
+  D:/MyBlender/Otros/libharu_lib/libhpdfsd.lib
   ${PUGIXML_LIBRARIES}
 )
 

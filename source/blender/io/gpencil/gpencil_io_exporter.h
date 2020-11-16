@@ -83,6 +83,7 @@ typedef enum eGpencilExportParams_Flag {
 
 typedef enum eGpencilExport_Modes {
   GP_EXPORT_TO_SVG = 0,
+  GP_EXPORT_TO_PDF = 1,
   /* Add new export formats here. */
 } eGpencilExport_Modes;
 

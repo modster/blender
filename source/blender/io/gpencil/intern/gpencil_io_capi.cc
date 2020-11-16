@@ -44,6 +44,8 @@
 #include "DEG_depsgraph_query.h"
 
 #include "../gpencil_io_exporter.h"
+#include "../gpencil_io_importer.h"
+
 #include "gpencil_io_export_svg.h"
 
 using blender::io::gpencil::GpencilExporterSVG;
@@ -213,6 +215,25 @@ static bool gpencil_io_export_storyboard(Depsgraph *depsgraph,
   }
 
   delete exporter;
+
+  return done;
+}
+
+/* Main import entry point function. */
+bool gpencil_io_import(const char *filename, GpencilImportParams *iparams)
+{
+  bool done = false;
+
+  /* Prepare document. */
+  copy_v2_v2(iparams->paper_size, iparams->paper_size);
+
+  // GpencilExporterSVG exporter = GpencilExporterSVG(filename, iparams);
+
+  // float no_offset[2] = {0.0f, 0.0f};
+  // float ratio[2] = {1.0f, 1.0f};
+  // exporter.set_frame_ratio(ratio);
+  // iparams->file_subfix[0] = '\0';
+  // done |= gpencil_io_export_frame(&exporter, iparams, no_offset, true, true, true);
 
   return done;
 }
