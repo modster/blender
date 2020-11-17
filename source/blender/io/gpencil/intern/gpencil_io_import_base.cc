@@ -45,6 +45,7 @@
 
 #include "UI_view2d.h"
 
+#include "ED_gpencil.h"
 #include "ED_view3d.h"
 
 #include "DEG_depsgraph.h"
@@ -79,17 +80,31 @@ GpencilImporter::GpencilImporter(const struct GpencilImportParams *iparams)
   gpl_cur_ = NULL;
   gpf_cur_ = NULL;
   gps_cur_ = NULL;
+
+  object_created_ = false;
 }
 
 /**
- * Set output file input_text full path.
+ * Set filename from input_text full path.
  * \param C: Context.
  * \param filename: Path of the file provided by dialog.
  */
 void GpencilImporter::set_filename(const char *filename)
 {
-  BLI_strncpy(in_filename_, filename, FILE_MAX);
-  BLI_path_abs(in_filename_, BKE_main_blendfile_path(bmain));
+  BLI_strncpy(filename_, filename, FILE_MAX);
+  BLI_path_abs(filename_, BKE_main_blendfile_path(bmain));
+}
+
+Object *GpencilImporter::create_object(void)
+{
+  const float *cur = scene->cursor.location;
+  ushort local_view_bits = (params_.v3d && params_.v3d->localvd) ? params_.v3d->local_view_uuid :
+                                                                   0;
+  Object *ob_gpencil = ED_gpencil_add_object(params_.C, cur, local_view_bits);
+  /* Grease pencil is rotated 90 degrees in X axis by default. */
+  ob_gpencil->rot[0] -= DEG2RADF(90.0f);
+
+  return ob_gpencil;
 }
 
 struct bGPDlayer *GpencilImporter::gpl_current_get(void)
@@ -119,6 +134,32 @@ struct bGPDstroke *GpencilImporter::gps_current_get(void)
 void GpencilImporter::gps_current_set(struct bGPDstroke *gps)
 {
   gps_cur_ = gps;
+}
+
+int32_t GpencilImporter::create_material(const char *name, const bool stroke, const bool fill)
+{
+  const float default_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+  int32_t mat_index = BKE_gpencil_material_find_index_by_name_prefix(params_.ob_target, name);
+  /* Stroke and Fill material. */
+  if (mat_index == -1) {
+    int32_t new_idx;
+    Material *mat_gp = BKE_gpencil_object_material_new(bmain, params_.ob_target, name, &new_idx);
+    MaterialGPencilStyle *gp_style = mat_gp->gp_style;
+    gp_style->flag &= ~GP_MATERIAL_STROKE_SHOW;
+    gp_style->flag &= ~GP_MATERIAL_FILL_SHOW;
+
+    copy_v4_v4(gp_style->stroke_rgba, default_color);
+    copy_v4_v4(gp_style->fill_rgba, default_color);
+    if (stroke) {
+      gp_style->flag |= GP_MATERIAL_STROKE_SHOW;
+    }
+    if (fill) {
+      gp_style->flag |= GP_MATERIAL_FILL_SHOW;
+    }
+    mat_index = params_.ob_target->totcol - 1;
+  }
+
+  return mat_index;
 }
 
 }  // namespace blender::io::gpencil

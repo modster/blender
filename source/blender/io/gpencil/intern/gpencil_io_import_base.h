@@ -51,13 +51,15 @@ class GpencilImporter {
   virtual bool read(void) = 0;
 
   void set_frame_number(int value);
+  struct Object *create_object(void);
+  int32_t create_material(const char *name, const bool stroke, const bool fill);
 
  protected:
   GpencilImportParams params_;
 
   bool invert_axis_[2];
   float diff_mat_[4][4];
-  char in_filename_[FILE_MAX];
+  char filename_[FILE_MAX];
 
   /* Data for easy access. */
   struct Depsgraph *depsgraph;
@@ -67,6 +69,7 @@ class GpencilImporter {
   struct RegionView3D *rv3d;
 
   int cfra_;
+  bool object_created_;
 
   struct bGPDlayer *gpl_current_get(void);
   struct bGPDframe *gpf_current_get(void);

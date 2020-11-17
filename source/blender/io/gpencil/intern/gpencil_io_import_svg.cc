@@ -79,9 +79,75 @@ GpencilImporterSVG::~GpencilImporterSVG(void)
 bool GpencilImporterSVG::read(void)
 {
   bool result = true;
-  printf("Hello from SVG Importer: %s!!\n", params_.ob_target->id.name + 2);
+  NSVGimage *svg_data = NULL;
+  svg_data = nsvgParseFromFile(filename_, "px", 96.0f);
+  if (svg_data == NULL) {
+    std::cout << " Could not open SVG.\n ";
+    return false;
+  }
+
+  /* Create grease pencil object. */
+  if (params_.ob_target == NULL) {
+    params_.ob_target = create_object();
+    object_created_ = true;
+  }
+  if (params_.ob_target == NULL) {
+    std::cout << "Unable to create new object.\n";
+    return false;
+  }
+  bGPdata *gpd = (bGPdata *)params_.ob_target->data;
+
+  /* Loop all shapes. */
+  for (NSVGshape *shape = svg_data->shapes; shape; shape = shape->next) {
+    /* Check if the layer exist and create if needed. */
+    bGPDlayer *gpl = (bGPDlayer *)BLI_findstring(
+        &gpd->layers, shape->id, offsetof(bGPDlayer, info));
+    if (gpl == NULL) {
+      BKE_gpencil_layer_addnew(gpd, shape->id, true);
+    }
+    /* Check frame. */
+    bGPDframe *gpf = BKE_gpencil_layer_frame_get(gpl, cfra_, GP_GETFRAME_ADD_NEW);
+    /* Create materials. */
+    bool is_stroke = (bool)shape->stroke.type;
+    bool is_fill = (bool)shape->fill.type;
+    if ((!is_stroke) && (!is_fill)) {
+      is_stroke = true;
+    }
+
+    /* Create_shape materials. */
+    const char *const mat_names[] = {"Stroke", "Fill", "Stroke and Fill"};
+    int index = 0;
+    if ((is_stroke) && (is_fill)) {
+      index = 2;
+    }
+    else if ((!is_stroke) && (is_fill)) {
+      index = 1;
+    }
+    int32_t mat_index = create_material(mat_names[index], is_stroke, is_fill);
+
+    /* Loop all paths to create the stroke data. */
+    for (NSVGpath *path = shape->paths; path; path = path->next) {
+      create_stroke(gpf, path, mat_index);
+    }
+  }
+
+  /* Free memory. */
+  nsvgDelete(svg_data);
 
   return result;
+}
+
+void GpencilImporterSVG::create_stroke(struct bGPDframe *gpf,
+                                       struct NSVGpath *path,
+                                       int32_t mat_index)
+{
+  bGPDstroke *gps = BKE_gpencil_stroke_new(mat_index, path->npts, 1.0f);
+  BLI_addtail(&gpf->strokes, gps);
+  gps->editcurve = BKE_gpencil_stroke_editcurve_new(path->npts);
+
+  bGPDcurve_point *ptc = NULL;
+  for (int i = 0; i < path->npts - 1; i += 3) {
+  }
 }
 
 }  // namespace blender::io::gpencil
