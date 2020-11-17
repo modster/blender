@@ -1376,11 +1376,12 @@ class WM_OT_properties_edit(Operator):
         # setup defaults
         props = item.custom_properties()
         props.update_rna(self.property)
-        self.min = self.property.min # HANS-TODO: This doesn't work, self.property is a STRING
-        self.max = self.property.max
-        self.soft_min = self.property.soft_min
-        self.soft_max = self.property.soft_max
-        self.subtype = self.property.subtype
+        prop = item.bl_rna.properties[self.property]
+        self.min = prop.hard_min
+        self.max = prop.hard_min
+        self.soft_min = prop.soft_min
+        self.soft_max = prop.soft_max
+        self.subtype = prop.subtype
 
         self._init_subtype(prop_type, is_array, subtype)
 

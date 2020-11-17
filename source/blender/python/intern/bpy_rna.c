@@ -4245,7 +4245,7 @@ static PyObject *pyrna_struct_custom_properties(BPy_StructRNA *self)
   BPy_IDProperty *group = PyObject_New(BPy_IDProperty, &BPy_IDGroup_Type);
   group->id = self->ptr.owner_id;
   group->prop = idprops;
-  group->parent = NULL; /* can be NULL */
+  group->parent = NULL;
   return (PyObject *)group;
 }
 
