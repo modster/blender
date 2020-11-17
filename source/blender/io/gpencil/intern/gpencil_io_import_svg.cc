@@ -79,7 +79,7 @@ GpencilImporterSVG::~GpencilImporterSVG(void)
 bool GpencilImporterSVG::read(void)
 {
   bool result = true;
-  printf("Hello from SVG Importer!!\n");
+  printf("Hello from SVG Importer: %s!!\n", params_.ob_target->id.name + 2);
 
   return result;
 }

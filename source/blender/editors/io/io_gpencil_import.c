@@ -32,6 +32,7 @@
 #include "BKE_context.h"
 #include "BKE_gpencil.h"
 #include "BKE_main.h"
+#include "BKE_object.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
@@ -135,6 +136,11 @@ static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
   int flag = 0;
   // const bool use_gray_scale = RNA_boolean_get(op->ptr, "use_gray_scale");
   // SET_FLAG_FROM_TEST(flag, use_gray_scale, GP_EXPORT_GRAY_SCALE);
+
+  /* If active object is not a editable grease pencil, set to NULL to create a new object. */
+  if ((ob && ob->type != OB_GPENCIL) || (BKE_object_is_libdata(ob) == true)) {
+    ob = NULL;
+  }
 
   struct GpencilImportParams params = {
       .C = C,

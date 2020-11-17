@@ -78,9 +78,9 @@ class GpencilImporter {
   void set_filename(const char *filename);
 
  private:
-  struct bGPDlayer *_gpl_cur;
-  struct bGPDframe *_gpf_cur;
-  struct bGPDstroke *_gps_cur;
+  struct bGPDlayer *gpl_cur_;
+  struct bGPDframe *gpf_cur_;
+  struct bGPDstroke *gps_cur_;
 };
 
 }  // namespace blender::io::gpencil

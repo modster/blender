@@ -74,11 +74,11 @@ GpencilImporter::GpencilImporter(const struct GpencilImportParams *iparams)
   depsgraph = CTX_data_depsgraph_pointer(params_.C);
   scene = CTX_data_scene(params_.C);
   rv3d = (RegionView3D *)params_.region->regiondata;
-  gpd = (bGPdata *)params_.ob_target->data;
 
-  _gpl_cur = NULL;
-  _gpf_cur = NULL;
-  _gps_cur = NULL;
+  gpd = NULL;
+  gpl_cur_ = NULL;
+  gpf_cur_ = NULL;
+  gps_cur_ = NULL;
 }
 
 /**
@@ -94,31 +94,31 @@ void GpencilImporter::set_filename(const char *filename)
 
 struct bGPDlayer *GpencilImporter::gpl_current_get(void)
 {
-  return _gpl_cur;
+  return gpl_cur_;
 }
 
 void GpencilImporter::gpl_current_set(struct bGPDlayer *gpl)
 {
-  _gpl_cur = gpl;
+  gpl_cur_ = gpl;
 }
 
 struct bGPDframe *GpencilImporter::gpf_current_get(void)
 {
-  return _gpf_cur;
+  return gpf_cur_;
 }
 
 void GpencilImporter::gpf_current_set(struct bGPDframe *gpf)
 {
-  _gpf_cur = gpf;
+  gpf_cur_ = gpf;
 }
 struct bGPDstroke *GpencilImporter::gps_current_get(void)
 {
-  return _gps_cur;
+  return gps_cur_;
 }
 
 void GpencilImporter::gps_current_set(struct bGPDstroke *gps)
 {
-  _gps_cur = gps;
+  gps_cur_ = gps;
 }
 
 }  // namespace blender::io::gpencil
