@@ -21,43 +21,25 @@
 /** \file
  * \ingroup bgpencil
  */
+#include "gpencil_io_import_base.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+struct GpencilImportParams;
 
-struct ARegion;
-struct bContext;
-struct View3D;
+#define SVG_IMPORTER_NAME "SVG Import for Grease Pencil"
+#define SVG_IMPORTER_VERSION "v1.0"
 
-struct GpencilImportParams {
-  bContext *C;
-  ARegion *region;
-  View3D *v3d;
-  /** Grease pencil target object. */
-  struct Object *ob_target;
-  /** Import mode.  */
-  uint16_t mode;
-  /** target frame.  */
-  int32_t frame_target;
-  /** Flags. */
-  uint32_t flag;
-  /** Stroke sampling. */
-  float stroke_sample;
+namespace blender::io::gpencil {
+
+class GpencilImporterSVG : public GpencilImporter {
+
+ public:
+  GpencilImporterSVG(const char *filename, const struct GpencilImportParams *iparams);
+  ~GpencilImporterSVG(void);
+
+  bool read(void);
+
+ protected:
+ private:
 };
 
-/* GpencilImportParams->flag. */
-typedef enum eGpencilImportParams_Flag {
-  GP_IMPORT_DUMMY = (1 << 0),
-} eGpencilImportParams_Flag;
-
-typedef enum eGpencilImport_Modes {
-  GP_IMPORT_FROM_SVG = 0,
-  /* Add new import formats here. */
-} eGpencilImport_Modes;
-
-bool gpencil_io_import(const char *filename, struct GpencilImportParams *iparams);
-
-#ifdef __cplusplus
-}
-#endif
+}  // namespace blender::io::gpencil

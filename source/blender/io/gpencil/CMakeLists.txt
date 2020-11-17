@@ -34,6 +34,7 @@ set(INC
   ../../../../intern/guardedalloc
   ../../../../intern/utfconv
 
+  # This line must be changed if Libharu is included as external lib
   ${LIBDIR}/libharu/include
 )
 
@@ -43,21 +44,31 @@ set(INC_SYS
 
 set(SRC
  intern/gpencil_io_capi.cc
- intern/gpencil_io_export_base.cc
- intern/gpencil_io_export_svg.cc
+
+ # This line must be removed if NanoSVG is moved to extern
+ nanosvg/nanosvg.h
 
  gpencil_io_importer.h
+ intern/gpencil_io_import_base.h
+ intern/gpencil_io_import_svg.h
+ intern/gpencil_io_import_base.cc
+ intern/gpencil_io_import_svg.cc
+
  gpencil_io_exporter.h
- intern/gpencil_io_export_svg.h
  intern/gpencil_io_export_base.h
+ intern/gpencil_io_export_svg.h
+ intern/gpencil_io_export_base.cc
+ intern/gpencil_io_export_svg.cc
 )
 
 set(LIB
   bf_blenkernel
   bf_blenlib
   bf_io_common
-  ${LIBDIR}/libharu/libhpdfsd.lib
   ${PUGIXML_LIBRARIES}
+
+  # This line must be changed if Libharu is included as external lib
+  ${LIBDIR}/libharu/libhpdfsd.lib
 )
 
 list(APPEND LIB

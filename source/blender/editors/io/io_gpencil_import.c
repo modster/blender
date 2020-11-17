@@ -77,11 +77,6 @@ bool wm_gpencil_import_svg_common_check(bContext *UNUSED(C), wmOperator *op)
 
 static void gpencil_import_common_props(wmOperatorType *ot)
 {
-  RNA_def_boolean(ot->srna,
-                  "use_gray_scale",
-                  false,
-                  "Gray Scale",
-                  "Import in gray scale instead of full color");
   RNA_def_float(
       ot->srna,
       "stroke_sample",
@@ -96,36 +91,18 @@ static void gpencil_import_common_props(wmOperatorType *ot)
 
 static void ui_gpencil_import_common_settings(uiLayout *layout, PointerRNA *imfptr)
 {
-  uiLayout *box, *row, *col, *sub;
+  uiLayout *box, *row, *col;
 
   box = uiLayoutBox(layout);
   row = uiLayoutRow(box, false);
   uiItemL(row, IFACE_("Import Options"), ICON_SCENE_DATA);
 
   col = uiLayoutColumn(box, false);
-
-  sub = uiLayoutColumn(col, true);
-  uiItemR(sub, imfptr, "use_gray_scale", 0, NULL, ICON_NONE);
 }
 
 static int wm_gpencil_import_svg_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   UNUSED_VARS(event);
-
-  if (!RNA_struct_property_is_set(op->ptr, "filepath")) {
-    Main *bmain = CTX_data_main(C);
-    char filepath[FILE_MAX];
-
-    if (BKE_main_blendfile_path(bmain)[0] == '\0') {
-      BLI_strncpy(filepath, "untitled", sizeof(filepath));
-    }
-    else {
-      BLI_strncpy(filepath, BKE_main_blendfile_path(bmain), sizeof(filepath));
-    }
-
-    BLI_path_extension_replace(filepath, sizeof(filepath), ".svg");
-    RNA_string_set(op->ptr, "filepath", filepath);
-  }
 
   WM_event_add_fileselect(C, op);
 
@@ -142,7 +119,7 @@ static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  /*For some reason the region cannot be retrieved from the context.
+  /* For some reason the region cannot be retrieved from the context.
    * If a better solution is found in the future, remove this function. */
   ARegion *region = get_invoke_region(C);
   if (region == NULL) {
@@ -154,24 +131,19 @@ static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
   char filename[FILE_MAX];
   RNA_string_get(op->ptr, "filepath", filename);
 
-  const short select = RNA_enum_get(op->ptr, "selected_object_type");
-
-  const bool use_gray_scale = RNA_boolean_get(op->ptr, "use_gray_scale");
-
   /* Set flags. */
   int flag = 0;
+  // const bool use_gray_scale = RNA_boolean_get(op->ptr, "use_gray_scale");
   // SET_FLAG_FROM_TEST(flag, use_gray_scale, GP_EXPORT_GRAY_SCALE);
 
   struct GpencilImportParams params = {
       .C = C,
       .region = region,
       .v3d = v3d,
-      .obact = ob,
+      .ob_target = ob,
       .mode = GP_IMPORT_FROM_SVG,
-      .frame_start = CFRA,
-      .frame_end = CFRA,
+      .frame_target = CFRA,
       .flag = flag,
-      .select = select,
       .stroke_sample = RNA_float_get(op->ptr, "stroke_sample"),
 
   };
@@ -218,17 +190,6 @@ static bool wm_gpencil_import_svg_poll(bContext *C)
   if (CTX_wm_window(C) == NULL) {
     return false;
   }
-  Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
-    return false;
-  }
-
-  bGPdata *gpd = (bGPdata *)ob->data;
-  bGPDlayer *gpl = BKE_gpencil_layer_active_get(gpd);
-
-  if (gpl == NULL) {
-    return false;
-  }
 
   return true;
 }
@@ -248,10 +209,10 @@ void WM_OT_gpencil_import_svg(wmOperatorType *ot)
   WM_operator_properties_filesel(ot,
                                  FILE_TYPE_OBJECT_IO,
                                  FILE_BLENDER,
-                                 FILE_SAVE,
-                                 WM_FILESEL_FILEPATH | WM_FILESEL_SHOW_PROPS,
+                                 FILE_OPENFILE,
+                                 WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH | WM_FILESEL_SHOW_PROPS,
                                  FILE_DEFAULTDISPLAY,
-                                 FILE_SORT_ALPHA);
+                                 FILE_SORT_DEFAULT);
 
   gpencil_import_common_props(ot);
 }

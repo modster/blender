@@ -43,12 +43,14 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
 
-#include "../gpencil_io_exporter.h"
 #include "../gpencil_io_importer.h"
+#include "gpencil_io_import_svg.h"
 
+#include "../gpencil_io_exporter.h"
 #include "gpencil_io_export_svg.h"
 
 using blender::io::gpencil::GpencilExporterSVG;
+using blender::io::gpencil::GpencilImporterSVG;
 
 /* Check if frame is included. */
 static bool is_keyframe_selected(bContext *C, bGPdata *gpd, int32_t framenum, bool use_markers)
@@ -79,8 +81,27 @@ static bool is_keyframe_selected(bContext *C, bGPdata *gpd, int32_t framenum, bo
   return true;
 }
 
+/* Import frame. */
+static bool gpencil_io_import_frame(void *in_importer, const GpencilImportParams *iparams)
+{
+
+  bool result = false;
+  switch (iparams->mode) {
+    case GP_IMPORT_FROM_SVG: {
+      GpencilImporterSVG *importer = (GpencilImporterSVG *)in_importer;
+      result |= importer->read();
+      break;
+    }
+    /* Add new import formats here. */
+    default:
+      break;
+  }
+
+  return result;
+}
+
 /* Export current frame. */
-static bool gpencil_io_export_frame(GpencilExporterSVG *exporter,
+static bool gpencil_io_export_frame(void *in_exporter,
                                     const GpencilExportParams *iparams,
                                     float frame_offset[2],
                                     const bool newpage,
@@ -91,6 +112,7 @@ static bool gpencil_io_export_frame(GpencilExporterSVG *exporter,
   bool result = false;
   switch (iparams->mode) {
     case GP_EXPORT_TO_SVG: {
+      GpencilExporterSVG *exporter = (GpencilExporterSVG *)in_exporter;
       exporter->set_frame_number(iparams->framenum);
       exporter->set_frame_offset(frame_offset);
       std::string subfix = iparams->file_subfix;
@@ -224,13 +246,9 @@ bool gpencil_io_import(const char *filename, GpencilImportParams *iparams)
 {
   bool done = false;
 
-  // GpencilExporterSVG exporter = GpencilExporterSVG(filename, iparams);
+  GpencilImporterSVG importer = GpencilImporterSVG(filename, iparams);
 
-  // float no_offset[2] = {0.0f, 0.0f};
-  // float ratio[2] = {1.0f, 1.0f};
-  // exporter.set_frame_ratio(ratio);
-  // iparams->file_subfix[0] = '\0';
-  // done |= gpencil_io_export_frame(&exporter, iparams, no_offset, true, true, true);
+  done |= gpencil_io_import_frame(&importer, iparams);
 
   return done;
 }

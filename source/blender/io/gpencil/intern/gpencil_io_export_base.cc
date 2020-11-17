@@ -131,6 +131,10 @@ GpencilExporter::GpencilExporter(const struct GpencilExportParams *iparams)
       offset_[1] = boundbox.ymin;
     }
   }
+
+  _gpl_cur = NULL;
+  _gpf_cur = NULL;
+  _gps_cur = NULL;
 }
 
 /** Create a list of selected objects sorted from back to front */
