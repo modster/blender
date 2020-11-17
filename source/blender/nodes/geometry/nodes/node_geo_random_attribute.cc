@@ -34,10 +34,19 @@ static bNodeSocketTemplate geo_node_random_attribute_out[] = {
     {-1, ""},
 };
 
+static void geo_attribute_random_init(bNodeTree *UNUSED(tree), bNode *node)
+{
+  node->custom1 = CD_PROP_FLOAT;
+}
+
 namespace blender::nodes {
 
 static void geo_random_attribute_exec(GeoNodeExecParams params)
 {
+  const bNode &node = params.node();
+  const int data_type = node.custom1;
+  const AttributeDomain domain = static_cast<AttributeDomain>(node.custom2);
+
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   const std::string attribute_name = params.extract_input<std::string>("Attribute");
   const float3 min_value = params.extract_input<float3>("Min");
@@ -55,8 +64,7 @@ static void geo_random_attribute_exec(GeoNodeExecParams params)
       mesh_component, attribute_name);
 
   if (!attribute_opt.has_value()) {
-    BKE_id_attribute_new(
-        &mesh->id, attribute_name.c_str(), CD_PROP_FLOAT3, ATTR_DOMAIN_VERTEX, nullptr);
+    BKE_id_attribute_new(&mesh->id, attribute_name.c_str(), data_type, domain, nullptr);
     attribute_opt = bke::mesh_attribute_get_for_write(mesh_component, attribute_name);
   }
 
@@ -96,6 +104,7 @@ void register_node_type_geo_random_attribute()
 
   geo_node_type_base(&ntype, GEO_NODE_RANDOM_ATTRIBUTE, "Random Attribute", 0, 0);
   node_type_socket_templates(&ntype, geo_node_random_attribute_in, geo_node_random_attribute_out);
+  node_type_init(&ntype, geo_attribute_random_init);
   ntype.geometry_node_execute = blender::nodes::geo_random_attribute_exec;
   nodeRegisterType(&ntype);
 }
