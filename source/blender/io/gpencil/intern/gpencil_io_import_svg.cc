@@ -93,6 +93,10 @@ bool GpencilImporterSVG::read(void)
   }
   if (params_.ob_target == NULL) {
     std::cout << "Unable to create new object.\n";
+    if (svg_data) {
+      nsvgDelete(svg_data);
+    }
+
     return false;
   }
   bGPdata *gpd = (bGPdata *)params_.ob_target->data;
