@@ -33,7 +33,8 @@ set(INC
   ../../../../intern/clog
   ../../../../intern/guardedalloc
   ../../../../intern/utfconv
-  D:/MyBlender/Otros/libharu_lib/include
+
+  ${LIBDIR}/libharu/include
 )
 
 set(INC_SYS
@@ -55,7 +56,7 @@ set(LIB
   bf_blenkernel
   bf_blenlib
   bf_io_common
-  D:/MyBlender/Otros/libharu_lib/libhpdfsd.lib
+  ${LIBDIR}/libharu/libhpdfsd.lib
   ${PUGIXML_LIBRARIES}
 )
 
