@@ -224,9 +224,6 @@ bool gpencil_io_import(const char *filename, GpencilImportParams *iparams)
 {
   bool done = false;
 
-  /* Prepare document. */
-  copy_v2_v2(iparams->paper_size, iparams->paper_size);
-
   // GpencilExporterSVG exporter = GpencilExporterSVG(filename, iparams);
 
   // float no_offset[2] = {0.0f, 0.0f};

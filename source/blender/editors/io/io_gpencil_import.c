@@ -173,10 +173,6 @@ static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
       .flag = flag,
       .select = select,
       .stroke_sample = RNA_float_get(op->ptr, "stroke_sample"),
-      .page_layout = {0.0f, 0.0f},
-      .page_type = 0,
-      .paper_size = {0.0f, 0.0f},
-      .text_type = 0,
 
   };
 
