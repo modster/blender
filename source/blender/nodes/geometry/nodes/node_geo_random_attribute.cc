@@ -18,6 +18,8 @@
 
 #include "BLI_rand.hh"
 
+#include "DNA_mesh_types.h"
+
 static bNodeSocketTemplate geo_node_random_attribute_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_STRING, N_("Attribute")},
@@ -43,8 +45,20 @@ static void geo_random_attribute_exec(GeoNodeExecParams params)
   const int seed = params.extract_input<int>("Seed");
 
   MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
+  Mesh *mesh = mesh_component.get_for_write();
+  if (mesh == nullptr) {
+    params.set_output("Geometry", geometry_set);
+    return;
+  }
+
   std::optional<WriteAttributePtr> attribute_opt = bke::mesh_attribute_get_for_write(
       mesh_component, attribute_name);
+
+  if (!attribute_opt.has_value()) {
+    BKE_id_attribute_new(
+        &mesh->id, attribute_name.c_str(), CD_PROP_FLOAT3, ATTR_DOMAIN_VERTEX, nullptr);
+    attribute_opt = bke::mesh_attribute_get_for_write(mesh_component, attribute_name);
+  }
 
   RandomNumberGenerator rng;
   rng.seed_random(seed);
