@@ -70,6 +70,8 @@ GpencilImporter::GpencilImporter(const struct GpencilImportParams *iparams)
   params_.flag = iparams->flag;
   params_.stroke_sample = iparams->stroke_sample;
 
+  cfra_ = iparams->frame_target;
+
   /* Easy access data. */
   bmain = CTX_data_main(params_.C);
   depsgraph = CTX_data_depsgraph_pointer(params_.C);

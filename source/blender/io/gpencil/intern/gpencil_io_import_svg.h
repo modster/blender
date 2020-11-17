@@ -25,6 +25,7 @@
 
 struct GpencilImportParams;
 struct NSVGpath;
+struct bGPdata;
 struct bGPDframe;
 
 #define SVG_IMPORTER_NAME "SVG Import for Grease Pencil"
@@ -42,7 +43,10 @@ class GpencilImporterSVG : public GpencilImporter {
 
  protected:
  private:
-  void create_stroke(struct bGPDframe *gpf, struct NSVGpath *path, int32_t mat_index);
+  void create_stroke(struct bGPdata *gpd,
+                     struct bGPDframe *gpf,
+                     struct NSVGpath *path,
+                     int32_t mat_index);
 };
 
 }  // namespace blender::io::gpencil

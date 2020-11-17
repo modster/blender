@@ -80,7 +80,7 @@ bool GpencilImporterSVG::read(void)
 {
   bool result = true;
   NSVGimage *svg_data = NULL;
-  svg_data = nsvgParseFromFile(filename_, "px", 96.0f);
+  svg_data = nsvgParseFromFile(filename_, "mm", 96.0f);
   if (svg_data == NULL) {
     std::cout << " Could not open SVG.\n ";
     return false;
@@ -104,10 +104,11 @@ bool GpencilImporterSVG::read(void)
   /* Loop all shapes. */
   for (NSVGshape *shape = svg_data->shapes; shape; shape = shape->next) {
     /* Check if the layer exist and create if needed. */
+
     bGPDlayer *gpl = (bGPDlayer *)BLI_findstring(
         &gpd->layers, shape->id, offsetof(bGPDlayer, info));
     if (gpl == NULL) {
-      BKE_gpencil_layer_addnew(gpd, shape->id, true);
+      gpl = BKE_gpencil_layer_addnew(gpd, shape->id, true);
     }
     /* Check frame. */
     bGPDframe *gpf = BKE_gpencil_layer_frame_get(gpl, cfra_, GP_GETFRAME_ADD_NEW);
@@ -131,7 +132,7 @@ bool GpencilImporterSVG::read(void)
 
     /* Loop all paths to create the stroke data. */
     for (NSVGpath *path = shape->paths; path; path = path->next) {
-      create_stroke(gpf, path, mat_index);
+      create_stroke(gpd, gpf, path, mat_index);
     }
   }
 
@@ -141,17 +142,52 @@ bool GpencilImporterSVG::read(void)
   return result;
 }
 
-void GpencilImporterSVG::create_stroke(struct bGPDframe *gpf,
-                                       struct NSVGpath *path,
+void GpencilImporterSVG::create_stroke(bGPdata *gpd,
+                                       bGPDframe *gpf,
+                                       NSVGpath *path,
                                        int32_t mat_index)
 {
-  bGPDstroke *gps = BKE_gpencil_stroke_new(mat_index, path->npts, 1.0f);
-  BLI_addtail(&gpf->strokes, gps);
-  gps->editcurve = BKE_gpencil_stroke_editcurve_new(path->npts);
+  // gps->editcurve = BKE_gpencil_stroke_editcurve_new(path->npts);
 
-  bGPDcurve_point *ptc = NULL;
+  const int edges = 3;
+  const float step = 1.0f / (float)(edges - 1);
+
+  bool cyclic = (path->closed == '0') ? false : true;
+  int totpoints = path->npts - 1;
+
+  bGPDstroke *gps = BKE_gpencil_stroke_new(mat_index, totpoints, 1.0f);
+  BLI_addtail(&gpf->strokes, gps);
+
+  int start_index = 0;
   for (int i = 0; i < path->npts - 1; i += 3) {
+    float *p = &path->pts[i * 2];
+    // printf("P1(%f,%f) C1(%f,%f) C2(%f,%f) P2(%f,%f)\n",
+    //       p[0],
+    //       p[1],
+    //       p[2],
+    //       p[3],
+    //       p[4],
+    //       p[5],
+    //       p[6],
+    //       p[7]);
+    float a = 0.0f;
+    for (int v = 0; v < edges; v++) {
+      bGPDspoint *pt = &gps->points[start_index];
+      pt->strength = 1.0f;
+      pt->pressure = 1.0f;
+      pt->z = 0.0f;
+      interp_v2_v2v2v2v2_cubic(&pt->x, &p[0], &p[2], &p[4], &p[6], a);
+      // printf("\t%d->%d->%f: (%f, %f)\n", start_index, v, a, pt->x, pt->y);
+
+      /* Scale from milimeters. */
+      mul_v3_fl(&pt->x, 0.001f);
+      a += step;
+      start_index++;
+    }
   }
+  /* Cleanup and recalculate geometry. */
+  BKE_gpencil_stroke_merge_distance(gpd, gpf, gps, 0.001f, true);
+  BKE_gpencil_stroke_geometry_update(gpd, gps);
 }
 
 }  // namespace blender::io::gpencil
