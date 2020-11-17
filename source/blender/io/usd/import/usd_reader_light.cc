@@ -20,10 +20,10 @@
 #include "usd_reader_light.h"
 
 #include "BLI_assert.h"
-#include "BLI_utildefines.h"
 #include "BLI_math_base.h"
 #include "BLI_math_matrix.h"
 #include "BLI_math_rotation.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_light.h"
 #include "BKE_object.h"
@@ -52,116 +52,111 @@ bool USDLightReader::valid() const
 
 void USDLightReader::create_object(Main *bmain, double time)
 {
-   if (!this->valid()) {
-     return;
-   }
+  if (!this->valid()) {
+    return;
+  }
 
-   /* Determine prim visibility.
-    * TODO(makowalski): Consider optimizations to avoid this expensive call,
-    * for example, by determining visibility during stage traversal. */
-   pxr::TfToken vis_tok = this->light_.ComputeVisibility();
+  /* Determine prim visibility.
+   * TODO(makowalski): Consider optimizations to avoid this expensive call,
+   * for example, by determining visibility during stage traversal. */
+  pxr::TfToken vis_tok = this->light_.ComputeVisibility();
 
-   if (vis_tok == pxr::UsdGeomTokens->invisible) {
-     return;
-   }
+  if (vis_tok == pxr::UsdGeomTokens->invisible) {
+    return;
+  }
 
-   std::string obj_name = get_object_name();
+  std::string obj_name = get_object_name();
 
-   if (obj_name.empty()) {
-     /* Sanity check. */
-     std::cerr << "Warning: couldn't determine object name for " << this->prim_path() << std::endl;
-   }
+  if (obj_name.empty()) {
+    /* Sanity check. */
+    std::cerr << "Warning: couldn't determine object name for " << this->prim_path() << std::endl;
+  }
 
-   this->object_ = BKE_object_add_only_object(bmain, OB_LAMP, obj_name.c_str());
+  this->object_ = BKE_object_add_only_object(bmain, OB_LAMP, obj_name.c_str());
 
-   std::string light_name = get_data_name();
+  std::string light_name = get_data_name();
 
-   if (light_name.empty()) {
-     /* Sanity check. */
-     std::cerr << "Warning: couldn't determine light name for " << this->prim_path() << std::endl;
-   }
+  if (light_name.empty()) {
+    /* Sanity check. */
+    std::cerr << "Warning: couldn't determine light name for " << this->prim_path() << std::endl;
+  }
 
-   Light *light = (Light *)BKE_light_add(bmain, light_name.c_str());
+  Light *light = (Light *)BKE_light_add(bmain, light_name.c_str());
 
-   this->object_->data = light;
+  this->object_->data = light;
 
-   if (prim_.IsA<pxr::UsdLuxDiskLight>()) {
-     light->type = LA_AREA;
-     light->area_shape = LA_AREA_DISK;
+  if (prim_.IsA<pxr::UsdLuxDiskLight>()) {
+    light->type = LA_AREA;
+    light->area_shape = LA_AREA_DISK;
 
-     pxr::UsdLuxDiskLight disk_light(this->prim_);
-     if (disk_light) {
-       if (pxr::UsdAttribute radius_attr = disk_light.GetRadiusAttr())
-       {
-         float radius = 1.0;
-         radius_attr.Get(&radius, time);
-         light->area_size = radius;
-       }
-     }
-   }
-   else if (prim_.IsA<pxr::UsdLuxDistantLight>()) {
-     light->type = LA_SUN;
-   }
-   else if (prim_.IsA<pxr::UsdLuxRectLight>()) {
-     light->type = LA_AREA;
-     light->area_shape = LA_AREA_RECT;
+    pxr::UsdLuxDiskLight disk_light(this->prim_);
+    if (disk_light) {
+      if (pxr::UsdAttribute radius_attr = disk_light.GetRadiusAttr()) {
+        float radius = 1.0;
+        radius_attr.Get(&radius, time);
+        light->area_size = radius;
+      }
+    }
+  }
+  else if (prim_.IsA<pxr::UsdLuxDistantLight>()) {
+    light->type = LA_SUN;
+  }
+  else if (prim_.IsA<pxr::UsdLuxRectLight>()) {
+    light->type = LA_AREA;
+    light->area_shape = LA_AREA_RECT;
 
-     pxr::UsdLuxRectLight rect_light(this->prim_);
-     if (rect_light) {
-       if (pxr::UsdAttribute width_attr = rect_light.GetWidthAttr())
-       {
-         float width = 1.0;
-         width_attr.Get(&width, time);
-         light->area_size = width;
-       }
-       if (pxr::UsdAttribute height_attr = rect_light.GetHeightAttr())
-       {
-         float height = 1.0;
-         height_attr.Get(&height, time);
-         light->area_sizey = height;
-       }
-     }
-   }
-   else if (prim_.IsA<pxr::UsdLuxSphereLight>()) {
-     light->type = LA_LOCAL;
+    pxr::UsdLuxRectLight rect_light(this->prim_);
+    if (rect_light) {
+      if (pxr::UsdAttribute width_attr = rect_light.GetWidthAttr()) {
+        float width = 1.0;
+        width_attr.Get(&width, time);
+        light->area_size = width;
+      }
+      if (pxr::UsdAttribute height_attr = rect_light.GetHeightAttr()) {
+        float height = 1.0;
+        height_attr.Get(&height, time);
+        light->area_sizey = height;
+      }
+    }
+  }
+  else if (prim_.IsA<pxr::UsdLuxSphereLight>()) {
+    light->type = LA_LOCAL;
 
-     pxr::UsdLuxSphereLight sphere_light(this->prim_);
-     if (sphere_light) {
-       if (pxr::UsdAttribute radius_attr = sphere_light.GetRadiusAttr())
-       {
-         float radius = 1.0;
-         radius_attr.Get(&radius, time);
-         light->area_size = radius;
-       }
-     }
-   }
+    pxr::UsdLuxSphereLight sphere_light(this->prim_);
+    if (sphere_light) {
+      if (pxr::UsdAttribute radius_attr = sphere_light.GetRadiusAttr()) {
+        float radius = 1.0;
+        radius_attr.Get(&radius, time);
+        light->area_size = radius;
+      }
+    }
+  }
 
-   if (pxr::UsdAttribute intensity_attr = light_.GetIntensityAttr()) {
-     float intensity = 1.0;
-     intensity_attr.Get(&intensity, time);
-     light->energy = intensity * context_.import_params.light_intensity_scale;
+  if (pxr::UsdAttribute intensity_attr = light_.GetIntensityAttr()) {
+    float intensity = 1.0;
+    intensity_attr.Get(&intensity, time);
+    light->energy = intensity * context_.import_params.light_intensity_scale;
 
-     /* Apply inverse of scaling applied on export in USDLightWriter::do_write().
-      * TODO(makowalski): confirm that this scaling is correct. */
-     if (light->type != LA_SUN) {
-       light->energy *= 100.0f;
-     }
-   }
+    /* Apply inverse of scaling applied on export in USDLightWriter::do_write().
+     * TODO(makowalski): confirm that this scaling is correct. */
+    if (light->type != LA_SUN) {
+      light->energy *= 100.0f;
+    }
+  }
 
-   if (pxr::UsdAttribute color_attr = light_.GetColorAttr()) {
-     pxr::GfVec3f color(1.0);
-     color_attr.Get(&color, time);
-     light->r = color[0];
-     light->g = color[1];
-     light->b = color[2];
-   }
+  if (pxr::UsdAttribute color_attr = light_.GetColorAttr()) {
+    pxr::GfVec3f color(1.0);
+    color_attr.Get(&color, time);
+    light->r = color[0];
+    light->g = color[1];
+    light->b = color[2];
+  }
 
-   if (pxr::UsdAttribute specular_attr = light_.GetSpecularAttr()) {
-     float specular = 1.0f;
-     specular_attr.Get(&specular, time);
-     light->spec_fac = specular;
-   }
-
+  if (pxr::UsdAttribute specular_attr = light_.GetSpecularAttr()) {
+    float specular = 1.0f;
+    specular_attr.Get(&specular, time);
+    light->spec_fac = specular;
+  }
 }
 
 void USDLightReader::read_matrix(float r_mat[4][4] /* local matrix */,
