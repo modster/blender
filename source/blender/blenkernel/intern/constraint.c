@@ -95,6 +95,10 @@
 #  include "ABC_alembic.h"
 #endif
 
+#ifdef WITH_USD
+#  include "usd.h"
+#endif
+
 /* ---------------------------------------------------------------------------- */
 /* Useful macros for testing various common flag combinations */
 
@@ -5290,7 +5294,7 @@ static void transformcache_id_looper(bConstraint *con, ConstraintIDFunc func, vo
 
 static void transformcache_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *targets)
 {
-#ifdef WITH_ALEMBIC
+#if defined(WITH_ALEMBIC) || defined(WITH_USD)
   bTransformCacheConstraint *data = con->data;
   Scene *scene = cob->scene;
 
@@ -5308,7 +5312,20 @@ static void transformcache_evaluate(bConstraint *con, bConstraintOb *cob, ListBa
     BKE_cachefile_reader_open(cache_file, &data->reader, cob->ob, data->object_path);
   }
 
-  ABC_get_transform(data->reader, cob->matrix, time, cache_file->scale);
+  switch (cache_file->type) {
+#  ifdef WITH_ALEMBIC
+    case CACHEFILE_TYPE_ALEMBIC:
+      ABC_get_transform(data->reader, cob->matrix, time, cache_file->scale);
+      break;
+#  endif
+#  ifdef WITH_USD
+    case CACHEFILE_TYPE_USD:
+      USD_get_transform(data->reader, cob->matrix, time * FPS, cache_file->scale);
+      break;
+#  endif
+    default:
+      break;
+  }
 #else
   UNUSED_VARS(con, cob);
 #endif

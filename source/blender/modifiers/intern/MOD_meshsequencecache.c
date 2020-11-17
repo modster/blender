@@ -38,6 +38,7 @@
 
 #include "BKE_cachefile.h"
 #include "BKE_context.h"
+#include "BKE_customdata.h"
 #include "BKE_lib_query.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
@@ -49,11 +50,15 @@
 
 #include "BLO_read_write.h"
 
+#include "BLI_string.h"
+
 #include "DEG_depsgraph_build.h"
 #include "DEG_depsgraph_query.h"
 
 #include "MOD_modifiertypes.h"
 #include "MOD_ui_common.h"
+
+#include "MEM_guardedalloc.h"
 
 #ifdef WITH_ALEMBIC
 #  include "ABC_alembic.h"
@@ -61,11 +66,22 @@
 #  include "BKE_lib_id.h"
 #endif
 
+#ifdef WITH_USD
+#  include "BKE_global.h"
+#  include "BKE_library.h"
+#  include "usd.h"
+#endif
+
 static void initData(ModifierData *md)
 {
   MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)md;
 
   BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(mcmd, modifier));
+
+  mcmd->cache_file = NULL;
+  mcmd->object_path[0] = '\0';
+  mcmd->vel_fac = 1.0f;
+  mcmd->read_flag = MOD_MESHSEQ_READ_ALL;
 
   MEMCPY_STRUCT_AFTER(mcmd, DNA_struct_default_get(MeshSeqCacheModifierData), modifier);
 }
@@ -109,7 +125,7 @@ static bool isDisabled(const struct Scene *UNUSED(scene),
 
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
 {
-#ifdef WITH_ALEMBIC
+#if defined(WITH_USD) || defined(WITH_ALEMBIC)
   MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)md;
 
   /* Only used to check whether we are operating on org data or not... */
@@ -121,7 +137,10 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   const float frame = DEG_get_ctime(ctx->depsgraph);
   const float time = BKE_cachefile_time_offset(cache_file, frame, FPS);
   const char *err_str = NULL;
+  switch (cache_file->type) {
 
+#  ifdef WITH_ALEMBIC
+    case CACHEFILE_TYPE_ALEMBIC:
   if (!mcmd->reader || !STREQ(mcmd->reader_object_path, mcmd->object_path)) {
     STRNCPY(mcmd->reader_object_path, mcmd->object_path);
     BKE_cachefile_reader_open(cache_file, &mcmd->reader, ctx->object, mcmd->object_path);
@@ -178,7 +197,67 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
     mesh = org_mesh;
   }
 
-  return result ? result : mesh;
+  if (!result) {
+    result = mesh;
+  }
+  return result;
+  break;
+#  endif
+#  ifdef WITH_USD
+    case CACHEFILE_TYPE_USD:
+      if (!mcmd->reader || !STREQ(mcmd->reader_object_path, mcmd->object_path)) {
+        STRNCPY(mcmd->reader_object_path, mcmd->object_path);
+        BKE_cachefile_reader_open(cache_file, &mcmd->reader, ctx->object, mcmd->object_path);
+        if (!mcmd->reader) {
+          printf("Could not create usd reader\n");
+          modifier_setError(md, "Could not create USD reader for file %s", cache_file->filepath);
+          return mesh;
+        }
+      }
+
+      /* If this invocation is for the ORCO mesh, and the mesh in Alembic hasn't changed topology,
+       * we must return the mesh as-is instead of deforming it. */
+      if (ctx->flag & MOD_APPLY_ORCO &&
+          !USD_mesh_topology_changed(mcmd->reader, ctx->object, mesh, time * FPS, &err_str)) {
+        printf("ORCO and no topology changed\n");
+        return mesh;
+      }
+
+      if (me != NULL) {
+        MVert *mvert = mesh->mvert;
+        MEdge *medge = mesh->medge;
+        MPoly *mpoly = mesh->mpoly;
+
+        /* TODO(sybren+bastien): possibly check relevant custom data layers (UV/color depending on
+         * flags) and duplicate those too. */
+        if ((me->mvert == mvert) || (me->medge == medge) || (me->mpoly == mpoly)) {
+          /* We need to duplicate data here, otherwise we'll modify org mesh, see T51701. */
+          BKE_id_copy_ex(NULL,
+                         &mesh->id,
+                         (ID **)&mesh,
+                         LIB_ID_CREATE_NO_MAIN | LIB_ID_CREATE_NO_USER_REFCOUNT |
+                             LIB_ID_CREATE_NO_DEG_TAG | LIB_ID_COPY_NO_PREVIEW);
+        }
+      }
+
+      Mesh *usd_result = USD_read_mesh(
+          mcmd->reader, ctx->object, mesh, time * FPS, &err_str, mcmd->read_flag, mcmd->vel_fac);
+      if (err_str) {
+        modifier_setError(md, "%s", err_str);
+      }
+
+      if (!ELEM(usd_result, NULL, mesh) && (mesh != org_mesh)) {
+        BKE_id_free(NULL, mesh);
+        mesh = org_mesh;
+      }
+
+      return usd_result ? usd_result : mesh;
+      break;
+#  endif
+    default:
+      return NULL;
+      break;
+  }
 #else
   UNUSED_VARS(ctx, md);
   return mesh;
@@ -187,7 +266,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
 
 static bool dependsOnTime(ModifierData *md)
 {
-#ifdef WITH_ALEMBIC
+#if defined(WITH_USD) || defined(WITH_ALEMBIC)
   MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)md;
   return (mcmd->cache_file != NULL);
 #else

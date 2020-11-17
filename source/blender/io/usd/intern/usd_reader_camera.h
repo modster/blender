@@ -12,20 +12,31 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2019 Blender Foundation.
- * All rights reserved.
  */
-
-#pragma once
 
 /** \file
- * \ingroup editor/io
+ * \ingroup busd
  */
 
-struct wmOperatorType;
+#ifndef __USD_READER_CAMERA_H__
+#define __USD_READER_CAMERA_H__
 
-void WM_OT_usd_export(struct wmOperatorType *ot);
+#include "usd.h"
+#include "usd_reader_xform.h"
 
-void WM_OT_usd_import(struct wmOperatorType *ot);
+class USDCameraReader : public USDXformReader {
 
+ public:
+  USDCameraReader(pxr::UsdStageRefPtr stage,
+                  const pxr::UsdPrim &object,
+                  const USDImportParams &import_params,
+                  ImportSettings &settings)
+      : USDXformReader(stage, object, import_params, settings)
+  {
+  }
+
+  void createObject(Main *bmain, double motionSampleTime) override;
+  void readObjectData(Main *bmain, double motionSampleTime) override;
+};
+
+#endif /* __USD_READER_CAMERA_H__ */

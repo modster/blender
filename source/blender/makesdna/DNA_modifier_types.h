@@ -2116,6 +2116,8 @@ typedef struct MeshSeqCacheModifierData {
   /** 1024 = FILE_MAX. */
   char object_path[1024];
 
+  float vel_fac;
+
   char read_flag;
   char _pad[3];
 
@@ -2155,7 +2157,11 @@ enum {
    * the mesh topology changes, but this heuristic sometimes fails. In these cases, users can
    * disable interpolation with this flag. */
   MOD_MESHSEQ_INTERPOLATE_VERTICES = (1 << 4),
+  MOD_MESHSEQ_READ_ATTR  = (1 << 5),
+  MOD_MESHSEQ_READ_VELS  = (1 << 6),
 };
+// USD Import re-added attr and vel. We are unsure as to why they were removed
+// They are necessary for full USD Import of data
 
 typedef struct SDefBind {
   unsigned int *vert_inds;
