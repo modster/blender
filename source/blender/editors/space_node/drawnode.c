@@ -3141,14 +3141,6 @@ static void node_texture_set_butfunc(bNodeType *ntype)
 
 /* ****************** BUTTON CALLBACKS FOR GEOMETRY NODES ***************** */
 
-static void node_geometry_buts_attribute_create(uiLayout *layout,
-                                                bContext *UNUSED(C),
-                                                PointerRNA *ptr)
-{
-  uiItemR(layout, ptr, "data_type", DEFAULT_FLAGS, "", ICON_NONE);
-  uiItemR(layout, ptr, "domain", DEFAULT_FLAGS, "", ICON_NONE);
-}
-
 static void node_geometry_buts_attribute_math(uiLayout *layout,
                                               bContext *UNUSED(C),
                                               PointerRNA *ptr)
@@ -3189,11 +3181,11 @@ static void node_geometry_buts_triangulate(uiLayout *layout, bContext *UNUSED(C)
 static void node_geometry_set_butfunc(bNodeType *ntype)
 {
   switch (ntype->type) {
-    case GEO_NODE_ATTRIBUTE_CREATE:
-      ntype->draw_buttons = node_geometry_buts_attribute_create;
-      break;
     case GEO_NODE_ATTRIBUTE_MATH:
       ntype->draw_buttons = node_geometry_buts_attribute_math;
+      break;
+    case GEO_NODE_ATTRIBUTE_RANDOM:
+      ntype->draw_buttons = node_geometry_buts_attribute_random;
       break;
     case GEO_NODE_BOOLEAN:
       ntype->draw_buttons = node_geometry_buts_boolean_math;

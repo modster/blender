@@ -4680,7 +4680,6 @@ static void registerGeometryNodes(void)
 {
   register_node_type_geo_group();
 
-  register_node_type_geo_attribute_create();
   register_node_type_geo_attribute_math();
   register_node_type_geo_attribute_random();
   register_node_type_geo_triangulate();

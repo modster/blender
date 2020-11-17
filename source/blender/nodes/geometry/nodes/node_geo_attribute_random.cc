@@ -31,7 +31,6 @@ static bNodeSocketTemplate geo_node_attribute_random_in[] = {
 
 static bNodeSocketTemplate geo_node_attribute_random_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    // {SOCK_STRING, N_("Attribute")},
     {-1, ""},
 };
 
@@ -41,29 +40,24 @@ static void geo_attribute_random_init(bNodeTree *UNUSED(tree), bNode *node)
 }
 
 namespace blender::nodes {
-static void geo_attribute_random_exec(bNode *node, GeoNodeInputs inputs, GeoNodeOutputs outputs)
+static void geo_attribute_random_exec(GeoNodeExecParams params)
 {
-  GeometryPtr geometry = inputs.extract<GeometryPtr>("Geometry");
-
-  if (!geometry.has_value()) {
-    outputs.set("Geometry", std::move(geometry));
-    return;
-  }
-
-  make_geometry_mutable(geometry);
+  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  std::string attribute_name = params.extract_input<std::string>("Attribute");
 
   RandomNumberGenerator rng(0);
-  Mesh *mesh = geometry->get_mesh_for_write();
-  std::string attribute_name = inputs.extract<std::string>("Attribute");
+  CustomDataType data_type = static_cast<CustomDataType>(params.node().custom1);
+  AttributeDomain domain = static_cast<AttributeDomain>(params.node().custom2);
 
-  CustomDataType data_type = static_cast<CustomDataType>(node->custom1);
-  AttributeDomain domain = static_cast<AttributeDomain>(node->custom2);
+  if (geometry_set.has_mesh()) {
+    Mesh *mesh = geometry_set.get_mesh_for_write();
+  }
 
-  ReportList report_list_dummy;
-  CustomDataLayer *custom_data = BKE_id_attribute_new(
-      reinterpret_cast<ID *>(mesh), attribute_name.c_str(), data_type, domain, &report_list_dummy);
+  if (geometry_set.has_pointcloud()) {
+    PointCloud *point_cloud = geometry_set.get_pointcloud_for_write();
+  }
 
-  outputs.set("Geometry", std::move(geometry));
+  params.set_output("Geometry", std::move(geometry_set));
 }
 }  // namespace blender::nodes
 

@@ -29,29 +29,25 @@ static bNodeSocketTemplate geo_node_attribute_math_in[] = {
 
 static bNodeSocketTemplate geo_node_attribute_math_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    // {SOCK_STRING, N_("Attribute")},
     {-1, ""},
 };
 
 namespace blender::nodes {
-static void geo_attribute_math_exec(bNode *UNUSED(node),
-                                    GeoNodeInputs inputs,
-                                    GeoNodeOutputs outputs)
+static void geo_attribute_math_exec(GeoNodeExecParams params)
 {
-  GeometryPtr geometry = inputs.extract<GeometryPtr>("Geometry");
+  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry A");
+  std::string attribute_name_a = params.extract_input<std::string>("Attribute A");
+  std::string attribute_name_b = params.extract_input<std::string>("Attribute B");
 
-  if (!geometry.has_value()) {
-    outputs.set("Geometry", std::move(geometry));
-    return;
+  if (geometry_set.has_mesh()) {
+    Mesh *mesh = geometry_set.get_mesh_for_write();
   }
 
-  make_geometry_mutable(geometry);
+  if (geometry_set.has_pointcloud()) {
+    PointCloud *point_cloud = geometry_set.get_pointcloud_for_write();
+  }
 
-  Mesh *mesh = geometry->get_mesh_for_write();
-  std::string attribute_name_a = inputs.extract<std::string>("Attribute A");
-  std::string attribute_name_b = inputs.extract<std::string>("Attribute B");
-
-  outputs.set("Geometry", std::move(geometry));
+  params.set_output("Geometry", std::move(geometry_set));
 }
 }  // namespace blender::nodes
 

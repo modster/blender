@@ -138,7 +138,6 @@ set(SRC
   function/nodes/node_fn_switch.cc
   function/node_function_util.cc
 
-  geometry/nodes/node_geo_attribute_create.cc
   geometry/nodes/node_geo_attribute_math.cc
   geometry/nodes/node_geo_attribute_random.cc
   geometry/nodes/node_geo_common.cc

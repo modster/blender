@@ -496,7 +496,6 @@ geometry_node_categories = [
         NodeItem("GeometryNodeSubdivisionSurface"),
     ]),
     GeometryNodeCategory("GEO_ATTRIBUTES", "Attributes", items=[
-        # NodeItem("GeometryNodeCreateAttribute"),
         NodeItem("GeometryNodeRandomAttribute"),
         NodeItem("GeometryNodeAttributeMath"),
     ]),
