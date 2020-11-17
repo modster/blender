@@ -234,7 +234,7 @@ ModifierData *ED_object_modifier_add(
       /* ensure skin-node customdata exists */
       BKE_mesh_ensure_skin_customdata(ob->data);
     }
-    else if (type == eModifierType_Nodes) {
+    else if (type == eModifierType_Empty) {
       MOD_nodes_init(bmain, (NodesModifierData *)new_md);
     }
   }
@@ -1911,7 +1911,7 @@ void OBJECT_OT_multires_external_save(wmOperatorType *ot)
                                  FILE_SAVE,
                                  WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH,
                                  FILE_DEFAULTDISPLAY,
-                                 FILE_SORT_ALPHA);
+                                 FILE_SORT_DEFAULT);
   edit_modifier_properties(ot);
 }
 
@@ -2332,7 +2332,9 @@ static void skin_armature_bone_create(Object *skin_ob,
     EditBone *bone = ED_armature_ebone_add(arm, "Bone");
 
     bone->parent = parent_bone;
-    bone->flag |= BONE_CONNECTED;
+    if (parent_bone != NULL) {
+      bone->flag |= BONE_CONNECTED;
+    }
 
     copy_v3_v3(bone->head, mvert[parent_v].co);
     copy_v3_v3(bone->tail, mvert[v].co);

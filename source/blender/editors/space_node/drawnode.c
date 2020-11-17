@@ -748,6 +748,7 @@ static void node_shader_buts_vect_transform(uiLayout *layout, bContext *UNUSED(C
 
 static void node_shader_buts_attribute(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
+  uiItemR(layout, ptr, "attribute_type", DEFAULT_FLAGS, IFACE_("Type"), ICON_NONE);
   uiItemR(layout, ptr, "attribute_name", DEFAULT_FLAGS, IFACE_("Name"), ICON_NONE);
 }
 
@@ -3179,6 +3180,12 @@ static void node_geometry_buts_subdivision_surface(uiLayout *layout,
 #endif
 }
 
+static void node_geometry_buts_triangulate(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+  uiItemR(layout, ptr, "quad_method", DEFAULT_FLAGS, "", ICON_NONE);
+  uiItemR(layout, ptr, "ngon_method", DEFAULT_FLAGS, "", ICON_NONE);
+}
+
 static void node_geometry_set_butfunc(bNodeType *ntype)
 {
   switch (ntype->type) {
@@ -3193,6 +3200,9 @@ static void node_geometry_set_butfunc(bNodeType *ntype)
       break;
     case GEO_NODE_SUBDIVISION_SURFACE:
       ntype->draw_buttons = node_geometry_buts_subdivision_surface;
+      break;
+    case GEO_NODE_TRIANGULATE:
+      ntype->draw_buttons = node_geometry_buts_triangulate;
       break;
   }
 }
@@ -3380,7 +3390,7 @@ static const float std_node_socket_colors[][4] = {
     {0.0, 0.0, 0.0, 1.0},    /*__SOCK_MESH (deprecated) */
     {0.06, 0.52, 0.15, 1.0}, /* SOCK_INT */
     {0.39, 0.39, 0.39, 1.0}, /* SOCK_STRING */
-    {0.40, 0.10, 0.10, 1.0}, /* SOCK_OBJECT */
+    {0.85, 0.34, 0.11, 1.0}, /* SOCK_OBJECT */
     {0.10, 0.40, 0.10, 1.0}, /* SOCK_IMAGE */
     {0.00, 0.83, 0.64, 1.0}, /* SOCK_GEOMETRY */
 };

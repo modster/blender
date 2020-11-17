@@ -35,7 +35,7 @@ static bNodeSocketTemplate geo_node_transform_out[] = {
     {-1, ""},
 };
 
-using blender::float3;
+namespace blender::nodes {
 
 static bool use_translate(const float3 rotation, const float3 scale)
 {
@@ -85,33 +85,51 @@ static void transform_pointcloud(PointCloud *pointcloud,
   }
 }
 
-namespace blender::nodes {
-static void geo_transform_exec(bNode *UNUSED(node), GeoNodeInputs inputs, GeoNodeOutputs outputs)
+static void transform_instances(InstancesComponent &instances,
+                                const float3 translation,
+                                const float3 rotation,
+                                const float3 scale)
 {
-  GeometryPtr geometry = inputs.extract<GeometryPtr>("Geometry");
+  MutableSpan<float3> positions = instances.positions();
 
-  if (!geometry.has_value()) {
-    outputs.set("Geometry", std::move(geometry));
-    return;
+  /* Use only translation if rotation and scale don't apply. */
+  if (use_translate(rotation, scale)) {
+    for (float3 &position : positions) {
+      add_v3_v3(position, translation);
+    }
   }
+  else {
+    float mat[4][4];
+    loc_eul_size_to_mat4(mat, translation, rotation, scale);
+    for (float3 &position : positions) {
+      mul_m4_v3(mat, position);
+    }
+  }
+}
 
-  const float3 translation = inputs.extract<float3>("Translation");
-  const float3 rotation = inputs.extract<float3>("Rotation");
-  const float3 scale = inputs.extract<float3>("Scale");
+static void geo_transform_exec(GeoNodeExecParams params)
+{
+  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+  const float3 translation = params.extract_input<float3>("Translation");
+  const float3 rotation = params.extract_input<float3>("Rotation");
+  const float3 scale = params.extract_input<float3>("Scale");
 
-  make_geometry_mutable(geometry);
-
-  if (geometry->has_mesh()) {
-    Mesh *mesh = geometry->get_mesh_for_write();
+  if (geometry_set.has_mesh()) {
+    Mesh *mesh = geometry_set.get_mesh_for_write();
     transform_mesh(mesh, translation, rotation, scale);
   }
 
-  if (geometry->has_pointcloud()) {
-    PointCloud *pointcloud = geometry->get_pointcloud_for_write();
+  if (geometry_set.has_pointcloud()) {
+    PointCloud *pointcloud = geometry_set.get_pointcloud_for_write();
     transform_pointcloud(pointcloud, translation, rotation, scale);
   }
 
-  outputs.set("Geometry", std::move(geometry));
+  if (geometry_set.has_instances()) {
+    InstancesComponent &instances = geometry_set.get_component_for_write<InstancesComponent>();
+    transform_instances(instances, translation, rotation, scale);
+  }
+
+  params.set_output("Geometry", std::move(geometry_set));
 }
 }  // namespace blender::nodes
 

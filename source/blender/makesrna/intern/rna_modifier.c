@@ -143,6 +143,7 @@ const EnumPropertyItem rna_enum_object_modifier_type_items[] = {
      ICON_MOD_EDGESPLIT,
      "Edge Split",
      "Split away joined faces at the edges"},
+    {eModifierType_Empty, "EMPTY", ICON_MESH_DATA, "Empty", ""}, /* TODO: Use correct icon. */
     {eModifierType_Mask,
      "MASK",
      ICON_MOD_MASK,
@@ -163,7 +164,6 @@ const EnumPropertyItem rna_enum_object_modifier_type_items[] = {
      ICON_MOD_MULTIRES,
      "Multiresolution",
      "Subdivide the mesh in a way that allows editing the higher subdivision levels"},
-    {eModifierType_Nodes, "NODES", ICON_MESH_DATA, "Nodes", ""}, /* TODO: Use correct icon. */
     {eModifierType_Remesh,
      "REMESH",
      ICON_MOD_REMESH,
@@ -200,7 +200,7 @@ const EnumPropertyItem rna_enum_object_modifier_type_items[] = {
      "WELD",
      ICON_AUTOMERGE_OFF,
      "Weld",
-     "Find groups of vertices closer than dist and merges them together"},
+     "Find groups of vertices closer than dist and merge them together"},
     {eModifierType_Wireframe,
      "WIREFRAME",
      ICON_MOD_WIREFRAME,

@@ -112,8 +112,7 @@ namespace blender {
 namespace nodes {
 class SocketMFNetworkBuilder;
 class NodeMFNetworkBuilder;
-class GeoNodeInputs;
-class GeoNodeOutputs;
+class GeoNodeExecParams;
 }  // namespace nodes
 namespace fn {
 class CPPType;
@@ -122,9 +121,7 @@ class MFDataType;
 }  // namespace blender
 
 using NodeExpandInMFNetworkFunction = void (*)(blender::nodes::NodeMFNetworkBuilder &builder);
-using NodeGeometryExecFunction = void (*)(struct bNode *node,
-                                          blender::nodes::GeoNodeInputs inputs,
-                                          blender::nodes::GeoNodeOutputs outputs);
+using NodeGeometryExecFunction = void (*)(blender::nodes::GeoNodeExecParams params);
 using SocketGetCPPTypeFunction = const blender::fn::CPPType *(*)();
 using SocketGetCPPValueFunction = void (*)(const struct bNodeSocket &socket, void *r_value);
 using SocketExpandInMFNetworkFunction = void (*)(blender::nodes::SocketMFNetworkBuilder &builder);
@@ -1347,9 +1344,9 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_POINT_DISTRIBUTE 1004
 #define GEO_NODE_POINT_INSTANCE 1005
 #define GEO_NODE_SUBDIVISION_SURFACE 1006
-#define GEO_NODE_ATTRIBUTE_RANDOM 1007
-#define GEO_NODE_ATTRIBUTE_MATH 1008
-#define GEO_NODE_ATTRIBUTE_CREATE 1009
+#define GEO_NODE_OBJECT_INFO 1007
+#define GEO_NODE_ATTRIBUTE_RANDOM 1008
+#define GEO_NODE_ATTRIBUTE_MATH 1009
 
 /** \} */
 
@@ -1367,8 +1364,8 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 
 /** \} */
 
-void init_nodesystem(void);
-void free_nodesystem(void);
+void BKE_node_system_init(void);
+void BKE_node_system_exit(void);
 
 /* -------------------------------------------------------------------- */
 /* evaluation support, */

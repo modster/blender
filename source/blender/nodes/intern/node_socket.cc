@@ -32,7 +32,7 @@
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
-#include "BKE_geometry.hh"
+#include "BKE_geometry_set.hh"
 #include "BKE_lib_id.h"
 #include "BKE_node.h"
 #include "BKE_persistent_data_handle.hh"
@@ -136,7 +136,7 @@ static void verify_socket_template_list(bNodeTree *ntree,
   bNodeSocketTemplate *stemp;
 
   /* no inputs anymore? */
-  if (stemp_first == NULL) {
+  if (stemp_first == nullptr) {
     for (sock = (bNodeSocket *)socklist->first; sock; sock = nextsock) {
       nextsock = sock->next;
       nodeRemoveSocket(ntree, node, sock);
@@ -267,7 +267,7 @@ void node_socket_init_default_value(bNodeSocket *sock)
     case SOCK_OBJECT: {
       bNodeSocketValueObject *dval = (bNodeSocketValueObject *)MEM_callocN(
           sizeof(bNodeSocketValueObject), "node socket value object");
-      dval->value = NULL;
+      dval->value = nullptr;
 
       sock->default_value = dval;
       break;
@@ -275,7 +275,7 @@ void node_socket_init_default_value(bNodeSocket *sock)
     case SOCK_IMAGE: {
       bNodeSocketValueImage *dval = (bNodeSocketValueImage *)MEM_callocN(
           sizeof(bNodeSocketValueImage), "node socket value image");
-      dval->value = NULL;
+      dval->value = nullptr;
 
       sock->default_value = dval;
       break;
@@ -491,13 +491,13 @@ static bNodeSocketType *make_standard_socket_type(int type, int subtype)
   /* set the RNA type
    * uses the exact same identifier as the socket type idname */
   srna = stype->ext_socket.srna = RNA_struct_find(socket_idname);
-  BLI_assert(srna != NULL);
+  BLI_assert(srna != nullptr);
   /* associate the RNA type with the socket type */
   RNA_struct_blender_type_set(srna, stype);
 
   /* set the interface RNA type */
   srna = stype->ext_interface.srna = RNA_struct_find(interface_idname);
-  BLI_assert(srna != NULL);
+  BLI_assert(srna != nullptr);
   /* associate the RNA type with the socket type */
   RNA_struct_blender_type_set(srna, stype);
 
@@ -521,7 +521,7 @@ static bNodeSocketType *make_standard_socket_type(int type, int subtype)
 
 extern "C" void ED_init_node_socket_type_virtual(bNodeSocketType *);
 
-static bNodeSocketType *make_socket_type_virtual(void)
+static bNodeSocketType *make_socket_type_virtual()
 {
   const char *socket_idname = "NodeSocketVirtual";
   bNodeSocketType *stype;
@@ -534,7 +534,7 @@ static bNodeSocketType *make_socket_type_virtual(void)
   /* set the RNA type
    * uses the exact same identifier as the socket type idname */
   srna = stype->ext_socket.srna = RNA_struct_find(socket_idname);
-  BLI_assert(srna != NULL);
+  BLI_assert(srna != nullptr);
   /* associate the RNA type with the socket type */
   RNA_struct_blender_type_set(srna, stype);
 
@@ -544,8 +544,8 @@ static bNodeSocketType *make_socket_type_virtual(void)
   ED_init_node_socket_type_virtual(stype);
 
   stype->use_link_limits_of_type = true;
-  stype->input_link_limit = 1;
-  stype->output_link_limit = 1;
+  stype->input_link_limit = 0xFFF;
+  stype->output_link_limit = 0xFFF;
 
   return stype;
 }
@@ -666,11 +666,9 @@ static bNodeSocketType *make_socket_type_object()
 static bNodeSocketType *make_socket_type_geometry()
 {
   bNodeSocketType *socktype = make_standard_socket_type(SOCK_GEOMETRY, PROP_NONE);
-  socktype->get_cpp_type = []() {
-    return &blender::fn::CPPType::get<blender::bke::GeometryPtr>();
-  };
+  socktype->get_cpp_type = []() { return &blender::fn::CPPType::get<GeometrySet>(); };
   socktype->get_cpp_value = [](const bNodeSocket &UNUSED(socket), void *r_value) {
-    new (r_value) blender::bke::GeometryPtr();
+    new (r_value) GeometrySet();
   };
   return socktype;
 }

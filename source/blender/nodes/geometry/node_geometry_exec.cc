@@ -16,7 +16,7 @@
 
 #include "NOD_geometry_exec.hh"
 
-MAKE_CPP_TYPE(GeometryPtr, blender::bke::GeometryPtr);
+MAKE_CPP_TYPE(GeometrySet, GeometrySet);
 
 namespace blender::nodes {
 

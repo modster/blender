@@ -29,6 +29,7 @@
 
 #include "BLI_float3.hh"
 #include "BLI_listbase.h"
+#include "BLI_set.hh"
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
@@ -74,6 +75,12 @@
 
 using blender::float3;
 
+/* To be replaced soon. */
+using namespace blender;
+using namespace blender::nodes;
+using namespace blender::fn;
+using namespace blender::bke;
+
 static void initData(ModifierData *md)
 {
   NodesModifierData *nmd = (NodesModifierData *)md;
@@ -83,11 +90,49 @@ static void initData(ModifierData *md)
   MEMCPY_STRUCT_AFTER(nmd, DNA_struct_default_get(NodesModifierData), modifier);
 }
 
+static void addIdsUsedBySocket(const ListBase *sockets, Set<ID *> &ids)
+{
+  LISTBASE_FOREACH (const bNodeSocket *, socket, sockets) {
+    if (socket->type == SOCK_OBJECT) {
+      Object *object = ((bNodeSocketValueObject *)socket->default_value)->value;
+      if (object != nullptr) {
+        ids.add(&object->id);
+      }
+    }
+  }
+}
+
+static void findUsedIds(const bNodeTree &tree, Set<ID *> &ids)
+{
+  Set<const bNodeTree *> handled_groups;
+
+  LISTBASE_FOREACH (const bNode *, node, &tree.nodes) {
+    addIdsUsedBySocket(&node->inputs, ids);
+    addIdsUsedBySocket(&node->outputs, ids);
+
+    if (node->type == NODE_GROUP) {
+      const bNodeTree *group = (bNodeTree *)node->id;
+      if (group != nullptr && handled_groups.add(group)) {
+        findUsedIds(*group, ids);
+      }
+    }
+  }
+}
+
 static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
 {
   NodesModifierData *nmd = reinterpret_cast<NodesModifierData *>(md);
   if (nmd->node_group != nullptr) {
     DEG_add_node_tree_relation(ctx->node, nmd->node_group, "Nodes Modifier");
+
+    Set<ID *> used_ids;
+    findUsedIds(*nmd->node_group, used_ids);
+    for (ID *id : used_ids) {
+      if (GS(id->name) == ID_OB) {
+        DEG_add_object_relation(ctx->node, (Object *)id, DEG_OB_COMP_TRANSFORM, "Nodes Modifier");
+        DEG_add_object_relation(ctx->node, (Object *)id, DEG_OB_COMP_GEOMETRY, "Nodes Modifier");
+      }
+    }
   }
 
   /* TODO: Add relations for IDs in settings. */
@@ -120,25 +165,13 @@ static bool isDisabled(const struct Scene *UNUSED(scene),
                        bool UNUSED(useRenderParams))
 {
   NodesModifierData *nmd = reinterpret_cast<NodesModifierData *>(md);
-  UNUSED_VARS(nmd);
+
+  if (nmd->node_group == nullptr) {
+    return true;
+  }
+
   return false;
 }
-
-static PointCloud *modifyPointCloud(ModifierData *md,
-                                    const ModifierEvalContext *UNUSED(ctx),
-                                    PointCloud *pointcloud)
-{
-  NodesModifierData *nmd = reinterpret_cast<NodesModifierData *>(md);
-  UNUSED_VARS(nmd);
-  std::cout << __func__ << "\n";
-  return pointcloud;
-}
-
-/* To be replaced soon. */
-using namespace blender;
-using namespace blender::nodes;
-using namespace blender::fn;
-using namespace blender::bke;
 
 class GeometryNodesEvaluator {
  private:
@@ -147,14 +180,17 @@ class GeometryNodesEvaluator {
   Vector<const DInputSocket *> group_outputs_;
   MultiFunctionByNode &mf_by_node_;
   const DataTypeConversions &conversions_;
+  const PersistentDataHandleMap &handle_map_;
 
  public:
   GeometryNodesEvaluator(const Map<const DOutputSocket *, GMutablePointer> &group_input_data,
                          Vector<const DInputSocket *> group_outputs,
-                         MultiFunctionByNode &mf_by_node)
+                         MultiFunctionByNode &mf_by_node,
+                         const PersistentDataHandleMap &handle_map)
       : group_outputs_(std::move(group_outputs)),
         mf_by_node_(mf_by_node),
-        conversions_(get_implicit_type_conversions())
+        conversions_(get_implicit_type_conversions()),
+        handle_map_(handle_map)
   {
     for (auto item : group_input_data.items()) {
       this->forward_to_inputs(*item.key, item.value);
@@ -188,21 +224,13 @@ class GeometryNodesEvaluator {
     const int total_inputs = from_sockets.size() + from_group_inputs.size();
     BLI_assert(total_inputs <= 1);
 
-    const CPPType &type = *socket_cpp_type_get(*socket_to_compute.typeinfo());
-
     if (total_inputs == 0) {
       /* The input is not connected, use the value from the socket itself. */
-      bNodeSocket &bsocket = *socket_to_compute.bsocket();
-      void *buffer = allocator_.allocate(type.size(), type.alignment());
-      socket_cpp_value_get(bsocket, buffer);
-      return GMutablePointer{type, buffer};
+      return get_unlinked_input_value(socket_to_compute);
     }
     if (from_group_inputs.size() == 1) {
       /* The input gets its value from the input of a group that is not further connected. */
-      bNodeSocket &bsocket = *from_group_inputs[0]->bsocket();
-      void *buffer = allocator_.allocate(type.size(), type.alignment());
-      socket_cpp_value_get(bsocket, buffer);
-      return GMutablePointer{type, buffer};
+      return get_unlinked_input_value(socket_to_compute);
     }
 
     /* Compute the socket now. */
@@ -227,9 +255,8 @@ class GeometryNodesEvaluator {
 
     /* Execute the node. */
     GValueMap<StringRef> node_outputs_map{allocator_};
-    GeoNodeInputs node_inputs{bnode, node_inputs_map};
-    GeoNodeOutputs node_outputs{bnode, node_outputs_map};
-    this->execute_node(node, node_inputs, node_outputs);
+    GeoNodeExecParams params{bnode, node_inputs_map, node_outputs_map, handle_map_};
+    this->execute_node(node, params);
 
     /* Forward computed outputs to linked input sockets. */
     for (const DOutputSocket *output_socket : node.outputs()) {
@@ -240,23 +267,23 @@ class GeometryNodesEvaluator {
     }
   }
 
-  void execute_node(const DNode &node, GeoNodeInputs node_inputs, GeoNodeOutputs node_outputs)
+  void execute_node(const DNode &node, GeoNodeExecParams params)
   {
-    bNode *bnode = node.bnode();
-    if (bnode->typeinfo->geometry_node_execute != nullptr) {
-      bnode->typeinfo->geometry_node_execute(bnode, node_inputs, node_outputs);
+    const bNode &bnode = params.node();
+    if (bnode.typeinfo->geometry_node_execute != nullptr) {
+      bnode.typeinfo->geometry_node_execute(params);
       return;
     }
 
     /* Use the multi-function implementation of the node. */
     const MultiFunction &fn = *mf_by_node_.lookup(&node);
-    MFContextBuilder context;
-    MFParamsBuilder params{fn, 1};
+    MFContextBuilder fn_context;
+    MFParamsBuilder fn_params{fn, 1};
     Vector<GMutablePointer> input_data;
     for (const DInputSocket *dsocket : node.inputs()) {
       if (dsocket->is_available()) {
-        GMutablePointer data = node_inputs.extract(dsocket->identifier());
-        params.add_readonly_single_input(GSpan(*data.type(), data.get(), 1));
+        GMutablePointer data = params.extract_input(dsocket->identifier());
+        fn_params.add_readonly_single_input(GSpan(*data.type(), data.get(), 1));
         input_data.append(data);
       }
     }
@@ -265,18 +292,20 @@ class GeometryNodesEvaluator {
       if (dsocket->is_available()) {
         const CPPType &type = *socket_cpp_type_get(*dsocket->typeinfo());
         void *buffer = allocator_.allocate(type.size(), type.alignment());
-        params.add_uninitialized_single_output(GMutableSpan(type, buffer, 1));
+        fn_params.add_uninitialized_single_output(GMutableSpan(type, buffer, 1));
         output_data.append(GMutablePointer(type, buffer));
       }
     }
-    fn.call(IndexRange(1), params, context);
+    fn.call(IndexRange(1), fn_params, fn_context);
     for (GMutablePointer value : input_data) {
       value.destruct();
     }
     for (const int i : node.outputs().index_range()) {
-      GMutablePointer value = output_data[i];
-      node_outputs.set_by_move(node.output(i).identifier(), value);
-      value.destruct();
+      if (node.output(i).is_available()) {
+        GMutablePointer value = output_data[i];
+        params.set_output_by_move(node.output(i).identifier(), value);
+        value.destruct();
+      }
     }
   }
 
@@ -327,6 +356,30 @@ class GeometryNodesEvaluator {
       }
     }
   }
+
+  GMutablePointer get_unlinked_input_value(const DInputSocket &socket)
+  {
+    bNodeSocket *bsocket;
+    if (socket.linked_group_inputs().size() == 0) {
+      bsocket = socket.bsocket();
+    }
+    else {
+      bsocket = socket.linked_group_inputs()[0]->bsocket();
+    }
+    const CPPType &type = *socket_cpp_type_get(*socket.typeinfo());
+    void *buffer = allocator_.allocate(type.size(), type.alignment());
+
+    if (bsocket->type == SOCK_OBJECT) {
+      Object *object = ((bNodeSocketValueObject *)bsocket->default_value)->value;
+      PersistentObjectHandle object_handle = handle_map_.lookup(object);
+      new (buffer) PersistentObjectHandle(object_handle);
+    }
+    else {
+      socket_cpp_value_get(*bsocket, buffer);
+    }
+
+    return {type, buffer};
+  }
 };
 
 /**
@@ -370,18 +423,24 @@ static IDProperty *socket_add_property(IDProperty *settings_prop_group,
   }
 
   /* Create the properties for the socket's UI settings. */
-  IDP_AddToGroup(prop_ui_group, property_type.create_min_ui_prop(socket, "min"));
-  IDP_AddToGroup(prop_ui_group, property_type.create_min_ui_prop(socket, "soft_min"));
-  IDP_AddToGroup(prop_ui_group, property_type.create_max_ui_prop(socket, "max"));
-  IDP_AddToGroup(prop_ui_group, property_type.create_max_ui_prop(socket, "soft_max"));
-  IDP_AddToGroup(prop_ui_group, property_type.create_default_ui_prop(socket, "default"));
-  if (property_type.rna_subtype_get != NULL) {
-    const char *subtype_identifier = NULL;
+  if (property_type.create_min_ui_prop != nullptr) {
+    IDP_AddToGroup(prop_ui_group, property_type.create_min_ui_prop(socket, "min"));
+    IDP_AddToGroup(prop_ui_group, property_type.create_min_ui_prop(socket, "soft_min"));
+  }
+  if (property_type.create_max_ui_prop != nullptr) {
+    IDP_AddToGroup(prop_ui_group, property_type.create_max_ui_prop(socket, "max"));
+    IDP_AddToGroup(prop_ui_group, property_type.create_max_ui_prop(socket, "soft_max"));
+  }
+  if (property_type.create_default_ui_prop != nullptr) {
+    IDP_AddToGroup(prop_ui_group, property_type.create_default_ui_prop(socket, "default"));
+  }
+  if (property_type.rna_subtype_get != nullptr) {
+    const char *subtype_identifier = nullptr;
     RNA_enum_identifier(rna_enum_property_subtype_items,
                         property_type.rna_subtype_get(socket),
                         &subtype_identifier);
 
-    if (subtype_identifier != NULL) {
+    if (subtype_identifier != nullptr) {
       IDPropertyTemplate idprop = {0};
       idprop.string.str = subtype_identifier;
       idprop.string.len = BLI_strnlen(subtype_identifier, MAX_NAME) + 1;
@@ -399,22 +458,26 @@ static const SocketPropertyType *get_socket_property_type(const bNodeSocket &bso
       static const SocketPropertyType float_type = {
           [](const bNodeSocket &socket, const char *name) {
             bNodeSocketValueFloat *value = (bNodeSocketValueFloat *)socket.default_value;
-            IDPropertyTemplate idprop = {.f = value->value};
+            IDPropertyTemplate idprop = {0};
+            idprop.f = value->value;
             return IDP_New(IDP_FLOAT, &idprop, name);
           },
           [](const bNodeSocket &socket, const char *name) {
             bNodeSocketValueFloat *value = (bNodeSocketValueFloat *)socket.default_value;
-            IDPropertyTemplate idprop = {.d = value->min};
+            IDPropertyTemplate idprop = {0};
+            idprop.d = value->min;
             return IDP_New(IDP_DOUBLE, &idprop, name);
           },
           [](const bNodeSocket &socket, const char *name) {
             bNodeSocketValueFloat *value = (bNodeSocketValueFloat *)socket.default_value;
-            IDPropertyTemplate idprop = {.d = value->max};
+            IDPropertyTemplate idprop = {0};
+            idprop.d = value->max;
             return IDP_New(IDP_DOUBLE, &idprop, name);
           },
           [](const bNodeSocket &socket, const char *name) {
             bNodeSocketValueFloat *value = (bNodeSocketValueFloat *)socket.default_value;
-            IDPropertyTemplate idprop = {.d = value->value};
+            IDPropertyTemplate idprop = {0};
+            idprop.d = value->value;
             return IDP_New(IDP_DOUBLE, &idprop, name);
           },
           [](const bNodeSocket &socket) {
@@ -431,22 +494,26 @@ static const SocketPropertyType *get_socket_property_type(const bNodeSocket &bso
       static const SocketPropertyType int_type = {
           [](const bNodeSocket &socket, const char *name) {
             bNodeSocketValueInt *value = (bNodeSocketValueInt *)socket.default_value;
-            IDPropertyTemplate idprop = {.i = value->value};
+            IDPropertyTemplate idprop = {0};
+            idprop.i = value->value;
             return IDP_New(IDP_INT, &idprop, name);
           },
           [](const bNodeSocket &socket, const char *name) {
             bNodeSocketValueInt *value = (bNodeSocketValueInt *)socket.default_value;
-            IDPropertyTemplate idprop = {.i = value->min};
+            IDPropertyTemplate idprop = {0};
+            idprop.i = value->min;
             return IDP_New(IDP_INT, &idprop, name);
           },
           [](const bNodeSocket &socket, const char *name) {
             bNodeSocketValueInt *value = (bNodeSocketValueInt *)socket.default_value;
-            IDPropertyTemplate idprop = {.i = value->max};
+            IDPropertyTemplate idprop = {0};
+            idprop.i = value->max;
             return IDP_New(IDP_INT, &idprop, name);
           },
           [](const bNodeSocket &socket, const char *name) {
             bNodeSocketValueInt *value = (bNodeSocketValueInt *)socket.default_value;
-            IDPropertyTemplate idprop = {.i = value->value};
+            IDPropertyTemplate idprop = {0};
+            idprop.i = value->value;
             return IDP_New(IDP_INT, &idprop, name);
           },
           [](const bNodeSocket &socket) {
@@ -470,12 +537,14 @@ static const SocketPropertyType *get_socket_property_type(const bNodeSocket &bso
           },
           [](const bNodeSocket &socket, const char *name) {
             bNodeSocketValueVector *value = (bNodeSocketValueVector *)socket.default_value;
-            IDPropertyTemplate idprop = {.d = value->min};
+            IDPropertyTemplate idprop = {0};
+            idprop.d = value->min;
             return IDP_New(IDP_DOUBLE, &idprop, name);
           },
           [](const bNodeSocket &socket, const char *name) {
             bNodeSocketValueVector *value = (bNodeSocketValueVector *)socket.default_value;
-            IDPropertyTemplate idprop = {.d = value->max};
+            IDPropertyTemplate idprop = {0};
+            idprop.d = value->max;
             return IDP_New(IDP_DOUBLE, &idprop, name);
           },
           [](const bNodeSocket &socket, const char *name) {
@@ -504,20 +573,24 @@ static const SocketPropertyType *get_socket_property_type(const bNodeSocket &bso
       static const SocketPropertyType boolean_type = {
           [](const bNodeSocket &socket, const char *name) {
             bNodeSocketValueBoolean *value = (bNodeSocketValueBoolean *)socket.default_value;
-            IDPropertyTemplate idprop = {.i = value->value != 0};
+            IDPropertyTemplate idprop = {0};
+            idprop.i = value->value != 0;
             return IDP_New(IDP_INT, &idprop, name);
           },
           [](const bNodeSocket &UNUSED(socket), const char *name) {
-            IDPropertyTemplate idprop = {.i = 0};
+            IDPropertyTemplate idprop = {0};
+            idprop.i = 0;
             return IDP_New(IDP_INT, &idprop, name);
           },
           [](const bNodeSocket &UNUSED(socket), const char *name) {
-            IDPropertyTemplate value = {.i = 1};
-            return IDP_New(IDP_INT, &value, name);
+            IDPropertyTemplate idprop = {0};
+            idprop.i = 1;
+            return IDP_New(IDP_INT, &idprop, name);
           },
           [](const bNodeSocket &socket, const char *name) {
             bNodeSocketValueBoolean *value = (bNodeSocketValueBoolean *)socket.default_value;
-            IDPropertyTemplate idprop = {.i = value->value != 0};
+            IDPropertyTemplate idprop = {0};
+            idprop.i = value->value != 0;
             return IDP_New(IDP_INT, &idprop, name);
           },
           nullptr,
@@ -568,7 +641,7 @@ void MOD_nodes_update_interface(Object *object, NodesModifierData *nmd)
     IDProperty *new_prop = socket_add_property(
         nmd->settings.properties, ui_container_group, *property_type, *socket);
 
-    if (old_properties != NULL) {
+    if (old_properties != nullptr) {
       IDProperty *old_prop = IDP_GetPropertyFromGroup(old_properties, socket->identifier);
       if (old_prop != nullptr && property_type->is_correct_type(*old_prop)) {
         IDP_CopyPropertyContent(new_prop, old_prop);
@@ -576,7 +649,7 @@ void MOD_nodes_update_interface(Object *object, NodesModifierData *nmd)
     }
   }
 
-  if (old_properties != NULL) {
+  if (old_properties != nullptr) {
     IDP_FreeProperty(old_properties);
   }
 
@@ -591,8 +664,8 @@ void MOD_nodes_init(Main *bmain, NodesModifierData *nmd)
   ntreeAddSocketInterface(ntree, SOCK_IN, "NodeSocketGeometry", "Geometry");
   ntreeAddSocketInterface(ntree, SOCK_OUT, "NodeSocketGeometry", "Geometry");
 
-  bNode *group_input_node = nodeAddStaticNode(NULL, ntree, NODE_GROUP_INPUT);
-  bNode *group_output_node = nodeAddStaticNode(NULL, ntree, NODE_GROUP_OUTPUT);
+  bNode *group_input_node = nodeAddStaticNode(nullptr, ntree, NODE_GROUP_INPUT);
+  bNode *group_output_node = nodeAddStaticNode(nullptr, ntree, NODE_GROUP_OUTPUT);
 
   group_input_node->locx = -200 - group_input_node->width;
   group_output_node->locx = 200;
@@ -633,15 +706,27 @@ static void initialize_group_input(NodesModifierData &nmd,
   property_type->init_cpp_value(*property, r_value);
 }
 
+static void fill_data_handle_map(const DerivedNodeTree &tree, PersistentDataHandleMap &handle_map)
+{
+  Set<ID *> used_ids;
+  findUsedIds(*tree.btree(), used_ids);
+
+  int current_handle = 0;
+  for (ID *id : used_ids) {
+    handle_map.add(current_handle, *id);
+    current_handle++;
+  }
+}
+
 /**
  * Evaluate a node group to compute the output geometry.
  * Currently, this uses a fairly basic and inefficient algorithm that might compute things more
  * often than necessary. It's going to be replaced soon.
  */
-static GeometryPtr compute_geometry(const DerivedNodeTree &tree,
+static GeometrySet compute_geometry(const DerivedNodeTree &tree,
                                     Span<const DOutputSocket *> group_input_sockets,
                                     const DInputSocket &socket_to_compute,
-                                    GeometryPtr input_geometry,
+                                    GeometrySet input_geometry_set,
                                     NodesModifierData *nmd)
 {
   ResourceCollector resources;
@@ -657,8 +742,9 @@ static GeometryPtr compute_geometry(const DerivedNodeTree &tree,
      * modifier. */
     const DOutputSocket *first_input_socket = group_input_sockets[0];
     if (first_input_socket->bsocket()->type == SOCK_GEOMETRY) {
-      GeometryPtr *geometry_in = allocator.construct<GeometryPtr>(std::move(input_geometry));
-      group_inputs.add_new(first_input_socket, geometry_in);
+      GeometrySet *geometry_set_in = allocator.construct<GeometrySet>(
+          std::move(input_geometry_set));
+      group_inputs.add_new(first_input_socket, geometry_set_in);
       remaining_input_sockets = remaining_input_sockets.drop_front(1);
     }
 
@@ -674,18 +760,21 @@ static GeometryPtr compute_geometry(const DerivedNodeTree &tree,
   Vector<const DInputSocket *> group_outputs;
   group_outputs.append(&socket_to_compute);
 
-  GeometryNodesEvaluator evaluator{group_inputs, group_outputs, mf_by_node};
+  PersistentDataHandleMap handle_map;
+  fill_data_handle_map(tree, handle_map);
+
+  GeometryNodesEvaluator evaluator{group_inputs, group_outputs, mf_by_node, handle_map};
   Vector<GMutablePointer> results = evaluator.execute();
   BLI_assert(results.size() == 1);
   GMutablePointer result = results[0];
 
-  GeometryPtr output_geometry = std::move(*(GeometryPtr *)result.get());
+  GeometrySet output_geometry = std::move(*(GeometrySet *)result.get());
   return output_geometry;
 }
 
 /**
  * \note This could be done in #initialize_group_input, though that would require adding the
- * the object as a paramete, so it's likely better to this check as a separate step.
+ * the object as a parameter, so it's likely better to this check as a separate step.
  */
 static void check_property_socket_sync(const Object *ob, ModifierData *md)
 {
@@ -700,47 +789,69 @@ static void check_property_socket_sync(const Object *ob, ModifierData *md)
 
     IDProperty *property = IDP_GetPropertyFromGroup(nmd->settings.properties, socket->identifier);
     if (property == nullptr) {
-      BKE_modifier_set_error(ob,
-                             md,
-                             "Missing property for input socket \"%s\" (\"%s\") ",
-                             socket->name,
-                             socket->identifier);
+      if (socket->type == SOCK_STRING) {
+        BKE_modifier_set_error(ob, md, "String sockets cannot be exposed in the modifier");
+      }
+      else if (socket->type == SOCK_OBJECT) {
+        BKE_modifier_set_error(ob, md, "Object sockets cannot be exposed in the modifier");
+      }
+      else if (socket->type == SOCK_GEOMETRY) {
+        BKE_modifier_set_error(ob, md, "The node group can only have one geometry input");
+      }
+      else {
+        BKE_modifier_set_error(
+            ob, md, "Missing modifier property for input socket \"%s\"", socket->name);
+      }
       continue;
     }
 
     const SocketPropertyType *property_type = get_socket_property_type(*socket);
     if (!property_type->is_correct_type(*property)) {
-      BKE_modifier_set_error(ob,
-                             md,
-                             "Property type does not match for input socket \"%s\" (\"%s\") ",
-                             socket->name,
-                             socket->identifier);
+      BKE_modifier_set_error(
+          ob, md, "Property type does not match for input socket \"(%s)\"", socket->name);
       continue;
     }
   }
+
+  bool has_geometry_output = false;
+  LISTBASE_FOREACH (const bNodeSocket *, socket, &nmd->node_group->outputs) {
+    if (socket->type == SOCK_GEOMETRY) {
+      has_geometry_output = true;
+    }
+  }
+
+  if (!has_geometry_output) {
+    BKE_modifier_set_error(ob, md, "The node group must have a geometry output");
+  }
 }
 
-static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
+static void modifyGeometry(ModifierData *md,
+                           const ModifierEvalContext *ctx,
+                           GeometrySet &geometry_set)
 {
   NodesModifierData *nmd = reinterpret_cast<NodesModifierData *>(md);
   if (nmd->node_group == nullptr) {
-    return mesh;
+    return;
   }
 
   check_property_socket_sync(ctx->object, md);
 
   NodeTreeRefMap tree_refs;
   DerivedNodeTree tree{nmd->node_group, tree_refs};
-  ResourceCollector resources;
+
+  if (tree.has_link_cycles()) {
+    BKE_modifier_set_error(ctx->object, md, "Node group has cycles");
+    return;
+  }
 
   Span<const DNode *> input_nodes = tree.nodes_by_type("NodeGroupInput");
   Span<const DNode *> output_nodes = tree.nodes_by_type("NodeGroupOutput");
 
   if (input_nodes.size() > 1) {
-    return mesh;
+    return;
   }
   if (output_nodes.size() != 1) {
-    return mesh;
+    return;
   }
 
   Span<const DOutputSocket *> group_inputs = (input_nodes.size() == 1) ?
@@ -748,25 +859,37 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
                                                  Span<const DOutputSocket *>{};
   Span<const DInputSocket *> group_outputs = output_nodes[0]->inputs().drop_back(1);
 
-  if (group_outputs.size() != 1) {
-    return mesh;
+  if (group_outputs.size() == 0) {
+    return;
   }
 
   const DInputSocket *group_output = group_outputs[0];
   if (group_output->idname() != "NodeSocketGeometry") {
-    return mesh;
+    return;
   }
 
-  GeometryPtr input_geometry{Geometry::create_with_mesh(mesh, false)};
+  geometry_set = compute_geometry(
+      tree, group_inputs, *group_outputs[0], std::move(geometry_set), nmd);
+}
 
-  GeometryPtr new_geometry = compute_geometry(
-      tree, group_inputs, *group_outputs[0], std::move(input_geometry), nmd);
-  make_geometry_mutable(new_geometry);
-  Mesh *new_mesh = new_geometry->get_component_for_write<MeshComponent>().release();
+static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
+{
+  GeometrySet geometry_set = GeometrySet::create_with_mesh(mesh, GeometryOwnershipType::Editable);
+  geometry_set.get_component_for_write<MeshComponent>().copy_vertex_group_names_from_object(
+      *ctx->object);
+  modifyGeometry(md, ctx, geometry_set);
+  Mesh *new_mesh = geometry_set.get_component_for_write<MeshComponent>().release();
   if (new_mesh == nullptr) {
     return BKE_mesh_new_nomain(0, 0, 0, 0, 0);
   }
   return new_mesh;
+}
+
+static void modifyPointCloud(ModifierData *md,
+                             const ModifierEvalContext *ctx,
+                             GeometrySet *geometry_set)
+{
+  modifyGeometry(md, ctx, *geometry_set);
 }
 
 /* Drawing the properties manually with #uiItemR instead of #uiDefAutoButsRNA allows using
@@ -799,14 +922,13 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 #ifdef WITH_GEOMETRY_NODES
   uiLayout *layout = panel->layout;
 
-  PointerRNA ob_ptr;
-  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, &ob_ptr);
+  PointerRNA *ptr = modifier_panel_get_property_pointers(panel, nullptr);
   NodesModifierData *nmd = static_cast<NodesModifierData *>(ptr->data);
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
 
-  uiItemR(layout, ptr, "node_group", 0, NULL, ICON_MESH_DATA);
+  uiItemR(layout, ptr, "node_group", 0, nullptr, ICON_MESH_DATA);
 
   if (nmd->node_group != nullptr && nmd->settings.properties != nullptr) {
     PointerRNA settings_ptr;
@@ -823,7 +945,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
 static void panelRegister(ARegionType *region_type)
 {
-  modifier_panel_register(region_type, eModifierType_Nodes, panel_draw);
+  modifier_panel_register(region_type, eModifierType_Empty, panel_draw);
 }
 
 static void blendWrite(BlendWriter *writer, const ModifierData *md)
@@ -865,7 +987,7 @@ static void freeData(ModifierData *md)
 }
 
 ModifierTypeInfo modifierType_Nodes = {
-    /* name */ "Nodes",
+    /* name */ "Empty",
     /* structName */ "NodesModifierData",
     /* structSize */ sizeof(NodesModifierData),
 #ifdef WITH_GEOMETRY_NODES
@@ -882,25 +1004,25 @@ ModifierTypeInfo modifierType_Nodes = {
 
     /* copyData */ copyData,
 
-    /* deformVerts */ NULL,
-    /* deformMatrices */ NULL,
-    /* deformVertsEM */ NULL,
-    /* deformMatricesEM */ NULL,
+    /* deformVerts */ nullptr,
+    /* deformMatrices */ nullptr,
+    /* deformVertsEM */ nullptr,
+    /* deformMatricesEM */ nullptr,
     /* modifyMesh */ modifyMesh,
-    /* modifyHair */ NULL,
+    /* modifyHair */ nullptr,
     /* modifyPointCloud */ modifyPointCloud,
-    /* modifyVolume */ NULL,
+    /* modifyVolume */ nullptr,
 
     /* initData */ initData,
-    /* requiredDataMask */ NULL,
+    /* requiredDataMask */ nullptr,
     /* freeData */ freeData,
     /* isDisabled */ isDisabled,
     /* updateDepsgraph */ updateDepsgraph,
-    /* dependsOnTime */ NULL,
-    /* dependsOnNormals */ NULL,
+    /* dependsOnTime */ nullptr,
+    /* dependsOnNormals */ nullptr,
     /* foreachIDLink */ foreachIDLink,
-    /* foreachTexLink */ NULL,
-    /* freeRuntimeData */ NULL,
+    /* foreachTexLink */ nullptr,
+    /* freeRuntimeData */ nullptr,
     /* panelRegister */ panelRegister,
     /* blendWrite */ blendWrite,
     /* blendRead */ blendRead,

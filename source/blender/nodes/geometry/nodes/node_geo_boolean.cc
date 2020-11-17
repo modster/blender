@@ -53,12 +53,14 @@ static Mesh *mesh_boolean_calc(const Mesh *mesh_a, const Mesh *mesh_b, int boole
 
   BMesh *bm;
   {
-    struct BMeshCreateParams bmesh_create_params = {.use_toolflags = false};
+    struct BMeshCreateParams bmesh_create_params = {0};
+    bmesh_create_params.use_toolflags = false;
     bm = BM_mesh_create(&allocsize, &bmesh_create_params);
   }
 
   {
-    struct BMeshFromMeshParams bmesh_from_mesh_params = {.calc_face_normal = true};
+    struct BMeshFromMeshParams bmesh_from_mesh_params = {0};
+    bmesh_from_mesh_params.calc_face_normal = true;
     BM_mesh_bm_from_me(bm, mesh_a, &bmesh_from_mesh_params);
     BM_mesh_bm_from_me(bm, mesh_b, &bmesh_from_mesh_params);
   }
@@ -89,9 +91,10 @@ static Mesh *mesh_boolean_calc(const Mesh *mesh_a, const Mesh *mesh_b, int boole
     }
   }
 
-  BM_mesh_boolean(bm, looptris, tottri, bm_face_isect_pair, NULL, 2, false, boolean_mode);
+  BM_mesh_boolean(
+      bm, looptris, tottri, bm_face_isect_pair, nullptr, 2, false, false, boolean_mode);
 
-  Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh_a);
+  Mesh *result = BKE_mesh_from_bmesh_for_eval_nomain(bm, nullptr, mesh_a);
   BM_mesh_free(bm);
   result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
   MEM_freeN(looptris);
@@ -100,35 +103,30 @@ static Mesh *mesh_boolean_calc(const Mesh *mesh_a, const Mesh *mesh_b, int boole
 }
 
 namespace blender::nodes {
-static void geo_boolean_exec(bNode *node, GeoNodeInputs inputs, GeoNodeOutputs outputs)
+static void geo_boolean_exec(GeoNodeExecParams params)
 {
-  GeometryPtr geometry_in_a = inputs.extract<GeometryPtr>("Geometry A");
-  GeometryPtr geometry_in_b = inputs.extract<GeometryPtr>("Geometry B");
-  GeometryPtr geometry_out;
+  GeometrySet geometry_set_in_a = params.extract_input<GeometrySet>("Geometry A");
+  GeometrySet geometry_set_in_b = params.extract_input<GeometrySet>("Geometry B");
+  GeometrySet geometry_set_out;
 
-  if (!geometry_in_a.has_value() || !geometry_in_b.has_value()) {
-    outputs.set("Geometry", std::move(geometry_out));
-    return;
-  }
-
-  const Mesh *mesh_in_a = geometry_in_a->get_mesh_for_read();
-  const Mesh *mesh_in_b = geometry_in_b->get_mesh_for_read();
+  const Mesh *mesh_in_a = geometry_set_in_a.get_mesh_for_read();
+  const Mesh *mesh_in_b = geometry_set_in_b.get_mesh_for_read();
   if (mesh_in_a == nullptr || mesh_in_b == nullptr) {
-    outputs.set("Geometry", std::move(geometry_out));
+    params.set_output("Geometry", std::move(geometry_set_out));
     return;
   }
 
-  GeometryNodeBooleanOperation operation = (GeometryNodeBooleanOperation)node->custom1;
+  GeometryNodeBooleanOperation operation = (GeometryNodeBooleanOperation)params.node().custom1;
   if (operation < 0 || operation > 2) {
     BLI_assert(false);
-    outputs.set("Geometry", std::move(geometry_out));
+    params.set_output("Geometry", std::move(geometry_set_out));
     return;
   }
 
   Mesh *mesh_out = mesh_boolean_calc(mesh_in_a, mesh_in_b, operation);
-  geometry_out = Geometry::create_with_mesh(mesh_out);
+  geometry_set_out = GeometrySet::create_with_mesh(mesh_out);
 
-  outputs.set("Geometry", std::move(geometry_out));
+  params.set_output("Geometry", std::move(geometry_set_out));
 }
 }  // namespace blender::nodes
 

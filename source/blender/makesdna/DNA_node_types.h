@@ -924,6 +924,8 @@ typedef struct NodeTexMagic {
 
 typedef struct NodeShaderAttribute {
   char name[64];
+  int type;
+  char _pad[4];
 } NodeShaderAttribute;
 
 typedef struct NodeShaderVectTransform {
@@ -1092,6 +1094,13 @@ typedef struct NodeDenoise {
 #define SHD_VECT_TRANSFORM_SPACE_WORLD 0
 #define SHD_VECT_TRANSFORM_SPACE_OBJECT 1
 #define SHD_VECT_TRANSFORM_SPACE_CAMERA 2
+
+/* attribute */
+enum {
+  SHD_ATTRIBUTE_GEOMETRY = 0,
+  SHD_ATTRIBUTE_OBJECT = 1,
+  SHD_ATTRIBUTE_INSTANCER = 2,
+};
 
 /* toon modes */
 #define SHD_TOON_DIFFUSE 0
@@ -1432,3 +1441,16 @@ typedef enum GeometryNodeBooleanOperation {
   GEO_NODE_BOOLEAN_UNION = 1,
   GEO_NODE_BOOLEAN_DIFFERENCE = 2,
 } GeometryNodeBooleanOperation;
+
+/* Triangulate Node */
+typedef enum GeometryNodeTriangulateNGons {
+  GEO_NODE_TRIANGULATE_NGON_BEAUTY = 0,
+  GEO_NODE_TRIANGULATE_NGON_EARCLIP = 1,
+} GeometryNodeTriangulateNGons;
+
+typedef enum GeometryNodeTriangulateQuads {
+  GEO_NODE_TRIANGULATE_QUAD_BEAUTY = 0,
+  GEO_NODE_TRIANGULATE_QUAD_FIXED = 1,
+  GEO_NODE_TRIANGULATE_QUAD_ALTERNATE = 2,
+  GEO_NODE_TRIANGULATE_QUAD_SHORTEDGE = 3,
+} GeometryNodeTriangulateQuads;
