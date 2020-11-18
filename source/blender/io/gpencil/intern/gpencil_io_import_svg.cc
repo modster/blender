@@ -34,6 +34,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_math_color.h"
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
@@ -102,13 +103,21 @@ bool GpencilImporterSVG::read(void)
   bGPdata *gpd = (bGPdata *)params_.ob_target->data;
 
   /* Loop all shapes. */
+  char prv_id[70] = {"*"};
+  int prefix = 0;
   for (NSVGshape *shape = svg_data->shapes; shape; shape = shape->next) {
-    /* Check if the layer exist and create if needed. */
+    char *layer_id = BLI_sprintfN("%03d_%s", prefix, shape->id);
+    if (!STREQ(prv_id, layer_id)) {
+      prefix++;
+      layer_id = BLI_sprintfN("%03d_%s", prefix, shape->id);
+      strcpy(prv_id, layer_id);
+    }
 
+    /* Check if the layer exist and create if needed. */
     bGPDlayer *gpl = (bGPDlayer *)BLI_findstring(
-        &gpd->layers, shape->id, offsetof(bGPDlayer, info));
+        &gpd->layers, layer_id, offsetof(bGPDlayer, info));
     if (gpl == NULL) {
-      gpl = BKE_gpencil_layer_addnew(gpd, shape->id, true);
+      gpl = BKE_gpencil_layer_addnew(gpd, layer_id, true);
     }
     /* Check frame. */
     bGPDframe *gpf = BKE_gpencil_layer_frame_get(gpl, cfra_, GP_GETFRAME_ADD_NEW);
@@ -120,10 +129,11 @@ bool GpencilImporterSVG::read(void)
     }
 
     /* Create_shape materials. */
-    const char *const mat_names[] = {"Stroke", "Fill", "Stroke and Fill"};
+    const char *const mat_names[] = {"Stroke", "Fill"};
     int index = 0;
     if ((is_stroke) && (is_fill)) {
-      index = 2;
+      index = 0;
+      is_fill = false;
     }
     else if ((!is_stroke) && (is_fill)) {
       index = 1;
@@ -132,7 +142,7 @@ bool GpencilImporterSVG::read(void)
 
     /* Loop all paths to create the stroke data. */
     for (NSVGpath *path = shape->paths; path; path = path->next) {
-      create_stroke(gpd, gpf, path, mat_index);
+      create_stroke(gpd, gpf, shape, path, mat_index);
     }
   }
 
@@ -142,45 +152,59 @@ bool GpencilImporterSVG::read(void)
   return result;
 }
 
-void GpencilImporterSVG::create_stroke(bGPdata *gpd,
-                                       bGPDframe *gpf,
-                                       NSVGpath *path,
-                                       int32_t mat_index)
+void GpencilImporterSVG::create_stroke(
+    bGPdata *gpd, bGPDframe *gpf, NSVGshape *shape, NSVGpath *path, int32_t mat_index)
 {
-  // gps->editcurve = BKE_gpencil_stroke_editcurve_new(path->npts);
+  const bool is_stroke = (bool)shape->stroke.type;
+  const bool is_fill = (bool)shape->fill.type;
 
   const int edges = 3;
   const float step = 1.0f / (float)(edges - 1);
 
-  bool cyclic = (path->closed == '0') ? false : true;
   int totpoints = path->npts - 1;
-
   bGPDstroke *gps = BKE_gpencil_stroke_new(mat_index, totpoints, 1.0f);
   BLI_addtail(&gpf->strokes, gps);
+
+  if (path->closed == '1') {
+    gps->flag |= GP_STROKE_CYCLIC;
+  }
+  if (is_stroke) {
+    gps->thickness = shape->strokeWidth;
+  }
+  /* Apply Fill vertex color. */
+  if (is_fill) {
+    NSVGpaint fill = shape->fill;
+    convert_color(fill.color, gps->vert_color_fill);
+    gps->fill_opacity_fac = gps->vert_color_fill[3];
+    gps->vert_color_fill[3] = 1.0f;
+  }
 
   int start_index = 0;
   for (int i = 0; i < path->npts - 1; i += 3) {
     float *p = &path->pts[i * 2];
-    // printf("P1(%f,%f) C1(%f,%f) C2(%f,%f) P2(%f,%f)\n",
-    //       p[0],
-    //       p[1],
-    //       p[2],
-    //       p[3],
-    //       p[4],
-    //       p[5],
-    //       p[6],
-    //       p[7]);
     float a = 0.0f;
     for (int v = 0; v < edges; v++) {
       bGPDspoint *pt = &gps->points[start_index];
-      pt->strength = 1.0f;
+      pt->strength = shape->opacity;
       pt->pressure = 1.0f;
       pt->z = 0.0f;
       interp_v2_v2v2v2v2_cubic(&pt->x, &p[0], &p[2], &p[4], &p[6], a);
-      // printf("\t%d->%d->%f: (%f, %f)\n", start_index, v, a, pt->x, pt->y);
 
       /* Scale from milimeters. */
       mul_v3_fl(&pt->x, 0.001f);
+
+      /* Apply color to vertex color. */
+      if (is_fill) {
+        NSVGpaint fill = shape->fill;
+        convert_color(fill.color, pt->vert_color);
+      }
+      if (is_stroke) {
+        NSVGpaint stroke = shape->stroke;
+        convert_color(stroke.color, pt->vert_color);
+        gps->fill_opacity_fac = pt->vert_color[3];
+      }
+      pt->vert_color[3] = 1.0f;
+
       a += step;
       start_index++;
     }
@@ -188,6 +212,30 @@ void GpencilImporterSVG::create_stroke(bGPdata *gpd,
   /* Cleanup and recalculate geometry. */
   BKE_gpencil_stroke_merge_distance(gpd, gpf, gps, 0.001f, true);
   BKE_gpencil_stroke_geometry_update(gpd, gps);
+}
+
+static void unpack_nano_color(float r_col[4], const unsigned int pack)
+{
+  unsigned char rgb_u[4];
+
+  rgb_u[0] = ((pack) >> 0) & 0xFF;
+  rgb_u[1] = ((pack) >> 8) & 0xFF;
+  rgb_u[2] = ((pack) >> 16) & 0xFF;
+  rgb_u[3] = ((pack) >> 24) & 0xFF;
+
+  r_col[0] = (float)rgb_u[0] / 255.0f;
+  r_col[1] = (float)rgb_u[1] / 255.0f;
+  r_col[2] = (float)rgb_u[2] / 255.0f;
+  r_col[3] = (float)rgb_u[3] / 255.0f;
+}
+
+void GpencilImporterSVG::convert_color(unsigned int color, float r_linear_rgba[4])
+{
+  float rgba[4];
+  unpack_nano_color(rgba, color);
+
+  srgb_to_linearrgb_v3_v3(r_linear_rgba, rgba);
+  r_linear_rgba[3] = rgba[3];
 }
 
 }  // namespace blender::io::gpencil

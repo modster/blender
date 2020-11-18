@@ -140,7 +140,8 @@ void GpencilImporter::gps_current_set(struct bGPDstroke *gps)
 
 int32_t GpencilImporter::create_material(const char *name, const bool stroke, const bool fill)
 {
-  const float default_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+  const float default_stroke_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+  const float default_fill_color[4] = {0.5f, 0.5f, 0.5f, 1.0f};
   int32_t mat_index = BKE_gpencil_material_find_index_by_name_prefix(params_.ob_target, name);
   /* Stroke and Fill material. */
   if (mat_index == -1) {
@@ -150,8 +151,8 @@ int32_t GpencilImporter::create_material(const char *name, const bool stroke, co
     gp_style->flag &= ~GP_MATERIAL_STROKE_SHOW;
     gp_style->flag &= ~GP_MATERIAL_FILL_SHOW;
 
-    copy_v4_v4(gp_style->stroke_rgba, default_color);
-    copy_v4_v4(gp_style->fill_rgba, default_color);
+    copy_v4_v4(gp_style->stroke_rgba, default_stroke_color);
+    copy_v4_v4(gp_style->fill_rgba, default_fill_color);
     if (stroke) {
       gp_style->flag |= GP_MATERIAL_STROKE_SHOW;
     }

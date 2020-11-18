@@ -24,6 +24,7 @@
 #include "gpencil_io_import_base.h"
 
 struct GpencilImportParams;
+struct NSVGshape;
 struct NSVGpath;
 struct bGPdata;
 struct bGPDframe;
@@ -45,8 +46,11 @@ class GpencilImporterSVG : public GpencilImporter {
  private:
   void create_stroke(struct bGPdata *gpd,
                      struct bGPDframe *gpf,
+                     struct NSVGshape *shape,
                      struct NSVGpath *path,
                      int32_t mat_index);
+
+  void convert_color(unsigned int color, float r_linear_rgba[4]);
 };
 
 }  // namespace blender::io::gpencil
