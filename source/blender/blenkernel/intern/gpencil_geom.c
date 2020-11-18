@@ -3226,7 +3226,6 @@ void BKE_gpencil_stroke_join(bGPDstroke *gps_a,
         gps_a, dvert, pt, delta, pt->pressure * ratio, pt->strength, deltatime);
   }
 }
-}
 
 /**
  * Stroke to view space
