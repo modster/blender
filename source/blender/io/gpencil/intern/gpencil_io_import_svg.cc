@@ -146,8 +146,23 @@ bool GpencilImporterSVG::read(void)
     }
   }
 
-  /* Free memory. */
+  /* Free SVG memory. */
   nsvgDelete(svg_data);
+
+  /* Calculate bounding box and move all points to new origin center. */
+  float gp_center[3];
+  BKE_gpencil_centroid_3d(gpd, gp_center);
+  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+    LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
+      LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+        int i;
+        bGPDspoint *pt;
+        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+          sub_v3_v3(&pt->x, gp_center);
+        }
+      }
+    }
+  }
 
   return result;
 }
