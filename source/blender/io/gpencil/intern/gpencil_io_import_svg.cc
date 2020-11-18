@@ -109,6 +109,7 @@ bool GpencilImporterSVG::read(void)
     char *layer_id = BLI_sprintfN("%03d_%s", prefix, shape->id);
     if (!STREQ(prv_id, layer_id)) {
       prefix++;
+      MEM_freeN(layer_id);
       layer_id = BLI_sprintfN("%03d_%s", prefix, shape->id);
       strcpy(prv_id, layer_id);
     }
@@ -119,6 +120,8 @@ bool GpencilImporterSVG::read(void)
     if (gpl == NULL) {
       gpl = BKE_gpencil_layer_addnew(gpd, layer_id, true);
     }
+    MEM_freeN(layer_id);
+
     /* Check frame. */
     bGPDframe *gpf = BKE_gpencil_layer_frame_get(gpl, cfra_, GP_GETFRAME_ADD_NEW);
     /* Create materials. */
@@ -174,10 +177,11 @@ void GpencilImporterSVG::create_stroke(
   const bool is_stroke = (bool)shape->stroke.type;
   const bool is_fill = (bool)shape->fill.type;
 
-  const int edges = 3;
+  const int edges = params_.resolution;
   const float step = 1.0f / (float)(edges - 1);
 
-  int totpoints = path->npts - 1;
+  int totpoints = (path->npts / 3) * params_.resolution;
+
   bGPDstroke *gps = BKE_gpencil_stroke_new(mat_index, totpoints, 1.0f);
   BLI_addtail(&gpf->strokes, gps);
 
@@ -231,6 +235,7 @@ void GpencilImporterSVG::create_stroke(
       start_index++;
     }
   }
+
   /* Cleanup and recalculate geometry. */
   BKE_gpencil_stroke_merge_distance(gpd, gpf, gps, 0.001f, true);
   BKE_gpencil_stroke_geometry_update(gpd, gps);

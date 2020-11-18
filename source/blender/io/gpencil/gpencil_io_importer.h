@@ -40,6 +40,8 @@ struct GpencilImportParams {
   uint16_t mode;
   /** target frame.  */
   int32_t frame_target;
+  /** Resolution.  */
+  int32_t resolution;
   /** Flags. */
   uint32_t flag;
 };

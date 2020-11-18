@@ -94,7 +94,10 @@ static void gpencil_import_common_props(wmOperatorType *ot)
                       GP_TARGET_OB_NEW,
                       "Target Object",
                       "Target grease pencil object");
+
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+  RNA_def_int(
+      ot->srna, "resolution", 3, 1, 30, "Resolution", "Resolution of the generated curves", 1, 20);
 }
 
 static void ui_gpencil_import_common_settings(uiLayout *layout, PointerRNA *imfptr)
@@ -109,6 +112,8 @@ static void ui_gpencil_import_common_settings(uiLayout *layout, PointerRNA *imfp
 
   sub = uiLayoutColumn(col, true);
   uiItemR(sub, imfptr, "target", 0, NULL, ICON_NONE);
+  sub = uiLayoutColumn(col, true);
+  uiItemR(sub, imfptr, "resolution", 0, NULL, ICON_NONE);
 }
 
 static int wm_gpencil_import_svg_invoke(bContext *C, wmOperator *op, const wmEvent *event)
@@ -157,6 +162,8 @@ static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
     }
   }
 
+  const int resolution = RNA_int_get(op->ptr, "resolution");
+
   struct GpencilImportParams params = {
       .C = C,
       .region = region,
@@ -165,7 +172,7 @@ static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
       .mode = GP_IMPORT_FROM_SVG,
       .frame_target = CFRA,
       .flag = flag,
-
+      .resolution = resolution,
   };
 
   /* Do Import. */
@@ -216,7 +223,7 @@ static bool wm_gpencil_import_svg_poll(bContext *C)
 
 void WM_OT_gpencil_import_svg(wmOperatorType *ot)
 {
-  ot->name = "Import to SVG";
+  ot->name = "Import SVG";
   ot->description = "Import SVG into grease pencil";
   ot->idname = "WM_OT_gpencil_import_svg";
 
