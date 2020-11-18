@@ -19,6 +19,7 @@
 
 #include "usd_reader_mesh.h"
 #include "usd_import_util.h"
+#include "usd_material_importer.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -453,6 +454,10 @@ void USDMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)
     }
   }
 
+  USDMaterialImporter mtl_importer(this->context_, bmain);
+
+  /* TODO(makowalski): Move more of the material creation logic inot USDMaterialImporter. */
+
   if (subset_mtls.empty()) {
     /* No material subsets.  See if there is a material bound to the mesh. */
 
@@ -490,7 +495,7 @@ void USDMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)
 
     if (!blen_mtl) {
       /* No existing material, so add it now. */
-      blen_mtl = BKE_material_add(bmain, mtl_name.c_str());
+      blen_mtl = mtl_importer.add_material(bound_mtl);
     }
 
     if (!blen_mtl) {
@@ -546,7 +551,7 @@ void USDMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)
         blen_mtl = blen_mtl_iter->second;
       }
       else {
-        blen_mtl = BKE_material_add(bmain, mtl_name.c_str());
+        blen_mtl = mtl_importer.add_material(usd_mtl_iter->second);
 
         if (blen_mtl) {
           blen_mtl_map.insert(std::make_pair(mtl_name, blen_mtl));

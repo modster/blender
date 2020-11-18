@@ -55,6 +55,7 @@ set(INC_SYS
 set(SRC
 
   import/usd_import_util.cc
+  import/usd_material_importer.cc
   import/usd_prim_iterator.cc
   import/usd_reader_camera.cc
   import/usd_reader_light.cc
@@ -76,6 +77,7 @@ set(SRC
   usd.h
   import/usd_importer_context.h
   import/usd_import_util.h
+  import/usd_material_importer.h
   import/usd_prim_iterator.h
   import/usd_reader_camera.h
   import/usd_reader_light.h
