@@ -217,6 +217,7 @@ void GpencilImporterSVG::create_stroke(
       pt->strength = shape->opacity;
       pt->pressure = 1.0f;
       pt->z = 0.0f;
+      /* TODO: (antoniov) Can be improved loading curve data instead to load stroke. */
       interp_v2_v2v2v2v2_cubic(&pt->x, &p[0], &p[2], &p[4], &p[6], a);
 
       /* Scale from milimeters. */
