@@ -68,7 +68,6 @@ GpencilImporter::GpencilImporter(const struct GpencilImportParams *iparams)
   params_.C = iparams->C;
   params_.mode = iparams->mode;
   params_.flag = iparams->flag;
-  params_.stroke_sample = iparams->stroke_sample;
 
   cfra_ = iparams->frame_target;
 
@@ -103,8 +102,6 @@ Object *GpencilImporter::create_object(void)
   ushort local_view_bits = (params_.v3d && params_.v3d->localvd) ? params_.v3d->local_view_uuid :
                                                                    0;
   Object *ob_gpencil = ED_gpencil_add_object(params_.C, cur, local_view_bits);
-  /* Grease pencil is rotated 90 degrees in X axis by default. */
-  ob_gpencil->rot[0] -= DEG2RADF(90.0f);
 
   return ob_gpencil;
 }

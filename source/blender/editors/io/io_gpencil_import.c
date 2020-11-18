@@ -56,6 +56,8 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
 
+#include "ED_gpencil.h"
+
 #include "io_gpencil.h"
 
 #include "gpencil_io_importer.h"
@@ -78,27 +80,35 @@ bool wm_gpencil_import_svg_common_check(bContext *UNUSED(C), wmOperator *op)
 
 static void gpencil_import_common_props(wmOperatorType *ot)
 {
-  RNA_def_float(
-      ot->srna,
-      "stroke_sample",
-      0.0f,
-      0.0f,
-      100.0f,
-      "Sampling",
-      "Precision of sampling stroke, low values gets more precise result, zero to disable",
-      0.0f,
-      100.0f);
+  PropertyRNA *prop;
+
+  static const EnumPropertyItem target_object_modes[] = {
+      {GP_TARGET_OB_NEW, "NEW", 0, "New Object", ""},
+      {GP_TARGET_OB_SELECTED, "ACTIVE", 0, "Active Object", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  prop = RNA_def_enum(ot->srna,
+                      "target",
+                      target_object_modes,
+                      GP_TARGET_OB_NEW,
+                      "Target Object",
+                      "Target grease pencil object");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 static void ui_gpencil_import_common_settings(uiLayout *layout, PointerRNA *imfptr)
 {
-  uiLayout *box, *row, *col;
+  uiLayout *box, *row, *col, *sub;
 
   box = uiLayoutBox(layout);
   row = uiLayoutRow(box, false);
   uiItemL(row, IFACE_("Import Options"), ICON_SCENE_DATA);
 
   col = uiLayoutColumn(box, false);
+
+  sub = uiLayoutColumn(col, true);
+  uiItemR(sub, imfptr, "target", 0, NULL, ICON_NONE);
 }
 
 static int wm_gpencil_import_svg_invoke(bContext *C, wmOperator *op, const wmEvent *event)
@@ -134,12 +144,17 @@ static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
 
   /* Set flags. */
   int flag = 0;
-  // const bool use_gray_scale = RNA_boolean_get(op->ptr, "use_gray_scale");
-  // SET_FLAG_FROM_TEST(flag, use_gray_scale, GP_EXPORT_GRAY_SCALE);
-
   /* If active object is not a editable grease pencil, set to NULL to create a new object. */
-  if ((ob && ob->type != OB_GPENCIL) || (BKE_object_is_libdata(ob) == true)) {
-    ob = NULL;
+  eGP_TargetObjectMode target = RNA_enum_get(op->ptr, "target");
+  ob = (target == GP_TARGET_OB_SELECTED) ? CTX_data_active_object(C) : NULL;
+
+  if (ob != NULL) {
+    if (ob->type != OB_GPENCIL) {
+      ob = NULL;
+    }
+    else if (BKE_object_obdata_is_libdata(ob)) {
+      ob = NULL;
+    }
   }
 
   struct GpencilImportParams params = {
@@ -150,7 +165,6 @@ static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
       .mode = GP_IMPORT_FROM_SVG,
       .frame_target = CFRA,
       .flag = flag,
-      .stroke_sample = RNA_float_get(op->ptr, "stroke_sample"),
 
   };
 

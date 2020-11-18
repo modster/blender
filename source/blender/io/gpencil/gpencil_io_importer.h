@@ -42,8 +42,6 @@ struct GpencilImportParams {
   int32_t frame_target;
   /** Flags. */
   uint32_t flag;
-  /** Stroke sampling. */
-  float stroke_sample;
 };
 
 /* GpencilImportParams->flag. */

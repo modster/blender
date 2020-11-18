@@ -152,6 +152,7 @@ bool GpencilImporterSVG::read(void)
   /* Calculate bounding box and move all points to new origin center. */
   float gp_center[3];
   BKE_gpencil_centroid_3d(gpd, gp_center);
+
   LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
     LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
@@ -194,6 +195,11 @@ void GpencilImporterSVG::create_stroke(
     gps->vert_color_fill[3] = 1.0f;
   }
 
+  /* Grease pencil is rotated 90 degrees in X axis by default. */
+  float matrix[4][4];
+  unit_m4(matrix);
+  rotate_m4(matrix, 'X', DEG2RADF(-90.0f));
+
   int start_index = 0;
   for (int i = 0; i < path->npts - 1; i += 3) {
     float *p = &path->pts[i * 2];
@@ -207,6 +213,7 @@ void GpencilImporterSVG::create_stroke(
 
       /* Scale from milimeters. */
       mul_v3_fl(&pt->x, 0.001f);
+      mul_m4_v3(matrix, &pt->x);
 
       /* Apply color to vertex color. */
       if (is_fill) {
