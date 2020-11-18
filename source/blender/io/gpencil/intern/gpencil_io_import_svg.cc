@@ -102,6 +102,13 @@ bool GpencilImporterSVG::read(void)
   }
   bGPdata *gpd = (bGPdata *)params_.ob_target->data;
 
+  /* Grease pencil is rotated 90 degrees in X axis by default. */
+  float matrix[4][4];
+  float scale[3] = {params_.scale, params_.scale, params_.scale};
+  unit_m4(matrix);
+  rotate_m4(matrix, 'X', DEG2RADF(-90.0f));
+  rescale_m4(matrix, scale);
+
   /* Loop all shapes. */
   char prv_id[70] = {"*"};
   int prefix = 0;
@@ -147,7 +154,7 @@ bool GpencilImporterSVG::read(void)
 
     /* Loop all paths to create the stroke data. */
     for (NSVGpath *path = shape->paths; path; path = path->next) {
-      create_stroke(gpd, gpf, shape, path, mat_index);
+      create_stroke(gpd, gpf, shape, path, mat_index, matrix);
     }
   }
 
@@ -173,8 +180,12 @@ bool GpencilImporterSVG::read(void)
   return result;
 }
 
-void GpencilImporterSVG::create_stroke(
-    bGPdata *gpd, bGPDframe *gpf, NSVGshape *shape, NSVGpath *path, int32_t mat_index)
+void GpencilImporterSVG::create_stroke(bGPdata *gpd,
+                                       bGPDframe *gpf,
+                                       NSVGshape *shape,
+                                       NSVGpath *path,
+                                       int32_t mat_index,
+                                       float matrix[4][4])
 {
   const bool is_stroke = (bool)shape->stroke.type;
   const bool is_fill = (bool)shape->fill.type;
@@ -200,13 +211,6 @@ void GpencilImporterSVG::create_stroke(
     gps->fill_opacity_fac = gps->vert_color_fill[3];
     gps->vert_color_fill[3] = 1.0f;
   }
-
-  /* Grease pencil is rotated 90 degrees in X axis by default. */
-  float matrix[4][4];
-  float scale[3] = {params_.scale, params_.scale, params_.scale};
-  unit_m4(matrix);
-  rotate_m4(matrix, 'X', DEG2RADF(-90.0f));
-  rescale_m4(matrix, scale);
 
   int start_index = 0;
   for (int i = 0; i < path->npts - 1; i += 3) {
