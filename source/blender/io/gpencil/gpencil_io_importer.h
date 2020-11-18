@@ -44,6 +44,8 @@ struct GpencilImportParams {
   int32_t resolution;
   /** Flags. */
   uint32_t flag;
+  /** Scale. */
+  float scale;
 };
 
 /* GpencilImportParams->flag. */

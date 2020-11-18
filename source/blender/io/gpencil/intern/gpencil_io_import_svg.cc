@@ -119,6 +119,8 @@ bool GpencilImporterSVG::read(void)
         &gpd->layers, layer_id, offsetof(bGPDlayer, info));
     if (gpl == NULL) {
       gpl = BKE_gpencil_layer_addnew(gpd, layer_id, true);
+      /* Disable lights. */
+      gpl->flag &= ~GP_LAYER_USE_LIGHTS;
     }
     MEM_freeN(layer_id);
 
@@ -189,7 +191,7 @@ void GpencilImporterSVG::create_stroke(
     gps->flag |= GP_STROKE_CYCLIC;
   }
   if (is_stroke) {
-    gps->thickness = shape->strokeWidth;
+    gps->thickness = shape->strokeWidth * params_.scale;
   }
   /* Apply Fill vertex color. */
   if (is_fill) {
@@ -201,8 +203,10 @@ void GpencilImporterSVG::create_stroke(
 
   /* Grease pencil is rotated 90 degrees in X axis by default. */
   float matrix[4][4];
+  float scale[3] = {params_.scale, params_.scale, params_.scale};
   unit_m4(matrix);
   rotate_m4(matrix, 'X', DEG2RADF(-90.0f));
+  rescale_m4(matrix, scale);
 
   int start_index = 0;
   for (int i = 0; i < path->npts - 1; i += 3) {

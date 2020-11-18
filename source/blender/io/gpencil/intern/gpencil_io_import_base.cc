@@ -69,6 +69,7 @@ GpencilImporter::GpencilImporter(const struct GpencilImportParams *iparams)
   params_.mode = iparams->mode;
   params_.flag = iparams->flag;
   params_.resolution = iparams->resolution;
+  params_.scale = iparams->scale;
 
   cfra_ = iparams->frame_target;
 

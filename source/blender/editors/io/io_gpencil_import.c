@@ -96,8 +96,25 @@ static void gpencil_import_common_props(wmOperatorType *ot)
                       "Target grease pencil object");
 
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
-  RNA_def_int(
-      ot->srna, "resolution", 3, 1, 30, "Resolution", "Resolution of the generated curves", 1, 20);
+  RNA_def_int(ot->srna,
+              "resolution",
+              10,
+              1,
+              30,
+              "Resolution",
+              "Resolution of the generated curves",
+              1,
+              20);
+
+  RNA_def_float(ot->srna,
+                "scale",
+                10.0f,
+                0.001f,
+                100.0f,
+                "Scale",
+                "Scale of the final stroke",
+                0.001f,
+                100.0f);
 }
 
 static void ui_gpencil_import_common_settings(uiLayout *layout, PointerRNA *imfptr)
@@ -114,6 +131,8 @@ static void ui_gpencil_import_common_settings(uiLayout *layout, PointerRNA *imfp
   uiItemR(sub, imfptr, "target", 0, NULL, ICON_NONE);
   sub = uiLayoutColumn(col, true);
   uiItemR(sub, imfptr, "resolution", 0, NULL, ICON_NONE);
+  sub = uiLayoutColumn(col, true);
+  uiItemR(sub, imfptr, "scale", 0, NULL, ICON_NONE);
 }
 
 static int wm_gpencil_import_svg_invoke(bContext *C, wmOperator *op, const wmEvent *event)
@@ -163,6 +182,7 @@ static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
   }
 
   const int resolution = RNA_int_get(op->ptr, "resolution");
+  const float scale = RNA_float_get(op->ptr, "scale");
 
   struct GpencilImportParams params = {
       .C = C,
@@ -173,6 +193,7 @@ static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
       .frame_target = CFRA,
       .flag = flag,
       .resolution = resolution,
+      .scale = scale,
   };
 
   /* Do Import. */
