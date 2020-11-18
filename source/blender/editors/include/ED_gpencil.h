@@ -63,6 +63,8 @@ struct bAnimContext;
 struct wmKeyConfig;
 struct wmOperator;
 
+#define GPENCIL_MINIMUM_JOIN_DIST 20.0f
+
 /* Reproject stroke modes. */
 typedef enum eGP_ReprojectModes {
   /* Axis */
@@ -371,6 +373,22 @@ void ED_gpencil_stroke_buffer_spread_segment(struct Brush *brush,
                                              struct GP_SpaceConversion *gsc,
                                              int from_index,
                                              int to_index);
+
+struct bGPDstroke *ED_gpencil_stroke_nearest_to_ends(struct bContext *C,
+                                                     struct GP_SpaceConversion *gsc,
+                                                     struct bGPDlayer *gpl,
+                                                     struct bGPDframe *gpf,
+                                                     struct bGPDstroke *gps,
+                                                     const float radius,
+                                                     int *r_index);
+
+struct bGPDstroke *ED_gpencil_stroke_join_and_trim(struct bGPdata *gpd,
+                                                   struct bGPDframe *gpf,
+                                                   struct bGPDstroke *gps,
+                                                   struct bGPDstroke *gps_dst,
+                                                   const int pt_index);
+
+void ED_gpencil_stroke_close_by_distance(struct bGPDstroke *gps, const float threshold);
 
 #ifdef __cplusplus
 }
