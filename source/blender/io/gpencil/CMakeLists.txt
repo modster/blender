@@ -35,7 +35,7 @@ set(INC
   ../../../../intern/utfconv
 
   # This line must be changed if Libharu is included as external lib
-  ${LIBDIR}/libharu/include
+  # ${LIBDIR}/libharu/include
 )
 
 set(INC_SYS
@@ -68,7 +68,7 @@ set(LIB
   ${PUGIXML_LIBRARIES}
 
   # This line must be changed if Libharu is included as external lib
-  ${LIBDIR}/libharu/libhpdfsd.lib
+  # ${LIBDIR}/libharu/libhpdfsd.lib
 )
 
 list(APPEND LIB
