@@ -57,7 +57,7 @@
 
 #include "ED_view3d.h"
 
-#include "gpencil_io_export_svg.h"
+#include "gpencil_io_export_pdf.h"
 #include "gpencil_io_exporter.h"
 
 #include "pugixml.hpp"
@@ -65,35 +65,38 @@
 namespace blender ::io ::gpencil {
 
 /* Constructor. */
-GpencilExporterSVG::GpencilExporterSVG(const char *filename,
+GpencilExporterPDF::GpencilExporterPDF(const char *filename,
                                        const struct GpencilExportParams *iparams)
     : GpencilExporter(iparams)
 {
   set_out_filename(filename);
-
-  invert_axis_[0] = false;
-  invert_axis_[1] = true;
 }
 
 /* Destructor. */
-GpencilExporterSVG::~GpencilExporterSVG(void)
+GpencilExporterPDF::~GpencilExporterPDF(void)
 {
   /* Nothing to do yet. */
 }
 
-bool GpencilExporterSVG::add_newpage(void)
+bool GpencilExporterPDF::new_document(void)
 {
-  create_document_header();
+  create_document();
   return true;
 }
 
-bool GpencilExporterSVG::add_body(void)
+bool GpencilExporterPDF::add_newpage(void)
+{
+  create_document();
+  return true;
+}
+
+bool GpencilExporterPDF::add_body(void)
 {
   export_gpencil_layers();
   return true;
 }
 
-bool GpencilExporterSVG::write(std::string subfix)
+bool GpencilExporterPDF::write(std::string subfix)
 {
   bool result = true;
   /* Save File. */
@@ -102,7 +105,7 @@ bool GpencilExporterSVG::write(std::string subfix)
   std::string frame_file = out_filename_;
   size_t found = frame_file.find_last_of(".");
   if (found != std::string::npos) {
-    frame_file.replace(found, 8, subfix + ".svg");
+    frame_file.replace(found, 8, subfix + ".pdf");
   }
 
 /* Support unicode character paths on Windows. */
@@ -112,72 +115,41 @@ bool GpencilExporterSVG::write(std::string subfix)
 
   UTF16_ENCODE(filename_cstr);
   std::wstring wstr(filename_cstr_16);
-  result = main_doc_.save_file(wstr.c_str());
+  HPDF_SaveToFile(pdf_, (const char *)wstr.c_str());
 
   UTF16_UN_ENCODE(filename_cstr);
 #else
-  result = main_doc_.save_file(frame_file.c_str());
+  result = HPDF_SaveToFile(pdf_, frame_file.c_str());
 #endif
 
   return result;
 }
 
-/* Create document header and main svg node. */
-void GpencilExporterSVG::create_document_header(void)
+/* Create pdf document. */
+void GpencilExporterPDF::create_document(void)
 {
-  /* Add a custom document declaration node. */
-  pugi::xml_node decl = main_doc_.prepend_child(pugi::node_declaration);
-  decl.append_attribute("version") = "1.0";
-  decl.append_attribute("encoding") = "UTF-8";
-
-  pugi::xml_node comment = main_doc_.append_child(pugi::node_comment);
-  char txt[128];
-  sprintf(txt, " Generator: Blender, %s - %s ", SVG_EXPORTER_NAME, SVG_EXPORTER_VERSION);
-  comment.set_value(txt);
-
-  pugi::xml_node doctype = main_doc_.append_child(pugi::node_doctype);
-  doctype.set_value(
-      "svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" "
-      "\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\"");
-
-  main_node_ = main_doc_.append_child("svg");
-  main_node_.append_attribute("version").set_value("1.0");
-  main_node_.append_attribute("x").set_value("0px");
-  main_node_.append_attribute("y").set_value("0px");
-
-  std::string width;
-  std::string height;
-
-  if ((params_.flag & GP_EXPORT_STORYBOARD_MODE) != 0) {
-    width = std::to_string(params_.paper_size[0]);
-    height = std::to_string(params_.paper_size[1]);
-  }
-  else {
-    width = std::to_string(render_x_);
-    height = std::to_string(render_y_);
-  }
-
-  main_node_.append_attribute("width").set_value((width + "px").c_str());
-  main_node_.append_attribute("height").set_value((height + "px").c_str());
-  std::string viewbox = "0 0 " + width + " " + height;
-  main_node_.append_attribute("viewBox").set_value(viewbox.c_str());
-
-  /* Scene name. */
-  if ((params_.flag & GP_EXPORT_STORYBOARD_MODE) != 0) {
-    char scenetxt[96];
-    sprintf(scenetxt, "Scene: %s", scene->id.name + 2);
-
-    add_text(
-        main_node_, 30.0f, params_.paper_size[1] - 30.0f, std::string(scenetxt), 12.0f, "#000000");
+  pdf_ = HPDF_New(nullptr, nullptr);
+  if (!pdf_) {
+    std::cout << "error: cannot create PdfDoc object\n";
+    return;
   }
 }
 
-/* Main layer loop. */
-void GpencilExporterSVG::export_gpencil_layers(void)
+/* Add page. */
+void GpencilExporterPDF::add_page(void)
 {
-  const bool is_clipping = is_camera_mode() && (params_.flag & (GP_EXPORT_CLIP_CAMERA |
-                                                                GP_EXPORT_STORYBOARD_MODE)) != 0;
+  const HPDF_REAL PAGE_WIDTH = 1980;
+  const HPDF_REAL PAGE_HEIGHT = 1080;
 
+  /* Add a new page object. */
+  page_ = HPDF_AddPage(pdf_);
+  HPDF_Page_SetHeight(page_, PAGE_HEIGHT);
+  HPDF_Page_SetWidth(page_, PAGE_WIDTH);
+}
+
+/* Main layer loop. */
+void GpencilExporterPDF::export_gpencil_layers(void)
+{
   /* If is doing a set of frames, the list of objects can change for each frame. */
   if (is_camera_mode() && ((params_.flag & GP_EXPORT_STORYBOARD_MODE) != 0)) {
     create_object_list();
@@ -186,40 +158,10 @@ void GpencilExporterSVG::export_gpencil_layers(void)
   for (ObjectZ &obz : ob_list_) {
     Object *ob = obz.ob;
 
-    /* Camera clipping. */
-    if (is_clipping) {
-      pugi::xml_node clip_node = main_node_.append_child("clipPath");
-      clip_node.append_attribute("id").set_value(("clip-path" + std::to_string(cfra_)).c_str());
-
-      if ((params_.flag & GP_EXPORT_STORYBOARD_MODE) != 0) {
-        add_rect(clip_node,
-                 frame_offset_[0],
-                 frame_offset_[1],
-                 frame_box_[0],
-                 frame_box_[1],
-                 0.0f,
-                 "#000000");
-      }
-      else {
-        add_rect(clip_node, 0, 0, render_x_, render_y_, 0.0f, "#000000");
-      }
-    }
-
-    frame_node_ = main_node_.append_child("g");
     std::string frametxt = "blender_frame_" + std::to_string(cfra_);
-    frame_node_.append_attribute("id").set_value(frametxt.c_str());
-
-    /* Clip area. */
-    if (is_clipping) {
-      frame_node_.append_attribute("clip-path")
-          .set_value(("url(#clip-path" + std::to_string(cfra_) + ")").c_str());
-    }
-
-    pugi::xml_node ob_node = frame_node_.append_child("g");
 
     char obtxt[96];
     sprintf(obtxt, "blender_object_%s", ob->id.name + 2);
-    ob_node.append_attribute("id").set_value(obtxt);
 
     /* Use evaluated version to get strokes with modifiers. */
     Object *ob_eval_ = (Object *)DEG_get_evaluated_id(depsgraph, &ob->id);
@@ -237,16 +179,7 @@ void GpencilExporterSVG::export_gpencil_layers(void)
       }
       gpf_current_set(gpf);
 
-      /* Layer node. */
-      std::string txt = "Layer: ";
-      txt.append(gpl->info);
-      ob_node.append_child(pugi::node_comment).set_value(txt.c_str());
-
-      pugi::xml_node gpl_node = ob_node.append_child("g");
-      gpl_node.append_attribute("id").set_value(gpl->info);
-
       BKE_gpencil_parent_matrix_get(depsgraph, ob, gpl, diff_mat_);
-
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
         if (gps->totpoints == 0) {
           continue;
@@ -259,7 +192,7 @@ void GpencilExporterSVG::export_gpencil_layers(void)
         /* Apply layer thickness change. */
         gps_duplicate->thickness += gpl->line_change;
         CLAMP_MIN(gps_duplicate->thickness, 1.0f);
-
+#if 0
         if (gps_duplicate->totpoints == 1) {
           export_stroke_to_point(gpl_node);
         }
@@ -270,7 +203,7 @@ void GpencilExporterSVG::export_gpencil_layers(void)
           /* Fill. */
           if ((material_is_fill()) && (params_.flag & GP_EXPORT_FILL)) {
             /* Fill is always exported as polygon because the stroke of the fill is done
-             * in a different SVG command. */
+             * in a different PDF command. */
             export_stroke_to_polyline(gpl_node, true);
           }
 
@@ -296,56 +229,19 @@ void GpencilExporterSVG::export_gpencil_layers(void)
             }
           }
         }
-
+#endif
         BKE_gpencil_free_stroke(gps_duplicate);
-      }
-    }
-
-    /* Frame border. */
-    if ((params_.flag & GP_EXPORT_STORYBOARD_MODE) != 0) {
-      add_rect(main_node_,
-               frame_offset_[0],
-               frame_offset_[1],
-               frame_box_[0],
-               frame_box_[1],
-               6.0f,
-               "#000000");
-
-      /* Frame text. */
-      if (params_.text_type != GP_EXPORT_TXT_NONE) {
-        char text[64];
-        switch (params_.text_type) {
-          case GP_EXPORT_TXT_SHOT:
-            sprintf(text, "#%d", shot_);
-            break;
-          case GP_EXPORT_TXT_FRAME:
-            sprintf(text, "%04d", cfra_);
-            break;
-          case GP_EXPORT_TXT_SHOT_FRAME:
-            sprintf(text, "#%d/%04d", shot_, cfra_);
-            break;
-          default:
-            sprintf(text, "%04d", cfra_);
-            break;
-        }
-
-        const float font_size = 30.0f;
-        add_text(main_node_,
-                 frame_offset_[0] + 5.0f,
-                 frame_offset_[1] + frame_box_[1] + font_size,
-                 std::string(text),
-                 font_size,
-                 "#000000");
       }
     }
   }
 }
 
+#if 0
 /**
  * Export a point
  * \param gpl_node: Node of the layer.
  */
-void GpencilExporterSVG::export_stroke_to_point(pugi::xml_node gpl_node)
+void GpencilExporterPDF::export_stroke_to_point(pugi::xml_node gpl_node)
 {
   bGPDstroke *gps = gps_current_get();
 
@@ -368,11 +264,11 @@ void GpencilExporterSVG::export_stroke_to_point(pugi::xml_node gpl_node)
 }
 
 /**
- * Export a stroke using SVG path
+ * Export a stroke using PDF path
  * \param gpl_node: Node of the layer.
  * \param do_fill: True if the stroke is only fill
  */
-void GpencilExporterSVG::export_stroke_to_path(pugi::xml_node gpl_node, const bool do_fill)
+void GpencilExporterPDF::export_stroke_to_path(pugi::xml_node gpl_node, const bool do_fill)
 {
   bGPDlayer *gpl = gpl_current_get();
   bGPDstroke *gps = gps_current_get();
@@ -425,7 +321,7 @@ void GpencilExporterSVG::export_stroke_to_path(pugi::xml_node gpl_node, const bo
  * \param gpl_node: Node of the layer.
  * \param do_fill: True if the stroke is only fill
  */
-void GpencilExporterSVG::export_stroke_to_polyline(pugi::xml_node gpl_node, const bool do_fill)
+void GpencilExporterPDF::export_stroke_to_polyline(pugi::xml_node gpl_node, const bool do_fill)
 {
   bGPDlayer *gpl = gpl_current_get();
   bGPDstroke *gps = gps_current_get();
@@ -475,11 +371,11 @@ void GpencilExporterSVG::export_stroke_to_polyline(pugi::xml_node gpl_node, cons
 }
 
 /**
- * Set color SVG string for stroke
+ * Set color PDF string for stroke
  * \param gps_node: Stroke node
  * @param do_fill: True if the stroke is only fill
  */
-void GpencilExporterSVG::color_string_set(pugi::xml_node gps_node, const bool do_fill)
+void GpencilExporterPDF::color_string_set(pugi::xml_node gps_node, const bool do_fill)
 {
   bGPDlayer *gpl = gpl_current_get();
   bGPDstroke *gps = gps_current_get();
@@ -520,60 +416,5 @@ void GpencilExporterSVG::color_string_set(pugi::xml_node gps_node, const bool do
     }
   }
 }
-
-/**
- * Create a SVG rectangle
- * \param node: Parent node
- * \param x: X location
- * \param y: Y location
- * \param width: width of the recntagle
- * \param height: Height of the rectangle
- * \param thickness: Thickness of the line
- * \param hexcolor: Color of the line
- */
-void GpencilExporterSVG::add_rect(pugi::xml_node node,
-                                  float x,
-                                  float y,
-                                  float width,
-                                  float height,
-                                  float thickness,
-                                  std::string hexcolor)
-{
-  pugi::xml_node rect_node = node.append_child("rect");
-  rect_node.append_attribute("x").set_value(x);
-  rect_node.append_attribute("y").set_value(y);
-  rect_node.append_attribute("width").set_value(width);
-  rect_node.append_attribute("height").set_value(height);
-  rect_node.append_attribute("fill").set_value("none");
-  if (thickness > 0.0f) {
-    rect_node.append_attribute("stroke").set_value(hexcolor.c_str());
-    rect_node.append_attribute("stroke-width").set_value(thickness);
-  }
-}
-
-/**
- * Create SVG text
- * \param node: Parent node
- * \param x: X location
- * \param y: Y location
- * \param text: Text to include
- * \param size: Size of th etext
- * \param hexcolor: Color of the text
- */
-void GpencilExporterSVG::add_text(pugi::xml_node node,
-                                  float x,
-                                  float y,
-                                  std::string text,
-                                  const float size,
-                                  std::string hexcolor)
-{
-  pugi::xml_node nodetxt = node.append_child("text");
-
-  nodetxt.append_attribute("x").set_value(x);
-  nodetxt.append_attribute("y").set_value(y);
-  // nodetxt.append_attribute("font-family").set_value("'system-ui'");
-  nodetxt.append_attribute("font-size").set_value(size);
-  nodetxt.append_attribute("fill").set_value(hexcolor.c_str());
-  nodetxt.text().set(text.c_str());
-}
+#endif
 }  // namespace blender::io::gpencil

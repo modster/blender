@@ -35,7 +35,7 @@ set(INC
   ../../../../intern/utfconv
 
   # This line must be changed if Libharu is included as external lib
-  # ${LIBDIR}/libharu/include
+  ${LIBDIR}/libharu/include
 )
 
 set(INC_SYS
@@ -57,8 +57,10 @@ set(SRC
  gpencil_io_exporter.h
  intern/gpencil_io_export_base.h
  intern/gpencil_io_export_svg.h
+ intern/gpencil_io_export_pdf.h
  intern/gpencil_io_export_base.cc
  intern/gpencil_io_export_svg.cc
+ intern/gpencil_io_export_pdf.cc
 )
 
 set(LIB
@@ -68,7 +70,7 @@ set(LIB
   ${PUGIXML_LIBRARIES}
 
   # This line must be changed if Libharu is included as external lib
-  # ${LIBDIR}/libharu/libhpdfsd.lib
+  ${LIBDIR}/libharu/libhpdfsd.lib
 )
 
 list(APPEND LIB

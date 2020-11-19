@@ -62,11 +62,11 @@ class GpencilExporterSVG : public GpencilExporter {
 
  private:
   /* XML doc. */
-  pugi::xml_document _main_doc;
+  pugi::xml_document main_doc_;
   /* Main document node. */
-  pugi::xml_node _main_node;
+  pugi::xml_node main_node_;
   /** Frame node  */
-  pugi::xml_node _frame_node;
+  pugi::xml_node frame_node_;
   void create_document_header(void);
   void export_gpencil_layers(void);
 

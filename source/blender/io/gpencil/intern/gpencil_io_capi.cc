@@ -47,9 +47,12 @@
 #include "gpencil_io_import_svg.h"
 
 #include "../gpencil_io_exporter.h"
+#include "gpencil_io_export_pdf.h"
 #include "gpencil_io_export_svg.h"
 
+using blender::io::gpencil::GpencilExporterPDF;
 using blender::io::gpencil::GpencilExporterSVG;
+
 using blender::io::gpencil::GpencilImporterSVG;
 
 /* Check if frame is included. */
@@ -100,38 +103,41 @@ static bool gpencil_io_import_frame(void *in_importer, const GpencilImportParams
   return result;
 }
 
-/* Export current frame. */
-static bool gpencil_io_export_frame(void *in_exporter,
-                                    const GpencilExportParams *iparams,
-                                    float frame_offset[2],
-                                    const bool newpage,
-                                    const bool body,
-                                    const bool savepage)
+/* Export frame in PDF. */
+static bool gpencil_io_export_pdf(GpencilExporterPDF *exporter, const GpencilExportParams *iparams)
 {
-
   bool result = false;
-  switch (iparams->mode) {
-    case GP_EXPORT_TO_SVG: {
-      GpencilExporterSVG *exporter = (GpencilExporterSVG *)in_exporter;
-      exporter->set_frame_number(iparams->framenum);
-      exporter->set_frame_offset(frame_offset);
-      std::string subfix = iparams->file_subfix;
-      if (newpage) {
-        result |= exporter->add_newpage();
-      }
-      if (body) {
-        result |= exporter->add_body();
-      }
-      if (savepage) {
-        result = exporter->write(subfix);
-      }
-      break;
-    }
-    /* Add new export formats here. */
-    default:
-      break;
-  }
+  exporter->set_frame_number(iparams->framenum);
+  std::string subfix = iparams->file_subfix;
 
+  result |= exporter->add_newpage();
+  result |= exporter->add_body();
+  result = exporter->write(subfix);
+
+  return result;
+}
+
+/* Export current frame in SVG. */
+static bool gpencil_io_export_frame_svg(GpencilExporterSVG *exporter,
+                                        const GpencilExportParams *iparams,
+                                        float frame_offset[2],
+                                        const bool newpage,
+                                        const bool body,
+                                        const bool savepage)
+{
+  bool result = false;
+  exporter->set_frame_number(iparams->framenum);
+  exporter->set_frame_offset(frame_offset);
+  std::string subfix = iparams->file_subfix;
+  if (newpage) {
+    result |= exporter->add_newpage();
+  }
+  if (body) {
+    result |= exporter->add_body();
+  }
+  if (savepage) {
+    result = exporter->write(subfix);
+  }
   return result;
 }
 
@@ -193,7 +199,8 @@ static bool gpencil_io_export_storyboard(Depsgraph *depsgraph,
       exporter->set_frame_box(frame_box);
       exporter->set_frame_ratio(render_ratio);
 
-      pending_save |= gpencil_io_export_frame(exporter, iparams, frame_offset, true, false, false);
+      pending_save |= gpencil_io_export_frame_svg(
+          exporter, iparams, frame_offset, true, false, false);
       header = false;
     }
 
@@ -202,7 +209,8 @@ static bool gpencil_io_export_storyboard(Depsgraph *depsgraph,
     sprintf(iparams->file_subfix, "%04d", page);
     iparams->framenum = i;
 
-    pending_save |= gpencil_io_export_frame(exporter, iparams, frame_offset, false, true, false);
+    pending_save |= gpencil_io_export_frame_svg(
+        exporter, iparams, frame_offset, false, true, false);
     col++;
 
     if (col > blocks[0]) {
@@ -219,7 +227,7 @@ static bool gpencil_io_export_storyboard(Depsgraph *depsgraph,
     }
 
     if (row > blocks[1]) {
-      done |= gpencil_io_export_frame(exporter, iparams, frame_offset, false, false, true);
+      done |= gpencil_io_export_frame_svg(exporter, iparams, frame_offset, false, false, true);
       page++;
       header = true;
       pending_save = false;
@@ -233,7 +241,7 @@ static bool gpencil_io_export_storyboard(Depsgraph *depsgraph,
   }
 
   if (pending_save) {
-    done |= gpencil_io_export_frame(exporter, iparams, frame_offset, false, false, true);
+    done |= gpencil_io_export_frame_svg(exporter, iparams, frame_offset, false, false, true);
   }
 
   delete exporter;
@@ -260,31 +268,42 @@ bool gpencil_io_export(const char *filename, GpencilExportParams *iparams)
   Scene *scene = CTX_data_scene(iparams->C);
   Object *ob = CTX_data_active_object(iparams->C);
 
-  const bool is_storyboard = ((iparams->flag & GP_EXPORT_STORYBOARD_MODE) != 0);
-
   bool done = false;
 
-  /* Prepare document. */
-  copy_v2_v2(iparams->paper_size, iparams->paper_size);
+  switch (iparams->mode) {
+    case GP_EXPORT_TO_SVG: {
+      /* Prepare document. */
+      copy_v2_v2(iparams->paper_size, iparams->paper_size);
+      const bool is_storyboard = ((iparams->flag & GP_EXPORT_STORYBOARD_MODE) != 0);
 
-  if (!is_storyboard) {
-    GpencilExporterSVG exporter = GpencilExporterSVG(filename, iparams);
+      if (!is_storyboard) {
+        GpencilExporterSVG exporter = GpencilExporterSVG(filename, iparams);
 
-    float no_offset[2] = {0.0f, 0.0f};
-    float ratio[2] = {1.0f, 1.0f};
-    exporter.set_frame_ratio(ratio);
-    iparams->file_subfix[0] = '\0';
-    done |= gpencil_io_export_frame(&exporter, iparams, no_offset, true, true, true);
+        float no_offset[2] = {0.0f, 0.0f};
+        float ratio[2] = {1.0f, 1.0f};
+        exporter.set_frame_ratio(ratio);
+        iparams->file_subfix[0] = '\0';
+        done |= gpencil_io_export_frame_svg(&exporter, iparams, no_offset, true, true, true);
+      }
+      else {
+        int32_t oldframe = (int32_t)DEG_get_ctime(depsgraph);
+
+        done |= gpencil_io_export_storyboard(depsgraph, scene, ob, filename, iparams);
+
+        /* Return frame state and DB to original state. */
+        CFRA = oldframe;
+        BKE_scene_graph_update_for_newframe(depsgraph);
+      }
+      break;
+    }
+    case GP_EXPORT_TO_PDF: {
+      GpencilExporterPDF exporter = GpencilExporterPDF(filename, iparams);
+      done |= gpencil_io_export_pdf(&exporter, iparams);
+      break;
+    }
+    /* Add new export formats here. */
+    default:
+      break;
   }
-  else {
-    int32_t oldframe = (int32_t)DEG_get_ctime(depsgraph);
-
-    done |= gpencil_io_export_storyboard(depsgraph, scene, ob, filename, iparams);
-
-    /* Return frame state and DB to original state. */
-    CFRA = oldframe;
-    BKE_scene_graph_update_for_newframe(depsgraph);
-  }
-
   return done;
 }
