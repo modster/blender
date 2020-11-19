@@ -86,7 +86,7 @@ void split_line_key_rest(StringRef line, StringRef &r_line_key, StringRef &r_res
    * character and use it in the getline. */
   const int64_t carriage_return{r_rest_line.find_first_of('\r')};
   if (carriage_return != StringRef::not_found) {
-    r_rest_line = r_rest_line.drop_prefix(carriage_return);
+    r_rest_line = r_rest_line.substr(0, carriage_return + 1);
   }
 
   const int64_t trailing_space{r_rest_line.find_last_not_of(' ')};
