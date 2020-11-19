@@ -472,6 +472,10 @@ static ID *view3d_drop_id_in_main_region_poll_id(bContext *C,
                                                  const wmEvent *event,
                                                  ID_Type id_type)
 {
+  ScrArea *area = CTX_wm_area(C);
+  if (ED_region_overlap_isect_any_xy(area, &event->x)) {
+    return NULL;
+  }
   return view3d_drop_in_main_region_poll(C, event) ? WM_drag_ID(drag, id_type) : NULL;
 }
 
