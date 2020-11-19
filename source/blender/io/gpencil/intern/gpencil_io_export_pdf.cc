@@ -60,8 +60,6 @@
 #include "gpencil_io_export_pdf.h"
 #include "gpencil_io_exporter.h"
 
-#include "pugixml.hpp"
-
 namespace blender ::io ::gpencil {
 
 /* Constructor. */
@@ -70,6 +68,10 @@ GpencilExporterPDF::GpencilExporterPDF(const char *filename,
     : GpencilExporter(iparams)
 {
   set_out_filename(filename);
+
+  pdf_ = nullptr;
+  page_ = nullptr;
+  gstate_ = nullptr;
 }
 
 /* Destructor. */
@@ -80,14 +82,12 @@ GpencilExporterPDF::~GpencilExporterPDF(void)
 
 bool GpencilExporterPDF::new_document(void)
 {
-  create_document();
-  return true;
+  return create_document();
 }
 
 bool GpencilExporterPDF::add_newpage(void)
 {
-  create_document();
-  return true;
+  return add_page();
 }
 
 bool GpencilExporterPDF::add_body(void)
@@ -98,7 +98,6 @@ bool GpencilExporterPDF::add_body(void)
 
 bool GpencilExporterPDF::write(std::string subfix)
 {
-  bool result = true;
   /* Save File. */
 
   /* Add page to filename. */
@@ -108,43 +107,43 @@ bool GpencilExporterPDF::write(std::string subfix)
     frame_file.replace(found, 8, subfix + ".pdf");
   }
 
-/* Support unicode character paths on Windows. */
-#ifdef WIN32
-  char filename_cstr[FILE_MAX];
-  BLI_strncpy(filename_cstr, frame_file.c_str(), FILE_MAX);
+  /* Support unicode character paths on Windows. */
+  //#ifdef WIN32
+  //  char filename_cstr[FILE_MAX];
+  //  BLI_strncpy(filename_cstr, frame_file.c_str(), FILE_MAX);
+  //
+  //  UTF16_ENCODE(filename_cstr);
+  //  std::wstring wstr(filename_cstr_16);
+  //  HPDF_SaveToFile(pdf_, (const char *)wstr.c_str());
+  //
+  //  UTF16_UN_ENCODE(filename_cstr);
+  //#else
+  HPDF_STATUS res = HPDF_SaveToFile(pdf_, frame_file.c_str());
+  //#endif
 
-  UTF16_ENCODE(filename_cstr);
-  std::wstring wstr(filename_cstr_16);
-  HPDF_SaveToFile(pdf_, (const char *)wstr.c_str());
-
-  UTF16_UN_ENCODE(filename_cstr);
-#else
-  result = HPDF_SaveToFile(pdf_, frame_file.c_str());
-#endif
-
-  return result;
+  return (res == 0) ? true : false;
 }
 
 /* Create pdf document. */
-void GpencilExporterPDF::create_document(void)
+bool GpencilExporterPDF::create_document(void)
 {
   pdf_ = HPDF_New(nullptr, nullptr);
   if (!pdf_) {
     std::cout << "error: cannot create PdfDoc object\n";
-    return;
+    return false;
   }
+  return true;
 }
 
 /* Add page. */
-void GpencilExporterPDF::add_page(void)
+bool GpencilExporterPDF::add_page(void)
 {
-  const HPDF_REAL PAGE_WIDTH = 1980;
-  const HPDF_REAL PAGE_HEIGHT = 1080;
-
   /* Add a new page object. */
   page_ = HPDF_AddPage(pdf_);
-  HPDF_Page_SetHeight(page_, PAGE_HEIGHT);
-  HPDF_Page_SetWidth(page_, PAGE_WIDTH);
+  HPDF_Page_SetWidth(page_, params_.paper_size[0]);
+  HPDF_Page_SetHeight(page_, params_.paper_size[1]);
+
+  return true;
 }
 
 /* Main layer loop. */
@@ -192,9 +191,8 @@ void GpencilExporterPDF::export_gpencil_layers(void)
         /* Apply layer thickness change. */
         gps_duplicate->thickness += gpl->line_change;
         CLAMP_MIN(gps_duplicate->thickness, 1.0f);
-#if 0
         if (gps_duplicate->totpoints == 1) {
-          export_stroke_to_point(gpl_node);
+          export_stroke_to_point();
         }
         else {
           bool is_normalized = ((params_.flag & GP_EXPORT_NORM_THICKNESS) != 0) ||
@@ -202,15 +200,14 @@ void GpencilExporterPDF::export_gpencil_layers(void)
 
           /* Fill. */
           if ((material_is_fill()) && (params_.flag & GP_EXPORT_FILL)) {
-            /* Fill is always exported as polygon because the stroke of the fill is done
-             * in a different PDF command. */
-            export_stroke_to_polyline(gpl_node, true);
+            /* Fill is exported as polygon for fill and stroke in a different shape. */
+            export_stroke_to_polyline(true, false);
           }
 
           /* Stroke. */
           if (material_is_stroke()) {
             if (is_normalized) {
-              export_stroke_to_polyline(gpl_node, false);
+              export_stroke_to_polyline(false, true);
             }
             else {
               bGPDstroke *gps_perimeter = BKE_gpencil_stroke_perimeter_from_view(
@@ -223,105 +220,42 @@ void GpencilExporterPDF::export_gpencil_layers(void)
                 BKE_gpencil_stroke_sample(gpd_eval, gps_perimeter, params_.stroke_sample, false);
               }
 
-              export_stroke_to_path(gpl_node, false);
+              export_stroke_to_polyline(false, false);
 
               BKE_gpencil_free_stroke(gps_perimeter);
             }
           }
         }
-#endif
         BKE_gpencil_free_stroke(gps_duplicate);
       }
     }
   }
 }
 
-#if 0
 /**
  * Export a point
- * \param gpl_node: Node of the layer.
  */
-void GpencilExporterPDF::export_stroke_to_point(pugi::xml_node gpl_node)
+void GpencilExporterPDF::export_stroke_to_point(void)
 {
   bGPDstroke *gps = gps_current_get();
 
   BLI_assert(gps->totpoints == 1);
   float screen_co[2];
 
-  pugi::xml_node gps_node = gpl_node.append_child("circle");
-
-  color_string_set(gps_node, false);
-
   bGPDspoint *pt = &gps->points[0];
   gpencil_3d_point_to_screen_space(&pt->x, screen_co);
-
-  gps_node.append_attribute("cx").set_value(screen_co[0]);
-  gps_node.append_attribute("cy").set_value(screen_co[1]);
-
   /* Radius. */
   float radius = stroke_point_radius_get(gps);
-  gps_node.append_attribute("r").set_value(radius);
-}
 
-/**
- * Export a stroke using PDF path
- * \param gpl_node: Node of the layer.
- * \param do_fill: True if the stroke is only fill
- */
-void GpencilExporterPDF::export_stroke_to_path(pugi::xml_node gpl_node, const bool do_fill)
-{
-  bGPDlayer *gpl = gpl_current_get();
-  bGPDstroke *gps = gps_current_get();
-
-  pugi::xml_node gps_node = gpl_node.append_child("path");
-
-  float col[3];
-  std::string stroke_hex;
-  if (do_fill) {
-    gps_node.append_attribute("fill-opacity").set_value(fill_color_[3] * gpl->opacity);
-
-    interp_v3_v3v3(col, fill_color_, gpl->tintcolor, gpl->tintcolor[3]);
-  }
-  else {
-    gps_node.append_attribute("fill-opacity")
-        .set_value(stroke_color_[3] * stroke_average_opacity_get() * gpl->opacity);
-
-    interp_v3_v3v3(col, stroke_color_, gpl->tintcolor, gpl->tintcolor[3]);
-  }
-  if ((params_.flag & GP_EXPORT_GRAY_SCALE) != 0) {
-    rgb_to_grayscale(col);
-  }
-
-  linearrgb_to_srgb_v3_v3(col, col);
-  stroke_hex = rgb_to_hexstr(col);
-
-  gps_node.append_attribute("fill").set_value(stroke_hex.c_str());
-  gps_node.append_attribute("stroke").set_value("none");
-
-  std::string txt = "M";
-  for (uint32_t i = 0; i < gps->totpoints; i++) {
-    if (i > 0) {
-      txt.append("L");
-    }
-    bGPDspoint *pt = &gps->points[i];
-    float screen_co[2];
-    gpencil_3d_point_to_screen_space(&pt->x, screen_co);
-    txt.append(std::to_string(screen_co[0]) + "," + std::to_string(screen_co[1]));
-  }
-  /* Close patch (cyclic)*/
-  if (gps->flag & GP_STROKE_CYCLIC) {
-    txt.append("z");
-  }
-
-  gps_node.append_attribute("d").set_value(txt.c_str());
+  HPDF_Page_Circle(page_, screen_co[0], params_.paper_size[1] - screen_co[1], radius);
+  HPDF_Page_ClosePathFillStroke(page_);
 }
 
 /**
  * Export a stroke using polyline or polygon
- * \param gpl_node: Node of the layer.
  * \param do_fill: True if the stroke is only fill
  */
-void GpencilExporterPDF::export_stroke_to_polyline(pugi::xml_node gpl_node, const bool do_fill)
+void GpencilExporterPDF::export_stroke_to_polyline(const bool do_fill, const bool normalize)
 {
   bGPDlayer *gpl = gpl_current_get();
   bGPDstroke *gps = gps_current_get();
@@ -348,73 +282,66 @@ void GpencilExporterPDF::export_stroke_to_polyline(pugi::xml_node gpl_node, cons
 
   BKE_gpencil_free_stroke(gps_temp);
 
-  pugi::xml_node gps_node = gpl_node.append_child(do_fill || cyclic ? "polygon" : "polyline");
-
-  color_string_set(gps_node, do_fill);
+  color_set(do_fill);
 
   if (material_is_stroke() && !do_fill) {
-    gps_node.append_attribute("stroke-width").set_value((radius * 2.0f) - gpl->line_change);
+    HPDF_Page_SetLineJoin(page_, HPDF_ROUND_JOIN);
+    HPDF_Page_SetLineWidth(page_, (radius * 2.0f) - gpl->line_change);
   }
 
-  std::string txt;
+  /* Loop all points. */
   for (uint32_t i = 0; i < gps->totpoints; i++) {
-    if (i > 0) {
-      txt.append(" ");
-    }
     pt = &gps->points[i];
     float screen_co[2];
     gpencil_3d_point_to_screen_space(&pt->x, screen_co);
-    txt.append(std::to_string(screen_co[0]) + "," + std::to_string(screen_co[1]));
+    if (i == 0) {
+      HPDF_Page_MoveTo(page_, screen_co[0], params_.paper_size[1] - screen_co[1]);
+    }
+    else {
+      HPDF_Page_LineTo(page_, screen_co[0], params_.paper_size[1] - screen_co[1]);
+    }
+  }
+  if (do_fill || !normalize) {
+    HPDF_Page_Fill(page_);
+  }
+  else {
+    HPDF_Page_Stroke(page_);
   }
 
-  gps_node.append_attribute("points").set_value(txt.c_str());
+  HPDF_Page_GRestore(page_);
 }
 
 /**
- * Set color PDF string for stroke
- * \param gps_node: Stroke node
+ * Set color
  * @param do_fill: True if the stroke is only fill
  */
-void GpencilExporterPDF::color_string_set(pugi::xml_node gps_node, const bool do_fill)
+void GpencilExporterPDF::color_set(const bool do_fill)
 {
   bGPDlayer *gpl = gpl_current_get();
-  bGPDstroke *gps = gps_current_get();
 
-  const bool round_cap = (gps->caps[0] == GP_STROKE_CAP_ROUND ||
-                          gps->caps[1] == GP_STROKE_CAP_ROUND);
+  const float fill_opacity = fill_color_[3] * gpl->opacity;
+  const float stroke_opacity = stroke_color_[3] * stroke_average_opacity_get() * gpl->opacity;
+
+  HPDF_Page_GSave(page_);
+  gstate_ = HPDF_CreateExtGState(pdf_);
 
   float col[3];
   if (do_fill) {
     interp_v3_v3v3(col, fill_color_, gpl->tintcolor, gpl->tintcolor[3]);
-    if ((params_.flag & GP_EXPORT_GRAY_SCALE) != 0) {
-      rgb_to_grayscale(col);
-    }
     linearrgb_to_srgb_v3_v3(col, col);
-    std::string stroke_hex = rgb_to_hexstr(col);
-    gps_node.append_attribute("fill").set_value(stroke_hex.c_str());
-    gps_node.append_attribute("stroke").set_value("none");
-    gps_node.append_attribute("fill-opacity").set_value(fill_color_[3] * gpl->opacity);
+
+    HPDF_ExtGState_SetAlphaFill(gstate_, fill_opacity);
+    HPDF_Page_SetRGBFill(page_, col[0], col[1], col[2]);
   }
   else {
     interp_v3_v3v3(col, stroke_color_, gpl->tintcolor, gpl->tintcolor[3]);
-    if ((params_.flag & GP_EXPORT_GRAY_SCALE) != 0) {
-      rgb_to_grayscale(col);
-    }
     linearrgb_to_srgb_v3_v3(col, col);
-    std::string stroke_hex = rgb_to_hexstr(col);
-    gps_node.append_attribute("stroke").set_value(stroke_hex.c_str());
-    gps_node.append_attribute("stroke-opacity")
-        .set_value(stroke_color_[3] * stroke_average_opacity_get() * gpl->opacity);
 
-    if (gps->totpoints > 1) {
-      gps_node.append_attribute("fill").set_value("none");
-      gps_node.append_attribute("stroke-linecap").set_value(round_cap ? "round" : "square");
-    }
-    else {
-      gps_node.append_attribute("fill").set_value(stroke_hex.c_str());
-      gps_node.append_attribute("fill-opacity").set_value(fill_color_[3] * gpl->opacity);
-    }
+    HPDF_ExtGState_SetAlphaFill(gstate_, stroke_opacity);
+    HPDF_ExtGState_SetAlphaStroke(gstate_, stroke_opacity);
+    HPDF_Page_SetRGBFill(page_, col[0], col[1], col[2]);
+    HPDF_Page_SetRGBStroke(page_, col[0], col[1], col[2]);
   }
+  HPDF_Page_SetExtGState(page_, gstate_);
 }
-#endif
 }  // namespace blender::io::gpencil

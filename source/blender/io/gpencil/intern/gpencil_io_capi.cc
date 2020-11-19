@@ -109,7 +109,7 @@ static bool gpencil_io_export_pdf(GpencilExporterPDF *exporter, const GpencilExp
   bool result = false;
   exporter->set_frame_number(iparams->framenum);
   std::string subfix = iparams->file_subfix;
-
+  result |= exporter->new_document();
   result |= exporter->add_newpage();
   result |= exporter->add_body();
   result = exporter->write(subfix);

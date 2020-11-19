@@ -54,17 +54,13 @@ class GpencilExporterPDF : public GpencilExporter {
   /* State. */
   HPDF_ExtGState gstate_;
 
-  void create_document(void);
-  void add_page(void);
+  bool create_document(void);
+  bool add_page(void);
   void export_gpencil_layers(void);
 
-  // void export_stroke_to_point(pugi::xml_node gpl_node);
-
-  // void export_stroke_to_path(pugi::xml_node gpl_node, const bool is_fill);
-
-  // void export_stroke_to_polyline(pugi::xml_node gpl_node, const bool is_fill);
-
-  // void color_string_set(pugi::xml_node gps_node, const bool is_fill);
+  void export_stroke_to_point(void);
+  void export_stroke_to_polyline(const bool is_fill, const bool normalize);
+  void color_set(const bool do_fill);
 };
 
 }  // namespace blender::io::gpencil

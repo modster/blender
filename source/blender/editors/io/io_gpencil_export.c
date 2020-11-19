@@ -114,7 +114,7 @@ static void ui_gpencil_export_common_settings(uiLayout *layout,
   }
 }
 
-static void gpencil_export_common_props(wmOperatorType *ot)
+static void gpencil_export_common_props_svg(wmOperatorType *ot)
 {
   static const EnumPropertyItem gpencil_export_select_items[] = {
       {GP_EXPORT_ACTIVE, "ACTIVE", 0, "Active", "Include only active object"},
@@ -145,6 +145,39 @@ static void gpencil_export_common_props(wmOperatorType *ot)
                   false,
                   "Gray Scale",
                   "Export in gray scale instead of full color");
+  RNA_def_float(
+      ot->srna,
+      "stroke_sample",
+      0.0f,
+      0.0f,
+      100.0f,
+      "Sampling",
+      "Precision of sampling stroke, low values gets more precise result, zero to disable",
+      0.0f,
+      100.0f);
+}
+
+static void gpencil_export_common_props_pdf(wmOperatorType *ot)
+{
+  static const EnumPropertyItem gpencil_export_select_items[] = {
+      {GP_EXPORT_ACTIVE, "ACTIVE", 0, "Active", "Include only active object"},
+      {GP_EXPORT_SELECTED, "SELECTED", 0, "Selected", "Include selected objects"},
+      {GP_EXPORT_VISIBLE, "VISIBLE", 0, "Visible", "Include visible objects"},
+      {0, NULL, 0, NULL, NULL},
+  };
+  RNA_def_boolean(ot->srna, "use_fill", true, "Fill", "Export filled areas");
+  RNA_def_boolean(ot->srna,
+                  "use_normalized_thickness",
+                  false,
+                  "Normalize",
+                  "Export strokes with constant thickness along the stroke");
+  ot->prop = RNA_def_enum(ot->srna,
+                          "selected_object_type",
+                          gpencil_export_select_items,
+                          GP_EXPORT_SELECTED,
+                          "Object",
+                          "Objects included in the export");
+
   RNA_def_float(
       ot->srna,
       "stroke_sample",
@@ -319,7 +352,7 @@ void WM_OT_gpencil_export_svg(wmOperatorType *ot)
                                  FILE_DEFAULTDISPLAY,
                                  FILE_SORT_ALPHA);
 
-  gpencil_export_common_props(ot);
+  gpencil_export_common_props_svg(ot);
 }
 
 /* <-------- SVG Storyboard export. --------> */
@@ -560,7 +593,7 @@ void WM_OT_gpencil_export_storyboard(wmOperatorType *ot)
                                  FILE_DEFAULTDISPLAY,
                                  FILE_SORT_ALPHA);
 
-  gpencil_export_common_props(ot);
+  gpencil_export_common_props_svg(ot);
 
   RNA_def_int(ot->srna,
               "start",
@@ -618,7 +651,7 @@ static int wm_gpencil_export_pdf_invoke(bContext *C, wmOperator *op, const wmEve
       BLI_strncpy(filepath, BKE_main_blendfile_path(bmain), sizeof(filepath));
     }
 
-    BLI_path_extension_replace(filepath, sizeof(filepath), ".svg");
+    BLI_path_extension_replace(filepath, sizeof(filepath), ".pdf");
     RNA_string_set(op->ptr, "filepath", filepath);
   }
 
@@ -653,15 +686,14 @@ static int wm_gpencil_export_pdf_exec(bContext *C, wmOperator *op)
   const bool use_norm_thickness = RNA_boolean_get(op->ptr, "use_normalized_thickness");
   const short select = RNA_enum_get(op->ptr, "selected_object_type");
 
-  const bool use_clip_camera = RNA_boolean_get(op->ptr, "use_clip_camera");
-  const bool use_gray_scale = RNA_boolean_get(op->ptr, "use_gray_scale");
-
   /* Set flags. */
   int flag = 0;
   SET_FLAG_FROM_TEST(flag, use_fill, GP_EXPORT_FILL);
   SET_FLAG_FROM_TEST(flag, use_norm_thickness, GP_EXPORT_NORM_THICKNESS);
-  SET_FLAG_FROM_TEST(flag, use_clip_camera, GP_EXPORT_CLIP_CAMERA);
-  SET_FLAG_FROM_TEST(flag, use_gray_scale, GP_EXPORT_GRAY_SCALE);
+
+  float paper[2];
+  paper[0] = scene->r.xsch;
+  paper[1] = scene->r.ysch;
 
   struct GpencilExportParams params = {
       .C = C,
@@ -676,9 +708,8 @@ static int wm_gpencil_export_pdf_exec(bContext *C, wmOperator *op)
       .stroke_sample = RNA_float_get(op->ptr, "stroke_sample"),
       .page_layout = {0.0f, 0.0f},
       .page_type = 0,
-      .paper_size = {0.0f, 0.0f},
+      .paper_size = {paper[0], paper[1]},
       .text_type = 0,
-
   };
 
   /* Do export. */
@@ -687,10 +718,10 @@ static int wm_gpencil_export_pdf_exec(bContext *C, wmOperator *op)
   WM_cursor_wait(0);
 
   if (done) {
-    BKE_report(op->reports, RPT_INFO, "SVG export file created");
+    BKE_report(op->reports, RPT_INFO, "PDF export file created");
   }
   else {
-    BKE_report(op->reports, RPT_WARNING, "Unable to export SVG");
+    BKE_report(op->reports, RPT_WARNING, "Unable to export PDF");
   }
 
   return OPERATOR_FINISHED;
@@ -698,7 +729,7 @@ static int wm_gpencil_export_pdf_exec(bContext *C, wmOperator *op)
 
 static void ui_gpencil_export_pdf_settings(uiLayout *layout, PointerRNA *imfptr)
 {
-  uiLayout *box, *row;
+  uiLayout *box, *row, *col, *sub;
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
@@ -711,7 +742,16 @@ static void ui_gpencil_export_pdf_settings(uiLayout *layout, PointerRNA *imfptr)
   row = uiLayoutRow(box, false);
   uiItemR(row, imfptr, "selected_object_type", 0, NULL, ICON_NONE);
 
-  ui_gpencil_export_common_settings(layout, imfptr, false);
+  box = uiLayoutBox(layout);
+  row = uiLayoutRow(box, false);
+  uiItemL(row, IFACE_("Export Options"), ICON_SCENE_DATA);
+
+  col = uiLayoutColumn(box, false);
+
+  sub = uiLayoutColumn(col, true);
+  uiItemR(sub, imfptr, "stroke_sample", 0, NULL, ICON_NONE);
+  uiItemR(sub, imfptr, "use_fill", 0, NULL, ICON_NONE);
+  uiItemR(sub, imfptr, "use_normalized_thickness", 0, NULL, ICON_NONE);
 }
 
 static void wm_gpencil_export_pdf_draw(bContext *UNUSED(C), wmOperator *op)
@@ -764,5 +804,5 @@ void WM_OT_gpencil_export_pdf(wmOperatorType *ot)
                                  FILE_DEFAULTDISPLAY,
                                  FILE_SORT_ALPHA);
 
-  gpencil_export_common_props(ot);
+  gpencil_export_common_props_pdf(ot);
 }
