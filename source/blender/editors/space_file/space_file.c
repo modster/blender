@@ -754,6 +754,30 @@ static void file_space_subtype_item_extend(bContext *UNUSED(C),
   RNA_enum_items_add(item, totitem, rna_enum_space_file_browse_mode_items);
 }
 
+const char *file_context_dir[] = {"active_file", NULL};
+
+static int /*eContextResult*/ file_context(const bContext *C,
+                                           const char *member,
+                                           bContextDataResult *result)
+{
+  bScreen *screen = CTX_wm_screen(C);
+  SpaceFile *sfile = CTX_wm_space_file(C);
+  FileSelectParams *params = ED_fileselect_get_active_params(sfile);
+
+  BLI_assert(!ED_area_is_global(CTX_wm_area(C)));
+
+  if (CTX_data_dir(member)) {
+    CTX_data_dir_set(result, file_context_dir);
+    return CTX_RESULT_OK;
+  }
+  else if (CTX_data_equals(member, "active_file")) {
+    FileDirEntry *file = filelist_file(sfile->files, params->active_file);
+    CTX_data_pointer_set(result, &screen->id, &RNA_FileSelectEntry, file);
+    return CTX_RESULT_OK;
+  }
+  return CTX_RESULT_MEMBER_NOT_FOUND;
+}
+
 /* only called once, from space/spacetypes.c */
 void ED_spacetype_file(void)
 {
@@ -776,6 +800,7 @@ void ED_spacetype_file(void)
   st->space_subtype_item_extend = file_space_subtype_item_extend;
   st->space_subtype_get = file_space_subtype_get;
   st->space_subtype_set = file_space_subtype_set;
+  st->context = file_context;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype file region");

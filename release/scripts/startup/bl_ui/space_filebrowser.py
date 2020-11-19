@@ -553,6 +553,24 @@ class FILEBROWSER_MT_context_menu(Menu):
         layout.prop_menu_enum(params, "sort_method")
 
 
+class ASSETBROWSER_PT_metadata(Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "Asset Meta-data"
+    bl_options = {'HIDE_HEADER'}
+
+    @classmethod
+    def poll(cls, context):
+        return panel_poll_is_asset_browsing(context)
+
+    def draw(self, context):
+        layout = self.layout
+        active_file = context.active_file
+
+        if active_file:
+            layout.label(text=active_file.name)
+
+
 classes = (
     FILEBROWSER_HT_header,
     FILEBROWSER_PT_display,
@@ -570,6 +588,7 @@ classes = (
     FILEBROWSER_MT_view,
     FILEBROWSER_MT_select,
     FILEBROWSER_MT_context_menu,
+    ASSETBROWSER_PT_metadata,
 )
 
 if __name__ == "__main__":  # only for live edit.

@@ -2531,6 +2531,18 @@ static const EnumPropertyItem *rna_FileSelectParams_asset_repository_itemf(
   return item;
 }
 
+static void rna_FileBrowser_FileSelectEntry_name_get(PointerRNA *ptr, char *value)
+{
+  const FileDirEntry *entry = ptr->data;
+  strcpy(value, entry->name);
+}
+
+static int rna_FileBrowser_FileSelectEntry_name_length(PointerRNA *ptr)
+{
+  const FileDirEntry *entry = ptr->data;
+  return (int)strlen(entry->name);
+}
+
 static void rna_FileSelectParams_asset_category_set(PointerRNA *ptr, uint64_t value)
 {
   FileSelectParams *params = ptr->data;
@@ -5870,6 +5882,23 @@ static void rna_def_fileselect_idfilter(BlenderRNA *brna)
   }
 }
 
+static void rna_def_fileselect_entry(BlenderRNA *brna)
+{
+  PropertyRNA *prop;
+  StructRNA *srna = RNA_def_struct(brna, "FileSelectEntry", NULL);
+  RNA_def_struct_sdna(srna, "FileDirEntry");
+  RNA_def_struct_ui_text(srna, "File Select Entry", "A file viewable in the File Browser");
+
+  prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_funcs(prop,
+                                "rna_FileBrowser_FileSelectEntry_name_get",
+                                "rna_FileBrowser_FileSelectEntry_name_length",
+                                NULL);
+  RNA_def_property_ui_text(prop, "Name", "");
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_struct_name_property(srna, prop);
+}
+
 static void rna_def_fileselect_params(BlenderRNA *brna)
 {
   StructRNA *srna;
@@ -6961,6 +6990,7 @@ void RNA_def_space(BlenderRNA *brna)
   rna_def_space_image(brna);
   rna_def_space_sequencer(brna);
   rna_def_space_text(brna);
+  rna_def_fileselect_entry(brna);
   rna_def_fileselect_params(brna);
   rna_def_fileselect_idfilter(brna);
   rna_def_filemenu_entry(brna);
