@@ -662,8 +662,8 @@ static int wm_gpencil_export_pdf_exec(bContext *C, wmOperator *op)
   SET_FLAG_FROM_TEST(flag, use_norm_thickness, GP_EXPORT_NORM_THICKNESS);
 
   float paper[2];
-  paper[0] = scene->r.xsch;
-  paper[1] = scene->r.ysch;
+  paper[0] = scene->r.xsch * scene->r.size;
+  paper[1] = scene->r.ysch * scene->r.size;
 
   struct GpencilExportParams params = {
       .C = C,
