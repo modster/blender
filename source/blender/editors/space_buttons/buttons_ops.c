@@ -246,7 +246,7 @@ static int file_browse_exec(bContext *C, wmOperator *op)
     ED_undo_push(C, undostr);
   }
 
-  /* Special annoying exception, filesel on redo panel [#26618]. */
+  /* Special annoying exception, filesel on redo panel T26618. */
   {
     wmOperator *redo_op = WM_operator_last_redo(C);
     if (redo_op) {
@@ -378,7 +378,7 @@ void BUTTONS_OT_file_browse(wmOperatorType *ot)
                                  FILE_OPENFILE,
                                  WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH,
                                  FILE_DEFAULTDISPLAY,
-                                 FILE_SORT_ALPHA);
+                                 FILE_SORT_DEFAULT);
 }
 
 /* Second operator, only difference from BUTTONS_OT_file_browse is WM_FILESEL_DIRECTORY. */
@@ -405,7 +405,7 @@ void BUTTONS_OT_directory_browse(wmOperatorType *ot)
                                  FILE_OPENFILE,
                                  WM_FILESEL_DIRECTORY | WM_FILESEL_RELPATH,
                                  FILE_DEFAULTDISPLAY,
-                                 FILE_SORT_ALPHA);
+                                 FILE_SORT_DEFAULT);
 }
 
 /** \} */

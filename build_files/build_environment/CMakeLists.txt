@@ -85,6 +85,7 @@ include(cmake/flexbison.cmake)
 include(cmake/osl.cmake)
 include(cmake/tbb.cmake)
 include(cmake/openvdb.cmake)
+include(cmake/nanovdb.cmake)
 include(cmake/python.cmake)
 include(cmake/python_site_packages.cmake)
 include(cmake/package_python.cmake)
@@ -117,7 +118,6 @@ if(WIN32)
   include(cmake/yamlcpp.cmake)
   # LCMS is an OCIO dep, but only if you build the apps, leaving it here for convenience
   # include(cmake/lcms.cmake)
-
 endif()
 
 if(NOT WIN32 OR ENABLE_MINGW64)

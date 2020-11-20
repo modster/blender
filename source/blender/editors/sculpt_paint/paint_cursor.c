@@ -1265,7 +1265,13 @@ static bool paint_cursor_context_init(bContext *C,
   pcontext->scene = CTX_data_scene(C);
   pcontext->ups = &pcontext->scene->toolsettings->unified_paint_settings;
   pcontext->paint = BKE_paint_get_active_from_context(C);
+  if (pcontext->paint == NULL) {
+    return false;
+  }
   pcontext->brush = BKE_paint_brush(pcontext->paint);
+  if (pcontext->brush == NULL) {
+    return false;
+  }
   pcontext->mode = BKE_paintmode_get_active_from_context(C);
 
   ED_view3d_viewcontext_init(C, &pcontext->vc, pcontext->depsgraph);
@@ -1303,6 +1309,11 @@ static bool paint_cursor_context_init(bContext *C,
 
   Object *active_object = pcontext->vc.obact;
   pcontext->ss = active_object ? active_object->sculpt : NULL;
+
+  if (pcontext->ss && pcontext->ss->draw_faded_cursor) {
+    pcontext->outline_alpha = 0.3f;
+    copy_v3_fl(pcontext->outline_col, 0.8f);
+  }
 
   pcontext->is_stroke_active = pcontext->ups->stroke_active;
 
@@ -1663,7 +1674,7 @@ static void paint_cursor_draw_3d_view_brush_cursor_inactive(PaintCursorContext *
 
   /* Cloth brush local simulation areas. */
   if (brush->sculpt_tool == SCULPT_TOOL_CLOTH &&
-      brush->cloth_simulation_area_type == BRUSH_CLOTH_SIMULATION_AREA_LOCAL) {
+      brush->cloth_simulation_area_type != BRUSH_CLOTH_SIMULATION_AREA_GLOBAL) {
     const float white[3] = {1.0f, 1.0f, 1.0f};
     const float zero_v[3] = {0.0f};
     /* This functions sets its own drawing space in order to draw the simulation limits when the
@@ -1744,7 +1755,7 @@ static void paint_cursor_cursor_draw_3d_view_brush_cursor_active(PaintCursorCont
     else if (brush->cloth_force_falloff_type == BRUSH_CLOTH_FORCE_FALLOFF_RADIAL &&
              brush->cloth_simulation_area_type == BRUSH_CLOTH_SIMULATION_AREA_LOCAL) {
       /* Display the simulation limits if sculpting outside them. */
-      /* This does not makes much sense of plane fallof as the fallof is infinte or global. */
+      /* This does not makes much sense of plane falloff as the falloff is infinte or global. */
 
       if (len_v3v3(ss->cache->true_location, ss->cache->true_initial_location) >
           ss->cache->radius * (1.0f + brush->cloth_sim_limit)) {

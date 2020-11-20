@@ -42,6 +42,7 @@ set(SRC
   gpencil_convert.c
   gpencil_data.c
   gpencil_edit.c
+  gpencil_edit_curve.c
   gpencil_fill.c
   gpencil_interpolate.c
   gpencil_merge.c
@@ -60,12 +61,27 @@ set(SRC
   gpencil_weight_paint.c
 
   gpencil_intern.h
+  gpencil_trace.h
 )
 
 set(LIB
   bf_blenkernel
   bf_blenlib
 )
+
+if(WITH_POTRACE)
+  list(APPEND SRC
+    gpencil_trace_ops.c
+    gpencil_trace_utils.c
+  )
+  list(APPEND INC
+    ${POTRACE_INCLUDE_DIRS}
+  )
+  list(APPEND LIB
+    ${POTRACE_LIBRARIES}
+  )
+  add_definitions(-DWITH_POTRACE)
+endif()
 
 if(WITH_INTERNATIONAL)
   add_definitions(-DWITH_INTERNATIONAL)

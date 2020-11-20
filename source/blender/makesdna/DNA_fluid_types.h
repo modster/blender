@@ -25,6 +25,10 @@
 
 #include "DNA_listBase.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * #FluidDomainSettings.flags
  * Domain flags.
@@ -311,7 +315,6 @@ enum {
 #define FLUID_NAME_OBVEL_Z "z_obvel"
 #define FLUID_NAME_FRACTIONS "fractions"
 #define FLUID_NAME_INVELC "invelC"
-#define FLUID_NAME_INVEL "invel"
 #define FLUID_NAME_INVEL_X "x_invel"
 #define FLUID_NAME_INVEL_Y "y_invel"
 #define FLUID_NAME_INVEL_Z "z_invel"
@@ -464,6 +467,7 @@ enum {
 enum {
   VDB_PRECISION_HALF_FLOAT = 0,
   VDB_PRECISION_FULL_FLOAT = 1,
+  VDB_PRECISION_MINI_FLOAT = 2,
 };
 
 /* Deprecated values (i.e. all defines and enums below this line up until typedefs). */
@@ -586,10 +590,11 @@ typedef struct FluidDomainSettings {
   float particle_radius;
   float particle_band_width;
   float fractions_threshold;
+  float fractions_distance;
   float flip_ratio;
   int sys_particle_maximum;
   short simulation_method;
-  char _pad4[2];
+  char _pad4[6];
 
   /* Diffusion options. */
   float surface_tension;
@@ -859,3 +864,7 @@ typedef struct FluidEffectorSettings {
   short guide_mode;
   char _pad2[2];
 } FluidEffectorSettings;
+
+#ifdef __cplusplus
+}
+#endif

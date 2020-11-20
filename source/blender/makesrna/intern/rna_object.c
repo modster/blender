@@ -579,7 +579,7 @@ static StructRNA *rna_Object_data_typef(PointerRNA *ptr)
       return &RNA_ID;
 #  endif
     case OB_POINTCLOUD:
-#  ifdef WITH_PARTICLE_NODES
+#  ifdef WITH_POINT_CLOUD
       return &RNA_PointCloud;
 #  else
       return &RNA_ID;
@@ -741,9 +741,8 @@ static void rna_Object_dup_collection_set(PointerRNA *ptr,
   Object *ob = (Object *)ptr->data;
   Collection *grp = (Collection *)value.data;
 
-  /* must not let this be set if the object belongs in this group already,
-   * thus causing a cycle/infinite-recursion leading to crashes on load [#25298]
-   */
+  /* Must not let this be set if the object belongs in this group already,
+   * thus causing a cycle/infinite-recursion leading to crashes on load T25298. */
   if (BKE_collection_has_object_recursive(grp, ob) == 0) {
     if (ob->type == OB_EMPTY) {
       id_us_min(&ob->instance_collection->id);
@@ -2066,14 +2065,14 @@ static void rna_def_vertex_group(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Name", "Vertex group name");
   RNA_def_struct_name_property(srna, prop);
   RNA_def_property_string_funcs(prop, NULL, NULL, "rna_VertexGroup_name_set");
-  /* update data because modifiers may use [#24761] */
+  /* update data because modifiers may use T24761. */
   RNA_def_property_update(
       prop, NC_GEOM | ND_DATA | NA_RENAME, "rna_Object_internal_update_data_dependency");
 
   prop = RNA_def_property(srna, "lock_weight", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_ui_text(prop, "", "Maintain the relative weights for the group");
   RNA_def_property_boolean_sdna(prop, NULL, "flag", 0);
-  /* update data because modifiers may use [#24761] */
+  /* update data because modifiers may use T24761. */
   RNA_def_property_update(prop, NC_GEOM | ND_DATA | NA_RENAME, "rna_Object_internal_update_data");
 
   prop = RNA_def_property(srna, "index", PROP_INT, PROP_UNSIGNED);
@@ -2126,7 +2125,7 @@ static void rna_def_face_map(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Name", "Face map name");
   RNA_def_struct_name_property(srna, prop);
   RNA_def_property_string_funcs(prop, NULL, NULL, "rna_FaceMap_name_set");
-  /* update data because modifiers may use [#24761] */
+  /* update data because modifiers may use T24761. */
   RNA_def_property_update(prop, NC_GEOM | ND_DATA | NA_RENAME, "rna_Object_internal_update_data");
 
   prop = RNA_def_property(srna, "select", PROP_BOOLEAN, PROP_NONE);
@@ -2699,6 +2698,15 @@ static void rna_def_object(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop, "Parent Bone", "Name of parent bone in case of a bone parenting relation");
   RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Object_dependency_update");
+
+  prop = RNA_def_property(srna, "use_camera_lock_parent", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(
+      prop, NULL, "transflag", OB_TRANSFORM_ADJUST_ROOT_PARENT_FOR_VIEW_LOCK);
+  RNA_def_property_ui_text(prop,
+                           "Camera Parent Lock",
+                           "View Lock 3D viewport camera transformation affects the object's "
+                           "parent instead");
+  RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, "rna_Object_internal_update");
 
   /* Track and Up flags */
   /* XXX: these have been saved here for a bit longer (after old track was removed),

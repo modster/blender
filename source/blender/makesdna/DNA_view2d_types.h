@@ -25,6 +25,10 @@
 
 #include "DNA_vec_types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* ---------------------------------- */
 
 /* View 2D data - stored per region */
@@ -66,13 +70,6 @@ typedef struct View2D {
 
   /** Pivot point for transforms (rotate and scale). */
   short around;
-
-  /** Different offset per tab, for buttons. */
-  float *tab_offset;
-  /** Number of tabs stored. */
-  int tab_num;
-  /** Current tab. */
-  int tab_cur;
 
   /* Usually set externally (as in, not in view2d files). */
   /** Alpha of vertical and horizontal scrollbars (range is [0, 255]). */
@@ -180,3 +177,7 @@ enum {
   V2D_ALIGN_NO_POS_Y = (1 << 2),
   V2D_ALIGN_NO_NEG_Y = (1 << 3),
 };
+
+#ifdef __cplusplus
+}
+#endif

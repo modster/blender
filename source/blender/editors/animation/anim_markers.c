@@ -36,6 +36,7 @@
 
 #include "BKE_context.h"
 #include "BKE_fcurve.h"
+#include "BKE_idprop.h"
 #include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_report.h"
@@ -686,7 +687,7 @@ static int ed_marker_add_exec(bContext *C, wmOperator *UNUSED(op))
   marker = MEM_callocN(sizeof(TimeMarker), "TimeMarker");
   marker->flag = SELECT;
   marker->frame = frame;
-  BLI_snprintf(marker->name, sizeof(marker->name), "F_%02d", frame);  // XXX - temp code only
+  BLI_snprintf(marker->name, sizeof(marker->name), "F_%02d", frame); /* XXX - temp code only */
   BLI_addtail(markers, marker);
 
   WM_event_add_notifier(C, NC_SCENE | ND_MARKERS, NULL);
@@ -1104,8 +1105,12 @@ static void ed_marker_duplicate_apply(bContext *C)
       newmarker->camera = marker->camera;
 #endif
 
+      if (marker->prop != NULL) {
+        newmarker->prop = IDP_CopyProperty(marker->prop);
+      }
+
       /* new marker is added to the beginning of list */
-      // FIXME: bad ordering!
+      /* FIXME: bad ordering! */
       BLI_addhead(markers, newmarker);
     }
   }
@@ -1265,7 +1270,7 @@ static int ed_marker_select(
   WM_event_add_notifier(C, NC_SCENE | ND_MARKERS, NULL);
   WM_event_add_notifier(C, NC_ANIMATION | ND_MARKERS, NULL);
 
-  /* allowing tweaks, but needs OPERATOR_FINISHED, otherwise renaming fails... [#25987] */
+  /* allowing tweaks, but needs OPERATOR_FINISHED, otherwise renaming fails, see T25987. */
   return ret_val | OPERATOR_PASS_THROUGH;
 }
 
@@ -1458,6 +1463,10 @@ static int ed_marker_delete_exec(bContext *C, wmOperator *UNUSED(op))
   for (marker = markers->first; marker; marker = nmarker) {
     nmarker = marker->next;
     if (marker->flag & SELECT) {
+      if (marker->prop != NULL) {
+        IDP_FreePropertyContent(marker->prop);
+        MEM_freeN(marker->prop);
+      }
       BLI_freelinkN(markers, marker);
       changed = true;
     }
