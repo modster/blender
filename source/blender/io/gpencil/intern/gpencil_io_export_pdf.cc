@@ -62,6 +62,11 @@
 
 namespace blender ::io ::gpencil {
 
+static void error_handler(HPDF_STATUS error_no, HPDF_STATUS detail_no, void *user_data)
+{
+  printf("ERROR: error_no=%04X, detail_no=%u\n", (HPDF_UINT)error_no, (HPDF_UINT)detail_no);
+}
+
 /* Constructor. */
 GpencilExporterPDF::GpencilExporterPDF(const char *filename,
                                        const struct GpencilExportParams *iparams)
@@ -127,7 +132,7 @@ bool GpencilExporterPDF::write(std::string subfix)
 /* Create pdf document. */
 bool GpencilExporterPDF::create_document(void)
 {
-  pdf_ = HPDF_New(nullptr, nullptr);
+  pdf_ = HPDF_New(error_handler, nullptr);
   if (!pdf_) {
     std::cout << "error: cannot create PdfDoc object\n";
     return false;
@@ -140,6 +145,11 @@ bool GpencilExporterPDF::add_page(void)
 {
   /* Add a new page object. */
   page_ = HPDF_AddPage(pdf_);
+  if (!pdf_) {
+    std::cout << "error: cannot create PdfPage\n";
+    return false;
+  }
+
   HPDF_Page_SetWidth(page_, params_.paper_size[0]);
   HPDF_Page_SetHeight(page_, params_.paper_size[1]);
 
@@ -150,17 +160,12 @@ bool GpencilExporterPDF::add_page(void)
 void GpencilExporterPDF::export_gpencil_layers(void)
 {
   /* If is doing a set of frames, the list of objects can change for each frame. */
-  if (is_camera_mode() && ((params_.flag & GP_EXPORT_STORYBOARD_MODE) != 0)) {
+  if (params_.frame_type != GP_EXPORT_FRAME_ACTIVE) {
     create_object_list();
   }
 
   for (ObjectZ &obz : ob_list_) {
     Object *ob = obz.ob;
-
-    std::string frametxt = "blender_frame_" + std::to_string(cfra_);
-
-    char obtxt[96];
-    sprintf(obtxt, "blender_object_%s", ob->id.name + 2);
 
     /* Use evaluated version to get strokes with modifiers. */
     Object *ob_eval_ = (Object *)DEG_get_evaluated_id(depsgraph, &ob->id);
@@ -286,19 +291,21 @@ void GpencilExporterPDF::export_stroke_to_polyline(const bool do_fill, const boo
 
   if (material_is_stroke() && !do_fill) {
     HPDF_Page_SetLineJoin(page_, HPDF_ROUND_JOIN);
-    HPDF_Page_SetLineWidth(page_, (radius * 2.0f) - gpl->line_change);
+    HPDF_Page_SetLineWidth(page_, MAX2((radius * 2.0f) - gpl->line_change, 1.0f));
   }
 
   /* Loop all points. */
   for (uint32_t i = 0; i < gps->totpoints; i++) {
     pt = &gps->points[i];
     float screen_co[2];
-    gpencil_3d_point_to_screen_space(&pt->x, screen_co);
-    if (i == 0) {
-      HPDF_Page_MoveTo(page_, screen_co[0], params_.paper_size[1] - screen_co[1]);
-    }
-    else {
-      HPDF_Page_LineTo(page_, screen_co[0], params_.paper_size[1] - screen_co[1]);
+    HPDF_STATUS err;
+    if (gpencil_3d_point_to_screen_space(&pt->x, screen_co)) {
+      if (i == 0) {
+        err = HPDF_Page_MoveTo(page_, screen_co[0], params_.paper_size[1] - screen_co[1]);
+      }
+      else {
+        err = HPDF_Page_LineTo(page_, screen_co[0], params_.paper_size[1] - screen_co[1]);
+      }
     }
   }
   if (do_fill || !normalize) {
@@ -329,6 +336,7 @@ void GpencilExporterPDF::color_set(const bool do_fill)
   if (do_fill) {
     interp_v3_v3v3(col, fill_color_, gpl->tintcolor, gpl->tintcolor[3]);
     linearrgb_to_srgb_v3_v3(col, col);
+    CLAMP3(col, 0.0f, 1.0f);
 
     HPDF_ExtGState_SetAlphaFill(gstate_, fill_opacity);
     HPDF_Page_SetRGBFill(page_, col[0], col[1], col[2]);
@@ -336,6 +344,7 @@ void GpencilExporterPDF::color_set(const bool do_fill)
   else {
     interp_v3_v3v3(col, stroke_color_, gpl->tintcolor, gpl->tintcolor[3]);
     linearrgb_to_srgb_v3_v3(col, col);
+    CLAMP3(col, 0.0f, 1.0f);
 
     HPDF_ExtGState_SetAlphaFill(gstate_, stroke_opacity);
     HPDF_ExtGState_SetAlphaStroke(gstate_, stroke_opacity);

@@ -49,8 +49,10 @@ struct GpencilExportParams {
   int32_t framenum;
   /** Flags. */
   uint32_t flag;
-  /** Select mode */
+  /** Select mode. */
   uint16_t select;
+  /** Frame type. */
+  uint16_t frame_type;
   /** File subfix. */
   char file_subfix[10];
   /** Stroke sampling. */
@@ -93,6 +95,12 @@ typedef enum eGpencilExportSelect {
   GP_EXPORT_SELECTED = 1,
   GP_EXPORT_VISIBLE = 2,
 } eGpencilExportSelect;
+
+/* Framerange to be exported. */
+typedef enum eGpencilExportFrame {
+  GP_EXPORT_FRAME_ACTIVE = 0,
+  GP_EXPORT_FRAME_SELECTED = 1,
+} eGpencilExportFrame;
 
 /** Document orientation. */
 typedef enum eGpencilExportPaper {

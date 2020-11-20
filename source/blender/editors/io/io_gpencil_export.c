@@ -157,39 +157,6 @@ static void gpencil_export_common_props_svg(wmOperatorType *ot)
       100.0f);
 }
 
-static void gpencil_export_common_props_pdf(wmOperatorType *ot)
-{
-  static const EnumPropertyItem gpencil_export_select_items[] = {
-      {GP_EXPORT_ACTIVE, "ACTIVE", 0, "Active", "Include only active object"},
-      {GP_EXPORT_SELECTED, "SELECTED", 0, "Selected", "Include selected objects"},
-      {GP_EXPORT_VISIBLE, "VISIBLE", 0, "Visible", "Include visible objects"},
-      {0, NULL, 0, NULL, NULL},
-  };
-  RNA_def_boolean(ot->srna, "use_fill", true, "Fill", "Export filled areas");
-  RNA_def_boolean(ot->srna,
-                  "use_normalized_thickness",
-                  false,
-                  "Normalize",
-                  "Export strokes with constant thickness along the stroke");
-  ot->prop = RNA_def_enum(ot->srna,
-                          "selected_object_type",
-                          gpencil_export_select_items,
-                          GP_EXPORT_SELECTED,
-                          "Object",
-                          "Objects included in the export");
-
-  RNA_def_float(
-      ot->srna,
-      "stroke_sample",
-      0.0f,
-      0.0f,
-      100.0f,
-      "Sampling",
-      "Precision of sampling stroke, low values gets more precise result, zero to disable",
-      0.0f,
-      100.0f);
-}
-
 /* <-------- SVG single frame export. --------> */
 static int wm_gpencil_export_svg_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
@@ -261,6 +228,7 @@ static int wm_gpencil_export_svg_exec(bContext *C, wmOperator *op)
       .frame_end = CFRA,
       .flag = flag,
       .select = select,
+      .frame_type = GP_EXPORT_FRAME_ACTIVE,
       .stroke_sample = RNA_float_get(op->ptr, "stroke_sample"),
       .page_layout = {0.0f, 0.0f},
       .page_type = 0,
@@ -438,6 +406,7 @@ static int wm_gpencil_export_stb_exec(bContext *C, wmOperator *op)
       .frame_end = RNA_int_get(op->ptr, "end"),
       .flag = flag,
       .select = select,
+      .frame_type = GP_EXPORT_FRAME_ACTIVE,
       .stroke_sample = RNA_float_get(op->ptr, "stroke_sample"),
       .page_layout = {page_layout[0], page_layout[1]},
       .page_type = (int)RNA_enum_get(op->ptr, "page_type"),
@@ -685,6 +654,7 @@ static int wm_gpencil_export_pdf_exec(bContext *C, wmOperator *op)
   const bool use_fill = RNA_boolean_get(op->ptr, "use_fill");
   const bool use_norm_thickness = RNA_boolean_get(op->ptr, "use_normalized_thickness");
   const short select = RNA_enum_get(op->ptr, "selected_object_type");
+  const short frame_type = RNA_enum_get(op->ptr, "frame_type");
 
   /* Set flags. */
   int flag = 0;
@@ -701,10 +671,11 @@ static int wm_gpencil_export_pdf_exec(bContext *C, wmOperator *op)
       .v3d = v3d,
       .obact = ob,
       .mode = GP_EXPORT_TO_PDF,
-      .frame_start = CFRA,
-      .frame_end = CFRA,
+      .frame_start = SFRA,
+      .frame_end = EFRA,
       .flag = flag,
       .select = select,
+      .frame_type = frame_type,
       .stroke_sample = RNA_float_get(op->ptr, "stroke_sample"),
       .page_layout = {0.0f, 0.0f},
       .page_type = 0,
@@ -747,6 +718,10 @@ static void ui_gpencil_export_pdf_settings(uiLayout *layout, PointerRNA *imfptr)
   uiItemL(row, IFACE_("Export Options"), ICON_SCENE_DATA);
 
   col = uiLayoutColumn(box, false);
+  sub = uiLayoutColumn(col, true);
+  uiItemR(sub, imfptr, "frame_type", 0, IFACE_("Frame"), ICON_NONE);
+
+  uiLayoutSetPropSep(box, true);
 
   sub = uiLayoutColumn(col, true);
   uiItemR(sub, imfptr, "stroke_sample", 0, NULL, ICON_NONE);
@@ -754,9 +729,8 @@ static void ui_gpencil_export_pdf_settings(uiLayout *layout, PointerRNA *imfptr)
   uiItemR(sub, imfptr, "use_normalized_thickness", 0, NULL, ICON_NONE);
 }
 
-static void wm_gpencil_export_pdf_draw(bContext *UNUSED(C), wmOperator *op)
+static void wm_gpencil_export_pdf_draw(bContext *C, wmOperator *op)
 {
-
   PointerRNA ptr;
 
   RNA_pointer_create(NULL, op->type->srna, op->properties, &ptr);
@@ -804,5 +778,45 @@ void WM_OT_gpencil_export_pdf(wmOperatorType *ot)
                                  FILE_DEFAULTDISPLAY,
                                  FILE_SORT_ALPHA);
 
-  gpencil_export_common_props_pdf(ot);
+  static const EnumPropertyItem gpencil_export_select_items[] = {
+      {GP_EXPORT_ACTIVE, "ACTIVE", 0, "Active", "Include only active object"},
+      {GP_EXPORT_SELECTED, "SELECTED", 0, "Selected", "Include selected objects"},
+      {GP_EXPORT_VISIBLE, "VISIBLE", 0, "Visible", "Include visible objects"},
+      {0, NULL, 0, NULL, NULL},
+  };
+  static const EnumPropertyItem gpencil_export_frame_items[] = {
+      {GP_EXPORT_FRAME_ACTIVE, "ACTIVE", 0, "Active", "Include only active frame"},
+      {GP_EXPORT_FRAME_SELECTED, "SELECTED", 0, "Selected", "Include selected frames"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_boolean(ot->srna, "use_fill", true, "Fill", "Export filled areas");
+  RNA_def_boolean(ot->srna,
+                  "use_normalized_thickness",
+                  false,
+                  "Normalize",
+                  "Export strokes with constant thickness along the stroke");
+  ot->prop = RNA_def_enum(ot->srna,
+                          "selected_object_type",
+                          gpencil_export_select_items,
+                          GP_EXPORT_SELECTED,
+                          "Object",
+                          "Objects included in the export");
+
+  RNA_def_float(
+      ot->srna,
+      "stroke_sample",
+      0.0f,
+      0.0f,
+      100.0f,
+      "Sampling",
+      "Precision of sampling stroke, low values gets more precise result, zero to disable",
+      0.0f,
+      100.0f);
+  ot->prop = RNA_def_enum(ot->srna,
+                          "frame_type",
+                          gpencil_export_frame_items,
+                          GP_EXPORT_ACTIVE,
+                          "Frames",
+                          "Frames included in the export");
 }

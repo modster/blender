@@ -56,7 +56,8 @@ using blender::io::gpencil::GpencilExporterSVG;
 using blender::io::gpencil::GpencilImporterSVG;
 
 /* Check if frame is included. */
-static bool is_keyframe_selected(bContext *C, bGPdata *gpd, int32_t framenum, bool use_markers)
+static bool is_keyframe_included(
+    bContext *C, bGPdata *gpd, int32_t framenum, bool use_selected, bool use_markers)
 {
   if (!use_markers) {
     /* Check if exist a frame. */
@@ -66,7 +67,9 @@ static bool is_keyframe_selected(bContext *C, bGPdata *gpd, int32_t framenum, bo
       }
       LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
         if (gpf->framenum == framenum) {
-          return false;
+          if ((!use_selected) || (use_selected && (gpf->flag & GP_FRAME_SELECT))) {
+            return true;
+          }
         }
       }
     }
@@ -76,12 +79,12 @@ static bool is_keyframe_selected(bContext *C, bGPdata *gpd, int32_t framenum, bo
     /* Check if exist a marker. */
     LISTBASE_FOREACH (TimeMarker *, marker, markers) {
       if (marker->frame == framenum) {
-        return false;
+        return true;
       }
     }
   }
 
-  return true;
+  return false;
 }
 
 /* Import frame. */
@@ -104,15 +107,44 @@ static bool gpencil_io_import_frame(void *in_importer, const GpencilImportParams
 }
 
 /* Export frame in PDF. */
-static bool gpencil_io_export_pdf(GpencilExporterPDF *exporter, const GpencilExportParams *iparams)
+static bool gpencil_io_export_pdf(Depsgraph *depsgraph,
+                                  Scene *scene,
+                                  Object *ob,
+                                  GpencilExporterPDF *exporter,
+                                  const GpencilExportParams *iparams)
 {
   bool result = false;
+  Object *ob_eval_ = (Object *)DEG_get_evaluated_id(depsgraph, &ob->id);
+  bGPdata *gpd_eval = (bGPdata *)ob_eval_->data;
+
   exporter->set_frame_number(iparams->framenum);
   std::string subfix = iparams->file_subfix;
   result |= exporter->new_document();
-  result |= exporter->add_newpage();
-  result |= exporter->add_body();
-  result = exporter->write(subfix);
+
+  const bool use_frame_selected = (iparams->frame_type == GP_EXPORT_FRAME_SELECTED);
+  if (!use_frame_selected) {
+    result |= exporter->add_newpage();
+    result |= exporter->add_body();
+    result = exporter->write(subfix);
+  }
+  else {
+    for (int32_t i = iparams->frame_start; i < iparams->frame_end + 1; i++) {
+      if (!is_keyframe_included(iparams->C, gpd_eval, i, use_frame_selected, false)) {
+        continue;
+      }
+
+      CFRA = i;
+      BKE_scene_graph_update_for_newframe(depsgraph);
+      exporter->set_frame_number(i);
+      result |= exporter->add_newpage();
+      result |= exporter->add_body();
+    }
+    result = exporter->write(subfix);
+    /* Back to original frame. */
+    exporter->set_frame_number(iparams->framenum);
+    CFRA = iparams->framenum;
+    BKE_scene_graph_update_for_newframe(depsgraph);
+  }
 
   return result;
 }
@@ -189,7 +221,7 @@ static bool gpencil_io_export_storyboard(Depsgraph *depsgraph,
   const bool use_markers = ((iparams->flag & GP_EXPORT_MARKERS) != 0);
 
   for (int32_t i = iparams->frame_start; i < iparams->frame_end + 1; i++) {
-    if (is_keyframe_selected(iparams->C, gpd_eval, i, use_markers)) {
+    if (!is_keyframe_included(iparams->C, gpd_eval, i, false, use_markers)) {
       continue;
     }
     shot++;
@@ -298,7 +330,7 @@ bool gpencil_io_export(const char *filename, GpencilExportParams *iparams)
     }
     case GP_EXPORT_TO_PDF: {
       GpencilExporterPDF exporter = GpencilExporterPDF(filename, iparams);
-      done |= gpencil_io_export_pdf(&exporter, iparams);
+      done |= gpencil_io_export_pdf(depsgraph, scene, ob, &exporter, iparams);
       break;
     }
     /* Add new export formats here. */

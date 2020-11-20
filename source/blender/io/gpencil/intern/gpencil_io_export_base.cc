@@ -69,6 +69,7 @@ GpencilExporter::GpencilExporter(const struct GpencilExportParams *iparams)
   params_.mode = iparams->mode;
   params_.flag = iparams->flag;
   params_.select = iparams->select;
+  params_.frame_type = iparams->frame_type;
   params_.stroke_sample = iparams->stroke_sample;
   params_.framenum = iparams->framenum;
   frame_ratio_[0] = frame_ratio_[1] = 1.0f;
@@ -318,7 +319,7 @@ float GpencilExporter::stroke_point_radius_get(struct bGPDstroke *gps)
   float radius = len_v2(v1);
   BKE_gpencil_free_stroke(gps_perimeter);
 
-  return radius;
+  return MAX2(radius, 1.0f);
 }
 
 /**
