@@ -383,6 +383,11 @@ FileSelectParams *ED_fileselect_ensure_active_params(SpaceFile *sfile)
  */
 FileSelectParams *ED_fileselect_get_active_params(const SpaceFile *sfile)
 {
+  if (!sfile) {
+    /* Sometimes called in poll before space type was checked. */
+    return NULL;
+  }
+
   switch ((eFileBrowse_Mode)sfile->browse_mode) {
     case FILE_BROWSE_MODE_FILES:
       return sfile->params;
