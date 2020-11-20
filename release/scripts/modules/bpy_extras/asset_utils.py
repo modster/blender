@@ -45,3 +45,19 @@ class SpaceAssetInfo:
         if hasattr(context, "active_file"):
             active_file = context.active_file
             return active_file.asset_data
+
+class AssetBrowserPanel:
+    bl_space_type = 'FILE_BROWSER'
+
+    @classmethod
+    def poll(cls, context):
+        return SpaceAssetInfo.is_asset_browser_poll(context)
+
+class AssetMetaDataPanel:
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+
+    @classmethod
+    def poll(cls, context):
+        active_file = context.active_file
+        return SpaceAssetInfo.is_asset_browser_poll(context) and active_file and active_file.asset_data

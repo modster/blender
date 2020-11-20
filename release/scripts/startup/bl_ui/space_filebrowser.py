@@ -19,6 +19,10 @@
 # <pep8 compliant>
 from bpy.types import Header, Panel, Menu, UIList
 
+from bpy_extras import (
+    asset_utils,
+)
+
 
 class FILEBROWSER_HT_header(Header):
     bl_space_type = 'FILE_BROWSER'
@@ -200,32 +204,6 @@ def panel_poll_is_upper_region(region):
 def panel_poll_is_asset_browsing(context):
     from bpy_extras.asset_utils import SpaceAssetInfo
     return SpaceAssetInfo.is_asset_browser_poll(context)
-
-
-class FILEBROWSER_PT_asset_navigation_bar(Panel):
-    bl_label = "Asset Navigation"
-    bl_space_type = 'FILE_BROWSER'
-    bl_region_type = 'TOOLS'
-    bl_options = {'HIDE_HEADER'}
-
-    @classmethod
-    def poll(cls, context):
-        return panel_poll_is_asset_browsing(context)
-
-    def draw(self, context):
-        layout = self.layout
-
-        space_file = context.space_data
-
-        col = layout.column()
-
-        col.scale_x = 1.3
-        col.scale_y = 1.3
-        col.prop(space_file.params, "asset_category", expand=True)
-
-        col.separator()
-
-        col.operator("asset.catalog_add", text="Add Catalog", icon='ADD')
 
 
 class FILEBROWSER_UL_dir(UIList):
@@ -554,15 +532,31 @@ class FILEBROWSER_MT_context_menu(Menu):
         layout.prop_menu_enum(params, "sort_method")
 
 
-class ASSETBROWSER_PT_metadata(Panel):
-    bl_space_type = 'FILE_BROWSER'
+class ASSETBROWSER_PT_navigation_bar(asset_utils.AssetBrowserPanel, Panel):
+    bl_label = "Asset Navigation"
+    bl_region_type = 'TOOLS'
+    bl_options = {'HIDE_HEADER'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        space_file = context.space_data
+
+        col = layout.column()
+
+        col.scale_x = 1.3
+        col.scale_y = 1.3
+        col.prop(space_file.params, "asset_category", expand=True)
+
+        col.separator()
+
+        col.operator("asset.catalog_add", text="Add Catalog", icon='ADD')
+
+
+class ASSETBROWSER_PT_metadata(asset_utils.AssetBrowserPanel, Panel):
     bl_region_type = 'TOOL_PROPS'
     bl_label = "Asset Meta-data"
     bl_options = {'HIDE_HEADER'}
-
-    @classmethod
-    def poll(cls, context):
-        return panel_poll_is_asset_browsing(context)
 
     def draw(self, context):
         layout = self.layout
@@ -574,20 +568,12 @@ class ASSETBROWSER_PT_metadata(Panel):
             layout.label(text="No asset selected.")
 
 
-class ASSETBROWSER_PT_metadata_tags(Panel):
-    bl_space_type = 'FILE_BROWSER'
-    bl_region_type = 'TOOL_PROPS'
-    bl_label = "Asset Tags"
-
-    @classmethod
-    def poll(cls, context):
-        active_file = context.active_file
-        return panel_poll_is_asset_browsing(context) and active_file and active_file.asset_data
+class ASSETBROWSER_PT_metadata_tags(asset_utils.AssetMetaDataPanel, Panel):
+    bl_label = "Tags"
 
     def draw(self, context):
         layout = self.layout
-        active_file = context.active_file
-        asset_data = active_file.asset_data
+        asset_data = asset_utils.SpaceAssetInfo.get_active_asset(context)
 
         row = layout.row()
         row.template_list("ASSETBROWSER_UL_metadata_tags", "asset_tags", asset_data, "tags",
@@ -614,7 +600,6 @@ classes = (
     FILEBROWSER_HT_header,
     FILEBROWSER_PT_display,
     FILEBROWSER_PT_filter,
-    FILEBROWSER_PT_asset_navigation_bar,
     FILEBROWSER_UL_dir,
     FILEBROWSER_PT_bookmarks_volumes,
     FILEBROWSER_PT_bookmarks_system,
@@ -627,6 +612,7 @@ classes = (
     FILEBROWSER_MT_view,
     FILEBROWSER_MT_select,
     FILEBROWSER_MT_context_menu,
+    ASSETBROWSER_PT_navigation_bar,
     ASSETBROWSER_PT_metadata,
     ASSETBROWSER_PT_metadata_tags,
     ASSETBROWSER_UL_metadata_tags,
