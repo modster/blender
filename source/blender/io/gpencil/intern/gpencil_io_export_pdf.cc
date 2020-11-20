@@ -338,7 +338,7 @@ void GpencilExporterPDF::color_set(const bool do_fill)
     linearrgb_to_srgb_v3_v3(col, col);
     CLAMP3(col, 0.0f, 1.0f);
 
-    HPDF_ExtGState_SetAlphaFill(gstate_, fill_opacity);
+    HPDF_ExtGState_SetAlphaFill(gstate_, clamp_f(fill_opacity, 0.0f, 1.0f));
     HPDF_Page_SetRGBFill(page_, col[0], col[1], col[2]);
   }
   else {
@@ -346,8 +346,8 @@ void GpencilExporterPDF::color_set(const bool do_fill)
     linearrgb_to_srgb_v3_v3(col, col);
     CLAMP3(col, 0.0f, 1.0f);
 
-    HPDF_ExtGState_SetAlphaFill(gstate_, stroke_opacity);
-    HPDF_ExtGState_SetAlphaStroke(gstate_, stroke_opacity);
+    HPDF_ExtGState_SetAlphaFill(gstate_, clamp_f(stroke_opacity, 0.0f, 1.0f));
+    HPDF_ExtGState_SetAlphaStroke(gstate_, clamp_f(stroke_opacity, 0.0f, 1.0f));
     HPDF_Page_SetRGBFill(page_, col[0], col[1], col[2]);
     HPDF_Page_SetRGBStroke(page_, col[0], col[1], col[2]);
   }
