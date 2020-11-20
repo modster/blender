@@ -33,7 +33,11 @@ class FILEBROWSER_HT_header(Header):
         space_data = context.space_data
         params = space_data.params
 
-        layout.prop(params, "asset_repository", text="")
+        row = layout.row(align=True)
+        row.prop(params, "asset_repository", text="")
+        # External repositories don't auto-refresh, add refresh button.
+        if params.asset_repository != 'LOCAL':
+            row.operator("file.refresh", text="", icon="FILE_REFRESH")
 
         layout.separator_spacer()
 
