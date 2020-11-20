@@ -1063,18 +1063,27 @@ static void rearrange_animchannels_filter_visible(ListBase *anim_data_visible,
                                                   eAnim_ChannelType type)
 {
   ListBase anim_data = {NULL, NULL};
-  bAnimListElem *ale, *ale_next;
-  int filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_LIST_CHANNELS);
+  eAnimFilter_Flags filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE |
+                              ANIMFILTER_LIST_CHANNELS);
 
   /* get all visible channels */
   ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 
   /* now, only keep the ones that are of the types we are interested in */
-  for (ale = anim_data.first; ale; ale = ale_next) {
-    ale_next = ale->next;
-
+  LISTBASE_FOREACH_MUTABLE (bAnimListElem *, ale, &anim_data) {
     if (ale->type != type) {
       BLI_freelinkN(&anim_data, ale);
+      continue;
+    }
+
+    if (type == ANIMTYPE_NLATRACK) {
+      NlaTrack *nlt = (NlaTrack *)ale->data;
+
+      if (ID_IS_OVERRIDE_LIBRARY(ale->id) && (nlt->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0) {
+        /* No re-arrangement of non-local tracks of override data. */
+        BLI_freelinkN(&anim_data, ale);
+        continue;
+      }
     }
   }
 

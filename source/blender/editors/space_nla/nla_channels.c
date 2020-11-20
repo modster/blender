@@ -796,6 +796,11 @@ static int nlaedit_delete_tracks_exec(bContext *C, wmOperator *UNUSED(op))
       NlaTrack *nlt = (NlaTrack *)ale->data;
       AnimData *adt = ale->adt;
 
+      if (ID_IS_OVERRIDE_LIBRARY(ale->id) && (nlt->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0) {
+        /* No deletion of non-local tracks of override data. */
+        continue;
+      }
+
       /* if track is currently 'solo', then AnimData should have its
        * 'has solo' flag disabled
        */

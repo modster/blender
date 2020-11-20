@@ -966,6 +966,11 @@ static int nlaedit_add_meta_exec(bContext *C, wmOperator *UNUSED(op))
     AnimData *adt = ale->adt;
     NlaStrip *strip;
 
+    if (ID_IS_OVERRIDE_LIBRARY(ale->id) && (nlt->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0) {
+      /* No making metastrips in non-local tracks of override data. */
+      continue;
+    }
+
     /* create meta-strips from the continuous chains of selected strips */
     BKE_nlastrips_make_metas(&nlt->strips, 0);
 
@@ -1029,6 +1034,11 @@ static int nlaedit_remove_meta_exec(bContext *C, wmOperator *UNUSED(op))
   /* for each track, find pairs of strips to add transitions to */
   for (ale = anim_data.first; ale; ale = ale->next) {
     NlaTrack *nlt = (NlaTrack *)ale->data;
+
+    if (ID_IS_OVERRIDE_LIBRARY(ale->id) && (nlt->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0) {
+      /* No removing metastrips from non-local tracks of override data. */
+      continue;
+    }
 
     /* clear all selected meta-strips, regardless of whether they are temporary or not */
     BKE_nlastrips_clear_metas(&nlt->strips, 1, 0);
@@ -1095,6 +1105,10 @@ static int nlaedit_duplicate_exec(bContext *C, wmOperator *op)
     AnimData *adt = ale->adt;
     NlaStrip *strip, *nstrip, *next;
     NlaTrack *track;
+
+    /* Note: In this case we allow it in override context because this operator is almost always
+     * paired with the transform one, which will ensure that the new strip ends up in a valid
+     * (local) track. */
 
     for (strip = nlt->strips.first; strip; strip = next) {
       next = strip->next;
@@ -1208,6 +1222,11 @@ static int nlaedit_delete_exec(bContext *C, wmOperator *UNUSED(op))
   for (ale = anim_data.first; ale; ale = ale->next) {
     NlaTrack *nlt = (NlaTrack *)ale->data;
     NlaStrip *strip, *nstrip;
+
+    if (ID_IS_OVERRIDE_LIBRARY(ale->id) && (nlt->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0) {
+      /* No deletion of strips in non-local tracks of override data. */
+      continue;
+    }
 
     for (strip = nlt->strips.first; strip; strip = nstrip) {
       nstrip = strip->next;
@@ -1359,6 +1378,11 @@ static int nlaedit_split_exec(bContext *C, wmOperator *UNUSED(op))
     AnimData *adt = ale->adt;
     NlaStrip *strip, *next;
 
+    if (ID_IS_OVERRIDE_LIBRARY(ale->id) && (nlt->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0) {
+      /* No splitting of strips in non-local tracks of override data. */
+      continue;
+    }
+
     for (strip = nlt->strips.first; strip; strip = next) {
       next = strip->next;
 
@@ -1502,6 +1526,11 @@ static int nlaedit_swap_exec(bContext *C, wmOperator *op)
 
     NlaStrip *strip, *stripN = NULL;
     NlaStrip *area = NULL, *sb = NULL;
+
+    if (ID_IS_OVERRIDE_LIBRARY(ale->id) && (nlt->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0) {
+      /* No re-ordering of strips whithin non-local tracks of override data. */
+      continue;
+    }
 
     /* make temporary metastrips so that entire islands of selections can be moved around */
     BKE_nlastrips_make_metas(&nlt->strips, 1);
@@ -1679,6 +1708,12 @@ static int nlaedit_move_up_exec(bContext *C, wmOperator *UNUSED(op))
       continue;
     }
 
+    if (ID_IS_OVERRIDE_LIBRARY(ale->id) && ((nlt->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0 ||
+                                            (nltn->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0)) {
+      /* No moving of strips in non-local tracks of override data. */
+      continue;
+    }
+
     /* for every selected strip, try to move */
     for (strip = nlt->strips.first; strip; strip = stripn) {
       stripn = strip->next;
@@ -1753,6 +1788,12 @@ static int nlaedit_move_down_exec(bContext *C, wmOperator *UNUSED(op))
 
     /* if this track has no tracks before it, skip for now... */
     if (nltp == NULL) {
+      continue;
+    }
+
+    if (ID_IS_OVERRIDE_LIBRARY(ale->id) && ((nlt->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0 ||
+                                            (nltp->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0)) {
+      /* No moving of strips in non-local tracks of override data. */
       continue;
     }
 
@@ -2023,11 +2064,11 @@ static int nlaedit_apply_scale_exec(bContext *C, wmOperator *UNUSED(op))
       /* strip must be selected, and must be action-clip only
        * (transitions don't have scale) */
       if ((strip->flag & NLASTRIP_FLAG_SELECT) && (strip->type == NLASTRIP_TYPE_CLIP)) {
-        /* if the referenced action is used by other strips,
-         * make this strip use its own copy */
-        if (strip->act == NULL) {
+        if (strip->act == NULL || ID_IS_OVERRIDE_LIBRARY(strip->act) || ID_IS_LINKED(strip->act)) {
           continue;
         }
+        /* if the referenced action is used by other strips,
+         * make this strip use its own copy */
         if (strip->act->id.us > 1) {
           /* make a copy of the Action to work on */
           bAction *act = (bAction *)BKE_id_copy(bmain, &strip->act->id);
@@ -2375,6 +2416,11 @@ static int nla_fmodifier_add_exec(bContext *C, wmOperator *op)
     NlaTrack *nlt = (NlaTrack *)ale->data;
     NlaStrip *strip;
 
+    if (ID_IS_OVERRIDE_LIBRARY(ale->id) && (nlt->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0) {
+      /* No adding f-modifiers to strips in non-local tracks of override data. */
+      continue;
+    }
+
     for (strip = nlt->strips.first; strip; strip = strip->next) {
       /* can F-Modifier be added to the current strip? */
       if (active_only) {
@@ -2551,6 +2597,11 @@ static int nla_fmodifier_paste_exec(bContext *C, wmOperator *op)
   for (ale = anim_data.first; ale; ale = ale->next) {
     NlaTrack *nlt = (NlaTrack *)ale->data;
     NlaStrip *strip;
+
+    if (ID_IS_OVERRIDE_LIBRARY(ale->id) && (nlt->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0) {
+      /* No pasting in non-local tracks of override data. */
+      continue;
+    }
 
     for (strip = nlt->strips.first; strip; strip = strip->next) {
       /* can F-Modifier be added to the current strip? */

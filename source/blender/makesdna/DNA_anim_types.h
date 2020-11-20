@@ -875,6 +875,9 @@ typedef enum eNlaTrack_Flag {
   /** track is not allowed to execute,
    * usually as result of tweaking being enabled (internal flag) */
   NLATRACK_DISABLED = (1 << 10),
+
+  /** That NLA track is added to an override ID, which means it is fully editable. */
+  NLATRACK_OVERRIDELIBRARY_LOCAL = 1 << 16,
 } eNlaTrack_Flag;
 
 /* ************************************ */
