@@ -561,11 +561,30 @@ class ASSETBROWSER_PT_metadata(asset_utils.AssetBrowserPanel, Panel):
     def draw(self, context):
         layout = self.layout
         active_file = context.active_file
+        active_asset = asset_utils.SpaceAssetInfo.get_active_asset(context)
 
-        if active_file:
-            layout.label(text=active_file.name)
+        layout.use_property_split = True
+
+        if active_file and active_asset:
+            layout.prop(active_file, "name")
         else:
             layout.label(text="No asset selected.")
+
+
+class ASSETBROWSER_PT_metadata_details(asset_utils.AssetBrowserPanel, Panel):
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "Details"
+    bl_parent_id = "ASSETBROWSER_PT_metadata"
+
+    def draw(self, context):
+        layout = self.layout
+        active_asset = asset_utils.SpaceAssetInfo.get_active_asset(context)
+
+        layout.use_property_split = True
+
+        if active_asset:
+            layout.prop(active_asset, "author")
+            layout.prop(active_asset, "description")
 
 
 class ASSETBROWSER_PT_metadata_tags(asset_utils.AssetMetaDataPanel, Panel):
@@ -614,6 +633,7 @@ classes = (
     FILEBROWSER_MT_context_menu,
     ASSETBROWSER_PT_navigation_bar,
     ASSETBROWSER_PT_metadata,
+    ASSETBROWSER_PT_metadata_details,
     ASSETBROWSER_PT_metadata_tags,
     ASSETBROWSER_UL_metadata_tags,
 )
