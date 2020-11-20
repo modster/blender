@@ -22,6 +22,7 @@
 
 #include "BLI_listbase.h"
 #include "BLI_string.h"
+#include "BLI_string_utils.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_asset.h"
@@ -101,6 +102,26 @@ void BKE_asset_data_free(AssetData *asset_data)
   MEM_SAFE_FREE(asset_data);
 }
 
+static CustomTag *assetdata_tag_create(const char *const name)
+{
+  CustomTag *tag = MEM_callocN(sizeof(*tag), __func__);
+  BLI_strncpy(tag->name, name, sizeof(tag->name));
+  return tag;
+}
+
+CustomTag *BKE_assetdata_tag_add(AssetData *asset_data, const char *name)
+{
+  CustomTag *tag = assetdata_tag_create(name);
+
+  BLI_addtail(&asset_data->tags, tag);
+  BLI_uniquename(&asset_data->tags, tag, name, '.', offsetof(CustomTag, name), sizeof(tag->name));
+
+  return tag;
+}
+
+/**
+ * Make sure there is a tag with name \a name, create one if needed.
+ */
 struct CustomTagEnsureResult BKE_assetdata_tag_ensure(AssetData *asset_data, const char *name)
 {
   struct CustomTagEnsureResult result = {.tag = NULL};
@@ -116,9 +137,7 @@ struct CustomTagEnsureResult BKE_assetdata_tag_ensure(AssetData *asset_data, con
     return result;
   }
 
-  tag = MEM_mallocN(sizeof(*tag), __func__);
-  BLI_strncpy(tag->name, name, sizeof(tag->name));
-
+  tag = assetdata_tag_create(name);
   BLI_addtail(&asset_data->tags, tag);
 
   result.tag = tag;

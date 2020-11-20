@@ -38,17 +38,26 @@
 
 static CustomTag *rna_AssetData_tag_new(AssetData *asset_data,
                                         ReportList *reports,
-                                        const char *name)
+                                        const char *name,
+                                        bool skip_if_exists)
 {
-  struct CustomTagEnsureResult result = BKE_assetdata_tag_ensure(asset_data, name);
+  CustomTag *tag = NULL;
 
-  if (!result.is_new) {
-    BKE_reportf(
-        reports, RPT_WARNING, "Tag '%s' already present for given asset", result.tag->name);
-    /* Report, but still return valid item. */
+  if (skip_if_exists) {
+    struct CustomTagEnsureResult result = BKE_assetdata_tag_ensure(asset_data, name);
+
+    if (!result.is_new) {
+      BKE_reportf(
+          reports, RPT_WARNING, "Tag '%s' already present for given asset", result.tag->name);
+      /* Report, but still return valid item. */
+    }
+    tag = result.tag;
+  }
+  else {
+    tag = BKE_assetdata_tag_add(asset_data, name);
   }
 
-  return result.tag;
+  return tag;
 }
 
 static void rna_AssetData_tag_remove(AssetData *asset_data,
@@ -141,6 +150,11 @@ static void rna_def_asset_custom_tags_api(BlenderRNA *brna, PropertyRNA *cprop)
   RNA_def_function_flag(func, FUNC_USE_REPORTS);
   parm = RNA_def_string(func, "name", NULL, MAX_NAME, "Name", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_boolean(func,
+                         "skip_if_exists",
+                         false,
+                         "Skip if Exists",
+                         "Do not add a new tag if one of the same type already exists");
   /* return type */
   parm = RNA_def_pointer(func, "tag", "CustomTag", "", "New tag");
   RNA_def_function_return(func, parm);

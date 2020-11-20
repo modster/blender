@@ -198,7 +198,8 @@ def panel_poll_is_upper_region(region):
 
 
 def panel_poll_is_asset_browsing(context):
-    return context.space_data.browse_mode == 'ASSETS'
+    from bpy_extras.asset_utils import SpaceAssetInfo
+    return SpaceAssetInfo.is_asset_browser_poll(context)
 
 
 class FILEBROWSER_PT_asset_navigation_bar(Panel):
@@ -588,8 +589,13 @@ class ASSETBROWSER_PT_metadata_tags(Panel):
         active_file = context.active_file
         asset_data = active_file.asset_data
 
-        layout.template_list("ASSETBROWSER_UL_metadata_tags", "asset_tags", asset_data, "tags",
-                             asset_data, "active_tag", rows=4)
+        row = layout.row()
+        row.template_list("ASSETBROWSER_UL_metadata_tags", "asset_tags", asset_data, "tags",
+                          asset_data, "active_tag", rows=4)
+
+        col = row.column(align=True)
+        col.operator("asset.tag_add", icon='ADD', text="")
+        col.operator("asset.tag_remove", icon='REMOVE', text="")
 
 
 class ASSETBROWSER_UL_metadata_tags(UIList):

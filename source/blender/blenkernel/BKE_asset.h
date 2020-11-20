@@ -51,6 +51,7 @@ struct CustomTagEnsureResult {
   bool is_new;
 };
 
+struct CustomTag *BKE_assetdata_tag_add(struct AssetData *asset_data, const char *name);
 struct CustomTagEnsureResult BKE_assetdata_tag_ensure(struct AssetData *asset_data,
                                                       const char *name);
 void BKE_assetdata_tag_remove(struct AssetData *asset_data, struct CustomTag *tag);
