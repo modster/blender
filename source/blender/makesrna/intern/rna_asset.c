@@ -32,6 +32,8 @@
 
 #  include "BKE_asset.h"
 
+#  include "BLI_listbase.h"
+
 #  include "RNA_access.h"
 
 static CustomTag *rna_AssetData_tag_new(AssetData *asset_data,
@@ -95,6 +97,14 @@ static void rna_AssetData_description_set(PointerRNA *ptr, const char *value)
   else {
     asset_data->description = NULL;
   }
+}
+
+static void rna_AssetData_active_tag_range(
+    PointerRNA *ptr, int *min, int *max, int *softmin, int *softmax)
+{
+  const AssetData *asset_data = ptr->data;
+  *min = *softmin = 0;
+  *max = *softmax = BLI_listbase_count(&asset_data->tags) - 1;
 }
 
 #else
@@ -173,6 +183,10 @@ static void rna_def_asset_data(BlenderRNA *brna)
                            "Custom tags (name tokens) for the asset, used for filtering and "
                            "general asset management");
   rna_def_asset_custom_tags_api(brna, prop);
+
+  prop = RNA_def_property(srna, "active_tag", PROP_INT, PROP_NONE);
+  RNA_def_property_int_funcs(prop, NULL, NULL, "rna_AssetData_active_tag_range");
+  RNA_def_property_ui_text(prop, "Active Tag", "Index of the tag set for editing");
 }
 
 void RNA_def_asset(BlenderRNA *brna)

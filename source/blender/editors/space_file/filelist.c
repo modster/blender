@@ -279,6 +279,8 @@ typedef struct FileListInternEntry {
    * preview reading from disk. Non-owning pointer. */
   PreviewImage *preview_image;
 
+  AssetData *asset_data;
+
   /** Defined in BLI_fileops.h */
   eFileAttributes attributes;
   BLI_stat_t st;
@@ -1906,6 +1908,7 @@ static FileDirEntry *filelist_file_create_entry(FileList *filelist, const int in
   if (entry->redirection_path) {
     ret->redirection_path = BLI_strdup(entry->redirection_path);
   }
+  ret->asset_data = entry->asset_data;
   ret->id_uuid = entry->id_uuid;
   /* For some file types the preview is already available. */
   if (entry->preview_image &&
@@ -3225,6 +3228,7 @@ static void filelist_readjob_main_assets(Main *current_main,
         (uint32_t *)filelist->filelist_intern.curr_uuid, 1);
     entry->preview_image = BKE_assetdata_preview_get_from_id(id_iter->asset_data, id_iter);
     entry->id_uuid = id_iter->session_uuid;
+    entry->asset_data = id_iter->asset_data;
     nbr_entries++;
     BLI_addtail(&tmp_entries, entry);
   }

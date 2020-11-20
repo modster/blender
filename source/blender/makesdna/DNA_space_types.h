@@ -1074,6 +1074,8 @@ typedef struct FileDirEntry {
   /** ID type, in case typeflag has FILE_TYPE_BLENDERLIB set. */
   int blentype;
 
+  struct AssetData *asset_data;
+
   /* Path to item that is relative to current folder root. */
   char *relpath;
   /** Optional argument for shortcuts, aliases etc. */

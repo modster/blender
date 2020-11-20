@@ -569,6 +569,39 @@ class ASSETBROWSER_PT_metadata(Panel):
 
         if active_file:
             layout.label(text=active_file.name)
+        else:
+            layout.label(text="No asset selected.")
+
+
+class ASSETBROWSER_PT_metadata_tags(Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "Asset Tags"
+
+    @classmethod
+    def poll(cls, context):
+        active_file = context.active_file
+        return panel_poll_is_asset_browsing(context) and active_file and active_file.asset_data
+
+    def draw(self, context):
+        layout = self.layout
+        active_file = context.active_file
+        asset_data = active_file.asset_data
+
+        layout.template_list("ASSETBROWSER_UL_metadata_tags", "asset_tags", asset_data, "tags",
+                             asset_data, "active_tag", rows=4)
+
+
+class ASSETBROWSER_UL_metadata_tags(UIList):
+    def draw_item(self, _context, layout, _data, item, icon, _active_data, _active_propname, _index):
+        tag = item
+
+        row = layout.row(align=True)
+        # Non-editable entries would show grayed-out, which is bad in this specific case, so switch to mere label.
+        if tag.is_property_readonly("name"):
+            row.label(text=tag.name, icon_value=icon)
+        else:
+            row.prop(tag, "name", text="", emboss=False, icon_value=icon)
 
 
 classes = (
@@ -589,6 +622,8 @@ classes = (
     FILEBROWSER_MT_select,
     FILEBROWSER_MT_context_menu,
     ASSETBROWSER_PT_metadata,
+    ASSETBROWSER_PT_metadata_tags,
+    ASSETBROWSER_UL_metadata_tags,
 )
 
 if __name__ == "__main__":  # only for live edit.

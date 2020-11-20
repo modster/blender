@@ -2543,6 +2543,12 @@ static int rna_FileBrowser_FileSelectEntry_name_length(PointerRNA *ptr)
   return (int)strlen(entry->name);
 }
 
+static PointerRNA rna_FileBrowser_FileSelectEntry_asset_data_get(PointerRNA *ptr)
+{
+  const FileDirEntry *entry = ptr->data;
+  return rna_pointer_inherit_refine(ptr, &RNA_AssetData, entry->asset_data);
+}
+
 static void rna_FileSelectParams_asset_category_set(PointerRNA *ptr, uint64_t value)
 {
   FileSelectParams *params = ptr->data;
@@ -5897,6 +5903,13 @@ static void rna_def_fileselect_entry(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Name", "");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_struct_name_property(srna, prop);
+
+  prop = RNA_def_property(srna, "asset_data", PROP_POINTER, PROP_NONE);
+  RNA_def_property_struct_type(prop, "AssetData");
+  RNA_def_property_pointer_funcs(
+      prop, "rna_FileBrowser_FileSelectEntry_asset_data_get", NULL, NULL, NULL);
+  RNA_def_property_ui_text(
+      prop, "Asset Data", "Asset data, valid if the file represents an asset");
 }
 
 static void rna_def_fileselect_params(BlenderRNA *brna)

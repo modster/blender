@@ -59,6 +59,9 @@ typedef struct AssetData {
    * function exactly (e.g. how they are registered to provide a list of searchable available tags)
    * is up to the asset-engine. */
   ListBase tags; /* CustomTag */
+  short active_tag;
+
+  char _pad[6];
 } AssetData;
 
 #endif /* __DNA_ASSET_TYPES_H__ */
