@@ -207,11 +207,6 @@ static void export_frame(Depsgraph *depsgraph,
   if (!frame_writer.init_writer(filepath)) {
     return;
   }
-  //
-  //  /* Meshes, and curves to be exported in mesh form. */
-  //  Vector<std::unique_ptr<OBJMesh>> exportable_as_mesh;
-  //  /* NURBS to be exported in parameter form. */
-  //  Vector<std::unique_ptr<OBJCurve>> exportable_as_nurbs;
   auto [exportable_as_mesh, exportable_as_nurbs] = filter_supported_objects(depsgraph,
                                                                             export_params);
 

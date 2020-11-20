@@ -220,7 +220,7 @@ void OBJWriter::write_uv_coords(OBJMesh &r_obj_mesh_data) const
 }
 
 /**
- * Write loop normals for smooth-shaded polygons, and polygon normals otherwise, as vn x y z .
+ * Write loop normals for smooth-shaded polygons, and polygon normals otherwise, as "vn x y z".
  */
 void OBJWriter::write_poly_normals(const OBJMesh &obj_mesh_data) const
 {
@@ -584,7 +584,7 @@ void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
 
   for (const MTLMaterial &mtl_material : mtl_materials) {
     fprintf(mtl_outfile_, "\nnewmtl %s\n", mtl_material.name.c_str());
-    /* At least one material property has not been modified since its initialisation. */
+    /* At least one material property has not been modified since its initialization. */
     BLI_assert(all_items_positive({mtl_material.d, mtl_material.Ns, mtl_material.Ni}) &&
                mtl_material.illum > 0);
     BLI_assert(all_items_positive(mtl_material.Ka) && all_items_positive(mtl_material.Kd) &&
