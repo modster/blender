@@ -293,7 +293,7 @@ NlaTrack *BKE_nlatrack_add(AnimData *adt, NlaTrack *prev)
   nlt = MEM_callocN(sizeof(NlaTrack), "NlaTrack");
 
   /* set settings requiring the track to not be part of the stack yet */
-  nlt->flag = NLATRACK_SELECTED | NLATRACK_OVERRIDELIBRARY_LOCAL;
+  nlt->flag = NLATRACK_SELECTED;
   nlt->index = BLI_listbase_count(&adt->nla_tracks);
 
   /* add track to stack, and make it the active one */
@@ -2273,11 +2273,6 @@ void BKE_nla_blend_read_lib(BlendLibReader *reader, ID *id, ListBase *tracks)
 {
   /* we only care about the NLA strips inside the tracks */
   LISTBASE_FOREACH (NlaTrack *, nlt, tracks) {
-    /* If linking from a library, clear 'local' library override flag. */
-    if (id->lib != NULL) {
-      nlt->flag &= ~NLATRACK_OVERRIDELIBRARY_LOCAL;
-    }
-
     blend_lib_read_nla_strips(reader, id, &nlt->strips);
   }
 }
