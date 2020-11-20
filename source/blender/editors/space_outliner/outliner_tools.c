@@ -712,27 +712,6 @@ static void outliner_object_delete_fn(bContext *C, ReportList *reports, Scene *s
   }
 }
 
-static void id_make_asset_cb(bContext *C,
-                             ReportList *UNUSED(reports),
-                             Scene *UNUSED(scene),
-                             TreeElement *UNUSED(te),
-                             TreeStoreElem *UNUSED(tsep),
-                             TreeStoreElem *tselem,
-                             void *UNUSED(user_data))
-{
-  ID *id = tselem->id;
-  PointerRNA id_ptr;
-  PointerRNA op_ptr;
-
-  RNA_id_pointer_create(id, &id_ptr);
-
-  WM_operator_properties_create(&op_ptr, "ASSET_OT_make");
-  RNA_pointer_set(&op_ptr, "id", id_ptr);
-  WM_operator_name_call(C, "ASSET_OT_make", WM_OP_EXEC_DEFAULT, &op_ptr);
-
-  WM_operator_properties_free(&op_ptr);
-}
-
 static void id_local_fn(bContext *C,
                         ReportList *UNUSED(reports),
                         Scene *UNUSED(scene),
@@ -1939,11 +1918,7 @@ static int outliner_id_operation_exec(bContext *C, wmOperator *op)
       break;
     }
     case OUTLINER_IDOP_MAKE_ASSET: {
-      outliner_do_libdata_operation(
-          C, op->reports, scene, space_outliner, &space_outliner->tree, id_make_asset_cb, NULL);
-      ED_undo_push(C, "Made Asset");
-      /* TODO how to handle undo here? id_make_asset_cb() calls an OP. Esp. in case of multiple
-       * data-blocks we only want a single push. */
+      WM_operator_name_call(C, "ASSET_OT_make", WM_OP_EXEC_DEFAULT, NULL);
       break;
     }
     case OUTLINER_IDOP_LOCAL: {

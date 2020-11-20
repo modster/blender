@@ -15,22 +15,37 @@
  */
 
 /** \file
- * \ingroup editors
+ * \ingroup edasset
  */
 
-#ifndef __ED_ASSET_H__
-#define __ED_ASSET_H__
+#include "BKE_asset.h"
+#include "BKE_context.h"
+#include "BKE_lib_id.h"
 
-#ifdef __cplusplus
-extern "C" {
+#include "DNA_ID.h"
+#include "DNA_asset_types.h"
+
+#include "UI_interface_icons.h"
+
+#include "ED_asset.h"
+
+bool ED_asset_make_for_id(const bContext *C, ID *id)
+{
+  if (id->asset_data) {
+    return false;
+  }
+
+  id_fake_user_set(id);
+
+#ifdef WITH_ASSET_REPO_INFO
+  BKE_asset_repository_info_global_ensure();
 #endif
+  id->asset_data = BKE_asset_data_create();
 
-bool ED_asset_make_for_id(const struct bContext *C, struct ID *id);
+  UI_icon_render_id(C, NULL, id, true, true);
+  /* Store reference to the ID's preview. */
+  /* XXX get rid of this? File read will be a hassle and no real need for it right now. */
+  id->asset_data->preview = BKE_assetdata_preview_get_from_id(id->asset_data, id);
 
-void ED_operatortypes_asset(void);
-
-#ifdef __cplusplus
+  return true;
 }
-#endif
-
-#endif /* __ED_ASSET_H__ */

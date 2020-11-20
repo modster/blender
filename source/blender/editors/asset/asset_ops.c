@@ -20,8 +20,6 @@
 
 #include "BKE_asset.h"
 #include "BKE_context.h"
-#include "BKE_icons.h"
-#include "BKE_lib_id.h"
 #include "BKE_report.h"
 
 #include "BLI_listbase.h"
@@ -34,40 +32,66 @@
 #include "RNA_access.h"
 #include "RNA_define.h"
 
-#include "UI_interface_icons.h"
-
 #include "WM_api.h"
 #include "WM_types.h"
 
+static bool asset_make_poll(bContext *C)
+{
+  int tot_selected = 0;
+  bool can_make_asset = false;
+
+  /* Note that this isn't entirely cheap. Iterates over entire Outliner tree and allocates a link
+   * for each selected item. The button only shows in the context menu though, so acceptable. */
+  CTX_DATA_BEGIN (C, ID *, id, selected_ids) {
+    tot_selected++;
+    if (!id->asset_data) {
+      can_make_asset = true;
+      break;
+    }
+  }
+  CTX_DATA_END;
+
+  if (!can_make_asset) {
+    if (tot_selected > 0) {
+      CTX_wm_operator_poll_msg_set(C, "Selected data-blocks are already assets.");
+    }
+    else {
+      CTX_wm_operator_poll_msg_set(C, "No data-blocks selected");
+    }
+    return false;
+  }
+
+  return true;
+}
+
 static int asset_make_exec(bContext *C, wmOperator *op)
 {
-  PointerRNA idptr = RNA_pointer_get(op->ptr, "id");
-  ID *id = idptr.data;
+  ID *last_id = NULL;
+  int tot_created = 0;
 
-  if (!id || !RNA_struct_is_ID(idptr.type)) {
+  CTX_DATA_BEGIN (C, ID *, id, selected_ids) {
+    if (id->asset_data) {
+      continue;
+    }
+
+    ED_asset_make_for_id(C, id);
+    last_id = id;
+    tot_created++;
+  }
+  CTX_DATA_END;
+
+  /* User feedback. */
+  if (tot_created < 1) {
+    BKE_report(op->reports, RPT_ERROR, "No data-blocks to create assets for found");
     return OPERATOR_CANCELLED;
   }
-
-  if (id->asset_data) {
-    BKE_reportf(op->reports, RPT_ERROR, "Data-block '%s' already is an asset", id->name + 2);
-    return OPERATOR_CANCELLED;
+  if (tot_created == 1) {
+    /* If only one data-block: Give more useful message by printing asset name. */
+    BKE_reportf(op->reports, RPT_INFO, "Data-block '%s' is now an asset", last_id->name + 2);
   }
-
-  /* TODO this should probably be somewhere in BKE and/or ED. */
-
-  id_fake_user_set(id);
-
-#ifdef WITH_ASSET_REPO_INFO
-  BKE_asset_repository_info_global_ensure();
-#endif
-  id->asset_data = BKE_asset_data_create();
-
-  UI_icon_render_id(C, NULL, id, true, true);
-  /* Store reference to the ID's preview. */
-  /* XXX get rid of this? File read will be a hassle and no real need for it right now. */
-  id->asset_data->preview = BKE_assetdata_preview_get_from_id(id->asset_data, id);
-
-  BKE_reportf(op->reports, RPT_INFO, "Data-block '%s' is now an asset", id->name + 2);
+  else {
+    BKE_reportf(op->reports, RPT_INFO, "%i data-blocks are now assets", tot_created);
+  }
 
   WM_main_add_notifier(NC_ID | NA_EDITED, NULL);
   WM_main_add_notifier(NC_ASSET | NA_ADDED, NULL);
@@ -81,10 +105,10 @@ static void ASSET_OT_make(wmOperatorType *ot)
   ot->description = "Enable asset management for a data-block";
   ot->idname = "ASSET_OT_make";
 
+  ot->poll = asset_make_poll;
   ot->exec = asset_make_exec;
 
-  RNA_def_pointer_runtime(
-      ot->srna, "id", &RNA_ID, "Data-block", "Data-block to enable asset management for");
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
 static int asset_catalog_add_exec(bContext *C, wmOperator *op)

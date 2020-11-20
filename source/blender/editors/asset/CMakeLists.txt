@@ -28,6 +28,7 @@ set(INC_SYS
 )
 
 set(SRC
+  asset_edit.c
   asset_ops.c
 )
 

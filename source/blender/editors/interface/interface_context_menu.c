@@ -959,11 +959,7 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
     }
 
     if (RNA_struct_is_ID(but->rnapoin.type)) {
-      PointerRNA op_ptr;
-
-      uiItemFullO(
-          layout, "ASSET_OT_make", NULL, ICON_NONE, NULL, WM_OP_INVOKE_DEFAULT, 0, &op_ptr);
-      RNA_pointer_set(&op_ptr, "id", but->rnapoin);
+      uiItemO(layout, NULL, ICON_NONE, "ASSET_OT_make");
       uiItemS(layout);
     }
   }
