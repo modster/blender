@@ -27,52 +27,59 @@ from bpy_extras import (
 class FILEBROWSER_HT_header(Header):
     bl_space_type = 'FILE_BROWSER'
 
-    def draw(self, context):
+    def draw_asset_browser_buttons(self, context):
         layout = self.layout
 
-        st = context.space_data
-        params = st.params
+        space_data = context.space_data
+        params = space_data.params
 
-        if st.active_operator is None:
+        layout.prop(params, "asset_repository", text="")
+
+        layout.separator_spacer()
+
+        # Uses prop_with_popover() as popover() only adds the triangle icon in headers.
+        layout.prop_with_popover(
+            params,
+            "display_type",
+            panel="FILEBROWSER_PT_display",
+            text="",
+            icon_only=True,
+        )
+        layout.prop_with_popover(
+            params,
+            "display_type",
+            panel="FILEBROWSER_PT_filter",
+            text="",
+            icon='FILTER',
+            icon_only=True,
+        )
+
+        layout.prop(params, "filter_search", text="", icon='VIEWZOOM')
+
+        layout.operator(
+            "screen.region_toggle",
+            text="",
+            icon='PREFERENCES',
+            depress=is_option_region_visible(context, space_data)
+        ).region_type = 'TOOL_PROPS'
+
+    def draw(self, context):
+        from bpy_extras.asset_utils import SpaceAssetInfo
+
+        layout = self.layout
+
+        space_data = context.space_data
+
+        if space_data.active_operator is None:
             layout.template_header()
 
         FILEBROWSER_MT_editor_menus.draw_collapsible(context, layout)
 
-        if panel_poll_is_asset_browsing(context):
+        if SpaceAssetInfo.is_asset_browser(space_data):
             layout.separator()
-
-            layout.prop(params, "asset_repository", text="")
-
-        # can be None when save/reload with a file selector open
-
-        layout.separator_spacer()
-
-        if panel_poll_is_asset_browsing(context):
-            # Uses prop_with_popover() as popover() only adds the triangle icon in headers.
-            layout.prop_with_popover(
-                params,
-                "display_type",
-                panel="FILEBROWSER_PT_display",
-                text="",
-                icon_only=True,
-            )
-            layout.prop_with_popover(
-                params,
-                "display_type",
-                panel="FILEBROWSER_PT_filter",
-                text="",
-                icon='FILTER',
-                icon_only=True,
-            )
-
-            layout.prop(params, "filter_search", text="", icon='VIEWZOOM')
-
-            layout.operator(
-                "screen.region_toggle",
-                text="",
-                icon='PREFERENCES',
-                depress=is_option_region_visible(context, st)
-            ).region_type = 'TOOL_PROPS'
+            self.draw_asset_browser_buttons(context)
+        else:
+            layout.separator_spacer()
 
         if not context.screen.show_statusbar:
             layout.template_running_jobs()
