@@ -127,9 +127,9 @@ GpencilExporter::GpencilExporter(const struct GpencilExportParams *iparams)
     offset_[1] = boundbox.ymin;
   }
 
-  gpl_cur_ = NULL;
-  gpf_cur_ = NULL;
-  gps_cur_ = NULL;
+  gpl_cur_ = nullptr;
+  gpf_cur_ = nullptr;
+  gps_cur_ = nullptr;
 }
 
 /** Create a list of selected objects sorted from back to front */
@@ -165,7 +165,7 @@ void GpencilExporter::create_object_list(void)
       float zdepth = 0;
       if (rv3d_) {
         if (rv3d_->is_persp) {
-          zdepth = ED_view3d_calc_zfac(rv3d_, object->obmat[3], NULL);
+          zdepth = ED_view3d_calc_zfac(rv3d_, object->obmat[3], nullptr);
         }
         else {
           zdepth = -dot_v3v3(rv3d_->viewinv[2], object->obmat[3]);
@@ -248,7 +248,7 @@ bool GpencilExporter::gpencil_3d_point_to_screen_space(const float co[3], float 
  */
 float GpencilExporter::stroke_average_pressure_get(struct bGPDstroke *gps)
 {
-  bGPDspoint *pt = NULL;
+  bGPDspoint *pt = nullptr;
 
   if (gps->totpoints == 1) {
     pt = &gps->points[0];
@@ -296,7 +296,7 @@ bool GpencilExporter::is_stroke_thickness_constant(struct bGPDstroke *gps)
 float GpencilExporter::stroke_point_radius_get(struct bGPDstroke *gps)
 {
   const bGPDlayer *gpl = gpl_current_get();
-  bGPDspoint *pt = NULL;
+  bGPDspoint *pt = nullptr;
   float v1[2], screen_co[2], screen_ex[2];
 
   pt = &gps->points[0];
@@ -476,7 +476,7 @@ void GpencilExporter::selected_objects_boundbox_set(void)
       BKE_gpencil_parent_matrix_get(depsgraph_, ob_eval, gpl, diff_mat_);
 
       bGPDframe *gpf = gpl->actframe;
-      if (gpf == NULL) {
+      if (gpf == nullptr) {
         continue;
       }
 

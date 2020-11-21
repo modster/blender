@@ -80,19 +80,19 @@ GpencilImporterSVG::~GpencilImporterSVG(void)
 bool GpencilImporterSVG::read(void)
 {
   bool result = true;
-  NSVGimage *svg_data = NULL;
+  NSVGimage *svg_data = nullptr;
   svg_data = nsvgParseFromFile(filename_, "mm", 96.0f);
-  if (svg_data == NULL) {
+  if (svg_data == nullptr) {
     std::cout << " Could not open SVG.\n ";
     return false;
   }
 
   /* Create grease pencil object. */
-  if (params_.ob_target == NULL) {
+  if (params_.ob_target == nullptr) {
     params_.ob_target = create_object();
     object_created_ = true;
   }
-  if (params_.ob_target == NULL) {
+  if (params_.ob_target == nullptr) {
     std::cout << "Unable to create new object.\n";
     if (svg_data) {
       nsvgDelete(svg_data);
@@ -124,7 +124,7 @@ bool GpencilImporterSVG::read(void)
     /* Check if the layer exist and create if needed. */
     bGPDlayer *gpl = (bGPDlayer *)BLI_findstring(
         &gpd_->layers, layer_id, offsetof(bGPDlayer, info));
-    if (gpl == NULL) {
+    if (gpl == nullptr) {
       gpl = BKE_gpencil_layer_addnew(gpd_, layer_id, true);
       /* Disable lights. */
       gpl->flag &= ~GP_LAYER_USE_LIGHTS;

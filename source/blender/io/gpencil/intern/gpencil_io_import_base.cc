@@ -79,10 +79,10 @@ GpencilImporter::GpencilImporter(const struct GpencilImportParams *iparams)
   scene_ = CTX_data_scene(params_.C);
   rv3d_ = (RegionView3D *)params_.region->regiondata;
 
-  gpd_ = NULL;
-  gpl_cur_ = NULL;
-  gpf_cur_ = NULL;
-  gps_cur_ = NULL;
+  gpd_ = nullptr;
+  gpl_cur_ = nullptr;
+  gpf_cur_ = nullptr;
+  gps_cur_ = nullptr;
 
   object_created_ = false;
 }

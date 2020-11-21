@@ -203,7 +203,7 @@ void GpencilExporterSVG::export_gpencil_layers(void)
       gpl_current_set(gpl);
 
       bGPDframe *gpf = gpl->actframe;
-      if ((gpf == NULL) || (gpf->strokes.first == NULL)) {
+      if ((gpf == nullptr) || (gpf->strokes.first == nullptr)) {
         continue;
       }
       gpf_current_set(gpf);
