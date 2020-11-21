@@ -76,14 +76,14 @@ class GpencilExporter {
   std::list<ObjectZ> ob_list_;
 
   /* Data for easy access. */
-  struct Depsgraph *depsgraph;
-  struct bGPdata *gpd;
-  struct Main *bmain;
-  struct Scene *scene;
-  struct RegionView3D *rv3d;
+  struct Depsgraph *depsgraph_;
+  struct bGPdata *gpd_;
+  struct Main *bmain_;
+  struct Scene *scene_;
+  struct RegionView3D *rv3d_;
 
-  uint16_t winx_, winy_;
-  uint16_t render_x_, render_y_;
+  int16_t winx_, winy_;
+  int16_t render_x_, render_y_;
   float camera_ratio_;
   rctf camera_rect_;
 

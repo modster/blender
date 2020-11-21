@@ -74,12 +74,12 @@ GpencilImporter::GpencilImporter(const struct GpencilImportParams *iparams)
   cfra_ = iparams->frame_target;
 
   /* Easy access data. */
-  bmain = CTX_data_main(params_.C);
-  depsgraph = CTX_data_depsgraph_pointer(params_.C);
-  scene = CTX_data_scene(params_.C);
-  rv3d = (RegionView3D *)params_.region->regiondata;
+  bmain_ = CTX_data_main(params_.C);
+  depsgraph_ = CTX_data_depsgraph_pointer(params_.C);
+  scene_ = CTX_data_scene(params_.C);
+  rv3d_ = (RegionView3D *)params_.region->regiondata;
 
-  gpd = NULL;
+  gpd_ = NULL;
   gpl_cur_ = NULL;
   gpf_cur_ = NULL;
   gps_cur_ = NULL;
@@ -95,14 +95,14 @@ GpencilImporter::GpencilImporter(const struct GpencilImportParams *iparams)
 void GpencilImporter::set_filename(const char *filename)
 {
   BLI_strncpy(filename_, filename, FILE_MAX);
-  BLI_path_abs(filename_, BKE_main_blendfile_path(bmain));
+  BLI_path_abs(filename_, BKE_main_blendfile_path(bmain_));
 }
 
 Object *GpencilImporter::create_object(void)
 {
-  const float *cur = scene->cursor.location;
+  const float *cur = scene_->cursor.location;
   ushort local_view_bits = (params_.v3d && params_.v3d->localvd) ? params_.v3d->local_view_uuid :
-                                                                   0;
+                                                                   (ushort)0;
   Object *ob_gpencil = ED_gpencil_add_object(params_.C, cur, local_view_bits);
 
   return ob_gpencil;
@@ -145,7 +145,7 @@ int32_t GpencilImporter::create_material(const char *name, const bool stroke, co
   /* Stroke and Fill material. */
   if (mat_index == -1) {
     int32_t new_idx;
-    Material *mat_gp = BKE_gpencil_object_material_new(bmain, params_.ob_target, name, &new_idx);
+    Material *mat_gp = BKE_gpencil_object_material_new(bmain_, params_.ob_target, name, &new_idx);
     MaterialGPencilStyle *gp_style = mat_gp->gp_style;
     gp_style->flag &= ~GP_MATERIAL_STROKE_SHOW;
     gp_style->flag &= ~GP_MATERIAL_FILL_SHOW;

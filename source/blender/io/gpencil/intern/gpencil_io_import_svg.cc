@@ -100,7 +100,7 @@ bool GpencilImporterSVG::read(void)
 
     return false;
   }
-  bGPdata *gpd = (bGPdata *)params_.ob_target->data;
+  gpd_ = (bGPdata *)params_.ob_target->data;
 
   /* Grease pencil is rotated 90 degrees in X axis by default. */
   float matrix[4][4];
@@ -123,9 +123,9 @@ bool GpencilImporterSVG::read(void)
 
     /* Check if the layer exist and create if needed. */
     bGPDlayer *gpl = (bGPDlayer *)BLI_findstring(
-        &gpd->layers, layer_id, offsetof(bGPDlayer, info));
+        &gpd_->layers, layer_id, offsetof(bGPDlayer, info));
     if (gpl == NULL) {
-      gpl = BKE_gpencil_layer_addnew(gpd, layer_id, true);
+      gpl = BKE_gpencil_layer_addnew(gpd_, layer_id, true);
       /* Disable lights. */
       gpl->flag &= ~GP_LAYER_USE_LIGHTS;
     }
@@ -154,7 +154,7 @@ bool GpencilImporterSVG::read(void)
 
     /* Loop all paths to create the stroke data. */
     for (NSVGpath *path = shape->paths; path; path = path->next) {
-      create_stroke(gpd, gpf, shape, path, mat_index, matrix);
+      create_stroke(gpd_, gpf, shape, path, mat_index, matrix);
     }
   }
 
@@ -163,9 +163,9 @@ bool GpencilImporterSVG::read(void)
 
   /* Calculate bounding box and move all points to new origin center. */
   float gp_center[3];
-  BKE_gpencil_centroid_3d(gpd, gp_center);
+  BKE_gpencil_centroid_3d(gpd_, gp_center);
 
-  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd_->layers) {
     LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
         int i;

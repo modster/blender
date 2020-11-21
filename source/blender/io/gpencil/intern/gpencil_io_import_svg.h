@@ -44,7 +44,7 @@ class GpencilImporterSVG : public GpencilImporter {
 
  protected:
  private:
-  void create_stroke(struct bGPdata *gpd,
+  void create_stroke(struct bGPdata *gpd_,
                      struct bGPDframe *gpf,
                      struct NSVGshape *shape,
                      struct NSVGpath *path,

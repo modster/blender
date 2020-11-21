@@ -62,11 +62,11 @@ class GpencilImporter {
   char filename_[FILE_MAX];
 
   /* Data for easy access. */
-  struct Depsgraph *depsgraph;
-  struct bGPdata *gpd;
-  struct Main *bmain;
-  struct Scene *scene;
-  struct RegionView3D *rv3d;
+  struct Depsgraph *depsgraph_;
+  struct bGPdata *gpd_;
+  struct Main *bmain_;
+  struct Scene *scene_;
+  struct RegionView3D *rv3d_;
 
   int cfra_;
   bool object_created_;

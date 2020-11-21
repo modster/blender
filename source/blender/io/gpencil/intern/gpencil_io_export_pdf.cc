@@ -62,7 +62,7 @@
 
 namespace blender ::io ::gpencil {
 
-static void error_handler(HPDF_STATUS error_no, HPDF_STATUS detail_no, void *user_data)
+static void error_handler(HPDF_STATUS error_no, HPDF_STATUS detail_no, void *UNUSED(user_data))
 {
   printf("ERROR: error_no=%04X, detail_no=%u\n", (HPDF_UINT)error_no, (HPDF_UINT)detail_no);
 }
@@ -168,7 +168,7 @@ void GpencilExporterPDF::export_gpencil_layers(void)
     Object *ob = obz.ob;
 
     /* Use evaluated version to get strokes with modifiers. */
-    Object *ob_eval_ = (Object *)DEG_get_evaluated_id(depsgraph, &ob->id);
+    Object *ob_eval_ = (Object *)DEG_get_evaluated_id(depsgraph_, &ob->id);
     bGPdata *gpd_eval = (bGPdata *)ob_eval_->data;
 
     LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd_eval->layers) {
@@ -183,7 +183,7 @@ void GpencilExporterPDF::export_gpencil_layers(void)
       }
       gpf_current_set(gpf);
 
-      BKE_gpencil_parent_matrix_get(depsgraph, ob, gpl, diff_mat_);
+      BKE_gpencil_parent_matrix_get(depsgraph_, ob, gpl, diff_mat_);
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
         if (gps->totpoints == 0) {
           continue;
@@ -216,7 +216,7 @@ void GpencilExporterPDF::export_gpencil_layers(void)
             }
             else {
               bGPDstroke *gps_perimeter = BKE_gpencil_stroke_perimeter_from_view(
-                  rv3d, gpd, gpl, gps_duplicate, 3, diff_mat_);
+                  rv3d_, gpd_, gpl, gps_duplicate, 3, diff_mat_);
 
               gps_current_set(ob, gps_perimeter, false);
 

@@ -75,18 +75,14 @@ GpencilExporter::GpencilExporter(const struct GpencilExportParams *iparams)
   frame_ratio_[0] = frame_ratio_[1] = 1.0f;
   zero_v2(frame_offset_);
 
-  copy_v2_v2_int((int *)params_.page_layout, (int *)iparams->page_layout);
-  params_.page_type = iparams->page_type;
   copy_v2_v2(params_.paper_size, iparams->paper_size);
-  params_.text_type = iparams->text_type;
 
   /* Easy access data. */
-  bmain = CTX_data_main(params_.C);
-  depsgraph = CTX_data_depsgraph_pointer(params_.C);
-  scene = CTX_data_scene(params_.C);
-  rv3d = (RegionView3D *)params_.region->regiondata;
-  gpd = (bGPdata *)params_.obact->data;
-  const bool is_storyboard = ((params_.flag & GP_EXPORT_STORYBOARD_MODE) != 0);
+  bmain_ = CTX_data_main(params_.C);
+  depsgraph_ = CTX_data_depsgraph_pointer(params_.C);
+  scene_ = CTX_data_scene(params_.C);
+  rv3d_ = (RegionView3D *)params_.region->regiondata;
+  gpd_ = (bGPdata *)params_.obact->data;
 
   /* Load list of selected objects. */
   create_object_list();
@@ -98,15 +94,15 @@ GpencilExporter::GpencilExporter(const struct GpencilExportParams *iparams)
   invert_axis_[1] = true;
 
   /* Camera rectangle. */
-  if (rv3d->persp == RV3D_CAMOB) {
-    render_x_ = (scene->r.xsch * scene->r.size) / 100;
-    render_y_ = (scene->r.ysch * scene->r.size) / 100;
+  if (rv3d_->persp == RV3D_CAMOB) {
+    render_x_ = (scene_->r.xsch * scene_->r.size) / 100;
+    render_y_ = (scene_->r.ysch * scene_->r.size) / 100;
 
     ED_view3d_calc_camera_border(CTX_data_scene(params_.C),
-                                 depsgraph,
+                                 depsgraph_,
                                  params_.region,
                                  params_.v3d,
-                                 rv3d,
+                                 rv3d_,
                                  &camera_rect_,
                                  true);
     is_camera_ = true;
@@ -116,21 +112,19 @@ GpencilExporter::GpencilExporter(const struct GpencilExportParams *iparams)
   }
   else {
     is_camera_ = false;
-    if (!is_storyboard && (ob_list_.size() == 1)) {
-      /* Calc selected object boundbox. Need set initial value to some variables. */
-      camera_ratio_ = 1.0f;
-      offset_[0] = 0.0f;
-      offset_[1] = 0.0f;
+    /* Calc selected object boundbox. Need set initial value to some variables. */
+    camera_ratio_ = 1.0f;
+    offset_[0] = 0.0f;
+    offset_[1] = 0.0f;
 
-      selected_objects_boundbox_set();
-      rctf boundbox;
-      selected_objects_boundbox_get(&boundbox);
+    selected_objects_boundbox_set();
+    rctf boundbox;
+    selected_objects_boundbox_get(&boundbox);
 
-      render_x_ = boundbox.xmax - boundbox.xmin;
-      render_y_ = boundbox.ymax - boundbox.ymin;
-      offset_[0] = boundbox.xmin;
-      offset_[1] = boundbox.ymin;
-    }
+    render_x_ = boundbox.xmax - boundbox.xmin;
+    render_y_ = boundbox.ymax - boundbox.ymin;
+    offset_[0] = boundbox.xmin;
+    offset_[1] = boundbox.ymin;
   }
 
   gpl_cur_ = NULL;
@@ -144,7 +138,7 @@ void GpencilExporter::create_object_list(void)
   ViewLayer *view_layer = CTX_data_view_layer(params_.C);
 
   float camera_z_axis[3];
-  copy_v3_v3(camera_z_axis, rv3d->viewinv[2]);
+  copy_v3_v3(camera_z_axis, rv3d_->viewinv[2]);
   ob_list_.clear();
 
   LISTBASE_FOREACH (Base *, base, &view_layer->object_bases) {
@@ -169,12 +163,12 @@ void GpencilExporter::create_object_list(void)
     }
     else {
       float zdepth = 0;
-      if (rv3d) {
-        if (rv3d->is_persp) {
-          zdepth = ED_view3d_calc_zfac(rv3d, object->obmat[3], NULL);
+      if (rv3d_) {
+        if (rv3d_->is_persp) {
+          zdepth = ED_view3d_calc_zfac(rv3d_, object->obmat[3], NULL);
         }
         else {
-          zdepth = -dot_v3v3(rv3d->viewinv[2], object->obmat[3]);
+          zdepth = -dot_v3v3(rv3d_->viewinv[2], object->obmat[3]);
         }
         ObjectZ obz = {zdepth * -1.0f, object};
         ob_list_.push_back(obz);
@@ -194,7 +188,7 @@ void GpencilExporter::create_object_list(void)
 void GpencilExporter::set_out_filename(const char *filename)
 {
   BLI_strncpy(out_filename_, filename, FILE_MAX);
-  BLI_path_abs(out_filename_, BKE_main_blendfile_path(bmain));
+  BLI_path_abs(out_filename_, BKE_main_blendfile_path(bmain_));
 }
 
 /**
@@ -310,7 +304,7 @@ float GpencilExporter::stroke_point_radius_get(struct bGPDstroke *gps)
 
   /* Radius. */
   bGPDstroke *gps_perimeter = BKE_gpencil_stroke_perimeter_from_view(
-      rv3d, gpd, gpl, gps, 3, diff_mat_);
+      rv3d_, gpd_, gpl, gps, 3, diff_mat_);
 
   pt = &gps_perimeter->points[0];
   gpencil_3d_point_to_screen_space(&pt->x, screen_ex);
@@ -381,7 +375,7 @@ struct bGPDlayer *GpencilExporter::gpl_current_get(void)
 void GpencilExporter::gpl_current_set(struct bGPDlayer *gpl)
 {
   gpl_cur_ = gpl;
-  BKE_gpencil_parent_matrix_get(depsgraph, params_.obact, gpl, diff_mat_);
+  BKE_gpencil_parent_matrix_get(depsgraph_, params_.obact, gpl, diff_mat_);
 }
 
 struct bGPDframe *GpencilExporter::gpf_current_get(void)
@@ -472,14 +466,14 @@ void GpencilExporter::selected_objects_boundbox_set(void)
   for (ObjectZ &obz : ob_list_) {
     Object *ob = obz.ob;
     /* Use evaluated version to get strokes with modifiers. */
-    Object *ob_eval = (Object *)DEG_get_evaluated_id(depsgraph, &ob->id);
+    Object *ob_eval = (Object *)DEG_get_evaluated_id(depsgraph_, &ob->id);
     bGPdata *gpd_eval = (bGPdata *)ob_eval->data;
 
     LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd_eval->layers) {
       if (gpl->flag & GP_LAYER_HIDE) {
         continue;
       }
-      BKE_gpencil_parent_matrix_get(depsgraph, ob_eval, gpl, diff_mat_);
+      BKE_gpencil_parent_matrix_get(depsgraph_, ob_eval, gpl, diff_mat_);
 
       bGPDframe *gpf = gpl->actframe;
       if (gpf == NULL) {

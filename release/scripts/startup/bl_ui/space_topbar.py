@@ -461,8 +461,6 @@ class TOPBAR_MT_file_gpencil_export(Menu):
 
     def draw(self, context):
         self.layout.operator("wm.gpencil_export_svg", text="Scalable Vector Graphics (.svg)")
-        self.layout.operator("wm.gpencil_export_storyboard", text="Storyboard (.svg)")
-        self.layout.separator()
         self.layout.operator("wm.gpencil_export_pdf", text="Portable Document Format (.pdf)")
 
 
