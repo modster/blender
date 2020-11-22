@@ -314,12 +314,10 @@ void USDMaterialImporter::set_node_input(const pxr::UsdShadeInput &usd_input,
 
     /* For now, only convert UsdUVTexture and UsdPrimvarReader_float2 inputs. */
     if (shader_id == usdtokens::UsdUVTexture) {
-      std::cerr << "Have UsdUVTexture shader input.\n";
       convert_usd_uv_texture(
           source_shader, source_name, dest_node, dest_socket_name, ntree, column + 1, r_ctx);
     }
     if (shader_id == usdtokens::UsdPrimvarReader_float2) {
-      std::cerr << "Have UsdPrimvarReader_float2 shader input.\n";
       convert_usd_primvar_reader(
           source_shader, source_name, dest_node, dest_socket_name, ntree, column + 1, r_ctx);
     }
@@ -405,7 +403,6 @@ void USDMaterialImporter::convert_usd_uv_texture(const pxr::UsdShadeShader &usd_
     pxr::VtValue file_val;
     if (file_input.Get(&file_val) && file_val.IsHolding<pxr::SdfAssetPath>()) {
       std::string file_path = file_val.Get<pxr::SdfAssetPath>().GetResolvedPath();
-      std::cout << file_path << std::endl;
       if (!file_path.empty()) {
         const char *im_file = file_path.c_str();
         Image *image = BKE_image_load_exists(bmain_, im_file);
