@@ -45,6 +45,7 @@ typedef enum eSnapSelect {
   SNAP_NOT_SELECTED = 1,
   SNAP_NOT_ACTIVE = 2,
   SNAP_SELECTED = 3,
+  SNAP_SELECTABLE = 4,
 } eSnapSelect;
 
 /** used for storing multiple hits */

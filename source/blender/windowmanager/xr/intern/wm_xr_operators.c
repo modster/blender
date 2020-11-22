@@ -330,7 +330,8 @@ static bool wm_xr_select_raycast(bContext *C,
                                  const float direction[3],
                                  float *ray_dist,
                                  eSelectOp select_op,
-                                 bool deselect_all)
+                                 bool deselect_all,
+                                 bool selectable_only)
 {
   /* Uses same raycast method as Scene.ray_cast(). */
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
@@ -346,19 +347,19 @@ static bool wm_xr_select_raycast(bContext *C,
 
   SnapObjectContext *sctx = ED_transform_snap_object_context_create(vc.scene, 0);
 
-  ED_transform_snap_object_project_ray_ex(sctx,
-                                          depsgraph,
-                                          &(const struct SnapObjectParams){
-                                              .snap_select = vc.em ? SNAP_SELECTED : SNAP_ALL,
-                                          },
-                                          origin,
-                                          direction,
-                                          ray_dist,
-                                          location,
-                                          normal,
-                                          &index,
-                                          &ob,
-                                          obmat);
+  ED_transform_snap_object_project_ray_ex(
+      sctx,
+      depsgraph,
+      &(const struct SnapObjectParams){
+          .snap_select = vc.em ? SNAP_SELECTED : (selectable_only ? SNAP_SELECTABLE : SNAP_ALL)},
+      origin,
+      direction,
+      ray_dist,
+      location,
+      normal,
+      &index,
+      &ob,
+      obmat);
 
   ED_transform_snap_object_context_destroy(sctx);
 
@@ -557,7 +558,7 @@ static int wm_xr_select_raycast_modal_3d(bContext *C, wmOperator *op, const wmEv
   else if (event->val == KM_RELEASE) {
     float ray_dist;
     eSelectOp select_op = SEL_OP_SET;
-    bool deselect_all;
+    bool deselect_all, selectable_only;
     bool ret;
 
     prop = RNA_struct_find_property(op->ptr, "distance");
@@ -579,8 +580,11 @@ static int wm_xr_select_raycast_modal_3d(bContext *C, wmOperator *op, const wmEv
     prop = RNA_struct_find_property(op->ptr, "deselect_all");
     deselect_all = prop ? RNA_property_boolean_get(op->ptr, prop) : false;
 
+    prop = RNA_struct_find_property(op->ptr, "selectable_only");
+    selectable_only = prop ? RNA_property_boolean_get(op->ptr, prop) : true;
+
     ret = wm_xr_select_raycast(
-        C, data->origin, data->direction, &ray_dist, select_op, deselect_all);
+        C, data->origin, data->direction, &ray_dist, select_op, deselect_all, selectable_only);
 
     wm_xr_select_raycast_uninit(op);
 
@@ -633,6 +637,11 @@ static void WM_OT_xr_select_raycast(wmOperatorType *ot)
                        "Raycast axis in controller space",
                        -1.0f,
                        1.0f);
+  RNA_def_boolean(ot->srna,
+                  "selectable_only",
+                  true,
+                  "Selectable Only",
+                  "Only allow selectable objects to influence raycast result");
 }
 
 /** \} */
