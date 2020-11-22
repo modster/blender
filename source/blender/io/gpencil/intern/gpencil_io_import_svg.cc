@@ -54,8 +54,8 @@
 
 #include "ED_view3d.h"
 
+#include "gpencil_io.h"
 #include "gpencil_io_import_svg.h"
-#include "gpencil_io_importer.h"
 
 #define NANOSVG_ALL_COLOR_KEYWORDS
 #define NANOSVG_IMPLEMENTATION
@@ -64,8 +64,7 @@
 namespace blender::io::gpencil {
 
 /* Constructor. */
-GpencilImporterSVG::GpencilImporterSVG(const char *filename,
-                                       const struct GpencilImportParams *iparams)
+GpencilImporterSVG::GpencilImporterSVG(const char *filename, const struct GpencilIOParams *iparams)
     : GpencilImporter(iparams)
 {
   set_filename(filename);
@@ -88,11 +87,11 @@ bool GpencilImporterSVG::read(void)
   }
 
   /* Create grease pencil object. */
-  if (params_.ob_target == nullptr) {
-    params_.ob_target = create_object();
+  if (params_.ob == nullptr) {
+    params_.ob = create_object();
     object_created_ = true;
   }
-  if (params_.ob_target == nullptr) {
+  if (params_.ob == nullptr) {
     std::cout << "Unable to create new object.\n";
     if (svg_data) {
       nsvgDelete(svg_data);
@@ -100,7 +99,7 @@ bool GpencilImporterSVG::read(void)
 
     return false;
   }
-  gpd_ = (bGPdata *)params_.ob_target->data;
+  gpd_ = (bGPdata *)params_.ob->data;
 
   /* Grease pencil is rotated 90 degrees in X axis by default. */
   float matrix[4][4];

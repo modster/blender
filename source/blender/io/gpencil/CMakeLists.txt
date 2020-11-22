@@ -48,13 +48,16 @@ set(SRC
  # This line must be removed if NanoSVG is moved to extern
  nanosvg/nanosvg.h
 
- gpencil_io_importer.h
+ gpencil_io.h
+
+ intern/gpencil_io_base.h
+ intern/gpencil_io_base.cc
+
  intern/gpencil_io_import_base.h
  intern/gpencil_io_import_svg.h
  intern/gpencil_io_import_base.cc
  intern/gpencil_io_import_svg.cc
 
- gpencil_io_exporter.h
  intern/gpencil_io_export_base.h
  intern/gpencil_io_export_svg.h
  intern/gpencil_io_export_pdf.h

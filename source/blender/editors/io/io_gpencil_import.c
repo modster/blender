@@ -60,7 +60,7 @@
 
 #include "io_gpencil.h"
 
-#include "gpencil_io_importer.h"
+#include "gpencil_io.h"
 
 /* <-------- SVG single frame import. --------> */
 bool wm_gpencil_import_svg_common_check(bContext *UNUSED(C), wmOperator *op)
@@ -184,13 +184,13 @@ static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
   const int resolution = RNA_int_get(op->ptr, "resolution");
   const float scale = RNA_float_get(op->ptr, "scale");
 
-  struct GpencilImportParams params = {
+  struct GpencilIOParams params = {
       .C = C,
       .region = region,
       .v3d = v3d,
-      .ob_target = ob,
+      .ob = ob,
       .mode = GP_IMPORT_FROM_SVG,
-      .frame_target = CFRA,
+      .frame_cur = CFRA,
       .flag = flag,
       .resolution = resolution,
       .scale = scale,

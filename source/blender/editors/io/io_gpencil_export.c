@@ -57,7 +57,7 @@
 
 #include "io_gpencil.h"
 
-#include "gpencil_io_exporter.h"
+#include "gpencil_io.h"
 
 static bool wm_gpencil_export_svg_common_check(bContext *UNUSED(C), wmOperator *op)
 {
@@ -209,20 +209,22 @@ static int wm_gpencil_export_svg_exec(bContext *C, wmOperator *op)
   SET_FLAG_FROM_TEST(flag, use_norm_thickness, GP_EXPORT_NORM_THICKNESS);
   SET_FLAG_FROM_TEST(flag, use_clip_camera, GP_EXPORT_CLIP_CAMERA);
 
-  struct GpencilExportParams params = {
-      .C = C,
-      .region = region,
-      .v3d = v3d,
-      .obact = ob,
-      .mode = GP_EXPORT_TO_SVG,
-      .frame_start = CFRA,
-      .frame_end = CFRA,
-      .flag = flag,
-      .select = select,
-      .frame_type = GP_EXPORT_FRAME_ACTIVE,
-      .stroke_sample = RNA_float_get(op->ptr, "stroke_sample"),
-      .paper_size = {0.0f, 0.0f},
-  };
+  struct GpencilIOParams params = {.C = C,
+                                   .region = region,
+                                   .v3d = v3d,
+                                   .ob = ob,
+                                   .mode = GP_EXPORT_TO_SVG,
+                                   .frame_start = CFRA,
+                                   .frame_end = CFRA,
+                                   .frame_cur = CFRA,
+                                   .flag = flag,
+                                   .scale = 1.0f,
+                                   .select = select,
+                                   .frame_type = GP_EXPORT_FRAME_ACTIVE,
+                                   .file_subfix = '\0',
+                                   .stroke_sample = RNA_float_get(op->ptr, "stroke_sample"),
+                                   .paper_size = {0.0f, 0.0f},
+                                   .resolution = 1.0f};
 
   /* Do export. */
   WM_cursor_wait(1);
@@ -371,14 +373,15 @@ static int wm_gpencil_export_pdf_exec(bContext *C, wmOperator *op)
   paper[0] = scene->r.xsch * (scene->r.size / 100.0f);
   paper[1] = scene->r.ysch * (scene->r.size / 100.0f);
 
-  struct GpencilExportParams params = {
+  struct GpencilIOParams params = {
       .C = C,
       .region = region,
       .v3d = v3d,
-      .obact = ob,
+      .ob = ob,
       .mode = GP_EXPORT_TO_PDF,
       .frame_start = SFRA,
       .frame_end = EFRA,
+      .frame_cur = CFRA,
       .flag = flag,
       .select = select,
       .frame_type = frame_type,

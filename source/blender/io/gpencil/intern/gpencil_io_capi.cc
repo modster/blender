@@ -43,12 +43,10 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
 
-#include "../gpencil_io_importer.h"
-#include "gpencil_io_import_svg.h"
-
-#include "../gpencil_io_exporter.h"
+#include "../gpencil_io.h"
 #include "gpencil_io_export_pdf.h"
 #include "gpencil_io_export_svg.h"
+#include "gpencil_io_import_svg.h"
 
 using blender::io::gpencil::GpencilExporterPDF;
 using blender::io::gpencil::GpencilExporterSVG;
@@ -75,7 +73,7 @@ static bool is_keyframe_included(bGPdata *gpd_, int32_t framenum, bool use_selec
 }
 
 /* Import frame. */
-static bool gpencil_io_import_frame(void *in_importer, const GpencilImportParams *iparams)
+static bool gpencil_io_import_frame(void *in_importer, const GpencilIOParams *iparams)
 {
 
   bool result = false;
@@ -98,13 +96,13 @@ static bool gpencil_io_export_pdf(Depsgraph *depsgraph,
                                   Scene *scene,
                                   Object *ob,
                                   GpencilExporterPDF *exporter,
-                                  const GpencilExportParams *iparams)
+                                  const GpencilIOParams *iparams)
 {
   bool result = false;
   Object *ob_eval_ = (Object *)DEG_get_evaluated_id(depsgraph, &ob->id);
   bGPdata *gpd_eval = (bGPdata *)ob_eval_->data;
 
-  exporter->set_frame_number(iparams->framenum);
+  exporter->set_frame_number(iparams->frame_cur);
   std::string subfix = iparams->file_subfix;
   result |= exporter->new_document();
 
@@ -128,8 +126,8 @@ static bool gpencil_io_export_pdf(Depsgraph *depsgraph,
     }
     result = exporter->write(subfix);
     /* Back to original frame. */
-    exporter->set_frame_number(iparams->framenum);
-    CFRA = iparams->framenum;
+    exporter->set_frame_number(iparams->frame_cur);
+    CFRA = iparams->frame_cur;
     BKE_scene_graph_update_for_newframe(depsgraph);
   }
 
@@ -138,14 +136,14 @@ static bool gpencil_io_export_pdf(Depsgraph *depsgraph,
 
 /* Export current frame in SVG. */
 static bool gpencil_io_export_frame_svg(GpencilExporterSVG *exporter,
-                                        const GpencilExportParams *iparams,
+                                        const GpencilIOParams *iparams,
                                         float frame_offset[2],
                                         const bool newpage,
                                         const bool body,
                                         const bool savepage)
 {
   bool result = false;
-  exporter->set_frame_number(iparams->framenum);
+  exporter->set_frame_number(iparams->frame_cur);
   exporter->set_frame_offset(frame_offset);
   std::string subfix = iparams->file_subfix;
   if (newpage) {
@@ -161,7 +159,7 @@ static bool gpencil_io_export_frame_svg(GpencilExporterSVG *exporter,
 }
 
 /* Main import entry point function. */
-bool gpencil_io_import(const char *filename, GpencilImportParams *iparams)
+bool gpencil_io_import(const char *filename, GpencilIOParams *iparams)
 {
   bool done = false;
 
@@ -173,7 +171,7 @@ bool gpencil_io_import(const char *filename, GpencilImportParams *iparams)
 }
 
 /* Main export entry point function. */
-bool gpencil_io_export(const char *filename, GpencilExportParams *iparams)
+bool gpencil_io_export(const char *filename, GpencilIOParams *iparams)
 {
   Depsgraph *depsgraph_ = CTX_data_depsgraph_pointer(iparams->C);
   Scene *scene_ = CTX_data_scene(iparams->C);

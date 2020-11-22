@@ -57,19 +57,18 @@
 
 #include "ED_view3d.h"
 
+#include "gpencil_io.h"
 #include "gpencil_io_export_svg.h"
-#include "gpencil_io_exporter.h"
 
 #include "pugixml.hpp"
 
 namespace blender ::io ::gpencil {
 
 /* Constructor. */
-GpencilExporterSVG::GpencilExporterSVG(const char *filename,
-                                       const struct GpencilExportParams *iparams)
+GpencilExporterSVG::GpencilExporterSVG(const char *filename, const struct GpencilIOParams *iparams)
     : GpencilExporter(iparams)
 {
-  set_out_filename(filename);
+  set_filename(filename);
 
   invert_axis_[0] = false;
   invert_axis_[1] = true;
@@ -99,7 +98,7 @@ bool GpencilExporterSVG::write(std::string subfix)
   /* Save File. */
 
   /* Add page to filename. */
-  std::string frame_file = out_filename_;
+  std::string frame_file = filename_;
   size_t found = frame_file.find_last_of(".");
   if (found != std::string::npos) {
     frame_file.replace(found, 8, subfix + ".svg");

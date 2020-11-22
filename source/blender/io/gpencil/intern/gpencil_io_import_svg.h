@@ -23,7 +23,7 @@
  */
 #include "gpencil_io_import_base.h"
 
-struct GpencilImportParams;
+struct GpencilIOParams;
 struct NSVGshape;
 struct NSVGpath;
 struct bGPdata;
@@ -37,7 +37,7 @@ namespace blender::io::gpencil {
 class GpencilImporterSVG : public GpencilImporter {
 
  public:
-  GpencilImporterSVG(const char *filename, const struct GpencilImportParams *iparams);
+  GpencilImporterSVG(const char *filename, const struct GpencilIOParams *iparams);
   ~GpencilImporterSVG(void);
 
   bool read(void);

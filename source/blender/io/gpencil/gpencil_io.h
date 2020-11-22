@@ -33,22 +33,24 @@ struct View3D;
 /* Paper Size: A4, Letter. */
 static const float gpencil_export_paper_sizes[2] = {3508, 2480};
 
-struct GpencilExportParams {
+struct GpencilIOParams {
   bContext *C;
   ARegion *region;
   View3D *v3d;
   /** Grease pencil object. */
-  struct Object *obact;
-  /** Export mode.  */
+  struct Object *ob;
+  /** Mode.  */
   uint16_t mode;
   /** Start frame.  */
   int32_t frame_start;
   /** End frame.  */
   int32_t frame_end;
   /* Current frame. */
-  int32_t framenum;
+  int32_t frame_cur;
   /** Flags. */
   uint32_t flag;
+  /** Scale. */
+  float scale;
   /** Select mode. */
   uint16_t select;
   /** Frame type. */
@@ -59,23 +61,27 @@ struct GpencilExportParams {
   float stroke_sample;
   /** Paper size in pixels. */
   float paper_size[2];
+  /** Resolution.  */
+  int32_t resolution;
 };
 
-/* GpencilExportParams->flag. */
-typedef enum eGpencilExportParams_Flag {
+/* GpencilIOParams->flag. */
+typedef enum eGpencilIOParams_Flag {
   /* Export Filled strokes. */
   GP_EXPORT_FILL = (1 << 0),
   /* Export normalized thickness. */
   GP_EXPORT_NORM_THICKNESS = (1 << 1),
   /* Clip camera area. */
   GP_EXPORT_CLIP_CAMERA = (1 << 2),
-} eGpencilExportParams_Flag;
+} eGpencilIOParams_Flag;
 
-typedef enum eGpencilExport_Modes {
+typedef enum eGpencilIO_Modes {
   GP_EXPORT_TO_SVG = 0,
   GP_EXPORT_TO_PDF = 1,
-  /* Add new export formats here. */
-} eGpencilExport_Modes;
+
+  GP_IMPORT_FROM_SVG = 2,
+  /* Add new formats here. */
+} eGpencilIO_Modes;
 
 /* Object to be exported. */
 typedef enum eGpencilExportSelect {
@@ -90,7 +96,8 @@ typedef enum eGpencilExportFrame {
   GP_EXPORT_FRAME_SELECTED = 1,
 } eGpencilExportFrame;
 
-bool gpencil_io_export(const char *filename, struct GpencilExportParams *iparams);
+bool gpencil_io_export(const char *filename, struct GpencilIOParams *iparams);
+bool gpencil_io_import(const char *filename, struct GpencilIOParams *iparams);
 
 #ifdef __cplusplus
 }

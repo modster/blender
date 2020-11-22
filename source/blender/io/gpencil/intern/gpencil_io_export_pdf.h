@@ -28,7 +28,7 @@
 #include "gpencil_io_export_base.h"
 #include "hpdf.h"
 
-struct GpencilExportParams;
+struct GpencilIOParams;
 
 #define PDF_EXPORTER_NAME "PDF Export for Grease Pencil"
 #define PDF_EXPORTER_VERSION "v1.0"
@@ -38,7 +38,7 @@ namespace blender::io::gpencil {
 class GpencilExporterPDF : public GpencilExporter {
 
  public:
-  GpencilExporterPDF(const char *filename, const struct GpencilExportParams *iparams);
+  GpencilExporterPDF(const char *filename, const struct GpencilIOParams *iparams);
   ~GpencilExporterPDF(void);
   bool new_document(void);
   bool add_newpage(void);
