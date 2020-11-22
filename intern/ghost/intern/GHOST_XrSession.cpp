@@ -748,6 +748,7 @@ bool GHOST_XrSession::createActions(const char *action_set_name,
     CHECK_XR(
         xrCreateAction(action_set->set, &action_info, &action.action),
         (m_error_msg = std::string("Failed to create action \"") + info.name +
+                       "\" for action set \"" + action_set_name +
                        "\". Action name and/or paths are invalid. Name must not contain upper "
                        "case letters or special characters other than '-', '_', or '.'.")
             .c_str());
@@ -788,9 +789,10 @@ void GHOST_XrSession::destroyActions(const char *action_set_name,
                               "\" for action \"" + action_name + "\".")
                    .c_str());
     }
-    CHECK_XR(
-        xrDestroyAction(action->action),
-        (m_error_msg = std::string("Failed to destroy action \"") + action_name + "\".").c_str());
+    CHECK_XR(xrDestroyAction(action->action),
+             (m_error_msg = std::string("Failed to destroy action \"") + action_name +
+                            "\" for action set \"" + action_set_name + "\".")
+                 .c_str());
 
     actions.erase(action_name);
   }
