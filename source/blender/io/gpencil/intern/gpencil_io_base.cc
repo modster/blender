@@ -185,6 +185,7 @@ void GpencilIO::create_object_list(void)
         [](const ObjectZ &obz1, const ObjectZ &obz2) { return obz1.zdepth < obz2.zdepth; });
   }
 }
+
 /**
  * Set file input_text full path.
  * \param C: Context.
@@ -533,8 +534,4 @@ void GpencilIO::set_frame_box(float value[2])
   copy_v2_v2(frame_box_, value);
 }
 
-void GpencilIO::set_shot(int value)
-{
-  shot_ = value;
-}
 }  // namespace blender::io::gpencil

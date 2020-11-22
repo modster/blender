@@ -54,7 +54,6 @@ class GpencilIO {
   void set_frame_offset(float value[2]);
   void set_frame_ratio(float value[2]);
   void set_frame_box(float value[2]);
-  void set_shot(int value);
 
  protected:
   GpencilIOParams params_;
@@ -91,7 +90,6 @@ class GpencilIO {
   float frame_ratio_[2];
 
   int cfra_;
-  int shot_;
   bool object_created_;
 
   float stroke_color_[4], fill_color_[4];
