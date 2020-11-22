@@ -1405,8 +1405,6 @@ IDPropertyUIData *IDP_ui_data_ensure(IDProperty *idprop)
     return idprop->ui_data;
   }
 
-  size_t alloc_size = 0;
-
   if (idprop->type == IDP_STRING) {
     idprop->ui_data = MEM_callocN(sizeof(IDPropertyUIDataString), __func__);
   }
@@ -1433,10 +1431,6 @@ IDPropertyUIData *IDP_ui_data_ensure(IDProperty *idprop)
   else {
     /* UI data not supported for remaining types, this shouldn't be called in those cases. */
     BLI_assert(false);
-  }
-
-  if (alloc_size > 0) {
-    idprop->ui_data = MEM_callocN(alloc_size, __func__);
   }
 
   return idprop->ui_data;
