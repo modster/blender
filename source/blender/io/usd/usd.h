@@ -62,6 +62,7 @@ struct USDImportParams {
   bool debug;
   bool use_instancing;
   float light_intensity_scale;
+  bool import_usdpreview;
 };
 
 /* The USD_import function takes a as_background_job parameter, and returns a boolean.

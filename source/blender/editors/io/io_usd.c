@@ -281,6 +281,8 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
 
   const float light_intensity_scale = RNA_float_get(op->ptr, "light_intensity_scale");
 
+  const bool import_usdpreview = RNA_boolean_get(op->ptr, "import_usdpreview");
+
   /* Switch out of edit mode to avoid being stuck in it (T54326). */
   Object *obedit = CTX_data_edit_object(C);
   if (obedit) {
@@ -293,7 +295,8 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
                                    scale,
                                    debug,
                                    use_instancing,
-                                   light_intensity_scale};
+                                   light_intensity_scale,
+                                   import_usdpreview};
 
   bool ok = USD_import(C, filename, &params, as_background_job);
 
@@ -322,6 +325,7 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   box = uiLayoutBox(layout);
   uiItemL(box, IFACE_("Experimental"), ICON_NONE);
   uiItemR(box, ptr, "use_instancing", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "import_usdpreview", 0, NULL, ICON_NONE);
 }
 
 void WM_OT_usd_import(wmOperatorType *ot)
@@ -383,6 +387,13 @@ void WM_OT_usd_import(wmOperatorType *ot)
                 "Value by which to scale the intensity of imported lights",
                 0.0001f,
                 1000.0f);
+
+  RNA_def_boolean(
+      ot->srna,
+      "import_usdpreview",
+      false,
+      "Import UsdPreviewSurface",
+      "When checked, convert UsdPreviewSurface shaders to Principled BSD shader networks.");
 }
 
 #endif /* WITH_USD */

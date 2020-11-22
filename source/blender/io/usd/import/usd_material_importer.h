@@ -24,15 +24,30 @@
 
 struct Main;
 struct Material;
+struct bNode;
+struct bNodeTree;
 
 namespace blender::io::usd {
 
-/* Implements logic to create Blender materials
- * from USD materials. */
+struct NodePlacementContext {
+  float origx;
+  float origy;
+  std::vector<float> column_offsets;
+  const float horizontal_step;
+
+  NodePlacementContext(float in_origx, float in_origy, float in_horizontal_step = 300.0f)
+      : origx(in_origx),
+        origy(in_origy),
+        column_offsets(64, 0.0f),
+        horizontal_step(in_horizontal_step)
+  {
+  }
+};
+
+/* Converts USD materials to Blender representation. */
 
 class USDMaterialImporter {
  protected:
-
   USDImporterContext context_;
 
   Main *bmain_;
@@ -40,9 +55,34 @@ class USDMaterialImporter {
  public:
   USDMaterialImporter(const USDImporterContext &context, Main *bmain);
 
-  ~USDMaterialImporter();
-
   Material *add_material(const pxr::UsdShadeMaterial &usd_material) const;
+
+  void import_usd_preview(Material *mtl, const pxr::UsdShadeMaterial &usd_material) const;
+
+  void import_usd_preview(Material *mtl, const pxr::UsdShadeShader &usd_material) const;
+
+  void set_node_input(const pxr::UsdShadeInput &usd_input,
+                      bNode *dest_node,
+                      const char *dest_socket_name,
+                      bNodeTree *ntree,
+                      int column,
+                      NodePlacementContext &r_ctx) const;
+
+  void convert_usd_uv_texture(const pxr::UsdShadeShader &usd_shader,
+                              const pxr::TfToken &usd_source_name,
+                              bNode *dest_node,
+                              const char *dest_socket_name,
+                              bNodeTree *ntree,
+                              int column,
+                              NodePlacementContext &r_ctx) const;
+
+  void convert_usd_primvar_reader(const pxr::UsdShadeShader &usd_shader,
+                                  const pxr::TfToken &usd_source_name,
+                                  bNode *dest_node,
+                                  const char *dest_socket_name,
+                                  bNodeTree *ntree,
+                                  int column,
+                                  NodePlacementContext &r_ctx) const;
 };
 
 }  // namespace blender::io::usd
