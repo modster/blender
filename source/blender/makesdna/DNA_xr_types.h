@@ -22,6 +22,10 @@
 
 #include "DNA_view3d_types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct XrSessionSettings {
   /** Shading settings, struct shared with 3D-View so settings are the same. */
   struct View3DShading shading;
@@ -79,3 +83,7 @@ typedef enum eXrSessionObjectFlag {
   XR_OBJECT_ENABLE = (1 << 0),
   XR_OBJECT_AUTOKEY = (1 << 1),
 } eXrSessionObjectFlag;
+
+#ifdef __cplusplus
+}
+#endif

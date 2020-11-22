@@ -154,7 +154,6 @@ void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata)
                                   true,
                                   false,
                                   true,
-                                  true,
                                   NULL,
                                   false,
                                   surface_data->offscreen,
