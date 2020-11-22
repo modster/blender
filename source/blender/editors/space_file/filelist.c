@@ -1826,11 +1826,12 @@ bool filelist_is_dir(struct FileList *filelist, const char *path)
  */
 void filelist_setdir(struct FileList *filelist, char *r_dir)
 {
+  const bool allow_invalid = filelist->asset_repository;
   BLI_assert(strlen(r_dir) < FILE_MAX_LIBEXTRA);
 
   BLI_path_normalize_dir(BKE_main_blendfile_path_from_global(), r_dir);
-  const bool is_valid_path = filelist->checkdirf(filelist, r_dir, true);
-  BLI_assert(is_valid_path);
+  const bool is_valid_path = filelist->checkdirf(filelist, r_dir, !allow_invalid);
+  BLI_assert(is_valid_path || allow_invalid);
   UNUSED_VARS_NDEBUG(is_valid_path);
 
   if (!STREQ(filelist->filelist.root, r_dir)) {
@@ -3368,6 +3369,10 @@ void filelist_readjob_start(FileList *filelist, const bContext *C)
   Main *bmain = CTX_data_main(C);
   wmJob *wm_job;
   FileListReadJob *flrj;
+
+  if (!filelist_is_dir(filelist, filelist->filelist.root)) {
+    return;
+  }
 
   /* prepare job data */
   flrj = MEM_callocN(sizeof(*flrj), __func__);
