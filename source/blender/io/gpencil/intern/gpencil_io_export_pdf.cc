@@ -112,17 +112,19 @@ bool GpencilExporterPDF::write(std::string subfix)
   }
 
   /* Support unicode character paths on Windows. */
+  HPDF_STATUS res = 0;
+  /* TODO: It looks libharu does not support unicode. */
   //#ifdef WIN32
   //  char filename_cstr[FILE_MAX];
   //  BLI_strncpy(filename_cstr, frame_file.c_str(), FILE_MAX);
   //
   //  UTF16_ENCODE(filename_cstr);
   //  std::wstring wstr(filename_cstr_16);
-  //  HPDF_SaveToFile(pdf_, (const char *)wstr.c_str());
+  //  res = HPDF_SaveToFile(pdf_, wstr.c_str());
   //
   //  UTF16_UN_ENCODE(filename_cstr);
   //#else
-  HPDF_STATUS res = HPDF_SaveToFile(pdf_, frame_file.c_str());
+  res = HPDF_SaveToFile(pdf_, frame_file.c_str());
   //#endif
 
   return (res == 0) ? true : false;
