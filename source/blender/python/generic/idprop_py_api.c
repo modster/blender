@@ -1336,7 +1336,8 @@ PyDoc_STRVAR(BPy_IDGroup_update_rna_doc,
              "\n"
              "   Update the RNA type information of the IDProperty used for interaction and "
              "drawing in the user interface. The property specified by the key must be a direct "
-             "child of the group.\n ");
+             "child of the group. The required types for many of the keyword arguments depend on "
+             "the type of the property.\n ");
 static void BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObject *kwargs)
 {
   const char *key;
@@ -1380,6 +1381,9 @@ static void BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObjec
   }
 
   IDProperty *idprop = IDP_GetPropertyFromGroup(self->prop, key);
+  if (idprop == NULL) {
+    PyErr_Format(PyExc_KeyError, "Property \"%s\" not found in IDProperty group", key);
+  }
 
   if (!ELEM(idprop->type, IDP_STRING, IDP_INT, IDP_FLOAT, IDP_DOUBLE)) {
     PyErr_SetString(
@@ -1400,6 +1404,7 @@ static void BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObjec
       PyErr_SetString(PyExc_TypeError, "RNA subtype must be a string object");
     }
   }
+
   if (description != NULL) {
     if (PyUnicode_Check(rna_subtype)) {
       idprop->ui_data->description = BLI_strdup(_PyUnicode_AsString(rna_subtype));
@@ -1408,6 +1413,8 @@ static void BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObjec
       PyErr_SetString(PyExc_TypeError, "Property description must be a string object");
     }
   }
+
+  /* Type specific data. */
   if (idprop->type == IDP_INT || (idprop->type == IDP_ARRAY && idprop->subtype == IDP_INT)) {
     idprop_update_rna_ui_data_int(idprop, min, max, soft_min, soft_max, step, default_value);
   }
@@ -1419,6 +1426,132 @@ static void BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObjec
   else if (idprop->type == IDP_STRING) {
     idprop_update_rna_ui_data_string(idprop, default_value);
   }
+}
+
+static void idprop_ui_data_to_dict_int(IDProperty *idprop, PyObject *dict)
+{
+  IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)idprop->ui_data;
+  PyObject *item;
+
+  PyDict_SetItemString(dict, "min", item = PyLong_FromLong(ui_data->min));
+  Py_DECREF(item);
+  PyDict_SetItemString(dict, "max", item = PyLong_FromLong(ui_data->max));
+  Py_DECREF(item);
+  PyDict_SetItemString(dict, "soft_min", item = PyLong_FromLong(ui_data->soft_min));
+  Py_DECREF(item);
+  PyDict_SetItemString(dict, "soft_max", item = PyLong_FromLong(ui_data->soft_max));
+  Py_DECREF(item);
+  PyDict_SetItemString(dict, "step", item = PyLong_FromLong(ui_data->step));
+  Py_DECREF(item);
+  if (idprop->type == IDP_ARRAY) {
+    PyObject *list = PyList_New(ui_data->default_array_len);
+    for (int i = 0; i < ui_data->default_array_len; i++) {
+      PyList_SET_ITEM(list, i, PyLong_FromLong(ui_data->default_array[i]));
+    }
+    PyDict_SetItemString(dict, "default_value", list);
+    Py_DECREF(list);
+  }
+  else {
+    PyDict_SetItemString(dict, "default_value", item = PyLong_FromLong(ui_data->step));
+    Py_DECREF(item);
+  }
+}
+
+static void idprop_ui_data_to_dict_float(IDProperty *idprop, PyObject *dict)
+{
+  IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)idprop->ui_data;
+  PyObject *item;
+
+  PyDict_SetItemString(dict, "min", item = PyFloat_FromDouble(ui_data->min));
+  Py_DECREF(item);
+  PyDict_SetItemString(dict, "max", item = PyFloat_FromDouble(ui_data->max));
+  Py_DECREF(item);
+  PyDict_SetItemString(dict, "soft_min", item = PyFloat_FromDouble(ui_data->soft_min));
+  Py_DECREF(item);
+  PyDict_SetItemString(dict, "soft_max", item = PyFloat_FromDouble(ui_data->soft_max));
+  Py_DECREF(item);
+  PyDict_SetItemString(dict, "step", item = PyFloat_FromDouble((double)ui_data->step));
+  Py_DECREF(item);
+  PyDict_SetItemString(dict, "precision", item = PyFloat_FromDouble((double)ui_data->precision));
+  Py_DECREF(item);
+  if (idprop->type == IDP_ARRAY) {
+    PyObject *list = PyList_New(ui_data->default_array_len);
+    for (int i = 0; i < ui_data->default_array_len; i++) {
+      PyList_SET_ITEM(list, i, PyFloat_FromDouble(ui_data->default_array[i]));
+    }
+    PyDict_SetItemString(dict, "default_value", list);
+    Py_DECREF(list);
+  }
+  else {
+    PyDict_SetItemString(dict, "default_value", item = PyFloat_FromDouble(ui_data->step));
+    Py_DECREF(item);
+  }
+}
+
+static void idprop_ui_data_to_dict_string(IDProperty *idprop, PyObject *dict)
+{
+  IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)idprop->ui_data;
+  PyObject *item;
+
+  PyDict_SetItemString(dict, "min", item = PyUnicode_FromString(ui_data->default_value));
+  Py_DECREF(item);
+}
+
+PyDoc_STRVAR(BPy_IDGroup_rna_ui_data_doc,
+             ".. method:: rna_data(key)\n"
+             "\n"
+             "   Clear all members from this group.\n");
+static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
+{
+  const char *key;
+
+  if (!PyArg_ParseTuple(args, "s:get", &key)) {
+    Py_RETURN_NONE;
+  }
+
+  IDProperty *idprop = IDP_GetPropertyFromGroup(self->prop, key);
+  if (idprop == NULL) {
+    PyErr_SetString(PyExc_KeyError, "Property not found in IDProperty group");
+    Py_RETURN_NONE;
+  }
+
+  IDPropertyUIData *ui_data = idprop->ui_data;
+
+  if (ui_data == NULL) {
+    Py_RETURN_NONE;
+  }
+
+  PyObject *dict = PyDict_New();
+
+  /* RNA subtype. */
+  {
+    const char *subtype_id = NULL;
+    RNA_enum_identifier(rna_enum_property_subtype_items, ui_data->rna_subtype, &subtype_id);
+    PyObject *item = PyUnicode_FromString(subtype_id);
+    PyDict_SetItemString(dict, "subtype", item);
+    Py_DECREF(item);
+  }
+
+  /* Description. */
+  if (ui_data->description != NULL) {
+    PyObject *item = PyUnicode_FromString(ui_data->description);
+    PyDict_SetItemString(dict, "description", item);
+    Py_DECREF(item);
+  }
+
+  /* Type specific data. */
+  if (idprop->type == IDP_INT || (idprop->type == IDP_ARRAY && idprop->subtype == IDP_INT)) {
+    idprop_ui_data_to_dict_int(idprop, dict);
+  }
+  else if (ELEM(idprop->type, IDP_FLOAT, IDP_DOUBLE) ||
+           (idprop->type == IDP_ARRAY && ELEM(idprop->subtype, IDP_FLOAT, IDP_DOUBLE))) {
+    idprop_ui_data_to_dict_float(idprop, dict);
+  }
+  else if (idprop->type == IDP_STRING) {
+    idprop_ui_data_to_dict_string(idprop, dict);
+  }
+
+  return dict;
 }
 
 static struct PyMethodDef BPy_IDGroup_methods[] = {
@@ -1435,6 +1568,7 @@ static struct PyMethodDef BPy_IDGroup_methods[] = {
      (PyCFunction)BPy_IDGroup_update_rna,
      METH_VARARGS | METH_KEYWORDS,
      BPy_IDGroup_update_rna_doc},
+    {"rna_data", (PyCFunction)BPy_IDGroup_rna_ui_data, METH_VARARGS, BPy_IDGroup_rna_ui_data_doc},
     {NULL, NULL, 0, NULL},
 };
 

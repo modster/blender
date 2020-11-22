@@ -1376,12 +1376,13 @@ class WM_OT_properties_edit(Operator):
         # setup defaults
         props = item.custom_properties()
         props.update_rna(self.property)
+        rna_data = props.rna_data(self.property)
         prop = item.bl_rna.properties[self.property]
-        self.min = prop.hard_min
-        self.max = prop.hard_min
-        self.soft_min = prop.soft_min
-        self.soft_max = prop.soft_max
-        self.subtype = prop.subtype
+        self.min = rna_data["min"]
+        self.max = rna_data["max"]
+        self.soft_min = rna_data["soft_min"]
+        self.soft_max = rna_data["soft_max"]
+        self.subtype =  rna_data["subtype"]
 
         self._init_subtype(prop_type, is_array, subtype)
 
