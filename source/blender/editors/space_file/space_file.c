@@ -551,7 +551,9 @@ static void file_main_region_draw(const bContext *C, ARegion *region)
     file_highlight_set(sfile, region, event->x, event->y);
   }
 
-  file_draw_list(C, region);
+  if (!file_draw_hint_if_invalid(sfile, region)) {
+    file_draw_list(C, region);
+  }
 
   /* reset view matrix */
   UI_view2d_view_restore(C);

@@ -21,6 +21,7 @@
  * \ingroup spfile
  */
 
+#include <alloca.h>
 #include <errno.h>
 #include <math.h>
 #include <string.h>
@@ -216,6 +217,65 @@ static void file_draw_string(int sx,
                     &(struct uiFontStyleDraw_Params){
                         .align = align,
                     });
+}
+
+/**
+ * \param r_sx, r_sy: The lower right corner of the last line drawn. AKA the cursor position on
+ *                    completion.
+ */
+static void file_draw_string_multiline(int sx,
+                                       int sy,
+                                       const char *string,
+                                       int wrap_width,
+                                       int line_height,
+                                       const uchar text_col[4],
+                                       int *r_sx,
+                                       int *r_sy)
+{
+  rcti rect;
+
+  if (string[0] == '\0' || wrap_width < 1) {
+    return;
+  }
+
+  const uiStyle *style = UI_style_get();
+  int font_id = style->widgetlabel.uifont_id;
+  int len = strlen(string);
+
+  rctf textbox;
+  BLF_wordwrap(font_id, wrap_width);
+  BLF_enable(font_id, BLF_WORD_WRAP);
+  BLF_boundbox(font_id, string, len, &textbox);
+  BLF_disable(font_id, BLF_WORD_WRAP);
+
+  /* no text clipping needed, UI_fontstyle_draw does it but is a bit too strict
+   * (for buttons it works) */
+  rect.xmin = sx;
+  rect.xmax = sx + wrap_width;
+  /* Need to increase the clipping rect by one more line, since the #UI_fontstyle_draw_ex() will
+   * actually start drawing at (ymax - line-height). */
+  rect.ymin = sy - round_fl_to_int(BLI_rctf_size_y(&textbox)) - line_height;
+  rect.ymax = sy;
+
+  struct ResultBLF result;
+  UI_fontstyle_draw_ex(&style->widget,
+                       &rect,
+                       string,
+                       text_col,
+                       &(struct uiFontStyleDraw_Params){
+                           .align = UI_STYLE_TEXT_LEFT,
+                           .word_wrap = true,
+                       },
+                       len,
+                       NULL,
+                       NULL,
+                       &result);
+  if (r_sx) {
+    *r_sx = result.width;
+  }
+  if (r_sy) {
+    *r_sy = rect.ymin + line_height;
+  }
 }
 
 void file_calc_previews(const bContext *C, ARegion *region)
@@ -943,4 +1003,68 @@ void file_draw_list(const bContext *C, ARegion *region)
   }
 
   layout->curr_size = params->thumbnail_size;
+}
+
+static void file_draw_invalid_repository_hint(const SpaceFile *sfile, const ARegion *region)
+{
+  const FileAssetSelectParams *asset_params = ED_fileselect_get_asset_params(sfile);
+
+  char repository_ui_path[PATH_MAX];
+  file_path_to_ui_path(
+      asset_params->base_params.dir, repository_ui_path, sizeof(repository_ui_path));
+
+  uchar text_col[4];
+  uchar text_alert_col[4];
+  UI_GetThemeColor4ubv(TH_TEXT, text_col);
+  UI_GetThemeColor4ubv(TH_REDALERT, text_alert_col);
+
+  const View2D *v2d = &region->v2d;
+  const int pad = sfile->layout->tile_border_x;
+  const int width = BLI_rctf_size_x(&v2d->tot) - (2 * pad);
+  const int line_height = sfile->layout->textheight;
+  int sx = v2d->tot.xmin + pad;
+  /* For some reason no padding needed. */
+  int sy = v2d->tot.ymax;
+
+  {
+    const char *message = TIP_("Repository not found");
+    const int draw_string_str_len = strlen(message) + 2 + sizeof(repository_ui_path);
+    char *draw_string = alloca(draw_string_str_len);
+    BLI_snprintf(draw_string, draw_string_str_len, "%s: %s", message, repository_ui_path);
+    file_draw_string_multiline(sx, sy, draw_string, width, line_height, text_alert_col, NULL, &sy);
+  }
+
+  /* Next line, but separate it a bit further. */
+  sy -= line_height;
+
+  {
+    UI_icon_draw(sx, sy - UI_UNIT_Y, ICON_INFO);
+
+    const char *suggestion = TIP_(
+        "Set up the repository or edit repositories in the Preferences, File Paths section.");
+    file_draw_string_multiline(
+        sx + UI_UNIT_X, sy, suggestion, width - UI_UNIT_X, line_height, text_col, NULL, NULL);
+  }
+}
+
+/**
+ * Draw a string hint if the file list is invalid.
+ * \return true if the list is invalid and a hint was drawn.
+ */
+bool file_draw_hint_if_invalid(const SpaceFile *sfile, const ARegion *region)
+{
+  FileAssetSelectParams *asset_params = ED_fileselect_get_asset_params(sfile);
+  /* Only for asset browser. */
+  if (!ED_fileselect_is_asset_browser(sfile)) {
+    return false;
+  }
+  /* Check if the repository exists. */
+  if ((asset_params->asset_repository.type == FILE_ASSET_REPO_LOCAL) ||
+      filelist_is_dir(sfile->files, asset_params->base_params.dir)) {
+    return false;
+  }
+
+  file_draw_invalid_repository_hint(sfile, region);
+
+  return true;
 }
