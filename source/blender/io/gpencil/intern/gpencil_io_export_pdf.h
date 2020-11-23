@@ -30,7 +30,7 @@
 
 struct GpencilIOParams;
 
-#define PDF_EXPORTER_NAME "PDF Export for Grease Pencil"
+#define PDF_EXPORTER_NAME "PDF Exporter for Grease Pencil"
 #define PDF_EXPORTER_VERSION "v1.0"
 
 namespace blender::io::gpencil {
