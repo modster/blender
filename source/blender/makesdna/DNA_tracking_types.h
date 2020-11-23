@@ -28,6 +28,10 @@
 #include "DNA_defs.h"
 #include "DNA_listBase.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* match-moving data */
 
 struct Image;
@@ -255,9 +259,9 @@ typedef struct MovieTrackingSettings {
   short default_algorithm_flag;
   /** Minimal correlation which is still treated as successful tracking. */
   float default_minimum_correlation;
-  /** Size of pattern area for new tracks. */
+  /** Size of pattern area for new tracks, measured in pixels. */
   short default_pattern_size;
-  /** Size of search area for new tracks. */
+  /** Size of search area for new tracks, measured in pixels. */
   short default_search_size;
   /** Number of frames to be tracked during single tracking session
    * (if TRACKING_FRAMES_LIMIT is set). */
@@ -624,3 +628,7 @@ enum {
   PLANE_TRACK_LOCKED = (1 << 2),
   PLANE_TRACK_AUTOKEY = (1 << 3),
 };
+
+#ifdef __cplusplus
+}
+#endif
