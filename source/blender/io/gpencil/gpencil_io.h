@@ -28,6 +28,7 @@ extern "C" {
 
 struct ARegion;
 struct bContext;
+struct Object;
 struct View3D;
 
 /* Paper Size: A4, Letter. */
@@ -38,7 +39,7 @@ struct GpencilIOParams {
   ARegion *region;
   View3D *v3d;
   /** Grease pencil object. */
-  struct Object *ob;
+  Object *ob;
   /** Mode.  */
   uint16_t mode;
   /** Start frame.  */
