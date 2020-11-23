@@ -94,6 +94,7 @@ void DeviceScene::print_data_transfered()
 
   size_t data_transfered = 0;
   size_t data_amount = 0;
+  double total_time = 0.0;
 
 #define ACCUMULATE_DATA_TRANSFERED(x) \
   if (x.data_copied != 0) { \
@@ -102,7 +103,9 @@ void DeviceScene::print_data_transfered()
   } \
   data_transfered += x.data_copied; \
   data_amount += x.byte_size(); \
-  x.data_copied = 0
+  x.data_copied = 0; \
+  total_time += x.time_copying; \
+  x.time_copying = 0.0;
 
   ACCUMULATE_DATA_TRANSFERED(bvh_nodes);
   ACCUMULATE_DATA_TRANSFERED(bvh_leaf_nodes);
@@ -148,6 +151,7 @@ void DeviceScene::print_data_transfered()
 
   std::cerr << "    " << string_human_readable_size(data_transfered) << " / "
             << string_human_readable_size(data_amount) << '\n';
+  std::cerr << "Total time copying data to device : " << total_time << "s\n";
 }
 
 Scene::Scene(const SceneParams &params_, Device *device)
@@ -192,7 +196,7 @@ Scene::Scene(const SceneParams &params_, Device *device)
 
   shader_manager->add_default(this);
 
-  // enable_update_stats();
+  enable_update_stats();
 }
 
 Scene::~Scene()
@@ -284,8 +288,9 @@ void Scene::device_update(Device *device_, Progress &progress)
       update_stats->scene.times.add_entry({"device_update", time});
 
       if (print_stats) {
-        printf("Update statistics:\n%s\n", update_stats->full_report().c_str());
-        // dscene.print_data_transfered();
+        //printf("Update statistics:\n%s\n", update_stats->full_report().c_str());
+        std::cerr << "Update statistics:\n" << update_stats->full_report().c_str() << '\n';
+        dscene.print_data_transfered();
       }
     }
   });

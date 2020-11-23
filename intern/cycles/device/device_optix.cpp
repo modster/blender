@@ -1218,6 +1218,8 @@ class OptiXDevice : public CUDADevice {
 
     // Build bottom level acceleration structures (BLAS)
     // Note: Always keep this logic in sync with bvh_optix.cpp!
+    double blas_build_time = 0.0;
+    double data_copy_time = 0.0;
     for (Object *ob : bvh->objects) {
       // Skip geometry for which acceleration structure already exists
       Geometry *geom = ob->get_geometry();
@@ -1409,7 +1411,9 @@ class OptiXDevice : public CUDADevice {
         }
 
         // Allocate memory for new BLAS and build it
+        scoped_timer blas_build_timer;
         if (build_optix_bvh(build_input, num_motion_steps, handle, out_data, operation)) {
+          blas_build_time += blas_build_timer.get_time();
           geometry.insert({ob->get_geometry(), handle});
           static_cast<BVHOptiX *>(geom->bvh)->optix_data_handle = out_data;
           static_cast<BVHOptiX *>(geom->bvh)->optix_handle = handle;
@@ -1426,7 +1430,8 @@ class OptiXDevice : public CUDADevice {
           continue;
         }
 
-        const size_t num_verts = mesh->get_verts().size();
+        scoped_timer data_copy_timer;
+        size_t num_verts = mesh->get_verts().size();
 
         size_t num_motion_steps = 1;
         Attribute *motion_keys = mesh->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
@@ -1434,35 +1439,44 @@ class OptiXDevice : public CUDADevice {
           num_motion_steps = mesh->get_motion_steps();
         }
 
-        device_vector<int> index_data(this, "temp_index_data", MEM_READ_ONLY);
-        index_data.alloc(mesh->get_triangles().size());
-        memcpy(index_data.data(),
-               mesh->get_triangles().data(),
-               mesh->get_triangles().size() * sizeof(int));
-        device_vector<float3> vertex_data(this, "temp_vertex_data", MEM_READ_ONLY);
-        vertex_data.alloc(num_verts * num_motion_steps);
-
-        for (size_t step = 0; step < num_motion_steps; ++step) {
-          const float3 *verts = mesh->get_verts().data();
-
-          size_t center_step = (num_motion_steps - 1) / 2;
-          // The center step for motion vertices is not stored in the attribute
-          if (step != center_step) {
-            verts = motion_keys->data_float3() +
-                    (step > center_step ? step - 1 : step) * num_verts;
-          }
-
-          memcpy(vertex_data.data() + num_verts * step, verts, num_verts * sizeof(float3));
-        }
-
-        // Upload triangle data to GPU
-        index_data.copy_to_device();
-        vertex_data.copy_to_device();
-
         vector<device_ptr> vertex_ptrs;
         vertex_ptrs.reserve(num_motion_steps);
-        for (size_t step = 0; step < num_motion_steps; ++step) {
-          vertex_ptrs.push_back(vertex_data.device_pointer + num_verts * step * sizeof(float3));
+
+        device_vector<int> index_data(this, "temp_index_data", MEM_READ_ONLY);
+
+       if (num_motion_steps == 1) {
+          vertex_ptrs.push_back(bvh->device_verts_pointer + geom->bvh->device_verts_pointer * sizeof(float3));
+          num_verts = mesh->num_triangles() * 3;
+        }
+        else {
+          index_data.alloc(mesh->get_triangles().size());
+          memcpy(index_data.data(),
+                 mesh->get_triangles().data(),
+                 mesh->get_triangles().size() * sizeof(int));
+          device_vector<float3> vertex_data(this, "temp_vertex_data", MEM_READ_ONLY);
+          vertex_data.alloc(num_verts * num_motion_steps);
+
+          for (size_t step = 0; step < num_motion_steps; ++step) {
+            const float3 *verts = mesh->get_verts().data();
+
+            size_t center_step = (num_motion_steps - 1) / 2;
+            // The center step for motion vertices is not stored in the attribute
+            if (step != center_step) {
+              verts = motion_keys->data_float3() +
+                      (step > center_step ? step - 1 : step) * num_verts;
+            }
+
+            memcpy(vertex_data.data() + num_verts * step, verts, num_verts * sizeof(float3));
+          }
+
+          // Upload triangle data to GPU
+          index_data.copy_to_device();
+          vertex_data.copy_to_device();
+          data_copy_time += data_copy_timer.get_time();
+
+          for (size_t step = 0; step < num_motion_steps; ++step) {
+            vertex_ptrs.push_back(vertex_data.device_pointer + num_verts * step * sizeof(float3));
+          }
         }
 
         // Force a single any-hit call, so shadow record-all behavior works correctly
@@ -1473,10 +1487,14 @@ class OptiXDevice : public CUDADevice {
         build_input.triangleArray.numVertices = num_verts;
         build_input.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
         build_input.triangleArray.vertexStrideInBytes = sizeof(float3);
-        build_input.triangleArray.indexBuffer = index_data.device_pointer;
-        build_input.triangleArray.numIndexTriplets = mesh->num_triangles();
-        build_input.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-        build_input.triangleArray.indexStrideInBytes = 3 * sizeof(int);
+
+        if (index_data.size() != 0) {
+          build_input.triangleArray.indexBuffer = index_data.device_pointer;
+          build_input.triangleArray.numIndexTriplets = mesh->num_triangles();
+          build_input.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+          build_input.triangleArray.indexStrideInBytes = 3 * sizeof(int);
+        }
+
         build_input.triangleArray.flags = &build_flags;
         // The SBT does not store per primitive data since Cycles already allocates separate
         // buffers for that purpose. OptiX does not allow this to be zero though, so just pass in
@@ -1485,7 +1503,9 @@ class OptiXDevice : public CUDADevice {
         build_input.triangleArray.primitiveIndexOffset = mesh->optix_prim_offset;
 
         // Allocate memory for new BLAS and build it
+        scoped_timer blas_build_timer;
         if (build_optix_bvh(build_input, num_motion_steps, handle, out_data, operation)) {
+          blas_build_time += blas_build_timer.get_time();
           geometry.insert({ob->get_geometry(), handle});
           static_cast<BVHOptiX *>(geom->bvh)->optix_data_handle = out_data;
           static_cast<BVHOptiX *>(geom->bvh)->optix_handle = handle;
@@ -1496,6 +1516,9 @@ class OptiXDevice : public CUDADevice {
         }
       }
     }
+
+    std::cerr << "Total time spent builing blas : " << blas_build_time << '\n';
+    std::cerr << "Total copying blas data : " << data_copy_time << '\n';
 
     // Fill instance descriptions
 #  if OPTIX_ABI_VERSION < 41
@@ -1677,7 +1700,9 @@ class OptiXDevice : public CUDADevice {
       operation = OPTIX_BUILD_OPERATION_BUILD;
     }
 
+    scoped_timer tlas_build_time;
     if (build_optix_bvh(build_input, 0, tlas_handle, out_data, operation)) {
+      std::cerr << "Total time spent building tlas : " << tlas_build_time.get_time() << '\n';
       static_cast<BVHOptiX *>(bvh)->optix_data_handle = out_data;
       static_cast<BVHOptiX *>(bvh)->optix_handle = tlas_handle;
       static_cast<BVHOptiX *>(bvh)->do_refit = false;

@@ -25,6 +25,7 @@
 #include "util/util_half.h"
 #include "util/util_string.h"
 #include "util/util_texture.h"
+#include "util/util_time.h"
 #include "util/util_types.h"
 #include "util/util_vector.h"
 
@@ -326,6 +327,7 @@ template<typename T> class device_vector : public device_memory {
  public:
   bool modified;
   size_t data_copied = 0;
+  double time_copying = 0.0;
 
   device_vector(Device *device, const char *name, MemoryType type)
       : device_memory(device, name, type)
@@ -451,9 +453,11 @@ template<typename T> class device_vector : public device_memory {
 
   void copy_to_device()
   {
+    scoped_timer timer;
     device_copy_to();
     modified = false;
     data_copied = byte_size();
+    time_copying += timer.get_time();
   }
 
   size_t byte_size() const

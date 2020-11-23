@@ -598,6 +598,7 @@ void GeometryManager::update_attribute_element_offset(Geometry *geom,
         }
         attr_uchar4.modified = true;
       }
+      mattr->device_offset = attr_uchar4_offset;
       attr_uchar4_offset += size;
     }
     else if (mattr->type == TypeDesc::TypeFloat) {
@@ -611,6 +612,7 @@ void GeometryManager::update_attribute_element_offset(Geometry *geom,
         }
         attr_float.modified = true;
       }
+      mattr->device_offset = attr_float_offset;
       attr_float_offset += size;
     }
     else if (mattr->type == TypeFloat2) {
@@ -624,6 +626,7 @@ void GeometryManager::update_attribute_element_offset(Geometry *geom,
         }
         attr_float2.modified = true;
       }
+      mattr->device_offset = attr_float2_offset;
       attr_float2_offset += size;
     }
     else if (mattr->type == TypeDesc::TypeMatrix) {
@@ -637,6 +640,7 @@ void GeometryManager::update_attribute_element_offset(Geometry *geom,
         }
         attr_float3.modified = true;
       }
+      mattr->device_offset = attr_float3_offset;
       attr_float3_offset += size * 3;
     }
     else {
@@ -650,6 +654,7 @@ void GeometryManager::update_attribute_element_offset(Geometry *geom,
         }
         attr_float3.modified = true;
       }
+      mattr->device_offset = attr_float3_offset;
       attr_float3_offset += size;
     }
 
@@ -1214,6 +1219,7 @@ void GeometryManager::device_update_bvh(Device *device,
                                         Scene *scene,
                                         Progress &progress)
 {
+  BVHParams bparams;
   /* bvh build */
   progress.set_status("Updating Scene BVH", "Building");
   {
@@ -1222,7 +1228,6 @@ void GeometryManager::device_update_bvh(Device *device,
         scene->update_stats->geometry.times.add_entry({"device_update (build scene BVH)", time});
       }
     });
-    BVHParams bparams;
     bparams.top_level = true;
     bparams.bvh_layout = BVHParams::best_bvh_layout(scene->params.bvh_layout,
                                                     device->get_bvh_layout_mask());
@@ -1259,16 +1264,23 @@ void GeometryManager::device_update_bvh(Device *device,
     }
 
     bvh->build(progress, &device->stats);
+  }
 
-    if (progress.get_cancel()) {
-      free_bvh(dscene);
-      return;
-    }
+  if (progress.get_cancel()) {
+    free_bvh(dscene);
+    return;
+  }
 
-    /* copy to device */
-    progress.set_status("Updating Scene BVH", "Copying BVH to device");
+  /* copy to device */
+  progress.set_status("Updating Scene BVH", "Copying BVH to device");
 
-    PackedBVH &pack = bvh->pack;
+  PackedBVH &pack = bvh->pack;
+  {
+    scoped_callback_timer timer([scene](double time) {
+      if (scene->update_stats) {
+        scene->update_stats->geometry.times.add_entry({"device_update (copy packed BVH to device)", time});
+      }
+    });
 
     if (pack.nodes.size()) {
       dscene->bvh_nodes.steal_data(pack.nodes);
@@ -1324,6 +1336,10 @@ void GeometryManager::device_update_bvh(Device *device,
             {"device_update (copy BVH to device)", time});
       }
     });
+
+    bvh->device_attr_float3_pointer = dscene->attributes_float3.device_pointer;
+    bvh->device_verts_pointer = dscene->prim_tri_verts.device_pointer;
+
     bvh->copy_to_device(progress, dscene);
   }
 }
