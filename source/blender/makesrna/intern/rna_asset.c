@@ -31,6 +31,7 @@
 #ifdef RNA_RUNTIME
 
 #  include "BKE_asset.h"
+#  include "BKE_idprop.h"
 
 #  include "BLI_listbase.h"
 
@@ -72,6 +73,18 @@ static void rna_AssetData_tag_remove(AssetData *asset_data,
 
   BKE_assetdata_tag_remove(asset_data, tag);
   RNA_POINTER_INVALIDATE(tag_ptr);
+}
+
+static IDProperty *rna_AssetData_idprops(PointerRNA *ptr, bool create)
+{
+  AssetData *asset_data = ptr->data;
+
+  if (create && !asset_data->properties) {
+    IDPropertyTemplate val = {0};
+    asset_data->properties = IDP_New(IDP_GROUP, &val, "RNA_AssetData group");
+  }
+
+  return asset_data->properties;
 }
 
 static void rna_AssetData_description_get(PointerRNA *ptr, char *value)
@@ -176,6 +189,9 @@ static void rna_def_asset_data(BlenderRNA *brna)
   srna = RNA_def_struct(brna, "AssetData", NULL);
   RNA_def_struct_ui_text(srna, "Asset Data", "Additional data stored for an asset data-block");
   //  RNA_def_struct_ui_icon(srna, ICON_ASSET); /* TODO: Icon doesn't exist!. */
+  /* The struct has custom properties, but no pointer properties to other IDs! */
+  RNA_def_struct_idprops_func(srna, "rna_AssetData_idprops");
+  RNA_def_struct_flag(srna, STRUCT_NO_DATABLOCK_IDPROPERTIES); /* Mandatory! */
 
   prop = RNA_def_property(srna, "description", PROP_STRING, PROP_NONE);
   RNA_def_property_string_funcs(prop,
