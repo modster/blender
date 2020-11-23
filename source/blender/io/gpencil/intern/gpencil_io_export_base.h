@@ -21,28 +21,7 @@
 /** \file
  * \ingroup bgpencil
  */
-#include <list>
-#include <string>
-
-#include "BLI_path_util.h"
-
-#include "DNA_defs.h"
-
-#include "gpencil_io.h"
 #include "gpencil_io_base.h"
-
-struct ARegion;
-struct Depsgraph;
-struct Main;
-struct Object;
-struct RegionView3D;
-struct Scene;
-
-struct bGPdata;
-struct bGPDlayer;
-struct bGPDframe;
-struct bGPDstroke;
-struct MaterialGPencilStyle;
 
 namespace blender::io::gpencil {
 
@@ -50,8 +29,6 @@ class GpencilExporter : public GpencilIO {
 
  public:
   GpencilExporter(const struct GpencilIOParams *iparams);
-  virtual bool add_newpage(void) = 0;
-  virtual bool add_body(void) = 0;
   virtual bool write(std::string subfix) = 0;
 
  protected:

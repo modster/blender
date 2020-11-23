@@ -21,27 +21,7 @@
 /** \file
  * \ingroup bgpencil
  */
-#include <list>
-#include <string>
-
-#include "BLI_path_util.h"
-
-#include "DNA_defs.h"
-
-#include "gpencil_io.h"
 #include "gpencil_io_base.h"
-
-struct ARegion;
-struct Depsgraph;
-struct Main;
-struct Object;
-struct RegionView3D;
-struct Scene;
-
-struct bGPdata;
-struct bGPDlayer;
-struct bGPDframe;
-struct bGPDstroke;
 
 namespace blender::io::gpencil {
 
