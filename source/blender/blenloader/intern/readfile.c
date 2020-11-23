@@ -968,8 +968,9 @@ const char *blo_bhead_id_name(const FileData *fd, const BHead *bhead)
 }
 
 /* Warning! Caller's responsibility to ensure given bhead **is** and ID one! */
-AssetData *blo_bhead_id_asset_data(const FileData *fd, const BHead *bhead)
+AssetData *blo_bhead_id_asset_data_address(const FileData *fd, const BHead *bhead)
 {
+  BLI_assert(BKE_idtype_idcode_is_valid(bhead->code));
   return (fd->id_asset_data_offs > 0) ?
              *(AssetData **)POINTER_OFFSET(bhead, sizeof(*bhead) + fd->id_asset_data_offs) :
              NULL;
@@ -3621,6 +3622,27 @@ static BHead *read_libblock(FileData *fd,
     /* For undo, store contents read into id at id_old. */
     read_libblock_undo_restore_at_old_address(fd, main, id, id_old);
   }
+
+  return bhead;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Read Asset Data
+ * \{ */
+
+BHead *blo_read_asset_data_block(FileData *fd, BHead *bhead, AssetData **r_asset_data)
+{
+  BLI_assert(BKE_idtype_idcode_is_valid(bhead->code));
+
+  bhead = read_data_into_datamap(fd, bhead, "asset-data read");
+
+  BlendDataReader reader = {fd};
+  BLO_read_data_address(&reader, r_asset_data);
+  BKE_assetdata_read(&reader, *r_asset_data);
+
+  oldnewmap_clear(fd->datamap);
 
   return bhead;
 }

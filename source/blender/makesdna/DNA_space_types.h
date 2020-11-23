@@ -978,7 +978,9 @@ typedef enum eFileSel_File_Types {
   FILE_TYPE_USD = (1 << 18),
   FILE_TYPE_VOLUME = (1 << 19),
 
-  FILE_TYPE_ASSET = (1 << 29),
+  FILE_TYPE_ASSET = (1 << 28),
+  /* The file is an asset, but read from a file. So the file-list owns the asset-data. */
+  FILE_TYPE_ASSET_EXTERNAL = FILE_TYPE_ASSET | (1 << 29),
   /** An FS directory (i.e. S_ISDIR on its path is true). */
   FILE_TYPE_DIR = (1 << 30),
   FILE_TYPE_BLENDERLIB = (1ul << 31),

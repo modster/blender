@@ -1402,6 +1402,11 @@ static void filelist_intern_entry_free(FileListInternEntry *entry)
   if (entry->name) {
     MEM_freeN(entry->name);
   }
+  /* If we own the asset-data (it was generated from external file data), free it. */
+  if (entry->asset_data &&
+      ((entry->typeflag & FILE_TYPE_ASSET_EXTERNAL) == FILE_TYPE_ASSET_EXTERNAL)) {
+    BKE_asset_data_free(entry->asset_data);
+  }
   MEM_freeN(entry);
 }
 
@@ -2838,8 +2843,9 @@ static int filelist_readjob_list_lib(const char *root, ListBase *entries, const 
     entry = MEM_callocN(sizeof(*entry), __func__);
     entry->relpath = BLI_strdup(blockname);
     entry->typeflag |= FILE_TYPE_BLENDERLIB;
-    if (info && info->is_asset) {
-      entry->typeflag |= FILE_TYPE_ASSET;
+    if (info && info->asset_data) {
+      entry->typeflag |= FILE_TYPE_ASSET_EXTERNAL;
+      entry->asset_data = info->asset_data;
     }
     if (!(group && idcode)) {
       entry->typeflag |= FILE_TYPE_DIR;

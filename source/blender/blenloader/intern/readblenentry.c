@@ -184,7 +184,15 @@ LinkNode *BLO_blendhandle_get_datablock_info(BlendHandle *bh, int ofblocktype, i
       const char *name = blo_bhead_id_name(fd, bhead) + 2;
 
       STRNCPY(info->name, name);
-      info->is_asset = blo_bhead_id_asset_data(fd, bhead) != NULL;
+
+      /* Lastly, read asset data from the following blocks. */
+      info->asset_data = blo_bhead_id_asset_data_address(fd, bhead);
+      if (info->asset_data) {
+        bhead = blo_read_asset_data_block(fd, bhead, &info->asset_data);
+        /* blo_read_asset_data_block() reads all DATA heads and already advances bhead to the next
+         * non-DATA one. Go back, so the loop doesn't skip the non-DATA head. */
+        bhead = blo_bhead_prev(fd, bhead);
+      }
 
       BLI_linklist_prepend(&infos, info);
       tot++;
