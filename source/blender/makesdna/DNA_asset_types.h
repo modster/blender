@@ -33,9 +33,20 @@ typedef struct CustomTag {
   char name[64]; /* MAX_NAME */
 } CustomTag;
 
+/**
+ * \brief The meta-data of an asset.
+ * By creating and giving this for a data-block (#ID.asset_data), the data-block becomes an asset.
+ *
+ * \note This struct must be readable without having to read anything but blocks from the ID it is
+ *       attached to! That way, asset information of a file can be read, without reading anything
+ *       more than that from the file. So pointers to other IDs or ID data are strictly forbidden.
+ */
 typedef struct AssetData {
   /** Thumbnail image of the data-block. Duplicate of the referenced ID preview. */
   struct PreviewImage *preview;
+
+  /** Custom asset meta-data. Cannot store pointers to IDs (#STRUCT_NO_DATABLOCK_IDPROPERTIES)! */
+  struct IDProperty *properties;
 
   /** Optional description of this asset for display in the UI. Dynamic length. */
   char *description;

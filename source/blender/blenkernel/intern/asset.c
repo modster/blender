@@ -26,6 +26,7 @@
 
 #include "BKE_asset.h"
 #include "BKE_icons.h"
+#include "BKE_idprop.h"
 
 #include "DNA_ID.h"
 #include "DNA_asset_types.h"
@@ -44,6 +45,9 @@ AssetData *BKE_asset_data_create(void)
 
 void BKE_asset_data_free(AssetData *asset_data)
 {
+  if (asset_data->properties) {
+    IDP_FreeProperty(asset_data->properties);
+  }
   MEM_SAFE_FREE(asset_data->description);
   BLI_freelistN(&asset_data->tags);
 
@@ -86,6 +90,10 @@ void BKE_assetdata_write(BlendWriter *writer, AssetData *asset_data)
 {
   BLO_write_struct(writer, AssetData, asset_data);
 
+  if (asset_data->properties) {
+    IDP_BlendWrite(writer, asset_data->properties);
+  }
+
   if (asset_data->description) {
     BLO_write_string(writer, asset_data->description);
   }
@@ -97,6 +105,11 @@ void BKE_assetdata_write(BlendWriter *writer, AssetData *asset_data)
 void BKE_assetdata_read(BlendDataReader *reader, AssetData *asset_data)
 {
   /* asset_data itself has been read already. */
+
+  if (asset_data->properties) {
+    BLO_read_data_address(reader, &asset_data->properties);
+    IDP_BlendDataRead(reader, &asset_data->properties);
+  }
 
   BLO_read_data_address(reader, &asset_data->description);
   BLO_read_list(reader, &asset_data->tags);
