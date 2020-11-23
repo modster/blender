@@ -245,16 +245,16 @@ bool AlembicObject::has_data_loaded() const
 
 static void read_transforms(const IObject &iobject, AlembicObject::CachedData &cached_data)
 {
-  auto parent = iobject.getParent();
+  IObject parent = iobject.getParent();
 
-  // gather the samples times
+  /* gather all the samples times in the object's transform hierarchy */
   set<double> samples_times;
 
   while (parent) {
     if (IXform::matches(parent.getHeader())) {
       IXform xform(parent, Alembic::Abc::kWrapExisting);
 
-      const auto &schema = xform.getSchema();
+      const IXformSchema &schema = xform.getSchema();
 
       if (schema.valid()) {
         for (index_t i = 0; i < static_cast<index_t>(schema.getNumSamples()); ++i) {
@@ -267,30 +267,30 @@ static void read_transforms(const IObject &iobject, AlembicObject::CachedData &c
     parent = parent.getParent();
   }
 
-  // accumulate the matrices for each sample time
-  for (auto time : samples_times) {
+  /* accumulate the transformation matrices for each sample time */
+  foreach (double time, samples_times) {
     parent = iobject.getParent();
-    auto matrix = transform_identity();
+    Transform tfm = transform_identity();
 
-    auto selector = ISampleSelector(time);
+    ISampleSelector selector = ISampleSelector(time);
 
     while (parent) {
       if (IXform::matches(parent.getHeader())) {
         IXform xform(parent, Alembic::Abc::kWrapExisting);
 
-        const auto &schema = xform.getSchema();
+        const IXformSchema &schema = xform.getSchema();
 
         if (schema.valid()) {
-          XformSample samp = schema.getValue(selector);
-          Transform ax = make_transform(samp.getMatrix());
-          matrix = ax * matrix;
+          const XformSample &samp = schema.getValue(selector);
+          Transform parent_tfm = make_transform(samp.getMatrix());
+          tfm = parent_tfm * tfm;
         }
       }
 
       parent = parent.getParent();
     }
 
-    cached_data.transforms.add_data(matrix, time);
+    cached_data.transforms.add_data(tfm, time);
   }
 }
 
@@ -298,12 +298,12 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
 {
   cached_data.clear();
 
-  // TODO : store other properties and have a better structure to store these arrays
   Geometry *geometry = object->get_geometry();
   assert(geometry);
 
   AttributeRequestSet requested_attributes;
 
+  // TODO : check for attribute changes in the shaders
   foreach (Node *node, geometry->get_used_shaders()) {
     Shader *shader = static_cast<Shader *>(node);
 
@@ -612,50 +612,40 @@ void AlembicProcedural::generate(Scene *scene)
 
 void AlembicProcedural::load_objects()
 {
-  Abc::chrono_t frame_time = (Abc::chrono_t)(frame / frame_rate);
+  /* Traverse Alembic file hierarchy, avoiding recursion by using an explicit stack. */
+  std::stack<IObject> iobject_stack;
+  iobject_stack.push(archive.getTop());
 
-  /* Traverse Alembic file hierarchy, avoiding recursion by
-   * using an explicit stack
-   *
-   * TODO : cache the transformations
-   */
-  std::stack<std::pair<IObject, Transform>> objstack;
-  objstack.push(std::pair<IObject, Transform>(archive.getTop(), transform_identity()));
+  unordered_map<string, AlembicObject *> object_map;
 
-  while (!objstack.empty()) {
-    std::pair<IObject, Transform> obj = objstack.top();
-    objstack.pop();
+  foreach (AlembicObject *object, objects) {
+    object_map.insert({ object->get_path().c_str(), object });
+  }
 
-    string path = obj.first.getFullName();
-    Transform currmatrix = obj.second;
+  while (!iobject_stack.empty()) {
+    const IObject iobject = iobject_stack.top();
+    iobject_stack.pop();
 
-    AlembicObject *object = NULL;
+    const string &path = iobject.getFullName();
 
-    for (int i = 0; i < objects.size(); i++) {
-      if (fnmatch(objects[i]->get_path().c_str(), path.c_str(), 0) == 0) {
-        object = objects[i];
+    auto iter = object_map.find(path);
+
+    if (iter != object_map.end()) {
+      AlembicObject *object = iter->second;
+
+      if (IPolyMesh::matches(iobject.getHeader())) {
+        IPolyMesh mesh(iobject, Alembic::Abc::kWrapExisting);
+        object->iobject = iobject;
+      }
+      else if (ICurves::matches(iobject.getHeader())) {
+        ICurves curves(iobject, Alembic::Abc::kWrapExisting);
+        object->iobject = iobject;
       }
     }
 
-    if (IXform::matches(obj.first.getHeader())) {
-      IXform xform(obj.first, Alembic::Abc::kWrapExisting);
-      XformSample samp = xform.getSchema().getValue(ISampleSelector(frame_time));
-      Transform ax = make_transform(samp.getMatrix());
-      currmatrix = currmatrix * ax;
+    for (int i = 0; i < iobject.getNumChildren(); i++) {
+      iobject_stack.push(iobject.getChild(i));
     }
-    else if (IPolyMesh::matches(obj.first.getHeader()) && object) {
-      IPolyMesh mesh(obj.first, Alembic::Abc::kWrapExisting);
-      object->iobject = obj.first;
-      object->xform = currmatrix;
-    }
-    else if (ICurves::matches(obj.first.getHeader()) && object) {
-      ICurves curves(obj.first, Alembic::Abc::kWrapExisting);
-      object->iobject = obj.first;
-      object->xform = currmatrix;
-    }
-
-    for (int i = 0; i < obj.first.getNumChildren(); i++)
-      objstack.push(std::pair<IObject, Transform>(obj.first.getChild(i), currmatrix));
   }
 }
 
@@ -665,7 +655,6 @@ void AlembicProcedural::read_mesh(Scene *scene,
                                   IPolyMesh &polymesh,
                                   Abc::chrono_t frame_time)
 {
-  // TODO : support animation at the transformation level
   Mesh *mesh = nullptr;
 
   /* create a mesh node in the scene if not already done */
@@ -688,8 +677,6 @@ void AlembicProcedural::read_mesh(Scene *scene,
   else {
     mesh = static_cast<Mesh *>(abc_object->get_object()->get_geometry());
   }
-
-  // TODO : properly check if and what data needs to be rebuild
 
   IPolyMeshSchema schema = polymesh.getSchema();
 
@@ -788,7 +775,6 @@ void AlembicProcedural::read_curves(Scene *scene,
                                     ICurves &curves,
                                     Abc::chrono_t frame_time)
 {
-  // TODO : support animation at the transformation level
   Hair *hair;
 
   /* create a hair node in the scene if not already done */

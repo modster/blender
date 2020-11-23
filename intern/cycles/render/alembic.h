@@ -66,6 +66,7 @@ class AlembicObject : public Node {
   public:
       T *data_for_time(double time)
       {
+        /* TODO: arrays are emptied */
         if (size() == 1 && std::abs(data[0].time - time) < 1e-6) {
           return &data[0].data;
         }
