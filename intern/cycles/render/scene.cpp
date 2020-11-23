@@ -571,10 +571,6 @@ bool Scene::update(Progress &progress, bool &kernel_switch_needed)
 {
   /* update scene */
   if (need_update()) {
-    /* Need to update the procedurals before tagging for used shaders as procedurals may create
-     * geometry which is not in the scene yet. */
-    procedural_manager->update(this, progress);
-
     /* Updated used shader tag so we know which features are need for the kernel. */
     shader_manager->update_shaders_used(this);
 

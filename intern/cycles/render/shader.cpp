@@ -16,6 +16,7 @@
 
 #include "device/device.h"
 
+#include "render/alembic.h"
 #include "render/background.h"
 #include "render/camera.h"
 #include "render/colorspace.h"
@@ -504,6 +505,17 @@ void ShaderManager::update_shaders_used(Scene *scene)
 
   if (scene->background->get_shader())
     scene->background->get_shader()->used = true;
+
+  foreach (Procedural *procedural, scene->procedurals) {
+    AlembicProcedural *abc_proc = static_cast<AlembicProcedural *>(procedural);
+
+    foreach (AlembicObject *abc_object, abc_proc->objects) {
+      foreach (Node *node, abc_object->get_used_shaders()) {
+        Shader *shader = static_cast<Shader *>(node);
+        shader->used = true;
+      }
+    }
+  }
 
   foreach (Geometry *geom, scene->geometry)
     foreach (Node *node, geom->get_used_shaders()) {
