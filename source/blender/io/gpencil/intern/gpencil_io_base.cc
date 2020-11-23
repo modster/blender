@@ -85,7 +85,7 @@ GpencilIO::GpencilIO(const struct GpencilIOParams *iparams)
   depsgraph_ = CTX_data_depsgraph_pointer(params_.C);
   scene_ = CTX_data_scene(params_.C);
   rv3d_ = (RegionView3D *)params_.region->regiondata;
-  gpd_ = (bGPdata *)params_.ob->data;
+  gpd_ = (params_.ob != NULL) ? (bGPdata *)params_.ob->data : nullptr;
   cfra_ = iparams->frame_cur;
 
   /* Load list of selected objects. */
