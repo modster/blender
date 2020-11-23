@@ -506,7 +506,9 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
   }
 
   p->set_frame(static_cast<float>(frame_current));
-  if (p->frame_is_modified()) {
+  p->set_frame_rate(b_scene.render().fps());
+
+  if (p->is_modified()) {
     scene->procedural_manager->need_update = true;
   }
 
