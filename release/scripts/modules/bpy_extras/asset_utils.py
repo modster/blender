@@ -44,7 +44,7 @@ class SpaceAssetInfo:
     def get_active_asset(cls, context: Context):
         if hasattr(context, "active_file"):
             active_file = context.active_file
-            return active_file.asset_data
+            return active_file.asset_data if active_file else None
 
 class AssetBrowserPanel:
     bl_space_type = 'FILE_BROWSER'
