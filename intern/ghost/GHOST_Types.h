@@ -713,6 +713,9 @@ typedef struct GHOST_XrActionInfo {
   /** Input threshold for float actions (only used by wm). */
   float threshold;
 
+  /** The currently active subaction path (if any) for modal actions (only used by wm). */
+  char **active_modal_path;
+
   /** Operator to be called on XR events (only used by wm). */
   void *ot;
   void *op_properties;

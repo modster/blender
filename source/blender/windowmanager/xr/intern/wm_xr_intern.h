@@ -136,6 +136,9 @@ typedef struct wmXrAction {
   /** Input threshold for float actions. */
   float threshold;
 
+  /** The currently active subaction path (if any) for modal actions. */
+  char **active_modal_path;
+
   /** Operator to be called on XR events. */
   struct wmOperatorType *ot;
   IDProperty *op_properties;
@@ -145,10 +148,14 @@ typedef struct wmXrAction {
 typedef struct wmXrActionSet {
   char *name;
   struct GHash *actions; /* wmXrAction */
+
   /** Shared pointer with the GHash. The XR pose action that determines the controller
    * transforms. This is usually identified by the OpenXR path "/grip/pose" or "/aim/pose",
    * although it could differ depending on the specification and hardware. */
   wmXrAction *controller_pose_action;
+
+  /** Shared pointer with the GHash. The currently active modal action (if any). */
+  wmXrAction *active_modal_action;
 } wmXrActionSet;
 
 wmXrRuntimeData *wm_xr_runtime_data_create(void);

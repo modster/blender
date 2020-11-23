@@ -197,6 +197,9 @@ void WM_xr_action_set_destroy(wmXrData *xr, const char *action_set_name, bool re
       wm_xr_session_controller_data_clear(&xr->runtime->session_state);
       action_set->controller_pose_action = NULL;
     }
+    if (action_set->active_modal_action) {
+      action_set->active_modal_action = NULL;
+    }
     session_state->active_action_set = NULL;
   }
 
@@ -261,20 +264,37 @@ void WM_xr_actions_destroy(wmXrData *xr,
 
   GHOST_XrDestroyActions(xr->runtime->context, action_set_name, count, action_names);
 
-  /* Save name of controller pose action in case the action is removed from the GHash. */
-  char controller_pose_name[64];
-  strcpy(controller_pose_name, action_set->controller_pose_action->name);
-
   GHash *actions = action_set->actions;
+  char controller_pose_name[64];
+  char active_modal_name[64];
+
+  /* Save names of controller pose and active modal actions in case they are removed from the
+   * GHash. */
+  if (action_set->controller_pose_action) {
+    strcpy(controller_pose_name, action_set->controller_pose_action->name);
+  }
+  else {
+    controller_pose_name[0] = '\0';
+  }
+  if (action_set->active_modal_action) {
+    strcpy(active_modal_name, action_set->active_modal_action->name);
+  }
+  else {
+    active_modal_name[0] = '\0';
+  }
+
   for (unsigned int i = 0; i < count; ++i) {
     BLI_ghash_remove(actions, action_names[i], NULL, action_destroy);
   }
 
-  if (!action_find(action_set, controller_pose_name)) {
+  if ((controller_pose_name[0] != '\0') && !action_find(action_set, controller_pose_name)) {
     if (action_set == xr->runtime->session_state.active_action_set) {
       wm_xr_session_controller_data_clear(&xr->runtime->session_state);
     }
     action_set->controller_pose_action = NULL;
+  }
+  if ((active_modal_name[0] != '\0') && !action_find(action_set, active_modal_name)) {
+    action_set->active_modal_action = NULL;
   }
 }
 
@@ -316,6 +336,20 @@ bool WM_xr_active_action_set_set(wmXrData *xr, const char *action_set_name)
   wmXrActionSet *action_set = action_set_find(xr, action_set_name);
   if (!action_set) {
     return false;
+  }
+
+  {
+    /* Unset active modal action (if any). */
+    wmXrActionSet *active_action_set = xr->runtime->session_state.active_action_set;
+    if (active_action_set) {
+      wmXrAction *active_modal_action = active_action_set->active_modal_action;
+      if (active_modal_action) {
+        if (active_modal_action->active_modal_path) {
+          active_modal_action->active_modal_path = NULL;
+        }
+        active_action_set->active_modal_action = NULL;
+      }
+    }
   }
 
   xr->runtime->session_state.active_action_set = action_set;
