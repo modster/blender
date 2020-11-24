@@ -576,10 +576,12 @@ class ASSETBROWSER_PT_metadata(asset_utils.AssetBrowserPanel, Panel):
 
         layout.use_property_split = True
 
-        if active_file and active_asset:
-            layout.prop(active_file, "name")
-        else:
+        if not active_file or not active_asset:
             layout.label(text="No asset selected.")
+            return
+
+        layout.prop(active_file, "name")
+        layout.operator("ed.lib_id_load_custom_preview", icon='FILEBROWSER')
 
 
 class ASSETBROWSER_PT_metadata_details(asset_utils.AssetBrowserPanel, Panel):

@@ -232,6 +232,20 @@ static PreviewImage *previewimg_create_ex(size_t deferred_data_size)
   return prv_img;
 }
 
+static PreviewImage *previewimg_defered_create(const char *path, int source)
+{
+  /* We pack needed data for lazy loading (source type, in a single char, and path). */
+  const size_t deferred_data_size = strlen(path) + 2;
+  char *deferred_data;
+
+  PreviewImage *prv = previewimg_create_ex(deferred_data_size);
+  deferred_data = PRV_DEFERRED_DATA(prv);
+  deferred_data[0] = source;
+  memcpy(&deferred_data[1], path, deferred_data_size - 1);
+
+  return prv;
+}
+
 PreviewImage *BKE_previewimg_create(void)
 {
   return previewimg_create_ex(0);
@@ -372,9 +386,45 @@ PreviewImage *BKE_previewimg_id_ensure(ID *id)
   return NULL;
 }
 
+void BKE_previewimg_id_custom_set(ID *id, const char *path)
+{
+  PreviewImage **prv = BKE_previewimg_id_get_p(id);
+
+  /* Thumbnail previews must use the deferred pipeline. But we force them to be immediately
+   * generated here still. */
+
+  if (*prv) {
+    BKE_previewimg_deferred_release(*prv);
+  }
+  *prv = previewimg_defered_create(path, THB_SOURCE_IMAGE);
+
+  /* Can't lazy-render the preview on access. ID previews are saved to files and we want them to be
+   * there in time. Not only if something happened to have accessed it meanwhile. */
+  for (int i = 0; i < NUM_ICON_SIZES; i++) {
+    BKE_previewimg_ensure(*prv, i);
+    /* Prevent auto-updates. */
+    (*prv)->flag[i] |= PRV_USER_EDITED;
+  }
+}
+
 bool BKE_previewimg_id_supports_jobs(const ID *id)
 {
   return ELEM(GS(id->name), ID_OB, ID_MA, ID_TE, ID_LA, ID_WO, ID_IM, ID_BR);
+}
+
+void BKE_previewimg_deferred_release(PreviewImage *prv)
+{
+  if (prv) {
+    if (prv->tag & PRV_TAG_DEFFERED_RENDERING) {
+      /* We cannot delete the preview while it is being loaded in another thread... */
+      prv->tag |= PRV_TAG_DEFFERED_DELETE;
+      return;
+    }
+    if (prv->icon_id) {
+      BKE_icon_delete(prv->icon_id);
+    }
+    BKE_previewimg_freefunc(prv);
+  }
 }
 
 PreviewImage *BKE_previewimg_cached_get(const char *name)
@@ -402,6 +452,7 @@ PreviewImage *BKE_previewimg_cached_ensure(const char *name)
 
 /**
  * Generate a PreviewImage from given file path, using thumbnails management, if not yet existing.
+ * Does not actually generate the preview, #BKE_previewimg_ensure() must be called for that.
  */
 PreviewImage *BKE_previewimg_cached_thumbnail_read(const char *name,
                                                    const char *path,
@@ -430,15 +481,7 @@ PreviewImage *BKE_previewimg_cached_thumbnail_read(const char *name,
   }
 
   if (!prv) {
-    /* We pack needed data for lazy loading (source type, in a single char, and path). */
-    const size_t deferred_data_size = strlen(path) + 2;
-    char *deferred_data;
-
-    prv = previewimg_create_ex(deferred_data_size);
-    deferred_data = PRV_DEFERRED_DATA(prv);
-    deferred_data[0] = source;
-    memcpy(&deferred_data[1], path, deferred_data_size - 1);
-
+    previewimg_defered_create(path, source);
     force_update = true;
   }
 
@@ -454,26 +497,11 @@ PreviewImage *BKE_previewimg_cached_thumbnail_read(const char *name,
   return prv;
 }
 
-void BKE_previewimg_cached_release_pointer(PreviewImage *prv)
-{
-  if (prv) {
-    if (prv->tag & PRV_TAG_DEFFERED_RENDERING) {
-      /* We cannot delete the preview while it is being loaded in another thread... */
-      prv->tag |= PRV_TAG_DEFFERED_DELETE;
-      return;
-    }
-    if (prv->icon_id) {
-      BKE_icon_delete(prv->icon_id);
-    }
-    BKE_previewimg_freefunc(prv);
-  }
-}
-
 void BKE_previewimg_cached_release(const char *name)
 {
   PreviewImage *prv = BLI_ghash_popkey(gCachedPreviews, name, MEM_freeN);
 
-  BKE_previewimg_cached_release_pointer(prv);
+  BKE_previewimg_deferred_release(prv);
 }
 
 /**
