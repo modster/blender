@@ -610,6 +610,13 @@ void AlembicProcedural::generate(Scene *scene)
   clear_modified();
 }
 
+void AlembicProcedural::tag_update(Scene *scene)
+{
+  if (is_modified()) {
+    scene->procedural_manager->need_update = true;
+  }
+}
+
 void AlembicProcedural::load_objects()
 {
   /* Traverse Alembic file hierarchy, avoiding recursion by using an explicit stack. */

@@ -210,6 +210,8 @@ class AlembicProcedural : public Procedural {
 
   array<AlembicObject *> objects;  // todo : Node::set
 
+  void tag_update(Scene *scene);
+
  private:
   Alembic::AbcGeom::IArchive archive;
   bool objects_loaded = false;

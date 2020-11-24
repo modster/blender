@@ -508,10 +508,6 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
   p->set_frame(static_cast<float>(frame_current));
   p->set_frame_rate(b_scene.render().fps());
 
-  if (p->is_modified()) {
-    scene->procedural_manager->need_update = true;
-  }
-
   auto absolute_path = blender_absolute_path(b_data, b_ob, b_mesh_cache.cache_file().filepath());
 
   p->set_filepath(ustring(absolute_path));
@@ -541,6 +537,8 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
   abc_object->set_used_shaders(used_shaders);
 
   p->objects.push_back_slow(abc_object);
+
+  p->tag_update(scene);
 }
 
 void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
