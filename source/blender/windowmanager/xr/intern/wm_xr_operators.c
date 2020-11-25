@@ -422,7 +422,7 @@ static bool wm_xr_select_raycast(bContext *C,
     }
 
     if (!hit) {
-      if (deselect_all && (select_op == SEL_OP_SET)) {
+      if (deselect_all) {
         changed = EDBM_mesh_deselect_all_multi(C);
       }
     }
@@ -461,7 +461,7 @@ static bool wm_xr_select_raycast(bContext *C,
     }
   }
   else if (vc.em) {
-    if (deselect_all && (select_op == SEL_OP_SET)) {
+    if (deselect_all) {
       changed = EDBM_mesh_deselect_all_multi(C);
     }
 
@@ -476,7 +476,7 @@ static bool wm_xr_select_raycast(bContext *C,
     }
 
     if (!hit) {
-      if (deselect_all && (select_op == SEL_OP_SET)) {
+      if (deselect_all) {
         changed = object_deselect_all_except(vc.view_layer, NULL);
       }
     }
@@ -564,17 +564,17 @@ static int wm_xr_select_raycast_modal_3d(bContext *C, wmOperator *op, const wmEv
     prop = RNA_struct_find_property(op->ptr, "distance");
     ray_dist = prop ? RNA_property_float_get(op->ptr, prop) : BVH_RAYCAST_DIST_MAX;
 
-    prop = RNA_struct_find_property(op->ptr, "extend");
+    prop = RNA_struct_find_property(op->ptr, "toggle");
     if (prop && RNA_property_boolean_get(op->ptr, prop)) {
-      select_op = SEL_OP_ADD;
+      select_op = SEL_OP_XOR;
     }
     prop = RNA_struct_find_property(op->ptr, "deselect");
     if (prop && RNA_property_boolean_get(op->ptr, prop)) {
       select_op = SEL_OP_SUB;
     }
-    prop = RNA_struct_find_property(op->ptr, "toggle");
+    prop = RNA_struct_find_property(op->ptr, "extend");
     if (prop && RNA_property_boolean_get(op->ptr, prop)) {
-      select_op = SEL_OP_XOR;
+      select_op = SEL_OP_ADD;
     }
 
     prop = RNA_struct_find_property(op->ptr, "deselect_all");
