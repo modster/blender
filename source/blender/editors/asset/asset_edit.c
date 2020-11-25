@@ -27,6 +27,8 @@
 
 #include "UI_interface_icons.h"
 
+#include "RNA_access.h"
+
 #include "ED_asset.h"
 
 bool ED_asset_make_for_id(const bContext *C, ID *id)
@@ -48,4 +50,10 @@ bool ED_asset_make_for_id(const bContext *C, ID *id)
   id->asset_data->preview = BKE_assetdata_preview_get_from_id(id->asset_data, id);
 
   return true;
+}
+
+bool ED_asset_can_make_single_from_context(const bContext *C)
+{
+  /* Context needs a "focused_id" pointer to be set for #ASSET_OT_make() to use. */
+  return CTX_data_pointer_get_type_silent(C, "focused_id", &RNA_ID).data != NULL;
 }

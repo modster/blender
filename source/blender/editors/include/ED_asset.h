@@ -27,6 +27,8 @@ extern "C" {
 
 bool ED_asset_make_for_id(const struct bContext *C, struct ID *id);
 
+bool ED_asset_can_make_single_from_context(const struct bContext *C);
+
 void ED_operatortypes_asset(void);
 
 #ifdef __cplusplus

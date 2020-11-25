@@ -29,27 +29,54 @@
 
 #include "ED_asset.h"
 
+#include "MEM_guardedalloc.h"
+
 #include "RNA_access.h"
 #include "RNA_define.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
 
+/**
+ * Return the IDs to operate on as list of #CollectionPointerLink links. Needs freeing.
+ */
+static ListBase asset_make_get_ids_from_context(const bContext *C)
+{
+  ListBase list = {0};
+
+  PointerRNA idptr = CTX_data_pointer_get_type(C, "focused_id", &RNA_ID);
+
+  if (idptr.data) {
+    CollectionPointerLink *ctx_link = MEM_callocN(sizeof(*ctx_link), __func__);
+    ctx_link->ptr = idptr;
+    BLI_addtail(&list, ctx_link);
+  }
+  else {
+    CTX_data_selected_ids(C, &list);
+  }
+
+  return list;
+}
+
 static bool asset_make_poll(bContext *C)
 {
+  ListBase ids = asset_make_get_ids_from_context(C);
+
   int tot_selected = 0;
   bool can_make_asset = false;
 
   /* Note that this isn't entirely cheap. Iterates over entire Outliner tree and allocates a link
    * for each selected item. The button only shows in the context menu though, so acceptable. */
-  CTX_DATA_BEGIN (C, ID *, id, selected_ids) {
+  LISTBASE_FOREACH (CollectionPointerLink *, ctx_id, &ids) {
+    ID *id = ctx_id->ptr.data;
+
     tot_selected++;
     if (!id->asset_data) {
       can_make_asset = true;
       break;
     }
   }
-  CTX_DATA_END;
+  BLI_freelistN(&ids);
 
   if (!can_make_asset) {
     if (tot_selected > 0) {
@@ -66,10 +93,14 @@ static bool asset_make_poll(bContext *C)
 
 static int asset_make_exec(bContext *C, wmOperator *op)
 {
+  ListBase ids = asset_make_get_ids_from_context(C);
+
   ID *last_id = NULL;
   int tot_created = 0;
 
-  CTX_DATA_BEGIN (C, ID *, id, selected_ids) {
+  LISTBASE_FOREACH (CollectionPointerLink *, ctx_id, &ids) {
+    ID *id = ctx_id->ptr.data;
+    BLI_assert(RNA_struct_is_ID(ctx_id->ptr.type));
     if (id->asset_data) {
       continue;
     }
@@ -78,7 +109,7 @@ static int asset_make_exec(bContext *C, wmOperator *op)
     last_id = id;
     tot_created++;
   }
-  CTX_DATA_END;
+  BLI_freelistN(&ids);
 
   /* User feedback. */
   if (tot_created < 1) {
