@@ -512,6 +512,8 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
 
   p->set_filepath(ustring(absolute_path));
 
+  p->tag_update(scene);
+
   /* if the filepath was not modified, then we have already created the objects */
   if (!p->filepath_is_modified()) {
     return;
@@ -537,8 +539,6 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
   abc_object->set_used_shaders(used_shaders);
 
   p->objects.push_back_slow(abc_object);
-
-  p->tag_update(scene);
 }
 
 void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
