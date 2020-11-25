@@ -154,14 +154,6 @@ typedef struct NlaEvalData {
   NlaEvalSnapshot eval_snapshot;
 } NlaEvalData;
 
-typedef struct NlaPoseChannelPreBlend {
-  // char *bone_name;
-  NlaEvalChannel *location;
-  NlaEvalChannel *rotation;
-  NlaEvalChannel *scale;
-
-} NlaPoseChannelPreBlend;
-
 /* Information about the currently edited strip and ones below it for keyframing. */
 typedef struct NlaKeyframingContext {
   struct NlaKeyframingContext *next, *prev;

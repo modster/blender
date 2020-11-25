@@ -49,6 +49,7 @@ _modules = [
     "properties_mask_common",
     "properties_material",
     "properties_material_gpencil",
+    "properties_nla",
     "properties_object",
     "properties_paint_common",
     "properties_grease_pencil_common",

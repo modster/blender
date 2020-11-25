@@ -2996,6 +2996,18 @@ void nlastrip_evaluate(PointerRNA *ptr,
   /* Apply preblend transforms to each bone's raw snapshot values.  */
   Object *object = (Object *)ptr->owner_id;
   bPose *pose = object->pose;
+  /**
+   * Assumes preblend xformed bones are root bones with no parents. ( I think that would affect
+   * conversion to bone local space?). If it has an animated parent, then preblend xforms generally
+   * won't make sense anyways (not a usecase situation).
+   *
+   * Q: maybe the preblend xform should be stored per bone and already in local space?
+   *
+   * todo: make preblend xform UI in python... alot easier.
+   * todo: if strip has cycled, then apply preblend xform based on how far each bone moves per
+   * cycle. Probably need a toggle per preblend xform for whether cyclic offset if applied (no need
+   * to be per bone).
+   */
   LISTBASE_FOREACH (NlaStripPreBlendTransform *, preblend, &nes->strip->preblend_transforms) {
     float world[4][4];
     loc_eul_size_to_mat4(world, preblend->location, preblend->rotation_euler, preblend->scale);
