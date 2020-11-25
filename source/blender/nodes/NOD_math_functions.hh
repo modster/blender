@@ -137,6 +137,8 @@ inline bool try_dispatch_float_math_fl_fl_to_fl(const int operation, OpType &&op
       return dispatch([](float a, float b) { return floorf(safe_divide(a, b)) * b; });
     case NODE_MATH_ARCTAN2:
       return dispatch([](float a, float b) { return atan2f(a, b); });
+    case NODE_MATH_PINGPONG:
+      return dispatch([](float a, float b) { return pingpongf(a, b); });
   }
   return false;
 }
@@ -161,6 +163,12 @@ inline bool try_dispatch_float_math_fl_fl_fl_to_fl(const int operation, OpType &
       return dispatch([](float a, float b, float c) -> float {
         return ((a == b) || (fabsf(a - b) <= fmaxf(c, FLT_EPSILON))) ? 1.0f : 0.0f;
       });
+    case NODE_MATH_SMOOTH_MIN:
+      return dispatch([](float a, float b, float c) { return smoothminf(a, b, c); });
+    case NODE_MATH_SMOOTH_MAX:
+      return dispatch([](float a, float b, float c) { return -smoothminf(-a, -b, -c); });
+    case NODE_MATH_WRAP:
+      return dispatch([](float a, float b, float c) { return wrapf(a, b, c); });
   }
   return false;
 }
