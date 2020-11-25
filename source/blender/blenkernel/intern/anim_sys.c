@@ -40,7 +40,9 @@
 
 #include "BLT_translation.h"
 
+#include "DNA_action_types.h"
 #include "DNA_anim_types.h"
+#include "DNA_constraint_types.h"
 #include "DNA_light_types.h"
 #include "DNA_material_types.h"
 #include "DNA_object_types.h"
@@ -2931,7 +2933,47 @@ static void nlastrip_evaluate_meta_raw_value(PointerRNA *ptr,
   /* unlink this strip's modifiers from the parent's modifiers again */
   nlaeval_fmodifiers_split_stacks(&strip->modifiers, modifiers);
 }
+/*
+ * lower is also output
+ */
+static void nlaeval_snapshot_blend(NlaEvalData *nlaeval,
+                                   NlaEvalSnapshot *raw_upper,
+                                   short upper_blendmode,
+                                   float upper_influence,
+                                   NlaEvalSnapshot *lower)
+{
+  nlaeval_snapshot_ensure_size(lower, nlaeval->num_channels);
 
+  for (int i = 0; i < nlaeval->num_channels; i++) {
+    NlaEvalChannelSnapshot *c_upper = nlaeval_snapshot_get(raw_upper, i);
+    if (c_upper == NULL) {
+      continue;
+    }
+
+    NlaEvalChannelSnapshot *c_lower = nlaeval_snapshot_ensure_channel(lower, nec);
+
+    NlaEvalChannel *nec = c_lower->channel;
+    int mix_mode = c_lower->channel->mix_mode;
+    if (upper_blendmode == NLASTRIP_MODE_COMBINE) {
+      if (mix_mode == NEC_MIX_QUATERNION) {
+        nla_combine_quaternion(c_lower->values, c_upper->values, upper_influence, c_lower->values);
+      }
+      else {
+        float *base_values = nec->base_snapshot.values;
+        for (int j = 0; j < c_lower->length; j++) {
+          c_lower->values[j] = nla_combine_value(
+              mix_mode, base_values[j], c_lower->values[j], c_upper->values[j], upper_influence);
+        }
+      }
+    }
+    else {
+      for (int j = 0; j < c_lower->length; j++) {
+        c_lower->values[j] = nla_blend_value(
+            upper_blendmode, c_lower->values[j], c_upper->values[j], upper_influence);
+      }
+    }
+  }
+}
 /* evaluates the given evaluation strip */
 void nlastrip_evaluate(PointerRNA *ptr,
                        NlaEvalData *channels,
@@ -2942,52 +2984,100 @@ void nlastrip_evaluate(PointerRNA *ptr,
                        const bool flush_to_original,
                        bool allow_alloc_channels)
 {
-  NlaStrip *strip = nes->strip;
 
-  /* To prevent potential infinite recursion problems
-   * (i.e. transition strip, beside meta strip containing a transition
-   * several levels deep inside it),
-   * we tag the current strip as being evaluated, and clear this when we leave.
-   */
-  /* TODO: be careful with this flag, since some edit tools may be running and have
-   * set this while animation playback was running. */
-  if (strip->flag & NLASTRIP_FLAG_EDIT_TOUCHED) {
-    return;
+  NlaEvalSnapshot snapshot_raw;
+  nlaeval_snapshot_init(&snapshot_raw, channels, NULL);
+
+  short blendmode = 0;
+  float influence = 0;
+  nlastrip_evaluate_raw_value(
+      ptr, channels, NULL, nes, &snapshot_raw, anim_eval_context, &blendmode, &influence);
+
+  /* Apply preblend transforms to each bone's raw snapshot values.  */
+  Object *object = (Object *)ptr->owner_id;
+  bPose *pose = object->pose;
+  LISTBASE_FOREACH (NlaStripPreBlendTransform *, preblend, &nes->strip->preblend_transforms) {
+    float world[4][4];
+    loc_eul_size_to_mat4(world, preblend->location, preblend->rotation_euler, preblend->scale);
+
+    LISTBASE_FOREACH (NlaStripPreBlendTransform_BoneName *, bone, &preblend_xform->bones) {
+
+      char name_esc[sizeof(bone->name) * 2];
+      BLI_strescape(name_esc, bone->name, sizeof(name_esc));
+
+      /* Get preblend transform in bone's non-animated local space. */
+      float bone_preblend_matrix[4][4];
+      copy_m4_m4(bone_preblend_matrix, world);
+      bPoseChannel *pose_channel = BKE_pose_channel_find_name(pose, name_esc);
+      BKE_constraint_mat_convertspace(object,
+                                      pose_channel,
+                                      bone_preblend_matrix,
+                                      CONSTRAINT_SPACE_WORLD,
+                                      CONSTRAINT_SPACE_LOCAL,
+                                      false);
+
+      char *location_path = BLI_sprintfN("pose.bones[\"\s\"].location", name_esc);
+      NlaEvalChannel *location_channel = nlaevalchan_verify(ptr, channels, location_path);
+      float *location_values =
+          nlaeval_snapshot_ensure_channel(snapshot_raw, location_channel)->values;
+
+      char *rotation_path;
+      switch (pose_channel->rotmode) {
+        case ROT_MODE_QUAT:
+          rotation_path = BLI_sprintfN("pose.bones[\"\s\"].rotation_quaternion", name_esc);
+          break;
+        case ROT_MODE_AXISANGLE:
+          rotation_path = BLI_sprintfN("pose.bones[\"\s\"].rotation_axis_angle", name_esc);
+          break;
+        default:
+          rotation_path = BLI_sprintfN("pose.bones[\"\s\"].rotation_euler", name_esc);
+          break;
+      }
+      NlaEvalChannel *rotation_channel = nlaevalchan_verify(ptr, channels, rotation_path);
+      float *rotation_values =
+          nlaeval_snapshot_ensure_channel(snapshot_raw, rotation_channel)->values;
+
+      char *scale_path = BLI_sprintfN("pose.bones[\"\s\"].scale", name_esc);
+      NlaEvalChannel *scale_channel = nlaevalchan_verify(ptr, channels, scale_path);
+      float *scale_values = nlaeval_snapshot_ensure_channel(snapshot_raw, scale_channel)->values;
+
+      /* Apply preblend transform as a parent transform to bone's action channels.
+       * Results written directly back to raw snapshot. */
+      float raw_snapshot_matrix[4][4];
+      float decomposed_quat[4];
+      switch (pose_channel->rotmode) {
+        case ROT_MODE_QUAT:
+          loc_quat_size_to_mat4(
+              raw_snapshot_matrix, location_values, rotation_values, scale_values);
+          mul_m4_m4m4(raw_snapshot_matrix, bone_preblend_matrix, raw_snapshot_matrix);
+          mat4_decompose(location_values, rotation_values, scale_values, raw_snapshot_matrix);
+
+          break;
+        case ROT_MODE_AXISANGLE:
+          loc_axisangle_size_to_mat4(
+              raw_snapshot_matrix, location_values, rotation_values, scale_values);
+          mul_m4_m4m4(raw_snapshot_matrix, bone_preblend_matrix, raw_snapshot_matrix);
+          mat4_decompose(location_values, decomposed_quat, scale_values, raw_snapshot_matrix);
+          quat_to_axis_angle(rotation_values, &rotation_values[3], decomposed_quat);
+          break;
+        default:
+          loc_eul_size_to_mat4(
+              raw_snapshot_matrix, location_values, rotation_values, scale_values);
+          mul_m4_m4m4(raw_snapshot_matrix, bone_preblend_matrix, raw_snapshot_matrix);
+          quat_to_eul(rotation_values, decomposed_quat);
+
+          break;
+      }
+
+      MEM_freeN(location_path);  // todo: verify correct call
+      MEM_freeN(rotation_path);  // todo: verify correct call
+      MEM_freeN(scale_path);     // todo: verify correct call
+    }
   }
-  strip->flag |= NLASTRIP_FLAG_EDIT_TOUCHED;
 
-  /* actions to take depend on the type of strip */
-  switch (strip->type) {
-    case NLASTRIP_TYPE_CLIP: /* action-clip */
-      nlastrip_evaluate_actionclip(ptr, channels, modifiers, nes, snapshot, allow_alloc_channels);
-      break;
-    case NLASTRIP_TYPE_TRANSITION: /* transition */
-      nlastrip_evaluate_transition(ptr,
-                                   channels,
-                                   modifiers,
-                                   nes,
-                                   snapshot,
-                                   anim_eval_context,
-                                   flush_to_original,
-                                   allow_alloc_channels);
-      break;
-    case NLASTRIP_TYPE_META: /* meta */
-      nlastrip_evaluate_meta(ptr,
-                             channels,
-                             modifiers,
-                             nes,
-                             snapshot,
-                             anim_eval_context,
-                             flush_to_original,
-                             allow_alloc_channels);
-      break;
-
-    default: /* do nothing */
-      break;
-  }
-
-  /* clear temp recursion safe-check */
-  strip->flag &= ~NLASTRIP_FLAG_EDIT_TOUCHED;
+  /** Blend raw snapshot with lower snapshot. */
+  nlaeval_snapshot_blend(channels, &snapshot_raw, blendmode, influence, snapshot);
+  nlaeval_snapshot_free_data(&snapshot_raw);
 }
 
 /* Removes the effect of the evaluation strip from the snapshot value,
@@ -3037,8 +3127,8 @@ void nlastrip_evaluate_invert_get_lower_values(PointerRNA *ptr,
 }
 
 /* Evaluates strip without blending, stored within snapshot. NLAEvalChannelSnapshot
- * raw_value_sampled bits are set for channels sampled. This is only called by transition's invert
- * function. */
+ * raw_value_sampled bits are set for channels sampled. This is only called by transition's
+ * invert function. */
 void nlastrip_evaluate_raw_value(PointerRNA *ptr,
                                  NlaEvalData *upper_eval_data,
                                  ListBase *modifiers,
@@ -3070,9 +3160,9 @@ void nlastrip_evaluate_raw_value(PointerRNA *ptr,
       break;
     case NLASTRIP_TYPE_TRANSITION:
       /*
-       * If nes is eventually a transition, then nothing is written and no value bitmask is set.
-       * This matches the existing behavior that adjacent transitions evaluate to default (lower
-       * snapshot or property type default).
+       * If nes is eventually a transition, then nothing is written and no value bitmask is
+       * set. This matches the existing behavior that adjacent transitions evaluate to default
+       * (lower snapshot or property type default).
        *
        * In normal cases, this case should never happen. This is only called by
        * nlastrip_evaluate_transition_invert_get_lower_values() and transitions never reference
@@ -3114,8 +3204,8 @@ void nladata_flush_channels(PointerRNA *ptr,
   LISTBASE_FOREACH (NlaEvalChannel *, nec, &channels->channels) {
     /**
      * The bitmask is set for all channels touched by NLA due to the domain() function.
-     * Channels touched by current set of evaluated strips will have a snapshot channel directly
-     * from the evaluation snapshot.
+     * Channels touched by current set of evaluated strips will have a snapshot channel
+     * directly from the evaluation snapshot.
      *
      * This function falls back to the default value if the snapshot channel doesn't exist.
      * Thus channels, touched by NLA but not by the current set of evaluated strips, will be
@@ -3318,8 +3408,9 @@ static void nonstrip_action_fill_strip_data(const AnimData *adt,
    * and this setting doesn't work. */
   action_strip->flag |= NLASTRIP_FLAG_USR_INFLUENCE;
 
-  /* Unless extendmode is Nothing (might be useful for flattening NLA evaluation), disable range.
-   * Extendmode Nothing and Hold will behave as normal. Hold Forward will behave just like Hold.
+  /* Unless extendmode is Nothing (might be useful for flattening NLA evaluation), disable
+   * range. Extendmode Nothing and Hold will behave as normal. Hold Forward will behave just
+   * like Hold.
    */
   if (action_strip->extendmode != NLASTRIP_EXTEND_NOTHING) {
     action_strip->flag |= NLASTRIP_FLAG_NO_TIME_MAP;
@@ -3367,8 +3458,8 @@ bool is_nlatrack_evaluatable(const AnimData *adt, const NlaTrack *nlt)
   return true;
 }
 
-/** Check for special case of non-pushed action being evaluated with no NLA influence (off and no
- * strips evaluated) nor NLA interference (ensure NLA not soloing). */
+/** Check for special case of non-pushed action being evaluated with no NLA influence (off and
+ * no strips evaluated) nor NLA interference (ensure NLA not soloing). */
 static bool is_nonstrip_action_evaluated_without_nla(const AnimData *adt,
                                                      const bool any_strip_evaluated)
 {
@@ -3382,11 +3473,12 @@ static bool is_nonstrip_action_evaluated_without_nla(const AnimData *adt,
 }
 
 /** XXX Wayde Moss: BKE_nlatrack_find_tweaked() exists within nla.c, but it doesn't appear to
- * work as expected. From animsys_evaluate_nla_for_flush(), it returns NULL in tweak mode. I'm not
- * sure why. Preferably, it would be as simple as checking for (adt->act_Track == nlt) but that
- * doesn't work either, neither does comparing indices.
+ * work as expected. From animsys_evaluate_nla_for_flush(), it returns NULL in tweak mode. I'm
+ * not sure why. Preferably, it would be as simple as checking for (adt->act_Track == nlt) but
+ * that doesn't work either, neither does comparing indices.
  *
- *  This function is a temporary work around. The first disabled track is always the tweaked track.
+ *  This function is a temporary work around. The first disabled track is always the tweaked
+ * track.
  */
 static NlaTrack *nlatrack_find_tweaked(const AnimData *adt)
 {
@@ -3464,6 +3556,58 @@ static bool animsys_evaluate_nla_for_flush(NlaEvalData *echannels,
   nonstrip_action_fill_strip_data(adt, &action_strip, false);
   nlastrips_ctime_get_strip_single(&estrips, &action_strip, anim_eval_context, flush_to_original);
 
+  /*
+   * create and group loc/rot/scale nla channels for preblend bones
+   *  -need to also calc preblend xform in bone's local space (preblend transform in world
+  (pose?)
+   *      space, need it in bone local space) use convert_space?
+   *
+   *
+   * Q: how to get pchan_index from bone name?
+      bPoseChannel *BKE_pose_channel_find_name(const bPose *pose, const char *name)
+  bPoseChannel *pchan = pose_pchan_get_indexed(object, pchan_index);
+
+  BKE_constraint_mat_convertspace(ob, pchan, (float(*)[4])mat_ret, from, to, false);
+
+   * will also have to compute each strip into raw-value snapshots.
+   *
+   * before blending snapshot wtih lower, we apply preblend transforms -use preblend
+   * grouped data
+   * ______
+   *
+   * Prep:
+   *    1) Get all strips that will evaluate on current frame.
+   *    2) Create and group specified bones' nla channels. This is used to conveniently get
+  channels to apply preblend to. Grouped using  hash: bonename to nlachannels (should preblend
+  xform affect domain? should it xform as if bone has identity if no channels exist? for now
+  assuming trivial all TRS exist)
+
+   * For each strip:
+   *   1) store fcurve raw values into a snapshot
+   *   2)
+   * 1) Convert World space preblend xforms to each specified bone's local space
+    2.5) hash? for bone name to bone's preblend xform matrix?
+   * 4) Apply preblend xforms to raw snapshot as a parent xform
+   * 5) apply nla blend
+   */
+  /**
+   * todo: name escape bone names
+   * /
+
+  // TODO: preblend xform should be part of nalstrip_evaluate()? (so remap() and resample()
+  don't
+  // have to change anything)
+  //  should eval and create raw snapshot per call, then blend as expected before finishing
+  GHash *nla_preblend_from_bonename = BLI_ghash_str_new("preblend_xform_from_bonename");
+
+  // PointerRNA id_ptr;
+  // RNA_id_pointer_create(prop_ptr->owner_id, &id_ptr);
+
+  // NlaEvalChannel *nec = nlaevalchan_verify(&id_ptr, &upper_eval_data, rna_path);
+
+  for (nes = estrips.first; nes; nes = nes->next) {
+  }
+
   /* Per strip, evaluate and accumulate on top of existing channels. */
   for (nes = estrips.first; nes; nes = nes->next) {
     nlastrip_evaluate(ptr,
@@ -3497,12 +3641,12 @@ static bool animsys_evaluate_nla_for_flush(NlaEvalData *echannels,
         NlaStrip *strip = (NlaStrip *)ld_strip->data;
 
         // if full replace, we just take upper.
-        if (strip->blendmode == NLASTRIP_MODE_REPLACE && IS_EQF(strip->influence,1)) {
+        if (strip->blendmode == NLASTRIP_MODE_REPLACE && IS_EQF(strip->influence, 1)) {
           left_most_strip = strip;
-          continue; 
+          continue;
         }
 
-        //otherwise, take leftmost
+        // otherwise, take leftmost
         if (strip->start < left_most_strip->start) {
           left_most_strip = strip;
         }
@@ -3522,9 +3666,11 @@ static bool animsys_evaluate_nla_for_flush(NlaEvalData *echannels,
         nec_snapshot->values[0] = left_most_strip->location_alignment[0];
         nec_snapshot->values[1] = left_most_strip->location_alignment[1];
         nec_snapshot->values[2] = left_most_strip->location_alignment[2];
-        // animsys_write_orig_anim_rna(ptr, "location", 0, left_most_strip->location_alignment[0]);
-        // animsys_write_orig_anim_rna(ptr, "location", 1, left_most_strip->location_alignment[1]);
-        // animsys_write_orig_anim_rna(ptr, "location", 2, left_most_strip->location_alignment[2]);
+        // animsys_write_orig_anim_rna(ptr, "location", 0,
+        // left_most_strip->location_alignment[0]); animsys_write_orig_anim_rna(ptr,
+        // "location", 1, left_most_strip->location_alignment[1]);
+        // animsys_write_orig_anim_rna(ptr, "location", 2,
+        // left_most_strip->location_alignment[2]);
 
         nec = nlaevalchan_verify(ptr, echannels, "rotation_euler");
         nec_snapshot = nlaeval_snapshot_ensure_channel(&echannels->eval_snapshot, nec);
@@ -3533,9 +3679,10 @@ static bool animsys_evaluate_nla_for_flush(NlaEvalData *echannels,
         nec_snapshot->values[1] = left_most_strip->euler_alignment[1];
         nec_snapshot->values[2] = left_most_strip->euler_alignment[2];
         // animsys_write_orig_anim_rna(ptr, "rotation_euler", 0,
-        // left_most_strip->euler_alignment[0]); animsys_write_orig_anim_rna(ptr, "rotation_euler",
-        // 1, left_most_strip->euler_alignment[1]); animsys_write_orig_anim_rna(ptr,
-        // "rotation_euler", 2, left_most_strip->euler_alignment[2]);
+        // left_most_strip->euler_alignment[0]); animsys_write_orig_anim_rna(ptr,
+        // "rotation_euler", 1, left_most_strip->euler_alignment[1]);
+        // animsys_write_orig_anim_rna(ptr, "rotation_euler", 2,
+        // left_most_strip->euler_alignment[2]);
 
         nec = nlaevalchan_verify(ptr, echannels, "scale");
         nec_snapshot = nlaeval_snapshot_ensure_channel(&echannels->eval_snapshot, nec);
@@ -3556,8 +3703,8 @@ static bool animsys_evaluate_nla_for_flush(NlaEvalData *echannels,
   return true;
 }
 
-/** Lower blended values are calculated and accumulated into r_context->lower_nla_channels. Upper
- * NlaEvalStrips are stored in r_context->upper_estrips. */
+/** Lower blended values are calculated and accumulated into r_context->lower_nla_channels.
+ * Upper NlaEvalStrips are stored in r_context->upper_estrips. */
 static void animsys_evaluate_nla_for_keyframing(NlaKeyframingContext *r_context,
                                                 PointerRNA *ptr,
                                                 const AnimData *adt,
@@ -3638,7 +3785,8 @@ static void animsys_evaluate_nla_for_keyframing(NlaKeyframingContext *r_context,
   }
 
   /** Note: Although we early out, we can still keyframe to the non-pushed action since the
-   * keyframe remap function detects (adt->strip.act == NULL) and will keyframe without remapping.
+   * keyframe remap function detects (adt->strip.act == NULL) and will keyframe without
+   * remapping.
    */
   if (is_nonstrip_action_evaluated_without_nla(adt, has_strips)) {
     BLI_freelistN(&lower_estrips);
@@ -3865,13 +4013,14 @@ bool BKE_animsys_nla_remap_keyframe_values(struct NlaKeyframingContext *context,
     ListBase *upper_estrips = &context->upper_estrips;
     LISTBASE_FOREACH_BACKWARD (NlaEvalStrip *, nes, upper_estrips) {
       /** This will disable nec_snapshot->invertible bits if an upper strip is not invertible
-       * (full replace, multiply zero, or non-invertible transition). Then there is no inversion
-       * solution. */
+       * (full replace, multiply zero, or non-invertible transition). Then there is no
+       * inversion solution. */
       nlastrip_evaluate_invert_get_lower_values(
           &id_ptr, &upper_eval_data, NULL, nes, blended_values_snapshot, anim_eval_context);
     }
 
-    /* At this point, the snapshot contains the output values after the tweak strip is applied. */
+    /* At this point, the snapshot contains the output values after the tweak strip is applied.
+     */
     bool all_invertible = true;
     if (index == -1 || nec->mix_mode == NEC_MIX_QUATERNION) {
       for (int i = 0; i < count; i++) {
@@ -3886,7 +4035,8 @@ bool BKE_animsys_nla_remap_keyframe_values(struct NlaKeyframingContext *context,
 
     nlaeval_free(&upper_eval_data);
 
-    /** To match existing implementation, only succeeds if all desired indices are invertible. */
+    /** To match existing implementation, only succeeds if all desired indices are invertible.
+     */
     if (!all_invertible) {
       return false;
     }
@@ -4008,8 +4158,8 @@ void nlastrip_append_actionclip_recursive(ListBase *dst, NlaStrip *strip)
 }
 
 /** Mute selected NLA strips and resample into a new track. The final Nla stack result will be
- * preserved when possible. New resampled strip will be selected. Previously selected strips will
- * be muted and deselected afterward.
+ * preserved when possible. New resampled strip will be selected. Previously selected strips
+ * will be muted and deselected afterward.
  *
  * \param resample_blendmode: Resulting resampled strip's blend mode.
  * \param resample_influence: Resulting resampled strip's influence. above.
@@ -4034,8 +4184,8 @@ NlaTrack *BKE_animsys_resample_selected_strips(Main *main,
    *
    * Merge Strips: User selects a block of NlaStrips and Resamples.
    *
-   * Convert Strips: User selects a single NlaStrip and Resamples with a different blendmode and/or
-   * influence.
+   * Convert Strips: User selects a single NlaStrip and Resamples with a different blendmode
+   * and/or influence.
    *
    * ********************* Potential improvements/changes *********************************
    *
@@ -4045,18 +4195,18 @@ NlaTrack *BKE_animsys_resample_selected_strips(Main *main,
    * done by the caller.
    *
    * Allow user to somehow select channels to be resampled. Currently all channels found in all
-   * selected strips are resampled. Though a simple work around is to delete the undesired channels
-   * after the resample.
+   * selected strips are resampled. Though a simple work around is to delete the undesired
+   * channels after the resample.
    *
    * ********************* Limitations and potential problems *****************************
    *
-   * Design: When resample strip value not valid, what should we do? Currently we write a default
-   * value. Nothing we write will preserve the animation. This leaves the problem as a "Known
-   * Issue".
+   * Design: When resample strip value not valid, what should we do? Currently we write a
+   * default value. Nothing we write will preserve the animation. This leaves the problem as a
+   * "Known Issue".
    *
-   * This function will not properly resample outside of the resample bounds. Generally, it's not
-   * possible since multiple strips with non-None extend modes can not be represented by a single
-   * strip of any extend mode.. Maybe it's possible by properly setting the pre and post
+   * This function will not properly resample outside of the resample bounds. Generally, it's
+   * not possible since multiple strips with non-None extend modes can not be represented by a
+   * single strip of any extend mode.. Maybe it's possible by properly setting the pre and post
    * extrapolation for individual fcurves?
    */
 
@@ -4078,15 +4228,16 @@ NlaTrack *BKE_animsys_resample_selected_strips(Main *main,
    * whole_snapshot: Evaluate the whole NLA stack. Selected strips are included since we're
    * preserving this snapshot result.
    *
-   * lower_snapshot: Evaluate the NLA stack from the base track up to the resample track, excluding
-   * selected tracks and the resampled track.
+   * lower_snapshot: Evaluate the NLA stack from the base track up to the resample track,
+   * excluding selected tracks and the resampled track.
    *
-   * upper_strips: The strips from the resampled strip, exclusive, to the topmost track, excluding
-   * selected strips.
+   * upper_strips: The strips from the resampled strip, exclusive, to the topmost track,
+   * excluding selected strips.
    *
-   * With these three sets of data, we can solve for the value that resample strip must evaluate
-   * to that satisfies whole_snapshot when the selected strips are muted. It's the same way
-   * keyframe remapping works where the tweak strip is substituted with the resample strip.
+   * With these three sets of data, we can solve for the value that resample strip must
+   * evaluate to that satisfies whole_snapshot when the selected strips are muted. It's the
+   * same way keyframe remapping works where the tweak strip is substituted with the resample
+   * strip.
    */
 
   BLI_assert(!ELEM(NULL, main, depsgraph, adt, id_ptr));
@@ -4152,10 +4303,11 @@ NlaTrack *BKE_animsys_resample_selected_strips(Main *main,
     return NULL;
   }
 
-  /********* (Earlier than used) Create NlaEvalData, NlaEvalSnapshots, bActionGroup hashes. *****/
-  /** NOTE: We obtain the following data this early to prevent allocating the resample track and
-   * strip prematurely. It's mostly out of preference. Otherwise, this block can be placed right
-   * before calculating the resample keyframe values. */
+  /********* (Earlier than used) Create NlaEvalData, NlaEvalSnapshots, bActionGroup hashes.
+   * *****/
+  /** NOTE: We obtain the following data this early to prevent allocating the resample track
+   * and strip prematurely. It's mostly out of preference. Otherwise, this block can be placed
+   * right before calculating the resample keyframe values. */
 
   NlaEvalData eval_data_buffer;
   NlaEvalData *eval_data = &eval_data_buffer;
@@ -4176,17 +4328,17 @@ NlaTrack *BKE_animsys_resample_selected_strips(Main *main,
   /** Visit all the involved fcurves. An fcurve pair (rna_path, array_index) may be visited
    * multiple times.
    *
-   * Allocate all the necessary NlaEvalChannels and NlaEvalChannelSnapshots. This is the only time
-   * we allow new NlaEvalChannels and snapshots to be allocated.
+   * Allocate all the necessary NlaEvalChannels and NlaEvalChannelSnapshots. This is the only
+   *time we allow new NlaEvalChannels and snapshots to be allocated.
    *
    * NlaEvalChannel->domain bitmap will be used to store whether the fcurve channel exists
    * among the selected strips. Effectively it marks whether the fcurve is involved in the
-   * resample. For Quaternions, all 4 fcurves are marked as involved if any exists. Later, we only
-   * allocate enough memory to store resample values for involved fcurves.
+   * resample. For Quaternions, all 4 fcurves are marked as involved if any exists. Later, we
+   *only allocate enough memory to store resample values for involved fcurves.
    *
-   * We use hashes to preserve fcurve groups. For NlaEvalChannels, we assume that not all elements
-   * may be in the same bActionGroup. It's an unlikely case but still possible. For now we just
-   * store the original bActionGroup and later we'll duplicate it.
+   * We use hashes to preserve fcurve groups. For NlaEvalChannels, we assume that not all
+   *elements may be in the same bActionGroup. It's an unlikely case but still possible. For now
+   *we just store the original bActionGroup and later we'll duplicate it.
    **/
   LISTBASE_FOREACH (LinkData *, link_data, &selected_strips) {
     NlaStrip *outter_strip = link_data->data;
@@ -4244,8 +4396,8 @@ NlaTrack *BKE_animsys_resample_selected_strips(Main *main,
 
   /** Count the total number of fcurves involve in the resample.
    *
-   * We have to do this separately from the above loop because the above will visit the same fcurve
-   * (rna_path, array_index) pair multiple times. */
+   * We have to do this separately from the above loop because the above will visit the same
+   * fcurve (rna_path, array_index) pair multiple times. */
   int total_fcurves = 0;
   LISTBASE_FOREACH (NlaEvalChannel *, nec, &eval_data->channels) {
     for (int array_index = 0; array_index < nec->base_snapshot.length; array_index++) {
@@ -4334,10 +4486,10 @@ NlaTrack *BKE_animsys_resample_selected_strips(Main *main,
 
   /**************  4) Calculate resample keyframes. ***************************** */
 
-  /** Instead of calculating the resample strip value and creating a keyframe (and fcurve) for it
-   * per iteration, we create a buffer of all the resample values and create the keyframes after
-   * the resampling completes. This is partly for optimization and partly to simplify the code
-   * involved in the loop.
+  /** Instead of calculating the resample strip value and creating a keyframe (and fcurve) for
+   * it per iteration, we create a buffer of all the resample values and create the keyframes
+   * after the resampling completes. This is partly for optimization and partly to simplify the
+   * code involved in the loop.
    *
    * Memory layout:
    *
@@ -4349,9 +4501,9 @@ NlaTrack *BKE_animsys_resample_selected_strips(Main *main,
    *      }
    *    }
    *
-   * So we store all the keyframe co values for an fcurve as a single contiguous block. That way
-   * we can create the fcurve and sequentially write all of its co values in one go. For our
-   * current implementation, each write is offsetted by total_frames amount of floats. A
+   * So we store all the keyframe co values for an fcurve as a single contiguous block. That
+   * way we can create the fcurve and sequentially write all of its co values in one go. For
+   * our current implementation, each write is offsetted by total_frames amount of floats. A
    * potential efficiency improvement would be to calculate the eval data in the same order and
    * optimizing the eval calculation for single channels (4 channels for quaternions).
    */
@@ -4375,8 +4527,8 @@ NlaTrack *BKE_animsys_resample_selected_strips(Main *main,
   nonstrip_action_fill_strip_data(adt, &action_strip, false);
 
   /** XXX: Proceeding code assumes no NlaEvalChannel/Snapshot ever created or deleted. Doing so
-   * is unexpected and will lead to a crash since resample_values_buffer is not allocated for non
-   * resampled channels.
+   * is unexpected and will lead to a crash since resample_values_buffer is not allocated for
+   * non resampled channels.
    *
    * The only allocated data per frame are NlaEvalStrips into upper_estrips and lower_estrips,
    * freed per iteration. A more optimal solution is noted inside at the end of the loop. */
@@ -4445,9 +4597,9 @@ NlaTrack *BKE_animsys_resample_selected_strips(Main *main,
 
       /** Calculate lower_eval_data. Exclude selected strips.
        *
-       * Optimization: If resample strip is full REPLACE, then lower strips not needed to solve for
-       * resample result. This works because resample strip will replace every channel in the lower
-       * strips. */
+       * Optimization: If resample strip is full REPLACE, then lower strips not needed to solve
+       * for resample result. This works because resample strip will replace every channel in
+       * the lower strips. */
       if (!full_replace) {
         for (NlaEvalStrip *nes = lower_estrips.first; nes; nes = nes->next) {
           if ((nes->strip->flag & NLASTRIP_FLAG_SELECT) == 0) {
@@ -4475,9 +4627,9 @@ NlaTrack *BKE_animsys_resample_selected_strips(Main *main,
        */
       LISTBASE_FOREACH_BACKWARD (NlaEvalStrip *, nes, &upper_estrips) {
         if ((nes->strip->flag & NLASTRIP_FLAG_SELECT) == 0) {
-          /** This will disable nec_snapshot->invertible bits if an upper strip is not invertible
-           * (full replace, multiply zero, or non-invertible transition). Then there is no
-           * inversion solution. */
+          /** This will disable nec_snapshot->invertible bits if an upper strip is not
+           * invertible (full replace, multiply zero, or non-invertible transition). Then there
+           * is no inversion solution. */
           nlastrip_evaluate_invert_get_lower_values(
               id_ptr, eval_data, NULL, nes, whole_snapshot, &cfra_context);
         }
@@ -4649,10 +4801,10 @@ NlaTrack *BKE_animsys_resample_selected_strips(Main *main,
           BezTriple *beztr = (fcurve->bezt + index_cfra);
           beztr->h1 = beztr->h2 = HD_AUTO_ANIM;
           beztr->ipo = BEZT_IPO_BEZ;
-          /** TODO: What's convention for creating macros? Should I take it out of ED_anim_api.h
-           * and put it in here? What about things that rely on the same file for that define?
-           * Should I recreate the define in this file? Seems worst to copy what Macro does, but
-           * I can ask that question in the patch.
+          /** TODO: What's convention for creating macros? Should I take it out of
+           * ED_anim_api.h and put it in here? What about things that rely on the same file for
+           * that define? Should I recreate the define in this file? Seems worst to copy what
+           * Macro does, but I can ask that question in the patch.
            */
           // BEZKEYTYPE(&beztr) = keyframe_type;
           beztr->hide = BEZT_KEYTYPE_KEYFRAME;
@@ -4752,19 +4904,21 @@ static void animsys_evaluate_overrides(PointerRNA *ptr, AnimData *adt)
  * --------------< always executed >------------------
  *
  * Maintenance of editability of settings (XXX):
- * - In order to ensure that settings that are animated can still be manipulated in the UI without
- *   requiring that keyframes are added to prevent these values from being overwritten,
+ * - In order to ensure that settings that are animated can still be manipulated in the UI
+ * without requiring that keyframes are added to prevent these values from being overwritten,
  *   we use 'overrides'.
  *
  * Unresolved things:
  * - Handling of multi-user settings (i.e. time-offset, group-instancing) -> big cache grids
  *   or nodal system? but stored where?
  * - Multiple-block dependencies
- *   (i.e. drivers for settings are in both local and higher levels) -> split into separate lists?
+ *   (i.e. drivers for settings are in both local and higher levels) -> split into separate
+ * lists?
  *
  * Current Status:
- * - Currently (as of September 2009), overrides we haven't needed to (fully) implement overrides.
- *   However, the code for this is relatively harmless, so is left in the code for now.
+ * - Currently (as of September 2009), overrides we haven't needed to (fully) implement
+ * overrides. However, the code for this is relatively harmless, so is left in the code for
+ * now.
  */
 
 /* Evaluation loop for evaluation animation data
@@ -4885,8 +5039,8 @@ void BKE_animsys_evaluate_all_animation(Main *main, Depsgraph *depsgraph, float 
    * which should ultimately be empty, since it is not possible for now to have any animation
    * without some actions, and drivers wouldn't get affected by any state changes
    *
-   * however, if there are some curves, we will need to make sure that their 'ctime' property gets
-   * set correctly, so this optimization must be skipped in that case...
+   * however, if there are some curves, we will need to make sure that their 'ctime' property
+   * gets set correctly, so this optimization must be skipped in that case...
    */
   if (BLI_listbase_is_empty(&main->actions) && BLI_listbase_is_empty(&main->curves)) {
     if (G.debug & G_DEBUG) {
@@ -5049,8 +5203,8 @@ void BKE_animsys_eval_driver(Depsgraph *depsgraph, ID *id, int driver_index, FCu
     ChannelDriver *driver_orig = fcu_orig->driver;
     if ((driver_orig) && !(driver_orig->flag & DRIVER_FLAG_INVALID)) {
       /* evaluate this using values set already in other places
-       * NOTE: for 'layering' option later on, we should check if we should remove old value before
-       * adding new to only be done when drivers only changed */
+       * NOTE: for 'layering' option later on, we should check if we should remove old value
+       * before adding new to only be done when drivers only changed */
       // printf("\told val = %f\n", fcu->curval);
 
       PathResolvedRNA anim_rna;
