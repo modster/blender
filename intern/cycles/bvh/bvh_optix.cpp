@@ -103,18 +103,19 @@ void BVHOptiX::pack_blas()
     Mesh *const mesh = static_cast<Mesh *const>(geom);
     if (mesh->num_triangles() > 0) {
       const size_t num_triangles = mesh->num_triangles();
-      pack.prim_type.reserve(pack.prim_type.size() + num_triangles);
-      pack.prim_index.reserve(pack.prim_index.size() + num_triangles);
-      pack.prim_object.reserve(pack.prim_object.size() + num_triangles);
+      int *pack_prim_type = pack.prim_type.resize(num_triangles);
+      int *pack_prim_index = pack.prim_index.resize(num_triangles);
 
       uint type = PRIMITIVE_TRIANGLE;
       if (mesh->get_use_motion_blur() && mesh->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION))
         type = PRIMITIVE_MOTION_TRIANGLE;
 
       for (size_t k = 0; k < num_triangles; ++k) {
-        pack.prim_type.push_back_reserved(type);
-        pack.prim_index.push_back_reserved(k);
-        pack.prim_object.push_back_reserved(0);
+        pack_prim_type[k] = type;
+      }
+
+      for (size_t k = 0; k < num_triangles; ++k) {
+        pack_prim_index[k] = k;
       }
     }
   }
@@ -227,7 +228,6 @@ void BVHOptiX::pack_instance(Geometry *geom,
     int *bvh_prim_type = &bvh_pack.prim_type[0];
     int *bvh_prim_index = &bvh_pack.prim_index[0];
     uint *bvh_prim_tri_index = &bvh_pack.prim_tri_index[0];
-    uint *bvh_prim_visibility = &bvh_pack.prim_visibility[0];
 
     /* default to true for volumes and curves */
     bool prims_have_changed = true;
@@ -255,7 +255,7 @@ void BVHOptiX::pack_instance(Geometry *geom,
 
         pack_prim_type[pack_offset] = bvh_prim_type[i];
         pack_prim_object[pack_offset] = object_index;
-        pack_prim_visibility[pack_offset] = bvh_prim_visibility[i] | object_visibility;
+        pack_prim_visibility[pack_offset] = object_visibility;
       }
     }
   }

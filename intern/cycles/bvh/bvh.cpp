@@ -281,6 +281,51 @@ void BVH::pack_triangle(int idx, float4 tri_verts[3])
 
 void BVH::pack_primitives()
 {
+  if (!params.top_level && objects.size() == 1 && geometry.size() == 1) {
+    Object *ob = objects[0];
+    Geometry *geom = geometry[0];
+
+    if (geom->is_mesh() || geom->is_volume()) {
+      Mesh *const mesh = static_cast<Mesh *>(geometry[0]);
+      const size_t num_triangles = mesh->num_triangles();
+
+      if (mesh->triangles_is_modified()) {
+        uint *pack_prim_tri_index = pack.prim_tri_index.resize(num_triangles);
+        for (size_t k = 0; k < num_triangles; ++k) {
+          pack_prim_tri_index[k] = 3 * k;
+        }
+      }
+
+      if (mesh->triangles_is_modified() || mesh->verts_is_modified()) {
+        float4 *pack_prim_tri_verts = pack.prim_tri_verts.resize(3 * num_triangles);
+        const float3 *vpos = &mesh->get_verts()[0];
+        for (size_t k = 0; k < num_triangles; ++k) {
+          Mesh::Triangle t = mesh->get_triangle(k);
+          float3 v0 = vpos[t.v[0]];
+          float3 v1 = vpos[t.v[1]];
+          float3 v2 = vpos[t.v[2]];
+
+          pack_prim_tri_verts[3 * k + 0] = float3_to_float4(v0);
+          pack_prim_tri_verts[3 * k + 1] = float3_to_float4(v1);
+          pack_prim_tri_verts[3 * k + 2] = float3_to_float4(v2);
+        }
+      }
+
+      /* When packing for a bottom level OptiX BVH, we do not use the visibility. */
+      if (params.bvh_layout != BVHLayout::BVH_LAYOUT_OPTIX) {
+        uint *pack_prim_tri_visibility = pack.prim_tri_index.resize(num_triangles);
+        uint visibility = ob->visibility_for_tracing();
+        if (visibility != 0) {
+          for (size_t k = 0; k < num_triangles; ++k) {
+            pack_prim_tri_visibility[k] = visibility;
+          }
+        }
+      }
+
+      return;
+    }
+  }
+
   const size_t tidx_size = pack.prim_index.size();
   size_t num_prim_triangles = 0;
   /* Count number of triangles primitives in BVH. */
