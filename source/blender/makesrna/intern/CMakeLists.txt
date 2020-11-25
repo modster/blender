@@ -351,6 +351,9 @@ if(WITH_INPUT_NDOF)
 endif()
 
 if(WITH_XR_OPENXR)
+  list(APPEND INC
+    ../../windowmanager/xr
+  )
   add_definitions(-DWITH_XR_OPENXR)
 endif()
 

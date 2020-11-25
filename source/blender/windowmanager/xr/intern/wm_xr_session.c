@@ -65,19 +65,49 @@ static CLG_LogRef LOG = {"wm.xr"};
 static void wm_xr_session_create_cb(void *customdata)
 {
   wmXrData *xr_data = customdata;
+  XrSessionSettings *settings = &xr_data->session_settings;
+  wmXrSessionState *state = &xr_data->runtime->session_state;
   Main *bmain = CTX_data_main(xr_data->runtime->bcontext);
 
   /* Get action set data from Python. */
   BKE_callback_exec_null(bmain, BKE_CB_EVT_XR_SESSION_START_PRE);
 
   wm_xr_session_actions_init(xr_data);
+
+  /* Store constraint object poses. */
+  if (settings->headset_object) {
+    wm_xr_session_object_pose_get(settings->headset_object, &state->headset_object_orig_pose);
+  }
+  if (settings->controller0_object) {
+    wm_xr_session_object_pose_get(settings->controller0_object,
+                                  &state->controller0_object_orig_pose);
+  }
+  if (settings->controller1_object) {
+    wm_xr_session_object_pose_get(settings->controller1_object,
+                                  &state->controller1_object_orig_pose);
+  }
 }
 
 static void wm_xr_session_exit_cb(void *customdata)
 {
   wmXrData *xr_data = customdata;
+  XrSessionSettings *settings = &xr_data->session_settings;
+  wmXrSessionState *state = &xr_data->runtime->session_state;
 
-  xr_data->runtime->session_state.is_started = false;
+  state->is_started = false;
+
+  /* Restore constraint object poses. */
+  if (settings->headset_object) {
+    wm_xr_session_object_pose_set(&state->headset_object_orig_pose, settings->headset_object);
+  }
+  if (settings->controller0_object) {
+    wm_xr_session_object_pose_set(&state->controller0_object_orig_pose,
+                                  settings->controller0_object);
+  }
+  if (settings->controller1_object) {
+    wm_xr_session_object_pose_set(&state->controller1_object_orig_pose,
+                                  settings->controller1_object);
+  }
 
   wm_xr_session_actions_uninit(xr_data);
 
@@ -493,52 +523,6 @@ void wm_xr_session_actions_init(wmXrData *xr)
   }
 }
 
-void wm_xr_session_object_autokey(
-    bContext *C, Scene *scene, ViewLayer *view_layer, wmWindow *win, Object *ob, bool notify)
-{
-  /* Poll functions in keyingsets_utils.py require an active window and object. */
-  wmWindow *win_prev = win ? CTX_wm_window(C) : NULL;
-  if (win) {
-    CTX_wm_window_set(C, win);
-  }
-
-  Object *obact = CTX_data_active_object(C);
-  if (!obact) {
-    Base *base = BKE_view_layer_base_find(view_layer, ob);
-    if (base) {
-      ED_object_base_select(base, BA_SELECT);
-      ED_object_base_activate(C, base);
-    }
-  }
-
-  bScreen *screen = CTX_wm_screen(C);
-  if (screen && screen->animtimer && (IS_AUTOKEY_FLAG(scene, INSERTAVAIL) == 0) &&
-      ((scene->toolsettings->autokey_flag & ANIMRECORD_FLAG_WITHNLA) != 0)) {
-    TransInfo t;
-    t.scene = scene;
-    t.animtimer = screen->animtimer;
-    animrecord_check_state(&t, ob);
-  }
-
-  autokeyframe_object(C, scene, view_layer, ob, TFM_TRANSLATION);
-  if (IS_AUTOKEY_FLAG(scene, INSERTNEEDED)) {
-    autokeyframe_object(C, scene, view_layer, ob, TFM_ROTATION);
-  }
-
-  if (motionpath_need_update_object(scene, ob)) {
-    ED_objects_recalculate_paths(C, scene, OBJECT_PATH_CALC_RANGE_CURRENT_FRAME);
-  }
-
-  if (notify) {
-    WM_event_add_notifier(C, NC_OBJECT | ND_KEYS, NULL);
-    WM_main_add_notifier(NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
-  }
-
-  if (win) {
-    CTX_wm_window_set(C, win_prev);
-  }
-}
-
 static void wm_xr_session_controller_mats_update(const XrSessionSettings *settings,
                                                  const wmXrAction *controller_pose_action,
                                                  bContext *C,
@@ -594,9 +578,7 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
         controller->pose.position, controller->pose.orientation_quat, controller->mat);
 
     if (ob_constraint && ((ob_flag & XR_OBJECT_ENABLE) != 0)) {
-      copy_v3_v3(ob_constraint->loc, controller->pose.position);
-      quat_to_eul(ob_constraint->rot, controller->pose.orientation_quat);
-      DEG_id_tag_update(&ob_constraint->id, ID_RECALC_TRANSFORM);
+      wm_xr_session_object_pose_set(&controller->pose, ob_constraint);
 
       if (((ob_flag & XR_OBJECT_AUTOKEY) != 0) && screen_anim &&
           autokeyframe_cfra_can_key(scene, &ob_constraint->id)) {
@@ -832,9 +814,7 @@ void wm_xr_session_actions_update(wmXrData *xr)
   char ob_flag = settings->headset_flag;
 
   if (ob_constraint && ((ob_flag & XR_OBJECT_ENABLE) != 0)) {
-    copy_v3_v3(ob_constraint->loc, state->viewer_pose.position);
-    quat_to_eul(ob_constraint->rot, state->viewer_pose.orientation_quat);
-    DEG_id_tag_update(&ob_constraint->id, ID_RECALC_TRANSFORM);
+    wm_xr_session_object_pose_set(&state->viewer_pose, ob_constraint);
 
     if ((ob_flag & XR_OBJECT_AUTOKEY) != 0) {
       bScreen *screen_anim = ED_screen_animation_playing(wm);
@@ -934,6 +914,66 @@ void wm_xr_session_controller_data_clear(wmXrSessionState *state)
       }
       surface_data->controller_draw_handle = NULL;
     }
+  }
+}
+
+void wm_xr_session_object_pose_get(const Object *ob, GHOST_XrPose *pose)
+{
+  copy_v3_v3(pose->position, ob->loc);
+  eul_to_quat(pose->orientation_quat, ob->rot);
+}
+
+void wm_xr_session_object_pose_set(const GHOST_XrPose *pose, Object *ob)
+{
+  copy_v3_v3(ob->loc, pose->position);
+  quat_to_eul(ob->rot, pose->orientation_quat);
+
+  DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
+}
+
+void wm_xr_session_object_autokey(
+    bContext *C, Scene *scene, ViewLayer *view_layer, wmWindow *win, Object *ob, bool notify)
+{
+  /* Poll functions in keyingsets_utils.py require an active window and object. */
+  wmWindow *win_prev = win ? CTX_wm_window(C) : NULL;
+  if (win) {
+    CTX_wm_window_set(C, win);
+  }
+
+  Object *obact = CTX_data_active_object(C);
+  if (!obact) {
+    Base *base = BKE_view_layer_base_find(view_layer, ob);
+    if (base) {
+      ED_object_base_select(base, BA_SELECT);
+      ED_object_base_activate(C, base);
+    }
+  }
+
+  bScreen *screen = CTX_wm_screen(C);
+  if (screen && screen->animtimer && (IS_AUTOKEY_FLAG(scene, INSERTAVAIL) == 0) &&
+      ((scene->toolsettings->autokey_flag & ANIMRECORD_FLAG_WITHNLA) != 0)) {
+    TransInfo t;
+    t.scene = scene;
+    t.animtimer = screen->animtimer;
+    animrecord_check_state(&t, ob);
+  }
+
+  autokeyframe_object(C, scene, view_layer, ob, TFM_TRANSLATION);
+  if (IS_AUTOKEY_FLAG(scene, INSERTNEEDED)) {
+    autokeyframe_object(C, scene, view_layer, ob, TFM_ROTATION);
+  }
+
+  if (motionpath_need_update_object(scene, ob)) {
+    ED_objects_recalculate_paths(C, scene, OBJECT_PATH_CALC_RANGE_CURRENT_FRAME);
+  }
+
+  if (notify) {
+    WM_event_add_notifier(C, NC_OBJECT | ND_KEYS, NULL);
+    WM_main_add_notifier(NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
+  }
+
+  if (win) {
+    CTX_wm_window_set(C, win_prev);
   }
 }
 

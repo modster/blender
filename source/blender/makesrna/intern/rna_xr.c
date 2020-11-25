@@ -41,6 +41,8 @@
 #  include "WM_api.h"
 
 #  ifdef WITH_XR_OPENXR
+#    include "xr/intern/wm_xr_intern.h"
+
 static wmXrData *rna_XrSession_wm_xr_data_get(PointerRNA *ptr)
 {
   /* Callers could also get XrSessionState pointer through ptr->data, but prefer if we just
@@ -107,6 +109,30 @@ static void rna_XrSessionSettings_use_absolute_tracking_set(PointerRNA *ptr, boo
 #  endif
 }
 
+static void rna_XrSessionSettings_headset_object_set(PointerRNA *ptr,
+                                                     PointerRNA value,
+                                                     struct ReportList *UNUSED(reports))
+{
+#  ifdef WITH_XR_OPENXR
+  wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  Object *ob = value.data;
+  if (WM_xr_session_exists(xr)) {
+    if (xr->session_settings.headset_object) {
+      /* Restore previous object's original pose. */
+      wm_xr_session_object_pose_set(&xr->runtime->session_state.headset_object_orig_pose,
+                                    xr->session_settings.headset_object);
+    }
+    if (ob) {
+      /* Store new object's original pose. */
+      wm_xr_session_object_pose_get(ob, &xr->runtime->session_state.headset_object_orig_pose);
+    }
+  }
+  xr->session_settings.headset_object = ob;
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
 static bool rna_XrSessionSettings_headset_object_enable_get(PointerRNA *ptr)
 {
 #  ifdef WITH_XR_OPENXR
@@ -127,6 +153,17 @@ static void rna_XrSessionSettings_headset_object_enable_set(PointerRNA *ptr, boo
   }
   else {
     xr->session_settings.headset_flag &= (~XR_OBJECT_ENABLE);
+  }
+
+  /* Store/restore object's original pose. */
+  Object *ob = xr->session_settings.headset_object;
+  if (ob && WM_xr_session_exists(xr)) {
+    if (value) {
+      wm_xr_session_object_pose_get(ob, &xr->runtime->session_state.headset_object_orig_pose);
+    }
+    else {
+      wm_xr_session_object_pose_set(&xr->runtime->session_state.headset_object_orig_pose, ob);
+    }
   }
 #  else
   UNUSED_VARS(ptr, value);
@@ -159,6 +196,30 @@ static void rna_XrSessionSettings_headset_object_autokey_set(PointerRNA *ptr, bo
 #  endif
 }
 
+static void rna_XrSessionSettings_controller0_object_set(PointerRNA *ptr,
+                                                         PointerRNA value,
+                                                         struct ReportList *UNUSED(reports))
+{
+#  ifdef WITH_XR_OPENXR
+  wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  Object *ob = value.data;
+  if (WM_xr_session_exists(xr)) {
+    if (xr->session_settings.controller0_object) {
+      /* Restore previous object's original pose. */
+      wm_xr_session_object_pose_set(&xr->runtime->session_state.controller0_object_orig_pose,
+                                    xr->session_settings.controller0_object);
+    }
+    if (ob) {
+      /* Store new object's original pose. */
+      wm_xr_session_object_pose_get(ob, &xr->runtime->session_state.controller0_object_orig_pose);
+    }
+  }
+  xr->session_settings.controller0_object = ob;
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
 static bool rna_XrSessionSettings_controller0_object_enable_get(PointerRNA *ptr)
 {
 #  ifdef WITH_XR_OPENXR
@@ -179,6 +240,17 @@ static void rna_XrSessionSettings_controller0_object_enable_set(PointerRNA *ptr,
   }
   else {
     xr->session_settings.controller0_flag &= (~XR_OBJECT_ENABLE);
+  }
+
+  /* Store/restore object's original pose. */
+  Object *ob = xr->session_settings.controller0_object;
+  if (ob && WM_xr_session_exists(xr)) {
+    if (value) {
+      wm_xr_session_object_pose_get(ob, &xr->runtime->session_state.controller0_object_orig_pose);
+    }
+    else {
+      wm_xr_session_object_pose_set(&xr->runtime->session_state.controller0_object_orig_pose, ob);
+    }
   }
 #  else
   UNUSED_VARS(ptr, value);
@@ -211,6 +283,30 @@ static void rna_XrSessionSettings_controller0_object_autokey_set(PointerRNA *ptr
 #  endif
 }
 
+static void rna_XrSessionSettings_controller1_object_set(PointerRNA *ptr,
+                                                         PointerRNA value,
+                                                         struct ReportList *UNUSED(reports))
+{
+#  ifdef WITH_XR_OPENXR
+  wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
+  Object *ob = value.data;
+  if (WM_xr_session_exists(xr)) {
+    if (xr->session_settings.controller1_object) {
+      /* Restore previous object's original pose. */
+      wm_xr_session_object_pose_set(&xr->runtime->session_state.controller1_object_orig_pose,
+                                    xr->session_settings.controller1_object);
+    }
+    if (ob) {
+      /* Store new object's original pose. */
+      wm_xr_session_object_pose_get(ob, &xr->runtime->session_state.controller1_object_orig_pose);
+    }
+  }
+  xr->session_settings.controller1_object = ob;
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
 static bool rna_XrSessionSettings_controller1_object_enable_get(PointerRNA *ptr)
 {
 #  ifdef WITH_XR_OPENXR
@@ -231,6 +327,17 @@ static void rna_XrSessionSettings_controller1_object_enable_set(PointerRNA *ptr,
   }
   else {
     xr->session_settings.controller1_flag &= (~XR_OBJECT_ENABLE);
+  }
+
+  /* Store/restore object's original pose. */
+  Object *ob = xr->session_settings.controller1_object;
+  if (ob && WM_xr_session_exists(xr)) {
+    if (value) {
+      wm_xr_session_object_pose_get(ob, &xr->runtime->session_state.controller1_object_orig_pose);
+    }
+    else {
+      wm_xr_session_object_pose_set(&xr->runtime->session_state.controller1_object_orig_pose, ob);
+    }
   }
 #  else
   UNUSED_VARS(ptr, value);
@@ -797,6 +904,8 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
   RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
 
   prop = RNA_def_property(srna, "headset_object", PROP_POINTER, PROP_NONE);
+  RNA_def_property_pointer_funcs(
+      prop, NULL, "rna_XrSessionSettings_headset_object_set", NULL, NULL);
   RNA_def_property_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(
       prop,
@@ -805,6 +914,8 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
   RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
 
   prop = RNA_def_property(srna, "controller0_object", PROP_POINTER, PROP_NONE);
+  RNA_def_property_pointer_funcs(
+      prop, NULL, "rna_XrSessionSettings_controller0_object_set", NULL, NULL);
   RNA_def_property_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(
       prop,
@@ -813,6 +924,8 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
   RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
 
   prop = RNA_def_property(srna, "controller1_object", PROP_POINTER, PROP_NONE);
+  RNA_def_property_pointer_funcs(
+      prop, NULL, "rna_XrSessionSettings_controller1_object_set", NULL, NULL);
   RNA_def_property_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(
       prop,

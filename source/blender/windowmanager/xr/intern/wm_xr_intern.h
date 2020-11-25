@@ -75,6 +75,11 @@ typedef struct wmXrSessionState {
    * on calls to wm_xr_session_actions_update().
    * If NULL, all action sets will be treated as active and updated. */
   struct wmXrActionSet *active_action_set;
+
+  /** Constraint object original poses. */
+  GHOST_XrPose headset_object_orig_pose;
+  GHOST_XrPose controller0_object_orig_pose;
+  GHOST_XrPose controller1_object_orig_pose;
 } wmXrSessionState;
 
 typedef struct wmXrRuntimeData {
@@ -183,6 +188,8 @@ void wm_xr_session_actions_uninit(wmXrData *xr);
 void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_action,
                                             wmXrSessionState *state);
 void wm_xr_session_controller_data_clear(wmXrSessionState *state);
+void wm_xr_session_object_pose_get(const Object *ob, GHOST_XrPose *pose);
+void wm_xr_session_object_pose_set(const GHOST_XrPose *pose, Object *ob);
 void wm_xr_session_object_autokey(struct bContext *C,
                                   struct Scene *scene,
                                   struct ViewLayer *view_layer,
