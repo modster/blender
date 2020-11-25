@@ -876,9 +876,10 @@ void wm_xr_session_actions_uninit(wmXrData *xr)
   }
 }
 
-void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_action,
-                                            wmXrSessionState *state)
+void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_action, wmXrData *xr)
 {
+  wmXrSessionState *state = &xr->runtime->session_state;
+
   const unsigned int count = (unsigned int)min_ii(
       (int)ARRAY_SIZE(state->controllers), (int)controller_pose_action->count_subaction_paths);
 
@@ -895,7 +896,7 @@ void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_ac
     if (surface_data && !surface_data->controller_draw_handle) {
       if (surface_data->controller_art) {
         surface_data->controller_draw_handle = ED_region_draw_cb_activate(
-            surface_data->controller_art, wm_xr_draw_controllers, state, REGION_DRAW_POST_VIEW);
+            surface_data->controller_art, wm_xr_draw_controllers, xr, REGION_DRAW_POST_VIEW);
       }
     }
   }

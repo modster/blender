@@ -178,24 +178,20 @@ static void wm_xr_select_raycast_draw(const bContext *UNUSED(C),
 {
   const XrRaycastSelectData *data = customdata;
 
-  const eGPUDepthTest depth_test_prev = GPU_depth_test_get();
-  GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
-
   GPUVertFormat *format = immVertexFormat();
   uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
+  immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+  immUniformColor4f(0.863f, 0.0f, 0.545f, 1.0f);
+
+  GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
   GPU_line_width(3.0f);
 
-  immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
-
   immBegin(GPU_PRIM_LINES, 2);
-  immUniformColor4f(0.863f, 0.0f, 0.545f, 1.0f);
   immVertex3fv(pos, data->origin);
   immVertex3fv(pos, data->end);
   immEnd();
 
   immUnbindProgram();
-
-  GPU_depth_test(depth_test_prev);
 }
 
 static void wm_xr_select_raycast_init(wmOperator *op)

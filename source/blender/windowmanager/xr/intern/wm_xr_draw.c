@@ -32,7 +32,9 @@
 
 #include "GHOST_C-api.h"
 
+#include "GPU_batch_presets.h"
 #include "GPU_immediate.h"
+#include "GPU_matrix.h"
 #include "GPU_viewport.h"
 
 #include "WM_api.h"
@@ -174,61 +176,116 @@ void wm_xr_draw_view(const GHOST_XrDrawViewInfo *draw_view, void *customdata)
 
 void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), void *customdata)
 {
-  const wmXrSessionState *state = customdata;
+  const wmXrData *xr = customdata;
+  const XrSessionSettings *settings = &xr->session_settings;
+  const wmXrSessionState *state = &xr->runtime->session_state;
 
-  const eGPUDepthTest depth_test_prev = GPU_depth_test_get();
-  GPU_depth_test(GPU_DEPTH_ALWAYS);
+  switch (settings->controller_draw_style) {
+    case XR_CONTROLLER_DRAW_AXES: {
+      const float r[4] = {1.0f, 0.2f, 0.322f, 1.0f};
+      const float g[4] = {0.545f, 0.863f, 0.0f, 1.0f};
+      const float b[4] = {0.157f, 0.565f, 1.0f, 1.0f};
+      const float scale = 0.1f;
+      float x_axis[3], y_axis[3], z_axis[3];
 
-  /* For now, just draw controller axes. In the future this can be replaced
-   * with actual controller geometry. */
-  GPUVertFormat *format = immVertexFormat();
-  uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
-  GPU_line_width(3.0f);
+      GPUVertFormat *format = immVertexFormat();
+      uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
+      immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 
-  immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+      GPU_depth_test(GPU_DEPTH_NONE);
+      GPU_blend(GPU_BLEND_NONE);
+      GPU_line_width(3.0f);
 
-  const float r[4] = {1.0f, 0.2f, 0.322f, 1.0f};
-  const float g[4] = {0.545f, 0.863f, 0.0f, 1.0f};
-  const float b[4] = {0.157f, 0.565f, 1.0f, 1.0f};
+      for (int i = 0; i < 2; ++i) {
+        const float(*mat)[4] = state->controllers[i].mat;
+        normalize_v3_v3(x_axis, mat[0]);
+        mul_v3_fl(x_axis, scale);
+        add_v3_v3(x_axis, mat[3]);
 
-  const float scale = 0.1f;
-  float x_axis[3], y_axis[3], z_axis[3];
+        normalize_v3_v3(y_axis, mat[1]);
+        mul_v3_fl(y_axis, scale);
+        add_v3_v3(y_axis, mat[3]);
 
-  for (int i = 0; i < 2; ++i) {
-    const float(*mat)[4] = state->controllers[i].mat;
+        normalize_v3_v3(z_axis, mat[2]);
+        mul_v3_fl(z_axis, scale);
+        add_v3_v3(z_axis, mat[3]);
 
-    normalize_v3_v3(x_axis, mat[0]);
-    mul_v3_fl(x_axis, scale);
-    add_v3_v3(x_axis, mat[3]);
+        immBegin(GPU_PRIM_LINES, 2);
+        immUniformColor4fv(r);
+        immVertex3fv(pos, mat[3]);
+        immVertex3fv(pos, x_axis);
+        immEnd();
 
-    normalize_v3_v3(y_axis, mat[1]);
-    mul_v3_fl(y_axis, scale);
-    add_v3_v3(y_axis, mat[3]);
+        immBegin(GPU_PRIM_LINES, 2);
+        immUniformColor4fv(g);
+        immVertex3fv(pos, mat[3]);
+        immVertex3fv(pos, y_axis);
+        immEnd();
 
-    normalize_v3_v3(z_axis, mat[2]);
-    mul_v3_fl(z_axis, scale);
-    add_v3_v3(z_axis, mat[3]);
+        immBegin(GPU_PRIM_LINES, 2);
+        immUniformColor4fv(b);
+        immVertex3fv(pos, mat[3]);
+        immVertex3fv(pos, z_axis);
+        immEnd();
+      }
 
-    immBegin(GPU_PRIM_LINES, 2);
-    immUniformColor4fv(r);
-    immVertex3fv(pos, mat[3]);
-    immVertex3fv(pos, x_axis);
-    immEnd();
+      immUnbindProgram();
+      break;
+    }
+    case XR_CONTROLLER_DRAW_RAY: {
+      /* Sphere. */
+      {
+        const float color[4] = {0.5f, 0.5f, 0.5f, 0.5f};
+        const float scale = 0.05f;
 
-    immBegin(GPU_PRIM_LINES, 2);
-    immUniformColor4fv(g);
-    immVertex3fv(pos, mat[3]);
-    immVertex3fv(pos, y_axis);
-    immEnd();
+        GPUBatch *sphere = GPU_batch_preset_sphere(2);
+        GPU_batch_program_set_builtin(sphere, GPU_SHADER_3D_UNIFORM_COLOR);
+        GPU_batch_uniform_4fv(sphere, "color", color);
 
-    immBegin(GPU_PRIM_LINES, 2);
-    immUniformColor4fv(b);
-    immVertex3fv(pos, mat[3]);
-    immVertex3fv(pos, z_axis);
-    immEnd();
+        GPU_depth_test(GPU_DEPTH_NONE);
+        GPU_blend(GPU_BLEND_ALPHA);
+
+        for (int i = 0; i < 2; ++i) {
+          GPU_matrix_push();
+          GPU_matrix_mul(state->controllers[i].mat);
+          GPU_matrix_scale_1f(scale);
+          GPU_batch_draw(sphere);
+          GPU_matrix_pop();
+        }
+      }
+
+      /* Ray. */
+      {
+        const float color[4] = {0.863f, 0.0f, 0.545f, 0.5f};
+        const float scale = settings->clip_end;
+        float ray[3];
+
+        GPUVertFormat *format = immVertexFormat();
+        uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
+        immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
+        immUniformColor4fv(color);
+
+        GPU_depth_test(GPU_DEPTH_LESS_EQUAL);
+        GPU_line_width(3.0f);
+
+        for (int i = 0; i < 2; ++i) {
+          const float(*mat)[4] = state->controllers[i].mat;
+          normalize_v3_v3(ray, mat[2]);
+          mul_v3_fl(ray, -scale);
+          add_v3_v3(ray, mat[3]);
+
+          immBegin(GPU_PRIM_LINES, 2);
+          immVertex3fv(pos, mat[3]);
+          immVertex3fv(pos, ray);
+          immEnd();
+        }
+
+        immUnbindProgram();
+      }
+      break;
+    }
+    default: {
+      break;
+    }
   }
-
-  immUnbindProgram();
-
-  GPU_depth_test(depth_test_prev);
 }

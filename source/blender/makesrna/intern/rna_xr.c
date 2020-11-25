@@ -790,6 +790,12 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
+  static const EnumPropertyItem controller_draw_styles[] = {
+      {XR_CONTROLLER_DRAW_AXES, "AXES", 0, "Axes", "Draw controller's local axes"},
+      {XR_CONTROLLER_DRAW_RAY, "RAY", 0, "Ray", "Draw a ray along controller's -Z axis "},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   static const EnumPropertyItem selection_eyes[] = {
       {XR_EYE_LEFT, "EYE_LEFT", 0, "Left Eye", "Use the left eye's perspective for VR selection"},
       {XR_EYE_RIGHT,
@@ -864,6 +870,13 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
   prop = RNA_def_property(srna, "show_custom_overlays", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "draw_flags", V3D_OFSDRAW_XR_SHOW_CUSTOM_OVERLAYS);
   RNA_def_property_ui_text(prop, "Show Custom Overlays", "Show custom VR overlays");
+  RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
+
+  prop = RNA_def_property(srna, "controller_draw_style", PROP_ENUM, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_enum_items(prop, controller_draw_styles);
+  RNA_def_property_ui_text(
+      prop, "Controller Draw Style", "Style to use when drawing VR controllers");
   RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
 
   prop = RNA_def_property(srna, "selection_eye", PROP_ENUM, PROP_NONE);

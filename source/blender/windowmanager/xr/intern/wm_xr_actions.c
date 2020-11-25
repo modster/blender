@@ -355,8 +355,7 @@ bool WM_xr_active_action_set_set(wmXrData *xr, const char *action_set_name)
   xr->runtime->session_state.active_action_set = action_set;
 
   if (action_set->controller_pose_action) {
-    wm_xr_session_controller_data_populate(action_set->controller_pose_action,
-                                           &xr->runtime->session_state);
+    wm_xr_session_controller_data_populate(action_set->controller_pose_action, xr);
   }
 
   return true;
@@ -379,7 +378,7 @@ bool WM_xr_controller_pose_action_set(wmXrData *xr,
   action_set->controller_pose_action = action;
 
   if (action_set == xr->runtime->session_state.active_action_set) {
-    wm_xr_session_controller_data_populate(action, &xr->runtime->session_state);
+    wm_xr_session_controller_data_populate(action, xr);
   }
 
   return true;

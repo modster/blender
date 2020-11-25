@@ -186,7 +186,7 @@ void wm_xr_session_actions_init(wmXrData *xr);
 void wm_xr_session_actions_update(wmXrData *xr);
 void wm_xr_session_actions_uninit(wmXrData *xr);
 void wm_xr_session_controller_data_populate(const wmXrAction *controller_pose_action,
-                                            wmXrSessionState *state);
+                                            wmXrData *xr);
 void wm_xr_session_controller_data_clear(wmXrSessionState *state);
 void wm_xr_session_object_pose_get(const Object *ob, GHOST_XrPose *pose);
 void wm_xr_session_object_pose_set(const GHOST_XrPose *pose, Object *ob);
