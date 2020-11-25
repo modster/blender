@@ -21,11 +21,11 @@
  * \ingroup spfile
  */
 
-#include <alloca.h>
 #include <errno.h>
 #include <math.h>
 #include <string.h>
 
+#include "BLI_alloca.h"
 #include "BLI_blenlib.h"
 #include "BLI_fileops_types.h"
 #include "BLI_math.h"
