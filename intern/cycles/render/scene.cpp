@@ -98,7 +98,7 @@ void DeviceScene::print_data_transfered()
 
 #define ACCUMULATE_DATA_TRANSFERED(x) \
   if (x.data_copied != 0) { \
-    std::cerr << "    transfered " << x.name << ", " << string_human_readable_size(x.data_copied) \
+    std::cerr << "    transfered " << x.name << ", " << string_human_readable_size(x.data_copied) << ", " << x.time_copying << "s"  \
               << '\n'; \
   } \
   data_transfered += x.data_copied; \
