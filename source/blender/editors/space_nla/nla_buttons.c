@@ -535,51 +535,6 @@ static void nla_panel_animated_strip_time(const bContext *C, Panel *panel)
   uiItemR(layout, &strip_ptr, "strip_time", 0, NULL, ICON_NONE);
 }
 
-static void nla_panel_alignment_header(const bContext *C, Panel *panel)
-{
-  PointerRNA strip_ptr;
-  uiLayout *layout = panel->layout;
-  uiLayout *col;
-  uiBlock *block;
-
-  /* check context and also validity of pointer */
-  if (!nla_panel_context(C, NULL, NULL, &strip_ptr)) {
-    return;
-  }
-  block = uiLayoutGetBlock(layout);
-  UI_block_func_handle_set(block, do_nla_region_buttons, NULL);
-
-  // col = uiLayoutColumnWithHeading(layout, true, IFACE_("Alignment"));
-
-  col = uiLayoutColumn(layout, true);
-  uiItemR(col, &strip_ptr, "use_alignment", 0, "", ICON_NONE);
-}
-
-static void nla_panel_alignment(const bContext *C, Panel *panel)
-{
-  PointerRNA strip_ptr;
-  uiLayout *layout = panel->layout;
-  uiBlock *block;
-  uiLayout *column;
-
-  /* check context and also validity of pointer */
-  if (!nla_panel_context(C, NULL, NULL, &strip_ptr)) {
-    return;
-  }
-
-  block = uiLayoutGetBlock(layout);
-  UI_block_func_handle_set(block, do_nla_region_buttons, NULL);
-  uiLayoutSetPropSep(layout, true);
-
-  uiLayoutSetEnabled(layout, RNA_boolean_get(&strip_ptr, "use_alignment"));
-
-  
-  column = uiLayoutColumn(layout, false);
-  uiItemR(column, &strip_ptr, "location_alignment", 0, NULL, ICON_NONE);
-  uiItemR(column, &strip_ptr, "euler_alignment", 0, NULL, ICON_NONE);
-  uiItemR(column, &strip_ptr, "scale_alignment", 0, NULL, ICON_NONE);
-}
-
 /* F-Modifiers for active NLA-Strip */
 static void nla_panel_modifiers(const bContext *C, Panel *panel)
 {
@@ -691,20 +646,6 @@ void nla_buttons_register(ARegionType *art)
   pt->draw_header = nla_panel_animated_strip_time_header;
   pt->parent = pt_properties;
   pt->flag = PANEL_TYPE_DEFAULT_CLOSED;
-  pt->poll = nla_strip_eval_panel_poll;
-  BLI_addtail(&pt_properties->children, BLI_genericNodeN(pt));
-  BLI_addtail(&art->paneltypes, pt);
-
-  pt = MEM_callocN(sizeof(PanelType), "spacetype nla panel alignment");
-  strcpy(pt->idname, "NLA_PT_alignment");
-  strcpy(pt->parent_id, "NLA_PT_properties");
-  strcpy(pt->label, N_("Alignment"));
-  strcpy(pt->category, "Strip");
-  strcpy(pt->translation_context, BLT_I18NCONTEXT_DEFAULT_BPYRNA);
-  pt->draw = nla_panel_alignment;
-  pt->draw_header = nla_panel_alignment_header;
-  pt->parent = pt_properties;
-  pt->flag = PNL_DEFAULT_CLOSED;
   pt->poll = nla_strip_eval_panel_poll;
   BLI_addtail(&pt_properties->children, BLI_genericNodeN(pt));
   BLI_addtail(&art->paneltypes, pt);

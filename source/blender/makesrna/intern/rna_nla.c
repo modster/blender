@@ -153,23 +153,25 @@ static char *rna_NlaStripPreBlendTransform_path(PointerRNA *ptr)
   if (adt) {
     NlaTrack *nlt;
     NlaStrip *nls;
+    NlaStripPreBlendTransform *pbxform;
 
     int pbxform_index;
     for (nlt = adt->nla_tracks.first; nlt; nlt = nlt->next) {
       for (nls = nlt->strips.first; nls; nls = nls->next) {
         pbxform_index = 0;
-        for (pbxform = nls->pbxform.first; pbxform; pbxform = pbxform->next, pbxform_index++) {
-          if (nls->preblend_transforms == preblend_xform) {
+        for (pbxform = nls->preblend_transforms.first; pbxform;
+             pbxform = pbxform->next, pbxform_index++) {
+          if (pbxform == preblend_xform) {
             /* XXX but if we animate like this, the control will never work... */
             char name_esc_nlt[sizeof(nlt->name) * 2];
-            char name_esc_strip[sizeof(strip->name) * 2];
+            char name_esc_nls[sizeof(nls->name) * 2];
 
             BLI_strescape(name_esc_nlt, nlt->name, sizeof(name_esc_nlt));
-            BLI_strescape(name_esc_strip, strip->name, sizeof(name_esc_strip));
+            BLI_strescape(name_esc_nls, nls->name, sizeof(name_esc_nls));
             return BLI_sprintfN(
                 "animation_data.nla_tracks[\"%s\"].strips[\"%s\"].preblend_transforms[%i]",
                 name_esc_nlt,
-                name_esc_strip,
+                name_esc_nls,
                 pbxform_index);
           }
         }
@@ -199,7 +201,8 @@ static char *rna_NlaStripPreBlendTransform_BoneName_path(PointerRNA *ptr)
     for (nlt = adt->nla_tracks.first; nlt; nlt = nlt->next) {
       for (nls = nlt->strips.first; nls; nls = nls->next) {
         pbxform_index = 0;
-        for (pbxform = nls->pbxform.first; pbxform; pbxform = pbxform->next, pbxform_index++) {
+        for (pbxform = nls->preblend_transforms.first; pbxform;
+             pbxform = pbxform->next, pbxform_index++) {
           bone_index = 0;
           for (bone_name = pbxform->bones.first; bone_name;
                bone_name = bone_name->next, bone_index++) {
@@ -207,15 +210,15 @@ static char *rna_NlaStripPreBlendTransform_BoneName_path(PointerRNA *ptr)
             if (bone_name == search_bone_name) {
               /* XXX but if we animate like this, the control will never work... */
               char name_esc_nlt[sizeof(nlt->name) * 2];
-              char name_esc_strip[sizeof(strip->name) * 2];
+              char name_esc_nls[sizeof(nls->name) * 2];
 
               BLI_strescape(name_esc_nlt, nlt->name, sizeof(name_esc_nlt));
-              BLI_strescape(name_esc_strip, strip->name, sizeof(name_esc_strip));
+              BLI_strescape(name_esc_nls, nls->name, sizeof(name_esc_nls));
               return BLI_sprintfN(
                   "animation_data.nla_tracks[\"%s\"].strips[\"%s\"].preblend_transforms[%i].bones["
                   "%i]",
                   name_esc_nlt,
-                  name_esc_strip,
+                  name_esc_nls,
                   pbxform_index,
                   bone_index);
             }
@@ -641,6 +644,18 @@ static void rna_nlastrip_blendXform_bone_name_set(PointerRNA *ptr, const char *v
   BLI_strncpy_utf8(pbxform_bone_name->name, value, sizeof(pbxform_bone_name->name));
 }
 
+static NlaStripPreBlendTransform *rna_NlaStrip_preblend_new(NlaStrip *strip, ReportList *reports)
+{
+  return BKE_nlastrip_new_preblend_transform(strip);
+}
+
+static void rna_NlaStrip_preblend_remove(NlaStrip *strip,
+                                         ReportList *reports,
+                                         PointerRNA *preblend)
+{
+  BKE_nlastrip_free_preblend_transform(strip, (NlaStripPreBlendTransform *)preblend->data);
+}
+
 #else
 
 static void rna_def_strip_fcurves(BlenderRNA *brna, PropertyRNA *cprop)
@@ -669,6 +684,40 @@ static void rna_def_strip_fcurves(BlenderRNA *brna, PropertyRNA *cprop)
   parm = RNA_def_pointer(
       func, "fcurve", "FCurve", "", "The found F-Curve, or None if it doesn't exist");
   RNA_def_function_return(func, parm);
+}
+
+static void rna_def_nlastrip_blendXforms(BlenderRNA *brna, PropertyRNA *cprop)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  FunctionRNA *func;
+  PropertyRNA *parm;
+
+  RNA_def_property_srna(cprop, "NlaStripPreblendTransforms");
+  srna = RNA_def_struct(brna, "NlaStripPreblendTransforms", NULL);
+  RNA_def_struct_sdna(srna, "NlaStrip");
+  RNA_def_struct_ui_text(
+      srna, "Nla Strip Preblend Transforms", "Collection of Preblend Transforms");
+
+  /* add target */
+  func = RNA_def_function(srna, "add", "rna_NlaStrip_preblend_new");
+  RNA_def_function_flag(func, FUNC_USE_REPORTS);
+  RNA_def_function_ui_description(func, "Add a new bone");
+  /* return type */
+  parm = RNA_def_pointer(func, "preblend", "NlaStripPreBlendTransform", "", "");
+  RNA_def_function_return(func, parm);
+
+  /* remove target */
+  func = RNA_def_function(srna, "remove", "rna_NlaStrip_preblend_remove");
+  RNA_def_function_flag(func, FUNC_USE_REPORTS);
+  RNA_def_function_ui_description(func, "Remove an existing bone from the armature");
+
+  /* target to remove*/
+  parm = RNA_def_pointer(
+      func, "preblend", "NlaStripPreBlendTransform", "", "NlaStripPreBlendTransform to remove");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+  RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
 }
 
 static void rna_def_nlastrip(BlenderRNA *brna)
@@ -923,6 +972,8 @@ static void rna_def_nlastrip(BlenderRNA *brna)
   prop = RNA_def_property(srna, "preblend_transforms", PROP_COLLECTION, PROP_NONE);
   RNA_def_property_struct_type(prop, "NlaStripPreBlendTransform");
   RNA_def_property_ui_text(prop, "PreBlendTransforms", "");
+  rna_def_nlastrip_blendXforms(
+      brna, prop);  // GG: todo: test to ensure add/removal works before copying to bones
 
   RNA_define_lib_overridable(false);
 }
@@ -1066,7 +1117,42 @@ static void rna_def_nlastrip_blendXform(BlenderRNA *brna)
   prop = RNA_def_property(srna, "bones", PROP_COLLECTION, PROP_NONE);
   RNA_def_property_struct_type(prop, "Bone");
   RNA_def_property_ui_text(prop, "Bones", "Bones to apply pre-blend transform to before blending");
+  // rna_def_preblend_bones(brna, prop);
 }
+// static void rna_def_preblend_bones(BlenderRNA *brna, PropertyRNA *cprop)
+// {
+//   StructRNA *srna;
+//   PropertyRNA *prop;
+
+//   FunctionRNA *func;
+//   PropertyRNA *parm;
+
+//   RNA_def_property_srna(cprop, "NlaStripPreBlendTransform_BoneNames");
+//   srna = RNA_def_struct(brna, "NlaStripPreBlendTransform_BoneNames", NULL);
+//   RNA_def_struct_sdna(srna, "NlaStripPreblendTransform");
+//   RNA_def_struct_ui_text(srna,
+//                          "Nla Strip Preblend Transform Bone Names",
+//                          "Collection of Preblend Transform Bone Names");
+
+//   /* add target */
+//   func = RNA_def_function(srna, "add", "rna_NlaStrip_preblend_bones_new");
+//   RNA_def_function_flag(func, FUNC_USE_REPORTS);
+//   RNA_def_function_ui_description(func, "Add a new bone");
+//   /* return type */
+//   parm = RNA_def_pointer(func, "preblend", "NlaStripPreBlendTransform", "", "");
+//   RNA_def_function_return(func, parm);
+
+//   /* remove target */
+//   func = RNA_def_function(srna, "remove", "rna_NlaStrip_preblend_bones_remove");
+//   RNA_def_function_flag(func, FUNC_USE_REPORTS);
+//   RNA_def_function_ui_description(func, "Remove an existing bone from the armature");
+
+//   /* target to remove*/
+//   parm = RNA_def_pointer(
+//       func, "preblend", "NlaStripPreBlendTransform", "", "NlaStripPreBlendTransform to remove");
+//   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+//   RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
+// }
 
 static void rna_def_nlastrip_blendXform_bone_name(BlenderRNA *brna)
 {

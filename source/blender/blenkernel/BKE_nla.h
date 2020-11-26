@@ -67,6 +67,9 @@ struct NlaStrip *BKE_nlastrip_new(struct bAction *act);
 struct NlaStrip *BKE_nlastack_add_strip(struct AnimData *adt,
                                         struct bAction *act,
                                         const bool is_liboverride);
+struct NlaStripPreBlendTransform *BKE_nlastrip_new_preblend_transform(struct NlaStrip *strip);
+void BKE_nlastrip_free_preblend_transform(struct NlaStrip *strip,
+                                          struct NlaStripPreBlendTransform *preblend);
 struct NlaStrip *BKE_nla_add_soundstrip(struct Main *bmain,
                                         struct Scene *scene,
                                         struct Speaker *speaker);

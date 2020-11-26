@@ -55,6 +55,7 @@
 #include "BKE_action.h"
 #include "BKE_anim_data.h"
 #include "BKE_animsys.h"
+#include "BKE_constraint.h"
 #include "BKE_context.h"
 #include "BKE_fcurve.h"
 #include "BKE_global.h"
@@ -2950,9 +2951,9 @@ static void nlaeval_snapshot_blend(NlaEvalData *nlaeval,
       continue;
     }
 
+    NlaEvalChannel *nec = c_upper->channel;
     NlaEvalChannelSnapshot *c_lower = nlaeval_snapshot_ensure_channel(lower, nec);
 
-    NlaEvalChannel *nec = c_lower->channel;
     int mix_mode = c_lower->channel->mix_mode;
     if (upper_blendmode == NLASTRIP_MODE_COMBINE) {
       if (mix_mode == NEC_MIX_QUATERNION) {
@@ -3010,9 +3011,9 @@ void nlastrip_evaluate(PointerRNA *ptr,
    */
   LISTBASE_FOREACH (NlaStripPreBlendTransform *, preblend, &nes->strip->preblend_transforms) {
     float world[4][4];
-    loc_eul_size_to_mat4(world, preblend->location, preblend->rotation_euler, preblend->scale);
+    loc_eul_size_to_mat4(world, preblend->location, preblend->euler, preblend->scale);
 
-    LISTBASE_FOREACH (NlaStripPreBlendTransform_BoneName *, bone, &preblend_xform->bones) {
+    LISTBASE_FOREACH (NlaStripPreBlendTransform_BoneName *, bone, &preblend->bones) {
 
       char name_esc[sizeof(bone->name) * 2];
       BLI_strescape(name_esc, bone->name, sizeof(name_esc));
@@ -3031,7 +3032,7 @@ void nlastrip_evaluate(PointerRNA *ptr,
       char *location_path = BLI_sprintfN("pose.bones[\"\s\"].location", name_esc);
       NlaEvalChannel *location_channel = nlaevalchan_verify(ptr, channels, location_path);
       float *location_values =
-          nlaeval_snapshot_ensure_channel(snapshot_raw, location_channel)->values;
+          nlaeval_snapshot_ensure_channel(&snapshot_raw, location_channel)->values;
 
       char *rotation_path;
       switch (pose_channel->rotmode) {
@@ -3047,11 +3048,11 @@ void nlastrip_evaluate(PointerRNA *ptr,
       }
       NlaEvalChannel *rotation_channel = nlaevalchan_verify(ptr, channels, rotation_path);
       float *rotation_values =
-          nlaeval_snapshot_ensure_channel(snapshot_raw, rotation_channel)->values;
+          nlaeval_snapshot_ensure_channel(&snapshot_raw, rotation_channel)->values;
 
       char *scale_path = BLI_sprintfN("pose.bones[\"\s\"].scale", name_esc);
       NlaEvalChannel *scale_channel = nlaevalchan_verify(ptr, channels, scale_path);
-      float *scale_values = nlaeval_snapshot_ensure_channel(snapshot_raw, scale_channel)->values;
+      float *scale_values = nlaeval_snapshot_ensure_channel(&snapshot_raw, scale_channel)->values;
 
       /* Apply preblend transform as a parent transform to bone's action channels.
        * Results written directly back to raw snapshot. */
@@ -3066,8 +3067,11 @@ void nlastrip_evaluate(PointerRNA *ptr,
 
           break;
         case ROT_MODE_AXISANGLE:
-          loc_axisangle_size_to_mat4(
-              raw_snapshot_matrix, location_values, rotation_values, scale_values);
+          loc_axisangle_size_to_mat4(raw_snapshot_matrix,
+                                     location_values,
+                                     rotation_values,
+                                     rotation_values[3],
+                                     scale_values);
           mul_m4_m4m4(raw_snapshot_matrix, bone_preblend_matrix, raw_snapshot_matrix);
           mat4_decompose(location_values, decomposed_quat, scale_values, raw_snapshot_matrix);
           quat_to_axis_angle(rotation_values, &rotation_values[3], decomposed_quat);
@@ -3630,84 +3634,6 @@ static bool animsys_evaluate_nla_for_flush(NlaEvalData *echannels,
                       anim_eval_context,
                       flush_to_original,
                       true);
-  }
-
-  /** If alignment strips exist, then overwrite object transform without blending */
-  {
-    ListBase alignment_strips = {NULL, NULL};
-    for (nes = estrips.first; nes; nes = nes->next) {
-      NlaStrip *strip = nes->strip;
-      if ((strip->flag & NLASTRIP_FLAG_ALIGNED) == 0) {
-        continue;
-      }
-      LinkData *ld = MEM_callocN(sizeof(LinkData), __func__);
-      ld->data = strip;
-      BLI_addtail(&alignment_strips, ld);
-    }
-
-    if (alignment_strips.first) {
-      NlaStrip *left_most_strip = (NlaStrip *)((LinkData *)alignment_strips.first)->data;
-      LinkData *ld_strip;
-      /** Use Leftmost strip. If mul are left most, then use lower one. */
-      for (ld_strip = alignment_strips.first; ld_strip; ld_strip = ld_strip->next) {
-        NlaStrip *strip = (NlaStrip *)ld_strip->data;
-
-        // if full replace, we just take upper.
-        if (strip->blendmode == NLASTRIP_MODE_REPLACE && IS_EQF(strip->influence, 1)) {
-          left_most_strip = strip;
-          continue;
-        }
-
-        // otherwise, take leftmost
-        if (strip->start < left_most_strip->start) {
-          left_most_strip = strip;
-        }
-        // take top strip's alignment if it starts on lower's end since lower doesn't eval.
-        if (abs(strip->start - left_most_strip->end) < .001f) {
-          left_most_strip = strip;
-        }
-      }
-
-      if (left_most_strip) {
-        NlaEvalChannel *nec;
-        NlaEvalChannelSnapshot *nec_snapshot;
-
-        nec = nlaevalchan_verify(ptr, echannels, "location");
-        nec_snapshot = nlaeval_snapshot_ensure_channel(&echannels->eval_snapshot, nec);
-        BLI_bitmap_set_all(nec->domain.ptr, true, 3);
-        nec_snapshot->values[0] = left_most_strip->location_alignment[0];
-        nec_snapshot->values[1] = left_most_strip->location_alignment[1];
-        nec_snapshot->values[2] = left_most_strip->location_alignment[2];
-        // animsys_write_orig_anim_rna(ptr, "location", 0,
-        // left_most_strip->location_alignment[0]); animsys_write_orig_anim_rna(ptr,
-        // "location", 1, left_most_strip->location_alignment[1]);
-        // animsys_write_orig_anim_rna(ptr, "location", 2,
-        // left_most_strip->location_alignment[2]);
-
-        nec = nlaevalchan_verify(ptr, echannels, "rotation_euler");
-        nec_snapshot = nlaeval_snapshot_ensure_channel(&echannels->eval_snapshot, nec);
-        BLI_bitmap_set_all(nec->domain.ptr, true, 3);
-        nec_snapshot->values[0] = left_most_strip->euler_alignment[0];
-        nec_snapshot->values[1] = left_most_strip->euler_alignment[1];
-        nec_snapshot->values[2] = left_most_strip->euler_alignment[2];
-        // animsys_write_orig_anim_rna(ptr, "rotation_euler", 0,
-        // left_most_strip->euler_alignment[0]); animsys_write_orig_anim_rna(ptr,
-        // "rotation_euler", 1, left_most_strip->euler_alignment[1]);
-        // animsys_write_orig_anim_rna(ptr, "rotation_euler", 2,
-        // left_most_strip->euler_alignment[2]);
-
-        nec = nlaevalchan_verify(ptr, echannels, "scale");
-        nec_snapshot = nlaeval_snapshot_ensure_channel(&echannels->eval_snapshot, nec);
-        BLI_bitmap_set_all(nec->domain.ptr, true, 3);
-        nec_snapshot->values[0] = left_most_strip->scale_alignment[0];
-        nec_snapshot->values[1] = left_most_strip->scale_alignment[1];
-        nec_snapshot->values[2] = left_most_strip->scale_alignment[2];
-        // animsys_write_orig_anim_rna(ptr, "scale", 0, left_most_strip->scale_alignment[0]);
-        // animsys_write_orig_anim_rna(ptr, "scale", 1, left_most_strip->scale_alignment[1]);
-        // animsys_write_orig_anim_rna(ptr, "scale", 2, left_most_strip->scale_alignment[2]);
-      }
-    }
-    BLI_freelistN(&alignment_strips);
   }
 
   /* Free temporary evaluation data that's not used elsewhere. */

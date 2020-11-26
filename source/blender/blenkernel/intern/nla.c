@@ -398,6 +398,30 @@ NlaStrip *BKE_nlastack_add_strip(AnimData *adt, bAction *act, const bool is_libo
   return strip;
 }
 
+NlaStripPreBlendTransform *BKE_nlastrip_new_preblend_transform(NlaStrip *strip)
+{
+  NlaStripPreBlendTransform *preblend = MEM_callocN(sizeof(NlaStripPreBlendTransform), __func__);
+  preblend->location[0] = 0;
+  preblend->location[1] = 0;
+  preblend->location[2] = 0;
+  preblend->euler[0] = 0;
+  preblend->euler[1] = 0;
+  preblend->euler[2] = 0;
+  preblend->scale[0] = 1;
+  preblend->scale[1] = 1;
+  preblend->scale[2] = 1;
+
+  BLI_addtail(&strip->preblend_transforms, preblend);
+
+  return preblend;
+}
+void BKE_nlastrip_free_preblend_transform(NlaStrip *strip, NlaStripPreBlendTransform *preblend)
+{
+  // todo: ensure pattern of add/removal matches others (assumptions, that remove also frees, etc)
+  BLI_remlink(&strip->preblend_transforms, preblend);
+  MEM_freeN(preblend);
+}
+
 /* Add a NLA Strip referencing the given speaker's sound */
 NlaStrip *BKE_nla_add_soundstrip(Main *bmain, Scene *scene, Speaker *speaker)
 {

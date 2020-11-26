@@ -697,10 +697,14 @@ typedef enum eFCurve_Smoothing {
 /* NLA Strips ------------------------------------- */
 
 typedef struct NlaStripPreBlendTransform {
+  struct NlaStripPreBlendTransform *prev, *next;
   /** Used for Strip Alignment of bones: This applies a transform to strip bone channels before
-   * blending. This allows the animator to align traversal bones (like root bone) so that blending
-   * will occur in the proper blend space. Otherwise, blending a Run midway through a Walk cycle,
-   * where the root travels, results in the root blending to Run frame0, where the root is at zero.
+   * blending. This allows the animator to align traversal bones (like root bone) so that
+   blending
+   * will occur in the proper blend space. Otherwise, blending a Run midway through a Walk
+   cycle,
+   * where the root travels, results in the root blending to Run frame0, where the root is at
+   zero.
    */
   float location[3];
   float euler[3];
@@ -714,14 +718,9 @@ typedef struct NlaStripPreBlendTransform {
 } NlaStripPreBlendTransform;
 
 typedef struct NlaStripPreBlendTransform_BoneName {
-  char name[MAX_ID_NAME];
+  struct NlaStripPreBlendTransform_BoneName *prev, *next;
+  char name[64];
 } NlaStripPreBlendTransform_BoneName;
-
-/* NlaStripPreBlendTransform Flags */
-typedef enum eNlaStripPreBlendTransform_Target {
-  NLASTRIP_XFORM_OBJECT = 0,
-  NLASTRIP_XFORM_BONES = 1,
-} eNlaStrip_Blend_Mode;
 
 /**
  * NLA Strip (strip)
