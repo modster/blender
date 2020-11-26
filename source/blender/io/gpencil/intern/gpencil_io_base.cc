@@ -191,7 +191,7 @@ void GpencilIO::create_object_list(void)
  * \param C: Context.
  * \param filename: Path of the file provided by save dialog.
  */
-void GpencilIO::set_filename(const char *filename)
+void GpencilIO::filename_set(const char *filename)
 {
   BLI_strncpy(filename_, filename, FILE_MAX);
   BLI_path_abs(filename_, BKE_main_blendfile_path(bmain_));

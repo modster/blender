@@ -71,7 +71,7 @@ static void error_handler(HPDF_STATUS error_no, HPDF_STATUS detail_no, void *UNU
 GpencilExporterPDF::GpencilExporterPDF(const char *filename, const struct GpencilIOParams *iparams)
     : GpencilExporter(iparams)
 {
-  set_filename(filename);
+  filename_set(filename);
 
   pdf_ = nullptr;
   page_ = nullptr;

@@ -67,7 +67,7 @@ namespace blender::io::gpencil {
 GpencilImporterSVG::GpencilImporterSVG(const char *filename, const struct GpencilIOParams *iparams)
     : GpencilImporter(iparams)
 {
-  set_filename(filename);
+  filename_set(filename);
 }
 
 /* Destructor. */

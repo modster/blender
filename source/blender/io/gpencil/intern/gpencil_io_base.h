@@ -123,7 +123,7 @@ class GpencilIO {
 
   void selected_objects_boundbox_set(void);
   void selected_objects_boundbox_get(rctf *boundbox);
-  void set_filename(const char *filename);
+  void filename_set(const char *filename);
 
  private:
   struct bGPDlayer *gpl_cur_;
