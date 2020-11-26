@@ -151,8 +151,8 @@ bool GpencilExporterPDF::add_page(void)
     return false;
   }
 
-  HPDF_Page_SetWidth(page_, params_.paper_size[0]);
-  HPDF_Page_SetHeight(page_, params_.paper_size[1]);
+  HPDF_Page_SetWidth(page_, render_x_);
+  HPDF_Page_SetHeight(page_, render_y_);
 
   return true;
 }
@@ -253,7 +253,7 @@ void GpencilExporterPDF::export_stroke_to_point(void)
   /* Radius. */
   float radius = stroke_point_radius_get(gps);
 
-  HPDF_Page_Circle(page_, screen_co[0], params_.paper_size[1] - screen_co[1], radius);
+  HPDF_Page_Circle(page_, screen_co[0], render_y_ - screen_co[1], radius);
   HPDF_Page_ClosePathFillStroke(page_);
 }
 
@@ -302,10 +302,10 @@ void GpencilExporterPDF::export_stroke_to_polyline(const bool do_fill, const boo
     HPDF_STATUS err;
     if (gpencil_3d_point_to_screen_space(&pt->x, screen_co)) {
       if (i == 0) {
-        err = HPDF_Page_MoveTo(page_, screen_co[0], params_.paper_size[1] - screen_co[1]);
+        err = HPDF_Page_MoveTo(page_, screen_co[0], render_y_ - screen_co[1]);
       }
       else {
-        err = HPDF_Page_LineTo(page_, screen_co[0], params_.paper_size[1] - screen_co[1]);
+        err = HPDF_Page_LineTo(page_, screen_co[0], render_y_ - screen_co[1]);
       }
     }
   }

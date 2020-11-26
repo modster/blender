@@ -78,8 +78,6 @@ GpencilIO::GpencilIO(const struct GpencilIOParams *iparams)
 
   zero_v2(frame_offset_);
 
-  copy_v2_v2(params_.paper_size, iparams->paper_size);
-
   /* Easy access data. */
   bmain_ = CTX_data_main(params_.C);
   depsgraph_ = CTX_data_depsgraph_pointer(params_.C);

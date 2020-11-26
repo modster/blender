@@ -182,7 +182,6 @@ bool gpencil_io_export(const char *filename, GpencilIOParams *iparams)
   switch (iparams->mode) {
     case GP_EXPORT_TO_SVG: {
       /* Prepare document. */
-      copy_v2_v2(iparams->paper_size, iparams->paper_size);
       GpencilExporterSVG exporter = GpencilExporterSVG(filename, iparams);
 
       float no_offset[2] = {0.0f, 0.0f};

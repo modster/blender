@@ -223,7 +223,6 @@ static int wm_gpencil_export_svg_exec(bContext *C, wmOperator *op)
                                    .frame_type = GP_EXPORT_FRAME_ACTIVE,
                                    .file_subfix = '\0',
                                    .stroke_sample = RNA_float_get(op->ptr, "stroke_sample"),
-                                   .paper_size = {0.0f, 0.0f},
                                    .resolution = 1.0f};
 
   /* Do export. */
@@ -386,7 +385,6 @@ static int wm_gpencil_export_pdf_exec(bContext *C, wmOperator *op)
       .select = select,
       .frame_type = frame_type,
       .stroke_sample = RNA_float_get(op->ptr, "stroke_sample"),
-      .paper_size = {paper[0], paper[1]},
   };
 
   /* Do export. */

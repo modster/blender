@@ -57,8 +57,6 @@ struct GpencilIOParams {
   char file_subfix[10];
   /** Stroke sampling. */
   float stroke_sample;
-  /** Paper size in pixels. */
-  float paper_size[2];
   /** Resolution.  */
   int32_t resolution;
 };
