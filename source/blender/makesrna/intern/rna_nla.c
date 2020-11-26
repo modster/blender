@@ -655,6 +655,32 @@ static void rna_NlaStrip_preblend_remove(NlaStrip *strip,
 {
   BKE_nlastrip_free_preblend_transform(strip, (NlaStripPreBlendTransform *)preblend->data);
 }
+static void rna_NlaStrip_preblend_remove_at(NlaStrip *strip,
+                                            ReportList *reports,
+                                            int preblend_index)
+{
+  BKE_nlastrip_free_preblend_transform_at(strip, preblend_index);
+}
+
+static NlaStripPreBlendTransform_BoneName *rna_preblend_bone_name_new(
+    NlaStripPreBlendTransform *preblend, ReportList *reports)
+{
+  return BKE_preblend_transform_new_bone(preblend);
+}
+
+static void rna_preblend_bone_name_remove(NlaStripPreBlendTransform *preblend,
+                                          ReportList *reports,
+                                          PointerRNA *bone_name)
+{
+  BKE_preblend_transform_free_bone(preblend,
+                                   (NlaStripPreBlendTransform_BoneName *)bone_name->data);
+}
+static void rna_preblend_bone_name_remove_at(NlaStripPreBlendTransform *preblend,
+                                             ReportList *reports,
+                                             int bone_name_index)
+{
+  BKE_preblend_transform_free_bone_at(preblend, bone_name_index);
+}
 
 #else
 
@@ -694,8 +720,8 @@ static void rna_def_nlastrip_blendXforms(BlenderRNA *brna, PropertyRNA *cprop)
   FunctionRNA *func;
   PropertyRNA *parm;
 
-  RNA_def_property_srna(cprop, "NlaStripPreblendTransforms");
-  srna = RNA_def_struct(brna, "NlaStripPreblendTransforms", NULL);
+  RNA_def_property_srna(cprop, "NlaStripPreBlendTransforms");
+  srna = RNA_def_struct(brna, "NlaStripPreBlendTransforms", NULL);
   RNA_def_struct_sdna(srna, "NlaStrip");
   RNA_def_struct_ui_text(
       srna, "Nla Strip Preblend Transforms", "Collection of Preblend Transforms");
@@ -718,6 +744,14 @@ static void rna_def_nlastrip_blendXforms(BlenderRNA *brna, PropertyRNA *cprop)
       func, "preblend", "NlaStripPreBlendTransform", "", "NlaStripPreBlendTransform to remove");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
   RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
+
+  /* remove target */
+  func = RNA_def_function(srna, "remove_at", "rna_NlaStrip_preblend_remove_at");
+  RNA_def_function_flag(func, FUNC_USE_REPORTS);
+  RNA_def_function_ui_description(func, "Remove an existing bone from the armature");
+
+  /* target to remove*/
+  parm = RNA_def_int(func, "preblend_index", 0, 0, INT_MAX, "preblend_index", "", 0, INT_MAX);
 }
 
 static void rna_def_nlastrip(BlenderRNA *brna)
@@ -970,6 +1004,7 @@ static void rna_def_nlastrip(BlenderRNA *brna)
       prop, "Use Alignment", "Mark strip as aligned with other marked overlapping strips");
 
   prop = RNA_def_property(srna, "preblend_transforms", PROP_COLLECTION, PROP_NONE);
+  RNA_def_property_collection_sdna(prop, NULL, "preblend_transforms", NULL);
   RNA_def_property_struct_type(prop, "NlaStripPreBlendTransform");
   RNA_def_property_ui_text(prop, "PreBlendTransforms", "");
   rna_def_nlastrip_blendXforms(
@@ -1083,6 +1118,51 @@ static void rna_def_nlatrack(BlenderRNA *brna)
 
   RNA_define_lib_overridable(false);
 }
+static void rna_def_preblend_bones(BlenderRNA *brna, PropertyRNA *cprop)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  FunctionRNA *func;
+  PropertyRNA *parm;
+
+  RNA_def_property_srna(cprop, "NlaStripPreBlendTransform_BoneNames");
+  srna = RNA_def_struct(brna, "NlaStripPreBlendTransform_BoneNames", NULL);
+  RNA_def_struct_sdna(srna, "NlaStripPreBlendTransform");
+  RNA_def_struct_ui_text(srna,
+                         "Nla Strip Preblend Transform Bone Names",
+                         "Collection of Preblend Transform Bone Names");
+
+  /* add target */
+  func = RNA_def_function(srna, "add", "rna_preblend_bone_name_new");
+  RNA_def_function_flag(func, FUNC_USE_REPORTS);
+  RNA_def_function_ui_description(func, "Add a new bone");
+  /* return type */
+  parm = RNA_def_pointer(func, "bone_name", "NlaStripPreBlendTransform_BoneName", "", "");
+  RNA_def_function_return(func, parm);
+
+  /* remove target */
+  func = RNA_def_function(srna, "remove", "rna_preblend_bone_name_remove");
+  RNA_def_function_flag(func, FUNC_USE_REPORTS);
+  RNA_def_function_ui_description(func, "Remove an existing bone from the armature");
+
+  /* target to remove*/
+  parm = RNA_def_pointer(func,
+                         "bone_name",
+                         "NlaStripPreBlendTransform_BoneName",
+                         "",
+                         "NlaStripPreBlendTransform to remove");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+  RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
+
+  /* remove target */
+  func = RNA_def_function(srna, "remove_at", "rna_preblend_bone_name_remove_at");
+  RNA_def_function_flag(func, FUNC_USE_REPORTS);
+  RNA_def_function_ui_description(func, "Remove an existing bone from the armature");
+
+  /* target to remove*/
+  parm = RNA_def_int(func, "preblend_index", 0, 0, INT_MAX, "preblend_index", "", 0, INT_MAX);
+}
 
 static void rna_def_nlastrip_blendXform(BlenderRNA *brna)
 {
@@ -1117,42 +1197,8 @@ static void rna_def_nlastrip_blendXform(BlenderRNA *brna)
   prop = RNA_def_property(srna, "bones", PROP_COLLECTION, PROP_NONE);
   RNA_def_property_struct_type(prop, "Bone");
   RNA_def_property_ui_text(prop, "Bones", "Bones to apply pre-blend transform to before blending");
-  // rna_def_preblend_bones(brna, prop);
+  rna_def_preblend_bones(brna, prop);
 }
-// static void rna_def_preblend_bones(BlenderRNA *brna, PropertyRNA *cprop)
-// {
-//   StructRNA *srna;
-//   PropertyRNA *prop;
-
-//   FunctionRNA *func;
-//   PropertyRNA *parm;
-
-//   RNA_def_property_srna(cprop, "NlaStripPreBlendTransform_BoneNames");
-//   srna = RNA_def_struct(brna, "NlaStripPreBlendTransform_BoneNames", NULL);
-//   RNA_def_struct_sdna(srna, "NlaStripPreblendTransform");
-//   RNA_def_struct_ui_text(srna,
-//                          "Nla Strip Preblend Transform Bone Names",
-//                          "Collection of Preblend Transform Bone Names");
-
-//   /* add target */
-//   func = RNA_def_function(srna, "add", "rna_NlaStrip_preblend_bones_new");
-//   RNA_def_function_flag(func, FUNC_USE_REPORTS);
-//   RNA_def_function_ui_description(func, "Add a new bone");
-//   /* return type */
-//   parm = RNA_def_pointer(func, "preblend", "NlaStripPreBlendTransform", "", "");
-//   RNA_def_function_return(func, parm);
-
-//   /* remove target */
-//   func = RNA_def_function(srna, "remove", "rna_NlaStrip_preblend_bones_remove");
-//   RNA_def_function_flag(func, FUNC_USE_REPORTS);
-//   RNA_def_function_ui_description(func, "Remove an existing bone from the armature");
-
-//   /* target to remove*/
-//   parm = RNA_def_pointer(
-//       func, "preblend", "NlaStripPreBlendTransform", "", "NlaStripPreBlendTransform to remove");
-//   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
-//   RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
-// }
 
 static void rna_def_nlastrip_blendXform_bone_name(BlenderRNA *brna)
 {
@@ -1166,6 +1212,7 @@ static void rna_def_nlastrip_blendXform_bone_name(BlenderRNA *brna)
   RNA_def_struct_ui_icon(srna, ICON_GIZMO); /* XXX */
 
   prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "name");
   RNA_def_property_ui_text(prop, "Name", "Bone Name");
   RNA_def_struct_name_property(srna, prop);
   RNA_def_property_string_funcs(prop, NULL, NULL, "rna_nlastrip_blendXform_bone_name_set");

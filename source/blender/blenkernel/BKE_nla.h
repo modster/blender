@@ -70,6 +70,14 @@ struct NlaStrip *BKE_nlastack_add_strip(struct AnimData *adt,
 struct NlaStripPreBlendTransform *BKE_nlastrip_new_preblend_transform(struct NlaStrip *strip);
 void BKE_nlastrip_free_preblend_transform(struct NlaStrip *strip,
                                           struct NlaStripPreBlendTransform *preblend);
+void BKE_nlastrip_free_preblend_transform_at(struct NlaStrip *strip, int preblend_index);
+
+struct NlaStripPreBlendTransform_BoneName *BKE_preblend_transform_new_bone(
+    struct NlaStripPreBlendTransform *preblend);
+void BKE_preblend_transform_free_bone(struct NlaStripPreBlendTransform *preblend,
+                                      struct NlaStripPreBlendTransform_BoneName *bone_name);
+void BKE_preblend_transform_free_bone_at(struct NlaStripPreBlendTransform *preblend,
+                                         int bone_name_index);
 struct NlaStrip *BKE_nla_add_soundstrip(struct Main *bmain,
                                         struct Scene *scene,
                                         struct Speaker *speaker);

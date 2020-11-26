@@ -421,6 +421,37 @@ void BKE_nlastrip_free_preblend_transform(NlaStrip *strip, NlaStripPreBlendTrans
   BLI_remlink(&strip->preblend_transforms, preblend);
   MEM_freeN(preblend);
 }
+void BKE_nlastrip_free_preblend_transform_at(NlaStrip *strip, int preblend_index)
+{
+  NlaStripPreBlendTransform *preblend = BLI_findlink(&strip->preblend_transforms, preblend_index);
+  if (preblend) {
+    BKE_nlastrip_free_preblend_transform(strip, preblend);
+  }
+}
+
+NlaStripPreBlendTransform_BoneName *BKE_preblend_transform_new_bone(NlaStripPreBlendTransform *preblend)
+{
+  NlaStripPreBlendTransform_BoneName *bone_name = MEM_callocN(
+      sizeof(NlaStripPreBlendTransform_BoneName), __func__);
+
+  BLI_addtail(&preblend->bones, bone_name);
+
+  return bone_name;
+}
+void BKE_preblend_transform_free_bone(NlaStripPreBlendTransform *preblend,
+                                      NlaStripPreBlendTransform_BoneName *bone_name)
+{
+  // todo: ensure pattern of add/removal matches others (assumptions, that remove also frees, etc)
+  BLI_remlink(&preblend->bones, bone_name);
+  MEM_freeN(bone_name);
+}
+void BKE_preblend_transform_free_bone_at(NlaStripPreBlendTransform *preblend, int bone_name_index)
+{
+  NlaStripPreBlendTransform_BoneName *bone_name = BLI_findlink(&preblend->bones, bone_name_index);
+  if (bone_name) {
+    BKE_preblend_transform_free_bone(preblend, bone_name);
+  }
+}
 
 /* Add a NLA Strip referencing the given speaker's sound */
 NlaStrip *BKE_nla_add_soundstrip(Main *bmain, Scene *scene, Speaker *speaker)

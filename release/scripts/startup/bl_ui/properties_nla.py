@@ -61,7 +61,7 @@ class OBJECT_OT_nla_remove_preblend(bpy.types.Operator):
 
     def execute(self, context):
         active_strip = get_active_strip(context)
-        active_strip.preblend_transforms.remove(active_strip.preblend_transforms[self.preblend_index])
+        active_strip.preblend_transforms.remove_at(self.preblend_index)
 
         return {'FINISHED'}
 
@@ -79,8 +79,8 @@ class OBJECT_OT_nla_preblend_add_bone(bpy.types.Operator):
     def execute(self, context):
         active_strip = get_active_strip(context)
         preblend = active_strip.preblend_transforms[self.preblend_index]
-        preblend.bones.add()
-
+        bone = preblend.bones.add()
+        bone.name ="Hips"
         return {'FINISHED'}
 class OBJECT_OT_nla_preblend_remove_bone(bpy.types.Operator):
     bl_idname = "object.preblend_remove_bone"
@@ -97,7 +97,7 @@ class OBJECT_OT_nla_preblend_remove_bone(bpy.types.Operator):
     def execute(self, context):
         active_strip = get_active_strip(context)
         preblend = active_strip.preblend_transforms[self.preblend_index]
-        preblend.bones.remove(self.bone_index)
+        preblend.bones.remove_at(self.bone_index)
 
         return {'FINISHED'}
 
@@ -135,7 +135,9 @@ class OBJECT_PT_nla_alignment(Panel):
             row.operator(OBJECT_OT_nla_preblend_add_bone.bl_idname,text='',icon='ADD').preblend_index = i 
             for j,bone in enumerate(preblend.bones):
                 row = col.row(align=True)
-                row.prop_search(bone,"name",context.active_object.data,"bones",text='')
+                # print([b for b in context.active_object.data.bones])
+                # row.prop_search(bone,"name",context.active_object.data,"bones",text='')
+                row.prop(bone,"name")
                 op = row.operator(OBJECT_OT_nla_preblend_remove_bone.bl_idname,text='',icon='REMOVE')
                 op.preblend_index = i 
                 op.bone_index = j 
