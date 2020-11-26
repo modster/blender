@@ -26,39 +26,26 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "BKE_context.h"
 #include "BKE_gpencil.h"
 #include "BKE_gpencil_geom.h"
-#include "BKE_main.h"
-#include "BKE_material.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
-#include "BLI_math_color.h"
-#include "BLI_string.h"
-#include "BLI_utildefines.h"
 
 #include "DNA_gpencil_types.h"
-#include "DNA_material_types.h"
-#include "DNA_object_types.h"
-#include "DNA_scene_types.h"
-#include "DNA_screen_types.h"
-#include "DNA_view3d_types.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
 
 #include "ED_gpencil.h"
 
-#include "UI_view2d.h"
-
-#include "ED_view3d.h"
-
 #include "gpencil_io.h"
 #include "gpencil_io_import_svg.h"
 
+/* Custom flags for NanoSVG. */
 #define NANOSVG_ALL_COLOR_KEYWORDS
 #define NANOSVG_IMPLEMENTATION
+
 #include "nanosvg/nanosvg.h"
 
 namespace blender::io::gpencil {
@@ -249,6 +236,7 @@ void GpencilImporterSVG::create_stroke(bGPdata *gpd,
   BKE_gpencil_stroke_geometry_update(gpd, gps);
 }
 
+/* Unpack internal NanoSVG color. */
 static void unpack_nano_color(float r_col[4], const unsigned int pack)
 {
   unsigned char rgb_u[4];
