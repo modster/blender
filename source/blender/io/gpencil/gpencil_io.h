@@ -31,9 +31,6 @@ struct bContext;
 struct Object;
 struct View3D;
 
-/* Paper Size: A4, Letter. */
-static const float gpencil_export_paper_sizes[2] = {3508, 2480};
-
 struct GpencilIOParams {
   bContext *C;
   ARegion *region;
