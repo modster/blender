@@ -191,13 +191,15 @@ class OptiXDevice : public CUDADevice {
   OptixDenoiser denoiser = NULL;
   device_only_memory<unsigned char> denoiser_state;
   int denoiser_input_passes = 0;
+  device_only_memory<char> accel_build_temp_mem;
 
  public:
   OptiXDevice(DeviceInfo &info_, Stats &stats_, Profiler &profiler_, bool background_)
       : CUDADevice(info_, stats_, profiler_, background_),
         sbt_data(this, "__sbt", MEM_READ_ONLY),
         launch_params(this, "__params"),
-        denoiser_state(this, "__denoiser_state")
+        denoiser_state(this, "__denoiser_state"),
+        accel_build_temp_mem(this, "temp_build_mem")
   {
     // Store number of CUDA streams in device info
     info.cpu_threads = DebugFlags().optix.cuda_streams;
@@ -1106,21 +1108,22 @@ class OptiXDevice : public CUDADevice {
     check_result_optix_ret(
         optixAccelComputeMemoryUsage(context, &options, &build_input, 1, &sizes));
 
+    const size_t required_mem = (operation == OPTIX_BUILD_OPERATION_BUILD) ? sizes.tempSizeInBytes : sizes.tempUpdateSizeInBytes;
+
     // Allocate required output buffers
-    device_only_memory<char> temp_mem(this, "temp_build_mem");
-    temp_mem.alloc_to_device(align_up(sizes.tempSizeInBytes, 8) + 8);
-    if (!temp_mem.device_pointer)
+    accel_build_temp_mem.alloc_to_device(align_up(required_mem, 8) + 8, false);
+    if (!accel_build_temp_mem.device_pointer)
       return false;  // Make sure temporary memory allocation succeeded
 
     // Move textures to host memory if there is not enough room
-    size_t size = 0, free = 0;
-    cuMemGetInfo(&free, &size);
-    size = sizes.outputSizeInBytes + device_working_headroom;
-    if (size >= free && can_map_host) {
-      move_textures_to_host(size - free, false);
-    }
-
     if (operation == OPTIX_BUILD_OPERATION_BUILD) {
+      size_t size = 0, free = 0;
+      cuMemGetInfo(&free, &size);
+      size = sizes.outputSizeInBytes + device_working_headroom;
+      if (size >= free && can_map_host) {
+        move_textures_to_host(size - free, false);
+      }
+
       check_result_cuda_ret(cuMemAlloc(&out_data, sizes.outputSizeInBytes));
     }
 
@@ -1131,15 +1134,15 @@ class OptiXDevice : public CUDADevice {
     compacted_size_prop.type = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE;
     // A tiny space was allocated for this property at the end of the temporary buffer above
     // Make sure this pointer is 8-byte aligned
-    compacted_size_prop.result = align_up(temp_mem.device_pointer + sizes.tempSizeInBytes, 8);
+    compacted_size_prop.result = align_up(accel_build_temp_mem.device_pointer + required_mem, 8);
 
     check_result_optix_ret(optixAccelBuild(context,
                                            NULL,
                                            &options,
                                            &build_input,
                                            1,
-                                           temp_mem.device_pointer,
-                                           sizes.tempSizeInBytes,
+                                           accel_build_temp_mem.device_pointer,
+                                           required_mem,
                                            out_data,
                                            sizes.outputSizeInBytes,
                                            &out_handle,
@@ -1156,7 +1159,7 @@ class OptiXDevice : public CUDADevice {
           cuMemcpyDtoH(&compacted_size, compacted_size_prop.result, sizeof(compacted_size)));
 
       // Temporary memory is no longer needed, so free it now to make space
-      temp_mem.free();
+      //accel_build_temp_mem.free();
 
       // There is no point compacting if the size does not change
       if (compacted_size < sizes.outputSizeInBytes) {
@@ -1708,6 +1711,8 @@ class OptiXDevice : public CUDADevice {
       static_cast<BVHOptiX *>(bvh)->do_refit = false;
       return true;
     }
+
+    accel_build_temp_mem.free();
 
     return false;
   }
