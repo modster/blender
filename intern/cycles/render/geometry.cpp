@@ -1243,6 +1243,7 @@ void GeometryManager::device_update_bvh(Device *device,
     VLOG(1) << "Using " << bvh_layout_name(bparams.bvh_layout) << " layout.";
 
     if (bvh) {
+      bvh->params = bparams;
       bvh->pack = {};
 
       if (!(device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
