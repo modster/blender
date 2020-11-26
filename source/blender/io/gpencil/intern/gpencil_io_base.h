@@ -50,10 +50,10 @@ class GpencilIO {
  public:
   GpencilIO(const struct GpencilIOParams *iparams);
 
-  void set_frame_number(int value);
-  void set_frame_offset(float value[2]);
-  void set_frame_ratio(float value[2]);
-  void set_frame_box(float value[2]);
+  void frame_number_set(int value);
+  void frame_offset_set(float value[2]);
+  void frame_ratio_set(float value[2]);
+  void frame_box_set(float value[2]);
 
  protected:
   GpencilIOParams params_;

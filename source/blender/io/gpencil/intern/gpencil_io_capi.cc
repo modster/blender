@@ -102,7 +102,7 @@ static bool gpencil_io_export_pdf(Depsgraph *depsgraph,
   Object *ob_eval_ = (Object *)DEG_get_evaluated_id(depsgraph, &ob->id);
   bGPdata *gpd_eval = (bGPdata *)ob_eval_->data;
 
-  exporter->set_frame_number(iparams->frame_cur);
+  exporter->frame_number_set(iparams->frame_cur);
   std::string subfix = iparams->file_subfix;
   result |= exporter->new_document();
 
@@ -120,13 +120,13 @@ static bool gpencil_io_export_pdf(Depsgraph *depsgraph,
 
       CFRA = i;
       BKE_scene_graph_update_for_newframe(depsgraph);
-      exporter->set_frame_number(i);
+      exporter->frame_number_set(i);
       result |= exporter->add_newpage();
       result |= exporter->add_body();
     }
     result = exporter->write(subfix);
     /* Back to original frame. */
-    exporter->set_frame_number(iparams->frame_cur);
+    exporter->frame_number_set(iparams->frame_cur);
     CFRA = iparams->frame_cur;
     BKE_scene_graph_update_for_newframe(depsgraph);
   }
@@ -143,8 +143,8 @@ static bool gpencil_io_export_frame_svg(GpencilExporterSVG *exporter,
                                         const bool savepage)
 {
   bool result = false;
-  exporter->set_frame_number(iparams->frame_cur);
-  exporter->set_frame_offset(frame_offset);
+  exporter->frame_number_set(iparams->frame_cur);
+  exporter->frame_offset_set(frame_offset);
   std::string subfix = iparams->file_subfix;
   if (newpage) {
     result |= exporter->add_newpage();
@@ -187,7 +187,7 @@ bool gpencil_io_export(const char *filename, GpencilIOParams *iparams)
 
       float no_offset[2] = {0.0f, 0.0f};
       float ratio[2] = {1.0f, 1.0f};
-      exporter.set_frame_ratio(ratio);
+      exporter.frame_ratio_set(ratio);
       iparams->file_subfix[0] = '\0';
       done |= gpencil_io_export_frame_svg(&exporter, iparams, no_offset, true, true, true);
       break;
