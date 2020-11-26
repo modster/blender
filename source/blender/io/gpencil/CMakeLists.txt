@@ -73,7 +73,7 @@ set(LIB
   ${PUGIXML_LIBRARIES}
 
   # This line must be changed if Libharu is included as external lib
-  ${LIBDIR}/libharu/libhpdfsd.lib
+  ${LIBDIR}/libharu/lib/libhpdfsd.lib
 )
 
 list(APPEND LIB
