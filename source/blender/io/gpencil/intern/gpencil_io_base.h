@@ -24,10 +24,6 @@
 #include <list>
 #include <string>
 
-#include "BLI_path_util.h"
-
-#include "DNA_defs.h"
-
 #include "gpencil_io.h"
 
 struct ARegion;
