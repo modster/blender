@@ -2281,13 +2281,33 @@ static void nlastrip_evaluate_actionclip_raw_value(PointerRNA *ptr,
   float value = 0.0f;
   NlaEvalChannel *nec = NULL;
 
+  bool allow_alloc_channels = true;
   for (fcu = strip->act->curves.first; fcu; fcu = fcu->next) {
 
     if (!is_fcurve_evaluatable(fcu))
       continue;
 
     /** Only fill values for existing channels in snapshot, those that caller wants inverted. */
-    if (nlaevalchan_try_get(upper_eval_data, fcu->rna_path, &nec)) {
+    //if (nlaevalchan_try_get(upper_eval_data, fcu->rna_path, &nec)) {
+    if (true){
+
+      
+    /* Get an NLA evaluation channel to work with, and accumulate the evaluated value with the
+       * value(s) stored in this channel if it has been used already. */
+      NlaEvalChannel *nec = NULL;
+      if (allow_alloc_channels) {
+        /** Guarantees NlaEvalChannel. */
+        nec = nlaevalchan_verify(ptr, upper_eval_data, fcu->rna_path);
+      }
+      else {
+        /** Only get NlaEvalChannel if it exists. */
+        nlaevalchan_try_get(upper_eval_data, fcu->rna_path, &nec);
+      }
+
+      if (!nec) {
+        /** Skip since caller only wants to fill values for existing channels in snapshot. */
+        continue;
+      }
 
       necs = nlaeval_snapshot_ensure_channel(snapshot, nec);
       if (!nlaevalchan_validate_index_ex(nec, fcu->array_index))
@@ -2995,7 +3015,7 @@ void nlastrip_evaluate(PointerRNA *ptr,
       ptr, channels, NULL, nes, &snapshot_raw, anim_eval_context, &blendmode, &influence);
 
   /* Apply preblend transforms to each bone's raw snapshot values.  */
-  Object *object = (Object *)ptr->owner_id;
+  Object *object = (Object *)ptr->data;
   bPose *pose = object->pose;
   /**
    * Assumes preblend xformed bones are root bones with no parents. ( I think that would affect

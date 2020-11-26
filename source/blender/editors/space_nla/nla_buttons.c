@@ -377,6 +377,20 @@ static void nla_panel_properties(const bContext *C, Panel *panel)
   uiItemR(column, &strip_ptr, "frame_start", 0, IFACE_("Frame Start"), ICON_NONE);
   uiItemR(column, &strip_ptr, "frame_end", 0, IFACE_("End"), ICON_NONE);
 
+
+
+  NlaStrip *strip = ((NlaStrip *)strip_ptr.data);
+
+  if (strip->preblend_transforms.first) {
+
+    PointerRNA preblend_rna;
+    RNA_pointer_create(strip_ptr.owner_id,
+                       &RNA_NlaStripPreBlendTransform,
+                       strip->preblend_transforms.first,
+                       &preblend_rna);
+
+    uiItemR(column, &preblend_rna, "location", 0, NULL, ICON_NONE);
+  }
   /* Evaluation-Related Strip Properties ------------------ */
 
   /* sound properties strips don't have these settings */

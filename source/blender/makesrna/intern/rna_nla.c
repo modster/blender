@@ -715,7 +715,6 @@ static void rna_def_strip_fcurves(BlenderRNA *brna, PropertyRNA *cprop)
 static void rna_def_nlastrip_blendXforms(BlenderRNA *brna, PropertyRNA *cprop)
 {
   StructRNA *srna;
-  PropertyRNA *prop;
 
   FunctionRNA *func;
   PropertyRNA *parm;
@@ -998,10 +997,10 @@ static void rna_def_nlastrip(BlenderRNA *brna)
                            "after tweaking strip and its keyframes");
   RNA_def_property_update(prop, NC_ANIMATION | ND_NLA | NA_EDITED, "rna_NlaStrip_update");
 
-  prop = RNA_def_property(srna, "use_alignment", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "flag", NLASTRIP_FLAG_ALIGNED);
-  RNA_def_property_ui_text(
-      prop, "Use Alignment", "Mark strip as aligned with other marked overlapping strips");
+  // prop = RNA_def_property(srna, "use_alignment", PROP_BOOLEAN, PROP_NONE);
+  // RNA_def_property_boolean_sdna(prop, NULL, "flag", NLASTRIP_FLAG_ALIGNED);
+  // RNA_def_property_ui_text(
+  //     prop, "Use Alignment", "Mark strip as aligned with other marked overlapping strips");
 
   prop = RNA_def_property(srna, "preblend_transforms", PROP_COLLECTION, PROP_NONE);
   RNA_def_property_collection_sdna(prop, NULL, "preblend_transforms", NULL);
@@ -1173,18 +1172,14 @@ static void rna_def_nlastrip_blendXform(BlenderRNA *brna)
   srna = RNA_def_struct(brna, "NlaStripPreBlendTransform", NULL);
   RNA_def_struct_ui_text(srna, "NLA Strip Pre-Blend Transform", "");
   RNA_def_struct_path_func(srna, "rna_NlaStripPreBlendTransform_path");
-  RNA_def_struct_ui_icon(srna, ICON_GIZMO); /* XXX */
-
   /* name property */
   /** Note: should not be animated */
   prop = RNA_def_property(srna, "location", PROP_FLOAT, PROP_TRANSLATION);
-  RNA_def_property_float_sdna(prop, NULL, "location");
   RNA_def_property_ui_text(prop, "Location", "");
   RNA_def_property_ui_range(prop, -FLT_MAX, FLT_MAX, 1, RNA_TRANSLATION_PREC_DEFAULT);
   RNA_def_property_update(prop, NC_ANIMATION | ND_NLA | NA_EDITED, "rna_NlaStrip_update");
 
   prop = RNA_def_property(srna, "euler", PROP_FLOAT, PROP_EULER);
-  RNA_def_property_float_sdna(prop, NULL, "euler");
   RNA_def_property_ui_text(prop, "Rotation", "");
   RNA_def_property_update(prop, NC_ANIMATION | ND_NLA | NA_EDITED, "rna_NlaStrip_update");
 
@@ -1195,7 +1190,7 @@ static void rna_def_nlastrip_blendXform(BlenderRNA *brna)
   RNA_def_property_update(prop, NC_ANIMATION | ND_NLA | NA_EDITED, "rna_NlaStrip_update");
 
   prop = RNA_def_property(srna, "bones", PROP_COLLECTION, PROP_NONE);
-  RNA_def_property_struct_type(prop, "Bone");
+  RNA_def_property_struct_type(prop, "NlaStripPreBlendTransform_BoneName");
   RNA_def_property_ui_text(prop, "Bones", "Bones to apply pre-blend transform to before blending");
   rna_def_preblend_bones(brna, prop);
 }
@@ -1212,7 +1207,6 @@ static void rna_def_nlastrip_blendXform_bone_name(BlenderRNA *brna)
   RNA_def_struct_ui_icon(srna, ICON_GIZMO); /* XXX */
 
   prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
-  RNA_def_property_string_sdna(prop, NULL, "name");
   RNA_def_property_ui_text(prop, "Name", "Bone Name");
   RNA_def_struct_name_property(srna, prop);
   RNA_def_property_string_funcs(prop, NULL, NULL, "rna_nlastrip_blendXform_bone_name_set");

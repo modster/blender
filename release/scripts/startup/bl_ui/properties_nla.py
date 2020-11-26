@@ -45,8 +45,11 @@ class OBJECT_OT_nla_add_preblend(bpy.types.Operator):
     def execute(self, context):
         active_strip = get_active_strip(context)
         print(dict(active_strip.preblend_transforms))
-        active_strip.preblend_transforms.add()
+        k = active_strip.preblend_transforms.add()
 
+        # print(k.path_from_id("location"))
+        # print(active_strip.path_resolve("preblend_transforms"))
+        # print(k.id_data)
         return {'FINISHED'}
 class OBJECT_OT_nla_remove_preblend(bpy.types.Operator):
     bl_idname = "object.nla_remove_preblend"
@@ -106,6 +109,7 @@ class OBJECT_PT_nla_alignment(Panel):
     bl_region_type = 'UI'
     bl_label = "Alignment"
     bl_category = "Alignment"
+    bl_context = "object"
     
 
     def draw(self, context):
@@ -117,6 +121,15 @@ class OBJECT_PT_nla_alignment(Panel):
         active_strip = get_active_strip(context)
 
 
+        layout.prop(active_strip,"preblend_transforms")
+        
+        layout.prop(active_strip,"frame_start")
+        layout.prop(context.active_object,"location")
+        layout.prop(context.active_object.pose.bones["Hips"],"location")
+        if(context.active_pose_bone):
+            c = context.active_pose_bone.constraints
+            if(c):
+                layout.prop(c[0],'type')
         layout.operator(OBJECT_OT_nla_add_preblend.bl_idname,text='New Transform',icon='ADD')
         box = layout.box()
         for i,preblend in enumerate(active_strip.preblend_transforms):
