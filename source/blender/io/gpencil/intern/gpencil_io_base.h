@@ -47,7 +47,6 @@ class GpencilIO {
   GpencilIO(const struct GpencilIOParams *iparams);
 
   void frame_number_set(const int value);
-  void frame_offset_set(const float value[2]);
   void frame_ratio_set(const float value[2]);
   void frame_box_set(const float value[2]);
 
@@ -82,7 +81,6 @@ class GpencilIO {
   float offset_[2];
 
   float frame_box_[2];
-  float frame_offset_[2];
   float frame_ratio_[2];
 
   int cfra_;

@@ -68,8 +68,6 @@ GpencilIO::GpencilIO(const struct GpencilIOParams *iparams)
   params_.resolution = iparams->resolution;
   params_.scale = iparams->scale;
 
-  zero_v2(frame_offset_);
-
   /* Easy access data. */
   bmain_ = CTX_data_main(params_.C);
   depsgraph_ = CTX_data_depsgraph_pointer(params_.C);
@@ -215,9 +213,8 @@ bool GpencilIO::gpencil_3d_point_to_screen_space(const float co[3], float r_co[2
       sub_v2_v2(r_co, offset_);
       mul_v2_fl(r_co, camera_ratio_);
 
-      /* Apply frame offset and scale. */
+      /* Apply frame scale ratio. */
       mul_v2_v2(r_co, frame_ratio_);
-      add_v2_v2(r_co, frame_offset_);
 
       return true;
     }
@@ -507,11 +504,6 @@ void GpencilIO::selected_objects_boundbox_get(rctf *boundbox)
 void GpencilIO::frame_number_set(const int value)
 {
   cfra_ = value;
-}
-
-void GpencilIO::frame_offset_set(const float value[2])
-{
-  copy_v2_v2(frame_offset_, value);
 }
 
 void GpencilIO::frame_ratio_set(const float value[2])

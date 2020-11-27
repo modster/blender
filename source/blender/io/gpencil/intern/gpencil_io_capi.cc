@@ -137,14 +137,12 @@ static bool gpencil_io_export_pdf(Depsgraph *depsgraph,
 /* Export current frame in SVG. */
 static bool gpencil_io_export_frame_svg(GpencilExporterSVG *exporter,
                                         const GpencilIOParams *iparams,
-                                        float frame_offset[2],
                                         const bool newpage,
                                         const bool body,
                                         const bool savepage)
 {
   bool result = false;
   exporter->frame_number_set(iparams->frame_cur);
-  exporter->frame_offset_set(frame_offset);
   std::string subfix = iparams->file_subfix;
   if (newpage) {
     result |= exporter->add_newpage();
@@ -184,11 +182,10 @@ bool gpencil_io_export(const char *filename, GpencilIOParams *iparams)
       /* Prepare document. */
       GpencilExporterSVG exporter = GpencilExporterSVG(filename, iparams);
 
-      float no_offset[2] = {0.0f, 0.0f};
       float ratio[2] = {1.0f, 1.0f};
       exporter.frame_ratio_set(ratio);
       iparams->file_subfix[0] = '\0';
-      done |= gpencil_io_export_frame_svg(&exporter, iparams, no_offset, true, true, true);
+      done |= gpencil_io_export_frame_svg(&exporter, iparams, true, true, true);
       break;
     }
     case GP_EXPORT_TO_PDF: {
