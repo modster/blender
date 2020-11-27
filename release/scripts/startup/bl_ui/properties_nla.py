@@ -123,13 +123,13 @@ class OBJECT_PT_nla_alignment(Panel):
 
         layout.prop(active_strip,"preblend_transforms")
         
-        layout.prop(active_strip,"frame_start")
-        layout.prop(context.active_object,"location")
-        layout.prop(context.active_object.pose.bones["Hips"],"location")
-        if(context.active_pose_bone):
-            c = context.active_pose_bone.constraints
-            if(c):
-                layout.prop(c[0],'type')
+        # layout.prop(active_strip,"frame_start")
+        # layout.prop(context.active_object,"location")
+        # layout.prop(context.active_object.pose.bones["Hips"],"location")
+        # if(context.active_pose_bone):
+        #     c = context.active_pose_bone.constraints
+        #     if(c):
+        #         layout.prop(c[0],'type')
         layout.operator(OBJECT_OT_nla_add_preblend.bl_idname,text='New Transform',icon='ADD')
         box = layout.box()
         for i,preblend in enumerate(active_strip.preblend_transforms):

@@ -377,20 +377,6 @@ static void nla_panel_properties(const bContext *C, Panel *panel)
   uiItemR(column, &strip_ptr, "frame_start", 0, IFACE_("Frame Start"), ICON_NONE);
   uiItemR(column, &strip_ptr, "frame_end", 0, IFACE_("End"), ICON_NONE);
 
-
-
-  NlaStrip *strip = ((NlaStrip *)strip_ptr.data);
-
-  if (strip->preblend_transforms.first) {
-
-    PointerRNA preblend_rna;
-    RNA_pointer_create(strip_ptr.owner_id,
-                       &RNA_NlaStripPreBlendTransform,
-                       strip->preblend_transforms.first,
-                       &preblend_rna);
-
-    uiItemR(column, &preblend_rna, "location", 0, NULL, ICON_NONE);
-  }
   /* Evaluation-Related Strip Properties ------------------ */
 
   /* sound properties strips don't have these settings */
@@ -429,6 +415,27 @@ static void nla_panel_properties(const bContext *C, Panel *panel)
     uiItemR(row, &strip_ptr, "use_reverse", 0, NULL, ICON_NONE);
 
     uiItemR(column, &strip_ptr, "use_animated_time_cyclic", 0, NULL, ICON_NONE);
+
+    /** GG: I don't know why, but implementing UI in python results in wrong rna path (rooting from
+     * RNA Scene type) for preblend xform properties and updates don't work properly.
+     *
+     * Here, i guess since we specify the pointerRNA as a strip, it will be correct?
+     */
+    NlaStrip *strip = ((NlaStrip *)strip_ptr.data);
+
+    // temporary: only show 1st one for testing purposes, so when xform changes, it updates nla
+    if (strip->preblend_transforms.first) {
+
+      PointerRNA preblend_rna;
+      RNA_pointer_create(strip_ptr.owner_id,
+                         &RNA_NlaStripPreBlendTransform,
+                         strip->preblend_transforms.first,
+                         &preblend_rna);
+
+      uiItemR(column, &preblend_rna, "location", 0, NULL, ICON_NONE);
+      uiItemR(column, &preblend_rna, "euler", 0, NULL, ICON_NONE);
+      uiItemR(column, &preblend_rna, "scale", 0, NULL, ICON_NONE);
+    }
   }
 }
 

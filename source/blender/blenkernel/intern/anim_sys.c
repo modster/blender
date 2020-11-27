@@ -2288,11 +2288,10 @@ static void nlastrip_evaluate_actionclip_raw_value(PointerRNA *ptr,
       continue;
 
     /** Only fill values for existing channels in snapshot, those that caller wants inverted. */
-    //if (nlaevalchan_try_get(upper_eval_data, fcu->rna_path, &nec)) {
-    if (true){
+    // if (nlaevalchan_try_get(upper_eval_data, fcu->rna_path, &nec)) {
+    if (true) {
 
-      
-    /* Get an NLA evaluation channel to work with, and accumulate the evaluated value with the
+      /* Get an NLA evaluation channel to work with, and accumulate the evaluated value with the
        * value(s) stored in this channel if it has been used already. */
       NlaEvalChannel *nec = NULL;
       if (allow_alloc_channels) {
@@ -3005,7 +3004,20 @@ void nlastrip_evaluate(PointerRNA *ptr,
                        const bool flush_to_original,
                        bool allow_alloc_channels)
 {
-
+  /**
+   * Todo: for blending rotation channels, its sometimes important to choose whether to ipo
+   * through shorter or longer angle- maybe make it a toggle on preblend data? Otherwise can't
+   * properly align character flips due to it rotating in wrong direction... would need to be
+   * applied using quaternion which means doing similar rotation grabbing and manipulation from/to
+   * nla channels again which sucks..but doable..
+   *    -....and maybe it would need to be a per bone's rotation component set toggle?
+   *    -because some bones may flip while others may not...?
+   *
+   * What if we just stored the rotation channels as NLA quaternion channels (conversion on read
+   * from fcurves) Then right before flushing to property, we convert to proper rotation type?
+   * Unsure how itll affect keyframe remapping exactly
+   *
+   */
   NlaEvalSnapshot snapshot_raw;
   nlaeval_snapshot_init(&snapshot_raw, channels, NULL);
 
@@ -3038,18 +3050,32 @@ void nlastrip_evaluate(PointerRNA *ptr,
       char name_esc[sizeof(bone->name) * 2];
       BLI_strescape(name_esc, bone->name, sizeof(name_esc));
 
-      /* Get preblend transform in bone's non-animated local space. */
-      float bone_preblend_matrix[4][4];
-      copy_m4_m4(bone_preblend_matrix, world);
       bPoseChannel *pose_channel = BKE_pose_channel_find_name(pose, name_esc);
+
+      float rest_matrix[4][4];
+      unit_m4(rest_matrix);
       BKE_constraint_mat_convertspace(object,
                                       pose_channel,
-                                      bone_preblend_matrix,
-                                      CONSTRAINT_SPACE_WORLD,
+                                      rest_matrix,
                                       CONSTRAINT_SPACE_LOCAL,
+                                      CONSTRAINT_SPACE_WORLD,
                                       false);
+      float rest_matrix_inv[4][4];
+      invert_m4_m4(rest_matrix_inv, rest_matrix);
 
-      char *location_path = BLI_sprintfN("pose.bones[\"\s\"].location", name_esc);
+      /* Get preblend transform in bone's non-animated local space. */
+      float bone_preblend_matrix[4][4];
+      mul_m4_m4m4(bone_preblend_matrix, rest_matrix_inv, world);
+      mul_m4_m4m4(bone_preblend_matrix, bone_preblend_matrix, rest_matrix);
+      // copy_m4_m4(bone_preblend_matrix, world);
+      // BKE_constraint_mat_convertspace(object,
+      //                                pose_channel,
+      //                                bone_preblend_matrix,
+      //                                CONSTRAINT_SPACE_WORLD,
+      //                                CONSTRAINT_SPACE_LOCAL,
+      //                                false);
+
+      char *location_path = BLI_sprintfN("pose.bones[\"%s\"].location", name_esc);
       NlaEvalChannel *location_channel = nlaevalchan_verify(ptr, channels, location_path);
       float *location_values =
           nlaeval_snapshot_ensure_channel(&snapshot_raw, location_channel)->values;
@@ -3057,20 +3083,20 @@ void nlastrip_evaluate(PointerRNA *ptr,
       char *rotation_path;
       switch (pose_channel->rotmode) {
         case ROT_MODE_QUAT:
-          rotation_path = BLI_sprintfN("pose.bones[\"\s\"].rotation_quaternion", name_esc);
+          rotation_path = BLI_sprintfN("pose.bones[\"%s\"].rotation_quaternion", name_esc);
           break;
         case ROT_MODE_AXISANGLE:
-          rotation_path = BLI_sprintfN("pose.bones[\"\s\"].rotation_axis_angle", name_esc);
+          rotation_path = BLI_sprintfN("pose.bones[\"%s\"].rotation_axis_angle", name_esc);
           break;
         default:
-          rotation_path = BLI_sprintfN("pose.bones[\"\s\"].rotation_euler", name_esc);
+          rotation_path = BLI_sprintfN("pose.bones[\"%s\"].rotation_euler", name_esc);
           break;
       }
       NlaEvalChannel *rotation_channel = nlaevalchan_verify(ptr, channels, rotation_path);
       float *rotation_values =
           nlaeval_snapshot_ensure_channel(&snapshot_raw, rotation_channel)->values;
 
-      char *scale_path = BLI_sprintfN("pose.bones[\"\s\"].scale", name_esc);
+      char *scale_path = BLI_sprintfN("pose.bones[\"%s\"].scale", name_esc);
       NlaEvalChannel *scale_channel = nlaevalchan_verify(ptr, channels, scale_path);
       float *scale_values = nlaeval_snapshot_ensure_channel(&snapshot_raw, scale_channel)->values;
 

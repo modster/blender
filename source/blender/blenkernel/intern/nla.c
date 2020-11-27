@@ -429,7 +429,8 @@ void BKE_nlastrip_free_preblend_transform_at(NlaStrip *strip, int preblend_index
   }
 }
 
-NlaStripPreBlendTransform_BoneName *BKE_preblend_transform_new_bone(NlaStripPreBlendTransform *preblend)
+NlaStripPreBlendTransform_BoneName *BKE_preblend_transform_new_bone(
+    NlaStripPreBlendTransform *preblend)
 {
   NlaStripPreBlendTransform_BoneName *bone_name = MEM_callocN(
       sizeof(NlaStripPreBlendTransform_BoneName), __func__);
@@ -2271,6 +2272,11 @@ static void blend_write_nla_strips(BlendWriter *writer, ListBase *strips)
     BKE_fcurve_blend_write(writer, &strip->fcurves);
     BKE_fmodifiers_blend_write(writer, &strip->modifiers);
 
+    BLO_write_struct_list(writer, NlaStripPreBlendTransform, &strip->preblend_transforms);
+    LISTBASE_FOREACH (NlaStripPreBlendTransform *, preblend, &strip->preblend_transforms) {
+
+      BLO_write_struct_list(writer, NlaStripPreBlendTransform_BoneName, &preblend->bones);
+    }
     /* write the strip's children */
     blend_write_nla_strips(writer, &strip->strips);
   }
@@ -2290,6 +2296,12 @@ static void blend_data_read_nla_strips(BlendDataReader *reader, ListBase *strips
     /* strip's F-Modifiers */
     BLO_read_list(reader, &strip->modifiers);
     BKE_fmodifiers_blend_read_data(reader, &strip->modifiers, NULL);
+
+    BLO_read_list(reader, &strip->preblend_transforms);
+    LISTBASE_FOREACH (NlaStripPreBlendTransform *, preblend, &strip->preblend_transforms) {
+
+      BLO_read_list(reader, &preblend->bones);
+    }
   }
 }
 
