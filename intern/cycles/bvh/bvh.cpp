@@ -261,6 +261,15 @@ void BVH::refit_primitives(int start, int end, BoundBox &bbox, uint &visibility)
 
 /* Triangles */
 
+#define PACK_TRIANGLE(tidx) \
+  Mesh::Triangle t = mesh->get_triangle(tidx); \
+  float3 v0 = vpos[t.v[0]]; \
+  float3 v1 = vpos[t.v[1]]; \
+  float3 v2 = vpos[t.v[2]]; \
+  tri_verts[0] = float3_to_float4(v0); \
+  tri_verts[1] = float3_to_float4(v1); \
+  tri_verts[2] = float3_to_float4(v2)
+
 void BVH::pack_triangle(int idx, float4 tri_verts[3])
 {
   int tob = pack.prim_object[idx];
@@ -268,15 +277,8 @@ void BVH::pack_triangle(int idx, float4 tri_verts[3])
   const Mesh *mesh = static_cast<const Mesh *>(objects[tob]->get_geometry());
 
   int tidx = pack.prim_index[idx];
-  Mesh::Triangle t = mesh->get_triangle(tidx);
   const float3 *vpos = &mesh->verts[0];
-  float3 v0 = vpos[t.v[0]];
-  float3 v1 = vpos[t.v[1]];
-  float3 v2 = vpos[t.v[2]];
-
-  tri_verts[0] = float3_to_float4(v0);
-  tri_verts[1] = float3_to_float4(v1);
-  tri_verts[2] = float3_to_float4(v2);
+  PACK_TRIANGLE(tidx);
 }
 
 void BVH::pack_primitives()
@@ -284,6 +286,19 @@ void BVH::pack_primitives()
   if (!params.top_level && objects.size() == 1 && geometry.size() == 1) {
     Object *ob = objects[0];
     Geometry *geom = geometry[0];
+
+    const size_t num_prims = pack.prim_index.size();
+
+    /* When packing for a bottom level OptiX BVH, we do not use the visibility. */
+    if (params.bvh_layout != BVHLayout::BVH_LAYOUT_OPTIX) {
+      uint *pack_prim_tri_visibility = pack.prim_visibility.resize(num_prims);
+      uint visibility = ob->visibility_for_tracing();
+      if (visibility != 0) {
+        for (size_t k = 0; k < num_prims; ++k) {
+          pack_prim_tri_visibility[k] = visibility;
+        }
+      }
+    }
 
     if (geom->is_mesh() || geom->is_volume()) {
       Mesh *const mesh = static_cast<Mesh *>(geometry[0]);
@@ -300,30 +315,23 @@ void BVH::pack_primitives()
         float4 *pack_prim_tri_verts = pack.prim_tri_verts.resize(3 * num_triangles);
         const float3 *vpos = &mesh->get_verts()[0];
         for (size_t k = 0; k < num_triangles; ++k) {
-          Mesh::Triangle t = mesh->get_triangle(k);
-          float3 v0 = vpos[t.v[0]];
-          float3 v1 = vpos[t.v[1]];
-          float3 v2 = vpos[t.v[2]];
-
-          pack_prim_tri_verts[3 * k + 0] = float3_to_float4(v0);
-          pack_prim_tri_verts[3 * k + 1] = float3_to_float4(v1);
-          pack_prim_tri_verts[3 * k + 2] = float3_to_float4(v2);
+          float4 *tri_verts = &pack_prim_tri_verts[3 * k];
+          PACK_TRIANGLE(k);
         }
       }
+      else if (geom->is_hair()) {
+        Hair *hair = static_cast<Hair *>(geom);
 
-      /* When packing for a bottom level OptiX BVH, we do not use the visibility. */
-      if (params.bvh_layout != BVHLayout::BVH_LAYOUT_OPTIX) {
-        uint *pack_prim_tri_visibility = pack.prim_tri_index.resize(num_triangles);
-        uint visibility = ob->visibility_for_tracing();
-        if (visibility != 0) {
-          for (size_t k = 0; k < num_triangles; ++k) {
-            pack_prim_tri_visibility[k] = visibility;
+        if (hair->curve_keys_is_modified() || hair->curve_first_key_is_modified()) {
+          uint *pack_prim_tri_index = pack.prim_tri_index.resize(num_prims);
+          for (size_t k = 0; k < num_prims; ++k) {
+            pack_prim_tri_index[k] = -1;
           }
         }
       }
-
-      return;
     }
+
+    return;
   }
 
   const size_t tidx_size = pack.prim_index.size();

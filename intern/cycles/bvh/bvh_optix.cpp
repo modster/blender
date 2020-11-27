@@ -77,7 +77,6 @@ void BVHOptiX::pack_blas()
       const size_t num_segments = hair->num_segments();
       pack.prim_type.reserve(pack.prim_type.size() + num_segments);
       pack.prim_index.reserve(pack.prim_index.size() + num_segments);
-      pack.prim_object.reserve(pack.prim_object.size() + num_segments);
       // 'pack.prim_time' is only used in geom_curve_intersect.h
       // It is not needed because of OPTIX_MOTION_FLAG_[START|END]_VANISH
 
@@ -94,7 +93,6 @@ void BVHOptiX::pack_blas()
           pack.prim_type.push_back_reserved(PRIMITIVE_PACK_SEGMENT(type, k));
           // Each curve segment points back to its curve index
           pack.prim_index.push_back_reserved(j);
-          pack.prim_object.push_back_reserved(0);
         }
       }
     }
@@ -120,15 +118,8 @@ void BVHOptiX::pack_blas()
     }
   }
 
-  // Initialize visibility to zero and later update it during top-level build
-  uint prev_visibility = objects[0]->get_visibility();
-  objects[0]->set_visibility(0);
-
   // Update 'pack.prim_tri_index', 'pack.prim_tri_verts' and 'pack.prim_visibility'
   pack_primitives();
-
-  // Reset visibility after packing
-  objects[0]->set_visibility(prev_visibility);
 }
 
 void BVHOptiX::pack_tlas()
