@@ -170,8 +170,8 @@ void GpencilImporterSVG::create_stroke(bGPdata *gpd,
                                        bGPDframe *gpf,
                                        NSVGshape *shape,
                                        NSVGpath *path,
-                                       int32_t mat_index,
-                                       float matrix[4][4])
+                                       const int32_t mat_index,
+                                       const float matrix[4][4])
 {
   const bool is_stroke = (bool)shape->stroke.type;
   const bool is_fill = (bool)shape->fill.type;
@@ -237,7 +237,7 @@ void GpencilImporterSVG::create_stroke(bGPdata *gpd,
 }
 
 /* Unpack internal NanoSVG color. */
-static void unpack_nano_color(float r_col[4], const unsigned int pack)
+static void unpack_nano_color(const unsigned int pack, float r_col[4])
 {
   unsigned char rgb_u[4];
 
@@ -252,10 +252,10 @@ static void unpack_nano_color(float r_col[4], const unsigned int pack)
   r_col[3] = (float)rgb_u[3] / 255.0f;
 }
 
-void GpencilImporterSVG::convert_color(unsigned int color, float r_linear_rgba[4])
+void GpencilImporterSVG::convert_color(const uint32_t color, float r_linear_rgba[4])
 {
   float rgba[4];
-  unpack_nano_color(rgba, color);
+  unpack_nano_color(color, rgba);
 
   srgb_to_linearrgb_v3_v3(r_linear_rgba, rgba);
   r_linear_rgba[3] = rgba[3];

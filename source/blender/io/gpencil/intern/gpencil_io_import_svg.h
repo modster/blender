@@ -48,10 +48,10 @@ class GpencilImporterSVG : public GpencilImporter {
                      struct bGPDframe *gpf,
                      struct NSVGshape *shape,
                      struct NSVGpath *path,
-                     int32_t mat_index,
-                     float matrix[4][4]);
+                     const int32_t mat_index,
+                     const float matrix[4][4]);
 
-  void convert_color(unsigned int color, float r_linear_rgba[4]);
+  void convert_color(const uint32_t color, float r_linear_rgba[4]);
 };
 
 }  // namespace blender::io::gpencil
