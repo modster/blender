@@ -51,11 +51,11 @@ class NamedTimeEntry {
 };
 
 class DataTransferEntry {
-  public:
-    string name;
-    double time;
-    size_t size_copied;
-    size_t size;
+ public:
+  string name;
+  double time;
+  size_t size_copied;
+  size_t size;
 };
 
 /* Container of named size entries. Used, for example, to store per-mesh memory
@@ -244,8 +244,10 @@ class DataTransferStats {
   size_t total_size;
   size_t total_size_copied;
 
-public:
-  DataTransferStats() : total_time(0), total_size(0), total_size_copied(0) {}
+ public:
+  DataTransferStats() : total_time(0), total_size(0), total_size_copied(0)
+  {
+  }
 
   /* Add entry to the statistics. */
   void add_entry(const DataTransferEntry &entry)
@@ -267,10 +269,9 @@ public:
     entries.clear();
   }
 
-  template <typename T>
-  void add_entry(const device_vector<T> &dv)
+  template<typename T> void add_entry(const device_vector<T> &dv)
   {
-    add_entry({ dv.name, dv.time_copying, dv.data_copied, dv.byte_size() });
+    add_entry({dv.name, dv.time_copying, dv.data_copied, dv.byte_size()});
   }
 };
 

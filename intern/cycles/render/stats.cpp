@@ -405,11 +405,15 @@ string DataTransferStats::full_report()
     if (entry.size_copied == 0) {
       continue;
     }
-    result += string_printf(
-        "    %-22s %-10s %-10fs\n", entry.name.c_str(), string_human_readable_size(entry.size).c_str(), entry.time);
+    result += string_printf("    %-22s %-10s %-10fs\n",
+                            entry.name.c_str(),
+                            string_human_readable_size(entry.size).c_str(),
+                            entry.time);
   }
 
-  result += string_printf("Amount of data transfered : %s / %s\n", string_human_readable_size(total_size_copied).c_str(), string_human_readable_size(total_size).c_str());
+  result += string_printf("Amount of data transfered : %s / %s\n",
+                          string_human_readable_size(total_size_copied).c_str(),
+                          string_human_readable_size(total_size).c_str());
   result += string_printf("Total time spent transfering data : %fs\n", total_time);
 
   return result;

@@ -1108,7 +1108,9 @@ class OptiXDevice : public CUDADevice {
     check_result_optix_ret(
         optixAccelComputeMemoryUsage(context, &options, &build_input, 1, &sizes));
 
-    const size_t required_mem = (operation == OPTIX_BUILD_OPERATION_BUILD) ? sizes.tempSizeInBytes : sizes.tempUpdateSizeInBytes;
+    const size_t required_mem = (operation == OPTIX_BUILD_OPERATION_BUILD) ?
+                                    sizes.tempSizeInBytes :
+                                    sizes.tempUpdateSizeInBytes;
 
     // Allocate required output buffers
     accel_build_temp_mem.alloc_to_device(align_up(required_mem, 8) + 8, false);
@@ -1159,7 +1161,7 @@ class OptiXDevice : public CUDADevice {
           cuMemcpyDtoH(&compacted_size, compacted_size_prop.result, sizeof(compacted_size)));
 
       // Temporary memory is no longer needed, so free it now to make space
-      //accel_build_temp_mem.free();
+      // accel_build_temp_mem.free();
 
       // There is no point compacting if the size does not change
       if (compacted_size < sizes.outputSizeInBytes) {
@@ -1447,8 +1449,9 @@ class OptiXDevice : public CUDADevice {
 
         device_vector<int> index_data(this, "temp_index_data", MEM_READ_ONLY);
 
-       if (num_motion_steps == 1) {
-          vertex_ptrs.push_back(bvh->device_verts_pointer + geom->bvh->device_verts_pointer * sizeof(float3));
+        if (num_motion_steps == 1) {
+          vertex_ptrs.push_back(bvh->device_verts_pointer +
+                                geom->bvh->device_verts_pointer * sizeof(float3));
           num_verts = mesh->num_triangles() * 3;
         }
         else {

@@ -68,8 +68,7 @@ static Transform make_transform(const Abc::M44d &a)
   return trans;
 }
 
-static void read_default_uvs(const IV2fGeomParam &uvs,
-                             AlembicObject::CachedData &cached_data)
+static void read_default_uvs(const IV2fGeomParam &uvs, AlembicObject::CachedData &cached_data)
 {
   auto &attr = cached_data.add_attribute(ustring(uvs.getName()));
 
@@ -142,72 +141,72 @@ static void read_default_normals(const IN3fGeomParam &normals,
 
     const double time = normals.getTimeSampling()->getSampleTime(static_cast<index_t>(i));
 
-     switch (normals.getScope()) {
-       case kFacevaryingScope: {
-         attr.std = ATTR_STD_VERTEX_NORMAL;
+    switch (normals.getScope()) {
+      case kFacevaryingScope: {
+        attr.std = ATTR_STD_VERTEX_NORMAL;
 
-         auto vertices = cached_data.vertices.data_for_time(time);
-         auto triangles = cached_data.triangles.data_for_time(time);
+        auto vertices = cached_data.vertices.data_for_time(time);
+        auto triangles = cached_data.triangles.data_for_time(time);
 
-         if (!vertices || !triangles) {
-           continue;
-         }
+        if (!vertices || !triangles) {
+          continue;
+        }
 
-         array<char> data;
-         data.resize(vertices->size() * sizeof(float3));
+        array<char> data;
+        data.resize(vertices->size() * sizeof(float3));
 
-         float3 *data_float3 = reinterpret_cast<float3 *>(data.data());
+        float3 *data_float3 = reinterpret_cast<float3 *>(data.data());
 
-         for (size_t i = 0; i < vertices->size(); ++i) {
-           data_float3[i] = make_float3(0.0f);
-         }
+        for (size_t i = 0; i < vertices->size(); ++i) {
+          data_float3[i] = make_float3(0.0f);
+        }
 
-         const Imath::V3f *values = sample.getVals()->get();
+        const Imath::V3f *values = sample.getVals()->get();
 
-         for (const int3 &tri : *triangles) {
-           const Imath::V3f &v0 = values[tri.x];
-           const Imath::V3f &v1 = values[tri.y];
-           const Imath::V3f &v2 = values[tri.z];
+        for (const int3 &tri : *triangles) {
+          const Imath::V3f &v0 = values[tri.x];
+          const Imath::V3f &v1 = values[tri.y];
+          const Imath::V3f &v2 = values[tri.z];
 
-           data_float3[tri.x] += make_float3_from_yup(v0);
-           data_float3[tri.y] += make_float3_from_yup(v1);
-           data_float3[tri.z] += make_float3_from_yup(v2);
-         }
+          data_float3[tri.x] += make_float3_from_yup(v0);
+          data_float3[tri.y] += make_float3_from_yup(v1);
+          data_float3[tri.z] += make_float3_from_yup(v2);
+        }
 
-         attr.data.add_data(data, time);
+        attr.data.add_data(data, time);
 
-         break;
-       }
-       case kVaryingScope:
-       case kVertexScope: {
-         attr.std = ATTR_STD_VERTEX_NORMAL;
+        break;
+      }
+      case kVaryingScope:
+      case kVertexScope: {
+        attr.std = ATTR_STD_VERTEX_NORMAL;
 
-         auto vertices = cached_data.vertices.data_for_time(time);
+        auto vertices = cached_data.vertices.data_for_time(time);
 
-         if (!vertices) {
-           continue;
-         }
+        if (!vertices) {
+          continue;
+        }
 
-         array<char> data;
-         data.resize(vertices->size() * sizeof(float3));
+        array<char> data;
+        data.resize(vertices->size() * sizeof(float3));
 
-         float3 *data_float3 = reinterpret_cast<float3 *>(data.data());
+        float3 *data_float3 = reinterpret_cast<float3 *>(data.data());
 
-         const Imath::V3f *values = sample.getVals()->get();
+        const Imath::V3f *values = sample.getVals()->get();
 
-         for (size_t i = 0; i < vertices->size(); ++i) {
-           data_float3[i] = make_float3_from_yup(values[i]);
-         }
+        for (size_t i = 0; i < vertices->size(); ++i) {
+          data_float3[i] = make_float3_from_yup(values[i]);
+        }
 
-         attr.data.add_data(data, time);
+        attr.data.add_data(data, time);
 
-         break;
-       }
-       default: {
-         // not supported
-         break;
-       }
-     }
+        break;
+      }
+      default: {
+        // not supported
+        break;
+      }
+    }
   }
 }
 
@@ -372,7 +371,7 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
     }
 
     foreach (const AttributeRequest &attr, requested_attributes.requests) {
-     read_attribute(schema.getArbGeomParams(), iss, attr.name);
+      read_attribute(schema.getArbGeomParams(), iss, attr.name);
     }
   }
 
@@ -382,11 +381,11 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
     read_default_uvs(uvs, cached_data);
   }
 
-//  const IN3fGeomParam &normals = schema.getNormalsParam();
+  //  const IN3fGeomParam &normals = schema.getNormalsParam();
 
-//  if (normals.valid()) {
-//    read_default_normals(normals, cached_data);
-//  }
+  //  if (normals.valid()) {
+  //    read_default_normals(normals, cached_data);
+  //  }
 
   read_transforms(iobject, cached_data);
 
@@ -626,7 +625,7 @@ void AlembicProcedural::load_objects()
   unordered_map<string, AlembicObject *> object_map;
 
   foreach (AlembicObject *object, objects) {
-    object_map.insert({ object->get_path().c_str(), object });
+    object_map.insert({object->get_path().c_str(), object});
   }
 
   while (!iobject_stack.empty()) {

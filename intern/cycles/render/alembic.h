@@ -19,9 +19,9 @@
 #include "graph/node.h"
 #include "render/attribute.h"
 #include "render/procedural.h"
+#include "util/util_set.h"
 #include "util/util_transform.h"
 #include "util/util_vector.h"
-#include "util/util_set.h"
 
 //#ifdef WITH_ALEMBIC
 
@@ -53,124 +53,122 @@ class AlembicObject : public Node {
 
   // TODO : this is only for Meshes at the moment
 
-  template <typename T>
-  struct DataTimePair {
-      double time = 0;
-      T data{};
+  template<typename T> struct DataTimePair {
+    double time = 0;
+    T data{};
   };
 
-  template <typename T>
-  class DataStore {
-      vector<DataTimePair<T>> data{};
+  template<typename T> class DataStore {
+    vector<DataTimePair<T>> data{};
 
-  public:
-      T *data_for_time(double time)
-      {
-        /* TODO: arrays are emptied */
-        if (size() == 1 && std::abs(data[0].time - time) < 1e-6) {
-          return &data[0].data;
+   public:
+    T *data_for_time(double time)
+    {
+      /* TODO: arrays are emptied */
+      if (size() == 1 && std::abs(data[0].time - time) < 1e-6) {
+        return &data[0].data;
+      }
+
+      for (size_t i = 0; i < size() - 1; ++i) {
+        DataTimePair<T> &pair0 = data[i];
+
+        if (std::abs(pair0.time - time) <= 1e-6) {
+          return &pair0.data;
         }
 
-        for (size_t i = 0; i < size() - 1; ++i) {
-          DataTimePair<T> &pair0 = data[i];
+        DataTimePair<T> &pair1 = data[i + 1];
 
-          if (std::abs(pair0.time - time) <= 1e-6) {
-            return &pair0.data;
-          }
-
-          DataTimePair<T> &pair1 = data[i + 1];
-
-          if (std::abs(pair1.time - time) <= 1e-6) {
-            return &pair1.data;
-          }
-
-          /* see if we are in between samples to avoid issues when the FPS is
-           * different than the one for the Alembic archive */
-          if (pair0.time <= time && time < pair1.time) {
-            return &pair0.data;
-          }
+        if (std::abs(pair1.time - time) <= 1e-6) {
+          return &pair1.data;
         }
 
-        return nullptr;
+        /* see if we are in between samples to avoid issues when the FPS is
+         * different than the one for the Alembic archive */
+        if (pair0.time <= time && time < pair1.time) {
+          return &pair0.data;
+        }
       }
 
-      void add_data(T data_, double time)
-      {
-        data.push_back({ time, data_ });
-      }
+      return nullptr;
+    }
 
-      void add_data(array<T> &data_, double time)
-      {
-        data.emplace_back();
-        data.back().data.steal_data(data_);
-        data.back().time = time;
-      }
+    void add_data(T data_, double time)
+    {
+      data.push_back({time, data_});
+    }
 
-      bool is_constant() const
-      {
-        return data.size() <= 1;
-      }
+    void add_data(array<T> &data_, double time)
+    {
+      data.emplace_back();
+      data.back().data.steal_data(data_);
+      data.back().time = time;
+    }
 
-      size_t size() const
-      {
-        return data.size();
-      }
+    bool is_constant() const
+    {
+      return data.size() <= 1;
+    }
 
-      void clear()
-      {
-        data.clear();
-      }
+    size_t size() const
+    {
+      return data.size();
+    }
+
+    void clear()
+    {
+      data.clear();
+    }
   };
 
   struct CachedData {
-      DataStore<array<float3>> vertices;
-      DataStore<array<int3>> triangles{};
-      DataStore<array<int3>> triangles_loops{};
-      DataStore<Transform> transforms{};
-      ccl::set<double> dirty_frames{};
+    DataStore<array<float3>> vertices;
+    DataStore<array<int3>> triangles{};
+    DataStore<array<int3>> triangles_loops{};
+    DataStore<Transform> transforms{};
+    ccl::set<double> dirty_frames{};
 
-      struct CachedAttribute {
-          AttributeStandard std;
-          AttributeElement element;
-          TypeDesc type_desc;
-          ustring name;
-          DataStore<array<char>> data{};
-      };
+    struct CachedAttribute {
+      AttributeStandard std;
+      AttributeElement element;
+      TypeDesc type_desc;
+      ustring name;
+      DataStore<array<char>> data{};
+    };
 
-      vector<CachedAttribute> attributes{};
+    vector<CachedAttribute> attributes{};
 
-      void clear()
-      {
-        vertices.clear();
-        triangles.clear();
-        triangles_loops.clear();
-        transforms.clear();
-        dirty_frames.clear();
-        attributes.clear();
-      }
+    void clear()
+    {
+      vertices.clear();
+      triangles.clear();
+      triangles_loops.clear();
+      transforms.clear();
+      dirty_frames.clear();
+      attributes.clear();
+    }
 
-      void add_dirty_frame(double f)
-      {
-        dirty_frames.insert(f);
-      }
+    void add_dirty_frame(double f)
+    {
+      dirty_frames.insert(f);
+    }
 
-      bool is_dirty_frame(double f)
-      {
-        return dirty_frames.find(f) != dirty_frames.end();
-      }
+    bool is_dirty_frame(double f)
+    {
+      return dirty_frames.find(f) != dirty_frames.end();
+    }
 
-      CachedAttribute &add_attribute(ustring name)
-      {
-        for (auto &attr : attributes) {
-          if (attr.name == name) {
-            return attr;
-          }
+    CachedAttribute &add_attribute(ustring name)
+    {
+      for (auto &attr : attributes) {
+        if (attr.name == name) {
+          return attr;
         }
-
-        auto &attr = attributes.emplace_back();
-        attr.name = name;
-        return attr;
       }
+
+      auto &attr = attributes.emplace_back();
+      attr.name = name;
+      return attr;
+    }
   };
 
   Alembic::AbcGeom::IObject iobject;

@@ -1279,7 +1279,8 @@ void GeometryManager::device_update_bvh(Device *device,
   {
     scoped_callback_timer timer([scene](double time) {
       if (scene->update_stats) {
-        scene->update_stats->geometry.times.add_entry({"device_update (copy packed BVH to device)", time});
+        scene->update_stats->geometry.times.add_entry(
+            {"device_update (copy packed BVH to device)", time});
       }
     });
 

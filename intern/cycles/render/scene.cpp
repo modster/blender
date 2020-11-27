@@ -277,7 +277,7 @@ void Scene::device_update(Device *device_, Progress &progress)
       update_stats->scene.times.add_entry({"device_update", time});
 
       if (print_stats) {
-        //printf("Update statistics:\n%s\n", update_stats->full_report().c_str());
+        // printf("Update statistics:\n%s\n", update_stats->full_report().c_str());
         std::cerr << "Update statistics:\n" << update_stats->full_report().c_str() << '\n';
         dscene.print_data_transfered();
       }
