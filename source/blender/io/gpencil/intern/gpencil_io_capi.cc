@@ -182,8 +182,6 @@ bool gpencil_io_export(const char *filename, GpencilIOParams *iparams)
       /* Prepare document. */
       GpencilExporterSVG exporter = GpencilExporterSVG(filename, iparams);
 
-      float ratio[2] = {1.0f, 1.0f};
-      exporter.frame_ratio_set(ratio);
       iparams->file_subfix[0] = '\0';
       done |= gpencil_io_export_frame_svg(&exporter, iparams, true, true, true);
       break;
