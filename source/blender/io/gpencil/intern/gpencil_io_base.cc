@@ -23,8 +23,6 @@
  * \ingroup bgpencil
  */
 #include <algorithm>
-#include <cctype>
-#include <iostream>
 #include <string>
 
 #include "BKE_context.h"
@@ -36,11 +34,8 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
-#include "BLI_utildefines.h"
 
 #include "DNA_gpencil_types.h"
-#include "DNA_material_types.h"
-#include "DNA_object_types.h"
 #include "DNA_screen_types.h"
 
 #include "UI_view2d.h"
@@ -50,10 +45,7 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
 
-#include "gpencil_io.h"
 #include "gpencil_io_base.h"
-
-#include "pugixml.hpp"
 
 namespace blender::io::gpencil {
 
