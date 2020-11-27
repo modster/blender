@@ -190,10 +190,15 @@ static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
       .v3d = v3d,
       .ob = ob,
       .mode = GP_IMPORT_FROM_SVG,
+      .frame_start = CFRA,
+      .frame_end = CFRA,
       .frame_cur = CFRA,
       .flag = flag,
-      .resolution = resolution,
       .scale = scale,
+      .select = 0,
+      .frame_type = 0,
+      .stroke_sample = 0.0f,
+      .resolution = resolution,
   };
 
   /* Do Import. */

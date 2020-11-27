@@ -371,20 +371,20 @@ static int wm_gpencil_export_pdf_exec(bContext *C, wmOperator *op)
   paper[0] = scene->r.xsch * (scene->r.size / 100.0f);
   paper[1] = scene->r.ysch * (scene->r.size / 100.0f);
 
-  struct GpencilIOParams params = {
-      .C = C,
-      .region = region,
-      .v3d = v3d,
-      .ob = ob,
-      .mode = GP_EXPORT_TO_PDF,
-      .frame_start = SFRA,
-      .frame_end = EFRA,
-      .frame_cur = CFRA,
-      .flag = flag,
-      .select = select,
-      .frame_type = frame_type,
-      .stroke_sample = RNA_float_get(op->ptr, "stroke_sample"),
-  };
+  struct GpencilIOParams params = {.C = C,
+                                   .region = region,
+                                   .v3d = v3d,
+                                   .ob = ob,
+                                   .mode = GP_EXPORT_TO_PDF,
+                                   .frame_start = SFRA,
+                                   .frame_end = EFRA,
+                                   .frame_cur = CFRA,
+                                   .flag = flag,
+                                   .scale = 1.0f,
+                                   .select = select,
+                                   .frame_type = frame_type,
+                                   .stroke_sample = RNA_float_get(op->ptr, "stroke_sample"),
+                                   .resolution = 1.0f};
 
   /* Do export. */
   WM_cursor_wait(1);
