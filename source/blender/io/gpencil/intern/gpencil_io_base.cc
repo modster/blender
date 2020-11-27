@@ -61,8 +61,8 @@ GpencilIO::GpencilIO(const struct GpencilIOParams *iparams)
   params_.C = iparams->C;
   params_.mode = iparams->mode;
   params_.flag = iparams->flag;
-  params_.select = iparams->select;
-  params_.frame_type = iparams->frame_type;
+  params_.select_mode = iparams->select_mode;
+  params_.frame_mode = iparams->frame_mode;
   params_.stroke_sample = iparams->stroke_sample;
   params_.resolution = iparams->resolution;
   params_.scale = iparams->scale;
@@ -139,11 +139,11 @@ void GpencilIO::create_object_list(void)
     if (object->type != OB_GPENCIL) {
       continue;
     }
-    if ((params_.select == GP_EXPORT_ACTIVE) && (params_.ob != object)) {
+    if ((params_.select_mode == GP_EXPORT_ACTIVE) && (params_.ob != object)) {
       continue;
     }
 
-    if ((params_.select == GP_EXPORT_SELECTED) && ((base->flag & BASE_SELECTED) == 0)) {
+    if ((params_.select_mode == GP_EXPORT_SELECTED) && ((base->flag & BASE_SELECTED) == 0)) {
       continue;
     }
 

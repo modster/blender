@@ -199,7 +199,7 @@ static int wm_gpencil_export_svg_exec(bContext *C, wmOperator *op)
 
   const bool use_fill = RNA_boolean_get(op->ptr, "use_fill");
   const bool use_norm_thickness = RNA_boolean_get(op->ptr, "use_normalized_thickness");
-  const short select = RNA_enum_get(op->ptr, "selected_object_type");
+  const short select_mode = RNA_enum_get(op->ptr, "selected_object_type");
 
   const bool use_clip_camera = RNA_boolean_get(op->ptr, "use_clip_camera");
 
@@ -219,8 +219,8 @@ static int wm_gpencil_export_svg_exec(bContext *C, wmOperator *op)
                                    .frame_cur = CFRA,
                                    .flag = flag,
                                    .scale = 1.0f,
-                                   .select = select,
-                                   .frame_type = GP_EXPORT_FRAME_ACTIVE,
+                                   .select_mode = select_mode,
+                                   .frame_mode = GP_EXPORT_FRAME_ACTIVE,
                                    .stroke_sample = RNA_float_get(op->ptr, "stroke_sample"),
                                    .resolution = 1.0f};
 
@@ -359,8 +359,8 @@ static int wm_gpencil_export_pdf_exec(bContext *C, wmOperator *op)
 
   const bool use_fill = RNA_boolean_get(op->ptr, "use_fill");
   const bool use_norm_thickness = RNA_boolean_get(op->ptr, "use_normalized_thickness");
-  const short select = RNA_enum_get(op->ptr, "selected_object_type");
-  const short frame_type = RNA_enum_get(op->ptr, "frame_type");
+  const short select_mode = RNA_enum_get(op->ptr, "selected_object_type");
+  const short frame_mode = RNA_enum_get(op->ptr, "frame_mode");
 
   /* Set flags. */
   int flag = 0;
@@ -381,8 +381,8 @@ static int wm_gpencil_export_pdf_exec(bContext *C, wmOperator *op)
                                    .frame_cur = CFRA,
                                    .flag = flag,
                                    .scale = 1.0f,
-                                   .select = select,
-                                   .frame_type = frame_type,
+                                   .select_mode = select_mode,
+                                   .frame_mode = frame_mode,
                                    .stroke_sample = RNA_float_get(op->ptr, "stroke_sample"),
                                    .resolution = 1.0f};
 
@@ -422,7 +422,7 @@ static void ui_gpencil_export_pdf_settings(uiLayout *layout, PointerRNA *imfptr)
 
   col = uiLayoutColumn(box, false);
   sub = uiLayoutColumn(col, true);
-  uiItemR(sub, imfptr, "frame_type", 0, IFACE_("Frame"), ICON_NONE);
+  uiItemR(sub, imfptr, "frame_mode", 0, IFACE_("Frame"), ICON_NONE);
 
   uiLayoutSetPropSep(box, true);
 
@@ -517,7 +517,7 @@ void WM_OT_gpencil_export_pdf(wmOperatorType *ot)
       0.0f,
       100.0f);
   ot->prop = RNA_def_enum(ot->srna,
-                          "frame_type",
+                          "frame_mode",
                           gpencil_export_frame_items,
                           GP_EXPORT_ACTIVE,
                           "Frames",

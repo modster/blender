@@ -195,8 +195,8 @@ static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
       .frame_cur = CFRA,
       .flag = flag,
       .scale = scale,
-      .select = 0,
-      .frame_type = 0,
+      .select_mode = 0,
+      .frame_mode = 0,
       .stroke_sample = 0.0f,
       .resolution = resolution,
   };

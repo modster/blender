@@ -50,9 +50,9 @@ struct GpencilIOParams {
   /** Scale. */
   float scale;
   /** Select mode. */
-  uint16_t select;
-  /** Frame type. */
-  uint16_t frame_type;
+  uint16_t select_mode;
+  /** Frame mode. */
+  uint16_t frame_mode;
   /** Stroke sampling. */
   float stroke_sample;
   /** Resolution. */

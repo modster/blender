@@ -152,7 +152,7 @@ bool GpencilExporterPDF::add_page(void)
 void GpencilExporterPDF::export_gpencil_layers(void)
 {
   /* If is doing a set of frames, the list of objects can change for each frame. */
-  if (params_.frame_type != GP_EXPORT_FRAME_ACTIVE) {
+  if (params_.frame_mode != GP_EXPORT_FRAME_ACTIVE) {
     create_object_list();
   }
 
