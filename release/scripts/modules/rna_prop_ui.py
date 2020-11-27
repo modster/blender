@@ -50,13 +50,14 @@ def rna_idprop_ui_prop_update(item, prop):
 
 def rna_idprop_ui_prop_clear(item, prop, remove=True):
     # HANS-TODO: Add a clear method to the API
-    item.update_rna(prop, subtype="", 
-                        min=None, 
-                        max=None, 
-                        soft_min=None, 
-                        soft_max=None,
-                        description="",
-                        default=None)
+    props = item.custom_properties()
+    props.update_rna(prop, subtype="", 
+                     min=None, 
+                     max=None, 
+                     soft_min=None, 
+                     soft_max=None,
+                     description="",
+                     default=None)
 
 
 def rna_idprop_context_value(context, context_member, property_type):

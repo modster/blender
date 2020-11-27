@@ -1383,12 +1383,14 @@ static void BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObjec
   IDProperty *idprop = IDP_GetPropertyFromGroup(self->prop, key);
   if (idprop == NULL) {
     PyErr_Format(PyExc_KeyError, "Property \"%s\" not found in IDProperty group", key);
+    return;
   }
 
   if (!ELEM(idprop->type, IDP_STRING, IDP_INT, IDP_FLOAT, IDP_DOUBLE)) {
     PyErr_SetString(
         PyExc_ValueError,
         "RNA UI data is only supported for string, integer, float, or double properties");
+    return;
   }
 
   IDP_ui_data_ensure(idprop);

@@ -1538,7 +1538,6 @@ class WM_OT_properties_remove(Operator):
         prop = self.property
         rna_idprop_ui_prop_update(item, prop)
         del item[prop]
-        rna_idprop_ui_prop_clear(item, prop)
 
         return {'FINISHED'}
 
