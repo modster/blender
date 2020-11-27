@@ -47,7 +47,6 @@ class GpencilIO {
   GpencilIO(const struct GpencilIOParams *iparams);
 
   void frame_number_set(const int value);
-  void frame_box_set(const float value[2]);
 
  protected:
   GpencilIOParams params_;
@@ -78,8 +77,6 @@ class GpencilIO {
   rctf camera_rect_;
 
   float offset_[2];
-
-  float frame_box_[2];
 
   int cfra_;
   bool object_created_;

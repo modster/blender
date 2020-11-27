@@ -502,9 +502,4 @@ void GpencilIO::frame_number_set(const int value)
   cfra_ = value;
 }
 
-void GpencilIO::frame_box_set(const float value[2])
-{
-  copy_v2_v2(frame_box_, value);
-}
-
 }  // namespace blender::io::gpencil
