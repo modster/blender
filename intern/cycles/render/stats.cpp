@@ -395,6 +395,7 @@ void SceneUpdateStats::clear()
   scene.times.clear();
   svm.times.clear();
   tables.times.clear();
+  procedurals.times.clear();
 }
 
 string DataTransferStats::full_report()

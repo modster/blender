@@ -227,6 +227,7 @@ class SceneUpdateStats {
   UpdateTimeStats scene;
   UpdateTimeStats svm;
   UpdateTimeStats tables;
+  UpdateTimeStats procedurals;
 
   string full_report();
 
