@@ -39,7 +39,7 @@ struct GpencilIOParams {
   Object *ob;
   /** Mode.  */
   uint16_t mode;
-  /** Start frame.  */
+  /** Start frame. */
   int32_t frame_start;
   /** End frame.  */
   int32_t frame_end;
@@ -55,7 +55,7 @@ struct GpencilIOParams {
   uint16_t frame_type;
   /** Stroke sampling. */
   float stroke_sample;
-  /** Resolution.  */
+  /** Resolution. */
   int32_t resolution;
 };
 
