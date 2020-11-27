@@ -90,68 +90,57 @@ DeviceScene::DeviceScene(Device *device)
 
 void DeviceScene::print_data_transfered()
 {
-  std::cerr << "Data transfered :\n";
+  DataTransferStats stats;
 
-  size_t data_transfered = 0;
-  size_t data_amount = 0;
-  double total_time = 0.0;
+#define ADD_ENTRY_AND_CLEAR(dvector) \
+  stats.add_entry(dvector); \
+  dvector.time_copying = 0.0; \
+  dvector.data_copied = 0
 
-#define ACCUMULATE_DATA_TRANSFERED(x) \
-  if (x.data_copied != 0) { \
-    std::cerr << "    transfered " << x.name << ", " << string_human_readable_size(x.data_copied) << ", " << x.time_copying << "s"  \
-              << '\n'; \
-  } \
-  data_transfered += x.data_copied; \
-  data_amount += x.byte_size(); \
-  x.data_copied = 0; \
-  total_time += x.time_copying; \
-  x.time_copying = 0.0;
+  ADD_ENTRY_AND_CLEAR(bvh_nodes);
+  ADD_ENTRY_AND_CLEAR(bvh_leaf_nodes);
+  ADD_ENTRY_AND_CLEAR(object_node);
+  ADD_ENTRY_AND_CLEAR(prim_tri_index);
+  ADD_ENTRY_AND_CLEAR(prim_tri_verts);
+  ADD_ENTRY_AND_CLEAR(prim_type);
+  ADD_ENTRY_AND_CLEAR(prim_visibility);
+  ADD_ENTRY_AND_CLEAR(prim_index);
+  ADD_ENTRY_AND_CLEAR(prim_object);
+  ADD_ENTRY_AND_CLEAR(prim_time);
+  ADD_ENTRY_AND_CLEAR(tri_shader);
+  ADD_ENTRY_AND_CLEAR(tri_vnormal);
+  ADD_ENTRY_AND_CLEAR(tri_vindex);
+  ADD_ENTRY_AND_CLEAR(tri_patch);
+  ADD_ENTRY_AND_CLEAR(tri_patch_uv);
+  ADD_ENTRY_AND_CLEAR(curves);
+  ADD_ENTRY_AND_CLEAR(curve_keys);
+  ADD_ENTRY_AND_CLEAR(patches);
+  ADD_ENTRY_AND_CLEAR(objects);
+  ADD_ENTRY_AND_CLEAR(object_motion_pass);
+  ADD_ENTRY_AND_CLEAR(object_motion);
+  ADD_ENTRY_AND_CLEAR(object_flag);
+  ADD_ENTRY_AND_CLEAR(object_volume_step);
+  ADD_ENTRY_AND_CLEAR(camera_motion);
+  ADD_ENTRY_AND_CLEAR(attributes_map);
+  ADD_ENTRY_AND_CLEAR(attributes_float);
+  ADD_ENTRY_AND_CLEAR(attributes_float2);
+  ADD_ENTRY_AND_CLEAR(attributes_float3);
+  ADD_ENTRY_AND_CLEAR(attributes_uchar4);
+  ADD_ENTRY_AND_CLEAR(light_distribution);
+  ADD_ENTRY_AND_CLEAR(lights);
+  ADD_ENTRY_AND_CLEAR(light_background_marginal_cdf);
+  ADD_ENTRY_AND_CLEAR(light_background_conditional_cdf);
+  ADD_ENTRY_AND_CLEAR(particles);
+  ADD_ENTRY_AND_CLEAR(svm_nodes);
+  ADD_ENTRY_AND_CLEAR(shaders);
+  ADD_ENTRY_AND_CLEAR(lookup_table);
+  ADD_ENTRY_AND_CLEAR(sample_pattern_lut);
+  ADD_ENTRY_AND_CLEAR(ies_lights);
 
-  ACCUMULATE_DATA_TRANSFERED(bvh_nodes);
-  ACCUMULATE_DATA_TRANSFERED(bvh_leaf_nodes);
-  ACCUMULATE_DATA_TRANSFERED(object_node);
-  ACCUMULATE_DATA_TRANSFERED(prim_tri_index);
-  ACCUMULATE_DATA_TRANSFERED(prim_tri_verts);
-  ACCUMULATE_DATA_TRANSFERED(prim_type);
-  ACCUMULATE_DATA_TRANSFERED(prim_visibility);
-  ACCUMULATE_DATA_TRANSFERED(prim_index);
-  ACCUMULATE_DATA_TRANSFERED(prim_object);
-  ACCUMULATE_DATA_TRANSFERED(prim_time);
-  ACCUMULATE_DATA_TRANSFERED(tri_shader);
-  ACCUMULATE_DATA_TRANSFERED(tri_vnormal);
-  ACCUMULATE_DATA_TRANSFERED(tri_vindex);
-  ACCUMULATE_DATA_TRANSFERED(tri_patch);
-  ACCUMULATE_DATA_TRANSFERED(tri_patch_uv);
-  ACCUMULATE_DATA_TRANSFERED(curves);
-  ACCUMULATE_DATA_TRANSFERED(curve_keys);
-  ACCUMULATE_DATA_TRANSFERED(patches);
-  ACCUMULATE_DATA_TRANSFERED(objects);
-  ACCUMULATE_DATA_TRANSFERED(object_motion_pass);
-  ACCUMULATE_DATA_TRANSFERED(object_motion);
-  ACCUMULATE_DATA_TRANSFERED(object_flag);
-  ACCUMULATE_DATA_TRANSFERED(object_volume_step);
-  ACCUMULATE_DATA_TRANSFERED(camera_motion);
-  ACCUMULATE_DATA_TRANSFERED(attributes_map);
-  ACCUMULATE_DATA_TRANSFERED(attributes_float);
-  ACCUMULATE_DATA_TRANSFERED(attributes_float2);
-  ACCUMULATE_DATA_TRANSFERED(attributes_float3);
-  ACCUMULATE_DATA_TRANSFERED(attributes_uchar4);
-  ACCUMULATE_DATA_TRANSFERED(light_distribution);
-  ACCUMULATE_DATA_TRANSFERED(lights);
-  ACCUMULATE_DATA_TRANSFERED(light_background_marginal_cdf);
-  ACCUMULATE_DATA_TRANSFERED(light_background_conditional_cdf);
-  ACCUMULATE_DATA_TRANSFERED(particles);
-  ACCUMULATE_DATA_TRANSFERED(svm_nodes);
-  ACCUMULATE_DATA_TRANSFERED(shaders);
-  ACCUMULATE_DATA_TRANSFERED(lookup_table);
-  ACCUMULATE_DATA_TRANSFERED(sample_pattern_lut);
-  ACCUMULATE_DATA_TRANSFERED(ies_lights);
+#undef ADD_ENTRY_AND_CLEAR
 
-#undef ACCUMULATE_DATA_TRANSFERED
-
-  std::cerr << "    " << string_human_readable_size(data_transfered) << " / "
-            << string_human_readable_size(data_amount) << '\n';
-  std::cerr << "Total time copying data to device : " << total_time << "s\n";
+  std::cerr << "Data transfer statistics :\n";
+  std::cerr << stats.full_report();
 }
 
 Scene::Scene(const SceneParams &params_, Device *device)

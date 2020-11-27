@@ -1083,7 +1083,7 @@ void GeometryManager::device_update_mesh(
 
         if (mesh->shader_is_modified() || mesh->smooth_is_modified() ||
             mesh->triangles_is_modified() ||
-            (device_update_flags & DEVICE_CURVE_DATA_NEEDS_REALLOC)) {
+            (device_update_flags & DEVICE_MESH_DATA_NEEDS_REALLOC)) {
           dscene->tri_shader.modified = true;
           mesh->pack_shaders(scene, &tri_shader[mesh->prim_offset]);
         }

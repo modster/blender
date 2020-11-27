@@ -50,6 +50,14 @@ class NamedTimeEntry {
   double time;
 };
 
+class DataTransferEntry {
+  public:
+    string name;
+    double time;
+    size_t size_copied;
+    size_t size;
+};
+
 /* Container of named size entries. Used, for example, to store per-mesh memory
  * usage statistics. But also keeps track of overall memory usage of the
  * container.
@@ -219,11 +227,51 @@ class SceneUpdateStats {
   UpdateTimeStats scene;
   UpdateTimeStats svm;
   UpdateTimeStats tables;
-  UpdateTimeStats procedurals;
 
   string full_report();
 
   void clear();
+};
+
+class DataTransferStats {
+  /* NOTE: Is fine to read directly, but for adding use add_entry(), which
+   * makes sure all accumulating  values are properly updated.
+   */
+  vector<DataTransferEntry> entries;
+
+  /* Total time of all entries. */
+  double total_time;
+  size_t total_size;
+  size_t total_size_copied;
+
+public:
+  DataTransferStats() : total_time(0), total_size(0), total_size_copied(0) {}
+
+  /* Add entry to the statistics. */
+  void add_entry(const DataTransferEntry &entry)
+  {
+    total_time += entry.time;
+    total_size += entry.size;
+    total_size_copied += entry.size_copied;
+    entries.push_back(entry);
+  }
+
+  /* Generate full human-readable report. */
+  string full_report();
+
+  void clear()
+  {
+    total_time = 0.0;
+    total_size = 0;
+    total_size_copied = 0;
+    entries.clear();
+  }
+
+  template <typename T>
+  void add_entry(const device_vector<T> &dv)
+  {
+    add_entry({ dv.name, dv.time_copying, dv.data_copied, dv.byte_size() });
+  }
 };
 
 CCL_NAMESPACE_END
