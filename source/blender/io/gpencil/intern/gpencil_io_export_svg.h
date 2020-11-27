@@ -42,7 +42,7 @@ class GpencilExporterSVG : public GpencilExporter {
   ~GpencilExporterSVG(void);
   bool add_newpage(void);
   bool add_body(void);
-  bool write(std::string subfix);
+  bool write(const std::string subfix);
 
  protected:
   static void add_rect(pugi::xml_node node,

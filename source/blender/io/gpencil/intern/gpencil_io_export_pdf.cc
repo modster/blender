@@ -100,7 +100,7 @@ bool GpencilExporterPDF::add_body(void)
   return true;
 }
 
-bool GpencilExporterPDF::write(std::string subfix)
+bool GpencilExporterPDF::write(const std::string subfix)
 {
   /* Save File. */
 

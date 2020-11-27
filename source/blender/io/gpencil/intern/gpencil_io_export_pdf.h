@@ -43,7 +43,7 @@ class GpencilExporterPDF : public GpencilExporter {
   bool new_document(void);
   bool add_newpage(void);
   bool add_body(void);
-  bool write(std::string subfix);
+  bool write(const std::string subfix);
 
  protected:
  private:

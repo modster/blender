@@ -512,22 +512,22 @@ void GpencilIO::selected_objects_boundbox_get(rctf *boundbox)
   boundbox->ymax = select_boundbox_.ymax;
 }
 
-void GpencilIO::frame_number_set(int value)
+void GpencilIO::frame_number_set(const int value)
 {
   cfra_ = value;
 }
 
-void GpencilIO::frame_offset_set(float value[2])
+void GpencilIO::frame_offset_set(const float value[2])
 {
   copy_v2_v2(frame_offset_, value);
 }
 
-void GpencilIO::frame_ratio_set(float value[2])
+void GpencilIO::frame_ratio_set(const float value[2])
 {
   copy_v2_v2(frame_ratio_, value);
 }
 
-void GpencilIO::frame_box_set(float value[2])
+void GpencilIO::frame_box_set(const float value[2])
 {
   copy_v2_v2(frame_box_, value);
 }

@@ -92,7 +92,7 @@ bool GpencilExporterSVG::add_body(void)
   return true;
 }
 
-bool GpencilExporterSVG::write(std::string subfix)
+bool GpencilExporterSVG::write(const std::string subfix)
 {
   bool result = true;
   /* Save File. */
