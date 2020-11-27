@@ -266,6 +266,9 @@ static void read_transforms(const IObject &iobject, AlembicObject::CachedData &c
     parent = parent.getParent();
   }
 
+  // todo : proper time sampling
+  cached_data.transforms.set_time_sampling(cached_data.vertices.time_sampling);
+
   /* accumulate the transformation matrices for each sample time */
   foreach (double time, samples_times) {
     parent = iobject.getParent();
@@ -283,6 +286,10 @@ static void read_transforms(const IObject &iobject, AlembicObject::CachedData &c
           const XformSample &samp = schema.getValue(selector);
           Transform parent_tfm = make_transform(samp.getMatrix());
           tfm = parent_tfm * tfm;
+        }
+
+        if (!schema.getInheritsXforms(selector)) {
+          break;
         }
       }
 
@@ -312,6 +319,10 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
       }
     }
   }
+
+  cached_data.vertices.set_time_sampling(*schema.getTimeSampling());
+  cached_data.triangles.set_time_sampling(*schema.getTimeSampling());
+  cached_data.triangles_loops.set_time_sampling(*schema.getTimeSampling());
 
   for (size_t i = 0; i < schema.getNumSamples(); ++i) {
     const ISampleSelector iss = ISampleSelector(static_cast<index_t>(i));
@@ -445,6 +456,7 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
           data_float2 += 3;
         }
 
+        attribute.data.set_time_sampling(*param.getTimeSampling());
         attribute.data.add_data(data, time);
       }
     }
@@ -489,6 +501,7 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
           offset += 3;
         }
 
+        attribute.data.set_time_sampling(*param.getTimeSampling());
         attribute.data.add_data(data, time);
       }
     }
@@ -533,6 +546,7 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
           offset += 3;
         }
 
+        attribute.data.set_time_sampling(*param.getTimeSampling());
         attribute.data.add_data(data, time);
       }
     }
@@ -705,14 +719,14 @@ void AlembicProcedural::read_mesh(Scene *scene,
     object->set_tfm(*tfm);
   }
 
-  array<float3> *vertices = cached_data.vertices.data_for_time(frame_time);
+  array<float3> *vertices = cached_data.vertices.data_for_new_time(frame_time);
 
   if (vertices) {
     cached_data.add_dirty_frame(frame_time);
     mesh->set_verts(*vertices);
   }
 
-  array<int3> *triangle_data = cached_data.triangles.data_for_time(frame_time);
+  array<int3> *triangle_data = cached_data.triangles.data_for_new_time(frame_time);
   if (triangle_data) {
     cached_data.add_dirty_frame(frame_time);
     // TODO : shader association
@@ -747,7 +761,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
   }
 
   for (auto &attribute : cached_data.attributes) {
-    auto attr_data = attribute.data.data_for_time(frame_time);
+    auto attr_data = attribute.data.data_for_new_time(frame_time);
 
     if (!attr_data) {
       continue;

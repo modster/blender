@@ -60,36 +60,45 @@ class AlembicObject : public Node {
 
   template<typename T> class DataStore {
     vector<DataTimePair<T>> data{};
+    double last_lookup_time = -1.0;
+    Alembic::AbcCoreAbstract::TimeSampling time_sampling{};
 
-   public:
+    public:
+    void set_time_sampling(Alembic::AbcCoreAbstract::TimeSampling time_sampling_)
+    {
+      time_sampling = time_sampling_;
+    }
+
+    T *data_for_new_time(double time)
+    {
+      if (size() == 0) {
+        return nullptr;
+      }
+
+      auto index_pair = time_sampling.getNearIndex(time, data.size());
+      auto ptr = &data[index_pair.first];
+
+      /* check that the current time is not the same as the last time to avoid
+       * crashes as the data has been stolen by the node already */
+      if (last_lookup_time == ptr->time) {
+        return nullptr;
+      }
+
+      last_lookup_time = ptr->time;
+
+      return &ptr->data;
+    }
+
     T *data_for_time(double time)
     {
-      /* TODO: arrays are emptied */
-      if (size() == 1 && std::abs(data[0].time - time) < 1e-6) {
-        return &data[0].data;
+      if (size() == 0) {
+        return nullptr;
       }
 
-      for (size_t i = 0; i < size() - 1; ++i) {
-        DataTimePair<T> &pair0 = data[i];
+      auto index_pair = time_sampling.getNearIndex(time, data.size());
+      auto ptr = &data[index_pair.first];
 
-        if (std::abs(pair0.time - time) <= 1e-6) {
-          return &pair0.data;
-        }
-
-        DataTimePair<T> &pair1 = data[i + 1];
-
-        if (std::abs(pair1.time - time) <= 1e-6) {
-          return &pair1.data;
-        }
-
-        /* see if we are in between samples to avoid issues when the FPS is
-         * different than the one for the Alembic archive */
-        if (pair0.time <= time && time < pair1.time) {
-          return &pair0.data;
-        }
-      }
-
-      return nullptr;
+      return &ptr->data;
     }
 
     void add_data(T data_, double time)
