@@ -4230,16 +4230,16 @@ static PyObject *pyrna_struct_dir(BPy_StructRNA *self)
 
 PyDoc_STRVAR(pyrna_struct_custom_properties_doc,
              ".. classmethod:: custom_properties(struct)\n"
-             "   :return: the custom IDProperties for an RNA struct.\n"
-             "   :rtype: :class:`bpy.types.IDProperty`\n"); /* HANS-TODO: Proper name. */
+             "   :return: the parent group foran RNA struct's custom IDProperties.\n"
+             "   :rtype: :class:`bpy.types.IDProperty`\n");
 static PyObject *pyrna_struct_custom_properties(BPy_StructRNA *self)
 {
   PYRNA_STRUCT_CHECK_OBJ(self);
 
-  IDProperty *idprops = RNA_struct_idprops(&self->ptr, false);
+  IDProperty *idprops = RNA_struct_idprops(&self->ptr, true);
 
   if (idprops == NULL) {
-    return NULL;
+    return Py_None;
   }
 
   BPy_IDProperty *group = PyObject_New(BPy_IDProperty, &BPy_IDGroup_Type);
