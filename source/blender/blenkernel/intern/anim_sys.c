@@ -2987,9 +2987,56 @@ static void nlaeval_snapshot_blend(NlaEvalData *nlaeval,
       }
     }
     else {
-      for (int j = 0; j < c_lower->length; j++) {
-        c_lower->values[j] = nla_blend_value(
-            upper_blendmode, c_lower->values[j], c_upper->values[j], upper_influence);
+
+      {
+        // blend, user quat slerp through shortest angle if non full replace.
+        // combine and the other blend modes shouldnt need this behavior since replace
+        // defines an absolute orientation while the others are offset and proportional types.
+        if (upper_blendmode == NLASTRIP_MODE_REPLACE && upper_influence < 1.0f) {
+          PropertySubType subtype = RNA_property_subtype(nec->key.prop);
+          int length = nec->base_snapshot.length;
+
+          if (subtype == PROP_QUATERNION && length == 4) {
+            // Todo: quaternion slerp through shorter angle
+            float lower_qt[4], upper_qt[4];
+            copy_qt_qt(upper_qt, c_upper->values);
+            copy_qt_qt(lower_qt, c_lower->values);
+
+            float result_qt[4];
+            interp_qt_qtqt(result_qt, lower_qt, upper_qt, upper_influence);
+
+            copy_qt_qt(c_lower->values, result_qt);
+            continue;
+          }
+          else if (subtype == PROP_AXISANGLE && length == 4) {
+            // Todo: quaternion slerp through shorter angle
+            float lower_qt[4], upper_qt[4];
+            axis_angle_to_quat(upper_qt, c_upper->values, c_upper->values[3]);
+            axis_angle_to_quat(lower_qt, c_lower->values, c_lower->values[3]);
+
+            float result_qt[4];
+            interp_qt_qtqt(result_qt, lower_qt, upper_qt, upper_influence);
+
+            quat_to_axis_angle(c_lower->values, &c_lower->values[3], result_qt);
+            continue;
+          }
+          else if (subtype == PROP_EULER && length == 3) {
+            // Todo: quaternion slerp through shorter angle
+            float lower_qt[4], upper_qt[4];
+            eul_to_quat(upper_qt, c_upper->values);
+            eul_to_quat(lower_qt, c_lower->values);
+
+            float result_qt[4];
+            interp_qt_qtqt(result_qt, lower_qt, upper_qt, upper_influence);
+
+            quat_to_eul(c_lower->values, result_qt);
+            continue;
+          }
+        }
+        for (int j = 0; j < c_lower->length; j++) {
+          c_lower->values[j] = nla_blend_value(
+              upper_blendmode, c_lower->values[j], c_upper->values[j], upper_influence);
+        }
       }
     }
   }
