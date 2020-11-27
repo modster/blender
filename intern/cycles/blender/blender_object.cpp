@@ -506,7 +506,7 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
   }
 
   p->set_frame(static_cast<float>(frame_current));
-  p->set_frame_rate(b_scene.render().fps());
+  p->set_frame_rate(b_scene.render().fps() / b_scene.render().fps_base());
 
   auto absolute_path = blender_absolute_path(b_data, b_ob, b_mesh_cache.cache_file().filepath());
 
