@@ -103,14 +103,13 @@ static bool gpencil_io_export_pdf(Depsgraph *depsgraph,
   bGPdata *gpd_eval = (bGPdata *)ob_eval_->data;
 
   exporter->frame_number_set(iparams->frame_cur);
-  std::string subfix = iparams->file_subfix;
   result |= exporter->new_document();
 
   const bool use_frame_selected = (iparams->frame_type == GP_EXPORT_FRAME_SELECTED);
   if (!use_frame_selected) {
     result |= exporter->add_newpage();
     result |= exporter->add_body();
-    result = exporter->write(subfix);
+    result = exporter->write();
   }
   else {
     for (int32_t i = iparams->frame_start; i < iparams->frame_end + 1; i++) {
@@ -124,7 +123,7 @@ static bool gpencil_io_export_pdf(Depsgraph *depsgraph,
       result |= exporter->add_newpage();
       result |= exporter->add_body();
     }
-    result = exporter->write(subfix);
+    result = exporter->write();
     /* Back to original frame. */
     exporter->frame_number_set(iparams->frame_cur);
     CFRA = iparams->frame_cur;
@@ -143,7 +142,6 @@ static bool gpencil_io_export_frame_svg(GpencilExporterSVG *exporter,
 {
   bool result = false;
   exporter->frame_number_set(iparams->frame_cur);
-  std::string subfix = iparams->file_subfix;
   if (newpage) {
     result |= exporter->add_newpage();
   }
@@ -151,7 +149,7 @@ static bool gpencil_io_export_frame_svg(GpencilExporterSVG *exporter,
     result |= exporter->add_body();
   }
   if (savepage) {
-    result = exporter->write(subfix);
+    result = exporter->write();
   }
   return result;
 }
@@ -182,7 +180,6 @@ bool gpencil_io_export(const char *filename, GpencilIOParams *iparams)
       /* Prepare document. */
       GpencilExporterSVG exporter = GpencilExporterSVG(filename, iparams);
 
-      iparams->file_subfix[0] = '\0';
       done |= gpencil_io_export_frame_svg(&exporter, iparams, true, true, true);
       break;
     }

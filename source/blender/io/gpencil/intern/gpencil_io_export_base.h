@@ -29,7 +29,7 @@ class GpencilExporter : public GpencilIO {
 
  public:
   GpencilExporter(const struct GpencilIOParams *iparams);
-  virtual bool write(const std::string subfix) = 0;
+  virtual bool write(void) = 0;
 
  protected:
  private:

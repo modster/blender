@@ -221,7 +221,6 @@ static int wm_gpencil_export_svg_exec(bContext *C, wmOperator *op)
                                    .scale = 1.0f,
                                    .select = select,
                                    .frame_type = GP_EXPORT_FRAME_ACTIVE,
-                                   .file_subfix = '\0',
                                    .stroke_sample = RNA_float_get(op->ptr, "stroke_sample"),
                                    .resolution = 1.0f};
 

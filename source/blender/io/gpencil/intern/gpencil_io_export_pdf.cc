@@ -100,23 +100,14 @@ bool GpencilExporterPDF::add_body(void)
   return true;
 }
 
-bool GpencilExporterPDF::write(const std::string subfix)
+bool GpencilExporterPDF::write(void)
 {
-  /* Save File. */
-
-  /* Add page to filename. */
-  std::string frame_file = filename_;
-  size_t found = frame_file.find_last_of(".");
-  if (found != std::string::npos) {
-    frame_file.replace(found, 8, subfix + ".pdf");
-  }
-
   /* Support unicode character paths on Windows. */
   HPDF_STATUS res = 0;
   /* TODO: It looks libharu does not support unicode. */
   //#ifdef WIN32
   //  char filename_cstr[FILE_MAX];
-  //  BLI_strncpy(filename_cstr, frame_file.c_str(), FILE_MAX);
+  //  BLI_strncpy(filename_cstr, filename_, FILE_MAX);
   //
   //  UTF16_ENCODE(filename_cstr);
   //  std::wstring wstr(filename_cstr_16);
@@ -124,7 +115,7 @@ bool GpencilExporterPDF::write(const std::string subfix)
   //
   //  UTF16_UN_ENCODE(filename_cstr);
   //#else
-  res = HPDF_SaveToFile(pdf_, frame_file.c_str());
+  res = HPDF_SaveToFile(pdf_, filename_);
   //#endif
 
   return (res == 0) ? true : false;

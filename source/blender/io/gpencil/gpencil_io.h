@@ -53,8 +53,6 @@ struct GpencilIOParams {
   uint16_t select;
   /** Frame type. */
   uint16_t frame_type;
-  /** File subfix. */
-  char file_subfix[10];
   /** Stroke sampling. */
   float stroke_sample;
   /** Resolution.  */

@@ -92,22 +92,13 @@ bool GpencilExporterSVG::add_body(void)
   return true;
 }
 
-bool GpencilExporterSVG::write(const std::string subfix)
+bool GpencilExporterSVG::write(void)
 {
   bool result = true;
-  /* Save File. */
-
-  /* Add page to filename. */
-  std::string frame_file = filename_;
-  size_t found = frame_file.find_last_of(".");
-  if (found != std::string::npos) {
-    frame_file.replace(found, 8, subfix + ".svg");
-  }
-
 /* Support unicode character paths on Windows. */
 #ifdef WIN32
   char filename_cstr[FILE_MAX];
-  BLI_strncpy(filename_cstr, frame_file.c_str(), FILE_MAX);
+  BLI_strncpy(filename_cstr, filename_, FILE_MAX);
 
   UTF16_ENCODE(filename_cstr);
   std::wstring wstr(filename_cstr_16);
@@ -115,7 +106,7 @@ bool GpencilExporterSVG::write(const std::string subfix)
 
   UTF16_UN_ENCODE(filename_cstr);
 #else
-  result = main_doc_.save_file(frame_file.c_str());
+  result = main_doc_.save_file(filename_);
 #endif
 
   return result;
