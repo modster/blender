@@ -357,6 +357,9 @@ NlaStrip *BKE_nlastrip_new(bAction *act)
   strip->scale = 1.0f;
   strip->repeat = 1.0f;
 
+  /* For convenience, (see T82309#1055954). */
+  strip->flag |= NLASTRIP_FLAG_SYNC_LENGTH;
+
   /* return the new strip */
   return strip;
 }
