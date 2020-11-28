@@ -3053,7 +3053,7 @@ void nlastrip_evaluate(PointerRNA *ptr,
 {
   /**
    * Todo: for blending rotation channels, its sometimes important to choose whether to ipo
-   * through shorter or longer angle- maybe make it a toggle on preblend data? Otherwise can't
+   * through shorter or longer angle- maybe make it a toggle on blend data? Otherwise can't
    * properly align character flips due to it rotating in wrong direction... would need to be
    * applied using quaternion which means doing similar rotation grabbing and manipulation from/to
    * nla channels again which sucks..but doable..
@@ -3073,26 +3073,26 @@ void nlastrip_evaluate(PointerRNA *ptr,
   nlastrip_evaluate_raw_value(
       ptr, channels, NULL, nes, &snapshot_raw, anim_eval_context, &blendmode, &influence);
 
-  /* Apply preblend transforms to each bone's raw snapshot values.  */
+  /* Apply blend transforms to each bone's raw snapshot values.  */
   Object *object = (Object *)ptr->data;
   bPose *pose = object->pose;
   /**
-   * Assumes preblend xformed bones are root bones with no parents. ( I think that would affect
-   * conversion to bone local space?). If it has an animated parent, then preblend xforms generally
+   * Assumes blend xformed bones are root bones with no parents. ( I think that would affect
+   * conversion to bone local space?). If it has an animated parent, then blend xforms generally
    * won't make sense anyways (not a usecase situation).
    *
-   * Q: maybe the preblend xform should be stored per bone and already in local space?
+   * Q: maybe the blend xform should be stored per bone and already in local space?
    *
-   * todo: make preblend xform UI in python... alot easier.
-   * todo: if strip has cycled, then apply preblend xform based on how far each bone moves per
-   * cycle. Probably need a toggle per preblend xform for whether cyclic offset if applied (no need
+   * todo: make blend xform UI in python... alot easier.
+   * todo: if strip has cycled, then apply blend xform based on how far each bone moves per
+   * cycle. Probably need a toggle per blend xform for whether cyclic offset if applied (no need
    * to be per bone).
    */
-  LISTBASE_FOREACH (NlaStripPreBlendTransform *, preblend, &nes->strip->preblend_transforms) {
+  LISTBASE_FOREACH (NlaBlendTransform *, blend, &nes->strip->blend_transforms) {
     float world[4][4];
-    loc_eul_size_to_mat4(world, preblend->location, preblend->euler, preblend->scale);
+    loc_eul_size_to_mat4(world, blend->location, blend->euler, blend->scale);
 
-    LISTBASE_FOREACH (NlaStripPreBlendTransform_BoneName *, bone, &preblend->bones) {
+    LISTBASE_FOREACH (NlaBlendTransform_BoneTarget *, bone, &blend->bones) {
 
       char name_esc[sizeof(bone->name) * 2];
       BLI_strescape(name_esc, bone->name, sizeof(name_esc));
@@ -3101,6 +3101,10 @@ void nlastrip_evaluate(PointerRNA *ptr,
 
       float rest_matrix[4][4];
       unit_m4(rest_matrix);
+      /* Converting to world space works fine since the bone is in rest pose.
+       * and we want to apply a World-space delta transform but applied in local space,
+       * which is what the following matrix inversion and multiplication does.
+       * */
       BKE_constraint_mat_convertspace(object,
                                       pose_channel,
                                       rest_matrix,
@@ -3110,14 +3114,14 @@ void nlastrip_evaluate(PointerRNA *ptr,
       float rest_matrix_inv[4][4];
       invert_m4_m4(rest_matrix_inv, rest_matrix);
 
-      /* Get preblend transform in bone's non-animated local space. */
-      float bone_preblend_matrix[4][4];
-      mul_m4_m4m4(bone_preblend_matrix, rest_matrix_inv, world);
-      mul_m4_m4m4(bone_preblend_matrix, bone_preblend_matrix, rest_matrix);
-      // copy_m4_m4(bone_preblend_matrix, world);
+      /* Get blend transform in bone's non-animated local space. */
+      float bone_blend_matrix[4][4];
+      mul_m4_m4m4(bone_blend_matrix, rest_matrix_inv, world);
+      mul_m4_m4m4(bone_blend_matrix, bone_blend_matrix, rest_matrix);
+      // copy_m4_m4(bone_blend_matrix, world);
       // BKE_constraint_mat_convertspace(object,
       //                                pose_channel,
-      //                                bone_preblend_matrix,
+      //                                bone_blend_matrix,
       //                                CONSTRAINT_SPACE_WORLD,
       //                                CONSTRAINT_SPACE_LOCAL,
       //                                false);
@@ -3147,7 +3151,7 @@ void nlastrip_evaluate(PointerRNA *ptr,
       NlaEvalChannel *scale_channel = nlaevalchan_verify(ptr, channels, scale_path);
       float *scale_values = nlaeval_snapshot_ensure_channel(&snapshot_raw, scale_channel)->values;
 
-      /* Apply preblend transform as a parent transform to bone's action channels.
+      /* Apply blend transform as a parent transform to bone's action channels.
        * Results written directly back to raw snapshot. */
       float raw_snapshot_matrix[4][4];
       float decomposed_quat[4];
@@ -3155,7 +3159,7 @@ void nlastrip_evaluate(PointerRNA *ptr,
         case ROT_MODE_QUAT:
           loc_quat_size_to_mat4(
               raw_snapshot_matrix, location_values, rotation_values, scale_values);
-          mul_m4_m4m4(raw_snapshot_matrix, bone_preblend_matrix, raw_snapshot_matrix);
+          mul_m4_m4m4(raw_snapshot_matrix, bone_blend_matrix, raw_snapshot_matrix);
           mat4_decompose(location_values, rotation_values, scale_values, raw_snapshot_matrix);
 
           break;
@@ -3165,14 +3169,14 @@ void nlastrip_evaluate(PointerRNA *ptr,
                                      rotation_values,
                                      rotation_values[3],
                                      scale_values);
-          mul_m4_m4m4(raw_snapshot_matrix, bone_preblend_matrix, raw_snapshot_matrix);
+          mul_m4_m4m4(raw_snapshot_matrix, bone_blend_matrix, raw_snapshot_matrix);
           mat4_decompose(location_values, decomposed_quat, scale_values, raw_snapshot_matrix);
           quat_to_axis_angle(rotation_values, &rotation_values[3], decomposed_quat);
           break;
         default:
           loc_eul_size_to_mat4(
               raw_snapshot_matrix, location_values, rotation_values, scale_values);
-          mul_m4_m4m4(raw_snapshot_matrix, bone_preblend_matrix, raw_snapshot_matrix);
+          mul_m4_m4m4(raw_snapshot_matrix, bone_blend_matrix, raw_snapshot_matrix);
           quat_to_eul(rotation_values, decomposed_quat);
 
           break;
@@ -3666,8 +3670,8 @@ static bool animsys_evaluate_nla_for_flush(NlaEvalData *echannels,
   nlastrips_ctime_get_strip_single(&estrips, &action_strip, anim_eval_context, flush_to_original);
 
   /*
-   * create and group loc/rot/scale nla channels for preblend bones
-   *  -need to also calc preblend xform in bone's local space (preblend transform in world
+   * create and group loc/rot/scale nla channels for blend bones
+   *  -need to also calc blend xform in bone's local space (blend transform in world
   (pose?)
    *      space, need it in bone local space) use convert_space?
    *
@@ -3680,34 +3684,34 @@ static bool animsys_evaluate_nla_for_flush(NlaEvalData *echannels,
 
    * will also have to compute each strip into raw-value snapshots.
    *
-   * before blending snapshot wtih lower, we apply preblend transforms -use preblend
+   * before blending snapshot wtih lower, we apply blend transforms -use blend
    * grouped data
    * ______
    *
    * Prep:
    *    1) Get all strips that will evaluate on current frame.
    *    2) Create and group specified bones' nla channels. This is used to conveniently get
-  channels to apply preblend to. Grouped using  hash: bonename to nlachannels (should preblend
+  channels to apply blend to. Grouped using  hash: bonename to nlachannels (should blend
   xform affect domain? should it xform as if bone has identity if no channels exist? for now
   assuming trivial all TRS exist)
 
    * For each strip:
    *   1) store fcurve raw values into a snapshot
    *   2)
-   * 1) Convert World space preblend xforms to each specified bone's local space
-    2.5) hash? for bone name to bone's preblend xform matrix?
-   * 4) Apply preblend xforms to raw snapshot as a parent xform
+   * 1) Convert World space blend xforms to each specified bone's local space
+    2.5) hash? for bone name to bone's blend xform matrix?
+   * 4) Apply blend xforms to raw snapshot as a parent xform
    * 5) apply nla blend
    */
   /**
    * todo: name escape bone names
    * /
 
-  // TODO: preblend xform should be part of nalstrip_evaluate()? (so remap() and resample()
+  // TODO: blend xform should be part of nalstrip_evaluate()? (so remap() and resample()
   don't
   // have to change anything)
   //  should eval and create raw snapshot per call, then blend as expected before finishing
-  GHash *nla_preblend_from_bonename = BLI_ghash_str_new("preblend_xform_from_bonename");
+  GHash *nla_blend_from_bonename = BLI_ghash_str_new("blend_xform_from_bonename");
 
   // PointerRNA id_ptr;
   // RNA_id_pointer_create(prop_ptr->owner_id, &id_ptr);

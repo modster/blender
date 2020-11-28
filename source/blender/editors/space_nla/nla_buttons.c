@@ -417,24 +417,22 @@ static void nla_panel_properties(const bContext *C, Panel *panel)
     uiItemR(column, &strip_ptr, "use_animated_time_cyclic", 0, NULL, ICON_NONE);
 
     /** GG: I don't know why, but implementing UI in python results in wrong rna path (rooting from
-     * RNA Scene type) for preblend xform properties and updates don't work properly.
+     * RNA Scene type) for blend xform properties and updates don't work properly.
      *
      * Here, i guess since we specify the pointerRNA as a strip, it will be correct?
      */
     NlaStrip *strip = ((NlaStrip *)strip_ptr.data);
 
     // temporary: only show 1st one for testing purposes, so when xform changes, it updates nla
-    if (strip->preblend_transforms.first) {
+    if (strip->blend_transforms.first) {
 
-      PointerRNA preblend_rna;
-      RNA_pointer_create(strip_ptr.owner_id,
-                         &RNA_NlaStripPreBlendTransform,
-                         strip->preblend_transforms.first,
-                         &preblend_rna);
+      PointerRNA blend_rna;
+      RNA_pointer_create(
+          strip_ptr.owner_id, &RNA_NlaBlendTransform, strip->blend_transforms.first, &blend_rna);
 
-      uiItemR(column, &preblend_rna, "location", 0, NULL, ICON_NONE);
-      uiItemR(column, &preblend_rna, "euler", 0, NULL, ICON_NONE);
-      uiItemR(column, &preblend_rna, "scale", 0, NULL, ICON_NONE);
+      uiItemR(column, &blend_rna, "location", 0, NULL, ICON_NONE);
+      uiItemR(column, &blend_rna, "euler", 0, NULL, ICON_NONE);
+      uiItemR(column, &blend_rna, "scale", 0, NULL, ICON_NONE);
     }
   }
 }

@@ -398,59 +398,58 @@ NlaStrip *BKE_nlastack_add_strip(AnimData *adt, bAction *act, const bool is_libo
   return strip;
 }
 
-NlaStripPreBlendTransform *BKE_nlastrip_new_preblend_transform(NlaStrip *strip)
+NlaBlendTransform *BKE_nlastrip_new_blend_transform(NlaStrip *strip)
 {
-  NlaStripPreBlendTransform *preblend = MEM_callocN(sizeof(NlaStripPreBlendTransform), __func__);
-  preblend->location[0] = 0;
-  preblend->location[1] = 0;
-  preblend->location[2] = 0;
-  preblend->euler[0] = 0;
-  preblend->euler[1] = 0;
-  preblend->euler[2] = 0;
-  preblend->scale[0] = 1;
-  preblend->scale[1] = 1;
-  preblend->scale[2] = 1;
+  NlaBlendTransform *blend = MEM_callocN(sizeof(NlaBlendTransform), __func__);
+  blend->location[0] = 0;
+  blend->location[1] = 0;
+  blend->location[2] = 0;
+  blend->euler[0] = 0;
+  blend->euler[1] = 0;
+  blend->euler[2] = 0;
+  blend->scale[0] = 1;
+  blend->scale[1] = 1;
+  blend->scale[2] = 1;
 
-  BLI_addtail(&strip->preblend_transforms, preblend);
+  BLI_addtail(&strip->blend_transforms, blend);
 
-  return preblend;
+  return blend;
 }
-void BKE_nlastrip_free_preblend_transform(NlaStrip *strip, NlaStripPreBlendTransform *preblend)
+void BKE_nlastrip_free_blend_transform(NlaStrip *strip, NlaBlendTransform *blend)
 {
   // todo: ensure pattern of add/removal matches others (assumptions, that remove also frees, etc)
-  BLI_remlink(&strip->preblend_transforms, preblend);
-  MEM_freeN(preblend);
+  BLI_remlink(&strip->blend_transforms, blend);
+  MEM_freeN(blend);
 }
-void BKE_nlastrip_free_preblend_transform_at(NlaStrip *strip, int preblend_index)
+void BKE_nlastrip_free_blend_transform_at(NlaStrip *strip, int blend_index)
 {
-  NlaStripPreBlendTransform *preblend = BLI_findlink(&strip->preblend_transforms, preblend_index);
-  if (preblend) {
-    BKE_nlastrip_free_preblend_transform(strip, preblend);
+  NlaBlendTransform *blend = BLI_findlink(&strip->blend_transforms, blend_index);
+  if (blend) {
+    BKE_nlastrip_free_blend_transform(strip, blend);
   }
 }
 
-NlaStripPreBlendTransform_BoneName *BKE_preblend_transform_new_bone(
-    NlaStripPreBlendTransform *preblend)
+NlaBlendTransform_BoneTarget *BKE_blend_transform_new_bone(NlaBlendTransform *blend)
 {
-  NlaStripPreBlendTransform_BoneName *bone_name = MEM_callocN(
-      sizeof(NlaStripPreBlendTransform_BoneName), __func__);
+  NlaBlendTransform_BoneTarget *bone_name = MEM_callocN(sizeof(NlaBlendTransform_BoneTarget),
+                                                        __func__);
 
-  BLI_addtail(&preblend->bones, bone_name);
+  BLI_addtail(&blend->bones, bone_name);
 
   return bone_name;
 }
-void BKE_preblend_transform_free_bone(NlaStripPreBlendTransform *preblend,
-                                      NlaStripPreBlendTransform_BoneName *bone_name)
+void BKE_blend_transform_free_bone(NlaBlendTransform *blend,
+                                   NlaBlendTransform_BoneTarget *bone_name)
 {
   // todo: ensure pattern of add/removal matches others (assumptions, that remove also frees, etc)
-  BLI_remlink(&preblend->bones, bone_name);
+  BLI_remlink(&blend->bones, bone_name);
   MEM_freeN(bone_name);
 }
-void BKE_preblend_transform_free_bone_at(NlaStripPreBlendTransform *preblend, int bone_name_index)
+void BKE_blend_transform_free_bone_at(NlaBlendTransform *blend, int bone_name_index)
 {
-  NlaStripPreBlendTransform_BoneName *bone_name = BLI_findlink(&preblend->bones, bone_name_index);
+  NlaBlendTransform_BoneTarget *bone_name = BLI_findlink(&blend->bones, bone_name_index);
   if (bone_name) {
-    BKE_preblend_transform_free_bone(preblend, bone_name);
+    BKE_blend_transform_free_bone(blend, bone_name);
   }
 }
 
@@ -2272,10 +2271,10 @@ static void blend_write_nla_strips(BlendWriter *writer, ListBase *strips)
     BKE_fcurve_blend_write(writer, &strip->fcurves);
     BKE_fmodifiers_blend_write(writer, &strip->modifiers);
 
-    BLO_write_struct_list(writer, NlaStripPreBlendTransform, &strip->preblend_transforms);
-    LISTBASE_FOREACH (NlaStripPreBlendTransform *, preblend, &strip->preblend_transforms) {
+    BLO_write_struct_list(writer, NlaBlendTransform, &strip->blend_transforms);
+    LISTBASE_FOREACH (NlaBlendTransform *, blend, &strip->blend_transforms) {
 
-      BLO_write_struct_list(writer, NlaStripPreBlendTransform_BoneName, &preblend->bones);
+      BLO_write_struct_list(writer, NlaBlendTransform_BoneTarget, &blend->bones);
     }
     /* write the strip's children */
     blend_write_nla_strips(writer, &strip->strips);
@@ -2297,10 +2296,10 @@ static void blend_data_read_nla_strips(BlendDataReader *reader, ListBase *strips
     BLO_read_list(reader, &strip->modifiers);
     BKE_fmodifiers_blend_read_data(reader, &strip->modifiers, NULL);
 
-    BLO_read_list(reader, &strip->preblend_transforms);
-    LISTBASE_FOREACH (NlaStripPreBlendTransform *, preblend, &strip->preblend_transforms) {
+    BLO_read_list(reader, &strip->blend_transforms);
+    LISTBASE_FOREACH (NlaBlendTransform *, blend, &strip->blend_transforms) {
 
-      BLO_read_list(reader, &preblend->bones);
+      BLO_read_list(reader, &blend->bones);
     }
   }
 }

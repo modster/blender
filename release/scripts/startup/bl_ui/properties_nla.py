@@ -33,8 +33,8 @@ def get_active_strip(context):
     items =  [strip for strip in context.selected_nla_strips if strip.active]
     return items[0] if items else None 
 
-class OBJECT_OT_nla_add_preblend(bpy.types.Operator):
-    bl_idname = "object.nla_add_preblend"
+class OBJECT_OT_nla_add_blend(bpy.types.Operator):
+    bl_idname = "object.nla_add_blend"
     bl_label = "Add Preblend Transform"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -44,19 +44,19 @@ class OBJECT_OT_nla_add_preblend(bpy.types.Operator):
 
     def execute(self, context):
         active_strip = get_active_strip(context)
-        print(dict(active_strip.preblend_transforms))
-        k = active_strip.preblend_transforms.add()
+        print(dict(active_strip.blend_transforms))
+        k = active_strip.blend_transforms.add()
 
         # print(k.path_from_id("location"))
-        # print(active_strip.path_resolve("preblend_transforms"))
+        # print(active_strip.path_resolve("blend_transforms"))
         # print(k.id_data)
         return {'FINISHED'}
-class OBJECT_OT_nla_remove_preblend(bpy.types.Operator):
-    bl_idname = "object.nla_remove_preblend"
+class OBJECT_OT_nla_remove_blend(bpy.types.Operator):
+    bl_idname = "object.nla_remove_blend"
     bl_label = "Remove Preblend Transform"
     bl_options = {'REGISTER', 'UNDO'}
 
-    preblend_index : IntProperty()
+    blend_index : IntProperty()
 
     @classmethod
     def poll(cls,context):
@@ -64,16 +64,16 @@ class OBJECT_OT_nla_remove_preblend(bpy.types.Operator):
 
     def execute(self, context):
         active_strip = get_active_strip(context)
-        active_strip.preblend_transforms.remove_at(preblend_index=self.preblend_index)
+        active_strip.blend_transforms.remove_at(blend_index=self.blend_index)
 
         return {'FINISHED'}
 
-class OBJECT_OT_nla_preblend_add_bone(bpy.types.Operator):
-    bl_idname = "object.preblend_add_bone"
+class OBJECT_OT_nla_blend_add_bone(bpy.types.Operator):
+    bl_idname = "object.blend_add_bone"
     bl_label = "Preblend Add Bone"
     bl_options = {'REGISTER', 'UNDO'}
 
-    preblend_index : IntProperty()
+    blend_index : IntProperty()
 
     @classmethod
     def poll(cls,context):
@@ -81,16 +81,16 @@ class OBJECT_OT_nla_preblend_add_bone(bpy.types.Operator):
 
     def execute(self, context):
         active_strip = get_active_strip(context)
-        preblend = active_strip.preblend_transforms[self.preblend_index]
-        bone = preblend.bones.add()
+        blend = active_strip.blend_transforms[self.blend_index]
+        bone = blend.bones.add()
         bone.name ="Hips"
         return {'FINISHED'}
-class OBJECT_OT_nla_preblend_remove_bone(bpy.types.Operator):
-    bl_idname = "object.preblend_remove_bone"
+class OBJECT_OT_nla_blend_remove_bone(bpy.types.Operator):
+    bl_idname = "object.blend_remove_bone"
     bl_label = "Preblend Remove Bone"
     bl_options = {'REGISTER', 'UNDO'}
 
-    preblend_index : IntProperty()
+    blend_index : IntProperty()
     bone_index : IntProperty()
 
     @classmethod
@@ -99,8 +99,8 @@ class OBJECT_OT_nla_preblend_remove_bone(bpy.types.Operator):
 
     def execute(self, context):
         active_strip = get_active_strip(context)
-        preblend = active_strip.preblend_transforms[self.preblend_index]
-        preblend.bones.remove_at(self.bone_index)
+        blend = active_strip.blend_transforms[self.blend_index]
+        blend.bones.remove_at(self.bone_index)
 
         return {'FINISHED'}
 
@@ -121,7 +121,7 @@ class OBJECT_PT_nla_alignment(Panel):
         active_strip = get_active_strip(context)
 
 
-        layout.prop(active_strip,"preblend_transforms")
+        layout.prop(active_strip,"blend_transforms")
         
         # layout.prop(active_strip,"frame_start")
         # layout.prop(context.active_object,"location")
@@ -130,39 +130,39 @@ class OBJECT_PT_nla_alignment(Panel):
         #     c = context.active_pose_bone.constraints
         #     if(c):
         #         layout.prop(c[0],'type')
-        layout.operator(OBJECT_OT_nla_add_preblend.bl_idname,text='New Transform',icon='ADD')
+        layout.operator(OBJECT_OT_nla_add_blend.bl_idname,text='New Transform',icon='ADD')
         box = layout.box()
-        for i,preblend in enumerate(active_strip.preblend_transforms):
+        for i,blend in enumerate(active_strip.blend_transforms):
             row = box.row(align=True)
             row.label(text="World Transform")
-            row.operator(OBJECT_OT_nla_remove_preblend.bl_idname,text='',icon='REMOVE').preblend_index = i 
+            row.operator(OBJECT_OT_nla_remove_blend.bl_idname,text='',icon='REMOVE').blend_index = i 
 
-            box.prop(preblend,"location")
-            box.prop(preblend,"euler")
-            box.prop(preblend,"scale")
+            box.prop(blend,"location")
+            box.prop(blend,"euler")
+            box.prop(blend,"scale")
 
             col = box.column(align=True)
             row = col.row(align=True)
             #todo: support for objects?
             row.label(text="Bones")
-            row.operator(OBJECT_OT_nla_preblend_add_bone.bl_idname,text='',icon='ADD').preblend_index = i 
-            for j,bone in enumerate(preblend.bones):
+            row.operator(OBJECT_OT_nla_blend_add_bone.bl_idname,text='',icon='ADD').blend_index = i 
+            for j,bone in enumerate(blend.bones):
                 row = col.row(align=True)
                 # print([b for b in context.active_object.data.bones])
                 # row.prop_search(bone,"name",context.active_object.data,"bones",text='')
                 row.prop(bone,"name")
-                op = row.operator(OBJECT_OT_nla_preblend_remove_bone.bl_idname,text='',icon='REMOVE')
-                op.preblend_index = i 
+                op = row.operator(OBJECT_OT_nla_blend_remove_bone.bl_idname,text='',icon='REMOVE')
+                op.blend_index = i 
                 op.bone_index = j 
 
 
 classes = (
     # Object Panels
     OBJECT_PT_nla_alignment,
-    OBJECT_OT_nla_add_preblend,
-    OBJECT_OT_nla_remove_preblend,
-    OBJECT_OT_nla_preblend_remove_bone,
-    OBJECT_OT_nla_preblend_add_bone,
+    OBJECT_OT_nla_add_blend,
+    OBJECT_OT_nla_remove_blend,
+    OBJECT_OT_nla_blend_remove_bone,
+    OBJECT_OT_nla_blend_add_bone,
 )
 
 if __name__ == "__main__":  # only for live edit.
