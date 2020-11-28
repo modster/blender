@@ -71,7 +71,8 @@ typedef struct IDPropertyUIData {
 typedef struct IDPropertyUIDataInt {
   IDPropertyUIData generic_ui_data;
   int *default_array; /* Only for array properties. */
-  int64_t default_array_len;
+  int default_array_len;
+  char _pad[4];
 
   int min;
   int max;
@@ -85,7 +86,8 @@ typedef struct IDPropertyUIDataInt {
 typedef struct IDPropertyUIDataFloat {
   IDPropertyUIData generic_ui_data;
   double *default_array; /* Only for array properties. */
-  int64_t default_array_len;
+  int default_array_len;
+  char _pad[4];
 
   float step;
   float precision;

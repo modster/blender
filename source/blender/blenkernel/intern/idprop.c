@@ -1137,6 +1137,40 @@ void IDP_foreach_property(IDProperty *id_property_root,
 
 void IDP_WriteProperty_OnlyData(const IDProperty *prop, BlendWriter *writer);
 
+static void write_ui_data(const IDProperty *prop, BlendWriter *writer)
+{
+  IDPropertyUIData *ui_data = prop->ui_data;
+
+  BLO_write_string(writer, ui_data->description);
+
+  if (prop->type == IDP_STRING) {
+    IDPropertyUIDataString *ui_data_string = (IDPropertyUIDataString *)ui_data;
+    BLO_write_string(writer, ui_data_string->default_value);
+    BLO_write_struct(writer, IDPropertyUIDataString, ui_data);
+  }
+  else if (prop->type == IDP_INT || (prop->type == IDP_ARRAY && prop->subtype == IDP_INT)) {
+    IDPropertyUIDataInt *ui_data_int = (IDPropertyUIDataInt *)ui_data;
+    if (prop->type == IDP_ARRAY) {
+      BLO_write_int32_array(
+          writer, (uint)ui_data_int->default_array_len, (int32_t *)ui_data_int->default_array);
+    }
+    BLO_write_struct(writer, IDPropertyUIDataInt, ui_data);
+  }
+  else if (ELEM(prop->type, IDP_FLOAT, IDP_DOUBLE) ||
+           (prop->type == IDP_ARRAY && ELEM(prop->subtype, IDP_FLOAT, IDP_DOUBLE))) {
+    IDPropertyUIDataFloat *ui_data_float = (IDPropertyUIDataFloat *)ui_data;
+    if (prop->type == IDP_ARRAY) {
+      BLO_write_double_array(
+          writer, (uint)ui_data_float->default_array_len, ui_data_float->default_array);
+    }
+    BLO_write_struct(writer, IDPropertyUIDataFloat, ui_data);
+  }
+  else {
+    /* UI data not supported for remaining types, this shouldn't be called in those cases. */
+    BLI_assert(false);
+  }
+}
+
 static void IDP_WriteArray(const IDProperty *prop, BlendWriter *writer)
 {
   /*REMEMBER to set totalen to len in the linking code!!*/
@@ -1201,6 +1235,9 @@ void IDP_WriteProperty_OnlyData(const IDProperty *prop, BlendWriter *writer)
       IDP_WriteIDPArray(prop, writer);
       break;
   }
+  if (prop->ui_data != NULL) {
+    write_ui_data(prop, writer);
+  }
 }
 
 void IDP_BlendWrite(BlendWriter *writer, const IDProperty *prop)
@@ -1210,6 +1247,38 @@ void IDP_BlendWrite(BlendWriter *writer, const IDProperty *prop)
 }
 
 static void IDP_DirectLinkProperty(IDProperty *prop, BlendDataReader *reader);
+
+static void read_ui_data(IDProperty *prop, BlendDataReader *reader)
+{
+  IDPropertyUIData *ui_data = prop->ui_data;
+
+  BLO_read_data_address(reader, &ui_data->description);
+  BLO_read_data_address(reader, &ui_data);
+
+  if (prop->type == IDP_STRING) {
+    IDPropertyUIDataString *ui_data_string = (IDPropertyUIDataString *)ui_data;
+    BLO_read_data_address(reader, &ui_data_string->default_value);
+  }
+  else if (prop->type == IDP_INT || (prop->type == IDP_ARRAY && prop->subtype == IDP_INT)) {
+    IDPropertyUIDataInt *ui_data_int = (IDPropertyUIDataInt *)ui_data;
+    if (prop->type == IDP_ARRAY) {
+      BLO_read_int32_array(
+          reader, ui_data_int->default_array_len, (int **)&ui_data_int->default_array);
+    }
+  }
+  else if (ELEM(prop->type, IDP_FLOAT, IDP_DOUBLE) ||
+           (prop->type == IDP_ARRAY && ELEM(prop->subtype, IDP_FLOAT, IDP_DOUBLE))) {
+    IDPropertyUIDataFloat *ui_data_float = (IDPropertyUIDataFloat *)ui_data;
+    if (prop->type == IDP_ARRAY) {
+      BLO_read_double_array(
+          reader, ui_data_float->default_array_len, (double **)&ui_data_float->default_array);
+    }
+  }
+  else {
+    /* UI data not supported for remaining types, this shouldn't be called in those cases. */
+    BLI_assert(false);
+  }
+}
 
 static void IDP_DirectLinkIDPArray(IDProperty *prop, BlendDataReader *reader)
 {
@@ -1320,6 +1389,10 @@ static void IDP_DirectLinkProperty(IDProperty *prop, BlendDataReader *reader)
       prop->subtype = 0;
       IDP_Int(prop) = 0;
   }
+
+  if (prop->ui_data != NULL) {
+    read_ui_data(prop, reader);
+  }
 }
 
 void IDP_BlendReadData_impl(BlendDataReader *reader, IDProperty **prop, const char *caller_func_id)
@@ -1399,26 +1472,26 @@ void IDP_BlendReadExpand(struct BlendExpander *expander, IDProperty *prop)
   }
 }
 
-IDPropertyUIData *IDP_ui_data_ensure(IDProperty *idprop)
+IDPropertyUIData *IDP_ui_data_ensure(IDProperty *prop)
 {
-  if (idprop->ui_data != NULL) {
-    return idprop->ui_data;
+  if (prop->ui_data != NULL) {
+    return prop->ui_data;
   }
 
-  if (idprop->type == IDP_STRING) {
-    idprop->ui_data = MEM_callocN(sizeof(IDPropertyUIDataString), __func__);
+  if (prop->type == IDP_STRING) {
+    prop->ui_data = MEM_callocN(sizeof(IDPropertyUIDataString), __func__);
   }
-  else if (idprop->type == IDP_INT || (idprop->type == IDP_ARRAY && idprop->subtype == IDP_INT)) {
+  else if (prop->type == IDP_INT || (prop->type == IDP_ARRAY && prop->subtype == IDP_INT)) {
     IDPropertyUIDataInt *ui_data = MEM_callocN(sizeof(IDPropertyUIDataInt), __func__);
     ui_data->min = INT_MIN;
     ui_data->min = INT_MAX;
     ui_data->soft_min = INT_MIN;
     ui_data->soft_max = INT_MAX;
     ui_data->step = 1;
-    idprop->ui_data = (IDPropertyUIData *)ui_data;
+    prop->ui_data = (IDPropertyUIData *)ui_data;
   }
-  else if (ELEM(idprop->type, IDP_FLOAT, IDP_DOUBLE) ||
-           (idprop->type == IDP_ARRAY && ELEM(idprop->subtype, IDP_FLOAT, IDP_DOUBLE))) {
+  else if (ELEM(prop->type, IDP_FLOAT, IDP_DOUBLE) ||
+           (prop->type == IDP_ARRAY && ELEM(prop->subtype, IDP_FLOAT, IDP_DOUBLE))) {
     IDPropertyUIDataFloat *ui_data = MEM_callocN(sizeof(IDPropertyUIDataFloat), __func__);
     ui_data->min = FLT_MIN;
     ui_data->min = FLT_MIN;
@@ -1426,14 +1499,14 @@ IDPropertyUIData *IDP_ui_data_ensure(IDProperty *idprop)
     ui_data->soft_max = FLT_MAX;
     ui_data->step = 1.0f;
     ui_data->step = 3.0f;
-    idprop->ui_data = (IDPropertyUIData *)ui_data;
+    prop->ui_data = (IDPropertyUIData *)ui_data;
   }
   else {
     /* UI data not supported for remaining types, this shouldn't be called in those cases. */
     BLI_assert(false);
   }
 
-  return idprop->ui_data;
+  return prop->ui_data;
 }
 
 /** \} */
