@@ -64,7 +64,7 @@ class OBJECT_OT_nla_remove_preblend(bpy.types.Operator):
 
     def execute(self, context):
         active_strip = get_active_strip(context)
-        active_strip.preblend_transforms.remove_at(self.preblend_index)
+        active_strip.preblend_transforms.remove_at(preblend_index=self.preblend_index)
 
         return {'FINISHED'}
 
