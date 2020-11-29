@@ -122,8 +122,8 @@ class OBJECT_PT_nla_alignment(Panel):
 
 
         layout.prop(active_strip,"name")
-        layout.prop(active_strip,"action")
-        layout.prop(active_strip,"blend_transforms")
+        # layout.prop(active_strip,"action")
+        # layout.prop(active_strip,"blend_transforms")
         
         # layout.prop(active_strip,"frame_start")
         # layout.prop(context.active_object,"location")
@@ -133,8 +133,8 @@ class OBJECT_PT_nla_alignment(Panel):
         #     if(c):
         #         layout.prop(c[0],'type')
         layout.operator(OBJECT_OT_nla_add_blend.bl_idname,text='New Transform',icon='ADD')
-        box = layout.box()
         for i,blend in enumerate(active_strip.blend_transforms):
+            box = layout.box()
             row = box.row(align=True)
             row.label(text="World Transform")
             row.operator(OBJECT_OT_nla_remove_blend.bl_idname,text='',icon='REMOVE').blend_index = i 

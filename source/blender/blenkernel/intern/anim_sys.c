@@ -3169,7 +3169,8 @@ void nlastrip_evaluate(PointerRNA *ptr,
       float raw_snapshot_matrix[4][4];
       float decomposed_quat[4];
       switch (pose_channel->rotmode) {
-        case ROT_MODE_QUAT:
+        case ROT_MODE_QUAT: {
+
           // todo:... large error for some reason here? Maybe its a separate IK issue?
           // (seems fine with FK blends, but when I use the same animation with IK i get scealing
           // issues.)
@@ -3193,6 +3194,7 @@ void nlastrip_evaluate(PointerRNA *ptr,
           //  scale with be non-one afterward even if scale is one every  where else...
           // maybe it would be better to manually do scaling since its only affected by blend
           // xform's scale? but would error lead to issues with rotation and location?
+          normalize_qt(rotation_values);
           loc_quat_size_to_mat4(
               raw_snapshot_matrix, location_values, rotation_values, scale_values);
           mul_m4_m4m4(raw_snapshot_matrix, bone_blend_matrix, raw_snapshot_matrix);
@@ -3209,9 +3211,10 @@ void nlastrip_evaluate(PointerRNA *ptr,
           mat4_to_size(scale_values, raw_snapshot_matrix);  //...why is this 1.0 as expected.. but
                                                             // blender shows .8 for scale??(hips)
           // mat4_decompose(location_values, rotation_values, scale_values, raw_snapshot_matrix);
-
           break;
-        case ROT_MODE_AXISANGLE:
+        }
+        case ROT_MODE_AXISANGLE: {
+
           loc_axisangle_size_to_mat4(raw_snapshot_matrix,
                                      location_values,
                                      rotation_values,
@@ -3221,13 +3224,14 @@ void nlastrip_evaluate(PointerRNA *ptr,
           mat4_decompose(location_values, decomposed_quat, scale_values, raw_snapshot_matrix);
           quat_to_axis_angle(rotation_values, &rotation_values[3], decomposed_quat);
           break;
-        default:
+        }
+        default: {
           loc_eul_size_to_mat4(
               raw_snapshot_matrix, location_values, rotation_values, scale_values);
           mul_m4_m4m4(raw_snapshot_matrix, bone_blend_matrix, raw_snapshot_matrix);
           quat_to_eul(rotation_values, decomposed_quat);
-
           break;
+        }
       }
 
       MEM_freeN(location_path);  // todo: verify correct call
