@@ -336,7 +336,7 @@ typedef struct FileListEntryPreview {
    * generating (BKE_previewimg_is_finished()). */
   PreviewImage *in_memory_preview;
 
-  ImBuf *img;
+  int icon_id;
 } FileListEntryPreview;
 
 /* Dummy wrapper around FileListEntryPreview to ensure we do not access freed memory when freeing
@@ -1105,7 +1105,12 @@ ImBuf *filelist_getimage(struct FileList *filelist, const int index)
 {
   FileDirEntry *file = filelist_geticon_get_file(filelist, index);
 
-  return file->image;
+  return file->preview_icon_id ? BKE_icon_imbuf_get_buffer(file->preview_icon_id) : NULL;
+}
+
+ImBuf *filelist_file_getimage(const FileDirEntry *file)
+{
+  return file->preview_icon_id ? BKE_icon_imbuf_get_buffer(file->preview_icon_id) : NULL;
 }
 
 static ImBuf *filelist_geticon_image_ex(FileDirEntry *file)
@@ -1327,8 +1332,9 @@ static void filelist_entry_clear(FileDirEntry *entry)
   if (entry->redirection_path) {
     MEM_freeN(entry->redirection_path);
   }
-  if (entry->image) {
-    IMB_freeImBuf(entry->image);
+  if (entry->preview_icon_id) {
+    BKE_icon_delete(entry->preview_icon_id);
+    entry->preview_icon_id = 0;
   }
   /* For now, consider FileDirEntryRevision::poin as not owned here,
    * so no need to do anything about it */
@@ -1436,7 +1442,8 @@ static void filelist_cache_preview_runf(TaskPool *__restrict pool, void *taskdat
 
   if (preview->in_memory_preview) {
     if (BKE_previewimg_is_finished(preview->in_memory_preview, ICON_SIZE_PREVIEW)) {
-      preview->img = BKE_previewimg_to_imbuf(preview->in_memory_preview, ICON_SIZE_PREVIEW);
+      ImBuf *imbuf = BKE_previewimg_to_imbuf(preview->in_memory_preview, ICON_SIZE_PREVIEW);
+      preview->icon_id = BKE_icon_imbuf_create(imbuf);
       done = true;
     }
   }
@@ -1463,8 +1470,9 @@ static void filelist_cache_preview_runf(TaskPool *__restrict pool, void *taskdat
     IMB_thumb_path_lock(preview->path);
     /* Always generate biggest preview size for now, it's simpler and avoids having to re-generate
      * in case user switch to a bigger preview size. */
-    preview->img = IMB_thumb_manage(preview->path, THB_LARGE, source);
+    ImBuf *imbuf = IMB_thumb_manage(preview->path, THB_LARGE, source);
     IMB_thumb_path_unlock(preview->path);
+    preview->icon_id = BKE_icon_imbuf_create(imbuf);
 
     done = true;
   }
@@ -1486,8 +1494,8 @@ static void filelist_cache_preview_freef(TaskPool *__restrict UNUSED(pool), void
   /* preview_taskdata->preview is atomically set to NULL once preview has been processed and sent
    * to previews_done queue. */
   if (preview != NULL) {
-    if (preview->img) {
-      IMB_freeImBuf(preview->img);
+    if (preview->icon_id) {
+      BKE_icon_delete(preview->icon_id);
     }
     MEM_freeN(preview);
   }
@@ -1513,8 +1521,8 @@ static void filelist_cache_previews_clear(FileListEntryCache *cache)
     while ((preview = BLI_thread_queue_pop_timeout(cache->previews_done, 0))) {
       // printf("%s: DONE %d - %s - %p\n", __func__, preview->index, preview->path,
       // preview->img);
-      if (preview->img) {
-        IMB_freeImBuf(preview->img);
+      if (preview->icon_id) {
+        BKE_icon_delete(preview->icon_id);
       }
       MEM_freeN(preview);
     }
@@ -1545,7 +1553,7 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
 
   BLI_assert(cache->flags & FLC_PREVIEWS_ACTIVE);
 
-  if (!entry->image && !(entry->flags & FILE_ENTRY_INVALID_PREVIEW) &&
+  if (!entry->preview_icon_id && !(entry->flags & FILE_ENTRY_INVALID_PREVIEW) &&
       (entry->typeflag & (FILE_TYPE_IMAGE | FILE_TYPE_MOVIE | FILE_TYPE_FTFONT |
                           FILE_TYPE_BLENDER | FILE_TYPE_BLENDER_BACKUP | FILE_TYPE_BLENDERLIB))) {
     FileListEntryPreview *preview = MEM_mallocN(sizeof(*preview), __func__);
@@ -1562,7 +1570,7 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
     preview->index = index;
     preview->flags = entry->typeflag;
     preview->in_memory_preview = intern_entry->preview_image;
-    preview->img = NULL;
+    preview->icon_id = 0;
     //      printf("%s: %d - %s - %p\n", __func__, preview->index, preview->path, preview->img);
 
     filelist_cache_preview_ensure_running(cache);
@@ -1919,7 +1927,8 @@ static FileDirEntry *filelist_file_create_entry(FileList *filelist, const int in
   /* For some file types the preview is already available. */
   if (entry->preview_image &&
       BKE_previewimg_is_finished(entry->preview_image, ICON_SIZE_PREVIEW)) {
-    ret->image = BKE_previewimg_to_imbuf(entry->preview_image, ICON_SIZE_PREVIEW);
+    ImBuf *ibuf = BKE_previewimg_to_imbuf(entry->preview_image, ICON_SIZE_PREVIEW);
+    ret->preview_icon_id = BKE_icon_imbuf_create(ibuf);
   }
   BLI_addtail(&cache->cached_entries, ret);
   return ret;
@@ -2379,15 +2388,17 @@ bool filelist_cache_previews_update(FileList *filelist)
 
     //      printf("%s: %d - %s - %p\n", __func__, preview->index, preview->path, preview->img);
 
-    if (preview->img) {
+    if (preview->icon_id) {
       /* Due to asynchronous process, a preview for a given image may be generated several times,
        * i.e. entry->image may already be set at this point. */
-      if (entry && !entry->image) {
-        entry->image = preview->img;
+      if (entry && !entry->preview_icon_id) {
+        /* Move ownership over icon. */
+        entry->preview_icon_id = preview->icon_id;
+        preview->icon_id = 0;
         changed = true;
       }
       else {
-        IMB_freeImBuf(preview->img);
+        BKE_icon_delete(preview->icon_id);
       }
     }
     else if (entry) {

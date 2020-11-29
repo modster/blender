@@ -100,11 +100,12 @@ typedef void (*VectorDrawFunc)(int x, int y, int w, int h, float alpha);
 #define ICON_TYPE_COLOR_TEXTURE 1
 #define ICON_TYPE_MONO_TEXTURE 2
 #define ICON_TYPE_BUFFER 3
-#define ICON_TYPE_VECTOR 4
-#define ICON_TYPE_GEOM 5
-#define ICON_TYPE_EVENT 6 /* draw keymap entries using custom renderer. */
-#define ICON_TYPE_GPLAYER 7
-#define ICON_TYPE_BLANK 8
+#define ICON_TYPE_IMBUF 4
+#define ICON_TYPE_VECTOR 5
+#define ICON_TYPE_GEOM 6
+#define ICON_TYPE_EVENT 7 /* draw keymap entries using custom renderer. */
+#define ICON_TYPE_GPLAYER 8
+#define ICON_TYPE_BLANK 9
 
 typedef struct DrawInfo {
   int type;
@@ -1147,6 +1148,9 @@ static DrawInfo *icon_create_drawinfo(Icon *icon)
   if (ELEM(icon_data_type, ICON_DATA_ID, ICON_DATA_PREVIEW)) {
     di->type = ICON_TYPE_PREVIEW;
   }
+  else if (icon_data_type == ICON_DATA_IMBUF) {
+    di->type = ICON_TYPE_IMBUF;
+  }
   else if (icon_data_type == ICON_DATA_GEOM) {
     di->type = ICON_TYPE_GEOM;
   }
@@ -1794,7 +1798,14 @@ static void icon_draw_size(float x,
   /* We need to flush widget base first to ensure correct ordering. */
   UI_widgetbase_draw_cache_flush();
 
-  if (di->type == ICON_TYPE_VECTOR) {
+  if (di->type == ICON_TYPE_IMBUF) {
+    ImBuf *ibuf = icon->obj;
+
+    GPU_blend(GPU_BLEND_ALPHA_PREMULT);
+    icon_draw_rect(x, y, w, h, aspect, ibuf->x, ibuf->y, ibuf->rect, alpha, desaturate);
+    GPU_blend(GPU_BLEND_ALPHA);
+  }
+  else if (di->type == ICON_TYPE_VECTOR) {
     /* vector icons use the uiBlock transformation, they are not drawn
      * with untransformed coordinates like the other icons */
     di->data.vector.func((int)x, (int)y, w, h, 1.0f);

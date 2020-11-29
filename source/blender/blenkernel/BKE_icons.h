@@ -23,17 +23,26 @@
  * \ingroup bke
  *
  * Resizable Icons for Blender
+ *
+ * There is some thread safety for this API but it is rather weak. Registering or unregistering
+ * icons is thread safe, changing data of icons from multiple threads is not. Practically this
+ * should be fine since only the main thread modifies icons. Should that change, more locks or a
+ * different design need to be introduced.
  */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#include "BLI_compiler_attrs.h"
+
 typedef void (*DrawInfoFreeFP)(void *drawinfo);
 
 enum {
   /** ID preview: obj is #ID. */
   ICON_DATA_ID = 0,
+  /** Arbitrary Image buffer: obj is #ImBuf */
+  ICON_DATA_IMBUF,
   /** Preview: obj is #PreviewImage */
   ICON_DATA_PREVIEW,
   /** 2D triangles: obj is #Icon_Geom */
@@ -44,6 +53,9 @@ enum {
   ICON_DATA_GPLAYER,
 };
 
+/**
+ * \note See comment at the top regarding thread safety.
+ */
 struct Icon {
   void *drawinfo;
   /**
@@ -92,6 +104,9 @@ int BKE_icon_id_ensure(struct ID *id);
 int BKE_icon_gplayer_color_ensure(struct bGPDlayer *gpl);
 
 int BKE_icon_preview_ensure(struct ID *id, struct PreviewImage *preview);
+
+int BKE_icon_imbuf_create(struct ImBuf *ibuf) ATTR_WARN_UNUSED_RESULT;
+struct ImBuf *BKE_icon_imbuf_get_buffer(int icon_id) ATTR_WARN_UNUSED_RESULT;
 
 /* retrieve icon for id */
 struct Icon *BKE_icon_get(const int icon_id);

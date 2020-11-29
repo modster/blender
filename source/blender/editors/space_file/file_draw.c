@@ -169,10 +169,11 @@ static void file_draw_icon(uiBlock *block,
       UI_but_drag_set_id(but, id);
     }
     else if (file->typeflag & FILE_TYPE_ASSET) {
+      ImBuf *preview_image = filelist_file_getimage(file);
       char *rootpath_cpy = BLI_strdup(rootpath);
       BLI_path_slash_rstrip(rootpath_cpy);
       UI_but_drag_set_asset(
-          but, file->name, rootpath_cpy, file->blentype, icon, file->image, UI_DPI_FAC);
+          but, file->name, rootpath_cpy, file->blentype, icon, preview_image, UI_DPI_FAC);
     }
     else {
       /* path is no more static, cannot give it directly to but... */

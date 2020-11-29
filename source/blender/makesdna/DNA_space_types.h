@@ -1085,7 +1085,8 @@ typedef struct FileDirEntry {
 
   /** When showing local IDs (FILE_MAIN, FILE_MAIN_ASSET), UUID of the ID this file represents. */
   uint id_uuid;
-  struct ImBuf *image;
+  /* The icon_id for the preview image. */
+  int preview_icon_id;
 
   /* Tags are for info only, most of filtering is done in asset engine. */
   char **tags;

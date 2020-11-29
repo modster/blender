@@ -2543,6 +2543,12 @@ static int rna_FileBrowser_FileSelectEntry_name_length(PointerRNA *ptr)
   return (int)strlen(entry->name);
 }
 
+static int rna_FileBrowser_FileSelectEntry_preview_icon_id_get(PointerRNA *ptr)
+{
+  const FileDirEntry *entry = ptr->data;
+  return entry->preview_icon_id;
+}
+
 static PointerRNA rna_FileBrowser_FileSelectEntry_asset_data_get(PointerRNA *ptr)
 {
   const FileDirEntry *entry = ptr->data;
@@ -5907,6 +5913,20 @@ static void rna_def_fileselect_entry(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Name", "");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_struct_name_property(srna, prop);
+
+  prop = RNA_def_int(
+      srna,
+      "preview_icon_id",
+      0,
+      INT_MIN,
+      INT_MAX,
+      "Icon ID",
+      "Unique integer identifying the preview of this file as an icon (zero means invalid)",
+      INT_MIN,
+      INT_MAX);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_int_funcs(
+      prop, "rna_FileBrowser_FileSelectEntry_preview_icon_id_get", NULL, NULL);
 
   prop = RNA_def_property(srna, "asset_data", PROP_POINTER, PROP_NONE);
   RNA_def_property_struct_type(prop, "AssetData");

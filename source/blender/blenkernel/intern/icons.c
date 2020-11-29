@@ -81,6 +81,9 @@ static int gNextIconId = 1;
 
 static int gFirstIconId = 1;
 
+SpinLock gIconMutex;
+
+/* Not mutex-protected! */
 static GHash *gCachedPreviews = NULL;
 
 /* Queue of icons for deferred deletion. */
@@ -88,6 +91,7 @@ typedef struct DeferredIconDeleteNode {
   struct DeferredIconDeleteNode *next;
   int icon_id;
 } DeferredIconDeleteNode;
+/* Also protected with gIconMutex. */
 static LockfreeLinkList g_icon_delete_queue;
 
 static void icon_free(void *val)
@@ -123,6 +127,12 @@ static void icon_free_data(int icon_id, Icon *icon)
   if (icon->obj_type == ICON_DATA_ID) {
     ((ID *)(icon->obj))->icon_id = 0;
   }
+  else if (icon->obj_type == ICON_DATA_IMBUF) {
+    ImBuf *imbuf = icon->obj;
+    if (imbuf) {
+      IMB_freeImBuf(imbuf);
+    }
+  }
   else if (icon->obj_type == ICON_DATA_PREVIEW) {
     ((PreviewImage *)(icon->obj))->icon_id = 0;
   }
@@ -143,27 +153,40 @@ static void icon_free_data(int icon_id, Icon *icon)
   }
 }
 
+static Icon *icon_ghash_lookup(int icon_id)
+{
+  Icon *icon;
+  BLI_spin_lock(&gIconMutex);
+  icon = BLI_ghash_lookup(gIcons, POINTER_FROM_INT(icon_id));
+  BLI_spin_unlock(&gIconMutex);
+  return icon;
+}
+
 /* create an id for a new icon and make sure that ids from deleted icons get reused
  * after the integer number range is used up */
 static int get_next_free_id(void)
 {
-  BLI_assert(BLI_thread_is_main());
+  BLI_spin_lock(&gIconMutex);
   int startId = gFirstIconId;
 
   /* if we haven't used up the int number range, we just return the next int */
   if (gNextIconId >= gFirstIconId) {
-    return gNextIconId++;
+    int next_id = gNextIconId++;
+    BLI_spin_unlock(&gIconMutex);
+    return next_id;
   }
 
   /* now we try to find the smallest icon id not stored in the gIcons hash */
-  while (BLI_ghash_lookup(gIcons, POINTER_FROM_INT(startId)) && startId >= gFirstIconId) {
+  while (icon_ghash_lookup(startId) && startId >= gFirstIconId) {
     startId++;
   }
 
   /* if we found a suitable one that isn't used yet, return it */
   if (startId >= gFirstIconId) {
+    BLI_spin_unlock(&gIconMutex);
     return startId;
   }
+  BLI_spin_unlock(&gIconMutex);
 
   /* fail */
   return 0;
@@ -178,6 +201,7 @@ void BKE_icons_init(int first_dyn_id)
 
   if (!gIcons) {
     gIcons = BLI_ghash_int_new(__func__);
+    BLI_spin_init(&gIconMutex);
     BLI_linklist_lockfree_init(&g_icon_delete_queue);
   }
 
@@ -191,6 +215,7 @@ void BKE_icons_free(void)
   BLI_assert(BLI_thread_is_main());
 
   if (gIcons) {
+    BLI_spin_end(&gIconMutex);
     BLI_ghash_free(gIcons, NULL, icon_free);
     gIcons = NULL;
   }
@@ -205,7 +230,7 @@ void BKE_icons_free(void)
 
 void BKE_icons_deferred_free(void)
 {
-  BLI_assert(BLI_thread_is_main());
+  BLI_spin_lock(&gIconMutex);
 
   for (DeferredIconDeleteNode *node =
            (DeferredIconDeleteNode *)BLI_linklist_lockfree_begin(&g_icon_delete_queue);
@@ -214,6 +239,8 @@ void BKE_icons_deferred_free(void)
     BLI_ghash_remove(gIcons, POINTER_FROM_INT(node->icon_id), NULL, icon_free);
   }
   BLI_linklist_lockfree_clear(&g_icon_delete_queue, MEM_freeN);
+
+  BLI_spin_unlock(&gIconMutex);
 }
 
 static PreviewImage *previewimg_create_ex(size_t deferred_data_size)
@@ -429,6 +456,7 @@ void BKE_previewimg_deferred_release(PreviewImage *prv)
 
 PreviewImage *BKE_previewimg_cached_get(const char *name)
 {
+  BLI_assert(BLI_thread_is_main());
   return BLI_ghash_lookup(gCachedPreviews, name);
 }
 
@@ -437,6 +465,8 @@ PreviewImage *BKE_previewimg_cached_get(const char *name)
  */
 PreviewImage *BKE_previewimg_cached_ensure(const char *name)
 {
+  BLI_assert(BLI_thread_is_main());
+
   PreviewImage *prv = NULL;
   void **key_p, **prv_p;
 
@@ -459,6 +489,8 @@ PreviewImage *BKE_previewimg_cached_thumbnail_read(const char *name,
                                                    const int source,
                                                    bool force_update)
 {
+  BLI_assert(BLI_thread_is_main());
+
   PreviewImage *prv = NULL;
   void **prv_p;
 
@@ -499,6 +531,8 @@ PreviewImage *BKE_previewimg_cached_thumbnail_read(const char *name,
 
 void BKE_previewimg_cached_release(const char *name)
 {
+  BLI_assert(BLI_thread_is_main());
+
   PreviewImage *prv = BLI_ghash_popkey(gCachedPreviews, name, MEM_freeN);
 
   BKE_previewimg_deferred_release(prv);
@@ -635,15 +669,14 @@ void BKE_previewimg_blend_read(BlendDataReader *reader, PreviewImage *prv)
 
 void BKE_icon_changed(const int icon_id)
 {
-  BLI_assert(BLI_thread_is_main());
-
   Icon *icon = NULL;
 
   if (!icon_id || G.background) {
     return;
   }
 
-  icon = BLI_ghash_lookup(gIcons, POINTER_FROM_INT(icon_id));
+  BLI_spin_lock(&gIconMutex);
+  icon = icon_ghash_lookup(icon_id);
 
   if (icon) {
     /* We *only* expect ID-tied icons here, not non-ID icon/preview! */
@@ -663,6 +696,8 @@ void BKE_icon_changed(const int icon_id)
       }
     }
   }
+
+  BLI_spin_unlock(&gIconMutex);
 }
 
 static Icon *icon_create(int icon_id, int obj_type, void *obj)
@@ -678,7 +713,9 @@ static Icon *icon_create(int icon_id, int obj_type, void *obj)
   new_icon->drawinfo = NULL;
   new_icon->drawinfo_free = NULL;
 
+  BLI_spin_lock(&gIconMutex);
   BLI_ghash_insert(gIcons, POINTER_FROM_INT(icon_id), new_icon);
+  BLI_spin_unlock(&gIconMutex);
 
   return new_icon;
 }
@@ -805,13 +842,43 @@ int BKE_icon_preview_ensure(ID *id, PreviewImage *preview)
   return preview->icon_id;
 }
 
+/**
+ * Create an icon as owner or \a ibuf. The icon-ID is not stored in \a ibuf, it needs to be stored
+ * separately.
+ * \note Transforms ownership of \a ibuf to the newly created icon.
+ */
+int BKE_icon_imbuf_create(ImBuf *ibuf)
+{
+  int icon_id = get_next_free_id();
+
+  Icon *icon = icon_create(icon_id, ICON_DATA_IMBUF, ibuf);
+  icon->flag = ICON_FLAG_MANAGED;
+
+  return icon_id;
+}
+
+ImBuf *BKE_icon_imbuf_get_buffer(int icon_id)
+{
+  Icon *icon = icon_ghash_lookup(icon_id);
+  if (!icon) {
+    CLOG_ERROR(&LOG, "no icon for icon ID: %d", icon_id);
+    return NULL;
+  }
+  if (icon->obj_type != ICON_DATA_IMBUF) {
+    CLOG_ERROR(&LOG, "icon ID does not refer to an imbuf icon: %d", icon_id);
+    return NULL;
+  }
+
+  return icon->obj;
+}
+
 Icon *BKE_icon_get(const int icon_id)
 {
   BLI_assert(BLI_thread_is_main());
 
   Icon *icon = NULL;
 
-  icon = BLI_ghash_lookup(gIcons, POINTER_FROM_INT(icon_id));
+  icon = icon_ghash_lookup(icon_id);
 
   if (!icon) {
     CLOG_ERROR(&LOG, "no icon for icon ID: %d", icon_id);
@@ -823,14 +890,15 @@ Icon *BKE_icon_get(const int icon_id)
 
 void BKE_icon_set(const int icon_id, struct Icon *icon)
 {
-  BLI_assert(BLI_thread_is_main());
-
   void **val_p;
 
+  BLI_spin_lock(&gIconMutex);
   if (BLI_ghash_ensure_p(gIcons, POINTER_FROM_INT(icon_id), &val_p)) {
     CLOG_ERROR(&LOG, "icon already set: %d", icon_id);
+    BLI_spin_unlock(&gIconMutex);
     return;
   }
+  BLI_spin_unlock(&gIconMutex);
 
   *val_p = icon;
 }
@@ -839,6 +907,7 @@ static void icon_add_to_deferred_delete_queue(int icon_id)
 {
   DeferredIconDeleteNode *node = MEM_mallocN(sizeof(DeferredIconDeleteNode), __func__);
   node->icon_id = icon_id;
+  /* Doesn't need lock. */
   BLI_linklist_lockfree_insert(&g_icon_delete_queue, (LockfreeLinkNode *)node);
 }
 
@@ -856,7 +925,9 @@ void BKE_icon_id_delete(struct ID *id)
   }
 
   BKE_icons_deferred_free();
+  BLI_spin_lock(&gIconMutex);
   BLI_ghash_remove(gIcons, POINTER_FROM_INT(icon_id), NULL, icon_free);
+  BLI_spin_unlock(&gIconMutex);
 }
 
 /**
@@ -869,7 +940,9 @@ bool BKE_icon_delete(const int icon_id)
     return false;
   }
 
+  BLI_spin_lock(&gIconMutex);
   Icon *icon = BLI_ghash_popkey(gIcons, POINTER_FROM_INT(icon_id), NULL);
+  BLI_spin_unlock(&gIconMutex);
   if (icon) {
     icon_free_data(icon_id, icon);
     icon_free(icon);
@@ -886,17 +959,22 @@ bool BKE_icon_delete_unmanaged(const int icon_id)
     return false;
   }
 
+  BLI_spin_lock(&gIconMutex);
+
   Icon *icon = BLI_ghash_popkey(gIcons, POINTER_FROM_INT(icon_id), NULL);
   if (icon) {
     if (UNLIKELY(icon->flag & ICON_FLAG_MANAGED)) {
       BLI_ghash_insert(gIcons, POINTER_FROM_INT(icon_id), icon);
+      BLI_spin_unlock(&gIconMutex);
       return false;
     }
 
     icon_free_data(icon_id, icon);
     icon_free(icon);
+    BLI_spin_unlock(&gIconMutex);
     return true;
   }
+  BLI_spin_unlock(&gIconMutex);
 
   return false;
 }
