@@ -34,6 +34,8 @@
 
 #include "BLI_ghash.h"
 #include "BLI_listbase.h"
+#include "BLI_math_rotation.h"
+#include "BLI_math_vector.h"
 #include "BLI_string.h"
 #include "BLI_string_utils.h"
 #include "BLI_utildefines.h"
@@ -211,10 +213,32 @@ NlaStrip *BKE_nlastrip_copy(Main *bmain,
     BLI_addtail(&strip_d->strips, cs_d);
   }
 
+  BLI_listbase_clear(&strip_d->blend_transforms);
+  LISTBASE_FOREACH (NlaBlendTransform *, blend_xform, &strip->blend_transforms) {
+    NlaBlendTransform *blend_xform = BKE_nlastrip_blend_transform_copy(&strip_d);
+    BLI_addtail(&strip_d.blend_transforms, blend_xform);
+  }
+
   /* return the strip */
   return strip_d;
 }
 
+struct NlaBlendTransform *BKE_nlastrip_blend_transform_copy(NlaBlendTransform *blend_xform)
+{
+  NlaBlendTransform *duplicate_blend_xform = BKE_nlastrip_new_blend_transform();
+  copy_v3_v3(duplicate_blend_xform->location, blend_xform->location);
+  copy_v3_v3(duplicate_blend_xform->euler, blend_xform->euler);
+  copy_v3_v3(duplicate_blend_xform->scale, blend_xform->scale);
+
+  LISTBASE_FOREACH (NlaBlendTransform_BoneTarget *, bone_target, &blend_xform->bones) {
+    NlaBlendTransform_BoneTarget *duplicate_target = BKE_blend_transform_new_bone();
+    BLI_addtail(&duplicate_blend_xform->bones, duplicate_target);
+
+    strcpy(duplicate_target->name, bone_target->name);
+  }
+
+  return duplicate_blend_xform;
+}
 /**
  * Copy a single NLA Track.
  * \param flag: Control ID pointers management, see LIB_ID_CREATE_.../LIB_ID_COPY_...
@@ -398,7 +422,7 @@ NlaStrip *BKE_nlastack_add_strip(AnimData *adt, bAction *act, const bool is_libo
   return strip;
 }
 
-NlaBlendTransform *BKE_nlastrip_new_blend_transform(NlaStrip *strip)
+NlaBlendTransform *BKE_nlastrip_new_blend_transform()
 {
   NlaBlendTransform *blend = MEM_callocN(sizeof(NlaBlendTransform), __func__);
   blend->location[0] = 0;
@@ -411,9 +435,11 @@ NlaBlendTransform *BKE_nlastrip_new_blend_transform(NlaStrip *strip)
   blend->scale[1] = 1;
   blend->scale[2] = 1;
 
-  BLI_addtail(&strip->blend_transforms, blend);
-
   return blend;
+}
+
+NlaBlendTransform *BKE_nlastrip_copy_blend_transform(NlaStrip *strip)
+{
 }
 void BKE_nlastrip_free_blend_transform(NlaStrip *strip, NlaBlendTransform *blend)
 {
@@ -429,14 +455,12 @@ void BKE_nlastrip_free_blend_transform_at(NlaStrip *strip, int blend_index)
   }
 }
 
-NlaBlendTransform_BoneTarget *BKE_blend_transform_new_bone(NlaBlendTransform *blend)
+NlaBlendTransform_BoneTarget *BKE_blend_transform_new_bone()
 {
-  NlaBlendTransform_BoneTarget *bone_name = MEM_callocN(sizeof(NlaBlendTransform_BoneTarget),
-                                                        __func__);
+  NlaBlendTransform_BoneTarget *bone_target = MEM_callocN(sizeof(NlaBlendTransform_BoneTarget),
+                                                          __func__);
 
-  BLI_addtail(&blend->bones, bone_name);
-
-  return bone_name;
+  return bone_target;
 }
 void BKE_blend_transform_free_bone(NlaBlendTransform *blend,
                                    NlaBlendTransform_BoneTarget *bone_name)

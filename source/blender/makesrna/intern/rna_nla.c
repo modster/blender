@@ -644,7 +644,10 @@ static void rna_nlastrip_blendXform_bone_name_set(PointerRNA *ptr, const char *v
 
 static NlaBlendTransform *rna_NlaStrip_blend_new(NlaStrip *strip, ReportList *reports)
 {
-  return BKE_nlastrip_new_blend_transform(strip);
+  NlaBlendTransform *blend_xform = BKE_nlastrip_new_blend_transform();
+  BLI_addtail(&strip->blend_transforms, blend_xform);
+
+  return blend_xform;
 }
 
 static void rna_NlaStrip_blend_remove(NlaStrip *strip, ReportList *reports, PointerRNA *blend)
@@ -659,7 +662,9 @@ static void rna_NlaStrip_blend_remove_at(NlaStrip *strip, ReportList *reports, i
 static NlaBlendTransform_BoneTarget *rna_blend_bone_name_new(NlaBlendTransform *blend,
                                                              ReportList *reports)
 {
-  return BKE_blend_transform_new_bone(blend);
+  NlaBlendTransform_BoneTarget *bone_target = BKE_blend_transform_new_bone(blend);
+  BLI_addtail(&blend->bones, bone_target);
+  return bone_target;
 }
 
 static void rna_blend_bone_name_remove(NlaBlendTransform *blend,
