@@ -2956,12 +2956,18 @@ static void nlastrip_evaluate_meta_raw_value(PointerRNA *ptr,
 /*
  * lower is also output
  */
-static void nlaeval_snapshot_blend(NlaEvalData *nlaeval,
+static void nlaeval_snapshot_blend(PointerRNA *ptr,
+                                   NlaEvalData *nlaeval,
                                    NlaEvalSnapshot *raw_upper,
                                    short upper_blendmode,
                                    float upper_influence,
                                    NlaEvalSnapshot *lower)
 {
+  /**
+   * todo: keyframe remapping support for blend
+   * todo: move python UI for belnd xforms to C (nla_buttons.c)
+   *    -since python side is broken for some reason?
+   */
   nlaeval_snapshot_ensure_size(lower, nlaeval->num_channels);
 
   for (int i = 0; i < nlaeval->num_channels; i++) {
@@ -3033,6 +3039,13 @@ static void nlaeval_snapshot_blend(NlaEvalData *nlaeval,
             continue;
           }
         }
+
+        NlaEvalChannel *scale_channel = nlaevalchan_verify(
+            ptr, nlaeval, "pose.bones[\"Hips\"].scale");
+        if (nec == scale_channel) {
+          nec->is_array = scale_channel->is_array;
+        }
+
         for (int j = 0; j < c_lower->length; j++) {
           c_lower->values[j] = nla_blend_value(
               upper_blendmode, c_lower->values[j], c_upper->values[j], upper_influence);
@@ -3157,10 +3170,45 @@ void nlastrip_evaluate(PointerRNA *ptr,
       float decomposed_quat[4];
       switch (pose_channel->rotmode) {
         case ROT_MODE_QUAT:
+          // todo:... large error for some reason here? Maybe its a separate IK issue?
+          // (seems fine with FK blends, but when I use the same animation with IK i get scealing
+          // issues.)
+          //...but I doi think there may be a memory leak caused by this patch?
+
+          //..l.but when I use a non-NLA anim eval (full replace Action track) then everything
+          // works fine...
+          //..whats going on??? (nvm other strips ahd scale channels)
+          //    --but seems to occur when strip with preblend xform doens't have the scale
+          //    channels? After adding scale channels then it works fine? What if
+          //    nlaeevalchan_verify() keeps the path str key and assumes it survived (this isn't it
+          //    since not freeing memory doesnt solve it)
+          //        -can't be verify() func since problem still exists if other strips have scale
+          //        channels, thus it already exists. maybe its  a depsgraph issue? There is no
+          //        deps created for the blended scale channels despite it making changes-seems
+          //        unliekly?-still, blend xforms should still work if strip itself doesn't have
+          //        the channels. Notably, even if blend xform has scvale=2, then hips won't show
+          //        up in properties as having 2.0 scale, which is weird..,and why is this not a
+          //        problem for FK? (maybe the bake creates scale channels?)
+          //
+          //  scale with be non-one afterward even if scale is one every  where else...
+          // maybe it would be better to manually do scaling since its only affected by blend
+          // xform's scale? but would error lead to issues with rotation and location?
           loc_quat_size_to_mat4(
               raw_snapshot_matrix, location_values, rotation_values, scale_values);
           mul_m4_m4m4(raw_snapshot_matrix, bone_blend_matrix, raw_snapshot_matrix);
-          mat4_decompose(location_values, rotation_values, scale_values, raw_snapshot_matrix);
+
+          copy_v3_v3(location_values, raw_snapshot_matrix[3]);
+          mat4_to_quat(rotation_values, raw_snapshot_matrix);
+          //***********
+          //***IF SCALE NOT PART OF NLA DOMAIN, then it leads to serious scale errors?
+          // And the solution is literally to add scale channels in the dopesheet, then its 100%
+          // fine?
+          //...but why is this even a problem??!?!?
+          //...wait...if scale is not part of domain.. then why did it ever work in the viewport?
+          //  at what point was it being written back to the bone????
+          mat4_to_size(scale_values, raw_snapshot_matrix);  //...why is this 1.0 as expected.. but
+                                                            // blender shows .8 for scale??(hips)
+          // mat4_decompose(location_values, rotation_values, scale_values, raw_snapshot_matrix);
 
           break;
         case ROT_MODE_AXISANGLE:
@@ -3189,7 +3237,7 @@ void nlastrip_evaluate(PointerRNA *ptr,
   }
 
   /** Blend raw snapshot with lower snapshot. */
-  nlaeval_snapshot_blend(channels, &snapshot_raw, blendmode, influence, snapshot);
+  nlaeval_snapshot_blend(ptr, channels, &snapshot_raw, blendmode, influence, snapshot);
   nlaeval_snapshot_free_data(&snapshot_raw);
 }
 
@@ -3367,6 +3415,12 @@ static void nla_eval_domain_action(PointerRNA *ptr,
     }
 
     NlaEvalChannel *nec = nlaevalchan_verify(ptr, channels, fcu->rna_path);
+
+    NlaEvalChannel *scale_channel = nlaevalchan_verify(
+        ptr, channels, "pose.bones[\"Hips\"].scale");
+    if (nec == scale_channel) {
+      nec->is_array = scale_channel->is_array;
+    }
 
     if (nec != NULL) {
       /* For quaternion properties, enable all sub-channels. */

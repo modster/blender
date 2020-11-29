@@ -215,8 +215,8 @@ NlaStrip *BKE_nlastrip_copy(Main *bmain,
 
   BLI_listbase_clear(&strip_d->blend_transforms);
   LISTBASE_FOREACH (NlaBlendTransform *, blend_xform, &strip->blend_transforms) {
-    NlaBlendTransform *blend_xform = BKE_nlastrip_blend_transform_copy(&strip_d);
-    BLI_addtail(&strip_d.blend_transforms, blend_xform);
+    NlaBlendTransform *duplicate_blend_xform = BKE_nlastrip_blend_transform_copy(blend_xform);
+    BLI_addtail(&strip_d->blend_transforms, duplicate_blend_xform);
   }
 
   /* return the strip */

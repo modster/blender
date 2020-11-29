@@ -100,7 +100,7 @@ class OBJECT_OT_nla_blend_remove_bone(bpy.types.Operator):
     def execute(self, context):
         active_strip = get_active_strip(context)
         blend = active_strip.blend_transforms[self.blend_index]
-        blend.bones.remove_at(self.bone_index)
+        blend.bones.remove_at(bone_index=self.bone_index)
 
         return {'FINISHED'}
 
@@ -108,7 +108,7 @@ class OBJECT_PT_nla_alignment(Panel):
     bl_space_type = 'NLA_EDITOR'
     bl_region_type = 'UI'
     bl_label = "Alignment"
-    bl_category = "Alignment"
+    bl_category = "Strip"
     bl_context = "object"
     
 
@@ -121,6 +121,8 @@ class OBJECT_PT_nla_alignment(Panel):
         active_strip = get_active_strip(context)
 
 
+        layout.prop(active_strip,"name")
+        layout.prop(active_strip,"action")
         layout.prop(active_strip,"blend_transforms")
         
         # layout.prop(active_strip,"frame_start")
@@ -149,8 +151,8 @@ class OBJECT_PT_nla_alignment(Panel):
             for j,bone in enumerate(blend.bones):
                 row = col.row(align=True)
                 # print([b for b in context.active_object.data.bones])
-                # row.prop_search(bone,"name",context.active_object.data,"bones",text='')
-                row.prop(bone,"name")
+                row.prop_search(bone,"name",context.active_object.data,"bones",text='')
+                #row.prop(bone,"name")
                 op = row.operator(OBJECT_OT_nla_blend_remove_bone.bl_idname,text='',icon='REMOVE')
                 op.blend_index = i 
                 op.bone_index = j 

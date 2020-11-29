@@ -662,7 +662,7 @@ static void rna_NlaStrip_blend_remove_at(NlaStrip *strip, ReportList *reports, i
 static NlaBlendTransform_BoneTarget *rna_blend_bone_name_new(NlaBlendTransform *blend,
                                                              ReportList *reports)
 {
-  NlaBlendTransform_BoneTarget *bone_target = BKE_blend_transform_new_bone(blend);
+  NlaBlendTransform_BoneTarget *bone_target = BKE_blend_transform_new_bone();
   BLI_addtail(&blend->bones, bone_target);
   return bone_target;
 }
@@ -1154,7 +1154,7 @@ static void rna_def_blend_bones(BlenderRNA *brna, PropertyRNA *cprop)
   RNA_def_function_ui_description(func, "Remove an existing bone from the armature");
 
   /* target to remove*/
-  parm = RNA_def_int(func, "blend_index", 0, 0, INT_MAX, "blend_index", "", 0, INT_MAX);
+  parm = RNA_def_int(func, "bone_index", 0, 0, INT_MAX, "bone_index", "", 0, INT_MAX);
 }
 
 static void rna_def_nlastrip_blendXform(BlenderRNA *brna)
