@@ -17,6 +17,9 @@
 # ##### END GPL LICENSE BLOCK #####
 
 # <pep8 compliant>
+
+import bpy
+
 from bpy.types import Header, Panel, Menu, UIList
 
 from bpy_extras import (
@@ -580,8 +583,11 @@ class ASSETBROWSER_PT_metadata(asset_utils.AssetBrowserPanel, Panel):
             layout.label(text="No asset selected.")
             return
 
+        box = layout.box()
+        box.template_icon(icon_value=active_file.preview_icon_id, scale=5.0)
+        if bpy.ops.ed.lib_id_load_custom_preview.poll():
+            box.operator("ed.lib_id_load_custom_preview", icon='FILEBROWSER', text="Load Custom")
         layout.prop(active_file, "name")
-        layout.operator("ed.lib_id_load_custom_preview", icon='FILEBROWSER')
 
 
 class ASSETBROWSER_PT_metadata_details(asset_utils.AssetBrowserPanel, Panel):
