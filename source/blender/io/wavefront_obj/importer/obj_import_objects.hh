@@ -69,7 +69,7 @@ struct VertexIndexOffset {
 /**
  * A face's corner in an OBJ file. In Blender, it translates to a mloop vertex.
  */
-struct FaceCorner {
+struct PolyCorner {
   /* These indices range from zero to total vertices in the OBJ file. */
   int vert_index;
   /* -1 is to indicate absence of UV vertices. Only < 0 condition should be checked since
@@ -78,11 +78,11 @@ struct FaceCorner {
   int vertex_normal_index;
 };
 
-struct FaceElement {
+struct PolyElem {
   std::string vertex_group;
   std::string material_name;
   bool shaded_smooth = false;
-  Vector<FaceCorner> face_corners;
+  Vector<PolyCorner> face_corners;
   /* Not read from the OBJ file. Set to true for potentially invalid polygons. */
   bool invalid = false;
 };
@@ -123,7 +123,7 @@ class Geometry {
   Vector<int> vertex_normal_indices_;
   /** Edges written in the file in addition to (or even without polygon) elements. */
   Vector<MEdge> edges_;
-  Vector<FaceElement> face_elements_;
+  Vector<PolyElem> face_elements_;
   bool use_vertex_groups_ = false;
   NurbsElement nurbs_element_;
   int total_loops_ = 0;
@@ -139,8 +139,8 @@ class Geometry {
 
   int64_t vertex_index(const int64_t index) const;
   int64_t total_verts() const;
-  Span<FaceElement> face_elements() const;
-  const FaceElement &ith_face_element(const int64_t index) const;
+  Span<PolyElem> face_elements() const;
+  const PolyElem &ith_face_element(const int64_t index) const;
   int64_t total_face_elems() const;
   bool use_vertex_groups() const;
   Span<MEdge> edges() const;

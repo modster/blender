@@ -113,10 +113,10 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
 
   string line;
   /* Store vertex coordinates that belong to other Geometry instances.  */
-  VertexIndexOffset offset;
+  VertexIndexOffset offsets;
   /* Non owning raw pointer to a Geometry. To be updated while creating a new Geometry. */
   Geometry *current_geometry = create_geometry(
-      nullptr, GEOM_MESH, "", r_global_vertices, r_all_geometries, offset);
+      nullptr, GEOM_MESH, "", r_global_vertices, r_all_geometries, offsets);
 
   /* State-setting variables: if set, they remain the same for the remaining
    * elements in the object. */
@@ -143,7 +143,7 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
       state_object_group = "";
       state_material_name = "";
       current_geometry = create_geometry(
-          current_geometry, GEOM_MESH, rest_line, r_global_vertices, r_all_geometries, offset);
+          current_geometry, GEOM_MESH, rest_line, r_global_vertices, r_all_geometries, offsets);
     }
     else if (line_key == "v") {
       BLI_assert(current_geometry);
@@ -177,14 +177,15 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
       copy_string_to_int(str_edge_split[0], -1, edge_v1);
       copy_string_to_int(str_edge_split[1], -1, edge_v2);
       /* Always keep stored indices non-negative and zero-based. */
-      edge_v1 += edge_v1 < 0 ? r_global_vertices.vertices.size() : -offset.get_index_offset() - 1;
-      edge_v2 += edge_v2 < 0 ? r_global_vertices.vertices.size() : -offset.get_index_offset() - 1;
+      edge_v1 += edge_v1 < 0 ? r_global_vertices.vertices.size() : -offsets.get_index_offset() - 1;
+      edge_v2 += edge_v2 < 0 ? r_global_vertices.vertices.size() : -offsets.get_index_offset() - 1;
       BLI_assert(edge_v1 >= 0 && edge_v2 >= 0);
       current_geometry->edges_.append({static_cast<uint>(edge_v1), static_cast<uint>(edge_v2)});
     }
     else if (line_key == "g") {
       state_object_group = rest_line;
-      if (state_object_group.find("off") != string::npos || state_object_group.find("null") != string::npos ||
+      if (state_object_group.find("off") != string::npos ||
+          state_object_group.find("null") != string::npos ||
           state_object_group.find("default") != string::npos) {
         /* Set group for future elements like faces or curves to empty. */
         state_object_group = "";
@@ -205,7 +206,7 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
     }
     else if (line_key == "f") {
       BLI_assert(current_geometry);
-      FaceElement curr_face;
+      PolyElem curr_face;
       curr_face.shaded_smooth = state_shaded_smooth;
       if (!state_material_name.empty()) {
         curr_face.material_name = state_material_name;
@@ -219,14 +220,14 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
       Vector<StringRef> str_corners_split;
       split_by_char(rest_line, ' ', str_corners_split);
       for (StringRef str_corner : str_corners_split) {
-        FaceCorner corner;
-        size_t n_slash = std::count(str_corner.begin(), str_corner.end(), '/');
+        PolyCorner corner;
+        const size_t n_slash = std::count(str_corner.begin(), str_corner.end(), '/');
         if (n_slash == 0) {
-          /* Case: f v1 v2 v3 . */
+          /* Case: "f v1 v2 v3". */
           copy_string_to_int(str_corner, INT32_MAX, corner.vert_index);
         }
         else if (n_slash == 1) {
-          /* Case: f v1/vt1 v2/vt2 v3/vt3 . */
+          /* Case: "f v1/vt1 v2/vt2 v3/vt3". */
           Vector<StringRef> vert_uv_split;
           split_by_char(str_corner, '/', vert_uv_split);
           copy_string_to_int(vert_uv_split[0], INT32_MAX, corner.vert_index);
@@ -235,8 +236,8 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
           }
         }
         else if (n_slash == 2) {
-          /* Case: f v1//vn1 v2//vn2 v3//vn3 . */
-          /* Case: f v1/vt1/vn1 v2/vt2/vn2 v3/vt3/vn3 . */
+          /* Case: "f v1//vn1 v2//vn2 v3//vn3". */
+          /* Case: "f v1/vt1/vn1 v2/vt2/vn2 v3/vt3/vn3". */
           Vector<StringRef> vert_uv_normal_split;
           split_by_char(str_corner, '/', vert_uv_normal_split);
           copy_string_to_int(vert_uv_normal_split[0], INT32_MAX, corner.vert_index);
@@ -247,7 +248,7 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
         }
         /* Always keep stored indices non-negative and zero-based. */
         corner.vert_index += corner.vert_index < 0 ? r_global_vertices.vertices.size() :
-                                                     -offset.get_index_offset() - 1;
+                                                     -offsets.get_index_offset() - 1;
         corner.uv_vert_index += corner.uv_vert_index < 0 ? r_global_vertices.uv_vertices.size() :
                                                            -1;
         corner.vertex_normal_index += corner.vertex_normal_index < 0 ?
@@ -266,7 +267,7 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
                                            state_object_group,
                                            r_global_vertices,
                                            r_all_geometries,
-                                           offset);
+                                           offsets);
         current_geometry->nurbs_element_.group_ = state_object_group;
       }
       else {

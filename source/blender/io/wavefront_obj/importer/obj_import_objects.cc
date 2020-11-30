@@ -72,12 +72,12 @@ int64_t Geometry::total_verts() const
   return vertex_indices_.size();
 }
 
-Span<FaceElement> Geometry::face_elements() const
+Span<PolyElem> Geometry::face_elements() const
 {
   return face_elements_;
 }
 
-const FaceElement &Geometry::ith_face_element(const int64_t index) const
+const PolyElem &Geometry::ith_face_element(const int64_t index) const
 {
   return face_elements_[index];
 }

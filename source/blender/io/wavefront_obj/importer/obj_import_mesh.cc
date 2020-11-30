@@ -68,7 +68,7 @@ void MeshFromGeometry::create_mesh(Main *bmain,
   if (ob_name.empty()) {
     ob_name = "Untitled";
   }
-  Vector<FaceElement> new_faces;
+  Vector<PolyElem> new_faces;
   Set<std::pair<int, int>> fgon_edges;
   const auto [removed_faces, removed_loops]{tessellate_polygons(new_faces, fgon_edges)};
 
@@ -115,11 +115,11 @@ void MeshFromGeometry::create_mesh(Main *bmain,
  * Tessellate potentially invalid polygons and fill the
  */
 std::pair<int64_t, int64_t> MeshFromGeometry::tessellate_polygons(
-    Vector<FaceElement> &r_new_faces, Set<std::pair<int, int>> &fgon_edges)
+    Vector<PolyElem> &r_new_faces, Set<std::pair<int, int>> &fgon_edges)
 {
   int64_t removed_faces = 0;
   int64_t removed_loops = 0;
-  for (const FaceElement &curr_face : mesh_geometry_.face_elements()) {
+  for (const PolyElem &curr_face : mesh_geometry_.face_elements()) {
     if (curr_face.shaded_smooth || true) {  // should be valid/invalid
       return {removed_faces, removed_loops};
     }
@@ -129,7 +129,7 @@ std::pair<int64_t, int64_t> MeshFromGeometry::tessellate_polygons(
     face_vert_indices.reserve(curr_face.face_corners.size());
     face_uv_indices.reserve(curr_face.face_corners.size());
     face_normal_indices.reserve(curr_face.face_corners.size());
-    for (const FaceCorner &corner : curr_face.face_corners) {
+    for (const PolyCorner &corner : curr_face.face_corners) {
       face_vert_indices.append(corner.vert_index);
       face_normal_indices.append(corner.vertex_normal_index);
       face_uv_indices.append(corner.uv_vert_index);
@@ -238,7 +238,7 @@ void MeshFromGeometry::create_vertices()
  * It must receive all polygons to be added to the mesh. Remove holes from polygons before
  * calling this.
  */
-void MeshFromGeometry::create_polys_loops(Span<FaceElement> all_faces)
+void MeshFromGeometry::create_polys_loops(Span<PolyElem> all_faces)
 {
   /* Will not be used if vertex groups are not imported. */
   blender_mesh_->dvert = nullptr;
@@ -259,7 +259,7 @@ void MeshFromGeometry::create_polys_loops(Span<FaceElement> all_faces)
   int tot_loop_idx = 0;
 
   for (int poly_idx = 0; poly_idx < tot_face_elems; ++poly_idx) {
-    const FaceElement &curr_face = all_faces[poly_idx];
+    const PolyElem &curr_face = all_faces[poly_idx];
     if (curr_face.face_corners.size() < 3) {
       /* Don't add single vertex face, or edges. */
       std::cerr << "Face with less than 3 vertices found, skipping." << std::endl;
@@ -274,7 +274,7 @@ void MeshFromGeometry::create_polys_loops(Span<FaceElement> all_faces)
     }
     mpoly.mat_nr = mesh_geometry_.material_names().index_of_try(curr_face.material_name);
 
-    for (const FaceCorner &curr_corner : curr_face.face_corners) {
+    for (const PolyCorner &curr_corner : curr_face.face_corners) {
       MLoop &mloop = blender_mesh_->mloop[tot_loop_idx];
       tot_loop_idx++;
       mloop.v = curr_corner.vert_index;
@@ -351,8 +351,8 @@ void MeshFromGeometry::create_uv_verts()
       &blender_mesh_->ldata, CD_MLOOPUV, CD_DEFAULT, nullptr, mesh_geometry_.total_loops()));
   int tot_loop_idx = 0;
 
-  for (const FaceElement &curr_face : mesh_geometry_.face_elements()) {
-    for (const FaceCorner &curr_corner : curr_face.face_corners) {
+  for (const PolyElem &curr_face : mesh_geometry_.face_elements()) {
+    for (const PolyCorner &curr_corner : curr_face.face_corners) {
       if (curr_corner.uv_vert_index >= 0 &&
           curr_corner.uv_vert_index < global_vertices_.uv_vertices.size()) {
         const float2 &mluv_src = global_vertices_.uv_vertices[curr_corner.uv_vert_index];
@@ -393,7 +393,7 @@ void MeshFromGeometry::create_materials(
  */
 void MeshFromGeometry::add_custom_normals()
 {
-  const int64_t tot_loop_normals{mesh_geometry_.tot_normals()};
+  const int64_t tot_loop_normals{mesh_geometry_.total_normals()};
   float(*loop_normals)[3] = static_cast<float(*)[3]>(
       MEM_malloc_arrayN(tot_loop_normals, sizeof(float[3]), __func__));
 
