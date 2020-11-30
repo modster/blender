@@ -205,7 +205,7 @@ static Transform make_transform(const Abc::M44d &a)
   return trans;
 }
 
-static void read_default_uvs(const IV2fGeomParam &uvs, AlembicObject::CachedData &cached_data)
+static void read_default_uvs(const IV2fGeomParam &uvs, CachedData &cached_data)
 {
   auto &attr = cached_data.add_attribute(ustring(uvs.getName()));
 
@@ -264,7 +264,7 @@ static void read_default_uvs(const IV2fGeomParam &uvs, AlembicObject::CachedData
 }
 
 static void read_default_normals(const IN3fGeomParam &normals,
-                                 AlembicObject::CachedData &cached_data)
+                                 CachedData &cached_data)
 {
   auto &attr = cached_data.add_attribute(ustring(normals.getName()));
 
