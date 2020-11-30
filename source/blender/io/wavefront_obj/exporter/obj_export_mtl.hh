@@ -40,12 +40,12 @@ struct tex_map_XX {
   tex_map_XX(StringRef to_socket_id) : dest_socket_id(to_socket_id){};
 
   /** Target socket which this texture node connects to. */
-  const std::string dest_socket_id{};
+  const std::string dest_socket_id;
   float3 translation{0.0f};
   float3 scale{1.0f};
   /* Only Flat and Smooth projections are supported. */
   int projection_type = SHD_PROJ_FLAT;
-  std::string image_path{};
+  std::string image_path;
   std::string mtl_dir_path;
 };
 
@@ -76,7 +76,7 @@ struct MTLMaterial {
     }
   }
 
-  std::string name{};
+  std::string name;
   /* Always check for negative values while importing or exporting. Use defaults if
    * any value is negative. */
   float Ns{-1.0f};
