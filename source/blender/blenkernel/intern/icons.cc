@@ -1,4 +1,4 @@
-/*
+﻿/*
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -21,9 +21,9 @@
  * \ingroup bke
  */
 
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
 
 #include "CLG_log.h"
 
@@ -46,6 +46,7 @@
 #include "BLI_string.h"
 #include "BLI_threads.h"
 #include "BLI_utildefines.h"
+#include "BLI_vector.hh"
 
 #include "BKE_global.h" /* only for G.background test */
 #include "BKE_icons.h"
@@ -96,11 +97,11 @@ static LockfreeLinkList g_icon_delete_queue;
 
 static void icon_free(void *val)
 {
-  Icon *icon = val;
+  Icon *icon = (Icon *)val;
 
   if (icon) {
     if (icon->obj_type == ICON_DATA_GEOM) {
-      struct Icon_Geom *obj = icon->obj;
+      struct Icon_Geom *obj = (struct Icon_Geom *)icon->obj;
       if (obj->mem) {
         /* coords & colors are part of this memory. */
         MEM_freeN((void *)obj->mem);
@@ -128,7 +129,7 @@ static void icon_free_data(int icon_id, Icon *icon)
     ((ID *)(icon->obj))->icon_id = 0;
   }
   else if (icon->obj_type == ICON_DATA_IMBUF) {
-    ImBuf *imbuf = icon->obj;
+    ImBuf *imbuf = (ImBuf *)icon->obj;
     if (imbuf) {
       IMB_freeImBuf(imbuf);
     }
@@ -143,7 +144,7 @@ static void icon_free_data(int icon_id, Icon *icon)
     ((struct Icon_Geom *)(icon->obj))->icon_id = 0;
   }
   else if (icon->obj_type == ICON_DATA_STUDIOLIGHT) {
-    StudioLight *sl = icon->obj;
+    StudioLight *sl = (StudioLight *)icon->obj;
     if (sl != NULL) {
       BKE_studiolight_unset_icon_id(sl, icon_id);
     }
@@ -157,7 +158,7 @@ static Icon *icon_ghash_lookup(int icon_id)
 {
   Icon *icon;
   BLI_spin_lock(&gIconMutex);
-  icon = BLI_ghash_lookup(gIcons, POINTER_FROM_INT(icon_id));
+  icon = (Icon *)BLI_ghash_lookup(gIcons, POINTER_FROM_INT(icon_id));
   BLI_spin_unlock(&gIconMutex);
   return icon;
 }
@@ -246,7 +247,8 @@ void BKE_icons_deferred_free(void)
 
 static PreviewImage *previewimg_create_ex(size_t deferred_data_size)
 {
-  PreviewImage *prv_img = MEM_mallocN(sizeof(PreviewImage) + deferred_data_size, "img_prv");
+  PreviewImage *prv_img = (PreviewImage *)MEM_mallocN(sizeof(PreviewImage) + deferred_data_size,
+                                                      "img_prv");
   memset(prv_img, 0, sizeof(*prv_img)); /* leave deferred data dirty */
 
   if (deferred_data_size) {
@@ -267,7 +269,7 @@ static PreviewImage *previewimg_defered_create(const char *path, int source)
   char *deferred_data;
 
   PreviewImage *prv = previewimg_create_ex(deferred_data_size);
-  deferred_data = PRV_DEFERRED_DATA(prv);
+  deferred_data = (char *)PRV_DEFERRED_DATA(prv);
   deferred_data[0] = source;
   memcpy(&deferred_data[1], path, deferred_data_size - 1);
 
@@ -319,7 +321,7 @@ void BKE_previewimg_clear_single(struct PreviewImage *prv, enum eIconSizes size)
 void BKE_previewimg_clear(struct PreviewImage *prv)
 {
   for (int i = 0; i < NUM_ICON_SIZES; i++) {
-    BKE_previewimg_clear_single(prv, i);
+    BKE_previewimg_clear_single(prv, (eIconSizes)i);
   }
 }
 
@@ -328,10 +330,10 @@ PreviewImage *BKE_previewimg_copy(const PreviewImage *prv)
   PreviewImage *prv_img = NULL;
 
   if (prv) {
-    prv_img = MEM_dupallocN(prv);
+    prv_img = (PreviewImage *)MEM_dupallocN(prv);
     for (int i = 0; i < NUM_ICON_SIZES; i++) {
       if (prv->rect[i]) {
-        prv_img->rect[i] = MEM_dupallocN(prv->rect[i]);
+        prv_img->rect[i] = (uint *)MEM_dupallocN(prv->rect[i]);
       }
       prv_img->gputexture[i] = NULL;
     }
@@ -458,7 +460,7 @@ void BKE_previewimg_deferred_release(PreviewImage *prv)
 PreviewImage *BKE_previewimg_cached_get(const char *name)
 {
   BLI_assert(BLI_thread_is_main());
-  return BLI_ghash_lookup(gCachedPreviews, name);
+  return (PreviewImage *)BLI_ghash_lookup(gCachedPreviews, name);
 }
 
 /**
@@ -475,7 +477,7 @@ PreviewImage *BKE_previewimg_cached_ensure(const char *name)
     *key_p = BLI_strdup(name);
     *prv_p = BKE_previewimg_create();
   }
-  prv = *prv_p;
+  prv = *(PreviewImage **)prv_p;
   BLI_assert(prv);
 
   return prv;
@@ -498,12 +500,12 @@ PreviewImage *BKE_previewimg_cached_thumbnail_read(const char *name,
   prv_p = BLI_ghash_lookup_p(gCachedPreviews, name);
 
   if (prv_p) {
-    prv = *prv_p;
+    prv = *(PreviewImage **)prv_p;
     BLI_assert(prv);
   }
 
   if (prv && force_update) {
-    const char *prv_deferred_data = PRV_DEFERRED_DATA(prv);
+    const char *prv_deferred_data = (char *)PRV_DEFERRED_DATA(prv);
     if (((int)prv_deferred_data[0] == source) && STREQ(&prv_deferred_data[1], path)) {
       /* If same path, no need to re-allocate preview, just clear it up. */
       BKE_previewimg_clear(prv);
@@ -534,7 +536,7 @@ void BKE_previewimg_cached_release(const char *name)
 {
   BLI_assert(BLI_thread_is_main());
 
-  PreviewImage *prv = BLI_ghash_popkey(gCachedPreviews, name, MEM_freeN);
+  PreviewImage *prv = (PreviewImage *)BLI_ghash_popkey(gCachedPreviews, name, MEM_freeN);
 
   BKE_previewimg_deferred_release(prv);
 }
@@ -551,12 +553,12 @@ void BKE_previewimg_ensure(PreviewImage *prv, const int size)
 
     if (do_icon || do_preview) {
       ImBuf *thumb;
-      char *prv_deferred_data = PRV_DEFERRED_DATA(prv);
+      char *prv_deferred_data = (char *)PRV_DEFERRED_DATA(prv);
       int source = prv_deferred_data[0];
       char *path = &prv_deferred_data[1];
       int icon_w, icon_h;
 
-      thumb = IMB_thumb_manage(path, THB_LARGE, source);
+      thumb = IMB_thumb_manage(path, THB_LARGE, (ThumbSource)source);
 
       if (thumb) {
         /* PreviewImage assumes premultiplied alhpa... */
@@ -565,7 +567,7 @@ void BKE_previewimg_ensure(PreviewImage *prv, const int size)
         if (do_preview) {
           prv->w[ICON_SIZE_PREVIEW] = thumb->x;
           prv->h[ICON_SIZE_PREVIEW] = thumb->y;
-          prv->rect[ICON_SIZE_PREVIEW] = MEM_dupallocN(thumb->rect);
+          prv->rect[ICON_SIZE_PREVIEW] = (uint *)MEM_dupallocN(thumb->rect);
           prv->flag[ICON_SIZE_PREVIEW] &= ~(PRV_CHANGED | PRV_USER_EDITED | PRV_UNFINISHED);
         }
         if (do_icon) {
@@ -584,7 +586,7 @@ void BKE_previewimg_ensure(PreviewImage *prv, const int size)
           IMB_scaleImBuf(thumb, icon_w, icon_h);
           prv->w[ICON_SIZE_ICON] = icon_w;
           prv->h[ICON_SIZE_ICON] = icon_h;
-          prv->rect[ICON_SIZE_ICON] = MEM_dupallocN(thumb->rect);
+          prv->rect[ICON_SIZE_ICON] = (uint *)MEM_dupallocN(thumb->rect);
           prv->flag[ICON_SIZE_ICON] &= ~(PRV_CHANGED | PRV_USER_EDITED | PRV_UNFINISHED);
         }
         IMB_freeImBuf(thumb);
@@ -700,7 +702,7 @@ void BKE_icon_changed(const int icon_id)
 
 static Icon *icon_create(int icon_id, int obj_type, void *obj)
 {
-  Icon *new_icon = MEM_mallocN(sizeof(Icon), __func__);
+  Icon *new_icon = (Icon *)MEM_mallocN(sizeof(Icon), __func__);
 
   new_icon->obj_type = obj_type;
   new_icon->obj = obj;
@@ -867,7 +869,7 @@ ImBuf *BKE_icon_imbuf_get_buffer(int icon_id)
     return NULL;
   }
 
-  return icon->obj;
+  return (ImBuf *)icon->obj;
 }
 
 Icon *BKE_icon_get(const int icon_id)
@@ -903,7 +905,8 @@ void BKE_icon_set(const int icon_id, struct Icon *icon)
 
 static void icon_add_to_deferred_delete_queue(int icon_id)
 {
-  DeferredIconDeleteNode *node = MEM_mallocN(sizeof(DeferredIconDeleteNode), __func__);
+  DeferredIconDeleteNode *node = (DeferredIconDeleteNode *)MEM_mallocN(
+      sizeof(DeferredIconDeleteNode), __func__);
   node->icon_id = icon_id;
   /* Doesn't need lock. */
   BLI_linklist_lockfree_insert(&g_icon_delete_queue, (LockfreeLinkNode *)node);
@@ -939,7 +942,7 @@ bool BKE_icon_delete(const int icon_id)
   }
 
   BLI_spin_lock(&gIconMutex);
-  Icon *icon = BLI_ghash_popkey(gIcons, POINTER_FROM_INT(icon_id), NULL);
+  Icon *icon = (Icon *)BLI_ghash_popkey(gIcons, POINTER_FROM_INT(icon_id), NULL);
   BLI_spin_unlock(&gIconMutex);
   if (icon) {
     icon_free_data(icon_id, icon);
@@ -959,7 +962,7 @@ bool BKE_icon_delete_unmanaged(const int icon_id)
 
   BLI_spin_lock(&gIconMutex);
 
-  Icon *icon = BLI_ghash_popkey(gIcons, POINTER_FROM_INT(icon_id), NULL);
+  Icon *icon = (Icon *)BLI_ghash_popkey(gIcons, POINTER_FROM_INT(icon_id), NULL);
   if (icon) {
     if (UNLIKELY(icon->flag & ICON_FLAG_MANAGED)) {
       BLI_ghash_insert(gIcons, POINTER_FROM_INT(icon_id), icon);
@@ -997,50 +1000,50 @@ int BKE_icon_geom_ensure(struct Icon_Geom *geom)
   return geom->icon_id;
 }
 
-struct Icon_Geom *BKE_icon_geom_from_memory(const uchar *data, size_t data_len)
+struct Icon_Geom *BKE_icon_geom_from_memory(uchar *data, size_t data_len)
 {
   BLI_assert(BLI_thread_is_main());
   if (data_len <= 8) {
-    goto fail;
+    return nullptr;
   }
+  /* Wrapper for RAII early exit cleanups. */
+  std::unique_ptr<uchar> data_wrapper(std::move(data));
+
   /* Skip the header. */
   data_len -= 8;
   const int div = 3 * 2 * 3;
   const int coords_len = data_len / div;
   if (coords_len * div != data_len) {
-    goto fail;
+    return nullptr;
   }
 
   const uchar header[4] = {'V', 'C', 'O', 0};
-  const uchar *p = data;
+  uchar *p = data_wrapper.get();
   if (memcmp(p, header, ARRAY_SIZE(header)) != 0) {
-    goto fail;
+    return nullptr;
   }
   p += 4;
 
-  struct Icon_Geom *geom = MEM_mallocN(sizeof(*geom), __func__);
+  struct Icon_Geom *geom = (struct Icon_Geom *)MEM_mallocN(sizeof(*geom), __func__);
   geom->coords_range[0] = (int)*p++;
   geom->coords_range[1] = (int)*p++;
   /* x, y ignored for now */
   p += 2;
 
   geom->coords_len = coords_len;
-  geom->coords = (void *)p;
-  geom->colors = (void *)(p + (data_len / 3));
+  geom->coords = reinterpret_cast<decltype(geom->coords)>(p);
+  geom->colors = reinterpret_cast<decltype(geom->colors)>(p + (data_len / 3));
   geom->icon_id = 0;
-  geom->mem = data;
+  /* Move buffer ownership to C buffer. */
+  geom->mem = data_wrapper.release();
   return geom;
-
-fail:
-  MEM_freeN((void *)data);
-  return NULL;
 }
 
 struct Icon_Geom *BKE_icon_geom_from_file(const char *filename)
 {
   BLI_assert(BLI_thread_is_main());
   size_t data_len;
-  uchar *data = BLI_file_read_binary_as_mem(filename, 0, &data_len);
+  uchar *data = (uchar *)BLI_file_read_binary_as_mem(filename, 0, &data_len);
   if (data == NULL) {
     return NULL;
   }
