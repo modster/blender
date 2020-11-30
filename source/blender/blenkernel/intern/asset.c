@@ -190,5 +190,4 @@ void BKE_assetdata_read(BlendDataReader *reader, AssetData *asset_data)
 
   BLO_read_data_address(reader, &asset_data->description);
   BLO_read_list(reader, &asset_data->tags);
-  asset_data->preview = NULL;
 }

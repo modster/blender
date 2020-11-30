@@ -45,9 +45,6 @@ bool ED_asset_make_for_id(const bContext *C, ID *id)
   id->asset_data = BKE_asset_data_create();
 
   UI_icon_render_id(C, NULL, id, true, true);
-  /* Store reference to the ID's preview. */
-  /* XXX get rid of this? File read will be a hassle and no real need for it right now. */
-  id->asset_data->preview = BKE_assetdata_preview_get_from_id(id->asset_data, id);
 
   return true;
 }
