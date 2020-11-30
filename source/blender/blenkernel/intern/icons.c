@@ -176,8 +176,9 @@ static int get_next_free_id(void)
     return next_id;
   }
 
-  /* now we try to find the smallest icon id not stored in the gIcons hash */
-  while (icon_ghash_lookup(startId) && startId >= gFirstIconId) {
+  /* Now we try to find the smallest icon id not stored in the gIcons hash.
+   * Don't use icon_ghash_lookup here, it would lock recursively (thread-lock). */
+  while (BLI_ghash_lookup(gIcons, POINTER_FROM_INT(startId)) && startId >= gFirstIconId) {
     startId++;
   }
 
@@ -675,7 +676,6 @@ void BKE_icon_changed(const int icon_id)
     return;
   }
 
-  BLI_spin_lock(&gIconMutex);
   icon = icon_ghash_lookup(icon_id);
 
   if (icon) {
@@ -696,8 +696,6 @@ void BKE_icon_changed(const int icon_id)
       }
     }
   }
-
-  BLI_spin_unlock(&gIconMutex);
 }
 
 static Icon *icon_create(int icon_id, int obj_type, void *obj)
