@@ -67,7 +67,7 @@ int64_t Geometry::vertex_index(const int64_t index) const
   return vertex_indices_[index];
 }
 
-int64_t Geometry::tot_verts() const
+int64_t Geometry::total_verts() const
 {
   return vertex_indices_.size();
 }
@@ -82,7 +82,7 @@ const FaceElement &Geometry::ith_face_element(const int64_t index) const
   return face_elements_[index];
 }
 
-int64_t Geometry::tot_face_elems() const
+int64_t Geometry::total_face_elems() const
 {
   return face_elements_.size();
 }
@@ -97,22 +97,22 @@ Span<MEdge> Geometry::edges() const
   return edges_;
 }
 
-int64_t Geometry::tot_edges() const
+int64_t Geometry::total_edges() const
 {
   return edges_.size();
 }
 
-int Geometry::tot_loops() const
+int Geometry::total_loops() const
 {
-  return tot_loops_;
+  return total_loops_;
 }
 
-int64_t Geometry::vertex_normal_index(const int64_t index) const
+int64_t Geometry::vertex_normal_index(const int64_t vertex_index) const
 {
-  return vertex_normal_indices_[index];
+  return vertex_normal_indices_[vertex_index];
 }
 
-int64_t Geometry::tot_normals() const
+int64_t Geometry::total_normals() const
 {
   return vertex_normal_indices_.size();
 }

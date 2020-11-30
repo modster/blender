@@ -35,7 +35,7 @@ class OBJParser {
  private:
   const OBJImportParams &import_params_;
   std::ifstream obj_file_;
-  Vector<std::string> mtl_libraries_{};
+  Vector<std::string> mtl_libraries_;
 
  public:
   OBJParser(const OBJImportParams &import_params);

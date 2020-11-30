@@ -40,8 +40,8 @@ namespace blender::io::obj {
  * Geometry instance at any time.
  */
 struct GlobalVertices {
-  Vector<float3> vertices{};
-  Vector<float2> uv_vertices{};
+  Vector<float3> vertices;
+  Vector<float2> uv_vertices;
   Vector<float3> vertex_normals;
 };
 
@@ -79,7 +79,7 @@ struct FaceCorner {
 };
 
 struct FaceElement {
-  std::string vertex_group{};
+  std::string vertex_group;
   std::string material_name;
   bool shaded_smooth = false;
   Vector<FaceCorner> face_corners;
@@ -95,14 +95,14 @@ struct NurbsElement {
    * For curves, groups may be used to specify multiple splines in the same curve object.
    * It may also serve as the name of the curve if not specified explicitly.
    */
-  std::string group_{};
+  std::string group_;
   int degree = 0;
   /**
    * Indices into the global list of vertex coordinates. Must be non-negative.
    */
-  Vector<int> curv_indices{};
+  Vector<int> curv_indices;
   /* Values in the parm u/v line in a curve definition. */
-  Vector<float> parm{};
+  Vector<float> parm;
 };
 
 enum eGeometryType {
@@ -113,8 +113,8 @@ enum eGeometryType {
 class Geometry {
  private:
   eGeometryType geom_type_ = GEOM_MESH;
-  std::string geometry_name_{};
-  VectorSet<std::string> material_names_{};
+  std::string geometry_name_;
+  VectorSet<std::string> material_names_;
   /**
    * Indices in the vector range from zero to total vertices in a geometry.
    * Values range from zero to total coordinates in the global list.
@@ -122,11 +122,11 @@ class Geometry {
   Vector<int> vertex_indices_;
   Vector<int> vertex_normal_indices_;
   /** Edges written in the file in addition to (or even without polygon) elements. */
-  Vector<MEdge> edges_{};
-  Vector<FaceElement> face_elements_{};
+  Vector<MEdge> edges_;
+  Vector<FaceElement> face_elements_;
   bool use_vertex_groups_ = false;
   NurbsElement nurbs_element_;
-  int tot_loops_ = 0;
+  int total_loops_ = 0;
 
  public:
   Geometry(eGeometryType type, StringRef ob_name)
@@ -138,16 +138,16 @@ class Geometry {
   void set_geometry_name(StringRef new_name);
 
   int64_t vertex_index(const int64_t index) const;
-  int64_t tot_verts() const;
+  int64_t total_verts() const;
   Span<FaceElement> face_elements() const;
   const FaceElement &ith_face_element(const int64_t index) const;
-  int64_t tot_face_elems() const;
+  int64_t total_face_elems() const;
   bool use_vertex_groups() const;
   Span<MEdge> edges() const;
-  int64_t tot_edges() const;
-  int tot_loops() const;
-  int64_t vertex_normal_index(const int64_t index) const;
-  int64_t tot_normals() const;
+  int64_t total_edges() const;
+  int total_loops() const;
+  int64_t vertex_normal_index(const int64_t vertex_index) const;
+  int64_t total_normals() const;
 
   const VectorSet<std::string> &material_names() const;
 
@@ -161,7 +161,7 @@ class Geometry {
 struct UniqueObjectDeleter {
   void operator()(Object *object)
   {
-    BKE_id_free(NULL, object);
+    BKE_id_free(nullptr, object);
   }
 };
 

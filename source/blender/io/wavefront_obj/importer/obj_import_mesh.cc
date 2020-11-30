@@ -72,11 +72,12 @@ void MeshFromGeometry::create_mesh(Main *bmain,
   Set<std::pair<int, int>> fgon_edges;
   const auto [removed_faces, removed_loops]{tessellate_polygons(new_faces, fgon_edges)};
 
-  const int64_t tot_verts_object{mesh_geometry_.tot_verts()};
+  const int64_t tot_verts_object{mesh_geometry_.total_verts()};
   /* Total explicitly imported edges, not the ones belonging the polygons to be created. */
-  const int64_t tot_edges{mesh_geometry_.tot_edges()};
-  const int64_t tot_face_elems{mesh_geometry_.tot_face_elems() - removed_faces + new_faces.size()};
-  const int64_t tot_loops{mesh_geometry_.tot_loops() - removed_loops + 3 * new_faces.size()};
+  const int64_t tot_edges{mesh_geometry_.total_edges()};
+  const int64_t tot_face_elems{mesh_geometry_.total_face_elems() - removed_faces +
+                               new_faces.size()};
+  const int64_t tot_loops{mesh_geometry_.total_loops() - removed_loops + 3 * new_faces.size()};
 
   blender_mesh_.reset(
       BKE_mesh_new_nomain(tot_verts_object, tot_edges, 0, tot_loops, tot_face_elems));
@@ -211,12 +212,12 @@ void MeshFromGeometry::dissolve_edges(const Set<std::pair<int, int>> &fgon_edges
 
 void MeshFromGeometry::create_vertices()
 {
-  const int64_t tot_verts_object{mesh_geometry_.tot_verts()};
+  const int64_t tot_verts_object{mesh_geometry_.total_verts()};
   for (int i = 0; i < tot_verts_object; ++i) {
     if (mesh_geometry_.vertex_index(i) < global_vertices_.vertices.size()) {
       copy_v3_v3(blender_mesh_->mvert[i].co,
                  global_vertices_.vertices[mesh_geometry_.vertex_index(i)]);
-      if (i >= mesh_geometry_.tot_normals()) {
+      if (i >= mesh_geometry_.total_normals()) {
         /* Silence debug warning in mesh validate. */
         const float3 normals = {1.0f, 1.0f, 1.0f};
         normal_float_to_short_v3(blender_mesh_->mvert[i].no, normals);
@@ -242,10 +243,10 @@ void MeshFromGeometry::create_polys_loops(Span<FaceElement> all_faces)
   /* Will not be used if vertex groups are not imported. */
   blender_mesh_->dvert = nullptr;
   float weight = 0.0f;
-  if (mesh_geometry_.tot_verts() && mesh_geometry_.use_vertex_groups()) {
+  if (mesh_geometry_.total_verts() && mesh_geometry_.use_vertex_groups()) {
     blender_mesh_->dvert = static_cast<MDeformVert *>(CustomData_add_layer(
-        &blender_mesh_->vdata, CD_MDEFORMVERT, CD_CALLOC, nullptr, mesh_geometry_.tot_verts()));
-    weight = 1.0f / mesh_geometry_.tot_verts();
+        &blender_mesh_->vdata, CD_MDEFORMVERT, CD_CALLOC, nullptr, mesh_geometry_.total_verts()));
+    weight = 1.0f / mesh_geometry_.total_verts();
   }
   else {
     UNUSED_VARS(weight);
@@ -321,12 +322,12 @@ void MeshFromGeometry::create_polys_loops(Span<FaceElement> all_faces)
  */
 void MeshFromGeometry::create_edges()
 {
-  const int64_t tot_edges{mesh_geometry_.tot_edges()};
+  const int64_t tot_edges{mesh_geometry_.total_edges()};
   for (int i = 0; i < tot_edges; ++i) {
     const MEdge &src_edge = mesh_geometry_.edges()[i];
     MEdge &dst_edge = blender_mesh_->medge[i];
-    BLI_assert(src_edge.v1 < mesh_geometry_.tot_verts() &&
-               src_edge.v2 < mesh_geometry_.tot_verts());
+    BLI_assert(src_edge.v1 < mesh_geometry_.total_verts() &&
+               src_edge.v2 < mesh_geometry_.total_verts());
     dst_edge.v1 = src_edge.v1;
     dst_edge.v2 = src_edge.v2;
     dst_edge.flag = ME_LOOSEEDGE;
@@ -347,7 +348,7 @@ void MeshFromGeometry::create_uv_verts()
     return;
   }
   MLoopUV *mluv_dst = static_cast<MLoopUV *>(CustomData_add_layer(
-      &blender_mesh_->ldata, CD_MLOOPUV, CD_DEFAULT, nullptr, mesh_geometry_.tot_loops()));
+      &blender_mesh_->ldata, CD_MLOOPUV, CD_DEFAULT, nullptr, mesh_geometry_.total_loops()));
   int tot_loop_idx = 0;
 
   for (const FaceElement &curr_face : mesh_geometry_.face_elements()) {

@@ -63,8 +63,8 @@ static Geometry *create_geometry(Geometry *const prev_geometry,
   if (prev_geometry && prev_geometry->get_geom_type() == GEOM_MESH) {
     /* After the creation of a Geometry instance, at least one element has been found in the OBJ
      * file that indicates that it is a mesh. */
-    if (prev_geometry->tot_verts() || prev_geometry->tot_face_elems() ||
-        prev_geometry->tot_normals() || prev_geometry->tot_edges()) {
+    if (prev_geometry->total_verts() || prev_geometry->total_face_elems() ||
+        prev_geometry->total_normals() || prev_geometry->total_edges()) {
       return new_geometry();
     }
     if (new_type == GEOM_MESH) {
@@ -120,9 +120,9 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
 
   /* State-setting variables: if set, they remain the same for the remaining
    * elements in the object. */
-  bool shaded_smooth = false;
-  string object_group{};
-  string material_name;
+  bool state_shaded_smooth = false;
+  string state_object_group;
+  string state_material_name;
 
   while (std::getline(obj_file_, line)) {
     /* Keep reading new lines if the last character is `\`. */
@@ -139,15 +139,15 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
       mtl_libraries_.append(string(rest_line));
     }
     else if (line_key == "o") {
-      shaded_smooth = false;
-      object_group = {};
-      material_name = "";
+      state_shaded_smooth = false;
+      state_object_group = "";
+      state_material_name = "";
       current_geometry = create_geometry(
           current_geometry, GEOM_MESH, rest_line, r_global_vertices, r_all_geometries, offset);
     }
     else if (line_key == "v") {
       BLI_assert(current_geometry);
-      float3 curr_vert{};
+      float3 curr_vert;
       Vector<StringRef> str_vert_split;
       split_by_char(rest_line, ' ', str_vert_split);
       copy_string_to_float(str_vert_split, FLT_MAX, {curr_vert, 3});
@@ -155,7 +155,7 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
       current_geometry->vertex_indices_.append(r_global_vertices.vertices.size() - 1);
     }
     else if (line_key == "vn") {
-      float3 curr_vert_normal{};
+      float3 curr_vert_normal;
       Vector<StringRef> str_vert_normal_split;
       split_by_char(rest_line, ' ', str_vert_normal_split);
       copy_string_to_float(str_vert_normal_split, FLT_MAX, {curr_vert_normal, 2});
@@ -163,7 +163,7 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
       current_geometry->vertex_normal_indices_.append(r_global_vertices.vertex_normals.size() - 1);
     }
     else if (line_key == "vt") {
-      float2 curr_uv_vert{};
+      float2 curr_uv_vert;
       Vector<StringRef> str_uv_vert_split;
       split_by_char(rest_line, ' ', str_uv_vert_split);
       copy_string_to_float(str_uv_vert_split, FLT_MAX, {curr_uv_vert, 2});
@@ -183,11 +183,11 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
       current_geometry->edges_.append({static_cast<uint>(edge_v1), static_cast<uint>(edge_v2)});
     }
     else if (line_key == "g") {
-      object_group = rest_line;
-      if (object_group.find("off") != string::npos || object_group.find("null") != string::npos ||
-          object_group.find("default") != string::npos) {
+      state_object_group = rest_line;
+      if (state_object_group.find("off") != string::npos || state_object_group.find("null") != string::npos ||
+          state_object_group.find("default") != string::npos) {
         /* Set group for future elements like faces or curves to empty. */
-        object_group = {};
+        state_object_group = "";
       }
     }
     else if (line_key == "s") {
@@ -196,22 +196,22 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
           rest_line.find("null") == StringRef::not_found) {
         int smooth = 0;
         copy_string_to_int(rest_line, 0, smooth);
-        shaded_smooth = smooth != 0;
+        state_shaded_smooth = smooth != 0;
       }
       else {
         /* The OBJ file explicitly set shading to off. */
-        shaded_smooth = false;
+        state_shaded_smooth = false;
       }
     }
     else if (line_key == "f") {
       BLI_assert(current_geometry);
       FaceElement curr_face;
-      curr_face.shaded_smooth = shaded_smooth;
-      if (!material_name.empty()) {
-        curr_face.material_name = material_name;
+      curr_face.shaded_smooth = state_shaded_smooth;
+      if (!state_material_name.empty()) {
+        curr_face.material_name = state_material_name;
       }
-      if (!object_group.empty()) {
-        curr_face.vertex_group = object_group;
+      if (!state_object_group.empty()) {
+        curr_face.vertex_group = state_object_group;
         /* Yes it repeats several times, but another if-check will not reduce steps either. */
         current_geometry->use_vertex_groups_ = true;
       }
@@ -237,7 +237,7 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
         else if (n_slash == 2) {
           /* Case: f v1//vn1 v2//vn2 v3//vn3 . */
           /* Case: f v1/vt1/vn1 v2/vt2/vn2 v3/vt3/vn3 . */
-          Vector<StringRef> vert_uv_normal_split{};
+          Vector<StringRef> vert_uv_normal_split;
           split_by_char(str_corner, '/', vert_uv_normal_split);
           copy_string_to_int(vert_uv_normal_split[0], INT32_MAX, corner.vert_index);
           copy_string_to_int(vert_uv_normal_split[1], INT32_MAX, corner.uv_vert_index);
@@ -257,17 +257,17 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
       }
 
       current_geometry->face_elements_.append(curr_face);
-      current_geometry->tot_loops_ += curr_face.face_corners.size();
+      current_geometry->total_loops_ += curr_face.face_corners.size();
     }
     else if (line_key == "cstype") {
       if (rest_line.find("bspline") != StringRef::not_found) {
         current_geometry = create_geometry(current_geometry,
                                            GEOM_CURVE,
-                                           object_group,
+                                           state_object_group,
                                            r_global_vertices,
                                            r_all_geometries,
                                            offset);
-        current_geometry->nurbs_element_.group_ = object_group;
+        current_geometry->nurbs_element_.group_ = state_object_group;
       }
       else {
         std::cerr << "Curve type not supported:'" << rest_line << "'" << std::endl;
@@ -307,7 +307,7 @@ void OBJParser::parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometr
     else if (line_key == "usemtl") {
       /* Materials may repeat if faces are written without sorting. */
       current_geometry->material_names_.add(string(rest_line));
-      material_name = rest_line;
+      state_material_name = rest_line;
     }
   }
 }
@@ -404,7 +404,7 @@ void MTLParser::parse_and_store(Map<string, std::unique_ptr<MTLMaterial>> &r_mtl
   MTLMaterial *current_mtlmaterial = nullptr;
 
   while (std::getline(mtl_file_, line)) {
-    StringRef line_key{}, rest_line{};
+    StringRef line_key, rest_line;
     split_line_key_rest(line, line_key, rest_line);
     if (line.empty() || rest_line.is_empty()) {
       continue;
@@ -426,22 +426,22 @@ void MTLParser::parse_and_store(Map<string, std::unique_ptr<MTLMaterial>> &r_mtl
       copy_string_to_float(rest_line, 324.0f, current_mtlmaterial->Ns);
     }
     else if (line_key == "Ka") {
-      Vector<StringRef> str_ka_split{};
+      Vector<StringRef> str_ka_split;
       split_by_char(rest_line, ' ', str_ka_split);
       copy_string_to_float(str_ka_split, 0.0f, {current_mtlmaterial->Ka, 3});
     }
     else if (line_key == "Kd") {
-      Vector<StringRef> str_kd_split{};
+      Vector<StringRef> str_kd_split;
       split_by_char(rest_line, ' ', str_kd_split);
       copy_string_to_float(str_kd_split, 0.8f, {current_mtlmaterial->Kd, 3});
     }
     else if (line_key == "Ks") {
-      Vector<StringRef> str_ks_split{};
+      Vector<StringRef> str_ks_split;
       split_by_char(rest_line, ' ', str_ks_split);
       copy_string_to_float(str_ks_split, 0.5f, {current_mtlmaterial->Ks, 3});
     }
     else if (line_key == "Ke") {
-      Vector<StringRef> str_ke_split{};
+      Vector<StringRef> str_ke_split;
       split_by_char(rest_line, ' ', str_ke_split);
       copy_string_to_float(str_ke_split, 0.0f, {current_mtlmaterial->Ke, 3});
     }
@@ -463,7 +463,7 @@ void MTLParser::parse_and_store(Map<string, std::unique_ptr<MTLMaterial>> &r_mtl
         continue;
       }
       tex_map_XX &tex_map = current_mtlmaterial->texture_maps.lookup(string(line_key));
-      Vector<StringRef> str_map_xx_split{};
+      Vector<StringRef> str_map_xx_split;
       split_by_char(rest_line, ' ', str_map_xx_split);
 
       /* TODO ankitm: use `skip_unsupported_options` for parsing these options too? */
