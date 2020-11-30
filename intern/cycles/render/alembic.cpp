@@ -705,8 +705,13 @@ void AlembicProcedural::generate(Scene *scene)
 
   Abc::chrono_t frame_time = (Abc::chrono_t)(frame / frame_rate);
 
-  for (size_t i = 0; i < objects.size(); ++i) {
-    AlembicObject *object = objects[i];
+  int objects_updated = 0;
+
+  foreach (AlembicObject *object, objects) {
+    /* skip constant objects */
+    if (object->has_data_loaded() && object->is_constant()) {
+      continue;
+    }
 
     if (IPolyMesh::matches(object->iobject.getHeader())) {
       IPolyMesh mesh(object->iobject, Alembic::Abc::kWrapExisting);
@@ -716,6 +721,8 @@ void AlembicProcedural::generate(Scene *scene)
       ICurves curves(object->iobject, Alembic::Abc::kWrapExisting);
       read_curves(scene, object, object->xform, curves, frame_time);
     }
+
+    objects_updated += 1;
   }
 
   clear_modified();

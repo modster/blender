@@ -163,6 +163,29 @@ struct CachedData {
     attr.name = name;
     return attr;
   }
+
+  bool is_constant() const
+  {
+    if (!vertices.is_constant()) {
+      return false;
+    }
+
+    if (!triangles.is_constant()) {
+      return false;
+    }
+
+    if (!transforms.is_constant()) {
+      return false;
+    }
+
+    for (const CachedAttribute &attr : attributes) {
+      if (!attr.data.is_constant()) {
+        return false;
+      }
+    }
+
+    return true;
+  }
 };
 
 class AlembicObject : public Node {
@@ -189,6 +212,11 @@ class AlembicObject : public Node {
   CachedData &get_cached_data()
   {
     return cached_data;
+  }
+
+  bool is_constant() const
+  {
+    return cached_data.is_constant();
   }
 
  private:
