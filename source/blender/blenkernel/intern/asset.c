@@ -57,7 +57,7 @@ void BKE_asset_repository_info_free(AssetRepositoryInfo **repository_info)
 
   LISTBASE_FOREACH_MUTABLE (AssetCatalog *, catalog, &(*repository_info)->catalogs) {
     BLI_remlink(&(*repository_info)->catalogs, catalog);
-    BKE_asset_repository_catalog_free(catalog);
+    BKE_asset_repository_catalog_free(&catalog);
   }
   MEM_SAFE_FREE(*repository_info);
 }
@@ -83,9 +83,9 @@ AssetCatalog *BKE_asset_repository_catalog_create(const char *name)
   return catalog;
 }
 
-void BKE_asset_repository_catalog_free(AssetCatalog *catalog)
+void BKE_asset_repository_catalog_free(AssetCatalog **catalog)
 {
-  MEM_freeN(catalog);
+  MEM_SAFE_FREE(*catalog);
 }
 
 AssetData *BKE_asset_data_create(void)
@@ -95,15 +95,15 @@ AssetData *BKE_asset_data_create(void)
   return asset_data;
 }
 
-void BKE_asset_data_free(AssetData *asset_data)
+void BKE_asset_data_free(AssetData **asset_data)
 {
-  if (asset_data->properties) {
-    IDP_FreeProperty(asset_data->properties);
+  if ((*asset_data)->properties) {
+    IDP_FreeProperty((*asset_data)->properties);
   }
-  MEM_SAFE_FREE(asset_data->description);
-  BLI_freelistN(&asset_data->tags);
+  MEM_SAFE_FREE((*asset_data)->description);
+  BLI_freelistN(&(*asset_data)->tags);
 
-  MEM_SAFE_FREE(asset_data);
+  MEM_SAFE_FREE(*asset_data);
 }
 
 static CustomTag *assetdata_tag_create(const char *const name)

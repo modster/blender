@@ -66,7 +66,7 @@ void BKE_libblock_free_data(ID *id, const bool do_id_user)
   }
 
   if (id->asset_data) {
-    BKE_asset_data_free(id->asset_data);
+    BKE_asset_data_free(&id->asset_data);
   }
 
   BKE_animdata_free(id, do_id_user);

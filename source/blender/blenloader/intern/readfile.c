@@ -961,13 +961,13 @@ static BHead *blo_bhead_read_full(FileData *fd, BHead *thisblock)
 }
 #endif /* USE_BHEAD_READ_ON_DEMAND */
 
-/* Warning! Caller's responsibility to ensure given bhead **is** and ID one! */
+/* Warning! Caller's responsibility to ensure given bhead **is** an ID one! */
 const char *blo_bhead_id_name(const FileData *fd, const BHead *bhead)
 {
   return (const char *)POINTER_OFFSET(bhead, sizeof(*bhead) + fd->id_name_offs);
 }
 
-/* Warning! Caller's responsibility to ensure given bhead **is** and ID one! */
+/* Warning! Caller's responsibility to ensure given bhead **is** an ID one! */
 AssetData *blo_bhead_id_asset_data_address(const FileData *fd, const BHead *bhead)
 {
   BLI_assert(BKE_idtype_idcode_is_valid(bhead->code));

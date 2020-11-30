@@ -277,7 +277,7 @@ void WM_operatortype_last_properties_clear_all(void)
     wmOperatorType *ot = BLI_ghashIterator_getValue(&iter);
 
     if (ot->last_properties) {
-      IDP_FreeProperty_ex(ot->last_properties, false);
+      IDP_FreeProperty(ot->last_properties);
       ot->last_properties = NULL;
     }
   }

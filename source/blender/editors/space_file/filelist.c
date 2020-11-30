@@ -1411,7 +1411,7 @@ static void filelist_intern_entry_free(FileListInternEntry *entry)
   /* If we own the asset-data (it was generated from external file data), free it. */
   if (entry->asset_data &&
       ((entry->typeflag & FILE_TYPE_ASSET_EXTERNAL) == FILE_TYPE_ASSET_EXTERNAL)) {
-    BKE_asset_data_free(entry->asset_data);
+    BKE_asset_data_free(&entry->asset_data);
   }
   MEM_freeN(entry);
 }
