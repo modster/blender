@@ -27,7 +27,7 @@
 /** \name Asset Struct
  * \{ */
 
-#define _DNA_DEFAULT_AssetData \
+#define _DNA_DEFAULT_AssetMetaData \
   { \
     0 \
   }

@@ -162,7 +162,7 @@ void blo_end_packed_pointer_map(FileData *fd, struct Main *oldmain);
 void blo_add_library_pointer_map(ListBase *old_mainlist, FileData *fd);
 void blo_make_old_idmap_from_main(FileData *fd, struct Main *bmain);
 
-BHead *blo_read_asset_data_block(FileData *fd, BHead *bhead, struct AssetData **r_asset_data);
+BHead *blo_read_asset_data_block(FileData *fd, BHead *bhead, struct AssetMetaData **r_asset_data);
 
 void blo_cache_storage_init(FileData *fd, struct Main *bmain);
 void blo_cache_storage_old_bmain_clear(FileData *fd, struct Main *bmain_old);
@@ -175,7 +175,7 @@ BHead *blo_bhead_next(FileData *fd, BHead *thisblock);
 BHead *blo_bhead_prev(FileData *fd, BHead *thisblock);
 
 const char *blo_bhead_id_name(const FileData *fd, const BHead *bhead);
-struct AssetData *blo_bhead_id_asset_data_address(const FileData *fd, const BHead *bhead);
+struct AssetMetaData *blo_bhead_id_asset_data_address(const FileData *fd, const BHead *bhead);
 
 /* do versions stuff */
 

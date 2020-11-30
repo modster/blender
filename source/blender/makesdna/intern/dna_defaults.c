@@ -151,7 +151,7 @@
   static const struct_name DNA_DEFAULT_##struct_name = _DNA_DEFAULT_##struct_name
 
 /* DNA_asset_defaults.h */
-SDNA_DEFAULT_DECL_STRUCT(AssetData);
+SDNA_DEFAULT_DECL_STRUCT(AssetMetaData);
 
 /* DNA_armature_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(bArmature);
@@ -344,7 +344,7 @@ extern const bTheme U_theme_default;
 const void *DNA_default_table[SDNA_TYPE_MAX] = {
 
     /* DNA_asset_defaults.h */
-    SDNA_DEFAULT_DECL(AssetData),
+    SDNA_DEFAULT_DECL(AssetMetaData),
 
     /* DNA_armature_defaults.h */
     SDNA_DEFAULT_DECL(bArmature),

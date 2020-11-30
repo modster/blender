@@ -42,7 +42,7 @@ bool ED_asset_make_for_id(const bContext *C, ID *id)
 #ifdef WITH_ASSET_REPO_INFO
   BKE_asset_repository_info_global_ensure();
 #endif
-  id->asset_data = BKE_asset_data_create();
+  id->asset_data = BKE_asset_metadata_create();
 
   UI_icon_render_id(C, NULL, id, true, true);
 

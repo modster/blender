@@ -28,10 +28,10 @@
  * Currently only used by assets, could be used more often at some point.
  * Maybe add a custom icon and color to these in future?
  */
-typedef struct CustomTag {
-  struct CustomTag *next, *prev;
+typedef struct AssetTag {
+  struct AssetTag *next, *prev;
   char name[64]; /* MAX_NAME */
-} CustomTag;
+} AssetTag;
 
 #ifdef WITH_ASSET_REPO_INFO
 typedef struct AssetCatalog {
@@ -55,7 +55,7 @@ extern AssetRepositoryInfo *G_asset_repository_info;
  *       attached to! That way, asset information of a file can be read, without reading anything
  *       more than that from the file. So pointers to other IDs or ID data are strictly forbidden.
  */
-typedef struct AssetData {
+typedef struct AssetMetaData {
   /** Custom asset meta-data. Cannot store pointers to IDs (#STRUCT_NO_DATABLOCK_IDPROPERTIES)! */
   struct IDProperty *properties;
 
@@ -66,10 +66,10 @@ typedef struct AssetData {
   /** User defined tags for this asset. The asset manager uses these for filtering, but how they
    * function exactly (e.g. how they are registered to provide a list of searchable available tags)
    * is up to the asset-engine. */
-  ListBase tags; /* CustomTag */
+  ListBase tags; /* AssetTag */
   short active_tag;
 
   char _pad[6];
-} AssetData;
+} AssetMetaData;
 
 #endif /* __DNA_ASSET_TYPES_H__ */

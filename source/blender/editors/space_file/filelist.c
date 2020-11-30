@@ -279,7 +279,7 @@ typedef struct FileListInternEntry {
    * preview reading from disk. Non-owning pointer. */
   PreviewImage *preview_image;
 
-  AssetData *asset_data;
+  AssetMetaData *asset_data;
 
   /** Defined in BLI_fileops.h */
   eFileAttributes attributes;
@@ -1411,7 +1411,7 @@ static void filelist_intern_entry_free(FileListInternEntry *entry)
   /* If we own the asset-data (it was generated from external file data), free it. */
   if (entry->asset_data &&
       ((entry->typeflag & FILE_TYPE_ASSET_EXTERNAL) == FILE_TYPE_ASSET_EXTERNAL)) {
-    BKE_asset_data_free(&entry->asset_data);
+    BKE_asset_metadata_free(&entry->asset_data);
   }
   MEM_freeN(entry);
 }
@@ -3244,7 +3244,7 @@ static void filelist_readjob_main_assets(Main *current_main,
     entry->blentype = GS(id_iter->name);
     *((uint32_t *)entry->uuid) = atomic_add_and_fetch_uint32(
         (uint32_t *)filelist->filelist_intern.curr_uuid, 1);
-    entry->preview_image = BKE_assetdata_preview_get_from_id(id_iter->asset_data, id_iter);
+    entry->preview_image = BKE_asset_metadata_preview_get_from_id(id_iter->asset_data, id_iter);
     entry->id_uuid = id_iter->session_uuid;
     entry->asset_data = id_iter->asset_data;
     nbr_entries++;

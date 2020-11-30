@@ -42,25 +42,25 @@ void BKE_asset_repository_info_update_for_file_read(struct AssetRepositoryInfo *
 struct AssetCatalog *BKE_asset_repository_catalog_create(const char *name);
 void BKE_asset_repository_catalog_free(struct AssetCatalog **catalog);
 
-struct AssetData *BKE_asset_data_create(void);
-void BKE_asset_data_free(struct AssetData **asset_data);
+struct AssetMetaData *BKE_asset_metadata_create(void);
+void BKE_asset_metadata_free(struct AssetMetaData **asset_data);
 
-struct CustomTagEnsureResult {
-  struct CustomTag *tag;
+struct AssetTagEnsureResult {
+  struct AssetTag *tag;
   /* Set to false if a tag of this name was already present. */
   bool is_new;
 };
 
-struct CustomTag *BKE_assetdata_tag_add(struct AssetData *asset_data, const char *name);
-struct CustomTagEnsureResult BKE_assetdata_tag_ensure(struct AssetData *asset_data,
-                                                      const char *name);
-void BKE_assetdata_tag_remove(struct AssetData *asset_data, struct CustomTag *tag);
+struct AssetTag *BKE_asset_metadata_tag_add(struct AssetMetaData *asset_data, const char *name);
+struct AssetTagEnsureResult BKE_asset_metadata_tag_ensure(struct AssetMetaData *asset_data,
+                                                          const char *name);
+void BKE_asset_metadata_tag_remove(struct AssetMetaData *asset_data, struct AssetTag *tag);
 
-struct PreviewImage *BKE_assetdata_preview_get_from_id(const struct AssetData *asset_data,
-                                                       const struct ID *owner_id);
+struct PreviewImage *BKE_asset_metadata_preview_get_from_id(const struct AssetMetaData *asset_data,
+                                                            const struct ID *owner_id);
 
-void BKE_assetdata_write(struct BlendWriter *writer, struct AssetData *asset_data);
-void BKE_assetdata_read(struct BlendDataReader *reader, struct AssetData *asset_data);
+void BKE_asset_metadata_write(struct BlendWriter *writer, struct AssetMetaData *asset_data);
+void BKE_asset_metadata_read(struct BlendDataReader *reader, struct AssetMetaData *asset_data);
 
 #ifdef __cplusplus
 }

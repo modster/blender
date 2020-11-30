@@ -968,11 +968,11 @@ const char *blo_bhead_id_name(const FileData *fd, const BHead *bhead)
 }
 
 /* Warning! Caller's responsibility to ensure given bhead **is** an ID one! */
-AssetData *blo_bhead_id_asset_data_address(const FileData *fd, const BHead *bhead)
+AssetMetaData *blo_bhead_id_asset_data_address(const FileData *fd, const BHead *bhead)
 {
   BLI_assert(BKE_idtype_idcode_is_valid(bhead->code));
   return (fd->id_asset_data_offs > 0) ?
-             *(AssetData **)POINTER_OFFSET(bhead, sizeof(*bhead) + fd->id_asset_data_offs) :
+             *(AssetMetaData **)POINTER_OFFSET(bhead, sizeof(*bhead) + fd->id_asset_data_offs) :
              NULL;
 }
 
@@ -1053,7 +1053,7 @@ static bool read_file_dna(FileData *fd, const char **r_error_message)
         /* used to retrieve ID names from (bhead+1) */
         fd->id_name_offs = DNA_elem_offset(fd->filesdna, "ID", "char", "name[]");
         BLI_assert(fd->id_name_offs != -1);
-        fd->id_asset_data_offs = DNA_elem_offset(fd->filesdna, "ID", "AssetData", "*asset_data");
+        fd->id_asset_data_offs = DNA_elem_offset(fd->filesdna, "ID", "AssetMetaData", "*asset_data");
 
         return true;
       }
@@ -2376,7 +2376,7 @@ static void direct_link_id_common(
 
   if (id->asset_data) {
     BLO_read_data_address(reader, &id->asset_data);
-    BKE_assetdata_read(reader, id->asset_data);
+    BKE_asset_metadata_read(reader, id->asset_data);
   }
 
   /*link direct data of ID properties*/
@@ -3632,7 +3632,7 @@ static BHead *read_libblock(FileData *fd,
 /** \name Read Asset Data
  * \{ */
 
-BHead *blo_read_asset_data_block(FileData *fd, BHead *bhead, AssetData **r_asset_data)
+BHead *blo_read_asset_data_block(FileData *fd, BHead *bhead, AssetMetaData **r_asset_data)
 {
   BLI_assert(BKE_idtype_idcode_is_valid(bhead->code));
 
@@ -3640,7 +3640,7 @@ BHead *blo_read_asset_data_block(FileData *fd, BHead *bhead, AssetData **r_asset
 
   BlendDataReader reader = {fd};
   BLO_read_data_address(&reader, r_asset_data);
-  BKE_assetdata_read(&reader, *r_asset_data);
+  BKE_asset_metadata_read(&reader, *r_asset_data);
 
   oldnewmap_clear(fd->datamap);
 

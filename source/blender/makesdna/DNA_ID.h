@@ -270,7 +270,7 @@ typedef struct ID {
   /** If this ID is an asset, this pointer is set and references all data defining an asset. */
   /* TODO this will probably not stay here. Instead we might want a new asset ID-type that
    * references another ID. */
-  struct AssetData *asset_data;
+  struct AssetMetaData *asset_data;
 
   /** MAX_ID_NAME. */
   char name[66];

@@ -88,14 +88,14 @@ void BKE_asset_repository_catalog_free(AssetCatalog **catalog)
   MEM_SAFE_FREE(*catalog);
 }
 
-AssetData *BKE_asset_data_create(void)
+AssetMetaData *BKE_asset_metadata_create(void)
 {
-  AssetData *asset_data = MEM_callocN(sizeof(AssetData), __func__);
-  memcpy(asset_data, DNA_struct_default_get(AssetData), sizeof(*asset_data));
+  AssetMetaData *asset_data = MEM_callocN(sizeof(AssetMetaData), __func__);
+  memcpy(asset_data, DNA_struct_default_get(AssetMetaData), sizeof(*asset_data));
   return asset_data;
 }
 
-void BKE_asset_data_free(AssetData **asset_data)
+void BKE_asset_metadata_free(AssetMetaData **asset_data)
 {
   if ((*asset_data)->properties) {
     IDP_FreeProperty((*asset_data)->properties);
@@ -106,19 +106,19 @@ void BKE_asset_data_free(AssetData **asset_data)
   MEM_SAFE_FREE(*asset_data);
 }
 
-static CustomTag *assetdata_tag_create(const char *const name)
+static AssetTag *asset_metadata_tag_create(const char *const name)
 {
-  CustomTag *tag = MEM_callocN(sizeof(*tag), __func__);
+  AssetTag *tag = MEM_callocN(sizeof(*tag), __func__);
   BLI_strncpy(tag->name, name, sizeof(tag->name));
   return tag;
 }
 
-CustomTag *BKE_assetdata_tag_add(AssetData *asset_data, const char *name)
+AssetTag *BKE_asset_metadata_tag_add(AssetMetaData *asset_data, const char *name)
 {
-  CustomTag *tag = assetdata_tag_create(name);
+  AssetTag *tag = asset_metadata_tag_create(name);
 
   BLI_addtail(&asset_data->tags, tag);
-  BLI_uniquename(&asset_data->tags, tag, name, '.', offsetof(CustomTag, name), sizeof(tag->name));
+  BLI_uniquename(&asset_data->tags, tag, name, '.', offsetof(AssetTag, name), sizeof(tag->name));
 
   return tag;
 }
@@ -126,14 +126,15 @@ CustomTag *BKE_assetdata_tag_add(AssetData *asset_data, const char *name)
 /**
  * Make sure there is a tag with name \a name, create one if needed.
  */
-struct CustomTagEnsureResult BKE_assetdata_tag_ensure(AssetData *asset_data, const char *name)
+struct AssetTagEnsureResult BKE_asset_metadata_tag_ensure(AssetMetaData *asset_data,
+                                                          const char *name)
 {
-  struct CustomTagEnsureResult result = {.tag = NULL};
+  struct AssetTagEnsureResult result = {.tag = NULL};
   if (!name[0]) {
     return result;
   }
 
-  CustomTag *tag = BLI_findstring(&asset_data->tags, name, offsetof(CustomTag, name));
+  AssetTag *tag = BLI_findstring(&asset_data->tags, name, offsetof(AssetTag, name));
 
   if (tag) {
     result.tag = tag;
@@ -141,7 +142,7 @@ struct CustomTagEnsureResult BKE_assetdata_tag_ensure(AssetData *asset_data, con
     return result;
   }
 
-  tag = assetdata_tag_create(name);
+  tag = asset_metadata_tag_create(name);
   BLI_addtail(&asset_data->tags, tag);
 
   result.tag = tag;
@@ -149,23 +150,24 @@ struct CustomTagEnsureResult BKE_assetdata_tag_ensure(AssetData *asset_data, con
   return result;
 }
 
-void BKE_assetdata_tag_remove(AssetData *asset_data, CustomTag *tag)
+void BKE_asset_metadata_tag_remove(AssetMetaData *asset_data, AssetTag *tag)
 {
   BLI_freelinkN(&asset_data->tags, tag);
 }
 
 /* Queries -------------------------------------------- */
 
-PreviewImage *BKE_assetdata_preview_get_from_id(const AssetData *UNUSED(asset_data), const ID *id)
+PreviewImage *BKE_asset_metadata_preview_get_from_id(const AssetMetaData *UNUSED(asset_data),
+                                                     const ID *id)
 {
   return BKE_previewimg_id_get(id);
 }
 
 /* .blend file API -------------------------------------------- */
 
-void BKE_assetdata_write(BlendWriter *writer, AssetData *asset_data)
+void BKE_asset_metadata_write(BlendWriter *writer, AssetMetaData *asset_data)
 {
-  BLO_write_struct(writer, AssetData, asset_data);
+  BLO_write_struct(writer, AssetMetaData, asset_data);
 
   if (asset_data->properties) {
     IDP_BlendWrite(writer, asset_data->properties);
@@ -174,12 +176,12 @@ void BKE_assetdata_write(BlendWriter *writer, AssetData *asset_data)
   if (asset_data->description) {
     BLO_write_string(writer, asset_data->description);
   }
-  LISTBASE_FOREACH (CustomTag *, tag, &asset_data->tags) {
-    BLO_write_struct(writer, CustomTag, tag);
+  LISTBASE_FOREACH (AssetTag *, tag, &asset_data->tags) {
+    BLO_write_struct(writer, AssetTag, tag);
   }
 }
 
-void BKE_assetdata_read(BlendDataReader *reader, AssetData *asset_data)
+void BKE_asset_metadata_read(BlendDataReader *reader, AssetMetaData *asset_data)
 {
   /* asset_data itself has been read already. */
 

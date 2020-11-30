@@ -124,7 +124,7 @@ void BLO_blendfiledata_free(BlendFileData *bfd);
 
 struct BLODataBlockInfo {
   char name[64]; /* MAX_NAME */
-  struct AssetData *asset_data;
+  struct AssetMetaData *asset_data;
 };
 
 BlendHandle *BLO_blendhandle_from_file(const char *filepath, struct ReportList *reports);

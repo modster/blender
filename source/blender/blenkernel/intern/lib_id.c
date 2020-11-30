@@ -2363,7 +2363,7 @@ void BKE_id_reorder(const ListBase *lb, ID *id, ID *relative, bool after)
 void BKE_id_blend_write(BlendWriter *writer, ID *id)
 {
   if (id->asset_data) {
-    BKE_assetdata_write(writer, id->asset_data);
+    BKE_asset_metadata_write(writer, id->asset_data);
   }
 
   /* ID_WM's id->properties are considered runtime only, and never written in .blend file. */

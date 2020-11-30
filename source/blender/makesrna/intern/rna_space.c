@@ -2552,7 +2552,7 @@ static int rna_FileBrowser_FileSelectEntry_preview_icon_id_get(PointerRNA *ptr)
 static PointerRNA rna_FileBrowser_FileSelectEntry_asset_data_get(PointerRNA *ptr)
 {
   const FileDirEntry *entry = ptr->data;
-  return rna_pointer_inherit_refine(ptr, &RNA_AssetData, entry->asset_data);
+  return rna_pointer_inherit_refine(ptr, &RNA_AssetMetaData, entry->asset_data);
 }
 
 static void rna_FileSelectParams_asset_category_set(PointerRNA *ptr, uint64_t value)
@@ -5929,7 +5929,7 @@ static void rna_def_fileselect_entry(BlenderRNA *brna)
       prop, "rna_FileBrowser_FileSelectEntry_preview_icon_id_get", NULL, NULL);
 
   prop = RNA_def_property(srna, "asset_data", PROP_POINTER, PROP_NONE);
-  RNA_def_property_struct_type(prop, "AssetData");
+  RNA_def_property_struct_type(prop, "AssetMetaData");
   RNA_def_property_pointer_funcs(
       prop, "rna_FileBrowser_FileSelectEntry_asset_data_get", NULL, NULL, NULL);
   RNA_def_property_ui_text(
