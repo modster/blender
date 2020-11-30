@@ -24,6 +24,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 
 #include "CLG_log.h"
 
@@ -76,13 +77,16 @@ enum {
 
 static CLG_LogRef LOG = {"bke.icons"};
 
+/* Protected by gIconMutex. */
 static GHash *gIcons = NULL;
 
+/* Protected by gIconMutex. */
 static int gNextIconId = 1;
 
+/* Protected by gIconMutex. */
 static int gFirstIconId = 1;
 
-SpinLock gIconMutex;
+std::mutex gIconMutex;
 
 /* Not mutex-protected! */
 static GHash *gCachedPreviews = NULL;
@@ -92,7 +96,7 @@ typedef struct DeferredIconDeleteNode {
   struct DeferredIconDeleteNode *next;
   int icon_id;
 } DeferredIconDeleteNode;
-/* Also protected with gIconMutex. */
+/* Protected by gIconMutex. */
 static LockfreeLinkList g_icon_delete_queue;
 
 static void icon_free(void *val)
@@ -156,39 +160,33 @@ static void icon_free_data(int icon_id, Icon *icon)
 
 static Icon *icon_ghash_lookup(int icon_id)
 {
-  Icon *icon;
-  BLI_spin_lock(&gIconMutex);
-  icon = (Icon *)BLI_ghash_lookup(gIcons, POINTER_FROM_INT(icon_id));
-  BLI_spin_unlock(&gIconMutex);
-  return icon;
+  std::scoped_lock lock(gIconMutex);
+  return (Icon *)BLI_ghash_lookup(gIcons, POINTER_FROM_INT(icon_id));
 }
 
 /* create an id for a new icon and make sure that ids from deleted icons get reused
  * after the integer number range is used up */
 static int get_next_free_id(void)
 {
-  BLI_spin_lock(&gIconMutex);
+  std::scoped_lock lock(gIconMutex);
   int startId = gFirstIconId;
 
   /* if we haven't used up the int number range, we just return the next int */
   if (gNextIconId >= gFirstIconId) {
     int next_id = gNextIconId++;
-    BLI_spin_unlock(&gIconMutex);
     return next_id;
   }
 
   /* Now we try to find the smallest icon id not stored in the gIcons hash.
-   * Don't use icon_ghash_lookup here, it would lock recursively (thread-lock). */
+   * Don't use icon_ghash_lookup here, it would lock recursively (dead-lock). */
   while (BLI_ghash_lookup(gIcons, POINTER_FROM_INT(startId)) && startId >= gFirstIconId) {
     startId++;
   }
 
   /* if we found a suitable one that isn't used yet, return it */
   if (startId >= gFirstIconId) {
-    BLI_spin_unlock(&gIconMutex);
     return startId;
   }
-  BLI_spin_unlock(&gIconMutex);
 
   /* fail */
   return 0;
@@ -203,7 +201,6 @@ void BKE_icons_init(int first_dyn_id)
 
   if (!gIcons) {
     gIcons = BLI_ghash_int_new(__func__);
-    BLI_spin_init(&gIconMutex);
     BLI_linklist_lockfree_init(&g_icon_delete_queue);
   }
 
@@ -217,7 +214,6 @@ void BKE_icons_free(void)
   BLI_assert(BLI_thread_is_main());
 
   if (gIcons) {
-    BLI_spin_end(&gIconMutex);
     BLI_ghash_free(gIcons, NULL, icon_free);
     gIcons = NULL;
   }
@@ -232,7 +228,7 @@ void BKE_icons_free(void)
 
 void BKE_icons_deferred_free(void)
 {
-  BLI_spin_lock(&gIconMutex);
+  std::scoped_lock lock(gIconMutex);
 
   for (DeferredIconDeleteNode *node =
            (DeferredIconDeleteNode *)BLI_linklist_lockfree_begin(&g_icon_delete_queue);
@@ -241,8 +237,6 @@ void BKE_icons_deferred_free(void)
     BLI_ghash_remove(gIcons, POINTER_FROM_INT(node->icon_id), NULL, icon_free);
   }
   BLI_linklist_lockfree_clear(&g_icon_delete_queue, MEM_freeN);
-
-  BLI_spin_unlock(&gIconMutex);
 }
 
 static PreviewImage *previewimg_create_ex(size_t deferred_data_size)
@@ -713,9 +707,10 @@ static Icon *icon_create(int icon_id, int obj_type, void *obj)
   new_icon->drawinfo = NULL;
   new_icon->drawinfo_free = NULL;
 
-  BLI_spin_lock(&gIconMutex);
-  BLI_ghash_insert(gIcons, POINTER_FROM_INT(icon_id), new_icon);
-  BLI_spin_unlock(&gIconMutex);
+  {
+    std::scoped_lock lock(gIconMutex);
+    BLI_ghash_insert(gIcons, POINTER_FROM_INT(icon_id), new_icon);
+  }
 
   return new_icon;
 }
@@ -892,13 +887,11 @@ void BKE_icon_set(const int icon_id, struct Icon *icon)
 {
   void **val_p;
 
-  BLI_spin_lock(&gIconMutex);
+  std::scoped_lock lock(gIconMutex);
   if (BLI_ghash_ensure_p(gIcons, POINTER_FROM_INT(icon_id), &val_p)) {
     CLOG_ERROR(&LOG, "icon already set: %d", icon_id);
-    BLI_spin_unlock(&gIconMutex);
     return;
   }
-  BLI_spin_unlock(&gIconMutex);
 
   *val_p = icon;
 }
@@ -926,9 +919,8 @@ void BKE_icon_id_delete(struct ID *id)
   }
 
   BKE_icons_deferred_free();
-  BLI_spin_lock(&gIconMutex);
+  std::scoped_lock lock(gIconMutex);
   BLI_ghash_remove(gIcons, POINTER_FROM_INT(icon_id), NULL, icon_free);
-  BLI_spin_unlock(&gIconMutex);
 }
 
 /**
@@ -941,10 +933,8 @@ bool BKE_icon_delete(const int icon_id)
     return false;
   }
 
-  BLI_spin_lock(&gIconMutex);
-  Icon *icon = (Icon *)BLI_ghash_popkey(gIcons, POINTER_FROM_INT(icon_id), NULL);
-  BLI_spin_unlock(&gIconMutex);
-  if (icon) {
+  std::scoped_lock lock(gIconMutex);
+  if (Icon *icon = (Icon *)BLI_ghash_popkey(gIcons, POINTER_FROM_INT(icon_id), NULL)) {
     icon_free_data(icon_id, icon);
     icon_free(icon);
     return true;
@@ -960,22 +950,19 @@ bool BKE_icon_delete_unmanaged(const int icon_id)
     return false;
   }
 
-  BLI_spin_lock(&gIconMutex);
+  std::scoped_lock lock(gIconMutex);
 
   Icon *icon = (Icon *)BLI_ghash_popkey(gIcons, POINTER_FROM_INT(icon_id), NULL);
   if (icon) {
     if (UNLIKELY(icon->flag & ICON_FLAG_MANAGED)) {
       BLI_ghash_insert(gIcons, POINTER_FROM_INT(icon_id), icon);
-      BLI_spin_unlock(&gIconMutex);
       return false;
     }
 
     icon_free_data(icon_id, icon);
     icon_free(icon);
-    BLI_spin_unlock(&gIconMutex);
     return true;
   }
-  BLI_spin_unlock(&gIconMutex);
 
   return false;
 }
