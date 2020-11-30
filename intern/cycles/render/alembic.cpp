@@ -47,13 +47,150 @@ static float3 make_float3_from_yup(const Imath::Vec3<float> &v)
 
 static M44d convert_yup_zup(const M44d &mtx)
 {
-  Imath::Vec3<double> scale, shear, rot, trans;
-  extractSHRT(mtx, scale, shear, rot, trans);
-  M44d rotmat, scalemat, transmat;
-  rotmat.setEulerAngles(Imath::Vec3<double>(rot.x, -rot.z, rot.y));
-  scalemat.setScale(Imath::Vec3<double>(scale.x, scale.z, scale.y));
-  transmat.setTranslation(Imath::Vec3<double>(trans.x, -trans.z, trans.y));
-  return scalemat * rotmat * transmat;
+  V3d scale, shear, rotation, translation;
+  extractSHRT(mtx, scale, shear, rotation, translation);
+
+  M44d rot_mat, scale_mat, trans_mat;
+  rot_mat.setEulerAngles(V3d(rotation.x, -rotation.z, rotation.y));
+  scale_mat.setScale(V3d(scale.x, scale.z, scale.y));
+  trans_mat.setTranslation(V3d(translation.x, -translation.z, translation.y));
+
+  return scale_mat * rot_mat * trans_mat;
+}
+
+void transform_decompose(const Imath::M44d &mat,
+                         Imath::V3d &scale,
+                         Imath::V3d &shear,
+                         Imath::Quatd &rotation,
+                         Imath::V3d &translation)
+{
+  Imath::M44d mat_remainder(mat);
+
+  /* extract scale and shear */
+  Imath::extractAndRemoveScalingAndShear(mat_remainder, scale, shear);
+
+  /* extract translation */
+  translation.x = mat_remainder[3][0];
+  translation.y = mat_remainder[3][1];
+  translation.z = mat_remainder[3][2];
+
+  /* extract rotation */
+  rotation = extractQuat(mat_remainder);
+}
+
+M44d transform_compose(const Imath::V3d &scale,
+                       const Imath::V3d &shear,
+                       const Imath::Quatd &rotation,
+                       const Imath::V3d &translation)
+{
+  Imath::M44d scale_mat, shear_mat, rot_mat, trans_mat;
+
+  scale_mat.setScale(scale);
+  shear_mat.setShear(shear);
+  rot_mat = rotation.toMatrix44();
+  trans_mat.setTranslation(translation);
+
+  return scale_mat * shear_mat * rot_mat * trans_mat;
+}
+
+/* get the matrix for the specified time, or return the identity matrix if there is no exact match
+ */
+static M44d get_matrix_for_time(const MatrixSampleMap &samples, chrono_t time)
+{
+  MatrixSampleMap::const_iterator iter = samples.find(time);
+  if (iter != samples.end()) {
+    return iter->second;
+  }
+
+  return M44d();
+}
+
+/* get the matrix for the specified time, or interpolate between samples if there is no exact match
+ */
+static M44d get_interpolated_matrix_for_time(const MatrixSampleMap &samples, chrono_t time)
+{
+  if (samples.empty()) {
+    return M44d();
+  }
+
+  /* see if exact match */
+  MatrixSampleMap::const_iterator iter = samples.find(time);
+  if (iter != samples.end()) {
+    return iter->second;
+  }
+
+  if (samples.size() == 1) {
+    return samples.begin()->second;
+  }
+
+  if (time <= samples.begin()->first) {
+    return samples.begin()->second;
+  }
+
+  if (time >= samples.rbegin()->first) {
+    return samples.rbegin()->second;
+  }
+
+  /* find previous and next time sample to interpolate */
+  chrono_t prev_time = samples.begin()->first;
+  chrono_t next_time = samples.rbegin()->first;
+
+  for (MatrixSampleMap::const_iterator I = samples.begin(); I != samples.end(); ++I) {
+    chrono_t current_time = (*I).first;
+
+    if (current_time > prev_time && current_time <= time) {
+      prev_time = current_time;
+    }
+
+    if (current_time > next_time && current_time >= time) {
+      next_time = current_time;
+    }
+  }
+
+  const M44d prev_mat = get_matrix_for_time(samples, prev_time);
+  const M44d next_mat = get_matrix_for_time(samples, next_time);
+
+  Imath::V3d prev_scale, next_scale;
+  Imath::V3d prev_shear, next_shear;
+  Imath::V3d prev_translation, next_translation;
+  Imath::Quatd prev_rotation, next_rotation;
+
+  transform_decompose(prev_mat, prev_scale, prev_shear, prev_rotation, prev_translation);
+  transform_decompose(next_mat, next_scale, next_shear, next_rotation, next_translation);
+
+  chrono_t t = (time - prev_time) / (next_time - prev_time);
+
+  /* ensure rotation around the shortest angle  */
+  if ((prev_rotation ^ next_rotation) < 0) {
+    next_rotation = -next_rotation;
+  }
+
+  return transform_compose(Imath::lerp(prev_scale, next_scale, t),
+                           Imath::lerp(prev_shear, next_shear, t),
+                           Imath::slerp(prev_rotation, next_rotation, t),
+                           Imath::lerp(prev_translation, next_translation, t));
+}
+
+static void concatenate_xform_samples(const MatrixSampleMap &parent_samples,
+                                      const MatrixSampleMap &local_samples,
+                                      MatrixSampleMap &output_samples)
+{
+  std::set<chrono_t> union_of_samples;
+
+  for (auto &pair : parent_samples) {
+    union_of_samples.insert(pair.first);
+  }
+
+  for (auto &pair : local_samples) {
+    union_of_samples.insert(pair.first);
+  }
+
+  foreach (chrono_t time, union_of_samples) {
+    M44d parent_matrix = get_interpolated_matrix_for_time(parent_samples, time);
+    M44d local_matrix = get_interpolated_matrix_for_time(local_samples, time);
+
+    output_samples[time] = local_matrix * parent_matrix;
+  }
 }
 
 static Transform make_transform(const Abc::M44d &a)
@@ -242,64 +379,6 @@ bool AlembicObject::has_data_loaded() const
   return data_loaded;
 }
 
-static void read_transforms(const IObject &iobject, AlembicObject::CachedData &cached_data)
-{
-  IObject parent = iobject.getParent();
-
-  /* gather all the samples times in the object's transform hierarchy */
-  set<double> samples_times;
-
-  while (parent) {
-    if (IXform::matches(parent.getHeader())) {
-      IXform xform(parent, Alembic::Abc::kWrapExisting);
-
-      const IXformSchema &schema = xform.getSchema();
-
-      if (schema.valid()) {
-        for (index_t i = 0; i < static_cast<index_t>(schema.getNumSamples()); ++i) {
-          const double time = schema.getTimeSampling()->getSampleTime(i);
-          samples_times.insert(time);
-        }
-      }
-    }
-
-    parent = parent.getParent();
-  }
-
-  // todo : proper time sampling
-  cached_data.transforms.set_time_sampling(cached_data.vertices.time_sampling);
-
-  /* accumulate the transformation matrices for each sample time */
-  foreach (double time, samples_times) {
-    parent = iobject.getParent();
-    Transform tfm = transform_identity();
-
-    ISampleSelector selector = ISampleSelector(time);
-
-    while (parent) {
-      if (IXform::matches(parent.getHeader())) {
-        IXform xform(parent, Alembic::Abc::kWrapExisting);
-
-        const IXformSchema &schema = xform.getSchema();
-
-        if (schema.valid()) {
-          const XformSample &samp = schema.getValue(selector);
-          Transform parent_tfm = make_transform(samp.getMatrix());
-          tfm = parent_tfm * tfm;
-        }
-
-        if (!schema.getInheritsXforms(selector)) {
-          break;
-        }
-      }
-
-      parent = parent.getParent();
-    }
-
-    cached_data.transforms.add_data(tfm, time);
-  }
-}
-
 void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
 {
   cached_data.clear();
@@ -398,7 +477,26 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
   //    read_default_normals(normals, cached_data);
   //  }
 
-  read_transforms(iobject, cached_data);
+  {
+    if (xform_samples.size() == 0) {
+      cached_data.transforms.add_data(transform_identity(), 0.0);
+    }
+    else {
+      for (auto &pair : xform_samples) {
+        Transform tfm = make_transform(pair.second);
+
+        if (iobject.getName() == "tank_r_treadsegment_mshShape") {
+          std::cerr << pair.second << "\n";
+        }
+
+        cached_data.transforms.add_data(tfm, pair.first);
+      }
+    }
+
+    // TODO : proper time sampling, but is it possible for the hierarchy to have different time
+    // sampling for each xform ?
+    cached_data.transforms.set_time_sampling(cached_data.vertices.time_sampling);
+  }
 
   data_loaded = true;
 }
@@ -632,40 +730,16 @@ void AlembicProcedural::tag_update(Scene *scene)
 
 void AlembicProcedural::load_objects()
 {
-  /* Traverse Alembic file hierarchy, avoiding recursion by using an explicit stack. */
-  std::stack<IObject> iobject_stack;
-  iobject_stack.push(archive.getTop());
-
   unordered_map<string, AlembicObject *> object_map;
 
   foreach (AlembicObject *object, objects) {
     object_map.insert({object->get_path().c_str(), object});
   }
 
-  while (!iobject_stack.empty()) {
-    const IObject iobject = iobject_stack.top();
-    iobject_stack.pop();
+  IObject root = archive.getTop();
 
-    const string &path = iobject.getFullName();
-
-    auto iter = object_map.find(path);
-
-    if (iter != object_map.end()) {
-      AlembicObject *object = iter->second;
-
-      if (IPolyMesh::matches(iobject.getHeader())) {
-        IPolyMesh mesh(iobject, Alembic::Abc::kWrapExisting);
-        object->iobject = iobject;
-      }
-      else if (ICurves::matches(iobject.getHeader())) {
-        ICurves curves(iobject, Alembic::Abc::kWrapExisting);
-        object->iobject = iobject;
-      }
-    }
-
-    for (int i = 0; i < iobject.getNumChildren(); i++) {
-      iobject_stack.push(iobject.getChild(i));
-    }
+  for (size_t i = 0; i < root.getNumChildren(); ++i) {
+    walk_hierarchy(root, root.getChildHeader(i), nullptr, object_map);
   }
 }
 
@@ -858,6 +932,99 @@ void AlembicProcedural::read_curves(Scene *scene,
    * coordinates as generated coordinates if requested */
   if (hair->need_attribute(scene, ATTR_STD_GENERATED)) {
     // TODO : add generated coordinates for curves
+  }
+}
+void AlembicProcedural::walk_hierarchy(
+    IObject parent,
+    const ObjectHeader &header,
+    MatrixSampleMap *xform_samples,
+    const unordered_map<std::string, AlembicObject *> &object_map)
+{
+  IObject next_object;
+
+  MatrixSampleMap concatenated_xform_samples;
+
+  if (IXform::matches(header)) {
+    IXform xform(parent, header.getName());
+
+    IXformSchema &xs = xform.getSchema();
+
+    if (xs.getNumOps() > 0) {
+      TimeSamplingPtr ts = xs.getTimeSampling();
+      MatrixSampleMap local_xform_samples;
+
+      MatrixSampleMap *temp_xform_samples = nullptr;
+      if (xform_samples == nullptr) {
+        /* If there is no parent transforms, fill the map directly. */
+        temp_xform_samples = &concatenated_xform_samples;
+      }
+      else {
+        /* use a temporary map */
+        temp_xform_samples = &local_xform_samples;
+      }
+
+      for (size_t i = 0; i < xs.getNumSamples(); ++i) {
+        chrono_t sample_time = ts->getSampleTime(i);
+        XformSample sample = xs.getValue(ISampleSelector(sample_time));
+        temp_xform_samples->insert({sample_time, sample.getMatrix()});
+      }
+
+      if (xform_samples != nullptr) {
+        concatenate_xform_samples(*xform_samples, local_xform_samples, concatenated_xform_samples);
+      }
+
+      xform_samples = &concatenated_xform_samples;
+    }
+
+    next_object = xform;
+  }
+  else if (ISubD::matches(header)) {
+    // todo: subdivision
+  }
+  else if (IPolyMesh::matches(header)) {
+    IPolyMesh mesh(parent, header.getName());
+
+    auto iter = object_map.find(mesh.getFullName());
+
+    if (iter != object_map.end()) {
+      AlembicObject *abc_object = iter->second;
+      abc_object->iobject = mesh;
+
+      if (xform_samples) {
+        abc_object->xform_samples = *xform_samples;
+      }
+    }
+
+    next_object = mesh;
+  }
+  else if (ICurves::matches(header)) {
+    ICurves curves(parent, header.getName());
+
+    auto iter = object_map.find(curves.getFullName());
+
+    if (iter != object_map.end()) {
+      AlembicObject *abc_object = iter->second;
+      abc_object->iobject = curves;
+
+      if (xform_samples) {
+        abc_object->xform_samples = *xform_samples;
+      }
+    }
+
+    next_object = curves;
+  }
+  else if (IFaceSet::matches(header)) {
+    // ignore the face set, it will be read along with the data
+  }
+  else {
+    // unsupported type for now (Points, NuPatch)
+    next_object = parent.getChild(header.getName());
+  }
+
+  if (next_object.valid()) {
+    for (size_t i = 0; i < next_object.getNumChildren(); ++i) {
+      walk_hierarchy(next_object, next_object.getChildHeader(i), xform_samples, object_map);
+    }
   }
 }
 

@@ -34,6 +34,8 @@ class Geometry;
 class Object;
 class Shader;
 
+using MatrixSampleMap = std::map<Alembic::Abc::chrono_t, Alembic::Abc::M44d>;
+
 class AlembicObject : public Node {
  public:
   NODE_DECLARE
@@ -61,9 +63,10 @@ class AlembicObject : public Node {
   template<typename T> class DataStore {
     vector<DataTimePair<T>> data{};
     double last_lookup_time = -1.0;
+
+   public:
     Alembic::AbcCoreAbstract::TimeSampling time_sampling{};
 
-    public:
     void set_time_sampling(Alembic::AbcCoreAbstract::TimeSampling time_sampling_)
     {
       time_sampling = time_sampling_;
@@ -180,6 +183,7 @@ class AlembicObject : public Node {
     }
   };
 
+  MatrixSampleMap xform_samples;
   Alembic::AbcGeom::IObject iobject;
   Transform xform;
 
@@ -236,6 +240,11 @@ class AlembicProcedural : public Procedural {
                    Transform xform,
                    Alembic::AbcGeom::ICurves &curves,
                    Alembic::AbcGeom::Abc::chrono_t frame_time);
+
+  void walk_hierarchy(Alembic::AbcGeom::IObject parent,
+                      const Alembic::AbcGeom::ObjectHeader &ohead,
+                      MatrixSampleMap *xform_samples,
+                      const unordered_map<string, AlembicObject *> &object_map);
 };
 
 CCL_NAMESPACE_END
