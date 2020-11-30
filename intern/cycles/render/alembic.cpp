@@ -477,26 +477,19 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
   //    read_default_normals(normals, cached_data);
   //  }
 
-  {
-    if (xform_samples.size() == 0) {
-      cached_data.transforms.add_data(transform_identity(), 0.0);
-    }
-    else {
-      for (auto &pair : xform_samples) {
-        Transform tfm = make_transform(pair.second);
-
-        if (iobject.getName() == "tank_r_treadsegment_mshShape") {
-          std::cerr << pair.second << "\n";
-        }
-
-        cached_data.transforms.add_data(tfm, pair.first);
-      }
-    }
-
-    // TODO : proper time sampling, but is it possible for the hierarchy to have different time
-    // sampling for each xform ?
-    cached_data.transforms.set_time_sampling(cached_data.vertices.time_sampling);
+  if (xform_samples.size() == 0) {
+    cached_data.transforms.add_data(transform_identity(), 0.0);
   }
+  else {
+    for (auto &pair : xform_samples) {
+      Transform tfm = make_transform(pair.second);
+      cached_data.transforms.add_data(tfm, pair.first);
+    }
+  }
+
+  // TODO : proper time sampling, but is it possible for the hierarchy to have different time
+  // sampling for each xform ?
+  cached_data.transforms.set_time_sampling(cached_data.vertices.time_sampling);
 
   data_loaded = true;
 }
@@ -691,9 +684,9 @@ void AlembicProcedural::generate(Scene *scene)
     archive = factory.getArchive(filepath.c_str());
 
     if (!archive.valid()) {
-      // avoid potential infinite update loops in viewport synchronization
+      /* avoid potential infinite update loops in viewport synchronization */
+      filepath.clear();
       clear_modified();
-      // TODO : error reporting
       return;
     }
   }
@@ -794,14 +787,12 @@ void AlembicProcedural::read_mesh(Scene *scene,
   }
 
   Transform *tfm = cached_data.transforms.data_for_time(frame_time);
-
   if (tfm) {
     auto object = abc_object->get_object();
     object->set_tfm(*tfm);
   }
 
   array<float3> *vertices = cached_data.vertices.data_for_new_time(frame_time);
-
   if (vertices) {
     cached_data.add_dirty_frame(frame_time);
     mesh->set_verts(*vertices);
@@ -941,6 +932,7 @@ void AlembicProcedural::read_curves(Scene *scene,
     // TODO : add generated coordinates for curves
   }
 }
+
 void AlembicProcedural::walk_hierarchy(
     IObject parent,
     const ObjectHeader &header,
