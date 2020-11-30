@@ -49,9 +49,7 @@
 #include "transform_snap.h"
 
 /* -------------------------------------------------------------------- */
-/* Transform (Translation) */
-
-/** \name Transform Translation
+/** \name Transform (Translation)
  * \{ */
 
 static void headerTranslation(TransInfo *t, const float vec[3], char str[UI_MAX_DRAW_STR])
@@ -391,7 +389,7 @@ static void applyTranslation(TransInfo *t, const int UNUSED(mval[2]))
 
     float incr_dir[3];
     mul_v3_m3v3(incr_dir, t->spacemtx_inv, global_dir);
-    if (transform_snap_increment(t, incr_dir)) {
+    if (!(activeSnap(t) && validSnap(t)) && transform_snap_increment(t, incr_dir)) {
       mul_v3_m3v3(incr_dir, t->spacemtx, incr_dir);
 
       /* Test for mixed snap with grid. */
@@ -449,9 +447,9 @@ void initTranslation(TransInfo *t)
   t->num.flag = 0;
   t->num.idx_max = t->idx_max;
 
-  copy_v3_v3(t->snap, t->snap_spatial);
+  copy_v2_v2(t->snap, t->snap_spatial);
 
-  copy_v3_fl(t->num.val_inc, t->snap[1]);
+  copy_v3_fl(t->num.val_inc, t->snap[0]);
   t->num.unit_sys = t->scene->unit.system;
   if (t->spacetype == SPACE_VIEW3D) {
     /* Handling units makes only sense in 3Dview... See T38877. */

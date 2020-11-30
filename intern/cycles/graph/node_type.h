@@ -165,12 +165,12 @@ struct NodeType {
 
 /* Sock Definition Macros */
 
-#define SOCKET_OFFSETOF(T, name) (((char *)&(((T *)1)->name)) - (char *)1)
-#define SOCKET_SIZEOF(T, name) (sizeof(((T *)1)->name))
+#define SOCKET_OFFSETOF(T, name) offsetof(T, name)
+#define SOCKET_SIZEOF(T, name) (sizeof(T::name))
 #define SOCKET_DEFINE(name, ui_name, default_value, datatype, TYPE, flags, ...) \
   { \
     static datatype defval = default_value; \
-    CHECK_TYPE(((T *)1)->name, datatype); \
+    CHECK_TYPE(T::name, datatype); \
     type->register_input(ustring(#name), \
                          ustring(ui_name), \
                          TYPE, \
@@ -267,8 +267,8 @@ struct NodeType {
                 ##__VA_ARGS__)
 #define SOCKET_NODE_ARRAY(name, ui_name, node_type, ...) \
   { \
-    static Node *defval = NULL; \
-    assert(SOCKET_SIZEOF(T, name) == sizeof(Node *)); \
+    static array<Node *> defval = {}; \
+    assert(SOCKET_SIZEOF(T, name) == sizeof(array<Node *>)); \
     type->register_input(ustring(#name), \
                          ustring(ui_name), \
                          SocketType::NODE_ARRAY, \

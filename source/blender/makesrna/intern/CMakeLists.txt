@@ -20,7 +20,7 @@
 
 if(CMAKE_COMPILER_IS_GNUCC)
   # add here so we fail early.
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=implicit-function-declaration")
+  string(APPEND CMAKE_C_FLAGS " -Werror=implicit-function-declaration")
 endif()
 
 # files rna_access.c rna_define.c makesrna.c intentionally excluded.
@@ -98,12 +98,13 @@ set(DEFSRC
 )
 
 if(WITH_EXPERIMENTAL_FEATURES)
-  add_definitions(-DWITH_PARTICLE_NODES)
+  add_definitions(-DWITH_GEOMETRY_NODES)
+  add_definitions(-DWITH_POINT_CLOUD)
   add_definitions(-DWITH_HAIR_NODES)
   list(APPEND DEFSRC
+    rna_hair.c
     rna_pointcloud.c
     rna_simulation.c
-    rna_hair.c
   )
 endif()
 
@@ -150,7 +151,7 @@ if(CMAKE_COMPILER_IS_GNUCC OR (CMAKE_C_COMPILER_ID MATCHES "Clang"))
   set(GENSRC_CFLAGS "-Wno-missing-prototypes")
 endif()
 if(CMAKE_C_COMPILER_ID MATCHES "Clang")
-  set(GENSRC_CFLAGS "${GENSRC_CFLAGS} -Wno-missing-variable-declarations")
+  string(APPEND GENSRC_CFLAGS " -Wno-missing-variable-declarations")
 endif()
 
 if(GENSRC_CFLAGS)
@@ -373,10 +374,11 @@ blender_include_dirs(
   ../../imbuf
   ../../makesdna
   ../../nodes/
+  ../../sequencer
   ../../simulation
   ../../windowmanager
   ../../editors/include
-  ../../render/extern/include
+  ../../render
   ../../../../intern/cycles/blender
   ../../../../intern/atomic
   ../../../../intern/glew-mx

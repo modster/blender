@@ -44,9 +44,7 @@
 #include "transform_snap.h"
 
 /* -------------------------------------------------------------------- */
-/* Transform (Shear) */
-
-/** \name Transform Shear
+/** \name Transform (Shear)
  * \{ */
 
 static void initShear_mouseInputMode(TransInfo *t)
@@ -58,12 +56,12 @@ static void initShear_mouseInputMode(TransInfo *t)
   /* Needed for axis aligned view gizmo. */
   if (t->orient[t->orient_curr].type == V3D_ORIENT_VIEW) {
     if (t->orient_axis_ortho == 0) {
-      if (t->center2d[1] > t->mouse.imval[1]) {
+      if (t->center2d[1] < t->mouse.imval[1]) {
         dir_flip = !dir_flip;
       }
     }
     else if (t->orient_axis_ortho == 1) {
-      if (t->center2d[0] > t->mouse.imval[0]) {
+      if (t->center2d[0] < t->mouse.imval[0]) {
         dir_flip = !dir_flip;
       }
     }
@@ -226,11 +224,10 @@ void initShear(TransInfo *t)
 
   t->idx_max = 0;
   t->num.idx_max = 0;
-  t->snap[0] = 0.0f;
-  t->snap[1] = 0.1f;
-  t->snap[2] = t->snap[1] * 0.1f;
+  t->snap[0] = 0.1f;
+  t->snap[1] = t->snap[0] * 0.1f;
 
-  copy_v3_fl(t->num.val_inc, t->snap[1]);
+  copy_v3_fl(t->num.val_inc, t->snap[0]);
   t->num.unit_sys = t->scene->unit.system;
   t->num.unit_type[0] = B_UNIT_NONE; /* Don't think we have any unit here? */
 

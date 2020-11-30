@@ -42,6 +42,7 @@
 
 #include "BLT_translation.h"
 
+#include "DNA_defaults.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
@@ -1686,9 +1687,9 @@ static Mesh *weldModifier_doWeld(WeldModifierData *wmd, const ModifierEvalContex
   }
 #else
   {
-    KDTree_3d *tree = BLI_kdtree_3d_new(totvert);
+    KDTree_3d *tree = BLI_kdtree_3d_new(v_mask ? v_mask_act : totvert);
     for (uint i = 0; i < totvert; i++) {
-      if (!(v_mask && !BLI_BITMAP_TEST(v_mask, i))) {
+      if (!v_mask || BLI_BITMAP_TEST(v_mask, i)) {
         BLI_kdtree_3d_insert(tree, i, mvert[i].co);
       }
       vert_dest_map[i] = OUT_OF_CONTEXT;
@@ -1696,7 +1697,7 @@ static Mesh *weldModifier_doWeld(WeldModifierData *wmd, const ModifierEvalContex
 
     BLI_kdtree_3d_balance(tree);
     vert_kill_len = BLI_kdtree_3d_calc_duplicates_fast(
-        tree, wmd->merge_dist, true, (int *)vert_dest_map);
+        tree, wmd->merge_dist, false, (int *)vert_dest_map);
     BLI_kdtree_3d_free(tree);
   }
 #endif
@@ -1913,8 +1914,9 @@ static void initData(ModifierData *md)
 {
   WeldModifierData *wmd = (WeldModifierData *)md;
 
-  wmd->merge_dist = 0.001f;
-  wmd->defgrp_name[0] = '\0';
+  BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(wmd, modifier));
+
+  MEMCPY_STRUCT_AFTER(wmd, DNA_struct_default_get(WeldModifierData), modifier);
 }
 
 static void requiredDataMask(Object *UNUSED(ob),
@@ -1978,7 +1980,6 @@ ModifierTypeInfo modifierType_Weld = {
     /* updateDepsgraph */ NULL,
     /* dependsOnTime */ NULL,
     /* dependsOnNormals */ NULL,
-    /* foreachObjectLink */ NULL,
     /* foreachIDLink */ NULL,
     /* foreachTexLink */ NULL,
     /* freeRuntimeData */ NULL,

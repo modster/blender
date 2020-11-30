@@ -726,7 +726,7 @@ static void set_pchan_colorset(ArmatureDrawContext *ctx, Object *ob, bPoseChanne
 
   /* only try to set custom color if enabled for armature */
   if (arm->flag & ARM_COL_CUSTOM) {
-    /* currently, a bone can only use a custom color set if it's group (if it has one),
+    /* currently, a bone can only use a custom color set if its group (if it has one),
      * has been set to use one
      */
     if (pchan->agrp_index) {
@@ -1910,7 +1910,7 @@ static void draw_armature_edit(ArmatureDrawContext *ctx)
 
   edbo_compute_bbone_child(arm);
 
-  for (eBone = arm->edbo->first, index = ob_orig->runtime.select_id; eBone;
+  for (eBone = arm->edbo->first, index = ob->runtime.select_id; eBone;
        eBone = eBone->next, index += 0x10000) {
     if (eBone->layer & arm->layer) {
       if ((eBone->flag & BONE_HIDDEN_A) == 0) {
@@ -2005,8 +2005,7 @@ static void draw_armature_pose(ArmatureDrawContext *ctx)
         DRW_state_is_select();
 
     if (is_pose_select) {
-      const Object *ob_orig = DEG_get_original_object(ob);
-      index = ob_orig->runtime.select_id;
+      index = ob->runtime.select_id;
     }
   }
 

@@ -42,6 +42,7 @@
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_gpencil.h"
+#include "BKE_gpencil_geom.h"
 #include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_report.h"
@@ -910,7 +911,7 @@ static void annotation_stroke_newfrombuffer(tGPsdata *p)
         int totarrowpoints = runtime.arrow_end_style;
 
         /* Setting up arrow stroke. */
-        bGPDstroke *e_arrow_gps = BKE_gpencil_stroke_duplicate(gps, false);
+        bGPDstroke *e_arrow_gps = BKE_gpencil_stroke_duplicate(gps, false, false);
         annotation_stroke_arrow_allocate(e_arrow_gps, totarrowpoints);
 
         /* Set pointer to first non-initialized point. */
@@ -931,7 +932,7 @@ static void annotation_stroke_newfrombuffer(tGPsdata *p)
         int totarrowpoints = runtime.arrow_start_style;
 
         /* Setting up arrow stroke. */
-        bGPDstroke *s_arrow_gps = BKE_gpencil_stroke_duplicate(gps, false);
+        bGPDstroke *s_arrow_gps = BKE_gpencil_stroke_duplicate(gps, false, false);
         annotation_stroke_arrow_allocate(s_arrow_gps, totarrowpoints);
 
         /* Set pointer to first non-initialized point. */
@@ -1198,7 +1199,8 @@ static void annotation_stroke_eraser_dostroke(tGPsdata *p,
 
     /* Second Pass: Remove any points that are tagged */
     if (do_cull) {
-      gpencil_stroke_delete_tagged_points(gpf, gps, gps->next, GP_SPOINT_TAG, false, 0);
+      BKE_gpencil_stroke_delete_tagged_points(
+          p->gpd, gpf, gps, gps->next, GP_SPOINT_TAG, false, 0);
     }
   }
 }
@@ -1432,6 +1434,41 @@ static bool annotation_session_initdata(bContext *C, tGPsdata *p)
   return 1;
 }
 
+/* Enable the annotations in the current space. */
+static void annotation_visible_on_space(tGPsdata *p)
+{
+  ScrArea *area = p->area;
+  switch (area->spacetype) {
+    case SPACE_VIEW3D: {
+      View3D *v3d = (View3D *)area->spacedata.first;
+      v3d->flag2 |= V3D_SHOW_ANNOTATION;
+      break;
+    }
+    case SPACE_SEQ: {
+      SpaceSeq *sseq = (SpaceSeq *)area->spacedata.first;
+      sseq->flag |= SEQ_SHOW_GPENCIL;
+      break;
+    }
+    case SPACE_IMAGE: {
+      SpaceImage *sima = (SpaceImage *)area->spacedata.first;
+      sima->flag |= SI_SHOW_GPENCIL;
+      break;
+    }
+    case SPACE_NODE: {
+      SpaceNode *snode = (SpaceNode *)area->spacedata.first;
+      snode->flag |= SNODE_SHOW_GPENCIL;
+      break;
+    }
+    case SPACE_CLIP: {
+      SpaceClip *sclip = (SpaceClip *)area->spacedata.first;
+      sclip->flag |= SC_SHOW_ANNOTATION;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 /* init new painting session */
 static tGPsdata *annotation_session_initpaint(bContext *C)
 {
@@ -1457,6 +1494,9 @@ static tGPsdata *annotation_session_initpaint(bContext *C)
    *       erase size won't get lost
    */
   p->radius = U.gp_eraser;
+
+  /* Annotations must be always visible when use it. */
+  annotation_visible_on_space(p);
 
   /* return context data for running paint operator */
   return p;
@@ -2003,7 +2043,7 @@ static void annotation_draw_apply(wmOperator *op, tGPsdata *p, Depsgraph *depsgr
     short ok = annotation_stroke_addpoint(p, p->mval, p->pressure, p->curtime);
 
     /* handle errors while adding point */
-    if ((ok == GP_STROKEADD_FULL) || (ok == GP_STROKEADD_OVERFLOW)) {
+    if (ELEM(ok, GP_STROKEADD_FULL, GP_STROKEADD_OVERFLOW)) {
       /* finish off old stroke */
       annotation_paint_strokeend(p);
       /* And start a new one!!! Else, projection errors! */
@@ -2090,7 +2130,7 @@ static void annotation_draw_apply_event(
   else {
     p->straight[0] = 0;
     /* We were using shift while having permanent stabilization active,
-       so activate the temp flag back again. */
+     * so activate the temp flag back again. */
     if (p->flags & GP_PAINTFLAG_USE_STABILIZER) {
       if ((p->flags & GP_PAINTFLAG_USE_STABILIZER_TEMP) == 0) {
         annotation_draw_toggle_stabilizer_cursor(p, true);
@@ -2098,8 +2138,8 @@ static void annotation_draw_apply_event(
       }
     }
     /* We are using the temporal stabilizer flag atm,
-       but shift is not pressed as well as the permanent flag is not used,
-       so we don't need the cursor anymore. */
+     * but shift is not pressed as well as the permanent flag is not used,
+     * so we don't need the cursor anymore. */
     else if (p->flags & GP_PAINTFLAG_USE_STABILIZER_TEMP) {
       /* Reset temporal stabilizer flag and remove cursor. */
       p->flags &= ~GP_PAINTFLAG_USE_STABILIZER_TEMP;
@@ -2353,7 +2393,7 @@ static tGPsdata *annotation_stroke_begin(bContext *C, wmOperator *op)
   tGPsdata *p = op->customdata;
 
   /* we must check that we're still within the area that we're set up to work from
-   * otherwise we could crash (see bug #20586)
+   * otherwise we could crash (see bug T20586)
    */
   if (CTX_wm_area(C) != p->area) {
     printf("\t\t\tGP - wrong area execution abort!\n");
@@ -2467,8 +2507,8 @@ static int annotation_draw_modal(bContext *C, wmOperator *op, const wmEvent *eve
              EVT_UPARROWKEY,
              EVT_ZKEY)) {
       /* allow some keys:
-       *   - for frame changing [#33412]
-       *   - for undo (during sketching sessions)
+       *   - For frame changing T33412.
+       *   - For undo (during sketching sessions).
        */
     }
     else if (ELEM(event->type,
@@ -2520,7 +2560,7 @@ static int annotation_draw_modal(bContext *C, wmOperator *op, const wmEvent *eve
    *  - LEFTMOUSE  = standard drawing (all) / straight line drawing (all) / polyline (toolbox
    * only)
    *  - RIGHTMOUSE = polyline (hotkey) / eraser (all)
-   *    (Disabling RIGHTMOUSE case here results in bugs like [#32647])
+   *    (Disabling RIGHTMOUSE case here results in bugs like T32647)
    * also making sure we have a valid event value, to not exit too early
    */
   if (ELEM(event->type, LEFTMOUSE, RIGHTMOUSE) && (ELEM(event->val, KM_PRESS, KM_RELEASE))) {

@@ -43,12 +43,14 @@ def get_arguments(filepath, output_filepath):
 
     return args
 
+
 def create_argparse():
     parser = argparse.ArgumentParser()
     parser.add_argument("-blender", nargs="+")
     parser.add_argument("-testdir", nargs=1)
     parser.add_argument("-outdir", nargs=1)
     parser.add_argument("-idiff", nargs=1)
+    parser.add_argument("-device", nargs=1)
     return parser
 
 
@@ -60,12 +62,16 @@ def main():
     test_dir = args.testdir[0]
     idiff = args.idiff[0]
     output_dir = args.outdir[0]
+    device = args.device[0]
 
     from modules import render_report
-    report = render_report.Report("Cycles", output_dir, idiff)
+    report = render_report.Report('Cycles', output_dir, idiff, device)
     report.set_pixelated(True)
     report.set_reference_dir("cycles_renders")
-    report.set_compare_engines('cycles', 'eevee')
+    if device == 'CPU':
+        report.set_compare_engine('eevee')
+    else:
+        report.set_compare_engine('cycles', 'CPU')
 
     # Increase threshold for motion blur, see T78777.
     test_dir_name = Path(test_dir).name

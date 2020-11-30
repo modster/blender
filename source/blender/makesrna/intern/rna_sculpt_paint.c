@@ -229,7 +229,7 @@ static const EnumPropertyItem *rna_ParticleEdit_tool_itemf(bContext *C,
 #  else
   /* use this rather than PE_get_current() - because the editing cache is
    * dependent on the cache being updated which can happen after this UI
-   * draws causing a glitch [#28883] */
+   * draws causing a glitch T28883. */
   ParticleSystem *psys = psys_get_current(ob);
 #  endif
 
@@ -1151,7 +1151,7 @@ static void rna_def_particle_edit(BlenderRNA *brna)
 
   static const EnumPropertyItem edit_type_items[] = {
       {PE_TYPE_PARTICLES, "PARTICLES", 0, "Particles", ""},
-      {PE_TYPE_SOFTBODY, "SOFT_BODY", 0, "Soft body", ""},
+      {PE_TYPE_SOFTBODY, "SOFT_BODY", 0, "Soft Body", ""},
       {PE_TYPE_CLOTH, "CLOTH", 0, "Cloth", ""},
       {0, NULL, 0, NULL, NULL},
   };

@@ -43,7 +43,9 @@ function(add_blender_test testname)
 
   # Don't fail tests on leaks since these often happen in external libraries
   # that we can't fix.
-  set_tests_properties(${testname} PROPERTIES ENVIRONMENT LSAN_OPTIONS=exitcode=0)
+  set_tests_properties(${testname} PROPERTIES ENVIRONMENT
+    LSAN_OPTIONS=exitcode=0:$ENV{LSAN_OPTIONS}
+  )
 endfunction()
 
 # Run Python script outside Blender.
@@ -56,7 +58,9 @@ function(add_python_test testname testscript)
     NAME ${testname}
     COMMAND ${TEST_PYTHON_EXE} ${testscript} ${ARGN}
   )
-  set_tests_properties(${testname} PROPERTIES ENVIRONMENT LSAN_OPTIONS=exitcode=0)
+  set_tests_properties(${testname} PROPERTIES ENVIRONMENT
+    LSAN_OPTIONS=exitcode=0:$ENV{LSAN_OPTIONS}
+  )
 endfunction()
 
 # ------------------------------------------------------------------------------
@@ -635,20 +639,28 @@ if(WITH_CYCLES OR WITH_OPENGL_RENDER_TESTS)
       list(APPEND render_tests grease_pencil)
     endif()
 
+    # Cycles
     if(WITH_CYCLES)
-      foreach(render_test bake;${render_tests})
-        add_python_test(
-          cycles_${render_test}
-          ${CMAKE_CURRENT_LIST_DIR}/cycles_render_tests.py
-          -blender "${TEST_BLENDER_EXE}"
-          -testdir "${TEST_SRC_DIR}/render/${render_test}"
-          -idiff "${OPENIMAGEIO_IDIFF}"
-          -outdir "${TEST_OUT_DIR}/cycles"
-        )
+      foreach(_cycles_device ${CYCLES_TEST_DEVICES})
+        string(TOLOWER "${_cycles_device}" _cycles_device_lower)
+        set(_cycles_render_tests bake;${render_tests};osl)
+
+        foreach(render_test ${_cycles_render_tests})
+          add_python_test(
+            cycles_${render_test}_${_cycles_device_lower}
+            ${CMAKE_CURRENT_LIST_DIR}/cycles_render_tests.py
+            -blender "${TEST_BLENDER_EXE}"
+            -testdir "${TEST_SRC_DIR}/render/${render_test}"
+            -idiff "${OPENIMAGEIO_IDIFF}"
+            -outdir "${TEST_OUT_DIR}/cycles"
+            -device ${_cycles_device}
+          )
+        endforeach()
       endforeach()
     endif()
 
     if(WITH_OPENGL_RENDER_TESTS)
+      # Eevee
       foreach(render_test ${render_tests})
         add_python_test(
           eevee_${render_test}_test
@@ -661,6 +673,7 @@ if(WITH_CYCLES OR WITH_OPENGL_RENDER_TESTS)
       endforeach()
 
       foreach(render_test ${render_tests})
+        # Workbench
         add_python_test(
           workbench_${render_test}_test
           ${CMAKE_CURRENT_LIST_DIR}/workbench_render_tests.py
@@ -735,6 +748,30 @@ if(WITH_CODEC_FFMPEG)
     --testdir "${TEST_SRC_DIR}/ffmpeg"
   )
 endif()
+
+
+# ------------------------------------------------------------------------------
+# SEQUENCER RENDER TESTS
+
+if(NOT OPENIMAGEIO_IDIFF)
+  MESSAGE(STATUS "Disabling sequencer render tests because OIIO idiff does not exist")
+else()
+  set(render_tests
+    transform
+  )
+
+  foreach(render_test ${render_tests})
+    add_python_test(
+      sequencer_render_${render_test}
+      ${CMAKE_CURRENT_LIST_DIR}/sequencer_render_tests.py
+      -blender "${TEST_BLENDER_EXE}"
+      -testdir "${TEST_SRC_DIR}/sequence_editing/${render_test}"
+      -idiff "${OPENIMAGEIO_IDIFF}"
+      -outdir "${TEST_OUT_DIR}/sequence_editing"
+    )
+  endforeach()
+endif()
+
 
 add_subdirectory(collada)
 

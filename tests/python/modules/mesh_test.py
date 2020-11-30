@@ -168,8 +168,16 @@ class MeshTest:
     the public method run_test().
     """
 
-    def __init__(self, test_name: str, test_object_name: str, expected_object_name: str, operations_stack=None,
-                 apply_modifiers=False, do_compare=False, threshold=None):
+    def __init__(
+            self,
+            test_name: str,
+            test_object_name: str,
+            expected_object_name: str,
+            operations_stack=None,
+            apply_modifiers=False,
+            do_compare=False,
+            threshold=None
+    ):
         """
         Constructs a MeshTest object. Raises a KeyError if objects with names expected_object_name
         or test_object_name don't exist.

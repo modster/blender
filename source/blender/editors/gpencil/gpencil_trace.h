@@ -25,11 +25,11 @@
 #define __GPENCIL_TRACE_H__
 
 /* internal exports only */
-struct bGPDframe;
 struct FILE;
 struct ImBuf;
 struct Main;
 struct Object;
+struct bGPDframe;
 
 #include "potracelib.h"
 
@@ -55,6 +55,10 @@ struct Object;
 #define BM_CLR(bm, x, y) (bm_safe(bm, x, y) ? BM_UCLR(bm, x, y) : 0)
 #define BM_INV(bm, x, y) (bm_safe(bm, x, y) ? BM_UINV(bm, x, y) : 0)
 #define BM_PUT(bm, x, y, b) (bm_safe(bm, x, y) ? BM_UPUT(bm, x, y, b) : 0)
+
+/* Trace modes */
+#define GPENCIL_TRACE_MODE_SINGLE 0
+#define GPENCIL_TRACE_MODE_SEQUENCE 1
 
 void ED_gpencil_trace_bitmap_print(FILE *f, const potrace_bitmap_t *bm);
 

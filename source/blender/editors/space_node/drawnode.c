@@ -47,10 +47,13 @@
 
 #include "GPU_batch.h"
 #include "GPU_batch_presets.h"
+#include "GPU_framebuffer.h"
 #include "GPU_immediate.h"
 #include "GPU_matrix.h"
 #include "GPU_platform.h"
 #include "GPU_state.h"
+
+#include "DRW_engine.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -748,6 +751,7 @@ static void node_shader_buts_vect_transform(uiLayout *layout, bContext *UNUSED(C
 
 static void node_shader_buts_attribute(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
+  uiItemR(layout, ptr, "attribute_type", DEFAULT_FLAGS, IFACE_("Type"), ICON_NONE);
   uiItemR(layout, ptr, "attribute_name", DEFAULT_FLAGS, IFACE_("Name"), ICON_NONE);
 }
 
@@ -2369,7 +2373,7 @@ static void node_composit_buts_bokehimage(uiLayout *layout, bContext *UNUSED(C),
 static void node_composit_buts_bokehblur(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "use_variable_size", DEFAULT_FLAGS, NULL, ICON_NONE);
-  // uiItemR(layout, ptr, "f_stop", DEFAULT_FLAGS, NULL, ICON_NONE);  // UNUSED
+  // uiItemR(layout, ptr, "f_stop", DEFAULT_FLAGS, NULL, ICON_NONE); /* UNUSED */
   uiItemR(layout, ptr, "blur_max", DEFAULT_FLAGS, NULL, ICON_NONE);
   uiItemR(layout, ptr, "use_extended_bounds", DEFAULT_FLAGS, NULL, ICON_NONE);
 }
@@ -3140,58 +3144,8 @@ static void node_texture_set_butfunc(bNodeType *ntype)
 
 /* ****************** BUTTON CALLBACKS FOR SIMULATION NODES ***************** */
 
-static void node_simulation_buts_particle_simulation(uiLayout *layout,
-                                                     bContext *UNUSED(C),
-                                                     PointerRNA *ptr)
+static void node_simulation_set_butfunc(bNodeType *UNUSED(ntype))
 {
-  uiItemR(layout, ptr, "name", DEFAULT_FLAGS, "", ICON_NONE);
-}
-
-static void node_simulation_buts_particle_time_step_event(uiLayout *layout,
-                                                          bContext *UNUSED(C),
-                                                          PointerRNA *ptr)
-{
-  uiItemR(layout, ptr, "mode", DEFAULT_FLAGS, "", ICON_NONE);
-}
-
-static void node_simulation_buts_particle_attribute(uiLayout *layout,
-                                                    bContext *UNUSED(C),
-                                                    PointerRNA *ptr)
-{
-  uiItemR(layout, ptr, "data_type", DEFAULT_FLAGS, "", ICON_NONE);
-}
-
-static void node_simulation_buts_set_particle_attribute(uiLayout *layout,
-                                                        bContext *UNUSED(C),
-                                                        PointerRNA *ptr)
-{
-  uiItemR(layout, ptr, "data_type", DEFAULT_FLAGS, "", ICON_NONE);
-}
-
-static void node_simulation_buts_time(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
-{
-  uiItemR(layout, ptr, "mode", DEFAULT_FLAGS, "", ICON_NONE);
-}
-
-static void node_simulation_set_butfunc(bNodeType *ntype)
-{
-  switch (ntype->type) {
-    case SIM_NODE_PARTICLE_SIMULATION:
-      ntype->draw_buttons = node_simulation_buts_particle_simulation;
-      break;
-    case SIM_NODE_PARTICLE_TIME_STEP_EVENT:
-      ntype->draw_buttons = node_simulation_buts_particle_time_step_event;
-      break;
-    case SIM_NODE_PARTICLE_ATTRIBUTE:
-      ntype->draw_buttons = node_simulation_buts_particle_attribute;
-      break;
-    case SIM_NODE_SET_PARTICLE_ATTRIBUTE:
-      ntype->draw_buttons = node_simulation_buts_set_particle_attribute;
-      break;
-    case SIM_NODE_TIME:
-      ntype->draw_buttons = node_simulation_buts_time;
-      break;
-  }
 }
 
 /* ****************** BUTTON CALLBACKS FOR FUNCTION NODES ***************** */
@@ -3379,10 +3333,6 @@ static const float std_node_socket_colors[][4] = {
     {0.39, 0.39, 0.39, 1.0}, /* SOCK_STRING */
     {0.40, 0.10, 0.10, 1.0}, /* SOCK_OBJECT */
     {0.10, 0.40, 0.10, 1.0}, /* SOCK_IMAGE */
-    {0.80, 0.80, 0.20, 1.0}, /* SOCK_EMITTERS */
-    {0.80, 0.20, 0.80, 1.0}, /* SOCK_EVENTS */
-    {0.20, 0.80, 0.80, 1.0}, /* SOCK_FORCES */
-    {0.30, 0.30, 0.30, 1.0}, /* SOCK_CONTROL_FLOW */
 };
 
 /* common color callbacks for standard types */
@@ -3587,8 +3537,6 @@ void draw_nodespace_back_pix(const bContext *C,
   Main *bmain = CTX_data_main(C);
   bNodeInstanceKey active_viewer_key = (snode->nodetree ? snode->nodetree->active_viewer_key :
                                                           NODE_INSTANCE_KEY_NONE);
-  float shuffle[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-
   GPU_matrix_push_projection();
   GPU_matrix_push();
   wmOrtho2_region_pixelspace(region);
@@ -3605,73 +3553,26 @@ void draw_nodespace_back_pix(const bContext *C,
     return;
   }
 
+  GPU_matrix_push_projection();
+  GPU_matrix_push();
+
+  /* The draw manager is used to draw the backdrop image. */
+  GPUFrameBuffer *old_fb = GPU_framebuffer_active_get();
+  GPU_framebuffer_restore();
+  DRW_draw_view(C);
+  GPU_framebuffer_bind_no_srgb(old_fb);
+  /* Draw manager changes the depth state. Set it back to NONE. Without this the node preview
+   * images aren't drawn correctly. */
+  GPU_depth_test(GPU_DEPTH_NONE);
+
   void *lock;
   Image *ima = BKE_image_ensure_viewer(bmain, IMA_TYPE_COMPOSITE, "Viewer Node");
   ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock);
   if (ibuf) {
-    GPU_matrix_push_projection();
-    GPU_matrix_push();
-
     /* somehow the offset has to be calculated inverse */
     wmOrtho2_region_pixelspace(region);
-
     const float x = (region->winx - snode->zoom * ibuf->x) / 2 + snode->xof;
     const float y = (region->winy - snode->zoom * ibuf->y) / 2 + snode->yof;
-
-    if (ibuf->rect || ibuf->rect_float) {
-      uchar *display_buffer = NULL;
-      void *cache_handle = NULL;
-
-      if (snode->flag & (SNODE_SHOW_R | SNODE_SHOW_G | SNODE_SHOW_B | SNODE_SHOW_ALPHA)) {
-
-        display_buffer = IMB_display_buffer_acquire_ctx(C, ibuf, &cache_handle);
-
-        if (snode->flag & SNODE_SHOW_R) {
-          shuffle[0] = 1.0f;
-        }
-        else if (snode->flag & SNODE_SHOW_G) {
-          shuffle[1] = 1.0f;
-        }
-        else if (snode->flag & SNODE_SHOW_B) {
-          shuffle[2] = 1.0f;
-        }
-        else {
-          shuffle[3] = 1.0f;
-        }
-
-        IMMDrawPixelsTexState state = immDrawPixelsTexSetup(GPU_SHADER_2D_IMAGE_SHUFFLE_COLOR);
-        GPU_shader_uniform_vector(
-            state.shader, GPU_shader_get_uniform(state.shader, "shuffle"), 4, 1, shuffle);
-
-        immDrawPixelsTex(&state,
-                         x,
-                         y,
-                         ibuf->x,
-                         ibuf->y,
-                         GPU_RGBA8,
-                         false,
-                         display_buffer,
-                         snode->zoom,
-                         snode->zoom,
-                         NULL);
-
-        GPU_shader_unbind();
-      }
-      else if (snode->flag & SNODE_USE_ALPHA) {
-        GPU_blend(GPU_BLEND_ALPHA);
-
-        ED_draw_imbuf_ctx(C, ibuf, x, y, false, snode->zoom, snode->zoom);
-
-        GPU_blend(GPU_BLEND_NONE);
-      }
-      else {
-        ED_draw_imbuf_ctx(C, ibuf, x, y, false, snode->zoom, snode->zoom);
-      }
-
-      if (cache_handle) {
-        IMB_display_buffer_release(cache_handle);
-      }
-    }
 
     /** \note draw selected info on backdrop */
     if (snode->edittree) {
@@ -3705,12 +3606,11 @@ void draw_nodespace_back_pix(const bContext *C,
         immUnbindProgram();
       }
     }
-
-    GPU_matrix_pop_projection();
-    GPU_matrix_pop();
   }
 
   BKE_image_release_ibuf(ima, ibuf, lock);
+  GPU_matrix_pop_projection();
+  GPU_matrix_pop();
 }
 
 /* return quadratic beziers points for a given nodelink and clip if v2d is not NULL. */
@@ -4128,7 +4028,6 @@ void node_draw_link(View2D *v2d, SpaceNode *snode, bNodeLink *link)
   }
 
   node_draw_link_bezier(v2d, snode, link, th_col1, th_col2, th_col3);
-  //  node_draw_link_straight(v2d, snode, link, th_col1, do_shaded, th_col2, do_triple, th_col3);
 }
 
 void ED_node_draw_snap(View2D *v2d, const float cent[2], float size, NodeBorder border, uint pos)

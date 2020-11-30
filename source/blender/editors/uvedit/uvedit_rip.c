@@ -73,7 +73,7 @@ typedef struct ULData {
    * around the connected fan are attached to an edge.
    *
    * In this case there is no need to detect contiguous loops,
-   * each isolated case is handled on it's own, no need to walk over selected edges.
+   * each isolated case is handled on its own, no need to walk over selected edges.
    *
    * \note This flag isn't flushed to other loops which could also have this enabled.
    * Currently it's not necessary since we can start off on any one of these loops,
@@ -938,10 +938,10 @@ static int uv_rip_exec(bContext *C, wmOperator *op)
 
 static int uv_rip_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  ARegion *ar = CTX_wm_region(C);
+  ARegion *region = CTX_wm_region(C);
   float co[2];
 
-  UI_view2d_region_to_view(&ar->v2d, event->mval[0], event->mval[1], &co[0], &co[1]);
+  UI_view2d_region_to_view(&region->v2d, event->mval[0], event->mval[1], &co[0], &co[1]);
   RNA_float_set_array(op->ptr, "location", co);
 
   return uv_rip_exec(C, op);

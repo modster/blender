@@ -457,6 +457,15 @@ static void distortion_model_parameters_from_tracking(
       camera_intrinsics_options->nuke_k1 = camera->nuke_k1;
       camera_intrinsics_options->nuke_k2 = camera->nuke_k2;
       return;
+    case TRACKING_DISTORTION_MODEL_BROWN:
+      camera_intrinsics_options->distortion_model = LIBMV_DISTORTION_MODEL_BROWN;
+      camera_intrinsics_options->brown_k1 = camera->brown_k1;
+      camera_intrinsics_options->brown_k2 = camera->brown_k2;
+      camera_intrinsics_options->brown_k3 = camera->brown_k3;
+      camera_intrinsics_options->brown_k4 = camera->brown_k4;
+      camera_intrinsics_options->brown_p1 = camera->brown_p1;
+      camera_intrinsics_options->brown_p2 = camera->brown_p2;
+      return;
   }
 
   /* Unknown distortion model, which might be due to opening newer file in older Blender.
@@ -490,6 +499,15 @@ static void distortion_model_parameters_from_options(
       camera->distortion_model = TRACKING_DISTORTION_MODEL_NUKE;
       camera->nuke_k1 = camera_intrinsics_options->nuke_k1;
       camera->nuke_k2 = camera_intrinsics_options->nuke_k2;
+      return;
+    case LIBMV_DISTORTION_MODEL_BROWN:
+      camera->distortion_model = TRACKING_DISTORTION_MODEL_BROWN;
+      camera->brown_k1 = camera_intrinsics_options->brown_k1;
+      camera->brown_k2 = camera_intrinsics_options->brown_k2;
+      camera->brown_k3 = camera_intrinsics_options->brown_k3;
+      camera->brown_k4 = camera_intrinsics_options->brown_k4;
+      camera->brown_p1 = camera_intrinsics_options->brown_p1;
+      camera->brown_p2 = camera_intrinsics_options->brown_p2;
       return;
   }
 
@@ -704,7 +722,7 @@ static ImBuf *make_grayscale_ibuf_copy(ImBuf *ibuf)
 {
   ImBuf *grayscale = IMB_allocImBuf(ibuf->x, ibuf->y, 32, 0);
 
-  BLI_assert(ibuf->channels == 3 || ibuf->channels == 4);
+  BLI_assert(ELEM(ibuf->channels, 3, 4));
 
   /* TODO(sergey): Bummer, currently IMB API only allows to create 4 channels
    * float buffer, so we do it manually here.
@@ -862,7 +880,7 @@ static ImBuf *accessor_get_ibuf(TrackingImageAccessor *accessor,
   }
   /* Transform number of channels. */
   if (input_mode == LIBMV_IMAGE_MODE_RGBA) {
-    BLI_assert(orig_ibuf->channels == 3 || orig_ibuf->channels == 4);
+    BLI_assert(ELEM(orig_ibuf->channels, 3, 4));
     /* pass */
   }
   else /* if (input_mode == LIBMV_IMAGE_MODE_MONO) */ {
@@ -991,8 +1009,7 @@ static void accessor_release_mask_callback(libmv_CacheKey cache_key)
 TrackingImageAccessor *tracking_image_accessor_new(MovieClip *clips[MAX_ACCESSOR_CLIP],
                                                    int num_clips,
                                                    MovieTrackingTrack **tracks,
-                                                   int num_tracks,
-                                                   int start_frame)
+                                                   int num_tracks)
 {
   TrackingImageAccessor *accessor = MEM_callocN(sizeof(TrackingImageAccessor),
                                                 "tracking image accessor");
@@ -1004,9 +1021,11 @@ TrackingImageAccessor *tracking_image_accessor_new(MovieClip *clips[MAX_ACCESSOR
 
   memcpy(accessor->clips, clips, num_clips * sizeof(MovieClip *));
   accessor->num_clips = num_clips;
-  accessor->tracks = tracks;
+
+  accessor->tracks = MEM_malloc_arrayN(
+      num_tracks, sizeof(MovieTrackingTrack *), "image accessor tracks");
+  memcpy(accessor->tracks, tracks, num_tracks * sizeof(MovieTrackingTrack *));
   accessor->num_tracks = num_tracks;
-  accessor->start_frame = start_frame;
 
   accessor->libmv_accessor = libmv_FrameAccessorNew((libmv_FrameAccessorUserData *)accessor,
                                                     accessor_get_image_callback,
@@ -1024,5 +1043,6 @@ void tracking_image_accessor_destroy(TrackingImageAccessor *accessor)
   IMB_moviecache_free(accessor->cache);
   libmv_FrameAccessorDestroy(accessor->libmv_accessor);
   BLI_spin_end(&accessor->cache_lock);
+  MEM_freeN(accessor->tracks);
   MEM_freeN(accessor);
 }

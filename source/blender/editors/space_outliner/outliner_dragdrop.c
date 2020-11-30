@@ -85,8 +85,8 @@ static TreeElement *outliner_dropzone_element(TreeElement *te,
   }
   /* Not it.  Let's look at its children. */
   if (children && (TREESTORE(te)->flag & TSE_CLOSED) == 0 && (te->subtree.first)) {
-    for (te = te->subtree.first; te; te = te->next) {
-      TreeElement *te_valid = outliner_dropzone_element(te, fmval, children);
+    LISTBASE_FOREACH (TreeElement *, te_sub, &te->subtree) {
+      TreeElement *te_valid = outliner_dropzone_element(te_sub, fmval, children);
       if (te_valid) {
         return te_valid;
       }
@@ -100,9 +100,7 @@ static TreeElement *outliner_dropzone_find(const SpaceOutliner *space_outliner,
                                            const float fmval[2],
                                            const bool children)
 {
-  TreeElement *te;
-
-  for (te = space_outliner->tree.first; te; te = te->next) {
+  LISTBASE_FOREACH (TreeElement *, te, &space_outliner->tree) {
     TreeElement *te_valid = outliner_dropzone_element(te, fmval, children);
     if (te_valid) {
       return te_valid;
@@ -643,6 +641,7 @@ static int material_drop_invoke(bContext *C, wmOperator *UNUSED(op), const wmEve
 
   BKE_object_material_assign(bmain, ob, ma, ob->totcol + 1, BKE_MAT_ASSIGN_USERPREF);
 
+  WM_event_add_notifier(C, NC_OBJECT | ND_OB_SHADING, ob);
   WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, CTX_wm_view3d(C));
   WM_event_add_notifier(C, NC_MATERIAL | ND_SHADING_LINKS, ma);
 
@@ -849,6 +848,10 @@ static bool datastack_drop_poll(bContext *C,
                                 const wmEvent *event,
                                 const char **r_tooltip)
 {
+  if (drag->type != WM_DRAG_DATASTACK) {
+    return false;
+  }
+
   SpaceOutliner *space_outliner = CTX_wm_space_outliner(C);
   ARegion *region = CTX_wm_region(C);
   bool changed = outliner_flag_set(&space_outliner->tree, TSE_HIGHLIGHTED | TSE_DRAG_ANY, false);
@@ -1365,16 +1368,18 @@ static int outliner_item_drag_drop_invoke(bContext *C,
     WM_operator_properties_free(&op_ptr);
   }
 
-  wmDrag *drag = WM_event_start_drag(C, data.icon, WM_DRAG_ID, NULL, 0.0, WM_DRAG_NOP);
+  const bool use_datastack_drag = ELEM(tselem->type,
+                                       TSE_MODIFIER,
+                                       TSE_MODIFIER_BASE,
+                                       TSE_CONSTRAINT,
+                                       TSE_CONSTRAINT_BASE,
+                                       TSE_GPENCIL_EFFECT,
+                                       TSE_GPENCIL_EFFECT_BASE);
 
-  if (ELEM(tselem->type,
-           TSE_MODIFIER,
-           TSE_MODIFIER_BASE,
-           TSE_CONSTRAINT,
-           TSE_CONSTRAINT_BASE,
-           TSE_GPENCIL_EFFECT,
-           TSE_GPENCIL_EFFECT_BASE)) {
+  const int wm_drag_type = use_datastack_drag ? WM_DRAG_DATASTACK : WM_DRAG_ID;
+  wmDrag *drag = WM_event_start_drag(C, data.icon, wm_drag_type, NULL, 0.0, WM_DRAG_NOP);
 
+  if (use_datastack_drag) {
     TreeElement *te_bone = NULL;
     bPoseChannel *pchan = outliner_find_parent_bone(te, &te_bone);
     datastack_drop_data_init(drag, (Object *)tselem->id, pchan, te, tselem, te->directdata);
