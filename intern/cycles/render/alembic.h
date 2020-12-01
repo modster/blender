@@ -25,8 +25,8 @@
 
 #ifdef WITH_ALEMBIC
 
-#include <Alembic/AbcCoreFactory/All.h>
-#include <Alembic/AbcGeom/All.h>
+#  include <Alembic/AbcCoreFactory/All.h>
+#  include <Alembic/AbcGeom/All.h>
 
 CCL_NAMESPACE_BEGIN
 
@@ -39,8 +39,8 @@ using MatrixSampleMap = std::map<Alembic::Abc::chrono_t, Alembic::Abc::M44d>;
 
 template<typename T> class DataStore {
   struct DataTimePair {
-      double time = 0;
-      T data{};
+    double time = 0;
+    T data{};
   };
 
   vector<DataTimePair> data{};
@@ -202,8 +202,7 @@ class AlembicObject : public Node {
   void set_object(Object *object);
   Object *get_object();
 
-  void load_all_data(const Alembic::AbcGeom::IPolyMeshSchema &schema,
-                     Progress &progress);
+  void load_all_data(const Alembic::AbcGeom::IPolyMeshSchema &schema, Progress &progress);
 
   bool has_data_loaded() const;
 

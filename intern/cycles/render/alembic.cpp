@@ -257,8 +257,7 @@ static void read_default_uvs(const IV2fGeomParam &uvs, CachedData &cached_data)
   }
 }
 
-static void read_default_normals(const IN3fGeomParam &normals,
-                                 CachedData &cached_data)
+static void read_default_normals(const IN3fGeomParam &normals, CachedData &cached_data)
 {
   auto &attr = cached_data.add_attribute(ustring(normals.getName()));
 
@@ -398,9 +397,9 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema, Progress &progr
   cached_data.triangles_loops.set_time_sampling(*schema.getTimeSampling());
 
   for (size_t i = 0; i < schema.getNumSamples(); ++i) {
-   if (progress.get_cancel()) {
-     return;
-   }
+    if (progress.get_cancel()) {
+      return;
+    }
 
     const ISampleSelector iss = ISampleSelector(static_cast<index_t>(i));
     const IPolyMeshSchema::Sample sample = schema.getValue(iss);
@@ -491,7 +490,9 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema, Progress &progr
     cached_data.transforms.add_data(transform_identity(), 0.0);
   }
   else {
-    /* It is possible for a leaf node of the hierarchy to have multiple samples for its transforms if a sibling has animated transforms. So check if we indeed have animated transformations. */
+    /* It is possible for a leaf node of the hierarchy to have multiple samples for its transforms
+     * if a sibling has animated transforms. So check if we indeed have animated transformations.
+     */
     M44d first_matrix = xform_samples.begin()->first;
     bool has_animation = false;
     for (auto &pair : xform_samples) {
@@ -958,12 +959,12 @@ void AlembicProcedural::read_curves(Scene *scene,
   }
 }
 
-void AlembicProcedural::walk_hierarchy(IObject parent,
+void AlembicProcedural::walk_hierarchy(
+    IObject parent,
     const ObjectHeader &header,
     MatrixSampleMap *xform_samples,
-    const unordered_map<std::string,
-                                       AlembicObject *> &object_map,
-                                       Progress &progress)
+    const unordered_map<std::string, AlembicObject *> &object_map,
+    Progress &progress)
 {
   if (progress.get_cancel()) {
     return;
@@ -1052,7 +1053,8 @@ void AlembicProcedural::walk_hierarchy(IObject parent,
 
   if (next_object.valid()) {
     for (size_t i = 0; i < next_object.getNumChildren(); ++i) {
-      walk_hierarchy(next_object, next_object.getChildHeader(i), xform_samples, object_map, progress);
+      walk_hierarchy(
+          next_object, next_object.getChildHeader(i), xform_samples, object_map, progress);
     }
   }
 }
