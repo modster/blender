@@ -880,7 +880,6 @@ void AlembicProcedural::read_mesh(Scene *scene,
   mesh->add_face_normals();
 
   if (mesh->is_modified()) {
-    // TODO : check for modification of subdivision data (is a separate object in Alembic)
     bool need_rebuild = mesh->triangles_is_modified();
     mesh->tag_update(scene, need_rebuild);
   }
