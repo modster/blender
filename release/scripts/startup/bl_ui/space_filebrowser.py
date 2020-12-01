@@ -598,7 +598,6 @@ class ASSETBROWSER_PT_metadata_details(asset_utils.AssetBrowserPanel, Panel):
         layout.use_property_split = True
 
         if active_asset:
-            layout.prop(active_asset, "author")
             layout.prop(active_asset, "description")
 
 
