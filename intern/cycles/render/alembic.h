@@ -44,7 +44,6 @@ template<typename T> class DataStore {
   };
 
   vector<DataTimePair> data{};
-  double last_lookup_time = -1.0;
 
  public:
   Alembic::AbcCoreAbstract::TimeSampling time_sampling{};
@@ -52,26 +51,6 @@ template<typename T> class DataStore {
   void set_time_sampling(Alembic::AbcCoreAbstract::TimeSampling time_sampling_)
   {
     time_sampling = time_sampling_;
-  }
-
-  T *data_for_new_time(double time)
-  {
-    if (size() == 0) {
-      return nullptr;
-    }
-
-    auto index_pair = time_sampling.getNearIndex(time, data.size());
-    auto ptr = &data[index_pair.first];
-
-    /* check that the current time is not the same as the last time to avoid
-     * crashes as the data has been stolen by the node already */
-    if (last_lookup_time == ptr->time) {
-      return nullptr;
-    }
-
-    last_lookup_time = ptr->time;
-
-    return &ptr->data;
   }
 
   T *data_for_time(double time)
@@ -120,7 +99,6 @@ struct CachedData {
   DataStore<array<int3>> triangles{};
   DataStore<array<int3>> triangles_loops{};
   DataStore<Transform> transforms{};
-  ccl::set<double> dirty_frames{};
 
   struct CachedAttribute {
     AttributeStandard std;
@@ -138,18 +116,7 @@ struct CachedData {
     triangles.clear();
     triangles_loops.clear();
     transforms.clear();
-    dirty_frames.clear();
     attributes.clear();
-  }
-
-  void add_dirty_frame(double f)
-  {
-    dirty_frames.insert(f);
-  }
-
-  bool is_dirty_frame(double f)
-  {
-    return dirty_frames.find(f) != dirty_frames.end();
   }
 
   CachedAttribute &add_attribute(ustring name)

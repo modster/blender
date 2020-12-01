@@ -805,27 +805,21 @@ void AlembicProcedural::read_mesh(Scene *scene,
 
   auto &cached_data = abc_object->get_cached_data();
 
-  // TODO : arrays are emptied when passed to the sockets, so we need to reload the data
-  // perhaps we should just have a way to set the pointer
-  if (cached_data.is_dirty_frame(frame_time)) {
-    abc_object->load_all_data(schema, progress);
-  }
-
   Transform *tfm = cached_data.transforms.data_for_time(frame_time);
   if (tfm) {
     auto object = abc_object->get_object();
     object->set_tfm(*tfm);
   }
 
-  array<float3> *vertices = cached_data.vertices.data_for_new_time(frame_time);
+  array<float3> *vertices = cached_data.vertices.data_for_time(frame_time);
   if (vertices) {
-    cached_data.add_dirty_frame(frame_time);
-    mesh->set_verts(*vertices);
+    // TODO : arrays are emptied when passed to the sockets, so we need to copy the array to avoid reloading the data
+    array<float3> new_vertices = *vertices;
+    mesh->set_verts(new_vertices);
   }
 
-  array<int3> *triangle_data = cached_data.triangles.data_for_new_time(frame_time);
+  array<int3> *triangle_data = cached_data.triangles.data_for_time(frame_time);
   if (triangle_data) {
-    cached_data.add_dirty_frame(frame_time);
     // TODO : shader association
     array<int> triangles;
     array<bool> smooth;
@@ -858,7 +852,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
   }
 
   for (auto &attribute : cached_data.attributes) {
-    auto attr_data = attribute.data.data_for_new_time(frame_time);
+    auto attr_data = attribute.data.data_for_time(frame_time);
 
     if (!attr_data) {
       continue;
