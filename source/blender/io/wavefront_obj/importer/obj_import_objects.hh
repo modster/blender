@@ -154,8 +154,7 @@ class Geometry {
   const NurbsElement &nurbs_elem() const;
   const std::string &group() const;
 
-  /* Parser class edits all the parameters of the Geometry class. */
-  friend class OBJParser;
+  friend class OBJStorer;
 };
 
 struct UniqueObjectDeleter {

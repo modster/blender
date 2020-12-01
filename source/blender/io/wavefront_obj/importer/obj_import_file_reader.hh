@@ -40,11 +40,46 @@ class OBJParser {
  public:
   OBJParser(const OBJImportParams &import_params);
 
-  void parse_and_store(Vector<std::unique_ptr<Geometry>> &r_all_geometries,
-                       GlobalVertices &r_global_vertices);
+  void parse(Vector<std::unique_ptr<Geometry>> &r_all_geometries,
+             GlobalVertices &r_global_vertices);
   Span<std::string> mtl_libraries() const;
 };
 
+class OBJStorer {
+ private:
+  Geometry &r_geom_;
+
+ public:
+  OBJStorer(Geometry &r_geom) : r_geom_(r_geom)
+  {
+  }
+  void add_vertex(const StringRef rest_line, GlobalVertices &r_global_vertices);
+  void add_vertex_normal(const StringRef rest_line, GlobalVertices &r_global_vertices);
+  void add_uv_vertex(const StringRef rest_line, GlobalVertices &r_global_vertices);
+  void add_edge(const StringRef rest_line,
+                const VertexIndexOffset &offsets,
+                GlobalVertices &r_global_vertices);
+  void add_polygon(const StringRef rest_line,
+                   const VertexIndexOffset &offsets,
+                   const GlobalVertices &global_vertices,
+                   const StringRef state_material_name,
+                   const StringRef state_object_group,
+                   const bool state_shaded_smooth);
+
+  void set_curve_type(const StringRef rest_line,
+                      const GlobalVertices &global_vertices,
+                      const StringRef state_object_group,
+                      VertexIndexOffset &r_offsets,
+                      Vector<std::unique_ptr<Geometry>> &r_all_geometries);
+  void set_curve_degree(const StringRef rest_line);
+  void add_curve_vertex_indices(const StringRef rest_line, const GlobalVertices &global_vertices);
+  void add_curve_parameters(const StringRef rest_line);
+
+  void update_object_group(const StringRef rest_line, std::string &r_state_object_group) const;
+  void update_polygon_material(const StringRef rest_line,
+                               std::string &r_state_material_name) const;
+  void update_smooth_group(const StringRef rest_line, bool &r_state_shaded_smooth) const;
+};
 /**
  * All texture map options with number of arguments they accept.
  */

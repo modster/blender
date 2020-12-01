@@ -77,7 +77,7 @@ void importer_main(bContext *C, const OBJImportParams &import_params)
   Map<std::string, std::unique_ptr<MTLMaterial>> materials;
 
   OBJParser obj_parser{import_params};
-  obj_parser.parse_and_store(all_geometries, global_vertices);
+  obj_parser.parse(all_geometries, global_vertices);
 
   for (StringRef mtl_library : obj_parser.mtl_libraries()) {
     MTLParser mtl_parser{mtl_library, import_params.filepath};
