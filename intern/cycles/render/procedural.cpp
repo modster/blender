@@ -45,7 +45,7 @@ bool Procedural::is_procedural() const
 
 ProceduralManager::ProceduralManager()
 {
-  need_update = true;
+  need_update_ = true;
 }
 
 ProceduralManager::~ProceduralManager()
@@ -54,7 +54,7 @@ ProceduralManager::~ProceduralManager()
 
 void ProceduralManager::update(Scene *scene, Progress &progress)
 {
-  if (!need_update) {
+  if (!need_update()) {
     return;
   }
 
@@ -78,7 +78,7 @@ void ProceduralManager::update(Scene *scene, Progress &progress)
     return;
   }
 
-  need_update = false;
+  need_update_ = false;
 }
 
 CCL_NAMESPACE_END

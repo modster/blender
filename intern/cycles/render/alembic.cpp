@@ -747,7 +747,7 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
 void AlembicProcedural::tag_update(Scene *scene)
 {
   if (is_modified()) {
-    scene->procedural_manager->need_update = true;
+    scene->procedural_manager->tag_update();
   }
 }
 

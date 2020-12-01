@@ -34,13 +34,23 @@ class Procedural : public Node, public NodeOwner {
 };
 
 class ProceduralManager {
- public:
-  bool need_update;
+  bool need_update_;
 
+ public:
   ProceduralManager();
   ~ProceduralManager();
 
   void update(Scene *scene, Progress &progress);
+
+  void tag_update()
+  {
+    need_update_ = true;
+  }
+
+  bool need_update() const
+  {
+    return need_update_;
+  }
 };
 
 CCL_NAMESPACE_END

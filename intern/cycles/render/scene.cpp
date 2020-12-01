@@ -465,7 +465,7 @@ bool Scene::need_data_update()
           light_manager->need_update() || lookup_tables->need_update() ||
           integrator->is_modified() || shader_manager->need_update() ||
           particle_system_manager->need_update() || bake_manager->need_update() ||
-          film->is_modified() || procedural_manager->need_update);
+          film->is_modified() || procedural_manager->need_update());
 }
 
 bool Scene::need_reset()
@@ -490,7 +490,7 @@ void Scene::reset()
   geometry_manager->tag_update(this, UPDATE_ALL);
   light_manager->tag_update(this, UPDATE_ALL);
   particle_system_manager->tag_update(this);
-  procedural_manager->need_update = true;
+  procedural_manager->tag_update();
 }
 
 void Scene::device_free()
@@ -738,7 +738,7 @@ template<> AlembicProcedural *Scene::create_node<AlembicProcedural>()
   AlembicProcedural *node = new AlembicProcedural();
   node->set_owner(this);
   procedurals.push_back(node);
-  procedural_manager->need_update = true;
+  procedural_manager->tag_update();
   return node;
 #else
   return nullptr;
@@ -817,7 +817,7 @@ template<> void Scene::delete_node_impl(AlembicProcedural *node)
 {
 #ifdef WITH_ALEMBIC
   delete_node_from_array(procedurals, static_cast<Procedural *>(node));
-  procedural_manager->need_update = true;
+  procedural_manager->tag_update();
 #else
   (void)node;
 #endif
@@ -880,7 +880,7 @@ template<> void Scene::delete_nodes(const set<Shader *> & /*nodes*/, const NodeO
 template<> void Scene::delete_nodes(const set<Procedural *> &nodes, const NodeOwner *owner)
 {
   remove_nodes_in_set(nodes, procedurals, owner);
-  procedural_manager->need_update = true;
+  procedural_manager->tag_update();
 }
 
 CCL_NAMESPACE_END
