@@ -93,12 +93,19 @@ template<typename T> class DataStore {
   }
 };
 
-// TODO : this is only for Meshes at the moment
 struct CachedData {
+  DataStore<Transform> transforms{};
+
+  /* mesh data */
   DataStore<array<float3>> vertices;
   DataStore<array<int3>> triangles{};
   DataStore<array<int3>> triangles_loops{};
-  DataStore<Transform> transforms{};
+
+  /* hair data */
+  DataStore<array<float3>> curve_keys;
+  DataStore<array<float>> curve_radius;
+  DataStore<array<int>> curve_first_key;
+  DataStore<array<int>> curve_shader;
 
   struct CachedAttribute {
     AttributeStandard std;
@@ -117,6 +124,10 @@ struct CachedData {
     triangles_loops.clear();
     transforms.clear();
     attributes.clear();
+    curve_keys.clear();
+    curve_radius.clear();
+    curve_first_key.clear();
+    curve_shader.clear();
   }
 
   CachedAttribute &add_attribute(ustring name)
@@ -146,6 +157,22 @@ struct CachedData {
       return false;
     }
 
+    if (!curve_keys.is_constant()) {
+      return false;
+    }
+
+    if (!curve_radius.is_constant()) {
+      return false;
+    }
+
+    if (!curve_first_key.is_constant()) {
+      return false;
+    }
+
+    if (!curve_shader.is_constant()) {
+      return false;
+    }
+
     for (const CachedAttribute &attr : attributes) {
       if (!attr.data.is_constant()) {
         return false;
@@ -170,6 +197,7 @@ class AlembicObject : public Node {
   Object *get_object();
 
   void load_all_data(const Alembic::AbcGeom::IPolyMeshSchema &schema, Progress &progress);
+  void load_all_data(const Alembic::AbcGeom::ICurvesSchema &schema, Progress &progress);
 
   bool has_data_loaded() const;
 
@@ -199,6 +227,10 @@ class AlembicObject : public Node {
   void read_attribute(const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
                       const Alembic::AbcGeom::ISampleSelector &iss,
                       const ustring &attr_name);
+
+  void setup_transform_cache();
+
+  AttributeRequestSet get_requested_attributes();
 };
 
 class AlembicProcedural : public Procedural {

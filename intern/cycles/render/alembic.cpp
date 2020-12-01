@@ -378,21 +378,7 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema, Progress &progr
 {
   cached_data.clear();
 
-  Geometry *geometry = object->get_geometry();
-  assert(geometry);
-
-  AttributeRequestSet requested_attributes;
-
-  // TODO : check for attribute changes in the shaders
-  foreach (Node *node, geometry->get_used_shaders()) {
-    Shader *shader = static_cast<Shader *>(node);
-
-    foreach (const AttributeRequest &attr, shader->attributes.requests) {
-      if (attr.name != "") {
-        requested_attributes.add(attr.name);
-      }
-    }
-  }
+  AttributeRequestSet requested_attributes = get_requested_attributes();
 
   cached_data.vertices.set_time_sampling(*schema.getTimeSampling());
   cached_data.triangles.set_time_sampling(*schema.getTimeSampling());
@@ -488,6 +474,74 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema, Progress &progr
     return;
   }
 
+  setup_transform_cache();
+
+  data_loaded = true;
+}
+
+void AlembicObject::load_all_data(const Alembic::AbcGeom::ICurvesSchema &schema, Progress &progress)
+{
+  cached_data.clear();
+
+  cached_data.curve_keys.set_time_sampling(*schema.getTimeSampling());
+  cached_data.curve_radius.set_time_sampling(*schema.getTimeSampling());
+  cached_data.curve_first_key.set_time_sampling(*schema.getTimeSampling());
+  cached_data.curve_shader.set_time_sampling(*schema.getTimeSampling());
+
+  for (size_t i = 0; i < schema.getNumSamples(); ++i) {
+    if (progress.get_cancel()) {
+      return;
+    }
+
+    const ISampleSelector iss = ISampleSelector(static_cast<index_t>(i));
+    const ICurvesSchema::Sample sample = schema.getValue(iss);
+
+    const double time = schema.getTimeSampling()->getSampleTime(static_cast<index_t>(i));
+
+    const Int32ArraySamplePtr curves_num_vertices = sample.getCurvesNumVertices();
+    const P3fArraySamplePtr position = sample.getPositions();
+
+    array<float3> curve_keys;
+    array<float> curve_radius;
+    array<int> curve_first_key;
+    array<int> curve_shader;
+
+    curve_keys.reserve(position->size());
+    curve_radius.reserve(position->size());
+    curve_first_key.reserve(curves_num_vertices->size());
+    curve_shader.reserve(curves_num_vertices->size());
+
+    int offset = 0;
+    for (size_t i = 0; i < curves_num_vertices->size(); i++) {
+      const int num_vertices = curves_num_vertices->get()[i];
+
+      for (int j = 0; j < num_vertices; j++) {
+        const V3f &f = position->get()[offset + j];
+        curve_keys.push_back_reserved(make_float3_from_yup(f));
+        curve_radius.push_back_reserved(0.01f);
+      }
+
+      curve_first_key.push_back_reserved(offset);
+      curve_shader.push_back_reserved(0);
+
+      offset += num_vertices;
+    }
+
+    cached_data.curve_keys.add_data(curve_keys, time);
+    cached_data.curve_radius.add_data(curve_radius, time);
+    cached_data.curve_first_key.add_data(curve_first_key, time);
+    cached_data.curve_shader.add_data(curve_shader, time);
+  }
+
+  // TODO: attributes
+
+  setup_transform_cache();
+
+  data_loaded = true;
+}
+
+void AlembicObject::setup_transform_cache()
+{
   if (xform_samples.size() == 0) {
     cached_data.transforms.add_data(transform_identity(), 0.0);
   }
@@ -518,8 +572,27 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema, Progress &progr
   // TODO : proper time sampling, but is it possible for the hierarchy to have different time
   // sampling for each xform ?
   cached_data.transforms.set_time_sampling(cached_data.vertices.time_sampling);
+}
 
-  data_loaded = true;
+AttributeRequestSet AlembicObject::get_requested_attributes()
+{
+  AttributeRequestSet requested_attributes;
+
+  Geometry *geometry = object->get_geometry();
+  assert(geometry);
+
+  // TODO : check for attribute changes in the shaders
+  foreach (Node *node, geometry->get_used_shaders()) {
+    Shader *shader = static_cast<Shader *>(node);
+
+    foreach (const AttributeRequest &attr, shader->attributes.requests) {
+      if (attr.name != "") {
+        requested_attributes.add(attr.name);
+      }
+    }
+  }
+
+  return requested_attributes;
 }
 
 void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
@@ -842,14 +915,6 @@ void AlembicProcedural::read_mesh(Scene *scene,
     mesh->set_shader(shader);
   }
 
-  /* we don't yet support arbitrary attributes, for now add vertex
-   * coordinates as generated coordinates if requested */
-  if (mesh->need_attribute(scene, ATTR_STD_GENERATED)) {
-    Attribute *attr = mesh->attributes.add(ATTR_STD_GENERATED);
-    memcpy(
-        attr->data_float3(), mesh->get_verts().data(), sizeof(float3) * mesh->get_verts().size());
-  }
-
   for (auto &attribute : cached_data.attributes) {
     auto attr_data = attribute.data.data_for_time(frame_time);
 
@@ -869,6 +934,14 @@ void AlembicProcedural::read_mesh(Scene *scene,
     memcpy(attr->data(), attr_data->data(), attr_data->size());
   }
 
+  /* we don't yet support arbitrary attributes, for now add vertex
+   * coordinates as generated coordinates if requested */
+  if (mesh->need_attribute(scene, ATTR_STD_GENERATED)) {
+    Attribute *attr = mesh->attributes.add(ATTR_STD_GENERATED);
+    memcpy(
+        attr->data_float3(), mesh->get_verts().data(), sizeof(float3) * mesh->get_verts().size());
+  }
+
   /* TODO: read normals from the archive if present */
   mesh->add_face_normals();
 
@@ -884,7 +957,6 @@ void AlembicProcedural::read_curves(Scene *scene,
                                     Progress &progress)
 {
   ICurves curves(abc_object->iobject, Alembic::Abc::kWrapExisting);
-
   Hair *hair;
 
   /* create a hair node in the scene if not already done */
@@ -907,28 +979,74 @@ void AlembicProcedural::read_curves(Scene *scene,
     hair = static_cast<Hair *>(abc_object->get_object()->get_geometry());
   }
 
-  ICurvesSchema::Sample samp = curves.getSchema().getValue(ISampleSelector(frame_time));
+  if (!abc_object->has_data_loaded()) {
+    ICurvesSchema schema = curves.getSchema();
+    abc_object->load_all_data(schema, progress);
+  }
 
-  hair->clear();
-  hair->reserve_curves(samp.getNumCurves(), samp.getPositions()->size());
+  auto &cached_data = abc_object->get_cached_data();
 
-  Abc::Int32ArraySamplePtr curveNumVerts = samp.getCurvesNumVertices();
-  int offset = 0;
-  for (int i = 0; i < curveNumVerts->size(); i++) {
-    int numVerts = curveNumVerts->get()[i];
-    for (int j = 0; j < numVerts; j++) {
-      Imath::Vec3<float> f = samp.getPositions()->get()[offset + j];
-      hair->add_curve_key(make_float3_from_yup(f), 0.01f);
+  Transform *tfm = cached_data.transforms.data_for_time(frame_time);
+  if (tfm) {
+    Object *object = abc_object->get_object();
+    object->set_tfm(*tfm);
+  }
+
+  array<float3> *curve_keys = cached_data.curve_keys.data_for_time(frame_time);
+  if (curve_keys) {
+    array<float3> new_curve_keys = *curve_keys;
+    hair->set_curve_keys(new_curve_keys);
+  }
+
+  array<float> *curve_radius = cached_data.curve_radius.data_for_time(frame_time);
+  if (curve_radius) {
+    array<float> new_curve_radius = *curve_radius;
+    hair->set_curve_radius(new_curve_radius);
+  }
+
+  array<int> *curve_first_key = cached_data.curve_first_key.data_for_time(frame_time);
+  if (curve_first_key) {
+    array<int> new_curve_first_key = *curve_first_key;
+    hair->set_curve_first_key(new_curve_first_key);
+  }
+
+  array<int> *curve_shader = cached_data.curve_shader.data_for_time(frame_time);
+  if (curve_shader) {
+    array<int> new_curve_shader = *curve_shader;
+    hair->set_curve_shader(new_curve_shader);
+  }
+
+  for (auto &attribute : cached_data.attributes) {
+    auto attr_data = attribute.data.data_for_time(frame_time);
+
+    if (!attr_data) {
+      continue;
     }
-    hair->add_curve(offset, 0);
-    offset += numVerts;
+
+    Attribute *attr = nullptr;
+    if (attribute.std != ATTR_STD_NONE) {
+      attr = hair->attributes.add(attribute.std, attribute.name);
+    }
+    else {
+      attr = hair->attributes.add(attribute.name, attribute.type_desc, attribute.element);
+    }
+    assert(attr);
+
+    memcpy(attr->data(), attr_data->data(), attr_data->size());
   }
 
-  /* we don't yet support arbitrary attributes, for now add vertex
-   * coordinates as generated coordinates if requested */
+  /* we don't yet support arbitrary attributes, for now add first keys as generated coordinates if requested */
   if (hair->need_attribute(scene, ATTR_STD_GENERATED)) {
-    // TODO : add generated coordinates for curves
+    Attribute *attr_generated = hair->attributes.add(ATTR_STD_GENERATED);
+    float3 *generated = attr_generated->data_float3();
+
+    for (size_t i = 0; i < hair->num_curves(); i++) {
+      generated[i] = hair->get_curve_keys()[hair->get_curve(i).first_key];
+    }
   }
+
+  const bool rebuild = (hair->curve_keys_is_modified() || hair->curve_radius_is_modified());
+  hair->tag_update(scene, rebuild);
 }
 
 void AlembicProcedural::walk_hierarchy(
