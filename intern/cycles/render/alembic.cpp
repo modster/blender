@@ -34,6 +34,8 @@ using namespace Alembic::AbcGeom;
 
 CCL_NAMESPACE_BEGIN
 
+/* TODO(@kevindietrich): motion blur support, requires persistent data for final renders, or at least a way to tell which frame data to load, so we do not load the entire archive for a few frames. */
+
 static float3 make_float3_from_yup(const Imath::Vec3<float> &v)
 {
   return make_float3(v.x, -v.z, v.y);
@@ -674,8 +676,6 @@ NODE_DEFINE(AlembicProcedural)
 {
   NodeType *type = NodeType::add("alembic", create);
 
-  SOCKET_BOOLEAN(use_motion_blur, "Use Motion Blur", false);
-
   SOCKET_STRING(filepath, "Filename", ustring());
   SOCKET_FLOAT(frame, "Frame", 1.0f);
   SOCKET_FLOAT(frame_rate, "Frame Rate", 24.0f);
@@ -779,7 +779,6 @@ void AlembicProcedural::read_mesh(Scene *scene,
   /* create a mesh node in the scene if not already done */
   if (!abc_object->get_object()) {
     mesh = scene->create_node<Mesh>();
-    mesh->set_use_motion_blur(use_motion_blur);
     mesh->name = abc_object->iobject.getName();
 
     array<Node *> used_shaders = abc_object->get_used_shaders();
@@ -891,7 +890,6 @@ void AlembicProcedural::read_curves(Scene *scene,
   /* create a hair node in the scene if not already done */
   if (!abc_object->get_object()) {
     hair = scene->create_node<Hair>();
-    hair->set_use_motion_blur(use_motion_blur);
     hair->name = abc_object->iobject.getName();
 
     array<Node *> used_shaders = abc_object->get_used_shaders();
@@ -924,25 +922,6 @@ void AlembicProcedural::read_curves(Scene *scene,
     }
     hair->add_curve(offset, 0);
     offset += numVerts;
-  }
-
-  if (use_motion_blur) {
-    Attribute *attr = hair->attributes.add(ATTR_STD_MOTION_VERTEX_POSITION);
-    float3 *fdata = attr->data_float3();
-    float shuttertimes[2] = {-scene->camera->get_shuttertime() / 2.0f,
-                             scene->camera->get_shuttertime() / 2.0f};
-    AbcA::TimeSamplingPtr ts = curves.getSchema().getTimeSampling();
-    for (int i = 0; i < 2; i++) {
-      frame_time = static_cast<Abc::chrono_t>((frame + shuttertimes[i]) / frame_rate);
-      std::pair<index_t, chrono_t> idx = ts->getNearIndex(frame_time,
-                                                          curves.getSchema().getNumSamples());
-      ICurvesSchema::Sample shuttersamp = curves.getSchema().getValue(idx.first);
-      for (int i = 0; i < shuttersamp.getPositions()->size(); i++) {
-        Imath::Vec3<float> f = shuttersamp.getPositions()->get()[i];
-        float3 p = make_float3_from_yup(f);
-        *fdata++ = p;
-      }
-    }
   }
 
   /* we don't yet support arbitrary attributes, for now add vertex

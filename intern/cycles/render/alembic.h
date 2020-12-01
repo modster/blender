@@ -209,7 +209,6 @@ class AlembicProcedural : public Procedural {
   ~AlembicProcedural();
   void generate(Scene *scene, Progress &progress);
 
-  NODE_SOCKET_API(bool, use_motion_blur)
   NODE_SOCKET_API(ustring, filepath)
   NODE_SOCKET_API(float, frame)
   NODE_SOCKET_API(float, frame_rate)
