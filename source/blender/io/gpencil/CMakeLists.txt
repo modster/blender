@@ -39,7 +39,7 @@ set(INC
 )
 
 set(INC_SYS
-  ${PUGIXML_INCLUDE_DIRS}
+  ${PUGIXML_INCLUDE_DIR}
 )
 
 set(SRC
