@@ -40,9 +40,6 @@
 #include "DNA_genfile.h"
 #include "DNA_sdna_types.h"
 
-#ifdef WITH_ASSET_REPO_INFO
-#  include "BKE_asset.h"
-#endif
 #include "BKE_idtype.h"
 #include "BKE_main.h"
 
@@ -479,12 +476,6 @@ void BLO_blendfiledata_free(BlendFileData *bfd)
   if (bfd->user) {
     MEM_freeN(bfd->user);
   }
-
-#ifdef WITH_ASSET_REPO_INFO
-  if (bfd->asset_repository_info) {
-    BKE_asset_repository_info_free(&bfd->asset_repository_info);
-  }
-#endif
 
   MEM_freeN(bfd);
 }

@@ -562,10 +562,6 @@ class ASSETBROWSER_PT_navigation_bar(asset_utils.AssetBrowserPanel, Panel):
         col.scale_y = 1.3
         col.prop(space_file.params, "asset_category", expand=True)
 
-        col.separator()
-
-        col.operator("asset.catalog_add", text="Add Catalog", icon='ADD')
-
 
 class ASSETBROWSER_PT_metadata(asset_utils.AssetBrowserPanel, Panel):
     bl_region_type = 'TOOL_PROPS'

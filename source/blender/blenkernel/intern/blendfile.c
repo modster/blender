@@ -26,9 +26,6 @@
 
 #include "MEM_guardedalloc.h"
 
-#ifdef WITH_ASSET_REPO_INFO
-#  include "DNA_asset_types.h"
-#endif
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_workspace_types.h"
@@ -43,9 +40,6 @@
 
 #include "BKE_addon.h"
 #include "BKE_appdir.h"
-#ifdef WITH_ASSET_REPO_INFO
-#  include "BKE_asset.h"
-#endif
 #include "BKE_blender.h"
 #include "BKE_blender_version.h"
 #include "BKE_blendfile.h"
@@ -288,17 +282,6 @@ static void setup_app_data(bContext *C,
 
   bmain = G_MAIN = bfd->main;
   bfd->main = NULL;
-
-#ifdef WITH_ASSET_REPO_INFO
-  if (mode != LOAD_UNDO) {
-    /* Close old repository info. */
-    BKE_asset_repository_info_update_for_file_read(&G_asset_repository_info);
-
-    /* Move read repository info to the current app. */
-    G_asset_repository_info = bfd->asset_repository_info;
-    bfd->asset_repository_info = NULL;
-  }
-#endif
 
   CTX_data_main_set(C, bmain);
 

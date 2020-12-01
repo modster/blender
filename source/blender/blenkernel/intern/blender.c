@@ -37,9 +37,6 @@
 #include "IMB_moviecache.h"
 
 #include "BKE_addon.h"
-#ifdef WITH_ASSET_REPO_INFO
-#  include "BKE_asset.h"
-#endif
 #include "BKE_blender.h" /* own include */
 #include "BKE_blender_user_menu.h"
 #include "BKE_blender_version.h" /* own include */
@@ -84,9 +81,6 @@ void BKE_blender_free(void)
 
   BKE_main_free(G_MAIN);
   G_MAIN = NULL;
-#ifdef WITH_ASSET_REPO_INFO
-  BKE_asset_repository_info_global_free();
-#endif
 
   if (G.log.file != NULL) {
     fclose(G.log.file);

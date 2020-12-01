@@ -903,19 +903,6 @@ static void write_thumb(WriteData *wd, const BlendThumbnail *thumb)
   }
 }
 
-#ifdef WITH_ASSET_REPO_INFO
-static void write_asset_repository_info(BlendWriter *writer,
-                                        const AssetRepositoryInfo *repository_info)
-{
-  if (repository_info) {
-    writestruct(writer->wd, ASSET_REPOSITORY_INFO, AssetRepositoryInfo, 1, repository_info);
-    LISTBASE_FOREACH (const AssetCatalog *, catalog, &repository_info->catalogs) {
-      BLO_write_struct(writer, AssetCatalog, catalog);
-    }
-  }
-}
-#endif
-
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -929,12 +916,7 @@ static bool write_file_handle(Main *mainvar,
                               MemFile *current,
                               int write_flags,
                               bool use_userdef,
-                              const BlendThumbnail *thumb
-#ifdef WITH_ASSET_REPO_INFO
-                              ,
-                              const AssetRepositoryInfo *repository_info
-#endif
-)
+                              const BlendThumbnail *thumb)
 {
   BHead bhead;
   ListBase mainlist;
@@ -956,9 +938,6 @@ static bool write_file_handle(Main *mainvar,
 
   write_renderinfo(wd, mainvar);
   write_thumb(wd, thumb);
-#ifdef WITH_ASSET_REPO_INFO
-  write_asset_repository_info(&writer, repository_info);
-#endif
   write_global(wd, write_flags, mainvar);
 
   /* The window-manager and screen often change,
@@ -1155,9 +1134,6 @@ bool BLO_write_file(Main *mainvar,
   const bool use_save_as_copy = params->use_save_as_copy;
   const bool use_userdef = params->use_userdef;
   const BlendThumbnail *thumb = params->thumb;
-#ifdef WITH_ASSET_REPO_INFO
-  const AssetRepositoryInfo *repository_info = params->asset_repository_info;
-#endif
 
   /* path backup/restore */
   void *path_list_backup = NULL;
@@ -1249,18 +1225,7 @@ bool BLO_write_file(Main *mainvar,
   }
 
   /* actual file writing */
-  const bool err = write_file_handle(mainvar,
-                                     &ww,
-                                     NULL,
-                                     NULL,
-                                     write_flags,
-                                     use_userdef,
-                                     thumb
-#ifdef WITH_ASSET_REPO_INFO
-                                     ,
-                                     repository_info
-#endif
-  );
+  const bool err = write_file_handle(mainvar, &ww, NULL, NULL, write_flags, use_userdef, thumb);
 
   ww.close(&ww);
 
@@ -1306,18 +1271,8 @@ bool BLO_write_file_mem(Main *mainvar, MemFile *compare, MemFile *current, int w
 {
   bool use_userdef = false;
 
-  const bool err = write_file_handle(mainvar,
-                                     NULL,
-                                     compare,
-                                     current,
-                                     write_flags,
-                                     use_userdef,
-                                     NULL
-#ifdef WITH_ASSET_REPO_INFO
-                                     ,
-                                     NULL
-#endif
-  );
+  const bool err = write_file_handle(
+      mainvar, NULL, compare, current, write_flags, use_userdef, NULL);
 
   return (err == 0);
 }

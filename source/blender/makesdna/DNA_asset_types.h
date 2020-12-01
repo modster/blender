@@ -33,20 +33,6 @@ typedef struct AssetTag {
   char name[64]; /* MAX_NAME */
 } AssetTag;
 
-#ifdef WITH_ASSET_REPO_INFO
-typedef struct AssetCatalog {
-  struct AssetCatalog *next, *prev;
-
-  char name[64]; /* MAX_NAME */
-} AssetCatalog;
-
-typedef struct AssetRepositoryInfo {
-  ListBase catalogs;
-} AssetRepositoryInfo;
-
-extern AssetRepositoryInfo *G_asset_repository_info;
-#endif
-
 /**
  * \brief The meta-data of an asset.
  * By creating and giving this for a data-block (#ID.asset_data), the data-block becomes an asset.

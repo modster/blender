@@ -450,8 +450,6 @@ else()
   set(WITH_EXPERIMENTAL_FEATURES ON)
 endif()
 
-add_definitions(-DWITH_ASSET_REPO_INFO)
-
 # Unit testsing
 option(WITH_GTESTS "Enable GTest unit testing" OFF)
 option(WITH_OPENGL_RENDER_TESTS "Enable OpenGL render related unit testing (Experimental)" OFF)
