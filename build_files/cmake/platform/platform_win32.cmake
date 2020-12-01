@@ -253,8 +253,10 @@ foreach(child ${children})
   endif()
 endforeach()
 
-set(PUGIXML_LIBRARIES optimized ${LIBDIR}/pugixml/lib/pugixml.lib debug ${LIBDIR}/pugixml/lib/pugixml_d.lib)
-set(PUGIXML_INCLUDE_DIRS ${LIBDIR}/pugixml/include)
+if(WITH_PUGIXML)
+  set(PUGIXML_LIBRARIES optimized ${LIBDIR}/pugixml/lib/pugixml.lib debug ${LIBDIR}/pugixml/lib/pugixml_d.lib)
+  set(PUGIXML_INCLUDE_DIR ${LIBDIR}/pugixml/include)
+endif()
 
 set(ZLIB_INCLUDE_DIRS ${LIBDIR}/zlib/include)
 set(ZLIB_LIBRARIES ${LIBDIR}/zlib/lib/libz_st.lib)
@@ -722,7 +724,7 @@ if(WINDOWS_PYTHON_DEBUG)
     string(REPLACE "/" "\\" _group_path "${_source_path}")
     source_group("${_group_path}" FILES "${_source}")
   endforeach()
-  
+
   # If the user scripts env var is set, include scripts from there otherwise
   # include user scripts in the profile folder.
   if(DEFINED ENV{BLENDER_USER_SCRIPTS})
@@ -733,7 +735,7 @@ if(WINDOWS_PYTHON_DEBUG)
     # Include the user scripts from the profile folder in the blender_python_user_scripts project.
     set(USER_SCRIPTS_ROOT "$ENV{appdata}/blender foundation/blender/${BLENDER_VERSION}/scripts")
   endif()
-  
+
   file(TO_CMAKE_PATH ${USER_SCRIPTS_ROOT} USER_SCRIPTS_ROOT)
   FILE(GLOB_RECURSE inFiles "${USER_SCRIPTS_ROOT}/*.*" )
   ADD_CUSTOM_TARGET(blender_python_user_scripts SOURCES ${inFiles})

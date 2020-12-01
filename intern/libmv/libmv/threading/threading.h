@@ -1,4 +1,4 @@
-// Copyright (c) 2007, 2008, 2009 libmv authors.
+// Copyright (c) 2020 libmv authors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -18,25 +18,26 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef LIBMV_LOGGING_LOGGING_H
-#define LIBMV_LOGGING_LOGGING_H
+#ifndef LIBMV_THREADING_THREADING_H_
+#define LIBMV_THREADING_THREADING_H_
 
-#include <glog/logging.h>
+#include "libmv/build/build_config.h"
 
-// Note on logging severity and verbosity level.
-//
-// Reserve LOG(INFO) for messages which are always to be put to log and don't
-// use the INFO severity for the debugging/troubleshooting type of messages.
-// Some reasoning behind:
-//
-//   - Library integration would want to disable "noisy" messages coming from
-//     algorithms.
-//
-//   - It is not possible to disable INFO severity entirely: there is enough
-//     of preparation being done for the message stream. What is even worse
-//     is that such stream preparation causes measurable time spent in spin
-//     lock, ruining multi-threading.
+#if COMPILER_SUPPORTS_CXX11
+#  include <condition_variable>
+#  include <mutex>
+#endif
 
-#define LG VLOG(1)
+namespace libmv {
 
-#endif  // LIBMV_LOGGING_LOGGING_H
+#if COMPILER_SUPPORTS_CXX11
+using mutex =  std::mutex;
+using scoped_lock = std::unique_lock<std::mutex>;
+using condition_variable = std::condition_variable;
+#else
+#  error Please add support for threading in threading/threading.h
+#endif
+
+}  // namespace libmv
+
+#endif  // LIBMV_THREADING_THREADING_H_
