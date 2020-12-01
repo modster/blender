@@ -34,6 +34,7 @@
 
 #include "util/util_foreach.h"
 #include "util/util_transform.h"
+#include "util/util_progress.h"
 #include "util/util_vector.h"
 
 using namespace Alembic::AbcGeom;
@@ -379,7 +380,7 @@ bool AlembicObject::has_data_loaded() const
   return data_loaded;
 }
 
-void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
+void AlembicObject::load_all_data(const IPolyMeshSchema &schema, Progress &progress)
 {
   cached_data.clear();
 
@@ -404,6 +405,10 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
   cached_data.triangles_loops.set_time_sampling(*schema.getTimeSampling());
 
   for (size_t i = 0; i < schema.getNumSamples(); ++i) {
+   if (progress.get_cancel()) {
+     return;
+   }
+
     const ISampleSelector iss = ISampleSelector(static_cast<index_t>(i));
     const IPolyMeshSchema::Sample sample = schema.getValue(iss);
 
@@ -465,10 +470,18 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
     }
   }
 
+  if (progress.get_cancel()) {
+    return;
+  }
+
   const IV2fGeomParam &uvs = schema.getUVsParam();
 
   if (uvs.valid()) {
     read_default_uvs(uvs, cached_data);
+  }
+
+  if (progress.get_cancel()) {
+    return;
   }
 
   //  const IN3fGeomParam &normals = schema.getNormalsParam();
@@ -476,6 +489,10 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema)
   //  if (normals.valid()) {
   //    read_default_normals(normals, cached_data);
   //  }
+
+  if (progress.get_cancel()) {
+    return;
+  }
 
   if (xform_samples.size() == 0) {
     cached_data.transforms.add_data(transform_identity(), 0.0);
@@ -672,7 +689,7 @@ AlembicProcedural::~AlembicProcedural()
   }
 }
 
-void AlembicProcedural::generate(Scene *scene)
+void AlembicProcedural::generate(Scene *scene, Progress &progress)
 {
   if (!is_modified()) {
     return;
@@ -692,7 +709,7 @@ void AlembicProcedural::generate(Scene *scene)
   }
 
   if (!objects_loaded) {
-    load_objects();
+    load_objects(progress);
     objects_loaded = true;
   }
 
@@ -701,6 +718,10 @@ void AlembicProcedural::generate(Scene *scene)
   int objects_updated = 0;
 
   foreach (AlembicObject *object, objects) {
+    if (progress.get_cancel()) {
+      return;
+    }
+
     /* skip constant objects */
     if (object->has_data_loaded() && object->is_constant()) {
       continue;
@@ -708,11 +729,11 @@ void AlembicProcedural::generate(Scene *scene)
 
     if (IPolyMesh::matches(object->iobject.getHeader())) {
       IPolyMesh mesh(object->iobject, Alembic::Abc::kWrapExisting);
-      read_mesh(scene, object, object->xform, mesh, frame_time);
+      read_mesh(scene, object, object->xform, mesh, frame_time, progress);
     }
     else if (ICurves::matches(object->iobject.getHeader())) {
       ICurves curves(object->iobject, Alembic::Abc::kWrapExisting);
-      read_curves(scene, object, object->xform, curves, frame_time);
+      read_curves(scene, object, object->xform, curves, frame_time, progress);
     }
 
     objects_updated += 1;
@@ -728,7 +749,7 @@ void AlembicProcedural::tag_update(Scene *scene)
   }
 }
 
-void AlembicProcedural::load_objects()
+void AlembicProcedural::load_objects(Progress &progress)
 {
   unordered_map<string, AlembicObject *> object_map;
 
@@ -739,7 +760,7 @@ void AlembicProcedural::load_objects()
   IObject root = archive.getTop();
 
   for (size_t i = 0; i < root.getNumChildren(); ++i) {
-    walk_hierarchy(root, root.getChildHeader(i), nullptr, object_map);
+    walk_hierarchy(root, root.getChildHeader(i), nullptr, object_map, progress);
   }
 }
 
@@ -747,7 +768,8 @@ void AlembicProcedural::read_mesh(Scene *scene,
                                   AlembicObject *abc_object,
                                   Transform xform,
                                   IPolyMesh &polymesh,
-                                  Abc::chrono_t frame_time)
+                                  Abc::chrono_t frame_time,
+                                  Progress &progress)
 {
   Mesh *mesh = nullptr;
 
@@ -775,7 +797,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
   IPolyMeshSchema schema = polymesh.getSchema();
 
   if (!abc_object->has_data_loaded()) {
-    abc_object->load_all_data(schema);
+    abc_object->load_all_data(schema, progress);
   }
 
   auto &cached_data = abc_object->get_cached_data();
@@ -783,7 +805,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
   // TODO : arrays are emptied when passed to the sockets, so we need to reload the data
   // perhaps we should just have a way to set the pointer
   if (cached_data.is_dirty_frame(frame_time)) {
-    abc_object->load_all_data(schema);
+    abc_object->load_all_data(schema, progress);
   }
 
   Transform *tfm = cached_data.transforms.data_for_time(frame_time);
@@ -865,7 +887,8 @@ void AlembicProcedural::read_curves(Scene *scene,
                                     AlembicObject *abc_object,
                                     Transform xform,
                                     ICurves &curves,
-                                    Abc::chrono_t frame_time)
+                                    Abc::chrono_t frame_time,
+                                    Progress &progress)
 {
   Hair *hair;
 
@@ -933,12 +956,17 @@ void AlembicProcedural::read_curves(Scene *scene,
   }
 }
 
-void AlembicProcedural::walk_hierarchy(
-    IObject parent,
+void AlembicProcedural::walk_hierarchy(IObject parent,
     const ObjectHeader &header,
     MatrixSampleMap *xform_samples,
-    const unordered_map<std::string, AlembicObject *> &object_map)
+    const unordered_map<std::string,
+                                       AlembicObject *> &object_map,
+                                       Progress &progress)
 {
+  if (progress.get_cancel()) {
+    return;
+  }
+
   IObject next_object;
 
   MatrixSampleMap concatenated_xform_samples;
@@ -1022,7 +1050,7 @@ void AlembicProcedural::walk_hierarchy(
 
   if (next_object.valid()) {
     for (size_t i = 0; i < next_object.getNumChildren(); ++i) {
-      walk_hierarchy(next_object, next_object.getChildHeader(i), xform_samples, object_map);
+      walk_hierarchy(next_object, next_object.getChildHeader(i), xform_samples, object_map, progress);
     }
   }
 }

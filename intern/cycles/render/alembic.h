@@ -32,6 +32,7 @@ CCL_NAMESPACE_BEGIN
 
 class Geometry;
 class Object;
+class Progress;
 class Shader;
 
 using MatrixSampleMap = std::map<Alembic::Abc::chrono_t, Alembic::Abc::M44d>;
@@ -201,7 +202,8 @@ class AlembicObject : public Node {
   void set_object(Object *object);
   Object *get_object();
 
-  void load_all_data(const Alembic::AbcGeom::IPolyMeshSchema &schema);
+  void load_all_data(const Alembic::AbcGeom::IPolyMeshSchema &schema,
+                     Progress &progress);
 
   bool has_data_loaded() const;
 
@@ -239,7 +241,7 @@ class AlembicProcedural : public Procedural {
 
   AlembicProcedural();
   ~AlembicProcedural();
-  void generate(Scene *scene);
+  void generate(Scene *scene, Progress &progress);
 
   NODE_SOCKET_API(bool, use_motion_blur)
   NODE_SOCKET_API(ustring, filepath)
@@ -254,24 +256,27 @@ class AlembicProcedural : public Procedural {
   Alembic::AbcGeom::IArchive archive;
   bool objects_loaded = false;
 
-  void load_objects();
+  void load_objects(Progress &progress);
 
   void read_mesh(Scene *scene,
                  AlembicObject *abc_object,
                  Transform xform,
                  Alembic::AbcGeom::IPolyMesh &mesh,
-                 Alembic::AbcGeom::Abc::chrono_t frame_time);
+                 Alembic::AbcGeom::Abc::chrono_t frame_time,
+                 Progress &progress);
 
   void read_curves(Scene *scene,
                    AlembicObject *abc_object,
                    Transform xform,
                    Alembic::AbcGeom::ICurves &curves,
-                   Alembic::AbcGeom::Abc::chrono_t frame_time);
+                   Alembic::AbcGeom::Abc::chrono_t frame_time,
+                   Progress &progress);
 
   void walk_hierarchy(Alembic::AbcGeom::IObject parent,
                       const Alembic::AbcGeom::ObjectHeader &ohead,
                       MatrixSampleMap *xform_samples,
-                      const unordered_map<string, AlembicObject *> &object_map);
+                      const unordered_map<string, AlembicObject *> &object_map,
+                      Progress &progress);
 };
 
 CCL_NAMESPACE_END
