@@ -1248,7 +1248,7 @@ void GeometryManager::device_update_bvh(Device *device,
 
       if (!(device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
         if (bparams.bvh_layout == BVHLayout::BVH_LAYOUT_OPTIX) {
-          bvh->refit(progress);
+          // bvh->refit(progress);
         }
 
         PackedBVH &pack = bvh->pack;
