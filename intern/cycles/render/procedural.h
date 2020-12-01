@@ -17,7 +17,6 @@
 #pragma once
 
 #include "graph/node.h"
-#include "util/util_vector.h"
 
 CCL_NAMESPACE_BEGIN
 

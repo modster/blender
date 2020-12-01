@@ -14,16 +14,7 @@
  * limitations under the License.
  */
 
-#include "alembic.h"
-
-#include <algorithm>
-#include <fnmatch.h>
-#include <iterator>
-#include <set>
-#include <sstream>
-#include <stack>
-#include <stdio.h>
-#include <vector>
+#include "render/alembic.h"
 
 #include "render/camera.h"
 #include "render/curves.h"
@@ -33,8 +24,8 @@
 #include "render/shader.h"
 
 #include "util/util_foreach.h"
-#include "util/util_transform.h"
 #include "util/util_progress.h"
+#include "util/util_transform.h"
 #include "util/util_vector.h"
 
 #ifdef WITH_ALEMBIC
