@@ -80,6 +80,75 @@ class OBJStorer {
                                std::string &r_state_material_name) const;
   void update_smooth_group(const StringRef rest_line, bool &r_state_shaded_smooth) const;
 };
+
+enum class eOBJLineKey {
+  V,
+  VN,
+  VT,
+  F,
+  L,
+  CSTYPE,
+  DEG,
+  CURV,
+  PARM,
+  O,
+  G,
+  S,
+  USEMTL,
+  MTLLIB,
+  COMMENT
+};
+
+constexpr eOBJLineKey line_key_str_to_enum(const std::string_view key_str)
+{
+  if (key_str == "v" || key_str == "V") {
+    return eOBJLineKey::V;
+  }
+  if (key_str == "vn" || key_str == "VN") {
+    return eOBJLineKey::VN;
+  }
+  if (key_str == "vt" || key_str == "VT") {
+    return eOBJLineKey::VT;
+  }
+  if (key_str == "f" || key_str == "F") {
+    return eOBJLineKey::F;
+  }
+  if (key_str == "l" || key_str == "L") {
+    return eOBJLineKey::L;
+  }
+  if (key_str == "cstype" || key_str == "CSTYPE") {
+    return eOBJLineKey::CSTYPE;
+  }
+  if (key_str == "deg" || key_str == "DEG") {
+    return eOBJLineKey::DEG;
+  }
+  if (key_str == "curv" || key_str == "CURV") {
+    return eOBJLineKey::CURV;
+  }
+  if (key_str == "parm" || key_str == "PARM") {
+    return eOBJLineKey::PARM;
+  }
+  if (key_str == "o" || key_str == "O") {
+    return eOBJLineKey::O;
+  }
+  if (key_str == "g" || key_str == "G") {
+    return eOBJLineKey::G;
+  }
+  if (key_str == "s" || key_str == "S") {
+    return eOBJLineKey::S;
+  }
+  if (key_str == "usemtl" || key_str == "USEMTL") {
+    return eOBJLineKey::USEMTL;
+  }
+  if (key_str == "mtllib" || key_str == "MTLLIB") {
+    return eOBJLineKey::MTLLIB;
+  }
+  if (key_str == "#") {
+    return eOBJLineKey::COMMENT;
+  }
+  return eOBJLineKey::COMMENT;
+}
+
 /**
  * All texture map options with number of arguments they accept.
  */

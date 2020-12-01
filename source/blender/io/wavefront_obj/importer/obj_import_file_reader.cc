@@ -328,69 +328,89 @@ void OBJParser::parse(Vector<std::unique_ptr<Geometry>> &r_all_geometries,
       continue;
     }
 
-    if (line_key == "v") {
-      OBJStorer storer(*current_geometry);
-      storer.add_vertex(rest_line, r_global_vertices);
-    }
-    else if (line_key == "vn") {
-      OBJStorer storer(*current_geometry);
-      storer.add_vertex_normal(rest_line, r_global_vertices);
-    }
-    else if (line_key == "vt") {
-      OBJStorer storer(*current_geometry);
-      storer.add_uv_vertex(rest_line, r_global_vertices);
-    }
-    else if (line_key == "f") {
-      OBJStorer storer(*current_geometry);
-      storer.add_polygon(rest_line,
-                         offsets,
-                         r_global_vertices,
-                         state_material_name,
-                         state_material_name,
-                         state_shaded_smooth);
-    }
-    else if (line_key == "l") {
-      OBJStorer storer(*current_geometry);
-      storer.add_edge(rest_line, offsets, r_global_vertices);
-    }
-    else if (line_key == "mtllib") {
-      mtl_libraries_.append(string(rest_line));
-    }
-    else if (line_key == "o") {
-      state_shaded_smooth = false;
-      state_object_group = "";
-      state_material_name = "";
-      current_geometry = create_geometry(
-          current_geometry, GEOM_MESH, rest_line, r_global_vertices, r_all_geometries, offsets);
-    }
-    else if (line_key == "cstype") {
-      OBJStorer storer(*current_geometry);
-      storer.set_curve_type(
-          rest_line, r_global_vertices, state_object_group, offsets, r_all_geometries);
-    }
-    else if (line_key == "deg") {
-      OBJStorer storer(*current_geometry);
-      storer.set_curve_degree(rest_line);
-    }
-    else if (line_key == "curv") {
-      OBJStorer storer(*current_geometry);
-      storer.add_curve_vertex_indices(rest_line, r_global_vertices);
-    }
-    else if (line_key == "parm") {
-      OBJStorer storer(*current_geometry);
-      storer.add_curve_parameters(rest_line);
-    }
-    else if (line_key == "g") {
-      OBJStorer storer(*current_geometry);
-      storer.update_object_group(rest_line, state_object_group);
-    }
-    else if (line_key == "s") {
-      OBJStorer storer(*current_geometry);
-      storer.update_smooth_group(rest_line, state_shaded_smooth);
-    }
-    else if (line_key == "usemtl") {
-      OBJStorer storer(*current_geometry);
-      storer.update_polygon_material(rest_line, state_material_name);
+    switch (line_key_str_to_enum(line_key)) {
+      case eOBJLineKey::V: {
+        OBJStorer storer(*current_geometry);
+        storer.add_vertex(rest_line, r_global_vertices);
+        break;
+      }
+      case eOBJLineKey::VN: {
+        OBJStorer storer(*current_geometry);
+        storer.add_vertex_normal(rest_line, r_global_vertices);
+        break;
+      }
+      case eOBJLineKey::VT: {
+        OBJStorer storer(*current_geometry);
+        storer.add_uv_vertex(rest_line, r_global_vertices);
+        break;
+      }
+      case eOBJLineKey::F: {
+        OBJStorer storer(*current_geometry);
+        storer.add_polygon(rest_line,
+                           offsets,
+                           r_global_vertices,
+                           state_material_name,
+                           state_material_name,
+                           state_shaded_smooth);
+        break;
+      }
+      case eOBJLineKey::L: {
+        OBJStorer storer(*current_geometry);
+        storer.add_edge(rest_line, offsets, r_global_vertices);
+        break;
+      }
+      case eOBJLineKey::CSTYPE: {
+        OBJStorer storer(*current_geometry);
+        storer.set_curve_type(
+            rest_line, r_global_vertices, state_object_group, offsets, r_all_geometries);
+        break;
+      }
+      case eOBJLineKey::DEG: {
+        OBJStorer storer(*current_geometry);
+        storer.set_curve_degree(rest_line);
+        break;
+      }
+      case eOBJLineKey::CURV: {
+        OBJStorer storer(*current_geometry);
+        storer.add_curve_vertex_indices(rest_line, r_global_vertices);
+        break;
+      }
+      case eOBJLineKey::PARM: {
+        OBJStorer storer(*current_geometry);
+        storer.add_curve_parameters(rest_line);
+        break;
+      }
+      case eOBJLineKey::O: {
+        state_shaded_smooth = false;
+        state_object_group = "";
+        state_material_name = "";
+        current_geometry = create_geometry(
+            current_geometry, GEOM_MESH, rest_line, r_global_vertices, r_all_geometries, offsets);
+        break;
+      }
+      case eOBJLineKey::G: {
+        OBJStorer storer(*current_geometry);
+        storer.update_object_group(rest_line, state_object_group);
+        break;
+      }
+      case eOBJLineKey::S: {
+        OBJStorer storer(*current_geometry);
+        storer.update_smooth_group(rest_line, state_shaded_smooth);
+        break;
+      }
+      case eOBJLineKey::USEMTL: {
+        OBJStorer storer(*current_geometry);
+        storer.update_polygon_material(rest_line, state_material_name);
+        break;
+      }
+      case eOBJLineKey::MTLLIB: {
+        mtl_libraries_.append(string(rest_line));
+        break;
+      }
+      case eOBJLineKey::COMMENT:
+        ATTR_FALLTHROUGH;
+      default:
+        break;
     }
   }
 }
