@@ -260,15 +260,11 @@ class AlembicProcedural : public Procedural {
 
   void read_mesh(Scene *scene,
                  AlembicObject *abc_object,
-                 Transform xform,
-                 Alembic::AbcGeom::IPolyMesh &mesh,
                  Alembic::AbcGeom::Abc::chrono_t frame_time,
                  Progress &progress);
 
   void read_curves(Scene *scene,
                    AlembicObject *abc_object,
-                   Transform xform,
-                   Alembic::AbcGeom::ICurves &curves,
                    Alembic::AbcGeom::Abc::chrono_t frame_time,
                    Progress &progress);
 

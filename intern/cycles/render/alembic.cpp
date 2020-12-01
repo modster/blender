@@ -728,12 +728,10 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
     }
 
     if (IPolyMesh::matches(object->iobject.getHeader())) {
-      IPolyMesh mesh(object->iobject, Alembic::Abc::kWrapExisting);
-      read_mesh(scene, object, object->xform, mesh, frame_time, progress);
+      read_mesh(scene, object, frame_time, progress);
     }
     else if (ICurves::matches(object->iobject.getHeader())) {
-      ICurves curves(object->iobject, Alembic::Abc::kWrapExisting);
-      read_curves(scene, object, object->xform, curves, frame_time, progress);
+      read_curves(scene, object, frame_time, progress);
     }
 
     objects_updated += 1;
@@ -766,11 +764,11 @@ void AlembicProcedural::load_objects(Progress &progress)
 
 void AlembicProcedural::read_mesh(Scene *scene,
                                   AlembicObject *abc_object,
-                                  Transform xform,
-                                  IPolyMesh &polymesh,
                                   Abc::chrono_t frame_time,
                                   Progress &progress)
 {
+  IPolyMesh polymesh(abc_object->iobject, Alembic::Abc::kWrapExisting);
+
   Mesh *mesh = nullptr;
 
   /* create a mesh node in the scene if not already done */
@@ -785,7 +783,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
     /* create object*/
     Object *object = scene->create_node<Object>();
     object->set_geometry(mesh);
-    object->set_tfm(xform);
+    object->set_tfm(abc_object->xform);
     object->name = abc_object->iobject.getName();
 
     abc_object->set_object(object);
@@ -885,11 +883,11 @@ void AlembicProcedural::read_mesh(Scene *scene,
 
 void AlembicProcedural::read_curves(Scene *scene,
                                     AlembicObject *abc_object,
-                                    Transform xform,
-                                    ICurves &curves,
                                     Abc::chrono_t frame_time,
                                     Progress &progress)
 {
+  ICurves curves(abc_object->iobject, Alembic::Abc::kWrapExisting);
+
   Hair *hair;
 
   /* create a hair node in the scene if not already done */
@@ -904,7 +902,7 @@ void AlembicProcedural::read_curves(Scene *scene,
     /* create object*/
     Object *object = scene->create_node<Object>();
     object->set_geometry(hair);
-    object->set_tfm(xform);
+    object->set_tfm(abc_object->xform);
     object->name = abc_object->iobject.getName();
 
     abc_object->set_object(object);
