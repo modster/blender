@@ -734,11 +734,15 @@ template<> Shader *Scene::create_node<Shader>()
 
 template<> AlembicProcedural *Scene::create_node<AlembicProcedural>()
 {
+#ifdef WITH_ALEMBIC
   AlembicProcedural *node = new AlembicProcedural();
   node->set_owner(this);
   procedurals.push_back(node);
   procedural_manager->need_update = true;
   return node;
+#else
+  return nullptr;
+#endif
 }
 
 template<typename T> void delete_node_from_array(vector<T> &nodes, T node)
@@ -811,8 +815,12 @@ template<> void Scene::delete_node_impl(Shader * /*node*/)
 
 template<> void Scene::delete_node_impl(AlembicProcedural *node)
 {
+#ifdef WITH_ALEMBIC
   delete_node_from_array(procedurals, static_cast<Procedural *>(node));
   procedural_manager->need_update = true;
+#else
+  (void)node;
+#endif
 }
 
 template<typename T>

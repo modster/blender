@@ -19,7 +19,6 @@ set(INC
 )
 
 set(INC_SYS
-  ${ALEMBIC_INCLUDE_DIR}
   ${GLEW_INCLUDE_DIR}
 )
 
@@ -149,9 +148,15 @@ if(WITH_OPENVDB)
   )
 endif()
 
-list(APPEND LIB
-  ${ALEMBIC_LIBRARIES}
-)
+if(WITH_ALEMBIC)
+  add_definitions(-DWITH_ALEMBIC)
+  list(APPEND INC_SYS
+    ${ALEMBIC_INCLUDE_DIRS}
+  )
+  list(APPEND LIB
+    ${ALEMBIC_LIBRARIES}
+  )
+endif()
 
 if(WITH_NANOVDB)
   list(APPEND INC_SYS

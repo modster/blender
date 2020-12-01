@@ -486,6 +486,7 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
                                   int frame_current,
                                   float motion_time)
 {
+#ifdef WITH_ALEMBIC
   bool motion = motion_time != 0.0f;
 
   if (motion) {
@@ -539,6 +540,12 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
   abc_object->set_used_shaders(used_shaders);
 
   p->objects.push_back_slow(abc_object);
+#else
+  (void)b_ob;
+  (void)b_mesh_cache;
+  (void)frame_current;
+  (void)motion_time;
+#endif
 }
 
 void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
@@ -597,12 +604,15 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
 
     /* Object itself. */
     if (b_instance.show_self()) {
+#ifdef WITH_ALEMBIC
       BL::MeshSequenceCacheModifier b_mesh_cache = object_alembic_cache_find(b_ob);
 
       if (b_mesh_cache) {
         sync_procedural(b_ob, b_mesh_cache, b_depsgraph.scene().frame_current(), motion_time);
       }
-      else {
+      else
+#endif
+      {
         sync_object(b_depsgraph,
                     b_view_layer,
                     b_instance,

@@ -23,7 +23,7 @@
 #include "util/util_transform.h"
 #include "util/util_vector.h"
 
-//#ifdef WITH_ALEMBIC
+#ifdef WITH_ALEMBIC
 
 #include <Alembic/AbcCoreFactory/All.h>
 #include <Alembic/AbcGeom/All.h>
@@ -276,3 +276,5 @@ class AlembicProcedural : public Procedural {
 };
 
 CCL_NAMESPACE_END
+
+#endif

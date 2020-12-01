@@ -506,6 +506,7 @@ void ShaderManager::update_shaders_used(Scene *scene)
   if (scene->background->get_shader())
     scene->background->get_shader()->used = true;
 
+#ifdef WITH_ALEMBIC
   foreach (Procedural *procedural, scene->procedurals) {
     AlembicProcedural *abc_proc = static_cast<AlembicProcedural *>(procedural);
 
@@ -516,6 +517,7 @@ void ShaderManager::update_shaders_used(Scene *scene)
       }
     }
   }
+#endif
 
   foreach (Geometry *geom, scene->geometry)
     foreach (Node *node, geom->get_used_shaders()) {

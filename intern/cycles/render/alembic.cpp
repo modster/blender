@@ -37,6 +37,8 @@
 #include "util/util_progress.h"
 #include "util/util_vector.h"
 
+#ifdef WITH_ALEMBIC
+
 using namespace Alembic::AbcGeom;
 
 CCL_NAMESPACE_BEGIN
@@ -1065,3 +1067,5 @@ void AlembicProcedural::walk_hierarchy(IObject parent,
 }
 
 CCL_NAMESPACE_END
+
+#endif

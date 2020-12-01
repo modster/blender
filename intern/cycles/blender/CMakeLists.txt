@@ -24,7 +24,6 @@ set(INC
 )
 
 set(INC_SYS
-  ${ALEMBIC_INCLUDE_DIRS}
   ${PYTHON_INCLUDE_DIRS}
   ${GLEW_INCLUDE_DIR}
 )
@@ -113,6 +112,16 @@ if(WITH_OPENVDB)
   )
   list(APPEND LIB
     ${OPENVDB_LIBRARIES}
+  )
+endif()
+
+if(WITH_ALEMBIC)
+  add_definitions(-DWITH_ALEMBIC)
+  list(APPEND INC_SYS
+    ${ALEMBIC_INCLUDE_DIRS}
+  )
+  list(APPEND LIB
+    ${ALEMBIC_LIBRARIES}
   )
 endif()
 
