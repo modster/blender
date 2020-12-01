@@ -2440,7 +2440,8 @@ static int rna_FileSelectParams_asset_repository_get(PointerRNA *ptr)
     return params->asset_repository.type;
   }
 
-  /* TODO check if path exists? */
+  /* Note that the path isn't checked for validity here. If an invalid repository path is used, the
+   * Asset Browser can give a nice hint on what's wrong. */
   const bUserAssetRepository *user_repository = BKE_preferences_asset_repository_find_from_name(
       &U, params->asset_repository.idname);
   const int index = BKE_preferences_asset_repository_get_index(&U, user_repository);
@@ -2467,7 +2468,8 @@ static void rna_FileSelectParams_asset_repository_set(PointerRNA *ptr, int value
   const bUserAssetRepository *user_repository = BKE_preferences_asset_repository_find_from_index(
       &U, value - FILE_ASSET_REPO_CUSTOM);
 
-  /* TODO check if path exists? */
+  /* Note that the path isn't checked for validity here. If an invalid repository path is used, the
+   * Asset Browser can give a nice hint on what's wrong. */
   const bool is_valid = (user_repository->name[0] && user_repository->path[0]);
   if (user_repository && is_valid) {
     BLI_strncpy(params->asset_repository.idname,
@@ -2503,7 +2505,8 @@ static const EnumPropertyItem *rna_FileSelectParams_asset_repository_itemf(
   int i = 0;
   for (bUserAssetRepository *user_repository = U.asset_repositories.first; user_repository;
        user_repository = user_repository->next, i++) {
-    /* TODO check if path exists? */
+    /* Note that the path itself isn't checked for validity here. If an invalid repository path is
+     * used, the Asset Browser can give a nice hint on what's wrong. */
     const bool is_valid = (user_repository->name[0] && user_repository->path[0]);
     if (!is_valid) {
       continue;
