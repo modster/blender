@@ -498,9 +498,24 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema, Progress &progr
     cached_data.transforms.add_data(transform_identity(), 0.0);
   }
   else {
+    /* It is possible for a leaf node of the hierarchy to have multiple samples for its transforms if a sibling has animated transforms. So check if we indeed have animated transformations. */
+    M44d first_matrix = xform_samples.begin()->first;
+    bool has_animation = false;
     for (auto &pair : xform_samples) {
-      Transform tfm = make_transform(pair.second);
-      cached_data.transforms.add_data(tfm, pair.first);
+      if (pair.second != first_matrix) {
+        has_animation = true;
+        break;
+      }
+    }
+
+    if (!has_animation) {
+      cached_data.transforms.add_data(make_transform(first_matrix), 0.0);
+    }
+    else {
+      for (auto &pair : xform_samples) {
+        Transform tfm = make_transform(pair.second);
+        cached_data.transforms.add_data(tfm, pair.first);
+      }
     }
   }
 
@@ -715,8 +730,6 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
 
   Abc::chrono_t frame_time = (Abc::chrono_t)(frame / frame_rate);
 
-  int objects_updated = 0;
-
   foreach (AlembicObject *object, objects) {
     if (progress.get_cancel()) {
       return;
@@ -733,8 +746,6 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
     else if (ICurves::matches(object->iobject.getHeader())) {
       read_curves(scene, object, frame_time, progress);
     }
-
-    objects_updated += 1;
   }
 
   clear_modified();
