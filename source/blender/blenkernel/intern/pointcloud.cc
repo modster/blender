@@ -243,13 +243,6 @@ PointCloud *BKE_pointcloud_new_nomain(const int totpoint)
 
   pointcloud->totpoint = totpoint;
 
-  CustomData_add_layer_named(&pointcloud->pdata,
-                             CD_PROP_FLOAT,
-                             CD_CALLOC,
-                             nullptr,
-                             pointcloud->totpoint,
-                             POINTCLOUD_ATTR_RADIUS);
-
   pointcloud->totpoint = totpoint;
   CustomData_realloc(&pointcloud->pdata, pointcloud->totpoint);
   BKE_pointcloud_update_customdata_pointers(pointcloud);
