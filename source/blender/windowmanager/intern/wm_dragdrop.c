@@ -153,7 +153,7 @@ wmDrag *WM_event_start_drag(
       break;
     case WM_DRAG_ID:
       if (poin) {
-        WM_drag_add_ID(drag, poin, NULL);
+        WM_drag_add_local_ID(drag, poin, NULL);
       }
       break;
     case WM_DRAG_ASSET:
@@ -301,7 +301,7 @@ void wm_drags_check_ops(bContext *C, const wmEvent *event)
 
 /* ************** IDs ***************** */
 
-void WM_drag_add_ID(wmDrag *drag, ID *id, ID *from_parent)
+void WM_drag_add_local_ID(wmDrag *drag, ID *id, ID *from_parent)
 {
   /* Don't drag the same ID twice. */
   LISTBASE_FOREACH (wmDragID *, drag_id, &drag->ids) {
@@ -324,7 +324,7 @@ void WM_drag_add_ID(wmDrag *drag, ID *id, ID *from_parent)
   BLI_addtail(&drag->ids, drag_id);
 }
 
-ID *WM_drag_ID(const wmDrag *drag, short idcode)
+ID *WM_drag_get_local_ID(const wmDrag *drag, short idcode)
 {
   if (drag->type != WM_DRAG_ID) {
     return NULL;
@@ -339,17 +339,17 @@ ID *WM_drag_ID(const wmDrag *drag, short idcode)
   return (idcode == 0 || GS(id->name) == idcode) ? id : NULL;
 }
 
-ID *WM_drag_ID_from_event(const wmEvent *event, short idcode)
+ID *WM_drag_get_local_ID_from_event(const wmEvent *event, short idcode)
 {
   if (event->custom != EVT_DATA_DRAGDROP) {
     return NULL;
   }
 
   ListBase *lb = event->customdata;
-  return WM_drag_ID(lb->first, idcode);
+  return WM_drag_get_local_ID(lb->first, idcode);
 }
 
-wmDragAsset *WM_drag_asset_data(const wmDrag *drag, int idcode)
+wmDragAsset *WM_drag_get_asset_data(const wmDrag *drag, int idcode)
 {
   if (drag->type != WM_DRAG_ASSET) {
     return NULL;
@@ -366,17 +366,21 @@ static ID *wm_drag_asset_id_import(wmDragAsset *asset_drag)
       G_MAIN, NULL, NULL, NULL, asset_drag->path, asset_drag->id_type, asset_drag->name);
 }
 
-ID *WM_drag_asset_id(const wmDrag *drag, int idcode)
+/**
+ * When dragging a local ID, return that. Otherwise, if dragging an asset-handle, link or append
+ * that depending on what was chosen by the drag-box (currently append only in fact).
+ */
+ID *WM_drag_get_local_ID_or_import_from_asset(const wmDrag *drag, int idcode)
 {
   if (!ELEM(drag->type, WM_DRAG_ASSET, WM_DRAG_ID)) {
     return NULL;
   }
 
   if (drag->type == WM_DRAG_ID) {
-    return WM_drag_ID(drag, idcode);
+    return WM_drag_get_local_ID(drag, idcode);
   }
 
-  wmDragAsset *asset_drag = WM_drag_asset_data(drag, idcode);
+  wmDragAsset *asset_drag = WM_drag_get_asset_data(drag, idcode);
   if (!asset_drag) {
     return NULL;
   }
@@ -400,7 +404,7 @@ static const char *wm_drag_name(wmDrag *drag)
 {
   switch (drag->type) {
     case WM_DRAG_ID: {
-      ID *id = WM_drag_ID(drag, 0);
+      ID *id = WM_drag_get_local_ID(drag, 0);
       bool single = (BLI_listbase_count_at_most(&drag->ids, 2) == 1);
 
       if (single) {
@@ -412,7 +416,7 @@ static const char *wm_drag_name(wmDrag *drag)
       break;
     }
     case WM_DRAG_ASSET: {
-      const wmDragAsset *asset_drag = WM_drag_asset_data(drag, 0);
+      const wmDragAsset *asset_drag = WM_drag_get_asset_data(drag, 0);
       return asset_drag->name;
     }
     case WM_DRAG_PATH:

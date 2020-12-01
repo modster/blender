@@ -476,7 +476,7 @@ static ID *view3d_drop_id_in_main_region_poll_id(bContext *C,
   if (ED_region_overlap_isect_any_xy(area, &event->x)) {
     return NULL;
   }
-  return view3d_drop_in_main_region_poll(C, event) ? WM_drag_ID(drag, id_type) : NULL;
+  return view3d_drop_in_main_region_poll(C, event) ? WM_drag_get_local_ID(drag, id_type) : NULL;
 }
 
 static bool view3d_drop_id_in_main_region_poll(bContext *C,
@@ -488,7 +488,7 @@ static bool view3d_drop_id_in_main_region_poll(bContext *C,
     return false;
   }
 
-  return WM_drag_ID(drag, id_type) || WM_drag_asset_data(drag, id_type);
+  return WM_drag_get_local_ID(drag, id_type) || WM_drag_get_asset_data(drag, id_type);
 }
 
 static bool view3d_ob_drop_poll(bContext *C,
@@ -543,7 +543,7 @@ static bool view3d_ima_drop_poll(bContext *C,
     return (ELEM(drag->icon, 0, ICON_FILE_IMAGE, ICON_FILE_MOVIE));
   }
 
-  return WM_drag_ID(drag, ID_IM) || WM_drag_asset_data(drag, ID_IM);
+  return WM_drag_get_local_ID(drag, ID_IM) || WM_drag_get_asset_data(drag, ID_IM);
 }
 
 static bool view3d_ima_bg_is_camera_view(bContext *C)
@@ -606,14 +606,14 @@ static bool view3d_volume_drop_poll(bContext *UNUSED(C),
 
 static void view3d_ob_drop_copy(wmDrag *drag, wmDropBox *drop)
 {
-  ID *id = WM_drag_asset_id(drag, ID_OB);
+  ID *id = WM_drag_get_local_ID_or_import_from_asset(drag, ID_OB);
 
   RNA_string_set(drop->ptr, "name", id->name + 2);
 }
 
 static void view3d_collection_drop_copy(wmDrag *drag, wmDropBox *drop)
 {
-  ID *id = WM_drag_asset_id(drag, ID_GR);
+  ID *id = WM_drag_get_local_ID_or_import_from_asset(drag, ID_GR);
 
   drop->opcontext = WM_OP_EXEC_DEFAULT;
   RNA_string_set(drop->ptr, "name", id->name + 2);
@@ -621,14 +621,14 @@ static void view3d_collection_drop_copy(wmDrag *drag, wmDropBox *drop)
 
 static void view3d_id_drop_copy(wmDrag *drag, wmDropBox *drop)
 {
-  ID *id = WM_drag_asset_id(drag, 0);
+  ID *id = WM_drag_get_local_ID_or_import_from_asset(drag, 0);
 
   RNA_string_set(drop->ptr, "name", id->name + 2);
 }
 
 static void view3d_id_drop_copy_with_type(wmDrag *drag, wmDropBox *drop)
 {
-  ID *id = WM_drag_ID(drag, 0);
+  ID *id = WM_drag_get_local_ID(drag, 0);
 
   RNA_string_set(drop->ptr, "name", id->name + 2);
   RNA_enum_set(drop->ptr, "type", GS(id->name));
@@ -636,7 +636,7 @@ static void view3d_id_drop_copy_with_type(wmDrag *drag, wmDropBox *drop)
 
 static void view3d_id_path_drop_copy(wmDrag *drag, wmDropBox *drop)
 {
-  ID *id = WM_drag_asset_id(drag, 0);
+  ID *id = WM_drag_get_local_ID_or_import_from_asset(drag, 0);
 
   if (id) {
     RNA_string_set(drop->ptr, "name", id->name + 2);
