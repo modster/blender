@@ -1255,28 +1255,6 @@ class USERPREF_PT_file_paths_data(FilePathsPanel, Panel):
         col.prop(paths, "temporary_directory", text="Temporary Files")
 
 
-class USERPREF_PT_file_paths_asset_repositories(FilePathsPanel, Panel):
-    bl_label = "Asset Repositories"
-
-    def draw(self, context):
-        layout = self.layout
-        layout.use_property_split = False
-        layout.use_property_decorate = False
-
-        paths = context.preferences.filepaths
-
-        box = layout.box()
-        for i, repository in enumerate(paths.asset_repositories):
-            row = box.row()
-            split = row.split(factor=0.65)
-            split.prop(repository, "path", text="")
-            split.prop(repository, "name")
-            row.operator("preferences.asset_repository_remove", text="", icon='X', emboss=False).index = i
-
-        row = box.row()
-        row.operator("preferences.asset_repository_add", text="", icon='ADD', emboss=False)
-
-
 class USERPREF_PT_file_paths_render(FilePathsPanel, Panel):
     bl_label = "Render"
 
@@ -1355,6 +1333,29 @@ class USERPREF_PT_saveload_autorun(FilePathsPanel, Panel):
             row.prop(path_cmp, "path", text="")
             row.prop(path_cmp, "use_glob", text="", icon='FILTER')
             row.operator("preferences.autoexec_path_remove", text="", icon='X', emboss=False).index = i
+
+
+class USERPREF_PT_file_paths_asset_repositories(FilePathsPanel, Panel):
+    bl_label = "Asset Repositories"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = False
+        layout.use_property_decorate = False
+
+        paths = context.preferences.filepaths
+
+        box = layout.box()
+        for i, repository in enumerate(paths.asset_repositories):
+            row = box.row()
+            split = row.split(factor=0.35)
+            split.prop(repository, "name")
+            split.prop(repository, "path", text="")
+            row.operator("preferences.asset_repository_remove", text="", icon='X', emboss=False).index = i
+
+        row = box.row()
+        row.alignment = 'RIGHT'
+        row.operator("preferences.asset_repository_add", text="", icon='ADD', emboss=False)
 
 
 # -----------------------------------------------------------------------------
@@ -2306,10 +2307,10 @@ classes = (
     USERPREF_PT_theme_collection_colors,
 
     USERPREF_PT_file_paths_data,
-    USERPREF_PT_file_paths_asset_repositories,
     USERPREF_PT_file_paths_render,
     USERPREF_PT_file_paths_applications,
     USERPREF_PT_file_paths_development,
+    USERPREF_PT_file_paths_asset_repositories,
 
     USERPREF_PT_saveload_blend,
     USERPREF_PT_saveload_blend_autosave,

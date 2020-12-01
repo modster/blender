@@ -565,7 +565,7 @@ class ASSETBROWSER_PT_navigation_bar(asset_utils.AssetBrowserPanel, Panel):
 
 class ASSETBROWSER_PT_metadata(asset_utils.AssetBrowserPanel, Panel):
     bl_region_type = 'TOOL_PROPS'
-    bl_label = "Asset Meta-data"
+    bl_label = "Asset Metadata"
     bl_options = {'HIDE_HEADER'}
 
     def draw(self, context):
