@@ -43,6 +43,7 @@
 #include "BKE_idprop.h"
 #include "BKE_keyconfig.h"
 #include "BKE_main.h"
+#include "BKE_preferences.h"
 
 #include "BLO_readfile.h"
 
@@ -827,6 +828,9 @@ void blo_do_versions_userdef(UserDef *userdef)
    */
   {
     /* Keep this block, even when empty. */
+    if (BLI_listbase_is_empty(&userdef->asset_repositories)) {
+      BKE_preferences_asset_repository_default_add(userdef);
+    }
   }
 
   LISTBASE_FOREACH (bTheme *, btheme, &userdef->themes) {
