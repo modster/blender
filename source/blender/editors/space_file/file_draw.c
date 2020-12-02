@@ -25,6 +25,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "BLI_alloca.h"
 #include "BLI_blenlib.h"
 #include "BLI_fileops_types.h"
 #include "BLI_math.h"
@@ -135,6 +136,9 @@ static void draw_tile(int sx, int sy, int width, int height, int colorid, int sh
 }
 
 static void file_draw_icon(uiBlock *block,
+                           const struct FileList *files,
+                           const FileDirEntry *file,
+                           const char *rootpath,
                            const char *path,
                            int sx,
                            int sy,
@@ -158,8 +162,23 @@ static void file_draw_icon(uiBlock *block,
   UI_but_func_tooltip_set(but, file_draw_tooltip_func, BLI_strdup(path));
 
   if (drag) {
-    /* path is no more static, cannot give it directly to but... */
-    UI_but_drag_set_path(but, BLI_strdup(path), true);
+    /* TODO duplicated from file_draw_preview(). */
+    ID *id;
+
+    if ((id = filelist_file_get_id(files, file))) {
+      UI_but_drag_set_id(but, id);
+    }
+    else if (file->typeflag & FILE_TYPE_ASSET) {
+      ImBuf *preview_image = filelist_file_getimage(file);
+      char *rootpath_cpy = BLI_strdup(rootpath);
+      BLI_path_slash_rstrip(rootpath_cpy);
+      UI_but_drag_set_asset(
+          but, file->name, rootpath_cpy, file->blentype, icon, preview_image, UI_DPI_FAC);
+    }
+    else {
+      /* path is no more static, cannot give it directly to but... */
+      UI_but_drag_set_path(but, BLI_strdup(path), true);
+    }
   }
 }
 
@@ -201,6 +220,65 @@ static void file_draw_string(int sx,
                     });
 }
 
+/**
+ * \param r_sx, r_sy: The lower right corner of the last line drawn. AKA the cursor position on
+ *                    completion.
+ */
+static void file_draw_string_multiline(int sx,
+                                       int sy,
+                                       const char *string,
+                                       int wrap_width,
+                                       int line_height,
+                                       const uchar text_col[4],
+                                       int *r_sx,
+                                       int *r_sy)
+{
+  rcti rect;
+
+  if (string[0] == '\0' || wrap_width < 1) {
+    return;
+  }
+
+  const uiStyle *style = UI_style_get();
+  int font_id = style->widgetlabel.uifont_id;
+  int len = strlen(string);
+
+  rctf textbox;
+  BLF_wordwrap(font_id, wrap_width);
+  BLF_enable(font_id, BLF_WORD_WRAP);
+  BLF_boundbox(font_id, string, len, &textbox);
+  BLF_disable(font_id, BLF_WORD_WRAP);
+
+  /* no text clipping needed, UI_fontstyle_draw does it but is a bit too strict
+   * (for buttons it works) */
+  rect.xmin = sx;
+  rect.xmax = sx + wrap_width;
+  /* Need to increase the clipping rect by one more line, since the #UI_fontstyle_draw_ex() will
+   * actually start drawing at (ymax - line-height). */
+  rect.ymin = sy - round_fl_to_int(BLI_rctf_size_y(&textbox)) - line_height;
+  rect.ymax = sy;
+
+  struct ResultBLF result;
+  UI_fontstyle_draw_ex(&style->widget,
+                       &rect,
+                       string,
+                       text_col,
+                       &(struct uiFontStyleDraw_Params){
+                           .align = UI_STYLE_TEXT_LEFT,
+                           .word_wrap = true,
+                       },
+                       len,
+                       NULL,
+                       NULL,
+                       &result);
+  if (r_sx) {
+    *r_sx = result.width;
+  }
+  if (r_sy) {
+    *r_sy = rect.ymin + line_height;
+  }
+}
+
 void file_calc_previews(const bContext *C, ARegion *region)
 {
   SpaceFile *sfile = CTX_wm_space_file(C);
@@ -211,6 +289,9 @@ void file_calc_previews(const bContext *C, ARegion *region)
 }
 
 static void file_draw_preview(uiBlock *block,
+                              const struct FileList *files,
+                              const FileDirEntry *file,
+                              const char *rootpath,
                               const char *path,
                               int sx,
                               int sy,
@@ -219,7 +300,6 @@ static void file_draw_preview(uiBlock *block,
                               const int icon,
                               FileLayout *layout,
                               const bool is_icon,
-                              const int typeflags,
                               const bool drag,
                               const bool dimmed,
                               const bool is_link)
@@ -233,7 +313,7 @@ static void file_draw_preview(uiBlock *block,
   float scale;
   int ex, ey;
   bool show_outline = !is_icon &&
-                      (typeflags & (FILE_TYPE_IMAGE | FILE_TYPE_MOVIE | FILE_TYPE_BLENDER));
+                      (file->typeflag & (FILE_TYPE_IMAGE | FILE_TYPE_MOVIE | FILE_TYPE_BLENDER));
 
   BLI_assert(imb != NULL);
 
@@ -274,14 +354,14 @@ static void file_draw_preview(uiBlock *block,
 
   float col[4] = {1.0f, 1.0f, 1.0f, 1.0f};
   if (is_icon) {
-    if (typeflags & FILE_TYPE_DIR) {
+    if (file->typeflag & FILE_TYPE_DIR) {
       UI_GetThemeColor4fv(TH_ICON_FOLDER, col);
     }
     else {
       UI_GetThemeColor4fv(TH_TEXT, col);
     }
   }
-  else if (typeflags & FILE_TYPE_FTFONT) {
+  else if (file->typeflag & FILE_TYPE_FTFONT) {
     UI_GetThemeColor4fv(TH_TEXT, col);
   }
 
@@ -289,7 +369,7 @@ static void file_draw_preview(uiBlock *block,
     col[3] *= 0.3f;
   }
 
-  if (!is_icon && typeflags & FILE_TYPE_BLENDERLIB) {
+  if (!is_icon && file->typeflag & FILE_TYPE_BLENDERLIB) {
     /* Datablock preview images use premultiplied alpha. */
     GPU_blend(GPU_BLEND_ALPHA_PREMULT);
   }
@@ -325,7 +405,7 @@ static void file_draw_preview(uiBlock *block,
       icon_color[2] = 255;
     }
     icon_x = xco + (ex / 2.0f) - (icon_size / 2.0f);
-    icon_y = yco + (ey / 2.0f) - (icon_size * ((typeflags & FILE_TYPE_DIR) ? 0.78f : 0.75f));
+    icon_y = yco + (ey / 2.0f) - (icon_size * ((file->typeflag & FILE_TYPE_DIR) ? 0.78f : 0.75f));
     UI_icon_draw_ex(
         icon_x, icon_y, icon, icon_aspect / U.dpi_fac, icon_opacity, 0.0f, icon_color, false);
   }
@@ -347,13 +427,13 @@ static void file_draw_preview(uiBlock *block,
       /* Link to folder or non-previewed file. */
       uchar icon_color[4];
       UI_GetThemeColor4ubv(TH_BACK, icon_color);
-      icon_x = xco + ((typeflags & FILE_TYPE_DIR) ? 0.14f : 0.23f) * scaledx;
-      icon_y = yco + ((typeflags & FILE_TYPE_DIR) ? 0.24f : 0.14f) * scaledy;
+      icon_x = xco + ((file->typeflag & FILE_TYPE_DIR) ? 0.14f : 0.23f) * scaledx;
+      icon_y = yco + ((file->typeflag & FILE_TYPE_DIR) ? 0.24f : 0.14f) * scaledy;
       UI_icon_draw_ex(
           icon_x, icon_y, arrow, icon_aspect / U.dpi_fac * 1.8, 0.3f, 0.0f, icon_color, false);
     }
   }
-  else if (icon && !is_icon && !(typeflags & FILE_TYPE_FTFONT)) {
+  else if (icon && !is_icon && !(file->typeflag & FILE_TYPE_FTFONT)) {
     /* Smaller, fainter icon at bottom-left for preview image thumbnail, but not for fonts. */
     float icon_x, icon_y;
     const uchar dark[4] = {0, 0, 0, 255};
@@ -386,8 +466,20 @@ static void file_draw_preview(uiBlock *block,
 
   /* dragregion */
   if (drag) {
+    ID *id;
+
+    if ((id = filelist_file_get_id(files, file))) {
+      UI_but_drag_set_id(but, id);
+    }
     /* path is no more static, cannot give it directly to but... */
-    UI_but_drag_set_image(but, BLI_strdup(path), icon, imb, scale, true);
+    else if (file->typeflag & FILE_TYPE_ASSET) {
+      char *rootpath_cpy = BLI_strdup(rootpath);
+      BLI_path_slash_rstrip(rootpath_cpy);
+      UI_but_drag_set_asset(but, file->name, rootpath_cpy, file->blentype, icon, imb, scale);
+    }
+    else {
+      UI_but_drag_set_image(but, BLI_strdup(path), icon, imb, scale, true);
+    }
   }
 
   GPU_blend(GPU_BLEND_NONE);
@@ -822,6 +914,9 @@ void file_draw_list(const bContext *C, ARegion *region)
       }
 
       file_draw_preview(block,
+                        files,
+                        file,
+                        root,
                         path,
                         sx,
                         sy,
@@ -830,13 +925,15 @@ void file_draw_list(const bContext *C, ARegion *region)
                         icon,
                         layout,
                         is_icon,
-                        file->typeflag,
                         do_drag,
                         is_hidden,
                         is_link);
     }
     else {
       file_draw_icon(block,
+                     files,
+                     file,
+                     root,
                      path,
                      sx,
                      sy - layout->tile_border_y,
@@ -907,4 +1004,68 @@ void file_draw_list(const bContext *C, ARegion *region)
   }
 
   layout->curr_size = params->thumbnail_size;
+}
+
+static void file_draw_invalid_repository_hint(const SpaceFile *sfile, const ARegion *region)
+{
+  const FileAssetSelectParams *asset_params = ED_fileselect_get_asset_params(sfile);
+
+  char repository_ui_path[PATH_MAX];
+  file_path_to_ui_path(
+      asset_params->base_params.dir, repository_ui_path, sizeof(repository_ui_path));
+
+  uchar text_col[4];
+  uchar text_alert_col[4];
+  UI_GetThemeColor4ubv(TH_TEXT, text_col);
+  UI_GetThemeColor4ubv(TH_REDALERT, text_alert_col);
+
+  const View2D *v2d = &region->v2d;
+  const int pad = sfile->layout->tile_border_x;
+  const int width = BLI_rctf_size_x(&v2d->tot) - (2 * pad);
+  const int line_height = sfile->layout->textheight;
+  int sx = v2d->tot.xmin + pad;
+  /* For some reason no padding needed. */
+  int sy = v2d->tot.ymax;
+
+  {
+    const char *message = TIP_("Repository not found");
+    const int draw_string_str_len = strlen(message) + 2 + sizeof(repository_ui_path);
+    char *draw_string = alloca(draw_string_str_len);
+    BLI_snprintf(draw_string, draw_string_str_len, "%s: %s", message, repository_ui_path);
+    file_draw_string_multiline(sx, sy, draw_string, width, line_height, text_alert_col, NULL, &sy);
+  }
+
+  /* Next line, but separate it a bit further. */
+  sy -= line_height;
+
+  {
+    UI_icon_draw(sx, sy - UI_UNIT_Y, ICON_INFO);
+
+    const char *suggestion = TIP_(
+        "Set up the repository or edit repositories in the Preferences, File Paths section.");
+    file_draw_string_multiline(
+        sx + UI_UNIT_X, sy, suggestion, width - UI_UNIT_X, line_height, text_col, NULL, NULL);
+  }
+}
+
+/**
+ * Draw a string hint if the file list is invalid.
+ * \return true if the list is invalid and a hint was drawn.
+ */
+bool file_draw_hint_if_invalid(const SpaceFile *sfile, const ARegion *region)
+{
+  FileAssetSelectParams *asset_params = ED_fileselect_get_asset_params(sfile);
+  /* Only for asset browser. */
+  if (!ED_fileselect_is_asset_browser(sfile)) {
+    return false;
+  }
+  /* Check if the repository exists. */
+  if ((asset_params->asset_repository.type == FILE_ASSET_REPO_LOCAL) ||
+      filelist_is_dir(sfile->files, asset_params->base_params.dir)) {
+    return false;
+  }
+
+  file_draw_invalid_repository_hint(sfile, region);
+
+  return true;
 }

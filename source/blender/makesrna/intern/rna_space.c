@@ -2558,6 +2558,18 @@ static PointerRNA rna_FileBrowser_FileSelectEntry_asset_data_get(PointerRNA *ptr
   return rna_pointer_inherit_refine(ptr, &RNA_AssetMetaData, entry->asset_data);
 }
 
+static void rna_FileSelectParams_asset_category_set(PointerRNA *ptr, uint64_t value)
+{
+  FileSelectParams *params = ptr->data;
+  params->filter_id = value;
+}
+
+static uint64_t rna_FileSelectParams_asset_category_get(PointerRNA *ptr)
+{
+  FileSelectParams *params = ptr->data;
+  return params->filter_id;
+}
+
 static PointerRNA rna_FileBrowser_params_get(PointerRNA *ptr)
 {
   SpaceFile *sfile = ptr->data;
@@ -5955,6 +5967,47 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
+  /* XXX copied from rna_def_fileselect_idfilter. */
+  static const EnumPropertyItem asset_category_items[] = {
+      {FILTER_ID_SCE, "SCENES", ICON_SCENE_DATA, "Scenes", "Show scenes"},
+      {FILTER_ID_AC, "ANIMATIONS", ICON_ANIM_DATA, "Animations", "Show animation data"},
+      {FILTER_ID_OB | FILTER_ID_GR,
+       "OBJECTS_AND_COLLECTIONS",
+       ICON_GROUP,
+       "Objects & Collections",
+       "Show objects and collections"},
+      {FILTER_ID_AR | FILTER_ID_CU | FILTER_ID_LT | FILTER_ID_MB | FILTER_ID_ME
+       /* XXX avoid warning */
+       // | FILTER_ID_HA | FILTER_ID_PT | FILTER_ID_VO
+       ,
+       "GEOMETRY",
+       ICON_MESH_DATA,
+       "Geometry",
+       "Show meshes, curves, lattice, armatures and metaballs data"},
+      {FILTER_ID_LS | FILTER_ID_MA | FILTER_ID_NT | FILTER_ID_TE,
+       "SHADING",
+       ICON_MATERIAL_DATA,
+       "Shading",
+       "Show materials, nodetrees, textures and Freestyle's linestyles"},
+      {FILTER_ID_IM | FILTER_ID_MC | FILTER_ID_MSK | FILTER_ID_SO,
+       "IMAGES_AND_SOUNDS",
+       ICON_IMAGE_DATA,
+       "Images & Sounds",
+       "Show images, movie clips, sounds and masks"},
+      {FILTER_ID_CA | FILTER_ID_LA | FILTER_ID_LP | FILTER_ID_SPK | FILTER_ID_WO | FILTER_ID_WS,
+       "ENVIRONMENTS",
+       ICON_WORLD_DATA,
+       "Environment",
+       "Show worlds, lights, cameras and speakers"},
+      {FILTER_ID_BR | FILTER_ID_GD | FILTER_ID_PA | FILTER_ID_PAL | FILTER_ID_PC | FILTER_ID_TXT |
+           FILTER_ID_VF | FILTER_ID_CF,
+       "MISC",
+       ICON_GREASEPENCIL,
+       "Miscellaneous",
+       "Show other data types"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   srna = RNA_def_struct(brna, "FileSelectParams", NULL);
   RNA_def_struct_path_func(srna, "rna_FileSelectParams_path");
   RNA_def_struct_ui_text(srna, "File Select Parameters", "File Select Parameters");
@@ -6134,6 +6187,15 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
                               "rna_FileSelectParams_asset_repository_itemf");
   RNA_def_property_ui_text(prop, "Asset Repository", "");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
+
+  prop = RNA_def_property(srna, "asset_category", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, asset_category_items);
+  RNA_def_property_enum_funcs(prop,
+                              "rna_FileSelectParams_asset_category_get",
+                              "rna_FileSelectParams_asset_category_set",
+                              NULL);
+  RNA_def_property_ui_text(prop, "Asset Category", "Determine which kind of assets to display");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
 
   prop = RNA_def_property(srna, "display_size", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "thumbnail_size");
