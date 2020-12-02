@@ -359,7 +359,7 @@ static void add_positions(const P3fArraySamplePtr positions, double time, Cached
   cached_data.vertices.add_data(vertices, time);
 }
 
-static void add_triangles(const Int32ArraySamplePtr face_counts, const Int32ArraySamplePtr face_indices, double time, CachedData &cached_data)
+static void add_triangles(const Int32ArraySamplePtr face_counts, const Int32ArraySamplePtr face_indices, double time, CachedData &cached_data, const array<int> &polygon_to_shader)
 {
   if (!face_counts || !face_indices) {
     return;
@@ -374,18 +374,27 @@ static void add_triangles(const Int32ArraySamplePtr face_counts, const Int32Arra
     num_triangles += face_counts_array[i] - 2;
   }
 
+  array<int> shader;
   array<int3> triangles;
   array<int3> triangles_loops;
+  shader.reserve(num_triangles);
   triangles.reserve(num_triangles);
   triangles_loops.reserve(num_triangles);
   int index_offset = 0;
 
   for (size_t i = 0; i < num_faces; i++) {
+    int current_shader = 0;
+
+    if (!polygon_to_shader.empty()) {
+      current_shader = polygon_to_shader[i];
+    }
+
     for (int j = 0; j < face_counts_array[i] - 2; j++) {
       int v0 = face_indices_array[index_offset];
       int v1 = face_indices_array[index_offset + j + 1];
       int v2 = face_indices_array[index_offset + j + 2];
 
+      shader.push_back_reserved(current_shader);
       triangles.push_back_reserved(make_int3(v0, v1, v2));
       triangles_loops.push_back_reserved(
             make_int3(index_offset, index_offset + j + 1, index_offset + j + 2));
@@ -396,6 +405,7 @@ static void add_triangles(const Int32ArraySamplePtr face_counts, const Int32Arra
 
   cached_data.triangles.add_data(triangles, time);
   cached_data.triangles_loops.add_data(triangles_loops, time);
+  cached_data.shader.add_data(shader, time);
 }
 
 NODE_DEFINE(AlembicObject)
@@ -430,7 +440,65 @@ bool AlembicObject::has_data_loaded() const
   return data_loaded;
 }
 
-void AlembicObject::load_all_data(const IPolyMeshSchema &schema, Progress &progress)
+void AlembicObject::read_face_sets(IPolyMeshSchema &schema, array<int> &polygon_to_shader)
+{
+  assert(geometry);
+
+  /* TODO(@kevindietrich) at the moment this is only supported for meshes whose topology remains constant (with possible vertex animation) */
+  if (schema.getTopologyVariance() == kHeterogenousTopology) {
+    return;
+  }
+
+  std::vector<std::string> face_sets;
+  schema.getFaceSetNames(face_sets);
+
+  if (face_sets.empty()) {
+    return;
+  }
+
+  auto face_counts = schema.getFaceCountsProperty().getValue();
+
+  polygon_to_shader.resize(face_counts->size());
+
+  foreach (const std::string &face_set_name, face_sets) {
+    int shader_index = 0;
+
+    foreach (Node *node, geometry->get_used_shaders()) {
+      if (node->name == face_set_name) {
+        break;
+      }
+
+      ++shader_index;
+    }
+
+    if (shader_index >= geometry->get_used_shaders().size()) {
+      continue;
+    }
+
+    const IFaceSet face_set = schema.getFaceSet(face_set_name);
+
+    if (!face_set.valid()) {
+      continue;
+    }
+
+    const IFaceSetSchema face_schem = face_set.getSchema();
+    const IFaceSetSchema::Sample face_sample = face_schem.getValue(ISampleSelector(index_t(0)));
+    const Int32ArraySamplePtr group_faces = face_sample.getFaces();
+    const size_t num_group_faces = group_faces->size();
+
+    for (size_t l = 0; l < num_group_faces; l++) {
+      size_t pos = (*group_faces)[l];
+
+      if (pos >= polygon_to_shader.size()) {
+        continue;
+      }
+
+      polygon_to_shader[pos] = shader_index;
+    }
+  }
+}
+
+void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
 {
   cached_data.clear();
 
@@ -440,6 +508,11 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema, Progress &progr
   cached_data.triangles.set_time_sampling(*schema.getTimeSampling());
   cached_data.triangles_loops.set_time_sampling(*schema.getTimeSampling());
 
+  /* start by reading the face sets (per face shader), as we directly split polygons to triangles */
+  array<int> polygon_to_shader;
+  read_face_sets(schema, polygon_to_shader);
+
+  /* read topology */
   for (size_t i = 0; i < schema.getNumSamples(); ++i) {
     if (progress.get_cancel()) {
       return;
@@ -452,7 +525,7 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema, Progress &progr
 
     add_positions(sample.getPositions(), time, cached_data);
 
-    add_triangles(sample.getFaceCounts(), sample.getFaceIndices(), time, cached_data);
+    add_triangles(sample.getFaceCounts(), sample.getFaceIndices(), time, cached_data, polygon_to_shader);
 
     foreach (const AttributeRequest &attr, requested_attributes.requests) {
       read_attribute(schema.getArbGeomParams(), iss, attr.name);
@@ -901,27 +974,28 @@ void AlembicProcedural::read_mesh(Scene *scene,
 
   array<int3> *triangle_data = cached_data.triangles.data_for_time(frame_time);
   if (triangle_data) {
-    // TODO : shader association
     array<int> triangles;
     array<bool> smooth;
-    array<int> shader;
 
     triangles.reserve(triangle_data->size() * 3);
     smooth.reserve(triangle_data->size());
-    shader.reserve(triangle_data->size());
 
     for (size_t i = 0; i < triangle_data->size(); ++i) {
       int3 tri = (*triangle_data)[i];
       triangles.push_back_reserved(tri.x);
       triangles.push_back_reserved(tri.y);
       triangles.push_back_reserved(tri.z);
-      shader.push_back_reserved(0);
       smooth.push_back_reserved(1);
     }
 
     mesh->set_triangles(triangles);
     mesh->set_smooth(smooth);
-    mesh->set_shader(shader);
+  }
+
+  array<int> *shader = cached_data.shader.data_for_time(frame_time);
+  if (shader) {
+    array<int> new_shader = *shader;
+    mesh->set_shader(new_shader);
   }
 
   for (auto &attribute : cached_data.attributes) {

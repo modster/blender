@@ -100,6 +100,7 @@ struct CachedData {
   DataStore<array<float3>> vertices;
   DataStore<array<int3>> triangles{};
   DataStore<array<int3>> triangles_loops{};
+  DataStore<array<int>> shader{};
 
   /* hair data */
   DataStore<array<float3>> curve_keys;
@@ -196,7 +197,7 @@ class AlembicObject : public Node {
   void set_object(Object *object);
   Object *get_object();
 
-  void load_all_data(const Alembic::AbcGeom::IPolyMeshSchema &schema, Progress &progress);
+  void load_all_data(Alembic::AbcGeom::IPolyMeshSchema &schema, Progress &progress);
   void load_all_data(const Alembic::AbcGeom::ICurvesSchema &schema, Progress &progress);
 
   bool has_data_loaded() const;
@@ -227,6 +228,8 @@ class AlembicObject : public Node {
   void read_attribute(const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
                       const Alembic::AbcGeom::ISampleSelector &iss,
                       const ustring &attr_name);
+
+  void read_face_sets(Alembic::AbcGeom::IPolyMeshSchema &schema, array<int> &polygon_to_shader);
 
   void setup_transform_cache();
 
