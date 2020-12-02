@@ -1265,6 +1265,9 @@ static void write_area_regions(BlendWriter *writer, ScrArea *area)
       if (sfile->params) {
         BLO_write_struct(writer, FileSelectParams, sfile->params);
       }
+      if (sfile->asset_params) {
+        BLO_write_struct(writer, FileAssetSelectParams, sfile->asset_params);
+      }
     }
     else if (sl->spacetype == SPACE_SEQ) {
       BLO_write_struct(writer, SpaceSeq, sl);
@@ -1663,11 +1666,13 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
        * plus, it isn't saved to files yet!
        */
       sfile->folders_prev = sfile->folders_next = NULL;
+      BLI_listbase_clear(&sfile->folder_histories);
       sfile->files = NULL;
       sfile->layout = NULL;
       sfile->op = NULL;
       sfile->previews_timer = NULL;
       BLO_read_data_address(reader, &sfile->params);
+      BLO_read_data_address(reader, &sfile->asset_params);
     }
     else if (sl->spacetype == SPACE_CLIP) {
       SpaceClip *sclip = (SpaceClip *)sl;

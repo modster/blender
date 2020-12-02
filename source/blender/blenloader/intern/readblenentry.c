@@ -301,7 +301,7 @@ LinkNode *BLO_blendhandle_get_previews(BlendHandle *bh, int ofblocktype, int *to
  * (e.g. "Scene", "Mesh", "Light", etc.).
  *
  * \param bh: The blendhandle to access.
- * \return A BLI_linklist of strings. The string links should be freed with malloc.
+ * \return A BLI_linklist of strings. The string links should be freed with #MEM_freeN().
  */
 LinkNode *BLO_blendhandle_get_linkable_groups(BlendHandle *bh)
 {
@@ -319,7 +319,7 @@ LinkNode *BLO_blendhandle_get_linkable_groups(BlendHandle *bh)
         const char *str = BKE_idtype_idcode_to_name(bhead->code);
 
         if (BLI_gset_add(gathered, (void *)str)) {
-          BLI_linklist_prepend(&names, strdup(str));
+          BLI_linklist_prepend(&names, BLI_strdup(str));
         }
       }
     }

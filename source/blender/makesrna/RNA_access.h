@@ -252,6 +252,7 @@ extern StructRNA RNA_FModifierStepped;
 extern StructRNA RNA_FaceMap;
 extern StructRNA RNA_FieldSettings;
 extern StructRNA RNA_FileBrowserFSMenuEntry;
+extern StructRNA RNA_FileSelectEntry;
 extern StructRNA RNA_FileSelectParams;
 extern StructRNA RNA_FloatAttribute;
 extern StructRNA RNA_FloatAttributeValue;
