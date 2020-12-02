@@ -264,7 +264,12 @@ typedef struct IDOverrideLibrary {
 typedef struct ID {
   void *next, *prev;
   struct ID *newid;
+
   struct Library *lib;
+
+  /** If the ID is an asset, this pointer is set. Owning pointer. */
+  struct AssetMetaData *asset_data;
+
   /** MAX_ID_NAME. */
   char name[66];
   /**
