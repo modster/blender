@@ -34,7 +34,12 @@ using namespace Alembic::AbcGeom;
 
 CCL_NAMESPACE_BEGIN
 
-/* TODO(@kevindietrich): motion blur support, requires persistent data for final renders, or at least a way to tell which frame data to load, so we do not load the entire archive for a few frames. */
+/* TODO(@kevindietrich): motion blur support, requires persistent data for final renders, or at
+ * least a way to tell which frame data to load, so we do not load the entire archive for a few
+ * frames. */
+
+/* TODO(@kevindietrich) : arrays are emptied when passed to the sockets, so for now we copy the
+ * array to avoid reloading the data */
 
 static float3 make_float3_from_yup(const Imath::Vec3<float> &v)
 {
@@ -146,10 +151,10 @@ static M44d get_interpolated_matrix_for_time(const MatrixSampleMap &samples, chr
   const M44d prev_mat = get_matrix_for_time(samples, prev_time);
   const M44d next_mat = get_matrix_for_time(samples, next_time);
 
-  Imath::V3d prev_scale, next_scale;
-  Imath::V3d prev_shear, next_shear;
-  Imath::V3d prev_translation, next_translation;
-  Imath::Quatd prev_rotation, next_rotation;
+  V3d prev_scale, next_scale;
+  V3d prev_shear, next_shear;
+  V3d prev_translation, next_translation;
+  Quatd prev_rotation, next_rotation;
 
   transform_decompose(prev_mat, prev_scale, prev_shear, prev_rotation, prev_translation);
   transform_decompose(next_mat, next_scale, next_shear, next_rotation, next_translation);
@@ -171,13 +176,13 @@ static void concatenate_xform_samples(const MatrixSampleMap &parent_samples,
                                       const MatrixSampleMap &local_samples,
                                       MatrixSampleMap &output_samples)
 {
-  std::set<chrono_t> union_of_samples;
+  set<chrono_t> union_of_samples;
 
-  for (auto &pair : parent_samples) {
+  for (const std::pair<chrono_t, M44d> pair : parent_samples) {
     union_of_samples.insert(pair.first);
   }
 
-  for (auto &pair : local_samples) {
+  for (const std::pair<chrono_t, M44d> pair : local_samples) {
     union_of_samples.insert(pair.first);
   }
 
@@ -189,7 +194,7 @@ static void concatenate_xform_samples(const MatrixSampleMap &parent_samples,
   }
 }
 
-static Transform make_transform(const Abc::M44d &a)
+static Transform make_transform(const M44d &a)
 {
   M44d m = convert_yup_zup(a);
   Transform trans;
@@ -203,24 +208,24 @@ static Transform make_transform(const Abc::M44d &a)
 
 static void read_default_uvs(const IV2fGeomParam &uvs, CachedData &cached_data)
 {
-  auto &attr = cached_data.add_attribute(ustring(uvs.getName()));
+  CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(uvs.getName()));
 
-  for (index_t i = 0; i < static_cast<index_t>(uvs.getNumSamples()); ++i) {
-    const ISampleSelector iss = ISampleSelector(static_cast<index_t>(i));
+  for (size_t i = 0; i < uvs.getNumSamples(); ++i) {
+    const ISampleSelector iss = ISampleSelector(index_t(i));
     const IV2fGeomParam::Sample sample = uvs.getExpandedValue(iss);
 
-    const double time = uvs.getTimeSampling()->getSampleTime(static_cast<index_t>(i));
+    const double time = uvs.getTimeSampling()->getSampleTime(index_t(i));
 
     switch (uvs.getScope()) {
       case kFacevaryingScope: {
-        IV2fGeomParam::Sample uvsample = uvs.getIndexedValue(iss);
+        const IV2fGeomParam::Sample uvsample = uvs.getIndexedValue(iss);
 
         if (!uvsample.valid()) {
           continue;
         }
 
-        auto triangles = cached_data.triangles.data_for_time(time);
-        auto triangles_loops = cached_data.triangles_loops.data_for_time(time);
+        const array<int3> *triangles = cached_data.triangles.data_for_time(time);
+        const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time(time);
 
         if (!triangles || !triangles_loops) {
           continue;
@@ -234,7 +239,7 @@ static void read_default_uvs(const IV2fGeomParam &uvs, CachedData &cached_data)
         float2 *data_float2 = reinterpret_cast<float2 *>(data.data());
 
         const unsigned int *indices = uvsample.getIndices()->get();
-        const Imath::Vec2<float> *values = uvsample.getVals()->get();
+        const V2f *values = uvsample.getVals()->get();
 
         for (const int3 &loop : *triangles_loops) {
           unsigned int v0 = indices[loop.x];
@@ -261,7 +266,7 @@ static void read_default_uvs(const IV2fGeomParam &uvs, CachedData &cached_data)
 
 static void read_default_normals(const IN3fGeomParam &normals, CachedData &cached_data)
 {
-  auto &attr = cached_data.add_attribute(ustring(normals.getName()));
+  CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(normals.getName()));
 
   for (index_t i = 0; i < static_cast<index_t>(normals.getNumSamples()); ++i) {
     const ISampleSelector iss = ISampleSelector(static_cast<index_t>(i));
@@ -277,8 +282,8 @@ static void read_default_normals(const IN3fGeomParam &normals, CachedData &cache
       case kFacevaryingScope: {
         attr.std = ATTR_STD_VERTEX_NORMAL;
 
-        auto vertices = cached_data.vertices.data_for_time(time);
-        auto triangles = cached_data.triangles.data_for_time(time);
+        const array<float3> *vertices = cached_data.vertices.data_for_time(time);
+        const array<int3> *triangles = cached_data.triangles.data_for_time(time);
 
         if (!vertices || !triangles) {
           continue;
@@ -313,7 +318,7 @@ static void read_default_normals(const IN3fGeomParam &normals, CachedData &cache
       case kVertexScope: {
         attr.std = ATTR_STD_VERTEX_NORMAL;
 
-        auto vertices = cached_data.vertices.data_for_time(time);
+        const array<float3> *vertices = cached_data.vertices.data_for_time(time);
 
         if (!vertices) {
           continue;
@@ -359,7 +364,11 @@ static void add_positions(const P3fArraySamplePtr positions, double time, Cached
   cached_data.vertices.add_data(vertices, time);
 }
 
-static void add_triangles(const Int32ArraySamplePtr face_counts, const Int32ArraySamplePtr face_indices, double time, CachedData &cached_data, const array<int> &polygon_to_shader)
+static void add_triangles(const Int32ArraySamplePtr face_counts,
+                          const Int32ArraySamplePtr face_indices,
+                          double time,
+                          CachedData &cached_data,
+                          const array<int> &polygon_to_shader)
 {
   if (!face_counts || !face_indices) {
     return;
@@ -397,7 +406,7 @@ static void add_triangles(const Int32ArraySamplePtr face_counts, const Int32Arra
       shader.push_back_reserved(current_shader);
       triangles.push_back_reserved(make_int3(v0, v1, v2));
       triangles_loops.push_back_reserved(
-            make_int3(index_offset, index_offset + j + 1, index_offset + j + 2));
+          make_int3(index_offset, index_offset + j + 1, index_offset + j + 2));
     }
 
     index_offset += face_counts_array[i];
@@ -444,7 +453,8 @@ void AlembicObject::read_face_sets(IPolyMeshSchema &schema, array<int> &polygon_
 {
   assert(geometry);
 
-  /* TODO(@kevindietrich) at the moment this is only supported for meshes whose topology remains constant (with possible vertex animation) */
+  /* TODO(@kevindietrich) at the moment this is only supported for meshes whose topology remains
+   * constant (with possible vertex animation) */
   if (schema.getTopologyVariance() == kHeterogenousTopology) {
     return;
   }
@@ -456,7 +466,7 @@ void AlembicObject::read_face_sets(IPolyMeshSchema &schema, array<int> &polygon_
     return;
   }
 
-  auto face_counts = schema.getFaceCountsProperty().getValue();
+  const Int32ArraySamplePtr face_counts = schema.getFaceCountsProperty().getValue();
 
   polygon_to_shader.resize(face_counts->size());
 
@@ -508,7 +518,8 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
   cached_data.triangles.set_time_sampling(*schema.getTimeSampling());
   cached_data.triangles_loops.set_time_sampling(*schema.getTimeSampling());
 
-  /* start by reading the face sets (per face shader), as we directly split polygons to triangles */
+  /* start by reading the face sets (per face shader), as we directly split polygons to triangles
+   */
   array<int> polygon_to_shader;
   read_face_sets(schema, polygon_to_shader);
 
@@ -525,7 +536,8 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
 
     add_positions(sample.getPositions(), time, cached_data);
 
-    add_triangles(sample.getFaceCounts(), sample.getFaceIndices(), time, cached_data, polygon_to_shader);
+    add_triangles(
+        sample.getFaceCounts(), sample.getFaceIndices(), time, cached_data, polygon_to_shader);
 
     foreach (const AttributeRequest &attr, requested_attributes.requests) {
       read_attribute(schema.getArbGeomParams(), iss, attr.name);
@@ -561,7 +573,8 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
   data_loaded = true;
 }
 
-void AlembicObject::load_all_data(const Alembic::AbcGeom::ICurvesSchema &schema, Progress &progress)
+void AlembicObject::load_all_data(const Alembic::AbcGeom::ICurvesSchema &schema,
+                                  Progress &progress)
 {
   cached_data.clear();
 
@@ -615,7 +628,7 @@ void AlembicObject::load_all_data(const Alembic::AbcGeom::ICurvesSchema &schema,
     cached_data.curve_shader.add_data(curve_shader, time);
   }
 
-  // TODO: attributes
+  // TODO(@kevindietrich): attributes
 
   setup_transform_cache();
 
@@ -633,7 +646,7 @@ void AlembicObject::setup_transform_cache()
      */
     M44d first_matrix = xform_samples.begin()->first;
     bool has_animation = false;
-    for (auto &pair : xform_samples) {
+    for (const std::pair<chrono_t, M44d> pair : xform_samples) {
       if (pair.second != first_matrix) {
         has_animation = true;
         break;
@@ -644,15 +657,15 @@ void AlembicObject::setup_transform_cache()
       cached_data.transforms.add_data(make_transform(first_matrix), 0.0);
     }
     else {
-      for (auto &pair : xform_samples) {
+      for (const std::pair<chrono_t, M44d> pair : xform_samples) {
         Transform tfm = make_transform(pair.second);
         cached_data.transforms.add_data(tfm, pair.first);
       }
     }
   }
 
-  // TODO : proper time sampling, but is it possible for the hierarchy to have different time
-  // sampling for each xform ?
+  // TODO(@kevindietrich) : proper time sampling, but is it possible for the hierarchy to have
+  // different time sampling for each xform ?
   cached_data.transforms.set_time_sampling(cached_data.vertices.time_sampling);
 }
 
@@ -663,7 +676,7 @@ AttributeRequestSet AlembicObject::get_requested_attributes()
   Geometry *geometry = object->get_geometry();
   assert(geometry);
 
-  // TODO : check for attribute changes in the shaders
+  // TODO(@kevindietrich) : check for attribute changes in the shaders
   foreach (Node *node, geometry->get_used_shaders()) {
     Shader *shader = static_cast<Shader *>(node);
 
@@ -681,8 +694,8 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
                                    const ISampleSelector &iss,
                                    const ustring &attr_name)
 {
-  auto index = iss.getRequestedIndex();
-  auto &attribute = cached_data.add_attribute(attr_name);
+  const index_t index = iss.getRequestedIndex();
+  CachedData::CachedAttribute &attribute = cached_data.add_attribute(attr_name);
 
   for (size_t i = 0; i < arb_geom_params.getNumProperties(); ++i) {
     const PropertyHeader &prop = arb_geom_params.getPropertyHeader(i);
@@ -697,7 +710,7 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
       IV2fGeomParam::Sample sample;
       param.getIndexed(sample, iss);
 
-      auto time = param.getTimeSampling()->getSampleTime(index);
+      const chrono_t time = param.getTimeSampling()->getSampleTime(index);
 
       if (param.getScope() == kFacevaryingScope) {
         V2fArraySamplePtr values = sample.getVals();
@@ -707,8 +720,8 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
         attribute.element = ATTR_ELEMENT_CORNER;
         attribute.type_desc = TypeFloat2;
 
-        auto triangles = cached_data.triangles.data_for_time(time);
-        auto triangles_loops = cached_data.triangles_loops.data_for_time(time);
+        const array<int3> *triangles = cached_data.triangles.data_for_time(time);
+        const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time(time);
 
         if (!triangles || !triangles_loops) {
           continue;
@@ -740,7 +753,7 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
       IC3fGeomParam::Sample sample;
       param.getIndexed(sample, iss);
 
-      auto time = param.getTimeSampling()->getSampleTime(index);
+      const chrono_t time = param.getTimeSampling()->getSampleTime(index);
 
       C3fArraySamplePtr values = sample.getVals();
 
@@ -750,7 +763,7 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
         attribute.element = ATTR_ELEMENT_CORNER_BYTE;
         attribute.type_desc = TypeRGBA;
 
-        auto triangles = cached_data.triangles.data_for_time(time);
+        const array<int3> *triangles = cached_data.triangles.data_for_time(time);
 
         if (!triangles) {
           continue;
@@ -785,7 +798,7 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
       IC4fGeomParam::Sample sample;
       param.getIndexed(sample, iss);
 
-      auto time = param.getTimeSampling()->getSampleTime(index);
+      const chrono_t time = param.getTimeSampling()->getSampleTime(index);
 
       C4fArraySamplePtr values = sample.getVals();
 
@@ -795,7 +808,7 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
         attribute.element = ATTR_ELEMENT_CORNER_BYTE;
         attribute.type_desc = TypeRGBA;
 
-        auto triangles = cached_data.triangles.data_for_time(time);
+        const array<int3> *triangles = cached_data.triangles.data_for_time(time);
 
         if (!triangles) {
           continue;
@@ -877,7 +890,7 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
     objects_loaded = true;
   }
 
-  Abc::chrono_t frame_time = (Abc::chrono_t)(frame / frame_rate);
+  const chrono_t frame_time = (chrono_t)(frame / frame_rate);
 
   foreach (AlembicObject *object, objects) {
     if (progress.get_cancel()) {
@@ -957,17 +970,16 @@ void AlembicProcedural::read_mesh(Scene *scene,
     abc_object->load_all_data(schema, progress);
   }
 
-  auto &cached_data = abc_object->get_cached_data();
+  CachedData &cached_data = abc_object->get_cached_data();
 
   Transform *tfm = cached_data.transforms.data_for_time(frame_time);
   if (tfm) {
-    auto object = abc_object->get_object();
+    Object *object = abc_object->get_object();
     object->set_tfm(*tfm);
   }
 
   array<float3> *vertices = cached_data.vertices.data_for_time(frame_time);
   if (vertices) {
-    // TODO : arrays are emptied when passed to the sockets, so we need to copy the array to avoid reloading the data
     array<float3> new_vertices = *vertices;
     mesh->set_verts(new_vertices);
   }
@@ -998,8 +1010,8 @@ void AlembicProcedural::read_mesh(Scene *scene,
     mesh->set_shader(new_shader);
   }
 
-  for (auto &attribute : cached_data.attributes) {
-    auto attr_data = attribute.data.data_for_time(frame_time);
+  for (CachedData::CachedAttribute &attribute : cached_data.attributes) {
+    const array<char> *attr_data = attribute.data.data_for_time(frame_time);
 
     if (!attr_data) {
       continue;
@@ -1018,7 +1030,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
     memcpy(attr->data(), attr_data->data(), attr_data->size());
   }
 
-  // TODO: proper normals support
+  // TODO(@kevindietrich): proper normals support
   mesh->attributes.remove(ATTR_STD_FACE_NORMAL);
   mesh->attributes.remove(ATTR_STD_VERTEX_NORMAL);
 
@@ -1069,7 +1081,7 @@ void AlembicProcedural::read_curves(Scene *scene,
     abc_object->load_all_data(schema, progress);
   }
 
-  auto &cached_data = abc_object->get_cached_data();
+  CachedData &cached_data = abc_object->get_cached_data();
 
   Transform *tfm = cached_data.transforms.data_for_time(frame_time);
   if (tfm) {
@@ -1101,8 +1113,8 @@ void AlembicProcedural::read_curves(Scene *scene,
     hair->set_curve_shader(new_curve_shader);
   }
 
-  for (auto &attribute : cached_data.attributes) {
-    auto attr_data = attribute.data.data_for_time(frame_time);
+  for (CachedData::CachedAttribute &attribute : cached_data.attributes) {
+    const array<char> *attr_data = attribute.data.data_for_time(frame_time);
 
     if (!attr_data) {
       continue;
@@ -1120,7 +1132,8 @@ void AlembicProcedural::read_curves(Scene *scene,
     memcpy(attr->data(), attr_data->data(), attr_data->size());
   }
 
-  /* we don't yet support arbitrary attributes, for now add first keys as generated coordinates if requested */
+  /* we don't yet support arbitrary attributes, for now add first keys as generated coordinates if
+   * requested */
   if (hair->need_attribute(scene, ATTR_STD_GENERATED)) {
     Attribute *attr_generated = hair->attributes.add(ATTR_STD_GENERATED);
     float3 *generated = attr_generated->data_float3();
@@ -1169,7 +1182,7 @@ void AlembicProcedural::walk_hierarchy(
       }
 
       for (size_t i = 0; i < xs.getNumSamples(); ++i) {
-        chrono_t sample_time = ts->getSampleTime(i);
+        chrono_t sample_time = ts->getSampleTime(index_t(i));
         XformSample sample = xs.getValue(ISampleSelector(sample_time));
         temp_xform_samples->insert({sample_time, sample.getMatrix()});
       }
@@ -1189,7 +1202,8 @@ void AlembicProcedural::walk_hierarchy(
   else if (IPolyMesh::matches(header)) {
     IPolyMesh mesh(parent, header.getName());
 
-    auto iter = object_map.find(mesh.getFullName());
+    unordered_map<std::string, AlembicObject *>::const_iterator iter;
+    iter = object_map.find(mesh.getFullName());
 
     if (iter != object_map.end()) {
       AlembicObject *abc_object = iter->second;
@@ -1205,7 +1219,8 @@ void AlembicProcedural::walk_hierarchy(
   else if (ICurves::matches(header)) {
     ICurves curves(parent, header.getName());
 
-    auto iter = object_map.find(curves.getFullName());
+    unordered_map<std::string, AlembicObject *>::const_iterator iter;
+    iter = object_map.find(curves.getFullName());
 
     if (iter != object_map.end()) {
       AlembicObject *abc_object = iter->second;
@@ -1222,7 +1237,7 @@ void AlembicProcedural::walk_hierarchy(
     // ignore the face set, it will be read along with the data
   }
   else {
-    // unsupported type for now (Points, NuPatch)
+    // unsupported type for now (Points, NuPatch, SubD)
     next_object = parent.getChild(header.getName());
   }
 
