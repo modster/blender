@@ -510,7 +510,9 @@ void ShaderManager::update_shaders_used(Scene *scene)
   foreach (Procedural *procedural, scene->procedurals) {
     AlembicProcedural *abc_proc = static_cast<AlembicProcedural *>(procedural);
 
-    foreach (AlembicObject *abc_object, abc_proc->objects) {
+    foreach (Node *abc_node, abc_proc->get_objects()) {
+      AlembicObject *abc_object = static_cast<AlembicObject *>(abc_node);
+
       foreach (Node *node, abc_object->get_used_shaders()) {
         Shader *shader = static_cast<Shader *>(node);
         shader->used = true;

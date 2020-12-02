@@ -539,7 +539,7 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
   abc_object->set_path(ustring(b_mesh_cache.object_path()));
   abc_object->set_used_shaders(used_shaders);
 
-  p->objects.push_back_slow(abc_object);
+  p->add_object(abc_object);
 #else
   (void)b_ob;
   (void)b_mesh_cache;

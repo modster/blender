@@ -247,8 +247,9 @@ class AlembicProcedural : public Procedural {
   NODE_SOCKET_API(ustring, filepath)
   NODE_SOCKET_API(float, frame)
   NODE_SOCKET_API(float, frame_rate)
+  NODE_SOCKET_API_ARRAY(array<Node *>, objects)
 
-  array<AlembicObject *> objects;  // todo : Node::set
+  void add_object(AlembicObject *object);
 
   void tag_update(Scene *scene);
 

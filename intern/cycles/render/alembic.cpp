@@ -885,14 +885,16 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
     }
   }
 
-  if (!objects_loaded) {
+  if (!objects_loaded || objects_is_modified()) {
     load_objects(progress);
     objects_loaded = true;
   }
 
   const chrono_t frame_time = (chrono_t)(frame / frame_rate);
 
-  foreach (AlembicObject *object, objects) {
+  foreach (Node *node, objects) {
+    AlembicObject *object = static_cast<AlembicObject *>(node);
+
     if (progress.get_cancel()) {
       return;
     }
@@ -913,6 +915,12 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
   clear_modified();
 }
 
+void AlembicProcedural::add_object(AlembicObject *object)
+{
+  objects.push_back_slow(object);
+  tag_objects_modified();
+}
+
 void AlembicProcedural::tag_update(Scene *scene)
 {
   if (is_modified()) {
@@ -924,8 +932,13 @@ void AlembicProcedural::load_objects(Progress &progress)
 {
   unordered_map<string, AlembicObject *> object_map;
 
-  foreach (AlembicObject *object, objects) {
-    object_map.insert({object->get_path().c_str(), object});
+  foreach (Node *node, objects) {
+    AlembicObject *object = static_cast<AlembicObject *>(node);
+
+    /* only consider newly added objects */
+    if (object->get_object() != nullptr) {
+      object_map.insert({object->get_path().c_str(), object});
+    }
   }
 
   IObject root = archive.getTop();
