@@ -55,7 +55,7 @@ void read_next_line(std::ifstream &file, string &r_line)
  * Also remove leading & trailing spaces as well as `\r` carriage return
  * character if present.
  */
-void split_line_key_rest(StringRef line, StringRef &r_line_key, StringRef &r_rest_line)
+void split_line_key_rest(const StringRef line, StringRef &r_line_key, StringRef &r_rest_line)
 {
   if (line.is_empty()) {
     return;
@@ -71,7 +71,8 @@ void split_line_key_rest(StringRef line, StringRef &r_line_key, StringRef &r_res
     r_line_key = line.substr(0, pos_split);
   }
 
-  r_rest_line = line = line.drop_prefix(r_line_key.size());
+  /* Eat the delimiter also using "+ 1". */
+  r_rest_line = line.drop_prefix(r_line_key.size() + 1);
   if (r_rest_line.is_empty()) {
     return;
   }
