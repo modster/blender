@@ -342,6 +342,12 @@ PreviewImage **BKE_previewimg_id_get_p(const ID *id)
   return NULL;
 }
 
+PreviewImage *BKE_previewimg_id_get(const ID *id)
+{
+  PreviewImage **prv_p = BKE_previewimg_id_get_p(id);
+  return prv_p ? *prv_p : NULL;
+}
+
 void BKE_previewimg_id_free(ID *id)
 {
   PreviewImage **prv_p = BKE_previewimg_id_get_p(id);

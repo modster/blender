@@ -38,6 +38,7 @@
 #include "BKE_idprop.h"
 #include "BKE_screen.h"
 
+#include "ED_asset.h"
 #include "ED_keyframing.h"
 #include "ED_screen.h"
 
@@ -515,6 +516,7 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
 
   uiPopupMenu *pup;
   uiLayout *layout;
+  bContextStore *previous_ctx = CTX_store_get(C);
 
   {
     uiStringInfo label = {BUT_GET_LABEL, NULL};
@@ -526,6 +528,11 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
     layout = UI_popup_menu_layout(pup);
     if (label.strinfo) {
       MEM_freeN(label.strinfo);
+    }
+
+    if (but->context) {
+      uiLayoutContextCopy(layout, but->context);
+      CTX_store_set(C, uiLayoutGetContextStore(layout));
     }
     uiLayoutSetOperatorContext(layout, WM_OP_INVOKE_DEFAULT);
   }
@@ -959,6 +966,12 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
     }
   }
 
+  /* If the button reprents an id, it can set the "focused_id" context pointer. */
+  if (ED_asset_can_make_single_from_context(C)) {
+    uiItemO(layout, NULL, ICON_NONE, "ASSET_OT_make");
+    uiItemS(layout);
+  }
+
   /* Pointer properties and string properties with
    * prop_search support jumping to target object/bone. */
   if (but->rnapoin.data && but->rnaprop) {
@@ -1220,6 +1233,10 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
   MenuType *mt = WM_menutype_find("WM_MT_button_context", true);
   if (mt) {
     UI_menutype_draw(C, mt, uiLayoutColumn(layout, false));
+  }
+
+  if (but->context) {
+    CTX_store_set(C, previous_ctx);
   }
 
   return UI_popup_menu_end_or_cancel(C, pup);
