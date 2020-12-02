@@ -342,6 +342,62 @@ static void read_default_normals(const IN3fGeomParam &normals, CachedData &cache
   }
 }
 
+static void add_positions(const P3fArraySamplePtr positions, double time, CachedData &cached_data)
+{
+  if (!positions) {
+    return;
+  }
+
+  array<float3> vertices;
+  vertices.reserve(positions->size());
+
+  for (size_t i = 0; i < positions->size(); i++) {
+    Imath::Vec3<float> f = positions->get()[i];
+    vertices.push_back_reserved(make_float3_from_yup(f));
+  }
+
+  cached_data.vertices.add_data(vertices, time);
+}
+
+static void add_triangles(const Int32ArraySamplePtr face_counts, const Int32ArraySamplePtr face_indices, double time, CachedData &cached_data)
+{
+  if (!face_counts || !face_indices) {
+    return;
+  }
+
+  const size_t num_faces = face_counts->size();
+  const int *face_counts_array = face_counts->get();
+  const int *face_indices_array = face_indices->get();
+
+  size_t num_triangles = 0;
+  for (size_t i = 0; i < face_counts->size(); i++) {
+    num_triangles += face_counts_array[i] - 2;
+  }
+
+  array<int3> triangles;
+  array<int3> triangles_loops;
+  triangles.reserve(num_triangles);
+  triangles_loops.reserve(num_triangles);
+  int index_offset = 0;
+
+  for (size_t i = 0; i < num_faces; i++) {
+    for (int j = 0; j < face_counts_array[i] - 2; j++) {
+      int v0 = face_indices_array[index_offset];
+      int v1 = face_indices_array[index_offset + j + 1];
+      int v2 = face_indices_array[index_offset + j + 2];
+
+      triangles.push_back_reserved(make_int3(v0, v1, v2));
+      triangles_loops.push_back_reserved(
+            make_int3(index_offset, index_offset + j + 1, index_offset + j + 2));
+    }
+
+    index_offset += face_counts_array[i];
+  }
+
+  cached_data.triangles.add_data(triangles, time);
+  cached_data.triangles_loops.add_data(triangles_loops, time);
+}
+
 NODE_DEFINE(AlembicObject)
 {
   NodeType *type = NodeType::add("alembic_object", create);
@@ -392,58 +448,11 @@ void AlembicObject::load_all_data(const IPolyMeshSchema &schema, Progress &progr
     const ISampleSelector iss = ISampleSelector(static_cast<index_t>(i));
     const IPolyMeshSchema::Sample sample = schema.getValue(iss);
 
-    const P3fArraySamplePtr positions = sample.getPositions();
-
     const double time = schema.getTimeSampling()->getSampleTime(static_cast<index_t>(i));
 
-    if (positions) {
-      array<float3> vertices;
-      vertices.reserve(positions->size());
+    add_positions(sample.getPositions(), time, cached_data);
 
-      for (int i = 0; i < positions->size(); i++) {
-        Imath::Vec3<float> f = positions->get()[i];
-        vertices.push_back_reserved(make_float3_from_yup(f));
-      }
-
-      cached_data.vertices.add_data(vertices, time);
-    }
-
-    Int32ArraySamplePtr face_counts = sample.getFaceCounts();
-    Int32ArraySamplePtr face_indices = sample.getFaceIndices();
-
-    if (face_counts && face_indices) {
-      const size_t num_faces = face_counts->size();
-      const int *face_counts_array = face_counts->get();
-      const int *face_indices_array = face_indices->get();
-
-      size_t num_triangles = 0;
-      for (size_t i = 0; i < face_counts->size(); i++) {
-        num_triangles += face_counts_array[i] - 2;
-      }
-
-      array<int3> triangles;
-      array<int3> triangles_loops;
-      triangles.reserve(num_triangles);
-      triangles_loops.reserve(num_triangles);
-      int index_offset = 0;
-
-      for (size_t i = 0; i < num_faces; i++) {
-        for (int j = 0; j < face_counts_array[i] - 2; j++) {
-          int v0 = face_indices_array[index_offset];
-          int v1 = face_indices_array[index_offset + j + 1];
-          int v2 = face_indices_array[index_offset + j + 2];
-
-          triangles.push_back_reserved(make_int3(v0, v1, v2));
-          triangles_loops.push_back_reserved(
-              make_int3(index_offset, index_offset + j + 1, index_offset + j + 2));
-        }
-
-        index_offset += face_counts_array[i];
-      }
-
-      cached_data.triangles.add_data(triangles, time);
-      cached_data.triangles_loops.add_data(triangles_loops, time);
-    }
+    add_triangles(sample.getFaceCounts(), sample.getFaceIndices(), time, cached_data);
 
     foreach (const AttributeRequest &attr, requested_attributes.requests) {
       read_attribute(schema.getArbGeomParams(), iss, attr.name);
