@@ -901,7 +901,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
     smooth.reserve(triangle_data->size());
     shader.reserve(triangle_data->size());
 
-    for (int i = 0; i < triangle_data->size(); ++i) {
+    for (size_t i = 0; i < triangle_data->size(); ++i) {
       int3 tri = (*triangle_data)[i];
       triangles.push_back_reserved(tri.x);
       triangles.push_back_reserved(tri.y);
@@ -931,8 +931,13 @@ void AlembicProcedural::read_mesh(Scene *scene,
     }
     assert(attr);
 
+    attr->modified = true;
     memcpy(attr->data(), attr_data->data(), attr_data->size());
   }
+
+  // TODO: proper normals support
+  mesh->attributes.remove(ATTR_STD_FACE_NORMAL);
+  mesh->attributes.remove(ATTR_STD_VERTEX_NORMAL);
 
   /* we don't yet support arbitrary attributes, for now add vertex
    * coordinates as generated coordinates if requested */
@@ -941,9 +946,6 @@ void AlembicProcedural::read_mesh(Scene *scene,
     memcpy(
         attr->data_float3(), mesh->get_verts().data(), sizeof(float3) * mesh->get_verts().size());
   }
-
-  /* TODO: read normals from the archive if present */
-  mesh->add_face_normals();
 
   if (mesh->is_modified()) {
     bool need_rebuild = mesh->triangles_is_modified();
