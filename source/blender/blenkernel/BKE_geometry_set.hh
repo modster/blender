@@ -88,6 +88,8 @@ class GeometryComponent {
 
   GeometryComponentType type() const;
 
+  bool attribute_exists(const blender::StringRef attribute_name) const;
+
   /* Returns true when the geometry component supports this attribute domain. */
   virtual bool attribute_domain_supported(const AttributeDomain domain) const;
   /* Returns true when the given data type is supported in the given domain. */
@@ -122,7 +124,6 @@ class GeometryComponent {
                                     const AttributeDomain domain,
                                     const CustomDataType data_type);
 
-  virtual bool has_attribute(const blender::StringRef attribute_name) const;
   virtual blender::Set<std::string> attribute_names() const;
   virtual bool is_empty() const;
 
@@ -294,7 +295,6 @@ class MeshComponent : public GeometryComponent {
                             const AttributeDomain domain,
                             const CustomDataType data_type) final;
 
-  bool has_attribute(const blender::StringRef attribute_name) const;
   blender::Set<std::string> attribute_names() const final;
   bool is_empty() const final;
 
@@ -337,7 +337,6 @@ class PointCloudComponent : public GeometryComponent {
                             const AttributeDomain domain,
                             const CustomDataType data_type) final;
 
-  bool has_attribute(const blender::StringRef attribute_name) const;
   blender::Set<std::string> attribute_names() const final;
   bool is_empty() const final;
 

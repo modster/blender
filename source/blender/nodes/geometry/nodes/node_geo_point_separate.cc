@@ -84,13 +84,13 @@ static void separate_component_attributes(const GeometryComponent &in_component,
      * attributes will already exist on new components by definition. It should always be possible
      * to recreate the attribute on the same component type. Also, if one of the new components
      * has the attribute the other one should have it too, but check independently to be safe. */
-    if (!out_component_a.has_attribute(name)) {
+    if (!out_component_a.attribute_exists(name)) {
       if (!out_component_a.attribute_try_create(name, domain, data_type)) {
         BLI_assert(false);
         continue;
       }
     }
-    if (!out_component_b.has_attribute(name)) {
+    if (!out_component_b.attribute_exists(name)) {
       if (!out_component_b.attribute_try_create(name, domain, data_type)) {
         BLI_assert(false);
         continue;
@@ -146,7 +146,7 @@ static Array<bool> calculate_split(const GeometryComponent &component,
   }
   *r_b_total = in_total - *r_a_total;
 
-  return a_or_b; /* TODO: Can't return a span here? How to do that? */
+  return a_or_b;
 }
 
 /* Much of the attribute code can be handled generically for every geometry component type. */

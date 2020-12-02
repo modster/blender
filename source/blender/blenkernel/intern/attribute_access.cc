@@ -590,8 +590,12 @@ Set<std::string> GeometryComponent::attribute_names() const
   return {};
 }
 
-bool GeometryComponent::has_attribute(const blender::StringRef UNUSED(attribute_name)) const
+bool GeometryComponent::attribute_exists(const blender::StringRef attribute_name) const
 {
+  ReadAttributePtr attribute = this->attribute_try_get_for_read(attribute_name);
+  if (attribute) {
+    return true;
+  }
   return false;
 }
 
@@ -806,11 +810,6 @@ bool PointCloudComponent::attribute_try_create(const StringRef attribute_name,
   CustomData_add_layer_named(
       &pointcloud->pdata, data_type, CD_DEFAULT, nullptr, pointcloud_->totpoint, attribute_name_c);
   return true;
-}
-
-bool PointCloudComponent::has_attribute(const blender::StringRef attribute_name) const
-{
-  return custom_data_has_layer_with_name(pointcloud_->pdata, attribute_name);
 }
 
 Set<std::string> PointCloudComponent::attribute_names() const
@@ -1067,11 +1066,6 @@ bool MeshComponent::attribute_try_create(const StringRef attribute_name,
     default:
       return false;
   }
-}
-
-bool MeshComponent::has_attribute(const blender::StringRef attribute_name) const
-{
-  return custom_data_has_layer_with_name(mesh_->pdata, attribute_name);
 }
 
 Set<std::string> MeshComponent::attribute_names() const
