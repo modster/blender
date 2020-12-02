@@ -133,8 +133,8 @@ void OBJStorer::add_edge(const StringRef rest_line,
 }
 
 void OBJStorer::add_polygon(const StringRef rest_line,
-                            const VertexIndexOffset &offsets,
                             const GlobalVertices &global_vertices,
+                            const VertexIndexOffset &offsets,
                             const StringRef state_material_name,
                             const StringRef state_object_group,
                             const bool state_shaded_smooth)
@@ -327,56 +327,47 @@ void OBJParser::parse(Vector<std::unique_ptr<Geometry>> &r_all_geometries,
     if (line.empty() || rest_line.is_empty()) {
       continue;
     }
-
+    OBJStorer storer(*current_geometry);
     switch (line_key_str_to_enum(line_key)) {
       case eOBJLineKey::V: {
-        OBJStorer storer(*current_geometry);
         storer.add_vertex(rest_line, r_global_vertices);
         break;
       }
       case eOBJLineKey::VN: {
-        OBJStorer storer(*current_geometry);
         storer.add_vertex_normal(rest_line, r_global_vertices);
         break;
       }
       case eOBJLineKey::VT: {
-        OBJStorer storer(*current_geometry);
         storer.add_uv_vertex(rest_line, r_global_vertices);
         break;
       }
       case eOBJLineKey::F: {
-        OBJStorer storer(*current_geometry);
         storer.add_polygon(rest_line,
-                           offsets,
                            r_global_vertices,
+                           offsets,
                            state_material_name,
                            state_material_name,
                            state_shaded_smooth);
         break;
       }
       case eOBJLineKey::L: {
-        OBJStorer storer(*current_geometry);
         storer.add_edge(rest_line, offsets, r_global_vertices);
         break;
       }
       case eOBJLineKey::CSTYPE: {
-        OBJStorer storer(*current_geometry);
         storer.set_curve_type(
             rest_line, r_global_vertices, state_object_group, offsets, r_all_geometries);
         break;
       }
       case eOBJLineKey::DEG: {
-        OBJStorer storer(*current_geometry);
         storer.set_curve_degree(rest_line);
         break;
       }
       case eOBJLineKey::CURV: {
-        OBJStorer storer(*current_geometry);
         storer.add_curve_vertex_indices(rest_line, r_global_vertices);
         break;
       }
       case eOBJLineKey::PARM: {
-        OBJStorer storer(*current_geometry);
         storer.add_curve_parameters(rest_line);
         break;
       }
@@ -389,17 +380,14 @@ void OBJParser::parse(Vector<std::unique_ptr<Geometry>> &r_all_geometries,
         break;
       }
       case eOBJLineKey::G: {
-        OBJStorer storer(*current_geometry);
         storer.update_object_group(rest_line, state_object_group);
         break;
       }
       case eOBJLineKey::S: {
-        OBJStorer storer(*current_geometry);
         storer.update_smooth_group(rest_line, state_shaded_smooth);
         break;
       }
       case eOBJLineKey::USEMTL: {
-        OBJStorer storer(*current_geometry);
         storer.update_polygon_material(rest_line, state_material_name);
         break;
       }
@@ -408,8 +396,9 @@ void OBJParser::parse(Vector<std::unique_ptr<Geometry>> &r_all_geometries,
         break;
       }
       case eOBJLineKey::COMMENT:
-        ATTR_FALLTHROUGH;
+        break;
       default:
+        std::cout << "Element not recognised: '" << line_key << "'" << std::endl;
         break;
     }
   }

@@ -60,8 +60,8 @@ class OBJStorer {
                 const VertexIndexOffset &offsets,
                 GlobalVertices &r_global_vertices);
   void add_polygon(const StringRef rest_line,
-                   const VertexIndexOffset &offsets,
                    const GlobalVertices &global_vertices,
+                   const VertexIndexOffset &offsets,
                    const StringRef state_material_name,
                    const StringRef state_object_group,
                    const bool state_shaded_smooth);
