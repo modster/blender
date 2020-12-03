@@ -714,7 +714,8 @@ void WM_OT_alembic_import(wmOperatorType *ot)
                   "force_modifier",
                   false,
                   "Force Modifier",
-                  "Add a cache modifier for every object in the Alembic archive, even if they are not animated");
+                  "Add a cache modifier for every object in the Alembic archive, even if they are "
+                  "not animated");
 
   RNA_def_boolean(ot->srna,
                   "is_sequence",

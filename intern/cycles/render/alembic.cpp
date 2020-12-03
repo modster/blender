@@ -38,7 +38,7 @@ CCL_NAMESPACE_BEGIN
  * least a way to tell which frame data to load, so we do not load the entire archive for a few
  * frames. */
 
-/* TODO(@kevindietrich) : arrays are emptied when passed to the sockets, so for now we copy the
+/* TODO(@kevindietrich): arrays are emptied when passed to the sockets, so for now we copy the
  * arrays to avoid reloading the data */
 
 static float3 make_float3_from_yup(const Imath::Vec3<float> &v)
@@ -59,11 +59,11 @@ static M44d convert_yup_zup(const M44d &mtx)
   return scale_mat * rot_mat * trans_mat;
 }
 
-void transform_decompose(const Imath::M44d &mat,
-                         Imath::V3d &scale,
-                         Imath::V3d &shear,
-                         Imath::Quatd &rotation,
-                         Imath::V3d &translation)
+static void transform_decompose(const Imath::M44d &mat,
+                                Imath::V3d &scale,
+                                Imath::V3d &shear,
+                                Imath::Quatd &rotation,
+                                Imath::V3d &translation)
 {
   Imath::M44d mat_remainder(mat);
 
@@ -79,10 +79,10 @@ void transform_decompose(const Imath::M44d &mat,
   rotation = extractQuat(mat_remainder);
 }
 
-M44d transform_compose(const Imath::V3d &scale,
-                       const Imath::V3d &shear,
-                       const Imath::Quatd &rotation,
-                       const Imath::V3d &translation)
+static M44d transform_compose(const Imath::V3d &scale,
+                              const Imath::V3d &shear,
+                              const Imath::Quatd &rotation,
+                              const Imath::V3d &translation)
 {
   Imath::M44d scale_mat, shear_mat, rot_mat, trans_mat;
 
@@ -516,9 +516,10 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
 
   AttributeRequestSet requested_attributes = get_requested_attributes();
 
-  cached_data.vertices.set_time_sampling(*schema.getTimeSampling());
-  cached_data.triangles.set_time_sampling(*schema.getTimeSampling());
-  cached_data.triangles_loops.set_time_sampling(*schema.getTimeSampling());
+  const TimeSamplingPtr time_sampling = schema.getTimeSampling();
+  cached_data.vertices.set_time_sampling(*time_sampling);
+  cached_data.triangles.set_time_sampling(*time_sampling);
+  cached_data.triangles_loops.set_time_sampling(*time_sampling);
 
   /* start by reading the face sets (per face shader), as we directly split polygons to triangles
    */
@@ -536,7 +537,7 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
     const ISampleSelector iss = ISampleSelector(static_cast<index_t>(i));
     const IPolyMeshSchema::Sample sample = schema.getValue(iss);
 
-    const double time = schema.getTimeSampling()->getSampleTime(static_cast<index_t>(i));
+    const double time = time_sampling->getSampleTime(static_cast<index_t>(i));
 
     add_positions(sample.getPositions(), time, cached_data);
 
@@ -571,7 +572,9 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
   data_loaded = true;
 }
 
-void AlembicObject::load_all_data(const ICurvesSchema &schema, Progress &progress, float default_radius)
+void AlembicObject::load_all_data(const ICurvesSchema &schema,
+                                  Progress &progress,
+                                  float default_radius)
 {
   cached_data.clear();
 

@@ -206,7 +206,9 @@ class AlembicObject : public Node {
   Object *get_object();
 
   void load_all_data(Alembic::AbcGeom::IPolyMeshSchema &schema, Progress &progress);
-  void load_all_data(const Alembic::AbcGeom::ICurvesSchema &schema, Progress &progress, float default_radius);
+  void load_all_data(const Alembic::AbcGeom::ICurvesSchema &schema,
+                     Progress &progress,
+                     float default_radius);
 
   bool has_data_loaded() const;
 
