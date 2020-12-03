@@ -79,6 +79,7 @@ set(SRC
   intern/armature_update.c
   intern/asset.c
   intern/attribute.c
+  intern/attribute_access.cc
   intern/autoexec.c
   intern/blender.c
   intern/blender_copybuffer.c
@@ -125,6 +126,7 @@ set(SRC
   intern/fmodifier.c
   intern/font.c
   intern/freestyle.c
+  intern/geometry_set.cc
   intern/gpencil.c
   intern/gpencil_curve.c
   intern/gpencil_geom.c
@@ -268,6 +270,7 @@ set(SRC
   BKE_appdir.h
   BKE_armature.h
   BKE_attribute.h
+  BKE_attribute_access.hh
   BKE_autoexec.h
   BKE_asset.h
   BKE_blender.h
@@ -314,6 +317,8 @@ set(SRC
   BKE_fluid.h
   BKE_font.h
   BKE_freestyle.h
+  BKE_geometry_set.h
+  BKE_geometry_set.hh
   BKE_global.h
   BKE_gpencil.h
   BKE_gpencil_curve.h
