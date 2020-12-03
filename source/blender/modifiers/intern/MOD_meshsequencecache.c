@@ -123,7 +123,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   const float time = BKE_cachefile_time_offset(cache_file, frame, FPS);
   const char *err_str = NULL;
 
-  if (check_rendered_viewport_visible(bmain) || (ctx->flag & MOD_APPLY_RENDER)) {
+  if (cache_file->use_cycles_procedural && check_rendered_viewport_visible(bmain)) {
     return mesh;
   }
 

@@ -607,7 +607,8 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
       BL::MeshSequenceCacheModifier b_mesh_cache = object_alembic_cache_find(b_ob);
 
       /* only for viewport renders at the moment as we are loading the entire archive in memory */
-      if (b_mesh_cache && b_v3d) {
+      if (b_mesh_cache && b_v3d && experimental &&
+          b_mesh_cache.cache_file().use_cycles_procedural()) {
         sync_procedural(b_ob, b_mesh_cache, b_depsgraph.scene().frame_current(), motion_time);
       }
       else

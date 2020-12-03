@@ -86,7 +86,9 @@ typedef struct CacheFile {
   /** Animation flag. */
   short flag;
 
-  char _pad;
+  /** Use the Cycles Alembic procedural for rendering, also disables loading the data in the
+   * modifiers. */
+  char use_cycles_procedural;
 
   char velocity_unit;
   /* Name of the velocity property in the Alembic file. */
