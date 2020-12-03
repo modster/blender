@@ -52,8 +52,11 @@ typedef struct AssetMetaData {
    * is up to the asset-engine. */
   ListBase tags; /* AssetTag */
   short active_tag;
+  /** Store the number of tags to avoid continuous counting. Could be turned into runtime data, we
+   * can always reliably reconstruct it from the list. */
+  short tot_tags;
 
-  char _pad[6];
+  char _pad[4];
 } AssetMetaData;
 
 #endif /* __DNA_ASSET_TYPES_H__ */

@@ -315,6 +315,7 @@ typedef struct ID {
   struct ID *orig_id;
 
   void *py_instance;
+  void *_pad1;
 } ID;
 
 /**
