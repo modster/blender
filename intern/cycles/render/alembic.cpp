@@ -264,85 +264,86 @@ static void read_default_uvs(const IV2fGeomParam &uvs, CachedData &cached_data)
   }
 }
 
-static void read_default_normals(const IN3fGeomParam &normals, CachedData &cached_data)
+static void add_normals(const Int32ArraySamplePtr face_indices,
+                                 const IN3fGeomParam &normals,
+                                 double time,
+                                 CachedData &cached_data)
 {
-  CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(normals.getName()));
 
-  for (index_t i = 0; i < static_cast<index_t>(normals.getNumSamples()); ++i) {
-    const ISampleSelector iss = ISampleSelector(static_cast<index_t>(i));
-    const IN3fGeomParam::Sample sample = normals.getExpandedValue(iss);
+  switch (normals.getScope()) {
+    case kFacevaryingScope: {
+      const ISampleSelector iss = ISampleSelector(time);
+      const IN3fGeomParam::Sample sample = normals.getExpandedValue(iss);
 
-    if (!sample.valid()) {
-      return;
+      if (!sample.valid()) {
+        return;
+      }
+
+      CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(normals.getName()));
+      attr.std = ATTR_STD_VERTEX_NORMAL;
+
+      const array<float3> *vertices = cached_data.vertices.data_for_time(time);
+
+      if (!vertices) {
+        return;
+      }
+
+      array<char> data;
+      data.resize(vertices->size() * sizeof(float3));
+
+      float3 *data_float3 = reinterpret_cast<float3 *>(data.data());
+
+      const int *face_indices_array = face_indices->get();
+      const N3fArraySamplePtr values = sample.getVals();
+
+      for (size_t i = 0; i < face_indices->size(); ++i) {
+        int point_index = face_indices_array[i];
+        /* polygon winding order in Alembic follows the RenderMan convention, which is the
+         * reverse of Cycle, so the normal has to flipped
+         * this code also assumes that the vertices of each polygon corresponding to the same
+         * point have the same normal (that we do not have split normals, which is not
+         * supported in Cycles anyway) */
+        data_float3[point_index] = -make_float3_from_yup(values->get()[i]);
+      }
+
+      attr.data.add_data(data, time);
+      break;
     }
+    case kVaryingScope:
+    case kVertexScope: {
+      const ISampleSelector iss = ISampleSelector(time);
+      const IN3fGeomParam::Sample sample = normals.getExpandedValue(iss);
 
-    const double time = normals.getTimeSampling()->getSampleTime(static_cast<index_t>(i));
-
-    switch (normals.getScope()) {
-      case kFacevaryingScope: {
-        attr.std = ATTR_STD_VERTEX_NORMAL;
-
-        const array<float3> *vertices = cached_data.vertices.data_for_time(time);
-        const array<int3> *triangles = cached_data.triangles.data_for_time(time);
-
-        if (!vertices || !triangles) {
-          continue;
-        }
-
-        array<char> data;
-        data.resize(vertices->size() * sizeof(float3));
-
-        float3 *data_float3 = reinterpret_cast<float3 *>(data.data());
-
-        for (size_t i = 0; i < vertices->size(); ++i) {
-          data_float3[i] = make_float3(0.0f);
-        }
-
-        const Imath::V3f *values = sample.getVals()->get();
-
-        for (const int3 &tri : *triangles) {
-          const Imath::V3f &v0 = values[tri.x];
-          const Imath::V3f &v1 = values[tri.y];
-          const Imath::V3f &v2 = values[tri.z];
-
-          data_float3[tri.x] += make_float3_from_yup(v0);
-          data_float3[tri.y] += make_float3_from_yup(v1);
-          data_float3[tri.z] += make_float3_from_yup(v2);
-        }
-
-        attr.data.add_data(data, time);
-
-        break;
+      if (!sample.valid()) {
+        return;
       }
-      case kVaryingScope:
-      case kVertexScope: {
-        attr.std = ATTR_STD_VERTEX_NORMAL;
 
-        const array<float3> *vertices = cached_data.vertices.data_for_time(time);
+      CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(normals.getName()));
+      attr.std = ATTR_STD_VERTEX_NORMAL;
 
-        if (!vertices) {
-          continue;
-        }
+      const array<float3> *vertices = cached_data.vertices.data_for_time(time);
 
-        array<char> data;
-        data.resize(vertices->size() * sizeof(float3));
-
-        float3 *data_float3 = reinterpret_cast<float3 *>(data.data());
-
-        const Imath::V3f *values = sample.getVals()->get();
-
-        for (size_t i = 0; i < vertices->size(); ++i) {
-          data_float3[i] = make_float3_from_yup(values[i]);
-        }
-
-        attr.data.add_data(data, time);
-
-        break;
+      if (!vertices) {
+        return;
       }
-      default: {
-        // not supported
-        break;
+
+      array<char> data;
+      data.resize(vertices->size() * sizeof(float3));
+
+      float3 *data_float3 = reinterpret_cast<float3 *>(data.data());
+
+      const Imath::V3f *values = sample.getVals()->get();
+
+      for (size_t i = 0; i < vertices->size(); ++i) {
+        data_float3[i] = make_float3_from_yup(values[i]);
       }
+
+      attr.data.add_data(data, time);
+
+      break;
+    }
+    default: {
+      break;
     }
   }
 }
@@ -523,6 +524,8 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
   array<int> polygon_to_shader;
   read_face_sets(schema, polygon_to_shader);
 
+  const IN3fGeomParam &normals = schema.getNormalsParam();
+
   /* read topology */
   for (size_t i = 0; i < schema.getNumSamples(); ++i) {
     if (progress.get_cancel()) {
@@ -539,6 +542,10 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
     add_triangles(
         sample.getFaceCounts(), sample.getFaceIndices(), time, cached_data, polygon_to_shader);
 
+    if (normals.valid()) {
+      add_normals(sample.getFaceIndices(), normals, time, cached_data);
+    }
+
     foreach (const AttributeRequest &attr, requested_attributes.requests) {
       read_attribute(schema.getArbGeomParams(), iss, attr.name);
     }
@@ -553,16 +560,6 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
   if (uvs.valid()) {
     read_default_uvs(uvs, cached_data);
   }
-
-  if (progress.get_cancel()) {
-    return;
-  }
-
-  //  const IN3fGeomParam &normals = schema.getNormalsParam();
-
-  //  if (normals.valid()) {
-  //    read_default_normals(normals, cached_data);
-  //  }
 
   if (progress.get_cancel()) {
     return;
@@ -1042,10 +1039,6 @@ void AlembicProcedural::read_mesh(Scene *scene,
     attr->modified = true;
     memcpy(attr->data(), attr_data->data(), attr_data->size());
   }
-
-  // TODO(@kevindietrich): proper normals support
-  mesh->attributes.remove(ATTR_STD_FACE_NORMAL);
-  mesh->attributes.remove(ATTR_STD_VERTEX_NORMAL);
 
   /* we don't yet support arbitrary attributes, for now add vertex
    * coordinates as generated coordinates if requested */
