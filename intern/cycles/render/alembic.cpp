@@ -655,7 +655,8 @@ void AlembicObject::load_all_data(const ICurvesSchema &schema,
 void AlembicObject::setup_transform_cache()
 {
   if (xform_samples.size() == 0) {
-    cached_data.transforms.add_data(transform_identity(), 0.0);
+    Transform tfm = transform_identity();
+    cached_data.transforms.add_data(tfm, 0.0);
   }
   else {
     /* It is possible for a leaf node of the hierarchy to have multiple samples for its transforms
@@ -671,7 +672,8 @@ void AlembicObject::setup_transform_cache()
     }
 
     if (!has_animation) {
-      cached_data.transforms.add_data(make_transform(first_matrix), 0.0);
+      Transform tfm = make_transform(first_matrix);
+      cached_data.transforms.add_data(tfm, 0.0);
     }
     else {
       for (const std::pair<chrono_t, M44d> pair : xform_samples) {

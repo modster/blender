@@ -37,6 +37,13 @@ class Shader;
 
 using MatrixSampleMap = std::map<Alembic::Abc::chrono_t, Alembic::Abc::M44d>;
 
+/* Helpers to detect if some type is a ccl::array. */
+template<typename> struct is_array : public std::false_type {
+};
+
+template<typename T> struct is_array<array<T>> : public std::true_type {
+};
+
 template<typename T> class DataStore {
   struct DataTimePair {
     double time = 0;
@@ -65,16 +72,16 @@ template<typename T> class DataStore {
     return &ptr->data;
   }
 
-  void add_data(T data_, double time)
+  void add_data(T &data_, double time)
   {
-    data.push_back({time, data_});
-  }
+    if constexpr (is_array<T>::value) {
+      data.emplace_back();
+      data.back().data.steal_data(data_);
+      data.back().time = time;
+      return;
+    }
 
-  void add_data(array<T> &data_, double time)
-  {
-    data.emplace_back();
-    data.back().data.steal_data(data_);
-    data.back().time = time;
+    data.push_back({time, data_});
   }
 
   bool is_constant() const
