@@ -896,7 +896,7 @@ static void template_ID(const bContext *C,
   // lb = template_ui->idlb;
 
   /* Allow opertators to take the ID from context. */
-  uiLayoutSetContextPointer(layout, "focused_id", &idptr);
+  uiLayoutSetContextPointer(layout, "id", &idptr);
 
   block = uiLayoutGetBlock(layout);
   UI_block_align_begin(block);

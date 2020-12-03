@@ -268,6 +268,7 @@ const char *BKE_idtype_idcode_to_name(const short idcode);
 const char *BKE_idtype_idcode_to_name_plural(const short idcode);
 const char *BKE_idtype_idcode_to_translation_context(const short idcode);
 bool BKE_idtype_idcode_is_linkable(const short idcode);
+bool BKE_idtype_idcode_can_be_asset(const short idcode);
 bool BKE_idtype_idcode_is_valid(const short idcode);
 
 short BKE_idtype_idcode_from_name(const char *idtype_name);
