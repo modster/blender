@@ -39,7 +39,7 @@
 
 AssetMetaData *BKE_asset_metadata_create(void)
 {
-  AssetMetaData *asset_data = MEM_callocN(sizeof(AssetMetaData), __func__);
+  AssetMetaData *asset_data = MEM_callocN(sizeof(*asset_data), __func__);
   memcpy(asset_data, DNA_struct_default_get(AssetMetaData), sizeof(*asset_data));
   return asset_data;
 }
@@ -55,20 +55,23 @@ void BKE_asset_metadata_free(AssetMetaData **asset_data)
   MEM_SAFE_FREE(*asset_data);
 }
 
-static AssetTag *asset_metadata_tag_create(const char *const name)
+static AssetTag *asset_metadata_tag_add(AssetMetaData *asset_data, const char *const name)
 {
   AssetTag *tag = MEM_callocN(sizeof(*tag), __func__);
   BLI_strncpy(tag->name, name, sizeof(tag->name));
+
+  BLI_addtail(&asset_data->tags, tag);
+  asset_data->tot_tags++;
+  /* Invariant! */
+  BLI_assert(BLI_listbase_count(&asset_data->tags) == asset_data->tot_tags);
+
   return tag;
 }
 
 AssetTag *BKE_asset_metadata_tag_add(AssetMetaData *asset_data, const char *name)
 {
-  AssetTag *tag = asset_metadata_tag_create(name);
-
-  BLI_addtail(&asset_data->tags, tag);
+  AssetTag *tag = asset_metadata_tag_add(asset_data, name);
   BLI_uniquename(&asset_data->tags, tag, name, '.', offsetof(AssetTag, name), sizeof(tag->name));
-
   return tag;
 }
 
@@ -91,8 +94,7 @@ struct AssetTagEnsureResult BKE_asset_metadata_tag_ensure(AssetMetaData *asset_d
     return result;
   }
 
-  tag = asset_metadata_tag_create(name);
-  BLI_addtail(&asset_data->tags, tag);
+  tag = asset_metadata_tag_add(asset_data, name);
 
   result.tag = tag;
   result.is_new = true;
@@ -101,7 +103,11 @@ struct AssetTagEnsureResult BKE_asset_metadata_tag_ensure(AssetMetaData *asset_d
 
 void BKE_asset_metadata_tag_remove(AssetMetaData *asset_data, AssetTag *tag)
 {
+  BLI_assert(BLI_findindex(&asset_data->tags, tag) >= 0);
   BLI_freelinkN(&asset_data->tags, tag);
+  asset_data->tot_tags--;
+  /* Invariant! */
+  BLI_assert(BLI_listbase_count(&asset_data->tags) == asset_data->tot_tags);
 }
 
 /* Queries -------------------------------------------- */
@@ -141,4 +147,5 @@ void BKE_asset_metadata_read(BlendDataReader *reader, AssetMetaData *asset_data)
 
   BLO_read_data_address(reader, &asset_data->description);
   BLO_read_list(reader, &asset_data->tags);
+  BLI_assert(BLI_listbase_count(&asset_data->tags) == asset_data->tot_tags);
 }

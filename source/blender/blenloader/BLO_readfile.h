@@ -132,7 +132,7 @@ struct LinkNode *BLO_blendhandle_get_datablock_names(BlendHandle *bh,
                                                      int *tot_names);
 struct LinkNode *BLO_blendhandle_get_datablock_info(BlendHandle *bh,
                                                     int ofblocktype,
-                                                    int *tot_names);
+                                                    int *tot_info_items);
 struct LinkNode *BLO_blendhandle_get_previews(BlendHandle *bh, int ofblocktype, int *tot_prev);
 struct LinkNode *BLO_blendhandle_get_linkable_groups(BlendHandle *bh);
 
