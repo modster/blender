@@ -496,51 +496,49 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
   BL::CacheFile cache_file = b_mesh_cache.cache_file();
   void *cache_file_key = cache_file.ptr.data;
 
-  AlembicProcedural *p = static_cast<AlembicProcedural *>(procedural_map.find(cache_file_key));
+  AlembicProcedural *procedural = static_cast<AlembicProcedural *>(
+      procedural_map.find(cache_file_key));
 
-  if (!p) {
-    p = scene->create_node<AlembicProcedural>();
-    procedural_map.add(cache_file_key, p);
+  if (procedural == nullptr) {
+    procedural = scene->create_node<AlembicProcedural>();
+    procedural_map.add(cache_file_key, procedural);
   }
   else {
-    procedural_map.used(p);
+    procedural_map.used(procedural);
   }
 
-  p->set_frame(static_cast<float>(frame_current));
-  p->set_frame_rate(b_scene.render().fps() / b_scene.render().fps_base());
-  p->set_default_curves_radius(cache_file.default_curves_radius());
+  procedural->set_frame(static_cast<float>(frame_current));
+  procedural->set_frame_rate(b_scene.render().fps() / b_scene.render().fps_base());
+  procedural->set_default_curves_radius(cache_file.default_curves_radius());
 
-  auto absolute_path = blender_absolute_path(b_data, b_ob, b_mesh_cache.cache_file().filepath());
+  string absolute_path = blender_absolute_path(b_data, b_ob, b_mesh_cache.cache_file().filepath());
+  procedural->set_filepath(ustring(absolute_path));
 
-  p->set_filepath(ustring(absolute_path));
+  ustring object_path = ustring(b_mesh_cache.object_path());
 
-  p->tag_update(scene);
+  if (!procedural->has_object(object_path)) {
+    Shader *default_shader = (b_ob.type() == BL::Object::type_VOLUME) ? scene->default_volume :
+                                                                        scene->default_surface;
+    array<Node *> used_shaders;
 
-  /* if the filepath was not modified, then we have already created the objects */
-  if (!p->filepath_is_modified()) {
-    return;
+    BL::Object::material_slots_iterator slot;
+    for (b_ob.material_slots.begin(slot); slot != b_ob.material_slots.end(); ++slot) {
+      BL::ID b_material(slot->material());
+      find_shader(b_material, used_shaders, default_shader);
+    }
+
+    if (used_shaders.size() == 0) {
+      used_shaders.push_back_slow(default_shader);
+    }
+
+    AlembicObject *abc_object = procedural->create_node<AlembicObject>();
+    abc_object->set_path(object_path);
+    abc_object->set_used_shaders(used_shaders);
+
+    procedural->add_object(abc_object);
   }
 
-  Shader *default_shader = (b_ob.type() == BL::Object::type_VOLUME) ? scene->default_volume :
-                                                                      scene->default_surface;
-  /* Find shader indices. */
-  array<Node *> used_shaders;
-
-  BL::Object::material_slots_iterator slot;
-  for (b_ob.material_slots.begin(slot); slot != b_ob.material_slots.end(); ++slot) {
-    BL::ID b_material(slot->material());
-    find_shader(b_material, used_shaders, default_shader);
-  }
-
-  if (used_shaders.size() == 0) {
-    used_shaders.push_back_slow(default_shader);
-  }
-
-  AlembicObject *abc_object = scene->create_node<AlembicObject>();
-  abc_object->set_path(ustring(b_mesh_cache.object_path()));
-  abc_object->set_used_shaders(used_shaders);
-
-  p->add_object(abc_object);
+  procedural->tag_update(scene);
 #else
   (void)b_ob;
   (void)b_mesh_cache;

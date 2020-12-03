@@ -38,11 +38,6 @@ Procedural::~Procedural()
 {
 }
 
-bool Procedural::is_procedural() const
-{
-  return true;
-}
-
 ProceduralManager::ProceduralManager()
 {
   need_update_ = true;
@@ -79,6 +74,16 @@ void ProceduralManager::update(Scene *scene, Progress &progress)
   }
 
   need_update_ = false;
+}
+
+void ProceduralManager::tag_update()
+{
+  need_update_ = true;
+}
+
+bool ProceduralManager::need_update() const
+{
+  return need_update_;
 }
 
 CCL_NAMESPACE_END

@@ -180,7 +180,8 @@ struct CachedData {
     shader.clear();
   }
 
-  CachedAttribute &add_attribute(ustring name)
+  CachedAttribute &add_attribute(const ustring &name,
+                                 const Alembic::Abc::TimeSampling &time_sampling)
   {
     for (auto &attr : attributes) {
       if (attr.name == name) {
@@ -190,6 +191,7 @@ struct CachedData {
 
     auto &attr = attributes.emplace_back();
     attr.name = name;
+    attr.data.set_time_sampling(time_sampling);
     return attr;
   }
 
@@ -314,7 +316,8 @@ class AlembicObject : public Node {
  */
 class AlembicProcedural : public Procedural {
   Alembic::AbcGeom::IArchive archive;
-  bool objects_loaded = false;
+  bool objects_loaded;
+  Scene *scene_;
 
  public:
   NODE_DECLARE
@@ -347,6 +350,9 @@ class AlembicProcedural : public Procedural {
 
   /* Tag for an update only if something was modified. */
   void tag_update(Scene *scene);
+
+  /* Returns true if an object with the given path exists in this procedural. */
+  bool has_object(const ustring &path) const;
 
  private:
   /* Load the data for all the objects whose data has not yet been loaded. */

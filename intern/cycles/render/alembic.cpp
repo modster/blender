@@ -41,7 +41,7 @@ CCL_NAMESPACE_BEGIN
 /* TODO(@kevindietrich): arrays are emptied when passed to the sockets, so for now we copy the
  * arrays to avoid reloading the data */
 
-static float3 make_float3_from_yup(const Imath::Vec3<float> &v)
+static float3 make_float3_from_yup(const V3f &v)
 {
   return make_float3(v.x, -v.z, v.y);
 }
@@ -59,13 +59,10 @@ static M44d convert_yup_zup(const M44d &mtx)
   return scale_mat * rot_mat * trans_mat;
 }
 
-static void transform_decompose(const Imath::M44d &mat,
-                                Imath::V3d &scale,
-                                Imath::V3d &shear,
-                                Imath::Quatd &rotation,
-                                Imath::V3d &translation)
+static void transform_decompose(
+    const M44d &mat, V3d &scale, V3d &shear, Quatd &rotation, V3d &translation)
 {
-  Imath::M44d mat_remainder(mat);
+  M44d mat_remainder(mat);
 
   /* extract scale and shear */
   Imath::extractAndRemoveScalingAndShear(mat_remainder, scale, shear);
@@ -79,12 +76,12 @@ static void transform_decompose(const Imath::M44d &mat,
   rotation = extractQuat(mat_remainder);
 }
 
-static M44d transform_compose(const Imath::V3d &scale,
-                              const Imath::V3d &shear,
-                              const Imath::Quatd &rotation,
-                              const Imath::V3d &translation)
+static M44d transform_compose(const V3d &scale,
+                              const V3d &shear,
+                              const Quatd &rotation,
+                              const V3d &translation)
 {
-  Imath::M44d scale_mat, shear_mat, rot_mat, trans_mat;
+  M44d scale_mat, shear_mat, rot_mat, trans_mat;
 
   scale_mat.setScale(scale);
   shear_mat.setShear(shear);
@@ -206,62 +203,61 @@ static Transform make_transform(const M44d &a)
   return trans;
 }
 
-static void read_default_uvs(const IV2fGeomParam &uvs, CachedData &cached_data)
+static void add_uvs(const IV2fGeomParam &uvs, CachedData &cached_data, Progress &progress)
 {
-  CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(uvs.getName()));
+  if (uvs.getScope() != kFacevaryingScope) {
+    return;
+  }
+
+  const TimeSamplingPtr time_sampling = uvs.getTimeSampling();
+
+  CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(uvs.getName()),
+                                                                *time_sampling);
+  attr.std = ATTR_STD_UV;
 
   for (size_t i = 0; i < uvs.getNumSamples(); ++i) {
+    if (progress.get_cancel()) {
+      return;
+    }
+
     const ISampleSelector iss = ISampleSelector(index_t(i));
     const IV2fGeomParam::Sample sample = uvs.getExpandedValue(iss);
 
-    const double time = uvs.getTimeSampling()->getSampleTime(index_t(i));
+    const double time = time_sampling->getSampleTime(index_t(i));
 
-    switch (uvs.getScope()) {
-      case kFacevaryingScope: {
-        const IV2fGeomParam::Sample uvsample = uvs.getIndexedValue(iss);
+    const IV2fGeomParam::Sample uvsample = uvs.getIndexedValue(iss);
 
-        if (!uvsample.valid()) {
-          continue;
-        }
-
-        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
-        const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time_no_check(
-            time);
-
-        if (!triangles || !triangles_loops) {
-          continue;
-        }
-
-        attr.std = ATTR_STD_UV;
-
-        array<char> data;
-        data.resize(triangles->size() * 3 * sizeof(float2));
-
-        float2 *data_float2 = reinterpret_cast<float2 *>(data.data());
-
-        const unsigned int *indices = uvsample.getIndices()->get();
-        const V2f *values = uvsample.getVals()->get();
-
-        for (const int3 &loop : *triangles_loops) {
-          unsigned int v0 = indices[loop.x];
-          unsigned int v1 = indices[loop.y];
-          unsigned int v2 = indices[loop.z];
-
-          data_float2[0] = make_float2(values[v0][0], values[v0][1]);
-          data_float2[1] = make_float2(values[v1][0], values[v1][1]);
-          data_float2[2] = make_float2(values[v2][0], values[v2][1]);
-          data_float2 += 3;
-        }
-
-        attr.data.add_data(data, time);
-
-        break;
-      }
-      default: {
-        // not supported
-        break;
-      }
+    if (!uvsample.valid()) {
+      continue;
     }
+
+    const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
+    const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time_no_check(time);
+
+    if (!triangles || !triangles_loops) {
+      continue;
+    }
+
+    array<char> data;
+    data.resize(triangles->size() * 3 * sizeof(float2));
+
+    float2 *data_float2 = reinterpret_cast<float2 *>(data.data());
+
+    const unsigned int *indices = uvsample.getIndices()->get();
+    const V2f *values = uvsample.getVals()->get();
+
+    for (const int3 &loop : *triangles_loops) {
+      unsigned int v0 = indices[loop.x];
+      unsigned int v1 = indices[loop.y];
+      unsigned int v2 = indices[loop.z];
+
+      data_float2[0] = make_float2(values[v0][0], values[v0][1]);
+      data_float2[1] = make_float2(values[v1][0], values[v1][1]);
+      data_float2[2] = make_float2(values[v2][0], values[v2][1]);
+      data_float2 += 3;
+    }
+
+    attr.data.add_data(data, time);
   }
 }
 
@@ -270,7 +266,6 @@ static void add_normals(const Int32ArraySamplePtr face_indices,
                         double time,
                         CachedData &cached_data)
 {
-
   switch (normals.getScope()) {
     case kFacevaryingScope: {
       const ISampleSelector iss = ISampleSelector(time);
@@ -280,7 +275,8 @@ static void add_normals(const Int32ArraySamplePtr face_indices,
         return;
       }
 
-      CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(normals.getName()));
+      CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(normals.getName()),
+                                                                    *normals.getTimeSampling());
       attr.std = ATTR_STD_VERTEX_NORMAL;
 
       const array<float3> *vertices = cached_data.vertices.data_for_time_no_check(time);
@@ -319,7 +315,8 @@ static void add_normals(const Int32ArraySamplePtr face_indices,
         return;
       }
 
-      CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(normals.getName()));
+      CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(normals.getName()),
+                                                                    *normals.getTimeSampling());
       attr.std = ATTR_STD_VERTEX_NORMAL;
 
       const array<float3> *vertices = cached_data.vertices.data_for_time_no_check(time);
@@ -359,7 +356,7 @@ static void add_positions(const P3fArraySamplePtr positions, double time, Cached
   vertices.reserve(positions->size());
 
   for (size_t i = 0; i < positions->size(); i++) {
-    Imath::Vec3<float> f = positions->get()[i];
+    V3f f = positions->get()[i];
     vertices.push_back_reserved(make_float3_from_yup(f));
   }
 
@@ -548,6 +545,10 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
     }
 
     foreach (const AttributeRequest &attr, requested_attributes.requests) {
+      if (progress.get_cancel()) {
+        return;
+      }
+
       read_attribute(schema.getArbGeomParams(), iss, attr.name);
     }
   }
@@ -559,7 +560,7 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
   const IV2fGeomParam &uvs = schema.getUVsParam();
 
   if (uvs.valid()) {
-    read_default_uvs(uvs, cached_data);
+    add_uvs(uvs, cached_data, progress);
   }
 
   if (progress.get_cancel()) {
@@ -713,148 +714,148 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
                                    const ustring &attr_name)
 {
   const index_t index = iss.getRequestedIndex();
-  CachedData::CachedAttribute &attribute = cached_data.add_attribute(attr_name);
 
-  for (size_t i = 0; i < arb_geom_params.getNumProperties(); ++i) {
-    const PropertyHeader &prop = arb_geom_params.getPropertyHeader(i);
+  const PropertyHeader *prop = arb_geom_params.getPropertyHeader(attr_name.c_str());
 
-    if (prop.getName() != attr_name) {
-      continue;
-    }
+  if (prop == nullptr) {
+    return;
+  }
 
-    if (IV2fProperty::matches(prop.getMetaData()) && Alembic::AbcGeom::isUV(prop)) {
-      const IV2fGeomParam &param = IV2fGeomParam(arb_geom_params, prop.getName());
+  CachedData::CachedAttribute &attribute = cached_data.add_attribute(attr_name,
+                                                                     *prop->getTimeSampling());
 
-      IV2fGeomParam::Sample sample;
-      param.getIndexed(sample, iss);
+  if (IV2fProperty::matches(prop->getMetaData()) && Alembic::AbcGeom::isUV(*prop)) {
+    const IV2fGeomParam &param = IV2fGeomParam(arb_geom_params, prop->getName());
 
-      const chrono_t time = param.getTimeSampling()->getSampleTime(index);
+    IV2fGeomParam::Sample sample;
+    param.getIndexed(sample, iss);
 
-      if (param.getScope() == kFacevaryingScope) {
-        V2fArraySamplePtr values = sample.getVals();
-        UInt32ArraySamplePtr indices = sample.getIndices();
+    const chrono_t time = param.getTimeSampling()->getSampleTime(index);
 
-        attribute.std = ATTR_STD_NONE;
-        attribute.element = ATTR_ELEMENT_CORNER;
-        attribute.type_desc = TypeFloat2;
-
-        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
-        const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time_no_check(
-            time);
-
-        if (!triangles || !triangles_loops) {
-          continue;
-        }
-
-        array<char> data;
-        data.resize(triangles->size() * 3 * sizeof(float2));
-
-        float2 *data_float2 = reinterpret_cast<float2 *>(data.data());
-
-        for (const int3 &loop : *triangles_loops) {
-          unsigned int v0 = (*indices)[loop.x];
-          unsigned int v1 = (*indices)[loop.y];
-          unsigned int v2 = (*indices)[loop.z];
-
-          data_float2[0] = make_float2((*values)[v0][0], (*values)[v0][1]);
-          data_float2[1] = make_float2((*values)[v1][0], (*values)[v1][1]);
-          data_float2[2] = make_float2((*values)[v2][0], (*values)[v2][1]);
-          data_float2 += 3;
-        }
-
-        attribute.data.set_time_sampling(*param.getTimeSampling());
-        attribute.data.add_data(data, time);
-      }
-    }
-    else if (IC3fProperty::matches(prop.getMetaData())) {
-      const IC3fGeomParam &param = IC3fGeomParam(arb_geom_params, prop.getName());
-
-      IC3fGeomParam::Sample sample;
-      param.getIndexed(sample, iss);
-
-      const chrono_t time = param.getTimeSampling()->getSampleTime(index);
-
-      C3fArraySamplePtr values = sample.getVals();
+    if (param.getScope() == kFacevaryingScope) {
+      V2fArraySamplePtr values = sample.getVals();
+      UInt32ArraySamplePtr indices = sample.getIndices();
 
       attribute.std = ATTR_STD_NONE;
+      attribute.element = ATTR_ELEMENT_CORNER;
+      attribute.type_desc = TypeFloat2;
 
-      if (param.getScope() == kVaryingScope) {
-        attribute.element = ATTR_ELEMENT_CORNER_BYTE;
-        attribute.type_desc = TypeRGBA;
+      const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
+      const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time_no_check(
+          time);
 
-        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
-
-        if (!triangles) {
-          continue;
-        }
-
-        array<char> data;
-        data.resize(triangles->size() * 3 * sizeof(uchar4));
-
-        uchar4 *data_uchar4 = reinterpret_cast<uchar4 *>(data.data());
-
-        int offset = 0;
-        for (const int3 &tri : *triangles) {
-          Imath::C3f v = (*values)[tri.x];
-          data_uchar4[offset + 0] = color_float_to_byte(make_float3(v.x, v.y, v.z));
-
-          v = (*values)[tri.y];
-          data_uchar4[offset + 1] = color_float_to_byte(make_float3(v.x, v.y, v.z));
-
-          v = (*values)[tri.z];
-          data_uchar4[offset + 2] = color_float_to_byte(make_float3(v.x, v.y, v.z));
-
-          offset += 3;
-        }
-
-        attribute.data.set_time_sampling(*param.getTimeSampling());
-        attribute.data.add_data(data, time);
+      if (!triangles || !triangles_loops) {
+        return;
       }
+
+      array<char> data;
+      data.resize(triangles->size() * 3 * sizeof(float2));
+
+      float2 *data_float2 = reinterpret_cast<float2 *>(data.data());
+
+      for (const int3 &loop : *triangles_loops) {
+        unsigned int v0 = (*indices)[loop.x];
+        unsigned int v1 = (*indices)[loop.y];
+        unsigned int v2 = (*indices)[loop.z];
+
+        data_float2[0] = make_float2((*values)[v0][0], (*values)[v0][1]);
+        data_float2[1] = make_float2((*values)[v1][0], (*values)[v1][1]);
+        data_float2[2] = make_float2((*values)[v2][0], (*values)[v2][1]);
+        data_float2 += 3;
+      }
+
+      attribute.data.set_time_sampling(*param.getTimeSampling());
+      attribute.data.add_data(data, time);
     }
-    else if (IC4fProperty::matches(prop.getMetaData())) {
-      const IC4fGeomParam &param = IC4fGeomParam(arb_geom_params, prop.getName());
+  }
+  else if (IC3fProperty::matches(prop->getMetaData())) {
+    const IC3fGeomParam &param = IC3fGeomParam(arb_geom_params, prop->getName());
 
-      IC4fGeomParam::Sample sample;
-      param.getIndexed(sample, iss);
+    IC3fGeomParam::Sample sample;
+    param.getIndexed(sample, iss);
 
-      const chrono_t time = param.getTimeSampling()->getSampleTime(index);
+    const chrono_t time = param.getTimeSampling()->getSampleTime(index);
 
-      C4fArraySamplePtr values = sample.getVals();
+    C3fArraySamplePtr values = sample.getVals();
 
-      attribute.std = ATTR_STD_NONE;
+    attribute.std = ATTR_STD_NONE;
 
-      if (param.getScope() == kVaryingScope) {
-        attribute.element = ATTR_ELEMENT_CORNER_BYTE;
-        attribute.type_desc = TypeRGBA;
+    if (param.getScope() == kVaryingScope) {
+      attribute.element = ATTR_ELEMENT_CORNER_BYTE;
+      attribute.type_desc = TypeRGBA;
 
-        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
+      const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
 
-        if (!triangles) {
-          continue;
-        }
-
-        array<char> data;
-        data.resize(triangles->size() * 3 * sizeof(uchar4));
-
-        uchar4 *data_uchar4 = reinterpret_cast<uchar4 *>(data.data());
-
-        int offset = 0;
-        for (const int3 &tri : *triangles) {
-          Imath::C4f v = (*values)[tri.x];
-          data_uchar4[offset + 0] = color_float4_to_uchar4(make_float4(v.r, v.g, v.b, v.a));
-
-          v = (*values)[tri.y];
-          data_uchar4[offset + 1] = color_float4_to_uchar4(make_float4(v.r, v.g, v.b, v.a));
-
-          v = (*values)[tri.z];
-          data_uchar4[offset + 2] = color_float4_to_uchar4(make_float4(v.r, v.g, v.b, v.a));
-
-          offset += 3;
-        }
-
-        attribute.data.set_time_sampling(*param.getTimeSampling());
-        attribute.data.add_data(data, time);
+      if (!triangles) {
+        return;
       }
+
+      array<char> data;
+      data.resize(triangles->size() * 3 * sizeof(uchar4));
+
+      uchar4 *data_uchar4 = reinterpret_cast<uchar4 *>(data.data());
+
+      int offset = 0;
+      for (const int3 &tri : *triangles) {
+        Imath::C3f v = (*values)[tri.x];
+        data_uchar4[offset + 0] = color_float_to_byte(make_float3(v.x, v.y, v.z));
+
+        v = (*values)[tri.y];
+        data_uchar4[offset + 1] = color_float_to_byte(make_float3(v.x, v.y, v.z));
+
+        v = (*values)[tri.z];
+        data_uchar4[offset + 2] = color_float_to_byte(make_float3(v.x, v.y, v.z));
+
+        offset += 3;
+      }
+
+      attribute.data.set_time_sampling(*param.getTimeSampling());
+      attribute.data.add_data(data, time);
+    }
+  }
+  else if (IC4fProperty::matches(prop->getMetaData())) {
+    const IC4fGeomParam &param = IC4fGeomParam(arb_geom_params, prop->getName());
+
+    IC4fGeomParam::Sample sample;
+    param.getIndexed(sample, iss);
+
+    const chrono_t time = param.getTimeSampling()->getSampleTime(index);
+
+    C4fArraySamplePtr values = sample.getVals();
+
+    attribute.std = ATTR_STD_NONE;
+
+    if (param.getScope() == kVaryingScope) {
+      attribute.element = ATTR_ELEMENT_CORNER_BYTE;
+      attribute.type_desc = TypeRGBA;
+
+      const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
+
+      if (!triangles) {
+        return;
+      }
+
+      array<char> data;
+      data.resize(triangles->size() * 3 * sizeof(uchar4));
+
+      uchar4 *data_uchar4 = reinterpret_cast<uchar4 *>(data.data());
+
+      int offset = 0;
+      for (const int3 &tri : *triangles) {
+        Imath::C4f v = (*values)[tri.x];
+        data_uchar4[offset + 0] = color_float4_to_uchar4(make_float4(v.r, v.g, v.b, v.a));
+
+        v = (*values)[tri.y];
+        data_uchar4[offset + 1] = color_float4_to_uchar4(make_float4(v.r, v.g, v.b, v.a));
+
+        v = (*values)[tri.z];
+        data_uchar4[offset + 2] = color_float4_to_uchar4(make_float4(v.r, v.g, v.b, v.a));
+
+        offset += 3;
+      }
+
+      attribute.data.set_time_sampling(*param.getTimeSampling());
+      attribute.data.add_data(data, time);
     }
   }
 }
@@ -878,17 +879,35 @@ AlembicProcedural::AlembicProcedural() : Procedural(node_type)
   frame = 1.0f;
   frame_rate = 24.0f;
   default_curves_radius = 0.01f;
+
+  objects_loaded = false;
+  scene_ = nullptr;
 }
 
 AlembicProcedural::~AlembicProcedural()
 {
-  for (size_t i = 0; i < objects.size(); ++i) {
-    delete objects[i];
+  ccl::set<Geometry *> geometries_set;
+  ccl::set<Object *> objects_set;
+  ccl::set<AlembicObject *> abc_objects_set;
+
+  foreach (Node *node, objects) {
+    AlembicObject *abc_object = static_cast<AlembicObject *>(node);
+
+    objects_set.insert(abc_object->get_object());
+    geometries_set.insert(abc_object->get_object()->get_geometry());
+
+    delete_node(abc_object);
   }
+
+  scene_->delete_nodes(geometries_set, this);
+  scene_->delete_nodes(objects_set, this);
 }
 
 void AlembicProcedural::generate(Scene *scene, Progress &progress)
 {
+  assert(scene_ == nullptr || scene_ == scene);
+  scene_ = scene;
+
   if (!is_modified()) {
     return;
   }
@@ -949,6 +968,19 @@ void AlembicProcedural::tag_update(Scene *scene)
   }
 }
 
+bool AlembicProcedural::has_object(const ustring &path) const
+{
+  foreach (Node *node, objects) {
+    AlembicObject *object = static_cast<AlembicObject *>(node);
+
+    if (object->get_path() == path) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void AlembicProcedural::load_objects(Progress &progress)
 {
   unordered_map<string, AlembicObject *> object_map;
@@ -981,6 +1013,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
   /* create a mesh node in the scene if not already done */
   if (!abc_object->get_object()) {
     mesh = scene->create_node<Mesh>();
+    mesh->set_owner(this);
     mesh->name = abc_object->iobject.getName();
 
     array<Node *> used_shaders = abc_object->get_used_shaders();
@@ -988,6 +1021,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
 
     /* create object*/
     Object *object = scene->create_node<Object>();
+    object->set_owner(this);
     object->set_geometry(mesh);
     object->set_tfm(abc_object->xform);
     object->name = abc_object->iobject.getName();
@@ -1089,6 +1123,7 @@ void AlembicProcedural::read_curves(Scene *scene,
   /* create a hair node in the scene if not already done */
   if (!abc_object->get_object()) {
     hair = scene->create_node<Hair>();
+    hair->set_owner(this);
     hair->name = abc_object->iobject.getName();
 
     array<Node *> used_shaders = abc_object->get_used_shaders();
@@ -1096,6 +1131,7 @@ void AlembicProcedural::read_curves(Scene *scene,
 
     /* create object*/
     Object *object = scene->create_node<Object>();
+    object->set_owner(this);
     object->set_geometry(hair);
     object->set_tfm(abc_object->xform);
     object->name = abc_object->iobject.getName();
