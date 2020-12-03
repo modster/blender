@@ -968,7 +968,17 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
 
   /* If the button reprents an id, it can set the "id" context pointer. */
   if (ED_asset_can_make_single_from_context(C)) {
-    uiItemO(layout, NULL, ICON_NONE, "ASSET_OT_make");
+    ID *id = CTX_data_pointer_get_type(C, "id", &RNA_ID).data;
+
+    /* Gray out items depending on if data-block is an asset. Preferably this could be done via
+     * operator poll, but that doesn't work since the operator also works with "selected_ids",
+     * which isn't cheap to check. */
+    uiLayout *sub = uiLayoutColumn(layout, true);
+    uiLayoutSetEnabled(sub, !id->asset_data);
+    uiItemO(sub, NULL, ICON_NONE, "ASSET_OT_make");
+    sub = uiLayoutColumn(layout, true);
+    uiLayoutSetEnabled(sub, id->asset_data);
+    uiItemO(sub, NULL, ICON_NONE, "ASSET_OT_unmake");
     uiItemS(layout);
   }
 
