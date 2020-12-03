@@ -453,9 +453,6 @@ bool AlembicObject::has_data_loaded() const
 
 void AlembicObject::read_face_sets(IPolyMeshSchema &schema, array<int> &polygon_to_shader)
 {
-  Geometry *geometry = object->get_geometry();
-  assert(geometry);
-
   /* TODO(@kevindietrich) at the moment this is only supported for meshes whose topology remains
    * constant (with possible vertex animation) */
   if (schema.getTopologyVariance() == kHeterogenousTopology) {
@@ -476,7 +473,7 @@ void AlembicObject::read_face_sets(IPolyMeshSchema &schema, array<int> &polygon_
   foreach (const std::string &face_set_name, face_sets) {
     int shader_index = 0;
 
-    foreach (Node *node, geometry->get_used_shaders()) {
+    foreach (Node *node, get_used_shaders()) {
       if (node->name == face_set_name) {
         break;
       }
@@ -484,8 +481,9 @@ void AlembicObject::read_face_sets(IPolyMeshSchema &schema, array<int> &polygon_
       ++shader_index;
     }
 
-    if (shader_index >= geometry->get_used_shaders().size()) {
-      continue;
+    if (shader_index >= get_used_shaders().size()) {
+      /* use the first shader instead if none was found */
+      shader_index = 0;
     }
 
     const IFaceSet face_set = schema.getFaceSet(face_set_name);
