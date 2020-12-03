@@ -20,6 +20,7 @@
 
 #include "BKE_asset.h"
 #include "BKE_context.h"
+#include "BKE_idtype.h"
 #include "BKE_lib_id.h"
 
 #include "DNA_ID.h"
@@ -36,6 +37,9 @@ bool ED_asset_make_for_id(const bContext *C, ID *id)
   if (id->asset_data) {
     return false;
   }
+  if (!BKE_idtype_idcode_can_be_asset(GS(id->name))) {
+    return false;
+  }
 
   id_fake_user_set(id);
 
@@ -46,8 +50,19 @@ bool ED_asset_make_for_id(const bContext *C, ID *id)
   return true;
 }
 
+bool ED_asset_unmake_from_id(ID *id)
+{
+  if (!id->asset_data) {
+    return false;
+  }
+  BKE_asset_metadata_free(&id->asset_data);
+  /* TODO What about user-count? */
+
+  return true;
+}
+
 bool ED_asset_can_make_single_from_context(const bContext *C)
 {
-  /* Context needs a "focused_id" pointer to be set for #ASSET_OT_make() to use. */
-  return CTX_data_pointer_get_type_silent(C, "focused_id", &RNA_ID).data != NULL;
+  /* Context needs a "id" pointer to be set for #ASSET_OT_make()/#ASSET_OT_unmake() to use. */
+  return CTX_data_pointer_get_type_silent(C, "id", &RNA_ID).data != NULL;
 }
