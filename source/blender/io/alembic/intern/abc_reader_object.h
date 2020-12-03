@@ -53,6 +53,8 @@ struct ImportSettings {
   bool validate_meshes;
   bool force_modifier;
 
+  float default_curves_radius;
+
   CacheFile *cache_file;
 
   ImportSettings()
@@ -67,6 +69,7 @@ struct ImportSettings {
         read_flag(0),
         validate_meshes(false),
         force_modifier(false),
+        default_curves_radius(0.01f),
         cache_file(NULL)
   {
   }

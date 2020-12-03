@@ -96,6 +96,7 @@ bool ABC_import(struct bContext *C,
                 int offset,
                 bool validate_meshes,
                 bool force_modifier,
+                float default_curves_radius,
                 bool as_background_job);
 
 AbcArchiveHandle *ABC_create_handle(struct Main *bmain,

@@ -571,27 +571,39 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
   data_loaded = true;
 }
 
-void AlembicObject::load_all_data(const ICurvesSchema &schema, Progress &progress)
+void AlembicObject::load_all_data(const ICurvesSchema &schema, Progress &progress, float default_radius)
 {
   cached_data.clear();
 
-  cached_data.curve_keys.set_time_sampling(*schema.getTimeSampling());
-  cached_data.curve_radius.set_time_sampling(*schema.getTimeSampling());
-  cached_data.curve_first_key.set_time_sampling(*schema.getTimeSampling());
-  cached_data.curve_shader.set_time_sampling(*schema.getTimeSampling());
+  const TimeSamplingPtr time_sampling = schema.getTimeSampling();
+  cached_data.curve_keys.set_time_sampling(*time_sampling);
+  cached_data.curve_radius.set_time_sampling(*time_sampling);
+  cached_data.curve_first_key.set_time_sampling(*time_sampling);
+  cached_data.curve_shader.set_time_sampling(*time_sampling);
 
   for (size_t i = 0; i < schema.getNumSamples(); ++i) {
     if (progress.get_cancel()) {
       return;
     }
 
-    const ISampleSelector iss = ISampleSelector(static_cast<index_t>(i));
+    const ISampleSelector iss = ISampleSelector(index_t(i));
     const ICurvesSchema::Sample sample = schema.getValue(iss);
 
-    const double time = schema.getTimeSampling()->getSampleTime(static_cast<index_t>(i));
+    const double time = time_sampling->getSampleTime(index_t(i));
 
     const Int32ArraySamplePtr curves_num_vertices = sample.getCurvesNumVertices();
     const P3fArraySamplePtr position = sample.getPositions();
+
+    const IFloatGeomParam widths_param = schema.getWidthsParam();
+    FloatArraySamplePtr radiuses;
+
+    if (widths_param.valid()) {
+      IFloatGeomParam::Sample wsample = widths_param.getExpandedValue(iss);
+      radiuses = wsample.getVals();
+    }
+
+    const bool do_radius = (radiuses != nullptr) && (radiuses->size() > 1);
+    float radius = (radiuses && radiuses->size() == 1) ? (*radiuses)[0] : default_radius;
 
     array<float3> curve_keys;
     array<float> curve_radius;
@@ -610,7 +622,12 @@ void AlembicObject::load_all_data(const ICurvesSchema &schema, Progress &progres
       for (int j = 0; j < num_vertices; j++) {
         const V3f &f = position->get()[offset + j];
         curve_keys.push_back_reserved(make_float3_from_yup(f));
-        curve_radius.push_back_reserved(0.01f);
+
+        if (do_radius) {
+          radius = (*radiuses)[offset + j];
+        }
+
+        curve_radius.push_back_reserved(radius);
       }
 
       curve_first_key.push_back_reserved(offset);
@@ -844,6 +861,7 @@ NODE_DEFINE(AlembicProcedural)
   SOCKET_STRING(filepath, "Filename", ustring());
   SOCKET_FLOAT(frame, "Frame", 1.0f);
   SOCKET_FLOAT(frame_rate, "Frame Rate", 24.0f);
+  SOCKET_FLOAT(default_curves_radius, "Default Curve Radius", 0.01f);
 
   SOCKET_NODE_ARRAY(objects, "Objects", &AlembicObject::node_type);
 
@@ -854,6 +872,7 @@ AlembicProcedural::AlembicProcedural() : Procedural(node_type)
 {
   frame = 1.0f;
   frame_rate = 24.0f;
+  default_curves_radius = 0.01f;
 }
 
 AlembicProcedural::~AlembicProcedural()
@@ -1082,9 +1101,9 @@ void AlembicProcedural::read_curves(Scene *scene,
     hair = static_cast<Hair *>(abc_object->get_object()->get_geometry());
   }
 
-  if (!abc_object->has_data_loaded()) {
+  if (!abc_object->has_data_loaded() || default_curves_radius_is_modified()) {
     ICurvesSchema schema = curves.getSchema();
-    abc_object->load_all_data(schema, progress);
+    abc_object->load_all_data(schema, progress, default_curves_radius);
   }
 
   CachedData &cached_data = abc_object->get_cached_data();

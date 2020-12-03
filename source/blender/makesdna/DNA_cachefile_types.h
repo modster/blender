@@ -80,11 +80,13 @@ typedef struct CacheFile {
   /** The frame offset to subtract. */
   float frame_offset;
 
+  /** Default radius assigned to curves if no such property exists for them. */
+  float default_curves_radius;
+
   /** Animation flag. */
   short flag;
-  short draw_flag; /* UNUSED */
 
-  char _pad[3];
+  char _pad;
 
   char velocity_unit;
   /* Name of the velocity property in the Alembic file. */

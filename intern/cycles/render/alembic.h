@@ -206,7 +206,7 @@ class AlembicObject : public Node {
   Object *get_object();
 
   void load_all_data(Alembic::AbcGeom::IPolyMeshSchema &schema, Progress &progress);
-  void load_all_data(const Alembic::AbcGeom::ICurvesSchema &schema, Progress &progress);
+  void load_all_data(const Alembic::AbcGeom::ICurvesSchema &schema, Progress &progress, float default_radius);
 
   bool has_data_loaded() const;
 
@@ -253,6 +253,7 @@ class AlembicProcedural : public Procedural {
   NODE_SOCKET_API(float, frame)
   NODE_SOCKET_API(float, frame_rate)
   NODE_SOCKET_API_ARRAY(array<Node *>, objects)
+  NODE_SOCKET_API(float, default_curves_radius)
 
   void add_object(AlembicObject *object);
 

@@ -595,6 +595,8 @@ static void ui_alembic_import_settings(uiLayout *layout, PointerRNA *imfptr)
   uiItemR(col, imfptr, "is_sequence", 0, NULL, ICON_NONE);
   uiItemR(col, imfptr, "validate_meshes", 0, NULL, ICON_NONE);
   uiItemR(col, imfptr, "force_modifier", 0, NULL, ICON_NONE);
+
+  uiItemR(box, imfptr, "default_curves_radius", 0, NULL, ICON_NONE);
 }
 
 static void wm_alembic_import_draw(bContext *UNUSED(C), wmOperator *op)
@@ -630,6 +632,7 @@ static int wm_alembic_import_exec(bContext *C, wmOperator *op)
   const bool validate_meshes = RNA_boolean_get(op->ptr, "validate_meshes");
   const bool force_modifier = RNA_boolean_get(op->ptr, "force_modifier");
   const bool as_background_job = RNA_boolean_get(op->ptr, "as_background_job");
+  const float default_curves_radius = RNA_float_get(op->ptr, "default_curves_radius");
 
   int offset = 0;
   int sequence_len = 1;
@@ -657,6 +660,7 @@ static int wm_alembic_import_exec(bContext *C, wmOperator *op)
                        offset,
                        validate_meshes,
                        force_modifier,
+                       default_curves_radius,
                        as_background_job);
 
   return as_background_job || ok ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
@@ -717,6 +721,17 @@ void WM_OT_alembic_import(wmOperatorType *ot)
                   false,
                   "Is Sequence",
                   "Set to true if the cache is split into separate files");
+
+  RNA_def_float(
+      ot->srna,
+      "default_curves_radius",
+      0.01f,
+      0.0001f,
+      1000.0f,
+      "Curves Radius",
+      "Value to use for defining the curves width when the curves do not have a property for it",
+      0.0001f,
+      1000.0f);
 
   RNA_def_boolean(
       ot->srna,
