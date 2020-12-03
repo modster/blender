@@ -685,7 +685,7 @@ void AlembicObject::setup_transform_cache()
 
   // TODO(@kevindietrich) : proper time sampling, but is it possible for the hierarchy to have
   // different time sampling for each xform ?
-  cached_data.transforms.set_time_sampling(cached_data.vertices.time_sampling);
+  cached_data.transforms.set_time_sampling(cached_data.vertices.get_time_sampling());
 }
 
 AttributeRequestSet AlembicObject::get_requested_attributes()

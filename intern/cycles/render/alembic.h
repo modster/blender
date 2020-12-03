@@ -51,13 +51,17 @@ template<typename T> class DataStore {
   };
 
   vector<DataTimePair> data{};
-
- public:
   Alembic::AbcCoreAbstract::TimeSampling time_sampling{};
 
+ public:
   void set_time_sampling(Alembic::AbcCoreAbstract::TimeSampling time_sampling_)
   {
     time_sampling = time_sampling_;
+  }
+
+  Alembic::AbcCoreAbstract::TimeSampling get_time_sampling() const
+  {
+    return time_sampling;
   }
 
   T *data_for_time(double time)
