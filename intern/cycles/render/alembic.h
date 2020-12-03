@@ -44,6 +44,11 @@ template<typename> struct is_array : public std::false_type {
 template<typename T> struct is_array<array<T>> : public std::true_type {
 };
 
+/* Store the data set for an animation at every time points, or at the begining of the animation
+ * for constant data.
+ *
+ * The data is supposed to be stored in chronological order, and is looked up using the current
+ * animation time in seconds using the TimeSampling from the Alembic property. */
 template<typename T> class DataStore {
   struct DataTimePair {
     double time = 0;
@@ -130,12 +135,18 @@ template<typename T> class DataStore {
   }
 };
 
+/* Actual cache for the stored data.
+ * This caches the topological, transformation, and attribute data for a Mesh node or a Hair node
+ * inside of DataStores.
+ */
 struct CachedData {
   DataStore<Transform> transforms{};
 
   /* mesh data */
   DataStore<array<float3>> vertices;
   DataStore<array<int3>> triangles{};
+  /* triangle "loops" are the polygons' vertices indices used for indexing face varying attributes
+   * (like UVs) */
   DataStore<array<int3>> triangles_loops{};
   DataStore<array<int>> shader{};
 
@@ -226,15 +237,27 @@ struct CachedData {
   }
 };
 
+/* Representation of an Alembic object for the AlembicProcedural.
+ *
+ * The AlembicObject holds the path to the Alembic IObject inside of the archive that is desired
+ * for rendering, as well as the list of shaders that it is using.
+ *
+ * The names of the shaders should correspond to the names of the FaceSets inside of the Alembic
+ * archive for per-triangle shader association. If there is no FaceSets, or the names do not
+ * match, the first shader is used for rendering for all triangles.
+ */
 class AlembicObject : public Node {
  public:
   NODE_DECLARE
 
+  /* Path to the IObject inside of the archive. */
+  NODE_SOCKET_API(ustring, path)
+
+  /* Shaders used for rendering. */
+  NODE_SOCKET_API_ARRAY(array<Node *>, used_shaders)
+
   AlembicObject();
   ~AlembicObject();
-
-  NODE_SOCKET_API(ustring, path)
-  NODE_SOCKET_API_ARRAY(array<Node *>, used_shaders)
 
  private:
   friend class AlembicProcedural;
@@ -280,45 +303,77 @@ class AlembicObject : public Node {
   AttributeRequestSet get_requested_attributes();
 };
 
+/* Procedural to render objects from a single Alembic archive.
+ *
+ * Every object desired to be rendered should be passed as an AlembicObject through the objects
+ * socket.
+ *
+ * This procedural will load the data set for the entire animation in memory on the first frame,
+ * and directly set the data for the new frames on the created Nodes if needed. This allows for
+ * faster updates between frames as it avoids reseeking the data on disk.
+ */
 class AlembicProcedural : public Procedural {
- public:
-  NODE_DECLARE
-
-  AlembicProcedural();
-  ~AlembicProcedural();
-  void generate(Scene *scene, Progress &progress);
-
-  NODE_SOCKET_API(ustring, filepath)
-  NODE_SOCKET_API(float, frame)
-  NODE_SOCKET_API(float, frame_rate)
-  NODE_SOCKET_API_ARRAY(array<Node *>, objects)
-  NODE_SOCKET_API(float, default_curves_radius)
-
-  void add_object(AlembicObject *object);
-
-  void tag_update(Scene *scene);
-
- private:
   Alembic::AbcGeom::IArchive archive;
   bool objects_loaded = false;
 
+ public:
+  NODE_DECLARE
+
+  /* The filepath to the archive */
+  NODE_SOCKET_API(ustring, filepath)
+
+  /* The current frame to render. */
+  NODE_SOCKET_API(float, frame)
+
+  /* The frame rate used for rendering. */
+  NODE_SOCKET_API(float, frame_rate)
+
+  /* List of AlembicObjects to render. */
+  NODE_SOCKET_API_ARRAY(array<Node *>, objects)
+
+  /* Set the default radius to use for curves when the Alembic Curves Schemas do not have radius
+   * information. */
+  NODE_SOCKET_API(float, default_curves_radius)
+
+  AlembicProcedural();
+  ~AlembicProcedural();
+
+  /* Populates the Cycles scene with Nodes for every contained AlembicObject on the first
+   * invocation, and updates the data on subsequent invocations if the frame changed. */
+  void generate(Scene *scene, Progress &progress);
+
+  /* Add an object to our list of objects, and tag the socket as modified. */
+  void add_object(AlembicObject *object);
+
+  /* Tag for an update only if something was modified. */
+  void tag_update(Scene *scene);
+
+ private:
+  /* Load the data for all the objects whose data has not yet been loaded. */
   void load_objects(Progress &progress);
 
-  void read_mesh(Scene *scene,
-                 AlembicObject *abc_object,
-                 Alembic::AbcGeom::Abc::chrono_t frame_time,
-                 Progress &progress);
-
-  void read_curves(Scene *scene,
-                   AlembicObject *abc_object,
-                   Alembic::AbcGeom::Abc::chrono_t frame_time,
-                   Progress &progress);
-
+  /* Traverse the Alembic hierarchy to lookup the IObjects for the AlembicObjects that were
+   * specified in our objects socket, and accumulate all of the transformations samples along the
+   * way for each IObject. */
   void walk_hierarchy(Alembic::AbcGeom::IObject parent,
                       const Alembic::AbcGeom::ObjectHeader &ohead,
                       MatrixSampleMap *xform_samples,
                       const unordered_map<string, AlembicObject *> &object_map,
                       Progress &progress);
+
+  /* Read the data for an IPolyMesh at the specified frame_time. Creates corresponding Geometry and
+   * Object Nodes in the Cycles scene if none exist yet. */
+  void read_mesh(Scene *scene,
+                 AlembicObject *abc_object,
+                 Alembic::AbcGeom::Abc::chrono_t frame_time,
+                 Progress &progress);
+
+  /* Read the data for an ICurves at the specified frame_time. Creates corresponding Geometry and
+   * Object Nodes in the Cycles scene if none exist yet. */
+  void read_curves(Scene *scene,
+                   AlembicObject *abc_object,
+                   Alembic::AbcGeom::Abc::chrono_t frame_time,
+                   Progress &progress);
 };
 
 CCL_NAMESPACE_END
