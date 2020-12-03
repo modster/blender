@@ -967,7 +967,7 @@ const char *blo_bhead_id_name(const FileData *fd, const BHead *bhead)
 AssetMetaData *blo_bhead_id_asset_data_address(const FileData *fd, const BHead *bhead)
 {
   BLI_assert(BKE_idtype_idcode_is_valid(bhead->code));
-  return (fd->id_asset_data_offs > 0) ?
+  return (fd->id_asset_data_offs >= 0) ?
              *(AssetMetaData **)POINTER_OFFSET(bhead, sizeof(*bhead) + fd->id_asset_data_offs) :
              NULL;
 }
