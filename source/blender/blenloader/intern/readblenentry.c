@@ -165,10 +165,10 @@ LinkNode *BLO_blendhandle_get_datablock_names(BlendHandle *bh, int ofblocktype, 
  *
  * \param bh: The blendhandle to access.
  * \param ofblocktype: The type of names to get.
- * \param tot_names: The length of the returned list.
+ * \param tot_info_items: The length of the returned list.
  * \return A BLI_linklist of BLODataBlockInfo *. The links should be freed with MEM_freeN.
  */
-LinkNode *BLO_blendhandle_get_datablock_info(BlendHandle *bh, int ofblocktype, int *tot_names)
+LinkNode *BLO_blendhandle_get_datablock_info(BlendHandle *bh, int ofblocktype, int *tot_info_items)
 {
   FileData *fd = (FileData *)bh;
   LinkNode *infos = NULL;
@@ -199,7 +199,7 @@ LinkNode *BLO_blendhandle_get_datablock_info(BlendHandle *bh, int ofblocktype, i
     }
   }
 
-  *tot_names = tot;
+  *tot_info_items = tot;
   return infos;
 }
 

@@ -113,7 +113,7 @@ typedef struct FileData {
   /** Used to retrieve ID names from (bhead+1). */
   int id_name_offs;
   /** Used to retrieve asset data from (bhead+1). NOTE: This may not be available in old files,
-   * will be 0 then! */
+   * will be -1 then! */
   int id_asset_data_offs;
   /** For do_versions patching. */
   int globalf, fileflags;
