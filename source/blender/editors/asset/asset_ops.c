@@ -48,7 +48,7 @@ static ListBase asset_make_get_ids_from_context(const bContext *C)
 {
   ListBase list = {0};
 
-  PointerRNA idptr = CTX_data_pointer_get_type(C, "focused_id", &RNA_ID);
+  PointerRNA idptr = CTX_data_pointer_get_type(C, "id", &RNA_ID);
 
   if (idptr.data) {
     CollectionPointerLink *ctx_link = MEM_callocN(sizeof(*ctx_link), __func__);

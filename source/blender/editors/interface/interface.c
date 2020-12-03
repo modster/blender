@@ -4557,7 +4557,7 @@ static uiBut *ui_def_but_rna(uiBlock *block,
      * access it.*/
     const PointerRNA pptr = RNA_property_pointer_get(ptr, prop);
     if (pptr.data && RNA_struct_is_ID(pptr.type)) {
-      but->context = CTX_store_add(&block->contexts, "focused_id", &pptr);
+      but->context = CTX_store_add(&block->contexts, "id", &pptr);
     }
   }
 

@@ -966,7 +966,7 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
     }
   }
 
-  /* If the button reprents an id, it can set the "focused_id" context pointer. */
+  /* If the button reprents an id, it can set the "id" context pointer. */
   if (ED_asset_can_make_single_from_context(C)) {
     uiItemO(layout, NULL, ICON_NONE, "ASSET_OT_make");
     uiItemS(layout);
