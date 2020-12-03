@@ -224,8 +224,9 @@ static void read_default_uvs(const IV2fGeomParam &uvs, CachedData &cached_data)
           continue;
         }
 
-        const array<int3> *triangles = cached_data.triangles.data_for_time(time);
-        const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time(time);
+        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
+        const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time_no_check(
+            time);
 
         if (!triangles || !triangles_loops) {
           continue;
@@ -282,7 +283,7 @@ static void add_normals(const Int32ArraySamplePtr face_indices,
       CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(normals.getName()));
       attr.std = ATTR_STD_VERTEX_NORMAL;
 
-      const array<float3> *vertices = cached_data.vertices.data_for_time(time);
+      const array<float3> *vertices = cached_data.vertices.data_for_time_no_check(time);
 
       if (!vertices) {
         return;
@@ -321,7 +322,7 @@ static void add_normals(const Int32ArraySamplePtr face_indices,
       CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(normals.getName()));
       attr.std = ATTR_STD_VERTEX_NORMAL;
 
-      const array<float3> *vertices = cached_data.vertices.data_for_time(time);
+      const array<float3> *vertices = cached_data.vertices.data_for_time_no_check(time);
 
       if (!vertices) {
         return;
@@ -739,8 +740,9 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
         attribute.element = ATTR_ELEMENT_CORNER;
         attribute.type_desc = TypeFloat2;
 
-        const array<int3> *triangles = cached_data.triangles.data_for_time(time);
-        const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time(time);
+        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
+        const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time_no_check(
+            time);
 
         if (!triangles || !triangles_loops) {
           continue;
@@ -782,7 +784,7 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
         attribute.element = ATTR_ELEMENT_CORNER_BYTE;
         attribute.type_desc = TypeRGBA;
 
-        const array<int3> *triangles = cached_data.triangles.data_for_time(time);
+        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
 
         if (!triangles) {
           continue;
@@ -827,7 +829,7 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
         attribute.element = ATTR_ELEMENT_CORNER_BYTE;
         attribute.type_desc = TypeRGBA;
 
-        const array<int3> *triangles = cached_data.triangles.data_for_time(time);
+        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
 
         if (!triangles) {
           continue;

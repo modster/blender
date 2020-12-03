@@ -53,6 +53,8 @@ template<typename T> class DataStore {
   vector<DataTimePair> data{};
   Alembic::AbcCoreAbstract::TimeSampling time_sampling{};
 
+  double last_loaded_time = std::numeric_limits<double>::max();
+
  public:
   void set_time_sampling(Alembic::AbcCoreAbstract::TimeSampling time_sampling_)
   {
@@ -64,16 +66,39 @@ template<typename T> class DataStore {
     return time_sampling;
   }
 
+  /* Get the data for the specified time.
+   * Return nullptr if there is no data or if the data for this time was already loaded. */
   T *data_for_time(double time)
   {
     if (size() == 0) {
       return nullptr;
     }
 
-    auto index_pair = time_sampling.getNearIndex(time, data.size());
-    auto ptr = &data[index_pair.first];
+    std::pair<size_t, Alembic::Abc::chrono_t> index_pair;
+    index_pair = time_sampling.getNearIndex(time, data.size());
+    DataTimePair &data_pair = data[index_pair.first];
 
-    return &ptr->data;
+    if (last_loaded_time == data_pair.time) {
+      return nullptr;
+    }
+
+    last_loaded_time = data_pair.time;
+
+    return &data_pair.data;
+  }
+
+  /* get the data for the specified time, but do not check if the data was already loaded for this
+   * time return nullptr if there is no data */
+  T *data_for_time_no_check(double time)
+  {
+    if (size() == 0) {
+      return nullptr;
+    }
+
+    std::pair<size_t, Alembic::Abc::chrono_t> index_pair;
+    index_pair = time_sampling.getNearIndex(time, data.size());
+    DataTimePair &data_pair = data[index_pair.first];
+    return &data_pair.data;
   }
 
   void add_data(T &data_, double time)
@@ -100,6 +125,7 @@ template<typename T> class DataStore {
 
   void clear()
   {
+    last_loaded_time = std::numeric_limits<double>::max();
     data.clear();
   }
 };
