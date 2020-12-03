@@ -85,7 +85,9 @@ static void asset_make_for_idptr_list(const bContext *C,
       continue;
     }
 
-    ED_asset_make_for_id(C, id);
+    if (!ED_asset_make_for_id(C, id)) {
+      continue;
+    }
 
     r_stats->last_id = id;
     r_stats->tot_created++;

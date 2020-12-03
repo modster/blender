@@ -20,6 +20,7 @@
 
 #include "BKE_asset.h"
 #include "BKE_context.h"
+#include "BKE_idtype.h"
 #include "BKE_lib_id.h"
 
 #include "DNA_ID.h"
@@ -34,6 +35,9 @@
 bool ED_asset_make_for_id(const bContext *C, ID *id)
 {
   if (id->asset_data) {
+    return false;
+  }
+  if (!BKE_idtype_idcode_can_be_asset(GS(id->name))) {
     return false;
   }
 

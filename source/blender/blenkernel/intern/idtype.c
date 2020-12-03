@@ -235,6 +235,11 @@ bool BKE_idtype_idcode_is_linkable(const short idcode)
   return id_type != NULL ? (id_type->flags & IDTYPE_FLAGS_NO_LIBLINKING) == 0 : false;
 }
 
+bool BKE_idtype_idcode_can_be_asset(const short idcode)
+{
+  return BKE_idtype_idcode_is_linkable(idcode);
+}
+
 /**
  * Convert an \a idcode into an \a idfilter (e.g. ID_OB -> FILTER_ID_OB).
  */
