@@ -142,7 +142,9 @@ static int asset_make_exec(bContext *C, wmOperator *op)
 static void ASSET_OT_make(wmOperatorType *ot)
 {
   ot->name = "Make Asset";
-  ot->description = "Enable asset management for a data-block";
+  ot->description =
+      "Enable easier reuse of selected data-blocks through the Asset Browser, with the help of "
+      "customizable metadata (like previews, descriptions and tags)";
   ot->idname = "ASSET_OT_make";
 
   ot->exec = asset_make_exec;
