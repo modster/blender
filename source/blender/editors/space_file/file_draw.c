@@ -946,7 +946,6 @@ void file_draw_list(const bContext *C, ARegion *region)
     }
 
     if (file_selflag & FILE_SEL_EDITING) {
-      FileSelectParams *params = ED_fileselect_get_active_params(sfile);
       const short width = (params->display == FILE_IMGDISPLAY) ?
                               textwidth :
                               layout->attribute_columns[COLUMN_NAME].width -
