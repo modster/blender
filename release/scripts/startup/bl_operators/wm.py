@@ -1260,6 +1260,8 @@ class WM_OT_properties_edit(Operator):
             rna_idprop_value_item_type,
         )
 
+        print("custom property edit execute")
+
         data_path = self.data_path
         prop = self.property
 
@@ -1267,6 +1269,7 @@ class WM_OT_properties_edit(Operator):
 
         if prop_old is None:
             self.report({'ERROR'}, "Direct execution not supported")
+            print("prop_old is None")
             return {'CANCELLED'}
 
         value_eval = self.get_value_eval()
@@ -1296,14 +1299,18 @@ class WM_OT_properties_edit(Operator):
         prop_type, is_array = rna_idprop_value_item_type(prop_value)
 
         if prop_type in {float, int}:
+            print("Calling update_rna")
             item.update_rna(prop, subtype=self.subtype, 
                                   min=self.min, 
                                   max=self.max, 
                                   soft_min=self.soft_min, 
                                   soft_max=self.soft_max,
-                                  description=self.description)
+                                  description="HELLO THERE")
+            print("Calling rna_data")
+            print(item.rna_data(prop)["description"])
         if prop_type in {float, int, str}:
             item.update_rna(prop, default=default_eval)
+            print(item.rna_data(prop)["description"])
 
         # If we have changed the type of the property, update its potential anim curves!
         if prop_type_old != prop_type_new:
@@ -1377,14 +1384,16 @@ class WM_OT_properties_edit(Operator):
         props = item.custom_properties()
         props.update_rna(self.property)
         rna_data = props.rna_data(self.property)
-        prop = item.bl_rna.properties[self.property]
-        self.min = rna_data["min"]
-        self.max = rna_data["max"]
-        self.soft_min = rna_data["soft_min"]
-        self.soft_max = rna_data["soft_max"]
         self.subtype =  rna_data["subtype"]
+        if prop_type in {int, float}:
+            self.min = rna_data["min"]
+            self.max = rna_data["max"]
+            self.soft_min = rna_data["soft_min"]
+            self.soft_max = rna_data["soft_max"]
+        if prop_type in {int, float, str}:
+            self.default = str(rna_data["default_value"])
 
-        self._init_subtype(prop_type, is_array, subtype)
+        self._init_subtype(prop_type, is_array, self.subtype)
 
         # store for comparison
         self._cmp_props = self._cmp_props_get()

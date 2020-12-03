@@ -1498,7 +1498,7 @@ IDPropertyUIData *IDP_ui_data_ensure(IDProperty *prop)
     ui_data->soft_min = FLT_MIN;
     ui_data->soft_max = FLT_MAX;
     ui_data->step = 1.0f;
-    ui_data->step = 3.0f;
+    ui_data->precision = 3.0f;
     prop->ui_data = (IDPropertyUIData *)ui_data;
   }
   else {
