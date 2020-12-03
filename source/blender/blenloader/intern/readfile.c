@@ -44,9 +44,7 @@
 #define DNA_DEPRECATED_ALLOW
 
 #include "DNA_anim_types.h"
-#include "DNA_armature_types.h"
 #include "DNA_asset_types.h"
-#include "DNA_brush_types.h"
 #include "DNA_cachefile_types.h"
 #include "DNA_fileglobal_types.h"
 #include "DNA_genfile.h"
@@ -74,9 +72,7 @@
 
 #include "BKE_anim_data.h"
 #include "BKE_animsys.h"
-#include "BKE_armature.h"
 #include "BKE_asset.h"
-#include "BKE_brush.h"
 #include "BKE_collection.h"
 #include "BKE_global.h" /* for G */
 #include "BKE_idprop.h"

@@ -160,8 +160,8 @@ LinkNode *BLO_blendhandle_get_datablock_names(BlendHandle *bh, int ofblocktype, 
 }
 
 /**
- * Gets the names of all the data-blocks in a file of a certain type
- * (e.g. all the scene names in a file).
+ * Gets the names and asset-data (if ID is an asset) of all the data-blocks in a file of a certain
+ * type (e.g. all the scene names in a file).
  *
  * \param bh: The blendhandle to access.
  * \param ofblocktype: The type of names to get.

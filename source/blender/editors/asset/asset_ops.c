@@ -18,6 +18,8 @@
  * \ingroup edasset
  */
 
+#include <string.h>
+
 #include "BKE_asset.h"
 #include "BKE_context.h"
 #include "BKE_report.h"
@@ -36,6 +38,8 @@
 
 #include "WM_api.h"
 #include "WM_types.h"
+
+/* -------------------------------------------------------------------- */
 
 /**
  * Return the IDs to operate on as list of #CollectionPointerLink links. Needs freeing.
@@ -58,70 +62,61 @@ static ListBase asset_make_get_ids_from_context(const bContext *C)
   return list;
 }
 
-static bool asset_make_poll(bContext *C)
+struct AssetMakeResultStats {
+  int tot_created;
+  int tot_selected_ids;
+  int tot_already_asset;
+  ID *last_id;
+};
+
+static void asset_make_for_idptr_list(const bContext *C,
+                                      const ListBase *ids,
+                                      struct AssetMakeResultStats *r_stats)
 {
-  ListBase ids = asset_make_get_ids_from_context(C);
+  memset(r_stats, 0, sizeof(*r_stats));
 
-  int tot_selected = 0;
-  bool can_make_asset = false;
+  LISTBASE_FOREACH (CollectionPointerLink *, ctx_id, ids) {
+    BLI_assert(RNA_struct_is_ID(ctx_id->ptr.type));
+    r_stats->tot_selected_ids++;
 
-  /* Note that this isn't entirely cheap. Iterates over entire Outliner tree and allocates a link
-   * for each selected item. The button only shows in the context menu though, so acceptable. */
-  LISTBASE_FOREACH (CollectionPointerLink *, ctx_id, &ids) {
     ID *id = ctx_id->ptr.data;
-
-    tot_selected++;
-    if (!id->asset_data) {
-      can_make_asset = true;
-      break;
+    if (id->asset_data) {
+      r_stats->tot_already_asset++;
+      continue;
     }
+
+    ED_asset_make_for_id(C, id);
+
+    r_stats->last_id = id;
+    r_stats->tot_created++;
   }
-  BLI_freelistN(&ids);
-
-  if (!can_make_asset) {
-    if (tot_selected > 0) {
-      CTX_wm_operator_poll_msg_set(C, "Selected data-blocks are already assets.");
-    }
-    else {
-      CTX_wm_operator_poll_msg_set(C, "No data-blocks selected");
-    }
-    return false;
-  }
-
-  return true;
 }
 
 static int asset_make_exec(bContext *C, wmOperator *op)
 {
   ListBase ids = asset_make_get_ids_from_context(C);
 
-  ID *last_id = NULL;
-  int tot_created = 0;
-
-  LISTBASE_FOREACH (CollectionPointerLink *, ctx_id, &ids) {
-    ID *id = ctx_id->ptr.data;
-    BLI_assert(RNA_struct_is_ID(ctx_id->ptr.type));
-    if (id->asset_data) {
-      continue;
-    }
-
-    ED_asset_make_for_id(C, id);
-    last_id = id;
-    tot_created++;
-  }
+  struct AssetMakeResultStats stats;
+  asset_make_for_idptr_list(C, &ids, &stats);
   BLI_freelistN(&ids);
 
-  /* User feedback. */
-  if (tot_created < 1) {
+  /* User feedback on failure. */
+  if ((stats.tot_created < 1) && (stats.tot_already_asset > 0)) {
+    BKE_report(op->reports, RPT_ERROR, "Selected data-blocks are already assets");
+    return OPERATOR_CANCELLED;
+  }
+  if (stats.tot_created < 1) {
     BKE_report(op->reports, RPT_ERROR, "No data-blocks to create assets for found");
     return OPERATOR_CANCELLED;
   }
-  if (tot_created == 1) {
+
+  /* User feedback on success. */
+  if (stats.tot_created == 1) {
     /* If only one data-block: Give more useful message by printing asset name. */
-    BKE_reportf(op->reports, RPT_INFO, "Data-block '%s' is now an asset", last_id->name + 2);
+    BKE_reportf(op->reports, RPT_INFO, "Data-block '%s' is now an asset", stats.last_id->name + 2);
   }
   else {
-    BKE_reportf(op->reports, RPT_INFO, "%i data-blocks are now assets", tot_created);
+    BKE_reportf(op->reports, RPT_INFO, "%i data-blocks are now assets", stats.tot_created);
   }
 
   WM_main_add_notifier(NC_ID | NA_EDITED, NULL);
@@ -136,7 +131,6 @@ static void ASSET_OT_make(wmOperatorType *ot)
   ot->description = "Enable asset management for a data-block";
   ot->idname = "ASSET_OT_make";
 
-  ot->poll = asset_make_poll;
   ot->exec = asset_make_exec;
 
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;

@@ -267,9 +267,7 @@ typedef struct ID {
 
   struct Library *lib;
 
-  /** If this ID is an asset, this pointer is set and references all data defining an asset. */
-  /* TODO this will probably not stay here. Instead we might want a new asset ID-type that
-   * references another ID. */
+  /** If the ID is an asset, this pointer is set. Owning pointer. */
   struct AssetMetaData *asset_data;
 
   /** MAX_ID_NAME. */

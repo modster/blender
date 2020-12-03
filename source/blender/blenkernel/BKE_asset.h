@@ -32,9 +32,6 @@ struct BlendDataReader;
 struct ID;
 struct PreviewImage;
 
-struct AssetCatalog *BKE_asset_repository_catalog_create(const char *name);
-void BKE_asset_repository_catalog_free(struct AssetCatalog **catalog);
-
 struct AssetMetaData *BKE_asset_metadata_create(void);
 void BKE_asset_metadata_free(struct AssetMetaData **asset_data);
 
