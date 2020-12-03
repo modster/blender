@@ -1338,7 +1338,7 @@ PyDoc_STRVAR(BPy_IDGroup_update_rna_doc,
              "drawing in the user interface. The property specified by the key must be a direct "
              "child of the group. The required types for many of the keyword arguments depend on "
              "the type of the property.\n ");
-static void BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObject *kwargs)
+static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObject *kwargs)
 {
   const char *key;
   PyObject *rna_subtype = NULL;
@@ -1377,20 +1377,20 @@ static void BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObjec
                                    &step,
                                    &default_value,
                                    &description)) {
-    return;
+    return NULL;
   }
 
   IDProperty *idprop = IDP_GetPropertyFromGroup(self->prop, key);
   if (idprop == NULL) {
     PyErr_Format(PyExc_KeyError, "Property \"%s\" not found in IDProperty group", key);
-    return;
+    return NULL;
   }
 
   if (!ELEM(idprop->type, IDP_STRING, IDP_INT, IDP_FLOAT, IDP_DOUBLE)) {
     PyErr_SetString(
         PyExc_ValueError,
         "RNA UI data is only supported for string, integer, float, or double properties");
-    return;
+    return NULL;
   }
 
   IDP_ui_data_ensure(idprop);
@@ -1428,6 +1428,8 @@ static void BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObjec
   else if (idprop->type == IDP_STRING) {
     idprop_update_rna_ui_data_string(idprop, default_value);
   }
+
+  Py_RETURN_NONE;
 }
 
 static void idprop_ui_data_to_dict_int(IDProperty *idprop, PyObject *dict)
