@@ -129,6 +129,7 @@ struct CachedData {
     curve_radius.clear();
     curve_first_key.clear();
     curve_shader.clear();
+    shader.clear();
   }
 
   CachedAttribute &add_attribute(ustring name)
@@ -174,6 +175,10 @@ struct CachedData {
       return false;
     }
 
+    if (!shader.is_constant()) {
+      return false;
+    }
+
     for (const CachedAttribute &attr : attributes) {
       if (!attr.data.is_constant()) {
         return false;
@@ -193,6 +198,9 @@ class AlembicObject : public Node {
 
   NODE_SOCKET_API(ustring, path)
   NODE_SOCKET_API_ARRAY(array<Node *>, used_shaders)
+
+ private:
+  friend class AlembicProcedural;
 
   void set_object(Object *object);
   Object *get_object();
@@ -216,11 +224,8 @@ class AlembicObject : public Node {
     return cached_data.is_constant();
   }
 
- private:
   Object *object = nullptr;
-  Geometry *geometry = nullptr;
 
-  // runtime data
   bool data_loaded = false;
 
   CachedData cached_data;

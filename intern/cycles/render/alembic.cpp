@@ -39,7 +39,7 @@ CCL_NAMESPACE_BEGIN
  * frames. */
 
 /* TODO(@kevindietrich) : arrays are emptied when passed to the sockets, so for now we copy the
- * array to avoid reloading the data */
+ * arrays to avoid reloading the data */
 
 static float3 make_float3_from_yup(const Imath::Vec3<float> &v)
 {
@@ -265,9 +265,9 @@ static void read_default_uvs(const IV2fGeomParam &uvs, CachedData &cached_data)
 }
 
 static void add_normals(const Int32ArraySamplePtr face_indices,
-                                 const IN3fGeomParam &normals,
-                                 double time,
-                                 CachedData &cached_data)
+                        const IN3fGeomParam &normals,
+                        double time,
+                        CachedData &cached_data)
 {
 
   switch (normals.getScope()) {
@@ -299,7 +299,7 @@ static void add_normals(const Int32ArraySamplePtr face_indices,
       for (size_t i = 0; i < face_indices->size(); ++i) {
         int point_index = face_indices_array[i];
         /* polygon winding order in Alembic follows the RenderMan convention, which is the
-         * reverse of Cycle, so the normal has to flipped
+         * reverse of Cycle, so the normal has to be flipped
          * this code also assumes that the vertices of each polygon corresponding to the same
          * point have the same normal (that we do not have split normals, which is not
          * supported in Cycles anyway) */
@@ -452,6 +452,7 @@ bool AlembicObject::has_data_loaded() const
 
 void AlembicObject::read_face_sets(IPolyMeshSchema &schema, array<int> &polygon_to_shader)
 {
+  Geometry *geometry = object->get_geometry();
   assert(geometry);
 
   /* TODO(@kevindietrich) at the moment this is only supported for meshes whose topology remains
@@ -570,8 +571,7 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
   data_loaded = true;
 }
 
-void AlembicObject::load_all_data(const Alembic::AbcGeom::ICurvesSchema &schema,
-                                  Progress &progress)
+void AlembicObject::load_all_data(const ICurvesSchema &schema, Progress &progress)
 {
   cached_data.clear();
 
@@ -625,7 +625,7 @@ void AlembicObject::load_all_data(const Alembic::AbcGeom::ICurvesSchema &schema,
     cached_data.curve_shader.add_data(curve_shader, time);
   }
 
-  // TODO(@kevindietrich): attributes
+  // TODO(@kevindietrich): attributes, but I need example files
 
   setup_transform_cache();
 
@@ -933,7 +933,7 @@ void AlembicProcedural::load_objects(Progress &progress)
     AlembicObject *object = static_cast<AlembicObject *>(node);
 
     /* only consider newly added objects */
-    if (object->get_object() != nullptr) {
+    if (object->get_object() == nullptr) {
       object_map.insert({object->get_path().c_str(), object});
     }
   }
@@ -1203,7 +1203,8 @@ void AlembicProcedural::walk_hierarchy(
     next_object = xform;
   }
   else if (ISubD::matches(header)) {
-    // todo: subdivision
+    // TODO(@kevindietrich): we could support reading SubD objects, but we would need a way to set
+    // the dicing parameters
   }
   else if (IPolyMesh::matches(header)) {
     IPolyMesh mesh(parent, header.getName());
@@ -1243,7 +1244,7 @@ void AlembicProcedural::walk_hierarchy(
     // ignore the face set, it will be read along with the data
   }
   else {
-    // unsupported type for now (Points, NuPatch, SubD)
+    // unsupported type for now (Points, NuPatch)
     next_object = parent.getChild(header.getName());
   }
 
