@@ -256,7 +256,7 @@ static PreviewImage *previewimg_create_ex(size_t deferred_data_size)
   return prv_img;
 }
 
-static PreviewImage *previewimg_defered_create(const char *path, int source)
+static PreviewImage *previewimg_deferred_create(const char *path, int source)
 {
   /* We pack needed data for lazy loading (source type, in a single char, and path). */
   const size_t deferred_data_size = strlen(path) + 2;
@@ -420,7 +420,7 @@ void BKE_previewimg_id_custom_set(ID *id, const char *path)
   if (*prv) {
     BKE_previewimg_deferred_release(*prv);
   }
-  *prv = previewimg_defered_create(path, THB_SOURCE_IMAGE);
+  *prv = previewimg_deferred_create(path, THB_SOURCE_IMAGE);
 
   /* Can't lazy-render the preview on access. ID previews are saved to files and we want them to be
    * there in time. Not only if something happened to have accessed it meanwhile. */
@@ -510,7 +510,7 @@ PreviewImage *BKE_previewimg_cached_thumbnail_read(const char *name,
   }
 
   if (!prv) {
-    prv = previewimg_defered_create(path, source);
+    prv = previewimg_deferred_create(path, source);
     force_update = true;
   }
 
