@@ -958,7 +958,6 @@ void RNA_property_update_main(struct Main *bmain,
                               PointerRNA *ptr,
                               PropertyRNA *prop);
 bool RNA_property_update_check(struct PropertyRNA *prop);
-bool RNA_propety_is_idprop(const struct PropertyRNA *prop);
 
 /* Property Data */
 

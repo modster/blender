@@ -2016,12 +2016,6 @@ bool RNA_property_animateable(PointerRNA *ptr, PropertyRNA *prop)
   return (prop->flag & PROP_EDITABLE) != 0;
 }
 
-/* HANS-TODO: Remove, only for testing. */
-bool RNA_propety_is_idprop(const PropertyRNA *prop)
-{
-  return prop->magic != RNA_MAGIC;
-}
-
 bool RNA_property_animated(PointerRNA *ptr, PropertyRNA *prop)
 {
   int len = 1, index;

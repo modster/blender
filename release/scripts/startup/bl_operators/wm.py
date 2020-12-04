@@ -1299,18 +1299,16 @@ class WM_OT_properties_edit(Operator):
         prop_type, is_array = rna_idprop_value_item_type(prop_value)
 
         if prop_type in {float, int}:
-            print("Calling update_rna")
-            item.update_rna(prop, subtype=self.subtype, 
+            props = item.custom_properties()
+            props.update_rna(prop, subtype=self.subtype, 
                                   min=self.min, 
                                   max=self.max, 
                                   soft_min=self.soft_min, 
                                   soft_max=self.soft_max,
                                   description="HELLO THERE")
-            print("Calling rna_data")
-            print(item.rna_data(prop)["description"])
         if prop_type in {float, int, str}:
-            item.update_rna(prop, default=default_eval)
-            print(item.rna_data(prop)["description"])
+            props = item.custom_properties()
+            props.update_rna(prop, default=default_eval)
 
         # If we have changed the type of the property, update its potential anim curves!
         if prop_type_old != prop_type_new:

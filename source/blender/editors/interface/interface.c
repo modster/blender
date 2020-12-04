@@ -4403,10 +4403,6 @@ static uiBut *ui_def_but_rna(uiBlock *block,
                              float a2,
                              const char *tip)
 {
-
-  if (RNA_propety_is_idprop(prop)) {
-    printf(" ");
-  }
   const PropertyType proptype = RNA_property_type(prop);
   int icon = 0;
   uiMenuCreateFunc func = NULL;

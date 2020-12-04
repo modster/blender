@@ -1182,22 +1182,22 @@ static void idprop_update_rna_ui_data_int(IDProperty *idprop,
   }
 
   IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)idprop->ui_data;
-  if (py_min != Py_None) {
+  if (!ELEM(py_min, NULL, Py_None)) {
     ui_data->min = PyC_Long_AsI32(py_min);
   }
-  if (py_max != Py_None) {
+  if (!ELEM(py_max, NULL, Py_None)) {
     ui_data->max = PyC_Long_AsI32(py_max);
   }
-  if (py_soft_min != Py_None) {
+  if (!ELEM(py_soft_min, NULL, Py_None)) {
     ui_data->soft_min = PyC_Long_AsI32(py_soft_min);
   }
-  if (py_soft_max != Py_None) {
+  if (!ELEM(py_soft_max, NULL, Py_None)) {
     ui_data->soft_max = PyC_Long_AsI32(py_soft_max);
   }
-  if (py_step != Py_None) {
+  if (!ELEM(py_step, NULL, Py_None)) {
     ui_data->step = PyC_Long_AsI32(py_step);
   }
-  if (py_default_value != Py_None) {
+  if (!ELEM(py_default_value, NULL, Py_None)) {
     if (PySequence_Check(py_default_value)) {
       if (idprop->type != IDP_ARRAY) {
         PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
@@ -1231,7 +1231,7 @@ static void idprop_update_rna_ui_data_int(IDProperty *idprop,
 
 static bool check_null_or_float(PyObject *py_object)
 {
-  if (py_object == NULL) {
+  if (ELEM(py_object, NULL, Py_None)) {
     return true;
   }
 
@@ -1259,25 +1259,25 @@ static void idprop_update_rna_ui_data_float(IDProperty *idprop,
   }
 
   IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)idprop->ui_data;
-  if (py_min != Py_None) {
+  if (!ELEM(py_min, NULL, Py_None)) {
     ui_data->min = PyFloat_AsDouble(py_min);
   }
-  if (py_max != Py_None) {
+  if (!ELEM(py_max, NULL, Py_None)) {
     ui_data->max = PyFloat_AsDouble(py_max);
   }
-  if (py_soft_min != Py_None) {
+  if (!ELEM(py_soft_min, NULL, Py_None)) {
     ui_data->soft_min = PyFloat_AsDouble(py_soft_min);
   }
-  if (py_soft_max != Py_None) {
+  if (!ELEM(py_soft_max, NULL, Py_None)) {
     ui_data->soft_max = PyFloat_AsDouble(py_soft_max);
   }
-  if (py_step != Py_None) {
+  if (!ELEM(py_step, NULL, Py_None)) {
     ui_data->step = (float)PyFloat_AsDouble(py_step);
   }
-  if (py_precision != Py_None) {
+  if (!ELEM(py_precision, NULL, Py_None)) {
     ui_data->precision = (float)PyFloat_AsDouble(py_precision);
   }
-  if (py_default_value != Py_None) {
+  if (!ELEM(py_default_value, NULL, Py_None)) {
     if (PySequence_Check(py_default_value)) {
       if (idprop->type != IDP_ARRAY) {
         PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
@@ -1312,7 +1312,7 @@ static void idprop_update_rna_ui_data_string(IDProperty *idprop, PyObject *py_de
 {
   IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)idprop->ui_data;
 
-  if (py_default_value != Py_None) {
+  if (!ELEM(py_default_value, NULL, Py_None)) {
     if (PyUnicode_Check(py_default_value)) {
       ui_data->default_value = BLI_strdup(_PyUnicode_AsString(py_default_value));
     }

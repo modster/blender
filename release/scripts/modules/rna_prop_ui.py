@@ -114,8 +114,6 @@ def rna_idprop_ui_create(
 
     proptype, _ = rna_idprop_value_item_type(default)
 
-    props = item.custom_properties()
-
     # Sanitize limits
     if proptype is bool:
         min = soft_min = False
@@ -132,6 +130,7 @@ def rna_idprop_ui_create(
     rna_idprop_ui_prop_update(item, prop)
 
     # Update the UI settings
+    props = item.custom_properties()
     props.update_rna(prop, subtype=subtype, 
                            min=min, 
                            max=max, 
