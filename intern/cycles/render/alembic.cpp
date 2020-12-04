@@ -1009,6 +1009,47 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
   }
 }
 
+/* Update existing attributes and remove any attribute not in the cached_data, those attributes
+ * were added by Cycles (e.g. face normals) */
+static void update_attributes(AttributeSet &attributes, CachedData &cached_data, double frame_time)
+{
+  set<Attribute *> cached_attributes;
+
+  for (CachedData::CachedAttribute &attribute : cached_data.attributes) {
+    const array<char> *attr_data = attribute.data.data_for_time(frame_time);
+
+    Attribute *attr = nullptr;
+    if (attribute.std != ATTR_STD_NONE) {
+      attr = attributes.add(attribute.std, attribute.name);
+    }
+    else {
+      attr = attributes.add(attribute.name, attribute.type_desc, attribute.element);
+    }
+    assert(attr);
+
+    cached_attributes.insert(attr);
+
+    if (!attr_data) {
+      /* no new data */
+      continue;
+    }
+
+    attr->modified = true;
+    memcpy(attr->data(), attr_data->data(), attr_data->size());
+  }
+
+  /* remove any attributes not in cached_attributes */
+  list<Attribute>::iterator it;
+  for (it = attributes.attributes.begin(); it != attributes.attributes.end();) {
+    if (cached_attributes.find(&(*it)) == cached_attributes.end()) {
+      attributes.attributes.erase(it++);
+      continue;
+    }
+
+    it++;
+  }
+}
+
 NODE_DEFINE(AlembicProcedural)
 {
   NodeType *type = NodeType::add("alembic", create);
@@ -1192,6 +1233,8 @@ void AlembicProcedural::read_mesh(Scene *scene,
 
   CachedData &cached_data = abc_object->get_cached_data();
 
+  /* update sockets */
+
   Object *object = abc_object->get_object();
   cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
 
@@ -1219,25 +1262,9 @@ void AlembicProcedural::read_mesh(Scene *scene,
     mesh->set_smooth(smooth);
   }
 
-  for (CachedData::CachedAttribute &attribute : cached_data.attributes) {
-    const array<char> *attr_data = attribute.data.data_for_time(frame_time);
+  /* update attributes */
 
-    if (!attr_data) {
-      continue;
-    }
-
-    Attribute *attr = nullptr;
-    if (attribute.std != ATTR_STD_NONE) {
-      attr = mesh->attributes.add(attribute.std, attribute.name);
-    }
-    else {
-      attr = mesh->attributes.add(attribute.name, attribute.type_desc, attribute.element);
-    }
-    assert(attr);
-
-    attr->modified = true;
-    memcpy(attr->data(), attr_data->data(), attr_data->size());
-  }
+  update_attributes(mesh->attributes, cached_data, frame_time);
 
   /* we don't yet support arbitrary attributes, for now add vertex
    * coordinates as generated coordinates if requested */
@@ -1312,45 +1339,33 @@ void AlembicProcedural::read_subd(Scene *scene,
   /* cached_data.shader is also used for subd_shader */
   cached_data.shader.copy_to_socket(frame_time, mesh, mesh->get_subd_shader_socket());
 
-  cached_data.subd_start_corner.copy_to_socket(frame_time, mesh, mesh->get_subd_start_corner_socket());
+  cached_data.subd_start_corner.copy_to_socket(
+      frame_time, mesh, mesh->get_subd_start_corner_socket());
 
-  cached_data.subd_num_corners.copy_to_socket(frame_time, mesh, mesh->get_subd_num_corners_socket());
+  cached_data.subd_num_corners.copy_to_socket(
+      frame_time, mesh, mesh->get_subd_num_corners_socket());
 
   cached_data.subd_smooth.copy_to_socket(frame_time, mesh, mesh->get_subd_smooth_socket());
 
-  cached_data.subd_ptex_offset.copy_to_socket(frame_time, mesh, mesh->get_subd_ptex_offset_socket());
+  cached_data.subd_ptex_offset.copy_to_socket(
+      frame_time, mesh, mesh->get_subd_ptex_offset_socket());
 
-  cached_data.subd_face_corners.copy_to_socket(frame_time, mesh, mesh->get_subd_face_corners_socket());
+  cached_data.subd_face_corners.copy_to_socket(
+      frame_time, mesh, mesh->get_subd_face_corners_socket());
 
   cached_data.num_ngons.copy_to_socket(frame_time, mesh, mesh->get_num_ngons_socket());
 
-  cached_data.subd_creases_edge.copy_to_socket(frame_time, mesh, mesh->get_subd_creases_edge_socket());
+  cached_data.subd_creases_edge.copy_to_socket(
+      frame_time, mesh, mesh->get_subd_creases_edge_socket());
 
-  cached_data.subd_creases_weight.copy_to_socket(frame_time, mesh, mesh->get_subd_creases_weight_socket());
+  cached_data.subd_creases_weight.copy_to_socket(
+      frame_time, mesh, mesh->get_subd_creases_weight_socket());
 
   mesh->set_num_subd_faces(mesh->get_subd_shader().size());
 
   /* udpate attributes */
 
-  for (CachedData::CachedAttribute &attribute : cached_data.attributes) {
-    const array<char> *attr_data = attribute.data.data_for_time(frame_time);
-
-    if (!attr_data) {
-      continue;
-    }
-
-    Attribute *attr = nullptr;
-    if (attribute.std != ATTR_STD_NONE) {
-      attr = mesh->attributes.add(attribute.std, attribute.name);
-    }
-    else {
-      attr = mesh->attributes.add(attribute.name, attribute.type_desc, attribute.element);
-    }
-    assert(attr);
-
-    attr->modified = true;
-    memcpy(attr->data(), attr_data->data(), attr_data->size());
-  }
+  update_attributes(mesh->subd_attributes, cached_data, frame_time);
 
   /* we don't yet support arbitrary attributes, for now add vertex
    * coordinates as generated coordinates if requested */
@@ -1361,11 +1376,12 @@ void AlembicProcedural::read_subd(Scene *scene,
   }
 
   if (mesh->is_modified()) {
-    bool need_rebuild = (mesh->triangles_is_modified()) || (mesh->subd_num_corners_is_modified()) ||
-                   (mesh->subd_shader_is_modified()) || (mesh->subd_smooth_is_modified()) ||
-                   (mesh->subd_ptex_offset_is_modified()) ||
-                   (mesh->subd_start_corner_is_modified()) ||
-                   (mesh->subd_face_corners_is_modified());
+    bool need_rebuild = (mesh->triangles_is_modified()) ||
+                        (mesh->subd_num_corners_is_modified()) ||
+                        (mesh->subd_shader_is_modified()) || (mesh->subd_smooth_is_modified()) ||
+                        (mesh->subd_ptex_offset_is_modified()) ||
+                        (mesh->subd_start_corner_is_modified()) ||
+                        (mesh->subd_face_corners_is_modified());
 
     mesh->tag_update(scene, need_rebuild);
   }
@@ -1408,6 +1424,8 @@ void AlembicProcedural::read_curves(Scene *scene,
 
   CachedData &cached_data = abc_object->get_cached_data();
 
+  /* update sockets */
+
   Object *object = abc_object->get_object();
   cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
 
@@ -1419,24 +1437,9 @@ void AlembicProcedural::read_curves(Scene *scene,
 
   cached_data.curve_first_key.copy_to_socket(frame_time, hair, hair->get_curve_first_key_socket());
 
-  for (CachedData::CachedAttribute &attribute : cached_data.attributes) {
-    const array<char> *attr_data = attribute.data.data_for_time(frame_time);
+  /* update attributes */
 
-    if (!attr_data) {
-      continue;
-    }
-
-    Attribute *attr = nullptr;
-    if (attribute.std != ATTR_STD_NONE) {
-      attr = hair->attributes.add(attribute.std, attribute.name);
-    }
-    else {
-      attr = hair->attributes.add(attribute.name, attribute.type_desc, attribute.element);
-    }
-    assert(attr);
-
-    memcpy(attr->data(), attr_data->data(), attr_data->size());
-  }
+  update_attributes(hair->attributes, cached_data, frame_time);
 
   /* we don't yet support arbitrary attributes, for now add first keys as generated coordinates if
    * requested */
