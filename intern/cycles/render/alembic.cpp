@@ -38,9 +38,6 @@ CCL_NAMESPACE_BEGIN
  * least a way to tell which frame data to load, so we do not load the entire archive for a few
  * frames. */
 
-/* TODO(@kevindietrich): arrays are emptied when passed to the sockets, so for now we copy the
- * arrays to avoid reloading the data */
-
 static float3 make_float3_from_yup(const V3f &v)
 {
   return make_float3(v.x, -v.z, v.y);
@@ -1040,17 +1037,12 @@ void AlembicProcedural::read_mesh(Scene *scene,
 
   CachedData &cached_data = abc_object->get_cached_data();
 
-  Transform *tfm = cached_data.transforms.data_for_time(frame_time);
-  if (tfm) {
-    Object *object = abc_object->get_object();
-    object->set_tfm(*tfm);
-  }
+  Object *object = abc_object->get_object();
+  cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
 
-  array<float3> *vertices = cached_data.vertices.data_for_time(frame_time);
-  if (vertices) {
-    array<float3> new_vertices = *vertices;
-    mesh->set_verts(new_vertices);
-  }
+  cached_data.vertices.copy_to_socket(frame_time, mesh, mesh->get_verts_socket());
+
+  cached_data.shader.copy_to_socket(frame_time, mesh, mesh->get_shader_socket());
 
   array<int3> *triangle_data = cached_data.triangles.data_for_time(frame_time);
   if (triangle_data) {
@@ -1070,12 +1062,6 @@ void AlembicProcedural::read_mesh(Scene *scene,
 
     mesh->set_triangles(triangles);
     mesh->set_smooth(smooth);
-  }
-
-  array<int> *shader = cached_data.shader.data_for_time(frame_time);
-  if (shader) {
-    array<int> new_shader = *shader;
-    mesh->set_shader(new_shader);
   }
 
   for (CachedData::CachedAttribute &attribute : cached_data.attributes) {
@@ -1149,35 +1135,16 @@ void AlembicProcedural::read_curves(Scene *scene,
 
   CachedData &cached_data = abc_object->get_cached_data();
 
-  Transform *tfm = cached_data.transforms.data_for_time(frame_time);
-  if (tfm) {
-    Object *object = abc_object->get_object();
-    object->set_tfm(*tfm);
-  }
+  Object *object = abc_object->get_object();
+  cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
 
-  array<float3> *curve_keys = cached_data.curve_keys.data_for_time(frame_time);
-  if (curve_keys) {
-    array<float3> new_curve_keys = *curve_keys;
-    hair->set_curve_keys(new_curve_keys);
-  }
+  cached_data.curve_keys.copy_to_socket(frame_time, hair, hair->get_curve_keys_socket());
 
-  array<float> *curve_radius = cached_data.curve_radius.data_for_time(frame_time);
-  if (curve_radius) {
-    array<float> new_curve_radius = *curve_radius;
-    hair->set_curve_radius(new_curve_radius);
-  }
+  cached_data.curve_radius.copy_to_socket(frame_time, hair, hair->get_curve_radius_socket());
 
-  array<int> *curve_first_key = cached_data.curve_first_key.data_for_time(frame_time);
-  if (curve_first_key) {
-    array<int> new_curve_first_key = *curve_first_key;
-    hair->set_curve_first_key(new_curve_first_key);
-  }
+  cached_data.curve_shader.copy_to_socket(frame_time, hair, hair->get_curve_shader_socket());
 
-  array<int> *curve_shader = cached_data.curve_shader.data_for_time(frame_time);
-  if (curve_shader) {
-    array<int> new_curve_shader = *curve_shader;
-    hair->set_curve_shader(new_curve_shader);
-  }
+  cached_data.curve_first_key.copy_to_socket(frame_time, hair, hair->get_curve_first_key_socket());
 
   for (CachedData::CachedAttribute &attribute : cached_data.attributes) {
     const array<char> *attr_data = attribute.data.data_for_time(frame_time);

@@ -133,6 +133,22 @@ template<typename T> class DataStore {
     last_loaded_time = std::numeric_limits<double>::max();
     data.clear();
   }
+
+  /* Copy the data for the specified time to the node's socket. If there is no
+   * data for this time or it was already loaded, do nothing. */
+  void copy_to_socket(double time, Node *node, const SocketType *socket)
+  {
+    T *data_ = data_for_time(time);
+
+    if (data_ == nullptr) {
+      return;
+    }
+
+    /* TODO(@kevindietrich): arrays are emptied when passed to the sockets, so for now we copy the
+     * arrays to avoid reloading the data */
+    T value = *data_;
+    node->set(*socket, value);
+  }
 };
 
 /* Actual cache for the stored data.
