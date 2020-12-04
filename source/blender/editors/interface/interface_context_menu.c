@@ -505,7 +505,6 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
   uiPopupMenu *pup;
   uiLayout *layout;
   bContextStore *previous_ctx = CTX_store_get(C);
-
   {
     uiStringInfo label = {BUT_GET_LABEL, NULL};
 
