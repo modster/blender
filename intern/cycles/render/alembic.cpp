@@ -306,12 +306,7 @@ static void add_normals(const Int32ArraySamplePtr face_indices,
 
       for (size_t i = 0; i < face_indices->size(); ++i) {
         int point_index = face_indices_array[i];
-        /* polygon winding order in Alembic follows the RenderMan convention, which is the
-         * reverse of Cycle, so the normal has to be flipped
-         * this code also assumes that the vertices of each polygon corresponding to the same
-         * point have the same normal (that we do not have split normals, which is not
-         * supported in Cycles anyway) */
-        data_float3[point_index] = -make_float3_from_yup(values->get()[i]);
+        data_float3[point_index] = make_float3_from_yup(values->get()[i]);
       }
 
       attr.data.add_data(data, time);
@@ -414,9 +409,11 @@ static void add_triangles(const Int32ArraySamplePtr face_counts,
       int v2 = face_indices_array[index_offset + j + 2];
 
       shader.push_back_reserved(current_shader);
-      triangles.push_back_reserved(make_int3(v0, v1, v2));
+
+      /* Alembic orders the loops following the RenderMan convetion, so need to go in reverse. */
+      triangles.push_back_reserved(make_int3(v2, v1, v0));
       triangles_loops.push_back_reserved(
-          make_int3(index_offset, index_offset + j + 1, index_offset + j + 2));
+          make_int3(index_offset + j + 2, index_offset + j + 1, index_offset));
     }
 
     index_offset += face_counts_array[i];
