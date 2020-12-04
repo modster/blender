@@ -571,8 +571,8 @@ TEST(atomic, atomic_fetch_and_or_int16)
   }
 
   {
-    int32_t value = 0x1234;
-    EXPECT_EQ(atomic_fetch_and_or_int32(&value, -0x5678), 0x1234);
+    int16_t value = 0x1234;
+    EXPECT_EQ(atomic_fetch_and_or_int16(&value, -0x5678), 0x1234);
     EXPECT_EQ(value, -0x4444);
   }
 }
@@ -586,9 +586,9 @@ TEST(atomic, atomic_fetch_and_and_int16)
   }
 
   {
-    int32_t value = 0x1234;
-    EXPECT_EQ(atomic_fetch_and_and_int32(&value, -0xABCD), 0x1234);
-    EXPECT_EQ(value, 0x1030);
+    int16_t value = 0x1234;
+    EXPECT_EQ(atomic_fetch_and_and_int16(&value, -0x789A), 0x1234);
+    EXPECT_EQ(value, 0x224);
   }
 }
 
