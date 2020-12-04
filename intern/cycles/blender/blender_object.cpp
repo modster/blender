@@ -535,6 +535,11 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
     abc_object->set_path(object_path);
     abc_object->set_used_shaders(used_shaders);
 
+    PointerRNA cobj = RNA_pointer_get(&b_ob.ptr, "cycles");
+    const float subd_dicing_rate = max(0.1f, RNA_float_get(&cobj, "dicing_rate") * dicing_rate);
+    abc_object->set_subd_dicing_rate(subd_dicing_rate);
+    abc_object->set_subd_max_level(max_subdivisions);
+
     procedural->add_object(abc_object);
   }
 

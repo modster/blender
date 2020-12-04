@@ -419,6 +419,9 @@ NODE_DEFINE(AlembicObject)
   SOCKET_STRING(path, "Alembic Path", ustring());
   SOCKET_NODE_ARRAY(used_shaders, "Used Shaders", &Shader::node_type);
 
+  SOCKET_INT(subd_max_level, "Max Subdivision Level", 1);
+  SOCKET_FLOAT(subd_dicing_rate, "Subdivision Dicing Rate", 1.0f);
+
   return type;
 }
 
@@ -445,7 +448,8 @@ bool AlembicObject::has_data_loaded() const
   return data_loaded;
 }
 
-void AlembicObject::read_face_sets(IPolyMeshSchema &schema, array<int> &polygon_to_shader)
+template<typename SchemaType>
+void AlembicObject::read_face_sets(SchemaType &schema, array<int> &polygon_to_shader)
 {
   /* TODO(@kevindietrich) at the moment this is only supported for meshes whose topology remains
    * constant (with possible vertex animation) */
@@ -562,6 +566,150 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
 
   if (uvs.valid()) {
     add_uvs(uvs, cached_data, progress);
+  }
+
+  if (progress.get_cancel()) {
+    return;
+  }
+
+  setup_transform_cache();
+
+  data_loaded = true;
+}
+
+void AlembicObject::load_all_data(ISubDSchema &schema, Progress &progress)
+{
+  cached_data.clear();
+
+  AttributeRequestSet requested_attributes = get_requested_attributes();
+
+  const TimeSamplingPtr time_sampling = schema.getTimeSampling();
+  cached_data.vertices.set_time_sampling(*time_sampling);
+  cached_data.triangles.set_time_sampling(*time_sampling);
+  cached_data.triangles_loops.set_time_sampling(*time_sampling);
+  cached_data.shader.set_time_sampling(*time_sampling);
+  cached_data.subd_start_corner.set_time_sampling(*time_sampling);
+  cached_data.subd_num_corners.set_time_sampling(*time_sampling);
+  cached_data.subd_smooth.set_time_sampling(*time_sampling);
+  cached_data.subd_ptex_offset.set_time_sampling(*time_sampling);
+  cached_data.subd_face_corners.set_time_sampling(*time_sampling);
+  cached_data.num_ngons.set_time_sampling(*time_sampling);
+  cached_data.subd_creases_edge.set_time_sampling(*time_sampling);
+  cached_data.subd_creases_weight.set_time_sampling(*time_sampling);
+
+  /* start by reading the face sets (per face shader), as we directly split polygons to triangles
+   */
+  array<int> polygon_to_shader;
+  read_face_sets(schema, polygon_to_shader);
+
+  /* read topology */
+  for (size_t i = 0; i < schema.getNumSamples(); ++i) {
+    if (progress.get_cancel()) {
+      return;
+    }
+
+    const ISampleSelector iss = ISampleSelector(static_cast<index_t>(i));
+    const ISubDSchema::Sample sample = schema.getValue(iss);
+
+    const double time = time_sampling->getSampleTime(static_cast<index_t>(i));
+
+    add_positions(sample.getPositions(), time, cached_data);
+
+    const Int32ArraySamplePtr face_counts = sample.getFaceCounts();
+    const Int32ArraySamplePtr face_indices = sample.getFaceIndices();
+
+    /* read faces */
+    array<int> subd_start_corner;
+    array<int> shader;
+    array<int> subd_num_corners;
+    array<bool> subd_smooth;
+    array<int> subd_ptex_offset;
+    array<int> subd_face_corners;
+
+    const size_t num_faces = face_counts->size();
+    const int *face_counts_array = face_counts->get();
+    const int *face_indices_array = face_indices->get();
+
+    int num_ngons = 0;
+    int num_corners = 0;
+    for (size_t i = 0; i < face_counts->size(); i++) {
+      num_ngons += (face_counts_array[i] == 4 ? 0 : 1);
+      num_corners += face_counts_array[i];
+    }
+
+    subd_start_corner.reserve(num_faces);
+    subd_num_corners.reserve(num_faces);
+    subd_smooth.reserve(num_faces);
+    subd_ptex_offset.reserve(num_faces);
+    shader.reserve(num_faces);
+    subd_face_corners.reserve(num_corners);
+
+    int start_corner = 0;
+    int current_shader = 0;
+    int ptex_offset = 0;
+
+    for (size_t i = 0; i < face_counts->size(); i++) {
+      num_corners = face_counts_array[i];
+
+      if (!polygon_to_shader.empty()) {
+        current_shader = polygon_to_shader[i];
+      }
+
+      subd_start_corner.push_back_reserved(start_corner);
+      subd_num_corners.push_back_reserved(num_corners);
+
+      for (int j = 0; j < num_corners; ++j) {
+        subd_face_corners.push_back_reserved(face_indices_array[start_corner + j]);
+      }
+
+      shader.push_back_reserved(current_shader);
+      subd_smooth.push_back_reserved(1);
+      subd_ptex_offset.push_back_reserved(ptex_offset);
+
+      ptex_offset += (num_corners == 4 ? 1 : num_corners);
+
+      start_corner += num_corners;
+    }
+
+    cached_data.shader.add_data(shader, time);
+    cached_data.subd_start_corner.add_data(subd_start_corner, time);
+    cached_data.subd_num_corners.add_data(subd_num_corners, time);
+    cached_data.subd_smooth.add_data(subd_smooth, time);
+    cached_data.subd_ptex_offset.add_data(subd_ptex_offset, time);
+    cached_data.subd_face_corners.add_data(subd_face_corners, time);
+    cached_data.num_ngons.add_data(num_ngons, time);
+
+    /* read creases */
+    Int32ArraySamplePtr creases_length = sample.getCreaseLengths();
+    Int32ArraySamplePtr creases_indices = sample.getCreaseIndices();
+    FloatArraySamplePtr creases_sharpnesses = sample.getCreaseSharpnesses();
+
+    if (creases_length && creases_indices && creases_sharpnesses) {
+      array<int> creases_edge;
+      array<float> creases_weight;
+
+      creases_edge.reserve(creases_sharpnesses->size() * 2);
+      creases_weight.reserve(creases_sharpnesses->size());
+
+      int length_offset = 0;
+      int weight_offset = 0;
+      for (size_t c = 0; c < creases_length->size(); ++c) {
+        const int crease_length = creases_length->get()[c];
+
+        for (size_t j = 0; j < crease_length - 1; ++j) {
+          creases_edge.push_back_reserved(creases_indices->get()[length_offset + j]);
+          creases_edge.push_back_reserved(creases_indices->get()[length_offset + j + 1]);
+          creases_weight.push_back_reserved(creases_sharpnesses->get()[weight_offset++]);
+        }
+
+        length_offset += crease_length;
+      }
+
+      cached_data.subd_creases_edge.add_data(creases_edge, time);
+      cached_data.subd_creases_weight.add_data(creases_weight, time);
+    }
+
+    /* TODO(@kevindietrich) : attributes, need test files */
   }
 
   if (progress.get_cancel()) {
@@ -951,6 +1099,9 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
     else if (ICurves::matches(object->iobject.getHeader())) {
       read_curves(scene, object, frame_time, progress);
     }
+    else if (ISubD::matches(object->iobject.getHeader())) {
+      read_subd(scene, object, frame_time, progress);
+    }
   }
 
   clear_modified();
@@ -1102,6 +1253,124 @@ void AlembicProcedural::read_mesh(Scene *scene,
   }
 }
 
+void AlembicProcedural::read_subd(Scene *scene,
+                                  AlembicObject *abc_object,
+                                  Abc::chrono_t frame_time,
+                                  Progress &progress)
+{
+  ISubD subd_mesh(abc_object->iobject, Alembic::Abc::kWrapExisting);
+
+  Mesh *mesh = nullptr;
+
+  /* create a mesh node in the scene if not already done */
+  if (!abc_object->get_object()) {
+    mesh = scene->create_node<Mesh>();
+    mesh->set_owner(this);
+    mesh->name = abc_object->iobject.getName();
+
+    array<Node *> used_shaders = abc_object->get_used_shaders();
+    mesh->set_used_shaders(used_shaders);
+
+    /* create object*/
+    Object *object = scene->create_node<Object>();
+    object->set_owner(this);
+    object->set_geometry(mesh);
+    object->set_tfm(abc_object->xform);
+    object->name = abc_object->iobject.getName();
+
+    abc_object->set_object(object);
+  }
+  else {
+    mesh = static_cast<Mesh *>(abc_object->get_object()->get_geometry());
+  }
+
+  ISubDSchema schema = subd_mesh.getSchema();
+
+  if (!abc_object->has_data_loaded()) {
+    abc_object->load_all_data(schema, progress);
+  }
+
+  if (schema.getSubdivisionSchemeProperty().getValue() == "catmull-clark") {
+    mesh->set_subdivision_type(Mesh::SubdivisionType::SUBDIVISION_CATMULL_CLARK);
+  }
+  else {
+    mesh->set_subdivision_type(Mesh::SubdivisionType::SUBDIVISION_LINEAR);
+  }
+
+  mesh->set_subd_max_level(abc_object->get_subd_max_level());
+  mesh->set_subd_dicing_rate(abc_object->get_subd_dicing_rate());
+
+  CachedData &cached_data = abc_object->get_cached_data();
+
+  /* udpate sockets */
+
+  Object *object = abc_object->get_object();
+  cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
+
+  cached_data.vertices.copy_to_socket(frame_time, mesh, mesh->get_verts_socket());
+
+  /* cached_data.shader is also used for subd_shader */
+  cached_data.shader.copy_to_socket(frame_time, mesh, mesh->get_subd_shader_socket());
+
+  cached_data.subd_start_corner.copy_to_socket(frame_time, mesh, mesh->get_subd_start_corner_socket());
+
+  cached_data.subd_num_corners.copy_to_socket(frame_time, mesh, mesh->get_subd_num_corners_socket());
+
+  cached_data.subd_smooth.copy_to_socket(frame_time, mesh, mesh->get_subd_smooth_socket());
+
+  cached_data.subd_ptex_offset.copy_to_socket(frame_time, mesh, mesh->get_subd_ptex_offset_socket());
+
+  cached_data.subd_face_corners.copy_to_socket(frame_time, mesh, mesh->get_subd_face_corners_socket());
+
+  cached_data.num_ngons.copy_to_socket(frame_time, mesh, mesh->get_num_ngons_socket());
+
+  cached_data.subd_creases_edge.copy_to_socket(frame_time, mesh, mesh->get_subd_creases_edge_socket());
+
+  cached_data.subd_creases_weight.copy_to_socket(frame_time, mesh, mesh->get_subd_creases_weight_socket());
+
+  mesh->set_num_subd_faces(mesh->get_subd_shader().size());
+
+  /* udpate attributes */
+
+  for (CachedData::CachedAttribute &attribute : cached_data.attributes) {
+    const array<char> *attr_data = attribute.data.data_for_time(frame_time);
+
+    if (!attr_data) {
+      continue;
+    }
+
+    Attribute *attr = nullptr;
+    if (attribute.std != ATTR_STD_NONE) {
+      attr = mesh->attributes.add(attribute.std, attribute.name);
+    }
+    else {
+      attr = mesh->attributes.add(attribute.name, attribute.type_desc, attribute.element);
+    }
+    assert(attr);
+
+    attr->modified = true;
+    memcpy(attr->data(), attr_data->data(), attr_data->size());
+  }
+
+  /* we don't yet support arbitrary attributes, for now add vertex
+   * coordinates as generated coordinates if requested */
+  if (mesh->need_attribute(scene, ATTR_STD_GENERATED)) {
+    Attribute *attr = mesh->attributes.add(ATTR_STD_GENERATED);
+    memcpy(
+        attr->data_float3(), mesh->get_verts().data(), sizeof(float3) * mesh->get_verts().size());
+  }
+
+  if (mesh->is_modified()) {
+    bool need_rebuild = (mesh->triangles_is_modified()) || (mesh->subd_num_corners_is_modified()) ||
+                   (mesh->subd_shader_is_modified()) || (mesh->subd_smooth_is_modified()) ||
+                   (mesh->subd_ptex_offset_is_modified()) ||
+                   (mesh->subd_start_corner_is_modified()) ||
+                   (mesh->subd_face_corners_is_modified());
+
+    mesh->tag_update(scene, need_rebuild);
+  }
+}
+
 void AlembicProcedural::read_curves(Scene *scene,
                                     AlembicObject *abc_object,
                                     Abc::chrono_t frame_time,
@@ -1234,8 +1503,21 @@ void AlembicProcedural::walk_hierarchy(
     next_object = xform;
   }
   else if (ISubD::matches(header)) {
-    // TODO(@kevindietrich): we could support reading SubD objects, but we would need a way to set
-    // the dicing parameters
+    ISubD subd(parent, header.getName());
+
+    unordered_map<std::string, AlembicObject *>::const_iterator iter;
+    iter = object_map.find(subd.getFullName());
+
+    if (iter != object_map.end()) {
+      AlembicObject *abc_object = iter->second;
+      abc_object->iobject = subd;
+
+      if (xform_samples) {
+        abc_object->xform_samples = *xform_samples;
+      }
+    }
+
+    next_object = subd;
   }
   else if (IPolyMesh::matches(header)) {
     IPolyMesh mesh(parent, header.getName());

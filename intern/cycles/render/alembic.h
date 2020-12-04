@@ -166,6 +166,16 @@ struct CachedData {
   DataStore<array<int3>> triangles_loops{};
   DataStore<array<int>> shader{};
 
+  /* subd data */
+  DataStore<array<int>> subd_start_corner;
+  DataStore<array<int>> subd_num_corners;
+  DataStore<array<bool>> subd_smooth;
+  DataStore<array<int>> subd_ptex_offset;
+  DataStore<array<int>> subd_face_corners;
+  DataStore<int> num_ngons;
+  DataStore<array<int>> subd_creases_edge;
+  DataStore<array<float>> subd_creases_weight;
+
   /* hair data */
   DataStore<array<float3>> curve_keys;
   DataStore<array<float>> curve_radius;
@@ -274,6 +284,12 @@ class AlembicObject : public Node {
   /* Shaders used for rendering. */
   NODE_SOCKET_API_ARRAY(array<Node *>, used_shaders)
 
+  /* Maximum number of subdivisions for ISubD objects. */
+  NODE_SOCKET_API(int, subd_max_level)
+
+  /* Finest level of detail (in pixels) for the subdivision. */
+  NODE_SOCKET_API(float, subd_dicing_rate)
+
   AlembicObject();
   ~AlembicObject();
 
@@ -284,6 +300,7 @@ class AlembicObject : public Node {
   Object *get_object();
 
   void load_all_data(Alembic::AbcGeom::IPolyMeshSchema &schema, Progress &progress);
+  void load_all_data(Alembic::AbcGeom::ISubDSchema &schema, Progress &progress);
   void load_all_data(const Alembic::AbcGeom::ICurvesSchema &schema,
                      Progress &progress,
                      float default_radius);
@@ -314,7 +331,8 @@ class AlembicObject : public Node {
                       const Alembic::AbcGeom::ISampleSelector &iss,
                       const ustring &attr_name);
 
-  void read_face_sets(Alembic::AbcGeom::IPolyMeshSchema &schema, array<int> &polygon_to_shader);
+  template<typename SchemaType>
+  void read_face_sets(SchemaType &schema, array<int> &polygon_to_shader);
 
   void setup_transform_cache();
 
@@ -396,6 +414,13 @@ class AlembicProcedural : public Procedural {
                    AlembicObject *abc_object,
                    Alembic::AbcGeom::Abc::chrono_t frame_time,
                    Progress &progress);
+
+  /* Read the data for an ISubD at the specified frame_time. Creates corresponding Geometry and
+   * Object Nodes in the Cycles scene if none exist yet. */
+  void read_subd(Scene *scene,
+                 AlembicObject *abc_object,
+                 Alembic::AbcGeom::Abc::chrono_t frame_time,
+                 Progress &progress);
 };
 
 CCL_NAMESPACE_END
