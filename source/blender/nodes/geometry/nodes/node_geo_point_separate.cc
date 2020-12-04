@@ -27,7 +27,6 @@
 static bNodeSocketTemplate geo_node_point_instance_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_STRING, N_("Mask")},
-    {SOCK_FLOAT, N_("Threshold"), 0.5f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {-1, ""},
 };
 
@@ -47,14 +46,15 @@ static void fill_new_attribute_from_input(ReadAttributePtr input_attribute,
   fn::GSpan in_span = input_attribute->get_span();
   int i_a = 0;
   int i_b = 0;
-  for (int i_in : IndexRange(input_attribute->size())) {
-    if (a_or_b[i_in]) {
-      out_attribute_a->set(i_a, in_span[i_in]);
-      i_a++;
-    }
-    else {
+  for (int i_in = 0; i_in < in_span.size(); i_in++) {
+    const bool move_to_b = a_or_b[i_in];
+    if (move_to_b) {
       out_attribute_b->set(i_b, in_span[i_in]);
       i_b++;
+    }
+    else {
+      out_attribute_a->set(i_a, in_span[i_in]);
+      i_a++;
     }
   }
 }
@@ -66,10 +66,10 @@ static void fill_new_attribute_from_input(ReadAttributePtr input_attribute,
  * This is trivial for simple components like point clouds, but for meshes a map between
  * input and output indices might be necessary.
  */
-static void separate_component_attributes(const GeometryComponent &in_component,
-                                          GeometryComponent &out_component_a,
-                                          GeometryComponent &out_component_b,
-                                          Span<bool> a_or_b)
+static void move_split_attributes(const PointCloudComponent &in_component,
+                                  GeometryComponent &out_component_a,
+                                  GeometryComponent &out_component_b,
+                                  Span<bool> a_or_b)
 {
   Set<std::string> attribute_names = in_component.attribute_names();
 
@@ -109,64 +109,49 @@ static void separate_component_attributes(const GeometryComponent &in_component,
   }
 }
 
-/* TODO: How to override based on component type without adding it as an argument? */
-static void create_new_components(GeometrySet *out_set_a,
-                                  GeometrySet *out_set_b,
-                                  const int a_total,
-                                  const int b_total)
-{
-  /* Start fresh with new pointclouds. */
-  out_set_a->replace_pointcloud(BKE_pointcloud_new_nomain(a_total));
-  out_set_b->replace_pointcloud(BKE_pointcloud_new_nomain(b_total));
-}
-
 /**
  * Find total in each new set and find which of the output sets each point will belong to.
  */
-static Array<bool> calculate_split(const GeometryComponent &component,
-                                   const std::string mask_name,
-                                   const float threshold,
-                                   int *r_a_total,
-                                   int *r_b_total)
+static Array<bool> split_point_cloud_component(const GeometryComponent &component,
+                                               const std::string mask_name,
+                                               int *r_a_total,
+                                               int *r_b_total)
 {
-  /* For now this will always sample the attributes on the point level. */
-  const FloatReadAttribute mask_attribute = component.attribute_get_for_read<float>(
-      mask_name, ATTR_DOMAIN_POINT, 1.0f);
-  Span<float> masks = mask_attribute.get_span();
+  const BooleanReadAttribute mask_attribute = component.attribute_get_for_read<bool>(
+      mask_name, ATTR_DOMAIN_POINT, false);
+  Array<bool> masks = mask_attribute.get_span();
   const int in_total = masks.size();
 
-  *r_a_total = 0;
-  Array<bool> a_or_b(in_total);
-  for (int i : masks.index_range()) {
-    const bool in_a = masks[i] > threshold;
-    a_or_b[i] = in_a;
-    if (in_a) {
-      *r_a_total += 1;
+  *r_b_total = 0;
+  for (bool mask : masks) {
+    if (mask) {
+      *r_b_total += 1;
     }
   }
-  *r_b_total = in_total - *r_a_total;
+  *r_a_total = in_total - *r_b_total;
 
-  return a_or_b;
+  return masks;
 }
 
-/* Much of the attribute code can be handled generically for every geometry component type. */
-template<typename Component>
-static void separate_component_type(const Component &component,
-                                    GeometrySet *out_set_a,
-                                    GeometrySet *out_set_b,
-                                    const std::string mask_name,
-                                    const float threshold)
+static void separate_point_cloud(const PointCloudComponent &in_component,
+                                 const std::string mask_name,
+                                 PointCloudComponent &out_component_a,
+                                 PointCloudComponent &out_component_b)
 {
+  const int size = in_component.attribute_domain_size(ATTR_DOMAIN_POINT);
+  if (size == 0) {
+    return;
+  }
+
   int a_total;
   int b_total;
-  Array<bool> a_or_b = calculate_split(component, mask_name, threshold, &a_total, &b_total);
+  Array<bool> a_or_b = split_point_cloud_component(in_component, mask_name, &a_total, &b_total);
 
-  /* Start fresh with new components since the size will change anyway. */
-  create_new_components(out_set_a, out_set_b, a_total, b_total);
+  /* Start fresh with new components. */
+  out_component_a.replace(BKE_pointcloud_new_nomain(a_total));
+  out_component_b.replace(BKE_pointcloud_new_nomain(b_total));
 
-  GeometryComponent &out_component_a = out_set_a->get_component_for_write<Component>();
-  GeometryComponent &out_component_b = out_set_b->get_component_for_write<Component>();
-  separate_component_attributes(component, out_component_a, out_component_b, a_or_b.as_span());
+  move_split_attributes(in_component, out_component_a, out_component_b, a_or_b.as_span());
 }
 
 static void geo_node_point_separate_exec(GeoNodeExecParams params)
@@ -176,15 +161,12 @@ static void geo_node_point_separate_exec(GeoNodeExecParams params)
   GeometrySet out_set_b(geometry_set);
 
   const std::string mask_name = params.extract_input<std::string>("Mask");
-  const float threshold = params.extract_input<float>("Threshold");
 
   if (geometry_set.has<PointCloudComponent>()) {
-    separate_component_type<PointCloudComponent>(
-        *geometry_set.get_component_for_read<PointCloudComponent>(),
-        &out_set_a,
-        &out_set_b,
-        mask_name,
-        threshold);
+    separate_point_cloud(*geometry_set.get_component_for_read<PointCloudComponent>(),
+                         mask_name,
+                         out_set_a.get_component_for_write<PointCloudComponent>(),
+                         out_set_b.get_component_for_write<PointCloudComponent>());
   }
 
   params.set_output("Geometry A", std::move(out_set_a));
