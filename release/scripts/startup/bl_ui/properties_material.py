@@ -43,7 +43,7 @@ class MATERIAL_UL_matslots(UIList):
         slot = item
         ma = slot.material
 
-        layout.context_pointer_set("focused_id", ma)
+        layout.context_pointer_set("id", ma)
 
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             if ma:
