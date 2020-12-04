@@ -4694,6 +4694,7 @@ static void registerGeometryNodes(void)
   register_node_type_geo_attribute_math();
   register_node_type_geo_join_geometry();
   register_node_type_geo_point_separate();
+  register_node_type_geo_attribute_compare();
 }
 
 static void registerFunctionNodes(void)

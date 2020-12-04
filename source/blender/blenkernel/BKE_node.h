@@ -1351,6 +1351,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_ATTRIBUTE_MATH 1009
 #define GEO_NODE_JOIN_GEOMETRY 1010
 #define GEO_NODE_POINT_SEPARATE 1011
+#define GEO_NODE_ATTRIBUTE_COMPARE 1012
 
 /** \} */
 
