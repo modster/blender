@@ -206,10 +206,15 @@ static void add_uvs(const IV2fGeomParam &uvs, CachedData &cached_data, Progress 
     return;
   }
 
-  const TimeSamplingPtr time_sampling = uvs.getTimeSampling();
+  const TimeSamplingPtr time_sampling_ptr = uvs.getTimeSampling();
+
+  TimeSampling time_sampling;
+  if (time_sampling_ptr) {
+    time_sampling = *time_sampling_ptr;
+  }
 
   CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(uvs.getName()),
-                                                                *time_sampling);
+                                                                time_sampling);
   attr.std = ATTR_STD_UV;
 
   for (size_t i = 0; i < uvs.getNumSamples(); ++i) {
@@ -220,7 +225,7 @@ static void add_uvs(const IV2fGeomParam &uvs, CachedData &cached_data, Progress 
     const ISampleSelector iss = ISampleSelector(index_t(i));
     const IV2fGeomParam::Sample sample = uvs.getExpandedValue(iss);
 
-    const double time = time_sampling->getSampleTime(index_t(i));
+    const double time = time_sampling.getSampleTime(index_t(i));
 
     const IV2fGeomParam::Sample uvsample = uvs.getIndexedValue(iss);
 
@@ -870,14 +875,14 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
     return;
   }
 
-  CachedData::CachedAttribute &attribute = cached_data.add_attribute(attr_name,
-                                                                     *prop->getTimeSampling());
-
   if (IV2fProperty::matches(prop->getMetaData()) && Alembic::AbcGeom::isUV(*prop)) {
     const IV2fGeomParam &param = IV2fGeomParam(arb_geom_params, prop->getName());
 
     IV2fGeomParam::Sample sample;
     param.getIndexed(sample, iss);
+
+    CachedData::CachedAttribute &attribute = cached_data.add_attribute(attr_name,
+                                                                       *param.getTimeSampling());
 
     const chrono_t time = param.getTimeSampling()->getSampleTime(index);
 
@@ -923,6 +928,9 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
     IC3fGeomParam::Sample sample;
     param.getIndexed(sample, iss);
 
+    CachedData::CachedAttribute &attribute = cached_data.add_attribute(attr_name,
+                                                                       *param.getTimeSampling());
+
     const chrono_t time = param.getTimeSampling()->getSampleTime(index);
 
     C3fArraySamplePtr values = sample.getVals();
@@ -967,6 +975,9 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
 
     IC4fGeomParam::Sample sample;
     param.getIndexed(sample, iss);
+
+    CachedData::CachedAttribute &attribute = cached_data.add_attribute(attr_name,
+                                                                       *param.getTimeSampling());
 
     const chrono_t time = param.getTimeSampling()->getSampleTime(index);
 

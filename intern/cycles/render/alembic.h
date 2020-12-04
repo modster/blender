@@ -215,7 +215,7 @@ struct CachedData {
       }
     }
 
-    auto &attr = attributes.emplace_back();
+    CachedAttribute &attr = attributes.emplace_back();
     attr.name = name;
     attr.data.set_time_sampling(time_sampling);
     return attr;
