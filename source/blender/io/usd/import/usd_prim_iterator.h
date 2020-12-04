@@ -18,29 +18,35 @@
  */
 #pragma once
 
-#include "pxr/usd/usd/common.h"
+#include "usd_importer_context.h"
+
+#include <pxr/usd/usd/common.h>
 
 #include <map>
 #include <vector>
 
+struct Main;
+
 namespace blender::io::usd {
 
-struct USDImporterContext;
+class USDDataCache;
 class USDXformableReader;
 
 class USDPrimIterator {
  protected:
   pxr::UsdStageRefPtr stage_;
+  USDImporterContext context_;
+  Main *bmain_;
 
  public:
-  USDPrimIterator(pxr::UsdStageRefPtr stage);
+  USDPrimIterator(pxr::UsdStageRefPtr stage, const USDImporterContext &context, Main *bmain);
 
-  void create_object_readers(const USDImporterContext &context,
-                             std::vector<USDXformableReader *> &r_readers) const;
+  void create_object_readers(std::vector<USDXformableReader *> &r_readers) const;
 
   void create_prototype_object_readers(
-      const USDImporterContext &context,
       std::map<pxr::SdfPath, USDXformableReader *> &r_proto_readers) const;
+
+  void cache_prototype_data(USDDataCache &r_cache) const;
 
   void debug_traverse_stage() const;
 

@@ -16,33 +16,42 @@
  * The Original Code is Copyright (C) 2020 Blender Foundation.
  * All rights reserved.
  */
-#pragma once
 
-#include "usd_reader_xformable.h"
+#include "usd_data_cache.h"
 
-#include <map>
-
-struct Mesh;
+#include <iostream>
 
 namespace blender::io::usd {
 
-/* Abstract base class of readers that can create a Blender mesh object.
- * Subclasses must define the create_mesh() and assign_materials() virtual
- * functions to implement the logic for creating the Mesh data and materials. */
+USDDataCache::USDDataCache()
+{
+}
 
-class USDMeshReaderBase : public USDXformableReader {
- protected:
- public:
-  USDMeshReaderBase(const pxr::UsdPrim &prim, const USDImporterContext &context);
+USDDataCache::~USDDataCache()
+{
+  /* TODO(makowalski): decrement use count and/or delete the cached data? */
+}
 
-  virtual ~USDMeshReaderBase();
+bool USDDataCache::add_prototype_mesh(const pxr::SdfPath path, Mesh *mesh)
+{
+  /* TODO(makowalsk): should we increment mesh use count?  */
+  return prototype_meshes_.insert(std::make_pair(path, mesh)).second;
+}
 
-  void create_object(Main *bmain, double time, USDDataCache *data_cache) override;
+void USDDataCache::clear_protype_mesh(const pxr::SdfPath &path)
+{
+  /* TODO(makowalsk): should we decrement mesh use count or delete mesh?  */
+  prototype_meshes_.erase(path);
+}
 
-  struct Mesh *read_mesh(Main *bmain, double time, USDDataCache *data_cache);
+Mesh *USDDataCache::get_prototype_mesh(const pxr::SdfPath &path) const
+{
+  std::map<pxr::SdfPath, Mesh *>::const_iterator it = prototype_meshes_.find(path);
+  if (it != prototype_meshes_.end()) {
+    return it->second;
+  }
 
-  virtual struct Mesh *create_mesh(Main *bmain, double time) = 0;
-  virtual void assign_materials(Main *bmain, Mesh *mesh, double time) = 0;
-};
+  return nullptr;
+}
 
 }  // namespace blender::io::usd

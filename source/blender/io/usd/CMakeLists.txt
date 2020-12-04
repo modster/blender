@@ -54,6 +54,7 @@ set(INC_SYS
 
 set(SRC
 
+  import/usd_data_cache.cc
   import/usd_import_util.cc
   import/usd_material_importer.cc
   import/usd_prim_iterator.cc
@@ -75,6 +76,7 @@ set(SRC
   intern/usd_writer_transform.cc
 
   usd.h
+  import/usd_data_cache.h
   import/usd_importer_context.h
   import/usd_import_util.h
   import/usd_material_importer.h

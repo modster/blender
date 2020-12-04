@@ -20,6 +20,7 @@
 #include "usd_prim_iterator.h"
 
 #include "usd.h"
+#include "usd_data_cache.h"
 #include "usd_importer_context.h"
 #include "usd_reader_camera.h"
 #include "usd_reader_light.h"
@@ -41,23 +42,24 @@
 
 namespace blender::io::usd {
 
-USDPrimIterator::USDPrimIterator(pxr::UsdStageRefPtr stage) : stage_(stage)
+USDPrimIterator::USDPrimIterator(pxr::UsdStageRefPtr stage,
+                                 const USDImporterContext &context,
+                                 Main *bmain)
+    : stage_(stage), context_(context), bmain_(bmain)
 {
 }
 
-void USDPrimIterator::create_object_readers(const USDImporterContext &context,
-                                            std::vector<USDXformableReader *> &r_readers) const
+void USDPrimIterator::create_object_readers(std::vector<USDXformableReader *> &r_readers) const
 {
   if (!stage_) {
     return;
   }
   std::vector<USDXformableReader *> child_readers;
 
-  create_object_readers(stage_->GetPseudoRoot(), context, r_readers, child_readers);
+  create_object_readers(stage_->GetPseudoRoot(), context_, r_readers, child_readers);
 }
 
 void USDPrimIterator::create_prototype_object_readers(
-    const USDImporterContext &context,
     std::map<pxr::SdfPath, USDXformableReader *> &r_proto_readers) const
 {
   if (!stage_) {
@@ -70,7 +72,7 @@ void USDPrimIterator::create_prototype_object_readers(
     std::vector<USDXformableReader *> proto_readers;
     std::vector<USDXformableReader *> child_readers;
 
-    create_object_readers(proto_prim, context, proto_readers, child_readers);
+    create_object_readers(proto_prim, context_, proto_readers, child_readers);
 
     for (USDXformableReader *reader : proto_readers) {
       if (reader) {
@@ -165,6 +167,45 @@ void USDPrimIterator::create_object_readers(const pxr::UsdPrim &prim,
     /* No reader was allocated for this prim, so we pass our child readers back to the caller,
      * for possible handling by a parent reader. */
     r_child_readers.insert(r_child_readers.end(), child_readers.begin(), child_readers.end());
+  }
+}
+
+void USDPrimIterator::cache_prototype_data(USDDataCache &r_cache) const
+{
+  if (!stage_) {
+    return;
+  }
+
+  std::vector<pxr::UsdPrim> protos = stage_->GetMasters();
+
+  for (const pxr::UsdPrim &proto_prim : protos) {
+    std::vector<USDXformableReader *> proto_readers;
+    std::vector<USDXformableReader *> child_readers;
+
+    create_object_readers(proto_prim, context_, proto_readers, child_readers);
+
+    for (USDXformableReader *reader : proto_readers) {
+      if (reader) {
+        pxr::UsdPrim reader_prim = reader->prim();
+        if (reader_prim) {
+
+          if (USDMeshReaderBase *mesh_reader = dynamic_cast<USDMeshReaderBase *>(reader)) {
+            Mesh *proto_mesh = mesh_reader->create_mesh(bmain_, 0.0);
+            if (proto_mesh) {
+              /* TODO(makowalski): Do we want to decrement the mesh's use count to 0?
+               * Might have a small memory leak otherwise. Also, check if mesh is
+               * already in cache before adding? */
+              r_cache.add_prototype_mesh(reader_prim.GetPath(), proto_mesh);
+            }
+          }
+        }
+      }
+    }
+
+    /* Clean up the readers. */
+    for (USDXformableReader *reader : proto_readers) {
+      delete reader;
+    }
   }
 }
 

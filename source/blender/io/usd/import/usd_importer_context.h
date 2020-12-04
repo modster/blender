@@ -31,7 +31,6 @@ typedef std::map<pxr::SdfPath, USDXformableReader *> ObjectReaderMap;
 struct USDImporterContext {
   const pxr::TfToken stage_up_axis;
   const USDImportParams import_params;
-  ObjectReaderMap *proto_readers;
 };
 
 }  // namespace blender::io::usd

@@ -18,6 +18,7 @@
  */
 
 #include "usd_reader_mesh_base.h"
+#include "usd_data_cache.h"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -34,8 +35,6 @@
 
 namespace blender::io::usd {
 
-std::map<pxr::SdfPath, Mesh *> USDMeshReaderBase::s_prototype_meshes;
-
 USDMeshReaderBase::USDMeshReaderBase(const pxr::UsdPrim &prim, const USDImporterContext &context)
     : USDXformableReader(prim, context)
 {
@@ -45,7 +44,7 @@ USDMeshReaderBase::~USDMeshReaderBase()
 {
 }
 
-void USDMeshReaderBase::create_object(Main *bmain, double time)
+void USDMeshReaderBase::create_object(Main *bmain, double time, USDDataCache *data_cache)
 {
   if (!this->valid()) {
     return;
@@ -76,7 +75,7 @@ void USDMeshReaderBase::create_object(Main *bmain, double time)
   }
 
   object_ = BKE_object_add_only_object(bmain, OB_MESH, obj_name.c_str());
-  Mesh *mesh = this->read_mesh(bmain, time);
+  Mesh *mesh = this->read_mesh(bmain, time, data_cache);
   object_->data = mesh;
 
   if (this->context_.import_params.import_materials) {
@@ -84,13 +83,12 @@ void USDMeshReaderBase::create_object(Main *bmain, double time)
   }
 }
 
-Mesh *USDMeshReaderBase::read_mesh(Main *bmain, double time)
+Mesh *USDMeshReaderBase::read_mesh(Main *bmain, double time, USDDataCache *data_cache)
 {
   /* If this prim is an instance proxy and instancing is enabled,
    * return the shared mesh created by the instance prototype. */
 
-  if (this->context_.import_params.use_instancing && this->context_.proto_readers &&
-      this->prim_.IsInstanceProxy()) {
+  if (this->context_.import_params.use_instancing && data_cache && this->prim_.IsInstanceProxy()) {
 
     pxr::UsdPrim proto_prim = this->prim_.GetPrimInMaster();
 
@@ -98,45 +96,16 @@ Mesh *USDMeshReaderBase::read_mesh(Main *bmain, double time)
 
       pxr::SdfPath proto_path = proto_prim.GetPath();
 
-      /* See if the prototype is already been cached. */
-      std::map<pxr::SdfPath, Mesh *>::const_iterator proto_mesh_iter = s_prototype_meshes.find(
-          proto_path);
-      if (proto_mesh_iter != s_prototype_meshes.end()) {
-        Mesh *cached_mesh = proto_mesh_iter->second;
-        if (cached_mesh) {
-          /* Increment the user count before returning. */
-          id_us_plus(&cached_mesh->id);
-        }
-        return cached_mesh;
+      Mesh *proto_mesh = data_cache->get_prototype_mesh(proto_path);
+
+      if (proto_mesh) {
+        /* Increment the user count before returning. */
+        id_us_plus(&proto_mesh->id);
+        return proto_mesh;
       }
 
-      /* No cached mesh.  Lookup the reader for the prototype prim. */
-
-      ObjectReaderMap::iterator proto_reader_iter = this->context_.proto_readers->find(proto_path);
-
-      if (proto_reader_iter != this->context_.proto_readers->end()) {
-
-        USDXformableReader *proto_reader = proto_reader_iter->second;
-
-        USDMeshReaderBase *proto_mesh_reader = dynamic_cast<USDMeshReaderBase *>(proto_reader);
-
-        if (proto_mesh_reader) {
-          Mesh *proto_mesh = proto_mesh_reader->create_mesh(bmain, time);
-
-          if (proto_mesh) {
-            s_prototype_meshes.insert(std::make_pair(proto_path, proto_mesh));
-            return proto_mesh;
-          }
-          else {
-            std::cerr << "Couldn't evaluate prototype " << proto_path.GetString()
-                      << " mesh for instance " << this->prim_path_ << std::endl;
-          }
-        }
-        else {
-          std::cerr << "Invalid prototype " << proto_path.GetString()
-                    << " reader type for instance " << this->prim_path_ << std::endl;
-        }
-      }
+      std::cerr << "WARNING: no cached mesh for prototype " << proto_path << " for instance "
+                << this->prim_path_ << std::endl;
     }
   }
 

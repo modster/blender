@@ -43,7 +43,7 @@ bool USDCameraReader::valid() const
   return static_cast<bool>(camera_);
 }
 
-void USDCameraReader::create_object(Main *bmain, double time)
+void USDCameraReader::create_object(Main *bmain, double time, USDDataCache *data_cache)
 {
   if (!this->valid()) {
     return;

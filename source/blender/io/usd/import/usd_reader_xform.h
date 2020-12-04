@@ -40,7 +40,7 @@ class USDXformReader : public USDXformableReader {
     return false;
   }
 
-  void create_object(Main *bmain, double time) override;
+  void create_object(Main *bmain, double time, USDDataCache *data_cache) override;
 };
 
 }  // namespace blender::io::usd

@@ -18,31 +18,43 @@
  */
 #pragma once
 
-#include "usd_reader_xformable.h"
-
 #include <map>
+
+#include <pxr/usd/sdf/path.h>
 
 struct Mesh;
 
 namespace blender::io::usd {
 
-/* Abstract base class of readers that can create a Blender mesh object.
- * Subclasses must define the create_mesh() and assign_materials() virtual
- * functions to implement the logic for creating the Mesh data and materials. */
+/* Caches data imported from USD, typically shared data for instanced primitives. */
 
-class USDMeshReaderBase : public USDXformableReader {
+class USDDataCache {
  protected:
+  /* Shared meshes for instancing. */
+  std::map<pxr::SdfPath, Mesh *> prototype_meshes_;
+
  public:
-  USDMeshReaderBase(const pxr::UsdPrim &prim, const USDImporterContext &context);
+  USDDataCache();
 
-  virtual ~USDMeshReaderBase();
+  ~USDDataCache();
 
-  void create_object(Main *bmain, double time, USDDataCache *data_cache) override;
+  const std::map<pxr::SdfPath, Mesh *> &prototype_meshes() const
+  {
+    return prototype_meshes_;
+  }
 
-  struct Mesh *read_mesh(Main *bmain, double time, USDDataCache *data_cache);
+  void clear_prototype_meshes()
+  {
+    /* TODO(makowalsk): should we decrement mesh use counts or delete meshes?  */
+    prototype_meshes_.clear();
+  }
 
-  virtual struct Mesh *create_mesh(Main *bmain, double time) = 0;
-  virtual void assign_materials(Main *bmain, Mesh *mesh, double time) = 0;
+  bool add_prototype_mesh(const pxr::SdfPath path, Mesh *mesh);
+
+  void clear_protype_mesh(const pxr::SdfPath &path);
+
+  Mesh *get_prototype_mesh(const pxr::SdfPath &path) const;
+
 };
 
 }  // namespace blender::io::usd

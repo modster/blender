@@ -50,7 +50,7 @@ bool USDLightReader::valid() const
   return static_cast<bool>(light_);
 }
 
-void USDLightReader::create_object(Main *bmain, double time)
+void USDLightReader::create_object(Main *bmain, double time, USDDataCache *data_cache)
 {
   if (!this->valid()) {
     return;

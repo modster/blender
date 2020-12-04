@@ -31,6 +31,8 @@ struct Object;
 
 namespace blender::io::usd {
 
+class USDDataCache;
+
 /* Wraps the UsdGeomXformable schema. Abstract base class for all readers
  * that create a Blender object and compute its transform. */
 
@@ -82,7 +84,7 @@ class USDXformableReader : public USDPrimReader {
 
   virtual bool valid() const = 0;
 
-  virtual void create_object(Main *bmain, double time) = 0;
+  virtual void create_object(Main *bmain, double time, USDDataCache *data_cache) = 0;
 
   virtual bool can_merge_with_parent() const
   {

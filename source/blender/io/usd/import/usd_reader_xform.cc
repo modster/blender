@@ -36,7 +36,7 @@ bool USDXformReader::valid() const
   return static_cast<bool>(xform_);
 }
 
-void USDXformReader::create_object(Main *bmain, double time)
+void USDXformReader::create_object(Main *bmain, double time, USDDataCache *data_cache)
 {
   if (!this->valid()) {
     return;

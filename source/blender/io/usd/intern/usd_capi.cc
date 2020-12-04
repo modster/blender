@@ -17,6 +17,7 @@
  * All rights reserved.
  */
 
+#include "import/usd_data_cache.h"
 #include "import/usd_importer_context.h"
 #include "import/usd_prim_iterator.h"
 #include "import/usd_reader_mesh_base.h"
@@ -234,7 +235,7 @@ struct ImportJobData {
 
   pxr::UsdStageRefPtr stage;
   std::vector<USDXformableReader *> readers;
-  std::map<pxr::SdfPath, USDXformableReader *> proto_readers;
+  USDDataCache data_cache;
 };
 
 static void import_startjob(void *user_data, short *stop, short *do_update, float *progress)
@@ -260,9 +261,9 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   }
 
   pxr::TfToken up_axis = pxr::UsdGeomGetStageUpAxis(data->stage);
-  USDImporterContext import_ctx{up_axis, data->params, &data->proto_readers};
+  USDImporterContext import_ctx{up_axis, data->params};
 
-  USDPrimIterator usd_prim_iter(data->stage);
+  USDPrimIterator usd_prim_iter(data->stage, import_ctx, data->bmain);
 
   // Optionally print the stage contents for debugging.
   if (data->params.debug) {
@@ -277,13 +278,13 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   *data->do_update = true;
   *data->progress = 0.1f;
 
-  /* Optionally get the prototype prim readers for instancing. */
+  /* Optionally, cache the prototype data for instancing. */
   if (data->params.use_instancing) {
-    usd_prim_iter.create_prototype_object_readers(import_ctx, data->proto_readers);
+    usd_prim_iter.cache_prototype_data(data->data_cache);
   }
 
   /* Get the xformable prim readers. */
-  usd_prim_iter.create_object_readers(import_ctx, data->readers);
+  usd_prim_iter.create_object_readers(data->readers);
 
   // Create objects
 
@@ -297,7 +298,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
     USDXformableReader *reader = *iter;
 
     if (reader->valid()) {
-      reader->create_object(data->bmain, time);
+      reader->create_object(data->bmain, time, &data->data_cache);
     }
     else {
       std::cerr << "Object " << reader->prim_path() << " in USD file " << data->filename
@@ -410,15 +411,7 @@ static void import_endjob(void *user_data)
 
   data->readers.clear();
 
-  for (ObjectReaderMap::iterator map_iter = data->proto_readers.begin();
-       map_iter != data->proto_readers.end();
-       ++map_iter) {
-    delete map_iter->second;
-  }
-
-  data->proto_readers.clear();
-
-  USDMeshReaderBase::clear_prototype_meshes();
+  /* TODO(makowalski): Explicitly clear the data cache as well? */
 
   WM_set_locked_interface(data->wm, false);
 
