@@ -295,15 +295,15 @@ void Scene::device_update(Device *device_, Progress &progress)
    * - Lookup tables are done a second time to handle film tables
    */
 
-  procedural_manager->update(this, progress);
-
-  if (progress.get_cancel())
-    return;
-
   progress.set_status("Updating Shaders");
   shader_manager->device_update(device, &dscene, this, progress);
 
   if (progress.get_cancel() || device->have_error())
+    return;
+
+  procedural_manager->update(this, progress);
+
+  if (progress.get_cancel())
     return;
 
   progress.set_status("Updating Background");

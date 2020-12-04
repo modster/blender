@@ -130,8 +130,13 @@ template<typename T> class DataStore {
 
   void clear()
   {
-    last_loaded_time = std::numeric_limits<double>::max();
+    invalidate_last_loaded_time();
     data.clear();
+  }
+
+  void invalidate_last_loaded_time()
+  {
+    last_loaded_time = std::numeric_limits<double>::max();
   }
 
   /* Copy the data for the specified time to the node's socket. If there is no
@@ -203,7 +208,21 @@ struct CachedData {
     curve_radius.clear();
     curve_first_key.clear();
     curve_shader.clear();
+    subd_start_corner.clear();
+    subd_num_corners.clear();
+    subd_smooth.clear();
+    subd_ptex_offset.clear();
+    subd_face_corners.clear();
+    num_ngons.clear();
+    subd_creases_edge.clear();
+    subd_creases_weight.clear();
     shader.clear();
+
+    for (CachedAttribute &attr : attributes) {
+      attr.data.clear();
+    }
+
+    attributes.clear();
   }
 
   CachedAttribute &add_attribute(const ustring &name,
@@ -263,6 +282,35 @@ struct CachedData {
 
     return true;
   }
+
+  void invalidate_last_loaded_time(bool attributes_only = false)
+  {
+    if (attributes_only) {
+      for (CachedAttribute &attr : attributes) {
+        attr.data.invalidate_last_loaded_time();
+      }
+
+      return;
+    }
+
+    vertices.invalidate_last_loaded_time();
+    triangles.invalidate_last_loaded_time();
+    triangles_loops.invalidate_last_loaded_time();
+    transforms.invalidate_last_loaded_time();
+    curve_keys.invalidate_last_loaded_time();
+    curve_radius.invalidate_last_loaded_time();
+    curve_first_key.invalidate_last_loaded_time();
+    curve_shader.invalidate_last_loaded_time();
+    subd_start_corner.invalidate_last_loaded_time();
+    subd_num_corners.invalidate_last_loaded_time();
+    subd_smooth.invalidate_last_loaded_time();
+    subd_ptex_offset.invalidate_last_loaded_time();
+    subd_face_corners.invalidate_last_loaded_time();
+    num_ngons.invalidate_last_loaded_time();
+    subd_creases_edge.invalidate_last_loaded_time();
+    subd_creases_weight.invalidate_last_loaded_time();
+    shader.invalidate_last_loaded_time();
+  }
 };
 
 /* Representation of an Alembic object for the AlembicProcedural.
@@ -307,6 +355,8 @@ class AlembicObject : public Node {
 
   bool has_data_loaded() const;
 
+  bool need_shader_update = true;
+
   MatrixSampleMap xform_samples;
   Alembic::AbcGeom::IObject iobject;
   Transform xform;
@@ -327,9 +377,12 @@ class AlembicObject : public Node {
 
   CachedData cached_data;
 
+  void update_shader_attributes(const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
+                                Progress &progress);
+
   void read_attribute(const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
-                      const Alembic::AbcGeom::ISampleSelector &iss,
-                      const ustring &attr_name);
+                      const ustring &attr_name,
+                      Progress &progress);
 
   template<typename SchemaType>
   void read_face_sets(SchemaType &schema, array<int> &polygon_to_shader);
@@ -385,8 +438,8 @@ class AlembicProcedural : public Procedural {
   /* Tag for an update only if something was modified. */
   void tag_update(Scene *scene);
 
-  /* Returns true if an object with the given path exists in this procedural. */
-  bool has_object(const ustring &path) const;
+  /* Returns a pointer to an exisiting or a newly created AlembicObject for the given path. */
+  AlembicObject *get_or_create_object(const ustring &path);
 
  private:
   /* Load the data for all the objects whose data has not yet been loaded. */

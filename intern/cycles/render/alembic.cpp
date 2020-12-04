@@ -453,6 +453,35 @@ bool AlembicObject::has_data_loaded() const
   return data_loaded;
 }
 
+void AlembicObject::update_shader_attributes(const ICompoundProperty &arb_geom_params,
+                                             Progress &progress)
+{
+  AttributeRequestSet requested_attributes = get_requested_attributes();
+
+  foreach (const AttributeRequest &attr, requested_attributes.requests) {
+    if (progress.get_cancel()) {
+      return;
+    }
+
+    bool attr_exists = false;
+    foreach (CachedData::CachedAttribute &cached_attr, cached_data.attributes) {
+      if (cached_attr.name == attr.name) {
+        attr_exists = true;
+        break;
+      }
+    }
+
+    if (attr_exists) {
+      continue;
+    }
+
+    read_attribute(arb_geom_params, attr.name, progress);
+  }
+
+  cached_data.invalidate_last_loaded_time(true);
+  need_shader_update = false;
+}
+
 template<typename SchemaType>
 void AlembicObject::read_face_sets(SchemaType &schema, array<int> &polygon_to_shader)
 {
@@ -516,8 +545,6 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
 {
   cached_data.clear();
 
-  AttributeRequestSet requested_attributes = get_requested_attributes();
-
   const TimeSamplingPtr time_sampling = schema.getTimeSampling();
   cached_data.vertices.set_time_sampling(*time_sampling);
   cached_data.triangles.set_time_sampling(*time_sampling);
@@ -553,15 +580,13 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
     if (normals.valid()) {
       add_normals(sample.getFaceIndices(), normals, time, cached_data);
     }
-
-    foreach (const AttributeRequest &attr, requested_attributes.requests) {
-      if (progress.get_cancel()) {
-        return;
-      }
-
-      read_attribute(schema.getArbGeomParams(), iss, attr.name);
-    }
   }
+
+  if (progress.get_cancel()) {
+    return;
+  }
+
+  update_shader_attributes(schema.getArbGeomParams(), progress);
 
   if (progress.get_cancel()) {
     return;
@@ -713,9 +738,9 @@ void AlembicObject::load_all_data(ISubDSchema &schema, Progress &progress)
       cached_data.subd_creases_edge.add_data(creases_edge, time);
       cached_data.subd_creases_weight.add_data(creases_weight, time);
     }
-
-    /* TODO(@kevindietrich) : attributes, need test files */
   }
+
+  /* TODO(@kevindietrich) : attributes, need test files */
 
   if (progress.get_cancel()) {
     return;
@@ -799,7 +824,7 @@ void AlembicObject::load_all_data(const ICurvesSchema &schema,
     cached_data.curve_shader.add_data(curve_shader, time);
   }
 
-  // TODO(@kevindietrich): attributes, but I need example files
+  // TODO(@kevindietrich): attributes, need example files
 
   setup_transform_cache();
 
@@ -849,7 +874,6 @@ AttributeRequestSet AlembicObject::get_requested_attributes()
   Geometry *geometry = object->get_geometry();
   assert(geometry);
 
-  // TODO(@kevindietrich) : check for attribute changes in the shaders
   foreach (Node *node, geometry->get_used_shaders()) {
     Shader *shader = static_cast<Shader *>(node);
 
@@ -864,11 +888,9 @@ AttributeRequestSet AlembicObject::get_requested_attributes()
 }
 
 void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
-                                   const ISampleSelector &iss,
-                                   const ustring &attr_name)
+                                   const ustring &attr_name,
+                                   Progress &progress)
 {
-  const index_t index = iss.getRequestedIndex();
-
   const PropertyHeader *prop = arb_geom_params.getPropertyHeader(attr_name.c_str());
 
   if (prop == nullptr) {
@@ -878,144 +900,168 @@ void AlembicObject::read_attribute(const ICompoundProperty &arb_geom_params,
   if (IV2fProperty::matches(prop->getMetaData()) && Alembic::AbcGeom::isUV(*prop)) {
     const IV2fGeomParam &param = IV2fGeomParam(arb_geom_params, prop->getName());
 
-    IV2fGeomParam::Sample sample;
-    param.getIndexed(sample, iss);
-
     CachedData::CachedAttribute &attribute = cached_data.add_attribute(attr_name,
                                                                        *param.getTimeSampling());
 
-    const chrono_t time = param.getTimeSampling()->getSampleTime(index);
-
-    if (param.getScope() == kFacevaryingScope) {
-      V2fArraySamplePtr values = sample.getVals();
-      UInt32ArraySamplePtr indices = sample.getIndices();
-
-      attribute.std = ATTR_STD_NONE;
-      attribute.element = ATTR_ELEMENT_CORNER;
-      attribute.type_desc = TypeFloat2;
-
-      const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
-      const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time_no_check(
-          time);
-
-      if (!triangles || !triangles_loops) {
+    for (size_t i = 0; i < param.getNumSamples(); ++i) {
+      if (progress.get_cancel()) {
         return;
       }
 
-      array<char> data;
-      data.resize(triangles->size() * 3 * sizeof(float2));
+      ISampleSelector iss = ISampleSelector(index_t(i));
 
-      float2 *data_float2 = reinterpret_cast<float2 *>(data.data());
+      IV2fGeomParam::Sample sample;
+      param.getIndexed(sample, iss);
 
-      for (const int3 &loop : *triangles_loops) {
-        unsigned int v0 = (*indices)[loop.x];
-        unsigned int v1 = (*indices)[loop.y];
-        unsigned int v2 = (*indices)[loop.z];
+      const chrono_t time = param.getTimeSampling()->getSampleTime(index_t(i));
 
-        data_float2[0] = make_float2((*values)[v0][0], (*values)[v0][1]);
-        data_float2[1] = make_float2((*values)[v1][0], (*values)[v1][1]);
-        data_float2[2] = make_float2((*values)[v2][0], (*values)[v2][1]);
-        data_float2 += 3;
+      if (param.getScope() == kFacevaryingScope) {
+        V2fArraySamplePtr values = sample.getVals();
+        UInt32ArraySamplePtr indices = sample.getIndices();
+
+        attribute.std = ATTR_STD_NONE;
+        attribute.element = ATTR_ELEMENT_CORNER;
+        attribute.type_desc = TypeFloat2;
+
+        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
+        const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time_no_check(
+            time);
+
+        if (!triangles || !triangles_loops) {
+          return;
+        }
+
+        array<char> data;
+        data.resize(triangles->size() * 3 * sizeof(float2));
+
+        float2 *data_float2 = reinterpret_cast<float2 *>(data.data());
+
+        for (const int3 &loop : *triangles_loops) {
+          unsigned int v0 = (*indices)[loop.x];
+          unsigned int v1 = (*indices)[loop.y];
+          unsigned int v2 = (*indices)[loop.z];
+
+          data_float2[0] = make_float2((*values)[v0][0], (*values)[v0][1]);
+          data_float2[1] = make_float2((*values)[v1][0], (*values)[v1][1]);
+          data_float2[2] = make_float2((*values)[v2][0], (*values)[v2][1]);
+          data_float2 += 3;
+        }
+
+        attribute.data.set_time_sampling(*param.getTimeSampling());
+        attribute.data.add_data(data, time);
       }
-
-      attribute.data.set_time_sampling(*param.getTimeSampling());
-      attribute.data.add_data(data, time);
     }
   }
   else if (IC3fProperty::matches(prop->getMetaData())) {
     const IC3fGeomParam &param = IC3fGeomParam(arb_geom_params, prop->getName());
 
-    IC3fGeomParam::Sample sample;
-    param.getIndexed(sample, iss);
-
     CachedData::CachedAttribute &attribute = cached_data.add_attribute(attr_name,
                                                                        *param.getTimeSampling());
 
-    const chrono_t time = param.getTimeSampling()->getSampleTime(index);
-
-    C3fArraySamplePtr values = sample.getVals();
-
-    attribute.std = ATTR_STD_NONE;
-
-    if (param.getScope() == kVaryingScope) {
-      attribute.element = ATTR_ELEMENT_CORNER_BYTE;
-      attribute.type_desc = TypeRGBA;
-
-      const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
-
-      if (!triangles) {
+    for (size_t i = 0; i < param.getNumSamples(); ++i) {
+      if (progress.get_cancel()) {
         return;
       }
 
-      array<char> data;
-      data.resize(triangles->size() * 3 * sizeof(uchar4));
+      ISampleSelector iss = ISampleSelector(index_t(i));
 
-      uchar4 *data_uchar4 = reinterpret_cast<uchar4 *>(data.data());
+      IC3fGeomParam::Sample sample;
+      param.getIndexed(sample, iss);
 
-      int offset = 0;
-      for (const int3 &tri : *triangles) {
-        Imath::C3f v = (*values)[tri.x];
-        data_uchar4[offset + 0] = color_float_to_byte(make_float3(v.x, v.y, v.z));
+      const chrono_t time = param.getTimeSampling()->getSampleTime(index_t(i));
 
-        v = (*values)[tri.y];
-        data_uchar4[offset + 1] = color_float_to_byte(make_float3(v.x, v.y, v.z));
+      C3fArraySamplePtr values = sample.getVals();
 
-        v = (*values)[tri.z];
-        data_uchar4[offset + 2] = color_float_to_byte(make_float3(v.x, v.y, v.z));
+      attribute.std = ATTR_STD_NONE;
 
-        offset += 3;
+      if (param.getScope() == kVaryingScope) {
+        attribute.element = ATTR_ELEMENT_CORNER_BYTE;
+        attribute.type_desc = TypeRGBA;
+
+        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
+
+        if (!triangles) {
+          return;
+        }
+
+        array<char> data;
+        data.resize(triangles->size() * 3 * sizeof(uchar4));
+
+        uchar4 *data_uchar4 = reinterpret_cast<uchar4 *>(data.data());
+
+        int offset = 0;
+        for (const int3 &tri : *triangles) {
+          Imath::C3f v = (*values)[tri.x];
+          data_uchar4[offset + 0] = color_float_to_byte(make_float3(v.x, v.y, v.z));
+
+          v = (*values)[tri.y];
+          data_uchar4[offset + 1] = color_float_to_byte(make_float3(v.x, v.y, v.z));
+
+          v = (*values)[tri.z];
+          data_uchar4[offset + 2] = color_float_to_byte(make_float3(v.x, v.y, v.z));
+
+          offset += 3;
+        }
+
+        attribute.data.set_time_sampling(*param.getTimeSampling());
+        attribute.data.add_data(data, time);
       }
-
-      attribute.data.set_time_sampling(*param.getTimeSampling());
-      attribute.data.add_data(data, time);
     }
   }
   else if (IC4fProperty::matches(prop->getMetaData())) {
     const IC4fGeomParam &param = IC4fGeomParam(arb_geom_params, prop->getName());
 
-    IC4fGeomParam::Sample sample;
-    param.getIndexed(sample, iss);
-
     CachedData::CachedAttribute &attribute = cached_data.add_attribute(attr_name,
                                                                        *param.getTimeSampling());
 
-    const chrono_t time = param.getTimeSampling()->getSampleTime(index);
-
-    C4fArraySamplePtr values = sample.getVals();
-
-    attribute.std = ATTR_STD_NONE;
-
-    if (param.getScope() == kVaryingScope) {
-      attribute.element = ATTR_ELEMENT_CORNER_BYTE;
-      attribute.type_desc = TypeRGBA;
-
-      const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
-
-      if (!triangles) {
+    for (size_t i = 0; i < param.getNumSamples(); ++i) {
+      if (progress.get_cancel()) {
         return;
       }
 
-      array<char> data;
-      data.resize(triangles->size() * 3 * sizeof(uchar4));
+      ISampleSelector iss = ISampleSelector(index_t(i));
 
-      uchar4 *data_uchar4 = reinterpret_cast<uchar4 *>(data.data());
+      IC4fGeomParam::Sample sample;
+      param.getIndexed(sample, iss);
 
-      int offset = 0;
-      for (const int3 &tri : *triangles) {
-        Imath::C4f v = (*values)[tri.x];
-        data_uchar4[offset + 0] = color_float4_to_uchar4(make_float4(v.r, v.g, v.b, v.a));
+      const chrono_t time = param.getTimeSampling()->getSampleTime(index_t(i));
 
-        v = (*values)[tri.y];
-        data_uchar4[offset + 1] = color_float4_to_uchar4(make_float4(v.r, v.g, v.b, v.a));
+      C4fArraySamplePtr values = sample.getVals();
 
-        v = (*values)[tri.z];
-        data_uchar4[offset + 2] = color_float4_to_uchar4(make_float4(v.r, v.g, v.b, v.a));
+      attribute.std = ATTR_STD_NONE;
 
-        offset += 3;
+      if (param.getScope() == kVaryingScope) {
+        attribute.element = ATTR_ELEMENT_CORNER_BYTE;
+        attribute.type_desc = TypeRGBA;
+
+        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
+
+        if (!triangles) {
+          return;
+        }
+
+        array<char> data;
+        data.resize(triangles->size() * 3 * sizeof(uchar4));
+
+        uchar4 *data_uchar4 = reinterpret_cast<uchar4 *>(data.data());
+
+        int offset = 0;
+        for (const int3 &tri : *triangles) {
+          Imath::C4f v = (*values)[tri.x];
+          data_uchar4[offset + 0] = color_float4_to_uchar4(make_float4(v.r, v.g, v.b, v.a));
+
+          v = (*values)[tri.y];
+          data_uchar4[offset + 1] = color_float4_to_uchar4(make_float4(v.r, v.g, v.b, v.a));
+
+          v = (*values)[tri.z];
+          data_uchar4[offset + 2] = color_float4_to_uchar4(make_float4(v.r, v.g, v.b, v.a));
+
+          offset += 3;
+        }
+
+        attribute.data.set_time_sampling(*param.getTimeSampling());
+        attribute.data.add_data(data, time);
       }
-
-      attribute.data.set_time_sampling(*param.getTimeSampling());
-      attribute.data.add_data(data, time);
     }
   }
 }
@@ -1109,7 +1155,23 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
   assert(scene_ == nullptr || scene_ == scene);
   scene_ = scene;
 
-  if (!is_modified()) {
+  bool need_shader_updates = false;
+
+  /* check for changes in shaders (newly requested atttributes) */
+  foreach (Node *object_node, objects) {
+    AlembicObject *object = static_cast<AlembicObject *>(object_node);
+
+    foreach (Node *shader_node, object->get_used_shaders()) {
+      Shader *shader = static_cast<Shader *>(shader_node);
+
+      if (shader->need_update_geometry()) {
+        object->need_shader_update = true;
+        need_shader_updates = true;
+      }
+    }
+  }
+
+  if (!is_modified() && !need_shader_updates) {
     return;
   }
 
@@ -1141,7 +1203,7 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
     }
 
     /* skip constant objects */
-    if (object->has_data_loaded() && object->is_constant()) {
+    if (object->has_data_loaded() && object->is_constant() && !object->need_shader_update) {
       continue;
     }
 
@@ -1154,6 +1216,8 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
     else if (ISubD::matches(object->iobject.getHeader())) {
       read_subd(scene, object, frame_time, progress);
     }
+
+    object->clear_modified();
   }
 
   clear_modified();
@@ -1167,22 +1231,25 @@ void AlembicProcedural::add_object(AlembicObject *object)
 
 void AlembicProcedural::tag_update(Scene *scene)
 {
-  if (is_modified()) {
-    scene->procedural_manager->tag_update();
-  }
+  scene->procedural_manager->tag_update();
 }
 
-bool AlembicProcedural::has_object(const ustring &path) const
+AlembicObject *AlembicProcedural::get_or_create_object(const ustring &path)
 {
   foreach (Node *node, objects) {
     AlembicObject *object = static_cast<AlembicObject *>(node);
 
     if (object->get_path() == path) {
-      return true;
+      return object;
     }
   }
 
-  return false;
+  AlembicObject *object = create_node<AlembicObject>();
+  object->set_path(path);
+
+  add_object(object);
+
+  return object;
 }
 
 void AlembicProcedural::load_objects(Progress &progress)
@@ -1236,13 +1303,15 @@ void AlembicProcedural::read_mesh(Scene *scene,
     mesh = static_cast<Mesh *>(abc_object->get_object()->get_geometry());
   }
 
+  CachedData &cached_data = abc_object->get_cached_data();
   IPolyMeshSchema schema = polymesh.getSchema();
 
   if (!abc_object->has_data_loaded()) {
     abc_object->load_all_data(schema, progress);
   }
-
-  CachedData &cached_data = abc_object->get_cached_data();
+  else if (abc_object->need_shader_update) {
+    abc_object->update_shader_attributes(schema.getArbGeomParams(), progress);
+  }
 
   /* update sockets */
 
@@ -1339,6 +1408,11 @@ void AlembicProcedural::read_subd(Scene *scene,
 
   CachedData &cached_data = abc_object->get_cached_data();
 
+  if (abc_object->subd_max_level_is_modified() || abc_object->subd_dicing_rate_is_modified()) {
+    /* need to reset the current data is something changed */
+    cached_data.invalidate_last_loaded_time();
+  }
+
   /* udpate sockets */
 
   Object *object = abc_object->get_object();
@@ -1427,8 +1501,9 @@ void AlembicProcedural::read_curves(Scene *scene,
     hair = static_cast<Hair *>(abc_object->get_object()->get_geometry());
   }
 
+  ICurvesSchema schema = curves.getSchema();
+
   if (!abc_object->has_data_loaded() || default_curves_radius_is_modified()) {
-    ICurvesSchema schema = curves.getSchema();
     abc_object->load_all_data(schema, progress, default_curves_radius);
   }
 

@@ -514,36 +514,22 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
   string absolute_path = blender_absolute_path(b_data, b_ob, b_mesh_cache.cache_file().filepath());
   procedural->set_filepath(ustring(absolute_path));
 
+  /* create or update existing AlembicObjects */
   ustring object_path = ustring(b_mesh_cache.object_path());
 
-  if (!procedural->has_object(object_path)) {
-    Shader *default_shader = (b_ob.type() == BL::Object::type_VOLUME) ? scene->default_volume :
-                                                                        scene->default_surface;
-    array<Node *> used_shaders;
+  AlembicObject *abc_object = procedural->get_or_create_object(object_path);
 
-    BL::Object::material_slots_iterator slot;
-    for (b_ob.material_slots.begin(slot); slot != b_ob.material_slots.end(); ++slot) {
-      BL::ID b_material(slot->material());
-      find_shader(b_material, used_shaders, default_shader);
-    }
+  array<Node *> used_shaders = find_used_shaders(b_ob);
+  abc_object->set_used_shaders(used_shaders);
 
-    if (used_shaders.size() == 0) {
-      used_shaders.push_back_slow(default_shader);
-    }
+  PointerRNA cobj = RNA_pointer_get(&b_ob.ptr, "cycles");
+  const float subd_dicing_rate = max(0.1f, RNA_float_get(&cobj, "dicing_rate") * dicing_rate);
+  abc_object->set_subd_dicing_rate(subd_dicing_rate);
+  abc_object->set_subd_max_level(max_subdivisions);
 
-    AlembicObject *abc_object = procedural->create_node<AlembicObject>();
-    abc_object->set_path(object_path);
-    abc_object->set_used_shaders(used_shaders);
-
-    PointerRNA cobj = RNA_pointer_get(&b_ob.ptr, "cycles");
-    const float subd_dicing_rate = max(0.1f, RNA_float_get(&cobj, "dicing_rate") * dicing_rate);
-    abc_object->set_subd_dicing_rate(subd_dicing_rate);
-    abc_object->set_subd_max_level(max_subdivisions);
-
-    procedural->add_object(abc_object);
+  if (abc_object->is_modified() || procedural->is_modified()) {
+    procedural->tag_update(scene);
   }
-
-  procedural->tag_update(scene);
 #else
   (void)b_ob;
   (void)b_mesh_cache;
