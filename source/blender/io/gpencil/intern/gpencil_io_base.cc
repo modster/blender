@@ -342,7 +342,7 @@ void GpencilIO::rgb_to_grayscale(float color[3])
  */
 std::string GpencilIO::to_lower_string(char *input_text)
 {
-  ::std::string text = input_text;
+  std::string text = input_text;
   /* First remove any point of the string. */
   size_t found = text.find_first_of(".");
   while (found != std::string::npos) {
