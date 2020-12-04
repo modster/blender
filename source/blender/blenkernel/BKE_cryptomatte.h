@@ -13,29 +13,30 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Copyright 2011, Blender Foundation.
+ * The Original Code is Copyright (C) 2020 Blender Foundation.
+ * All rights reserved.
  */
 
-#include "COM_CompositorContext.h"
-#include "COM_defines.h"
-#include <cstdio>
+/** \file
+ * \ingroup bke
+ */
 
-CompositorContext::CompositorContext()
-{
-  this->m_scene = nullptr;
-  this->m_rd = nullptr;
-  this->m_quality = COM_QUALITY_HIGH;
-  this->m_hasActiveOpenCLDevices = false;
-  this->m_fastCalculation = false;
-  this->m_viewSettings = nullptr;
-  this->m_displaySettings = nullptr;
+#pragma once
+
+#include "BLI_sys_types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct Object;
+struct Material;
+
+uint32_t BKE_cryptomatte_object_hash(const struct Object *object);
+uint32_t BKE_cryptomatte_material_hash(const struct Material *material);
+uint32_t BKE_cryptomatte_asset_hash(const struct Object *object);
+float BKE_cryptomatte_hash_to_float(uint32_t cryptomatte_hash);
+
+#ifdef __cplusplus
 }
-
-int CompositorContext::getFramenumber() const
-{
-  if (this->m_rd) {
-    return this->m_rd->cfra;
-  }
-
-  return -1; /* this should never happen */
-}
+#endif
