@@ -213,7 +213,16 @@ static void add_uvs(const IV2fGeomParam &uvs, CachedData &cached_data, Progress 
     time_sampling = *time_sampling_ptr;
   }
 
-  CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(uvs.getName()),
+  std::string name = Alembic::Abc::GetSourceName(uvs.getMetaData());
+
+  /* According to the convention, primary UVs should have had their name
+   * set using Alembic::Abc::SetSourceName, but you can't expect everyone
+   * to follow it! :) */
+  if (name.empty()) {
+    name = uvs.getName();
+  }
+
+  CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(name),
                                                                 time_sampling);
   attr.std = ATTR_STD_UV;
 
