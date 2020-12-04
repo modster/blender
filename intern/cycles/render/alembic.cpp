@@ -534,6 +534,10 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
 
     add_positions(sample.getPositions(), time, cached_data);
 
+    /* TODO(@kevindietrich): this is a waste of memory and processing time if only the positions
+     * are changing but we cannot optimize in this current system if the attributes are changing
+     * over time as well, as we need valid data for each time point. This can be solved by using
+     * reference counting on the array and simply share the array across frames. */
     add_triangles(
         sample.getFaceCounts(), sample.getFaceIndices(), time, cached_data, polygon_to_shader);
 
