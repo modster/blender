@@ -374,9 +374,8 @@ typedef struct PreviewImage {
   /* All values of 2 are really NUM_ICON_SIZES */
   unsigned int w[2];
   unsigned int h[2];
-  int32_t flag[2];
+  short flag[2];
   short changed_timestamp[2];
-  char _pad1[4];
   unsigned int *rect[2];
 
   /* Runtime-only data. */
