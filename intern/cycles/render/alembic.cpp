@@ -1286,6 +1286,7 @@ void AlembicProcedural::read_subd(Scene *scene,
                                   Progress &progress)
 {
   ISubD subd_mesh(abc_object->iobject, Alembic::Abc::kWrapExisting);
+  ISubDSchema schema = subd_mesh.getSchema();
 
   Mesh *mesh = nullptr;
 
@@ -1297,6 +1298,13 @@ void AlembicProcedural::read_subd(Scene *scene,
 
     array<Node *> used_shaders = abc_object->get_used_shaders();
     mesh->set_used_shaders(used_shaders);
+
+    if (schema.getSubdivisionSchemeProperty().getValue() == "catmull-clark") {
+      mesh->set_subdivision_type(Mesh::SubdivisionType::SUBDIVISION_CATMULL_CLARK);
+    }
+    else {
+      mesh->set_subdivision_type(Mesh::SubdivisionType::SUBDIVISION_LINEAR);
+    }
 
     /* create object*/
     Object *object = scene->create_node<Object>();
@@ -1311,17 +1319,8 @@ void AlembicProcedural::read_subd(Scene *scene,
     mesh = static_cast<Mesh *>(abc_object->get_object()->get_geometry());
   }
 
-  ISubDSchema schema = subd_mesh.getSchema();
-
   if (!abc_object->has_data_loaded()) {
     abc_object->load_all_data(schema, progress);
-  }
-
-  if (schema.getSubdivisionSchemeProperty().getValue() == "catmull-clark") {
-    mesh->set_subdivision_type(Mesh::SubdivisionType::SUBDIVISION_CATMULL_CLARK);
-  }
-  else {
-    mesh->set_subdivision_type(Mesh::SubdivisionType::SUBDIVISION_LINEAR);
   }
 
   mesh->set_subd_max_level(abc_object->get_subd_max_level());
