@@ -339,28 +339,27 @@ void USDMaterialImporter::set_node_input(const pxr::UsdShadeInput &usd_input,
     switch (sock->type) {
       case SOCK_FLOAT:
         if (val.IsHolding<float>()) {
-          float fval = val.Get<float>();
-          ((bNodeSocketValueFloat *)sock->default_value)->value = fval;
+          ((bNodeSocketValueFloat *)sock->default_value)->value = val.UncheckedGet<float>();
         }
         else if (val.IsHolding<pxr::GfVec3f>()) {
-          pxr::GfVec3f v3f = val.Get<pxr::GfVec3f>();
+          pxr::GfVec3f v3f = val.UncheckedGet<pxr::GfVec3f>();
           float average = (v3f[0] + v3f[1] + v3f[2]) / 3.0f;
           ((bNodeSocketValueFloat *)sock->default_value)->value = average;
         }
         break;
       case SOCK_RGBA:
         if (val.IsHolding<pxr::GfVec3f>()) {
-          pxr::GfVec3f v3f = val.Get<pxr::GfVec3f>();
+          pxr::GfVec3f v3f = val.UncheckedGet<pxr::GfVec3f>();
           copy_v3_v3(((bNodeSocketValueRGBA *)sock->default_value)->value, v3f.data());
         }
         break;
       case SOCK_VECTOR:
         if (val.IsHolding<pxr::GfVec3f>()) {
-          pxr::GfVec3f v3f = val.Get<pxr::GfVec3f>();
+          pxr::GfVec3f v3f = val.UncheckedGet<pxr::GfVec3f>();
           copy_v3_v3(((bNodeSocketValueVector *)sock->default_value)->value, v3f.data());
         }
         else if (val.IsHolding<pxr::GfVec2f>()) {
-          pxr::GfVec2f v2f = val.Get<pxr::GfVec2f>();
+          pxr::GfVec2f v2f = val.UncheckedGet<pxr::GfVec2f>();
           copy_v2_v2(((bNodeSocketValueVector *)sock->default_value)->value, v2f.data());
         }
         break;
