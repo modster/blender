@@ -54,7 +54,6 @@ class USDDataCache {
   void clear_protype_mesh(const pxr::SdfPath &path);
 
   Mesh *get_prototype_mesh(const pxr::SdfPath &path) const;
-
 };
 
 }  // namespace blender::io::usd
