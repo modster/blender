@@ -20,6 +20,8 @@
 #include "usd_reader_prim.h"
 #include "BLI_assert.h"
 
+#include <iostream>
+
 namespace blender::io::usd {
 
 USDPrimReader::USDPrimReader(const pxr::UsdPrim &prim, const USDImporterContext &context)
@@ -27,7 +29,8 @@ USDPrimReader::USDPrimReader(const pxr::UsdPrim &prim, const USDImporterContext 
       prim_path_(""),
       context_(context),
       min_time_(std::numeric_limits<double>::max()),
-      max_time_(std::numeric_limits<double>::min())
+      max_time_(std::numeric_limits<double>::min()),
+      refcount_(1)
 {
   if (prim) {
     prim_path_ = prim.GetPath().GetString();
@@ -51,6 +54,22 @@ double USDPrimReader::min_time() const
 double USDPrimReader::max_time() const
 {
   return max_time_;
+}
+
+int USDPrimReader::incref()
+{
+  return ++refcount_;
+}
+
+int USDPrimReader::decref()
+{
+  --refcount_;
+  BLI_assert(refcount_ >= 0);
+  if (refcount_ == 0) {
+    delete this;
+    return 0;
+  }
+  return refcount_;
 }
 
 } /* namespace blender::io::usd */

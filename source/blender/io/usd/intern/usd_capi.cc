@@ -406,7 +406,7 @@ static void import_endjob(void *user_data)
   /* Delete the reders. */
 
   for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-    delete *iter;
+    (*iter)->decref();
   }
 
   data->readers.clear();

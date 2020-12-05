@@ -42,9 +42,17 @@ class USDPrimReader {
   double min_time_;
   double max_time_;
 
+  /* Use reference counting since the same reader may be used by multiple
+   * modifiers and/or
+   * constraints. */
+  int refcount_;
+
  public:
   explicit USDPrimReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
 
+  /* TODO(makowalsk): Consider making the destructor protected here and for derived
+   * classes,
+   * to force the use of incref and decref. */
   virtual ~USDPrimReader();
 
   // Disallow assignment and copying.
@@ -76,6 +84,13 @@ class USDPrimReader {
 
   double min_time() const;
   double max_time() const;
+
+  int refcount() const
+  {
+    return refcount_;
+  }
+  int incref();
+  int decref();
 };
 
 } /* namespace blender::io::usd */

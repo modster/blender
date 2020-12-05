@@ -204,7 +204,7 @@ void USDPrimIterator::cache_prototype_data(USDDataCache &r_cache) const
 
     /* Clean up the readers. */
     for (USDXformableReader *reader : proto_readers) {
-      delete reader;
+      reader->decref();
     }
   }
 }
