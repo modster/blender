@@ -1153,18 +1153,31 @@ static PyObject *BPy_IDGroup_get(BPy_IDProperty *self, PyObject *args)
   return def;
 }
 
-static bool check_null_or_int(PyObject *py_object)
+static bool check_ui_data_value(PyObject *py_object)
 {
-  if (py_object == NULL) {
+  if (ELEM(py_object, NULL, Py_None)) {
+    return false;
+  }
+
+  if (PyLong_Check(py_object) || PyFloat_Check(py_object)) {
     return true;
   }
 
-  if (PyLong_Check(py_object)) {
-    return true;
-  }
-
-  PyErr_SetString(PyExc_TypeError, "Integer property ui values must be integers");
+  PyErr_SetString(PyExc_TypeError, "Property ui data values must be integers or floats");
   return false;
+}
+
+static int int_from_py_int_or_double(PyObject *py_object)
+{
+  if (PyLong_Check(py_object)) {
+    return PyC_Long_AsI32(py_object);
+  }
+  if (PyFloat_Check(py_object)) {
+    return (int)PyFloat_AsDouble(py_object);
+  }
+
+  BLI_assert(false);
+  return 0;
 }
 
 static void idprop_update_rna_ui_data_int(IDProperty *idprop,
@@ -1175,27 +1188,25 @@ static void idprop_update_rna_ui_data_int(IDProperty *idprop,
                                           PyObject *py_step,
                                           PyObject *py_default_value)
 {
-  if (!check_null_or_int(py_min) || !check_null_or_int(py_max) ||
-      !check_null_or_int(py_soft_min) || !check_null_or_int(py_soft_max) ||
-      !check_null_or_int(py_step)) {
-    return;
-  }
-
   IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)idprop->ui_data;
-  if (!ELEM(py_min, NULL, Py_None)) {
-    ui_data->min = PyC_Long_AsI32(py_min);
+  if (check_ui_data_value(py_min)) {
+    ui_data->min = int_from_py_int_or_double(py_min);
+    ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
   }
-  if (!ELEM(py_max, NULL, Py_None)) {
-    ui_data->max = PyC_Long_AsI32(py_max);
+  if (check_ui_data_value(py_max)) {
+    ui_data->max = int_from_py_int_or_double(py_max);
+    ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
   }
-  if (!ELEM(py_soft_min, NULL, Py_None)) {
-    ui_data->soft_min = PyC_Long_AsI32(py_soft_min);
+  if (check_ui_data_value(py_soft_min)) {
+    ui_data->soft_min = int_from_py_int_or_double(py_soft_min);
+    ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
   }
-  if (!ELEM(py_soft_max, NULL, Py_None)) {
-    ui_data->soft_max = PyC_Long_AsI32(py_soft_max);
+  if (check_ui_data_value(py_soft_max)) {
+    ui_data->soft_max = int_from_py_int_or_double(py_soft_max);
+    ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
   }
-  if (!ELEM(py_step, NULL, Py_None)) {
-    ui_data->step = PyC_Long_AsI32(py_step);
+  if (check_ui_data_value(py_step)) {
+    ui_data->step = int_from_py_int_or_double(py_step);
   }
   if (!ELEM(py_default_value, NULL, Py_None)) {
     if (PySequence_Check(py_default_value)) {
@@ -1203,44 +1214,37 @@ static void idprop_update_rna_ui_data_int(IDProperty *idprop,
         PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
       }
       else {
+        MEM_SAFE_FREE(ui_data->default_array);
         PyObject **ob_seq_fast_items = PySequence_Fast_ITEMS(py_default_value);
         Py_ssize_t len = PySequence_Fast_GET_SIZE(py_default_value);
 
-        if (ui_data->default_array != NULL) {
-          MEM_freeN(ui_data->default_array);
-        }
-
+        ui_data->default_array_len = len;
         ui_data->default_array = MEM_malloc_arrayN(len, sizeof(int), __func__);
         for (Py_ssize_t i = 0; i < len; i++) {
           PyObject *item = ob_seq_fast_items[i];
-          if (!PyLong_Check(item)) {
-            PyErr_SetString(PyExc_TypeError,
-                            "Integer array property default values must be integers");
-            break;
+          if (check_ui_data_value(item)) {
+            ui_data->default_array[i] = int_from_py_int_or_double(item);
           }
-          ui_data->default_array[i] = PyC_Long_AsI32(item);
-          ui_data->default_array_len = len;
         }
       }
     }
-    else if (check_null_or_int(py_default_value)) {
+    else if (check_ui_data_value(py_default_value)) {
       ui_data->default_value = PyC_Long_AsI32(py_default_value);
     }
   }
 }
 
-static bool check_null_or_float(PyObject *py_object)
+static double double_from_py_int_or_double(PyObject *py_object)
 {
-  if (ELEM(py_object, NULL, Py_None)) {
-    return true;
+  if (PyLong_Check(py_object)) {
+    return (double)PyC_Long_AsI32(py_object);
   }
-
   if (PyFloat_Check(py_object)) {
-    return true;
+    return PyFloat_AsDouble(py_object);
   }
 
-  PyErr_SetString(PyExc_TypeError, "Float or double property ui values must be python floats");
-  return false;
+  BLI_assert(false);
+  return 0.0;
 }
 
 static void idprop_update_rna_ui_data_float(IDProperty *idprop,
@@ -1252,30 +1256,28 @@ static void idprop_update_rna_ui_data_float(IDProperty *idprop,
                                             PyObject *py_precision,
                                             PyObject *py_default_value)
 {
-  if (!check_null_or_float(py_min) || !check_null_or_float(py_max) ||
-      !check_null_or_float(py_soft_min) || !check_null_or_float(py_soft_max) ||
-      !check_null_or_float(py_step) || !check_null_or_float(py_precision)) {
-    return;
-  }
-
   IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)idprop->ui_data;
-  if (!ELEM(py_min, NULL, Py_None)) {
-    ui_data->min = PyFloat_AsDouble(py_min);
+  if (check_ui_data_value(py_min)) {
+    ui_data->min = double_from_py_int_or_double(py_min);
+    ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
   }
-  if (!ELEM(py_max, NULL, Py_None)) {
-    ui_data->max = PyFloat_AsDouble(py_max);
+  if (check_ui_data_value(py_max)) {
+    ui_data->max = double_from_py_int_or_double(py_max);
+    ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
   }
-  if (!ELEM(py_soft_min, NULL, Py_None)) {
-    ui_data->soft_min = PyFloat_AsDouble(py_soft_min);
+  if (check_ui_data_value(py_soft_min)) {
+    ui_data->soft_min = double_from_py_int_or_double(py_soft_min);
+    ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
   }
-  if (!ELEM(py_soft_max, NULL, Py_None)) {
-    ui_data->soft_max = PyFloat_AsDouble(py_soft_max);
+  if (check_ui_data_value(py_soft_max)) {
+    ui_data->soft_max = double_from_py_int_or_double(py_soft_max);
+    ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
   }
-  if (!ELEM(py_step, NULL, Py_None)) {
-    ui_data->step = (float)PyFloat_AsDouble(py_step);
+  if (check_ui_data_value(py_step)) {
+    ui_data->step = (float)double_from_py_int_or_double(py_step);
   }
-  if (!ELEM(py_precision, NULL, Py_None)) {
-    ui_data->precision = (float)PyFloat_AsDouble(py_precision);
+  if (check_ui_data_value(py_precision)) {
+    ui_data->precision = (float)double_from_py_int_or_double(py_precision);
   }
   if (!ELEM(py_default_value, NULL, Py_None)) {
     if (PySequence_Check(py_default_value)) {
@@ -1283,28 +1285,22 @@ static void idprop_update_rna_ui_data_float(IDProperty *idprop,
         PyErr_SetString(PyExc_TypeError, "Only array properties can have array default values");
       }
       else {
+        MEM_SAFE_FREE(ui_data->default_array);
         PyObject **ob_seq_fast_items = PySequence_Fast_ITEMS(py_default_value);
         Py_ssize_t len = PySequence_Fast_GET_SIZE(py_default_value);
 
-        if (ui_data->default_array != NULL) {
-          MEM_freeN(ui_data->default_array);
-        }
-
+        ui_data->default_array_len = len;
         ui_data->default_array = MEM_malloc_arrayN(len, sizeof(double), __func__);
         for (Py_ssize_t i = 0; i < len; i++) {
           PyObject *item = ob_seq_fast_items[i];
-          if (!PyLong_Check(item)) {
-            PyErr_SetString(PyExc_TypeError,
-                            "Float or double property defult values must be python floats");
-            break;
+          if (check_ui_data_value(item)) {
+            ui_data->default_array[i] = double_from_py_int_or_double(item);
           }
-          ui_data->default_array[i] = PyFloat_AsDouble(item);
-          ui_data->default_array_len = len;
         }
       }
     }
-    else if (check_null_or_float(py_default_value)) {
-      ui_data->default_value = PyFloat_AsDouble(py_default_value);
+    else if (check_ui_data_value(py_default_value)) {
+      ui_data->default_value = double_from_py_int_or_double(py_default_value);
     }
   }
 }
@@ -1386,7 +1382,8 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
     return NULL;
   }
 
-  if (!ELEM(idprop->type, IDP_STRING, IDP_INT, IDP_FLOAT, IDP_DOUBLE)) {
+  if (!ELEM(idprop->type, IDP_STRING, IDP_INT, IDP_FLOAT, IDP_DOUBLE, IDP_ARRAY) ||
+      ((idprop->type == IDP_ARRAY) && !ELEM(idprop->subtype, IDP_INT, IDP_FLOAT, IDP_DOUBLE))) {
     PyErr_SetString(
         PyExc_ValueError,
         "RNA UI data is only supported for string, integer, float, or double properties");
@@ -1395,7 +1392,7 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
 
   IDP_ui_data_ensure(idprop);
 
-  if (rna_subtype != NULL) {
+  if (!ELEM(rna_subtype, NULL, Py_None)) {
     if (PyUnicode_Check(rna_subtype)) {
       const char *subtype_string = _PyUnicode_AsString(rna_subtype);
       int result = PROP_NONE;
@@ -1407,9 +1404,9 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
     }
   }
 
-  if (description != NULL) {
+  if (!ELEM(description, NULL, Py_None)) {
     if (PyUnicode_Check(rna_subtype)) {
-      idprop->ui_data->description = BLI_strdup(_PyUnicode_AsString(rna_subtype));
+      idprop->ui_data->description = BLI_strdup(_PyUnicode_AsString(description));
     }
     else if (description != Py_None) {
       PyErr_SetString(PyExc_TypeError, "Property description must be a string object");
@@ -1497,7 +1494,7 @@ static void idprop_ui_data_to_dict_string(IDProperty *idprop, PyObject *dict)
   IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)idprop->ui_data;
   PyObject *item;
 
-  PyDict_SetItemString(dict, "min", item = PyUnicode_FromString(ui_data->default_value));
+  PyDict_SetItemString(dict, "default_value", item = PyUnicode_FromString(ui_data->default_value));
   Py_DECREF(item);
 }
 

@@ -1260,8 +1260,6 @@ class WM_OT_properties_edit(Operator):
             rna_idprop_value_item_type,
         )
 
-        print("custom property edit execute")
-
         data_path = self.data_path
         prop = self.property
 
@@ -1305,7 +1303,7 @@ class WM_OT_properties_edit(Operator):
                                   max=self.max, 
                                   soft_min=self.soft_min, 
                                   soft_max=self.soft_max,
-                                  description="HELLO THERE")
+                                  description=self.description)
         if prop_type in {float, int, str}:
             props = item.custom_properties()
             props.update_rna(prop, default=default_eval)

@@ -2727,6 +2727,7 @@ void RNA_property_int_get_default_array(PointerRNA *ptr, PropertyRNA *prop, int 
     const IDProperty *idprop = (const IDProperty *)prop;
     if (idprop->ui_data) {
       BLI_assert(idprop->type == IDP_ARRAY);
+      BLI_assert(idprop->subtype == IDP_INT);
       const IDPropertyUIDataInt *ui_data = (const IDPropertyUIDataInt *)idprop->ui_data;
       if (ui_data->default_array) {
         rna_property_int_fill_default_array_values(ui_data->default_array,
@@ -3058,7 +3059,7 @@ float RNA_property_float_get_default(PointerRNA *UNUSED(ptr), PropertyRNA *prop)
   if (prop->magic != RNA_MAGIC) {
     const IDProperty *idprop = (const IDProperty *)prop;
     if (idprop->ui_data) {
-      BLI_assert(idprop->type == IDP_FLOAT);
+      BLI_assert(ELEM(idprop->type, IDP_FLOAT, IDP_DOUBLE));
       const IDPropertyUIDataFloat *ui_data = (const IDPropertyUIDataFloat *)idprop->ui_data;
       return (float)ui_data->default_value;
     }
@@ -3096,6 +3097,7 @@ void RNA_property_float_get_default_array(PointerRNA *ptr, PropertyRNA *prop, fl
     const IDProperty *idprop = (const IDProperty *)prop;
     if (idprop->ui_data) {
       BLI_assert(idprop->type == IDP_ARRAY);
+      BLI_assert(ELEM(idprop->type, IDP_FLOAT, IDP_DOUBLE));
       const IDPropertyUIDataFloat *ui_data = (const IDPropertyUIDataFloat *)idprop->ui_data;
       if (ui_data->default_array) {
         /* A version of #rna_property_float_fill_default_array_values for a double array. */

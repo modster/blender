@@ -1032,6 +1032,30 @@ IDProperty *IDP_New(const char type, const IDPropertyTemplate *val, const char *
   return prop;
 }
 
+static void free_ui_data(IDProperty *prop)
+{
+  if (prop->ui_data == NULL) {
+    return;
+  }
+
+  if (prop->type == IDP_STRING) {
+    IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)prop->ui_data;
+    MEM_SAFE_FREE(ui_data->default_value);
+  }
+  else if (prop->type == IDP_INT || (prop->type == IDP_ARRAY && prop->subtype == IDP_INT)) {
+    IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)prop->ui_data;
+    MEM_SAFE_FREE(ui_data->default_array);
+  }
+  else if (ELEM(prop->type, IDP_FLOAT, IDP_DOUBLE) ||
+           (prop->type == IDP_ARRAY && ELEM(prop->subtype, IDP_FLOAT, IDP_DOUBLE))) {
+    IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)prop->ui_data;
+    MEM_SAFE_FREE(ui_data->default_array);
+  }
+
+  MEM_SAFE_FREE(prop->ui_data->description);
+  MEM_freeN(prop->ui_data);
+}
+
 /**
  * \note This will free allocated data, all child properties of arrays and groups, and unlink IDs!
  * But it does not free the actual IDProperty struct itself.
@@ -1057,6 +1081,7 @@ void IDP_FreePropertyContent_ex(IDProperty *prop, const bool do_id_user)
       }
       break;
   }
+  free_ui_data(prop);
 }
 
 void IDP_FreePropertyContent(IDProperty *prop)
