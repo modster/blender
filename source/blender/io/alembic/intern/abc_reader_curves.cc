@@ -223,7 +223,7 @@ void AbcCurveReader::read_curve_sample(Curve *cu,
 
     const bool do_radius = (radiuses != nullptr) && (radiuses->size() > 1);
     float radius = (radiuses && radiuses->size() == 1) ? (*radiuses)[0] :
-                                                         m_settings->default_curves_radius;
+                                                         m_settings->default_radius;
 
     nu->type = CU_NURBS;
 

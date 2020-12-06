@@ -7242,7 +7242,7 @@ void uiTemplateCacheFile(uiLayout *layout,
   uiItemR(layout, &fileptr, "velocity_name", 0, NULL, ICON_NONE);
   uiItemR(layout, &fileptr, "velocity_unit", 0, NULL, ICON_NONE);
 
-  uiItemR(layout, &fileptr, "default_curves_radius", 0, NULL, ICON_NONE);
+  uiItemR(layout, &fileptr, "default_radius", 0, NULL, ICON_NONE);
 
   /* TODO: unused for now, so no need to expose. */
 #if 0

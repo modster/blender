@@ -666,7 +666,7 @@ bool ABC_import(bContext *C,
                 int offset,
                 bool validate_meshes,
                 bool force_modifier,
-                float default_curves_radius,
+                float default_radius,
                 bool as_background_job)
 {
   /* Using new here since MEM_* functions do not call constructor to properly initialize data. */
@@ -686,7 +686,7 @@ bool ABC_import(bContext *C,
   job->settings.sequence_offset = offset;
   job->settings.validate_meshes = validate_meshes;
   job->settings.force_modifier = force_modifier;
-  job->settings.default_curves_radius = default_curves_radius;
+  job->settings.default_radius = default_radius;
   job->error_code = ABC_NO_ERROR;
   job->was_cancelled = false;
   job->archive = nullptr;

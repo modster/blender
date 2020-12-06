@@ -63,7 +63,7 @@ static void cache_file_init_data(ID *id)
 
   BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(cache_file, id));
 
-  cache_file->default_curves_radius = 0.01f;
+  cache_file->default_radius = 0.01f;
   cache_file->scale = 1.0f;
   cache_file->velocity_unit = CACHEFILE_VELOCITY_UNIT_SECOND;
   BLI_strncpy(cache_file->velocity_name, ".velocities", sizeof(cache_file->velocity_name));

@@ -1121,7 +1121,7 @@ NODE_DEFINE(AlembicProcedural)
   SOCKET_FLOAT(frame, "Frame", 1.0f);
   SOCKET_FLOAT(frame_rate, "Frame Rate", 24.0f);
   SOCKET_FLOAT(frame_offset, "Frame Offset", 0.0f);
-  SOCKET_FLOAT(default_curves_radius, "Default Curve Radius", 0.01f);
+  SOCKET_FLOAT(default_radius, "Default Radius", 0.01f);
 
   SOCKET_NODE_ARRAY(objects, "Objects", &AlembicObject::node_type);
 
@@ -1132,7 +1132,7 @@ AlembicProcedural::AlembicProcedural() : Procedural(node_type)
 {
   frame = 1.0f;
   frame_rate = 24.0f;
-  default_curves_radius = 0.01f;
+  default_radius = 0.01f;
 
   objects_loaded = false;
   scene_ = nullptr;
@@ -1510,8 +1510,8 @@ void AlembicProcedural::read_curves(Scene *scene,
 
   ICurvesSchema schema = curves.getSchema();
 
-  if (!abc_object->has_data_loaded() || default_curves_radius_is_modified() || abc_object->radius_scale_is_modified()) {
-    abc_object->load_all_data(schema, progress, default_curves_radius);
+  if (!abc_object->has_data_loaded() || default_radius_is_modified() || abc_object->radius_scale_is_modified()) {
+    abc_object->load_all_data(schema, progress, default_radius);
   }
 
   CachedData &cached_data = abc_object->get_cached_data();

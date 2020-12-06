@@ -208,12 +208,11 @@ static void rna_def_cachefile(BlenderRNA *brna)
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 
-  prop = RNA_def_property(srna, "default_curves_radius", PROP_FLOAT, PROP_NONE);
-  RNA_def_property_float_sdna(prop, NULL, "default_curves_radius");
+  prop = RNA_def_property(srna, "default_radius", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "default_radius");
   RNA_def_property_ui_text(prop,
-                           "Curves Radius",
-                           "Value to use for defining the curves width when the curves in the "
-                           "Alembic archive do not have a property for it");
+                           "Default Radius",
+                           "Value to use for defining the radius of curves and points when they do have of property for it");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
   RNA_define_lib_overridable(false);

@@ -429,7 +429,7 @@ class AlembicProcedural : public Procedural {
 
   /* Set the default radius to use for curves when the Alembic Curves Schemas do not have radius
    * information. */
-  NODE_SOCKET_API(float, default_curves_radius)
+  NODE_SOCKET_API(float, default_radius)
 
   AlembicProcedural();
   ~AlembicProcedural();

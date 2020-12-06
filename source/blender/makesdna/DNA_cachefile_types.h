@@ -80,8 +80,8 @@ typedef struct CacheFile {
   /** The frame offset to subtract. */
   float frame_offset;
 
-  /** Default radius assigned to curves if no such property exists for them. */
-  float default_curves_radius;
+  /** Default radius assigned to curves or points if no such property exists for them. */
+  float default_radius;
 
   /** Animation flag. */
   short flag;
