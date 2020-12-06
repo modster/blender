@@ -576,12 +576,17 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
 
     add_positions(sample.getPositions(), time, cached_data);
 
-    /* TODO(@kevindietrich): this is a waste of memory and processing time if only the positions
-     * are changing but we cannot optimize in this current system if the attributes are changing
-     * over time as well, as we need valid data for each time point. This can be solved by using
-     * reference counting on the array and simply share the array across frames. */
-    add_triangles(
-        sample.getFaceCounts(), sample.getFaceIndices(), time, cached_data, polygon_to_shader);
+	/* Only copy triangles for other frames if the topology is changing over time as well.
+	 *
+	 * TODO(@kevindietrich): even for dynamic simulations, this is a waste of memory and
+	 * processing time if only the positions are changing in a subsequence of frames but we
+	 * cannot optimize in this current system if the attributes are changing over time as well,
+	 * as we need valid data for each time point. This can be solved by using reference counting
+	 * on the ccl::array and simply share the array across frames. */
+	if (schema.getTopologyVariance() != kHomogenousTopology || i == 0) {
+		add_triangles(
+			sample.getFaceCounts(), sample.getFaceIndices(), time, cached_data, polygon_to_shader);
+	}
 
     if (normals.valid()) {
       add_normals(sample.getFaceIndices(), normals, time, cached_data);
@@ -651,99 +656,99 @@ void AlembicObject::load_all_data(ISubDSchema &schema, Progress &progress)
 
     add_positions(sample.getPositions(), time, cached_data);
 
-    const Int32ArraySamplePtr face_counts = sample.getFaceCounts();
-    const Int32ArraySamplePtr face_indices = sample.getFaceIndices();
+	const Int32ArraySamplePtr face_counts = sample.getFaceCounts();
+	const Int32ArraySamplePtr face_indices = sample.getFaceIndices();
 
-    /* read faces */
-    array<int> subd_start_corner;
-    array<int> shader;
-    array<int> subd_num_corners;
-    array<bool> subd_smooth;
-    array<int> subd_ptex_offset;
-    array<int> subd_face_corners;
+	/* read faces */
+	array<int> subd_start_corner;
+	array<int> shader;
+	array<int> subd_num_corners;
+	array<bool> subd_smooth;
+	array<int> subd_ptex_offset;
+	array<int> subd_face_corners;
 
-    const size_t num_faces = face_counts->size();
-    const int *face_counts_array = face_counts->get();
-    const int *face_indices_array = face_indices->get();
+	const size_t num_faces = face_counts->size();
+	const int *face_counts_array = face_counts->get();
+	const int *face_indices_array = face_indices->get();
 
-    int num_ngons = 0;
-    int num_corners = 0;
-    for (size_t i = 0; i < face_counts->size(); i++) {
-      num_ngons += (face_counts_array[i] == 4 ? 0 : 1);
-      num_corners += face_counts_array[i];
-    }
+	int num_ngons = 0;
+	int num_corners = 0;
+	for (size_t i = 0; i < face_counts->size(); i++) {
+	  num_ngons += (face_counts_array[i] == 4 ? 0 : 1);
+	  num_corners += face_counts_array[i];
+	}
 
-    subd_start_corner.reserve(num_faces);
-    subd_num_corners.reserve(num_faces);
-    subd_smooth.reserve(num_faces);
-    subd_ptex_offset.reserve(num_faces);
-    shader.reserve(num_faces);
-    subd_face_corners.reserve(num_corners);
+	subd_start_corner.reserve(num_faces);
+	subd_num_corners.reserve(num_faces);
+	subd_smooth.reserve(num_faces);
+	subd_ptex_offset.reserve(num_faces);
+	shader.reserve(num_faces);
+	subd_face_corners.reserve(num_corners);
 
-    int start_corner = 0;
-    int current_shader = 0;
-    int ptex_offset = 0;
+	int start_corner = 0;
+	int current_shader = 0;
+	int ptex_offset = 0;
 
-    for (size_t i = 0; i < face_counts->size(); i++) {
-      num_corners = face_counts_array[i];
+	for (size_t i = 0; i < face_counts->size(); i++) {
+	  num_corners = face_counts_array[i];
 
-      if (!polygon_to_shader.empty()) {
-        current_shader = polygon_to_shader[i];
-      }
+	  if (!polygon_to_shader.empty()) {
+		current_shader = polygon_to_shader[i];
+	  }
 
-      subd_start_corner.push_back_reserved(start_corner);
-      subd_num_corners.push_back_reserved(num_corners);
+	  subd_start_corner.push_back_reserved(start_corner);
+	  subd_num_corners.push_back_reserved(num_corners);
 
-      for (int j = 0; j < num_corners; ++j) {
-        subd_face_corners.push_back_reserved(face_indices_array[start_corner + j]);
-      }
+	  for (int j = 0; j < num_corners; ++j) {
+		subd_face_corners.push_back_reserved(face_indices_array[start_corner + j]);
+	  }
 
-      shader.push_back_reserved(current_shader);
-      subd_smooth.push_back_reserved(1);
-      subd_ptex_offset.push_back_reserved(ptex_offset);
+	  shader.push_back_reserved(current_shader);
+	  subd_smooth.push_back_reserved(1);
+	  subd_ptex_offset.push_back_reserved(ptex_offset);
 
-      ptex_offset += (num_corners == 4 ? 1 : num_corners);
+	  ptex_offset += (num_corners == 4 ? 1 : num_corners);
 
-      start_corner += num_corners;
-    }
+	  start_corner += num_corners;
+	}
 
-    cached_data.shader.add_data(shader, time);
-    cached_data.subd_start_corner.add_data(subd_start_corner, time);
-    cached_data.subd_num_corners.add_data(subd_num_corners, time);
-    cached_data.subd_smooth.add_data(subd_smooth, time);
-    cached_data.subd_ptex_offset.add_data(subd_ptex_offset, time);
-    cached_data.subd_face_corners.add_data(subd_face_corners, time);
-    cached_data.num_ngons.add_data(num_ngons, time);
+	cached_data.shader.add_data(shader, time);
+	cached_data.subd_start_corner.add_data(subd_start_corner, time);
+	cached_data.subd_num_corners.add_data(subd_num_corners, time);
+	cached_data.subd_smooth.add_data(subd_smooth, time);
+	cached_data.subd_ptex_offset.add_data(subd_ptex_offset, time);
+	cached_data.subd_face_corners.add_data(subd_face_corners, time);
+	cached_data.num_ngons.add_data(num_ngons, time);
 
-    /* read creases */
-    Int32ArraySamplePtr creases_length = sample.getCreaseLengths();
-    Int32ArraySamplePtr creases_indices = sample.getCreaseIndices();
-    FloatArraySamplePtr creases_sharpnesses = sample.getCreaseSharpnesses();
+	/* read creases */
+	Int32ArraySamplePtr creases_length = sample.getCreaseLengths();
+	Int32ArraySamplePtr creases_indices = sample.getCreaseIndices();
+	FloatArraySamplePtr creases_sharpnesses = sample.getCreaseSharpnesses();
 
-    if (creases_length && creases_indices && creases_sharpnesses) {
-      array<int> creases_edge;
-      array<float> creases_weight;
+	if (creases_length && creases_indices && creases_sharpnesses) {
+	  array<int> creases_edge;
+	  array<float> creases_weight;
 
-      creases_edge.reserve(creases_sharpnesses->size() * 2);
-      creases_weight.reserve(creases_sharpnesses->size());
+	  creases_edge.reserve(creases_sharpnesses->size() * 2);
+	  creases_weight.reserve(creases_sharpnesses->size());
 
-      int length_offset = 0;
-      int weight_offset = 0;
-      for (size_t c = 0; c < creases_length->size(); ++c) {
-        const int crease_length = creases_length->get()[c];
+	  int length_offset = 0;
+	  int weight_offset = 0;
+	  for (size_t c = 0; c < creases_length->size(); ++c) {
+		const int crease_length = creases_length->get()[c];
 
-        for (size_t j = 0; j < crease_length - 1; ++j) {
-          creases_edge.push_back_reserved(creases_indices->get()[length_offset + j]);
-          creases_edge.push_back_reserved(creases_indices->get()[length_offset + j + 1]);
-          creases_weight.push_back_reserved(creases_sharpnesses->get()[weight_offset++]);
-        }
+		for (size_t j = 0; j < crease_length - 1; ++j) {
+		  creases_edge.push_back_reserved(creases_indices->get()[length_offset + j]);
+		  creases_edge.push_back_reserved(creases_indices->get()[length_offset + j + 1]);
+		  creases_weight.push_back_reserved(creases_sharpnesses->get()[weight_offset++]);
+		}
 
-        length_offset += crease_length;
-      }
+		length_offset += crease_length;
+	  }
 
-      cached_data.subd_creases_edge.add_data(creases_edge, time);
-      cached_data.subd_creases_weight.add_data(creases_weight, time);
-    }
+	  cached_data.subd_creases_edge.add_data(creases_edge, time);
+	  cached_data.subd_creases_weight.add_data(creases_weight, time);
+	}
   }
 
   /* TODO(@kevindietrich) : attributes, need test files */
