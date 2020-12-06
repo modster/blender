@@ -345,6 +345,10 @@ void rna_ViewLayer_material_override_update(struct Main *bmain,
 void rna_ViewLayer_pass_update(struct Main *bmain,
                                struct Scene *activescene,
                                struct PointerRNA *ptr);
+void rna_ViewLayer_active_aov_index_range(
+    PointerRNA *ptr, int *min, int *max, int *softmin, int *softmax);
+int rna_ViewLayer_active_aov_index_get(PointerRNA *ptr);
+void rna_ViewLayer_active_aov_index_set(PointerRNA *ptr, int value);
 
 /* named internal so as not to conflict with obj.update() rna func */
 void rna_Object_internal_update_data(struct Main *bmain,
@@ -466,9 +470,7 @@ void RNA_def_main_lightprobes(BlenderRNA *brna, PropertyRNA *cprop);
 #ifdef WITH_HAIR_NODES
 void RNA_def_main_hairs(BlenderRNA *brna, PropertyRNA *cprop);
 #endif
-#ifdef WITH_POINT_CLOUD
 void RNA_def_main_pointclouds(BlenderRNA *brna, PropertyRNA *cprop);
-#endif
 void RNA_def_main_volumes(BlenderRNA *brna, PropertyRNA *cprop);
 #ifdef WITH_GEOMETRY_NODES
 void RNA_def_main_simulations(BlenderRNA *brna, PropertyRNA *cprop);
