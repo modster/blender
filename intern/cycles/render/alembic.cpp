@@ -489,14 +489,8 @@ void AlembicObject::update_shader_attributes(const ICompoundProperty &arb_geom_p
 }
 
 template<typename SchemaType>
-void AlembicObject::read_face_sets(SchemaType &schema, array<int> &polygon_to_shader)
+void AlembicObject::read_face_sets(SchemaType &schema, array<int> &polygon_to_shader, ISampleSelector sample_sel)
 {
-  /* TODO(@kevindietrich) at the moment this is only supported for meshes whose topology remains
-   * constant (with possible vertex animation) */
-  if (schema.getTopologyVariance() == kHeterogenousTopology) {
-    return;
-  }
-
   std::vector<std::string> face_sets;
   schema.getFaceSetNames(face_sets);
 
@@ -531,7 +525,7 @@ void AlembicObject::read_face_sets(SchemaType &schema, array<int> &polygon_to_sh
     }
 
     const IFaceSetSchema face_schem = face_set.getSchema();
-    const IFaceSetSchema::Sample face_sample = face_schem.getValue(ISampleSelector(index_t(0)));
+	const IFaceSetSchema::Sample face_sample = face_schem.getValue(sample_sel);
     const Int32ArraySamplePtr group_faces = face_sample.getFaces();
     const size_t num_group_faces = group_faces->size();
 
@@ -556,11 +550,6 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
   cached_data.triangles.set_time_sampling(*time_sampling);
   cached_data.triangles_loops.set_time_sampling(*time_sampling);
 
-  /* start by reading the face sets (per face shader), as we directly split polygons to triangles
-   */
-  array<int> polygon_to_shader;
-  read_face_sets(schema, polygon_to_shader);
-
   const IN3fGeomParam &normals = schema.getNormalsParam();
 
   /* read topology */
@@ -584,6 +573,11 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
 	 * as we need valid data for each time point. This can be solved by using reference counting
 	 * on the ccl::array and simply share the array across frames. */
 	if (schema.getTopologyVariance() != kHomogenousTopology || i == 0) {
+		/* start by reading the face sets (per face shader), as we directly split polygons to triangles
+		 */
+		array<int> polygon_to_shader;
+		read_face_sets(schema, polygon_to_shader, iss);
+
 		add_triangles(
 			sample.getFaceCounts(), sample.getFaceIndices(), time, cached_data, polygon_to_shader);
 	}
@@ -638,11 +632,6 @@ void AlembicObject::load_all_data(ISubDSchema &schema, Progress &progress)
   cached_data.subd_creases_edge.set_time_sampling(*time_sampling);
   cached_data.subd_creases_weight.set_time_sampling(*time_sampling);
 
-  /* start by reading the face sets (per face shader), as we directly split polygons to triangles
-   */
-  array<int> polygon_to_shader;
-  read_face_sets(schema, polygon_to_shader);
-
   /* read topology */
   for (size_t i = 0; i < schema.getNumSamples(); ++i) {
     if (progress.get_cancel()) {
@@ -658,6 +647,10 @@ void AlembicObject::load_all_data(ISubDSchema &schema, Progress &progress)
 
 	const Int32ArraySamplePtr face_counts = sample.getFaceCounts();
 	const Int32ArraySamplePtr face_indices = sample.getFaceIndices();
+
+	/* start by reading the face sets (per face shader) */
+	array<int> polygon_to_shader;
+	read_face_sets(schema, polygon_to_shader, iss);
 
 	/* read faces */
 	array<int> subd_start_corner;
