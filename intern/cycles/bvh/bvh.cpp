@@ -283,7 +283,7 @@ void BVH::pack_triangle(int idx, float4 tri_verts[3])
 
 void BVH::pack_primitives()
 {
-  if (!params.top_level && objects.size() == 1 && geometry.size() == 1) {
+  if (!params.top_level && objects.size() == 1 && geometry.size() == 1 && params.bvh_layout != BVHLayout::BVH_LAYOUT_BVH2) {
     Object *ob = objects[0];
     Geometry *geom = geometry[0];
 
