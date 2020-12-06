@@ -1210,7 +1210,7 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
     }
 
     /* skip constant objects */
-    if (object->has_data_loaded() && object->is_constant() && !object->need_shader_update) {
+    if (object->has_data_loaded() && object->is_constant() && !object->is_modified() && !object->need_shader_update) {
       continue;
     }
 
