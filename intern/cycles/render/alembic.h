@@ -388,7 +388,9 @@ class AlembicObject : public Node {
                       Progress &progress);
 
   template<typename SchemaType>
-  void read_face_sets(SchemaType &schema, array<int> &polygon_to_shader, Alembic::AbcGeom::ISampleSelector sample_sel);
+  void read_face_sets(SchemaType &schema,
+                      array<int> &polygon_to_shader,
+                      Alembic::AbcGeom::ISampleSelector sample_sel);
 
   void setup_transform_cache();
 

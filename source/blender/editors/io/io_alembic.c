@@ -723,16 +723,16 @@ void WM_OT_alembic_import(wmOperatorType *ot)
                   "Is Sequence",
                   "Set to true if the cache is split into separate files");
 
-  RNA_def_float(
-      ot->srna,
-      "default_radius",
-      0.01f,
-      0.0001f,
-      1000.0f,
-      "Curves Radius",
-      "Value to use for defining the radius of curves of points when then do not have a property for it",
-      0.0001f,
-      1000.0f);
+  RNA_def_float(ot->srna,
+                "default_radius",
+                0.01f,
+                0.0001f,
+                1000.0f,
+                "Curves Radius",
+                "Value to use for defining the radius of curves of points when then do not have a "
+                "property for it",
+                0.0001f,
+                1000.0f);
 
   RNA_def_boolean(
       ot->srna,

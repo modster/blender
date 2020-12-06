@@ -46,7 +46,13 @@ static float3 make_float3_from_yup(const V3f &v)
 static M44d convert_yup_zup(const M44d &mtx)
 {
   V3d scale, shear, rotation, translation;
-  extractSHRT(mtx, scale, shear, rotation, translation, true, IMATH_INTERNAL_NAMESPACE::Euler<double>::XZY);
+  extractSHRT(mtx,
+              scale,
+              shear,
+              rotation,
+              translation,
+              true,
+              IMATH_INTERNAL_NAMESPACE::Euler<double>::XZY);
 
   M44d rot_mat, scale_mat, trans_mat;
   rot_mat.setEulerAngles(V3d(rotation.x, -rotation.z, rotation.y));
@@ -222,8 +228,7 @@ static void add_uvs(const IV2fGeomParam &uvs, CachedData &cached_data, Progress 
     name = uvs.getName();
   }
 
-  CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(name),
-                                                                time_sampling);
+  CachedData::CachedAttribute &attr = cached_data.add_attribute(ustring(name), time_sampling);
   attr.std = ATTR_STD_UV;
 
   for (size_t i = 0; i < uvs.getNumSamples(); ++i) {
@@ -491,7 +496,9 @@ void AlembicObject::update_shader_attributes(const ICompoundProperty &arb_geom_p
 }
 
 template<typename SchemaType>
-void AlembicObject::read_face_sets(SchemaType &schema, array<int> &polygon_to_shader, ISampleSelector sample_sel)
+void AlembicObject::read_face_sets(SchemaType &schema,
+                                   array<int> &polygon_to_shader,
+                                   ISampleSelector sample_sel)
 {
   std::vector<std::string> face_sets;
   schema.getFaceSetNames(face_sets);
@@ -527,7 +534,7 @@ void AlembicObject::read_face_sets(SchemaType &schema, array<int> &polygon_to_sh
     }
 
     const IFaceSetSchema face_schem = face_set.getSchema();
-	const IFaceSetSchema::Sample face_sample = face_schem.getValue(sample_sel);
+    const IFaceSetSchema::Sample face_sample = face_schem.getValue(sample_sel);
     const Int32ArraySamplePtr group_faces = face_sample.getFaces();
     const size_t num_group_faces = group_faces->size();
 
@@ -567,22 +574,23 @@ void AlembicObject::load_all_data(IPolyMeshSchema &schema, Progress &progress)
 
     add_positions(sample.getPositions(), time, cached_data);
 
-	/* Only copy triangles for other frames if the topology is changing over time as well.
-	 *
-	 * TODO(@kevindietrich): even for dynamic simulations, this is a waste of memory and
-	 * processing time if only the positions are changing in a subsequence of frames but we
-	 * cannot optimize in this current system if the attributes are changing over time as well,
-	 * as we need valid data for each time point. This can be solved by using reference counting
-	 * on the ccl::array and simply share the array across frames. */
-	if (schema.getTopologyVariance() != kHomogenousTopology || i == 0) {
-		/* start by reading the face sets (per face shader), as we directly split polygons to triangles
-		 */
-		array<int> polygon_to_shader;
-		read_face_sets(schema, polygon_to_shader, iss);
+    /* Only copy triangles for other frames if the topology is changing over time as well.
+     *
+     * TODO(@kevindietrich): even for dynamic simulations, this is a waste of memory and
+     * processing time if only the positions are changing in a subsequence of frames but we
+     * cannot optimize in this current system if the attributes are changing over time as well,
+     * as we need valid data for each time point. This can be solved by using reference counting
+     * on the ccl::array and simply share the array across frames. */
+    if (schema.getTopologyVariance() != kHomogenousTopology || i == 0) {
+      /* start by reading the face sets (per face shader), as we directly split polygons to
+       * triangles
+       */
+      array<int> polygon_to_shader;
+      read_face_sets(schema, polygon_to_shader, iss);
 
-		add_triangles(
-			sample.getFaceCounts(), sample.getFaceIndices(), time, cached_data, polygon_to_shader);
-	}
+      add_triangles(
+          sample.getFaceCounts(), sample.getFaceIndices(), time, cached_data, polygon_to_shader);
+    }
 
     if (normals.valid()) {
       add_normals(sample.getFaceIndices(), normals, time, cached_data);
@@ -647,103 +655,103 @@ void AlembicObject::load_all_data(ISubDSchema &schema, Progress &progress)
 
     add_positions(sample.getPositions(), time, cached_data);
 
-	const Int32ArraySamplePtr face_counts = sample.getFaceCounts();
-	const Int32ArraySamplePtr face_indices = sample.getFaceIndices();
+    const Int32ArraySamplePtr face_counts = sample.getFaceCounts();
+    const Int32ArraySamplePtr face_indices = sample.getFaceIndices();
 
-	/* start by reading the face sets (per face shader) */
-	array<int> polygon_to_shader;
-	read_face_sets(schema, polygon_to_shader, iss);
+    /* start by reading the face sets (per face shader) */
+    array<int> polygon_to_shader;
+    read_face_sets(schema, polygon_to_shader, iss);
 
-	/* read faces */
-	array<int> subd_start_corner;
-	array<int> shader;
-	array<int> subd_num_corners;
-	array<bool> subd_smooth;
-	array<int> subd_ptex_offset;
-	array<int> subd_face_corners;
+    /* read faces */
+    array<int> subd_start_corner;
+    array<int> shader;
+    array<int> subd_num_corners;
+    array<bool> subd_smooth;
+    array<int> subd_ptex_offset;
+    array<int> subd_face_corners;
 
-	const size_t num_faces = face_counts->size();
-	const int *face_counts_array = face_counts->get();
-	const int *face_indices_array = face_indices->get();
+    const size_t num_faces = face_counts->size();
+    const int *face_counts_array = face_counts->get();
+    const int *face_indices_array = face_indices->get();
 
-	int num_ngons = 0;
-	int num_corners = 0;
-	for (size_t i = 0; i < face_counts->size(); i++) {
-	  num_ngons += (face_counts_array[i] == 4 ? 0 : 1);
-	  num_corners += face_counts_array[i];
-	}
+    int num_ngons = 0;
+    int num_corners = 0;
+    for (size_t i = 0; i < face_counts->size(); i++) {
+      num_ngons += (face_counts_array[i] == 4 ? 0 : 1);
+      num_corners += face_counts_array[i];
+    }
 
-	subd_start_corner.reserve(num_faces);
-	subd_num_corners.reserve(num_faces);
-	subd_smooth.reserve(num_faces);
-	subd_ptex_offset.reserve(num_faces);
-	shader.reserve(num_faces);
-	subd_face_corners.reserve(num_corners);
+    subd_start_corner.reserve(num_faces);
+    subd_num_corners.reserve(num_faces);
+    subd_smooth.reserve(num_faces);
+    subd_ptex_offset.reserve(num_faces);
+    shader.reserve(num_faces);
+    subd_face_corners.reserve(num_corners);
 
-	int start_corner = 0;
-	int current_shader = 0;
-	int ptex_offset = 0;
+    int start_corner = 0;
+    int current_shader = 0;
+    int ptex_offset = 0;
 
-	for (size_t i = 0; i < face_counts->size(); i++) {
-	  num_corners = face_counts_array[i];
+    for (size_t i = 0; i < face_counts->size(); i++) {
+      num_corners = face_counts_array[i];
 
-	  if (!polygon_to_shader.empty()) {
-		current_shader = polygon_to_shader[i];
-	  }
+      if (!polygon_to_shader.empty()) {
+        current_shader = polygon_to_shader[i];
+      }
 
-	  subd_start_corner.push_back_reserved(start_corner);
-	  subd_num_corners.push_back_reserved(num_corners);
+      subd_start_corner.push_back_reserved(start_corner);
+      subd_num_corners.push_back_reserved(num_corners);
 
-	  for (int j = 0; j < num_corners; ++j) {
-		subd_face_corners.push_back_reserved(face_indices_array[start_corner + j]);
-	  }
+      for (int j = 0; j < num_corners; ++j) {
+        subd_face_corners.push_back_reserved(face_indices_array[start_corner + j]);
+      }
 
-	  shader.push_back_reserved(current_shader);
-	  subd_smooth.push_back_reserved(1);
-	  subd_ptex_offset.push_back_reserved(ptex_offset);
+      shader.push_back_reserved(current_shader);
+      subd_smooth.push_back_reserved(1);
+      subd_ptex_offset.push_back_reserved(ptex_offset);
 
-	  ptex_offset += (num_corners == 4 ? 1 : num_corners);
+      ptex_offset += (num_corners == 4 ? 1 : num_corners);
 
-	  start_corner += num_corners;
-	}
+      start_corner += num_corners;
+    }
 
-	cached_data.shader.add_data(shader, time);
-	cached_data.subd_start_corner.add_data(subd_start_corner, time);
-	cached_data.subd_num_corners.add_data(subd_num_corners, time);
-	cached_data.subd_smooth.add_data(subd_smooth, time);
-	cached_data.subd_ptex_offset.add_data(subd_ptex_offset, time);
-	cached_data.subd_face_corners.add_data(subd_face_corners, time);
-	cached_data.num_ngons.add_data(num_ngons, time);
+    cached_data.shader.add_data(shader, time);
+    cached_data.subd_start_corner.add_data(subd_start_corner, time);
+    cached_data.subd_num_corners.add_data(subd_num_corners, time);
+    cached_data.subd_smooth.add_data(subd_smooth, time);
+    cached_data.subd_ptex_offset.add_data(subd_ptex_offset, time);
+    cached_data.subd_face_corners.add_data(subd_face_corners, time);
+    cached_data.num_ngons.add_data(num_ngons, time);
 
-	/* read creases */
-	Int32ArraySamplePtr creases_length = sample.getCreaseLengths();
-	Int32ArraySamplePtr creases_indices = sample.getCreaseIndices();
-	FloatArraySamplePtr creases_sharpnesses = sample.getCreaseSharpnesses();
+    /* read creases */
+    Int32ArraySamplePtr creases_length = sample.getCreaseLengths();
+    Int32ArraySamplePtr creases_indices = sample.getCreaseIndices();
+    FloatArraySamplePtr creases_sharpnesses = sample.getCreaseSharpnesses();
 
-	if (creases_length && creases_indices && creases_sharpnesses) {
-	  array<int> creases_edge;
-	  array<float> creases_weight;
+    if (creases_length && creases_indices && creases_sharpnesses) {
+      array<int> creases_edge;
+      array<float> creases_weight;
 
-	  creases_edge.reserve(creases_sharpnesses->size() * 2);
-	  creases_weight.reserve(creases_sharpnesses->size());
+      creases_edge.reserve(creases_sharpnesses->size() * 2);
+      creases_weight.reserve(creases_sharpnesses->size());
 
-	  int length_offset = 0;
-	  int weight_offset = 0;
-	  for (size_t c = 0; c < creases_length->size(); ++c) {
-		const int crease_length = creases_length->get()[c];
+      int length_offset = 0;
+      int weight_offset = 0;
+      for (size_t c = 0; c < creases_length->size(); ++c) {
+        const int crease_length = creases_length->get()[c];
 
-		for (size_t j = 0; j < crease_length - 1; ++j) {
-		  creases_edge.push_back_reserved(creases_indices->get()[length_offset + j]);
-		  creases_edge.push_back_reserved(creases_indices->get()[length_offset + j + 1]);
-		  creases_weight.push_back_reserved(creases_sharpnesses->get()[weight_offset++]);
-		}
+        for (size_t j = 0; j < crease_length - 1; ++j) {
+          creases_edge.push_back_reserved(creases_indices->get()[length_offset + j]);
+          creases_edge.push_back_reserved(creases_indices->get()[length_offset + j + 1]);
+          creases_weight.push_back_reserved(creases_sharpnesses->get()[weight_offset++]);
+        }
 
-		length_offset += crease_length;
-	  }
+        length_offset += crease_length;
+      }
 
-	  cached_data.subd_creases_edge.add_data(creases_edge, time);
-	  cached_data.subd_creases_weight.add_data(creases_weight, time);
-	}
+      cached_data.subd_creases_edge.add_data(creases_edge, time);
+      cached_data.subd_creases_weight.add_data(creases_weight, time);
+    }
   }
 
   /* TODO(@kevindietrich) : attributes, need test files */
@@ -1210,7 +1218,8 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
     }
 
     /* skip constant objects */
-    if (object->has_data_loaded() && object->is_constant() && !object->is_modified() && !object->need_shader_update) {
+    if (object->has_data_loaded() && object->is_constant() && !object->is_modified() &&
+        !object->need_shader_update) {
       continue;
     }
 
@@ -1510,7 +1519,8 @@ void AlembicProcedural::read_curves(Scene *scene,
 
   ICurvesSchema schema = curves.getSchema();
 
-  if (!abc_object->has_data_loaded() || default_radius_is_modified() || abc_object->radius_scale_is_modified()) {
+  if (!abc_object->has_data_loaded() || default_radius_is_modified() ||
+      abc_object->radius_scale_is_modified()) {
     abc_object->load_all_data(schema, progress, default_radius);
   }
 

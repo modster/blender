@@ -508,10 +508,10 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
   }
 
   if (cache_file.override_frame()) {
-	  procedural->set_frame(cache_file.frame());
+    procedural->set_frame(cache_file.frame());
   }
   else {
-	  procedural->set_frame(static_cast<float>(frame_current));
+    procedural->set_frame(static_cast<float>(frame_current));
   }
 
   procedural->set_frame_rate(b_scene.render().fps() / b_scene.render().fps_base());
