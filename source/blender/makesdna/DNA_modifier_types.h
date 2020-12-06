@@ -2125,7 +2125,8 @@ typedef struct MeshSeqCacheModifierData {
    * modifier was last executed. Used to access Alembic samples through the RNA. */
   float last_lookup_time;
 
-  int _pad1;
+  /* Factors the radius for curves and points. */
+  float radius_scale;
 } MeshSeqCacheModifierData;
 
 /* MeshSeqCacheModifierData.read_flag */

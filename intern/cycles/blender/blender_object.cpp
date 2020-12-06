@@ -534,6 +534,8 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
   abc_object->set_subd_dicing_rate(subd_dicing_rate);
   abc_object->set_subd_max_level(max_subdivisions);
 
+  abc_object->set_radius_scale(b_mesh_cache.radius_scale());
+
   if (abc_object->is_modified() || procedural->is_modified()) {
     procedural->tag_update(scene);
   }

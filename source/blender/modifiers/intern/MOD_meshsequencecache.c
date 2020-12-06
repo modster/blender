@@ -242,6 +242,7 @@ static void panel_draw(const bContext *C, Panel *panel)
   }
 
   uiItemR(layout, ptr, "velocity_scale", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "radius_scale", 0, NULL, ICON_NONE);
 
   modifier_panel_end(layout, ptr);
 }

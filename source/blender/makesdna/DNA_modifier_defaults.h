@@ -421,6 +421,7 @@
     .num_vertices = 0, \
     .velocity_delta = 0.0f, \
     .last_lookup_time = 0.0f, \
+    .radius_scale = 1.0f, \
   }
 
 #define _DNA_DEFAULT_MirrorModifierData \

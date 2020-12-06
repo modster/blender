@@ -338,6 +338,9 @@ class AlembicObject : public Node {
   /* Finest level of detail (in pixels) for the subdivision. */
   NODE_SOCKET_API(float, subd_dicing_rate)
 
+  /* Scale the radius of points and curves. */
+  NODE_SOCKET_API(float, radius_scale)
+
   AlembicObject();
   ~AlembicObject();
 

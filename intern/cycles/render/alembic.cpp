@@ -433,6 +433,8 @@ NODE_DEFINE(AlembicObject)
   SOCKET_INT(subd_max_level, "Max Subdivision Level", 1);
   SOCKET_FLOAT(subd_dicing_rate, "Subdivision Dicing Rate", 1.0f);
 
+  SOCKET_FLOAT(radius_scale, "Radius Scale", 1.0f);
+
   return type;
 }
 
@@ -813,7 +815,7 @@ void AlembicObject::load_all_data(const ICurvesSchema &schema,
           radius = (*radiuses)[offset + j];
         }
 
-        curve_radius.push_back_reserved(radius);
+        curve_radius.push_back_reserved(radius * radius_scale);
       }
 
       curve_first_key.push_back_reserved(offset);
@@ -1508,7 +1510,7 @@ void AlembicProcedural::read_curves(Scene *scene,
 
   ICurvesSchema schema = curves.getSchema();
 
-  if (!abc_object->has_data_loaded() || default_curves_radius_is_modified()) {
+  if (!abc_object->has_data_loaded() || default_curves_radius_is_modified() || abc_object->radius_scale_is_modified()) {
     abc_object->load_all_data(schema, progress, default_curves_radius);
   }
 

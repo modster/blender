@@ -6112,6 +6112,15 @@ static void rna_def_modifier_meshseqcache(BlenderRNA *brna)
       "Multiplier used to control the magnitude of the velocity vectors for time effects");
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
+  prop = RNA_def_property(srna, "radius_scale", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "radius_scale");
+  RNA_def_property_range(prop, 0.0f, FLT_MAX);
+  RNA_def_property_ui_text(
+      prop,
+      "Radius Scale",
+      "Multiplier used to control the radius for points and curves");
+  RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
   /* -------------------------- Velocity Vectors -------------------------- */
 
   prop = RNA_def_property(srna, "vertex_velocities", PROP_COLLECTION, PROP_NONE);
