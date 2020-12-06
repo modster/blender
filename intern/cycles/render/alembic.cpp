@@ -1118,6 +1118,7 @@ NODE_DEFINE(AlembicProcedural)
   SOCKET_STRING(filepath, "Filename", ustring());
   SOCKET_FLOAT(frame, "Frame", 1.0f);
   SOCKET_FLOAT(frame_rate, "Frame Rate", 24.0f);
+  SOCKET_FLOAT(frame_offset, "Frame Offset", 0.0f);
   SOCKET_FLOAT(default_curves_radius, "Default Curve Radius", 0.01f);
 
   SOCKET_NODE_ARRAY(objects, "Objects", &AlembicObject::node_type);
@@ -1197,7 +1198,7 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
     objects_loaded = true;
   }
 
-  const chrono_t frame_time = (chrono_t)(frame / frame_rate);
+  const chrono_t frame_time = (chrono_t)((frame - frame_offset) / frame_rate);
 
   foreach (Node *node, objects) {
     AlembicObject *object = static_cast<AlembicObject *>(node);

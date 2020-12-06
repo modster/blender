@@ -409,13 +409,16 @@ class AlembicProcedural : public Procedural {
  public:
   NODE_DECLARE
 
-  /* The filepath to the archive */
+  /* The file path to the Alembic archive */
   NODE_SOCKET_API(ustring, filepath)
 
   /* The current frame to render. */
   NODE_SOCKET_API(float, frame)
 
-  /* The frame rate used for rendering. */
+  /* Subtracted to the current frame. */
+  NODE_SOCKET_API(float, frame_offset)
+
+  /* The frame rate used for rendering in units of frames per second. */
   NODE_SOCKET_API(float, frame_rate)
 
   /* List of AlembicObjects to render. */
