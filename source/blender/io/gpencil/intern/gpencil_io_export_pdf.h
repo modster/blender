@@ -1,5 +1,3 @@
-
-
 /*
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,48 +16,51 @@
  * The Original Code is Copyright (C) 2020 Blender Foundation
  * All rights reserved.
  */
+#pragma once
 
 /** \file
  * \ingroup bgpencil
  */
-#include <algorithm>
-#include <cctype>
-#include <iostream>
-#include <string>
+#include "BLI_path_util.h"
 
-#include "BKE_context.h"
-#include "BKE_gpencil.h"
-#include "BKE_gpencil_geom.h"
-#include "BKE_layer.h"
-#include "BKE_main.h"
-#include "BKE_material.h"
-
-#include "BLI_blenlib.h"
-#include "BLI_math.h"
-#include "BLI_utildefines.h"
-
-#include "DNA_gpencil_types.h"
 #include "DNA_material_types.h"
-#include "DNA_object_types.h"
-#include "DNA_screen_types.h"
 
-#include "UI_view2d.h"
-
-#include "ED_view3d.h"
-
-#include "DEG_depsgraph.h"
-#include "DEG_depsgraph_query.h"
-
-#include "gpencil_io.h"
 #include "gpencil_io_export_base.h"
+#include "hpdf.h"
 
-#include "pugixml.hpp"
+struct GpencilIOParams;
+
+#define PDF_EXPORTER_NAME "PDF Exporter for Grease Pencil"
+#define PDF_EXPORTER_VERSION "v1.0"
 
 namespace blender::io::gpencil {
 
-/* Constructor. */
-GpencilExporter::GpencilExporter(const struct GpencilIOParams *iparams) : GpencilIO(iparams)
-{
-  /* Nothing yet */
-}
+class GpencilExporterPDF : public GpencilExporter {
+
+ public:
+  GpencilExporterPDF(const char *filename, const struct GpencilIOParams *iparams);
+  ~GpencilExporterPDF(void);
+  bool new_document(void);
+  bool add_newpage(void);
+  bool add_body(void);
+  bool write(void);
+
+ protected:
+ private:
+  /* PDF document. */
+  HPDF_Doc pdf_;
+  /* PDF page. */
+  HPDF_Page page_;
+  /* State. */
+  HPDF_ExtGState gstate_;
+
+  bool create_document(void);
+  bool add_page(void);
+  void export_gpencil_layers(void);
+
+  void export_stroke_to_point(void);
+  void export_stroke_to_polyline(const bool is_fill, const bool normalize);
+  void color_set(const bool do_fill);
+};
+
 }  // namespace blender::io::gpencil

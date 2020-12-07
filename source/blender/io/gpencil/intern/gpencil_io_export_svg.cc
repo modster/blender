@@ -57,19 +57,18 @@
 
 #include "ED_view3d.h"
 
+#include "gpencil_io.h"
 #include "gpencil_io_export_svg.h"
-#include "gpencil_io_exporter.h"
 
 #include "pugixml.hpp"
 
 namespace blender ::io ::gpencil {
 
 /* Constructor. */
-GpencilExporterSVG::GpencilExporterSVG(const char *filename,
-                                       const struct GpencilExportParams *iparams)
+GpencilExporterSVG::GpencilExporterSVG(const char *filename, const struct GpencilIOParams *iparams)
     : GpencilExporter(iparams)
 {
-  set_out_filename(filename);
+  filename_set(filename);
 
   invert_axis_[0] = false;
   invert_axis_[1] = true;
@@ -93,30 +92,21 @@ bool GpencilExporterSVG::add_body(void)
   return true;
 }
 
-bool GpencilExporterSVG::write(std::string subfix)
+bool GpencilExporterSVG::write(void)
 {
   bool result = true;
-  /* Save File. */
-
-  /* Add page to filename. */
-  std::string frame_file = out_filename_;
-  size_t found = frame_file.find_last_of(".");
-  if (found != std::string::npos) {
-    frame_file.replace(found, 8, subfix + ".svg");
-  }
-
 /* Support unicode character paths on Windows. */
 #ifdef WIN32
   char filename_cstr[FILE_MAX];
-  BLI_strncpy(filename_cstr, frame_file.c_str(), FILE_MAX);
+  BLI_strncpy(filename_cstr, filename_, FILE_MAX);
 
   UTF16_ENCODE(filename_cstr);
   std::wstring wstr(filename_cstr_16);
-  result = _main_doc.save_file(wstr.c_str());
+  result = main_doc_.save_file(wstr.c_str());
 
   UTF16_UN_ENCODE(filename_cstr);
 #else
-  result = _main_doc.save_file(frame_file.c_str());
+  result = main_doc_.save_file(filename_);
 #endif
 
   return result;
@@ -126,103 +116,74 @@ bool GpencilExporterSVG::write(std::string subfix)
 void GpencilExporterSVG::create_document_header(void)
 {
   /* Add a custom document declaration node. */
-  pugi::xml_node decl = _main_doc.prepend_child(pugi::node_declaration);
+  pugi::xml_node decl = main_doc_.prepend_child(pugi::node_declaration);
   decl.append_attribute("version") = "1.0";
   decl.append_attribute("encoding") = "UTF-8";
 
-  pugi::xml_node comment = _main_doc.append_child(pugi::node_comment);
+  pugi::xml_node comment = main_doc_.append_child(pugi::node_comment);
   char txt[128];
   sprintf(txt, " Generator: Blender, %s - %s ", SVG_EXPORTER_NAME, SVG_EXPORTER_VERSION);
   comment.set_value(txt);
 
-  pugi::xml_node doctype = _main_doc.append_child(pugi::node_doctype);
+  pugi::xml_node doctype = main_doc_.append_child(pugi::node_doctype);
   doctype.set_value(
       "svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" "
       "\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\"");
 
-  _main_node = _main_doc.append_child("svg");
-  _main_node.append_attribute("version").set_value("1.0");
-  _main_node.append_attribute("x").set_value("0px");
-  _main_node.append_attribute("y").set_value("0px");
+  main_node_ = main_doc_.append_child("svg");
+  main_node_.append_attribute("version").set_value("1.0");
+  main_node_.append_attribute("x").set_value("0px");
+  main_node_.append_attribute("y").set_value("0px");
 
   std::string width;
   std::string height;
 
-  if ((params_.flag & GP_EXPORT_STORYBOARD_MODE) != 0) {
-    width = std::to_string(params_.paper_size[0]);
-    height = std::to_string(params_.paper_size[1]);
-  }
-  else {
-    width = std::to_string(render_x_);
-    height = std::to_string(render_y_);
-  }
+  width = std::to_string(render_x_);
+  height = std::to_string(render_y_);
 
-  _main_node.append_attribute("width").set_value((width + "px").c_str());
-  _main_node.append_attribute("height").set_value((height + "px").c_str());
+  main_node_.append_attribute("width").set_value((width + "px").c_str());
+  main_node_.append_attribute("height").set_value((height + "px").c_str());
   std::string viewbox = "0 0 " + width + " " + height;
-  _main_node.append_attribute("viewBox").set_value(viewbox.c_str());
-
-  /* Scene name. */
-  if ((params_.flag & GP_EXPORT_STORYBOARD_MODE) != 0) {
-    char scenetxt[96];
-    sprintf(scenetxt, "Scene: %s", scene->id.name + 2);
-
-    add_text(
-        _main_node, 30.0f, params_.paper_size[1] - 30.0f, std::string(scenetxt), 12.0f, "#000000");
-  }
+  main_node_.append_attribute("viewBox").set_value(viewbox.c_str());
 }
 
 /* Main layer loop. */
 void GpencilExporterSVG::export_gpencil_layers(void)
 {
-  const bool is_clipping = is_camera_mode() && (params_.flag & (GP_EXPORT_CLIP_CAMERA |
-                                                                GP_EXPORT_STORYBOARD_MODE)) != 0;
+  const bool is_clipping = is_camera_mode() && (params_.flag & GP_EXPORT_CLIP_CAMERA) != 0;
 
   /* If is doing a set of frames, the list of objects can change for each frame. */
-  if (is_camera_mode() && ((params_.flag & GP_EXPORT_STORYBOARD_MODE) != 0)) {
-    create_object_list();
-  }
+  create_object_list();
 
   for (ObjectZ &obz : ob_list_) {
     Object *ob = obz.ob;
 
     /* Camera clipping. */
     if (is_clipping) {
-      pugi::xml_node clip_node = _main_node.append_child("clipPath");
+      pugi::xml_node clip_node = main_node_.append_child("clipPath");
       clip_node.append_attribute("id").set_value(("clip-path" + std::to_string(cfra_)).c_str());
 
-      if ((params_.flag & GP_EXPORT_STORYBOARD_MODE) != 0) {
-        add_rect(clip_node,
-                 frame_offset_[0],
-                 frame_offset_[1],
-                 frame_box_[0],
-                 frame_box_[1],
-                 0.0f,
-                 "#000000");
-      }
-      else {
-        add_rect(clip_node, 0, 0, render_x_, render_y_, 0.0f, "#000000");
-      }
+      add_rect(clip_node, 0, 0, render_x_, render_y_, 0.0f, "#000000");
     }
 
-    _frame_node = _main_node.append_child("g");
+    frame_node_ = main_node_.append_child("g");
     std::string frametxt = "blender_frame_" + std::to_string(cfra_);
-    _frame_node.append_attribute("id").set_value(frametxt.c_str());
+    frame_node_.append_attribute("id").set_value(frametxt.c_str());
 
     /* Clip area. */
     if (is_clipping) {
-      _frame_node.append_attribute("clip-path")
+      frame_node_.append_attribute("clip-path")
           .set_value(("url(#clip-path" + std::to_string(cfra_) + ")").c_str());
     }
 
-    pugi::xml_node ob_node = _frame_node.append_child("g");
+    pugi::xml_node ob_node = frame_node_.append_child("g");
 
     char obtxt[96];
     sprintf(obtxt, "blender_object_%s", ob->id.name + 2);
     ob_node.append_attribute("id").set_value(obtxt);
 
     /* Use evaluated version to get strokes with modifiers. */
-    Object *ob_eval_ = (Object *)DEG_get_evaluated_id(depsgraph, &ob->id);
+    Object *ob_eval_ = (Object *)DEG_get_evaluated_id(depsgraph_, &ob->id);
     bGPdata *gpd_eval = (bGPdata *)ob_eval_->data;
 
     LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd_eval->layers) {
@@ -232,7 +193,7 @@ void GpencilExporterSVG::export_gpencil_layers(void)
       gpl_current_set(gpl);
 
       bGPDframe *gpf = gpl->actframe;
-      if ((gpf == NULL) || (gpf->strokes.first == NULL)) {
+      if ((gpf == nullptr) || (gpf->strokes.first == nullptr)) {
         continue;
       }
       gpf_current_set(gpf);
@@ -245,7 +206,7 @@ void GpencilExporterSVG::export_gpencil_layers(void)
       pugi::xml_node gpl_node = ob_node.append_child("g");
       gpl_node.append_attribute("id").set_value(gpl->info);
 
-      BKE_gpencil_parent_matrix_get(depsgraph, ob, gpl, diff_mat_);
+      BKE_gpencil_parent_matrix_get(depsgraph_, ob, gpl, diff_mat_);
 
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
         if (gps->totpoints == 0) {
@@ -281,7 +242,7 @@ void GpencilExporterSVG::export_gpencil_layers(void)
             }
             else {
               bGPDstroke *gps_perimeter = BKE_gpencil_stroke_perimeter_from_view(
-                  rv3d, gpd, gpl, gps_duplicate, 3, diff_mat_);
+                  rv3d_, gpd_, gpl, gps_duplicate, 3, diff_mat_);
 
               gps_current_set(ob, gps_perimeter, false);
 
@@ -298,44 +259,6 @@ void GpencilExporterSVG::export_gpencil_layers(void)
         }
 
         BKE_gpencil_free_stroke(gps_duplicate);
-      }
-    }
-
-    /* Frame border. */
-    if ((params_.flag & GP_EXPORT_STORYBOARD_MODE) != 0) {
-      add_rect(_main_node,
-               frame_offset_[0],
-               frame_offset_[1],
-               frame_box_[0],
-               frame_box_[1],
-               6.0f,
-               "#000000");
-
-      /* Frame text. */
-      if (params_.text_type != GP_EXPORT_TXT_NONE) {
-        char text[64];
-        switch (params_.text_type) {
-          case GP_EXPORT_TXT_SHOT:
-            sprintf(text, "#%d", shot_);
-            break;
-          case GP_EXPORT_TXT_FRAME:
-            sprintf(text, "%04d", cfra_);
-            break;
-          case GP_EXPORT_TXT_SHOT_FRAME:
-            sprintf(text, "#%d/%04d", shot_, cfra_);
-            break;
-          default:
-            sprintf(text, "%04d", cfra_);
-            break;
-        }
-
-        const float font_size = 30.0f;
-        add_text(_main_node,
-                 frame_offset_[0] + 5.0f,
-                 frame_offset_[1] + frame_box_[1] + font_size,
-                 std::string(text),
-                 font_size,
-                 "#000000");
       }
     }
   }
@@ -391,9 +314,6 @@ void GpencilExporterSVG::export_stroke_to_path(pugi::xml_node gpl_node, const bo
         .set_value(stroke_color_[3] * stroke_average_opacity_get() * gpl->opacity);
 
     interp_v3_v3v3(col, stroke_color_, gpl->tintcolor, gpl->tintcolor[3]);
-  }
-  if ((params_.flag & GP_EXPORT_GRAY_SCALE) != 0) {
-    rgb_to_grayscale(col);
   }
 
   linearrgb_to_srgb_v3_v3(col, col);
@@ -490,9 +410,6 @@ void GpencilExporterSVG::color_string_set(pugi::xml_node gps_node, const bool do
   float col[3];
   if (do_fill) {
     interp_v3_v3v3(col, fill_color_, gpl->tintcolor, gpl->tintcolor[3]);
-    if ((params_.flag & GP_EXPORT_GRAY_SCALE) != 0) {
-      rgb_to_grayscale(col);
-    }
     linearrgb_to_srgb_v3_v3(col, col);
     std::string stroke_hex = rgb_to_hexstr(col);
     gps_node.append_attribute("fill").set_value(stroke_hex.c_str());
@@ -501,9 +418,6 @@ void GpencilExporterSVG::color_string_set(pugi::xml_node gps_node, const bool do
   }
   else {
     interp_v3_v3v3(col, stroke_color_, gpl->tintcolor, gpl->tintcolor[3]);
-    if ((params_.flag & GP_EXPORT_GRAY_SCALE) != 0) {
-      rgb_to_grayscale(col);
-    }
     linearrgb_to_srgb_v3_v3(col, col);
     std::string stroke_hex = rgb_to_hexstr(col);
     gps_node.append_attribute("stroke").set_value(stroke_hex.c_str());

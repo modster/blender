@@ -13,29 +13,29 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
+ * The Original Code is Copyright (C) 2020 Blender Foundation
  * All rights reserved.
  */
-
-#ifndef __IO_GPENCIL_H__
-#define __IO_GPENCIL_H__
+#pragma once
 
 /** \file
- * \ingroup editor/io
+ * \ingroup bgpencil
  */
+#include "gpencil_io_base.h"
 
-struct ARegion;
-struct bContext;
-struct View3D;
-struct wmOperator;
-struct wmOperatorType;
+namespace blender::io::gpencil {
 
-void WM_OT_gpencil_import_svg(struct wmOperatorType *ot);
+class GpencilImporter : public GpencilIO {
 
-void WM_OT_gpencil_export_svg(struct wmOperatorType *ot);
-void WM_OT_gpencil_export_pdf(struct wmOperatorType *ot);
+ public:
+  GpencilImporter(const struct GpencilIOParams *iparams);
+  virtual bool read(void) = 0;
 
-struct ARegion *get_invoke_region(struct bContext *C);
-struct View3D *get_invoke_view3d(struct bContext *C);
+ protected:
+  struct Object *create_object(void);
+  int32_t create_material(const char *name, const bool stroke, const bool fill);
 
-#endif /* __IO_GPENCIL_H__ */
+ private:
+};
+
+}  // namespace blender::io::gpencil

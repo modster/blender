@@ -28,7 +28,7 @@
 #include "gpencil_io_export_base.h"
 #include "pugixml.hpp"
 
-struct GpencilExportParams;
+struct GpencilIOParams;
 
 #define SVG_EXPORTER_NAME "SVG Export for Grease Pencil"
 #define SVG_EXPORTER_VERSION "v1.0"
@@ -38,11 +38,11 @@ namespace blender::io::gpencil {
 class GpencilExporterSVG : public GpencilExporter {
 
  public:
-  GpencilExporterSVG(const char *filename, const struct GpencilExportParams *iparams);
+  GpencilExporterSVG(const char *filename, const struct GpencilIOParams *iparams);
   ~GpencilExporterSVG(void);
   bool add_newpage(void);
   bool add_body(void);
-  bool write(std::string subfix);
+  bool write(void);
 
  protected:
   static void add_rect(pugi::xml_node node,
@@ -62,11 +62,11 @@ class GpencilExporterSVG : public GpencilExporter {
 
  private:
   /* XML doc. */
-  pugi::xml_document _main_doc;
+  pugi::xml_document main_doc_;
   /* Main document node. */
-  pugi::xml_node _main_node;
+  pugi::xml_node main_node_;
   /** Frame node  */
-  pugi::xml_node _frame_node;
+  pugi::xml_node frame_node_;
   void create_document_header(void);
   void export_gpencil_layers(void);
 

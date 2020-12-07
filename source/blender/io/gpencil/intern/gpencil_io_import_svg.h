@@ -1,5 +1,3 @@
-
-
 /*
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,48 +16,42 @@
  * The Original Code is Copyright (C) 2020 Blender Foundation
  * All rights reserved.
  */
+#pragma once
 
 /** \file
  * \ingroup bgpencil
  */
-#include <algorithm>
-#include <cctype>
-#include <iostream>
-#include <string>
+#include "gpencil_io_import_base.h"
 
-#include "BKE_context.h"
-#include "BKE_gpencil.h"
-#include "BKE_gpencil_geom.h"
-#include "BKE_layer.h"
-#include "BKE_main.h"
-#include "BKE_material.h"
+struct GpencilIOParams;
+struct NSVGshape;
+struct NSVGpath;
+struct bGPdata;
+struct bGPDframe;
 
-#include "BLI_blenlib.h"
-#include "BLI_math.h"
-#include "BLI_utildefines.h"
-
-#include "DNA_gpencil_types.h"
-#include "DNA_material_types.h"
-#include "DNA_object_types.h"
-#include "DNA_screen_types.h"
-
-#include "UI_view2d.h"
-
-#include "ED_view3d.h"
-
-#include "DEG_depsgraph.h"
-#include "DEG_depsgraph_query.h"
-
-#include "gpencil_io.h"
-#include "gpencil_io_export_base.h"
-
-#include "pugixml.hpp"
+#define SVG_IMPORTER_NAME "SVG Import for Grease Pencil"
+#define SVG_IMPORTER_VERSION "v1.0"
 
 namespace blender::io::gpencil {
 
-/* Constructor. */
-GpencilExporter::GpencilExporter(const struct GpencilIOParams *iparams) : GpencilIO(iparams)
-{
-  /* Nothing yet */
-}
+class GpencilImporterSVG : public GpencilImporter {
+
+ public:
+  GpencilImporterSVG(const char *filename, const struct GpencilIOParams *iparams);
+  ~GpencilImporterSVG(void);
+
+  bool read(void);
+
+ protected:
+ private:
+  void create_stroke(struct bGPdata *gpd_,
+                     struct bGPDframe *gpf,
+                     struct NSVGshape *shape,
+                     struct NSVGpath *path,
+                     const int32_t mat_index,
+                     const float matrix[4][4]);
+
+  void convert_color(const uint32_t color, float r_linear_rgba[4]);
+};
+
 }  // namespace blender::io::gpencil

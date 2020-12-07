@@ -40,7 +40,9 @@ set(SRC
   io_alembic.c
   io_cache.c
   io_collada.c
-  io_gpencil.c
+  io_gpencil_import.c
+  io_gpencil_export.c
+  io_gpencil_utils.c
   io_ops.c
   io_usd.c
 

@@ -17,25 +17,46 @@
  * All rights reserved.
  */
 
-#ifndef __IO_GPENCIL_H__
-#define __IO_GPENCIL_H__
-
 /** \file
  * \ingroup editor/io
  */
 
-struct ARegion;
-struct bContext;
-struct View3D;
-struct wmOperator;
-struct wmOperatorType;
+#include "DNA_space_types.h"
 
-void WM_OT_gpencil_import_svg(struct wmOperatorType *ot);
+#include "BKE_context.h"
+#include "BKE_screen.h"
 
-void WM_OT_gpencil_export_svg(struct wmOperatorType *ot);
-void WM_OT_gpencil_export_pdf(struct wmOperatorType *ot);
+#include "WM_api.h"
 
-struct ARegion *get_invoke_region(struct bContext *C);
-struct View3D *get_invoke_view3d(struct bContext *C);
+ARegion *get_invoke_region(bContext *C)
+{
+  bScreen *screen = CTX_wm_screen(C);
+  if (screen == NULL) {
+    return NULL;
+  }
+  ScrArea *area = BKE_screen_find_big_area(screen, SPACE_VIEW3D, 0);
+  if (area == NULL) {
+    return NULL;
+  }
 
-#endif /* __IO_GPENCIL_H__ */
+  ARegion *region = BKE_area_find_region_type(area, RGN_TYPE_WINDOW);
+
+  return region;
+}
+
+View3D *get_invoke_view3d(bContext *C)
+{
+  bScreen *screen = CTX_wm_screen(C);
+  if (screen == NULL) {
+    return NULL;
+  }
+  ScrArea *area = BKE_screen_find_big_area(screen, SPACE_VIEW3D, 0);
+  if (area == NULL) {
+    return NULL;
+  }
+  if (area) {
+    return area->spacedata.first;
+  }
+
+  return NULL;
+}

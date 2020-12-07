@@ -1634,6 +1634,13 @@ static void rna_def_gpencil_stroke(BlenderRNA *brna)
   RNA_def_parameter_clear_flags(prop, PROP_ANIMATABLE, 0);
   RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_uv_update");
 
+  /* Fill opacity. */
+  prop = RNA_def_property(srna, "fill_opacity", PROP_FLOAT, PROP_FACTOR);
+  RNA_def_property_float_sdna(prop, NULL, "fill_opacity_fac");
+  RNA_def_property_float_default(prop, 1.0f);
+  RNA_def_property_ui_text(prop, "Fill Opacity", "Opacity of the fill area");
+  RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_update");
+
   /* Vertex Color for Fill. */
   prop = RNA_def_property(srna, "vertex_color_fill", PROP_FLOAT, PROP_COLOR);
   RNA_def_property_float_sdna(prop, NULL, "vert_color_fill");

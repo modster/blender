@@ -28,63 +28,54 @@ extern "C" {
 
 struct ARegion;
 struct bContext;
+struct Object;
 struct View3D;
 
-/* Paper Size: A4, Letter. */
-static const float gpencil_export_paper_sizes[2] = {3508, 2480};
-
-struct GpencilExportParams {
+struct GpencilIOParams {
   bContext *C;
   ARegion *region;
   View3D *v3d;
   /** Grease pencil object. */
-  struct Object *obact;
-  /** Export mode.  */
+  Object *ob;
+  /** Mode.  */
   uint16_t mode;
-  /** Start frame.  */
+  /** Start frame. */
   int32_t frame_start;
   /** End frame.  */
   int32_t frame_end;
   /* Current frame. */
-  int32_t framenum;
+  int32_t frame_cur;
   /** Flags. */
   uint32_t flag;
-  /** Select mode */
-  uint16_t select;
-  /** File subfix. */
-  char file_subfix[10];
+  /** Scale. */
+  float scale;
+  /** Select mode. */
+  uint16_t select_mode;
+  /** Frame mode. */
+  uint16_t frame_mode;
   /** Stroke sampling. */
   float stroke_sample;
-  /** Row and cols of storyboard. */
-  int32_t page_layout[2];
-  /** Page type (Landscape/Portrait). */
-  uint16_t page_type;
-  /** Paper size in pixels. */
-  float paper_size[2];
-  /** Text type for each frame. */
-  uint16_t text_type;
+  /** Resolution. */
+  int32_t resolution;
 };
 
-/* GpencilExportParams->flag. */
-typedef enum eGpencilExportParams_Flag {
-  /* Use Storyboard format. */
-  GP_EXPORT_STORYBOARD_MODE = (1 << 0),
+/* GpencilIOParams->flag. */
+typedef enum eGpencilIOParams_Flag {
   /* Export Filled strokes. */
-  GP_EXPORT_FILL = (1 << 1),
+  GP_EXPORT_FILL = (1 << 0),
   /* Export normalized thickness. */
-  GP_EXPORT_NORM_THICKNESS = (1 << 2),
+  GP_EXPORT_NORM_THICKNESS = (1 << 1),
   /* Clip camera area. */
-  GP_EXPORT_CLIP_CAMERA = (1 << 3),
-  /* Gray Scale. */
-  GP_EXPORT_GRAY_SCALE = (1 << 4),
-  /* Export markers frames. */
-  GP_EXPORT_MARKERS = (1 << 5),
-} eGpencilExportParams_Flag;
+  GP_EXPORT_CLIP_CAMERA = (1 << 2),
+} eGpencilIOParams_Flag;
 
-typedef enum eGpencilExport_Modes {
+typedef enum eGpencilIO_Modes {
   GP_EXPORT_TO_SVG = 0,
-  /* Add new export formats here. */
-} eGpencilExport_Modes;
+  GP_EXPORT_TO_PDF = 1,
+
+  GP_IMPORT_FROM_SVG = 2,
+  /* Add new formats here. */
+} eGpencilIO_Modes;
 
 /* Object to be exported. */
 typedef enum eGpencilExportSelect {
@@ -93,21 +84,14 @@ typedef enum eGpencilExportSelect {
   GP_EXPORT_VISIBLE = 2,
 } eGpencilExportSelect;
 
-/** Document orientation. */
-typedef enum eGpencilExportPaper {
-  GP_EXPORT_PAPER_LANDSCAPE = 0,
-  GP_EXPORT_PAPER_PORTRAIT = 1,
-} eGpencilExportPaper;
+/* Framerange to be exported. */
+typedef enum eGpencilExportFrame {
+  GP_EXPORT_FRAME_ACTIVE = 0,
+  GP_EXPORT_FRAME_SELECTED = 1,
+} eGpencilExportFrame;
 
-/* GpencilExportParams->text_flag. */
-typedef enum eGpencilExportText {
-  GP_EXPORT_TXT_NONE = 0,
-  GP_EXPORT_TXT_SHOT = 1,
-  GP_EXPORT_TXT_FRAME = 2,
-  GP_EXPORT_TXT_SHOT_FRAME = 3,
-} eGpencilExportText;
-
-bool gpencil_io_export(const char *filename, struct GpencilExportParams *iparams);
+bool gpencil_io_export(const char *filename, struct GpencilIOParams *iparams);
+bool gpencil_io_import(const char *filename, struct GpencilIOParams *iparams);
 
 #ifdef __cplusplus
 }
