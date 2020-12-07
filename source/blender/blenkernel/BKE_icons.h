@@ -188,7 +188,7 @@ void BKE_previewimg_blend_write(struct BlendWriter *writer, const struct Preview
 void BKE_previewimg_blend_read(struct BlendDataReader *reader, struct PreviewImage *prv);
 
 int BKE_icon_geom_ensure(struct Icon_Geom *geom);
-struct Icon_Geom *BKE_icon_geom_from_memory(const uchar *data, size_t data_len);
+struct Icon_Geom *BKE_icon_geom_from_memory(uchar *data, size_t data_len);
 struct Icon_Geom *BKE_icon_geom_from_file(const char *filename);
 
 struct ImBuf *BKE_icon_geom_rasterize(const struct Icon_Geom *geom,

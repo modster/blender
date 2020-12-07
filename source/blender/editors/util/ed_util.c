@@ -518,6 +518,10 @@ static bool lib_id_load_custom_preview_poll(bContext *C)
     CTX_wm_operator_poll_msg_set(C, TIP_("Can't edit external library data"));
     return false;
   }
+  if (ID_IS_OVERRIDE_LIBRARY(id)) {
+    CTX_wm_operator_poll_msg_set(C, TIP_("Can't edit previews of overridden library data"));
+    return false;
+  }
   if (!BKE_previewimg_id_get_p(id)) {
     CTX_wm_operator_poll_msg_set(C, TIP_("Data-block does not support previews"));
     return false;
