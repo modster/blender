@@ -31,8 +31,8 @@ static bNodeSocketTemplate geo_node_point_instance_in[] = {
 };
 
 static bNodeSocketTemplate geo_node_point_instance_out[] = {
-    {SOCK_GEOMETRY, N_("Geometry A")},
-    {SOCK_GEOMETRY, N_("Geometry B")},
+    {SOCK_GEOMETRY, N_("Geometry 1")},
+    {SOCK_GEOMETRY, N_("Geometry 2")},
     {-1, ""},
 };
 
@@ -158,7 +158,7 @@ static void geo_node_point_separate_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   GeometrySet out_set_a(geometry_set);
-  GeometrySet out_set_b(geometry_set);
+  GeometrySet out_set_b;
 
   const std::string mask_name = params.extract_input<std::string>("Mask");
 
@@ -169,8 +169,8 @@ static void geo_node_point_separate_exec(GeoNodeExecParams params)
                          out_set_b.get_component_for_write<PointCloudComponent>());
   }
 
-  params.set_output("Geometry A", std::move(out_set_a));
-  params.set_output("Geometry B", std::move(out_set_b));
+  params.set_output("Geometry 1", std::move(out_set_a));
+  params.set_output("Geometry 2", std::move(out_set_b));
 }
 }  // namespace blender::nodes
 
