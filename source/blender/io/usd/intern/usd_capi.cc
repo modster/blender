@@ -63,6 +63,8 @@
 #include "BKE_object.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
+
+#include "DNA_cachefile_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 
@@ -78,6 +80,36 @@
 #include <iostream>
 
 namespace blender::io::usd {
+
+USDPrimIterator *archive_from_handle(CacheArchiveHandle *handle)
+{
+  return reinterpret_cast<USDPrimIterator *>(handle);
+}
+
+CacheArchiveHandle *handle_from_archive(USDPrimIterator *archive)
+{
+  return reinterpret_cast<CacheArchiveHandle *>(archive);
+}
+
+static bool gather_objects_paths(const pxr::UsdPrim &object, ListBase *object_paths)
+{
+  /* if (!object.IsValid()) {
+     return false;
+   }
+
+   for (const pxr::UsdPrim &childPrim : object.GetChildren()) {
+     gather_objects_paths(childPrim, object_paths);
+   }
+
+   void *usd_path_void = MEM_callocN(sizeof(CacheObjectPath), "CacheObjectPath");
+   CacheObjectPath *usd_path = static_cast<CacheObjectPath *>(usd_path_void);
+
+   BLI_strncpy(usd_path->path, object.GetPrimPath().GetString().c_str(), sizeof(usd_path->path));
+   BLI_addtail(object_paths, usd_path);
+
+   return true;*/
+  return false;
+}
 
 struct ExportJobData {
   Main *bmain;
@@ -265,6 +297,23 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 
   USDPrimIterator usd_prim_iter(data->stage, import_ctx, data->bmain);
 
+  CacheFile *cache_file = static_cast<CacheFile *>(
+      BKE_cachefile_add(data->bmain, BLI_path_basename(data->filename)));
+
+  /* Decrement the ID ref-count because it is going to be incremented for each
+   * modifier and constraint that it will be attached to, so since currently
+   * it is not used by anyone, its use count will off by one. */
+  /* TODO(makowalski): rather than decrementing the use count, should
+   * we just call BKE_id_free_us() on the cache_file id when cleaning up? */
+  id_us_min(&cache_file->id);
+
+  // cache_file->is_sequence = data->params.is_sequence;
+  cache_file->scale = data->params.scale;
+  STRNCPY(cache_file->filepath, data->filename);
+
+  // data->archive = archive;
+  // data->settings.cache_file = cache_file;
+
   // Optionally print the stage contents for debugging.
   if (data->params.debug) {
     usd_prim_iter.debug_traverse_stage();
@@ -333,7 +382,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   i = 0;
   for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
     USDXformableReader *reader = *iter;
-    reader->set_object_transform(time);
+    reader->set_object_transform(time, cache_file);
 
     *data->progress = 0.7f + 0.3f * (++i / size);
     *data->do_update = true;
@@ -551,4 +600,146 @@ int USD_get_version(void)
    * So the major version is implicit/invisible in the public version number.
    */
   return PXR_VERSION;
+}
+
+static blender::io::usd::USDPrimReader *get_usd_reader(CacheReader *reader,
+                                                       Object *ob,
+                                                       const char **err_str)
+{
+  blender::io::usd::USDPrimReader *usd_reader =
+      reinterpret_cast<blender::io::usd::USDPrimReader *>(reader);
+  pxr::UsdPrim iobject = usd_reader->prim();
+
+  if (!iobject.IsValid()) {
+    *err_str = "Invalid object: verify object path";
+    return NULL;
+  }
+
+  return usd_reader;
+}
+
+// Mesh *USD_read_mesh(CacheReader *reader,
+//  Object *ob,
+//  Mesh *existing_mesh,
+//  const float time,
+//  const char **err_str,
+//  int read_flag,
+//  float vel_fac)
+//{
+//  USDGeomReader *usd_reader = reinterpret_cast<USDGeomReader *>(
+//    get_usd_reader(reader, ob, err_str));
+//  if (usd_reader == NULL) {
+//    return NULL;
+//  }
+//
+//  return usd_reader->read_mesh(existing_mesh, time, read_flag, vel_fac, err_str);
+//}
+//
+// bool USD_mesh_topology_changed(
+//  CacheReader *reader, Object *ob, Mesh *existing_mesh, const float time, const char **err_str)
+//{
+//  USDMeshReader *usd_reader = (USDMeshReader *)get_usd_reader(reader, ob, err_str);
+//
+//  if (usd_reader == NULL) {
+//    return false;
+//  }
+//
+//  return usd_reader->topology_changed(existing_mesh, time);
+//}
+
+void USDCacheReader_incref(CacheReader *reader)
+{
+  blender::io::usd::USDPrimReader *usd_reader =
+      reinterpret_cast<blender::io::usd::USDPrimReader *>(reader);
+  usd_reader->incref();
+}
+
+CacheReader *CacheReader_open_usd_object(CacheArchiveHandle *handle,
+                                         CacheReader *reader,
+                                         Object *object,
+                                         const char *object_path)
+{
+  if (object_path[0] == '\0') {
+    return reader;
+  }
+
+  blender::io::usd::USDPrimIterator *archive = blender::io::usd::archive_from_handle(handle);
+
+  if (!archive || !archive->valid()) {
+    return reader;
+  }
+
+  pxr::UsdPrim prim = archive->stage()->GetPrimAtPath(pxr::SdfPath(object_path));
+
+  if (reader) {
+    USDCacheReader_free(reader);
+  }
+
+  blender::io::usd::USDXformableReader *usd_reader = archive->get_object_reader(prim);
+
+  if (!usd_reader) {
+    /* This object is not supported */
+    return nullptr;
+  }
+
+  if (!usd_reader->valid()) {
+    std::cerr << "WARNING: cache reader attempting to open invalid object " << object_path
+              << std::endl;
+    return nullptr;
+  }
+
+  usd_reader->eval_merged_with_parent();
+
+  usd_reader->set_object(object);
+  return reinterpret_cast<CacheReader *>(usd_reader);
+}
+
+void USDCacheReader_free(CacheReader *reader)
+{
+  blender::io::usd::USDPrimReader *usd_reader =
+      reinterpret_cast<blender::io::usd::USDPrimReader *>(reader);
+  usd_reader->decref();
+}
+
+CacheArchiveHandle *USD_create_handle(struct Main *bmain,
+                                      const char *filename,
+                                      ListBase *object_paths)
+{
+  pxr::UsdStageRefPtr stage = pxr::UsdStage::Open(filename);
+  if (!stage) {
+    std::cerr << "WARNING: Couldn't open '" << filename << "' when creating USD archive handle\n";
+    return nullptr;
+  }
+
+  // TODO(makowalski): Need to account for all import parameters.
+  pxr::TfToken up_axis = pxr::UsdGeomGetStageUpAxis(stage);
+  blender::io::usd::USDImporterContext import_ctx{up_axis, USDImportParams{}};
+
+  blender::io::usd::USDPrimIterator *archive = new blender::io::usd::USDPrimIterator(
+      stage, import_ctx, bmain);
+
+  if (object_paths) {
+    archive->gather_objects_paths(object_paths);
+  }
+
+  return blender::io::usd::handle_from_archive(archive);
+}
+
+void USD_free_handle(CacheArchiveHandle *handle)
+{
+  blender::io::usd::USDPrimIterator *archive = blender::io::usd::archive_from_handle(handle);
+  delete archive;
+}
+
+void USD_get_transform(struct CacheReader *reader, float r_mat[4][4], float time, float scale)
+{
+  if (!reader) {
+    return;
+  }
+
+  blender::io::usd::USDXformableReader *usd_reader =
+      reinterpret_cast<blender::io::usd::USDXformableReader *>(reader);
+
+  bool is_constant = false;
+  usd_reader->read_matrix(r_mat, time, scale, is_constant);
 }

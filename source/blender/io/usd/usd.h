@@ -28,6 +28,8 @@ extern "C" {
 struct Scene;
 struct bContext;
 
+typedef struct CacheArchiveHandle CacheArchiveHandle;
+
 struct USDExportParams {
   bool export_animation;
   bool export_hair;
@@ -80,6 +82,39 @@ bool USD_import(struct bContext *C,
                 bool as_background_job);
 
 int USD_get_version(void);
+
+// ----- USD Import and Mesh Cache interface
+
+CacheArchiveHandle *USD_create_handle(struct Main *bmain,
+                                      const char *filename,
+                                      struct ListBase *object_paths);
+
+void USD_free_handle(CacheArchiveHandle *handle);
+
+void USD_get_transform(struct CacheReader *reader, float r_mat[4][4], float time, float scale);
+
+/* Either modifies current_mesh in-place or constructs a new mesh. */
+// struct Mesh *USD_read_mesh(struct CacheReader *reader,
+//                           struct Object *ob,
+//                           struct Mesh *current_mesh,
+//                           const float time,
+//                           const char **err_str,
+//                           int flags,
+//                           float vel_scale);
+//
+// bool USD_mesh_topology_changed(struct CacheReader *reader,
+//                               struct Object *ob,
+//                               struct Mesh *existing_mesh,
+//                               const float time,
+//                               const char **err_str);
+
+struct CacheReader *CacheReader_open_usd_object(struct CacheArchiveHandle *handle,
+                                                struct CacheReader *reader,
+                                                struct Object *object,
+                                                const char *object_path);
+
+void USDCacheReader_incref(struct CacheReader *reader);
+void USDCacheReader_free(struct CacheReader *reader);
 
 #ifdef __cplusplus
 }

@@ -110,9 +110,10 @@ void USDCameraReader::create_object(Main *bmain, double time, USDDataCache *data
 
 void USDCameraReader::read_matrix(float r_mat[4][4] /* local matrix */,
                                   const double time,
-                                  const float scale) const
+                                  const float scale,
+                                  bool &is_constant) const
 {
-  USDXformableReader::read_matrix(r_mat, time, scale);
+  USDXformableReader::read_matrix(r_mat, time, scale, is_constant);
 
   /* Conveting from y-up to z-up requires adjusting
    * the camera rotation. */

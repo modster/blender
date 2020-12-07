@@ -37,7 +37,10 @@ class USDLightReader : public USDXformableReader {
 
   void create_object(Main *bmain, double time, USDDataCache *data_cache) override;
 
-  void read_matrix(float r_mat[4][4], const double time, const float scale) const override;
+  void read_matrix(float r_mat[4][4],
+                   const double time,
+                   const float scale,
+                   bool &is_constant) const override;
 };
 
 }  // namespace blender::io::usd

@@ -20,17 +20,22 @@
 #include "usd_reader_xformable.h"
 #include "usd_import_util.h"
 
+#include "BKE_constraint.h"
 #include "BKE_lib_id.h"
 #include "BKE_object.h"
+#include "DNA_cachefile_types.h"
+#include "DNA_constraint_types.h"
 #include "DNA_object_types.h"
 
 #include "BLI_listbase.h"
 #include "BLI_math_geom.h"
+#include "BLI_path_util.h"
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/gf/matrix4f.h>
+#include <pxr/usd/usdGeom/xform.h>
 #include <pxr/usd/usdGeom/xformable.h>
 
 #include <iostream>
@@ -51,33 +56,73 @@ Object *USDXformableReader::object() const
   return object_;
 }
 
-void USDXformableReader::set_object_transform(const double time)
+void USDXformableReader::eval_merged_with_parent()
 {
-  if (!this->object_) {
+  merged_with_parent_ = false;
+  if (valid() && can_merge_with_parent()) {
+    pxr::UsdPrim parent = prim_.GetParent();
+
+    // Merge with the parent if the parent is an Xform and has only one child.
+    if (parent && !parent.IsPseudoRoot() && parent.IsA<pxr::UsdGeomXform>()) {
+
+      pxr::UsdPrimSiblingRange child_prims = parent.GetFilteredChildren(
+          pxr::UsdTraverseInstanceProxies(pxr::UsdPrimDefaultPredicate));
+
+      // Unfortunately, we need to iterate over the child primitives
+      // to count them.
+      int num_child_prims = 0;
+      for (const pxr::UsdPrim &child_prim : child_prims) {
+        ++num_child_prims;
+        if (num_child_prims > 1) {
+          break;
+        }
+      }
+      merged_with_parent_ = num_child_prims == 1;
+    }
+  }
+}
+
+void USDXformableReader::set_object_transform(const double time, CacheFile *cache_file)
+{
+  if (!object_) {
     return;
   }
 
   float transform_from_usd[4][4];
+  bool is_constant = true;
 
-  this->read_matrix(transform_from_usd, time, this->context_.import_params.scale);
+  this->read_matrix(transform_from_usd, time, this->context_.import_params.scale, is_constant);
 
   /* Apply the matrix to the object. */
   BKE_object_apply_mat4(object_, transform_from_usd, true, false);
   BKE_object_to_mat4(object_, object_->obmat);
 
-  /* TODO(makowalski):  Set up transform constraint if not constant. */
+  if (cache_file && !is_constant) {
+    bConstraint *con = BKE_constraint_add_for_object(
+        object_, NULL, CONSTRAINT_TYPE_TRANSFORM_CACHE);
+    bTransformCacheConstraint *data = static_cast<bTransformCacheConstraint *>(con->data);
+    BLI_strncpy(data->object_path, this->prim_path().c_str(), FILE_MAX);
+
+    data->cache_file = cache_file;
+    id_us_plus(&data->cache_file->id);
+  }
 }
 
 void USDXformableReader::read_matrix(float r_mat[4][4] /* local matrix */,
                                      const double time,
-                                     const float scale) const
+                                     const float scale,
+                                     bool &is_constant) const
 {
+  is_constant = true;
+
   pxr::UsdGeomXformable xformable(prim_);
 
   if (!xformable) {
     unit_m4(r_mat);
     return;
   }
+
+  is_constant = !xformable.TransformMightBeTimeVarying();
 
   pxr::GfMatrix4d usd_local_xf;
   bool reset_xform_stack;
@@ -88,6 +133,8 @@ void USDXformableReader::read_matrix(float r_mat[4][4] /* local matrix */,
     pxr::UsdGeomXformable parent_xformable(prim_.GetParent());
 
     if (parent_xformable) {
+      is_constant = is_constant && !parent_xformable.TransformMightBeTimeVarying();
+
       pxr::GfMatrix4d usd_parent_local_xf;
       parent_xformable.GetLocalTransformation(&usd_parent_local_xf, &reset_xform_stack, time);
 

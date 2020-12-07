@@ -28,6 +28,12 @@
 #include "usd_reader_xform.h"
 #include "usd_reader_xformable.h"
 
+#include "BLI_listbase.h"
+#include "BLI_string.h"
+#include "DNA_cachefile_types.h"
+
+#include "MEM_guardedalloc.h"
+
 #include <iostream>
 #include <pxr/pxr.h>
 #include <pxr/usd/usd/prim.h>
@@ -47,6 +53,18 @@ USDPrimIterator::USDPrimIterator(pxr::UsdStageRefPtr stage,
                                  Main *bmain)
     : stage_(stage), context_(context), bmain_(bmain)
 {
+}
+
+USDPrimIterator::USDPrimIterator(const char *file_path,
+                                 const USDImporterContext &context,
+                                 Main *bmain)
+    : stage_(pxr::UsdStage::Open(file_path)), context_(context), bmain_(bmain)
+{
+}
+
+bool USDPrimIterator::valid() const
+{
+  return stage_;
 }
 
 void USDPrimIterator::create_object_readers(std::vector<USDXformableReader *> &r_readers) const
@@ -90,6 +108,11 @@ void USDPrimIterator::debug_traverse_stage() const
   debug_traverse_stage(stage_);
 }
 
+USDXformableReader *USDPrimIterator::get_object_reader(const pxr::UsdPrim &prim)
+{
+  return get_object_reader(prim, context_);
+}
+
 USDXformableReader *USDPrimIterator::get_object_reader(const pxr::UsdPrim &prim,
                                                        const USDImporterContext &context)
 {
@@ -126,7 +149,9 @@ void USDPrimIterator::create_object_readers(const pxr::UsdPrim &prim,
   pxr::UsdPrimSiblingRange child_prims = prim.GetFilteredChildren(
       pxr::UsdTraverseInstanceProxies(pxr::UsdPrimDefaultPredicate));
 
+  int num_child_prims = 0;
   for (const pxr::UsdPrim &child_prim : child_prims) {
+    ++num_child_prims;
     create_object_readers(child_prim, context, r_readers, child_readers);
   }
 
@@ -144,7 +169,7 @@ void USDPrimIterator::create_object_readers(const pxr::UsdPrim &prim,
 
   /* If this is an Xform prim, see if we can merge with the child reader. */
 
-  if (prim.IsA<pxr::UsdGeomXform>() && child_readers.size() == 1 &&
+  if (prim.IsA<pxr::UsdGeomXform>() && num_child_prims == 1 &&
       !child_readers.front()->merged_with_parent() &&
       child_readers.front()->can_merge_with_parent()) {
     child_readers.front()->set_merged_with_parent(true);
@@ -207,6 +232,26 @@ void USDPrimIterator::cache_prototype_data(USDDataCache &r_cache) const
       reader->decref();
     }
   }
+}
+
+bool USDPrimIterator::gather_objects_paths(ListBase *object_paths) const
+{
+  if (!stage_) {
+    return false;
+  }
+
+  pxr::UsdPrimRange prims = stage_->Traverse(
+      pxr::UsdTraverseInstanceProxies(pxr::UsdPrimDefaultPredicate));
+
+  for (const pxr::UsdPrim &prim : prims) {
+    void *usd_path_void = MEM_callocN(sizeof(CacheObjectPath), "CacheObjectPath");
+    CacheObjectPath *usd_path = static_cast<CacheObjectPath *>(usd_path_void);
+
+    BLI_strncpy(usd_path->path, prim.GetPrimPath().GetString().c_str(), sizeof(usd_path->path));
+    BLI_addtail(object_paths, usd_path);
+  }
+
+  return true;
 }
 
 void USDPrimIterator::debug_traverse_stage(const pxr::UsdStageRefPtr &usd_stage)

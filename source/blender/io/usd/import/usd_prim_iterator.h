@@ -23,6 +23,7 @@
 #include <pxr/usd/usd/common.h>
 
 #include <map>
+#include <set>
 #include <vector>
 
 struct Main;
@@ -41,6 +42,15 @@ class USDPrimIterator {
  public:
   USDPrimIterator(pxr::UsdStageRefPtr stage, const USDImporterContext &context, Main *bmain);
 
+  USDPrimIterator(const char *file_path, const USDImporterContext &context, Main *bmain);
+
+  bool valid() const;
+
+  pxr::UsdStageRefPtr stage() const
+  {
+    return stage_;
+  }
+
   void create_object_readers(std::vector<USDXformableReader *> &r_readers) const;
 
   void create_prototype_object_readers(
@@ -48,7 +58,11 @@ class USDPrimIterator {
 
   void cache_prototype_data(USDDataCache &r_cache) const;
 
+  bool gather_objects_paths(ListBase *object_paths) const;
+
   void debug_traverse_stage() const;
+
+  USDXformableReader *get_object_reader(const pxr::UsdPrim &prim);
 
   static USDXformableReader *get_object_reader(const pxr::UsdPrim &prim,
                                                const USDImporterContext &context);

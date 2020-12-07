@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 
+struct CacheFile;
 struct Main;
 struct Mesh;
 struct Object;
@@ -52,6 +53,11 @@ class USDXformableReader : public USDPrimReader {
 
   Object *object() const;
 
+  void set_object(Object *object)
+  {
+    object_ = object;
+  }
+
   USDXformableReader *parent() const
   {
     return parent_;
@@ -72,6 +78,13 @@ class USDXformableReader : public USDPrimReader {
     return merged_with_parent_;
   }
 
+  /* Determines whether or not this reader takes into
+   * account the encapsulated USD primitive's parent when
+   * computing the object's transform and sets the value
+   * of the merged_with_parent_ flag accordingly. Note that
+   * this function may be expensive to compute. */
+  void eval_merged_with_parent();
+
   std::string get_object_name() const
   {
     return merged_with_parent_ ? this->parent_prim_name() : this->prim_name();
@@ -91,9 +104,12 @@ class USDXformableReader : public USDPrimReader {
     return true;
   }
 
-  void set_object_transform(const double time);
+  void set_object_transform(const double time, CacheFile *cache_file = nullptr);
 
-  virtual void read_matrix(float r_mat[4][4], const double time, const float scale) const;
+  virtual void read_matrix(float r_mat[4][4],
+                           const double time,
+                           const float scale,
+                           bool &is_constant) const;
 };
 
 } /* namespace blender::io::usd */
