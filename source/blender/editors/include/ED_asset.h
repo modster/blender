@@ -25,8 +25,8 @@
 extern "C" {
 #endif
 
-bool ED_asset_make_for_id(const struct bContext *C, struct ID *id);
-bool ED_asset_unmake_from_id(struct ID *id);
+bool ED_asset_mark_id(const struct bContext *C, struct ID *id);
+bool ED_asset_clear_id(struct ID *id);
 
 bool ED_asset_can_make_single_from_context(const struct bContext *C);
 
