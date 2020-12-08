@@ -268,6 +268,7 @@ void BLI_path_normalize_dir(const char *relabase, char *dir)
   if (dir[0] == '\0') {
     return;
   }
+
   BLI_path_normalize(relabase, dir);
   BLI_path_slash_ensure(dir);
 }

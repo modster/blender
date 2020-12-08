@@ -135,7 +135,7 @@ void BLO_blendhandle_print_sizes(BlendHandle *bh, void *fp)
  * \param bh: The blendhandle to access.
  * \param ofblocktype: The type of names to get.
  * \param tot_names: The length of the returned list.
- * \return A BLI_linklist of strings. The string links should be freed with malloc.
+ * \return A BLI_linklist of strings. The string links should be freed with #MEM_freeN().
  */
 LinkNode *BLO_blendhandle_get_datablock_names(BlendHandle *bh, int ofblocktype, int *tot_names)
 {
@@ -148,7 +148,7 @@ LinkNode *BLO_blendhandle_get_datablock_names(BlendHandle *bh, int ofblocktype, 
     if (bhead->code == ofblocktype) {
       const char *idname = blo_bhead_id_name(fd, bhead);
 
-      BLI_linklist_prepend(&names, strdup(idname + 2));
+      BLI_linklist_prepend(&names, BLI_strdup(idname + 2));
       tot++;
     }
     else if (bhead->code == ENDB) {
