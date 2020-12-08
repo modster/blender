@@ -32,7 +32,7 @@
 
 #include "ED_asset.h"
 
-bool ED_asset_make_for_id(const bContext *C, ID *id)
+bool ED_asset_mark_id(const bContext *C, ID *id)
 {
   if (id->asset_data) {
     return false;
@@ -50,7 +50,7 @@ bool ED_asset_make_for_id(const bContext *C, ID *id)
   return true;
 }
 
-bool ED_asset_unmake_from_id(ID *id)
+bool ED_asset_clear_id(ID *id)
 {
   if (!id->asset_data) {
     return false;
@@ -63,6 +63,6 @@ bool ED_asset_unmake_from_id(ID *id)
 
 bool ED_asset_can_make_single_from_context(const bContext *C)
 {
-  /* Context needs a "id" pointer to be set for #ASSET_OT_make()/#ASSET_OT_unmake() to use. */
+  /* Context needs a "id" pointer to be set for #ASSET_OT_mark()/#ASSET_OT_clear() to use. */
   return CTX_data_pointer_get_type_silent(C, "id", &RNA_ID).data != NULL;
 }
