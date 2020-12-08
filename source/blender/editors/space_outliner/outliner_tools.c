@@ -1685,8 +1685,8 @@ typedef enum eOutlinerIdOpTypes {
   OUTLINER_IDOP_INVALID = 0,
 
   OUTLINER_IDOP_UNLINK,
-  OUTLINER_IDOP_MAKE_ASSET,
-  OUTLINER_IDOP_UNMAKE_ASSET,
+  OUTLINER_IDOP_MARK_ASSET,
+  OUTLINER_IDOP_CLEAR_ASSET,
   OUTLINER_IDOP_LOCAL,
   OUTLINER_IDOP_OVERRIDE_LIBRARY_CREATE,
   OUTLINER_IDOP_OVERRIDE_LIBRARY_CREATE_HIERARCHY,
@@ -1712,8 +1712,8 @@ typedef enum eOutlinerIdOpTypes {
 /* TODO: implement support for changing the ID-block used. */
 static const EnumPropertyItem prop_id_op_types[] = {
     {OUTLINER_IDOP_UNLINK, "UNLINK", 0, "Unlink", ""},
-    {OUTLINER_IDOP_MAKE_ASSET, "MAKE_ASSET", 0, "Make Asset", ""},
-    {OUTLINER_IDOP_UNMAKE_ASSET, "UNMAKE_ASSET", 0, "Remove Asset Data", ""},
+    {OUTLINER_IDOP_MARK_ASSET, "MARK_ASSET", 0, "Mark Asset", ""},
+    {OUTLINER_IDOP_CLEAR_ASSET, "CLEAR_ASSET", 0, "Clear Asset", ""},
     {OUTLINER_IDOP_LOCAL, "LOCAL", 0, "Make Local", ""},
     {OUTLINER_IDOP_SINGLE, "SINGLE", 0, "Make Single User", ""},
     {OUTLINER_IDOP_DELETE, "DELETE", ICON_X, "Delete", ""},
@@ -1919,12 +1919,12 @@ static int outliner_id_operation_exec(bContext *C, wmOperator *op)
       }
       break;
     }
-    case OUTLINER_IDOP_MAKE_ASSET: {
-      WM_operator_name_call(C, "ASSET_OT_make", WM_OP_EXEC_DEFAULT, NULL);
+    case OUTLINER_IDOP_MARK_ASSET: {
+      WM_operator_name_call(C, "ASSET_OT_mark", WM_OP_EXEC_DEFAULT, NULL);
       break;
     }
-    case OUTLINER_IDOP_UNMAKE_ASSET: {
-      WM_operator_name_call(C, "ASSET_OT_unmake", WM_OP_EXEC_DEFAULT, NULL);
+    case OUTLINER_IDOP_CLEAR_ASSET: {
+      WM_operator_name_call(C, "ASSET_OT_clear", WM_OP_EXEC_DEFAULT, NULL);
       break;
     }
     case OUTLINER_IDOP_LOCAL: {
