@@ -3097,7 +3097,7 @@ void RNA_property_float_get_default_array(PointerRNA *ptr, PropertyRNA *prop, fl
     const IDProperty *idprop = (const IDProperty *)prop;
     if (idprop->ui_data) {
       BLI_assert(idprop->type == IDP_ARRAY);
-      BLI_assert(ELEM(idprop->type, IDP_FLOAT, IDP_DOUBLE));
+      BLI_assert(ELEM(idprop->subtype, IDP_FLOAT, IDP_DOUBLE));
       const IDPropertyUIDataFloat *ui_data = (const IDPropertyUIDataFloat *)idprop->ui_data;
       if (ui_data->default_array) {
         /* A version of #rna_property_float_fill_default_array_values for a double array. */
