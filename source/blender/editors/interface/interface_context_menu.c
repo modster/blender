@@ -962,10 +962,10 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
      * which isn't cheap to check. */
     uiLayout *sub = uiLayoutColumn(layout, true);
     uiLayoutSetEnabled(sub, !id->asset_data);
-    uiItemO(sub, NULL, ICON_NONE, "ASSET_OT_make");
+    uiItemO(sub, NULL, ICON_NONE, "ASSET_OT_mark");
     sub = uiLayoutColumn(layout, true);
     uiLayoutSetEnabled(sub, id->asset_data);
-    uiItemO(sub, NULL, ICON_NONE, "ASSET_OT_unmake");
+    uiItemO(sub, NULL, ICON_NONE, "ASSET_OT_clear");
     uiItemS(layout);
   }
 
