@@ -1382,8 +1382,7 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
     return NULL;
   }
 
-  if (!ELEM(idprop->type, IDP_STRING, IDP_INT, IDP_FLOAT, IDP_DOUBLE, IDP_ARRAY) ||
-      ((idprop->type == IDP_ARRAY) && !ELEM(idprop->subtype, IDP_INT, IDP_FLOAT, IDP_DOUBLE))) {
+  if (!IDP_supports_ui_data(idprop)) {
     PyErr_SetString(
         PyExc_ValueError,
         "RNA UI data is only supported for string, integer, float, or double properties");

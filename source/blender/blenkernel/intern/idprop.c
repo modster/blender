@@ -1497,6 +1497,17 @@ void IDP_BlendReadExpand(struct BlendExpander *expander, IDProperty *prop)
   }
 }
 
+bool IDP_supports_ui_data(const IDProperty *prop)
+{
+  if (ELEM(prop->type, IDP_STRING, IDP_INT, IDP_FLOAT, IDP_DOUBLE)) {
+    return true;
+  }
+  if (prop->type == IDP_ARRAY && ELEM(prop->subtype, IDP_INT, IDP_FLOAT, IDP_DOUBLE)) {
+    return true;
+  }
+  return false;
+}
+
 IDPropertyUIData *IDP_ui_data_ensure(IDProperty *prop)
 {
   if (prop->ui_data != NULL) {

@@ -54,6 +54,7 @@
 #include "BKE_colortools.h"
 #include "BKE_fcurve.h"
 #include "BKE_gpencil.h"
+#include "BKE_idprop.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
 #include "BKE_mesh.h"
@@ -63,6 +64,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "RNA_access.h"
+#include "RNA_enum_types.h"
 
 #include "SEQ_sequencer.h"
 
@@ -208,6 +210,202 @@ static void seq_convert_transform_crop_lb(const Scene *scene,
       seq_convert_transform_crop_lb(scene, &seq->seqbase, render_size);
     }
   }
+}
+
+static IDProperty *do_versions_idproperty_id_custom_properties(ID *id)
+{
+  PointerRNA ptr;
+  RNA_id_pointer_create(id, &ptr);
+  IDProperty *idprop_group = RNA_struct_idprops(&ptr, false);
+  if (idprop_group == NULL) {
+    return NULL;
+  }
+
+  BLI_assert(idprop_group->type == IDP_GROUP);
+  return idprop_group;
+}
+
+static IDProperty *do_versions_idproperty_find_ui_container(IDProperty *idprop_group)
+{
+  LISTBASE_FOREACH (IDProperty *, prop, &idprop_group->data.group) {
+    if (prop->type == IDP_GROUP && STREQ(prop->name, "_RNA_UI")) {
+      return prop;
+    }
+  }
+  return NULL;
+}
+
+static void do_versions_idproperty_move_data_int(IDPropertyUIDataInt *ui_data,
+                                                 const IDProperty *prop_ui_data)
+{
+  IDProperty *min = IDP_GetPropertyFromGroup(prop_ui_data, "min");
+  if (min != NULL) {
+    BLI_assert(min->type == IDP_INT);
+    ui_data->min = IDP_Int(min);
+    ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
+  }
+  IDProperty *max = IDP_GetPropertyFromGroup(prop_ui_data, "max");
+  if (max != NULL) {
+    BLI_assert(max->type == IDP_INT);
+    ui_data->max = IDP_Int(max);
+    ui_data->soft_max = MAX2(ui_data->soft_max, ui_data->max);
+  }
+  IDProperty *soft_min = IDP_GetPropertyFromGroup(prop_ui_data, "soft_min");
+  if (soft_min != NULL) {
+    BLI_assert(soft_min->type == IDP_INT);
+    ui_data->soft_min = IDP_Int(soft_min);
+    ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
+  }
+  IDProperty *soft_max = IDP_GetPropertyFromGroup(prop_ui_data, "soft_max");
+  if (soft_max != NULL) {
+    BLI_assert(soft_max->type == IDP_INT);
+    ui_data->soft_max = IDP_Int(soft_max);
+    ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
+  }
+  IDProperty *step = IDP_GetPropertyFromGroup(prop_ui_data, "step");
+  if (step != NULL) {
+    BLI_assert(step->type == IDP_INT);
+    ui_data->step = IDP_Int(step);
+  }
+  IDProperty *default_value = IDP_GetPropertyFromGroup(prop_ui_data, "default");
+  if (default_value != NULL) {
+    if (default_value->type == IDP_ARRAY) {
+      BLI_assert(ELEM(default_value->subtype, IDP_FLOAT, IDP_DOUBLE));
+      ui_data->default_array = MEM_dupallocN(IDP_Array(default_value));
+      ui_data->default_array_len = default_value->len;
+    }
+    else if (default_value->type == IDP_INT) {
+      ui_data->default_value = IDP_Int(default_value);
+    }
+  }
+}
+
+static void do_versions_idproperty_move_data_float(IDPropertyUIDataFloat *ui_data,
+                                                   const IDProperty *prop_ui_data)
+{
+  IDProperty *min = IDP_GetPropertyFromGroup(prop_ui_data, "min");
+  if (min != NULL) {
+    BLI_assert(min->type == IDP_DOUBLE);
+    ui_data->min = IDP_Double(min);
+    ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
+  }
+  IDProperty *max = IDP_GetPropertyFromGroup(prop_ui_data, "max");
+  if (max != NULL) {
+    BLI_assert(max->type == IDP_DOUBLE);
+    ui_data->max = IDP_Double(max);
+    ui_data->soft_max = MAX2(ui_data->soft_max, ui_data->max);
+  }
+  IDProperty *soft_min = IDP_GetPropertyFromGroup(prop_ui_data, "soft_min");
+  if (soft_min != NULL) {
+    BLI_assert(soft_min->type == IDP_DOUBLE);
+    ui_data->soft_min = IDP_Double(soft_min);
+    ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
+  }
+  IDProperty *soft_max = IDP_GetPropertyFromGroup(prop_ui_data, "soft_max");
+  if (soft_max != NULL) {
+    BLI_assert(soft_max->type == IDP_DOUBLE);
+    ui_data->soft_max = IDP_Double(soft_max);
+    ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
+  }
+  IDProperty *step = IDP_GetPropertyFromGroup(prop_ui_data, "step");
+  if (step != NULL) {
+    BLI_assert(step->type == IDP_DOUBLE);
+    ui_data->step = (float)IDP_Double(step);
+  }
+  IDProperty *precision = IDP_GetPropertyFromGroup(prop_ui_data, "precision");
+  if (precision != NULL) {
+    BLI_assert(precision->type == IDP_DOUBLE);
+    ui_data->precision = (float)IDP_Double(precision);
+  }
+  IDProperty *default_value = IDP_GetPropertyFromGroup(prop_ui_data, "default");
+  if (default_value != NULL) {
+    if (default_value->type == IDP_ARRAY) {
+      BLI_assert(ELEM(default_value->subtype, IDP_FLOAT, IDP_DOUBLE));
+      ui_data->default_array = MEM_dupallocN(IDP_Array(default_value));
+      ui_data->default_array_len = default_value->len;
+    }
+    else if (default_value->type == IDP_DOUBLE) {
+      ui_data->default_value = IDP_Double(default_value);
+    }
+    else if (default_value->type == IDP_FLOAT) {
+      ui_data->default_value = IDP_Float(default_value);
+    }
+    else {
+      BLI_assert(false);
+    }
+  }
+}
+
+static void do_versions_idproperty_move_data_string(IDPropertyUIDataString *ui_data,
+                                                    const IDProperty *prop_ui_data)
+{
+  IDProperty *default_value = IDP_GetPropertyFromGroup(prop_ui_data, "default");
+  if (default_value != NULL) {
+    BLI_assert(default_value->type == IDP_STRING);
+    ui_data->default_value = BLI_strdup(IDP_String(default_value));
+  }
+}
+
+static void do_versions_idproperty_move_data(IDProperty *prop, const IDProperty *prop_ui_data)
+{
+  IDPropertyUIData *ui_data = IDP_ui_data_ensure(prop);
+
+  IDProperty *subtype = IDP_GetPropertyFromGroup(prop_ui_data, "subtype");
+  if (subtype != NULL) {
+    BLI_assert(subtype->type == IDP_STRING);
+    const char *subtype_string = IDP_String(subtype);
+    int result = PROP_NONE;
+    RNA_enum_value_from_id(rna_enum_property_subtype_items, subtype_string, &result);
+    ui_data->rna_subtype = result;
+  }
+
+  IDProperty *description = IDP_GetPropertyFromGroup(prop_ui_data, "description");
+  if (description != NULL) {
+    BLI_assert(description->type == IDP_STRING);
+    ui_data->description = BLI_strdup(IDP_String(description));
+  }
+
+  /* Type specific data. */
+  if (prop->type == IDP_INT || (prop->type == IDP_ARRAY && prop->subtype == IDP_INT)) {
+    do_versions_idproperty_move_data_int((IDPropertyUIDataInt *)ui_data, prop_ui_data);
+  }
+  else if (ELEM(prop->type, IDP_FLOAT, IDP_DOUBLE) ||
+           (prop->type == IDP_ARRAY && ELEM(prop->subtype, IDP_FLOAT, IDP_DOUBLE))) {
+    do_versions_idproperty_move_data_float((IDPropertyUIDataFloat *)ui_data, prop_ui_data);
+  }
+  else if (prop->type == IDP_STRING) {
+    do_versions_idproperty_move_data_string((IDPropertyUIDataString *)ui_data, prop_ui_data);
+  }
+}
+
+/**
+ * Initialize the new IDProperty UI data struct. Assumes only the
+ * top level of IDProperties have UI data in a "_RNA_UI" group.
+ */
+static void do_versions_idproperty_ui_data(ID *id)
+{
+  IDProperty *idprop_group = do_versions_idproperty_id_custom_properties(id);
+  if (idprop_group == NULL) {
+    return;
+  }
+
+  IDProperty *ui_container = do_versions_idproperty_find_ui_container(idprop_group);
+  if (ui_container == NULL) {
+    return;
+  }
+
+  LISTBASE_FOREACH (IDProperty *, prop, &idprop_group->data.group) {
+    IDProperty *prop_ui_data = IDP_GetPropertyFromGroup(ui_container, prop->name);
+    if (prop_ui_data == NULL) {
+      continue;
+    }
+
+    if (IDP_supports_ui_data(prop)) {
+      do_versions_idproperty_move_data(prop, prop_ui_data);
+    }
+  }
+
+  IDP_FreeFromGroup(idprop_group, ui_container);
 }
 
 void do_versions_after_linking_290(Main *bmain, ReportList *UNUSED(reports))
@@ -482,13 +680,19 @@ void do_versions_after_linking_290(Main *bmain, ReportList *UNUSED(reports))
         BKE_pose_rebuild(bmain, ob, ob->data, true);
       }
     }
-  }
 
-  /* Wet Paint Radius Factor */
-  for (Brush *br = bmain->brushes.first; br; br = br->id.next) {
-    if (br->ob_mode & OB_MODE_SCULPT && br->wet_paint_radius_factor == 0.0f) {
-      br->wet_paint_radius_factor = 1.0f;
+    /* Wet Paint Radius Factor */
+    for (Brush *br = bmain->brushes.first; br; br = br->id.next) {
+      if (br->ob_mode & OB_MODE_SCULPT && br->wet_paint_radius_factor == 0.0f) {
+        br->wet_paint_radius_factor = 1.0f;
+      }
     }
+
+    ID *id;
+    FOREACH_MAIN_ID_BEGIN (bmain, id) {
+      do_versions_idproperty_ui_data(id);
+    }
+    FOREACH_MAIN_ID_END;
   }
 }
 
@@ -1243,5 +1447,11 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
    */
   {
     /* Keep this block, even when empty. */
+    //   ID *id;
+    //   FOREACH_MAIN_ID_BEGIN (bmain, id) {
+    //     do_versions_idproperty_ui_data(id);
+    //   }
+    //   FOREACH_MAIN_ID_END;
+    // }
   }
 }
