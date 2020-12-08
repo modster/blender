@@ -212,19 +212,6 @@ static void seq_convert_transform_crop_lb(const Scene *scene,
   }
 }
 
-static IDProperty *do_versions_idproperty_id_custom_properties(ID *id)
-{
-  PointerRNA ptr;
-  RNA_id_pointer_create(id, &ptr);
-  IDProperty *idprop_group = RNA_struct_idprops(&ptr, false);
-  if (idprop_group == NULL) {
-    return NULL;
-  }
-
-  BLI_assert(idprop_group->type == IDP_GROUP);
-  return idprop_group;
-}
-
 static IDProperty *do_versions_idproperty_find_ui_container(IDProperty *idprop_group)
 {
   LISTBASE_FOREACH (IDProperty *, prop, &idprop_group->data.group) {
@@ -384,7 +371,7 @@ static void do_versions_idproperty_move_data(IDProperty *prop, const IDProperty 
  */
 static void do_versions_idproperty_ui_data(ID *id)
 {
-  IDProperty *idprop_group = do_versions_idproperty_id_custom_properties(id);
+  IDProperty *idprop_group = IDP_GetProperties(id, false);
   if (idprop_group == NULL) {
     return;
   }
