@@ -800,3 +800,6 @@ if(WITH_POTRACE)
   set(POTRACE_LIBRARIES ${LIBDIR}/potrace/lib/potrace.lib)
   set(POTRACE_FOUND On)
 endif()
+
+set(LIBHARU_INCLUDE_DIRS ${LIBDIR}/libharu/include)
+set(LIBHARU_LIBRARIES ${LIBDIR}/libharu/lib/libhpdfsd.lib)
