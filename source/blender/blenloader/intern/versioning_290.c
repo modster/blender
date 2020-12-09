@@ -27,6 +27,7 @@
 #include "BLI_utildefines.h"
 
 #include "DNA_anim_types.h"
+#include "DNA_armature_types.h"
 #include "DNA_brush_types.h"
 #include "DNA_cachefile_types.h"
 #include "DNA_constraint_types.h"
@@ -212,7 +213,7 @@ static void seq_convert_transform_crop_lb(const Scene *scene,
   }
 }
 
-static IDProperty *do_versions_idproperty_find_ui_container(IDProperty *idprop_group)
+static IDProperty *idproperty_find_ui_container(IDProperty *idprop_group)
 {
   LISTBASE_FOREACH (IDProperty *, prop, &idprop_group->data.group) {
     if (prop->type == IDP_GROUP && STREQ(prop->name, "_RNA_UI")) {
@@ -222,8 +223,8 @@ static IDProperty *do_versions_idproperty_find_ui_container(IDProperty *idprop_g
   return NULL;
 }
 
-static void do_versions_idproperty_move_data_int(IDPropertyUIDataInt *ui_data,
-                                                 const IDProperty *prop_ui_data)
+static void version_idproperty_move_data_int(IDPropertyUIDataInt *ui_data,
+                                             const IDProperty *prop_ui_data)
 {
   IDProperty *min = IDP_GetPropertyFromGroup(prop_ui_data, "min");
   if (min != NULL) {
@@ -267,8 +268,8 @@ static void do_versions_idproperty_move_data_int(IDPropertyUIDataInt *ui_data,
   }
 }
 
-static void do_versions_idproperty_move_data_float(IDPropertyUIDataFloat *ui_data,
-                                                   const IDProperty *prop_ui_data)
+static void version_idproperty_move_data_float(IDPropertyUIDataFloat *ui_data,
+                                               const IDProperty *prop_ui_data)
 {
   IDProperty *min = IDP_GetPropertyFromGroup(prop_ui_data, "min");
   if (min != NULL) {
@@ -323,8 +324,8 @@ static void do_versions_idproperty_move_data_float(IDPropertyUIDataFloat *ui_dat
   }
 }
 
-static void do_versions_idproperty_move_data_string(IDPropertyUIDataString *ui_data,
-                                                    const IDProperty *prop_ui_data)
+static void version_idproperty_move_data_string(IDPropertyUIDataString *ui_data,
+                                                const IDProperty *prop_ui_data)
 {
   IDProperty *default_value = IDP_GetPropertyFromGroup(prop_ui_data, "default");
   if (default_value != NULL) {
@@ -333,50 +334,13 @@ static void do_versions_idproperty_move_data_string(IDPropertyUIDataString *ui_d
   }
 }
 
-static void do_versions_idproperty_move_data(IDProperty *prop, const IDProperty *prop_ui_data)
+static void version_idproperty_ui_data(IDProperty *idprop_group)
 {
-  IDPropertyUIData *ui_data = IDP_ui_data_ensure(prop);
-
-  IDProperty *subtype = IDP_GetPropertyFromGroup(prop_ui_data, "subtype");
-  if (subtype != NULL) {
-    BLI_assert(subtype->type == IDP_STRING);
-    const char *subtype_string = IDP_String(subtype);
-    int result = PROP_NONE;
-    RNA_enum_value_from_id(rna_enum_property_subtype_items, subtype_string, &result);
-    ui_data->rna_subtype = result;
-  }
-
-  IDProperty *description = IDP_GetPropertyFromGroup(prop_ui_data, "description");
-  if (description != NULL) {
-    BLI_assert(description->type == IDP_STRING);
-    ui_data->description = BLI_strdup(IDP_String(description));
-  }
-
-  /* Type specific data. */
-  if (prop->type == IDP_INT || (prop->type == IDP_ARRAY && prop->subtype == IDP_INT)) {
-    do_versions_idproperty_move_data_int((IDPropertyUIDataInt *)ui_data, prop_ui_data);
-  }
-  else if (ELEM(prop->type, IDP_FLOAT, IDP_DOUBLE) ||
-           (prop->type == IDP_ARRAY && ELEM(prop->subtype, IDP_FLOAT, IDP_DOUBLE))) {
-    do_versions_idproperty_move_data_float((IDPropertyUIDataFloat *)ui_data, prop_ui_data);
-  }
-  else if (prop->type == IDP_STRING) {
-    do_versions_idproperty_move_data_string((IDPropertyUIDataString *)ui_data, prop_ui_data);
-  }
-}
-
-/**
- * Initialize the new IDProperty UI data struct. Assumes only the
- * top level of IDProperties have UI data in a "_RNA_UI" group.
- */
-static void do_versions_idproperty_ui_data(ID *id)
-{
-  IDProperty *idprop_group = IDP_GetProperties(id, false);
   if (idprop_group == NULL) {
     return;
   }
 
-  IDProperty *ui_container = do_versions_idproperty_find_ui_container(idprop_group);
+  IDProperty *ui_container = idproperty_find_ui_container(idprop_group);
   if (ui_container == NULL) {
     return;
   }
@@ -387,12 +351,115 @@ static void do_versions_idproperty_ui_data(ID *id)
       continue;
     }
 
-    if (IDP_supports_ui_data(prop)) {
-      do_versions_idproperty_move_data(prop, prop_ui_data);
+    if (!IDP_supports_ui_data(prop)) {
+      continue;
     }
+
+    IDPropertyUIData *ui_data = IDP_ui_data_ensure(prop);
+
+    IDProperty *subtype = IDP_GetPropertyFromGroup(prop_ui_data, "subtype");
+    if (subtype != NULL) {
+      BLI_assert(subtype->type == IDP_STRING);
+      const char *subtype_string = IDP_String(subtype);
+      int result = PROP_NONE;
+      RNA_enum_value_from_id(rna_enum_property_subtype_items, subtype_string, &result);
+      ui_data->rna_subtype = result;
+    }
+
+    IDProperty *description = IDP_GetPropertyFromGroup(prop_ui_data, "description");
+    if (description != NULL) {
+      BLI_assert(description->type == IDP_STRING);
+      ui_data->description = BLI_strdup(IDP_String(description));
+    }
+
+    /* Type specific data. */
+    if (prop->type == IDP_INT || (prop->type == IDP_ARRAY && prop->subtype == IDP_INT)) {
+      version_idproperty_move_data_int((IDPropertyUIDataInt *)ui_data, prop_ui_data);
+    }
+    else if (ELEM(prop->type, IDP_FLOAT, IDP_DOUBLE) ||
+             (prop->type == IDP_ARRAY && ELEM(prop->subtype, IDP_FLOAT, IDP_DOUBLE))) {
+      version_idproperty_move_data_float((IDPropertyUIDataFloat *)ui_data, prop_ui_data);
+    }
+    else if (prop->type == IDP_STRING) {
+      version_idproperty_move_data_string((IDPropertyUIDataString *)ui_data, prop_ui_data);
+    }
+
+    IDP_FreeFromGroup(ui_container, prop_ui_data);
   }
 
   IDP_FreeFromGroup(idprop_group, ui_container);
+}
+
+static void do_versions_idproperty_bones_recursive(Bone *bone)
+{
+  version_idproperty_ui_data(bone->prop);
+  LISTBASE_FOREACH (Bone *, child_bone, &bone->childbase) {
+    do_versions_idproperty_bones_recursive(child_bone);
+  }
+}
+
+/**
+ * For every data block that supports them, initialize the new IDProperty UI data struct based on
+ * the old more complicated storage. Assumes only the top level of IDProperties below the parent
+ * group had UI data in a "_RNA_UI" group.
+ *
+ * \note Many IDProperties weren't exposed in the interface, so they don't all have UI data.
+ */
+static void do_versions_idproperty_ui_data(Main *bmain)
+{
+  /* ID data. */
+  ID *id;
+  FOREACH_MAIN_ID_BEGIN (bmain, id) {
+    IDProperty *idprop_group = IDP_GetProperties(id, false);
+    if (idprop_group == NULL) {
+      continue;
+    }
+    version_idproperty_ui_data(idprop_group);
+  }
+  FOREACH_MAIN_ID_END;
+
+  /* Bones. */
+  LISTBASE_FOREACH (bArmature *, armature, &bmain->armatures) {
+    LISTBASE_FOREACH (Bone *, bone, &armature->bonebase) {
+      do_versions_idproperty_bones_recursive(bone);
+    }
+  }
+
+  /* Pose channels. */
+  LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
+    if (ob->pose) {
+      LISTBASE_FOREACH (bPoseChannel *, pchan, &ob->pose->chanbase) {
+        version_idproperty_ui_data(pchan->prop);
+      }
+    }
+  }
+
+  /* View layers. */
+  LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+    LISTBASE_FOREACH (ViewLayer *, view_layer, &scene->view_layers) {
+      version_idproperty_ui_data(view_layer->id_properties);
+    }
+  }
+
+  /* Nodes and node sockets. */
+  LISTBASE_FOREACH (bNodeTree *, ntree, &bmain->nodetrees) {
+    LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+      version_idproperty_ui_data(node->prop);
+    }
+    LISTBASE_FOREACH (bNodeSocket *, socket, &ntree->inputs) {
+      version_idproperty_ui_data(socket->prop);
+    }
+    LISTBASE_FOREACH (bNodeSocket *, socket, &ntree->outputs) {
+      version_idproperty_ui_data(socket->prop);
+    }
+  }
+
+  /* Markers. */
+  LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+    LISTBASE_FOREACH (TimeMarker *, marker, &scene->markers) {
+      version_idproperty_ui_data(marker->prop);
+    }
+  }
 }
 
 void do_versions_after_linking_290(Main *bmain, ReportList *UNUSED(reports))
@@ -675,11 +742,7 @@ void do_versions_after_linking_290(Main *bmain, ReportList *UNUSED(reports))
       }
     }
 
-    ID *id;
-    FOREACH_MAIN_ID_BEGIN (bmain, id) {
-      do_versions_idproperty_ui_data(id);
-    }
-    FOREACH_MAIN_ID_END;
+    do_versions_idproperty_ui_data(bmain);
   }
 }
 
