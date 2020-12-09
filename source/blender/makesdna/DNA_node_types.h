@@ -1059,6 +1059,17 @@ typedef struct NodeDenoise {
   char _pad[7];
 } NodeDenoise;
 
+typedef struct NodeAttributeCompare {
+  /* e.g. NODE_FLOAT_COMPARE_LESS_THAN. */
+  uint8_t operation;
+
+  /* GeometryNodeAttributeInputMode */
+  uint8_t input_type_a;
+  uint8_t input_type_b;
+
+  char _pad[5];
+} NodeAttributeCompare;
+
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
 #define NODE_SCRIPT_EXTERNAL 1
@@ -1336,14 +1347,14 @@ enum {
 };
 
 /* Float compare node operations. */
-enum {
+typedef enum FloatCompareOperation {
   NODE_FLOAT_COMPARE_LESS_THAN = 0,
   NODE_FLOAT_COMPARE_LESS_EQUAL = 1,
   NODE_FLOAT_COMPARE_GREATER_THAN = 2,
   NODE_FLOAT_COMPARE_GREATER_EQUAL = 3,
   NODE_FLOAT_COMPARE_EQUAL = 4,
   NODE_FLOAT_COMPARE_NOT_EQUAL = 5,
-};
+} FloatCompareOperation;
 
 /* Clamp node types. */
 enum {
@@ -1469,6 +1480,7 @@ typedef enum GeometryNodeAttributeInputMode {
   GEO_NODE_ATTRIBUTE_INPUT_FLOAT = 1,
   GEO_NODE_ATTRIBUTE_INPUT_VECTOR = 2,
   GEO_NODE_ATTRIBUTE_INPUT_COLOR = 3,
+  GEO_NODE_ATTRIBUTE_INPUT_BOOLEAN = 4,
 } GeometryNodeAttributeInputMode;
 
 #ifdef __cplusplus

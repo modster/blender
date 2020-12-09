@@ -30,11 +30,15 @@
 
 static bNodeSocketTemplate geo_node_attribute_compare_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_STRING, N_("Attribute A")},
-    {SOCK_FLOAT, N_("A"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
-    {SOCK_STRING, N_("Attribute B")},
-    {SOCK_FLOAT, N_("B"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
-    {SOCK_FLOAT, N_("Epsilon"), 0.01f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
+    {SOCK_STRING, N_("A")},
+    {SOCK_FLOAT, N_("A"), 0.0, 0.0, 0.0, 0.0, -FLT_MAX, FLT_MAX},
+    {SOCK_VECTOR, N_("A"), 0.0, 0.0, 0.0, 0.0, -FLT_MAX, FLT_MAX},
+    {SOCK_RGBA, N_("A"), 0.5, 0.5, 0.5, 1.0},
+    {SOCK_STRING, N_("B")},
+    {SOCK_FLOAT, N_("B"), 0.0, 0.0, 0.0, 0.0, -FLT_MAX, FLT_MAX},
+    {SOCK_VECTOR, N_("B"), 0.0, 0.0, 0.0, 0.0, -FLT_MAX, FLT_MAX},
+    {SOCK_RGBA, N_("B"), 0.5, 0.5, 0.5, 1.0},
+    {SOCK_FLOAT, N_("Threshold"), 0.01f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
     {SOCK_STRING, N_("Result")},
     {-1, ""},
 };
@@ -46,69 +50,52 @@ static bNodeSocketTemplate geo_node_attribute_compare_out[] = {
 
 static void geo_node_attribute_compare_init(bNodeTree *UNUSED(tree), bNode *node)
 {
-  node->custom1 = NODE_FLOAT_COMPARE_GREATER_THAN;
-  node->custom2 = GEO_NODE_USE_ATTRIBUTE_A | GEO_NODE_USE_ATTRIBUTE_B;
+  NodeAttributeCompare *data = (NodeAttributeCompare *)MEM_callocN(sizeof(NodeAttributeCompare),
+                                                                   "attribute mix node");
+  data->operation = NODE_FLOAT_COMPARE_GREATER_THAN;
+  data->input_type_a = GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE;
+  data->input_type_b = GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE;
+  node->storage = data;
 }
 
-static bool use_epsilon(const bNode &node)
+static bool operation_is_equality(const NodeAttributeCompare &node_storage)
 {
-  return ELEM(node.custom1, NODE_FLOAT_COMPARE_EQUAL, NODE_FLOAT_COMPARE_NOT_EQUAL);
-}
-
-static void geo_node_attribute_compare_update(bNodeTree *UNUSED(ntree), bNode *node)
-{
-  bNodeSocket *socket_attribute_a = (bNodeSocket *)BLI_findlink(&node->inputs, 1);
-  bNodeSocket *socket_float_a = socket_attribute_a->next;
-  bNodeSocket *socket_attribute_b = socket_float_a->next;
-  bNodeSocket *socket_float_b = socket_attribute_b->next;
-  bNodeSocket *socket_epsilon = socket_float_b->next;
-
-  GeometryNodeUseAttributeFlag flag = static_cast<GeometryNodeUseAttributeFlag>(node->custom2);
-
-  nodeSetSocketAvailability(socket_attribute_a, flag & GEO_NODE_USE_ATTRIBUTE_A);
-  nodeSetSocketAvailability(socket_attribute_b, flag & GEO_NODE_USE_ATTRIBUTE_B);
-  nodeSetSocketAvailability(socket_float_a, !(flag & GEO_NODE_USE_ATTRIBUTE_A));
-  nodeSetSocketAvailability(socket_float_b, !(flag & GEO_NODE_USE_ATTRIBUTE_B));
-  nodeSetSocketAvailability(socket_epsilon, use_epsilon(*node));
+  return ELEM(node_storage.operation, NODE_FLOAT_COMPARE_EQUAL, NODE_FLOAT_COMPARE_NOT_EQUAL);
 }
 
 namespace blender::nodes {
 
+static void geo_node_attribute_compare_update(bNodeTree *UNUSED(ntree), bNode *node)
+{
+  NodeAttributeCompare *node_storage = (NodeAttributeCompare *)node->storage;
+  update_attribute_input_socket_availabilities(
+      *node, "A", (GeometryNodeAttributeInputMode)node_storage->input_type_a);
+  update_attribute_input_socket_availabilities(
+      *node, "B", (GeometryNodeAttributeInputMode)node_storage->input_type_b);
+
+  bNodeSocket *socket_epsilon = (bNodeSocket *)BLI_findlink(&node->inputs, 9);
+  nodeSetSocketAvailability(socket_epsilon, operation_is_equality(*node_storage));
+}
+
 static void do_math_operation(const FloatReadAttribute &input_a,
                               const FloatReadAttribute &input_b,
-                              BooleanWriteAttribute result,
-                              const int operation,
-                              const float epsilon)
+                              const FloatCompareOperation operation,
+                              MutableSpan<bool> span_result)
 {
   const int size = input_a.size();
 
   Span<float> span_a = input_a.get_span();
   Span<float> span_b = input_b.get_span();
-  MutableSpan<bool> span_result = result.get_span();
 
   if (try_dispatch_float_math_fl_fl_to_bool(
           operation, [&](auto math_function, const FloatMathOperationInfo &UNUSED(info)) {
             for (const int i : IndexRange(size)) {
-              const float in1 = span_a[i];
-              const float in2 = span_b[i];
-              const bool out = math_function(in1, in2);
+              const float a = span_a[i];
+              const float b = span_b[i];
+              const bool out = math_function(a, b);
               span_result[i] = out;
             }
           })) {
-    result.apply_span();
-    return;
-  }
-
-  if (try_dispatch_float_math_fl_fl_fl_to_bool(
-          operation, [&](auto math_function, const FloatMathOperationInfo &UNUSED(info)) {
-            for (const int i : IndexRange(size)) {
-              const float in1 = span_a[i];
-              const float in2 = span_b[i];
-              const bool out = math_function(in1, in2, epsilon);
-              span_result[i] = out;
-            }
-          })) {
-    result.apply_span();
     return;
   }
 
@@ -116,10 +103,136 @@ static void do_math_operation(const FloatReadAttribute &input_a,
   BLI_assert(false);
 }
 
+static void do_equal_operation(const FloatReadAttribute &input_a,
+                               const FloatReadAttribute &input_b,
+                               const float threshold,
+                               MutableSpan<bool> span_result)
+{
+  const int size = input_a.size();
+  for (const int i : IndexRange(size)) {
+    const float a = input_a[i];
+    const float b = input_b[i];
+    span_result[i] = compare_ff(a, b, threshold);
+  }
+}
+
+static void do_equal_operation(const Float3ReadAttribute &input_a,
+                               const Float3ReadAttribute &input_b,
+                               const float threshold,
+                               MutableSpan<bool> span_result)
+{
+  const int size = input_a.size();
+  for (const int i : IndexRange(size)) {
+    const float3 a = input_a[i];
+    const float3 b = input_b[i];
+    span_result[i] = len_v3v3(a, b) < threshold;
+  }
+}
+
+static void do_equal_operation(const Color4fReadAttribute &input_a,
+                               const Color4fReadAttribute &input_b,
+                               const float threshold,
+                               MutableSpan<bool> span_result)
+{
+  const int size = input_a.size();
+  for (const int i : IndexRange(size)) {
+    const Color4f a = input_a[i];
+    const Color4f b = input_b[i];
+    span_result[i] = sqrtf(len_squared_v4v4(a, b)) < threshold;
+  }
+}
+
+static void do_equal_operation(const BooleanReadAttribute &input_a,
+                               const BooleanReadAttribute &input_b,
+                               const float UNUSED(threshold),
+                               MutableSpan<bool> span_result)
+{
+  const int size = input_a.size();
+  for (const int i : IndexRange(size)) {
+    const bool a = input_a[i];
+    const bool b = input_b[i];
+    span_result[i] = a == b;
+  }
+}
+
+static void do_not_equal_operation(const FloatReadAttribute &input_a,
+                                   const FloatReadAttribute &input_b,
+                                   const float threshold,
+                                   MutableSpan<bool> span_result)
+{
+  const int size = input_a.size();
+  for (const int i : IndexRange(size)) {
+    const float a = input_a[i];
+    const float b = input_b[i];
+    span_result[i] = !compare_ff(a, b, threshold);
+  }
+}
+
+static void do_not_equal_operation(const Float3ReadAttribute &input_a,
+                                   const Float3ReadAttribute &input_b,
+                                   const float threshold,
+                                   MutableSpan<bool> span_result)
+{
+  const int size = input_a.size();
+  for (const int i : IndexRange(size)) {
+    const float3 a = input_a[i];
+    const float3 b = input_b[i];
+
+    span_result[i] = len_v3v3(a, b) >= threshold;
+  }
+}
+
+static void do_not_equal_operation(const Color4fReadAttribute &input_a,
+                                   const Color4fReadAttribute &input_b,
+                                   const float threshold,
+                                   MutableSpan<bool> span_result)
+{
+  const int size = input_a.size();
+  for (const int i : IndexRange(size)) {
+    const Color4f a = input_a[i];
+    const Color4f b = input_b[i];
+    span_result[i] = sqrtf(len_squared_v4v4(a, b)) >= threshold;
+  }
+}
+
+static void do_not_equal_operation(const BooleanReadAttribute &input_a,
+                                   const BooleanReadAttribute &input_b,
+                                   const float UNUSED(threshold),
+                                   MutableSpan<bool> span_result)
+{
+  const int size = input_a.size();
+  for (const int i : IndexRange(size)) {
+    const bool a = input_a[i];
+    const bool b = input_b[i];
+    span_result[i] = a != b;
+  }
+}
+
+static CustomDataType get_data_type(GeometryComponent &component,
+                                    const GeoNodeExecParams &params,
+                                    const NodeAttributeCompare &node_storage)
+{
+  if (operation_is_equality(node_storage)) {
+    CustomDataType data_type_a = params.get_input_attribute_data_type(
+        "A", component, CD_PROP_FLOAT);
+    CustomDataType data_type_b = params.get_input_attribute_data_type(
+        "B", component, CD_PROP_FLOAT);
+
+    /* Convert the input attributes to the same data type for the equality tests. Use the lower
+     * complexity attribute type because any other information would be arbitrary anyway.*/
+    return attribute_domain_lowest_complexity(Span<CustomDataType>{data_type_a, data_type_b});
+  }
+
+  /* Use float compare for every operation besides equality. (This might have to change). */
+  return CD_PROP_FLOAT;
+}
+
 static void attribute_compare_calc(GeometryComponent &component, const GeoNodeExecParams &params)
 {
   const bNode &node = params.node();
-  const int operation = node.custom1;
+  NodeAttributeCompare *node_storage = (NodeAttributeCompare *)node.storage;
+  const FloatCompareOperation operation = static_cast<FloatCompareOperation>(
+      node_storage->operation);
 
   /* The result type of this node is always float. */
   const CustomDataType result_type = CD_PROP_BOOL;
@@ -134,35 +247,83 @@ static void attribute_compare_calc(GeometryComponent &component, const GeoNodeEx
     return;
   }
 
-  GeometryNodeUseAttributeFlag flag = static_cast<GeometryNodeUseAttributeFlag>(node.custom2);
+  const CustomDataType input_data_type = get_data_type(component, params, *node_storage);
 
-  auto get_input_attribute = [&](GeometryNodeUseAttributeFlag use_flag,
-                                 StringRef attribute_socket_identifier,
-                                 StringRef value_socket_identifier) {
-    if (flag & use_flag) {
-      const std::string attribute_name = params.get_input<std::string>(
-          attribute_socket_identifier);
-      return component.attribute_try_get_for_read(attribute_name, result_domain, CD_PROP_FLOAT);
-    }
-    const float value = params.get_input<float>(value_socket_identifier);
-    return component.attribute_get_constant_for_read(result_domain, CD_PROP_FLOAT, &value);
-  };
-
-  ReadAttributePtr attribute_a = get_input_attribute(GEO_NODE_USE_ATTRIBUTE_A, "Attribute A", "A");
-  ReadAttributePtr attribute_b = get_input_attribute(GEO_NODE_USE_ATTRIBUTE_B, "Attribute B", "B");
+  ReadAttributePtr attribute_a = params.get_input_attribute(
+      "A", component, result_domain, input_data_type, nullptr);
+  ReadAttributePtr attribute_b = params.get_input_attribute(
+      "B", component, result_domain, input_data_type, nullptr);
 
   if (!attribute_a || !attribute_b) {
     /* Attribute wasn't found. */
     return;
   }
 
-  const float epsilon = use_epsilon(node) ? params.get_input<float>("Epsilon") : 0.0f;
+  BooleanWriteAttribute attribute_result_bool = std::move(attribute_result);
+  MutableSpan<bool> result_span = attribute_result_bool.get_span();
 
-  do_math_operation(std::move(attribute_a),
-                    std::move(attribute_b),
-                    std::move(attribute_result),
-                    operation,
-                    epsilon);
+  /* Use specific types for correct equality operations, but for other
+   * operations we can use* implicit conversions and float comparison. */
+  if (operation_is_equality(*node_storage)) {
+    const float threshold = params.get_input<float>("Threshold");
+    if (operation == NODE_FLOAT_COMPARE_EQUAL) {
+      if (input_data_type == CD_PROP_FLOAT) {
+        FloatReadAttribute attribute_a_float = std::move(attribute_a);
+        FloatReadAttribute attribute_b_float = std::move(attribute_b);
+        do_equal_operation(
+            std::move(attribute_a_float), std::move(attribute_b_float), threshold, result_span);
+      }
+      else if (input_data_type == CD_PROP_FLOAT3) {
+        Float3ReadAttribute attribute_a_float3 = std::move(attribute_a);
+        Float3ReadAttribute attribute_b_float3 = std::move(attribute_b);
+        do_equal_operation(
+            std::move(attribute_a_float3), std::move(attribute_b_float3), threshold, result_span);
+      }
+      else if (input_data_type == CD_PROP_COLOR) {
+        Color4fReadAttribute attribute_a_color = std::move(attribute_a);
+        Color4fReadAttribute attribute_b_color = std::move(attribute_b);
+        do_equal_operation(
+            std::move(attribute_a_color), std::move(attribute_b_color), threshold, result_span);
+      }
+      else if (input_data_type == CD_PROP_BOOL) {
+        BooleanReadAttribute attribute_a_bool = std::move(attribute_a);
+        BooleanReadAttribute attribute_b_bool = std::move(attribute_b);
+        do_equal_operation(
+            std::move(attribute_a_bool), std::move(attribute_b_bool), threshold, result_span);
+      }
+    }
+    else if (operation == NODE_FLOAT_COMPARE_NOT_EQUAL) {
+      if (input_data_type == CD_PROP_FLOAT) {
+        FloatReadAttribute attribute_a_float = std::move(attribute_a);
+        FloatReadAttribute attribute_b_float = std::move(attribute_b);
+        do_not_equal_operation(
+            std::move(attribute_a_float), std::move(attribute_b_float), threshold, result_span);
+      }
+      else if (input_data_type == CD_PROP_FLOAT3) {
+        Float3ReadAttribute attribute_a_float3 = std::move(attribute_a);
+        Float3ReadAttribute attribute_b_float3 = std::move(attribute_b);
+        do_not_equal_operation(
+            std::move(attribute_a_float3), std::move(attribute_b_float3), threshold, result_span);
+      }
+      else if (input_data_type == CD_PROP_COLOR) {
+        Color4fReadAttribute attribute_a_color = std::move(attribute_a);
+        Color4fReadAttribute attribute_b_color = std::move(attribute_b);
+        do_not_equal_operation(
+            std::move(attribute_a_color), std::move(attribute_b_color), threshold, result_span);
+      }
+      else if (input_data_type == CD_PROP_BOOL) {
+        BooleanReadAttribute attribute_a_bool = std::move(attribute_a);
+        BooleanReadAttribute attribute_b_bool = std::move(attribute_b);
+        do_not_equal_operation(
+            std::move(attribute_a_bool), std::move(attribute_b_bool), threshold, result_span);
+      }
+    }
+  }
+  else {
+    do_math_operation(std::move(attribute_a), std::move(attribute_b), operation, result_span);
+  }
+
+  attribute_result_bool.apply_span();
 }
 
 static void geo_node_attribute_compare_exec(GeoNodeExecParams params)
@@ -190,7 +351,9 @@ void register_node_type_geo_attribute_compare()
   node_type_socket_templates(
       &ntype, geo_node_attribute_compare_in, geo_node_attribute_compare_out);
   ntype.geometry_node_execute = blender::nodes::geo_node_attribute_compare_exec;
-  node_type_update(&ntype, geo_node_attribute_compare_update);
+  node_type_update(&ntype, blender::nodes::geo_node_attribute_compare_update);
+  node_type_storage(
+      &ntype, "NodeAttributeCompare", node_free_standard_storage, node_copy_standard_storage);
   node_type_init(&ntype, geo_node_attribute_compare_init);
   nodeRegisterType(&ntype);
 }

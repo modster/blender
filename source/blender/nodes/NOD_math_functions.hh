@@ -202,7 +202,8 @@ inline bool try_dispatch_float_math_fl_fl_fl_to_fl(const int operation, Callback
  * This is similar to try_dispatch_float_math_fl_to_fl, just with a different callback signature.
  */
 template<typename Callback>
-inline bool try_dispatch_float_math_fl_fl_to_bool(const int operation, Callback &&callback)
+inline bool try_dispatch_float_math_fl_fl_to_bool(const FloatCompareOperation operation,
+                                                  Callback &&callback)
 {
   const FloatMathOperationInfo *info = get_float_compare_operation_info(operation);
   if (info == nullptr) {
@@ -224,32 +225,8 @@ inline bool try_dispatch_float_math_fl_fl_to_bool(const int operation, Callback 
       return dispatch([](float a, float b) { return a > b; });
     case NODE_FLOAT_COMPARE_GREATER_EQUAL:
       return dispatch([](float a, float b) { return a >= b; });
-  }
-  return false;
-}
-
-/**
- * This is similar to try_dispatch_float_math_fl_to_fl, just with a different callback signature.
- */
-template<typename Callback>
-inline bool try_dispatch_float_math_fl_fl_fl_to_bool(const int operation, Callback &&callback)
-{
-  const FloatMathOperationInfo *info = get_float_compare_operation_info(operation);
-  if (info == nullptr) {
-    return false;
-  }
-
-  /* This is just an utility function to keep the individual cases smaller. */
-  auto dispatch = [&](auto math_function) -> bool {
-    callback(math_function, *info);
-    return true;
-  };
-
-  switch (operation) {
-    case NODE_FLOAT_COMPARE_EQUAL:
-      return dispatch([](float a, float b, float c) { return compare_ff(a, b, c); });
-    case NODE_FLOAT_COMPARE_NOT_EQUAL:
-      return dispatch([](float a, float b, float c) { return !compare_ff(a, b, c); });
+    default:
+      return false;
   }
   return false;
 }
