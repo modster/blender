@@ -284,6 +284,32 @@ void IDP_FreeArray(IDProperty *prop)
   }
 }
 
+static IDPropertyUIData *copy_ui_data(const IDProperty *prop)
+{
+  IDPropertyUIData *data_new = MEM_dupallocN(prop->ui_data);
+
+  /* Copy extra type specific data. */
+  if (prop->type == IDP_STRING) {
+    IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)prop->ui_data;
+    IDPropertyUIDataString *ui_data_new = (IDPropertyUIDataString *)data_new;
+    ui_data_new->default_value = MEM_dupallocN(ui_data->default_value);
+  }
+  else if (prop->type == IDP_ARRAY && prop->subtype == IDP_INT) {
+    IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)prop->ui_data;
+    IDPropertyUIDataInt *ui_data_new = (IDPropertyUIDataInt *)data_new;
+    ui_data_new->default_array = MEM_dupallocN(ui_data->default_array);
+  }
+  else if (prop->type == IDP_ARRAY && ELEM(prop->subtype, IDP_FLOAT, IDP_DOUBLE)) {
+    IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)prop->ui_data;
+    IDPropertyUIDataFloat *ui_data_new = (IDPropertyUIDataFloat *)data_new;
+    ui_data_new->default_array = MEM_dupallocN(ui_data->default_array);
+  }
+
+  data_new->description = MEM_dupallocN(prop->ui_data->description);
+
+  return data_new;
+}
+
 static IDProperty *idp_generic_copy(const IDProperty *prop, const int UNUSED(flag))
 {
   IDProperty *newp = MEM_callocN(sizeof(IDProperty), __func__);
@@ -293,6 +319,10 @@ static IDProperty *idp_generic_copy(const IDProperty *prop, const int UNUSED(fla
   newp->flag = prop->flag;
   newp->data.val = prop->data.val;
   newp->data.val2 = prop->data.val2;
+
+  if (prop->ui_data != NULL) {
+    newp->ui_data = copy_ui_data(prop);
+  }
 
   return newp;
 }
@@ -709,6 +739,7 @@ bool IDP_InsertToGroup(IDProperty *group, IDProperty *previous, IDProperty *pnew
 void IDP_RemoveFromGroup(IDProperty *group, IDProperty *prop)
 {
   BLI_assert(group->type == IDP_GROUP);
+  BLI_assert(BLI_findindex(&group->data.group, prop) != -1);
 
   group->len--;
   BLI_remlink(&group->data.group, prop);
@@ -1054,6 +1085,7 @@ static void free_ui_data(IDProperty *prop)
 
   MEM_SAFE_FREE(prop->ui_data->description);
   MEM_freeN(prop->ui_data);
+  prop->ui_data = NULL;
 }
 
 /**
@@ -1081,6 +1113,7 @@ void IDP_FreePropertyContent_ex(IDProperty *prop, const bool do_id_user)
       }
       break;
   }
+
   free_ui_data(prop);
 }
 
