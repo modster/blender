@@ -358,13 +358,13 @@ void WM_OT_usd_import(wmOperatorType *ot)
                                  FILE_DEFAULTDISPLAY,
                                  FILE_SORT_ALPHA);
 
-  RNA_def_boolean(ot->srna, "import_uvs", true, "uvs", "When checked, import mesh uvs.");
+  RNA_def_boolean(ot->srna, "import_uvs", true, "uvs", "When checked, import mesh uvs");
 
   RNA_def_boolean(
-      ot->srna, "import_normals", true, "normals", "When checked, import mesh normals.");
+      ot->srna, "import_normals", true, "normals", "When checked, import mesh normals");
 
   RNA_def_boolean(
-      ot->srna, "import_materials", true, "materials", "When checked, import materials.");
+      ot->srna, "import_materials", true, "materials", "When checked, import materials");
 
   RNA_def_float(
       ot->srna,
@@ -378,7 +378,7 @@ void WM_OT_usd_import(wmOperatorType *ot)
       1000.0f);
 
   RNA_def_boolean(
-      ot->srna, "debug", false, "debug", "When checked, output debug information to the shell.");
+      ot->srna, "debug", false, "debug", "When checked, output debug information to the shell");
 
   RNA_def_boolean(
       ot->srna,
@@ -386,7 +386,7 @@ void WM_OT_usd_import(wmOperatorType *ot)
       false,
       "Instancing",
       "When checked, instanced USD references are imported as shared data in Blender. "
-      "When unchecked, instanced USD reference are imported as unique data in Blender.");
+      "When unchecked, instanced USD reference are imported as unique data in Blender");
 
   RNA_def_float(ot->srna,
                 "light_intensity_scale",
@@ -403,7 +403,7 @@ void WM_OT_usd_import(wmOperatorType *ot)
       "import_usdpreview",
       false,
       "Import UsdPreviewSurface",
-      "When checked, convert UsdPreviewSurface shaders to Principled BSD shader networks.");
+      "When checked, convert UsdPreviewSurface shaders to Principled BSD shader networks");
 
   RNA_def_boolean(ot->srna,
                   "is_sequence",
@@ -416,7 +416,7 @@ void WM_OT_usd_import(wmOperatorType *ot)
                   true,
                   "Transform Cache Constraint",
                   "When checked, create transform cache constraints for objects that have "
-                  "time-varying transforms.");
+                  "time-varying transforms");
 }
 
 #endif /* WITH_USD */
