@@ -790,7 +790,9 @@ static bool is_filtered_hidden(const char *filename,
     return true;
   }
 #endif
-  if ((filter->flags & FLF_ASSETS_ONLY) && !(file->typeflag & FILE_TYPE_ASSET)) {
+  /* For data-blocks (but not the group directories), check the asset-only filter. */
+  if (!(file->typeflag & FILE_TYPE_DIR) && (file->typeflag & FILE_TYPE_BLENDERLIB) &&
+      (filter->flags & FLF_ASSETS_ONLY) && !(file->typeflag & FILE_TYPE_ASSET)) {
     return true;
   }
 
