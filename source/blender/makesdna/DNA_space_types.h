@@ -676,7 +676,7 @@ typedef enum eSpaceSeq_OverlayType {
  * If the type is set to #FILE_ASSET_REPO_CUSTOM, idname must have the name to identify the custom
  * repository. Otherwise idname is not used.
  */
-typedef struct FileSelectAssetRepositoryID {
+typedef struct FileSelectAssetRepositoryUID {
   short type;
   char _pad[6];
   /**
@@ -684,7 +684,7 @@ typedef struct FileSelectAssetRepositoryID {
    * define which. Can be empty otherwise.
    */
   char idname[64]; /* MAX_NAME */
-} FileSelectAssetRepositoryID;
+} FileSelectAssetRepositoryUID;
 
 /* Config and Input for File Selector */
 typedef struct FileSelectParams {
@@ -752,7 +752,7 @@ typedef struct FileSelectParams {
 typedef struct FileAssetSelectParams {
   FileSelectParams base_params;
 
-  FileSelectAssetRepositoryID asset_repository;
+  FileSelectAssetRepositoryUID asset_repository;
 } FileAssetSelectParams;
 
 /**
@@ -791,6 +791,8 @@ typedef struct SpaceFile {
   /** Config and input for file select. One for each browse-mode, to keep them independent. */
   FileSelectParams *params;
   FileAssetSelectParams *asset_params;
+
+  void *_pad2;
 
   /**
    * Holds the list of files to show.
@@ -980,10 +982,10 @@ typedef enum eFileSel_File_Types {
 
   FILE_TYPE_ASSET = (1 << 28),
   /* The file is an asset, but read from a file. So the file-list owns the asset-data. */
-  FILE_TYPE_ASSET_EXTERNAL = FILE_TYPE_ASSET | (1 << 29),
+  FILE_TYPE_ASSET_EXTERNAL = (1 << 29),
   /** An FS directory (i.e. S_ISDIR on its path is true). */
   FILE_TYPE_DIR = (1 << 30),
-  FILE_TYPE_BLENDERLIB = (1ul << 31),
+  FILE_TYPE_BLENDERLIB = (1u << 31),
 } eFileSel_File_Types;
 
 /* Selection Flags in filesel: struct direntry, unsigned char selflag */
@@ -1072,7 +1074,7 @@ typedef struct FileDirEntry {
   FileDirEntryRevision *entry;
 
   /** #eFileSel_File_Types. */
-  uint64_t typeflag;
+  int typeflag;
   /** ID type, in case typeflag has FILE_TYPE_BLENDERLIB set. */
   int blentype;
 
@@ -1084,7 +1086,7 @@ typedef struct FileDirEntry {
   char *redirection_path;
 
   /** When showing local IDs (FILE_MAIN, FILE_MAIN_ASSET), UUID of the ID this file represents. */
-  uint id_uuid;
+  uint id_session_uuid;
   /* The icon_id for the preview image. */
   int preview_icon_id;
 
@@ -1119,7 +1121,6 @@ typedef struct FileDirEntry {
 #
 typedef struct FileDirEntryArr {
   ListBase entries;
-  /* 0 is a valid value (files read but none to display), -1 means files have yet to be read. */
   int nbr_entries;
   int nbr_entries_filtered;
   int entry_idx_start, entry_idx_end;
