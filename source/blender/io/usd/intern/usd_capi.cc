@@ -298,22 +298,23 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 
   USDPrimIterator usd_prim_iter(data->stage, import_ctx, data->bmain);
 
-  CacheFile *cache_file = static_cast<CacheFile *>(
-      BKE_cachefile_add(data->bmain, BLI_path_basename(data->filename)));
+  CacheFile *cache_file = nullptr;
 
-  /* Decrement the ID ref-count because it is going to be incremented for each
-   * modifier and constraint that it will be attached to, so since currently
-   * it is not used by anyone, its use count will off by one. */
-  /* TODO(makowalski): rather than decrementing the use count, should
-   * we just call BKE_id_free_us() on the cache_file id when cleaning up? */
-  id_us_min(&cache_file->id);
+  if (data->params.transform_constraint) {
+    cache_file = static_cast<CacheFile *>(
+        BKE_cachefile_add(data->bmain, BLI_path_basename(data->filename)));
 
-  // cache_file->is_sequence = data->params.is_sequence;
-  cache_file->scale = data->params.scale;
-  STRNCPY(cache_file->filepath, data->filename);
+    /* Decrement the ID ref-count because it is going to be incremented for each
+     * modifier and constraint that it will be attached to, so since currently
+     * it is not used by anyone, its use count will off by one. */
+    /* TODO(makowalski): rather than decrementing the use count, should
+     * we just call BKE_id_free_us() on the cache_file id when cleaning up? */
+    id_us_min(&cache_file->id);
 
-  // data->archive = archive;
-  // data->settings.cache_file = cache_file;
+    cache_file->is_sequence = data->params.is_sequence;
+    cache_file->scale = data->params.scale;
+    STRNCPY(cache_file->filepath, data->filename);
+  }
 
   // Optionally print the stage contents for debugging.
   if (data->params.debug) {

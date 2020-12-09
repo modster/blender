@@ -97,7 +97,7 @@ void USDXformableReader::set_object_transform(const double time, CacheFile *cach
   BKE_object_apply_mat4(object_, transform_from_usd, true, false);
   BKE_object_to_mat4(object_, object_->obmat);
 
-  if (cache_file && !is_constant) {
+  if (cache_file && (!is_constant || this->context_.import_params.is_sequence)) {
     bConstraint *con = BKE_constraint_add_for_object(
         object_, NULL, CONSTRAINT_TYPE_TRANSFORM_CACHE);
     bTransformCacheConstraint *data = static_cast<bTransformCacheConstraint *>(con->data);
