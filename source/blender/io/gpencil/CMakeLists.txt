@@ -33,13 +33,11 @@ set(INC
   ../../../../intern/clog
   ../../../../intern/guardedalloc
   ../../../../intern/utfconv
-
-  # This line must be changed if Libharu is included as external lib
-  ${LIBDIR}/libharu/include
 )
 
 set(INC_SYS
   ${PUGIXML_INCLUDE_DIR}
+  ${LIBHARU_INCLUDE_DIR}
 )
 
 set(SRC
@@ -70,10 +68,9 @@ set(LIB
   bf_blenkernel
   bf_blenlib
   bf_io_common
-  ${PUGIXML_LIBRARIES}
 
-  # This line must be changed if Libharu is included as external lib
-  ${LIBDIR}/libharu/lib/libhpdfsd.lib
+  ${PUGIXML_LIBRARIES}
+  ${LIBHARU_LIBRARIES}
 )
 
 list(APPEND LIB
