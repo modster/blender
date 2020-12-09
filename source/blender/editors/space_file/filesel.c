@@ -124,9 +124,9 @@ static void fileselect_ensure_updated_asset_params(SpaceFile *sfile)
   FileSelectParams *base_params = &asset_params->base_params;
   base_params->file[0] = '\0';
   base_params->filter_glob[0] = '\0';
-  /* TODO this way of using filters to realize categories is noticably slower than
-   * specifying a "group" to read. That's because all types are read and filtering is applied
-   * afterwards. Would be nice if we could lazy-read individual groups. */
+  /* TODO this way of using filters to form categories is notably slower than specifying a
+   * "group" to read. That's because all types are read and filtering is applied afterwards. Would
+   * be nice if we could lazy-read individual groups. */
   base_params->flag |= U_default.file_space_data.flag | FILE_ASSETS_ONLY | FILE_FILTER;
   base_params->flag &= ~FILE_DIRSEL_ONLY;
   base_params->filter |= FILE_TYPE_BLENDERLIB;
@@ -375,9 +375,6 @@ FileSelectParams *ED_fileselect_ensure_active_params(SpaceFile *sfile)
       }
       return &sfile->asset_params->base_params;
   }
-
-  BLI_assert(0);
-  return NULL;
 }
 
 /**
@@ -396,9 +393,6 @@ FileSelectParams *ED_fileselect_get_active_params(const SpaceFile *sfile)
     case FILE_BROWSE_MODE_ASSETS:
       return (FileSelectParams *)sfile->asset_params;
   }
-
-  BLI_assert(0);
-  return NULL;
 }
 
 FileSelectParams *ED_fileselect_get_file_params(const SpaceFile *sfile)
@@ -413,7 +407,7 @@ FileAssetSelectParams *ED_fileselect_get_asset_params(const SpaceFile *sfile)
 
 static void fileselect_refresh_asset_params(FileAssetSelectParams *asset_params)
 {
-  FileSelectAssetRepositoryID *repository = &asset_params->asset_repository;
+  FileSelectAssetRepositoryUID *repository = &asset_params->asset_repository;
   FileSelectParams *base_params = &asset_params->base_params;
   bUserAssetRepository *user_repository = NULL;
 
