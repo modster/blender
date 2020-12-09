@@ -62,11 +62,10 @@ static void fill_new_attribute_from_input(ReadAttributePtr input_attribute,
 /**
  * Move the original attribute values to the two output components.
  *
- * \note This assumes a consistent ordering of indices before and after the split.
- * This is trivial for simple components like point clouds, but for meshes a map between
- * input and output indices might be necessary.
+ * \note This assumes a consistent ordering of indices before and after the split,
+ * which is true for points and a simple vertex array.
  */
-static void move_split_attributes(const PointCloudComponent &in_component,
+static void move_split_attributes(const GeometryComponent &in_component,
                                   GeometryComponent &out_component_a,
                                   GeometryComponent &out_component_b,
                                   Span<bool> a_or_b)
@@ -76,6 +75,11 @@ static void move_split_attributes(const PointCloudComponent &in_component,
   for (const std::string &name : attribute_names) {
     ReadAttributePtr attribute = in_component.attribute_try_get_for_read(name);
     BLI_assert(attribute);
+
+    /* Since this node only creates points and vertices, don't copy other attributes. */
+    if (attribute->domain() != ATTR_DOMAIN_POINT) {
+      continue;
+    }
 
     const CustomDataType data_type = bke::cpp_type_to_custom_data_type(attribute->cpp_type());
     const AttributeDomain domain = attribute->domain();
@@ -112,10 +116,10 @@ static void move_split_attributes(const PointCloudComponent &in_component,
 /**
  * Find total in each new set and find which of the output sets each point will belong to.
  */
-static Array<bool> split_point_cloud_component(const GeometryComponent &component,
-                                               const std::string mask_name,
-                                               int *r_a_total,
-                                               int *r_b_total)
+static Array<bool> count_point_splits(const GeometryComponent &component,
+                                      const std::string mask_name,
+                                      int *r_a_total,
+                                      int *r_b_total)
 {
   const BooleanReadAttribute mask_attribute = component.attribute_get_for_read<bool>(
       mask_name, ATTR_DOMAIN_POINT, false);
@@ -123,7 +127,7 @@ static Array<bool> split_point_cloud_component(const GeometryComponent &componen
   const int in_total = masks.size();
 
   *r_b_total = 0;
-  for (bool mask : masks) {
+  for (const bool mask : masks) {
     if (mask) {
       *r_b_total += 1;
     }
@@ -131,6 +135,26 @@ static Array<bool> split_point_cloud_component(const GeometryComponent &componen
   *r_a_total = in_total - *r_b_total;
 
   return masks;
+}
+
+static void separate_mesh(const MeshComponent &in_component,
+                          const std::string mask_name,
+                          MeshComponent &out_component_a,
+                          MeshComponent &out_component_b)
+{
+  const int size = in_component.attribute_domain_size(ATTR_DOMAIN_POINT);
+  if (size == 0) {
+    return;
+  }
+
+  int a_total;
+  int b_total;
+  Array<bool> a_or_b = count_point_splits(in_component, mask_name, &a_total, &b_total);
+
+  out_component_a.replace(BKE_mesh_new_nomain(a_total, 0, 0, 0, 0));
+  out_component_b.replace(BKE_mesh_new_nomain(b_total, 0, 0, 0, 0));
+
+  move_split_attributes(in_component, out_component_a, out_component_b, a_or_b.as_span());
 }
 
 static void separate_point_cloud(const PointCloudComponent &in_component,
@@ -145,9 +169,8 @@ static void separate_point_cloud(const PointCloudComponent &in_component,
 
   int a_total;
   int b_total;
-  Array<bool> a_or_b = split_point_cloud_component(in_component, mask_name, &a_total, &b_total);
+  Array<bool> a_or_b = count_point_splits(in_component, mask_name, &a_total, &b_total);
 
-  /* Start fresh with new components. */
   out_component_a.replace(BKE_pointcloud_new_nomain(a_total));
   out_component_b.replace(BKE_pointcloud_new_nomain(b_total));
 
@@ -167,6 +190,12 @@ static void geo_node_point_separate_exec(GeoNodeExecParams params)
                          mask_name,
                          out_set_a.get_component_for_write<PointCloudComponent>(),
                          out_set_b.get_component_for_write<PointCloudComponent>());
+  }
+  if (geometry_set.has<MeshComponent>()) {
+    separate_mesh(*geometry_set.get_component_for_read<MeshComponent>(),
+                  mask_name,
+                  out_set_a.get_component_for_write<MeshComponent>(),
+                  out_set_b.get_component_for_write<MeshComponent>());
   }
 
   params.set_output("Geometry 1", std::move(out_set_a));
