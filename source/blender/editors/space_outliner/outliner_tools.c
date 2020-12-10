@@ -1927,10 +1927,6 @@ static int outliner_id_operation_exec(bContext *C, wmOperator *op)
       WM_operator_name_call(C, "ASSET_OT_clear", WM_OP_EXEC_DEFAULT, NULL);
       break;
     }
-    case OUTLINER_IDOP_UNMAKE_ASSET: {
-      WM_operator_name_call(C, "ASSET_OT_unmake", WM_OP_EXEC_DEFAULT, NULL);
-      break;
-    }
     case OUTLINER_IDOP_LOCAL: {
       /* make local */
       outliner_do_libdata_operation(
