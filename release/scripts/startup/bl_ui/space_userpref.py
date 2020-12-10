@@ -1350,16 +1350,26 @@ class USERPREF_PT_file_paths_asset_libraries(FilePathsPanel, Panel):
         paths = context.preferences.filepaths
 
         box = layout.box()
-        for i, library in enumerate(paths.asset_libraries):
-            row = box.row()
-            split = row.split(factor=0.35)
-            split.prop(library, "name")
-            split.prop(library, "path", text="")
-            row.operator("preferences.asset_library_remove", text="", icon='X', emboss=False).index = i
+        split = box.split(factor=0.35)
+        name_col = split.column()
+        path_col = split.column()
 
-        row = box.row()
-        row.alignment = 'RIGHT'
-        row.operator("preferences.asset_library_add", text="", icon='ADD', emboss=False)
+        row = name_col.row(align=True)  # Padding
+        row.separator()
+        row.label(text="Name")
+
+        row = path_col.row(align=True)  # Padding
+        row.separator()
+        row.label(text="Path")
+
+        subrow = row.row()
+        subrow.operator("preferences.asset_library_add", text="", icon='ADD', emboss=False)
+
+        for i, library in enumerate(paths.asset_libraries):
+            name_col.prop(library, "name", text="")
+            row = path_col.row()
+            row.prop(library, "path", text="")
+            row.operator("preferences.asset_library_remove", text="", icon='X', emboss=False).index = i
 
 
 # -----------------------------------------------------------------------------
