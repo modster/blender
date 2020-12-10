@@ -2749,6 +2749,7 @@ static void lib_link_workspace_layout_restore(struct IDNameLib_Map *id_map,
           SpaceFile *sfile = (SpaceFile *)sl;
           sfile->op = NULL;
           sfile->previews_timer = NULL;
+          sfile->rebuild_flag = FILE_REBUILD_MAIN_FILES;
         }
         else if (sl->spacetype == SPACE_ACTION) {
           SpaceAction *saction = (SpaceAction *)sl;

@@ -1670,6 +1670,7 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
       sfile->layout = NULL;
       sfile->op = NULL;
       sfile->previews_timer = NULL;
+      sfile->rebuild_flag = 0;
       BLO_read_data_address(reader, &sfile->params);
       BLO_read_data_address(reader, &sfile->asset_params);
     }
@@ -1755,8 +1756,11 @@ void BKE_screen_area_blend_read_lib(BlendLibReader *reader, ID *parent_id, ScrAr
         }
         break;
       }
-      case SPACE_FILE:
+      case SPACE_FILE: {
+        SpaceFile *sfile = (SpaceFile *)sl;
+        sfile->rebuild_flag |= FILE_REBUILD_MAIN_FILES;
         break;
+      }
       case SPACE_ACTION: {
         SpaceAction *saction = (SpaceAction *)sl;
         bDopeSheet *ads = &saction->ads;

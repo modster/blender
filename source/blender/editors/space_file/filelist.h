@@ -83,10 +83,7 @@ int filelist_geticon(struct FileList *filelist, const int index, const bool is_m
 struct FileList *filelist_new(short type);
 void filelist_settype(struct FileList *filelist, short type);
 void filelist_clear(struct FileList *filelist);
-void filelist_clear_ex(struct FileList *filelist,
-                       const bool do_cache,
-                       const bool do_selection,
-                       const bool do_id_map);
+void filelist_clear_ex(struct FileList *filelist, const bool do_cache, const bool do_selection);
 void filelist_free(struct FileList *filelist);
 
 const char *filelist_dir(struct FileList *filelist);
@@ -97,7 +94,7 @@ int filelist_files_ensure(struct FileList *filelist);
 int filelist_needs_reading(struct FileList *filelist);
 FileDirEntry *filelist_file(struct FileList *filelist, int index);
 int filelist_file_findpath(struct FileList *filelist, const char *file);
-struct ID *filelist_file_get_id(const struct FileList *filelist, const struct FileDirEntry *file);
+struct ID *filelist_file_get_id(const struct FileDirEntry *file);
 FileDirEntry *filelist_entry_find_uuid(struct FileList *filelist, const int uuid[4]);
 void filelist_file_cache_slidingwindow_set(struct FileList *filelist, size_t window_size);
 bool filelist_file_cache_block(struct FileList *filelist, const int index);
@@ -105,6 +102,7 @@ bool filelist_file_cache_block(struct FileList *filelist, const int index);
 bool filelist_needs_force_reset(struct FileList *filelist);
 void filelist_tag_force_reset(struct FileList *filelist);
 bool filelist_pending(struct FileList *filelist);
+bool filelist_needs_reset_on_main_changes(const struct FileList *filelist);
 bool filelist_is_ready(struct FileList *filelist);
 
 unsigned int filelist_entry_select_set(const struct FileList *filelist,
