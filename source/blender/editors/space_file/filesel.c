@@ -375,6 +375,9 @@ FileSelectParams *ED_fileselect_ensure_active_params(SpaceFile *sfile)
       }
       return &sfile->asset_params->base_params;
   }
+
+  BLI_assert(!"Invalid browse mode set in file space.");
+  return NULL;
 }
 
 /**
@@ -393,6 +396,9 @@ FileSelectParams *ED_fileselect_get_active_params(const SpaceFile *sfile)
     case FILE_BROWSE_MODE_ASSETS:
       return (FileSelectParams *)sfile->asset_params;
   }
+
+  BLI_assert(!"Invalid browse mode set in file space.");
+  return NULL;
 }
 
 FileSelectParams *ED_fileselect_get_file_params(const SpaceFile *sfile)
@@ -413,7 +419,8 @@ static void fileselect_refresh_asset_params(FileAssetSelectParams *asset_params)
 
   /* Ensure valid repo, or fall-back to local one. */
   if (library->type == FILE_ASSET_LIBRARY_CUSTOM) {
-    user_library = BKE_preferences_asset_library_find_from_name(&U, library->idname);
+    user_library = BKE_preferences_asset_library_find_from_name(
+        &U, library->custom_library_identifier);
     if (!user_library) {
       library->type = FILE_ASSET_LIBRARY_LOCAL;
     }
