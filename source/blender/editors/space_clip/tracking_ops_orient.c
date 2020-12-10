@@ -700,18 +700,6 @@ static int set_scale_exec(bContext *C, wmOperator *op)
   return do_set_scale(C, op, false, false);
 }
 
-static int set_scale_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
-{
-  SpaceClip *sc = CTX_wm_space_clip(C);
-  MovieClip *clip = ED_space_clip_get_clip(sc);
-
-  if (!RNA_struct_property_is_set(op->ptr, "distance")) {
-    RNA_float_set(op->ptr, "distance", clip->tracking.settings.dist);
-  }
-
-  return set_scale_exec(C, op);
-}
-
 void CLIP_OT_set_scale(wmOperatorType *ot)
 {
   /* identifiers */
@@ -721,7 +709,6 @@ void CLIP_OT_set_scale(wmOperatorType *ot)
 
   /* api callbacks */
   ot->exec = set_scale_exec;
-  ot->invoke = set_scale_invoke;
   ot->poll = set_orientation_poll;
 
   /* flags */
@@ -760,18 +747,6 @@ static int set_solution_scale_exec(bContext *C, wmOperator *op)
   return do_set_scale(C, op, true, false);
 }
 
-static int set_solution_scale_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
-{
-  SpaceClip *sc = CTX_wm_space_clip(C);
-  MovieClip *clip = ED_space_clip_get_clip(sc);
-
-  if (!RNA_struct_property_is_set(op->ptr, "distance")) {
-    RNA_float_set(op->ptr, "distance", clip->tracking.settings.object_distance);
-  }
-
-  return set_solution_scale_exec(C, op);
-}
-
 void CLIP_OT_set_solution_scale(wmOperatorType *ot)
 {
   /* identifiers */
@@ -783,7 +758,6 @@ void CLIP_OT_set_solution_scale(wmOperatorType *ot)
 
   /* api callbacks */
   ot->exec = set_solution_scale_exec;
-  ot->invoke = set_solution_scale_invoke;
   ot->poll = set_solution_scale_poll;
 
   /* flags */
@@ -822,16 +796,6 @@ static int apply_solution_scale_exec(bContext *C, wmOperator *op)
   return do_set_scale(C, op, false, true);
 }
 
-static int apply_solution_scale_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
-{
-  SpaceClip *sc = CTX_wm_space_clip(C);
-  MovieClip *clip = ED_space_clip_get_clip(sc);
-  if (!RNA_struct_property_is_set(op->ptr, "distance")) {
-    RNA_float_set(op->ptr, "distance", clip->tracking.settings.dist);
-  }
-  return apply_solution_scale_exec(C, op);
-}
-
 void CLIP_OT_apply_solution_scale(wmOperatorType *ot)
 {
   /* identifiers */
@@ -843,7 +807,6 @@ void CLIP_OT_apply_solution_scale(wmOperatorType *ot)
 
   /* api callbacks */
   ot->exec = apply_solution_scale_exec;
-  ot->invoke = apply_solution_scale_invoke;
   ot->poll = apply_solution_scale_poll;
 
   /* flags */

@@ -295,22 +295,7 @@ typedef struct MovieTrackingSettings {
 
   /* which camera intrinsics to refine. uses on the REFINE_* flags */
   int refine_camera_intrinsics;
-
-  /* ** tool settings ** */
-
-  /* set scale */
-  /** Distance between two bundles used for scene scaling. */
-  float dist;
-
-  /* cleanup */
-  int clean_frames, clean_action;
-  float clean_error;
-
-  /* set object scale */
-  /** Distance between two bundles used for object scaling. */
-  float object_distance;
-
-  char _pad3[4];
+  char _pad3[16];
 } MovieTrackingSettings;
 
 typedef struct MovieTrackingStabilization {

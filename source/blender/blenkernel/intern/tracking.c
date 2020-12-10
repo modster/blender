@@ -336,8 +336,6 @@ void BKE_tracking_settings_init(MovieTracking *tracking)
   tracking->settings.default_search_size = 71;
   tracking->settings.default_algorithm_flag |= TRACK_ALGORITHM_FLAG_USE_BRUTE;
   tracking->settings.default_weight = 1.0f;
-  tracking->settings.dist = 1;
-  tracking->settings.object_distance = 1;
   tracking->settings.refine_camera_intrinsics = REFINE_NO_INTRINSICS;
 
   tracking->stabilization.scaleinf = 1.0f;

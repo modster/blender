@@ -577,14 +577,7 @@ class CLIP_PT_tools_cleanup(CLIP_PT_tracking_panel, Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
 
-        clip = context.space_data.clip
-        settings = clip.tracking.settings
-
         col = layout.column()
-        col.prop(settings, "clean_frames", text="Frames")
-        col.prop(settings, "clean_error", text="Error")
-        col.prop(settings, "clean_action", text="Type")
-        col.separator()
         col.operator("clip.clean_tracks")
         col.operator("clip.filter_tracks")
 
@@ -664,7 +657,6 @@ class CLIP_PT_tools_object(CLIP_PT_reconstruction_panel, Panel):
         sc = context.space_data
         clip = sc.clip
         tracking_object = clip.tracking.objects.active
-        settings = sc.clip.tracking.settings
 
         col = layout.column()
 
@@ -673,7 +665,6 @@ class CLIP_PT_tools_object(CLIP_PT_reconstruction_panel, Panel):
         col.separator()
 
         col.operator("clip.set_solution_scale", text="Set Scale")
-        col.prop(settings, "object_distance")
 
 
 class CLIP_PT_objects(CLIP_PT_clip_view_panel, Panel):
