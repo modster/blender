@@ -484,6 +484,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeRandomAttribute"),
         NodeItem("GeometryNodeAttributeMath"),
         NodeItem("GeometryNodeAttributeCompare"),
+        NodeItem("GeometryNodeAttributeFill"),
     ]),
     GeometryNodeCategory("GEO_COLOR", "Color", items=[
         NodeItem("ShaderNodeValToRGB"),

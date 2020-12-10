@@ -1465,7 +1465,7 @@ static char *rna_Node_path(PointerRNA *ptr)
   bNode *node = (bNode *)ptr->data;
   char name_esc[sizeof(node->name) * 2];
 
-  BLI_strescape(name_esc, node->name, sizeof(name_esc));
+  BLI_str_escape(name_esc, node->name, sizeof(name_esc));
   return BLI_sprintfN("nodes[\"%s\"]", name_esc);
 }
 
@@ -1492,7 +1492,7 @@ char *rna_Node_ImageUser_path(PointerRNA *ptr)
       continue;
     }
 
-    BLI_strescape(name_esc, node->name, sizeof(name_esc));
+    BLI_str_escape(name_esc, node->name, sizeof(name_esc));
     return BLI_sprintfN("nodes[\"%s\"].image_user", name_esc);
   }
 
@@ -1885,6 +1885,30 @@ static const EnumPropertyItem *rna_GeometryNodeAttributeRandom_domain_itemf(
 {
   *r_free = true;
   return itemf_function_check(rna_enum_attribute_domain_items, attribute_random_domain_supported);
+}
+
+static bool attribute_fill_type_supported(const EnumPropertyItem *item)
+{
+  return ELEM(item->value, CD_PROP_FLOAT, CD_PROP_FLOAT3, CD_PROP_COLOR);
+}
+static const EnumPropertyItem *rna_GeometryNodeAttributeFill_type_itemf(bContext *UNUSED(C),
+                                                                        PointerRNA *UNUSED(ptr),
+                                                                        PropertyRNA *UNUSED(prop),
+                                                                        bool *r_free)
+{
+  *r_free = true;
+  return itemf_function_check(rna_enum_attribute_type_items, attribute_fill_type_supported);
+}
+
+static bool attribute_fill_domain_supported(const EnumPropertyItem *item)
+{
+  return item->value == ATTR_DOMAIN_POINT;
+}
+static const EnumPropertyItem *rna_GeometryNodeAttributeFill_domain_itemf(
+    bContext *UNUSED(C), PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), bool *r_free)
+{
+  *r_free = true;
+  return itemf_function_check(rna_enum_attribute_domain_items, attribute_fill_domain_supported);
 }
 
 static bool attribute_math_operation_supported(const EnumPropertyItem *item)
@@ -2471,7 +2495,7 @@ static char *rna_NodeSocket_path(PointerRNA *ptr)
     return NULL;
   }
 
-  BLI_strescape(name_esc, node->name, sizeof(name_esc));
+  BLI_str_escape(name_esc, node->name, sizeof(name_esc));
 
   if (sock->in_out == SOCK_IN) {
     return BLI_sprintfN("nodes[\"%s\"].inputs[%d]", name_esc, socketindex);
@@ -8349,6 +8373,13 @@ static void def_geo_random_attribute(StructRNA *srna)
   def_geo_attribute_create_common(srna,
                                   "rna_GeometryNodeAttributeRandom_type_itemf",
                                   "rna_GeometryNodeAttributeRandom_domain_itemf");
+}
+
+static void def_geo_attribute_fill(StructRNA *srna)
+{
+  def_geo_attribute_create_common(srna,
+                                  "rna_GeometryNodeAttributeFill_type_itemf",
+                                  "rna_GeometryNodeAttributeFill_domain_itemf");
 }
 
 static void def_geo_attribute_math(StructRNA *srna)

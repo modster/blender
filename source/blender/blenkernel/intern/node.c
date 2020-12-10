@@ -2708,7 +2708,7 @@ void nodeRemoveNode(Main *bmain, bNodeTree *ntree, bNode *node, bool do_id_user)
   char propname_esc[MAX_IDPROP_NAME * 2];
   char prefix[MAX_IDPROP_NAME * 2];
 
-  BLI_strescape(propname_esc, node->name, sizeof(propname_esc));
+  BLI_str_escape(propname_esc, node->name, sizeof(propname_esc));
   BLI_snprintf(prefix, sizeof(prefix), "nodes[\"%s\"]", propname_esc);
 
   if (BKE_animdata_fix_paths_remove((ID *)ntree, prefix)) {
@@ -4682,6 +4682,7 @@ static void registerGeometryNodes(void)
 {
   register_node_type_geo_group();
 
+  register_node_type_geo_attribute_fill();
   register_node_type_geo_triangulate();
   register_node_type_geo_edge_split();
   register_node_type_geo_transform();

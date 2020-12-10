@@ -139,6 +139,7 @@ set(SRC
   function/node_function_util.cc
 
   geometry/nodes/node_geo_attribute_compare.cc
+  geometry/nodes/node_geo_attribute_fill.cc
   geometry/nodes/node_geo_attribute_math.cc
   geometry/nodes/node_geo_common.cc
   geometry/nodes/node_geo_boolean.cc
