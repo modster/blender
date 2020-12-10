@@ -432,7 +432,10 @@ enum {
 
 /* FileList.type_flags */
 enum FileListTypeFlags {
+  /** The file list has references to main data (IDs) and needs special care. */
   FL_USES_MAIN_DATA = (1 << 0),
+  /** The file list type is not thread-safe. */
+  FL_NO_THREADS = (1 << 2),
 };
 
 #define SPECIAL_IMG_SIZE 256
@@ -1735,11 +1738,10 @@ void filelist_settype(FileList *filelist, short type)
       filelist->filterf = is_filtered_lib;
       break;
     case FILE_MAIN_ASSET:
-      /* TODO this may not be thread safe, main data may change. */
       filelist->checkdirf = filelist_checkdir_main_assets;
       filelist->read_jobf = filelist_readjob_main_assets;
       filelist->filterf = is_filtered_main_assets;
-      filelist->type_flags |= FL_USES_MAIN_DATA;
+      filelist->type_flags |= FL_USES_MAIN_DATA | FL_NO_THREADS;
       break;
     default:
       filelist->checkdirf = filelist_checkdir_dir;
@@ -3251,7 +3253,7 @@ static void filelist_readjob_main_assets(Main *current_main,
                                          short *UNUSED(stop),
                                          short *do_update,
                                          float *UNUSED(progress),
-                                         ThreadMutex *lock)
+                                         ThreadMutex *UNUSED(lock))
 {
   BLI_assert(BLI_listbase_is_empty(&filelist->filelist.entries) &&
              (filelist->filelist.nbr_entries == FILEDIR_NBR_ENTRIES_UNSET));
@@ -3287,16 +3289,12 @@ static void filelist_readjob_main_assets(Main *current_main,
   FOREACH_MAIN_ID_END;
 
   if (nbr_entries) {
-    BLI_mutex_lock(lock);
-
     *do_update = true;
 
     BLI_movelisttolist(&filelist->filelist.entries, &tmp_entries);
     filelist->filelist.nbr_entries += nbr_entries;
     filelist->filelist.nbr_entries_filtered = filelist->filelist.entry_idx_start =
         filelist->filelist.entry_idx_end = -1;
-
-    BLI_mutex_unlock(lock);
   }
 }
 
@@ -3431,22 +3429,38 @@ void filelist_readjob_start(FileList *filelist, const bContext *C)
   filelist->flags &= ~(FL_FORCE_RESET | FL_IS_READY);
   filelist->flags |= FL_IS_PENDING;
 
+  /* Init even for single threaded execution. Called functions use it. */
   BLI_mutex_init(&flrj->lock);
 
-  /* setup job */
-  wm_job = WM_jobs_get(CTX_wm_manager(C),
-                       CTX_wm_window(C),
-                       CTX_data_scene(C),
-                       "Listing Dirs...",
-                       WM_JOB_PROGRESS,
-                       WM_JOB_TYPE_FILESEL_READDIR);
-  WM_jobs_customdata_set(wm_job, flrj, filelist_readjob_free);
-  WM_jobs_timer(wm_job, 0.01, NC_SPACE | ND_SPACE_FILE_LIST, NC_SPACE | ND_SPACE_FILE_LIST);
-  WM_jobs_callbacks(
-      wm_job, filelist_readjob_startjob, NULL, filelist_readjob_update, filelist_readjob_endjob);
+  if (filelist->type_flags & FL_NO_THREADS) {
+    short dummy_stop = false;
+    short dummy_do_update = false;
+    float dummy_progress = 0.0f;
 
-  /* start the job */
-  WM_jobs_start(CTX_wm_manager(C), wm_job);
+    /* Single threaded execution. Just directly call the callbacks. */
+    filelist_readjob_startjob(flrj, &dummy_stop, &dummy_do_update, &dummy_progress);
+    filelist_readjob_endjob(flrj);
+    filelist_readjob_free(flrj);
+
+    WM_event_add_notifier(C, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
+    return;
+  }
+  else {
+    /* setup job */
+    wm_job = WM_jobs_get(CTX_wm_manager(C),
+                         CTX_wm_window(C),
+                         CTX_data_scene(C),
+                         "Listing Dirs...",
+                         WM_JOB_PROGRESS,
+                         WM_JOB_TYPE_FILESEL_READDIR);
+    WM_jobs_customdata_set(wm_job, flrj, filelist_readjob_free);
+    WM_jobs_timer(wm_job, 0.01, NC_SPACE | ND_SPACE_FILE_LIST, NC_SPACE | ND_SPACE_FILE_LIST);
+    WM_jobs_callbacks(
+        wm_job, filelist_readjob_startjob, NULL, filelist_readjob_update, filelist_readjob_endjob);
+
+    /* start the job */
+    WM_jobs_start(CTX_wm_manager(C), wm_job);
+  }
 }
 
 void filelist_readjob_stop(wmWindowManager *wm, Scene *owner_scene)
