@@ -137,7 +137,6 @@ static void draw_tile(int sx, int sy, int width, int height, int colorid, int sh
 static void file_draw_icon(uiBlock *block,
                            const struct FileList *files,
                            const FileDirEntry *file,
-                           const char *rootpath,
                            const char *path,
                            int sx,
                            int sy,
@@ -169,10 +168,16 @@ static void file_draw_icon(uiBlock *block,
     }
     else if (file->typeflag & FILE_TYPE_ASSET) {
       ImBuf *preview_image = filelist_file_getimage(file);
-      char *rootpath_cpy = BLI_strdup(rootpath);
-      BLI_path_slash_rstrip(rootpath_cpy);
-      UI_but_drag_set_asset(
-          but, file->name, rootpath_cpy, file->blentype, icon, preview_image, UI_DPI_FAC);
+      char blend_path[FILE_MAX_LIBEXTRA];
+      if (BLO_library_path_explode(path, blend_path, NULL, NULL)) {
+        UI_but_drag_set_asset(but,
+                              file->name,
+                              BLI_strdup(blend_path),
+                              file->blentype,
+                              icon,
+                              preview_image,
+                              UI_DPI_FAC);
+      }
     }
     else {
       /* path is no more static, cannot give it directly to but... */
@@ -290,7 +295,6 @@ void file_calc_previews(const bContext *C, ARegion *region)
 static void file_draw_preview(uiBlock *block,
                               const struct FileList *files,
                               const FileDirEntry *file,
-                              const char *rootpath,
                               const char *path,
                               int sx,
                               int sy,
@@ -472,9 +476,11 @@ static void file_draw_preview(uiBlock *block,
     }
     /* path is no more static, cannot give it directly to but... */
     else if (file->typeflag & FILE_TYPE_ASSET) {
-      char *rootpath_cpy = BLI_strdup(rootpath);
-      BLI_path_slash_rstrip(rootpath_cpy);
-      UI_but_drag_set_asset(but, file->name, rootpath_cpy, file->blentype, icon, imb, scale);
+      char blend_path[FILE_MAX_LIBEXTRA];
+      if (BLO_library_path_explode(path, blend_path, NULL, NULL)) {
+        UI_but_drag_set_asset(
+            but, file->name, BLI_strdup(blend_path), file->blentype, icon, imb, scale);
+      }
     }
     else {
       UI_but_drag_set_image(but, BLI_strdup(path), icon, imb, scale, true);
@@ -915,7 +921,6 @@ void file_draw_list(const bContext *C, ARegion *region)
       file_draw_preview(block,
                         files,
                         file,
-                        root,
                         path,
                         sx,
                         sy,
@@ -932,7 +937,6 @@ void file_draw_list(const bContext *C, ARegion *region)
       file_draw_icon(block,
                      files,
                      file,
-                     root,
                      path,
                      sx,
                      sy - layout->tile_border_y,
