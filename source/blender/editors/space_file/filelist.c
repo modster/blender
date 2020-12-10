@@ -370,8 +370,8 @@ typedef struct FileList {
   FileDirEntryArr filelist;
 
   eFileSelectType type;
-  /* The repository this list was created for. Stored here so we know when to re-read. */
-  FileSelectAssetRepositoryUID *asset_repository;
+  /* The library this list was created for. Stored here so we know when to re-read. */
+  FileSelectAssetLibraryUID *asset_library;
 
   short flags;
 
@@ -1027,46 +1027,45 @@ void filelist_setfilter_options(FileList *filelist,
 }
 
 /**
- * Checks two repositories for equality.
- * \return True if the repositories match.
+ * Checks two libraries for equality.
+ * \return True if the libraries match.
  */
-static bool filelist_compare_asset_repositories(const FileSelectAssetRepositoryUID *repository_a,
-                                                const FileSelectAssetRepositoryUID *repository_b)
+static bool filelist_compare_asset_libraries(const FileSelectAssetLibraryUID *library_a,
+                                             const FileSelectAssetLibraryUID *library_b)
 {
-  if (repository_a->type != repository_b->type) {
+  if (library_a->type != library_b->type) {
     return false;
   }
-  if (repository_a->type == FILE_ASSET_REPO_CUSTOM) {
-    return STREQ(repository_a->idname, repository_b->idname);
+  if (library_a->type == FILE_ASSET_LIBRARY_CUSTOM) {
+    return STREQ(library_a->idname, library_b->idname);
   }
 
   return true;
 }
 
 /**
- * \param asset_repository: May be NULL to unset the repository.
+ * \param asset_library: May be NULL to unset the library.
  */
-void filelist_setrepository(FileList *filelist,
-                            const FileSelectAssetRepositoryUID *asset_repository)
+void filelist_setlibrary(FileList *filelist, const FileSelectAssetLibraryUID *asset_library)
 {
   /* Unset if needed. */
-  if (!asset_repository) {
-    if (filelist->asset_repository) {
-      MEM_SAFE_FREE(filelist->asset_repository);
+  if (!asset_library) {
+    if (filelist->asset_library) {
+      MEM_SAFE_FREE(filelist->asset_library);
       filelist->flags |= FL_FORCE_RESET;
     }
     return;
   }
 
-  if (!filelist->asset_repository) {
-    filelist->asset_repository = MEM_mallocN(sizeof(*filelist->asset_repository),
-                                             "filelist asset repository");
-    *filelist->asset_repository = *asset_repository;
+  if (!filelist->asset_library) {
+    filelist->asset_library = MEM_mallocN(sizeof(*filelist->asset_library),
+                                          "filelist asset library");
+    *filelist->asset_library = *asset_library;
 
     filelist->flags |= FL_FORCE_RESET;
   }
-  else if (!filelist_compare_asset_repositories(filelist->asset_repository, asset_repository)) {
-    *filelist->asset_repository = *asset_repository;
+  else if (!filelist_compare_asset_libraries(filelist->asset_library, asset_library)) {
+    *filelist->asset_library = *asset_library;
     filelist->flags |= FL_FORCE_RESET;
   }
 }
@@ -1790,7 +1789,7 @@ void filelist_free(struct FileList *filelist)
     filelist->selection_state = NULL;
   }
 
-  MEM_SAFE_FREE(filelist->asset_repository);
+  MEM_SAFE_FREE(filelist->asset_library);
 
   memset(&filelist->filter_data, 0, sizeof(filelist->filter_data));
 
@@ -1856,7 +1855,7 @@ bool filelist_is_dir(struct FileList *filelist, const char *path)
  */
 void filelist_setdir(struct FileList *filelist, char *r_dir)
 {
-  const bool allow_invalid = filelist->asset_repository != NULL;
+  const bool allow_invalid = filelist->asset_library != NULL;
   BLI_assert(strlen(r_dir) < FILE_MAX_LIBEXTRA);
 
   BLI_path_normalize_dir(BKE_main_blendfile_path_from_global(), r_dir);
@@ -3326,7 +3325,7 @@ static void filelist_readjob_startjob(void *flrjv, short *stop, short *do_update
   flrj->tmp_filelist->libfiledata = NULL;
   memset(&flrj->tmp_filelist->filelist_cache, 0, sizeof(flrj->tmp_filelist->filelist_cache));
   flrj->tmp_filelist->selection_state = NULL;
-  flrj->tmp_filelist->asset_repository = NULL;
+  flrj->tmp_filelist->asset_library = NULL;
 
   BLI_mutex_unlock(&flrj->lock);
 

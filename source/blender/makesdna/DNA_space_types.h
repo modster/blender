@@ -665,21 +665,21 @@ typedef enum eSpaceSeq_OverlayType {
  * \{ */
 
 /**
- * Information to identify a asset repository. May be either one of the predefined types (current
- * 'Main', builtin repository, project repository), or a custom type as defined in the Preferences.
+ * Information to identify a asset library. May be either one of the predefined types (current
+ * 'Main', builtin library, project library), or a custom type as defined in the Preferences.
  *
- * If the type is set to #FILE_ASSET_REPO_CUSTOM, idname must have the name to identify the custom
- * repository. Otherwise idname is not used.
+ * If the type is set to #FILE_ASSET_LIBRARY_CUSTOM, idname must have the name to identify the
+ * custom library. Otherwise idname is not used.
  */
-typedef struct FileSelectAssetRepositoryUID {
+typedef struct FileSelectAssetLibraryUID {
   short type;
   char _pad[6];
   /**
-   * If showing a custom asset repository (#FILE_ASSET_REPO_CUSTOM), this name has to be set to
+   * If showing a custom asset library (#FILE_ASSET_LIBRARY_CUSTOM), this name has to be set to
    * define which. Can be empty otherwise.
    */
   char idname[64]; /* MAX_NAME */
-} FileSelectAssetRepositoryUID;
+} FileSelectAssetLibraryUID;
 
 /* Config and Input for File Selector */
 typedef struct FileSelectParams {
@@ -747,7 +747,7 @@ typedef struct FileSelectParams {
 typedef struct FileAssetSelectParams {
   FileSelectParams base_params;
 
-  FileSelectAssetRepositoryUID asset_repository;
+  FileSelectAssetLibraryUID asset_library;
 } FileAssetSelectParams;
 
 /**
@@ -835,21 +835,21 @@ typedef enum eFileBrowse_Mode {
   FILE_BROWSE_MODE_ASSETS = 1,
 } eFileBrowse_Mode;
 
-typedef enum eFileAssetReporitory_Type {
+typedef enum eFileAssetLibrary_Type {
   /* For the future. Display assets bundled with Blender by default. */
-  // FILE_ASSET_REPO_BUNDLED = 0,
+  // FILE_ASSET_LIBRARY_BUNDLED = 0,
   /** Display assets from the current session (current "Main"). */
-  FILE_ASSET_REPO_LOCAL = 1,
+  FILE_ASSET_LIBRARY_LOCAL = 1,
   /* For the future. Display assets for the current project. */
-  // FILE_ASSET_REPO_PROJECT = 2,
+  // FILE_ASSET_LIBRARY_PROJECT = 2,
 
-  /** Display assets from custom asset repositories, as defined in the preferences
-   * (#bUserAssetRepository). The name will be taken from #FileSelectParams.asset_repository.idname
+  /** Display assets from custom asset libraries, as defined in the preferences
+   * (#bUserAssetLibrary). The name will be taken from #FileSelectParams.asset_library.idname
    * then.
-   * In RNA, we add the index of the custom repository to this to identify it by index. So keep
+   * In RNA, we add the index of the custom library to this to identify it by index. So keep
    * this last! */
-  FILE_ASSET_REPO_CUSTOM = 100,
-} eFileAssetReporitory_Type;
+  FILE_ASSET_LIBRARY_CUSTOM = 100,
+} eFileAssetLibrary_Type;
 
 /* FileSelectParams.display */
 enum eFileDisplayType {
