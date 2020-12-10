@@ -266,7 +266,7 @@ typedef struct FileListInternEntry {
   char uuid[16];
 
   /** eFileSel_File_Types */
-  uint64_t typeflag;
+  int typeflag;
   /** ID type, in case typeflag has FILE_TYPE_BLENDERLIB set. */
   int blentype;
 
