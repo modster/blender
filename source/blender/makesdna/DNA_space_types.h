@@ -986,8 +986,6 @@ typedef enum eFileSel_File_Types {
   FILE_TYPE_VOLUME = (1 << 19),
 
   FILE_TYPE_ASSET = (1 << 28),
-  /* The file is an asset, but read from a file. So the file-list owns the asset-data. */
-  FILE_TYPE_ASSET_EXTERNAL = (1 << 29),
   /** An FS directory (i.e. S_ISDIR on its path is true). */
   FILE_TYPE_DIR = (1 << 30),
   FILE_TYPE_BLENDERLIB = (1u << 31),
@@ -1088,10 +1086,12 @@ typedef struct FileDirEntry {
   /** Optional argument for shortcuts, aliases etc. */
   char *redirection_path;
 
-  /** When showing local IDs (FILE_MAIN, FILE_MAIN_ASSET), UUID of the ID this file represents. */
-  uint id_session_uuid;
+  /** When showing local IDs (FILE_MAIN, FILE_MAIN_ASSET), ID this file represents. Note comment
+   * for FileListInternEntry.local_data, the same applies here! */
+  ID *id;
   /** If this file represents an asset, its asset data is here. Note that we may show assets of
-   * external files (#FILE_TYPE_ASSET_EXTERNAL) in which case this is set but not the id above. */
+   * external files in which case this is set but not the id above.
+   * Note comment for FileListInternEntry.local_data, the same applies here! */
   struct AssetMetaData *asset_data;
 
   /* The icon_id for the preview image. */

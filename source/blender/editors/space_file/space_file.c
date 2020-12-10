@@ -740,7 +740,7 @@ static int /*eContextResult*/ file_context(const bContext *C,
   else if (CTX_data_equals(member, "active_id")) {
     const FileDirEntry *file = filelist_file(sfile->files, params->active_file);
 
-    ID *id = filelist_file_get_id(sfile->files, file);
+    ID *id = filelist_file_get_id(file);
     if (id) {
       CTX_data_id_pointer_set(result, id);
     }
