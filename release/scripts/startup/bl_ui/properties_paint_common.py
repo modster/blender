@@ -643,6 +643,11 @@ def brush_settings(layout, context, brush, popover=False):
             layout.prop(brush, "elastic_deform_volume_preservation", slider=True)
             layout.separator()
 
+        elif sculpt_tool == 'SNAKE_HOOK':
+            layout.separator()
+            layout.prop(brush, "snake_hook_deform_type")
+            layout.separator()
+
         elif sculpt_tool == 'POSE':
             layout.separator()
             layout.prop(brush, "deform_target")
@@ -715,6 +720,9 @@ def brush_settings(layout, context, brush, popover=False):
             row.prop(brush, "wet_persistence")
             row.prop(brush, "invert_wet_persistence_pressure", text="")
             row.prop(brush, "use_wet_persistence_pressure", text="")
+
+            row = layout.row(align=True)
+            row.prop(brush, "wet_paint_radius_factor")
 
             row = layout.row(align=True)
             row.prop(brush, "density")

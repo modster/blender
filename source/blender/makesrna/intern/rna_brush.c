@@ -2072,6 +2072,20 @@ static void rna_def_brush(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
+  static const EnumPropertyItem brush_snake_hook_deform_type_items[] = {
+      {BRUSH_SNAKE_HOOK_DEFORM_FALLOFF,
+       "FALLOFF",
+       0,
+       "Radius Falloff",
+       "Applies the brush falloff in the tip of the brush"},
+      {BRUSH_SNAKE_HOOK_DEFORM_ELASTIC,
+       "ELASTIC",
+       0,
+       "Elastic",
+       "Modifies the entire mesh using elastic deform"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   static const EnumPropertyItem brush_cloth_deform_type_items[] = {
       {BRUSH_CLOTH_DEFORM_DRAG, "DRAG", 0, "Drag", ""},
       {BRUSH_CLOTH_DEFORM_PUSH, "PUSH", 0, "Push", ""},
@@ -2306,6 +2320,11 @@ static void rna_def_brush(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "elastic_deform_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, brush_elastic_deform_type_items);
+  RNA_def_property_ui_text(prop, "Deformation", "Deformation type that is used in the brush");
+  RNA_def_property_update(prop, 0, "rna_Brush_update");
+
+  prop = RNA_def_property(srna, "snake_hook_deform_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, brush_snake_hook_deform_type_items);
   RNA_def_property_ui_text(prop, "Deformation", "Deformation type that is used in the brush");
   RNA_def_property_update(prop, 0, "rna_Brush_update");
 
@@ -2852,6 +2871,16 @@ static void rna_def_brush(BlenderRNA *brna)
                            "Area Radius",
                            "Ratio between the brush radius and the radius that is going to be "
                            "used to sample the area center");
+  RNA_def_property_update(prop, 0, "rna_Brush_update");
+
+  prop = RNA_def_property(srna, "wet_paint_radius_factor", PROP_FLOAT, PROP_FACTOR);
+  RNA_def_property_float_sdna(prop, NULL, "wet_paint_radius_factor");
+  RNA_def_property_range(prop, 0.0f, 2.0f);
+  RNA_def_property_ui_range(prop, 0.0f, 2.0f, 0.001, 3);
+  RNA_def_property_ui_text(prop,
+                           "Wet Paint Radius",
+                           "Ratio between the brush radius and the radius that is going to be "
+                           "used to sample the color to blend in wet paint");
   RNA_def_property_update(prop, 0, "rna_Brush_update");
 
   prop = RNA_def_property(srna, "stencil_pos", PROP_FLOAT, PROP_XYZ);
