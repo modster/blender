@@ -266,7 +266,7 @@ typedef struct FileListInternEntry {
   char uuid[16];
 
   /** eFileSel_File_Types */
-  uint64_t typeflag;
+  int typeflag;
   /** ID type, in case typeflag has FILE_TYPE_BLENDERLIB set. */
   int blentype;
 
@@ -276,14 +276,22 @@ typedef struct FileListInternEntry {
   /** not strictly needed, but used during sorting, avoids to have to recompute it there... */
   char *name;
 
-  /** When showing local IDs (FILE_MAIN, FILE_MAIN_ASSET), session UUID of the ID this file
-   * represents. */
-  uint id_session_uuid;
-  /* For the few file types that have the preview already in memory. For others, there's delayed
-   * preview reading from disk. Non-owning pointer. */
-  PreviewImage *preview_image;
+  /**
+   * This is data from the current main, represented by this file. It's crucial that this is
+   * updated correctly on undo, redo and file reading (without UI). That's job of the space to do.
+   */
+  struct {
+    /** When showing local IDs (FILE_MAIN, FILE_MAIN_ASSET), the ID this file entry represents. */
+    ID *id;
 
-  AssetMetaData *asset_data;
+    /* For the few file types that have the preview already in memory. For others, there's delayed
+     * preview reading from disk. Non-owning pointer. */
+    PreviewImage *preview_image;
+  } local_data;
+
+  /** When the file represents an asset read from another file, it is stored here.
+   * Owning pointer. */
+  AssetMetaData *imported_asset_data;
 
   /** Defined in BLI_fileops.h */
   eFileAttributes attributes;
@@ -391,12 +399,6 @@ typedef struct FileList {
    */
   GHash *selection_state;
 
-  /* If the file browser shows local IDs (FILE_MAIN, FILE_MAIN_ASSET), this is needed to keep safe
-   * references (safe over deletion or undo/redo) to the IDs. */
-  /* TODO could we use something more lighweight? Something that only stores IDs that are actually
-   * used. */
-  struct IDNameLib_Map *id_map;
-
   short max_recursion;
   short recursion_level;
 
@@ -430,7 +432,10 @@ enum {
 
 /* FileList.type_flags */
 enum FileListTypeFlags {
+  /** The file list has references to main data (IDs) and needs special care. */
   FL_USES_MAIN_DATA = (1 << 0),
+  /** The file list type is not thread-safe. */
+  FL_NO_THREADS = (1 << 2),
 };
 
 #define SPECIAL_IMG_SIZE 256
@@ -1045,7 +1050,7 @@ static bool filelist_compare_asset_libraries(const FileSelectAssetLibraryUID *li
     return false;
   }
   if (library_a->type == FILE_ASSET_LIBRARY_CUSTOM) {
-    return STREQ(library_a->idname, library_b->idname);
+    return STREQ(library_a->custom_library_identifier, library_b->custom_library_identifier);
   }
 
   return true;
@@ -1439,8 +1444,8 @@ static void filelist_intern_entry_free(FileListInternEntry *entry)
     MEM_freeN(entry->name);
   }
   /* If we own the asset-data (it was generated from external file data), free it. */
-  if (entry->asset_data && (entry->typeflag & FILE_TYPE_ASSET_EXTERNAL)) {
-    BKE_asset_metadata_free(&entry->asset_data);
+  if (entry->imported_asset_data) {
+    BKE_asset_metadata_free(&entry->imported_asset_data);
   }
   MEM_freeN(entry);
 }
@@ -1598,7 +1603,7 @@ static void filelist_cache_previews_push(FileList *filelist, FileDirEntry *entry
 
     preview->index = index;
     preview->flags = entry->typeflag;
-    preview->in_memory_preview = intern_entry->preview_image;
+    preview->in_memory_preview = intern_entry->local_data.preview_image;
     preview->icon_id = 0;
     //      printf("%s: %d - %s - %p\n", __func__, preview->index, preview->path, preview->img);
 
@@ -1733,11 +1738,10 @@ void filelist_settype(FileList *filelist, short type)
       filelist->filterf = is_filtered_lib;
       break;
     case FILE_MAIN_ASSET:
-      /* TODO this may not be thread safe, main data may change. */
       filelist->checkdirf = filelist_checkdir_main_assets;
       filelist->read_jobf = filelist_readjob_main_assets;
       filelist->filterf = is_filtered_main_assets;
-      filelist->type_flags |= FL_USES_MAIN_DATA;
+      filelist->type_flags |= FL_USES_MAIN_DATA | FL_NO_THREADS;
       break;
     default:
       filelist->checkdirf = filelist_checkdir_dir;
@@ -1749,10 +1753,7 @@ void filelist_settype(FileList *filelist, short type)
   filelist->flags |= FL_FORCE_RESET;
 }
 
-void filelist_clear_ex(struct FileList *filelist,
-                       const bool do_cache,
-                       const bool do_selection,
-                       const bool do_id_map)
+void filelist_clear_ex(struct FileList *filelist, const bool do_cache, const bool do_selection)
 {
   if (!filelist) {
     return;
@@ -1771,16 +1772,11 @@ void filelist_clear_ex(struct FileList *filelist,
   if (do_selection && filelist->selection_state) {
     BLI_ghash_clear(filelist->selection_state, MEM_freeN, NULL);
   }
-
-  if (do_id_map && filelist->id_map) {
-    BKE_main_idmap_destroy(filelist->id_map);
-    filelist->id_map = NULL;
-  }
 }
 
 void filelist_clear(struct FileList *filelist)
 {
-  filelist_clear_ex(filelist, true, true, true);
+  filelist_clear_ex(filelist, true, true);
 }
 
 void filelist_free(struct FileList *filelist)
@@ -1791,7 +1787,7 @@ void filelist_free(struct FileList *filelist)
   }
 
   /* No need to clear cache & selection_state, we free them anyway. */
-  filelist_clear_ex(filelist, false, false, true);
+  filelist_clear_ex(filelist, false, false);
   filelist_cache_free(&filelist->filelist_cache);
 
   if (filelist->selection_state) {
@@ -1953,12 +1949,15 @@ static FileDirEntry *filelist_file_create_entry(FileList *filelist, const int in
   if (entry->redirection_path) {
     ret->redirection_path = BLI_strdup(entry->redirection_path);
   }
-  ret->asset_data = entry->asset_data;
-  ret->id_session_uuid = entry->id_session_uuid;
+  ret->id = entry->local_data.id;
+  ret->asset_data = entry->imported_asset_data ? entry->imported_asset_data : NULL;
+  if (ret->id && (ret->asset_data == NULL)) {
+    ret->asset_data = ret->id->asset_data;
+  }
   /* For some file types the preview is already available. */
-  if (entry->preview_image &&
-      BKE_previewimg_is_finished(entry->preview_image, ICON_SIZE_PREVIEW)) {
-    ImBuf *ibuf = BKE_previewimg_to_imbuf(entry->preview_image, ICON_SIZE_PREVIEW);
+  if (entry->local_data.preview_image &&
+      BKE_previewimg_is_finished(entry->local_data.preview_image, ICON_SIZE_PREVIEW)) {
+    ImBuf *ibuf = BKE_previewimg_to_imbuf(entry->local_data.preview_image, ICON_SIZE_PREVIEW);
     ret->preview_icon_id = BKE_icon_imbuf_create(ibuf);
   }
   BLI_addtail(&cache->cached_entries, ret);
@@ -2030,7 +2029,7 @@ int filelist_file_findpath(struct FileList *filelist, const char *filename)
 {
   int fidx = -1;
 
-  if (filelist->filelist.nbr_entries_filtered < FILEDIR_NBR_ENTRIES_UNSET) {
+  if (filelist->filelist.nbr_entries_filtered == FILEDIR_NBR_ENTRIES_UNSET) {
     return fidx;
   }
 
@@ -2051,18 +2050,14 @@ int filelist_file_findpath(struct FileList *filelist, const char *filename)
 /**
  * Get the ID a file represents (if any). For #FILE_MAIN, #FILE_MAIN_ASSET.
  */
-ID *filelist_file_get_id(const FileList *filelist, const FileDirEntry *file)
+ID *filelist_file_get_id(const FileDirEntry *file)
 {
-  if ((file->id_session_uuid == MAIN_ID_SESSION_UUID_UNSET) || (filelist->id_map == NULL)) {
-    return NULL;
-  }
-
-  return BKE_main_idmap_lookup_uuid(filelist->id_map, file->id_session_uuid);
+  return file->id;
 }
 
 FileDirEntry *filelist_entry_find_uuid(struct FileList *filelist, const int uuid[4])
 {
-  if (filelist->filelist.nbr_entries_filtered < FILEDIR_NBR_ENTRIES_UNSET) {
+  if (filelist->filelist.nbr_entries_filtered == FILEDIR_NBR_ENTRIES_UNSET) {
     return NULL;
   }
 
@@ -2886,9 +2881,9 @@ static int filelist_readjob_list_lib(const char *root, ListBase *entries, const 
     entry->relpath = BLI_strdup(blockname);
     entry->typeflag |= FILE_TYPE_BLENDERLIB;
     if (info && info->asset_data) {
-      entry->typeflag |= FILE_TYPE_ASSET | FILE_TYPE_ASSET_EXTERNAL;
+      entry->typeflag |= FILE_TYPE_ASSET;
       /* Moves ownership! */
-      entry->asset_data = info->asset_data;
+      entry->imported_asset_data = info->asset_data;
     }
     if (!(group && idcode)) {
       entry->typeflag |= FILE_TYPE_DIR;
@@ -3258,7 +3253,7 @@ static void filelist_readjob_main_assets(Main *current_main,
                                          short *UNUSED(stop),
                                          short *do_update,
                                          float *UNUSED(progress),
-                                         ThreadMutex *lock)
+                                         ThreadMutex *UNUSED(lock))
 {
   BLI_assert(BLI_listbase_is_empty(&filelist->filelist.entries) &&
              (filelist->filelist.nbr_entries == FILEDIR_NBR_ENTRIES_UNSET));
@@ -3285,25 +3280,21 @@ static void filelist_readjob_main_assets(Main *current_main,
     entry->blentype = GS(id_iter->name);
     *((uint32_t *)entry->uuid) = atomic_add_and_fetch_uint32(
         (uint32_t *)filelist->filelist_intern.curr_uuid, 1);
-    entry->preview_image = BKE_asset_metadata_preview_get_from_id(id_iter->asset_data, id_iter);
-    entry->id_session_uuid = id_iter->session_uuid;
-    entry->asset_data = id_iter->asset_data;
+    entry->local_data.preview_image = BKE_asset_metadata_preview_get_from_id(id_iter->asset_data,
+                                                                             id_iter);
+    entry->local_data.id = id_iter;
     nbr_entries++;
     BLI_addtail(&tmp_entries, entry);
   }
   FOREACH_MAIN_ID_END;
 
   if (nbr_entries) {
-    BLI_mutex_lock(lock);
-
     *do_update = true;
 
     BLI_movelisttolist(&filelist->filelist.entries, &tmp_entries);
     filelist->filelist.nbr_entries += nbr_entries;
     filelist->filelist.nbr_entries_filtered = filelist->filelist.entry_idx_start =
         filelist->filelist.entry_idx_end = -1;
-
-    BLI_mutex_unlock(lock);
   }
 }
 
@@ -3377,7 +3368,7 @@ static void filelist_readjob_update(void *flrjv)
 
   if (new_nbr_entries) {
     /* Do not clear selection cache, we can assume already 'selected' uuids are still valid! */
-    filelist_clear_ex(flrj->filelist, true, false, false);
+    filelist_clear_ex(flrj->filelist, true, false);
 
     flrj->filelist->flags |= (FL_NEED_SORTING | FL_NEED_FILTERING);
   }
@@ -3409,9 +3400,6 @@ static void filelist_readjob_free(void *flrjv)
     BLI_assert(flrj->tmp_filelist->filelist.nbr_entries == 0);
     BLI_assert(BLI_listbase_is_empty(&flrj->tmp_filelist->filelist.entries));
 
-    /* Don't let this be free'd, the tmp list doesn't own it. */
-    flrj->tmp_filelist->id_map = NULL;
-
     filelist_freelib(flrj->tmp_filelist);
     filelist_free(flrj->tmp_filelist);
     MEM_freeN(flrj->tmp_filelist);
@@ -3438,27 +3426,41 @@ void filelist_readjob_start(FileList *filelist, const bContext *C)
   flrj->current_main = bmain;
   BLI_strncpy(flrj->main_name, BKE_main_blendfile_path(bmain), sizeof(flrj->main_name));
 
-  BLI_assert(filelist->id_map == NULL);
   filelist->flags &= ~(FL_FORCE_RESET | FL_IS_READY);
   filelist->flags |= FL_IS_PENDING;
-  filelist->id_map = BKE_main_idmap_create(bmain, false, NULL, MAIN_IDMAP_TYPE_UUID);
 
+  /* Init even for single threaded execution. Called functions use it. */
   BLI_mutex_init(&flrj->lock);
 
-  /* setup job */
-  wm_job = WM_jobs_get(CTX_wm_manager(C),
-                       CTX_wm_window(C),
-                       CTX_data_scene(C),
-                       "Listing Dirs...",
-                       WM_JOB_PROGRESS,
-                       WM_JOB_TYPE_FILESEL_READDIR);
-  WM_jobs_customdata_set(wm_job, flrj, filelist_readjob_free);
-  WM_jobs_timer(wm_job, 0.01, NC_SPACE | ND_SPACE_FILE_LIST, NC_SPACE | ND_SPACE_FILE_LIST);
-  WM_jobs_callbacks(
-      wm_job, filelist_readjob_startjob, NULL, filelist_readjob_update, filelist_readjob_endjob);
+  if (filelist->type_flags & FL_NO_THREADS) {
+    short dummy_stop = false;
+    short dummy_do_update = false;
+    float dummy_progress = 0.0f;
 
-  /* start the job */
-  WM_jobs_start(CTX_wm_manager(C), wm_job);
+    /* Single threaded execution. Just directly call the callbacks. */
+    filelist_readjob_startjob(flrj, &dummy_stop, &dummy_do_update, &dummy_progress);
+    filelist_readjob_endjob(flrj);
+    filelist_readjob_free(flrj);
+
+    WM_event_add_notifier(C, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
+    return;
+  }
+  else {
+    /* setup job */
+    wm_job = WM_jobs_get(CTX_wm_manager(C),
+                         CTX_wm_window(C),
+                         CTX_data_scene(C),
+                         "Listing Dirs...",
+                         WM_JOB_PROGRESS,
+                         WM_JOB_TYPE_FILESEL_READDIR);
+    WM_jobs_customdata_set(wm_job, flrj, filelist_readjob_free);
+    WM_jobs_timer(wm_job, 0.01, NC_SPACE | ND_SPACE_FILE_LIST, NC_SPACE | ND_SPACE_FILE_LIST);
+    WM_jobs_callbacks(
+        wm_job, filelist_readjob_startjob, NULL, filelist_readjob_update, filelist_readjob_endjob);
+
+    /* start the job */
+    WM_jobs_start(CTX_wm_manager(C), wm_job);
+  }
 }
 
 void filelist_readjob_stop(wmWindowManager *wm, Scene *owner_scene)

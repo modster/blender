@@ -135,7 +135,6 @@ static void draw_tile(int sx, int sy, int width, int height, int colorid, int sh
 }
 
 static void file_draw_icon(uiBlock *block,
-                           const struct FileList *files,
                            const FileDirEntry *file,
                            const char *path,
                            int sx,
@@ -163,7 +162,7 @@ static void file_draw_icon(uiBlock *block,
     /* TODO duplicated from file_draw_preview(). */
     ID *id;
 
-    if ((id = filelist_file_get_id(files, file))) {
+    if ((id = filelist_file_get_id(file))) {
       UI_but_drag_set_id(but, id);
     }
     else if (file->typeflag & FILE_TYPE_ASSET) {
@@ -293,7 +292,6 @@ void file_calc_previews(const bContext *C, ARegion *region)
 }
 
 static void file_draw_preview(uiBlock *block,
-                              const struct FileList *files,
                               const FileDirEntry *file,
                               const char *path,
                               int sx,
@@ -471,7 +469,7 @@ static void file_draw_preview(uiBlock *block,
   if (drag) {
     ID *id;
 
-    if ((id = filelist_file_get_id(files, file))) {
+    if ((id = filelist_file_get_id(file))) {
       UI_but_drag_set_id(but, id);
     }
     /* path is no more static, cannot give it directly to but... */
@@ -919,7 +917,6 @@ void file_draw_list(const bContext *C, ARegion *region)
       }
 
       file_draw_preview(block,
-                        files,
                         file,
                         path,
                         sx,
@@ -935,7 +932,6 @@ void file_draw_list(const bContext *C, ARegion *region)
     }
     else {
       file_draw_icon(block,
-                     files,
                      file,
                      path,
                      sx,

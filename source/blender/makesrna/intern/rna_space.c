@@ -2474,9 +2474,11 @@ static PointerRNA rna_FileSelectParams_filter_id_get(PointerRNA *ptr)
   return rna_pointer_inherit_refine(ptr, &RNA_FileSelectIDFilter, ptr->data);
 }
 
-static int rna_FileSelectParams_asset_library_get(PointerRNA *ptr)
+static int rna_FileAssetSelectParams_asset_library_get(PointerRNA *ptr)
 {
   FileAssetSelectParams *params = ptr->data;
+  /* Just an extra sanity check to ensure this isn't somehow called for RNA_FileSelectParams. */
+  BLI_assert(ptr->type == &RNA_FileAssetSelectParams);
 
   /* Simple case: Predefined repo, just set the value. */
   if (params->asset_library.type < FILE_ASSET_LIBRARY_CUSTOM) {
@@ -2486,7 +2488,7 @@ static int rna_FileSelectParams_asset_library_get(PointerRNA *ptr)
   /* Note that the path isn't checked for validity here. If an invalid library path is used, the
    * Asset Browser can give a nice hint on what's wrong. */
   const bUserAssetLibrary *user_library = BKE_preferences_asset_library_find_from_name(
-      &U, params->asset_library.idname);
+      &U, params->asset_library.custom_library_identifier);
   const int index = BKE_preferences_asset_library_get_index(&U, user_library);
   if (index > -1) {
     return FILE_ASSET_LIBRARY_CUSTOM + index;
@@ -2496,14 +2498,14 @@ static int rna_FileSelectParams_asset_library_get(PointerRNA *ptr)
   return FILE_ASSET_LIBRARY_LOCAL;
 }
 
-static void rna_FileSelectParams_asset_library_set(PointerRNA *ptr, int value)
+static void rna_FileAssetSelectParams_asset_library_set(PointerRNA *ptr, int value)
 {
   FileAssetSelectParams *params = ptr->data;
 
   /* Simple case: Predefined repo, just set the value. */
   if (value < FILE_ASSET_LIBRARY_CUSTOM) {
     params->asset_library.type = value;
-    params->asset_library.idname[0] = '\0';
+    params->asset_library.custom_library_identifier[0] = '\0';
     BLI_assert(ELEM(value, FILE_ASSET_LIBRARY_LOCAL));
     return;
   }
@@ -2515,16 +2517,15 @@ static void rna_FileSelectParams_asset_library_set(PointerRNA *ptr, int value)
    * Asset Browser can give a nice hint on what's wrong. */
   const bool is_valid = (user_library->name[0] && user_library->path[0]);
   if (user_library && is_valid) {
-    BLI_strncpy(
-        params->asset_library.idname, user_library->name, sizeof(params->asset_library.idname));
+    BLI_strncpy(params->asset_library.custom_library_identifier,
+                user_library->name,
+                sizeof(params->asset_library.custom_library_identifier));
     params->asset_library.type = FILE_ASSET_LIBRARY_CUSTOM;
   }
 }
 
-static const EnumPropertyItem *rna_FileSelectParams_asset_library_itemf(bContext *UNUSED(C),
-                                                                        PointerRNA *UNUSED(ptr),
-                                                                        PropertyRNA *UNUSED(prop),
-                                                                        bool *r_free)
+static const EnumPropertyItem *rna_FileAssetSelectParams_asset_library_itemf(
+    bContext *UNUSED(C), PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), bool *r_free)
 {
   const EnumPropertyItem predefined_items[] = {
       /* For the future. */
@@ -2578,6 +2579,18 @@ static const EnumPropertyItem *rna_FileSelectParams_asset_library_itemf(bContext
   return item;
 }
 
+static void rna_FileAssetSelectParams_asset_category_set(PointerRNA *ptr, uint64_t value)
+{
+  FileSelectParams *params = ptr->data;
+  params->filter_id = value;
+}
+
+static uint64_t rna_FileAssetSelectParams_asset_category_get(PointerRNA *ptr)
+{
+  FileSelectParams *params = ptr->data;
+  return params->filter_id;
+}
+
 static void rna_FileBrowser_FileSelectEntry_name_get(PointerRNA *ptr, char *value)
 {
   const FileDirEntry *entry = ptr->data;
@@ -2602,25 +2615,30 @@ static PointerRNA rna_FileBrowser_FileSelectEntry_asset_data_get(PointerRNA *ptr
   return rna_pointer_inherit_refine(ptr, &RNA_AssetMetaData, entry->asset_data);
 }
 
-static void rna_FileSelectParams_asset_category_set(PointerRNA *ptr, uint64_t value)
+static StructRNA *rna_FileBrowser_params_typef(PointerRNA *ptr)
 {
-  FileSelectParams *params = ptr->data;
-  params->filter_id = value;
-}
+  SpaceFile *sfile = ptr->data;
+  FileSelectParams *params = ED_fileselect_get_active_params(sfile);
 
-static uint64_t rna_FileSelectParams_asset_category_get(PointerRNA *ptr)
-{
-  FileSelectParams *params = ptr->data;
-  return params->filter_id;
+  if (params == ED_fileselect_get_file_params(sfile)) {
+    return &RNA_FileSelectParams;
+  }
+  if (params == (void *)ED_fileselect_get_asset_params(sfile)) {
+    return &RNA_FileAssetSelectParams;
+  }
+
+  BLI_assert(!"Could not identify file select parameters");
+  return NULL;
 }
 
 static PointerRNA rna_FileBrowser_params_get(PointerRNA *ptr)
 {
   SpaceFile *sfile = ptr->data;
   FileSelectParams *params = ED_fileselect_get_active_params(sfile);
+  StructRNA *params_struct = rna_FileBrowser_params_typef(ptr);
 
-  if (params) {
-    return rna_pointer_inherit_refine(ptr, &RNA_FileSelectParams, params);
+  if (params && params_struct) {
+    return rna_pointer_inherit_refine(ptr, params_struct, params);
   }
 
   return rna_pointer_inherit_refine(ptr, NULL, NULL);
@@ -6019,47 +6037,6 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
-  /* XXX copied from rna_def_fileselect_idfilter. */
-  static const EnumPropertyItem asset_category_items[] = {
-      {FILTER_ID_SCE, "SCENES", ICON_SCENE_DATA, "Scenes", "Show scenes"},
-      {FILTER_ID_AC, "ANIMATIONS", ICON_ANIM_DATA, "Animations", "Show animation data"},
-      {FILTER_ID_OB | FILTER_ID_GR,
-       "OBJECTS_AND_COLLECTIONS",
-       ICON_GROUP,
-       "Objects & Collections",
-       "Show objects and collections"},
-      {FILTER_ID_AR | FILTER_ID_CU | FILTER_ID_LT | FILTER_ID_MB | FILTER_ID_ME
-       /* XXX avoid warning */
-       // | FILTER_ID_HA | FILTER_ID_PT | FILTER_ID_VO
-       ,
-       "GEOMETRY",
-       ICON_MESH_DATA,
-       "Geometry",
-       "Show meshes, curves, lattice, armatures and metaballs data"},
-      {FILTER_ID_LS | FILTER_ID_MA | FILTER_ID_NT | FILTER_ID_TE,
-       "SHADING",
-       ICON_MATERIAL_DATA,
-       "Shading",
-       "Show materials, nodetrees, textures and Freestyle's linestyles"},
-      {FILTER_ID_IM | FILTER_ID_MC | FILTER_ID_MSK | FILTER_ID_SO,
-       "IMAGES_AND_SOUNDS",
-       ICON_IMAGE_DATA,
-       "Images & Sounds",
-       "Show images, movie clips, sounds and masks"},
-      {FILTER_ID_CA | FILTER_ID_LA | FILTER_ID_LP | FILTER_ID_SPK | FILTER_ID_WO | FILTER_ID_WS,
-       "ENVIRONMENTS",
-       ICON_WORLD_DATA,
-       "Environment",
-       "Show worlds, lights, cameras and speakers"},
-      {FILTER_ID_BR | FILTER_ID_GD | FILTER_ID_PA | FILTER_ID_PAL | FILTER_ID_PC | FILTER_ID_TXT |
-           FILTER_ID_VF | FILTER_ID_CF,
-       "MISC",
-       ICON_GREASEPENCIL,
-       "Miscellaneous",
-       "Show other data types"},
-      {0, NULL, 0, NULL, NULL},
-  };
-
   srna = RNA_def_struct(brna, "FileSelectParams", NULL);
   RNA_def_struct_path_func(srna, "rna_FileSelectParams_path");
   RNA_def_struct_ui_text(srna, "File Select Parameters", "File Select Parameters");
@@ -6232,30 +6209,81 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_TEXTEDIT_UPDATE);
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
 
-  prop = RNA_def_property(srna, "asset_library", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, DummyRNA_NULL_items);
-  RNA_def_property_enum_funcs(prop,
-                              "rna_FileSelectParams_asset_library_get",
-                              "rna_FileSelectParams_asset_library_set",
-                              "rna_FileSelectParams_asset_library_itemf");
-  RNA_def_property_ui_text(prop, "Asset Library", "");
-  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
-
-  prop = RNA_def_property(srna, "asset_category", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, asset_category_items);
-  RNA_def_property_enum_funcs(prop,
-                              "rna_FileSelectParams_asset_category_get",
-                              "rna_FileSelectParams_asset_category_set",
-                              NULL);
-  RNA_def_property_ui_text(prop, "Asset Category", "Determine which kind of assets to display");
-  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
-
   prop = RNA_def_property(srna, "display_size", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "thumbnail_size");
   RNA_def_property_enum_items(prop, display_size_items);
   RNA_def_property_ui_text(prop,
                            "Display Size",
                            "Change the size of the display (width of columns or thumbnails size)");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
+}
+
+static void rna_def_fileselect_asset_params(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  /* XXX copied from rna_def_fileselect_idfilter. */
+  static const EnumPropertyItem asset_category_items[] = {
+      {FILTER_ID_SCE, "SCENES", ICON_SCENE_DATA, "Scenes", "Show scenes"},
+      {FILTER_ID_AC, "ANIMATIONS", ICON_ANIM_DATA, "Animations", "Show animation data"},
+      {FILTER_ID_OB | FILTER_ID_GR,
+       "OBJECTS_AND_COLLECTIONS",
+       ICON_GROUP,
+       "Objects & Collections",
+       "Show objects and collections"},
+      {FILTER_ID_AR | FILTER_ID_CU | FILTER_ID_LT | FILTER_ID_MB | FILTER_ID_ME
+       /* XXX avoid warning */
+       // | FILTER_ID_HA | FILTER_ID_PT | FILTER_ID_VO
+       ,
+       "GEOMETRY",
+       ICON_MESH_DATA,
+       "Geometry",
+       "Show meshes, curves, lattice, armatures and metaballs data"},
+      {FILTER_ID_LS | FILTER_ID_MA | FILTER_ID_NT | FILTER_ID_TE,
+       "SHADING",
+       ICON_MATERIAL_DATA,
+       "Shading",
+       "Show materials, nodetrees, textures and Freestyle's linestyles"},
+      {FILTER_ID_IM | FILTER_ID_MC | FILTER_ID_MSK | FILTER_ID_SO,
+       "IMAGES_AND_SOUNDS",
+       ICON_IMAGE_DATA,
+       "Images & Sounds",
+       "Show images, movie clips, sounds and masks"},
+      {FILTER_ID_CA | FILTER_ID_LA | FILTER_ID_LP | FILTER_ID_SPK | FILTER_ID_WO | FILTER_ID_WS,
+       "ENVIRONMENTS",
+       ICON_WORLD_DATA,
+       "Environment",
+       "Show worlds, lights, cameras and speakers"},
+      {FILTER_ID_BR | FILTER_ID_GD | FILTER_ID_PA | FILTER_ID_PAL | FILTER_ID_PC | FILTER_ID_TXT |
+           FILTER_ID_VF | FILTER_ID_CF,
+       "MISC",
+       ICON_GREASEPENCIL,
+       "Miscellaneous",
+       "Show other data types"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  srna = RNA_def_struct(brna, "FileAssetSelectParams", "FileSelectParams");
+  RNA_def_struct_ui_text(
+      srna, "Asset Select Parameters", "Settings for the file selection in Asset Browser mode");
+
+  prop = RNA_def_property(srna, "asset_library", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, DummyRNA_NULL_items);
+  RNA_def_property_enum_funcs(prop,
+                              "rna_FileAssetSelectParams_asset_library_get",
+                              "rna_FileAssetSelectParams_asset_library_set",
+                              "rna_FileAssetSelectParams_asset_library_itemf");
+  RNA_def_property_ui_text(prop, "Asset Library", "");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
+
+  prop = RNA_def_property(srna, "asset_category", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, asset_category_items);
+  RNA_def_property_enum_funcs(prop,
+                              "rna_FileAssetSelectParams_asset_category_get",
+                              "rna_FileAssetSelectParams_asset_category_set",
+                              NULL);
+  RNA_def_property_ui_text(prop, "Asset Category", "Determine which kind of assets to display");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
 }
 
@@ -6322,7 +6350,8 @@ static void rna_def_space_filebrowser(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "params", PROP_POINTER, PROP_NONE);
   RNA_def_property_struct_type(prop, "FileSelectParams");
-  RNA_def_property_pointer_funcs(prop, "rna_FileBrowser_params_get", NULL, NULL, NULL);
+  RNA_def_property_pointer_funcs(
+      prop, "rna_FileBrowser_params_get", NULL, "rna_FileBrowser_params_typef", NULL);
   RNA_def_property_ui_text(
       prop, "Filebrowser Parameter", "Parameters and Settings for the Filebrowser");
 
@@ -7072,6 +7101,7 @@ void RNA_def_space(BlenderRNA *brna)
   rna_def_space_text(brna);
   rna_def_fileselect_entry(brna);
   rna_def_fileselect_params(brna);
+  rna_def_fileselect_asset_params(brna);
   rna_def_fileselect_idfilter(brna);
   rna_def_filemenu_entry(brna);
   rna_def_space_filebrowser(brna);

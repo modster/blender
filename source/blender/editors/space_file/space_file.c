@@ -212,19 +212,17 @@ static SpaceLink *file_duplicate(SpaceLink *sl)
   sfilen->previews_timer = NULL;
   sfilen->smoothscroll_timer = NULL;
 
+  FileSelectParams *active_params_old = ED_fileselect_get_active_params(sfileo);
+  if (active_params_old) {
+    sfilen->files = filelist_new(active_params_old->type);
+    filelist_setdir(sfilen->files, active_params_old->dir);
+  }
+
   if (sfileo->params) {
     sfilen->params = MEM_dupallocN(sfileo->params);
-    filelist_setdir(sfilen->files, sfilen->params->dir);
   }
-
   if (sfileo->asset_params) {
     sfilen->asset_params = MEM_dupallocN(sfileo->asset_params);
-    filelist_setdir(sfilen->files, sfilen->asset_params->base_params.dir);
-  }
-
-  FileSelectParams *active_params = ED_fileselect_get_active_params(sfilen);
-  if (active_params) {
-    sfilen->files = filelist_new(active_params->type);
   }
 
   sfilen->folder_histories = folder_history_list_duplicate(&sfileo->folder_histories);
@@ -800,7 +798,7 @@ static int /*eContextResult*/ file_context(const bContext *C,
   else if (CTX_data_equals(member, "active_id")) {
     const FileDirEntry *file = filelist_file(sfile->files, params->active_file);
 
-    ID *id = filelist_file_get_id(sfile->files, file);
+    ID *id = filelist_file_get_id(file);
     if (id) {
       CTX_data_id_pointer_set(result, id);
     }
