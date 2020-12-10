@@ -2707,7 +2707,7 @@ static bool file_delete_single(const FileSelectParams *params,
       *r_error_message = "File is not a local data-block asset.";
       return false;
     }
-    ED_asset_unmake_from_id(id);
+    ED_asset_clear_id(id);
   }
   else {
     char str[FILE_MAX];

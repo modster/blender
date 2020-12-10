@@ -1004,13 +1004,12 @@ void file_draw_list(const bContext *C, ARegion *region)
   layout->curr_size = params->thumbnail_size;
 }
 
-static void file_draw_invalid_repository_hint(const SpaceFile *sfile, const ARegion *region)
+static void file_draw_invalid_library_hint(const SpaceFile *sfile, const ARegion *region)
 {
   const FileAssetSelectParams *asset_params = ED_fileselect_get_asset_params(sfile);
 
-  char repository_ui_path[PATH_MAX];
-  file_path_to_ui_path(
-      asset_params->base_params.dir, repository_ui_path, sizeof(repository_ui_path));
+  char library_ui_path[PATH_MAX];
+  file_path_to_ui_path(asset_params->base_params.dir, library_ui_path, sizeof(library_ui_path));
 
   uchar text_col[4];
   uchar text_alert_col[4];
@@ -1026,10 +1025,10 @@ static void file_draw_invalid_repository_hint(const SpaceFile *sfile, const AReg
   int sy = v2d->tot.ymax;
 
   {
-    const char *message = TIP_("Repository not found");
-    const int draw_string_str_len = strlen(message) + 2 + sizeof(repository_ui_path);
+    const char *message = TIP_("Library not found");
+    const int draw_string_str_len = strlen(message) + 2 + sizeof(library_ui_path);
     char *draw_string = alloca(draw_string_str_len);
-    BLI_snprintf(draw_string, draw_string_str_len, "%s: %s", message, repository_ui_path);
+    BLI_snprintf(draw_string, draw_string_str_len, "%s: %s", message, library_ui_path);
     file_draw_string_multiline(sx, sy, draw_string, width, line_height, text_alert_col, NULL, &sy);
   }
 
@@ -1040,7 +1039,7 @@ static void file_draw_invalid_repository_hint(const SpaceFile *sfile, const AReg
     UI_icon_draw(sx, sy - UI_UNIT_Y, ICON_INFO);
 
     const char *suggestion = TIP_(
-        "Set up the repository or edit repositories in the Preferences, File Paths section.");
+        "Set up the library or edit repositories in the Preferences, File Paths section.");
     file_draw_string_multiline(
         sx + UI_UNIT_X, sy, suggestion, width - UI_UNIT_X, line_height, text_col, NULL, NULL);
   }
@@ -1057,13 +1056,13 @@ bool file_draw_hint_if_invalid(const SpaceFile *sfile, const ARegion *region)
   if (!ED_fileselect_is_asset_browser(sfile)) {
     return false;
   }
-  /* Check if the repository exists. */
-  if ((asset_params->asset_repository.type == FILE_ASSET_REPO_LOCAL) ||
+  /* Check if the library exists. */
+  if ((asset_params->asset_library.type == FILE_ASSET_LIBRARY_LOCAL) ||
       filelist_is_dir(sfile->files, asset_params->base_params.dir)) {
     return false;
   }
 
-  file_draw_invalid_repository_hint(sfile, region);
+  file_draw_invalid_library_hint(sfile, region);
 
   return true;
 }
