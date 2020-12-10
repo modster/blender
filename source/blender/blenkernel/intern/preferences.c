@@ -17,7 +17,7 @@
 /** \file
  * \ingroup bke
  *
- * User defined menu API.
+ * User defined asset library API.
  */
 
 #include <string.h>
@@ -40,68 +40,67 @@
 #define U BLI_STATIC_ASSERT(false, "Global 'U' not allowed, only use arguments passed in!")
 
 /* -------------------------------------------------------------------- */
-/** \name Asset Repositories
+/** \name Asset Libraries
  * \{ */
 
-bUserAssetRepository *BKE_preferences_asset_repository_add(UserDef *userdef,
-                                                           const char *name,
-                                                           const char *path)
+bUserAssetLibrary *BKE_preferences_asset_library_add(UserDef *userdef,
+                                                     const char *name,
+                                                     const char *path)
 {
-  bUserAssetRepository *repository = MEM_callocN(sizeof(*repository), "bUserAssetRepository");
+  bUserAssetLibrary *library = MEM_callocN(sizeof(*library), "bUserAssetLibrary");
 
-  BLI_addtail(&userdef->asset_repositories, repository);
+  BLI_addtail(&userdef->asset_libraries, library);
 
   if (name) {
-    BKE_preferences_asset_repository_name_set(userdef, repository, name);
+    BKE_preferences_asset_library_name_set(userdef, library, name);
   }
   if (path) {
-    BLI_strncpy(repository->path, path, sizeof(repository->path));
+    BLI_strncpy(library->path, path, sizeof(library->path));
   }
 
-  return repository;
+  return library;
 }
 
-void BKE_preferences_asset_repository_name_set(UserDef *userdef,
-                                               bUserAssetRepository *repository,
-                                               const char *name)
+void BKE_preferences_asset_library_name_set(UserDef *userdef,
+                                            bUserAssetLibrary *library,
+                                            const char *name)
 {
-  BLI_strncpy_utf8(repository->name, name, sizeof(repository->name));
-  BLI_uniquename(&userdef->asset_repositories,
-                 repository,
+  BLI_strncpy_utf8(library->name, name, sizeof(library->name));
+  BLI_uniquename(&userdef->asset_libraries,
+                 library,
                  name,
                  '.',
-                 offsetof(bUserAssetRepository, name),
-                 sizeof(repository->name));
+                 offsetof(bUserAssetLibrary, name),
+                 sizeof(library->name));
 }
 
 /**
- * Unlink and free a repository preference member.
- * \note Free's \a repository itself.
+ * Unlink and free a library preference member.
+ * \note Free's \a library itself.
  */
-void BKE_preferences_asset_repository_remove(UserDef *userdef, bUserAssetRepository *repository)
+void BKE_preferences_asset_library_remove(UserDef *userdef, bUserAssetLibrary *library)
 {
-  BLI_freelinkN(&userdef->asset_repositories, repository);
+  BLI_freelinkN(&userdef->asset_libraries, library);
 }
 
-bUserAssetRepository *BKE_preferences_asset_repository_find_from_index(const UserDef *userdef,
-                                                                       int index)
+bUserAssetLibrary *BKE_preferences_asset_library_find_from_index(const UserDef *userdef, int index)
 {
-  return BLI_findlink(&userdef->asset_repositories, index);
+  return BLI_findlink(&userdef->asset_libraries, index);
 }
 
-bUserAssetRepository *BKE_preferences_asset_repository_find_from_name(const UserDef *userdef,
-                                                                      const char *name)
+bUserAssetLibrary *BKE_preferences_asset_library_find_from_name(const UserDef *userdef,
+                                                                const char *name)
 {
-  return BLI_findstring(&userdef->asset_repositories, name, offsetof(bUserAssetRepository, name));
+  return BLI_findstring(&userdef->asset_libraries, name, offsetof(bUserAssetLibrary, name));
 }
 
-int BKE_preferences_asset_repository_get_index(const UserDef *userdef,
-                                               const bUserAssetRepository *repository)
+int BKE_preferences_asset_library_get_index(const UserDef *userdef,
+                                            const bUserAssetLibrary *library)
 {
-  return BLI_findindex(&userdef->asset_repositories, repository);
+  return BLI_findindex(&userdef->asset_libraries, library);
 }
 
-void BKE_preferences_asset_repository_default_add(UserDef *userdef)
+void BKE_preferences_asset_library_default_add(UserDef *userdef)
 {
   const char *asset_blend_name = "assets.blend";
   const char *doc_path = BKE_appdir_folder_default();
@@ -111,11 +110,10 @@ void BKE_preferences_asset_repository_default_add(UserDef *userdef)
     return;
   }
 
-  /* Add new "Default" repository under '[doc_path]/assets.blend'. */
+  /* Add new "Default" library under '[doc_path]/assets.blend'. */
 
-  bUserAssetRepository *repository = BKE_preferences_asset_repository_add(
-      userdef, DATA_("Default"), NULL);
-  BLI_join_dirfile(repository->path, sizeof(repository->path), doc_path, asset_blend_name);
+  bUserAssetLibrary *library = BKE_preferences_asset_library_add(userdef, DATA_("Default"), NULL);
+  BLI_join_dirfile(library->path, sizeof(library->path), doc_path, asset_blend_name);
 }
 
 /** \} */
