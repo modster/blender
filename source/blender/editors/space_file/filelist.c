@@ -1050,7 +1050,7 @@ static bool filelist_compare_asset_libraries(const FileSelectAssetLibraryUID *li
     return false;
   }
   if (library_a->type == FILE_ASSET_LIBRARY_CUSTOM) {
-    return STREQ(library_a->idname, library_b->idname);
+    return STREQ(library_a->custom_library_identifier, library_b->custom_library_identifier);
   }
 
   return true;
@@ -2029,7 +2029,7 @@ int filelist_file_findpath(struct FileList *filelist, const char *filename)
 {
   int fidx = -1;
 
-  if (filelist->filelist.nbr_entries_filtered < FILEDIR_NBR_ENTRIES_UNSET) {
+  if (filelist->filelist.nbr_entries_filtered == FILEDIR_NBR_ENTRIES_UNSET) {
     return fidx;
   }
 
@@ -2057,7 +2057,7 @@ ID *filelist_file_get_id(const FileDirEntry *file)
 
 FileDirEntry *filelist_entry_find_uuid(struct FileList *filelist, const int uuid[4])
 {
-  if (filelist->filelist.nbr_entries_filtered < FILEDIR_NBR_ENTRIES_UNSET) {
+  if (filelist->filelist.nbr_entries_filtered == FILEDIR_NBR_ENTRIES_UNSET) {
     return NULL;
   }
 

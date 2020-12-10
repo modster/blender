@@ -2486,7 +2486,7 @@ static int rna_FileSelectParams_asset_library_get(PointerRNA *ptr)
   /* Note that the path isn't checked for validity here. If an invalid library path is used, the
    * Asset Browser can give a nice hint on what's wrong. */
   const bUserAssetLibrary *user_library = BKE_preferences_asset_library_find_from_name(
-      &U, params->asset_library.idname);
+      &U, params->asset_library.custom_library_identifier);
   const int index = BKE_preferences_asset_library_get_index(&U, user_library);
   if (index > -1) {
     return FILE_ASSET_LIBRARY_CUSTOM + index;
@@ -2503,7 +2503,7 @@ static void rna_FileSelectParams_asset_library_set(PointerRNA *ptr, int value)
   /* Simple case: Predefined repo, just set the value. */
   if (value < FILE_ASSET_LIBRARY_CUSTOM) {
     params->asset_library.type = value;
-    params->asset_library.idname[0] = '\0';
+    params->asset_library.custom_library_identifier[0] = '\0';
     BLI_assert(ELEM(value, FILE_ASSET_LIBRARY_LOCAL));
     return;
   }
@@ -2515,8 +2515,9 @@ static void rna_FileSelectParams_asset_library_set(PointerRNA *ptr, int value)
    * Asset Browser can give a nice hint on what's wrong. */
   const bool is_valid = (user_library->name[0] && user_library->path[0]);
   if (user_library && is_valid) {
-    BLI_strncpy(
-        params->asset_library.idname, user_library->name, sizeof(params->asset_library.idname));
+    BLI_strncpy(params->asset_library.custom_library_identifier,
+                user_library->name,
+                sizeof(params->asset_library.custom_library_identifier));
     params->asset_library.type = FILE_ASSET_LIBRARY_CUSTOM;
   }
 }

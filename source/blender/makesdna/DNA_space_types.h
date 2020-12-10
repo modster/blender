@@ -678,7 +678,7 @@ typedef struct FileSelectAssetLibraryUID {
    * If showing a custom asset library (#FILE_ASSET_LIBRARY_CUSTOM), this name has to be set to
    * define which. Can be empty otherwise.
    */
-  char idname[64]; /* MAX_NAME */
+  char custom_library_identifier[64]; /* MAX_NAME */
 } FileSelectAssetLibraryUID;
 
 /* Config and Input for File Selector */
