@@ -2887,7 +2887,7 @@ static int filelist_readjob_list_lib(const char *root, ListBase *entries, const 
     nbr_entries++;
   }
 
-  BLI_linklist_free(datablock_infos ? datablock_infos : names, MEM_freeN);
+  BLI_linklist_freeN(datablock_infos ? datablock_infos : names);
 
   return nbr_entries;
 }

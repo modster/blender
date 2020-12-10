@@ -107,7 +107,7 @@ static void fileselect_initialize_params_common(SpaceFile *sfile, FileSelectPara
   }
 }
 
-static void fileselect_ensure_asset_params(SpaceFile *sfile)
+static void fileselect_ensure_updated_asset_params(SpaceFile *sfile)
 {
   BLI_assert(sfile->browse_mode == FILE_BROWSE_MODE_ASSETS);
   BLI_assert(sfile->op == NULL);
@@ -144,7 +144,7 @@ static void fileselect_ensure_asset_params(SpaceFile *sfile)
 /**
  * \note RNA_struct_property_is_set_ex is used here because we want
  *       the previously used settings to be used here rather than overriding them */
-static void fileselect_ensure_file_params(SpaceFile *sfile)
+static FileSelectParams *fileselect_ensure_updated_file_params(SpaceFile *sfile)
 {
   BLI_assert(sfile->browse_mode == FILE_BROWSE_MODE_FILES);
 
@@ -354,6 +354,8 @@ static void fileselect_ensure_file_params(SpaceFile *sfile)
   }
 
   fileselect_initialize_params_common(sfile, params);
+
+  return params;
 }
 
 /**
@@ -364,12 +366,12 @@ FileSelectParams *ED_fileselect_ensure_active_params(SpaceFile *sfile)
   switch ((eFileBrowse_Mode)sfile->browse_mode) {
     case FILE_BROWSE_MODE_FILES:
       if (!sfile->params) {
-        fileselect_ensure_file_params(sfile);
+        fileselect_ensure_updated_file_params(sfile);
       }
       return sfile->params;
     case FILE_BROWSE_MODE_ASSETS:
       if (!sfile->asset_params) {
-        fileselect_ensure_asset_params(sfile);
+        fileselect_ensure_updated_asset_params(sfile);
       }
       return &sfile->asset_params->base_params;
   }
@@ -480,7 +482,7 @@ void ED_fileselect_set_params_from_userdef(SpaceFile *sfile)
 
   BLI_assert(sfile->browse_mode == FILE_BROWSE_MODE_FILES);
 
-  FileSelectParams *params = ED_fileselect_ensure_active_params(sfile);
+  FileSelectParams *params = fileselect_ensure_updated_file_params(sfile);
   if (!op) {
     return;
   }
@@ -545,6 +547,15 @@ void ED_fileselect_params_to_userdef(SpaceFile *sfile,
   if (memcmp(sfile_udata_new, &sfile_udata_old, sizeof(sfile_udata_old)) != 0) {
     U.runtime.is_dirty = true;
   }
+}
+
+void ED_fileselect_reset_params(SpaceFile *sfile)
+{
+  FileSelectParams *params = ED_fileselect_get_active_params(sfile);
+  params->type = FILE_UNIX;
+  params->flag = 0;
+  params->title[0] = '\0';
+  params->active_file = -1;
 }
 
 /**

@@ -112,6 +112,8 @@ void ED_fileselect_params_to_userdef(struct SpaceFile *sfile,
                                      const int temp_win_size[],
                                      const bool is_maximized);
 
+void ED_fileselect_reset_params(struct SpaceFile *sfile);
+
 void ED_fileselect_init_layout(struct SpaceFile *sfile, struct ARegion *region);
 
 FileLayout *ED_fileselect_get_layout(struct SpaceFile *sfile, struct ARegion *region);
