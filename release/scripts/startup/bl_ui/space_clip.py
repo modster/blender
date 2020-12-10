@@ -607,9 +607,6 @@ class CLIP_PT_tools_orientation(CLIP_PT_tracking_panel, Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
 
-        sc = context.space_data
-        settings = sc.clip.tracking.settings
-
         col = layout.column(align=True)
 
         row = col.row(align=True)
@@ -629,8 +626,6 @@ class CLIP_PT_tools_orientation(CLIP_PT_tracking_panel, Panel):
         row = col.row(align=True)
         row.operator("clip.set_scale")
         row.operator("clip.apply_solution_scale", text="Apply Scale")
-
-        col.prop(settings, "distance")
 
 
 class CLIP_PT_tools_object(CLIP_PT_reconstruction_panel, Panel):
