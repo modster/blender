@@ -62,20 +62,20 @@ static int attribute_data_type_complexity(const CustomDataType data_type)
   }
 }
 
-CustomDataType attribute_domain_lowest_complexity(Span<CustomDataType> data_types)
+CustomDataType attribute_domain_highest_complexity(Span<CustomDataType> data_types)
 {
-  int lowest_complexity = INT_MAX;
-  CustomDataType least_complex_type = CD_PROP_BOOL;
+  int highest_complexity = INT_MIN;
+  CustomDataType most_complex_type = CD_PROP_COLOR;
 
   for (const CustomDataType data_type : data_types) {
     const int complexity = attribute_data_type_complexity(data_type);
-    if (complexity < lowest_complexity) {
-      lowest_complexity = complexity;
-      least_complex_type = data_type;
+    if (complexity > highest_complexity) {
+      highest_complexity = complexity;
+      most_complex_type = data_type;
     }
   }
 
-  return least_complex_type;
+  return most_complex_type;
 }
 
 }  // namespace blender::nodes

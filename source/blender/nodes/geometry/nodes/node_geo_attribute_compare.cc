@@ -221,12 +221,12 @@ static CustomDataType get_data_type(GeometryComponent &component,
     CustomDataType data_type_b = params.get_input_attribute_data_type(
         "B", component, CD_PROP_FLOAT);
 
-    /* Convert the input attributes to the same data type for the equality tests. Use the lower
-     * complexity attribute type because any other information would be arbitrary anyway.*/
-    return attribute_domain_lowest_complexity(Span<CustomDataType>{data_type_a, data_type_b});
+    /* Convert the input attributes to the same data type for the equality tests. Use the higher
+     * complexity attribute type, otherwise information necessary to the comparison may be lost. */
+    return attribute_domain_highest_complexity({data_type_a, data_type_b});
   }
 
-  /* Use float compare for every operation besides equality. (This might have to change). */
+  /* Use float compare for every operation besides equality. */
   return CD_PROP_FLOAT;
 }
 
@@ -265,8 +265,8 @@ static void attribute_compare_calc(GeometryComponent &component, const GeoNodeEx
   BooleanWriteAttribute attribute_result_bool = std::move(attribute_result);
   MutableSpan<bool> result_span = attribute_result_bool.get_span();
 
-  /* Use specific types for correct equality operations, but for other
-   * operations we can use* implicit conversions and float comparison. */
+  /* Use specific types for correct equality operations, but for other operations we use implicit
+   * conversions and float comparison. In other words, the comparison is not element-wise. */
   if (operation_is_equality(*node_storage)) {
     const float threshold = params.get_input<float>("Threshold");
     if (operation == NODE_FLOAT_COMPARE_EQUAL) {

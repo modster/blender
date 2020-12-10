@@ -43,6 +43,6 @@ void update_attribute_input_socket_availabilities(bNode &node,
                                                   const StringRef name,
                                                   const GeometryNodeAttributeInputMode mode);
 
-CustomDataType attribute_domain_lowest_complexity(Span<CustomDataType>);
+CustomDataType attribute_domain_highest_complexity(Span<CustomDataType>);
 
 }  // namespace blender::nodes
