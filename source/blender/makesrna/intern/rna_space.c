@@ -2474,9 +2474,11 @@ static PointerRNA rna_FileSelectParams_filter_id_get(PointerRNA *ptr)
   return rna_pointer_inherit_refine(ptr, &RNA_FileSelectIDFilter, ptr->data);
 }
 
-static int rna_FileSelectParams_asset_library_get(PointerRNA *ptr)
+static int rna_FileAssetSelectParams_asset_library_get(PointerRNA *ptr)
 {
   FileAssetSelectParams *params = ptr->data;
+  /* Just an extra sanity check to ensure this isn't somehow called for RNA_FileSelectParams. */
+  BLI_assert(ptr->type == &RNA_FileAssetSelectParams);
 
   /* Simple case: Predefined repo, just set the value. */
   if (params->asset_library.type < FILE_ASSET_LIBRARY_CUSTOM) {
@@ -2496,7 +2498,7 @@ static int rna_FileSelectParams_asset_library_get(PointerRNA *ptr)
   return FILE_ASSET_LIBRARY_LOCAL;
 }
 
-static void rna_FileSelectParams_asset_library_set(PointerRNA *ptr, int value)
+static void rna_FileAssetSelectParams_asset_library_set(PointerRNA *ptr, int value)
 {
   FileAssetSelectParams *params = ptr->data;
 
@@ -2522,10 +2524,8 @@ static void rna_FileSelectParams_asset_library_set(PointerRNA *ptr, int value)
   }
 }
 
-static const EnumPropertyItem *rna_FileSelectParams_asset_library_itemf(bContext *UNUSED(C),
-                                                                        PointerRNA *UNUSED(ptr),
-                                                                        PropertyRNA *UNUSED(prop),
-                                                                        bool *r_free)
+static const EnumPropertyItem *rna_FileAssetSelectParams_asset_library_itemf(
+    bContext *UNUSED(C), PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), bool *r_free)
 {
   const EnumPropertyItem predefined_items[] = {
       /* For the future. */
@@ -2603,13 +2603,30 @@ static PointerRNA rna_FileBrowser_FileSelectEntry_asset_data_get(PointerRNA *ptr
   return rna_pointer_inherit_refine(ptr, &RNA_AssetMetaData, entry->asset_data);
 }
 
-static PointerRNA rna_FileBrowser_params_get(PointerRNA *ptr)
+static StructRNA *rna_FileBrowser_params_typef(PointerRNA *ptr)
 {
   SpaceFile *sfile = ptr->data;
   FileSelectParams *params = ED_fileselect_get_active_params(sfile);
 
-  if (params) {
-    return rna_pointer_inherit_refine(ptr, &RNA_FileSelectParams, params);
+  if (params == ED_fileselect_get_file_params(sfile)) {
+    return &RNA_FileSelectParams;
+  }
+  if (params == (void *)ED_fileselect_get_asset_params(sfile)) {
+    return &RNA_FileAssetSelectParams;
+  }
+
+  BLI_assert(!"Could not identify file select parameters");
+  return NULL;
+}
+
+static PointerRNA rna_FileBrowser_params_get(PointerRNA *ptr)
+{
+  SpaceFile *sfile = ptr->data;
+  FileSelectParams *params = ED_fileselect_get_active_params(sfile);
+  StructRNA *params_struct = rna_FileBrowser_params_typef(ptr);
+
+  if (params && params_struct) {
+    return rna_pointer_inherit_refine(ptr, params_struct, params);
   }
 
   return rna_pointer_inherit_refine(ptr, NULL, NULL);
@@ -6180,15 +6197,6 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_TEXTEDIT_UPDATE);
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
 
-  prop = RNA_def_property(srna, "asset_library", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, DummyRNA_NULL_items);
-  RNA_def_property_enum_funcs(prop,
-                              "rna_FileSelectParams_asset_library_get",
-                              "rna_FileSelectParams_asset_library_set",
-                              "rna_FileSelectParams_asset_library_itemf");
-  RNA_def_property_ui_text(prop, "Asset Library", "");
-  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
-
   prop = RNA_def_property(srna, "display_size", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "thumbnail_size");
   RNA_def_property_enum_items(prop, display_size_items);
@@ -6196,6 +6204,25 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
                            "Display Size",
                            "Change the size of the display (width of columns or thumbnails size)");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
+}
+
+static void rna_def_fileselect_asset_params(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  srna = RNA_def_struct(brna, "FileAssetSelectParams", "FileSelectParams");
+  RNA_def_struct_ui_text(
+      srna, "Asset Select Parameters", "Settings for the file selection in Asset Browser mode");
+
+  prop = RNA_def_property(srna, "asset_library", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, DummyRNA_NULL_items);
+  RNA_def_property_enum_funcs(prop,
+                              "rna_FileAssetSelectParams_asset_library_get",
+                              "rna_FileAssetSelectParams_asset_library_set",
+                              "rna_FileAssetSelectParams_asset_library_itemf");
+  RNA_def_property_ui_text(prop, "Asset Library", "");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
 }
 
 static void rna_def_filemenu_entry(BlenderRNA *brna)
@@ -6261,7 +6288,8 @@ static void rna_def_space_filebrowser(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "params", PROP_POINTER, PROP_NONE);
   RNA_def_property_struct_type(prop, "FileSelectParams");
-  RNA_def_property_pointer_funcs(prop, "rna_FileBrowser_params_get", NULL, NULL, NULL);
+  RNA_def_property_pointer_funcs(
+      prop, "rna_FileBrowser_params_get", NULL, "rna_FileBrowser_params_typef", NULL);
   RNA_def_property_ui_text(
       prop, "Filebrowser Parameter", "Parameters and Settings for the Filebrowser");
 
@@ -7011,6 +7039,7 @@ void RNA_def_space(BlenderRNA *brna)
   rna_def_space_text(brna);
   rna_def_fileselect_entry(brna);
   rna_def_fileselect_params(brna);
+  rna_def_fileselect_asset_params(brna);
   rna_def_fileselect_idfilter(brna);
   rna_def_filemenu_entry(brna);
   rna_def_space_filebrowser(brna);
