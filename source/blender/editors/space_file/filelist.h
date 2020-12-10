@@ -105,6 +105,7 @@ bool filelist_file_cache_block(struct FileList *filelist, const int index);
 bool filelist_needs_force_reset(struct FileList *filelist);
 void filelist_tag_force_reset(struct FileList *filelist);
 bool filelist_pending(struct FileList *filelist);
+bool filelist_needs_reset_on_main_changes(const struct FileList *filelist);
 bool filelist_is_ready(struct FileList *filelist);
 
 unsigned int filelist_entry_select_set(const struct FileList *filelist,

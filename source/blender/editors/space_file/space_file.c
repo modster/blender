@@ -279,6 +279,12 @@ static void file_refresh(const bContext *C, ScrArea *area)
   fileselect_refresh_params(sfile);
   folder_history_list_ensure_for_active_browse_mode(sfile);
 
+  if (sfile->files && (sfile->rebuild_flag & FILE_REBUILD_MAIN_FILES) &&
+      filelist_needs_reset_on_main_changes(sfile->files)) {
+    filelist_tag_force_reset(sfile->files);
+  }
+  sfile->rebuild_flag &= ~FILE_REBUILD_MAIN_FILES;
+
   if (!sfile->files) {
     sfile->files = filelist_new(params->type);
     params->highlight_file = -1; /* added this so it opens nicer (ton) */
@@ -372,8 +378,7 @@ static void file_listener(wmWindow *UNUSED(win),
       }
       break;
     case NC_ASSET: {
-      FileAssetSelectParams *asset_params = ED_fileselect_get_asset_params(sfile);
-      if (asset_params && (asset_params->asset_library.type == FILE_ASSET_LIBRARY_LOCAL)) {
+      if (sfile->files && filelist_needs_reset_on_main_changes(sfile->files)) {
         /* Full refresh of the file list if local asset data was changed. Refreshing this view is
          * cheap and users expect this to be updated immediately. */
         file_tag_reset_list(area, sfile);
@@ -457,6 +462,22 @@ static void file_main_region_message_subscribe(const struct bContext *UNUSED(C),
   }
 }
 
+static bool file_main_region_needs_refresh_before_draw(SpaceFile *sfile)
+{
+  /* Needed, because filelist is not initialized on loading */
+  if (!sfile->files || filelist_needs_reading(sfile->files)) {
+    return true;
+  }
+
+  /* File reading tagged the space because main data changed that may require a filelist reset. */
+  if (filelist_needs_reset_on_main_changes(sfile->files) &&
+      (sfile->rebuild_flag & FILE_REBUILD_MAIN_FILES)) {
+    return true;
+  }
+
+  return false;
+}
+
 static void file_main_region_draw(const bContext *C, ARegion *region)
 {
   /* draw entirely, view changes should be handled here */
@@ -465,8 +486,7 @@ static void file_main_region_draw(const bContext *C, ARegion *region)
 
   View2D *v2d = &region->v2d;
 
-  /* Needed, because filelist is not initialized on loading */
-  if (!sfile->files || filelist_needs_reading(sfile->files)) {
+  if (file_main_region_needs_refresh_before_draw(sfile)) {
     file_refresh(C, NULL);
   }
 
@@ -729,6 +749,19 @@ static int /*eContextResult*/ file_context(const bContext *C,
   return CTX_RESULT_MEMBER_NOT_FOUND;
 }
 
+static void file_id_remap(ScrArea *area, SpaceLink *sl, ID *UNUSED(old_id), ID *UNUSED(new_id))
+{
+  SpaceFile *sfile = (SpaceFile *)sl;
+
+  /* If the file shows main data (IDs), tag it for reset. */
+  if (sfile->files && filelist_needs_reset_on_main_changes(sfile->files)) {
+    /* Full refresh of the file list if main data was changed, don't even attempt remap pointers.
+     * We could give file list types a id-remap callback, but it's probably not worth it.
+     * Refreshing local file lists is relatively cheap. */
+    file_tag_reset_list(area, sfile);
+  }
+}
+
 /* only called once, from space/spacetypes.c */
 void ED_spacetype_file(void)
 {
@@ -749,6 +782,7 @@ void ED_spacetype_file(void)
   st->keymap = file_keymap;
   st->dropboxes = file_dropboxes;
   st->context = file_context;
+  st->id_remap = file_id_remap;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype file region");

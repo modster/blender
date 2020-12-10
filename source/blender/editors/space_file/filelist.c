@@ -413,6 +413,9 @@ typedef struct FileList {
 
   /* Filter an entry of current filelist. */
   bool (*filterf)(struct FileListInternEntry *, const char *, FileListFilter *);
+
+  /* Flags for the list-type, only set/changed when the type changes (#filelist_settype()). */
+  short type_flags; /* FileList.type_flags */
 } FileList;
 
 /* FileList.flags */
@@ -423,6 +426,11 @@ enum {
   FL_NEED_SORTING = 1 << 3,
   FL_NEED_FILTERING = 1 << 4,
   FL_SORT_INVERT = 1 << 5,
+};
+
+/* FileList.type_flags */
+enum FileListTypeFlags {
+  FL_USES_MAIN_DATA = (1 << 0),
 };
 
 #define SPECIAL_IMG_SIZE 256
@@ -1712,6 +1720,7 @@ void filelist_settype(FileList *filelist, short type)
   }
 
   filelist->type = type;
+  filelist->type_flags = 0;
   switch (filelist->type) {
     case FILE_MAIN:
       filelist->checkdirf = filelist_checkdir_main;
@@ -1728,6 +1737,7 @@ void filelist_settype(FileList *filelist, short type)
       filelist->checkdirf = filelist_checkdir_main_assets;
       filelist->read_jobf = filelist_readjob_main_assets;
       filelist->filterf = is_filtered_main_assets;
+      filelist->type_flags |= FL_USES_MAIN_DATA;
       break;
     default:
       filelist->checkdirf = filelist_checkdir_dir;
@@ -1895,6 +1905,11 @@ bool filelist_is_ready(struct FileList *filelist)
 bool filelist_pending(struct FileList *filelist)
 {
   return (filelist->flags & FL_IS_PENDING) != 0;
+}
+
+bool filelist_needs_reset_on_main_changes(const FileList *filelist)
+{
+  return (filelist->type_flags & FL_USES_MAIN_DATA) != 0;
 }
 
 /**
@@ -2872,6 +2887,7 @@ static int filelist_readjob_list_lib(const char *root, ListBase *entries, const 
     entry->typeflag |= FILE_TYPE_BLENDERLIB;
     if (info && info->asset_data) {
       entry->typeflag |= FILE_TYPE_ASSET | FILE_TYPE_ASSET_EXTERNAL;
+      /* Moves ownership! */
       entry->asset_data = info->asset_data;
     }
     if (!(group && idcode)) {
