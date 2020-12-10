@@ -3008,7 +3008,10 @@ static void nlaeval_snapshot_blend(PointerRNA *ptr,
             copy_qt_qt(upper_qt, c_upper->values);
             copy_qt_qt(lower_qt, c_lower->values);
 
-            float result_qt[4];
+            normalize_qt(upper_qt);
+            normalize_qt(lower_qt);
+
+                float result_qt[4];
             interp_qt_qtqt(result_qt, lower_qt, upper_qt, upper_influence);
 
             copy_qt_qt(c_lower->values, result_qt);
