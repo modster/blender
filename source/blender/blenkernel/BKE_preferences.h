@@ -27,31 +27,29 @@ extern "C" {
 #include "BLI_compiler_attrs.h"
 
 struct UserDef;
-struct bUserAssetRepository;
+struct bUserAssetLibrary;
 
-void BKE_preferences_asset_repository_free(struct bUserAssetRepository *repository) ATTR_NONNULL();
+void BKE_preferences_asset_library_free(struct bUserAssetLibrary *library) ATTR_NONNULL();
 
-struct bUserAssetRepository *BKE_preferences_asset_repository_add(struct UserDef *userdef,
-                                                                  const char *name,
-                                                                  const char *path)
-    ATTR_NONNULL(1);
-void BKE_preferences_asset_repository_name_set(struct UserDef *userdef,
-                                               struct bUserAssetRepository *repository,
-                                               const char *name) ATTR_NONNULL();
+struct bUserAssetLibrary *BKE_preferences_asset_library_add(struct UserDef *userdef,
+                                                            const char *name,
+                                                            const char *path) ATTR_NONNULL(1);
+void BKE_preferences_asset_library_name_set(struct UserDef *userdef,
+                                            struct bUserAssetLibrary *library,
+                                            const char *name) ATTR_NONNULL();
 
-void BKE_preferences_asset_repository_remove(struct UserDef *userdef,
-                                             struct bUserAssetRepository *repository)
-    ATTR_NONNULL();
+void BKE_preferences_asset_library_remove(struct UserDef *userdef,
+                                          struct bUserAssetLibrary *library) ATTR_NONNULL();
 
-struct bUserAssetRepository *BKE_preferences_asset_repository_find_from_index(
+struct bUserAssetLibrary *BKE_preferences_asset_library_find_from_index(
     const struct UserDef *userdef, int index) ATTR_NONNULL() ATTR_WARN_UNUSED_RESULT;
-struct bUserAssetRepository *BKE_preferences_asset_repository_find_from_name(
+struct bUserAssetLibrary *BKE_preferences_asset_library_find_from_name(
     const struct UserDef *userdef, const char *name) ATTR_NONNULL() ATTR_WARN_UNUSED_RESULT;
-int BKE_preferences_asset_repository_get_index(const struct UserDef *userdef,
-                                               const struct bUserAssetRepository *repository)
+int BKE_preferences_asset_library_get_index(const struct UserDef *userdef,
+                                            const struct bUserAssetLibrary *library)
     ATTR_NONNULL() ATTR_WARN_UNUSED_RESULT;
 
-void BKE_preferences_asset_repository_default_add(struct UserDef *userdef) ATTR_NONNULL();
+void BKE_preferences_asset_library_default_add(struct UserDef *userdef) ATTR_NONNULL();
 
 #ifdef __cplusplus
 }

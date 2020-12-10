@@ -646,7 +646,7 @@ UserDef *BKE_blendfile_userdef_from_defaults(void)
   /* Default studio light. */
   BKE_studiolight_default(userdef->light_param, userdef->light_ambient);
 
-  BKE_preferences_asset_repository_default_add(userdef);
+  BKE_preferences_asset_library_default_add(userdef);
 
   return userdef;
 }

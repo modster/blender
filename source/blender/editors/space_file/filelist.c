@@ -225,16 +225,15 @@ void folder_history_list_ensure_for_active_browse_mode(SpaceFile *sfile)
 
 static void folder_history_entry_free(SpaceFile *sfile, FileFolderHistory *history)
 {
-  folderlist_free(&history->folders_prev);
-  folderlist_free(&history->folders_next);
-  BLI_freelinkN(&sfile->folder_histories, history);
-
   if (sfile->folders_prev == &history->folders_prev) {
     sfile->folders_prev = NULL;
   }
   if (sfile->folders_next == &history->folders_next) {
     sfile->folders_next = NULL;
   }
+  folderlist_free(&history->folders_prev);
+  folderlist_free(&history->folders_next);
+  BLI_freelinkN(&sfile->folder_histories, history);
 }
 
 void folder_history_list_free(SpaceFile *sfile)

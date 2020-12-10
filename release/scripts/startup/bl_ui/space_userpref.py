@@ -1339,8 +1339,8 @@ class USERPREF_PT_saveload_autorun(FilePathsPanel, Panel):
             row.operator("preferences.autoexec_path_remove", text="", icon='X', emboss=False).index = i
 
 
-class USERPREF_PT_file_paths_asset_repositories(FilePathsPanel, Panel):
-    bl_label = "Asset Repositories"
+class USERPREF_PT_file_paths_asset_libraries(FilePathsPanel, Panel):
+    bl_label = "Asset Libraries"
 
     def draw(self, context):
         layout = self.layout
@@ -1350,16 +1350,26 @@ class USERPREF_PT_file_paths_asset_repositories(FilePathsPanel, Panel):
         paths = context.preferences.filepaths
 
         box = layout.box()
-        for i, repository in enumerate(paths.asset_repositories):
-            row = box.row()
-            split = row.split(factor=0.35)
-            split.prop(repository, "name")
-            split.prop(repository, "path", text="")
-            row.operator("preferences.asset_repository_remove", text="", icon='X', emboss=False).index = i
+        split = box.split(factor=0.35)
+        name_col = split.column()
+        path_col = split.column()
 
-        row = box.row()
-        row.alignment = 'RIGHT'
-        row.operator("preferences.asset_repository_add", text="", icon='ADD', emboss=False)
+        row = name_col.row(align=True)  # Padding
+        row.separator()
+        row.label(text="Name")
+
+        row = path_col.row(align=True)  # Padding
+        row.separator()
+        row.label(text="Path")
+
+        subrow = row.row()
+        subrow.operator("preferences.asset_library_add", text="", icon='ADD', emboss=False)
+
+        for i, library in enumerate(paths.asset_libraries):
+            name_col.prop(library, "name", text="")
+            row = path_col.row()
+            row.prop(library, "path", text="")
+            row.operator("preferences.asset_library_remove", text="", icon='X', emboss=False).index = i
 
 
 # -----------------------------------------------------------------------------
@@ -2312,7 +2322,7 @@ classes = (
     USERPREF_PT_file_paths_render,
     USERPREF_PT_file_paths_applications,
     USERPREF_PT_file_paths_development,
-    USERPREF_PT_file_paths_asset_repositories,
+    USERPREF_PT_file_paths_asset_libraries,
 
     USERPREF_PT_saveload_blend,
     USERPREF_PT_saveload_blend_autosave,

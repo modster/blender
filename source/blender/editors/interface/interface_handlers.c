@@ -630,7 +630,7 @@ static bool ui_rna_is_userdef(PointerRNA *ptr, PropertyRNA *prop)
              &RNA_AddonPreferences,
              &RNA_KeyConfigPreferences,
              &RNA_KeyMapItem,
-             &RNA_UserAssetRepository)) {
+             &RNA_UserAssetLibrary)) {
       tag = true;
     }
   }
