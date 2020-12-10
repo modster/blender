@@ -2120,7 +2120,7 @@ static void rna_SpaceDopeSheetEditor_action_update(bContext *C, PointerRNA *ptr)
      *      and the user then uses the browse menu to get back to this action,
      *      assigning it as the active action (i.e. the stash strip gets out of sync)
      */
-    BKE_nla_action_stash(adt);
+    BKE_nla_action_stash(adt, ID_IS_OVERRIDE_LIBRARY(id));
   }
 
   BKE_animdata_set_action(NULL, id, saction->action);
@@ -6205,7 +6205,8 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "use_filter_asset_only", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", FILE_ASSETS_ONLY);
-  RNA_def_property_ui_text(prop, "Only Assets", "Hide .blend files items that are not assets");
+  RNA_def_property_ui_text(
+      prop, "Only Assets", "Hide .blend files items that are not data-blocks with asset metadata");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
 
   prop = RNA_def_property(srna, "filter_id", PROP_POINTER, PROP_NONE);

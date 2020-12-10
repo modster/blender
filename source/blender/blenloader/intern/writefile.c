@@ -755,8 +755,8 @@ static void write_userdef(BlendWriter *writer, const UserDef *userdef)
     BLO_write_struct(writer, bPathCompare, path_cmp);
   }
 
-  LISTBASE_FOREACH (const bUserAssetRepository *, asset_repository, &userdef->asset_repositories) {
-    BLO_write_struct(writer, bUserAssetRepository, asset_repository);
+  LISTBASE_FOREACH (const bUserAssetLibrary *, asset_library, &userdef->asset_libraries) {
+    BLO_write_struct(writer, bUserAssetLibrary, asset_library);
   }
 
   LISTBASE_FOREACH (const uiStyle *, style, &userdef->uistyles) {

@@ -30,7 +30,7 @@ extern "C" {
 struct BlendHandle;
 struct FileList;
 struct FileSelection;
-struct FileSelectAssetRepositoryID;
+struct FileSelectAssetRepositoryUID;
 struct wmWindowManager;
 
 struct FileDirEntry;
@@ -71,7 +71,7 @@ void filelist_setfilter_options(struct FileList *filelist,
                                 const char *filter_search);
 void filelist_filter(struct FileList *filelist);
 void filelist_setrepository(struct FileList *filelist,
-                            const struct FileSelectAssetRepositoryID *asset_repository);
+                            const struct FileSelectAssetRepositoryUID *asset_repository);
 
 void filelist_init_icons(void);
 void filelist_free_icons(void);

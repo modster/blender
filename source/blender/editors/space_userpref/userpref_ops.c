@@ -135,24 +135,24 @@ static void PREFERENCES_OT_autoexec_path_remove(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Add Asset Repository Operator
+/** \name Add Asset Library Operator
  * \{ */
 
-static int preferences_asset_repository_add_exec(bContext *UNUSED(C), wmOperator *UNUSED(op))
+static int preferences_asset_library_add_exec(bContext *UNUSED(C), wmOperator *UNUSED(op))
 {
-  BKE_preferences_asset_repository_add(&U, NULL, NULL);
+  BKE_preferences_asset_library_add(&U, NULL, NULL);
   U.runtime.is_dirty = true;
   return OPERATOR_FINISHED;
 }
 
-static void PREFERENCES_OT_asset_repository_add(wmOperatorType *ot)
+static void PREFERENCES_OT_asset_library_add(wmOperatorType *ot)
 {
-  ot->name = "Add Asset Repository";
-  ot->idname = "PREFERENCES_OT_asset_repository_add";
+  ot->name = "Add Asset Library";
+  ot->idname = "PREFERENCES_OT_asset_library_add";
   ot->description =
       "Add a path to a .blend file to be used by the Asset Browser as source of assets";
 
-  ot->exec = preferences_asset_repository_add_exec;
+  ot->exec = preferences_asset_library_add_exec;
 
   ot->flag = OPTYPE_INTERNAL;
 }
@@ -160,28 +160,28 @@ static void PREFERENCES_OT_asset_repository_add(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Remove Asset Repository Operator
+/** \name Remove Asset Library Operator
  * \{ */
 
-static int preferences_asset_repository_remove_exec(bContext *UNUSED(C), wmOperator *op)
+static int preferences_asset_library_remove_exec(bContext *UNUSED(C), wmOperator *op)
 {
   const int index = RNA_int_get(op->ptr, "index");
-  bUserAssetRepository *repository = BLI_findlink(&U.asset_repositories, index);
-  if (repository) {
-    BKE_preferences_asset_repository_remove(&U, repository);
+  bUserAssetLibrary *library = BLI_findlink(&U.asset_libraries, index);
+  if (library) {
+    BKE_preferences_asset_library_remove(&U, library);
     U.runtime.is_dirty = true;
   }
   return OPERATOR_FINISHED;
 }
 
-static void PREFERENCES_OT_asset_repository_remove(wmOperatorType *ot)
+static void PREFERENCES_OT_asset_library_remove(wmOperatorType *ot)
 {
-  ot->name = "Remove Asset Repository";
-  ot->idname = "PREFERENCES_OT_asset_repository_remove";
+  ot->name = "Remove Asset Library";
+  ot->idname = "PREFERENCES_OT_asset_library_remove";
   ot->description =
       "Remove a path to a .blend file, so the Asset Browser will not attempt to show it anymore";
 
-  ot->exec = preferences_asset_repository_remove_exec;
+  ot->exec = preferences_asset_library_remove_exec;
 
   ot->flag = OPTYPE_INTERNAL;
 
@@ -197,6 +197,6 @@ void ED_operatortypes_userpref(void)
   WM_operatortype_append(PREFERENCES_OT_autoexec_path_add);
   WM_operatortype_append(PREFERENCES_OT_autoexec_path_remove);
 
-  WM_operatortype_append(PREFERENCES_OT_asset_repository_add);
-  WM_operatortype_append(PREFERENCES_OT_asset_repository_remove);
+  WM_operatortype_append(PREFERENCES_OT_asset_library_add);
+  WM_operatortype_append(PREFERENCES_OT_asset_library_remove);
 }

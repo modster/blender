@@ -39,7 +39,6 @@
 
 #include "BKE_context.h"
 #include "BKE_main.h"
-#include "BKE_main_idmap.h"
 
 #include "BLO_readfile.h"
 

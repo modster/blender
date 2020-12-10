@@ -41,7 +41,7 @@
 
 /* -------------------------------------------------------------------- */
 
-struct AssetMakeResultStats {
+struct AssetMarkResultStats {
   int tot_created;
   int tot_already_asset;
   ID *last_id;
@@ -68,9 +68,9 @@ static ListBase /* CollectionPointerLink */ asset_operation_get_ids_from_context
   return list;
 }
 
-static void asset_make_for_idptr_list(const bContext *C,
+static void asset_mark_for_idptr_list(const bContext *C,
                                       const ListBase /* CollectionPointerLink */ *ids,
-                                      struct AssetMakeResultStats *r_stats)
+                                      struct AssetMarkResultStats *r_stats)
 {
   memset(r_stats, 0, sizeof(*r_stats));
 
@@ -83,14 +83,14 @@ static void asset_make_for_idptr_list(const bContext *C,
       continue;
     }
 
-    if (ED_asset_make_for_id(C, id)) {
+    if (ED_asset_mark_id(C, id)) {
       r_stats->last_id = id;
       r_stats->tot_created++;
     }
   }
 }
 
-static bool asset_make_results_report(const struct AssetMakeResultStats *stats,
+static bool asset_mark_results_report(const struct AssetMarkResultStats *stats,
                                       ReportList *reports)
 {
   /* User feedback on failure. */
@@ -119,15 +119,15 @@ static bool asset_make_results_report(const struct AssetMakeResultStats *stats,
   return true;
 }
 
-static int asset_make_exec(bContext *C, wmOperator *op)
+static int asset_mark_exec(bContext *C, wmOperator *op)
 {
   ListBase ids = asset_operation_get_ids_from_context(C);
 
-  struct AssetMakeResultStats stats;
-  asset_make_for_idptr_list(C, &ids, &stats);
+  struct AssetMarkResultStats stats;
+  asset_mark_for_idptr_list(C, &ids, &stats);
   BLI_freelistN(&ids);
 
-  if (!asset_make_results_report(&stats, op->reports)) {
+  if (!asset_mark_results_report(&stats, op->reports)) {
     return OPERATOR_CANCELLED;
   }
 
@@ -137,28 +137,28 @@ static int asset_make_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-static void ASSET_OT_make(wmOperatorType *ot)
+static void ASSET_OT_mark(wmOperatorType *ot)
 {
-  ot->name = "Make Asset";
+  ot->name = "Mark Asset";
   ot->description =
       "Enable easier reuse of selected data-blocks through the Asset Browser, with the help of "
       "customizable metadata (like previews, descriptions and tags)";
-  ot->idname = "ASSET_OT_make";
+  ot->idname = "ASSET_OT_mark";
 
-  ot->exec = asset_make_exec;
+  ot->exec = asset_mark_exec;
 
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
 /* -------------------------------------------------------------------- */
 
-struct AssetUnmakeResultStats {
+struct AssetClearResultStats {
   int tot_removed;
   ID *last_id;
 };
 
-static void asset_unmake_from_idptr_list(const ListBase /* CollectionPointerLink */ *ids,
-                                         struct AssetUnmakeResultStats *r_stats)
+static void asset_clear_from_idptr_list(const ListBase /* CollectionPointerLink */ *ids,
+                                        struct AssetClearResultStats *r_stats)
 {
   memset(r_stats, 0, sizeof(*r_stats));
 
@@ -170,15 +170,15 @@ static void asset_unmake_from_idptr_list(const ListBase /* CollectionPointerLink
       continue;
     }
 
-    if (ED_asset_unmake_from_id(id)) {
+    if (ED_asset_clear_id(id)) {
       r_stats->tot_removed++;
       r_stats->last_id = id;
     }
   }
 }
 
-static bool asset_unmake_result_report(const struct AssetUnmakeResultStats *stats,
-                                       ReportList *reports)
+static bool asset_clear_result_report(const struct AssetClearResultStats *stats,
+                                      ReportList *reports)
 
 {
   if (stats->tot_removed < 1) {
@@ -198,15 +198,15 @@ static bool asset_unmake_result_report(const struct AssetUnmakeResultStats *stat
   return true;
 }
 
-static int asset_unmake_exec(bContext *C, wmOperator *op)
+static int asset_clear_exec(bContext *C, wmOperator *op)
 {
   ListBase ids = asset_operation_get_ids_from_context(C);
 
-  struct AssetUnmakeResultStats stats;
-  asset_unmake_from_idptr_list(&ids, &stats);
+  struct AssetClearResultStats stats;
+  asset_clear_from_idptr_list(&ids, &stats);
   BLI_freelistN(&ids);
 
-  if (!asset_unmake_result_report(&stats, op->reports)) {
+  if (!asset_clear_result_report(&stats, op->reports)) {
     return OPERATOR_CANCELLED;
   }
 
@@ -216,15 +216,15 @@ static int asset_unmake_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-static void ASSET_OT_unmake(wmOperatorType *ot)
+static void ASSET_OT_clear(wmOperatorType *ot)
 {
-  ot->name = "Remove Asset-Data";
+  ot->name = "Clear Asset";
   ot->description =
       "Delete all asset metadata and turn the selected asset data-blocks back into normal "
       "data-blocks";
-  ot->idname = "ASSET_OT_unmake";
+  ot->idname = "ASSET_OT_clear";
 
-  ot->exec = asset_unmake_exec;
+  ot->exec = asset_clear_exec;
 
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
@@ -233,6 +233,6 @@ static void ASSET_OT_unmake(wmOperatorType *ot)
 
 void ED_operatortypes_asset(void)
 {
-  WM_operatortype_append(ASSET_OT_make);
-  WM_operatortype_append(ASSET_OT_unmake);
+  WM_operatortype_append(ASSET_OT_mark);
+  WM_operatortype_append(ASSET_OT_clear);
 }
