@@ -121,11 +121,12 @@ static void do_equal_operation(const Float3ReadAttribute &input_a,
                                const float threshold,
                                MutableSpan<bool> span_result)
 {
+  const float threshold_squared = pow2f(threshold);
   const int size = input_a.size();
   for (const int i : IndexRange(size)) {
     const float3 a = input_a[i];
     const float3 b = input_b[i];
-    span_result[i] = len_v3v3(a, b) < threshold;
+    span_result[i] = len_squared_v3v3(a, b) < threshold_squared;
   }
 }
 
@@ -134,11 +135,12 @@ static void do_equal_operation(const Color4fReadAttribute &input_a,
                                const float threshold,
                                MutableSpan<bool> span_result)
 {
+  const float threshold_squared = pow2f(threshold);
   const int size = input_a.size();
   for (const int i : IndexRange(size)) {
     const Color4f a = input_a[i];
     const Color4f b = input_b[i];
-    span_result[i] = sqrtf(len_squared_v4v4(a, b)) < threshold;
+    span_result[i] = len_squared_v4v4(a, b) < threshold_squared;
   }
 }
 
@@ -173,12 +175,12 @@ static void do_not_equal_operation(const Float3ReadAttribute &input_a,
                                    const float threshold,
                                    MutableSpan<bool> span_result)
 {
+  const float threshold_squared = pow2f(threshold);
   const int size = input_a.size();
   for (const int i : IndexRange(size)) {
     const float3 a = input_a[i];
     const float3 b = input_b[i];
-
-    span_result[i] = len_v3v3(a, b) >= threshold;
+    span_result[i] = len_squared_v3v3(a, b) >= threshold_squared;
   }
 }
 
@@ -187,11 +189,12 @@ static void do_not_equal_operation(const Color4fReadAttribute &input_a,
                                    const float threshold,
                                    MutableSpan<bool> span_result)
 {
+  const float threshold_squared = pow2f(threshold);
   const int size = input_a.size();
   for (const int i : IndexRange(size)) {
     const Color4f a = input_a[i];
     const Color4f b = input_b[i];
-    span_result[i] = sqrtf(len_squared_v4v4(a, b)) >= threshold;
+    span_result[i] = len_squared_v4v4(a, b) >= threshold_squared;
   }
 }
 
