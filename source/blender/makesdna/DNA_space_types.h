@@ -777,10 +777,13 @@ typedef struct SpaceFile {
   char _pad0[6];
   /* End 'SpaceLink' header. */
 
-  /* Is this a File Browser or an Asset Browser? */
+  /** Is this a File Browser or an Asset Browser? */
   char browse_mode; /* eFileBrowse_Mode */
 
-  char _pad1[3];
+  /** Runtime flags to notify about changed data that may require rebuilding. */
+  char rebuild_flag;
+  char _pad1[2];
+
   int scroll_offset;
 
   /** Config and input for file select. One for each browse-mode, to keep them independent. */
@@ -878,6 +881,13 @@ enum eFileSortType {
   FILE_SORT_EXTENSION = 2,
   FILE_SORT_TIME = 3,
   FILE_SORT_SIZE = 4,
+};
+
+/* SpaceFile.rebuild_flag */
+enum eFileRebuildFlags {
+  /** Tag the space as having to update files representing or containing main data. Must be set
+   * after file read and undo/redo. */
+  FILE_REBUILD_MAIN_FILES = (1 << 0),
 };
 
 /* FileSelectParams.details_flags */
@@ -1073,8 +1083,6 @@ typedef struct FileDirEntry {
   /** ID type, in case typeflag has FILE_TYPE_BLENDERLIB set. */
   int blentype;
 
-  struct AssetMetaData *asset_data;
-
   /* Path to item that is relative to current folder root. */
   char *relpath;
   /** Optional argument for shortcuts, aliases etc. */
@@ -1082,6 +1090,10 @@ typedef struct FileDirEntry {
 
   /** When showing local IDs (FILE_MAIN, FILE_MAIN_ASSET), UUID of the ID this file represents. */
   uint id_session_uuid;
+  /** If this file represents an asset, its asset data is here. Note that we may show assets of
+   * external files (#FILE_TYPE_ASSET_EXTERNAL) in which case this is set but not the id above. */
+  struct AssetMetaData *asset_data;
+
   /* The icon_id for the preview image. */
   int preview_icon_id;
 
