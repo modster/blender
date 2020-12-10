@@ -3120,6 +3120,7 @@ void nlastrip_evaluate(PointerRNA *ptr,
        * */
       BKE_constraint_mat_convertspace(object,
                                       pose_channel,
+                                      NULL,
                                       rest_matrix,
                                       CONSTRAINT_SPACE_LOCAL,
                                       CONSTRAINT_SPACE_WORLD,
@@ -4528,10 +4529,10 @@ NlaTrack *BKE_animsys_resample_selected_strips(Main *main,
 
   /************** 3) Allocate resample strip. *************************************** */
 
-  NlaTrack *resample_track = BKE_nlatrack_add(adt, NULL);
+  NlaTrack *resample_track = BKE_nlatrack_add(adt, NULL, false);
   bAction *resample_action = BKE_action_add(main, resample_name);
   NlaStrip *resample_strip = BKE_nlastrip_new(resample_action);
-  BKE_nlatrack_add_strip(resample_track, resample_strip);
+  BKE_nlatrack_add_strip(resample_track, resample_strip, false);
 
   /** REFACTOR: as BKE_nla_track_rename() */
   strcpy(resample_track->name, resample_name);
