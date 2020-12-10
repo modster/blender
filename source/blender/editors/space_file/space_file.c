@@ -287,7 +287,7 @@ static void file_refresh(const bContext *C, ScrArea *area)
   filelist_setdir(sfile->files, params->dir);
   filelist_setrecursion(sfile->files, params->recursion_level);
   filelist_setsorting(sfile->files, params->sort, params->flag & FILE_SORT_INVERT);
-  filelist_setrepository(sfile->files, asset_params ? &asset_params->asset_repository : NULL);
+  filelist_setlibrary(sfile->files, asset_params ? &asset_params->asset_library : NULL);
   filelist_setfilter_options(
       sfile->files,
       (params->flag & FILE_FILTER) != 0,
@@ -373,7 +373,7 @@ static void file_listener(wmWindow *UNUSED(win),
       break;
     case NC_ASSET: {
       FileAssetSelectParams *asset_params = ED_fileselect_get_asset_params(sfile);
-      if (asset_params && (asset_params->asset_repository.type == FILE_ASSET_REPO_LOCAL)) {
+      if (asset_params && (asset_params->asset_library.type == FILE_ASSET_LIBRARY_LOCAL)) {
         /* Full refresh of the file list if local asset data was changed. Refreshing this view is
          * cheap and users expect this to be updated immediately. */
         file_tag_reset_list(area, sfile);

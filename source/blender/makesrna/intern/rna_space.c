@@ -2474,61 +2474,62 @@ static PointerRNA rna_FileSelectParams_filter_id_get(PointerRNA *ptr)
   return rna_pointer_inherit_refine(ptr, &RNA_FileSelectIDFilter, ptr->data);
 }
 
-static int rna_FileSelectParams_asset_repository_get(PointerRNA *ptr)
+static int rna_FileSelectParams_asset_library_get(PointerRNA *ptr)
 {
   FileAssetSelectParams *params = ptr->data;
 
   /* Simple case: Predefined repo, just set the value. */
-  if (params->asset_repository.type < FILE_ASSET_REPO_CUSTOM) {
-    return params->asset_repository.type;
+  if (params->asset_library.type < FILE_ASSET_LIBRARY_CUSTOM) {
+    return params->asset_library.type;
   }
 
-  /* Note that the path isn't checked for validity here. If an invalid repository path is used, the
+  /* Note that the path isn't checked for validity here. If an invalid library path is used, the
    * Asset Browser can give a nice hint on what's wrong. */
-  const bUserAssetRepository *user_repository = BKE_preferences_asset_repository_find_from_name(
-      &U, params->asset_repository.idname);
-  const int index = BKE_preferences_asset_repository_get_index(&U, user_repository);
+  const bUserAssetLibrary *user_library = BKE_preferences_asset_library_find_from_name(
+      &U, params->asset_library.idname);
+  const int index = BKE_preferences_asset_library_get_index(&U, user_library);
   if (index > -1) {
-    return FILE_ASSET_REPO_CUSTOM + index;
+    return FILE_ASSET_LIBRARY_CUSTOM + index;
   }
 
   BLI_assert(0);
-  return FILE_ASSET_REPO_LOCAL;
+  return FILE_ASSET_LIBRARY_LOCAL;
 }
 
-static void rna_FileSelectParams_asset_repository_set(PointerRNA *ptr, int value)
+static void rna_FileSelectParams_asset_library_set(PointerRNA *ptr, int value)
 {
   FileAssetSelectParams *params = ptr->data;
 
   /* Simple case: Predefined repo, just set the value. */
-  if (value < FILE_ASSET_REPO_CUSTOM) {
-    params->asset_repository.type = value;
-    params->asset_repository.idname[0] = '\0';
-    BLI_assert(ELEM(value, FILE_ASSET_REPO_LOCAL));
+  if (value < FILE_ASSET_LIBRARY_CUSTOM) {
+    params->asset_library.type = value;
+    params->asset_library.idname[0] = '\0';
+    BLI_assert(ELEM(value, FILE_ASSET_LIBRARY_LOCAL));
     return;
   }
 
-  const bUserAssetRepository *user_repository = BKE_preferences_asset_repository_find_from_index(
-      &U, value - FILE_ASSET_REPO_CUSTOM);
+  const bUserAssetLibrary *user_library = BKE_preferences_asset_library_find_from_index(
+      &U, value - FILE_ASSET_LIBRARY_CUSTOM);
 
-  /* Note that the path isn't checked for validity here. If an invalid repository path is used, the
+  /* Note that the path isn't checked for validity here. If an invalid library path is used, the
    * Asset Browser can give a nice hint on what's wrong. */
-  const bool is_valid = (user_repository->name[0] && user_repository->path[0]);
-  if (user_repository && is_valid) {
-    BLI_strncpy(params->asset_repository.idname,
-                user_repository->name,
-                sizeof(params->asset_repository.idname));
-    params->asset_repository.type = FILE_ASSET_REPO_CUSTOM;
+  const bool is_valid = (user_library->name[0] && user_library->path[0]);
+  if (user_library && is_valid) {
+    BLI_strncpy(
+        params->asset_library.idname, user_library->name, sizeof(params->asset_library.idname));
+    params->asset_library.type = FILE_ASSET_LIBRARY_CUSTOM;
   }
 }
 
-static const EnumPropertyItem *rna_FileSelectParams_asset_repository_itemf(
-    bContext *UNUSED(C), PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), bool *r_free)
+static const EnumPropertyItem *rna_FileSelectParams_asset_library_itemf(bContext *UNUSED(C),
+                                                                        PointerRNA *UNUSED(ptr),
+                                                                        PropertyRNA *UNUSED(prop),
+                                                                        bool *r_free)
 {
   const EnumPropertyItem predefined_items[] = {
       /* For the future. */
       // {FILE_ASSET_REPO_BUNDLED, "BUNDLED", 0, "Bundled", "Show the default user assets"},
-      {FILE_ASSET_REPO_LOCAL,
+      {FILE_ASSET_LIBRARY_LOCAL,
        "LOCAL",
        ICON_BLENDER,
        "Current File",
@@ -2540,27 +2541,27 @@ static const EnumPropertyItem *rna_FileSelectParams_asset_repository_itemf(
   int totitem = 0;
 
   /* Add separator if needed. */
-  if (!BLI_listbase_is_empty(&U.asset_repositories)) {
+  if (!BLI_listbase_is_empty(&U.asset_libraries)) {
     const EnumPropertyItem sepr = {0, "", 0, "Custom", NULL};
     RNA_enum_item_add(&item, &totitem, &sepr);
   }
 
   int i = 0;
-  for (bUserAssetRepository *user_repository = U.asset_repositories.first; user_repository;
-       user_repository = user_repository->next, i++) {
-    /* Note that the path itself isn't checked for validity here. If an invalid repository path is
+  for (bUserAssetLibrary *user_library = U.asset_libraries.first; user_library;
+       user_library = user_library->next, i++) {
+    /* Note that the path itself isn't checked for validity here. If an invalid library path is
      * used, the Asset Browser can give a nice hint on what's wrong. */
-    const bool is_valid = (user_repository->name[0] && user_repository->path[0]);
+    const bool is_valid = (user_library->name[0] && user_library->path[0]);
     if (!is_valid) {
       continue;
     }
 
-    /* Use repository path as description, it's a nice hint for users. */
-    EnumPropertyItem tmp = {FILE_ASSET_REPO_CUSTOM + i,
-                            user_repository->name,
+    /* Use library path as description, it's a nice hint for users. */
+    EnumPropertyItem tmp = {FILE_ASSET_LIBRARY_CUSTOM + i,
+                            user_library->name,
                             ICON_NONE,
-                            user_repository->name,
-                            user_repository->path};
+                            user_library->name,
+                            user_library->path};
     RNA_enum_item_add(&item, &totitem, &tmp);
   }
 
@@ -6178,13 +6179,13 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_TEXTEDIT_UPDATE);
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_LIST, NULL);
 
-  prop = RNA_def_property(srna, "asset_repository", PROP_ENUM, PROP_NONE);
+  prop = RNA_def_property(srna, "asset_library", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, DummyRNA_NULL_items);
   RNA_def_property_enum_funcs(prop,
-                              "rna_FileSelectParams_asset_repository_get",
-                              "rna_FileSelectParams_asset_repository_set",
-                              "rna_FileSelectParams_asset_repository_itemf");
-  RNA_def_property_ui_text(prop, "Asset Repository", "");
+                              "rna_FileSelectParams_asset_library_get",
+                              "rna_FileSelectParams_asset_library_set",
+                              "rna_FileSelectParams_asset_library_itemf");
+  RNA_def_property_ui_text(prop, "Asset Library", "");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
 
   prop = RNA_def_property(srna, "display_size", PROP_ENUM, PROP_NONE);

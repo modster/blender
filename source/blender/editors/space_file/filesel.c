@@ -118,7 +118,7 @@ static void fileselect_ensure_updated_asset_params(SpaceFile *sfile)
     asset_params = sfile->asset_params = MEM_callocN(sizeof(*asset_params),
                                                      "FileAssetSelectParams");
     asset_params->base_params.details_flags = U_default.file_space_data.details_flags;
-    asset_params->asset_repository.type = FILE_ASSET_REPO_LOCAL;
+    asset_params->asset_library.type = FILE_ASSET_LIBRARY_LOCAL;
   }
 
   FileSelectParams *base_params = &asset_params->base_params;
@@ -407,28 +407,28 @@ FileAssetSelectParams *ED_fileselect_get_asset_params(const SpaceFile *sfile)
 
 static void fileselect_refresh_asset_params(FileAssetSelectParams *asset_params)
 {
-  FileSelectAssetRepositoryUID *repository = &asset_params->asset_repository;
+  FileSelectAssetLibraryUID *library = &asset_params->asset_library;
   FileSelectParams *base_params = &asset_params->base_params;
-  bUserAssetRepository *user_repository = NULL;
+  bUserAssetLibrary *user_library = NULL;
 
   /* Ensure valid repo, or fall-back to local one. */
-  if (repository->type == FILE_ASSET_REPO_CUSTOM) {
-    user_repository = BKE_preferences_asset_repository_find_from_name(&U, repository->idname);
-    if (!user_repository) {
-      repository->type = FILE_ASSET_REPO_LOCAL;
+  if (library->type == FILE_ASSET_LIBRARY_CUSTOM) {
+    user_library = BKE_preferences_asset_library_find_from_name(&U, library->idname);
+    if (!user_library) {
+      library->type = FILE_ASSET_LIBRARY_LOCAL;
     }
   }
 
-  switch (repository->type) {
-    case FILE_ASSET_REPO_LOCAL:
+  switch (library->type) {
+    case FILE_ASSET_LIBRARY_LOCAL:
       base_params->dir[0] = '\0';
       break;
-    case FILE_ASSET_REPO_CUSTOM:
-      BLI_assert(user_repository);
-      BLI_strncpy(base_params->dir, user_repository->path, sizeof(base_params->dir));
+    case FILE_ASSET_LIBRARY_CUSTOM:
+      BLI_assert(user_library);
+      BLI_strncpy(base_params->dir, user_library->path, sizeof(base_params->dir));
       break;
   }
-  base_params->type = (repository->type == FILE_ASSET_REPO_LOCAL) ? FILE_MAIN_ASSET : FILE_LOADLIB;
+  base_params->type = (library->type == FILE_ASSET_LIBRARY_LOCAL) ? FILE_MAIN_ASSET : FILE_LOADLIB;
 }
 
 void fileselect_refresh_params(SpaceFile *sfile)
