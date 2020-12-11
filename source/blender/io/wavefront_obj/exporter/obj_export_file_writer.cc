@@ -361,6 +361,7 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
     (this->*poly_element_writer)(
         poly_vertex_indices, obj_mesh_data.uv_indices(i), poly_normal_indices);
   }
+  /* Unusual: Other indices are updated in #OBJWriter::update_index_offsets. */
   index_offsets_.normal_offset += per_object_tot_normals;
 }
 

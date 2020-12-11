@@ -287,7 +287,7 @@ template<eFileType filetype> class FileHandler : NonCopyable, NonMovable {
   }
 
   template<typename FileTypeTraits<filetype>::SyntaxType key, typename... T>
-  constexpr void write(T &&...args) const
+  constexpr void write(T &&... args) const
   {
     constexpr Formatting<filetype> fmt_nargs_valid = syntax_elem_to_formatting<filetype, T...>(
         key);
@@ -328,13 +328,13 @@ template<eFileType filetype> class FileHandler : NonCopyable, NonMovable {
 
   template<int total_args, typename... T>
   constexpr std::enable_if_t<(total_args != 0), void> write__impl(const char *fmt,
-                                                                  T &&...args) const
+                                                                  T &&... args) const
   {
     std::fprintf(outfile_, fmt, string_to_primitive(std::forward<T>(args))...);
   }
   template<int total_args, typename... T>
   constexpr std::enable_if_t<(total_args == 0), void> write__impl(const char *fmt,
-                                                                  T &&...args) const
+                                                                  T &&... args) const
   {
     std::fputs(fmt, outfile_);
   }
