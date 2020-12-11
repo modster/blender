@@ -801,5 +801,5 @@ if(WITH_POTRACE)
   set(POTRACE_FOUND On)
 endif()
 
-set(LIBHARU_INCLUDE_DIRS ${LIBDIR}/libharu/include)
+set(LIBHARU_INCLUDE_DIR ${LIBDIR}/libharu/include)
 set(LIBHARU_LIBRARIES ${LIBDIR}/libharu/lib/libhpdfsd.lib)
