@@ -4957,11 +4957,7 @@ PointerRNA rna_array_lookup_int(
 static char *rna_path_token(const char **path, char *fixedbuf, int fixedlen, int bracket)
 {
   const char *p;
-  char *buf;
-  char quote = '\0';
-  int i, j, len, escape;
-
-  len = 0;
+  int len = 0;
 
   if (bracket) {
     /* get data between [], check escaping ] with \] */
@@ -4974,33 +4970,24 @@ static char *rna_path_token(const char **path, char *fixedbuf, int fixedlen, int
 
     p = *path;
 
-    /* 2 kinds of lookups now, quoted or unquoted */
-    quote = *p;
-
-    if (quote != '"') { /* " - this comment is hack for Aligorith's text editor's sanity */
-      quote = 0;
-    }
-
-    if (quote == 0) {
+    /* 2 kinds of look-ups now, quoted or unquoted. */
+    if (*p != '"') {
       while (*p && (*p != ']')) {
         len++;
         p++;
       }
     }
     else {
-      escape = 0;
-      /* skip the first quote */
-      len++;
-      p++;
-      while (*p && (*p != quote || escape)) {
-        escape = (*p == '\\');
-        len++;
-        p++;
+      const char *p_end = BLI_str_escape_find_quote(p + 1);
+      if (p_end == NULL) {
+        /* No Matching quote. */
+        return NULL;
       }
+      /* Skip the last quoted char to get the `]`. */
+      p_end += 1;
 
-      /* skip the last quoted char to get the ']' */
-      len++;
-      p++;
+      len += (p_end - p);
+      p = p_end;
     }
 
     if (*p != ']') {
@@ -5022,25 +5009,13 @@ static char *rna_path_token(const char **path, char *fixedbuf, int fixedlen, int
     return NULL;
   }
 
-  /* try to use fixed buffer if possible */
-  if (len + 1 < fixedlen) {
-    buf = fixedbuf;
-  }
-  else {
-    buf = MEM_mallocN(sizeof(char) * (len + 1), "rna_path_token");
-  }
+  /* Try to use fixed buffer if possible. */
+  char *buf = (len + 1 < fixedlen) ? fixedbuf : MEM_mallocN(sizeof(char) * (len + 1), __func__);
 
   /* copy string, taking into account escaped ] */
   if (bracket) {
-    for (p = *path, i = 0, j = 0; i < len; i++, p++) {
-      if (*p == '\\' && *(p + 1) == quote) {
-      }
-      else {
-        buf[j++] = *p;
-      }
-    }
-
-    buf[j] = 0;
+    BLI_str_unescape(buf, *path, len);
+    p = (*path) + len;
   }
   else {
     memcpy(buf, *path, sizeof(char) * len);
@@ -6008,7 +5983,7 @@ char *RNA_path_from_ID_to_property_index(PointerRNA *ptr,
     }
     else {
       char propname_esc[MAX_IDPROP_NAME * 2];
-      BLI_strescape(propname_esc, propname, sizeof(propname_esc));
+      BLI_str_escape(propname_esc, propname, sizeof(propname_esc));
       path = BLI_sprintfN("%s[\"%s\"]%s", ptrpath, propname_esc, index_str);
     }
     MEM_freeN(ptrpath);
@@ -6019,7 +5994,7 @@ char *RNA_path_from_ID_to_property_index(PointerRNA *ptr,
     }
     else {
       char propname_esc[MAX_IDPROP_NAME * 2];
-      BLI_strescape(propname_esc, propname, sizeof(propname_esc));
+      BLI_str_escape(propname_esc, propname, sizeof(propname_esc));
       path = BLI_sprintfN("[\"%s\"]%s", propname_esc, index_str);
     }
   }
@@ -6105,7 +6080,7 @@ char *RNA_path_full_ID_py(Main *bmain, ID *id)
 
   char id_esc[(sizeof(id->name) - 2) * 2];
 
-  BLI_strescape(id_esc, id->name + 2, sizeof(id_esc));
+  BLI_str_escape(id_esc, id->name + 2, sizeof(id_esc));
 
   return BLI_sprintfN("bpy.data.%s[\"%s\"]%s%s",
                       BKE_idtype_idcode_to_name_plural(GS(id->name)),
@@ -7059,7 +7034,7 @@ char *RNA_property_as_string(
       buf = MEM_mallocN(sizeof(char) * (length + 1), "RNA_property_as_string");
       buf_esc = MEM_mallocN(sizeof(char) * (length * 2 + 1), "RNA_property_as_string esc");
       RNA_property_string_get(ptr, prop, buf);
-      BLI_strescape(buf_esc, buf, length * 2 + 1);
+      BLI_str_escape(buf_esc, buf, length * 2 + 1);
       MEM_freeN(buf);
       BLI_dynstr_appendf(dynstr, "\"%s\"", buf_esc);
       MEM_freeN(buf_esc);
