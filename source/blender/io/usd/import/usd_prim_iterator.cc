@@ -25,6 +25,7 @@
 #include "usd_reader_camera.h"
 #include "usd_reader_light.h"
 #include "usd_reader_mesh.h"
+#include "usd_reader_shape.h"
 #include "usd_reader_xform.h"
 #include "usd_reader_xformable.h"
 
@@ -40,8 +41,13 @@
 #include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdGeom/camera.h>
+#include <pxr/usd/usdGeom/capsule.h>
+#include <pxr/usd/usdGeom/cone.h>
+#include <pxr/usd/usdGeom/cube.h>
+#include <pxr/usd/usdGeom/cylinder.h>
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/usd/usdGeom/scope.h>
+#include <pxr/usd/usdGeom/sphere.h>
 #include <pxr/usd/usdGeom/tokens.h>
 #include <pxr/usd/usdGeom/xformable.h>
 #include <pxr/usd/usdLux/light.h>
@@ -123,6 +129,11 @@ USDXformableReader *USDPrimIterator::get_object_reader(const pxr::UsdPrim &prim,
   }
   else if (prim.IsA<pxr::UsdGeomMesh>()) {
     result = new USDMeshReader(prim, context);
+  }
+  else if (prim.IsA<pxr::UsdGeomCapsule>() || prim.IsA<pxr::UsdGeomCone>() ||
+           prim.IsA<pxr::UsdGeomCube>() || prim.IsA<pxr::UsdGeomCylinder>() ||
+           prim.IsA<pxr::UsdGeomSphere>()) {
+    result = new USDShapeReader(prim, context);
   }
   else if (prim.IsA<pxr::UsdGeomXform>()) {
     result = new USDXformReader(prim, context);
