@@ -22,7 +22,7 @@
  */
 
 #include <cstdio>
-
+#include <exception>
 #include <memory>
 
 #include "BKE_scene.h"
@@ -76,6 +76,12 @@ Depsgraph *OBJDepsgraph::get()
 void OBJDepsgraph::update_for_newframe()
 {
   BKE_scene_graph_update_for_newframe(depsgraph_);
+}
+
+static void print_exception_error(const std::system_error &ex)
+{
+  std::cerr << ex.code().category().name() << ": " << ex.what() << ": " << ex.code().message()
+            << std::endl;
 }
 
 /**
@@ -147,8 +153,14 @@ static void write_mesh_objects(Vector<std::unique_ptr<OBJMesh>> exportable_as_me
 {
   std::unique_ptr<MTLWriter> mtl_writer = nullptr;
   if (export_params.export_materials) {
-    mtl_writer = std::make_unique<MTLWriter>(export_params.filepath);
-    if (mtl_writer->good()) {
+    try {
+      mtl_writer = std::make_unique<MTLWriter>(export_params.filepath);
+    }
+    catch (const std::system_error &ex) {
+      print_exception_error(ex);
+    }
+    if (mtl_writer) {
+      mtl_writer->write_header();
       obj_writer.write_mtllib_name(mtl_writer->mtl_file_path());
     }
   }
@@ -170,7 +182,7 @@ static void write_mesh_objects(Vector<std::unique_ptr<OBJMesh>> exportable_as_me
       if (export_params.export_uv) {
         obj_writer.write_uv_coords(*obj_mesh);
       }
-      if (mtl_writer->good()) {
+      if (mtl_writer) {
         mtl_writer->append_materials(*obj_mesh);
       }
       obj_writer.write_poly_elements(*obj_mesh);
@@ -203,15 +215,26 @@ static void export_frame(Depsgraph *depsgraph,
                          const OBJExportParams &export_params,
                          const char *filepath)
 {
-  OBJWriter frame_writer(export_params);
-  if (!frame_writer.init_writer(filepath)) {
+  std::unique_ptr<OBJWriter> frame_writer = nullptr;
+  try {
+    frame_writer = std::make_unique<OBJWriter>(filepath, export_params);
+  }
+  catch (const std::system_error &ex) {
+    print_exception_error(ex);
     return;
   }
+  if (!frame_writer) {
+    BLI_assert(!"File should be writable by now.");
+    return;
+  }
+
+  frame_writer->writer_header();
+
   auto [exportable_as_mesh, exportable_as_nurbs] = filter_supported_objects(depsgraph,
                                                                             export_params);
 
-  write_mesh_objects(std::move(exportable_as_mesh), frame_writer, export_params);
-  write_nurbs_curve_objects(std::move(exportable_as_nurbs), frame_writer);
+  write_mesh_objects(std::move(exportable_as_mesh), *frame_writer, export_params);
+  write_nurbs_curve_objects(std::move(exportable_as_nurbs), *frame_writer);
 }
 
 /**

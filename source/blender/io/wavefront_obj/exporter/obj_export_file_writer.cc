@@ -61,15 +61,14 @@ void OBJWriter::write_vert_uv_normal_indices(Span<int> vert_indices,
 {
   BLI_assert(vert_indices.size() == uv_indices.size() &&
              vert_indices.size() == normal_indices.size());
-  fputs("f", outfile_);
+  file_handler_->write<eOBJSyntaxElement::poly_element_begin>();
   for (int j = 0; j < vert_indices.size(); j++) {
-    fprintf(outfile_,
-            " %u/%u/%u",
-            vert_indices[j] + index_offsets_.vertex_offset + 1,
-            uv_indices[j] + index_offsets_.uv_vertex_offset + 1,
-            normal_indices[j] + index_offsets_.normal_offset + 1);
+    file_handler_->write<eOBJSyntaxElement::vertex_uv_normal_indices>(
+        vert_indices[j] + index_offsets_.vertex_offset + 1,
+        uv_indices[j] + index_offsets_.uv_vertex_offset + 1,
+        normal_indices[j] + index_offsets_.normal_offset + 1);
   }
-  fputs("\n", outfile_);
+  file_handler_->write<eOBJSyntaxElement::poly_element_end>();
 }
 
 /**
@@ -80,14 +79,13 @@ void OBJWriter::write_vert_normal_indices(Span<int> vert_indices,
                                           Span<int> normal_indices) const
 {
   BLI_assert(vert_indices.size() == normal_indices.size());
-  fputs("f", outfile_);
+  file_handler_->write<eOBJSyntaxElement::poly_element_begin>();
   for (int j = 0; j < vert_indices.size(); j++) {
-    fprintf(outfile_,
-            " %u//%u",
-            vert_indices[j] + index_offsets_.vertex_offset + 1,
-            normal_indices[j] + index_offsets_.normal_offset + 1);
+    file_handler_->write<eOBJSyntaxElement::vertex_normal_indices>(
+        vert_indices[j] + index_offsets_.vertex_offset + 1,
+        normal_indices[j] + index_offsets_.normal_offset + 1);
   }
-  fputs("\n", outfile_);
+  file_handler_->write<eOBJSyntaxElement::poly_element_end>();
 }
 
 /**
@@ -98,14 +96,13 @@ void OBJWriter::write_vert_uv_indices(Span<int> vert_indices,
                                       Span<int> /*normal_indices*/) const
 {
   BLI_assert(vert_indices.size() == uv_indices.size());
-  fputs("f", outfile_);
+  file_handler_->write<eOBJSyntaxElement::poly_element_begin>();
   for (int j = 0; j < vert_indices.size(); j++) {
-    fprintf(outfile_,
-            " %u/%u",
-            vert_indices[j] + index_offsets_.vertex_offset + 1,
-            uv_indices[j] + index_offsets_.uv_vertex_offset + 1);
+    file_handler_->write<eOBJSyntaxElement::vertex_uv_indices>(
+        vert_indices[j] + index_offsets_.vertex_offset + 1,
+        uv_indices[j] + index_offsets_.uv_vertex_offset + 1);
   }
-  fputs("\n", outfile_);
+  file_handler_->write<eOBJSyntaxElement::poly_element_end>();
 }
 
 /**
@@ -115,46 +112,32 @@ void OBJWriter::write_vert_indices(Span<int> vert_indices,
                                    Span<int> /*uv_indices*/,
                                    Span<int> /*normal_indices*/) const
 {
-  fputs("f", outfile_);
+  file_handler_->write<eOBJSyntaxElement::poly_element_begin>();
   for (const int vert_index : vert_indices) {
-    fprintf(outfile_, " %u", vert_index + index_offsets_.vertex_offset + 1);
+    file_handler_->write<eOBJSyntaxElement::vertex_indices>(vert_index +
+                                                            index_offsets_.vertex_offset + 1);
   }
-  fputs("\n", outfile_);
+  file_handler_->write<eOBJSyntaxElement::poly_element_end>();
 }
 
-OBJWriter::~OBJWriter()
+void OBJWriter::writer_header() const
 {
-  if (outfile_ && fclose(outfile_)) {
-    std::cerr << "Error: could not close the OBJ file properly, file may be corrupted."
-              << std::endl;
-  }
-}
-
-/**
- * Try to open the .OBJ file and write file header.
- * \return Whether the destination file is writable.
- */
-bool OBJWriter::init_writer(const char *filepath)
-{
-  outfile_ = fopen(filepath, "w");
-  if (!outfile_) {
-    std::perror(std::string("Error in creating the file at: ").append(filepath).c_str());
-    return false;
-  }
-  fprintf(outfile_, "# Blender %s\n# www.blender.org\n", BKE_blender_version_string());
-  return true;
+  using namespace std::string_literals;
+  file_handler_->write<eOBJSyntaxElement::string>("# Blender "s + BKE_blender_version_string() +
+                                                  "\n");
+  file_handler_->write<eOBJSyntaxElement::string>("# www.blender.org\n");
 }
 
 /**
  * Write file name of Material Library in .OBJ file.
  */
-void OBJWriter::write_mtllib_name(const char *mtl_filepath) const
+void OBJWriter::write_mtllib_name(const StringRefNull mtl_filepath) const
 {
   /* Split .MTL file path into parent directory and filename. */
   char mtl_file_name[FILE_MAXFILE];
   char mtl_dir_name[FILE_MAXDIR];
-  BLI_split_dirfile(mtl_filepath, mtl_dir_name, mtl_file_name, FILE_MAXDIR, FILE_MAXFILE);
-  fprintf(outfile_, "mtllib %s\n", mtl_file_name);
+  BLI_split_dirfile(mtl_filepath.data(), mtl_dir_name, mtl_file_name, FILE_MAXDIR, FILE_MAXFILE);
+  file_handler_->write<eOBJSyntaxElement::mtllib>(mtl_file_name);
 }
 
 /**
@@ -168,15 +151,16 @@ void OBJWriter::write_object_group(const OBJMesh &obj_mesh_data) const
   if (!export_params_.export_object_groups) {
     return;
   }
-  const char *object_name = obj_mesh_data.get_object_name();
+  const std::string object_name = obj_mesh_data.get_object_name();
   const char *object_mesh_name = obj_mesh_data.get_object_mesh_name();
   const char *object_material_name = obj_mesh_data.get_object_material_name(0);
   if (export_params_.export_materials && export_params_.export_material_groups &&
       object_material_name) {
-    fprintf(outfile_, "g %s_%s_%s\n", object_name, object_mesh_name, object_material_name);
+    file_handler_->write<eOBJSyntaxElement::object_group>(object_name + "_" + object_mesh_name +
+                                                          "_" + object_material_name);
     return;
   }
-  fprintf(outfile_, "g %s_%s\n", object_name, object_mesh_name);
+  file_handler_->write<eOBJSyntaxElement::object_group>(object_name + "_" + object_mesh_name);
 }
 
 /**
@@ -189,7 +173,7 @@ void OBJWriter::write_object_name(const OBJMesh &obj_mesh_data) const
     write_object_group(obj_mesh_data);
     return;
   }
-  fprintf(outfile_, "o %s\n", object_name);
+  file_handler_->write<eOBJSyntaxElement::object_name>(object_name);
 }
 
 /**
@@ -200,7 +184,7 @@ void OBJWriter::write_vertex_coords(const OBJMesh &obj_mesh_data) const
   const int tot_vertices = obj_mesh_data.tot_vertices();
   for (int i = 0; i < tot_vertices; i++) {
     float3 vertex = obj_mesh_data.calc_vertex_coords(i, export_params_.scaling_factor);
-    fprintf(outfile_, "v %f %f %f\n", vertex[0], vertex[1], vertex[2]);
+    file_handler_->write<eOBJSyntaxElement::vertex_coords>(vertex[0], vertex[1], vertex[2]);
   }
 }
 
@@ -215,7 +199,7 @@ void OBJWriter::write_uv_coords(OBJMesh &r_obj_mesh_data) const
   r_obj_mesh_data.store_uv_coords_and_indices(uv_coords);
 
   for (const std::array<float, 2> &uv_vertex : uv_coords) {
-    fprintf(outfile_, "vt %f %f\n", uv_vertex[0], uv_vertex[1]);
+    file_handler_->write<eOBJSyntaxElement::uv_vertex_coords>(uv_vertex[0], uv_vertex[1]);
   }
 }
 
@@ -231,12 +215,13 @@ void OBJWriter::write_poly_normals(const OBJMesh &obj_mesh_data) const
     if (obj_mesh_data.is_ith_poly_smooth(i)) {
       obj_mesh_data.calc_loop_normals(i, lnormals);
       for (const float3 &lnormal : lnormals) {
-        fprintf(outfile_, "vn %f %f %f\n", lnormal[0], lnormal[1], lnormal[2]);
+        file_handler_->write<eOBJSyntaxElement::normal>(lnormal[0], lnormal[1], lnormal[2]);
       }
     }
     else {
       float3 poly_normal = obj_mesh_data.calc_poly_normal(i);
-      fprintf(outfile_, "vn %f %f %f\n", poly_normal[0], poly_normal[1], poly_normal[2]);
+      file_handler_->write<eOBJSyntaxElement::normal>(
+          poly_normal[0], poly_normal[1], poly_normal[2]);
     }
   }
 }
@@ -262,7 +247,7 @@ int OBJWriter::write_smooth_group(const OBJMesh &obj_mesh_data,
     /* Group has already been written, even if it is "s 0". */
     return current_group;
   }
-  fprintf(outfile_, "s %d\n", current_group);
+  file_handler_->write<eOBJSyntaxElement::smooth_group>(current_group);
   return current_group;
 }
 
@@ -285,14 +270,14 @@ int16_t OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
     return current_mat_nr;
   }
   if (current_mat_nr == NOT_FOUND) {
-    fprintf(outfile_, "usemtl %s\n", MATERIAL_GROUP_DISABLED);
+    file_handler_->write<eOBJSyntaxElement::poly_usemtl>(MATERIAL_GROUP_DISABLED);
     return current_mat_nr;
   }
   const char *mat_name = obj_mesh_data.get_object_material_name(current_mat_nr);
   if (export_params_.export_object_groups) {
     write_object_group(obj_mesh_data);
   }
-  fprintf(outfile_, "usemtl %s\n", mat_name);
+  file_handler_->write<eOBJSyntaxElement::poly_usemtl>(mat_name);
   return current_mat_nr;
 }
 
@@ -313,10 +298,11 @@ int16_t OBJWriter::write_vertex_group(const OBJMesh &obj_mesh_data,
     return current_group;
   }
   if (current_group == NOT_FOUND) {
-    fprintf(outfile_, "g %s\n", DEFORM_GROUP_DISABLED);
+    file_handler_->write<eOBJSyntaxElement::object_group>(DEFORM_GROUP_DISABLED);
     return current_group;
   }
-  fprintf(outfile_, "g %s\n", obj_mesh_data.get_poly_deform_group_name(current_group));
+  file_handler_->write<eOBJSyntaxElement::object_group>(
+      obj_mesh_data.get_poly_deform_group_name(current_group));
   return current_group;
 }
 
@@ -391,10 +377,9 @@ void OBJWriter::write_edges_indices(const OBJMesh &obj_mesh_data) const
     if (!vertex_indices) {
       continue;
     }
-    fprintf(outfile_,
-            "l %u %u\n",
-            (*vertex_indices)[0] + index_offsets_.vertex_offset + 1,
-            (*vertex_indices)[1] + index_offsets_.vertex_offset + 1);
+    file_handler_->write<eOBJSyntaxElement::edge>(
+        (*vertex_indices)[0] + index_offsets_.vertex_offset + 1,
+        (*vertex_indices)[1] + index_offsets_.vertex_offset + 1);
   }
 }
 
@@ -409,17 +394,15 @@ void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
     for (int vertex_idx = 0; vertex_idx < total_vertices; vertex_idx++) {
       const float3 vertex_coords = obj_nurbs_data.vertex_coordinates(
           spline_idx, vertex_idx, export_params_.scaling_factor);
-      fprintf(outfile_, "v %f %f %f\n", vertex_coords[0], vertex_coords[1], vertex_coords[2]);
+      file_handler_->write<eOBJSyntaxElement::vertex_coords>(
+          vertex_coords[0], vertex_coords[1], vertex_coords[2]);
     }
 
     const char *nurbs_name = obj_nurbs_data.get_curve_name();
     const int nurbs_degree = obj_nurbs_data.get_nurbs_degree(spline_idx);
-    fprintf(outfile_,
-            "g %s\n"
-            "cstype bspline\n"
-            "deg %d\n",
-            nurbs_name,
-            nurbs_degree);
+    file_handler_->write<eOBJSyntaxElement::object_group>(nurbs_name);
+    file_handler_->write<eOBJSyntaxElement::cstype>();
+    file_handler_->write<eOBJSyntaxElement::nurbs_degree>(nurbs_degree);
     /**
      * The numbers written here are indices into the vertex coordinates written
      * earlier, relative to the line that is going to be written.
@@ -428,25 +411,26 @@ void OBJWriter::write_nurbs_curve(const OBJCurve &obj_nurbs_data) const
      * 0.0 1.0 -1 -2 -3 -4 -1 -2 -3 for a cyclic curve with 4 vertices.
      */
     const int total_control_points = obj_nurbs_data.total_spline_control_points(spline_idx);
-    fputs("curv 0.0 1.0", outfile_);
+    file_handler_->write<eOBJSyntaxElement::curve_element_begin>();
     for (int i = 0; i < total_control_points; i++) {
-      /* "+1" to keep indices one-based, even if they're negative: i.e., -1 refers to the last
-       * vertex coordinate, -2 second last. */
-      fprintf(outfile_, " %d", -((i % total_vertices) + 1));
+      /* "+1" to keep indices one-based, even if they're negative: i.e., -1 refers to the
+       * last vertex coordinate, -2 second last. */
+      file_handler_->write<eOBJSyntaxElement::vertex_indices>(-((i % total_vertices) + 1));
     }
-    fputs("\n", outfile_);
+    file_handler_->write<eOBJSyntaxElement::curve_element_end>();
 
     /**
-     * In "parm u 0 0.1 .." line:, (total control points + 2) equidistant numbers in the parameter
-     * range are inserted.
+     * In "parm u 0 0.1 .." line:, (total control points + 2) equidistant numbers in the
+     * parameter range are inserted.
      */
-    fputs("parm u 0.000000 ", outfile_);
+    file_handler_->write<eOBJSyntaxElement::nurbs_parameter_begin>();
     for (int i = 1; i <= total_control_points + 2; i++) {
-      fprintf(outfile_, "%f ", 1.0f * i / (total_control_points + 2 + 1));
+      file_handler_->write<eOBJSyntaxElement::nurbs_parameters>(1.0f * i /
+                                                                (total_control_points + 2 + 1));
     }
-    fputs("1.000000\n", outfile_);
+    file_handler_->write<eOBJSyntaxElement::nurbs_parameter_end>();
 
-    fputs("end\n", outfile_);
+    file_handler_->write<eOBJSyntaxElement::nurbs_group_end>();
   }
 }
 
@@ -476,41 +460,30 @@ static std::string float3_to_string(const float3 &numbers)
   return r_string.str();
 };
 
-/**
- * Open the .MTL file in append mode.
+/*
+ * Create the .MTL file.
  */
 MTLWriter::MTLWriter(const char *obj_filepath)
 {
-  BLI_strncpy(mtl_filepath_, obj_filepath, FILE_MAX);
-  BLI_path_extension_replace(mtl_filepath_, FILE_MAX, ".mtl");
-  mtl_outfile_ = fopen(mtl_filepath_, "w");
-  if (!mtl_outfile_) {
-    std::perror(std::string("Error in creating the file at: ").append(mtl_filepath_).c_str());
-    return;
+  mtl_filepath_ = obj_filepath;
+  const bool ok = BLI_path_extension_replace(mtl_filepath_.data(), FILE_MAX, ".mtl");
+  if (!ok) {
+    throw std::system_error(ENAMETOOLONG, std::system_category(), "");
   }
-  fprintf(stderr, "Material Library: %s\n", mtl_filepath_);
-  fprintf(mtl_outfile_, "# Blender %s\n# www.blender.org\n", BKE_blender_version_string());
+  file_handler_ = std::make_unique<FileHandler<eFileType::MTL>>(mtl_filepath_);
+  std::cout << "Material Library created at: " << mtl_filepath_ << std::endl;
 }
 
-MTLWriter::~MTLWriter()
+void MTLWriter::write_header() const
 {
-  if (mtl_outfile_ && fclose(mtl_outfile_)) {
-    std::cerr << "Error: could not close the '" << mtl_file_path()
-              << "' file properly, it may be corrupted." << std::endl;
-  }
+  using namespace std::string_literals;
+  file_handler_->write<eMTLSyntaxElement::string>("# Blender "s + BKE_blender_version_string() +
+                                                  "\n");
+  file_handler_->write<eMTLSyntaxElement::string>("# www.blender.org\n");
 }
 
-/**
- * \return If the .MTL file is writable.
- */
-bool MTLWriter::good() const
+StringRefNull MTLWriter::mtl_file_path() const
 {
-  return mtl_outfile_ != nullptr;
-}
-
-const char *MTLWriter::mtl_file_path() const
-{
-  BLI_assert(this->good());
   return mtl_filepath_;
 }
 
@@ -519,26 +492,26 @@ const char *MTLWriter::mtl_file_path() const
  */
 void MTLWriter::write_bsdf_properties(const MTLMaterial &mtl_material)
 {
-  fprintf(mtl_outfile_,
-          "Ni %0.6f\n"
-          "d %.6f\n"
-          "Ns %0.6f\n"
-          "illum %d\n",
-          mtl_material.Ni,
-          mtl_material.d,
-          mtl_material.Ns,
-          mtl_material.illum);
-  fprintf(mtl_outfile_, "Ka %s\n", float3_to_string(mtl_material.Ka).c_str());
-  fprintf(mtl_outfile_, "Kd %s\n", float3_to_string(mtl_material.Kd).c_str());
-  fprintf(mtl_outfile_, "Ks %s\n", float3_to_string(mtl_material.Ks).c_str());
-  fprintf(mtl_outfile_, "Ke %s\n", float3_to_string(mtl_material.Ke).c_str());
+  file_handler_->write<eMTLSyntaxElement::Ni>(mtl_material.Ni);
+  file_handler_->write<eMTLSyntaxElement::d>(mtl_material.d);
+  file_handler_->write<eMTLSyntaxElement::Ns>(mtl_material.Ns);
+  file_handler_->write<eMTLSyntaxElement::illum>(mtl_material.illum);
+  file_handler_->write<eMTLSyntaxElement::Ka>(
+      mtl_material.Ka.x, mtl_material.Ka.y, mtl_material.Ka.z);
+  file_handler_->write<eMTLSyntaxElement::Kd>(
+      mtl_material.Kd.x, mtl_material.Kd.y, mtl_material.Kd.z);
+  file_handler_->write<eMTLSyntaxElement::Ks>(
+      mtl_material.Ks.x, mtl_material.Ks.y, mtl_material.Ks.z);
+  file_handler_->write<eMTLSyntaxElement::Ke>(
+      mtl_material.Ke.x, mtl_material.Ke.y, mtl_material.Ke.z);
 }
 
 /**
- * Write a texture map in the form "map_XX -s 1 1 1 -o 0 0 0 -bm 1 path/to/image".
+ * Write a texture map in the form "map_XX -s 1. 1. 1. -o 0. 0. 0. [-bm 1.] path/to/image".
  */
-void MTLWriter::write_texture_map(const MTLMaterial &mtl_material,
-                                  const Map<const std::string, tex_map_XX>::Item &texture_map)
+void MTLWriter::write_texture_map(
+    const MTLMaterial &mtl_material,
+    const Map<const eMTLSyntaxElement, tex_map_XX>::Item &texture_map)
 {
   std::string translation;
   std::string scale;
@@ -550,18 +523,26 @@ void MTLWriter::write_texture_map(const MTLMaterial &mtl_material,
   if (texture_map.value.scale != float3{1.0f, 1.0f, 1.0f}) {
     scale.append(" -o ").append(float3_to_string(texture_map.value.scale));
   }
-  if (texture_map.key == "map_Bump" && mtl_material.map_Bump_strength > 0.0001f) {
+  if (texture_map.key == eMTLSyntaxElement::map_Bump && mtl_material.map_Bump_strength > 0.0001f) {
     map_bump_strength.append(" -bm ").append(std::to_string(mtl_material.map_Bump_strength));
   }
 
-  /* Keep only one space between options since filepaths may have leading spaces too. */
-  fprintf(mtl_outfile_,
-          "%s%s%s%s %s\n",
-          texture_map.key.c_str(),
-          translation.c_str(),       /* Can be empty. */
-          scale.c_str(),             /* Can be empty. */
-          map_bump_strength.c_str(), /* Can be empty. */
-          texture_map.value.image_path.c_str());
+#define SYNTAX_DISPATCH(eMTLSyntaxElement) \
+  if (texture_map.key == eMTLSyntaxElement) { \
+    file_handler_->write<eMTLSyntaxElement>(translation + scale + map_bump_strength, \
+                                            texture_map.value.image_path); \
+    return; \
+  }
+
+  SYNTAX_DISPATCH(eMTLSyntaxElement::map_Kd);
+  SYNTAX_DISPATCH(eMTLSyntaxElement::map_Ks);
+  SYNTAX_DISPATCH(eMTLSyntaxElement::map_Ns);
+  SYNTAX_DISPATCH(eMTLSyntaxElement::map_d);
+  SYNTAX_DISPATCH(eMTLSyntaxElement::map_refl);
+  SYNTAX_DISPATCH(eMTLSyntaxElement::map_Ke);
+  SYNTAX_DISPATCH(eMTLSyntaxElement::map_Bump);
+
+  BLI_assert(!"This map type was not written to the file.");
 }
 
 /**
@@ -569,21 +550,17 @@ void MTLWriter::write_texture_map(const MTLMaterial &mtl_material,
  */
 void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
 {
-  BLI_assert(this->good());
-  if (!this->good()) {
-    return;
-  }
   MaterialWrap mat_wrap;
   Vector<MTLMaterial> mtl_materials = mat_wrap.fill_materials(mesh_to_export);
 
-#ifdef DEBUG
+#ifndef NDEBUG
   auto all_items_positive = [](const float3 &triplet) {
     return triplet.x >= 0.0f && triplet.y >= 0.0f && triplet.z >= 0.0f;
   };
 #endif
 
   for (const MTLMaterial &mtl_material : mtl_materials) {
-    fprintf(mtl_outfile_, "\nnewmtl %s\n", mtl_material.name.c_str());
+    file_handler_->write<eMTLSyntaxElement::newmtl>(mtl_material.name);
     /* At least one material property has not been modified since its initialization. */
     BLI_assert(all_items_positive({mtl_material.d, mtl_material.Ns, mtl_material.Ni}) &&
                mtl_material.illum > 0);
@@ -593,7 +570,7 @@ void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
     write_bsdf_properties(mtl_material);
 
     /* Write image texture maps. */
-    for (const Map<const std::string, tex_map_XX>::Item &texture_map :
+    for (const Map<const eMTLSyntaxElement, tex_map_XX>::Item &texture_map :
          mtl_material.texture_maps.items()) {
       if (texture_map.value.image_path.empty()) {
         continue;

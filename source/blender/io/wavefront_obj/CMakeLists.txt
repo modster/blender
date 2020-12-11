@@ -58,6 +58,7 @@ set(SRC
   IO_wavefront_obj.h
   exporter/obj_exporter.hh
   exporter/obj_export_file_writer.hh
+  exporter/obj_export_io.hh
   exporter/obj_export_mesh.hh
   exporter/obj_export_mtl.hh
   exporter/obj_export_nurbs.hh

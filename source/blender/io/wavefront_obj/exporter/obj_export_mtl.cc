@@ -256,12 +256,12 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
    * - finding "Strength" property of the node for `-bm` option.
    */
 
-  for (Map<const std::string, tex_map_XX>::MutableItem texture_map :
+  for (Map<const eMTLSyntaxElement, tex_map_XX>::MutableItem texture_map :
        r_mtl_mat.texture_maps.items()) {
     Vector<const nodes::OutputSocketRef *> linked_sockets;
     const bNode *normal_map_node{nullptr};
 
-    if (texture_map.key == "map_Bump") {
+    if (texture_map.key == eMTLSyntaxElement::map_Bump) {
       /* Find sockets linked to destination "Normal" socket in p-bsdf node. */
       linked_sockets_to_dest_id(bsdf_node_, node_tree, "Normal", linked_sockets);
       /* Among the linked sockets, find Normal Map shader node. */
@@ -270,7 +270,7 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
       /* Find sockets linked to "Color" socket in normal map node. */
       linked_sockets_to_dest_id(normal_map_node, node_tree, "Color", linked_sockets);
     }
-    else if (texture_map.key == "map_Ke") {
+    else if (texture_map.key == eMTLSyntaxElement::map_Ke) {
       float emission_strength = 0.0f;
       copy_property_from_node(
           SOCK_FLOAT, bsdf_node_, "Emission Strength", {&emission_strength, 1});

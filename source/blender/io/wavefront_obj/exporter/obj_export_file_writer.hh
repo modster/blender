@@ -29,10 +29,13 @@
 #include "BLI_vector.hh"
 
 #include "IO_wavefront_obj.h"
+#include "obj_export_io.hh"
 #include "obj_export_mtl.hh"
 
 namespace blender::io::obj {
 
+class OBJCurve;
+class OBJMesh;
 /**
  * Total vertices/ UV vertices/ normals of previous Objects
  * should be added to the current Object's indices.
@@ -48,25 +51,22 @@ struct IndexOffsets {
  */
 class OBJWriter : NonMovable, NonCopyable {
  private:
-  /**
-   * Destination .OBJ file.
-   */
-  FILE *outfile_ = nullptr;
   const OBJExportParams &export_params_;
-
+  std::unique_ptr<FileHandler<eFileType::OBJ>> file_handler_ = nullptr;
   IndexOffsets index_offsets_{0, 0, 0};
 
  public:
-  OBJWriter(const OBJExportParams &export_params) : export_params_(export_params)
+  OBJWriter(const char *filepath, const OBJExportParams &export_params)
+      : export_params_(export_params)
   {
+    file_handler_ = std::make_unique<FileHandler<eFileType::OBJ>>(filepath);
   }
-  ~OBJWriter();
 
-  bool init_writer(const char *filepath);
+  void writer_header() const;
 
   void write_object_name(const OBJMesh &obj_mesh_data) const;
   void write_object_group(const OBJMesh &obj_mesh_data) const;
-  void write_mtllib_name(const char *mtl_filepath) const;
+  void write_mtllib_name(const StringRefNull mtl_filepath) const;
   void write_vertex_coords(const OBJMesh &obj_mesh_data) const;
   void write_uv_coords(OBJMesh &obj_mesh_data) const;
   void write_poly_normals(const OBJMesh &obj_mesh_data) const;
@@ -110,20 +110,19 @@ class OBJWriter : NonMovable, NonCopyable {
  */
 class MTLWriter : NonMovable, NonCopyable {
  private:
-  char mtl_filepath_[FILE_MAX];
-  FILE *mtl_outfile_;
+  std::unique_ptr<FileHandler<eFileType::MTL>> file_handler_ = nullptr;
+  std::string mtl_filepath_;
 
  public:
   MTLWriter(const char *obj_filepath);
-  ~MTLWriter();
 
-  bool good() const;
-  const char *mtl_file_path() const;
+  void write_header() const;
+  StringRefNull mtl_file_path() const;
   void append_materials(const OBJMesh &mesh_to_export);
 
  private:
   void write_bsdf_properties(const MTLMaterial &mtl_material);
   void write_texture_map(const MTLMaterial &mtl_material,
-                         const Map<const std::string, tex_map_XX>::Item &texture_map);
+                         const Map<const eMTLSyntaxElement, tex_map_XX>::Item &texture_map);
 };
 }  // namespace blender::io::obj

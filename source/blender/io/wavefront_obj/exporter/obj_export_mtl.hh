@@ -29,6 +29,17 @@
 #include "BLI_vector.hh"
 
 #include "DNA_node_types.h"
+#include "obj_export_io.hh"
+
+namespace blender {
+template<> struct DefaultHash<io::obj::eMTLSyntaxElement> {
+  uint64_t operator()(const io::obj::eMTLSyntaxElement value) const
+  {
+    return static_cast<uint64_t>(value);
+  }
+};
+
+}  // namespace blender
 
 namespace blender::io::obj {
 class OBJMesh;
@@ -55,24 +66,24 @@ struct tex_map_XX {
 struct MTLMaterial {
   MTLMaterial()
   {
-    texture_maps.add("map_Kd", tex_map_XX("Base Color"));
-    texture_maps.add("map_Ks", tex_map_XX("Specular"));
-    texture_maps.add("map_Ns", tex_map_XX("Roughness"));
-    texture_maps.add("map_d", tex_map_XX("Alpha"));
-    texture_maps.add("map_refl", tex_map_XX("Metallic"));
-    texture_maps.add("map_Ke", tex_map_XX("Emission"));
-    texture_maps.add("map_Bump", tex_map_XX("Normal"));
+    texture_maps.add(eMTLSyntaxElement::map_Kd, tex_map_XX("Base Color"));
+    texture_maps.add(eMTLSyntaxElement::map_Ks, tex_map_XX("Specular"));
+    texture_maps.add(eMTLSyntaxElement::map_Ns, tex_map_XX("Roughness"));
+    texture_maps.add(eMTLSyntaxElement::map_d, tex_map_XX("Alpha"));
+    texture_maps.add(eMTLSyntaxElement::map_refl, tex_map_XX("Metallic"));
+    texture_maps.add(eMTLSyntaxElement::map_Ke, tex_map_XX("Emission"));
+    texture_maps.add(eMTLSyntaxElement::map_Bump, tex_map_XX("Normal"));
   }
 
   /**
    * Caller must ensure that the given lookup key exists in the Map.
    * \return Texture map corresponding to the given ID.
    */
-  tex_map_XX &tex_map_of_type(StringRef map_string)
+  tex_map_XX &tex_map_of_type(const eMTLSyntaxElement key)
   {
     {
-      BLI_assert(texture_maps.contains_as(map_string));
-      return texture_maps.lookup_as(map_string);
+      BLI_assert(texture_maps.contains_as(key));
+      return texture_maps.lookup_as(key);
     }
   }
 
@@ -87,7 +98,7 @@ struct MTLMaterial {
   float Ni{-1.0f};
   float d{-1.0f};
   int illum{-1};
-  Map<const std::string, tex_map_XX> texture_maps;
+  Map<const eMTLSyntaxElement, tex_map_XX> texture_maps;
   /** Only used for Normal Map node: "map_Bump". */
   float map_Bump_strength{-1.0f};
 };
