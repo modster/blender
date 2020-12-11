@@ -1147,10 +1147,11 @@ rna_default = StringProperty(
     maxlen=1024,
 )
 
-rna_property = StringProperty(
+rna_custom_property = StringProperty(
     name="Property Name",
     description="Property name edit",
-    maxlen=1024,
+    # Match `MAX_IDPROP_NAME - 1` in Blender's source.
+    maxlen=63,
 )
 
 rna_min = FloatProperty(
@@ -1196,7 +1197,7 @@ class WM_OT_properties_edit(Operator):
     bl_options = {'REGISTER', 'INTERNAL'}
 
     data_path: rna_path
-    property: rna_property
+    property: rna_custom_property
     value: rna_value
     default: rna_default
     min: rna_min
@@ -1263,6 +1264,7 @@ class WM_OT_properties_edit(Operator):
 
         data_path = self.data_path
         prop = self.property
+        prop_escape = bpy.utils.escape_identifier(prop)
 
         prop_old = getattr(self, "_last_prop", [None])[0]
 
@@ -1288,7 +1290,7 @@ class WM_OT_properties_edit(Operator):
 
         # Reassign
         item[prop] = value_eval
-        item.property_overridable_library_set('["%s"]' % prop, self.is_overridable_library)
+        item.property_overridable_library_set('["%s"]' % prop_escape, self.is_overridable_library)
         rna_idprop_ui_prop_update(item, prop)
 
         self._last_prop[:] = [prop]
@@ -1311,7 +1313,7 @@ class WM_OT_properties_edit(Operator):
 
         # If we have changed the type of the property, update its potential anim curves!
         if prop_type_old != prop_type_new:
-            data_path = '["%s"]' % bpy.utils.escape_identifier(prop)
+            data_path = '["%s"]' % prop_escape
             done = set()
 
             def _update(fcurves):
@@ -1352,13 +1354,16 @@ class WM_OT_properties_edit(Operator):
             rna_idprop_value_item_type
         )
 
+        prop = self.property
+        prop_escape = bpy.utils.escape_identifier(prop)
+
         data_path = self.data_path
 
         if not data_path:
             self.report({'ERROR'}, "Data path not set")
             return {'CANCELLED'}
 
-        self._last_prop = [self.property]
+        self._last_prop = [prop]
 
         item = eval("context.%s" % data_path)
 
@@ -1367,7 +1372,7 @@ class WM_OT_properties_edit(Operator):
             return {'CANCELLED'}
 
         # retrieve overridable static
-        is_overridable = item.is_property_overridable_library('["%s"]' % self.property)
+        is_overridable = item.is_property_overridable_library('["%s"]' % prop_escape)
         self.is_overridable_library = bool(is_overridable)
 
         # default default value
@@ -1379,8 +1384,8 @@ class WM_OT_properties_edit(Operator):
 
         # setup defaults
         props = item.custom_properties()
-        props.update_rna(self.property)
-        rna_data = props.rna_data(self.property)
+        props.update_rna(prop)
+        rna_data = props.rna_data(prop)
         self.subtype =  rna_data["subtype"]
         if prop_type in {int, float}:
             self.min = rna_data["min"]
@@ -1527,7 +1532,7 @@ class WM_OT_properties_remove(Operator):
     bl_options = {'UNDO', 'INTERNAL'}
 
     data_path: rna_path
-    property: rna_property
+    property: rna_custom_property
 
     def execute(self, context):
         from rna_prop_ui import (
