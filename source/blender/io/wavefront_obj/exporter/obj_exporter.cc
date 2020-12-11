@@ -21,7 +21,7 @@
  * \ingroup obj
  */
 
-#include <stdio.h>
+#include <cstdio>
 
 #include <memory>
 

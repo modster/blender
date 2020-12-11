@@ -86,9 +86,9 @@ class OBJWriter : NonMovable, NonCopyable {
   void update_index_offsets(const OBJMesh &obj_mesh_data);
 
  private:
-  typedef void (OBJWriter::*func_vert_uv_normal_indices)(Span<int> vert_indices,
-                                                         Span<int> uv_indices,
-                                                         Span<int> normal_indices) const;
+  using func_vert_uv_normal_indices = void (OBJWriter::*)(Span<int> vert_indices,
+                                                          Span<int> uv_indices,
+                                                          Span<int> normal_indices) const;
   func_vert_uv_normal_indices get_poly_element_writer(const OBJMesh &obj_mesh_data) const;
 
   void write_vert_uv_normal_indices(Span<int> vert_indices,
