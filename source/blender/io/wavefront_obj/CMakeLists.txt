@@ -42,10 +42,10 @@ set(INC_SYS
 set(SRC
   IO_wavefront_obj.cc
   exporter/obj_exporter.cc
+  exporter/obj_export_file_writer.cc
   exporter/obj_export_mesh.cc
   exporter/obj_export_mtl.cc
   exporter/obj_export_nurbs.cc
-  exporter/obj_export_file_writer.cc
   importer/importer_mesh_utils.cc
   importer/obj_import_file_reader.cc
   importer/obj_importer.cc
@@ -57,10 +57,10 @@ set(SRC
 
   IO_wavefront_obj.h
   exporter/obj_exporter.hh
+  exporter/obj_export_file_writer.hh
   exporter/obj_export_mesh.hh
   exporter/obj_export_mtl.hh
   exporter/obj_export_nurbs.hh
-  exporter/obj_export_file_writer.hh
   importer/importer_mesh_utils.hh
   importer/obj_import_file_reader.hh
   importer/obj_importer.hh
@@ -99,4 +99,5 @@ if(WITH_GTESTS)
 
   include(GTestTesting)
   blender_add_test_lib(bf_wavefront_obj_tests "${TEST_SRC}" "${TEST_INC}" "${INC_SYS}" "${TEST_LIB}")
+  add_dependencies(bf_wavefront_obj_tests bf_wavefront_obj)
 endif()
