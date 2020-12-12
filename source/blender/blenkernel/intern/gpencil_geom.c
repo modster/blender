@@ -3420,8 +3420,6 @@ void BKE_gpencil_stroke_uniform_subdivide(bGPdata *gpd,
   BKE_gpencil_stroke_geometry_update(gpd, gps);
 }
 
-}
-
 /**
  * Stroke to view space
  * Transforms a stroke to view space. This allows for manipulations in 2D but also easy conversion
