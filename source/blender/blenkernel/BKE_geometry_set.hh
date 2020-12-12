@@ -88,6 +88,9 @@ class GeometryComponent {
 
   GeometryComponentType type() const;
 
+  /* Return true when any attribute with this name exists, including built in attributes. */
+  bool attribute_exists(const blender::StringRef attribute_name) const;
+
   /* Returns true when the geometry component supports this attribute domain. */
   virtual bool attribute_domain_supported(const AttributeDomain domain) const;
   /* Returns true when the given data type is supported in the given domain. */
@@ -156,6 +159,14 @@ class GeometryComponent {
   blender::bke::ReadAttributePtr attribute_get_constant_for_read(const AttributeDomain domain,
                                                                  const CustomDataType data_type,
                                                                  const void *value) const;
+
+  /* Create a read-only dummy attribute that always returns the same value.
+   * The given value is converted to the correct type if necessary. */
+  blender::bke::ReadAttributePtr attribute_get_constant_for_read_converted(
+      const AttributeDomain domain,
+      const CustomDataType in_data_type,
+      const CustomDataType out_data_type,
+      const void *value) const;
 
   /* Get a read-only dummy attribute that always returns the same value. */
   template<typename T>

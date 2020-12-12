@@ -1626,11 +1626,6 @@ class CyclesPreferences(bpy.types.AddonPreferences):
         for device in devices:
             box.prop(device, "use", text=device.name)
 
-        if device_type == 'OPTIX':
-            col = box.column(align=True)
-            col.label(text="OptiX support is experimental", icon='INFO')
-            col.label(text="Not all Cycles features are supported yet", icon='BLANK1')
-
     def draw_impl(self, layout, context):
         row = layout.row()
         row.prop(self, "compute_device_type", expand=True)
