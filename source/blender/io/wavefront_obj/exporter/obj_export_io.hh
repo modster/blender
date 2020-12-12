@@ -136,7 +136,7 @@ syntax_elem_to_formatting(const eOBJSyntaxElement key)
       return {"vn %f %f %f\n", 3, is_type_float<T...>};
     }
     case eOBJSyntaxElement::poly_element_begin: {
-      return {"f ", 0, is_type_string_related<T...>};
+      return {"f", 0, is_type_string_related<T...>};
     }
     case eOBJSyntaxElement::vertex_uv_normal_indices: {
       return {" %d/%d/%d", 3, is_type_integral<T...>};

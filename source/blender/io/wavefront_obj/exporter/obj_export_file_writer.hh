@@ -56,7 +56,7 @@ class OBJWriter : NonMovable, NonCopyable {
   IndexOffsets index_offsets_{0, 0, 0};
 
  public:
-  OBJWriter(const char *filepath, const OBJExportParams &export_params)
+  OBJWriter(const char *filepath, const OBJExportParams &export_params) noexcept(false)
       : export_params_(export_params)
   {
     file_handler_ = std::make_unique<FileHandler<eFileType::OBJ>>(filepath);
@@ -114,7 +114,7 @@ class MTLWriter : NonMovable, NonCopyable {
   std::string mtl_filepath_;
 
  public:
-  MTLWriter(const char *obj_filepath);
+  MTLWriter(const char *obj_filepath) noexcept(false);
 
   void write_header() const;
   StringRefNull mtl_file_path() const;

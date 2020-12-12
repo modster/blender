@@ -464,7 +464,7 @@ static std::string float3_to_string(const float3 &numbers)
 /*
  * Create the .MTL file.
  */
-MTLWriter::MTLWriter(const char *obj_filepath)
+MTLWriter::MTLWriter(const char *obj_filepath) noexcept(false)
 {
   mtl_filepath_ = obj_filepath;
   const bool ok = BLI_path_extension_replace(mtl_filepath_.data(), FILE_MAX, ".mtl");
