@@ -51,7 +51,7 @@ class GpencilImporterSVG : public GpencilImporter {
                      const int32_t mat_index,
                      const float matrix[4][4]);
 
-  void convert_color(const uint32_t color, float r_linear_rgba[4]);
+  void convert_color(const int32_t color, float r_linear_rgba[4]);
 };
 
 }  // namespace blender::io::gpencil

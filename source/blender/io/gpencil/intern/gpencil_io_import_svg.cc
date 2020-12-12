@@ -252,7 +252,7 @@ static void unpack_nano_color(const unsigned int pack, float r_col[4])
   r_col[3] = (float)rgb_u[3] / 255.0f;
 }
 
-void GpencilImporterSVG::convert_color(const uint32_t color, float r_linear_rgba[4])
+void GpencilImporterSVG::convert_color(const int32_t color, float r_linear_rgba[4])
 {
   float rgba[4];
   unpack_nano_color(color, rgba);

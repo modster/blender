@@ -287,7 +287,7 @@ void GpencilExporterPDF::export_stroke_to_polyline(const bool do_fill, const boo
   }
 
   /* Loop all points. */
-  for (uint32_t i = 0; i < gps->totpoints; i++) {
+  for (int32_t i = 0; i < gps->totpoints; i++) {
     pt = &gps->points[i];
     float screen_co[2];
     HPDF_STATUS err;
