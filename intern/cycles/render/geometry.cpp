@@ -15,8 +15,7 @@
  */
 
 #include "bvh/bvh.h"
-#include "bvh/bvh_build.h"
-#include "bvh/bvh_embree.h"
+#include "bvh/bvh2.h"
 
 #include "device/device.h"
 
@@ -41,6 +40,7 @@
 #include "util/util_foreach.h"
 #include "util/util_logging.h"
 #include "util/util_progress.h"
+#include "util/util_task.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -162,7 +162,8 @@ int Geometry::motion_step(float time) const
 
 bool Geometry::need_build_bvh(BVHLayout layout) const
 {
-  return !transform_applied || has_surface_bssrdf || layout == BVH_LAYOUT_OPTIX;
+  return is_instanced() || layout == BVH_LAYOUT_OPTIX || layout == BVH_LAYOUT_MULTI_OPTIX ||
+         layout == BVH_LAYOUT_MULTI_OPTIX_EMBREE;
 }
 
 bool Geometry::is_instanced() const
@@ -218,7 +219,7 @@ void Geometry::compute_bvh(
       bvh->geometry = geometry;
       bvh->objects = objects;
 
-      bvh->refit(*progress);
+      device->build_bvh(bvh, *progress, true);
     }
     else {
       progress->set_status(msg, "Building BVH");
@@ -235,7 +236,7 @@ void Geometry::compute_bvh(
 
       delete bvh;
       bvh = BVH::create(bparams, geometry, objects, device);
-      MEM_GUARDED_CALL(progress, bvh->build, *progress);
+      MEM_GUARDED_CALL(progress, device->build_bvh, bvh, *progress, false);
     }
   }
 
@@ -1219,131 +1220,129 @@ void GeometryManager::device_update_bvh(Device *device,
                                         Scene *scene,
                                         Progress &progress)
 {
-  BVHParams bparams;
   /* bvh build */
   progress.set_status("Updating Scene BVH", "Building");
-  {
-    scoped_callback_timer timer([scene](double time) {
-      if (scene->update_stats) {
-        scene->update_stats->geometry.times.add_entry({"device_update (build scene BVH)", time});
-      }
-    });
-    bparams.top_level = true;
-    bparams.bvh_layout = BVHParams::best_bvh_layout(scene->params.bvh_layout,
-                                                    device->get_bvh_layout_mask());
-    bparams.use_spatial_split = scene->params.use_bvh_spatial_split;
-    bparams.use_unaligned_nodes = dscene->data.bvh.have_curves &&
-                                  scene->params.use_bvh_unaligned_nodes;
-    bparams.num_motion_triangle_steps = scene->params.num_bvh_time_steps;
-    bparams.num_motion_curve_steps = scene->params.num_bvh_time_steps;
-    bparams.bvh_type = scene->params.bvh_type;
-    bparams.curve_subdivisions = scene->params.curve_subdivisions();
-    bparams.pack_all_data = !bvh || (device_update_flags & DEVICE_DATA_NEEDS_REALLOC);
+  BVHParams bparams;
+  bparams.top_level = true;
+  bparams.bvh_layout = BVHParams::best_bvh_layout(scene->params.bvh_layout,
+                                                  device->get_bvh_layout_mask());
+  bparams.use_spatial_split = scene->params.use_bvh_spatial_split;
+  bparams.use_unaligned_nodes = dscene->data.bvh.have_curves &&
+                                scene->params.use_bvh_unaligned_nodes;
+  bparams.num_motion_triangle_steps = scene->params.num_bvh_time_steps;
+  bparams.num_motion_curve_steps = scene->params.num_bvh_time_steps;
+  bparams.bvh_type = scene->params.bvh_type;
+  bparams.curve_subdivisions = scene->params.curve_subdivisions();
 
-    VLOG(1) << "Using " << bvh_layout_name(bparams.bvh_layout) << " layout.";
+  VLOG(1) << "Using " << bvh_layout_name(bparams.bvh_layout) << " layout.";
 
-    if (bvh) {
-      bvh->params = bparams;
-      bvh->pack = {};
-
-      if (!(device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-        if (bparams.bvh_layout == BVHLayout::BVH_LAYOUT_OPTIX) {
-          // bvh->refit(progress);
-        }
-
-        PackedBVH &pack = bvh->pack;
-
-        /* get back the vertices if the size is still the same, we can safely update this array
-         * with the new coordinates */
-        dscene->prim_tri_verts.give_data(pack.prim_tri_verts);
-      }
-    }
-
-    if (!bvh || (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-      free_bvh(dscene);
-      bvh = BVH::create(bparams, scene->geometry, scene->objects, device);
-    }
-
-    bvh->build(progress, &device->stats);
-  }
+  delete scene->bvh;
+  BVH *bvh = scene->bvh = BVH::create(bparams, scene->geometry, scene->objects, device);
+  device->build_bvh(bvh, progress, false);
 
   if (progress.get_cancel()) {
-    free_bvh(dscene);
     return;
+  }
+
+  PackedBVH pack;
+  if (bparams.bvh_layout == BVH_LAYOUT_BVH2) {
+    pack = std::move(static_cast<BVH2 *>(bvh)->pack);
+  }
+  else {
+    progress.set_status("Updating Scene BVH", "Packing BVH primitives");
+
+    size_t num_prims = 0;
+    size_t num_tri_verts = 0;
+    foreach (Geometry *geom, scene->geometry) {
+      if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
+        Mesh *mesh = static_cast<Mesh *>(geom);
+        num_prims += mesh->num_triangles();
+        num_tri_verts += 3 * mesh->num_triangles();
+      }
+      else if (geom->is_hair()) {
+        Hair *hair = static_cast<Hair *>(geom);
+        num_prims += hair->num_segments();
+      }
+    }
+
+    pack.root_index = -1;
+    pack.prim_tri_index.reserve(num_prims);
+    pack.prim_tri_verts.reserve(num_tri_verts);
+    pack.prim_type.reserve(num_prims);
+    pack.prim_index.reserve(num_prims);
+    pack.prim_object.reserve(num_prims);
+    pack.prim_visibility.reserve(num_prims);
+
+    // Merge visibility flags of all objects and find object index for non-instanced geometry
+    unordered_map<const Geometry *, pair<int, uint>> geometry_to_object_info;
+    geometry_to_object_info.reserve(scene->geometry.size());
+    foreach (Object *ob, scene->objects) {
+      const Geometry *const geom = ob->get_geometry();
+      pair<int, uint> &info = geometry_to_object_info[geom];
+      info.second |= ob->visibility_for_tracing();
+      if (!geom->is_instanced()) {
+        info.first = ob->get_device_index();
+      }
+    }
+
+    // Iterate over scene mesh list instead of objects, since 'optix_prim_offset' was calculated
+    // based on that list, which may be ordered differently from the object list.
+    foreach (Geometry *geom, scene->geometry) {
+      const pair<int, uint> &info = geometry_to_object_info[geom];
+      geom->pack_primitives(pack, info.first, info.second);
+    }
   }
 
   /* copy to device */
   progress.set_status("Updating Scene BVH", "Copying BVH to device");
 
-  PackedBVH &pack = bvh->pack;
-  {
-    scoped_callback_timer timer([scene](double time) {
-      if (scene->update_stats) {
-        scene->update_stats->geometry.times.add_entry(
-            {"device_update (copy packed BVH to device)", time});
-      }
-    });
-
-    if (pack.nodes.size()) {
-      dscene->bvh_nodes.steal_data(pack.nodes);
-      dscene->bvh_nodes.copy_to_device();
-    }
-    if (pack.leaf_nodes.size()) {
-      dscene->bvh_leaf_nodes.steal_data(pack.leaf_nodes);
-      dscene->bvh_leaf_nodes.copy_to_device();
-    }
-    if (pack.object_node.size()) {
-      dscene->object_node.steal_data(pack.object_node);
-      dscene->object_node.copy_to_device();
-    }
-    if (pack.prim_tri_index.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-      dscene->prim_tri_index.steal_data(pack.prim_tri_index);
-      dscene->prim_tri_index.copy_to_device();
-    }
-    if (pack.prim_tri_verts.size()) {
-      dscene->prim_tri_verts.steal_data(pack.prim_tri_verts);
-      dscene->prim_tri_verts.copy_to_device();
-    }
-    if (pack.prim_type.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-      dscene->prim_type.steal_data(pack.prim_type);
-      dscene->prim_type.copy_to_device();
-    }
-    if (pack.prim_visibility.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-      dscene->prim_visibility.steal_data(pack.prim_visibility);
-      dscene->prim_visibility.copy_to_device();
-    }
-    if (pack.prim_index.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-      dscene->prim_index.steal_data(pack.prim_index);
-      dscene->prim_index.copy_to_device();
-    }
-    if (pack.prim_object.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-      dscene->prim_object.steal_data(pack.prim_object);
-      dscene->prim_object.copy_to_device();
-    }
-    if (pack.prim_time.size() && (device_update_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-      dscene->prim_time.steal_data(pack.prim_time);
-      dscene->prim_time.copy_to_device();
-    }
-
-    dscene->data.bvh.root = pack.root_index;
-    dscene->data.bvh.bvh_layout = bparams.bvh_layout;
-    dscene->data.bvh.use_bvh_steps = (scene->params.num_bvh_time_steps != 0);
-    dscene->data.bvh.curve_subdivisions = scene->params.curve_subdivisions();
+  if (pack.nodes.size()) {
+    dscene->bvh_nodes.steal_data(pack.nodes);
+    dscene->bvh_nodes.copy_to_device();
+  }
+  if (pack.leaf_nodes.size()) {
+    dscene->bvh_leaf_nodes.steal_data(pack.leaf_nodes);
+    dscene->bvh_leaf_nodes.copy_to_device();
+  }
+  if (pack.object_node.size()) {
+    dscene->object_node.steal_data(pack.object_node);
+    dscene->object_node.copy_to_device();
+  }
+  if (pack.prim_tri_index.size()) {
+    dscene->prim_tri_index.steal_data(pack.prim_tri_index);
+    dscene->prim_tri_index.copy_to_device();
+  }
+  if (pack.prim_tri_verts.size()) {
+    dscene->prim_tri_verts.steal_data(pack.prim_tri_verts);
+    dscene->prim_tri_verts.copy_to_device();
+  }
+  if (pack.prim_type.size()) {
+    dscene->prim_type.steal_data(pack.prim_type);
+    dscene->prim_type.copy_to_device();
+  }
+  if (pack.prim_visibility.size()) {
+    dscene->prim_visibility.steal_data(pack.prim_visibility);
+    dscene->prim_visibility.copy_to_device();
+  }
+  if (pack.prim_index.size()) {
+    dscene->prim_index.steal_data(pack.prim_index);
+    dscene->prim_index.copy_to_device();
+  }
+  if (pack.prim_object.size()) {
+    dscene->prim_object.steal_data(pack.prim_object);
+    dscene->prim_object.copy_to_device();
+  }
+  if (pack.prim_time.size()) {
+    dscene->prim_time.steal_data(pack.prim_time);
+    dscene->prim_time.copy_to_device();
   }
 
-  {
-    scoped_callback_timer timer([scene](double time) {
-      if (scene->update_stats) {
-        scene->update_stats->geometry.times.add_entry(
-            {"device_update (copy BVH to device)", time});
-      }
-    });
-
-    bvh->device_attr_float3_pointer = dscene->attributes_float3.device_pointer;
-    bvh->device_verts_pointer = dscene->prim_tri_verts.device_pointer;
-
-    bvh->copy_to_device(progress, dscene);
-  }
+  dscene->data.bvh.root = pack.root_index;
+  dscene->data.bvh.bvh_layout = bparams.bvh_layout;
+  dscene->data.bvh.use_bvh_steps = (scene->params.num_bvh_time_steps != 0);
+  dscene->data.bvh.curve_subdivisions = scene->params.curve_subdivisions();
+  /* The scene handle is set in 'CPUDevice::const_copy_to' and 'OptiXDevice::const_copy_to' */
+  dscene->data.bvh.scene = NULL;
 }
 
 void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Progress &progress)
@@ -1852,18 +1851,6 @@ void GeometryManager::device_update(Device *device,
 
 void GeometryManager::device_free(Device *device, DeviceScene *dscene)
 {
-#ifdef WITH_EMBREE
-  if (dscene->data.bvh.scene) {
-    if (dscene->data.bvh.bvh_layout == BVH_LAYOUT_EMBREE) {
-      BVHEmbree::destroy(dscene->data.bvh.scene);
-      if (bvh) {
-        static_cast<BVHEmbree *>(bvh)->scene = NULL;
-      }
-    }
-    dscene->data.bvh.scene = NULL;
-  }
-#endif
-
   if (device_update_flags & (DEVICE_MESH_DATA_NEEDS_REALLOC | DEVICE_CURVE_DATA_NEEDS_REALLOC)) {
     dscene->bvh_nodes.free();
     dscene->bvh_leaf_nodes.free();
