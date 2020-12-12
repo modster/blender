@@ -46,7 +46,7 @@ struct GpencilIOParams {
   /* Current frame. */
   int32_t frame_cur;
   /** Flags. */
-  int32_t flag;
+  uint32_t flag;
   /** Scale. */
   float scale;
   /** Select mode. */
