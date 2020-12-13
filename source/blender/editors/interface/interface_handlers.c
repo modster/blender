@@ -838,6 +838,7 @@ static void ui_apply_but_undo(uiBut *but)
     /* fallback, else we don't get an undo! */
     if (str == NULL || str[0] == '\0' || str_len_clip == 0) {
       str = "Unknown Action";
+      str_len_clip = strlen(str);
     }
 
     /* Optionally override undo when undo system doesn't support storing properties. */
@@ -1348,6 +1349,9 @@ static void ui_multibut_states_apply(bContext *C, uiHandleButtonData *data, uiBl
     if (mbut_state == NULL) {
       /* Highly unlikely. */
       printf("%s: Can't find button\n", __func__);
+      /* While this avoids crashing, multi-button dragging will fail,
+       * which is still a bug from the user perspective. See T83651. */
+      continue;
     }
 
     void *active_back;
@@ -8363,8 +8367,8 @@ uiBut *UI_context_active_but_get(const bContext *C)
  */
 uiBut *UI_context_active_but_get_respect_menu(const bContext *C)
 {
-  ARegion *ar_menu = CTX_wm_menu(C);
-  return ui_context_button_active(ar_menu ? ar_menu : CTX_wm_region(C), NULL);
+  ARegion *region_menu = CTX_wm_menu(C);
+  return ui_context_button_active(region_menu ? region_menu : CTX_wm_region(C), NULL);
 }
 
 uiBut *UI_region_active_but_get(ARegion *region)

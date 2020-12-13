@@ -99,7 +99,6 @@ set(DEFSRC
 
 if(WITH_EXPERIMENTAL_FEATURES)
   add_definitions(-DWITH_GEOMETRY_NODES)
-  add_definitions(-DWITH_POINT_CLOUD)
   add_definitions(-DWITH_HAIR_NODES)
   list(APPEND DEFSRC
     rna_hair.c
@@ -376,6 +375,7 @@ blender_include_dirs(
   ../../ikplugin
   ../../imbuf
   ../../makesdna
+  ../../modifiers
   ../../nodes/
   ../../sequencer
   ../../simulation

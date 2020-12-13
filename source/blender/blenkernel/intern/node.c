@@ -39,6 +39,7 @@
 #include "DNA_light_types.h"
 #include "DNA_linestyle_types.h"
 #include "DNA_material_types.h"
+#include "DNA_modifier_types.h"
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_simulation_types.h"
@@ -65,7 +66,6 @@
 #include "BKE_lib_query.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
-#include "BKE_simulation.h"
 
 #include "BLI_ghash.h"
 #include "BLI_threads.h"
@@ -75,8 +75,8 @@
 #include "NOD_common.h"
 #include "NOD_composite.h"
 #include "NOD_function.h"
+#include "NOD_geometry.h"
 #include "NOD_shader.h"
-#include "NOD_simulation.h"
 #include "NOD_socket.h"
 #include "NOD_texture.h"
 
@@ -84,6 +84,8 @@
 #include "DEG_depsgraph_build.h"
 
 #include "BLO_read_write.h"
+
+#include "MOD_nodes.h"
 
 #define NODE_DEFAULT_MAX_WIDTH 700
 
@@ -272,6 +274,11 @@ static void library_foreach_node_socket(LibraryForeachIDData *data, bNodeSocket 
       BKE_LIB_FOREACHID_PROCESS(data, default_value->value, IDWALK_CB_USER);
       break;
     }
+    case SOCK_COLLECTION: {
+      bNodeSocketValueCollection *default_value = sock->default_value;
+      BKE_LIB_FOREACHID_PROCESS(data, default_value->value, IDWALK_CB_USER);
+      break;
+    }
     case SOCK_FLOAT:
     case SOCK_VECTOR:
     case SOCK_RGBA:
@@ -281,6 +288,7 @@ static void library_foreach_node_socket(LibraryForeachIDData *data, bNodeSocket 
     case __SOCK_MESH:
     case SOCK_CUSTOM:
     case SOCK_SHADER:
+    case SOCK_GEOMETRY:
       break;
   }
 }
@@ -370,9 +378,13 @@ static void write_node_socket_default_value(BlendWriter *writer, bNodeSocket *so
     case SOCK_IMAGE:
       BLO_write_struct(writer, bNodeSocketValueImage, sock->default_value);
       break;
+    case SOCK_COLLECTION:
+      BLO_write_struct(writer, bNodeSocketValueCollection, sock->default_value);
+      break;
     case __SOCK_MESH:
     case SOCK_CUSTOM:
     case SOCK_SHADER:
+    case SOCK_GEOMETRY:
       BLI_assert(false);
       break;
   }
@@ -705,6 +717,11 @@ static void lib_link_node_socket(BlendLibReader *reader, Library *lib, bNodeSock
       BLO_read_id_address(reader, lib, &default_value->value);
       break;
     }
+    case SOCK_COLLECTION: {
+      bNodeSocketValueImage *default_value = sock->default_value;
+      BLO_read_id_address(reader, lib, &default_value->value);
+      break;
+    }
     case SOCK_FLOAT:
     case SOCK_VECTOR:
     case SOCK_RGBA:
@@ -714,6 +731,7 @@ static void lib_link_node_socket(BlendLibReader *reader, Library *lib, bNodeSock
     case __SOCK_MESH:
     case SOCK_CUSTOM:
     case SOCK_SHADER:
+    case SOCK_GEOMETRY:
       break;
   }
 }
@@ -783,6 +801,11 @@ static void expand_node_socket(BlendExpander *expander, bNodeSocket *sock)
         BLO_expand(expander, default_value->value);
         break;
       }
+      case SOCK_COLLECTION: {
+        bNodeSocketValueCollection *default_value = sock->default_value;
+        BLO_expand(expander, default_value->value);
+        break;
+      }
       case SOCK_FLOAT:
       case SOCK_VECTOR:
       case SOCK_RGBA:
@@ -792,6 +815,7 @@ static void expand_node_socket(BlendExpander *expander, bNodeSocket *sock)
       case __SOCK_MESH:
       case SOCK_CUSTOM:
       case SOCK_SHADER:
+      case SOCK_GEOMETRY:
         break;
     }
   }
@@ -1339,6 +1363,11 @@ static void socket_id_user_increment(bNodeSocket *sock)
       id_us_plus((ID *)default_value->value);
       break;
     }
+    case SOCK_COLLECTION: {
+      bNodeSocketValueCollection *default_value = sock->default_value;
+      id_us_plus((ID *)default_value->value);
+      break;
+    }
     case SOCK_FLOAT:
     case SOCK_VECTOR:
     case SOCK_RGBA:
@@ -1348,6 +1377,7 @@ static void socket_id_user_increment(bNodeSocket *sock)
     case __SOCK_MESH:
     case SOCK_CUSTOM:
     case SOCK_SHADER:
+    case SOCK_GEOMETRY:
       break;
   }
 }
@@ -1365,6 +1395,11 @@ static void socket_id_user_decrement(bNodeSocket *sock)
       id_us_min(&default_value->value->id);
       break;
     }
+    case SOCK_COLLECTION: {
+      bNodeSocketValueCollection *default_value = sock->default_value;
+      id_us_min(&default_value->value->id);
+      break;
+    }
     case SOCK_FLOAT:
     case SOCK_VECTOR:
     case SOCK_RGBA:
@@ -1374,6 +1409,7 @@ static void socket_id_user_decrement(bNodeSocket *sock)
     case __SOCK_MESH:
     case SOCK_CUSTOM:
     case SOCK_SHADER:
+    case SOCK_GEOMETRY:
       break;
   }
 }
@@ -1501,6 +1537,10 @@ const char *nodeStaticSocketType(int type, int subtype)
       return "NodeSocketObject";
     case SOCK_IMAGE:
       return "NodeSocketImage";
+    case SOCK_GEOMETRY:
+      return "NodeSocketGeometry";
+    case SOCK_COLLECTION:
+      return "NodeSocketCollection";
   }
   return NULL;
 }
@@ -1566,6 +1606,10 @@ const char *nodeStaticSocketInterfaceType(int type, int subtype)
       return "NodeSocketInterfaceObject";
     case SOCK_IMAGE:
       return "NodeSocketInterfaceImage";
+    case SOCK_GEOMETRY:
+      return "NodeSocketInterfaceGeometry";
+    case SOCK_COLLECTION:
+      return "NodeSocketInterfaceCollection";
   }
   return NULL;
 }
@@ -2696,7 +2740,7 @@ void nodeRemoveNode(Main *bmain, bNodeTree *ntree, bNode *node, bool do_id_user)
   char propname_esc[MAX_IDPROP_NAME * 2];
   char prefix[MAX_IDPROP_NAME * 2];
 
-  BLI_strescape(propname_esc, node->name, sizeof(propname_esc));
+  BLI_str_escape(propname_esc, node->name, sizeof(propname_esc));
   BLI_snprintf(prefix, sizeof(prefix), "nodes[\"%s\"]", propname_esc);
 
   if (BKE_animdata_fix_paths_remove((ID *)ntree, prefix)) {
@@ -3948,14 +3992,18 @@ void ntreeUpdateAllNew(Main *main)
   FOREACH_NODETREE_END;
 }
 
-void ntreeUpdateAllUsers(Main *main, ID *ngroup)
+void ntreeUpdateAllUsers(Main *main, ID *id)
 {
+  if (id == NULL) {
+    return;
+  }
+
   /* Update all users of ngroup, to add/remove sockets as needed. */
   FOREACH_NODETREE_BEGIN (main, ntree, owner_id) {
     bool need_update = false;
 
     LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
-      if (node->id == ngroup) {
+      if (node->id == id) {
         if (node->typeinfo->group_update_func) {
           node->typeinfo->group_update_func(ntree, node);
         }
@@ -3969,6 +4017,22 @@ void ntreeUpdateAllUsers(Main *main, ID *ngroup)
     }
   }
   FOREACH_NODETREE_END;
+
+  if (GS(id->name) == ID_NT) {
+    bNodeTree *ngroup = (bNodeTree *)id;
+    if (ngroup->type == NTREE_GEOMETRY) {
+      LISTBASE_FOREACH (Object *, object, &main->objects) {
+        LISTBASE_FOREACH (ModifierData *, md, &object->modifiers) {
+          if (md->type == eModifierType_Nodes) {
+            NodesModifierData *nmd = (NodesModifierData *)md;
+            if (nmd->node_group == ngroup) {
+              MOD_nodes_update_interface(object, nmd);
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 void ntreeUpdateTree(Main *bmain, bNodeTree *ntree)
@@ -4649,9 +4713,23 @@ static void registerTextureNodes(void)
   register_node_type_tex_proc_distnoise();
 }
 
-static void registerSimulationNodes(void)
+static void registerGeometryNodes(void)
 {
-  register_node_type_sim_group();
+  register_node_type_geo_group();
+
+  register_node_type_geo_attribute_fill();
+  register_node_type_geo_triangulate();
+  register_node_type_geo_edge_split();
+  register_node_type_geo_transform();
+  register_node_type_geo_subdivision_surface();
+  register_node_type_geo_boolean();
+  register_node_type_geo_point_distribute();
+  register_node_type_geo_point_instance();
+  register_node_type_geo_object_info();
+  register_node_type_geo_random_attribute();
+  register_node_type_geo_attribute_math();
+  register_node_type_geo_join_geometry();
+  register_node_type_geo_attribute_mix();
 }
 
 static void registerFunctionNodes(void)
@@ -4678,7 +4756,7 @@ void BKE_node_system_init(void)
   register_node_tree_type_cmp();
   register_node_tree_type_sh();
   register_node_tree_type_tex();
-  register_node_tree_type_sim();
+  register_node_tree_type_geo();
 
   register_node_type_frame();
   register_node_type_reroute();
@@ -4688,7 +4766,7 @@ void BKE_node_system_init(void)
   registerCompositNodes();
   registerShaderNodes();
   registerTextureNodes();
-  registerSimulationNodes();
+  registerGeometryNodes();
   registerFunctionNodes();
 }
 
