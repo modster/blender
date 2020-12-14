@@ -25,8 +25,10 @@
 extern "C" {
 #endif
 
-struct Scene;
 struct bContext;
+struct CacheReader;
+struct Object;
+struct Scene;
 
 typedef struct CacheArchiveHandle CacheArchiveHandle;
 

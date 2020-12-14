@@ -32,7 +32,6 @@ namespace blender::io::usd {
 
 class USDShapeReader : public USDXformableReader {
  protected:
-
  public:
   USDShapeReader(const pxr::UsdPrim &prim, const USDImporterContext &context);
 

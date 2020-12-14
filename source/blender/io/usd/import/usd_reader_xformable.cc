@@ -68,15 +68,9 @@ void USDXformableReader::eval_merged_with_parent()
       pxr::UsdPrimSiblingRange child_prims = parent.GetFilteredChildren(
           pxr::UsdTraverseInstanceProxies(pxr::UsdPrimDefaultPredicate));
 
-      // Unfortunately, we need to iterate over the child primitives
-      // to count them.
-      int num_child_prims = 0;
-      for (const pxr::UsdPrim &child_prim : child_prims) {
-        ++num_child_prims;
-        if (num_child_prims > 1) {
-          break;
-        }
-      }
+      // UsdPrimSiblingRange doesn't have a size() function, so we compute the child count.
+      std::ptrdiff_t num_child_prims = std::distance(child_prims.begin(), child_prims.end());
+
       merged_with_parent_ = num_child_prims == 1;
     }
   }
