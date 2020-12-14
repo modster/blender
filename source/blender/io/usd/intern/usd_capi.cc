@@ -289,7 +289,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 
   data->stage = pxr::UsdStage::Open(data->filename);
   if (!data->stage) {
-    WM_reportf(RPT_ERROR, "USD Export: couldn't open USD stage for file %s", data->filename);
+    WM_reportf(RPT_ERROR, "USD Import: couldn't open USD stage for file %s", data->filename);
     return;
   }
 
