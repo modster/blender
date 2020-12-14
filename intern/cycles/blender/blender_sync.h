@@ -152,8 +152,7 @@ class BlenderSync {
 
   void sync_procedural(BL::Object &b_ob,
                        BL::MeshSequenceCacheModifier &b_mesh_cache,
-                       int frame_current,
-                       float motion_time);
+                       bool background);
 
   bool sync_object_attributes(BL::DepsgraphObjectInstance &b_instance, Object *object);
 

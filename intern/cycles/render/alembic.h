@@ -30,6 +30,7 @@
 
 CCL_NAMESPACE_BEGIN
 
+class AlembicProcedural;
 class Geometry;
 class Object;
 class Progress;
@@ -197,120 +198,16 @@ struct CachedData {
 
   vector<CachedAttribute> attributes{};
 
-  void clear()
-  {
-    vertices.clear();
-    triangles.clear();
-    triangles_loops.clear();
-    transforms.clear();
-    attributes.clear();
-    curve_keys.clear();
-    curve_radius.clear();
-    curve_first_key.clear();
-    curve_shader.clear();
-    subd_start_corner.clear();
-    subd_num_corners.clear();
-    subd_smooth.clear();
-    subd_ptex_offset.clear();
-    subd_face_corners.clear();
-    num_ngons.clear();
-    subd_creases_edge.clear();
-    subd_creases_weight.clear();
-    shader.clear();
-
-    for (CachedAttribute &attr : attributes) {
-      attr.data.clear();
-    }
-
-    attributes.clear();
-  }
+  void clear();
 
   CachedAttribute &add_attribute(const ustring &name,
-                                 const Alembic::Abc::TimeSampling &time_sampling)
-  {
-    for (auto &attr : attributes) {
-      if (attr.name == name) {
-        return attr;
-      }
-    }
+                                 const Alembic::Abc::TimeSampling &time_sampling);
 
-    CachedAttribute &attr = attributes.emplace_back();
-    attr.name = name;
-    attr.data.set_time_sampling(time_sampling);
-    return attr;
-  }
+  bool is_constant() const;
 
-  bool is_constant() const
-  {
-    if (!vertices.is_constant()) {
-      return false;
-    }
+  void invalidate_last_loaded_time(bool attributes_only = false);
 
-    if (!triangles.is_constant()) {
-      return false;
-    }
-
-    if (!transforms.is_constant()) {
-      return false;
-    }
-
-    if (!curve_keys.is_constant()) {
-      return false;
-    }
-
-    if (!curve_radius.is_constant()) {
-      return false;
-    }
-
-    if (!curve_first_key.is_constant()) {
-      return false;
-    }
-
-    if (!curve_shader.is_constant()) {
-      return false;
-    }
-
-    if (!shader.is_constant()) {
-      return false;
-    }
-
-    for (const CachedAttribute &attr : attributes) {
-      if (!attr.data.is_constant()) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  void invalidate_last_loaded_time(bool attributes_only = false)
-  {
-    if (attributes_only) {
-      for (CachedAttribute &attr : attributes) {
-        attr.data.invalidate_last_loaded_time();
-      }
-
-      return;
-    }
-
-    vertices.invalidate_last_loaded_time();
-    triangles.invalidate_last_loaded_time();
-    triangles_loops.invalidate_last_loaded_time();
-    transforms.invalidate_last_loaded_time();
-    curve_keys.invalidate_last_loaded_time();
-    curve_radius.invalidate_last_loaded_time();
-    curve_first_key.invalidate_last_loaded_time();
-    curve_shader.invalidate_last_loaded_time();
-    subd_start_corner.invalidate_last_loaded_time();
-    subd_num_corners.invalidate_last_loaded_time();
-    subd_smooth.invalidate_last_loaded_time();
-    subd_ptex_offset.invalidate_last_loaded_time();
-    subd_face_corners.invalidate_last_loaded_time();
-    num_ngons.invalidate_last_loaded_time();
-    subd_creases_edge.invalidate_last_loaded_time();
-    subd_creases_weight.invalidate_last_loaded_time();
-    shader.invalidate_last_loaded_time();
-  }
+  void set_time_sampling(Alembic::AbcCoreAbstract::TimeSampling time_sampling);
 };
 
 /* Representation of an Alembic object for the AlembicProcedural.
@@ -350,9 +247,17 @@ class AlembicObject : public Node {
   void set_object(Object *object);
   Object *get_object();
 
-  void load_all_data(Alembic::AbcGeom::IPolyMeshSchema &schema, Progress &progress);
-  void load_all_data(Alembic::AbcGeom::ISubDSchema &schema, Progress &progress);
-  void load_all_data(const Alembic::AbcGeom::ICurvesSchema &schema,
+  void load_all_data(AlembicProcedural *proc,
+                     Alembic::AbcGeom::IPolyMeshSchema &schema,
+                     float scale,
+                     Progress &progress);
+  void load_all_data(AlembicProcedural *proc,
+                     Alembic::AbcGeom::ISubDSchema &schema,
+                     float scale,
+                     Progress &progress);
+  void load_all_data(AlembicProcedural *proc,
+                     const Alembic::AbcGeom::ICurvesSchema &schema,
+                     float scale,
                      Progress &progress,
                      float default_radius);
 
@@ -392,7 +297,7 @@ class AlembicObject : public Node {
                       array<int> &polygon_to_shader,
                       Alembic::AbcGeom::ISampleSelector sample_sel);
 
-  void setup_transform_cache();
+  void setup_transform_cache(float scale);
 
   AttributeRequestSet get_requested_attributes();
 };
@@ -420,6 +325,12 @@ class AlembicProcedural : public Procedural {
   /* The current frame to render. */
   NODE_SOCKET_API(float, frame)
 
+  /* The first frame to load data for. */
+  NODE_SOCKET_API(float, start_frame)
+
+  /* The last frame to load data for. */
+  NODE_SOCKET_API(float, end_frame)
+
   /* Subtracted to the current frame. */
   NODE_SOCKET_API(float, frame_offset)
 
@@ -432,6 +343,10 @@ class AlembicProcedural : public Procedural {
   /* Set the default radius to use for curves when the Alembic Curves Schemas do not have radius
    * information. */
   NODE_SOCKET_API(float, default_radius)
+
+  /* Multiplier to account for differences in default units for measuring objects in various
+   * software. */
+  NODE_SOCKET_API(float, scale)
 
   AlembicProcedural();
   ~AlembicProcedural();

@@ -468,31 +468,11 @@ bool BlenderSync::sync_object_attributes(BL::DepsgraphObjectInstance &b_instance
 
 /* Object Loop */
 
-static BL::MeshSequenceCacheModifier object_alembic_cache_find(BL::Object b_ob)
-{
-  if (b_ob.modifiers.length() > 0) {
-    BL::Modifier b_mod = b_ob.modifiers[b_ob.modifiers.length() - 1];
-
-    if (b_mod.type() == BL::Modifier::type_MESH_SEQUENCE_CACHE) {
-      return BL::MeshSequenceCacheModifier(b_mod);
-    }
-  }
-
-  return BL::MeshSequenceCacheModifier(PointerRNA_NULL);
-}
-
 void BlenderSync::sync_procedural(BL::Object &b_ob,
                                   BL::MeshSequenceCacheModifier &b_mesh_cache,
-                                  int frame_current,
-                                  float motion_time)
+                                  bool background)
 {
 #ifdef WITH_ALEMBIC
-  bool motion = motion_time != 0.0f;
-
-  if (motion) {
-    return;
-  }
-
   BL::CacheFile cache_file = b_mesh_cache.cache_file();
   void *cache_file_key = cache_file.ptr.data;
 
@@ -507,12 +487,24 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
     procedural_map.used(procedural);
   }
 
+  float current_frame = b_scene.frame_current();
   if (cache_file.override_frame()) {
-    procedural->set_frame(cache_file.frame());
+    current_frame = cache_file.frame();
+  }
+
+  if (!background && !cache_file.override_frame()) {
+    /* for viewport renders we load the entire animation, unless we have a fixed frame */
+    procedural->set_start_frame(b_scene.frame_start());
+    procedural->set_end_frame(b_scene.frame_end());
   }
   else {
-    procedural->set_frame(static_cast<float>(frame_current));
+    /* for final renders we set the start and end frames to the current one so we
+     * only load data for the current frame */
+    procedural->set_start_frame(current_frame);
+    procedural->set_end_frame(current_frame);
   }
+
+  procedural->set_frame(current_frame);
 
   procedural->set_frame_rate(b_scene.render().fps() / b_scene.render().fps_base());
   procedural->set_default_radius(cache_file.default_radius());
@@ -520,6 +512,8 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
 
   string absolute_path = blender_absolute_path(b_data, b_ob, b_mesh_cache.cache_file().filepath());
   procedural->set_filepath(ustring(absolute_path));
+
+  procedural->set_scale(cache_file.scale());
 
   /* create or update existing AlembicObjects */
   ustring object_path = ustring(b_mesh_cache.object_path());
@@ -604,12 +598,13 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
     /* Object itself. */
     if (b_instance.show_self()) {
 #ifdef WITH_ALEMBIC
-      BL::MeshSequenceCacheModifier b_mesh_cache = object_alembic_cache_find(b_ob);
+      BL::MeshSequenceCacheModifier b_mesh_cache = object_mesh_cache_find(b_ob, false);
 
-      /* only for viewport renders at the moment as we are loading the entire archive in memory */
-      if (b_mesh_cache && b_v3d && experimental &&
+      /* experimental as blender does not have good support for procedurals at the moment
+       * skip in the motion case, as the motion blur data will be handled in the procedural */
+      if (!motion && b_mesh_cache && experimental &&
           b_mesh_cache.cache_file().use_cycles_procedural()) {
-        sync_procedural(b_ob, b_mesh_cache, b_depsgraph.scene().frame_current(), motion_time);
+        sync_procedural(b_ob, b_mesh_cache, !b_v3d);
       }
       else
 #endif

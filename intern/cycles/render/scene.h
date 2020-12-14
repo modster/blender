@@ -464,6 +464,8 @@ template<> void Scene::delete_node_impl(ParticleSystem *node);
 
 template<> void Scene::delete_node_impl(Shader *node);
 
+template<> void Scene::delete_node_impl(Procedural *node);
+
 template<> void Scene::delete_node_impl(AlembicProcedural *node);
 
 template<> void Scene::delete_nodes(const set<Light *> &nodes, const NodeOwner *owner);

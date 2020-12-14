@@ -595,7 +595,6 @@ static void ui_alembic_import_settings(uiLayout *layout, PointerRNA *imfptr)
   uiItemR(col, imfptr, "is_sequence", 0, NULL, ICON_NONE);
   uiItemR(col, imfptr, "validate_meshes", 0, NULL, ICON_NONE);
   uiItemR(col, imfptr, "force_modifier", 0, NULL, ICON_NONE);
-
   uiItemR(box, imfptr, "default_radius", 0, NULL, ICON_NONE);
 }
 
@@ -728,7 +727,7 @@ void WM_OT_alembic_import(wmOperatorType *ot)
                 0.01f,
                 0.0001f,
                 1000.0f,
-                "Curves Radius",
+                "Default Radius",
                 "Value to use for defining the radius of curves of points when then do not have a "
                 "property for it",
                 0.0001f,

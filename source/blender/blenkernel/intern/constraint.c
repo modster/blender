@@ -5300,7 +5300,8 @@ static void transformcache_evaluate(bConstraint *con, bConstraintOb *cob, ListBa
     return;
   }
 
-  if (check_rendered_viewport_visible(DEG_get_bmain(cob->depsgraph))) {
+  /* Do not process data if using the Cycles procedural. */
+  if (BKE_cache_file_use_cycles_procedural(cob->depsgraph, cache_file)) {
     return;
   }
 

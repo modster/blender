@@ -2467,7 +2467,7 @@ int BKE_scene_orientation_slot_get_index(const TransformOrientationSlot *orient_
 
 /** \} */
 
-bool check_rendered_viewport_visible(Main *bmain)
+bool BKE_check_rendered_viewport_visible(Main *bmain)
 {
   wmWindowManager *wm = bmain->wm.first;
   wmWindow *window;
@@ -2511,7 +2511,7 @@ static void prepare_mesh_for_viewport_render(Main *bmain, const ViewLayer *view_
     Mesh *mesh = obedit->data;
     if ((obedit->type == OB_MESH) &&
         ((obedit->id.recalc & ID_RECALC_ALL) || (mesh->id.recalc & ID_RECALC_ALL))) {
-      if (check_rendered_viewport_visible(bmain)) {
+      if (BKE_check_rendered_viewport_visible(bmain)) {
         BMesh *bm = mesh->edit_mesh->bm;
         BM_mesh_bm_to_me(bmain,
                          bm,

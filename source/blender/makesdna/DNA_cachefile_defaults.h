@@ -39,6 +39,7 @@
     .handle = NULL, \
     .handle_filepath[0] = '\0', \
     .handle_readers = NULL, \
+    .default_radius = 0.01f, \
   }
 
 /** \} */

@@ -116,14 +116,14 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   Mesh *me = (ctx->object->type == OB_MESH) ? ctx->object->data : NULL;
   Mesh *org_mesh = mesh;
 
-  struct Main *bmain = DEG_get_bmain(ctx->depsgraph);
   Scene *scene = DEG_get_evaluated_scene(ctx->depsgraph);
   CacheFile *cache_file = mcmd->cache_file;
   const float frame = DEG_get_ctime(ctx->depsgraph);
   const float time = BKE_cachefile_time_offset(cache_file, frame, FPS);
   const char *err_str = NULL;
 
-  if (cache_file->use_cycles_procedural && check_rendered_viewport_visible(bmain)) {
+  /* Do not process data if using the Cycles procedural. */
+  if (BKE_cache_file_use_cycles_procedural(ctx->depsgraph, cache_file)) {
     return mesh;
   }
 

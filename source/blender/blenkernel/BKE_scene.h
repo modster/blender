@@ -260,7 +260,7 @@ void BKE_scene_cursor_from_mat4(struct View3DCursor *cursor,
  */
 void BKE_scene_eval_sequencer_sequences(struct Depsgraph *depsgraph, struct Scene *scene);
 
-bool check_rendered_viewport_visible(struct Main *bmain);
+bool BKE_check_rendered_viewport_visible(struct Main *bmain);
 
 #ifdef __cplusplus
 }

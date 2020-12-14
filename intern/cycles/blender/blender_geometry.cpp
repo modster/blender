@@ -45,7 +45,6 @@ static Geometry::Type determine_geom_type(BL::Object &b_ob, bool use_particle_ha
 array<Node *> BlenderSync::find_used_shaders(BL::Object &b_ob)
 {
   BL::Material material_override = view_layer.material_override;
-
   Shader *default_shader = (b_ob.type() == BL::Object::type_VOLUME) ? scene->default_volume :
                                                                       scene->default_surface;
 

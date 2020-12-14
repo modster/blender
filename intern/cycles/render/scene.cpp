@@ -197,54 +197,51 @@ Scene::~Scene()
 
 void Scene::free_memory(bool final)
 {
-  if (!params.persistent_data || final) {
-    delete bvh;
-    bvh = NULL;
+  delete bvh;
+  bvh = NULL;
 
-    foreach (Shader *s, shaders)
-      delete s;
-    foreach (Geometry *g, geometry)
-      delete g;
-    foreach (Object *o, objects)
-      delete o;
-    foreach (Light *l, lights)
-      delete l;
-    foreach (ParticleSystem *p, particle_systems)
-      delete p;
-    foreach (Procedural *p, procedurals)
-      delete p;
+  foreach (Shader *s, shaders)
+    delete s;
+  /* delete procedurals before other types as they may hold pointers to those types */
+  foreach (Procedural *p, procedurals)
+    delete p;
+  foreach (Geometry *g, geometry)
+    delete g;
+  foreach (Object *o, objects)
+    delete o;
+  foreach (Light *l, lights)
+    delete l;
+  foreach (ParticleSystem *p, particle_systems)
+    delete p;
 
-    shaders.clear();
-    geometry.clear();
-    objects.clear();
-    lights.clear();
-    particle_systems.clear();
-    procedurals.clear();
-  }
+  shaders.clear();
+  geometry.clear();
+  objects.clear();
+  lights.clear();
+  particle_systems.clear();
+  procedurals.clear();
 
   if (device) {
-    if (!params.persistent_data || final) {
-      camera->device_free(device, &dscene, this);
-      film->device_free(device, &dscene, this);
-      background->device_free(device, &dscene);
-      integrator->device_free(device, &dscene);
+    camera->device_free(device, &dscene, this);
+    film->device_free(device, &dscene, this);
+    background->device_free(device, &dscene);
+    integrator->device_free(device, &dscene);
 
-      object_manager->device_free(device, &dscene);
-      geometry_manager->device_free(device, &dscene);
-      shader_manager->device_free(device, &dscene, this);
-      light_manager->device_free(device, &dscene);
+    object_manager->device_free(device, &dscene);
+    geometry_manager->device_free(device, &dscene);
+    shader_manager->device_free(device, &dscene, this);
+    light_manager->device_free(device, &dscene);
 
-      particle_system_manager->device_free(device, &dscene);
+    particle_system_manager->device_free(device, &dscene);
 
-      bake_manager->device_free(device, &dscene);
+    bake_manager->device_free(device, &dscene);
 
+    if (!params.persistent_data || final)
       image_manager->device_free(device);
-
-      lookup_tables->device_free(device, &dscene);
-    }
-    else {
+    else
       image_manager->device_free_builtin(device);
-    }
+
+    lookup_tables->device_free(device, &dscene);
   }
 
   if (final) {
@@ -818,11 +815,20 @@ template<> void Scene::delete_node_impl(Shader * /*node*/)
   /* don't delete unused shaders, not supported */
 }
 
+template<> void Scene::delete_node_impl(Procedural *node)
+{
+#ifdef WITH_ALEMBIC
+  delete_node_from_array(procedurals, node);
+  procedural_manager->tag_update();
+#else
+  (void)node;
+#endif
+}
+
 template<> void Scene::delete_node_impl(AlembicProcedural *node)
 {
 #ifdef WITH_ALEMBIC
-  delete_node_from_array(procedurals, static_cast<Procedural *>(node));
-  procedural_manager->tag_update();
+  delete_node_impl(static_cast<Procedural *>(node));
 #else
   (void)node;
 #endif

@@ -60,6 +60,9 @@ void BKE_cachefile_reader_open(struct CacheFile *cache_file,
                                const char *object_path);
 void BKE_cachefile_reader_free(struct CacheFile *cache_file, struct CacheReader **reader);
 
+bool BKE_cache_file_use_cycles_procedural(struct Depsgraph *depsgraph,
+                                          struct CacheFile *cache_file);
+
 #ifdef __cplusplus
 }
 #endif

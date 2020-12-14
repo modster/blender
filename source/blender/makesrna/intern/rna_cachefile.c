@@ -110,7 +110,7 @@ static void rna_def_cachefile(BlenderRNA *brna)
       prop,
       "Cycles Procedural",
       "Load the Alembic data at render time using the Cycles procedural, instead of loading data "
-      "from Blender (only available for viewport renders)");
+      "from Blender");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
   /* ----------------- For Scene time ------------------- */
