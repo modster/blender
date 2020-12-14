@@ -2967,6 +2967,18 @@ static void rna_def_userdef_theme_space_node(BlenderRNA *brna)
   RNA_def_property_array(prop, 3);
   RNA_def_property_ui_text(prop, "Layout Node", "");
   RNA_def_property_update(prop, 0, "rna_userdef_theme_update");
+
+  prop = RNA_def_property(srna, "geometry_node", PROP_FLOAT, PROP_COLOR_GAMMA);
+  RNA_def_property_float_sdna(prop, NULL, "nodeclass_geometry");
+  RNA_def_property_array(prop, 3);
+  RNA_def_property_ui_text(prop, "Geometry Node", "");
+  RNA_def_property_update(prop, 0, "rna_userdef_theme_update");
+
+  prop = RNA_def_property(srna, "attribute_node", PROP_FLOAT, PROP_COLOR_GAMMA);
+  RNA_def_property_float_sdna(prop, NULL, "nodeclass_attribute");
+  RNA_def_property_array(prop, 3);
+  RNA_def_property_ui_text(prop, "Attribute Node", "");
+  RNA_def_property_update(prop, 0, "rna_userdef_theme_update");
 }
 
 static void rna_def_userdef_theme_space_buts(BlenderRNA *brna)
@@ -3245,6 +3257,11 @@ static void rna_def_userdef_theme_space_seq(BlenderRNA *brna)
   RNA_def_property_float_sdna(prop, NULL, "anim_preview_range");
   RNA_def_property_array(prop, 4);
   RNA_def_property_ui_text(prop, "Preview Range", "Color of preview range overlay");
+  RNA_def_property_update(prop, 0, "rna_userdef_theme_update");
+
+  prop = RNA_def_property(srna, "row_alternate", PROP_FLOAT, PROP_COLOR_GAMMA);
+  RNA_def_property_array(prop, 4);
+  RNA_def_property_ui_text(prop, "Alternate Rows", "Overlay color on every other row");
   RNA_def_property_update(prop, 0, "rna_userdef_theme_update");
 }
 
@@ -4558,7 +4575,7 @@ static void rna_def_userdef_view(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop,
       "Navigation Controls",
-      "Show navigation controls in 2D & 3D views which do not have scroll bars");
+      "Show navigation controls in 2D and 3D views which do not have scroll bars");
   RNA_def_property_update(prop, 0, "rna_userdef_gizmo_update");
 
   /* menus */
@@ -5009,7 +5026,6 @@ static void rna_def_userdef_edit(BlenderRNA *brna)
       prop,
       "Channel Group Colors",
       "Use animation channel group colors; generally this is used to show bone group colors");
-  RNA_def_property_boolean_default(prop, true);
   RNA_def_property_update(prop, 0, "rna_userdef_anim_update");
 
   prop = RNA_def_property(srna, "fcurve_new_auto_smoothing", PROP_ENUM, PROP_NONE);
@@ -5257,12 +5273,12 @@ static void rna_def_userdef_system(BlenderRNA *brna)
   };
 
   static const EnumPropertyItem audio_format_items[] = {
-      {0x01, "U8", 0, "8-bit Unsigned", "Set audio sample format to 8 bit unsigned integer"},
-      {0x12, "S16", 0, "16-bit Signed", "Set audio sample format to 16 bit signed integer"},
-      {0x13, "S24", 0, "24-bit Signed", "Set audio sample format to 24 bit signed integer"},
-      {0x14, "S32", 0, "32-bit Signed", "Set audio sample format to 32 bit signed integer"},
-      {0x24, "FLOAT", 0, "32-bit Float", "Set audio sample format to 32 bit float"},
-      {0x28, "DOUBLE", 0, "64-bit Float", "Set audio sample format to 64 bit float"},
+      {0x01, "U8", 0, "8-bit Unsigned", "Set audio sample format to 8-bit unsigned integer"},
+      {0x12, "S16", 0, "16-bit Signed", "Set audio sample format to 16-bit signed integer"},
+      {0x13, "S24", 0, "24-bit Signed", "Set audio sample format to 24-bit signed integer"},
+      {0x14, "S32", 0, "32-bit Signed", "Set audio sample format to 32-bit signed integer"},
+      {0x24, "FLOAT", 0, "32-bit Float", "Set audio sample format to 32-bit float"},
+      {0x28, "DOUBLE", 0, "64-bit Float", "Set audio sample format to 64-bit float"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -5930,12 +5946,6 @@ static void rna_def_userdef_input(BlenderRNA *brna)
   prop = RNA_def_property(srna, "invert_zoom_wheel", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "uiflag", USER_WHEELZOOMDIR);
   RNA_def_property_ui_text(prop, "Wheel Invert Zoom", "Swap the Mouse Wheel zoom direction");
-
-  prop = RNA_def_property(srna, "wheel_scroll_lines", PROP_INT, PROP_NONE);
-  RNA_def_property_int_sdna(prop, NULL, "wheellinescroll");
-  RNA_def_property_range(prop, 0, 32);
-  RNA_def_property_ui_text(
-      prop, "Wheel Scroll Lines", "Number of lines scrolled at a time with the mouse wheel");
 }
 
 static void rna_def_userdef_keymap(BlenderRNA *brna)
@@ -5968,7 +5978,7 @@ static void rna_def_userdef_filepaths(BlenderRNA *brna)
       {2, "DJV", 0, "DJV", "Open source frame player: http://djv.sourceforge.net"},
       {3, "FRAMECYCLER", 0, "FrameCycler", "Frame player from IRIDAS"},
       {4, "RV", 0, "RV", "Frame player from Tweak Software"},
-      {5, "MPLAYER", 0, "MPlayer", "Media player for video & png/jpeg/sgi image sequences"},
+      {5, "MPLAYER", 0, "MPlayer", "Media player for video and PNG/JPEG/SGI image sequences"},
       {50, "CUSTOM", 0, "Custom", "Custom animation player executable path"},
       {0, NULL, 0, NULL, NULL},
   };
@@ -6051,10 +6061,11 @@ static void rna_def_userdef_filepaths(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "script_directory", PROP_STRING, PROP_DIRPATH);
   RNA_def_property_string_sdna(prop, NULL, "pythondir");
-  RNA_def_property_ui_text(prop,
-                           "Python Scripts Directory",
-                           "Alternate script path, matching the default layout with subdirs: "
-                           "startup, add-ons & modules (requires restart)");
+  RNA_def_property_ui_text(
+      prop,
+      "Python Scripts Directory",
+      "Alternate script path, matching the default layout with subdirectories: "
+      "startup, add-ons and modules (requires restart)");
   /* TODO, editing should reset sys.path! */
 
   prop = RNA_def_property(srna, "i18n_branches_directory", PROP_STRING, PROP_DIRPATH);
@@ -6109,7 +6120,7 @@ static void rna_def_userdef_filepaths(BlenderRNA *brna)
   RNA_def_property_ui_text(prop,
                            "Auto Save Temporary Files",
                            "Automatic saving of temporary files in temp directory, "
-                           "uses process ID (sculpt & edit-mode data won't be saved!)");
+                           "uses process ID (sculpt and edit mode data won't be saved)");
   RNA_def_property_update(prop, 0, "rna_userdef_autosave_update");
 
   prop = RNA_def_property(srna, "auto_save_time", PROP_INT, PROP_NONE);
@@ -6148,16 +6159,6 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
       prop,
       "Undo Legacy",
       "Use legacy undo (slower than the new default one, but may be more stable in some cases)");
-
-  prop = RNA_def_property(srna, "use_new_geometry_nodes", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "use_new_geometry_nodes", 1);
-  RNA_def_property_ui_text(
-      prop, "New Geometry Nodes", "Enable the new geometry nodes system in the ui");
-
-  prop = RNA_def_property(srna, "use_new_point_cloud_type", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "use_new_point_cloud_type", 1);
-  RNA_def_property_ui_text(
-      prop, "New Point Cloud Type", "Enable the new point cloud type in the ui");
 
   prop = RNA_def_property(srna, "use_new_hair_type", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "use_new_hair_type", 1);

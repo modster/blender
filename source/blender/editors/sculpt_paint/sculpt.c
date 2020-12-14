@@ -2632,7 +2632,8 @@ void SCULPT_clip(Sculpt *sd, SculptSession *ss, float co[3], const float val[3])
       continue;
     }
 
-    if ((ss->cache->flag & (CLIP_X << i)) && (fabsf(co[i]) <= ss->cache->clip_tolerance[i])) {
+    if (ss->cache && (ss->cache->flag & (CLIP_X << i)) &&
+        (fabsf(co[i]) <= ss->cache->clip_tolerance[i])) {
       co[i] = 0.0f;
     }
     else {
@@ -4024,13 +4025,13 @@ void SCULPT_flip_v3_by_symm_area(float v[3],
                                  const ePaintSymmetryAreas symmarea,
                                  const float pivot[3])
 {
-  for (char i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; i++) {
     ePaintSymmetryFlags symm_it = 1 << i;
     if (symm & symm_it) {
       if (symmarea & symm_it) {
         flip_v3(v, symm_it);
       }
-      if (pivot[0] < 0) {
+      if (pivot[i] < 0.0f) {
         flip_v3(v, symm_it);
       }
     }
@@ -4042,13 +4043,13 @@ void SCULPT_flip_quat_by_symm_area(float quat[3],
                                    const ePaintSymmetryAreas symmarea,
                                    const float pivot[3])
 {
-  for (char i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; i++) {
     ePaintSymmetryFlags symm_it = 1 << i;
     if (symm & symm_it) {
       if (symmarea & symm_it) {
         flip_qt(quat, symm_it);
       }
-      if (pivot[0] < 0) {
+      if (pivot[i] < 0.0f) {
         flip_qt(quat, symm_it);
       }
     }
@@ -4231,6 +4232,8 @@ static void do_snake_hook_brush_task_cb_ex(void *__restrict userdata,
                                   (len_v3(grab_delta) / ss->cache->radius)) :
                                  0.0f;
 
+  const bool do_elastic = brush->snake_hook_deform_type == BRUSH_SNAKE_HOOK_DEFORM_ELASTIC;
+
   proxy = BKE_pbvh_node_add_proxy(ss->pbvh, data->nodes[n])->co;
 
   SculptBrushTest test;
@@ -4238,18 +4241,28 @@ static void do_snake_hook_brush_task_cb_ex(void *__restrict userdata,
       ss, &test, data->brush->falloff_shape);
   const int thread_id = BLI_task_parallel_thread_id(tls);
 
+  KelvinletParams params;
+  BKE_kelvinlet_init_params(&params, ss->cache->radius, bstrength, 1.0f, 0.4f);
+
   BKE_pbvh_vertex_iter_begin(ss->pbvh, data->nodes[n], vd, PBVH_ITER_UNIQUE)
   {
-    if (sculpt_brush_test_sq_fn(&test, vd.co)) {
-      const float fade = bstrength * SCULPT_brush_strength_factor(ss,
-                                                                  brush,
-                                                                  vd.co,
-                                                                  sqrtf(test.dist),
-                                                                  vd.no,
-                                                                  vd.fno,
-                                                                  vd.mask ? *vd.mask : 0.0f,
-                                                                  vd.index,
-                                                                  thread_id);
+    if (do_elastic || sculpt_brush_test_sq_fn(&test, vd.co)) {
+
+      float fade;
+      if (do_elastic) {
+        fade = 1.0f;
+      }
+      else {
+        fade = bstrength * SCULPT_brush_strength_factor(ss,
+                                                        brush,
+                                                        vd.co,
+                                                        sqrtf(test.dist),
+                                                        vd.no,
+                                                        vd.fno,
+                                                        vd.mask ? *vd.mask : 0.0f,
+                                                        vd.index,
+                                                        thread_id);
+      }
 
       mul_v3_v3fl(proxy[vd.i], grab_delta, fade);
 
@@ -4286,6 +4299,17 @@ static void do_snake_hook_brush_task_cb_ex(void *__restrict userdata,
         float delta_rotate[3];
         sculpt_rake_rotate(ss, test.location, vd.co, fade, delta_rotate);
         add_v3_v3(proxy[vd.i], delta_rotate);
+      }
+
+      if (do_elastic) {
+        float disp[3];
+        BKE_kelvinlet_grab_triscale(disp, &params, vd.co, ss->cache->location, proxy[vd.i]);
+        mul_v3_fl(disp, bstrength * 20.0f);
+        if (vd.mask) {
+          mul_v3_fl(disp, 1.0f - *vd.mask);
+        }
+        mul_v3_fl(disp, SCULPT_automasking_factor_get(ss->cache->automasking, ss, vd.index));
+        copy_v3_v3(proxy[vd.i], disp);
       }
 
       if (vd.mvert) {
@@ -5713,16 +5737,8 @@ static void do_brush_action(Sculpt *sd, Object *ob, Brush *brush, UnifiedPaintSe
 
   /* Build a list of all nodes that are potentially within the brush's area of influence */
 
-  /* These brushes need to update all nodes as they are not constrained by the brush radius */
-  /* Elastic deform needs all nodes to avoid artifacts as the effect of the brush is not
-   * constrained by the radius. */
-  /* Pose needs all nodes because it applies all symmetry iterations at the same time and the IK
-   * chain can grow to any area of the model. */
-  /* This can be optimized by filtering the nodes after calculating the chain. */
-  if (ELEM(brush->sculpt_tool,
-           SCULPT_TOOL_ELASTIC_DEFORM,
-           SCULPT_TOOL_POSE,
-           SCULPT_TOOL_BOUNDARY)) {
+  if (SCULPT_tool_needs_all_pbvh_nodes(brush)) {
+    /* These brushes need to update all nodes as they are not constrained by the brush radius */
     BKE_pbvh_search_gather(ss->pbvh, NULL, NULL, &nodes, &totnode);
   }
   else if (brush->sculpt_tool == SCULPT_TOOL_CLOTH) {
@@ -8669,7 +8685,7 @@ static int sculpt_sample_color_invoke(bContext *C,
 static void SCULPT_OT_sample_color(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Sample color";
+  ot->name = "Sample Color";
   ot->idname = "SCULPT_OT_sample_color";
   ot->description = "Sample the vertex color of the active vertex";
 
@@ -9391,9 +9407,9 @@ static void dyntopo_detail_size_edit_cancel(bContext *C, wmOperator *op)
 {
   Object *active_object = CTX_data_active_object(C);
   SculptSession *ss = active_object->sculpt;
-  ARegion *ar = CTX_wm_region(C);
+  ARegion *region = CTX_wm_region(C);
   DyntopoDetailSizeEditCustomData *cd = op->customdata;
-  ED_region_draw_cb_exit(ar->type, cd->draw_handle);
+  ED_region_draw_cb_exit(region->type, cd->draw_handle);
   ss->draw_faded_cursor = false;
   MEM_freeN(op->customdata);
   ED_workspace_status_text(C, NULL);
@@ -9456,7 +9472,7 @@ static int dyntopo_detail_size_edit_modal(bContext *C, wmOperator *op, const wmE
 {
   Object *active_object = CTX_data_active_object(C);
   SculptSession *ss = active_object->sculpt;
-  ARegion *ar = CTX_wm_region(C);
+  ARegion *region = CTX_wm_region(C);
   DyntopoDetailSizeEditCustomData *cd = op->customdata;
   Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
 
@@ -9464,7 +9480,7 @@ static int dyntopo_detail_size_edit_modal(bContext *C, wmOperator *op, const wmE
   if ((event->type == EVT_ESCKEY && event->val == KM_PRESS) ||
       (event->type == RIGHTMOUSE && event->val == KM_PRESS)) {
     dyntopo_detail_size_edit_cancel(C, op);
-    ED_region_tag_redraw(ar);
+    ED_region_tag_redraw(region);
     return OPERATOR_FINISHED;
   }
 
@@ -9472,16 +9488,16 @@ static int dyntopo_detail_size_edit_modal(bContext *C, wmOperator *op, const wmE
   if ((event->type == LEFTMOUSE && event->val == KM_RELEASE) ||
       (event->type == EVT_RETKEY && event->val == KM_PRESS) ||
       (event->type == EVT_PADENTER && event->val == KM_PRESS)) {
-    ED_region_draw_cb_exit(ar->type, cd->draw_handle);
+    ED_region_draw_cb_exit(region->type, cd->draw_handle);
     sd->constant_detail = cd->detail_size;
     ss->draw_faded_cursor = false;
     MEM_freeN(op->customdata);
-    ED_region_tag_redraw(ar);
+    ED_region_tag_redraw(region);
     ED_workspace_status_text(C, NULL);
     return OPERATOR_FINISHED;
   }
 
-  ED_region_tag_redraw(ar);
+  ED_region_tag_redraw(region);
 
   if (event->type == EVT_LEFTCTRLKEY && event->val == KM_PRESS) {
     cd->sample_mode = true;
@@ -9503,7 +9519,7 @@ static int dyntopo_detail_size_edit_modal(bContext *C, wmOperator *op, const wmE
 
 static int dyntopo_detail_size_edit_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  ARegion *ar = CTX_wm_region(C);
+  ARegion *region = CTX_wm_region(C);
   Object *active_object = CTX_data_active_object(C);
   Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
   Brush *brush = BKE_paint_brush(&sd->paint);
@@ -9513,7 +9529,7 @@ static int dyntopo_detail_size_edit_invoke(bContext *C, wmOperator *op, const wm
 
   /* Initial operator Custom Data setup. */
   cd->draw_handle = ED_region_draw_cb_activate(
-      ar->type, dyntopo_detail_size_edit_draw, cd, REGION_DRAW_POST_VIEW);
+      region->type, dyntopo_detail_size_edit_draw, cd, REGION_DRAW_POST_VIEW);
   cd->active_object = active_object;
   cd->init_mval[0] = event->mval[0];
   cd->init_mval[1] = event->mval[1];
@@ -9557,7 +9573,7 @@ static int dyntopo_detail_size_edit_invoke(bContext *C, wmOperator *op, const wm
   SCULPT_vertex_random_access_ensure(ss);
 
   WM_event_add_modal_handler(C, op);
-  ED_region_tag_redraw(ar);
+  ED_region_tag_redraw(region);
 
   ss->draw_faded_cursor = true;
 

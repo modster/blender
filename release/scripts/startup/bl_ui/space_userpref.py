@@ -208,9 +208,13 @@ class USERPREF_PT_interface_display(InterfacePanel, CenterAlignMixIn, Panel):
         col.prop(view, "show_splash", text="Splash Screen")
         col.prop(view, "show_developer_ui")
 
-        col = layout.column(heading="Tooltips")
-        col.prop(view, "show_tooltips")
-        col.prop(view, "show_tooltips_python")
+        col.separator()
+
+        col = layout.column(heading="Tooltips", align=True)
+        col.prop(view, "show_tooltips", text = "User Tooltips")
+        sub = col.column()
+        sub.active = view.show_tooltips
+        sub.prop(view, "show_tooltips_python")
 
 
 class USERPREF_PT_interface_text(InterfacePanel, CenterAlignMixIn, Panel):
@@ -1539,8 +1543,6 @@ class USERPREF_PT_navigation_zoom(NavigationPanel, CenterAlignMixIn, Panel):
             col.prop(inputs, "use_zoom_to_mouse")
             col.prop(inputs, "invert_zoom_wheel", text="Invert Wheel Zoom Direction")
 
-        # sub.prop(view, "wheel_scroll_lines", text="Scroll Lines")
-
 
 class USERPREF_PT_navigation_fly_walk(NavigationPanel, CenterAlignMixIn, Panel):
     bl_label = "Fly & Walk"
@@ -2187,7 +2189,7 @@ class USERPREF_PT_experimental_new_features(ExperimentalPanel, Panel):
             context, (
                 ({"property": "use_sculpt_vertex_colors"}, "T71947"),
                 ({"property": "use_switch_object_operator"}, "T80402"),
-                ({"property": "use_sculpt_tools_tilt"}, "T00000"),
+                ({"property": "use_sculpt_tools_tilt"}, "T82877"),
                 ({"property": "use_object_add_tool"}, "T57210"),
             ),
         )
@@ -2200,8 +2202,6 @@ class USERPREF_PT_experimental_prototypes(ExperimentalPanel, Panel):
         self._draw_items(
             context, (
                 ({"property": "use_new_hair_type"}, "T68981"),
-                ({"property": "use_new_point_cloud_type"}, "T75717"),
-                ({"property": "use_new_geometry_nodes"}, "project/profile/121"),
             ),
         )
 

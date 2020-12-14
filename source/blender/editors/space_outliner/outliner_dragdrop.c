@@ -445,7 +445,7 @@ static int parent_drop_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 void OUTLINER_OT_parent_drop(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Drop to Set Parent [+Alt keeps transforms]";
+  ot->name = "Drop to Set Parent (hold Alt to keep transforms)";
   ot->description = "Drag to parent in Outliner";
   ot->idname = "OUTLINER_OT_parent_drop";
 
@@ -531,7 +531,7 @@ static int parent_clear_invoke(bContext *C, wmOperator *UNUSED(op), const wmEven
 void OUTLINER_OT_parent_clear(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Drop to Clear Parent [+Alt keeps transforms]";
+  ot->name = "Drop to Clear Parent (hold Alt to keep transforms)";
   ot->description = "Drag to clear parent in Outliner";
   ot->idname = "OUTLINER_OT_parent_clear";
 
@@ -854,7 +854,8 @@ static bool datastack_drop_poll(bContext *C,
 
   SpaceOutliner *space_outliner = CTX_wm_space_outliner(C);
   ARegion *region = CTX_wm_region(C);
-  bool changed = outliner_flag_set(&space_outliner->tree, TSE_HIGHLIGHTED | TSE_DRAG_ANY, false);
+  bool changed = outliner_flag_set(
+      &space_outliner->tree, TSE_HIGHLIGHTED_ANY | TSE_DRAG_ANY, false);
 
   StackDropData *drop_data = drag->poin;
   if (!drop_data) {
@@ -1173,7 +1174,8 @@ static bool collection_drop_poll(bContext *C,
 {
   SpaceOutliner *space_outliner = CTX_wm_space_outliner(C);
   ARegion *region = CTX_wm_region(C);
-  bool changed = outliner_flag_set(&space_outliner->tree, TSE_HIGHLIGHTED | TSE_DRAG_ANY, false);
+  bool changed = outliner_flag_set(
+      &space_outliner->tree, TSE_HIGHLIGHTED_ANY | TSE_DRAG_ANY, false);
 
   CollectionDrop data;
   if (!event->shift && collection_drop_init(C, drag, event, &data)) {
