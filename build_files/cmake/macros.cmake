@@ -1226,6 +1226,8 @@ function(find_python_package
             "The build will be usable, only add-ons that depend on this package won't be functional."
           )
           set(WITH_PYTHON_${_upper_package} OFF PARENT_SCOPE)
+        else()
+          message(STATUS "${package} include files found at '${PYTHON_${_upper_package}_PATH}'")
         endif()
       endif()
     endif()
