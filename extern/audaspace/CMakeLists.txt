@@ -719,6 +719,8 @@ endif()
 
 # directories
 
+message(STATUS "AUDASPACE: includes are: ${INCLUDE}")
+
 include_directories(${INCLUDE})
 link_directories()
 
