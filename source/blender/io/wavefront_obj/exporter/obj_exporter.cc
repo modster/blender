@@ -228,7 +228,7 @@ static void export_frame(Depsgraph *depsgraph,
     return;
   }
 
-  frame_writer->writer_header();
+  frame_writer->write_header();
 
   auto [exportable_as_mesh, exportable_as_nurbs] = filter_supported_objects(depsgraph,
                                                                             export_params);

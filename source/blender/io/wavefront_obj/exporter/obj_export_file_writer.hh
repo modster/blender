@@ -62,7 +62,7 @@ class OBJWriter : NonMovable, NonCopyable {
     file_handler_ = std::make_unique<FileHandler<eFileType::OBJ>>(filepath);
   }
 
-  void writer_header() const;
+  void write_header() const;
 
   void write_object_name(const OBJMesh &obj_mesh_data) const;
   void write_object_group(const OBJMesh &obj_mesh_data) const;
@@ -89,7 +89,7 @@ class OBJWriter : NonMovable, NonCopyable {
   using func_vert_uv_normal_indices = void (OBJWriter::*)(Span<int> vert_indices,
                                                           Span<int> uv_indices,
                                                           Span<int> normal_indices) const;
-  func_vert_uv_normal_indices get_poly_element_writer(const OBJMesh &obj_mesh_data) const;
+  func_vert_uv_normal_indices get_poly_element_writer(const int total_uv_vertices) const;
 
   void write_vert_uv_normal_indices(Span<int> vert_indices,
                                     Span<int> uv_indices,

@@ -120,7 +120,7 @@ void OBJWriter::write_vert_indices(Span<int> vert_indices,
   file_handler_->write<eOBJSyntaxElement::poly_element_end>();
 }
 
-void OBJWriter::writer_header() const
+void OBJWriter::write_header() const
 {
   using namespace std::string_literals;
   file_handler_->write<eOBJSyntaxElement::string>("# Blender "s + BKE_blender_version_string() +
@@ -310,10 +310,10 @@ int16_t OBJWriter::write_vertex_group(const OBJMesh &obj_mesh_data,
  * \return Writer function with appropriate polygon-element syntax.
  */
 OBJWriter::func_vert_uv_normal_indices OBJWriter::get_poly_element_writer(
-    const OBJMesh &obj_mesh_data) const
+    const int total_uv_vertices) const
 {
   if (export_params_.export_normals) {
-    if (export_params_.export_uv && (obj_mesh_data.tot_uv_vertices() > 0)) {
+    if (export_params_.export_uv && (total_uv_vertices > 0)) {
       /* Write both normals and UV indices. */
       return &OBJWriter::write_vert_uv_normal_indices;
     }
@@ -321,7 +321,7 @@ OBJWriter::func_vert_uv_normal_indices OBJWriter::get_poly_element_writer(
     return &OBJWriter::write_vert_normal_indices;
   }
   /* Write UV indices. */
-  if (export_params_.export_uv && (obj_mesh_data.tot_uv_vertices() > 0)) {
+  if (export_params_.export_uv && (total_uv_vertices > 0)) {
     return &OBJWriter::write_vert_uv_indices;
   }
   /* Write neither normals nor UV indices. */
@@ -339,7 +339,8 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
   int16_t last_poly_vertex_group = NEGATIVE_INIT;
   int16_t last_poly_mat_nr = NEGATIVE_INIT;
 
-  const func_vert_uv_normal_indices poly_element_writer = get_poly_element_writer(obj_mesh_data);
+  const func_vert_uv_normal_indices poly_element_writer = get_poly_element_writer(
+      obj_mesh_data.tot_uv_vertices());
 
   /* Number of normals may not be equal to number of polygons due to smooth shading. */
   int per_object_tot_normals = 0;
