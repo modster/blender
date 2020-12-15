@@ -405,7 +405,8 @@ static void do_versions_idproperty_bones_recursive(Bone *bone)
  * the old more complicated storage. Assumes only the top level of IDProperties below the parent
  * group had UI data in a "_RNA_UI" group.
  *
- * \note Many IDProperties weren't exposed in the interface, so they don't all have UI data.
+ * \note Some IDProperty usages in DNA aren't exposed or are runtime-only, so they don't all have
+ * UI data.
  */
 static void do_versions_idproperty_ui_data(Main *bmain)
 {
@@ -540,8 +541,6 @@ static void do_versions_idproperty_ui_data(Main *bmain)
       version_idproperty_ui_data(render_data->ffcodecdata.properties);
     }
   }
-
-  /* Other IDProperty struct usages in DNA that are just runtime data: #wmOperator */
 }
 
 void do_versions_after_linking_290(Main *bmain, ReportList *UNUSED(reports))
@@ -816,15 +815,14 @@ void do_versions_after_linking_290(Main *bmain, ReportList *UNUSED(reports))
         BKE_pose_rebuild(bmain, ob, ob->data, true);
       }
     }
-
-    /* Wet Paint Radius Factor */
-    for (Brush *br = bmain->brushes.first; br; br = br->id.next) {
-      if (br->ob_mode & OB_MODE_SCULPT && br->wet_paint_radius_factor == 0.0f) {
-        br->wet_paint_radius_factor = 1.0f;
-      }
-    }
-
     do_versions_idproperty_ui_data(bmain);
+  }
+
+  /* Wet Paint Radius Factor */
+  for (Brush *br = bmain->brushes.first; br; br = br->id.next) {
+    if (br->ob_mode & OB_MODE_SCULPT && br->wet_paint_radius_factor == 0.0f) {
+      br->wet_paint_radius_factor = 1.0f;
+    }
   }
 }
 
