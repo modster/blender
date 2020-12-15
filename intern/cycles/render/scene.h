@@ -66,56 +66,6 @@ class RenderStats;
 class SceneUpdateStats;
 class Volume;
 
-enum UpdateFlags : uint32_t {
-  /* the event that happened in the system and the reason for the update tagging */
-  MESH_ADDED = (1 << 0),
-  MESH_REMOVED = (1 << 1),
-  HAIR_ADDED = (1 << 2),
-  HAIR_REMOVED = (1 << 3),
-  UV_PASS_NEEDED = (1 << 4),
-  MOTION_PASS_NEEDED = (1 << 5),
-  SHADER_ATTRIBUTE_MODIFIED = (1 << 6),
-  LIGHT_MODIFIED = (1 << 7),
-  LIGHT_ADDED = (1 << 8),
-  LIGHT_REMOVED = (1 << 9),
-  MESH_NEED_REBUILD = (1 << 10),
-  EMISSIVE_MESH_MODIFIED = (1 << 11),
-  SHADER_COMPILED = (1 << 12),
-  SHADER_MODIFIED = (1 << 13),
-  AO_PASS_MODIFIED = (1 << 14),
-  BACKGROUND_AO_MODIFIED = (1 << 15),
-  INTEGRATOR_MODIFIED = (1 << 16),
-  SHADER_ADDED = (1 << 17),
-  OBJECT_ADDED = (1 << 18),
-  OBJECT_REMOVED = (1 << 19),
-  OBJECT_MODIFIED = (1 << 20),
-  GEOMETRY_MODIFIED = (1 << 21),
-  PARTICLE_MODIFIED = (1 << 22),
-  HOLDOUT_MODIFIED = (1 << 23),
-  MOTION_BLUR_MODIFIED = (1 << 24),
-
-  /* who is tagging for the update, to avoid infinite recursions when cross tagging between
-     managers */
-  OBJECT_MANAGER = (1 << 25),
-  GEOMETRY_MANAGER = (1 << 26),
-
-  /* tag everything in the manager for an update */
-  UPDATE_ALL = ~0u,
-
-  UPDATE_NONE = 0u,
-};
-
-inline UpdateFlags operator|(UpdateFlags flag1, UpdateFlags flag2)
-{
-  return static_cast<UpdateFlags>(static_cast<uint32_t>(flag1) | static_cast<uint32_t>(flag2));
-}
-
-inline UpdateFlags &operator|=(UpdateFlags &flag, uint32_t v)
-{
-  flag = static_cast<UpdateFlags>(static_cast<uint32_t>(flag) | v);
-  return flag;
-}
-
 /* Scene Device Data */
 
 class DeviceScene {

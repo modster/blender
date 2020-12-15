@@ -260,6 +260,10 @@ class device_memory {
   device_ptr original_device_ptr;
   size_t original_device_size;
   Device *original_device;
+  bool need_realloc_;
+  bool modified;
+  size_t data_copied_ = 0;
+  double time_copying_ = 0.0;
 };
 
 /* Device Only Memory
@@ -325,16 +329,13 @@ template<typename T> class device_only_memory : public device_memory {
 
 template<typename T> class device_vector : public device_memory {
  public:
-  bool modified;
-  size_t data_copied = 0;
-  double time_copying = 0.0;
-
   device_vector(Device *device, const char *name, MemoryType type)
       : device_memory(device, name, type)
   {
     data_type = device_type_traits<T>::data_type;
     data_elements = device_type_traits<T>::num_elements;
     modified = true;
+    need_realloc_ = true;
 
     assert(data_elements > 0);
   }
@@ -432,7 +433,36 @@ template<typename T> class device_vector : public device_memory {
     data_depth = 0;
     host_pointer = 0;
     modified = true;
+    need_realloc_ = true;
     assert(device_pointer == 0);
+  }
+
+  void free_if_need_realloc(bool force_free)
+  {
+    if (need_realloc_ || force_free) {
+      free();
+    }
+  }
+
+  bool is_modified() const
+  {
+    return modified;
+  }
+
+  bool need_realloc()
+  {
+    return need_realloc_;
+  }
+
+  void tag_modified()
+  {
+    modified = true;
+  }
+
+  void tag_realloc()
+  {
+    need_realloc_ = true;
+    tag_modified();
   }
 
   size_t size() const
@@ -453,16 +483,52 @@ template<typename T> class device_vector : public device_memory {
 
   void copy_to_device()
   {
-    scoped_timer timer;
-    device_copy_to();
+    if (data_size != 0) {
+      scoped_timer timer;
+      device_copy_to();
+      time_copying_ += timer.get_time();
+      data_copied_ = byte_size();
+    }
+  }
+
+  void copy_to_device_if_modified()
+  {
+    if (!modified) {
+      return;
+    }
+
+    copy_to_device();
+  }
+
+  void clear_modified()
+  {
     modified = false;
-    data_copied = byte_size();
-    time_copying += timer.get_time();
+    need_realloc_ = false;
   }
 
   size_t byte_size() const
   {
     return size() * sizeof(T);
+  }
+
+  size_t data_copied() const
+  {
+    return data_copied_;
+  }
+
+  double time_copying() const
+  {
+    return time_copying_;
+  }
+
+  void data_copied(size_t x)
+  {
+    data_copied_ = x;
+  }
+
+  void time_copying(double d)
+  {
+    time_copying_ = d;
   }
 
   void copy_from_device()

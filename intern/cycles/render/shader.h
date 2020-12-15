@@ -44,7 +44,6 @@ class Progress;
 class Scene;
 class ShaderGraph;
 struct float3;
-enum UpdateFlags : uint32_t;
 
 enum ShadingSystem { SHADINGSYSTEM_OSL, SHADINGSYSTEM_SVM };
 
@@ -166,6 +165,17 @@ class Shader : public Node {
 
 class ShaderManager {
  public:
+  enum : uint32_t {
+    SHADER_ADDED = (1 << 0),
+    SHADER_MODIFIED = (1 << 2),
+    INTEGRATOR_MODIFIED = (1 << 3),
+
+    /* tag everything in the manager for an update */
+    UPDATE_ALL = ~0u,
+
+    UPDATE_NONE = 0u,
+  };
+
   static ShaderManager *create(int shadingsystem);
   virtual ~ShaderManager();
 
@@ -207,14 +217,14 @@ class ShaderManager {
 
   string get_cryptomatte_materials(Scene *scene);
 
-  void tag_update(Scene *scene, UpdateFlags flag);
+  void tag_update(Scene *scene, uint32_t flag);
 
   bool need_update() const;
 
  protected:
   ShaderManager();
 
-  UpdateFlags update_flags;
+  uint32_t update_flags;
 
   typedef unordered_map<ustring, uint, ustringHash> AttributeIDMap;
   AttributeIDMap unique_attribute_id;

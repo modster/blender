@@ -114,7 +114,7 @@ void BakeManager::set(Scene *scene,
 
   /* create device and update scene */
   scene->film->tag_modified();
-  scene->integrator->tag_update(scene, UPDATE_ALL);
+  scene->integrator->tag_update(scene, Integrator::UPDATE_ALL);
 
   need_update_ = true;
 }

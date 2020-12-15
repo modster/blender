@@ -163,7 +163,7 @@ class Attribute {
   void add(const Transform &tfm);
   void add(const char *data);
 
-  void set_data_from(Attribute &other);
+  void set_data_from(Attribute &&other);
 
   static bool same_storage(TypeDesc a, TypeDesc b);
   static const char *standard_name(AttributeStandard std);
@@ -203,7 +203,9 @@ class AttributeSet {
 
   /* Update the attributes in this AttributeSet with the ones from the new set,
    * and remove any attribute not found on the new set from this. */
-  void update(AttributeSet &new_attributes);
+  void update(AttributeSet &&new_attributes);
+
+  void clear_modified();
 };
 
 /* AttributeRequest

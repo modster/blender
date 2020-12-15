@@ -1058,8 +1058,8 @@ void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph, BL::Object b_ob, Mesh *me
     mesh->set_value(socket, new_mesh, socket);
   }
 
-  mesh->attributes.update(new_mesh.attributes);
-  mesh->subd_attributes.update(new_mesh.subd_attributes);
+  mesh->attributes.update(std::move(new_mesh.attributes));
+  mesh->subd_attributes.update(std::move(new_mesh.subd_attributes));
 
   mesh->set_num_subd_faces(new_mesh.get_num_subd_faces());
 

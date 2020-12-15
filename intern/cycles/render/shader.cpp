@@ -312,13 +312,13 @@ void Shader::tag_update(Scene *scene)
   /* update tag */
   tag_modified();
 
-  scene->shader_manager->tag_update(scene, SHADER_MODIFIED);
+  scene->shader_manager->tag_update(scene, ShaderManager::SHADER_MODIFIED);
 
   /* if the shader previously was emissive, update light distribution,
    * if the new shader is emissive, a light manager update tag will be
    * done in the shader manager device update. */
   if (use_mis && has_surface_emission)
-    scene->light_manager->tag_update(scene, SHADER_MODIFIED);
+    scene->light_manager->tag_update(scene, LightManager::SHADER_MODIFIED);
 
   /* Special handle of background MIS light for now: for some reason it
    * has use_mis set to false. We are quite close to release now, so
@@ -327,7 +327,7 @@ void Shader::tag_update(Scene *scene)
   if (this == scene->background->get_shader(scene)) {
     scene->light_manager->need_update_background = true;
     if (scene->light_manager->has_background_light(scene)) {
-      scene->light_manager->tag_update(scene, SHADER_MODIFIED);
+      scene->light_manager->tag_update(scene, LightManager::SHADER_MODIFIED);
     }
   }
 
@@ -356,8 +356,8 @@ void Shader::tag_update(Scene *scene)
       attributes.add(ATTR_STD_POSITION_UNDISPLACED);
     }
     if (displacement_method_is_modified()) {
-      need_update_geometry = true;
-      scene->geometry_manager->need_update = true;
+      need_update_displacement = true;
+      scene->geometry_manager->tag_update(scene, GeometryManager::SHADER_DISPLACEMENT_MODIFIED);
       scene->object_manager->need_flags_update = true;
     }
   }
@@ -366,8 +366,7 @@ void Shader::tag_update(Scene *scene)
    * need_update_attribute, update the relevant meshes and clear it. */
   if (attributes.modified(prev_attributes)) {
     need_update_attribute = true;
-    scene->geometry_manager->tag_update(scene, SHADER_ATTRIBUTE_MODIFIED);
-    scene->procedural_manager->tag_update();
+    scene->geometry_manager->tag_update(scene, GeometryManager::SHADER_ATTRIBUTE_MODIFIED);
   }
 
   if (has_volume != prev_has_volume || volume_step_rate != prev_volume_step_rate) {
@@ -383,7 +382,7 @@ void Shader::tag_used(Scene *scene)
    * recompiled because it was skipped for compilation before */
   if (!used) {
     tag_modified();
-    scene->shader_manager->tag_update(scene, SHADER_MODIFIED);
+    scene->shader_manager->tag_update(scene, ShaderManager::SHADER_MODIFIED);
   }
 }
 
@@ -818,10 +817,10 @@ string ShaderManager::get_cryptomatte_materials(Scene *scene)
   return manifest;
 }
 
-void ShaderManager::tag_update(Scene * /*scene*/, UpdateFlags /*flag*/)
+void ShaderManager::tag_update(Scene * /*scene*/, uint32_t /*flag*/)
 {
   /* update everything for now */
-  update_flags = UpdateFlags::UPDATE_ALL;
+  update_flags = ShaderManager::UPDATE_ALL;
 }
 
 bool ShaderManager::need_update() const

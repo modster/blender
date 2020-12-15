@@ -374,8 +374,8 @@ void BlenderSync::sync_integrator()
     integrator->set_ao_bounces(0);
   }
 
-  /* UPDATE_NONE as we don't want to tag the integrator as modified, just tag dependant things */
-  integrator->tag_update(scene, UPDATE_NONE);
+  /* UPDATE_NONE as we don't want to tag the integrator as modified, just tag dependent things */
+  integrator->tag_update(scene, Integrator::UPDATE_NONE);
 }
 
 /* Film */
@@ -728,7 +728,7 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
 
   scene->film->set_pass_alpha_threshold(b_view_layer.pass_alpha_threshold());
   scene->film->tag_passes_update(scene, passes);
-  scene->integrator->tag_update(scene, UPDATE_ALL);
+  scene->integrator->tag_update(scene, Integrator::UPDATE_ALL);
 
   return passes;
 }

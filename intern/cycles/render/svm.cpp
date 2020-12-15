@@ -125,7 +125,7 @@ void SVMShaderManager::device_update(Device *device,
 
     shader->clear_modified();
     if (shader->get_use_mis() && shader->has_surface_emission) {
-      scene->light_manager->tag_update(scene, SHADER_COMPILED);
+      scene->light_manager->tag_update(scene, LightManager::SHADER_COMPILED);
     }
 
     /* Update the global jump table.

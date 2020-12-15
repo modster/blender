@@ -226,16 +226,16 @@ void Object::tag_update(Scene *scene)
     foreach (Node *node, geometry->get_used_shaders()) {
       Shader *shader = static_cast<Shader *>(node);
       if (shader->get_use_mis() && shader->has_surface_emission)
-        scene->light_manager->tag_update(scene, EMISSIVE_MESH_MODIFIED);
+        scene->light_manager->tag_update(scene, LightManager::EMISSIVE_MESH_MODIFIED);
     }
   }
 
   scene->camera->need_flags_update = true;
 
-  UpdateFlags flag = OBJECT_MODIFIED;
+  uint32_t flag = ObjectManager::OBJECT_MODIFIED;
 
   if (use_holdout_is_modified()) {
-    flag |= HOLDOUT_MODIFIED;
+    flag |= ObjectManager::HOLDOUT_MODIFIED;
   }
 
   if (tfm_is_modified()) {
@@ -638,6 +638,9 @@ void ObjectManager::device_update_transforms(DeviceScene *dscene, Scene *scene, 
     numparticles += psys->particles.size();
   }
 
+  /* as all the arrays are the same size, checking only dscene.objects is sufficient */
+  const bool update_all = dscene->objects.need_realloc();
+
   /* Parallel object update, with grain size to avoid too much threading overhead
    * for individual objects. */
   static const int OBJECTS_PER_TASK = 32;
@@ -646,7 +649,7 @@ void ObjectManager::device_update_transforms(DeviceScene *dscene, Scene *scene, 
                  for (size_t i = r.begin(); i != r.end(); i++) {
                    Object *ob = state.scene->objects[i];
 
-                   if (!ob->is_modified() && !(device_flags & DEVICE_DATA_NEEDS_REALLOC)) {
+                   if (!ob->is_modified() && !update_all) {
                      continue;
                    }
 
@@ -658,9 +661,7 @@ void ObjectManager::device_update_transforms(DeviceScene *dscene, Scene *scene, 
     return;
   }
 
-  if (device_flags & (DEVICE_DATA_MODIFIED | DEVICE_DATA_NEEDS_REALLOC)) {
-    dscene->objects.copy_to_device();
-  }
+  dscene->objects.copy_to_device_if_modified();
 
   if (state.need_motion == Scene::MOTION_PASS) {
     dscene->object_motion_pass.copy_to_device();
@@ -671,6 +672,10 @@ void ObjectManager::device_update_transforms(DeviceScene *dscene, Scene *scene, 
 
   dscene->data.bvh.have_motion = state.have_motion;
   dscene->data.bvh.have_curves = state.have_curves;
+
+  dscene->objects.clear_modified();
+  dscene->object_motion_pass.clear_modified();
+  dscene->object_motion.clear_modified();
 }
 
 void ObjectManager::device_update(Device *device,
@@ -681,15 +686,25 @@ void ObjectManager::device_update(Device *device,
   if (!need_update())
     return;
 
-  device_flags = 0;
-
   if (update_flags & (OBJECT_ADDED | OBJECT_REMOVED)) {
-    device_flags |= DEVICE_DATA_NEEDS_REALLOC;
+    dscene->objects.tag_realloc();
+    dscene->object_motion_pass.tag_realloc();
+    dscene->object_motion.tag_realloc();
+    dscene->object_flag.tag_realloc();
+    dscene->object_volume_step.tag_realloc();
+  }
+
+  if (update_flags & HOLDOUT_MODIFIED) {
+    dscene->object_flag.tag_modified();
+  }
+
+  if (update_flags & PARTICLE_MODIFIED) {
+    dscene->objects.tag_modified();
   }
 
   VLOG(1) << "Total " << scene->objects.size() << " objects.";
 
-  device_free(device, dscene);
+  device_free(device, dscene, false);
 
   if (scene->objects.size() == 0)
     return;
@@ -706,8 +721,14 @@ void ObjectManager::device_update(Device *device,
     foreach (Object *object, scene->objects) {
       object->index = index++;
 
+      /* this is a bit too broad, however a bigger refactor might be needed to properly separate
+       * update each type of data (transform, flags, etc.) */
       if (object->is_modified()) {
-        device_flags |= DEVICE_DATA_MODIFIED;
+        dscene->objects.tag_modified();
+        dscene->object_motion_pass.tag_modified();
+        dscene->object_motion.tag_modified();
+        dscene->object_flag.tag_modified();
+        dscene->object_volume_step.tag_modified();
       }
     }
   }
@@ -841,6 +862,9 @@ void ObjectManager::device_update_flags(
   /* Copy object flag. */
   dscene->object_flag.copy_to_device();
   dscene->object_volume_step.copy_to_device();
+
+  dscene->object_flag.clear_modified();
+  dscene->object_volume_step.clear_modified();
 }
 
 void ObjectManager::device_update_mesh_offsets(Device *, DeviceScene *dscene, Scene *scene)
@@ -888,17 +912,13 @@ void ObjectManager::device_update_mesh_offsets(Device *, DeviceScene *dscene, Sc
   }
 }
 
-void ObjectManager::device_free(Device *, DeviceScene *dscene)
+void ObjectManager::device_free(Device *, DeviceScene *dscene, bool force_free)
 {
-  if (!(device_flags & DEVICE_DATA_NEEDS_REALLOC)) {
-    return;
-  }
-
-  dscene->objects.free();
-  dscene->object_motion_pass.free();
-  dscene->object_motion.free();
-  dscene->object_flag.free();
-  dscene->object_volume_step.free();
+  dscene->objects.free_if_need_realloc(force_free);
+  dscene->object_motion_pass.free_if_need_realloc(force_free);
+  dscene->object_motion.free_if_need_realloc(force_free);
+  dscene->object_flag.free_if_need_realloc(force_free);
+  dscene->object_volume_step.free_if_need_realloc(force_free);
 }
 
 void ObjectManager::apply_static_transforms(DeviceScene * /*dscene*/,
@@ -965,21 +985,16 @@ void ObjectManager::apply_static_transforms(DeviceScene * /*dscene*/,
   }
 }
 
-void ObjectManager::tag_update(Scene *scene, UpdateFlags flag)
+void ObjectManager::tag_update(Scene *scene, uint32_t flag)
 {
-  /* todo:
-   * HOLDOUT_MODIFIED
-   * PARTICLE_MODIFIED
-   * GEOMETRY_MANAGER
-   */
   update_flags |= flag;
 
   /* avoid infinite loops if the geometry manager tagged us for an update */
   if ((flag & GEOMETRY_MANAGER) == 0) {
-    scene->geometry_manager->tag_update(scene, OBJECT_MANAGER);
+    scene->geometry_manager->tag_update(scene, GeometryManager::OBJECT_MANAGER);
   }
 
-  scene->light_manager->tag_update(scene, OBJECT_MANAGER);
+  scene->light_manager->tag_update(scene, LightManager::OBJECT_MANAGER);
 }
 
 bool ObjectManager::need_update() const

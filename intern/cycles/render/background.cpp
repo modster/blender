@@ -131,7 +131,7 @@ void Background::device_free(Device * /*device*/, DeviceScene * /*dscene*/)
 void Background::tag_update(Scene *scene)
 {
   if (ao_factor_is_modified() || use_ao_is_modified()) {
-    scene->integrator->tag_update(scene, BACKGROUND_AO_MODIFIED);
+    scene->integrator->tag_update(scene, Integrator::BACKGROUND_AO_MODIFIED);
   }
 }
 

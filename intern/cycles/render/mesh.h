@@ -55,9 +55,6 @@ class Mesh : public Geometry {
  protected:
   Mesh(const NodeType *node_type_, Type geom_type_);
 
-  size_t previous_verts_count;
-  size_t previous_triangles_count;
-
  public:
   NODE_DECLARE
 
@@ -235,7 +232,7 @@ class Mesh : public Geometry {
                   size_t tri_offset);
   void pack_patches(uint *patch_data, uint vert_offset, uint face_offset, uint corner_offset);
 
-  void pack_primitives(PackedBVH &pack, int object, uint visibility) override;
+  void pack_primitives(PackedBVH *pack, int object, uint visibility, bool pack_all) override;
 
   void tessellate(DiagSplit *split);
 

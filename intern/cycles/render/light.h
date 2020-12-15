@@ -38,7 +38,6 @@ class Object;
 class Progress;
 class Scene;
 class Shader;
-enum UpdateFlags : uint32_t;
 
 class Light : public Node {
  public:
@@ -92,6 +91,22 @@ class Light : public Node {
 
 class LightManager {
  public:
+  enum : uint32_t {
+    MESH_NEED_REBUILD = (1 << 0),
+    EMISSIVE_MESH_MODIFIED = (1 << 1),
+    LIGHT_MODIFIED = (1 << 2),
+    LIGHT_ADDED = (1 << 3),
+    LIGHT_REMOVED = (1 << 4),
+    OBJECT_MANAGER = (1 << 5),
+    SHADER_COMPILED = (1 << 6),
+    SHADER_MODIFIED = (1 << 7),
+
+    /* tag everything in the manager for an update */
+    UPDATE_ALL = ~0u,
+
+    UPDATE_NONE = 0u,
+  };
+
   bool use_light_visibility;
 
   /* Need to update background (including multiple importance map) */
@@ -108,7 +123,7 @@ class LightManager {
   void device_update(Device *device, DeviceScene *dscene, Scene *scene, Progress &progress);
   void device_free(Device *device, DeviceScene *dscene, const bool free_background = true);
 
-  void tag_update(Scene *scene, UpdateFlags flag);
+  void tag_update(Scene *scene, uint32_t flag);
 
   bool need_update() const;
 
@@ -148,7 +163,7 @@ class LightManager {
   bool last_background_enabled;
   int last_background_resolution;
 
-  UpdateFlags update_flags;
+  uint32_t update_flags;
 };
 
 CCL_NAMESPACE_END

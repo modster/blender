@@ -42,7 +42,6 @@ class SceneParams;
 class Shader;
 class Volume;
 struct PackedBVH;
-enum UpdateFlags : uint32_t;
 
 /* Geometry
  *
@@ -126,7 +125,7 @@ class Geometry : public Node {
                    int n,
                    int total);
 
-  virtual void pack_primitives(PackedBVH &pack, int object, uint visibility) = 0;
+  virtual void pack_primitives(PackedBVH *pack, int object, uint visibility, bool pack_all) = 0;
 
   /* Check whether the geometry should have own BVH built separately. Briefly,
    * own BVH is needed for geometry, if:
@@ -168,34 +167,31 @@ class Geometry : public Node {
 /* Geometry Manager */
 
 class GeometryManager {
-  using DeviceUpdateFlags = uint32_t;
-
-  enum {
-    DEVICE_VERTEX_NEEDS_REALLOC = (1 << 0),
-    DEVICE_TRIANGLES_NEEDS_REALLOC = (1 << 1),
-    DEVICE_CURVES_NEEDS_REALLOC = (1 << 2),
-    DEVICE_CURVE_KEYS_NEEDS_REALLOC = (1 << 3),
-
-    ATTR_FLOAT_NEEDS_REALLOC = (1 << 4),
-    ATTR_FLOAT2_NEEDS_REALLOC = (1 << 5),
-    ATTR_FLOAT3_NEEDS_REALLOC = (1 << 6),
-    ATTR_UCHAR4_NEEDS_REALLOC = (1 << 7),
-
-    ATTRS_NEED_REALLOC = (ATTR_FLOAT_NEEDS_REALLOC | ATTR_FLOAT2_NEEDS_REALLOC |
-                          ATTR_FLOAT3_NEEDS_REALLOC | ATTR_UCHAR4_NEEDS_REALLOC),
-    DEVICE_MESH_DATA_NEEDS_REALLOC = (DEVICE_VERTEX_NEEDS_REALLOC |
-                                      DEVICE_TRIANGLES_NEEDS_REALLOC | ATTRS_NEED_REALLOC),
-    DEVICE_CURVE_DATA_NEEDS_REALLOC = (DEVICE_CURVES_NEEDS_REALLOC |
-                                       DEVICE_CURVE_KEYS_NEEDS_REALLOC | ATTRS_NEED_REALLOC),
-    DEVICE_DATA_NEEDS_REALLOC = (DEVICE_MESH_DATA_NEEDS_REALLOC | DEVICE_CURVE_DATA_NEEDS_REALLOC),
-  };
-
-  DeviceUpdateFlags device_update_flags;
-  UpdateFlags update_flags;
-
-  BVH *bvh;
+  uint32_t update_flags;
 
  public:
+  enum : uint32_t {
+    UV_PASS_NEEDED = (1 << 0),
+    MOTION_PASS_NEEDED = (1 << 1),
+    GEOMETRY_MODIFIED = (1 << 2),
+    OBJECT_MANAGER = (1 << 3),
+    MESH_ADDED = (1 << 4),
+    MESH_REMOVED = (1 << 5),
+    HAIR_ADDED = (1 << 6),
+    HAIR_REMOVED = (1 << 7),
+
+    SHADER_ATTRIBUTE_MODIFIED = (1 << 8),
+    SHADER_DISPLACEMENT_MODIFIED = (1 << 9),
+
+    GEOMETRY_ADDED = MESH_ADDED | HAIR_ADDED,
+    GEOMETRY_REMOVED = MESH_REMOVED | HAIR_REMOVED,
+
+    /* tag everything in the manager for an update */
+    UPDATE_ALL = ~0u,
+
+    UPDATE_NONE = 0u,
+  };
+
   /* Update Flags */
   bool need_flags_update;
 
@@ -206,10 +202,10 @@ class GeometryManager {
   /* Device Updates */
   void device_update_preprocess(Device *device, Scene *scene, Progress &progress);
   void device_update(Device *device, DeviceScene *dscene, Scene *scene, Progress &progress);
-  void device_free(Device *device, DeviceScene *dscene);
+  void device_free(Device *device, DeviceScene *dscene, bool force_free);
 
   /* Updates */
-  void tag_update(Scene *scene, UpdateFlags flag);
+  void tag_update(Scene *scene, uint32_t flag);
 
   bool need_update() const;
 
@@ -252,8 +248,6 @@ class GeometryManager {
   void device_update_displacement_images(Device *device, Scene *scene, Progress &progress);
 
   void device_update_volume_images(Device *device, Scene *scene, Progress &progress);
-
-  void free_bvh(DeviceScene *dscene);
 
  private:
   static void update_attribute_element_offset(Geometry *geom,

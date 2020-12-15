@@ -148,7 +148,7 @@ void Attribute::add(const char *data)
   modified = true;
 }
 
-void Attribute::set_data_from(Attribute &other)
+void Attribute::set_data_from(Attribute &&other)
 {
   assert(other.std == std);
   assert(other.type == type);
@@ -157,11 +157,11 @@ void Attribute::set_data_from(Attribute &other)
   this->flags = other.flags;
 
   if (this->buffer.size() != other.buffer.size()) {
-    this->buffer = other.buffer;
+    this->buffer = std::move(other.buffer);
     modified = true;
   }
   else if (memcmp(this->data(), other.data(), other.buffer.size()) != 0) {
-    this->buffer = other.buffer;
+    this->buffer = std::move(other.buffer);
     modified = true;
   }
 }
@@ -657,7 +657,7 @@ void AttributeSet::clear(bool preserve_voxel_data)
   }
 }
 
-void AttributeSet::update(AttributeSet &new_attributes)
+void AttributeSet::update(AttributeSet &&new_attributes)
 {
   /* add or update old_attributes based on the new_attributes */
   foreach (Attribute &attr, new_attributes.attributes) {
@@ -670,7 +670,7 @@ void AttributeSet::update(AttributeSet &new_attributes)
       nattr = add(attr.name, attr.type, attr.element);
     }
 
-    nattr->set_data_from(attr);
+    nattr->set_data_from(std::move(attr));
   }
 
   /* remove any attributes not on new_attributes */
@@ -690,6 +690,13 @@ void AttributeSet::update(AttributeSet &new_attributes)
     }
 
     it++;
+  }
+}
+
+void AttributeSet::clear_modified()
+{
+  foreach (Attribute &attr, attributes) {
+    attr.modified = false;
   }
 }
 

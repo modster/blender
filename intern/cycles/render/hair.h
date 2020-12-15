@@ -140,16 +140,13 @@ class Hair : public Geometry {
     return curve_keys.size() - curve_first_key.size();
   }
 
-  size_t previous_keys_num;
-  size_t previous_curves_num;
-
   /* UDIM */
   void get_uv_tiles(ustring map, unordered_set<int> &tiles) override;
 
   /* BVH */
   void pack_curves(Scene *scene, float4 *curve_key_co, float4 *curve_data, size_t curvekey_offset);
 
-  void pack_primitives(PackedBVH &pack, int object, uint visibility) override;
+  void pack_primitives(PackedBVH *pack, int object, uint visibility, bool pack_all) override;
 };
 
 CCL_NAMESPACE_END

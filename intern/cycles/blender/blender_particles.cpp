@@ -85,7 +85,7 @@ bool BlenderSync::sync_dupli_particle(BL::Object &b_ob,
   object->set_particle_index(psys->particles.size() - 1);
 
   if (object->particle_index_is_modified())
-    scene->object_manager->tag_update(scene, PARTICLE_MODIFIED);
+    scene->object_manager->tag_update(scene, ObjectManager::PARTICLE_MODIFIED);
 
   /* return that this object has particle data */
   return true;

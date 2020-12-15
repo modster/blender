@@ -272,7 +272,7 @@ class DataTransferStats {
 
   template<typename T> void add_entry(const device_vector<T> &dv)
   {
-    add_entry({dv.name, dv.time_copying, dv.data_copied, dv.byte_size()});
+    add_entry({dv.name, dv.time_copying(), dv.data_copied(), dv.byte_size()});
   }
 };
 
