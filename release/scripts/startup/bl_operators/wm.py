@@ -1536,7 +1536,6 @@ class WM_OT_properties_remove(Operator):
 
     def execute(self, context):
         from rna_prop_ui import (
-            rna_idprop_ui_prop_clear,
             rna_idprop_ui_prop_update,
         )
         data_path = self.data_path
