@@ -56,8 +56,6 @@ class Attribute {
 
   bool modified;
 
-  size_t device_offset = 0;
-
   Attribute(ustring name,
             TypeDesc type,
             AttributeElement element,

@@ -85,9 +85,6 @@ class BVH {
 
   int num_refits;
 
-  size_t device_attr_float3_pointer = 0;
-  size_t device_verts_pointer = 0;
-
   static BVH *create(const BVHParams &params,
                      const vector<Geometry *> &geometry,
                      const vector<Object *> &objects,

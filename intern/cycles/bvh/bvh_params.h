@@ -66,9 +66,6 @@ class BVHParams {
   /* object or mesh level bvh */
   bool top_level;
 
-  /* pack the data from all meshes even if they are not modified */
-  bool pack_all_data;
-
   /* BVH layout to be built. */
   BVHLayout bvh_layout;
 
@@ -116,7 +113,6 @@ class BVHParams {
     max_motion_curve_leaf_size = 4;
 
     top_level = false;
-    pack_all_data = false;
     bvh_layout = BVH_LAYOUT_BVH2;
     use_unaligned_nodes = false;
 
