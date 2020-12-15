@@ -42,7 +42,13 @@ class USDMeshReaderBase : public USDXformableReader {
   struct Mesh *read_mesh(Main *bmain, double time, USDDataCache *data_cache);
 
   virtual struct Mesh *create_mesh(Main *bmain, double time) = 0;
-  virtual void assign_materials(Main *bmain, Mesh *mesh, double time) = 0;
+
+  /* If mesh isn't null, assign material indices to the mesh faces.
+   * If set_object_materials is true, assign materials to the object. */
+  virtual void assign_materials(Main *bmain,
+                                Mesh *mesh,
+                                double time,
+                                bool set_object_materials) = 0;
 };
 
 }  // namespace blender::io::usd

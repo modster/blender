@@ -79,7 +79,7 @@ void USDMeshReaderBase::create_object(Main *bmain, double time, USDDataCache *da
   object_->data = mesh;
 
   if (this->context_.import_params.import_materials) {
-    assign_materials(bmain, mesh, time);
+    assign_materials(bmain, mesh, time, true);
   }
 }
 

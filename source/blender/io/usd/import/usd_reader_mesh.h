@@ -39,7 +39,7 @@ class USDMeshReader : public USDMeshReaderBase {
   bool valid() const override;
 
   struct Mesh *create_mesh(Main *bmain, double time) override;
-  void assign_materials(Main *bmain, Mesh *mesh, double time);
+  void assign_materials(Main *bmain, Mesh *mesh, double time, bool set_object_materials) override;
 };
 
 }  // namespace blender::io::usd

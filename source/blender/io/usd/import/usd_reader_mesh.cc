@@ -325,7 +325,7 @@ void process_normals(Mesh *mesh, const MeshSampleData &mesh_data)
   }
 }
 
-void build_mtl_map(const Main *bmain, std::map<std::string, Material *> &mat_map)
+void build_mat_map(const Main *bmain, std::map<std::string, Material *> &mat_map)
 {
   Material *material = static_cast<Material *>(bmain->materials.first);
 
@@ -415,18 +415,16 @@ Mesh *USDMeshReader::create_mesh(Main *bmain, double time)
   return mesh;
 }
 
-void USDMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)
+void USDMeshReader::assign_materials(Main *bmain,
+                                     Mesh *mesh,
+                                     double time,
+                                     bool set_object_materials)
 {
-  if (!bmain || !mesh || !object_ || !mesh_) {
+  if (!mesh && !(set_object_materials && bmain && this->object_ && this->prim())) {
     return;
   }
 
-  /* Maps USD material names to material instances. */
-  std::map<std::string, pxr::UsdShadeMaterial> usd_mtl_map;
-
-  /* Each pair in the following vector represents a subset
-   * and the name of the material to which it's bound. */
-  std::vector<std::pair<pxr::UsdGeomSubset, std::string>> subset_mtls;
+  std::map<pxr::SdfPath, int> mat_map;
 
   /* Find the geom subsets that have bound materials.
    * We don't call pxr::UsdShadeMaterialBindingAPI::GetMaterialBindSubsets()
@@ -437,167 +435,121 @@ void USDMeshReader::assign_materials(Main *bmain, Mesh *mesh, double time)
   const std::vector<pxr::UsdGeomSubset> face_subsets = pxr::UsdGeomSubset::GetAllGeomSubsets(
       this->mesh_);
 
-  for (const pxr::UsdGeomSubset &sub : face_subsets) {
-    pxr::UsdShadeMaterialBindingAPI sub_bind_api(sub);
-    PXR_NS::UsdRelationship rel;
-    pxr::UsdShadeMaterial sub_bound_mtl = sub_bind_api.ComputeBoundMaterial(
-        PXR_NS::UsdShadeTokens->allPurpose, &rel);
+  if (!face_subsets.empty()) {
 
-    /* Check if we have a bound material that was not inherited from another prim. */
-    if (sub_bound_mtl && rel.GetPrim() == sub.GetPrim()) {
-      pxr::UsdPrim mtl_prim = sub_bound_mtl.GetPrim();
-      if (mtl_prim) {
-        std::string mtl_name = sub_bound_mtl.GetPrim().GetName().GetString();
-        subset_mtls.push_back(std::make_pair(sub, mtl_name));
-        usd_mtl_map.insert(std::make_pair(mtl_name, sub_bound_mtl));
+    int current_mat = 0;
+
+    for (const pxr::UsdGeomSubset &sub : face_subsets) {
+      pxr::UsdShadeMaterialBindingAPI sub_bind_api(sub);
+
+      /* TODO(makowalski): Verify that the following will work for instance proxies. */
+
+      pxr::SdfPath mat_path = sub_bind_api.GetDirectBinding().GetMaterialPath();
+
+      if (mat_path.IsEmpty()) {
+        continue;
+      }
+
+      if (mat_map.find(mat_path) == mat_map.end()) {
+        mat_map[mat_path] = 1 + current_mat++;
+      }
+
+      if (mesh) {
+        const int mat_idx = mat_map[mat_path] - 1;
+
+        /* Query the subset membership. */
+        pxr::UsdAttribute indicesAttribute = sub.GetIndicesAttr();
+        pxr::VtIntArray indices;
+        indicesAttribute.Get(&indices, time);
+
+        /* Assign the poly material indices. */
+        for (int face_idx : indices) {
+          if (face_idx > mesh->totpoly) {
+            std::cerr << "WARNING:  Out of bounds material subset index." << std::endl;
+            continue;
+          }
+          mesh->mpoly[face_idx].mat_nr = mat_idx;
+        }
       }
     }
   }
 
-  USDMaterialImporter mtl_importer(this->context_, bmain);
+  if (!(set_object_materials && bmain && this->object_)) {
+    return;
+  }
 
-  /* TODO(makowalski): Move more of the material creation logic inot USDMaterialImporter. */
+  if (mat_map.empty()) {
 
-  if (subset_mtls.empty()) {
-    /* No material subsets.  See if there is a material bound to the mesh. */
+    pxr::UsdShadeMaterialBindingAPI binding_api(this->prim());
 
-    pxr::UsdShadeMaterialBindingAPI binding_api(this->mesh_.GetPrim());
+    // Note that calling binding_api.GetDirectBinding() doesn't appear
+    // to work for instance proxies.
     pxr::UsdShadeMaterial bound_mtl = binding_api.ComputeBoundMaterial();
 
-    if (!bound_mtl || !bound_mtl.GetPrim()) {
-      return;
+    if (bound_mtl) {
+      mat_map.insert(std::make_pair(bound_mtl.GetPath(), 1));
     }
+  }
 
-    /* We have a material bound to the mesh prim. */
+  if (mat_map.empty()) {
+    return;
+  }
 
-    /* Add a material slot to the object .*/
+  /* Add material slots. */
+  std::map<pxr::SdfPath, int>::const_iterator mat_iter = mat_map.begin();
 
+  for (; mat_iter != mat_map.end(); ++mat_iter) {
     if (!BKE_object_material_slot_add(bmain, object_)) {
       std::cerr << "WARNING:  Couldn't add material slot for mesh prim " << this->prim_path_
                 << std::endl;
       return;
     }
+  }
 
-    /* Check if a material with the same name already exists. */
+  USDMaterialImporter mat_importer(this->context_, bmain);
 
-    std::string mtl_name = bound_mtl.GetPrim().GetName().GetString();
+  /* TODO(makowalski): Move more of the material creation logic into USDMaterialImporter. */
 
-    Material *mtl = static_cast<Material *>(bmain->materials.first);
+  /* Create the Blender materials. */
+
+  /* Query the current Blender materials. */
+  std::map<std::string, Material *> blen_mat_map;
+  build_mat_map(bmain, blen_mat_map);
+
+  /* Iterate over the USD materials and add corresponding
+   * Blender materials of the same name, if they don't
+   * already exist. */
+  mat_iter = mat_map.begin();
+
+  for (; mat_iter != mat_map.end(); ++mat_iter) {
     Material *blen_mtl = nullptr;
 
-    for (; mtl; mtl = static_cast<Material *>(mtl->id.next)) {
-      if (strcmp(mtl_name.c_str(), mtl->id.name + 2) == 0) {
-        /* Found an existing material with the same name. */
-        blen_mtl = mtl;
-        break;
+    std::string mat_name = mat_iter->first.GetName();
+
+    std::map<std::string, Material *>::const_iterator blen_mat_iter = blen_mat_map.find(mat_name);
+
+    if (blen_mat_iter != blen_mat_map.end()) {
+      blen_mtl = blen_mat_iter->second;
+    }
+    else {
+
+      pxr::UsdPrim mat_prim = this->prim().GetStage()->GetPrimAtPath(mat_iter->first);
+
+      pxr::UsdShadeMaterial usd_mat(mat_prim);
+      blen_mtl = mat_importer.add_material(usd_mat);
+
+      if (blen_mtl) {
+        blen_mat_map.insert(std::make_pair(mat_name, blen_mtl));
       }
     }
 
     if (!blen_mtl) {
-      /* No existing material, so add it now. */
-      blen_mtl = mtl_importer.add_material(bound_mtl);
-    }
-
-    if (!blen_mtl) {
-      std::cerr << "WARNING:  Couldn't add material " << mtl_name << " for mesh prim "
+      std::cerr << "WARNING:  Couldn't add material " << mat_name << " for mesh prim "
                 << this->prim_path_ << std::endl;
+      return;
     }
 
-    /* Set the material IDs on the polys. */
-    for (int p = 0; p < mesh->totpoly; ++p) {
-      mesh->mpoly[p].mat_nr = 0;
-    }
-
-    BKE_object_material_assign(bmain, object_, blen_mtl, 1, BKE_MAT_ASSIGN_OBDATA);
-  }
-  else {
-
-    /* Maps USD material names to material slot index. */
-    std::map<std::string, int> mtl_index_map;
-
-    /* Add material slots. */
-    std::map<std::string, pxr::UsdShadeMaterial>::const_iterator usd_mtl_iter =
-        usd_mtl_map.begin();
-
-    for (; usd_mtl_iter != usd_mtl_map.end(); ++usd_mtl_iter) {
-      if (!BKE_object_material_slot_add(bmain, object_)) {
-        std::cerr << "WARNING:  Couldn't add material slot for mesh prim " << this->prim_path_
-                  << std::endl;
-        return;
-      }
-    }
-
-    /* Create the Blender materials. */
-
-    /* Query the current materials. */
-    std::map<std::string, Material *> blen_mtl_map;
-    build_mtl_map(bmain, blen_mtl_map);
-
-    /* Iterate over the USD materials and add corresponding
-     * Blender materials of the same name, if they don't
-     * already exist. */
-    usd_mtl_iter = usd_mtl_map.begin();
-    int idx = 0;
-
-    for (; usd_mtl_iter != usd_mtl_map.end(); ++usd_mtl_iter, ++idx) {
-      Material *blen_mtl = nullptr;
-
-      std::string mtl_name = usd_mtl_iter->first.c_str();
-
-      std::map<std::string, Material *>::const_iterator blen_mtl_iter = blen_mtl_map.find(
-          mtl_name);
-
-      if (blen_mtl_iter != blen_mtl_map.end()) {
-        blen_mtl = blen_mtl_iter->second;
-      }
-      else {
-        blen_mtl = mtl_importer.add_material(usd_mtl_iter->second);
-
-        if (blen_mtl) {
-          blen_mtl_map.insert(std::make_pair(mtl_name, blen_mtl));
-        }
-      }
-
-      if (!blen_mtl) {
-        std::cerr << "WARNING:  Couldn't add material " << mtl_name << " for mesh prim "
-                  << this->prim_path_ << std::endl;
-        return;
-      }
-
-      BKE_object_material_assign(bmain, object_, blen_mtl, idx + 1, BKE_MAT_ASSIGN_OBDATA);
-
-      /* Record this material's index. */
-      mtl_index_map.insert(std::make_pair(usd_mtl_iter->first, idx));
-    }
-
-    /* Assign the material indices. */
-
-    for (const std::pair<pxr::UsdGeomSubset, std::string> &sub_mtl : subset_mtls) {
-
-      /* Find the index of the current material. */
-      std::map<std::string, int>::const_iterator mtl_index_iter = mtl_index_map.find(
-          sub_mtl.second);
-
-      if (mtl_index_iter == mtl_index_map.end()) {
-        std::cerr << "WARNING:  Couldn't find material index." << std::endl;
-        return;
-      }
-
-      int mtl_idx = mtl_index_iter->second;
-
-      /* Query the subset membership. */
-      pxr::VtIntArray indices;
-      sub_mtl.first.GetIndicesAttr().Get(&indices, time);
-
-      /* Assign the poly material indices. */
-      for (int face_idx : indices) {
-        if (mtl_idx > mesh->totpoly) {
-          std::cerr << "WARNING:  Out of bounds material index." << std::endl;
-          return;
-        }
-        mesh->mpoly[face_idx].mat_nr = mtl_idx;
-      }
-    }
+    BKE_object_material_assign(bmain, object_, blen_mtl, mat_iter->second, BKE_MAT_ASSIGN_OBDATA);
   }
 }
 
