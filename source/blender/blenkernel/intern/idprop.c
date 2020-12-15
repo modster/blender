@@ -1064,7 +1064,7 @@ IDProperty *IDP_New(const char type, const IDPropertyTemplate *val, const char *
   return prop;
 }
 
-static void free_ui_data(IDProperty *prop)
+void IDP_free_ui_data(IDProperty *prop)
 {
   if (prop->type == IDP_STRING) {
     IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)prop->ui_data;
@@ -1113,7 +1113,7 @@ void IDP_FreePropertyContent_ex(IDProperty *prop, const bool do_id_user)
 
   if (prop->ui_data != NULL) {
     printf("Free UI data: %s\n", prop->name);
-    free_ui_data(prop);
+    IDP_free_ui_data(prop);
   }
 }
 

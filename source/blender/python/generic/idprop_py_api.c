@@ -1494,12 +1494,13 @@ static void idprop_ui_data_to_dict_string(IDProperty *idprop, PyObject *dict)
 PyDoc_STRVAR(BPy_IDGroup_rna_ui_data_doc,
              ".. method:: rna_data(key)\n"
              "\n"
-             "   Clear all members from this group.\n");
+             "   Return a dictionary of the property's RNA UI data. The fields in the "
+             "returned dictionary and their types will depend on the property's type.\n");
 static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
 {
   const char *key;
 
-  if (!PyArg_ParseTuple(args, "s:get", &key)) {
+  if (!PyArg_ParseTuple(args, "s:rna_data", &key)) {
     Py_RETURN_NONE;
   }
 
@@ -1548,6 +1549,31 @@ static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
   return dict;
 }
 
+PyDoc_STRVAR(BPy_IDGroup_rna_ui_data_clear_doc,
+             ".. method:: clear_rna(key)\n"
+             "\n"
+             "   Remove the RNA UI data from this IDProperty.\n");
+static PyObject *BPy_IDGroup_rna_ui_data_clear(BPy_IDProperty *self, PyObject *args)
+{
+  const char *key;
+
+  if (!PyArg_ParseTuple(args, "s:clear_rna", &key)) {
+    Py_RETURN_NONE;
+  }
+
+  IDProperty *idprop = IDP_GetPropertyFromGroup(self->prop, key);
+  if (idprop == NULL) {
+    PyErr_SetString(PyExc_KeyError, "Property not found in IDProperty group");
+    Py_RETURN_NONE;
+  }
+
+  if (idprop->ui_data) {
+    IDP_free_ui_data(idprop);
+  }
+
+  Py_RETURN_NONE;
+}
+
 static struct PyMethodDef BPy_IDGroup_methods[] = {
     {"pop", (PyCFunction)BPy_IDGroup_pop, METH_VARARGS, BPy_IDGroup_pop_doc},
     {"iteritems", (PyCFunction)BPy_IDGroup_iter_items, METH_NOARGS, BPy_IDGroup_iter_items_doc},
@@ -1563,6 +1589,10 @@ static struct PyMethodDef BPy_IDGroup_methods[] = {
      METH_VARARGS | METH_KEYWORDS,
      BPy_IDGroup_update_rna_doc},
     {"rna_data", (PyCFunction)BPy_IDGroup_rna_ui_data, METH_VARARGS, BPy_IDGroup_rna_ui_data_doc},
+    {"clear_rna",
+     (PyCFunction)BPy_IDGroup_rna_ui_data_clear,
+     METH_VARARGS,
+     BPy_IDGroup_rna_ui_data_clear_doc},
     {NULL, NULL, 0, NULL},
 };
 

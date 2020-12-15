@@ -30,13 +30,6 @@ ARRAY_TYPES = (list, tuple, IDPropertyArray, Vector)
 MAX_DISPLAY_ROWS = 4
 
 
-def rna_idprop_ui_del(item):
-    try:
-        del item['_RNA_UI']
-    except KeyError:
-        pass
-
-
 def rna_idprop_quote_path(prop):
     return "[\"%s\"]" % bpy.utils.escape_identifier(prop)
 
@@ -48,16 +41,9 @@ def rna_idprop_ui_prop_update(item, prop):
         prop_rna.update()
 
 
-def rna_idprop_ui_prop_clear(item, prop, remove=True):
-    # HANS-TODO: Add a clear method to the API
+def rna_idprop_ui_prop_clear(item, prop):
     props = item.custom_properties()
-    props.update_rna(prop, subtype="", 
-                     min=None, 
-                     max=None, 
-                     soft_min=None, 
-                     soft_max=None,
-                     description="",
-                     default=None)
+    props.clear_rna(prop)
 
 
 def rna_idprop_context_value(context, context_member, property_type):
