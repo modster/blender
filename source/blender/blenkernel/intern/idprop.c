@@ -321,6 +321,7 @@ static IDProperty *idp_generic_copy(const IDProperty *prop, const int UNUSED(fla
   newp->data.val2 = prop->data.val2;
 
   if (prop->ui_data != NULL) {
+    printf("Copy UI data: %s\n", prop->name);
     newp->ui_data = copy_ui_data(prop);
   }
 
@@ -1065,10 +1066,6 @@ IDProperty *IDP_New(const char type, const IDPropertyTemplate *val, const char *
 
 static void free_ui_data(IDProperty *prop)
 {
-  if (prop->ui_data == NULL) {
-    return;
-  }
-
   if (prop->type == IDP_STRING) {
     IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)prop->ui_data;
     MEM_SAFE_FREE(ui_data->default_value);
@@ -1114,7 +1111,10 @@ void IDP_FreePropertyContent_ex(IDProperty *prop, const bool do_id_user)
       break;
   }
 
-  free_ui_data(prop);
+  if (prop->ui_data != NULL) {
+    printf("Free UI data: %s\n", prop->name);
+    free_ui_data(prop);
+  }
 }
 
 void IDP_FreePropertyContent(IDProperty *prop)
@@ -1294,6 +1294,7 @@ void IDP_WriteProperty_OnlyData(const IDProperty *prop, BlendWriter *writer)
       break;
   }
   if (prop->ui_data != NULL) {
+    printf("Write UI data: %s\n", prop->name);
     write_ui_data(prop, writer);
   }
 }
@@ -1449,6 +1450,7 @@ static void IDP_DirectLinkProperty(IDProperty *prop, BlendDataReader *reader)
   }
 
   if (prop->ui_data != NULL) {
+    printf("Read UI data: %s\n", prop->name);
     read_ui_data(prop, reader);
   }
 }
