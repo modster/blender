@@ -1407,16 +1407,20 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
   }
 
   /* Type specific data. */
-  if (idprop->type == IDP_INT || (idprop->type == IDP_ARRAY && idprop->subtype == IDP_INT)) {
-    idprop_update_rna_ui_data_int(idprop, min, max, soft_min, soft_max, step, default_value);
-  }
-  else if (ELEM(idprop->type, IDP_FLOAT, IDP_DOUBLE) ||
-           (idprop->type == IDP_ARRAY && ELEM(idprop->subtype, IDP_FLOAT, IDP_DOUBLE))) {
-    idprop_update_rna_ui_data_float(
-        idprop, min, max, soft_min, soft_max, step, precision, default_value);
-  }
-  else if (idprop->type == IDP_STRING) {
-    idprop_update_rna_ui_data_string(idprop, default_value);
+  switch (IDP_ui_data_type(idprop)) {
+    case IDP_UI_DATA_TYPE_STRING:
+      idprop_update_rna_ui_data_string(idprop, default_value);
+      break;
+    case IDP_UI_DATA_TYPE_INT:
+      idprop_update_rna_ui_data_int(idprop, min, max, soft_min, soft_max, step, default_value);
+      break;
+    case IDP_UI_DATA_TYPE_FLOAT:
+      idprop_update_rna_ui_data_float(
+          idprop, min, max, soft_min, soft_max, step, precision, default_value);
+      break;
+    case IDP_UI_DATA_TYPE_UNSUPPORTED:
+      BLI_assert(false);
+      break;
   }
 
   Py_RETURN_NONE;
@@ -1511,7 +1515,6 @@ static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
   }
 
   IDPropertyUIData *ui_data = idprop->ui_data;
-
   if (ui_data == NULL) {
     Py_RETURN_NONE;
   }
@@ -1535,15 +1538,19 @@ static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
   }
 
   /* Type specific data. */
-  if (idprop->type == IDP_INT || (idprop->type == IDP_ARRAY && idprop->subtype == IDP_INT)) {
-    idprop_ui_data_to_dict_int(idprop, dict);
-  }
-  else if (ELEM(idprop->type, IDP_FLOAT, IDP_DOUBLE) ||
-           (idprop->type == IDP_ARRAY && ELEM(idprop->subtype, IDP_FLOAT, IDP_DOUBLE))) {
-    idprop_ui_data_to_dict_float(idprop, dict);
-  }
-  else if (idprop->type == IDP_STRING) {
-    idprop_ui_data_to_dict_string(idprop, dict);
+  switch (IDP_ui_data_type(idprop)) {
+    case IDP_UI_DATA_TYPE_STRING:
+      idprop_ui_data_to_dict_string(idprop, dict);
+      break;
+    case IDP_UI_DATA_TYPE_INT:
+      idprop_ui_data_to_dict_int(idprop, dict);
+      break;
+    case IDP_UI_DATA_TYPE_FLOAT:
+      idprop_ui_data_to_dict_float(idprop, dict);
+      break;
+    case IDP_UI_DATA_TYPE_UNSUPPORTED:
+      BLI_assert(false);
+      break;
   }
 
   return dict;

@@ -375,15 +375,19 @@ static void version_idproperty_ui_data(IDProperty *idprop_group)
     }
 
     /* Type specific data. */
-    if (prop->type == IDP_INT || (prop->type == IDP_ARRAY && prop->subtype == IDP_INT)) {
-      version_idproperty_move_data_int((IDPropertyUIDataInt *)ui_data, prop_ui_data);
-    }
-    else if (ELEM(prop->type, IDP_FLOAT, IDP_DOUBLE) ||
-             (prop->type == IDP_ARRAY && ELEM(prop->subtype, IDP_FLOAT, IDP_DOUBLE))) {
-      version_idproperty_move_data_float((IDPropertyUIDataFloat *)ui_data, prop_ui_data);
-    }
-    else if (prop->type == IDP_STRING) {
-      version_idproperty_move_data_string((IDPropertyUIDataString *)ui_data, prop_ui_data);
+    switch (IDP_ui_data_type(prop)) {
+      case IDP_UI_DATA_TYPE_STRING:
+        version_idproperty_move_data_string((IDPropertyUIDataString *)ui_data, prop_ui_data);
+        break;
+      case IDP_UI_DATA_TYPE_INT:
+        version_idproperty_move_data_int((IDPropertyUIDataInt *)ui_data, prop_ui_data);
+        break;
+      case IDP_UI_DATA_TYPE_FLOAT:
+        version_idproperty_move_data_float((IDPropertyUIDataFloat *)ui_data, prop_ui_data);
+        break;
+      case IDP_UI_DATA_TYPE_UNSUPPORTED:
+        BLI_assert(false);
+        break;
     }
 
     IDP_FreeFromGroup(ui_container, prop_ui_data);

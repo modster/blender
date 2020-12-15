@@ -212,6 +212,19 @@ void IDP_BlendReadLib(struct BlendLibReader *reader, struct IDProperty *prop);
 void IDP_BlendReadExpand(struct BlendExpander *expander, struct IDProperty *prop);
 
 bool IDP_supports_ui_data(const struct IDProperty *prop);
+
+typedef enum IDPropertyUIDataType {
+  /** Other properties types that don't support RNA UI data. */
+  IDP_UI_DATA_TYPE_UNSUPPORTED = -1,
+  /**IDP_INT or IDP_ARRAY with subtype IDP_INT. */
+  IDP_UI_DATA_TYPE_INT = 0,
+  /** IDP_FLOAT and IDP_DOUBLE or IDP_ARRAY properties with a float or double subtypes. */
+  IDP_UI_DATA_TYPE_FLOAT = 1,
+  /** IDP_STRING properties. */
+  IDP_UI_DATA_TYPE_STRING = 2,
+} IDPropertyUIDataType;
+
+IDPropertyUIDataType IDP_ui_data_type(const struct IDProperty *prop);
 struct IDPropertyUIData *IDP_ui_data_ensure(struct IDProperty *idprop);
 
 #ifdef __cplusplus

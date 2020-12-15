@@ -67,7 +67,7 @@ typedef struct IDPropertyUIData {
   int _pad;
 } IDPropertyUIData;
 
-/** UI information for IDP_INT or IDP_ARRAY with subtype IDP_INT. */
+/* IDP_UI_DATA_TYPE_INT */
 typedef struct IDPropertyUIDataInt {
   IDPropertyUIData generic_ui_data;
   int *default_array; /* Only for array properties. */
@@ -82,7 +82,7 @@ typedef struct IDPropertyUIDataInt {
   int default_value;
 } IDPropertyUIDataInt;
 
-/** UI information for IDP_FLOAT and IDP_DOUBLE or IDP_ARRAY properties with those subtypes. */
+/* IDP_UI_DATA_TYPE_FLOAT */
 typedef struct IDPropertyUIDataFloat {
   IDPropertyUIData generic_ui_data;
   double *default_array; /* Only for array properties. */
@@ -99,7 +99,7 @@ typedef struct IDPropertyUIDataFloat {
   double default_value;
 } IDPropertyUIDataFloat;
 
-/** UI information for #IDP_STRING. */
+/* IDP_UI_DATA_TYPE_STRING */
 typedef struct IDPropertyUIDataString {
   IDPropertyUIData generic_ui_data;
   char *default_value;
