@@ -1398,7 +1398,7 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
   }
 
   if (!ELEM(description, NULL, Py_None)) {
-    if (PyUnicode_Check(rna_subtype)) {
+    if (PyUnicode_Check(description)) {
       idprop->ui_data->description = BLI_strdup(_PyUnicode_AsString(description));
     }
     else if (description != Py_None) {
