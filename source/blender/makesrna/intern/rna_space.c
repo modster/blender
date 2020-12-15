@@ -412,12 +412,7 @@ static const EnumPropertyItem rna_enum_view3dshading_render_pass_type_items[] = 
     {EEVEE_RENDER_PASS_DIFFUSE_COLOR, "DIFFUSE_COLOR", 0, "Diffuse Color", ""},
     {EEVEE_RENDER_PASS_SPECULAR_LIGHT, "SPECULAR_LIGHT", 0, "Specular Light", ""},
     {EEVEE_RENDER_PASS_SPECULAR_COLOR, "SPECULAR_COLOR", 0, "Specular Color", ""},
-    {EEVEE_RENDER_PASS_VOLUME_TRANSMITTANCE,
-     "VOLUME_TRANSMITTANCE",
-     0,
-     "Volume Transmittance",
-     ""},
-    {EEVEE_RENDER_PASS_VOLUME_SCATTER, "VOLUME_SCATTER", 0, "Volume Scattering", ""},
+    {EEVEE_RENDER_PASS_VOLUME_LIGHT, "VOLUME_LIGHT", 0, "Volume Light", ""},
 
     {0, "", ICON_NONE, "Effects", ""},
     {EEVEE_RENDER_PASS_BLOOM, "BLOOM", 0, "Bloom", ""},
@@ -4281,7 +4276,8 @@ static void rna_def_space_view3d(BlenderRNA *brna)
   /* Camera Object Data. */
   prop = RNA_def_property(srna, "show_gizmo_camera_lens", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "gizmo_show_camera", V3D_GIZMO_SHOW_CAMERA_LENS);
-  RNA_def_property_ui_text(prop, "Show Camera Lens", "Gizmo to adjust camera lens & ortho size");
+  RNA_def_property_ui_text(
+      prop, "Show Camera Lens", "Gizmo to adjust camera focal length or orthographic scale");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
   prop = RNA_def_property(srna, "show_gizmo_camera_dof_distance", PROP_BOOLEAN, PROP_NONE);
@@ -5491,7 +5487,7 @@ static void rna_def_space_graph(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "flag", SIPO_NORMALIZE);
   RNA_def_property_ui_text(prop,
                            "Use Normalization",
-                           "Display curves in normalized to -1..1 range, "
+                           "Display curves in normalized range from -1 to 1, "
                            "for easier editing of multiple curves with different ranges");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_GRAPH, NULL);
 

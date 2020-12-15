@@ -44,6 +44,7 @@ struct bNodePreview;
 struct bNodeTreeExec;
 struct bNodeType;
 struct uiBlock;
+struct Collection;
 
 #define NODE_MAXSTR 64
 
@@ -160,6 +161,7 @@ typedef enum eNodeSocketDatatype {
   SOCK_OBJECT = 8,
   SOCK_IMAGE = 9,
   SOCK_GEOMETRY = 10,
+  SOCK_COLLECTION = 11,
 } eNodeSocketDatatype;
 
 /* socket shape */
@@ -579,6 +581,10 @@ typedef struct bNodeSocketValueObject {
 typedef struct bNodeSocketValueImage {
   struct Image *value;
 } bNodeSocketValueImage;
+
+typedef struct bNodeSocketValueCollection {
+  struct Collection *value;
+} bNodeSocketValueCollection;
 
 /* data structs, for node->storage */
 enum {
@@ -1046,10 +1052,20 @@ typedef struct NodeSunBeams {
   float ray_length;
 } NodeSunBeams;
 
+typedef struct CryptomatteEntry {
+  struct CryptomatteEntry *next, *prev;
+  float encoded_hash;
+  /** MAX_NAME. */
+  char name[64];
+  char _pad[4];
+} CryptomatteEntry;
+
 typedef struct NodeCryptomatte {
   float add[3];
   float remove[3];
-  char *matte_id;
+  char *matte_id DNA_DEPRECATED;
+  /* Contains `CryptomatteEntry`. */
+  ListBase entries;
   int num_inputs;
   char _pad[4];
 } NodeCryptomatte;
@@ -1058,6 +1074,16 @@ typedef struct NodeDenoise {
   char hdr;
   char _pad[7];
 } NodeDenoise;
+
+typedef struct NodeAttributeMix {
+  /* e.g. MA_RAMP_BLEND. */
+  uint8_t blend_type;
+
+  /* GeometryNodeAttributeInputMode */
+  uint8_t input_type_factor;
+  uint8_t input_type_a;
+  uint8_t input_type_b;
+} NodeAttributeMix;
 
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
@@ -1463,6 +1489,11 @@ typedef enum GeometryNodeUseAttributeFlag {
   GEO_NODE_USE_ATTRIBUTE_A = (1 << 0),
   GEO_NODE_USE_ATTRIBUTE_B = (1 << 1),
 } GeometryNodeUseAttributeFlag;
+
+typedef enum GeometryNodePointInstanceType {
+  GEO_NODE_POINT_INSTANCE_TYPE_OBJECT = 0,
+  GEO_NODE_POINT_INSTANCE_TYPE_COLLECTION = 1,
+} GeometryNodePointInstanceType;
 
 typedef enum GeometryNodeAttributeInputMode {
   GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE = 0,

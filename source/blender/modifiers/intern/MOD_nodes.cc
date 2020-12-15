@@ -104,6 +104,12 @@ static void addIdsUsedBySocket(const ListBase *sockets, Set<ID *> &ids)
         ids.add(&object->id);
       }
     }
+    else if (socket->type == SOCK_COLLECTION) {
+      Collection *collection = ((bNodeSocketValueCollection *)socket->default_value)->value;
+      if (collection != nullptr) {
+        ids.add(&collection->id);
+      }
+    }
   }
 }
 
@@ -399,6 +405,11 @@ class GeometryNodesEvaluator {
       blender::bke::PersistentObjectHandle object_handle = handle_map_.lookup(object);
       new (buffer) blender::bke::PersistentObjectHandle(object_handle);
     }
+    else if (bsocket->type == SOCK_COLLECTION) {
+      Collection *collection = ((bNodeSocketValueCollection *)bsocket->default_value)->value;
+      blender::bke::PersistentCollectionHandle collection_handle = handle_map_.lookup(collection);
+      new (buffer) blender::bke::PersistentCollectionHandle(collection_handle);
+    }
     else {
       blender::nodes::socket_cpp_value_get(*bsocket, buffer);
     }
@@ -553,6 +564,7 @@ void MOD_nodes_update_interface(Object *object, NodesModifierData *nmd)
     }
 
     IDProperty *new_prop = property_type->create_prop(*socket, socket->identifier);
+    new_prop->flag |= IDP_FLAG_OVERRIDABLE_LIBRARY;
     IDP_AddToGroup(nmd->settings.properties, new_prop);
 
     if (old_properties != nullptr) {
@@ -715,6 +727,9 @@ static void check_property_socket_sync(const Object *ob, ModifierData *md)
       else if (socket->type == SOCK_GEOMETRY) {
         BKE_modifier_set_error(ob, md, "Node group can only have one geometry input");
       }
+      else if (socket->type == SOCK_COLLECTION) {
+        BKE_modifier_set_error(ob, md, "Collection socket can not be exposed in the modifier");
+      }
       else {
         BKE_modifier_set_error(ob, md, "Missing property for input socket \"%s\"", socket->name);
       }
@@ -827,8 +842,12 @@ static void draw_property_for_socket(uiLayout *layout,
   /* IDProperties can be removed with python, so there could be a situation where
    * there isn't a property for a socket or it doesn't have the correct type. */
   if (property != nullptr && property_type->is_correct_type(*property)) {
-    char rna_path[128];
-    BLI_snprintf(rna_path, ARRAY_SIZE(rna_path), "[\"%s\"]", socket.identifier);
+
+    char socket_id_esc[sizeof(socket.identifier) * 2];
+    BLI_str_escape(socket_id_esc, socket.identifier, sizeof(socket_id_esc));
+
+    char rna_path[sizeof(socket_id_esc) + 4];
+    BLI_snprintf(rna_path, ARRAY_SIZE(rna_path), "[\"%s\"]", socket_id_esc);
     uiItemR(layout, settings_ptr, rna_path, 0, socket.name, ICON_NONE);
   }
 }
@@ -910,6 +929,15 @@ static void freeData(ModifierData *md)
   }
 }
 
+static void requiredDataMask(Object *UNUSED(ob),
+                             ModifierData *UNUSED(md),
+                             CustomData_MeshMasks *r_cddata_masks)
+{
+  /* We don't know what the node tree will need. If there are vertex groups, it is likely that the
+   * node tree wants to access them. */
+  r_cddata_masks->vmask |= CD_MASK_MDEFORMVERT;
+}
+
 ModifierTypeInfo modifierType_Nodes = {
     /* name */ "GeometryNodes",
     /* structName */ "NodesModifierData",
@@ -917,9 +945,9 @@ ModifierTypeInfo modifierType_Nodes = {
     /* srna */ &RNA_NodesModifier,
     /* type */ eModifierTypeType_Constructive,
     /* flags */
-    static_cast<ModifierTypeFlag>(eModifierTypeFlag_AcceptsMesh |
-                                  eModifierTypeFlag_SupportsEditmode |
-                                  eModifierTypeFlag_EnableInEditmode),
+    static_cast<ModifierTypeFlag>(
+        eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsEditmode |
+        eModifierTypeFlag_EnableInEditmode | eModifierTypeFlag_SupportsMapping),
     /* icon */ ICON_NODETREE,
 
     /* copyData */ copyData,
@@ -934,7 +962,7 @@ ModifierTypeInfo modifierType_Nodes = {
     /* modifyVolume */ nullptr,
 
     /* initData */ initData,
-    /* requiredDataMask */ nullptr,
+    /* requiredDataMask */ requiredDataMask,
     /* freeData */ freeData,
     /* isDisabled */ isDisabled,
     /* updateDepsgraph */ updateDepsgraph,
