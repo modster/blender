@@ -105,7 +105,7 @@ TEST(obj_exporter_test_utils, append_positive_frame_to_filename)
   EXPECT_EQ_ARRAY(path_with_frame, path_truth, BLI_strlen_utf8(path_truth));
 }
 
-TEST_F(obj_exporter_test, OBJCurve_nurbs_points)
+TEST_F(obj_exporter_test, curve_nurbs_points)
 {
   if (!load_file_and_depsgraph(all_curve_objects_file)) {
     ADD_FAILURE();
@@ -134,7 +134,7 @@ TEST_F(obj_exporter_test, OBJCurve_nurbs_points)
   }
 }
 
-TEST_F(obj_exporter_test, OBJCurve_coordinates)
+TEST_F(obj_exporter_test, curve_coordinates)
 {
   if (!load_file_and_depsgraph(all_curve_objects_file)) {
     ADD_FAILURE();
