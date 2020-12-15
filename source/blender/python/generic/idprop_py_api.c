@@ -29,6 +29,7 @@
 
 #include "BKE_idprop.h"
 
+#include "DNA_ID.h" /* ID property definitions. */
 #include "RNA_access.h"
 #include "RNA_enum_types.h"
 
