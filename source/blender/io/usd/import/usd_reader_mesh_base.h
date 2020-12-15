@@ -39,7 +39,7 @@ class USDMeshReaderBase : public USDXformableReader {
 
   void create_object(Main *bmain, double time, USDDataCache *data_cache) override;
 
-  struct Mesh *read_mesh(Main *bmain, double time, USDDataCache *data_cache);
+  struct Mesh *read_mesh(Main *bmain, double time, USDDataCache *data_cache, bool &r_is_instance);
 
   virtual struct Mesh *create_mesh(Main *bmain, double time) = 0;
 

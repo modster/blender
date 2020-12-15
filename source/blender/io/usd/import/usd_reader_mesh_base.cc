@@ -75,15 +75,20 @@ void USDMeshReaderBase::create_object(Main *bmain, double time, USDDataCache *da
   }
 
   object_ = BKE_object_add_only_object(bmain, OB_MESH, obj_name.c_str());
-  Mesh *mesh = this->read_mesh(bmain, time, data_cache);
+
+  bool is_mesh_instance = false;
+  Mesh *mesh = this->read_mesh(bmain, time, data_cache, is_mesh_instance);
   object_->data = mesh;
 
   if (this->context_.import_params.import_materials) {
-    assign_materials(bmain, mesh, time, true);
+    assign_materials(bmain, (is_mesh_instance ? nullptr : mesh), time, true);
   }
 }
 
-Mesh *USDMeshReaderBase::read_mesh(Main *bmain, double time, USDDataCache *data_cache)
+Mesh *USDMeshReaderBase::read_mesh(Main *bmain,
+                                   double time,
+                                   USDDataCache *data_cache,
+                                   bool &r_is_instance)
 {
   /* If this prim is an instance proxy and instancing is enabled,
    * return the shared mesh created by the instance prototype. */
@@ -101,6 +106,7 @@ Mesh *USDMeshReaderBase::read_mesh(Main *bmain, double time, USDDataCache *data_
       if (proto_mesh) {
         /* Increment the user count before returning. */
         id_us_plus(&proto_mesh->id);
+        r_is_instance = true;
         return proto_mesh;
       }
 
@@ -110,6 +116,7 @@ Mesh *USDMeshReaderBase::read_mesh(Main *bmain, double time, USDDataCache *data_
   }
 
   /* Not sharing the prototype mesh, so create unique mesh data. */
+  r_is_instance = false;
   return create_mesh(bmain, time);
 }
 

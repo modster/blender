@@ -214,6 +214,8 @@ void USDPrimIterator::cache_prototype_data(USDDataCache &r_cache) const
 
   std::vector<pxr::UsdPrim> protos = stage_->GetMasters();
 
+  double time = 0.0;
+
   for (const pxr::UsdPrim &proto_prim : protos) {
     std::vector<USDXformableReader *> proto_readers;
     std::vector<USDXformableReader *> child_readers;
@@ -226,8 +228,13 @@ void USDPrimIterator::cache_prototype_data(USDDataCache &r_cache) const
         if (reader_prim) {
 
           if (USDMeshReaderBase *mesh_reader = dynamic_cast<USDMeshReaderBase *>(reader)) {
-            Mesh *proto_mesh = mesh_reader->create_mesh(bmain_, 0.0);
+            Mesh *proto_mesh = mesh_reader->create_mesh(bmain_, time);
             if (proto_mesh) {
+
+              if (this->context_.import_params.import_materials) {
+                mesh_reader->assign_materials(this->bmain_, proto_mesh, time, false);
+              }
+
               /* TODO(makowalski): Do we want to decrement the mesh's use count to 0?
                * Might have a small memory leak otherwise. Also, check if mesh is
                * already in cache before adding? */
