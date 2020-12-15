@@ -211,7 +211,7 @@ void IDP_BlendReadLib(struct BlendLibReader *reader, struct IDProperty *prop);
 void IDP_BlendReadExpand(struct BlendExpander *expander, struct IDProperty *prop);
 
 bool IDP_supports_ui_data(const struct IDProperty *prop);
-struct IDPropertyUIData *IDP_ui_data_ensure(IDProperty *idprop);
+struct IDPropertyUIData *IDP_ui_data_ensure(struct IDProperty *idprop);
 
 #ifdef __cplusplus
 }
