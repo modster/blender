@@ -169,14 +169,14 @@ class MeshTest:
     """
 
     def __init__(
-            self,
-            test_name: str,
-            test_object_name: str,
-            expected_object_name: str,
-            operations_stack=None,
-            apply_modifiers=False,
-            do_compare=False,
-            threshold=None
+        self,
+        test_name: str,
+        test_object_name: str,
+        expected_object_name: str,
+        operations_stack=None,
+        apply_modifiers=False,
+        do_compare=False,
+        threshold=None
     ):
         """
         Constructs a MeshTest object. Raises a KeyError if objects with names expected_object_name
@@ -275,34 +275,34 @@ class MeshTest:
         """
         return self._test_updated
 
-    def _set_parameters_util(self, modifier, modifier_parameters, nested_settings_path, modifier_name):
+    def _set_parameters_impl(self, modifier, modifier_parameters, nested_settings_path, modifier_name):
         """
         Doing a depth first traversal of the modifier parameters and setting their values.
-        :param: modifier: Of type modifier, its altered to become a setting in recursion
-        :param: modifier_parameters : dict, a simple/nested dictionary of modifier parameters.
+        :param: modifier: Of type modifier, its altered to become a setting in recursion.
+        :param: modifier_parameters : dict or sequence, a simple/nested dictionary of modifier parameters.
         :param: nested_settings_path : list(stack): helps in tracing path to each node.
         """
         if not isinstance(modifier_parameters, dict):
             param_setting = None
             for i, setting in enumerate(nested_settings_path):
-                try:
-                    # We want to set the attribute only when we have reached the last setting
-                    # Applying of intermediate settings is meaningless.
-                    if i == len(nested_settings_path) - 1:
-                        setattr(modifier, setting, modifier_parameters)
 
+                # We want to set the attribute only when we have reached the last setting.
+                # Applying of intermediate settings is meaningless.
+                if i == len(nested_settings_path) - 1:
+                    setattr(modifier, setting, modifier_parameters)
+
+                elif hasattr(modifier, setting):
+                    param_setting = getattr(modifier, setting)
+                    # getattr doesn't accept canvas_surfaces["Surface"], but we need to pass it to setattr.
+                    if setting == "canvas_surfaces":
+                        modifier = param_setting.active
                     else:
-                        param_setting = getattr(modifier, setting)
-                        # getattr doesn't accept canvas_surfaces["Surface"], but we need to pass it to setattr
-                        if setting == "canvas_surfaces":
-                            modifier = param_setting.active
-                        else:
-                            modifier = param_setting
-                except AttributeError:
+                        modifier = param_setting
+                else:
                     # Clean up first
                     bpy.ops.object.delete()
-                    raise AttributeError("Modifier '{}' has no parameter named '{}'".
-                                         format(modifier_name, setting))
+                    raise Exception("Modifier '{}' has no parameter named '{}'".
+                                    format(modifier_name, setting))
 
             # It pops the current node before moving on to its sibling.
             nested_settings_path.pop()
@@ -310,9 +310,9 @@ class MeshTest:
 
         for key in modifier_parameters:
             nested_settings_path.append(key)
-            self._set_parameters_util(modifier, modifier_parameters[key], nested_settings_path, modifier_name)
+            self._set_parameters_impl(modifier, modifier_parameters[key], nested_settings_path, modifier_name)
 
-        if len(nested_settings_path) != 0:
+        if nested_settings_path:
             nested_settings_path.pop()
 
     def set_parameters(self, modifier, modifier_parameters):
@@ -322,7 +322,7 @@ class MeshTest:
         settings = []
         modifier_copy = modifier
         modifier_name = modifier.name
-        self._set_parameters_util(modifier_copy, modifier_parameters, settings, modifier_name)
+        self._set_parameters_impl(modifier_copy, modifier_parameters, settings, modifier_name)
 
     def _add_modifier(self, test_object, modifier_spec: ModifierSpec):
         """
@@ -332,7 +332,7 @@ class MeshTest:
         """
         bakers_list = ['CLOTH', 'SOFT_BODY', 'DYNAMIC_PAINT', 'FLUID']
         scene = bpy.context.scene
-        scene.frame_set(0)
+        scene.frame_set(1)
         modifier = test_object.modifiers.new(modifier_spec.modifier_name,
                                              modifier_spec.modifier_type)
 
@@ -393,7 +393,7 @@ class MeshTest:
         """
         Applies Particle System settings to test objects
         """
-        bpy.context.scene.frame_set(0)
+        bpy.context.scene.frame_set(1)
         bpy.ops.object.select_all(action='DESELECT')
 
         test_object.modifiers.new(particle_sys_spec.modifier_name, particle_sys_spec.modifier_type)
@@ -463,8 +463,8 @@ class MeshTest:
             retval = mesh_operator(**operator.operator_parameters)
         except AttributeError:
             raise AttributeError("bpy.ops.mesh has no attribute {}".format(operator.operator_name))
-        except TypeError:
-            raise TypeError("Incorrect operator parameters {}".format(operator.operator_parameters))
+        except TypeError as ex:
+            raise TypeError("Incorrect operator parameters {!r} raised {!r}".format(operator.operator_parameters, ex))
 
         if retval != {'FINISHED'}:
             raise RuntimeError("Unexpected operator return value: {}".format(retval))
@@ -484,8 +484,8 @@ class MeshTest:
             retval = object_operator(**operator.operator_parameters)
         except AttributeError:
             raise AttributeError("bpy.ops.mesh has no attribute {}".format(operator.operator_name))
-        except TypeError:
-            raise TypeError("Incorrect operator parameters {}".format(operator.operator_parameters))
+        except TypeError as ex:
+            raise TypeError("Incorrect operator parameters {!r} raised {!r}".format(operator.operator_parameters, ex))
 
         if retval != {'FINISHED'}:
             raise RuntimeError("Unexpected operator return value: {}".format(retval))
@@ -510,8 +510,6 @@ class MeshTest:
 
         if isinstance(object_operations, OperatorSpecObjectMode):
             self._apply_operator_object_mode(object_operations)
-
-        print("NAME", list(test_object.modifiers))
 
         scene.frame_set(operation.frame_number)
 
@@ -566,37 +564,38 @@ class MeshTest:
                                         type(OperatorSpecObjectMode), type(ParticleSystemSpec), type(operation)))
 
         # Compare resulting mesh with expected one.
-        # Compare only when self.do_compare is set to True, it is set to False for run-test
-        if self.do_compare:
-            if self.verbose:
-                print("Comparing expected mesh with resulting mesh...")
-            evaluated_test_mesh = evaluated_test_object.data
-            expected_mesh = self.expected_object.data
-            if self.threshold:
-                compare_result = evaluated_test_mesh.unit_test_compare(mesh=expected_mesh, threshold=self.threshold)
-            else:
-                compare_result = evaluated_test_mesh.unit_test_compare(mesh=expected_mesh)
-            compare_success = (compare_result == 'Same')
-
-            # Also check if invalid geometry (which is never expected) had to be corrected...
-            validation_success = evaluated_test_mesh.validate(verbose=True) == False
-
-            if compare_success and validation_success:
-                if self.verbose:
-                    print("Success!")
-
-                # Clean up.
-                if self.verbose:
-                    print("Cleaning up...")
-                # Delete evaluated_test_object.
-                bpy.ops.object.delete()
-                return True
-
-            else:
-                return self._on_failed_test(compare_result, validation_success, evaluated_test_object)
-        else:
+        # Compare only when self.do_compare is set to True, it is set to False for run-test and returns.
+        if not self.do_compare:
             print("Meshes/objects are not compared, compare evaluated and expected object in Blender for "
-                  "visualization.")
+                  "visualization only.")
+            return False
+
+        if self.verbose:
+            print("Comparing expected mesh with resulting mesh...")
+        evaluated_test_mesh = evaluated_test_object.data
+        expected_mesh = self.expected_object.data
+        if self.threshold:
+            compare_result = evaluated_test_mesh.unit_test_compare(mesh=expected_mesh, threshold=self.threshold)
+        else:
+            compare_result = evaluated_test_mesh.unit_test_compare(mesh=expected_mesh)
+        compare_success = (compare_result == 'Same')
+
+        # Also check if invalid geometry (which is never expected) had to be corrected...
+        validation_success = evaluated_test_mesh.validate(verbose=True) == False
+
+        if compare_success and validation_success:
+            if self.verbose:
+                print("Success!")
+
+            # Clean up.
+            if self.verbose:
+                print("Cleaning up...")
+            # Delete evaluated_test_object.
+            bpy.ops.object.delete()
+            return True
+
+        else:
+            return self._on_failed_test(compare_result, validation_success, evaluated_test_object)
 
 
 class RunTest:
@@ -634,20 +633,21 @@ class RunTest:
              mesh_test.OperatorSpecEditMode objects
         """
         self.tests = tests
-        self._check_for_unique_test_name()
+        self._ensure_unique_test_name_or_raise_error()
         self.apply_modifiers = apply_modifiers
         self.do_compare = do_compare
         self.verbose = os.environ.get("BLENDER_VERBOSE") is not None
         self._failed_tests_list = []
 
-    def _check_for_unique_test_name(self):
+    def _ensure_unique_test_name_or_raise_error(self):
         """
-        Check if the test name is unique
+        Check if the test name is unique else raise an error.
         """
         all_test_names = []
-        for index, _ in enumerate(self.tests):
-            test_name = self.tests[index].test_name
+        for each_test in self.tests:
+            test_name = each_test.test_name
             all_test_names.append(test_name)
+
         seen_name = set()
         for ele in all_test_names:
             if ele in seen_name:
@@ -659,11 +659,11 @@ class RunTest:
         """
         Run all tests in self.tests list. Raises an exception if one the tests fails.
         """
-        for index, _ in enumerate(self.tests):
-            test_name = self.tests[index].test_name
+        for test_number, each_test in enumerate(self.tests):
+            test_name = each_test.test_name
             if self.verbose:
                 print()
-                print("Running test {}...".format(index))
+                print("Running test {}...".format(test_number))
                 print("Test name {}\n".format(test_name))
             success = self.run_test(test_name)
 
@@ -671,7 +671,7 @@ class RunTest:
                 self._failed_tests_list.append(test_name)
 
         if len(self._failed_tests_list) != 0:
-            print("Following tests failed: {}".format(self._failed_tests_list))
+            print("\nFollowing tests failed: {}".format(self._failed_tests_list))
 
             blender_path = bpy.app.binary_path
             blend_path = bpy.data.filepath
@@ -691,16 +691,13 @@ class RunTest:
         :param test_name: int - name of test
         :return: bool - True if test passed, False otherwise.
         """
-        case = self.tests[0]
-        len_test = len(self.tests)
-        count = 0
-        for index, _ in enumerate(self.tests):
-            if test_name == self.tests[index].test_name:
+        case = None
+        for index, each_test in enumerate(self.tests):
+            if test_name == each_test.test_name:
                 case = self.tests[index]
                 break
-            count = count + 1
 
-        if count == len_test:
+        if case is None:
             raise Exception('No test called {} found!'.format(test_name))
 
         test = case
@@ -716,6 +713,3 @@ class RunTest:
             success = test.run_test()
 
         return success
-
-
-
