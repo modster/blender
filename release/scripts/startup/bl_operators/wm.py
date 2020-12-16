@@ -1270,7 +1270,6 @@ class WM_OT_properties_edit(Operator):
 
         if prop_old is None:
             self.report({'ERROR'}, "Direct execution not supported")
-            print("prop_old is None")
             return {'CANCELLED'}
 
         value_eval = self.get_value_eval()
