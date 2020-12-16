@@ -321,7 +321,6 @@ static IDProperty *idp_generic_copy(const IDProperty *prop, const int UNUSED(fla
   newp->data.val2 = prop->data.val2;
 
   if (prop->ui_data != NULL) {
-    printf("Copy UI data: %s\n", prop->name);
     newp->ui_data = IDP_copy_ui_data(prop);
   }
 
@@ -1119,7 +1118,6 @@ void IDP_FreePropertyContent_ex(IDProperty *prop, const bool do_id_user)
   }
 
   if (prop->ui_data != NULL) {
-    printf("Free UI data: %s\n", prop->name);
     IDP_free_ui_data(prop);
   }
 }
@@ -1305,7 +1303,6 @@ void IDP_WriteProperty_OnlyData(const IDProperty *prop, BlendWriter *writer)
       break;
   }
   if (prop->ui_data != NULL) {
-    printf("Write UI data: %s\n", prop->name);
     write_ui_data(prop, writer);
   }
 }
@@ -1320,19 +1317,17 @@ static void IDP_DirectLinkProperty(IDProperty *prop, BlendDataReader *reader);
 
 static void read_ui_data(IDProperty *prop, BlendDataReader *reader)
 {
-  IDPropertyUIData *ui_data = prop->ui_data;
-
+  BLO_read_data_address(reader, &prop->ui_data);
   BLO_read_data_address(reader, &ui_data->description);
-  BLO_read_data_address(reader, &ui_data);
 
   switch (IDP_ui_data_type(prop)) {
     case IDP_UI_DATA_TYPE_STRING: {
-      IDPropertyUIDataString *ui_data_string = (IDPropertyUIDataString *)ui_data;
+      IDPropertyUIDataString *ui_data_string = (IDPropertyUIDataString *)prop->ui_data;
       BLO_read_data_address(reader, &ui_data_string->default_value);
       break;
     }
     case IDP_UI_DATA_TYPE_INT: {
-      IDPropertyUIDataInt *ui_data_int = (IDPropertyUIDataInt *)ui_data;
+      IDPropertyUIDataInt *ui_data_int = (IDPropertyUIDataInt *)prop->ui_data;
       if (prop->type == IDP_ARRAY) {
         BLO_read_int32_array(
             reader, ui_data_int->default_array_len, (int **)&ui_data_int->default_array);
@@ -1340,7 +1335,7 @@ static void read_ui_data(IDProperty *prop, BlendDataReader *reader)
       break;
     }
     case IDP_UI_DATA_TYPE_FLOAT: {
-      IDPropertyUIDataFloat *ui_data_float = (IDPropertyUIDataFloat *)ui_data;
+      IDPropertyUIDataFloat *ui_data_float = (IDPropertyUIDataFloat *)prop->ui_data;
       if (prop->type == IDP_ARRAY) {
         BLO_read_double_array(
             reader, ui_data_float->default_array_len, (double **)&ui_data_float->default_array);
@@ -1465,7 +1460,6 @@ static void IDP_DirectLinkProperty(IDProperty *prop, BlendDataReader *reader)
   }
 
   if (prop->ui_data != NULL) {
-    printf("Read UI data: %s\n", prop->name);
     read_ui_data(prop, reader);
   }
 }
