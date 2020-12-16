@@ -284,7 +284,7 @@ void IDP_FreeArray(IDProperty *prop)
   }
 }
 
-static IDPropertyUIData *copy_ui_data(const IDProperty *prop)
+IDPropertyUIData *IDP_copy_ui_data(const IDProperty *prop)
 {
   IDPropertyUIData *data_new = MEM_dupallocN(prop->ui_data);
 
@@ -322,7 +322,7 @@ static IDProperty *idp_generic_copy(const IDProperty *prop, const int UNUSED(fla
 
   if (prop->ui_data != NULL) {
     printf("Copy UI data: %s\n", prop->name);
-    newp->ui_data = copy_ui_data(prop);
+    newp->ui_data = IDP_copy_ui_data(prop);
   }
 
   return newp;
@@ -1581,7 +1581,7 @@ IDPropertyUIData *IDP_ui_data_ensure(IDProperty *prop)
     case IDP_UI_DATA_TYPE_INT: {
       IDPropertyUIDataInt *ui_data = MEM_callocN(sizeof(IDPropertyUIDataInt), __func__);
       ui_data->min = INT_MIN;
-      ui_data->min = INT_MAX;
+      ui_data->max = INT_MAX;
       ui_data->soft_min = INT_MIN;
       ui_data->soft_max = INT_MAX;
       ui_data->step = 1;
@@ -1591,7 +1591,7 @@ IDPropertyUIData *IDP_ui_data_ensure(IDProperty *prop)
     case IDP_UI_DATA_TYPE_FLOAT: {
       IDPropertyUIDataFloat *ui_data = MEM_callocN(sizeof(IDPropertyUIDataFloat), __func__);
       ui_data->min = FLT_MIN;
-      ui_data->min = FLT_MIN;
+      ui_data->max = FLT_MIN;
       ui_data->soft_min = FLT_MIN;
       ui_data->soft_max = FLT_MAX;
       ui_data->step = 1.0f;

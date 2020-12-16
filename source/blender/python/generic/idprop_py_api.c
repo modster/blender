@@ -1324,9 +1324,9 @@ PyDoc_STRVAR(BPy_IDGroup_update_rna_doc,
              "                       default_value=None, "
              "                       description=None)\n"
              "\n"
-             "   Update the RNA type information of the IDProperty used for interaction and "
-             "drawing in the user interface. The property specified by the key must be a direct "
-             "child of the group. The required types for many of the keyword arguments depend on "
+             "   Update the RNA type information of the IDProperty used for interaction and\n"
+             "drawing in the user interface. The property specified by the key must be a direct\n"
+             "child of the group. The required types for many of the keyword arguments depend on\n"
              "the type of the property.\n ");
 static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObject *kwargs)
 {
@@ -1559,7 +1559,9 @@ static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
 PyDoc_STRVAR(BPy_IDGroup_rna_ui_data_clear_doc,
              ".. method:: clear_rna(key)\n"
              "\n"
-             "   Remove the RNA UI data from this IDProperty.\n");
+             "   Remove the RNA UI data from this IDProperty.\n"
+             "\n"
+             "   :raises KeyError: If no property with the name is in the group.\n");
 static PyObject *BPy_IDGroup_rna_ui_data_clear(BPy_IDProperty *self, PyObject *args)
 {
   const char *key;
@@ -1577,6 +1579,54 @@ static PyObject *BPy_IDGroup_rna_ui_data_clear(BPy_IDProperty *self, PyObject *a
   if (idprop->ui_data) {
     IDP_free_ui_data(idprop);
   }
+
+  Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(
+    BPy_IDGroup_rna_ui_data_copy_doc,
+    ".. method:: clear_rna(source_group, key_source, key_destination)\n"
+    "\n"
+    "   Copy UI data from an IDProperty in the source group to a property in this group.\n "
+    "If the source property has no UI data, the target UI data will be reset if it exists.\n"
+    "\n"
+    "   :raises KeyError: If either the source or destination item doesn't exist.\n"
+    "   :raises TypeError: If the types of the two properties don't match.\n");
+static PyObject *BPy_IDGroup_rna_ui_data_copy(BPy_IDProperty *self, PyObject *args)
+{
+  BPy_IDProperty *group_src;
+  const char *key_src;
+  const char *key_dest;
+
+  if (!PyArg_ParseTuple(
+          args, "O!ss:clear_rna", &BPy_IDGroup_Type, &group_src, &key_src, &key_dest)) {
+    Py_RETURN_NONE;
+  }
+
+  const IDProperty *idprop_src = IDP_GetPropertyFromGroup(self->prop, key_src);
+  IDProperty *idprop_dest = IDP_GetPropertyFromGroup(group_src->prop, key_dest);
+  if (ELEM(NULL, idprop_src, idprop_dest)) {
+    PyErr_SetString(PyExc_KeyError, "Property not found in IDProperty group");
+    Py_RETURN_NONE;
+  }
+
+  if (idprop_src->ui_data == NULL) {
+    if (idprop_dest->ui_data != NULL) {
+      IDP_free_ui_data(idprop_dest);
+    }
+    Py_RETURN_NONE;
+  }
+
+  if (IDP_ui_data_type(idprop_src) != IDP_ui_data_type(idprop_dest)) {
+    PyErr_SetString(PyExc_TypeError, "Source and destination UI data types do not match");
+    Py_RETURN_NONE;
+  }
+
+  if (idprop_dest->ui_data != NULL) {
+    IDP_free_ui_data(idprop_dest);
+  }
+
+  idprop_dest->ui_data = IDP_copy_ui_data(idprop_src);
 
   Py_RETURN_NONE;
 }
@@ -1600,6 +1650,10 @@ static struct PyMethodDef BPy_IDGroup_methods[] = {
      (PyCFunction)BPy_IDGroup_rna_ui_data_clear,
      METH_VARARGS,
      BPy_IDGroup_rna_ui_data_clear_doc},
+    {"copy_rna",
+     (PyCFunction)BPy_IDGroup_rna_ui_data_copy,
+     METH_VARARGS,
+     BPy_IDGroup_rna_ui_data_copy_doc},
     {NULL, NULL, 0, NULL},
 };
 

@@ -211,8 +211,6 @@ void IDP_BlendReadData_impl(struct BlendDataReader *reader,
 void IDP_BlendReadLib(struct BlendLibReader *reader, struct IDProperty *prop);
 void IDP_BlendReadExpand(struct BlendExpander *expander, struct IDProperty *prop);
 
-bool IDP_supports_ui_data(const struct IDProperty *prop);
-
 typedef enum IDPropertyUIDataType {
   /** Other properties types that don't support RNA UI data. */
   IDP_UI_DATA_TYPE_UNSUPPORTED = -1,
@@ -224,8 +222,10 @@ typedef enum IDPropertyUIDataType {
   IDP_UI_DATA_TYPE_STRING = 2,
 } IDPropertyUIDataType;
 
+bool IDP_supports_ui_data(const struct IDProperty *prop);
 IDPropertyUIDataType IDP_ui_data_type(const struct IDProperty *prop);
-struct IDPropertyUIData *IDP_ui_data_ensure(struct IDProperty *idprop);
+struct IDPropertyUIData *IDP_ui_data_ensure(struct IDProperty *prop);
+struct IDPropertyUIData *IDP_copy_ui_data(const struct IDProperty *prop);
 
 #ifdef __cplusplus
 }
