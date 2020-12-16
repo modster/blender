@@ -320,9 +320,8 @@ class MeshTest:
         Wrapper for _set_parameters_util
         """
         settings = []
-        modifier_copy = modifier
         modifier_name = modifier.name
-        self._set_parameters_impl(modifier_copy, modifier_parameters, settings, modifier_name)
+        self._set_parameters_impl(modifier, modifier_parameters, settings, modifier_name)
 
     def _add_modifier(self, test_object, modifier_spec: ModifierSpec):
         """
