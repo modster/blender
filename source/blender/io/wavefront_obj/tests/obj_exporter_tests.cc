@@ -92,7 +92,7 @@ TEST_F(obj_exporter_test, filter_objects_selected)
   EXPECT_EQ(objcurves.size(), 2);
 }
 
-TEST(obj_exporter_test_utils, append_negative_frame_to_filename)
+TEST(obj_exporter_utils, append_negative_frame_to_filename)
 {
   const char path_original[FILE_MAX] = "/my_file.obj";
   const char path_truth[FILE_MAX] = "/my_file-123.obj";
@@ -103,7 +103,7 @@ TEST(obj_exporter_test_utils, append_negative_frame_to_filename)
   EXPECT_EQ_ARRAY(path_with_frame, path_truth, BLI_strlen_utf8(path_truth));
 }
 
-TEST(obj_exporter_test_utils, append_positive_frame_to_filename)
+TEST(obj_exporter_utils, append_positive_frame_to_filename)
 {
   const char path_original[FILE_MAX] = "/my_file.obj";
   const char path_truth[FILE_MAX] = "/my_file123.obj";
@@ -197,7 +197,7 @@ static std::string read_temp_file_in_string(const std::string &file_path)
   return input_ss.str();
 }
 
-TEST_F(obj_exporter_test, header)
+TEST(obj_exporter_writer, header)
 {
   {
     OBJExportParamsDefault _export;
@@ -213,7 +213,7 @@ TEST_F(obj_exporter_test, header)
   ASSERT_EQ(result, "# Blender "s + BKE_blender_version_string() + "\n" + "# www.blender.org\n");
 }
 
-TEST_F(obj_exporter_test, mtllib)
+TEST(obj_exporter_writer, mtllib)
 {
   {
     OBJExportParamsDefault _export;
