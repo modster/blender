@@ -1,11 +1,17 @@
 /* Apache License, Version 2.0 */
 
+#include <fstream>
 #include <gtest/gtest.h>
 #include <ios>
 #include <memory>
+#include <sstream>
+#include <string>
+#include <system_error>
 
 #include "testing/testing.h"
 #include "tests/blendfile_loading_base_test.h"
+
+#include "BKE_blender_version.h"
 
 #include "BLI_index_range.hh"
 #include "BLI_string_utf8.h"
@@ -13,6 +19,7 @@
 
 #include "DEG_depsgraph.h"
 
+#include "obj_export_file_writer.hh"
 #include "obj_export_mesh.hh"
 #include "obj_export_nurbs.hh"
 #include "obj_exporter.hh"
@@ -42,6 +49,8 @@ class obj_exporter_test : public BlendfileLoadingBaseTest {
 const std::string all_objects_file = "io_tests/blend_scene/all_objects_2_92.blend";
 // https://developer.blender.org/F9278970
 const std::string all_curve_objects_file = "io_tests/blend_scene/all_curves_2_92.blend";
+
+const std::string some_meshes_file = "io_tests/blend_scene/all_meshes.blend";
 
 TEST_F(obj_exporter_test, filter_objects_curves_as_mesh)
 {
@@ -162,4 +171,62 @@ TEST_F(obj_exporter_test, curve_coordinates)
     }
   }
 }
+
+static std::unique_ptr<OBJWriter> init_writer(const OBJExportParams &params,
+                                              const std::string out_filepath)
+{
+  try {
+    auto writer = std::make_unique<OBJWriter>(out_filepath.c_str(), params);
+    return writer;
+  }
+  catch (const std::system_error &ex) {
+    std::cerr << ex.code().category().name() << ": " << ex.what() << ": " << ex.code().message()
+              << std::endl;
+    return nullptr;
+  }
+}
+
+const char *const temp_file_path =
+    "/Users/ankitkumar/blender-build/build_darwin_lite/Testing/output.OBJ";
+
+static std::string read_temp_file_in_string(const std::string &file_path)
+{
+  std::ifstream temp_stream(file_path);
+  std::ostringstream input_ss;
+  input_ss << temp_stream.rdbuf();
+  return input_ss.str();
+}
+
+TEST_F(obj_exporter_test, header)
+{
+  {
+    OBJExportParamsDefault _export;
+    std::unique_ptr<OBJWriter> writer = init_writer(_export.params, temp_file_path);
+    if (!writer) {
+      ADD_FAILURE();
+      return;
+    }
+    writer->write_header();
+  }
+  const std::string result = read_temp_file_in_string(temp_file_path);
+  using namespace std::string_literals;
+  ASSERT_EQ(result, "# Blender "s + BKE_blender_version_string() + "\n" + "# www.blender.org\n");
+}
+
+TEST_F(obj_exporter_test, mtllib)
+{
+  {
+    OBJExportParamsDefault _export;
+    std::unique_ptr<OBJWriter> writer = init_writer(_export.params, temp_file_path);
+    if (!writer) {
+      ADD_FAILURE();
+      return;
+    }
+    writer->write_mtllib_name("/Users/blah.mtl");
+    writer->write_mtllib_name("\\C:\\blah.mtl");
+  }
+  const std::string result = read_temp_file_in_string(temp_file_path);
+  ASSERT_EQ(result, "mtllib blah.mtl\nmtllib blah.mtl\n");
+}
+
 }  // namespace blender::io::obj
