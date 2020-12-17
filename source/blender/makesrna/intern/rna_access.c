@@ -1105,8 +1105,11 @@ bool RNA_struct_bl_idname_ok_or_report(ReportList *reports,
   const bool failure = false;
 #endif
   if (p == NULL || p == identifier || p + len_sep >= identifier + len_id) {
-    BKE_reportf(
-        reports, report_level, "'%s' doesn't contain '%s' with prefix & suffix", identifier, sep);
+    BKE_reportf(reports,
+                report_level,
+                "'%s' does not contain '%s' with prefix and suffix",
+                identifier,
+                sep);
     return failure;
   }
 
@@ -5805,7 +5808,7 @@ ID *RNA_find_real_ID_and_path(Main *bmain, ID *id, const char **r_path)
         if (r_path) {
           *r_path = "collection";
         }
-        return (ID *)BKE_collection_master_scene_search(bmain, (Collection *)id);
+        return (ID *)BKE_collection_master_scene_search(bmain, (struct Collection *)id);
 
       default:
         return NULL;
