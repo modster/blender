@@ -481,10 +481,11 @@ def not_implemented_node(idname):
 geometry_node_categories = [
     # Geometry Nodes
     GeometryNodeCategory("GEO_ATTRIBUTE", "Attribute", items=[
-        NodeItem("GeometryNodeRandomAttribute"),
+        NodeItem("GeometryNodeAttributeRandomize"),
         NodeItem("GeometryNodeAttributeMath"),
         NodeItem("GeometryNodeAttributeFill"),
         NodeItem("GeometryNodeAttributeMix"),
+        NodeItem("GeometryNodeAttributeColorRamp"),
     ]),
     GeometryNodeCategory("GEO_COLOR", "Color", items=[
         NodeItem("ShaderNodeValToRGB"),

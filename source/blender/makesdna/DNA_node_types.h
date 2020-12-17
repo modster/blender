@@ -33,6 +33,7 @@ extern "C" {
 #endif
 
 struct AnimData;
+struct Collection;
 struct ID;
 struct Image;
 struct ListBase;
@@ -43,7 +44,6 @@ struct bNodePreview;
 struct bNodeTreeExec;
 struct bNodeType;
 struct uiBlock;
-struct Collection;
 
 #define NODE_MAXSTR 64
 
@@ -1084,6 +1084,10 @@ typedef struct NodeAttributeMix {
   uint8_t input_type_b;
 } NodeAttributeMix;
 
+typedef struct NodeAttributeColorRamp {
+  ColorBand color_ramp;
+} NodeAttributeColorRamp;
+
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
 #define NODE_SCRIPT_EXTERNAL 1
@@ -1500,6 +1504,11 @@ typedef enum GeometryNodeAttributeInputMode {
   GEO_NODE_ATTRIBUTE_INPUT_VECTOR = 2,
   GEO_NODE_ATTRIBUTE_INPUT_COLOR = 3,
 } GeometryNodeAttributeInputMode;
+
+typedef enum GeometryNodePointDistributeMethod {
+  GEO_NODE_POINT_DISTRIBUTE_RANDOM = 0,
+  GEO_NODE_POINT_DISTRIBUTE_POISSON = 1,
+} GeometryNodePointDistributeMethod;
 
 #ifdef __cplusplus
 }

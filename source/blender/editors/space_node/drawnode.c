@@ -3208,6 +3208,20 @@ static void node_geometry_buts_attribute_mix(uiLayout *layout,
   uiItemR(col, ptr, "input_type_b", DEFAULT_FLAGS, IFACE_("B"), ICON_NONE);
 }
 
+static void node_geometry_buts_attribute_point_distribute(uiLayout *layout,
+                                                          bContext *UNUSED(C),
+                                                          PointerRNA *ptr)
+{
+  uiItemR(layout, ptr, "distribute_method", DEFAULT_FLAGS, "", ICON_NONE);
+}
+
+static void node_geometry_buts_attribute_color_ramp(uiLayout *layout,
+                                                    bContext *UNUSED(C),
+                                                    PointerRNA *ptr)
+{
+  uiTemplateColorRamp(layout, ptr, "color_ramp", 0);
+}
+
 static void node_geometry_set_butfunc(bNodeType *ntype)
 {
   switch (ntype->type) {
@@ -3220,7 +3234,7 @@ static void node_geometry_set_butfunc(bNodeType *ntype)
     case GEO_NODE_TRIANGULATE:
       ntype->draw_buttons = node_geometry_buts_triangulate;
       break;
-    case GEO_NODE_RANDOM_ATTRIBUTE:
+    case GEO_NODE_ATTRIBUTE_RANDOMIZE:
       ntype->draw_buttons = node_geometry_buts_random_attribute;
       break;
     case GEO_NODE_ATTRIBUTE_MATH:
@@ -3234,6 +3248,12 @@ static void node_geometry_set_butfunc(bNodeType *ntype)
       break;
     case GEO_NODE_ATTRIBUTE_MIX:
       ntype->draw_buttons = node_geometry_buts_attribute_mix;
+      break;
+    case GEO_NODE_POINT_DISTRIBUTE:
+      ntype->draw_buttons = node_geometry_buts_attribute_point_distribute;
+      break;
+    case GEO_NODE_ATTRIBUTE_COLOR_RAMP:
+      ntype->draw_buttons = node_geometry_buts_attribute_color_ramp;
       break;
   }
 }
