@@ -47,7 +47,7 @@ def get_generate_modifiers_list(test_object_name, randomize=False):
         ModifierSpec('array', 'ARRAY', {}),
         ModifierSpec('bevel', 'BEVEL', {'width': 0.1}),
         ModifierSpec('boolean', 'BOOLEAN', {'object': boolean_test_object, 'solver': 'FAST'}),
-        ModifierSpec('build', 'BUILD', {'frame_start': 0, 'frame_duration': 1}),
+        ModifierSpec('build', 'BUILD', {'frame_start': 1, 'frame_duration': 1}, 2),
         ModifierSpec('decimate', 'DECIMATE', {}),
         ModifierSpec('edge split', 'EDGE_SPLIT', {}),
 
@@ -167,7 +167,7 @@ def main():
                                                   'offset_object': bpy.data.objects["testRadialArrayHelper"]})]),
 
         MeshTest("CylinderBuild", "testCylinderBuild", "expectedCylinderBuild",
-                 [ModifierSpec('build', 'BUILD', {'frame_start': 0, 'frame_duration': 1})]),
+                 [ModifierSpec('build', 'BUILD', {'frame_start': 1, 'frame_duration': 1}, 2)]),
 
         # 17
         MeshTest("ConeDecimate", "testConeDecimate", "expectedConeDecimate",
@@ -289,7 +289,7 @@ def main():
                  [ModifierSpec('bevel', 'BEVEL', {})]),
 
         MeshTest("CurveBuild", "testObjBezierCurveBuild", "expObjBezierCurveBuild",
-                 [ModifierSpec('build', 'BUILD', {'frame_start': 0, 'frame_duration': 1})]),
+                 [ModifierSpec('build', 'BUILD', {'frame_start': 1, 'frame_duration': 1}, 2)]),
 
         MeshTest("CurveDecimate", "testObjBezierCurveDecimate", "expObjBezierCurveDecimate",
                  [ModifierSpec('decimate', 'DECIMATE', {'ratio': 0.5})]),
