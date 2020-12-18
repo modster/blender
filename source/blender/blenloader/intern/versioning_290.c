@@ -686,6 +686,7 @@ static void do_versions_291_fcurve_handles_limit(FCurve *fcu)
   }
 }
 
+/* NOLINTNEXTLINE: readability-function-size */
 void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
 {
   UNUSED_VARS(fd);
@@ -1428,5 +1429,26 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
    */
   {
     /* Keep this block, even when empty. */
+
+    FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
+      if (ntree->type == NTREE_GEOMETRY) {
+        LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+          if (node->type == GEO_NODE_ATTRIBUTE_MATH && node->storage == NULL) {
+            const int old_use_attibute_a = (1 << 0);
+            const int old_use_attibute_b = (1 << 1);
+            NodeAttributeMath *data = MEM_callocN(sizeof(NodeAttributeMath), "NodeAttributeMath");
+            data->operation = NODE_MATH_ADD;
+            data->input_type_a = (node->custom2 & old_use_attibute_a) ?
+                                     GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE :
+                                     GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
+            data->input_type_b = (node->custom2 & old_use_attibute_b) ?
+                                     GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE :
+                                     GEO_NODE_ATTRIBUTE_INPUT_FLOAT;
+            node->storage = data;
+          }
+        }
+      }
+    }
+    FOREACH_NODETREE_END;
   }
 }
