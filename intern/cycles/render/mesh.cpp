@@ -811,12 +811,16 @@ void Mesh::pack_primitives(ccl::PackedBVH *pack, int object, uint visibility, bo
     return;
 
   const size_t num_prims = num_triangles();
-  float4 *prim_tri_verts = &pack->prim_tri_verts[optix_prim_offset * 3];
+
+  /* Use prim_offset for indexing as it is computed per geometry type, and prim_tri_verts does not
+   * contain data for Hair geometries. */
+  float4 *prim_tri_verts = &pack->prim_tri_verts[prim_offset * 3];
   // 'pack->prim_time' is unused by Embree and OptiX
 
   uint type = has_motion_blur() ? PRIMITIVE_MOTION_TRIANGLE : PRIMITIVE_TRIANGLE;
 
   if (pack_all) {
+    /* Use optix_prim_offset for indexing as those arrays also contain data for Hair geometries. */
     unsigned int *prim_tri_index = &pack->prim_tri_index[optix_prim_offset];
     int *prim_type = &pack->prim_type[optix_prim_offset];
     unsigned int *prim_visibility = &pack->prim_visibility[optix_prim_offset];
@@ -824,7 +828,7 @@ void Mesh::pack_primitives(ccl::PackedBVH *pack, int object, uint visibility, bo
     int *prim_object = &pack->prim_object[optix_prim_offset];
 
     for (size_t k = 0; k < num_prims; ++k) {
-      prim_tri_index[k] = (optix_prim_offset + k) * 3;
+      prim_tri_index[k] = (prim_offset + k) * 3;
       prim_type[k] = type;
       prim_index[k] = prim_offset + k;
       prim_object[k] = object;

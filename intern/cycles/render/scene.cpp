@@ -219,13 +219,12 @@ void Scene::free_memory(bool final)
   objects.clear();
   lights.clear();
   particle_systems.clear();
-  procedurals.clear();
 
   if (device) {
     camera->device_free(device, &dscene, this);
     film->device_free(device, &dscene, this);
     background->device_free(device, &dscene);
-    integrator->device_free(device, &dscene);
+    integrator->device_free(device, &dscene, true);
 
     object_manager->device_free(device, &dscene, true);
     geometry_manager->device_free(device, &dscene, true);

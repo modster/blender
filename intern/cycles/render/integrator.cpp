@@ -115,6 +115,10 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
     }
   });
 
+  if (sampling_pattern_is_modified()) {
+    dscene->sample_pattern_lut.tag_realloc();
+  }
+
   device_free(device, dscene);
 
   KernelIntegrator *kintegrator = &dscene->data.integrator;
@@ -271,13 +275,9 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
   clear_modified();
 }
 
-void Integrator::device_free(Device *, DeviceScene *dscene)
+void Integrator::device_free(Device *, DeviceScene *dscene, bool force_free)
 {
-  if (!sampling_pattern_is_modified()) {
-    return;
-  }
-
-  dscene->sample_pattern_lut.free();
+  dscene->sample_pattern_lut.free_if_need_realloc(force_free);
 }
 
 void Integrator::tag_update(Scene *scene, uint32_t flag)
