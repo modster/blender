@@ -267,7 +267,14 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayout *column = uiLayoutColumn(layout, true);
 
   uiItemR(column, ptr, "use_contour", 0, NULL, ICON_NONE);
+
+  bool use_crease = RNA_boolean_get(ptr, "use_crease");
+
   uiItemR(column, ptr, "use_crease", 0, "Crease", ICON_NONE);
+  if (use_crease) {
+    uiItemR(column, ptr, "crease_threshold", UI_ITEM_R_SLIDER, "Threshold", ICON_NONE);
+  }
+
   uiItemR(column, ptr, "use_material", 0, "Material", ICON_NONE);
   uiItemR(column, ptr, "use_edge_mark", 0, "Edge Marks", ICON_NONE);
   uiItemR(column, ptr, "use_intersection", 0, "Intersection", ICON_NONE);
@@ -275,6 +282,8 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemPointerR(layout, ptr, "target_layer", &obj_data_ptr, "layers", NULL, ICON_GREASEPENCIL);
   uiItemPointerR(
       layout, ptr, "target_material", &obj_data_ptr, "materials", NULL, ICON_SHADING_TEXTURE);
+
+  uiItemR(layout, ptr, "remove_doubles", 0, "Allow Overlapping Edges", ICON_NONE);
 
   gpencil_modifier_panel_end(layout, ptr);
 }
@@ -292,8 +301,6 @@ static void style_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(column, ptr, "thickness", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 
   uiItemR(column, ptr, "opacity", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
-
-  uiItemR(column, ptr, "pre_sample_length", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 }
 
 static void occlusion_panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -339,6 +346,23 @@ static void occlusion_panel_draw(const bContext *UNUSED(C), Panel *panel)
   }
 }
 
+static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, NULL);
+
+  uiLayout *layout = panel->layout;
+
+  uiLayoutSetPropSep(layout, true);
+
+  uiLayout *column = uiLayoutColumn(layout, true);
+  uiItemR(column, ptr, "chaining_geometry_threshold", 0, NULL, ICON_NONE);
+  uiItemR(column, ptr, "chaining_image_threshold", 0, NULL, ICON_NONE);
+
+  uiItemR(layout, ptr, "pre_sample_length", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+
+  uiItemR(layout, ptr, "angle_splitting_threshold", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+}
+
 static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   PointerRNA ob_ptr;
@@ -373,6 +397,8 @@ static void panelRegister(ARegionType *region_type)
       region_type, "style", "Style", NULL, style_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "occlusion", "Occlusion", NULL, occlusion_panel_draw, panel_type);
+  gpencil_modifier_subpanel_register(
+      region_type, "chaining", "Chaining", NULL, chaining_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "vgroup", "Vertex Weight Transfer", NULL, vgroup_panel_draw, panel_type);
 }
