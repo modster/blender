@@ -41,8 +41,6 @@ struct Camera;
 struct CustomData_MeshMasks;
 struct Depsgraph;
 struct EditBone;
-struct GPUOffScreen;
-struct GPUViewport;
 struct ID;
 struct MVert;
 struct Main;
@@ -55,7 +53,6 @@ struct RenderEngineType;
 struct Scene;
 struct ScrArea;
 struct View3D;
-struct View3DShading;
 struct ViewContext;
 struct ViewLayer;
 struct bContext;
@@ -64,8 +61,6 @@ struct bScreen;
 struct rctf;
 struct rcti;
 struct wmGizmo;
-struct wmOperator;
-struct wmOperatorType;
 struct wmWindow;
 struct wmWindowManager;
 
@@ -98,24 +93,6 @@ typedef struct ViewDepths {
 
   bool damaged;
 } ViewDepths;
-
-typedef struct ViewDrawOffscreenContext {
-  struct Depsgraph *depsgraph;
-  struct Scene *scene;
-  int drawtype;
-  struct View3D *v3d;
-  struct ARegion *region;
-  int winx;
-  int winy;
-  float viewmat[4][4];
-  float winmat[4][4];
-  bool do_sky;
-  bool is_persp;
-  const char *viewname;
-  const bool do_color_management;
-  struct GPUOffScreen *ofs;
-  struct GPUViewport *viewport;
-} ViewDrawOffscreenContext;
 
 /* Rotate 3D cursor on placement. */
 enum eV3DCursorOrient {
@@ -158,6 +135,11 @@ void ED_view3d_to_object(const struct Depsgraph *depsgraph,
                          const float ofs[3],
                          const float quat[4],
                          const float dist);
+
+bool ED_view3d_camera_to_view_selected(struct Main *bmain,
+                                       struct Depsgraph *depsgraph,
+                                       const struct Scene *scene,
+                                       struct Object *camera_ob);
 
 void ED_view3d_lastview_store(struct RegionView3D *rv3d);
 
@@ -382,6 +364,12 @@ bool ED_view3d_win_to_3d_on_plane(const struct ARegion *region,
                                   const float mval[2],
                                   const bool do_clip,
                                   float r_out[3]);
+bool ED_view3d_win_to_3d_on_plane_with_fallback(const struct ARegion *region,
+                                                const float plane[4],
+                                                const float mval[2],
+                                                const bool do_clip,
+                                                const float plane_fallback[4],
+                                                float r_out[3]);
 bool ED_view3d_win_to_3d_on_plane_int(const struct ARegion *region,
                                       const float plane[4],
                                       const int mval[2],

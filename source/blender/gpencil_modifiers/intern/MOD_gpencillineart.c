@@ -30,6 +30,7 @@
 
 #include "BLT_translation.h"
 
+#include "DNA_collection_types.h"
 #include "DNA_gpencil_modifier_types.h"
 #include "DNA_gpencil_types.h"
 #include "DNA_lineart_types.h"

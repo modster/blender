@@ -66,9 +66,14 @@
 
 #include "SEQ_sequencer.h"
 
+#include "effects.h"
+#include "image_cache.h"
+#include "multiview.h"
+#include "prefetch.h"
 #include "proxy.h"
 #include "render.h"
-#include "sequencer.h"
+#include "strip_time.h"
+#include "utils.h"
 
 static ImBuf *seq_render_strip_stack(const SeqRenderData *context,
                                      SeqRenderState *state,
@@ -257,55 +262,6 @@ void seq_render_state_init(SeqRenderState *state)
   state->scene_parents = NULL;
 }
 
-float seq_give_frame_index(Sequence *seq, float timeline_frame)
-{
-  float frame_index;
-  int sta = seq->start;
-  int end = seq->start + seq->len - 1;
-
-  if (seq->type & SEQ_TYPE_EFFECT) {
-    end = seq->enddisp;
-  }
-
-  if (end < sta) {
-    return -1;
-  }
-
-  if (seq->flag & SEQ_REVERSE_FRAMES) {
-    /*reverse frame in this sequence */
-    if (timeline_frame <= sta) {
-      frame_index = end - sta;
-    }
-    else if (timeline_frame >= end) {
-      frame_index = 0;
-    }
-    else {
-      frame_index = end - timeline_frame;
-    }
-  }
-  else {
-    if (timeline_frame <= sta) {
-      frame_index = 0;
-    }
-    else if (timeline_frame >= end) {
-      frame_index = end - sta;
-    }
-    else {
-      frame_index = timeline_frame - sta;
-    }
-  }
-
-  if (seq->strobe < 1.0f) {
-    seq->strobe = 1.0f;
-  }
-
-  if (seq->strobe > 1.0f) {
-    frame_index -= fmodf((double)frame_index, (double)seq->strobe);
-  }
-
-  return frame_index;
-}
-
 StripElem *SEQ_render_give_stripelem(Sequence *seq, int timeline_frame)
 {
   StripElem *se = seq->strip->stripdata;
@@ -381,16 +337,17 @@ static int evaluate_seq_frame_gen(Sequence **seq_arr,
   return totseq;
 }
 
-int SEQ_render_evaluate_frame(Scene *scene, int timeline_frame)
+/**
+ * Count number of strips in timeline at timeline_frame
+ *
+ * \param seqbase: ListBase in which strips are located
+ * \param timeline_frame: frame on timeline from where gaps are searched for
+ * \return number of strips
+ */
+int SEQ_render_evaluate_frame(ListBase *seqbase, int timeline_frame)
 {
-  Editing *ed = BKE_sequencer_editing_get(scene, false);
   Sequence *seq_arr[MAXSEQ + 1];
-
-  if (ed == NULL) {
-    return 0;
-  }
-
-  return evaluate_seq_frame_gen(seq_arr, ed->seqbasep, timeline_frame, 0);
+  return evaluate_seq_frame_gen(seq_arr, seqbase, timeline_frame, 0);
 }
 
 static bool video_seq_is_rendered(Sequence *seq)
@@ -571,7 +528,6 @@ static void sequencer_image_transform_init(void *handle_v,
   handle->ibuf_source = init_data->ibuf_source;
   handle->ibuf_out = init_data->ibuf_out;
   handle->transform = init_data->transform;
-  handle->scale_to_fit = init_data->scale_to_fit;
   handle->image_scale_factor = init_data->image_scale_factor;
   handle->for_render = init_data->for_render;
 
@@ -583,8 +539,8 @@ static void *sequencer_image_transform_do_thread(void *data_v)
 {
   const ImageTransformThreadData *data = (ImageTransformThreadData *)data_v;
   const StripTransform *transform = data->transform;
-  const float scale_x = transform->scale_x * data->scale_to_fit;
-  const float scale_y = transform->scale_y * data->scale_to_fit;
+  const float scale_x = transform->scale_x * data->image_scale_factor;
+  const float scale_y = transform->scale_y * data->image_scale_factor;
   const float scale_to_fit_offs_x = (data->ibuf_out->x - data->ibuf_source->x) / 2;
   const float scale_to_fit_offs_y = (data->ibuf_out->y - data->ibuf_source->y) / 2;
   const float translate_x = transform->xofs * data->image_scale_factor + scale_to_fit_offs_x;
@@ -669,10 +625,6 @@ static ImBuf *input_preprocess(const SeqRenderData *context,
     IMB_filtery(preprocessed_ibuf);
   }
 
-  /* Calculate scale factor, so image fits in preview area with original aspect ratio. */
-  const float scale_to_fit_factor = MIN2((float)context->rectx / (float)ibuf->x,
-                                         (float)context->recty / (float)ibuf->y);
-
   /* Get scale factor if preview resolution doesn't match project resolution. */
   float preview_scale_factor;
   if (context->preview_render_size == SEQ_RENDER_SIZE_SCENE) {
@@ -691,10 +643,10 @@ static ImBuf *input_preprocess(const SeqRenderData *context,
     const int height = ibuf->y;
     const StripCrop *c = seq->strip->crop;
 
-    const int left = c->left / scale_to_fit_factor * preview_scale_factor;
-    const int right = c->right / scale_to_fit_factor * preview_scale_factor;
-    const int top = c->top / scale_to_fit_factor * preview_scale_factor;
-    const int bottom = c->bottom / scale_to_fit_factor * preview_scale_factor;
+    const int left = c->left;
+    const int right = c->right;
+    const int top = c->top;
+    const int bottom = c->bottom;
     const float col[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 
     /* Left. */
@@ -716,7 +668,6 @@ static ImBuf *input_preprocess(const SeqRenderData *context,
     init_data.ibuf_source = ibuf;
     init_data.ibuf_out = preprocessed_ibuf;
     init_data.transform = seq->strip->transform;
-    init_data.scale_to_fit = scale_to_fit_factor;
     init_data.image_scale_factor = preview_scale_factor;
     init_data.for_render = context->for_render;
     IMB_processor_apply_threaded(context->recty,

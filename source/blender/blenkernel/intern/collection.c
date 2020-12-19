@@ -458,7 +458,7 @@ void BKE_collection_add_from_collection(Main *bmain,
   bool is_instantiated = false;
 
   FOREACH_SCENE_COLLECTION_BEGIN (scene, collection) {
-    if (!ID_IS_LINKED(collection) && BKE_collection_has_collection(collection, collection_src)) {
+    if (!ID_IS_LINKED(collection) && collection_find_child(collection, collection_src)) {
       collection_child_add(collection, collection_dst, 0, true);
       is_instantiated = true;
     }
@@ -1814,6 +1814,15 @@ static void layer_collection_flags_store(Main *bmain,
   }
 }
 
+static void layer_collection_flags_free_recursive(LayerCollectionFlag *flag)
+{
+  LISTBASE_FOREACH (LayerCollectionFlag *, child, &flag->children) {
+    layer_collection_flags_free_recursive(child);
+  }
+
+  BLI_freelistN(&flag->children);
+}
+
 static void layer_collection_flags_restore_recursive(LayerCollection *layer_collection,
                                                      LayerCollectionFlag *flag)
 {
@@ -1829,7 +1838,6 @@ static void layer_collection_flags_restore_recursive(LayerCollection *layer_coll
 
     child_flag = child_flag->next;
   }
-  BLI_freelistN(&flag->children);
 
   /* We treat exclude as a special case.
    *
@@ -1855,10 +1863,15 @@ static void layer_collection_flags_restore(ListBase *flags, const Collection *co
 
     LayerCollection *layer_collection = BKE_layer_collection_first_from_scene_collection(
         view_layer, collection);
-    /* The flags should only be added if the collection is in the view layer. */
-    BLI_assert(layer_collection != NULL);
-
-    layer_collection_flags_restore_recursive(layer_collection, flag);
+    /* Check that the collection is still in the scene (and therefore its view layers). In most
+     * cases this is true, but if we move a sub-collection shared by several scenes to a collection
+     * local to the target scene, it is effectively removed from every other scene's hierarchy
+     * (e.g. moving into current scene's master collection). Then the other scene's view layers
+     * won't contain a matching layer collection anymore, so there is nothing to restore to. */
+    if (layer_collection != NULL) {
+      layer_collection_flags_restore_recursive(layer_collection, flag);
+    }
+    layer_collection_flags_free_recursive(flag);
   }
 
   BLI_freelistN(flags);
@@ -1905,15 +1918,23 @@ bool BKE_collection_move(Main *bmain,
   }
 
   /* Make sure we store the flag of the layer collections before we remove and re-create them.
-   * Otherwise they will get lost and everything will be copied from the new parent collection. */
+   * Otherwise they will get lost and everything will be copied from the new parent collection.
+   * Don't use flag syncing when moving a collection to a different scene, as it no longer exists
+   * in the same view layers anyway. */
+  const bool do_flag_sync = BKE_scene_find_from_collection(bmain, to_parent) ==
+                            BKE_scene_find_from_collection(bmain, collection);
   ListBase layer_flags;
-  layer_collection_flags_store(bmain, collection, &layer_flags);
+  if (do_flag_sync) {
+    layer_collection_flags_store(bmain, collection, &layer_flags);
+  }
 
   /* Create and remove layer collections. */
   BKE_main_collection_sync(bmain);
 
-  /* Restore the original layer collection flags. */
-  layer_collection_flags_restore(&layer_flags, collection);
+  /* Restore the original layer collection flags and free their temporary storage. */
+  if (do_flag_sync) {
+    layer_collection_flags_restore(&layer_flags, collection);
+  }
 
   /* We need to sync it again to pass the correct flags to the collections objects. */
   BKE_main_collection_sync(bmain);
