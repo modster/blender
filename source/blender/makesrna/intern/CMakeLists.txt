@@ -31,6 +31,7 @@ set(DEFSRC
   rna_animviz.c
   rna_armature.c
   rna_attribute.c
+  rna_asset.c
   rna_boid.c
   rna_brush.c
   rna_cachefile.c
@@ -377,6 +378,7 @@ blender_include_dirs(
   ../../ikplugin
   ../../imbuf
   ../../makesdna
+  ../../modifiers
   ../../nodes/
   ../../sequencer
   ../../simulation
@@ -430,6 +432,7 @@ set(LIB
 
   bf_editor_animation
   bf_editor_armature
+  bf_editor_asset
   bf_editor_curve
   bf_editor_gizmo_library
   bf_editor_gpencil

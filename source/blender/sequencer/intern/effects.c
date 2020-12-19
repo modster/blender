@@ -42,6 +42,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_sequence_types.h"
 #include "DNA_space_types.h"
+#include "DNA_vfont_types.h"
 
 #include "BKE_fcurve.h"
 #include "BKE_lib_id.h"
@@ -62,8 +63,10 @@
 
 #include "BLF_api.h"
 
+#include "effects.h"
 #include "render.h"
-#include "sequencer.h"
+#include "strip_time.h"
+#include "utils.h"
 
 static struct SeqEffectHandle get_sequence_effect_impl(int seq_type);
 
@@ -3913,7 +3916,7 @@ static ImBuf *do_text_effect(const SeqRenderData *context,
   /* Compensate text size for preview render size. */
   proxy_size_comp = context->scene->r.size / 100.0;
   if (context->preview_render_size != SEQ_RENDER_SIZE_SCENE) {
-    proxy_size_comp *= SEQ_rendersize_to_scale_factor(context->preview_render_size);
+    proxy_size_comp = SEQ_rendersize_to_scale_factor(context->preview_render_size);
   }
 
   /* set before return */

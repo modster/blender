@@ -3202,6 +3202,8 @@ static void update_effectors_task_cb(void *__restrict userdata,
       mul_v3_fl(retvel, mag);
 
       /* Copy computed force to fluid solver forces. */
+      mul_v3_fl(retvel, 0.2f);     /* Factor from 0e6820cc5d62. */
+      CLAMP3(retvel, -1.0f, 1.0f); /* Restrict forces to +-1 interval. */
       data->force_x[index] = retvel[0];
       data->force_y[index] = retvel[1];
       data->force_z[index] = retvel[2];
@@ -4557,7 +4559,7 @@ void BKE_fluid_particle_system_destroy(struct Object *ob, const int particle_typ
     if (psys->part->type == particle_type) {
       /* clear modifier */
       pfmd = psys_get_modifier(ob, psys);
-      BLI_remlink(&ob->modifiers, pfmd);
+      BKE_modifier_remove_from_list(ob, (ModifierData *)pfmd);
       BKE_modifier_free((ModifierData *)pfmd);
 
       /* clear particle system */

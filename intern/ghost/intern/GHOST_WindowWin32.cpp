@@ -1292,7 +1292,7 @@ GHOST_TSuccess GHOST_WindowWin32::getWintabInfo(std::vector<GHOST_WintabInfoWin3
 
   GHOST_SystemWin32 *system = (GHOST_SystemWin32 *)GHOST_System::getSystem();
 
-  updatePendingWintabEvents();
+  updateWintabEvents();
 
   auto &pendingEvents = m_wintab.pendingEvents;
   size_t pendingEventSize = pendingEvents.size();
@@ -1388,6 +1388,44 @@ GHOST_TSuccess GHOST_WindowWin32::getWintabInfo(std::vector<GHOST_WintabInfoWin3
   return GHOST_kSuccess;
 }
 
+void GHOST_WindowWin32::updateWintabEvents()
+{
+  readWintabEvents();
+  // When a Wintab device is used to leave window focus, some of it's packets are periodically not
+  // queued in time to be flushed. Reading packets needs to occur before expiring packets to clear
+  // these from the queue.
+  expireWintabEvents();
+}
+
+void GHOST_WindowWin32::updateWintabEventsSyncTime()
+{
+  readWintabEvents();
+
+  if (!m_wintab.pendingEvents.empty()) {
+    auto lastEvent = m_wintab.pendingEvents.back();
+    m_wintab.sysTimeOffset = ::GetTickCount() - lastEvent.pkTime;
+  }
+
+  expireWintabEvents();
+}
+
+void GHOST_WindowWin32::readWintabEvents()
+{
+  if (!(m_wintab.packetsGet && m_wintab.context)) {
+    return;
+  }
+
+  auto &pendingEvents = m_wintab.pendingEvents;
+
+  /* Get new packets. */
+  const int numPackets = m_wintab.packetsGet(
+      m_wintab.context, m_wintab.pkts.size(), m_wintab.pkts.data());
+
+  for (int i = 0; i < numPackets; i++) {
+    pendingEvents.push(m_wintab.pkts[i]);
+  }
+}
+
 /* Wintab (per documentation but may vary with implementation) does not update when its event
  * buffer is full. This is an issue because we need some synchronization point between Wintab
  * events and Win32 events, so we can't drain and process the queue immediately. We need to
@@ -1396,43 +1434,21 @@ GHOST_TSuccess GHOST_WindowWin32::getWintabInfo(std::vector<GHOST_WintabInfoWin3
  * mode from the Wintab API alone. There is no guaranteed ordering between Wintab and Win32 mouse
  * events and no documented time stamp shared between the two, so we synchronize on mouse button
  * events. */
-void GHOST_WindowWin32::updatePendingWintabEvents()
+void GHOST_WindowWin32::expireWintabEvents()
 {
-  if (!(m_wintab.packetsGet && m_wintab.context)) {
-    return;
-  }
-  GHOST_SystemWin32 *system = (GHOST_SystemWin32 *)GHOST_System::getSystem();
-
   auto &pendingEvents = m_wintab.pendingEvents;
 
-  /* Clear outdated events from queue. */
-  GHOST_TUns64 currTime = system->getMilliSeconds();
-  GHOST_TUns64 timeout = 300;
+  DWORD currTime = ::GetTickCount() - m_wintab.sysTimeOffset;
+  DWORD millisTimeout = 300;
   while (!pendingEvents.empty()) {
-    GHOST_TUns64 pktTime = system->millisSinceStart(pendingEvents.front().pkTime);
-    if (currTime - pktTime > timeout) {
+    DWORD pkTime = pendingEvents.front().pkTime;
+
+    if (currTime > pkTime + millisTimeout) {
       pendingEvents.pop();
     }
     else {
       break;
     }
-  }
-
-  /* Get new packets. */
-  const int numPackets = m_wintab.packetsGet(
-      m_wintab.context, m_wintab.pkts.size(), m_wintab.pkts.data());
-
-  int i = 0;
-  /* Don't queue outdated packets, such events can include packets that occurred before the current
-   * window lost and regained focus. */
-  for (; i < numPackets; i++) {
-    GHOST_TUns64 pktTime = system->millisSinceStart(m_wintab.pkts[i].pkTime);
-    if (currTime - pktTime < timeout) {
-      break;
-    }
-  }
-  for (; i < numPackets; i++) {
-    pendingEvents.push(m_wintab.pkts[i]);
   }
 }
 

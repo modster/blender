@@ -966,6 +966,7 @@ class VIEW3D_PT_tools_weightpaint_symmetry(Panel, View3DPaintPanel):
         row.active = mesh.use_mirror_vertex_group_x
         row.prop(mesh, "use_mirror_topology")
 
+
 class VIEW3D_PT_tools_weightpaint_symmetry_for_topbar(Panel):
     bl_space_type = 'TOPBAR'
     bl_region_type = 'HEADER'
@@ -1364,7 +1365,7 @@ class VIEW3D_PT_tools_grease_pencil_brush_settings(Panel, View3DPanel, GreasePen
                     row_mat.template_ID(gp_settings, "material", live_icon=True)
                 else:
                     row_mat.template_ID(context.active_object, "active_material", live_icon=True)
-                    row_mat.enabled = False  # will otherwise allow to change material in active slot
+                    row_mat.enabled = False  # will otherwise allow changing material in active slot
 
                 row.prop(gp_settings, "use_material_pin", text="")
 

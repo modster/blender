@@ -27,9 +27,13 @@
 #include "DNA_brush_types.h"
 #include "DNA_listBase.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct AnimData;
-struct MDeformVert;
 struct Curve;
+struct MDeformVert;
 
 #define GP_DEFAULT_PIX_FACTOR 1.0f
 #define GP_DEFAULT_GRID_LINES 4
@@ -837,3 +841,7 @@ typedef enum eGP_DrawMode {
 #define GPENCIL_ANY_VERTEX_MASK(flag) \
   ((flag & (GP_VERTEX_MASK_SELECTMODE_POINT | GP_VERTEX_MASK_SELECTMODE_STROKE | \
             GP_VERTEX_MASK_SELECTMODE_SEGMENT)))
+
+#ifdef __cplusplus
+}
+#endif

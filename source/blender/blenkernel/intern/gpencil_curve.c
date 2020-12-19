@@ -36,8 +36,11 @@
 
 #include "BLT_translation.h"
 
+#include "DNA_collection_types.h"
 #include "DNA_gpencil_types.h"
+#include "DNA_material_types.h"
 #include "DNA_meshdata_types.h"
+#include "DNA_scene_types.h"
 
 #include "BKE_collection.h"
 #include "BKE_context.h"
@@ -560,7 +563,7 @@ void BKE_gpencil_convert_curve(Main *bmain,
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Editcurve kernel functions
+/** \name Edit-Curve Kernel Functions
  * \{ */
 
 static bGPDcurve *gpencil_stroke_editcurve_generate_edgecases(bGPDstroke *gps,
