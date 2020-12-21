@@ -218,15 +218,14 @@ typedef struct bNode {
   char name[64];
   int flag;
   short type;
-  char _pad[2];
   /** Both for dependency and sorting. */
   short done, level;
-  /** Lasty: check preview render status, menunr: browse ID blocks. */
-  short lasty, menunr;
-  /** For groupnode, offset in global caller stack. */
-  short stack_index;
-  /** Number of this node in list, used for UI exec events. */
-  short nr;
+
+  /** Used as a boolean for execution. */
+  uint8_t need_exec;
+
+  char _pad[1];
+
   /** Custom user-defined color. */
   float color[3];
 
@@ -264,10 +263,8 @@ typedef struct bNode {
   short custom1, custom2;
   float custom3, custom4;
 
-  /** Need_exec is set as UI execution event, exec is flag during exec. */
-  short need_exec, exec;
-  /** Optional extra storage for use in thread (read only then!). */
-  void *threaddata;
+  char _pad1[4];
+
   /** Entire boundbox (worldspace). */
   rctf totr;
   /** Optional buttons area. */
@@ -1085,6 +1082,17 @@ typedef struct NodeAttributeCompare {
   char _pad[5];
 } NodeAttributeCompare;
 
+typedef struct NodeAttributeMath {
+  /* e.g. NODE_MATH_ADD. */
+  uint8_t operation;
+
+  /* GeometryNodeAttributeInputMode */
+  uint8_t input_type_a;
+  uint8_t input_type_b;
+
+  char _pad[5];
+} NodeAttributeMath;
+
 typedef struct NodeAttributeMix {
   /* e.g. MA_RAMP_BLEND. */
   uint8_t blend_type;
@@ -1098,6 +1106,10 @@ typedef struct NodeAttributeMix {
 typedef struct NodeAttributeColorRamp {
   ColorBand color_ramp;
 } NodeAttributeColorRamp;
+
+typedef struct NodeInputVector {
+  float vector[3];
+} NodeInputVector;
 
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
@@ -1498,11 +1510,6 @@ typedef enum GeometryNodeTriangulateQuads {
   GEO_NODE_TRIANGULATE_QUAD_ALTERNATE = 2,
   GEO_NODE_TRIANGULATE_QUAD_SHORTEDGE = 3,
 } GeometryNodeTriangulateQuads;
-
-typedef enum GeometryNodeUseAttributeFlag {
-  GEO_NODE_USE_ATTRIBUTE_A = (1 << 0),
-  GEO_NODE_USE_ATTRIBUTE_B = (1 << 1),
-} GeometryNodeUseAttributeFlag;
 
 typedef enum GeometryNodePointInstanceType {
   GEO_NODE_POINT_INSTANCE_TYPE_OBJECT = 0,
