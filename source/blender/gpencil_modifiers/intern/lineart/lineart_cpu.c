@@ -1479,12 +1479,9 @@ static void lineart_geometry_object_load(Depsgraph *dg,
     if (rb->remove_doubles) {
       BMEditMesh *em = BKE_editmesh_create(bm, false);
       BMOperator findop, weldop;
-      BMO_op_initf(bm,
-                   &findop,
-                   BMO_FLAG_DEFAULTS,
-                   "find_doubles verts=%av keep_verts=%Hv dist=%f",
-                   BM_ELEM_SELECT,
-                   0.0001);
+
+      /* See bmesh_opdefines.c and bmesh_operators.c for op names and argument formatting. */
+      BMO_op_initf(bm, &findop, BMO_FLAG_DEFAULTS, "find_doubles verts=%av dist=%f", 0.0001);
 
       BMO_op_exec(bm, &findop);
 
