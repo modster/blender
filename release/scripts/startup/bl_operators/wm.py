@@ -1391,6 +1391,10 @@ class WM_OT_properties_edit(Operator):
             self.max = rna_data["max"]
             self.soft_min = rna_data["soft_min"]
             self.soft_max = rna_data["soft_max"]
+            self.use_soft_limits = (
+                self.min != self.soft_min or
+                self.max != self.soft_max
+            )
         if prop_type in {int, float, str}:
             self.default = str(rna_data["default_value"])
 
