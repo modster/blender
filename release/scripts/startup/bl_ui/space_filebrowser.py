@@ -589,11 +589,11 @@ class ASSETBROWSER_PT_metadata(asset_utils.AssetBrowserPanel, Panel):
         active_asset = asset_utils.SpaceAssetInfo.get_active_asset(context)
 
         if not active_file or not active_asset:
-            layout.label(text="No asset selected.", icon='INFO')
+            layout.label(text="No asset selected", icon='INFO')
             return
 
         # If the active file is an ID, use its name directly so renaming is possible from right here.
-        layout.prop(context.id if not None else active_file, "name", text="")
+        layout.prop(context.id if context.id is not None else active_file, "name", text="")
 
 
 class ASSETBROWSER_PT_metadata_preview(asset_utils.AssetMetaDataPanel, Panel):
