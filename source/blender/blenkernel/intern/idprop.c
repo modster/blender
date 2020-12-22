@@ -1318,7 +1318,7 @@ static void IDP_DirectLinkProperty(IDProperty *prop, BlendDataReader *reader);
 static void read_ui_data(IDProperty *prop, BlendDataReader *reader)
 {
   BLO_read_data_address(reader, &prop->ui_data);
-  BLO_read_data_address(reader, &ui_data->description);
+  BLO_read_data_address(reader, &prop->ui_data->description);
 
   switch (IDP_ui_data_type(prop)) {
     case IDP_UI_DATA_TYPE_STRING: {
