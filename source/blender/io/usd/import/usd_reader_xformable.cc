@@ -76,6 +76,18 @@ void USDXformableReader::eval_merged_with_parent()
   }
 }
 
+bool USDXformableReader::can_merge_with_parent() const
+{
+  bool can_merge = false;
+
+  if (valid()) {
+    pxr::UsdPrim parent = prim_.GetParent();
+    can_merge = parent && !parent.IsPseudoRoot() && parent.IsA<pxr::UsdGeomXform>();
+  }
+
+  return can_merge;
+}
+
 void USDXformableReader::set_object_transform(const double time, CacheFile *cache_file)
 {
   if (!object_) {

@@ -99,10 +99,7 @@ class USDXformableReader : public USDPrimReader {
 
   virtual void create_object(Main *bmain, double time, USDDataCache *data_cache) = 0;
 
-  virtual bool can_merge_with_parent() const
-  {
-    return true;
-  }
+  virtual bool can_merge_with_parent() const;
 
   void set_object_transform(const double time, CacheFile *cache_file = nullptr);
 
