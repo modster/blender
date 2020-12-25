@@ -156,6 +156,8 @@ void GpencilExporterPDF::export_gpencil_layers(void)
     create_object_list();
   }
 
+  const bool is_normalized = ((params_.flag & GP_EXPORT_NORM_THICKNESS) != 0);
+
   for (ObjectZ &obz : ob_list_) {
     Object *ob = obz.ob;
 
@@ -192,9 +194,6 @@ void GpencilExporterPDF::export_gpencil_layers(void)
           export_stroke_to_point();
         }
         else {
-          bool is_normalized = ((params_.flag & GP_EXPORT_NORM_THICKNESS) != 0) ||
-                               is_stroke_thickness_constant(gps);
-
           /* Fill. */
           if ((material_is_fill()) && (params_.flag & GP_EXPORT_FILL)) {
             /* Fill is exported as polygon for fill and stroke in a different shape. */
