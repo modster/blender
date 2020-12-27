@@ -62,6 +62,7 @@ struct MeshSampleData {
 };
 
 const pxr::TfToken st_primvar_name("st", pxr::TfToken::Immortal);
+const pxr::TfToken normals_primvar_name("normals", pxr::TfToken::Immortal);
 
 void sample_uvs(const pxr::UsdGeomMesh &mesh,
                 MeshSampleData &mesh_data,
@@ -404,8 +405,18 @@ Mesh *USDMeshReader::create_mesh(Main *bmain, double time)
   read_mpolys(mesh, mesh_data);
 
   if (this->context_.import_params.import_normals) {
-    mesh_.GetNormalsAttr().Get(&mesh_data.normals, time);
-    mesh_data.normals_interpolation = mesh_.GetNormalsInterpolation();
+
+    /* If 'normals' and 'primvars:normals' are both specified, the latter has precedence. */
+    pxr::UsdGeomPrimvar primvar = mesh_.GetPrimvar(normals_primvar_name);
+    if (primvar.HasValue()) {
+      primvar.ComputeFlattened(&mesh_data.normals, time);
+      mesh_data.normals_interpolation = primvar.GetInterpolation();
+    }
+    else {
+      mesh_.GetNormalsAttr().Get(&mesh_data.normals, time);
+      mesh_data.normals_interpolation = mesh_.GetNormalsInterpolation();
+    }
+
     process_normals(mesh, mesh_data);
   }
   else {
