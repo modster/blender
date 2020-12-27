@@ -286,6 +286,10 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
   const bool is_sequence = RNA_boolean_get(op->ptr, "is_sequence");
   const bool transform_constraint = RNA_boolean_get(op->ptr, "transform_constraint");
 
+  const bool import_guide = RNA_boolean_get(op->ptr, "import_guide");
+  const bool import_proxy = RNA_boolean_get(op->ptr, "import_proxy");
+  const bool import_render = RNA_boolean_get(op->ptr, "import_render");
+
   /* Switch out of edit mode to avoid being stuck in it (T54326). */
   Object *obedit = CTX_data_edit_object(C);
   if (obedit) {
@@ -301,7 +305,10 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
                                    light_intensity_scale,
                                    import_usdpreview,
                                    is_sequence,
-                                   transform_constraint};
+                                   transform_constraint,
+                                   import_guide,
+                                   import_proxy,
+                                   import_render};
 
   bool ok = USD_import(C, filename, &params, as_background_job);
 
@@ -331,6 +338,12 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   uiItemL(box, IFACE_("Animation Cache"), ICON_NONE);
   uiItemR(box, ptr, "is_sequence", 0, NULL, ICON_NONE);
   uiItemR(box, ptr, "transform_constraint", 0, NULL, ICON_NONE);
+
+  box = uiLayoutBox(layout);
+  uiItemL(box, IFACE_("Purpose"), ICON_NONE);
+  uiItemR(box, ptr, "import_guide", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "import_proxy", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "import_render", 0, NULL, ICON_NONE);
 
   box = uiLayoutBox(layout);
   uiItemL(box, IFACE_("Experimental"), ICON_NONE);
@@ -417,6 +430,13 @@ void WM_OT_usd_import(wmOperatorType *ot)
                   "Transform Cache Constraint",
                   "When checked, create transform cache constraints for objects that have "
                   "time-varying transforms");
+
+  RNA_def_boolean(ot->srna, "import_guide", false, "Guide", "When checked, import guide geometry");
+
+  RNA_def_boolean(ot->srna, "import_proxy", true, "Proxy", "When checked, import proxy geometry");
+
+  RNA_def_boolean(
+      ot->srna, "import_render", true, "Render", "When checked, import final render geometry");
 }
 
 #endif /* WITH_USD */

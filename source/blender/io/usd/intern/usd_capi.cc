@@ -447,8 +447,9 @@ static void import_endjob(void *user_data)
     DEG_id_tag_update(&data->scene->id, ID_RECALC_BASE_FLAGS);
     DEG_relations_tag_update(data->bmain);
 
-    //if (data->is_background_job) {
-    //  /* Blender already returned from the import operator, so we need to store our own extra undo
+    // if (data->is_background_job) {
+    //  /* Blender already returned from the import operator, so we need to store our own extra
+    //  undo
     //   * step. */
     //  ED_undo_push(data->C, "USD Import Finished");
     //}

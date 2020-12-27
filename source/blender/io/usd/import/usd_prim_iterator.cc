@@ -145,12 +145,52 @@ USDXformableReader *USDPrimIterator::get_object_reader(const pxr::UsdPrim &prim,
   return result;
 }
 
+/* Returns true if the given prim should be excluded from the
+ * traversal because it has a purpose which was not requested
+ * by the user; e.g., the prim represents guide geometry and
+ * the import_guide parameter is toggled off. */
+bool USDPrimIterator::filter_by_purpose(const pxr::UsdPrim &prim,
+                                        const USDImporterContext &context)
+{
+  if (!prim.IsPseudoRoot() && prim.IsA<pxr::UsdGeomImageable>() &&
+      !(context.import_params.import_guide && context.import_params.import_proxy &&
+        context.import_params.import_render)) {
+    pxr::UsdGeomImageable imageable(prim);
+    if (imageable) {
+      if (pxr::UsdAttribute purpose_attr = imageable.GetPurposeAttr()) {
+        pxr::TfToken purpose;
+        purpose_attr.Get(&purpose);
+        if ((!context.import_params.import_guide && purpose == pxr::UsdGeomTokens->guide) ||
+            (!context.import_params.import_proxy && purpose == pxr::UsdGeomTokens->proxy) ||
+            (!context.import_params.import_render && purpose == pxr::UsdGeomTokens->proxy)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 void USDPrimIterator::create_object_readers(const pxr::UsdPrim &prim,
                                             const USDImporterContext &context,
                                             std::vector<USDXformableReader *> &r_readers,
                                             std::vector<USDXformableReader *> &r_child_readers)
 {
   if (!prim) {
+    return;
+  }
+
+  if (filter_by_purpose(prim, context)) {
+    // This prim has a purpose that was not requested
+    // by the user, so we skip it.
+    //
+    // TODO(makowalski): Here it's assumed that all the
+    // child prims should be pruned as well.  Verify
+    // that this is correct; i.e., should we account
+    // for the possibility that a child prim might not
+    // inherit purpose and therefore shouldn't necessarily
+    // be pruned?
     return;
   }
 

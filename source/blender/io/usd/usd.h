@@ -69,6 +69,9 @@ struct USDImportParams {
   bool import_usdpreview;
   bool is_sequence;
   bool transform_constraint;
+  bool import_guide;
+  bool import_proxy;
+  bool import_render;
 };
 
 /* The USD_import function takes a as_background_job parameter, and returns a boolean.
