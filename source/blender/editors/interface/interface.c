@@ -1592,10 +1592,10 @@ void ui_but_override_flag(Main *bmain, uiBut *but)
       bmain, &but->rnapoin, but->rnaprop, but->rnaindex);
 
   if (override_status & RNA_OVERRIDE_STATUS_OVERRIDDEN) {
-    but->flag |= UI_BUT_OVERRIDEN;
+    but->flag |= UI_BUT_OVERRIDDEN;
   }
   else {
-    but->flag &= ~UI_BUT_OVERRIDEN;
+    but->flag &= ~UI_BUT_OVERRIDDEN;
   }
 }
 
@@ -1626,10 +1626,10 @@ static uiButExtraOpIcon *ui_but_extra_operator_icon_add_ptr(uiBut *but,
 
   extra_op_icon->icon = (BIFIconID)icon;
   extra_op_icon->optype_params = MEM_callocN(sizeof(*extra_op_icon->optype_params),
-                                             "uiButExtraOpIcon.optype_hook");
+                                             "uiButExtraOpIcon.optype_params");
   extra_op_icon->optype_params->optype = optype;
   extra_op_icon->optype_params->opptr = MEM_callocN(sizeof(*extra_op_icon->optype_params->opptr),
-                                                    "uiButExtraOpIcon.optype_hook.opptr");
+                                                    "uiButExtraOpIcon.optype_params.opptr");
   WM_operator_properties_create_ptr(extra_op_icon->optype_params->opptr,
                                     extra_op_icon->optype_params->optype);
   extra_op_icon->optype_params->opcontext = opcontext;
@@ -4537,7 +4537,7 @@ static uiBut *ui_def_but_rna(uiBlock *block,
       block, type, retval, str, x, y, width, height, NULL, min, max, a1, a2, tip);
 
   if (but->type == UI_BTYPE_NUM) {
-    /* Set default values, can be overriden later. */
+    /* Set default values, can be overridden later. */
     UI_but_number_step_size_set(but, a1);
     UI_but_number_precision_set(but, a2);
   }
