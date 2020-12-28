@@ -273,8 +273,9 @@ static void do_versions_idproperty_bones_recursive(Bone *bone)
  * the old more complicated storage. Assumes only the top level of IDProperties below the parent
  * group had UI data in a "_RNA_UI" group.
  *
- * \note Some IDProperty usages in DNA aren't exposed or are runtime-only, so they don't all have
- * UI data.
+ * \note The following IDProperty groups in DNA aren't exposed in the UI or are runtime-only, so
+ * they don't have UI data: wmOperator, bAddon, bUserMenuItem_Op, wmKeyMapItem, wmKeyConfigPref,
+ * uiList, FFMpegCodecData, View3DShading, bToolRef, TimeMarker, ViewLayer, bPoseChannel.
  */
 static void do_versions_idproperty_ui_data(Main *bmain)
 {
@@ -296,22 +297,6 @@ static void do_versions_idproperty_ui_data(Main *bmain)
     }
   }
 
-  /* Pose channels. */
-  LISTBASE_FOREACH (Object *, ob, &bmain->objects) {
-    if (ob->pose) {
-      LISTBASE_FOREACH (bPoseChannel *, pchan, &ob->pose->chanbase) {
-        version_idproperty_ui_data(pchan->prop);
-      }
-    }
-  }
-
-  /* View layers. */
-  LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
-    LISTBASE_FOREACH (ViewLayer *, view_layer, &scene->view_layers) {
-      version_idproperty_ui_data(view_layer->id_properties);
-    }
-  }
-
   /* Nodes and node sockets. */
   LISTBASE_FOREACH (bNodeTree *, ntree, &bmain->nodetrees) {
     LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
@@ -325,88 +310,12 @@ static void do_versions_idproperty_ui_data(Main *bmain)
     }
   }
 
-  /* Markers. */
-  LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
-    LISTBASE_FOREACH (TimeMarker *, marker, &scene->markers) {
-      version_idproperty_ui_data(marker->prop);
-    }
-  }
-
-  /* ToolRefs. */
-  LISTBASE_FOREACH (WorkSpace *, workspace, &bmain->workspaces) {
-    LISTBASE_FOREACH (bToolRef *, tref, &workspace->tools) {
-      version_idproperty_ui_data(tref->properties);
-    }
-  }
-
-  // /* wmKeyConfigPref. */
-  // LISTBASE_FOREACH (wmKeyConfigPref *, kpt, &U.user_keyconfig_prefs) {
-  //   version_idproperty_ui_data(kpt->prop);
-  // }
-
-  // /* Keymaps. */
-  // LISTBASE_FOREACH (wmKeyMap *, keymap, &U.user_keymaps) {
-  //   LISTBASE_FOREACH (wmKeyMapItem *, kmi, &keymap->items) {
-  //     version_idproperty_ui_data(kmi->properties);
-  //   }
-  // }
-
-  // /* User menu items. */
-  // LISTBASE_FOREACH (bUserMenu *, um, &U.user_menus) {
-  //   LISTBASE_FOREACH (bUserMenuItem *, umi, &um->items) {
-  //     if (umi->type == USER_MENU_TYPE_OPERATOR) {
-  //       bUserMenuItem_Op *umi_op = (bUserMenuItem_Op *)umi;
-  //       version_idproperty_ui_data(umi_op->prop);
-  //     }
-  //   }
-  // }
-
-  /* Addon preferences. */
-  // LISTBASE_FOREACH (bAddon *, addon, &U.addons) {
-  //   version_idproperty_ui_data(addon->prop);
-  // }
-
-  /* 3D view shading. */
-  LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
-    LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
-      LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
-        if (sl->spacetype == SPACE_VIEW3D) {
-          View3D *v3d = (View3D *)sl;
-          version_idproperty_ui_data(v3d->shading.prop);
-        }
-      }
-    }
-  }
-  LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
-    version_idproperty_ui_data(scene->display.shading.prop);
-  }
-
   /* Sequences. */
   LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
     if (scene->ed != NULL) {
       LISTBASE_FOREACH (Sequence *, seq, &scene->ed->seqbase) {
         version_idproperty_ui_data(seq->prop);
       }
-    }
-  }
-
-  /* UI lists. */
-  LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
-    LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
-      LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
-        LISTBASE_FOREACH (uiList *, ui_list, &region->ui_lists) {
-          version_idproperty_ui_data(ui_list->properties);
-        }
-      }
-    }
-  }
-
-  /* Scenes and render FFMpeg data. */
-  LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
-    version_idproperty_ui_data(scene->layer_properties);
-    RenderData *render_data = &scene->r;
-    if (render_data != NULL) {
-      version_idproperty_ui_data(render_data->ffcodecdata.properties);
     }
   }
 }
