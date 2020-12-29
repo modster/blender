@@ -567,7 +567,7 @@ bool USD_import(bContext *C,
 
     /* setup job */
     WM_jobs_customdata_set(wm_job, job, blender::io::usd::import_freejob);
-    WM_jobs_timer(wm_job, 0.1, NC_SCENE | ND_FRAME, NC_SCENE | ND_FRAME);
+    WM_jobs_timer(wm_job, 0.1, NC_SCENE, NC_SCENE);
     WM_jobs_callbacks(wm_job,
                       blender::io::usd::import_startjob,
                       nullptr,
