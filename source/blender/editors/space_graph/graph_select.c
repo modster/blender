@@ -512,16 +512,19 @@ static rctf initialize_box_select_coords(const bAnimContext *ac, const rctf *rec
   return rectf;
 }
 
-static ListBase initialize_box_select_anim_data(const SpaceGraph *sipo, bAnimContext *ac)
+static int initialize_filter(const SpaceGraph *sipo)
 {
-  ListBase anim_data = {NULL, NULL};
-
   int filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_NODUPLIS);
   if (sipo->flag & SIPO_SELCUVERTSONLY) {
     filter |= ANIMFILTER_FOREDIT | ANIMFILTER_SELEDIT;
   }
-  ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
+  return filter;
+}
 
+static ListBase initialize_box_select_anim_data(const int filter, bAnimContext *ac)
+{
+  ListBase anim_data = {NULL, NULL};
+  ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
   return anim_data;
 }
 
@@ -583,7 +586,8 @@ static void box_select_graphkeys(bAnimContext *ac,
 {
   const rctf rectf = initialize_box_select_coords(ac, rectf_view);
   SpaceGraph *sipo = (SpaceGraph *)ac->sl;
-  ListBase anim_data = initialize_box_select_anim_data(sipo, ac);
+  const int filter = initialize_filter(sipo);
+  ListBase anim_data = initialize_box_select_anim_data(filter, ac);
   rctf scaled_rectf;
   KeyframeEditData ked;
   int mapping_flag;
@@ -655,6 +659,112 @@ static void box_select_graphkeys(bAnimContext *ac,
   ANIM_animdata_freelist(&anim_data);
 }
 
+/* This function checks whether a keyframe is already selected. */
+static bool is_key_already_selected(const ListBase *anim_data)
+{
+  for (bAnimListElem *ale = anim_data->first; ale; ale = ale->next) {
+    const FCurve *fcu = (FCurve *)ale->key_data;
+    BezTriple *bezt;
+    uint i;
+    for (bezt = fcu->bezt, i = 0; i < fcu->totvert; bezt++, i++) {
+      if (BEZT_ISSEL_ANY(bezt)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/* Perform a box selection of the curves themselves. If check_for_keys is true,
+ * no curves will be selected if a keyframe is already selected by the user. */
+static void box_select_graphcurves(bAnimContext *ac,
+                                   const rctf *rectf_view,
+                                   short mode,
+                                   bool incl_handles,
+                                   void *data,
+                                   bool check_for_key_selection)
+{
+  const rctf rectf = initialize_box_select_coords(ac, rectf_view);
+  SpaceGraph *sipo = (SpaceGraph *)ac->sl;
+  const int filter = initialize_filter(sipo);
+  ListBase anim_data = initialize_box_select_anim_data(filter, ac);
+  rctf scaled_rectf;
+  KeyframeEditData ked;
+  int mapping_flag;
+  initialize_box_select_key_editing_data(
+      sipo, incl_handles, mode, ac, data, &scaled_rectf, &ked, &mapping_flag);
+
+  /* Curve selection should only be done if there is no keyframe already selected, unless
+   * the user has chosen not to care about already selected keys. */
+  if (check_for_key_selection && is_key_already_selected(&anim_data)) {
+    return;
+  }
+
+  FCurve *selected_curve = NULL;
+  uint selected_count = 0;
+
+  for (bAnimListElem *ale = anim_data.first; ale; ale = ale->next) {
+    AnimData *adt = ANIM_nla_mapping_get(ac, ale);
+    FCurve *fcu = (FCurve *)ale->key_data;
+    float offset;
+    const float unit_scale = ANIM_unit_mapping_get_factor(
+        ac->scene, ale->id, fcu, mapping_flag, &offset);
+
+    /* Apply NLA mapping to all the keyframes, since it's easier than trying to
+     * guess when a callback might use something different.
+     */
+    if (adt) {
+      ANIM_nla_mapping_apply_fcurve(adt, ale->key_data, 0, incl_handles == 0);
+    }
+
+    scaled_rectf.xmin = rectf.xmin;
+    scaled_rectf.xmax = rectf.xmax;
+    scaled_rectf.ymin = rectf.ymin / unit_scale - offset;
+    scaled_rectf.ymax = rectf.ymax / unit_scale - offset;
+
+    /* Set horizontal range (if applicable).
+     * NOTE: these values are only used for x-range and y-range but not region
+     *      (which uses ked.data, i.e. rectf)
+     */
+    if (mode != BEZT_OK_VALUERANGE) {
+      ked.f1 = rectf.xmin;
+      ked.f2 = rectf.xmax;
+    }
+    else {
+      ked.f1 = rectf.ymin;
+      ked.f2 = rectf.ymax;
+    }
+
+    const float step = (rectf.xmax - rectf.xmin) / 30.0f;
+    float x = rectf.xmin;
+
+    /* Sample points on the given fcurve in the interval defined by the
+     * xmin and xmax of the selected rectangle.
+     * For each point, check if it is inside of the selection box. If it is, then
+     * stop the loop and select this curve.
+     */
+    while (x < rectf.xmax) {
+      float current_point[2];
+      current_point[0] = x;
+      current_point[1] = (evaluate_fcurve(fcu, x) + offset) * unit_scale;
+
+      if (BLI_rctf_isect_pt_v(&rectf, current_point)) {
+        fcu->flag |= FCURVE_SELECTED;
+        selected_curve = fcu;
+        selected_count++;
+        break;
+      }
+      x += step;
+    }
+  }
+
+  /* If only one curve is selected, then make it active so that it's easier to
+   * add curve modifiers for instance. */
+  if (selected_count == 1) {
+    ANIM_set_active_channel(ac, ac->data, ac->datatype, filter, selected_curve, ANIMTYPE_FCURVE);
+  }
+}
+
 /* ------------------- */
 
 static int graphkeys_box_select_invoke(bContext *C, wmOperator *op, const wmEvent *event)
@@ -700,6 +810,8 @@ static int graphkeys_box_select_exec(bContext *C, wmOperator *op)
   /* 'include_handles' from the operator specifies whether to include handles in the selection. */
   const bool incl_handles = RNA_boolean_get(op->ptr, "include_handles");
 
+  const bool enable_curves_selection = RNA_boolean_get(op->ptr, "select_curves");
+
   /* Get settings from operator. */
   WM_operator_properties_border_to_rcti(op, &rect);
 
@@ -727,6 +839,10 @@ static int graphkeys_box_select_exec(bContext *C, wmOperator *op)
 
   /* Apply box_select action. */
   box_select_graphkeys(&ac, &rect_fl, mode, selectmode, incl_handles, NULL);
+  if (enable_curves_selection) {
+    box_select_graphcurves(&ac, &rect_fl, mode, incl_handles, NULL, true);
+  }
+
   /* Send notifier that keyframe selection has changed. */
   WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_SELECTED, NULL);
 
@@ -765,6 +881,13 @@ void GRAPH_OT_select_box(wmOperatorType *ot)
 
   prop = RNA_def_boolean(
       ot->srna, "tweak", 0, "Tweak", "Operator has been activated using a tweak event");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+
+  prop = RNA_def_boolean(ot->srna,
+                         "select_curves",
+                         1,
+                         "Select Curves",
+                         "Are curves directly selectable? If no, only keyframes are selected");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 
   WM_operator_properties_gesture_box(ot);
@@ -810,12 +933,18 @@ static int graphkeys_lassoselect_exec(bContext *C, wmOperator *op)
     }
   }
 
+  const bool enable_curves_selection = RNA_boolean_get(op->ptr, "select_curves");
+
   /* Get settings from operator. */
   BLI_lasso_boundbox(&rect, data_lasso.mcoords, data_lasso.mcoords_len);
   BLI_rctf_rcti_copy(&rect_fl, &rect);
 
   /* Apply box_select action. */
   box_select_graphkeys(&ac, &rect_fl, BEZT_OK_REGION_LASSO, selectmode, incl_handles, &data_lasso);
+  if (enable_curves_selection) {
+    box_select_graphcurves(
+        &ac, &rect_fl, BEZT_OK_REGION_LASSO, incl_handles, &data_lasso, true);
+  }
 
   MEM_freeN((void *)data_lasso.mcoords);
 
@@ -845,6 +974,13 @@ void GRAPH_OT_select_lasso(wmOperatorType *ot)
   /* Properties. */
   WM_operator_properties_gesture_lasso(ot);
   WM_operator_properties_select_operation_simple(ot);
+  PropertyRNA *prop = RNA_def_boolean(
+      ot->srna,
+      "select_curves",
+      1,
+      "Select Curves",
+      "Are curves directly selectable? If no, only keyframes are selected");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 /* ------------------- */
@@ -869,6 +1005,8 @@ static int graph_circle_select_exec(bContext *C, wmOperator *op)
   const eSelectOp sel_op = ED_select_op_modal(RNA_enum_get(op->ptr, "mode"),
                                               WM_gesture_is_modal_first(op->customdata));
   const short selectmode = (sel_op != SEL_OP_SUB) ? SELECT_ADD : SELECT_SUBTRACT;
+  const bool enable_curves_selection = RNA_boolean_get(op->ptr, "select_curves");
+
   if (SEL_OP_USE_PRE_DESELECT(sel_op)) {
     deselect_graph_keys(&ac, 0, SELECT_SUBTRACT, true);
   }
@@ -895,6 +1033,10 @@ static int graph_circle_select_exec(bContext *C, wmOperator *op)
 
   /* Apply box_select action. */
   box_select_graphkeys(&ac, &rect_fl, BEZT_OK_REGION_CIRCLE, selectmode, incl_handles, &data);
+  if (enable_curves_selection) {
+    box_select_graphcurves(
+        &ac, &rect_fl, BEZT_OK_REGION_CIRCLE, incl_handles, &data, true);
+  }
 
   /* Send notifier that keyframe selection has changed. */
   WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_SELECTED, NULL);
@@ -920,6 +1062,13 @@ void GRAPH_OT_select_circle(wmOperatorType *ot)
   /* properties */
   WM_operator_properties_gesture_circle(ot);
   WM_operator_properties_select_operation_simple(ot);
+  PropertyRNA *prop = RNA_def_boolean(
+      ot->srna,
+      "select_curves",
+      1,
+      "Select Curves",
+      "Are curves directly selectable? If no, only keyframes are selected");
+  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 /* ******************** Column Select Operator **************************** */
