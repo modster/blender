@@ -463,10 +463,16 @@ static void nla_draw_strip(SpaceNla *snla,
          */
         if (strip->prev == NULL) {
           /* set the drawing color to the color of the strip, but with very faint alpha */
-          immUniformColor3fvAlpha(color, 0.15f);
+          immUniformColor3fvAlpha(color, 0.30f);
 
           /* draw the rect to the edge of the screen */
           immRectf(shdr_pos, v2d->cur.xmin, yminc, strip->start, ymaxc);
+        }
+        else {
+          immUniformColor3fvAlpha(color, 0.30f);
+          /* Draw the rect to the prev strip. This will overlap with previous strip's Hold_Forward
+           * which is OK. */
+          immRectf(shdr_pos, strip->prev->end, yminc, strip->start, ymaxc);
         }
         ATTR_FALLTHROUGH;
 

@@ -877,17 +877,19 @@ NlaEvalStrip *nlastrips_ctime_get_strip(ListBase *list,
         side = NES_TIME_BEFORE;
       }
       else {
-        /* before next strip - previous strip has ended, but next hasn't begun,
-         * so blending mode depends on whether strip is being held or not...
-         * - only occurs when no transition strip added, otherwise the transition would have
-         *   been picked up above...
-         */
-        strip = strip->prev;
+        /* Before current strip - previous strip has ended, but current hasn't begun. */
 
-        if (strip->extendmode != NLASTRIP_EXTEND_NOTHING) {
-          estrip = strip;
+        /* Order of branch important to give previous strip extrapolation higher priority.*/
+        if (strip->prev->extendmode != NLASTRIP_EXTEND_NOTHING) {
+          /* Previous strip extrapolates forward. */
+          estrip = strip->prev;
+          side = NES_TIME_AFTER;
         }
-        side = NES_TIME_AFTER;
+        else if (strip->extendmode == NLASTRIP_EXTEND_HOLD) {
+          /* Let current strip extrapolates backward. */
+          estrip = strip;
+          side = NES_TIME_BEFORE;
+        }
       }
       break;
     }
