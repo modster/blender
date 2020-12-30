@@ -1790,7 +1790,7 @@ static void BKE_nlastrip_validate_autoblends(NlaTrack *nlt, NlaStrip *nls)
 /* Ensure that auto-blending and other settings are set correctly */
 void BKE_nla_validate_state(AnimData *adt)
 {
-  NlaStrip *strip, *fstrip = NULL;
+  NlaStrip *strip = NULL;
   NlaTrack *nlt;
 
   /* sanity checks */
@@ -1804,37 +1804,6 @@ void BKE_nla_validate_state(AnimData *adt)
     for (strip = nlt->strips.first; strip; strip = strip->next) {
       /* auto-blending first */
       BKE_nlastrip_validate_autoblends(nlt, strip);
-
-      /* extend mode - find first strip */
-      if ((fstrip == NULL) || (strip->start < fstrip->start)) {
-        fstrip = strip;
-      }
-    }
-  }
-
-  /* second pass over the strips to adjust the extend-mode to fix any problems */
-  for (nlt = adt->nla_tracks.first; nlt; nlt = nlt->next) {
-    for (strip = nlt->strips.first; strip; strip = strip->next) {
-      /* apart from 'nothing' option which user has to explicitly choose, we don't really know if
-       * we should be overwriting the extend setting (but assume that's what the user wanted)
-       */
-      /* TODO: 1 solution is to tie this in with auto-blending... */
-      if (strip->extendmode != NLASTRIP_EXTEND_NOTHING) {
-        /* 1) First strip must be set to extend hold, otherwise, stuff before acts dodgy
-         * 2) Only overwrite extend mode if *not* changing it will most probably result in
-         * occlusion problems, which will occur if...
-         * - blendmode = REPLACE
-         * - all channels the same (this is fiddly to test, so is currently assumed)
-         *
-         * Should fix problems such as T29869.
-         */
-        if (strip == fstrip) {
-          strip->extendmode = NLASTRIP_EXTEND_HOLD;
-        }
-        else if (strip->blendmode == NLASTRIP_MODE_REPLACE) {
-          strip->extendmode = NLASTRIP_EXTEND_HOLD_FORWARD;
-        }
-      }
     }
   }
 }
@@ -1998,20 +1967,6 @@ void BKE_nla_action_pushdown(AnimData *adt, const bool is_liboverride)
        */
       strip->flag |= NLASTRIP_FLAG_USR_INFLUENCE;
       BKE_nlastrip_validate_fcurves(strip);
-    }
-  }
-
-  /* if the strip is the first one in the track it lives in, check if there
-   * are strips in any other tracks that may be before this, and set the extend
-   * mode accordingly
-   */
-  if (nlastrip_is_first(adt, strip) == 0) {
-    /* Not first, so extend mode can only be:
-     * NLASTRIP_EXTEND_HOLD_FORWARD not NLASTRIP_EXTEND_HOLD,
-     * so that it doesn't override strips in previous tracks. */
-    /* FIXME: this needs to be more automated, since user can rearrange strips */
-    if (strip->extendmode == NLASTRIP_EXTEND_HOLD) {
-      strip->extendmode = NLASTRIP_EXTEND_HOLD_FORWARD;
     }
   }
 
