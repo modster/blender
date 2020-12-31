@@ -549,8 +549,10 @@ void headerRotation(TransInfo *t, char str[UI_MAX_DRAW_STR], float final)
   }
 
   if (t->flag & T_PROP_EDIT_ALL) {
-    ofs += BLI_snprintf(
-        str + ofs, UI_MAX_DRAW_STR - ofs, TIP_(" Proportional size: %.2f"), t->prop_size);
+    if ((t->flag & T_PROP_FIXED_DISTANCE) == 0) {
+      ofs += BLI_snprintf(
+          str + ofs, UI_MAX_DRAW_STR - ofs, TIP_(" Proportional size: %.2f"), t->prop_size);
+    }
   }
 }
 
@@ -886,8 +888,10 @@ void headerResize(TransInfo *t, const float vec[3], char str[UI_MAX_DRAW_STR])
   }
 
   if (t->flag & T_PROP_EDIT_ALL) {
-    ofs += BLI_snprintf(
-        str + ofs, UI_MAX_DRAW_STR - ofs, TIP_(" Proportional size: %.2f"), t->prop_size);
+    if ((t->flag & T_PROP_FIXED_DISTANCE) == 0) {
+      ofs += BLI_snprintf(
+          str + ofs, UI_MAX_DRAW_STR - ofs, TIP_(" Proportional size: %.2f"), t->prop_size);
+    }
   }
 }
 

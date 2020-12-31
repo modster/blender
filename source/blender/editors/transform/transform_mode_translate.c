@@ -201,8 +201,10 @@ static void headerTranslation(TransInfo *t, const float vec[3], char str[UI_MAX_
   }
 
   if (t->flag & T_PROP_EDIT_ALL) {
-    ofs += BLI_snprintf(
-        str + ofs, UI_MAX_DRAW_STR - ofs, TIP_(" Proportional size: %.2f"), t->prop_size);
+    if ((t->flag & T_PROP_FIXED_DISTANCE) == 0) {
+      ofs += BLI_snprintf(
+          str + ofs, UI_MAX_DRAW_STR - ofs, TIP_(" Proportional size: %.2f"), t->prop_size);
+    }
   }
 
   if (t->spacetype == SPACE_NODE) {

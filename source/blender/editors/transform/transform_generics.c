@@ -1285,18 +1285,24 @@ void calculatePropRatio(TransInfo *t)
         if (td->flag & TD_SELECTED) {
           td->factor = 1.0f;
         }
-        else if ((connected && (td->flag & TD_NOTCONNECTED || td->dist > t->prop_size)) ||
-                 (connected == 0 && td->rdist > t->prop_size)) {
+        else if (((t->flag & T_PROP_FIXED_DISTANCE) == 0) &&
+                 ((connected && (td->flag & TD_NOTCONNECTED || td->dist > t->prop_size)) ||
+                  (connected == 0 && td->rdist > t->prop_size))) {
           td->factor = 0.0f;
           restoreElement(td);
         }
         else {
           /* Use rdist for falloff calculations, it is the real distance */
-          if (connected) {
-            dist = (t->prop_size - td->dist) / t->prop_size;
+          if ((t->flag & T_PROP_FIXED_DISTANCE) == 0) {
+            if (connected) {
+              dist = (t->prop_size - td->dist) / t->prop_size;
+            }
+            else {
+              dist = (t->prop_size - td->rdist) / t->prop_size;
+            }
           }
           else {
-            dist = (t->prop_size - td->rdist) / t->prop_size;
+            dist = 1.0f - td->dist;
           }
 
           /*

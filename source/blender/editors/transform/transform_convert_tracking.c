@@ -95,11 +95,13 @@ typedef struct TransformInitContext {
 static void markerToTransDataInit(TransformInitContext *init_context,
                                   MovieTrackingTrack *track,
                                   MovieTrackingMarker *marker,
+                                  const int framenr,
                                   int area,
                                   float loc[2],
                                   const float rel[2],
                                   const float off[2],
-                                  const float aspect[2])
+                                  const float aspect[2],
+                                  float distance)
 {
   TransData *td = init_context->current.td;
   TransData2D *td2d = init_context->current.td2d;
@@ -166,8 +168,11 @@ static void markerToTransDataInit(TransformInitContext *init_context,
   td->ext = NULL;
   td->val = NULL;
 
-  td->flag |= TD_SELECTED;
-  td->dist = 0.0;
+  if (marker->framenr == framenr) {
+    td->flag |= TD_SELECTED;
+    marker->flag &= ~(MARKER_DISABLED | MARKER_TRACKED);
+  }
+  td->dist = distance;
 
   unit_m3(td->mtx);
   unit_m3(td->smtx);
@@ -177,25 +182,35 @@ static void markerToTransDataInit(TransformInitContext *init_context,
   init_context->current.tdt++;
 }
 
-static void trackToTransData(TransformInitContext *init_context,
-                             const int framenr,
-                             MovieTrackingTrack *track,
-                             const float aspect[2])
+static void markerAreasToTransData(TransformInitContext *init_context,
+                                   MovieTrackingTrack *track,
+                                   MovieTrackingMarker *marker,
+                                   const int framenr,
+                                   const float aspect[2],
+                                   float distance)
 {
-  MovieTrackingMarker *marker = BKE_tracking_marker_ensure(track, framenr);
-
   markerToTransDataInit(init_context,
                         track,
                         marker,
+                        framenr,
                         TRACK_AREA_POINT,
                         track->offset,
                         marker->pos,
                         track->offset,
-                        aspect);
+                        aspect,
+                        distance);
 
   if (track->flag & SELECT) {
-    markerToTransDataInit(
-        init_context, track, marker, TRACK_AREA_POINT, marker->pos, NULL, NULL, aspect);
+    markerToTransDataInit(init_context,
+                          track,
+                          marker,
+                          framenr,
+                          TRACK_AREA_POINT,
+                          marker->pos,
+                          NULL,
+                          NULL,
+                          aspect,
+                          distance);
   }
 
   if (track->pat_flag & SELECT) {
@@ -205,11 +220,13 @@ static void trackToTransData(TransformInitContext *init_context,
       markerToTransDataInit(init_context,
                             track,
                             marker,
+                            framenr,
                             TRACK_AREA_PAT,
                             marker->pattern_corners[a],
                             marker->pos,
                             NULL,
-                            aspect);
+                            aspect,
+                            distance);
     }
   }
 
@@ -217,24 +234,110 @@ static void trackToTransData(TransformInitContext *init_context,
     markerToTransDataInit(init_context,
                           track,
                           marker,
+                          framenr,
                           TRACK_AREA_SEARCH,
                           marker->search_min,
                           marker->pos,
                           NULL,
-                          aspect);
+                          aspect,
+                          distance);
 
     markerToTransDataInit(init_context,
                           track,
                           marker,
+                          framenr,
                           TRACK_AREA_SEARCH,
                           marker->search_max,
                           marker->pos,
                           NULL,
-                          aspect);
+                          aspect,
+                          distance);
+  }
+}
+
+static void trackToTransData(TransformInitContext *init_context,
+                             const int framenr,
+                             MovieTrackingTrack *track,
+                             const float aspect[2])
+{
+  TransInfo *t = init_context->t;
+
+  MovieTrackingMarker *marker_at_frame = BKE_tracking_marker_ensure(track, framenr);
+  markerAreasToTransData(init_context, track, marker_at_frame, framenr, aspect, 0.0f);
+
+  if ((t->flag & (T_PROP_EDIT)) == 0) {
+    return;
+  }
+  const int marker_at_frame_index = marker_at_frame - track->markers;
+
+  /* TODO(sergey): De-duplicate traversal and counting logic. in both forard and backward
+   * directions. */
+  /* TODO(sergey): De-duplicate logic around which markers are considered stoppers. */
+
+  /* When doing proportional editing with topology enabled, add all markers from the tracked
+   * segment to the transform data, The order of markers is not important, but it is important to
+   * stay within the current segment. This is done as two loops going backward and formward,
+   * starting from the next to the marker which corresponds to the active frame. */
+
+  /* Traverse markers backwards, adding them to the transform data.
+   * Stop when tracked segment is over, or when all markers to the left side of the
+   * `marker_at_frame` has been added. */
+  {
+    int num_markers = 0;
+    for (int marker_index = marker_at_frame_index - 1; marker_index >= 0; marker_index--) {
+      MovieTrackingMarker *marker = &track->markers[marker_index];
+      if (marker->flag & MARKER_DISABLED) {
+        break;
+      }
+      if ((marker->flag & MARKER_TRACKED) == 0) {
+        break;
+      }
+      num_markers++;
+    }
+
+    for (int i = 0, marker_index = marker_at_frame_index - 1; marker_index >= 0;
+         i++, marker_index--) {
+      MovieTrackingMarker *marker = &track->markers[marker_index];
+      if (marker->flag & MARKER_DISABLED) {
+        break;
+      }
+      if ((marker->flag & MARKER_TRACKED) == 0) {
+        break;
+      }
+      const float distance = (float)(i + 1) / (num_markers + 1);
+      markerAreasToTransData(init_context, track, marker, framenr, aspect, distance);
+    }
   }
 
-  if (init_context->current.td != NULL) {
-    marker->flag &= ~(MARKER_DISABLED | MARKER_TRACKED);
+  /* Traverse markers forward, adding them to the transform data.
+   * Stop when tracked segment is over, or when all markers to the left side of the
+   * `marker_at_frame` has been added. */
+  {
+    int num_markers = 0;
+    for (int marker_index = marker_at_frame_index + 1; marker_index < track->markersnr;
+         marker_index++) {
+      MovieTrackingMarker *marker = &track->markers[marker_index];
+      if (marker->flag & MARKER_DISABLED) {
+        break;
+      }
+      if ((marker->flag & MARKER_TRACKED) == 0) {
+        break;
+      }
+      num_markers++;
+    }
+
+    for (int i = 0, marker_index = marker_at_frame_index + 1; marker_index < track->markersnr;
+         i++, marker_index++) {
+      MovieTrackingMarker *marker = &track->markers[marker_index];
+      if (marker->flag & MARKER_DISABLED) {
+        break;
+      }
+      if ((marker->flag & MARKER_TRACKED) == 0) {
+        break;
+      }
+      const float distance = (float)(i + 1) / (num_markers + 1);
+      markerAreasToTransData(init_context, track, marker, framenr, aspect, distance);
+    }
   }
 }
 
@@ -357,6 +460,10 @@ static void createTransTrackingTracksData(bContext *C, TransInfo *t)
   init_context.space_clip = space_clip;
   init_context.t = t;
   init_context.tc = tc;
+
+  if ((t->flag & T_PROP_EDIT) == T_PROP_EDIT) {
+    t->flag |= T_PROP_FIXED_DISTANCE | T_PROP_CONNECTED;
+  }
 
   /* Count required tranformation data. */
 
@@ -584,7 +691,6 @@ static void cancelTransTracking(TransInfo *t)
       MovieTrackingMarker *marker = BKE_tracking_marker_get_exact(track, tdt->framenr);
 
       BLI_assert(marker != NULL);
-
       marker->flag = tdt->flag;
 
       if (track->flag & SELECT) {
@@ -623,7 +729,6 @@ static void cancelTransTracking(TransInfo *t)
                                                                                    tdt->framenr);
 
       BLI_assert(plane_marker != NULL);
-
       plane_marker->flag = tdt->flag;
       i += 3;
     }

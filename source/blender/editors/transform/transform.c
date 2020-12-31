@@ -984,7 +984,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
         break;
       case TFM_MODAL_PROPSIZE:
         /* MOUSEPAN usage... */
-        if (t->flag & T_PROP_EDIT) {
+        if ((t->flag & T_PROP_EDIT) && ((t->flag & T_PROP_FIXED_DISTANCE) == 0)) {
           float fac = 1.0f + 0.005f * (event->y - event->prevy);
           t->prop_size *= fac;
           if (t->spacetype == SPACE_VIEW3D && t->persp != RV3D_ORTHO) {
@@ -1000,7 +1000,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
         }
         break;
       case TFM_MODAL_PROPSIZE_UP:
-        if (t->flag & T_PROP_EDIT) {
+        if ((t->flag & T_PROP_EDIT) && ((t->flag & T_PROP_FIXED_DISTANCE) == 0)) {
           t->prop_size *= (t->modifiers & MOD_PRECISION) ? 1.01f : 1.1f;
           if (t->spacetype == SPACE_VIEW3D && t->persp != RV3D_ORTHO) {
             t->prop_size = min_ff(t->prop_size, ((View3D *)t->view)->clip_end);
@@ -1014,7 +1014,7 @@ int transformEvent(TransInfo *t, const wmEvent *event)
         }
         break;
       case TFM_MODAL_PROPSIZE_DOWN:
-        if (t->flag & T_PROP_EDIT) {
+        if ((t->flag & T_PROP_EDIT) && ((t->flag & T_PROP_FIXED_DISTANCE) == 0)) {
           t->prop_size /= (t->modifiers & MOD_PRECISION) ? 1.01f : 1.1f;
           t->prop_size = max_ff(t->prop_size, T_PROP_SIZE_MIN);
           calculatePropRatio(t);

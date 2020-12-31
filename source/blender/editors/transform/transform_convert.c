@@ -1258,7 +1258,6 @@ void createTransData(bContext *C, TransInfo *t)
       break;
     case TC_TRACKING_DATA:
       createTransTrackingData(C, t);
-      init_prop_edit = false;
       break;
     case TC_NONE:
     default:
@@ -1293,6 +1292,9 @@ void createTransData(bContext *C, TransInfo *t)
       /* Already calculated by uv_set_connectivity_distance. */
     }
     else if (convert_type == TC_CURVE_VERTS && t->obedit_type == OB_CURVE) {
+      set_prop_dist(t, false);
+    }
+    else if (convert_type == TC_TRACKING_DATA) {
       set_prop_dist(t, false);
     }
     else {

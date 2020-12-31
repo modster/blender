@@ -455,45 +455,46 @@ enum {
   T_PROP_EDIT = 1 << 10,
   T_PROP_CONNECTED = 1 << 11,
   T_PROP_PROJECTED = 1 << 12,
-  T_PROP_EDIT_ALL = T_PROP_EDIT | T_PROP_CONNECTED | T_PROP_PROJECTED,
+  T_PROP_FIXED_DISTANCE = (1 << 13),
+  T_PROP_EDIT_ALL = T_PROP_EDIT | T_PROP_CONNECTED | T_PROP_PROJECTED | T_PROP_FIXED_DISTANCE,
 
-  T_V3D_ALIGN = 1 << 13,
+  T_V3D_ALIGN = 1 << 14,
   /** For 2D views such as UV or f-curve. */
-  T_2D_EDIT = 1 << 14,
-  T_CLIP_UV = 1 << 15,
+  T_2D_EDIT = 1 << 15,
+  T_CLIP_UV = 1 << 16,
 
   /** Auto-IK is on. */
-  T_AUTOIK = 1 << 16,
+  T_AUTOIK = 1 << 17,
 
   /** Don't use mirror even if the data-block option is set. */
-  T_NO_MIRROR = 1 << 17,
+  T_NO_MIRROR = 1 << 18,
 
   /** To indicate that the value set in the `value` parameter is the final
    * value of the transformation, modified only by the constrain. */
-  T_INPUT_IS_VALUES_FINAL = 1 << 18,
+  T_INPUT_IS_VALUES_FINAL = 1 << 19,
 
   /** To specify if we save back settings at the end. */
-  T_MODAL = 1 << 19,
+  T_MODAL = 1 << 20,
 
   /** No re-topology (projection). */
-  T_NO_PROJECT = 1 << 20,
+  T_NO_PROJECT = 1 << 21,
 
-  T_RELEASE_CONFIRM = 1 << 21,
+  T_RELEASE_CONFIRM = 1 << 22,
 
   /** Alternative transformation. used to add offset to tracking markers. */
-  T_ALT_TRANSFORM = 1 << 22,
+  T_ALT_TRANSFORM = 1 << 23,
 
   /** #TransInfo.center has been set, don't change it. */
-  T_OVERRIDE_CENTER = 1 << 23,
+  T_OVERRIDE_CENTER = 1 << 24,
 
-  T_MODAL_CURSOR_SET = 1 << 24,
+  T_MODAL_CURSOR_SET = 1 << 25,
 
-  T_CLNOR_REBUILD = 1 << 25,
+  T_CLNOR_REBUILD = 1 << 26,
 
   /** Merges unselected into selected after transforming (runs after transforming). */
-  T_AUTOMERGE = 1 << 26,
+  T_AUTOMERGE = 1 << 27,
   /** Runs auto-merge & splits. */
-  T_AUTOSPLIT = 1 << 27,
+  T_AUTOSPLIT = 1 << 28,
 };
 
 /** #TransInfo.modifiers */
