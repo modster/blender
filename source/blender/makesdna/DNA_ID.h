@@ -566,6 +566,11 @@ enum {
   /* RESET_AFTER_USE Used by undo system to tag unchanged IDs re-used from old Main (instead of
    * read from memfile). */
   LIB_TAG_UNDO_OLD_ID_REUSED = 1 << 19,
+
+  /**
+   * The data-block is a library override that needs re-sync to its linked reference.
+   */
+  LIB_TAG_LIB_OVERRIDE_NEED_RESYNC = 1 << 13,
 };
 
 /* Tag given ID for an update in all the dependency graphs. */
