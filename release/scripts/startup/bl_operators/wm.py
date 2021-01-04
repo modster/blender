@@ -1383,7 +1383,6 @@ class WM_OT_properties_edit(Operator):
 
         # setup defaults
         props = item.custom_properties()
-        props.update_rna(prop)
         rna_data = props.rna_data(prop)
         self.subtype =  rna_data["subtype"]
         if prop_type in {int, float}:

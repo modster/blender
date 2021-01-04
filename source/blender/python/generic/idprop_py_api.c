@@ -1514,10 +1514,8 @@ static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
     Py_RETURN_NONE;
   }
 
-  IDPropertyUIData *ui_data = idprop->ui_data;
-  if (ui_data == NULL) {
-    Py_RETURN_NONE;
-  }
+  IDPropertyUIData *ui_data = IDP_ui_data_ensure(idprop);
+  BLI_assert(ui_data != NULL);
 
   PyObject *dict = PyDict_New();
 
