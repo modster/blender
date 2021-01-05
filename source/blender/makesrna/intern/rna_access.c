@@ -2712,9 +2712,7 @@ bool RNA_property_int_set_default(PropertyRNA *prop, int value)
   BLI_assert(idprop->type == IDP_INT);
 
   IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)IDP_ui_data_ensure(idprop);
-
   ui_data->default_value = value;
-
   return true;
 }
 
@@ -3082,9 +3080,7 @@ bool RNA_property_float_set_default(PropertyRNA *prop, float value)
   BLI_assert(idprop->type == IDP_INT);
 
   IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)IDP_ui_data_ensure(idprop);
-
   ui_data->default_value = (double)value;
-
   return true;
 }
 
