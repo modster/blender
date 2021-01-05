@@ -13,27 +13,29 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Copyright 2020, Blender Foundation.
+ * The Original Code is Copyright (C) 2004 Blender Foundation.
+ * All rights reserved.
  */
 
 #pragma once
 
-#include "COM_NodeOperation.h"
-
-/**
- * Operation which is used by keying node to modify image's alpha channels.
- * It keeps color properly pre-multiplied.
+/** \file
+ * \ingroup sequencer
  */
-class KeyingSetAlphaOperation : public NodeOperation {
- private:
-  SocketReader *m_inputColor;
-  SocketReader *m_inputAlpha;
 
- public:
-  KeyingSetAlphaOperation();
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+struct Scene;
+struct Sequence;
 
-  void initExecution();
-  void deinitExecution();
-};
+struct Sequence *SEQ_select_active_get(struct Scene *scene);
+int SEQ_select_active_get_pair(struct Scene *scene,
+                               struct Sequence **seq_act,
+                               struct Sequence **seq_other);
+void SEQ_select_active_set(struct Scene *scene, struct Sequence *seq);
+
+#ifdef __cplusplus
+}
+#endif

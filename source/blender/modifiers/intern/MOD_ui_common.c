@@ -256,6 +256,11 @@ static void modifier_ops_extra_draw(bContext *C, uiLayout *layout, void *md_v)
             "OBJECT_OT_modifier_copy");
   }
 
+  uiItemO(layout,
+          CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Copy to Selected"),
+          0,
+          "OBJECT_OT_modifier_copy_to_selected");
+
   uiItemS(layout);
 
   /* Move to first. */
@@ -307,10 +312,16 @@ static void modifier_panel_header(const bContext *C, Panel *panel)
 
   /* Modifier Icon. */
   sub = uiLayoutRow(layout, true);
+  uiLayoutSetEmboss(sub, UI_EMBOSS_NONE);
   if (mti->isDisabled && mti->isDisabled(scene, md, 0)) {
     uiLayoutSetRedAlert(sub, true);
   }
-  uiItemL(sub, "", RNA_struct_ui_icon(ptr->type));
+  uiItemStringO(sub,
+                "",
+                RNA_struct_ui_icon(ptr->type),
+                "OBJECT_OT_modifier_set_active",
+                "modifier",
+                md->name);
 
   row = uiLayoutRow(layout, true);
 

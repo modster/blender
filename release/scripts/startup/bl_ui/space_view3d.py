@@ -957,7 +957,7 @@ class VIEW3D_MT_transform(VIEW3D_MT_transform_base, Menu):
         # generic...
         layout = self.layout
         if context.mode == 'EDIT_MESH':
-            layout.operator("transform.shrink_fatten", text="Shrink Fatten")
+            layout.operator("transform.shrink_fatten", text="Shrink/Fatten")
             layout.operator("transform.skin_resize")
         elif context.mode == 'EDIT_CURVE':
             layout.operator("transform.transform", text="Radius").mode = 'CURVE_SHRINKFATTEN'
@@ -2147,7 +2147,8 @@ class VIEW3D_MT_add(Menu):
         layout.operator("object.text_add", text="Text", icon='OUTLINER_OB_FONT')
         if context.preferences.experimental.use_new_hair_type:
             layout.operator("object.hair_add", text="Hair", icon='OUTLINER_OB_HAIR')
-        layout.operator("object.pointcloud_add", text="Point Cloud", icon='OUTLINER_OB_POINTCLOUD')
+        if context.preferences.experimental.use_new_point_cloud_type:
+            layout.operator("object.pointcloud_add", text="Point Cloud", icon='OUTLINER_OB_POINTCLOUD')
         layout.menu("VIEW3D_MT_volume_add", text="Volume", icon='OUTLINER_OB_VOLUME')
         layout.operator_menu_enum("object.gpencil_add", "type", text="Grease Pencil", icon='OUTLINER_OB_GREASEPENCIL')
 
@@ -5090,7 +5091,7 @@ class VIEW3D_MT_edit_gpencil_transform(Menu):
         layout.operator("transform.bend", text="Bend")
         layout.operator("transform.shear", text="Shear")
         layout.operator("transform.tosphere", text="To Sphere")
-        layout.operator("transform.transform", text="Shrink Fatten").mode = 'GPENCIL_SHRINKFATTEN'
+        layout.operator("transform.transform", text="Shrink/Fatten").mode = 'GPENCIL_SHRINKFATTEN'
 
 
 class VIEW3D_MT_edit_gpencil_showhide(Menu):
@@ -5305,6 +5306,7 @@ class VIEW3D_MT_sculpt_mask_edit_pie(Menu):
         op.filter_type = 'CONTRAST_DECREASE'
         op.auto_iteration_count = False
 
+
 class VIEW3D_MT_sculpt_automasking_pie(Menu):
     bl_label = "Automasking"
 
@@ -5474,12 +5476,12 @@ class VIEW3D_PT_view3d_lock(Panel):
                     view, "lock_bone", lock_object.data,
                     "edit_bones" if lock_object.mode == 'EDIT'
                     else "bones",
-                    text="",
+                    text="Bone",
                 )
-        else:
-            subcol = sub.column(heading="Lock")
-            subcol.prop(view, "lock_cursor", text="To 3D Cursor")
 
+        col = layout.column(heading="Lock", align=True)
+        if not lock_object:
+            col.prop(view, "lock_cursor", text="To 3D Cursor")
         col.prop(view, "lock_camera", text="Camera to View")
 
 
@@ -7042,7 +7044,7 @@ class VIEW3D_MT_gpencil_edit_context_menu(Menu):
             col.operator("transform.bend", text="Bend")
             col.operator("transform.shear", text="Shear")
             col.operator("transform.tosphere", text="To Sphere")
-            col.operator("transform.transform", text="Shrink Fatten").mode = 'GPENCIL_SHRINKFATTEN'
+            col.operator("transform.transform", text="Shrink/Fatten").mode = 'GPENCIL_SHRINKFATTEN'
 
             col.separator()
 
@@ -7086,7 +7088,7 @@ class VIEW3D_MT_gpencil_edit_context_menu(Menu):
             col.separator()
 
             col.operator("gpencil.stroke_smooth", text="Smooth Stroke").only_selected = False
-            col.operator("transform.transform", text="Shrink Fatten").mode = 'GPENCIL_SHRINKFATTEN'
+            col.operator("transform.transform", text="Shrink/Fatten").mode = 'GPENCIL_SHRINKFATTEN'
 
             col.separator()
 

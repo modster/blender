@@ -30,6 +30,7 @@ set(DEFSRC
   rna_animation.c
   rna_animviz.c
   rna_armature.c
+  rna_asset.c
   rna_attribute.c
   rna_boid.c
   rna_brush.c
@@ -99,6 +100,7 @@ set(DEFSRC
 
 if(WITH_EXPERIMENTAL_FEATURES)
   add_definitions(-DWITH_GEOMETRY_NODES)
+  add_definitions(-DWITH_POINT_CLOUD)
   add_definitions(-DWITH_HAIR_NODES)
   list(APPEND DEFSRC
     rna_hair.c
@@ -426,6 +428,7 @@ set(LIB
 
   bf_editor_animation
   bf_editor_armature
+  bf_editor_asset
   bf_editor_curve
   bf_editor_gizmo_library
   bf_editor_gpencil

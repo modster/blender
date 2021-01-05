@@ -112,6 +112,13 @@ static void outliner_main_region_listener(wmWindow *UNUSED(win),
 
   /* context changes */
   switch (wmn->category) {
+    case NC_WM:
+      switch (wmn->data) {
+        case ND_LIB_OVERRIDE_CHANGED:
+          ED_region_tag_redraw(region);
+          break;
+      }
+      break;
     case NC_SCENE:
       switch (wmn->data) {
         case ND_OB_ACTIVE:
@@ -152,8 +159,6 @@ static void outliner_main_region_listener(wmWindow *UNUSED(win),
     case NC_OBJECT:
       switch (wmn->data) {
         case ND_TRANSFORM:
-          /* transform doesn't change outliner data */
-          break;
         case ND_BONE_ACTIVE:
         case ND_BONE_SELECT:
         case ND_DRAW:
@@ -451,6 +456,7 @@ void ED_spacetype_outliner(void)
   st->dropboxes = outliner_dropboxes;
   st->id_remap = outliner_id_remap;
   st->deactivate = outliner_deactivate;
+  st->context = outliner_context;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype outliner region");

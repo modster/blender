@@ -13,33 +13,29 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Copyright 2011, Blender Foundation.
+ * The Original Code is Copyright (C) 2004 Blender Foundation.
+ * All rights reserved.
  */
 
 #pragma once
 
-#include "COM_NodeOperation.h"
-
-/**
- * this program converts an input color to an output value.
- * it assumes we are in sRGB color space.
+/** \file
+ * \ingroup sequencer
  */
-class SetAlphaOperation : public NodeOperation {
- private:
-  SocketReader *m_inputColor;
-  SocketReader *m_inputAlpha;
 
- public:
-  /**
-   * Default constructor
-   */
-  SetAlphaOperation();
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-  /**
-   * the inner loop of this program
-   */
-  void executePixelSampled(float output[4], float x, float y, PixelSampler sampler);
+struct ListBase;
+struct Main;
 
-  void initExecution();
-  void deinitExecution();
-};
+extern struct ListBase seqbase_clipboard;
+extern int seqbase_clipboard_frame;
+void SEQ_clipboard_pointers_store(struct Main *bmain, struct ListBase *seqbase);
+void SEQ_clipboard_pointers_restore(struct ListBase *seqbase, struct Main *bmain);
+void SEQ_clipboard_free(void);
+
+#ifdef __cplusplus
+}
+#endif

@@ -41,6 +41,7 @@
 
 #include "DNA_gpencil_modifier_types.h"
 #include "DNA_gpencil_types.h"
+#include "DNA_material_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
@@ -340,7 +341,7 @@ void GPENCIL_OT_selectmode_toggle(wmOperatorType *ot)
   ot->flag = OPTYPE_UNDO | OPTYPE_REGISTER;
 
   /* properties */
-  prop = RNA_def_int(ot->srna, "mode", 0, 0, 2, "Select mode", "Select mode", 0, 2);
+  prop = RNA_def_int(ot->srna, "mode", 0, 0, 2, "Select Mode", "Select mode", 0, 2);
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
 
@@ -2758,7 +2759,7 @@ void GPENCIL_OT_dissolve(wmOperatorType *ot)
                           prop_gpencil_dissolve_types,
                           0,
                           "Type",
-                          "Method used for dissolving Stroke points");
+                          "Method used for dissolving stroke points");
 }
 
 /** \} */
@@ -3441,7 +3442,7 @@ void GPENCIL_OT_stroke_caps_set(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Set Caps Mode";
   ot->idname = "GPENCIL_OT_stroke_caps_set";
-  ot->description = "Change Stroke caps mode (rounded or flat)";
+  ot->description = "Change stroke caps mode (rounded or flat)";
 
   /* api callbacks */
   ot->exec = gpencil_stroke_caps_set_exec;

@@ -13,42 +13,45 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Copyright 2011, Blender Foundation.
+ * Copyright 2020, Blender Foundation.
  */
 
-#include "COM_SetAlphaOperation.h"
+#include "COM_ColorExposureOperation.h"
 
-SetAlphaOperation::SetAlphaOperation()
+ExposureOperation::ExposureOperation()
 {
   this->addInputSocket(COM_DT_COLOR);
   this->addInputSocket(COM_DT_VALUE);
   this->addOutputSocket(COM_DT_COLOR);
-
-  this->m_inputColor = nullptr;
-  this->m_inputAlpha = nullptr;
+  this->m_inputProgram = nullptr;
 }
 
-void SetAlphaOperation::initExecution()
+void ExposureOperation::initExecution()
 {
-  this->m_inputColor = getInputSocketReader(0);
-  this->m_inputAlpha = getInputSocketReader(1);
+  this->m_inputProgram = this->getInputSocketReader(0);
+  this->m_inputExposureProgram = this->getInputSocketReader(1);
 }
 
-void SetAlphaOperation::executePixelSampled(float output[4],
+void ExposureOperation::executePixelSampled(float output[4],
                                             float x,
                                             float y,
                                             PixelSampler sampler)
 {
-  float alphaInput[4];
+  float inputValue[4];
+  float inputExposure[4];
+  this->m_inputProgram->readSampled(inputValue, x, y, sampler);
+  this->m_inputExposureProgram->readSampled(inputExposure, x, y, sampler);
+  const float exposure = pow(2, inputExposure[0]);
 
-  this->m_inputColor->readSampled(output, x, y, sampler);
-  this->m_inputAlpha->readSampled(alphaInput, x, y, sampler);
+  output[0] = inputValue[0] * exposure;
+  output[1] = inputValue[1] * exposure;
+  output[2] = inputValue[2] * exposure;
 
-  output[3] = alphaInput[0];
+  output[3] = inputValue[3];
 }
 
-void SetAlphaOperation::deinitExecution()
+void ExposureOperation::deinitExecution()
 {
-  this->m_inputColor = nullptr;
-  this->m_inputAlpha = nullptr;
+  this->m_inputProgram = nullptr;
+  this->m_inputExposureProgram = nullptr;
 }

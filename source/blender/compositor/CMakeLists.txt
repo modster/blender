@@ -213,6 +213,8 @@ set(SRC
   nodes/COM_ColorCorrectionNode.h
   nodes/COM_ColorCurveNode.cpp
   nodes/COM_ColorCurveNode.h
+  nodes/COM_ColorExposureNode.cpp
+  nodes/COM_ColorExposureNode.h
   nodes/COM_ColorRampNode.cpp
   nodes/COM_ColorRampNode.h
   nodes/COM_ColorToBWNode.cpp
@@ -353,8 +355,6 @@ set(SRC
   operations/COM_KeyingDespillOperation.h
   operations/COM_KeyingOperation.cpp
   operations/COM_KeyingOperation.h
-  operations/COM_KeyingSetAlphaOperation.cpp
-  operations/COM_KeyingSetAlphaOperation.h
 
   operations/COM_ColorSpillOperation.cpp
   operations/COM_ColorSpillOperation.h
@@ -399,6 +399,8 @@ set(SRC
   operations/COM_ChromaMatteOperation.h
   operations/COM_ColorCurveOperation.cpp
   operations/COM_ColorCurveOperation.h
+  operations/COM_ColorExposureOperation.cpp
+  operations/COM_ColorExposureOperation.h
   operations/COM_ColorMatteOperation.cpp
   operations/COM_ColorMatteOperation.h
   operations/COM_ColorRampOperation.cpp
@@ -457,8 +459,10 @@ set(SRC
   operations/COM_MapRangeOperation.h
   operations/COM_MapValueOperation.cpp
   operations/COM_MapValueOperation.h
-  operations/COM_SetAlphaOperation.cpp
-  operations/COM_SetAlphaOperation.h
+  operations/COM_SetAlphaMultiplyOperation.cpp
+  operations/COM_SetAlphaMultiplyOperation.h
+  operations/COM_SetAlphaReplaceOperation.cpp
+  operations/COM_SetAlphaReplaceOperation.h
 
   # Distort operation
   operations/COM_DisplaceOperation.cpp

@@ -41,6 +41,7 @@ class Scene;
 class SceneParams;
 class Shader;
 class Volume;
+struct PackedBVH;
 
 /* Geometry
  *
@@ -124,6 +125,8 @@ class Geometry : public Node {
                    int n,
                    int total);
 
+  virtual void pack_primitives(PackedBVH &pack, int object, uint visibility) = 0;
+
   /* Check whether the geometry should have own BVH built separately. Briefly,
    * own BVH is needed for geometry, if:
    *
@@ -154,6 +157,8 @@ class Geometry : public Node {
 
   /* Updates */
   void tag_update(Scene *scene, bool rebuild);
+
+  void tag_bvh_update(bool rebuild);
 };
 
 /* Geometry Manager */
@@ -195,7 +200,7 @@ class GeometryManager {
                              vector<AttributeRequestSet> &object_attributes);
 
   /* Compute verts/triangles/curves offsets in global arrays. */
-  void mesh_calc_offset(Scene *scene);
+  void mesh_calc_offset(Scene *scene, BVHLayout bvh_layout);
 
   void device_update_object(Device *device, DeviceScene *dscene, Scene *scene, Progress &progress);
 

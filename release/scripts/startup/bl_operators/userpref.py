@@ -187,7 +187,7 @@ class PREFERENCES_OT_copy_prev(Operator):
 
 
 class PREFERENCES_OT_keyconfig_test(Operator):
-    """Test key-config for conflicts"""
+    """Test key configuration for conflicts"""
     bl_idname = "preferences.keyconfig_test"
     bl_label = "Test Key Configuration for Conflicts"
 
@@ -868,7 +868,7 @@ class PREFERENCES_OT_addon_show(Operator):
 # Note: shares some logic with PREFERENCES_OT_addon_install
 # but not enough to de-duplicate. Fixes here may apply to both.
 class PREFERENCES_OT_app_template_install(Operator):
-    """Install an application-template"""
+    """Install an application template"""
     bl_idname = "preferences.app_template_install"
     bl_label = "Install Template from File..."
 

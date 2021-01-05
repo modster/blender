@@ -1926,7 +1926,7 @@ void BKE_pchan_rot_to_mat3(const bPoseChannel *pchan, float r_mat[3][3])
 {
   /* rotations may either be quats, eulers (with various rotation orders), or axis-angle */
   if (pchan->rotmode > 0) {
-    /* euler rotations (will cause gimble lock,
+    /* Euler rotations (will cause gimbal lock,
      * but this can be alleviated a bit with rotation orders) */
     eulO_to_mat3(r_mat, pchan->eul, pchan->rotmode);
   }
@@ -2441,7 +2441,7 @@ static void pose_proxy_sync(Object *ob, Object *from, int layer_protected)
 }
 
 /**
- * \param r_last_visited_bone_p the last bone handled by the last call to this function.
+ * \param r_last_visited_bone_p: The last bone handled by the last call to this function.
  */
 static int rebuild_pose_bone(
     bPose *pose, Bone *bone, bPoseChannel *parchan, int counter, Bone **r_last_visited_bone_p)

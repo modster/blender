@@ -1761,8 +1761,7 @@ static void DRW_render_gpencil_to_image(RenderEngine *engine,
 void DRW_render_gpencil(struct RenderEngine *engine, struct Depsgraph *depsgraph)
 {
   /* This function should only be called if there are are grease pencil objects,
-   * especially important to avoid failing in in background renders without OpenGL
-   * context. */
+   * especially important to avoid failing in background renders without OpenGL context. */
   BLI_assert(DRW_render_check_grease_pencil(depsgraph));
 
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
@@ -1911,6 +1910,11 @@ void DRW_render_to_image(RenderEngine *engine, struct Depsgraph *depsgraph)
   }
 
   RE_engine_end_result(engine, render_result, false, false, false);
+
+  if (engine_type->draw_engine->store_metadata) {
+    RenderResult *final_render_result = RE_engine_get_result(engine);
+    engine_type->draw_engine->store_metadata(data, final_render_result);
+  }
 
   /* Force cache to reset. */
   drw_viewport_cache_resize();
@@ -2073,7 +2077,6 @@ void DRW_draw_render_loop_2d_ex(struct Depsgraph *depsgraph,
    * for the image editor this is when showing UV's.*/
   const bool do_populate_loop = (DST.draw_ctx.space_data->spacetype == SPACE_IMAGE);
   const bool do_annotations = drw_draw_show_annotation();
-  const bool do_region_callbacks = (DST.draw_ctx.space_data->spacetype != SPACE_IMAGE);
   const bool do_draw_gizmos = (DST.draw_ctx.space_data->spacetype != SPACE_IMAGE);
 
   /* Get list of enabled engines */
@@ -2125,7 +2128,7 @@ void DRW_draw_render_loop_2d_ex(struct Depsgraph *depsgraph,
   /* Start Drawing */
   DRW_state_reset();
 
-  if (do_region_callbacks && DST.draw_ctx.evil_C) {
+  if (DST.draw_ctx.evil_C) {
     ED_region_draw_cb_draw(DST.draw_ctx.evil_C, DST.draw_ctx.region, REGION_DRAW_PRE_VIEW);
   }
 
@@ -2147,10 +2150,8 @@ void DRW_draw_render_loop_2d_ex(struct Depsgraph *depsgraph,
     if (do_annotations) {
       ED_annotation_draw_view2d(DST.draw_ctx.evil_C, true);
     }
-    if (do_region_callbacks) {
-      GPU_depth_test(GPU_DEPTH_NONE);
-      ED_region_draw_cb_draw(DST.draw_ctx.evil_C, DST.draw_ctx.region, REGION_DRAW_POST_VIEW);
-    }
+    GPU_depth_test(GPU_DEPTH_NONE);
+    ED_region_draw_cb_draw(DST.draw_ctx.evil_C, DST.draw_ctx.region, REGION_DRAW_POST_VIEW);
     GPU_matrix_pop_projection();
     /* Callback can be nasty and do whatever they want with the state.
      * Don't trust them! */

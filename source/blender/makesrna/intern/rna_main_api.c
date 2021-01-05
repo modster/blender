@@ -678,6 +678,7 @@ static Hair *rna_Main_hairs_new(Main *bmain, const char *name)
 }
 #  endif
 
+#  ifdef WITH_POINT_CLOUD
 static PointCloud *rna_Main_pointclouds_new(Main *bmain, const char *name)
 {
   char safe_name[MAX_ID_NAME - 2];
@@ -687,6 +688,7 @@ static PointCloud *rna_Main_pointclouds_new(Main *bmain, const char *name)
   id_us_min(&pointcloud->id);
   return pointcloud;
 }
+#  endif
 
 static Volume *rna_Main_volumes_new(Main *bmain, const char *name)
 {
@@ -755,7 +757,9 @@ RNA_MAIN_ID_TAG_FUNCS_DEF(lightprobes, lightprobes, ID_LP)
 #  ifdef WITH_HAIR_NODES
 RNA_MAIN_ID_TAG_FUNCS_DEF(hairs, hairs, ID_HA)
 #  endif
+#  ifdef WITH_POINT_CLOUD
 RNA_MAIN_ID_TAG_FUNCS_DEF(pointclouds, pointclouds, ID_PT)
+#  endif
 RNA_MAIN_ID_TAG_FUNCS_DEF(volumes, volumes, ID_VO)
 #  ifdef WITH_GEOMETRY_NODES
 RNA_MAIN_ID_TAG_FUNCS_DEF(simulations, simulations, ID_SIM)
@@ -1202,7 +1206,7 @@ void RNA_def_main_images(BlenderRNA *brna, PropertyRNA *cprop)
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   RNA_def_boolean(func, "alpha", 0, "Alpha", "Use alpha channel");
   RNA_def_boolean(
-      func, "float_buffer", 0, "Float Buffer", "Create an image with floating point color");
+      func, "float_buffer", 0, "Float Buffer", "Create an image with floating-point color");
   RNA_def_boolean(func, "stereo3d", 0, "Stereo 3D", "Create left and right views");
   RNA_def_boolean(func, "is_data", 0, "Is Data", "Create image with non-color data color space");
   RNA_def_boolean(func, "tiled", 0, "Tiled", "Create a tiled image");
@@ -2206,6 +2210,7 @@ void RNA_def_main_hairs(BlenderRNA *brna, PropertyRNA *cprop)
 }
 #  endif
 
+#  ifdef WITH_POINT_CLOUD
 void RNA_def_main_pointclouds(BlenderRNA *brna, PropertyRNA *cprop)
 {
   StructRNA *srna;
@@ -2252,6 +2257,7 @@ void RNA_def_main_pointclouds(BlenderRNA *brna, PropertyRNA *cprop)
   parm = RNA_def_boolean(func, "value", 0, "Value", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 }
+#  endif
 
 void RNA_def_main_volumes(BlenderRNA *brna, PropertyRNA *cprop)
 {

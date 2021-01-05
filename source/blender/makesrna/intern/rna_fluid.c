@@ -872,7 +872,7 @@ static char *rna_FluidDomainSettings_path(PointerRNA *ptr)
   ModifierData *md = (ModifierData *)settings->fmd;
   char name_esc[sizeof(md->name) * 2];
 
-  BLI_strescape(name_esc, md->name, sizeof(name_esc));
+  BLI_str_escape(name_esc, md->name, sizeof(name_esc));
   return BLI_sprintfN("modifiers[\"%s\"].domain_settings", name_esc);
 }
 
@@ -882,7 +882,7 @@ static char *rna_FluidFlowSettings_path(PointerRNA *ptr)
   ModifierData *md = (ModifierData *)settings->fmd;
   char name_esc[sizeof(md->name) * 2];
 
-  BLI_strescape(name_esc, md->name, sizeof(name_esc));
+  BLI_str_escape(name_esc, md->name, sizeof(name_esc));
   return BLI_sprintfN("modifiers[\"%s\"].flow_settings", name_esc);
 }
 
@@ -892,7 +892,7 @@ static char *rna_FluidEffectorSettings_path(PointerRNA *ptr)
   ModifierData *md = (ModifierData *)settings->fmd;
   char name_esc[sizeof(md->name) * 2];
 
-  BLI_strescape(name_esc, md->name, sizeof(name_esc));
+  BLI_str_escape(name_esc, md->name, sizeof(name_esc));
   return BLI_sprintfN("modifiers[\"%s\"].effector_settings", name_esc);
 }
 
@@ -1552,7 +1552,7 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
   RNA_def_property_dynamic_array_funcs(prop, "rna_FluidModifier_grid_get_length");
   RNA_def_property_float_funcs(prop, "rna_FluidModifier_temperature_grid_get", NULL, NULL);
   RNA_def_property_ui_text(
-      prop, "Temperature Grid", "Smoke temperature grid, range 0..1 represents 0..1000K");
+      prop, "Temperature Grid", "Smoke temperature grid, range 0 to 1 represents 0 to 1000K");
 #  endif /* WITH_FLUID */
 
   /* domain object data */
@@ -1927,6 +1927,22 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
       prop,
       "System Maximum",
       "Maximum number of fluid particles that are allowed in this simulation");
+  RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_datacache_reset");
+
+  /* viscosity options */
+
+  prop = RNA_def_property(srna, "use_viscosity", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", FLUID_DOMAIN_USE_VISCOSITY);
+  RNA_def_property_ui_text(prop, "Use Viscosity", "Enable fluid viscosity settings");
+  RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_datacache_reset");
+
+  prop = RNA_def_property(srna, "viscosity_value", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_range(prop, 0.0, 10.0);
+  RNA_def_property_ui_range(prop, 0.0, 5.0, 0.01, 3);
+  RNA_def_property_ui_text(prop,
+                           "Strength",
+                           "Viscosity of liquid (higher values result in more viscous fluids, a "
+                           "value of 0 will still apply some viscosity)");
   RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_datacache_reset");
 
   /*  diffusion options */

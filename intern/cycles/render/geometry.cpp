@@ -15,8 +15,7 @@
  */
 
 #include "bvh/bvh.h"
-#include "bvh/bvh_build.h"
-#include "bvh/bvh_embree.h"
+#include "bvh/bvh2.h"
 
 #include "device/device.h"
 
@@ -41,6 +40,7 @@
 #include "util/util_foreach.h"
 #include "util/util_logging.h"
 #include "util/util_progress.h"
+#include "util/util_task.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -162,7 +162,8 @@ int Geometry::motion_step(float time) const
 
 bool Geometry::need_build_bvh(BVHLayout layout) const
 {
-  return !transform_applied || has_surface_bssrdf || layout == BVH_LAYOUT_OPTIX;
+  return is_instanced() || layout == BVH_LAYOUT_OPTIX || layout == BVH_LAYOUT_MULTI_OPTIX ||
+         layout == BVH_LAYOUT_MULTI_OPTIX_EMBREE;
 }
 
 bool Geometry::is_instanced() const
@@ -218,7 +219,7 @@ void Geometry::compute_bvh(
       bvh->geometry = geometry;
       bvh->objects = objects;
 
-      bvh->refit(*progress);
+      device->build_bvh(bvh, *progress, true);
     }
     else {
       progress->set_status(msg, "Building BVH");
@@ -235,7 +236,7 @@ void Geometry::compute_bvh(
 
       delete bvh;
       bvh = BVH::create(bparams, geometry, objects, device);
-      MEM_GUARDED_CALL(progress, bvh->build, *progress);
+      MEM_GUARDED_CALL(progress, device->build_bvh, bvh, *progress, false);
     }
   }
 
@@ -277,6 +278,15 @@ void Geometry::tag_update(Scene *scene, bool rebuild)
 
   scene->geometry_manager->need_update = true;
   scene->object_manager->need_update = true;
+}
+
+void Geometry::tag_bvh_update(bool rebuild)
+{
+  tag_modified();
+
+  if (rebuild) {
+    need_update_rebuild = true;
+  }
 }
 
 /* Geometry Manager */
@@ -914,7 +924,7 @@ void GeometryManager::device_update_attributes(Device *device,
   scene->object_manager->device_update_mesh_offsets(device, dscene, scene);
 }
 
-void GeometryManager::mesh_calc_offset(Scene *scene)
+void GeometryManager::mesh_calc_offset(Scene *scene, BVHLayout bvh_layout)
 {
   size_t vert_size = 0;
   size_t tri_size = 0;
@@ -929,6 +939,14 @@ void GeometryManager::mesh_calc_offset(Scene *scene)
   size_t optix_prim_size = 0;
 
   foreach (Geometry *geom, scene->geometry) {
+    if (geom->optix_prim_offset != optix_prim_size) {
+      /* Need to rebuild BVH in OptiX, since refit only allows modified mesh data there */
+      const bool has_optix_bvh = bvh_layout == BVH_LAYOUT_OPTIX ||
+                                 bvh_layout == BVH_LAYOUT_MULTI_OPTIX ||
+                                 bvh_layout == BVH_LAYOUT_MULTI_OPTIX_EMBREE;
+      geom->tag_bvh_update(has_optix_bvh);
+    }
+
     if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
       Mesh *mesh = static_cast<Mesh *>(geom);
 
@@ -1162,24 +1180,65 @@ void GeometryManager::device_update_bvh(Device *device,
 
   VLOG(1) << "Using " << bvh_layout_name(bparams.bvh_layout) << " layout.";
 
-  BVH *bvh = BVH::create(bparams, scene->geometry, scene->objects, device);
-  bvh->build(progress, &device->stats);
+  delete scene->bvh;
+  BVH *bvh = scene->bvh = BVH::create(bparams, scene->geometry, scene->objects, device);
+  device->build_bvh(bvh, progress, false);
 
   if (progress.get_cancel()) {
-#ifdef WITH_EMBREE
-    if (dscene->data.bvh.scene) {
-      BVHEmbree::destroy(dscene->data.bvh.scene);
-      dscene->data.bvh.scene = NULL;
-    }
-#endif
-    delete bvh;
     return;
+  }
+
+  PackedBVH pack;
+  if (bparams.bvh_layout == BVH_LAYOUT_BVH2) {
+    pack = std::move(static_cast<BVH2 *>(bvh)->pack);
+  }
+  else {
+    progress.set_status("Updating Scene BVH", "Packing BVH primitives");
+
+    size_t num_prims = 0;
+    size_t num_tri_verts = 0;
+    foreach (Geometry *geom, scene->geometry) {
+      if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
+        Mesh *mesh = static_cast<Mesh *>(geom);
+        num_prims += mesh->num_triangles();
+        num_tri_verts += 3 * mesh->num_triangles();
+      }
+      else if (geom->is_hair()) {
+        Hair *hair = static_cast<Hair *>(geom);
+        num_prims += hair->num_segments();
+      }
+    }
+
+    pack.root_index = -1;
+    pack.prim_tri_index.reserve(num_prims);
+    pack.prim_tri_verts.reserve(num_tri_verts);
+    pack.prim_type.reserve(num_prims);
+    pack.prim_index.reserve(num_prims);
+    pack.prim_object.reserve(num_prims);
+    pack.prim_visibility.reserve(num_prims);
+
+    // Merge visibility flags of all objects and find object index for non-instanced geometry
+    unordered_map<const Geometry *, pair<int, uint>> geometry_to_object_info;
+    geometry_to_object_info.reserve(scene->geometry.size());
+    foreach (Object *ob, scene->objects) {
+      const Geometry *const geom = ob->get_geometry();
+      pair<int, uint> &info = geometry_to_object_info[geom];
+      info.second |= ob->visibility_for_tracing();
+      if (!geom->is_instanced()) {
+        info.first = ob->get_device_index();
+      }
+    }
+
+    // Iterate over scene mesh list instead of objects, since 'optix_prim_offset' was calculated
+    // based on that list, which may be ordered differently from the object list.
+    foreach (Geometry *geom, scene->geometry) {
+      const pair<int, uint> &info = geometry_to_object_info[geom];
+      geom->pack_primitives(pack, info.first, info.second);
+    }
   }
 
   /* copy to device */
   progress.set_status("Updating Scene BVH", "Copying BVH to device");
-
-  PackedBVH &pack = bvh->pack;
 
   if (pack.nodes.size()) {
     dscene->bvh_nodes.steal_data(pack.nodes);
@@ -1226,10 +1285,8 @@ void GeometryManager::device_update_bvh(Device *device,
   dscene->data.bvh.bvh_layout = bparams.bvh_layout;
   dscene->data.bvh.use_bvh_steps = (scene->params.num_bvh_time_steps != 0);
   dscene->data.bvh.curve_subdivisions = scene->params.curve_subdivisions();
-
-  bvh->copy_to_device(progress, dscene);
-
-  delete bvh;
+  /* The scene handle is set in 'CPUDevice::const_copy_to' and 'OptiXDevice::const_copy_to' */
+  dscene->data.bvh.scene = NULL;
 }
 
 void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Progress &progress)
@@ -1486,7 +1543,9 @@ void GeometryManager::device_update(Device *device,
   /* Device update. */
   device_free(device, dscene);
 
-  mesh_calc_offset(scene);
+  const BVHLayout bvh_layout = BVHParams::best_bvh_layout(scene->params.bvh_layout,
+                                                          device->get_bvh_layout_mask());
+  mesh_calc_offset(scene, bvh_layout);
   if (true_displacement_used) {
     scoped_callback_timer timer([scene](double time) {
       if (scene->update_stats) {
@@ -1513,8 +1572,6 @@ void GeometryManager::device_update(Device *device,
   }
 
   /* Update displacement. */
-  BVHLayout bvh_layout = BVHParams::best_bvh_layout(scene->params.bvh_layout,
-                                                    device->get_bvh_layout_mask());
   bool displacement_done = false;
   size_t num_bvh = 0;
 
@@ -1653,14 +1710,6 @@ void GeometryManager::device_update(Device *device,
 
 void GeometryManager::device_free(Device *device, DeviceScene *dscene)
 {
-#ifdef WITH_EMBREE
-  if (dscene->data.bvh.scene) {
-    if (dscene->data.bvh.bvh_layout == BVH_LAYOUT_EMBREE)
-      BVHEmbree::destroy(dscene->data.bvh.scene);
-    dscene->data.bvh.scene = NULL;
-  }
-#endif
-
   dscene->bvh_nodes.free();
   dscene->bvh_leaf_nodes.free();
   dscene->object_node.free();

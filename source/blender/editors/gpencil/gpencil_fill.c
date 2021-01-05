@@ -35,6 +35,7 @@
 #include "DNA_brush_types.h"
 #include "DNA_gpencil_types.h"
 #include "DNA_image_types.h"
+#include "DNA_material_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 #include "DNA_windowmanager_types.h"
@@ -721,9 +722,7 @@ static void gpencil_boundaryfill_area(tGPDfill *tgpf)
   }
 
   /* release ibuf */
-  if (ibuf) {
-    BKE_image_release_ibuf(tgpf->ima, ibuf, lock);
-  }
+  BKE_image_release_ibuf(tgpf->ima, ibuf, lock);
 
   tgpf->ima->id.tag |= LIB_TAG_DOIT;
   /* free temp stack data */
@@ -759,9 +758,7 @@ static void gpencil_set_borders(tGPDfill *tgpf, const bool transparent)
   }
 
   /* release ibuf */
-  if (ibuf) {
-    BKE_image_release_ibuf(tgpf->ima, ibuf, lock);
-  }
+  BKE_image_release_ibuf(tgpf->ima, ibuf, lock);
 
   tgpf->ima->id.tag |= LIB_TAG_DOIT;
 }
@@ -793,9 +790,7 @@ static void gpencil_invert_image(tGPDfill *tgpf)
   }
 
   /* release ibuf */
-  if (ibuf) {
-    BKE_image_release_ibuf(tgpf->ima, ibuf, lock);
-  }
+  BKE_image_release_ibuf(tgpf->ima, ibuf, lock);
 
   tgpf->ima->id.tag |= LIB_TAG_DOIT;
 }
@@ -845,9 +840,7 @@ static void gpencil_erase_processed_area(tGPDfill *tgpf)
   }
 
   /* release ibuf */
-  if (ibuf) {
-    BKE_image_release_ibuf(tgpf->ima, ibuf, lock);
-  }
+  BKE_image_release_ibuf(tgpf->ima, ibuf, lock);
 
   tgpf->ima->id.tag |= LIB_TAG_DOIT;
 }
@@ -1061,9 +1054,7 @@ static void gpencil_get_outline_points(tGPDfill *tgpf, const bool dilate)
   }
 
   /* release ibuf */
-  if (ibuf) {
-    BKE_image_release_ibuf(tgpf->ima, ibuf, lock);
-  }
+  BKE_image_release_ibuf(tgpf->ima, ibuf, lock);
 }
 
 /* get z-depth array to reproject on surface */
@@ -1706,6 +1697,6 @@ void GPENCIL_OT_fill(wmOperatorType *ot)
   /* flags */
   ot->flag = OPTYPE_UNDO | OPTYPE_BLOCKING;
 
-  prop = RNA_def_boolean(ot->srna, "on_back", false, "Draw On Back", "Send new stroke to Back");
+  prop = RNA_def_boolean(ot->srna, "on_back", false, "Draw on Back", "Send new stroke to back");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }

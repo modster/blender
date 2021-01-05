@@ -41,6 +41,7 @@
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
+#include "DNA_object_force_types.h"
 #include "DNA_particle_types.h"
 #include "DNA_scene_types.h"
 
@@ -74,6 +75,7 @@
 #include "BKE_material.h"
 #include "BKE_mesh.h"
 #include "BKE_modifier.h"
+#include "BKE_object.h"
 #include "BKE_particle.h"
 #include "BKE_pointcache.h"
 #include "BKE_scene.h"
@@ -3947,6 +3949,7 @@ static ModifierData *object_add_or_copy_particle_system(
   psmd = (ParticleSystemModifierData *)md;
   psmd->psys = psys;
   BLI_addtail(&ob->modifiers, md);
+  BKE_object_modifier_set_active(ob, md);
 
   psys->totpart = 0;
   psys->flag = PSYS_CURRENT;

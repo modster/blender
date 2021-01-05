@@ -41,9 +41,10 @@ const EnumPropertyItem rna_enum_attribute_type_items[] = {
     {CD_PROP_FLOAT, "FLOAT", 0, "Float", "Floating-point value"},
     {CD_PROP_INT32, "INT", 0, "Integer", "32-bit integer"},
     {CD_PROP_FLOAT3, "FLOAT_VECTOR", 0, "Vector", "3D vector with floating-point values"},
-    {CD_PROP_COLOR, "FLOAT_COLOR", 0, "Float Color", "RGBA color with floating-point precisions"},
+    {CD_PROP_COLOR, "FLOAT_COLOR", 0, "Color", "RGBA color with floating-point precisions"},
     {CD_MLOOPCOL, "BYTE_COLOR", 0, "Byte Color", "RGBA color with 8-bit precision"},
     {CD_PROP_STRING, "STRING", 0, "String", "Text string"},
+    {CD_PROP_BOOL, "BOOLEAN", 0, "Boolean", "True or false"},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -363,7 +364,7 @@ static void rna_def_attribute_float(BlenderRNA *brna)
 
   srna = RNA_def_struct(brna, "FloatAttribute", "Attribute");
   RNA_def_struct_sdna(srna, "CustomDataLayer");
-  RNA_def_struct_ui_text(srna, "Float Attribute", "Geometry attribute with floating point values");
+  RNA_def_struct_ui_text(srna, "Float Attribute", "Geometry attribute with floating-point values");
 
   prop = RNA_def_property(srna, "data", PROP_COLLECTION, PROP_NONE);
   RNA_def_property_struct_type(prop, "FloatAttributeValue");
@@ -380,7 +381,7 @@ static void rna_def_attribute_float(BlenderRNA *brna)
   srna = RNA_def_struct(brna, "FloatAttributeValue", NULL);
   RNA_def_struct_sdna(srna, "MFloatProperty");
   RNA_def_struct_ui_text(
-      srna, "Float Attribute Value", "Floating point value in geometry attribute");
+      srna, "Float Attribute Value", "Floating-point value in geometry attribute");
   prop = RNA_def_property(srna, "value", PROP_FLOAT, PROP_NONE);
   RNA_def_property_float_sdna(prop, NULL, "f");
   RNA_def_property_update(prop, 0, "rna_Attribute_update_data");
@@ -395,7 +396,7 @@ static void rna_def_attribute_float_vector(BlenderRNA *brna)
   srna = RNA_def_struct(brna, "FloatVectorAttribute", "Attribute");
   RNA_def_struct_sdna(srna, "CustomDataLayer");
   RNA_def_struct_ui_text(
-      srna, "Float Vector Attribute", "Vector geometry attribute, with floating point precision");
+      srna, "Float Vector Attribute", "Vector geometry attribute, with floating-point precision");
 
   prop = RNA_def_property(srna, "data", PROP_COLLECTION, PROP_NONE);
   RNA_def_property_struct_type(prop, "FloatVectorAttributeValue");
@@ -431,7 +432,7 @@ static void rna_def_attribute_float_color(BlenderRNA *brna)
   srna = RNA_def_struct(brna, "FloatColorAttribute", "Attribute");
   RNA_def_struct_sdna(srna, "CustomDataLayer");
   RNA_def_struct_ui_text(
-      srna, "Float Color Attribute", "Color geometry attribute, with floating point precision");
+      srna, "Float Color Attribute", "Color geometry attribute, with floating-point precision");
 
   prop = RNA_def_property(srna, "data", PROP_COLLECTION, PROP_NONE);
   RNA_def_property_struct_type(prop, "FloatColorAttributeValue");

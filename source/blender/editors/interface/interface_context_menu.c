@@ -38,6 +38,7 @@
 #include "BKE_idprop.h"
 #include "BKE_screen.h"
 
+#include "ED_asset.h"
 #include "ED_keyframing.h"
 #include "ED_screen.h"
 
@@ -229,7 +230,7 @@ static uiBlock *menu_add_shortcut(bContext *C, ARegion *region, void *arg)
    * than being found on adding later... */
   wmKeyMap *km = WM_keymap_guess_opname(C, idname);
   wmKeyMapItem *kmi = WM_keymap_add_item(km, idname, EVT_AKEY, KM_PRESS, 0, 0);
-  int kmi_id = kmi->id;
+  const int kmi_id = kmi->id;
 
   /* This takes ownership of prop, or prop can be NULL for reset. */
   WM_keymap_item_properties_reset(kmi, prop);
@@ -279,7 +280,7 @@ static void menu_add_shortcut_cancel(struct bContext *C, void *arg1)
 
 #ifdef USE_KEYMAP_ADD_HACK
   wmKeyMap *km = WM_keymap_guess_opname(C, idname);
-  int kmi_id = g_kmi_id_hack;
+  const int kmi_id = g_kmi_id_hack;
   UNUSED_VARS(but);
 #else
   int kmi_id = WM_key_event_operator_id(C, idname, but->opcontext, prop, true, &km);
@@ -503,16 +504,22 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
 
   uiPopupMenu *pup;
   uiLayout *layout;
+  bContextStore *previous_ctx = CTX_store_get(C);
   {
     uiStringInfo label = {BUT_GET_LABEL, NULL};
 
     /* highly unlikely getting the label ever fails */
-    UI_but_string_info_get(C, but, &label, NULL);
+    UI_but_string_info_get(C, but, NULL, &label, NULL);
 
     pup = UI_popup_menu_begin(C, label.strinfo ? label.strinfo : "", ICON_NONE);
     layout = UI_popup_menu_layout(pup);
     if (label.strinfo) {
       MEM_freeN(label.strinfo);
+    }
+
+    if (but->context) {
+      uiLayoutContextCopy(layout, but->context);
+      CTX_store_set(C, uiLayoutGetContextStore(layout));
     }
     uiLayoutSetOperatorContext(layout, WM_OP_INVOKE_DEFAULT);
   }
@@ -777,7 +784,7 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
       /* Override Operators */
       uiItemS(layout);
 
-      if (but->flag & UI_BUT_OVERRIDEN) {
+      if (but->flag & UI_BUT_OVERRIDDEN) {
         if (is_array_component) {
 #if 0 /* Disabled for now. */
           ot = WM_operatortype_find("UI_OT_override_type_set_button", false);
@@ -944,6 +951,22 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
       ui_but_menu_add_path_operators(layout, ptr, prop);
       uiItemS(layout);
     }
+  }
+
+  /* If the button reprents an id, it can set the "id" context pointer. */
+  if (ED_asset_can_make_single_from_context(C)) {
+    ID *id = CTX_data_pointer_get_type(C, "id", &RNA_ID).data;
+
+    /* Gray out items depending on if data-block is an asset. Preferably this could be done via
+     * operator poll, but that doesn't work since the operator also works with "selected_ids",
+     * which isn't cheap to check. */
+    uiLayout *sub = uiLayoutColumn(layout, true);
+    uiLayoutSetEnabled(sub, !id->asset_data);
+    uiItemO(sub, NULL, ICON_NONE, "ASSET_OT_mark");
+    sub = uiLayoutColumn(layout, true);
+    uiLayoutSetEnabled(sub, id->asset_data);
+    uiItemO(sub, NULL, ICON_NONE, "ASSET_OT_clear");
+    uiItemS(layout);
   }
 
   /* Pointer properties and string properties with
@@ -1208,6 +1231,10 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
   MenuType *mt = WM_menutype_find("WM_MT_button_context", true);
   if (mt) {
     UI_menutype_draw(C, mt, uiLayoutColumn(layout, false));
+  }
+
+  if (but->context) {
+    CTX_store_set(C, previous_ctx);
   }
 
   return UI_popup_menu_end_or_cancel(C, pup);

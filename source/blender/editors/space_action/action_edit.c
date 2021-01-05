@@ -1702,7 +1702,7 @@ static const EnumPropertyItem prop_actkeys_snap_types[] = {
      "NEAREST_FRAME",
      0,
      "Selection to Nearest Frame",
-     "Snap selected keyframes to the nearest (whole) frame (use to fix accidental sub-frame "
+     "Snap selected keyframes to the nearest (whole) frame (use to fix accidental subframe "
      "offsets)"},
     {ACTKEYS_SNAP_NEAREST_SECOND,
      "NEAREST_SECOND",
@@ -1827,7 +1827,7 @@ static const EnumPropertyItem prop_actkeys_mirror_types[] = {
     {ACTKEYS_MIRROR_XAXIS,
      "XAXIS",
      0,
-     "By Values Over Value=0",
+     "By Values Over Zero Value",
      "Flip values of selected keyframes (i.e. negative values become positive, and vice versa)"},
     {ACTKEYS_MIRROR_MARKER,
      "MARKER",
