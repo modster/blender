@@ -3301,7 +3301,7 @@ void RNA_property_string_set_bytes(PointerRNA *ptr, PropertyRNA *prop, const cha
   }
 }
 
-void RNA_property_string_get_default(PointerRNA *UNUSED(ptr), PropertyRNA *prop, char *value)
+void RNA_property_string_get_default(PropertyRNA *prop, char *value, const int max_len)
 {
   StringPropertyRNA *sprop = (StringPropertyRNA *)rna_ensure_property(prop);
 
@@ -3310,7 +3310,7 @@ void RNA_property_string_get_default(PointerRNA *UNUSED(ptr), PropertyRNA *prop,
     if (idprop->ui_data) {
       BLI_assert(idprop->type == IDP_STRING);
       const IDPropertyUIDataString *ui_data = (const IDPropertyUIDataString *)idprop->ui_data;
-      strcpy(value, ui_data->default_value);
+      BLI_strncpy(value, ui_data->default_value, max_len);
       return;
     }
 
@@ -3342,7 +3342,7 @@ char *RNA_property_string_get_default_alloc(PointerRNA *ptr,
     buf = MEM_callocN(sizeof(char) * (length + 1), "RNA_string_get_alloc");
   }
 
-  RNA_property_string_get_default(ptr, prop, buf);
+  RNA_property_string_get_default(prop, buf, length);
 
   return buf;
 }
