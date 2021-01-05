@@ -1153,11 +1153,11 @@ static bool check_ui_data_value(PyObject *py_object)
     return false;
   }
 
-  if (PyLong_Check(py_object) || PyFloat_Check(py_object)) {
+  if (PyLong_Check(py_object) || PyFloat_Check(py_object) || PyBool_Check(py_object)) {
     return true;
   }
 
-  PyErr_SetString(PyExc_TypeError, "Property ui data values must be integers or floats");
+  PyErr_SetString(PyExc_TypeError, "UI data values must be integers, floats, or booleans");
   return false;
 }
 
@@ -1168,6 +1168,9 @@ static int int_from_py_int_or_double(PyObject *py_object)
   }
   if (PyFloat_Check(py_object)) {
     return (int)PyFloat_AsDouble(py_object);
+  }
+  if (PyBool_Check(py_object)) {
+    return PyObject_IsTrue(py_object);
   }
 
   BLI_assert(false);
@@ -1235,6 +1238,9 @@ static double double_from_py_int_or_double(PyObject *py_object)
   }
   if (PyFloat_Check(py_object)) {
     return PyFloat_AsDouble(py_object);
+  }
+  if (PyBool_Check(py_object)) {
+    return (double)PyObject_IsTrue(py_object);
   }
 
   BLI_assert(false);
