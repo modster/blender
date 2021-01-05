@@ -1377,9 +1377,7 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
   }
 
   if (!IDP_supports_ui_data(idprop)) {
-    PyErr_SetString(
-        PyExc_ValueError,
-        "RNA UI data is only supported for string, integer, float, or double properties");
+    PyErr_Format(PyExc_KeyError, "IDProperty \"%s\" does not support RNA data", idprop->name);
     return NULL;
   }
 
@@ -1516,6 +1514,11 @@ static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
 
   IDPropertyUIData *ui_data = IDP_ui_data_ensure(idprop);
   BLI_assert(ui_data != NULL);
+
+  if (!IDP_supports_ui_data(idprop)) {
+    PyErr_Format(PyExc_KeyError, "IDProperty \"%s\" does not support RNA data", idprop->name);
+    Py_RETURN_NONE;
+  }
 
   PyObject *dict = PyDict_New();
 
