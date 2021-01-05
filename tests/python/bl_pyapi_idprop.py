@@ -199,6 +199,15 @@ class TestBufferProtocol(TestHelper, unittest.TestCase):
         self.assertEqual(list(view1), list(view2))
         self.assertEqual(view1.tobytes(), view2.tobytes())
 
+class TestRNAData(TestHelper, unittest.TestCase):
+
+    def test_custom_properties_none(self):
+        bpy.ops.object.add_named("test")
+        test_object = bpy.data.objects["test"]
+        props = test_object.custom_properties()
+        self.assertEqual(len(props), 0)
+        
+
 
 if __name__ == '__main__':
     import sys
