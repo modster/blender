@@ -3357,7 +3357,9 @@ int RNA_property_string_default_length(PointerRNA *UNUSED(ptr), PropertyRNA *pro
     if (idprop->ui_data) {
       BLI_assert(idprop->type == IDP_STRING);
       const IDPropertyUIDataString *ui_data = (const IDPropertyUIDataString *)idprop->ui_data;
-      return strlen(ui_data->default_value);
+      if (ui_data->default_value != NULL) {
+        return strlen(ui_data->default_value);
+      }
     }
 
     return 0;
