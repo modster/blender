@@ -89,47 +89,73 @@ static IDProperty *idproperty_find_ui_container(IDProperty *idprop_group)
   return NULL;
 }
 
+/**
+ * General retrieval of values from a property of various types. Previously saved  files might not
+ * necessarily have consistent UI data types because they were create-able with the Python API and
+ * nothing was enforced.
+ */
+static int idproperty_get_int(const IDProperty *prop)
+{
+  switch (prop->type) {
+    case IDP_INT:
+      return IDP_Int(prop);
+    case IDP_DOUBLE:
+      return (int)IDP_Double(prop);
+    case IDP_FLOAT:
+      return (int)IDP_Float(prop);
+    default:
+      return 0;
+  }
+}
+static double idproperty_get_double(const IDProperty *prop)
+{
+  switch (prop->type) {
+    case IDP_DOUBLE:
+      return IDP_Double(prop);
+    case IDP_FLOAT:
+      return (double)IDP_Float(prop);
+    case IDP_INT:
+      return (double)IDP_Int(prop);
+    default:
+      return 0.0;
+  }
+}
+
 static void version_idproperty_move_data_int(IDPropertyUIDataInt *ui_data,
                                              const IDProperty *prop_ui_data)
 {
   IDProperty *min = IDP_GetPropertyFromGroup(prop_ui_data, "min");
   if (min != NULL) {
-    BLI_assert(min->type == IDP_INT);
-    ui_data->min = IDP_Int(min);
-    ui_data->soft_min = IDP_Int(min);
+    ui_data->min = ui_data->soft_min = idproperty_get_int(min);
   }
   IDProperty *max = IDP_GetPropertyFromGroup(prop_ui_data, "max");
   if (max != NULL) {
-    BLI_assert(max->type == IDP_INT);
-    ui_data->max = IDP_Int(max);
-    ui_data->soft_max = IDP_Int(max);
+    ui_data->max = ui_data->soft_max = idproperty_get_int(max);
   }
   IDProperty *soft_min = IDP_GetPropertyFromGroup(prop_ui_data, "soft_min");
   if (soft_min != NULL) {
-    BLI_assert(soft_min->type == IDP_INT);
-    ui_data->soft_min = IDP_Int(soft_min);
+    ui_data->soft_min = idproperty_get_int(soft_min);
     ui_data->soft_min = MIN2(ui_data->soft_min, ui_data->min);
   }
   IDProperty *soft_max = IDP_GetPropertyFromGroup(prop_ui_data, "soft_max");
   if (soft_max != NULL) {
-    BLI_assert(soft_max->type == IDP_INT);
-    ui_data->soft_max = IDP_Int(soft_max);
+    ui_data->soft_max = idproperty_get_int(soft_max);
     ui_data->soft_max = MAX2(ui_data->soft_max, ui_data->max);
   }
   IDProperty *step = IDP_GetPropertyFromGroup(prop_ui_data, "step");
   if (step != NULL) {
-    BLI_assert(step->type == IDP_INT);
-    ui_data->step = IDP_Int(step);
+    ui_data->step = idproperty_get_int(soft_max);
   }
   IDProperty *default_value = IDP_GetPropertyFromGroup(prop_ui_data, "default");
   if (default_value != NULL) {
     if (default_value->type == IDP_ARRAY) {
-      BLI_assert(ELEM(default_value->subtype, IDP_FLOAT, IDP_DOUBLE));
-      ui_data->default_array = MEM_dupallocN(IDP_Array(default_value));
-      ui_data->default_array_len = default_value->len;
+      if (default_value->subtype == IDP_INT) {
+        ui_data->default_array = MEM_dupallocN(IDP_Array(default_value));
+        ui_data->default_array_len = default_value->len;
+      }
     }
     else if (default_value->type == IDP_INT) {
-      ui_data->default_value = IDP_Int(default_value);
+      ui_data->default_value = idproperty_get_int(default_value);
     }
   }
 }
@@ -139,50 +165,40 @@ static void version_idproperty_move_data_float(IDPropertyUIDataFloat *ui_data,
 {
   IDProperty *min = IDP_GetPropertyFromGroup(prop_ui_data, "min");
   if (min != NULL) {
-    BLI_assert(min->type == IDP_DOUBLE);
-    ui_data->min = IDP_Double(min);
-    ui_data->soft_min = IDP_Double(min);
+    ui_data->min = ui_data->soft_min = idproperty_get_double(min);
   }
   IDProperty *max = IDP_GetPropertyFromGroup(prop_ui_data, "max");
   if (max != NULL) {
-    BLI_assert(max->type == IDP_DOUBLE);
-    ui_data->max = IDP_Double(max);
-    ui_data->soft_max = IDP_Double(min);
+    ui_data->max = ui_data->soft_max = idproperty_get_double(min);
   }
   IDProperty *soft_min = IDP_GetPropertyFromGroup(prop_ui_data, "soft_min");
   if (soft_min != NULL) {
-    BLI_assert(soft_min->type == IDP_DOUBLE);
-    ui_data->soft_min = IDP_Double(soft_min);
+    ui_data->soft_min = idproperty_get_double(soft_min);
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
   }
   IDProperty *soft_max = IDP_GetPropertyFromGroup(prop_ui_data, "soft_max");
   if (soft_max != NULL) {
-    BLI_assert(soft_max->type == IDP_DOUBLE);
-    ui_data->soft_max = IDP_Double(soft_max);
+    ui_data->soft_max = idproperty_get_double(soft_max);
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
   }
   IDProperty *step = IDP_GetPropertyFromGroup(prop_ui_data, "step");
   if (step != NULL) {
-    BLI_assert(step->type == IDP_DOUBLE);
-    ui_data->step = (float)IDP_Double(step);
+    ui_data->step = (float)idproperty_get_double(step);
   }
   IDProperty *precision = IDP_GetPropertyFromGroup(prop_ui_data, "precision");
   if (precision != NULL) {
-    BLI_assert(precision->type == IDP_DOUBLE);
-    ui_data->precision = (int)IDP_Double(precision);
+    ui_data->precision = idproperty_get_int(precision);
   }
   IDProperty *default_value = IDP_GetPropertyFromGroup(prop_ui_data, "default");
   if (default_value != NULL) {
     if (default_value->type == IDP_ARRAY) {
-      BLI_assert(ELEM(default_value->subtype, IDP_FLOAT, IDP_DOUBLE));
-      ui_data->default_array = MEM_dupallocN(IDP_Array(default_value));
-      ui_data->default_array_len = default_value->len;
+      if (ELEM(default_value->subtype, IDP_FLOAT, IDP_DOUBLE)) {
+        ui_data->default_array = MEM_dupallocN(IDP_Array(default_value));
+        ui_data->default_array_len = default_value->len;
+      }
     }
-    else if (default_value->type == IDP_DOUBLE) {
-      ui_data->default_value = IDP_Double(default_value);
-    }
-    else if (default_value->type == IDP_FLOAT) {
-      ui_data->default_value = IDP_Float(default_value);
+    else if (ELEM(default_value->type, IDP_DOUBLE, IDP_FLOAT)) {
+      ui_data->default_value = idproperty_get_double(default_value);
     }
     else {
       BLI_assert(false);
@@ -194,8 +210,7 @@ static void version_idproperty_move_data_string(IDPropertyUIDataString *ui_data,
                                                 const IDProperty *prop_ui_data)
 {
   IDProperty *default_value = IDP_GetPropertyFromGroup(prop_ui_data, "default");
-  if (default_value != NULL) {
-    BLI_assert(default_value->type == IDP_STRING);
+  if (default_value != NULL && default_value->type == IDP_STRING) {
     ui_data->default_value = BLI_strdup(IDP_String(default_value));
   }
 }
@@ -224,8 +239,7 @@ static void version_idproperty_ui_data(IDProperty *idprop_group)
     IDPropertyUIData *ui_data = IDP_ui_data_ensure(prop);
 
     IDProperty *subtype = IDP_GetPropertyFromGroup(prop_ui_data, "subtype");
-    if (subtype != NULL) {
-      BLI_assert(subtype->type == IDP_STRING);
+    if (subtype != NULL && subtype->type == IDP_STRING) {
       const char *subtype_string = IDP_String(subtype);
       int result = PROP_NONE;
       RNA_enum_value_from_id(rna_enum_property_subtype_items, subtype_string, &result);
@@ -233,8 +247,7 @@ static void version_idproperty_ui_data(IDProperty *idprop_group)
     }
 
     IDProperty *description = IDP_GetPropertyFromGroup(prop_ui_data, "description");
-    if (description != NULL) {
-      BLI_assert(description->type == IDP_STRING);
+    if (description != NULL && description->type == IDP_STRING) {
       ui_data->description = BLI_strdup(IDP_String(description));
     }
 
