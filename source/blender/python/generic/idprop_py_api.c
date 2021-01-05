@@ -1313,7 +1313,7 @@ static void idprop_update_rna_ui_data_string(IDProperty *idprop, PyObject *py_de
       ui_data->default_value = BLI_strdup(_PyUnicode_AsString(py_default_value));
     }
     else {
-      PyErr_SetString(PyExc_TypeError, "String property defult value must have a string type");
+      PyErr_SetString(PyExc_TypeError, "String property default value must have a string type");
     }
   }
 }
