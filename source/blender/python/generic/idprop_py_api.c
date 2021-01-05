@@ -1226,7 +1226,7 @@ static void idprop_update_rna_ui_data_int(IDProperty *idprop,
       }
     }
     else if (pyobject_can_convert_to_number(py_default_value)) {
-      ui_data->default_value = PyC_Long_AsI32(py_default_value);
+      ui_data->default_value = int_from_py_int_or_double(py_default_value);
     }
   }
 }
