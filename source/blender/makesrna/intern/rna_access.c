@@ -3077,7 +3077,7 @@ bool RNA_property_float_set_default(PropertyRNA *prop, float value)
   }
 
   IDProperty *idprop = (IDProperty *)prop;
-  BLI_assert(idprop->type == IDP_INT);
+  BLI_assert(idprop->type == IDP_FLOAT);
 
   IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)IDP_ui_data_ensure(idprop);
   ui_data->default_value = (double)value;
