@@ -96,25 +96,25 @@ static void version_idproperty_move_data_int(IDPropertyUIDataInt *ui_data,
   if (min != NULL) {
     BLI_assert(min->type == IDP_INT);
     ui_data->min = IDP_Int(min);
-    ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
+    ui_data->soft_min = IDP_Int(min);
   }
   IDProperty *max = IDP_GetPropertyFromGroup(prop_ui_data, "max");
   if (max != NULL) {
     BLI_assert(max->type == IDP_INT);
     ui_data->max = IDP_Int(max);
-    ui_data->soft_max = MAX2(ui_data->soft_max, ui_data->max);
+    ui_data->soft_max = IDP_Int(max);
   }
   IDProperty *soft_min = IDP_GetPropertyFromGroup(prop_ui_data, "soft_min");
   if (soft_min != NULL) {
     BLI_assert(soft_min->type == IDP_INT);
     ui_data->soft_min = IDP_Int(soft_min);
-    ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
+    ui_data->soft_min = MIN2(ui_data->soft_min, ui_data->min);
   }
   IDProperty *soft_max = IDP_GetPropertyFromGroup(prop_ui_data, "soft_max");
   if (soft_max != NULL) {
     BLI_assert(soft_max->type == IDP_INT);
     ui_data->soft_max = IDP_Int(soft_max);
-    ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
+    ui_data->soft_max = MAX2(ui_data->soft_max, ui_data->max);
   }
   IDProperty *step = IDP_GetPropertyFromGroup(prop_ui_data, "step");
   if (step != NULL) {
@@ -141,13 +141,13 @@ static void version_idproperty_move_data_float(IDPropertyUIDataFloat *ui_data,
   if (min != NULL) {
     BLI_assert(min->type == IDP_DOUBLE);
     ui_data->min = IDP_Double(min);
-    ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
+    ui_data->soft_min = IDP_Double(min);
   }
   IDProperty *max = IDP_GetPropertyFromGroup(prop_ui_data, "max");
   if (max != NULL) {
     BLI_assert(max->type == IDP_DOUBLE);
     ui_data->max = IDP_Double(max);
-    ui_data->soft_max = MAX2(ui_data->soft_max, ui_data->max);
+    ui_data->soft_max = IDP_Double(min);
   }
   IDProperty *soft_min = IDP_GetPropertyFromGroup(prop_ui_data, "soft_min");
   if (soft_min != NULL) {
@@ -169,7 +169,7 @@ static void version_idproperty_move_data_float(IDPropertyUIDataFloat *ui_data,
   IDProperty *precision = IDP_GetPropertyFromGroup(prop_ui_data, "precision");
   if (precision != NULL) {
     BLI_assert(precision->type == IDP_DOUBLE);
-    ui_data->precision = (float)IDP_Double(precision);
+    ui_data->precision = (int)IDP_Double(precision);
   }
   IDProperty *default_value = IDP_GetPropertyFromGroup(prop_ui_data, "default");
   if (default_value != NULL) {

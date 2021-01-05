@@ -1271,7 +1271,7 @@ static void idprop_update_rna_ui_data_float(IDProperty *idprop,
     ui_data->step = (float)double_from_py_int_or_double(py_step);
   }
   if (check_ui_data_value(py_precision)) {
-    ui_data->precision = (float)double_from_py_int_or_double(py_precision);
+    ui_data->precision = int_from_py_int_or_double(py_precision);
   }
   if (!ELEM(py_default_value, NULL, Py_None)) {
     if (PySequence_Check(py_default_value)) {

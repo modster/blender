@@ -90,7 +90,7 @@ typedef struct IDPropertyUIDataFloat {
   char _pad[4];
 
   float step;
-  float precision;
+  int precision;
 
   double min;
   double max;

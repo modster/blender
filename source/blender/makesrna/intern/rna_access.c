@@ -1324,7 +1324,7 @@ void RNA_property_float_ui_range(PointerRNA *ptr,
       *softmin = (float)ui_data->soft_min;
       *softmax = (float)ui_data->soft_max;
       *step = ui_data->step;
-      *precision = ui_data->precision;
+      *precision = (float)ui_data->precision;
     }
     else {
       *softmin = FLT_MIN;
