@@ -1331,9 +1331,9 @@ PyDoc_STRVAR(BPy_IDGroup_update_rna_doc,
              "                       description=None)\n"
              "\n"
              "   Update the RNA type information of the IDProperty used for interaction and\n"
-             "drawing in the user interface. The property specified by the key must be a direct\n"
-             "child of the group. The required types for many of the keyword arguments depend on\n"
-             "the type of the property.\n ");
+             "   drawing in the user interface. The property specified by the key must be a\n"
+             "   direct child of the group. The required types for many of the keyword arguments\n"
+             "   depend on the type of the property.\n ");
 static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, PyObject *kwargs)
 {
   const char *key;
@@ -1502,8 +1502,8 @@ static void idprop_ui_data_to_dict_string(IDProperty *idprop, PyObject *dict)
 PyDoc_STRVAR(BPy_IDGroup_rna_ui_data_doc,
              ".. method:: rna_data(key)\n"
              "\n"
-             "   Return a dictionary of the property's RNA UI data. The fields in the "
-             "returned dictionary and their types will depend on the property's type.\n");
+             "   Return a dictionary of the property's RNA UI data. The fields in the\n"
+             "   returned dictionary and their types will depend on the property's type.\n");
 static PyObject *BPy_IDGroup_rna_ui_data(BPy_IDProperty *self, PyObject *args)
 {
   const char *key;
@@ -1592,10 +1592,10 @@ static PyObject *BPy_IDGroup_rna_ui_data_clear(BPy_IDProperty *self, PyObject *a
 
 PyDoc_STRVAR(
     BPy_IDGroup_rna_ui_data_copy_doc,
-    ".. method:: clear_rna(source_group, key_source, key_destination)\n"
+    ".. method:: copy_rna(source_group, key_source, key_destination)\n"
     "\n"
     "   Copy UI data from an IDProperty in the source group to a property in this group.\n "
-    "If the source property has no UI data, the target UI data will be reset if it exists.\n"
+    "   If the source property has no UI data, the target UI data will be reset if it exists.\n"
     "\n"
     "   :raises KeyError: If either the source or destination item doesn't exist.\n"
     "   :raises TypeError: If the types of the two properties don't match.\n");
