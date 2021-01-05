@@ -1147,7 +1147,7 @@ static PyObject *BPy_IDGroup_get(BPy_IDProperty *self, PyObject *args)
   return def;
 }
 
-static bool check_ui_data_value(PyObject *py_object)
+static bool pyobject_can_convert_to_number(PyObject *py_object)
 {
   if (ELEM(py_object, NULL, Py_None)) {
     return false;
@@ -1186,23 +1186,23 @@ static void idprop_update_rna_ui_data_int(IDProperty *idprop,
                                           PyObject *py_default_value)
 {
   IDPropertyUIDataInt *ui_data = (IDPropertyUIDataInt *)idprop->ui_data;
-  if (check_ui_data_value(py_min)) {
+  if (pyobject_can_convert_to_number(py_min)) {
     ui_data->min = int_from_py_int_or_double(py_min);
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
   }
-  if (check_ui_data_value(py_max)) {
+  if (pyobject_can_convert_to_number(py_max)) {
     ui_data->max = int_from_py_int_or_double(py_max);
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
   }
-  if (check_ui_data_value(py_soft_min)) {
+  if (pyobject_can_convert_to_number(py_soft_min)) {
     ui_data->soft_min = int_from_py_int_or_double(py_soft_min);
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
   }
-  if (check_ui_data_value(py_soft_max)) {
+  if (pyobject_can_convert_to_number(py_soft_max)) {
     ui_data->soft_max = int_from_py_int_or_double(py_soft_max);
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
   }
-  if (check_ui_data_value(py_step)) {
+  if (pyobject_can_convert_to_number(py_step)) {
     ui_data->step = int_from_py_int_or_double(py_step);
   }
   if (!ELEM(py_default_value, NULL, Py_None)) {
@@ -1219,13 +1219,13 @@ static void idprop_update_rna_ui_data_int(IDProperty *idprop,
         ui_data->default_array = MEM_malloc_arrayN(len, sizeof(int), __func__);
         for (Py_ssize_t i = 0; i < len; i++) {
           PyObject *item = ob_seq_fast_items[i];
-          if (check_ui_data_value(item)) {
+          if (pyobject_can_convert_to_number(item)) {
             ui_data->default_array[i] = int_from_py_int_or_double(item);
           }
         }
       }
     }
-    else if (check_ui_data_value(py_default_value)) {
+    else if (pyobject_can_convert_to_number(py_default_value)) {
       ui_data->default_value = PyC_Long_AsI32(py_default_value);
     }
   }
@@ -1257,26 +1257,26 @@ static void idprop_update_rna_ui_data_float(IDProperty *idprop,
                                             PyObject *py_default_value)
 {
   IDPropertyUIDataFloat *ui_data = (IDPropertyUIDataFloat *)idprop->ui_data;
-  if (check_ui_data_value(py_min)) {
+  if (pyobject_can_convert_to_number(py_min)) {
     ui_data->min = double_from_py_int_or_double(py_min);
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
   }
-  if (check_ui_data_value(py_max)) {
+  if (pyobject_can_convert_to_number(py_max)) {
     ui_data->max = double_from_py_int_or_double(py_max);
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
   }
-  if (check_ui_data_value(py_soft_min)) {
+  if (pyobject_can_convert_to_number(py_soft_min)) {
     ui_data->soft_min = double_from_py_int_or_double(py_soft_min);
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
   }
-  if (check_ui_data_value(py_soft_max)) {
+  if (pyobject_can_convert_to_number(py_soft_max)) {
     ui_data->soft_max = double_from_py_int_or_double(py_soft_max);
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
   }
-  if (check_ui_data_value(py_step)) {
+  if (pyobject_can_convert_to_number(py_step)) {
     ui_data->step = (float)double_from_py_int_or_double(py_step);
   }
-  if (check_ui_data_value(py_precision)) {
+  if (pyobject_can_convert_to_number(py_precision)) {
     ui_data->precision = int_from_py_int_or_double(py_precision);
   }
   if (!ELEM(py_default_value, NULL, Py_None)) {
@@ -1293,13 +1293,13 @@ static void idprop_update_rna_ui_data_float(IDProperty *idprop,
         ui_data->default_array = MEM_malloc_arrayN(len, sizeof(double), __func__);
         for (Py_ssize_t i = 0; i < len; i++) {
           PyObject *item = ob_seq_fast_items[i];
-          if (check_ui_data_value(item)) {
+          if (pyobject_can_convert_to_number(item)) {
             ui_data->default_array[i] = double_from_py_int_or_double(item);
           }
         }
       }
     }
-    else if (check_ui_data_value(py_default_value)) {
+    else if (pyobject_can_convert_to_number(py_default_value)) {
       ui_data->default_value = double_from_py_int_or_double(py_default_value);
     }
   }
