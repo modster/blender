@@ -69,6 +69,8 @@ float sum(vec2 v) { return dot(vec2(1.0), v); }
 float sum(vec3 v) { return dot(vec3(1.0), v); }
 float sum(vec4 v) { return dot(vec4(1.0), v); }
 
+#define weighted_sum(a, b, c, d, e) (((a) * e.x + (b) * e.y + (c) * e.z + (d) * e.w) / max(1e-6, dot(e, vec4(1.0))));
+
 float avg(vec2 v) { return dot(vec2(1.0 / 2.0), v); }
 float avg(vec3 v) { return dot(vec3(1.0 / 3.0), v); }
 float avg(vec4 v) { return dot(vec4(1.0 / 4.0), v); }

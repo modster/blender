@@ -84,19 +84,23 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
     /* Go full 32bits for rendering and reduce the color artifacts. */
     eGPUTextureFormat fb_format = DRW_state_is_image_render() ? GPU_RGBA32F : GPU_RGBA16F;
 
-    effects->dof_blur = DRW_texture_pool_query_2d(
-        buffer_size[0] * 2, buffer_size[1], fb_format, &draw_engine_eevee_type);
+    bool do_alpha = !DRW_state_draw_background();
 
-    GPU_framebuffer_ensure_config(&fbl->dof_scatter_fb,
-                                  {
-                                      GPU_ATTACHMENT_NONE,
-                                      GPU_ATTACHMENT_TEXTURE(effects->dof_blur),
-                                  });
+    for (int i = 0; i < 2; i++) {
+      effects->dof_blur[i] = DRW_texture_pool_query_2d(
+          buffer_size[0], buffer_size[1], fb_format, &draw_engine_eevee_type);
 
-    if (!DRW_state_draw_background()) {
-      effects->dof_blur_alpha = DRW_texture_pool_query_2d(
-          buffer_size[0] * 2, buffer_size[1], GPU_R32F, &draw_engine_eevee_type);
-      GPU_framebuffer_texture_attach(fbl->dof_scatter_fb, effects->dof_blur_alpha, 1, 0);
+      GPU_framebuffer_ensure_config(&fbl->dof_scatter_fb[i],
+                                    {
+                                        GPU_ATTACHMENT_NONE,
+                                        GPU_ATTACHMENT_TEXTURE(effects->dof_blur[i]),
+                                    });
+
+      if (do_alpha) {
+        effects->dof_blur_alpha[i] = DRW_texture_pool_query_2d(
+            buffer_size[0], buffer_size[1], GPU_R32F, &draw_engine_eevee_type);
+        GPU_framebuffer_texture_attach(fbl->dof_scatter_fb[i], effects->dof_blur_alpha[i], 1, 0);
+      }
     }
 
     /* Parameters */
@@ -138,7 +142,7 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
 
   /* Cleanup to release memory */
   GPU_FRAMEBUFFER_FREE_SAFE(fbl->dof_down_fb);
-  GPU_FRAMEBUFFER_FREE_SAFE(fbl->dof_scatter_fb);
+  GPU_FRAMEBUFFER_FREE_SAFE(fbl->dof_scatter_fb[2]);
 
   return 0;
 }
@@ -174,19 +178,29 @@ void EEVEE_depth_of_field_cache_init(EEVEE_ViewLayerData *UNUSED(sldata), EEVEE_
     DRW_shgroup_uniform_vec2(grp, "dofParams", effects->dof_params, 1);
     DRW_shgroup_call(grp, quad, NULL);
 
-    DRW_PASS_CREATE(psl->dof_scatter, DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ADD_FULL);
+    DRW_PASS_CREATE(psl->dof_scatter[0], DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ADD_FULL);
+    DRW_PASS_CREATE(psl->dof_scatter[1], DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ADD_FULL);
 
     /* This create an empty batch of N triangles to be positioned
      * by the vertex shader 0.4ms against 6ms with instancing */
     const float *viewport_size = DRW_viewport_size_get();
-    const int sprite_len = ((int)viewport_size[0] / 2) *
-                           ((int)viewport_size[1] / 2); /* brackets matters */
-    grp = DRW_shgroup_create(EEVEE_shaders_depth_of_field_scatter_get(use_alpha),
-                             psl->dof_scatter);
-    DRW_shgroup_uniform_texture_ref(grp, "nearBuffer", &effects->dof_down_near);
-    DRW_shgroup_uniform_texture_ref(grp, "farBuffer", &effects->dof_down_far);
+    const int sprite_len = ((int)viewport_size[0] / 4) *
+                           ((int)viewport_size[1] / 4); /* brackets matters */
+    GPUShader *scatter_shader = EEVEE_shaders_depth_of_field_scatter_get(use_alpha);
+
+    grp = DRW_shgroup_create(scatter_shader, psl->dof_scatter[0]);
+    DRW_shgroup_uniform_texture_ref(grp, "colorBuffer", &effects->dof_down_near);
     DRW_shgroup_uniform_texture_ref(grp, "cocBuffer", &effects->dof_coc);
     DRW_shgroup_uniform_vec4(grp, "bokehParams", effects->dof_bokeh, 2);
+    DRW_shgroup_uniform_bool_copy(grp, "nearPass", true);
+
+    DRW_shgroup_call_procedural_triangles(grp, NULL, sprite_len);
+
+    grp = DRW_shgroup_create(scatter_shader, psl->dof_scatter[1]);
+    DRW_shgroup_uniform_texture_ref(grp, "colorBuffer", &effects->dof_down_far);
+    DRW_shgroup_uniform_texture_ref(grp, "cocBuffer", &effects->dof_coc);
+    DRW_shgroup_uniform_vec4(grp, "bokehParams", effects->dof_bokeh, 2);
+    DRW_shgroup_uniform_bool_copy(grp, "nearPass", false);
 
     DRW_shgroup_call_procedural_triangles(grp, NULL, sprite_len);
 
@@ -194,7 +208,8 @@ void EEVEE_depth_of_field_cache_init(EEVEE_ViewLayerData *UNUSED(sldata), EEVEE_
 
     grp = DRW_shgroup_create(EEVEE_shaders_depth_of_field_resolve_get(use_alpha),
                              psl->dof_resolve);
-    DRW_shgroup_uniform_texture_ref(grp, "scatterBuffer", &effects->dof_blur);
+    DRW_shgroup_uniform_texture_ref(grp, "scatterNearBuffer", &effects->dof_blur[0]);
+    DRW_shgroup_uniform_texture_ref(grp, "scatterFarBuffer", &effects->dof_blur[1]);
     DRW_shgroup_uniform_texture_ref(grp, "colorBuffer", &effects->source_buffer);
     DRW_shgroup_uniform_texture_ref(grp, "depthBuffer", &dtxl->depth);
     DRW_shgroup_uniform_vec2(grp, "nearFar", effects->dof_near_far, 1);
@@ -202,7 +217,8 @@ void EEVEE_depth_of_field_cache_init(EEVEE_ViewLayerData *UNUSED(sldata), EEVEE_
     DRW_shgroup_call(grp, quad, NULL);
 
     if (use_alpha) {
-      DRW_shgroup_uniform_texture_ref(grp, "scatterAlphaBuffer", &effects->dof_blur_alpha);
+      DRW_shgroup_uniform_texture_ref(grp, "scatterNearAlphaBuffer", &effects->dof_blur_alpha[0]);
+      DRW_shgroup_uniform_texture_ref(grp, "scatterFarAlphaBuffer", &effects->dof_blur_alpha[1]);
       DRW_shgroup_uniform_bool_copy(grp, "unpremult", DRW_state_is_image_render());
     }
   }
@@ -224,10 +240,12 @@ void EEVEE_depth_of_field_draw(EEVEE_Data *vedata)
     GPU_framebuffer_bind(fbl->dof_down_fb);
     DRW_draw_pass(psl->dof_down);
 
-    /* Scatter */
-    GPU_framebuffer_bind(fbl->dof_scatter_fb);
-    GPU_framebuffer_clear_color(fbl->dof_scatter_fb, clear_col);
-    DRW_draw_pass(psl->dof_scatter);
+    /* Scatter: Near & Far. */
+    for (int i = 0; i < 2; i++) {
+      GPU_framebuffer_bind(fbl->dof_scatter_fb[i]);
+      GPU_framebuffer_clear_color(fbl->dof_scatter_fb[i], clear_col);
+      DRW_draw_pass(psl->dof_scatter[i]);
+    }
 
     /* Resolve */
     GPU_framebuffer_bind(effects->target_buffer);

@@ -45,7 +45,7 @@ extern struct DrawEngineType draw_engine_eevee_type;
 
 /* Minimum UBO is 16384 bytes */
 #define MAX_PROBE 128 /* TODO : find size by dividing UBO max size by probe data size */
-#define MAX_GRID 64   /* TODO : find size by dividing UBO max size by grid data size */
+#define MAX_GRID 64 /* TODO : find size by dividing UBO max size by grid data size */
 #define MAX_PLANAR 16 /* TODO : find size by dividing UBO max size by grid data size */
 #define MAX_LIGHT 128 /* TODO : find size by dividing UBO max size by light data size */
 #define MAX_CASCADE_NUM 4
@@ -259,7 +259,7 @@ typedef struct EEVEE_PassList {
   struct DRWPass *bloom_resolve;
   struct DRWPass *bloom_accum_ps;
   struct DRWPass *dof_down;
-  struct DRWPass *dof_scatter;
+  struct DRWPass *dof_scatter[2];
   struct DRWPass *dof_resolve;
   struct DRWPass *volumetric_world_ps;
   struct DRWPass *volumetric_objects_ps;
@@ -340,7 +340,7 @@ typedef struct EEVEE_FramebufferList {
   struct GPUFrameBuffer *sss_translucency_fb;
   struct GPUFrameBuffer *sss_accum_fb;
   struct GPUFrameBuffer *dof_down_fb;
-  struct GPUFrameBuffer *dof_scatter_fb;
+  struct GPUFrameBuffer *dof_scatter_fb[2];
   struct GPUFrameBuffer *volumetric_fb;
   struct GPUFrameBuffer *volumetric_scat_fb;
   struct GPUFrameBuffer *volumetric_integ_fb;
@@ -735,8 +735,8 @@ typedef struct EEVEE_EffectsInfo {
   struct GPUTexture *dof_down_near; /* Textures from pool */
   struct GPUTexture *dof_down_far;
   struct GPUTexture *dof_coc;
-  struct GPUTexture *dof_blur;
-  struct GPUTexture *dof_blur_alpha;
+  struct GPUTexture *dof_blur[2];
+  struct GPUTexture *dof_blur_alpha[2];
   /* Alpha Checker */
   float color_checker_dark[4];
   float color_checker_light[4];

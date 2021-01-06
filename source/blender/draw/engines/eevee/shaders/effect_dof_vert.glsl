@@ -1,66 +1,94 @@
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 
+uniform bool nearPass;
 uniform vec4 bokehParams[2];
 
 #define bokeh_rotation bokehParams[0].x
 #define bokeh_ratio bokehParams[0].y
 #define bokeh_maxsize bokehParams[0].z
 
-uniform sampler2D nearBuffer;
-uniform sampler2D farBuffer;
+uniform sampler2D colorBuffer;
 uniform sampler2D cocBuffer;
 
-flat out vec4 color;
-flat out float weight;
-flat out float smoothFac;
-flat out ivec2 edge;
-out vec2 particlecoord;
+/* Scatter pass, calculate a triangle covering the CoC.
+ * We render to a half resolution target with double width so we can
+ * separate near and far fields. We also generate only one triangle per group of 4 pixels
+ * to limit overdraw. */
 
-/* Scatter pass, calculate a triangle covering the CoC. */
+flat out vec4 color1;
+flat out vec4 color2;
+flat out vec4 color3;
+flat out vec4 color4;
+flat out vec4 weights;
+flat out vec4 cocs;
+flat out vec2 spritepos;
+
+/* Load 4 Circle of confusion values. texel_co is centered around the 4 taps. */
+vec4 fetch_cocs(vec2 texel_co)
+{
+  /* TODO(fclem) The textureGather(sampler, co, comp) variant isn't here on some implementations.*/
+#if 0  // GPU_ARB_texture_gather
+  vec2 uvs = texel_co / vec2(textureSize(cocBuffer, 0));
+  /* Reminder: Samples order is CW starting from top left. */
+  cocs = textureGather(cocBuffer, uvs, nearPass ? 0 : 1);
+#else
+  ivec2 texel = ivec2(texel_co - 0.5);
+  vec4 cocs;
+  if (nearPass) {
+    cocs.x = texelFetchOffset(cocBuffer, texel, 0, ivec2(0, 1)).r;
+    cocs.y = texelFetchOffset(cocBuffer, texel, 0, ivec2(1, 1)).r;
+    cocs.z = texelFetchOffset(cocBuffer, texel, 0, ivec2(1, 0)).r;
+    cocs.w = texelFetchOffset(cocBuffer, texel, 0, ivec2(0, 0)).r;
+  }
+  else {
+    cocs.x = texelFetchOffset(cocBuffer, texel, 0, ivec2(0, 1)).g;
+    cocs.y = texelFetchOffset(cocBuffer, texel, 0, ivec2(1, 1)).g;
+    cocs.z = texelFetchOffset(cocBuffer, texel, 0, ivec2(1, 0)).g;
+    cocs.w = texelFetchOffset(cocBuffer, texel, 0, ivec2(0, 0)).g;
+  }
+#endif
+  /* We are scattering at half resolution, so divide CoC by 2. */
+  return cocs * 0.5;
+}
+
 void main()
 {
   ivec2 tex_size = textureSize(cocBuffer, 0);
   /* We render to a double width texture so compute
    * the target texel size accordingly */
-  vec2 texel_size = vec2(0.5, 1.0) / vec2(tex_size);
+  vec2 texel_size = 1.0 / vec2(tex_size);
 
   int t_id = gl_VertexID / 3; /* Triangle Id */
 
-  ivec2 texelco = ivec2(0);
-  /* some math to get the target pixel */
-  texelco.x = t_id % tex_size.x;
-  texelco.y = t_id / tex_size.x;
+  /* Some math to get the target pixel. */
+  int half_tex_width = tex_size.x / 2;
+  ivec2 texelco = ivec2(t_id % half_tex_width, t_id / half_tex_width) * 2;
 
-  vec2 cocs = texelFetch(cocBuffer, texelco, 0).rg;
+  /* Center sprite around the 4 texture taps. */
+  spritepos = vec2(texelco) + 1.0;
 
-  bool is_near = (cocs.x > cocs.y);
-  float coc = (is_near) ? cocs.x : cocs.y;
+  cocs = fetch_cocs(spritepos);
 
-  /* Clamp to max size for performance */
-  coc = min(coc, bokeh_maxsize);
+  /* Clamp to max size for performance. */
+  /* TODO. Maybe clamp Circle of confusion radius during downsample pass. */
+  cocs = min(cocs, bokeh_maxsize);
+  float max_coc = max_v4(cocs);
 
-  if (coc >= 1.0) {
-    if (is_near) {
-      color = texelFetch(nearBuffer, texelco, 0);
-    }
-    else {
-      color = texelFetch(farBuffer, texelco, 0);
-    }
+  if (max_coc >= 0.5) {
     /* find the area the pixel will cover and divide the color by it */
-    /* HACK: 4.0 out of nowhere (I suppose it's 4 pixels footprint for coc 0?)
-     * Makes near in focus more closer to 1.0 alpha. */
-    weight = 4.0 / (coc * coc * M_PI);
-    color *= weight;
+    weights = 1.0 / (cocs * cocs * M_PI);
+    weights = mix(vec4(0.0), weights, greaterThanEqual(cocs, vec4(0.5)));
 
-    /* Compute edge to discard fragment that does not belong to the other layer. */
-    edge.x = (is_near) ? 1 : -1;
-    edge.y = (is_near) ? -tex_size.x + 1 : tex_size.x;
+    color1 = texelFetchOffset(colorBuffer, texelco, 0, ivec2(0, 1)) * weights.x;
+    color2 = texelFetchOffset(colorBuffer, texelco, 0, ivec2(1, 1)) * weights.y;
+    color3 = texelFetchOffset(colorBuffer, texelco, 0, ivec2(1, 0)) * weights.z;
+    color4 = texelFetchOffset(colorBuffer, texelco, 0, ivec2(0, 0)) * weights.w;
   }
   else {
     /* Don't produce any fragments */
-    color = vec4(0.0);
     gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
+    color1 = color2 = color3 = color4 = vec4(0.0);
     return;
   }
 
@@ -87,23 +115,10 @@ void main()
   gl_Position.z = 0.0;
   gl_Position.w = 1.0;
 
-  /* Generate Triangle */
-  particlecoord = gl_Position.xy;
-
-  gl_Position.xy *= coc * texel_size * vec2(bokeh_ratio, 1.0);
-  gl_Position.xy -= 1.0 - 0.5 * texel_size; /* NDC Bottom left */
-  gl_Position.xy += (0.5 + vec2(texelco) * 2.0) * texel_size;
-
-  /* Push far plane to left side. */
-  if (!is_near) {
-    gl_Position.x += 2.0 / 2.0;
-  }
-
-  /* don't do smoothing for small sprites */
-  if (coc > 3.0) {
-    smoothFac = 1.0 - 1.5 / coc;
-  }
-  else {
-    smoothFac = 1.0;
-  }
+  /* Add 1 to max_coc because the max_coc may not be centered on the sprite origin. */
+  gl_Position.xy *= (max_coc + 1.0) * vec2(bokeh_ratio, 1.0);
+  /* Position the sprite. */
+  gl_Position.xy += spritepos;
+  /* NDC range [-1..1]. */
+  gl_Position.xy = gl_Position.xy * texel_size * 2.0 - 1.0;
 }

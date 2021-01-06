@@ -9,7 +9,7 @@ uniform sampler2D depthBuffer;
 uniform vec2 dofParams;
 uniform bool unpremult;
 
-#define dof_mul dofParams.x  /* distance * aperturesize * invsensorsize */
+#define dof_mul dofParams.x /* distance * aperturesize * invsensorsize */
 #define dof_bias dofParams.y /* aperturesize * invsensorsize */
 
 uniform vec4 bokehParams[2];
@@ -31,9 +31,6 @@ uniform vec2 nearFar; /* Near & far view depths values */
   ((ProjectionMatrix[3][3] == 0.0) ? \
        (nearFar.x * nearFar.y) / (z * (nearFar.x - nearFar.y) + nearFar.y) : \
        z * (nearFar.y - nearFar.x) + nearFar.x) /* Only true for camera view! */
-
-#define weighted_sum(a, b, c, d, e) \
-  (a * e.x + b * e.y + c * e.z + d * e.w) / max(1e-6, dot(e, vec4(1.0)));
 
 vec4 safe_color(vec4 c)
 {
@@ -98,66 +95,64 @@ void main(void)
 
 #elif defined(STEP_SCATTER)
 
-flat in vec4 color;
-flat in float weight;
-flat in float smoothFac;
-flat in ivec2 edge;
-/* coordinate used for calculating radius */
-in vec2 particlecoord;
+flat in vec4 color1;
+flat in vec4 color2;
+flat in vec4 color3;
+flat in vec4 color4;
+flat in vec4 weights;
+flat in vec4 cocs;
+flat in vec2 spritepos;
 
 layout(location = 0) out vec4 fragColor;
 #  ifdef USE_ALPHA_DOF
 layout(location = 1) out float fragAlpha;
 #  endif
 
-/* accumulate color in the near/far blur buffers */
-void main(void)
+float bokeh_shape(vec2 center)
 {
-  /* Discard to avoid bleeding onto the next layer */
-  if (int(gl_FragCoord.x) * edge.x + edge.y > 0) {
-    discard;
-  }
+  vec2 co = gl_FragCoord.xy - center;
+  float dist = length(co);
 
-  /* Circle Dof */
-  float dist = length(particlecoord);
-
-  /* Outside of bokeh shape */
-  if (dist > 1.0) {
-    discard;
-  }
-
-  /* Regular Polygon Dof */
   if (bokeh_sides.x > 0.0) {
     /* Circle parametrization */
-    float theta = atan(particlecoord.y, particlecoord.x) + bokeh_rotation;
-
+    float theta = atan(co.y, co.x) + bokeh_rotation;
     /* Optimized version of :
      * float denom = theta - (M_2PI / bokeh_sides) * floor((bokeh_sides * theta + M_PI) / M_2PI);
      * float r = cos(M_PI / bokeh_sides) / cos(denom); */
     float denom = theta - bokeh_sides.y * floor(bokeh_sides.z * theta + 0.5);
     float r = bokeh_sides.w / cos(denom);
-
     /* Divide circle radial coord by the shape radius for angle theta.
      * Giving us the new linear radius to the shape edge. */
     dist /= r;
-
-    /* Outside of bokeh shape */
-    if (dist > 1.0) {
-      discard;
-    }
   }
 
-  fragColor = color;
+  return dist;
+}
 
-  /* Smooth the edges a bit. This effectively reduce the bokeh shape
+/* accumulate color in the near/far blur buffers */
+void main(void)
+{
+  vec4 shapes;
+  shapes.x = bokeh_shape(spritepos + vec2(-0.5, 0.5));
+  shapes.y = bokeh_shape(spritepos + vec2(0.5, 0.5));
+  shapes.z = bokeh_shape(spritepos + vec2(0.5, -0.5));
+  shapes.w = bokeh_shape(spritepos + vec2(-0.5, -0.5));
+  /* Becomes signed distance field in pixel units. */
+  shapes -= cocs;
+  /* Smooth the edges a bit. This effectively soften the bokeh shape
    * but does fade out the undersampling artifacts. */
-  float shape = smoothstep(1.0, min(0.999, smoothFac), dist);
+  vec4 fac = clamp(cocs - 1.0, 0.0, 1.0) * 0.6 + 0.01;
+  shapes = 1.0 - smoothstep(-fac, fac, shapes);
+  /* Outside of bokeh shape. Try to avoid overloading ROPs. */
+  if (max_v4(shapes) == 0.0) {
+    discard;
+  }
 
-  fragColor *= shape;
+  fragColor = weighted_sum(color1, color2, color3, color4, shapes);
 
 #  ifdef USE_ALPHA_DOF
   fragAlpha = fragColor.a;
-  fragColor.a = weight * shape;
+  fragColor.a = sum(weights * shapes);
 #  endif
 }
 
@@ -165,18 +160,16 @@ void main(void)
 
 #  define MERGE_THRESHOLD 4.0
 
-uniform sampler2D scatterBuffer;
-uniform sampler2D scatterAlphaBuffer;
+uniform sampler2D scatterNearBuffer;
+uniform sampler2D scatterNearAlphaBuffer;
+uniform sampler2D scatterFarBuffer;
+uniform sampler2D scatterFarAlphaBuffer;
 
 in vec4 uvcoordsvar;
 out vec4 fragColor;
 
 vec4 upsample_filter(sampler2D tex, vec2 uv, vec2 texelSize)
 {
-  /* TODO FIXME: Clamp the sample position
-   * depending on the layer to avoid bleeding.
-   * This is not really noticeable so leaving it as is for now. */
-
 #  if 1 /* 9-tap bilinear upsampler (tent filter) */
   vec4 d = texelSize.xyxy * vec4(1, 1, -1, 0);
 
@@ -221,11 +214,9 @@ void main(void)
 
   vec4 focus_col = textureLod(colorBuffer, uv, 0.0);
 
-  vec2 texelSize = vec2(0.5, 1.0) / vec2(textureSize(scatterBuffer, 0));
-  vec2 near_uv = uv * vec2(0.5, 1.0);
-  vec2 far_uv = near_uv + vec2(0.5, 0.0);
-  vec4 near_col = upsample_filter(scatterBuffer, near_uv, texelSize);
-  vec4 far_col = upsample_filter(scatterBuffer, far_uv, texelSize);
+  vec2 texelSize = 1.0 / vec2(textureSize(scatterNearBuffer, 0));
+  vec4 near_col = upsample_filter(scatterNearBuffer, uv, texelSize);
+  vec4 far_col = upsample_filter(scatterFarBuffer, uv, texelSize);
 
   float far_w = far_col.a;
   float near_w = near_col.a;
@@ -235,8 +226,8 @@ void main(void)
   focus_col *= focus_w; /* Premul */
 
 #  ifdef USE_ALPHA_DOF
-  near_col.a = upsample_filter(scatterAlphaBuffer, near_uv, texelSize).r;
-  far_col.a = upsample_filter(scatterAlphaBuffer, far_uv, texelSize).r;
+  near_col.a = upsample_filter(scatterNearAlphaBuffer, uv, texelSize).r;
+  far_col.a = upsample_filter(scatterFarAlphaBuffer, uv, texelSize).r;
 #  endif
 
   fragColor = (far_col + near_col + focus_col) * inv_weight_sum;
