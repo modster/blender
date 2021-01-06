@@ -1818,26 +1818,6 @@ static int clean_tracks_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-static int clean_tracks_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
-{
-  SpaceClip *sc = CTX_wm_space_clip(C);
-  MovieClip *clip = ED_space_clip_get_clip(sc);
-
-  if (!RNA_struct_property_is_set(op->ptr, "frames")) {
-    RNA_int_set(op->ptr, "frames", clip->tracking.settings.clean_frames);
-  }
-
-  if (!RNA_struct_property_is_set(op->ptr, "error")) {
-    RNA_float_set(op->ptr, "error", clip->tracking.settings.clean_error);
-  }
-
-  if (!RNA_struct_property_is_set(op->ptr, "action")) {
-    RNA_enum_set(op->ptr, "action", clip->tracking.settings.clean_action);
-  }
-
-  return clean_tracks_exec(C, op);
-}
-
 void CLIP_OT_clean_tracks(wmOperatorType *ot)
 {
   static const EnumPropertyItem actions_items[] = {
@@ -1858,7 +1838,6 @@ void CLIP_OT_clean_tracks(wmOperatorType *ot)
 
   /* api callbacks */
   ot->exec = clean_tracks_exec;
-  ot->invoke = clean_tracks_invoke;
   ot->poll = ED_space_clip_tracking_poll;
 
   /* flags */
@@ -1881,7 +1860,7 @@ void CLIP_OT_clean_tracks(wmOperatorType *ot)
                 0.0f,
                 FLT_MAX,
                 "Reprojection Error",
-                "Effect on tracks which have got larger reprojection error",
+                "Effect on tracks which have a larger re-projection error",
                 0.0f,
                 100.0f);
   RNA_def_enum(ot->srna, "action", actions_items, 0, "Action", "Cleanup action to execute");

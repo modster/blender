@@ -948,10 +948,6 @@ void blo_do_versions_260(FileData *fd, Library *UNUSED(lib), Main *bmain)
 
         clip->proxy.build_tc_flag |= IMB_TC_RECORD_RUN_NO_GAPS;
 
-        if (!tracking->settings.object_distance) {
-          tracking->settings.object_distance = 1.0f;
-        }
-
         if (BLI_listbase_is_empty(&tracking->objects)) {
           BKE_tracking_object_add(tracking, "Camera");
         }

@@ -878,17 +878,6 @@ static void rna_def_trackingSettings(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
-  static const EnumPropertyItem cleanup_items[] = {
-      {TRACKING_CLEAN_SELECT, "SELECT", 0, "Select", "Select unclean tracks"},
-      {TRACKING_CLEAN_DELETE_TRACK, "DELETE_TRACK", 0, "Delete Track", "Delete unclean tracks"},
-      {TRACKING_CLEAN_DELETE_SEGMENT,
-       "DELETE_SEGMENTS",
-       0,
-       "Delete Segments",
-       "Delete unclean segments of tracks"},
-      {0, NULL, 0, NULL, NULL},
-  };
-
   srna = RNA_def_struct(brna, "MovieTrackingSettings", NULL);
   RNA_def_struct_ui_text(srna, "Movie tracking settings", "Match moving settings");
 
@@ -940,41 +929,6 @@ static void rna_def_trackingSettings(BlenderRNA *brna)
       prop,
       "Refine Tangential",
       "Refine tangential coefficients of distortion model during camera solving");
-
-  /* tool settings */
-
-  /* distance */
-  prop = RNA_def_property(srna, "distance", PROP_FLOAT, PROP_NONE);
-  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-  RNA_def_property_float_sdna(prop, NULL, "dist");
-  RNA_def_property_float_default(prop, 1.0f);
-  RNA_def_property_ui_text(
-      prop, "Distance", "Distance between two bundles used for scene scaling");
-
-  /* frames count */
-  prop = RNA_def_property(srna, "clean_frames", PROP_INT, PROP_NONE);
-  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-  RNA_def_property_int_sdna(prop, NULL, "clean_frames");
-  RNA_def_property_range(prop, 0, INT_MAX);
-  RNA_def_property_ui_text(
-      prop,
-      "Tracked Frames",
-      "Effect on tracks which are tracked less than the specified amount of frames");
-
-  /* re-projection error */
-  prop = RNA_def_property(srna, "clean_error", PROP_FLOAT, PROP_NONE);
-  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-  RNA_def_property_float_sdna(prop, NULL, "clean_error");
-  RNA_def_property_range(prop, 0, FLT_MAX);
-  RNA_def_property_ui_text(
-      prop, "Reprojection Error", "Effect on tracks which have a larger re-projection error");
-
-  /* cleanup action */
-  prop = RNA_def_property(srna, "clean_action", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "clean_action");
-  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-  RNA_def_property_enum_items(prop, cleanup_items);
-  RNA_def_property_ui_text(prop, "Action", "Cleanup action to execute");
 
   /* ** default tracker settings ** */
   prop = RNA_def_property(srna, "show_default_expanded", PROP_BOOLEAN, PROP_NONE);
@@ -1108,18 +1062,6 @@ static void rna_def_trackingSettings(BlenderRNA *brna)
   prop = RNA_def_property(srna, "default_weight", PROP_FLOAT, PROP_FACTOR);
   RNA_def_property_range(prop, 0.0f, 1.0f);
   RNA_def_property_ui_text(prop, "Weight", "Influence of newly created track on a final solution");
-
-  /* ** object tracking ** */
-
-  /* object distance */
-  prop = RNA_def_property(srna, "object_distance", PROP_FLOAT, PROP_NONE);
-  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-  RNA_def_property_float_sdna(prop, NULL, "object_distance");
-  RNA_def_property_ui_text(
-      prop, "Distance", "Distance between two bundles used for object scaling");
-  RNA_def_property_range(prop, 0.001, 10000);
-  RNA_def_property_float_default(prop, 1.0f);
-  RNA_def_property_ui_range(prop, 0.001, 10000.0, 1, 3);
 }
 
 static void rna_def_trackingCamera(BlenderRNA *brna)
