@@ -387,7 +387,7 @@ class CLIP_PT_tracking_settings(CLIP_PT_tracking_panel, Panel):
     bl_category = "Track"
 
     def draw_header_preset(self, _context):
-        CLIP_PT_tracking_settings_presets.draw_panel_header(self.layout)
+        CLIP_PT_track_defaults_presets.draw_panel_header(self.layout)
 
     def draw(self, context):
         layout = self.layout
@@ -424,30 +424,6 @@ class CLIP_PT_tracking_settings(CLIP_PT_tracking_panel, Panel):
         col.separator()
         col.operator("clip.track_settings_as_default",
                      text="Copy from Active Track")
-
-
-class CLIP_PT_tracking_settings_extras(CLIP_PT_tracking_panel, Panel):
-    bl_label = "Tracking Settings Extra"
-    bl_parent_id = "CLIP_PT_tracking_settings"
-    bl_space_type = 'CLIP_EDITOR'
-    bl_region_type = 'TOOLS'
-    bl_options = {'DEFAULT_CLOSED'}
-
-    def draw(self, context):
-        layout = self.layout
-        layout.use_property_split = True
-        layout.use_property_decorate = False
-
-        sc = context.space_data
-        clip = sc.clip
-        settings = clip.tracking.settings
-
-        col = layout.column()
-        col.prop(settings, "default_weight")
-        col = layout.column(align=True)
-        col.prop(settings, "default_correlation_min")
-        col.prop(settings, "default_margin")
-        col.prop(settings, "use_default_mask")
 
 
 class CLIP_PT_tools_tracking(CLIP_PT_tracking_panel, Panel):
@@ -704,8 +680,18 @@ class CLIP_PT_track(CLIP_PT_tracking_panel, Panel):
         row.prop(act_track, "use_alpha_preview",
                  text="", toggle=True, icon='IMAGE_ALPHA')
 
-        layout.prop(act_track, "weight")
-        layout.prop(act_track, "weight_stab")
+        col = layout.column()
+        col.prop(act_track, "weight")
+        col.prop(act_track, "weight_stab")
+
+        col = layout.column()
+        col.prop(act_track, "motion_model")
+        col.prop(act_track, "pattern_match", text="Match")
+
+        col.separator()
+
+        col.prop(act_track, "use_brute")
+        col.prop(act_track, "use_normalization")
 
         if act_track.has_bundle:
             label_text = "Average Error: %.2f px" % (act_track.average_error)
@@ -721,6 +707,111 @@ class CLIP_PT_track(CLIP_PT_tracking_panel, Panel):
         if act_track.use_custom_color:
             row = layout.row()
             row.prop(act_track, "color", text="")
+
+
+class CLIP_PT_track_extras(CLIP_PT_tracking_panel, Panel):
+    bl_space_type = 'CLIP_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = "Track"
+    bl_label = "Extra Settings"
+    bl_parent_id = 'CLIP_PT_track'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        clip = context.space_data.clip
+
+        return clip.tracking.tracks.active
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
+        clip = context.space_data.clip
+        active = clip.tracking.tracks.active
+        settings = clip.tracking.settings
+
+        col = layout.column(align=True)
+        col.prop(active, "correlation_min")
+        col.prop(active, "margin")
+
+        col = layout.column()
+        col.prop(active, "use_mask")
+        col.prop(active, "frames_limit")
+        col.prop(settings, "speed")
+
+
+class CLIP_PT_track_defaults(CLIP_PT_tracking_panel, Panel):
+    bl_label = "Default Track Settings"
+    bl_space_type = 'CLIP_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = "Track"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw_header_preset(self, _context):
+        CLIP_PT_track_defaults_presets.draw_panel_header(self.layout)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
+        sc = context.space_data
+        clip = sc.clip
+        settings = clip.tracking.settings
+
+        col = layout.column(align=True)
+        col.prop(settings, "default_pattern_size")
+        col.prop(settings, "default_search_size")
+
+        col.separator()
+
+        col.prop(settings, "default_motion_model")
+        col.prop(settings, "default_pattern_match", text="Match")
+
+        col.prop(settings, "use_default_brute")
+        col.prop(settings, "use_default_normalization")
+
+        col = layout.column()
+
+        row = col.row(align=True)
+        row.use_property_split = False
+        row.prop(settings, "use_default_red_channel",
+                 text="R", toggle=True)
+        row.prop(settings, "use_default_green_channel",
+                 text="G", toggle=True)
+        row.prop(settings, "use_default_blue_channel",
+                 text="B", toggle=True)
+
+        col.separator()
+        col.operator("clip.track_settings_as_default",
+                     text="Copy from Active Track")
+
+
+class CLIP_PT_track_defaults_extra(CLIP_PT_tracking_panel, Panel):
+    bl_label = "Extra Settings"
+    bl_parent_id = "CLIP_PT_track_defaults"
+    bl_space_type = 'CLIP_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = "Track"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
+        sc = context.space_data
+        clip = sc.clip
+        settings = clip.tracking.settings
+
+        col = layout.column()
+        col.prop(settings, "default_weight")
+        col = layout.column(align=True)
+        col.prop(settings, "default_correlation_min")
+        col.prop(settings, "default_margin")
+        col.prop(settings, "use_default_mask")
 
 
 class CLIP_PT_plane_track(CLIP_PT_tracking_panel, Panel):
@@ -751,67 +842,6 @@ class CLIP_PT_plane_track(CLIP_PT_tracking_panel, Panel):
         row = layout.row()
         row.active = active_track.image is not None
         row.prop(active_track, "image_opacity", text="Opacity")
-
-
-class CLIP_PT_track_settings(CLIP_PT_tracking_panel, Panel):
-    bl_space_type = 'CLIP_EDITOR'
-    bl_region_type = 'UI'
-    bl_category = "Track"
-    bl_label = "Tracking Settings"
-    bl_options = {'DEFAULT_CLOSED'}
-
-    def draw(self, context):
-        layout = self.layout
-        layout.use_property_split = True
-        layout.use_property_decorate = False
-
-        clip = context.space_data.clip
-        active = clip.tracking.tracks.active
-
-        if not active:
-            layout.active = False
-            layout.label(text="No active track")
-            return
-
-        col = layout.column()
-        col.prop(active, "motion_model")
-        col.prop(active, "pattern_match", text="Match")
-
-        col.prop(active, "use_brute")
-        col.prop(active, "use_normalization")
-
-
-class CLIP_PT_track_settings_extras(CLIP_PT_tracking_panel, Panel):
-    bl_space_type = 'CLIP_EDITOR'
-    bl_region_type = 'UI'
-    bl_category = "Track"
-    bl_label = "Tracking Settings Extras"
-    bl_parent_id = 'CLIP_PT_track_settings'
-    bl_options = {'DEFAULT_CLOSED'}
-
-    @classmethod
-    def poll(cls, context):
-        clip = context.space_data.clip
-
-        return clip.tracking.tracks.active
-
-    def draw(self, context):
-        layout = self.layout
-        layout.use_property_split = True
-        layout.use_property_decorate = False
-
-        clip = context.space_data.clip
-        active = clip.tracking.tracks.active
-        settings = clip.tracking.settings
-
-        col = layout.column(align=True)
-        col.prop(active, "correlation_min")
-        col.prop(active, "margin")
-
-        col = layout.column()
-        col.prop(active, "use_mask")
-        col.prop(active, "frames_limit")
-        col.prop(settings, "speed")
 
 
 class CLIP_PT_tracking_camera(Panel):
@@ -1550,7 +1580,7 @@ class CLIP_PT_track_color_presets(PresetPanel, Panel):
     preset_add_operator = "clip.track_color_preset_add"
 
 
-class CLIP_PT_tracking_settings_presets(PresetPanel, Panel):
+class CLIP_PT_track_defaults_presets(PresetPanel, Panel):
     """Predefined tracking settings"""
     bl_label = "Tracking Presets"
     preset_subdir = "tracking_settings"
@@ -1751,10 +1781,11 @@ classes = (
     CLIP_MT_tracking_editor_menus,
     CLIP_MT_masking_editor_menus,
     CLIP_PT_track,
+    CLIP_PT_track_extras,
+    CLIP_PT_track_defaults,
+    CLIP_PT_track_defaults_extra,
     CLIP_PT_tools_clip,
     CLIP_PT_tools_marker,
-    CLIP_PT_tracking_settings,
-    CLIP_PT_tracking_settings_extras,
     CLIP_PT_tools_tracking,
     CLIP_PT_tools_plane_tracking,
     CLIP_PT_tools_solve,
@@ -1764,8 +1795,6 @@ classes = (
     CLIP_PT_tools_object,
     CLIP_PT_objects,
     CLIP_PT_plane_track,
-    CLIP_PT_track_settings,
-    CLIP_PT_track_settings_extras,
     CLIP_PT_tracking_camera,
     CLIP_PT_tracking_lens,
     CLIP_PT_tracking_solve,
@@ -1795,7 +1824,7 @@ classes = (
     CLIP_MT_tracking_context_menu,
     CLIP_PT_camera_presets,
     CLIP_PT_track_color_presets,
-    CLIP_PT_tracking_settings_presets,
+    CLIP_PT_track_defaults_presets,
     CLIP_MT_stabilize_2d_context_menu,
     CLIP_MT_stabilize_2d_rotation_context_menu,
     CLIP_MT_pivot_pie,
