@@ -530,36 +530,9 @@ class CLIP_PT_tools_solve(CLIP_PT_tracking_panel, Panel):
 
         clip = context.space_data.clip
         tracking = clip.tracking
-        settings = tracking.settings
         tracking_object = tracking.objects.active
-        camera = clip.tracking.camera
 
         col = layout.column()
-        col.prop(settings, "use_tripod_solver", text="Tripod")
-        col = layout.column()
-        col.active = not settings.use_tripod_solver
-        col.prop(settings, "use_keyframe_selection", text="Keyframe")
-
-        col = layout.column(align=True)
-        col.active = (not settings.use_tripod_solver and
-                      not settings.use_keyframe_selection)
-        col.prop(tracking_object, "keyframe_a")
-        col.prop(tracking_object, "keyframe_b")
-
-        col = layout.column(heading="Refine", align=True)
-        col.active = tracking_object.is_camera
-        col.prop(settings, "refine_intrinsics_focal_length", text="Focal Length")
-        col.prop(settings, "refine_intrinsics_principal_point", text="Optical Center")
-
-        col.prop(settings, "refine_intrinsics_radial_distortion", text="Radial Distortion")
-
-        row = col.row()
-        row.active = (camera.distortion_model == 'BROWN')
-        row.prop(settings, "refine_intrinsics_tangential_distortion", text="Tangential Distortion")
-
-        col = layout.column(align=True)
-        col.scale_y = 2.0
-
         col.operator("clip.solve_camera",
                      text="Solve Camera Motion" if tracking_object.is_camera
                      else "Solve Object Motion")
@@ -935,6 +908,48 @@ class CLIP_PT_tracking_lens(Panel):
             col.separator()
             col.prop(camera, "brown_p1")
             col.prop(camera, "brown_p2")
+
+
+class CLIP_PT_tracking_solve(CLIP_PT_tracking_panel, Panel):
+    bl_space_type = 'CLIP_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = "Track"
+    bl_label = "Solve"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
+        clip = context.space_data.clip
+        tracking = clip.tracking
+        settings = tracking.settings
+        tracking_object = tracking.objects.active
+        camera = clip.tracking.camera
+
+        col = layout.column()
+        col.prop(settings, "use_tripod_solver", text="Tripod")
+        col = layout.column()
+        col.active = not settings.use_tripod_solver
+        col.prop(settings, "use_keyframe_selection", text="Keyframe")
+
+        col = layout.column(align=True)
+        col.active = (not settings.use_tripod_solver and
+                      not settings.use_keyframe_selection)
+        col.prop(tracking_object, "keyframe_a")
+        col.prop(tracking_object, "keyframe_b")
+
+        col = layout.column(heading="Refine", align=True)
+        col.active = tracking_object.is_camera
+        col.prop(settings, "refine_intrinsics_focal_length", text="Focal Length")
+        col.prop(settings, "refine_intrinsics_principal_point", text="Optical Center")
+
+        col.prop(settings, "refine_intrinsics_radial_distortion", text="Radial Distortion")
+
+        row = col.row()
+        row.active = (camera.distortion_model == 'BROWN')
+        row.prop(settings, "refine_intrinsics_tangential_distortion", text="Tangential Distortion")
 
 
 class CLIP_PT_marker(CLIP_PT_tracking_panel, Panel):
@@ -1753,6 +1768,7 @@ classes = (
     CLIP_PT_track_settings_extras,
     CLIP_PT_tracking_camera,
     CLIP_PT_tracking_lens,
+    CLIP_PT_tracking_solve,
     CLIP_PT_marker,
     CLIP_PT_proxy,
     CLIP_PT_footage,
