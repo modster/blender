@@ -607,6 +607,9 @@ class CLIP_PT_tools_orientation(CLIP_PT_tracking_panel, Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
 
+        clip = context.space_data.clip
+        tracking_object = clip.tracking.objects.active
+
         col = layout.column(align=True)
 
         row = col.row(align=True)
@@ -624,42 +627,11 @@ class CLIP_PT_tools_orientation(CLIP_PT_tracking_panel, Panel):
         col = layout.column()
 
         row = col.row(align=True)
-        row.operator("clip.set_scale")
+        if tracking_object.is_camera:
+            row.operator("clip.set_scale")
+        else:
+            row.operator("clip.set_solution_scale", text="Set Scale")
         row.operator("clip.apply_solution_scale", text="Apply Scale")
-
-
-class CLIP_PT_tools_object(CLIP_PT_reconstruction_panel, Panel):
-    bl_space_type = 'CLIP_EDITOR'
-    bl_region_type = 'TOOLS'
-    bl_label = "Object"
-    bl_category = "Solve"
-
-    @classmethod
-    def poll(cls, context):
-        sc = context.space_data
-        if CLIP_PT_reconstruction_panel.poll(context) and sc.mode == 'TRACKING':
-            clip = sc.clip
-
-            tracking_object = clip.tracking.objects.active
-
-            return not tracking_object.is_camera
-
-        return False
-
-    def draw(self, context):
-        layout = self.layout
-
-        sc = context.space_data
-        clip = sc.clip
-        tracking_object = clip.tracking.objects.active
-
-        col = layout.column()
-
-        col.prop(tracking_object, "scale")
-
-        col.separator()
-
-        col.operator("clip.set_solution_scale", text="Set Scale")
 
 
 class CLIP_PT_objects(CLIP_PT_clip_view_panel, Panel):
@@ -671,9 +643,12 @@ class CLIP_PT_objects(CLIP_PT_clip_view_panel, Panel):
 
     def draw(self, context):
         layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
 
         sc = context.space_data
         tracking = sc.clip.tracking
+        tracking_object = sc.clip.tracking.objects.active
 
         row = layout.row()
         row.template_list("CLIP_UL_tracking_objects", "", tracking, "objects",
@@ -683,6 +658,10 @@ class CLIP_PT_objects(CLIP_PT_clip_view_panel, Panel):
 
         sub.operator("clip.tracking_object_new", icon='ADD', text="")
         sub.operator("clip.tracking_object_remove", icon='REMOVE', text="")
+
+        if not tracking_object.is_camera:
+            col = layout.row()
+            row.prop(tracking_object, "scale")
 
 
 class CLIP_PT_track(CLIP_PT_tracking_panel, Panel):
@@ -1746,7 +1725,6 @@ classes = (
     CLIP_PT_tools_cleanup,
     CLIP_PT_tools_geometry,
     CLIP_PT_tools_orientation,
-    CLIP_PT_tools_object,
     CLIP_PT_objects,
     CLIP_PT_plane_track,
     CLIP_PT_track_settings,
