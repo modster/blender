@@ -627,10 +627,8 @@ static void draw_seq_text_get_source(Sequence *seq, char *r_source, size_t sourc
   if (ELEM(seq->type, SEQ_TYPE_IMAGE, SEQ_TYPE_MOVIE)) {
     BLI_snprintf(r_source, source_len, "%s%s", seq->strip->dir, seq->strip->stripdata->name);
   }
-  else if (seq->type == SEQ_TYPE_SOUND_RAM) {
-    if (seq->sound) {
-      BLI_snprintf(r_source, source_len, "%s", seq->sound->filepath);
-    }
+  else if (seq->type == SEQ_TYPE_SOUND_RAM && seq->sound != NULL) {
+    BLI_snprintf(r_source, source_len, "%s", seq->sound->filepath);
   }
   else if (seq->type == SEQ_TYPE_MULTICAM) {
     BLI_snprintf(r_source, source_len, "Channel: %d", seq->multicam_source);
@@ -639,8 +637,8 @@ static void draw_seq_text_get_source(Sequence *seq, char *r_source, size_t sourc
     TextVars *textdata = seq->effectdata;
     BLI_snprintf(r_source, source_len, "%s", textdata->text);
   }
-  else if (seq->type == SEQ_TYPE_SCENE) {
-    if (seq->scene_camera) {
+  else if (seq->type == SEQ_TYPE_SCENE && seq->scene != NULL) {
+    if (seq->scene_camera && seq->scene_camera != NULL) {
       BLI_snprintf(r_source,
                    source_len,
                    "%s (%s)",
@@ -651,10 +649,10 @@ static void draw_seq_text_get_source(Sequence *seq, char *r_source, size_t sourc
       BLI_snprintf(r_source, source_len, "%s", seq->scene->id.name + 2);
     }
   }
-  else if (seq->type == SEQ_TYPE_MOVIECLIP) {
+  else if (seq->type == SEQ_TYPE_MOVIECLIP && seq->clip != NULL) {
     BLI_snprintf(r_source, source_len, "%s", seq->clip->id.name + 2);
   }
-  else if (seq->type == SEQ_TYPE_MASK) {
+  else if (seq->type == SEQ_TYPE_MASK && seq->mask != NULL) {
     BLI_snprintf(r_source, source_len, "%s", seq->mask->id.name + 2);
   }
   else {
@@ -1880,6 +1878,10 @@ static void draw_seq_backdrop(View2D *v2d)
   uint pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
   immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
+  /* View backdrop. */
+  immUniformThemeColorShade(TH_BACK, -25);
+  immRectf(pos, v2d->cur.xmin, v2d->cur.ymin, v2d->cur.xmax, v2d->cur.ymax);
+
   /* Darker overlay over the view backdrop. */
   immUniformThemeColorShade(TH_BACK, -20);
   immRectf(pos, v2d->cur.xmin, -1.0, v2d->cur.xmax, 1.0);
@@ -1887,21 +1889,17 @@ static void draw_seq_backdrop(View2D *v2d)
   /* Alternating horizontal stripes. */
   i = max_ii(1, ((int)v2d->cur.ymin) - 1);
 
-  float col_alternating[4];
-  UI_GetThemeColor4fv(TH_ROW_ALTERNATE, col_alternating);
+  GPU_blend(GPU_BLEND_ALPHA);
+  immUniformThemeColor(TH_ROW_ALTERNATE);
 
   while (i < v2d->cur.ymax) {
     if (i & 1) {
-      immUniformThemeColorBlendShade(TH_BACK, TH_ROW_ALTERNATE, col_alternating[3], -25);
+      immRectf(pos, v2d->cur.xmin, i, v2d->cur.xmax, i + 1);
     }
-    else {
-      immUniformThemeColorShade(TH_BACK, -25);
-    }
-
-    immRectf(pos, v2d->cur.xmin, i, v2d->cur.xmax, i + 1);
-
     i++;
   }
+
+  GPU_blend(GPU_BLEND_NONE);
 
   /* Lines separating the horizontal bands. */
   i = max_ii(1, ((int)v2d->cur.ymin) - 1);
