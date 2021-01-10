@@ -787,6 +787,60 @@ static void IDP_FreeGroup(IDProperty *prop, const bool do_id_user)
 /** \name Main Functions  (IDProperty Main API)
  * \{ */
 
+/**
+ * Return an int from an IDProperty with a compatible type. This should be avoided, but
+ * it's sometimes necessary, for example when legacy files have incorrect property types.
+ */
+int IDP_get_int(const IDProperty *prop)
+{
+  switch (prop->type) {
+    case IDP_INT:
+      return IDP_Int(prop);
+    case IDP_DOUBLE:
+      return (int)IDP_Double(prop);
+    case IDP_FLOAT:
+      return (int)IDP_Float(prop);
+    default:
+      return 0;
+  }
+}
+
+/**
+ * Return a double from an IDProperty with a compatible type. This should be avoided, but
+ * it's sometimes necessary, for example when legacy files have incorrect property types.
+ */
+double IDP_get_double(const IDProperty *prop)
+{
+  switch (prop->type) {
+    case IDP_DOUBLE:
+      return IDP_Double(prop);
+    case IDP_FLOAT:
+      return (double)IDP_Float(prop);
+    case IDP_INT:
+      return (double)IDP_Int(prop);
+    default:
+      return 0.0;
+  }
+}
+
+/**
+ * Return a float from an IDProperty with a compatible type. This should be avoided, but
+ * it's sometimes necessary, for example when legacy files have incorrect property types.
+ */
+float IDP_get_float(const IDProperty *prop)
+{
+  switch (prop->type) {
+    case IDP_FLOAT:
+      return IDP_Float(prop);
+    case IDP_DOUBLE:
+      return (float)IDP_Double(prop);
+    case IDP_INT:
+      return (float)IDP_Int(prop);
+    default:
+      return 0.0f;
+  }
+}
+
 IDProperty *IDP_CopyProperty_ex(const IDProperty *prop, const int flag)
 {
   switch (prop->type) {

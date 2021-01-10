@@ -89,62 +89,30 @@ static IDProperty *idproperty_find_ui_container(IDProperty *idprop_group)
   return NULL;
 }
 
-/**
- * General retrieval of values from a property of various types. Previously saved  files might not
- * necessarily have consistent UI data types because they were create-able with the Python API and
- * nothing was enforced.
- */
-static int idproperty_get_int(const IDProperty *prop)
-{
-  switch (prop->type) {
-    case IDP_INT:
-      return IDP_Int(prop);
-    case IDP_DOUBLE:
-      return (int)IDP_Double(prop);
-    case IDP_FLOAT:
-      return (int)IDP_Float(prop);
-    default:
-      return 0;
-  }
-}
-static double idproperty_get_double(const IDProperty *prop)
-{
-  switch (prop->type) {
-    case IDP_DOUBLE:
-      return IDP_Double(prop);
-    case IDP_FLOAT:
-      return (double)IDP_Float(prop);
-    case IDP_INT:
-      return (double)IDP_Int(prop);
-    default:
-      return 0.0;
-  }
-}
-
 static void version_idproperty_move_data_int(IDPropertyUIDataInt *ui_data,
                                              const IDProperty *prop_ui_data)
 {
   IDProperty *min = IDP_GetPropertyFromGroup(prop_ui_data, "min");
   if (min != NULL) {
-    ui_data->min = ui_data->soft_min = idproperty_get_int(min);
+    ui_data->min = ui_data->soft_min = IDP_get_int(min);
   }
   IDProperty *max = IDP_GetPropertyFromGroup(prop_ui_data, "max");
   if (max != NULL) {
-    ui_data->max = ui_data->soft_max = idproperty_get_int(max);
+    ui_data->max = ui_data->soft_max = IDP_get_int(max);
   }
   IDProperty *soft_min = IDP_GetPropertyFromGroup(prop_ui_data, "soft_min");
   if (soft_min != NULL) {
-    ui_data->soft_min = idproperty_get_int(soft_min);
+    ui_data->soft_min = IDP_get_int(soft_min);
     ui_data->soft_min = MIN2(ui_data->soft_min, ui_data->min);
   }
   IDProperty *soft_max = IDP_GetPropertyFromGroup(prop_ui_data, "soft_max");
   if (soft_max != NULL) {
-    ui_data->soft_max = idproperty_get_int(soft_max);
+    ui_data->soft_max = IDP_get_int(soft_max);
     ui_data->soft_max = MAX2(ui_data->soft_max, ui_data->max);
   }
   IDProperty *step = IDP_GetPropertyFromGroup(prop_ui_data, "step");
   if (step != NULL) {
-    ui_data->step = idproperty_get_int(soft_max);
+    ui_data->step = IDP_get_int(soft_max);
   }
   IDProperty *default_value = IDP_GetPropertyFromGroup(prop_ui_data, "default");
   if (default_value != NULL) {
@@ -155,7 +123,7 @@ static void version_idproperty_move_data_int(IDPropertyUIDataInt *ui_data,
       }
     }
     else if (default_value->type == IDP_INT) {
-      ui_data->default_value = idproperty_get_int(default_value);
+      ui_data->default_value = IDP_get_int(default_value);
     }
   }
 }
@@ -165,29 +133,29 @@ static void version_idproperty_move_data_float(IDPropertyUIDataFloat *ui_data,
 {
   IDProperty *min = IDP_GetPropertyFromGroup(prop_ui_data, "min");
   if (min != NULL) {
-    ui_data->min = ui_data->soft_min = idproperty_get_double(min);
+    ui_data->min = ui_data->soft_min = IDP_get_double(min);
   }
   IDProperty *max = IDP_GetPropertyFromGroup(prop_ui_data, "max");
   if (max != NULL) {
-    ui_data->max = ui_data->soft_max = idproperty_get_double(min);
+    ui_data->max = ui_data->soft_max = IDP_get_double(min);
   }
   IDProperty *soft_min = IDP_GetPropertyFromGroup(prop_ui_data, "soft_min");
   if (soft_min != NULL) {
-    ui_data->soft_min = idproperty_get_double(soft_min);
+    ui_data->soft_min = IDP_get_double(soft_min);
     ui_data->soft_min = MAX2(ui_data->soft_min, ui_data->min);
   }
   IDProperty *soft_max = IDP_GetPropertyFromGroup(prop_ui_data, "soft_max");
   if (soft_max != NULL) {
-    ui_data->soft_max = idproperty_get_double(soft_max);
+    ui_data->soft_max = IDP_get_double(soft_max);
     ui_data->soft_max = MIN2(ui_data->soft_max, ui_data->max);
   }
   IDProperty *step = IDP_GetPropertyFromGroup(prop_ui_data, "step");
   if (step != NULL) {
-    ui_data->step = (float)idproperty_get_double(step);
+    ui_data->step = IDP_get_float(step);
   }
   IDProperty *precision = IDP_GetPropertyFromGroup(prop_ui_data, "precision");
   if (precision != NULL) {
-    ui_data->precision = idproperty_get_int(precision);
+    ui_data->precision = IDP_get_int(precision);
   }
   IDProperty *default_value = IDP_GetPropertyFromGroup(prop_ui_data, "default");
   if (default_value != NULL) {
@@ -198,10 +166,7 @@ static void version_idproperty_move_data_float(IDPropertyUIDataFloat *ui_data,
       }
     }
     else if (ELEM(default_value->type, IDP_DOUBLE, IDP_FLOAT)) {
-      ui_data->default_value = idproperty_get_double(default_value);
-    }
-    else {
-      BLI_assert(false);
+      ui_data->default_value = IDP_get_double(default_value);
     }
   }
 }
