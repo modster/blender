@@ -3342,7 +3342,7 @@ char *RNA_property_string_get_default_alloc(PointerRNA *ptr,
     buf = MEM_callocN(sizeof(char) * (length + 1), "RNA_string_get_alloc");
   }
 
-  RNA_property_string_get_default(prop, buf, length);
+  RNA_property_string_get_default(prop, buf, length + 1);
 
   return buf;
 }
