@@ -202,12 +202,16 @@ class TestBufferProtocol(TestHelper, unittest.TestCase):
 class TestRNAData(TestHelper, unittest.TestCase):
 
     def test_custom_properties_none(self):
-        bpy.ops.object.add_named("test")
+        bpy.data.objects.new("test", None)
         test_object = bpy.data.objects["test"]
         props = test_object.custom_properties()
         self.assertEqual(len(props), 0)
-        
 
+        test_object["test_prop"] = 0.5
+        rna_data = props.rna_data("test_prop")
+        self.assertTrue("min" in rna_data)
+        self.assertTrue(rna_data["min"] < -10000.0)
+        
 
 if __name__ == '__main__':
     import sys
