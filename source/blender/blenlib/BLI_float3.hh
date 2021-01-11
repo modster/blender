@@ -231,7 +231,8 @@ inline float distance(const float3 &a, const float3 &b)
 
 inline float distance_squared(const float3 &a, const float3 &b)
 {
-  return dot(a, b);
+  const float3 diff = a - b;
+  return dot(diff, diff);
 }
 
 inline float3 lerp(const float3 &a, const float3 &b, float t)

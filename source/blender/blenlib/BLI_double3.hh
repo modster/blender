@@ -221,7 +221,8 @@ inline double distance(const double3 &a, const double3 &b)
 
 inline double distance_squared(const double3 &a, const double3 &b)
 {
-  return dot(a, b);
+  const double3 diff = a - b;
+  return dot(diff, diff);
 }
 
 inline double3 lerp(const double3 &a, const double3 &b, double t)

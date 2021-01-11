@@ -175,7 +175,8 @@ inline mpq_class distance(const mpq2 &a, const mpq2 &b)
 
 inline mpq_class distance_squared(const mpq2 &a, const mpq2 &b)
 {
-  return dot(a, b);
+  const mpq2 diff = a - b;
+  return dot(diff, diff);
 }
 
 }  // namespace blender::math

@@ -168,7 +168,8 @@ inline float distance(const float2 &a, const float2 &b)
 
 inline float distance_squared(const float2 &a, const float2 &b)
 {
-  return dot(a, b);
+  const float2 diff = a - b;
+  return dot(diff, diff);
 }
 
 }  // namespace blender::math
