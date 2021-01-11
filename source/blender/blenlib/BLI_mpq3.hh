@@ -65,8 +65,6 @@ struct mpq3 {
     return &x;
   }
 
-  static mpq3 cross_poly(Span<mpq3> poly);
-
   /** There is a sensible use for hashing on exact arithmetic types. */
   uint64_t hash() const;
 };
@@ -273,12 +271,13 @@ inline int dominant_axis(const mpq3 &a)
   return ((x > y) ? ((x > z) ? 0 : 2) : ((y > z) ? 1 : 2));
 }
 
+mpq3 cross_poly(Span<mpq3> poly);
+uint64_t hash_mpq_class(const mpq_class &value);
+
 }  // namespace blender::math
 
 namespace blender {
 using math::mpq3;
-
-uint64_t hash_mpq_class(const mpq_class &value);
-}  // namespace blender
+}
 
 #endif /* WITH_GMP */

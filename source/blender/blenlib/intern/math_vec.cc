@@ -29,78 +29,75 @@
 #include "BLI_span.hh"
 #include "BLI_utildefines.h"
 
-namespace blender {
+namespace blender::math {
 
-float2::isect_result float2::isect_seg_seg(const float2 &v1,
-                                           const float2 &v2,
-                                           const float2 &v3,
-                                           const float2 &v4)
+isect_result_float2 isect_seg_seg(const float2 &v1,
+                                  const float2 &v2,
+                                  const float2 &v3,
+                                  const float2 &v4)
 {
-  float2::isect_result ans;
+  isect_result_float2 ans;
   float div = (v2[0] - v1[0]) * (v4[1] - v3[1]) - (v2[1] - v1[1]) * (v4[0] - v3[0]);
   if (div == 0.0f) {
     ans.lambda = 0.0f;
     ans.mu = 0.0f;
-    ans.kind = float2::isect_result::LINE_LINE_COLINEAR;
+    ans.kind = isect_result_float2::LINE_LINE_COLINEAR;
   }
   else {
     ans.lambda = ((v1[1] - v3[1]) * (v4[0] - v3[0]) - (v1[0] - v3[0]) * (v4[1] - v3[1])) / div;
     ans.mu = ((v1[1] - v3[1]) * (v2[0] - v1[0]) - (v1[0] - v3[0]) * (v2[1] - v1[1])) / div;
     if (ans.lambda >= 0.0f && ans.lambda <= 1.0f && ans.mu >= 0.0f && ans.mu <= 1.0f) {
       if (ans.lambda == 0.0f || ans.lambda == 1.0f || ans.mu == 0.0f || ans.mu == 1.0f) {
-        ans.kind = float2::isect_result::LINE_LINE_EXACT;
+        ans.kind = isect_result_float2::LINE_LINE_EXACT;
       }
       else {
-        ans.kind = float2::isect_result::LINE_LINE_CROSS;
+        ans.kind = isect_result_float2::LINE_LINE_CROSS;
       }
     }
     else {
-      ans.kind = float2::isect_result::LINE_LINE_NONE;
+      ans.kind = isect_result_float2::LINE_LINE_NONE;
     }
   }
   return ans;
 }
 
-double2::isect_result double2::isect_seg_seg(const double2 &v1,
-                                             const double2 &v2,
-                                             const double2 &v3,
-                                             const double2 &v4)
+isect_result_double2 isect_seg_seg(const double2 &v1,
+                                   const double2 &v2,
+                                   const double2 &v3,
+                                   const double2 &v4)
 {
-  double2::isect_result ans;
+  isect_result_double2 ans;
   double div = (v2[0] - v1[0]) * (v4[1] - v3[1]) - (v2[1] - v1[1]) * (v4[0] - v3[0]);
   if (div == 0.0) {
     ans.lambda = 0.0;
-    ans.kind = double2::isect_result::LINE_LINE_COLINEAR;
+    ans.kind = isect_result_double2::LINE_LINE_COLINEAR;
   }
   else {
     ans.lambda = ((v1[1] - v3[1]) * (v4[0] - v3[0]) - (v1[0] - v3[0]) * (v4[1] - v3[1])) / div;
     double mu = ((v1[1] - v3[1]) * (v2[0] - v1[0]) - (v1[0] - v3[0]) * (v2[1] - v1[1])) / div;
     if (ans.lambda >= 0.0 && ans.lambda <= 1.0 && mu >= 0.0 && mu <= 1.0) {
       if (ans.lambda == 0.0 || ans.lambda == 1.0 || mu == 0.0 || mu == 1.0) {
-        ans.kind = double2::isect_result::LINE_LINE_EXACT;
+        ans.kind = isect_result_double2::LINE_LINE_EXACT;
       }
       else {
-        ans.kind = double2::isect_result::LINE_LINE_CROSS;
+        ans.kind = isect_result_double2::LINE_LINE_CROSS;
       }
     }
     else {
-      ans.kind = double2::isect_result::LINE_LINE_NONE;
+      ans.kind = isect_result_double2::LINE_LINE_NONE;
     }
   }
   return ans;
 }
 
 #ifdef WITH_GMP
-mpq2::isect_result mpq2::isect_seg_seg(const mpq2 &v1,
-                                       const mpq2 &v2,
-                                       const mpq2 &v3,
-                                       const mpq2 &v4)
+isect_result_mpq2 isect_seg_seg(const mpq2 &v1, const mpq2 &v2, const mpq2 &v3, const mpq2 &v4)
 {
-  mpq2::isect_result ans;
+  isect_result_mpq2 ans;
   mpq_class div = (v2[0] - v1[0]) * (v4[1] - v3[1]) - (v2[1] - v1[1]) * (v4[0] - v3[0]);
   if (div == 0.0) {
     ans.lambda = 0.0;
-    ans.kind = mpq2::isect_result::LINE_LINE_COLINEAR;
+    ans.kind = isect_result_mpq2::LINE_LINE_COLINEAR;
   }
   else {
     ans.lambda = ((v1[1] - v3[1]) * (v4[0] - v3[0]) - (v1[0] - v3[0]) * (v4[1] - v3[1])) / div;
@@ -109,21 +106,21 @@ mpq2::isect_result mpq2::isect_seg_seg(const mpq2 &v1,
     if (ans.lambda >= 0 && ans.lambda <= 1 &&
         ((div > 0 && mudiv >= 0 && mudiv <= div) || (div < 0 && mudiv <= 0 && mudiv >= div))) {
       if (ans.lambda == 0 || ans.lambda == 1 || mudiv == 0 || mudiv == div) {
-        ans.kind = mpq2::isect_result::LINE_LINE_EXACT;
+        ans.kind = isect_result_mpq2::LINE_LINE_EXACT;
       }
       else {
-        ans.kind = mpq2::isect_result::LINE_LINE_CROSS;
+        ans.kind = isect_result_mpq2::LINE_LINE_CROSS;
       }
     }
     else {
-      ans.kind = mpq2::isect_result::LINE_LINE_NONE;
+      ans.kind = isect_result_mpq2::LINE_LINE_NONE;
     }
   }
   return ans;
-}
+}  // namespace math
 #endif
 
-double3 double3::cross_poly(Span<double3> poly)
+double3 cross_poly(Span<double3> poly)
 {
   /* Newell's Method. */
   int nv = static_cast<int>(poly.size());
@@ -147,7 +144,7 @@ double3 double3::cross_poly(Span<double3> poly)
 }
 
 #ifdef WITH_GMP
-mpq3 mpq3::cross_poly(Span<mpq3> poly)
+mpq3 cross_poly(Span<mpq3> poly)
 {
   /* Newell's Method. */
   int nv = static_cast<int>(poly.size());
@@ -192,4 +189,4 @@ uint64_t mpq3::hash() const
 }
 #endif
 
-}  // namespace blender
+}  // namespace blender::math

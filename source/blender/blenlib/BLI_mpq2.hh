@@ -80,21 +80,6 @@ struct mpq2 {
     return &x;
   }
 
-  struct isect_result {
-    enum {
-      LINE_LINE_COLINEAR = -1,
-      LINE_LINE_NONE = 0,
-      LINE_LINE_EXACT = 1,
-      LINE_LINE_CROSS = 2,
-    } kind;
-    mpq_class lambda;
-  };
-
-  static isect_result isect_seg_seg(const mpq2 &v1,
-                                    const mpq2 &v2,
-                                    const mpq2 &v3,
-                                    const mpq2 &v4);
-
   /** There is a sensible use for hashing on exact arithmetic types. */
   uint64_t hash() const;
 };
@@ -178,6 +163,18 @@ inline mpq_class distance_squared(const mpq2 &a, const mpq2 &b)
   const mpq2 diff = a - b;
   return dot(diff, diff);
 }
+
+struct isect_result_mpq2 {
+  enum {
+    LINE_LINE_COLINEAR = -1,
+    LINE_LINE_NONE = 0,
+    LINE_LINE_EXACT = 1,
+    LINE_LINE_CROSS = 2,
+  } kind;
+  mpq_class lambda;
+};
+
+isect_result_mpq2 isect_seg_seg(const mpq2 &v1, const mpq2 &v2, const mpq2 &v3, const mpq2 &v4);
 
 }  // namespace blender::math
 

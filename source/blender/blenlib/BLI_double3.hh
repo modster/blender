@@ -61,8 +61,6 @@ struct double3 {
   {
     return &x;
   }
-
-  static double3 cross_poly(Span<double3> poly);
 };
 
 inline double normalize_and_get_length(double3 &a)
@@ -242,6 +240,8 @@ inline int dominant_axis(const double3 &a)
   double z = (a.z >= 0) ? a.z : -a.z;
   return ((x > y) ? ((x > z) ? 0 : 2) : ((y > z) ? 1 : 2));
 }
+
+double3 cross_poly(Span<double3> poly);
 
 }  // namespace blender::math
 

@@ -1664,10 +1664,11 @@ void fill_crossdata_for_intersect(const FatCo<T> &curco,
   BLI_assert(se_vcva->vert == vc && se_vcva->next->vert == va);
   BLI_assert(se_vcvb->vert == vc && se_vcvb->next->vert == vb);
   UNUSED_VARS_NDEBUG(vc);
-  auto isect = vec2<T>::isect_seg_seg(va->co.exact, vb->co.exact, curco.exact, v2->co.exact);
+  auto isect = isect_seg_seg(va->co.exact, vb->co.exact, curco.exact, v2->co.exact);
+  using isect_result = decltype(isect);
   T &lambda = isect.lambda;
   switch (isect.kind) {
-    case vec2<T>::isect_result::LINE_LINE_CROSS: {
+    case isect_result::LINE_LINE_CROSS: {
 #ifdef WITH_GMP
       if (!std::is_same<T, mpq_class>::value) {
 #else
@@ -1695,7 +1696,7 @@ void fill_crossdata_for_intersect(const FatCo<T> &curco,
       }
       break;
     }
-    case vec2<T>::isect_result::LINE_LINE_EXACT: {
+    case isect_result::LINE_LINE_EXACT: {
       if (lambda == 0) {
         fill_crossdata_for_through_vert(va, se_vcva, cd, cd_next);
       }
@@ -1710,7 +1711,7 @@ void fill_crossdata_for_intersect(const FatCo<T> &curco,
       }
       break;
     }
-    case vec2<T>::isect_result::LINE_LINE_NONE: {
+    case isect_result::LINE_LINE_NONE: {
 #ifdef WITH_GMP
       if (std::is_same<T, mpq_class>::value) {
         BLI_assert(false);
@@ -1726,7 +1727,7 @@ void fill_crossdata_for_intersect(const FatCo<T> &curco,
       }
       break;
     }
-    case vec2<T>::isect_result::LINE_LINE_COLINEAR: {
+    case isect_result::LINE_LINE_COLINEAR: {
       if (distance_squared(va->co.approx, v2->co.approx) <=
           distance_squared(vb->co.approx, v2->co.approx)) {
         fill_crossdata_for_through_vert(va, se_vcva, cd, cd_next);

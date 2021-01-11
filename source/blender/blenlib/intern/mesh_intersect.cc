@@ -193,7 +193,7 @@ void Face::populate_plane(bool need_exact)
       for (int i : index_range()) {
         co[i] = vert[i]->co_exact;
       }
-      normal_exact = mpq3::cross_poly(co);
+      normal_exact = cross_poly(co);
     }
     else {
       mpq3 tr02 = vert[0]->co_exact - vert[2]->co_exact;
@@ -210,7 +210,7 @@ void Face::populate_plane(bool need_exact)
       for (int i : index_range()) {
         co[i] = vert[i]->co;
       }
-      normal = double3::cross_poly(co);
+      normal = cross_poly(co);
     }
     else {
       double3 tr02 = vert[0]->co - vert[2]->co;

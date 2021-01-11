@@ -50,21 +50,6 @@ struct double2 {
   {
     return &x;
   }
-
-  struct isect_result {
-    enum {
-      LINE_LINE_COLINEAR = -1,
-      LINE_LINE_NONE = 0,
-      LINE_LINE_EXACT = 1,
-      LINE_LINE_CROSS = 2,
-    } kind;
-    double lambda;
-  };
-
-  static isect_result isect_seg_seg(const double2 &v1,
-                                    const double2 &v2,
-                                    const double2 &v3,
-                                    const double2 &v4);
 };
 
 inline double length(const double2 &a)
@@ -139,6 +124,21 @@ inline double distance_squared(const double2 &a, const double2 &b)
   double2 diff = a - b;
   return dot(diff, diff);
 }
+
+struct isect_result_double2 {
+  enum {
+    LINE_LINE_COLINEAR = -1,
+    LINE_LINE_NONE = 0,
+    LINE_LINE_EXACT = 1,
+    LINE_LINE_CROSS = 2,
+  } kind;
+  double lambda;
+};
+
+isect_result_double2 isect_seg_seg(const double2 &v1,
+                                   const double2 &v2,
+                                   const double2 &v3,
+                                   const double2 &v4);
 
 }  // namespace blender::math
 

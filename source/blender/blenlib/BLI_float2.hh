@@ -53,22 +53,6 @@ struct float2 {
     uint64_t x2 = *reinterpret_cast<const uint32_t *>(&y);
     return (x1 * 812519) ^ (x2 * 707951);
   }
-
-  struct isect_result {
-    enum {
-      LINE_LINE_COLINEAR = -1,
-      LINE_LINE_NONE = 0,
-      LINE_LINE_EXACT = 1,
-      LINE_LINE_CROSS = 2,
-    } kind;
-    float lambda;
-    float mu;
-  };
-
-  static isect_result isect_seg_seg(const float2 &v1,
-                                    const float2 &v2,
-                                    const float2 &v3,
-                                    const float2 &v4);
 };
 
 inline bool operator==(const float2 &a, const float2 &b)
@@ -171,6 +155,22 @@ inline float distance_squared(const float2 &a, const float2 &b)
   const float2 diff = a - b;
   return dot(diff, diff);
 }
+
+struct isect_result_float2 {
+  enum {
+    LINE_LINE_COLINEAR = -1,
+    LINE_LINE_NONE = 0,
+    LINE_LINE_EXACT = 1,
+    LINE_LINE_CROSS = 2,
+  } kind;
+  float lambda;
+  float mu;
+};
+
+isect_result_float2 isect_seg_seg(const float2 &v1,
+                                  const float2 &v2,
+                                  const float2 &v3,
+                                  const float2 &v4);
 
 }  // namespace blender::math
 
