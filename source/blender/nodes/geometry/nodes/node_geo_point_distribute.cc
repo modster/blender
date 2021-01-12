@@ -177,20 +177,20 @@ BLI_NOINLINE static KDTree_3d *build_kdtree(Span<float3> positions)
   return kdtree;
 }
 
-BLI_NOINLINE static void create_elimination_mask_for_close_points(
-    Span<float3> positions, const float minimum_distance, MutableSpan<bool> r_elimination_mask)
+BLI_NOINLINE static void update_elimination_mask_for_close_points(
+    Span<float3> positions, const float minimum_distance, MutableSpan<bool> elimination_mask)
 {
   KDTree_3d *kdtree = build_kdtree(positions);
 
   for (const int i : positions.index_range()) {
-    if (r_elimination_mask[i]) {
+    if (elimination_mask[i]) {
       continue;
     }
 
     struct CallbackData {
       int index;
       MutableSpan<bool> elimination_mask;
-    } callback_data = {i, r_elimination_mask};
+    } callback_data = {i, elimination_mask};
 
     BLI_kdtree_3d_range_search_cb(
         kdtree,
@@ -206,6 +206,40 @@ BLI_NOINLINE static void create_elimination_mask_for_close_points(
         &callback_data);
   }
   BLI_kdtree_3d_free(kdtree);
+}
+
+BLI_NOINLINE static void update_elimination_mask_based_on_density_mask(
+    const Mesh &mesh,
+    const FloatReadAttribute &density_mask,
+    Span<float3> bary_coords,
+    Span<int> looptri_indices,
+    MutableSpan<bool> elimination_mask)
+{
+  Span<MLoopTri> looptris = get_mesh_looptris(mesh);
+  for (const int i : bary_coords.index_range()) {
+    if (elimination_mask[i]) {
+      continue;
+    }
+
+    const MLoopTri &looptri = looptris[looptri_indices[i]];
+    const float3 bary_coord = bary_coords[i];
+
+    const int v0_index = mesh.mloop[looptri.tri[0]].v;
+    const int v1_index = mesh.mloop[looptri.tri[1]].v;
+    const int v2_index = mesh.mloop[looptri.tri[2]].v;
+
+    const float v0_density_factor = std::max(0.0f, density_mask[v0_index]);
+    const float v1_density_factor = std::max(0.0f, density_mask[v1_index]);
+    const float v2_density_factor = std::max(0.0f, density_mask[v2_index]);
+
+    const float probablity = v0_density_factor * bary_coord.x + v1_density_factor * bary_coord.y +
+                             v2_density_factor * bary_coord.z;
+
+    const float hash = BLI_hash_int_01(bary_coord.hash());
+    if (hash > probablity) {
+      elimination_mask[i] = true;
+    }
+  }
 }
 
 BLI_NOINLINE static void eliminate_points_based_on_mask(Span<bool> elimination_mask,
@@ -263,7 +297,9 @@ static Vector<float3> stable_random_scatter_with_minimum_distance(
   Vector<int> looptri_indices;
   initial_uniform_distribution(mesh, max_density, seed, positions, bary_coords, looptri_indices);
   Array<bool> elimination_mask(positions.size(), false);
-  create_elimination_mask_for_close_points(positions, minimum_distance, elimination_mask);
+  update_elimination_mask_for_close_points(positions, minimum_distance, elimination_mask);
+  update_elimination_mask_based_on_density_mask(
+      mesh, density_factors, bary_coords, looptri_indices, elimination_mask);
   eliminate_points_based_on_mask(elimination_mask, positions, bary_coords, looptri_indices);
 
   const int tot_output_points = positions.size();
