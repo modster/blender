@@ -1610,8 +1610,8 @@ static PyObject *BPy_IDGroup_rna_ui_data_copy(BPy_IDProperty *self, PyObject *ar
     Py_RETURN_NONE;
   }
 
-  const IDProperty *idprop_src = IDP_GetPropertyFromGroup(self->prop, key_src);
-  IDProperty *idprop_dest = IDP_GetPropertyFromGroup(group_src->prop, key_dest);
+  const IDProperty *idprop_src = IDP_GetPropertyFromGroup(group_src->prop, key_src);
+  IDProperty *idprop_dest = IDP_GetPropertyFromGroup(self->prop, key_dest);
   if (ELEM(NULL, idprop_src, idprop_dest)) {
     PyErr_SetString(PyExc_KeyError, "Property not found in IDProperty group");
     Py_RETURN_NONE;
