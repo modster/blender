@@ -169,9 +169,9 @@ BLI_NOINLINE static void update_elimination_mask_for_close_points(
   BLI_kdtree_3d_free(kdtree);
 }
 
-BLI_NOINLINE static void update_elimination_mask_based_on_density_mask(
+BLI_NOINLINE static void update_elimination_mask_based_on_density_factors(
     const Mesh &mesh,
-    const FloatReadAttribute &density_mask,
+    const FloatReadAttribute &density_factors,
     Span<float3> bary_coords,
     Span<int> looptri_indices,
     MutableSpan<bool> elimination_mask)
@@ -189,9 +189,9 @@ BLI_NOINLINE static void update_elimination_mask_based_on_density_mask(
     const int v1_index = mesh.mloop[looptri.tri[1]].v;
     const int v2_index = mesh.mloop[looptri.tri[2]].v;
 
-    const float v0_density_factor = std::max(0.0f, density_mask[v0_index]);
-    const float v1_density_factor = std::max(0.0f, density_mask[v1_index]);
-    const float v2_density_factor = std::max(0.0f, density_mask[v2_index]);
+    const float v0_density_factor = std::max(0.0f, density_factors[v0_index]);
+    const float v1_density_factor = std::max(0.0f, density_factors[v1_index]);
+    const float v2_density_factor = std::max(0.0f, density_factors[v2_index]);
 
     const float probablity = v0_density_factor * bary_coord.x + v1_density_factor * bary_coord.y +
                              v2_density_factor * bary_coord.z;
@@ -246,7 +246,7 @@ BLI_NOINLINE static void compute_remaining_point_data(const Mesh &mesh,
 static void sample_mesh_surface_with_minimum_distance(const Mesh &mesh,
                                                       const float max_density,
                                                       const float minimum_distance,
-                                                      const FloatReadAttribute &density_mask,
+                                                      const FloatReadAttribute &density_factors,
                                                       const int seed,
                                                       Vector<float3> &r_positions,
                                                       Vector<float3> &r_bary_coords,
@@ -256,8 +256,8 @@ static void sample_mesh_surface_with_minimum_distance(const Mesh &mesh,
       mesh, max_density, nullptr, seed, r_positions, r_bary_coords, r_looptri_indices);
   Array<bool> elimination_mask(r_positions.size(), false);
   update_elimination_mask_for_close_points(r_positions, minimum_distance, elimination_mask);
-  update_elimination_mask_based_on_density_mask(
-      mesh, density_mask, r_bary_coords, r_looptri_indices, elimination_mask);
+  update_elimination_mask_based_on_density_factors(
+      mesh, density_factors, r_bary_coords, r_looptri_indices, elimination_mask);
   eliminate_points_based_on_mask(elimination_mask, r_positions, r_bary_coords, r_looptri_indices);
 }
 
