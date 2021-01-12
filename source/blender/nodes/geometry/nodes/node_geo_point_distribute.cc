@@ -16,9 +16,11 @@
 
 #include "BLI_float3.hh"
 #include "BLI_hash.h"
+#include "BLI_kdtree.h"
 #include "BLI_math_vector.h"
 #include "BLI_rand.hh"
 #include "BLI_span.hh"
+#include "BLI_timeit.hh"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -122,6 +124,124 @@ static Vector<float3> random_scatter_points_from_mesh(const Mesh *mesh,
   return points;
 }
 
+BLI_NOINLINE static void initial_uniform_distribution(const Mesh *mesh,
+                                                      const float density,
+                                                      const int seed,
+                                                      Vector<float3> &r_positions,
+                                                      Vector<float3> &r_normals,
+                                                      Vector<int> &r_ids)
+{
+  /* This only updates a cache and can be considered to be logically const. */
+  const MLoopTri *looptris = BKE_mesh_runtime_looptri_ensure(const_cast<Mesh *>(mesh));
+  const int looptris_len = BKE_mesh_runtime_looptri_len(mesh);
+
+  for (const int looptri_index : IndexRange(looptris_len)) {
+    const MLoopTri &looptri = looptris[looptri_index];
+    const int v0_index = mesh->mloop[looptri.tri[0]].v;
+    const int v1_index = mesh->mloop[looptri.tri[1]].v;
+    const int v2_index = mesh->mloop[looptri.tri[2]].v;
+    const float3 v0_pos = mesh->mvert[v0_index].co;
+    const float3 v1_pos = mesh->mvert[v1_index].co;
+    const float3 v2_pos = mesh->mvert[v2_index].co;
+    const float area = area_tri_v3(v0_pos, v1_pos, v2_pos);
+    const int looptri_seed = BLI_hash_int(looptri_index + seed);
+    RandomNumberGenerator looptri_rng(looptri_seed);
+
+    const float points_amount_fl = area * density;
+    const float add_point_probability = fractf(points_amount_fl);
+    const bool add_point = add_point_probability > looptri_rng.get_float();
+    const int point_amount = (int)points_amount_fl + (int)add_point;
+
+    for (int i = 0; i < point_amount; i++) {
+      const float3 bary_coords = looptri_rng.get_barycentric_coordinates();
+      float3 point_pos;
+      interp_v3_v3v3v3(point_pos, v0_pos, v1_pos, v2_pos, bary_coords);
+      r_positions.append(point_pos);
+
+      /* Build a hash stable even when the mesh is deformed. */
+      r_ids.append(((int)(bary_coords.hash()) + looptri_index));
+
+      float3 tri_normal;
+      normal_tri_v3(tri_normal, v0_pos, v1_pos, v2_pos);
+      r_normals.append(tri_normal);
+    }
+  }
+}
+
+BLI_NOINLINE static KDTree_3d *build_kdtree(Span<float3> positions)
+{
+  KDTree_3d *kdtree = BLI_kdtree_3d_new(positions.size());
+  for (const int i : positions.index_range()) {
+    BLI_kdtree_3d_insert(kdtree, i, positions[i]);
+  }
+  BLI_kdtree_3d_balance(kdtree);
+  return kdtree;
+}
+
+BLI_NOINLINE static void create_elimination_mask_for_close_points(
+    Span<float3> positions, const float minimum_distance, MutableSpan<bool> r_elimination_mask)
+{
+  KDTree_3d *kdtree = build_kdtree(positions);
+
+  for (const int i : positions.index_range()) {
+    if (r_elimination_mask[i]) {
+      continue;
+    }
+
+    struct CallbackData {
+      int index;
+      MutableSpan<bool> elimination_mask;
+    } callback_data = {i, r_elimination_mask};
+
+    BLI_kdtree_3d_range_search_cb(
+        kdtree,
+        positions[i],
+        minimum_distance,
+        [](void *user_data, int index, const float *UNUSED(co), float UNUSED(dist_sq)) {
+          CallbackData &callback_data = *static_cast<CallbackData *>(user_data);
+          if (index != callback_data.index) {
+            callback_data.elimination_mask[index] = true;
+          }
+          return true;
+        },
+        &callback_data);
+  }
+  BLI_kdtree_3d_free(kdtree);
+}
+
+BLI_NOINLINE static void eliminate_points_based_on_mask(Span<bool> elimination_mask,
+                                                        Vector<float3> &positions,
+                                                        Vector<float3> &normals,
+                                                        Vector<int> &ids)
+{
+  for (int i = positions.size() - 1; i >= 0; i--) {
+    if (elimination_mask[i]) {
+      positions.remove_and_reorder(i);
+      normals.remove_and_reorder(i);
+      ids.remove_and_reorder(i);
+    }
+  }
+}
+
+static Vector<float3> stable_random_scatter_with_minimum_distance(
+    const Mesh *mesh,
+    const float max_density,
+    const float minimum_distance,
+    const FloatReadAttribute &density_factors,
+    Vector<float3> &r_normals,
+    Vector<int> &r_ids,
+    const int seed)
+{
+  SCOPED_TIMER(__func__);
+
+  Vector<float3> positions;
+  initial_uniform_distribution(mesh, max_density, seed, positions, r_normals, r_ids);
+  Array<bool> elimination_mask(positions.size(), false);
+  create_elimination_mask_for_close_points(positions, minimum_distance, elimination_mask);
+  eliminate_points_based_on_mask(elimination_mask, positions, r_normals, r_ids);
+  return positions;
+}
+
 static void geo_node_point_distribute_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
@@ -164,8 +284,9 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
           mesh_in, density, density_factors, normals, stable_ids, seed);
       break;
     case GEO_NODE_POINT_DISTRIBUTE_POISSON:
-      const float min_dist = params.extract_input<float>("Distance Min");
-      UNUSED_VARS(min_dist);
+      const float minimum_distance = params.extract_input<float>("Distance Min");
+      points = stable_random_scatter_with_minimum_distance(
+          mesh_in, density, minimum_distance, density_factors, normals, stable_ids, seed);
       break;
   }
 
