@@ -77,25 +77,25 @@ static Span<MLoopTri> get_mesh_looptris(const Mesh &mesh)
   return {looptris, looptris_len};
 }
 
-static Vector<float3> random_scatter_points_from_mesh(const Mesh *mesh,
-                                                      const float density,
-                                                      const FloatReadAttribute &density_factors,
-                                                      Vector<float3> &r_normals,
-                                                      Vector<int> &r_ids,
-                                                      const int seed)
+static void sample_mesh_surface(const Mesh &mesh,
+                                const float base_density,
+                                const FloatReadAttribute &density_factors,
+                                const int seed,
+                                Vector<float3> &r_positions,
+                                Vector<float3> &r_bary_coords,
+                                Vector<int> &r_looptri_indices)
 {
-  Span<MLoopTri> looptris = get_mesh_looptris(*mesh);
-
-  Vector<float3> points;
+  Span<MLoopTri> looptris = get_mesh_looptris(mesh);
 
   for (const int looptri_index : looptris.index_range()) {
     const MLoopTri &looptri = looptris[looptri_index];
-    const int v0_index = mesh->mloop[looptri.tri[0]].v;
-    const int v1_index = mesh->mloop[looptri.tri[1]].v;
-    const int v2_index = mesh->mloop[looptri.tri[2]].v;
-    const float3 v0_pos = mesh->mvert[v0_index].co;
-    const float3 v1_pos = mesh->mvert[v1_index].co;
-    const float3 v2_pos = mesh->mvert[v2_index].co;
+    const int v0_index = mesh.mloop[looptri.tri[0]].v;
+    const int v1_index = mesh.mloop[looptri.tri[1]].v;
+    const int v2_index = mesh.mloop[looptri.tri[2]].v;
+    const float3 v0_pos = mesh.mvert[v0_index].co;
+    const float3 v1_pos = mesh.mvert[v1_index].co;
+    const float3 v2_pos = mesh.mvert[v2_index].co;
+
     const float v0_density_factor = std::max(0.0f, density_factors[v0_index]);
     const float v1_density_factor = std::max(0.0f, density_factors[v1_index]);
     const float v2_density_factor = std::max(0.0f, density_factors[v2_index]);
@@ -107,27 +107,20 @@ static Vector<float3> random_scatter_points_from_mesh(const Mesh *mesh,
     const int looptri_seed = BLI_hash_int(looptri_index + seed);
     RandomNumberGenerator looptri_rng(looptri_seed);
 
-    const float points_amount_fl = area * density * looptri_density_factor;
+    const float points_amount_fl = area * base_density * looptri_density_factor;
     const float add_point_probability = fractf(points_amount_fl);
     const bool add_point = add_point_probability > looptri_rng.get_float();
     const int point_amount = (int)points_amount_fl + (int)add_point;
 
     for (int i = 0; i < point_amount; i++) {
-      const float3 bary_coords = looptri_rng.get_barycentric_coordinates();
+      const float3 bary_coord = looptri_rng.get_barycentric_coordinates();
       float3 point_pos;
-      interp_v3_v3v3v3(point_pos, v0_pos, v1_pos, v2_pos, bary_coords);
-      points.append(point_pos);
-
-      /* Build a hash stable even when the mesh is deformed. */
-      r_ids.append((int)(bary_coords.hash()) + looptri_index);
-
-      float3 tri_normal;
-      normal_tri_v3(tri_normal, v0_pos, v1_pos, v2_pos);
-      r_normals.append(tri_normal);
+      interp_v3_v3v3v3(point_pos, v0_pos, v1_pos, v2_pos, bary_coord);
+      r_positions.append(point_pos);
+      r_bary_coords.append(bary_coord);
+      r_looptri_indices.append(looptri_index);
     }
   }
-
-  return points;
 }
 
 BLI_NOINLINE static void initial_uniform_distribution(const Mesh &mesh,
@@ -264,7 +257,8 @@ BLI_NOINLINE static void compute_remaining_point_data(const Mesh &mesh,
                                                       Span<float3> bary_coords,
                                                       Span<int> looptri_indices,
                                                       MutableSpan<float3> r_normals,
-                                                      MutableSpan<int> r_ids)
+                                                      MutableSpan<int> r_ids,
+                                                      MutableSpan<float3> r_rotations)
 {
   Span<MLoopTri> looptris = get_mesh_looptris(mesh);
   for (const int i : bary_coords.index_range()) {
@@ -281,35 +275,28 @@ BLI_NOINLINE static void compute_remaining_point_data(const Mesh &mesh,
 
     r_ids[i] = (int)(bary_coord.hash()) + looptri_index;
     normal_tri_v3(r_normals[i], v0_pos, v1_pos, v2_pos);
+    r_rotations[i] = normal_to_euler_rotation(r_normals[i]);
   }
 }
 
-static Vector<float3> stable_random_scatter_with_minimum_distance(
-    const Mesh &mesh,
-    const float max_density,
-    const float minimum_distance,
-    const FloatReadAttribute &density_factors,
-    Vector<float3> &r_normals,
-    Vector<int> &r_ids,
-    const int seed)
+static void sample_mesh_surface_with_minimum_distance(const Mesh &mesh,
+                                                      const float max_density,
+                                                      const float minimum_distance,
+                                                      const FloatReadAttribute &density_factors,
+                                                      const int seed,
+                                                      Vector<float3> &r_positions,
+                                                      Vector<float3> &r_bary_coords,
+                                                      Vector<int> &r_looptri_indices)
 {
   SCOPED_TIMER(__func__);
 
-  Vector<float3> positions;
-  Vector<float3> bary_coords;
-  Vector<int> looptri_indices;
-  initial_uniform_distribution(mesh, max_density, seed, positions, bary_coords, looptri_indices);
-  Array<bool> elimination_mask(positions.size(), false);
-  update_elimination_mask_for_close_points(positions, minimum_distance, elimination_mask);
+  initial_uniform_distribution(
+      mesh, max_density, seed, r_positions, r_bary_coords, r_looptri_indices);
+  Array<bool> elimination_mask(r_positions.size(), false);
+  update_elimination_mask_for_close_points(r_positions, minimum_distance, elimination_mask);
   update_elimination_mask_based_on_density_mask(
-      mesh, density_factors, bary_coords, looptri_indices, elimination_mask);
-  eliminate_points_based_on_mask(elimination_mask, positions, bary_coords, looptri_indices);
-
-  const int tot_output_points = positions.size();
-  r_normals.resize(tot_output_points);
-  r_ids.resize(tot_output_points);
-  compute_remaining_point_data(mesh, bary_coords, looptri_indices, r_normals, r_ids);
-  return positions;
+      mesh, density_factors, r_bary_coords, r_looptri_indices, elimination_mask);
+  eliminate_points_based_on_mask(elimination_mask, r_positions, r_bary_coords, r_looptri_indices);
 }
 
 static void geo_node_point_distribute_exec(GeoNodeExecParams params)
@@ -345,25 +332,37 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
       density_attribute, ATTR_DOMAIN_POINT, 1.0f);
   const int seed = params.get_input<int>("Seed");
 
-  Vector<int> stable_ids;
-  Vector<float3> normals;
-  Vector<float3> points;
+  Vector<float3> positions;
+  Vector<float3> bary_coords;
+  Vector<int> looptri_indices;
   switch (distribute_method) {
     case GEO_NODE_POINT_DISTRIBUTE_RANDOM:
-      points = random_scatter_points_from_mesh(
-          mesh_in, density, density_factors, normals, stable_ids, seed);
+      sample_mesh_surface(
+          *mesh_in, density, density_factors, seed, positions, bary_coords, looptri_indices);
       break;
     case GEO_NODE_POINT_DISTRIBUTE_POISSON:
       const float minimum_distance = params.extract_input<float>("Distance Min");
-      points = stable_random_scatter_with_minimum_distance(
-          *mesh_in, density, minimum_distance, density_factors, normals, stable_ids, seed);
+      sample_mesh_surface_with_minimum_distance(*mesh_in,
+                                                density,
+                                                minimum_distance,
+                                                density_factors,
+                                                seed,
+                                                positions,
+                                                bary_coords,
+                                                looptri_indices);
       break;
   }
+  const int tot_points = positions.size();
+  Array<float3> normals(tot_points);
+  Array<int> stable_ids(tot_points);
+  Array<float3> rotations(tot_points);
+  compute_remaining_point_data(
+      *mesh_in, bary_coords, looptri_indices, normals, stable_ids, rotations);
 
-  PointCloud *pointcloud = BKE_pointcloud_new_nomain(points.size());
-  memcpy(pointcloud->co, points.data(), sizeof(float3) * points.size());
-  for (const int i : points.index_range()) {
-    *(float3 *)(pointcloud->co + i) = points[i];
+  PointCloud *pointcloud = BKE_pointcloud_new_nomain(tot_points);
+  memcpy(pointcloud->co, positions.data(), sizeof(float3) * tot_points);
+  for (const int i : positions.index_range()) {
+    *(float3 *)(pointcloud->co + i) = positions[i];
     pointcloud->radius[i] = 0.05f;
   }
 
@@ -391,9 +390,7 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
     Float3WriteAttribute rotations_attribute = point_component.attribute_try_ensure_for_write(
         "rotation", ATTR_DOMAIN_POINT, CD_PROP_FLOAT3);
     MutableSpan<float3> rotations_span = rotations_attribute.get_span();
-    for (const int i : rotations_span.index_range()) {
-      rotations_span[i] = normal_to_euler_rotation(normals[i]);
-    }
+    rotations_span.copy_from(rotations);
     rotations_attribute.apply_span();
   }
 
