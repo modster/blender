@@ -280,7 +280,6 @@ BLI_NOINLINE static void compute_remaining_point_data(const Mesh &mesh,
     const float3 v2_pos = mesh.mvert[v2_index].co;
 
     r_ids[i] = (int)(bary_coord.hash()) + looptri_index;
-
     normal_tri_v3(r_normals[i], v0_pos, v1_pos, v2_pos);
   }
 }
