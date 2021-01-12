@@ -69,6 +69,14 @@ static float3 normal_to_euler_rotation(const float3 normal)
   return rotation;
 }
 
+static Span<MLoopTri> get_mesh_looptris(const Mesh &mesh)
+{
+  /* This only updates a cache and can be considered to be logically const. */
+  const MLoopTri *looptris = BKE_mesh_runtime_looptri_ensure(const_cast<Mesh *>(&mesh));
+  const int looptris_len = BKE_mesh_runtime_looptri_len(&mesh);
+  return {looptris, looptris_len};
+}
+
 static Vector<float3> random_scatter_points_from_mesh(const Mesh *mesh,
                                                       const float density,
                                                       const FloatReadAttribute &density_factors,
@@ -76,13 +84,11 @@ static Vector<float3> random_scatter_points_from_mesh(const Mesh *mesh,
                                                       Vector<int> &r_ids,
                                                       const int seed)
 {
-  /* This only updates a cache and can be considered to be logically const. */
-  const MLoopTri *looptris = BKE_mesh_runtime_looptri_ensure(const_cast<Mesh *>(mesh));
-  const int looptris_len = BKE_mesh_runtime_looptri_len(mesh);
+  Span<MLoopTri> looptris = get_mesh_looptris(*mesh);
 
   Vector<float3> points;
 
-  for (const int looptri_index : IndexRange(looptris_len)) {
+  for (const int looptri_index : looptris.index_range()) {
     const MLoopTri &looptri = looptris[looptri_index];
     const int v0_index = mesh->mloop[looptri.tri[0]].v;
     const int v1_index = mesh->mloop[looptri.tri[1]].v;
@@ -113,7 +119,7 @@ static Vector<float3> random_scatter_points_from_mesh(const Mesh *mesh,
       points.append(point_pos);
 
       /* Build a hash stable even when the mesh is deformed. */
-      r_ids.append(((int)(bary_coords.hash()) + looptri_index));
+      r_ids.append((int)(bary_coords.hash()) + looptri_index);
 
       float3 tri_normal;
       normal_tri_v3(tri_normal, v0_pos, v1_pos, v2_pos);
@@ -124,25 +130,23 @@ static Vector<float3> random_scatter_points_from_mesh(const Mesh *mesh,
   return points;
 }
 
-BLI_NOINLINE static void initial_uniform_distribution(const Mesh *mesh,
+BLI_NOINLINE static void initial_uniform_distribution(const Mesh &mesh,
                                                       const float density,
                                                       const int seed,
                                                       Vector<float3> &r_positions,
-                                                      Vector<float3> &r_normals,
-                                                      Vector<int> &r_ids)
+                                                      Vector<float3> &r_bary_coords,
+                                                      Vector<int> &r_looptri_indices)
 {
-  /* This only updates a cache and can be considered to be logically const. */
-  const MLoopTri *looptris = BKE_mesh_runtime_looptri_ensure(const_cast<Mesh *>(mesh));
-  const int looptris_len = BKE_mesh_runtime_looptri_len(mesh);
+  Span<MLoopTri> looptris = get_mesh_looptris(mesh);
 
-  for (const int looptri_index : IndexRange(looptris_len)) {
+  for (const int looptri_index : looptris.index_range()) {
     const MLoopTri &looptri = looptris[looptri_index];
-    const int v0_index = mesh->mloop[looptri.tri[0]].v;
-    const int v1_index = mesh->mloop[looptri.tri[1]].v;
-    const int v2_index = mesh->mloop[looptri.tri[2]].v;
-    const float3 v0_pos = mesh->mvert[v0_index].co;
-    const float3 v1_pos = mesh->mvert[v1_index].co;
-    const float3 v2_pos = mesh->mvert[v2_index].co;
+    const int v0_index = mesh.mloop[looptri.tri[0]].v;
+    const int v1_index = mesh.mloop[looptri.tri[1]].v;
+    const int v2_index = mesh.mloop[looptri.tri[2]].v;
+    const float3 v0_pos = mesh.mvert[v0_index].co;
+    const float3 v1_pos = mesh.mvert[v1_index].co;
+    const float3 v2_pos = mesh.mvert[v2_index].co;
     const float area = area_tri_v3(v0_pos, v1_pos, v2_pos);
     const int looptri_seed = BLI_hash_int(looptri_index + seed);
     RandomNumberGenerator looptri_rng(looptri_seed);
@@ -157,13 +161,8 @@ BLI_NOINLINE static void initial_uniform_distribution(const Mesh *mesh,
       float3 point_pos;
       interp_v3_v3v3v3(point_pos, v0_pos, v1_pos, v2_pos, bary_coords);
       r_positions.append(point_pos);
-
-      /* Build a hash stable even when the mesh is deformed. */
-      r_ids.append(((int)(bary_coords.hash()) + looptri_index));
-
-      float3 tri_normal;
-      normal_tri_v3(tri_normal, v0_pos, v1_pos, v2_pos);
-      r_normals.append(tri_normal);
+      r_bary_coords.append(bary_coords);
+      r_looptri_indices.append(looptri_index);
     }
   }
 }
@@ -211,20 +210,45 @@ BLI_NOINLINE static void create_elimination_mask_for_close_points(
 
 BLI_NOINLINE static void eliminate_points_based_on_mask(Span<bool> elimination_mask,
                                                         Vector<float3> &positions,
-                                                        Vector<float3> &normals,
-                                                        Vector<int> &ids)
+                                                        Vector<float3> &bary_coords,
+                                                        Vector<int> &looptri_indices)
 {
   for (int i = positions.size() - 1; i >= 0; i--) {
     if (elimination_mask[i]) {
       positions.remove_and_reorder(i);
-      normals.remove_and_reorder(i);
-      ids.remove_and_reorder(i);
+      bary_coords.remove_and_reorder(i);
+      looptri_indices.remove_and_reorder(i);
     }
   }
 }
 
+BLI_NOINLINE static void compute_remaining_point_data(const Mesh &mesh,
+                                                      Span<float3> bary_coords,
+                                                      Span<int> looptri_indices,
+                                                      MutableSpan<float3> r_normals,
+                                                      MutableSpan<int> r_ids)
+{
+  Span<MLoopTri> looptris = get_mesh_looptris(mesh);
+  for (const int i : bary_coords.index_range()) {
+    const int looptri_index = looptri_indices[i];
+    const MLoopTri &looptri = looptris[looptri_index];
+    const float3 &bary_coord = bary_coords[i];
+
+    const int v0_index = mesh.mloop[looptri.tri[0]].v;
+    const int v1_index = mesh.mloop[looptri.tri[1]].v;
+    const int v2_index = mesh.mloop[looptri.tri[2]].v;
+    const float3 v0_pos = mesh.mvert[v0_index].co;
+    const float3 v1_pos = mesh.mvert[v1_index].co;
+    const float3 v2_pos = mesh.mvert[v2_index].co;
+
+    r_ids[i] = (int)(bary_coord.hash()) + looptri_index;
+
+    normal_tri_v3(r_normals[i], v0_pos, v1_pos, v2_pos);
+  }
+}
+
 static Vector<float3> stable_random_scatter_with_minimum_distance(
-    const Mesh *mesh,
+    const Mesh &mesh,
     const float max_density,
     const float minimum_distance,
     const FloatReadAttribute &density_factors,
@@ -235,10 +259,17 @@ static Vector<float3> stable_random_scatter_with_minimum_distance(
   SCOPED_TIMER(__func__);
 
   Vector<float3> positions;
-  initial_uniform_distribution(mesh, max_density, seed, positions, r_normals, r_ids);
+  Vector<float3> bary_coords;
+  Vector<int> looptri_indices;
+  initial_uniform_distribution(mesh, max_density, seed, positions, bary_coords, looptri_indices);
   Array<bool> elimination_mask(positions.size(), false);
   create_elimination_mask_for_close_points(positions, minimum_distance, elimination_mask);
-  eliminate_points_based_on_mask(elimination_mask, positions, r_normals, r_ids);
+  eliminate_points_based_on_mask(elimination_mask, positions, bary_coords, looptri_indices);
+
+  const int tot_output_points = positions.size();
+  r_normals.resize(tot_output_points);
+  r_ids.resize(tot_output_points);
+  compute_remaining_point_data(mesh, bary_coords, looptri_indices, r_normals, r_ids);
   return positions;
 }
 
@@ -286,7 +317,7 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
     case GEO_NODE_POINT_DISTRIBUTE_POISSON:
       const float minimum_distance = params.extract_input<float>("Distance Min");
       points = stable_random_scatter_with_minimum_distance(
-          mesh_in, density, minimum_distance, density_factors, normals, stable_ids, seed);
+          *mesh_in, density, minimum_distance, density_factors, normals, stable_ids, seed);
       break;
   }
 
