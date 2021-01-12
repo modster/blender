@@ -207,11 +207,42 @@ class TestRNAData(TestHelper, unittest.TestCase):
         props = test_object.custom_properties()
         self.assertEqual(len(props), 0)
 
+        # Access default RNA data values
         test_object["test_prop"] = 0.5
         rna_data = props.rna_data("test_prop")
         self.assertTrue("min" in rna_data)
-        self.assertTrue(rna_data["min"] < -10000.0)
-        
+        self.assertLess(rna_data["min"], -10000.0)
+        self.assertEqual(rna_data["subtype"], "NONE")
+        self.assertGreater(rna_data["soft_max"], 10000.0)
+
+        # Change RNA data values
+        props.update_rna("test_prop", subtype="TEMPERATURE", min=0, soft_min=0.1)
+        rna_data = props.rna_data("test_prop")
+        self.assertEqual(rna_data["min"], 0)
+        self.assertEqual(rna_data["soft_min"], 0.1)
+        self.assertEqual(rna_data["subtype"], "TEMPERATURE")
+
+        # Copy RNA data values from one property to another
+        test_object["test_prop_2"] = 11.7
+        props.copy_rna(props, "test_prop", "test_prop_2")
+        rna_data = props.rna_data("test_prop_2")
+        self.assertEqual(rna_data["min"], 0)
+        self.assertEqual(rna_data["soft_min"], 0.1)
+        self.assertEqual(rna_data["subtype"], "TEMPERATURE")
+        self.assertGreater(rna_data["soft_max"], 10000.0)
+
+        # Copy RNA data values to another object's property
+        bpy.data.objects.new("test_2", None)
+        test_object_2 = bpy.data.objects["test_2"]
+        test_object_2["test_prop_3"] = 20.1
+        props_2 = test_object_2.custom_properties()
+        props_2.copy_rna(props, "test_prop", "test_prop_3")
+        rna_data = props_2.rna_data("test_prop_3")
+        self.assertEqual(rna_data["min"], 0)
+        self.assertEqual(rna_data["soft_min"], 0.1)
+        self.assertEqual(rna_data["subtype"], "TEMPERATURE")
+        self.assertGreater(rna_data["soft_max"], 10000.0)
+
 
 if __name__ == '__main__':
     import sys
