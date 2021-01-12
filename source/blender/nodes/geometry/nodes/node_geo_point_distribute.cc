@@ -36,7 +36,7 @@
 
 static bNodeSocketTemplate geo_node_point_distribute_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_FLOAT, N_("Distance Min"), 0.1f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_NONE},
+    {SOCK_FLOAT, N_("Distance Min"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_NONE},
     {SOCK_FLOAT, N_("Density Max"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100000.0f, PROP_NONE},
     {SOCK_STRING, N_("Density Attribute")},
     {SOCK_INT, N_("Seed"), 0, 0, 0, 0, -10000, 10000},
@@ -180,6 +180,10 @@ BLI_NOINLINE static KDTree_3d *build_kdtree(Span<float3> positions)
 BLI_NOINLINE static void update_elimination_mask_for_close_points(
     Span<float3> positions, const float minimum_distance, MutableSpan<bool> elimination_mask)
 {
+  if (minimum_distance <= 0.0f) {
+    return;
+  }
+
   KDTree_3d *kdtree = build_kdtree(positions);
 
   for (const int i : positions.index_range()) {
