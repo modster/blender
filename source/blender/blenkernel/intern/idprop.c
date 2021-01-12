@@ -1628,9 +1628,9 @@ IDPropertyUIData *IDP_ui_data_ensure(IDProperty *prop)
     }
     case IDP_UI_DATA_TYPE_INT: {
       IDPropertyUIDataInt *ui_data = MEM_callocN(sizeof(IDPropertyUIDataInt), __func__);
-      ui_data->min = INT_MIN;
+      ui_data->min = -INT_MAX;
       ui_data->max = INT_MAX;
-      ui_data->soft_min = INT_MIN;
+      ui_data->soft_min = -INT_MAX;
       ui_data->soft_max = INT_MAX;
       ui_data->step = 1;
       prop->ui_data = (IDPropertyUIData *)ui_data;
@@ -1638,9 +1638,9 @@ IDPropertyUIData *IDP_ui_data_ensure(IDProperty *prop)
     }
     case IDP_UI_DATA_TYPE_FLOAT: {
       IDPropertyUIDataFloat *ui_data = MEM_callocN(sizeof(IDPropertyUIDataFloat), __func__);
-      ui_data->min = FLT_MIN;
-      ui_data->max = FLT_MIN;
-      ui_data->soft_min = FLT_MIN;
+      ui_data->min = -FLT_MAX;
+      ui_data->max = FLT_MAX;
+      ui_data->soft_min = -FLT_MAX;
       ui_data->soft_max = FLT_MAX;
       ui_data->step = 1.0f;
       ui_data->precision = 3;
