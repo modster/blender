@@ -3301,6 +3301,7 @@ static Object* do_convert_meshIsland(FractureModifierData* fmd, MeshIsland *mi, 
 	mul_m4_v3(ob_new->obmat, cent);
 	copy_v3_v3(ob_new->loc, cent);
 
+#if 0
 	/*if (mi->frame_count > 0)*/ {
 		if (start < mi->start_frame) {
 			start = mi->start_frame;
@@ -3310,6 +3311,7 @@ static Object* do_convert_meshIsland(FractureModifierData* fmd, MeshIsland *mi, 
 			end = mi->start_frame + mi->frame_count;
 		}
 	}
+#endif 
 
 	if (mi->rigidbody->type == RBO_TYPE_ACTIVE)
 	{
@@ -3359,13 +3361,20 @@ static Object* do_convert_meshIsland(FractureModifierData* fmd, MeshIsland *mi, 
 				//is there a bake, if yes... use that (disabled for now, odd probs...)
 				if (is_baked)
 				{
-					//BKE_ptcache_id_time(pid, scene, (float)i, NULL, NULL, NULL);
-					//if (BKE_ptcache_read(pid, (float)i, false))
+					BKE_ptcache_id_time(pid, scene, (float)i, NULL, NULL, NULL);
+					if (BKE_ptcache_read(pid, (float)i, false))
 					{
-						//BKE_ptcache_validate(cache, i);
-						//copy_v3_v3(loc, mi->rigidbody->pos);
-						//copy_qt_qt(rot, mi->rigidbody->orn);
-						int x = i - start;
+						BKE_ptcache_validate(cache, i);
+						copy_v3_v3(loc, mi->rigidbody->pos);
+						copy_qt_qt(rot, mi->rigidbody->orn);
+
+						// This works only if the conversion happens directly after baking. 
+						// Otherwise this data is not stored in the blend. There was an attempt
+						// to rebuild it prior to conversion, but that lead to weird results.
+
+						// so try to read the cache now.
+
+						/*int x = i - start;
 
 						loc[0] = mi->locs[x*3];
 						loc[1] = mi->locs[x*3+1];
@@ -3374,7 +3383,7 @@ static Object* do_convert_meshIsland(FractureModifierData* fmd, MeshIsland *mi, 
 						rot[0] = mi->rots[x*4];
 						rot[1] = mi->rots[x*4+1];
 						rot[2] = mi->rots[x*4+2];
-						rot[3] = mi->rots[x*4+3];
+						rot[3] = mi->rots[x*4+3];*/
 
 						if (fmd->fracture_mode == MOD_FRACTURE_EXTERNAL) {
 							mul_qt_qtqt(rot, rot, mi->rot);
@@ -3559,27 +3568,25 @@ static bool convert_modifier_to_keyframes(FractureModifierData* fmd, Group* gr, 
 	Base** basarray_old = MEM_mallocN(sizeof(Base*) * count, "conversion_tempbases_old");
 	double starttime;
 
-	is_baked = true;
+	//is_baked = true;
 
 	if (scene && scene->rigidbody_world)
 	{
 		cache = scene->rigidbody_world->pointcache;
 	}
 
-#if 0
 	if (cache && (!(cache->flag & PTCACHE_OUTDATED) || cache->flag & PTCACHE_BAKED))
 	{
 		//start = cache->startframe;
 		//end = cache->endframe;
 		/* need to "fill" the rigidbody world by doing 1 sim step, else bake cant be read properly */
-		//BKE_rigidbody_do_simulation(scene, (float)(start+1));
+		BKE_rigidbody_do_simulation(scene, (float)(start+1));
 		BKE_ptcache_id_from_rigidbody(&pid, NULL, scene->rigidbody_world);
 		is_baked = true;
 	}
 	else {
 		return false;
 	}
-#endif
 
 	parent = BKE_object_add(G.main, scene, OB_EMPTY, name);
 	BKE_mesh_center_of_surface(ob->data, obloc);
@@ -3669,6 +3676,7 @@ static int rigidbody_convert_keyframes_exec(bContext *C, wmOperator *op)
 				return OPERATOR_CANCELLED;
 			}
 
+#if 0
 			//force a transform sync, gah
 			if (cache->flag & PTCACHE_BAKED || !(cache->flag & PTCACHE_OUTDATED))
 			{
@@ -3679,6 +3687,7 @@ static int rigidbody_convert_keyframes_exec(bContext *C, wmOperator *op)
 					BKE_object_where_is_calc_time(scene, selob, (float)frame);
 				}
 			}
+#endif
 
 #if 0
 			//this check might be wrong in case a passive shard (no sim data then) is first
@@ -3714,9 +3723,9 @@ static int rigidbody_convert_keyframes_exec(bContext *C, wmOperator *op)
 		CTX_DATA_END;
 
 		//free a possible bake... because we added new rigidbodies, and this would mess up the mesh
-		if (scene->rigidbody_world && scene->rigidbody_world->pointcache) {
+		/*if (scene->rigidbody_world && scene->rigidbody_world->pointcache) {
 			scene->rigidbody_world->pointcache->flag &= ~PTCACHE_BAKED;
-		}
+		}*/
 
 		DAG_relations_tag_update(G.main);
 		WM_event_add_notifier(C, NC_OBJECT | ND_TRANSFORM, NULL);
@@ -3737,6 +3746,16 @@ static int rigidbody_convert_keyframes_exec(bContext *C, wmOperator *op)
 
 static int rigidbody_convert_keyframes_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
 {
+	Scene *scene = CTX_data_scene(C);
+	PointCache* cache = NULL;
+
+	if (scene && scene->rigidbody_world)
+	{
+		cache = scene->rigidbody_world->pointcache;
+		RNA_int_set(op->ptr, "start_frame", cache->startframe);
+		RNA_int_set(op->ptr, "end_frame", cache->endframe);
+	}
+
 	return WM_operator_props_dialog_popup(C, op, 10 * UI_UNIT_X, 5 * UI_UNIT_Y);
 }
 

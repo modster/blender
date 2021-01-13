@@ -23,7 +23,8 @@ set(ZLIB_URI https://netcologne.dl.sourceforge.net/project/libpng/zlib/${ZLIB_VE
 set(ZLIB_HASH 44d667c142d7cda120332623eab69f40)
 
 set(OPENAL_VERSION 1.17.2)
-set(OPENAL_URI http://kcat.strangesoft.net/openal-releases/openal-soft-${OPENAL_VERSION}.tar.bz2)
+#set(OPENAL_URI http://kcat.strangesoft.net/openal-releases/openal-soft-${OPENAL_VERSION}.tar.bz2)
+set(OPENAL_URI https://www.openal-soft.org/openal-releases/openal-soft-${OPENAL_VERSION}.tar.bz2)
 set(OPENAL_HASH 1764e0d8fec499589b47ebc724e0913d)
 
 set(PNG_VERSION 1.6.21)
@@ -149,8 +150,11 @@ set(PYTHON_HASH 57d1f8bfbabf4f2500273fb0706e6f21)
 if(UNIX AND NOT APPLE)
 	# Needed to be compatible with GCC 7, other platforms can upgrade later
 	set(TBB_VERSION 2017_U7)
-	set(TBB_URI https://github.com/01org/tbb/archive/${TBB_VERSION}.tar.gz)
-	set(TBB_HASH 364f2a4b80e978f38a69cbf7c466b898)
+	#set(TBB_URI https://github.com/01org/tbb/archive/${TBB_VERSION}.tar.gz)
+	#set(TBB_HASH 364f2a4b80e978f38a69cbf7c466b898)
+	set(TBB_URI https://github.com/oneapi-src/oneTBB/archive/${TBB_VERSION}.tar.gz)
+	set(TBB_HASH af1c799fe754924de7d5b00a6fb5f514)
+	
 else()
 	set(TBB_VERSION 44_20160128)
 	set(TBB_URI https://www.threadingbuildingblocks.org/sites/default/files/software_releases/source/tbb${TBB_VERSION}oss_src_0.tgz)
