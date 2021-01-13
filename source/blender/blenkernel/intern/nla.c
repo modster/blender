@@ -317,7 +317,7 @@ void BKE_nlatrack_insert_after(ListBase *nla_tracks,
    * before library overrides. So it must inserted after the last override. */
   if (prev == NULL) {
     NlaTrack *first_track = (NlaTrack *)nla_tracks->first;
-    if ((first_track->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0) {
+    if (first_track != NULL && (first_track->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0) {
       prev = first_track;
     }
   }
