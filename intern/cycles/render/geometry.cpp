@@ -1230,8 +1230,7 @@ void GeometryManager::device_update_bvh(Device *device,
   VLOG(1) << "Using " << bvh_layout_name(bparams.bvh_layout) << " layout.";
 
   const bool can_refit = scene->bvh != nullptr &&
-                         (bparams.bvh_layout == BVHLayout::BVH_LAYOUT_OPTIX ||
-                          bparams.bvh_layout == BVHLayout::BVH_LAYOUT_EMBREE);
+                         (bparams.bvh_layout == BVHLayout::BVH_LAYOUT_OPTIX);
   const bool pack_all = scene->bvh == nullptr;
 
   BVH *bvh = scene->bvh;
@@ -1245,8 +1244,10 @@ void GeometryManager::device_update_bvh(Device *device,
     return;
   }
 
+  const bool has_bvh2_layout = (bparams.bvh_layout == BVH_LAYOUT_BVH2);
+
   PackedBVH pack;
-  if (bparams.bvh_layout == BVH_LAYOUT_BVH2) {
+  if (has_bvh2_layout) {
     pack = std::move(static_cast<BVH2 *>(bvh)->pack);
   }
   else {
@@ -1314,6 +1315,9 @@ void GeometryManager::device_update_bvh(Device *device,
   /* copy to device */
   progress.set_status("Updating Scene BVH", "Copying BVH to device");
 
+  /* When using BVH2, we always have to copy/update the data as its layout is dependent on the
+   * BVH's leaf nodes which may be different when the objects or vertices move. */
+
   if (pack.nodes.size()) {
     dscene->bvh_nodes.steal_data(pack.nodes);
     dscene->bvh_nodes.copy_to_device();
@@ -1326,7 +1330,7 @@ void GeometryManager::device_update_bvh(Device *device,
     dscene->object_node.steal_data(pack.object_node);
     dscene->object_node.copy_to_device();
   }
-  if (pack.prim_tri_index.size() && dscene->prim_tri_index.need_realloc()) {
+  if (pack.prim_tri_index.size() && (dscene->prim_tri_index.need_realloc() || has_bvh2_layout)) {
     dscene->prim_tri_index.steal_data(pack.prim_tri_index);
     dscene->prim_tri_index.copy_to_device();
   }
@@ -1334,23 +1338,23 @@ void GeometryManager::device_update_bvh(Device *device,
     dscene->prim_tri_verts.steal_data(pack.prim_tri_verts);
     dscene->prim_tri_verts.copy_to_device();
   }
-  if (pack.prim_type.size() && dscene->prim_type.need_realloc()) {
+  if (pack.prim_type.size() && (dscene->prim_type.need_realloc() || has_bvh2_layout)) {
     dscene->prim_type.steal_data(pack.prim_type);
     dscene->prim_type.copy_to_device();
   }
-  if (pack.prim_visibility.size() && dscene->prim_visibility.need_realloc()) {
+  if (pack.prim_visibility.size() && (dscene->prim_visibility.need_realloc() || has_bvh2_layout)) {
     dscene->prim_visibility.steal_data(pack.prim_visibility);
     dscene->prim_visibility.copy_to_device();
   }
-  if (pack.prim_index.size() && dscene->prim_index.need_realloc()) {
+  if (pack.prim_index.size() && (dscene->prim_index.need_realloc() || has_bvh2_layout)) {
     dscene->prim_index.steal_data(pack.prim_index);
     dscene->prim_index.copy_to_device();
   }
-  if (pack.prim_object.size() && dscene->prim_object.need_realloc()) {
+  if (pack.prim_object.size() && (dscene->prim_object.need_realloc() || has_bvh2_layout)) {
     dscene->prim_object.steal_data(pack.prim_object);
     dscene->prim_object.copy_to_device();
   }
-  if (pack.prim_time.size() && dscene->prim_time.need_realloc()) {
+  if (pack.prim_time.size() && (dscene->prim_time.need_realloc() || has_bvh2_layout)) {
     dscene->prim_time.steal_data(pack.prim_time);
     dscene->prim_time.copy_to_device();
   }

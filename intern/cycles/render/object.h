@@ -167,7 +167,9 @@ class ObjectManager {
   string get_cryptomatte_assets(Scene *scene);
 
  protected:
-  void device_update_object_transform(UpdateObjectTransformState *state, Object *ob);
+  void device_update_object_transform(UpdateObjectTransformState *state,
+                                      Object *ob,
+                                      bool update_all);
   void device_update_object_transform_task(UpdateObjectTransformState *state);
   bool device_update_object_transform_pop_work(UpdateObjectTransformState *state,
                                                int *start_index,

@@ -209,28 +209,20 @@ void Object::apply_transform(bool apply_to_motion)
 
 void Object::tag_update(Scene *scene)
 {
-  if (geometry) {
-    if (geometry->transform_applied)
-      geometry->tag_modified();
+  uint32_t flag = ObjectManager::UPDATE_NONE;
 
-    foreach (Node *node, geometry->get_used_shaders()) {
-      Shader *shader = static_cast<Shader *>(node);
-      if (shader->get_use_mis() && shader->has_surface_emission)
-        scene->light_manager->tag_update(scene, LightManager::EMISSIVE_MESH_MODIFIED);
+  if (is_modified()) {
+    flag |= ObjectManager::OBJECT_MODIFIED;
+
+    if (use_holdout_is_modified()) {
+      flag |= ObjectManager::HOLDOUT_MODIFIED;
     }
   }
 
-  scene->camera->need_flags_update = true;
-
-  uint32_t flag = ObjectManager::OBJECT_MODIFIED;
-
-  if (use_holdout_is_modified()) {
-    flag |= ObjectManager::HOLDOUT_MODIFIED;
-  }
-
-  if (tfm_is_modified()) {
-    /* tag the geometry as modified so the BVH is updated, but do not tag everything as modified */
-    if (geometry) {
+  if (geometry) {
+    if (tfm_is_modified()) {
+      /* tag the geometry as modified so the BVH is updated, but do not tag everything as modified
+       */
       if (geometry->is_mesh() || geometry->is_volume()) {
         Mesh *mesh = static_cast<Mesh *>(geometry);
         mesh->tag_verts_modified();
@@ -240,8 +232,15 @@ void Object::tag_update(Scene *scene)
         hair->tag_curve_keys_modified();
       }
     }
+
+    foreach (Node *node, geometry->get_used_shaders()) {
+      Shader *shader = static_cast<Shader *>(node);
+      if (shader->get_use_mis() && shader->has_surface_emission)
+        scene->light_manager->tag_update(scene, LightManager::EMISSIVE_MESH_MODIFIED);
+    }
   }
 
+  scene->camera->need_flags_update = true;
   scene->object_manager->tag_update(scene, flag);
 }
 
@@ -406,7 +405,9 @@ static float object_volume_density(const Transform &tfm, Geometry *geom)
   return 1.0f;
 }
 
-void ObjectManager::device_update_object_transform(UpdateObjectTransformState *state, Object *ob)
+void ObjectManager::device_update_object_transform(UpdateObjectTransformState *state,
+                                                   Object *ob,
+                                                   bool update_all)
 {
   KernelObject &kobject = state->objects[ob->index];
   Transform *object_motion_pass = state->object_motion_pass;
@@ -480,8 +481,11 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
       kobject.motion_offset = state->motion_offset[ob->index];
 
       /* Decompose transforms for interpolation. */
-      DecomposedTransform *decomp = state->object_motion + kobject.motion_offset;
-      transform_motion_decompose(decomp, ob->motion.data(), ob->motion.size());
+      if (ob->tfm_is_modified() || update_all) {
+        DecomposedTransform *decomp = state->object_motion + kobject.motion_offset;
+        transform_motion_decompose(decomp, ob->motion.data(), ob->motion.size());
+      }
+
       flag |= SD_OBJECT_MOTION;
       state->have_motion = true;
     }
@@ -504,13 +508,20 @@ void ObjectManager::device_update_object_transform(UpdateObjectTransformState *s
                          0;
   kobject.patch_map_offset = 0;
   kobject.attribute_map_offset = 0;
-  uint32_t hash_name = util_murmur_hash3(ob->name.c_str(), ob->name.length(), 0);
-  uint32_t hash_asset = util_murmur_hash3(ob->asset_name.c_str(), ob->asset_name.length(), 0);
-  kobject.cryptomatte_object = util_hash_to_float(hash_name);
-  kobject.cryptomatte_asset = util_hash_to_float(hash_asset);
+
+  if (ob->asset_name_is_modified() || update_all) {
+    uint32_t hash_name = util_murmur_hash3(ob->name.c_str(), ob->name.length(), 0);
+    uint32_t hash_asset = util_murmur_hash3(ob->asset_name.c_str(), ob->asset_name.length(), 0);
+    kobject.cryptomatte_object = util_hash_to_float(hash_name);
+    kobject.cryptomatte_asset = util_hash_to_float(hash_asset);
+  }
+
   kobject.shadow_terminator_offset = 1.0f / (1.0f - 0.5f * ob->shadow_terminator_offset);
 
   /* Object flag. */
+  if (ob->use_holdout) {
+    flag |= SD_OBJECT_HOLDOUT_MASK;
+  }
   state->object_flag[ob->index] = flag;
   state->object_volume_step[ob->index] = FLT_MAX;
 
@@ -575,12 +586,7 @@ void ObjectManager::device_update_transforms(DeviceScene *dscene, Scene *scene, 
                [&](const blocked_range<size_t> &r) {
                  for (size_t i = r.begin(); i != r.end(); i++) {
                    Object *ob = state.scene->objects[i];
-
-                   if (!ob->is_modified() && !update_all) {
-                     continue;
-                   }
-
-                   device_update_object_transform(&state, ob);
+                   device_update_object_transform(&state, ob, update_all);
                  }
                });
 
@@ -589,7 +595,6 @@ void ObjectManager::device_update_transforms(DeviceScene *dscene, Scene *scene, 
   }
 
   dscene->objects.copy_to_device_if_modified();
-
   if (state.need_motion == Scene::MOTION_PASS) {
     dscene->object_motion_pass.copy_to_device();
   }
@@ -755,18 +760,6 @@ void ObjectManager::device_update_flags(
       object_flag[object->index] &= ~SD_OBJECT_SHADOW_CATCHER;
     }
 
-    if (object->use_holdout) {
-      object_flag[object->index] |= SD_OBJECT_HOLDOUT_MASK;
-    }
-
-    if (object->geometry->transform_applied) {
-      object_flag[object->index] |= SD_OBJECT_TRANSFORM_APPLIED;
-
-      if (object->geometry->transform_negative_scaled) {
-        object_flag[object->index] |= SD_OBJECT_NEGATIVE_SCALE_APPLIED;
-      }
-    }
-
     if (bounds_valid) {
       foreach (Object *volume_object, volume_objects) {
         if (object == volume_object) {
@@ -848,9 +841,7 @@ void ObjectManager::device_free(Device *, DeviceScene *dscene, bool force_free)
   dscene->object_volume_step.free_if_need_realloc(force_free);
 }
 
-void ObjectManager::apply_static_transforms(DeviceScene * /*dscene*/,
-                                            Scene *scene,
-                                            Progress &progress)
+void ObjectManager::apply_static_transforms(DeviceScene *dscene, Scene *scene, Progress &progress)
 {
   /* todo: normals and displacement should be done before applying transform! */
   /* todo: create objects/geometry in right order! */
@@ -873,6 +864,8 @@ void ObjectManager::apply_static_transforms(DeviceScene * /*dscene*/,
 
   if (progress.get_cancel())
     return;
+
+  uint *object_flag = dscene->object_flag.data();
 
   /* apply transforms for objects with single user geometry */
   foreach (Object *object, scene->objects) {
@@ -905,6 +898,10 @@ void ObjectManager::apply_static_transforms(DeviceScene * /*dscene*/,
           if (progress.get_cancel())
             return;
         }
+
+        object_flag[i] |= SD_OBJECT_TRANSFORM_APPLIED;
+        if (geom->transform_negative_scaled)
+          object_flag[i] |= SD_OBJECT_NEGATIVE_SCALE_APPLIED;
       }
     }
 
