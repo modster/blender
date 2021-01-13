@@ -672,12 +672,12 @@ static int nlaedit_add_actionclip_exec(bContext *C, wmOperator *op)
     strip->start = cfra;
 
     /* firstly try adding strip to our current track, but if that fails, add to a new track */
-    if (BKE_nlatrack_add_strip(nlt, strip, is_liboverride) == 0) {
+    if (!BKE_nlatrack_try_add_strip(nlt, strip, is_liboverride)) {
       /* trying to add to the current failed (no space),
        * so add a new track to the stack, and add to that...
        */
-      nlt = BKE_nlatrack_add(adt, NULL, is_liboverride);
-      BKE_nlatrack_add_strip(nlt, strip, is_liboverride);
+      nlt = BKE_nlatrack_new_tail_and_set_active(&adt->nla_tracks, is_liboverride);
+      BKE_nlatrack_add_strip(nlt, strip);
     }
 
     /* auto-name it */
@@ -901,12 +901,12 @@ static int nlaedit_add_sound_exec(bContext *C, wmOperator *UNUSED(op))
     strip->end += cfra;
 
     /* firstly try adding strip to our current track, but if that fails, add to a new track */
-    if (BKE_nlatrack_add_strip(nlt, strip, is_liboverride) == 0) {
+    if (!BKE_nlatrack_try_add_strip(nlt, strip, is_liboverride)) {
       /* trying to add to the current failed (no space),
        * so add a new track to the stack, and add to that...
        */
-      nlt = BKE_nlatrack_add(adt, NULL, is_liboverride);
-      BKE_nlatrack_add_strip(nlt, strip, is_liboverride);
+      nlt = BKE_nlatrack_new_tail_and_set_active(&adt->nla_tracks, is_liboverride);
+      BKE_nlatrack_add_strip(nlt, strip);
     }
 
     /* auto-name it */
@@ -1123,13 +1123,14 @@ static int nlaedit_duplicate_exec(bContext *C, wmOperator *op)
 
         /* in case there's no space in the track above,
          * or we haven't got a reference to it yet, try adding */
-        if (BKE_nlatrack_add_strip(nlt->next, nstrip, is_liboverride) == 0) {
+        if (!BKE_nlatrack_try_add_strip(nlt->next, nstrip, is_liboverride)) {
           /* need to add a new track above the one above the current one
            * - if the current one is the last one, nlt->next will be NULL, which defaults to adding
            *   at the top of the stack anyway...
            */
-          track = BKE_nlatrack_add(adt, nlt->next, is_liboverride);
-          BKE_nlatrack_add_strip(track, nstrip, is_liboverride);
+          track = BKE_nlatrack_new_after_and_set_active(
+              &adt->nla_tracks, nlt->next, is_liboverride);
+          BKE_nlatrack_add_strip(track, nstrip);
         }
 
         /* deselect the original and the active flag */
@@ -1238,15 +1239,15 @@ static int nlaedit_delete_exec(bContext *C, wmOperator *UNUSED(op))
       if (strip->flag & NLASTRIP_FLAG_SELECT) {
         /* if a strip either side of this was a transition, delete those too */
         if ((strip->prev) && (strip->prev->type == NLASTRIP_TYPE_TRANSITION)) {
-          BKE_nlastrip_free(&nlt->strips, strip->prev, true);
+          BKE_nlastrip_remove_and_free(&nlt->strips, strip->prev, true);
         }
         if ((nstrip) && (nstrip->type == NLASTRIP_TYPE_TRANSITION)) {
           nstrip = nstrip->next;
-          BKE_nlastrip_free(&nlt->strips, strip->next, true);
+          BKE_nlastrip_remove_and_free(&nlt->strips, strip->next, true);
         }
 
         /* finally, delete this strip */
-        BKE_nlastrip_free(&nlt->strips, strip, true);
+        BKE_nlastrip_remove_and_free(&nlt->strips, strip, true);
       }
     }
   }
@@ -1643,8 +1644,8 @@ static int nlaedit_swap_exec(bContext *C, wmOperator *op)
       }
 
       /* add strips back to track now */
-      BKE_nlatrack_add_strip(nlt, area, is_liboverride);
-      BKE_nlatrack_add_strip(nlt, sb, is_liboverride);
+      BKE_nlatrack_try_add_strip(nlt, area, is_liboverride);
+      BKE_nlatrack_try_add_strip(nlt, sb, is_liboverride);
     }
 
     /* clear (temp) metastrips */
@@ -1729,8 +1730,8 @@ static int nlaedit_move_up_exec(bContext *C, wmOperator *UNUSED(op))
         if (BKE_nlatrack_has_space(nltn, strip->start, strip->end)) {
           /* remove from its current track, and add to the one above
            * (it 'should' work, so no need to worry) */
-          BLI_remlink(&nlt->strips, strip);
-          BKE_nlatrack_add_strip(nltn, strip, is_liboverride);
+          BKE_nlatrack_remove_strip(nlt, strip);
+          BKE_nlatrack_add_strip(nltn, strip);
         }
       }
     }
@@ -1814,8 +1815,8 @@ static int nlaedit_move_down_exec(bContext *C, wmOperator *UNUSED(op))
         if (BKE_nlatrack_has_space(nltp, strip->start, strip->end)) {
           /* remove from its current track, and add to the one above
            * (it 'should' work, so no need to worry) */
-          BLI_remlink(&nlt->strips, strip);
-          BKE_nlatrack_add_strip(nltp, strip, is_liboverride);
+          BKE_nlatrack_remove_strip(nlt, strip);
+          BKE_nlatrack_add_strip(nltp, strip);
         }
       }
     }
@@ -2306,10 +2307,10 @@ static int nlaedit_snap_exec(bContext *C, wmOperator *op)
       BLI_remlink(&tmp_strips, strip);
 
       /* in case there's no space in the current track, try adding */
-      if (BKE_nlatrack_add_strip(nlt, strip, is_liboverride) == 0) {
+      if (!BKE_nlatrack_try_add_strip(nlt, strip, is_liboverride)) {
         /* need to add a new track above the current one */
-        track = BKE_nlatrack_add(adt, nlt, is_liboverride);
-        BKE_nlatrack_add_strip(track, strip, is_liboverride);
+        track = BKE_nlatrack_new_after_and_set_active(&adt->nla_tracks, nlt, is_liboverride);
+        BKE_nlatrack_add_strip(track, strip);
 
         /* clear temp meta-strips on this new track,
          * as we may not be able to get back to it */

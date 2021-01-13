@@ -46,8 +46,8 @@ struct PropertyRNA;
 /* ----------------------------- */
 /* Data Management */
 
-void BKE_nlastrip_free(ListBase *strips, struct NlaStrip *strip, bool do_id_user);
-void BKE_nlatrack_free(ListBase *tracks, struct NlaTrack *nlt, bool do_id_user);
+void BKE_nlastrip_free(struct NlaStrip *strip, bool do_id_user);
+void BKE_nlatrack_free(struct NlaTrack *nlt, bool do_id_user);
 void BKE_nla_tracks_free(ListBase *tracks, bool do_id_user);
 
 struct NlaStrip *BKE_nlastrip_copy(struct Main *bmain,
@@ -60,10 +60,39 @@ struct NlaTrack *BKE_nlatrack_copy(struct Main *bmain,
                                    const int flag);
 void BKE_nla_tracks_copy(struct Main *bmain, ListBase *dst, ListBase *src, const int flag);
 
-struct NlaTrack *BKE_nlatrack_add(struct AnimData *adt,
-                                  struct NlaTrack *prev,
-                                  bool is_liboverride);
+struct NlaTrack *BKE_nlatrack_new();
+void BKE_nlatrack_remove(ListBase *tracks, struct NlaTrack *nlt);
+void BKE_nlatrack_remove_and_free(ListBase *tracks, struct NlaTrack *nlt, const bool do_id_user);
+
+void BKE_nlatrack_insert_after(ListBase *nla_tracks,
+                               struct NlaTrack *prev,
+                               struct NlaTrack *new_track,
+                               const bool is_liboverride);
+
+void BKE_nlatrack_insert_before(ListBase *nla_tracks,
+                                struct NlaTrack *next,
+                                struct NlaTrack *new_track,
+                                const bool is_liboverride);
+
+struct NlaTrack *BKE_nlatrack_new_after_and_set_active(ListBase *nla_tracks,
+                                                       struct NlaTrack *prev,
+                                                       const bool is_liboverride);
+
+struct NlaTrack *BKE_nlatrack_new_before_and_set_active(ListBase *nla_tracks,
+                                                        struct NlaTrack *next,
+                                                        const bool is_liboverride);
+
+struct NlaTrack *BKE_nlatrack_new_tail_and_set_active(ListBase *nla_tracks,
+                                                      const bool is_liboverride);
+struct NlaTrack *BKE_nlatrack_new_head_and_set_active(ListBase *nla_tracks,
+                                                      const bool is_liboverride);
+
 struct NlaStrip *BKE_nlastrip_new(struct bAction *act);
+
+void BKE_nlatrack_remove_strip(struct NlaTrack *track, struct NlaStrip *strip);
+void BKE_nlastrip_remove(ListBase *strips, struct NlaStrip *strip);
+void BKE_nlastrip_remove_and_free(ListBase *strips, struct NlaStrip *strip, const bool do_id_user);
+
 struct NlaStrip *BKE_nlastack_add_strip(struct AnimData *adt,
                                         struct bAction *act,
                                         const bool is_liboverride);
@@ -79,12 +108,13 @@ void BKE_nla_strip_foreach_id(struct NlaStrip *strip, struct LibraryForeachIDDat
 bool BKE_nlastrips_has_space(ListBase *strips, float start, float end);
 void BKE_nlastrips_sort_strips(ListBase *strips);
 
-bool BKE_nlastrips_add_strip(ListBase *strips, struct NlaStrip *strip);
+void BKE_nlastrips_add_strip(ListBase *strips, struct NlaStrip *strip);
+bool BKE_nlastrips_try_add_strip(ListBase *strips, struct NlaStrip *strip);
 
 void BKE_nlastrips_make_metas(ListBase *strips, bool is_temp);
 void BKE_nlastrips_clear_metas(ListBase *strips, bool only_sel, bool only_temp);
 void BKE_nlastrips_clear_metastrip(ListBase *strips, struct NlaStrip *strip);
-bool BKE_nlameta_add_strip(struct NlaStrip *mstrip, struct NlaStrip *strip);
+bool BKE_nlameta_try_add_strip(struct NlaStrip *mstrip, struct NlaStrip *strip);
 void BKE_nlameta_flush_transforms(struct NlaStrip *mstrip);
 
 /* ............ */
@@ -99,9 +129,10 @@ void BKE_nlatrack_solo_toggle(struct AnimData *adt, struct NlaTrack *nlt);
 bool BKE_nlatrack_has_space(struct NlaTrack *nlt, float start, float end);
 void BKE_nlatrack_sort_strips(struct NlaTrack *nlt);
 
-bool BKE_nlatrack_add_strip(struct NlaTrack *nlt,
-                            struct NlaStrip *strip,
-                            const bool is_liboverride);
+void BKE_nlatrack_add_strip(struct NlaTrack *nlt, struct NlaStrip *strip);
+bool BKE_nlatrack_try_add_strip(struct NlaTrack *nlt,
+                                struct NlaStrip *strip,
+                                const bool is_liboverride);
 
 bool BKE_nlatrack_get_bounds(struct NlaTrack *nlt, float bounds[2]);
 

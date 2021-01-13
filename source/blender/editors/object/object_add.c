@@ -1717,13 +1717,13 @@ static int object_speaker_add_exec(bContext *C, wmOperator *op)
   {
     /* create new data for NLA hierarchy */
     AnimData *adt = BKE_animdata_add_id(&ob->id);
-    NlaTrack *nlt = BKE_nlatrack_add(adt, NULL, is_liboverride);
+    NlaTrack *nlt = BKE_nlatrack_new_tail_and_set_active(&adt->nla_tracks, is_liboverride);
     NlaStrip *strip = BKE_nla_add_soundstrip(bmain, scene, ob->data);
     strip->start = CFRA;
     strip->end += strip->start;
 
     /* hook them up */
-    BKE_nlatrack_add_strip(nlt, strip, is_liboverride);
+    BKE_nlatrack_add_strip(nlt, strip);
 
     /* auto-name the strip, and give the track an interesting name  */
     BLI_strncpy(nlt->name, DATA_("SoundTrack"), sizeof(nlt->name));

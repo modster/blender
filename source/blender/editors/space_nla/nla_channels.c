@@ -655,14 +655,14 @@ bool nlaedit_add_tracks_existing(bAnimContext *ac, bool above_sel)
        */
       if (above_sel) {
         /* just add a new one above this one */
-        BKE_nlatrack_add(adt, nlt, is_liboverride);
+        BKE_nlatrack_new_after_and_set_active(&adt->nla_tracks, nlt, is_liboverride);
         ale->update = ANIM_UPDATE_DEPS;
         added = true;
       }
       else if ((lastAdt == NULL) || (adt != lastAdt)) {
         /* add one track to the top of the owning AnimData's stack,
          * then don't add anymore to this stack */
-        BKE_nlatrack_add(adt, NULL, is_liboverride);
+        BKE_nlatrack_new_tail_and_set_active(&adt->nla_tracks, is_liboverride);
         lastAdt = adt;
         ale->update = ANIM_UPDATE_DEPS;
         added = true;
@@ -700,7 +700,7 @@ bool nlaedit_add_tracks_empty(bAnimContext *ac)
     /* ensure it is empty */
     if (BLI_listbase_is_empty(&adt->nla_tracks)) {
       /* add new track to this AnimData block then */
-      BKE_nlatrack_add(adt, NULL, ID_IS_OVERRIDE_LIBRARY(ale->id));
+      BKE_nlatrack_new_tail_and_set_active(&adt->nla_tracks, ID_IS_OVERRIDE_LIBRARY(ale->id));
       ale->update = ANIM_UPDATE_DEPS;
       added = true;
     }
@@ -811,7 +811,7 @@ static int nlaedit_delete_tracks_exec(bContext *C, wmOperator *UNUSED(op))
       }
 
       /* call delete on this track - deletes all strips too */
-      BKE_nlatrack_free(&adt->nla_tracks, nlt, true);
+      BKE_nlatrack_remove_and_free(&adt->nla_tracks, nlt, true);
       ale->update = ANIM_UPDATE_DEPS;
     }
   }

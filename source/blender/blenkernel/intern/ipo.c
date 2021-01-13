@@ -2012,12 +2012,12 @@ static void nlastrips_to_animdata(ID *id, ListBase *strips)
       }
 
       /* try to add this strip to the current NLA-Track (i.e. the 'last' one on the stack atm) */
-      if (BKE_nlatrack_add_strip(nlt, strip, false) == 0) {
+      if (!BKE_nlatrack_try_add_strip(nlt, strip, false)) {
         /* trying to add to the current failed (no space),
          * so add a new track to the stack, and add to that...
          */
-        nlt = BKE_nlatrack_add(adt, NULL, false);
-        BKE_nlatrack_add_strip(nlt, strip, false);
+        nlt = BKE_nlatrack_new_tail_and_set_active(&adt->nla_tracks, false);
+        BKE_nlatrack_add_strip(nlt, strip);
       }
 
       /* ensure that strip has a name */
