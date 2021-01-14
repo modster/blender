@@ -149,7 +149,7 @@ static void do_math_operation_fl3_fl3_to_fl3(const Float3ReadAttribute &input_a,
 
   Span<float3> span_a = input_a.get_span();
   Span<float3> span_b = input_b.get_span();
-  MutableSpan<float3> span_result = result.get_span();
+  MutableSpan<float3> span_result = result.get_span_for_write_only();
 
   bool success = try_dispatch_float_math_fl3_fl3_to_fl3(
       operation, [&](auto math_function, const FloatMathOperationInfo &UNUSED(info)) {
@@ -179,7 +179,7 @@ static void do_math_operation_fl3_fl3_fl3_to_fl3(const Float3ReadAttribute &inpu
   Span<float3> span_a = input_a.get_span();
   Span<float3> span_b = input_b.get_span();
   Span<float3> span_c = input_c.get_span();
-  MutableSpan<float3> span_result = result.get_span();
+  MutableSpan<float3> span_result = result.get_span_for_write_only();
 
   bool success = try_dispatch_float_math_fl3_fl3_fl3_to_fl3(
       operation, [&](auto math_function, const FloatMathOperationInfo &UNUSED(info)) {
@@ -208,7 +208,7 @@ static void do_math_operation_fl3_fl3_to_fl(const Float3ReadAttribute &input_a,
 
   Span<float3> span_a = input_a.get_span();
   Span<float3> span_b = input_b.get_span();
-  MutableSpan<float> span_result = result.get_span();
+  MutableSpan<float> span_result = result.get_span_for_write_only();
 
   bool success = try_dispatch_float_math_fl3_fl3_to_fl(
       operation, [&](auto math_function, const FloatMathOperationInfo &UNUSED(info)) {
@@ -236,7 +236,7 @@ static void do_math_operation_fl3_fl_to_fl3(const Float3ReadAttribute &input_a,
 
   Span<float3> span_a = input_a.get_span();
   Span<float> span_b = input_b.get_span();
-  MutableSpan<float3> span_result = result.get_span();
+  MutableSpan<float3> span_result = result.get_span_for_write_only();
 
   bool success = try_dispatch_float_math_fl3_fl_to_fl3(
       operation, [&](auto math_function, const FloatMathOperationInfo &UNUSED(info)) {
@@ -262,7 +262,7 @@ static void do_math_operation_fl3_to_fl3(const Float3ReadAttribute &input_a,
   const int size = input_a.size();
 
   Span<float3> span_a = input_a.get_span();
-  MutableSpan<float3> span_result = result.get_span();
+  MutableSpan<float3> span_result = result.get_span_for_write_only();
 
   bool success = try_dispatch_float_math_fl3_to_fl3(
       operation, [&](auto math_function, const FloatMathOperationInfo &UNUSED(info)) {
@@ -287,7 +287,7 @@ static void do_math_operation_fl3_to_fl(const Float3ReadAttribute &input_a,
   const int size = input_a.size();
 
   Span<float3> span_a = input_a.get_span();
-  MutableSpan<float> span_result = result.get_span();
+  MutableSpan<float> span_result = result.get_span_for_write_only();
 
   bool success = try_dispatch_float_math_fl3_to_fl(
       operation, [&](auto math_function, const FloatMathOperationInfo &UNUSED(info)) {
@@ -363,20 +363,17 @@ static void attribute_vector_math_calc(GeometryComponent &component,
     case NODE_VECTOR_MATH_MODULO:
     case NODE_VECTOR_MATH_MINIMUM:
     case NODE_VECTOR_MATH_MAXIMUM:
-      do_math_operation_fl3_fl3_to_fl3(
-          std::move(attribute_a), std::move(attribute_b), std::move(attribute_result), operation);
+      do_math_operation_fl3_fl3_to_fl3(*attribute_a, *attribute_b, *attribute_result, operation);
       break;
     case NODE_VECTOR_MATH_DOT_PRODUCT:
     case NODE_VECTOR_MATH_DISTANCE:
-      do_math_operation_fl3_fl3_to_fl(
-          std::move(attribute_a), std::move(attribute_b), std::move(attribute_result), operation);
+      do_math_operation_fl3_fl3_to_fl(*attribute_a, *attribute_b, *attribute_result, operation);
       break;
     case NODE_VECTOR_MATH_LENGTH:
-      do_math_operation_fl3_to_fl(std::move(attribute_a), std::move(attribute_result), operation);
+      do_math_operation_fl3_to_fl(*attribute_a, *attribute_result, operation);
       break;
     case NODE_VECTOR_MATH_SCALE:
-      do_math_operation_fl3_fl_to_fl3(
-          std::move(attribute_a), std::move(attribute_b), std::move(attribute_result), operation);
+      do_math_operation_fl3_fl_to_fl3(*attribute_a, *attribute_b, *attribute_result, operation);
       break;
     case NODE_VECTOR_MATH_NORMALIZE:
     case NODE_VECTOR_MATH_FLOOR:
@@ -386,14 +383,11 @@ static void attribute_vector_math_calc(GeometryComponent &component,
     case NODE_VECTOR_MATH_SINE:
     case NODE_VECTOR_MATH_COSINE:
     case NODE_VECTOR_MATH_TANGENT:
-      do_math_operation_fl3_to_fl3(std::move(attribute_a), std::move(attribute_result), operation);
+      do_math_operation_fl3_to_fl3(*attribute_a, *attribute_result, operation);
       break;
     case NODE_VECTOR_MATH_WRAP:
-      do_math_operation_fl3_fl3_fl3_to_fl3(std::move(attribute_a),
-                                           std::move(attribute_b),
-                                           std::move(attribute_c),
-                                           std::move(attribute_result),
-                                           operation);
+      do_math_operation_fl3_fl3_fl3_to_fl3(
+          *attribute_a, *attribute_b, *attribute_c, *attribute_result, operation);
       break;
   }
 }
