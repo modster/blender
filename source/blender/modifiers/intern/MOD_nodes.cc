@@ -593,10 +593,6 @@ static const SocketPropertyType *get_socket_property_type(const bNodeSocket &bso
             idprop.id = (ID *)value->value;
             return IDP_New(IDP_ID, &idprop, name);
           },
-          nullptr,
-          nullptr,
-          nullptr,
-          nullptr,
           [](const IDProperty &property) { return property.type == IDP_ID; },
           [](const IDProperty &property, const PersistentDataHandleMap &handles, void *r_value) {
             ID *id = IDP_Id(&property);
@@ -614,10 +610,6 @@ static const SocketPropertyType *get_socket_property_type(const bNodeSocket &bso
             idprop.id = (ID *)value->value;
             return IDP_New(IDP_ID, &idprop, name);
           },
-          nullptr,
-          nullptr,
-          nullptr,
-          nullptr,
           [](const IDProperty &property) { return property.type == IDP_ID; },
           [](const IDProperty &property, const PersistentDataHandleMap &handles, void *r_value) {
             ID *id = IDP_Id(&property);
