@@ -22,7 +22,6 @@
 set(INC
   .
   intern
-  intern/lineart
   ../blenfont
   ../blenkernel
   ../blenlib
@@ -84,6 +83,12 @@ endif()
 if(WITH_LINEART)
   add_definitions(-DWITH_LINEART)
   add_subdirectory(intern/lineart)
+  list(APPEND INC
+    intern/lineart
+  )
+  list(APPEND LIB
+    bf_gpencil_lineart
+  )
 endif()
 
 add_definitions(${GL_DEFINITIONS})

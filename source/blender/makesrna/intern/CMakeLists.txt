@@ -334,6 +334,9 @@ endif()
 
 if(WITH_LINEART)
   add_definitions(-DWITH_LINEART)
+  list(APPEND INC
+  ../../gpencil_modifiers/intern/lineart
+  )
 endif()
 
 if(WITH_OPENSUBDIV)
@@ -384,7 +387,6 @@ blender_include_dirs(
   ../../simulation
   ../../windowmanager
   ../../editors/include
-  ../../gpencil_modifiers/intern/lineart
   ../../render
   ../../../../intern/cycles/blender
   ../../../../intern/atomic

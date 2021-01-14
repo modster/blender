@@ -87,7 +87,6 @@ const EnumPropertyItem rna_enum_ramp_blend_items[] = {
 
 #  include "ED_gpencil.h"
 #  include "ED_image.h"
-#  include "ED_lineart.h"
 #  include "ED_node.h"
 #  include "ED_screen.h"
 
