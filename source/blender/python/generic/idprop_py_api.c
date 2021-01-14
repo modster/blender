@@ -1355,7 +1355,7 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
                                  "soft_max",
                                  "precision",
                                  "step",
-                                 "default",
+                                 "default_value",
                                  "description",
                                  NULL};
 
