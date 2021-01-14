@@ -243,6 +243,21 @@ class TestRNAData(TestHelper, unittest.TestCase):
         self.assertEqual(rna_data["subtype"], "TEMPERATURE")
         self.assertGreater(rna_data["soft_max"], 10000.0)
 
+        # Test RNA data for string property
+        test_object["test_string_prop"] = "Hello there!"
+        props = test_object.custom_properties()
+        props.update_rna("test_string_prop", default_value="Goodbye where?")
+        rna_data = props.rna_data("test_string_prop")
+        self.assertEqual(rna_data["default_value"], "Goodbye where?")
+
+        # Test RNA data for array property
+        test_object["test_array_prop"] = [1, 2, 3]
+        props = test_object.custom_properties()
+        props.update_rna("test_array_prop", default_value=[1, 2])
+        rna_data = props.rna_data("test_array_prop")
+        self.assertEqual(rna_data["default_value"], [1, 2])
+
+
 
 if __name__ == '__main__':
     import sys
