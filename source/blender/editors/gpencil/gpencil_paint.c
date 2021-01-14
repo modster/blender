@@ -912,11 +912,6 @@ static short gpencil_stroke_addpoint(tGPsdata *p,
       }
     }
 
-    /* Spread points. */
-    if (brush_settings->flag & GP_BRUSH_GROUP_RANDOM) {
-      ED_gpencil_stroke_buffer_spread(brush, &p->gsc);
-    }
-
     /* Update evaluated data. */
     ED_gpencil_sbuffer_update_eval(gpd, p->ob_eval);
 
@@ -3789,9 +3784,6 @@ static int gpencil_draw_modal(bContext *C, wmOperator *op, const wmEvent *event)
         for (int r = 0; r < 5; r++) {
           gpencil_smooth_segment(p->gpd, 0.15f, size_before - 1, size_after - 1);
         }
-        /* Spread the points if needed. */
-        ED_gpencil_stroke_buffer_spread_segment(
-            p->brush, &p->gsc, size_before - 1, size_after - 1);
       }
 
       /* finish painting operation if anything went wrong just now */

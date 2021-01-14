@@ -50,8 +50,7 @@ typedef struct BrushClone {
 typedef struct BrushGpencilSettings {
   /** Amount of smoothing to apply to newly created strokes. */
   float draw_smoothfac;
-  /** Spread of points to increase topology density. */
-  int draw_spread;
+  char _pad2[4];
   /** Amount of alpha strength to apply to newly created strokes. */
   float draw_strength;
   /** Amount of jitter to apply to newly created strokes. */
