@@ -175,10 +175,15 @@ float dof_gather_accum_weight(float coc, float bordering_radius, bool first_ring
 struct CocTile {
   float fg_min_coc;
   float fg_max_coc;
+  float fg_slight_focus_max_coc;
   float bg_min_coc;
   float bg_max_coc;
   float bg_min_intersectable_coc;
 };
+
+/* WATCH: Might have to change depending on the texture format. */
+#define DOF_TILE_DEFOCUS 0.25
+#define DOF_TILE_FOCUS 0.0
 
 /* Init a CoC tile for reduction algorithms. */
 CocTile dof_coc_tile_init(void)
@@ -186,6 +191,7 @@ CocTile dof_coc_tile_init(void)
   CocTile tile;
   tile.fg_min_coc = 0.0;
   tile.fg_max_coc = -1000.0;
+  tile.fg_slight_focus_max_coc = -1.0;
   tile.bg_min_coc = 1000.0;
   tile.bg_max_coc = 0.0;
   tile.bg_min_intersectable_coc = 1000.0;
@@ -197,12 +203,13 @@ CocTile dof_coc_tile_load(sampler2D fg_buffer, sampler2D bg_buffer, ivec2 tile_c
   ivec2 tex_size = textureSize(fg_buffer, 0).xy;
   tile_co = clamp(tile_co, ivec2(0), tex_size - 1);
 
-  vec2 fg = texelFetch(fg_buffer, tile_co, 0).xy;
+  vec3 fg = texelFetch(fg_buffer, tile_co, 0).xyz;
   vec3 bg = texelFetch(bg_buffer, tile_co, 0).xyz;
 
   CocTile tile;
-  tile.fg_min_coc = fg.x;
-  tile.fg_max_coc = fg.y;
+  tile.fg_min_coc = -fg.x;
+  tile.fg_max_coc = -fg.y;
+  tile.fg_slight_focus_max_coc = fg.z;
   tile.bg_min_coc = bg.x;
   tile.bg_max_coc = bg.y;
   tile.bg_min_intersectable_coc = bg.z;
@@ -217,8 +224,9 @@ CocTile dof_coc_tile_load(sampler2D tile_buffer, ivec2 tile_co, bool is_foregrou
   CocTile tile;
   vec3 data = texelFetch(tile_buffer, tile_co, 0).xyz;
   if (is_foreground) {
-    tile.fg_min_coc = data.x;
-    tile.fg_max_coc = data.y;
+    tile.fg_min_coc = -data.x;
+    tile.fg_max_coc = -data.y;
+    tile.fg_slight_focus_max_coc = data.z;
   }
   else {
     tile.bg_min_coc = data.x;

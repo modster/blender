@@ -11,7 +11,7 @@ uniform sampler2D cocTilesFgBuffer;
 uniform sampler2D cocTilesBgBuffer;
 
 /* 1/16th of fullres. Same format as input. */
-layout(location = 0) out vec2 outFgCoc; /* Min, Max */
+layout(location = 0) out vec3 outFgCoc; /* Min, Max, MaxSlightFocus */
 layout(location = 1) out vec3 outBgCoc; /* Min, Max, MinIntersectable */
 
 const float tile_to_fullres_factor = 16.0;
@@ -99,6 +99,6 @@ void main()
 #endif
   }
 
-  outFgCoc = vec2(out_tile.fg_min_coc, out_tile.fg_max_coc);
+  outFgCoc = vec3(-out_tile.fg_min_coc, -out_tile.fg_max_coc, out_tile.fg_slight_focus_max_coc);
   outBgCoc = vec3(out_tile.bg_min_coc, out_tile.bg_max_coc, out_tile.bg_min_intersectable_coc);
 }

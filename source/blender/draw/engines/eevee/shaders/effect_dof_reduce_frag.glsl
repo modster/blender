@@ -22,6 +22,9 @@ layout(location = 1) out float outCoc;
 
 #ifdef COPY_PASS
 
+/* TODO(fclem) Output scatter color to a separate R11G11B10 buffer. */
+// layout(location = 2) out float outScatterColor;
+
 /* Simple copy pass where we select what pixels to scatter. Also the resolution might change.
  * NOTE: The texture can end up being too big because of the mipmap padding. We correct for that
  * during the convolution phase. */

@@ -19,25 +19,6 @@ in vec4 uvcoordsvar;
 
 out vec4 fragColor;
 
-/* TODO(fclem) Could be optimized by putting this in the flatten pass foregroundCoC.z.
- * Could even pass if below the high res infocus threshold. */
-float dof_local_max_abs_coc_below_threshold(float threshold)
-{
-  int i_radius = int(threshold);
-  ivec2 texel = ivec2(gl_FragCoord.xy / 16.0) * 16;
-  float max_coc = 0.0;
-  for (int y = 0; y < 16; y++) {
-    for (int x = 0; x < 16; x++) {
-      float depth = texelFetch(fullResDepthBuffer, texel + ivec2(x, y), 0).r;
-      float coc = abs(dof_coc_from_zdepth(depth));
-      if (coc <= threshold && coc > max_coc) {
-        max_coc = coc;
-      }
-    }
-  }
-  return max_coc;
-}
-
 void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_weight)
 {
   DofGatherData fg_accum = GATHER_DATA_INIT;
@@ -115,7 +96,7 @@ void main(void)
   vec2 uv = uvcoordsvar.xy;
 
   vec4 noise = texelfetch_noise_tex(gl_FragCoord.xy);
-  /* Stochastically randomize which pixel to resolve from. This avoids having garbage values
+  /* Stochastically randomize which pixel to resolve. This avoids having garbage values
    * from the weight mask interpolation but still have less pixelated look. */
   uv += noise.zw * 0.5 / vec2(textureSize(bgColorBuffer, 0).xy);
 
@@ -124,32 +105,24 @@ void main(void)
   float fg_w = textureLod(fgWeightBuffer, uv, 0.0).r;
   float bg_w = textureLod(bgWeightBuffer, uv, 0.0).r;
 
-  /* WATCH: Dangerous to use coc tiles here since they are conservative only for downsampled pixels
-   * (half res), so we could miss small blocks of 3 pixels.
-   * Original implementation uses compute shader group min/max to do this conservatively on
-   * all fullres pixels. */
   ivec2 tile_co = ivec2(gl_FragCoord.xy / 16.0);
   CocTile coc_tile = dof_coc_tile_load(fgTileBuffer, bgTileBuffer, tile_co);
 
-  bool do_slight_focus_gather = (coc_tile.fg_min_coc < 0.0 &&
-                                 -coc_tile.fg_max_coc < layer_threshold) &&
-                                (coc_tile.bg_max_coc > 0.0 &&
-                                 coc_tile.bg_min_coc < layer_threshold);
-
-  float slight_focus_radius = 0.0;
-  /* TODO(fclem) real conservative slight focus detection. */
-  if (true || do_slight_focus_gather) {
-    slight_focus_radius = dof_local_max_abs_coc_below_threshold(layer_threshold);
-  }
-
   vec4 focus = vec4(0.0);
   float focus_w = 0.0;
-  if (slight_focus_radius > 0.5) {
-    dof_slight_focus_gather(slight_focus_radius, focus, focus_w);
+  if (coc_tile.fg_slight_focus_max_coc >= 0.5) {
+    dof_slight_focus_gather(coc_tile.fg_slight_focus_max_coc, focus, focus_w);
   }
   else {
     focus = textureLod(fullResColorBuffer, uv, 0.0);
-    focus_w = 0.00001; /* Almost no weight. */
+    if (coc_tile.fg_slight_focus_max_coc == DOF_TILE_FOCUS) {
+      /* Tile is full in focus. */
+      focus_w = 1.0;
+    }
+    else /* (coc_tile.fg_slight_focus_max_coc == DOF_TILE_DEFOCUS) */ {
+      /* Tile is full in defocus. */
+      focus_w = 0.0001; /* Almost no weight, used on last resort. */
+    }
   }
 
   /* Composite background. */
@@ -165,4 +138,10 @@ void main(void)
 
   /* Composite foreground. */
   fragColor = fragColor * (1.0 - fg_w) + fg * fg_w;
+
+#if 0 /* Debug */
+  if (coc_tile.fg_slight_focus_max_coc == DOF_TILE_FOCUS) {
+    fragColor.rgb *= vec3(1.0, 0.1, 0.1);
+  }
+#endif
 }

@@ -13,20 +13,23 @@
 uniform sampler2D halfResCocBuffer;
 
 /* 1/8th of halfResCocBuffer resolution. So 1/16th of fullres. */
-layout(location = 0) out vec2 outFgCoc; /* Min, Max */
+layout(location = 0) out vec3 outFgCoc; /* Min, Max, MaxSlightFocus */
 layout(location = 1) out vec3 outBgCoc; /* Min, Max, MinIntersectable */
 
 void main()
 {
-  vec2 halfres_texel_size = 1.0 / vec2(textureSize(halfResCocBuffer, 0).xy);
+  ivec2 halfres_bounds = textureSize(halfResCocBuffer, 0).xy - 1;
+  ivec2 tile_co = ivec2(gl_FragCoord.xy);
 
   CocTile tile = dof_coc_tile_init();
 
   for (int x = 0; x < 8; x++) {
     /* OPTI: Could be done in separate passes. */
     for (int y = 0; y < 8; y++) {
-      vec2 sample_uv = (floor(gl_FragCoord.xy) * 8.0 + vec2(x, y) + 0.5) * halfres_texel_size;
-      float sample_coc = textureLod(halfResCocBuffer, sample_uv, 0.0).r;
+      ivec2 sample_texel = tile_co * 8 + ivec2(x, y);
+      vec2 sample_data = texelFetch(halfResCocBuffer, min(sample_texel, halfres_bounds), 0).rg;
+      float sample_coc = sample_data.x;
+      float sample_slight_focus_coc = sample_data.y;
 
       float fg_coc = min(sample_coc, 0.0);
       tile.fg_min_coc = min(tile.fg_min_coc, fg_coc);
@@ -39,9 +42,23 @@ void main()
       if (sample_coc > 0.0) {
         tile.bg_min_intersectable_coc = min(tile.bg_min_intersectable_coc, bg_coc);
       }
+
+      /* Do not consider values below 0.5 for expansion as they are "encoded".
+       * See setup pass shader for more infos. */
+      if (sample_slight_focus_coc > 0.5 || tile.fg_slight_focus_max_coc == -1.0) {
+        tile.fg_slight_focus_max_coc = max(tile.fg_slight_focus_max_coc, sample_slight_focus_coc);
+      }
+      else if ((sample_slight_focus_coc == DOF_TILE_DEFOCUS &&
+                tile.fg_slight_focus_max_coc == DOF_TILE_FOCUS) ||
+               (sample_slight_focus_coc == DOF_TILE_FOCUS &&
+                tile.fg_slight_focus_max_coc == DOF_TILE_DEFOCUS)) {
+        /* Tile where completely out of focus and in focus are both present.
+         * Consider as very slightly out of focus. */
+        tile.fg_slight_focus_max_coc = 0.75;
+      }
     }
   }
 
-  outFgCoc = vec2(tile.fg_min_coc, tile.fg_max_coc);
+  outFgCoc = vec3(-tile.fg_min_coc, -tile.fg_max_coc, tile.fg_slight_focus_max_coc);
   outBgCoc = vec3(tile.bg_min_coc, tile.bg_max_coc, tile.bg_min_intersectable_coc);
 }

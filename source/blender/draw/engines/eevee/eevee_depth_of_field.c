@@ -118,7 +118,7 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
 
 #define NO_FILTERING GPU_SAMPLER_MIPMAP
 #define COLOR_FORMAT GPU_RGBA16F
-#define FG_TILE_FORMAT GPU_RG16F
+#define FG_TILE_FORMAT GPU_R11F_G11F_B10F
 #define BG_TILE_FORMAT GPU_R11F_G11F_B10F
 #define TILE_DIVISOR 16
 
@@ -146,7 +146,7 @@ static void dof_setup_pass_init(EEVEE_FramebufferList *fbl,
   DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 
   fx->dof_half_res_color_tx = DRW_texture_pool_query_2d(UNPACK2(res), COLOR_FORMAT, owner);
-  fx->dof_half_res_coc_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R16F, owner);
+  fx->dof_half_res_coc_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RG16F, owner);
 
   GPU_framebuffer_ensure_config(&fbl->dof_setup_fb,
                                 {

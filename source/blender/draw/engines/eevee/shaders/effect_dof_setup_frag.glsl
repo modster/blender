@@ -1,6 +1,9 @@
 
 /**
  * Setup pass: CoC and luma aware downsample to half resolution of the input scene color buffer.
+ *
+ * An addition to the downsample CoC, we output the maximum slight out of focus CoC to be
+ * sure we don't miss a pixel.
  **/
 
 #pragma BLENDER_REQUIRE(effect_dof_lib.glsl)
@@ -11,7 +14,7 @@ uniform sampler2D depthBuffer;
 
 /* Half resolution. */
 layout(location = 0) out vec4 outColor;
-layout(location = 1) out float outCoc;
+layout(location = 1) out vec2 outCoc; /* x: Downsample CoC, y: Max slight focus abs CoC */
 
 void main()
 {
@@ -35,7 +38,26 @@ void main()
   weights *= safe_rcp(sum(weights));
 
   outColor = weighted_sum_array(colors, weights);
-  outCoc = dot(cocs, weights);
+  outCoc.x = dot(cocs, weights);
 
-  outCoc = clamp(outCoc, -bokehMaxsize, bokehMaxsize);
+  outCoc.x = clamp(outCoc.x, -bokehMaxsize, bokehMaxsize);
+
+  /* Max slight focus abs CoC. */
+
+  /* Clamp to 0.5 if full in defocus to differentiate full focus tiles with coc == 0.0.
+   * This enables an optimization in the resolve pass. */
+  const vec4 threshold = vec4(layer_threshold + layer_offset);
+  cocs = abs(cocs);
+  bvec4 defocus = greaterThan(cocs, threshold);
+  bvec4 focus = lessThanEqual(cocs, vec4(0.5));
+  if (any(defocus) && any(focus)) {
+    /* For the same reason as in the flatten pass. This is a case we cannot optimize for. */
+    cocs = mix(cocs, vec4(0.75), focus);
+    cocs = mix(cocs, vec4(0.75), defocus);
+  }
+  else {
+    cocs = mix(cocs, vec4(DOF_TILE_FOCUS), focus);
+    cocs = mix(cocs, vec4(DOF_TILE_DEFOCUS), defocus);
+  }
+  outCoc.y = max_v4(cocs);
 }
