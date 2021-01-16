@@ -20,7 +20,11 @@ flat out vec4 weights;
 flat out vec4 cocs;
 flat out vec2 spritepos;
 
-const bool is_foreground = FOREGROUND_PASS;
+#ifdef DOF_FOREGROUND_PASS
+const bool is_foreground = true;
+#else /* DOF_BACKGROUND_PASS */
+const bool is_foreground = false;
+#endif
 
 float fetch_tile_abs_max_coc(vec2 texel_co)
 {

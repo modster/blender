@@ -206,6 +206,15 @@ typedef enum EEVEE_SSRShaderOptions {
   SSR_MAX_SHADER = (1 << 4),
 } EEVEE_SSRShaderOptions;
 
+/* DOF Gather pass shader variations */
+typedef enum EEVEE_DofGatherPass {
+  DOF_GATHER_FOREGROUND = 0,
+  DOF_GATHER_BACKGROUND = 1,
+  DOF_GATHER_HOLEFILL = 2,
+
+  DOF_GATHER_MAX_PASS,
+} EEVEE_DofGatherPass;
+
 /* ************ PROBE UBO ************* */
 
 /* They are the same struct as their Cache siblings.
@@ -265,6 +274,7 @@ typedef struct EEVEE_PassList {
   struct DRWPass *dof_reduce_copy;
   struct DRWPass *dof_reduce;
   struct DRWPass *dof_gather_fg;
+  struct DRWPass *dof_gather_fg_holefill;
   struct DRWPass *dof_gather_bg;
   struct DRWPass *dof_scatter_fg;
   struct DRWPass *dof_scatter_bg;
@@ -352,6 +362,7 @@ typedef struct EEVEE_FramebufferList {
   struct GPUFrameBuffer *dof_dilate_tiles_fb;
   struct GPUFrameBuffer *dof_reduce_fb;
   struct GPUFrameBuffer *dof_gather_fg_fb;
+  struct GPUFrameBuffer *dof_gather_fg_holefill_fb;
   struct GPUFrameBuffer *dof_gather_bg_fb;
   struct GPUFrameBuffer *dof_scatter_fg_fb;
   struct GPUFrameBuffer *dof_scatter_bg_fb;
@@ -760,6 +771,8 @@ typedef struct EEVEE_EffectsInfo {
   struct GPUTexture *dof_coc_tiles_fg_tx;
   struct GPUTexture *dof_fg_color_tx;
   struct GPUTexture *dof_fg_weight_tx;
+  struct GPUTexture *dof_fg_holefill_color_tx;
+  struct GPUTexture *dof_fg_holefill_weight_tx;
   struct GPUTexture *dof_half_res_coc_tx;
   struct GPUTexture *dof_half_res_color_tx;
   struct GPUTexture *dof_reduce_input_coc_tx; /* Just references to actual textures. */
@@ -1141,7 +1154,7 @@ struct GPUShader *EEVEE_shaders_depth_of_field_flatten_tiles_get(void);
 struct GPUShader *EEVEE_shaders_depth_of_field_dilate_tiles_get(int pass);
 struct GPUShader *EEVEE_shaders_depth_of_field_downsample_get(void);
 struct GPUShader *EEVEE_shaders_depth_of_field_reduce_get(int is_copy_pass);
-struct GPUShader *EEVEE_shaders_depth_of_field_gather_get(int is_foreground);
+struct GPUShader *EEVEE_shaders_depth_of_field_gather_get(EEVEE_DofGatherPass pass);
 struct GPUShader *EEVEE_shaders_depth_of_field_filter_get(void);
 struct GPUShader *EEVEE_shaders_depth_of_field_scatter_get(int is_foreground);
 struct GPUShader *EEVEE_shaders_depth_of_field_resolve_get(void);

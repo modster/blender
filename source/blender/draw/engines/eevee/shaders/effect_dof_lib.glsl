@@ -105,10 +105,7 @@ vec4 dof_load_scatter_color(sampler2D gather_input_color_buffer, vec2 uv, float 
   return color;
 }
 
-float dof_load_gather_coc(sampler2D gather_input_coc_buffer,
-                          vec2 uv,
-                          float lod,
-                          const bool is_foreground)
+float dof_load_gather_coc(sampler2D gather_input_coc_buffer, vec2 uv, float lod)
 {
   float coc = textureLod(gather_input_coc_buffer, uv, lod).r;
   /* We gather at halfres. CoC must be divided by 2 to be compared against radii. */
@@ -184,17 +181,18 @@ struct CocTile {
 /* WATCH: Might have to change depending on the texture format. */
 #define DOF_TILE_DEFOCUS 0.25
 #define DOF_TILE_FOCUS 0.0
+#define DOF_TILE_LARGE_COC 1024.0
 
 /* Init a CoC tile for reduction algorithms. */
 CocTile dof_coc_tile_init(void)
 {
   CocTile tile;
   tile.fg_min_coc = 0.0;
-  tile.fg_max_coc = -1000.0;
+  tile.fg_max_coc = -DOF_TILE_LARGE_COC;
   tile.fg_slight_focus_max_coc = -1.0;
-  tile.bg_min_coc = 1000.0;
+  tile.bg_min_coc = DOF_TILE_LARGE_COC;
   tile.bg_max_coc = 0.0;
-  tile.bg_min_intersectable_coc = 1000.0;
+  tile.bg_min_intersectable_coc = DOF_TILE_LARGE_COC;
   return tile;
 }
 
@@ -213,26 +211,6 @@ CocTile dof_coc_tile_load(sampler2D fg_buffer, sampler2D bg_buffer, ivec2 tile_c
   tile.bg_min_coc = bg.x;
   tile.bg_max_coc = bg.y;
   tile.bg_min_intersectable_coc = bg.z;
-  return tile;
-}
-
-CocTile dof_coc_tile_load(sampler2D tile_buffer, ivec2 tile_co, bool is_foreground)
-{
-  ivec2 tex_size = textureSize(tile_buffer, 0).xy;
-  tile_co = clamp(tile_co, ivec2(0), tex_size - 1);
-
-  CocTile tile;
-  vec3 data = texelFetch(tile_buffer, tile_co, 0).xyz;
-  if (is_foreground) {
-    tile.fg_min_coc = -data.x;
-    tile.fg_max_coc = -data.y;
-    tile.fg_slight_focus_max_coc = data.z;
-  }
-  else {
-    tile.bg_min_coc = data.x;
-    tile.bg_max_coc = data.y;
-    tile.bg_min_intersectable_coc = data.z;
-  }
   return tile;
 }
 
@@ -279,11 +257,29 @@ void dof_gather_accumulate_sample_pair(DofGatherData pair_data[2],
     return;
   }
 
+  float inter_weight[2];
+
   for (int i = 0; i < 2; i++) {
-    float inter_weight = dof_intersection_weight(pair_data[i].coc, pair_data[i].dist);
+    inter_weight[i] = dof_intersection_weight(pair_data[i].coc, pair_data[i].dist);
+  }
+
+#ifdef DOF_HOLEFILL_PASS
+  if (pair_data[0].coc < 0.0 && pair_data[1].coc > pair_data[0].coc) {
+    inter_weight[1] = max(inter_weight[1], inter_weight[0]);
+  }
+  else if (pair_data[1].coc < 0.0 && pair_data[0].coc > pair_data[1].coc) {
+    inter_weight[0] = max(inter_weight[1], inter_weight[0]);
+  }
+#endif
+
+  for (int i = 0; i < 2; i++) {
+#ifdef DOF_HOLEFILL_PASS
+    float layer_weight = float(pair_data[i].coc > -layer_threshold);
+#else
     float layer_weight = dof_layer_weight(pair_data[i].coc, is_foreground);
+#endif
     float sample_weight = dof_sample_weight(pair_data[i].coc);
-    float weight = inter_weight * layer_weight * sample_weight;
+    float weight = inter_weight[i] * layer_weight * sample_weight;
 
     /**
      * If a CoC is larger than bordering radius we accumulate it to the general accumulator.

@@ -17,7 +17,8 @@ uniform sampler2D colorBuffer;
 uniform sampler2D cocBuffer;
 
 /* CoC Min&Max tile buffer at 1/16th of fullres. */
-uniform sampler2D cocTilesBuffer;
+uniform sampler2D cocTilesFgBuffer;
+uniform sampler2D cocTilesBgBuffer;
 
 /* Used to correct the padding in the color and CoC buffers. */
 uniform vec2 gatherInputUvCorrection;
@@ -27,7 +28,11 @@ uniform vec2 gatherOutputTexelSize;
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out float outWeight;
 
-const bool is_foreground = FOREGROUND_PASS;
+#ifdef DOF_FOREGROUND_PASS
+const bool is_foreground = true;
+#else /* DOF_BACKGROUND_PASS */
+const bool is_foreground = false;
+#endif
 
 void dof_gather_accumulator(float base_radius, const bool do_fast_gather)
 {
@@ -38,7 +43,7 @@ void dof_gather_accumulator(float base_radius, const bool do_fast_gather)
   noise.zw = vec2(0.0, 1.0);
 #endif
 
-  const int ring_count = 3; /* TODO(fclem) Shader variations? */
+  const int ring_count = 4; /* TODO(fclem) Shader variations? */
   float unit_ring_radius = 1.0 / float(ring_count);
   float unit_sample_radius = 1.0 / float(ring_count + 0.5);
   float lod = floor(log2(base_radius * unit_sample_radius) - 1.5);
@@ -81,7 +86,7 @@ void dof_gather_accumulator(float base_radius, const bool do_fast_gather)
         vec2 sample_co = center_co + ((i == 0) ? offset : -offset);
         vec2 sample_uv = sample_co * gatherOutputTexelSize * gatherInputUvCorrection;
         pair_data[i].color = dof_load_gather_color(colorBuffer, sample_uv, lod);
-        pair_data[i].coc = dof_load_gather_coc(cocBuffer, sample_uv, lod, is_foreground);
+        pair_data[i].coc = dof_load_gather_coc(cocBuffer, sample_uv, lod);
         pair_data[i].dist = distance(center_co, sample_co);
       }
 
@@ -95,7 +100,7 @@ void dof_gather_accumulator(float base_radius, const bool do_fast_gather)
     }
 
     dof_gather_accumulate_sample_ring(
-        ring_data, sample_pair_count, first_ring, do_fast_gather, is_foreground, accum_data);
+        ring_data, sample_pair_count * 2, first_ring, do_fast_gather, is_foreground, accum_data);
 
     first_ring = false;
   }
@@ -105,7 +110,7 @@ void dof_gather_accumulator(float base_radius, const bool do_fast_gather)
     vec2 sample_uv = center_co * gatherOutputTexelSize * gatherInputUvCorrection;
     DofGatherData center_data;
     center_data.color = dof_load_gather_color(colorBuffer, sample_uv, lod);
-    center_data.coc = dof_load_gather_coc(cocBuffer, sample_uv, lod, is_foreground);
+    center_data.coc = dof_load_gather_coc(cocBuffer, sample_uv, lod);
     center_data.dist = 0.0;
 
     dof_gather_accumulate_center_sample(center_data, do_fast_gather, is_foreground, accum_data);
@@ -117,14 +122,31 @@ void dof_gather_accumulator(float base_radius, const bool do_fast_gather)
 void main()
 {
   ivec2 tile_co = ivec2(gl_FragCoord.xy / 8.0);
-  CocTile coc_tile = dof_coc_tile_load(cocTilesBuffer, tile_co, is_foreground);
+  CocTile coc_tile = dof_coc_tile_load(cocTilesFgBuffer, cocTilesBgBuffer, tile_co);
 
-  /* Gather at half resolution. Divide coc by 2. */
-  float base_radius = 0.5 * max(0.0, is_foreground ? -coc_tile.fg_min_coc : coc_tile.bg_max_coc);
-  float min_radius = 0.5 * max(0.0, is_foreground ? -coc_tile.fg_max_coc : coc_tile.bg_min_coc);
+#if defined(DOF_FOREGROUND_PASS)
+  float base_radius = -coc_tile.fg_min_coc;
+  float min_radius = -coc_tile.fg_max_coc;
 
+#elif defined(DOF_HOLEFILL_PASS)
+  float base_radius = -coc_tile.fg_min_coc;
+  float min_radius = -coc_tile.fg_max_coc;
+
+#else /* DOF_BACKGROUND_PASS */
+  float base_radius = coc_tile.bg_max_coc;
+  float min_radius = coc_tile.bg_min_coc;
+#endif
   /* Allow for a 5% radius difference. */
   bool do_fast_gather = (base_radius - min_radius) < (0.05 * base_radius);
+  /* Gather at half resolution. Divide coc by 2. */
+  base_radius *= 0.5;
+
+#ifdef DOF_HOLEFILL_PASS
+  if (do_fast_gather && (base_radius > 4.0)) {
+    /* This means the foreground pass is fully opaque. Ignore this tile. */
+    base_radius = 0.0;
+  }
+#endif
 
   if (base_radius < 1.0) {
     /* Early out. */

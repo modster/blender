@@ -8,12 +8,17 @@
 
 uniform sampler2D fullResColorBuffer;
 uniform sampler2D fullResDepthBuffer;
+
 uniform sampler2D bgColorBuffer;
 uniform sampler2D bgWeightBuffer;
 uniform sampler2D bgTileBuffer;
+
 uniform sampler2D fgColorBuffer;
 uniform sampler2D fgWeightBuffer;
 uniform sampler2D fgTileBuffer;
+
+uniform sampler2D holefillColorBuffer;
+uniform sampler2D holefillWeightBuffer;
 
 in vec4 uvcoordsvar;
 
@@ -55,9 +60,9 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
     }
 
     dof_gather_accumulate_sample_ring(
-        bg_ring, ring_sample_count, first_ring, false, false, bg_accum);
+        bg_ring, ring_sample_count * 2, first_ring, false, false, bg_accum);
     dof_gather_accumulate_sample_ring(
-        fg_ring, ring_sample_count, first_ring, false, true, fg_accum);
+        fg_ring, ring_sample_count * 2, first_ring, false, true, fg_accum);
 
     first_ring = false;
   }
@@ -102,8 +107,10 @@ void main(void)
 
   vec4 bg = textureLod(bgColorBuffer, uv, 0.0);
   vec4 fg = textureLod(fgColorBuffer, uv, 0.0);
+  vec4 hf = textureLod(holefillColorBuffer, uv, 0.0);
   float fg_w = textureLod(fgWeightBuffer, uv, 0.0).r;
   float bg_w = textureLod(bgWeightBuffer, uv, 0.0).r;
+  float hf_w = textureLod(holefillWeightBuffer, uv, 0.0).r;
 
   ivec2 tile_co = ivec2(gl_FragCoord.xy / 16.0);
   CocTile coc_tile = dof_coc_tile_load(fgTileBuffer, bgTileBuffer, tile_co);
@@ -125,11 +132,16 @@ void main(void)
     }
   }
 
-  /* Composite background. */
-  fragColor = bg;
-  float weight = float(bg_w > 0.0);
+  fragColor = hf;
+  float weight = float(hf_w > 0.0);
 
-  /* TODO Composite hole filling pass. */
+  /* Composite background. */
+  fragColor = fragColor * (1.0 - bg_w) + bg * bg_w;
+  weight = weight * (1.0 - bg_w) + bg_w;
+  fragColor *= safe_rcp(weight);
+
+  /* Fill holes with the composited background. */
+  weight = float(weight > 0.0);
 
   /* Composite in focus + slight defocus. */
   fragColor = fragColor * (1.0 - focus_w) + focus * focus_w;

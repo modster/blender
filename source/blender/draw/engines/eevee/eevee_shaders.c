@@ -82,7 +82,7 @@ static struct {
   struct GPUShader *dof_dilate_tiles_sh[2];
   struct GPUShader *dof_downsample_sh;
   struct GPUShader *dof_reduce_sh[2];
-  struct GPUShader *dof_gather_sh[2];
+  struct GPUShader *dof_gather_sh[DOF_GATHER_MAX_PASS];
   struct GPUShader *dof_filter_sh;
   struct GPUShader *dof_scatter_sh[2];
   struct GPUShader *dof_resolve_sh;
@@ -1075,15 +1075,30 @@ GPUShader *EEVEE_shaders_depth_of_field_reduce_get(int is_copy_pass)
   return e_data.dof_reduce_sh[is_copy_pass];
 }
 
-GPUShader *EEVEE_shaders_depth_of_field_gather_get(int is_foreground)
+GPUShader *EEVEE_shaders_depth_of_field_gather_get(EEVEE_DofGatherPass pass)
 {
-  if (e_data.dof_gather_sh[is_foreground] == NULL) {
-    e_data.dof_gather_sh[is_foreground] = DRW_shader_create_fullscreen_with_shaderlib(
-        datatoc_effect_dof_gather_frag_glsl,
-        e_data.lib,
-        (is_foreground) ? "#define FOREGROUND_PASS true\n" : "#define FOREGROUND_PASS false\n");
+  if (e_data.dof_gather_sh[pass] == NULL) {
+    const char *define = "";
+    switch (pass) {
+      case DOF_GATHER_FOREGROUND:
+        define = "#define DOF_FOREGROUND_PASS\n";
+        break;
+      case DOF_GATHER_BACKGROUND:
+        define = "#define DOF_BACKGROUND_PASS\n";
+        break;
+      case DOF_GATHER_HOLEFILL:
+        define =
+            "#define DOF_BACKGROUND_PASS\n"
+            "#define DOF_HOLEFILL_PASS\n";
+        break;
+      default:
+        break;
+    }
+
+    e_data.dof_gather_sh[pass] = DRW_shader_create_fullscreen_with_shaderlib(
+        datatoc_effect_dof_gather_frag_glsl, e_data.lib, define);
   }
-  return e_data.dof_gather_sh[is_foreground];
+  return e_data.dof_gather_sh[pass];
 }
 
 GPUShader *EEVEE_shaders_depth_of_field_filter_get(void)
@@ -1103,7 +1118,7 @@ GPUShader *EEVEE_shaders_depth_of_field_scatter_get(int is_foreground)
         NULL,
         datatoc_effect_dof_scatter_frag_glsl,
         e_data.lib,
-        (is_foreground) ? "#define FOREGROUND_PASS true\n" : "#define FOREGROUND_PASS false\n");
+        (is_foreground) ? "#define DOF_FOREGROUND_PASS\n" : "#define DOF_BACKGROUND_PASS\n");
   }
   return e_data.dof_scatter_sh[is_foreground];
 }
@@ -1528,8 +1543,9 @@ void EEVEE_shaders_free(void)
   DRW_SHADER_FREE_SAFE(e_data.dof_downsample_sh);
   DRW_SHADER_FREE_SAFE(e_data.dof_reduce_sh[0]);
   DRW_SHADER_FREE_SAFE(e_data.dof_reduce_sh[1]);
-  DRW_SHADER_FREE_SAFE(e_data.dof_gather_sh[0]);
-  DRW_SHADER_FREE_SAFE(e_data.dof_gather_sh[1]);
+  for (int i = 0; i < DOF_GATHER_MAX_PASS; i++) {
+    DRW_SHADER_FREE_SAFE(e_data.dof_gather_sh[i]);
+  }
   DRW_SHADER_FREE_SAFE(e_data.dof_filter_sh);
   DRW_SHADER_FREE_SAFE(e_data.dof_scatter_sh[0]);
   DRW_SHADER_FREE_SAFE(e_data.dof_scatter_sh[1]);

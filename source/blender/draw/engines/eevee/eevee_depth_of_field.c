@@ -314,12 +314,12 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
   {
     DRW_PASS_CREATE(psl->dof_gather_fg, DRW_STATE_WRITE_COLOR);
 
-    const bool is_foreground = true;
-    GPUShader *sh = EEVEE_shaders_depth_of_field_gather_get(is_foreground);
+    GPUShader *sh = EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_FOREGROUND);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_gather_fg);
     DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &txl->dof_reduced_color, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
-    DRW_shgroup_uniform_texture_ref(grp, "cocTilesBuffer", &fx->dof_coc_dilated_tiles_fg_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "cocTilesFgBuffer", &fx->dof_coc_dilated_tiles_fg_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "cocTilesBgBuffer", &fx->dof_coc_dilated_tiles_bg_tx);
     DRW_shgroup_uniform_texture(grp, "utilTex", EEVEE_materials_get_util_tex());
     DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherInputUvCorrection", uv_correction_fac);
@@ -339,14 +339,41 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
                                   });
   }
   {
+    DRW_PASS_CREATE(psl->dof_gather_fg_holefill, DRW_STATE_WRITE_COLOR);
+
+    GPUShader *sh = EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_HOLEFILL);
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_gather_fg_holefill);
+    DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &txl->dof_reduced_color, NO_FILTERING);
+    DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
+    DRW_shgroup_uniform_texture_ref(grp, "cocTilesFgBuffer", &fx->dof_coc_dilated_tiles_fg_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "cocTilesBgBuffer", &fx->dof_coc_dilated_tiles_bg_tx);
+    DRW_shgroup_uniform_texture(grp, "utilTex", EEVEE_materials_get_util_tex());
+    DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
+    DRW_shgroup_uniform_vec2_copy(grp, "gatherInputUvCorrection", uv_correction_fac);
+    DRW_shgroup_uniform_vec2_copy(grp, "gatherOutputTexelSize", output_texel_size);
+    DRW_shgroup_uniform_vec4(grp, "bokehParams", fx->dof_bokeh, 2);
+    DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+
+    /* NOTE: This pass is the owner. So textures from pool can come from previous passes. */
+    fx->dof_fg_holefill_color_tx = DRW_texture_pool_query_2d(UNPACK2(res), COLOR_FORMAT, owner);
+    fx->dof_fg_holefill_weight_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R16F, owner);
+
+    GPU_framebuffer_ensure_config(&fbl->dof_gather_fg_holefill_fb,
+                                  {
+                                      GPU_ATTACHMENT_NONE,
+                                      GPU_ATTACHMENT_TEXTURE(fx->dof_fg_holefill_color_tx),
+                                      GPU_ATTACHMENT_TEXTURE(fx->dof_fg_holefill_weight_tx),
+                                  });
+  }
+  {
     DRW_PASS_CREATE(psl->dof_gather_bg, DRW_STATE_WRITE_COLOR);
 
-    const bool is_foreground = false;
-    GPUShader *sh = EEVEE_shaders_depth_of_field_gather_get(is_foreground);
+    GPUShader *sh = EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_BACKGROUND);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_gather_bg);
     DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &txl->dof_reduced_color, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
-    DRW_shgroup_uniform_texture_ref(grp, "cocTilesBuffer", &fx->dof_coc_dilated_tiles_bg_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "cocTilesFgBuffer", &fx->dof_coc_dilated_tiles_fg_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "cocTilesBgBuffer", &fx->dof_coc_dilated_tiles_bg_tx);
     DRW_shgroup_uniform_texture(grp, "utilTex", EEVEE_materials_get_util_tex());
     DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherInputUvCorrection", uv_correction_fac);
@@ -452,6 +479,10 @@ static void dof_recombine_pass_init(EEVEE_FramebufferList *UNUSED(fbl),
   DRW_shgroup_uniform_texture_ref(grp, "bgTileBuffer", &fx->dof_coc_dilated_tiles_bg_tx);
   DRW_shgroup_uniform_texture_ref_ex(grp, "fgColorBuffer", &fx->dof_fg_color_tx, NO_FILTERING);
   DRW_shgroup_uniform_texture_ref_ex(grp, "fgWeightBuffer", &fx->dof_fg_weight_tx, NO_FILTERING);
+  DRW_shgroup_uniform_texture_ref_ex(
+      grp, "holefillColorBuffer", &fx->dof_fg_holefill_color_tx, NO_FILTERING);
+  DRW_shgroup_uniform_texture_ref_ex(
+      grp, "holefillWeightBuffer", &fx->dof_fg_holefill_weight_tx, NO_FILTERING);
   DRW_shgroup_uniform_texture_ref(grp, "fgTileBuffer", &fx->dof_coc_dilated_tiles_fg_tx);
   DRW_shgroup_uniform_texture(grp, "utilTex", EEVEE_materials_get_util_tex());
   DRW_shgroup_uniform_vec4_copy(grp, "cocParams", fx->dof_coc_params);
@@ -556,6 +587,12 @@ void EEVEE_depth_of_field_draw(EEVEE_Data *vedata)
 
       GPU_framebuffer_bind(fbl->dof_scatter_bg_fb);
       DRW_draw_pass(psl->dof_scatter_bg);
+    }
+
+    {
+      /* Holefill convolution. */
+      GPU_framebuffer_bind(fbl->dof_gather_fg_holefill_fb);
+      DRW_draw_pass(psl->dof_gather_fg_holefill);
     }
 
     GPU_framebuffer_bind(fx->target_buffer);
