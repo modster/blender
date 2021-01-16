@@ -298,7 +298,7 @@ void dof_gather_accumulate_sample_pair(DofGatherData pair_data[2],
 }
 
 void dof_gather_accumulate_sample_ring(DofGatherData ring_data,
-                                       int sample_pair_count,
+                                       int sample_count,
                                        bool first_ring,
                                        const bool do_fast_gather,
                                        /* accum_data occludes the ring_data if true. */
@@ -331,7 +331,7 @@ void dof_gather_accumulate_sample_ring(DofGatherData ring_data,
   float ring_no_occlu = saturate(accum_avg_coc - ring_avg_coc);
   float accum_no_occlu = saturate(ring_avg_coc - accum_avg_coc - 2.5);
   /* (Slide 40) */
-  float ring_opacity = saturate(ring_data.opacity / float(sample_pair_count * 2));
+  float ring_opacity = saturate(ring_data.opacity / float(sample_count));
 
   /* TODO(fclem) find what is not working here. */
   if (false && reversed_occlusion) {
@@ -353,30 +353,43 @@ void dof_gather_accumulate_sample_ring(DofGatherData ring_data,
   }
 }
 
-void dof_gather_accumulate_center_sample(DofGatherData data,
+void dof_gather_accumulate_center_sample(DofGatherData center_data,
                                          const bool do_fast_gather,
                                          const bool is_foreground,
                                          inout DofGatherData accum_data)
 {
-  /* TODO(fclem) Leaving this unoptimized until we are 100% sure of
-   * dof_gather_accumulate_sample_pair & dof_gather_accumulate_sample_ring. */
-  DofGatherData center_data[2];
-  center_data[0] = data;
-  center_data[0].coc_sqr = data.coc * data.coc;
-  center_data[1] = center_data[0];
+  float layer_weight = dof_layer_weight(center_data.coc, is_foreground);
+  float sample_weight = dof_sample_weight(center_data.coc);
+  float weight = layer_weight * sample_weight;
 
-  const bool first_ring = false;
-  DofGatherData ring_data = GATHER_DATA_INIT;
-  dof_gather_accumulate_sample_pair(
-      center_data, 3.0, first_ring, do_fast_gather, is_foreground, ring_data, accum_data);
+  if (do_fast_gather) {
+    /* Hope for the compiler to optimize the above. */
+    layer_weight = 1.0;
+    sample_weight = 1.0;
+    weight = 1.0;
+  }
+
+  /* Logic of dof_gather_accumulate_sample */
+  center_data.coc_sqr = center_data.coc * (center_data.coc * weight);
+  center_data.color *= weight;
+  center_data.coc *= weight;
+  center_data.weight = weight;
+
+  accum_data.layer_opacity += layer_weight;
+
+  /* TODO(fclem) verify this. */
+  // center_data.opacity += saturate(center_data.coc - bordering_radius - 0.5);
+  center_data.opacity = sample_weight;
+
+  /* Accumulate center as its own rign. */
   dof_gather_accumulate_sample_ring(
-      ring_data, 2, first_ring, do_fast_gather, is_foreground, accum_data);
+      center_data, 1, false, do_fast_gather, is_foreground, accum_data);
 }
 
 float dof_gather_total_sample_count(const int ring_count)
 {
   float float_ring = float(ring_count);
-  return ((float_ring * float_ring - float_ring) * 4.0 + 1.0) * 2.0;
+  return ((float_ring * float_ring - float_ring) * 2.0 + 1.0) * 2.0;
 }
 
 void dof_gather_accumulate_resolve(const int ring_count,
