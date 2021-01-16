@@ -182,6 +182,9 @@ void GpencilExporterPDF::export_gpencil_layers(void)
         if (gps->totpoints == 0) {
           continue;
         }
+        if (!ED_gpencil_stroke_material_visible(ob, gpl, gps)) {
+          continue;
+        }
         /* Duplicate the stroke to apply any layer thickness change. */
         bGPDstroke *gps_duplicate = BKE_gpencil_stroke_duplicate(gps, true, false);
 

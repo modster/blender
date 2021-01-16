@@ -150,6 +150,9 @@ bool ED_gpencil_stroke_can_use(const struct bContext *C, const struct bGPDstroke
 bool ED_gpencil_stroke_color_use(struct Object *ob,
                                  const struct bGPDlayer *gpl,
                                  const struct bGPDstroke *gps);
+bool ED_gpencil_stroke_material_visible(struct Object *ob,
+                                        const struct bGPDlayer *gpl,
+                                        const struct bGPDstroke *gps);
 
 /* ----------- Grease Pencil Operators ----------------- */
 

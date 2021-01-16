@@ -596,6 +596,21 @@ bool ED_gpencil_stroke_color_use(Object *ob, const bGPDlayer *gpl, const bGPDstr
   return true;
 }
 
+/* Check whether given stroke is visible for the current material. */
+bool ED_gpencil_stroke_material_visible(Object *ob, const bGPDlayer *gpl, const bGPDstroke *gps)
+{
+  /* check if the color is editable */
+  MaterialGPencilStyle *gp_style = BKE_gpencil_material_settings(ob, gps->mat_nr + 1);
+
+  if (gp_style != NULL) {
+    if (gp_style->flag & GP_MATERIAL_HIDE) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 /* ******************************************************** */
 /* Space Conversion */
 
