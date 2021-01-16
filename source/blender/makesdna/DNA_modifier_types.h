@@ -2119,7 +2119,7 @@ typedef struct MeshSeqCacheModifierData {
   float vel_fac;
 
   char read_flag;
-  char _pad[3];
+  char _pad[7];
 
   float velocity_scale;
 

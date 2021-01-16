@@ -46,7 +46,7 @@ struct Light;
 struct Material;
 struct bNodeTree;
 
-namespace USD {
+namespace blender::io::usd {
 
 USDPrimReader *create_reader(const pxr::UsdStageRefPtr &stage,
                              const pxr::UsdPrim &prim,
@@ -54,6 +54,6 @@ USDPrimReader *create_reader(const pxr::UsdStageRefPtr &stage,
                              ImportSettings &settings);
 USDPrimReader *create_fake_reader(class USDStageReader *archive, const pxr::UsdPrim &prim);
 
-}  // Namespace USD
+}  // Namespace blender::io::usd
 
 #endif /* __USD_UTIL_H__ */

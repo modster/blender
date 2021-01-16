@@ -76,6 +76,7 @@ typedef struct CustomData {
    * Correct size is ensured in CustomData_update_typemap assert().
    */
   int typemap[56];
+  char _pad[4];
   /** Number of layers, size of layers array. */
   int totlayer, maxlayer;
   /** In editmode, total size of all data layers. */

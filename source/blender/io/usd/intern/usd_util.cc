@@ -84,7 +84,7 @@ extern "C" {
 #include <pxr/usd/usdGeom/scope.h>
 #include <pxr/usd/usdLux/light.h>
 
-namespace USD {
+namespace blender::io::usd {
 
 USDPrimReader *create_reader(const pxr::UsdStageRefPtr &stage,
                              const pxr::UsdPrim &prim,
@@ -119,7 +119,7 @@ USDPrimReader *create_reader(const pxr::UsdStageRefPtr &stage,
 }
 
 // TODO: The handle does not have the proper import params or settings
-USDPrimReader *create_fake_reader(USD::USDStageReader *archive, const pxr::UsdPrim &prim)
+USDPrimReader *create_fake_reader(USDStageReader *archive, const pxr::UsdPrim &prim)
 {
   USDPrimReader *reader = nullptr;
   if (prim.IsA<pxr::UsdGeomCamera>()) {
@@ -146,4 +146,4 @@ USDPrimReader *create_fake_reader(USD::USDStageReader *archive, const pxr::UsdPr
   return reader;
 }
 
-}  // Namespace USD
+}  // Namespace blender::io::usd

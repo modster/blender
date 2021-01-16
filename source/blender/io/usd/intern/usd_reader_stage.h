@@ -37,7 +37,7 @@ struct Scene;
 
 struct ImportSettings;
 
-namespace USD {
+namespace blender::io::usd {
 
 /* Wrappers around input and output archives. The goal is to be able to use
  * streams so that unicode paths work on Windows (T49112), and to make sure that
@@ -86,6 +86,6 @@ class USDStageReader {
   void clear_readers();
 };
 
-};  // namespace USD
+};  // namespace blender::io::usd
 
 #endif /* __USD_READER_ARCHIVE_H__ */

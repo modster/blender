@@ -210,7 +210,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
         BKE_cachefile_reader_open(cache_file, &mcmd->reader, ctx->object, mcmd->object_path);
         if (!mcmd->reader) {
           printf("Could not create usd reader\n");
-          modifier_setError(md, "Could not create USD reader for file %s", cache_file->filepath);
+          BKE_modifier_set_error(ctx->object, md, "Could not create USD reader for file %s", cache_file->filepath);
           return mesh;
         }
       }
@@ -243,7 +243,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
       Mesh *usd_result = USD_read_mesh(
           mcmd->reader, ctx->object, mesh, time * FPS, &err_str, mcmd->read_flag, mcmd->vel_fac);
       if (err_str) {
-        modifier_setError(md, "%s", err_str);
+        BKE_modifier_set_error(ctx->object, md, "%s", err_str);
       }
 
       if (!ELEM(usd_result, NULL, mesh) && (mesh != org_mesh)) {

@@ -52,7 +52,7 @@ extern "C" {
 }
 #include <iostream>
 
-namespace USD {
+namespace blender::io::usd {
 
 USDStageReader::USDStageReader(struct Main *bmain, const char *filename)
 {
@@ -82,7 +82,7 @@ static USDPrimReader *_handlePrim(Main *bmain,
 {
   USDPrimReader *reader = NULL;
 
-  reader = USD::create_reader(stage, prim, params, settings);
+  reader = create_reader(stage, prim, params, settings);
 
   if (reader == NULL)
     return NULL;
@@ -150,4 +150,4 @@ void USDStageReader::clear_readers()
   }
 }
 
-}  // Namespace USD
+}  // Namespace blender::io::usd

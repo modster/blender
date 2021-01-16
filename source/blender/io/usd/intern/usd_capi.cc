@@ -40,6 +40,7 @@
 #include "DEG_depsgraph_query.h"
 
 #include "DNA_cachefile_types.h"
+#include "DNA_collection_types.h"
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_world_types.h"
@@ -319,7 +320,7 @@ int USD_get_version(void)
 
 /* ********************** Import file ********************** */
 
-namespace USD {
+namespace blender::io::usd {
 enum {
   USD_NO_ERROR = 0,
   USD_ARCHIVE_FAIL,
@@ -558,16 +559,20 @@ static void import_freejob(void *user_data)
   delete data;
 }
 
-}  // namespace USD
+}  // namespace blender::io::usd
+
+using namespace blender::io::usd;
 
 bool USD_import(struct bContext *C,
                 const char *filepath,
                 const USDImportParams *params,
                 bool as_background_job)
 {
+  blender::io::usd::ensure_usd_plugin_path_registered();
+
   /* Using new here since MEM_* funcs do not call ctor to properly initialize
    * data. */
-  USD::ImportJobData *job = new USD::ImportJobData();
+  ImportJobData *job = new ImportJobData();
   // USD::ImportJobData *job = static_cast<USD::ImportJobData
   // *>(MEM_mallocN(sizeof(USD::ImportJobData), "ImportJobData"));
   job->bmain = CTX_data_main(C);
@@ -583,7 +588,7 @@ bool USD_import(struct bContext *C,
   job->settings.sequence_len = params->sequence_len;
   job->settings.validate_meshes = params->validate_meshes;
   job->settings.sequence_len = params->sequence_len;
-  job->error_code = USD::USD_NO_ERROR;
+  job->error_code = USD_NO_ERROR;
   job->was_canceled = false;
   job->archive = NULL;
 
@@ -601,9 +606,9 @@ bool USD_import(struct bContext *C,
                                 WM_JOB_TYPE_ALEMBIC);
 
     /* setup job */
-    WM_jobs_customdata_set(wm_job, job, USD::import_freejob);
+    WM_jobs_customdata_set(wm_job, job, import_freejob);
     WM_jobs_timer(wm_job, 0.1, NC_SCENE | ND_FRAME, NC_SCENE | ND_FRAME);
-    WM_jobs_callbacks(wm_job, USD::import_startjob, NULL, NULL, USD::import_endjob);
+    WM_jobs_callbacks(wm_job, import_startjob, NULL, NULL, import_endjob);
 
     WM_jobs_start(CTX_wm_manager(C), wm_job);
   }
@@ -612,11 +617,11 @@ bool USD_import(struct bContext *C,
     short stop = 0, do_update = 0;
     float progress = 0.f;
 
-    USD::import_startjob(job, &stop, &do_update, &progress);
-    USD::import_endjob(job);
+    import_startjob(job, &stop, &do_update, &progress);
+    import_endjob(job);
     import_ok = job->import_ok;
 
-    USD::import_freejob(job);
+    import_freejob(job);
   }
 
   return import_ok;
@@ -685,7 +690,7 @@ CacheReader *CacheReader_open_usd_object(USDStageHandle *handle,
     return reader;
   }
 
-  USD::USDStageReader *archive = USD::archive_from_handle(handle);
+  USDStageReader *archive = archive_from_handle(handle);
 
   if (!archive || !archive->valid()) {
     return reader;
@@ -698,7 +703,7 @@ CacheReader *CacheReader_open_usd_object(USDStageHandle *handle,
   }
 
   // TODO: The handle does not have the proper import params or settings
-  USDPrimReader *usd_reader = USD::create_fake_reader(archive, prim);
+  USDPrimReader *usd_reader = create_fake_reader(archive, prim);
 
   if (usd_reader == NULL) {
     /* This object is not supported */
@@ -722,7 +727,7 @@ void USDCacheReader_free(CacheReader *reader)
 
 USDStageHandle *USD_create_handle(struct Main *bmain, const char *filename, ListBase *object_paths)
 {
-  USD::USDStageReader *archive = new USD::USDStageReader(bmain, filename);
+  USDStageReader *archive = new USDStageReader(bmain, filename);
 
   if (!archive->valid()) {
     delete archive;
@@ -730,15 +735,15 @@ USDStageHandle *USD_create_handle(struct Main *bmain, const char *filename, List
   }
 
   if (object_paths) {
-    USD::gather_objects_paths(archive->stage()->GetPseudoRoot(), object_paths);
+    gather_objects_paths(archive->stage()->GetPseudoRoot(), object_paths);
   }
 
-  return USD::handle_from_archive(archive);
+  return handle_from_archive(archive);
 }
 
 void USD_free_handle(USDStageHandle *handle)
 {
-  USD::USDStageReader *archive = USD::archive_from_handle(handle);
+  USDStageReader *archive = archive_from_handle(handle);
   delete archive;
 }
 

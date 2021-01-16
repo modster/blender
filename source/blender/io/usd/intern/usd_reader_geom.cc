@@ -89,7 +89,7 @@ Mesh *USDGeomReader::read_mesh(struct Mesh *existing_mesh,
 
 void USDGeomReader::addCacheModifier()
 {
-  ModifierData *md = modifier_new(eModifierType_MeshSequenceCache);
+  ModifierData *md = BKE_modifier_new(eModifierType_MeshSequenceCache);
   BLI_addtail(&m_object->modifiers, md);
 
   MeshSeqCacheModifierData *mcmd = reinterpret_cast<MeshSeqCacheModifierData *>(md);
@@ -104,7 +104,7 @@ void USDGeomReader::addCacheModifier()
 
 void USDGeomReader::addSubdivModifier()
 {
-  ModifierData *md = modifier_new(eModifierType_Subsurf);
+  ModifierData *md = BKE_modifier_new(eModifierType_Subsurf);
   BLI_addtail(&m_object->modifiers, md);
 
   //SubsurfModifierData *subd = reinterpret_cast<SubsurfModifierData *>(md);

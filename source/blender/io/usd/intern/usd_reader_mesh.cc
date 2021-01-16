@@ -24,6 +24,7 @@ extern "C" {
 #include "DNA_constraint_types.h"
 #include "DNA_curve_types.h"
 #include "DNA_customdata_types.h"
+#include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
