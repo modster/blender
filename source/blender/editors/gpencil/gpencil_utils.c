@@ -689,7 +689,7 @@ void gpencil_apply_parent(Depsgraph *depsgraph, Object *obact, bGPDlayer *gpl, b
   float inverse_diff_mat[4][4];
   float fpt[3];
 
-  BKE_gpencil_parent_matrix_get(depsgraph, obact, gpl, diff_mat);
+  BKE_gpencil_layer_transform_matrix_get(depsgraph, obact, gpl, diff_mat);
   invert_m4_m4(inverse_diff_mat, diff_mat);
 
   for (i = 0; i < gps->totpoints; i++) {
@@ -712,10 +712,11 @@ void gpencil_apply_parent_point(Depsgraph *depsgraph,
   float inverse_diff_mat[4][4];
   float fpt[3];
 
-  BKE_gpencil_parent_matrix_get(depsgraph, obact, gpl, diff_mat);
+  BKE_gpencil_layer_transform_matrix_get(depsgraph, obact, gpl, diff_mat);
   invert_m4_m4(inverse_diff_mat, diff_mat);
 
   mul_v3_m4v3(fpt, inverse_diff_mat, &pt->x);
+
   copy_v3_v3(&pt->x, fpt);
 }
 
@@ -1012,6 +1013,12 @@ void ED_gpencil_drawing_reference_get(const Scene *scene,
       else {
         /* use object location */
         copy_v3_v3(r_vec, ob->obmat[3]);
+        /* Apply layer offset. */
+        bGPdata *gpd = ob->data;
+        bGPDlayer *gpl = BKE_gpencil_layer_active_get(gpd);
+        if (gpl != NULL) {
+          add_v3_v3(r_vec, gpl->layer_mat[3]);
+        }
       }
     }
   }
@@ -1036,7 +1043,7 @@ void ED_gpencil_project_stroke_to_view(bContext *C, bGPDlayer *gpl, bGPDstroke *
   /* init space conversion stuff */
   gpencil_point_conversion_init(C, &gsc);
 
-  BKE_gpencil_parent_matrix_get(depsgraph, ob, gpl, diff_mat);
+  BKE_gpencil_layer_transform_matrix_get(depsgraph, ob, gpl, diff_mat);
   invert_m4_m4(inverse_diff_mat, diff_mat);
 
   /* Adjust each point */
@@ -1061,6 +1068,7 @@ void ED_gpencil_project_stroke_to_view(bContext *C, bGPDlayer *gpl, bGPDstroke *
 void ED_gpencil_project_stroke_to_plane(const Scene *scene,
                                         const Object *ob,
                                         const RegionView3D *rv3d,
+                                        bGPDlayer *gpl,
                                         bGPDstroke *gps,
                                         const float origin[3],
                                         const int axis)
@@ -1072,6 +1080,10 @@ void ED_gpencil_project_stroke_to_plane(const Scene *scene,
 
   float ray[3];
   float rpoint[3];
+
+  /* Recalculate layer transform matrix. */
+  loc_eul_size_to_mat4(gpl->layer_mat, gpl->location, gpl->rotation, gpl->scale);
+  invert_m4_m4(gpl->layer_invmat, gpl->layer_mat);
 
   /* normal vector for a plane locked to axis */
   zero_v3(plane_normal);
@@ -1089,11 +1101,20 @@ void ED_gpencil_project_stroke_to_plane(const Scene *scene,
       copy_m4_m4(mat, ob->obmat);
 
       /* move origin to cursor */
+      if ((ts->gpencil_v3d_align & GP_PROJECT_CURSOR) == 0) {
+        if (gpl != NULL) {
+          add_v3_v3(mat[3], gpl->location);
+        }
+      }
       if (ts->gpencil_v3d_align & GP_PROJECT_CURSOR) {
         copy_v3_v3(mat[3], cursor->location);
       }
 
       mul_mat3_m4_v3(mat, plane_normal);
+    }
+
+    if ((gpl != NULL) && (ts->gp_sculpt.lock_axis != GP_LOCKAXIS_CURSOR)) {
+      mul_mat3_m4_v3(gpl->layer_mat, plane_normal);
     }
   }
   else {
@@ -1101,12 +1122,6 @@ void ED_gpencil_project_stroke_to_plane(const Scene *scene,
     plane_normal[2] = 1.0f;
     float mat[4][4];
     loc_eul_size_to_mat4(mat, cursor->location, cursor->rotation_euler, scale);
-
-    /* move origin to object */
-    if ((ts->gpencil_v3d_align & GP_PROJECT_CURSOR) == 0) {
-      copy_v3_v3(mat[3], ob->obmat[3]);
-    }
-
     mul_mat3_m4_v3(mat, plane_normal);
   }
 
@@ -1142,8 +1157,12 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
   ARegion *region = gsc->region;
   RegionView3D *rv3d = region->regiondata;
 
+  /* Recalculate layer transform matrix. */
+  loc_eul_size_to_mat4(gpl->layer_mat, gpl->location, gpl->rotation, gpl->scale);
+  invert_m4_m4(gpl->layer_invmat, gpl->layer_mat);
+
   float diff_mat[4][4], inverse_diff_mat[4][4];
-  BKE_gpencil_parent_matrix_get(depsgraph, gsc->ob, gpl, diff_mat);
+  BKE_gpencil_layer_transform_matrix_get(depsgraph, gsc->ob, gpl, diff_mat);
   invert_m4_m4(inverse_diff_mat, diff_mat);
 
   float origin[3];
@@ -1209,7 +1228,7 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
         }
       }
 
-      ED_gpencil_project_point_to_plane(gsc->scene, gsc->ob, rv3d, origin, axis, &pt2);
+      ED_gpencil_project_point_to_plane(gsc->scene, gsc->ob, gpl, rv3d, origin, axis, &pt2);
 
       copy_v3_v3(&pt->x, &pt2.x);
 
@@ -1265,6 +1284,7 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
  */
 void ED_gpencil_project_point_to_plane(const Scene *scene,
                                        const Object *ob,
+                                       bGPDlayer *gpl,
                                        const RegionView3D *rv3d,
                                        const float origin[3],
                                        const int axis,
@@ -1292,6 +1312,11 @@ void ED_gpencil_project_point_to_plane(const Scene *scene,
     if (ob && (ob->type == OB_GPENCIL)) {
       float mat[4][4];
       copy_m4_m4(mat, ob->obmat);
+      if ((ts->gpencil_v3d_align & GP_PROJECT_CURSOR) == 0) {
+        if (gpl != NULL) {
+          add_v3_v3(mat[3], gpl->location);
+        }
+      }
 
       /* move origin to cursor */
       if (ts->gpencil_v3d_align & GP_PROJECT_CURSOR) {
@@ -1299,6 +1324,10 @@ void ED_gpencil_project_point_to_plane(const Scene *scene,
       }
 
       mul_mat3_m4_v3(mat, plane_normal);
+      /* Apply layer rotation (local transform). */
+      if ((gpl != NULL) && (ts->gp_sculpt.lock_axis != GP_LOCKAXIS_CURSOR)) {
+        mul_mat3_m4_v3(gpl->layer_mat, plane_normal);
+      }
     }
   }
   else {
@@ -1464,7 +1493,7 @@ void ED_gpencil_reset_layers_parent(Depsgraph *depsgraph, Object *obact, bGPdata
       /* only redo if any change */
       if (!equals_m4m4(gpl->inverse, cur_mat)) {
         /* first apply current transformation to all strokes */
-        BKE_gpencil_parent_matrix_get(depsgraph, obact, gpl, diff_mat);
+        BKE_gpencil_layer_transform_matrix_get(depsgraph, obact, gpl, diff_mat);
         /* undo local object */
         sub_v3_v3(diff_mat[3], gpl_loc);
 
@@ -3141,7 +3170,7 @@ bGPDstroke *ED_gpencil_stroke_nearest_to_ends(bContext *C,
 
   /* calculate difference matrix object */
   float diff_mat[4][4];
-  BKE_gpencil_parent_matrix_get(depsgraph, ob, gpl, diff_mat);
+  BKE_gpencil_layer_transform_matrix_get(depsgraph, ob, gpl, diff_mat);
 
   /* Calculate the extremes of the stroke in 2D. */
   bGPDspoint pt_parent;
