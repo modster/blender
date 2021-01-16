@@ -206,7 +206,7 @@ void GpencilExporterSVG::export_gpencil_layers(void)
       pugi::xml_node gpl_node = ob_node.append_child("g");
       gpl_node.append_attribute("id").set_value(gpl->info);
 
-      BKE_gpencil_parent_matrix_get(depsgraph_, ob, gpl, diff_mat_);
+      BKE_gpencil_layer_transform_matrix_get(depsgraph_, ob, gpl, diff_mat_);
 
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
         if (gps->totpoints == 0) {

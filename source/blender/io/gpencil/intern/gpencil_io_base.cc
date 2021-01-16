@@ -368,7 +368,7 @@ struct bGPDlayer *GpencilIO::gpl_current_get(void)
 void GpencilIO::gpl_current_set(struct bGPDlayer *gpl)
 {
   gpl_cur_ = gpl;
-  BKE_gpencil_parent_matrix_get(depsgraph_, params_.ob, gpl, diff_mat_);
+  BKE_gpencil_layer_transform_matrix_get(depsgraph_, params_.ob, gpl, diff_mat_);
 }
 
 struct bGPDframe *GpencilIO::gpf_current_get(void)
@@ -464,7 +464,7 @@ void GpencilIO::selected_objects_boundbox_set(void)
       if (gpl->flag & GP_LAYER_HIDE) {
         continue;
       }
-      BKE_gpencil_parent_matrix_get(depsgraph_, ob_eval, gpl, diff_mat_);
+      BKE_gpencil_layer_transform_matrix_get(depsgraph_, ob_eval, gpl, diff_mat_);
 
       bGPDframe *gpf = gpl->actframe;
       if (gpf == nullptr) {
