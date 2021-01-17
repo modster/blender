@@ -3019,7 +3019,6 @@ static void rna_def_keyconfig(BlenderRNA *brna)
                                 "rna_wmKeyMapItem_xr_action_set_get",
                                 "rna_wmKeyMapItem_xr_action_set_length",
                                 "rna_wmKeyMapItem_xr_action_set_set");
-  RNA_def_struct_name_property(srna, prop);
   RNA_def_property_update(prop, 0, "rna_KeyMapItem_update");
 
   prop = RNA_def_property(srna, "xr_action", PROP_STRING, PROP_NONE);
@@ -3029,7 +3028,6 @@ static void rna_def_keyconfig(BlenderRNA *brna)
                                 "rna_wmKeyMapItem_xr_action_get",
                                 "rna_wmKeyMapItem_xr_action_length",
                                 "rna_wmKeyMapItem_xr_action_set");
-  RNA_def_struct_name_property(srna, prop);
   RNA_def_property_update(prop, 0, "rna_KeyMapItem_update");
 
   prop = RNA_def_property(srna, "repeat", PROP_BOOLEAN, PROP_NONE);

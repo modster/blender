@@ -32,6 +32,7 @@
 #include "DEG_depsgraph.h"
 
 #include "DNA_camera_types.h"
+#include "DNA_object_types.h"
 
 #include "DRW_engine.h"
 
