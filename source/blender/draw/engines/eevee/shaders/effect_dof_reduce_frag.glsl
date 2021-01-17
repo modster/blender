@@ -7,11 +7,12 @@
 #pragma BLENDER_REQUIRE(effect_dof_lib.glsl)
 
 /** Inputs:
- * COPY_PASS: Is output of setup pass (halfres).
+ * COPY_PASS: Is output of setup pass (halfres) and downsample pass (quarter res).
  * REDUCE_PASS: Is previous Gather input miplvl (halfres >> miplvl).
  **/
 uniform sampler2D colorBuffer;
 uniform sampler2D cocBuffer;
+uniform sampler2D downsampledBuffer;
 
 /** Outputs:
  * COPY_PASS: Gather input mip0.
@@ -25,9 +26,37 @@ layout(location = 1) out float outCoc;
 /* TODO(fclem) Output scatter color to a separate R11G11B10 buffer. */
 // layout(location = 2) out float outScatterColor;
 
+vec3 non_linear_comparison_space(vec3 color)
+{
+  /* TODO(fclem) we might want something more aware of exposure. */
+  return -1.0 / (-1.0 - max(vec3(0.0), (color - scatterColorThreshold)));
+}
+
+/* NOTE: Do not compare alpha as it is not scattered by the scatter pass. */
+bool dof_scatter_neighborhood_rejection(vec3 color)
+{
+  color = non_linear_comparison_space(color);
+  /* Centered in the middle of 4 quarter res texel. */
+  vec2 texel_size = 1.0 / vec2(textureSize(downsampledBuffer, 0).xy);
+  vec2 uv = (floor(gl_FragCoord.xy * 0.5) + 1.0) * texel_size;
+
+  vec3 max_diff = vec3(0.0);
+  for (int i = 0; i < 4; i++) {
+    vec2 sample_uv = uv + 2.0 * quad_offsets[i] * texel_size;
+    vec3 ref = textureLod(downsampledBuffer, uv, 0.0).rgb;
+    ref = non_linear_comparison_space(ref);
+    max_diff = max(max_diff, abs(ref - color));
+  }
+  /* TODO(fclem) Adjust using multiple test scene. */
+  const float rejection_threshold = 0.05;
+  bool valid = max_v3(max_diff) > rejection_threshold;
+
+  return valid;
+}
+
 /* Simple copy pass where we select what pixels to scatter. Also the resolution might change.
- * NOTE: The texture can end up being too big because of the mipmap padding. We correct for that
- * during the convolution phase. */
+ * NOTE: The texture can end up being too big because of the mipmap padding. We correct for
+ * that during the convolution phase. */
 void main()
 {
   vec2 uv = gl_FragCoord.xy / vec2(textureSize(colorBuffer, 0).xy);
@@ -40,7 +69,7 @@ void main()
   /* Only scatter if CoC is big enough. */
   do_scatter = do_scatter && (abs(outCoc) > scatterCocThreshold);
   /* TODO(fclem) Needs the downsample pass. */
-  // do_scatter = do_scatter && dof_scatter_neighborhood_rejection(outColor, uv);
+  do_scatter = do_scatter && dof_scatter_neighborhood_rejection(outColor.rgb);
 
   /**
    * NOTE: Here we deviate from the reference implementation. Since we cannot write a sprite list

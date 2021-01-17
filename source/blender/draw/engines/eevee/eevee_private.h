@@ -272,6 +272,7 @@ typedef struct EEVEE_PassList {
   struct DRWPass *dof_dilate_tiles_minmax;
   struct DRWPass *dof_dilate_tiles_minabs;
   struct DRWPass *dof_reduce_copy;
+  struct DRWPass *dof_downsample;
   struct DRWPass *dof_reduce;
   struct DRWPass *dof_gather_fg;
   struct DRWPass *dof_gather_fg_holefill;
@@ -360,6 +361,7 @@ typedef struct EEVEE_FramebufferList {
   struct GPUFrameBuffer *dof_setup_fb;
   struct GPUFrameBuffer *dof_flatten_tiles_fb;
   struct GPUFrameBuffer *dof_dilate_tiles_fb;
+  struct GPUFrameBuffer *dof_downsample_fb;
   struct GPUFrameBuffer *dof_reduce_fb;
   struct GPUFrameBuffer *dof_gather_fg_fb;
   struct GPUFrameBuffer *dof_gather_fg_holefill_fb;
@@ -769,6 +771,7 @@ typedef struct EEVEE_EffectsInfo {
   struct GPUTexture *dof_coc_dilated_tiles_fg_tx;
   struct GPUTexture *dof_coc_tiles_bg_tx;
   struct GPUTexture *dof_coc_tiles_fg_tx;
+  struct GPUTexture *dof_downsample_tx;
   struct GPUTexture *dof_fg_color_tx;
   struct GPUTexture *dof_fg_occlusion_tx;
   struct GPUTexture *dof_fg_weight_tx;

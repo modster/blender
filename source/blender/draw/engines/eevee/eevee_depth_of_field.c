@@ -241,8 +241,31 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
   int res[2] = {(multiple * divide_ceil_u(fullres[0], multiple)) / 2,
                 (multiple * divide_ceil_u(fullres[1], multiple)) / 2};
 
+  int quater_res[2] = {divide_ceil_u(fullres[0], 4), divide_ceil_u(fullres[1], 4)};
+
   /* TODO(fclem): Make this dependent of the quality of the gather pass. */
   fx->dof_scatter_coc_threshold = 5.0f;
+
+  {
+    DRW_PASS_CREATE(psl->dof_downsample, DRW_STATE_WRITE_COLOR);
+
+    GPUShader *sh = EEVEE_shaders_depth_of_field_downsample_get();
+    DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_downsample);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "colorBuffer", &fx->dof_reduce_input_color_tx, NO_FILTERING);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "cocBuffer", &fx->dof_reduce_input_coc_tx, NO_FILTERING);
+    DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+
+    void *owner = (void *)&dof_reduce_pass_init;
+    fx->dof_downsample_tx = DRW_texture_pool_query_2d(UNPACK2(quater_res), COLOR_FORMAT, owner);
+
+    GPU_framebuffer_ensure_config(&fbl->dof_downsample_fb,
+                                  {
+                                      GPU_ATTACHMENT_NONE,
+                                      GPU_ATTACHMENT_TEXTURE(fx->dof_downsample_tx),
+                                  });
+  }
 
   {
     DRW_PASS_CREATE(psl->dof_reduce_copy, DRW_STATE_WRITE_COLOR);
@@ -254,6 +277,8 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
         grp, "colorBuffer", &fx->dof_reduce_input_color_tx, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(
         grp, "cocBuffer", &fx->dof_reduce_input_coc_tx, NO_FILTERING);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "downsampledBuffer", &fx->dof_downsample_tx, NO_FILTERING);
     DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_uniform_float_copy(grp, "scatterCocThreshold", fx->dof_scatter_coc_threshold);
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
@@ -560,9 +585,14 @@ void EEVEE_depth_of_field_draw(EEVEE_Data *vedata)
     SWAP(GPUTexture *, fx->dof_coc_dilated_tiles_bg_tx, fx->dof_coc_tiles_bg_tx);
     SWAP(GPUTexture *, fx->dof_coc_dilated_tiles_fg_tx, fx->dof_coc_tiles_fg_tx);
 
-    /* First step is just a copy. */
     fx->dof_reduce_input_color_tx = fx->dof_half_res_color_tx;
     fx->dof_reduce_input_coc_tx = fx->dof_half_res_coc_tx;
+
+    /* First step is just a copy. */
+    GPU_framebuffer_bind(fbl->dof_downsample_fb);
+    DRW_draw_pass(psl->dof_downsample);
+
+    /* First step is just a copy. */
     GPU_framebuffer_bind(fbl->dof_reduce_fb);
     DRW_draw_pass(psl->dof_reduce_copy);
 
