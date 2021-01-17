@@ -177,7 +177,6 @@ void GpencilExporterPDF::export_gpencil_layers(void)
       }
       gpf_current_set(gpf);
 
-      BKE_gpencil_layer_transform_matrix_get(depsgraph_, ob, gpl, diff_mat_);
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
         if (gps->totpoints == 0) {
           continue;
