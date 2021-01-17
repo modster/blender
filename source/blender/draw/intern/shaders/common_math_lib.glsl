@@ -85,6 +85,11 @@ float avg(vec4 v) { return dot(vec4(1.0 / 4.0), v); }
 float safe_rcp(float a) { return (a > 0.0) ? (1.0 / a) : 0.0; }
 vec4 safe_rcp(vec4 a) { return mix(vec4(0.0), (1.0 / a), greaterThan(a, vec4(0.0))); }
 
+float sqr(float a) { return a * a; }
+vec2 sqr(vec2 a) { return a * a; }
+vec3 sqr(vec3 a) { return a * a; }
+vec4 sqr(vec4 a) { return a * a; }
+
 #define weighted_sum(val0, val1, val2, val3, weights) ((val0 * weights[0] + val1 * weights[1] + val2 * weights[2] + val3 * weights[3]) * safe_rcp(sum(weights)));
 #define weighted_sum_array(val, weights) ((val[0] * weights[0] + val[1] * weights[1] + val[2] * weights[2] + val[3] * weights[3]) * safe_rcp(sum(weights)));
 /* clang-format on */

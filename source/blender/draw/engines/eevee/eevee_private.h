@@ -770,6 +770,7 @@ typedef struct EEVEE_EffectsInfo {
   struct GPUTexture *dof_coc_tiles_bg_tx;
   struct GPUTexture *dof_coc_tiles_fg_tx;
   struct GPUTexture *dof_fg_color_tx;
+  struct GPUTexture *dof_fg_occlusion_tx;
   struct GPUTexture *dof_fg_weight_tx;
   struct GPUTexture *dof_fg_holefill_color_tx;
   struct GPUTexture *dof_fg_holefill_weight_tx;

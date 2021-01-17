@@ -27,6 +27,13 @@ uniform vec2 gatherOutputTexelSize;
 
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out float outWeight;
+#ifndef DOF_HOLEFILL_PASS
+layout(location = 2) out vec2 outOcclusion;
+#else
+
+/* Dirty global variable that isn't used. So it should get optimized out. */
+vec2 outOcclusion;
+#endif
 
 #ifdef DOF_FOREGROUND_PASS
 const bool is_foreground = true;
@@ -116,7 +123,7 @@ void dof_gather_accumulator(float base_radius, const bool do_fast_gather)
     dof_gather_accumulate_center_sample(center_data, do_fast_gather, is_foreground, accum_data);
   }
 
-  dof_gather_accumulate_resolve(ring_count, accum_data, outColor, outWeight);
+  dof_gather_accumulate_resolve(ring_count, accum_data, outColor, outWeight, outOcclusion);
 }
 
 void main()
@@ -137,7 +144,7 @@ void main()
   float min_radius = coc_tile.bg_min_coc;
 #endif
   /* Allow for a 5% radius difference. */
-  bool do_fast_gather = (base_radius - min_radius) < (0.05 * base_radius);
+  bool do_fast_gather = (base_radius - min_radius) < (DOF_FAST_GATHER_COC_ERROR * base_radius);
   /* Gather at half resolution. Divide coc by 2. */
   base_radius *= 0.5;
 
@@ -152,6 +159,7 @@ void main()
     /* Early out. */
     outColor = vec4(0.0);
     outWeight = 0.0;
+    outOcclusion = vec2(0.0, 0.0);
   }
   else if (do_fast_gather) {
     /* Fast gather */
@@ -160,6 +168,7 @@ void main()
   else {
     dof_gather_accumulator(base_radius, false);
   }
+
 #if 0 /* Debug. */
   if (do_fast_gather) {
     outColor.rgb = outColor.rgb * vec3(0.5, 1.0, 0.5) + vec3(0.5, 1.0, 0.5) * 0.1;

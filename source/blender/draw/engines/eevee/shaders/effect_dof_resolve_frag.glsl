@@ -79,9 +79,10 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
 
   vec4 bg_col, fg_col;
   float bg_weight, fg_weight;
+  vec2 unused_occlusion;
 
-  dof_gather_accumulate_resolve(i_radius, bg_accum, bg_col, bg_weight);
-  dof_gather_accumulate_resolve(i_radius, fg_accum, fg_col, fg_weight);
+  dof_gather_accumulate_resolve(i_radius, bg_accum, bg_col, bg_weight, unused_occlusion);
+  dof_gather_accumulate_resolve(i_radius, fg_accum, fg_col, fg_weight, unused_occlusion);
 
   /* Fix weighting issues on perfectly focus > slight focus transitionning areas. */
   if (abs(center_data.coc) < 0.5) {

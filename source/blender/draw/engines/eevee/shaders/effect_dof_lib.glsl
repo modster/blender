@@ -22,6 +22,9 @@ uniform float scatterCocThreshold;
 
 /* -------------- Utils ------------- */
 
+/* Allow 5% CoC error. */
+#define DOF_FAST_GATHER_COC_ERROR 0.05
+
 const vec2 quad_offsets[4] = vec2[4](
     vec2(-0.5, 0.5), vec2(0.5, 0.5), vec2(0.5, -0.5), vec2(-0.5, -0.5));
 
@@ -395,9 +398,12 @@ float dof_gather_total_sample_count(const int ring_count)
 void dof_gather_accumulate_resolve(const int ring_count,
                                    DofGatherData accum_data,
                                    out vec4 out_col,
-                                   out float out_weight)
+                                   out float out_weight,
+                                   out vec2 out_occlusion)
 {
-  out_col = accum_data.color * safe_rcp(accum_data.weight);
+  float weight_inv = safe_rcp(accum_data.weight);
+  out_col = accum_data.color * weight_inv;
+  out_occlusion = vec2(abs(accum_data.coc), accum_data.coc_sqr) * weight_inv;
 
   if (accum_data.weight > 0.0) {
     out_weight = accum_data.layer_opacity * safe_rcp(dof_gather_total_sample_count(ring_count));

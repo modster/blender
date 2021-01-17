@@ -330,12 +330,14 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     /* NOTE: This pass is the owner. So textures from pool can come from previous passes. */
     fx->dof_fg_color_tx = DRW_texture_pool_query_2d(UNPACK2(res), COLOR_FORMAT, owner);
     fx->dof_fg_weight_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R16F, owner);
+    fx->dof_fg_occlusion_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RG16F, owner);
 
     GPU_framebuffer_ensure_config(&fbl->dof_gather_fg_fb,
                                   {
                                       GPU_ATTACHMENT_NONE,
                                       GPU_ATTACHMENT_TEXTURE(fx->dof_fg_color_tx),
                                       GPU_ATTACHMENT_TEXTURE(fx->dof_fg_weight_tx),
+                                      GPU_ATTACHMENT_TEXTURE(fx->dof_fg_occlusion_tx),
                                   });
   }
   {
@@ -384,14 +386,14 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     /* NOTE: This pass is the owner. So textures from pool can come from previous passes. */
     fx->dof_bg_color_tx = DRW_texture_pool_query_2d(UNPACK2(res), COLOR_FORMAT, owner);
     fx->dof_bg_weight_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R16F, owner);
-    /* TODO(fclem): scatter occlusion. */
-    // fx->dof_bg_occlusion_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RG16F, owner);
+    fx->dof_bg_occlusion_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RG16F, owner);
 
     GPU_framebuffer_ensure_config(&fbl->dof_gather_bg_fb,
                                   {
                                       GPU_ATTACHMENT_NONE,
                                       GPU_ATTACHMENT_TEXTURE(fx->dof_bg_color_tx),
                                       GPU_ATTACHMENT_TEXTURE(fx->dof_bg_weight_tx),
+                                      GPU_ATTACHMENT_TEXTURE(fx->dof_bg_occlusion_tx),
                                   });
   }
 }
@@ -420,6 +422,7 @@ static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
     DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_scatter_fg);
     DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &txl->dof_reduced_color, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
+    DRW_shgroup_uniform_texture_ref(grp, "occlusionBuffer", &fx->dof_fg_occlusion_tx);
     DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_uniform_float_copy(grp, "scatterCocThreshold", fx->dof_scatter_coc_threshold);
     DRW_shgroup_uniform_vec2_copy(grp, "targetTexelSize", target_texel_size);
@@ -441,13 +444,12 @@ static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
     DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_scatter_bg);
     DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &txl->dof_reduced_color, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
+    DRW_shgroup_uniform_texture_ref(grp, "occlusionBuffer", &fx->dof_bg_occlusion_tx);
     DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_uniform_float_copy(grp, "scatterCocThreshold", fx->dof_scatter_coc_threshold);
     DRW_shgroup_uniform_vec2_copy(grp, "targetTexelSize", target_texel_size);
     DRW_shgroup_uniform_int_copy(grp, "spritePerRow", input_size[0] / 2);
     DRW_shgroup_uniform_vec4(grp, "bokehParams", fx->dof_bokeh, 2);
-    /* TODO(fclem): scatter occlusion. */
-    // DRW_shgroup_uniform_texture_ref(grp, "occlusionBuffer", &fx->dof_bg_occlusion_tx);
     DRW_shgroup_call_procedural_triangles(grp, NULL, sprite_count);
 
     GPU_framebuffer_ensure_config(&fbl->dof_scatter_bg_fb,

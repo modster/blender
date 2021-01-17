@@ -1,5 +1,14 @@
 
+/**
+ * Scatter pass: Use sprites to scatter the color of very bright pixel to have higher quality blur.
+ *
+ * We only scatter one triangle per sprite and one sprite per 4 pixels to reduce vertex shader
+ * invocations and overdraw.
+ **/
+
 #pragma BLENDER_REQUIRE(effect_dof_lib.glsl)
+
+uniform sampler2D occlusionBuffer;
 
 flat in vec4 color1;
 flat in vec4 color2;
@@ -16,25 +25,9 @@ float bokeh_shape(vec2 center)
   vec2 co = gl_FragCoord.xy - center;
   float dist = length(co);
 
-#if 0
-  if (bokeh_sides.x > 0.0) {
-    /* Circle parametrization */
-    float theta = atan(co.y, co.x) + bokeh_rotation;
-    /* Optimized version of :
-     * float denom = theta - (M_2PI / bokeh_sides) * floor((bokeh_sides * theta + M_PI) / M_2PI);
-     * float r = cos(M_PI / bokeh_sides) / cos(denom); */
-    float denom = theta - bokeh_sides.y * floor(bokeh_sides.z * theta + 0.5);
-    float r = bokeh_sides.w / cos(denom);
-    /* Divide circle radial coord by the shape radius for angle theta.
-     * Giving us the new linear radius to the shape edge. */
-    dist /= r;
-  }
-#endif
-
   return dist;
 }
 
-/* accumulate color in the near/far blur buffers */
 void main(void)
 {
   vec4 shapes;
@@ -49,6 +42,17 @@ void main(void)
   if (max_v4(shapes) == 0.0) {
     discard;
   }
+
+  /* Works because target is the same size as occlusionBuffer. */
+  vec2 uv = gl_FragCoord.xy / vec2(textureSize(occlusionBuffer, 0).xy);
+  vec2 occlusion_data = texture(occlusionBuffer, uv).rg;
+  /* Fix tilling artifacts. (Slide 90) */
+  const float correction_fac = 1.0 - DOF_FAST_GATHER_COC_ERROR;
+  /* Occlude the sprite with geometry from the same field
+   * using a VSM like chebychev test (slide 85). */
+  float mean = occlusion_data.x;
+  float variance = occlusion_data.x;
+  shapes *= variance * safe_rcp(variance + sqr(max(cocs * correction_fac - mean, 0.0)));
 
   fragColor = color1 * shapes.x;
   fragColor += color2 * shapes.y;
