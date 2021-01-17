@@ -152,6 +152,11 @@ void main(void)
   /* Composite foreground. */
   fragColor = fragColor * (1.0 - fg_w) + fg * fg_w;
 
+  /* Fix float precision issue in alpha compositing.  */
+  if (fragColor.a > 0.99) {
+    fragColor.a = 1.0;
+  }
+
 #if 0 /* Debug */
   if (coc_tile.fg_slight_focus_max_coc == DOF_TILE_FOCUS) {
     fragColor.rgb *= vec3(1.0, 0.1, 0.1);
