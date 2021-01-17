@@ -45,8 +45,6 @@ struct NlaKeyframingContext;
 struct PathResolvedRNA;
 struct PointerRNA;
 struct PropertyRNA;
-struct ReportList;
-struct Scene;
 struct bAction;
 struct bActionGroup;
 struct bContext;
@@ -214,8 +212,7 @@ struct NlaKeyframingContext *BKE_animsys_get_nla_keyframing_context(
     struct ListBase *cache,
     struct PointerRNA *ptr,
     struct AnimData *adt,
-    const struct AnimationEvalContext *anim_eval_context,
-    const bool flush_to_original);
+    const struct AnimationEvalContext *anim_eval_context);
 bool BKE_animsys_nla_remap_keyframe_values(struct NlaKeyframingContext *context,
                                            struct PointerRNA *prop_ptr,
                                            struct PropertyRNA *prop,

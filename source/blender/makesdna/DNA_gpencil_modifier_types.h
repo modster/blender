@@ -107,6 +107,8 @@ typedef struct NoiseGpencilModifierData {
   float factor_uvs;
   /** Noise Frequency scaling */
   float noise_scale;
+  float noise_offset;
+  char _pad[4];
   /** How many frames before recalculate randoms. */
   int step;
   /** Custom index for passes. */
@@ -351,6 +353,7 @@ typedef enum eArrayGpencil_Flag {
   GP_ARRAY_USE_OFFSET = (1 << 7),
   GP_ARRAY_USE_RELATIVE = (1 << 8),
   GP_ARRAY_USE_OB_OFFSET = (1 << 9),
+  GP_ARRAY_UNIFORM_RANDOM_SCALE = (1 << 10),
 } eArrayGpencil_Flag;
 
 typedef struct BuildGpencilModifierData {

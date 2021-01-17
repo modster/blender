@@ -317,14 +317,14 @@ static void node_uiblocks_init(const bContext *C, bNodeTree *ntree)
   }
 }
 
-void node_to_view(struct bNode *node, float x, float y, float *rx, float *ry)
+void node_to_view(const bNode *node, float x, float y, float *rx, float *ry)
 {
   nodeToView(node, x, y, rx, ry);
   *rx *= UI_DPI_FAC;
   *ry *= UI_DPI_FAC;
 }
 
-void node_to_updated_rect(struct bNode *node, rctf *r_rect)
+void node_to_updated_rect(const bNode *node, rctf *r_rect)
 {
   node_to_view(node, node->offsetx, node->offsety, &r_rect->xmin, &r_rect->ymax);
   node_to_view(node,
@@ -334,7 +334,7 @@ void node_to_updated_rect(struct bNode *node, rctf *r_rect)
                &r_rect->ymin);
 }
 
-void node_from_view(struct bNode *node, float x, float y, float *rx, float *ry)
+void node_from_view(const bNode *node, float x, float y, float *rx, float *ry)
 {
   x /= UI_DPI_FAC;
   y /= UI_DPI_FAC;
@@ -344,8 +344,6 @@ void node_from_view(struct bNode *node, float x, float y, float *rx, float *ry)
 /* based on settings in node, sets drawing rect info. each redraw! */
 static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
 {
-  uiLayout *layout, *row;
-
   PointerRNA nodeptr;
   RNA_pointer_create(&ntree->id, &RNA_Node, node, &nodeptr);
 
@@ -374,15 +372,15 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
     PointerRNA sockptr;
     RNA_pointer_create(&ntree->id, &RNA_NodeSocket, nsock, &sockptr);
 
-    layout = UI_block_layout(node->block,
-                             UI_LAYOUT_VERTICAL,
-                             UI_LAYOUT_PANEL,
-                             locx + NODE_DYS,
-                             dy,
-                             NODE_WIDTH(node) - NODE_DY,
-                             NODE_DY,
-                             0,
-                             UI_style_get_dpi());
+    uiLayout *layout = UI_block_layout(node->block,
+                                       UI_LAYOUT_VERTICAL,
+                                       UI_LAYOUT_PANEL,
+                                       locx + NODE_DYS,
+                                       dy,
+                                       NODE_WIDTH(node) - NODE_DY,
+                                       NODE_DY,
+                                       0,
+                                       UI_style_get_dpi());
 
     if (node->flag & NODE_MUTED) {
       uiLayoutSetActive(layout, false);
@@ -393,7 +391,7 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
     uiLayoutSetContextPointer(layout, "socket", &sockptr);
 
     /* align output buttons to the right */
-    row = uiLayoutRow(layout, 1);
+    uiLayout *row = uiLayoutRow(layout, true);
     uiLayoutSetAlignment(row, UI_LAYOUT_ALIGN_RIGHT);
     const char *socket_label = nodeSocketLabel(nsock);
     nsock->typeinfo->draw((bContext *)C, row, &sockptr, &nodeptr, IFACE_(socket_label));
@@ -469,15 +467,15 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
     node->butr.ymin = 0;
     node->butr.ymax = 0;
 
-    layout = UI_block_layout(node->block,
-                             UI_LAYOUT_VERTICAL,
-                             UI_LAYOUT_PANEL,
-                             locx + NODE_DYS,
-                             dy,
-                             node->butr.xmax,
-                             0,
-                             0,
-                             UI_style_get_dpi());
+    uiLayout *layout = UI_block_layout(node->block,
+                                       UI_LAYOUT_VERTICAL,
+                                       UI_LAYOUT_PANEL,
+                                       locx + NODE_DYS,
+                                       dy,
+                                       node->butr.xmax,
+                                       0,
+                                       0,
+                                       UI_style_get_dpi());
 
     if (node->flag & NODE_MUTED) {
       uiLayoutSetActive(layout, false);
@@ -502,15 +500,15 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
     PointerRNA sockptr;
     RNA_pointer_create(&ntree->id, &RNA_NodeSocket, nsock, &sockptr);
 
-    layout = UI_block_layout(node->block,
-                             UI_LAYOUT_VERTICAL,
-                             UI_LAYOUT_PANEL,
-                             locx + NODE_DYS,
-                             dy,
-                             NODE_WIDTH(node) - NODE_DY,
-                             NODE_DY,
-                             0,
-                             UI_style_get_dpi());
+    uiLayout *layout = UI_block_layout(node->block,
+                                       UI_LAYOUT_VERTICAL,
+                                       UI_LAYOUT_PANEL,
+                                       locx + NODE_DYS,
+                                       dy,
+                                       NODE_WIDTH(node) - NODE_DY,
+                                       NODE_DY,
+                                       0,
+                                       UI_style_get_dpi());
 
     if (node->flag & NODE_MUTED) {
       uiLayoutSetActive(layout, false);
@@ -520,7 +518,7 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
     uiLayoutSetContextPointer(layout, "node", &nodeptr);
     uiLayoutSetContextPointer(layout, "socket", &sockptr);
 
-    row = uiLayoutRow(layout, 1);
+    uiLayout *row = uiLayoutRow(layout, true);
 
     const char *socket_label = nodeSocketLabel(nsock);
     nsock->typeinfo->draw((bContext *)C, row, &sockptr, &nodeptr, IFACE_(socket_label));
@@ -691,11 +689,11 @@ int node_get_colorid(bNode *node)
 /* note: in cmp_util.c is similar code, for node_compo_pass_on()
  *       the same goes for shader and texture nodes. */
 /* note: in node_edit.c is similar code, for untangle node */
-static void node_draw_mute_line(View2D *v2d, SpaceNode *snode, bNode *node)
+static void node_draw_mute_line(const View2D *v2d, const SpaceNode *snode, const bNode *node)
 {
   GPU_blend(GPU_BLEND_ALPHA);
 
-  LISTBASE_FOREACH (bNodeLink *, link, &node->internal_links) {
+  LISTBASE_FOREACH (const bNodeLink *, link, &node->internal_links) {
     node_draw_link_bezier(v2d, snode, link, TH_REDALERT, TH_REDALERT, -1);
   }
 
@@ -771,7 +769,6 @@ void node_socket_color_get(
     bContext *C, bNodeTree *ntree, PointerRNA *node_ptr, bNodeSocket *sock, float r_color[4])
 {
   PointerRNA ptr;
-
   BLI_assert(RNA_struct_is_a(node_ptr->type, &RNA_Node));
   RNA_pointer_create((ID *)ntree, &RNA_NodeSocket, sock, &ptr);
 
@@ -950,14 +947,14 @@ static void node_toggle_button_cb(struct bContext *C, void *node_argv, void *op_
   WM_operator_name_call(C, opname, WM_OP_INVOKE_DEFAULT, NULL);
 }
 
-void node_draw_shadow(SpaceNode *snode, bNode *node, float radius, float alpha)
+void node_draw_shadow(const SpaceNode *snode, const bNode *node, float radius, float alpha)
 {
-  rctf *rct = &node->totr;
+  const rctf *rct = &node->totr;
   UI_draw_roundbox_corner_set(UI_CNR_ALL);
   ui_draw_dropshadow(rct, radius, snode->aspect, alpha, node->flag & SELECT);
 }
 
-void node_draw_sockets(View2D *v2d,
+void node_draw_sockets(const View2D *v2d,
                        const bContext *C,
                        bNodeTree *ntree,
                        bNode *node,
@@ -1121,16 +1118,14 @@ void node_draw_sockets(View2D *v2d,
 }
 
 static void node_draw_basis(const bContext *C,
-                            ARegion *region,
-                            SpaceNode *snode,
+                            const View2D *v2d,
+                            const SpaceNode *snode,
                             bNodeTree *ntree,
                             bNode *node,
                             bNodeInstanceKey key)
 {
   /* float socket_size = NODE_SOCKSIZE*U.dpi/72; */ /* UNUSED */
   float iconbutw = 0.8f * UI_UNIT_X;
-
-  View2D *v2d = &region->v2d;
 
   /* skip if out of view */
   if (BLI_rctf_isect(&node->totr, &v2d->cur, NULL) == false) {
@@ -1346,8 +1341,8 @@ static void node_draw_basis(const bContext *C,
 }
 
 static void node_draw_hidden(const bContext *C,
-                             ARegion *region,
-                             SpaceNode *snode,
+                             const View2D *v2d,
+                             const SpaceNode *snode,
                              bNodeTree *ntree,
                              bNode *node,
                              bNodeInstanceKey UNUSED(key))
@@ -1355,8 +1350,6 @@ static void node_draw_hidden(const bContext *C,
   rctf *rct = &node->totr;
   float centy = BLI_rctf_cent_y(rct);
   float hiddenrad = BLI_rctf_size_y(rct) / 2.0f;
-
-  View2D *v2d = &region->v2d;
 
   float scale;
   UI_view2d_scale_get(v2d, &scale, NULL);
@@ -1441,7 +1434,7 @@ static void node_draw_hidden(const bContext *C,
 
   /* disable lines */
   if (node->flag & NODE_MUTED) {
-    node_draw_mute_line(&region->v2d, snode, node);
+    node_draw_mute_line(v2d, snode, node);
   }
 
   char showname[128]; /* 128 is used below */
@@ -1553,11 +1546,12 @@ void node_draw_default(const bContext *C,
                        bNode *node,
                        bNodeInstanceKey key)
 {
+  const View2D *v2d = &region->v2d;
   if (node->flag & NODE_HIDDEN) {
-    node_draw_hidden(C, region, snode, ntree, node, key);
+    node_draw_hidden(C, v2d, snode, ntree, node, key);
   }
   else {
-    node_draw_basis(C, region, snode, ntree, node, key);
+    node_draw_basis(C, v2d, snode, ntree, node, key);
   }
 }
 
@@ -1610,8 +1604,7 @@ void node_draw_nodetree(const bContext *C,
 #endif
 
   /* draw background nodes, last nodes in front */
-  int a = 0;
-  LISTBASE_FOREACH_INDEX (bNode *, node, &ntree->nodes, a) {
+  LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
 #ifdef USE_DRAW_TOT_UPDATE
     /* unrelated to background nodes, update the v2d->tot,
      * can be anywhere before we draw the scroll bars */
@@ -1623,7 +1616,6 @@ void node_draw_nodetree(const bContext *C,
     }
 
     bNodeInstanceKey key = BKE_node_instance_key(parent_key, ntree, node);
-    node->nr = a; /* index of node in list, used for exec event code */
     node_draw(C, region, snode, ntree, node, key);
   }
 
@@ -1639,14 +1631,12 @@ void node_draw_nodetree(const bContext *C,
   GPU_blend(GPU_BLEND_NONE);
 
   /* draw foreground nodes, last nodes in front */
-  a = 0;
-  LISTBASE_FOREACH_INDEX (bNode *, node, &ntree->nodes, a) {
+  LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
     if (node->flag & NODE_BACKGROUND) {
       continue;
     }
 
     bNodeInstanceKey key = BKE_node_instance_key(parent_key, ntree, node);
-    node->nr = a; /* index of node in list, used for exec event code */
     node_draw(C, region, snode, ntree, node, key);
   }
 }
@@ -1691,8 +1681,8 @@ static void draw_nodetree(const bContext *C,
 /* shade the parent node group and add a uiBlock to clip mouse events */
 static void draw_group_overlay(const bContext *C, ARegion *region)
 {
-  View2D *v2d = &region->v2d;
-  rctf rect = v2d->cur;
+  const View2D *v2d = &region->v2d;
+  const rctf rect = v2d->cur;
   float color[4];
 
   /* shade node groups to separate them visually */

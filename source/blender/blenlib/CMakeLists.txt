@@ -54,6 +54,7 @@ set(SRC
   intern/BLI_memblock.c
   intern/BLI_memiter.c
   intern/BLI_mempool.c
+  intern/BLI_mmap.c
   intern/BLI_timer.c
   intern/DLRB_tree.c
   intern/array_store.c
@@ -203,6 +204,7 @@ set(SRC
   BLI_heap_simple.h
   BLI_index_mask.hh
   BLI_index_range.hh
+  BLI_inplace_priority_queue.hh
   BLI_iterator.h
   BLI_jitter_2d.h
   BLI_kdopbvh.h
@@ -242,6 +244,7 @@ set(SRC
   BLI_mempool.h
   BLI_mesh_boolean.hh
   BLI_mesh_intersect.hh
+  BLI_mmap.h
   BLI_mpq2.hh
   BLI_mpq3.hh
   BLI_multi_value_map.hh
@@ -390,6 +393,7 @@ if(WITH_GTESTS)
     tests/BLI_heap_test.cc
     tests/BLI_index_mask_test.cc
     tests/BLI_index_range_test.cc
+    tests/BLI_inplace_priority_queue_test.cc
     tests/BLI_kdopbvh_test.cc
     tests/BLI_linear_allocator_test.cc
     tests/BLI_linklist_lockfree_test.cc

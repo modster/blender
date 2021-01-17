@@ -27,6 +27,7 @@
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
+#include "DNA_scene_types.h"
 
 #include "BLI_array_utils.h"
 #include "BLI_listbase.h"
@@ -818,7 +819,7 @@ void ED_mesh_undosys_type(UndoType *ut)
 
   ut->step_foreach_ID_ref = mesh_undosys_foreach_ID_ref;
 
-  ut->use_context = true;
+  ut->flags = UNDOTYPE_FLAG_NEED_CONTEXT_FOR_ENCODE;
 
   ut->step_size = sizeof(MeshUndoStep);
 }

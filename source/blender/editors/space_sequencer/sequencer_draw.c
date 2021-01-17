@@ -26,6 +26,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_string_utils.h"
 #include "BLI_threads.h"
 #include "BLI_utildefines.h"
 
@@ -68,7 +69,16 @@
 
 #include "BIF_glutil.h"
 
+#include "SEQ_effects.h"
+#include "SEQ_prefetch.h"
+#include "SEQ_proxy.h"
+#include "SEQ_relations.h"
+#include "SEQ_render.h"
+#include "SEQ_select.h"
 #include "SEQ_sequencer.h"
+#include "SEQ_time.h"
+#include "SEQ_transform.h"
+#include "SEQ_utils.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -227,16 +237,16 @@ void color3ubv_from_seq(Scene *curscene, Sequence *seq, uchar col[3])
  * \param x1, x2, y1, y2: The starting and end X value to draw the wave, same for y1 and y2.
  * \param stepsize: The width of a pixel.
  */
-static void draw_seq_waveform(View2D *v2d,
-                              const bContext *C,
-                              SpaceSeq *sseq,
-                              Scene *scene,
-                              Sequence *seq,
-                              float x1,
-                              float y1,
-                              float x2,
-                              float y2,
-                              float stepsize)
+static void draw_seq_waveform_overlay(View2D *v2d,
+                                      const bContext *C,
+                                      SpaceSeq *sseq,
+                                      Scene *scene,
+                                      Sequence *seq,
+                                      float x1,
+                                      float y1,
+                                      float x2,
+                                      float y2,
+                                      float stepsize)
 {
   /* Offset x1 and x2 values, to match view min/max, if strip is out of bounds. */
   int x1_offset = max_ff(v2d->cur.xmin, x1);
@@ -371,7 +381,7 @@ static void drawmeta_contents(Scene *scene, Sequence *seqm, float x1, float y1, 
   ListBase *seqbase;
   int offset;
 
-  seqbase = BKE_sequence_seqbase_get(seqm, &offset);
+  seqbase = SEQ_get_seqbase_from_sequence(seqm, &offset);
   if (!seqbase || BLI_listbase_is_empty(seqbase)) {
     return;
   }
@@ -488,7 +498,7 @@ static void draw_seq_handle(View2D *v2d,
     whichsel = SEQ_RIGHTSEL;
   }
 
-  if (!(seq->type & SEQ_TYPE_EFFECT) || BKE_sequence_effect_get_num_inputs(seq->type) == 0) {
+  if (!(seq->type & SEQ_TYPE_EFFECT) || SEQ_effect_get_num_inputs(seq->type) == 0) {
     GPU_blend(GPU_BLEND_ALPHA);
 
     GPU_blend(GPU_BLEND_ALPHA);
@@ -603,121 +613,131 @@ static void draw_seq_outline(Sequence *seq,
   }
 }
 
-/* Draw info text on a sequence strip. */
-static void draw_seq_text(View2D *v2d,
-                          Sequence *seq,
-                          SpaceSeq *sseq,
-                          float x1,
-                          float x2,
-                          float y1,
-                          float y2,
-                          bool seq_active,
-                          bool y_threshold)
+static const char *draw_seq_text_get_name(Sequence *seq)
 {
-  rctf rect;
-  char str[32 + FILE_MAX];
-  size_t str_len;
   const char *name = seq->name + 2;
-  uchar col[4];
-
-  /* All strings should include name. */
   if (name[0] == '\0') {
-    name = BKE_sequence_give_name(seq);
+    name = SEQ_sequence_give_name(seq);
   }
+  return name;
+}
 
-  if (ELEM(seq->type, SEQ_TYPE_META, SEQ_TYPE_ADJUSTMENT)) {
-    str_len = BLI_snprintf(str, sizeof(str), "%s | %d", name, seq->len);
-  }
-  else if (seq->type == SEQ_TYPE_SCENE) {
-    if (seq->scene) {
-      if (seq->scene_camera) {
-        str_len = BLI_snprintf(str,
-                               sizeof(str),
-                               "%s: %s (%s) | %d",
-                               name,
-                               seq->scene->id.name + 2,
-                               ((ID *)seq->scene_camera)->name + 2,
-                               seq->len);
+static void draw_seq_text_get_source(Sequence *seq, char *r_source, size_t source_len)
+{
+  *r_source = '\0';
+
+  /* Set source for the most common types. */
+  switch (seq->type) {
+    case SEQ_TYPE_IMAGE:
+    case SEQ_TYPE_MOVIE: {
+      BLI_join_dirfile(r_source, source_len, seq->strip->dir, seq->strip->stripdata->name);
+      break;
+    }
+    case SEQ_TYPE_SOUND_RAM: {
+      if (seq->sound != NULL) {
+        BLI_strncpy(r_source, seq->sound->filepath, source_len);
       }
-      else {
-        str_len = BLI_snprintf(
-            str, sizeof(str), "%s: %s | %d", name, seq->scene->id.name + 2, seq->len);
+      break;
+    }
+    case SEQ_TYPE_MULTICAM: {
+      BLI_snprintf(r_source, source_len, "Channel: %d", seq->multicam_source);
+      break;
+    }
+    case SEQ_TYPE_TEXT: {
+      const TextVars *textdata = seq->effectdata;
+      BLI_strncpy(r_source, textdata->text, source_len);
+      break;
+    }
+    case SEQ_TYPE_SCENE: {
+      if (seq->scene != NULL) {
+        if (seq->scene_camera != NULL) {
+          BLI_snprintf(r_source,
+                       source_len,
+                       "%s (%s)",
+                       seq->scene->id.name + 2,
+                       seq->scene_camera->id.name + 2);
+        }
+        else {
+          BLI_strncpy(r_source, seq->scene->id.name + 2, source_len);
+        }
       }
+      break;
     }
-    else {
-      str_len = BLI_snprintf(str, sizeof(str), "%s | %d", name, seq->len);
+    case SEQ_TYPE_MOVIECLIP: {
+      if (seq->clip != NULL) {
+        BLI_strncpy(r_source, seq->clip->id.name + 2, source_len);
+      }
+      break;
     }
-  }
-  else if (seq->type == SEQ_TYPE_MOVIECLIP) {
-    if (seq->clip && !STREQ(name, seq->clip->id.name + 2)) {
-      str_len = BLI_snprintf(
-          str, sizeof(str), "%s: %s | %d", name, seq->clip->id.name + 2, seq->len);
-    }
-    else {
-      str_len = BLI_snprintf(str, sizeof(str), "%s | %d", name, seq->len);
-    }
-  }
-  else if (seq->type == SEQ_TYPE_MASK) {
-    if (seq->mask && !STREQ(name, seq->mask->id.name + 2)) {
-      str_len = BLI_snprintf(
-          str, sizeof(str), "%s: %s | %d", name, seq->mask->id.name + 2, seq->len);
-    }
-    else {
-      str_len = BLI_snprintf(str, sizeof(str), "%s | %d", name, seq->len);
+    case SEQ_TYPE_MASK: {
+      if (seq->mask != NULL) {
+        BLI_strncpy(r_source, seq->mask->id.name + 2, source_len);
+      }
+      break;
     }
   }
-  else if (seq->type == SEQ_TYPE_MULTICAM) {
-    str_len = BLI_snprintf(str, sizeof(str), "Cam %s: %d", name, seq->multicam_source);
-  }
-  else if (seq->type == SEQ_TYPE_IMAGE) {
-    str_len = BLI_snprintf(str,
-                           sizeof(str),
-                           "%s: %s%s | %d",
-                           name,
-                           seq->strip->dir,
-                           seq->strip->stripdata->name,
-                           seq->len);
-  }
-  else if (seq->type == SEQ_TYPE_TEXT) {
-    TextVars *textdata = seq->effectdata;
-    str_len = BLI_snprintf(str, sizeof(str), "%s | %d", textdata->text, seq->startdisp);
-  }
-  else if (seq->type & SEQ_TYPE_EFFECT) {
-    str_len = BLI_snprintf(str, sizeof(str), "%s | %d", name, seq->len);
-  }
-  else if (seq->type == SEQ_TYPE_SOUND_RAM) {
-    /* If a waveform is drawn, avoid to draw text when there is not enough vertical space. */
-    if (!y_threshold && (sseq->flag & SEQ_NO_WAVEFORMS) == 0 &&
-        ((sseq->flag & SEQ_ALL_WAVEFORMS) || (seq->flag & SEQ_AUDIO_DRAW_WAVEFORM))) {
+}
 
-      str[0] = 0;
-      str_len = 0;
-    }
-    else if (seq->sound) {
-      str_len = BLI_snprintf(
-          str, sizeof(str), "%s: %s | %d", name, seq->sound->filepath, seq->len);
-    }
-    else {
-      str_len = BLI_snprintf(str, sizeof(str), "%s | %d", name, seq->len);
-    }
-  }
-  else if (seq->type == SEQ_TYPE_MOVIE) {
-    str_len = BLI_snprintf(str,
-                           sizeof(str),
-                           "%s: %s%s | %d",
-                           name,
-                           seq->strip->dir,
-                           seq->strip->stripdata->name,
-                           seq->len);
-  }
-  else {
-    /* Should never get here!, but might with files from future. */
-    BLI_assert(0);
+static size_t draw_seq_text_get_overlay_string(SpaceSeq *sseq,
+                                               Sequence *seq,
+                                               char *r_overlay_string,
+                                               size_t overlay_string_len)
+{
+  const char *text_sep = " | ";
+  const char *text_array[5];
+  int i = 0;
 
-    str_len = BLI_snprintf(str, sizeof(str), "%s | %d", name, seq->len);
+  if (sseq->flag & SEQ_SHOW_STRIP_NAME) {
+    text_array[i++] = draw_seq_text_get_name(seq);
+  }
+
+  char source[FILE_MAX];
+  if (sseq->flag & SEQ_SHOW_STRIP_SOURCE) {
+    draw_seq_text_get_source(seq, source, sizeof(source));
+    if (source[0] != '\0') {
+      if (i != 0) {
+        text_array[i++] = text_sep;
+      }
+      text_array[i++] = source;
+    }
+  }
+
+  char strip_duration_text[16];
+  if (sseq->flag & SEQ_SHOW_STRIP_DURATION) {
+    const int strip_duration = seq->enddisp - seq->startdisp;
+    SNPRINTF(strip_duration_text, "%d", strip_duration);
+    if (i != 0) {
+      text_array[i++] = text_sep;
+    }
+    text_array[i++] = strip_duration_text;
+  }
+
+  BLI_assert(i <= ARRAY_SIZE(text_array));
+
+  return BLI_string_join_array(r_overlay_string, overlay_string_len, text_array, i) -
+         r_overlay_string;
+}
+
+/* Draw info text on a sequence strip. */
+static void draw_seq_text_overlay(View2D *v2d,
+                                  Sequence *seq,
+                                  SpaceSeq *sseq,
+                                  float x1,
+                                  float x2,
+                                  float y1,
+                                  float y2,
+                                  bool seq_active)
+{
+  char overlay_string[FILE_MAX];
+  size_t overlay_string_len = draw_seq_text_get_overlay_string(
+      sseq, seq, overlay_string, sizeof(overlay_string));
+
+  if (overlay_string_len == 0) {
+    return;
   }
 
   /* White text for the active strip. */
+  uchar col[4];
   col[0] = col[1] = col[2] = seq_active ? 255 : 10;
   col[3] = 255;
 
@@ -731,15 +751,16 @@ static void draw_seq_text(View2D *v2d,
     }
   }
 
+  rctf rect;
   rect.xmin = x1;
   rect.ymin = y1;
   rect.xmax = x2;
   rect.ymax = y2;
 
-  UI_view2d_text_cache_add_rectf(v2d, &rect, str, str_len, col);
+  UI_view2d_text_cache_add_rectf(v2d, &rect, overlay_string, overlay_string_len, col);
 }
 
-static void draw_sequence_extensions(Scene *scene, Sequence *seq, uint pos, float pixely)
+static void draw_sequence_extensions_overlay(Scene *scene, Sequence *seq, uint pos, float pixely)
 {
   float x1, x2, y1, y2;
   uchar col[4], blend_col[3];
@@ -850,9 +871,9 @@ static void draw_seq_background(Scene *scene,
   /* Draw the main strip body. */
   if (is_single_image) {
     immRectf(pos,
-             BKE_sequence_tx_get_final_left(seq, false),
+             SEQ_transform_get_left_handle_frame(seq, false),
              y1,
-             BKE_sequence_tx_get_final_right(seq, false),
+             SEQ_transform_get_right_handle_frame(seq, false),
              y2);
   }
   else {
@@ -988,7 +1009,7 @@ static void fcurve_batch_add_verts(GPUVertBuf *vbo,
  * - Volume for sound strips.
  * - Opacity for the other types.
  */
-static void draw_seq_fcurve(
+static void draw_seq_fcurve_overlay(
     Scene *scene, View2D *v2d, Sequence *seq, float x1, float y1, float x2, float y2, float pixelx)
 {
   FCurve *fcu;
@@ -1077,7 +1098,7 @@ static void draw_seq_strip(const bContext *C,
   float pixely = BLI_rctf_size_y(&v2d->cur) / BLI_rcti_size_y(&v2d->mask);
 
   /* Check if we are doing "solo preview". */
-  bool is_single_image = (char)BKE_sequence_single_check(seq);
+  bool is_single_image = (char)SEQ_transform_single_image_check(seq);
 
   /* Draw strip body. */
   x1 = (seq->startstill) ? seq->start : seq->startdisp;
@@ -1085,11 +1106,21 @@ static void draw_seq_strip(const bContext *C,
   x2 = (seq->endstill) ? (seq->start + seq->len) : seq->enddisp;
   y2 = seq->machine + SEQ_STRIP_OFSTOP;
 
-  /* Calculate height needed for drawing text on strip. */
-  float text_margin_y = y2 - min_ff(0.40f, 20 * U.dpi_fac * pixely);
+  float text_margin_y;
+  bool y_threshold;
+  if ((sseq->flag & SEQ_SHOW_STRIP_NAME) || (sseq->flag & SEQ_SHOW_STRIP_SOURCE) ||
+      (sseq->flag & SEQ_SHOW_STRIP_DURATION)) {
 
-  /* Is there enough space for drawing something else than text? */
-  bool y_threshold = ((y2 - y1) / pixely) > 20 * U.dpi_fac;
+    /* Calculate height needed for drawing text on strip. */
+    text_margin_y = y2 - min_ff(0.40f, 20 * U.dpi_fac * pixely);
+
+    /* Is there enough space for drawing something else than text? */
+    y_threshold = ((y2 - y1) / pixely) > 20 * U.dpi_fac;
+  }
+  else {
+    text_margin_y = y2;
+    y_threshold = 1;
+  }
 
   uint pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
   immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
@@ -1102,12 +1133,13 @@ static void draw_seq_strip(const bContext *C,
   }
 
   /* Draw strip offsets when flag is enabled or during "solo preview". */
-  if (!is_single_image && (seq->startofs || seq->endofs) && pixely > 0) {
-    if ((sseq->draw_flag & SEQ_DRAW_OFFSET_EXT) || (seq == special_seq_update)) {
-      draw_sequence_extensions(scene, seq, pos, pixely);
+  if ((sseq->flag & SEQ_SHOW_STRIP_OVERLAY)) {
+    if (!is_single_image && (seq->startofs || seq->endofs) && pixely > 0) {
+      if ((sseq->draw_flag & SEQ_DRAW_OFFSET_EXT) || (seq == special_seq_update)) {
+        draw_sequence_extensions_overlay(scene, seq, pos, pixely);
+      }
     }
   }
-
   immUnbindProgram();
 
   x1 = seq->startdisp;
@@ -1118,31 +1150,31 @@ static void draw_seq_strip(const bContext *C,
     drawmeta_contents(scene, seq, x1, y1, x2, y2);
   }
 
-  if (sseq->flag & SEQ_SHOW_FCURVES) {
-    draw_seq_fcurve(scene, v2d, seq, x1, y1, x2, y2, pixelx);
+  if ((sseq->flag & SEQ_SHOW_STRIP_OVERLAY) && (sseq->flag & SEQ_SHOW_FCURVES)) {
+    draw_seq_fcurve_overlay(scene, v2d, seq, x1, y1, x2, y2, pixelx);
   }
 
   /* Draw sound strip waveform. */
-  if ((seq->type == SEQ_TYPE_SOUND_RAM) && (sseq->flag & SEQ_NO_WAVEFORMS) == 0) {
-    draw_seq_waveform(v2d,
-                      C,
-                      sseq,
-                      scene,
-                      seq,
-                      x1,
-                      y_threshold ? y1 + 0.05f : y1,
-                      x2,
-                      y_threshold ? text_margin_y : y2,
-                      BLI_rctf_size_x(&region->v2d.cur) / region->winx);
+  if ((seq->type == SEQ_TYPE_SOUND_RAM) && ((sseq->flag & SEQ_SHOW_STRIP_OVERLAY)) &&
+      (sseq->flag & SEQ_NO_WAVEFORMS) == 0) {
+    draw_seq_waveform_overlay(v2d,
+                              C,
+                              sseq,
+                              scene,
+                              seq,
+                              x1,
+                              y_threshold ? y1 + 0.05f : y1,
+                              x2,
+                              y_threshold ? text_margin_y : y2,
+                              BLI_rctf_size_x(&region->v2d.cur) / region->winx);
   }
-
   /* Draw locked state. */
   if (seq->flag & SEQ_LOCK) {
     draw_seq_locked(x1, y1, x2, y2);
   }
 
   /* Draw Red line on the top of invalid strip (Missing media). */
-  if (!BKE_sequence_is_valid_check(seq)) {
+  if (!SEQ_sequence_has_source(seq)) {
     draw_seq_invalid(x1, x2, y2, text_margin_y);
   }
 
@@ -1162,11 +1194,21 @@ static void draw_seq_strip(const bContext *C,
 
   calculate_seq_text_offsets(v2d, seq, &x1, &x2, pixelx);
 
-  /* Don't draw strip if there is not enough vertical or horizontal space. */
-  if (((x2 - x1) > 32 * pixelx * U.dpi_fac) && ((y2 - y1) > 8 * pixely * U.dpi_fac)) {
-    /* Depending on the vertical space, draw text on top or in the center of strip. */
-    draw_seq_text(
-        v2d, seq, sseq, x1, x2, y_threshold ? text_margin_y : y1, y2, seq_active, y_threshold);
+  /* If a waveform is drawn, avoid drawing text when there is not enough vertical space. */
+  if (seq->type == SEQ_TYPE_SOUND_RAM) {
+    if (!y_threshold && (sseq->flag & SEQ_NO_WAVEFORMS) == 0 &&
+        ((sseq->flag & SEQ_ALL_WAVEFORMS) || (seq->flag & SEQ_AUDIO_DRAW_WAVEFORM))) {
+      return;
+    }
+  }
+
+  if (sseq->flag & SEQ_SHOW_STRIP_OVERLAY) {
+    /* Don't draw strip if there is not enough vertical or horizontal space. */
+    if (((x2 - x1) > 32 * pixelx * U.dpi_fac) && ((y2 - y1) > 8 * pixely * U.dpi_fac)) {
+      /* Depending on the vertical space, draw text on top or in the center of strip. */
+      draw_seq_text_overlay(
+          v2d, seq, sseq, x1, x2, y_threshold ? text_margin_y : y1, y2, seq_active);
+    }
   }
 }
 
@@ -1236,7 +1278,7 @@ void ED_sequencer_special_preview_clear(void)
  *
  * TODO: do not rely on such hack and just update the \a ibuf outside of
  * the UI drawing code.
- **/
+ */
 ImBuf *sequencer_ibuf_get(struct Main *bmain,
                           ARegion *region,
                           struct Depsgraph *depsgraph,
@@ -1360,7 +1402,7 @@ static void sequencer_display_size(Scene *scene, float r_viewrect[2])
   r_viewrect[0] *= scene->r.xasp / scene->r.yasp;
 }
 
-static void sequencer_draw_gpencil(const bContext *C)
+static void sequencer_draw_gpencil_overlay(const bContext *C)
 {
   /* Draw grease-pencil (image aligned). */
   ED_annotation_draw_2dimage(C);
@@ -1373,7 +1415,9 @@ static void sequencer_draw_gpencil(const bContext *C)
 }
 
 /* Draw content and safety borders borders. */
-static void sequencer_draw_borders(const SpaceSeq *sseq, const View2D *v2d, const Scene *scene)
+static void sequencer_draw_borders_overlay(const SpaceSeq *sseq,
+                                           const View2D *v2d,
+                                           const Scene *scene)
 {
   float x1 = v2d->tot.xmin;
   float y1 = v2d->tot.ymin;
@@ -1428,7 +1472,7 @@ void sequencer_draw_maskedit(const bContext *C, Scene *scene, ARegion *region, S
 
   // if (sc->mode == SC_MODE_MASKEDIT)
   if (0 && sseq->mainb == SEQ_DRAW_IMG_IMBUF) {
-    Mask *mask = BKE_sequencer_mask_get(scene);
+    Mask *mask = SEQ_active_mask_get(scene);
 
     if (mask) {
       int width, height;
@@ -1460,7 +1504,7 @@ void sequencer_draw_maskedit(const bContext *C, Scene *scene, ARegion *region, S
 /* Force redraw, when prefetching and using cache view. */
 static void seq_prefetch_wm_notify(const bContext *C, Scene *scene)
 {
-  if (BKE_sequencer_prefetch_need_redraw(CTX_data_main(C), scene)) {
+  if (SEQ_prefetch_need_redraw(CTX_data_main(C), scene)) {
     WM_event_add_notifier(C, NC_SCENE | ND_SEQUENCER, NULL);
   }
 }
@@ -1825,17 +1869,17 @@ void sequencer_draw_preview(const bContext *C,
         C, scene, region, sseq, ibuf, scope, draw_overlay, draw_backdrop);
 
     /* Draw over image. */
-    if (sseq->flag & SEQ_SHOW_METADATA) {
+    if (sseq->flag & SEQ_SHOW_METADATA && sseq->flag & SEQ_SHOW_STRIP_OVERLAY) {
       ED_region_image_metadata_draw(0.0, 0.0, ibuf, &v2d->tot, 1.0, 1.0);
     }
   }
 
-  if (show_imbuf) {
-    sequencer_draw_borders(sseq, v2d, scene);
+  if (show_imbuf && (sseq->flag & SEQ_SHOW_STRIP_OVERLAY)) {
+    sequencer_draw_borders_overlay(sseq, v2d, scene);
   }
 
-  if (draw_gpencil && show_imbuf) {
-    sequencer_draw_gpencil(C);
+  if (draw_gpencil && show_imbuf && (sseq->flag & SEQ_SHOW_STRIP_OVERLAY)) {
+    sequencer_draw_gpencil_overlay(C);
   }
 #if 0
   sequencer_draw_maskedit(C, scene, region, sseq);
@@ -1858,6 +1902,10 @@ static void draw_seq_backdrop(View2D *v2d)
   uint pos = GPU_vertformat_attr_add(immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
   immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
+  /* View backdrop. */
+  immUniformThemeColorShade(TH_BACK, -25);
+  immRectf(pos, v2d->cur.xmin, v2d->cur.ymin, v2d->cur.xmax, v2d->cur.ymax);
+
   /* Darker overlay over the view backdrop. */
   immUniformThemeColorShade(TH_BACK, -20);
   immRectf(pos, v2d->cur.xmin, -1.0, v2d->cur.xmax, 1.0);
@@ -1865,21 +1913,17 @@ static void draw_seq_backdrop(View2D *v2d)
   /* Alternating horizontal stripes. */
   i = max_ii(1, ((int)v2d->cur.ymin) - 1);
 
-  float col_alternating[4];
-  UI_GetThemeColor4fv(TH_ROW_ALTERNATE, col_alternating);
+  GPU_blend(GPU_BLEND_ALPHA);
+  immUniformThemeColor(TH_ROW_ALTERNATE);
 
   while (i < v2d->cur.ymax) {
     if (i & 1) {
-      immUniformThemeColorBlendShade(TH_BACK, TH_ROW_ALTERNATE, col_alternating[3], -25);
+      immRectf(pos, v2d->cur.xmin, i, v2d->cur.xmax, i + 1);
     }
-    else {
-      immUniformThemeColorShade(TH_BACK, -25);
-    }
-
-    immRectf(pos, v2d->cur.xmin, i, v2d->cur.xmax, i + 1);
-
     i++;
   }
+
+  GPU_blend(GPU_BLEND_NONE);
 
   /* Lines separating the horizontal bands. */
   i = max_ii(1, ((int)v2d->cur.ymin) - 1);
@@ -1889,6 +1933,7 @@ static void draw_seq_backdrop(View2D *v2d)
   while (line_len--) {
     immVertex2f(pos, v2d->cur.xmax, i);
     immVertex2f(pos, v2d->cur.xmin, i);
+    i++;
   }
   immEnd();
 
@@ -1900,7 +1945,7 @@ static void draw_seq_strips(const bContext *C, Editing *ed, ARegion *region)
   Scene *scene = CTX_data_scene(C);
   View2D *v2d = &region->v2d;
   SpaceSeq *sseq = CTX_wm_space_seq(C);
-  Sequence *last_seq = BKE_sequencer_active_get(scene);
+  Sequence *last_seq = SEQ_select_active_get(scene);
   int sel = 0, j;
   float pixelx = BLI_rctf_size_x(&v2d->cur) / BLI_rcti_size_x(&v2d->mask);
 
@@ -1943,7 +1988,7 @@ static void draw_seq_strips(const bContext *C, Editing *ed, ARegion *region)
     draw_seq_strip(C, sseq, scene, region, last_seq, pixelx, true);
 
     /* When active strip is an effect, highlight its inputs. */
-    if (BKE_sequence_effect_get_num_inputs(last_seq->type) > 0) {
+    if (SEQ_effect_get_num_inputs(last_seq->type) > 0) {
       draw_effect_inputs_highlight(last_seq);
     }
     /* When active is a Multi-cam strip, highlight its source channel. */
@@ -1987,7 +2032,7 @@ static void draw_seq_strips(const bContext *C, Editing *ed, ARegion *region)
 
 static void seq_draw_sfra_efra(Scene *scene, View2D *v2d)
 {
-  const Editing *ed = BKE_sequencer_editing_get(scene, false);
+  const Editing *ed = SEQ_editing_get(scene, false);
   const int frame_sta = scene->r.sfra;
   const int frame_end = scene->r.efra + 1;
 
@@ -2089,8 +2134,10 @@ static bool draw_cache_view_init_fn(void *userdata, size_t item_count)
 }
 
 /* Called as a callback */
-static bool draw_cache_view_iter_fn(
-    void *userdata, struct Sequence *seq, int timeline_frame, int cache_type, float UNUSED(cost))
+static bool draw_cache_view_iter_fn(void *userdata,
+                                    struct Sequence *seq,
+                                    int timeline_frame,
+                                    int cache_type)
 {
   CacheDrawData *drawdata = userdata;
   struct View2D *v2d = drawdata->v2d;
@@ -2252,7 +2299,7 @@ static void draw_cache_view(const bContext *C)
   userdata.composite_vbo = GPU_vertbuf_create_with_format(&format);
   userdata.final_out_vbo = GPU_vertbuf_create_with_format(&format);
 
-  BKE_sequencer_cache_iterate(scene, &userdata, draw_cache_view_init_fn, draw_cache_view_iter_fn);
+  SEQ_cache_iterate(scene, &userdata, draw_cache_view_init_fn, draw_cache_view_iter_fn);
 
   draw_cache_view_batch(userdata.raw_vbo, userdata.raw_vert_count, 1.0f, 0.1f, 0.02f, 0.4f);
   draw_cache_view_batch(
@@ -2269,7 +2316,7 @@ static void draw_cache_view(const bContext *C)
 void draw_timeline_seq(const bContext *C, ARegion *region)
 {
   Scene *scene = CTX_data_scene(C);
-  Editing *ed = BKE_sequencer_editing_get(scene, false);
+  Editing *ed = SEQ_editing_get(scene, false);
   SpaceSeq *sseq = CTX_wm_space_seq(C);
   View2D *v2d = &region->v2d;
   short cfra_flag = 0;
@@ -2292,7 +2339,7 @@ void draw_timeline_seq(const bContext *C, ARegion *region)
 
   UI_view2d_view_ortho(v2d);
   /* Get timeline bound-box, needed for the scroll-bars. */
-  boundbox_seq(scene, &v2d->tot);
+  SEQ_timeline_boundbox(scene, SEQ_active_seqbase_get(ed), &v2d->tot);
   draw_seq_backdrop(v2d);
   UI_view2d_constant_grid_draw(v2d, FPS);
 

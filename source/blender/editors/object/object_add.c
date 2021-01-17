@@ -65,6 +65,7 @@
 #include "BKE_duplilist.h"
 #include "BKE_effect.h"
 #include "BKE_font.h"
+#include "BKE_geometry_set.h"
 #include "BKE_gpencil_curve.h"
 #include "BKE_gpencil_geom.h"
 #include "BKE_hair.h"
@@ -185,6 +186,80 @@ static const EnumPropertyItem align_options[] = {
     {ALIGN_CURSOR, "CURSOR", 0, "3D Cursor", "Use the 3D cursor orientation for the new object"},
     {0, NULL, 0, NULL, NULL},
 };
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Local Helpers
+ * \{ */
+
+/**
+ * Operator properties for creating an object under a screen space (2D) coordinate.
+ * Used for object dropping like behavior (drag object and drop into 3D View).
+ */
+static void object_add_drop_xy_props(wmOperatorType *ot)
+{
+  PropertyRNA *prop;
+
+  prop = RNA_def_int(ot->srna,
+                     "drop_x",
+                     0,
+                     INT_MIN,
+                     INT_MAX,
+                     "Drop X",
+                     "X-coordinate (screen space) to place the new object under",
+                     INT_MIN,
+                     INT_MAX);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+  prop = RNA_def_int(ot->srna,
+                     "drop_y",
+                     0,
+                     INT_MIN,
+                     INT_MAX,
+                     "Drop Y",
+                     "Y-coordinate (screen space) to place the new object under",
+                     INT_MIN,
+                     INT_MAX);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
+}
+
+static bool object_add_drop_xy_is_set(const wmOperator *op)
+{
+  return RNA_struct_property_is_set(op->ptr, "drop_x") &&
+         RNA_struct_property_is_set(op->ptr, "drop_y");
+}
+
+/**
+ * Query the currently set X- and Y-coordinate to position the new object under.
+ * \param r_mval: Returned pointer to the coordinate in region-space.
+ */
+static bool object_add_drop_xy_get(bContext *C, wmOperator *op, int (*r_mval)[2])
+{
+  if (!object_add_drop_xy_is_set(op)) {
+    (*r_mval)[0] = 0.0f;
+    (*r_mval)[1] = 0.0f;
+    return false;
+  }
+
+  const ARegion *region = CTX_wm_region(C);
+  (*r_mval)[0] = RNA_int_get(op->ptr, "drop_x") - region->winrct.xmin;
+  (*r_mval)[1] = RNA_int_get(op->ptr, "drop_y") - region->winrct.ymin;
+
+  return true;
+}
+
+/**
+ * Set the drop coordinate to the mouse position (if not already set) and call the operator's
+ * `exec()` callback.
+ */
+static int object_add_drop_xy_generic_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  if (!object_add_drop_xy_is_set(op)) {
+    RNA_int_set(op->ptr, "drop_x", event->x);
+    RNA_int_set(op->ptr, "drop_y", event->y);
+  }
+  return op->type->exec(C, op);
+}
 
 /** \} */
 
@@ -323,8 +398,11 @@ void ED_object_add_generic_props(wmOperatorType *ot, bool do_editmode)
   PropertyRNA *prop;
 
   if (do_editmode) {
-    prop = RNA_def_boolean(
-        ot->srna, "enter_editmode", 0, "Enter Editmode", "Enter editmode when adding this object");
+    prop = RNA_def_boolean(ot->srna,
+                           "enter_editmode",
+                           0,
+                           "Enter Edit Mode",
+                           "Enter edit mode when adding this object");
     RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
   }
   /* note: this property gets hidden for add-camera operator */
@@ -1444,10 +1522,8 @@ static int collection_instance_add_exec(bContext *C, wmOperator *op)
     RNA_property_string_get(op->ptr, prop_name, name);
     collection = (Collection *)BKE_libblock_find_name(bmain, ID_GR, name);
 
-    if (!RNA_property_is_set(op->ptr, prop_location)) {
-      const wmEvent *event = CTX_wm_window(C)->eventstate;
-      ARegion *region = CTX_wm_region(C);
-      const int mval[2] = {event->x - region->winrct.xmin, event->y - region->winrct.ymin};
+    int mval[2];
+    if (!RNA_property_is_set(op->ptr, prop_location) && object_add_drop_xy_get(C, op, &mval)) {
       ED_object_location_from_view(C, loc);
       ED_view3d_cursor3d_position(C, mval, false, loc);
       RNA_property_float_set_array(op->ptr, prop_location, loc);
@@ -1490,6 +1566,19 @@ static int collection_instance_add_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
+static int object_instance_add_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+  if (!object_add_drop_xy_is_set(op)) {
+    RNA_int_set(op->ptr, "drop_x", event->x);
+    RNA_int_set(op->ptr, "drop_y", event->y);
+  }
+
+  if (!RNA_struct_property_is_set(op->ptr, "name")) {
+    return WM_enum_search_invoke(C, op, event);
+  }
+  return op->type->exec(C, op);
+}
+
 /* only used as menu */
 void OBJECT_OT_collection_instance_add(wmOperatorType *ot)
 {
@@ -1501,7 +1590,7 @@ void OBJECT_OT_collection_instance_add(wmOperatorType *ot)
   ot->idname = "OBJECT_OT_collection_instance_add";
 
   /* api callbacks */
-  ot->invoke = WM_enum_search_invoke;
+  ot->invoke = object_instance_add_invoke;
   ot->exec = collection_instance_add_exec;
   ot->poll = ED_operator_objectmode;
 
@@ -1516,6 +1605,8 @@ void OBJECT_OT_collection_instance_add(wmOperatorType *ot)
   RNA_def_property_flag(prop, PROP_ENUM_NO_TRANSLATE);
   ot->prop = prop;
   ED_object_add_generic_props(ot, false);
+
+  object_add_drop_xy_props(ot);
 }
 
 /** \} */
@@ -1553,10 +1644,8 @@ static int object_data_instance_add_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  if (!RNA_property_is_set(op->ptr, prop_location)) {
-    const wmEvent *event = CTX_wm_window(C)->eventstate;
-    ARegion *region = CTX_wm_region(C);
-    const int mval[2] = {event->x - region->winrct.xmin, event->y - region->winrct.ymin};
+  int mval[2];
+  if (!RNA_property_is_set(op->ptr, prop_location) && object_add_drop_xy_get(C, op, &mval)) {
     ED_object_location_from_view(C, loc);
     ED_view3d_cursor3d_position(C, mval, false, loc);
     RNA_property_float_set_array(op->ptr, prop_location, loc);
@@ -1588,6 +1677,7 @@ void OBJECT_OT_data_instance_add(wmOperatorType *ot)
   ot->idname = "OBJECT_OT_data_instance_add";
 
   /* api callbacks */
+  ot->invoke = object_add_drop_xy_generic_invoke;
   ot->exec = object_data_instance_add_exec;
   ot->poll = ED_operator_objectmode;
 
@@ -1599,6 +1689,8 @@ void OBJECT_OT_data_instance_add(wmOperatorType *ot)
   PropertyRNA *prop = RNA_def_enum(ot->srna, "type", rna_enum_id_type_items, 0, "Type", "");
   RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_ID);
   ED_object_add_generic_props(ot, false);
+
+  object_add_drop_xy_props(ot);
 }
 
 /** \} */
@@ -1714,6 +1806,9 @@ void OBJECT_OT_hair_add(wmOperatorType *ot)
 
 static bool object_pointcloud_add_poll(bContext *C)
 {
+  if (!U.experimental.use_new_point_cloud_type) {
+    return false;
+  }
   return ED_operator_objectmode(C);
 }
 
@@ -2052,6 +2147,13 @@ static bool dupliobject_instancer_cmp(const void *a_, const void *b_)
   return false;
 }
 
+static bool object_has_geometry_set_instances(const Object *object_eval)
+{
+  struct GeometrySet *geometry_set = object_eval->runtime.geometry_set_eval;
+
+  return (geometry_set != NULL) && BKE_geometry_set_has_instances(geometry_set);
+}
+
 static void make_object_duplilist_real(bContext *C,
                                        Depsgraph *depsgraph,
                                        Scene *scene,
@@ -2063,12 +2165,18 @@ static void make_object_duplilist_real(bContext *C,
   ViewLayer *view_layer = CTX_data_view_layer(C);
   GHash *parent_gh = NULL, *instancer_gh = NULL;
 
-  if (!(base->object->transflag & OB_DUPLI)) {
+  Object *object_eval = DEG_get_evaluated_object(depsgraph, base->object);
+
+  if (!(base->object->transflag & OB_DUPLI) && !object_has_geometry_set_instances(object_eval)) {
     return;
   }
 
-  Object *object_eval = DEG_get_evaluated_object(depsgraph, base->object);
   ListBase *lb_duplis = object_duplilist(depsgraph, scene, object_eval);
+
+  if (BLI_listbase_is_empty(lb_duplis)) {
+    free_object_duplilist(lb_duplis);
+    return;
+  }
 
   GHash *dupli_gh = BLI_ghash_ptr_new(__func__);
   if (use_hierarchy) {
@@ -2316,17 +2424,23 @@ static const EnumPropertyItem convert_target_items[] = {
      "MESH",
      ICON_OUTLINER_OB_MESH,
      "Mesh",
-     "Mesh from Curve, Surface, Metaball, Text, or Pointcloud objects"},
+#ifdef WITH_POINT_CLOUD
+     "Mesh from Curve, Surface, Metaball, Text, or Point Cloud objects"},
+#else
+     "Mesh from Curve, Surface, Metaball, or Text objects"},
+#endif
     {OB_GPENCIL,
      "GPENCIL",
      ICON_OUTLINER_OB_GREASEPENCIL,
      "Grease Pencil",
      "Grease Pencil from Curve or Mesh objects"},
+#ifdef WITH_POINT_CLOUD
     {OB_POINTCLOUD,
      "POINTCLOUD",
      ICON_OUTLINER_OB_POINTCLOUD,
-     "Pointcloud",
-     "Pointcloud from Mesh objects"},
+     "Point Cloud",
+     "Point Cloud from Mesh objects"},
+#endif
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -3216,8 +3330,6 @@ void OBJECT_OT_duplicate(wmOperatorType *ot)
 
 static int object_add_named_exec(bContext *C, wmOperator *op)
 {
-  wmWindow *win = CTX_wm_window(C);
-  const wmEvent *event = win ? win->eventstate : NULL;
   Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);
   ViewLayer *view_layer = CTX_data_view_layer(C);
@@ -3246,9 +3358,8 @@ static int object_add_named_exec(bContext *C, wmOperator *op)
 
   basen->object->restrictflag &= ~OB_RESTRICT_VIEWPORT;
 
-  if (event) {
-    ARegion *region = CTX_wm_region(C);
-    const int mval[2] = {event->x - region->winrct.xmin, event->y - region->winrct.ymin};
+  int mval[2];
+  if (object_add_drop_xy_get(C, op, &mval)) {
     ED_object_location_from_view(C, basen->object->loc);
     ED_view3d_cursor3d_position(C, mval, false, basen->object->loc);
   }
@@ -3278,6 +3389,7 @@ void OBJECT_OT_add_named(wmOperatorType *ot)
   ot->idname = "OBJECT_OT_add_named";
 
   /* api callbacks */
+  ot->invoke = object_add_drop_xy_generic_invoke;
   ot->exec = object_add_named_exec;
   ot->poll = ED_operator_objectmode;
 
@@ -3290,6 +3402,8 @@ void OBJECT_OT_add_named(wmOperatorType *ot)
                   "Linked",
                   "Duplicate object but not object data, linking to the original data");
   RNA_def_string(ot->srna, "name", NULL, MAX_ID_NAME - 2, "Name", "Object name to add");
+
+  object_add_drop_xy_props(ot);
 }
 
 /** \} */

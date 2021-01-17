@@ -41,5 +41,12 @@ bool geo_node_poll_default(struct bNodeType *ntype, struct bNodeTree *ntree);
 namespace blender::nodes {
 void update_attribute_input_socket_availabilities(bNode &node,
                                                   const StringRef name,
-                                                  const GeometryNodeAttributeInputMode mode);
-}
+                                                  const GeometryNodeAttributeInputMode mode,
+                                                  const bool name_is_available = true);
+
+CustomDataType attribute_data_type_highest_complexity(Span<CustomDataType>);
+
+Array<uint32_t> get_geometry_element_ids_as_uints(const GeometryComponent &component,
+                                                  const AttributeDomain domain);
+
+}  // namespace blender::nodes

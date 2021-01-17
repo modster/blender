@@ -39,10 +39,7 @@ extern DrawEngineType draw_engine_gpencil_type;
 struct GPENCIL_Data;
 struct GPENCIL_StorageList;
 struct GPUBatch;
-struct GPUVertBuf;
-struct GPUVertFormat;
 struct GpencilBatchCache;
-struct MaterialGPencilStyle;
 struct Object;
 struct RenderEngine;
 struct RenderLayer;
@@ -345,6 +342,8 @@ typedef struct GPENCIL_PrivateData {
 
   /* Display onion skinning */
   bool do_onion;
+  /* Playing animation */
+  bool playing;
   /* simplify settings */
   bool simplify_fill;
   bool simplify_fx;

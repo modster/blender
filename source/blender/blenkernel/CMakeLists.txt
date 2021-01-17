@@ -40,6 +40,7 @@ set(INC
   ../sequencer
   ../shader_fx
   ../simulation
+  ../../../intern/eigen
   ../../../intern/ghost
   ../../../intern/glew-mx
   ../../../intern/guardedalloc
@@ -66,7 +67,7 @@ set(SRC
   intern/CCGSubSurf.c
   intern/CCGSubSurf_legacy.c
   intern/CCGSubSurf_util.c
-  intern/DerivedMesh.c
+  intern/DerivedMesh.cc
   intern/action.c
   intern/addon.c
   intern/anim_data.c
@@ -77,6 +78,7 @@ set(SRC
   intern/armature.c
   intern/armature_deform.c
   intern/armature_update.c
+  intern/asset.c
   intern/attribute.c
   intern/attribute_access.cc
   intern/autoexec.c
@@ -101,7 +103,7 @@ set(SRC
   intern/constraint.c
   intern/context.c
   intern/crazyspace.c
-  intern/cryptomatte.c
+  intern/cryptomatte.cc
   intern/curve.c
   intern/curve_bevel.c
   intern/curve_decimate.c
@@ -132,7 +134,7 @@ set(SRC
   intern/gpencil_geom.c
   intern/gpencil_modifier.c
   intern/hair.c
-  intern/icons.c
+  intern/icons.cc
   intern/icons_rasterize.c
   intern/idprop.c
   intern/idprop_utils.c
@@ -169,6 +171,7 @@ set(SRC
   intern/mesh.c
   intern/mesh_convert.c
   intern/mesh_evaluate.c
+  intern/mesh_fair.cc
   intern/mesh_iterators.c
   intern/mesh_mapping.c
   intern/mesh_merge.c
@@ -214,6 +217,7 @@ set(SRC
   intern/pbvh_bmesh.c
   intern/pointcache.c
   intern/pointcloud.cc
+  intern/preferences.c
   intern/report.c
   intern/rigidbody.c
   intern/scene.c
@@ -268,8 +272,10 @@ set(SRC
   BKE_animsys.h
   BKE_appdir.h
   BKE_armature.h
+  BKE_asset.h
   BKE_attribute.h
   BKE_attribute_access.hh
+  BKE_attribute_math.hh
   BKE_autoexec.h
   BKE_blender.h
   BKE_blender_copybuffer.h
@@ -349,6 +355,7 @@ set(SRC
   BKE_mball.h
   BKE_mball_tessellate.h
   BKE_mesh.h
+  BKE_mesh_fair.h
   BKE_mesh_iterators.h
   BKE_mesh_mapping.h
   BKE_mesh_mirror.h
@@ -374,6 +381,7 @@ set(SRC
   BKE_persistent_data_handle.hh
   BKE_pointcache.h
   BKE_pointcloud.h
+  BKE_preferences.h
   BKE_report.h
   BKE_rigidbody.h
   BKE_scene.h
@@ -724,6 +732,7 @@ add_dependencies(bf_blenkernel bf_dna)
 if(WITH_GTESTS)
   set(TEST_SRC
     intern/armature_test.cc
+    intern/cryptomatte_test.cc
     intern/fcurve_test.cc
     intern/lattice_deform_test.cc
     intern/layer_test.cc

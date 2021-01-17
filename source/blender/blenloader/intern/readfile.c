@@ -44,7 +44,9 @@
 #define DNA_DEPRECATED_ALLOW
 
 #include "DNA_anim_types.h"
+#include "DNA_asset_types.h"
 #include "DNA_cachefile_types.h"
+#include "DNA_collection_types.h"
 #include "DNA_fileglobal_types.h"
 #include "DNA_genfile.h"
 #include "DNA_key_types.h"
@@ -53,6 +55,7 @@
 #include "DNA_packedFile_types.h"
 #include "DNA_sdna_types.h"
 #include "DNA_sound_types.h"
+#include "DNA_vfont_types.h"
 #include "DNA_volume_types.h"
 #include "DNA_workspace_types.h"
 
@@ -65,12 +68,14 @@
 #include "BLI_math.h"
 #include "BLI_memarena.h"
 #include "BLI_mempool.h"
+#include "BLI_mmap.h"
 #include "BLI_threads.h"
 
 #include "BLT_translation.h"
 
 #include "BKE_anim_data.h"
 #include "BKE_animsys.h"
+#include "BKE_asset.h"
 #include "BKE_collection.h"
 #include "BKE_global.h" /* for G */
 #include "BKE_idprop.h"
@@ -101,6 +106,9 @@
 #include "BLO_readfile.h"
 #include "BLO_undofile.h"
 
+#include "SEQ_clipboard.h"
+#include "SEQ_iterator.h"
+#include "SEQ_modifier.h"
 #include "SEQ_sequencer.h"
 
 #include "readfile.h"
@@ -955,10 +963,19 @@ static BHead *blo_bhead_read_full(FileData *fd, BHead *thisblock)
 }
 #endif /* USE_BHEAD_READ_ON_DEMAND */
 
-/* Warning! Caller's responsibility to ensure given bhead **is** and ID one! */
+/* Warning! Caller's responsibility to ensure given bhead **is** an ID one! */
 const char *blo_bhead_id_name(const FileData *fd, const BHead *bhead)
 {
   return (const char *)POINTER_OFFSET(bhead, sizeof(*bhead) + fd->id_name_offs);
+}
+
+/* Warning! Caller's responsibility to ensure given bhead **is** an ID one! */
+AssetMetaData *blo_bhead_id_asset_data_address(const FileData *fd, const BHead *bhead)
+{
+  BLI_assert(BKE_idtype_idcode_is_valid(bhead->code));
+  return (fd->id_asset_data_offs >= 0) ?
+             *(AssetMetaData **)POINTER_OFFSET(bhead, sizeof(*bhead) + fd->id_asset_data_offs) :
+             NULL;
 }
 
 static void decode_blender_header(FileData *fd)
@@ -1038,6 +1055,8 @@ static bool read_file_dna(FileData *fd, const char **r_error_message)
         /* used to retrieve ID names from (bhead+1) */
         fd->id_name_offs = DNA_elem_offset(fd->filesdna, "ID", "char", "name[]");
         BLI_assert(fd->id_name_offs != -1);
+        fd->id_asset_data_offs = DNA_elem_offset(
+            fd->filesdna, "ID", "AssetMetaData", "*asset_data");
 
         return true;
       }
@@ -1159,6 +1178,53 @@ static ssize_t fd_read_from_memory(FileData *filedata,
   filedata->file_offset += readsize;
 
   return readsize;
+}
+
+/* Memory-mapped file reading.
+ * By using mmap(), we can map a file so that it can be treated like normal memory,
+ * meaning that we can just read from it with memcpy() etc.
+ * This avoids system call overhead and can significantly speed up file loading.
+ */
+
+static ssize_t fd_read_from_mmap(FileData *filedata,
+                                 void *buffer,
+                                 size_t size,
+                                 bool *UNUSED(r_is_memchunck_identical))
+{
+  /* don't read more bytes than there are available in the buffer */
+  size_t readsize = MIN2(size, (size_t)(filedata->buffersize - filedata->file_offset));
+
+  if (!BLI_mmap_read(filedata->mmap_file, buffer, filedata->file_offset, readsize)) {
+    return 0;
+  }
+
+  filedata->file_offset += readsize;
+
+  return readsize;
+}
+
+static off64_t fd_seek_from_mmap(FileData *filedata, off64_t offset, int whence)
+{
+  off64_t new_pos;
+  if (whence == SEEK_CUR) {
+    new_pos = filedata->file_offset + offset;
+  }
+  else if (whence == SEEK_SET) {
+    new_pos = offset;
+  }
+  else if (whence == SEEK_END) {
+    new_pos = filedata->buffersize + offset;
+  }
+  else {
+    return -1;
+  }
+
+  if (new_pos < 0 || new_pos > filedata->buffersize) {
+    return -1;
+  }
+
+  filedata->file_offset = new_pos;
+  return filedata->file_offset;
 }
 
 /* MemFile reading. */
@@ -1288,6 +1354,8 @@ static FileData *blo_filedata_from_file_descriptor(const char *filepath,
 {
   FileDataReadFn *read_fn = NULL;
   FileDataSeekFn *seek_fn = NULL; /* Optional. */
+  size_t buffersize = 0;
+  BLI_mmap_file *mmap_file = NULL;
 
   gzFile gzfile = (gzFile)Z_NULL;
 
@@ -1304,13 +1372,20 @@ static FileData *blo_filedata_from_file_descriptor(const char *filepath,
     return NULL;
   }
 
-  BLI_lseek(file, 0, SEEK_SET);
-
   /* Regular file. */
   if (memcmp(header, "BLENDER", sizeof(header)) == 0) {
     read_fn = fd_read_data_from_file;
     seek_fn = fd_seek_data_from_file;
+
+    mmap_file = BLI_mmap_open(file);
+    if (mmap_file != NULL) {
+      read_fn = fd_read_from_mmap;
+      seek_fn = fd_seek_from_mmap;
+      buffersize = BLI_lseek(file, 0, SEEK_END);
+    }
   }
+
+  BLI_lseek(file, 0, SEEK_SET);
 
   /* Gzip file. */
   errno = 0;
@@ -1345,6 +1420,8 @@ static FileData *blo_filedata_from_file_descriptor(const char *filepath,
 
   fd->read = read_fn;
   fd->seek = seek_fn;
+  fd->mmap_file = mmap_file;
+  fd->buffersize = buffersize;
 
   return fd;
 }
@@ -1511,6 +1588,11 @@ void blo_filedata_free(FileData *fd)
     if (fd->buffer && !(fd->flags & FD_FLAGS_NOT_MY_BUFFER)) {
       MEM_freeN((void *)fd->buffer);
       fd->buffer = NULL;
+    }
+
+    if (fd->mmap_file) {
+      BLI_mmap_free(fd->mmap_file);
+      fd->mmap_file = NULL;
     }
 
     /* Free all BHeadN data blocks */
@@ -2358,6 +2440,11 @@ static void direct_link_id_common(
     return;
   }
 
+  if (id->asset_data) {
+    BLO_read_data_address(reader, &id->asset_data);
+    BKE_asset_metadata_read(reader, id->asset_data);
+  }
+
   /*link direct data of ID properties*/
   if (id->properties) {
     BLO_read_data_address(reader, &id->properties);
@@ -2583,7 +2670,7 @@ static int lib_link_seq_clipboard_cb(Sequence *seq, void *arg_pt)
 static void lib_link_clipboard_restore(struct IDNameLib_Map *id_map)
 {
   /* update IDs stored in sequencer clipboard */
-  BKE_sequencer_base_recursive_apply(&seqbase_clipboard, lib_link_seq_clipboard_cb, id_map);
+  SEQ_iterator_seqbase_recursive_apply(&seqbase_clipboard, lib_link_seq_clipboard_cb, id_map);
 }
 
 static int lib_link_main_data_restore_cb(LibraryIDLinkCallbackData *cb_data)
@@ -2740,6 +2827,7 @@ static void lib_link_workspace_layout_restore(struct IDNameLib_Map *id_map,
           SpaceFile *sfile = (SpaceFile *)sl;
           sfile->op = NULL;
           sfile->previews_timer = NULL;
+          sfile->tags = FILE_TAG_REBUILD_MAIN_FILES;
         }
         else if (sl->spacetype == SPACE_ACTION) {
           SpaceAction *saction = (SpaceAction *)sl;
@@ -3615,6 +3703,27 @@ static BHead *read_libblock(FileData *fd,
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Read Asset Data
+ * \{ */
+
+BHead *blo_read_asset_data_block(FileData *fd, BHead *bhead, AssetMetaData **r_asset_data)
+{
+  BLI_assert(BKE_idtype_idcode_is_valid(bhead->code));
+
+  bhead = read_data_into_datamap(fd, bhead, "asset-data read");
+
+  BlendDataReader reader = {fd};
+  BLO_read_data_address(&reader, r_asset_data);
+  BKE_asset_metadata_read(&reader, *r_asset_data);
+
+  oldnewmap_clear(fd->datamap);
+
+  return bhead;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Read Global Data
  * \{ */
 
@@ -3872,6 +3981,7 @@ static BHead *read_userdef(BlendFileData *bfd, FileData *fd, BHead *bhead)
   BLO_read_list(reader, &user->user_menus);
   BLO_read_list(reader, &user->addons);
   BLO_read_list(reader, &user->autoexec_paths);
+  BLO_read_list(reader, &user->asset_libraries);
 
   LISTBASE_FOREACH (wmKeyMap *, keymap, &user->user_keymaps) {
     keymap->modal_items = NULL;

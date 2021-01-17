@@ -892,7 +892,7 @@ static void acf_group_name(bAnimListElem *ale, char *name)
 /* name property for group entries */
 static bool acf_group_name_prop(bAnimListElem *ale, PointerRNA *ptr, PropertyRNA **prop)
 {
-  RNA_pointer_create(ale->id, &RNA_ActionGroup, ale->data, ptr);
+  RNA_pointer_create(ale->fcurve_owner_id, &RNA_ActionGroup, ale->data, ptr);
   *prop = RNA_struct_name_property(ptr->type);
 
   return (*prop != NULL);
@@ -1013,7 +1013,7 @@ static bool acf_fcurve_name_prop(bAnimListElem *ale, PointerRNA *ptr, PropertyRN
    * as our "name" so that user can perform quick fixes
    */
   if (fcu->flag & FCURVE_DISABLED) {
-    RNA_pointer_create(ale->id, &RNA_FCurve, ale->data, ptr);
+    RNA_pointer_create(ale->fcurve_owner_id, &RNA_FCurve, ale->data, ptr);
     *prop = RNA_struct_find_property(ptr, "data_path");
   }
   else {
@@ -3965,7 +3965,7 @@ static void acf_nlaaction_name(bAnimListElem *ale, char *name)
 static bool acf_nlaaction_name_prop(bAnimListElem *ale, PointerRNA *ptr, PropertyRNA **prop)
 {
   if (ale->data) {
-    RNA_pointer_create(ale->id, &RNA_Action, ale->data, ptr);
+    RNA_pointer_create(ale->fcurve_owner_id, &RNA_Action, ale->data, ptr);
     *prop = RNA_struct_name_property(ptr->type);
 
     return (*prop != NULL);
@@ -4710,7 +4710,7 @@ static void achannel_setting_slider_cb(bContext *C, void *id_poin, void *fcu_poi
   const AnimationEvalContext anim_eval_context = BKE_animsys_eval_context_construct(depsgraph,
                                                                                     (float)CFRA);
   NlaKeyframingContext *nla_context = BKE_animsys_get_nla_keyframing_context(
-      &nla_cache, &id_ptr, adt, &anim_eval_context, false);
+      &nla_cache, &id_ptr, adt, &anim_eval_context);
 
   /* get current frame and apply NLA-mapping to it (if applicable) */
   cfra = BKE_nla_tweakedit_remap(adt, (float)CFRA, NLATIME_CONVERT_UNMAP);
@@ -4766,7 +4766,7 @@ static void achannel_setting_slider_shapekey_cb(bContext *C, void *key_poin, voi
   const AnimationEvalContext anim_eval_context = BKE_animsys_eval_context_construct(depsgraph,
                                                                                     (float)CFRA);
   NlaKeyframingContext *nla_context = BKE_animsys_get_nla_keyframing_context(
-      &nla_cache, &id_ptr, key->adt, &anim_eval_context, false);
+      &nla_cache, &id_ptr, key->adt, &anim_eval_context);
 
   /* get current frame and apply NLA-mapping to it (if applicable) */
   const float remapped_frame = BKE_nla_tweakedit_remap(
@@ -5353,7 +5353,7 @@ void ANIM_channel_draw_widgets(const bContext *C,
                                 "",
                                 ICON_NONE,
                                 offset,
-                                ymid,
+                                rect->ymin,
                                 SLIDER_WIDTH,
                                 channel_height);
             UI_but_func_set(but, achannel_setting_slider_nla_curve_cb, ale->id, ale->data);
@@ -5411,7 +5411,7 @@ void ANIM_channel_draw_widgets(const bContext *C,
                             "",
                             icon,
                             offset,
-                            ymid,
+                            rect->ymin,
                             ICON_WIDTH,
                             channel_height);
             }
@@ -5437,7 +5437,7 @@ void ANIM_channel_draw_widgets(const bContext *C,
                             "",
                             icon,
                             offset,
-                            ymid,
+                            rect->ymin,
                             ICON_WIDTH,
                             channel_height);
             }
@@ -5457,7 +5457,7 @@ void ANIM_channel_draw_widgets(const bContext *C,
                             "",
                             ICON_NONE,
                             offset,
-                            ymid,
+                            rect->ymin,
                             width,
                             channel_height);
             }
@@ -5483,7 +5483,7 @@ void ANIM_channel_draw_widgets(const bContext *C,
                                 "",
                                 ICON_NONE,
                                 offset,
-                                ymid,
+                                rect->ymin,
                                 SLIDER_WIDTH,
                                 channel_height);
 

@@ -148,10 +148,18 @@ static bool object_materials_supported_poll_ex(bContext *C, const Object *ob)
   if (!ED_operator_object_active_local_editable_ex(C, ob)) {
     return false;
   }
+  if (!OB_TYPE_SUPPORT_MATERIAL(ob->type)) {
+    return false;
+  }
+
+  /* Material linked to object. */
+  if (ob->matbits && ob->actcol && ob->matbits[ob->actcol - 1]) {
+    return true;
+  }
+
+  /* Material linked to obdata. */
   const ID *data = ob->data;
-  return (OB_TYPE_SUPPORT_MATERIAL(ob->type) &&
-          /* Object data checks. */
-          data && !ID_IS_LINKED(data) && !ID_IS_OVERRIDE_LIBRARY(data));
+  return (data && !ID_IS_LINKED(data) && !ID_IS_OVERRIDE_LIBRARY(data));
 }
 
 static bool object_materials_supported_poll(bContext *C)
@@ -1227,13 +1235,13 @@ void SCENE_OT_light_cache_bake(wmOperatorType *ot)
       {LIGHTCACHE_SUBSET_ALL,
        "ALL",
        0,
-       "All LightProbes",
+       "All Light Probes",
        "Bake both irradiance grids and reflection cubemaps"},
       {LIGHTCACHE_SUBSET_DIRTY,
        "DIRTY",
        0,
        "Dirty Only",
-       "Only bake lightprobes that are marked as dirty"},
+       "Only bake light probes that are marked as dirty"},
       {LIGHTCACHE_SUBSET_CUBE,
        "CUBEMAPS",
        0,

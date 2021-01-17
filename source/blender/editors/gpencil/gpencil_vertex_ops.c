@@ -32,6 +32,7 @@
 
 #include "DNA_brush_types.h"
 #include "DNA_gpencil_types.h"
+#include "DNA_material_types.h"
 
 #include "BKE_colortools.h"
 #include "BKE_context.h"
@@ -236,7 +237,7 @@ void GPENCIL_OT_vertex_color_brightness_contrast(wmOperatorType *ot)
   PropertyRNA *prop;
 
   /* identifiers */
-  ot->name = "Vertex Paint Bright/Contrast";
+  ot->name = "Vertex Paint Brightness/Contrast";
   ot->idname = "GPENCIL_OT_vertex_color_brightness_contrast";
   ot->description = "Adjust vertex color brightness/contrast";
 
@@ -673,7 +674,7 @@ static bool gpencil_extract_palette_from_vertex(bContext *C,
         if (ED_gpencil_stroke_can_use(C, gps) == false) {
           continue;
         }
-        if (ED_gpencil_stroke_color_use(ob, gpl, gps) == false) {
+        if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
           continue;
         }
         MaterialGPencilStyle *gp_style = BKE_gpencil_material_settings(ob, gps->mat_nr + 1);
@@ -858,7 +859,7 @@ static int gpencil_material_to_vertex_exec(bContext *C, wmOperator *op)
         if (ED_gpencil_stroke_can_use(C, gps) == false) {
           continue;
         }
-        if (ED_gpencil_stroke_color_use(ob, gpl, gps) == false) {
+        if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
           continue;
         }
 

@@ -198,7 +198,7 @@ class ANIM_OT_keying_set_export(Operator):
 
 
 class NLA_OT_bake(Operator):
-    """Bake all selected objects loc/scale/rotation animation to an action"""
+    """Bake all selected objects location/scale/rotation animation to an action"""
     bl_idname = "nla.bake"
     bl_label = "Bake Action"
     bl_options = {'REGISTER', 'UNDO'}
@@ -347,7 +347,7 @@ class ClearUselessActions(Operator):
 
 
 class UpdateAnimatedTransformConstraint(Operator):
-    """Update fcurves/drivers affecting Transform constraints (use it with files from 2.70 and earlier)"""
+    """Update f-curves/drivers affecting Transform constraints (use it with files from 2.70 and earlier)"""
     bl_idname = "anim.update_animated_transform_constraints"
     bl_label = "Update Animated Transform Constraints"
     bl_options = {'REGISTER', 'UNDO'}

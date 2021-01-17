@@ -27,6 +27,7 @@
 #include "BLI_listbase.h"
 
 #include "DNA_ID.h"
+#include "DNA_collection_types.h"
 #include "DNA_node_types.h"
 #include "DNA_object_enums.h"
 #include "DNA_object_types.h"
@@ -281,7 +282,7 @@ void ED_memfile_undosys_type(UndoType *ut)
   ut->step_decode = memfile_undosys_step_decode;
   ut->step_free = memfile_undosys_step_free;
 
-  ut->use_context = true;
+  ut->flags = 0;
 
   ut->step_size = sizeof(MemFileUndoStep);
 }

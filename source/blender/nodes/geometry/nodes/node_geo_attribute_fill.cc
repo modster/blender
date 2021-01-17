@@ -27,6 +27,7 @@ static bNodeSocketTemplate geo_node_attribute_fill_in[] = {
     {SOCK_VECTOR, N_("Value"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {SOCK_FLOAT, N_("Value"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {SOCK_RGBA, N_("Value"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
+    {SOCK_BOOLEAN, N_("Value"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
     {-1, ""},
 };
 
@@ -45,12 +46,14 @@ static void geo_node_attribute_fill_update(bNodeTree *UNUSED(ntree), bNode *node
   bNodeSocket *socket_value_vector = (bNodeSocket *)BLI_findlink(&node->inputs, 2);
   bNodeSocket *socket_value_float = socket_value_vector->next;
   bNodeSocket *socket_value_color4f = socket_value_float->next;
+  bNodeSocket *socket_value_boolean = socket_value_color4f->next;
 
   const CustomDataType data_type = static_cast<CustomDataType>(node->custom1);
 
   nodeSetSocketAvailability(socket_value_vector, data_type == CD_PROP_FLOAT3);
   nodeSetSocketAvailability(socket_value_float, data_type == CD_PROP_FLOAT);
   nodeSetSocketAvailability(socket_value_color4f, data_type == CD_PROP_COLOR);
+  nodeSetSocketAvailability(socket_value_boolean, data_type == CD_PROP_BOOL);
 }
 
 namespace blender::nodes {
@@ -65,7 +68,7 @@ static void fill_attribute(GeometryComponent &component, const GeoNodeExecParams
     return;
   }
 
-  WriteAttributePtr attribute = component.attribute_try_ensure_for_write(
+  OutputAttributePtr attribute = component.attribute_try_get_for_output(
       attribute_name, domain, data_type);
   if (!attribute) {
     return;
@@ -73,32 +76,34 @@ static void fill_attribute(GeometryComponent &component, const GeoNodeExecParams
 
   switch (data_type) {
     case CD_PROP_FLOAT: {
-      FloatWriteAttribute float_attribute = std::move(attribute);
       const float value = params.get_input<float>("Value_001");
-      MutableSpan<float> attribute_span = float_attribute.get_span();
+      MutableSpan<float> attribute_span = attribute->get_span_for_write_only<float>();
       attribute_span.fill(value);
-      float_attribute.apply_span();
       break;
     }
     case CD_PROP_FLOAT3: {
-      Float3WriteAttribute float3_attribute = std::move(attribute);
       const float3 value = params.get_input<float3>("Value");
-      MutableSpan<float3> attribute_span = float3_attribute.get_span();
+      MutableSpan<float3> attribute_span = attribute->get_span_for_write_only<float3>();
       attribute_span.fill(value);
-      float3_attribute.apply_span();
       break;
     }
     case CD_PROP_COLOR: {
-      Color4fWriteAttribute color4f_attribute = std::move(attribute);
       const Color4f value = params.get_input<Color4f>("Value_002");
-      MutableSpan<Color4f> attribute_span = color4f_attribute.get_span();
+      MutableSpan<Color4f> attribute_span = attribute->get_span_for_write_only<Color4f>();
       attribute_span.fill(value);
-      color4f_attribute.apply_span();
+      break;
+    }
+    case CD_PROP_BOOL: {
+      const bool value = params.get_input<bool>("Value_003");
+      MutableSpan<bool> attribute_span = attribute->get_span_for_write_only<bool>();
+      attribute_span.fill(value);
       break;
     }
     default:
       break;
   }
+
+  attribute.apply_span_and_save();
 }
 
 static void geo_node_attribute_fill_exec(GeoNodeExecParams params)

@@ -4270,6 +4270,7 @@ static RNAProcessItem PROCESS_ITEMS[] = {
     {"rna_animviz.c", NULL, RNA_def_animviz},
     {"rna_armature.c", "rna_armature_api.c", RNA_def_armature},
     {"rna_attribute.c", NULL, RNA_def_attribute},
+    {"rna_asset.c", NULL, RNA_def_asset},
     {"rna_boid.c", NULL, RNA_def_boid},
     {"rna_brush.c", NULL, RNA_def_brush},
     {"rna_cachefile.c", NULL, RNA_def_cachefile},
@@ -4308,7 +4309,9 @@ static RNAProcessItem PROCESS_ITEMS[] = {
     {"rna_packedfile.c", NULL, RNA_def_packedfile},
     {"rna_palette.c", NULL, RNA_def_palette},
     {"rna_particle.c", NULL, RNA_def_particle},
+#ifdef WITH_POINT_CLOUD
     {"rna_pointcloud.c", NULL, RNA_def_pointcloud},
+#endif
     {"rna_pose.c", "rna_pose_api.c", RNA_def_pose},
     {"rna_curveprofile.c", NULL, RNA_def_profile},
     {"rna_lightprobe.c", NULL, RNA_def_lightprobe},
@@ -4433,7 +4436,7 @@ static void rna_generate(BlenderRNA *brna, FILE *f, const char *filename, const 
     }
   }
 
-  if (STREQ(filename, "rna_ID.c")) {
+  if (filename && STREQ(filename, "rna_ID.c")) {
     /* this is ugly, but we cannot have c files compiled for both
      * makesrna and blender with some build systems at the moment */
     fprintf(f, "#include \"rna_define.c\"\n\n");
@@ -4755,7 +4758,13 @@ static const char *cpp_classes =
     "class CollectionIterator {\n"
     "public:\n"
     "    CollectionIterator() : iter(), t(iter.ptr), init(false) { iter.valid = false; }\n"
+    "    CollectionIterator(const PointerRNA &ptr) : CollectionIterator() { this->begin(ptr); }\n"
     "    ~CollectionIterator(void) { if (init) Tend(&iter); };\n"
+    "\n"
+    "    CollectionIterator(const CollectionIterator &other) = delete;\n"
+    "    CollectionIterator(CollectionIterator &&other) = delete;\n"
+    "    CollectionIterator &operator=(const CollectionIterator &other) = delete;\n"
+    "    CollectionIterator &operator=(CollectionIterator &&other) = delete;\n"
     "\n"
     "    operator bool(void)\n"
     "    { return iter.valid != 0; }\n"
@@ -4774,9 +4783,6 @@ static const char *cpp_classes =
     "true; }\n"
     "\n"
     "private:\n"
-    "    const CollectionIterator<T, Tbegin, Tnext, Tend>& operator = "
-    "(const CollectionIterator<T, Tbegin, Tnext, Tend>& /*copy*/) {}\n"
-    ""
     "    CollectionPropertyIterator iter;\n"
     "    T t;\n"
     "    bool init;\n"
@@ -4791,6 +4797,8 @@ static const char *cpp_classes =
     "\n"
     "    void begin(CollectionIterator<T, Tbegin, Tnext, Tend>& iter)\n"
     "    { iter.begin(ptr); }\n"
+    "    CollectionIterator<T, Tbegin, Tnext, Tend> begin()\n"
+    "    { return CollectionIterator<T, Tbegin, Tnext, Tend>(ptr); }\n"
     "    CollectionIterator<T, Tbegin, Tnext, Tend> end()\n"
     "    { return CollectionIterator<T, Tbegin, Tnext, Tend>(); } /* test */ \n"
     ""

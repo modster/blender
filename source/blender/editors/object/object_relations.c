@@ -484,7 +484,7 @@ void OBJECT_OT_proxy_make(wmOperatorType *ot)
                       DummyRNA_DEFAULT_items,
                       0,
                       "Proxy Object",
-                      "Name of lib-linked/collection object to make a proxy for");
+                      "Name of library-linked/collection object to make a proxy for");
   RNA_def_enum_funcs(prop, proxy_collection_object_itemf);
   RNA_def_property_flag(prop, PROP_ENUM_NO_TRANSLATE);
   ot->prop = prop;
@@ -1567,7 +1567,11 @@ static bool allow_make_links_data(const int type, Object *ob_src, Object *ob_dst
       }
       break;
     case MAKE_LINKS_MATERIALS:
-      if (OB_TYPE_SUPPORT_MATERIAL(ob_src->type) && OB_TYPE_SUPPORT_MATERIAL(ob_dst->type)) {
+      if (OB_TYPE_SUPPORT_MATERIAL(ob_src->type) && OB_TYPE_SUPPORT_MATERIAL(ob_dst->type) &&
+          /* Linking non-grease-pencil materials to a grease-pencil object causes issues.
+           * We make sure that if one of the objects is a grease-pencil object, the other must be
+           * as well. */
+          ((ob_src->type == OB_GPENCIL) == (ob_dst->type == OB_GPENCIL))) {
         return true;
       }
       break;
@@ -2527,7 +2531,7 @@ static bool convert_proxy_to_override_poll(bContext *C)
   return obact != NULL && obact->proxy != NULL;
 }
 
-static int convert_proxy_to_override_exec(bContext *C, wmOperator *UNUSED(op))
+static int convert_proxy_to_override_exec(bContext *C, wmOperator *op)
 {
   Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);
@@ -2540,6 +2544,15 @@ static int convert_proxy_to_override_exec(bContext *C, wmOperator *UNUSED(op))
   const bool is_override_instancing_object = ob_proxy_group != NULL;
 
   const bool success = BKE_lib_override_library_proxy_convert(bmain, scene, view_layer, ob_proxy);
+
+  if (!success) {
+    BKE_reportf(
+        op->reports,
+        RPT_ERROR_INVALID_INPUT,
+        "Could not create a library override from proxy '%s' (might use already local data?)",
+        ob_proxy->id.name + 2);
+    return OPERATOR_CANCELLED;
+  }
 
   /* Remove the instance empty from this scene, the items now have an overridden collection
    * instead. */
@@ -2556,7 +2569,7 @@ static int convert_proxy_to_override_exec(bContext *C, wmOperator *UNUSED(op))
 void OBJECT_OT_convert_proxy_to_override(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Convert Proxy To Override";
+  ot->name = "Convert Proxy to Override";
   ot->description = "Convert a proxy to a local library override";
   ot->idname = "OBJECT_OT_convert_proxy_to_override";
 

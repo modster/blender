@@ -32,10 +32,10 @@
 #include "BKE_attribute_access.hh"
 #include "BKE_geometry_set.h"
 
-struct Mesh;
-struct PointCloud;
-struct Object;
 struct Collection;
+struct Mesh;
+struct Object;
+struct PointCloud;
 
 /* Each geometry component has a specific type. The type determines what kind of data the component
  * stores. Functions modifying a geometry will usually just modify a subset of the component types.
@@ -64,6 +64,62 @@ template<> struct DefaultHash<GeometryComponentType> {
   }
 };
 }  // namespace blender
+
+class GeometryComponent;
+
+/**
+ * An #OutputAttributePtr wraps a #WriteAttributePtr that might not be stored in its final
+ * destination yet. Therefore, once the attribute has been filled with data, the #save method has
+ * to be called, to store the attribute where it belongs (possibly by replacing an existing
+ * attribute with the same name).
+ *
+ * This is useful for example in the Attribute Color Ramp node, when the same attribute name is
+ * used as input and output. Typically the input is a float attribute, and the output is a color.
+ * Those two attributes cannot exist at the same time, due to a name collision. To handle this
+ * situation well, first the output colors have to be computed before the input floats are deleted.
+ * Therefore, the outputs have to be written to a temporary buffer that replaces the existing
+ * attribute once all computations are done.
+ */
+class OutputAttributePtr {
+ private:
+  blender::bke::WriteAttributePtr attribute_;
+
+ public:
+  OutputAttributePtr() = default;
+  OutputAttributePtr(blender::bke::WriteAttributePtr attribute);
+  OutputAttributePtr(GeometryComponent &component,
+                     AttributeDomain domain,
+                     std::string name,
+                     CustomDataType data_type);
+
+  ~OutputAttributePtr();
+
+  /* Returns false, when this wrapper is empty. */
+  operator bool() const
+  {
+    return static_cast<bool>(attribute_);
+  }
+
+  /* Get a reference to the underlying #WriteAttribute. */
+  blender::bke::WriteAttribute &get()
+  {
+    BLI_assert(attribute_);
+    return *attribute_;
+  }
+
+  blender::bke::WriteAttribute &operator*()
+  {
+    return *attribute_;
+  }
+
+  blender::bke::WriteAttribute *operator->()
+  {
+    return attribute_.get();
+  }
+
+  void save();
+  void apply_span_and_save();
+};
 
 /**
  * This is the base class for specialized geometry component types.
@@ -136,6 +192,11 @@ class GeometryComponent {
       const AttributeDomain domain,
       const CustomDataType data_type) const;
 
+  /* Get a read-only attribute interpolated to the input domain, leaving the data type unchanged.
+   * Returns null when the attribute does not exist. */
+  blender::bke::ReadAttributePtr attribute_try_get_for_read(
+      const blender::StringRef attribute_name, const AttributeDomain domain) const;
+
   /* Get a read-only attribute for the given domain and data type.
    * Returns a constant attribute based on the default value if the attribute does not exist.
    * Never returns null. */
@@ -180,14 +241,19 @@ class GeometryComponent {
   }
 
   /**
-   * Returns the attribute with the given parameters if it exists.
-   * If an exact match does not exist, other attributes with the same name are deleted and a new
-   * attribute is created if possible.
+   * If an attribute with the given params exist, it is returned.
+   * If no attribute with the given name exists, create it and
+   * fill it with the default value if it is provided.
+   * If an attribute with the given name but different domain or type exists, a temporary attribute
+   * is created that has to be saved after the output has been computed. This avoids deleting
+   * another attribute, before a computation is finished.
+   *
+   * This might return no attribute when the attribute cannot exist on the component.
    */
-  blender::bke::WriteAttributePtr attribute_try_ensure_for_write(
-      const blender::StringRef attribute_name,
-      const AttributeDomain domain,
-      const CustomDataType data_type);
+  OutputAttributePtr attribute_try_get_for_output(const blender::StringRef attribute_name,
+                                                  const AttributeDomain domain,
+                                                  const CustomDataType data_type,
+                                                  const void *default_value = nullptr);
 };
 
 template<typename T>
@@ -359,6 +425,7 @@ class InstancesComponent : public GeometryComponent {
   blender::Vector<blender::float3> positions_;
   blender::Vector<blender::float3> rotations_;
   blender::Vector<blender::float3> scales_;
+  blender::Vector<int> ids_;
   blender::Vector<InstancedData> instanced_data_;
 
  public:
@@ -370,20 +437,24 @@ class InstancesComponent : public GeometryComponent {
   void add_instance(Object *object,
                     blender::float3 position,
                     blender::float3 rotation = {0, 0, 0},
-                    blender::float3 scale = {1, 1, 1});
+                    blender::float3 scale = {1, 1, 1},
+                    const int id = -1);
   void add_instance(Collection *collection,
                     blender::float3 position,
                     blender::float3 rotation = {0, 0, 0},
-                    blender::float3 scale = {1, 1, 1});
+                    blender::float3 scale = {1, 1, 1},
+                    const int id = -1);
   void add_instance(InstancedData data,
                     blender::float3 position,
                     blender::float3 rotation,
-                    blender::float3 scale);
+                    blender::float3 scale,
+                    const int id = -1);
 
   blender::Span<InstancedData> instanced_data() const;
   blender::Span<blender::float3> positions() const;
   blender::Span<blender::float3> rotations() const;
   blender::Span<blender::float3> scales() const;
+  blender::Span<int> ids() const;
   blender::MutableSpan<blender::float3> positions();
   int instances_amount() const;
 

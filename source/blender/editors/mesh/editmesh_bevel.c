@@ -1055,7 +1055,7 @@ void MESH_OT_bevel(wmOperatorType *ot)
        "CUTOFF",
        0,
        "Cutoff",
-       "A cut-off at each profile's end before the intersection"},
+       "A cutoff at each profile's end before the intersection"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -1129,7 +1129,7 @@ void MESH_OT_bevel(wmOperatorType *ot)
                prop_affect_items,
                BEVEL_AFFECT_EDGES,
                "Affect",
-               "Affect Edges or Vertices");
+               "Affect edges or vertices");
 
   RNA_def_boolean(ot->srna,
                   "clamp_overlap",

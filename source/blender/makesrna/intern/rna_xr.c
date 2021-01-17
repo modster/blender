@@ -792,7 +792,7 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
 
   static const EnumPropertyItem controller_draw_styles[] = {
       {XR_CONTROLLER_DRAW_AXES, "AXES", 0, "Axes", "Draw controller's local axes"},
-      {XR_CONTROLLER_DRAW_RAY, "RAY", 0, "Ray", "Draw a ray along controller's -Z axis "},
+      {XR_CONTROLLER_DRAW_RAY, "RAY", 0, "Ray", "Draw a ray along controller's -Z axis"},
       {0, NULL, 0, NULL, NULL},
   };
 

@@ -42,6 +42,7 @@
 #include "DNA_anim_types.h"
 #include "DNA_brush_types.h"
 #include "DNA_gpencil_types.h"
+#include "DNA_material_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
@@ -1331,8 +1332,8 @@ static int gpencil_merge_layer_exec(bContext *C, wmOperator *op)
   }
 
   /* Read all frames from merge layer and add any missing in destination layer,
-   * copying all previous strokes to keep the image equals. Need to do it in a separated
-   * loop to avoid strokes acumulation. */
+   * copying all previous strokes to keep the image equals.
+   * Need to do it in a separated loop to avoid strokes accumulation. */
   LISTBASE_FOREACH (bGPDframe *, gpf_src, &gpl_src->frames) {
     /* Try to find frame in destination layer hash table. */
     bGPDframe *gpf_dst = BLI_ghash_lookup(gh_frames_dst, POINTER_FROM_INT(gpf_src->framenum));
@@ -1559,7 +1560,7 @@ static int gpencil_stroke_arrange_exec(bContext *C, wmOperator *op)
               continue;
             }
             /* check if the color is editable */
-            if (ED_gpencil_stroke_color_use(ob, gpl, gps) == false) {
+            if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
               continue;
             }
             /* some stroke is already at front*/
@@ -1724,7 +1725,7 @@ static int gpencil_stroke_change_color_exec(bContext *C, wmOperator *op)
               continue;
             }
             /* check if the color is editable */
-            if (ED_gpencil_stroke_color_use(ob, gpl, gps) == false) {
+            if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
               continue;
             }
 
@@ -1905,7 +1906,7 @@ void GPENCIL_OT_brush_reset(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Reset Brush";
   ot->idname = "GPENCIL_OT_brush_reset";
-  ot->description = "Reset Brush to default parameters";
+  ot->description = "Reset brush to default parameters";
 
   /* api callbacks */
   ot->exec = gpencil_brush_reset_exec;
@@ -2853,7 +2854,7 @@ int ED_gpencil_join_objects_exec(bContext *C, wmOperator *op)
           float inverse_diff_mat[4][4];
 
           /* recalculate all stroke points */
-          BKE_gpencil_parent_matrix_get(depsgraph, ob_iter, gpl_src, diff_mat);
+          BKE_gpencil_layer_transform_matrix_get(depsgraph, ob_iter, gpl_src, diff_mat);
           invert_m4_m4_safe_ortho(inverse_diff_mat, diff_mat);
 
           Material *ma_src = NULL;
@@ -3387,7 +3388,7 @@ static int gpencil_material_select_exec(bContext *C, wmOperator *op)
             continue;
           }
           /* check if the color is editable */
-          if (ED_gpencil_stroke_color_use(ob, gpl, gps) == false) {
+          if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
             continue;
           }
 

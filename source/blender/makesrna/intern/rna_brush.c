@@ -22,6 +22,7 @@
 
 #include "DNA_brush_types.h"
 #include "DNA_gpencil_types.h"
+#include "DNA_material_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_texture_types.h"
@@ -133,6 +134,7 @@ const EnumPropertyItem rna_enum_brush_sculpt_tool_items[] = {
     {SCULPT_TOOL_SIMPLIFY, "SIMPLIFY", ICON_BRUSH_DATA, "Simplify", ""},
     {SCULPT_TOOL_MASK, "MASK", ICON_BRUSH_MASK, "Mask", ""},
     {SCULPT_TOOL_DISPLACEMENT_ERASER, "DISPLACEMENT_ERASER", ICON_BRUSH_SCULPT_DRAW, "Multires Displacement Eraser", ""},
+    {SCULPT_TOOL_DISPLACEMENT_SMEAR, "DISPLACEMENT_SMEAR", ICON_BRUSH_SCULPT_DRAW, "Multires Displacement Smear", ""},
     {SCULPT_TOOL_PAINT, "PAINT", ICON_BRUSH_SCULPT_DRAW, "Paint", ""},
     {SCULPT_TOOL_SMEAR, "SMEAR", ICON_BRUSH_SCULPT_DRAW, "Smear", ""},
     {SCULPT_TOOL_DRAW_FACE_SETS, "DRAW_FACE_SETS", ICON_BRUSH_MASK, "Draw Face Sets", ""},
@@ -1462,13 +1464,13 @@ static void rna_def_gpencil_options(BlenderRNA *brna)
   RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, NULL);
 
   /* fill factor size */
-  prop = RNA_def_property(srna, "fill_factor", PROP_INT, PROP_NONE);
-  RNA_def_property_int_sdna(prop, NULL, "fill_factor");
-  RNA_def_property_range(prop, 1, 8);
+  prop = RNA_def_property(srna, "fill_factor", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "fill_factor");
+  RNA_def_property_range(prop, GPENCIL_MIN_FILL_FAC, 8.0f);
   RNA_def_property_ui_text(
       prop,
-      "Resolution",
-      "Multiplier for fill resolution, higher resolution is more accurate but slower");
+      "Precision",
+      "Factor for fill boundary accuracy, higher values are more accurate but slower");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, NULL);
 
@@ -2044,7 +2046,7 @@ static void rna_def_brush(BlenderRNA *brna)
       {BRUSH_CURVE_SHARP, "SHARP", ICON_SHARPCURVE, "Sharp", ""},
       {BRUSH_CURVE_LIN, "LIN", ICON_LINCURVE, "Linear", ""},
       {BRUSH_CURVE_POW4, "POW4", ICON_SHARPCURVE, "Sharper", ""},
-      {BRUSH_CURVE_INVSQUARE, "INVSQUARE", ICON_INVERSESQUARECURVE, "Inverse square", ""},
+      {BRUSH_CURVE_INVSQUARE, "INVSQUARE", ICON_INVERSESQUARECURVE, "Inverse Square", ""},
       {BRUSH_CURVE_CONSTANT, "CONSTANT", ICON_NOCURVE, "Constant", ""},
       {0, NULL, 0, NULL, NULL},
   };
@@ -2065,8 +2067,8 @@ static void rna_def_brush(BlenderRNA *brna)
 
   static const EnumPropertyItem brush_elastic_deform_type_items[] = {
       {BRUSH_ELASTIC_DEFORM_GRAB, "GRAB", 0, "Grab", ""},
-      {BRUSH_ELASTIC_DEFORM_GRAB_BISCALE, "GRAB_BISCALE", 0, "Bi-scale Grab", ""},
-      {BRUSH_ELASTIC_DEFORM_GRAB_TRISCALE, "GRAB_TRISCALE", 0, "Tri-scale Grab", ""},
+      {BRUSH_ELASTIC_DEFORM_GRAB_BISCALE, "GRAB_BISCALE", 0, "Bi-Scale Grab", ""},
+      {BRUSH_ELASTIC_DEFORM_GRAB_TRISCALE, "GRAB_TRISCALE", 0, "Tri-Scale Grab", ""},
       {BRUSH_ELASTIC_DEFORM_SCALE, "SCALE", 0, "Scale", ""},
       {BRUSH_ELASTIC_DEFORM_TWIST, "TWIST", 0, "Twist", ""},
       {0, NULL, 0, NULL, NULL},
@@ -2829,7 +2831,7 @@ static void rna_def_brush(BlenderRNA *brna)
   RNA_def_property_range(prop, 0.0f, 1.0f);
   RNA_def_property_ui_range(prop, 0.0f, 1.0f, 0.001, 3);
   RNA_def_property_ui_text(
-      prop, "Autosmooth", "Amount of smoothing to automatically apply to each stroke");
+      prop, "Auto-Smooth", "Amount of smoothing to automatically apply to each stroke");
   RNA_def_property_update(prop, 0, "rna_Brush_update");
 
   prop = RNA_def_property(srna, "topology_rake_factor", PROP_FLOAT, PROP_FACTOR);
@@ -2971,21 +2973,21 @@ static void rna_def_brush(BlenderRNA *brna)
   prop = RNA_def_property(srna, "use_automasking_topology", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "automasking_flags", BRUSH_AUTOMASKING_TOPOLOGY);
   RNA_def_property_ui_text(prop,
-                           "Topology Auto-masking",
+                           "Topology Auto-Masking",
                            "Affect only vertices connected to the active vertex under the brush");
   RNA_def_property_update(prop, 0, "rna_Brush_update");
 
   prop = RNA_def_property(srna, "use_automasking_face_sets", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "automasking_flags", BRUSH_AUTOMASKING_FACE_SETS);
   RNA_def_property_ui_text(prop,
-                           "Face Sets Auto-masking",
+                           "Face Sets Auto-Masking",
                            "Affect only vertices that share Face Sets with the active vertex");
   RNA_def_property_update(prop, 0, "rna_Brush_update");
 
   prop = RNA_def_property(srna, "use_automasking_boundary_edges", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "automasking_flags", BRUSH_AUTOMASKING_BOUNDARY_EDGES);
   RNA_def_property_ui_text(
-      prop, "Mesh Boundary Auto-masking", "Do not affect non manifold boundary edges");
+      prop, "Mesh Boundary Auto-Masking", "Do not affect non manifold boundary edges");
   RNA_def_property_update(prop, 0, "rna_Brush_update");
 
   prop = RNA_def_property(srna, "use_automasking_boundary_face_sets", PROP_BOOLEAN, PROP_NONE);
@@ -3219,7 +3221,7 @@ static void rna_def_brush(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "use_edge_to_edge", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", BRUSH_EDGE_TO_EDGE);
-  RNA_def_property_ui_text(prop, "Edge-to-edge", "Drag anchor brush from edge-to-edge");
+  RNA_def_property_ui_text(prop, "Edge-to-Edge", "Drag anchor brush from edge-to-edge");
   RNA_def_property_update(prop, 0, "rna_Brush_update");
 
   prop = RNA_def_property(srna, "use_restore_mesh", PROP_BOOLEAN, PROP_NONE);
@@ -3241,7 +3243,7 @@ static void rna_def_brush(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "paint_curve", PROP_POINTER, PROP_NONE);
   RNA_def_property_flag(prop, PROP_EDITABLE);
-  RNA_def_property_ui_text(prop, "Paint Curve", "Active Paint Curve");
+  RNA_def_property_ui_text(prop, "Paint Curve", "Active paint curve");
   RNA_def_property_update(prop, 0, "rna_Brush_update");
 
   prop = RNA_def_property(srna, "gradient", PROP_POINTER, PROP_NEVER_NULL);
