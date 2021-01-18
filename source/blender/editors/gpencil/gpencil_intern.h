@@ -522,6 +522,8 @@ void GPENCIL_OT_primitive_polyline(struct wmOperatorType *ot);
 void GPENCIL_OT_primitive_circle(struct wmOperatorType *ot);
 void GPENCIL_OT_primitive_curve(struct wmOperatorType *ot);
 
+void GPENCIL_OT_draw_curve(struct wmOperatorType *ot);
+
 /* vertex groups ------------ */
 void GPENCIL_OT_vertex_group_assign(struct wmOperatorType *ot);
 void GPENCIL_OT_vertex_group_remove_from(struct wmOperatorType *ot);

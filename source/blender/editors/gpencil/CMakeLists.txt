@@ -41,6 +41,7 @@ set(SRC
   gpencil_add_stroke.c
   gpencil_armature.c
   gpencil_convert.c
+  gpencil_curve_draw.c
   gpencil_data.c
   gpencil_edit.c
   gpencil_edit_curve.c

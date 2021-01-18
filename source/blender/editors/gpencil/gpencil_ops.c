@@ -674,6 +674,8 @@ void ED_operatortypes_gpencil(void)
   WM_operatortype_append(GPENCIL_OT_primitive_circle);
   WM_operatortype_append(GPENCIL_OT_primitive_curve);
 
+  WM_operatortype_append(GPENCIL_OT_draw_curve);
+
   /* convert old 2.7 files to 2.8 */
   WM_operatortype_append(GPENCIL_OT_convert_old_files);
 
