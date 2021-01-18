@@ -9,14 +9,6 @@ uniform vec4 cocParams;
 #define cocNear cocParams[2] /* Near view depths value. */
 #define cocFar cocParams[3] /* Far view depths value. */
 
-uniform vec4 bokehParams[2];
-
-#define bokehRotation bokehParams[0].x
-#define bokehRatio bokehParams[0].y
-#define bokehMaxsize bokehParams[0].z
-/* Polygon Bokeh shape number of sides (with precomputed vars) */
-#define bokehSides bokehParams[1]
-
 uniform float scatterColorThreshold;
 uniform float scatterCocThreshold;
 

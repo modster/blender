@@ -274,6 +274,7 @@ typedef struct EEVEE_PassList {
   struct DRWPass *dof_reduce_copy;
   struct DRWPass *dof_downsample;
   struct DRWPass *dof_reduce;
+  struct DRWPass *dof_bokeh;
   struct DRWPass *dof_gather_fg;
   struct DRWPass *dof_gather_fg_holefill;
   struct DRWPass *dof_gather_bg;
@@ -364,6 +365,7 @@ typedef struct EEVEE_FramebufferList {
   struct GPUFrameBuffer *dof_dilate_tiles_fb;
   struct GPUFrameBuffer *dof_downsample_fb;
   struct GPUFrameBuffer *dof_reduce_fb;
+  struct GPUFrameBuffer *dof_bokeh_fb;
   struct GPUFrameBuffer *dof_gather_fg_fb;
   struct GPUFrameBuffer *dof_gather_fg_holefill_fb;
   struct GPUFrameBuffer *dof_gather_bg_fb;
@@ -759,8 +761,7 @@ typedef struct EEVEE_EffectsInfo {
   struct GPUTexture *velocity_tiles_tx;
   /* Depth Of Field */
   float dof_coc_params[2], dof_coc_near_dist, dof_coc_far_dist;
-  float dof_bokeh[4];
-  float dof_bokeh_sides[4];
+  float dof_bokeh_blades, dof_bokeh_rotation, dof_bokeh_ratio, dof_bokeh_max_size;
   float dof_scatter_color_threshold;
   float dof_scatter_coc_threshold;
   float dof_fx_max_coc;
@@ -770,6 +771,7 @@ typedef struct EEVEE_EffectsInfo {
   struct GPUTexture *dof_bg_color_tx; /* All textures from pool... */
   struct GPUTexture *dof_bg_occlusion_tx;
   struct GPUTexture *dof_bg_weight_tx;
+  struct GPUTexture *dof_bokeh_tx;
   struct GPUTexture *dof_coc_dilated_tiles_bg_tx;
   struct GPUTexture *dof_coc_dilated_tiles_fg_tx;
   struct GPUTexture *dof_coc_tiles_bg_tx;
@@ -1156,14 +1158,15 @@ struct GPUShader *EEVEE_shaders_bloom_blit_get(bool high_quality);
 struct GPUShader *EEVEE_shaders_bloom_downsample_get(bool high_quality);
 struct GPUShader *EEVEE_shaders_bloom_upsample_get(bool high_quality);
 struct GPUShader *EEVEE_shaders_bloom_resolve_get(bool high_quality);
+struct GPUShader *EEVEE_shaders_depth_of_field_bokeh_get(void);
 struct GPUShader *EEVEE_shaders_depth_of_field_setup_get(void);
 struct GPUShader *EEVEE_shaders_depth_of_field_flatten_tiles_get(void);
 struct GPUShader *EEVEE_shaders_depth_of_field_dilate_tiles_get(int pass);
 struct GPUShader *EEVEE_shaders_depth_of_field_downsample_get(void);
 struct GPUShader *EEVEE_shaders_depth_of_field_reduce_get(int is_copy_pass);
-struct GPUShader *EEVEE_shaders_depth_of_field_gather_get(EEVEE_DofGatherPass pass);
+struct GPUShader *EEVEE_shaders_depth_of_field_gather_get(EEVEE_DofGatherPass pass, int bokeh_tx);
 struct GPUShader *EEVEE_shaders_depth_of_field_filter_get(void);
-struct GPUShader *EEVEE_shaders_depth_of_field_scatter_get(int is_foreground);
+struct GPUShader *EEVEE_shaders_depth_of_field_scatter_get(int is_foreground, int bokeh_tx);
 struct GPUShader *EEVEE_shaders_depth_of_field_resolve_get(void);
 struct GPUShader *EEVEE_shaders_effect_downsample_sh_get(void);
 struct GPUShader *EEVEE_shaders_effect_downsample_cube_sh_get(void);

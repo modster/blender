@@ -3,6 +3,7 @@
 
 uniform vec2 targetTexelSize;
 uniform int spritePerRow;
+uniform float bokehRatio;
 
 uniform sampler2D colorBuffer;
 uniform sampler2D cocBuffer;
@@ -19,6 +20,7 @@ flat out vec4 color4;
 flat out vec4 weights;
 flat out vec4 cocs;
 flat out vec2 spritepos;
+flat out float spritesize;
 
 #ifdef DOF_FOREGROUND_PASS
 const bool is_foreground = true;
@@ -139,11 +141,16 @@ void main()
   gl_Position.z = 0.0;
   gl_Position.w = 1.0;
 
+  spritesize = max_v4(cocs);
+
   /* Add 2.5 to max_coc because the max_coc may not be centered on the sprite origin
    * and because we smooth the bokeh shape a bit in the pixel shader. */
-  gl_Position.xy *= (max_v4(cocs) + 2.5) * vec2(bokehRatio, 1.0);
+  gl_Position.xy *= spritesize * vec2(bokehRatio, 1.0) + 2.5;
   /* Position the sprite. */
   gl_Position.xy += spritepos;
   /* NDC range [-1..1]. */
   gl_Position.xy = gl_Position.xy * targetTexelSize * 2.0 - 1.0;
+
+  /* Add 2.5 for the same reason but without the ratio. */
+  spritesize += 2.5;
 }

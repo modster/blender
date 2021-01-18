@@ -9,6 +9,7 @@
 #pragma BLENDER_REQUIRE(effect_dof_lib.glsl)
 
 uniform sampler2D occlusionBuffer;
+uniform sampler2D bokehLut;
 
 flat in vec4 color1;
 flat in vec4 color2;
@@ -17,13 +18,22 @@ flat in vec4 color4;
 flat in vec4 weights;
 flat in vec4 cocs;
 flat in vec2 spritepos;
+flat in float spritesize; /* MaxCoC */
 
 layout(location = 0) out vec4 fragColor;
 
 float bokeh_shape(vec2 center)
 {
   vec2 co = gl_FragCoord.xy - center;
+
+#ifdef DOF_BOKEH_TEXTURE
+  float texture_size = float(textureSize(bokehLut, 0).x);
+  /* Bias scale to avoid sampling at the texture's border. */
+  float scale_fac = spritesize * (texture_size + 2.0) / texture_size;
+  float dist = scale_fac * textureLod(bokehLut, (co / scale_fac) * 0.5 + 0.5, 0.0).z;
+#else
   float dist = length(co);
+#endif
 
   return dist;
 }

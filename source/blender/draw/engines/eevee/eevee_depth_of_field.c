@@ -91,9 +91,10 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
     effects->dof_coc_params[1] *= viewport_size[0] / sensor_scaled;
     effects->dof_coc_params[0] = -focus_dist * effects->dof_coc_params[1];
 
-    effects->dof_bokeh[0] = rotation;
-    effects->dof_bokeh[1] = ratio;
-    effects->dof_bokeh[2] = scene_eval->eevee.bokeh_max_size;
+    effects->dof_bokeh_blades = blades;
+    effects->dof_bokeh_rotation = rotation;
+    effects->dof_bokeh_ratio = ratio;
+    effects->dof_bokeh_max_size = scene_eval->eevee.bokeh_max_size;
 
     /* TODO(fclem) User parameters. */
     effects->dof_scatter_color_threshold = 1.5f;
@@ -106,13 +107,7 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
     /* Clamp with user defined max. */
     effects->dof_fx_max_coc = min_ff(scene_eval->eevee.bokeh_max_size, max_coc);
 
-    /* Precompute values to save instructions in fragment shader. */
-    effects->dof_bokeh_sides[0] = blades;
-    effects->dof_bokeh_sides[1] = blades > 0.0f ? 2.0f * M_PI / blades : 0.0f;
-    effects->dof_bokeh_sides[2] = blades / (2.0f * M_PI);
-    effects->dof_bokeh_sides[3] = blades > 0.0f ? cosf(M_PI / blades) : 0.0f;
-
-    if (scene_eval->eevee.bokeh_max_size < 0.5f) {
+    if (effects->dof_fx_max_coc < 0.5f) {
       return 0;
     }
 
@@ -142,6 +137,39 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
 #define DILATE_RING_COUNT 3
 
 /**
+ * Create bokeh texture.
+ **/
+static void dof_bokeh_pass_init(EEVEE_FramebufferList *fbl,
+                                EEVEE_PassList *psl,
+                                EEVEE_EffectsInfo *fx)
+{
+  if ((fx->dof_bokeh_blades == 0.0) && (fx->dof_bokeh_ratio == 1.0f)) {
+    fx->dof_bokeh_tx = NULL;
+    return;
+  }
+
+  void *owner = (void *)&dof_bokeh_pass_init;
+  int res[2] = {32, 32};
+
+  DRW_PASS_CREATE(psl->dof_bokeh, DRW_STATE_WRITE_COLOR);
+
+  GPUShader *sh = EEVEE_shaders_depth_of_field_bokeh_get();
+  DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_bokeh);
+  DRW_shgroup_uniform_float_copy(grp, "bokehSides", fx->dof_bokeh_blades);
+  DRW_shgroup_uniform_float_copy(grp, "bokehRotation", fx->dof_bokeh_rotation);
+  DRW_shgroup_uniform_float_copy(grp, "bokehRatio", fx->dof_bokeh_ratio);
+  DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+
+  fx->dof_bokeh_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
+
+  GPU_framebuffer_ensure_config(&fbl->dof_bokeh_fb,
+                                {
+                                    GPU_ATTACHMENT_NONE,
+                                    GPU_ATTACHMENT_TEXTURE(fx->dof_bokeh_tx),
+                                });
+}
+
+/**
  * Ouputs halfResColorBuffer and halfResCocBuffer.
  **/
 static void dof_setup_pass_init(EEVEE_FramebufferList *fbl,
@@ -161,7 +189,7 @@ static void dof_setup_pass_init(EEVEE_FramebufferList *fbl,
   DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &fx->source_buffer, NO_FILTERING);
   DRW_shgroup_uniform_texture_ref_ex(grp, "depthBuffer", &dtxl->depth, NO_FILTERING);
   DRW_shgroup_uniform_vec4_copy(grp, "cocParams", fx->dof_coc_params);
-  DRW_shgroup_uniform_vec4_copy(grp, "bokehParams", fx->dof_bokeh);
+  DRW_shgroup_uniform_float_copy(grp, "bokehMaxSize", fx->dof_bokeh_max_size);
   DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 
   fx->dof_half_res_color_tx = DRW_texture_pool_query_2d(UNPACK2(res), COLOR_FORMAT, owner);
@@ -394,11 +422,12 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
   GPU_texture_get_mipmap_size(txl->dof_reduced_color, 0, input_size);
   float uv_correction_fac[2] = {res[0] / (float)input_size[0], res[1] / (float)input_size[1]};
   float output_texel_size[2] = {1.0f / res[0], 1.0f / res[1]};
+  const bool use_bokeh_tx = (fx->dof_bokeh_tx != NULL);
 
   {
     DRW_PASS_CREATE(psl->dof_gather_fg_holefill, DRW_STATE_WRITE_COLOR);
 
-    GPUShader *sh = EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_HOLEFILL);
+    GPUShader *sh = EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_HOLEFILL, false);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_gather_fg_holefill);
     DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &txl->dof_reduced_color, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
@@ -408,7 +437,6 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherInputUvCorrection", uv_correction_fac);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherOutputTexelSize", output_texel_size);
-    DRW_shgroup_uniform_vec4(grp, "bokehParams", fx->dof_bokeh, 2);
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 
     /* NOTE: This pass is the owner. So textures from pool can come from previous passes. */
@@ -425,7 +453,7 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
   {
     DRW_PASS_CREATE(psl->dof_gather_fg, DRW_STATE_WRITE_COLOR);
 
-    GPUShader *sh = EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_FOREGROUND);
+    GPUShader *sh = EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_FOREGROUND, use_bokeh_tx);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_gather_fg);
     DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &txl->dof_reduced_color, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
@@ -435,7 +463,9 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherInputUvCorrection", uv_correction_fac);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherOutputTexelSize", output_texel_size);
-    DRW_shgroup_uniform_vec4(grp, "bokehParams", fx->dof_bokeh, 2);
+    if (use_bokeh_tx) {
+      DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
+    }
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 
     /* NOTE: This pass is the owner. So textures from pool can come from previous passes. */
@@ -456,7 +486,7 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
   {
     DRW_PASS_CREATE(psl->dof_gather_bg, DRW_STATE_WRITE_COLOR);
 
-    GPUShader *sh = EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_BACKGROUND);
+    GPUShader *sh = EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_BACKGROUND, use_bokeh_tx);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_gather_bg);
     DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &txl->dof_reduced_color, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
@@ -466,7 +496,9 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherInputUvCorrection", uv_correction_fac);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherOutputTexelSize", output_texel_size);
-    DRW_shgroup_uniform_vec4(grp, "bokehParams", fx->dof_bokeh, 2);
+    if (use_bokeh_tx) {
+      DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
+    }
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 
     /* NOTE: This pass is the owner. So textures from pool can come from previous passes. */
@@ -519,12 +551,13 @@ static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
   /* Draw a sprite for every four halfres pixels. */
   int sprite_count = (input_size[0] / 2) * (input_size[1] / 2);
   float target_texel_size[2] = {1.0f / target_size[0], 1.0f / target_size[1]};
+  const bool use_bokeh_tx = (fx->dof_bokeh_tx != NULL);
 
   {
     DRW_PASS_CREATE(psl->dof_scatter_fg, DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ADD_FULL);
 
     const bool is_foreground = true;
-    GPUShader *sh = EEVEE_shaders_depth_of_field_scatter_get(is_foreground);
+    GPUShader *sh = EEVEE_shaders_depth_of_field_scatter_get(is_foreground, use_bokeh_tx);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_scatter_fg);
     DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &txl->dof_reduced_color, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
@@ -533,7 +566,10 @@ static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_float_copy(grp, "scatterCocThreshold", fx->dof_scatter_coc_threshold);
     DRW_shgroup_uniform_vec2_copy(grp, "targetTexelSize", target_texel_size);
     DRW_shgroup_uniform_int_copy(grp, "spritePerRow", input_size[0] / 2);
-    DRW_shgroup_uniform_vec4(grp, "bokehParams", fx->dof_bokeh, 2);
+    DRW_shgroup_uniform_float_copy(grp, "bokehRatio", fx->dof_bokeh_ratio);
+    if (use_bokeh_tx) {
+      DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
+    }
     DRW_shgroup_call_procedural_triangles(grp, NULL, sprite_count);
 
     GPU_framebuffer_ensure_config(&fbl->dof_scatter_fg_fb,
@@ -546,16 +582,20 @@ static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
     DRW_PASS_CREATE(psl->dof_scatter_bg, DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ADD_FULL);
 
     const bool is_foreground = false;
-    GPUShader *sh = EEVEE_shaders_depth_of_field_scatter_get(is_foreground);
+    GPUShader *sh = EEVEE_shaders_depth_of_field_scatter_get(is_foreground, use_bokeh_tx);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_scatter_bg);
     DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &txl->dof_reduced_color, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref(grp, "occlusionBuffer", &fx->dof_bg_occlusion_tx);
+    DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
     DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_uniform_float_copy(grp, "scatterCocThreshold", fx->dof_scatter_coc_threshold);
     DRW_shgroup_uniform_vec2_copy(grp, "targetTexelSize", target_texel_size);
     DRW_shgroup_uniform_int_copy(grp, "spritePerRow", input_size[0] / 2);
-    DRW_shgroup_uniform_vec4(grp, "bokehParams", fx->dof_bokeh, 2);
+    DRW_shgroup_uniform_float_copy(grp, "bokehRatio", fx->dof_bokeh_ratio);
+    if (use_bokeh_tx) {
+      DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
+    }
     DRW_shgroup_call_procedural_triangles(grp, NULL, sprite_count);
 
     GPU_framebuffer_ensure_config(&fbl->dof_scatter_bg_fb,
@@ -606,6 +646,7 @@ void EEVEE_depth_of_field_cache_init(EEVEE_ViewLayerData *UNUSED(sldata), EEVEE_
   EEVEE_EffectsInfo *fx = stl->effects;
 
   if ((fx->enabled_effects & EFFECT_DOF) != 0) {
+    dof_bokeh_pass_init(fbl, psl, fx);
     dof_setup_pass_init(fbl, psl, fx);
     dof_flatten_tiles_pass_init(fbl, psl, fx);
     dof_dilate_tiles_pass_init(fbl, psl, fx);
@@ -641,6 +682,11 @@ void EEVEE_depth_of_field_draw(EEVEE_Data *vedata)
   /* Depth Of Field */
   if ((effects->enabled_effects & EFFECT_DOF) != 0) {
     DRW_stats_group_start("Depth of Field");
+
+    if (fx->dof_bokeh_tx != NULL) {
+      GPU_framebuffer_bind(fbl->dof_bokeh_fb);
+      DRW_draw_pass(psl->dof_bokeh);
+    }
 
     GPU_framebuffer_bind(fbl->dof_setup_fb);
     DRW_draw_pass(psl->dof_setup);

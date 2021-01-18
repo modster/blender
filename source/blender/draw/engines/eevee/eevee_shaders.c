@@ -77,14 +77,15 @@ static struct {
   struct GPUShader *bloom_resolve_sh[2];
 
   /* Depth Of Field */
+  struct GPUShader *dof_bokeh_sh;
   struct GPUShader *dof_setup_sh;
   struct GPUShader *dof_flatten_tiles_sh;
   struct GPUShader *dof_dilate_tiles_sh[2];
   struct GPUShader *dof_downsample_sh;
   struct GPUShader *dof_reduce_sh[2];
-  struct GPUShader *dof_gather_sh[DOF_GATHER_MAX_PASS];
+  struct GPUShader *dof_gather_sh[DOF_GATHER_MAX_PASS][2];
   struct GPUShader *dof_filter_sh;
-  struct GPUShader *dof_scatter_sh[2];
+  struct GPUShader *dof_scatter_sh[2][2];
   struct GPUShader *dof_resolve_sh;
 
   /* General purpose Shaders. */
@@ -198,6 +199,7 @@ extern char datatoc_cubemap_lib_glsl[];
 extern char datatoc_default_frag_glsl[];
 extern char datatoc_lookdev_world_frag_glsl[];
 extern char datatoc_effect_bloom_frag_glsl[];
+extern char datatoc_effect_dof_bokeh_frag_glsl[];
 extern char datatoc_effect_dof_dilate_tiles_frag_glsl[];
 extern char datatoc_effect_dof_downsample_frag_glsl[];
 extern char datatoc_effect_dof_filter_frag_glsl[];
@@ -1026,6 +1028,15 @@ GPUShader *EEVEE_shaders_bloom_resolve_get(bool high_quality)
 /** \name Depth of field
  * \{ */
 
+GPUShader *EEVEE_shaders_depth_of_field_bokeh_get(void)
+{
+  if (e_data.dof_bokeh_sh == NULL) {
+    e_data.dof_bokeh_sh = DRW_shader_create_fullscreen_with_shaderlib(
+        datatoc_effect_dof_bokeh_frag_glsl, e_data.lib, NULL);
+  }
+  return e_data.dof_bokeh_sh;
+}
+
 GPUShader *EEVEE_shaders_depth_of_field_setup_get(void)
 {
   if (e_data.dof_setup_sh == NULL) {
@@ -1075,30 +1086,40 @@ GPUShader *EEVEE_shaders_depth_of_field_reduce_get(int is_copy_pass)
   return e_data.dof_reduce_sh[is_copy_pass];
 }
 
-GPUShader *EEVEE_shaders_depth_of_field_gather_get(EEVEE_DofGatherPass pass)
+GPUShader *EEVEE_shaders_depth_of_field_gather_get(EEVEE_DofGatherPass pass, int use_bokeh_tx)
 {
-  if (e_data.dof_gather_sh[pass] == NULL) {
-    const char *define = "";
+  if (e_data.dof_gather_sh[pass][use_bokeh_tx] == NULL) {
+    DynStr *ds = BLI_dynstr_new();
+
     switch (pass) {
       case DOF_GATHER_FOREGROUND:
-        define = "#define DOF_FOREGROUND_PASS\n";
+        BLI_dynstr_append(ds, "#define DOF_FOREGROUND_PASS\n");
         break;
       case DOF_GATHER_BACKGROUND:
-        define = "#define DOF_BACKGROUND_PASS\n";
+        BLI_dynstr_append(ds, "#define DOF_BACKGROUND_PASS\n");
         break;
       case DOF_GATHER_HOLEFILL:
-        define =
-            "#define DOF_BACKGROUND_PASS\n"
-            "#define DOF_HOLEFILL_PASS\n";
+        BLI_dynstr_append(ds,
+                          "#define DOF_BACKGROUND_PASS\n"
+                          "#define DOF_HOLEFILL_PASS\n");
         break;
       default:
         break;
     }
 
-    e_data.dof_gather_sh[pass] = DRW_shader_create_fullscreen_with_shaderlib(
+    if (use_bokeh_tx) {
+      BLI_dynstr_append(ds, "#define DOF_BOKEH_TEXTURE\n");
+    }
+
+    char *define = BLI_dynstr_get_cstring(ds);
+    BLI_dynstr_free(ds);
+
+    e_data.dof_gather_sh[pass][use_bokeh_tx] = DRW_shader_create_fullscreen_with_shaderlib(
         datatoc_effect_dof_gather_frag_glsl, e_data.lib, define);
+
+    MEM_freeN(define);
   }
-  return e_data.dof_gather_sh[pass];
+  return e_data.dof_gather_sh[pass][use_bokeh_tx];
 }
 
 GPUShader *EEVEE_shaders_depth_of_field_filter_get(void)
@@ -1110,17 +1131,31 @@ GPUShader *EEVEE_shaders_depth_of_field_filter_get(void)
   return e_data.dof_filter_sh;
 }
 
-GPUShader *EEVEE_shaders_depth_of_field_scatter_get(int is_foreground)
+GPUShader *EEVEE_shaders_depth_of_field_scatter_get(int is_foreground, int use_bokeh_tx)
 {
-  if (e_data.dof_scatter_sh[is_foreground] == NULL) {
-    e_data.dof_scatter_sh[is_foreground] = DRW_shader_create_with_shaderlib(
+  if (e_data.dof_scatter_sh[is_foreground][use_bokeh_tx] == NULL) {
+    DynStr *ds = BLI_dynstr_new();
+
+    BLI_dynstr_append(
+        ds, (is_foreground) ? "#define DOF_FOREGROUND_PASS\n" : "#define DOF_BACKGROUND_PASS\n");
+
+    if (use_bokeh_tx) {
+      BLI_dynstr_append(ds, "#define DOF_BOKEH_TEXTURE\n");
+    }
+
+    char *define = BLI_dynstr_get_cstring(ds);
+    BLI_dynstr_free(ds);
+
+    e_data.dof_scatter_sh[is_foreground][use_bokeh_tx] = DRW_shader_create_with_shaderlib(
         datatoc_effect_dof_scatter_vert_glsl,
         NULL,
         datatoc_effect_dof_scatter_frag_glsl,
         e_data.lib,
-        (is_foreground) ? "#define DOF_FOREGROUND_PASS\n" : "#define DOF_BACKGROUND_PASS\n");
+        define);
+
+    MEM_freeN(define);
   }
-  return e_data.dof_scatter_sh[is_foreground];
+  return e_data.dof_scatter_sh[is_foreground][use_bokeh_tx];
 }
 
 GPUShader *EEVEE_shaders_depth_of_field_resolve_get(void)
@@ -1536,6 +1571,7 @@ void EEVEE_shaders_free(void)
   DRW_SHADER_FREE_SAFE(e_data.velocity_resolve_sh);
   DRW_SHADER_FREE_SAFE(e_data.taa_resolve_sh);
   DRW_SHADER_FREE_SAFE(e_data.taa_resolve_reproject_sh);
+  DRW_SHADER_FREE_SAFE(e_data.dof_bokeh_sh);
   DRW_SHADER_FREE_SAFE(e_data.dof_setup_sh);
   DRW_SHADER_FREE_SAFE(e_data.dof_flatten_tiles_sh);
   DRW_SHADER_FREE_SAFE(e_data.dof_dilate_tiles_sh[0]);
@@ -1544,11 +1580,14 @@ void EEVEE_shaders_free(void)
   DRW_SHADER_FREE_SAFE(e_data.dof_reduce_sh[0]);
   DRW_SHADER_FREE_SAFE(e_data.dof_reduce_sh[1]);
   for (int i = 0; i < DOF_GATHER_MAX_PASS; i++) {
-    DRW_SHADER_FREE_SAFE(e_data.dof_gather_sh[i]);
+    DRW_SHADER_FREE_SAFE(e_data.dof_gather_sh[i][0]);
+    DRW_SHADER_FREE_SAFE(e_data.dof_gather_sh[i][1]);
   }
   DRW_SHADER_FREE_SAFE(e_data.dof_filter_sh);
-  DRW_SHADER_FREE_SAFE(e_data.dof_scatter_sh[0]);
-  DRW_SHADER_FREE_SAFE(e_data.dof_scatter_sh[1]);
+  DRW_SHADER_FREE_SAFE(e_data.dof_scatter_sh[0][0]);
+  DRW_SHADER_FREE_SAFE(e_data.dof_scatter_sh[0][1]);
+  DRW_SHADER_FREE_SAFE(e_data.dof_scatter_sh[1][0]);
+  DRW_SHADER_FREE_SAFE(e_data.dof_scatter_sh[1][1]);
   DRW_SHADER_FREE_SAFE(e_data.dof_resolve_sh);
   DRW_SHADER_FREE_SAFE(e_data.cryptomatte_sh[0]);
   DRW_SHADER_FREE_SAFE(e_data.cryptomatte_sh[1]);

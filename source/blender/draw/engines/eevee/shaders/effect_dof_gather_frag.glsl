@@ -20,6 +20,8 @@ uniform sampler2D cocBuffer;
 uniform sampler2D cocTilesFgBuffer;
 uniform sampler2D cocTilesBgBuffer;
 
+uniform sampler2D bokehLut;
+
 /* Used to correct the padding in the color and CoC buffers. */
 uniform vec2 gatherInputUvCorrection;
 
@@ -50,7 +52,7 @@ void dof_gather_accumulator(float base_radius, const bool do_fast_gather)
   noise.zw = vec2(0.0, 1.0);
 #endif
 
-  const int ring_count = 4; /* TODO(fclem) Shader variations? */
+  const int ring_count = 3; /* TODO(fclem) Shader variations? */
   float unit_ring_radius = 1.0 / float(ring_count);
   float unit_sample_radius = 1.0 / float(ring_count + 0.5);
   float lod = floor(log2(base_radius * unit_sample_radius) - 1.5);
@@ -77,7 +79,7 @@ void dof_gather_accumulator(float base_radius, const bool do_fast_gather)
     float ring_radius = float(ring) * unit_ring_radius * base_radius + ring_offset;
 
     float angle_offset = step_rot * noise.y;
-    vec2 offset = vec2(cos(angle_offset), sin(angle_offset)) * ring_radius;
+    vec2 offset = vec2(cos(angle_offset), sin(angle_offset));
 
     /* Slide 38. */
     const float coc_radius_error = 1.0;
@@ -90,7 +92,13 @@ void dof_gather_accumulator(float base_radius, const bool do_fast_gather)
 
       DofGatherData pair_data[2];
       for (int i = 0; i < 2; i++) {
-        vec2 sample_co = center_co + ((i == 0) ? offset : -offset);
+        vec2 offset_co = ((i == 0) ? offset : -offset);
+#ifdef DOF_BOKEH_TEXTURE
+        /* OPTI(fclem): Potential savings here by reducing the bokeh texture size or its LOD.
+         * A bit tricky to do for now because of anamorphic bokeh. */
+        offset_co = texture(bokehLut, offset_co * 0.48 + 0.5).rg;
+#endif
+        vec2 sample_co = center_co + offset_co * ring_radius;
         vec2 sample_uv = sample_co * gatherOutputTexelSize * gatherInputUvCorrection;
         pair_data[i].color = dof_load_gather_color(colorBuffer, sample_uv, lod);
         pair_data[i].coc = dof_load_gather_coc(cocBuffer, sample_uv, lod);

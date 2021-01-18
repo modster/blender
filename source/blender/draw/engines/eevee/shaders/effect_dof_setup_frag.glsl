@@ -12,6 +12,8 @@
 uniform sampler2D colorBuffer;
 uniform sampler2D depthBuffer;
 
+uniform float bokehMaxSize;
+
 /* Half resolution. */
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec2 outCoc; /* x: Downsample CoC, y: Max slight focus abs CoC */
@@ -40,7 +42,7 @@ void main()
   outColor = weighted_sum_array(colors, weights);
   outCoc.x = dot(cocs, weights);
 
-  outCoc.x = clamp(outCoc.x, -bokehMaxsize, bokehMaxsize);
+  outCoc.x = clamp(outCoc.x, -bokehMaxSize, bokehMaxSize);
 
   /* Max slight focus abs CoC. */
 
