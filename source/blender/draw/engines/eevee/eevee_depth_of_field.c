@@ -40,6 +40,11 @@
 #include "GPU_texture.h"
 #include "eevee_private.h"
 
+static float coc_radius_from_camera_depth(EEVEE_EffectsInfo *fx, float camera_depth)
+{
+  return fx->dof_coc_params[0] / camera_depth - fx->dof_coc_params[1];
+}
+
 int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
                               EEVEE_Data *vedata,
                               Object *camera)
@@ -93,11 +98,23 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
     /* TODO(fclem) User parameters. */
     effects->dof_scatter_color_threshold = 1.5f;
 
+    float max_abs_fg_coc = fabsf(coc_radius_from_camera_depth(effects, -cam->clip_start));
+    /* Background is at infinity so maximum CoC is the limit of the function at -inf. */
+    float max_abs_bg_coc = fabsf(effects->dof_coc_params[1]);
+
+    float max_coc = max_ff(max_abs_bg_coc, max_abs_fg_coc);
+    /* Clamp with user defined max. */
+    effects->dof_fx_max_coc = min_ff(scene_eval->eevee.bokeh_max_size, max_coc);
+
     /* Precompute values to save instructions in fragment shader. */
     effects->dof_bokeh_sides[0] = blades;
     effects->dof_bokeh_sides[1] = blades > 0.0f ? 2.0f * M_PI / blades : 0.0f;
     effects->dof_bokeh_sides[2] = blades / (2.0f * M_PI);
     effects->dof_bokeh_sides[3] = blades > 0.0f ? cosf(M_PI / blades) : 0.0f;
+
+    if (scene_eval->eevee.bokeh_max_size < 0.5f) {
+      return 0;
+    }
 
     return EFFECT_DOF | EFFECT_POST_BUFFER;
   }
@@ -121,6 +138,8 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
 #define FG_TILE_FORMAT GPU_R11F_G11F_B10F
 #define BG_TILE_FORMAT GPU_R11F_G11F_B10F
 #define TILE_DIVISOR 16
+#define GATHER_RING_COUNT 3
+#define DILATE_RING_COUNT 3
 
 /**
  * Ouputs halfResColorBuffer and halfResCocBuffer.
@@ -199,8 +218,6 @@ static void dof_dilate_tiles_pass_init(EEVEE_FramebufferList *fbl,
   const float *fullres = DRW_viewport_size_get();
   int res[2] = {divide_ceil_u(fullres[0], TILE_DIVISOR), divide_ceil_u(fullres[1], TILE_DIVISOR)};
 
-  fx->dof_dilate_steps = 1; /* TODO */
-
   DRW_PASS_CREATE(psl->dof_dilate_tiles_minmax, DRW_STATE_WRITE_COLOR);
   DRW_PASS_CREATE(psl->dof_dilate_tiles_minabs, DRW_STATE_WRITE_COLOR);
 
@@ -210,6 +227,8 @@ static void dof_dilate_tiles_pass_init(EEVEE_FramebufferList *fbl,
     DRWShadingGroup *grp = DRW_shgroup_create(sh, drw_pass);
     DRW_shgroup_uniform_texture_ref(grp, "cocTilesFgBuffer", &fx->dof_coc_tiles_fg_tx);
     DRW_shgroup_uniform_texture_ref(grp, "cocTilesBgBuffer", &fx->dof_coc_tiles_bg_tx);
+    DRW_shgroup_uniform_int(grp, "ringCount", &fx->dof_dilate_ring_count, 1);
+    DRW_shgroup_uniform_int(grp, "ringWidthMultiplier", &fx->dof_dilate_ring_width_multiplier, 1);
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
   }
 
@@ -222,6 +241,46 @@ static void dof_dilate_tiles_pass_init(EEVEE_FramebufferList *fbl,
                                     GPU_ATTACHMENT_TEXTURE(fx->dof_coc_dilated_tiles_fg_tx),
                                     GPU_ATTACHMENT_TEXTURE(fx->dof_coc_dilated_tiles_bg_tx),
                                 });
+}
+
+static void dof_dilate_tiles_pass_draw(EEVEE_FramebufferList *fbl,
+                                       EEVEE_PassList *psl,
+                                       EEVEE_EffectsInfo *fx)
+{
+  for (int pass = 0; pass < 2; pass++) {
+    DRWPass *drw_pass = (pass == 0) ? psl->dof_dilate_tiles_minmax : psl->dof_dilate_tiles_minabs;
+
+    /* Error introduced by gather center jittering. */
+    const float error_multiplier = 1.0f + 1.0f / (GATHER_RING_COUNT + 0.5f);
+    int dilation_end_radius = ceilf((fx->dof_fx_max_coc * error_multiplier) / TILE_DIVISOR);
+
+    /* This algorithm produce the exact dilation radius by dividing it in multiple passes. */
+    int dilation_radius = 0;
+    while (dilation_radius < dilation_end_radius) {
+      int remainder = dilation_end_radius - dilation_radius;
+      /* Do not step over any unvisited tile. */
+      int max_multiplier = dilation_radius + 1;
+
+      int ring_count = min_ii(DILATE_RING_COUNT, ceilf(remainder / (float)max_multiplier));
+      int multiplier = min_ii(max_multiplier, floor(remainder / (float)ring_count));
+
+      dilation_radius += ring_count * multiplier;
+
+      fx->dof_dilate_ring_count = ring_count;
+      fx->dof_dilate_ring_width_multiplier = multiplier;
+
+      GPU_framebuffer_bind(fbl->dof_dilate_tiles_fb);
+      DRW_draw_pass(drw_pass);
+
+      SWAP(GPUFrameBuffer *, fbl->dof_dilate_tiles_fb, fbl->dof_flatten_tiles_fb);
+      SWAP(GPUTexture *, fx->dof_coc_dilated_tiles_bg_tx, fx->dof_coc_tiles_bg_tx);
+      SWAP(GPUTexture *, fx->dof_coc_dilated_tiles_fg_tx, fx->dof_coc_tiles_fg_tx);
+    }
+  }
+  /* Swap again so that final textures are dof_coc_dilated_tiles_*_tx. */
+  SWAP(GPUFrameBuffer *, fbl->dof_dilate_tiles_fb, fbl->dof_flatten_tiles_fb);
+  SWAP(GPUTexture *, fx->dof_coc_dilated_tiles_bg_tx, fx->dof_coc_tiles_bg_tx);
+  SWAP(GPUTexture *, fx->dof_coc_dilated_tiles_fg_tx, fx->dof_coc_tiles_fg_tx);
 }
 
 /**
@@ -589,23 +648,7 @@ void EEVEE_depth_of_field_draw(EEVEE_Data *vedata)
     GPU_framebuffer_bind(fbl->dof_flatten_tiles_fb);
     DRW_draw_pass(psl->dof_flatten_tiles);
 
-    for (int pass = 0; pass < 2; pass++) {
-      DRWPass *drw_pass = (pass == 0) ? psl->dof_dilate_tiles_minmax :
-                                        psl->dof_dilate_tiles_minabs;
-
-      for (int i = 0; i < fx->dof_dilate_steps; i++) {
-        GPU_framebuffer_bind(fbl->dof_dilate_tiles_fb);
-        DRW_draw_pass(drw_pass);
-
-        SWAP(GPUFrameBuffer *, fbl->dof_dilate_tiles_fb, fbl->dof_flatten_tiles_fb);
-        SWAP(GPUTexture *, fx->dof_coc_dilated_tiles_bg_tx, fx->dof_coc_tiles_bg_tx);
-        SWAP(GPUTexture *, fx->dof_coc_dilated_tiles_fg_tx, fx->dof_coc_tiles_fg_tx);
-      }
-    }
-    /* Swap again so that final textures are dof_coc_dilated_tiles_*_tx. */
-    SWAP(GPUFrameBuffer *, fbl->dof_dilate_tiles_fb, fbl->dof_flatten_tiles_fb);
-    SWAP(GPUTexture *, fx->dof_coc_dilated_tiles_bg_tx, fx->dof_coc_tiles_bg_tx);
-    SWAP(GPUTexture *, fx->dof_coc_dilated_tiles_fg_tx, fx->dof_coc_tiles_fg_tx);
+    dof_dilate_tiles_pass_draw(fbl, psl, fx);
 
     fx->dof_reduce_input_color_tx = fx->dof_half_res_color_tx;
     fx->dof_reduce_input_coc_tx = fx->dof_half_res_coc_tx;

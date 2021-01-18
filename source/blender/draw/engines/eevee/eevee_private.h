@@ -763,8 +763,10 @@ typedef struct EEVEE_EffectsInfo {
   float dof_bokeh_sides[4];
   float dof_scatter_color_threshold;
   float dof_scatter_coc_threshold;
+  float dof_fx_max_coc;
+  int dof_dilate_ring_count;
+  int dof_dilate_ring_width_multiplier;
   int dof_reduce_steps;
-  int dof_dilate_steps;
   struct GPUTexture *dof_bg_color_tx; /* All textures from pool... */
   struct GPUTexture *dof_bg_occlusion_tx;
   struct GPUTexture *dof_bg_weight_tx;

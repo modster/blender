@@ -10,6 +10,9 @@
 uniform sampler2D cocTilesFgBuffer;
 uniform sampler2D cocTilesBgBuffer;
 
+uniform int ringCount;
+uniform int ringWidthMultiplier;
+
 /* 1/16th of fullres. Same format as input. */
 layout(location = 0) out vec3 outFgCoc; /* Min, Max, MaxSlightFocus */
 layout(location = 1) out vec3 outBgCoc; /* Min, Max, MinIntersectable */
@@ -20,8 +23,6 @@ const float tile_to_fullres_factor = 16.0;
 const float gather_ring_count = 3;
 /* Error introduced by the random offset of the gathering kernel's center. */
 const float bluring_radius_error = 1.0 + 1.0 / (gather_ring_count + 0.5);
-/* NOTE(fclem): if we ever need larger gather. */
-const int ring_width_multiplier = 1;
 
 #define RINGS_COUNT 3
 
@@ -31,14 +32,14 @@ void main()
 
   CocTile ring_buckets[RINGS_COUNT];
 
-  for (int ring = 0; ring < RINGS_COUNT; ring++) {
+  for (int ring = 0; ring < ringCount && ring < RINGS_COUNT; ring++) {
     ring_buckets[ring] = dof_coc_tile_init();
 
     int ring_distance = ring + 1;
     for (int sample_id = 0; sample_id < 4 * ring_distance; sample_id++) {
       ivec2 offset = dof_square_ring_sample_offset(ring_distance, sample_id);
 
-      offset *= ring_width_multiplier;
+      offset *= ringWidthMultiplier;
 
       for (int i = 0; i < 2; i++) {
         ivec2 adj_tile_pos = center_tile_pos + ((i == 0) ? offset : -offset);
@@ -69,10 +70,10 @@ void main()
   /* Load center tile. */
   CocTile out_tile = dof_coc_tile_load(cocTilesFgBuffer, cocTilesBgBuffer, center_tile_pos);
 
-  for (int ring = 0; ring < RINGS_COUNT; ring++) {
+  for (int ring = 0; ring < ringCount && ring < RINGS_COUNT; ring++) {
     float ring_distance = float(ring + 1);
 
-    ring_distance = (ring_distance * ring_width_multiplier - 1) * tile_to_fullres_factor;
+    ring_distance = (ring_distance * ringWidthMultiplier - 1) * tile_to_fullres_factor;
 
     /* NOTE(fclem): Unsure if both sides of the inequalities have the same unit. */
 #ifdef DILATE_MODE_MIN_MAX
