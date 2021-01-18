@@ -279,6 +279,7 @@ typedef struct EEVEE_PassList {
   struct DRWPass *dof_gather_bg;
   struct DRWPass *dof_scatter_fg;
   struct DRWPass *dof_scatter_bg;
+  struct DRWPass *dof_filter;
   struct DRWPass *dof_resolve;
   struct DRWPass *volumetric_world_ps;
   struct DRWPass *volumetric_objects_ps;
