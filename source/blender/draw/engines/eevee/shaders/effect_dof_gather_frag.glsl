@@ -158,17 +158,22 @@ void main()
 #endif
   /* Allow for a 5% radius difference. */
   bool do_fast_gather = (base_radius - min_radius) < (DOF_FAST_GATHER_COC_ERROR * base_radius);
-  /* Gather at half resolution. Divide coc by 2. */
-  base_radius *= 0.5;
+
+  /* In fullres CoC. */
+  const float early_out_threshold = layer_threshold - layer_offset;
+  bool can_early_out = base_radius < early_out_threshold;
 
 #ifdef DOF_HOLEFILL_PASS
-  if (do_fast_gather && (base_radius > 4.0)) {
+  if (do_fast_gather && !can_early_out) {
     /* This means the foreground pass is fully opaque. Ignore this tile. */
-    base_radius = 0.0;
+    can_early_out = true;
   }
 #endif
 
-  if (base_radius < 1.0) {
+  /* Gather at half resolution. Divide CoC by 2. */
+  base_radius *= 0.5;
+
+  if (can_early_out) {
     /* Early out. */
     outColor = vec4(0.0);
     outWeight = 0.0;
