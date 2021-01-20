@@ -499,7 +499,7 @@ void do_versions_after_linking_290(Main *bmain, ReportList *UNUSED(reports))
     /**
      * Make sure Emission Alpha fcurve and drivers is properly mapped after the Emission Strength
      * got introduced.
-     * */
+     */
 
     /**
      * Effectively we are replacing the (animation of) node socket input 18 with 19.
@@ -510,7 +510,7 @@ void do_versions_after_linking_290(Main *bmain, ReportList *UNUSED(reports))
      *
      * The for loop for the input ids is at the top level otherwise we lose the animation
      * keyframe data.
-     * */
+     */
     for (int input_id = 21; input_id >= 18; input_id--) {
       FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
         if (ntree->type == NTREE_SHADER) {
@@ -1572,18 +1572,25 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
-  /**
-   * Versioning code until next subversion bump goes here.
-   *
-   * \note Be sure to check when bumping the version:
-   * - "versioning_userdef.c", #blo_do_versions_userdef
-   * - "versioning_userdef.c", #do_versions_theme
-   *
-   * \note Keep this message at the bottom of the function.
-   */
-  {
-    /* Keep this block, even when empty. */
+  if ((!MAIN_VERSION_ATLEAST(bmain, 292, 14)) ||
+      ((bmain->versionfile == 293) && (!MAIN_VERSION_ATLEAST(bmain, 293, 1)))) {
+    FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
+      if (ntree->type != NTREE_GEOMETRY) {
+        continue;
+      }
+      LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+        if (node->type == GEO_NODE_OBJECT_INFO && node->storage == NULL) {
+          NodeGeometryObjectInfo *data = (NodeGeometryObjectInfo *)MEM_callocN(
+              sizeof(NodeGeometryObjectInfo), __func__);
+          data->transform_space = GEO_NODE_TRANSFORM_SPACE_RELATIVE;
+          node->storage = data;
+        }
+      }
+    }
+    FOREACH_NODETREE_END;
+  }
 
+  if (!MAIN_VERSION_ATLEAST(bmain, 293, 1)) {
     /* Grease pencil layer transform matrix. */
     if (!DNA_struct_elem_find(fd->filesdna, "bGPDlayer", "float", "location[0]")) {
       LISTBASE_FOREACH (bGPdata *, gpd, &bmain->gpencils) {
@@ -1602,5 +1609,18 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
         brush->gpencil_settings->fill_factor = 1.0f;
       }
     }
+  }
+
+  /**
+   * Versioning code until next subversion bump goes here.
+   *
+   * \note Be sure to check when bumping the version:
+   * - "versioning_userdef.c", #blo_do_versions_userdef
+   * - "versioning_userdef.c", #do_versions_theme
+   *
+   * \note Keep this message at the bottom of the function.
+   */
+  {
+    /* Keep this block, even when empty. */
   }
 }
