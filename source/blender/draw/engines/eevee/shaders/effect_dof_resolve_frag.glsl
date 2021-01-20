@@ -34,7 +34,7 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
 
   bool first_ring = true;
 
-  for (int ring = 0; ring < i_radius; ring++) {
+  for (int ring = i_radius - 1; ring >= 0; ring--) {
     DofGatherData fg_ring = GATHER_DATA_INIT;
     DofGatherData bg_ring = GATHER_DATA_INIT;
 
@@ -53,10 +53,12 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
         pair_data[i].dist = dist;
       }
 
+      /* (fclem) Dunno why 2.5, it might be related to  */
+      float bordering_radius = dist + 2.5;
       dof_gather_accumulate_sample_pair(
-          pair_data, dist, first_ring, false, false, bg_ring, bg_accum);
+          pair_data, bordering_radius, first_ring, false, false, bg_ring, bg_accum);
       dof_gather_accumulate_sample_pair(
-          pair_data, dist, first_ring, false, true, fg_ring, fg_accum);
+          pair_data, bordering_radius, first_ring, false, true, fg_ring, fg_accum);
     }
 
     dof_gather_accumulate_sample_ring(
