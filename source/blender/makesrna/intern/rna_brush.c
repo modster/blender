@@ -1873,6 +1873,11 @@ static void rna_def_gpencil_options(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_BRUSH_OCCLUDE_ERASER);
   RNA_def_property_ui_text(prop, "Occlude Eraser", "Erase only strokes visible and not occluded");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+
+  prop = RNA_def_property(srna, "use_curve_data", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_BRUSH_CURVE_DATA);
+  RNA_def_property_ui_text(prop, "Generate Curve", "Create Curve data for the new stroke");
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 }
 
 static void rna_def_brush(BlenderRNA *brna)

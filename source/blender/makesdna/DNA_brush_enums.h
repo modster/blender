@@ -97,6 +97,8 @@ typedef enum eGPDbrush_Flag {
   GP_BRUSH_OCCLUDE_ERASER = (1 << 15),
   /* Post process trim stroke */
   GP_BRUSH_TRIM_STROKE = (1 << 16),
+  /* Indicates that the stroke will be converted to a curve automatically. */
+  GP_BRUSH_CURVE_DATA = (1 << 17),
 } eGPDbrush_Flag;
 
 typedef enum eGPDbrush_Flag2 {

@@ -1425,6 +1425,9 @@ class VIEW3D_PT_tools_grease_pencil_brush_advanced(View3DPanel, Panel):
                     subcol.enabled = False
                 subcol.prop(gp_settings, "aspect")
 
+                col.separator()
+                col.prop(gp_settings, "use_curve_data")
+
             elif brush.gpencil_tool == 'FILL':
                 row = col.row(align=True)
                 row.prop(gp_settings, "fill_draw_mode", text="Boundary")
@@ -1445,6 +1448,9 @@ class VIEW3D_PT_tools_grease_pencil_brush_advanced(View3DPanel, Panel):
                     sub = sub.row(align=True)
                     sub.active = gp_settings.show_fill
                     sub.prop(gp_settings, "fill_threshold", text="")
+
+                col.separator()
+                col.prop(gp_settings, "use_curve_data")
 
 
 class VIEW3D_PT_tools_grease_pencil_brush_stroke(Panel, View3DPanel):
