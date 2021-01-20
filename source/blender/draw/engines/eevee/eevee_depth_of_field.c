@@ -255,6 +255,7 @@ static void dof_dilate_tiles_pass_init(EEVEE_FramebufferList *fbl,
     DRWShadingGroup *grp = DRW_shgroup_create(sh, drw_pass);
     DRW_shgroup_uniform_texture_ref(grp, "cocTilesFgBuffer", &fx->dof_coc_tiles_fg_tx);
     DRW_shgroup_uniform_texture_ref(grp, "cocTilesBgBuffer", &fx->dof_coc_tiles_bg_tx);
+    DRW_shgroup_uniform_bool(grp, "dilateSlightFocus", &fx->dof_dilate_slight_focus, 1);
     DRW_shgroup_uniform_int(grp, "ringCount", &fx->dof_dilate_ring_count, 1);
     DRW_shgroup_uniform_int(grp, "ringWidthMultiplier", &fx->dof_dilate_ring_width_multiplier, 1);
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
@@ -285,6 +286,9 @@ static void dof_dilate_tiles_pass_draw(EEVEE_FramebufferList *fbl,
     /* This algorithm produce the exact dilation radius by dividing it in multiple passes. */
     int dilation_radius = 0;
     while (dilation_radius < dilation_end_radius) {
+      /* Dilate slight focus only on first iteration. */
+      fx->dof_dilate_slight_focus = (dilation_radius == 0) ? 1 : 0;
+
       int remainder = dilation_end_radius - dilation_radius;
       /* Do not step over any unvisited tile. */
       int max_multiplier = dilation_radius + 1;

@@ -176,6 +176,7 @@ struct CocTile {
 /* WATCH: Might have to change depending on the texture format. */
 #define DOF_TILE_DEFOCUS 0.25
 #define DOF_TILE_FOCUS 0.0
+#define DOF_TILE_MIXED 0.75
 #define DOF_TILE_LARGE_COC 1024.0
 
 /* Init a CoC tile for reduction algorithms. */
@@ -207,6 +208,22 @@ CocTile dof_coc_tile_load(sampler2D fg_buffer, sampler2D bg_buffer, ivec2 tile_c
   tile.bg_max_coc = bg.y;
   tile.bg_min_intersectable_coc = bg.z;
   return tile;
+}
+
+/* Special function to return the correct max value of 2 slight focus coc. */
+float dof_coc_max_slight_focus(float coc1, float coc2)
+{
+  /* Do not consider values below 0.5 for expansion as they are "encoded".
+   * See setup pass shader for more infos. */
+  if (coc1 > 0.5 || coc2 > 0.5) {
+    return max(coc1, coc2);
+  }
+  else if ((coc1 == DOF_TILE_DEFOCUS && coc2 == DOF_TILE_FOCUS) ||
+           (coc1 == DOF_TILE_FOCUS && coc2 == DOF_TILE_DEFOCUS)) {
+    /* Tile where completely out of focus and in focus are both present.
+     * Consider as very slightly out of focus. */
+    return DOF_TILE_MIXED;
+  }
 }
 
 /* ------------------- GATHER UTILS ------------------- */

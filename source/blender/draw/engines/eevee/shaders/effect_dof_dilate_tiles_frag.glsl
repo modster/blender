@@ -12,6 +12,7 @@ uniform sampler2D cocTilesBgBuffer;
 
 uniform int ringCount;
 uniform int ringWidthMultiplier;
+uniform bool dilateSlightFocus;
 
 /* 1/16th of fullres. Same format as input. */
 layout(location = 0) out vec3 outFgCoc; /* Min, Max, MaxSlightFocus */
@@ -83,6 +84,12 @@ void main()
 
     if (ring_buckets[ring].bg_max_coc * bluring_radius_error > ring_distance) {
       out_tile.bg_max_coc = max(out_tile.bg_max_coc, ring_buckets[ring].bg_max_coc);
+    }
+
+    /* Dilate once. */
+    if (dilateSlightFocus && (ring == 0)) {
+      out_tile.fg_slight_focus_max_coc = dof_coc_max_slight_focus(
+          out_tile.fg_slight_focus_max_coc, ring_buckets[ring].fg_slight_focus_max_coc);
     }
 
 #else /* DILATE_MODE_MIN_ABS */

@@ -54,8 +54,8 @@ void main()
   bvec4 focus = lessThanEqual(cocs, vec4(0.5));
   if (any(defocus) && any(focus)) {
     /* For the same reason as in the flatten pass. This is a case we cannot optimize for. */
-    cocs = mix(cocs, vec4(0.75), focus);
-    cocs = mix(cocs, vec4(0.75), defocus);
+    cocs = mix(cocs, vec4(DOF_TILE_MIXED), focus);
+    cocs = mix(cocs, vec4(DOF_TILE_MIXED), defocus);
   }
   else {
     cocs = mix(cocs, vec4(DOF_TILE_FOCUS), focus);

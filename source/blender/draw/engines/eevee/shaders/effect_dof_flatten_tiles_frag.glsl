@@ -43,19 +43,8 @@ void main()
         tile.bg_min_intersectable_coc = min(tile.bg_min_intersectable_coc, bg_coc);
       }
 
-      /* Do not consider values below 0.5 for expansion as they are "encoded".
-       * See setup pass shader for more infos. */
-      if (sample_slight_focus_coc > 0.5 || tile.fg_slight_focus_max_coc == -1.0) {
-        tile.fg_slight_focus_max_coc = max(tile.fg_slight_focus_max_coc, sample_slight_focus_coc);
-      }
-      else if ((sample_slight_focus_coc == DOF_TILE_DEFOCUS &&
-                tile.fg_slight_focus_max_coc == DOF_TILE_FOCUS) ||
-               (sample_slight_focus_coc == DOF_TILE_FOCUS &&
-                tile.fg_slight_focus_max_coc == DOF_TILE_DEFOCUS)) {
-        /* Tile where completely out of focus and in focus are both present.
-         * Consider as very slightly out of focus. */
-        tile.fg_slight_focus_max_coc = 0.75;
-      }
+      tile.fg_slight_focus_max_coc = dof_coc_max_slight_focus(tile.fg_slight_focus_max_coc,
+                                                              sample_slight_focus_coc);
     }
   }
 
