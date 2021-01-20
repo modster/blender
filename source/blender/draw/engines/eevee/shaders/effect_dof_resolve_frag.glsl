@@ -74,8 +74,11 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
   center_data.coc = dof_coc_from_zdepth(depth);
   center_data.dist = 0.0;
 
-  dof_gather_accumulate_center_sample(center_data, false, true, fg_accum);
-  dof_gather_accumulate_center_sample(center_data, false, false, bg_accum);
+  /* Slide 38. */
+  float bordering_radius = 0.75;
+
+  dof_gather_accumulate_center_sample(center_data, bordering_radius, false, true, fg_accum);
+  dof_gather_accumulate_center_sample(center_data, bordering_radius, false, false, bg_accum);
 
   vec4 bg_col, fg_col;
   float bg_weight, fg_weight;

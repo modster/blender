@@ -219,7 +219,7 @@ struct DofGatherData {
   float coc;
   float coc_sqr;
   /* For ring bucket merging. */
-  float opacity;
+  float transparency;
 
   float layer_opacity;
 };
@@ -286,9 +286,8 @@ void dof_gather_accumulate_sample_pair(DofGatherData pair_data[2],
 
     accum_data.layer_opacity += layer_weight;
 
-    /* TODO(fclem) verify this. */
-    // ring_data.opacity += saturate(pair_data[i].coc - bordering_radius - 0.5);
-    ring_data.opacity += sample_weight;
+    float coc = is_foreground ? -pair_data[i].coc : pair_data[i].coc;
+    ring_data.transparency += saturate(coc - bordering_radius);
   }
 }
 
@@ -311,6 +310,8 @@ void dof_gather_accumulate_sample_ring(DofGatherData ring_data,
     accum_data.coc = ring_data.coc;
     accum_data.coc_sqr = ring_data.coc_sqr;
     accum_data.weight = ring_data.weight;
+
+    accum_data.transparency = ring_data.transparency;
     return;
   }
 
@@ -324,23 +325,28 @@ void dof_gather_accumulate_sample_ring(DofGatherData ring_data,
   /* Smooth test to set opacity to see if the ring average coc occludes the accumulation.
    * Test is reversed to be multiplied against opacity. */
   float ring_no_occlu = saturate(accum_avg_coc - ring_avg_coc);
-  float accum_no_occlu = saturate(ring_avg_coc - accum_avg_coc - 2.5);
-  /* (Slide 40) */
-  float ring_opacity = saturate(ring_data.opacity / float(sample_count));
+  float accum_no_occlu = saturate(ring_avg_coc - accum_avg_coc + 1.0);
 
-  /* TODO(fclem) find what is not working here. */
-  if (false && reversed_occlusion) {
+  /* (Slide 40) */
+  float ring_opacity = saturate(1.0 - ring_data.transparency / float(sample_count));
+  float accum_opacity = 1.0 - accum_data.transparency;
+
+  if (reversed_occlusion) {
     /* Accum_data occludes the ring. */
-    float alpha = (accum_data.weight == 0.0) ? 1.0 : (1.0 - accum_data.opacity * accum_no_occlu);
+    float alpha = (accum_data.weight == 0.0) ? 0.0 : (1.0 - accum_opacity * accum_no_occlu);
+    alpha = 1.0 - alpha;
+
     accum_data.color += ring_data.color * alpha;
     accum_data.coc += ring_data.coc * alpha;
     accum_data.coc_sqr += ring_data.coc_sqr * alpha;
     accum_data.weight += ring_data.weight * alpha;
-    accum_data.opacity += ring_opacity * (1.0 - accum_data.opacity);
+
+    accum_data.transparency += (1.0 - ring_opacity) * alpha;
   }
   else {
     /* Ring occludes the accum_data (Same as reference). */
     float alpha = (accum_data.weight == 0.0) ? 0.0 : (1.0 - ring_opacity * ring_no_occlu);
+
     accum_data.color = accum_data.color * alpha + ring_data.color;
     accum_data.coc = accum_data.coc * alpha + ring_data.coc;
     accum_data.coc_sqr = accum_data.coc_sqr * alpha + ring_data.coc_sqr;
@@ -349,6 +355,7 @@ void dof_gather_accumulate_sample_ring(DofGatherData ring_data,
 }
 
 void dof_gather_accumulate_center_sample(DofGatherData center_data,
+                                         float bordering_radius,
                                          const bool do_fast_gather,
                                          const bool is_foreground,
                                          inout DofGatherData accum_data)
@@ -364,6 +371,14 @@ void dof_gather_accumulate_center_sample(DofGatherData center_data,
     weight = 1.0;
   }
 
+  float coc = is_foreground ? -center_data.coc : center_data.coc;
+  center_data.transparency = saturate(coc - bordering_radius);
+
+  /* Fix an issue with last ring opacity not contributing enough. */
+  if (is_foreground) {
+    center_data.transparency = 0.0;
+  }
+
   /* Logic of dof_gather_accumulate_sample */
   center_data.coc_sqr = center_data.coc * (center_data.coc * weight);
   center_data.color *= weight;
@@ -371,10 +386,6 @@ void dof_gather_accumulate_center_sample(DofGatherData center_data,
   center_data.weight = weight;
 
   accum_data.layer_opacity += layer_weight;
-
-  /* TODO(fclem) verify this. */
-  // center_data.opacity += saturate(center_data.coc - bordering_radius - 0.5);
-  center_data.opacity = sample_weight;
 
   /* Accumulate center as its own rign. */
   dof_gather_accumulate_sample_ring(

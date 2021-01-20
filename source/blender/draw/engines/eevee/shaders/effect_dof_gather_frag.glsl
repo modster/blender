@@ -128,7 +128,12 @@ void dof_gather_accumulator(float base_radius, const bool do_fast_gather)
     center_data.coc = dof_load_gather_coc(cocBuffer, sample_uv, lod);
     center_data.dist = 0.0;
 
-    dof_gather_accumulate_center_sample(center_data, do_fast_gather, is_foreground, accum_data);
+    /* Slide 38. */
+    const float coc_radius_error = 1.0;
+    float bordering_radius = (0.5 + coc_radius_error) * base_radius * unit_sample_radius;
+
+    dof_gather_accumulate_center_sample(
+        center_data, bordering_radius, do_fast_gather, is_foreground, accum_data);
   }
 
   dof_gather_accumulate_resolve(ring_count, accum_data, outColor, outWeight, outOcclusion);
