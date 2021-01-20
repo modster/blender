@@ -475,10 +475,12 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
 
     /* NOTE: First target is holefill texture so we can use the median filter on it.
      * See the filter function. */
+    /* TODO(fclem) Actually, filtering the color without the weight buffer is adding black
+     * outlines to the foreground layer. So we don't do filtering for foreground for now. */
     GPU_framebuffer_ensure_config(&fbl->dof_gather_fg_fb,
                                   {
                                       GPU_ATTACHMENT_NONE,
-                                      GPU_ATTACHMENT_TEXTURE(fx->dof_fg_holefill_color_tx),
+                                      GPU_ATTACHMENT_TEXTURE(fx->dof_fg_color_tx),
                                       GPU_ATTACHMENT_TEXTURE(fx->dof_fg_weight_tx),
                                       GPU_ATTACHMENT_TEXTURE(fx->dof_fg_occlusion_tx),
                                   });
@@ -715,8 +717,8 @@ void EEVEE_depth_of_field_draw(EEVEE_Data *vedata)
       GPU_framebuffer_bind(fbl->dof_gather_fg_fb);
       DRW_draw_pass(psl->dof_gather_fg);
 
-      GPU_framebuffer_bind(fbl->dof_scatter_fg_fb);
-      DRW_draw_pass(psl->dof_filter);
+      // GPU_framebuffer_bind(fbl->dof_scatter_fg_fb);
+      // DRW_draw_pass(psl->dof_filter);
 
       DRW_draw_pass(psl->dof_scatter_fg);
     }
