@@ -849,6 +849,8 @@ typedef enum eGP_DrawMode {
 
 #define GPENCIL_PLAY_ON(gpd) ((gpd) && ((gpd)->runtime.playing == 1))
 
+#define GPENCIL_STROKE_IS_CURVE(gps) ((gps) && ((gps)->editcurve != NULL))
+
 #ifdef __cplusplus
 }
 #endif

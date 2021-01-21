@@ -446,8 +446,9 @@ void GPENCIL_OT_recalc_geometry(struct wmOperatorType *ot);
 
 /* stroke editcurve */
 
-void GPENCIL_OT_stroke_enter_editcurve_mode(struct wmOperatorType *ot);
 void GPENCIL_OT_stroke_editcurve_set_handle_type(struct wmOperatorType *ot);
+void GPENCIL_OT_stroke_make_curve(struct wmOperatorType *ot);
+void GPENCIL_OT_stroke_clear_curve(struct wmOperatorType *ot);
 
 /* stroke sculpting -- */
 
@@ -729,10 +730,10 @@ struct GP_EditableStrokes_Iter {
             /* skip strokes that are invalid for current view */ \
             if (ED_gpencil_stroke_can_use(C, gps) == false) \
               continue; \
-            if (gps->editcurve == NULL) \
+            if (!GPENCIL_STROKE_IS_CURVE(gps)) \
               continue; \
             bGPDcurve *gpc = gps->editcurve; \
-    /* ... Do Stuff With Strokes ...  */
+    /* ... Do Stuff With Curves ...  */
 
 #define GP_EDITABLE_CURVES_END(gpstroke_iter) \
   } \

@@ -54,89 +54,9 @@
 
 #include "gpencil_intern.h"
 
-/* Poll callback for checking if there is an active layer and we are in curve edit mode. */
-static bool gpencil_curve_edit_mode_poll(bContext *C)
-{
-  Object *ob = CTX_data_active_object(C);
-  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
-    return false;
-  }
-  bGPdata *gpd = (bGPdata *)ob->data;
-  if (!GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd)) {
-    return false;
-  }
-
-  bGPDlayer *gpl = BKE_gpencil_layer_active_get(gpd);
-  return (gpl != NULL);
-}
-
-static int gpencil_stroke_enter_editcurve_mode_exec(bContext *C, wmOperator *op)
-{
-  Object *ob = CTX_data_active_object(C);
-  bGPdata *gpd = ob->data;
-
-  float error_threshold = RNA_float_get(op->ptr, "error_threshold");
-  gpd->curve_edit_threshold = error_threshold;
-
-  if (ELEM(NULL, gpd)) {
-    return OPERATOR_CANCELLED;
-  }
-
-  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
-    LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
-      if (gpf == gpl->actframe) {
-        LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-          /* only allow selected and non-converted strokes to be transformed */
-          if ((gps->flag & GP_STROKE_SELECT && gps->editcurve == NULL) ||
-              (gps->editcurve != NULL && gps->editcurve->flag & GP_CURVE_NEEDS_STROKE_UPDATE)) {
-            BKE_gpencil_stroke_editcurve_update(gpd, gpl, gps);
-            /* Update the selection from the stroke to the curve. */
-            BKE_gpencil_editcurve_stroke_sync_selection(gps, gps->editcurve);
-            gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
-            BKE_gpencil_stroke_geometry_update(gpd, gps);
-          }
-        }
-      }
-    }
-  }
-
-  gpd->flag |= GP_DATA_CURVE_EDIT_MODE;
-
-  /* notifiers */
-  DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
-  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
-
-  return OPERATOR_FINISHED;
-}
-
-void GPENCIL_OT_stroke_enter_editcurve_mode(wmOperatorType *ot)
-{
-  PropertyRNA *prop;
-
-  /* identifiers */
-  ot->name = "Enter curve edit mode";
-  ot->idname = "GPENCIL_OT_stroke_enter_editcurve_mode";
-  ot->description = "Called to transform a stroke into a curve";
-
-  /* api callbacks */
-  ot->exec = gpencil_stroke_enter_editcurve_mode_exec;
-  ot->poll = gpencil_active_layer_poll;
-
-  /* flags */
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-
-  /* properties */
-  prop = RNA_def_float(ot->srna,
-                       "error_threshold",
-                       0.1f,
-                       FLT_MIN,
-                       100.0f,
-                       "Error Threshold",
-                       "Threshold on the maximum deviation from the actual stroke",
-                       FLT_MIN,
-                       10.f);
-  RNA_def_property_ui_range(prop, FLT_MIN, 10.0f, 0.1f, 5);
-}
+/* -------------------------------------------------------------------- */
+/** \name Set handle type operator
+ * \{ */
 
 static int gpencil_editcurve_set_handle_type_exec(bContext *C, wmOperator *op)
 {
@@ -202,13 +122,155 @@ void GPENCIL_OT_stroke_editcurve_set_handle_type(wmOperatorType *ot)
   /* api callbacks */
   ot->invoke = WM_menu_invoke;
   ot->exec = gpencil_editcurve_set_handle_type_exec;
-  ot->poll = gpencil_curve_edit_mode_poll;
+  ot->poll = gpencil_active_layer_poll;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
   /* properties */
   ot->prop = RNA_def_enum(ot->srna, "type", editcurve_handle_type_items, 1, "Type", "Spline type");
+}
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Make curve from stroke operator
+ * \{ */
+
+static int gpencil_stroke_make_curve_exec(bContext *C, wmOperator *op)
+{
+  Object *ob = CTX_data_active_object(C);
+  bGPdata *gpd = ob->data;
+  const float threshold = RNA_float_get(op->ptr, "threshold");
+  const float corner_angle = RNA_float_get(op->ptr, "corner_angle");
+
+  if (ELEM(NULL, gpd)) {
+    return OPERATOR_CANCELLED;
+  }
+
+  bool changed = false;
+  GP_EDITABLE_STROKES_BEGIN (gps_iter, C, gpl, gps) {
+    if (!GPENCIL_STROKE_IS_CURVE(gps)) {
+      if (gps->flag & GP_STROKE_SELECT) {
+        BKE_gpencil_stroke_editcurve_update(gps, threshold, corner_angle);
+        if (gps->editcurve != NULL) {
+          bGPDcurve *gpc = gps->editcurve;
+          BKE_gpencil_stroke_geometry_update(gpd, gps);
+
+          /* Select all curve points. */
+          for (uint32_t i = 0; i < gpc->tot_curve_points; i++) {
+            bGPDcurve_point *pt = &gpc->curve_points[i];
+            pt->flag &= ~GP_CURVE_POINT_SELECT;
+            BEZT_SEL_ALL(&pt->bezt);
+          }
+          gpc->flag &= ~GP_CURVE_SELECT;
+
+          /* Deselect stroke points. */
+          for (uint32_t i = 0; i < gps->totpoints; i++) {
+            bGPDspoint *pt = &gps->points[i];
+            pt->flag &= ~GP_SPOINT_SELECT;
+          }
+          gps->flag &= ~GP_STROKE_SELECT;
+
+          changed = true;
+        }
+      }
+    }
+  }
+  GP_EDITABLE_STROKES_END(gps_iter);
+
+  if (changed) {
+    /* notifiers */
+    DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
+    WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
+  }
+
+  return OPERATOR_FINISHED;
+}
+
+void GPENCIL_OT_stroke_make_curve(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Make curve";
+  ot->idname = "GPENCIL_OT_stroke_make_curve";
+  ot->description = "Convert the stroke to a curve";
+
+  /* api callbacks */
+  ot->exec = gpencil_stroke_make_curve_exec;
+  ot->poll = gpencil_active_layer_poll;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  /* properties */
+  ot->prop = RNA_def_float(ot->srna,
+                           "threshold",
+                           GP_DEFAULT_CURVE_ERROR,
+                           0.0f,
+                           100.0f,
+                           "Threshold",
+                           "Curve conversion error threshold",
+                           0.0f,
+                           3.0f);
+
+  ot->prop = RNA_def_float(ot->srna,
+                           "corner_angle",
+                           GP_DEFAULT_CURVE_EDIT_CORNER_ANGLE,
+                           0.0f,
+                           DEG2RADF(180.0f),
+                           "Corner angle",
+                           "Angle threshold to be treated as corners",
+                           0.0f,
+                           DEG2RADF(180.0f));
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Clear curve from stroke operator
+ * \{ */
+
+static int gpencil_stroke_clear_curve_exec(bContext *C, wmOperator *op)
+{
+  Object *ob = CTX_data_active_object(C);
+  bGPdata *gpd = ob->data;
+
+  if (ELEM(NULL, gpd)) {
+    return OPERATOR_CANCELLED;
+  }
+
+  bool changed = false;
+  GP_EDITABLE_CURVES_BEGIN(gps_iter, C, gpl, gps, gpc)
+  {
+    if (gpc->flag & GP_CURVE_SELECT) {
+      BKE_gpencil_stroke_editcurve_sync_selection(gps, gpc);
+      BKE_gpencil_free_stroke_editcurve(gps);
+      changed = true;
+    }
+  }
+  GP_EDITABLE_CURVES_END(gps_iter);
+
+  if (changed) {
+    /* notifiers */
+    DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
+    WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
+  }
+
+  return OPERATOR_FINISHED;
+}
+
+void GPENCIL_OT_stroke_clear_curve(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Clear curve";
+  ot->idname = "GPENCIL_OT_stroke_clear_curve";
+  ot->description = "Deletes the curve data and converts it to a stroke";
+
+  /* api callbacks */
+  ot->exec = gpencil_stroke_clear_curve_exec;
+  ot->poll = gpencil_active_layer_poll;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
 /** \} */

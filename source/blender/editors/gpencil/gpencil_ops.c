@@ -585,10 +585,11 @@ void ED_operatortypes_gpencil(void)
   WM_operatortype_append(GPENCIL_OT_sculpt_paint);
   WM_operatortype_append(GPENCIL_OT_weight_paint);
 
-  /* Edit stroke editcurve */
+  /* Editcurve */
 
-  WM_operatortype_append(GPENCIL_OT_stroke_enter_editcurve_mode);
   WM_operatortype_append(GPENCIL_OT_stroke_editcurve_set_handle_type);
+  WM_operatortype_append(GPENCIL_OT_stroke_make_curve);
+  WM_operatortype_append(GPENCIL_OT_stroke_clear_curve);
 
   /* Editing (Buttons) ------------ */
 
