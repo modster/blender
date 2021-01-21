@@ -43,7 +43,24 @@ const bool is_foreground = true;
 const bool is_foreground = false;
 #endif
 
-void dof_gather_accumulator(float base_radius, const bool do_fast_gather)
+const int ring_count = 3; /* TODO(fclem) Shader variations? */
+const float unit_ring_radius = 1.0 / float(ring_count);
+const float unit_sample_radius = 1.0 / float(ring_count + 0.5);
+const float radius_downscale_factor = float(ring_count - 2) * unit_ring_radius;
+
+/* Radii needs to be halfres CoC sizes. */
+bool dof_do_density_change(float base_radius, float min_intersectable_radius)
+{
+  bool need_new_density = (base_radius * unit_ring_radius > min_intersectable_radius);
+  bool larger_than_min_density = (base_radius * radius_downscale_factor > ring_count);
+
+  return need_new_density && larger_than_min_density;
+}
+
+void dof_gather_accumulator(float base_radius,
+                            float min_intersectable_radius,
+                            const bool do_fast_gather,
+                            const bool do_density_change)
 {
   vec4 noise = texelfetch_noise_tex(gl_FragCoord.xy);
 
@@ -52,10 +69,7 @@ void dof_gather_accumulator(float base_radius, const bool do_fast_gather)
   noise.zw = vec2(0.0, 1.0);
 #endif
 
-  const int ring_count = 3; /* TODO(fclem) Shader variations? */
-  float unit_ring_radius = 1.0 / float(ring_count);
-  float unit_sample_radius = 1.0 / float(ring_count + 0.5);
-  float lod = floor(log2(base_radius * unit_sample_radius) - 1.5);
+  float lod = floor(log2(base_radius * unit_sample_radius) - 2.0);
 
   /* Jitter center half a pixel to reduce undersampling and nearest interpolation mode. */
   vec2 jitter_ofs = 0.95 * noise.zw * sqrt(noise.x);
@@ -67,16 +81,16 @@ void dof_gather_accumulator(float base_radius, const bool do_fast_gather)
 
   /* TODO(fclem) another seed? For now Cranly-Partterson rotation with golden ratio. */
   noise.x = fract(noise.x + 0.61803398875);
-  /* Randomize ring radius to avoid seeing the ring shapes. 1 is to not overlap the center. */
-  float ring_offset = 1.0 - (noise.x) * unit_ring_radius * base_radius;
 
+  int density_change = 0;
   for (int ring = ring_count; ring > 0; ring--) {
     int sample_pair_count = 4 * ring;
 
     float step_rot = M_PI / float(sample_pair_count);
     mat2 step_rot_mat = rot2_from_angle(step_rot);
 
-    float ring_radius = float(ring) * unit_ring_radius * base_radius + ring_offset;
+    /* Randomize ring radius to avoid seeing the ring shapes. 1 is to not overlap the center. */
+    float ring_radius = 1.0 + (float(ring) - noise.x) * unit_ring_radius * base_radius;
 
     float angle_offset = step_rot * noise.y;
     vec2 offset = vec2(cos(angle_offset), sin(angle_offset));
@@ -118,6 +132,22 @@ void dof_gather_accumulator(float base_radius, const bool do_fast_gather)
         ring_data, sample_pair_count * 2, first_ring, do_fast_gather, is_foreground, accum_data);
 
     first_ring = false;
+
+    /* Check if we need to change density after the first 2 rings. */
+    if (do_density_change && (ring == (ring_count - 1))) {
+      /* Gather density change to avoid undersampling small CoC (slide 58). */
+      if (dof_do_density_change(base_radius, min_intersectable_radius)) {
+        base_radius *= radius_downscale_factor;
+        ring += 2;
+        lod -= 1.0;
+        /* We need to account for the density change in the weights (slide 62).
+         * For that multiply old kernel data by its area divided by the new kernel area. */
+        float outer_rings_weight = 1.0 / sqr(radius_downscale_factor);
+        dof_gather_ammend_weight(accum_data, outer_rings_weight);
+
+        density_change++;
+      }
+    }
   }
 
   {
@@ -137,6 +167,18 @@ void dof_gather_accumulator(float base_radius, const bool do_fast_gather)
   }
 
   dof_gather_accumulate_resolve(ring_count, accum_data, outColor, outWeight, outOcclusion);
+
+#if 0 /* Debug. */
+  if (density_change == 1) {
+    outColor.rgb = outColor.rgb * vec3(0.5, 1.0, 0.5);
+  }
+  else if (density_change == 2) {
+    outColor.rgb = outColor.rgb * vec3(1.0, 1.0, 0.5);
+  }
+  else if (density_change > 2) {
+    outColor.rgb = outColor.rgb * vec3(1.0, 0.5, 0.5);
+  }
+#endif
 }
 
 void main()
@@ -147,14 +189,19 @@ void main()
 #if defined(DOF_FOREGROUND_PASS)
   float base_radius = -coc_tile.fg_min_coc;
   float min_radius = -coc_tile.fg_max_coc;
+  float min_intersectable_radius = DOF_TILE_LARGE_COC;
 
 #elif defined(DOF_HOLEFILL_PASS)
   float base_radius = -coc_tile.fg_min_coc;
   float min_radius = -coc_tile.fg_max_coc;
+  float min_intersectable_radius = DOF_TILE_LARGE_COC;
 
 #else /* DOF_BACKGROUND_PASS */
   float base_radius = coc_tile.bg_max_coc;
   float min_radius = coc_tile.bg_min_coc;
+  // float min_intersectable_radius = coc_tile.bg_min_intersectable_coc;
+  float min_intersectable_radius = min_radius;
+
 #endif
   /* Allow for a 5% radius difference. */
   bool do_fast_gather = (base_radius - min_radius) < (DOF_FAST_GATHER_COC_ERROR * base_radius);
@@ -172,6 +219,9 @@ void main()
 
   /* Gather at half resolution. Divide CoC by 2. */
   base_radius *= 0.5;
+  min_intersectable_radius *= 0.5;
+
+  bool do_density_change = dof_do_density_change(base_radius, min_intersectable_radius);
 
   if (can_early_out) {
     /* Early out. */
@@ -180,11 +230,13 @@ void main()
     outOcclusion = vec2(0.0, 0.0);
   }
   else if (do_fast_gather) {
-    /* Fast gather */
-    dof_gather_accumulator(base_radius, true);
+    dof_gather_accumulator(base_radius, min_intersectable_radius, true, false);
+  }
+  else if (do_density_change) {
+    dof_gather_accumulator(base_radius, min_intersectable_radius, false, true);
   }
   else {
-    dof_gather_accumulator(base_radius, false);
+    dof_gather_accumulator(base_radius, min_intersectable_radius, false, false);
   }
 
 #if 0 /* Debug. */

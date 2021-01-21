@@ -243,6 +243,14 @@ struct DofGatherData {
 
 #define GATHER_DATA_INIT DofGatherData(vec4(0.0), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
+void dof_gather_ammend_weight(inout DofGatherData sample_data, float weight)
+{
+  sample_data.color *= weight;
+  sample_data.coc *= weight;
+  sample_data.coc_sqr *= weight;
+  sample_data.weight *= weight;
+}
+
 void dof_gather_accumulate_sample(DofGatherData sample_data,
                                   float weight,
                                   inout DofGatherData accum_data)
