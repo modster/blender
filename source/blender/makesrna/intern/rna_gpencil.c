@@ -192,30 +192,6 @@ static void rna_GpencilLayerMatrix_update(Main *bmain, Scene *scene, PointerRNA 
   rna_GPencil_update(bmain, scene, ptr);
 }
 
-static void rna_GPencil_curve_edit_mode_toggle(Main *bmain, Scene *scene, PointerRNA *ptr)
-{
-  ToolSettings *ts = scene->toolsettings;
-  bGPdata *gpd = (bGPdata *)ptr->owner_id;
-
-  /* Curve edit mode is turned on. */
-  if (GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd)) {
-    /* If the current select mode is segment and the Bezier mode is on, change
-     * to Point because segment is not supported. */
-    if (ts->gpencil_selectmode_edit == GP_SELECTMODE_SEGMENT) {
-      ts->gpencil_selectmode_edit = GP_SELECTMODE_POINT;
-    }
-
-    BKE_gpencil_strokes_selected_update_editcurve(gpd);
-  }
-  /* Curve edit mode is turned off. */
-  else {
-    BKE_gpencil_strokes_selected_sync_selection_editcurve(gpd);
-  }
-
-  /* Standard update. */
-  rna_GPencil_update(bmain, scene, ptr);
-}
-
 static void rna_GPencil_stroke_curve_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
   bGPdata *gpd = (bGPdata *)ptr->owner_id;
@@ -2458,11 +2434,6 @@ static void rna_def_gpencil_data(BlenderRNA *brna)
                            "Edit strokes from multiple grease pencil keyframes at the same time "
                            "(keyframes must be selected to be included)");
   RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_update");
-
-  prop = RNA_def_property(srna, "use_curve_edit", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_DATA_CURVE_EDIT_MODE);
-  RNA_def_property_ui_text(prop, "Curve Editing", "Edit strokes using curve handles");
-  RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_curve_edit_mode_toggle");
 
   prop = RNA_def_property(srna, "use_autolock_layers", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_DATA_AUTOLOCK_LAYERS);
