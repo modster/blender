@@ -196,40 +196,18 @@ static void rna_GPencil_stroke_curve_update(Main *bmain, Scene *scene, PointerRN
 {
   bGPdata *gpd = (bGPdata *)ptr->owner_id;
 
-  if (GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd)) {
-    LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
-      if (gpl->actframe != NULL) {
-        bGPDframe *gpf = gpl->actframe;
-        LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-          if (gps->editcurve != NULL) {
-            gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
-            BKE_gpencil_stroke_geometry_update(gpd, gps);
-          }
+  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+    if (gpl->actframe != NULL) {
+      bGPDframe *gpf = gpl->actframe;
+      LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+        if (gps->editcurve != NULL) {
+          gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
+          BKE_gpencil_stroke_geometry_update(gpd, gps);
         }
       }
     }
   }
 
-  rna_GPencil_update(bmain, scene, ptr);
-}
-
-static void rna_GPencil_stroke_curve_resolution_update(Main *bmain, Scene *scene, PointerRNA *ptr)
-{
-  bGPdata *gpd = (bGPdata *)ptr->owner_id;
-
-  if (GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd)) {
-    LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
-      if (gpl->actframe != NULL) {
-        bGPDframe *gpf = gpl->actframe;
-        LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-          if (gps->editcurve != NULL) {
-            gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
-            BKE_gpencil_stroke_geometry_update(gpd, gps);
-          }
-        }
-      }
-    }
-  }
   rna_GPencil_update(bmain, scene, ptr);
 }
 
@@ -2397,7 +2375,7 @@ static void rna_def_gpencil_data(BlenderRNA *brna)
       "Curve Resolution",
       "Number of segments generated between control points when editing strokes in curve mode");
   RNA_def_property_update(
-      prop, NC_GPENCIL | ND_DATA, "rna_GPencil_stroke_curve_resolution_update");
+      prop, NC_GPENCIL | ND_DATA, "rna_GPencil_stroke_curve_update");
 
   prop = RNA_def_property(srna, "use_adaptive_curve_resolution", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_DATA_CURVE_ADAPTIVE_RESOLUTION);
@@ -2408,7 +2386,7 @@ static void rna_def_gpencil_data(BlenderRNA *brna)
                            "the length of the segment. The resolution is the number of points "
                            "generated per unit distance");
   RNA_def_property_update(
-      prop, NC_GPENCIL | ND_DATA, "rna_GPencil_stroke_curve_resolution_update");
+      prop, NC_GPENCIL | ND_DATA, "rna_GPencil_stroke_curve_update");
 
   /* Curve editing error threshold. */
   prop = RNA_def_property(srna, "curve_edit_threshold", PROP_FLOAT, PROP_FACTOR);
