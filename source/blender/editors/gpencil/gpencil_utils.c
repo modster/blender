@@ -2569,9 +2569,18 @@ void ED_gpencil_select_toggle_all(bContext *C, int action)
     action = SEL_SELECT;
 
     CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
-      if (gps->flag & GP_STROKE_SELECT) {
-        action = SEL_DESELECT;
-        break; /* XXX: this only gets out of the inner loop. */
+      if (GPENCIL_STROKE_IS_CURVE(gps)) {
+        bGPDcurve *gpc = gps->editcurve;
+        if (gpc->flag & GP_CURVE_SELECT) {
+          action = SEL_DESELECT;
+          break;
+        }
+      }
+      else {
+        if (gps->flag & GP_STROKE_SELECT) {
+          action = SEL_DESELECT;
+          break; /* XXX: this only gets out of the inner loop. */
+        }
       }
     }
     CTX_DATA_END;
@@ -2592,18 +2601,25 @@ void ED_gpencil_select_toggle_all(bContext *C, int action)
 
       /* deselect all strokes on all frames */
       LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
-        bGPDstroke *gps;
-
-        for (gps = gpf->strokes.first; gps; gps = gps->next) {
-          bGPDspoint *pt;
-          int i;
-
+        for (bGPDstroke *gps = gpf->strokes.first; gps; gps = gps->next) {
           /* only edit strokes that are valid in this view... */
-          if (ED_gpencil_stroke_can_use(C, gps)) {
-            for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+          if (!ED_gpencil_stroke_can_use(C, gps))
+            continue;
+
+          if (GPENCIL_STROKE_IS_CURVE(gps)) {
+            bGPDcurve *gpc = gps->editcurve;
+            for (uint32_t i = 0; i < gpc->tot_curve_points; i++) {
+              bGPDcurve_point *pt = &gpc->curve_points[i];
+              pt->flag &= ~GP_CURVE_POINT_SELECT;
+              BEZT_DESEL_ALL(&pt->bezt);
+            }
+            gpc->flag &= ~GP_CURVE_SELECT;
+          }
+          else {
+            for (uint32_t i = 0; i < gps->totpoints; i++) {
+              bGPDspoint *pt = &gps->points[i];
               pt->flag &= ~GP_SPOINT_SELECT;
             }
-
             gps->flag &= ~GP_STROKE_SELECT;
           }
         }
@@ -2614,37 +2630,66 @@ void ED_gpencil_select_toggle_all(bContext *C, int action)
   else {
     /* select or deselect all strokes */
     CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
-      bGPDspoint *pt;
-      int i;
       bool selected = false;
 
-      /* Change selection status of all points, then make the stroke match */
-      for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-        switch (action) {
-          case SEL_SELECT:
-            pt->flag |= GP_SPOINT_SELECT;
-            break;
-#if 0
-          case SEL_DESELECT:
-           pt->flag &= ~GP_SPOINT_SELECT;
-           break;
-#endif
-          case SEL_INVERT:
-            pt->flag ^= GP_SPOINT_SELECT;
-            break;
+      if (GPENCIL_STROKE_IS_CURVE(gps)) {
+        bGPDcurve *gpc = gps->editcurve;
+
+        for (uint32_t i = 0; i < gpc->tot_curve_points; i++) {
+          bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
+          BezTriple *bezt = &gpc_pt->bezt;
+          switch (action) {
+            case SEL_SELECT:
+              gpc_pt->flag |= GP_CURVE_POINT_SELECT;
+              BEZT_SEL_ALL(bezt);
+              break;
+            case SEL_INVERT:
+              gpc_pt->flag ^= GP_CURVE_POINT_SELECT;
+              BEZT_SEL_INVERT(bezt);
+              break;
+            default:
+              break;
+          }
+
+          if (gpc_pt->flag & GP_CURVE_POINT_SELECT) {
+            selected = true;
+          }
         }
 
-        if (pt->flag & GP_SPOINT_SELECT) {
-          selected = true;
+        if (selected) {
+          gpc->flag |= GP_CURVE_SELECT;
         }
-      }
-
-      /* Change status of stroke */
-      if (selected) {
-        gps->flag |= GP_STROKE_SELECT;
+        else {
+          gpc->flag &= ~GP_CURVE_SELECT;
+        }
       }
       else {
-        gps->flag &= ~GP_STROKE_SELECT;
+        bGPDspoint *pt;
+        int i;
+
+        /* Change selection status of all points, then make the stroke match */
+        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+          switch (action) {
+            case SEL_SELECT:
+              pt->flag |= GP_SPOINT_SELECT;
+              break;
+            case SEL_INVERT:
+              pt->flag ^= GP_SPOINT_SELECT;
+              break;
+          }
+
+          if (pt->flag & GP_SPOINT_SELECT) {
+            selected = true;
+          }
+        }
+
+        /* Change status of stroke */
+        if (selected) {
+          gps->flag |= GP_STROKE_SELECT;
+        }
+        else {
+          gps->flag &= ~GP_STROKE_SELECT;
+        }
       }
     }
     CTX_DATA_END;
@@ -2687,7 +2732,7 @@ void ED_gpencil_select_curve_toggle_all(bContext *C, int action)
 
       /* Make sure stroke has an editcurve */
       if (gps->editcurve == NULL) {
-        BKE_gpencil_stroke_editcurve_update(gpd, gpl, gps);
+        // BKE_gpencil_stroke_editcurve_update(gpd, gpl, gps);
         gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
         BKE_gpencil_stroke_geometry_update(gpd, gps);
       }

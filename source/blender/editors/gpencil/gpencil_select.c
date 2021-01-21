@@ -156,31 +156,29 @@ static bool gpencil_3d_point_to_screen_space(ARegion *region,
 static void deselect_all_selected(bContext *C)
 {
   CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
-    /* deselect stroke and its points if selected */
-    if (gps->flag & GP_STROKE_SELECT) {
-      bGPDspoint *pt;
-      int i;
-
-      /* deselect points */
-      for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-        pt->flag &= ~GP_SPOINT_SELECT;
-      }
-
-      /* deselect stroke itself too */
-      gps->flag &= ~GP_STROKE_SELECT;
-    }
-
-    /* deselect curve and curve points */
-    if (gps->editcurve != NULL) {
+    if (GPENCIL_STROKE_IS_CURVE(gps)) {
       bGPDcurve *gpc = gps->editcurve;
-      for (int j = 0; j < gpc->tot_curve_points; j++) {
-        bGPDcurve_point *gpc_pt = &gpc->curve_points[j];
-        BezTriple *bezt = &gpc_pt->bezt;
-        gpc_pt->flag &= ~GP_CURVE_POINT_SELECT;
-        BEZT_DESEL_ALL(bezt);
-      }
 
-      gpc->flag &= ~GP_CURVE_SELECT;
+      if(gpc->flag & GP_CURVE_SELECT) {
+        /* Deselect the curve points. */
+        for (uint32_t i = 0; i < gpc->tot_curve_points; i++) {
+          bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
+          BezTriple *bezt = &gpc_pt->bezt;
+          gpc_pt->flag &= ~GP_CURVE_POINT_SELECT;
+          BEZT_DESEL_ALL(bezt);
+        }
+        gpc->flag &= ~GP_CURVE_SELECT;
+      }
+    }
+    else {
+      if (gps->flag & GP_STROKE_SELECT) {
+        /* Deselect the points. */
+        for (uint32_t i = 0; i < gps->totpoints; i++) {
+          bGPDspoint *pt = &gps->points[i];
+          pt->flag &= ~GP_SPOINT_SELECT;
+        }
+        gps->flag &= ~GP_STROKE_SELECT;
+      }
     }
   }
   CTX_DATA_END;
@@ -234,7 +232,6 @@ static int gpencil_select_all_exec(bContext *C, wmOperator *op)
 {
   bGPdata *gpd = ED_gpencil_data_get_active(C);
   int action = RNA_enum_get(op->ptr, "action");
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
 
   if (gpd == NULL) {
     BKE_report(op->reports, RPT_ERROR, "No Grease Pencil data");
@@ -254,12 +251,7 @@ static int gpencil_select_all_exec(bContext *C, wmOperator *op)
     }
   }
 
-  if (is_curve_edit) {
-    ED_gpencil_select_curve_toggle_all(C, action);
-  }
-  else {
-    ED_gpencil_select_toggle_all(C, action);
-  }
+  ED_gpencil_select_toggle_all(C, action);
 
   /* updates */
   DEG_id_tag_update(&gpd->id, ID_RECALC_GEOMETRY);
@@ -1309,7 +1301,7 @@ static bool gpencil_stroke_do_circle_sel(bGPdata *gpd,
 
   /* If curve edit mode, generate the curve. */
   if (is_curve_edit && hit && gps_active->editcurve == NULL) {
-    BKE_gpencil_stroke_editcurve_update(gpd, gpl, gps_active);
+    // BKE_gpencil_stroke_editcurve_update(gpd, gpl, gps_active);
     gps_active->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
     /* Select all curve points. */
     select_all_curve_points(gps_active, gps_active->editcurve, false);
@@ -1886,7 +1878,7 @@ static bool gpencil_generic_stroke_select(bContext *C,
 
     /* If curve edit mode, generate the curve. */
     if (is_curve_edit && (hit || whole) && gps_active->editcurve == NULL) {
-      BKE_gpencil_stroke_editcurve_update(gpd, gpl, gps_active);
+      // BKE_gpencil_stroke_editcurve_update(gpd, gpl, gps_active);
       gps_active->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
       /* Select all curve points. */
       select_all_curve_points(gps_active, gps_active->editcurve, false);
@@ -2304,7 +2296,7 @@ static int gpencil_select_exec(bContext *C, wmOperator *op)
   if (whole) {
     /* Generate editcurve if it does not exist */
     if (is_curve_edit && hit_curve == NULL) {
-      BKE_gpencil_stroke_editcurve_update(gpd, hit_layer, hit_stroke);
+      // BKE_gpencil_stroke_editcurve_update(gpd, hit_layer, hit_stroke);
       hit_stroke->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
       BKE_gpencil_stroke_geometry_update(gpd, hit_stroke);
       hit_curve = hit_stroke->editcurve;

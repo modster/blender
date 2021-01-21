@@ -154,6 +154,7 @@ static int gpencil_stroke_make_curve_exec(bContext *C, wmOperator *op)
         BKE_gpencil_stroke_editcurve_update(gps, threshold, corner_angle);
         if (gps->editcurve != NULL) {
           bGPDcurve *gpc = gps->editcurve;
+          gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
           BKE_gpencil_stroke_geometry_update(gpd, gps);
 
           /* Select all curve points. */
