@@ -109,8 +109,7 @@ void OVERLAY_edit_gpencil_cache_init(OVERLAY_Data *vedata)
                            (GPENCIL_EDIT_MODE(gpd) &&
                             (ts->gpencil_selectmode_edit != GP_SELECTMODE_STROKE));
 
-  if ((!GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd)) &&
-      ((!GPENCIL_VERTEX_MODE(gpd) && !GPENCIL_PAINT_MODE(gpd)) || use_vertex_mask)) {
+  if (((!GPENCIL_VERTEX_MODE(gpd) && !GPENCIL_PAINT_MODE(gpd)) || use_vertex_mask)) {
     DRWState state = DRW_STATE_WRITE_COLOR | DRW_STATE_WRITE_DEPTH | DRW_STATE_DEPTH_LESS_EQUAL |
                      DRW_STATE_BLEND_ALPHA;
     DRW_PASS_CREATE(psl->edit_gpencil_ps, state | pd->clipping_state);
@@ -137,22 +136,10 @@ void OVERLAY_edit_gpencil_cache_init(OVERLAY_Data *vedata)
     }
   }
 
-  /* Handles and curve point for Curve Edit submode. */
-  if (GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd)) {
+  /* Handles and curve point for Edit mode. */
+  if (GPENCIL_EDIT_MODE(gpd)) {
     DRWState state = DRW_STATE_WRITE_COLOR;
     DRW_PASS_CREATE(psl->edit_gpencil_curve_ps, state | pd->clipping_state);
-
-    /* Edit lines. */
-    if (show_lines) {
-      sh = OVERLAY_shader_edit_gpencil_wire();
-      pd->edit_gpencil_wires_grp = grp = DRW_shgroup_create(sh, psl->edit_gpencil_curve_ps);
-      DRW_shgroup_uniform_block(grp, "globalsBlock", G_draw.block_ubo);
-      DRW_shgroup_uniform_bool_copy(grp, "doMultiframe", show_multi_edit_lines);
-      DRW_shgroup_uniform_bool_copy(grp, "doWeightColor", is_weight_paint);
-      DRW_shgroup_uniform_bool_copy(grp, "hideSelect", hide_select);
-      DRW_shgroup_uniform_float_copy(grp, "gpEditOpacity", v3d->vertex_opacity);
-      DRW_shgroup_uniform_texture(grp, "weightTex", G_draw.weight_ramp);
-    }
 
     sh = OVERLAY_shader_edit_curve_handle();
     pd->edit_gpencil_curve_handle_grp = grp = DRW_shgroup_create(sh, psl->edit_gpencil_curve_ps);
