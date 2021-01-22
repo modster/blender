@@ -43,7 +43,7 @@ bool dof_scatter_neighborhood_rejection(vec3 color)
   vec3 max_diff = vec3(0.0);
   for (int i = 0; i < 4; i++) {
     vec2 sample_uv = uv + 2.0 * quad_offsets[i] * texel_size;
-    vec3 ref = textureLod(downsampledBuffer, uv, 0.0).rgb;
+    vec3 ref = textureLod(downsampledBuffer, sample_uv, 0.0).rgb;
     ref = non_linear_comparison_space(ref);
     max_diff = max(max_diff, abs(ref - color));
   }
@@ -68,7 +68,7 @@ void main()
   bool do_scatter = any(greaterThan(outColor.rgb, vec3(scatterColorThreshold)));
   /* Only scatter if CoC is big enough. */
   do_scatter = do_scatter && (abs(outCoc) > scatterCocThreshold);
-  /* TODO(fclem) Needs the downsample pass. */
+  /* Only scatter if neighborhood is different enough. */
   do_scatter = do_scatter && dof_scatter_neighborhood_rejection(outColor.rgb);
 
   /**
