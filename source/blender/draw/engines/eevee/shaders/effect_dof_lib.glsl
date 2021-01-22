@@ -215,7 +215,7 @@ float dof_coc_max_slight_focus(float coc1, float coc2)
 {
   /* Do not consider values below 0.5 for expansion as they are "encoded".
    * See setup pass shader for more infos. */
-  if (coc1 > 0.5 || coc2 > 0.5) {
+  if (coc1 > 0.5 || coc2 > 0.5 || coc1 == -1.0 || coc2 == -1.0) {
     return max(coc1, coc2);
   }
   else if ((coc1 == DOF_TILE_DEFOCUS && coc2 == DOF_TILE_FOCUS) ||
