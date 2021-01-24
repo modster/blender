@@ -38,6 +38,8 @@ float bokeh_shape(vec2 center)
   return dist;
 }
 
+#define linearstep(p0, p1, v) (clamp(((v) - (p0)) / abs((p1) - (p0)), 0.0, 1.0))
+
 void main(void)
 {
   vec4 shapes;
@@ -47,7 +49,7 @@ void main(void)
   /* Becomes signed distance field in pixel units. */
   shapes -= cocs;
   /* Smooth the edges a bit to fade out the undersampling artifacts. */
-  shapes = 1.0 - smoothstep(-0.6, 0.6, shapes);
+  shapes = 1.0 - linearstep(-0.8, 0.8, shapes);
   /* Outside of bokeh shape. Try to avoid overloading ROPs. */
   if (max_v4(shapes) == 0.0) {
     discard;
