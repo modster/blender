@@ -1056,6 +1056,25 @@ void BKE_gpencil_brush_preset_set(Main *bmain, Brush *brush, const short type)
       zero_v3(brush->secondary_rgb);
       break;
     }
+    case GP_BRUSH_PRESET_INK_CURVE: {
+      brush->size = 25.0f;
+      brush->gpencil_settings->flag &= ~GP_BRUSH_USE_PRESSURE;
+
+      brush->gpencil_settings->draw_strength = 1.0f;
+      brush->gpencil_settings->flag &= ~GP_BRUSH_USE_STRENGTH_PRESSURE;
+
+      brush->gpencil_settings->input_samples = 10;
+      brush->gpencil_settings->draw_angle = 0.0f;
+      brush->gpencil_settings->draw_angle_factor = 0.0f;
+      brush->gpencil_settings->hardeness = 1.0f;
+      copy_v2_fl(brush->gpencil_settings->aspect_ratio, 1.0f);
+
+      brush->gpencil_settings->icon_id = GP_BRUSH_ICON_PEN;
+      brush->gpencil_tool = GPAINT_TOOL_CURVE;
+
+      zero_v3(brush->secondary_rgb);
+      break;
+    }
     case GP_BRUSH_PRESET_VERTEX_DRAW: {
       brush->gpencil_settings->icon_id = GP_BRUSH_ICON_VERTEX_DRAW;
       brush->gpencil_vertex_tool = GPVERTEX_TOOL_DRAW;
@@ -1396,6 +1415,12 @@ void BKE_brush_gpencil_paint_presets(Main *bmain, ToolSettings *ts, const bool r
   brush = gpencil_brush_ensure(bmain, ts, "Tint", OB_MODE_PAINT_GPENCIL, &r_new);
   if ((reset) || (r_new)) {
     BKE_gpencil_brush_preset_set(bmain, brush, GP_BRUSH_PRESET_TINT);
+  }
+
+  /* Tint brush. */
+  brush = gpencil_brush_ensure(bmain, ts, "Curve pen", OB_MODE_PAINT_GPENCIL, &r_new);
+  if ((reset) || (r_new)) {
+    BKE_gpencil_brush_preset_set(bmain, brush, GPAINT_TOOL_CURVE);
   }
 
   /* Set default Draw brush. */

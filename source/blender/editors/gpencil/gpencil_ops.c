@@ -168,6 +168,11 @@ static bool gpencil_stroke_paintmode_tint_poll(bContext *C)
   return gpencil_stroke_paintmode_poll_with_tool(C, GPAINT_TOOL_TINT);
 }
 
+static bool gpencil_stroke_paintmode_curve_poll(bContext *C)
+{
+  return gpencil_stroke_paintmode_poll_with_tool(C, GPAINT_TOOL_CURVE);
+}
+
 /* Poll callback for stroke sculpting mode */
 static bool gpencil_stroke_sculptmode_poll(bContext *C)
 {
@@ -338,6 +343,13 @@ static void ed_keymap_gpencil_painting_tint(wmKeyConfig *keyconf)
   keymap->poll = gpencil_stroke_paintmode_tint_poll;
 }
 
+/* keys for draw with a curve brush */
+static void ed_keymap_gpencil_painting_curve(wmKeyConfig *keyconf)
+{
+  wmKeyMap *keymap = WM_keymap_ensure(keyconf, "Grease Pencil Stroke Paint (Curve)", 0, 0);
+  keymap->poll = gpencil_stroke_paintmode_curve_poll;
+}
+
 /* Stroke Painting Keymap - Only when paintmode is enabled */
 static void ed_keymap_gpencil_painting(wmKeyConfig *keyconf)
 {
@@ -472,6 +484,7 @@ void ED_keymap_gpencil(wmKeyConfig *keyconf)
   ed_keymap_gpencil_painting_erase(keyconf);
   ed_keymap_gpencil_painting_fill(keyconf);
   ed_keymap_gpencil_painting_tint(keyconf);
+  ed_keymap_gpencil_painting_curve(keyconf);
   ed_keymap_gpencil_sculpting(keyconf);
   ed_keymap_gpencil_sculptpainting_smooth(keyconf);
   ed_keymap_gpencil_sculptpainting_thickness(keyconf);

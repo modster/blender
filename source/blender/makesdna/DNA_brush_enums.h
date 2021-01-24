@@ -44,6 +44,7 @@ typedef enum eGPBrush_Presets {
   GP_BRUSH_PRESET_ERASER_POINT = 12,
   GP_BRUSH_PRESET_ERASER_STROKE = 13,
   GP_BRUSH_PRESET_TINT = 14,
+  GP_BRUSH_PRESET_INK_CURVE = 15,
 
   /* Vertex Paint 100-199. */
   GP_BRUSH_PRESET_VERTEX_DRAW = 100,
@@ -556,6 +557,7 @@ typedef enum eBrushGPaintTool {
   GPAINT_TOOL_FILL = 1,
   GPAINT_TOOL_ERASE = 2,
   GPAINT_TOOL_TINT = 3,
+  GPAINT_TOOL_CURVE = 4,
 } eBrushGPaintTool;
 
 /* BrushGpencilSettings->brush type */

@@ -1906,6 +1906,21 @@ class _defs_gpencil_paint:
         )
 
     @ToolDef.from_fn
+    def curve_pen():
+        def draw_settings(context, layout, tool):
+            pass
+
+        return dict(
+            idname="builtin.curve_pen",
+            label="Curve Pen",
+            icon="",
+            cursor='DOT',
+            widget=None,
+            keymap=(),
+            draw_settings=draw_settings,
+        )
+
+    @ToolDef.from_fn
     def cutter():
         def draw_settings(_context, layout, tool):
             props = tool.operator_properties("gpencil.stroke_cutter")
@@ -2914,11 +2929,10 @@ class VIEW3D_PT_tools_active(ToolSelectPanelHelper, Panel):
             _defs_view3d_generic.cursor,
             None,
             _defs_gpencil_paint.generate_from_brushes,
+            _defs_gpencil_paint.curve_pen,
             _defs_gpencil_paint.cutter,
             None,
             _defs_gpencil_paint.eyedropper,
-            None,
-            _defs_gpencil_paint.curve_pen,
             None,
             _defs_gpencil_paint.line,
             _defs_gpencil_paint.polyline,

@@ -192,6 +192,11 @@ const EnumPropertyItem rna_enum_brush_gpencil_types_items[] = {
      ICON_BRUSH_TEXDRAW,
      "Tint",
      "The brush is of type used for tinting strokes"},
+    {GPAINT_TOOL_CURVE,
+     "CURVE",
+     ICON_STROKE,
+     "Curve pen",
+     "The brush is of type used for drawing curves"},
     {0, NULL, 0, NULL, NULL},
 };
 

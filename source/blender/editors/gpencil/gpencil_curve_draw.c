@@ -68,7 +68,9 @@ typedef enum eGPDcurve_draw_state {
   IN_SET_VECTOR = 1,
   IN_DRAG_ALIGNED_HANDLE = 2,
   IN_DRAG_FREE_HANDLE = 3,
+  IN_SET_THICKNESS = 4,
 } eGPDcurve_draw_state;
+
 typedef struct tGPDcurve_draw {
   Scene *scene;
   ARegion *region;
@@ -79,6 +81,8 @@ typedef struct tGPDcurve_draw {
   bGPDstroke *gps;
   bGPDcurve *gpc;
   int cframe;
+
+  Brush *brush;
 
   GP_SpaceConversion gsc;
 
@@ -93,6 +97,7 @@ typedef struct tGPDcurve_draw {
   bool is_mouse_down;
 
   bool is_cyclic;
+  float prev_pressure;
 
   eGPDcurve_draw_state state;
 } tGPDcurve_draw;
@@ -113,6 +118,8 @@ static void debug_print_state(tGPDcurve_draw *tcd)
       "VECTOR",
       "ALIGN",
       "FREE",
+      "THICK",
+      "ALPHA"
   };
   printf("State: %s\tMouse x=%d\ty=%d\tpressed:%s\n",
          state_str[tcd->state],
@@ -142,7 +149,8 @@ static void gpencil_project_mval_to_v3(
   }
 }
 
-static void gpencil_push_new_curve_point(tGPDcurve_draw *tcd)
+/* Helper: Add a new curve point at the end (duplicating the previous last) */
+static void gpencil_push_curve_point(bContext *C, tGPDcurve_draw *tcd)
 {
   bGPDcurve *gpc = tcd->gpc;
   int old_num_points = gpc->tot_curve_points;
@@ -161,7 +169,43 @@ static void gpencil_push_new_curve_point(tGPDcurve_draw *tcd)
   BEZT_DESEL_ALL(&old_last->bezt);
 
   BKE_gpencil_stroke_update_geometry_from_editcurve(
-      tcd->gps, tcd->gpd->curve_edit_resolution, true);
+      tcd->gps, tcd->gpd->curve_edit_resolution, false);
+}
+
+/* Helper: Remove the last curve point */
+static void gpencil_pop_curve_point(bContext *C, tGPDcurve_draw *tcd)
+{
+  bGPdata *gpd = tcd->gpd;
+  bGPDstroke *gps = tcd->gps;
+  bGPDcurve *gpc = tcd->gpc;
+  const int old_num_points = gpc->tot_curve_points;
+  const int new_num_points = old_num_points - 1;
+  printf("old: %d, new: %d\n", old_num_points, new_num_points);
+
+  /* Create new stroke and curve */
+  bGPDstroke *new_stroke = BKE_gpencil_stroke_duplicate(tcd->gps, false, false);
+  new_stroke->points = NULL;
+
+  bGPDcurve *new_curve = BKE_gpencil_stroke_editcurve_new(new_num_points);
+  new_curve->flag = gpc->flag;
+  memcpy(new_curve->curve_points, gpc->curve_points, sizeof(bGPDcurve_point) * new_num_points);
+  new_stroke->editcurve = new_curve;
+
+  BKE_gpencil_stroke_update_geometry_from_editcurve(new_stroke, gpd->curve_edit_resolution, false);
+
+  /* Remove and free old stroke and curve */
+  BLI_remlink(&tcd->gpf->strokes, gps);
+  BKE_gpencil_free_stroke(gps);
+
+  tcd->gps = new_stroke;
+  tcd->gpc = new_curve;
+
+  BLI_addtail(&tcd->gpf->strokes, new_stroke);
+  BKE_gpencil_stroke_geometry_update(gpd, new_stroke);
+
+  DEG_id_tag_update(&gpd->id, ID_RECALC_COPY_ON_WRITE);
+  DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
+  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
 }
 
 static void gpencil_set_handle_type_last_point(tGPDcurve_draw *tcd, eBezTriple_Handle type)
@@ -169,6 +213,22 @@ static void gpencil_set_handle_type_last_point(tGPDcurve_draw *tcd, eBezTriple_H
   bGPDcurve *gpc = tcd->gpc;
   bGPDcurve_point *cpt = &gpc->curve_points[gpc->tot_curve_points - 1];
   cpt->bezt.h1 = cpt->bezt.h2 = type;
+}
+
+static void gpencil_set_alpha_last_segment(tGPDcurve_draw *tcd, float alpha)
+{
+  bGPDstroke *gps = tcd->gps;
+  bGPDcurve *gpc = tcd->gpc;
+
+  if (gpc->tot_curve_points < 2) {
+    return;
+  }
+
+  bGPDcurve_point *old_last = &gpc->curve_points[gpc->tot_curve_points - 2];
+  for (uint32_t i = old_last->point_index; i < gps->totpoints; i++) {
+    bGPDspoint *pt = &gps->points[i];
+    pt->strength = alpha;
+  }
 }
 
 /* ------------------------------------------------------------------------- */
@@ -197,7 +257,7 @@ static void gpencil_curve_draw_init(bContext *C, wmOperator *op, const wmEvent *
   copy_v2_v2_int(tcd->imval, event->mval);
   copy_v2_v2_int(tcd->imval_prev, event->mval);
   tcd->is_mouse_down = (event->val == KM_PRESS);
-  tcd->state = IN_MOVE;
+  tcd->state = IN_SET_VECTOR;
 
   if ((paint->brush == NULL) || (paint->brush->gpencil_settings == NULL)) {
     BKE_brush_gpencil_paint_presets(bmain, ts, true);
@@ -207,7 +267,8 @@ static void gpencil_curve_draw_init(bContext *C, wmOperator *op, const wmEvent *
   BKE_brush_tool_set(brush, paint, 0);
   BKE_paint_brush_set(paint, brush);
   BrushGpencilSettings *brush_settings = brush->gpencil_settings;
-  // tcd->brush = brush;
+  tcd->brush = brush;
+  printf("Brush size: %d\n", brush->size);
 
   /* Get active layer or create a new one. */
   bGPDlayer *gpl = CTX_data_active_gpencil_layer(C);
@@ -255,12 +316,17 @@ static void gpencil_curve_draw_init(bContext *C, wmOperator *op, const wmEvent *
   tcd->gps = gps;
 
   /* Create editcurve. */
-  BKE_gpencil_stroke_editcurve_update(tcd->gpd, tcd->gpl, tcd->gps);
-  bGPDcurve_point *cpt = &gps->editcurve->curve_points[0];
+  bGPDcurve *gpc = BKE_gpencil_stroke_editcurve_new(1);
+  bGPDcurve_point *cpt = &gpc->curve_points[0];
+  copy_v3_v3(cpt->bezt.vec[0], first_pt);
+  copy_v3_v3(cpt->bezt.vec[1], first_pt);
+  copy_v3_v3(cpt->bezt.vec[2], first_pt);
+  cpt->pressure = 1.0f;
+  cpt->strength = 1.0f;
   cpt->flag |= GP_CURVE_POINT_SELECT;
   BEZT_SEL_ALL(&cpt->bezt);
-  gps->editcurve->flag |= GP_CURVE_SELECT;
-  tcd->gpc = tcd->gps->editcurve;
+  gps->editcurve = gpc;
+  tcd->gpc = gpc;
 
   /* Calc geometry data. */
   BKE_gpencil_stroke_geometry_update(tcd->gpd, gps);
@@ -281,35 +347,55 @@ static void gpencil_curve_draw_update(bContext *C, tGPDcurve_draw *tcd)
   int tot_points = gpc->tot_curve_points;
   bGPDcurve_point *cpt = &gpc->curve_points[tot_points - 1];
   BezTriple *bezt = &cpt->bezt;
+  Brush *brush = tcd->brush;
 
   float co[3];
   switch (tcd->state) {
     case IN_MOVE: {
       gpencil_project_mval_to_v3(tcd->scene, tcd->region, tcd->ob, tcd->imval, co);
-      copy_v3_v3(&bezt->vec[1], co);
-      BKE_gpencil_editcurve_recalculate_handles(gps);
+      copy_v3_v3(bezt->vec[0], co);
+      copy_v3_v3(bezt->vec[1], co);
+      copy_v3_v3(bezt->vec[2], co);
+
+      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, gpd->curve_edit_resolution, true);
+      gpencil_set_alpha_last_segment(tcd, 0.1f);
       break;
     }
     case IN_DRAG_ALIGNED_HANDLE: {
       float vec[3];
       gpencil_project_mval_to_v3(tcd->scene, tcd->region, tcd->ob, tcd->imval, co);
-      sub_v3_v3v3(vec, &bezt->vec[1], co);
-      add_v3_v3(vec, &bezt->vec[1]);
-      copy_v3_v3(&bezt->vec[0], vec);
-      copy_v3_v3(&bezt->vec[2], co);
-      // BKE_gpencil_editcurve_recalculate_handles(gps);
+      sub_v3_v3v3(vec, bezt->vec[1], co);
+      add_v3_v3(vec, bezt->vec[1]);
+      copy_v3_v3(bezt->vec[0], vec);
+      copy_v3_v3(bezt->vec[2], co);
+
+      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, gpd->curve_edit_resolution, true);
       break;
     }
     case IN_DRAG_FREE_HANDLE: {
       gpencil_project_mval_to_v3(tcd->scene, tcd->region, tcd->ob, tcd->imval, co);
-      copy_v3_v3(&bezt->vec[2], co);
+      copy_v3_v3(bezt->vec[2], co);
+
+      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, gpd->curve_edit_resolution, true);
+      break;
+    }
+    case IN_SET_THICKNESS: {
+      int move[2];
+      sub_v2_v2v2_int(move, tcd->imval, tcd->imval_start);
+      int dir = move[0] > 0.0f ? 1 : -1;
+      int dist = len_manhattan_v2_int(move);
+      /* TODO: calculate correct radius. */
+      float dr = dir * ((float)dist / 10.0f);
+      cpt->pressure = tcd->prev_pressure + dr;
+      CLAMP_MIN(cpt->pressure, 0.0f);
+
+      BKE_gpencil_stroke_update_geometry_from_editcurve(gps, gpd->curve_edit_resolution, true);
       break;
     }
     default:
       break;
   }
 
-  BKE_gpencil_stroke_update_geometry_from_editcurve(gps, gpd->curve_edit_resolution, true);
   BKE_gpencil_stroke_geometry_update(gpd, gps);
 
   DEG_id_tag_update(&gpd->id, ID_RECALC_COPY_ON_WRITE);
@@ -320,6 +406,13 @@ static void gpencil_curve_draw_update(bContext *C, tGPDcurve_draw *tcd)
 static void gpencil_curve_draw_confirm(bContext *C, wmOperator *op, tGPDcurve_draw *tcd)
 {
   printf("Confirm curve draw\n");
+  bGPDcurve *gpc = tcd->gpc;
+  int tot_points = gpc->tot_curve_points;
+  bGPDcurve_point *cpt = &gpc->curve_points[tot_points - 1];
+  cpt->flag &= ~GP_CURVE_POINT_SELECT;
+  BEZT_DESEL_ALL(&cpt->bezt);
+
+  BKE_gpencil_editcurve_recalculate_handles(tcd->gps);
 }
 
 static void gpencil_curve_draw_exit(bContext *C, wmOperator *op)
@@ -377,15 +470,20 @@ static int gpencil_curve_draw_modal(bContext *C, wmOperator *op, const wmEvent *
         copy_v2_v2_int(tcd->imval_end, tcd->imval);
         tcd->is_mouse_down = false;
         /* Reset state to move. */
-        if (tcd->state > IN_MOVE) {
+        if (ELEM(tcd->state, IN_SET_VECTOR, IN_DRAG_ALIGNED_HANDLE, IN_DRAG_FREE_HANDLE)) {
           tcd->state = IN_MOVE;
+          gpencil_push_curve_point(C, tcd);
         }
-        gpencil_push_new_curve_point(tcd);
+        else if (tcd->state == IN_SET_THICKNESS) {
+          tcd->state = IN_MOVE;
+          WM_cursor_modal_set(win, WM_CURSOR_DOT);
+        }
+
         gpencil_curve_draw_update(C, tcd);
       }
       break;
     }
-    case RIGHTMOUSE:
+    case RIGHTMOUSE: /* cancel */
     case EVT_ESCKEY: {
       ED_workspace_status_text(C, NULL);
       WM_cursor_modal_restore(win);
@@ -396,12 +494,16 @@ static int gpencil_curve_draw_modal(bContext *C, wmOperator *op, const wmEvent *
       gpencil_curve_draw_exit(C, op);
       return OPERATOR_CANCELLED;
     }
-    case EVT_SPACEKEY:
+    case EVT_SPACEKEY: /* confirm */
     case MIDDLEMOUSE:
     case EVT_PADENTER:
     case EVT_RETKEY: {
       ED_workspace_status_text(C, NULL);
       WM_cursor_modal_restore(win);
+
+      if (tcd->state == IN_MOVE) {
+        gpencil_pop_curve_point(C, tcd);
+      }
 
       /* Create curve */
       gpencil_curve_draw_confirm(C, op, tcd);
@@ -431,7 +533,7 @@ static int gpencil_curve_draw_modal(bContext *C, wmOperator *op, const wmEvent *
       break;
     }
     case EVT_CKEY: {
-      if (event->val == KM_RELEASE) {
+      if (event->val == KM_PRESS) {
         if (tcd->is_cyclic) {
           tcd->gps->flag &= ~GP_STROKE_CYCLIC;
         }
@@ -439,8 +541,36 @@ static int gpencil_curve_draw_modal(bContext *C, wmOperator *op, const wmEvent *
           tcd->gps->flag |= GP_STROKE_CYCLIC;
         }
         tcd->is_cyclic = !tcd->is_cyclic;
+        gpencil_curve_draw_update(C, tcd);
       }
-      gpencil_curve_draw_update(C, tcd);
+      break;
+    }
+    case EVT_FKEY: {
+      if (event->val == KM_PRESS && tcd->state != IN_SET_THICKNESS) {
+        tcd->state = IN_SET_THICKNESS;
+        WM_cursor_modal_set(win, WM_CURSOR_EW_SCROLL);
+
+        bGPDcurve_point *cpt_last = &tcd->gpc->curve_points[tcd->gpc->tot_curve_points - 1];
+        tcd->prev_pressure = cpt_last->pressure;
+        copy_v2_v2_int(tcd->imval_start, tcd->imval);
+
+        gpencil_curve_draw_update(C, tcd);
+      }
+      break;
+    }
+    case EVT_XKEY: {
+      if (event->val == KM_PRESS) {
+        if (tcd->state == IN_MOVE) {
+          gpencil_pop_curve_point(C, tcd);
+          bGPDcurve_point *cpt_last = &tcd->gpc->curve_points[tcd->gpc->tot_curve_points - 1];
+          cpt_last->flag |= GP_CURVE_POINT_SELECT;
+          BEZT_SEL_ALL(&cpt_last->bezt);
+        }
+        else if (ELEM(tcd->state, IN_DRAG_ALIGNED_HANDLE, IN_DRAG_FREE_HANDLE)) {
+          tcd->state = IN_MOVE;
+        }
+        gpencil_curve_draw_update(C, tcd);
+      }
       break;
     }
     default: {
@@ -487,8 +617,6 @@ static bool gpencil_curve_draw_poll(bContext *C)
 
 void GPENCIL_OT_draw_curve(wmOperatorType *ot)
 {
-  PropertyRNA *prop;
-
   /* identifiers */
   ot->name = "Grease Pencil Draw Curve";
   ot->idname = "GPENCIL_OT_draw_curve";
@@ -499,9 +627,6 @@ void GPENCIL_OT_draw_curve(wmOperatorType *ot)
   ot->modal = gpencil_curve_draw_modal;
   ot->cancel = gpencil_curve_draw_cancel;
   ot->poll = gpencil_curve_draw_poll;
-
-  prop = RNA_def_boolean(ot->srna, "wait_for_input", true, "Wait for Input", "");
-  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_BLOCKING;
