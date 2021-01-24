@@ -52,6 +52,11 @@ void main()
         ring_buckets[ring].fg_min_coc = min(ring_buckets[ring].fg_min_coc, adj_tile.fg_min_coc);
         ring_buckets[ring].bg_max_coc = max(ring_buckets[ring].bg_max_coc, adj_tile.bg_max_coc);
 
+        if (dilateSlightFocus) {
+          ring_buckets[ring].fg_slight_focus_max_coc = dof_coc_max_slight_focus(
+              ring_buckets[ring].fg_slight_focus_max_coc, adj_tile.fg_slight_focus_max_coc);
+        }
+
 #else /* DILATE_MODE_MIN_ABS */
         ring_buckets[ring].fg_max_coc = max(ring_buckets[ring].fg_max_coc, adj_tile.fg_max_coc);
         ring_buckets[ring].bg_min_coc = min(ring_buckets[ring].bg_min_coc, adj_tile.bg_min_coc);
@@ -71,6 +76,12 @@ void main()
   /* Load center tile. */
   CocTile out_tile = dof_coc_tile_load(cocTilesFgBuffer, cocTilesBgBuffer, center_tile_pos);
 
+  /* Dilate once. */
+  if (dilateSlightFocus) {
+    out_tile.fg_slight_focus_max_coc = dof_coc_max_slight_focus(
+        out_tile.fg_slight_focus_max_coc, ring_buckets[0].fg_slight_focus_max_coc);
+  }
+
   for (int ring = 0; ring < ringCount && ring < RINGS_COUNT; ring++) {
     float ring_distance = float(ring + 1);
 
@@ -84,12 +95,6 @@ void main()
 
     if (ring_buckets[ring].bg_max_coc * bluring_radius_error > ring_distance) {
       out_tile.bg_max_coc = max(out_tile.bg_max_coc, ring_buckets[ring].bg_max_coc);
-    }
-
-    /* Dilate once. */
-    if (dilateSlightFocus && (ring == 0)) {
-      out_tile.fg_slight_focus_max_coc = dof_coc_max_slight_focus(
-          out_tile.fg_slight_focus_max_coc, ring_buckets[ring].fg_slight_focus_max_coc);
     }
 
 #else /* DILATE_MODE_MIN_ABS */
