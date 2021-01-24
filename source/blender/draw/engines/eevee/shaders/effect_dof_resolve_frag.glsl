@@ -26,11 +26,16 @@ out vec4 fragColor;
 
 void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_weight)
 {
+  vec4 noise = texelfetch_noise_tex(gl_FragCoord.xy);
+
   DofGatherData fg_accum = GATHER_DATA_INIT;
   DofGatherData bg_accum = GATHER_DATA_INIT;
 
-  const int i_radius = 3;  // int(floor(radius)); /* TODO */
+  int i_radius = clamp(int(ceil(radius + 0.5)), 1, 4);
+  const int resolve_ring_density = 1; /* 1,2 or 4. */
   ivec2 texel = ivec2(gl_FragCoord.xy);
+
+  int sample_id_offset = (int(noise.x * 4.0) % 4) / resolve_ring_density;
 
   bool first_ring = true;
 
@@ -39,9 +44,10 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
     DofGatherData bg_ring = GATHER_DATA_INIT;
 
     int ring_distance = ring + 1;
-    int ring_sample_count = 4 * ring_distance;
+    int ring_sample_count = resolve_ring_density * ring_distance;
     for (int sample_id = 0; sample_id < ring_sample_count; sample_id++) {
-      ivec2 offset = dof_square_ring_sample_offset(ring_distance, sample_id);
+      ivec2 offset = dof_square_ring_sample_offset(ring_distance,
+                                                   sample_id * 2 + sample_id_offset);
       float dist = length(vec2(offset));
 
       DofGatherData pair_data[2];
@@ -53,12 +59,13 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
         pair_data[i].dist = dist;
       }
 
-      /* (fclem) Dunno why 2.5, it might be related to  */
-      float bordering_radius = dist + 2.5;
+      /* (fclem) Dunno why 2.5. */
+      float bordering_radius = dist + 0.5;
+      const float isect_mul = 4.0;
       dof_gather_accumulate_sample_pair(
-          pair_data, bordering_radius, first_ring, false, false, bg_ring, bg_accum);
+          pair_data, bordering_radius, isect_mul, first_ring, false, false, bg_ring, bg_accum);
       dof_gather_accumulate_sample_pair(
-          pair_data, bordering_radius, first_ring, false, true, fg_ring, fg_accum);
+          pair_data, bordering_radius, isect_mul, first_ring, false, true, fg_ring, fg_accum);
     }
 
     dof_gather_accumulate_sample_ring(
@@ -77,7 +84,7 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
   center_data.dist = 0.0;
 
   /* Slide 38. */
-  float bordering_radius = 0.75;
+  float bordering_radius = 0.5;
 
   dof_gather_accumulate_center_sample(center_data, bordering_radius, false, true, fg_accum);
   dof_gather_accumulate_center_sample(center_data, bordering_radius, false, false, bg_accum);
@@ -86,8 +93,9 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
   float bg_weight, fg_weight;
   vec2 unused_occlusion;
 
-  dof_gather_accumulate_resolve(i_radius, bg_accum, bg_col, bg_weight, unused_occlusion);
-  dof_gather_accumulate_resolve(i_radius, fg_accum, fg_col, fg_weight, unused_occlusion);
+  int total_sample_count = dof_gather_total_sample_count(i_radius, resolve_ring_density);
+  dof_gather_accumulate_resolve(total_sample_count, bg_accum, bg_col, bg_weight, unused_occlusion);
+  dof_gather_accumulate_resolve(total_sample_count, fg_accum, fg_col, fg_weight, unused_occlusion);
 
   /* Fix weighting issues on perfectly focus > slight focus transitionning areas. */
   if (abs(center_data.coc) < 0.5) {
@@ -109,7 +117,7 @@ void main(void)
   vec4 noise = texelfetch_noise_tex(gl_FragCoord.xy);
   /* Stochastically randomize which pixel to resolve. This avoids having garbage values
    * from the weight mask interpolation but still have less pixelated look. */
-  uv += noise.zw * 0.5 / vec2(textureSize(bgColorBuffer, 0).xy);
+  // uv += noise.zw * 0.5 / vec2(textureSize(bgColorBuffer, 0).xy);
 
   vec4 bg = textureLod(bgColorBuffer, uv, 0.0);
   vec4 fg = textureLod(fgColorBuffer, uv, 0.0);
@@ -138,24 +146,34 @@ void main(void)
     }
   }
 
-  fragColor = hf;
-  float weight = float(hf_w > 0.0);
+  fragColor = vec4(0.0);
+  float weight = 0.0;
 
-  /* Composite background. */
-  fragColor = fragColor * (1.0 - bg_w) + bg * bg_w;
-  weight = weight * (1.0 - bg_w) + bg_w;
-  fragColor *= safe_rcp(weight);
+  if (!no_holefill_pass) {
+    fragColor = hf;
+    weight = float(hf_w > 0.0);
+  }
 
-  /* Fill holes with the composited background. */
-  weight = float(weight > 0.0);
+  if (!no_background_pass) {
+    /* Composite background. */
+    fragColor = fragColor * (1.0 - bg_w) + bg * bg_w;
+    weight = weight * (1.0 - bg_w) + bg_w;
+    fragColor *= safe_rcp(weight);
+    /* Fill holes with the composited background. */
+    weight = float(weight > 0.0);
+  }
 
-  /* Composite in focus + slight defocus. */
-  fragColor = fragColor * (1.0 - focus_w) + focus * focus_w;
-  weight = weight * (1.0 - focus_w) + focus_w;
-  fragColor *= safe_rcp(weight);
+  if (!no_slight_focus_pass) {
+    /* Composite in focus + slight defocus. */
+    fragColor = fragColor * (1.0 - focus_w) + focus * focus_w;
+    weight = weight * (1.0 - focus_w) + focus_w;
+    fragColor *= safe_rcp(weight);
+  }
 
-  /* Composite foreground. */
-  fragColor = fragColor * (1.0 - fg_w) + fg * fg_w;
+  if (!no_foreground_pass) {
+    /* Composite foreground. */
+    fragColor = fragColor * (1.0 - fg_w) + fg * fg_w;
+  }
 
   /* Fix float precision issue in alpha compositing.  */
   if (fragColor.a > 0.99) {
@@ -163,7 +181,7 @@ void main(void)
   }
 
 #if 0 /* Debug */
-  if (coc_tile.fg_slight_focus_max_coc == DOF_TILE_FOCUS) {
+  if (coc_tile.fg_slight_focus_max_coc >= 0.5) {
     fragColor.rgb *= vec3(1.0, 0.1, 0.1);
   }
 #endif

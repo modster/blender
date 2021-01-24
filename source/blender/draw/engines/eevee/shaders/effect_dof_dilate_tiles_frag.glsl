@@ -20,8 +20,6 @@ layout(location = 1) out vec3 outBgCoc; /* Min, Max, MinIntersectable */
 
 const float tile_to_fullres_factor = 16.0;
 
-/* TODO should be a define. */
-const float gather_ring_count = 3;
 /* Error introduced by the random offset of the gathering kernel's center. */
 const float bluring_radius_error = 1.0 + 1.0 / (gather_ring_count + 0.5);
 

@@ -12,6 +12,35 @@ uniform vec4 cocParams;
 uniform float scatterColorThreshold;
 uniform float scatterCocThreshold;
 
+/* -------------- Debug Defines ------------- */
+
+const bool no_smooth_intersection = false;
+const bool no_gather_occlusion = false;
+const bool no_gather_mipmaps = false;
+const bool no_gather_random = false;
+const bool no_gather_filtering = false;
+const bool no_scatter_occlusion = false;
+const bool no_scatter_pass = false;
+const bool no_foreground_pass = false;
+const bool no_background_pass = false;
+const bool no_slight_focus_pass = false;
+const bool no_holefill_pass = false;
+
+/* -------------- Quality Defines ------------- */
+
+#ifdef DOF_HOLEFILL_PASS
+/* No need for very high density for holefill. */
+const int gather_ring_count = 3;
+const int gather_ring_density = 3;
+const int gather_max_density_change = 0;
+const int gather_density_change_ring = 1;
+#else
+const int gather_ring_count = 5;
+const int gather_ring_density = 3;
+const int gather_max_density_change = 50; /* Dictates the maximum good quality blur. */
+const int gather_density_change_ring = 1;
+#endif
+
 /* -------------- Utils ------------- */
 
 /* Allow 5% CoC error. */
@@ -147,9 +176,15 @@ vec4 dof_sample_weight(vec4 coc)
 }
 
 /* Intersection with the center of the kernel. */
-float dof_intersection_weight(float coc, float distance_from_center)
+float dof_intersection_weight(float coc, float distance_from_center, float intersection_multiplier)
 {
-  return saturate((abs(coc) - distance_from_center) * 1.0 + 0.5);
+  if (no_smooth_intersection) {
+    return step(0.0, (abs(coc) - distance_from_center));
+  }
+  else {
+    /* (Slide 64). */
+    return saturate((abs(coc) - distance_from_center) * intersection_multiplier + 0.5);
+  }
 }
 
 /* Returns weight of the sample for the outer bucket (containing previous rings). */
@@ -235,11 +270,12 @@ struct DofGatherData {
   float coc_sqr;
   /* For ring bucket merging. */
   float transparency;
+  float transparency_weight;
 
   float layer_opacity;
 };
 
-#define GATHER_DATA_INIT DofGatherData(vec4(0.0), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+#define GATHER_DATA_INIT DofGatherData(vec4(0.0), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 void dof_gather_ammend_weight(inout DofGatherData sample_data, float weight)
 {
@@ -261,6 +297,7 @@ void dof_gather_accumulate_sample(DofGatherData sample_data,
 
 void dof_gather_accumulate_sample_pair(DofGatherData pair_data[2],
                                        float bordering_radius,
+                                       float intersection_multiplier,
                                        bool first_ring,
                                        const bool do_fast_gather,
                                        const bool is_foreground,
@@ -275,29 +312,26 @@ void dof_gather_accumulate_sample_pair(DofGatherData pair_data[2],
     return;
   }
 
-  float inter_weight[2];
-
-  for (int i = 0; i < 2; i++) {
-    inter_weight[i] = dof_intersection_weight(pair_data[i].coc, pair_data[i].dist);
+#if defined(DOF_HOLEFILL_PASS) || defined(DOF_FOREGROUND_PASS)
+  const float mirroring_threshold = -layer_threshold - layer_offset;
+  /* TODO(fclem) Promote to parameter? dither with Noise? */
+  const float mirroring_min_distance = 15.0;
+  if (pair_data[0].coc < mirroring_threshold &&
+      (pair_data[1].coc - mirroring_min_distance) > pair_data[0].coc) {
+    pair_data[1].coc = pair_data[0].coc;
   }
-
-#ifdef DOF_HOLEFILL_PASS
-  if (pair_data[0].coc < 0.0 && pair_data[1].coc > pair_data[0].coc) {
-    inter_weight[1] = max(inter_weight[1], inter_weight[0]);
-  }
-  else if (pair_data[1].coc < 0.0 && pair_data[0].coc > pair_data[1].coc) {
-    inter_weight[0] = max(inter_weight[1], inter_weight[0]);
+  else if (pair_data[1].coc < mirroring_threshold &&
+           (pair_data[0].coc - mirroring_min_distance) > pair_data[1].coc) {
+    pair_data[0].coc = pair_data[1].coc;
   }
 #endif
 
   for (int i = 0; i < 2; i++) {
-#ifdef DOF_HOLEFILL_PASS
-    float layer_weight = float(pair_data[i].coc > -layer_threshold);
-#else
-    float layer_weight = dof_layer_weight(pair_data[i].coc, is_foreground);
-#endif
     float sample_weight = dof_sample_weight(pair_data[i].coc);
-    float weight = inter_weight[i] * layer_weight * sample_weight;
+    float layer_weight = dof_layer_weight(pair_data[i].coc, is_foreground);
+    float inter_weight = dof_intersection_weight(
+        pair_data[i].coc, pair_data[i].dist, intersection_multiplier);
+    float weight = inter_weight * layer_weight * sample_weight;
 
     /**
      * If a CoC is larger than bordering radius we accumulate it to the general accumulator.
@@ -309,8 +343,13 @@ void dof_gather_accumulate_sample_pair(DofGatherData pair_data[2],
 
     accum_data.layer_opacity += layer_weight;
 
+#ifdef DOF_FOREGROUND_PASS
+    ring_data.transparency += 1.0 - weight;
+#else
     float coc = is_foreground ? -pair_data[i].coc : pair_data[i].coc;
     ring_data.transparency += saturate(coc - bordering_radius);
+#endif
+    ring_data.transparency_weight += 1.0;
   }
 }
 
@@ -334,7 +373,7 @@ void dof_gather_accumulate_sample_ring(DofGatherData ring_data,
     accum_data.coc_sqr = ring_data.coc_sqr;
     accum_data.weight = ring_data.weight;
 
-    accum_data.transparency = ring_data.transparency;
+    accum_data.transparency = ring_data.transparency / ring_data.transparency_weight;
     return;
   }
 
@@ -347,33 +386,39 @@ void dof_gather_accumulate_sample_ring(DofGatherData ring_data,
 
   /* Smooth test to set opacity to see if the ring average coc occludes the accumulation.
    * Test is reversed to be multiplied against opacity. */
-  float ring_no_occlu = saturate(accum_avg_coc - ring_avg_coc);
-  float accum_no_occlu = saturate(ring_avg_coc - accum_avg_coc + 1.0);
+  float ring_occlu = saturate(accum_avg_coc - ring_avg_coc);
+  float accum_occlu = saturate(ring_avg_coc - accum_avg_coc + 1.0);
+
+  if (no_gather_occlusion) {
+    ring_occlu = 0.0;
+    accum_occlu = 0.0;
+  }
 
   /* (Slide 40) */
-  float ring_opacity = saturate(1.0 - ring_data.transparency / float(sample_count));
+  float ring_opacity = saturate(1.0 - ring_data.transparency / ring_data.transparency_weight);
   float accum_opacity = 1.0 - accum_data.transparency;
 
   if (reversed_occlusion) {
     /* Accum_data occludes the ring. */
-    float alpha = (accum_data.weight == 0.0) ? 0.0 : (1.0 - accum_opacity * accum_no_occlu);
-    alpha = 1.0 - alpha;
+    float alpha = (accum_data.weight == 0.0) ? 0.0 : accum_opacity * accum_occlu;
+    float one_minus_alpha = 1.0 - alpha;
 
-    accum_data.color += ring_data.color * alpha;
-    accum_data.coc += ring_data.coc * alpha;
-    accum_data.coc_sqr += ring_data.coc_sqr * alpha;
-    accum_data.weight += ring_data.weight * alpha;
+    accum_data.color += ring_data.color * one_minus_alpha;
+    accum_data.coc += ring_data.coc * one_minus_alpha;
+    accum_data.coc_sqr += ring_data.coc_sqr * one_minus_alpha;
+    accum_data.weight += ring_data.weight * one_minus_alpha;
 
-    accum_data.transparency += (1.0 - ring_opacity) * alpha;
+    accum_data.transparency *= 1.0 - ring_opacity;
   }
   else {
     /* Ring occludes the accum_data (Same as reference). */
-    float alpha = (accum_data.weight == 0.0) ? 0.0 : (1.0 - ring_opacity * ring_no_occlu);
+    float alpha = (accum_data.weight == 0.0) ? 1.0 : (ring_opacity * ring_occlu);
+    float one_minus_alpha = 1.0 - alpha;
 
-    accum_data.color = accum_data.color * alpha + ring_data.color;
-    accum_data.coc = accum_data.coc * alpha + ring_data.coc;
-    accum_data.coc_sqr = accum_data.coc_sqr * alpha + ring_data.coc_sqr;
-    accum_data.weight = accum_data.weight * alpha + ring_data.weight;
+    accum_data.color = accum_data.color * one_minus_alpha + ring_data.color;
+    accum_data.coc = accum_data.coc * one_minus_alpha + ring_data.coc;
+    accum_data.coc_sqr = accum_data.coc_sqr * one_minus_alpha + ring_data.coc_sqr;
+    accum_data.weight = accum_data.weight * one_minus_alpha + ring_data.weight;
   }
 }
 
@@ -386,42 +431,55 @@ void dof_gather_accumulate_center_sample(DofGatherData center_data,
   float layer_weight = dof_layer_weight(center_data.coc, is_foreground);
   float sample_weight = dof_sample_weight(center_data.coc);
   float weight = layer_weight * sample_weight;
+  float accum_weight = dof_gather_accum_weight(center_data.coc, bordering_radius, false);
 
   if (do_fast_gather) {
     /* Hope for the compiler to optimize the above. */
     layer_weight = 1.0;
     sample_weight = 1.0;
+    accum_weight = 1.0;
     weight = 1.0;
   }
 
-  float coc = is_foreground ? -center_data.coc : center_data.coc;
-  center_data.transparency = saturate(coc - bordering_radius);
+  center_data.transparency = 1.0 - weight;
+  center_data.transparency_weight = 1.0;
 
-  /* Fix an issue with last ring opacity not contributing enough. */
-  if (is_foreground) {
-    center_data.transparency = 0.0;
+  dof_gather_accumulate_sample(center_data, weight * accum_weight, accum_data);
+
+  if (!do_fast_gather) {
+    /* Logic of dof_gather_accumulate_sample(). */
+    weight *= (1.0 - accum_weight);
+    center_data.coc_sqr = center_data.coc * (center_data.coc * weight);
+    center_data.color *= weight;
+    center_data.coc *= weight;
+    center_data.weight = weight;
+
+    accum_data.layer_opacity += layer_weight;
+
+    /* Accumulate center as its own ring. */
+    dof_gather_accumulate_sample_ring(
+        center_data, 1, false, do_fast_gather, is_foreground, accum_data);
   }
-
-  /* Logic of dof_gather_accumulate_sample */
-  center_data.coc_sqr = center_data.coc * (center_data.coc * weight);
-  center_data.color *= weight;
-  center_data.coc *= weight;
-  center_data.weight = weight;
-
-  accum_data.layer_opacity += layer_weight;
-
-  /* Accumulate center as its own rign. */
-  dof_gather_accumulate_sample_ring(
-      center_data, 1, false, do_fast_gather, is_foreground, accum_data);
 }
 
-float dof_gather_total_sample_count(const int ring_count)
+int dof_gather_total_sample_count(const int ring_count, const int ring_density)
 {
-  float float_ring = float(ring_count);
-  return ((float_ring * float_ring - float_ring) * 2.0 + 1.0) * 2.0;
+  return (ring_count * ring_count - ring_count) * ring_density + 1;
 }
 
-void dof_gather_accumulate_resolve(const int ring_count,
+int dof_gather_total_sample_count_with_density_change(const int ring_count,
+                                                      const int ring_density,
+                                                      int density_change)
+{
+  int sample_count_per_density_change = dof_gather_total_sample_count(ring_count, ring_density) -
+                                        dof_gather_total_sample_count(
+                                            ring_count - gather_density_change_ring, ring_density);
+
+  return dof_gather_total_sample_count(ring_count, ring_density) +
+         sample_count_per_density_change * density_change;
+}
+
+void dof_gather_accumulate_resolve(int total_sample_count,
                                    DofGatherData accum_data,
                                    out vec4 out_col,
                                    out float out_weight,
@@ -431,16 +489,16 @@ void dof_gather_accumulate_resolve(const int ring_count,
   out_col = accum_data.color * weight_inv;
   out_occlusion = vec2(abs(accum_data.coc), accum_data.coc_sqr) * weight_inv;
 
+#ifdef DOF_FOREGROUND_PASS
+  out_weight = 1.0 - accum_data.transparency;
+#else
   if (accum_data.weight > 0.0) {
-    out_weight = accum_data.layer_opacity * safe_rcp(dof_gather_total_sample_count(ring_count));
-    /* Gathering may not accumulate to 1.0 alpha because of float precision. */
-    if (out_weight > 0.99) {
-      out_weight = 1.0;
-    }
+    out_weight = accum_data.layer_opacity * safe_rcp(float(total_sample_count));
   }
-  else {
-    /* Avoid dark fringe since the gather area can be larger than actual radius. */
-    out_weight = 0.0;
+#endif
+  /* Gathering may not accumulate to 1.0 alpha because of float precision. */
+  if (out_weight > 0.99) {
+    out_weight = 1.0;
   }
 }
 

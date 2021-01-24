@@ -55,16 +55,18 @@ void main(void)
     discard;
   }
 
-  /* Works because target is the same size as occlusionBuffer. */
-  vec2 uv = gl_FragCoord.xy / vec2(textureSize(occlusionBuffer, 0).xy);
-  vec2 occlusion_data = texture(occlusionBuffer, uv).rg;
-  /* Fix tilling artifacts. (Slide 90) */
-  const float correction_fac = 1.0 - DOF_FAST_GATHER_COC_ERROR;
-  /* Occlude the sprite with geometry from the same field
-   * using a VSM like chebychev test (slide 85). */
-  float mean = occlusion_data.x;
-  float variance = occlusion_data.x;
-  shapes *= variance * safe_rcp(variance + sqr(max(cocs * correction_fac - mean, 0.0)));
+  if (!no_scatter_occlusion) {
+    /* Works because target is the same size as occlusionBuffer. */
+    vec2 uv = gl_FragCoord.xy / vec2(textureSize(occlusionBuffer, 0).xy);
+    vec2 occlusion_data = texture(occlusionBuffer, uv).rg;
+    /* Fix tilling artifacts. (Slide 90) */
+    const float correction_fac = 1.0 - DOF_FAST_GATHER_COC_ERROR;
+    /* Occlude the sprite with geometry from the same field
+     * using a VSM like chebychev test (slide 85). */
+    float mean = occlusion_data.x;
+    float variance = occlusion_data.x;
+    shapes *= variance * safe_rcp(variance + sqr(max(cocs * correction_fac - mean, 0.0)));
+  }
 
   fragColor = color1 * shapes.x;
   fragColor += color2 * shapes.y;

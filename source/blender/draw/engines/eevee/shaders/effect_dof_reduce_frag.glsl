@@ -68,8 +68,12 @@ void main()
   bool do_scatter = any(greaterThan(outColor.rgb, vec3(scatterColorThreshold)));
   /* Only scatter if CoC is big enough. */
   do_scatter = do_scatter && (abs(outCoc) > scatterCocThreshold);
+  /* Only scatter if CoC is not too big to avoid performance issues. */
+  do_scatter = do_scatter && (abs(outCoc) < 200.0); /* TODO(fclem) user threshold. */
   /* Only scatter if neighborhood is different enough. */
   do_scatter = do_scatter && dof_scatter_neighborhood_rejection(outColor.rgb);
+  /* For debuging. */
+  do_scatter = !no_scatter_pass && do_scatter;
 
   /**
    * NOTE: Here we deviate from the reference implementation. Since we cannot write a sprite list
@@ -103,6 +107,7 @@ void main()
   }
 
   vec4 weights = dof_downsample_bilateral_coc_weights(cocs);
+  weights *= dof_downsample_bilateral_color_weights(colors);
   /* Normalize so that the sum is 1. */
   weights *= safe_rcp(sum(weights));
 

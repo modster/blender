@@ -58,6 +58,10 @@ vec4 median_filter(sampler2D tex, vec2 uv)
     samples[s] = textureLod(tex, uv + ofs[s] * texel_size, 0.0);
   }
 
+  if (no_gather_filtering) {
+    return samples[4];
+  }
+
   for (int s = 0; s < 9; s += 3) {
     lmh(samples[s], samples[s + 1], samples[s + 2], samples[s], samples[s + 1], samples[s + 2]);
   }
