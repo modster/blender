@@ -270,12 +270,11 @@ struct DofGatherData {
   float coc_sqr;
   /* For ring bucket merging. */
   float transparency;
-  float transparency_weight;
 
   float layer_opacity;
 };
 
-#define GATHER_DATA_INIT DofGatherData(vec4(0.0), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+#define GATHER_DATA_INIT DofGatherData(vec4(0.0), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 void dof_gather_ammend_weight(inout DofGatherData sample_data, float weight)
 {
@@ -312,7 +311,7 @@ void dof_gather_accumulate_sample_pair(DofGatherData pair_data[2],
     return;
   }
 
-#if defined(DOF_HOLEFILL_PASS) || defined(DOF_FOREGROUND_PASS)
+#if defined(DOF_HOLEFILL_PASS)
   const float mirroring_threshold = -layer_threshold - layer_offset;
   /* TODO(fclem) Promote to parameter? dither with Noise? */
   const float mirroring_min_distance = 15.0;
@@ -343,13 +342,13 @@ void dof_gather_accumulate_sample_pair(DofGatherData pair_data[2],
 
     accum_data.layer_opacity += layer_weight;
 
-#ifdef DOF_FOREGROUND_PASS
-    ring_data.transparency += 1.0 - weight;
-#else
-    float coc = is_foreground ? -pair_data[i].coc : pair_data[i].coc;
-    ring_data.transparency += saturate(coc - bordering_radius);
-#endif
-    ring_data.transparency_weight += 1.0;
+    if (is_foreground) {
+      ring_data.transparency += 1.0 - inter_weight * layer_weight;
+    }
+    else {
+      float coc = is_foreground ? -pair_data[i].coc : pair_data[i].coc;
+      ring_data.transparency += saturate(coc - bordering_radius);
+    }
   }
 }
 
@@ -373,7 +372,7 @@ void dof_gather_accumulate_sample_ring(DofGatherData ring_data,
     accum_data.coc_sqr = ring_data.coc_sqr;
     accum_data.weight = ring_data.weight;
 
-    accum_data.transparency = ring_data.transparency / ring_data.transparency_weight;
+    accum_data.transparency = ring_data.transparency / float(sample_count);
     return;
   }
 
@@ -387,7 +386,7 @@ void dof_gather_accumulate_sample_ring(DofGatherData ring_data,
   /* Smooth test to set opacity to see if the ring average coc occludes the accumulation.
    * Test is reversed to be multiplied against opacity. */
   float ring_occlu = saturate(accum_avg_coc - ring_avg_coc);
-  float accum_occlu = saturate(ring_avg_coc - accum_avg_coc + 1.0);
+  float accum_occlu = saturate(ring_avg_coc * 1.5 - accum_avg_coc + 2.0);
 
   if (no_gather_occlusion) {
     ring_occlu = 0.0;
@@ -395,7 +394,7 @@ void dof_gather_accumulate_sample_ring(DofGatherData ring_data,
   }
 
   /* (Slide 40) */
-  float ring_opacity = saturate(1.0 - ring_data.transparency / ring_data.transparency_weight);
+  float ring_opacity = saturate(1.0 - ring_data.transparency / float(sample_count));
   float accum_opacity = 1.0 - accum_data.transparency;
 
   if (reversed_occlusion) {
@@ -442,7 +441,6 @@ void dof_gather_accumulate_center_sample(DofGatherData center_data,
   }
 
   center_data.transparency = 1.0 - weight;
-  center_data.transparency_weight = 1.0;
 
   dof_gather_accumulate_sample(center_data, weight * accum_weight, accum_data);
 
