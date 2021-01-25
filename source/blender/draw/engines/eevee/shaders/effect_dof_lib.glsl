@@ -502,12 +502,18 @@ void dof_gather_accumulate_resolve(int total_sample_count,
   out_weight = 1.0 - accum_data.transparency;
 #else
   if (accum_data.weight > 0.0) {
-    out_weight = accum_data.layer_opacity * safe_rcp(float(total_sample_count));
+    out_weight = accum_data.layer_opacity / float(total_sample_count);
+  }
+  else {
+    out_weight = 0.0;
   }
 #endif
   /* Gathering may not accumulate to 1.0 alpha because of float precision. */
   if (out_weight > 0.99) {
     out_weight = 1.0;
+  }
+  else if (out_weight < 0.01) {
+    out_weight = 0.0;
   }
 }
 
