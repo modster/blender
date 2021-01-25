@@ -14,6 +14,9 @@ uniform float scatterCocThreshold;
 
 /* -------------- Debug Defines ------------- */
 
+// #define DOF_DEBUG_GATHER_PERF
+// #define DOF_DEBUG_SCATTER_PERF
+
 const bool no_smooth_intersection = false;
 const bool no_gather_occlusion = false;
 const bool no_gather_mipmaps = false;

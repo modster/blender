@@ -208,11 +208,16 @@ void dof_gather_accumulator(float base_radius,
       gather_ring_count, gather_ring_density, density_change);
   dof_gather_accumulate_resolve(total_sample_count, accum_data, outColor, outWeight, outOcclusion);
 
-#if 0 /* Debug. */
+#if defined(DOF_DEBUG_GATHER_PERF)
   if (density_change > 0) {
     float fac = saturate(float(density_change) / float(10.0));
-    outColor.rgb = outColor.rgb * vec3(fac, 1.0 - fac, 0.2);
+    outColor.rgb = avg(outColor.rgb) * neon_gradient(fac);
   }
+  if (do_fast_gather) {
+    outColor.rgb = avg(outColor.rgb) * vec3(0.0, 1.0, 0.0);
+  }
+#elif defined(DOF_DEBUG_SCATTER_PERF)
+  outColor.rgb = avg(outColor.rgb) * vec3(0.0, 1.0, 0.0);
 #endif
 }
 
@@ -273,10 +278,4 @@ void main()
   else {
     dof_gather_accumulator(base_radius, min_intersectable_radius, false, false);
   }
-
-#if 0 /* Debug. */
-  if (do_fast_gather) {
-    outColor.rgb = outColor.rgb * vec3(0.5, 1.0, 0.5) + vec3(0.5, 1.0, 0.5) * 0.1;
-  }
-#endif
 }

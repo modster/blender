@@ -75,4 +75,8 @@ void main(void)
 
   /* Do not accumulate alpha. This has already been accumulated by the gather pass. */
   fragColor.a = 0.0;
+
+#ifdef DOF_DEBUG_SCATTER_PERF
+  fragColor.rgb = avg(fragColor.rgb) * vec3(1.0, 0.0, 0.0);
+#endif
 }

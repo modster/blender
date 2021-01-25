@@ -149,3 +149,14 @@ vec2 fast_acos(vec2 v)
 }
 
 /** \} */
+
+/*
+ * For debugging purpose mainly.
+ * From https://www.shadertoy.com/view/4dsSzr
+ * By Morgan McGuire @morgan3d, http://graphicscodex.com
+ * Reuse permitted under the BSD license.
+ */
+vec3 neon_gradient(float t)
+{
+  return clamp(vec3(t * 1.3 + 0.1, sqr(abs(0.43 - t) * 1.7), (1.0 - t) * 1.7), 0.0, 1.0);
+}
