@@ -219,6 +219,7 @@ void Scene::free_memory(bool final)
   objects.clear();
   lights.clear();
   particle_systems.clear();
+  procedurals.clear();
 
   if (device) {
     camera->device_free(device, &dscene, this);
@@ -817,12 +818,8 @@ template<> void Scene::delete_node_impl(Shader * /*node*/)
 
 template<> void Scene::delete_node_impl(Procedural *node)
 {
-#ifdef WITH_ALEMBIC
   delete_node_from_array(procedurals, node);
   procedural_manager->tag_update();
-#else
-  (void)node;
-#endif
 }
 
 template<> void Scene::delete_node_impl(AlembicProcedural *node)
