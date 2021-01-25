@@ -1240,6 +1240,8 @@ void GeometryManager::device_update_bvh(Device *device,
 
   device->build_bvh(bvh, progress, can_refit);
 
+  std::cerr << "Total time spent building tlas : " << std::abs(bvh->build_time) << '\n';
+
   if (progress.get_cancel()) {
     return;
   }
@@ -1318,53 +1320,61 @@ void GeometryManager::device_update_bvh(Device *device,
   /* When using BVH2, we always have to copy/update the data as its layout is dependent on the
    * BVH's leaf nodes which may be different when the objects or vertices move. */
 
-  if (pack.nodes.size()) {
-    dscene->bvh_nodes.steal_data(pack.nodes);
-    dscene->bvh_nodes.copy_to_device();
-  }
-  if (pack.leaf_nodes.size()) {
-    dscene->bvh_leaf_nodes.steal_data(pack.leaf_nodes);
-    dscene->bvh_leaf_nodes.copy_to_device();
-  }
-  if (pack.object_node.size()) {
-    dscene->object_node.steal_data(pack.object_node);
-    dscene->object_node.copy_to_device();
-  }
-  if (pack.prim_tri_index.size() && (dscene->prim_tri_index.need_realloc() || has_bvh2_layout)) {
-    dscene->prim_tri_index.steal_data(pack.prim_tri_index);
-    dscene->prim_tri_index.copy_to_device();
-  }
-  if (pack.prim_tri_verts.size()) {
-    dscene->prim_tri_verts.steal_data(pack.prim_tri_verts);
-    dscene->prim_tri_verts.copy_to_device();
-  }
-  if (pack.prim_type.size() && (dscene->prim_type.need_realloc() || has_bvh2_layout)) {
-    dscene->prim_type.steal_data(pack.prim_type);
-    dscene->prim_type.copy_to_device();
-  }
-  if (pack.prim_visibility.size() && (dscene->prim_visibility.need_realloc() || has_bvh2_layout)) {
-    dscene->prim_visibility.steal_data(pack.prim_visibility);
-    dscene->prim_visibility.copy_to_device();
-  }
-  if (pack.prim_index.size() && (dscene->prim_index.need_realloc() || has_bvh2_layout)) {
-    dscene->prim_index.steal_data(pack.prim_index);
-    dscene->prim_index.copy_to_device();
-  }
-  if (pack.prim_object.size() && (dscene->prim_object.need_realloc() || has_bvh2_layout)) {
-    dscene->prim_object.steal_data(pack.prim_object);
-    dscene->prim_object.copy_to_device();
-  }
-  if (pack.prim_time.size() && (dscene->prim_time.need_realloc() || has_bvh2_layout)) {
-    dscene->prim_time.steal_data(pack.prim_time);
-    dscene->prim_time.copy_to_device();
-  }
+  {
+    scoped_callback_timer timer([scene](double time) {
+      if (scene->update_stats) {
+        scene->update_stats->geometry.times.add_entry(
+            {"device_update (copy packed BVH to device)", time});
+      }
+    });
+    if (pack.nodes.size()) {
+      dscene->bvh_nodes.steal_data(pack.nodes);
+      dscene->bvh_nodes.copy_to_device();
+    }
+    if (pack.leaf_nodes.size()) {
+      dscene->bvh_leaf_nodes.steal_data(pack.leaf_nodes);
+      dscene->bvh_leaf_nodes.copy_to_device();
+    }
+    if (pack.object_node.size()) {
+      dscene->object_node.steal_data(pack.object_node);
+      dscene->object_node.copy_to_device();
+    }
+    if (pack.prim_tri_index.size() && (dscene->prim_tri_index.need_realloc() || has_bvh2_layout)) {
+      dscene->prim_tri_index.steal_data(pack.prim_tri_index);
+      dscene->prim_tri_index.copy_to_device();
+    }
+    if (pack.prim_tri_verts.size()) {
+      dscene->prim_tri_verts.steal_data(pack.prim_tri_verts);
+      dscene->prim_tri_verts.copy_to_device();
+    }
+    if (pack.prim_type.size() && (dscene->prim_type.need_realloc() || has_bvh2_layout)) {
+      dscene->prim_type.steal_data(pack.prim_type);
+      dscene->prim_type.copy_to_device();
+    }
+    if (pack.prim_visibility.size() && (dscene->prim_visibility.need_realloc() || has_bvh2_layout)) {
+      dscene->prim_visibility.steal_data(pack.prim_visibility);
+      dscene->prim_visibility.copy_to_device();
+    }
+    if (pack.prim_index.size() && (dscene->prim_index.need_realloc() || has_bvh2_layout)) {
+      dscene->prim_index.steal_data(pack.prim_index);
+      dscene->prim_index.copy_to_device();
+    }
+    if (pack.prim_object.size() && (dscene->prim_object.need_realloc() || has_bvh2_layout)) {
+      dscene->prim_object.steal_data(pack.prim_object);
+      dscene->prim_object.copy_to_device();
+    }
+    if (pack.prim_time.size() && (dscene->prim_time.need_realloc() || has_bvh2_layout)) {
+      dscene->prim_time.steal_data(pack.prim_time);
+      dscene->prim_time.copy_to_device();
+    }
 
-  dscene->data.bvh.root = pack.root_index;
-  dscene->data.bvh.bvh_layout = bparams.bvh_layout;
-  dscene->data.bvh.use_bvh_steps = (scene->params.num_bvh_time_steps != 0);
-  dscene->data.bvh.curve_subdivisions = scene->params.curve_subdivisions();
-  /* The scene handle is set in 'CPUDevice::const_copy_to' and 'OptiXDevice::const_copy_to' */
-  dscene->data.bvh.scene = NULL;
+    dscene->data.bvh.root = pack.root_index;
+    dscene->data.bvh.bvh_layout = bparams.bvh_layout;
+    dscene->data.bvh.use_bvh_steps = (scene->params.num_bvh_time_steps != 0);
+    dscene->data.bvh.curve_subdivisions = scene->params.curve_subdivisions();
+    /* The scene handle is set in 'CPUDevice::const_copy_to' and 'OptiXDevice::const_copy_to' */
+    dscene->data.bvh.scene = NULL;
+  }
 }
 
 /* Set of flags used to help determining what data has been modified or needs reallocation, so we
@@ -1913,8 +1923,12 @@ void GeometryManager::device_update(Device *device,
     foreach (Geometry *geom, scene->geometry) {
       if (geom->is_modified()) {
         need_update_scene_bvh = true;
+#if 1
         pool.push(function_bind(
             &Geometry::compute_bvh, geom, device, dscene, &scene->params, &progress, i, num_bvh));
+#else
+        geom->compute_bvh(device, dscene, &scene->params, &progress, i, num_bvh);
+#endif
         if (geom->need_build_bvh(bvh_layout)) {
           i++;
         }
@@ -1924,6 +1938,13 @@ void GeometryManager::device_update(Device *device,
     TaskPool::Summary summary;
     pool.wait_work(&summary);
     VLOG(2) << "Objects BVH build pool statistics:\n" << summary.full_report();
+
+    auto total_build_time = 0.0;
+    for (Geometry *geom : scene->geometry) {
+      total_build_time += std::abs(geom->bvh->build_time);
+      geom->bvh->build_time = 0.0;
+    }
+    std::cerr << "Total time spent building BLAS : " << total_build_time << '\n';
   }
 
   foreach (Shader *shader, scene->shaders) {

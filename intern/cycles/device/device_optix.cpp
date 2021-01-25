@@ -1193,6 +1193,7 @@ class OptiXDevice : public CUDADevice {
     // Make sure this pointer is 8-byte aligned
     compacted_size_prop.result = align_up(temp_mem.device_pointer + sizes.tempSizeInBytes, 8);
 
+    bvh->build_time = time_dt();
     OptixTraversableHandle out_handle = 0;
     check_result_optix_ret(optixAccelBuild(context,
                                            NULL,
@@ -1210,6 +1211,7 @@ class OptiXDevice : public CUDADevice {
 
     // Wait for all operations to finish
     check_result_cuda_ret(cuStreamSynchronize(NULL));
+    bvh->build_time -= time_dt();
 
     // Compact acceleration structure to save memory (do not do this in viewport for faster builds)
     if (background) {

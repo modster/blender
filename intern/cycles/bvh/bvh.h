@@ -84,6 +84,7 @@ class BVH {
   vector<Object *> objects;
 
   int num_refits;
+  double build_time = 0.0;
 
   static BVH *create(const BVHParams &params,
                      const vector<Geometry *> &geometry,
