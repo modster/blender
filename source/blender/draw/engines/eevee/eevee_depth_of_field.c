@@ -325,7 +325,13 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
                                  EEVEE_EffectsInfo *fx)
 {
   const float *fullres = DRW_viewport_size_get();
-  int mip_count = 4; /* TODO(fclem) depends on max blur radius. */
+
+  /* Divide by 2 because dof_fx_max_coc is in fullres CoC radius and the reduce texture begins at
+   * half resolution. */
+  float max_space_between_sample = fx->dof_fx_max_coc * 0.5f / GATHER_RING_COUNT;
+
+  int mip_count = max_ii(1, log2_ceil_u(max_space_between_sample));
+
   fx->dof_reduce_steps = mip_count - 1;
   /* This ensure the mipmaps are aligned for the needed 4 mip levels.
    * Starts at 2 because already at half resolution. */
@@ -391,6 +397,16 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_texture_ref_ex(
         grp, "cocBuffer", &fx->dof_reduce_input_coc_tx, NO_FILTERING);
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+  }
+
+  if (txl->dof_reduced_color) {
+    /* TODO(fclem) In the future, we need to check if mip_count did not change.
+     * For now it's ok as we always define all mip level.*/
+    if (res[0] != GPU_texture_width(txl->dof_reduced_color) ||
+        res[1] != GPU_texture_width(txl->dof_reduced_color)) {
+      DRW_TEXTURE_FREE_SAFE(txl->dof_reduced_color);
+      DRW_TEXTURE_FREE_SAFE(txl->dof_reduced_coc);
+    }
   }
 
   if (txl->dof_reduced_color == NULL) {
