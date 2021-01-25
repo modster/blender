@@ -229,7 +229,7 @@ void main()
 #if defined(DOF_FOREGROUND_PASS)
   float base_radius = -coc_tile.fg_min_coc;
   float min_radius = -coc_tile.fg_max_coc;
-  float min_intersectable_radius = min_radius;
+  float min_intersectable_radius = -coc_tile.fg_max_intersectable_coc;
 
 #elif defined(DOF_HOLEFILL_PASS)
   float base_radius = -coc_tile.fg_min_coc;
@@ -240,7 +240,6 @@ void main()
   float base_radius = coc_tile.bg_max_coc;
   float min_radius = coc_tile.bg_min_coc;
   float min_intersectable_radius = coc_tile.bg_min_intersectable_coc;
-  // float min_intersectable_radius = min_radius;
 
 #endif
   /* Allow for a 5% radius difference. */

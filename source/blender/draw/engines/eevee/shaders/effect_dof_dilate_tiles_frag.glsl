@@ -15,8 +15,8 @@ uniform int ringWidthMultiplier;
 uniform bool dilateSlightFocus;
 
 /* 1/16th of fullres. Same format as input. */
-layout(location = 0) out vec3 outFgCoc; /* Min, Max, MaxSlightFocus */
-layout(location = 1) out vec3 outBgCoc; /* Min, Max, MinIntersectable */
+layout(location = 0) out vec4 outFgCoc;
+layout(location = 1) out vec3 outBgCoc;
 
 const float tile_to_fullres_factor = 16.0;
 
@@ -63,6 +63,9 @@ void main()
         float closest_neighbor_distance = length(max(abs(vec2(offset)) - 1.0, 0.0)) *
                                           tile_to_fullres_factor;
 
+        ring_buckets[ring].fg_max_intersectable_coc = max(
+            ring_buckets[ring].fg_max_intersectable_coc,
+            adj_tile.fg_max_intersectable_coc + closest_neighbor_distance);
         ring_buckets[ring].bg_min_intersectable_coc = min(
             ring_buckets[ring].bg_min_intersectable_coc,
             adj_tile.bg_min_intersectable_coc + closest_neighbor_distance);
@@ -100,6 +103,8 @@ void main()
      * computed maximum CoC values. */
     if (-out_tile.fg_min_coc * bluring_radius_error > ring_distance) {
       out_tile.fg_max_coc = max(out_tile.fg_max_coc, ring_buckets[ring].fg_max_coc);
+      out_tile.fg_max_intersectable_coc = max(out_tile.fg_max_intersectable_coc,
+                                              ring_buckets[ring].fg_max_intersectable_coc);
     }
 
     if (out_tile.bg_max_coc * bluring_radius_error > ring_distance) {
@@ -110,6 +115,5 @@ void main()
 #endif
   }
 
-  outFgCoc = vec3(-out_tile.fg_min_coc, -out_tile.fg_max_coc, out_tile.fg_slight_focus_max_coc);
-  outBgCoc = vec3(out_tile.bg_min_coc, out_tile.bg_max_coc, out_tile.bg_min_intersectable_coc);
+  dof_coc_tile_store(out_tile, outFgCoc, outBgCoc);
 }

@@ -200,6 +200,7 @@ float dof_gather_accum_weight(float coc, float bordering_radius, bool first_ring
 struct CocTile {
   float fg_min_coc;
   float fg_max_coc;
+  float fg_max_intersectable_coc;
   float fg_slight_focus_max_coc;
   float bg_min_coc;
   float bg_max_coc;
@@ -218,6 +219,7 @@ CocTile dof_coc_tile_init(void)
   CocTile tile;
   tile.fg_min_coc = 0.0;
   tile.fg_max_coc = -DOF_TILE_LARGE_COC;
+  tile.fg_max_intersectable_coc = DOF_TILE_LARGE_COC;
   tile.fg_slight_focus_max_coc = -1.0;
   tile.bg_min_coc = DOF_TILE_LARGE_COC;
   tile.bg_max_coc = 0.0;
@@ -230,17 +232,29 @@ CocTile dof_coc_tile_load(sampler2D fg_buffer, sampler2D bg_buffer, ivec2 tile_c
   ivec2 tex_size = textureSize(fg_buffer, 0).xy;
   tile_co = clamp(tile_co, ivec2(0), tex_size - 1);
 
-  vec3 fg = texelFetch(fg_buffer, tile_co, 0).xyz;
+  vec4 fg = texelFetch(fg_buffer, tile_co, 0);
   vec3 bg = texelFetch(bg_buffer, tile_co, 0).xyz;
 
   CocTile tile;
   tile.fg_min_coc = -fg.x;
   tile.fg_max_coc = -fg.y;
-  tile.fg_slight_focus_max_coc = fg.z;
+  tile.fg_max_intersectable_coc = -fg.z;
+  tile.fg_slight_focus_max_coc = fg.w;
   tile.bg_min_coc = bg.x;
   tile.bg_max_coc = bg.y;
   tile.bg_min_intersectable_coc = bg.z;
   return tile;
+}
+
+void dof_coc_tile_store(CocTile tile, out vec4 out_fg, out vec3 out_bg)
+{
+  out_fg.x = -tile.fg_min_coc;
+  out_fg.y = -tile.fg_max_coc;
+  out_fg.z = -tile.fg_max_intersectable_coc;
+  out_fg.w = tile.fg_slight_focus_max_coc;
+  out_bg.x = tile.bg_min_coc;
+  out_bg.y = tile.bg_max_coc;
+  out_bg.z = tile.bg_min_intersectable_coc;
 }
 
 /* Special function to return the correct max value of 2 slight focus coc. */

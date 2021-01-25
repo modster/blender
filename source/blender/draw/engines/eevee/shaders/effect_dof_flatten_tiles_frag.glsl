@@ -13,8 +13,8 @@
 uniform sampler2D halfResCocBuffer;
 
 /* 1/8th of halfResCocBuffer resolution. So 1/16th of fullres. */
-layout(location = 0) out vec3 outFgCoc; /* Min, Max, MaxSlightFocus */
-layout(location = 1) out vec3 outBgCoc; /* Min, Max, MinIntersectable */
+layout(location = 0) out vec4 outFgCoc;
+layout(location = 1) out vec3 outBgCoc;
 
 void main()
 {
@@ -42,12 +42,14 @@ void main()
       if (sample_coc > 0.0) {
         tile.bg_min_intersectable_coc = min(tile.bg_min_intersectable_coc, bg_coc);
       }
+      if (sample_coc < 0.0) {
+        tile.fg_max_intersectable_coc = max(tile.fg_max_intersectable_coc, fg_coc);
+      }
 
       tile.fg_slight_focus_max_coc = dof_coc_max_slight_focus(tile.fg_slight_focus_max_coc,
                                                               sample_slight_focus_coc);
     }
   }
 
-  outFgCoc = vec3(-tile.fg_min_coc, -tile.fg_max_coc, tile.fg_slight_focus_max_coc);
-  outBgCoc = vec3(tile.bg_min_coc, tile.bg_max_coc, tile.bg_min_intersectable_coc);
+  dof_coc_tile_store(tile, outFgCoc, outBgCoc);
 }
