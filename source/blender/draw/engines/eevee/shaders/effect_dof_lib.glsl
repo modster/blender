@@ -388,7 +388,11 @@ void dof_gather_accumulate_sample_ring(DofGatherData ring_data,
   float ring_occlu = saturate(accum_avg_coc - ring_avg_coc);
   /* The bias here is arbitrary. Seems to avoid weird looking foreground in most cases.
    * We might need to make it a parameter or find a relative bias. */
-  float accum_occlu = saturate(ring_avg_coc - accum_avg_coc - 10.0);
+  float accum_occlu = saturate((ring_avg_coc - accum_avg_coc) * 0.1 - 1.0);
+
+#ifdef DOF_RESOLVE_PASS
+  ring_occlu = accum_occlu = 0.0;
+#endif
 
   if (no_gather_occlusion) {
     ring_occlu = 0.0;
