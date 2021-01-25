@@ -2280,6 +2280,20 @@ static bool rna_SpaceNodeEditor_tree_type_poll(void *Cv, bNodeTreeType *type)
   }
 }
 
+static void rna_SpaceNodeEditor_cursor_location_get(PointerRNA *ptr, float value[2])
+{
+  const SpaceNode *snode = (SpaceNode *)ptr->data;
+
+  ED_node_cursor_location_get(snode, value);
+}
+
+static void rna_SpaceNodeEditor_cursor_location_set(PointerRNA *ptr, const float value[2])
+{
+  SpaceNode *snode = (SpaceNode *)ptr->data;
+
+  ED_node_cursor_location_set(snode, value);
+}
+
 const EnumPropertyItem *RNA_enum_node_tree_types_itemf_impl(bContext *C, bool *r_free)
 {
   return rna_node_tree_type_itemf(C, rna_SpaceNodeEditor_tree_type_poll, r_free);
@@ -2347,9 +2361,13 @@ static void rna_SpaceNodeEditor_cursor_location_from_region(SpaceNode *snode,
 {
   ARegion *region = CTX_wm_region(C);
 
-  UI_view2d_region_to_view(&region->v2d, x, y, &snode->cursor[0], &snode->cursor[1]);
-  snode->cursor[0] /= UI_DPI_FAC;
-  snode->cursor[1] /= UI_DPI_FAC;
+  float cursor_location[2];
+
+  UI_view2d_region_to_view(&region->v2d, x, y, &cursor_location[0], &cursor_location[1]);
+  cursor_location[0] /= UI_DPI_FAC;
+  cursor_location[1] /= UI_DPI_FAC;
+
+  ED_node_cursor_location_set(snode, cursor_location);
 }
 
 static void rna_SpaceClipEditor_clip_set(PointerRNA *ptr,
@@ -3443,6 +3461,13 @@ static void rna_def_space_outliner(BlenderRNA *brna)
   RNA_def_property_enum_items(prop, rna_enum_id_type_items);
   RNA_def_property_ui_text(prop, "Filter by Type", "Data-block type to show");
   RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_ID);
+
+  prop = RNA_def_property(srna, "use_filter_lib_override", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "filter", SO_FILTER_NO_LIB_OVERRIDE);
+  RNA_def_property_ui_text(prop,
+                           "Show Library Overrides",
+                           "For libraries with overrides created, show the overridden values");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_OUTLINER, NULL);
 }
 
 static void rna_def_space_view3d_shading(BlenderRNA *brna)
@@ -4361,7 +4386,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop,
       "Local View",
-      "Display an isolated sub-set of objects, apart from the scene visibility");
+      "Display an isolated subset of objects, apart from the scene visibility");
 
   prop = RNA_def_property(srna, "lens", PROP_FLOAT, PROP_UNIT_CAMERA);
   RNA_def_property_float_sdna(prop, NULL, "lens");
@@ -4553,7 +4578,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "show_stereo_3d_convergence_plane", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "stereo3d_flag", V3D_S3D_DISPPLANE);
-  RNA_def_property_ui_text(prop, "Plane", "Show the stereo 3d convergence plane");
+  RNA_def_property_ui_text(prop, "Plane", "Show the stereo 3D convergence plane");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
   prop = RNA_def_property(srna, "stereo_3d_convergence_plane_alpha", PROP_FLOAT, PROP_FACTOR);
@@ -4563,7 +4588,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "show_stereo_3d_volume", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "stereo3d_flag", V3D_S3D_DISPVOLUME);
-  RNA_def_property_ui_text(prop, "Volume", "Show the stereo 3d frustum volume");
+  RNA_def_property_ui_text(prop, "Volume", "Show the stereo 3D frustum volume");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
   prop = RNA_def_property(srna, "stereo_3d_volume_alpha", PROP_FLOAT, PROP_FACTOR);
@@ -4777,6 +4802,17 @@ static void rna_def_space_properties(BlenderRNA *brna)
   StructRNA *srna;
   PropertyRNA *prop;
 
+  static const EnumPropertyItem tab_sync_items[] = {
+      {PROPERTIES_SYNC_ON, "ON", 0, "On", "Always sync from outliner editors to this editor"},
+      {PROPERTIES_SYNC_OFF, "OFF", 0, "Off", "Never sync from outliner editors to this editor"},
+      {PROPERTIES_SYNC_AUTO,
+       "AUTO",
+       0,
+       "Auto",
+       "Sync when this editor shares an edge with an outliner editor"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   srna = RNA_def_struct(brna, "SpaceProperties", "Space");
   RNA_def_struct_sdna(srna, "SpaceProperties");
   RNA_def_struct_ui_text(srna, "Properties Space", "Properties space data");
@@ -4827,6 +4863,13 @@ static void rna_def_space_properties(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_TEXTEDIT_UPDATE);
   RNA_def_property_update(
       prop, NC_SPACE | ND_SPACE_PROPERTIES, "rna_SpaceProperties_search_filter_update");
+
+  /* Outliner sync. */
+  prop = RNA_def_property(srna, "outliner_sync", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "outliner_sync");
+  RNA_def_property_enum_items(prop, tab_sync_items);
+  RNA_def_property_ui_text(prop, "Outliner Sync", "Sync tabs from outliner datablock selection");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_PROPERTIES, NULL);
 }
 
 static void rna_def_space_image_overlay(BlenderRNA *brna)
@@ -6269,13 +6312,13 @@ static void rna_def_fileselect_asset_params(BlenderRNA *brna)
        ICON_IMAGE_DATA,
        "Images & Sounds",
        "Show images, movie clips, sounds and masks"},
-      {FILTER_ID_CA | FILTER_ID_LA | FILTER_ID_LP | FILTER_ID_SPK | FILTER_ID_WO | FILTER_ID_WS,
+      {FILTER_ID_CA | FILTER_ID_LA | FILTER_ID_LP | FILTER_ID_SPK | FILTER_ID_WO,
        "ENVIRONMENTS",
        ICON_WORLD_DATA,
        "Environment",
        "Show worlds, lights, cameras and speakers"},
       {FILTER_ID_BR | FILTER_ID_GD | FILTER_ID_PA | FILTER_ID_PAL | FILTER_ID_PC | FILTER_ID_TXT |
-           FILTER_ID_VF | FILTER_ID_CF,
+           FILTER_ID_VF | FILTER_ID_CF | FILTER_ID_WS,
        "MISC",
        ICON_GREASEPENCIL,
        "Miscellaneous",
@@ -6791,11 +6834,13 @@ static void rna_def_space_node(BlenderRNA *brna)
   RNA_def_property_enum_items(prop, backdrop_channels_items);
   RNA_def_property_ui_text(prop, "Display Channels", "Channels of the image to draw");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_NODE_VIEW, NULL);
-
   /* the mx/my "cursor" in the node editor is used only by operators to store the mouse position */
   prop = RNA_def_property(srna, "cursor_location", PROP_FLOAT, PROP_XYZ);
   RNA_def_property_array(prop, 2);
-  RNA_def_property_float_sdna(prop, NULL, "cursor");
+  RNA_def_property_float_funcs(prop,
+                               "rna_SpaceNodeEditor_cursor_location_get",
+                               "rna_SpaceNodeEditor_cursor_location_set",
+                               NULL);
   RNA_def_property_ui_text(prop, "Cursor Location", "Location for adding new nodes");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_NODE_VIEW, NULL);
 

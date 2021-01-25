@@ -957,7 +957,7 @@ class VIEW3D_MT_transform(VIEW3D_MT_transform_base, Menu):
         # generic...
         layout = self.layout
         if context.mode == 'EDIT_MESH':
-            layout.operator("transform.shrink_fatten", text="Shrink Fatten")
+            layout.operator("transform.shrink_fatten", text="Shrink/Fatten")
             layout.operator("transform.skin_resize")
         elif context.mode == 'EDIT_CURVE':
             layout.operator("transform.transform", text="Radius").mode = 'CURVE_SHRINKFATTEN'
@@ -2236,11 +2236,6 @@ class VIEW3D_MT_object_relations(Menu):
         layout.operator_menu_enum("object.make_local", "type", text="Make Local...")
         layout.menu("VIEW3D_MT_make_single_user")
 
-        layout.separator()
-
-        layout.operator("object.data_transfer")
-        layout.operator("object.datalayout_transfer")
-
 
 class VIEW3D_MT_object(Menu):
     bl_context = "objectmode"
@@ -2274,7 +2269,7 @@ class VIEW3D_MT_object(Menu):
         layout.menu("VIEW3D_MT_object_relations")
         layout.menu("VIEW3D_MT_object_constraints")
         layout.menu("VIEW3D_MT_object_track")
-        layout.menu("VIEW3D_MT_make_links", text="Make Links")
+        layout.menu("VIEW3D_MT_make_links")
 
         layout.separator()
 
@@ -2292,16 +2287,7 @@ class VIEW3D_MT_object(Menu):
 
         layout.separator()
 
-        ob = context.active_object
-        if ob and ob.type == 'GPENCIL' and context.gpencil_data:
-            layout.operator_menu_enum("gpencil.convert", "type", text="Convert To")
-        else:
-            layout.operator_menu_enum("object.convert", "target")
-
-        # Potrace lib dependency
-        if bpy.app.build_options.potrace:
-            layout.separator()
-            layout.operator("gpencil.trace_image")
+        layout.menu("VIEW3D_MT_object_convert")
 
         layout.separator()
 
@@ -2420,14 +2406,14 @@ class VIEW3D_MT_object_context_menu(Menu):
             layout.operator_context = 'INVOKE_REGION_WIN'
 
             if obj.data.type == 'PERSP':
-                props = layout.operator("wm.context_modal_mouse", text="Camera Lens Angle")
+                props = layout.operator("wm.context_modal_mouse", text="Adjust Focal Length")
                 props.data_path_iter = "selected_editable_objects"
                 props.data_path_item = "data.lens"
                 props.input_scale = 0.1
                 if obj.data.lens_unit == 'MILLIMETERS':
-                    props.header_text = "Camera Lens Angle: %.1fmm"
+                    props.header_text = "Camera Focal Length: %.1fmm"
                 else:
-                    props.header_text = "Camera Lens Angle: %.1f\u00B0"
+                    props.header_text = "Camera Focal Length: %.1f\u00B0"
 
             else:
                 props = layout.operator("wm.context_modal_mouse", text="Camera Lens Scale")
@@ -2440,24 +2426,24 @@ class VIEW3D_MT_object_context_menu(Menu):
                 if view and view.camera == obj and view.region_3d.view_perspective == 'CAMERA':
                     props = layout.operator("ui.eyedropper_depth", text="DOF Distance (Pick)")
                 else:
-                    props = layout.operator("wm.context_modal_mouse", text="DOF Distance")
+                    props = layout.operator("wm.context_modal_mouse", text="Adjust Focus Distance")
                     props.data_path_iter = "selected_editable_objects"
                     props.data_path_item = "data.dof.focus_distance"
                     props.input_scale = 0.02
-                    props.header_text = "DOF Distance: %.3f"
+                    props.header_text = "Focus Distance: %.3f"
 
             layout.separator()
 
         elif obj.type in {'CURVE', 'FONT'}:
             layout.operator_context = 'INVOKE_REGION_WIN'
 
-            props = layout.operator("wm.context_modal_mouse", text="Extrude Size")
+            props = layout.operator("wm.context_modal_mouse", text="Adjust Extrusion")
             props.data_path_iter = "selected_editable_objects"
             props.data_path_item = "data.extrude"
             props.input_scale = 0.01
-            props.header_text = "Extrude Size: %.3f"
+            props.header_text = "Extrude: %.3f"
 
-            props = layout.operator("wm.context_modal_mouse", text="Width Size")
+            props = layout.operator("wm.context_modal_mouse", text="Adjust Offset")
             props.data_path_iter = "selected_editable_objects"
             props.data_path_item = "data.offset"
             props.input_scale = 0.01
@@ -2483,11 +2469,11 @@ class VIEW3D_MT_object_context_menu(Menu):
         elif obj.type == 'EMPTY':
             layout.operator_context = 'INVOKE_REGION_WIN'
 
-            props = layout.operator("wm.context_modal_mouse", text="Empty Draw Size")
+            props = layout.operator("wm.context_modal_mouse", text="Adjust Empty Display Size")
             props.data_path_iter = "selected_editable_objects"
             props.data_path_item = "empty_display_size"
             props.input_scale = 0.01
-            props.header_text = "Empty Draw Size: %.3f"
+            props.header_text = "Empty Display Size: %.3f"
 
             layout.separator()
 
@@ -2496,31 +2482,37 @@ class VIEW3D_MT_object_context_menu(Menu):
 
             layout.operator_context = 'INVOKE_REGION_WIN'
 
-            props = layout.operator("wm.context_modal_mouse", text="Power")
+            props = layout.operator("wm.context_modal_mouse", text="Adjust Light Power")
             props.data_path_iter = "selected_editable_objects"
             props.data_path_item = "data.energy"
+            props.input_scale = 1.0
             props.header_text = "Light Power: %.3f"
 
             if light.type == 'AREA':
-                props = layout.operator("wm.context_modal_mouse", text="Size X")
-                props.data_path_iter = "selected_editable_objects"
-                props.data_path_item = "data.size"
-                props.header_text = "Light Size X: %.3f"
-
                 if light.shape in {'RECTANGLE', 'ELLIPSE'}:
-                    props = layout.operator("wm.context_modal_mouse", text="Size Y")
+                    props = layout.operator("wm.context_modal_mouse", text="Adjust Area Light X Size")
+                    props.data_path_iter = "selected_editable_objects"
+                    props.data_path_item = "data.size"
+                    props.header_text = "Light Size X: %.3f"
+
+                    props = layout.operator("wm.context_modal_mouse", text="Adjust Area Light Y Size")
                     props.data_path_iter = "selected_editable_objects"
                     props.data_path_item = "data.size_y"
                     props.header_text = "Light Size Y: %.3f"
+                else:
+                    props = layout.operator("wm.context_modal_mouse", text="Adjust Area Light Size")
+                    props.data_path_iter = "selected_editable_objects"
+                    props.data_path_item = "data.size"
+                    props.header_text = "Light Size: %.3f"
 
             elif light.type in {'SPOT', 'POINT'}:
-                props = layout.operator("wm.context_modal_mouse", text="Radius")
+                props = layout.operator("wm.context_modal_mouse", text="Adjust Light Radius")
                 props.data_path_iter = "selected_editable_objects"
                 props.data_path_item = "data.shadow_soft_size"
                 props.header_text = "Light Radius: %.3f"
 
             elif light.type == 'SUN':
-                props = layout.operator("wm.context_modal_mouse", text="Angle")
+                props = layout.operator("wm.context_modal_mouse", text="Adjust Sun Light Angle")
                 props.data_path_iter = "selected_editable_objects"
                 props.data_path_item = "data.angle"
                 props.header_text = "Light Angle: %.3f"
@@ -2528,13 +2520,13 @@ class VIEW3D_MT_object_context_menu(Menu):
             if light.type == 'SPOT':
                 layout.separator()
 
-                props = layout.operator("wm.context_modal_mouse", text="Spot Size")
+                props = layout.operator("wm.context_modal_mouse", text="Adjust Spot Light Size")
                 props.data_path_iter = "selected_editable_objects"
                 props.data_path_item = "data.spot_size"
                 props.input_scale = 0.01
                 props.header_text = "Spot Size: %.2f"
 
-                props = layout.operator("wm.context_modal_mouse", text="Spot Blend")
+                props = layout.operator("wm.context_modal_mouse", text="Adjust Spot Light Blend")
                 props.data_path_iter = "selected_editable_objects"
                 props.data_path_item = "data.spot_blend"
                 props.input_scale = -0.01
@@ -2786,8 +2778,25 @@ class VIEW3D_MT_make_single_user(Menu):
         props.object = props.obdata = props.material = False
 
 
+class VIEW3D_MT_object_convert(Menu):
+    bl_label = "Convert"
+
+    def draw(self, context):
+        layout = self.layout
+        ob = context.active_object
+
+        if ob and ob.type == 'GPENCIL' and context.gpencil_data:
+            layout.operator_enum("gpencil.convert", "type")
+        else:
+            layout.operator_enum("object.convert", "target")
+
+        # Potrace lib dependency.
+        if bpy.app.build_options.potrace:
+            layout.operator("gpencil.trace_image", icon='OUTLINER_OB_GREASEPENCIL')
+
+
 class VIEW3D_MT_make_links(Menu):
-    bl_label = "Make Links"
+    bl_label = "Link/Transfer Data"
 
     def draw(self, _context):
         layout = self.layout
@@ -2795,10 +2804,10 @@ class VIEW3D_MT_make_links(Menu):
 
         if len(bpy.data.scenes) > 10:
             layout.operator_context = 'INVOKE_REGION_WIN'
-            layout.operator("object.make_links_scene", text="Objects to Scene...", icon='OUTLINER_OB_EMPTY')
+            layout.operator("object.make_links_scene", text="Link Objects to Scene...", icon='OUTLINER_OB_EMPTY')
         else:
             layout.operator_context = 'EXEC_REGION_WIN'
-            layout.operator_menu_enum("object.make_links_scene", "scene", text="Objects to Scene")
+            layout.operator_menu_enum("object.make_links_scene", "scene", text="Link Objects to Scene")
 
         layout.separator()
 
@@ -2806,7 +2815,12 @@ class VIEW3D_MT_make_links(Menu):
 
         layout.operator_enum("object.make_links_data", "type")  # inline
 
-        layout.operator("object.join_uvs")  # stupid place to add this!
+        layout.operator("object.join_uvs", text="Copy UV Maps")
+
+        layout.separator()
+
+        layout.operator("object.data_transfer")
+        layout.operator("object.datalayout_transfer")
 
 
 class VIEW3D_MT_brush_paint_modes(Menu):
@@ -5089,7 +5103,7 @@ class VIEW3D_MT_edit_gpencil_transform(Menu):
         layout.operator("transform.bend", text="Bend")
         layout.operator("transform.shear", text="Shear")
         layout.operator("transform.tosphere", text="To Sphere")
-        layout.operator("transform.transform", text="Shrink Fatten").mode = 'GPENCIL_SHRINKFATTEN'
+        layout.operator("transform.transform", text="Shrink/Fatten").mode = 'GPENCIL_SHRINKFATTEN'
 
 
 class VIEW3D_MT_edit_gpencil_showhide(Menu):
@@ -5474,12 +5488,12 @@ class VIEW3D_PT_view3d_lock(Panel):
                     view, "lock_bone", lock_object.data,
                     "edit_bones" if lock_object.mode == 'EDIT'
                     else "bones",
-                    text="",
+                    text="Bone",
                 )
-        else:
-            subcol = sub.column(heading="Lock")
-            subcol.prop(view, "lock_cursor", text="To 3D Cursor")
 
+        col = layout.column(heading="Lock", align=True)
+        if not lock_object:
+            col.prop(view, "lock_cursor", text="To 3D Cursor")
         col.prop(view, "lock_camera", text="Camera to View")
 
 
@@ -7042,7 +7056,7 @@ class VIEW3D_MT_gpencil_edit_context_menu(Menu):
             col.operator("transform.bend", text="Bend")
             col.operator("transform.shear", text="Shear")
             col.operator("transform.tosphere", text="To Sphere")
-            col.operator("transform.transform", text="Shrink Fatten").mode = 'GPENCIL_SHRINKFATTEN'
+            col.operator("transform.transform", text="Shrink/Fatten").mode = 'GPENCIL_SHRINKFATTEN'
 
             col.separator()
 
@@ -7086,7 +7100,7 @@ class VIEW3D_MT_gpencil_edit_context_menu(Menu):
             col.separator()
 
             col.operator("gpencil.stroke_smooth", text="Smooth Stroke").only_selected = False
-            col.operator("transform.transform", text="Shrink Fatten").mode = 'GPENCIL_SHRINKFATTEN'
+            col.operator("transform.transform", text="Shrink/Fatten").mode = 'GPENCIL_SHRINKFATTEN'
 
             col.separator()
 
@@ -7523,6 +7537,7 @@ classes = (
     VIEW3D_MT_object_rigid_body,
     VIEW3D_MT_object_clear,
     VIEW3D_MT_object_context_menu,
+    VIEW3D_MT_object_convert,
     VIEW3D_MT_object_shading,
     VIEW3D_MT_object_apply,
     VIEW3D_MT_object_relations,

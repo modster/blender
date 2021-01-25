@@ -243,9 +243,6 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
 
   /* holdout */
   object->set_use_holdout(use_holdout);
-  if (object->use_holdout_is_modified()) {
-    scene->object_manager->tag_update(scene);
-  }
 
   object->set_visibility(visibility);
 
@@ -348,6 +345,10 @@ static bool lookup_property(BL::ID b_id, const string &name, float4 *r_value)
   PropertyRNA *prop;
 
   if (!RNA_path_resolve(&b_id.ptr, name.c_str(), &ptr, &prop)) {
+    return false;
+  }
+
+  if (prop == NULL) {
     return false;
   }
 

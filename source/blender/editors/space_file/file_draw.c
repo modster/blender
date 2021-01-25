@@ -131,7 +131,15 @@ static void draw_tile(int sx, int sy, int width, int height, int colorid, int sh
   UI_GetThemeColorShade4fv(colorid, shade, color);
   UI_draw_roundbox_corner_set(UI_CNR_ALL);
   UI_draw_roundbox_aa(
-      true, (float)sx, (float)(sy - height), (float)(sx + width), (float)sy, 5.0f, color);
+      &(const rctf){
+          .xmin = (float)sx,
+          .xmax = (float)(sx + width),
+          .ymin = (float)(sy - height),
+          .ymax = (float)sy,
+      },
+      true,
+      5.0f,
+      color);
 }
 
 static void file_draw_icon(uiBlock *block,
@@ -1039,7 +1047,7 @@ static void file_draw_invalid_library_hint(const SpaceFile *sfile, const ARegion
     UI_icon_draw(sx, sy - UI_UNIT_Y, ICON_INFO);
 
     const char *suggestion = TIP_(
-        "Set up the library or edit libraries in the Preferences, File Paths section.");
+        "Set up the library or edit libraries in the Preferences, File Paths section");
     file_draw_string_multiline(
         sx + UI_UNIT_X, sy, suggestion, width - UI_UNIT_X, line_height, text_col, NULL, NULL);
   }

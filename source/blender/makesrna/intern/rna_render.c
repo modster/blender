@@ -586,7 +586,7 @@ static void rna_def_render_engine(BlenderRNA *brna)
 
   func = RNA_def_function(srna, "begin_result", "RE_engine_begin_result");
   RNA_def_function_ui_description(
-      func, "Create render result to write linear floating point render layers and passes");
+      func, "Create render result to write linear floating-point render layers and passes");
   parm = RNA_def_int(func, "x", 0, 0, INT_MAX, "X", "", 0, INT_MAX);
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_int(func, "y", 0, 0, INT_MAX, "Y", "", 0, INT_MAX);
@@ -1081,7 +1081,6 @@ static void rna_def_render_pass(BlenderRNA *brna)
   prop = RNA_def_property(srna, "fullname", PROP_STRING, PROP_NONE);
   RNA_def_property_string_sdna(prop, NULL, "fullname");
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_struct_name_property(srna, prop);
 
   prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
   RNA_def_property_string_sdna(prop, NULL, "name");

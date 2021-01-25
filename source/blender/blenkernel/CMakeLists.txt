@@ -40,9 +40,9 @@ set(INC
   ../sequencer
   ../shader_fx
   ../simulation
+  ../../../intern/eigen
   ../../../intern/ghost
   ../../../intern/glew-mx
-  ../../../intern/eigen
   ../../../intern/guardedalloc
   ../../../intern/iksolver/extern
   ../../../intern/atomic
@@ -272,10 +272,11 @@ set(SRC
   BKE_animsys.h
   BKE_appdir.h
   BKE_armature.h
+  BKE_asset.h
   BKE_attribute.h
   BKE_attribute_access.hh
+  BKE_attribute_math.hh
   BKE_autoexec.h
-  BKE_asset.h
   BKE_blender.h
   BKE_blender_copybuffer.h
   BKE_blender_undo.h
@@ -299,6 +300,8 @@ set(SRC
   BKE_constraint.h
   BKE_context.h
   BKE_crazyspace.h
+  BKE_cryptomatte.h
+  BKE_cryptomatte.hh
   BKE_curve.h
   BKE_curveprofile.h
   BKE_customdata.h
@@ -354,14 +357,15 @@ set(SRC
   BKE_mball.h
   BKE_mball_tessellate.h
   BKE_mesh.h
-  BKE_mesh_iterators.h
   BKE_mesh_fair.h
+  BKE_mesh_iterators.h
   BKE_mesh_mapping.h
   BKE_mesh_mirror.h
   BKE_mesh_remap.h
   BKE_mesh_remesh_voxel.h
   BKE_mesh_runtime.h
   BKE_mesh_tangent.h
+  BKE_mesh_types.h
   BKE_mesh_wrapper.h
   BKE_modifier.h
   BKE_movieclip.h
@@ -735,6 +739,7 @@ add_dependencies(bf_blenkernel bf_dna)
 if(WITH_GTESTS)
   set(TEST_SRC
     intern/armature_test.cc
+    intern/cryptomatte_test.cc
     intern/fcurve_test.cc
     intern/lattice_deform_test.cc
     intern/layer_test.cc

@@ -182,6 +182,16 @@ static void rna_GPencil_update(Main *UNUSED(bmain), Scene *UNUSED(scene), Pointe
   WM_main_add_notifier(NC_GPENCIL | NA_EDITED, NULL);
 }
 
+static void rna_GpencilLayerMatrix_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+  bGPDlayer *gpl = (bGPDlayer *)ptr->data;
+
+  loc_eul_size_to_mat4(gpl->layer_mat, gpl->location, gpl->rotation, gpl->scale);
+  invert_m4_m4(gpl->layer_invmat, gpl->layer_mat);
+
+  rna_GPencil_update(bmain, scene, ptr);
+}
+
 static void rna_GPencil_curve_edit_mode_toggle(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
   ToolSettings *ts = scene->toolsettings;
@@ -940,7 +950,7 @@ static void rna_GPencil_frame_remove(bGPDlayer *layer, ReportList *reports, Poin
 
 static bGPDframe *rna_GPencil_frame_copy(bGPDlayer *layer, bGPDframe *src)
 {
-  bGPDframe *frame = BKE_gpencil_frame_duplicate(src);
+  bGPDframe *frame = BKE_gpencil_frame_duplicate(src, true);
 
   while (BKE_gpencil_layer_frame_find(layer, frame->framenum)) {
     frame->framenum++;
@@ -2012,6 +2022,45 @@ static void rna_def_gpencil_layer(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Blend Mode", "Blend mode");
   RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_update");
 
+  /* Layer transforms. */
+  prop = RNA_def_property(srna, "location", PROP_FLOAT, PROP_TRANSLATION);
+  RNA_def_property_float_sdna(prop, NULL, "location");
+  RNA_def_property_ui_text(prop, "Location", "Values for change location");
+  RNA_def_property_ui_range(prop, -FLT_MAX, FLT_MAX, 1, RNA_TRANSLATION_PREC_DEFAULT);
+  RNA_def_property_update(prop, 0, "rna_GpencilLayerMatrix_update");
+
+  prop = RNA_def_property(srna, "rotation", PROP_FLOAT, PROP_EULER);
+  RNA_def_property_float_sdna(prop, NULL, "rotation");
+  RNA_def_property_ui_text(prop, "Rotation", "Values for changes in rotation");
+  RNA_def_property_ui_range(prop, -FLT_MAX, FLT_MAX, 1, RNA_TRANSLATION_PREC_DEFAULT);
+  RNA_def_property_update(prop, 0, "rna_GpencilLayerMatrix_update");
+
+  prop = RNA_def_property(srna, "scale", PROP_FLOAT, PROP_XYZ);
+  RNA_def_property_float_sdna(prop, NULL, "scale");
+  RNA_def_property_float_default(prop, 1.0f);
+  RNA_def_property_ui_text(prop, "Scale", "Values for changes in scale");
+  RNA_def_property_ui_range(prop, -FLT_MAX, FLT_MAX, 1, RNA_TRANSLATION_PREC_DEFAULT);
+  RNA_def_property_update(prop, 0, "rna_GpencilLayerMatrix_update");
+
+  /* Layer matrix. */
+  prop = RNA_def_property(srna, "matrix_layer", PROP_FLOAT, PROP_MATRIX);
+  RNA_def_property_float_sdna(prop, NULL, "layer_mat");
+  RNA_def_property_multi_array(prop, 2, rna_matrix_dimsize_4x4);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_override_flag(prop, PROPOVERRIDE_NO_COMPARISON);
+  RNA_def_property_override_clear_flag(prop, PROPOVERRIDE_OVERRIDABLE_LIBRARY);
+  RNA_def_property_ui_text(prop, "Matrix Layer", "Local Layer transformation matrix");
+
+  /* Layer inverse matrix. */
+  prop = RNA_def_property(srna, "matrix_inverse_layer", PROP_FLOAT, PROP_MATRIX);
+  RNA_def_property_float_sdna(prop, NULL, "layer_invmat");
+  RNA_def_property_multi_array(prop, 2, rna_matrix_dimsize_4x4);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_override_flag(prop, PROPOVERRIDE_NO_COMPARISON);
+  RNA_def_property_override_clear_flag(prop, PROPOVERRIDE_OVERRIDABLE_LIBRARY);
+  RNA_def_property_ui_text(
+      prop, "Matrix Layer Inverse", "Local Layer transformation inverse matrix");
+
   /* Flags */
   prop = RNA_def_property(srna, "hide", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_LAYER_HIDE);
@@ -2093,7 +2142,7 @@ static void rna_def_gpencil_layer(BlenderRNA *brna)
   RNA_def_property_pointer_funcs(prop, NULL, "rna_GPencilLayer_parent_set", NULL, NULL);
   RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
   RNA_def_property_override_flag(prop, PROPOVERRIDE_OVERRIDABLE_LIBRARY);
-  RNA_def_property_ui_text(prop, "Parent", "Parent Object");
+  RNA_def_property_ui_text(prop, "Parent", "Parent object");
   RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_dependency_update");
 
   /* parent type */
@@ -2405,7 +2454,7 @@ static void rna_def_gpencil_data(BlenderRNA *brna)
   prop = RNA_def_property(srna, "use_multiedit", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_DATA_STROKE_MULTIEDIT);
   RNA_def_property_ui_text(prop,
-                           "MultiFrame",
+                           "Multiframe",
                            "Edit strokes from multiple grease pencil keyframes at the same time "
                            "(keyframes must be selected to be included)");
   RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_update");
@@ -2419,7 +2468,7 @@ static void rna_def_gpencil_data(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_DATA_AUTOLOCK_LAYERS);
   RNA_def_property_ui_text(
       prop,
-      "Autolock Layers",
+      "Auto-Lock Layers",
       "Lock automatically all layers except active one to avoid accidental changes");
   RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, "rna_GPencil_autolock");
 
@@ -2537,7 +2586,7 @@ static void rna_def_gpencil_data(BlenderRNA *brna)
   prop = RNA_def_property(srna, "is_annotation", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", GP_DATA_ANNOTATIONS);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_ui_text(prop, "Annotation", "Current datablock is an annotation");
+  RNA_def_property_ui_text(prop, "Annotation", "Current data-block is an annotation");
 
   /* Nested Structs */
   prop = RNA_def_property(srna, "grid", PROP_POINTER, PROP_NONE);

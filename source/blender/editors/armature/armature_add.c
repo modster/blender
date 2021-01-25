@@ -306,8 +306,7 @@ static EditBone *get_named_editbone(ListBase *edbo, const char *name)
   return NULL;
 }
 
-/* Call this before doing any duplications
- * */
+/* Call this before doing any duplications. */
 void preEditBoneDuplicate(ListBase *editbones)
 {
   /* clear temp */
@@ -518,7 +517,8 @@ static void updateDuplicateActionConstraintSettings(EditBone *dup_bone,
   /* See if there is any channels that uses this bone */
   ListBase ani_curves;
   BLI_listbase_clear(&ani_curves);
-  if (BKE_fcurves_filter(&ani_curves, &act->curves, "pose.bones[", orig_bone->name)) {
+  if ((act != NULL) &&
+      BKE_fcurves_filter(&ani_curves, &act->curves, "pose.bones[", orig_bone->name)) {
     /* Create a copy and mirror the animation */
     for (LinkData *ld = ani_curves.first; ld; ld = ld->next) {
       FCurve *old_curve = ld->data;
@@ -1617,7 +1617,7 @@ void ARMATURE_OT_bone_primitive_add(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Add Bone";
   ot->idname = "ARMATURE_OT_bone_primitive_add";
-  ot->description = "Add a new bone located at the 3D-Cursor";
+  ot->description = "Add a new bone located at the 3D cursor";
 
   /* api callbacks */
   ot->exec = armature_bone_primitive_add_exec;

@@ -254,7 +254,7 @@ typedef struct IDOverrideLibrary {
 /**
  * ID is the first thing included in all serializable types. It
  * provides a common handle to place all data in double-linked lists.
- * */
+ */
 
 /* 2 characters for ID code and 64 for actual name */
 #define MAX_ID_NAME 66
@@ -314,6 +314,20 @@ typedef struct ID {
    */
   struct ID *orig_id;
 
+  /**
+   * Holds the #PyObject reference to the ID (initialized on demand).
+   *
+   * This isn't essential, it could be removed however it gives some advantages:
+   *
+   * - Every time the #ID is accessed a #BPy_StructRNA doesn't have to be created & destroyed
+   *   (consider all the polling and drawing functions that access ID's).
+   *
+   * - When this #ID is deleted, the #BPy_StructRNA can be invalidated
+   *   so accessing it from Python raises an exception instead of crashing.
+   *
+   *   This is of limited benefit though, as it doesn't apply to non #ID data
+   *   that references this ID (the bones of an armature or the modifiers of an object for e.g.).
+   */
   void *py_instance;
   void *_pad1;
 } ID;
@@ -512,7 +526,8 @@ typedef enum ID_Type {
 #define ID_IS_ASSET(_id) (((const ID *)(_id))->asset_data != NULL)
 
 /* Check whether datablock type is covered by copy-on-write. */
-#define ID_TYPE_IS_COW(_id_type) (!ELEM(_id_type, ID_BR, ID_PAL, ID_IM))
+#define ID_TYPE_IS_COW(_id_type) \
+  (!ELEM(_id_type, ID_LI, ID_IP, ID_SCR, ID_VF, ID_BR, ID_WM, ID_PAL, ID_PC, ID_WS, ID_IM))
 
 #ifdef GS
 #  undef GS
@@ -670,7 +685,7 @@ typedef enum IDRecalcFlag {
    * redraw update in that case. */
 
   /* Selection of the ID itself or its components (for example, vertices) did
-   * change, and all the drawing data is to eb updated. */
+   * change, and all the drawing data is to be updated. */
   ID_RECALC_SELECT = (1 << 9),
   /* Flags on the base did change, and is to be copied onto all the copies of
    * corresponding objects. */

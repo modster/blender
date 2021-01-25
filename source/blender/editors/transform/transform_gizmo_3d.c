@@ -704,7 +704,7 @@ int ED_transform_calc_gizmo_stats(const bContext *C,
       if (BKE_gpencil_layer_is_editable(gpl) && (gpl->actframe != NULL)) {
 
         /* calculate difference matrix */
-        BKE_gpencil_parent_matrix_get(depsgraph, ob, gpl, diff_mat);
+        BKE_gpencil_layer_transform_matrix_get(depsgraph, ob, gpl, diff_mat);
 
         LISTBASE_FOREACH (bGPDstroke *, gps, &gpl->actframe->strokes) {
           /* skip strokes that are invalid for current view */
@@ -1298,6 +1298,11 @@ static void gizmo_xform_message_subscribe(wmGizmoGroup *gzgroup,
 void drawDial3d(const TransInfo *t)
 {
   if (t->mode == TFM_ROTATION && t->spacetype == SPACE_VIEW3D) {
+    if (t->options & CTX_PAINT_CURVE) {
+      /* Matrices are in the screen space. Not supported. */
+      return;
+    }
+
     wmGizmo *gz = wm_gizmomap_modal_get(t->region->gizmo_map);
     if (gz == NULL) {
       /* We only draw Dial3d if the operator has been called by a gizmo. */
