@@ -1275,8 +1275,8 @@ void GeometryManager::device_update_bvh(Device *device,
       dscene->prim_tri_verts.give_data(pack.prim_tri_verts);
     }
     else {
-      /* it is not stricly necessary to skip those resizes we if do not have to repack, as the OS
-       * will not allocate pages if we do not touch them, however it does help catching bugs */
+      /* It is not strictly necessary to skip those resizes we if do not have to repack, as the OS
+       * will not allocate pages if we do not touch them, however it does help catching bugs. */
       pack.prim_tri_index.resize(num_prims);
       pack.prim_tri_verts.resize(num_tri_verts);
       pack.prim_type.resize(num_prims);
@@ -1532,7 +1532,7 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
       if (mesh->need_update_rebuild) {
         device_update_flags |= DEVICE_MESH_DATA_NEEDS_REALLOC;
       }
-      else if (mesh->verts_is_modified()) {
+      else if (mesh->is_modified()) {
         device_update_flags |= DEVICE_MESH_DATA_MODIFIED;
       }
     }
@@ -1612,9 +1612,10 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
   }
 
   if (device_update_flags & DEVICE_MESH_DATA_MODIFIED) {
-    /* if anything else than vertices are modified, we would need to reallocate, so this is the
-     * only array that can be updated */
+    /* if anything else than vertices or shaders are modified, we would need to reallocate, so
+     * these are the only arrays that can be updated */
     dscene->tri_vnormal.tag_modified();
+    dscene->tri_shader.tag_modified();
   }
 
   if (device_update_flags & DEVICE_CURVE_DATA_MODIFIED) {
