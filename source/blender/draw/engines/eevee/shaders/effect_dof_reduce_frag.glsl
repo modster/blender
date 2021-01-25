@@ -23,8 +23,7 @@ layout(location = 1) out float outCoc;
 
 #ifdef COPY_PASS
 
-/* TODO(fclem) Output scatter color to a separate R11G11B10 buffer. */
-// layout(location = 2) out float outScatterColor;
+layout(location = 2) out vec3 outScatterColor;
 
 vec3 non_linear_comparison_space(vec3 color)
 {
@@ -75,18 +74,9 @@ void main()
   /* For debuging. */
   do_scatter = !no_scatter_pass && do_scatter;
 
-  /**
-   * NOTE: Here we deviate from the reference implementation. Since we cannot write a sprite list
-   * directly (because of minimal hardware restriction), we keep the pixel intensity the same for
-   * mip0 and negate the color for scattered pixels.
-   * This make sure we can get back the color for each convolution method and still select
-   * only some pixels for scattering. However this does not give us the possibility to have a
-   * smooth transition between the two methods.
-   **/
-  if (do_scatter) {
-    /* Negate the color to specify that we want it to be scattered. */
-    outColor.rgb *= -1.0;
-  }
+  /* TODO(fclem) lerp between each case. */
+  outScatterColor = (do_scatter) ? outColor.rgb : vec3(0.0);
+  outColor.rgb = (do_scatter) ? vec3(0.0) : outColor.rgb;
 }
 
 #else /* REDUCE_PASS */

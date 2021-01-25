@@ -119,6 +119,7 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
   GPU_FRAMEBUFFER_FREE_SAFE(fbl->dof_flatten_tiles_fb);
   GPU_FRAMEBUFFER_FREE_SAFE(fbl->dof_dilate_tiles_fb);
   GPU_FRAMEBUFFER_FREE_SAFE(fbl->dof_reduce_fb);
+  GPU_FRAMEBUFFER_FREE_SAFE(fbl->dof_reduce_copy_fb);
   GPU_FRAMEBUFFER_FREE_SAFE(fbl->dof_gather_fg_fb);
   GPU_FRAMEBUFFER_FREE_SAFE(fbl->dof_gather_bg_fb);
   GPU_FRAMEBUFFER_FREE_SAFE(fbl->dof_scatter_bg_fb);
@@ -373,6 +374,9 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_uniform_float_copy(grp, "scatterCocThreshold", fx->dof_scatter_coc_threshold);
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+
+    void *owner = (void *)&dof_reduce_pass_init;
+    fx->dof_scatter_src_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R11F_G11F_B10F, owner);
   }
 
   {
@@ -385,7 +389,6 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
         grp, "colorBuffer", &fx->dof_reduce_input_color_tx, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(
         grp, "cocBuffer", &fx->dof_reduce_input_coc_tx, NO_FILTERING);
-    DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
   }
 
@@ -407,6 +410,14 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
                                     GPU_ATTACHMENT_NONE,
                                     GPU_ATTACHMENT_TEXTURE(txl->dof_reduced_color),
                                     GPU_ATTACHMENT_TEXTURE(txl->dof_reduced_coc),
+                                });
+
+  GPU_framebuffer_ensure_config(&fbl->dof_reduce_copy_fb,
+                                {
+                                    GPU_ATTACHMENT_NONE,
+                                    GPU_ATTACHMENT_TEXTURE(txl->dof_reduced_color),
+                                    GPU_ATTACHMENT_TEXTURE(txl->dof_reduced_coc),
+                                    GPU_ATTACHMENT_TEXTURE(fx->dof_scatter_src_tx),
                                 });
 }
 
@@ -438,7 +449,6 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_texture_ref(grp, "cocTilesFgBuffer", &fx->dof_coc_dilated_tiles_fg_tx);
     DRW_shgroup_uniform_texture_ref(grp, "cocTilesBgBuffer", &fx->dof_coc_dilated_tiles_bg_tx);
     DRW_shgroup_uniform_texture(grp, "utilTex", EEVEE_materials_get_util_tex());
-    DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherInputUvCorrection", uv_correction_fac);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherOutputTexelSize", output_texel_size);
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
@@ -464,7 +474,6 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_texture_ref(grp, "cocTilesFgBuffer", &fx->dof_coc_dilated_tiles_fg_tx);
     DRW_shgroup_uniform_texture_ref(grp, "cocTilesBgBuffer", &fx->dof_coc_dilated_tiles_bg_tx);
     DRW_shgroup_uniform_texture(grp, "utilTex", EEVEE_materials_get_util_tex());
-    DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherInputUvCorrection", uv_correction_fac);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherOutputTexelSize", output_texel_size);
     if (use_bokeh_tx) {
@@ -499,7 +508,6 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_texture_ref(grp, "cocTilesFgBuffer", &fx->dof_coc_dilated_tiles_fg_tx);
     DRW_shgroup_uniform_texture_ref(grp, "cocTilesBgBuffer", &fx->dof_coc_dilated_tiles_bg_tx);
     DRW_shgroup_uniform_texture(grp, "utilTex", EEVEE_materials_get_util_tex());
-    DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherInputUvCorrection", uv_correction_fac);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherOutputTexelSize", output_texel_size);
     if (use_bokeh_tx) {
@@ -565,10 +573,9 @@ static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
     const bool is_foreground = true;
     GPUShader *sh = EEVEE_shaders_depth_of_field_scatter_get(is_foreground, use_bokeh_tx);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_scatter_fg);
-    DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &txl->dof_reduced_color, NO_FILTERING);
+    DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &fx->dof_scatter_src_tx, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref(grp, "occlusionBuffer", &fx->dof_fg_occlusion_tx);
-    DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_uniform_float_copy(grp, "scatterCocThreshold", fx->dof_scatter_coc_threshold);
     DRW_shgroup_uniform_vec2_copy(grp, "targetTexelSize", target_texel_size);
     DRW_shgroup_uniform_int_copy(grp, "spritePerRow", input_size[0] / 2);
@@ -590,11 +597,10 @@ static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
     const bool is_foreground = false;
     GPUShader *sh = EEVEE_shaders_depth_of_field_scatter_get(is_foreground, use_bokeh_tx);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_scatter_bg);
-    DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &txl->dof_reduced_color, NO_FILTERING);
+    DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &fx->dof_scatter_src_tx, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref(grp, "occlusionBuffer", &fx->dof_bg_occlusion_tx);
     DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
-    DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_uniform_float_copy(grp, "scatterCocThreshold", fx->dof_scatter_coc_threshold);
     DRW_shgroup_uniform_vec2_copy(grp, "targetTexelSize", target_texel_size);
     DRW_shgroup_uniform_int_copy(grp, "spritePerRow", input_size[0] / 2);
@@ -711,7 +717,7 @@ void EEVEE_depth_of_field_draw(EEVEE_Data *vedata)
     DRW_draw_pass(psl->dof_downsample);
 
     /* First step is just a copy. */
-    GPU_framebuffer_bind(fbl->dof_reduce_fb);
+    GPU_framebuffer_bind(fbl->dof_reduce_copy_fb);
     DRW_draw_pass(psl->dof_reduce_copy);
 
     GPU_framebuffer_recursive_downsample(

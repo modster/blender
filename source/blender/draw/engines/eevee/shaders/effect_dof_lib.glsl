@@ -121,14 +121,12 @@ vec4 dof_downsample_bilateral_color_weights(vec4 colors[4])
 vec4 dof_load_gather_color(sampler2D gather_input_color_buffer, vec2 uv, float lod)
 {
   vec4 color = textureLod(gather_input_color_buffer, uv, lod);
-  color.rgb = abs(max(color.rgb, -scatterColorThreshold));
   return color;
 }
 
-vec4 dof_load_scatter_color(sampler2D gather_input_color_buffer, vec2 uv, float lod)
+vec4 dof_load_scatter_color(sampler2D scatter_input_color_buffer, vec2 uv, float lod)
 {
-  vec4 color = textureLod(gather_input_color_buffer, uv, lod);
-  color.rgb = max(-color.rgb - scatterColorThreshold, 0.0);
+  vec4 color = textureLod(scatter_input_color_buffer, uv, lod);
   return color;
 }
 
@@ -173,7 +171,7 @@ float dof_sample_weight(float coc)
 vec4 dof_sample_weight(vec4 coc)
 {
   /* Full intensity if CoC radius is below the pixel footprint. */
-  const float min_coc = 1.0;
+  const float min_coc = 0.57; /* For scattering ... but why? Maybe kernel radius jittering? */
   coc = max(vec4(min_coc), abs(coc));
   return (M_PI * min_coc * min_coc) / (M_PI * coc * coc);
 }

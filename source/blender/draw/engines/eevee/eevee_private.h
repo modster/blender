@@ -365,6 +365,7 @@ typedef struct EEVEE_FramebufferList {
   struct GPUFrameBuffer *dof_dilate_tiles_fb;
   struct GPUFrameBuffer *dof_downsample_fb;
   struct GPUFrameBuffer *dof_reduce_fb;
+  struct GPUFrameBuffer *dof_reduce_copy_fb;
   struct GPUFrameBuffer *dof_bokeh_fb;
   struct GPUFrameBuffer *dof_gather_fg_fb;
   struct GPUFrameBuffer *dof_gather_fg_holefill_fb;
@@ -785,6 +786,7 @@ typedef struct EEVEE_EffectsInfo {
   struct GPUTexture *dof_fg_holefill_weight_tx;
   struct GPUTexture *dof_half_res_coc_tx;
   struct GPUTexture *dof_half_res_color_tx;
+  struct GPUTexture *dof_scatter_src_tx;
   struct GPUTexture *dof_reduce_input_coc_tx; /* Just references to actual textures. */
   struct GPUTexture *dof_reduce_input_color_tx;
   /* Alpha Checker */
