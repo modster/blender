@@ -36,7 +36,7 @@ vec3 non_linear_comparison_space(vec3 color)
 }
 
 /* NOTE: Do not compare alpha as it is not scattered by the scatter pass. */
-bool dof_scatter_neighborhood_rejection(vec3 color)
+float dof_scatter_neighborhood_rejection(vec3 color)
 {
   color = non_linear_comparison_space(color);
   /* Centered in the middle of 4 quarter res texel. */
@@ -50,11 +50,36 @@ bool dof_scatter_neighborhood_rejection(vec3 color)
     ref = non_linear_comparison_space(ref);
     max_diff = max(max_diff, abs(ref - color));
   }
-  /* TODO(fclem) Adjust using multiple test scene. */
+  /* TODO(fclem) Adjust using multiple test scene or expose to the user. */
   const float rejection_threshold = 0.05;
-  bool valid = max_v3(max_diff) > rejection_threshold;
+  const float rejection_hardness = 3.0;
+  float validity = saturate((max_v3(max_diff) - rejection_threshold) * rejection_hardness);
 
-  return valid;
+  return validity;
+}
+
+/* This avoids sprite popping in and out at the screen border and
+ * drawing sprites larger than the screen. */
+float dof_scatter_screen_border_rejection(float coc, vec2 uv, vec2 screen_size)
+{
+  vec2 screen_pos = uv * screen_size;
+  float min_screen_border_distance = min_v2(min(screen_pos, screen_size - screen_pos));
+  /* Fullres to halfres CoC. */
+  coc *= 0.5;
+  /* Allow 10px transition. */
+  const float rejection_hardeness = 1.0 / 10.0;
+  return saturate((min_screen_border_distance - abs(coc)) * rejection_hardeness + 1.0);
+}
+
+float dof_scatter_luminosity_rejection(vec3 color)
+{
+  const float rejection_hardness = 2.0;
+  return saturate(max_v3(color - scatterColorThreshold) * rejection_hardness);
+}
+
+float dof_scatter_coc_radius_rejection(float coc)
+{
+  return saturate(abs(coc) - scatterCocThreshold);
 }
 
 /* Simple copy pass where we select what pixels to scatter. Also the resolution might change.
@@ -62,25 +87,25 @@ bool dof_scatter_neighborhood_rejection(vec3 color)
  * that during the convolution phase. */
 void main()
 {
-  vec2 uv = gl_FragCoord.xy / vec2(textureSize(colorBuffer, 0).xy);
+  vec2 halfres = vec2(textureSize(colorBuffer, 0).xy);
+  vec2 uv = gl_FragCoord.xy / halfres;
 
   outColor = textureLod(colorBuffer, uv, 0.0);
   outCoc = textureLod(cocBuffer, uv, 0.0).r;
 
   /* Only scatter if luminous enough. */
-  bool do_scatter = any(greaterThan(outColor.rgb, vec3(scatterColorThreshold)));
+  float do_scatter = dof_scatter_luminosity_rejection(outColor.rgb);
   /* Only scatter if CoC is big enough. */
-  do_scatter = do_scatter && (abs(outCoc) > scatterCocThreshold);
+  do_scatter *= dof_scatter_coc_radius_rejection(outCoc);
   /* Only scatter if CoC is not too big to avoid performance issues. */
-  do_scatter = do_scatter && (abs(outCoc) < 200.0); /* TODO(fclem) user threshold. */
+  do_scatter *= dof_scatter_screen_border_rejection(outCoc, uv, halfres);
   /* Only scatter if neighborhood is different enough. */
-  do_scatter = do_scatter && dof_scatter_neighborhood_rejection(outColor.rgb);
+  do_scatter *= dof_scatter_neighborhood_rejection(outColor.rgb);
   /* For debuging. */
-  do_scatter = !no_scatter_pass && do_scatter;
+  do_scatter *= float(!no_scatter_pass);
 
-  /* TODO(fclem) lerp between each case. */
-  outScatterColor = (do_scatter) ? outColor.rgb : vec3(0.0);
-  outColor.rgb = (do_scatter) ? vec3(0.0) : outColor.rgb;
+  outScatterColor = mix(vec3(0.0), outColor.rgb, do_scatter);
+  outColor.rgb = mix(outColor.rgb, vec3(0.0), do_scatter);
 
   /* Apply energy conservation to anamorphic scattered bokeh. */
   outScatterColor /= bokehRatio;
