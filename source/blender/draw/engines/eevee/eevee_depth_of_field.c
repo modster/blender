@@ -640,6 +640,7 @@ static void dof_recombine_pass_init(EEVEE_FramebufferList *UNUSED(fbl),
   DRW_shgroup_uniform_texture_ref(grp, "fgTileBuffer", &fx->dof_coc_dilated_tiles_fg_tx);
   DRW_shgroup_uniform_texture(grp, "utilTex", EEVEE_materials_get_util_tex());
   DRW_shgroup_uniform_vec4_copy(grp, "cocParams", fx->dof_coc_params);
+  DRW_shgroup_uniform_float_copy(grp, "bokehMaxSize", fx->dof_bokeh_max_size);
   DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 }
 

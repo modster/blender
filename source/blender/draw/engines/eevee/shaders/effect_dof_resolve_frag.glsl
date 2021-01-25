@@ -20,6 +20,8 @@ uniform sampler2D fgTileBuffer;
 uniform sampler2D holefillColorBuffer;
 uniform sampler2D holefillWeightBuffer;
 
+uniform float bokehMaxSize;
+
 in vec4 uvcoordsvar;
 
 out vec4 fragColor;
@@ -50,6 +52,8 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
                                                    sample_id * 2 + sample_id_offset);
       float dist = length(vec2(offset));
 
+      /* TODO(fclem) add Bokeh shape support here. */
+
       DofGatherData pair_data[2];
       for (int i = 0; i < 2; i++) {
         ivec2 sample_texel = texel + ((i == 0) ? offset : -offset);
@@ -57,11 +61,12 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
         pair_data[i].color = texelFetch(fullResColorBuffer, sample_texel, 0);
         pair_data[i].coc = dof_coc_from_zdepth(depth);
         pair_data[i].dist = dist;
+
+        pair_data[i].coc = clamp(pair_data[i].coc, -bokehMaxSize, bokehMaxSize);
       }
 
-      /* (fclem) Dunno why 2.5. */
       float bordering_radius = dist + 0.5;
-      const float isect_mul = 4.0;
+      const float isect_mul = 1.0;
       dof_gather_accumulate_sample_pair(
           pair_data, bordering_radius, isect_mul, first_ring, false, false, bg_ring, bg_accum);
       dof_gather_accumulate_sample_pair(
@@ -119,14 +124,14 @@ void main(void)
   /* Stochastically randomize which pixel to resolve. This avoids having garbage values
    * from the weight mask interpolation but still have less pixelated look. */
   const float jitter_radius = length(vec2(0.6));
-  uv += noise.zw * jitter_radius / vec2(textureSize(bgColorBuffer, 0).xy);
+  vec2 jitter_uv = uv + noise.zw * jitter_radius / vec2(textureSize(bgColorBuffer, 0).xy);
 
-  vec4 bg = textureLod(bgColorBuffer, uv, 0.0);
-  vec4 fg = textureLod(fgColorBuffer, uv, 0.0);
-  vec4 hf = textureLod(holefillColorBuffer, uv, 0.0);
-  float fg_w = textureLod(fgWeightBuffer, uv, 0.0).r;
-  float bg_w = textureLod(bgWeightBuffer, uv, 0.0).r;
-  float hf_w = textureLod(holefillWeightBuffer, uv, 0.0).r;
+  vec4 bg = textureLod(bgColorBuffer, jitter_uv, 0.0);
+  vec4 fg = textureLod(fgColorBuffer, jitter_uv, 0.0);
+  vec4 hf = textureLod(holefillColorBuffer, jitter_uv, 0.0);
+  float fg_w = textureLod(fgWeightBuffer, jitter_uv, 0.0).r;
+  float bg_w = textureLod(bgWeightBuffer, jitter_uv, 0.0).r;
+  float hf_w = textureLod(holefillWeightBuffer, jitter_uv, 0.0).r;
 
   ivec2 tile_co = ivec2(gl_FragCoord.xy / 16.0);
   CocTile coc_tile = dof_coc_tile_load(fgTileBuffer, bgTileBuffer, tile_co);

@@ -34,6 +34,8 @@ void main()
 
   vec4 cocs = dof_coc_from_zdepth(depths);
 
+  cocs = clamp(cocs, -bokehMaxSize, bokehMaxSize);
+
   vec4 weights = dof_downsample_bilateral_coc_weights(cocs);
   weights *= dof_downsample_bilateral_color_weights(colors);
   /* Normalize so that the sum is 1. */
@@ -41,8 +43,6 @@ void main()
 
   outColor = weighted_sum_array(colors, weights);
   outCoc.x = dot(cocs, weights);
-
-  outCoc.x = clamp(outCoc.x, -bokehMaxSize, bokehMaxSize);
 
   /* Max slight focus abs CoC. */
 
