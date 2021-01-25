@@ -15,6 +15,8 @@ uniform sampler2D cocBuffer;
 uniform sampler2D downsampledBuffer;
 
 uniform float bokehRatio;
+uniform float scatterColorThreshold;
+uniform float scatterCocThreshold;
 
 /** Outputs:
  * COPY_PASS: Gather input mip0.

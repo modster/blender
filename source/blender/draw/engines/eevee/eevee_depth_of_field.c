@@ -342,7 +342,7 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
   int quater_res[2] = {divide_ceil_u(fullres[0], 4), divide_ceil_u(fullres[1], 4)};
 
   /* TODO(fclem): Make this dependent of the quality of the gather pass. */
-  fx->dof_scatter_coc_threshold = 5.0f;
+  fx->dof_scatter_coc_threshold = 10.0f;
 
   {
     DRW_PASS_CREATE(psl->dof_downsample, DRW_STATE_WRITE_COLOR);
@@ -593,7 +593,6 @@ static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &fx->dof_scatter_src_tx, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref(grp, "occlusionBuffer", &fx->dof_fg_occlusion_tx);
-    DRW_shgroup_uniform_float_copy(grp, "scatterCocThreshold", fx->dof_scatter_coc_threshold);
     DRW_shgroup_uniform_vec2_copy(grp, "targetTexelSize", target_texel_size);
     DRW_shgroup_uniform_int_copy(grp, "spritePerRow", input_size[0] / 2);
     DRW_shgroup_uniform_float_copy(grp, "bokehRatio", fx->dof_bokeh_ratio);
@@ -618,7 +617,6 @@ static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref(grp, "occlusionBuffer", &fx->dof_bg_occlusion_tx);
     DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
-    DRW_shgroup_uniform_float_copy(grp, "scatterCocThreshold", fx->dof_scatter_coc_threshold);
     DRW_shgroup_uniform_vec2_copy(grp, "targetTexelSize", target_texel_size);
     DRW_shgroup_uniform_int_copy(grp, "spritePerRow", input_size[0] / 2);
     DRW_shgroup_uniform_float_copy(grp, "bokehRatio", fx->dof_bokeh_ratio);

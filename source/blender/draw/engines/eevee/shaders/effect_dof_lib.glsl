@@ -9,9 +9,6 @@ uniform vec4 cocParams;
 #define cocNear cocParams[2] /* Near view depths value. */
 #define cocFar cocParams[3] /* Far view depths value. */
 
-uniform float scatterColorThreshold;
-uniform float scatterCocThreshold;
-
 /* -------------- Debug Defines ------------- */
 
 // #define DOF_DEBUG_GATHER_PERF

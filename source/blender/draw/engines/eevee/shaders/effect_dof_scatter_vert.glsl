@@ -22,18 +22,6 @@ flat out vec4 cocs;
 flat out vec2 spritepos;
 flat out float spritesize;
 
-#ifdef DOF_FOREGROUND_PASS
-const bool is_foreground = true;
-#else /* DOF_BACKGROUND_PASS */
-const bool is_foreground = false;
-#endif
-
-float fetch_tile_abs_max_coc(vec2 texel_co)
-{
-  /* TODO */
-  return 1000.0;
-}
-
 /* Load 4 Circle of confusion values. texel_co is centered around the 4 taps. */
 vec4 fetch_cocs(vec2 texel_co)
 {
@@ -50,10 +38,12 @@ vec4 fetch_cocs(vec2 texel_co)
   cocs.z = texelFetchOffset(cocBuffer, texel, 0, ivec2(1, 0)).r;
   cocs.w = texelFetchOffset(cocBuffer, texel, 0, ivec2(0, 0)).r;
 #endif
-  if (is_foreground) {
-    cocs *= -1.0;
-  }
-  cocs = mix(vec4(0.0), cocs, greaterThan(cocs, vec4(scatterCocThreshold)));
+
+#ifdef DOF_FOREGROUND_PASS
+  cocs *= -1.0;
+#endif
+
+  cocs = max(vec4(0.0), cocs);
   /* We are scattering at half resolution, so divide CoC by 2. */
   return cocs * 0.5;
 }
@@ -75,14 +65,6 @@ void main()
 
   /* Center sprite around the 4 texture taps. */
   spritepos = vec2(texelco) + 1.0;
-
-  float max_coc_in_tile = fetch_tile_abs_max_coc(spritepos);
-
-  /* Early out from this tile max absolute CoC. */
-  if (max_coc_in_tile < scatterCocThreshold) {
-    vertex_discard();
-    return;
-  }
 
   cocs = fetch_cocs(spritepos);
 
