@@ -26,18 +26,14 @@ in vec4 uvcoordsvar;
 
 out vec4 fragColor;
 
-void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_weight)
+void dof_slight_focus_gather(float radius, vec4 noise, out vec4 out_color, out float out_weight)
 {
-  vec4 noise = texelfetch_noise_tex(gl_FragCoord.xy);
-
   DofGatherData fg_accum = GATHER_DATA_INIT;
   DofGatherData bg_accum = GATHER_DATA_INIT;
 
   int i_radius = clamp(int(ceil(radius + 0.5)), 1, 4);
-  const int resolve_ring_density = 1; /* 1,2 or 4. */
+  const int resolve_ring_density = 2;
   ivec2 texel = ivec2(gl_FragCoord.xy);
-
-  int sample_id_offset = (int(noise.x * 4.0) % 4) / resolve_ring_density;
 
   bool first_ring = true;
 
@@ -48,8 +44,10 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
     int ring_distance = ring + 1;
     int ring_sample_count = resolve_ring_density * ring_distance;
     for (int sample_id = 0; sample_id < ring_sample_count; sample_id++) {
-      ivec2 offset = dof_square_ring_sample_offset(ring_distance,
-                                                   sample_id * 2 + sample_id_offset);
+      int s = sample_id * (4 / resolve_ring_density) +
+              int(noise.y * float((4 - resolve_ring_density) * ring_distance));
+
+      ivec2 offset = dof_square_ring_sample_offset(ring_distance, s);
       float dist = length(vec2(offset));
 
       /* TODO(fclem) add Bokeh shape support here. */
@@ -139,7 +137,7 @@ void main(void)
   vec4 focus = vec4(0.0);
   float focus_w = 0.0;
   if (coc_tile.fg_slight_focus_max_coc >= 0.5) {
-    dof_slight_focus_gather(coc_tile.fg_slight_focus_max_coc, focus, focus_w);
+    dof_slight_focus_gather(coc_tile.fg_slight_focus_max_coc, noise, focus, focus_w);
   }
   else {
     focus = textureLod(fullResColorBuffer, uv, 0.0);
