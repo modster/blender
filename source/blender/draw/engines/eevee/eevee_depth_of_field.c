@@ -373,6 +373,7 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
         grp, "downsampledBuffer", &fx->dof_downsample_tx, NO_FILTERING);
     DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
     DRW_shgroup_uniform_float_copy(grp, "scatterCocThreshold", fx->dof_scatter_coc_threshold);
+    DRW_shgroup_uniform_float_copy(grp, "bokehRatio", fx->dof_bokeh_ratio);
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 
     void *owner = (void *)&dof_reduce_pass_init;

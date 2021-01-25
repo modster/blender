@@ -14,6 +14,8 @@ uniform sampler2D colorBuffer;
 uniform sampler2D cocBuffer;
 uniform sampler2D downsampledBuffer;
 
+uniform float bokehRatio;
+
 /** Outputs:
  * COPY_PASS: Gather input mip0.
  * REDUCE_PASS: Is next Gather input miplvl (halfres >> miplvl).
@@ -77,6 +79,9 @@ void main()
   /* TODO(fclem) lerp between each case. */
   outScatterColor = (do_scatter) ? outColor.rgb : vec3(0.0);
   outColor.rgb = (do_scatter) ? vec3(0.0) : outColor.rgb;
+
+  /* Apply energy conservation to anamorphic scattered bokeh. */
+  outScatterColor /= bokehRatio;
 }
 
 #else /* REDUCE_PASS */
