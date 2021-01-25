@@ -56,7 +56,7 @@ void dof_slight_focus_gather(float radius, vec4 noise, out vec4 out_color, out f
       for (int i = 0; i < 2; i++) {
         ivec2 sample_texel = texel + ((i == 0) ? offset : -offset);
         float depth = texelFetch(fullResDepthBuffer, sample_texel, 0).r;
-        pair_data[i].color = texelFetch(fullResColorBuffer, sample_texel, 0);
+        pair_data[i].color = safe_color(texelFetch(fullResColorBuffer, sample_texel, 0));
         pair_data[i].coc = dof_coc_from_zdepth(depth);
         pair_data[i].dist = dist;
 
@@ -82,7 +82,7 @@ void dof_slight_focus_gather(float radius, vec4 noise, out vec4 out_color, out f
   /* Center sample. */
   float depth = texelFetch(fullResDepthBuffer, texel, 0).r;
   DofGatherData center_data;
-  center_data.color = texelFetch(fullResColorBuffer, texel, 0);
+  center_data.color = safe_color(texelFetch(fullResColorBuffer, texel, 0));
   center_data.coc = dof_coc_from_zdepth(depth);
   center_data.dist = 0.0;
 
@@ -140,7 +140,7 @@ void main(void)
     dof_slight_focus_gather(coc_tile.fg_slight_focus_max_coc, noise, focus, focus_w);
   }
   else {
-    focus = textureLod(fullResColorBuffer, uv, 0.0);
+    focus = safe_color(textureLod(fullResColorBuffer, uv, 0.0));
     if (coc_tile.fg_slight_focus_max_coc == DOF_TILE_FOCUS) {
       /* Tile is full in focus. */
       focus_w = 1.0;
