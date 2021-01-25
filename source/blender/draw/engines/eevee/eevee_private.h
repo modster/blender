@@ -770,6 +770,7 @@ typedef struct EEVEE_EffectsInfo {
   int dof_dilate_ring_count;
   int dof_dilate_ring_width_multiplier;
   int dof_reduce_steps;
+  eGPUTextureFormat dof_color_format;
   struct GPUTexture *dof_bg_color_tx; /* All textures from pool... */
   struct GPUTexture *dof_bg_occlusion_tx;
   struct GPUTexture *dof_bg_weight_tx;
@@ -1467,6 +1468,7 @@ void EEVEE_render_update_passes(struct RenderEngine *engine,
                                 struct ViewLayer *view_layer);
 
 /** eevee_lookdev.c */
+bool EEVEE_lookdev_studiolight_enabled(const View3D *v3d);
 void EEVEE_lookdev_init(EEVEE_Data *vedata);
 void EEVEE_lookdev_cache_init(EEVEE_Data *vedata,
                               EEVEE_ViewLayerData *sldata,

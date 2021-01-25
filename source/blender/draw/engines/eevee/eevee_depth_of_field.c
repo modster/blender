@@ -130,7 +130,7 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
 }
 
 #define NO_FILTERING GPU_SAMPLER_MIPMAP
-#define COLOR_FORMAT GPU_RGBA16F
+#define COLOR_FORMAT fx->dof_color_format
 #define FG_TILE_FORMAT GPU_RGBA16F
 #define BG_TILE_FORMAT GPU_R11F_G11F_B10F
 #define TILE_DIVISOR 16
@@ -674,6 +674,17 @@ void EEVEE_depth_of_field_cache_init(EEVEE_ViewLayerData *UNUSED(sldata), EEVEE_
   EEVEE_EffectsInfo *fx = stl->effects;
 
   if ((fx->enabled_effects & EFFECT_DOF) != 0) {
+    const DRWContextState *draw_ctx = DRW_context_state_get();
+    const View3D *v3d = draw_ctx->v3d;
+
+    if (!DRW_state_draw_background() ||
+        (EEVEE_lookdev_studiolight_enabled(v3d) && v3d->shading.studiolight_background < 1.0f)) {
+      fx->dof_color_format = GPU_RGBA16F;
+    }
+    else {
+      fx->dof_color_format = GPU_R11F_G11F_B10F;
+    }
+
     dof_bokeh_pass_init(fbl, psl, fx);
     dof_setup_pass_init(fbl, psl, fx);
     dof_flatten_tiles_pass_init(fbl, psl, fx);

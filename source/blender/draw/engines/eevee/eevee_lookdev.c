@@ -151,6 +151,20 @@ void EEVEE_lookdev_init(EEVEE_Data *vedata)
   }
 }
 
+bool EEVEE_lookdev_studiolight_enabled(const View3D *v3d)
+{
+  if (!LOOK_DEV_STUDIO_LIGHT_ENABLED(v3d)) {
+    return false;
+  }
+  const View3DShading *shading = &v3d->shading;
+  StudioLight *sl = BKE_studiolight_find(shading->lookdev_light,
+                                         STUDIOLIGHT_ORIENTATIONS_MATERIAL_MODE);
+  if (sl == NULL || (sl->flag & STUDIOLIGHT_TYPE_WORLD) == 0) {
+    return false;
+  }
+  return true;
+}
+
 void EEVEE_lookdev_cache_init(EEVEE_Data *vedata,
                               EEVEE_ViewLayerData *sldata,
                               DRWPass *pass,
@@ -174,13 +188,10 @@ void EEVEE_lookdev_cache_init(EEVEE_Data *vedata,
     eevee_lookdev_hdri_preview_init(vedata, sldata);
   }
 
-  if (LOOK_DEV_STUDIO_LIGHT_ENABLED(v3d)) {
+  if (EEVEE_lookdev_studiolight_enabled(v3d)) {
     const View3DShading *shading = &v3d->shading;
     StudioLight *sl = BKE_studiolight_find(shading->lookdev_light,
                                            STUDIOLIGHT_ORIENTATIONS_MATERIAL_MODE);
-    if (sl == NULL || (sl->flag & STUDIOLIGHT_TYPE_WORLD) == 0) {
-      return;
-    }
 
     GPUShader *shader = probe_render ? EEVEE_shaders_studiolight_probe_sh_get() :
                                        EEVEE_shaders_studiolight_background_sh_get();
