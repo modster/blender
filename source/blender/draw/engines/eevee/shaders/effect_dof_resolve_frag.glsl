@@ -146,8 +146,8 @@ void main(void)
       focus_w = 1.0;
     }
     else /* (coc_tile.fg_slight_focus_max_coc == DOF_TILE_DEFOCUS) */ {
-      /* Tile is full in defocus. */
-      focus_w = 0.0001; /* Almost no weight, used on last resort. */
+      /* Tile is full in defocus. Use in focus to fill holes if there is no other options. */
+      focus_w = (fg_w == 0.0 && bg_w == 0.0 && hf_w == 0.0) ? 1.0 : 0.0;
     }
   }
 
@@ -160,6 +160,8 @@ void main(void)
   }
 
   if (!no_background_pass) {
+    /* Always prefer background to holefill pass. */
+    bg_w = float(bg_w > 0.0);
     /* Composite background. */
     fragColor = fragColor * (1.0 - bg_w) + bg * bg_w;
     weight = weight * (1.0 - bg_w) + bg_w;
