@@ -311,7 +311,7 @@ void dof_gather_accumulate_sample_pair(DofGatherData pair_data[2],
     return;
   }
 
-#if defined(DOF_HOLEFILL_PASS)
+#if 0
   const float mirroring_threshold = -layer_threshold - layer_offset;
   /* TODO(fclem) Promote to parameter? dither with Noise? */
   const float mirroring_min_distance = 15.0;
@@ -386,7 +386,9 @@ void dof_gather_accumulate_sample_ring(DofGatherData ring_data,
   /* Smooth test to set opacity to see if the ring average coc occludes the accumulation.
    * Test is reversed to be multiplied against opacity. */
   float ring_occlu = saturate(accum_avg_coc - ring_avg_coc);
-  float accum_occlu = saturate(ring_avg_coc * 1.5 - accum_avg_coc + 2.0);
+  /* The bias here is arbitrary. Seems to avoid weird looking foreground in most cases.
+   * We might need to make it a parameter or find a relative bias. */
+  float accum_occlu = saturate(ring_avg_coc - accum_avg_coc - 10.0);
 
   if (no_gather_occlusion) {
     ring_occlu = 0.0;
@@ -453,6 +455,11 @@ void dof_gather_accumulate_center_sample(DofGatherData center_data,
     center_data.weight = weight;
 
     accum_data.layer_opacity += layer_weight;
+
+#ifdef DOF_FOREGROUND_PASS /* Reduce issue with closer foreground over distant foreground. */
+    float ring_area = sqr(bordering_radius);
+    dof_gather_ammend_weight(center_data, ring_area);
+#endif
 
     /* Accumulate center as its own ring. */
     dof_gather_accumulate_sample_ring(

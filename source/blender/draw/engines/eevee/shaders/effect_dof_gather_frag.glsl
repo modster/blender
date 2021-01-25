@@ -158,6 +158,14 @@ void dof_gather_accumulator(float base_radius,
                                         accum_data);
     }
 
+#ifdef DOF_FOREGROUND_PASS /* Reduce issue with closer foreground over distant foreground. */
+    /* TODO(fclem) this seems to not be completely correct as the issue remains. */
+    float ring_area = (sqr(float(ring) + 0.5 + coc_radius_error) -
+                       sqr(float(ring) - 0.5 + coc_radius_error)) *
+                      sqr(base_radius * unit_sample_radius);
+    dof_gather_ammend_weight(ring_data, ring_area);
+#endif
+
     dof_gather_accumulate_sample_ring(
         ring_data, sample_pair_count * 2, first_ring, do_fast_gather, is_foreground, accum_data);
 
@@ -171,7 +179,9 @@ void dof_gather_accumulator(float base_radius,
         /* We need to account for the density change in the weights (slide 62).
          * For that multiply old kernel data by its area divided by the new kernel area. */
         const float outer_rings_weight = 1.0 / (radius_downscale_factor * radius_downscale_factor);
+#ifndef DOF_FOREGROUND_PASS /* Samples are already weighted per ring in foreground pass. */
         dof_gather_ammend_weight(accum_data, outer_rings_weight);
+#endif
         /* Re-init kernel position & sampling parameters. */
         dof_gather_init(base_radius, noise, center_co, lod, isect_mul);
         density_change++;
