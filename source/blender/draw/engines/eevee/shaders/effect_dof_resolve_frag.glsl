@@ -114,10 +114,12 @@ void main(void)
 {
   vec2 uv = uvcoordsvar.xy;
 
-  vec4 noise = texelfetch_noise_tex(gl_FragCoord.xy);
+  /* offset coord to avoid correlation with sampling pattern.  */
+  vec4 noise = texelfetch_noise_tex(gl_FragCoord.xy + 7.0);
   /* Stochastically randomize which pixel to resolve. This avoids having garbage values
    * from the weight mask interpolation but still have less pixelated look. */
-  // uv += noise.zw * 0.5 / vec2(textureSize(bgColorBuffer, 0).xy);
+  const float jitter_radius = length(vec2(0.6));
+  uv += noise.zw * jitter_radius / vec2(textureSize(bgColorBuffer, 0).xy);
 
   vec4 bg = textureLod(bgColorBuffer, uv, 0.0);
   vec4 fg = textureLod(fgColorBuffer, uv, 0.0);
