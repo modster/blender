@@ -11,7 +11,7 @@
 
 uniform float bokehSides;
 uniform float bokehRotation;
-uniform float bokehRatio;
+uniform vec2 bokehAnisotropy;
 
 in vec4 uvcoordsvar;
 
@@ -62,12 +62,9 @@ void main()
   vec2 uv = uvcoordsvar.xy * 2.0 - 1.0;
   vec2 old_uv = uv;
 
-  float radius;
+  float radius = length(uv);
 
   if (bokehSides > 0.0) {
-    /* Apply anamorphic distortion. */
-    uv.x /= bokehRatio;
-    radius = length(uv);
     /* NOTE: atan(y,x) has output range [-M_PI..M_PI], so add 2pi to avoid negative angles. */
     float theta = atan(uv.y, uv.x) + M_2PI;
     float r = length(uv);
@@ -79,12 +76,9 @@ void main()
 
     theta_new += bokehRotation;
 
-    uv = r_new * vec2(-cos(theta_new) * bokehRatio, sin(theta_new));
+    uv = r_new * vec2(-cos(theta_new), sin(theta_new));
   }
-  else {
-    radius = length(uv / vec2(bokehRatio, 1.0));
-    uv.x *= bokehRatio;
-  }
+
   /* For gather store the new UV. */
   outLut.xy = uv;
   /* For scatter store distance. */

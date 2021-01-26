@@ -14,7 +14,7 @@ uniform sampler2D colorBuffer;
 uniform sampler2D cocBuffer;
 uniform sampler2D downsampledBuffer;
 
-uniform float bokehRatio;
+uniform vec2 bokehAnisotropy;
 uniform float scatterColorThreshold;
 uniform float scatterCocThreshold;
 uniform float scatterColorNeighborMax;
@@ -110,7 +110,7 @@ void main()
   outColor.rgb = mix(outColor.rgb, vec3(0.0), do_scatter);
 
   /* Apply energy conservation to anamorphic scattered bokeh. */
-  outScatterColor /= bokehRatio;
+  outScatterColor /= min_v2(bokehAnisotropy);
 }
 
 #else /* REDUCE_PASS */

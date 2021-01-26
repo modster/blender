@@ -764,7 +764,8 @@ typedef struct EEVEE_EffectsInfo {
   struct GPUTexture *velocity_tiles_tx;
   /* Depth Of Field */
   float dof_coc_params[2], dof_coc_near_dist, dof_coc_far_dist;
-  float dof_bokeh_blades, dof_bokeh_rotation, dof_bokeh_ratio, dof_bokeh_max_size;
+  float dof_bokeh_blades, dof_bokeh_rotation, dof_bokeh_aniso[2], dof_bokeh_max_size;
+  float dof_bokeh_aniso_inv[2];
   float dof_scatter_color_threshold;
   float dof_scatter_coc_threshold;
   float dof_scatter_neighbor_max_color;

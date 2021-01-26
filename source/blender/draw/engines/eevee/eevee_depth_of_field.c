@@ -71,7 +71,7 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
     float fstop = cam->dof.aperture_fstop;
     float blades = cam->dof.aperture_blades;
     float rotation = cam->dof.aperture_rotation;
-    float ratio = 1.0f / cam->dof.aperture_ratio;
+    float ratio = 1.0f / max_ff(cam->dof.aperture_ratio, 0.00001f);
     float sensor = BKE_camera_sensor_size(cam->sensor_fit, cam->sensor_x, cam->sensor_y);
     float focus_dist = BKE_camera_object_dof_distance(camera);
     float focal_len = cam->lens;
@@ -86,6 +86,12 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
       sensor_scaled *= rv3d->viewcamtexcofac[0];
     }
 
+    if (ratio > 1.0) {
+      /* If ratio is scaling the bokeh outwards, we scale the aperture so that the gather
+       * kernel size will encompass the maximum axis. */
+      aperture *= ratio;
+    }
+
     effects->dof_coc_params[1] = -aperture *
                                  fabsf(focal_len_scaled / (focus_dist - focal_len_scaled));
     effects->dof_coc_params[1] *= viewport_size[0] / sensor_scaled;
@@ -93,8 +99,12 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
 
     effects->dof_bokeh_blades = blades;
     effects->dof_bokeh_rotation = rotation;
-    effects->dof_bokeh_ratio = ratio;
+    effects->dof_bokeh_aniso[0] = min_ff(ratio, 1.0f);
+    effects->dof_bokeh_aniso[1] = min_ff(1.0f / ratio, 1.0f);
     effects->dof_bokeh_max_size = scene_eval->eevee.bokeh_max_size;
+
+    copy_v2_v2(effects->dof_bokeh_aniso_inv, effects->dof_bokeh_aniso);
+    invert_v2(effects->dof_bokeh_aniso_inv);
 
     /* TODO(fclem) User parameters. */
     effects->dof_scatter_color_threshold = 0.7f;
@@ -146,7 +156,8 @@ static void dof_bokeh_pass_init(EEVEE_FramebufferList *fbl,
                                 EEVEE_PassList *psl,
                                 EEVEE_EffectsInfo *fx)
 {
-  if ((fx->dof_bokeh_blades == 0.0) && (fx->dof_bokeh_ratio == 1.0f)) {
+  if ((fx->dof_bokeh_aniso[0] == 1.0f) && (fx->dof_bokeh_aniso[1] == 1.0f) &&
+      (fx->dof_bokeh_blades == 0.0)) {
     fx->dof_bokeh_tx = NULL;
     return;
   }
@@ -160,7 +171,6 @@ static void dof_bokeh_pass_init(EEVEE_FramebufferList *fbl,
   DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_bokeh);
   DRW_shgroup_uniform_float_copy(grp, "bokehSides", fx->dof_bokeh_blades);
   DRW_shgroup_uniform_float_copy(grp, "bokehRotation", fx->dof_bokeh_rotation);
-  DRW_shgroup_uniform_float_copy(grp, "bokehRatio", fx->dof_bokeh_ratio);
   DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 
   fx->dof_bokeh_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
@@ -383,7 +393,7 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_float_copy(
         grp, "scatterColorNeighborMax", fx->dof_scatter_neighbor_max_color);
     DRW_shgroup_uniform_float_copy(grp, "scatterCocThreshold", fx->dof_scatter_coc_threshold);
-    DRW_shgroup_uniform_float_copy(grp, "bokehRatio", fx->dof_bokeh_ratio);
+    DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropy", fx->dof_bokeh_aniso);
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 
     void *owner = (void *)&EEVEE_depth_of_field_init;
@@ -504,6 +514,7 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_vec2_copy(grp, "gatherInputUvCorrection", uv_correction_fac);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherOutputTexelSize", output_texel_size);
     if (use_bokeh_tx) {
+      DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropy", fx->dof_bokeh_aniso);
       DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
     }
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
@@ -540,6 +551,7 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_vec2_copy(grp, "gatherInputUvCorrection", uv_correction_fac);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherOutputTexelSize", output_texel_size);
     if (use_bokeh_tx) {
+      DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropy", fx->dof_bokeh_aniso);
       DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
     }
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
@@ -623,8 +635,9 @@ static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_texture_ref(grp, "occlusionBuffer", &fx->dof_fg_occlusion_tx);
     DRW_shgroup_uniform_vec2_copy(grp, "targetTexelSize", target_texel_size);
     DRW_shgroup_uniform_int_copy(grp, "spritePerRow", input_size[0] / 2);
-    DRW_shgroup_uniform_float_copy(grp, "bokehRatio", fx->dof_bokeh_ratio);
+    DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropy", fx->dof_bokeh_aniso);
     if (use_bokeh_tx) {
+      DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropyInv", fx->dof_bokeh_aniso_inv);
       DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
     }
     DRW_shgroup_call_procedural_triangles(grp, NULL, sprite_count);
@@ -647,8 +660,9 @@ static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
     DRW_shgroup_uniform_vec2_copy(grp, "targetTexelSize", target_texel_size);
     DRW_shgroup_uniform_int_copy(grp, "spritePerRow", input_size[0] / 2);
-    DRW_shgroup_uniform_float_copy(grp, "bokehRatio", fx->dof_bokeh_ratio);
+    DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropy", fx->dof_bokeh_aniso);
     if (use_bokeh_tx) {
+      DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropyInv", fx->dof_bokeh_aniso_inv);
       DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
     }
     DRW_shgroup_call_procedural_triangles(grp, NULL, sprite_count);
@@ -688,7 +702,7 @@ static void dof_recombine_pass_init(EEVEE_FramebufferList *UNUSED(fbl),
   DRW_shgroup_uniform_texture(grp, "utilTex", EEVEE_materials_get_util_tex());
   DRW_shgroup_uniform_vec4_copy(grp, "cocParams", fx->dof_coc_params);
   DRW_shgroup_uniform_float_copy(grp, "bokehMaxSize", fx->dof_bokeh_max_size);
-  DRW_shgroup_uniform_float_copy(grp, "bokehRatioInv", 1.0f / fx->dof_bokeh_ratio);
+  DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropyInv", fx->dof_bokeh_aniso_inv);
   DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 }
 

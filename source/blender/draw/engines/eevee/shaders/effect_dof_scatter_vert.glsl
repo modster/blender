@@ -3,7 +3,7 @@
 
 uniform vec2 targetTexelSize;
 uniform int spritePerRow;
-uniform float bokehRatio;
+uniform vec2 bokehAnisotropy;
 
 uniform sampler2D colorBuffer;
 uniform sampler2D cocBuffer;
@@ -127,7 +127,7 @@ void main()
 
   /* Add 2.5 to max_coc because the max_coc may not be centered on the sprite origin
    * and because we smooth the bokeh shape a bit in the pixel shader. */
-  gl_Position.xy *= spritesize * vec2(bokehRatio, 1.0) + 2.5;
+  gl_Position.xy *= spritesize * bokehAnisotropy + 2.5;
   /* Position the sprite. */
   gl_Position.xy += spritepos;
   /* NDC range [-1..1]. */

@@ -30,6 +30,8 @@ uniform vec2 gatherInputUvCorrection;
 
 uniform vec2 gatherOutputTexelSize;
 
+uniform vec2 bokehAnisotropy;
+
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out float outWeight;
 #ifndef DOF_HOLEFILL_PASS
@@ -76,6 +78,9 @@ void dof_gather_init(float base_radius,
 {
   /* Jitter center half a ring to reduce undersampling. */
   vec2 jitter_ofs = 0.499 * noise.zw * sqrt(noise.x);
+#ifdef DOF_BOKEH_TEXTURE
+  jitter_ofs *= bokehAnisotropy;
+#endif
   center_co = gl_FragCoord.xy + jitter_ofs * base_radius * unit_sample_radius;
 
   /* TODO(fclem) Seems like the default lod selection is too big. Bias to avoid blocky moving
@@ -140,9 +145,9 @@ void dof_gather_accumulator(float base_radius,
       for (int i = 0; i < 2; i++) {
         vec2 offset_co = ((i == 0) ? offset : -offset);
 #ifdef DOF_BOKEH_TEXTURE
-        /* OPTI(fclem): Potential savings here by reducing the bokeh texture size or its LOD.
-         * A bit tricky to do for now because of anamorphic bokeh. */
-        offset_co = texture(bokehLut, offset_co * 0.48 + 0.5).rg;
+        /* Scaling to 0.25 for speed. Improves texture cache hit. */
+        offset_co = texture(bokehLut, offset_co * 0.25 + 0.5).rg;
+        offset_co *= bokehAnisotropy;
 #endif
         vec2 sample_co = center_co + offset_co * ring_radius;
         vec2 sample_uv = sample_co * gatherOutputTexelSize * gatherInputUvCorrection;

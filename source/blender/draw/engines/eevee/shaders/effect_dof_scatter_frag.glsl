@@ -11,6 +11,8 @@
 uniform sampler2D occlusionBuffer;
 uniform sampler2D bokehLut;
 
+uniform vec2 bokehAnisotropyInv;
+
 flat in vec4 color1;
 flat in vec4 color2;
 flat in vec4 color3;
@@ -27,6 +29,7 @@ float bokeh_shape(vec2 center)
   vec2 co = gl_FragCoord.xy - center;
 
 #ifdef DOF_BOKEH_TEXTURE
+  co *= bokehAnisotropyInv;
   float texture_size = float(textureSize(bokehLut, 0).x);
   /* Bias scale to avoid sampling at the texture's border. */
   float scale_fac = spritesize * (texture_size + 2.0) / texture_size;

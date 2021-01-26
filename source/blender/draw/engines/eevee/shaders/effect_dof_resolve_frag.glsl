@@ -21,7 +21,7 @@ uniform sampler2D holefillColorBuffer;
 uniform sampler2D holefillWeightBuffer;
 
 uniform float bokehMaxSize;
-uniform float bokehRatioInv;
+uniform vec2 bokehAnisotropyInv;
 
 in vec4 uvcoordsvar;
 
@@ -54,8 +54,7 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
       ivec2 offset = dof_square_ring_sample_offset(ring_distance, s);
       float ring_dist = length(vec2(offset));
 #if 1 /* TODO(fclem) shader variation. */
-      /* Might be a way to make this faster. */
-      float sample_dist = length(vec2(offset) * vec2(bokehRatioInv, 1.0));
+      float sample_dist = length(vec2(offset) * bokehAnisotropyInv);
 #endif
       /* TODO(fclem) add Bokeh shape support here. */
 
