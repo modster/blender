@@ -17,6 +17,7 @@ uniform sampler2D downsampledBuffer;
 uniform float bokehRatio;
 uniform float scatterColorThreshold;
 uniform float scatterCocThreshold;
+uniform float scatterColorNeighborMax;
 
 /** Outputs:
  * COPY_PASS: Gather input mip0.
@@ -29,16 +30,13 @@ layout(location = 1) out float outCoc;
 
 layout(location = 2) out vec3 outScatterColor;
 
-vec3 non_linear_comparison_space(vec3 color)
-{
-  /* TODO(fclem) we might want something more aware of exposure. */
-  return -1.0 / (-1.0 - max(vec3(0.0), (color - scatterColorThreshold)));
-}
-
 /* NOTE: Do not compare alpha as it is not scattered by the scatter pass. */
 float dof_scatter_neighborhood_rejection(vec3 color)
 {
-  color = non_linear_comparison_space(color);
+  color = min(vec3(scatterColorNeighborMax), color);
+
+  float validity = 0.0;
+
   /* Centered in the middle of 4 quarter res texel. */
   vec2 texel_size = 1.0 / vec2(textureSize(downsampledBuffer, 0).xy);
   vec2 uv = (floor(gl_FragCoord.xy * 0.5) + 1.0) * texel_size;
@@ -47,13 +45,14 @@ float dof_scatter_neighborhood_rejection(vec3 color)
   for (int i = 0; i < 4; i++) {
     vec2 sample_uv = uv + 2.0 * quad_offsets[i] * texel_size;
     vec3 ref = textureLod(downsampledBuffer, sample_uv, 0.0).rgb;
-    ref = non_linear_comparison_space(ref);
-    max_diff = max(max_diff, abs(ref - color));
+
+    ref = min(vec3(scatterColorNeighborMax), ref);
+    float diff = max_v3(max(vec3(0.0), ref - color));
+
+    const float rejection_threshold = 0.7;
+    diff = saturate(diff / rejection_threshold - 1.0);
+    validity = max(validity, diff);
   }
-  /* TODO(fclem) Adjust using multiple test scene or expose to the user. */
-  const float rejection_threshold = 0.05;
-  const float rejection_hardness = 3.0;
-  float validity = saturate((max_v3(max_diff) - rejection_threshold) * rejection_hardness);
 
   return validity;
 }
@@ -73,13 +72,14 @@ float dof_scatter_screen_border_rejection(float coc, vec2 uv, vec2 screen_size)
 
 float dof_scatter_luminosity_rejection(vec3 color)
 {
-  const float rejection_hardness = 2.0;
+  const float rejection_hardness = 5.0;
   return saturate(max_v3(color - scatterColorThreshold) * rejection_hardness);
 }
 
 float dof_scatter_coc_radius_rejection(float coc)
 {
-  return saturate(abs(coc) - scatterCocThreshold);
+  const float rejection_hardness = 0.3;
+  return saturate((abs(coc) - scatterCocThreshold) * rejection_hardness);
 }
 
 /* Simple copy pass where we select what pixels to scatter. Also the resolution might change.
@@ -99,10 +99,12 @@ void main()
   do_scatter *= dof_scatter_coc_radius_rejection(outCoc);
   /* Only scatter if CoC is not too big to avoid performance issues. */
   do_scatter *= dof_scatter_screen_border_rejection(outCoc, uv, halfres);
-  /* Only scatter if neighborhood is different enough. */
-  do_scatter *= dof_scatter_neighborhood_rejection(outColor.rgb);
+  /* Only scatter if neighborhood is different enough. Test is expensive, do only if worth it. */
+  do_scatter *= (do_scatter < 0.2) ? 1.0 : dof_scatter_neighborhood_rejection(outColor.rgb);
   /* For debuging. */
   do_scatter *= float(!no_scatter_pass);
+  /* Sharpen. */
+  do_scatter *= do_scatter * do_scatter;
 
   outScatterColor = mix(vec3(0.0), outColor.rgb, do_scatter);
   outColor.rgb = mix(outColor.rgb, vec3(0.0), do_scatter);

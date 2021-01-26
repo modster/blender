@@ -767,6 +767,7 @@ typedef struct EEVEE_EffectsInfo {
   float dof_bokeh_blades, dof_bokeh_rotation, dof_bokeh_ratio, dof_bokeh_max_size;
   float dof_scatter_color_threshold;
   float dof_scatter_coc_threshold;
+  float dof_scatter_neighbor_max_color;
   float dof_fx_max_coc;
   int dof_dilate_slight_focus;
   int dof_dilate_ring_count;

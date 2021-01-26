@@ -97,7 +97,8 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
     effects->dof_bokeh_max_size = scene_eval->eevee.bokeh_max_size;
 
     /* TODO(fclem) User parameters. */
-    effects->dof_scatter_color_threshold = 1.5f;
+    effects->dof_scatter_color_threshold = 0.7f;
+    effects->dof_scatter_neighbor_max_color = 10.0f;
 
     float max_abs_fg_coc = fabsf(coc_radius_from_camera_depth(effects, -cam->clip_start));
     /* Background is at infinity so maximum CoC is the limit of the function at -inf. */
@@ -379,6 +380,8 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_texture_ref_ex(
         grp, "downsampledBuffer", &fx->dof_downsample_tx, NO_FILTERING);
     DRW_shgroup_uniform_float_copy(grp, "scatterColorThreshold", fx->dof_scatter_color_threshold);
+    DRW_shgroup_uniform_float_copy(
+        grp, "scatterColorNeighborMax", fx->dof_scatter_neighbor_max_color);
     DRW_shgroup_uniform_float_copy(grp, "scatterCocThreshold", fx->dof_scatter_coc_threshold);
     DRW_shgroup_uniform_float_copy(grp, "bokehRatio", fx->dof_bokeh_ratio);
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
