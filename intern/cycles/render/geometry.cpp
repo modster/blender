@@ -1940,11 +1940,23 @@ void GeometryManager::device_update(Device *device,
     VLOG(2) << "Objects BVH build pool statistics:\n" << summary.full_report();
 
     auto total_build_time = 0.0;
+    auto total_build_time_mesh = 0.0;
+    auto total_build_time_curves = 0.0;
     for (Geometry *geom : scene->geometry) {
       total_build_time += std::abs(geom->bvh->build_time);
+
+      if (geom->is_mesh()) {
+        total_build_time_mesh += std::abs(geom->bvh->build_time);
+      }
+      else if (geom->is_hair()) {
+        total_build_time_curves += std::abs(geom->bvh->build_time);
+      }
+
       geom->bvh->build_time = 0.0;
     }
     std::cerr << "Total time spent building BLAS : " << total_build_time << '\n';
+    std::cerr << "Total time spent building mesh BLAS : " << total_build_time_mesh << '\n';
+    std::cerr << "Total time spent building hair BLAS : " << total_build_time_curves << '\n';
   }
 
   foreach (Shader *shader, scene->shaders) {
