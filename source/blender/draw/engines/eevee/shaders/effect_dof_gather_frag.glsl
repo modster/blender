@@ -263,8 +263,7 @@ void main()
   const float early_out_threshold = layer_threshold - layer_offset;
 #endif
 
-  /* Allow for a 5% radius difference. */
-  bool do_fast_gather = (base_radius - min_radius) < (DOF_FAST_GATHER_COC_ERROR * base_radius);
+  bool do_fast_gather = dof_do_fast_gather(base_radius, min_radius);
 
   /* In fullres CoC. */
   bool can_early_out = base_radius <= early_out_threshold;

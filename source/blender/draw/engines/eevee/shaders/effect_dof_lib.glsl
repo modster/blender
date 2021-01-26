@@ -24,6 +24,7 @@ const bool no_scatter_pass = false;
 const bool no_foreground_pass = false;
 const bool no_background_pass = false;
 const bool no_slight_focus_pass = false;
+const bool no_focus_pass = false;
 const bool no_holefill_pass = false;
 
 /* -------------- Quality Defines ------------- */
@@ -45,6 +46,11 @@ const int gather_density_change_ring = 1;
 
 /* Allow 5% CoC error. */
 #define DOF_FAST_GATHER_COC_ERROR 0.05
+
+bool dof_do_fast_gather(float max_absolute_coc, float min_absolute_coc)
+{
+  return (max_absolute_coc - min_absolute_coc) < (DOF_FAST_GATHER_COC_ERROR * max_absolute_coc);
+}
 
 const vec2 quad_offsets[4] = vec2[4](
     vec2(-0.5, 0.5), vec2(0.5, 0.5), vec2(0.5, -0.5), vec2(-0.5, -0.5));

@@ -26,8 +26,11 @@ in vec4 uvcoordsvar;
 
 out vec4 fragColor;
 
-void dof_slight_focus_gather(float radius, vec4 noise, out vec4 out_color, out float out_weight)
+void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_weight)
 {
+  /* offset coord to avoid correlation with sampling pattern.  */
+  vec4 noise = texelfetch_noise_tex(gl_FragCoord.xy + 7.0);
+
   DofGatherData fg_accum = GATHER_DATA_INIT;
   DofGatherData bg_accum = GATHER_DATA_INIT;
 
@@ -168,44 +171,32 @@ void dof_resolve_load_layer(sampler2D color_tex,
 
 void main(void)
 {
-  /* offset coord to avoid correlation with sampling pattern.  */
-  vec4 noise = texelfetch_noise_tex(gl_FragCoord.xy + 7.0);
-
   ivec2 tile_co = ivec2(gl_FragCoord.xy / 16.0);
   CocTile coc_tile = dof_coc_tile_load(fgTileBuffer, bgTileBuffer, tile_co);
 
-  vec4 focus = vec4(0.0);
-  float focus_w = 0.0;
-  if (coc_tile.fg_slight_focus_max_coc >= 0.5) {
-    dof_slight_focus_gather(coc_tile.fg_slight_focus_max_coc, noise, focus, focus_w);
-  }
-  else {
-    focus = safe_color(textureLod(fullResColorBuffer, uvcoordsvar.xy, 0.0));
-    if (coc_tile.fg_slight_focus_max_coc == DOF_TILE_FOCUS) {
-      /* Tile is full in focus. */
-      focus_w = 1.0;
-    }
-    else /* (coc_tile.fg_slight_focus_max_coc == DOF_TILE_DEFOCUS) */ {
-      /* Tile is full in defocus. Use in focus to fill holes if there is no other options. */
-      /* FIXME */
-      focus_w = 0.0;
-    }
-  }
+  /* Based on tile value, predict what pass we need to load. */
+  bool fg_fully_opaque = dof_do_fast_gather(-coc_tile.fg_min_coc, -coc_tile.fg_max_coc);
+  bool bg_fully_opaque = dof_do_fast_gather(-coc_tile.bg_max_coc, coc_tile.bg_min_coc);
+  bool do_foreground = (-coc_tile.fg_min_coc > layer_threshold);
+  bool do_slight_focus = !fg_fully_opaque && (coc_tile.fg_slight_focus_max_coc >= 0.5);
+  bool do_focus = !fg_fully_opaque && (coc_tile.fg_slight_focus_max_coc == DOF_TILE_FOCUS);
+  bool do_background = !do_focus && !fg_fully_opaque &&
+                       (coc_tile.bg_max_coc > layer_threshold - layer_offset);
+  bool do_holefill = !do_focus && !fg_fully_opaque && !bg_fully_opaque;
 
   fragColor = vec4(0.0);
   float weight = 0.0;
+
   vec4 layer_color;
   float layer_weight;
 
-  /* TODO/OPTI(fclem): do not load uneeded layers based on tile prediction. */
-
-  if (!no_holefill_pass) {
+  if (!no_holefill_pass && do_holefill) {
     dof_resolve_load_layer(holefillColorBuffer, holefillWeightBuffer, layer_color, layer_weight);
     fragColor = layer_color;
     weight = float(layer_weight > 0.0);
   }
 
-  if (!no_background_pass) {
+  if (!no_background_pass && do_background) {
     dof_resolve_load_layer(bgColorBuffer, bgWeightBuffer, layer_color, layer_weight);
     /* Always prefer background to holefill pass. */
     layer_weight = float(layer_weight > 0.0);
@@ -217,14 +208,24 @@ void main(void)
     weight = float(weight > 0.0);
   }
 
-  if (!no_slight_focus_pass) {
-    /* Composite in focus + slight defocus. */
-    fragColor = fragColor * (1.0 - focus_w) + focus * focus_w;
-    weight = weight * (1.0 - focus_w) + focus_w;
+  if (!no_slight_focus_pass && do_slight_focus) {
+    dof_slight_focus_gather(coc_tile.fg_slight_focus_max_coc, layer_color, layer_weight);
+    /* Composite slight defocus. */
+    fragColor = fragColor * (1.0 - layer_weight) + layer_color * layer_weight;
+    weight = weight * (1.0 - layer_weight) + layer_weight;
     fragColor *= safe_rcp(weight);
   }
 
-  if (!no_foreground_pass) {
+  if (!no_focus_pass && do_focus) {
+    layer_color = safe_color(textureLod(fullResColorBuffer, uvcoordsvar.xy, 0.0));
+    layer_weight = 1.0;
+    /* Composite in focus. */
+    fragColor = fragColor * (1.0 - layer_weight) + layer_color * layer_weight;
+    weight = weight * (1.0 - layer_weight) + layer_weight;
+    fragColor *= safe_rcp(weight);
+  }
+
+  if (!no_foreground_pass && do_foreground) {
     dof_resolve_load_layer(fgColorBuffer, fgWeightBuffer, layer_color, layer_weight);
     /* Composite foreground. */
     fragColor = fragColor * (1.0 - layer_weight) + layer_color * layer_weight;
