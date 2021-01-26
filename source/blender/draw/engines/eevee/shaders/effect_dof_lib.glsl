@@ -213,6 +213,14 @@ struct CocTile {
   float bg_min_intersectable_coc;
 };
 
+struct CocTilePrediction {
+  bool do_foreground;
+  bool do_slight_focus;
+  bool do_focus;
+  bool do_background;
+  bool do_holefill;
+};
+
 /* WATCH: Might have to change depending on the texture format. */
 #define DOF_TILE_DEFOCUS 0.25
 #define DOF_TILE_FOCUS 0.0
@@ -261,6 +269,30 @@ void dof_coc_tile_store(CocTile tile, out vec4 out_fg, out vec3 out_bg)
   out_bg.x = tile.bg_min_coc;
   out_bg.y = tile.bg_max_coc;
   out_bg.z = tile.bg_min_intersectable_coc;
+}
+
+CocTilePrediction dof_coc_tile_prediction_get(CocTile tile)
+{
+  /* Based on tile value, predict what pass we need to load. */
+  CocTilePrediction predict;
+
+  predict.do_foreground = (-tile.fg_min_coc > layer_threshold);
+  bool fg_fully_opaque = predict.do_foreground &&
+                         dof_do_fast_gather(-tile.fg_min_coc, -tile.fg_max_coc);
+
+  predict.do_slight_focus = !fg_fully_opaque && (tile.fg_slight_focus_max_coc >= 0.5);
+  predict.do_focus = !fg_fully_opaque && (tile.fg_slight_focus_max_coc == DOF_TILE_FOCUS);
+
+  predict.do_background = !predict.do_focus && !fg_fully_opaque &&
+                          (tile.bg_max_coc > layer_threshold - layer_offset);
+  bool bg_fully_opaque = predict.do_background &&
+                         dof_do_fast_gather(-tile.bg_max_coc, tile.bg_min_coc);
+  predict.do_holefill = !predict.do_focus && !fg_fully_opaque && !bg_fully_opaque;
+
+#if 0 /* Debug */
+  predict.do_foreground = predict.do_background = predict.do_holefill = true;
+#endif
+  return predict;
 }
 
 /* Special function to return the correct max value of 2 slight focus coc. */

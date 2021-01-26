@@ -238,42 +238,28 @@ void main()
 {
   ivec2 tile_co = ivec2(gl_FragCoord.xy / 8.0);
   CocTile coc_tile = dof_coc_tile_load(cocTilesFgBuffer, cocTilesBgBuffer, tile_co);
+  CocTilePrediction prediction = dof_coc_tile_prediction_get(coc_tile);
 
 #if defined(DOF_FOREGROUND_PASS)
   float base_radius = -coc_tile.fg_min_coc;
   float min_radius = -coc_tile.fg_max_coc;
   float min_intersectable_radius = -coc_tile.fg_max_intersectable_coc;
+  bool can_early_out = !prediction.do_foreground;
 
 #elif defined(DOF_HOLEFILL_PASS)
   float base_radius = -coc_tile.fg_min_coc;
   float min_radius = -coc_tile.fg_max_coc;
   float min_intersectable_radius = DOF_TILE_LARGE_COC;
+  bool can_early_out = !prediction.do_holefill;
 
 #else /* DOF_BACKGROUND_PASS */
   float base_radius = coc_tile.bg_max_coc;
   float min_radius = coc_tile.bg_min_coc;
   float min_intersectable_radius = coc_tile.bg_min_intersectable_coc;
-
-#endif
-
-#if defined(DOF_FOREGROUND_PASS)
-  /* Avoid tiles with 1.0 weights when max radius is clamped to layer_threshold. */
-  const float early_out_threshold = layer_threshold;
-#else
-  const float early_out_threshold = layer_threshold - layer_offset;
+  bool can_early_out = !prediction.do_background;
 #endif
 
   bool do_fast_gather = dof_do_fast_gather(base_radius, min_radius);
-
-  /* In fullres CoC. */
-  bool can_early_out = base_radius <= early_out_threshold;
-
-#ifdef DOF_HOLEFILL_PASS
-  if (do_fast_gather && !can_early_out) {
-    /* This means the foreground pass is fully opaque. Ignore this tile. */
-    can_early_out = true;
-  }
-#endif
 
   /* Gather at half resolution. Divide CoC by 2. */
   base_radius *= 0.5;
