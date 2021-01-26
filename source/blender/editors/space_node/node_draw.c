@@ -755,11 +755,9 @@ static void node_socket_outline_color_get(bool selected, float r_outline_color[4
 {
   if (selected) {
     UI_GetThemeColor4fv(TH_TEXT_HI, r_outline_color);
-    r_outline_color[3] = 0.9f;
   }
   else {
-    copy_v4_fl(r_outline_color, 0.0f);
-    r_outline_color[3] = 0.6f;
+    UI_GetThemeColor4fv(TH_BACK, r_outline_color);
   }
 }
 
@@ -839,7 +837,7 @@ void ED_node_socket_draw(bNodeSocket *sock, const rcti *rect, const float color[
   GPU_program_point_size(true);
 
   immBindBuiltinProgram(GPU_SHADER_KEYFRAME_DIAMOND);
-  immUniform1f("outline_scale", 0.7f);
+  immUniform1f("outline_scale", 1.25f);
   immUniform2f("ViewportSize", -1.0f, -1.0f);
 
   /* Single point */
@@ -984,7 +982,7 @@ void node_draw_sockets(const View2D *v2d,
   GPU_blend(GPU_BLEND_ALPHA);
   GPU_program_point_size(true);
   immBindBuiltinProgram(GPU_SHADER_KEYFRAME_DIAMOND);
-  immUniform1f("outline_scale", 0.7f);
+  immUniform1f("outline_scale", 1.25f);
   immUniform2f("ViewportSize", -1.0f, -1.0f);
 
   /* set handle size */
@@ -1147,25 +1145,26 @@ static void node_draw_basis(const bContext *C,
   else {
     /* Opaque headers for regular nodes. */
     UI_GetThemeColor3fv(color_id, color);
-    color[3] = 1.0f;
   }
 
   GPU_line_width(1.0f);
 
+  /* Stripe at the top of the header. */
   rctf *rct = &node->totr;
+  const float border_width = 2.0f * U.dpi_fac;
   UI_draw_roundbox_corner_set(UI_CNR_TOP_LEFT | UI_CNR_TOP_RIGHT);
-  UI_draw_roundbox_aa(
+  UI_draw_roundbox_4fv(
       &(const rctf){
           .xmin = rct->xmin,
           .xmax = rct->xmax,
-          .ymin = rct->ymax - NODE_DY,
+          .ymin = rct->ymax - border_width,
           .ymax = rct->ymax,
       },
       true,
-      BASIS_RAD,
+      BASIS_RAD / 2.0f,
       color);
 
-  /* show/hide icons */
+  /* Header icons aligned to the right. */
   float iconofs = rct->xmax - 0.35f * U.widget_unit;
 
   /* preview */
@@ -1177,7 +1176,7 @@ static void node_draw_basis(const bContext *C,
                               B_REDR,
                               ICON_MATERIAL,
                               iconofs,
-                              rct->ymax - NODE_DY,
+                              rct->ymax - NODE_DY - border_width,
                               iconbutw,
                               UI_UNIT_Y,
                               NULL,
@@ -1236,15 +1235,7 @@ static void node_draw_basis(const bContext *C,
     UI_block_emboss_set(node->block, UI_EMBOSS);
   }
 
-  /* title */
-  if (node->flag & SELECT) {
-    UI_GetThemeColor4fv(TH_SELECT, color);
-  }
-  else {
-    UI_GetThemeColorBlendShade4fv(TH_SELECT, color_id, 0.4f, 10, color);
-  }
-
-  /* open/close entirely? */
+  /* Expand/collapse widget. */
   {
     int but_size = U.widget_unit * 0.8f;
     /* XXX button uses a custom triangle draw below, so make it invisible without icon */
@@ -1268,7 +1259,10 @@ static void node_draw_basis(const bContext *C,
 
     UI_GetThemeColor4fv(TH_TEXT, color);
     /* custom draw function for this button */
-    UI_draw_icon_tri(rct->xmin + 0.65f * U.widget_unit, rct->ymax - NODE_DY / 2.2f, 'v', color);
+    UI_draw_icon_tri(rct->xmin + 0.65f * U.widget_unit,
+                     (rct->ymax - NODE_DY / 2.2f) - border_width,
+                     'v',
+                     color);
   }
 
   char showname[128]; /* 128 used below */
@@ -1279,7 +1273,7 @@ static void node_draw_basis(const bContext *C,
                         0,
                         showname,
                         (int)(rct->xmin + NODE_MARGIN_X),
-                        (int)(rct->ymax - NODE_DY),
+                        (int)((rct->ymax - NODE_DY) - border_width),
                         (short)(iconofs - rct->xmin - (18.0f * U.dpi_fac)),
                         (short)NODE_DY,
                         NULL,
@@ -1312,35 +1306,36 @@ static void node_draw_basis(const bContext *C,
     color[3] = 0.5f;
   }
 
+  /* Outline around active and selected nodes. */
+  if (node->flag & SELECT) {
+    float border_color[4];
+    UI_GetThemeColor4fv((node->flag & NODE_ACTIVE) ? TH_ACTIVE : TH_SELECT, border_color);
+
+    UI_draw_roundbox_corner_set(UI_CNR_ALL);
+    UI_draw_roundbox_4fv(
+        &(const rctf){
+            .xmin = rct->xmin - border_width,
+            .xmax = rct->xmax + border_width,
+            .ymin = rct->ymin - border_width,
+            .ymax = rct->ymax + border_width,
+        },
+        true,
+        BASIS_RAD,
+        border_color);
+  }
+
+  /* Node backdrop. */
   UI_draw_roundbox_corner_set(UI_CNR_BOTTOM_LEFT | UI_CNR_BOTTOM_RIGHT);
-  UI_draw_roundbox_aa(
+  UI_draw_roundbox_4fv(
       &(const rctf){
           .xmin = rct->xmin,
           .xmax = rct->xmax,
           .ymin = rct->ymin,
-          .ymax = rct->ymax - NODE_DY,
+          .ymax = rct->ymax - border_width,
       },
       true,
       BASIS_RAD,
       color);
-
-  /* outline active and selected emphasis */
-  if (node->flag & SELECT) {
-    UI_GetThemeColorShadeAlpha4fv(
-        (node->flag & NODE_ACTIVE) ? TH_ACTIVE : TH_SELECT, 0, -40, color);
-
-    UI_draw_roundbox_corner_set(UI_CNR_ALL);
-    UI_draw_roundbox_aa(
-        &(const rctf){
-            .xmin = rct->xmin,
-            .xmax = rct->xmax,
-            .ymin = rct->ymin,
-            .ymax = rct->ymax,
-        },
-        false,
-        BASIS_RAD,
-        color);
-  }
 
   /* disable lines */
   if (node->flag & NODE_MUTED) {
@@ -1382,6 +1377,25 @@ static void node_draw_hidden(const bContext *C,
   /* shadow */
   node_draw_shadow(snode, node, hiddenrad, 1.0f);
 
+  /* Outline around active and selected nodes. */
+  const float border_width = 3.0f * U.dpi_fac;
+  if (node->flag & SELECT) {
+    float border_color[4];
+    UI_GetThemeColor4fv((node->flag & NODE_ACTIVE) ? TH_ACTIVE : TH_SELECT, border_color);
+
+    UI_draw_roundbox_corner_set(UI_CNR_ALL);
+    UI_draw_roundbox_4fv(
+        &(const rctf){
+            .xmin = rct->xmin - border_width,
+            .xmax = rct->xmax + border_width,
+            .ymin = rct->ymin - border_width,
+            .ymax = rct->ymax + border_width,
+        },
+        hiddenrad,
+        true,
+        border_color);
+  }
+
   /* body */
   float color[4];
   int color_id = node_get_colorid(node);
@@ -1394,15 +1408,22 @@ static void node_draw_hidden(const bContext *C,
     UI_GetThemeColor4fv(color_id, color);
   }
 
-  UI_draw_roundbox_aa(rct, true, hiddenrad, color);
+  /* Draw colored outline with the color_id. */
+  UI_draw_roundbox_corner_set(UI_CNR_ALL);
+  UI_draw_roundbox_4fv(
+      &(const rctf){
+          .xmin = rct->xmin - (border_width / 3.0f),
+          .xmax = rct->xmax + (border_width / 3.0f),
+          .ymin = rct->ymin - (border_width / 3.0f),
+          .ymax = rct->ymax + (border_width / 3.0f),
+      },
+      true,
+      hiddenrad,
+      color);
 
-  /* outline active and selected emphasis */
-  if (node->flag & SELECT) {
-    UI_GetThemeColorShadeAlpha4fv(
-        (node->flag & NODE_ACTIVE) ? TH_ACTIVE : TH_SELECT, 0, -40, color);
-
-    UI_draw_roundbox_aa(rct, false, hiddenrad, color);
-  }
+  /* Draw inside of the node with the backdrop color. */
+  UI_GetThemeColor4fv(TH_NODE, color);
+  UI_draw_roundbox_4fv(rct, true, hiddenrad, color);
 
   /* custom color inline */
   if (node->flag & NODE_CUSTOM_COLOR) {
