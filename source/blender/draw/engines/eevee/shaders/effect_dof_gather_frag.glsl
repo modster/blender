@@ -16,6 +16,9 @@
 uniform sampler2D colorBuffer;
 uniform sampler2D cocBuffer;
 
+/* Same input buffer but with a bilinear sampler object. */
+uniform sampler2D colorBufferBilinear;
+
 /* CoC Min&Max tile buffer at 1/16th of fullres. */
 uniform sampler2D cocTilesFgBuffer;
 uniform sampler2D cocTilesBgBuffer;
@@ -143,7 +146,12 @@ void dof_gather_accumulator(float base_radius,
 #endif
         vec2 sample_co = center_co + offset_co * ring_radius;
         vec2 sample_uv = sample_co * gatherOutputTexelSize * gatherInputUvCorrection;
-        pair_data[i].color = dof_load_gather_color(colorBuffer, sample_uv, lod);
+        if (do_fast_gather) {
+          pair_data[i].color = dof_load_gather_color(colorBufferBilinear, sample_uv, lod);
+        }
+        else {
+          pair_data[i].color = dof_load_gather_color(colorBuffer, sample_uv, lod);
+        }
         pair_data[i].coc = dof_load_gather_coc(cocBuffer, sample_uv, lod);
         pair_data[i].dist = ring_radius;
       }
@@ -193,7 +201,12 @@ void dof_gather_accumulator(float base_radius,
     /* Center sample. */
     vec2 sample_uv = center_co * gatherOutputTexelSize * gatherInputUvCorrection;
     DofGatherData center_data;
-    center_data.color = dof_load_gather_color(colorBuffer, sample_uv, lod);
+    if (do_fast_gather) {
+      center_data.color = dof_load_gather_color(colorBufferBilinear, sample_uv, lod);
+    }
+    else {
+      center_data.color = dof_load_gather_color(colorBuffer, sample_uv, lod);
+    }
     center_data.coc = dof_load_gather_coc(cocBuffer, sample_uv, lod);
     center_data.dist = 0.0;
 

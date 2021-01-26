@@ -129,6 +129,7 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
   return 0;
 }
 
+#define WITH_FILTERING (GPU_SAMPLER_MIPMAP | GPU_SAMPLER_FILTER)
 #define NO_FILTERING GPU_SAMPLER_MIPMAP
 #define COLOR_FORMAT fx->dof_color_format
 #define FG_TILE_FORMAT GPU_RGBA16F
@@ -461,6 +462,8 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
 
     GPUShader *sh = EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_HOLEFILL, false);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_gather_fg_holefill);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "colorBufferBilinear", &txl->dof_reduced_color, WITH_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &txl->dof_reduced_color, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref(grp, "cocTilesFgBuffer", &fx->dof_coc_dilated_tiles_fg_tx);
@@ -486,6 +489,8 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
 
     GPUShader *sh = EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_FOREGROUND, use_bokeh_tx);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_gather_fg);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "colorBufferBilinear", &txl->dof_reduced_color, WITH_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &txl->dof_reduced_color, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref(grp, "cocTilesFgBuffer", &fx->dof_coc_dilated_tiles_fg_tx);
@@ -520,6 +525,8 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
 
     GPUShader *sh = EEVEE_shaders_depth_of_field_gather_get(DOF_GATHER_BACKGROUND, use_bokeh_tx);
     DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_gather_bg);
+    DRW_shgroup_uniform_texture_ref_ex(
+        grp, "colorBufferBilinear", &txl->dof_reduced_color, WITH_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &txl->dof_reduced_color, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref(grp, "cocTilesFgBuffer", &fx->dof_coc_dilated_tiles_fg_tx);
