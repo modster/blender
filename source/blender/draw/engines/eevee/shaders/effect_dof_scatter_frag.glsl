@@ -32,7 +32,7 @@ float bokeh_shape(vec2 center)
   float scale_fac = spritesize * (texture_size + 2.0) / texture_size;
   float dist = scale_fac * textureLod(bokehLut, (co / scale_fac) * 0.5 + 0.5, 0.0).z;
 #else
-  float dist = length(co);
+  float dist = fast_sqrt(len_squared(co));
 #endif
 
   return dist;
