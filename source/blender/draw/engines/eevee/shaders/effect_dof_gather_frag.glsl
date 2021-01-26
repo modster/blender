@@ -232,6 +232,9 @@ void dof_gather_accumulator(float base_radius,
 #elif defined(DOF_DEBUG_SCATTER_PERF)
   outColor.rgb = avg(outColor.rgb) * vec3(0.0, 1.0, 0.0);
 #endif
+
+  /* Output premultiplied color so we can use bilinear sampler in resolve pass. */
+  outColor *= outWeight;
 }
 
 void main()

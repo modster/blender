@@ -677,15 +677,13 @@ static void dof_recombine_pass_init(EEVEE_FramebufferList *UNUSED(fbl),
   DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_resolve);
   DRW_shgroup_uniform_texture_ref_ex(grp, "fullResColorBuffer", &fx->source_buffer, NO_FILTERING);
   DRW_shgroup_uniform_texture_ref_ex(grp, "fullResDepthBuffer", &dtxl->depth, NO_FILTERING);
-  DRW_shgroup_uniform_texture_ref_ex(grp, "bgColorBuffer", &fx->dof_bg_color_tx, NO_FILTERING);
-  DRW_shgroup_uniform_texture_ref_ex(grp, "bgWeightBuffer", &fx->dof_bg_weight_tx, NO_FILTERING);
+  DRW_shgroup_uniform_texture_ref(grp, "bgColorBuffer", &fx->dof_bg_color_tx);
+  DRW_shgroup_uniform_texture_ref(grp, "bgWeightBuffer", &fx->dof_bg_weight_tx);
   DRW_shgroup_uniform_texture_ref(grp, "bgTileBuffer", &fx->dof_coc_dilated_tiles_bg_tx);
-  DRW_shgroup_uniform_texture_ref_ex(grp, "fgColorBuffer", &fx->dof_fg_color_tx, NO_FILTERING);
-  DRW_shgroup_uniform_texture_ref_ex(grp, "fgWeightBuffer", &fx->dof_fg_weight_tx, NO_FILTERING);
-  DRW_shgroup_uniform_texture_ref_ex(
-      grp, "holefillColorBuffer", &fx->dof_fg_holefill_color_tx, NO_FILTERING);
-  DRW_shgroup_uniform_texture_ref_ex(
-      grp, "holefillWeightBuffer", &fx->dof_fg_holefill_weight_tx, NO_FILTERING);
+  DRW_shgroup_uniform_texture_ref(grp, "fgColorBuffer", &fx->dof_fg_color_tx);
+  DRW_shgroup_uniform_texture_ref(grp, "fgWeightBuffer", &fx->dof_fg_weight_tx);
+  DRW_shgroup_uniform_texture_ref(grp, "holefillColorBuffer", &fx->dof_fg_holefill_color_tx);
+  DRW_shgroup_uniform_texture_ref(grp, "holefillWeightBuffer", &fx->dof_fg_holefill_weight_tx);
   DRW_shgroup_uniform_texture_ref(grp, "fgTileBuffer", &fx->dof_coc_dilated_tiles_fg_tx);
   DRW_shgroup_uniform_texture(grp, "utilTex", EEVEE_materials_get_util_tex());
   DRW_shgroup_uniform_vec4_copy(grp, "cocParams", fx->dof_coc_params);
