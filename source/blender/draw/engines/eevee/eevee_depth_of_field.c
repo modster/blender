@@ -356,7 +356,7 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
         grp, "cocBuffer", &fx->dof_reduce_input_coc_tx, NO_FILTERING);
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 
-    void *owner = (void *)&dof_reduce_pass_init;
+    void *owner = (void *)&EEVEE_depth_of_field_init;
     fx->dof_downsample_tx = DRW_texture_pool_query_2d(UNPACK2(quater_res), COLOR_FORMAT, owner);
 
     GPU_framebuffer_ensure_config(&fbl->dof_downsample_fb,
@@ -383,7 +383,7 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_float_copy(grp, "bokehRatio", fx->dof_bokeh_ratio);
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 
-    void *owner = (void *)&dof_reduce_pass_init;
+    void *owner = (void *)&EEVEE_depth_of_field_init;
     fx->dof_scatter_src_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R11F_G11F_B10F, owner);
   }
 
@@ -448,7 +448,7 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
                                  EEVEE_TextureList *txl,
                                  EEVEE_EffectsInfo *fx)
 {
-  void *owner = (void *)&dof_gather_pass_init;
+  void *owner = (void *)&EEVEE_depth_of_field_init;
   const float *fullres = DRW_viewport_size_get();
   int res[2] = {divide_ceil_u(fullres[0], 2), divide_ceil_u(fullres[1], 2)};
   int input_size[2];
@@ -473,8 +473,10 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_vec2_copy(grp, "gatherOutputTexelSize", output_texel_size);
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 
-    /* NOTE: This pass is the owner. So textures from pool can come from previous passes. */
-    fx->dof_fg_holefill_color_tx = DRW_texture_pool_query_2d(UNPACK2(res), COLOR_FORMAT, owner);
+    /* Reuse textures from the setup pass. */
+    /* NOTE: We could use the texture pool do that for us but it does not track usage and it might
+     * backfire (it does in practice). */
+    fx->dof_fg_holefill_color_tx = fx->dof_half_res_color_tx;
     fx->dof_fg_holefill_weight_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R16F, owner);
 
     GPU_framebuffer_ensure_config(&fbl->dof_gather_fg_holefill_fb,
@@ -503,10 +505,12 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     }
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 
-    /* NOTE: This pass is the owner. So textures from pool can come from previous passes. */
     fx->dof_fg_color_tx = DRW_texture_pool_query_2d(UNPACK2(res), COLOR_FORMAT, owner);
     fx->dof_fg_weight_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R16F, owner);
-    fx->dof_fg_occlusion_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RG16F, owner);
+    /* Reuse textures from the setup pass. */
+    /* NOTE: We could use the texture pool do that for us but it does not track usage and it might
+     * backfire (it does in practice). */
+    fx->dof_fg_occlusion_tx = fx->dof_half_res_coc_tx;
 
     /* NOTE: First target is holefill texture so we can use the median filter on it.
      * See the filter function. */
@@ -537,10 +541,10 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     }
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 
-    /* NOTE: This pass is the owner. So textures from pool can come from previous passes. */
     fx->dof_bg_color_tx = DRW_texture_pool_query_2d(UNPACK2(res), COLOR_FORMAT, owner);
     fx->dof_bg_weight_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R16F, owner);
-    fx->dof_bg_occlusion_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RG16F, owner);
+    /* Reuse, since only used for scatter. Foreground is processed before background. */
+    fx->dof_bg_occlusion_tx = fx->dof_fg_occlusion_tx;
 
     /* NOTE: First target is holefill texture so we can use the median filter on it.
      * See the filter function. */
