@@ -675,8 +675,8 @@ static void dof_recombine_pass_init(EEVEE_FramebufferList *UNUSED(fbl),
 
   GPUShader *sh = EEVEE_shaders_depth_of_field_resolve_get();
   DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_resolve);
-  DRW_shgroup_uniform_texture_ref(grp, "fullResColorBuffer", &fx->source_buffer);
-  DRW_shgroup_uniform_texture_ref(grp, "fullResDepthBuffer", &dtxl->depth);
+  DRW_shgroup_uniform_texture_ref_ex(grp, "fullResColorBuffer", &fx->source_buffer, NO_FILTERING);
+  DRW_shgroup_uniform_texture_ref_ex(grp, "fullResDepthBuffer", &dtxl->depth, NO_FILTERING);
   DRW_shgroup_uniform_texture_ref_ex(grp, "bgColorBuffer", &fx->dof_bg_color_tx, NO_FILTERING);
   DRW_shgroup_uniform_texture_ref_ex(grp, "bgWeightBuffer", &fx->dof_bg_weight_tx, NO_FILTERING);
   DRW_shgroup_uniform_texture_ref(grp, "bgTileBuffer", &fx->dof_coc_dilated_tiles_bg_tx);

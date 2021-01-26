@@ -55,8 +55,10 @@ void dof_slight_focus_gather(float radius, vec4 noise, out vec4 out_color, out f
       DofGatherData pair_data[2];
       for (int i = 0; i < 2; i++) {
         ivec2 sample_texel = texel + ((i == 0) ? offset : -offset);
-        float depth = texelFetch(fullResDepthBuffer, sample_texel, 0).r;
-        pair_data[i].color = safe_color(texelFetch(fullResColorBuffer, sample_texel, 0));
+        /* OPTI: could precompute the factor. */
+        vec2 sample_uv = (vec2(sample_texel) + 0.5) / vec2(textureSize(fullResDepthBuffer, 0));
+        float depth = textureLod(fullResDepthBuffer, sample_uv, 0.0).r;
+        pair_data[i].color = safe_color(textureLod(fullResColorBuffer, sample_uv, 0.0));
         pair_data[i].coc = dof_coc_from_zdepth(depth);
         pair_data[i].dist = dist;
 
@@ -80,9 +82,10 @@ void dof_slight_focus_gather(float radius, vec4 noise, out vec4 out_color, out f
   }
 
   /* Center sample. */
-  float depth = texelFetch(fullResDepthBuffer, texel, 0).r;
+  vec2 sample_uv = uvcoordsvar.xy;
+  float depth = textureLod(fullResDepthBuffer, sample_uv, 0.0).r;
   DofGatherData center_data;
-  center_data.color = safe_color(texelFetch(fullResColorBuffer, texel, 0));
+  center_data.color = safe_color(textureLod(fullResColorBuffer, sample_uv, 0.0));
   center_data.coc = dof_coc_from_zdepth(depth);
   center_data.dist = 0.0;
 
@@ -120,16 +123,18 @@ void dof_resolve_load_layer(sampler2D color_tex,
 {
   ivec2 tx_size = textureSize(color_tex, 0).xy;
 
-  vec2 pixel_co = gl_FragCoord.xy / 2.0;
+  /* Not sure why we need the -0.5 offset, but without it the blur does not line up with slight
+   * focus. */
+  vec2 pixel_co = -0.5 + gl_FragCoord.xy / 2.0;
   vec2 interp = fract(pixel_co);
-  ivec2 texel = min(tx_size - 1, ivec2(pixel_co));
+  ivec2 texel = ivec2(pixel_co);
 
   /* Manual bilinear filtering with 0 weight handling. */
   vec4 c[2];
   float w[2];
   for (int i = 0; i < 2; i++) {
-    ivec2 t0 = texel + ivec2(0, i);
-    ivec2 t1 = texel + ivec2(1, i);
+    ivec2 t0 = min(tx_size - 1, texel + ivec2(0, i));
+    ivec2 t1 = min(tx_size - 1, texel + ivec2(1, i));
     vec4 c0 = texelFetch(color_tex, t0, 0);
     vec4 c1 = texelFetch(color_tex, t1, 0);
     float w0 = texelFetch(weight_tex, t0, 0).r;

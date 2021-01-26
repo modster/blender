@@ -255,12 +255,19 @@ void main()
   float min_intersectable_radius = coc_tile.bg_min_intersectable_coc;
 
 #endif
+
+#if defined(DOF_FOREGROUND_PASS)
+  /* Avoid tiles with 1.0 weights when max radius is clamped to layer_threshold. */
+  const float early_out_threshold = layer_threshold;
+#else
+  const float early_out_threshold = layer_threshold - layer_offset;
+#endif
+
   /* Allow for a 5% radius difference. */
   bool do_fast_gather = (base_radius - min_radius) < (DOF_FAST_GATHER_COC_ERROR * base_radius);
 
   /* In fullres CoC. */
-  const float early_out_threshold = layer_threshold - layer_offset;
-  bool can_early_out = base_radius < early_out_threshold;
+  bool can_early_out = base_radius <= early_out_threshold;
 
 #ifdef DOF_HOLEFILL_PASS
   if (do_fast_gather && !can_early_out) {
