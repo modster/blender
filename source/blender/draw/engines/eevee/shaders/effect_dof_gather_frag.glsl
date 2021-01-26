@@ -104,7 +104,7 @@ void dof_gather_accumulator(float base_radius,
   else {
     /* Jittering the radius more than we need means we are going to feather the bokeh shape half
      * a ring. So we need to compensate for fast gather that does not check CoC intersection. */
-    base_radius += (1.0 - noise.x * 2.0) * unit_ring_radius * base_radius;
+    base_radius += (0.5 - noise.x) * 1.5 * unit_ring_radius * base_radius;
   }
   /* TODO(fclem) another seed? For now Cranly-Partterson rotation with golden ratio. */
   noise.x = fract(noise.x + 0.61803398875);
