@@ -113,23 +113,58 @@ void dof_slight_focus_gather(float radius, vec4 noise, out vec4 out_color, out f
   out_color *= safe_rcp(out_weight);
 }
 
+void dof_resolve_load_layer(sampler2D color_tex,
+                            sampler2D weight_tex,
+                            out vec4 out_color,
+                            out float out_weight)
+{
+  ivec2 tx_size = textureSize(color_tex, 0).xy;
+
+  vec2 pixel_co = gl_FragCoord.xy / 2.0;
+  vec2 interp = fract(pixel_co);
+  ivec2 texel = min(tx_size - 1, ivec2(pixel_co));
+
+  /* Manual bilinear filtering with 0 weight handling. */
+  vec4 c[2];
+  float w[2];
+  for (int i = 0; i < 2; i++) {
+    ivec2 t0 = texel + ivec2(0, i);
+    ivec2 t1 = texel + ivec2(1, i);
+    vec4 c0 = texelFetch(color_tex, t0, 0);
+    vec4 c1 = texelFetch(color_tex, t1, 0);
+    float w0 = texelFetch(weight_tex, t0, 0).r;
+    float w1 = texelFetch(weight_tex, t1, 0).r;
+
+    if (w0 == 0.0) {
+      c0 = c1;
+      w0 = w1;
+    }
+    else if (w1 == 0.0) {
+      c1 = c0;
+      w1 = w0;
+    }
+
+    c[i] = mix(c0, c1, interp.x);
+    w[i] = mix(w0, w1, interp.x);
+  }
+
+  if (w[0] == 0.0) {
+    c[0] = c[1];
+    w[0] = w[1];
+  }
+  else if (w[1] == 0.0) {
+    c[1] = c[0];
+    w[1] = w[0];
+  }
+
+  out_color = mix(c[0], c[1], interp.y);
+  out_weight = mix(w[0], w[1], interp.y);
+}
+
 void main(void)
 {
-  vec2 uv = uvcoordsvar.xy;
-
   /* offset coord to avoid correlation with sampling pattern.  */
   vec4 noise = texelfetch_noise_tex(gl_FragCoord.xy + 7.0);
-  /* Stochastically randomize which pixel to resolve. This avoids having garbage values
-   * from the weight mask interpolation but still have less pixelated look. */
-  const float jitter_radius = length(vec2(0.6));
-  vec2 jitter_uv = uv + noise.zw * jitter_radius / vec2(textureSize(bgColorBuffer, 0).xy);
-
-  vec4 bg = textureLod(bgColorBuffer, jitter_uv, 0.0);
-  vec4 fg = textureLod(fgColorBuffer, jitter_uv, 0.0);
-  vec4 hf = textureLod(holefillColorBuffer, jitter_uv, 0.0);
-  float fg_w = textureLod(fgWeightBuffer, jitter_uv, 0.0).r;
-  float bg_w = textureLod(bgWeightBuffer, jitter_uv, 0.0).r;
-  float hf_w = textureLod(holefillWeightBuffer, jitter_uv, 0.0).r;
 
   ivec2 tile_co = ivec2(gl_FragCoord.xy / 16.0);
   CocTile coc_tile = dof_coc_tile_load(fgTileBuffer, bgTileBuffer, tile_co);
@@ -140,31 +175,38 @@ void main(void)
     dof_slight_focus_gather(coc_tile.fg_slight_focus_max_coc, noise, focus, focus_w);
   }
   else {
-    focus = safe_color(textureLod(fullResColorBuffer, uv, 0.0));
+    focus = safe_color(textureLod(fullResColorBuffer, uvcoordsvar.xy, 0.0));
     if (coc_tile.fg_slight_focus_max_coc == DOF_TILE_FOCUS) {
       /* Tile is full in focus. */
       focus_w = 1.0;
     }
     else /* (coc_tile.fg_slight_focus_max_coc == DOF_TILE_DEFOCUS) */ {
       /* Tile is full in defocus. Use in focus to fill holes if there is no other options. */
-      focus_w = (fg_w == 0.0 && bg_w == 0.0 && hf_w == 0.0) ? 1.0 : 0.0;
+      /* FIXME */
+      focus_w = 0.0;
     }
   }
 
   fragColor = vec4(0.0);
   float weight = 0.0;
+  vec4 layer_color;
+  float layer_weight;
+
+  /* TODO/OPTI(fclem): do not load uneeded layers based on tile prediction. */
 
   if (!no_holefill_pass) {
-    fragColor = hf;
-    weight = float(hf_w > 0.0);
+    dof_resolve_load_layer(holefillColorBuffer, holefillWeightBuffer, layer_color, layer_weight);
+    fragColor = layer_color;
+    weight = float(layer_weight > 0.0);
   }
 
   if (!no_background_pass) {
+    dof_resolve_load_layer(bgColorBuffer, bgWeightBuffer, layer_color, layer_weight);
     /* Always prefer background to holefill pass. */
-    bg_w = float(bg_w > 0.0);
+    layer_weight = float(layer_weight > 0.0);
     /* Composite background. */
-    fragColor = fragColor * (1.0 - bg_w) + bg * bg_w;
-    weight = weight * (1.0 - bg_w) + bg_w;
+    fragColor = fragColor * (1.0 - layer_weight) + layer_color * layer_weight;
+    weight = weight * (1.0 - layer_weight) + layer_weight;
     fragColor *= safe_rcp(weight);
     /* Fill holes with the composited background. */
     weight = float(weight > 0.0);
@@ -178,8 +220,9 @@ void main(void)
   }
 
   if (!no_foreground_pass) {
+    dof_resolve_load_layer(fgColorBuffer, fgWeightBuffer, layer_color, layer_weight);
     /* Composite foreground. */
-    fragColor = fragColor * (1.0 - fg_w) + fg * fg_w;
+    fragColor = fragColor * (1.0 - layer_weight) + layer_color * layer_weight;
   }
 
   /* Fix float precision issue in alpha compositing.  */
