@@ -368,8 +368,10 @@ typedef struct EEVEE_FramebufferList {
   struct GPUFrameBuffer *dof_reduce_copy_fb;
   struct GPUFrameBuffer *dof_bokeh_fb;
   struct GPUFrameBuffer *dof_gather_fg_fb;
+  struct GPUFrameBuffer *dof_filter_fg_fb;
   struct GPUFrameBuffer *dof_gather_fg_holefill_fb;
   struct GPUFrameBuffer *dof_gather_bg_fb;
+  struct GPUFrameBuffer *dof_filter_bg_fb;
   struct GPUFrameBuffer *dof_scatter_fg_fb;
   struct GPUFrameBuffer *dof_scatter_bg_fb;
   struct GPUFrameBuffer *volumetric_fb;

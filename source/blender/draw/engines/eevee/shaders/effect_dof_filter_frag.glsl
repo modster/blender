@@ -9,10 +9,12 @@
 #pragma BLENDER_REQUIRE(effect_dof_lib.glsl)
 
 uniform sampler2D colorBuffer;
+uniform sampler2D weightBuffer;
 
 in vec4 uvcoordsvar;
 
 layout(location = 0) out vec4 outColor;
+layout(location = 1) out float outWeight;
 
 /* From:
  * Implementing Median Filters in XC4000E FPGAs
@@ -87,5 +89,5 @@ void main()
   /* OPTI(fclem) Could early return on some tiles. */
 
   outColor = median_filter(colorBuffer, uvcoordsvar.xy);
-  /* TODO(fclem) Filter weight buffer? needs another framebuffer config grrr... */
+  outWeight = median_filter(weightBuffer, uvcoordsvar.xy).r;
 }
