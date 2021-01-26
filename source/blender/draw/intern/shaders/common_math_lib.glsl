@@ -91,6 +91,9 @@ vec2 sqr(vec2 a) { return a * a; }
 vec3 sqr(vec3 a) { return a * a; }
 vec4 sqr(vec4 a) { return a * a; }
 
+float len_squared(vec3 a) { return dot(a, a); }
+float len_squared(vec2 a) { return dot(a, a); }
+
 #define weighted_sum(val0, val1, val2, val3, weights) ((val0 * weights[0] + val1 * weights[1] + val2 * weights[2] + val3 * weights[3]) * safe_rcp(sum(weights)));
 #define weighted_sum_array(val, weights) ((val[0] * weights[0] + val[1] * weights[1] + val[2] * weights[2] + val[3] * weights[3]) * safe_rcp(sum(weights)));
 /* clang-format on */
@@ -106,11 +109,6 @@ float distance_squared(vec2 a, vec2 b)
 float distance_squared(vec3 a, vec3 b)
 {
   a -= b;
-  return dot(a, a);
-}
-
-float len_squared(vec3 a)
-{
   return dot(a, a);
 }
 
