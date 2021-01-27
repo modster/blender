@@ -106,9 +106,8 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
     copy_v2_v2(effects->dof_bokeh_aniso_inv, effects->dof_bokeh_aniso);
     invert_v2(effects->dof_bokeh_aniso_inv);
 
-    /* TODO(fclem) User parameters. */
-    effects->dof_scatter_color_threshold = 0.7f;
-    effects->dof_scatter_neighbor_max_color = 10.0f;
+    effects->dof_scatter_color_threshold = scene_eval->eevee.bokeh_threshold;
+    effects->dof_scatter_neighbor_max_color = scene_eval->eevee.bokeh_neighbor_max;
 
     float max_abs_fg_coc = fabsf(coc_radius_from_camera_depth(effects, -cam->clip_start));
     /* Background is at infinity so maximum CoC is the limit of the function at -inf. */

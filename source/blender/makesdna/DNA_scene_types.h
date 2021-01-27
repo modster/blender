@@ -1644,6 +1644,7 @@ typedef struct SceneEEVEE {
 
   float bokeh_max_size;
   float bokeh_threshold;
+  float bokeh_neighbor_max;
 
   float bloom_color[3];
   float bloom_threshold;
@@ -1658,7 +1659,6 @@ typedef struct SceneEEVEE {
   int motion_blur_position;
   float motion_blur_shutter;
   float motion_blur_depth_scale;
-  char _pad0[4];
 
   int shadow_method DNA_DEPRECATED;
   int shadow_cube_size;

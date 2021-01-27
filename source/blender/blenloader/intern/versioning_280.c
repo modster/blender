@@ -5124,5 +5124,9 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
 
     /* Keep this block, even when empty. */
+
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+      scene->eevee.bokeh_neighbor_max = 10.0f;
+    }
   }
 }

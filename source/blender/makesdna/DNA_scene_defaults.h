@@ -210,6 +210,7 @@
  \
     .bokeh_max_size = 100.0f, \
     .bokeh_threshold = 1.0f, \
+    .bokeh_neighbor_max = 10.0f, \
  \
     .bloom_color = {1.0f, 1.0f, 1.0f}, \
     .bloom_threshold = 0.8f, \
