@@ -2,6 +2,8 @@
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 
+#define BOKEH_LUT_SIZE 32 /* TODO share define with C. */
+
 uniform vec4 cocParams;
 
 #define cocMul cocParams[0] /* distance * aperturesize * invsensorsize */
