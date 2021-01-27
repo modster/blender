@@ -727,14 +727,10 @@ void EEVEE_depth_of_field_cache_init(EEVEE_ViewLayerData *UNUSED(sldata), EEVEE_
   if ((fx->enabled_effects & EFFECT_DOF) != 0) {
     const DRWContextState *draw_ctx = DRW_context_state_get();
     const View3D *v3d = draw_ctx->v3d;
-
-    if (!DRW_state_draw_background() ||
-        (EEVEE_lookdev_studiolight_enabled(v3d) && v3d->shading.studiolight_background < 1.0f)) {
-      fx->dof_color_format = GPU_RGBA16F;
-    }
-    else {
-      fx->dof_color_format = GPU_R11F_G11F_B10F;
-    }
+    /* GPU_RGBA16F is sufficient now that all scattered bokeh are premultiplied.
+     * GPU_R11F_G11F_B10F is not enough when lots of scattered sprites are big and offers
+     * relatively small benefits. */
+    fx->dof_color_format = GPU_RGBA16F;
 
     dof_bokeh_pass_init(fbl, psl, fx);
     dof_setup_pass_init(fbl, psl, fx);
