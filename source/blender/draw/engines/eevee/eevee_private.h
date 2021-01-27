@@ -778,7 +778,9 @@ typedef struct EEVEE_EffectsInfo {
   struct GPUTexture *dof_bg_color_tx; /* All textures from pool... */
   struct GPUTexture *dof_bg_occlusion_tx;
   struct GPUTexture *dof_bg_weight_tx;
-  struct GPUTexture *dof_bokeh_tx;
+  struct GPUTexture *dof_bokeh_gather_lut_tx;
+  struct GPUTexture *dof_bokeh_scatter_lut_tx;
+  struct GPUTexture *dof_bokeh_resolve_lut_tx;
   struct GPUTexture *dof_coc_dilated_tiles_bg_tx;
   struct GPUTexture *dof_coc_dilated_tiles_fg_tx;
   struct GPUTexture *dof_coc_tiles_bg_tx;
@@ -1175,7 +1177,7 @@ struct GPUShader *EEVEE_shaders_depth_of_field_reduce_get(int is_copy_pass);
 struct GPUShader *EEVEE_shaders_depth_of_field_gather_get(EEVEE_DofGatherPass pass, int bokeh_tx);
 struct GPUShader *EEVEE_shaders_depth_of_field_filter_get(void);
 struct GPUShader *EEVEE_shaders_depth_of_field_scatter_get(int is_foreground, int bokeh_tx);
-struct GPUShader *EEVEE_shaders_depth_of_field_resolve_get(void);
+struct GPUShader *EEVEE_shaders_depth_of_field_resolve_get(int use_bokeh_tx);
 struct GPUShader *EEVEE_shaders_effect_downsample_sh_get(void);
 struct GPUShader *EEVEE_shaders_effect_downsample_cube_sh_get(void);
 struct GPUShader *EEVEE_shaders_effect_minz_downlevel_sh_get(void);

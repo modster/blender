@@ -11,11 +11,13 @@
 
 uniform float bokehSides;
 uniform float bokehRotation;
-uniform vec2 bokehAnisotropy;
+uniform vec2 bokehAnisotropyInv;
 
 in vec4 uvcoordsvar;
 
-layout(location = 0) out vec3 outLut;
+layout(location = 0) out vec2 outGatherLut;
+layout(location = 1) out float outScatterLut;
+layout(location = 2) out float outResolveLut;
 
 float polygon_sides_length(float sides_count)
 {
@@ -64,6 +66,8 @@ void main()
 
   float radius = length(uv);
 
+  vec2 texel = floor(gl_FragCoord.xy) - float(DOF_MAX_SLIGHT_FOCUS_RADIUS);
+
   if (bokehSides > 0.0) {
     /* NOTE: atan(y,x) has output range [-M_PI..M_PI], so add 2pi to avoid negative angles. */
     float theta = atan(uv.y, uv.x) + M_2PI;
@@ -77,10 +81,19 @@ void main()
     theta_new += bokehRotation;
 
     uv = r_new * vec2(-cos(theta_new), sin(theta_new));
+
+    {
+      /* Slight focus distance */
+      texel *= bokehAnisotropyInv;
+      float theta = atan(texel.y, -texel.x) + M_2PI;
+      texel /= circle_to_polygon_radius(bokehSides, theta - bokehRotation);
+    }
   }
 
   /* For gather store the new UV. */
-  outLut.xy = uv;
+  outGatherLut = uv;
   /* For scatter store distance. */
-  outLut.z = radius;
+  outScatterLut = radius;
+  /* For slight focus gather store pixel perfect distance. */
+  outResolveLut = length(texel);
 }

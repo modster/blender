@@ -20,6 +20,8 @@ uniform sampler2D fgTileBuffer;
 uniform sampler2D holefillColorBuffer;
 uniform sampler2D holefillWeightBuffer;
 
+uniform sampler2D bokehLut;
+
 uniform float bokehMaxSize;
 uniform vec2 bokehAnisotropyInv;
 
@@ -53,21 +55,21 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
 
       ivec2 offset = dof_square_ring_sample_offset(ring_distance, s);
       float ring_dist = length(vec2(offset));
-#if 1 /* TODO(fclem) shader variation. */
-      float sample_dist = length(vec2(offset) * bokehAnisotropyInv);
-#endif
-      /* TODO(fclem) add Bokeh shape support here. */
 
       DofGatherData pair_data[2];
       for (int i = 0; i < 2; i++) {
-        ivec2 sample_texel = texel + ((i == 0) ? offset : -offset);
+        ivec2 sample_offset = ((i == 0) ? offset : -offset);
+        ivec2 sample_texel = texel + sample_offset;
         /* OPTI: could precompute the factor. */
         vec2 sample_uv = (vec2(sample_texel) + 0.5) / vec2(textureSize(fullResDepthBuffer, 0));
         float depth = textureLod(fullResDepthBuffer, sample_uv, 0.0).r;
         pair_data[i].color = safe_color(textureLod(fullResColorBuffer, sample_uv, 0.0));
         pair_data[i].coc = dof_coc_from_zdepth(depth);
-        pair_data[i].dist = sample_dist;
-
+        pair_data[i].dist = ring_dist;
+#ifdef DOF_BOKEH_TEXTURE
+        /* Contains subpixel distance to bokeh shape. */
+        pair_data[i].dist = texelFetch(bokehLut, sample_offset + DOF_MAX_SLIGHT_FOCUS_RADIUS, 0).r;
+#endif
         pair_data[i].coc = clamp(pair_data[i].coc, -bokehMaxSize, bokehMaxSize);
       }
 
@@ -93,6 +95,7 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
   DofGatherData center_data;
   center_data.color = safe_color(textureLod(fullResColorBuffer, sample_uv, 0.0));
   center_data.coc = dof_coc_from_zdepth(depth);
+  center_data.coc = clamp(center_data.coc, -bokehMaxSize, bokehMaxSize);
   center_data.dist = 0.0;
 
   /* Slide 38. */

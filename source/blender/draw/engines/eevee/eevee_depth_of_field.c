@@ -158,7 +158,9 @@ static void dof_bokeh_pass_init(EEVEE_FramebufferList *fbl,
 {
   if ((fx->dof_bokeh_aniso[0] == 1.0f) && (fx->dof_bokeh_aniso[1] == 1.0f) &&
       (fx->dof_bokeh_blades == 0.0)) {
-    fx->dof_bokeh_tx = NULL;
+    fx->dof_bokeh_gather_lut_tx = NULL;
+    fx->dof_bokeh_scatter_lut_tx = NULL;
+    fx->dof_bokeh_resolve_lut_tx = NULL;
     return;
   }
 
@@ -171,14 +173,19 @@ static void dof_bokeh_pass_init(EEVEE_FramebufferList *fbl,
   DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_bokeh);
   DRW_shgroup_uniform_float_copy(grp, "bokehSides", fx->dof_bokeh_blades);
   DRW_shgroup_uniform_float_copy(grp, "bokehRotation", fx->dof_bokeh_rotation);
+  DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropyInv", fx->dof_bokeh_aniso_inv);
   DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 
-  fx->dof_bokeh_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RGBA16F, owner);
+  fx->dof_bokeh_gather_lut_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RG16F, owner);
+  fx->dof_bokeh_scatter_lut_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R16F, owner);
+  fx->dof_bokeh_resolve_lut_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R16F, owner);
 
   GPU_framebuffer_ensure_config(&fbl->dof_bokeh_fb,
                                 {
                                     GPU_ATTACHMENT_NONE,
-                                    GPU_ATTACHMENT_TEXTURE(fx->dof_bokeh_tx),
+                                    GPU_ATTACHMENT_TEXTURE(fx->dof_bokeh_gather_lut_tx),
+                                    GPU_ATTACHMENT_TEXTURE(fx->dof_bokeh_scatter_lut_tx),
+                                    GPU_ATTACHMENT_TEXTURE(fx->dof_bokeh_resolve_lut_tx),
                                 });
 }
 
@@ -468,7 +475,7 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
   GPU_texture_get_mipmap_size(txl->dof_reduced_color, 0, input_size);
   float uv_correction_fac[2] = {res[0] / (float)input_size[0], res[1] / (float)input_size[1]};
   float output_texel_size[2] = {1.0f / res[0], 1.0f / res[1]};
-  const bool use_bokeh_tx = (fx->dof_bokeh_tx != NULL);
+  const bool use_bokeh_tx = (fx->dof_bokeh_gather_lut_tx != NULL);
 
   {
     DRW_PASS_CREATE(psl->dof_gather_fg_holefill, DRW_STATE_WRITE_COLOR);
@@ -515,7 +522,7 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_vec2_copy(grp, "gatherOutputTexelSize", output_texel_size);
     if (use_bokeh_tx) {
       DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropy", fx->dof_bokeh_aniso);
-      DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
+      DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_gather_lut_tx);
     }
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 
@@ -552,7 +559,7 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_vec2_copy(grp, "gatherOutputTexelSize", output_texel_size);
     if (use_bokeh_tx) {
       DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropy", fx->dof_bokeh_aniso);
-      DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
+      DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_gather_lut_tx);
     }
     DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 
@@ -622,7 +629,7 @@ static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
   /* Draw a sprite for every four halfres pixels. */
   int sprite_count = (input_size[0] / 2) * (input_size[1] / 2);
   float target_texel_size[2] = {1.0f / target_size[0], 1.0f / target_size[1]};
-  const bool use_bokeh_tx = (fx->dof_bokeh_tx != NULL);
+  const bool use_bokeh_tx = (fx->dof_bokeh_gather_lut_tx != NULL);
 
   {
     DRW_PASS_CREATE(psl->dof_scatter_fg, DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ADD_FULL);
@@ -638,7 +645,7 @@ static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropy", fx->dof_bokeh_aniso);
     if (use_bokeh_tx) {
       DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropyInv", fx->dof_bokeh_aniso_inv);
-      DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
+      DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_scatter_lut_tx);
     }
     DRW_shgroup_call_procedural_triangles(grp, NULL, sprite_count);
 
@@ -657,13 +664,12 @@ static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_texture_ref_ex(grp, "colorBuffer", &fx->dof_scatter_src_tx, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(grp, "cocBuffer", &txl->dof_reduced_coc, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref(grp, "occlusionBuffer", &fx->dof_bg_occlusion_tx);
-    DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
     DRW_shgroup_uniform_vec2_copy(grp, "targetTexelSize", target_texel_size);
     DRW_shgroup_uniform_int_copy(grp, "spritePerRow", input_size[0] / 2);
     DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropy", fx->dof_bokeh_aniso);
     if (use_bokeh_tx) {
       DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropyInv", fx->dof_bokeh_aniso_inv);
-      DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_tx);
+      DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_scatter_lut_tx);
     }
     DRW_shgroup_call_procedural_triangles(grp, NULL, sprite_count);
 
@@ -684,10 +690,11 @@ static void dof_recombine_pass_init(EEVEE_FramebufferList *UNUSED(fbl),
                                     EEVEE_EffectsInfo *fx)
 {
   DefaultTextureList *dtxl = DRW_viewport_texture_list_get();
+  const bool use_bokeh_tx = (fx->dof_bokeh_gather_lut_tx != NULL);
 
   DRW_PASS_CREATE(psl->dof_resolve, DRW_STATE_WRITE_COLOR);
 
-  GPUShader *sh = EEVEE_shaders_depth_of_field_resolve_get();
+  GPUShader *sh = EEVEE_shaders_depth_of_field_resolve_get(use_bokeh_tx);
   DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_resolve);
   DRW_shgroup_uniform_texture_ref_ex(grp, "fullResColorBuffer", &fx->source_buffer, NO_FILTERING);
   DRW_shgroup_uniform_texture_ref_ex(grp, "fullResDepthBuffer", &dtxl->depth, NO_FILTERING);
@@ -702,7 +709,10 @@ static void dof_recombine_pass_init(EEVEE_FramebufferList *UNUSED(fbl),
   DRW_shgroup_uniform_texture(grp, "utilTex", EEVEE_materials_get_util_tex());
   DRW_shgroup_uniform_vec4_copy(grp, "cocParams", fx->dof_coc_params);
   DRW_shgroup_uniform_float_copy(grp, "bokehMaxSize", fx->dof_bokeh_max_size);
-  DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropyInv", fx->dof_bokeh_aniso_inv);
+  if (use_bokeh_tx) {
+    DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropyInv", fx->dof_bokeh_aniso_inv);
+    DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_resolve_lut_tx);
+  }
   DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
 }
 
@@ -763,7 +773,7 @@ void EEVEE_depth_of_field_draw(EEVEE_Data *vedata)
   if ((effects->enabled_effects & EFFECT_DOF) != 0) {
     DRW_stats_group_start("Depth of Field");
 
-    if (fx->dof_bokeh_tx != NULL) {
+    if (fx->dof_bokeh_gather_lut_tx != NULL) {
       GPU_framebuffer_bind(fbl->dof_bokeh_fb);
       DRW_draw_pass(psl->dof_bokeh);
     }

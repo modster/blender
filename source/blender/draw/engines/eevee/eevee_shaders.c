@@ -86,7 +86,7 @@ static struct {
   struct GPUShader *dof_gather_sh[DOF_GATHER_MAX_PASS][2];
   struct GPUShader *dof_filter_sh;
   struct GPUShader *dof_scatter_sh[2][2];
-  struct GPUShader *dof_resolve_sh;
+  struct GPUShader *dof_resolve_sh[2];
 
   /* General purpose Shaders. */
   struct GPUShader *lookdev_background;
@@ -1158,13 +1158,26 @@ GPUShader *EEVEE_shaders_depth_of_field_scatter_get(int is_foreground, int use_b
   return e_data.dof_scatter_sh[is_foreground][use_bokeh_tx];
 }
 
-GPUShader *EEVEE_shaders_depth_of_field_resolve_get(void)
+GPUShader *EEVEE_shaders_depth_of_field_resolve_get(int use_bokeh_tx)
 {
-  if (e_data.dof_resolve_sh == NULL) {
-    e_data.dof_resolve_sh = DRW_shader_create_fullscreen_with_shaderlib(
-        datatoc_effect_dof_resolve_frag_glsl, e_data.lib, "#define DOF_RESOLVE_PASS\n");
+  if (e_data.dof_resolve_sh[use_bokeh_tx] == NULL) {
+    DynStr *ds = BLI_dynstr_new();
+
+    BLI_dynstr_append(ds, "#define DOF_RESOLVE_PASS\n");
+
+    if (use_bokeh_tx) {
+      BLI_dynstr_append(ds, "#define DOF_BOKEH_TEXTURE\n");
+    }
+
+    char *define = BLI_dynstr_get_cstring(ds);
+    BLI_dynstr_free(ds);
+
+    e_data.dof_resolve_sh[use_bokeh_tx] = DRW_shader_create_fullscreen_with_shaderlib(
+        datatoc_effect_dof_resolve_frag_glsl, e_data.lib, define);
+
+    MEM_freeN(define);
   }
-  return e_data.dof_resolve_sh;
+  return e_data.dof_resolve_sh[use_bokeh_tx];
 }
 
 /* \} */
@@ -1588,7 +1601,8 @@ void EEVEE_shaders_free(void)
   DRW_SHADER_FREE_SAFE(e_data.dof_scatter_sh[0][1]);
   DRW_SHADER_FREE_SAFE(e_data.dof_scatter_sh[1][0]);
   DRW_SHADER_FREE_SAFE(e_data.dof_scatter_sh[1][1]);
-  DRW_SHADER_FREE_SAFE(e_data.dof_resolve_sh);
+  DRW_SHADER_FREE_SAFE(e_data.dof_resolve_sh[0]);
+  DRW_SHADER_FREE_SAFE(e_data.dof_resolve_sh[1]);
   DRW_SHADER_FREE_SAFE(e_data.cryptomatte_sh[0]);
   DRW_SHADER_FREE_SAFE(e_data.cryptomatte_sh[1]);
   for (int i = 0; i < 2; i++) {

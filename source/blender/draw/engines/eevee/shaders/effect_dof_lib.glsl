@@ -145,6 +145,8 @@ const float layer_threshold = 4.0;
 /* For some reason 0.5 is not enough to make it watertight. */
 const float layer_offset = 0.5 + 0.5;
 
+#define DOF_MAX_SLIGHT_FOCUS_RADIUS 5
+
 float dof_layer_weight(float coc, const bool is_foreground)
 {
 /* NOTE: These are fullres pixel CoC value. */
