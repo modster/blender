@@ -142,8 +142,12 @@ float dof_load_gather_coc(sampler2D gather_input_coc_buffer, vec2 uv, float lod)
 
 /* Distribute weights between near/slightfocus/far fields (slide 117). */
 const float layer_threshold = 4.0;
+#ifdef DOF_FOREGROUND_PASS
+const float layer_offset = 0.5;
+#else
 /* For some reason 0.5 is not enough to make it watertight. */
 const float layer_offset = 0.5 + 0.5;
+#endif
 
 #define DOF_MAX_SLIGHT_FOCUS_RADIUS 5
 
