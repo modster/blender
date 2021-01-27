@@ -139,12 +139,8 @@ float dof_load_gather_coc(sampler2D gather_input_coc_buffer, vec2 uv, float lod)
 
 /* Distribute weights between near/slightfocus/far fields (slide 117). */
 const float layer_threshold = 4.0;
-#ifdef DOF_FOREGROUND_PASS
+/* Make sure it overlaps. */
 const float layer_offset = 0.5;
-#else
-/* For some reason 0.5 is not enough to make it watertight. */
-const float layer_offset = 0.5 + 0.5;
-#endif
 
 #define DOF_MAX_SLIGHT_FOCUS_RADIUS 5
 
@@ -279,7 +275,7 @@ CocTilePrediction dof_coc_tile_prediction_get(CocTile tile)
   /* Based on tile value, predict what pass we need to load. */
   CocTilePrediction predict;
 
-  predict.do_foreground = (-tile.fg_min_coc > layer_threshold);
+  predict.do_foreground = (-tile.fg_min_coc > layer_threshold - layer_offset);
   bool fg_fully_opaque = predict.do_foreground &&
                          dof_do_fast_gather(-tile.fg_min_coc, -tile.fg_max_coc);
 

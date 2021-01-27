@@ -300,14 +300,9 @@ static void dof_dilate_tiles_pass_draw(EEVEE_FramebufferList *fbl,
   for (int pass = 0; pass < 2; pass++) {
     DRWPass *drw_pass = (pass == 0) ? psl->dof_dilate_tiles_minmax : psl->dof_dilate_tiles_minabs;
 
-    /* Not in reference implementation. Strange we need to have something like this.
-     * Factor 4 is arbitrary and was chosen to fix a specific scene. It might not work for
-     * every scene. */
-    const float fast_gather_error = 1.0f / (1.0f - DOF_FAST_GATHER_COC_ERROR * 4.0f);
     /* Error introduced by gather center jittering. */
     const float error_multiplier = 1.0f + 1.0f / (DOF_GATHER_RING_COUNT + 0.5f);
-    int dilation_end_radius = ceilf((fx->dof_fx_max_coc * error_multiplier * fast_gather_error) /
-                                    DOF_TILE_DIVISOR);
+    int dilation_end_radius = ceilf((fx->dof_fx_max_coc * error_multiplier) / DOF_TILE_DIVISOR);
 
     /* This algorithm produce the exact dilation radius by dividing it in multiple passes. */
     int dilation_radius = 0;
