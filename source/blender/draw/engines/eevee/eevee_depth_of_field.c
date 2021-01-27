@@ -367,7 +367,7 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
   int quater_res[2] = {divide_ceil_u(fullres[0], 4), divide_ceil_u(fullres[1], 4)};
 
   /* TODO(fclem): Make this dependent of the quality of the gather pass. */
-  fx->dof_scatter_coc_threshold = 10.0f;
+  fx->dof_scatter_coc_threshold = 4.0f;
 
   {
     DRW_PASS_CREATE(psl->dof_downsample, DRW_STATE_WRITE_COLOR);
