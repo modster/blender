@@ -39,15 +39,15 @@ float dof_scatter_neighborhood_rejection(vec3 color)
 
   /* Centered in the middle of 4 quarter res texel. */
   vec2 texel_size = 1.0 / vec2(textureSize(downsampledBuffer, 0).xy);
-  vec2 uv = (floor(gl_FragCoord.xy * 0.5) + 1.0) * texel_size;
+  vec2 uv = (gl_FragCoord.xy * 0.5) * texel_size;
 
   vec3 max_diff = vec3(0.0);
   for (int i = 0; i < 4; i++) {
-    vec2 sample_uv = uv + 2.0 * quad_offsets[i] * texel_size;
+    vec2 sample_uv = uv + quad_offsets[i] * texel_size;
     vec3 ref = textureLod(downsampledBuffer, sample_uv, 0.0).rgb;
 
     ref = min(vec3(scatterColorNeighborMax), ref);
-    float diff = max_v3(max(vec3(0.0), ref - color));
+    float diff = max_v3(max(vec3(0.0), abs(ref - color)));
 
     const float rejection_threshold = 0.7;
     diff = saturate(diff / rejection_threshold - 1.0);
@@ -72,7 +72,7 @@ float dof_scatter_screen_border_rejection(float coc, vec2 uv, vec2 screen_size)
 
 float dof_scatter_luminosity_rejection(vec3 color)
 {
-  const float rejection_hardness = 5.0;
+  const float rejection_hardness = 1.0;
   return saturate(max_v3(color - scatterColorThreshold) * rejection_hardness);
 }
 
@@ -99,12 +99,10 @@ void main()
   do_scatter *= dof_scatter_coc_radius_rejection(outCoc);
   /* Only scatter if CoC is not too big to avoid performance issues. */
   do_scatter *= dof_scatter_screen_border_rejection(outCoc, uv, halfres);
-  /* Only scatter if neighborhood is different enough. Test is expensive, do only if worth it. */
-  do_scatter *= (do_scatter < 0.2) ? 1.0 : dof_scatter_neighborhood_rejection(outColor.rgb);
+  /* Only scatter if neighborhood is different enough. */
+  do_scatter *= dof_scatter_neighborhood_rejection(outColor.rgb);
   /* For debuging. */
   do_scatter *= float(!no_scatter_pass);
-  /* Sharpen. */
-  do_scatter *= do_scatter * do_scatter;
 
   outScatterColor = mix(vec3(0.0), outColor.rgb, do_scatter);
   outColor.rgb = mix(outColor.rgb, vec3(0.0), do_scatter);
