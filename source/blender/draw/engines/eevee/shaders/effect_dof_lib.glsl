@@ -176,7 +176,7 @@ float dof_sample_weight(float coc)
 vec4 dof_sample_weight(vec4 coc)
 {
   /* Full intensity if CoC radius is below the pixel footprint. */
-  const float min_coc = 0.57; /* For scattering ... but why? Maybe kernel radius jittering? */
+  const float min_coc = 1.0;
   coc = max(vec4(min_coc), abs(coc));
   return (M_PI * min_coc * min_coc) / (M_PI * coc * coc);
 }
