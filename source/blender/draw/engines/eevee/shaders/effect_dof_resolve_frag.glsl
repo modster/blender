@@ -1,6 +1,10 @@
 
-/* Recombine Pass
- * TODO decription
+/**
+ * Recombine Pass: Load separate convolution layer and composite with self slight defocus
+ * convolution and in-focus fields.
+ *
+ * The halfres gather methods are fast but lack precision for small CoC areas. To fix this we
+ * do a bruteforce gather to have a smooth transition between in-focus and defocus regions.
  */
 
 #pragma BLENDER_REQUIRE(common_utiltex_lib.glsl)
