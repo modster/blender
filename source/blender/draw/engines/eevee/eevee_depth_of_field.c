@@ -63,6 +63,8 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
     RegionView3D *rv3d = draw_ctx->rv3d;
     const float *viewport_size = DRW_viewport_size_get();
 
+    effects->dof_hq_slight_focus = (scene_eval->eevee.flag & SCE_EEVEE_DOF_HQ_SLIGHT_FOCUS) != 0;
+
     /* Retrieve Near and Far distance */
     effects->dof_coc_near_dist = -cam->clip_start;
     effects->dof_coc_far_dist = -cam->clip_end;
@@ -695,7 +697,7 @@ static void dof_recombine_pass_init(EEVEE_FramebufferList *UNUSED(fbl),
 
   DRW_PASS_CREATE(psl->dof_resolve, DRW_STATE_WRITE_COLOR);
 
-  GPUShader *sh = EEVEE_shaders_depth_of_field_resolve_get(use_bokeh_tx);
+  GPUShader *sh = EEVEE_shaders_depth_of_field_resolve_get(use_bokeh_tx, fx->dof_hq_slight_focus);
   DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_resolve);
   DRW_shgroup_uniform_texture_ref_ex(grp, "fullResColorBuffer", &fx->source_buffer, NO_FILTERING);
   DRW_shgroup_uniform_texture_ref_ex(grp, "fullResDepthBuffer", &dtxl->depth, NO_FILTERING);
@@ -726,8 +728,6 @@ void EEVEE_depth_of_field_cache_init(EEVEE_ViewLayerData *UNUSED(sldata), EEVEE_
   EEVEE_EffectsInfo *fx = stl->effects;
 
   if ((fx->enabled_effects & EFFECT_DOF) != 0) {
-    const DRWContextState *draw_ctx = DRW_context_state_get();
-    const View3D *v3d = draw_ctx->v3d;
     /* GPU_RGBA16F is sufficient now that all scattered bokeh are premultiplied.
      * GPU_R11F_G11F_B10F is not enough when lots of scattered sprites are big and offers
      * relatively small benefits. */
