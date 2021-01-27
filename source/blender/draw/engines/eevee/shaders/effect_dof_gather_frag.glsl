@@ -244,7 +244,7 @@ void dof_gather_accumulator(float base_radius,
 
 void main()
 {
-  ivec2 tile_co = ivec2(gl_FragCoord.xy / 8.0);
+  ivec2 tile_co = ivec2(gl_FragCoord.xy / float(DOF_TILE_DIVISOR / 2));
   CocTile coc_tile = dof_coc_tile_load(cocTilesFgBuffer, cocTilesBgBuffer, tile_co);
   CocTilePrediction prediction = dof_coc_tile_prediction_get(coc_tile);
 

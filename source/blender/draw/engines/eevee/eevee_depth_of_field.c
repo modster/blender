@@ -147,10 +147,6 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
 #define COLOR_FORMAT fx->dof_color_format
 #define FG_TILE_FORMAT GPU_RGBA16F
 #define BG_TILE_FORMAT GPU_R11F_G11F_B10F
-#define TILE_DIVISOR 16
-#define GATHER_RING_COUNT 3
-#define DILATE_RING_COUNT 3
-#define FAST_GATHER_COC_ERROR 0.05
 
 /**
  * Create bokeh texture.
@@ -177,7 +173,7 @@ static void dof_bokeh_pass_init(EEVEE_FramebufferList *fbl,
   DRW_shgroup_uniform_float_copy(grp, "bokehSides", fx->dof_bokeh_blades);
   DRW_shgroup_uniform_float_copy(grp, "bokehRotation", fx->dof_bokeh_rotation);
   DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropyInv", fx->dof_bokeh_aniso_inv);
-  DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+  DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
   fx->dof_bokeh_gather_lut_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RG16F, owner);
   fx->dof_bokeh_scatter_lut_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R16F, owner);
@@ -213,7 +209,7 @@ static void dof_setup_pass_init(EEVEE_FramebufferList *fbl,
   DRW_shgroup_uniform_texture_ref_ex(grp, "depthBuffer", &dtxl->depth, NO_FILTERING);
   DRW_shgroup_uniform_vec4_copy(grp, "cocParams", fx->dof_coc_params);
   DRW_shgroup_uniform_float_copy(grp, "bokehMaxSize", fx->dof_bokeh_max_size);
-  DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+  DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
   fx->dof_half_res_color_tx = DRW_texture_pool_query_2d(UNPACK2(res), COLOR_FORMAT, owner);
   fx->dof_half_res_coc_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_RG16F, owner);
@@ -235,7 +231,8 @@ static void dof_flatten_tiles_pass_init(EEVEE_FramebufferList *fbl,
 {
   void *owner = (void *)&EEVEE_depth_of_field_init;
   const float *fullres = DRW_viewport_size_get();
-  int res[2] = {divide_ceil_u(fullres[0], TILE_DIVISOR), divide_ceil_u(fullres[1], TILE_DIVISOR)};
+  int res[2] = {divide_ceil_u(fullres[0], DOF_TILE_DIVISOR),
+                divide_ceil_u(fullres[1], DOF_TILE_DIVISOR)};
 
   DRW_PASS_CREATE(psl->dof_flatten_tiles, DRW_STATE_WRITE_COLOR);
 
@@ -243,7 +240,7 @@ static void dof_flatten_tiles_pass_init(EEVEE_FramebufferList *fbl,
   DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->dof_flatten_tiles);
   DRW_shgroup_uniform_texture_ref_ex(
       grp, "halfResCocBuffer", &fx->dof_half_res_coc_tx, NO_FILTERING);
-  DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+  DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
   fx->dof_coc_tiles_fg_tx = DRW_texture_pool_query_2d(UNPACK2(res), FG_TILE_FORMAT, owner);
   fx->dof_coc_tiles_bg_tx = DRW_texture_pool_query_2d(UNPACK2(res), BG_TILE_FORMAT, owner);
@@ -267,7 +264,8 @@ static void dof_dilate_tiles_pass_init(EEVEE_FramebufferList *fbl,
 {
   void *owner = (void *)&EEVEE_depth_of_field_init;
   const float *fullres = DRW_viewport_size_get();
-  int res[2] = {divide_ceil_u(fullres[0], TILE_DIVISOR), divide_ceil_u(fullres[1], TILE_DIVISOR)};
+  int res[2] = {divide_ceil_u(fullres[0], DOF_TILE_DIVISOR),
+                divide_ceil_u(fullres[1], DOF_TILE_DIVISOR)};
 
   DRW_PASS_CREATE(psl->dof_dilate_tiles_minmax, DRW_STATE_WRITE_COLOR);
   DRW_PASS_CREATE(psl->dof_dilate_tiles_minabs, DRW_STATE_WRITE_COLOR);
@@ -281,7 +279,7 @@ static void dof_dilate_tiles_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_bool(grp, "dilateSlightFocus", &fx->dof_dilate_slight_focus, 1);
     DRW_shgroup_uniform_int(grp, "ringCount", &fx->dof_dilate_ring_count, 1);
     DRW_shgroup_uniform_int(grp, "ringWidthMultiplier", &fx->dof_dilate_ring_width_multiplier, 1);
-    DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
   }
 
   fx->dof_coc_dilated_tiles_fg_tx = DRW_texture_pool_query_2d(UNPACK2(res), FG_TILE_FORMAT, owner);
@@ -305,11 +303,11 @@ static void dof_dilate_tiles_pass_draw(EEVEE_FramebufferList *fbl,
     /* Not in reference implementation. Strange we need to have something like this.
      * Factor 4 is arbitrary and was chosen to fix a specific scene. It might not work for
      * every scene. */
-    const float fast_gather_error = 1.0f / (1.0f - FAST_GATHER_COC_ERROR * 4.0f);
+    const float fast_gather_error = 1.0f / (1.0f - DOF_FAST_GATHER_COC_ERROR * 4.0f);
     /* Error introduced by gather center jittering. */
-    const float error_multiplier = 1.0f + 1.0f / (GATHER_RING_COUNT + 0.5f);
+    const float error_multiplier = 1.0f + 1.0f / (DOF_GATHER_RING_COUNT + 0.5f);
     int dilation_end_radius = ceilf((fx->dof_fx_max_coc * error_multiplier * fast_gather_error) /
-                                    TILE_DIVISOR);
+                                    DOF_TILE_DIVISOR);
 
     /* This algorithm produce the exact dilation radius by dividing it in multiple passes. */
     int dilation_radius = 0;
@@ -321,7 +319,7 @@ static void dof_dilate_tiles_pass_draw(EEVEE_FramebufferList *fbl,
       /* Do not step over any unvisited tile. */
       int max_multiplier = dilation_radius + 1;
 
-      int ring_count = min_ii(DILATE_RING_COUNT, ceilf(remainder / (float)max_multiplier));
+      int ring_count = min_ii(DOF_DILATE_RING_COUNT, ceilf(remainder / (float)max_multiplier));
       int multiplier = min_ii(max_multiplier, floor(remainder / (float)ring_count));
 
       dilation_radius += ring_count * multiplier;
@@ -355,7 +353,7 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
 
   /* Divide by 2 because dof_fx_max_coc is in fullres CoC radius and the reduce texture begins at
    * half resolution. */
-  float max_space_between_sample = fx->dof_fx_max_coc * 0.5f / GATHER_RING_COUNT;
+  float max_space_between_sample = fx->dof_fx_max_coc * 0.5f / DOF_GATHER_RING_COUNT;
 
   int mip_count = max_ii(1, log2_ceil_u(max_space_between_sample));
 
@@ -380,7 +378,7 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
         grp, "colorBuffer", &fx->dof_reduce_input_color_tx, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(
         grp, "cocBuffer", &fx->dof_reduce_input_coc_tx, NO_FILTERING);
-    DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
     void *owner = (void *)&EEVEE_depth_of_field_init;
     fx->dof_downsample_tx = DRW_texture_pool_query_2d(UNPACK2(quater_res), COLOR_FORMAT, owner);
@@ -410,7 +408,7 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_float_copy(grp, "scatterCocThreshold", fx->dof_scatter_coc_threshold);
     DRW_shgroup_uniform_float_copy(grp, "colorNeighborClamping", fx->dof_denoise_factor);
     DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropy", fx->dof_bokeh_aniso);
-    DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
     void *owner = (void *)&EEVEE_depth_of_field_init;
     fx->dof_scatter_src_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R11F_G11F_B10F, owner);
@@ -426,7 +424,7 @@ static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
         grp, "colorBuffer", &fx->dof_reduce_input_color_tx, NO_FILTERING);
     DRW_shgroup_uniform_texture_ref_ex(
         grp, "cocBuffer", &fx->dof_reduce_input_coc_tx, NO_FILTERING);
-    DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
   }
 
   if (txl->dof_reduced_color) {
@@ -500,7 +498,7 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_texture(grp, "utilTex", EEVEE_materials_get_util_tex());
     DRW_shgroup_uniform_vec2_copy(grp, "gatherInputUvCorrection", uv_correction_fac);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherOutputTexelSize", output_texel_size);
-    DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
     /* Reuse textures from the setup pass. */
     /* NOTE: We could use the texture pool do that for us but it does not track usage and it might
@@ -533,7 +531,7 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
       DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropy", fx->dof_bokeh_aniso);
       DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_gather_lut_tx);
     }
-    DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
     fx->dof_fg_color_tx = DRW_texture_pool_query_2d(UNPACK2(res), COLOR_FORMAT, owner);
     fx->dof_fg_weight_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R16F, owner);
@@ -570,7 +568,7 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
       DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropy", fx->dof_bokeh_aniso);
       DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_gather_lut_tx);
     }
-    DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+    DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
     fx->dof_bg_color_tx = DRW_texture_pool_query_2d(UNPACK2(res), COLOR_FORMAT, owner);
     fx->dof_bg_weight_tx = DRW_texture_pool_query_2d(UNPACK2(res), GPU_R16F, owner);
@@ -606,7 +604,7 @@ static void dof_filter_pass_init(EEVEE_FramebufferList *fbl,
       grp, "colorBuffer", &fx->dof_fg_holefill_color_tx, NO_FILTERING);
   DRW_shgroup_uniform_texture_ref_ex(
       grp, "weightBuffer", &fx->dof_fg_holefill_weight_tx, NO_FILTERING);
-  DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+  DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
   GPU_framebuffer_ensure_config(&fbl->dof_filter_fg_fb,
                                 {
@@ -722,7 +720,7 @@ static void dof_recombine_pass_init(EEVEE_FramebufferList *UNUSED(fbl),
     DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropyInv", fx->dof_bokeh_aniso_inv);
     DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_resolve_lut_tx);
   }
-  DRW_shgroup_call(grp, DRW_cache_fullscreen_quad_get(), NULL);
+  DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 }
 
 void EEVEE_depth_of_field_cache_init(EEVEE_ViewLayerData *UNUSED(sldata), EEVEE_Data *vedata)

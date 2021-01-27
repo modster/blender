@@ -16,6 +16,8 @@ uniform sampler2D halfResCocBuffer;
 layout(location = 0) out vec4 outFgCoc;
 layout(location = 1) out vec3 outBgCoc;
 
+const int halfres_tile_divisor = DOF_TILE_DIVISOR / 2;
+
 void main()
 {
   ivec2 halfres_bounds = textureSize(halfResCocBuffer, 0).xy - 1;
@@ -23,10 +25,10 @@ void main()
 
   CocTile tile = dof_coc_tile_init();
 
-  for (int x = 0; x < 8; x++) {
+  for (int x = 0; x < halfres_tile_divisor; x++) {
     /* OPTI: Could be done in separate passes. */
-    for (int y = 0; y < 8; y++) {
-      ivec2 sample_texel = tile_co * 8 + ivec2(x, y);
+    for (int y = 0; y < halfres_tile_divisor; y++) {
+      ivec2 sample_texel = tile_co * halfres_tile_divisor + ivec2(x, y);
       vec2 sample_data = texelFetch(halfResCocBuffer, min(sample_texel, halfres_bounds), 0).rg;
       float sample_coc = sample_data.x;
       float sample_slight_focus_coc = sample_data.y;

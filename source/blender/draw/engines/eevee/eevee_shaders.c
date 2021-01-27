@@ -1032,7 +1032,7 @@ GPUShader *EEVEE_shaders_depth_of_field_bokeh_get(void)
 {
   if (e_data.dof_bokeh_sh == NULL) {
     e_data.dof_bokeh_sh = DRW_shader_create_fullscreen_with_shaderlib(
-        datatoc_effect_dof_bokeh_frag_glsl, e_data.lib, NULL);
+        datatoc_effect_dof_bokeh_frag_glsl, e_data.lib, DOF_SHADER_DEFINES);
   }
   return e_data.dof_bokeh_sh;
 }
@@ -1041,7 +1041,7 @@ GPUShader *EEVEE_shaders_depth_of_field_setup_get(void)
 {
   if (e_data.dof_setup_sh == NULL) {
     e_data.dof_setup_sh = DRW_shader_create_fullscreen_with_shaderlib(
-        datatoc_effect_dof_setup_frag_glsl, e_data.lib, NULL);
+        datatoc_effect_dof_setup_frag_glsl, e_data.lib, DOF_SHADER_DEFINES);
   }
   return e_data.dof_setup_sh;
 }
@@ -1050,7 +1050,7 @@ GPUShader *EEVEE_shaders_depth_of_field_flatten_tiles_get(void)
 {
   if (e_data.dof_flatten_tiles_sh == NULL) {
     e_data.dof_flatten_tiles_sh = DRW_shader_create_fullscreen_with_shaderlib(
-        datatoc_effect_dof_flatten_tiles_frag_glsl, e_data.lib, NULL);
+        datatoc_effect_dof_flatten_tiles_frag_glsl, e_data.lib, DOF_SHADER_DEFINES);
   }
   return e_data.dof_flatten_tiles_sh;
 }
@@ -1061,7 +1061,8 @@ GPUShader *EEVEE_shaders_depth_of_field_dilate_tiles_get(int pass)
     e_data.dof_dilate_tiles_sh[pass] = DRW_shader_create_fullscreen_with_shaderlib(
         datatoc_effect_dof_dilate_tiles_frag_glsl,
         e_data.lib,
-        (pass == 0) ? "#define DILATE_MODE_MIN_MAX\n" : "#define DILATE_MODE_MIN_ABS\n");
+        (pass == 0) ? DOF_SHADER_DEFINES "#define DILATE_MODE_MIN_MAX\n" :
+                      DOF_SHADER_DEFINES "#define DILATE_MODE_MIN_ABS\n");
   }
   return e_data.dof_dilate_tiles_sh[pass];
 }
@@ -1070,7 +1071,7 @@ GPUShader *EEVEE_shaders_depth_of_field_downsample_get(void)
 {
   if (e_data.dof_downsample_sh == NULL) {
     e_data.dof_downsample_sh = DRW_shader_create_fullscreen_with_shaderlib(
-        datatoc_effect_dof_downsample_frag_glsl, e_data.lib, NULL);
+        datatoc_effect_dof_downsample_frag_glsl, e_data.lib, DOF_SHADER_DEFINES);
   }
   return e_data.dof_downsample_sh;
 }
@@ -1081,7 +1082,8 @@ GPUShader *EEVEE_shaders_depth_of_field_reduce_get(int is_copy_pass)
     e_data.dof_reduce_sh[is_copy_pass] = DRW_shader_create_fullscreen_with_shaderlib(
         datatoc_effect_dof_reduce_frag_glsl,
         e_data.lib,
-        (is_copy_pass) ? "#define COPY_PASS\n" : "#define REDUCE_PASS\n");
+        (is_copy_pass) ? DOF_SHADER_DEFINES "#define COPY_PASS\n" :
+                         DOF_SHADER_DEFINES "#define REDUCE_PASS\n");
   }
   return e_data.dof_reduce_sh[is_copy_pass];
 }
@@ -1090,6 +1092,8 @@ GPUShader *EEVEE_shaders_depth_of_field_gather_get(EEVEE_DofGatherPass pass, int
 {
   if (e_data.dof_gather_sh[pass][use_bokeh_tx] == NULL) {
     DynStr *ds = BLI_dynstr_new();
+
+    BLI_dynstr_append(ds, DOF_SHADER_DEFINES);
 
     switch (pass) {
       case DOF_GATHER_FOREGROUND:
@@ -1126,7 +1130,7 @@ GPUShader *EEVEE_shaders_depth_of_field_filter_get(void)
 {
   if (e_data.dof_filter_sh == NULL) {
     e_data.dof_filter_sh = DRW_shader_create_fullscreen_with_shaderlib(
-        datatoc_effect_dof_filter_frag_glsl, e_data.lib, NULL);
+        datatoc_effect_dof_filter_frag_glsl, e_data.lib, DOF_SHADER_DEFINES);
   }
   return e_data.dof_filter_sh;
 }
@@ -1136,6 +1140,7 @@ GPUShader *EEVEE_shaders_depth_of_field_scatter_get(int is_foreground, int use_b
   if (e_data.dof_scatter_sh[is_foreground][use_bokeh_tx] == NULL) {
     DynStr *ds = BLI_dynstr_new();
 
+    BLI_dynstr_append(ds, DOF_SHADER_DEFINES);
     BLI_dynstr_append(
         ds, (is_foreground) ? "#define DOF_FOREGROUND_PASS\n" : "#define DOF_BACKGROUND_PASS\n");
 
@@ -1163,6 +1168,7 @@ GPUShader *EEVEE_shaders_depth_of_field_resolve_get(int use_bokeh_tx, int use_hq
   if (e_data.dof_resolve_sh[use_bokeh_tx][use_hq_gather] == NULL) {
     DynStr *ds = BLI_dynstr_new();
 
+    BLI_dynstr_append(ds, DOF_SHADER_DEFINES);
     BLI_dynstr_append(ds, "#define DOF_RESOLVE_PASS\n");
 
     if (use_bokeh_tx) {

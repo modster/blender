@@ -18,20 +18,18 @@ uniform bool dilateSlightFocus;
 layout(location = 0) out vec4 outFgCoc;
 layout(location = 1) out vec3 outBgCoc;
 
-const float tile_to_fullres_factor = 16.0;
+const float tile_to_fullres_factor = float(DOF_TILE_DIVISOR);
 
 /* Error introduced by the random offset of the gathering kernel's center. */
 const float bluring_radius_error = 1.0 + 1.0 / (gather_ring_count + 0.5);
-
-#define RINGS_COUNT 3
 
 void main()
 {
   ivec2 center_tile_pos = ivec2(gl_FragCoord.xy);
 
-  CocTile ring_buckets[RINGS_COUNT];
+  CocTile ring_buckets[DOF_DILATE_RING_COUNT];
 
-  for (int ring = 0; ring < ringCount && ring < RINGS_COUNT; ring++) {
+  for (int ring = 0; ring < ringCount && ring < DOF_DILATE_RING_COUNT; ring++) {
     ring_buckets[ring] = dof_coc_tile_init();
 
     int ring_distance = ring + 1;
@@ -83,7 +81,7 @@ void main()
         out_tile.fg_slight_focus_max_coc, ring_buckets[0].fg_slight_focus_max_coc);
   }
 
-  for (int ring = 0; ring < ringCount && ring < RINGS_COUNT; ring++) {
+  for (int ring = 0; ring < ringCount && ring < DOF_DILATE_RING_COUNT; ring++) {
     float ring_distance = float(ring + 1);
 
     ring_distance = (ring_distance * ringWidthMultiplier - 1) * tile_to_fullres_factor;

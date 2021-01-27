@@ -38,16 +38,13 @@ const int gather_ring_density = 3;
 const int gather_max_density_change = 0;
 const int gather_density_change_ring = 1;
 #else
-const int gather_ring_count = 5;
+const int gather_ring_count = DOF_GATHER_RING_COUNT;
 const int gather_ring_density = 3;
 const int gather_max_density_change = 50; /* Dictates the maximum good quality blur. */
 const int gather_density_change_ring = 1;
 #endif
 
 /* -------------- Utils ------------- */
-
-/* Allow 5% CoC error. */
-#define DOF_FAST_GATHER_COC_ERROR 0.05
 
 bool dof_do_fast_gather(float max_absolute_coc, float min_absolute_coc)
 {

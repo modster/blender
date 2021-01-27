@@ -215,6 +215,17 @@ typedef enum EEVEE_DofGatherPass {
   DOF_GATHER_MAX_PASS,
 } EEVEE_DofGatherPass;
 
+#define DOF_TILE_DIVISOR 16
+#define DOF_GATHER_RING_COUNT 5
+#define DOF_DILATE_RING_COUNT 3
+#define DOF_FAST_GATHER_COC_ERROR 0.05
+
+#define DOF_SHADER_DEFINES \
+  "#define DOF_TILE_DIVISOR " STRINGIFY(DOF_TILE_DIVISOR) "\n" \
+  "#define DOF_GATHER_RING_COUNT " STRINGIFY(DOF_GATHER_RING_COUNT) "\n" \
+  "#define DOF_DILATE_RING_COUNT " STRINGIFY(DOF_DILATE_RING_COUNT) "\n" \
+  "#define DOF_FAST_GATHER_COC_ERROR " STRINGIFY(DOF_FAST_GATHER_COC_ERROR) "\n"
+
 /* ************ PROBE UBO ************* */
 
 /* They are the same struct as their Cache siblings.

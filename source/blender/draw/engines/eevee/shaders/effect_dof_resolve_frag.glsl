@@ -137,7 +137,7 @@ void dof_resolve_load_layer(sampler2D color_tex,
 
 void main(void)
 {
-  ivec2 tile_co = ivec2(gl_FragCoord.xy / 16.0);
+  ivec2 tile_co = ivec2(gl_FragCoord.xy / float(DOF_TILE_DIVISOR));
   CocTile coc_tile = dof_coc_tile_load(fgTileBuffer, bgTileBuffer, tile_co);
   CocTilePrediction prediction = dof_coc_tile_prediction_get(coc_tile);
 
