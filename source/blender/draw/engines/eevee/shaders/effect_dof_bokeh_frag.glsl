@@ -62,7 +62,6 @@ void main()
 {
   /* Center uv in range [-1..1]. */
   vec2 uv = uvcoordsvar.xy * 2.0 - 1.0;
-  vec2 old_uv = uv;
 
   float radius = length(uv);
 
@@ -89,8 +88,11 @@ void main()
       texel /= circle_to_polygon_radius(bokehSides, theta - bokehRotation);
     }
   }
+  else {
+    uv *= safe_rcp(length(uv));
+  }
 
-  /* For gather store the new UV. */
+  /* For gather store the normalized UV. */
   outGatherLut = uv;
   /* For scatter store distance. */
   outScatterLut = radius;

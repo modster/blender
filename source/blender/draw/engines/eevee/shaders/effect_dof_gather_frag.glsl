@@ -146,7 +146,7 @@ void dof_gather_accumulator(float base_radius,
         vec2 offset_co = ((i == 0) ? offset : -offset);
 #ifdef DOF_BOKEH_TEXTURE
         /* Scaling to 0.25 for speed. Improves texture cache hit. */
-        offset_co = texture(bokehLut, offset_co * 0.25 + 0.5).rg * 2.0;
+        offset_co = texture(bokehLut, offset_co * 0.25 + 0.5).rg;
         offset_co *= bokehAnisotropy;
 #endif
         vec2 sample_co = center_co + offset_co * ring_radius;
