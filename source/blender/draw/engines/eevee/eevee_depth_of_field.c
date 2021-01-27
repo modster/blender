@@ -164,7 +164,7 @@ static void dof_bokeh_pass_init(EEVEE_FramebufferList *fbl,
   }
 
   void *owner = (void *)&dof_bokeh_pass_init;
-  int res[2] = {32, 32};
+  int res[2] = {DOF_BOKEH_LUT_SIZE, DOF_BOKEH_LUT_SIZE};
 
   DRW_PASS_CREATE(psl->dof_bokeh, DRW_STATE_WRITE_COLOR);
 

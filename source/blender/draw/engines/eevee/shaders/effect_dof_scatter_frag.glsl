@@ -32,7 +32,7 @@ float bokeh_shape(vec2 center)
   co *= bokehAnisotropyInv;
   float texture_size = float(textureSize(bokehLut, 0).x);
   /* Bias scale to avoid sampling at the texture's border. */
-  float scale_fac = spritesize * (float(BOKEH_LUT_SIZE) / float(BOKEH_LUT_SIZE - 1));
+  float scale_fac = spritesize * (float(DOF_BOKEH_LUT_SIZE) / float(DOF_BOKEH_LUT_SIZE - 1));
   float dist = scale_fac * textureLod(bokehLut, (co / scale_fac) * 0.5 + 0.5, 0.0).r;
 #else
   float dist = length(co);
