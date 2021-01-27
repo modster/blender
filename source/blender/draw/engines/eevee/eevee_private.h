@@ -770,6 +770,7 @@ typedef struct EEVEE_EffectsInfo {
   float dof_scatter_coc_threshold;
   float dof_scatter_neighbor_max_color;
   float dof_fx_max_coc;
+  float dof_denoise_factor;
   int dof_dilate_slight_focus;
   int dof_dilate_ring_count;
   int dof_dilate_ring_width_multiplier;

@@ -18,6 +18,7 @@ uniform vec2 bokehAnisotropy;
 uniform float scatterColorThreshold;
 uniform float scatterCocThreshold;
 uniform float scatterColorNeighborMax;
+uniform float colorNeighborClamping;
 
 /** Outputs:
  * COPY_PASS: Gather input mip0.
@@ -82,6 +83,35 @@ float dof_scatter_coc_radius_rejection(float coc)
   return saturate((abs(coc) - scatterCocThreshold) * rejection_hardness);
 }
 
+/* Lightweight version of neighborhood clamping found in TAA. */
+vec3 dof_neighborhood_clamping(vec3 color)
+{
+  vec2 texel_size = 1.0 / vec2(textureSize(colorBuffer, 0));
+  vec2 uv = gl_FragCoord.xy * texel_size;
+  vec4 ofs = vec4(-1, 1, -1, 1) * texel_size.xxyy;
+
+  /* Color bounding box clamping. 3x3 cross neighborhood. */
+  vec3 c01 = textureLod(colorBuffer, uv + ofs.xz, 0.0).rgb;
+  vec3 c21 = textureLod(colorBuffer, uv + ofs.xw, 0.0).rgb;
+  vec3 c10 = textureLod(colorBuffer, uv + ofs.yz, 0.0).rgb;
+  vec3 c12 = textureLod(colorBuffer, uv + ofs.yw, 0.0).rgb;
+
+  /* AABB minmax */
+  vec3 min_col = min4(c12, c01, c21, c10);
+  vec3 max_col = max4(c12, c01, c21, c10);
+
+  /* note: only clips towards aabb center (but fast!) */
+  vec3 center = 0.5 * (max_col + min_col);
+  vec3 extents = 0.5 * (max_col - min_col);
+  vec3 dist = color - center;
+  vec3 ts = abs(extents) / max(abs(dist), vec3(0.0001));
+  float t = saturate(min_v3(ts));
+
+  t = mix(1.0, t, colorNeighborClamping);
+
+  return center + dist * t;
+}
+
 /* Simple copy pass where we select what pixels to scatter. Also the resolution might change.
  * NOTE: The texture can end up being too big because of the mipmap padding. We correct for
  * that during the convolution phase. */
@@ -92,6 +122,8 @@ void main()
 
   outColor = textureLod(colorBuffer, uv, 0.0);
   outCoc = textureLod(cocBuffer, uv, 0.0).r;
+
+  outColor.rgb = dof_neighborhood_clamping(outColor.rgb);
 
   /* Only scatter if luminous enough. */
   float do_scatter = dof_scatter_luminosity_rejection(outColor.rgb);

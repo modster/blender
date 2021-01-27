@@ -200,6 +200,7 @@ class RENDER_PT_eevee_depth_of_field(RenderButtonsPanel, Panel):
         col.prop(props, "bokeh_max_size")
         col.prop(props, "bokeh_threshold")
         col.prop(props, "bokeh_neighbor_max")
+        col.prop(props, "bokeh_denoise_fac")
 
 
 class RENDER_PT_eevee_bloom(RenderButtonsPanel, Panel):
