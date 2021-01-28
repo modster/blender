@@ -40,9 +40,19 @@
 #include "GPU_texture.h"
 #include "eevee_private.h"
 
-static float coc_radius_from_camera_depth(EEVEE_EffectsInfo *fx, float camera_depth)
+static float coc_radius_from_camera_depth(bool is_ortho, EEVEE_EffectsInfo *fx, float camera_depth)
 {
-  return fx->dof_coc_params[0] / camera_depth - fx->dof_coc_params[1];
+  float multiplier = fx->dof_coc_params[0];
+  float bias = fx->dof_coc_params[1];
+  if (multiplier == 0.0f || bias == 0.0f) {
+    return 0.0f;
+  }
+  else if (is_ortho) {
+    return (camera_depth + multiplier / bias) * multiplier;
+  }
+  else {
+    return multiplier / camera_depth - bias;
+  }
 }
 
 int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
@@ -70,6 +80,7 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
     effects->dof_coc_far_dist = -cam->clip_end;
 
     /* Parameters */
+    bool is_ortho = cam->type == CAM_ORTHO;
     float fstop = cam->dof.aperture_fstop;
     float blades = cam->dof.aperture_blades;
     float rotation = cam->dof.aperture_rotation;
@@ -78,7 +89,14 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
     float focus_dist = BKE_camera_object_dof_distance(camera);
     float focal_len = cam->lens;
 
-    const float scale_camera = 0.001f;
+    if (is_ortho) {
+      /* (fclem) A bit of black magic here. I don't know if this is correct. */
+      fstop *= 1.3f;
+      focal_len = 1.0f;
+      sensor = cam->ortho_scale;
+    }
+
+    const float scale_camera = (is_ortho) ? 1.0 : 0.001f;
     /* we want radius here for the aperture number  */
     float aperture = 0.5f * scale_camera * focal_len / fstop;
     float focal_len_scaled = scale_camera * focal_len;
@@ -96,7 +114,14 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
 
     effects->dof_coc_params[1] = -aperture *
                                  fabsf(focal_len_scaled / (focus_dist - focal_len_scaled));
+    /* FIXME(fclem) This is broken for vertically fit sensor. */
     effects->dof_coc_params[1] *= viewport_size[0] / sensor_scaled;
+
+    if (is_ortho) {
+      /* (fclem) A bit of black magic here. Needed to match cycles. */
+      effects->dof_coc_params[1] *= 0.225;
+    }
+
     effects->dof_coc_params[0] = -focus_dist * effects->dof_coc_params[1];
 
     effects->dof_bokeh_blades = blades;
@@ -112,9 +137,16 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
     effects->dof_scatter_neighbor_max_color = scene_eval->eevee.bokeh_neighbor_max;
     effects->dof_denoise_factor = clamp_f(scene_eval->eevee.bokeh_denoise_fac, 0.0f, 1.0f);
 
-    float max_abs_fg_coc = fabsf(coc_radius_from_camera_depth(effects, -cam->clip_start));
-    /* Background is at infinity so maximum CoC is the limit of the function at -inf. */
-    float max_abs_bg_coc = fabsf(effects->dof_coc_params[1]);
+    float max_abs_fg_coc, max_abs_bg_coc;
+    if (is_ortho) {
+      max_abs_fg_coc = fabsf(coc_radius_from_camera_depth(true, effects, -cam->clip_start));
+      max_abs_bg_coc = fabsf(coc_radius_from_camera_depth(true, effects, -cam->clip_end));
+    }
+    else {
+      max_abs_fg_coc = fabsf(coc_radius_from_camera_depth(false, effects, -cam->clip_start));
+      /* Background is at infinity so maximum CoC is the limit of the function at -inf. */
+      max_abs_bg_coc = fabsf(effects->dof_coc_params[1]);
+    }
 
     float max_coc = max_ff(max_abs_bg_coc, max_abs_fg_coc);
     /* Clamp with user defined max. */

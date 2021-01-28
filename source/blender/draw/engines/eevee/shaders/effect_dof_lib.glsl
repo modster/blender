@@ -53,11 +53,14 @@ const vec2 quad_offsets[4] = vec2[4](
     vec2(-0.5, 0.5), vec2(0.5, 0.5), vec2(0.5, -0.5), vec2(-0.5, -0.5));
 
 /* Divide by sensor size to get the normalized size. */
-#define calculate_coc(zdepth) (cocMul / zdepth - cocBias)
+#define calculate_coc_persp(zdepth) (cocMul / zdepth - cocBias)
+#define calculate_coc_ortho(zdepth) ((zdepth + cocMul / cocBias) * cocMul)
+#define calculate_coc(z) \
+  (ProjectionMatrix[3][3] == 0.0) ? calculate_coc_persp(z) : calculate_coc_ortho(z)
 
 /* Ortho conversion is only true for camera view! */
 #define linear_depth_persp(d) ((cocNear * cocFar) / (d * (cocNear - cocFar) + cocFar))
-#define linear_depth_ortho(d) (d * (cocFar - cocNear) + cocNear)
+#define linear_depth_ortho(d) (d * (cocNear - cocFar) + cocNear)
 
 #define linear_depth(d) \
   ((ProjectionMatrix[3][3] == 0.0) ? linear_depth_persp(d) : linear_depth_ortho(d))
