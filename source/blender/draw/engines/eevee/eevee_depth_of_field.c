@@ -643,8 +643,12 @@ static void dof_gather_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_vec2_copy(grp, "gatherInputUvCorrection", uv_correction_fac);
     DRW_shgroup_uniform_vec2_copy(grp, "gatherOutputTexelSize", output_texel_size);
     if (use_bokeh_tx) {
+      /* Negate to flip bokeh shape. Mimics optical phenomenon. */
+      negate_v2(fx->dof_bokeh_aniso);
       DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropy", fx->dof_bokeh_aniso);
       DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_gather_lut_tx);
+      /* Restore. */
+      negate_v2(fx->dof_bokeh_aniso);
     }
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
@@ -766,8 +770,12 @@ static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
     DRW_shgroup_uniform_int_copy(grp, "spritePerRow", input_size[0] / 2);
     DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropy", fx->dof_bokeh_aniso);
     if (use_bokeh_tx) {
+      /* Negate to flip bokeh shape. Mimics optical phenomenon. */
+      negate_v2(fx->dof_bokeh_aniso);
       DRW_shgroup_uniform_vec2_copy(grp, "bokehAnisotropyInv", fx->dof_bokeh_aniso_inv);
       DRW_shgroup_uniform_texture_ref(grp, "bokehLut", &fx->dof_bokeh_scatter_lut_tx);
+      /* Restore. */
+      negate_v2(fx->dof_bokeh_aniso);
     }
     DRW_shgroup_call_procedural_triangles(grp, NULL, sprite_count);
 
