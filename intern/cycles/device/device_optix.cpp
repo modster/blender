@@ -1453,7 +1453,7 @@ class OptiXDevice : public CUDADevice {
           return;
         }
 
-        const size_t num_verts = mesh->get_verts().size();
+        size_t num_verts = mesh->get_verts().size();
 
         size_t num_motion_steps = 1;
         Attribute *motion_keys = mesh->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
@@ -1461,35 +1461,47 @@ class OptiXDevice : public CUDADevice {
           num_motion_steps = mesh->get_motion_steps();
         }
 
-        device_vector<int> index_data(this, "optix temp index data", MEM_READ_ONLY);
-        index_data.alloc(mesh->get_triangles().size());
-        memcpy(index_data.data(),
-               mesh->get_triangles().data(),
-               mesh->get_triangles().size() * sizeof(int));
-        device_vector<float3> vertex_data(this, "optix temp vertex data", MEM_READ_ONLY);
-        vertex_data.alloc(num_verts * num_motion_steps);
-
-        for (size_t step = 0; step < num_motion_steps; ++step) {
-          const float3 *verts = mesh->get_verts().data();
-
-          size_t center_step = (num_motion_steps - 1) / 2;
-          // The center step for motion vertices is not stored in the attribute
-          if (step != center_step) {
-            verts = motion_keys->data_float3() +
-                    (step > center_step ? step - 1 : step) * num_verts;
-          }
-
-          memcpy(vertex_data.data() + num_verts * step, verts, num_verts * sizeof(float3));
-        }
-
-        // Upload triangle data to GPU
-        index_data.copy_to_device();
-        vertex_data.copy_to_device();
-
         vector<device_ptr> vertex_ptrs;
         vertex_ptrs.reserve(num_motion_steps);
-        for (size_t step = 0; step < num_motion_steps; ++step) {
-          vertex_ptrs.push_back(vertex_data.device_pointer + num_verts * step * sizeof(float3));
+
+        device_vector<int> index_data(this, "optix temp index data", MEM_READ_ONLY);
+        device_vector<float3> vertex_data(this, "optix temp vertex data", MEM_READ_ONLY);
+
+        const bool no_motion_blur = num_motion_steps == 1;
+
+        if (no_motion_blur) {
+          /* no motion blur, we can reuse the pointer from the packed BVH */
+          vertex_ptrs.push_back(geom->vertex_pointer + geom->prim_offset * 3 * sizeof(float3));
+          num_verts = mesh->num_triangles() * 3;
+        }
+        else {
+          /* motion blur, we need to copy the vertices to the GPU, and use the triangles as index buffer */
+          index_data.alloc(mesh->get_triangles().size());
+          memcpy(index_data.data(),
+                 mesh->get_triangles().data(),
+                 mesh->get_triangles().size() * sizeof(int));
+          vertex_data.alloc(num_verts * num_motion_steps);
+
+          for (size_t step = 0; step < num_motion_steps; ++step) {
+            const float3 *verts = mesh->get_verts().data();
+
+            size_t center_step = (num_motion_steps - 1) / 2;
+            // The center step for motion vertices is not stored in the attribute
+            if (step != center_step) {
+              verts = motion_keys->data_float3() +
+                      (step > center_step ? step - 1 : step) * num_verts;
+            }
+
+            memcpy(vertex_data.data() + num_verts * step, verts, num_verts * sizeof(float3));
+          }
+
+          // Upload triangle data to GPU
+          index_data.copy_to_device();
+          vertex_data.copy_to_device();
+
+          for (size_t step = 0; step < num_motion_steps; ++step) {
+            vertex_ptrs.push_back(vertex_data.device_pointer + num_verts * step * sizeof(float3));
+          }
         }
 
         // Force a single any-hit call, so shadow record-all behavior works correctly
@@ -1500,10 +1512,19 @@ class OptiXDevice : public CUDADevice {
         build_input.triangleArray.numVertices = num_verts;
         build_input.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
         build_input.triangleArray.vertexStrideInBytes = sizeof(float3);
-        build_input.triangleArray.indexBuffer = index_data.device_pointer;
-        build_input.triangleArray.numIndexTriplets = mesh->num_triangles();
-        build_input.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-        build_input.triangleArray.indexStrideInBytes = 3 * sizeof(int);
+
+        if (no_motion_blur) {
+          build_input.triangleArray.indexBuffer = 0;
+          build_input.triangleArray.numIndexTriplets = 0;
+          build_input.triangleArray.indexStrideInBytes = 0;
+        }
+        else {
+          build_input.triangleArray.indexBuffer = index_data.device_pointer;
+          build_input.triangleArray.numIndexTriplets = mesh->num_triangles();
+          build_input.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+          build_input.triangleArray.indexStrideInBytes = 3 * sizeof(int);
+        }
+
         build_input.triangleArray.flags = &build_flags;
         // The SBT does not store per primitive data since Cycles already allocates separate
         // buffers for that purpose. OptiX does not allow this to be zero though, so just pass in

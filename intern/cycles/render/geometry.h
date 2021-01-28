@@ -57,6 +57,8 @@ class Geometry : public Node {
     VOLUME,
   };
 
+  device_ptr vertex_pointer = 0;
+
   Type geometry_type;
 
   /* Attributes */
@@ -250,6 +252,9 @@ class GeometryManager {
   void device_update_displacement_images(Device *device, Scene *scene, Progress &progress);
 
   void device_update_volume_images(Device *device, Scene *scene, Progress &progress);
+
+  void pack_bvh(DeviceScene *dscene, Scene *scene, Progress &progress);
+  void device_update_packed_bvh(PackedBVH &pack, DeviceScene *dscene, Scene *scene, bool has_bvh2_layout, Progress &progress);
 
  private:
   static void update_attribute_element_offset(Geometry *geom,
