@@ -337,34 +337,9 @@ float BKE_cachefile_time_offset(const CacheFile *cache_file, const float time, c
   return cache_file->is_sequence ? frame : frame / fps - time_offset;
 }
 
-bool BKE_cache_file_use_cycles_procedural(Depsgraph *depsgraph, CacheFile *cache_file)
+bool BKE_cache_file_use_proxy(Depsgraph *depsgraph, CacheFile *cache_file)
 {
-  /* do not return true even if this is true, we need to ensure that we are in a render, and using
-   * the experimental feature set */
-  if (!cache_file->use_cycles_procedural) {
-    return false;
-  }
-
-  Scene *scene = DEG_get_evaluated_scene(depsgraph);
-  if (!BKE_scene_uses_cycles(scene)) {
-    return false;
-  }
-
-  PointerRNA scene_ptr;
-  RNA_id_pointer_create(&scene->id, &scene_ptr);
-
-  PointerRNA cycles_ptr = RNA_pointer_get(&scene_ptr, "cycles");
-
-  if (RNA_enum_get(&cycles_ptr, "feature_set") != 1) { /* EXPERIMENTAL */
-    return false;
-  }
-
-  const bool is_viewport_render = BKE_check_rendered_viewport_visible(DEG_get_bmain(depsgraph));
+  /* proxies are only used for display in the viewport */
   const bool is_final_render = DEG_get_mode(depsgraph) == DAG_EVAL_RENDER;
-
-  if (!(is_viewport_render || is_final_render)) {
-    return false;
-  }
-
-  return true;
+  return cache_file->use_cycles_procedural && !is_final_render;
 }

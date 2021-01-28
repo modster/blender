@@ -20,6 +20,7 @@
 
 #include <string.h>
 
+#include "BLI_math_vector.h"
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
@@ -39,6 +40,8 @@
 #include "BKE_cachefile.h"
 #include "BKE_context.h"
 #include "BKE_lib_query.h"
+#include "BKE_mesh.h"
+#include "BKE_object.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
 
@@ -122,11 +125,6 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   const float time = BKE_cachefile_time_offset(cache_file, frame, FPS);
   const char *err_str = NULL;
 
-  /* Do not process data if using the Cycles procedural. */
-  if (BKE_cache_file_use_cycles_procedural(ctx->depsgraph, cache_file)) {
-    return mesh;
-  }
-
   if (!mcmd->reader || !STREQ(mcmd->reader_object_path, mcmd->object_path)) {
     STRNCPY(mcmd->reader_object_path, mcmd->object_path);
     BKE_cachefile_reader_open(cache_file, &mcmd->reader, ctx->object, mcmd->object_path);
@@ -136,6 +134,47 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
       return mesh;
     }
   }
+
+  /* Do not process data if using proxies. */
+  if (BKE_cache_file_use_proxy(ctx->depsgraph, cache_file)) {
+    BoundBox *bb = BKE_object_boundbox_get(ctx->object);
+
+    Mesh *result = BKE_mesh_new_nomain_from_template(org_mesh, 8, 0, 0, 24, 6);
+
+    MVert *mvert = result->mvert;
+    for (int i = 0; i < 8; ++i) {
+      copy_v3_v3(mvert[i].co, bb->vec[i]);
+    }
+
+    /* See BKE_object.h for the diagram. */
+    static unsigned int loops_v[6][4] = {
+      { 0, 4, 5, 1 },
+      { 4, 7, 6, 5 },
+      { 7, 3, 2, 6 },
+      { 3, 0, 1, 2 },
+      { 1, 5, 6, 2 },
+      { 3, 7, 4, 0 },
+    };
+
+    MLoop *mloop = result->mloop;
+    for (int i = 0; i < 6; ++i) {
+      for (int j = 0; j < 4; ++j, ++mloop) {
+        mloop->v = loops_v[i][j];
+      }
+    }
+
+    MPoly *mpoly = result->mpoly;
+    for (int i = 0; i < 6; ++i) {
+      mpoly[i].loopstart = i * 4;
+      mpoly[i].totloop = 4;
+    }
+
+    BKE_mesh_calc_edges(result, false, false);
+
+    return result;
+  }
+
+  fprintf(stderr, "évalue modifier\n");
 
   /* If this invocation is for the ORCO mesh, and the mesh in Alembic hasn't changed topology, we
    * must return the mesh as-is instead of deforming it. */

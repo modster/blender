@@ -607,7 +607,7 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
 
       /* experimental as blender does not have good support for procedurals at the moment
        * skip in the motion case, as the motion blur data will be handled in the procedural */
-      if (!motion && b_mesh_cache && experimental &&
+      if (!motion && b_v3d && b_mesh_cache && experimental &&
           b_mesh_cache.cache_file().use_cycles_procedural()) {
         sync_procedural(b_ob, b_mesh_cache, !b_v3d);
       }

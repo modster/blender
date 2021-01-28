@@ -1943,6 +1943,10 @@ void GeometryManager::device_update(Device *device,
     auto total_build_time_mesh = 0.0;
     auto total_build_time_curves = 0.0;
     for (Geometry *geom : scene->geometry) {
+      if (!geom->bvh) {
+        continue;
+      }
+
       total_build_time += std::abs(geom->bvh->build_time);
 
       if (geom->is_mesh()) {
