@@ -142,26 +142,50 @@ void EEVEE_temporal_sampling_matrices_calc(EEVEE_EffectsInfo *effects, const dou
   Scene *scene = draw_ctx->scene;
   RenderData *rd = &scene->r;
 
-  float persmat[4][4], viewmat[4][4], winmat[4][4];
+  float persmat[4][4], viewmat[4][4], winmat[4][4], wininv[4][4];
   DRW_view_persmat_get(NULL, persmat, false);
   DRW_view_viewmat_get(NULL, viewmat, false);
   DRW_view_winmat_get(NULL, winmat, false);
+  DRW_view_winmat_get(NULL, wininv, true);
 
   float ofs[2];
   EEVEE_temporal_sampling_offset_calc(ht_point, rd->gauss, ofs);
 
   window_translate_m4(winmat, persmat, ofs[0] / viewport_size[0], ofs[1] / viewport_size[1]);
 
+  /* Jitter is in pixel space. Focus distance in world space units. */
   float dof_jitter[2], focus_distance;
   if (EEVEE_depth_of_field_jitter_get(effects, ht_point, dof_jitter, &focus_distance)) {
-    dof_jitter[0] /= viewport_size[0];
-    dof_jitter[1] /= viewport_size[1];
+    /* Convert to NDC space [-1..1]. */
+    dof_jitter[0] /= viewport_size[0] * 0.5f;
+    dof_jitter[1] /= viewport_size[1] * 0.5f;
 
-    winmat[2][0] += dof_jitter[0] / focus_distance;
-    winmat[2][1] += dof_jitter[1] / focus_distance;
+    /* Skew the projection matrix in the ray direction and offset it to ray origin.
+     * Make it focus at focus_distance. */
+    if (winmat[2][3] != -1.0f) {
+      /* Orthographic */
+      add_v2_v2(winmat[2], dof_jitter);
 
-    winmat[3][0] += dof_jitter[0];
-    winmat[3][1] += dof_jitter[1];
+      window_translate_m4(
+          winmat, persmat, dof_jitter[0] * focus_distance, dof_jitter[1] * focus_distance);
+    }
+    else {
+      /* Get focus distance in NDC. */
+      float focus_pt[3] = {0.0f, 0.0f, -focus_distance};
+      mul_project_m4_v3(winmat, focus_pt);
+      /* Get pixel footprint in viewspace. */
+      float jitter_scaled[3] = {dof_jitter[0], dof_jitter[1], focus_pt[2]};
+      float center[3] = {0.0f, 0.0f, focus_pt[2]};
+      mul_project_m4_v3(wininv, jitter_scaled);
+      mul_project_m4_v3(wininv, center);
+
+      /* FIXME(fclem) The offset is noticeably large and the culling might make object pop out
+       * of the bluring radius. To fix this, use custom enlarged culling matrix. */
+      sub_v2_v2v2(jitter_scaled, jitter_scaled, center);
+      add_v2_v2(viewmat[3], jitter_scaled);
+
+      window_translate_m4(winmat, persmat, dof_jitter[0], dof_jitter[1]);
+    }
   }
 
   BLI_assert(effects->taa_view != NULL);

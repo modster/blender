@@ -112,8 +112,7 @@ bool EEVEE_depth_of_field_jitter_get(EEVEE_EffectsInfo *fx,
     mul_v2_v2(r_jitter, fx->dof_bokeh_aniso);
   }
 
-  /* Don't know why we multiply by 2 here. */
-  mul_v2_fl(r_jitter, fx->dof_jitter_radius * 2.0f);
+  mul_v2_fl(r_jitter, fx->dof_jitter_radius);
 
   *r_focus_distance = fx->dof_jitter_focus;
   return true;
@@ -182,7 +181,7 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
     effects->dof_coc_params[1] *= viewport_size[0] / sensor_scaled;
 
     if ((scene_eval->eevee.flag & SCE_EEVEE_DOF_JITTER) != 0) {
-      effects->dof_jitter_radius = focus_dist * effects->dof_coc_params[1];
+      effects->dof_jitter_radius = effects->dof_coc_params[1];
       effects->dof_jitter_focus = focus_dist;
       effects->dof_jitter_blades = blades;
 
