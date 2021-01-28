@@ -453,7 +453,7 @@ typedef enum ID_Type {
   ID_TXT = MAKE_ID2('T', 'X'), /* Text */
   ID_SPK = MAKE_ID2('S', 'K'), /* Speaker */
   ID_SO = MAKE_ID2('S', 'O'),  /* Sound */
-  ID_GR = MAKE_ID2('G', 'R'),  /* Group */
+  ID_GR = MAKE_ID2('G', 'R'),  /* Collection */
   ID_AR = MAKE_ID2('A', 'R'),  /* bArmature */
   ID_AC = MAKE_ID2('A', 'C'),  /* bAction */
   ID_NT = MAKE_ID2('N', 'T'),  /* bNodeTree */
@@ -472,7 +472,7 @@ typedef enum ID_Type {
   ID_HA = MAKE_ID2('H', 'A'),  /* Hair */
   ID_PT = MAKE_ID2('P', 'T'),  /* PointCloud */
   ID_VO = MAKE_ID2('V', 'O'),  /* Volume */
-  ID_SIM = MAKE_ID2('S', 'I'), /* Simulation (currently unused) */
+  ID_SIM = MAKE_ID2('S', 'I'), /* Simulation (geometry node groups) */
 } ID_Type;
 
 /* Only used as 'placeholder' in .blend files for directly linked data-blocks. */
@@ -530,8 +530,7 @@ typedef enum ID_Type {
 #define ID_IS_ASSET(_id) (((const ID *)(_id))->asset_data != NULL)
 
 /* Check whether datablock type is covered by copy-on-write. */
-#define ID_TYPE_IS_COW(_id_type) \
-  (!ELEM(_id_type, ID_LI, ID_IP, ID_SCR, ID_VF, ID_BR, ID_WM, ID_PAL, ID_PC, ID_WS, ID_IM))
+#define ID_TYPE_IS_COW(_id_type) (!ELEM(_id_type, ID_BR, ID_PAL, ID_IM))
 
 #ifdef GS
 #  undef GS

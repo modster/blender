@@ -45,7 +45,7 @@ template<typename> struct is_array : public std::false_type {
 template<typename T> struct is_array<array<T>> : public std::true_type {
 };
 
-/* Store the data set for an animation at every time points, or at the begining of the animation
+/* Store the data set for an animation at every time points, or at the beginning of the animation
  * for constant data.
  *
  * The data is supposed to be stored in chronological order, and is looked up using the current
@@ -150,7 +150,7 @@ template<typename T> class DataStore {
       return;
     }
 
-    /* TODO(@kevindietrich): arrays are emptied when passed to the sockets, so for now we copy the
+    /* TODO(kevindietrich): arrays are emptied when passed to the sockets, so for now we copy the
      * arrays to avoid reloading the data */
     T value = *data_;
     node->set(*socket, value);
