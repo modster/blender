@@ -20,6 +20,13 @@
  * \ingroup draw_engine
  *
  * Depth of field post process effect.
+ *
+ * There is 2 methods to achieve this effect.
+ * - The first uses projection matrix offsetting and sample accumulation to give reference quality
+ *   depth of field. But this needs many samples to hide the undersampling.
+ * - The second one is a post-processing based one. It follows the implementation described in
+ *   the presentation "Life of a Bokeh - Siggraph 2018" from Guillaume Abadie. There are some
+ *   difference with our actual implementation that prioritize quality.
  */
 
 #include "DRW_render.h"
@@ -53,6 +60,63 @@ static float coc_radius_from_camera_depth(bool is_ortho, EEVEE_EffectsInfo *fx, 
   else {
     return multiplier / camera_depth - bias;
   }
+}
+
+static void regular_polygon_sample(
+    float corners, float rotation, float u, float v, float r_sample[2])
+{
+  /* Sample corner number and reuse u. */
+  float corner = floorf(u * corners);
+  u = u * corners - corner;
+  /* Uniform sampled triangle weights. */
+  u = sqrtf(u);
+  v = v * u;
+  u = 1.0f - u;
+  /* Point in triangle. */
+  float angle = M_PI / corners;
+  float p[2] = {(u + v) * cosf(angle), (u - v) * sinf(angle)};
+  /* Rotate. */
+  rotation += corner * 2.0f * angle;
+  float cr = cosf(rotation);
+  float sr = sinf(rotation);
+  r_sample[0] = cr * p[0] - sr * p[1];
+  r_sample[1] = sr * p[0] + cr * p[1];
+}
+
+bool EEVEE_depth_of_field_jitter_get(EEVEE_EffectsInfo *fx,
+                                     const double ht_point[2],
+                                     float r_jitter[2],
+                                     float *r_focus_distance)
+{
+  if (fx->dof_jitter_radius == 0.0f) {
+    return false;
+  }
+  /* Maybe would be better to have another sequence ? */
+  r_jitter[0] = ht_point[0];
+  r_jitter[1] = ht_point[1];
+
+  {
+    /* Bokeh shape parametrisation */
+    if (fx->dof_jitter_blades == 0.0f) {
+      float r = sqrtf(r_jitter[0]);
+      float T = r_jitter[1] * 2.0f * M_PI;
+
+      r_jitter[0] = r * cosf(T);
+      r_jitter[1] = r * sinf(T);
+    }
+    else {
+      regular_polygon_sample(
+          fx->dof_jitter_blades, fx->dof_bokeh_rotation, r_jitter[0], r_jitter[1], r_jitter);
+    }
+
+    mul_v2_v2(r_jitter, fx->dof_bokeh_aniso);
+  }
+
+  /* Don't know why we multiply by 2 here. */
+  mul_v2_fl(r_jitter, fx->dof_jitter_radius * 2.0f);
+
+  *r_focus_distance = fx->dof_jitter_focus;
+  return true;
 }
 
 int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
@@ -117,6 +181,19 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
     /* FIXME(fclem) This is broken for vertically fit sensor. */
     effects->dof_coc_params[1] *= viewport_size[0] / sensor_scaled;
 
+    if ((scene_eval->eevee.flag & SCE_EEVEE_DOF_JITTER) != 0) {
+      effects->dof_jitter_radius = focus_dist * effects->dof_coc_params[1];
+      effects->dof_jitter_focus = focus_dist;
+      effects->dof_jitter_blades = blades;
+
+      effects->dof_coc_params[1] *= scene_eval->eevee.bokeh_overblur / 100.0f;
+      /* Disable blades for overblur because it erodes the shape. Prefer smoothing to eroding. */
+      blades = 0.0f;
+    }
+    else {
+      effects->dof_jitter_radius = 0.0f;
+    }
+
     if (is_ortho) {
       /* (fclem) A bit of black magic here. Needed to match cycles. */
       effects->dof_coc_params[1] *= 0.225;
@@ -158,6 +235,8 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
 
     return EFFECT_DOF | EFFECT_POST_BUFFER;
   }
+
+  effects->dof_jitter_radius = 0.0f;
 
   /* Cleanup to release memory */
   GPU_FRAMEBUFFER_FREE_SAFE(fbl->dof_setup_fb);

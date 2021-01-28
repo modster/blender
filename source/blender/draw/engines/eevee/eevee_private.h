@@ -776,6 +776,9 @@ typedef struct EEVEE_EffectsInfo {
   struct GPUTexture *velocity_tiles_x_tx;
   struct GPUTexture *velocity_tiles_tx;
   /* Depth Of Field */
+  float dof_jitter_radius;
+  float dof_jitter_blades;
+  float dof_jitter_focus;
   float dof_coc_params[2], dof_coc_near_dist, dof_coc_far_dist;
   float dof_bokeh_blades, dof_bokeh_rotation, dof_bokeh_aniso[2], dof_bokeh_max_size;
   float dof_bokeh_aniso_inv[2];
@@ -1312,6 +1315,10 @@ void EEVEE_lightprobes_planar_data_from_object(Object *ob,
 int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata, Object *camera);
 void EEVEE_depth_of_field_cache_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata);
 void EEVEE_depth_of_field_draw(EEVEE_Data *vedata);
+bool EEVEE_depth_of_field_jitter_get(EEVEE_EffectsInfo *effects,
+                                     const double ht_point[2],
+                                     float r_jitter[2],
+                                     float *r_focus_distance);
 
 /* eevee_bloom.c */
 int EEVEE_bloom_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata);

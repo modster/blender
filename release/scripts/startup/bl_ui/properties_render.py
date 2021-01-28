@@ -202,6 +202,11 @@ class RENDER_PT_eevee_depth_of_field(RenderButtonsPanel, Panel):
         col.prop(props, "bokeh_neighbor_max")
         col.prop(props, "bokeh_denoise_fac")
         col.prop(props, "use_bokeh_high_quality_slight_defocus")
+        col.prop(props, "use_bokeh_jittered")
+
+        col = layout.column()
+        col.active = props.use_bokeh_jittered
+        col.prop(props, "bokeh_overblur")
 
 
 class RENDER_PT_eevee_bloom(RenderButtonsPanel, Panel):

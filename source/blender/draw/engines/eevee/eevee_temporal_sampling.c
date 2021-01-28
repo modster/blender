@@ -152,6 +152,18 @@ void EEVEE_temporal_sampling_matrices_calc(EEVEE_EffectsInfo *effects, const dou
 
   window_translate_m4(winmat, persmat, ofs[0] / viewport_size[0], ofs[1] / viewport_size[1]);
 
+  float dof_jitter[2], focus_distance;
+  if (EEVEE_depth_of_field_jitter_get(effects, ht_point, dof_jitter, &focus_distance)) {
+    dof_jitter[0] /= viewport_size[0];
+    dof_jitter[1] /= viewport_size[1];
+
+    winmat[2][0] += dof_jitter[0] / focus_distance;
+    winmat[2][1] += dof_jitter[1] / focus_distance;
+
+    winmat[3][0] += dof_jitter[0];
+    winmat[3][1] += dof_jitter[1];
+  }
+
   BLI_assert(effects->taa_view != NULL);
 
   /* When rendering just update the view. This avoids recomputing the culling. */
