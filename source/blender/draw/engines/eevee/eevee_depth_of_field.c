@@ -186,9 +186,18 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
       effects->dof_jitter_focus = focus_dist;
       effects->dof_jitter_blades = blades;
 
-      effects->dof_coc_params[1] *= scene_eval->eevee.bokeh_overblur / 100.0f;
-      /* Disable blades for overblur because it erodes the shape. Prefer smoothing to eroding. */
-      blades = 0.0f;
+      int sample_count = DRW_state_is_image_render() ? stl->g_data->render_tot_samples :
+                                                       scene_eval->eevee.taa_samples;
+      /* Set to very high value in case of continuous rendering. */
+      sample_count = (sample_count == 0) ? 1024 : sample_count;
+
+      /* Compute a minimal overblur radius to fill the gaps between the samples.
+       * This is just the simplified form of dividing the area of the bokeh
+       * by the number of samples. */
+      float minimal_overblur = 1.0f / sqrtf(sample_count);
+      float user_overblur = scene_eval->eevee.bokeh_overblur / 100.0f;
+
+      effects->dof_coc_params[1] *= minimal_overblur + user_overblur;
     }
     else {
       effects->dof_jitter_radius = 0.0f;
