@@ -4756,6 +4756,11 @@ static void rna_def_userdef_view(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Gizmo Size", "Diameter of the gizmo");
   RNA_def_property_update(prop, 0, "rna_userdef_update");
 
+  prop = RNA_def_property(srna, "gizmo_size_navigate_v3d", PROP_INT, PROP_PIXEL);
+  RNA_def_property_range(prop, 30, 200);
+  RNA_def_property_ui_text(prop, "Navigate Gizmo Size", "The Navigate Gizmo size");
+  RNA_def_property_update(prop, 0, "rna_userdef_gizmo_update");
+
   /* Lookdev */
   prop = RNA_def_property(srna, "lookdev_sphere_size", PROP_INT, PROP_PIXEL);
   RNA_def_property_int_sdna(prop, NULL, "lookdev_sphere_size");
@@ -5066,10 +5071,10 @@ static void rna_def_userdef_edit(BlenderRNA *brna)
   prop = RNA_def_property(srna, "fcurve_unselected_alpha", PROP_FLOAT, PROP_FACTOR);
   RNA_def_property_float_sdna(prop, NULL, "fcu_inactive_alpha");
   RNA_def_property_range(prop, 0.001f, 1.0f);
-  RNA_def_property_ui_text(
-      prop,
-      "Unselected F-Curve Visibility",
-      "Amount that unselected F-Curves stand out from the background (Graph Editor)");
+  RNA_def_property_ui_text(prop,
+                           "Unselected F-Curve Opacity",
+                           "The opacity of unselected F-Curves against the "
+                           "background of the Graph Editor");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_GRAPH, NULL);
 
   /* grease pencil */
@@ -6225,10 +6230,12 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop, "Sculpt Mode Tilt Support", "Support for pen tablet tilt events in Sculpt Mode");
 
-  prop = RNA_def_property(srna, "use_object_add_tool", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "use_object_add_tool", 1);
+  prop = RNA_def_property(srna, "use_asset_browser", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "use_asset_browser", 1);
   RNA_def_property_ui_text(
-      prop, "Add Object Tool", "Show add object tool in the toolbar in Object Mode and Edit Mode");
+      prop,
+      "Asset Browser",
+      "Enable Asset Browser editor and operators to manage data-blocks as asset");
 }
 
 static void rna_def_userdef_addon_collection(BlenderRNA *brna, PropertyRNA *cprop)

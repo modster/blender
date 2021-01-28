@@ -755,9 +755,9 @@ static void gpencil_edit_curve_stroke_count_cb(bGPDlayer *gpl,
 }
 
 static uint32_t gpencil_beztriple_vflag_get(char flag,
-                                        char col_id,
-                                        bool handle_point,
-                                        const bool handle_selected)
+                                            char col_id,
+                                            bool handle_point,
+                                            const bool handle_selected)
 {
   uint32_t vflag = 0;
   SET_FLAG_FROM_TEST(vflag, (flag & SELECT), VFLAG_VERT_SELECTED);
@@ -800,20 +800,20 @@ static void gpencil_edit_curve_stroke_iter_cb(bGPDlayer *gpl,
     };
 
     /* First segment. */
-    copy_v3_v3(vert_ptr->pos, bezt->vec[0]);
+    mul_v3_m4v3(vert_ptr->pos, gpl->layer_mat, bezt->vec[0]);
     vert_ptr->data = vflag[0];
     vert_ptr++;
 
-    copy_v3_v3(vert_ptr->pos, bezt->vec[1]);
+    mul_v3_m4v3(vert_ptr->pos, gpl->layer_mat, bezt->vec[1]);
     vert_ptr->data = vflag[1];
     vert_ptr++;
 
     /* Second segment. */
-    copy_v3_v3(vert_ptr->pos, bezt->vec[1]);
+    mul_v3_m4v3(vert_ptr->pos, gpl->layer_mat, bezt->vec[1]);
     vert_ptr->data = vflag[1];
     vert_ptr++;
 
-    copy_v3_v3(vert_ptr->pos, bezt->vec[2]);
+    mul_v3_m4v3(vert_ptr->pos, gpl->layer_mat, bezt->vec[2]);
     vert_ptr->data = vflag[2];
     vert_ptr++;
   }

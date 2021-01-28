@@ -214,6 +214,7 @@ void GPENCIL_cache_init(void *ved)
                                  NULL :
                              false;
     pd->do_onion = show_onion && !hide_overlay && !playing;
+    pd->playing = playing;
     /* Save simplify flags (can change while drawing, so it's better to save). */
     Scene *scene = draw_ctx->scene;
     pd->simplify_fill = GPENCIL_SIMPLIFY_FILL(scene, playing);
@@ -241,6 +242,7 @@ void GPENCIL_cache_init(void *ved)
     pd->simplify_fill = false;
     pd->simplify_fx = false;
     pd->fade_layer_opacity = -1.0f;
+    pd->playing = false;
   }
 
   {
@@ -617,6 +619,15 @@ void GPENCIL_cache_populate(void *ved, Object *ob)
     /* Special case for rendering onion skin. */
     bGPdata *gpd = (bGPdata *)ob->data;
     bool do_onion = (!pd->is_render) ? pd->do_onion : (gpd->onion_flag & GP_ONION_GHOST_ALWAYS);
+    gpd->runtime.playing = (short)pd->playing;
+
+    /* When render in background the active frame could not be properly set due thread priority
+     * better set again. This is not required in viewport. */
+    if (txl->render_depth_tx) {
+      LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+        gpl->actframe = BKE_gpencil_layer_frame_get(gpl, pd->cfra, GP_GETFRAME_USE_PREV);
+      }
+    }
 
     BKE_gpencil_visible_stroke_iter(is_final_render ? pd->view_layer : NULL,
                                     ob,
@@ -977,4 +988,5 @@ DrawEngineType draw_engine_gpencil_type = {
     NULL,
     NULL,
     &GPENCIL_render_to_image,
+    NULL,
 };

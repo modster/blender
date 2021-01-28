@@ -735,7 +735,8 @@ typedef struct NodeImageMultiFileSocket {
   short use_render_format DNA_DEPRECATED;
   /** Use overall node image format. */
   short use_node_format;
-  char _pad1[4];
+  char save_as_render;
+  char _pad1[3];
   /** 1024 = FILE_MAX. */
   char path[1024];
   ImageFormatData format;
@@ -834,6 +835,11 @@ typedef struct NodeDilateErode {
 typedef struct NodeMask {
   int size_x, size_y;
 } NodeMask;
+
+typedef struct NodeSetAlpha {
+  char mode;
+  char _pad[7];
+} NodeSetAlpha;
 
 typedef struct NodeTexBase {
   TexMapping tex_mapping;
@@ -1083,14 +1089,15 @@ typedef struct NodeAttributeCompare {
 } NodeAttributeCompare;
 
 typedef struct NodeAttributeMath {
-  /* e.g. NODE_MATH_ADD. */
+  /* NodeMathOperation. */
   uint8_t operation;
 
   /* GeometryNodeAttributeInputMode */
   uint8_t input_type_a;
   uint8_t input_type_b;
+  uint8_t input_type_c;
 
-  char _pad[5];
+  char _pad[4];
 } NodeAttributeMath;
 
 typedef struct NodeAttributeMix {
@@ -1102,6 +1109,18 @@ typedef struct NodeAttributeMix {
   uint8_t input_type_a;
   uint8_t input_type_b;
 } NodeAttributeMix;
+
+typedef struct NodeAttributeVectorMath {
+  /* NodeVectorMathOperation */
+  uint8_t operation;
+
+  /* GeometryNodeAttributeInputMode */
+  uint8_t input_type_a;
+  uint8_t input_type_b;
+  uint8_t input_type_c;
+
+  char _pad[4];
+} NodeAttributeVectorMath;
 
 typedef struct NodeAttributeColorRamp {
   ColorBand color_ramp;
@@ -1123,6 +1142,56 @@ typedef struct NodeGeometryRotatePoints {
   uint8_t input_type_rotation;
   char _pad[3];
 } NodeGeometryRotatePoints;
+
+typedef struct NodeGeometryAlignRotationToVector {
+  /* GeometryNodeAlignRotationToVectorAxis */
+  uint8_t axis;
+
+  /* GeometryNodeAttributeInputMode */
+  uint8_t input_type_factor;
+  uint8_t input_type_vector;
+
+  char _pad[5];
+} NodeGeometryAlignRotationToVector;
+
+typedef struct NodeGeometryPointScale {
+  /* GeometryNodeAttributeInputMode */
+  uint8_t input_type;
+
+  char _pad[7];
+} NodeGeometryPointScale;
+
+typedef struct NodeGeometryPointTranslate {
+  /* GeometryNodeAttributeInputMode */
+  uint8_t input_type;
+
+  char _pad[7];
+} NodeGeometryPointTranslate;
+
+typedef struct NodeGeometryObjectInfo {
+  /* GeometryNodeTransformSpace. */
+  uint8_t transform_space;
+
+  char _pad[7];
+} NodeGeometryObjectInfo;
+
+typedef struct NodeGeometryPointInstance {
+  /* GeometryNodePointInstanceType. */
+  uint8_t instance_type;
+  /* GeometryNodePointInstanceFlag. */
+  uint8_t flag;
+
+  char _pad[6];
+} NodeGeometryPointInstance;
+
+typedef struct NodeGeometryPointsToVolume {
+  /* GeometryNodePointsToVolumeResolutionMode */
+  uint8_t resolution_mode;
+  /* GeometryNodeAttributeInputMode */
+  uint8_t input_type_radius;
+
+  char _pad[6];
+} NodeGeometryPointsToVolume;
 
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
@@ -1319,7 +1388,7 @@ enum {
 #define SHD_MATH_CLAMP 1
 
 /* Math node operations. */
-enum {
+typedef enum NodeMathOperation {
   NODE_MATH_ADD = 0,
   NODE_MATH_SUBTRACT = 1,
   NODE_MATH_MULTIPLY = 2,
@@ -1360,10 +1429,10 @@ enum {
   NODE_MATH_PINGPONG = 37,
   NODE_MATH_SMOOTH_MIN = 38,
   NODE_MATH_SMOOTH_MAX = 39,
-};
+} NodeMathOperation;
 
 /* Vector Math node operations. */
-enum {
+typedef enum NodeVectorMathOperation {
   NODE_VECTOR_MATH_ADD = 0,
   NODE_VECTOR_MATH_SUBTRACT = 1,
   NODE_VECTOR_MATH_MULTIPLY = 2,
@@ -1391,7 +1460,7 @@ enum {
   NODE_VECTOR_MATH_SINE = 21,
   NODE_VECTOR_MATH_COSINE = 22,
   NODE_VECTOR_MATH_TANGENT = 23,
-};
+} NodeVectorMathOperation;
 
 /* Boolean math node operations. */
 enum {
@@ -1468,6 +1537,13 @@ enum {
   CMP_NODEFLAG_STABILIZE_INVERSE = 1,
 };
 
+/* Set Alpha Node. */
+/* `NodeSetAlpha.mode` */
+typedef enum CMPNodeSetAlphaMode {
+  CMP_NODE_SETALPHA_MODE_APPLY = 0,
+  CMP_NODE_SETALPHA_MODE_REPLACE_ALPHA = 1,
+} CMPNodeSetAlphaMode;
+
 #define CMP_NODE_PLANETRACKDEFORM_MBLUR_SAMPLES_MAX 64
 
 /* Point Density shader node */
@@ -1529,6 +1605,10 @@ typedef enum GeometryNodePointInstanceType {
   GEO_NODE_POINT_INSTANCE_TYPE_COLLECTION = 1,
 } GeometryNodePointInstanceType;
 
+typedef enum GeometryNodePointInstanceFlag {
+  GEO_NODE_POINT_INSTANCE_WHOLE_COLLECTION = (1 << 0),
+} GeometryNodePointInstanceFlag;
+
 typedef enum GeometryNodeAttributeInputMode {
   GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE = 0,
   GEO_NODE_ATTRIBUTE_INPUT_FLOAT = 1,
@@ -1543,14 +1623,30 @@ typedef enum GeometryNodePointDistributeMethod {
 } GeometryNodePointDistributeMethod;
 
 typedef enum GeometryNodeRotatePointsType {
-  GEO_NODE_ROTATE_POINTS_TYPE_EULER = 0,
-  GEO_NODE_ROTATE_POINTS_TYPE_AXIS_ANGLE = 1,
+  GEO_NODE_POINT_ROTATE_TYPE_EULER = 0,
+  GEO_NODE_POINT_ROTATE_TYPE_AXIS_ANGLE = 1,
 } GeometryNodeRotatePointsType;
 
 typedef enum GeometryNodeRotatePointsSpace {
-  GEO_NODE_ROTATE_POINTS_SPACE_OBJECT = 0,
-  GEO_NODE_ROTATE_POINTS_SPACE_POINT = 1,
+  GEO_NODE_POINT_ROTATE_SPACE_OBJECT = 0,
+  GEO_NODE_POINT_ROTATE_SPACE_POINT = 1,
 } GeometryNodeRotatePointsSpace;
+
+typedef enum GeometryNodeAlignRotationToVectorAxis {
+  GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_X = 0,
+  GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_Y = 1,
+  GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_Z = 2,
+} GeometryNodeAlignRotationToVectorAxis;
+
+typedef enum GeometryNodeTransformSpace {
+  GEO_NODE_TRANSFORM_SPACE_ORIGINAL = 0,
+  GEO_NODE_TRANSFORM_SPACE_RELATIVE = 1,
+} GeometryNodeTransformSpace;
+
+typedef enum GeometryNodePointsToVolumeResolutionMode {
+  GEO_NODE_POINTS_TO_VOLUME_RESOLUTION_MODE_AMOUNT = 0,
+  GEO_NODE_POINTS_TO_VOLUME_RESOLUTION_MODE_SIZE = 1,
+} GeometryNodePointsToVolumeResolutionMode;
 
 #ifdef __cplusplus
 }

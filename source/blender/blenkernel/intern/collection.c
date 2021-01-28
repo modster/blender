@@ -362,6 +362,8 @@ IDTypeInfo IDType_ID_GR = {
     .blend_read_expand = collection_blend_read_expand,
 
     .blend_read_undo_preserve = NULL,
+
+    .lib_override_apply_post = NULL,
 };
 
 /** \} */
@@ -829,8 +831,8 @@ Base *BKE_collection_or_layer_objects(const ViewLayer *view_layer, Collection *c
 Collection *BKE_collection_master_add()
 {
   /* Not an actual datablock, but owned by scene. */
-  Collection *master_collection = MEM_callocN(sizeof(Collection), "Master Collection");
-  STRNCPY(master_collection->id.name, "GRMaster Collection");
+  Collection *master_collection = BKE_libblock_alloc(
+      NULL, ID_GR, "Master Collection", LIB_ID_CREATE_NO_MAIN);
   master_collection->id.flag |= LIB_EMBEDDED_DATA;
   master_collection->flag |= COLLECTION_IS_MASTER;
   master_collection->color_tag = COLLECTION_COLOR_NONE;
@@ -1941,9 +1943,6 @@ static void scene_collections_build_array(Collection *collection, void *data)
 
 static void scene_collections_array(Scene *scene, Collection ***collections_array, int *tot)
 {
-  Collection *collection;
-  Collection **array;
-
   *collections_array = NULL;
   *tot = 0;
 
@@ -1951,7 +1950,7 @@ static void scene_collections_array(Scene *scene, Collection ***collections_arra
     return;
   }
 
-  collection = scene->master_collection;
+  Collection *collection = scene->master_collection;
   BLI_assert(collection != NULL);
   scene_collection_callback(collection, scene_collections_count, tot);
 
@@ -1959,7 +1958,8 @@ static void scene_collections_array(Scene *scene, Collection ***collections_arra
     return;
   }
 
-  *collections_array = array = MEM_mallocN(sizeof(Collection *) * (*tot), "CollectionArray");
+  Collection **array = MEM_mallocN(sizeof(Collection *) * (*tot), "CollectionArray");
+  *collections_array = array;
   scene_collection_callback(collection, scene_collections_build_array, &array);
 }
 

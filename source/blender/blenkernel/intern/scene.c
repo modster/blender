@@ -1687,6 +1687,19 @@ static void scene_undo_preserve(BlendLibReader *reader, ID *id_new, ID *id_old)
   }
 }
 
+static void scene_lib_override_apply_post(ID *id_dst, ID *UNUSED(id_src))
+{
+  Scene *scene = (Scene *)id_dst;
+
+  if (scene->rigidbody_world != NULL) {
+    PTCacheID pid;
+    BKE_ptcache_id_from_rigidbody(&pid, NULL, scene->rigidbody_world);
+    LISTBASE_FOREACH (PointCache *, point_cache, pid.ptcaches) {
+      point_cache->flag |= PTCACHE_FLAG_INFO_DIRTY;
+    }
+  }
+}
+
 IDTypeInfo IDType_ID_SCE = {
     .id_code = ID_SCE,
     .id_filter = FILTER_ID_SCE,
@@ -1712,6 +1725,8 @@ IDTypeInfo IDType_ID_SCE = {
     .blend_read_expand = scene_blend_read_expand,
 
     .blend_read_undo_preserve = scene_undo_preserve,
+
+    .lib_override_apply_post = scene_lib_override_apply_post,
 };
 
 const char *RE_engine_id_BLENDER_EEVEE = "BLENDER_EEVEE";
@@ -1904,7 +1919,6 @@ Scene *BKE_scene_duplicate(Main *bmain, Scene *sce, eSceneCopyMethod type)
       sce_copy->id.properties = IDP_CopyProperty(sce->id.properties);
     }
 
-    MEM_freeN(sce_copy->toolsettings);
     BKE_sound_destroy_scene(sce_copy);
 
     /* copy color management settings */
@@ -1929,6 +1943,7 @@ Scene *BKE_scene_duplicate(Main *bmain, Scene *sce, eSceneCopyMethod type)
     sce_copy->display = sce->display;
 
     /* tool settings */
+    BKE_toolsettings_free(sce_copy->toolsettings);
     sce_copy->toolsettings = BKE_toolsettings_copy(sce->toolsettings, 0);
 
     /* make a private copy of the avicodecdata */
@@ -2030,6 +2045,21 @@ void BKE_scene_groups_relink(Scene *sce)
   if (sce->rigidbody_world) {
     BKE_rigidbody_world_groups_relink(sce->rigidbody_world);
   }
+}
+
+bool BKE_scene_can_be_removed(const Main *bmain, const Scene *scene)
+{
+  /* Linked scenes can always be removed. */
+  if (ID_IS_LINKED(scene)) {
+    return true;
+  }
+  /* Local scenes can only be removed, when there is at least one local scene left. */
+  LISTBASE_FOREACH (Scene *, other_scene, &bmain->scenes) {
+    if (other_scene != scene && !ID_IS_LINKED(other_scene)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 Scene *BKE_scene_add(Main *bmain, const char *name)

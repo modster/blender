@@ -85,16 +85,16 @@ const EnumPropertyItem rna_enum_object_mode_items[] = {
      ICON_GREASEPENCIL,
      "Draw",
      "Paint Grease Pencil Strokes"},
-    {OB_MODE_VERTEX_GPENCIL,
-     "VERTEX_GPENCIL",
-     ICON_VPAINT_HLT,
-     "Vertex Paint",
-     "Grease Pencil Vertex Paint Strokes"},
     {OB_MODE_WEIGHT_GPENCIL,
      "WEIGHT_GPENCIL",
      ICON_WPAINT_HLT,
      "Weight Paint",
      "Grease Pencil Weight Paint Strokes"},
+    {OB_MODE_VERTEX_GPENCIL,
+     "VERTEX_GPENCIL",
+     ICON_VPAINT_HLT,
+     "Vertex Paint",
+     "Grease Pencil Vertex Paint Strokes"},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -481,6 +481,17 @@ static void rna_Object_dependency_update(Main *bmain, Scene *UNUSED(scene), Poin
   DEG_id_tag_update(ptr->owner_id, ID_RECALC_TRANSFORM);
   DEG_relations_tag_update(bmain);
   WM_main_add_notifier(NC_OBJECT | ND_PARENT, ptr->owner_id);
+}
+
+void rna_Object_data_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+  Object *object = (Object *)ptr->data;
+
+  if (object->mode == OB_MODE_SCULPT) {
+    BKE_sculpt_ensure_orig_mesh_data(scene, object);
+  }
+
+  rna_Object_internal_update_data_dependency(bmain, scene, ptr);
 }
 
 static void rna_Object_data_set(PointerRNA *ptr, PointerRNA value, struct ReportList *reports)
@@ -2679,7 +2690,7 @@ static void rna_def_object(BlenderRNA *brna)
       prop, NULL, "rna_Object_data_set", "rna_Object_data_typef", "rna_Object_data_poll");
   RNA_def_property_flag(prop, PROP_EDITABLE | PROP_NEVER_UNLINK);
   RNA_def_property_ui_text(prop, "Data", "Object data");
-  RNA_def_property_update(prop, 0, "rna_Object_internal_update_data_dependency");
+  RNA_def_property_update(prop, 0, "rna_Object_data_update");
 
   prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "type");

@@ -1763,8 +1763,20 @@ if(WITH_BLENDER)
   # internal and external library information first, for test linking
   add_subdirectory(source)
 elseif(WITH_CYCLES_STANDALONE)
+  add_subdirectory(intern/glew-mx)
+  add_subdirectory(intern/guardedalloc)
+  add_subdirectory(intern/libc_compat)
+  add_subdirectory(intern/numaapi)
+  add_subdirectory(intern/sky)
+
   add_subdirectory(intern/cycles)
   add_subdirectory(extern/clew)
+  if(WITH_CYCLES_LOGGING)
+    if(NOT WITH_SYSTEM_GFLAGS)
+      add_subdirectory(extern/gflags)
+    endif()
+    add_subdirectory(extern/glog)
+  endif()
   if(WITH_CUDA_DYNLOAD)
     add_subdirectory(extern/cuew)
   endif()
@@ -1774,15 +1786,14 @@ elseif(WITH_CYCLES_STANDALONE)
 endif()
 
 #-----------------------------------------------------------------------------
+# Testing
+add_subdirectory(tests)
+
+#-----------------------------------------------------------------------------
 # Blender Application
 if(WITH_BLENDER)
   add_subdirectory(source/creator)
 endif()
-
-
-#-----------------------------------------------------------------------------
-# Testing
-add_subdirectory(tests)
 
 
 #-----------------------------------------------------------------------------
@@ -1846,6 +1857,8 @@ if(FIRST_RUN)
   info_cfg_option(WITH_OPENCOLORIO)
   info_cfg_option(WITH_OPENIMAGEDENOISE)
   info_cfg_option(WITH_OPENVDB)
+  info_cfg_option(WITH_POTRACE)
+  info_cfg_option(WITH_PUGIXML)
   info_cfg_option(WITH_QUADRIFLOW)
   info_cfg_option(WITH_TBB)
   info_cfg_option(WITH_USD)

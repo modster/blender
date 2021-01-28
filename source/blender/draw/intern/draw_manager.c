@@ -1715,8 +1715,8 @@ void DRW_draw_render_loop_offscreen(struct Depsgraph *depsgraph,
 
   GPU_matrix_identity_set();
   GPU_matrix_identity_projection_set();
-
-  GPU_viewport_unbind_from_offscreen(render_viewport, ofs, do_color_management);
+  const bool do_overlays = (v3d->flag2 & V3D_HIDE_OVERLAYS) == 0;
+  GPU_viewport_unbind_from_offscreen(render_viewport, ofs, do_color_management, do_overlays);
 
   if (draw_background) {
     /* Reset default. */
@@ -1910,6 +1910,11 @@ void DRW_render_to_image(RenderEngine *engine, struct Depsgraph *depsgraph)
   }
 
   RE_engine_end_result(engine, render_result, false, false, false);
+
+  if (engine_type->draw_engine->store_metadata) {
+    RenderResult *final_render_result = RE_engine_get_result(engine);
+    engine_type->draw_engine->store_metadata(data, final_render_result);
+  }
 
   /* Force cache to reset. */
   drw_viewport_cache_resize();

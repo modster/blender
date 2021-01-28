@@ -334,7 +334,6 @@ typedef struct uiHandleButtonData {
   int retval;
   /* booleans (could be made into flags) */
   bool cancel, escapecancel;
-  bool skip_undo_push;
   bool applied, applied_interactive;
   bool changed_cursor;
   wmTimer *flashtimer;
@@ -821,9 +820,7 @@ static void ui_apply_but_func(bContext *C, uiBut *but)
 /* typically call ui_apply_but_undo(), ui_apply_but_autokey() */
 static void ui_apply_but_undo(uiBut *but)
 {
-  const bool force_skip_undo = (but->active && but->active->skip_undo_push);
-
-  if (but->flag & UI_BUT_UNDO && !force_skip_undo) {
+  if (but->flag & UI_BUT_UNDO) {
     const char *str = NULL;
     size_t str_len_clip = SIZE_MAX - 1;
     bool skip_undo = false;
@@ -1993,7 +1990,12 @@ static bool ui_but_drag_init(bContext *C,
     }
     else {
       wmDrag *drag = WM_event_start_drag(
-          C, but->icon, but->dragtype, but->dragpoin, ui_but_value_get(but), WM_DRAG_NOP);
+          C,
+          but->icon,
+          but->dragtype,
+          but->dragpoin,
+          ui_but_value_get(but),
+          (but->dragflag & UI_BUT_DRAGPOIN_FREE) ? WM_DRAG_FREE_DATA : WM_DRAG_NOP);
       /* wmDrag has ownership over dragpoin now, stop messing with it. */
       but->dragpoin = NULL;
 
@@ -2869,8 +2871,7 @@ void ui_but_active_string_clear_and_exit(bContext *C, uiBut *but)
   but->active->str[0] = 0;
 
   ui_apply_but_TEX(C, but, but->active);
-  /* use onfree event so undo is handled by caller and apply is already done above */
-  button_activate_exit((bContext *)C, but, but->active, false, true);
+  button_activate_state(C, but, BUTTON_STATE_EXIT);
 }
 
 static void ui_textedit_string_ensure_max_length(uiBut *but, uiHandleButtonData *data, int maxlen)
@@ -4015,38 +4016,16 @@ static void ui_numedit_apply(bContext *C, uiBlock *block, uiBut *but, uiHandleBu
   ED_region_tag_redraw(data->region);
 }
 
-static void ui_but_extra_operator_icon_apply_func(uiBut *but, uiButExtraOpIcon *op_icon)
+static void ui_but_extra_operator_icon_apply(bContext *C, uiBut *but, uiButExtraOpIcon *op_icon)
 {
-  if (ui_afterfunc_check(but->block, but)) {
-    uiAfterFunc *after = ui_afterfunc_new();
-
-    after->optype = op_icon->optype_params->optype;
-    after->opcontext = op_icon->optype_params->opcontext;
-    after->opptr = op_icon->optype_params->opptr;
-
-    if (but->context) {
-      after->context = CTX_store_copy(but->context);
-    }
-
-    /* Ownership moved, don't let the UI code free it. */
-    op_icon->optype_params->opptr = NULL;
+  if (but->active->interactive) {
+    ui_apply_but(C, but->block, but, but->active, true);
   }
-}
-
-static void ui_but_extra_operator_icon_apply(bContext *C,
-                                             uiBut *but,
-                                             uiHandleButtonData *data,
-                                             uiButExtraOpIcon *op_icon)
-{
   button_activate_state(C, but, BUTTON_STATE_EXIT);
-  ui_apply_but(C, but->block, but, data, true);
-
-  data->postbut = but;
-  data->posttype = BUTTON_ACTIVATE_OVER;
-  /* Leave undo up to the operator. */
-  data->skip_undo_push = true;
-
-  ui_but_extra_operator_icon_apply_func(but, op_icon);
+  WM_operator_name_call_ptr(C,
+                            op_icon->optype_params->optype,
+                            op_icon->optype_params->opcontext,
+                            op_icon->optype_params->opptr);
 
   /* Force recreation of extra operator icons (pseudo update). */
   ui_but_extra_operator_icons_free(but);
@@ -4214,9 +4193,17 @@ static uiButExtraOpIcon *ui_but_extra_operator_icon_mouse_over_get(uiBut *but,
     return NULL;
   }
 
+  /* Same as in 'widget_draw_extra_icons', icon padding from the right edge. */
+  xmax -= 0.2 * icon_size;
+
+  /* Handle the padding space from the right edge as the last button. */
+  if (x > xmax) {
+    return but->extra_op_icons.last;
+  }
+
   /* Inverse order, from right to left. */
   LISTBASE_FOREACH_BACKWARD (uiButExtraOpIcon *, op_icon, &but->extra_op_icons) {
-    if ((x > (xmax - icon_size)) && x < xmax) {
+    if ((x > (xmax - icon_size)) && x <= xmax) {
       return op_icon;
     }
     xmax -= icon_size;
@@ -4245,7 +4232,7 @@ static bool ui_do_but_extra_operator_icon(bContext *C,
   ED_region_tag_redraw(data->region);
   button_tooltip_timer_reset(C, but);
 
-  ui_but_extra_operator_icon_apply(C, but, data, op_icon);
+  ui_but_extra_operator_icon_apply(C, but, op_icon);
   /* Note: 'but', 'data' may now be freed, don't access. */
 
   return true;
@@ -7880,10 +7867,7 @@ static ARegion *ui_but_tooltip_init(
   uiBut *but = UI_region_active_but_get(region);
   *r_exit_on_event = false;
   if (but) {
-    uiButExtraOpIcon *extra_icon = ui_but_extra_operator_icon_mouse_over_get(
-        but, but->active, CTX_wm_window(C)->eventstate);
-
-    return UI_tooltip_create_from_button_or_extra_icon(C, region, but, extra_icon, is_label);
+    return UI_tooltip_create_from_button(C, region, but, is_label);
   }
   return NULL;
 }
@@ -8341,7 +8325,7 @@ void ui_but_active_free(const bContext *C, uiBut *but)
 }
 
 /* returns the active button with an optional checking function */
-static uiBut *ui_context_button_active(ARegion *region, bool (*but_check_cb)(uiBut *))
+static uiBut *ui_context_button_active(const ARegion *region, bool (*but_check_cb)(const uiBut *))
 {
   uiBut *but_found = NULL;
 
@@ -8382,7 +8366,7 @@ static uiBut *ui_context_button_active(ARegion *region, bool (*but_check_cb)(uiB
   return but_found;
 }
 
-static bool ui_context_rna_button_active_test(uiBut *but)
+static bool ui_context_rna_button_active_test(const uiBut *but)
 {
   return (but->rnapoin.data != NULL);
 }
@@ -8407,7 +8391,7 @@ uiBut *UI_context_active_but_get_respect_menu(const bContext *C)
   return ui_context_button_active(region_menu ? region_menu : CTX_wm_region(C), NULL);
 }
 
-uiBut *UI_region_active_but_get(ARegion *region)
+uiBut *UI_region_active_but_get(const ARegion *region)
 {
   return ui_context_button_active(region, NULL);
 }
@@ -8503,6 +8487,15 @@ wmOperator *UI_context_active_operator_get(const struct bContext *C)
   }
 
   return NULL;
+}
+
+/**
+ * Try to find a search-box region opened from a button in \a button_region.
+ */
+ARegion *UI_region_searchbox_region_get(const ARegion *button_region)
+{
+  uiBut *but = UI_region_active_but_get(button_region);
+  return (but != NULL) ? but->active->searchbox : NULL;
 }
 
 /* helper function for insert keyframe, reset to default, etc operators */
@@ -9929,6 +9922,12 @@ static int ui_handle_menu_event(bContext *C,
               break;
             }
 
+            /* Only respond to explicit press to avoid the event that opened the menu
+             * activating an item when the key is held. */
+            if (event->is_repeat) {
+              break;
+            }
+
             if (event->alt) {
               act += 10;
             }
@@ -10008,8 +10007,11 @@ static int ui_handle_menu_event(bContext *C,
         case EVT_XKEY:
         case EVT_YKEY:
         case EVT_ZKEY: {
-          if ((event->val == KM_PRESS || event->val == KM_DBL_CLICK) &&
-              !IS_EVENT_MOD(event, shift, ctrl, oskey)) {
+          if (ELEM(event->val, KM_PRESS, KM_DBL_CLICK) &&
+              !IS_EVENT_MOD(event, shift, ctrl, oskey) &&
+              /* Only respond to explicit press to avoid the event that opened the menu
+               * activating an item when the key is held. */
+              !event->is_repeat) {
             if (ui_menu_pass_event_to_parent_if_nonactive(menu, but, level, retval)) {
               break;
             }
