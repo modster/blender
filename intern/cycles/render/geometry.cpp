@@ -1631,6 +1631,7 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
      * these are the only arrays that can be updated */
     dscene->tri_vnormal.tag_modified();
     dscene->tri_shader.tag_modified();
+    dscene->prim_tri_verts.tag_modified();
   }
 
   if (device_update_flags & DEVICE_CURVE_DATA_MODIFIED) {
