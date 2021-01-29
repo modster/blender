@@ -2535,6 +2535,11 @@ void DepsgraphRelationBuilder::build_cachefile(CacheFile *cache_file)
   if (built_map_.checkIsBuiltAndTag(cache_file)) {
     return;
   }
+
+  if (cache_file->use_cycles_procedural) {
+    return;
+  }
+
   build_idproperties(cache_file->id.properties);
   /* Animation. */
   build_animdata(&cache_file->id);
