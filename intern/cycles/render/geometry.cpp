@@ -711,11 +711,14 @@ void GeometryManager::device_update_attributes(Device *device,
    * been set per shader by the shader manager */
   vector<AttributeRequestSet> geom_attributes(scene->geometry.size());
 
+  AttributeRequestSet global_attributes;
+  scene->need_global_attributes(global_attributes);
+
   for (size_t i = 0; i < scene->geometry.size(); i++) {
     Geometry *geom = scene->geometry[i];
 
     geom->index = i;
-    scene->need_global_attributes(geom_attributes[i]);
+    geom_attributes[i].add(global_attributes);
 
     foreach (Node *node, geom->get_used_shaders()) {
       Shader *shader = static_cast<Shader *>(node);
