@@ -493,8 +493,17 @@ void dof_gather_accumulate_sample_ring(DofGatherData ring_data,
   }
 }
 
+/* FIXME(fclem) Seems to be wrong since it needs ringcount+1 as input for slightfocus gather. */
+int dof_gather_total_sample_count(const int ring_count, const int ring_density)
+{
+  return (ring_count * ring_count - ring_count) * ring_density + 1;
+}
+
 void dof_gather_accumulate_center_sample(DofGatherData center_data,
                                          float bordering_radius,
+#ifdef DOF_RESOLVE_PASS
+                                         int i_radius,
+#endif
                                          const bool do_fast_gather,
                                          const bool is_foreground,
                                          inout DofGatherData accum_data)
@@ -517,14 +526,20 @@ void dof_gather_accumulate_center_sample(DofGatherData center_data,
   dof_gather_accumulate_sample(center_data, weight * accum_weight, accum_data);
 
   if (!do_fast_gather) {
+#ifdef DOF_RESOLVE_PASS
+    /* NOTE(fclem): Hack to smooth transition to full in-focus opacity. */
+    int total_sample_count = dof_gather_total_sample_count(i_radius + 1, DOF_SLIGHT_FOCUS_DENSITY);
+    float fac = saturate(1.0 - abs(center_data.coc) / float(layer_threshold));
+    accum_data.layer_opacity += float(total_sample_count) * fac * fac;
+#endif
+    accum_data.layer_opacity += layer_weight;
+
     /* Logic of dof_gather_accumulate_sample(). */
     weight *= (1.0 - accum_weight);
     center_data.coc_sqr = center_data.coc * (center_data.coc * weight);
     center_data.color *= weight;
     center_data.coc *= weight;
     center_data.weight = weight;
-
-    accum_data.layer_opacity += layer_weight;
 
 #ifdef DOF_FOREGROUND_PASS /* Reduce issue with closer foreground over distant foreground. */
     float ring_area = sqr(bordering_radius);
@@ -535,11 +550,6 @@ void dof_gather_accumulate_center_sample(DofGatherData center_data,
     dof_gather_accumulate_sample_ring(
         center_data, 1, false, do_fast_gather, is_foreground, accum_data);
   }
-}
-
-int dof_gather_total_sample_count(const int ring_count, const int ring_density)
-{
-  return (ring_count * ring_count - ring_count) * ring_density + 1;
 }
 
 int dof_gather_total_sample_count_with_density_change(const int ring_count,

@@ -47,11 +47,11 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
 
   bool first_ring = true;
 
-  for (int ring = i_radius - 1; ring >= 0; ring--) {
+  for (int ring = i_radius; ring > 0; ring--) {
     DofGatherData fg_ring = GATHER_DATA_INIT;
     DofGatherData bg_ring = GATHER_DATA_INIT;
 
-    int ring_distance = ring + 1;
+    int ring_distance = ring;
     int ring_sample_count = resolve_ring_density * ring_distance;
     for (int sample_id = 0; sample_id < ring_sample_count; sample_id++) {
       int s = sample_id * (4 / resolve_ring_density) +
@@ -105,14 +105,16 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
   /* Slide 38. */
   float bordering_radius = 0.5;
 
-  dof_gather_accumulate_center_sample(center_data, bordering_radius, false, true, fg_accum);
-  dof_gather_accumulate_center_sample(center_data, bordering_radius, false, false, bg_accum);
+  dof_gather_accumulate_center_sample(
+      center_data, bordering_radius, i_radius, false, true, fg_accum);
+  dof_gather_accumulate_center_sample(
+      center_data, bordering_radius, i_radius, false, false, bg_accum);
 
   vec4 bg_col, fg_col;
   float bg_weight, fg_weight;
   vec2 unused_occlusion;
 
-  int total_sample_count = dof_gather_total_sample_count(i_radius, resolve_ring_density);
+  int total_sample_count = dof_gather_total_sample_count(i_radius + 1, resolve_ring_density);
   dof_gather_accumulate_resolve(total_sample_count, bg_accum, bg_col, bg_weight, unused_occlusion);
   dof_gather_accumulate_resolve(total_sample_count, fg_accum, fg_col, fg_weight, unused_occlusion);
 
