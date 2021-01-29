@@ -1195,8 +1195,7 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
   {
     scoped_callback_timer timer([scene](double time) {
       if (scene->update_stats) {
-        scene->update_stats->geometry.times.add_entry(
-            {"device_update (pack BVH)", time});
+        scene->update_stats->geometry.times.add_entry({"device_update (pack BVH)", time});
       }
     });
 
@@ -1223,7 +1222,7 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
     }
     else {
       /* It is not strictly necessary to skip those resizes we if do not have to repack, as the OS
-     * will not allocate pages if we do not touch them, however it does help catching bugs. */
+       * will not allocate pages if we do not touch them, however it does help catching bugs. */
       pack.prim_tri_index.resize(num_prims);
       pack.prim_tri_verts.resize(num_tri_verts);
       pack.prim_type.resize(num_prims);
@@ -1254,7 +1253,7 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
 
       const pair<int, uint> &info = geometry_to_object_info[geom];
       pool.push(function_bind(
-                  &Geometry::pack_primitives, geom, &pack, info.first, info.second, pack_all));
+          &Geometry::pack_primitives, geom, &pack, info.first, info.second, pack_all));
     }
     pool.wait_work();
   }
@@ -1266,7 +1265,8 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
   device_update_packed_bvh(pack, dscene, scene, false, progress);
 }
 
-void GeometryManager::device_update_packed_bvh(PackedBVH &pack, DeviceScene *dscene, Scene *scene, bool has_bvh2_layout, Progress &progress)
+void GeometryManager::device_update_packed_bvh(
+    PackedBVH &pack, DeviceScene *dscene, Scene *scene, bool has_bvh2_layout, Progress &progress)
 {
   scoped_callback_timer timer([scene](double time) {
     if (scene->update_stats) {
@@ -1322,7 +1322,7 @@ void GeometryManager::device_update_packed_bvh(PackedBVH &pack, DeviceScene *dsc
   }
 
   dscene->data.bvh.root = pack.root_index;
-  //dscene->data.bvh.bvh_layout = bparams.bvh_layout;
+  // dscene->data.bvh.bvh_layout = bparams.bvh_layout;
   dscene->data.bvh.use_bvh_steps = (scene->params.num_bvh_time_steps != 0);
   dscene->data.bvh.curve_subdivisions = scene->params.curve_subdivisions();
   /* The scene handle is set in 'CPUDevice::const_copy_to' and 'OptiXDevice::const_copy_to' */
@@ -1914,8 +1914,9 @@ void GeometryManager::device_update(Device *device,
    * especially when removing all of the objects during interactive renders */
   bool need_update_scene_bvh = (scene->bvh == nullptr);
 
-  if ((need_update_scene_bvh || dscene->prim_tri_verts.is_modified()) && bvh_layout != BVH_LAYOUT_BVH2) {
-     pack_bvh(dscene, scene, progress);
+  if ((need_update_scene_bvh || dscene->prim_tri_verts.is_modified()) &&
+      bvh_layout != BVH_LAYOUT_BVH2) {
+    pack_bvh(dscene, scene, progress);
   }
 
   {

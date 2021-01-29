@@ -148,12 +148,12 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
 
     /* See BKE_object.h for the diagram. */
     static unsigned int loops_v[6][4] = {
-      { 0, 4, 5, 1 },
-      { 4, 7, 6, 5 },
-      { 7, 3, 2, 6 },
-      { 3, 0, 1, 2 },
-      { 1, 5, 6, 2 },
-      { 3, 7, 4, 0 },
+        {0, 4, 5, 1},
+        {4, 7, 6, 5},
+        {7, 3, 2, 6},
+        {3, 0, 1, 2},
+        {1, 5, 6, 2},
+        {3, 7, 4, 0},
     };
 
     MLoop *mloop = result->mloop;

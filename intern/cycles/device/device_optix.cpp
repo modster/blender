@@ -1475,7 +1475,8 @@ class OptiXDevice : public CUDADevice {
           num_verts = mesh->num_triangles() * 3;
         }
         else {
-          /* motion blur, we need to copy the vertices to the GPU, and use the triangles as index buffer */
+          /* motion blur, we need to copy the vertices to the GPU, and use the triangles as index
+           * buffer */
           index_data.alloc(mesh->get_triangles().size());
           memcpy(index_data.data(),
                  mesh->get_triangles().data(),
