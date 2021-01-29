@@ -267,7 +267,7 @@ void main()
   bool can_early_out = !prediction.do_background;
 #endif
 
-  bool do_fast_gather = dof_do_fast_gather(base_radius, min_radius);
+  bool do_fast_gather = dof_do_fast_gather(base_radius, min_radius, is_foreground);
 
   /* Gather at half resolution. Divide CoC by 2. */
   base_radius *= 0.5;

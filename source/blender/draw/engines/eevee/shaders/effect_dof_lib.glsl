@@ -44,11 +44,6 @@ const int gather_density_change_ring = 1;
 
 /* -------------- Utils ------------- */
 
-bool dof_do_fast_gather(float max_absolute_coc, float min_absolute_coc)
-{
-  return (max_absolute_coc - min_absolute_coc) < (DOF_FAST_GATHER_COC_ERROR * max_absolute_coc);
-}
-
 const vec2 quad_offsets[4] = vec2[4](
     vec2(-0.5, 0.5), vec2(0.5, 0.5), vec2(0.5, -0.5), vec2(-0.5, -0.5));
 
@@ -142,13 +137,10 @@ float dof_load_gather_coc(sampler2D gather_input_coc_buffer, vec2 uv, float lod)
 
 /* Distribute weights between near/slightfocus/far fields (slide 117). */
 const float layer_threshold = 4.0;
-#ifdef DOF_RESOLVE_PASS
 /* Make sure it overlaps. */
-const float layer_offset = 0.5;
-#else
+const float layer_offset_fg = 0.5;
 /* Extra offset for convolution layers to avoid light leaking from background. */
 const float layer_offset = 0.5 + 0.5;
-#endif
 
 #define DOF_MAX_SLIGHT_FOCUS_RADIUS 5
 
@@ -160,7 +152,8 @@ float dof_layer_weight(float coc, const bool is_foreground)
          float(is_foreground ? (coc <= 0.5) : (coc > -0.5));
 #else
   coc *= 2.0; /* Account for half pixel gather. */
-  return saturate(((is_foreground) ? -coc : coc) - layer_threshold + layer_offset);
+  float threshold = layer_threshold - ((is_foreground) ? layer_offset_fg : layer_offset);
+  return saturate(((is_foreground) ? -coc : coc) - threshold);
 #endif
 }
 vec4 dof_layer_weight(vec4 coc)
@@ -206,6 +199,22 @@ float dof_gather_accum_weight(float coc, float bordering_radius, bool first_ring
     return 0.0;
   }
   return saturate(coc - bordering_radius);
+}
+
+bool dof_do_fast_gather(float max_absolute_coc, float min_absolute_coc, const bool is_foreground)
+{
+  float min_weight = dof_layer_weight((is_foreground) ? -min_absolute_coc : min_absolute_coc,
+                                      is_foreground);
+  if (min_weight < 1.0) {
+    return false;
+  }
+  /* FIXME(fclem): This is a workaround to fast gather triggering too early.
+   * Since we use custom opacity mask, the opacity is not given to be 100% even for
+   * after normal threshold. */
+  if (is_foreground && min_absolute_coc < layer_threshold) {
+    return false;
+  }
+  return (max_absolute_coc - min_absolute_coc) < (DOF_FAST_GATHER_COC_ERROR * max_absolute_coc);
 }
 
 /* ------------------- COC TILES UTILS ------------------- */
@@ -283,9 +292,9 @@ CocTilePrediction dof_coc_tile_prediction_get(CocTile tile)
   /* Based on tile value, predict what pass we need to load. */
   CocTilePrediction predict;
 
-  predict.do_foreground = (-tile.fg_min_coc > layer_threshold - layer_offset);
+  predict.do_foreground = (-tile.fg_min_coc > layer_threshold - layer_offset_fg);
   bool fg_fully_opaque = predict.do_foreground &&
-                         dof_do_fast_gather(-tile.fg_min_coc, -tile.fg_max_coc);
+                         dof_do_fast_gather(-tile.fg_min_coc, -tile.fg_max_coc, true);
 
   predict.do_slight_focus = !fg_fully_opaque && (tile.fg_slight_focus_max_coc >= 0.5);
   predict.do_focus = !fg_fully_opaque && (tile.fg_slight_focus_max_coc == DOF_TILE_FOCUS);
@@ -293,7 +302,7 @@ CocTilePrediction dof_coc_tile_prediction_get(CocTile tile)
   predict.do_background = !predict.do_focus && !fg_fully_opaque &&
                           (tile.bg_max_coc > layer_threshold - layer_offset);
   bool bg_fully_opaque = predict.do_background &&
-                         dof_do_fast_gather(-tile.bg_max_coc, tile.bg_min_coc);
+                         dof_do_fast_gather(-tile.bg_max_coc, tile.bg_min_coc, false);
   predict.do_holefill = !predict.do_focus && !fg_fully_opaque && !bg_fully_opaque;
 
 #if 0 /* Debug */
@@ -571,6 +580,13 @@ void dof_gather_accumulate_resolve(int total_sample_count,
   }
   else if (out_weight < 0.01) {
     out_weight = 0.0;
+  }
+  /* Same thing for alpha channel. */
+  if (out_col.a > 0.99) {
+    out_col.a = 1.0;
+  }
+  else if (out_col.a < 0.01) {
+    out_col.a = 0.0;
   }
 }
 
