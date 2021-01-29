@@ -1455,8 +1455,6 @@ void AlembicProcedural::read_mesh(Scene *scene,
                                   Abc::chrono_t frame_time,
                                   Progress &progress)
 {
-  IPolyMesh polymesh(abc_object->iobject, Alembic::Abc::kWrapExisting);
-
   Mesh *mesh = nullptr;
 
   /* create a mesh node in the scene if not already done */
@@ -1482,13 +1480,18 @@ void AlembicProcedural::read_mesh(Scene *scene,
   }
 
   CachedData &cached_data = abc_object->get_cached_data();
-  IPolyMeshSchema schema = polymesh.getSchema();
 
+  /* Note: keep the construction of the IPolyMesh and IPolyMeshSchema close to where they are used
+   * or needed, it is an expensive operation. */
   if (!abc_object->has_data_loaded()) {
+    IPolyMesh polymesh(abc_object->iobject, Alembic::Abc::kWrapExisting);
+    IPolyMeshSchema schema = polymesh.getSchema();
     abc_object->load_all_data(this, schema, scale, progress);
   }
   else {
     if (abc_object->need_shader_update) {
+      IPolyMesh polymesh(abc_object->iobject, Alembic::Abc::kWrapExisting);
+      IPolyMeshSchema schema = polymesh.getSchema();
       abc_object->update_shader_attributes(schema.getArbGeomParams(), progress);
     }
 
@@ -1549,9 +1552,6 @@ void AlembicProcedural::read_subd(Scene *scene,
                                   Abc::chrono_t frame_time,
                                   Progress &progress)
 {
-  ISubD subd_mesh(abc_object->iobject, Alembic::Abc::kWrapExisting);
-  ISubDSchema schema = subd_mesh.getSchema();
-
   Mesh *mesh = nullptr;
 
   /* create a mesh node in the scene if not already done */
@@ -1579,11 +1579,17 @@ void AlembicProcedural::read_subd(Scene *scene,
     mesh = static_cast<Mesh *>(abc_object->get_object()->get_geometry());
   }
 
+  /* Note: keep the construction of the ISubD and ISubDSchema close to where they are used or
+   * needed, it is an expensive operation. */
   if (!abc_object->has_data_loaded()) {
+    ISubD subd_mesh(abc_object->iobject, Alembic::Abc::kWrapExisting);
+    ISubDSchema schema = subd_mesh.getSchema();
     abc_object->load_all_data(this, schema, scale, progress);
   }
   else {
     if (abc_object->need_shader_update) {
+      ISubD subd_mesh(abc_object->iobject, Alembic::Abc::kWrapExisting);
+      ISubDSchema schema = subd_mesh.getSchema();
       abc_object->update_shader_attributes(schema.getArbGeomParams(), progress);
     }
 
@@ -1677,7 +1683,6 @@ void AlembicProcedural::read_curves(Scene *scene,
                                     Abc::chrono_t frame_time,
                                     Progress &progress)
 {
-  ICurves curves(abc_object->iobject, Alembic::Abc::kWrapExisting);
   Hair *hair;
 
   /* create a hair node in the scene if not already done */
@@ -1702,10 +1707,12 @@ void AlembicProcedural::read_curves(Scene *scene,
     hair = static_cast<Hair *>(abc_object->get_object()->get_geometry());
   }
 
-  ICurvesSchema schema = curves.getSchema();
-
+  /* Note: keep the construction of the ICurves and ICurvesSchema close to where they are used or
+   * needed, it is an expensive operation. */
   if (!abc_object->has_data_loaded() || default_radius_is_modified() ||
       abc_object->radius_scale_is_modified()) {
+    ICurves curves(abc_object->iobject, Alembic::Abc::kWrapExisting);
+    ICurvesSchema schema = curves.getSchema();
     abc_object->load_all_data(this, schema, scale, progress, default_radius);
   }
   else {
