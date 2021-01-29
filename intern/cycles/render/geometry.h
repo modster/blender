@@ -259,13 +259,9 @@ class GeometryManager {
  private:
   static void update_attribute_element_offset(Geometry *geom,
                                               device_vector<float> &attr_float,
-                                              size_t &attr_float_offset,
                                               device_vector<float2> &attr_float2,
-                                              size_t &attr_float2_offset,
                                               device_vector<float4> &attr_float3,
-                                              size_t &attr_float3_offset,
                                               device_vector<uchar4> &attr_uchar4,
-                                              size_t &attr_uchar4_offset,
                                               Attribute *mattr,
                                               AttributePrimitive prim,
                                               TypeDesc &type,

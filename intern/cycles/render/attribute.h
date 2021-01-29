@@ -54,6 +54,10 @@ class Attribute {
   AttributeElement element;
   uint flags; /* enum AttributeFlag */
 
+  /* offset into the DeviceScene array where the data will be copied. Only valid during device
+   * updates. */
+  size_t device_offset = 0;
+
   bool modified;
 
   Attribute(ustring name,
