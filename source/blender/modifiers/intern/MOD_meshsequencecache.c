@@ -174,8 +174,6 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
     return result;
   }
 
-  fprintf(stderr, "évalue modifier\n");
-
   /* If this invocation is for the ORCO mesh, and the mesh in Alembic hasn't changed topology, we
    * must return the mesh as-is instead of deforming it. */
   if (ctx->flag & MOD_APPLY_ORCO &&
