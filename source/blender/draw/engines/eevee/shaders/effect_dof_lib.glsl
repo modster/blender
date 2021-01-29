@@ -138,7 +138,7 @@ float dof_load_gather_coc(sampler2D gather_input_coc_buffer, vec2 uv, float lod)
 /* Distribute weights between near/slightfocus/far fields (slide 117). */
 const float layer_threshold = 4.0;
 /* Make sure it overlaps. */
-const float layer_offset_fg = 0.5;
+const float layer_offset_fg = 0.5 + 1.0;
 /* Extra offset for convolution layers to avoid light leaking from background. */
 const float layer_offset = 0.5 + 0.5;
 
