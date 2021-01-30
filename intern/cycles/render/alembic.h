@@ -263,6 +263,13 @@ class AlembicObject : public Node {
 
   bool has_data_loaded() const;
 
+  enum AbcSchemaType {
+    INVALID,
+    POLY_MESH,
+    SUBD,
+    CURVES,
+  };
+
   bool need_shader_update = true;
 
   MatrixSampleMap xform_samples;
@@ -282,6 +289,9 @@ class AlembicObject : public Node {
   Object *object = nullptr;
 
   bool data_loaded = false;
+
+  /* Set on construction. */
+  AbcSchemaType schema_type;
 
   CachedData cached_data;
 

@@ -1385,13 +1385,13 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
       continue;
     }
 
-    if (IPolyMesh::matches(object->iobject.getHeader())) {
+    if (object->schema_type == AlembicObject::POLY_MESH) {
       read_mesh(scene, object, frame_time, progress);
     }
-    else if (ICurves::matches(object->iobject.getHeader())) {
+    else if (object->schema_type == AlembicObject::CURVES) {
       read_curves(scene, object, frame_time, progress);
     }
-    else if (ISubD::matches(object->iobject.getHeader())) {
+    else if (object->schema_type == AlembicObject::SUBD) {
       read_subd(scene, object, frame_time, progress);
     }
 
@@ -1813,6 +1813,7 @@ void AlembicProcedural::walk_hierarchy(
     if (iter != object_map.end()) {
       AlembicObject *abc_object = iter->second;
       abc_object->iobject = subd;
+      abc_object->schema_type = AlembicObject::SUBD;
 
       if (xform_samples) {
         abc_object->xform_samples = *xform_samples;
@@ -1830,6 +1831,7 @@ void AlembicProcedural::walk_hierarchy(
     if (iter != object_map.end()) {
       AlembicObject *abc_object = iter->second;
       abc_object->iobject = mesh;
+      abc_object->schema_type = AlembicObject::POLY_MESH;
 
       if (xform_samples) {
         abc_object->xform_samples = *xform_samples;
@@ -1847,6 +1849,7 @@ void AlembicProcedural::walk_hierarchy(
     if (iter != object_map.end()) {
       AlembicObject *abc_object = iter->second;
       abc_object->iobject = curves;
+      abc_object->schema_type = AlembicObject::CURVES;
 
       if (xform_samples) {
         abc_object->xform_samples = *xform_samples;
