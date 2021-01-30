@@ -24,6 +24,8 @@
 
 #include "wm_xr.h"
 
+enum wmXrActionType;
+enum wmXrOpFlag;
 struct wmXrActionSet;
 struct GHash;
 
@@ -127,10 +129,9 @@ typedef struct wmXrDrawData {
   float eye_position_ofs[3]; /* Local/view space. */
 } wmXrDrawData;
 
-/** Same as GHOST_XrActionInfo but with non-const strings. */
 typedef struct wmXrAction {
   char *name;
-  GHOST_XrActionType type;
+  enum wmXrActionType type;
   unsigned int count_subaction_paths;
   char **subaction_paths;
   /** States for each subaction path. */
@@ -147,7 +148,7 @@ typedef struct wmXrAction {
   /** Operator to be called on XR events. */
   struct wmOperatorType *ot;
   IDProperty *op_properties;
-  char op_flag; /* wmXrOpFlag */
+  enum wmXrOpFlag op_flag;
 } wmXrAction;
 
 typedef struct wmXrActionSet {

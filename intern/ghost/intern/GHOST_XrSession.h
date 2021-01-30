@@ -54,7 +54,7 @@ class GHOST_XrSession {
 
   /** Action functions to be called pre-session start.
    * Note: The "destroy" functions can also be called post-session start. */
-  bool createActionSet(const GHOST_XrActionSetInfo *info);
+  bool createActionSet(const char *action_set_name);
   void destroyActionSet(const char *action_set_name, bool remove_reference = true);
   bool createActions(const char *action_set_name, uint32_t count, const GHOST_XrActionInfo *infos);
   void destroyActions(const char *action_set_name,
@@ -78,9 +78,7 @@ class GHOST_XrSession {
   bool syncActions(
       const char *action_set_name = nullptr); /* If action_set_name is nullptr, all attached
                                                * action sets will be synced. */
-  bool getActionStates(const char *action_set_name,
-                       uint32_t count,
-                       GHOST_XrActionInfo *const *r_infos);
+  bool getActionStates(const char *action_set_name, uint32_t count, GHOST_XrActionInfo *r_infos);
   bool applyHapticAction(const char *action_set_name,
                          const char *action_name,
                          uint32_t count,

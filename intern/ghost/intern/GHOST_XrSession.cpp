@@ -297,10 +297,9 @@ GHOST_XrSession::LifeExpectancy GHOST_XrSession::handleStateChangeEvent(
   assert(m_oxr->session == XR_NULL_HANDLE || m_oxr->session == lifecycle.session);
 
   switch (lifecycle.state) {
-    case XR_SESSION_STATE_READY: {
+    case XR_SESSION_STATE_READY:
       beginSession();
       break;
-    }
     case XR_SESSION_STATE_STOPPING:
       endSession();
       break;
@@ -635,28 +634,28 @@ static OpenXRActionProfile *find_action_profile(OpenXRAction *action,
   return &profile->second;
 }
 
-bool GHOST_XrSession::createActionSet(const GHOST_XrActionSetInfo *info)
+bool GHOST_XrSession::createActionSet(const char *action_set_name)
 {
   XrActionSetCreateInfo action_set_info{XR_TYPE_ACTION_SET_CREATE_INFO};
-  strcpy(action_set_info.actionSetName, info->name);
+  strcpy(action_set_info.actionSetName, action_set_name);
   strcpy(action_set_info.localizedActionSetName,
-         info->name); /* Just use same name for localized. This can be changed in the future if
-                         necessary. */
-  action_set_info.priority = info->priority;
+         action_set_name); /* Just use same name for localized. This can be changed in the future
+                              if necessary. */
+  action_set_info.priority = 0; /* Use same (default) priority for all action sets. */
 
   OpenXRActionSet action_set;
   CHECK_XR(xrCreateActionSet(m_context->getInstance(), &action_set_info, &action_set.set),
-           (m_error_msg = std::string("Failed to create action set \"") + info->name +
+           (m_error_msg = std::string("Failed to create action set \"") + action_set_name +
                           "\". Name must not contain upper case letters or special characters "
                           "other than '-', '_', or '.'.")
                .c_str());
 
   std::map<std::string, OpenXRActionSet> &action_sets = m_oxr->action_sets;
-  if (action_sets.find(info->name) == action_sets.end()) {
-    action_sets.insert({info->name, std::move(action_set)});
+  if (action_sets.find(action_set_name) == action_sets.end()) {
+    action_sets.insert({action_set_name, std::move(action_set)});
   }
   else {
-    action_sets[info->name] = std::move(action_set);
+    action_sets[action_set_name] = std::move(action_set);
   }
 
   return true;
@@ -717,29 +716,21 @@ bool GHOST_XrSession::createActions(const char *action_set_name,
                           necessary. */
 
     switch (info.type) {
-      case GHOST_kXrActionTypeBooleanInput: {
+      case GHOST_kXrActionTypeBooleanInput:
         action_info.actionType = XR_ACTION_TYPE_BOOLEAN_INPUT;
         break;
-      }
-      case GHOST_kXrActionTypeFloatInput: {
+      case GHOST_kXrActionTypeFloatInput:
         action_info.actionType = XR_ACTION_TYPE_FLOAT_INPUT;
         break;
-      }
-      case GHOST_kXrActionTypeVector2fInput: {
+      case GHOST_kXrActionTypeVector2fInput:
         action_info.actionType = XR_ACTION_TYPE_VECTOR2F_INPUT;
         break;
-      }
-      case GHOST_kXrActionTypePoseInput: {
+      case GHOST_kXrActionTypePoseInput:
         action_info.actionType = XR_ACTION_TYPE_POSE_INPUT;
         break;
-      }
-      case GHOST_kXrActionTypeVibrationOutput: {
+      case GHOST_kXrActionTypeVibrationOutput:
         action_info.actionType = XR_ACTION_TYPE_VIBRATION_OUTPUT;
         break;
-      }
-      default: {
-        continue;
-      }
     }
     action_info.countSubactionPaths = info.count_subaction_paths;
     action_info.subactionPaths = subaction_paths.data();
@@ -1182,7 +1173,7 @@ bool GHOST_XrSession::syncActions(const char *action_set_name)
 
 bool GHOST_XrSession::getActionStates(const char *action_set_name,
                                       uint32_t count,
-                                      GHOST_XrActionInfo *const *infos)
+                                      GHOST_XrActionInfo *r_infos)
 {
   OpenXRActionSet *action_set = find_action_set(m_oxr.get(), action_set_name);
   if (action_set == nullptr) {
@@ -1193,9 +1184,9 @@ bool GHOST_XrSession::getActionStates(const char *action_set_name,
   XrSession &session = m_oxr->session;
 
   for (uint32_t action_idx = 0; action_idx < count; ++action_idx) {
-    GHOST_XrActionInfo *info = infos[action_idx];
+    GHOST_XrActionInfo &info = r_infos[action_idx];
 
-    OpenXRAction *action = find_action(action_set, info->name);
+    OpenXRAction *action = find_action(action_set, info.name);
     if (action == nullptr) {
       continue;
     }
@@ -1203,22 +1194,21 @@ bool GHOST_XrSession::getActionStates(const char *action_set_name,
     XrActionStateGetInfo state_info{XR_TYPE_ACTION_STATE_GET_INFO};
     state_info.action = action->action;
 
-    for (uint32_t subaction_idx = 0; subaction_idx < info->count_subaction_paths;
-         ++subaction_idx) {
-      const char *subaction_path = info->subaction_paths[subaction_idx];
+    for (uint32_t subaction_idx = 0; subaction_idx < info.count_subaction_paths; ++subaction_idx) {
+      const char *subaction_path = info.subaction_paths[subaction_idx];
       CHECK_XR(xrStringToPath(instance, subaction_path, &state_info.subactionPath),
                (m_error_msg = std::string("Failed to get user path \"") + subaction_path + "\".")
                    .c_str());
 
-      switch (info->type) {
+      switch (info.type) {
         case GHOST_kXrActionTypeBooleanInput: {
           XrActionStateBoolean state{XR_TYPE_ACTION_STATE_BOOLEAN};
           CHECK_XR(xrGetActionStateBoolean(session, &state_info, &state),
                    (m_error_msg = std::string("Failed to get state for boolean action \"") +
-                                  info->name + "\".")
+                                  info.name + "\".")
                        .c_str());
           if (state.isActive) {
-            ((bool *)info->states)[subaction_idx] = state.currentState;
+            ((bool *)info.states)[subaction_idx] = state.currentState;
           }
           break;
         }
@@ -1226,10 +1216,10 @@ bool GHOST_XrSession::getActionStates(const char *action_set_name,
           XrActionStateFloat state{XR_TYPE_ACTION_STATE_FLOAT};
           CHECK_XR(xrGetActionStateFloat(session, &state_info, &state),
                    (m_error_msg = std::string("Failed to get state for float action \"") +
-                                  info->name + "\".")
+                                  info.name + "\".")
                        .c_str());
           if (state.isActive) {
-            ((float *)info->states)[subaction_idx] = state.currentState;
+            ((float *)info.states)[subaction_idx] = state.currentState;
           }
           break;
         }
@@ -1237,11 +1227,11 @@ bool GHOST_XrSession::getActionStates(const char *action_set_name,
           XrActionStateVector2f state{XR_TYPE_ACTION_STATE_VECTOR2F};
           CHECK_XR(xrGetActionStateVector2f(session, &state_info, &state),
                    (m_error_msg = std::string("Failed to get state for vector2f action \"") +
-                                  info->name + "\".")
+                                  info.name + "\".")
                        .c_str());
           if (state.isActive) {
             memcpy(
-                ((float(*)[2])info->states)[subaction_idx], &state.currentState, sizeof(float[2]));
+                ((float(*)[2])info.states)[subaction_idx], &state.currentState, sizeof(float[2]));
           }
           break;
         }
@@ -1249,7 +1239,7 @@ bool GHOST_XrSession::getActionStates(const char *action_set_name,
           XrActionStatePose state{XR_TYPE_ACTION_STATE_POSE};
           CHECK_XR(
               xrGetActionStatePose(session, &state_info, &state),
-              (m_error_msg = std::string("Failed to get state for action \"") + info->name + "\".")
+              (m_error_msg = std::string("Failed to get state for action \"") + info.name + "\".")
                   .c_str());
           if (state.isActive) {
             XrSpace *space = find_action_space(action, subaction_path);
@@ -1260,15 +1250,15 @@ bool GHOST_XrSession::getActionStates(const char *action_set_name,
                                      m_draw_info->frame_state.predictedDisplayTime,
                                      &space_location),
                        (m_error_msg = std::string("Failed to query pose space \"") +
-                                      subaction_path + "\" for action \"" + info->name + "\".")
+                                      subaction_path + "\" for action \"" + info.name + "\".")
                            .c_str());
               copy_openxr_pose_to_ghost_pose(space_location.pose,
-                                             ((GHOST_XrPose *)info->states)[subaction_idx]);
+                                             ((GHOST_XrPose *)info.states)[subaction_idx]);
             }
           }
           break;
         }
-        default: {
+        case GHOST_kXrActionTypeVibrationOutput: {
           break;
         }
       }

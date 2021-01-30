@@ -969,12 +969,11 @@ int GHOST_XrSessionNeedsUpsideDownDrawing(const GHOST_XrContextHandle xr_context
   return 0; /* Only reached if exception is thrown. */
 }
 
-int GHOST_XrCreateActionSet(GHOST_XrContextHandle xr_contexthandle,
-                            const GHOST_XrActionSetInfo *info)
+int GHOST_XrCreateActionSet(GHOST_XrContextHandle xr_contexthandle, const char *action_set_name)
 {
   GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
   GHOST_XrSession *xr_session = xr_context->getSession();
-  GHOST_XR_CAPI_CALL_RET(xr_session->createActionSet(info), xr_context);
+  GHOST_XR_CAPI_CALL_RET(xr_session->createActionSet(action_set_name), xr_context);
   return 0;
 }
 
@@ -1069,7 +1068,7 @@ int GHOST_XrSyncActions(GHOST_XrContextHandle xr_contexthandle, const char *acti
 int GHOST_XrGetActionStates(GHOST_XrContextHandle xr_contexthandle,
                             const char *action_set_name,
                             GHOST_TUns32 count,
-                            GHOST_XrActionInfo *const *r_infos)
+                            GHOST_XrActionInfo *r_infos)
 {
   GHOST_IXrContext *xr_context = (GHOST_IXrContext *)xr_contexthandle;
   GHOST_XrSession *xr_session = xr_context->getSession();

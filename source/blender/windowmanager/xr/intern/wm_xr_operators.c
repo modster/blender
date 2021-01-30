@@ -248,29 +248,22 @@ static void wm_xr_select_op_apply(void *elem,
       case SEL_OP_SUB:
       case SEL_OP_XOR: {
         switch (select_elem) {
-          case XR_SEL_BASE: {
+          case XR_SEL_BASE:
             ED_object_base_select((Base *)elem, BA_DESELECT);
             *r_changed = true;
             break;
-          }
-          case XR_SEL_VERTEX: {
+          case XR_SEL_VERTEX:
             BM_vert_select_set(bm, (BMVert *)elem, false);
             *r_changed = true;
             break;
-          }
-          case XR_SEL_EDGE: {
+          case XR_SEL_EDGE:
             BM_edge_select_set(bm, (BMEdge *)elem, false);
             *r_changed = true;
             break;
-          }
-          case XR_SEL_FACE: {
+          case XR_SEL_FACE:
             BM_face_select_set(bm, (BMFace *)elem, false);
             *r_changed = true;
             break;
-          }
-          default: {
-            break;
-          }
         }
         break;
       }
@@ -285,29 +278,22 @@ static void wm_xr_select_op_apply(void *elem,
       case SEL_OP_ADD:
       case SEL_OP_XOR: {
         switch (select_elem) {
-          case XR_SEL_BASE: {
+          case XR_SEL_BASE:
             ED_object_base_select((Base *)elem, BA_SELECT);
             *r_changed = true;
             break;
-          }
-          case XR_SEL_VERTEX: {
+          case XR_SEL_VERTEX:
             BM_vert_select_set(bm, (BMVert *)elem, true);
             *r_changed = true;
             break;
-          }
-          case XR_SEL_EDGE: {
+          case XR_SEL_EDGE:
             BM_edge_select_set(bm, (BMEdge *)elem, true);
             *r_changed = true;
             break;
-          }
-          case XR_SEL_FACE: {
+          case XR_SEL_FACE:
             BM_face_select_set(bm, (BMFace *)elem, true);
             *r_changed = true;
             break;
-          }
-          default: {
-            break;
-          }
         }
       }
       default: {

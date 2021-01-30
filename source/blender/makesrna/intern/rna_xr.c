@@ -391,15 +391,11 @@ static void rna_XrSessionState_reset_to_base_pose(bContext *C)
 #  endif
 }
 
-static bool rna_XrSessionState_action_set_create(bContext *C, const char *name)
+static bool rna_XrSessionState_action_set_create(bContext *C, const char *action_set_name)
 {
 #  ifdef WITH_XR_OPENXR
   wmWindowManager *wm = CTX_wm_manager(C);
-  GHOST_XrActionSetInfo info = {
-      .name = name,
-  };
-
-  return WM_xr_action_set_create(&wm->xr, &info);
+  return WM_xr_action_set_create(&wm->xr, action_set_name);
 #  else
   UNUSED_VARS(C, name);
   return false;
@@ -408,7 +404,7 @@ static bool rna_XrSessionState_action_set_create(bContext *C, const char *name)
 
 static bool rna_XrSessionState_action_create(bContext *C,
                                              const char *action_set_name,
-                                             const char *name,
+                                             const char *action_name,
                                              int type,
                                              const char *user_path0,
                                              const char *user_path1,
@@ -418,54 +414,58 @@ static bool rna_XrSessionState_action_create(bContext *C,
 {
 #  ifdef WITH_XR_OPENXR
   wmWindowManager *wm = CTX_wm_manager(C);
-  GHOST_XrActionInfo info = {
-      .name = name,
-      .type = type,
-      .threshold = threshold,
-  };
-
-  if (op[0] &&
-      ((type == GHOST_kXrActionTypeFloatInput) || type == GHOST_kXrActionTypeVector2fInput)) {
-    char idname[OP_MAX_TYPENAME];
-    WM_operator_bl_idname(idname, op);
-    wmOperatorType *ot = WM_operatortype_find(idname, true);
-    if (ot) {
-      info.ot = ot;
-      /* Get properties from add-on key map for XR session. */
-      wmKeyMap *km = WM_keymap_list_find(
-          &wm->addonconf->keymaps, "XR Session", SPACE_EMPTY, RGN_TYPE_XR);
-      if (km) {
-        wmKeyMapItem *kmi = WM_keymap_item_find_xr(km, action_set_name, name);
-        if (kmi && STREQ(kmi->idname, idname)) {
-          info.op_properties = kmi->properties;
-        }
-      }
-      info.op_flag = op_flag;
-    }
-  }
-
+  unsigned int count_subaction_paths = 0;
   const char *subaction_paths[2];
+
   if (user_path0 && !STREQ(user_path0, "")) {
     subaction_paths[0] = user_path0;
-    ++info.count_subaction_paths;
+    ++count_subaction_paths;
 
     if (user_path1 && !STREQ(user_path1, "")) {
       subaction_paths[1] = user_path1;
-      ++info.count_subaction_paths;
+      ++count_subaction_paths;
     }
   }
   else {
     if (user_path1 && !STREQ(user_path1, "")) {
       subaction_paths[0] = user_path1;
-      ++info.count_subaction_paths;
+      ++count_subaction_paths;
     }
     else {
       return false;
     }
   }
-  info.subaction_paths = subaction_paths;
 
-  return WM_xr_actions_create(&wm->xr, action_set_name, 1, &info);
+  wmOperatorType *ot = NULL;
+  IDProperty *op_properties = NULL;
+
+  if (op[0] && (type == XR_FLOAT_INPUT || type == XR_VECTOR2F_INPUT)) {
+    char idname[OP_MAX_TYPENAME];
+    WM_operator_bl_idname(idname, op);
+    ot = WM_operatortype_find(idname, true);
+    if (ot) {
+      /* Get properties from add-on key map for XR session. */
+      wmKeyMap *km = WM_keymap_list_find(
+          &wm->addonconf->keymaps, "XR Session", SPACE_EMPTY, RGN_TYPE_XR);
+      if (km) {
+        wmKeyMapItem *kmi = WM_keymap_item_find_xr(km, action_set_name, action_name);
+        if (kmi && STREQ(kmi->idname, idname)) {
+          op_properties = kmi->properties;
+        }
+      }
+    }
+  }
+
+  return WM_xr_action_create(&wm->xr,
+                             action_set_name,
+                             action_name,
+                             type,
+                             count_subaction_paths,
+                             subaction_paths,
+                             threshold,
+                             ot,
+                             op_properties,
+                             op_flag);
 #  else
   UNUSED_VARS(C, action_set_name, name, type, user_path0, user_path1, threshold, op, op_flag);
   return false;
@@ -482,39 +482,36 @@ bool rna_XrSessionState_action_space_create(bContext *C,
 {
 #  ifdef WITH_XR_OPENXR
   wmWindowManager *wm = CTX_wm_manager(C);
-  GHOST_XrActionSpaceInfo info = {
-      .action_name = action_name,
-  };
-
+  unsigned int count_subaction_paths = 0;
   const char *subaction_paths[2];
+
   if (user_path0 && !STREQ(user_path0, "")) {
     subaction_paths[0] = user_path0;
-    ++info.count_subaction_paths;
+    ++count_subaction_paths;
 
     if (user_path1 && !STREQ(user_path1, "")) {
       subaction_paths[1] = user_path1;
-      ++info.count_subaction_paths;
+      ++count_subaction_paths;
     }
   }
   else {
     if (user_path1 && !STREQ(user_path1, "")) {
       subaction_paths[0] = user_path1;
-      ++info.count_subaction_paths;
+      ++count_subaction_paths;
     }
     else {
       return false;
     }
   }
-  info.subaction_paths = subaction_paths;
 
   GHOST_XrPose poses[2];
   eul_to_quat(poses[0].orientation_quat, rotation);
   normalize_qt(poses[0].orientation_quat);
   copy_v3_v3(poses[0].position, location);
   memcpy(&poses[1], &poses[0], sizeof(GHOST_XrPose));
-  info.poses = poses;
 
-  return WM_xr_action_spaces_create(&wm->xr, action_set_name, 1, &info);
+  return WM_xr_action_space_create(
+      &wm->xr, action_set_name, action_name, count_subaction_paths, subaction_paths, poses);
 #  else
   UNUSED_VARS(C, action_set_name, action_name, user_path0, user_path1, location, rotation);
   return false;
@@ -530,38 +527,30 @@ bool rna_XrSessionState_action_binding_create(bContext *C,
 {
 #  ifdef WITH_XR_OPENXR
   wmWindowManager *wm = CTX_wm_manager(C);
-  GHOST_XrActionBindingsInfo info = {
-      .interaction_profile_path = profile,
-      .count_bindings = 1,
-  };
-  GHOST_XrActionBinding binding = {
-      .action_name = action_name,
-      .count_interaction_paths = 0,
-  };
-
+  unsigned int count_interaction_paths = 0;
   const char *interaction_paths[2];
+
   if (interaction_path0 && !STREQ(interaction_path0, "")) {
     interaction_paths[0] = interaction_path0;
-    ++binding.count_interaction_paths;
+    ++count_interaction_paths;
 
     if (interaction_path1 && !STREQ(interaction_path1, "")) {
       interaction_paths[1] = interaction_path1;
-      ++binding.count_interaction_paths;
+      ++count_interaction_paths;
     }
   }
   else {
     if (interaction_path1 && !STREQ(interaction_path1, "")) {
       interaction_paths[0] = interaction_path1;
-      ++binding.count_interaction_paths;
+      ++count_interaction_paths;
     }
     else {
       return false;
     }
   }
-  binding.interaction_paths = interaction_paths;
-  info.bindings = &binding;
 
-  return WM_xr_action_bindings_create(&wm->xr, action_set_name, 1, &info);
+  return WM_xr_action_binding_create(
+      &wm->xr, action_set_name, profile, action_name, count_interaction_paths, interaction_paths);
 #  else
   UNUSED_VARS(C, action_set_name, profile, action_name, interaction_path0, interaction_path1);
   return false;
@@ -601,15 +590,8 @@ void rna_XrSessionState_action_state_get(bContext *C,
   *r_state = 0.0f;
 #  ifdef WITH_XR_OPENXR
   wmWindowManager *wm = CTX_wm_manager(C);
-  GHOST_XrActionInfo info = {
-      .name = action_name,
-      .type = GHOST_kXrActionTypeFloatInput,
-      .count_subaction_paths = 1,
-      .subaction_paths = &user_path,
-      .states = r_state,
-  };
-
-  if (!WM_xr_action_states_get(&wm->xr, action_set_name, 1, &info)) {
+  if (!WM_xr_action_state_get(
+          &wm->xr, action_set_name, action_name, XR_FLOAT_INPUT, user_path, r_state)) {
     *r_state = 0.0f;
   }
 #  else
@@ -624,23 +606,17 @@ void rna_XrSessionState_pose_action_state_get(bContext *C,
                                               float r_state[7])
 {
 #  ifdef WITH_XR_OPENXR
-  GHOST_XrPose pose = {0};
   wmWindowManager *wm = CTX_wm_manager(C);
-  GHOST_XrActionInfo info = {
-      .name = action_name,
-      .type = GHOST_kXrActionTypePoseInput,
-      .count_subaction_paths = 1,
-      .subaction_paths = &user_path,
-      .states = &pose,
-  };
-
-  if (!WM_xr_action_states_get(&wm->xr, action_set_name, 1, &info)) {
+  if (!WM_xr_action_state_get(&wm->xr,
+                              action_set_name,
+                              action_name,
+                              XR_POSE_INPUT,
+                              user_path,
+                              (GHOST_XrPose *)r_state)) {
     zero_v3(r_state);
     unit_qt(&r_state[3]);
     return;
   }
-
-  memcpy(r_state, &pose, sizeof(float[7]));
 #  else
   UNUSED_VARS(C, action_set_name, action_name, user_path);
   zero_v3(r_state);
@@ -1004,22 +980,12 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   PropertyRNA *parm, *prop;
 
   static const EnumPropertyItem action_types[] = {
-      {2, "BUTTON", 0, "Button", "Button action"},
-      {3, "AXIS", 0, "Axis", "2D axis action"},
-      {4, "POSE", 0, "Pose", "3D pose action"},
-      {100, "HAPTIC", 0, "Haptic", "Haptic output action"},
+      {XR_FLOAT_INPUT, "BUTTON", 0, "Button", "Button action"},
+      {XR_VECTOR2F_INPUT, "AXIS", 0, "Axis", "2D axis action"},
+      {XR_POSE_INPUT, "POSE", 0, "Pose", "3D pose action"},
+      {XR_VIBRATION_OUTPUT, "HAPTIC", 0, "Haptic", "Haptic output action"},
       {0, NULL, 0, NULL, NULL},
   };
-#  ifdef WITH_XR_OPENXR
-  BLI_STATIC_ASSERT(GHOST_kXrActionTypeFloatInput == 2,
-                    "Float action type does not match GHOST_XrActionType value");
-  BLI_STATIC_ASSERT(GHOST_kXrActionTypeVector2fInput == 3,
-                    "Vector2f action type does not match GHOST_XrActionType value");
-  BLI_STATIC_ASSERT(GHOST_kXrActionTypePoseInput == 4,
-                    "Pose action type does not match GHOST_XrActionType value");
-  BLI_STATIC_ASSERT(GHOST_kXrActionTypeVibrationOutput == 100,
-                    "Haptic action type does not match GHOST_XrActionType value");
-#  endif
 
   static const EnumPropertyItem op_flags[] = {
       {XR_OP_PRESS,
@@ -1060,7 +1026,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func,
-                        "name",
+                        "action_set_name",
                         NULL,
                         64,
                         "Action Set",
@@ -1078,7 +1044,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   parm = RNA_def_string(func, "action_set_name", NULL, 64, "Action Set", "Action set name");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_string(func,
-                        "name",
+                        "action_name",
                         NULL,
                         64,
                         "Action",

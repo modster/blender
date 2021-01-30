@@ -1069,7 +1069,7 @@ GHOST_TSuccess GHOST_XrEventsHandle(GHOST_XrContextHandle xr_context);
 /**
  * Create an OpenXR action set for input/output.
  */
-int GHOST_XrCreateActionSet(GHOST_XrContextHandle xr_context, const GHOST_XrActionSetInfo *info);
+int GHOST_XrCreateActionSet(GHOST_XrContextHandle xr_context, const char *action_set_name);
 
 /**
  * Destroy a previously created OpenXR action set.
@@ -1139,15 +1139,11 @@ int GHOST_XrSyncActions(GHOST_XrContextHandle xr_context, const char *action_set
 
 /**
  * Get the states of OpenXR actions.
- *
- * \param r_infos: An array of action info pointers (NOT an array of action infos) that will
- * receive state data. The reason r_infos is an array of pointers is to allow writing to
- * previously created actions which may not be stored in contiguous memory.
  */
 int GHOST_XrGetActionStates(GHOST_XrContextHandle xr_context,
                             const char *action_set_name,
                             GHOST_TUns32 count,
-                            GHOST_XrActionInfo *const *r_infos);
+                            GHOST_XrActionInfo *r_infos);
 
 /**
  * Apply an OpenXR haptic output action.

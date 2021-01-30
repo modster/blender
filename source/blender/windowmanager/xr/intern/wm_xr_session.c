@@ -625,7 +625,7 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
         bool press_start;
 
         switch (action->type) {
-          case GHOST_kXrActionTypeBooleanInput: {
+          case XR_BOOLEAN_INPUT: {
             const bool *state = &((bool *)action->states)[i];
             bool *state_prev = &((bool *)action->states_prev)[i];
             if (*state) {
@@ -660,7 +660,7 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
             *state_prev = *state;
             break;
           }
-          case GHOST_kXrActionTypeFloatInput: {
+          case XR_FLOAT_INPUT: {
             const float *state = &((float *)action->states)[i];
             float *state_prev = &((float *)action->states_prev)[i];
             if (fabsf(*state) > action->threshold) {
@@ -695,7 +695,7 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
             *state_prev = *state;
             break;
           }
-          case GHOST_kXrActionTypeVector2fInput: {
+          case XR_VECTOR2F_INPUT: {
             const float(*state)[2] = &((float(*)[2])action->states)[i];
             float(*state_prev)[2] = &((float(*)[2])action->states_prev)[i];
             if (len_v2(*state) > action->threshold) {
@@ -730,9 +730,10 @@ static void wm_xr_session_events_dispatch(const XrSessionSettings *settings,
             copy_v2_v2(*state_prev, *state);
             break;
           }
-          default: {
+          case XR_POSE_INPUT:
+          case XR_VIBRATION_OUTPUT:
+            BLI_assert(false);
             break;
-          }
         }
 
         if ((val != KM_NOTHING) && (!active_modal_action || ((action == active_modal_action) &&
@@ -768,25 +769,31 @@ static void wm_xr_session_action_set_update(const XrSessionSettings *settings,
     return;
   }
 
-  /* Create an aligned list of action infos. */
-  GHOST_XrActionInfo **infos = MEM_callocN(sizeof(GHOST_XrActionInfo *) * count, __func__);
+  {
+    GHOST_XrActionInfo *infos = MEM_calloc_arrayN(count, sizeof(GHOST_XrActionInfo), __func__);
 
-  GHashIterator *ghi = BLI_ghashIterator_new(actions);
-  unsigned int i = 0;
-  GHASH_ITER (*ghi, actions) {
-    /* Cast wmXrAction to GHOST_XrActionInfo. */
-    BLI_STATIC_ASSERT(sizeof(wmXrAction) == sizeof(GHOST_XrActionInfo),
-                      "wmXrAction and GHOST_XrActionInfo sizes do not match.");
-    infos[i] = BLI_ghashIterator_getValue(ghi);
-    ++i;
+    GHashIterator *ghi = BLI_ghashIterator_new(actions);
+    GHOST_XrActionInfo *info = infos;
+    GHASH_ITER (*ghi, actions) {
+      const wmXrAction *action = BLI_ghashIterator_getValue(ghi);
+      info->name = action->name;
+      info->type = action->type;
+      info->count_subaction_paths = action->count_subaction_paths;
+      info->subaction_paths = action->subaction_paths;
+      info->states = action->states;
+      ++info;
+    }
+    BLI_ghashIterator_free(ghi);
+
+    int ret = GHOST_XrGetActionStates(xr_context, action_set->name, count, infos);
+    MEM_freeN(infos);
+    if (!ret) {
+      return;
+    }
   }
-  BLI_ghashIterator_free(ghi);
 
-  int ret = GHOST_XrGetActionStates(xr_context, action_set->name, count, infos);
-  MEM_freeN(infos);
-
-  if (ret &&
-      (action_set == state->active_action_set)) { /* Only dispatch events for active action set. */
+  /* Only dispatch events for active action set. */
+  if (action_set == state->active_action_set) {
     if (action_set->controller_pose_action) {
       wm_xr_session_controller_mats_update(
           settings, action_set->controller_pose_action, C, state, win);

@@ -649,6 +649,15 @@ typedef struct wmNDOFMotionData {
 } wmNDOFMotionData;
 #endif /* WITH_INPUT_NDOF */
 
+/** XR action type. Enum values match those in GHOST_XrActionType enum for consistency. */
+typedef enum wmXrActionType {
+  XR_BOOLEAN_INPUT = 1,
+  XR_FLOAT_INPUT = 2,
+  XR_VECTOR2F_INPUT = 3,
+  XR_POSE_INPUT = 4,
+  XR_VIBRATION_OUTPUT = 100,
+} wmXrActionType;
+
 typedef enum wmXrOpFlag {
   XR_OP_PRESS = 0,
   XR_OP_RELEASE = 1,
@@ -660,8 +669,8 @@ typedef struct wmXrActionData {
   char action_set[64];
   /** Action name. */
   char action[64];
-  /** Type (GHOST_XrActionType). */
-  char type;
+  /** Type. */
+  wmXrActionType type;
   /** State. Set appropriately based on type. */
   float state[2];
 

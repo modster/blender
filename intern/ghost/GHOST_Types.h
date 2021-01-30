@@ -694,12 +694,6 @@ typedef struct GHOST_XrError {
   void *customdata;
 } GHOST_XrError;
 
-typedef struct GHOST_XrActionSetInfo {
-  const char *name;
-  /** Larger values take precedence over smaller values. */
-  GHOST_TUns32 priority;
-} GHOST_XrActionSetInfo;
-
 /** XR action type. Enum values match those in OpenXR's
  * XrActionType enum for consistency. */
 typedef enum GHOST_XrActionType {
@@ -717,19 +711,6 @@ typedef struct GHOST_XrActionInfo {
   const char **subaction_paths;
   /** States for each subaction path. */
   void *states;
-  /** Previous states, stored to determine XR events. */
-  void *states_prev;
-
-  /** Input threshold for float actions (only used by wm). */
-  float threshold;
-
-  /** The currently active subaction path (if any) for modal actions (only used by wm). */
-  char **active_modal_path;
-
-  /** Operator to be called on XR events (only used by wm). */
-  void *ot;
-  void *op_properties;
-  char op_flag;
 } GHOST_XrActionInfo;
 
 typedef struct GHOST_XrActionSpaceInfo {
@@ -737,7 +718,7 @@ typedef struct GHOST_XrActionSpaceInfo {
   GHOST_TUns32 count_subaction_paths;
   const char **subaction_paths;
   /** Poses for each subaction path. */
-  GHOST_XrPose *poses;
+  const GHOST_XrPose *poses;
 } GHOST_XrActionSpaceInfo;
 
 typedef struct GHOST_XrActionBinding {

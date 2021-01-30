@@ -4948,21 +4948,19 @@ void wm_event_add_xrevent(const char *action_set_name,
   data->type = action->type;
 
   switch (action->type) {
-    case GHOST_kXrActionTypeBooleanInput: {
+    case XR_BOOLEAN_INPUT:
       data->state[0] = ((bool *)action->states)[subaction_idx] ? 1.0f : 0.0f;
       break;
-    }
-    case GHOST_kXrActionTypeFloatInput: {
+    case XR_FLOAT_INPUT:
       data->state[0] = ((float *)action->states)[subaction_idx];
       break;
-    }
-    case GHOST_kXrActionTypeVector2fInput: {
+    case XR_VECTOR2F_INPUT:
       copy_v2_v2(data->state, ((float(*)[2])action->states)[subaction_idx]);
       break;
-    }
-    default: {
+    case XR_POSE_INPUT:
+    case XR_VIBRATION_OUTPUT:
+      BLI_assert(false);
       return;
-    }
   }
 
   if (controller_pose) {

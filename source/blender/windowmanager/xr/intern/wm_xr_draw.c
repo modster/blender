@@ -284,8 +284,5 @@ void wm_xr_draw_controllers(const bContext *UNUSED(C), ARegion *UNUSED(region), 
       }
       break;
     }
-    default: {
-      break;
-    }
   }
 }
