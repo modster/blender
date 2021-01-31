@@ -45,7 +45,6 @@ OCIO_DECLARE_HANDLE(OCIO_ConstProcessorRcPtr);
 OCIO_DECLARE_HANDLE(OCIO_ConstCPUProcessorRcPtr);
 OCIO_DECLARE_HANDLE(OCIO_ConstContextRcPtr);
 OCIO_DECLARE_HANDLE(OCIO_PackedImageDesc);
-OCIO_DECLARE_HANDLE(OCIO_DisplayTransformRcPtr);
 OCIO_DECLARE_HANDLE(OCIO_ConstLookRcPtr);
 
 /* Standard XYZ to linear sRGB transform, for fallback. */
@@ -175,17 +174,13 @@ const char *OCIO_colorSpaceGetName(OCIO_ConstColorSpaceRcPtr *cs);
 const char *OCIO_colorSpaceGetDescription(OCIO_ConstColorSpaceRcPtr *cs);
 const char *OCIO_colorSpaceGetFamily(OCIO_ConstColorSpaceRcPtr *cs);
 
-OCIO_DisplayTransformRcPtr *OCIO_createDisplayTransform(void);
-void OCIO_displayTransformSetInputColorSpaceName(OCIO_DisplayTransformRcPtr *dt, const char *name);
-void OCIO_displayTransformSetDisplay(OCIO_DisplayTransformRcPtr *dt, const char *name);
-void OCIO_displayTransformSetView(OCIO_DisplayTransformRcPtr *dt, const char *name);
-void OCIO_displayTransformSetDisplayCC(OCIO_DisplayTransformRcPtr *dt,
-                                       OCIO_ConstTransformRcPtr *et);
-void OCIO_displayTransformSetLinearCC(OCIO_DisplayTransformRcPtr *dt,
-                                      OCIO_ConstTransformRcPtr *et);
-void OCIO_displayTransformSetLooksOverride(OCIO_DisplayTransformRcPtr *dt, const char *looks);
-void OCIO_displayTransformSetLooksOverrideEnabled(OCIO_DisplayTransformRcPtr *dt, bool enabled);
-void OCIO_displayTransformRelease(OCIO_DisplayTransformRcPtr *dt);
+OCIO_ConstProcessorRcPtr *OCIO_createDisplayProcessor(OCIO_ConstConfigRcPtr *config,
+                                                      const char *input,
+                                                      const char *view,
+                                                      const char *display,
+                                                      const char *look,
+                                                      const float scale,
+                                                      const float exponent);
 
 OCIO_PackedImageDesc *OCIO_createOCIO_PackedImageDesc(float *data,
                                                       long width,

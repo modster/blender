@@ -94,20 +94,13 @@ class IOCIOImpl {
   virtual const char *colorSpaceGetDescription(OCIO_ConstColorSpaceRcPtr *cs) = 0;
   virtual const char *colorSpaceGetFamily(OCIO_ConstColorSpaceRcPtr *cs) = 0;
 
-  virtual OCIO_DisplayTransformRcPtr *createDisplayTransform(void) = 0;
-  virtual void displayTransformSetInputColorSpaceName(OCIO_DisplayTransformRcPtr *dt,
-                                                      const char *name) = 0;
-  virtual void displayTransformSetDisplay(OCIO_DisplayTransformRcPtr *dt, const char *name) = 0;
-  virtual void displayTransformSetView(OCIO_DisplayTransformRcPtr *dt, const char *name) = 0;
-  virtual void displayTransformSetDisplayCC(OCIO_DisplayTransformRcPtr *dt,
-                                            OCIO_ConstTransformRcPtr *et) = 0;
-  virtual void displayTransformSetLinearCC(OCIO_DisplayTransformRcPtr *dt,
-                                           OCIO_ConstTransformRcPtr *et) = 0;
-  virtual void displayTransformSetLooksOverride(OCIO_DisplayTransformRcPtr *dt,
-                                                const char *looks) = 0;
-  virtual void displayTransformSetLooksOverrideEnabled(OCIO_DisplayTransformRcPtr *dt,
-                                                       bool enabled) = 0;
-  virtual void displayTransformRelease(OCIO_DisplayTransformRcPtr *dt) = 0;
+  virtual OCIO_ConstProcessorRcPtr *createDisplayProcessor(OCIO_ConstConfigRcPtr *config,
+                                                           const char *input,
+                                                           const char *view,
+                                                           const char *display,
+                                                           const char *look,
+                                                           const float scale,
+                                                           const float exponent) = 0;
 
   virtual OCIO_PackedImageDesc *createOCIO_PackedImageDesc(float *data,
                                                            long width,
@@ -200,15 +193,13 @@ class FallbackImpl : public IOCIOImpl {
   const char *colorSpaceGetDescription(OCIO_ConstColorSpaceRcPtr *cs);
   const char *colorSpaceGetFamily(OCIO_ConstColorSpaceRcPtr *cs);
 
-  OCIO_DisplayTransformRcPtr *createDisplayTransform(void);
-  void displayTransformSetInputColorSpaceName(OCIO_DisplayTransformRcPtr *dt, const char *name);
-  void displayTransformSetDisplay(OCIO_DisplayTransformRcPtr *dt, const char *name);
-  void displayTransformSetView(OCIO_DisplayTransformRcPtr *dt, const char *name);
-  void displayTransformSetDisplayCC(OCIO_DisplayTransformRcPtr *dt, OCIO_ConstTransformRcPtr *et);
-  void displayTransformSetLinearCC(OCIO_DisplayTransformRcPtr *dt, OCIO_ConstTransformRcPtr *et);
-  void displayTransformSetLooksOverride(OCIO_DisplayTransformRcPtr *dt, const char *looks);
-  void displayTransformSetLooksOverrideEnabled(OCIO_DisplayTransformRcPtr *dt, bool enabled);
-  void displayTransformRelease(OCIO_DisplayTransformRcPtr *dt);
+  OCIO_ConstProcessorRcPtr *createDisplayProcessor(OCIO_ConstConfigRcPtr *config,
+                                                   const char *input,
+                                                   const char *view,
+                                                   const char *display,
+                                                   const char *look,
+                                                   const float scale,
+                                                   const float exponent);
 
   OCIO_PackedImageDesc *createOCIO_PackedImageDesc(float *data,
                                                    long width,
@@ -300,15 +291,13 @@ class OCIOImpl : public IOCIOImpl {
   const char *colorSpaceGetDescription(OCIO_ConstColorSpaceRcPtr *cs);
   const char *colorSpaceGetFamily(OCIO_ConstColorSpaceRcPtr *cs);
 
-  OCIO_DisplayTransformRcPtr *createDisplayTransform(void);
-  void displayTransformSetInputColorSpaceName(OCIO_DisplayTransformRcPtr *dt, const char *name);
-  void displayTransformSetDisplay(OCIO_DisplayTransformRcPtr *dt, const char *name);
-  void displayTransformSetView(OCIO_DisplayTransformRcPtr *dt, const char *name);
-  void displayTransformSetDisplayCC(OCIO_DisplayTransformRcPtr *dt, OCIO_ConstTransformRcPtr *et);
-  void displayTransformSetLinearCC(OCIO_DisplayTransformRcPtr *dt, OCIO_ConstTransformRcPtr *et);
-  void displayTransformSetLooksOverride(OCIO_DisplayTransformRcPtr *dt, const char *looks);
-  void displayTransformSetLooksOverrideEnabled(OCIO_DisplayTransformRcPtr *dt, bool enabled);
-  void displayTransformRelease(OCIO_DisplayTransformRcPtr *dt);
+  OCIO_ConstProcessorRcPtr *createDisplayProcessor(OCIO_ConstConfigRcPtr *config,
+                                                   const char *input,
+                                                   const char *view,
+                                                   const char *display,
+                                                   const char *look,
+                                                   const float scale,
+                                                   const float exponent);
 
   OCIO_PackedImageDesc *createOCIO_PackedImageDesc(float *data,
                                                    long width,

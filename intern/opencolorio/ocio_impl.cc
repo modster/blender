@@ -396,7 +396,7 @@ const char *OCIOImpl::configGetDisplayColorSpaceName(OCIO_ConstConfigRcPtr *conf
                                                      const char *view)
 {
   try {
-    return (*(ConstConfigRcPtr *)config)->getDisplayColorSpaceName(display, view);
+    return (*(ConstConfigRcPtr *)config)->getDisplayViewColorSpaceName(display, view);
   }
   catch (Exception &exception) {
     OCIO_reportException(exception);
@@ -408,7 +408,11 @@ const char *OCIOImpl::configGetDisplayColorSpaceName(OCIO_ConstConfigRcPtr *conf
 void OCIOImpl::configGetDefaultLumaCoefs(OCIO_ConstConfigRcPtr *config, float *rgb)
 {
   try {
-    (*(ConstConfigRcPtr *)config)->getDefaultLumaCoefs(rgb);
+    double rgb_double[3];
+    (*(ConstConfigRcPtr *)config)->getDefaultLumaCoefs(rgb_double);
+    rgb[0] = (float)rgb_double[0];
+    rgb[1] = (float)rgb_double[1];
+    rgb[2] = (float)rgb_double[2];
   }
   catch (Exception &exception) {
     OCIO_reportException(exception);
@@ -742,57 +746,83 @@ const char *OCIOImpl::colorSpaceGetFamily(OCIO_ConstColorSpaceRcPtr *cs)
   return (*(ConstColorSpaceRcPtr *)cs)->getFamily();
 }
 
-OCIO_DisplayTransformRcPtr *OCIOImpl::createDisplayTransform(void)
+OCIO_ConstProcessorRcPtr *OCIOImpl::createDisplayProcessor(OCIO_ConstConfigRcPtr *config_,
+                                                           const char *input,
+                                                           const char *view,
+                                                           const char *display,
+                                                           const char *look,
+                                                           const float scale,
+                                                           const float exponent)
+
 {
-  DisplayTransformRcPtr *dt = OBJECT_GUARDED_NEW(DisplayTransformRcPtr);
+  ConstConfigRcPtr config = *(ConstConfigRcPtr *)config_;
+  GroupTransformRcPtr group = GroupTransform::Create();
 
-  *dt = DisplayTransform::Create();
+  /* Exposure. */
+  if (scale != 1.0) {
+    /* Always apply exposure in scene linear. */
+    ColorSpaceTransformRcPtr ct = ColorSpaceTransform::Create();
+    ct->setSrc(input);
+    ct->setDst(ROLE_SCENE_LINEAR);
+    group->appendTransform(ct);
 
-  return (OCIO_DisplayTransformRcPtr *)dt;
-}
+    /* Make further transforms aware of the color space change. */
+    input = ROLE_SCENE_LINEAR;
 
-void OCIOImpl::displayTransformSetInputColorSpaceName(OCIO_DisplayTransformRcPtr *dt,
-                                                      const char *name)
-{
-  (*(DisplayTransformRcPtr *)dt)->setInputColorSpaceName(name);
-}
+    /* Apply scale. */
+    MatrixTransformRcPtr mt = MatrixTransform::Create();
+    const double matrix[16] = {
+        scale, 0.0, 0.0, 0.0, 0.0, scale, 0.0, 0.0, 0.0, 0.0, scale, 0.0, 0.0, 0.0, 0.0, 1.0};
+    mt->setMatrix(matrix);
+    group->appendTransform(mt);
+  }
 
-void OCIOImpl::displayTransformSetDisplay(OCIO_DisplayTransformRcPtr *dt, const char *name)
-{
-  (*(DisplayTransformRcPtr *)dt)->setDisplay(name);
-}
+  /* Add look transform. */
+  if (strlen(look)) {
+    const char *look_output = LookTransform::GetLooksResultColorSpace(
+        config, config->getCurrentContext(), look);
 
-void OCIOImpl::displayTransformSetView(OCIO_DisplayTransformRcPtr *dt, const char *name)
-{
-  (*(DisplayTransformRcPtr *)dt)->setView(name);
-}
+    LookTransformRcPtr lt = LookTransform::Create();
+    lt->setSrc(input);
+    lt->setDst(look_output);
+    lt->setLooks(look);
+    group->appendTransform(lt);
 
-void OCIOImpl::displayTransformSetDisplayCC(OCIO_DisplayTransformRcPtr *dt,
-                                            OCIO_ConstTransformRcPtr *t)
-{
-  (*(DisplayTransformRcPtr *)dt)->setDisplayCC(*(ConstTransformRcPtr *)t);
-}
+    /* Make further transforms aware of the color space change. */
+    input = look_output;
+  }
 
-void OCIOImpl::displayTransformSetLinearCC(OCIO_DisplayTransformRcPtr *dt,
-                                           OCIO_ConstTransformRcPtr *t)
-{
-  (*(DisplayTransformRcPtr *)dt)->setLinearCC(*(ConstTransformRcPtr *)t);
-}
+  /* Add view and display transform. */
+  DisplayViewTransformRcPtr dvt = DisplayViewTransform::Create();
+  dvt->setSrc(input);
+  dvt->setLooksBypass(look != NULL);
+  dvt->setView(view);
+  dvt->setDisplay(display);
+  group->appendTransform(dvt);
 
-void OCIOImpl::displayTransformSetLooksOverride(OCIO_DisplayTransformRcPtr *dt, const char *looks)
-{
-  (*(DisplayTransformRcPtr *)dt)->setLooksOverride(looks);
-}
+  /* Gamma. */
+  if (exponent != 1.0) {
+    ExponentTransformRcPtr et = ExponentTransform::Create();
+    const double value[4] = {exponent, exponent, exponent, 1.0};
+    et->setValue(value);
+    group->appendTransform(et);
+  }
 
-void OCIOImpl::displayTransformSetLooksOverrideEnabled(OCIO_DisplayTransformRcPtr *dt,
-                                                       bool enabled)
-{
-  (*(DisplayTransformRcPtr *)dt)->setLooksOverrideEnabled(enabled);
-}
+  /* Create processor from transform. */
+  ConstProcessorRcPtr *p = OBJECT_GUARDED_NEW(ConstProcessorRcPtr);
 
-void OCIOImpl::displayTransformRelease(OCIO_DisplayTransformRcPtr *dt)
-{
-  OBJECT_GUARDED_DELETE((DisplayTransformRcPtr *)dt, DisplayTransformRcPtr);
+  try {
+    *p = config->getProcessor(group);
+
+    if (*p)
+      return (OCIO_ConstProcessorRcPtr *)p;
+  }
+  catch (Exception &exception) {
+    OCIO_reportException(exception);
+  }
+
+  OBJECT_GUARDED_DELETE(p, ConstProcessorRcPtr);
+  return NULL;
 }
 
 OCIO_PackedImageDesc *OCIOImpl::createOCIO_PackedImageDesc(float *data,

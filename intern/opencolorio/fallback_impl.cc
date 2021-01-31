@@ -468,54 +468,21 @@ const char *FallbackImpl::colorSpaceGetFamily(OCIO_ConstColorSpaceRcPtr * /*cs*/
   return "";
 }
 
-OCIO_DisplayTransformRcPtr *FallbackImpl::createDisplayTransform(void)
+OCIO_ConstProcessorRcPtr *FallbackImpl::createDisplayProcessor(
+    OCIO_ConstConfigRcPtr * /* config */,
+    const char * /* input */,
+    const char * /* view */,
+    const char * /* display */,
+    const char * /* look */,
+    const float scale,
+    const float exponent)
 {
   FallbackTransform *transform = new FallbackTransform();
   transform->type = TRANSFORM_LINEAR_TO_SRGB;
-  return (OCIO_DisplayTransformRcPtr *)transform;
-}
+  transform->scale = scale;
+  transform->exponent = exponent;
 
-void FallbackImpl::displayTransformSetInputColorSpaceName(OCIO_DisplayTransformRcPtr * /*dt*/,
-                                                          const char * /*name*/)
-{
-}
-
-void FallbackImpl::displayTransformSetDisplay(OCIO_DisplayTransformRcPtr * /*dt*/,
-                                              const char * /*name*/)
-{
-}
-
-void FallbackImpl::displayTransformSetView(OCIO_DisplayTransformRcPtr * /*dt*/,
-                                           const char * /*name*/)
-{
-}
-
-void FallbackImpl::displayTransformSetDisplayCC(OCIO_DisplayTransformRcPtr *dt,
-                                                OCIO_ConstTransformRcPtr *et)
-{
-  FallbackTransform *transform = (FallbackTransform *)dt;
-  transform->display_transform = (FallbackTransform *)et;
-}
-
-void FallbackImpl::displayTransformSetLinearCC(OCIO_DisplayTransformRcPtr *dt,
-                                               OCIO_ConstTransformRcPtr *et)
-{
-  FallbackTransform *transform = (FallbackTransform *)dt;
-  transform->linear_transform = (FallbackTransform *)et;
-}
-
-void FallbackImpl::displayTransformSetLooksOverride(OCIO_DisplayTransformRcPtr * /*dt*/,
-                                                    const char * /*looks*/)
-{
-}
-
-void FallbackImpl::displayTransformSetLooksOverrideEnabled(OCIO_DisplayTransformRcPtr * /*dt*/,
-                                                           bool /*enabled*/)
-{
-}
-
-void FallbackImpl::displayTransformRelease(OCIO_DisplayTransformRcPtr * /*dt*/)
-{
+  return (OCIO_ConstProcessorRcPtr *)new FallbackProcessor(transform);
 }
 
 OCIO_PackedImageDesc *FallbackImpl::createOCIO_PackedImageDesc(float *data,

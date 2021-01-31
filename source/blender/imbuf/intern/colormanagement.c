@@ -775,6 +775,12 @@ static bool colormanage_compatible_look(ColorManagedLook *look, const char *view
   return (look->view[0] == 0 || (view_name && STREQ(look->view, view_name)));
 }
 
+static bool colormanage_use_look(const char *look, const char *view_name)
+{
+  ColorManagedLook *look_descr = colormanage_look_get_named(look);
+  return (look_descr->is_noop == false && colormanage_compatible_look(look_descr, view_name));
+}
+
 void colormanage_cache_free(ImBuf *ibuf)
 {
   if (ibuf->display_buffer_flags) {
@@ -850,95 +856,31 @@ static ColorSpace *display_transform_get_colorspace(
   return NULL;
 }
 
-static OCIO_ConstProcessorRcPtr *create_display_buffer_processor(const char *look,
-                                                                 const char *view_transform,
-                                                                 const char *display,
-                                                                 float exposure,
-                                                                 float gamma,
-                                                                 const char *from_colorspace,
-                                                                 const bool linear_output)
+static OCIO_ConstCPUProcessorRcPtr *create_display_buffer_processor(const char *look,
+                                                                    const char *view_transform,
+                                                                    const char *display,
+                                                                    float exposure,
+                                                                    float gamma,
+                                                                    const char *from_colorspace)
 {
   OCIO_ConstConfigRcPtr *config = OCIO_getCurrentConfig();
-  OCIO_DisplayTransformRcPtr *dt;
-  OCIO_ConstProcessorRcPtr *processor;
-  ColorManagedLook *look_descr = colormanage_look_get_named(look);
+  const bool use_look = colormanage_use_look(look, view_transform);
+  const float scale = (exposure == 0.0f) ? 1.0f : powf(2.0f, exposure);
+  const float exponent = (gamma == 1.0f) ? 1.0f : 1.0f / MAX2(FLT_EPSILON, gamma);
 
-  dt = OCIO_createDisplayTransform();
+  OCIO_ConstProcessorRcPtr *processor = OCIO_createDisplayProcessor(
+      config, from_colorspace, view_transform, display, (use_look) ? look : "", scale, exponent);
 
-  OCIO_displayTransformSetInputColorSpaceName(dt, from_colorspace);
-  OCIO_displayTransformSetView(dt, view_transform);
-  OCIO_displayTransformSetDisplay(dt, display);
-
-  if (look_descr->is_noop == false && colormanage_compatible_look(look_descr, view_transform)) {
-    OCIO_displayTransformSetLooksOverrideEnabled(dt, true);
-    OCIO_displayTransformSetLooksOverride(dt, look);
-  }
-
-  /* fstop exposure control */
-  if (exposure != 0.0f) {
-    OCIO_MatrixTransformRcPtr *mt;
-    float gain = powf(2.0f, exposure);
-    const float scale4f[] = {gain, gain, gain, 1.0f};
-    float m44[16], offset4[4];
-
-    OCIO_matrixTransformScale(m44, offset4, scale4f);
-    mt = OCIO_createMatrixTransform();
-    OCIO_matrixTransformSetValue(mt, m44, offset4);
-    OCIO_displayTransformSetLinearCC(dt, (OCIO_ConstTransformRcPtr *)mt);
-
-    OCIO_matrixTransformRelease(mt);
-  }
-
-  /* post-display gamma transform */
-  if (gamma != 1.0f) {
-    OCIO_ExponentTransformRcPtr *et;
-    float exponent = 1.0f / MAX2(FLT_EPSILON, gamma);
-    const float exponent4f[] = {exponent, exponent, exponent, exponent};
-
-    et = OCIO_createExponentTransform();
-    OCIO_exponentTransformSetValue(et, exponent4f);
-    OCIO_displayTransformSetDisplayCC(dt, (OCIO_ConstTransformRcPtr *)et);
-
-    OCIO_exponentTransformRelease(et);
-  }
-
-  OCIO_GroupTransformRcPtr *gt = OCIO_createGroupTransform();
-  OCIO_groupTransformSetDirection(gt, true);
-  OCIO_groupTransformPushBack(gt, (OCIO_ConstTransformRcPtr *)dt);
-
-  if (linear_output) {
-    /* TODO use correct function display. */
-    OCIO_ExponentTransformRcPtr *et = OCIO_createExponentTransform();
-    OCIO_exponentTransformSetValue(et, (float[4]){2.2f, 2.2f, 2.2f, 1.0f});
-    OCIO_groupTransformPushBack(gt, (OCIO_ConstTransformRcPtr *)et);
-    OCIO_exponentTransformRelease(et);
-  }
-
-  processor = OCIO_configGetProcessor(config, (OCIO_ConstTransformRcPtr *)gt);
-
-  OCIO_groupTransformRelease(gt);
-  OCIO_displayTransformRelease(dt);
   OCIO_configRelease(config);
 
-  return processor;
-}
+  if (processor == NULL) {
+    return NULL;
+  }
 
-static OCIO_ConstProcessorRcPtr *create_display_encoded_buffer_processor(
-    const char *UNUSED(display))
-{
-  OCIO_ConstConfigRcPtr *config = OCIO_getCurrentConfig();
-  OCIO_ConstProcessorRcPtr *processor;
+  OCIO_ConstCPUProcessorRcPtr *cpu_processor = OCIO_processorGetCPUProcessor(processor);
+  OCIO_processorRelease(processor);
 
-  /* TODO use correct function display. */
-  OCIO_ExponentTransformRcPtr *et = OCIO_createExponentTransform();
-  OCIO_exponentTransformSetValue(et, (float[4]){1.0f / 2.2f, 1.0f / 2.2f, 1.0f / 2.2f, 1.0f});
-
-  processor = OCIO_configGetProcessor(config, (OCIO_ConstTransformRcPtr *)et);
-
-  OCIO_exponentTransformRelease(et);
-  OCIO_configRelease(config);
-
-  return processor;
+  return cpu_processor;
 }
 
 static OCIO_ConstProcessorRcPtr *create_colorspace_transform_processor(const char *from_colorspace,
@@ -3859,8 +3801,7 @@ ColormanageProcessor *IMB_colormanagement_display_processor_new(
                                                             display_settings->display_device,
                                                             applied_view_settings->exposure,
                                                             applied_view_settings->gamma,
-                                                            global_role_scene_linear,
-                                                            false);
+                                                            global_role_scene_linear);
 
   if (applied_view_settings->flag & COLORMANAGE_VIEW_USE_CURVES) {
     cm_processor->curve_mapping = BKE_curvemapping_copy(applied_view_settings->curve_mapping);

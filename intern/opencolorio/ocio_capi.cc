@@ -250,49 +250,15 @@ const char *OCIO_colorSpaceGetFamily(OCIO_ConstColorSpaceRcPtr *cs)
   return impl->colorSpaceGetFamily(cs);
 }
 
-OCIO_DisplayTransformRcPtr *OCIO_createDisplayTransform(void)
+OCIO_ConstProcessorRcPtr *OCIO_createDisplayProcessor(OCIO_ConstConfigRcPtr *config,
+                                                      const char *input,
+                                                      const char *view,
+                                                      const char *display,
+                                                      const char *look,
+                                                      const float scale,
+                                                      const float exponent)
 {
-  return impl->createDisplayTransform();
-}
-
-void OCIO_displayTransformSetInputColorSpaceName(OCIO_DisplayTransformRcPtr *dt, const char *name)
-{
-  impl->displayTransformSetInputColorSpaceName(dt, name);
-}
-
-void OCIO_displayTransformSetDisplay(OCIO_DisplayTransformRcPtr *dt, const char *name)
-{
-  impl->displayTransformSetDisplay(dt, name);
-}
-
-void OCIO_displayTransformSetView(OCIO_DisplayTransformRcPtr *dt, const char *name)
-{
-  impl->displayTransformSetView(dt, name);
-}
-
-void OCIO_displayTransformSetDisplayCC(OCIO_DisplayTransformRcPtr *dt, OCIO_ConstTransformRcPtr *t)
-{
-  impl->displayTransformSetDisplayCC(dt, t);
-}
-
-void OCIO_displayTransformSetLinearCC(OCIO_DisplayTransformRcPtr *dt, OCIO_ConstTransformRcPtr *t)
-{
-  impl->displayTransformSetLinearCC(dt, t);
-}
-
-void OCIO_displayTransformSetLooksOverride(OCIO_DisplayTransformRcPtr *dt, const char *looks)
-{
-  impl->displayTransformSetLooksOverride(dt, looks);
-}
-
-void OCIO_displayTransformSetLooksOverrideEnabled(OCIO_DisplayTransformRcPtr *dt, bool enabled)
-{
-  impl->displayTransformSetLooksOverrideEnabled(dt, enabled);
-}
-
-void OCIO_displayTransformRelease(OCIO_DisplayTransformRcPtr *dt)
-{
-  impl->displayTransformRelease(dt);
+  return impl->createDisplayProcessor(config, input, view, display, look, scale, exponent);
 }
 
 OCIO_PackedImageDesc *OCIO_createOCIO_PackedImageDesc(float *data,
