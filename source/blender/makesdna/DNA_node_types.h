@@ -1089,14 +1089,15 @@ typedef struct NodeAttributeCompare {
 } NodeAttributeCompare;
 
 typedef struct NodeAttributeMath {
-  /* e.g. NODE_MATH_ADD. */
+  /* NodeMathOperation. */
   uint8_t operation;
 
   /* GeometryNodeAttributeInputMode */
   uint8_t input_type_a;
   uint8_t input_type_b;
+  uint8_t input_type_c;
 
-  char _pad[5];
+  char _pad[4];
 } NodeAttributeMath;
 
 typedef struct NodeAttributeMix {
@@ -1166,6 +1167,31 @@ typedef struct NodeGeometryPointTranslate {
 
   char _pad[7];
 } NodeGeometryPointTranslate;
+
+typedef struct NodeGeometryObjectInfo {
+  /* GeometryNodeTransformSpace. */
+  uint8_t transform_space;
+
+  char _pad[7];
+} NodeGeometryObjectInfo;
+
+typedef struct NodeGeometryPointInstance {
+  /* GeometryNodePointInstanceType. */
+  uint8_t instance_type;
+  /* GeometryNodePointInstanceFlag. */
+  uint8_t flag;
+
+  char _pad[6];
+} NodeGeometryPointInstance;
+
+typedef struct NodeGeometryPointsToVolume {
+  /* GeometryNodePointsToVolumeResolutionMode */
+  uint8_t resolution_mode;
+  /* GeometryNodeAttributeInputMode */
+  uint8_t input_type_radius;
+
+  char _pad[6];
+} NodeGeometryPointsToVolume;
 
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
@@ -1362,7 +1388,7 @@ enum {
 #define SHD_MATH_CLAMP 1
 
 /* Math node operations. */
-enum {
+typedef enum NodeMathOperation {
   NODE_MATH_ADD = 0,
   NODE_MATH_SUBTRACT = 1,
   NODE_MATH_MULTIPLY = 2,
@@ -1403,7 +1429,7 @@ enum {
   NODE_MATH_PINGPONG = 37,
   NODE_MATH_SMOOTH_MIN = 38,
   NODE_MATH_SMOOTH_MAX = 39,
-};
+} NodeMathOperation;
 
 /* Vector Math node operations. */
 typedef enum NodeVectorMathOperation {
@@ -1579,6 +1605,10 @@ typedef enum GeometryNodePointInstanceType {
   GEO_NODE_POINT_INSTANCE_TYPE_COLLECTION = 1,
 } GeometryNodePointInstanceType;
 
+typedef enum GeometryNodePointInstanceFlag {
+  GEO_NODE_POINT_INSTANCE_WHOLE_COLLECTION = (1 << 0),
+} GeometryNodePointInstanceFlag;
+
 typedef enum GeometryNodeAttributeInputMode {
   GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE = 0,
   GEO_NODE_ATTRIBUTE_INPUT_FLOAT = 1,
@@ -1607,6 +1637,16 @@ typedef enum GeometryNodeAlignRotationToVectorAxis {
   GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_Y = 1,
   GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_Z = 2,
 } GeometryNodeAlignRotationToVectorAxis;
+
+typedef enum GeometryNodeTransformSpace {
+  GEO_NODE_TRANSFORM_SPACE_ORIGINAL = 0,
+  GEO_NODE_TRANSFORM_SPACE_RELATIVE = 1,
+} GeometryNodeTransformSpace;
+
+typedef enum GeometryNodePointsToVolumeResolutionMode {
+  GEO_NODE_POINTS_TO_VOLUME_RESOLUTION_MODE_AMOUNT = 0,
+  GEO_NODE_POINTS_TO_VOLUME_RESOLUTION_MODE_SIZE = 1,
+} GeometryNodePointsToVolumeResolutionMode;
 
 #ifdef __cplusplus
 }
