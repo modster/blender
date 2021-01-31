@@ -538,11 +538,13 @@ if(WITH_OPENCOLORIO)
   set(OPENCOLORIO_LIBPATH ${OPENCOLORIO}/lib)
   set(OPENCOLORIO_LIBRARIES
     optimized ${OPENCOLORIO_LIBPATH}/OpenColorIO.lib
-    optimized ${OPENCOLORIO_LIBPATH}/tinyxml.lib
     optimized ${OPENCOLORIO_LIBPATH}/libyaml-cpp.lib
+    optimized ${OPENCOLORIO_LIBPATH}/expat.lib
+    optimized ${OPENCOLORIO_LIBPATH}/pystring.lib
     debug ${OPENCOLORIO_LIBPATH}/OpencolorIO_d.lib
-    debug ${OPENCOLORIO_LIBPATH}/tinyxml_d.lib
     debug ${OPENCOLORIO_LIBPATH}/libyaml-cpp_d.lib
+    debug ${OPENCOLORIO_LIBPATH}/expat_d.lib
+    debug ${OPENCOLORIO_LIBPATH}/pystring_d.lib
   )
   set(OPENCOLORIO_DEFINITIONS)
 endif()
