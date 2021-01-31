@@ -112,16 +112,31 @@ class IOCIOImpl {
 
   virtual void OCIO_PackedImageDescRelease(OCIO_PackedImageDesc *p) = 0;
 
-  virtual bool supportGLSLDraw(void) = 0;
-  virtual bool setupGLSLDraw(struct OCIO_GLSLDrawState **state_r,
-                             OCIO_ConstProcessorRcPtr *ocio_processor_scene_to_ui,
-                             OCIO_ConstProcessorRcPtr *ocio_processor_ui_to_display,
-                             OCIO_CurveMappingSettings *curve_mapping_settings,
-                             float dither,
-                             bool predivide,
-                             bool overlay) = 0;
-  virtual void finishGLSLDraw(struct OCIO_GLSLDrawState *state) = 0;
-  virtual void freeGLState(struct OCIO_GLSLDrawState *state_r) = 0;
+  /* Optional GPU support. */
+  virtual bool supportGPUShader()
+  {
+    return false;
+  }
+  virtual bool gpuDisplayShaderBind(OCIO_ConstConfigRcPtr * /* config */,
+                                    const char * /* input */,
+                                    const char * /* view */,
+                                    const char * /* display */,
+                                    const char * /* look */,
+                                    OCIO_CurveMappingSettings * /* curve_mapping_settings */,
+                                    const float /* scale */,
+                                    const float /* exponent */,
+                                    const float /* dither */,
+                                    const bool /* use_predivide */,
+                                    const bool /* use_overlay */)
+  {
+    return false;
+  }
+  virtual void gpuDisplayShaderUnbind(void)
+  {
+  }
+  virtual void gpuCacheFree(void)
+  {
+  }
 
   virtual const char *getVersionString(void) = 0;
   virtual int getVersionHex(void) = 0;
@@ -211,17 +226,6 @@ class FallbackImpl : public IOCIOImpl {
 
   void OCIO_PackedImageDescRelease(OCIO_PackedImageDesc *p);
 
-  bool supportGLSLDraw(void);
-  bool setupGLSLDraw(struct OCIO_GLSLDrawState **state_r,
-                     OCIO_ConstProcessorRcPtr *ocio_processor_scene_to_ui,
-                     OCIO_ConstProcessorRcPtr *ocio_processor_ui_to_display,
-                     OCIO_CurveMappingSettings *curve_mapping_settings,
-                     float dither,
-                     bool predivide,
-                     bool overlay);
-  void finishGLSLDraw(struct OCIO_GLSLDrawState *state);
-  void freeGLState(struct OCIO_GLSLDrawState *state_r);
-
   const char *getVersionString(void);
   int getVersionHex(void);
 };
@@ -309,16 +313,20 @@ class OCIOImpl : public IOCIOImpl {
 
   void OCIO_PackedImageDescRelease(OCIO_PackedImageDesc *p);
 
-  bool supportGLSLDraw(void);
-  bool setupGLSLDraw(struct OCIO_GLSLDrawState **state_r,
-                     OCIO_ConstProcessorRcPtr *ocio_processor_scene_to_ui,
-                     OCIO_ConstProcessorRcPtr *ocio_processor_ui_to_display,
-                     OCIO_CurveMappingSettings *curve_mapping_settings,
-                     float dither,
-                     bool predivide,
-                     bool overlay);
-  void finishGLSLDraw(struct OCIO_GLSLDrawState *state);
-  void freeGLState(struct OCIO_GLSLDrawState *state_r);
+  bool supportGPUShader();
+  bool gpuDisplayShaderBind(OCIO_ConstConfigRcPtr *config,
+                            const char *input,
+                            const char *view,
+                            const char *display,
+                            const char *look,
+                            OCIO_CurveMappingSettings *curve_mapping_settings,
+                            const float scale,
+                            const float exponent,
+                            const float dither,
+                            const bool use_predivide,
+                            const bool use_overlay);
+  void gpuDisplayShaderUnbind(void);
+  void gpuCacheFree(void);
 
   const char *getVersionString(void);
   int getVersionHex(void);

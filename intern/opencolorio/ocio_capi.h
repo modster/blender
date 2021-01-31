@@ -24,7 +24,7 @@
 extern "C" {
 #endif
 
-struct OCIO_GLSLDrawState;
+typedef struct OCIO_GPUShader OCIO_GPUShader;
 
 #define OCIO_DECLARE_HANDLE(name) \
   typedef struct name##__ { \
@@ -192,16 +192,20 @@ OCIO_PackedImageDesc *OCIO_createOCIO_PackedImageDesc(float *data,
 
 void OCIO_PackedImageDescRelease(OCIO_PackedImageDesc *p);
 
-int OCIO_supportGLSLDraw(void);
-int OCIO_setupGLSLDraw(struct OCIO_GLSLDrawState **state_r,
-                       OCIO_ConstProcessorRcPtr *ocio_processor_scene_to_ui,
-                       OCIO_ConstProcessorRcPtr *ocio_processor_ui_to_display,
-                       OCIO_CurveMappingSettings *curve_mapping_settings,
-                       float dither,
-                       bool predivide,
-                       bool overlay);
-void OCIO_finishGLSLDraw(struct OCIO_GLSLDrawState *state);
-void OCIO_freeOGLState(struct OCIO_GLSLDrawState *state);
+bool OCIO_supportGPUShader(void);
+bool OCIO_gpuDisplayShaderBind(OCIO_ConstConfigRcPtr *config,
+                               const char *input,
+                               const char *view,
+                               const char *display,
+                               const char *look,
+                               OCIO_CurveMappingSettings *curve_mapping_settings,
+                               const float scale,
+                               const float exponent,
+                               const float dither,
+                               const bool use_predivide,
+                               const bool use_overlay);
+void OCIO_gpuDisplayShaderUnbind(void);
+void OCIO_gpuCacheFree(void);
 
 const char *OCIO_getVersionString(void);
 int OCIO_getVersionHex(void);

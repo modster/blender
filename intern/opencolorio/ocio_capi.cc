@@ -278,36 +278,44 @@ void OCIO_PackedImageDescRelease(OCIO_PackedImageDesc *id)
   impl->OCIO_PackedImageDescRelease(id);
 }
 
-int OCIO_supportGLSLDraw(void)
+bool OCIO_supportGPUShader()
 {
-  return (int)impl->supportGLSLDraw();
+  return impl->supportGPUShader();
 }
 
-int OCIO_setupGLSLDraw(struct OCIO_GLSLDrawState **state_r,
-                       OCIO_ConstProcessorRcPtr *ocio_processor_scene_to_ui,
-                       OCIO_ConstProcessorRcPtr *ocio_processor_ui_to_display,
-                       OCIO_CurveMappingSettings *curve_mapping_settings,
-                       float dither,
-                       bool predivide,
-                       bool overlay)
+bool OCIO_gpuDisplayShaderBind(OCIO_ConstConfigRcPtr *config,
+                               const char *input,
+                               const char *view,
+                               const char *display,
+                               const char *look,
+                               OCIO_CurveMappingSettings *curve_mapping_settings,
+                               const float scale,
+                               const float exponent,
+                               const float dither,
+                               const bool use_predivide,
+                               const bool use_overlay)
 {
-  return (int)impl->setupGLSLDraw(state_r,
-                                  ocio_processor_scene_to_ui,
-                                  ocio_processor_ui_to_display,
-                                  curve_mapping_settings,
-                                  dither,
-                                  predivide,
-                                  overlay);
+  return impl->gpuDisplayShaderBind(config,
+                                    input,
+                                    view,
+                                    display,
+                                    look,
+                                    curve_mapping_settings,
+                                    scale,
+                                    exponent,
+                                    dither,
+                                    use_predivide,
+                                    use_overlay);
 }
 
-void OCIO_finishGLSLDraw(struct OCIO_GLSLDrawState *state)
+void OCIO_gpuDisplayShaderUnbind(void)
 {
-  impl->finishGLSLDraw(state);
+  impl->gpuDisplayShaderUnbind();
 }
 
-void OCIO_freeOGLState(struct OCIO_GLSLDrawState *state)
+void OCIO_gpuCacheFree(void)
 {
-  impl->freeGLState(state);
+  impl->gpuCacheFree();
 }
 
 const char *OCIO_getVersionString(void)
