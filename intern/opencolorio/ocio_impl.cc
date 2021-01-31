@@ -17,6 +17,7 @@
  * All rights reserved.
  */
 
+#include <cassert>
 #include <iostream>
 #include <math.h>
 #include <sstream>
@@ -35,6 +36,7 @@ using namespace OCIO_NAMESPACE;
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_math.h"
 #include "BLI_math_color.h"
 
 #include "ocio_impl.h"
@@ -424,6 +426,8 @@ void OCIOImpl::configGetXYZtoRGB(OCIO_ConstConfigRcPtr *config_, float xyz_to_rg
   if (config->hasRole("XYZ") && config->hasRole("scene_linear")) {
     ConstProcessorRcPtr to_rgb_processor = config->getProcessor("XYZ", "scene_linear");
     if (to_rgb_processor) {
+      ConstCPUProcessorRcPtr device_processor = to_rgb_processor->getDefaultCPUProcessor();
+
       xyz_to_rgb[0][0] = 1.0f;
       xyz_to_rgb[0][1] = 0.0f;
       xyz_to_rgb[0][2] = 0.0f;
@@ -433,9 +437,9 @@ void OCIOImpl::configGetXYZtoRGB(OCIO_ConstConfigRcPtr *config_, float xyz_to_rg
       xyz_to_rgb[2][0] = 0.0f;
       xyz_to_rgb[2][1] = 0.0f;
       xyz_to_rgb[2][2] = 1.0f;
-      to_rgb_processor->applyRGB(xyz_to_rgb[0]);
-      to_rgb_processor->applyRGB(xyz_to_rgb[1]);
-      to_rgb_processor->applyRGB(xyz_to_rgb[2]);
+      device_processor->applyRGB(xyz_to_rgb[0]);
+      device_processor->applyRGB(xyz_to_rgb[1]);
+      device_processor->applyRGB(xyz_to_rgb[2]);
     }
   }
 }
@@ -558,6 +562,8 @@ void OCIOImpl::colorSpaceIsBuiltin(OCIO_ConstConfigRcPtr *config_,
     return;
   }
 
+  ConstCPUProcessorRcPtr device_processor = processor->getDefaultCPUProcessor();
+
   is_scene_linear = true;
   is_srgb = true;
   for (int i = 0; i < 256; i++) {
@@ -567,10 +573,10 @@ void OCIOImpl::colorSpaceIsBuiltin(OCIO_ConstConfigRcPtr *config_,
     float cG[3] = {0, v, 0};
     float cB[3] = {0, 0, v};
     float cW[3] = {v, v, v};
-    processor->applyRGB(cR);
-    processor->applyRGB(cG);
-    processor->applyRGB(cB);
-    processor->applyRGB(cW);
+    device_processor->applyRGB(cR);
+    device_processor->applyRGB(cG);
+    device_processor->applyRGB(cB);
+    device_processor->applyRGB(cW);
 
     /* Make sure that there is no channel crosstalk. */
     if (fabsf(cR[1]) > 1e-5f || fabsf(cR[2]) > 1e-5f || fabsf(cG[0]) > 1e-5f ||
@@ -629,37 +635,25 @@ OCIO_ConstProcessorRcPtr *OCIOImpl::configGetProcessorWithNames(OCIO_ConstConfig
   return 0;
 }
 
-OCIO_ConstProcessorRcPtr *OCIOImpl::configGetProcessor(OCIO_ConstConfigRcPtr *config,
-                                                       OCIO_ConstTransformRcPtr *transform)
+OCIO_ConstCPUProcessorRcPtr *OCIOImpl::processorGetCPUProcessor(
+    OCIO_ConstProcessorRcPtr *processor)
 {
-  ConstProcessorRcPtr *p = OBJECT_GUARDED_NEW(ConstProcessorRcPtr);
-
-  try {
-    *p = (*(ConstConfigRcPtr *)config)->getProcessor(*(ConstTransformRcPtr *)transform);
-
-    if (*p)
-      return (OCIO_ConstProcessorRcPtr *)p;
-  }
-  catch (Exception &exception) {
-    OCIO_reportException(exception);
-  }
-
-  OBJECT_GUARDED_DELETE(p, ConstProcessorRcPtr);
-
-  return NULL;
+  ConstCPUProcessorRcPtr *p = OBJECT_GUARDED_NEW(ConstCPUProcessorRcPtr);
+  *p = (*(ConstProcessorRcPtr *)processor)->getDefaultCPUProcessor();
+  return (OCIO_ConstCPUProcessorRcPtr *)p;
 }
 
-void OCIOImpl::processorApply(OCIO_ConstProcessorRcPtr *processor, OCIO_PackedImageDesc *img)
+void OCIOImpl::processorApply(OCIO_ConstCPUProcessorRcPtr *processor, OCIO_PackedImageDesc *img)
 {
   try {
-    (*(ConstProcessorRcPtr *)processor)->apply(*(PackedImageDesc *)img);
+    (*(ConstCPUProcessorRcPtr *)processor)->apply(*(PackedImageDesc *)img);
   }
   catch (Exception &exception) {
     OCIO_reportException(exception);
   }
 }
 
-void OCIOImpl::processorApply_predivide(OCIO_ConstProcessorRcPtr *processor,
+void OCIOImpl::processorApply_predivide(OCIO_ConstCPUProcessorRcPtr *processor,
                                         OCIO_PackedImageDesc *img_)
 {
   try {
@@ -667,7 +661,8 @@ void OCIOImpl::processorApply_predivide(OCIO_ConstProcessorRcPtr *processor,
     int channels = img->getNumChannels();
 
     if (channels == 4) {
-      float *pixels = img->getData();
+      assert(img->isFloat());
+      float *pixels = (float *)img->getData();
 
       int width = img->getWidth();
       int height = img->getHeight();
@@ -681,7 +676,7 @@ void OCIOImpl::processorApply_predivide(OCIO_ConstProcessorRcPtr *processor,
       }
     }
     else {
-      (*(ConstProcessorRcPtr *)processor)->apply(*img);
+      (*(ConstCPUProcessorRcPtr *)processor)->apply(*img);
     }
   }
   catch (Exception &exception) {
@@ -689,20 +684,20 @@ void OCIOImpl::processorApply_predivide(OCIO_ConstProcessorRcPtr *processor,
   }
 }
 
-void OCIOImpl::processorApplyRGB(OCIO_ConstProcessorRcPtr *processor, float *pixel)
+void OCIOImpl::processorApplyRGB(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel)
 {
-  (*(ConstProcessorRcPtr *)processor)->applyRGB(pixel);
+  (*(ConstCPUProcessorRcPtr *)processor)->applyRGB(pixel);
 }
 
-void OCIOImpl::processorApplyRGBA(OCIO_ConstProcessorRcPtr *processor, float *pixel)
+void OCIOImpl::processorApplyRGBA(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel)
 {
-  (*(ConstProcessorRcPtr *)processor)->applyRGBA(pixel);
+  (*(ConstCPUProcessorRcPtr *)processor)->applyRGBA(pixel);
 }
 
-void OCIOImpl::processorApplyRGBA_predivide(OCIO_ConstProcessorRcPtr *processor, float *pixel)
+void OCIOImpl::processorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel)
 {
   if (pixel[3] == 1.0f || pixel[3] == 0.0f) {
-    (*(ConstProcessorRcPtr *)processor)->applyRGBA(pixel);
+    (*(ConstCPUProcessorRcPtr *)processor)->applyRGBA(pixel);
   }
   else {
     float alpha, inv_alpha;
@@ -714,7 +709,7 @@ void OCIOImpl::processorApplyRGBA_predivide(OCIO_ConstProcessorRcPtr *processor,
     pixel[1] *= inv_alpha;
     pixel[2] *= inv_alpha;
 
-    (*(ConstProcessorRcPtr *)processor)->applyRGBA(pixel);
+    (*(ConstCPUProcessorRcPtr *)processor)->applyRGBA(pixel);
 
     pixel[0] *= alpha;
     pixel[1] *= alpha;
@@ -725,6 +720,11 @@ void OCIOImpl::processorApplyRGBA_predivide(OCIO_ConstProcessorRcPtr *processor,
 void OCIOImpl::processorRelease(OCIO_ConstProcessorRcPtr *p)
 {
   OBJECT_GUARDED_DELETE(p, ConstProcessorRcPtr);
+}
+
+void OCIOImpl::cpuProcessorRelease(OCIO_ConstCPUProcessorRcPtr *p)
+{
+  OBJECT_GUARDED_DELETE(p, ConstCPUProcessorRcPtr);
 }
 
 const char *OCIOImpl::colorSpaceGetName(OCIO_ConstColorSpaceRcPtr *cs)
@@ -805,8 +805,14 @@ OCIO_PackedImageDesc *OCIOImpl::createOCIO_PackedImageDesc(float *data,
 {
   try {
     void *mem = MEM_mallocN(sizeof(PackedImageDesc), __func__);
-    PackedImageDesc *id = new (mem) PackedImageDesc(
-        data, width, height, numChannels, chanStrideBytes, xStrideBytes, yStrideBytes);
+    PackedImageDesc *id = new (mem) PackedImageDesc(data,
+                                                    width,
+                                                    height,
+                                                    numChannels,
+                                                    BIT_DEPTH_F32,
+                                                    chanStrideBytes,
+                                                    xStrideBytes,
+                                                    yStrideBytes);
 
     return (OCIO_PackedImageDesc *)id;
   }
@@ -820,96 +826,6 @@ OCIO_PackedImageDesc *OCIOImpl::createOCIO_PackedImageDesc(float *data,
 void OCIOImpl::OCIO_PackedImageDescRelease(OCIO_PackedImageDesc *id)
 {
   OBJECT_GUARDED_DELETE((PackedImageDesc *)id, PackedImageDesc);
-}
-
-OCIO_GroupTransformRcPtr *OCIOImpl::createGroupTransform(void)
-{
-  GroupTransformRcPtr *gt = OBJECT_GUARDED_NEW(GroupTransformRcPtr);
-
-  *gt = GroupTransform::Create();
-
-  return (OCIO_GroupTransformRcPtr *)gt;
-}
-
-void OCIOImpl::groupTransformSetDirection(OCIO_GroupTransformRcPtr *gt, const bool forward)
-{
-  TransformDirection dir = forward ? TRANSFORM_DIR_FORWARD : TRANSFORM_DIR_INVERSE;
-  (*(GroupTransformRcPtr *)gt)->setDirection(dir);
-}
-
-void OCIOImpl::groupTransformPushBack(OCIO_GroupTransformRcPtr *gt, OCIO_ConstTransformRcPtr *tr)
-{
-  (*(GroupTransformRcPtr *)gt)->push_back(*(ConstTransformRcPtr *)tr);
-}
-
-void OCIOImpl::groupTransformRelease(OCIO_GroupTransformRcPtr *gt)
-{
-  OBJECT_GUARDED_DELETE((GroupTransformRcPtr *)gt, GroupTransformRcPtr);
-}
-
-OCIO_ColorSpaceTransformRcPtr *OCIOImpl::createColorSpaceTransform(void)
-{
-  ColorSpaceTransformRcPtr *ct = OBJECT_GUARDED_NEW(ColorSpaceTransformRcPtr);
-
-  *ct = ColorSpaceTransform::Create();
-  (*ct)->setDirection(TRANSFORM_DIR_FORWARD);
-
-  return (OCIO_ColorSpaceTransformRcPtr *)ct;
-}
-
-void OCIOImpl::colorSpaceTransformSetSrc(OCIO_ColorSpaceTransformRcPtr *ct, const char *name)
-{
-  (*(ColorSpaceTransformRcPtr *)ct)->setSrc(name);
-}
-
-void OCIOImpl::colorSpaceTransformRelease(OCIO_ColorSpaceTransformRcPtr *ct)
-{
-  OBJECT_GUARDED_DELETE((ColorSpaceTransformRcPtr *)ct, ColorSpaceTransformRcPtr);
-}
-
-OCIO_ExponentTransformRcPtr *OCIOImpl::createExponentTransform(void)
-{
-  ExponentTransformRcPtr *et = OBJECT_GUARDED_NEW(ExponentTransformRcPtr);
-
-  *et = ExponentTransform::Create();
-
-  return (OCIO_ExponentTransformRcPtr *)et;
-}
-
-void OCIOImpl::exponentTransformSetValue(OCIO_ExponentTransformRcPtr *et, const float *exponent)
-{
-  (*(ExponentTransformRcPtr *)et)->setValue(exponent);
-}
-
-void OCIOImpl::exponentTransformRelease(OCIO_ExponentTransformRcPtr *et)
-{
-  OBJECT_GUARDED_DELETE((ExponentTransformRcPtr *)et, ExponentTransformRcPtr);
-}
-
-OCIO_MatrixTransformRcPtr *OCIOImpl::createMatrixTransform(void)
-{
-  MatrixTransformRcPtr *mt = OBJECT_GUARDED_NEW(MatrixTransformRcPtr);
-
-  *mt = MatrixTransform::Create();
-
-  return (OCIO_MatrixTransformRcPtr *)mt;
-}
-
-void OCIOImpl::matrixTransformSetValue(OCIO_MatrixTransformRcPtr *mt,
-                                       const float *m44,
-                                       const float *offset4)
-{
-  (*(MatrixTransformRcPtr *)mt)->setValue(m44, offset4);
-}
-
-void OCIOImpl::matrixTransformRelease(OCIO_MatrixTransformRcPtr *mt)
-{
-  OBJECT_GUARDED_DELETE((MatrixTransformRcPtr *)mt, MatrixTransformRcPtr);
-}
-
-void OCIOImpl::matrixTransformScale(float *m44, float *offset4, const float *scale4f)
-{
-  MatrixTransform::Scale(m44, offset4, scale4f);
 }
 
 const char *OCIOImpl::getVersionString(void)

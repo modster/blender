@@ -42,14 +42,10 @@ struct OCIO_GLSLDrawState;
 OCIO_DECLARE_HANDLE(OCIO_ConstConfigRcPtr);
 OCIO_DECLARE_HANDLE(OCIO_ConstColorSpaceRcPtr);
 OCIO_DECLARE_HANDLE(OCIO_ConstProcessorRcPtr);
+OCIO_DECLARE_HANDLE(OCIO_ConstCPUProcessorRcPtr);
 OCIO_DECLARE_HANDLE(OCIO_ConstContextRcPtr);
 OCIO_DECLARE_HANDLE(OCIO_PackedImageDesc);
 OCIO_DECLARE_HANDLE(OCIO_DisplayTransformRcPtr);
-OCIO_DECLARE_HANDLE(OCIO_ConstTransformRcPtr);
-OCIO_DECLARE_HANDLE(OCIO_ColorSpaceTransformRcPtr);
-OCIO_DECLARE_HANDLE(OCIO_ExponentTransformRcPtr);
-OCIO_DECLARE_HANDLE(OCIO_MatrixTransformRcPtr);
-OCIO_DECLARE_HANDLE(OCIO_GroupTransformRcPtr);
 OCIO_DECLARE_HANDLE(OCIO_ConstLookRcPtr);
 
 /* Standard XYZ to linear sRGB transform, for fallback. */
@@ -163,16 +159,17 @@ void OCIO_lookRelease(OCIO_ConstLookRcPtr *look);
 OCIO_ConstProcessorRcPtr *OCIO_configGetProcessorWithNames(OCIO_ConstConfigRcPtr *config,
                                                            const char *srcName,
                                                            const char *dstName);
-OCIO_ConstProcessorRcPtr *OCIO_configGetProcessor(OCIO_ConstConfigRcPtr *config,
-                                                  OCIO_ConstTransformRcPtr *transform);
 
-void OCIO_processorApply(OCIO_ConstProcessorRcPtr *processor, OCIO_PackedImageDesc *img);
-void OCIO_processorApply_predivide(OCIO_ConstProcessorRcPtr *processor, OCIO_PackedImageDesc *img);
-void OCIO_processorApplyRGB(OCIO_ConstProcessorRcPtr *processor, float *pixel);
-void OCIO_processorApplyRGBA(OCIO_ConstProcessorRcPtr *processor, float *pixel);
-void OCIO_processorApplyRGBA_predivide(OCIO_ConstProcessorRcPtr *processor, float *pixel);
+OCIO_ConstCPUProcessorRcPtr *OCIO_processorGetCPUProcessor(OCIO_ConstProcessorRcPtr *p);
+void OCIO_processorApply(OCIO_ConstCPUProcessorRcPtr *processor, OCIO_PackedImageDesc *img);
+void OCIO_processorApply_predivide(OCIO_ConstCPUProcessorRcPtr *processor,
+                                   OCIO_PackedImageDesc *img);
+void OCIO_processorApplyRGB(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel);
+void OCIO_processorApplyRGBA(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel);
+void OCIO_processorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel);
 
 void OCIO_processorRelease(OCIO_ConstProcessorRcPtr *p);
+void OCIO_cpuProcessorRelease(OCIO_ConstCPUProcessorRcPtr *p);
 
 const char *OCIO_colorSpaceGetName(OCIO_ConstColorSpaceRcPtr *cs);
 const char *OCIO_colorSpaceGetDescription(OCIO_ConstColorSpaceRcPtr *cs);
@@ -199,27 +196,6 @@ OCIO_PackedImageDesc *OCIO_createOCIO_PackedImageDesc(float *data,
                                                       long yStrideBytes);
 
 void OCIO_PackedImageDescRelease(OCIO_PackedImageDesc *p);
-
-OCIO_GroupTransformRcPtr *OCIO_createGroupTransform(void);
-void OCIO_groupTransformSetDirection(OCIO_GroupTransformRcPtr *gt, const bool forward);
-void OCIO_groupTransformPushBack(OCIO_GroupTransformRcPtr *gt, OCIO_ConstTransformRcPtr *tr);
-void OCIO_groupTransformRelease(OCIO_GroupTransformRcPtr *gt);
-
-OCIO_ColorSpaceTransformRcPtr *OCIO_createColorSpaceTransform(void);
-void OCIO_colorSpaceTransformSetSrc(OCIO_ColorSpaceTransformRcPtr *ct, const char *name);
-void OCIO_colorSpaceTransformRelease(OCIO_ColorSpaceTransformRcPtr *ct);
-
-OCIO_ExponentTransformRcPtr *OCIO_createExponentTransform(void);
-void OCIO_exponentTransformSetValue(OCIO_ExponentTransformRcPtr *et, const float *exponent);
-void OCIO_exponentTransformRelease(OCIO_ExponentTransformRcPtr *et);
-
-OCIO_MatrixTransformRcPtr *OCIO_createMatrixTransform(void);
-void OCIO_matrixTransformSetValue(OCIO_MatrixTransformRcPtr *mt,
-                                  const float *m44,
-                                  const float *offset4);
-void OCIO_matrixTransformRelease(OCIO_MatrixTransformRcPtr *mt);
-
-void OCIO_matrixTransformScale(float *m44, float *offset4, const float *scale4);
 
 int OCIO_supportGLSLDraw(void);
 int OCIO_setupGLSLDraw(struct OCIO_GLSLDrawState **state_r,

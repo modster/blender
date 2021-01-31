@@ -411,20 +411,24 @@ ShaderManager::ShaderManager()
       OCIO::ConstProcessorRcPtr to_rgb_processor = config->getProcessor("XYZ", "scene_linear");
       OCIO::ConstProcessorRcPtr to_xyz_processor = config->getProcessor("scene_linear", "XYZ");
       if (to_rgb_processor && to_xyz_processor) {
+        OCIO::ConstCPUProcessorRcPtr to_xyz_device_processor =
+            to_xyz_processor->getDefaultCPUProcessor();
+        OCIO::ConstCPUProcessorRcPtr to_rgb_device_processor =
+            to_rgb_processor->getDefaultCPUProcessor();
         float r[] = {1.0f, 0.0f, 0.0f};
         float g[] = {0.0f, 1.0f, 0.0f};
         float b[] = {0.0f, 0.0f, 1.0f};
-        to_xyz_processor->applyRGB(r);
-        to_xyz_processor->applyRGB(g);
-        to_xyz_processor->applyRGB(b);
+        to_xyz_device_processor->applyRGB(r);
+        to_xyz_device_processor->applyRGB(g);
+        to_xyz_device_processor->applyRGB(b);
         rgb_to_y = make_float3(r[1], g[1], b[1]);
 
         float x[] = {1.0f, 0.0f, 0.0f};
         float y[] = {0.0f, 1.0f, 0.0f};
         float z[] = {0.0f, 0.0f, 1.0f};
-        to_rgb_processor->applyRGB(x);
-        to_rgb_processor->applyRGB(y);
-        to_rgb_processor->applyRGB(z);
+        to_rgb_device_processor->applyRGB(x);
+        to_rgb_device_processor->applyRGB(y);
+        to_rgb_device_processor->applyRGB(z);
         xyz_to_r = make_float3(x[0], y[0], z[0]);
         xyz_to_g = make_float3(x[1], y[1], z[1]);
         xyz_to_b = make_float3(x[2], y[2], z[2]);

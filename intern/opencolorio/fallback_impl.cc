@@ -34,7 +34,7 @@ using std::max;
 enum TransformType {
   TRANSFORM_LINEAR_TO_SRGB,
   TRANSFORM_SRGB_TO_LINEAR,
-  TRANSFORM_MATRIX,
+  TRANSFORM_SCALE,
   TRANSFORM_EXPONENT,
   TRANSFORM_UNKNOWN,
 };
@@ -53,129 +53,64 @@ typedef struct OCIO_PackedImageDescription {
 } OCIO_PackedImageDescription;
 
 struct FallbackTransform {
-  FallbackTransform() : type(TRANSFORM_UNKNOWN), linear_transform(NULL), display_transform(NULL)
+  FallbackTransform() : type(TRANSFORM_UNKNOWN), scale(1.0f), exponent(1.0f)
   {
   }
 
   virtual ~FallbackTransform()
   {
-    delete linear_transform;
-    delete display_transform;
   }
 
   void applyRGB(float *pixel)
   {
     if (type == TRANSFORM_LINEAR_TO_SRGB) {
-      applyLinearRGB(pixel);
+      pixel[0] *= scale;
+      pixel[1] *= scale;
+      pixel[2] *= scale;
+
       linearrgb_to_srgb_v3_v3(pixel, pixel);
-      applyDisplayRGB(pixel);
+
+      pixel[0] = powf(max(0.0f, pixel[0]), exponent);
+      pixel[1] = powf(max(0.0f, pixel[1]), exponent);
+      pixel[2] = powf(max(0.0f, pixel[2]), exponent);
     }
     else if (type == TRANSFORM_SRGB_TO_LINEAR) {
       srgb_to_linearrgb_v3_v3(pixel, pixel);
     }
     else if (type == TRANSFORM_EXPONENT) {
-      pixel[0] = powf(max(0.0f, pixel[0]), exponent[0]);
-      pixel[1] = powf(max(0.0f, pixel[1]), exponent[1]);
-      pixel[2] = powf(max(0.0f, pixel[2]), exponent[2]);
+      pixel[0] = powf(max(0.0f, pixel[0]), exponent);
+      pixel[1] = powf(max(0.0f, pixel[1]), exponent);
+      pixel[2] = powf(max(0.0f, pixel[2]), exponent);
     }
-    else if (type == TRANSFORM_MATRIX) {
-      float r = pixel[0];
-      float g = pixel[1];
-      float b = pixel[2];
-      pixel[0] = r * matrix[0] + g * matrix[1] + b * matrix[2];
-      pixel[1] = r * matrix[4] + g * matrix[5] + b * matrix[6];
-      pixel[2] = r * matrix[8] + g * matrix[9] + b * matrix[10];
-      pixel[0] += offset[0];
-      pixel[1] += offset[1];
-      pixel[2] += offset[2];
+    else if (type == TRANSFORM_SCALE) {
+      pixel[0] *= scale;
+      pixel[1] *= scale;
+      pixel[2] *= scale;
     }
   }
 
   void applyRGBA(float *pixel)
   {
-    if (type == TRANSFORM_LINEAR_TO_SRGB) {
-      applyLinearRGBA(pixel);
-      linearrgb_to_srgb_v4(pixel, pixel);
-      applyDisplayRGBA(pixel);
-    }
-    else if (type == TRANSFORM_SRGB_TO_LINEAR) {
-      srgb_to_linearrgb_v4(pixel, pixel);
-    }
-    else if (type == TRANSFORM_EXPONENT) {
-      pixel[0] = powf(max(0.0f, pixel[0]), exponent[0]);
-      pixel[1] = powf(max(0.0f, pixel[1]), exponent[1]);
-      pixel[2] = powf(max(0.0f, pixel[2]), exponent[2]);
-      pixel[3] = powf(max(0.0f, pixel[3]), exponent[3]);
-    }
-    else if (type == TRANSFORM_MATRIX) {
-      float r = pixel[0];
-      float g = pixel[1];
-      float b = pixel[2];
-      float a = pixel[3];
-      pixel[0] = r * matrix[0] + g * matrix[1] + b * matrix[2] + a * matrix[3];
-      pixel[1] = r * matrix[4] + g * matrix[5] + b * matrix[6] + a * matrix[7];
-      pixel[2] = r * matrix[8] + g * matrix[9] + b * matrix[10] + a * matrix[11];
-      pixel[3] = r * matrix[12] + g * matrix[13] + b * matrix[14] + a * matrix[15];
-      pixel[0] += offset[0];
-      pixel[1] += offset[1];
-      pixel[2] += offset[2];
-      pixel[3] += offset[3];
-    }
-  }
-
-  void applyLinearRGB(float *pixel)
-  {
-    if (linear_transform != NULL) {
-      linear_transform->applyRGB(pixel);
-    }
-  }
-
-  void applyLinearRGBA(float *pixel)
-  {
-    if (linear_transform != NULL) {
-      linear_transform->applyRGBA(pixel);
-    }
-  }
-
-  void applyDisplayRGB(float *pixel)
-  {
-    if (display_transform != NULL) {
-      display_transform->applyRGB(pixel);
-    }
-  }
-
-  void applyDisplayRGBA(float *pixel)
-  {
-    if (display_transform != NULL) {
-      display_transform->applyRGBA(pixel);
-    }
+    applyRGB(pixel);
   }
 
   TransformType type;
-  FallbackTransform *linear_transform;
-  FallbackTransform *display_transform;
+  /* Scale transform. */
+  float scale;
   /* Exponent transform. */
-  float exponent[4];
-  /* Matrix transform. */
-  float matrix[16];
-  float offset[4];
+  float exponent;
 
   MEM_CXX_CLASS_ALLOC_FUNCS("FallbackTransform");
 };
 
-struct FallbackGroupTransform : FallbackTransform {
-  ~FallbackGroupTransform()
-  {
-    for (auto transform : list) {
-      delete transform;
-    }
-  }
-  std::vector<FallbackTransform *> list;
-};
-
 struct FallbackProcessor {
-  FallbackProcessor() : transform(NULL)
+  FallbackProcessor(FallbackTransform *transform) : transform(transform)
   {
+  }
+
+  FallbackProcessor(const FallbackProcessor &other)
+  {
+    transform = new FallbackTransform(*other.transform);
   }
 
   ~FallbackProcessor()
@@ -413,20 +348,17 @@ OCIO_ConstProcessorRcPtr *FallbackImpl::configGetProcessorWithNames(OCIO_ConstCo
   else {
     transform->type = TRANSFORM_UNKNOWN;
   }
-  FallbackProcessor *processor = new FallbackProcessor();
-  processor->transform = transform;
-  return (OCIO_ConstProcessorRcPtr *)processor;
+  return (OCIO_ConstProcessorRcPtr *)new FallbackProcessor(transform);
 }
 
-OCIO_ConstProcessorRcPtr *FallbackImpl::configGetProcessor(OCIO_ConstConfigRcPtr * /*config*/,
-                                                           OCIO_ConstTransformRcPtr *transform)
+OCIO_ConstCPUProcessorRcPtr *FallbackImpl::processorGetCPUProcessor(OCIO_ConstProcessorRcPtr *p)
 {
-  FallbackProcessor *processor = new FallbackProcessor();
-  processor->transform = (FallbackTransform *)transform;
-  return (OCIO_ConstProcessorRcPtr *)processor;
+  FallbackProcessor *processor = (FallbackProcessor *)p;
+  return (OCIO_ConstCPUProcessorRcPtr *)new FallbackProcessor(*processor);
 }
 
-void FallbackImpl::processorApply(OCIO_ConstProcessorRcPtr *processor, OCIO_PackedImageDesc *img)
+void FallbackImpl::processorApply(OCIO_ConstCPUProcessorRcPtr *processor,
+                                  OCIO_PackedImageDesc *img)
 {
   /* OCIO_TODO stride not respected, channels must be 3 or 4 */
   OCIO_PackedImageDescription *desc = (OCIO_PackedImageDescription *)img;
@@ -448,7 +380,7 @@ void FallbackImpl::processorApply(OCIO_ConstProcessorRcPtr *processor, OCIO_Pack
   }
 }
 
-void FallbackImpl::processorApply_predivide(OCIO_ConstProcessorRcPtr *processor,
+void FallbackImpl::processorApply_predivide(OCIO_ConstCPUProcessorRcPtr *processor,
                                             OCIO_PackedImageDesc *img)
 {
   /* OCIO_TODO stride not respected, channels must be 3 or 4 */
@@ -471,17 +403,18 @@ void FallbackImpl::processorApply_predivide(OCIO_ConstProcessorRcPtr *processor,
   }
 }
 
-void FallbackImpl::processorApplyRGB(OCIO_ConstProcessorRcPtr *processor, float *pixel)
+void FallbackImpl::processorApplyRGB(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel)
 {
   ((FallbackProcessor *)processor)->applyRGB(pixel);
 }
 
-void FallbackImpl::processorApplyRGBA(OCIO_ConstProcessorRcPtr *processor, float *pixel)
+void FallbackImpl::processorApplyRGBA(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel)
 {
   ((FallbackProcessor *)processor)->applyRGBA(pixel);
 }
 
-void FallbackImpl::processorApplyRGBA_predivide(OCIO_ConstProcessorRcPtr *processor, float *pixel)
+void FallbackImpl::processorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *processor,
+                                                float *pixel)
 {
   if (pixel[3] == 1.0f || pixel[3] == 0.0f) {
     processorApplyRGBA(processor, pixel);
@@ -505,6 +438,11 @@ void FallbackImpl::processorApplyRGBA_predivide(OCIO_ConstProcessorRcPtr *proces
 }
 
 void FallbackImpl::processorRelease(OCIO_ConstProcessorRcPtr *processor)
+{
+  delete (FallbackProcessor *)(processor);
+}
+
+void FallbackImpl::cpuProcessorRelease(OCIO_ConstCPUProcessorRcPtr *processor)
 {
   delete (FallbackProcessor *)(processor);
 }
@@ -603,127 +541,6 @@ OCIO_PackedImageDesc *FallbackImpl::createOCIO_PackedImageDesc(float *data,
 void FallbackImpl::OCIO_PackedImageDescRelease(OCIO_PackedImageDesc *id)
 {
   MEM_freeN(id);
-}
-
-OCIO_GroupTransformRcPtr *FallbackImpl::createGroupTransform(void)
-{
-  FallbackTransform *transform = new FallbackGroupTransform();
-  transform->type = TRANSFORM_UNKNOWN;
-  return (OCIO_GroupTransformRcPtr *)transform;
-}
-
-void FallbackImpl::groupTransformSetDirection(OCIO_GroupTransformRcPtr * /*gt*/,
-                                              const bool /*forward */)
-{
-}
-
-void FallbackImpl::groupTransformPushBack(OCIO_GroupTransformRcPtr *gt,
-                                          OCIO_ConstTransformRcPtr *transform)
-{
-  FallbackGroupTransform *group = (FallbackGroupTransform *)gt;
-  group->list.push_back((FallbackTransform *)transform);
-}
-
-void FallbackImpl::groupTransformRelease(OCIO_GroupTransformRcPtr * /*gt*/)
-{
-}
-
-OCIO_ColorSpaceTransformRcPtr *FallbackImpl::createColorSpaceTransform(void)
-{
-  FallbackTransform *transform = new FallbackTransform();
-  transform->type = TRANSFORM_UNKNOWN;
-  return (OCIO_ColorSpaceTransformRcPtr *)transform;
-}
-
-void FallbackImpl::colorSpaceTransformSetSrc(OCIO_ColorSpaceTransformRcPtr * /*ct*/,
-                                             const char * /*name*/)
-{
-}
-
-void FallbackImpl::colorSpaceTransformRelease(OCIO_ColorSpaceTransformRcPtr * /*ct*/)
-{
-}
-
-OCIO_ExponentTransformRcPtr *FallbackImpl::createExponentTransform(void)
-{
-  FallbackTransform *transform = new FallbackTransform();
-  transform->type = TRANSFORM_EXPONENT;
-  return (OCIO_ExponentTransformRcPtr *)transform;
-}
-
-void FallbackImpl::exponentTransformSetValue(OCIO_ExponentTransformRcPtr *et,
-                                             const float *exponent)
-{
-  FallbackTransform *transform = (FallbackTransform *)et;
-  copy_v4_v4(transform->exponent, exponent);
-}
-
-void FallbackImpl::exponentTransformRelease(OCIO_ExponentTransformRcPtr * /*et*/)
-{
-}
-
-OCIO_MatrixTransformRcPtr *FallbackImpl::createMatrixTransform(void)
-{
-  FallbackTransform *transform = new FallbackTransform();
-  transform->type = TRANSFORM_MATRIX;
-  return (OCIO_MatrixTransformRcPtr *)transform;
-}
-
-void FallbackImpl::matrixTransformSetValue(OCIO_MatrixTransformRcPtr *mt,
-                                           const float *m44,
-                                           const float *offset4)
-{
-  FallbackTransform *transform = (FallbackTransform *)mt;
-  copy_m4_m4((float(*)[4])transform->matrix, (float(*)[4])m44);
-  copy_v4_v4(transform->offset, offset4);
-}
-
-void FallbackImpl::matrixTransformRelease(OCIO_MatrixTransformRcPtr * /*mt*/)
-{
-}
-
-void FallbackImpl::matrixTransformScale(float *m44, float *offset4, const float *scale4)
-{
-  if (scale4 == NULL) {
-    return;
-  }
-  if (m44 != NULL) {
-    memset(m44, 0, 16 * sizeof(float));
-    m44[0] = scale4[0];
-    m44[5] = scale4[1];
-    m44[10] = scale4[2];
-    m44[15] = scale4[3];
-  }
-  if (offset4 != NULL) {
-    offset4[0] = 0.0f;
-    offset4[1] = 0.0f;
-    offset4[2] = 0.0f;
-    offset4[3] = 0.0f;
-  }
-}
-
-bool FallbackImpl::supportGLSLDraw(void)
-{
-  return false;
-}
-
-bool FallbackImpl::setupGLSLDraw(struct OCIO_GLSLDrawState ** /*state_r*/,
-                                 OCIO_ConstProcessorRcPtr * /*ocio_processor_scene_to_ui*/,
-                                 OCIO_ConstProcessorRcPtr * /*ocio_processor_ui_to_display*/,
-                                 OCIO_CurveMappingSettings * /*curve_mapping_settings*/,
-                                 float /*dither*/,
-                                 bool /*predivide*/,
-                                 bool /*overlay*/)
-{
-  return false;
-}
-
-void FallbackImpl::finishGLSLDraw(OCIO_GLSLDrawState * /*state*/)
-{
-}
-
-void FallbackImpl::freeGLState(struct OCIO_GLSLDrawState * /*state_r*/)
-{
 }
 
 const char *FallbackImpl::getVersionString(void)
