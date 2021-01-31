@@ -38,6 +38,7 @@ using namespace OCIO_NAMESPACE;
 
 #include "BLI_math.h"
 #include "BLI_math_color.h"
+#include "BLI_math_matrix.h"
 
 #include "ocio_impl.h"
 
@@ -419,6 +420,43 @@ void OCIOImpl::configGetDefaultLumaCoefs(OCIO_ConstConfigRcPtr *config, float *r
   }
 }
 
+static bool to_scene_linear_matrix(ConstConfigRcPtr &config,
+                                   const char *colorspace,
+                                   float to_scene_linear[3][3])
+{
+  ConstProcessorRcPtr processor;
+  try {
+    processor = config->getProcessor(colorspace, ROLE_SCENE_LINEAR);
+  }
+  catch (Exception &exception) {
+    OCIO_reportException(exception);
+    return false;
+  }
+
+  if (!processor) {
+    return false;
+  }
+
+  ConstCPUProcessorRcPtr device_processor = processor->getDefaultCPUProcessor();
+  if (!device_processor) {
+    return false;
+  }
+
+  to_scene_linear[0][0] = 1.0f;
+  to_scene_linear[0][1] = 0.0f;
+  to_scene_linear[0][2] = 0.0f;
+  to_scene_linear[1][0] = 0.0f;
+  to_scene_linear[1][1] = 1.0f;
+  to_scene_linear[1][2] = 0.0f;
+  to_scene_linear[2][0] = 0.0f;
+  to_scene_linear[2][1] = 0.0f;
+  to_scene_linear[2][2] = 1.0f;
+  device_processor->applyRGB(to_scene_linear[0]);
+  device_processor->applyRGB(to_scene_linear[1]);
+  device_processor->applyRGB(to_scene_linear[2]);
+  return true;
+}
+
 void OCIOImpl::configGetXYZtoRGB(OCIO_ConstConfigRcPtr *config_, float xyz_to_rgb[3][3])
 {
   ConstConfigRcPtr config = (*(ConstConfigRcPtr *)config_);
@@ -426,25 +464,24 @@ void OCIOImpl::configGetXYZtoRGB(OCIO_ConstConfigRcPtr *config_, float xyz_to_rg
   /* Default to ITU-BT.709 in case no appropriate transform found. */
   memcpy(xyz_to_rgb, OCIO_XYZ_TO_LINEAR_SRGB, sizeof(OCIO_XYZ_TO_LINEAR_SRGB));
 
-  /* Auto estimate from XYZ and scene_linear roles, assumed to be a linear transform. */
-  if (config->hasRole("XYZ") && config->hasRole("scene_linear")) {
-    ConstProcessorRcPtr to_rgb_processor = config->getProcessor("XYZ", "scene_linear");
-    if (to_rgb_processor) {
-      ConstCPUProcessorRcPtr device_processor = to_rgb_processor->getDefaultCPUProcessor();
+  /* Get from OpenColorO config if it has the required roles. */
+  if (!config->hasRole(ROLE_SCENE_LINEAR)) {
+    return;
+  }
 
-      xyz_to_rgb[0][0] = 1.0f;
-      xyz_to_rgb[0][1] = 0.0f;
-      xyz_to_rgb[0][2] = 0.0f;
-      xyz_to_rgb[1][0] = 0.0f;
-      xyz_to_rgb[1][1] = 1.0f;
-      xyz_to_rgb[1][2] = 0.0f;
-      xyz_to_rgb[2][0] = 0.0f;
-      xyz_to_rgb[2][1] = 0.0f;
-      xyz_to_rgb[2][2] = 1.0f;
-      device_processor->applyRGB(xyz_to_rgb[0]);
-      device_processor->applyRGB(xyz_to_rgb[1]);
-      device_processor->applyRGB(xyz_to_rgb[2]);
+  if (config->hasRole("aces_interchange")) {
+    /* Standard OpenColorIO role, defined as ACES2065-1. */
+    const float xyz_to_aces[3][3] = {{1.0498110175f, -0.4959030231f, 0.0f},
+                                     {0.0f, 1.3733130458f, 0.0f},
+                                     {-0.0000974845f, 0.0982400361f, 0.9912520182f}};
+    float aces_to_rgb[3][3];
+    if (to_scene_linear_matrix(config, "aces_interchange", aces_to_rgb)) {
+      mul_m3_m3m3(xyz_to_rgb, aces_to_rgb, xyz_to_aces);
     }
+  }
+  else if (config->hasRole("XYZ")) {
+    /* Custom role used before the standard existed. */
+    to_scene_linear_matrix(config, "XXYZ", xyz_to_rgb);
   }
 }
 
