@@ -63,6 +63,20 @@ static CLG_LogRef LOG = {"wm.xr"};
 
 /* -------------------------------------------------------------------- */
 
+static void wm_xr_session_object_pose_get(const Object *ob, GHOST_XrPose *pose)
+{
+  copy_v3_v3(pose->position, ob->loc);
+  eul_to_quat(pose->orientation_quat, ob->rot);
+}
+
+static void wm_xr_session_object_pose_set(const GHOST_XrPose *pose, Object *ob)
+{
+  copy_v3_v3(ob->loc, pose->position);
+  quat_to_eul(ob->rot, pose->orientation_quat);
+
+  DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
+}
+
 static void wm_xr_session_create_cb(void *customdata)
 {
   wmXrData *xr_data = customdata;
@@ -490,6 +504,62 @@ bool WM_xr_session_state_controller_pose_rotation_get(const wmXrData *xr,
   return true;
 }
 
+void WM_xr_session_state_viewer_object_get(const wmXrData *xr, Object *ob)
+{
+  if (WM_xr_session_exists(xr)) {
+    wm_xr_session_object_pose_set(&xr->runtime->session_state.headset_object_orig_pose, ob);
+  }
+}
+
+void WM_xr_session_state_viewer_object_set(wmXrData *xr, const Object *ob)
+{
+  if (WM_xr_session_exists(xr)) {
+    wm_xr_session_object_pose_get(ob, &xr->runtime->session_state.headset_object_orig_pose);
+  }
+}
+
+void WM_xr_session_state_controller_object_get(const wmXrData *xr,
+                                               unsigned int subaction_idx,
+                                               Object *ob)
+{
+  if (WM_xr_session_exists(xr)) {
+    switch (subaction_idx) {
+      case 0:
+        wm_xr_session_object_pose_set(&xr->runtime->session_state.controller0_object_orig_pose,
+                                      ob);
+        break;
+      case 1:
+        wm_xr_session_object_pose_set(&xr->runtime->session_state.controller1_object_orig_pose,
+                                      ob);
+        break;
+      default:
+        BLI_assert(false);
+        break;
+    }
+  }
+}
+
+void WM_xr_session_state_controller_object_set(wmXrData *xr,
+                                               unsigned int subaction_idx,
+                                               const Object *ob)
+{
+  if (WM_xr_session_exists(xr)) {
+    switch (subaction_idx) {
+      case 0:
+        wm_xr_session_object_pose_get(ob,
+                                      &xr->runtime->session_state.controller0_object_orig_pose);
+        break;
+      case 1:
+        wm_xr_session_object_pose_get(ob,
+                                      &xr->runtime->session_state.controller1_object_orig_pose);
+        break;
+      default:
+        BLI_assert(false);
+        break;
+    }
+  }
+}
+
 /* -------------------------------------------------------------------- */
 /** \name XR-Session Actions
  *
@@ -558,13 +628,20 @@ static void wm_xr_session_controller_mats_update(const XrSessionSettings *settin
 
   for (unsigned int i = 0; i < count; ++i) {
     wmXrControllerData *controller = &state->controllers[i];
-    if (i == 0) {
-      ob_constraint = settings->controller0_object;
-      ob_flag = settings->controller0_flag;
-    }
-    else {
-      ob_constraint = settings->controller1_object;
-      ob_flag = settings->controller1_flag;
+    switch (i) {
+      case 0:
+        ob_constraint = settings->controller0_object;
+        ob_flag = settings->controller0_flag;
+        break;
+      case 1:
+        ob_constraint = settings->controller1_object;
+        ob_flag = settings->controller1_flag;
+        break;
+      default:
+        BLI_assert(false);
+        ob_constraint = NULL;
+        ob_flag = 0;
+        break;
     }
 
     /* Calculate controller matrix in world space. */
@@ -924,20 +1001,6 @@ void wm_xr_session_controller_data_clear(wmXrSessionState *state)
       surface_data->controller_draw_handle = NULL;
     }
   }
-}
-
-void wm_xr_session_object_pose_get(const Object *ob, GHOST_XrPose *pose)
-{
-  copy_v3_v3(pose->position, ob->loc);
-  eul_to_quat(pose->orientation_quat, ob->rot);
-}
-
-void wm_xr_session_object_pose_set(const GHOST_XrPose *pose, Object *ob)
-{
-  copy_v3_v3(ob->loc, pose->position);
-  quat_to_eul(ob->rot, pose->orientation_quat);
-
-  DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
 }
 
 void wm_xr_session_object_autokey(

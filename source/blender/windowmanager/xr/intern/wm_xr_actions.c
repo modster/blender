@@ -336,14 +336,15 @@ bool WM_xr_action_space_create(wmXrData *xr,
                                const char *action_name,
                                unsigned int count_subaction_paths,
                                const char **subaction_paths,
-                               const GHOST_XrPose *poses)
+                               const float (*poses)[7])
 {
   GHOST_XrActionSpaceInfo info = {
       .action_name = action_name,
       .count_subaction_paths = count_subaction_paths,
       .subaction_paths = subaction_paths,
-      .poses = poses,
+      .poses = (const GHOST_XrPose *)poses,
   };
+  BLI_STATIC_ASSERT(sizeof(*info.poses) == sizeof(*poses), "GHOST_XrPose size mismatch.");
 
   return GHOST_XrCreateActionSpaces(xr->runtime->context, action_set_name, 1, &info) ? true :
                                                                                        false;
@@ -493,10 +494,14 @@ bool WM_xr_action_state_get(const wmXrData *xr,
         case XR_VECTOR2F_INPUT:
           copy_v2_v2(((float(*)[2])r_state)[0], ((float(*)[2])action->states)[i]);
           break;
-        case XR_POSE_INPUT:
+        case XR_POSE_INPUT: {
+          /* Safety check, since r_state may be float[7] instead of GHOST_XrPose *. */
+          BLI_STATIC_ASSERT(sizeof(GHOST_XrPose) == sizeof(float[7]),
+                            "GHOST_XrPose size mismatch.");
           memcpy(
               (GHOST_XrPose *)r_state, &((GHOST_XrPose *)action->states)[i], sizeof(GHOST_XrPose));
           break;
+        }
         case XR_VIBRATION_OUTPUT:
           break;
       }

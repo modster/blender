@@ -30,10 +30,6 @@
 
 #include "WM_types.h"
 
-#ifdef WITH_XR_OPENXR
-#  include "../ghost/GHOST_Types.h"
-#endif
-
 #include "rna_internal.h"
 
 #ifdef RNA_RUNTIME
@@ -41,7 +37,6 @@
 #  include "WM_api.h"
 
 #  ifdef WITH_XR_OPENXR
-#    include "xr/intern/wm_xr_intern.h"
 
 static wmXrData *rna_XrSession_wm_xr_data_get(PointerRNA *ptr)
 {
@@ -116,17 +111,16 @@ static void rna_XrSessionSettings_headset_object_set(PointerRNA *ptr,
 #  ifdef WITH_XR_OPENXR
   wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
   Object *ob = value.data;
-  if (WM_xr_session_exists(xr)) {
-    if (xr->session_settings.headset_object) {
-      /* Restore previous object's original pose. */
-      wm_xr_session_object_pose_set(&xr->runtime->session_state.headset_object_orig_pose,
-                                    xr->session_settings.headset_object);
-    }
-    if (ob) {
-      /* Store new object's original pose. */
-      wm_xr_session_object_pose_get(ob, &xr->runtime->session_state.headset_object_orig_pose);
-    }
+
+  if (xr->session_settings.headset_object) {
+    /* Restore previous object's original pose. */
+    WM_xr_session_state_viewer_object_get(xr, xr->session_settings.headset_object);
   }
+  if (ob) {
+    /* Store new object's original pose. */
+    WM_xr_session_state_viewer_object_set(xr, ob);
+  }
+
   xr->session_settings.headset_object = ob;
 #  else
   UNUSED_VARS(ptr, value);
@@ -157,12 +151,12 @@ static void rna_XrSessionSettings_headset_object_enable_set(PointerRNA *ptr, boo
 
   /* Store/restore object's original pose. */
   Object *ob = xr->session_settings.headset_object;
-  if (ob && WM_xr_session_exists(xr)) {
+  if (ob) {
     if (value) {
-      wm_xr_session_object_pose_get(ob, &xr->runtime->session_state.headset_object_orig_pose);
+      WM_xr_session_state_viewer_object_set(xr, ob);
     }
     else {
-      wm_xr_session_object_pose_set(&xr->runtime->session_state.headset_object_orig_pose, ob);
+      WM_xr_session_state_viewer_object_get(xr, ob);
     }
   }
 #  else
@@ -203,17 +197,16 @@ static void rna_XrSessionSettings_controller0_object_set(PointerRNA *ptr,
 #  ifdef WITH_XR_OPENXR
   wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
   Object *ob = value.data;
-  if (WM_xr_session_exists(xr)) {
-    if (xr->session_settings.controller0_object) {
-      /* Restore previous object's original pose. */
-      wm_xr_session_object_pose_set(&xr->runtime->session_state.controller0_object_orig_pose,
-                                    xr->session_settings.controller0_object);
-    }
-    if (ob) {
-      /* Store new object's original pose. */
-      wm_xr_session_object_pose_get(ob, &xr->runtime->session_state.controller0_object_orig_pose);
-    }
+
+  if (xr->session_settings.controller0_object) {
+    /* Restore previous object's original pose. */
+    WM_xr_session_state_controller_object_get(xr, 0, xr->session_settings.controller0_object);
   }
+  if (ob) {
+    /* Store new object's original pose. */
+    WM_xr_session_state_controller_object_set(xr, 0, ob);
+  }
+
   xr->session_settings.controller0_object = ob;
 #  else
   UNUSED_VARS(ptr, value);
@@ -244,12 +237,12 @@ static void rna_XrSessionSettings_controller0_object_enable_set(PointerRNA *ptr,
 
   /* Store/restore object's original pose. */
   Object *ob = xr->session_settings.controller0_object;
-  if (ob && WM_xr_session_exists(xr)) {
+  if (ob) {
     if (value) {
-      wm_xr_session_object_pose_get(ob, &xr->runtime->session_state.controller0_object_orig_pose);
+      WM_xr_session_state_controller_object_set(xr, 0, ob);
     }
     else {
-      wm_xr_session_object_pose_set(&xr->runtime->session_state.controller0_object_orig_pose, ob);
+      WM_xr_session_state_controller_object_get(xr, 0, ob);
     }
   }
 #  else
@@ -290,17 +283,16 @@ static void rna_XrSessionSettings_controller1_object_set(PointerRNA *ptr,
 #  ifdef WITH_XR_OPENXR
   wmXrData *xr = rna_XrSession_wm_xr_data_get(ptr);
   Object *ob = value.data;
-  if (WM_xr_session_exists(xr)) {
-    if (xr->session_settings.controller1_object) {
-      /* Restore previous object's original pose. */
-      wm_xr_session_object_pose_set(&xr->runtime->session_state.controller1_object_orig_pose,
-                                    xr->session_settings.controller1_object);
-    }
-    if (ob) {
-      /* Store new object's original pose. */
-      wm_xr_session_object_pose_get(ob, &xr->runtime->session_state.controller1_object_orig_pose);
-    }
+
+  if (xr->session_settings.controller1_object) {
+    /* Restore previous object's original pose. */
+    WM_xr_session_state_controller_object_get(xr, 1, xr->session_settings.controller1_object);
   }
+  if (ob) {
+    /* Store new object's original pose. */
+    WM_xr_session_state_controller_object_set(xr, 1, ob);
+  }
+
   xr->session_settings.controller1_object = ob;
 #  else
   UNUSED_VARS(ptr, value);
@@ -331,12 +323,12 @@ static void rna_XrSessionSettings_controller1_object_enable_set(PointerRNA *ptr,
 
   /* Store/restore object's original pose. */
   Object *ob = xr->session_settings.controller1_object;
-  if (ob && WM_xr_session_exists(xr)) {
+  if (ob) {
     if (value) {
-      wm_xr_session_object_pose_get(ob, &xr->runtime->session_state.controller1_object_orig_pose);
+      WM_xr_session_state_controller_object_set(xr, 1, ob);
     }
     else {
-      wm_xr_session_object_pose_set(&xr->runtime->session_state.controller1_object_orig_pose, ob);
+      WM_xr_session_state_controller_object_get(xr, 1, ob);
     }
   }
 #  else
@@ -504,11 +496,11 @@ bool rna_XrSessionState_action_space_create(bContext *C,
     }
   }
 
-  GHOST_XrPose poses[2];
-  eul_to_quat(poses[0].orientation_quat, rotation);
-  normalize_qt(poses[0].orientation_quat);
-  copy_v3_v3(poses[0].position, location);
-  memcpy(&poses[1], &poses[0], sizeof(GHOST_XrPose));
+  float poses[2][7];
+  copy_v3_v3(poses[0], location);
+  eul_to_quat(&poses[0][3], rotation);
+  normalize_qt(&poses[0][3]);
+  memcpy(poses[1], poses[0], sizeof(float[7]));
 
   return WM_xr_action_space_create(
       &wm->xr, action_set_name, action_name, count_subaction_paths, subaction_paths, poses);
@@ -607,12 +599,8 @@ void rna_XrSessionState_pose_action_state_get(bContext *C,
 {
 #  ifdef WITH_XR_OPENXR
   wmWindowManager *wm = CTX_wm_manager(C);
-  if (!WM_xr_action_state_get(&wm->xr,
-                              action_set_name,
-                              action_name,
-                              XR_POSE_INPUT,
-                              user_path,
-                              (GHOST_XrPose *)r_state)) {
+  if (!WM_xr_action_state_get(
+          &wm->xr, action_set_name, action_name, XR_POSE_INPUT, user_path, r_state)) {
     zero_v3(r_state);
     unit_qt(&r_state[3]);
     return;

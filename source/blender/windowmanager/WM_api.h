@@ -67,14 +67,13 @@ struct wmOperatorType;
 struct wmPaintCursor;
 struct wmTabletData;
 
+#ifdef WITH_INPUT_NDOF
+struct wmNDOFMotionData;
+#endif
+
 #ifdef WITH_XR_OPENXR
 enum wmXrActionType;
 enum wmXrOpFlag;
-struct GHOST_XrPose;
-#endif
-
-#ifdef WITH_INPUT_NDOF
-struct wmNDOFMotionData;
 #endif
 
 typedef struct wmGizmo wmGizmo;
@@ -951,6 +950,14 @@ bool WM_xr_session_state_controller_pose_location_get(const wmXrData *xr,
 bool WM_xr_session_state_controller_pose_rotation_get(const wmXrData *xr,
                                                       unsigned int subaction_idx,
                                                       float r_rotation[4]);
+void WM_xr_session_state_viewer_object_get(const wmXrData *xr, Object *ob);
+void WM_xr_session_state_viewer_object_set(wmXrData *xr, const Object *ob);
+void WM_xr_session_state_controller_object_get(const wmXrData *xr,
+                                               unsigned int subaction_idx,
+                                               Object *ob);
+void WM_xr_session_state_controller_object_set(wmXrData *xr,
+                                               unsigned int subaction_idx,
+                                               const Object *ob);
 
 struct ARegionType *WM_xr_surface_controller_region_type_get(void);
 
@@ -975,7 +982,7 @@ bool WM_xr_action_space_create(wmXrData *xr,
                                const char *action_name,
                                unsigned int count_subaction_paths,
                                const char **subaction_paths,
-                               const struct GHOST_XrPose *poses);
+                               const float (*poses)[7]);
 void WM_xr_action_space_destroy(wmXrData *xr,
                                 const char *action_set_name,
                                 const char *action_name,
