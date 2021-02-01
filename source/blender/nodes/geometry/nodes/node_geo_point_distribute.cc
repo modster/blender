@@ -79,6 +79,7 @@ static Span<MLoopTri> get_mesh_looptris(const Mesh &mesh)
 }
 
 static void sample_mesh_surface(const Mesh &mesh,
+                                const float4x4 transform,
                                 const float base_density,
                                 const FloatReadAttribute *density_factors,
                                 const int seed,
@@ -93,9 +94,10 @@ static void sample_mesh_surface(const Mesh &mesh,
     const int v0_index = mesh.mloop[looptri.tri[0]].v;
     const int v1_index = mesh.mloop[looptri.tri[1]].v;
     const int v2_index = mesh.mloop[looptri.tri[2]].v;
-    const float3 v0_pos = mesh.mvert[v0_index].co;
-    const float3 v1_pos = mesh.mvert[v1_index].co;
-    const float3 v2_pos = mesh.mvert[v2_index].co;
+
+    const float3 v0_pos = transform * float3(mesh.mvert[v0_index].co);
+    const float3 v1_pos = transform * float3(mesh.mvert[v1_index].co);
+    const float3 v2_pos = transform * float3(mesh.mvert[v2_index].co);
 
     float looptri_density_factor = 1.0f;
     if (density_factors != nullptr) {
@@ -387,6 +389,7 @@ BLI_NOINLINE static void add_remaining_point_attributes(const MeshComponent &mes
 }
 
 static void sample_mesh_surface_with_minimum_distance(const Mesh &mesh,
+                                                      const float4x4 transform,
                                                       const float max_density,
                                                       const float minimum_distance,
                                                       const FloatReadAttribute &density_factors,
@@ -396,7 +399,7 @@ static void sample_mesh_surface_with_minimum_distance(const Mesh &mesh,
                                                       Vector<int> &r_looptri_indices)
 {
   sample_mesh_surface(
-      mesh, max_density, nullptr, seed, r_positions, r_bary_coords, r_looptri_indices);
+      mesh, transform, max_density, nullptr, seed, r_positions, r_bary_coords, r_looptri_indices);
   Array<bool> elimination_mask(r_positions.size(), false);
   update_elimination_mask_for_close_points(r_positions, minimum_distance, elimination_mask);
   update_elimination_mask_based_on_density_factors(
@@ -412,7 +415,7 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
   GeometryNodePointDistributeMethod distribute_method =
       static_cast<GeometryNodePointDistributeMethod>(params.node().custom1);
 
-  if (!geometry_set.has_mesh()) {
+  if (!geometry_set.has_mesh() && !geometry_set.has_instances()) {
     params.set_output("Geometry", std::move(geometry_set_out));
     return;
   }
@@ -425,38 +428,52 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
     return;
   }
 
-  const MeshComponent &mesh_component = *geometry_set.get_component_for_read<MeshComponent>();
-  const Mesh *mesh_in = mesh_component.get_for_read();
-
-  if (mesh_in == nullptr || mesh_in->mpoly == nullptr) {
-    params.set_output("Geometry", std::move(geometry_set_out));
-    return;
-  }
-
-  const FloatReadAttribute density_factors = mesh_component.attribute_get_for_read<float>(
-      density_attribute, ATTR_DOMAIN_POINT, 1.0f);
   const int seed = params.get_input<int>("Seed");
 
   Vector<float3> positions;
   Vector<float3> bary_coords;
   Vector<int> looptri_indices;
-  switch (distribute_method) {
-    case GEO_NODE_POINT_DISTRIBUTE_RANDOM:
-      sample_mesh_surface(
-          *mesh_in, density, &density_factors, seed, positions, bary_coords, looptri_indices);
-      break;
-    case GEO_NODE_POINT_DISTRIBUTE_POISSON:
-      const float minimum_distance = params.extract_input<float>("Distance Min");
-      sample_mesh_surface_with_minimum_distance(*mesh_in,
-                                                density,
-                                                minimum_distance,
-                                                density_factors,
-                                                seed,
-                                                positions,
-                                                bary_coords,
-                                                looptri_indices);
-      break;
-  }
+  BKE_foreach_geometry_component_recursive(
+      geometry_set,
+      [&](const GeometryComponent &component, blender::Span<blender::float4x4> transforms) {
+        if (component.type() != GeometryComponentType::Mesh) {
+          return;
+        }
+
+        const MeshComponent &mesh_component = static_cast<const MeshComponent &>(component);
+        const Mesh *mesh_in = mesh_component.get_for_read();
+        if (mesh_in == nullptr || mesh_in->mpoly == nullptr) {
+          return;
+        }
+        const FloatReadAttribute density_factors = mesh_component.attribute_get_for_read<float>(
+            density_attribute, ATTR_DOMAIN_POINT, 1.0f);
+
+        switch (distribute_method) {
+          case GEO_NODE_POINT_DISTRIBUTE_RANDOM:
+            sample_mesh_surface(*mesh_in,
+                                transforms[0],
+                                density,
+                                &density_factors,
+                                seed,
+                                positions,
+                                bary_coords,
+                                looptri_indices);
+            break;
+          case GEO_NODE_POINT_DISTRIBUTE_POISSON:
+            const float minimum_distance = params.get_input<float>("Distance Min");
+            sample_mesh_surface_with_minimum_distance(*mesh_in,
+                                                      transforms[0],
+                                                      density,
+                                                      minimum_distance,
+                                                      density_factors,
+                                                      seed,
+                                                      positions,
+                                                      bary_coords,
+                                                      looptri_indices);
+            break;
+        }
+      });
+
   const int tot_points = positions.size();
 
   PointCloud *pointcloud = BKE_pointcloud_new_nomain(tot_points);
@@ -470,7 +487,7 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
       geometry_set_out.get_component_for_write<PointCloudComponent>();
   point_component.replace(pointcloud);
 
-  add_remaining_point_attributes(mesh_component, point_component, bary_coords, looptri_indices);
+  // add_remaining_point_attributes(mesh_component, point_component, bary_coords, looptri_indices);
 
   params.set_output("Geometry", std::move(geometry_set_out));
 }
