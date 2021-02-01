@@ -134,7 +134,7 @@ if(WITH_OPENCOLORIO)
     ${OPENCOLORIO_INCLUDE_DIRS}
   )
   if(WIN32)
-    add_definitions(-DOpenColorIO_STATIC)
+    add_definitions(-DOpenColorIO_SKIP_IMPORTS)
   endif()
 endif()
 

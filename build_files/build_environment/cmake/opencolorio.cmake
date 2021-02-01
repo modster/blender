@@ -76,18 +76,18 @@ if(WIN32)
   if(BUILD_MODE STREQUAL Release)
     ExternalProject_Add_Step(external_opencolorio after_install
       COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/opencolorio/include ${HARVEST_TARGET}/opencolorio/include
-      COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/opencolorio/lib/static ${HARVEST_TARGET}/opencolorio/lib
+      COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/opencolorio/lib ${HARVEST_TARGET}/opencolorio/lib
       COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/yamlcpp/lib/libyaml-cppmd.lib ${HARVEST_TARGET}/opencolorio/lib/libyaml-cpp.lib
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/expat/lib/expat.lib ${HARVEST_TARGET}/opencolorio/lib/expat.lib
+      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/expat/lib/libexpatMD.lib ${HARVEST_TARGET}/opencolorio/lib/libexpatMD.lib
       COMMAND ${CMAKE_COMMAND} -E copy ${BUILD_DIR}/opencolorio/src/external_opencolorio-build/ext/dist/lib/pystring.lib ${HARVEST_TARGET}/opencolorio/lib/pystring.lib
       DEPENDEES install
     )
   endif()
   if(BUILD_MODE STREQUAL Debug)
     ExternalProject_Add_Step(external_opencolorio after_install
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/opencolorio/lib/static/Opencolorio.lib ${HARVEST_TARGET}/opencolorio/lib/OpencolorIO_d.lib
+      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/opencolorio/lib/Opencolorio.lib ${HARVEST_TARGET}/opencolorio/lib/OpencolorIO_d.lib
       COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/yamlcpp/lib/libyaml-cppmdd.lib ${HARVEST_TARGET}/opencolorio/lib/libyaml-cpp_d.lib
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/expat/lib/expat.lib ${HARVEST_TARGET}/opencolorio/lib/expat_d.lib
+      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/expat/lib/libexpatdMD.lib ${HARVEST_TARGET}/opencolorio/lib/libexpatdMD.lib
       COMMAND ${CMAKE_COMMAND} -E copy ${BUILD_DIR}/opencolorio/src/external_opencolorio-build/ext/dist/lib/pystring.lib ${HARVEST_TARGET}/opencolorio/lib/pystring_d.lib
       DEPENDEES install
     )
