@@ -231,7 +231,8 @@ static bool dependsOnTime(ModifierData *md)
 {
 #ifdef WITH_ALEMBIC
   MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)md;
-  return (mcmd->cache_file != NULL);
+  /* disable animations if using proxies, so we do not try to update */
+  return (mcmd->cache_file != NULL) && !mcmd->cache_file->use_cycles_procedural;
 #else
   UNUSED_VARS(md);
   return false;
@@ -249,6 +250,7 @@ static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphConte
 {
   MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)md;
 
+  /* do not add relations if using proxies, so we do not try to update the dependent objects */
   if (mcmd->cache_file != NULL) {
     DEG_add_object_cache_relation(
         ctx->node, mcmd->cache_file, DEG_OB_COMP_CACHE, "Mesh Cache File");
