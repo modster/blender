@@ -570,6 +570,8 @@ void Mesh::add_vertex_normals()
 
   /* static vertex normals */
   if (!attributes.find(ATTR_STD_VERTEX_NORMAL) && triangles_size) {
+    add_face_normals();
+
     /* get attributes */
     Attribute *attr_fN = attributes.find(ATTR_STD_FACE_NORMAL);
     Attribute *attr_vN = attributes.add(ATTR_STD_VERTEX_NORMAL);

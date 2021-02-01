@@ -1742,7 +1742,6 @@ void GeometryManager::device_update(Device *device,
         Mesh *mesh = static_cast<Mesh *>(geom);
 
         /* Update normals. */
-        mesh->add_face_normals();
         mesh->add_vertex_normals();
 
         if (mesh->need_attribute(scene, ATTR_STD_POSITION_UNDISPLACED)) {
