@@ -14,19 +14,24 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BLI_listbase_wrapper.hh" /* TODO: Couldn't figure this out yet. */
+
 #include "BKE_geometry_set.hh"
 #include "BKE_lib_id.h"
 #include "BKE_mesh.h"
 #include "BKE_mesh_wrapper.h"
+#include "BKE_modifier.h"
 #include "BKE_pointcloud.h"
 #include "BKE_volume.h"
 
+#include "DNA_collection_types.h"
 #include "DNA_object_types.h"
 
 #include "MEM_guardedalloc.h"
 
 using blender::float3;
 using blender::float4x4;
+using blender::ListBaseWrapper;
 using blender::MutableSpan;
 using blender::Span;
 using blender::StringRef;
@@ -547,6 +552,108 @@ int InstancesComponent::instances_amount() const
 bool InstancesComponent::is_empty() const
 {
   return transforms_.size() == 0;
+}
+
+static void foreach_geometry_component_recursive(const GeometrySet &geometry_set,
+                                                 const ForeachGeometryCallbackConst &callback,
+                                                 const float4x4 &transform);
+
+static GeometrySet object_get_geometry_set_for_read(const Object &object)
+{
+  /* Objects evaluated with a nodes modifier will have a geometry set already. */
+  if (object.runtime.geometry_set_eval != nullptr) {
+    return *object.runtime.geometry_set_eval;
+  }
+
+  /* Otherwise, construct a new geometry set with the component based on the object type. */
+  GeometrySet new_geometry_set;
+
+  if (object.type == OB_MESH) {
+    Mesh *mesh = BKE_modifier_get_evaluated_mesh_from_evaluated_object(
+        &const_cast<Object &>(object), false);
+
+    if (mesh != nullptr) {
+      BKE_mesh_wrapper_ensure_mdata(mesh);
+
+      MeshComponent &mesh_component = new_geometry_set.get_component_for_write<MeshComponent>();
+      mesh_component.replace(mesh, GeometryOwnershipType::ReadOnly);
+      mesh_component.copy_vertex_group_names_from_object(object);
+    }
+  }
+  // else if (object.type == OB_VOLUME) {
+  //   Volume *volume = BKE_modifier_get_volume...
+  // }
+
+  /* Return by value since there is no existing geometry set owned elsewhere to use. */
+  return new_geometry_set;
+}
+
+static void foreach_collection_geometry_set_recursive(const Collection &collection,
+                                                      const ForeachGeometryCallbackConst &callback,
+                                                      const float4x4 &transform)
+{
+  LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
+    BLI_assert(collection_object->ob != nullptr);
+    const Object &object = *collection_object->ob;
+    GeometrySet instance_geometry_set = object_get_geometry_set_for_read(object);
+
+    /* TODO: This seems to work-- validate this. */
+    const float4x4 instance_transform = transform * object.obmat;
+    foreach_geometry_component_recursive(instance_geometry_set, callback, instance_transform);
+  }
+  LISTBASE_FOREACH (const CollectionChild *, collection_child, &collection.children) {
+    BLI_assert(collection_child->collection != nullptr);
+    const Collection &collection = *collection_child->collection;
+    foreach_collection_geometry_set_recursive(collection, callback, transform);
+  }
+}
+
+static void foreach_geometry_component_recursive(const GeometrySet &geometry_set,
+                                                 const ForeachGeometryCallbackConst &callback,
+                                                 const float4x4 &transform)
+{
+  if (geometry_set.has_mesh()) {
+    callback(*geometry_set.get_component_for_read<MeshComponent>(), {transform});
+  }
+  if (geometry_set.has_pointcloud()) {
+    callback(*geometry_set.get_component_for_read<PointCloudComponent>(), {transform});
+  }
+  if (geometry_set.has_volume()) {
+    callback(*geometry_set.get_component_for_read<VolumeComponent>(), {transform});
+  }
+
+  if (geometry_set.has_instances()) {
+    const InstancesComponent &instances_component =
+        *geometry_set.get_component_for_read<InstancesComponent>();
+
+    Span<float4x4> transforms = instances_component.transforms();
+    Span<InstancedData> instances = instances_component.instanced_data();
+    for (const int i : instances.index_range()) {
+      const InstancedData &data = instances[i];
+      const float4x4 &transform = transforms[i];
+
+      if (data.type == INSTANCE_DATA_TYPE_OBJECT) {
+        BLI_assert(data.data.object != nullptr);
+        const Object &object = *data.data.object;
+        GeometrySet instance_geometry_set = object_get_geometry_set_for_read(object);
+        foreach_geometry_component_recursive(instance_geometry_set, callback, transform);
+      }
+      else if (data.type == INSTANCE_DATA_TYPE_COLLECTION) {
+        BLI_assert(data.data.collection != nullptr);
+        const Collection &collection = *data.data.collection;
+        foreach_collection_geometry_set_recursive(collection, callback, transform);
+      }
+    }
+  }
+}
+
+void BKE_foreach_geometry_component_recursive(const GeometrySet &geometry_set,
+                                              const ForeachGeometryCallbackConst &callback)
+{
+  float4x4 unit_transform;
+  unit_m4(unit_transform.values);
+
+  foreach_geometry_component_recursive(geometry_set, callback, unit_transform);
 }
 
 /** \} */

@@ -474,3 +474,9 @@ class VolumeComponent : public GeometryComponent {
 
   static constexpr inline GeometryComponentType static_type = GeometryComponentType::Volume;
 };
+
+using ForeachGeometryCallbackConst = std::function<void(
+    const GeometryComponent &component, blender::Span<blender::float4x4> transforms)>;
+
+void BKE_foreach_geometry_component_recursive(const GeometrySet &geometry_set,
+                                              const ForeachGeometryCallbackConst &callback);
