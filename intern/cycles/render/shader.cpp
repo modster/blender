@@ -656,7 +656,7 @@ void ShaderManager::device_free_common(Device *, DeviceScene *dscene, Scene *sce
 void ShaderManager::add_default(Scene *scene)
 {
   /* default surface */
-  if (scene->default_surface == nullptr) {
+  {
     ShaderGraph *graph = new ShaderGraph();
 
     DiffuseBsdfNode *diffuse = graph->create_node<DiffuseBsdfNode>();
@@ -673,7 +673,7 @@ void ShaderManager::add_default(Scene *scene)
   }
 
   /* default volume */
-  if (scene->default_volume == nullptr) {
+  {
     ShaderGraph *graph = new ShaderGraph();
 
     PrincipledVolumeNode *principled = graph->create_node<PrincipledVolumeNode>();
@@ -689,7 +689,7 @@ void ShaderManager::add_default(Scene *scene)
   }
 
   /* default light */
-  if (scene->default_light == nullptr) {
+  {
     ShaderGraph *graph = new ShaderGraph();
 
     EmissionNode *emission = graph->create_node<EmissionNode>();
@@ -707,7 +707,7 @@ void ShaderManager::add_default(Scene *scene)
   }
 
   /* default background */
-  if (scene->default_background == nullptr) {
+  {
     ShaderGraph *graph = new ShaderGraph();
 
     Shader *shader = scene->create_node<Shader>();
@@ -718,7 +718,7 @@ void ShaderManager::add_default(Scene *scene)
   }
 
   /* default empty */
-  if (scene->default_empty == nullptr) {
+  {
     ShaderGraph *graph = new ShaderGraph();
 
     Shader *shader = scene->create_node<Shader>();

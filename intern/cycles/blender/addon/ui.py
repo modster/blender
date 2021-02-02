@@ -742,7 +742,7 @@ class CYCLES_RENDER_PT_performance_final_render(CyclesButtonsPanel, Panel):
         col = layout.column()
 
         col.prop(rd, "use_save_buffers")
-        col.prop(rd, "use_persistent_data", text="Persistent Data")
+        col.prop(rd, "use_persistent_data", text="Persistent Images")
 
 
 class CYCLES_RENDER_PT_performance_viewport(CyclesButtonsPanel, Panel):

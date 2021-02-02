@@ -225,6 +225,7 @@ void BlenderSession::reset_session(BL::BlendData &b_data, BL::Depsgraph &b_depsg
   }
 
   session->progress.reset();
+  scene->reset();
 
   session->tile_manager.set_tile_order(session_params.tile_order);
 
@@ -236,19 +237,9 @@ void BlenderSession::reset_session(BL::BlendData &b_data, BL::Depsgraph &b_depsg
   /* There is no single depsgraph to use for the entire render.
    * See note on create_session().
    */
-  if (!scene->params.persistent_data) {
-    delete sync;
-    sync = nullptr;
-    scene->reset();
-  }
-
-  if (!sync) {
-    sync = new BlenderSync(b_engine, b_data, b_scene, scene, !background, session->progress);
-  }
-  else {
-    /* b_v3d should be null here, sync_recalc will check for nullity */
-    sync->sync_recalc(b_depsgraph, b_v3d);
-  }
+  /* sync object should be re-created */
+  delete sync;
+  sync = new BlenderSync(b_engine, b_data, b_scene, scene, !background, session->progress);
 
   BL::SpaceView3D b_null_space_view3d(PointerRNA_NULL);
   BL::RegionView3D b_null_region_view3d(PointerRNA_NULL);
@@ -609,13 +600,6 @@ void BlenderSession::render(BL::Depsgraph &b_depsgraph_)
   session->update_render_tile_cb = function_null;
 
   /* TODO: find a way to clear this data for persistent data render */
-  // todo(kevin): from patch
-//  session->device_free();
-
-//  if (!scene->params.persistent_data) {
-//    delete sync;
-//    sync = NULL;
-//  }
 #if 0
   /* free all memory used (host and device), so we wouldn't leave render
    * engine with extra memory allocated
