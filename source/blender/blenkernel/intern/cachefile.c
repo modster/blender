@@ -49,8 +49,6 @@
 
 #include "DEG_depsgraph_query.h"
 
-#include "RNA_access.h"
-
 #include "BLO_read_write.h"
 
 #ifdef WITH_ALEMBIC

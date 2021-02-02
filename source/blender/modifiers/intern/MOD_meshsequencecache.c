@@ -135,7 +135,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
     }
   }
 
-  /* Do not process data if using proxies. */
+  /* Do not process data if using proxies, return a box instead for displaying in the viewport. */
   if (BKE_cache_file_use_proxies(ctx->depsgraph, cache_file)) {
     BoundBox *bb = BKE_object_boundbox_get(ctx->object);
     Mesh *result = BKE_mesh_new_nomain_from_template(org_mesh, 8, 12, 0, 0, 0);
@@ -230,7 +230,7 @@ static bool dependsOnTime(ModifierData *md)
 {
 #ifdef WITH_ALEMBIC
   MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)md;
-  /* disable animations if using proxies, so we do not try to update */
+  /* Do not evaluate animations if using proxies. */
   return (mcmd->cache_file != NULL) && !mcmd->cache_file->use_proxies;
 #else
   UNUSED_VARS(md);
@@ -249,7 +249,6 @@ static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphConte
 {
   MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)md;
 
-  /* do not add relations if using proxies, so we do not try to update the dependent objects */
   if (mcmd->cache_file != NULL) {
     DEG_add_object_cache_relation(
         ctx->node, mcmd->cache_file, DEG_OB_COMP_CACHE, "Mesh Cache File");
