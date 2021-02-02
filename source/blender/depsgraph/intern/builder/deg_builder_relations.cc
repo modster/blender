@@ -2582,7 +2582,7 @@ void DepsgraphRelationBuilder::build_cachefile(CacheFile *cache_file)
     return;
   }
 
-  if (cache_file->use_cycles_procedural) {
+  if (cache_file->use_proxies) {
     return;
   }
 

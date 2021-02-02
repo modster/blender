@@ -474,8 +474,7 @@ bool BlenderSync::sync_object_attributes(BL::DepsgraphObjectInstance &b_instance
 /* Object Loop */
 
 void BlenderSync::sync_procedural(BL::Object &b_ob,
-                                  BL::MeshSequenceCacheModifier &b_mesh_cache,
-                                  bool background)
+                                  BL::MeshSequenceCacheModifier &b_mesh_cache)
 {
 #ifdef WITH_ALEMBIC
   BL::CacheFile cache_file = b_mesh_cache.cache_file();
@@ -497,16 +496,9 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
     current_frame = cache_file.frame();
   }
 
-  if (!background && !cache_file.override_frame()) {
-    /* for viewport renders we load the entire animation, unless we have a fixed frame */
+  if (!cache_file.override_frame()) {
     procedural->set_start_frame(b_scene.frame_start());
     procedural->set_end_frame(b_scene.frame_end());
-  }
-  else {
-    /* for final renders we set the start and end frames to the current one so we
-     * only load data for the current frame */
-    procedural->set_start_frame(current_frame);
-    procedural->set_end_frame(current_frame);
   }
 
   procedural->set_frame(current_frame);
@@ -606,10 +598,11 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
       BL::MeshSequenceCacheModifier b_mesh_cache = object_mesh_cache_find(b_ob, false);
 
       /* experimental as blender does not have good support for procedurals at the moment
+       * only available in the viewport at the moment since we load data for all the frames at once
        * skip in the motion case, as the motion blur data will be handled in the procedural */
       if (!motion && b_v3d && b_mesh_cache && experimental &&
-          b_mesh_cache.cache_file().use_cycles_procedural()) {
-        sync_procedural(b_ob, b_mesh_cache, !b_v3d);
+          b_mesh_cache.cache_file().use_proxies()) {
+        sync_procedural(b_ob, b_mesh_cache);
       }
       else
 #endif

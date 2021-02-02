@@ -7262,7 +7262,7 @@ void uiTemplateCacheFile(uiLayout *layout,
   row = uiLayoutRow(layout, false);
   uiItemR(row, &fileptr, "is_sequence", 0, NULL, ICON_NONE);
 
-  /* Check for presence of Cycles and Experimental feature set to display the use_cycles_procedural
+  /* Check for presence of Cycles and Experimental feature set to display the use_proxies
    * option. */
   Scene *scene = CTX_data_scene(C);
   PointerRNA scene_ptr;
@@ -7271,7 +7271,7 @@ void uiTemplateCacheFile(uiLayout *layout,
     PointerRNA cycles_ptr = RNA_pointer_get(&scene_ptr, "cycles");
     if (RNA_enum_get(&cycles_ptr, "feature_set") == 1) { /* EXPERIMENTAL */
       row = uiLayoutRow(layout, false);
-      uiItemR(row, &fileptr, "use_cycles_procedural", 0, NULL, ICON_NONE);
+      uiItemR(row, &fileptr, "use_proxies", 0, NULL, ICON_NONE);
     }
   }
 

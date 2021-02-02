@@ -136,17 +136,16 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   }
 
   /* Do not process data if using proxies. */
-  if (BKE_cache_file_use_proxy(ctx->depsgraph, cache_file)) {
+  if (BKE_cache_file_use_proxies(ctx->depsgraph, cache_file)) {
     BoundBox *bb = BKE_object_boundbox_get(ctx->object);
-
-    Mesh *result = BKE_mesh_new_nomain_from_template(org_mesh, 8, 0, 0, 24, 6);
+    Mesh *result = BKE_mesh_new_nomain_from_template(org_mesh, 8, 12, 0, 0, 0);
 
     MVert *mvert = result->mvert;
     for (int i = 0; i < 8; ++i) {
       copy_v3_v3(mvert[i].co, bb->vec[i]);
     }
 
-    /* See BKE_object.h for the diagram. */
+    /* See DNA_object_types.h for the diagram showing the order of the vertices for a BoundBox. */
     static unsigned int loops_v[6][4] = {
         {0, 4, 5, 1},
         {4, 7, 6, 5},
@@ -232,7 +231,7 @@ static bool dependsOnTime(ModifierData *md)
 #ifdef WITH_ALEMBIC
   MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)md;
   /* disable animations if using proxies, so we do not try to update */
-  return (mcmd->cache_file != NULL) && !mcmd->cache_file->use_cycles_procedural;
+  return (mcmd->cache_file != NULL) && !mcmd->cache_file->use_proxies;
 #else
   UNUSED_VARS(md);
   return false;

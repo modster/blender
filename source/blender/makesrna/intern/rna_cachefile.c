@@ -105,12 +105,11 @@ static void rna_def_cachefile(BlenderRNA *brna)
       prop, "Sequence", "Whether the cache is separated in a series of files");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
-  prop = RNA_def_property(srna, "use_cycles_procedural", PROP_BOOLEAN, PROP_NONE);
+  prop = RNA_def_property(srna, "use_proxies", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_ui_text(
       prop,
-      "Cycles Procedural",
-      "Load the Alembic data at render time using the Cycles procedural, instead of loading data "
-      "from Blender");
+      "Use Cycles Procedural",
+      "Load data using the Cycles procedural during preview renders, display boxes in the viewport");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
   /* ----------------- For Scene time ------------------- */

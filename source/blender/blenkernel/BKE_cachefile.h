@@ -60,7 +60,7 @@ void BKE_cachefile_reader_open(struct CacheFile *cache_file,
                                const char *object_path);
 void BKE_cachefile_reader_free(struct CacheFile *cache_file, struct CacheReader **reader);
 
-bool BKE_cache_file_use_proxy(struct Depsgraph *depsgraph, struct CacheFile *cache_file);
+bool BKE_cache_file_use_proxies(struct Depsgraph *depsgraph, struct CacheFile *cache_file);
 
 #ifdef __cplusplus
 }

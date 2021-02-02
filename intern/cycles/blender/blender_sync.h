@@ -151,8 +151,7 @@ class BlenderSync {
                       TaskPool *geom_task_pool);
 
   void sync_procedural(BL::Object &b_ob,
-                       BL::MeshSequenceCacheModifier &b_mesh_cache,
-                       bool background);
+                       BL::MeshSequenceCacheModifier &b_mesh_cache);
 
   bool sync_object_attributes(BL::DepsgraphObjectInstance &b_instance, Object *object);
 
