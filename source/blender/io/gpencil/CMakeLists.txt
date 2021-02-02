@@ -37,7 +37,7 @@ set(INC
 
 set(INC_SYS
   ${PUGIXML_INCLUDE_DIR}
-  ${LIBHARU_INCLUDE_DIR}
+  ${HARU_INCLUDE_DIR}
 )
 
 set(SRC
@@ -70,7 +70,7 @@ set(LIB
   bf_io_common
 
   ${PUGIXML_LIBRARIES}
-  ${LIBHARU_LIBRARIES}
+  ${HARU_LIBRARIES}
 )
 
 list(APPEND LIB
