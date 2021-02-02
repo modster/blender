@@ -37,7 +37,7 @@ set(INC
 
 set(INC_SYS
   ${PUGIXML_INCLUDE_DIR}
-  ${HARU_INCLUDE_DIR}
+  ${HARU_INCLUDE_DIRS}
 )
 
 set(SRC
