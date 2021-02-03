@@ -4,10 +4,10 @@
 
 uniform vec4 cocParams;
 
-#define cocMul cocParams[0] /* distance * aperturesize * invsensorsize */
+#define cocMul cocParams[0]  /* distance * aperturesize * invsensorsize */
 #define cocBias cocParams[1] /* aperturesize * invsensorsize */
 #define cocNear cocParams[2] /* Near view depths value. */
-#define cocFar cocParams[3] /* Far view depths value. */
+#define cocFar cocParams[3]  /* Far view depths value. */
 
 /* -------------- Debug Defines ------------- */
 

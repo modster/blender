@@ -45,7 +45,7 @@ extern struct DrawEngineType draw_engine_eevee_type;
 
 /* Minimum UBO is 16384 bytes */
 #define MAX_PROBE 128 /* TODO : find size by dividing UBO max size by probe data size */
-#define MAX_GRID 64 /* TODO : find size by dividing UBO max size by grid data size */
+#define MAX_GRID 64   /* TODO : find size by dividing UBO max size by grid data size */
 #define MAX_PLANAR 16 /* TODO : find size by dividing UBO max size by grid data size */
 #define MAX_LIGHT 128 /* TODO : find size by dividing UBO max size by light data size */
 #define MAX_CASCADE_NUM 4
