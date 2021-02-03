@@ -5123,12 +5123,6 @@ void blo_do_versions_280(FileData *fd, Library *UNUSED(lib), Main *bmain)
       wm->xr.session_settings.shading.flag |= V3D_SHADING_WORLD_ORIENTATION;
     }
 
-    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
-      scene->eevee.bokeh_neighbor_max = 10.0f;
-      scene->eevee.bokeh_denoise_fac = 0.75f;
-      scene->eevee.bokeh_overblur = 5.0f;
-    }
-
     /* Keep this block, even when empty. */
   }
 }
