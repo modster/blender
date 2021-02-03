@@ -27,7 +27,6 @@ uniform sampler2D holefillWeightBuffer;
 uniform sampler2D bokehLut;
 
 uniform float bokehMaxSize;
-uniform vec2 bokehAnisotropyInv;
 
 in vec4 uvcoordsvar;
 
@@ -81,6 +80,13 @@ void dof_slight_focus_gather(float radius, out vec4 out_color, out float out_wei
       const float isect_mul = 1.0;
       dof_gather_accumulate_sample_pair(
           pair_data, bordering_radius, isect_mul, first_ring, false, false, bg_ring, bg_accum);
+
+#ifdef DOF_BOKEH_TEXTURE
+      /* Swap distances in order to flip bokeh shape for foreground. */
+      float tmp = pair_data[0].dist;
+      pair_data[0].dist = pair_data[1].dist;
+      pair_data[1].dist = tmp;
+#endif
       dof_gather_accumulate_sample_pair(
           pair_data, bordering_radius, isect_mul, first_ring, false, true, fg_ring, fg_accum);
     }
