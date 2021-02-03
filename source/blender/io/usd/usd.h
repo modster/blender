@@ -61,7 +61,11 @@ struct USDImportParams {
   bool import_volumes;
   char *prim_path_mask;
   bool import_subdiv;
+  bool import_instance_proxies;
   bool create_collection;
+  bool import_guide;
+  bool import_proxy;
+  bool import_render;
 };
 
 /* The USD_export takes a as_background_job parameter, and returns a boolean.

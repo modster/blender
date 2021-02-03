@@ -298,10 +298,16 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
 
   const bool import_subdiv = RNA_boolean_get(op->ptr, "import_subdiv");
 
+  const bool import_instance_proxies = RNA_boolean_get(op->ptr, "import_instance_proxies");
+
   const bool create_collection = RNA_boolean_get(op->ptr, "create_collection");
 
   char *prim_path_mask = malloc(1024);
   RNA_string_get(op->ptr, "prim_path_mask", prim_path_mask);
+
+  const bool import_guide = RNA_boolean_get(op->ptr, "import_guide");
+  const bool import_proxy = RNA_boolean_get(op->ptr, "import_proxy");
+  const bool import_render = RNA_boolean_get(op->ptr, "import_render");
 
   int offset = 0;
   int sequence_len = 1;
@@ -338,7 +344,11 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
       import_volumes,
       prim_path_mask,
       import_subdiv,
+      import_instance_proxies,
       create_collection,
+      import_guide,
+      import_proxy,
+      import_render,
   };
 
   bool ok = USD_import(C, filename, &params, as_background_job);
@@ -391,6 +401,9 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   uiItemR(row, ptr, "import_subdiv", 0, NULL, ICON_NONE);
 
   row = uiLayoutRow(box, false);
+  uiItemR(row, ptr, "import_instance_proxies", 0, NULL, ICON_NONE);
+
+  row = uiLayoutRow(box, false);
   uiItemR(row, ptr, "create_collection", 0, NULL, ICON_NONE);
 
   // row = uiLayoutRow(box, false);
@@ -411,6 +424,13 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   uiItemR(box, ptr, "import_materials", 0, NULL, ICON_NONE);
   uiItemR(box, ptr, "import_meshes", 0, NULL, ICON_NONE);
   uiItemR(box, ptr, "import_volumes", 0, NULL, ICON_NONE);
+
+  box = uiLayoutBox(layout);
+  uiItemL(box, IFACE_("Purpose"), ICON_NONE);
+  uiItemR(box, ptr, "import_guide", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "import_proxy", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "import_render", 0, NULL, ICON_NONE);
+
 }
 
 void WM_OT_usd_import(struct wmOperatorType *ot)
@@ -509,6 +529,13 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   "SubdivisionScheme attribute");
 
   RNA_def_boolean(ot->srna,
+                  "import_instance_proxies",
+                  true,
+                  "Import Instance Proxies",
+                  "If enabled, USD instances will be traversed with instance proxies, "
+                  "creating a unique Blender object for each instance");
+
+  RNA_def_boolean(ot->srna,
                   "create_collection",
                   false,
                   "Create Collection",
@@ -530,6 +557,13 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                  1024,
                  "",
                  "If set, this will specify a specific primitive from the usd stage");
+
+  RNA_def_boolean(ot->srna, "import_guide", false, "Guide", "When checked, import guide geometry");
+
+  RNA_def_boolean(ot->srna, "import_proxy", true, "Proxy", "When checked, import proxy geometry");
+
+  RNA_def_boolean(
+    ot->srna, "import_render", true, "Render", "When checked, import final render geometry");
 }
 
 #endif /* WITH_USD */

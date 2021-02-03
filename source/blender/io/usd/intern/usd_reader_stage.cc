@@ -72,6 +72,33 @@ bool USDStageReader::valid() const
   return true;
 }
 
+/* Returns true if the given prim should be excluded from the
+ * traversal because it has a purpose which was not requested
+ * by the user; e.g., the prim represents guide geometry and
+ * the import_guide parameter is toggled off. */
+bool _filter_by_purpose(const pxr::UsdPrim &prim,
+                        const USDImportParams &params)
+{
+  if (prim.IsA<pxr::UsdGeomImageable>() &&
+      !(params.import_guide && params.import_proxy && params.import_render)) {
+
+    pxr::UsdGeomImageable imageable(prim);
+    if (imageable) {
+      if (pxr::UsdAttribute purpose_attr = imageable.GetPurposeAttr()) {
+        pxr::TfToken purpose;
+        purpose_attr.Get(&purpose);
+        if ((!params.import_guide && purpose == pxr::UsdGeomTokens->guide) ||
+            (!params.import_proxy && purpose == pxr::UsdGeomTokens->proxy) ||
+            (!params.import_render && purpose == pxr::UsdGeomTokens->render)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 static USDPrimReader *_handlePrim(Main *bmain,
                                   pxr::UsdStageRefPtr stage,
                                   const USDImportParams &params,
@@ -80,23 +107,34 @@ static USDPrimReader *_handlePrim(Main *bmain,
                                   std::vector<USDPrimReader *> &readers,
                                   ImportSettings &settings)
 {
+  if (_filter_by_purpose(prim, params)) {
+    return false;
+  }
+
   USDPrimReader *reader = NULL;
-
-  reader = create_reader(stage, prim, params, settings);
-
-  if (reader == NULL)
-    return NULL;
-
-  reader->parent(parent_reader);
-  reader->createObject(bmain, 0.0);
 
   // This check prevents the pseudo 'root' prim to be added
   if (prim != stage->GetPseudoRoot()) {
+    reader = blender::io::usd::create_reader(stage, prim, params, settings);
+    if (reader == NULL)
+      return NULL;
+
+    reader->parent(parent_reader);
+    reader->createObject(bmain, 0.0);
+
     readers.push_back(reader);
     reader->incref();
   }
 
-  for (const auto &childPrim : prim.GetChildren()) {
+  pxr::Usd_PrimFlagsPredicate filter_predicate = pxr::UsdPrimDefaultPredicate;
+
+  if (params.import_instance_proxies) {
+    filter_predicate = pxr::UsdTraverseInstanceProxies(filter_predicate);
+  }
+
+  pxr::UsdPrimSiblingRange children = prim.GetFilteredChildren(filter_predicate);
+
+  for (const auto &childPrim : children) {
     _handlePrim(bmain, stage, params, childPrim, reader, readers, settings);
   }
 
@@ -151,3 +189,4 @@ void USDStageReader::clear_readers()
 }
 
 }  // Namespace blender::io::usd
+
