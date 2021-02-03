@@ -104,31 +104,21 @@ struct FallbackTransform {
 };
 
 struct FallbackProcessor {
-  FallbackProcessor(FallbackTransform *transform) : transform(transform)
+  FallbackProcessor(const FallbackTransform &transform) : transform(transform)
   {
-  }
-
-  FallbackProcessor(const FallbackProcessor &other)
-  {
-    transform = new FallbackTransform(*other.transform);
-  }
-
-  ~FallbackProcessor()
-  {
-    delete transform;
   }
 
   void applyRGB(float *pixel)
   {
-    transform->applyRGB(pixel);
+    transform.applyRGB(pixel);
   }
 
   void applyRGBA(float *pixel)
   {
-    transform->applyRGBA(pixel);
+    transform.applyRGBA(pixel);
   }
 
-  FallbackTransform *transform;
+  FallbackTransform transform;
 
   MEM_CXX_CLASS_ALLOC_FUNCS("FallbackProcessor");
 };
@@ -338,50 +328,35 @@ OCIO_ConstProcessorRcPtr *FallbackImpl::configGetProcessorWithNames(OCIO_ConstCo
 {
   OCIO_ConstColorSpaceRcPtr *cs_src = configGetColorSpace(config, srcName);
   OCIO_ConstColorSpaceRcPtr *cs_dst = configGetColorSpace(config, dstName);
-  FallbackTransform *transform = new FallbackTransform();
+  FallbackTransform transform;
   if (cs_src == COLORSPACE_LINEAR && cs_dst == COLORSPACE_SRGB) {
-    transform->type = TRANSFORM_LINEAR_TO_SRGB;
+    transform.type = TRANSFORM_LINEAR_TO_SRGB;
   }
   else if (cs_src == COLORSPACE_SRGB && cs_dst == COLORSPACE_LINEAR) {
-    transform->type = TRANSFORM_SRGB_TO_LINEAR;
+    transform.type = TRANSFORM_SRGB_TO_LINEAR;
   }
   else {
-    transform->type = TRANSFORM_UNKNOWN;
+    transform.type = TRANSFORM_UNKNOWN;
   }
   return (OCIO_ConstProcessorRcPtr *)new FallbackProcessor(transform);
 }
 
-OCIO_ConstCPUProcessorRcPtr *FallbackImpl::processorGetCPUProcessor(OCIO_ConstProcessorRcPtr *p)
+OCIO_ConstCPUProcessorRcPtr *FallbackImpl::processorGetCPUProcessor(
+    OCIO_ConstProcessorRcPtr *processor)
 {
-  FallbackProcessor *processor = (FallbackProcessor *)p;
-  return (OCIO_ConstCPUProcessorRcPtr *)new FallbackProcessor(*processor);
+  /* Just make a copy of the processor so that we are compatible with OCIO
+   * which does need it as a separate object. */
+  FallbackProcessor *fallback_processor = (FallbackProcessor *)processor;
+  return (OCIO_ConstCPUProcessorRcPtr *)new FallbackProcessor(*fallback_processor);
 }
 
-void FallbackImpl::processorApply(OCIO_ConstCPUProcessorRcPtr *processor,
-                                  OCIO_PackedImageDesc *img)
+void FallbackImpl::processorRelease(OCIO_ConstProcessorRcPtr *processor)
 {
-  /* OCIO_TODO stride not respected, channels must be 3 or 4 */
-  OCIO_PackedImageDescription *desc = (OCIO_PackedImageDescription *)img;
-  int channels = desc->numChannels;
-  float *pixels = desc->data;
-  int width = desc->width;
-  int height = desc->height;
-  int x, y;
-
-  for (y = 0; y < height; y++) {
-    for (x = 0; x < width; x++) {
-      float *pixel = pixels + channels * (y * width + x);
-
-      if (channels == 4)
-        processorApplyRGBA(processor, pixel);
-      else if (channels == 3)
-        processorApplyRGB(processor, pixel);
-    }
-  }
+  delete (FallbackProcessor *)(processor);
 }
 
-void FallbackImpl::processorApply_predivide(OCIO_ConstCPUProcessorRcPtr *processor,
-                                            OCIO_PackedImageDesc *img)
+void FallbackImpl::cpuProcessorApply(OCIO_ConstCPUProcessorRcPtr *cpu_processor,
+                                     OCIO_PackedImageDesc *img)
 {
   /* OCIO_TODO stride not respected, channels must be 3 or 4 */
   OCIO_PackedImageDescription *desc = (OCIO_PackedImageDescription *)img;
@@ -396,28 +371,51 @@ void FallbackImpl::processorApply_predivide(OCIO_ConstCPUProcessorRcPtr *process
       float *pixel = pixels + channels * (y * width + x);
 
       if (channels == 4)
-        processorApplyRGBA_predivide(processor, pixel);
+        cpuProcessorApplyRGBA(cpu_processor, pixel);
       else if (channels == 3)
-        processorApplyRGB(processor, pixel);
+        cpuProcessorApplyRGB(cpu_processor, pixel);
     }
   }
 }
 
-void FallbackImpl::processorApplyRGB(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel)
+void FallbackImpl::cpuProcessorApply_predivide(OCIO_ConstCPUProcessorRcPtr *cpu_processor,
+                                               OCIO_PackedImageDesc *img)
 {
-  ((FallbackProcessor *)processor)->applyRGB(pixel);
+  /* OCIO_TODO stride not respected, channels must be 3 or 4 */
+  OCIO_PackedImageDescription *desc = (OCIO_PackedImageDescription *)img;
+  int channels = desc->numChannels;
+  float *pixels = desc->data;
+  int width = desc->width;
+  int height = desc->height;
+  int x, y;
+
+  for (y = 0; y < height; y++) {
+    for (x = 0; x < width; x++) {
+      float *pixel = pixels + channels * (y * width + x);
+
+      if (channels == 4)
+        cpuProcessorApplyRGBA_predivide(cpu_processor, pixel);
+      else if (channels == 3)
+        cpuProcessorApplyRGB(cpu_processor, pixel);
+    }
+  }
 }
 
-void FallbackImpl::processorApplyRGBA(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel)
+void FallbackImpl::cpuProcessorApplyRGB(OCIO_ConstCPUProcessorRcPtr *cpu_processor, float *pixel)
 {
-  ((FallbackProcessor *)processor)->applyRGBA(pixel);
+  ((FallbackProcessor *)cpu_processor)->applyRGB(pixel);
 }
 
-void FallbackImpl::processorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *processor,
-                                                float *pixel)
+void FallbackImpl::cpuProcessorApplyRGBA(OCIO_ConstCPUProcessorRcPtr *cpu_processor, float *pixel)
+{
+  ((FallbackProcessor *)cpu_processor)->applyRGBA(pixel);
+}
+
+void FallbackImpl::cpuProcessorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *cpu_processor,
+                                                   float *pixel)
 {
   if (pixel[3] == 1.0f || pixel[3] == 0.0f) {
-    processorApplyRGBA(processor, pixel);
+    cpuProcessorApplyRGBA(cpu_processor, pixel);
   }
   else {
     float alpha, inv_alpha;
@@ -429,7 +427,7 @@ void FallbackImpl::processorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *pro
     pixel[1] *= inv_alpha;
     pixel[2] *= inv_alpha;
 
-    processorApplyRGBA(processor, pixel);
+    cpuProcessorApplyRGBA(cpu_processor, pixel);
 
     pixel[0] *= alpha;
     pixel[1] *= alpha;
@@ -437,14 +435,9 @@ void FallbackImpl::processorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *pro
   }
 }
 
-void FallbackImpl::processorRelease(OCIO_ConstProcessorRcPtr *processor)
+void FallbackImpl::cpuProcessorRelease(OCIO_ConstCPUProcessorRcPtr *cpu_processor)
 {
-  delete (FallbackProcessor *)(processor);
-}
-
-void FallbackImpl::cpuProcessorRelease(OCIO_ConstCPUProcessorRcPtr *processor)
-{
-  delete (FallbackProcessor *)(processor);
+  delete (FallbackProcessor *)(cpu_processor);
 }
 
 const char *FallbackImpl::colorSpaceGetName(OCIO_ConstColorSpaceRcPtr *cs)
@@ -468,19 +461,18 @@ const char *FallbackImpl::colorSpaceGetFamily(OCIO_ConstColorSpaceRcPtr * /*cs*/
   return "";
 }
 
-OCIO_ConstProcessorRcPtr *FallbackImpl::createDisplayProcessor(
-    OCIO_ConstConfigRcPtr * /* config */,
-    const char * /* input */,
-    const char * /* view */,
-    const char * /* display */,
-    const char * /* look */,
-    const float scale,
-    const float exponent)
+OCIO_ConstProcessorRcPtr *FallbackImpl::createDisplayProcessor(OCIO_ConstConfigRcPtr * /*config*/,
+                                                               const char * /*input*/,
+                                                               const char * /*view*/,
+                                                               const char * /*display*/,
+                                                               const char * /*look*/,
+                                                               const float scale,
+                                                               const float exponent)
 {
-  FallbackTransform *transform = new FallbackTransform();
-  transform->type = TRANSFORM_LINEAR_TO_SRGB;
-  transform->scale = scale;
-  transform->exponent = exponent;
+  FallbackTransform transform;
+  transform.type = TRANSFORM_LINEAR_TO_SRGB;
+  transform.scale = scale;
+  transform.exponent = exponent;
 
   return (OCIO_ConstProcessorRcPtr *)new FallbackProcessor(transform);
 }

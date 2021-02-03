@@ -194,45 +194,45 @@ OCIO_ConstProcessorRcPtr *OCIO_configGetProcessorWithNames(OCIO_ConstConfigRcPtr
   return impl->configGetProcessorWithNames(config, srcName, dstName);
 }
 
-OCIO_ConstCPUProcessorRcPtr *OCIO_processorGetCPUProcessor(OCIO_ConstProcessorRcPtr *p)
+void OCIO_processorRelease(OCIO_ConstProcessorRcPtr *processor)
 {
-  return impl->processorGetCPUProcessor(p);
+  impl->processorRelease(processor);
 }
 
-void OCIO_processorApply(OCIO_ConstCPUProcessorRcPtr *processor, OCIO_PackedImageDesc *img)
+OCIO_ConstCPUProcessorRcPtr *OCIO_processorGetCPUProcessor(OCIO_ConstProcessorRcPtr *processor)
 {
-  impl->processorApply(processor, img);
+  return impl->processorGetCPUProcessor(processor);
 }
 
-void OCIO_processorApply_predivide(OCIO_ConstCPUProcessorRcPtr *processor,
+void OCIO_cpuProcessorApply(OCIO_ConstCPUProcessorRcPtr *cpu_processor, OCIO_PackedImageDesc *img)
+{
+  impl->cpuProcessorApply(cpu_processor, img);
+}
+
+void OCIO_cpuProcessorApply_predivide(OCIO_ConstCPUProcessorRcPtr *cpu_processor,
                                    OCIO_PackedImageDesc *img)
 {
-  impl->processorApply_predivide(processor, img);
+  impl->cpuProcessorApply_predivide(cpu_processor, img);
 }
 
-void OCIO_processorApplyRGB(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel)
+void OCIO_cpuProcessorApplyRGB(OCIO_ConstCPUProcessorRcPtr *cpu_processor, float *pixel)
 {
-  impl->processorApplyRGB(processor, pixel);
+  impl->cpuProcessorApplyRGB(cpu_processor, pixel);
 }
 
-void OCIO_processorApplyRGBA(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel)
+void OCIO_cpuProcessorApplyRGBA(OCIO_ConstCPUProcessorRcPtr *cpu_processor, float *pixel)
 {
-  impl->processorApplyRGBA(processor, pixel);
+  impl->cpuProcessorApplyRGBA(cpu_processor, pixel);
 }
 
-void OCIO_processorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel)
+void OCIO_cpuProcessorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel)
 {
-  impl->processorApplyRGBA_predivide(processor, pixel);
+  impl->cpuProcessorApplyRGBA_predivide(processor, pixel);
 }
 
-void OCIO_processorRelease(OCIO_ConstProcessorRcPtr *p)
+void OCIO_cpuProcessorRelease(OCIO_ConstCPUProcessorRcPtr *cpu_processor)
 {
-  impl->processorRelease(p);
-}
-
-void OCIO_cpuProcessorRelease(OCIO_ConstCPUProcessorRcPtr *p)
-{
-  impl->cpuProcessorRelease(p);
+  impl->cpuProcessorRelease(cpu_processor);
 }
 
 const char *OCIO_colorSpaceGetName(OCIO_ConstColorSpaceRcPtr *cs)

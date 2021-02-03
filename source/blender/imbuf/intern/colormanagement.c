@@ -101,7 +101,7 @@ static float imbuf_linear_srgb_to_xyz[3][3] = {{0.0f}};
 static pthread_mutex_t processor_lock = BLI_MUTEX_INITIALIZER;
 
 typedef struct ColormanageProcessor {
-  OCIO_ConstCPUProcessorRcPtr *processor;
+  OCIO_ConstCPUProcessorRcPtr *cpu_processor;
   CurveMapping *curve_mapping;
   bool is_data_result;
 } ColormanageProcessor;
@@ -119,8 +119,8 @@ static struct global_gpu_state {
 
 static struct global_color_picking_state {
   /* Cached processor for color picking conversion. */
-  OCIO_ConstCPUProcessorRcPtr *processor_to;
-  OCIO_ConstCPUProcessorRcPtr *processor_from;
+  OCIO_ConstCPUProcessorRcPtr *cpu_processor_to;
+  OCIO_ConstCPUProcessorRcPtr *cpu_processor_from;
   bool failed;
 } global_color_picking_state = {NULL};
 
@@ -721,12 +721,12 @@ void colormanagement_exit(void)
     MEM_freeN(global_gpu_state.curve_mapping_settings.lut);
   }
 
-  if (global_color_picking_state.processor_to) {
-    OCIO_cpuProcessorRelease(global_color_picking_state.processor_to);
+  if (global_color_picking_state.cpu_processor_to) {
+    OCIO_cpuProcessorRelease(global_color_picking_state.cpu_processor_to);
   }
 
-  if (global_color_picking_state.processor_from) {
-    OCIO_cpuProcessorRelease(global_color_picking_state.processor_from);
+  if (global_color_picking_state.cpu_processor_from) {
+    OCIO_cpuProcessorRelease(global_color_picking_state.cpu_processor_from);
   }
 
   memset(&global_gpu_state, 0, sizeof(global_gpu_state));
@@ -882,7 +882,7 @@ static OCIO_ConstCPUProcessorRcPtr *colorspace_to_scene_linear_cpu_processor(
       OCIO_ConstProcessorRcPtr *processor = create_colorspace_transform_processor(
           colorspace->name, global_role_scene_linear);
 
-      if (processor) {
+      if (processor != NULL) {
         colorspace->to_scene_linear = (struct OCIO_ConstCPUProcessorRcPtr *)
             OCIO_processorGetCPUProcessor(processor);
         OCIO_processorRelease(processor);
@@ -905,7 +905,7 @@ static OCIO_ConstCPUProcessorRcPtr *colorspace_from_scene_linear_cpu_processor(
       OCIO_ConstProcessorRcPtr *processor = create_colorspace_transform_processor(
           global_role_scene_linear, colorspace->name);
 
-      if (processor) {
+      if (processor != NULL) {
         colorspace->from_scene_linear = (struct OCIO_ConstCPUProcessorRcPtr *)
             OCIO_processorGetCPUProcessor(processor);
         OCIO_processorRelease(processor);
@@ -938,7 +938,7 @@ static OCIO_ConstCPUProcessorRcPtr *display_from_scene_linear_processor(
         OCIO_configRelease(config);
       }
 
-      if (processor) {
+      if (processor != NULL) {
         display->from_scene_linear = (struct OCIO_ConstCPUProcessorRcPtr *)
             OCIO_processorGetCPUProcessor(processor);
         OCIO_processorRelease(processor);
@@ -970,7 +970,7 @@ static OCIO_ConstCPUProcessorRcPtr *display_to_scene_linear_processor(ColorManag
         OCIO_configRelease(config);
       }
 
-      if (processor) {
+      if (processor != NULL) {
         display->to_scene_linear = (struct OCIO_ConstCPUProcessorRcPtr *)
             OCIO_processorGetCPUProcessor(processor);
         OCIO_processorRelease(processor);
@@ -2113,8 +2113,8 @@ void IMB_colormanagement_colorspace_to_scene_linear_v3(float pixel[3], ColorSpac
 
   processor = colorspace_to_scene_linear_cpu_processor(colorspace);
 
-  if (processor) {
-    OCIO_processorApplyRGB(processor, pixel);
+  if (processor != NULL) {
+    OCIO_cpuProcessorApplyRGB(processor, pixel);
   }
 }
 
@@ -2131,8 +2131,8 @@ void IMB_colormanagement_scene_linear_to_colorspace_v3(float pixel[3], ColorSpac
 
   processor = colorspace_from_scene_linear_cpu_processor(colorspace);
 
-  if (processor) {
-    OCIO_processorApplyRGB(processor, pixel);
+  if (processor != NULL) {
+    OCIO_cpuProcessorApplyRGB(processor, pixel);
   }
 }
 
@@ -2150,12 +2150,12 @@ void IMB_colormanagement_colorspace_to_scene_linear_v4(float pixel[4],
 
   processor = colorspace_to_scene_linear_cpu_processor(colorspace);
 
-  if (processor) {
+  if (processor != NULL) {
     if (predivide) {
-      OCIO_processorApplyRGBA_predivide(processor, pixel);
+      OCIO_cpuProcessorApplyRGBA_predivide(processor, pixel);
     }
     else {
-      OCIO_processorApplyRGBA(processor, pixel);
+      OCIO_cpuProcessorApplyRGBA(processor, pixel);
     }
   }
 }
@@ -2177,7 +2177,7 @@ void IMB_colormanagement_colorspace_to_scene_linear(float *buffer,
 
   processor = colorspace_to_scene_linear_cpu_processor(colorspace);
 
-  if (processor) {
+  if (processor != NULL) {
     OCIO_PackedImageDesc *img;
 
     img = OCIO_createOCIO_PackedImageDesc(buffer,
@@ -2189,10 +2189,10 @@ void IMB_colormanagement_colorspace_to_scene_linear(float *buffer,
                                           (size_t)channels * sizeof(float) * width);
 
     if (predivide) {
-      OCIO_processorApply_predivide(processor, img);
+      OCIO_cpuProcessorApply_predivide(processor, img);
     }
     else {
-      OCIO_processorApply(processor, img);
+      OCIO_cpuProcessorApply(processor, img);
     }
 
     OCIO_PackedImageDescRelease(img);
@@ -2229,12 +2229,12 @@ void IMB_colormanagement_imbuf_to_byte_texture(unsigned char *out_buffer,
     const unsigned char *in = in_buffer + in_offset * 4;
     unsigned char *out = out_buffer + out_offset * 4;
 
-    if (processor) {
+    if (processor != NULL) {
       /* Convert to scene linear, to sRGB and premultiply. */
       for (int x = 0; x < width; x++, in += 4, out += 4) {
         float pixel[4];
         rgba_uchar_to_float(pixel, in);
-        OCIO_processorApplyRGB(processor, pixel);
+        OCIO_cpuProcessorApplyRGB(processor, pixel);
         linearrgb_to_srgb_v3_v3(pixel, pixel);
         if (use_premultiply) {
           mul_v3_fl(pixel, pixel[3]);
@@ -2325,16 +2325,16 @@ void IMB_colormanagement_imbuf_to_float_texture(float *out_buffer,
  */
 void IMB_colormanagement_scene_linear_to_color_picking_v3(float pixel[3])
 {
-  if (!global_color_picking_state.processor_to && !global_color_picking_state.failed) {
+  if (!global_color_picking_state.cpu_processor_to && !global_color_picking_state.failed) {
     /* Create processor if none exists. */
     BLI_mutex_lock(&processor_lock);
 
-    if (!global_color_picking_state.processor_to && !global_color_picking_state.failed) {
+    if (!global_color_picking_state.cpu_processor_to && !global_color_picking_state.failed) {
       OCIO_ConstProcessorRcPtr *processor = create_colorspace_transform_processor(
           global_role_scene_linear, global_role_color_picking);
 
-      if (processor) {
-        global_color_picking_state.processor_to = OCIO_processorGetCPUProcessor(processor);
+      if (processor != NULL) {
+        global_color_picking_state.cpu_processor_to = OCIO_processorGetCPUProcessor(processor);
         OCIO_processorRelease(processor);
       }
       else {
@@ -2345,23 +2345,23 @@ void IMB_colormanagement_scene_linear_to_color_picking_v3(float pixel[3])
     BLI_mutex_unlock(&processor_lock);
   }
 
-  if (global_color_picking_state.processor_to) {
-    OCIO_processorApplyRGB(global_color_picking_state.processor_to, pixel);
+  if (global_color_picking_state.cpu_processor_to) {
+    OCIO_cpuProcessorApplyRGB(global_color_picking_state.cpu_processor_to, pixel);
   }
 }
 
 void IMB_colormanagement_color_picking_to_scene_linear_v3(float pixel[3])
 {
-  if (!global_color_picking_state.processor_from && !global_color_picking_state.failed) {
+  if (!global_color_picking_state.cpu_processor_from && !global_color_picking_state.failed) {
     /* Create processor if none exists. */
     BLI_mutex_lock(&processor_lock);
 
-    if (!global_color_picking_state.processor_from && !global_color_picking_state.failed) {
+    if (!global_color_picking_state.cpu_processor_from && !global_color_picking_state.failed) {
       OCIO_ConstProcessorRcPtr *processor = create_colorspace_transform_processor(
           global_role_color_picking, global_role_scene_linear);
 
-      if (processor) {
-        global_color_picking_state.processor_from = OCIO_processorGetCPUProcessor(processor);
+      if (processor != NULL) {
+        global_color_picking_state.cpu_processor_from = OCIO_processorGetCPUProcessor(processor);
         OCIO_processorRelease(processor);
       }
       else {
@@ -2372,8 +2372,8 @@ void IMB_colormanagement_color_picking_to_scene_linear_v3(float pixel[3])
     BLI_mutex_unlock(&processor_lock);
   }
 
-  if (global_color_picking_state.processor_from) {
-    OCIO_processorApplyRGB(global_color_picking_state.processor_from, pixel);
+  if (global_color_picking_state.cpu_processor_from) {
+    OCIO_cpuProcessorApplyRGB(global_color_picking_state.cpu_processor_from, pixel);
   }
 }
 
@@ -2401,8 +2401,8 @@ void IMB_colormanagement_scene_linear_to_display_v3(float pixel[3], ColorManaged
 {
   OCIO_ConstCPUProcessorRcPtr *processor = display_from_scene_linear_processor(display);
 
-  if (processor) {
-    OCIO_processorApplyRGB(processor, pixel);
+  if (processor != NULL) {
+    OCIO_cpuProcessorApplyRGB(processor, pixel);
   }
 }
 
@@ -2411,8 +2411,8 @@ void IMB_colormanagement_display_to_scene_linear_v3(float pixel[3], ColorManaged
 {
   OCIO_ConstCPUProcessorRcPtr *processor = display_to_scene_linear_processor(display);
 
-  if (processor) {
-    OCIO_processorApplyRGB(processor, pixel);
+  if (processor != NULL) {
+    OCIO_cpuProcessorApplyRGB(processor, pixel);
   }
 }
 
@@ -3772,12 +3772,13 @@ ColormanageProcessor *IMB_colormanagement_display_processor_new(
     cm_processor->is_data_result = display_space->is_data;
   }
 
-  cm_processor->processor = create_display_buffer_processor(applied_view_settings->look,
-                                                            applied_view_settings->view_transform,
-                                                            display_settings->display_device,
-                                                            applied_view_settings->exposure,
-                                                            applied_view_settings->gamma,
-                                                            global_role_scene_linear);
+  cm_processor->cpu_processor = create_display_buffer_processor(
+      applied_view_settings->look,
+      applied_view_settings->view_transform,
+      display_settings->display_device,
+      applied_view_settings->exposure,
+      applied_view_settings->gamma,
+      global_role_scene_linear);
 
   if (applied_view_settings->flag & COLORMANAGE_VIEW_USE_CURVES) {
     cm_processor->curve_mapping = BKE_curvemapping_copy(applied_view_settings->curve_mapping);
@@ -3800,8 +3801,8 @@ ColormanageProcessor *IMB_colormanagement_colorspace_processor_new(const char *f
 
   OCIO_ConstProcessorRcPtr *processor = create_colorspace_transform_processor(from_colorspace,
                                                                               to_colorspace);
-  if (processor) {
-    cm_processor->processor = OCIO_processorGetCPUProcessor(processor);
+  if (processor != NULL) {
+    cm_processor->cpu_processor = OCIO_processorGetCPUProcessor(processor);
   }
   OCIO_processorRelease(processor);
 
@@ -3814,8 +3815,8 @@ void IMB_colormanagement_processor_apply_v4(ColormanageProcessor *cm_processor, 
     BKE_curvemapping_evaluate_premulRGBF(cm_processor->curve_mapping, pixel, pixel);
   }
 
-  if (cm_processor->processor) {
-    OCIO_processorApplyRGBA(cm_processor->processor, pixel);
+  if (cm_processor->cpu_processor) {
+    OCIO_cpuProcessorApplyRGBA(cm_processor->cpu_processor, pixel);
   }
 }
 
@@ -3826,8 +3827,8 @@ void IMB_colormanagement_processor_apply_v4_predivide(ColormanageProcessor *cm_p
     BKE_curvemapping_evaluate_premulRGBF(cm_processor->curve_mapping, pixel, pixel);
   }
 
-  if (cm_processor->processor) {
-    OCIO_processorApplyRGBA_predivide(cm_processor->processor, pixel);
+  if (cm_processor->cpu_processor) {
+    OCIO_cpuProcessorApplyRGBA_predivide(cm_processor->cpu_processor, pixel);
   }
 }
 
@@ -3837,8 +3838,8 @@ void IMB_colormanagement_processor_apply_v3(ColormanageProcessor *cm_processor, 
     BKE_curvemapping_evaluate_premulRGBF(cm_processor->curve_mapping, pixel, pixel);
   }
 
-  if (cm_processor->processor) {
-    OCIO_processorApplyRGB(cm_processor->processor, pixel);
+  if (cm_processor->cpu_processor) {
+    OCIO_cpuProcessorApplyRGB(cm_processor->cpu_processor, pixel);
   }
 }
 
@@ -3883,7 +3884,7 @@ void IMB_colormanagement_processor_apply(ColormanageProcessor *cm_processor,
     }
   }
 
-  if (cm_processor->processor && channels >= 3) {
+  if (cm_processor->cpu_processor && channels >= 3) {
     OCIO_PackedImageDesc *img;
 
     /* apply OCIO processor */
@@ -3896,10 +3897,10 @@ void IMB_colormanagement_processor_apply(ColormanageProcessor *cm_processor,
                                           (size_t)channels * sizeof(float) * width);
 
     if (predivide) {
-      OCIO_processorApply_predivide(cm_processor->processor, img);
+      OCIO_cpuProcessorApply_predivide(cm_processor->cpu_processor, img);
     }
     else {
-      OCIO_processorApply(cm_processor->processor, img);
+      OCIO_cpuProcessorApply(cm_processor->cpu_processor, img);
     }
 
     OCIO_PackedImageDescRelease(img);
@@ -3929,8 +3930,8 @@ void IMB_colormanagement_processor_free(ColormanageProcessor *cm_processor)
   if (cm_processor->curve_mapping) {
     BKE_curvemapping_free(cm_processor->curve_mapping);
   }
-  if (cm_processor->processor) {
-    OCIO_cpuProcessorRelease(cm_processor->processor);
+  if (cm_processor->cpu_processor) {
+    OCIO_cpuProcessorRelease(cm_processor->cpu_processor);
   }
 
   MEM_freeN(cm_processor);

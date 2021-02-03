@@ -158,17 +158,16 @@ void OCIO_lookRelease(OCIO_ConstLookRcPtr *look);
 OCIO_ConstProcessorRcPtr *OCIO_configGetProcessorWithNames(OCIO_ConstConfigRcPtr *config,
                                                            const char *srcName,
                                                            const char *dstName);
+void OCIO_processorRelease(OCIO_ConstProcessorRcPtr *cpu_processor);
 
-OCIO_ConstCPUProcessorRcPtr *OCIO_processorGetCPUProcessor(OCIO_ConstProcessorRcPtr *p);
-void OCIO_processorApply(OCIO_ConstCPUProcessorRcPtr *processor, OCIO_PackedImageDesc *img);
-void OCIO_processorApply_predivide(OCIO_ConstCPUProcessorRcPtr *processor,
+OCIO_ConstCPUProcessorRcPtr *OCIO_processorGetCPUProcessor(OCIO_ConstProcessorRcPtr *processor);
+void OCIO_cpuProcessorApply(OCIO_ConstCPUProcessorRcPtr *cpu_processor, OCIO_PackedImageDesc *img);
+void OCIO_cpuProcessorApply_predivide(OCIO_ConstCPUProcessorRcPtr *cpu_processor,
                                    OCIO_PackedImageDesc *img);
-void OCIO_processorApplyRGB(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel);
-void OCIO_processorApplyRGBA(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel);
-void OCIO_processorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel);
-
-void OCIO_processorRelease(OCIO_ConstProcessorRcPtr *p);
-void OCIO_cpuProcessorRelease(OCIO_ConstCPUProcessorRcPtr *p);
+void OCIO_cpuProcessorApplyRGB(OCIO_ConstCPUProcessorRcPtr *cpu_processor, float *pixel);
+void OCIO_cpuProcessorApplyRGBA(OCIO_ConstCPUProcessorRcPtr *cpu_processor, float *pixel);
+void OCIO_cpuProcessorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *cpu_processor, float *pixel);
+void OCIO_cpuProcessorRelease(OCIO_ConstCPUProcessorRcPtr *processor);
 
 const char *OCIO_colorSpaceGetName(OCIO_ConstColorSpaceRcPtr *cs);
 const char *OCIO_colorSpaceGetDescription(OCIO_ConstColorSpaceRcPtr *cs);

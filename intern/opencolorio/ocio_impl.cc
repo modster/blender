@@ -284,9 +284,9 @@ void OCIOImpl::configGetDefaultLumaCoefs(OCIO_ConstConfigRcPtr *config, float *r
   try {
     double rgb_double[3];
     (*(ConstConfigRcPtr *)config)->getDefaultLumaCoefs(rgb_double);
-    rgb[0] = (float)rgb_double[0];
-    rgb[1] = (float)rgb_double[1];
-    rgb[2] = (float)rgb_double[2];
+    rgb[0] = rgb_double[0];
+    rgb[1] = rgb_double[1];
+    rgb[2] = rgb_double[2];
   }
   catch (Exception &exception) {
     OCIO_reportException(exception);
@@ -310,23 +310,15 @@ static bool to_scene_linear_matrix(ConstConfigRcPtr &config,
     return false;
   }
 
-  ConstCPUProcessorRcPtr device_processor = processor->getDefaultCPUProcessor();
-  if (!device_processor) {
+  ConstCPUProcessorRcPtr cpu_processor = processor->getDefaultCPUProcessor();
+  if (!cpu_processor) {
     return false;
   }
 
-  to_scene_linear[0][0] = 1.0f;
-  to_scene_linear[0][1] = 0.0f;
-  to_scene_linear[0][2] = 0.0f;
-  to_scene_linear[1][0] = 0.0f;
-  to_scene_linear[1][1] = 1.0f;
-  to_scene_linear[1][2] = 0.0f;
-  to_scene_linear[2][0] = 0.0f;
-  to_scene_linear[2][1] = 0.0f;
-  to_scene_linear[2][2] = 1.0f;
-  device_processor->applyRGB(to_scene_linear[0]);
-  device_processor->applyRGB(to_scene_linear[1]);
-  device_processor->applyRGB(to_scene_linear[2]);
+  unit_m3(to_scene_linear);
+  cpu_processor->applyRGB(to_scene_linear[0]);
+  cpu_processor->applyRGB(to_scene_linear[1]);
+  cpu_processor->applyRGB(to_scene_linear[2]);
   return true;
 }
 
@@ -354,7 +346,7 @@ void OCIOImpl::configGetXYZtoRGB(OCIO_ConstConfigRcPtr *config_, float xyz_to_rg
   }
   else if (config->hasRole("XYZ")) {
     /* Custom role used before the standard existed. */
-    to_scene_linear_matrix(config, "XXYZ", xyz_to_rgb);
+    to_scene_linear_matrix(config, "XYZ", xyz_to_rgb);
   }
 }
 
@@ -476,7 +468,7 @@ void OCIOImpl::colorSpaceIsBuiltin(OCIO_ConstConfigRcPtr *config_,
     return;
   }
 
-  ConstCPUProcessorRcPtr device_processor = processor->getDefaultCPUProcessor();
+  ConstCPUProcessorRcPtr cpu_processor = processor->getDefaultCPUProcessor();
 
   is_scene_linear = true;
   is_srgb = true;
@@ -487,10 +479,10 @@ void OCIOImpl::colorSpaceIsBuiltin(OCIO_ConstConfigRcPtr *config_,
     float cG[3] = {0, v, 0};
     float cB[3] = {0, 0, v};
     float cW[3] = {v, v, v};
-    device_processor->applyRGB(cR);
-    device_processor->applyRGB(cG);
-    device_processor->applyRGB(cB);
-    device_processor->applyRGB(cW);
+    cpu_processor->applyRGB(cR);
+    cpu_processor->applyRGB(cG);
+    cpu_processor->applyRGB(cB);
+    cpu_processor->applyRGB(cW);
 
     /* Make sure that there is no channel crosstalk. */
     if (fabsf(cR[1]) > 1e-5f || fabsf(cR[2]) > 1e-5f || fabsf(cG[0]) > 1e-5f ||
@@ -532,43 +524,49 @@ OCIO_ConstProcessorRcPtr *OCIOImpl::configGetProcessorWithNames(OCIO_ConstConfig
                                                                 const char *srcName,
                                                                 const char *dstName)
 {
-  ConstProcessorRcPtr *p = OBJECT_GUARDED_NEW(ConstProcessorRcPtr);
+  ConstProcessorRcPtr *processor = OBJECT_GUARDED_NEW(ConstProcessorRcPtr);
 
   try {
-    *p = (*(ConstConfigRcPtr *)config)->getProcessor(srcName, dstName);
+    *processor = (*(ConstConfigRcPtr *)config)->getProcessor(srcName, dstName);
 
-    if (*p)
-      return (OCIO_ConstProcessorRcPtr *)p;
+    if (*processor)
+      return (OCIO_ConstProcessorRcPtr *)processor;
   }
   catch (Exception &exception) {
     OCIO_reportException(exception);
   }
 
-  OBJECT_GUARDED_DELETE(p, ConstProcessorRcPtr);
+  OBJECT_GUARDED_DELETE(processor, ConstProcessorRcPtr);
 
   return 0;
+}
+
+void OCIOImpl::processorRelease(OCIO_ConstProcessorRcPtr *processor)
+{
+  OBJECT_GUARDED_DELETE(processor, ConstProcessorRcPtr);
 }
 
 OCIO_ConstCPUProcessorRcPtr *OCIOImpl::processorGetCPUProcessor(
     OCIO_ConstProcessorRcPtr *processor)
 {
-  ConstCPUProcessorRcPtr *p = OBJECT_GUARDED_NEW(ConstCPUProcessorRcPtr);
-  *p = (*(ConstProcessorRcPtr *)processor)->getDefaultCPUProcessor();
-  return (OCIO_ConstCPUProcessorRcPtr *)p;
+  ConstCPUProcessorRcPtr *cpu_processor = OBJECT_GUARDED_NEW(ConstCPUProcessorRcPtr);
+  *cpu_processor = (*(ConstProcessorRcPtr *)processor)->getDefaultCPUProcessor();
+  return (OCIO_ConstCPUProcessorRcPtr *)cpu_processor;
 }
 
-void OCIOImpl::processorApply(OCIO_ConstCPUProcessorRcPtr *processor, OCIO_PackedImageDesc *img)
+void OCIOImpl::cpuProcessorApply(OCIO_ConstCPUProcessorRcPtr *cpu_processor,
+                                 OCIO_PackedImageDesc *img)
 {
   try {
-    (*(ConstCPUProcessorRcPtr *)processor)->apply(*(PackedImageDesc *)img);
+    (*(ConstCPUProcessorRcPtr *)cpu_processor)->apply(*(PackedImageDesc *)img);
   }
   catch (Exception &exception) {
     OCIO_reportException(exception);
   }
 }
 
-void OCIOImpl::processorApply_predivide(OCIO_ConstCPUProcessorRcPtr *processor,
-                                        OCIO_PackedImageDesc *img_)
+void OCIOImpl::cpuProcessorApply_predivide(OCIO_ConstCPUProcessorRcPtr *cpu_processor,
+                                           OCIO_PackedImageDesc *img_)
 {
   try {
     PackedImageDesc *img = (PackedImageDesc *)img_;
@@ -585,12 +583,12 @@ void OCIOImpl::processorApply_predivide(OCIO_ConstCPUProcessorRcPtr *processor,
         for (int x = 0; x < width; x++) {
           float *pixel = pixels + 4 * (y * width + x);
 
-          processorApplyRGBA_predivide(processor, pixel);
+          cpuProcessorApplyRGBA_predivide(cpu_processor, pixel);
         }
       }
     }
     else {
-      (*(ConstCPUProcessorRcPtr *)processor)->apply(*img);
+      (*(ConstCPUProcessorRcPtr *)cpu_processor)->apply(*img);
     }
   }
   catch (Exception &exception) {
@@ -598,20 +596,21 @@ void OCIOImpl::processorApply_predivide(OCIO_ConstCPUProcessorRcPtr *processor,
   }
 }
 
-void OCIOImpl::processorApplyRGB(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel)
+void OCIOImpl::cpuProcessorApplyRGB(OCIO_ConstCPUProcessorRcPtr *cpu_processor, float *pixel)
 {
-  (*(ConstCPUProcessorRcPtr *)processor)->applyRGB(pixel);
+  (*(ConstCPUProcessorRcPtr *)cpu_processor)->applyRGB(pixel);
 }
 
-void OCIOImpl::processorApplyRGBA(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel)
+void OCIOImpl::cpuProcessorApplyRGBA(OCIO_ConstCPUProcessorRcPtr *cpu_processor, float *pixel)
 {
-  (*(ConstCPUProcessorRcPtr *)processor)->applyRGBA(pixel);
+  (*(ConstCPUProcessorRcPtr *)cpu_processor)->applyRGBA(pixel);
 }
 
-void OCIOImpl::processorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *processor, float *pixel)
+void OCIOImpl::cpuProcessorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *cpu_processor,
+                                               float *pixel)
 {
   if (pixel[3] == 1.0f || pixel[3] == 0.0f) {
-    (*(ConstCPUProcessorRcPtr *)processor)->applyRGBA(pixel);
+    (*(ConstCPUProcessorRcPtr *)cpu_processor)->applyRGBA(pixel);
   }
   else {
     float alpha, inv_alpha;
@@ -623,7 +622,7 @@ void OCIOImpl::processorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *process
     pixel[1] *= inv_alpha;
     pixel[2] *= inv_alpha;
 
-    (*(ConstCPUProcessorRcPtr *)processor)->applyRGBA(pixel);
+    (*(ConstCPUProcessorRcPtr *)cpu_processor)->applyRGBA(pixel);
 
     pixel[0] *= alpha;
     pixel[1] *= alpha;
@@ -631,14 +630,9 @@ void OCIOImpl::processorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *process
   }
 }
 
-void OCIOImpl::processorRelease(OCIO_ConstProcessorRcPtr *p)
+void OCIOImpl::cpuProcessorRelease(OCIO_ConstCPUProcessorRcPtr *cpu_processor)
 {
-  OBJECT_GUARDED_DELETE(p, ConstProcessorRcPtr);
-}
-
-void OCIOImpl::cpuProcessorRelease(OCIO_ConstCPUProcessorRcPtr *p)
-{
-  OBJECT_GUARDED_DELETE(p, ConstCPUProcessorRcPtr);
+  OBJECT_GUARDED_DELETE(cpu_processor, ConstCPUProcessorRcPtr);
 }
 
 const char *OCIOImpl::colorSpaceGetName(OCIO_ConstColorSpaceRcPtr *cs)
@@ -669,7 +663,7 @@ OCIO_ConstProcessorRcPtr *OCIOImpl::createDisplayProcessor(OCIO_ConstConfigRcPtr
   GroupTransformRcPtr group = GroupTransform::Create();
 
   /* Exposure. */
-  if (scale != 1.0) {
+  if (scale != 1.0f) {
     /* Always apply exposure in scene linear. */
     ColorSpaceTransformRcPtr ct = ColorSpaceTransform::Create();
     ct->setSrc(input);
@@ -688,7 +682,8 @@ OCIO_ConstProcessorRcPtr *OCIOImpl::createDisplayProcessor(OCIO_ConstConfigRcPtr
   }
 
   /* Add look transform. */
-  if (strlen(look)) {
+  const bool use_look = (strlen(look) != 0);
+  if (use_look) {
     const char *look_output = LookTransform::GetLooksResultColorSpace(
         config, config->getCurrentContext(), look);
 
@@ -705,20 +700,21 @@ OCIO_ConstProcessorRcPtr *OCIOImpl::createDisplayProcessor(OCIO_ConstConfigRcPtr
   /* Add view and display transform. */
   DisplayViewTransformRcPtr dvt = DisplayViewTransform::Create();
   dvt->setSrc(input);
-  dvt->setLooksBypass(look != NULL);
+  dvt->setLooksBypass(use_look);
   dvt->setView(view);
   dvt->setDisplay(display);
   group->appendTransform(dvt);
 
   /* Gamma. */
-  if (exponent != 1.0) {
+  if (exponent != 1.0f) {
     ExponentTransformRcPtr et = ExponentTransform::Create();
     const double value[4] = {exponent, exponent, exponent, 1.0};
     et->setValue(value);
     group->appendTransform(et);
   }
 
-  /* Create processor from transform. */
+  /* Create processor from transform. This is the moment were OCIO validates
+   * the entire transform, no need to check for the validity of inputs above. */
   ConstProcessorRcPtr *p = OBJECT_GUARDED_NEW(ConstProcessorRcPtr);
 
   try {
