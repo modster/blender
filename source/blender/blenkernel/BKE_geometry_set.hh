@@ -482,3 +482,7 @@ using ForeachGeometryCallbackConst = std::function<void(
 
 void BKE_foreach_geometry_component_recursive(const GeometrySet &geometry_set,
                                               const ForeachGeometryCallbackConst &callback);
+
+using GeometrySetGroup = std::pair<GeometrySet, blender::Vector<blender::float4x4>>;
+blender::Vector<GeometrySetGroup> BKE_geometry_set_gather_instanced(
+    const GeometrySet &geometry_set);

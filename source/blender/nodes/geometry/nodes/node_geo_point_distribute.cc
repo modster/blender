@@ -57,6 +57,10 @@ static void node_point_distribute_update(bNodeTree *UNUSED(ntree), bNode *node)
 }
 
 namespace blender::nodes {
+struct AttributeInfo {
+  CustomDataType data_type;
+  AttributeDomain domain;
+};
 
 /**
  * Use an arbitrary choice of axes for a usable rotation attribute directly out of this node.
@@ -127,48 +131,69 @@ static void sample_mesh_surface(const Mesh &mesh,
   }
 }
 
-BLI_NOINLINE static KDTree_3d *build_kdtree(Span<float3> positions)
+BLI_NOINLINE static KDTree_3d *build_kdtree(Span<Vector<float3>> all_positions)
 {
+  for (Vector<float3> positions : all_positions) {
+    for (const float3 position : positions) {
+    }
+  }
   KDTree_3d *kdtree = BLI_kdtree_3d_new(positions.size());
-  for (const int i : positions.index_range()) {
-    BLI_kdtree_3d_insert(kdtree, i, positions[i]);
+  int i = 0;
+  for (Vector<float3> positions : all_positions) {
+    for (const float3 position : positions) {
+      BLI_kdtree_3d_insert(kdtree, i, positions[i]);
+      i++;
+    }
   }
   BLI_kdtree_3d_balance(kdtree);
   return kdtree;
 }
 
 BLI_NOINLINE static void update_elimination_mask_for_close_points(
-    Span<float3> positions, const float minimum_distance, MutableSpan<bool> elimination_mask)
+    Span<Vector<float3>> positions_per_instance,
+    const float minimum_distance,
+    MutableSpan<bool> elimination_mask_per_instance)
 {
   if (minimum_distance <= 0.0f) {
     return;
   }
 
-  KDTree_3d *kdtree = build_kdtree(positions);
-
-  for (const int i : positions.index_range()) {
-    if (elimination_mask[i]) {
+  for (const int i_set : get_groups.index_range()) {
+    const GeometrySetGroup &set_group = get_groups[i_set];
+    const GeometrySet &set = set_group.first;
+    if (!set.has_mesh()) {
       continue;
     }
-
-    struct CallbackData {
-      int index;
-      MutableSpan<bool> elimination_mask;
-    } callback_data = {i, elimination_mask};
-
-    BLI_kdtree_3d_range_search_cb(
-        kdtree,
-        positions[i],
-        minimum_distance,
-        [](void *user_data, int index, const float *UNUSED(co), float UNUSED(dist_sq)) {
-          CallbackData &callback_data = *static_cast<CallbackData *>(user_data);
-          if (index != callback_data.index) {
-            callback_data.elimination_mask[index] = true;
-          }
-          return true;
-        },
-        &callback_data);
+    const Mesh &mesh = *set.get_mesh_for_read();
+    for (const float4x4 &transform : set_group.second) {
+    }
   }
+  KDTree_3d *kdtree = build_kdtree(positions);
+
+  for (const int i_instance :)
+    for (const int i : positions.index_range()) {
+      if (elimination_mask[i]) {
+        continue;
+      }
+
+      struct CallbackData {
+        int index;
+        MutableSpan<bool> elimination_mask;
+      } callback_data = {i, elimination_mask};
+
+      BLI_kdtree_3d_range_search_cb(
+          kdtree,
+          positions[i],
+          minimum_distance,
+          [](void *user_data, int index, const float *UNUSED(co), float UNUSED(dist_sq)) {
+            CallbackData &callback_data = *static_cast<CallbackData *>(user_data);
+            if (index != callback_data.index) {
+              callback_data.elimination_mask[index] = true;
+            }
+            return true;
+          },
+          &callback_data);
+    }
   BLI_kdtree_3d_free(kdtree);
 }
 
@@ -388,120 +413,146 @@ BLI_NOINLINE static void add_remaining_point_attributes(const MeshComponent &mes
       *mesh_component.get_for_read(), component, bary_coords, looptri_indices);
 }
 
-struct AttributeInfo {
-  std::string name;
-  Vector<CustomDataType> data_types;
-  Vector<AttributeDomain> domains;
-};
-
-struct ScatterPointsOnMeshOp {
-  /* Input data. */
-  const GeometryNodePointDistributeMethod distribute_method;
-  const std::string &density_attribute_name;
-  const int seed;
-  const float density;
-
-  /* Output data. */
-  Vector<float3> &positions;
-  Vector<float3> &bary_coords;
-  Vector<int> &looptri_indices;
-  Set<AttributeInfo> &attributes;
-
-  void operator()(const GeometryComponent &component, blender::Span<blender::float4x4> transforms)
-  {
-    if (component.type() != GeometryComponentType::Mesh) {
-      return;
+Map<const std::string, AttributeInfo> gather_attribute_info(Span<GeometrySetGroup> geometry_sets)
+{
+  Map<const std::string, AttributeInfo> attribute_info;
+  for (const GeometrySetGroup &set_group : geometry_sets) {
+    const GeometrySet &set = set_group.first;
+    if (!set.has_mesh()) {
+      continue;
     }
+    const MeshComponent &component = *set.get_component_for_read<MeshComponent>();
 
-    const MeshComponent &mesh_component = static_cast<const MeshComponent &>(component);
-    if (!mesh_component.has_mesh()) {
-      return;
-    }
-    const Mesh &mesh = *mesh_component.get_for_read();
-    for (const float4x4 &transform : transforms) {
-      switch (distribute_method) {
-        case GEO_NODE_POINT_DISTRIBUTE_RANDOM: {
-          const FloatReadAttribute density_factors = mesh_component.attribute_get_for_read<float>(
-              density_attribute_name, ATTR_DOMAIN_POINT, 1.0f);
-          sample_mesh_surface(mesh,
-                              transform,
-                              density,
-                              &density_factors,
-                              seed,
-                              positions,
-                              bary_coords,
-                              looptri_indices);
-          break;
-        }
-        case GEO_NODE_POINT_DISTRIBUTE_POISSON:
-          sample_mesh_surface(
-              mesh, transform, density, nullptr, seed, positions, bary_coords, looptri_indices);
-          break;
+    for (const std::string &name : component.attribute_names()) {
+      if (ELEM(name, "position", "normal", "id")) {
+        continue;
+      }
+      ReadAttributePtr attribute = component.attribute_try_get_for_read(name);
+      BLI_assert(attribute);
+      const CustomDataType data_type = attribute->custom_data_type();
+      const AttributeDomain domain = attribute->domain();
+      if (attribute_info.contains(name)) {
+        AttributeInfo &info = attribute_info.lookup(name);
+        info.data_type = attribute_data_type_highest_complexity({info.data_type, data_type});
+        /* TODO: Choose the domain based on priority. */
+        info.domain = domain;
+      }
+      else {
+        attribute_info.add(name, {data_type, domain});
       }
     }
   }
-};
+}
 
-struct PoissonEliminateFromDensityOp {
-  /* Input data. */
-  const std::string &density_attribute_name;
-  const float density;
-  Span<float3> bary_coords;
-  Span<int> looptri_indices;
-
-  /* Output data. */
-  MutableSpan<bool> elimination_mask;
-
-  void operator()(const GeometryComponent &component, blender::Span<blender::float4x4> transforms)
-  {
-    if (component.type() != GeometryComponentType::Mesh) {
-      return;
+PointCloud *random_create_points(Span<GeometrySetGroup> get_groups,
+                                 const GeoNodeExecParams &params,
+                                 MutableSpan<Vector<float3>> r_bary_coords_set,
+                                 MutableSpan<Vector<int>> r_looptri_indices_set,
+                                 const StringRef density_attribute_name,
+                                 const float density,
+                                 const int seed)
+{
+  Vector<float3> positions;
+  for (const int i_set : get_groups.index_range()) {
+    const GeometrySetGroup &set_group = get_groups[i_set];
+    const GeometrySet &set = set_group.first;
+    if (!set.has_mesh()) {
+      continue;
     }
-    const MeshComponent &mesh_component = static_cast<const MeshComponent &>(component);
-    if (!mesh_component.has_mesh()) {
-      return;
+    Vector<float3> &bary_coords = r_bary_coords_set[i_set];
+    Vector<int> &looptri_indices = r_looptri_indices_set[i_set];
+
+    const MeshComponent &component = *set.get_component_for_read<MeshComponent>();
+    const Mesh &mesh = *component.get_for_read();
+    const FloatReadAttribute density_factors = component.attribute_get_for_read<float>(
+        density_attribute_name, ATTR_DOMAIN_POINT, 1.0f);
+    for (const float4x4 &transform : set_group.second) {
+      sample_mesh_surface(mesh,
+                          transform,
+                          density,
+                          &density_factors,
+                          seed,
+                          positions,
+                          bary_coords,
+                          looptri_indices);
     }
-    const Mesh &mesh = *mesh_component.get_for_read();
-    for (const float4x4 &transform : transforms) {
-      const FloatReadAttribute density_factors = mesh_component.attribute_get_for_read<float>(
-          density_attribute_name, ATTR_DOMAIN_POINT, 1.0f);
-      update_elimination_mask_based_on_density_factors(
-          mesh, density_factors, bary_coords, looptri_indices, elimination_mask);
+    break;
+  }
+
+  PointCloud *pointcloud = BKE_pointcloud_new_nomain(positions.size());
+  memcpy(pointcloud->co, positions.data(), sizeof(float3) * positions.size());
+  return pointcloud;
+}
+
+PointCloud *poisson_disk_create_points(Span<GeometrySetGroup> get_groups,
+                                       const GeoNodeExecParams &params,
+                                       MutableSpan<Vector<float3>> r_bary_coords_set,
+                                       MutableSpan<Vector<int>> r_looptri_indices_set,
+                                       const StringRef density_attribute_name,
+                                       const float density,
+                                       const int seed)
+{
+  int instances_len = 0;
+  for (GeometrySetGroup set_group : get_groups) {
+    instances_len += set_group.second.size();
+  }
+  Vector<Vector<float3>> positions_per_instance(instances_len);
+
+  int points_len = 0;
+  int i_instance = 0;
+  for (const int i_set : get_groups.index_range()) {
+    const GeometrySetGroup &set_group = get_groups[i_set];
+    const GeometrySet &set = set_group.first;
+    if (!set.has_mesh()) {
+      continue;
+    }
+    Vector<float3> &bary_coords = r_bary_coords_set[i_set];
+    Vector<int> &looptri_indices = r_looptri_indices_set[i_set];
+    Vector<float3> &positions = positions_per_instance[i_instance];
+
+    const MeshComponent &component = *set.get_component_for_read<MeshComponent>();
+    const Mesh &mesh = *component.get_for_read();
+
+    for (const float4x4 &transform : set_group.second) {
+      sample_mesh_surface(
+          mesh, transform, density, nullptr, seed, positions, bary_coords, looptri_indices);
+      i_instance++;
+      points_len += positions.size();
     }
   }
-};
 
-struct AttributeInterpolateOp {
-  /* Input data. */
-  const std::string &density_attribute_name;
-  const float density;
-  Span<float3> bary_coords;
-  Span<int> looptri_indices;
+  Array<bool> elimination_mask(points_len, false);
+  const float minimum_distance = params.get_input<float>("Distance Min");
+  update_elimination_mask_for_close_points(
+      positions, points_len, minimum_distance, elimination_mask);
 
-  int index_offset = 0;
-
-  /* Output data. */
-  MutableSpan<bool> elimination_mask;
-
-  void operator()(const GeometryComponent &component, blender::Span<blender::float4x4> transforms)
-  {
-    if (component.type() != GeometryComponentType::Mesh) {
-      return;
+  int i_instance2 = 0;
+  for (const int i_set : get_groups.index_range()) {
+    const GeometrySetGroup &set_group = get_groups[i_set];
+    const GeometrySet &set = set_group.first;
+    if (!set.has_mesh()) {
+      continue;
     }
-    const MeshComponent &mesh_component = static_cast<const MeshComponent &>(component);
-    if (!mesh_component.has_mesh()) {
-      return;
-    }
-    const Mesh &mesh = *mesh_component.get_for_read();
-    for (const float4x4 &transform : transforms) {
+    Vector<float3> &bary_coords = r_bary_coords_set[i_set];
+    Vector<int> &looptri_indices = r_looptri_indices_set[i_set];
+    Vector<float3> &positions = positions_per_instance[i_set];
 
-      const FloatReadAttribute density_factors = mesh_component.attribute_get_for_read<float>(
+    const MeshComponent &component = *set.get_component_for_read<MeshComponent>();
+    const Mesh &mesh = *component.get_for_read();
+
+    for (const float4x4 &transform : set_group.second) {
+      const FloatReadAttribute density_factors = component.attribute_get_for_read<float>(
           density_attribute_name, ATTR_DOMAIN_POINT, 1.0f);
+
       update_elimination_mask_based_on_density_factors(
           mesh, density_factors, bary_coords, looptri_indices, elimination_mask);
+
+      eliminate_points_based_on_mask(
+          elimination_mask, positions_per_instance[i_instance2], bary_coords, looptri_indices);
+      i_instance2++;
     }
   }
-};
+}
 
 static void geo_node_point_distribute_exec(GeoNodeExecParams params)
 {
@@ -527,41 +578,117 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
 
   const int seed = params.get_input<int>("Seed");
 
-  Vector<float3> positions;
-  Vector<float3> bary_coords;
-  Vector<int> looptri_indices;
+  Vector<GeometrySetGroup> sets = BKE_geometry_set_gather_instanced(geometry_set);
+  int instances_len = 0;
+  for (GeometrySetGroup set_group : sets) {
+    instances_len += set_group.second.size();
+  }
+
+  Map<const std::string, AttributeInfo> attributes = gather_attribute_info(sets);
+
+  Vector<Vector<float3>> bary_coords_set(sets.size());
+  Vector<Vector<int>> looptri_indices_set(sets.size());
+  PointCloud *pointcloud;
+  switch (distribute_method) {
+    case GEO_NODE_POINT_DISTRIBUTE_RANDOM: {
+      pointcloud = random_create_points(sets,
+                                        params,
+                                        bary_coords_set,
+                                        looptri_indices_set,
+                                        density_attribute_name,
+                                        density,
+                                        seed);
+      break;
+    }
+    case GEO_NODE_POINT_DISTRIBUTE_POISSON:
+      pointcloud = poisson_disk_create_points(sets,
+                                              params,
+                                              bary_coords_set,
+                                              looptri_indices_set,
+                                              density_attribute_name,
+                                              density,
+                                              seed);
+      break;
+  }
+
+  /* One for every instance, for easier removal from . */
+  Vector<Vector<float3>> positions(instances_len);
+  Vector<Vector<float3>> bary_coords_set(sets.size());
+  Vector<Vector<int>> looptri_indices_set(sets.size());
   Set<AttributeInfo> attributes;
 
-  ScatterPointsOnMeshOp scatter_points_op{distribute_method,
-                                          density_attribute_name,
-                                          seed,
-                                          density,
-                                          positions,
-                                          bary_coords,
-                                          looptri_indices,
-                                          attributes};
-  BKE_foreach_geometry_component_recursive(geometry_set, scatter_points_op);
+  for (const int i_set : sets.index_range()) {
+    const GeometrySetGroup &set_group = sets[i_set];
+    const GeometrySet &set = set_group.first;
+    if (!set.has_mesh()) {
+      /* This will result in empty vectors when the set has no mesh, but that should be okay. */
+      continue;
+    }
+    Vector<float3> &bary_coords = bary_coords_set[i_set];
+    Vector<int> &looptri_indices = looptri_indices_set[i_set];
+
+    const MeshComponent &component = *set.get_component_for_read<MeshComponent>();
+    const Mesh &mesh = *component.get_for_read();
+    switch (distribute_method) {
+      case GEO_NODE_POINT_DISTRIBUTE_RANDOM: {
+        const FloatReadAttribute density_factors = component.attribute_get_for_read<float>(
+            density_attribute_name, ATTR_DOMAIN_POINT, 1.0f);
+        for (const float4x4 &transform : set_group.second) {
+          sample_mesh_surface(mesh,
+                              transform,
+                              density,
+                              &density_factors,
+                              seed,
+                              positions,
+                              bary_coords,
+                              looptri_indices);
+        }
+        break;
+      }
+      case GEO_NODE_POINT_DISTRIBUTE_POISSON:
+        break;
+    }
+  }
 
   /* Eliminate points based on the minimum distance for the poisson disk case. */
   if (distribute_method == GEO_NODE_POINT_DISTRIBUTE_POISSON) {
-    Array<bool> elimination_mask(positions.size(), false);
-    const float minimum_distance = params.get_input<float>("Distance Min");
 
-    update_elimination_mask_for_close_points(positions, minimum_distance, elimination_mask);
+    for (const int i_set : sets.index_range()) {
+      const int index_offset = index_offsets[i_set];
+      const GeometrySetGroup &set_group = sets[i_set];
+      const GeometrySet &set = set_group.first;
+      if (!set.has_mesh()) {
+        /* This will result in empty vectors when the set has no mesh, but that should be okay. */
+        continue;
+      }
+      Vector<float3> &bary_coords = bary_coords_set[i_set];
+      Vector<int> &looptri_indices = looptri_indices_set[i_set];
 
-    PoissonEliminateFromDensityOp eliminate_density_op{
-        density_attribute_name, density, bary_coords, looptri_indices};
-    BKE_foreach_geometry_component_recursive(geometry_set, eliminate_density_op);
-
-    eliminate_points_based_on_mask(elimination_mask, positions, bary_coords, looptri_indices);
+      const MeshComponent &component = *set.get_component_for_read<MeshComponent>();
+      const Mesh &mesh = *component.get_for_read();
+    }
   }
+
+  // const FloatReadAttribute density_factors = component.attribute_get_for_read<float>(
+  //     density_attribute_name, ATTR_DOMAIN_POINT, 1.0f);
+  // for (const float4x4 &transform : set_group.second) {
+  //   sample_mesh_surface(mesh,
+  //                       transform,
+  //                       density,
+  //                       &density_factors,
+  //                       seed,
+  //                       positions,
+  //                       bary_coords,
+  //                       looptri_indices);
+  // }
+  // for (const float4x4 &transform : set_group.second) {
+  //   sample_mesh_surface(
+  //       mesh, transform, density, nullptr, seed, positions, bary_coords, looptri_indices);
+  // }
 
   const int tot_points = positions.size();
 
-  PointCloud *pointcloud = BKE_pointcloud_new_nomain(tot_points);
-  memcpy(pointcloud->co, positions.data(), sizeof(float3) * tot_points);
-  for (const int i : positions.index_range()) {
-    *(float3 *)(pointcloud->co + i) = positions[i];
+  for (const int i : IndexRange(pointcloud->totpoint)) {
     pointcloud->radius[i] = 0.05f;
   }
 
