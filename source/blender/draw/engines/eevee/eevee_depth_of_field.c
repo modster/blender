@@ -21,7 +21,7 @@
  *
  * Depth of field post process effect.
  *
- * There is 2 methods to achieve this effect.
+ * There are 2 methods to achieve this effect.
  * - The first uses projection matrix offsetting and sample accumulation to give reference quality
  *   depth of field. But this needs many samples to hide the undersampling.
  * - The second one is a post-processing based one. It follows the implementation described in
@@ -282,7 +282,7 @@ static void dof_bokeh_pass_init(EEVEE_FramebufferList *fbl,
     return;
   }
 
-  void *owner = (void *)&dof_bokeh_pass_init;
+  void *owner = (void *)&EEVEE_depth_of_field_init;
   int res[2] = {DOF_BOKEH_LUT_SIZE, DOF_BOKEH_LUT_SIZE};
 
   DRW_PASS_CREATE(psl->dof_bokeh, DRW_STATE_WRITE_COLOR);
