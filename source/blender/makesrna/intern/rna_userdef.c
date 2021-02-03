@@ -3005,6 +3005,12 @@ static void rna_def_userdef_theme_space_buts(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Search Match", "");
   RNA_def_property_update(prop, 0, "rna_userdef_theme_update");
 
+  prop = RNA_def_property(srna, "active_modifier", PROP_FLOAT, PROP_COLOR_GAMMA);
+  RNA_def_property_float_sdna(prop, NULL, "active");
+  RNA_def_property_array(prop, 4);
+  RNA_def_property_ui_text(prop, "Active Modifier Outline", "");
+  RNA_def_property_update(prop, 0, "rna_userdef_theme_update");
+
   rna_def_userdef_theme_spaces_main(srna);
 }
 
@@ -5733,10 +5739,11 @@ static void rna_def_userdef_input(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "use_mouse_continuous", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "uiflag", USER_CONTINUOUS_MOUSE);
-  RNA_def_property_ui_text(prop,
-                           "Continuous Grab",
-                           "Allow moving the mouse outside the view on some manipulations "
-                           "(transform, ui control drag)");
+  RNA_def_property_ui_text(
+      prop,
+      "Continuous Grab",
+      "Let the mouse wrap around the view boundaries so mouse movements are not limited by the "
+      "screen size (used by transform, dragging of UI controls, etc.)");
 
   prop = RNA_def_property(srna, "use_drag_immediately", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", USER_RELEASECONFIRM);
