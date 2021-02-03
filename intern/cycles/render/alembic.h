@@ -358,6 +358,22 @@ class AlembicProcedural : public Procedural {
    * software. */
   NODE_SOCKET_API(float, scale)
 
+  /* Cache control. */
+
+  enum CacheMethod {
+    CACHE_ALL_DATA,
+        CACHE_FRAME_COUNT,
+        CACHE_MEMORY_LIMIT,
+  };
+
+  NODE_SOCKET_API(int, cache_method)
+
+  /* Maximum size of the cache in megabytes. */
+  NODE_SOCKET_API(uint, cache_memory_limit)
+
+  /* Maximum number of frames to hold in cache. */
+  NODE_SOCKET_API(int, cache_frame_count)
+
   AlembicProcedural();
   ~AlembicProcedural();
 

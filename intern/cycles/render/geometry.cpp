@@ -1533,6 +1533,8 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
       Hair *hair = static_cast<Hair *>(geom);
       hair->curve_shape = scene->params.hair_shape;
 
+      hair->need_update_rebuild &= hair->curve_first_key_is_modified();
+
       if (hair->need_update_rebuild) {
         device_update_flags |= DEVICE_CURVE_DATA_NEEDS_REALLOC;
       }

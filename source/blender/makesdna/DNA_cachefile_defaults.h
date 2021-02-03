@@ -40,6 +40,9 @@
     .handle_filepath[0] = '\0', \
     .handle_readers = NULL, \
     .default_radius = 0.01f, \
+    .cache_method = CACHEFILE_CACHE_ALL_DATA, \
+    .cache_memory_limit = 1024, \
+    .cache_frame_count = 10, \
   }
 
 /** \} */

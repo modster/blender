@@ -1299,6 +1299,14 @@ NODE_DEFINE(AlembicProcedural)
 
   SOCKET_NODE_ARRAY(objects, "Objects", &AlembicObject::node_type);
 
+  static NodeEnum cache_method_enum;
+  cache_method_enum.insert("combined", CACHE_ALL_DATA);
+  cache_method_enum.insert("depth", CACHE_FRAME_COUNT);
+  cache_method_enum.insert("normal", CACHE_MEMORY_LIMIT);
+  SOCKET_ENUM(cache_method, "Cache Method", cache_method_enum, CACHE_ALL_DATA);
+  SOCKET_UINT(cache_memory_limit, "Cache Memory Limit", 1024);
+  SOCKET_INT(cache_frame_count, "Cache Frame Count", 10);
+
   return type;
 }
 

@@ -7272,6 +7272,10 @@ void uiTemplateCacheFile(uiLayout *layout,
     if (RNA_enum_get(&cycles_ptr, "feature_set") == 1) { /* EXPERIMENTAL */
       row = uiLayoutRow(layout, false);
       uiItemR(row, &fileptr, "use_proxies", 0, NULL, ICON_NONE);
+
+      uiItemR(layout, &fileptr, "cache_method", 0, NULL, ICON_NONE);
+      uiItemR(layout, &fileptr, "cache_memory_limit", 0, NULL, ICON_NONE);
+      uiItemR(layout, &fileptr, "cache_frame_count", 0, NULL, ICON_NONE);
     }
   }
 

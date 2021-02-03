@@ -66,6 +66,9 @@ static void cache_file_init_data(ID *id)
   cache_file->default_radius = 0.01f;
   cache_file->scale = 1.0f;
   cache_file->velocity_unit = CACHEFILE_VELOCITY_UNIT_SECOND;
+  cache_file->cache_method = CACHEFILE_CACHE_ALL_DATA;
+  cache_file->cache_frame_count = 10;
+  cache_file->cache_memory_limit = 1024;
   BLI_strncpy(cache_file->velocity_name, ".velocities", sizeof(cache_file->velocity_name));
 }
 

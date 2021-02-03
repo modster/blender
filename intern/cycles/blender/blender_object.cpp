@@ -512,6 +512,18 @@ void BlenderSync::sync_procedural(BL::Object &b_ob,
 
   procedural->set_scale(cache_file.scale());
 
+  if (cache_file.cache_method() == BL::CacheFile::cache_method_ALL_DATA) {
+    procedural->set_cache_method(AlembicProcedural::CACHE_ALL_DATA);
+  }
+  else if (cache_file.cache_method() == BL::CacheFile::cache_method_FRAME_COUNT) {
+    procedural->set_cache_method(AlembicProcedural::CACHE_FRAME_COUNT);
+    procedural->set_cache_frame_count(cache_file.cache_frame_count());
+  }
+  else if (cache_file.cache_method() == BL::CacheFile::cache_method_MEMORY_LIMIT) {
+    procedural->set_cache_method(AlembicProcedural::CACHE_MEMORY_LIMIT);
+    procedural->set_cache_memory_limit(cache_file.cache_memory_limit());
+  }
+
   /* create or update existing AlembicObjects */
   ustring object_path = ustring(b_mesh_cache.object_path());
 

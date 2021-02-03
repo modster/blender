@@ -59,6 +59,14 @@ enum {
   CACHEFILE_VELOCITY_UNIT_SECOND,
 };
 
+/* CacheFile::cache_method
+ * Determines what scheme is used to cache data. */
+enum {
+  CACHEFILE_CACHE_ALL_DATA,
+  CACHEFILE_CACHE_FRAME_COUNT,
+ CACHEFILE_CACHE_MEMORY_LIMIT,
+};
+
 typedef struct CacheFile {
   ID id;
   struct AnimData *adt;
@@ -92,6 +100,11 @@ typedef struct CacheFile {
   char velocity_unit;
   /* Name of the velocity property in the Alembic file. */
   char velocity_name[64];
+
+  char cache_method;
+  char _pad[7];
+  int cache_memory_limit;
+  int cache_frame_count;
 
   /* Runtime */
   struct AbcArchiveHandle *handle;
