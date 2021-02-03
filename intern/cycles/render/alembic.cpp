@@ -169,6 +169,35 @@ void CachedData::set_time_sampling(TimeSampling time_sampling)
   }
 }
 
+size_t CachedData::memory_used() const
+{
+  size_t mem_used = 0;
+
+  mem_used += curve_first_key.memory_used();
+  mem_used += curve_keys.memory_used();
+  mem_used += curve_radius.memory_used();
+  mem_used += curve_shader.memory_used();
+  mem_used += num_ngons.memory_used();
+  mem_used += shader.memory_used();
+  mem_used += subd_creases_edge.memory_used();
+  mem_used += subd_creases_weight.memory_used();
+  mem_used += subd_face_corners.memory_used();
+  mem_used += subd_num_corners.memory_used();
+  mem_used += subd_ptex_offset.memory_used();
+  mem_used += subd_smooth.memory_used();
+  mem_used += subd_start_corner.memory_used();
+  mem_used += transforms.memory_used();
+  mem_used += triangles.memory_used();
+  mem_used += triangles_loops.memory_used();
+  mem_used += vertices.memory_used();
+
+  for (const CachedAttribute &attr : attributes) {
+     mem_used += attr.data.memory_used();
+  }
+
+  return mem_used;
+}
+
 /* get the sample times to load data for the given the start and end frame of the procedural */
 static set<chrono_t> get_relevant_sample_times(AlembicProcedural *proc,
                                                const TimeSampling &time_sampling,
@@ -1380,6 +1409,8 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
 
   const chrono_t frame_time = (chrono_t)((frame - frame_offset) / frame_rate);
 
+  size_t memory_used = 0;
+
   foreach (Node *node, objects) {
     AlembicObject *object = static_cast<AlembicObject *>(node);
 
@@ -1390,6 +1421,7 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
     /* skip constant objects */
     if (object->has_data_loaded() && object->is_constant() && !object->is_modified() &&
         !object->need_shader_update && !scale_is_modified()) {
+      memory_used += object->get_cached_data().memory_used();
       continue;
     }
 
@@ -1403,8 +1435,11 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
       read_subd(scene, object, frame_time, progress);
     }
 
+    memory_used += object->get_cached_data().memory_used();
     object->clear_modified();
   }
+
+  std::cerr << "AlembicProcedural memory usage : " << string_human_readable_size(memory_used) << '\n';
 
   clear_modified();
 }

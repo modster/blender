@@ -155,6 +155,21 @@ template<typename T> class DataStore {
     T value = *data_;
     node->set(*socket, value);
   }
+
+  size_t memory_used() const
+  {
+    if constexpr (is_array<T>::value) {
+      size_t mem_used = 0;
+
+      for (const DataTimePair &pair : data) {
+        mem_used += pair.data.size() * sizeof(T);
+      }
+
+      return mem_used;
+    }
+
+    return data.size() * sizeof(T);
+  }
 };
 
 /* Actual cache for the stored data.
@@ -208,6 +223,8 @@ struct CachedData {
   void invalidate_last_loaded_time(bool attributes_only = false);
 
   void set_time_sampling(Alembic::AbcCoreAbstract::TimeSampling time_sampling);
+
+  size_t memory_used() const;
 };
 
 /* Representation of an Alembic object for the AlembicProcedural.
