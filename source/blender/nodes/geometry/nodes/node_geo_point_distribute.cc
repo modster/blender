@@ -394,6 +394,115 @@ struct AttributeInfo {
   Vector<AttributeDomain> domains;
 };
 
+struct ScatterPointsOnMeshOp {
+  /* Input data. */
+  const GeometryNodePointDistributeMethod distribute_method;
+  const std::string &density_attribute_name;
+  const int seed;
+  const float density;
+
+  /* Output data. */
+  Vector<float3> &positions;
+  Vector<float3> &bary_coords;
+  Vector<int> &looptri_indices;
+  Set<AttributeInfo> &attributes;
+
+  void operator()(const GeometryComponent &component, blender::Span<blender::float4x4> transforms)
+  {
+    if (component.type() != GeometryComponentType::Mesh) {
+      return;
+    }
+
+    const MeshComponent &mesh_component = static_cast<const MeshComponent &>(component);
+    if (!mesh_component.has_mesh()) {
+      return;
+    }
+    const Mesh &mesh = *mesh_component.get_for_read();
+    for (const float4x4 &transform : transforms) {
+      switch (distribute_method) {
+        case GEO_NODE_POINT_DISTRIBUTE_RANDOM: {
+          const FloatReadAttribute density_factors = mesh_component.attribute_get_for_read<float>(
+              density_attribute_name, ATTR_DOMAIN_POINT, 1.0f);
+          sample_mesh_surface(mesh,
+                              transform,
+                              density,
+                              &density_factors,
+                              seed,
+                              positions,
+                              bary_coords,
+                              looptri_indices);
+          break;
+        }
+        case GEO_NODE_POINT_DISTRIBUTE_POISSON:
+          sample_mesh_surface(
+              mesh, transform, density, nullptr, seed, positions, bary_coords, looptri_indices);
+          break;
+      }
+    }
+  }
+};
+
+struct PoissonEliminateFromDensityOp {
+  /* Input data. */
+  const std::string &density_attribute_name;
+  const float density;
+  Span<float3> bary_coords;
+  Span<int> looptri_indices;
+
+  /* Output data. */
+  MutableSpan<bool> elimination_mask;
+
+  void operator()(const GeometryComponent &component, blender::Span<blender::float4x4> transforms)
+  {
+    if (component.type() != GeometryComponentType::Mesh) {
+      return;
+    }
+    const MeshComponent &mesh_component = static_cast<const MeshComponent &>(component);
+    if (!mesh_component.has_mesh()) {
+      return;
+    }
+    const Mesh &mesh = *mesh_component.get_for_read();
+    for (const float4x4 &transform : transforms) {
+      const FloatReadAttribute density_factors = mesh_component.attribute_get_for_read<float>(
+          density_attribute_name, ATTR_DOMAIN_POINT, 1.0f);
+      update_elimination_mask_based_on_density_factors(
+          mesh, density_factors, bary_coords, looptri_indices, elimination_mask);
+    }
+  }
+};
+
+struct AttributeInterpolateOp {
+  /* Input data. */
+  const std::string &density_attribute_name;
+  const float density;
+  Span<float3> bary_coords;
+  Span<int> looptri_indices;
+
+  int index_offset = 0;
+
+  /* Output data. */
+  MutableSpan<bool> elimination_mask;
+
+  void operator()(const GeometryComponent &component, blender::Span<blender::float4x4> transforms)
+  {
+    if (component.type() != GeometryComponentType::Mesh) {
+      return;
+    }
+    const MeshComponent &mesh_component = static_cast<const MeshComponent &>(component);
+    if (!mesh_component.has_mesh()) {
+      return;
+    }
+    const Mesh &mesh = *mesh_component.get_for_read();
+    for (const float4x4 &transform : transforms) {
+
+      const FloatReadAttribute density_factors = mesh_component.attribute_get_for_read<float>(
+          density_attribute_name, ATTR_DOMAIN_POINT, 1.0f);
+      update_elimination_mask_based_on_density_factors(
+          mesh, density_factors, bary_coords, looptri_indices, elimination_mask);
+    }
+  }
+};
+
 static void geo_node_point_distribute_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
@@ -422,48 +531,16 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
   Vector<float3> bary_coords;
   Vector<int> looptri_indices;
   Set<AttributeInfo> attributes;
-  BKE_foreach_geometry_component_recursive(
-      geometry_set,
-      [&](const GeometryComponent &component, blender::Span<blender::float4x4> transforms) {
-        if (component.type() != GeometryComponentType::Mesh) {
-          return;
-        }
 
-        /* TODO: Add attributes. */
-
-        for (const float4x4 &transform : transforms) {
-          const MeshComponent &mesh_component = static_cast<const MeshComponent &>(component);
-          const Mesh *mesh_in = mesh_component.get_for_read();
-          if (mesh_in == nullptr || mesh_in->mpoly == nullptr) {
-            return;
-          }
-          const FloatReadAttribute density_factors = mesh_component.attribute_get_for_read<float>(
-              density_attribute_name, ATTR_DOMAIN_POINT, 1.0f);
-
-          switch (distribute_method) {
-            case GEO_NODE_POINT_DISTRIBUTE_RANDOM:
-              sample_mesh_surface(*mesh_in,
-                                  transform,
-                                  density,
-                                  &density_factors,
-                                  seed,
-                                  positions,
-                                  bary_coords,
-                                  looptri_indices);
-              break;
-            case GEO_NODE_POINT_DISTRIBUTE_POISSON:
-              sample_mesh_surface(*mesh_in,
-                                  transform,
-                                  density,
-                                  nullptr,
-                                  seed,
-                                  positions,
-                                  bary_coords,
-                                  looptri_indices);
-              break;
-          }
-        }
-      });
+  ScatterPointsOnMeshOp scatter_points_op{distribute_method,
+                                          density_attribute_name,
+                                          seed,
+                                          density,
+                                          positions,
+                                          bary_coords,
+                                          looptri_indices,
+                                          attributes};
+  BKE_foreach_geometry_component_recursive(geometry_set, scatter_points_op);
 
   /* Eliminate points based on the minimum distance for the poisson disk case. */
   if (distribute_method == GEO_NODE_POINT_DISTRIBUTE_POISSON) {
@@ -472,22 +549,9 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
 
     update_elimination_mask_for_close_points(positions, minimum_distance, elimination_mask);
 
-      BKE_foreach_geometry_component_recursive(
-      geometry_set,
-      [&](const GeometryComponent &component, blender::Span<blender::float4x4> transforms) {
-      if (component.type() != GeometryComponentType::Mesh) {
-        return;
-      }
-      const Mesh *mesh_in = mesh_component.get_for_read();
-
-      const FloatReadAttribute density_factors = mesh_component.attribute_get_for_read<float>(
-          density_attribute_name, ATTR_DOMAIN_POINT, 1.0f);
-
-      for (const float4x4 &transform : transforms) {
-        update_elimination_mask_based_on_density_factors(
-            mesh_in, density_factors, bary_coords, looptri_indices, elimination_mask);
-      }
-      }
+    PoissonEliminateFromDensityOp eliminate_density_op{
+        density_attribute_name, density, bary_coords, looptri_indices};
+    BKE_foreach_geometry_component_recursive(geometry_set, eliminate_density_op);
 
     eliminate_points_based_on_mask(elimination_mask, positions, bary_coords, looptri_indices);
   }
