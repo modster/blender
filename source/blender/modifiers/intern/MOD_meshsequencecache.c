@@ -138,7 +138,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   /* Do not process data if using proxies, return a box instead for displaying in the viewport. */
   if (BKE_cache_file_use_proxies(ctx->depsgraph, cache_file)) {
     BoundBox *bb = BKE_object_boundbox_get(ctx->object);
-    Mesh *result = BKE_mesh_new_nomain_from_template(org_mesh, 8, 12, 0, 0, 0);
+    Mesh *result = BKE_mesh_new_nomain_from_template(org_mesh, 8, 0, 0, 24, 6);
 
     MVert *mvert = result->mvert;
     for (int i = 0; i < 8; ++i) {
