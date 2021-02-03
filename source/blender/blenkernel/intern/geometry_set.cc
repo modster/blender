@@ -571,10 +571,6 @@ bool InstancesComponent::is_empty() const
   return transforms_.size() == 0;
 }
 
-static void foreach_geometry_component_recursive(const GeometrySet &geometry_set,
-                                                 const ForeachGeometryCallbackConst &callback,
-                                                 const float4x4 &transform);
-
 static GeometrySet object_get_geometry_set_for_read(const Object &object)
 {
   /* Objects evaluated with a nodes modifier will have a geometry set already. */
@@ -604,6 +600,10 @@ static GeometrySet object_get_geometry_set_for_read(const Object &object)
   /* Return by value since there is no existing geometry set owned elsewhere to use. */
   return new_geometry_set;
 }
+
+static void foreach_geometry_component_recursive(const GeometrySet &geometry_set,
+                                                 const ForeachGeometryCallbackConst &callback,
+                                                 const float4x4 &transform);
 
 static void foreach_collection_geometry_set_recursive(const Collection &collection,
                                                       const ForeachGeometryCallbackConst &callback,
@@ -671,6 +671,78 @@ void BKE_foreach_geometry_component_recursive(const GeometrySet &geometry_set,
   unit_m4(unit_transform.values);
 
   foreach_geometry_component_recursive(geometry_set, callback, unit_transform);
+}
+
+/* ============= API 2 =============== */
+
+using GeometrySetGroup = std::pair<GeometrySet, Vector<float4x4>>;
+
+static void collect_geometry_set_recursive(
+    const GeometrySet &geometry_set,
+    const float4x4 &transform,
+    Vector<std::pair<GeometrySet, Vector<float4x4>>> &r_sets);
+
+static void collect_collection_geometry_set_recursive(const Collection &collection,
+                                                      const float4x4 &transform,
+                                                      Vector<GeometrySetGroup> &r_sets)
+{
+  LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
+    BLI_assert(collection_object->ob != nullptr);
+    const Object &object = *collection_object->ob;
+    GeometrySet instance_geometry_set = object_get_geometry_set_for_read(object);
+
+    /* TODO: This seems to work-- validate this. */
+    const float4x4 instance_transform = transform * object.obmat;
+    collect_geometry_set_recursive(instance_geometry_set, instance_transform, r_sets);
+  }
+  LISTBASE_FOREACH (const CollectionChild *, collection_child, &collection.children) {
+    BLI_assert(collection_child->collection != nullptr);
+    const Collection &collection = *collection_child->collection;
+    collect_collection_geometry_set_recursive(collection, transform, r_sets);
+  }
+}
+
+static void collect_geometry_set_recursive(const GeometrySet &geometry_set,
+                                           const float4x4 &transform,
+                                           Vector<GeometrySetGroup> &r_sets)
+{
+  r_sets.append({geometry_set, {transform}});
+
+  if (geometry_set.has_instances()) {
+    const InstancesComponent &instances_component =
+        *geometry_set.get_component_for_read<InstancesComponent>();
+
+    Span<float4x4> transforms = instances_component.transforms();
+    Span<InstancedData> instances = instances_component.instanced_data();
+    for (const int i : instances.index_range()) {
+      const InstancedData &data = instances[i];
+      const float4x4 &transform = transforms[i];
+
+      if (data.type == INSTANCE_DATA_TYPE_OBJECT) {
+        BLI_assert(data.data.object != nullptr);
+        const Object &object = *data.data.object;
+        GeometrySet instance_geometry_set = object_get_geometry_set_for_read(object);
+        collect_geometry_set_recursive(instance_geometry_set, transform, r_sets);
+      }
+      else if (data.type == INSTANCE_DATA_TYPE_COLLECTION) {
+        BLI_assert(data.data.collection != nullptr);
+        const Collection &collection = *data.data.collection;
+        collect_collection_geometry_set_recursive(collection, transform, r_sets);
+      }
+    }
+  }
+}
+
+Vector<GeometrySetGroup> BKE_geometry_set_gather_instanced(const GeometrySet &geometry_set)
+{
+  Vector<GeometrySetGroup> result_vector;
+
+  float4x4 unit_transform;
+  unit_m4(unit_transform.values);
+
+  collect_geometry_set_recursive(geometry_set, unit_transform, result_vector);
+
+  return result_vector;
 }
 
 /** \} */
