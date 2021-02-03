@@ -72,12 +72,12 @@ void main()
     float theta = atan(uv.y, uv.x) + M_2PI;
     float r = length(uv);
 
-    radius /= circle_to_polygon_radius(bokehSides, theta + bokehRotation);
+    radius /= circle_to_polygon_radius(bokehSides, theta - bokehRotation);
 
     float theta_new = circle_to_polygon_angle(bokehSides, theta);
     float r_new = circle_to_polygon_radius(bokehSides, theta_new);
 
-    theta_new += bokehRotation;
+    theta_new -= bokehRotation;
 
     uv = r_new * vec2(-cos(theta_new), sin(theta_new));
 
@@ -85,7 +85,7 @@ void main()
       /* Slight focus distance */
       texel *= bokehAnisotropyInv;
       float theta = atan(texel.y, -texel.x) + M_2PI;
-      texel /= circle_to_polygon_radius(bokehSides, theta - bokehRotation);
+      texel /= circle_to_polygon_radius(bokehSides, theta + bokehRotation);
     }
   }
   else {
