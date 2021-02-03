@@ -1055,8 +1055,9 @@ GPUShader *EEVEE_shaders_depth_of_field_flatten_tiles_get(void)
   return e_data.dof_flatten_tiles_sh;
 }
 
-GPUShader *EEVEE_shaders_depth_of_field_dilate_tiles_get(int pass)
+GPUShader *EEVEE_shaders_depth_of_field_dilate_tiles_get(bool b_pass)
 {
+  int pass = b_pass;
   if (e_data.dof_dilate_tiles_sh[pass] == NULL) {
     e_data.dof_dilate_tiles_sh[pass] = DRW_shader_create_fullscreen_with_shaderlib(
         datatoc_effect_dof_dilate_tiles_frag_glsl,
@@ -1076,8 +1077,9 @@ GPUShader *EEVEE_shaders_depth_of_field_downsample_get(void)
   return e_data.dof_downsample_sh;
 }
 
-GPUShader *EEVEE_shaders_depth_of_field_reduce_get(int is_copy_pass)
+GPUShader *EEVEE_shaders_depth_of_field_reduce_get(bool b_is_copy_pass)
 {
+  int is_copy_pass = b_is_copy_pass;
   if (e_data.dof_reduce_sh[is_copy_pass] == NULL) {
     e_data.dof_reduce_sh[is_copy_pass] = DRW_shader_create_fullscreen_with_shaderlib(
         datatoc_effect_dof_reduce_frag_glsl,
@@ -1088,8 +1090,9 @@ GPUShader *EEVEE_shaders_depth_of_field_reduce_get(int is_copy_pass)
   return e_data.dof_reduce_sh[is_copy_pass];
 }
 
-GPUShader *EEVEE_shaders_depth_of_field_gather_get(EEVEE_DofGatherPass pass, int use_bokeh_tx)
+GPUShader *EEVEE_shaders_depth_of_field_gather_get(EEVEE_DofGatherPass pass, bool b_use_bokeh_tx)
 {
+  int use_bokeh_tx = b_use_bokeh_tx;
   if (e_data.dof_gather_sh[pass][use_bokeh_tx] == NULL) {
     DynStr *ds = BLI_dynstr_new();
 
@@ -1135,8 +1138,10 @@ GPUShader *EEVEE_shaders_depth_of_field_filter_get(void)
   return e_data.dof_filter_sh;
 }
 
-GPUShader *EEVEE_shaders_depth_of_field_scatter_get(int is_foreground, int use_bokeh_tx)
+GPUShader *EEVEE_shaders_depth_of_field_scatter_get(bool b_is_foreground, bool b_use_bokeh_tx)
 {
+  int is_foreground = b_is_foreground;
+  int use_bokeh_tx = b_use_bokeh_tx;
   if (e_data.dof_scatter_sh[is_foreground][use_bokeh_tx] == NULL) {
     DynStr *ds = BLI_dynstr_new();
 
@@ -1163,8 +1168,10 @@ GPUShader *EEVEE_shaders_depth_of_field_scatter_get(int is_foreground, int use_b
   return e_data.dof_scatter_sh[is_foreground][use_bokeh_tx];
 }
 
-GPUShader *EEVEE_shaders_depth_of_field_resolve_get(int use_bokeh_tx, int use_hq_gather)
+GPUShader *EEVEE_shaders_depth_of_field_resolve_get(bool b_use_bokeh_tx, bool b_use_hq_gather)
 {
+  int use_hq_gather = b_use_hq_gather;
+  int use_bokeh_tx = b_use_bokeh_tx;
   if (e_data.dof_resolve_sh[use_bokeh_tx][use_hq_gather] == NULL) {
     DynStr *ds = BLI_dynstr_new();
 
