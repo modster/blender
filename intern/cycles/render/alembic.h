@@ -265,18 +265,15 @@ class AlembicObject : public Node {
   Object *get_object();
 
   void load_all_data(AlembicProcedural *proc,
-                     Alembic::AbcGeom::IPolyMeshSchema &schema,
-                     float scale,
+										 Alembic::AbcGeom::IPolyMeshSchema &schema,
                      Progress &progress);
-  void load_all_data(AlembicProcedural *proc,
-                     Alembic::AbcGeom::ISubDSchema &schema,
-                     float scale,
-                     Progress &progress);
-  void load_all_data(AlembicProcedural *proc,
-                     const Alembic::AbcGeom::ICurvesSchema &schema,
-                     float scale,
-                     Progress &progress,
-                     float default_radius);
+	void load_all_data(AlembicProcedural *proc,
+										 Alembic::AbcGeom::ISubDSchema &schema,
+										 Progress &progress);
+	void load_all_data(AlembicProcedural *proc,
+										 const Alembic::AbcGeom::ICurvesSchema &schema,
+										 Progress &progress,
+										 float default_radius);
 
   bool has_data_loaded() const;
 
@@ -422,24 +419,23 @@ class AlembicProcedural : public Procedural {
 
   /* Read the data for an IPolyMesh at the specified frame_time. Creates corresponding Geometry and
    * Object Nodes in the Cycles scene if none exist yet. */
-  void read_mesh(Scene *scene,
-                 AlembicObject *abc_object,
-                 Alembic::AbcGeom::Abc::chrono_t frame_time,
-                 Progress &progress);
+	void read_mesh(Scene *scene,
+								 AlembicObject *abc_object,
+								 Alembic::AbcGeom::Abc::chrono_t frame_time);
 
   /* Read the data for an ICurves at the specified frame_time. Creates corresponding Geometry and
    * Object Nodes in the Cycles scene if none exist yet. */
-  void read_curves(Scene *scene,
-                   AlembicObject *abc_object,
-                   Alembic::AbcGeom::Abc::chrono_t frame_time,
-                   Progress &progress);
+	void read_curves(Scene *scene,
+									 AlembicObject *abc_object,
+									 Alembic::AbcGeom::Abc::chrono_t frame_time);
 
   /* Read the data for an ISubD at the specified frame_time. Creates corresponding Geometry and
    * Object Nodes in the Cycles scene if none exist yet. */
-  void read_subd(Scene *scene,
-                 AlembicObject *abc_object,
-                 Alembic::AbcGeom::Abc::chrono_t frame_time,
-                 Progress &progress);
+	void read_subd(Scene *scene,
+								 AlembicObject *abc_object,
+								 Alembic::AbcGeom::Abc::chrono_t frame_time);
+
+	void build_caches(Progress &progress);
 };
 
 CCL_NAMESPACE_END
