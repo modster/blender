@@ -162,7 +162,7 @@ bool USDPrimIterator::filter_by_purpose(const pxr::UsdPrim &prim,
         purpose_attr.Get(&purpose);
         if ((!context.import_params.import_guide && purpose == pxr::UsdGeomTokens->guide) ||
             (!context.import_params.import_proxy && purpose == pxr::UsdGeomTokens->proxy) ||
-            (!context.import_params.import_render && purpose == pxr::UsdGeomTokens->proxy)) {
+            (!context.import_params.import_render && purpose == pxr::UsdGeomTokens->render)) {
           return true;
         }
       }
