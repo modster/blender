@@ -1415,7 +1415,7 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
   }
 
   if (!objects_loaded || objects_is_modified()) {
-    load_objects(progress);
+    load_objects(scene, progress);
     objects_loaded = true;
   }
 
@@ -1485,7 +1485,7 @@ AlembicObject *AlembicProcedural::get_or_create_object(const ustring &path)
   return object;
 }
 
-void AlembicProcedural::load_objects(Progress &progress)
+void AlembicProcedural::load_objects(Scene *scene, Progress &progress)
 {
   unordered_map<string, AlembicObject *> object_map;
 
@@ -1503,6 +1503,37 @@ void AlembicProcedural::load_objects(Progress &progress)
   for (size_t i = 0; i < root.getNumChildren(); ++i) {
     walk_hierarchy(root, root.getChildHeader(i), nullptr, object_map, progress);
   }
+
+  /* create nodes in the scene if not already done */
+  foreach (Node *node, objects) {
+    AlembicObject *abc_object = static_cast<AlembicObject *>(node);
+
+    /* only consider newly added objects */
+    if (abc_object->get_object() == nullptr) {
+      Geometry *geometry = nullptr;
+
+      if (abc_object->schema_type == AlembicObject::CURVES) {
+        geometry = scene->create_node<Hair>();
+      }
+      else if (abc_object->schema_type == AlembicObject::POLY_MESH || abc_object->schema_type == AlembicObject::SUBD) {
+        geometry = scene->create_node<Mesh>();
+      }
+
+      geometry->set_owner(this);
+      geometry->name = abc_object->iobject.getName();
+
+      array<Node *> used_shaders = abc_object->get_used_shaders();
+      geometry->set_used_shaders(used_shaders);
+
+      /* create object*/
+      Object *object = scene->create_node<Object>();
+      object->set_owner(this);
+      object->set_geometry(geometry);
+      object->name = abc_object->iobject.getName();
+
+      abc_object->set_object(object);
+    }
+  }
 }
 
 void AlembicProcedural::read_mesh(Scene *scene,
@@ -1510,29 +1541,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
                                   Abc::chrono_t frame_time,
                                   Progress &progress)
 {
-  Mesh *mesh = nullptr;
-
-  /* create a mesh node in the scene if not already done */
-  if (!abc_object->get_object()) {
-    mesh = scene->create_node<Mesh>();
-    mesh->set_owner(this);
-    mesh->name = abc_object->iobject.getName();
-
-    array<Node *> used_shaders = abc_object->get_used_shaders();
-    mesh->set_used_shaders(used_shaders);
-
-    /* create object*/
-    Object *object = scene->create_node<Object>();
-    object->set_owner(this);
-    object->set_geometry(mesh);
-    object->set_tfm(abc_object->xform);
-    object->name = abc_object->iobject.getName();
-
-    abc_object->set_object(object);
-  }
-  else {
-    mesh = static_cast<Mesh *>(abc_object->get_object()->get_geometry());
-  }
+  Mesh *mesh = static_cast<Mesh *>(abc_object->get_object()->get_geometry());
 
   CachedData &cached_data = abc_object->get_cached_data();
 
@@ -1607,32 +1616,10 @@ void AlembicProcedural::read_subd(Scene *scene,
                                   Abc::chrono_t frame_time,
                                   Progress &progress)
 {
-  Mesh *mesh = nullptr;
+  Mesh *mesh = static_cast<Mesh *>(abc_object->get_object()->get_geometry());
 
-  /* create a mesh node in the scene if not already done */
-  if (!abc_object->get_object()) {
-    mesh = scene->create_node<Mesh>();
-    mesh->set_owner(this);
-    mesh->name = abc_object->iobject.getName();
-
-    array<Node *> used_shaders = abc_object->get_used_shaders();
-    mesh->set_used_shaders(used_shaders);
-
-    /* Alembic is OpenSubDiv compliant, there is no option to set another subdivision type. */
-    mesh->set_subdivision_type(Mesh::SubdivisionType::SUBDIVISION_CATMULL_CLARK);
-
-    /* create object*/
-    Object *object = scene->create_node<Object>();
-    object->set_owner(this);
-    object->set_geometry(mesh);
-    object->set_tfm(abc_object->xform);
-    object->name = abc_object->iobject.getName();
-
-    abc_object->set_object(object);
-  }
-  else {
-    mesh = static_cast<Mesh *>(abc_object->get_object()->get_geometry());
-  }
+  /* Alembic is OpenSubDiv compliant, there is no option to set another subdivision type. */
+  mesh->set_subdivision_type(Mesh::SubdivisionType::SUBDIVISION_CATMULL_CLARK);
 
   /* Note: keep the construction of the ISubD and ISubDSchema close to where they are used or
    * needed, it is an expensive operation. */
@@ -1738,29 +1725,7 @@ void AlembicProcedural::read_curves(Scene *scene,
                                     Abc::chrono_t frame_time,
                                     Progress &progress)
 {
-  Hair *hair;
-
-  /* create a hair node in the scene if not already done */
-  if (!abc_object->get_object()) {
-    hair = scene->create_node<Hair>();
-    hair->set_owner(this);
-    hair->name = abc_object->iobject.getName();
-
-    array<Node *> used_shaders = abc_object->get_used_shaders();
-    hair->set_used_shaders(used_shaders);
-
-    /* create object*/
-    Object *object = scene->create_node<Object>();
-    object->set_owner(this);
-    object->set_geometry(hair);
-    object->set_tfm(abc_object->xform);
-    object->name = abc_object->iobject.getName();
-
-    abc_object->set_object(object);
-  }
-  else {
-    hair = static_cast<Hair *>(abc_object->get_object()->get_geometry());
-  }
+  Hair *hair = static_cast<Hair *>(abc_object->get_object()->get_geometry());
 
   /* Note: keep the construction of the ICurves and ICurvesSchema close to where they are used or
    * needed, it is an expensive operation. */

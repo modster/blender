@@ -409,7 +409,7 @@ class AlembicProcedural : public Procedural {
 
  private:
   /* Load the data for all the objects whose data has not yet been loaded. */
-  void load_objects(Progress &progress);
+	void load_objects(Scene *scene, Progress &progress);
 
   /* Traverse the Alembic hierarchy to lookup the IObjects for the AlembicObjects that were
    * specified in our objects socket, and accumulate all of the transformations samples along the
