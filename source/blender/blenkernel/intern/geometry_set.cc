@@ -593,13 +593,19 @@ static GeometrySet object_get_geometry_set_for_read(const Object &object)
       mesh_component.copy_vertex_group_names_from_object(object);
     }
   }
-  // else if (object.type == OB_VOLUME) {
-  //   Volume *volume = BKE_modifier_get_volume...
-  // }
+  /* TODO: Cover the case of pointclouds without modifiers,
+   * they may not be covered by the #geometry_set_eval case above. */
+  /* TODO: Add volume support. */
 
   /* Return by value since there is no existing geometry set owned elsewhere to use. */
   return new_geometry_set;
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Geometry Set Instances Callback
+ * \{ */
 
 static void foreach_geometry_component_recursive(const GeometrySet &geometry_set,
                                                  const ForeachGeometryCallbackConst &callback,
@@ -664,6 +670,13 @@ static void foreach_geometry_component_recursive(const GeometrySet &geometry_set
   }
 }
 
+/**
+ * Execute a callback for every component of a geometry set. This approach is used to avoid
+ * allocating a temporary vector the store the flattened instances before operation.
+ *
+ * \note For convenience (to avoid duplication in the caller),
+ * this also executes the callback for the argument geometry set.
+ */
 void BKE_foreach_geometry_component_recursive(const GeometrySet &geometry_set,
                                               const ForeachGeometryCallbackConst &callback)
 {
@@ -673,18 +686,19 @@ void BKE_foreach_geometry_component_recursive(const GeometrySet &geometry_set,
   foreach_geometry_component_recursive(geometry_set, callback, unit_transform);
 }
 
-/* ============= API 2 =============== */
+/** \} */
 
-using GeometrySetGroup = std::pair<GeometrySet, Vector<float4x4>>;
+/* -------------------------------------------------------------------- */
+/** \name Geometry Set Gather Recursive Instances
+ * \{ */
 
-static void collect_geometry_set_recursive(
-    const GeometrySet &geometry_set,
-    const float4x4 &transform,
-    Vector<std::pair<GeometrySet, Vector<float4x4>>> &r_sets);
+static void collect_geometry_set_recursive(const GeometrySet &geometry_set,
+                                           const float4x4 &transform,
+                                           Vector<GeometryInstanceGroup> &r_sets);
 
 static void collect_collection_geometry_set_recursive(const Collection &collection,
                                                       const float4x4 &transform,
-                                                      Vector<GeometrySetGroup> &r_sets)
+                                                      Vector<GeometryInstanceGroup> &r_sets)
 {
   LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
     BLI_assert(collection_object->ob != nullptr);
@@ -704,7 +718,7 @@ static void collect_collection_geometry_set_recursive(const Collection &collecti
 
 static void collect_geometry_set_recursive(const GeometrySet &geometry_set,
                                            const float4x4 &transform,
-                                           Vector<GeometrySetGroup> &r_sets)
+                                           Vector<GeometryInstanceGroup> &r_sets)
 {
   r_sets.append({geometry_set, {transform}});
 
@@ -733,9 +747,17 @@ static void collect_geometry_set_recursive(const GeometrySet &geometry_set,
   }
 }
 
-Vector<GeometrySetGroup> BKE_geometry_set_gather_instanced(const GeometrySet &geometry_set)
+/**
+ * Return a vector of geometry sets, including a flattened array of instances. This approach
+ * (as opposed to #BKE_foreach_geometry_component_recursive) can be used where multiple iterations
+ * over the input data are needed, or where it simplifies code enough.
+ *
+ * \note For convenience (to avoid duplication in the caller),
+ * the returned vector also contains the argument geometry set.
+ */
+Vector<GeometryInstanceGroup> BKE_geometry_set_gather_instanced(const GeometrySet &geometry_set)
 {
-  Vector<GeometrySetGroup> result_vector;
+  Vector<GeometryInstanceGroup> result_vector;
 
   float4x4 unit_transform;
   unit_m4(unit_transform.values);

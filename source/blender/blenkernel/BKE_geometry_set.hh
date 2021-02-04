@@ -483,6 +483,26 @@ using ForeachGeometryCallbackConst = std::function<void(
 void BKE_foreach_geometry_component_recursive(const GeometrySet &geometry_set,
                                               const ForeachGeometryCallbackConst &callback);
 
-using GeometrySetGroup = std::pair<GeometrySet, blender::Vector<blender::float4x4>>;
-blender::Vector<GeometrySetGroup> BKE_geometry_set_gather_instanced(
+/**
+ * Used to keep track of a group of instances using the same geometry data.
+ *
+ * \note In the future, this can be used to store "geometry set instances".
+ */
+struct GeometryInstanceGroup {
+  /**
+   * The geometry set instanced on each of the transforms. The components are not necessarily
+   * owned here. For example, they may be owned by the instanced object. This cannot be a
+   * reference because not all instanced data will necessarily have a #geometry_set_eval.
+   */
+  GeometrySet geometry_set;
+
+  /**
+   * As an optimization to avoid copying, the same geometry set can be associated with multiple
+   * instances. Each instance is stored as a transform matrix here. Again, these must be owned
+   * because they may be transformed from the original data. TODO: Validate that last statement.
+   */
+  blender::Vector<blender::float4x4> transforms;
+};
+
+blender::Vector<GeometryInstanceGroup> BKE_geometry_set_gather_instanced(
     const GeometrySet &geometry_set);
