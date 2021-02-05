@@ -360,6 +360,9 @@ BLI_NOINLINE static void interpolate_existing_attributes(
         const MeshComponent &source_component = *set.get_component_for_read<MeshComponent>();
         const Mesh &mesh = *source_component.get_for_read();
 
+        /* Use a dummy read without specifying a domain or data type in order to
+         * get the existing attribute's domain. Interpolation is done manually based
+         * on the bary coords in #interpolate_attribute. */
         ReadAttributePtr dummy_attribute = source_component.attribute_try_get_for_read(
             attribute_name);
         if (!dummy_attribute) {
@@ -369,7 +372,6 @@ BLI_NOINLINE static void interpolate_existing_attributes(
         }
 
         const AttributeDomain source_domain = dummy_attribute->domain();
-
         ReadAttributePtr source_attribute = source_component.attribute_get_for_read(
             attribute_name, source_domain, output_data_type, nullptr);
         BLI_assert(source_attribute);
@@ -536,6 +538,9 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
     instances_len += set_group.transforms.size();
   }
 
+  /* Store data per-instance in order to simplify attribute access after the scattering,
+   * and to make the point elimination simpler for the poisson disk mode. Node that some
+   * vectors will be empty if any instances don't contain mesh data. */
   Array<Vector<float3>> positions_array(instances_len);
   Array<Vector<float3>> bary_coords_array(instances_len);
   Array<Vector<int>> looptri_indices_array(instances_len);
