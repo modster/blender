@@ -58,12 +58,6 @@ static void node_point_distribute_update(bNodeTree *UNUSED(ntree), bNode *node)
 
 namespace blender::nodes {
 
-struct AttributeInfo {
-  /* The highest complexity data type for all attributes in the input meshes with the name. */
-  CustomDataType data_type;
-  /* The result domain is always "points" since we're creating a point cloud. */
-};
-
 /**
  * Use an arbitrary choice of axes for a usable rotation attribute directly out of this node.
  */
@@ -336,11 +330,10 @@ BLI_NOINLINE static void interpolate_existing_attributes(
     Span<Vector<float3>> bary_coords_array,
     Span<Vector<int>> looptri_indices_array)
 {
-  for (blender::Map<std::string, AttributeInfo>::Item entry : attributes.items()) {
+  for (Map<std::string, AttributeInfo>::Item entry : attributes.items()) {
     StringRef attribute_name = entry.key;
-
-    const AttributeInfo attribute_info = entry.value;
-    const CustomDataType output_data_type = attribute_info.data_type;
+    const CustomDataType output_data_type = entry.value.data_type;
+    /* The output domain is always #ATTR_DOMAIN_POINT, since we are creating a point cloud. */
     OutputAttributePtr attribute_out = component.attribute_try_get_for_output(
         attribute_name, ATTR_DOMAIN_POINT, output_data_type);
     BLI_assert(attribute_out);
@@ -357,6 +350,9 @@ BLI_NOINLINE static void interpolate_existing_attributes(
       int i_instance = 0;
       for (const GeometryInstanceGroup &set_group : sets) {
         const GeometrySet &set = set_group.geometry_set;
+        if (!set.has_mesh()) {
+          continue;
+        }
         const MeshComponent &source_component = *set.get_component_for_read<MeshComponent>();
         const Mesh &mesh = *source_component.get_for_read();
 
@@ -476,36 +472,6 @@ BLI_NOINLINE static void add_remaining_point_attributes(
   interpolate_existing_attributes(
       sets, group_start_indices, attributes, component, bary_coords_array, looptri_indices_array);
   compute_special_attributes(sets, component, bary_coords_array, looptri_indices_array);
-}
-
-static Map<std::string, AttributeInfo> gather_attribute_info(
-    Span<GeometryInstanceGroup> geometry_sets)
-{
-  Map<std::string, AttributeInfo> attribute_info;
-  for (const GeometryInstanceGroup &set_group : geometry_sets) {
-    const GeometrySet &set = set_group.geometry_set;
-    if (!set.has_mesh()) {
-      continue;
-    }
-    const MeshComponent &component = *set.get_component_for_read<MeshComponent>();
-
-    for (const std::string &name : component.attribute_names()) {
-      if (ELEM(name, "position", "normal", "id")) {
-        continue;
-      }
-      ReadAttributePtr attribute = component.attribute_try_get_for_read(name);
-      BLI_assert(attribute);
-      const CustomDataType data_type = attribute->custom_data_type();
-      if (attribute_info.contains(name)) {
-        AttributeInfo &info = attribute_info.lookup(name);
-        info.data_type = attribute_data_type_highest_complexity({info.data_type, data_type});
-      }
-      else {
-        attribute_info.add(name, {data_type});
-      }
-    }
-  }
-  return attribute_info;
 }
 
 static void geo_node_point_distribute_exec(GeoNodeExecParams params)
@@ -652,7 +618,10 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
       geometry_set_out.get_component_for_write<PointCloudComponent>();
   point_component.replace(pointcloud);
 
-  Map<std::string, AttributeInfo> attributes = gather_attribute_info(sets);
+  Map<std::string, AttributeInfo> attributes = gather_attribute_info<MeshComponent>(sets);
+  attributes.remove("position");
+  attributes.remove("normal");
+  attributes.remove("id");
   add_remaining_point_attributes(sets,
                                  group_start_indices,
                                  attributes,

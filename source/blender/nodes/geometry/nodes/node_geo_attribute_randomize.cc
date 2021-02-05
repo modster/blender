@@ -192,6 +192,8 @@ static void geo_node_random_attribute_exec(GeoNodeExecParams params)
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   const int seed = params.get_input<int>("Seed");
 
+  geometry_set_realize_instances_for_write(geometry_set);
+
   if (geometry_set.has<MeshComponent>()) {
     randomize_attribute(geometry_set.get_component_for_write<MeshComponent>(), params, seed);
   }

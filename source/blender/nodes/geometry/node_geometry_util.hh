@@ -49,4 +49,16 @@ CustomDataType attribute_data_type_highest_complexity(Span<CustomDataType>);
 Array<uint32_t> get_geometry_element_ids_as_uints(const GeometryComponent &component,
                                                   const AttributeDomain domain);
 
+struct AttributeInfo {
+  /* The highest complexity data type for all attributes in the input meshes with the name. */
+  CustomDataType data_type;
+  /* The result domain is always "points" since we're creating a point cloud. */
+  AttributeDomain domain;
+};
+
+template<typename Component>
+Map<std::string, AttributeInfo> gather_attribute_info(Span<GeometryInstanceGroup> geometry_sets);
+
+void geometry_set_realize_instances_for_write(GeometrySet &geometry_set);
+
 }  // namespace blender::nodes

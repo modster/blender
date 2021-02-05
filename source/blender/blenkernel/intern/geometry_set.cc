@@ -15,7 +15,10 @@
  */
 
 #include "BLI_listbase_wrapper.hh" /* TODO: Couldn't figure this out yet. */
+#include "BLI_map.hh"
 
+#include "BKE_attribute.h"
+#include "BKE_attribute_access.hh"
 #include "BKE_geometry_set.hh"
 #include "BKE_lib_id.h"
 #include "BKE_mesh.h"
@@ -32,6 +35,7 @@
 using blender::float3;
 using blender::float4x4;
 using blender::ListBaseWrapper;
+using blender::Map;
 using blender::MutableSpan;
 using blender::Span;
 using blender::StringRef;
@@ -730,18 +734,19 @@ static void collect_geometry_set_recursive(const GeometrySet &geometry_set,
     Span<InstancedData> instances = instances_component.instanced_data();
     for (const int i : instances.index_range()) {
       const InstancedData &data = instances[i];
-      const float4x4 &transform = transforms[i];
+      const float4x4 &instance_transform = transforms[i];
 
       if (data.type == INSTANCE_DATA_TYPE_OBJECT) {
         BLI_assert(data.data.object != nullptr);
         const Object &object = *data.data.object;
+        const float4x4 object_transform = transform * instance_transform * object.obmat;
         GeometrySet instance_geometry_set = object_get_geometry_set_for_read(object);
-        collect_geometry_set_recursive(instance_geometry_set, transform, r_sets);
+        collect_geometry_set_recursive(instance_geometry_set, object_transform, r_sets);
       }
       else if (data.type == INSTANCE_DATA_TYPE_COLLECTION) {
         BLI_assert(data.data.collection != nullptr);
         const Collection &collection = *data.data.collection;
-        collect_collection_geometry_set_recursive(collection, transform, r_sets);
+        collect_collection_geometry_set_recursive(collection, instance_transform, r_sets);
       }
     }
   }

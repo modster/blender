@@ -56,6 +56,8 @@ static void geo_node_triangulate_exec(GeoNodeExecParams params)
   GeometryNodeTriangulateNGons ngon_method = static_cast<GeometryNodeTriangulateNGons>(
       params.node().custom2);
 
+  geometry_set_realize_instances_for_write(geometry_set);
+
   /* #triangulate_mesh might modify the input mesh currently. */
   Mesh *mesh_in = geometry_set.get_mesh_for_write();
   if (mesh_in != nullptr) {
