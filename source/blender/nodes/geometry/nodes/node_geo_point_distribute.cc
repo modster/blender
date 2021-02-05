@@ -180,7 +180,6 @@ BLI_NOINLINE static void update_elimination_mask_for_close_points(
         MutableSpan<bool> elimination_mask;
       } callback_data = {i_point, elimination_mask};
 
-      std::cout << "  KDTree nearest point callback: \n";
       BLI_kdtree_3d_range_search_cb(
           kdtree,
           position,
@@ -188,7 +187,6 @@ BLI_NOINLINE static void update_elimination_mask_for_close_points(
           [](void *user_data, int index, const float *UNUSED(co), float UNUSED(dist_sq)) {
             CallbackData &callback_data = *static_cast<CallbackData *>(user_data);
             if (index != callback_data.index) {
-              std::cout << "    Eliminating index mask: " << index << "\n";
               callback_data.elimination_mask[index] = true;
             }
             return true;
@@ -340,7 +338,6 @@ BLI_NOINLINE static void interpolate_existing_attributes(
 {
   for (blender::Map<std::string, AttributeInfo>::Item entry : attributes.items()) {
     StringRef attribute_name = entry.key;
-    std::cout << "Working on attribute: " << attribute_name << "\n";
 
     const AttributeInfo attribute_info = entry.value;
     const CustomDataType output_data_type = attribute_info.data_type;
@@ -360,33 +357,17 @@ BLI_NOINLINE static void interpolate_existing_attributes(
       int i_instance = 0;
       for (const GeometryInstanceGroup &set_group : sets) {
         const GeometrySet &set = set_group.geometry_set;
-        std::cout << "  Working on geometry set: " << set << "\n";
-        if (set.has_instances()) {
-          std::cout << "    Set has instances\n";
-        }
-        if (set.has_pointcloud()) {
-          std::cout << "    Set has point cloud\n";
-        }
-        if (set.has_volume()) {
-          std::cout << "    Set has volume\n";
-        }
-        if (!set.has_mesh()) {
-          std::cout << "    Set has no mesh\n";
-          continue;
-        }
         const MeshComponent &source_component = *set.get_component_for_read<MeshComponent>();
         const Mesh &mesh = *source_component.get_for_read();
 
         ReadAttributePtr dummy_attribute = source_component.attribute_try_get_for_read(
             attribute_name);
         if (!dummy_attribute) {
-          std::cout << "    Source attribute not found\n";
           i_instance += set_group.transforms.size();
           i_set_with_mesh++;
           continue;
         }
 
-        /* Do not interpolate the domain, that is handled by #interpolate_attribute. */
         const AttributeDomain source_domain = dummy_attribute->domain();
 
         ReadAttributePtr source_attribute = source_component.attribute_get_for_read(
@@ -395,14 +376,12 @@ BLI_NOINLINE static void interpolate_existing_attributes(
         Span<T> source_span = source_attribute->get_span<T>();
 
         if (!source_attribute) {
-          std::cout << "    Source attribute read with correct domain not found\n";
           i_instance += set_group.transforms.size();
           i_set_with_mesh++;
           continue;
         }
 
         int i_point = group_start_indices[i_set_with_mesh];
-        std::cout << "    Adding attribute from source, starting at " << i_point << "\n";
         for (const int UNUSED(i_set_instance) : set_group.transforms.index_range()) {
           Span<float3> bary_coords = bary_coords_array[i_instance].as_span();
           Span<int> looptri_indices = looptri_indices_array[i_instance].as_span();
@@ -557,8 +536,6 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
     instances_len += set_group.transforms.size();
   }
 
-  std::cout << "\nSCATTERING POINTS\n";
-
   Array<Vector<float3>> positions_array(instances_len);
   Array<Vector<float3>> bary_coords_array(instances_len);
   Array<Vector<int>> looptri_indices_array(instances_len);
@@ -601,8 +578,6 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
     }
   }
 
-  std::cout << "  Scattered initial points: " << initial_points_len << "\n";
-
   if (distribute_method == GEO_NODE_POINT_DISTRIBUTE_POISSON) {
     /* Unlike the other result arrays, the elimination mask in stored as a flat array for every
      * point, in order to simplify culling points from the KDTree (which needs to know about all
@@ -611,15 +586,6 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
     const float minimum_distance = params.get_input<float>("Distance Min");
     update_elimination_mask_for_close_points(
         positions_array, minimum_distance, elimination_mask, initial_points_len);
-
-    int current_points_len = 0;
-    for (const bool mask : elimination_mask) {
-      if (!mask) {
-        current_points_len++;
-      }
-    }
-    std::cout << "  Eliminated based on KDTree, elimination mask total: " << current_points_len
-              << "\n";
 
     int i_point = 0;
     i_instance = 0;
@@ -658,15 +624,6 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
         i_instance++;
       }
     }
-
-    current_points_len = 0;
-    for (const bool mask : elimination_mask) {
-      if (!mask) {
-        current_points_len++;
-      }
-    }
-    std::cout << "  Eliminated based on density, elimination mask total: " << current_points_len
-              << "\n";
   }
 
   int final_points_len = 0;
@@ -676,8 +633,6 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
     group_start_indices[i] = final_points_len;
     final_points_len += positions.size();
   }
-
-  std::cout << "  Elinimated points, now there are: " << final_points_len << "\n";
 
   PointCloud *pointcloud = BKE_pointcloud_new_nomain(final_points_len);
   int i_point = 0;
@@ -692,8 +647,6 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
       geometry_set_out.get_component_for_write<PointCloudComponent>();
   point_component.replace(pointcloud);
 
-  std::cout << "\nINTERPOLATING ATTRIBUTES\n";
-
   Map<std::string, AttributeInfo> attributes = gather_attribute_info(sets);
   add_remaining_point_attributes(sets,
                                  group_start_indices,
@@ -702,13 +655,6 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
                                  bary_coords_array,
                                  looptri_indices_array);
 
-  std::cout << "Final geomtry set: " << geometry_set_out << "\n";
-
-  Set<std::string> final_attribute_names = point_component.attribute_names();
-  std::cout << "Final attribute names\n";
-  for (std::string name : final_attribute_names) {
-    std::cout << "  " << name << "\n";
-  }
   params.set_output("Geometry", std::move(geometry_set_out));
 }
 
