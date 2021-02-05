@@ -280,7 +280,7 @@ class GeometryNodesEvaluator {
             &socket_to_compute, from_socket);
         std::optional<GMutablePointer> value = value_by_input_.pop_try(key);
         if (value.has_value()) {
-          values.append(value.value());
+          values.append(*value);
         }
         else {
           this->compute_output_and_forward(*from_socket);
@@ -518,7 +518,7 @@ class GeometryNodesEvaluator {
  * TODO(Hans): Codify this with some sort of table or refactor IDProperty use in RNA_access.c.
  */
 struct SocketPropertyType {
-  /* Create the actual propery used to store the data for the modifier. */
+  /* Create the actual property used to store the data for the modifier. */
   IDProperty *(*create_prop)(const bNodeSocket &socket, const char *name);
   /* Reused to build the "soft_min" property too. */
   IDProperty *(*create_min_ui_prop)(const bNodeSocket &socket, const char *name);
