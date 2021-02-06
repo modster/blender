@@ -116,6 +116,13 @@ static void geo_node_boolean_exec(GeoNodeExecParams params)
     return;
   }
 
+  geometry_set_realize_instances_for_write(geometry_set_in_a);
+
+  /* Boolean does support taking an input of multiple meshes. Currently they must all be
+   * converted to BMesh before running the operation though. D9957 will make it possible to use
+   * the mesh structure directly. */
+  geometry_set_realize_instances_for_write(geometry_set_in_b);
+
   const Mesh *mesh_in_a = geometry_set_in_a.get_mesh_for_read();
   const Mesh *mesh_in_b = geometry_set_in_b.get_mesh_for_read();
 
