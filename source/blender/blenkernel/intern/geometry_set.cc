@@ -681,8 +681,8 @@ static void foreach_geometry_component_recursive(const GeometrySet &geometry_set
  * \note For convenience (to avoid duplication in the caller),
  * this also executes the callback for the argument geometry set.
  */
-void BKE_foreach_geometry_component_recursive(const GeometrySet &geometry_set,
-                                              const ForeachGeometryCallbackConst &callback)
+void BKE_geometry_set_foreach_component_recursive(const GeometrySet &geometry_set,
+                                                  const ForeachGeometryCallbackConst &callback)
 {
   float4x4 unit_transform;
   unit_m4(unit_transform.values);
@@ -754,8 +754,8 @@ static void collect_geometry_set_recursive(const GeometrySet &geometry_set,
 
 /**
  * Return a vector of geometry sets, including a flattened array of instances. This approach
- * (as opposed to #BKE_foreach_geometry_component_recursive) can be used where multiple iterations
- * over the input data are needed, or where it simplifies code enough.
+ * (as opposed to #BKE_geometry_set_foreach_component_recursive) can be used where multiple
+ * iterations over the input data are needed, or where it simplifies code enough.
  *
  * \note For convenience (to avoid duplication in the caller),
  * the returned vector also contains the argument geometry set.

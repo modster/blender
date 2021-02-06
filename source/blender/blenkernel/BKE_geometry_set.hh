@@ -480,8 +480,8 @@ class VolumeComponent : public GeometryComponent {
 using ForeachGeometryCallbackConst = std::function<void(
     const GeometryComponent &component, blender::Span<blender::float4x4> transforms)>;
 
-void BKE_foreach_geometry_component_recursive(const GeometrySet &geometry_set,
-                                              const ForeachGeometryCallbackConst &callback);
+void BKE_geometry_set_foreach_component_recursive(const GeometrySet &geometry_set,
+                                                  const ForeachGeometryCallbackConst &callback);
 
 /**
  * Used to keep track of a group of instances using the same geometry data.
