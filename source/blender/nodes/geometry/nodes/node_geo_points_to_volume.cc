@@ -129,18 +129,31 @@ static float compute_voxel_size(const GeoNodeExecParams &params,
   return voxel_size;
 }
 
-static void gather_point_data_from_component(const GeoNodeExecParams &params,
-                                             const GeometryComponent &component,
-                                             Vector<float3> &r_positions,
-                                             Vector<float> &r_radii)
+static void gather_point_data_from_component_and_transforms(const GeoNodeExecParams &params,
+                                                            const GeometryComponent &component,
+                                                            Vector<float3> &r_positions,
+                                                            Vector<float> &r_radii,
+                                                            Span<float4x4> transforms)
 {
-  Float3ReadAttribute positions = component.attribute_get_for_read<float3>(
-      "position", ATTR_DOMAIN_POINT, {0, 0, 0});
-  FloatReadAttribute radii = params.get_input_attribute<float>(
+  ReadAttributePtr positions_attribte = component.attribute_try_get_for_read(
+      "position", ATTR_DOMAIN_POINT, CD_PROP_FLOAT3);
+  if (!positions_attribte) {
+    return;
+  }
+  FloatReadAttribute radii_attribute = params.get_input_attribute<float>(
       "Radius", component, ATTR_DOMAIN_POINT, 0.0f);
+  Span<float> radii = radii_attribute.get_span();
+  Span<float3> positions = positions_attribte->get_span<float3>();
 
-  r_positions.extend(positions.get_span());
-  r_radii.extend(radii.get_span());
+  r_positions.reserve(r_positions.size() +
+                      component.attribute_domain_size(ATTR_DOMAIN_POINT) * transforms.size());
+
+  for (const float4x4 &transform : transforms) {
+    for (const float3 position : positions) {
+      r_positions.append(transform * position);
+    }
+    r_radii.extend(radii);
+  }
 }
 
 static void convert_to_grid_index_space(const float voxel_size,
@@ -163,14 +176,14 @@ static void initialize_volume_component_from_points(const GeometrySet &geometry_
   Vector<float3> positions;
   Vector<float> radii;
 
-  if (geometry_set_in.has<MeshComponent>()) {
-    gather_point_data_from_component(
-        params, *geometry_set_in.get_component_for_read<MeshComponent>(), positions, radii);
-  }
-  if (geometry_set_in.has<PointCloudComponent>()) {
-    gather_point_data_from_component(
-        params, *geometry_set_in.get_component_for_read<PointCloudComponent>(), positions, radii);
-  }
+  /* Note that it would be possible to avoid the matrix multiplication
+   * for the first non-instance geometry components. */
+  BKE_geometry_set_foreach_component_recursive(
+      geometry_set_in,
+      [&](const GeometryComponent &component, Span<blender::float4x4> transforms) {
+        gather_point_data_from_component_and_transforms(
+            params, component, positions, radii, transforms);
+      });
 
   const float max_radius = *std::max_element(radii.begin(), radii.end());
   const float voxel_size = compute_voxel_size(params, positions, max_radius);
