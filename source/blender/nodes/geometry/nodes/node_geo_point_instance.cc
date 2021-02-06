@@ -153,7 +153,8 @@ static Array<std::optional<InstancedData>> get_instanced_data(const GeoNodeExecP
 
 static void add_instances_from_geometry_component(InstancesComponent &instances,
                                                   const GeometryComponent &src_geometry,
-                                                  const GeoNodeExecParams &params)
+                                                  const GeoNodeExecParams &params,
+                                                  const float4x4 &transform)
 {
   const AttributeDomain domain = ATTR_DOMAIN_POINT;
 
@@ -171,9 +172,10 @@ static void add_instances_from_geometry_component(InstancesComponent &instances,
 
   for (const int i : IndexRange(domain_size)) {
     if (instances_data[i].has_value()) {
-      float transform[4][4];
-      loc_eul_size_to_mat4(transform, positions[i], rotations[i], scales[i]);
-      instances.add_instance(*instances_data[i], transform, ids[i]);
+      float4x4 instance_transform;
+      loc_eul_size_to_mat4(instance_transform.values, positions[i], rotations[i], scales[i]);
+      instance_transform = transform * instance_transform;
+      instances.add_instance(*instances_data[i], instance_transform, ids[i]);
     }
   }
 }
@@ -184,14 +186,14 @@ static void geo_node_point_instance_exec(GeoNodeExecParams params)
   GeometrySet geometry_set_out;
 
   InstancesComponent &instances = geometry_set_out.get_component_for_write<InstancesComponent>();
-  if (geometry_set.has<MeshComponent>()) {
-    add_instances_from_geometry_component(
-        instances, *geometry_set.get_component_for_read<MeshComponent>(), params);
-  }
-  if (geometry_set.has<PointCloudComponent>()) {
-    add_instances_from_geometry_component(
-        instances, *geometry_set.get_component_for_read<PointCloudComponent>(), params);
-  }
+
+  /* Note that the matrix multiplication for the non-instances components could be avoided. */
+  BKE_geometry_set_foreach_component_recursive(
+      geometry_set, [&](const GeometryComponent &component, Span<float4x4> transforms) {
+        for (const float4x4 &transform : transforms) {
+          add_instances_from_geometry_component(instances, component, params, transform);
+        }
+      });
 
   params.set_output("Geometry", std::move(geometry_set_out));
 }
