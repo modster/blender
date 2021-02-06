@@ -106,10 +106,10 @@ static Mesh *join_mesh_topology_and_builtin_attributes(Span<GeometryInstanceGrou
           const MVert &old_vert = mesh.mvert[i];
           MVert &new_vert = new_mesh->mvert[vert_offset + i];
 
+          new_vert = old_vert;
+
           const float3 new_position = transform * float3(old_vert.co);
           copy_v3_v3(new_vert.co, new_position);
-
-          new_vert = old_vert;
         }
         for (const int i : IndexRange(mesh.totedge)) {
           const MEdge &old_edge = mesh.medge[i];
