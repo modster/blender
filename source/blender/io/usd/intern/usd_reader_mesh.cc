@@ -383,7 +383,6 @@ void USDMeshReader::read_uvs(Mesh *mesh,
       }
     }
   }
-  BKE_mesh_calc_edges(mesh, false, false);
 }
 
 void USDMeshReader::read_attributes(Mesh *mesh,
@@ -502,7 +501,7 @@ void USDMeshReader::process_normals_face_varying(Mesh *mesh)
     return;
   }
 
-  // mesh->flag |= ME_AUTOSMOOTH;
+  mesh->flag |= ME_AUTOSMOOTH;
 
   long int loop_count = m_normals.size();
 
