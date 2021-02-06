@@ -112,92 +112,153 @@ static void move_split_attributes(const GeometryComponent &in_component,
   }
 }
 
-/**
- * Find total in each new set and find which of the output sets each point will belong to.
- */
-static Array<bool> count_point_splits(const GeometryComponent &component,
-                                      const GeoNodeExecParams &params,
-                                      int *r_a_total,
-                                      int *r_b_total)
+static void gather_component_attribute_info(const GeometryComponent &component,
+                                            Map<std::string, CustomDataType> &attribute_info,
+                                            Set<std::string> ignored_attributes)
 {
-  const BooleanReadAttribute mask_attribute = params.get_input_attribute<bool>(
-      "Mask", component, ATTR_DOMAIN_POINT, false);
-  Array<bool> masks = mask_attribute.get_span();
-  const int in_total = masks.size();
+  for (const std::string name : component.attribute_names()) {
+    if (ignored_attributes.contains(name)) {
+      continue;
+    }
+    const ReadAttributePtr read_attribute = component.attribute_try_get_for_read(
+        name, ATTR_DOMAIN_POINT);
+    if (!read_attribute) {
+      continue;
+    }
+    const CustomDataType data_type = read_attribute->custom_data_type();
+    attribute_info.add_or_modify(
+        name,
+        [&data_type](CustomDataType *final_data_type) { *final_data_type = data_type; },
+        [&data_type](CustomDataType *final_data_type) {
+          *final_data_type = attribute_data_type_highest_complexity({*final_data_type, data_type});
+        });
+  }
+}
 
-  *r_b_total = 0;
-  for (const bool mask : masks) {
-    if (mask) {
-      *r_b_total += 1;
+static void gather_component_positions(Span<float3> positions,
+                                       Span<bool> masks,
+                                       const float4x4 &transform,
+                                       Vector<float3> &r_positions_a,
+                                       Vector<float3> &r_positions_b)
+{
+  for (const int i : positions.index_range()) {
+    if (masks[i]) {
+      r_positions_b.append(transform * positions[i]);
+    }
+    else {
+      r_positions_a.append(transform * positions[i]);
     }
   }
-  *r_a_total = in_total - *r_b_total;
-
-  return masks;
 }
 
-static void separate_mesh(const MeshComponent &in_component,
-                          const GeoNodeExecParams &params,
-                          MeshComponent &out_component_a,
-                          MeshComponent &out_component_b)
+static void copy_attributes(const int offset,
+                            Span<bool> masks,
+                            Map<std::string, CustomDataType> &attribute_info,
+                            GeometryComponent &out_component_a,
+                            GeometryComponent &out_component_b)
 {
-  const int size = in_component.attribute_domain_size(ATTR_DOMAIN_POINT);
-  if (size == 0) {
-    return;
+  for (Map<std::string, CustomDataType>::Item entry : attribute_info.items()) {
+    StringRef name = entry.key;
+    const CustomDataType data_type_output = entry.value;
   }
-
-  int a_total;
-  int b_total;
-  Array<bool> a_or_b = count_point_splits(in_component, params, &a_total, &b_total);
-
-  out_component_a.replace(BKE_mesh_new_nomain(a_total, 0, 0, 0, 0));
-  out_component_b.replace(BKE_mesh_new_nomain(b_total, 0, 0, 0, 0));
-
-  move_split_attributes(in_component, out_component_a, out_component_b, a_or_b);
 }
 
-static void separate_point_cloud(const PointCloudComponent &in_component,
-                                 const GeoNodeExecParams &params,
-                                 PointCloudComponent &out_component_a,
-                                 PointCloudComponent &out_component_b)
-{
-  const int size = in_component.attribute_domain_size(ATTR_DOMAIN_POINT);
-  if (size == 0) {
-    return;
-  }
-
-  int a_total;
-  int b_total;
-  Array<bool> a_or_b = count_point_splits(in_component, params, &a_total, &b_total);
-
-  out_component_a.replace(BKE_pointcloud_new_nomain(a_total));
-  out_component_b.replace(BKE_pointcloud_new_nomain(b_total));
-
-  move_split_attributes(in_component, out_component_a, out_component_b, a_or_b);
-}
-
+/**
+ * \note This could be relatively easily optimized for the case where an entire
+ * component does not have the mask attribute, and thus is moved only to the "a" output.
+ */
 static void geo_node_point_separate_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   GeometrySet out_set_a(geometry_set);
   GeometrySet out_set_b;
 
-  if (geometry_set.has<PointCloudComponent>()) {
-    separate_point_cloud(*geometry_set.get_component_for_read<PointCloudComponent>(),
-                         params,
-                         out_set_a.get_component_for_write<PointCloudComponent>(),
-                         out_set_b.get_component_for_write<PointCloudComponent>());
+  Map<std::string, CustomDataType> attribute_info;
+
+  Vector<GeometryInstanceGroup> set_groups = BKE_geometry_set_gather_instanced(geometry_set);
+
+  const std::string mask_attribute_name = params.extract_input<std::string>("Mask");
+  Vector<float3> positions_a;
+  Vector<float3> positions_b;
+  BKE_geometry_set_foreach_component_recursive(
+      geometry_set, [&](const GeometryComponent &component, Span<float4x4> transforms) {
+        const int domain_size = component.attribute_domain_size(ATTR_DOMAIN_POINT);
+        if (domain_size == 0) {
+          return;
+        }
+
+        gather_component_attribute_info(component, attribute_info, {"position"});
+
+        /* Move positions to either output. */
+        const Float3ReadAttribute positions_attribute = component.attribute_get_for_read<float3>(
+            "position", ATTR_DOMAIN_POINT, {0.0f, 0.0f, 0.0f});
+        const BooleanReadAttribute mask_attribute = component.attribute_get_for_read<bool>(
+            mask_attribute_name, ATTR_DOMAIN_POINT, false);
+
+        for (const float4x4 &transform : transforms) {
+          gather_component_positions(positions_attribute.get_span(),
+                                     mask_attribute.get_span(),
+                                     transform,
+                                     positions_a,
+                                     positions_b);
+        }
+      });
+
+  PointCloudComponent &out_component_a = out_set_a.get_component_for_write<PointCloudComponent>();
+  PointCloudComponent &out_component_b = out_set_b.get_component_for_write<PointCloudComponent>();
+  PointCloud *pointcloud_a = BKE_pointcloud_new_nomain(positions_a.size());
+  PointCloud *pointcloud_b = BKE_pointcloud_new_nomain(positions_b.size());
+  memcpy(pointcloud_a->co, positions_a.data(), positions_a.end() - positions_a.begin());
+  memcpy(pointcloud_b->co, positions_b.data(), positions_b.end() - positions_b.begin());
+  out_component_a.replace(pointcloud_a);
+  out_component_b.replace(pointcloud_b);
+
+  /* Create attributes on output components. */
+  for (Map<std::string, CustomDataType>::Item entry : attribute_info.items()) {
+    StringRef name = entry.key;
+    const CustomDataType data_type = entry.value;
+    out_component_a.attribute_try_create(name, ATTR_DOMAIN_POINT, data_type);
+    out_component_b.attribute_try_create(name, ATTR_DOMAIN_POINT, data_type);
   }
-  if (geometry_set.has<MeshComponent>()) {
-    separate_mesh(*geometry_set.get_component_for_read<MeshComponent>(),
-                  params,
-                  out_set_a.get_component_for_write<MeshComponent>(),
-                  out_set_b.get_component_for_write<MeshComponent>());
-  }
+
+  /* Note: The following code is not ideal for a few reasons:
+   * 1. It will repeat the same mask checks for every instance of a component,
+   * when the result is going to be the same every time.
+   * 2. It retrieves the write attributes from the output components once for every
+   * input geometry component. Every retrieval will have overhead. */
+
+  int offset = 0;
+  BKE_geometry_set_foreach_component_recursive(
+      geometry_set, [&](const GeometryComponent &component, Span<float4x4> transforms) {
+        const int domain_size = component.attribute_domain_size(ATTR_DOMAIN_POINT);
+        if (domain_size == 0) {
+          return;
+        }
+
+        const BooleanReadAttribute mask_attribute = component.attribute_get_for_read<bool>(
+            mask_attribute_name, ATTR_DOMAIN_POINT, false);
+        Span<bool> masks = mask_attribute.get_span();
+
+        // for (Map<std::string, CustomDataType>::Item entry : attribute_info.items()) {
+        //   copy_attribute_to_outputs()
+        //   StringRef name = entry.key;
+        //   const CustomDataType data_type = entry.value;
+        //   ReadAttributePtr output_attribute_a = out_component_a.attribute_try_get_for_read(
+        //       name, ATTR_DOMAIN_POINT, data_type);
+        //   ReadAttributePtr output_attribute_b = out_component_b.attribute_try_get_for_read(
+        //       name, ATTR_DOMAIN_POINT, data_type);
+
+        //   for (const int UNUSED(i) : transforms.index_range()) {
+        //     copy_attribute(offset, masks, attribute_info, out_component_a, out_component_b);
+        //     offset += domain_size;
+        //   }
+        // }
+      });
 
   params.set_output("Geometry 1", std::move(out_set_a));
   params.set_output("Geometry 2", std::move(out_set_b));
 }
+
 }  // namespace blender::nodes
 
 void register_node_type_geo_point_separate()
