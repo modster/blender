@@ -3336,6 +3336,7 @@ static void node_geometry_buts_align_rotation_to_vector(uiLayout *layout,
                                                         PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "axis", DEFAULT_FLAGS | UI_ITEM_R_EXPAND, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "pivot_axis", DEFAULT_FLAGS, IFACE_("Pivot"), ICON_NONE);
   uiLayout *col = uiLayoutColumn(layout, false);
   uiItemR(col, ptr, "input_type_factor", DEFAULT_FLAGS, IFACE_("Factor"), ICON_NONE);
   uiItemR(col, ptr, "input_type_vector", DEFAULT_FLAGS, IFACE_("Vector"), ICON_NONE);
@@ -3386,6 +3387,15 @@ static void node_geometry_buts_attribute_proximity(uiLayout *layout,
                                                    PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "target_geometry_element", DEFAULT_FLAGS, "", ICON_NONE);
+}
+
+static void node_geometry_buts_volume_to_mesh(uiLayout *layout,
+                                              bContext *UNUSED(C),
+                                              PointerRNA *ptr)
+{
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
+  uiItemR(layout, ptr, "resolution_mode", DEFAULT_FLAGS, IFACE_("Resolution"), ICON_NONE);
 }
 
 static void node_geometry_set_butfunc(bNodeType *ntype)
@@ -3453,6 +3463,9 @@ static void node_geometry_set_butfunc(bNodeType *ntype)
       break;
     case GEO_NODE_ATTRIBUTE_PROXIMITY:
       ntype->draw_buttons = node_geometry_buts_attribute_proximity;
+      break;
+    case GEO_NODE_VOLUME_TO_MESH:
+      ntype->draw_buttons = node_geometry_buts_volume_to_mesh;
       break;
   }
 }
