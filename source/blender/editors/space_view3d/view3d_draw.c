@@ -165,7 +165,7 @@ void ED_view3d_update_viewmat(Depsgraph *depsgraph,
     rv3d->viewcamtexcofac[2] = rv3d->viewcamtexcofac[3] = 0.0f;
   }
 
-  /* calculate pixelsize factor once, is used for lights and obcenters */
+  /* Calculate pixel-size factor once, this is used for lights and object-centers. */
   {
     /* note:  '1.0f / len_v3(v1)'  replaced  'len_v3(rv3d->viewmat[0])'
      * because of float point precision problems at large values T23908. */
@@ -1959,6 +1959,16 @@ ImBuf *ED_view3d_draw_offscreen_imbuf(Depsgraph *depsgraph,
     }
   }
 
+  /* XXX(jbakker): `do_color_management` should be controlled by the caller. Currently when doing a
+   * viewport render animation and saving to an 8bit file format, color management would be applied
+   * twice. Once here, and once when saving the saving to disk. In this case the Save As Render
+   * option cannot be controlled either. But when doing an off-screen render you want to do the
+   * color management here.
+   *
+   * This option was added here to increase the performance for quick view-port preview renders.
+   * When using workbench the color differences haven't been reported as a bug. But users also use
+   * the viewport rendering to render Eevee scenes. In the later situation the saved colors are
+   * totally wrong. */
   const bool do_color_management = (ibuf->rect_float == NULL);
   ED_view3d_draw_offscreen(depsgraph,
                            scene,
@@ -2325,7 +2335,7 @@ void ED_view3d_depth_update(ARegion *region)
   }
 }
 
-/* Utility function to find the closest Z value, use for autodepth. */
+/* Utility function to find the closest Z value, use for auto-depth. */
 float view3d_depth_near(ViewDepths *d)
 {
   /* Convert to float for comparisons. */

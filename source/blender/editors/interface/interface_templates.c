@@ -208,6 +208,7 @@ static uiBlock *template_common_search_menu(const bContext *C,
                                             void *search_arg,
                                             uiButHandleFunc search_exec_fn,
                                             void *active_item,
+                                            uiButSearchTooltipFn item_tooltip_fn,
                                             const int preview_rows,
                                             const int preview_cols,
                                             float scale)
@@ -284,6 +285,7 @@ static uiBlock *template_common_search_menu(const bContext *C,
                          NULL,
                          search_exec_fn,
                          active_item);
+  UI_but_func_search_set_tooltip(but, item_tooltip_fn);
 
   UI_block_bounds_set_normal(block, 0.3f * U.widget_unit);
   UI_block_direction_set(block, UI_DIR_DOWN);
@@ -347,7 +349,7 @@ static bool id_search_allows_id(TemplateID *template_ui, const int flag, ID *id,
     }
   }
 
-  /* Hide dot-datablocks, but only if filter does not force them visible. */
+  /* Hide dot prefixed data-blocks, but only if filter does not force them visible. */
   if (U.uiflag & USER_HIDE_DOT) {
     if ((id->name[2] == '.') && (query[0] != '.')) {
       return false;
@@ -485,6 +487,31 @@ static void id_search_cb_objects_from_scene(const bContext *C,
   id_search_cb_tagged(C, arg_template, str, items);
 }
 
+static ARegion *template_ID_search_menu_item_tooltip(
+    bContext *C, ARegion *region, const rcti *item_rect, void *arg, void *active)
+{
+  TemplateID *template_ui = arg;
+  ID *active_id = active;
+  StructRNA *type = RNA_property_pointer_type(&template_ui->ptr, template_ui->prop);
+
+  uiSearchItemTooltipData tooltip_data = {0};
+
+  tooltip_data.name = active_id->name + 2;
+  BLI_snprintf(tooltip_data.description,
+               sizeof(tooltip_data.description),
+               TIP_("Choose %s data-block to be assigned to this user"),
+               RNA_struct_ui_name(type));
+  if (ID_IS_LINKED(active_id)) {
+    BLI_snprintf(tooltip_data.hint,
+                 sizeof(tooltip_data.hint),
+                 TIP_("Source library: %s\n%s"),
+                 active_id->lib->id.name + 2,
+                 active_id->lib->filepath);
+  }
+
+  return UI_tooltip_create_from_search_item_generic(C, region, item_rect, &tooltip_data);
+}
+
 /* ID Search browse menu, open */
 static uiBlock *id_search_menu(bContext *C, ARegion *region, void *arg_litem)
 {
@@ -512,6 +539,7 @@ static uiBlock *id_search_menu(bContext *C, ARegion *region, void *arg_litem)
                                      &template_ui,
                                      template_ID_set_property_exec_fn,
                                      active_item_ptr.data,
+                                     template_ID_search_menu_item_tooltip,
                                      template_ui.prv_rows,
                                      template_ui.prv_cols,
                                      template_ui.scale);
@@ -895,7 +923,7 @@ static void template_ID(const bContext *C,
   idfrom = template_ui->ptr.owner_id;
   // lb = template_ui->idlb;
 
-  /* Allow opertators to take the ID from context. */
+  /* Allow operators to take the ID from context. */
   uiLayoutSetContextPointer(layout, "id", &idptr);
 
   block = uiLayoutGetBlock(layout);
@@ -906,7 +934,7 @@ static void template_ID(const bContext *C,
   }
 
   if (text) {
-    /* Add label resepecting the separated layout property split state. */
+    /* Add label respecting the separated layout property split state. */
     uiItemL_respect_property_split(layout, text, ICON_NONE);
   }
 
@@ -1632,6 +1660,7 @@ static uiBlock *template_search_menu(bContext *C, ARegion *region, void *arg_tem
                                      &template_search,
                                      template_search_exec_fn,
                                      active_ptr.data,
+                                     NULL,
                                      template_search.preview_rows,
                                      template_search.preview_cols,
                                      1.0f);

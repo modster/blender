@@ -678,7 +678,7 @@ bool SCULPT_vertex_has_unique_face_set(SculptSession *ss, int index)
       return sculpt_check_unique_face_set_in_base_mesh(ss, index);
     }
     case PBVH_BMESH:
-      return false;
+      return true;
     case PBVH_GRIDS: {
       const CCGKey *key = BKE_pbvh_get_grid_key(ss->pbvh);
       const int grid_index = index / key->grid_area;
@@ -7237,7 +7237,8 @@ static bool sculpt_needs_connectivity_info(const Sculpt *sd,
           (brush->sculpt_tool == SCULPT_TOOL_BOUNDARY) ||
           (brush->sculpt_tool == SCULPT_TOOL_SLIDE_RELAX) ||
           (brush->sculpt_tool == SCULPT_TOOL_CLOTH) || (brush->sculpt_tool == SCULPT_TOOL_SMEAR) ||
-          (brush->sculpt_tool == SCULPT_TOOL_DRAW_FACE_SETS));
+          (brush->sculpt_tool == SCULPT_TOOL_DRAW_FACE_SETS) ||
+          (brush->sculpt_tool == SCULPT_TOOL_DISPLACEMENT_SMEAR));
 }
 
 void SCULPT_stroke_modifiers_check(const bContext *C, Object *ob, const Brush *brush)
@@ -8992,7 +8993,7 @@ void SCULPT_fake_neighbors_ensure(Sculpt *sd, Object *ob, const float max_dist)
   for (int i = 0; i < totvert; i++) {
     const int from_v = i;
 
-    /* This vertex does not have a fake neighbor yet, seach one for it. */
+    /* This vertex does not have a fake neighbor yet, search one for it. */
     if (ss->fake_neighbors.fake_neighbor_index[from_v] == FAKE_NEIGHBOR_NONE) {
       const int to_v = SCULPT_fake_neighbor_search(sd, ob, from_v, max_dist);
       if (to_v != -1) {

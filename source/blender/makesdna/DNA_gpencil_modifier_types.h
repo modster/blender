@@ -183,7 +183,7 @@ typedef struct ThickGpencilModifierData {
   int flag;
   /** Relative thickness factor. */
   float thickness_fac;
-  /** Absolute thickness overide. */
+  /** Absolute thickness override. */
   int thickness;
   /** Custom index for passes. */
   int layer_pass;

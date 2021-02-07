@@ -25,6 +25,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_system.h"
+#include "BLI_threads.h"
 
 #include "DNA_node_types.h"
 #include "DNA_object_types.h"
@@ -189,7 +190,7 @@ static void node_buts_curvecol(uiLayout *layout, bContext *UNUSED(C), PointerRNA
     cumap->flag &= ~CUMA_DRAW_SAMPLE;
   }
 
-  /* "Tone" (Standard/Filmlike) only used in the Compositor. */
+  /* "Tone" (Standard/Film-like) only used in the Compositor. */
   bNodeTree *ntree = (bNodeTree *)ptr->owner_id;
   uiTemplateCurveMapping(
       layout, ptr, "mapping", 'c', false, false, false, (ntree->type == NTREE_COMPOSIT));
@@ -558,7 +559,7 @@ static void node_draw_reroute(const bContext *C,
   if (node->flag & SELECT) {
     GPU_blend(GPU_BLEND_ALPHA);
     GPU_line_smooth(true);
-    /* using different shades of TH_TEXT_HI for the empasis, like triangle */
+    /* Using different shades of #TH_TEXT_HI for the emphasis, like triangle. */
     if (node->flag & NODE_ACTIVE) {
       UI_GetThemeColorShadeAlpha4fv(TH_TEXT_HI, 0, -40, debug_color);
     }
@@ -3165,13 +3166,80 @@ static void node_geometry_buts_random_attribute(uiLayout *layout,
   uiItemR(layout, ptr, "data_type", DEFAULT_FLAGS, "", ICON_NONE);
 }
 
+static bool node_attribute_math_operation_use_input_b(const NodeMathOperation operation)
+{
+  switch (operation) {
+    case NODE_MATH_ADD:
+    case NODE_MATH_SUBTRACT:
+    case NODE_MATH_MULTIPLY:
+    case NODE_MATH_DIVIDE:
+    case NODE_MATH_POWER:
+    case NODE_MATH_LOGARITHM:
+    case NODE_MATH_MINIMUM:
+    case NODE_MATH_MAXIMUM:
+    case NODE_MATH_LESS_THAN:
+    case NODE_MATH_GREATER_THAN:
+    case NODE_MATH_MODULO:
+    case NODE_MATH_ARCTAN2:
+    case NODE_MATH_SNAP:
+    case NODE_MATH_WRAP:
+    case NODE_MATH_COMPARE:
+    case NODE_MATH_MULTIPLY_ADD:
+    case NODE_MATH_PINGPONG:
+    case NODE_MATH_SMOOTH_MIN:
+    case NODE_MATH_SMOOTH_MAX:
+      return true;
+    case NODE_MATH_SINE:
+    case NODE_MATH_COSINE:
+    case NODE_MATH_TANGENT:
+    case NODE_MATH_ARCSINE:
+    case NODE_MATH_ARCCOSINE:
+    case NODE_MATH_ARCTANGENT:
+    case NODE_MATH_ROUND:
+    case NODE_MATH_ABSOLUTE:
+    case NODE_MATH_FLOOR:
+    case NODE_MATH_CEIL:
+    case NODE_MATH_FRACTION:
+    case NODE_MATH_SQRT:
+    case NODE_MATH_INV_SQRT:
+    case NODE_MATH_SIGN:
+    case NODE_MATH_EXPONENT:
+    case NODE_MATH_RADIANS:
+    case NODE_MATH_DEGREES:
+    case NODE_MATH_SINH:
+    case NODE_MATH_COSH:
+    case NODE_MATH_TANH:
+    case NODE_MATH_TRUNC:
+      return false;
+  }
+  BLI_assert(false);
+  return false;
+}
+
 static void node_geometry_buts_attribute_math(uiLayout *layout,
                                               bContext *UNUSED(C),
                                               PointerRNA *ptr)
 {
+  bNode *node = (bNode *)ptr->data;
+  NodeAttributeMath *node_storage = (NodeAttributeMath *)node->storage;
+  NodeMathOperation operation = (NodeMathOperation)node_storage->operation;
+
   uiItemR(layout, ptr, "operation", DEFAULT_FLAGS, "", ICON_NONE);
   uiItemR(layout, ptr, "input_type_a", DEFAULT_FLAGS, IFACE_("Type A"), ICON_NONE);
-  uiItemR(layout, ptr, "input_type_b", DEFAULT_FLAGS, IFACE_("Type B"), ICON_NONE);
+
+  /* These "use input b / c" checks are copied from the node's code.
+   * They could be de-duplicated if the drawing code was moved to the node's file. */
+  if (node_attribute_math_operation_use_input_b(operation)) {
+    uiItemR(layout, ptr, "input_type_b", DEFAULT_FLAGS, IFACE_("Type B"), ICON_NONE);
+  }
+  if (ELEM(operation,
+           NODE_MATH_MULTIPLY_ADD,
+           NODE_MATH_SMOOTH_MIN,
+           NODE_MATH_SMOOTH_MAX,
+           NODE_MATH_WRAP,
+           NODE_MATH_COMPARE)) {
+    uiItemR(layout, ptr, "input_type_c", DEFAULT_FLAGS, IFACE_("Type C"), ICON_NONE);
+  }
 }
 
 static void node_geometry_buts_attribute_vector_math(uiLayout *layout,
@@ -3268,6 +3336,7 @@ static void node_geometry_buts_align_rotation_to_vector(uiLayout *layout,
                                                         PointerRNA *ptr)
 {
   uiItemR(layout, ptr, "axis", DEFAULT_FLAGS | UI_ITEM_R_EXPAND, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "pivot_axis", DEFAULT_FLAGS, IFACE_("Pivot"), ICON_NONE);
   uiLayout *col = uiLayoutColumn(layout, false);
   uiItemR(col, ptr, "input_type_factor", DEFAULT_FLAGS, IFACE_("Factor"), ICON_NONE);
   uiItemR(col, ptr, "input_type_vector", DEFAULT_FLAGS, IFACE_("Vector"), ICON_NONE);
@@ -3294,6 +3363,39 @@ static void node_geometry_buts_attribute_sample_texture(uiLayout *layout,
                                                         PointerRNA *ptr)
 {
   uiTemplateID(layout, C, ptr, "texture", "texture.new", NULL, NULL, 0, ICON_NONE, NULL);
+}
+
+static void node_geometry_buts_points_to_volume(uiLayout *layout,
+                                                bContext *UNUSED(C),
+                                                PointerRNA *ptr)
+{
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
+  uiItemR(layout, ptr, "resolution_mode", DEFAULT_FLAGS, IFACE_("Resolution"), ICON_NONE);
+  uiItemR(layout, ptr, "input_type_radius", DEFAULT_FLAGS, IFACE_("Radius"), ICON_NONE);
+}
+
+static void node_geometry_buts_collection_info(uiLayout *layout,
+                                               bContext *UNUSED(C),
+                                               PointerRNA *ptr)
+{
+  uiItemR(layout, ptr, "transform_space", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
+}
+
+static void node_geometry_buts_attribute_proximity(uiLayout *layout,
+                                                   bContext *UNUSED(C),
+                                                   PointerRNA *ptr)
+{
+  uiItemR(layout, ptr, "target_geometry_element", DEFAULT_FLAGS, "", ICON_NONE);
+}
+
+static void node_geometry_buts_volume_to_mesh(uiLayout *layout,
+                                              bContext *UNUSED(C),
+                                              PointerRNA *ptr)
+{
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
+  uiItemR(layout, ptr, "resolution_mode", DEFAULT_FLAGS, IFACE_("Resolution"), ICON_NONE);
 }
 
 static void node_geometry_set_butfunc(bNodeType *ntype)
@@ -3352,6 +3454,18 @@ static void node_geometry_set_butfunc(bNodeType *ntype)
       break;
     case GEO_NODE_ATTRIBUTE_SAMPLE_TEXTURE:
       ntype->draw_buttons = node_geometry_buts_attribute_sample_texture;
+      break;
+    case GEO_NODE_POINTS_TO_VOLUME:
+      ntype->draw_buttons = node_geometry_buts_points_to_volume;
+      break;
+    case GEO_NODE_COLLECTION_INFO:
+      ntype->draw_buttons = node_geometry_buts_collection_info;
+      break;
+    case GEO_NODE_ATTRIBUTE_PROXIMITY:
+      ntype->draw_buttons = node_geometry_buts_attribute_proximity;
+      break;
+    case GEO_NODE_VOLUME_TO_MESH:
+      ntype->draw_buttons = node_geometry_buts_volume_to_mesh;
       break;
   }
 }
@@ -3780,7 +3894,9 @@ void draw_nodespace_back_pix(const bContext *C,
   /* The draw manager is used to draw the backdrop image. */
   GPUFrameBuffer *old_fb = GPU_framebuffer_active_get();
   GPU_framebuffer_restore();
+  BLI_thread_lock(LOCK_DRAW_IMAGE);
   DRW_draw_view(C);
+  BLI_thread_unlock(LOCK_DRAW_IMAGE);
   GPU_framebuffer_bind_no_srgb(old_fb);
   /* Draw manager changes the depth state. Set it back to NONE. Without this the node preview
    * images aren't drawn correctly. */

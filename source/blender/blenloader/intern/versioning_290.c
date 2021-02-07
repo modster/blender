@@ -658,7 +658,7 @@ static void do_versions_291_fcurve_handles_limit(FCurve *fcu)
 {
   uint i = 1;
   for (BezTriple *bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
-    /* Only adjust bezier keyframes. */
+    /* Only adjust bezier key-frames. */
     if (bezt->ipo != BEZT_IPO_BEZ) {
       continue;
     }
@@ -1097,10 +1097,10 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
   }
 
   if (!MAIN_VERSION_ATLEAST(bmain, 291, 5)) {
-    /* Fix fcurves to allow for new bezier handles behaviour (T75881 and D8752). */
+    /* Fix fcurves to allow for new bezier handles behavior (T75881 and D8752). */
     for (bAction *act = bmain->actions.first; act; act = act->id.next) {
       for (FCurve *fcu = act->curves.first; fcu; fcu = fcu->next) {
-        /* Only need to fix Bezier curves with at least 2 keyframes. */
+        /* Only need to fix Bezier curves with at least 2 key-frames. */
         if (fcu->totvert < 2 || fcu->bezt == NULL) {
           continue;
         }
@@ -1504,7 +1504,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
 
   if (!MAIN_VERSION_ATLEAST(bmain, 292, 10)) {
     if (!DNA_struct_find(fd->filesdna, "NodeSetAlpha")) {
-      LISTBASE_FOREACH (bNodeTree *, ntree, &bmain->nodetrees) {
+      FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
         if (ntree->type != NTREE_COMPOSIT) {
           continue;
         }
@@ -1517,6 +1517,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
           node->storage = storage;
         }
       }
+      FOREACH_NODETREE_END;
     }
 
     LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
@@ -1623,6 +1624,36 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
           data->instance_type = node->custom1;
           data->flag = (node->custom2 ? 0 : GEO_NODE_POINT_INSTANCE_WHOLE_COLLECTION);
           node->storage = data;
+        }
+      }
+    }
+    FOREACH_NODETREE_END;
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 293, 4)) {
+    /* Add support for all operations to the "Attribute Math" node. */
+    FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
+      if (ntree->type == NTREE_GEOMETRY) {
+        LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+          if (node->type == GEO_NODE_ATTRIBUTE_MATH) {
+            NodeAttributeMath *data = (NodeAttributeMath *)node->storage;
+            data->input_type_c = GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE;
+          }
+        }
+      }
+    }
+    FOREACH_NODETREE_END;
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 293, 5)) {
+    /* Change Nishita sky model Altitude unit. */
+    FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
+      if (ntree->type == NTREE_SHADER) {
+        LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+          if (node->type == SH_NODE_TEX_SKY && node->storage) {
+            NodeTexSky *tex = (NodeTexSky *)node->storage;
+            tex->altitude *= 1000.0f;
+          }
         }
       }
     }
