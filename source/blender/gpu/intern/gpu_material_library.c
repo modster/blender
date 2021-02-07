@@ -780,10 +780,6 @@ static void gpu_parse_material_library(GHash *hash, GPUMaterialLibrary *library)
         }
       }
 
-      /* TODO(fclem) This is only to avoid parsing error. Support is incomplete. */
-      if (!type && BLI_str_startswith(code, "bool")) {
-        type = GPU_BOOL;
-      }
       if (!type && BLI_str_startswith(code, "samplerCube")) {
         type = GPU_TEXCUBE;
       }

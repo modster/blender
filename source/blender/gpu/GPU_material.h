@@ -78,7 +78,6 @@ typedef enum eGPUType {
 
   /* GLSL Struct types */
   GPU_CLOSURE = 1007,
-  GPU_BOOL = 1008,
 
   /* Opengl Attributes */
   GPU_ATTR = 3001,

@@ -15,41 +15,38 @@ float principled_sheen(float NV)
 
 CLOSURE_EVAL_FUNCTION_DECLARE_4(node_bsdf_principled, Diffuse, Glossy, Glossy, Refraction)
 
-/* Constant booleans assure discarding of the individual closure eval. */
-void node_bsdf_principled_ex(const bool do_diffuse,
-                             const bool do_clearcoat,
-                             const bool do_refraction,
-                             vec4 base_color,
-                             float subsurface,
-                             vec3 subsurface_radius,
-                             vec4 subsurface_color,
-                             float metallic,
-                             float specular,
-                             float specular_tint,
-                             float roughness,
-                             float anisotropic,
-                             float anisotropic_rotation,
-                             float sheen,
-                             float sheen_tint,
-                             float clearcoat,
-                             float clearcoat_roughness,
-                             float ior,
-                             float transmission,
-                             float transmission_roughness,
-                             vec4 emission,
-                             float emission_strength,
-                             float alpha,
-                             vec3 N,
-                             vec3 CN,
-                             vec3 T,
-                             float use_multiscatter,
-                             float ssr_id,
-                             float sss_id,
-                             vec3 sss_scale,
-                             out Closure result)
+void node_bsdf_principled(vec4 base_color,
+                          float subsurface,
+                          vec3 subsurface_radius,
+                          vec4 subsurface_color,
+                          float metallic,
+                          float specular,
+                          float specular_tint,
+                          float roughness,
+                          float anisotropic,
+                          float anisotropic_rotation,
+                          float sheen,
+                          float sheen_tint,
+                          float clearcoat,
+                          float clearcoat_roughness,
+                          float ior,
+                          float transmission,
+                          float transmission_roughness,
+                          vec4 emission,
+                          float emission_strength,
+                          float alpha,
+                          vec3 N,
+                          vec3 CN,
+                          vec3 T,
+                          const float do_diffuse,
+                          const float do_clearcoat,
+                          const float do_refraction,
+                          const float do_multiscatter,
+                          float ssr_id,
+                          float sss_id,
+                          vec3 sss_scale,
+                          out Closure result)
 {
-  bool multi_ggx = false;
-
   /* Match cycles. */
   metallic = saturate(metallic);
   transmission = saturate(transmission);
@@ -71,21 +68,22 @@ void node_bsdf_principled_ex(const bool do_diffuse,
   in_Glossy_2.roughness = clearcoat_roughness;
 
   in_Refraction_3.N = N; /* Normalized during eval. */
-  in_Refraction_3.roughness = multi_ggx ? roughness : transmission_roughness;
+  in_Refraction_3.roughness = do_multiscatter != 0.0 ? roughness : transmission_roughness;
   in_Refraction_3.ior = ior;
+  
 
   CLOSURE_EVAL_FUNCTION_4(node_bsdf_principled, Diffuse, Glossy, Glossy, Refraction);
 
   result = CLOSURE_DEFAULT;
 
   /* This will tag the whole eval for optimisation. */
-  if (!do_diffuse) {
+  if (do_diffuse == 0.0) {
     out_Diffuse_0.radiance = vec3(0);
   }
-  if (!do_clearcoat) {
+  if (do_clearcoat == 0.0) {
     out_Glossy_2.radiance = vec3(0);
   }
-  if (!do_refraction) {
+  if (do_refraction == 0.0) {
     out_Refraction_3.radiance = vec3(0);
   }
 
@@ -114,8 +112,8 @@ void node_bsdf_principled_ex(const bool do_diffuse,
       vec3 f0 = mix(vec3(1.0), base_color.rgb, specular_tint);
       vec3 f90 = vec3(1);
 
-      vec3 brdf = (multi_ggx) ? F_brdf_multi_scatter(f0, f90, split_sum) :
-                                F_brdf_single_scatter(f0, f90, split_sum);
+      vec3 brdf = (do_multiscatter != 0.0) ? F_brdf_multi_scatter(f0, f90, split_sum) :
+                                             F_brdf_single_scatter(f0, f90, split_sum);
 
       out_glass_refl_radiance *= brdf;
       out_glass_refl_radiance = render_pass_glossy_mask(vec3(1), out_glass_refl_radiance);
@@ -131,8 +129,8 @@ void node_bsdf_principled_ex(const bool do_diffuse,
        * changing the f90 color directly in a non linear fashion. */
       vec3 f90 = mix(f0, vec3(1), fast_sqrt(specular));
 
-      vec3 brdf = (multi_ggx) ? F_brdf_multi_scatter(f0, f90, split_sum) :
-                                F_brdf_single_scatter(f0, f90, split_sum);
+      vec3 brdf = (do_multiscatter != 0.0) ? F_brdf_multi_scatter(f0, f90, split_sum) :
+                                             F_brdf_single_scatter(f0, f90, split_sum);
 
       out_Glossy_1.radiance *= brdf;
       out_Glossy_1.radiance = render_pass_glossy_mask(vec3(1), out_Glossy_1.radiance);
@@ -194,230 +192,9 @@ void node_bsdf_principled_ex(const bool do_diffuse,
 #  endif
 }
 
-#  define PRINCIPLED_BSDF_ARGUMENTS \
-    base_color, subsurface, subsurface_radius, subsurface_color, metallic, specular, \
-        specular_tint, roughness, anisotropic, anisotropic_rotation, sheen, sheen_tint, \
-        clearcoat, clearcoat_roughness, ior, transmission, transmission_roughness, emission, \
-        emission_strength, alpha, N, CN, T, use_multiscatter, ssr_id, sss_id, sss_scale, result
-
-void node_bsdf_principled(vec4 base_color,
-                          float subsurface,
-                          vec3 subsurface_radius,
-                          vec4 subsurface_color,
-                          float metallic,
-                          float specular,
-                          float specular_tint,
-                          float roughness,
-                          float anisotropic,
-                          float anisotropic_rotation,
-                          float sheen,
-                          float sheen_tint,
-                          float clearcoat,
-                          float clearcoat_roughness,
-                          float ior,
-                          float transmission,
-                          float transmission_roughness,
-                          vec4 emission,
-                          float emission_strength,
-                          float alpha,
-                          vec3 N,
-                          vec3 CN,
-                          vec3 T,
-                          float use_multiscatter,
-                          float ssr_id,
-                          float sss_id,
-                          vec3 sss_scale,
-                          out Closure result)
-{
-  node_bsdf_principled_ex(true /* do_diffuse */,
-                          true /* do_clearcoat */,
-                          true /* do_refraction */,
-                          PRINCIPLED_BSDF_ARGUMENTS);
-}
-
-void node_bsdf_principled_dielectric(vec4 base_color,
-                                     float subsurface,
-                                     vec3 subsurface_radius,
-                                     vec4 subsurface_color,
-                                     float metallic,
-                                     float specular,
-                                     float specular_tint,
-                                     float roughness,
-                                     float anisotropic,
-                                     float anisotropic_rotation,
-                                     float sheen,
-                                     float sheen_tint,
-                                     float clearcoat,
-                                     float clearcoat_roughness,
-                                     float ior,
-                                     float transmission,
-                                     float transmission_roughness,
-                                     vec4 emission,
-                                     float emission_strength,
-                                     float alpha,
-                                     vec3 N,
-                                     vec3 CN,
-                                     vec3 T,
-                                     float use_multiscatter,
-                                     float ssr_id,
-                                     float sss_id,
-                                     vec3 sss_scale,
-                                     out Closure result)
-{
-  node_bsdf_principled_ex(true /* do_diffuse */,
-                          false /* do_clearcoat */,
-                          false /* do_refraction */,
-                          PRINCIPLED_BSDF_ARGUMENTS);
-}
-
-void node_bsdf_principled_metallic(vec4 base_color,
-                                   float subsurface,
-                                   vec3 subsurface_radius,
-                                   vec4 subsurface_color,
-                                   float metallic,
-                                   float specular,
-                                   float specular_tint,
-                                   float roughness,
-                                   float anisotropic,
-                                   float anisotropic_rotation,
-                                   float sheen,
-                                   float sheen_tint,
-                                   float clearcoat,
-                                   float clearcoat_roughness,
-                                   float ior,
-                                   float transmission,
-                                   float transmission_roughness,
-                                   vec4 emission,
-                                   float emission_strength,
-                                   float alpha,
-                                   vec3 N,
-                                   vec3 CN,
-                                   vec3 T,
-                                   float use_multiscatter,
-                                   float ssr_id,
-                                   float sss_id,
-                                   vec3 sss_scale,
-                                   out Closure result)
-{
-  node_bsdf_principled_ex(false /* do_diffuse */,
-                          false /* do_clearcoat */,
-                          false /* do_refraction */,
-                          PRINCIPLED_BSDF_ARGUMENTS);
-}
-
-void node_bsdf_principled_clearcoat(vec4 base_color,
-                                    float subsurface,
-                                    vec3 subsurface_radius,
-                                    vec4 subsurface_color,
-                                    float metallic,
-                                    float specular,
-                                    float specular_tint,
-                                    float roughness,
-                                    float anisotropic,
-                                    float anisotropic_rotation,
-                                    float sheen,
-                                    float sheen_tint,
-                                    float clearcoat,
-                                    float clearcoat_roughness,
-                                    float ior,
-                                    float transmission,
-                                    float transmission_roughness,
-                                    vec4 emission,
-                                    float emission_strength,
-                                    float alpha,
-                                    vec3 N,
-                                    vec3 CN,
-                                    vec3 T,
-                                    float use_multiscatter,
-                                    float ssr_id,
-                                    float sss_id,
-                                    vec3 sss_scale,
-                                    out Closure result)
-{
-  node_bsdf_principled_ex(false /* do_diffuse */,
-                          true /* do_clearcoat */,
-                          false /* do_refraction */,
-                          PRINCIPLED_BSDF_ARGUMENTS);
-}
-
-void node_bsdf_principled_subsurface(vec4 base_color,
-                                     float subsurface,
-                                     vec3 subsurface_radius,
-                                     vec4 subsurface_color,
-                                     float metallic,
-                                     float specular,
-                                     float specular_tint,
-                                     float roughness,
-                                     float anisotropic,
-                                     float anisotropic_rotation,
-                                     float sheen,
-                                     float sheen_tint,
-                                     float clearcoat,
-                                     float clearcoat_roughness,
-                                     float ior,
-                                     float transmission,
-                                     float transmission_roughness,
-                                     vec4 emission,
-                                     float emission_strength,
-                                     float alpha,
-                                     vec3 N,
-                                     vec3 CN,
-                                     vec3 T,
-                                     float use_multiscatter,
-                                     float ssr_id,
-                                     float sss_id,
-                                     vec3 sss_scale,
-                                     out Closure result)
-{
-  node_bsdf_principled_ex(true /* do_diffuse */,
-                          false /* do_clearcoat */,
-                          false /* do_refraction */,
-                          PRINCIPLED_BSDF_ARGUMENTS);
-}
-
-void node_bsdf_principled_glass(vec4 base_color,
-                                float subsurface,
-                                vec3 subsurface_radius,
-                                vec4 subsurface_color,
-                                float metallic,
-                                float specular,
-                                float specular_tint,
-                                float roughness,
-                                float anisotropic,
-                                float anisotropic_rotation,
-                                float sheen,
-                                float sheen_tint,
-                                float clearcoat,
-                                float clearcoat_roughness,
-                                float ior,
-                                float transmission,
-                                float transmission_roughness,
-                                vec4 emission,
-                                float emission_strength,
-                                float alpha,
-                                vec3 N,
-                                vec3 CN,
-                                vec3 T,
-                                float use_multiscatter,
-                                float ssr_id,
-                                float sss_id,
-                                vec3 sss_scale,
-                                out Closure result)
-{
-  node_bsdf_principled_ex(false /* do_diffuse */,
-                          false /* do_clearcoat */,
-                          true /* do_refraction */,
-                          PRINCIPLED_BSDF_ARGUMENTS);
-}
-#  undef PRINCIPLED_BSDF_ARGUMENTS
 #else
 /* clang-format off */
 /* Stub principled because it is not compatible with volumetrics. */
-#  define node_bsdf_principled(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, result) (result = CLOSURE_DEFAULT)
-#  define node_bsdf_principled_dielectric(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, result) (result = CLOSURE_DEFAULT)
-#  define node_bsdf_principled_metallic(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, result) (result = CLOSURE_DEFAULT)
-#  define node_bsdf_principled_clearcoat(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, result) (result = CLOSURE_DEFAULT)
-#  define node_bsdf_principled_subsurface(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, result) (result = CLOSURE_DEFAULT)
-#  define node_bsdf_principled_glass(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, result) (result = CLOSURE_DEFAULT)
+#  define node_bsdf_principled(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, aa, bb, cc, dd, result) (result = CLOSURE_DEFAULT)
 /* clang-format on */
 #endif
