@@ -608,91 +608,6 @@ static GeometrySet object_get_geometry_set_for_read(const Object &object)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Geometry Set Instances Callback
- * \{ */
-
-static void foreach_geometry_component_recursive(const GeometrySet &geometry_set,
-                                                 const ForeachGeometryCallbackConst &callback,
-                                                 const float4x4 &transform);
-
-static void foreach_collection_geometry_set_recursive(const Collection &collection,
-                                                      const ForeachGeometryCallbackConst &callback,
-                                                      const float4x4 &transform)
-{
-  LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
-    BLI_assert(collection_object->ob != nullptr);
-    const Object &object = *collection_object->ob;
-    GeometrySet instance_geometry_set = object_get_geometry_set_for_read(object);
-
-    /* TODO: This seems to work-- validate this. */
-    const float4x4 instance_transform = transform * object.obmat;
-    foreach_geometry_component_recursive(instance_geometry_set, callback, instance_transform);
-  }
-  LISTBASE_FOREACH (const CollectionChild *, collection_child, &collection.children) {
-    BLI_assert(collection_child->collection != nullptr);
-    const Collection &collection = *collection_child->collection;
-    foreach_collection_geometry_set_recursive(collection, callback, transform);
-  }
-}
-
-static void foreach_geometry_component_recursive(const GeometrySet &geometry_set,
-                                                 const ForeachGeometryCallbackConst &callback,
-                                                 const float4x4 &transform)
-{
-  if (geometry_set.has_mesh()) {
-    callback(*geometry_set.get_component_for_read<MeshComponent>(), {transform});
-  }
-  if (geometry_set.has_pointcloud()) {
-    callback(*geometry_set.get_component_for_read<PointCloudComponent>(), {transform});
-  }
-  if (geometry_set.has_volume()) {
-    callback(*geometry_set.get_component_for_read<VolumeComponent>(), {transform});
-  }
-
-  if (geometry_set.has_instances()) {
-    const InstancesComponent &instances_component =
-        *geometry_set.get_component_for_read<InstancesComponent>();
-
-    Span<float4x4> transforms = instances_component.transforms();
-    Span<InstancedData> instances = instances_component.instanced_data();
-    for (const int i : instances.index_range()) {
-      const InstancedData &data = instances[i];
-      const float4x4 &transform = transforms[i];
-
-      if (data.type == INSTANCE_DATA_TYPE_OBJECT) {
-        BLI_assert(data.data.object != nullptr);
-        const Object &object = *data.data.object;
-        GeometrySet instance_geometry_set = object_get_geometry_set_for_read(object);
-        foreach_geometry_component_recursive(instance_geometry_set, callback, transform);
-      }
-      else if (data.type == INSTANCE_DATA_TYPE_COLLECTION) {
-        BLI_assert(data.data.collection != nullptr);
-        const Collection &collection = *data.data.collection;
-        foreach_collection_geometry_set_recursive(collection, callback, transform);
-      }
-    }
-  }
-}
-
-/**
- * Execute a callback for every component of a geometry set. This approach is used to avoid
- * allocating a temporary vector the store the flattened instances before operation.
- *
- * \note For convenience (to avoid duplication in the caller),
- * this also executes the callback for the argument geometry set.
- */
-void BKE_geometry_set_foreach_component_recursive(const GeometrySet &geometry_set,
-                                                  const ForeachGeometryCallbackConst &callback)
-{
-  float4x4 unit_transform;
-  unit_m4(unit_transform.values);
-
-  foreach_geometry_component_recursive(geometry_set, callback, unit_transform);
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name Geometry Set Gather Recursive Instances
  * \{ */
 
@@ -753,14 +668,14 @@ static void collect_geometry_set_recursive(const GeometrySet &geometry_set,
 }
 
 /**
- * Return a vector of geometry sets, including a flattened array of instances. This approach
- * (as opposed to #BKE_geometry_set_foreach_component_recursive) can be used where multiple
- * iterations over the input data are needed, or where it simplifies code enough.
+ * Return flattened vector of the geometry component's recursive instances. I.e. all collection
+ * instances and object instances will be expanded into the instances of their geometry components.
+ * Even the instances in those geometry components' will be included.
  *
  * \note For convenience (to avoid duplication in the caller),
  * the returned vector also contains the argument geometry set.
  */
-Vector<GeometryInstanceGroup> BKE_geometry_set_gather_instanced(const GeometrySet &geometry_set)
+Vector<GeometryInstanceGroup> BKE_geometry_set_gather_instances(const GeometrySet &geometry_set)
 {
   Vector<GeometryInstanceGroup> result_vector;
 

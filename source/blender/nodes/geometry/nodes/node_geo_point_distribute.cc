@@ -498,7 +498,7 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
 
   const int seed = params.get_input<int>("Seed");
 
-  Vector<GeometryInstanceGroup> sets = BKE_geometry_set_gather_instanced(geometry_set);
+  Vector<GeometryInstanceGroup> sets = BKE_geometry_set_gather_instances(geometry_set);
   int instances_len = 0;
   for (GeometryInstanceGroup set_group : sets) {
     instances_len += set_group.transforms.size();
@@ -618,10 +618,8 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
       geometry_set_out.get_component_for_write<PointCloudComponent>();
   point_component.replace(pointcloud);
 
-  Map<std::string, AttributeInfo> attributes = gather_attribute_info<MeshComponent>(sets);
-  attributes.remove("position");
-  attributes.remove("normal");
-  attributes.remove("id");
+  Map<std::string, AttributeInfo> attributes;
+  gather_attribute_info<MeshComponent>(attributes, sets, {"position", "normal", "id"});
   add_remaining_point_attributes(sets,
                                  group_start_indices,
                                  attributes,

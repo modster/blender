@@ -477,16 +477,10 @@ class VolumeComponent : public GeometryComponent {
   static constexpr inline GeometryComponentType static_type = GeometryComponentType::Volume;
 };
 
-using ForeachGeometryCallbackConst = std::function<void(
-    const GeometryComponent &component, blender::Span<blender::float4x4> transforms)>;
-
-void BKE_geometry_set_foreach_component_recursive(const GeometrySet &geometry_set,
-                                                  const ForeachGeometryCallbackConst &callback);
-
 /**
  * Used to keep track of a group of instances using the same geometry data.
  *
- * \note In the future, this can be used to store "geometry set instances".
+ * \note In the future, this can be used to store direct instances of geometry sets.
  */
 struct GeometryInstanceGroup {
   /**
@@ -504,5 +498,5 @@ struct GeometryInstanceGroup {
   blender::Vector<blender::float4x4> transforms;
 };
 
-blender::Vector<GeometryInstanceGroup> BKE_geometry_set_gather_instanced(
+blender::Vector<GeometryInstanceGroup> BKE_geometry_set_gather_instances(
     const GeometrySet &geometry_set);

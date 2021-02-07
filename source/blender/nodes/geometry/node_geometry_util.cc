@@ -27,30 +27,40 @@
 namespace blender::nodes {
 
 template<typename Component>
-Map<std::string, AttributeInfo> gather_attribute_info(Span<GeometryInstanceGroup> geometry_sets)
+void gather_attribute_info(Map<std::string, AttributeInfo> &attributes,
+                           Span<GeometryInstanceGroup> set_groups,
+                           Set<std::string> ignored_attributes)
 {
-  Map<std::string, AttributeInfo> attribute_info;
-  for (const GeometryInstanceGroup &set_group : geometry_sets) {
+  for (const GeometryInstanceGroup &set_group : set_groups) {
     const GeometrySet &set = set_group.geometry_set;
-    if (set.has<Component>()) {
-      const Component &component = *set.get_component_for_read<Component>();
-      for (const std::string &name : component.attribute_names()) {
-        ReadAttributePtr attribute = component.attribute_try_get_for_read(name);
-        BLI_assert(attribute);
-        const CustomDataType data_type = attribute->custom_data_type();
-        const AttributeDomain domain = attribute->domain();
-        if (attribute_info.contains(name)) {
-          AttributeInfo &info = attribute_info.lookup(name);
-          info.data_type = attribute_data_type_highest_complexity({info.data_type, data_type});
-          info.domain = domain; /* TODO: Use domain priority. */
-        }
-        else {
-          attribute_info.add(name, {data_type});
-        }
+    if (!set.has<Component>()) {
+      continue;
+    }
+    const Component &component = *set.get_component_for_read<Component>();
+
+    for (const std::string name : component.attribute_names()) {
+      if (ignored_attributes.contains(name)) {
+        continue;
       }
+      const ReadAttributePtr read_attribute = component.attribute_try_get_for_read(name);
+      if (!read_attribute) {
+        continue;
+      }
+      const AttributeDomain domain = read_attribute->domain();
+      const CustomDataType data_type = read_attribute->custom_data_type();
+
+      auto add_info = [&, data_type, domain](AttributeInfo *info) {
+        info->domain = domain;
+        info->data_type = data_type;
+      };
+      auto modify_info = [&, data_type, domain](AttributeInfo *info) {
+        info->domain = domain; /* TODO: Use highest priority domain. */
+        info->data_type = attribute_data_type_highest_complexity({info->data_type, data_type});
+      };
+
+      attributes.add_or_modify(name, add_info, modify_info);
     }
   }
-  return attribute_info;
 }
 
 static Mesh *join_mesh_topology_and_builtin_attributes(Span<GeometryInstanceGroup> set_groups)
@@ -200,8 +210,8 @@ static void join_components_mesh(Span<GeometryInstanceGroup> set_groups, Geometr
   dst_component.replace(new_mesh);
 
   /* The position attribute is handled above already. */
-  Map<std::string, AttributeInfo> attributes = gather_attribute_info<MeshComponent>(set_groups);
-  attributes.remove("position");
+  Map<std::string, AttributeInfo> attributes;
+  gather_attribute_info<MeshComponent>(attributes, set_groups, {"position"});
   join_attributes<MeshComponent>(
       set_groups, attributes, static_cast<GeometryComponent &>(dst_component));
 }
@@ -220,9 +230,8 @@ static void join_components_pointcloud(Span<GeometryInstanceGroup> set_groups, G
   PointCloudComponent &dst_component = result.get_component_for_write<PointCloudComponent>();
   PointCloud *pointcloud = BKE_pointcloud_new_nomain(totpoint);
   dst_component.replace(pointcloud);
-
-  Map<std::string, AttributeInfo> attributes = gather_attribute_info<PointCloudComponent>(
-      set_groups);
+  Map<std::string, AttributeInfo> attributes;
+  gather_attribute_info<MeshComponent>(attributes, set_groups, {});
   join_attributes<PointCloudComponent>(
       set_groups, attributes, static_cast<GeometryComponent &>(dst_component));
 }
@@ -241,7 +250,7 @@ void geometry_set_realize_instances_for_write(GeometrySet &geometry_set)
     return;
   }
 
-  Vector<GeometryInstanceGroup> set_groups = BKE_geometry_set_gather_instanced(geometry_set);
+  Vector<GeometryInstanceGroup> set_groups = BKE_geometry_set_gather_instances(geometry_set);
   join_components_mesh(set_groups, geometry_set);
   join_components_pointcloud(set_groups, geometry_set);
   join_components_volume(set_groups, geometry_set);

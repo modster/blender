@@ -56,9 +56,11 @@ struct AttributeInfo {
   AttributeDomain domain;
 };
 
-template<typename Component>
-Map<std::string, AttributeInfo> gather_attribute_info(Span<GeometryInstanceGroup> geometry_sets);
-
 void geometry_set_realize_instances_for_write(GeometrySet &geometry_set);
+
+template<typename Component>
+void gather_attribute_info(Map<std::string, AttributeInfo> &attributes,
+                           Span<GeometryInstanceGroup> set_groups,
+                           Set<std::string> ignored_attributes);
 
 }  // namespace blender::nodes

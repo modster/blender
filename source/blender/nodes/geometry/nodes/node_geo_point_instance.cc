@@ -151,16 +151,13 @@ static Array<std::optional<InstancedData>> get_instanced_data(const GeoNodeExecP
   return instances_data;
 }
 
-static void add_instances_from_geometry_component(InstancesComponent &instances,
-                                                  const GeometryComponent &src_geometry,
-                                                  const GeoNodeExecParams &params,
-                                                  const float4x4 &transform)
+static void add_instances_from_component_transforms(InstancesComponent &instances,
+                                                    const GeometryComponent &src_geometry,
+                                                    const GeoNodeExecParams &params,
+                                                    Span<float4x4> transforms)
 {
   const AttributeDomain domain = ATTR_DOMAIN_POINT;
-
-  const int domain_size = src_geometry.attribute_domain_size(domain);
-  Array<std::optional<InstancedData>> instances_data = get_instanced_data(
-      params, src_geometry, domain_size);
+  const int size = src_geometry.attribute_domain_size(domain) * transforms.size();
 
   Float3ReadAttribute positions = src_geometry.attribute_get_for_read<float3>(
       "position", domain, {0, 0, 0});
@@ -170,11 +167,15 @@ static void add_instances_from_geometry_component(InstancesComponent &instances,
       "scale", domain, {1, 1, 1});
   Int32ReadAttribute ids = src_geometry.attribute_get_for_read<int>("id", domain, -1);
 
-  for (const int i : IndexRange(domain_size)) {
+  /* HANS-TODO: This is quite broken, don't do this here. And really, why fill an array... */
+  Array<std::optional<InstancedData>> instances_data = get_instanced_data(
+      params, src_geometry, size);
+
+  for (const int i : IndexRange(size)) {
     if (instances_data[i].has_value()) {
       float4x4 instance_transform;
       loc_eul_size_to_mat4(instance_transform.values, positions[i], rotations[i], scales[i]);
-      instance_transform = transform * instance_transform;
+      instance_transform = transforms[i] * instance_transform;
       instances.add_instance(*instances_data[i], instance_transform, ids[i]);
     }
   }
@@ -183,17 +184,25 @@ static void add_instances_from_geometry_component(InstancesComponent &instances,
 static void geo_node_point_instance_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  GeometrySet geometry_set_out;
 
+  GeometrySet geometry_set_out;
   InstancesComponent &instances = geometry_set_out.get_component_for_write<InstancesComponent>();
 
-  /* Note that the matrix multiplication for the non-instances components could be avoided. */
-  BKE_geometry_set_foreach_component_recursive(
-      geometry_set, [&](const GeometryComponent &component, Span<float4x4> transforms) {
-        for (const float4x4 &transform : transforms) {
-          add_instances_from_geometry_component(instances, component, params, transform);
-        }
-      });
+  Vector<GeometryInstanceGroup> set_groups = BKE_geometry_set_gather_instances(geometry_set);
+  for (const GeometryInstanceGroup &set_group : set_groups) {
+    const GeometrySet &set = set_group.geometry_set;
+
+    if (set.has<MeshComponent>()) {
+      add_instances_from_component_transforms(
+          instances, *set.get_component_for_read<MeshComponent>(), params, set_group.transforms);
+    }
+    if (set.has<PointCloudComponent>()) {
+      add_instances_from_component_transforms(instances,
+                                              *set.get_component_for_read<PointCloudComponent>(),
+                                              params,
+                                              set_group.transforms);
+    }
+  }
 
   params.set_output("Geometry", std::move(geometry_set_out));
 }
