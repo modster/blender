@@ -171,12 +171,14 @@ static void add_instances_from_component_transforms(InstancesComponent &instance
   Array<std::optional<InstancedData>> instances_data = get_instanced_data(
       params, src_geometry, size);
 
-  for (const int i : IndexRange(size)) {
-    if (instances_data[i].has_value()) {
-      float4x4 instance_transform;
-      loc_eul_size_to_mat4(instance_transform.values, positions[i], rotations[i], scales[i]);
-      instance_transform = transforms[i] * instance_transform;
-      instances.add_instance(*instances_data[i], instance_transform, ids[i]);
+  for (const float4x4 &transform : transforms) {
+    for (const int i : IndexRange(size)) {
+      if (instances_data[i].has_value()) {
+        float4x4 instance_transform;
+        loc_eul_size_to_mat4(instance_transform.values, positions[i], rotations[i], scales[i]);
+        instance_transform = transform * instance_transform;
+        instances.add_instance(*instances_data[i], instance_transform, ids[i]);
+      }
     }
   }
 }
