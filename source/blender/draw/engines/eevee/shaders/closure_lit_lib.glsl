@@ -35,9 +35,9 @@
 
 #define CLOSURE_EVAL_DECLARE(t0, t1, t2, t3) \
   ClosureEval##t0 eval_##t0##_0 = closure_##t0##_eval_init(in_##t0##_0, cl_common, out_##t0##_0); \
-  ClosureEval##t1 eval_##t1##_1 = closure_##t1##_eval_init(in_##t1##_1, cl_common, out_##t0##_0); \
-  ClosureEval##t2 eval_##t2##_2 = closure_##t2##_eval_init(in_##t2##_2, cl_common, out_##t0##_0); \
-  ClosureEval##t3 eval_##t3##_3 = closure_##t3##_eval_init(in_##t3##_3, cl_common, out_##t0##_0);
+  ClosureEval##t1 eval_##t1##_1 = closure_##t1##_eval_init(in_##t1##_1, cl_common, out_##t1##_1); \
+  ClosureEval##t2 eval_##t2##_2 = closure_##t2##_eval_init(in_##t2##_2, cl_common, out_##t2##_2); \
+  ClosureEval##t3 eval_##t3##_3 = closure_##t3##_eval_init(in_##t3##_3, cl_common, out_##t3##_3);
 
 #define CLOSURE_META_SUBROUTINE(subroutine, t0, t1, t2, t3) \
   closure_##t0##_##subroutine(in_##t0##_0, eval_##t0##_0, cl_common, out_##t0##_0); \
