@@ -159,8 +159,8 @@ ClosureEvalCommon closure_Common_eval_init(void)
   cl_eval.rand = texelfetch_noise_tex(gl_FragCoord.xy);
   cl_eval.V = cameraVec;
   cl_eval.P = worldPosition;
-  cl_eval.N = gl_FrontFacing ? worldNormal : -worldNormal;
-  cl_eval.vN = gl_FrontFacing ? viewNormal : -viewNormal;
+  cl_eval.N = safe_normalize(gl_FrontFacing ? worldNormal : -worldNormal);
+  cl_eval.vN = safe_normalize(gl_FrontFacing ? viewNormal : -viewNormal);
   cl_eval.vP = viewPosition;
   cl_eval.vNg = safe_normalize(cross(dFdx(viewPosition), dFdy(viewPosition)));
   /* TODO(fclem) See if we can avoid this complicated setup. */
@@ -307,14 +307,14 @@ ClosureGridData closure_grid_eval_init(int id, inout ClosureEvalCommon cl_common
   grid.id = id;
   grid.data = grids_data[id];
   grid.attenuation = probe_attenuation_grid(grid.data, cl_common.P, grid.local_pos);
-  grid.attenuation = min(grid.attenuation, cl_common.specular_accum);
+  grid.attenuation = min(grid.attenuation, cl_common.diffuse_accum);
   cl_common.diffuse_accum -= grid.attenuation;
   return grid;
 }
 
 #define GRID_ITER_BEGIN(grid) \
   /* Starts at 1 because 0 is world irradiance. */ \
-  for (int i = 1; cl_common.specular_accum > 0.0 && i < prbNumRenderGrid && i < MAX_GRID; i++) { \
+  for (int i = 1; cl_common.diffuse_accum > 0.0 && i < prbNumRenderGrid && i < MAX_GRID; i++) { \
     grid = closure_grid_eval_init(i, cl_common); \
     if (grid.attenuation < 1e-8) { \
       continue; \
