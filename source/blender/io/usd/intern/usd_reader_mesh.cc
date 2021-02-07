@@ -488,9 +488,7 @@ void USDMeshReader::process_normals_vertex_varying(Mesh *mesh)
 {
   for (int i = 0; i < m_normals.size(); i++) {
     MVert &mvert = mesh->mvert[i];
-    mvert.no[0] = m_normals[i][0];
-    mvert.no[1] = m_normals[i][1];
-    mvert.no[2] = m_normals[i][2];
+    normal_float_to_short_v3(mvert.no, m_normals[i].data());
   }
 }
 
