@@ -194,6 +194,10 @@ static void geo_node_attribute_proximity_exec(GeoNodeExecParams params)
 
   geometry_set_realize_instances_for_write(geometry_set);
 
+  /* HANS-TODO: This isn't required. This node should be rewritten to handle instances
+   * for the target geometry set. */
+  geometry_set_realize_instances_for_write(geometry_set_target);
+
   if (geometry_set.has<MeshComponent>()) {
     attribute_calc_proximity(
         geometry_set.get_component_for_write<MeshComponent>(), geometry_set_target, params);

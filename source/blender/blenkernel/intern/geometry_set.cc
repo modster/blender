@@ -597,6 +597,7 @@ static GeometrySet object_get_geometry_set_for_read(const Object &object)
       mesh_component.copy_vertex_group_names_from_object(object);
     }
   }
+
   /* TODO: Cover the case of pointclouds without modifiers,
    * they may not be covered by the #geometry_set_eval case above. */
   /* TODO: Add volume support. */
@@ -611,31 +612,47 @@ static GeometrySet object_get_geometry_set_for_read(const Object &object)
 /** \name Geometry Set Gather Recursive Instances
  * \{ */
 
-static void collect_geometry_set_recursive(const GeometrySet &geometry_set,
+static void geometry_set_collect_recursive(const GeometrySet &geometry_set,
                                            const float4x4 &transform,
                                            Vector<GeometryInstanceGroup> &r_sets);
 
-static void collect_collection_geometry_set_recursive(const Collection &collection,
+static void geometry_set_collect_recursive_collection(const Collection &collection,
+                                                      const float4x4 &transform,
+                                                      Vector<GeometryInstanceGroup> &r_sets);
+
+static void geometry_set_collect_recursive_object(const Object &object,
+                                                  const float4x4 &transform,
+                                                  Vector<GeometryInstanceGroup> &r_sets)
+{
+  GeometrySet instance_geometry_set = object_get_geometry_set_for_read(object);
+  const float4x4 object_transform = transform * object.obmat; /* TODO: Validate this. */
+  geometry_set_collect_recursive(instance_geometry_set, object_transform, r_sets);
+
+  if (object.type == OB_EMPTY) {
+    const Collection *collection_instance = object.instance_collection;
+    if (collection_instance != nullptr) {
+      geometry_set_collect_recursive_collection(*collection_instance, object_transform, r_sets);
+    }
+  }
+}
+
+static void geometry_set_collect_recursive_collection(const Collection &collection,
                                                       const float4x4 &transform,
                                                       Vector<GeometryInstanceGroup> &r_sets)
 {
   LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
     BLI_assert(collection_object->ob != nullptr);
     const Object &object = *collection_object->ob;
-    GeometrySet instance_geometry_set = object_get_geometry_set_for_read(object);
-
-    /* TODO: This seems to work-- validate this. */
-    const float4x4 instance_transform = transform * object.obmat;
-    collect_geometry_set_recursive(instance_geometry_set, instance_transform, r_sets);
+    geometry_set_collect_recursive_object(object, transform, r_sets);
   }
   LISTBASE_FOREACH (const CollectionChild *, collection_child, &collection.children) {
     BLI_assert(collection_child->collection != nullptr);
     const Collection &collection = *collection_child->collection;
-    collect_collection_geometry_set_recursive(collection, transform, r_sets);
+    geometry_set_collect_recursive_collection(collection, transform, r_sets);
   }
 }
 
-static void collect_geometry_set_recursive(const GeometrySet &geometry_set,
+static void geometry_set_collect_recursive(const GeometrySet &geometry_set,
                                            const float4x4 &transform,
                                            Vector<GeometryInstanceGroup> &r_sets)
 {
@@ -649,19 +666,17 @@ static void collect_geometry_set_recursive(const GeometrySet &geometry_set,
     Span<InstancedData> instances = instances_component.instanced_data();
     for (const int i : instances.index_range()) {
       const InstancedData &data = instances[i];
-      const float4x4 &instance_transform = transforms[i];
+      const float4x4 &instance_transform = transform * transforms[i];
 
       if (data.type == INSTANCE_DATA_TYPE_OBJECT) {
         BLI_assert(data.data.object != nullptr);
         const Object &object = *data.data.object;
-        const float4x4 object_transform = transform * instance_transform * object.obmat;
-        GeometrySet instance_geometry_set = object_get_geometry_set_for_read(object);
-        collect_geometry_set_recursive(instance_geometry_set, object_transform, r_sets);
+        geometry_set_collect_recursive_object(object, instance_transform, r_sets);
       }
       else if (data.type == INSTANCE_DATA_TYPE_COLLECTION) {
         BLI_assert(data.data.collection != nullptr);
         const Collection &collection = *data.data.collection;
-        collect_collection_geometry_set_recursive(collection, instance_transform, r_sets);
+        geometry_set_collect_recursive_collection(collection, instance_transform, r_sets);
       }
     }
   }
@@ -682,7 +697,7 @@ Vector<GeometryInstanceGroup> BKE_geometry_set_gather_instances(const GeometrySe
   float4x4 unit_transform;
   unit_m4(unit_transform.values);
 
-  collect_geometry_set_recursive(geometry_set, unit_transform, result_vector);
+  geometry_set_collect_recursive(geometry_set, unit_transform, result_vector);
 
   return result_vector;
 }
