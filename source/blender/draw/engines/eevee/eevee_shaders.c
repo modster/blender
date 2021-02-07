@@ -281,21 +281,7 @@ static void eevee_shader_library_ensure(void)
     DRW_SHADER_LIB_ADD(e_data.lib, volumetric_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, closure_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, ssr_lib);
-
-    /* Add one for each Closure */
-    e_data.closure_lit_lib = BLI_string_joinN(datatoc_closure_lit_lib_glsl,
-                                              datatoc_closure_lit_lib_glsl,
-                                              datatoc_closure_lit_lib_glsl,
-                                              datatoc_closure_lit_lib_glsl,
-                                              datatoc_closure_lit_lib_glsl,
-                                              datatoc_closure_lit_lib_glsl,
-                                              datatoc_closure_lit_lib_glsl,
-                                              datatoc_closure_lit_lib_glsl,
-                                              datatoc_closure_lit_lib_glsl,
-                                              datatoc_closure_lit_lib_glsl,
-                                              datatoc_closure_lit_lib_glsl);
-
-    DRW_shader_library_add_file(e_data.lib, e_data.closure_lit_lib, "closure_lit_lib.glsl");
+    DRW_SHADER_LIB_ADD(e_data.lib, closure_lit_lib);
 
     e_data.surface_lit_frag = DRW_shader_library_create_shader_string(e_data.lib,
                                                                       datatoc_surface_frag_glsl);

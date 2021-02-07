@@ -72,6 +72,9 @@ float sum(vec4 v) { return dot(vec4(1.0), v); }
 float avg(vec2 v) { return dot(vec2(1.0 / 2.0), v); }
 float avg(vec3 v) { return dot(vec3(1.0 / 3.0), v); }
 float avg(vec4 v) { return dot(vec4(1.0 / 4.0), v); }
+
+float sqr(float v) { return v * v; }
+
 /* clang-format on */
 
 #define saturate(a) clamp(a, 0.0, 1.0)
@@ -91,6 +94,15 @@ float distance_squared(vec3 a, vec3 b)
 float len_squared(vec3 a)
 {
   return dot(a, a);
+}
+
+vec3 safe_normalize(vec3 v)
+{
+  float len = length(v);
+  if (isnan(len) || len == 0.0) {
+    return vec3(1.0, 0.0, 0.0);
+  }
+  return v / len;
 }
 
 /** \} */
