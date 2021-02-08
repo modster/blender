@@ -162,6 +162,7 @@ USDMeshReader::USDMeshReader(pxr::UsdStageRefPtr stage,
                              const USDImportParams &import_params,
                              ImportSettings &settings)
     : USDGeomReader(stage, object, import_params, settings),
+      m_isLeftHanded(false),
       m_lastNumPositions(-1),
       m_hasUVs(false),
       m_isTimeVarying(false),
