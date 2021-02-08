@@ -212,7 +212,7 @@ typedef enum eGPDcurve_point_Flag {
 
 /* Curve for Bezier Editing. */
 typedef struct bGPDcurve {
-  /** Array of BezTriple. */
+  /** Array of curve points. */
   bGPDcurve_point *curve_points;
   /** Total number of curve points. */
   int tot_curve_points;

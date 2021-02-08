@@ -304,6 +304,9 @@ static void gpencil_update_geometry(bGPdata *gpd)
 
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
         if (gps->flag & GP_STROKE_TAG) {
+          if (GPENCIL_STROKE_IS_CURVE(gps)) {
+            gps->editcurve->flag |= GP_CURVE_NEEDS_STROKE_UPDATE;
+          }
           BKE_gpencil_stroke_geometry_update(gpd, gps);
           gps->flag &= ~GP_STROKE_TAG;
         }
@@ -1440,6 +1443,7 @@ static bool gpencil_sculpt_brush_do_stroke(tGP_BrushEditData *gso,
   bool include_last = false;
   bool changed = false;
   float rot_eval = 0.0f;
+  const bool is_curve = GPENCIL_STROKE_IS_CURVE(gps_active);
 
   if (gps->totpoints == 1) {
     bGPDspoint pt_temp;
@@ -1456,6 +1460,9 @@ static bool gpencil_sculpt_brush_do_stroke(tGP_BrushEditData *gso,
       if (len_v2v2_int(mval_i, pc1) <= radius) {
         /* apply operation to this point */
         if (pt_active != NULL) {
+          if (is_curve) {
+            pt_active->flag |= GP_SPOINT_TAG;
+          }
           rot_eval = gpencil_sculpt_rotation_eval_get(gso, gps, pt, 0);
           changed = apply(gso, gps_active, rot_eval, 0, radius, pc1);
         }
@@ -1508,8 +1515,14 @@ static bool gpencil_sculpt_brush_do_stroke(tGP_BrushEditData *gso,
               ((pt_active->flag & GP_SPOINT_SELECT) == 0)) {
             continue;
           }
+
           index = (pt->runtime.pt_orig) ? pt->runtime.idx_orig : i;
           if ((pt_active != NULL) && (index < gps_active->totpoints)) {
+            if (is_curve) {
+              /* Tag points that will be transformed for curve update. */
+              pt_active->flag |= GP_SPOINT_TAG;
+            }
+
             rot_eval = gpencil_sculpt_rotation_eval_get(gso, gps, pt, i);
             ok = apply(gso, gps_active, rot_eval, index, radius, pc1);
           }

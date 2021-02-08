@@ -56,6 +56,13 @@
 
 #include "DEG_depsgraph_query.h"
 
+/* We treat pressure, strength and vertex colors as dimensions in the curve fitting like the
+ * position. But this means that e.g. a high pressure will change the shape of the
+ * higher-dimensional fitted curve which will in turn change the shape of the projected
+ * 3-dimensional curve. But we don't really want the pressure or something else than the position
+ * to influence the shape. So this COORD_FITTING_INFLUENCE will "dampen" the effect of the other
+ * attributes affecting the shape. Ideally, we fit the other attributes separate from the position.
+ */
 #define COORD_FITTING_INFLUENCE 20.0f
 
 /* -------------------------------------------------------------------- */
@@ -566,6 +573,37 @@ void BKE_gpencil_convert_curve(Main *bmain,
 /** \name Edit-Curve Kernel Functions
  * \{ */
 
+static int gpencil_count_tagged_curve_segments(bGPDstroke *gps)
+{
+  bGPDcurve *gpc = gps->editcurve;
+  /* Handle single point edgecase. */
+  if (gpc->tot_curve_points == 1) {
+    return (&gps->points[0]->flag & GP_SPOINT_TAG) ? 1 : 0;
+  }
+
+  int i, j, count = 0;
+  for (i = 0, j = 0; i < gps->totpoints; i++) {
+    bGPDspoint *pt = &gps->points[i];
+    if ((pt->flag & GP_SPOINT_TAG) == 0) {
+      if (j + 1 < gpc->tot_curve_points && i >= &gpc->curve_points[j + 1]->point_index) {
+        j++;
+      }
+      continue;
+    }
+    count++;
+
+    if (++j < gpc->tot_curve_points) {
+      bGPDcurve_point *cpt = &gpc->curve_points[j];
+      i = cpt->point_index;
+    }
+    else {
+      break;
+    }
+  }
+
+  return count;
+}
+
 static bGPDcurve *gpencil_stroke_editcurve_generate_edgecases(bGPDstroke *gps)
 {
   BLI_assert(gps->totpoints < 3);
@@ -650,6 +688,7 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_generate(bGPDstroke *gps,
   if (gps->totpoints < 3) {
     return gpencil_stroke_editcurve_generate_edgecases(gps);
   }
+/* Point data: x, y, z, pressure, strength, r, g, b, a */
 #define POINT_DIM 9
 
   float *points = MEM_callocN(sizeof(float) * gps->totpoints * POINT_DIM, __func__);
@@ -754,20 +793,94 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_generate(bGPDstroke *gps,
 }
 
 /**
- * Updates the editcurve for a stroke. Frees the old curve if one exists and generates a new one.
+ * Creates a bGPDcurve by doing a cubic curve fitting on the tagged segments (parts of the curve
+ * with at least one bGPDspoint with GP_SPOINT_TAG).
  */
-void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps, const float threshold, const float corner_angle)
+bGPDcurve *BKE_gpencil_stroke_editcurve_regenerate(bGPDstroke *gps,
+                                                   const float error_threshold,
+                                                   const float corner_angle)
+{
+  if (gps->totpoints < 3) {
+    BKE_gpencil_free_stroke_editcurve(gps);
+    return gpencil_stroke_editcurve_generate_edgecases(gps);
+  }
+
+  bGPDcurve *gpc = gps->editcurve;
+
+  int i, j, count = 0;
+  for (i = 0, j = 0; i < gps->totpoints; i++) {
+    bGPDspoint *pt = &gps->points[i];
+    if ((pt->flag & GP_SPOINT_TAG) == 0) {
+      if (j + 1 < gpc->tot_curve_points && i >= &gpc->curve_points[j + 1]->point_index) {
+        j++;
+      }
+      continue;
+    }
+    count++;
+
+    if (++j < gpc->tot_curve_points) {
+      bGPDcurve_point *cpt = &gpc->curve_points[j];
+      i = cpt->point_index;
+    }
+    else {
+      break;
+    }
+  }
+}
+
+/**
+ * Updates the editcurve for a stroke.
+ * \param gps: The stroke.
+ * \param threshold: Fitting threshold. The gernerated curve should not deviate more than this
+ * amount from the stroke.
+ * \param corner_angle: If angles greater than this amount are detected during fitting, they will
+ * be sharp (non-aligned handles).
+ * \param do_partial_update: If false, will delete the old curve and do a full update. If true,
+ * will check what points were changed using the GP_SPOINT_TAG point flag and only update the
+ * segments that should be updated and keep the others. If all segments were affected, will do a
+ * full update.
+ */
+void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps,
+                                         const float threshold,
+                                         const float corner_angle,
+                                         const bool do_partial_update)
 {
   if (gps == NULL || gps->totpoints < 0) {
     return;
   }
 
-  if (gps->editcurve != NULL) {
-    BKE_gpencil_free_stroke_editcurve(gps);
+  bGPDcurve *editcurve = NULL;
+
+  if (do_partial_update && gps->editcurve != NULL) {
+    /* Find the segments that need an update, then update them. */
+    const int tot_num_segments = (gps->flag & GP_STROKE_CYCLIC) ?
+                                     gps->editcurve->tot_curve_points :
+                                     gps->editcurve->tot_curve_points - 1;
+    const int num_sel_segments = gpencil_count_tagged_curve_segments(gps);
+    if (num_sel_segments == 0) {
+      /* No update needed. */
+      return;
+    }
+    else if (num_sel_segments == tot_num_segments) {
+      /* All segments need to be updated. Do a full update. */
+      BKE_gpencil_free_stroke_editcurve(gps);
+      editcurve = BKE_gpencil_stroke_editcurve_generate(gps, threshold, corner_angle);
+    }
+    else {
+      editcurve = BKE_gpencil_stroke_editcurve_regenerate(gps, threshold, corner_angle);
+    }
+  }
+  else {
+    /* Do a full update. Delete the old curve and generate a new one. */
+    if (gps->editcurve != NULL) {
+      BKE_gpencil_free_stroke_editcurve(gps);
+    }
+
+    editcurve = BKE_gpencil_stroke_editcurve_generate(gps, threshold, corner_angle);
   }
 
-  bGPDcurve *editcurve = BKE_gpencil_stroke_editcurve_generate(gps, threshold, corner_angle);
   if (editcurve == NULL) {
+    /* TODO: This should not happen. Maybe add an assert here? */
     return;
   }
 
@@ -1341,6 +1454,5 @@ void BKE_gpencil_editcurve_subdivide(bGPDstroke *gps, const int cuts)
     gpc->tot_curve_points = new_tot_curve_points;
   }
 }
-
 
 /** \} */
