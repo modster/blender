@@ -486,6 +486,11 @@ void USDMeshReader::read_vels(Mesh *mesh,
 
 void USDMeshReader::process_normals_vertex_varying(Mesh *mesh)
 {
+  if (m_normals.empty()) {
+    BKE_mesh_calc_normals(mesh);
+    return;
+  }
+
   for (int i = 0; i < m_normals.size(); i++) {
     MVert &mvert = mesh->mvert[i];
     normal_float_to_short_v3(mvert.no, m_normals[i].data());
@@ -565,15 +570,21 @@ void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
       mvert.co[1] = m_positions[i][1];
       mvert.co[2] = m_positions[i][2];
     }
-
-    if (m_normalInterpolation == pxr::UsdGeomTokens->vertex)
-      process_normals_vertex_varying(mesh);
   }
 
   if ((settings->read_flag & MOD_MESHSEQ_READ_POLY) != 0) {
     read_mpolys(mesh, mesh_prim, motionSampleTime);
     if (m_normalInterpolation == pxr::UsdGeomTokens->faceVarying)
       process_normals_face_varying(mesh);
+  }
+
+  // Process point normals after reading polys.  This
+  // is important in the case where the normals are empty
+  // and we invoke BKE_mesh_calc_normals(mesh), which requires
+  // edges to be defined.
+  if ((settings->read_flag & MOD_MESHSEQ_READ_VERT) != 0 &&
+      m_normalInterpolation == pxr::UsdGeomTokens->vertex) {
+    process_normals_vertex_varying(mesh);
   }
 
   if ((settings->read_flag & MOD_MESHSEQ_READ_UV) != 0) {
