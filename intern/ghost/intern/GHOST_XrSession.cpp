@@ -409,7 +409,7 @@ void GHOST_XrSession::endFrameDrawing(std::vector<XrCompositionLayerBaseHeader *
 void GHOST_XrSession::draw(void *draw_customdata)
 {
   std::vector<XrCompositionLayerProjectionView>
-      projection_layer_views; /* Keep alive until xrEndFrame() call! */
+      projection_layer_views; /* Keep alive until #xrEndFrame() call! */
   XrCompositionLayerProjection proj_layer;
   std::vector<XrCompositionLayerBaseHeader *> layers;
 
@@ -425,7 +425,7 @@ void GHOST_XrSession::draw(void *draw_customdata)
 
 static void copy_openxr_pose_to_ghost_pose(const XrPosef &oxr_pose, GHOST_XrPose &r_ghost_pose)
 {
-  /* Set and convert to Blender coodinate space. */
+  /* Set and convert to Blender coordinate space. */
   r_ghost_pose.position[0] = oxr_pose.position.x;
   r_ghost_pose.position[1] = oxr_pose.position.y;
   r_ghost_pose.position[2] = oxr_pose.position.z;
@@ -449,7 +449,7 @@ static void copy_ghost_pose_to_openxr_pose(const GHOST_XrPose &ghost_pose, XrPos
 
 static void ghost_xr_draw_view_info_from_view(const XrView &view, GHOST_XrDrawViewInfo &r_info)
 {
-  /* Set and convert to Blender coodinate space. */
+  /* Set and convert to Blender coordinate space. */
   copy_openxr_pose_to_ghost_pose(view.pose, r_info.eye_pose);
 
   r_info.fov.angle_left = view.fov.angleLeft;
