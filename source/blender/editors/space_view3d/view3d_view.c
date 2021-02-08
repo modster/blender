@@ -1693,6 +1693,44 @@ void ED_view3d_local_collections_reset(struct bContext *C, const bool reset_all)
 /** \name XR Functionality
  * \{ */
 
+/* Used for invoke_3d/modal_3d (XR) operators. */
+void ED_view3d_view_params_get(const struct View3D *v3d,
+                               const struct RegionView3D *rv3d,
+                               float *r_lens,
+                               float *r_clip_start,
+                               float *r_clip_end,
+                               float r_viewmat[4][4])
+{
+  *r_lens = v3d->lens;
+  *r_clip_start = v3d->clip_start;
+  *r_clip_end = v3d->clip_end;
+
+  if (r_viewmat) {
+    copy_m4_m4(r_viewmat, rv3d->viewmat);
+  }
+}
+
+void ED_view3d_view_params_set(struct Depsgraph *depsgraph,
+                               struct Scene *scene,
+                               struct View3D *v3d,
+                               struct ARegion *region,
+                               const float lens,
+                               const float clip_start,
+                               const float clip_end,
+                               const float viewmat[4][4])
+{
+  v3d->lens = lens;
+  v3d->clip_start = clip_start;
+  v3d->clip_end = clip_end;
+
+  if (viewmat) {
+    ED_view3d_update_viewmat(depsgraph, scene, v3d, region, viewmat, NULL, NULL, false);
+  }
+  else {
+    view3d_winmatrix_set(depsgraph, region, v3d, NULL);
+  }
+}
+
 #ifdef WITH_XR_OPENXR
 
 static void view3d_xr_mirror_begin(RegionView3D *rv3d)

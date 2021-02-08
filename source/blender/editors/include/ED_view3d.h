@@ -725,6 +725,21 @@ void ED_view3d_buttons_region_layout_ex(const struct bContext *C,
 bool ED_view3d_local_collections_set(struct Main *bmain, struct View3D *v3d);
 void ED_view3d_local_collections_reset(struct bContext *C, const bool reset_all);
 
+void ED_view3d_view_params_get(const struct View3D *v3d,
+                               const struct RegionView3D *rv3d,
+                               float *r_lens,
+                               float *r_clip_start,
+                               float *r_clip_end,
+                               float r_viewmat[4][4]);
+void ED_view3d_view_params_set(struct Depsgraph *depsgraph,
+                               struct Scene *scene,
+                               struct View3D *v3d,
+                               struct ARegion *region,
+                               const float lens,
+                               const float clip_start,
+                               const float clip_end,
+                               const float viewmat[4][4]);
+
 #ifdef WITH_XR_OPENXR
 void ED_view3d_xr_mirror_update(const struct ScrArea *area,
                                 const struct View3D *v3d,

@@ -2532,16 +2532,15 @@ static int view3d_select_invoke_3d(bContext *C, wmOperator *op, const wmEvent *e
   /* Since this function is called in a window context, we need to replace the
    * window view parameters with the XR surface counterparts to get a correct
    * result for GPU select. */
-  lens_prev = v3d->lens;
-  clip_start_prev = v3d->clip_start;
-  clip_end_prev = v3d->clip_end;
-  copy_m4_m4(viewmat_prev, rv3d->viewmat);
-
-  v3d->lens = actiondata->eye_lens;
-  v3d->clip_start = xr->session_settings.clip_start;
-  v3d->clip_end = xr->session_settings.clip_end;
-  ED_view3d_update_viewmat(
-      depsgraph, scene, v3d, region, actiondata->eye_viewmat, NULL, NULL, false);
+  ED_view3d_view_params_get(v3d, rv3d, &lens_prev, &clip_start_prev, &clip_end_prev, viewmat_prev);
+  ED_view3d_view_params_set(depsgraph,
+                            scene,
+                            v3d,
+                            region,
+                            actiondata->eye_lens,
+                            xr->session_settings.clip_start,
+                            xr->session_settings.clip_end,
+                            actiondata->eye_viewmat);
 
   map_to_pixel(mval,
                actiondata->controller_loc,
@@ -2555,10 +2554,8 @@ static int view3d_select_invoke_3d(bContext *C, wmOperator *op, const wmEvent *e
   retval = view3d_select_exec(C, op);
 
   /* Restore window view. */
-  v3d->lens = lens_prev;
-  v3d->clip_start = clip_start_prev;
-  v3d->clip_end = clip_end_prev;
-  ED_view3d_update_viewmat(depsgraph, scene, v3d, region, viewmat_prev, NULL, NULL, false);
+  ED_view3d_view_params_set(
+      depsgraph, scene, v3d, region, lens_prev, clip_start_prev, clip_end_prev, viewmat_prev);
 
   return retval;
 }

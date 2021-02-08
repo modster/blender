@@ -214,6 +214,7 @@ int WM_gesture_box_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
 
   const wmXrActionData *actiondata = event->customdata;
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+  Scene *scene = CTX_data_scene(C);
   View3D *v3d = CTX_wm_view3d(C);
   ARegion *region = CTX_wm_region(C);
   RegionView3D *rv3d = region->regiondata;
@@ -228,14 +229,15 @@ int WM_gesture_box_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
   memcpy(&event_mut, event, sizeof(wmEvent));
 
   /* Replace window view parameters with XR surface counterparts. */
-  lens_prev = v3d->lens;
-  clip_start_prev = v3d->clip_start;
-  clip_end_prev = v3d->clip_end;
-
-  v3d->lens = actiondata->eye_lens;
-  v3d->clip_start = xr->session_settings.clip_start;
-  v3d->clip_end = xr->session_settings.clip_end;
-  view3d_winmatrix_set(depsgraph, region, v3d, NULL);
+  ED_view3d_view_params_get(v3d, rv3d, &lens_prev, &clip_start_prev, &clip_end_prev, NULL);
+  ED_view3d_view_params_set(depsgraph,
+                            scene,
+                            v3d,
+                            region,
+                            actiondata->eye_lens,
+                            xr->session_settings.clip_start,
+                            xr->session_settings.clip_end,
+                            NULL);
 
   map_to_pixel(mval,
                actiondata->controller_loc,
@@ -243,6 +245,7 @@ int WM_gesture_box_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
                rv3d->winmat,
                region->winx,
                region->winy);
+
   event_mut.x = region->winrct.xmin + mval[0];
   event_mut.y = region->winrct.ymin + mval[1];
 
@@ -251,10 +254,8 @@ int WM_gesture_box_invoke_3d(bContext *C, wmOperator *op, const wmEvent *event)
   retval = WM_gesture_box_invoke(C, op, &event_mut);
 
   /* Restore window view. */
-  v3d->lens = lens_prev;
-  v3d->clip_start = clip_start_prev;
-  v3d->clip_end = clip_end_prev;
-  view3d_winmatrix_set(depsgraph, region, v3d, NULL);
+  ED_view3d_view_params_set(
+      depsgraph, scene, v3d, region, lens_prev, clip_start_prev, clip_end_prev, NULL);
 
   return retval;
 }
@@ -365,23 +366,16 @@ int WM_gesture_box_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
   /* Since this function is called in a window context, we need to replace the
    * window view parameters with the XR surface counterparts to get a correct
    * result for some operators (e.g. GPU select). */
-  lens_prev = v3d->lens;
-  clip_start_prev = v3d->clip_start;
-  clip_end_prev = v3d->clip_end;
-  if (release) {
-    copy_m4_m4(viewmat_prev, rv3d->viewmat);
-  }
-
-  v3d->lens = actiondata->eye_lens;
-  v3d->clip_start = xr->session_settings.clip_start;
-  v3d->clip_end = xr->session_settings.clip_end;
-  if (release) {
-    ED_view3d_update_viewmat(
-        depsgraph, scene, v3d, region, actiondata->eye_viewmat, NULL, NULL, false);
-  }
-  else {
-    view3d_winmatrix_set(depsgraph, region, v3d, NULL);
-  }
+  ED_view3d_view_params_get(
+      v3d, rv3d, &lens_prev, &clip_start_prev, &clip_end_prev, release ? viewmat_prev : NULL);
+  ED_view3d_view_params_set(depsgraph,
+                            scene,
+                            v3d,
+                            region,
+                            actiondata->eye_lens,
+                            xr->session_settings.clip_start,
+                            xr->session_settings.clip_end,
+                            release ? actiondata->eye_viewmat : NULL);
 
   map_to_pixel(mval,
                actiondata->controller_loc,
@@ -411,15 +405,14 @@ int WM_gesture_box_modal_3d(bContext *C, wmOperator *op, const wmEvent *event)
   retval = WM_gesture_box_modal(C, op, &event_mut);
 
   /* Restore window view. */
-  v3d->lens = lens_prev;
-  v3d->clip_start = clip_start_prev;
-  v3d->clip_end = clip_end_prev;
-  if (release) {
-    ED_view3d_update_viewmat(depsgraph, scene, v3d, region, viewmat_prev, NULL, NULL, false);
-  }
-  else {
-    view3d_winmatrix_set(depsgraph, region, v3d, NULL);
-  }
+  ED_view3d_view_params_set(depsgraph,
+                            scene,
+                            v3d,
+                            region,
+                            lens_prev,
+                            clip_start_prev,
+                            clip_end_prev,
+                            release ? viewmat_prev : NULL);
 
   return retval;
 }
