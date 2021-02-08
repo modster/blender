@@ -72,6 +72,7 @@ static const pxr::TfToken st("st", pxr::TfToken::Immortal);
 static const pxr::TfToken UVMap("UVMap", pxr::TfToken::Immortal);
 static const pxr::TfToken Cd("Cd", pxr::TfToken::Immortal);
 static const pxr::TfToken displayColor("displayColor", pxr::TfToken::Immortal);
+static const pxr::TfToken normalsPrimvar("normals", pxr::TfToken::Immortal);
 }  // namespace usdtokens
 
 namespace utils {
@@ -239,7 +240,16 @@ bool USDMeshReader::topology_changed(Mesh *existing_mesh, double motionSampleTim
   faceVertCountsAttr.Get(&m_face_counts, motionSampleTime);
   pointsAttr.Get(&m_positions, motionSampleTime);
 
-  normalsAttr.Get(&m_normals, motionSampleTime);
+  // If 'normals' and 'primvars:normals' are both specified, the latter has precedence.
+  pxr::UsdGeomPrimvar primvar = mesh_prim.GetPrimvar(usdtokens::normalsPrimvar);
+  if (primvar.HasValue()) {
+    primvar.ComputeFlattened(&m_normals, motionSampleTime);
+    m_normalInterpolation = primvar.GetInterpolation();
+  }
+  else {
+    mesh_prim.GetNormalsAttr().Get(&m_normals, motionSampleTime);
+    m_normalInterpolation = mesh_prim.GetNormalsInterpolation();
+  }
 
   if (m_lastNumPositions != m_positions.size()) {
     m_lastNumPositions = m_positions.size();
@@ -654,8 +664,6 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
   // pxr::UsdAttribute normalsAttr = mesh_prim.GetNormalsAttr();
   // pxr::UsdAttribute faceVertCountsAttr = mesh_prim.GetFaceVertexCountsAttr();
   // pxr::UsdAttribute faceVertIndicesAttr = mesh_prim.GetFaceVertexIndicesAttr();
-
-  m_normalInterpolation = mesh_prim.GetNormalsInterpolation();
 
   mesh_prim.GetOrientationAttr().Get(&m_orientation);
   if (m_orientation == pxr::UsdGeomTokens->leftHanded)
