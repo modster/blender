@@ -106,10 +106,10 @@ static void rna_def_cachefile(BlenderRNA *brna)
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
   prop = RNA_def_property(srna, "use_proxies", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_ui_text(
-      prop,
-      "Use Cycles Procedural",
-      "Load data using the Cycles procedural during preview renders, display boxes in the viewport");
+  RNA_def_property_ui_text(prop,
+                           "Use Cycles Procedural",
+                           "Load data using the Cycles procedural during preview renders, display "
+                           "boxes in the viewport");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
   /* ----------------- For Scene time ------------------- */
@@ -226,26 +226,21 @@ static void rna_def_cachefile(BlenderRNA *brna)
   RNA_def_property_enum_sdna(prop, NULL, "cache_method");
   RNA_def_property_enum_items(prop, cache_method_items);
   RNA_def_property_ui_text(
-      prop,
-      "Cache Method",
-      "Define how the data is stored memory for faster updates");
+      prop, "Cache Method", "Define how the data is stored memory for faster updates");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 
   prop = RNA_def_property(srna, "cache_memory_limit", PROP_INT, PROP_NONE);
   RNA_def_property_int_sdna(prop, NULL, "cache_memory_limit");
   RNA_def_property_range(prop, 0, INT_MAX);
-  RNA_def_property_ui_text(prop,
-                           "Memory Limit",
-                           "Maximum size of the data stored in memory, expressed in megabytes");
+  RNA_def_property_ui_text(
+      prop, "Memory Limit", "Maximum size of the data stored in memory, expressed in megabytes");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
   prop = RNA_def_property(srna, "cache_frame_count", PROP_INT, PROP_NONE);
   RNA_def_property_int_sdna(prop, NULL, "cache_frame_count");
   RNA_def_property_range(prop, 0, INT_MAX);
-  RNA_def_property_ui_text(prop,
-                           "Frame Count",
-                           "Maximum number of frames to hold in memory");
+  RNA_def_property_ui_text(prop, "Frame Count", "Maximum number of frames to hold in memory");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
   RNA_define_lib_overridable(false);

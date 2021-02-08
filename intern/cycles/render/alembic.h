@@ -281,16 +281,19 @@ class AlembicObject : public Node {
   void set_object(Object *object);
   Object *get_object();
 
-  void load_all_data(CachedData &cached_data, AlembicProcedural *proc,
-           Alembic::AbcGeom::IPolyMeshSchema &schema,
+  void load_all_data(CachedData &cached_data,
+                     AlembicProcedural *proc,
+                     Alembic::AbcGeom::IPolyMeshSchema &schema,
                      Progress &progress);
- void load_all_data(CachedData &cached_data, AlembicProcedural *proc,
-										 Alembic::AbcGeom::ISubDSchema &schema,
-										 Progress &progress);
- void load_all_data(CachedData &cached_data, AlembicProcedural *proc,
-										 const Alembic::AbcGeom::ICurvesSchema &schema,
-										 Progress &progress,
-										 float default_radius);
+  void load_all_data(CachedData &cached_data,
+                     AlembicProcedural *proc,
+                     Alembic::AbcGeom::ISubDSchema &schema,
+                     Progress &progress);
+  void load_all_data(CachedData &cached_data,
+                     AlembicProcedural *proc,
+                     const Alembic::AbcGeom::ICurvesSchema &schema,
+                     Progress &progress,
+                     float default_radius);
 
   bool has_data_loaded(int frame) const;
 
@@ -330,10 +333,12 @@ class AlembicObject : public Node {
   /* cache used to prefetch the next N frames during rendering */
   CachedData *prefetch_cache;
 
-  void update_shader_attributes(CachedData &cached_data, const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
+  void update_shader_attributes(CachedData &cached_data,
+                                const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
                                 Progress &progress);
 
-  void read_attribute(CachedData &cached_data, const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
+  void read_attribute(CachedData &cached_data,
+                      const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
                       const ustring &attr_name,
                       Progress &progress);
 
@@ -399,8 +404,8 @@ class AlembicProcedural : public Procedural {
 
   enum CacheMethod {
     CACHE_ALL_DATA,
-        CACHE_FRAME_COUNT,
-        CACHE_MEMORY_LIMIT,
+    CACHE_FRAME_COUNT,
+    CACHE_MEMORY_LIMIT,
   };
 
   NODE_SOCKET_API(int, cache_method)
@@ -429,7 +434,7 @@ class AlembicProcedural : public Procedural {
 
  private:
   /* Load the data for all the objects whose data has not yet been loaded. */
-	void load_objects(Scene *scene, Progress &progress);
+  void load_objects(Scene *scene, Progress &progress);
 
   /* Traverse the Alembic hierarchy to lookup the IObjects for the AlembicObjects that were
    * specified in our objects socket, and accumulate all of the transformations samples along the
@@ -442,23 +447,23 @@ class AlembicProcedural : public Procedural {
 
   /* Read the data for an IPolyMesh at the specified frame_time. Creates corresponding Geometry and
    * Object Nodes in the Cycles scene if none exist yet. */
-	void read_mesh(Scene *scene,
-								 AlembicObject *abc_object,
-								 Alembic::AbcGeom::Abc::chrono_t frame_time);
+  void read_mesh(Scene *scene,
+                 AlembicObject *abc_object,
+                 Alembic::AbcGeom::Abc::chrono_t frame_time);
 
   /* Read the data for an ICurves at the specified frame_time. Creates corresponding Geometry and
    * Object Nodes in the Cycles scene if none exist yet. */
-	void read_curves(Scene *scene,
-									 AlembicObject *abc_object,
-									 Alembic::AbcGeom::Abc::chrono_t frame_time);
+  void read_curves(Scene *scene,
+                   AlembicObject *abc_object,
+                   Alembic::AbcGeom::Abc::chrono_t frame_time);
 
   /* Read the data for an ISubD at the specified frame_time. Creates corresponding Geometry and
    * Object Nodes in the Cycles scene if none exist yet. */
-	void read_subd(Scene *scene,
-								 AlembicObject *abc_object,
-								 Alembic::AbcGeom::Abc::chrono_t frame_time);
+  void read_subd(Scene *scene,
+                 AlembicObject *abc_object,
+                 Alembic::AbcGeom::Abc::chrono_t frame_time);
 
-	void build_caches(Progress &progress);
+  void build_caches(Progress &progress);
 };
 
 CCL_NAMESPACE_END
