@@ -60,11 +60,13 @@ template<typename T> class DataStore {
   Alembic::AbcCoreAbstract::TimeSampling time_sampling{};
 
   double last_loaded_time = std::numeric_limits<double>::max();
+  int frame_offset = 0;
 
  public:
-  void set_time_sampling(Alembic::AbcCoreAbstract::TimeSampling time_sampling_)
+  void set_time_sampling(Alembic::AbcCoreAbstract::TimeSampling time_sampling_, int frame_offset_)
   {
     time_sampling = time_sampling_;
+    frame_offset = frame_offset_;
   }
 
   Alembic::AbcCoreAbstract::TimeSampling get_time_sampling() const
@@ -81,8 +83,8 @@ template<typename T> class DataStore {
     }
 
     std::pair<size_t, Alembic::Abc::chrono_t> index_pair;
-    index_pair = time_sampling.getNearIndex(time, data.size());
-    DataTimePair &data_pair = data[index_pair.first];
+    index_pair = time_sampling.getNearIndex(time, data.size() + frame_offset);
+    DataTimePair &data_pair = data[index_pair.first - frame_offset];
 
     if (last_loaded_time == data_pair.time) {
       return nullptr;
@@ -170,6 +172,15 @@ template<typename T> class DataStore {
 
     return data.size() * sizeof(T);
   }
+
+  void swap(DataStore<T> &other)
+  {
+    if (this == &other) {
+      return;
+    }
+
+    data.swap(other.data);
+  }
 };
 
 /* Actual cache for the stored data.
@@ -212,6 +223,10 @@ struct CachedData {
   };
 
   vector<CachedAttribute> attributes{};
+
+  int frame_start = -1;
+  int frame_end = -1;
+  int frame_offset = 0;
 
   void clear();
 
@@ -264,18 +279,18 @@ class AlembicObject : public Node {
   void set_object(Object *object);
   Object *get_object();
 
-  void load_all_data(AlembicProcedural *proc,
-										 Alembic::AbcGeom::IPolyMeshSchema &schema,
+  void load_all_data(CachedData &cached_data, AlembicProcedural *proc,
+           Alembic::AbcGeom::IPolyMeshSchema &schema,
                      Progress &progress);
-	void load_all_data(AlembicProcedural *proc,
+ void load_all_data(CachedData &cached_data, AlembicProcedural *proc,
 										 Alembic::AbcGeom::ISubDSchema &schema,
 										 Progress &progress);
-	void load_all_data(AlembicProcedural *proc,
+ void load_all_data(CachedData &cached_data, AlembicProcedural *proc,
 										 const Alembic::AbcGeom::ICurvesSchema &schema,
 										 Progress &progress,
 										 float default_radius);
 
-  bool has_data_loaded() const;
+  bool has_data_loaded(int frame) const;
 
   enum AbcSchemaType {
     INVALID,
@@ -294,12 +309,12 @@ class AlembicObject : public Node {
 
   CachedData &get_cached_data()
   {
-    return cached_data;
+    return cached_data_;
   }
 
   bool is_constant() const
   {
-    return cached_data.is_constant();
+    return cached_data_.is_constant();
   }
 
   Object *object = nullptr;
@@ -309,12 +324,12 @@ class AlembicObject : public Node {
   /* Set on construction. */
   AbcSchemaType schema_type;
 
-  CachedData cached_data;
+  CachedData cached_data_;
 
-  void update_shader_attributes(const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
+  void update_shader_attributes(CachedData &cached_data, const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
                                 Progress &progress);
 
-  void read_attribute(const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
+  void read_attribute(CachedData &cached_data, const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
                       const ustring &attr_name,
                       Progress &progress);
 
@@ -323,7 +338,7 @@ class AlembicObject : public Node {
                       array<int> &polygon_to_shader,
                       Alembic::AbcGeom::ISampleSelector sample_sel);
 
-  void setup_transform_cache(float scale);
+  void setup_transform_cache(CachedData &cached_data, float scale);
 
   AttributeRequestSet get_requested_attributes();
 };
