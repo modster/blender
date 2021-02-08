@@ -210,8 +210,27 @@ static set<chrono_t> get_relevant_sample_times(AlembicProcedural *proc,
     return result;
   }
 
-  double start_frame = (double)(proc->get_start_frame() / proc->get_frame_rate());
-  double end_frame = (double)((proc->get_end_frame() + 1) / proc->get_frame_rate());
+  double start_frame_index = 0;
+  double end_frame_index = 0;
+
+  if (proc->get_cache_method() == AlembicProcedural::CACHE_ALL_DATA) {
+    start_frame_index = (double)(proc->get_start_frame());
+    end_frame_index = (double)(proc->get_end_frame());
+  }
+  else if (proc->get_cache_method() == AlembicProcedural::CACHE_FRAME_COUNT) {
+    start_frame_index = (double)(proc->get_start_frame());
+
+    while (start_frame_index + proc->get_cache_frame_count() < static_cast<double>(proc->get_frame())) {
+      start_frame_index += proc->get_cache_frame_count();
+    }
+
+    end_frame_index = start_frame_index + proc->get_cache_frame_count();
+  }
+
+  std::cerr << "Caching between frames " << start_frame_index << " and " << end_frame_index << '\n';
+
+  double start_frame = start_frame_index / (double)(proc->get_frame_rate());
+  double end_frame =(end_frame_index + 1) / (double)(proc->get_frame_rate());
 
   size_t start_index = time_sampling.getFloorIndex(start_frame, num_samples).first;
   size_t end_index = time_sampling.getCeilIndex(end_frame, num_samples).first;
