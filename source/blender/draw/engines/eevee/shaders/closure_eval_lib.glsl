@@ -65,35 +65,38 @@
   { \
     CLOSURE_EVAL_DECLARE(t0, t1, t2, t3); \
 \
-    ClosurePlanarData planar; \
-    PLANAR_ITER_BEGIN(planar) \
-    { \
-      CLOSURE_META_SUBROUTINE_DATA(planar_eval, planar, t0, t1, t2, t3); \
+    for (int i = 0; cl_common.specular_accum > 0.0 && i < prbNumPlanar && i < MAX_PLANAR; i++) { \
+      ClosurePlanarData planar = closure_planar_eval_init(i, cl_common); \
+      if (planar.attenuation > 1e-8) { \
+        CLOSURE_META_SUBROUTINE_DATA(planar_eval, planar, t0, t1, t2, t3); \
+      } \
     } \
-    PLANAR_ITER_END \
 \
-    ClosureCubemapData cube; \
-    CUBEMAP_ITER_BEGIN(cube) \
-    { \
-      CLOSURE_META_SUBROUTINE_DATA(cubemap_eval, cube, t0, t1, t2, t3); \
+    /* Starts at 1 because 0 is world cubemap. */ \
+    for (int i = 1; cl_common.specular_accum > 0.0 && i < prbNumRenderCube && i < MAX_PROBE; \
+         i++) { \
+      ClosureCubemapData cube = closure_cubemap_eval_init(i, cl_common); \
+      if (cube.attenuation > 1e-8) { \
+        CLOSURE_META_SUBROUTINE_DATA(cubemap_eval, cube, t0, t1, t2, t3); \
+      } \
     } \
-    CUBEMAP_ITER_END \
 \
-    ClosureGridData grid; \
-    GRID_ITER_BEGIN(grid) \
-    { \
-      CLOSURE_META_SUBROUTINE_DATA(grid_eval, grid, t0, t1, t2, t3); \
+    /* Starts at 1 because 0 is world irradiance. */ \
+    for (int i = 1; cl_common.diffuse_accum > 0.0 && i < prbNumRenderGrid && i < MAX_GRID; i++) { \
+      ClosureGridData grid = closure_grid_eval_init(i, cl_common); \
+      if (grid.attenuation > 1e-8) { \
+        CLOSURE_META_SUBROUTINE_DATA(grid_eval, grid, t0, t1, t2, t3); \
+      } \
     } \
-    GRID_ITER_END \
 \
     CLOSURE_META_SUBROUTINE(indirect_end, t0, t1, t2, t3); \
 \
-    ClosureLightData light; \
-    LIGHT_ITER_BEGIN(light) \
-    { \
-      CLOSURE_META_SUBROUTINE_DATA(light_eval, light, t0, t1, t2, t3); \
+    for (int i = 0; i < laNumLight && i < MAX_LIGHT; i++) { \
+      ClosureLightData light = closure_light_eval_init(cl_common, i); \
+      if (light.vis > 1e-8) { \
+        CLOSURE_META_SUBROUTINE_DATA(light_eval, light, t0, t1, t2, t3); \
+      } \
     } \
-    LIGHT_ITER_END \
 \
     CLOSURE_META_SUBROUTINE(eval_end, t0, t1, t2, t3); \
   }
@@ -228,8 +231,9 @@ ClosureEvalCommon closure_Common_eval_init(ClosureInputCommon cl_in)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Light Loop
+/** \name Loop data
  *
+ * Loop datas are conveniently packed into struct to make it future proof.
  * \{ */
 
 struct ClosureLightData {
@@ -259,22 +263,6 @@ ClosureLightData closure_light_eval_init(ClosureEvalCommon cl_common, int light_
   return light;
 }
 
-#define LIGHT_ITER_BEGIN(light) \
-  for (int i = 0; i < laNumLight && i < MAX_LIGHT; i++) { \
-    light = closure_light_eval_init(cl_common, i); \
-    if (light.vis < 1e-8) { \
-      continue; \
-    }
-
-#define LIGHT_ITER_END }
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Glossy Probe Loop
- *
- * \{ */
-
 struct ClosureCubemapData {
   int id;            /** Probe id. */
   float attenuation; /** Attenuation. */
@@ -289,24 +277,6 @@ ClosureCubemapData closure_cubemap_eval_init(int cube_id, inout ClosureEvalCommo
   cl_common.specular_accum -= cube.attenuation;
   return cube;
 }
-
-#define CUBEMAP_ITER_BEGIN(cube) \
-  /* Starts at 1 because 0 is world cubemap. */ \
-  for (int i = 1; cl_common.specular_accum > 0.0 && i < prbNumRenderCube && i < MAX_PROBE; i++) { \
-    cube = closure_cubemap_eval_init(i, cl_common); \
-    if (cube.attenuation < 1e-8) { \
-      continue; \
-    }
-
-#define CUBEMAP_ITER_END }
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Glossy Planar probe Loop
- *
- * Should be run first, as it is replace by the SSR pass if SSR is enabled.
- * \{ */
 
 struct ClosurePlanarData {
   int id;            /** Probe id. */
@@ -325,23 +295,6 @@ ClosurePlanarData closure_planar_eval_init(int planar_id, inout ClosureEvalCommo
   return planar;
 }
 
-#define PLANAR_ITER_BEGIN(planar) \
-  /* Starts at 1 because 0 is world probe */ \
-  for (int i = 1; cl_common.specular_accum > 0.0 && i < prbNumPlanar && i < MAX_PLANAR; i++) { \
-    planar = closure_planar_eval_init(i, cl_common); \
-    if (planar.attenuation < 1e-8) { \
-      continue; \
-    }
-
-#define PLANAR_ITER_END }
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
-/** \name Irradiance Grid Loop
- *
- * \{ */
-
 struct ClosureGridData {
   int id;            /** Grid id. */
   GridData data;     /** grids_data[id] */
@@ -359,15 +312,5 @@ ClosureGridData closure_grid_eval_init(int id, inout ClosureEvalCommon cl_common
   cl_common.diffuse_accum -= grid.attenuation;
   return grid;
 }
-
-#define GRID_ITER_BEGIN(grid) \
-  /* Starts at 1 because 0 is world irradiance. */ \
-  for (int i = 1; cl_common.diffuse_accum > 0.0 && i < prbNumRenderGrid && i < MAX_GRID; i++) { \
-    grid = closure_grid_eval_init(i, cl_common); \
-    if (grid.attenuation < 1e-8) { \
-      continue; \
-    }
-
-#define GRID_ITER_END }
 
 /** \} */
