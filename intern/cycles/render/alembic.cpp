@@ -201,6 +201,35 @@ size_t CachedData::memory_used() const
   return mem_used;
 }
 
+void CachedData::swap(CachedData &other)
+{
+  if (this == &other) {
+    return;
+  }
+
+  curve_first_key.swap(other.curve_first_key);
+  curve_keys.swap(other.curve_keys);
+  curve_radius.swap(other.curve_radius);
+  curve_shader.swap(other.curve_shader);
+  num_ngons.swap(other.num_ngons);
+  shader.swap(other.shader);
+  subd_creases_edge.swap(other.subd_creases_edge);
+  subd_creases_weight.swap(other.subd_creases_weight);
+  subd_face_corners.swap(other.subd_face_corners);
+  subd_num_corners.swap(other.subd_num_corners);
+  subd_ptex_offset.swap(other.subd_ptex_offset);
+  subd_smooth.swap(other.subd_smooth);
+  subd_start_corner.swap(other.subd_start_corner);
+  transforms.swap(other.transforms);
+  triangles.swap(other.triangles);
+  triangles_loops.swap(other.triangles_loops);
+  vertices.swap(other.vertices);
+
+  for (size_t i = 0; i < attributes.size(); ++i) {
+     attributes[i].data.swap(other.attributes[i].data);
+  }
+}
+
 /* get the sample times to load data for the given the start and end frame of the procedural */
 static set<chrono_t> get_relevant_sample_times(AlembicProcedural *proc,
                                                CachedData &cached_data,
@@ -667,6 +696,8 @@ NODE_DEFINE(AlembicObject)
 
 AlembicObject::AlembicObject() : Node(node_type)
 {
+  schema_type = INVALID;
+  prefetch_cache = nullptr;
 }
 
 AlembicObject::~AlembicObject()
@@ -1121,6 +1152,13 @@ AttributeRequestSet AlembicObject::get_requested_attributes()
   }
 
   return requested_attributes;
+}
+
+void AlembicObject::swap_prefetch_cache()
+{
+  if (prefetch_cache) {
+    cached_data_.swap(*prefetch_cache);
+  }
 }
 
 void AlembicObject::read_attribute(CachedData &cached_data,

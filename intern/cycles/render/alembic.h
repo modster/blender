@@ -240,6 +240,8 @@ struct CachedData {
   void set_time_sampling(Alembic::AbcCoreAbstract::TimeSampling time_sampling);
 
   size_t memory_used() const;
+
+  void swap(CachedData &other);
 };
 
 /* Representation of an Alembic object for the AlembicProcedural.
@@ -325,6 +327,8 @@ class AlembicObject : public Node {
   AbcSchemaType schema_type;
 
   CachedData cached_data_;
+  /* cache used to prefetch the next N frames during rendering */
+  CachedData *prefetch_cache;
 
   void update_shader_attributes(CachedData &cached_data, const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
                                 Progress &progress);
@@ -341,6 +345,8 @@ class AlembicObject : public Node {
   void setup_transform_cache(CachedData &cached_data, float scale);
 
   AttributeRequestSet get_requested_attributes();
+
+  void swap_prefetch_cache();
 };
 
 /* Procedural to render objects from a single Alembic archive.
