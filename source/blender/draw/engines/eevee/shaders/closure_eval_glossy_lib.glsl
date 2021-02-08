@@ -16,6 +16,7 @@ struct ClosureEvalGlossy {
   float ltc_brdf_scale;    /** LTC BRDF scaling. */
   vec3 probe_sampling_dir; /** Direction to sample probes from. */
   float spec_occlusion;    /** Specular Occlusion. */
+  vec3 raytrace_radiance;  /** Raytrace reflection to be accumulated after occlusion. */
 };
 
 /* Stubs. */
@@ -24,9 +25,10 @@ struct ClosureEvalGlossy {
 
 #ifdef STEP_RESOLVE /* SSR */
 /* Prototype. */
-void ssr_resolve(ClosureInputGlossy cl_in,
-                 inout ClosureEvalCommon cl_common,
-                 inout ClosureOutputGlossy cl_out);
+void raytrace_resolve(ClosureInputGlossy cl_in,
+                      inout ClosureEvalGlossy cl_eval,
+                      inout ClosureEvalCommon cl_common,
+                      inout ClosureOutputGlossy cl_out);
 #endif
 
 ClosureEvalGlossy closure_Glossy_eval_init(inout ClosureInputGlossy cl_in,
@@ -37,10 +39,6 @@ ClosureEvalGlossy closure_Glossy_eval_init(inout ClosureInputGlossy cl_in,
   cl_in.roughness = clamp(cl_in.roughness, 1e-8, 0.9999);
   cl_out.radiance = vec3(0.0);
 
-#ifdef STEP_RESOLVE /* SSR */
-  ssr_resolve(cl_in, cl_common, cl_out);
-#endif
-
   float NV = dot(cl_in.N, cl_common.V);
   vec2 lut_uv = lut_coords_ltc(NV, cl_in.roughness);
 
@@ -48,6 +46,11 @@ ClosureEvalGlossy closure_Glossy_eval_init(inout ClosureInputGlossy cl_in,
   cl_eval.ltc_mat = texture(utilTex, vec3(lut_uv, LTC_MAT_LAYER));
   cl_eval.probe_sampling_dir = specular_dominant_dir(cl_in.N, cl_common.V, sqr(cl_in.roughness));
   cl_eval.spec_occlusion = specular_occlusion(NV, cl_common.occlusion, cl_in.roughness);
+  cl_eval.raytrace_radiance = vec3(0.0);
+
+#ifdef STEP_RESOLVE /* SSR */
+  raytrace_resolve(cl_in, cl_eval, cl_common, cl_out);
+#endif
 
   /* The brdf split sum LUT is applied after the radiance accumulation.
    * Correct the LTC so that its energy is constant. */
@@ -106,7 +109,10 @@ void closure_Glossy_indirect_end(ClosureInputGlossy cl_in,
     cl_out.radiance += cl_common.specular_accum * probe_radiance;
   }
 
+  /* Apply occlusion on distant lighting. */
   cl_out.radiance *= cl_eval.spec_occlusion;
+  /* Apply Raytrace reflections after occlusion since they are direct, local reflections. */
+  cl_out.radiance += cl_eval.raytrace_radiance;
 }
 
 void closure_Glossy_eval_end(ClosureInputGlossy cl_in,

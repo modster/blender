@@ -476,9 +476,10 @@ vec4 get_ssr_samples(vec4 hit_pdf,
   return accum;
 }
 
-void ssr_resolve(ClosureInputGlossy cl_in,
-                 inout ClosureEvalCommon cl_common,
-                 inout ClosureOutputGlossy cl_out)
+void raytrace_resolve(ClosureInputGlossy cl_in,
+                      inout ClosureEvalGlossy cl_eval,
+                      inout ClosureEvalCommon cl_common,
+                      inout ClosureOutputGlossy cl_out)
 {
 #  ifdef FULLRES
   ivec2 texel = ivec2(gl_FragCoord.xy);
@@ -546,14 +547,12 @@ void ssr_resolve(ClosureInputGlossy cl_in,
   }
 
   /* Compute SSR contribution */
-  if (weight_acc > 0.0) {
-    ssr_accum /= weight_acc;
-    /* fade between 0.5 and 1.0 roughness */
-    ssr_accum.a *= smoothstep(ssrMaxRoughness + 0.2, ssrMaxRoughness, roughness);
+  ssr_accum *= (weight_acc == 0.0) ? 0.0 : (1.0 / weight_acc);
+  /* fade between 0.5 and 1.0 roughness */
+  ssr_accum.a *= smoothstep(ssrMaxRoughness + 0.2, ssrMaxRoughness, roughness);
 
-    cl_out.radiance += ssr_accum.rgb * ssr_accum.a;
-    cl_common.specular_accum -= ssr_accum.a;
-  }
+  cl_eval.raytrace_radiance = ssr_accum.rgb * ssr_accum.a;
+  cl_common.specular_accum -= ssr_accum.a;
 }
 
 CLOSURE_EVAL_FUNCTION_DECLARE_1(ssr_resolve, Glossy)
