@@ -768,6 +768,10 @@ void AlembicObject::load_all_data(AlembicProcedural *proc,
 {
   cached_data.clear();
 
+  if (instance_of) {
+    return;
+  }
+
   const TimeSamplingPtr time_sampling = schema.getTimeSampling();
   cached_data.set_time_sampling(*time_sampling);
 
@@ -834,6 +838,10 @@ void AlembicObject::load_all_data(AlembicProcedural *proc,
                                   Progress &progress)
 {
   cached_data.clear();
+
+  if (instance_of) {
+    return;
+  }
 
   AttributeRequestSet requested_attributes = get_requested_attributes();
 
@@ -964,6 +972,10 @@ void AlembicObject::load_all_data(AlembicProcedural *proc,
                                   float default_radius)
 {
   cached_data.clear();
+
+  if (instance_of) {
+    return;
+  }
 
   const TimeSamplingPtr time_sampling = schema.getTimeSampling();
   cached_data.set_time_sampling(*time_sampling);
@@ -1518,18 +1530,20 @@ void AlembicProcedural::load_objects(Scene *scene, Progress &progress)
     if (abc_object->get_object() == nullptr) {
       Geometry *geometry = nullptr;
 
-      if (abc_object->schema_type == AlembicObject::CURVES) {
-        geometry = scene->create_node<Hair>();
-      }
-      else if (abc_object->schema_type == AlembicObject::POLY_MESH || abc_object->schema_type == AlembicObject::SUBD) {
-        geometry = scene->create_node<Mesh>();
-      }
+      if (!abc_object->instance_of) {
+        if (abc_object->schema_type == AlembicObject::CURVES) {
+          geometry = scene->create_node<Hair>();
+        }
+        else if (abc_object->schema_type == AlembicObject::POLY_MESH || abc_object->schema_type == AlembicObject::SUBD) {
+          geometry = scene->create_node<Mesh>();
+        }
 
-      geometry->set_owner(this);
-      geometry->name = abc_object->iobject.getName();
+        geometry->set_owner(this);
+        geometry->name = abc_object->iobject.getName();
 
-      array<Node *> used_shaders = abc_object->get_used_shaders();
-      geometry->set_used_shaders(used_shaders);
+        array<Node *> used_shaders = abc_object->get_used_shaders();
+        geometry->set_used_shaders(used_shaders);
+      }
 
       /* create object*/
       Object *object = scene->create_node<Object>();
@@ -1538,6 +1552,16 @@ void AlembicProcedural::load_objects(Scene *scene, Progress &progress)
       object->name = abc_object->iobject.getName();
 
       abc_object->set_object(object);
+    }
+  }
+
+  /* Share geometries between instances. */
+  foreach (Node *node, objects) {
+    AlembicObject *abc_object = static_cast<AlembicObject *>(node);
+
+    if (abc_object->instance_of) {
+      abc_object->get_object()->set_geometry(abc_object->instance_of->get_object()->get_geometry());
+      abc_object->schema_type = abc_object->instance_of->schema_type;
     }
   }
 }
@@ -1554,6 +1578,10 @@ void AlembicProcedural::read_mesh(Scene *scene,
 
   Object *object = abc_object->get_object();
   cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
+
+  if (abc_object->instance_of) {
+    return;
+  }
 
   cached_data.vertices.copy_to_socket(frame_time, mesh, mesh->get_verts_socket());
 
@@ -1610,6 +1638,13 @@ void AlembicProcedural::read_subd(Scene *scene,
 
   CachedData &cached_data = abc_object->get_cached_data();
 
+  Object *object = abc_object->get_object();
+  cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
+
+  if (abc_object->instance_of) {
+    return;
+  }
+
   if (abc_object->subd_max_level_is_modified() || abc_object->subd_dicing_rate_is_modified()) {
     /* need to reset the current data is something changed */
     cached_data.invalidate_last_loaded_time();
@@ -1628,9 +1663,6 @@ void AlembicProcedural::read_subd(Scene *scene,
   mesh->clear_non_sockets();
 
   /* udpate sockets */
-
-  Object *object = abc_object->get_object();
-  cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
 
   cached_data.vertices.copy_to_socket(frame_time, mesh, mesh->get_verts_socket());
 
@@ -1697,6 +1729,10 @@ void AlembicProcedural::read_curves(Scene *scene,
 
   Object *object = abc_object->get_object();
   cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
+
+  if (abc_object->instance_of) {
+    return;
+  }
 
   cached_data.curve_keys.copy_to_socket(frame_time, hair, hair->get_curve_keys_socket());
 
@@ -1834,6 +1870,27 @@ void AlembicProcedural::walk_hierarchy(
   else {
     // unsupported type for now (Points, NuPatch)
     next_object = parent.getChild(header.getName());
+
+    if (next_object.isInstanceRoot()) {
+      unordered_map<std::string, AlembicObject *>::const_iterator iter;
+
+      iter = object_map.find(next_object.getFullName());
+
+      if (iter != object_map.end()) {
+        AlembicObject *abc_object = iter->second;
+
+        iter = object_map.find(next_object.instanceSourcePath());
+
+        if (iter != object_map.end()) {
+          abc_object->iobject = next_object;
+          abc_object->instance_of = iter->second;
+
+          if (xform_samples) {
+            abc_object->xform_samples = *xform_samples;
+          }
+        }
+      }
+    }
   }
 
   if (next_object.valid()) {
