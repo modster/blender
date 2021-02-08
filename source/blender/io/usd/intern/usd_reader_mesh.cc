@@ -510,7 +510,14 @@ void USDMeshReader::process_normals_vertex_varying(Mesh *mesh)
 
 void USDMeshReader::process_normals_face_varying(Mesh *mesh)
 {
-  if (m_normals.size() <= 0) {
+  if (m_normals.empty()) {
+    BKE_mesh_calc_normals(mesh);
+    return;
+  }
+
+  // Check for normals count mismatches to prevent crashes.
+  if (m_normals.size() != mesh->totloop) {
+    std::cerr << "WARNING: loop normal count mismatch for mesh " << mesh->id.name << std::endl;
     BKE_mesh_calc_normals(mesh);
     return;
   }
@@ -523,11 +530,18 @@ void USDMeshReader::process_normals_face_varying(Mesh *mesh)
       MEM_malloc_arrayN(loop_count, sizeof(float[3]), "USD::FaceNormals"));
 
   MPoly *mpoly = mesh->mpoly;
-  int usd_index = 0;
 
   for (int i = 0, e = mesh->totpoly; i < e; ++i, ++mpoly) {
-    for (int j = 0; j < mpoly->totloop; j++, usd_index++) {
+    for (int j = 0; j < mpoly->totloop; j++) {
       int blender_index = mpoly->loopstart + j;
+
+      int usd_index = mpoly->loopstart;
+      if (m_isLeftHanded) {
+        usd_index += mpoly->totloop - 1 - j;
+      }
+      else {
+        usd_index += j;
+      }
 
       lnors[blender_index][0] = m_normals[usd_index][0];
       lnors[blender_index][1] = m_normals[usd_index][1];
