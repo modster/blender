@@ -22,6 +22,7 @@
  **/
 
 #define CLOSURE_VARS_DECLARE(t0, t1, t2, t3) \
+  ClosureInputCommon in_common = CLOSURE_INPUT_COMMON_DEFAULT; \
   ClosureInput##t0 in_##t0##_0 = CLOSURE_INPUT_##t0##_DEFAULT; \
   ClosureInput##t1 in_##t1##_1 = CLOSURE_INPUT_##t1##_DEFAULT; \
   ClosureInput##t2 in_##t2##_2 = CLOSURE_INPUT_##t2##_DEFAULT; \
@@ -32,6 +33,7 @@
   ClosureOutput##t3 out_##t3##_3;
 
 #define CLOSURE_EVAL_DECLARE(t0, t1, t2, t3) \
+  ClosureEvalCommon cl_common = closure_Common_eval_init(in_common); \
   ClosureEval##t0 eval_##t0##_0 = closure_##t0##_eval_init(in_##t0##_0, cl_common, out_##t0##_0); \
   ClosureEval##t1 eval_##t1##_1 = closure_##t1##_eval_init(in_##t1##_1, cl_common, out_##t1##_1); \
   ClosureEval##t2 eval_##t2##_2 = closure_##t2##_eval_init(in_##t2##_2, cl_common, out_##t2##_2); \
@@ -51,7 +53,8 @@
 
 /* Inputs are inout so that callers can get the final inputs used for evaluation. */
 #define CLOSURE_EVAL_FUNCTION_DECLARE(name, t0, t1, t2, t3) \
-  void closure_##name##_eval(inout ClosureInput##t0 in_##t0##_0, \
+  void closure_##name##_eval(ClosureInputCommon in_common, \
+                             inout ClosureInput##t0 in_##t0##_0, \
                              inout ClosureInput##t1 in_##t1##_1, \
                              inout ClosureInput##t2 in_##t2##_2, \
                              inout ClosureInput##t3 in_##t3##_3, \
@@ -60,7 +63,6 @@
                              out ClosureOutput##t2 out_##t2##_2, \
                              out ClosureOutput##t3 out_##t3##_3) \
   { \
-    ClosureEvalCommon cl_common = closure_Common_eval_init(); \
     CLOSURE_EVAL_DECLARE(t0, t1, t2, t3); \
 \
     ClosurePlanarData planar; \
@@ -97,7 +99,8 @@
   }
 
 #define CLOSURE_EVAL_FUNCTION(name, t0, t1, t2, t3) \
-  closure_##name##_eval(in_##t0##_0, \
+  closure_##name##_eval(in_common, \
+                        in_##t0##_0, \
                         in_##t1##_1, \
                         in_##t2##_2, \
                         in_##t3##_3, \
@@ -153,18 +156,39 @@
  * will be optimized out.
  * \{ */
 
-struct ClosureEvalCommon {
-  vec3 V;    /** View vector. */
-  vec3 P;    /** Surface position. */
-  vec3 N;    /** Normal vector, always facing camera. */
-  vec3 vN;   /** Normal vector, always facing camera. (viewspace) */
-  vec3 vP;   /** Surface position. (viewspace) */
-  vec3 vNg;  /** Geometric normal, always facing camera. (viewspace) */
-  vec4 rand; /** Random numbers. 3 random sequences. zw is a random point on a circle. */
+struct ClosureInputCommon {
+  /** Custom occlusion value set by the user. */
+  float occlusion;
+};
 
-  float specular_accum; /** Specular probe accumulator. Shared between planar and cubemap probe. */
-  float diffuse_accum;  /** Diffuse probe accumulator. */
-  float tracing_depth;  /** Viewspace depth to start raytracing from. */
+#define CLOSURE_INPUT_COMMON_DEFAULT ClosureInputCommon(1.0)
+
+struct ClosureEvalCommon {
+  /** View vector. */
+  vec3 V;
+  /** Surface position. */
+  vec3 P;
+  /** Normal vector, always facing camera. */
+  vec3 N;
+  /** Normal vector, always facing camera. (viewspace) */
+  vec3 vN;
+  /** Surface position. (viewspace) */
+  vec3 vP;
+  /** Geometric normal, always facing camera. (viewspace) */
+  vec3 vNg;
+  /** Random numbers. 3 random sequences. zw is a random point on a circle. */
+  vec4 rand;
+  /** Final occlusion factor. Mix of the user occlusion and SSAO. */
+  float occlusion;
+  /** Least occluded direction in the hemisphere. */
+  vec3 bent_normal;
+
+  /** Specular probe accumulator. Shared between planar and cubemap probe. */
+  float specular_accum;
+  /** Diffuse probe accumulator. */
+  float diffuse_accum;
+  /** Viewspace depth to start raytracing from. */
+  float tracing_depth;
 };
 
 /* Common cl_out struct used by most closures. */
@@ -172,7 +196,7 @@ struct ClosureOutput {
   vec3 radiance;
 };
 
-ClosureEvalCommon closure_Common_eval_init(void)
+ClosureEvalCommon closure_Common_eval_init(ClosureInputCommon cl_in)
 {
   ClosureEvalCommon cl_eval;
   cl_eval.rand = texelfetch_noise_tex(gl_FragCoord.xy);
@@ -190,6 +214,11 @@ ClosureEvalCommon closure_Common_eval_init(void)
   cl_eval.tracing_depth -= mix(2.4e-7, 4.8e-7, gl_FragCoord.z);
   /* Convert to view Z. */
   cl_eval.tracing_depth = get_view_z_from_depth(cl_eval.tracing_depth);
+
+  /* TODO(fclem) Do occlusion evaluation per Closure using shading normal. */
+  cl_eval.occlusion = min(
+      cl_in.occlusion,
+      occlusion_compute(cl_eval.N, cl_eval.vP, cl_eval.rand, cl_eval.bent_normal));
 
   cl_eval.specular_accum = 1.0;
   cl_eval.diffuse_accum = 1.0;

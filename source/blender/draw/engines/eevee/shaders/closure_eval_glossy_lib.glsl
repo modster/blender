@@ -3,7 +3,6 @@
 #pragma BLENDER_REQUIRE(lights_lib.glsl)
 #pragma BLENDER_REQUIRE(lightprobe_lib.glsl)
 #pragma BLENDER_REQUIRE(ambient_occlusion_lib.glsl)
-#pragma BLENDER_REQUIRE(ssr_lib.glsl)
 
 struct ClosureInputGlossy {
   vec3 N;          /** Shading normal. */
@@ -16,6 +15,7 @@ struct ClosureEvalGlossy {
   vec4 ltc_mat;            /** LTC matrix values. */
   float ltc_brdf_scale;    /** LTC BRDF scaling. */
   vec3 probe_sampling_dir; /** Direction to sample probes from. */
+  float spec_occlusion;    /** Specular Occlusion. */
 };
 
 /* Stubs. */
@@ -47,6 +47,7 @@ ClosureEvalGlossy closure_Glossy_eval_init(inout ClosureInputGlossy cl_in,
   ClosureEvalGlossy cl_eval;
   cl_eval.ltc_mat = texture(utilTex, vec3(lut_uv, LTC_MAT_LAYER));
   cl_eval.probe_sampling_dir = specular_dominant_dir(cl_in.N, cl_common.V, sqr(cl_in.roughness));
+  cl_eval.spec_occlusion = specular_occlusion(NV, cl_common.occlusion, cl_in.roughness);
 
   /* The brdf split sum LUT is applied after the radiance accumulation.
    * Correct the LTC so that its energy is constant. */
@@ -105,7 +106,7 @@ void closure_Glossy_indirect_end(ClosureInputGlossy cl_in,
     cl_out.radiance += cl_common.specular_accum * probe_radiance;
   }
 
-  /* TODO(fclem) Apply occlusion. */
+  cl_out.radiance *= cl_eval.spec_occlusion;
 }
 
 void closure_Glossy_eval_end(ClosureInputGlossy cl_in,

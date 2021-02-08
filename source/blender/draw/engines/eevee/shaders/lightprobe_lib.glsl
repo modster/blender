@@ -225,7 +225,7 @@ void fallback_cubemap(vec3 N,
 #ifdef SSR_AO
   vec4 rand = texelfetch_noise_tex(gl_FragCoord.xy);
   vec3 bent_normal;
-  float final_ao = occlusion_compute(N, viewPosition, 1.0, rand, bent_normal);
+  float final_ao = occlusion_compute(N, viewPosition, rand, bent_normal);
   final_ao = specular_occlusion(dot(N, V), final_ao, roughness);
 #else
   const float final_ao = 1.0;

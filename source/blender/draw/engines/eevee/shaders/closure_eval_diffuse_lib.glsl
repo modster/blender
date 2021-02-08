@@ -10,8 +10,7 @@ struct ClosureInputDiffuse {
 #define CLOSURE_INPUT_Diffuse_DEFAULT ClosureInputDiffuse(vec3(0.0), vec3(0.0))
 
 struct ClosureEvalDiffuse {
-  vec3 bent_normal;        /** Normal pointing in the least occluded direction. */
-  float ambient_occlusion; /** Final occlusion factor. */
+  float dummy;
 };
 
 /* Stubs. */
@@ -27,9 +26,7 @@ ClosureEvalDiffuse closure_Diffuse_eval_init(inout ClosureInputDiffuse cl_in,
   cl_out.radiance = vec3(0.0);
 
   ClosureEvalDiffuse cl_eval;
-  float user_ao = 1.0; /* TODO(fclem) wire the real one through ClosureEvalCommon. */
-  cl_eval.ambient_occlusion = occlusion_compute(
-      cl_in.N, cl_common.vP, user_ao, cl_common.rand, cl_eval.bent_normal);
+  cl_eval.dummy = 0.0;
   return cl_eval;
 }
 
@@ -52,7 +49,7 @@ void closure_Diffuse_grid_eval(ClosureInputDiffuse cl_in,
                                inout ClosureOutputDiffuse cl_out)
 {
   vec3 probe_radiance = probe_evaluate_grid(
-      grid.data, cl_common.P, cl_eval.bent_normal, grid.local_pos);
+      grid.data, cl_common.P, cl_common.bent_normal, grid.local_pos);
   cl_out.radiance += grid.attenuation * probe_radiance;
 }
 
@@ -64,11 +61,11 @@ void closure_Diffuse_indirect_end(ClosureInputDiffuse cl_in,
   /* If not enough light has been accumulated from probes, use the world specular cubemap
    * to fill the remaining energy needed. */
   if (cl_common.diffuse_accum > 0.0) {
-    vec3 probe_radiance = probe_evaluate_world_diff(cl_eval.bent_normal);
+    vec3 probe_radiance = probe_evaluate_world_diff(cl_common.bent_normal);
     cl_out.radiance += cl_common.diffuse_accum * probe_radiance;
   }
   /* Apply occlusion on radiance before the light loop. */
-  cl_out.radiance *= gtao_multibounce(cl_eval.ambient_occlusion, cl_in.albedo);
+  cl_out.radiance *= gtao_multibounce(cl_common.occlusion, cl_in.albedo);
 }
 
 void closure_Diffuse_eval_end(ClosureInputDiffuse cl_in,

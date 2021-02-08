@@ -17,6 +17,8 @@ void node_eevee_specular(vec4 diffuse,
 {
   CLOSURE_VARS_DECLARE_3(Diffuse, Glossy, Glossy);
 
+  in_common.occlusion = occlusion;
+
   in_Diffuse_0.N = normal; /* Normalized during eval. */
   in_Diffuse_0.albedo = diffuse.rgb;
 

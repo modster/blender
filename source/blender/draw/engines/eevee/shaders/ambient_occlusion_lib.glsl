@@ -246,7 +246,7 @@ float specular_occlusion(float NV, float AO, float roughness)
 }
 
 /* Use the right occlusion  */
-float occlusion_compute(vec3 N, vec3 vpos, float user_occlusion, vec4 rand, out vec3 bent_normal)
+float occlusion_compute(vec3 N, vec3 vpos, vec4 rand, out vec3 bent_normal)
 {
 #ifndef USE_REFRACTION
   if ((int(aoSettings) & USE_AO) != 0) {
@@ -276,10 +276,10 @@ float occlusion_compute(vec3 N, vec3 vpos, float user_occlusion, vec4 rand, out 
     /* Scale by user factor */
     visibility = pow(visibility, aoFactor);
 
-    return min(visibility, user_occlusion);
+    return visibility;
   }
 #endif
 
   bent_normal = N;
-  return user_occlusion;
+  return 1.0;
 }
