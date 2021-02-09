@@ -1005,7 +1005,9 @@ void CUDADevice::mem_copy_to(device_memory &mem)
     assert(!"mem_copy_to not supported for pixels.");
   }
   else if (mem.type == MEM_GLOBAL) {
-    global_free(mem);
+    if (mem.need_realloc_ || !mem.device_pointer) {
+      global_free(mem);
+    }
     global_alloc(mem);
   }
   else if (mem.type == MEM_TEXTURE) {
@@ -1099,7 +1101,10 @@ void CUDADevice::const_copy_to(const char *name, void *host, size_t size)
 void CUDADevice::global_alloc(device_memory &mem)
 {
   if (mem.is_resident(this)) {
-    generic_alloc(mem);
+    if (mem.need_realloc_ || mem.device_pointer == 0) {
+      generic_alloc(mem);
+    }
+
     generic_copy_to(mem);
   }
 
