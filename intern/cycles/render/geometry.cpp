@@ -1135,7 +1135,8 @@ void GeometryManager::device_update_mesh(
         hair->pack_curves(scene,
                           &curve_keys[hair->curvekey_offset],
                           &curves[hair->prim_offset],
-                          hair->curvekey_offset);
+                          hair->curvekey_offset,
+            copy_all_data);
         if (progress.get_cancel())
           return;
       }
@@ -1401,6 +1402,8 @@ enum {
   ATTR_FLOAT3_NEEDS_REALLOC = (1 << 10),
   ATTR_UCHAR4_NEEDS_REALLOC = (1 << 11),
 
+  DEVICE_CURVES_MODIFIED = (1 << 12),
+
   ATTRS_NEED_REALLOC = (ATTR_FLOAT_NEEDS_REALLOC | ATTR_FLOAT2_NEEDS_REALLOC |
                         ATTR_FLOAT3_NEEDS_REALLOC | ATTR_UCHAR4_NEEDS_REALLOC),
   DEVICE_MESH_DATA_NEEDS_REALLOC = (CURVE_DATA_NEED_REALLOC | ATTRS_NEED_REALLOC),
@@ -1540,6 +1543,10 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
       }
       else if (hair->is_modified()) {
         device_update_flags |= DEVICE_CURVE_DATA_MODIFIED;
+
+        if (hair->curve_shader_is_modified()) {
+          device_update_flags |= DEVICE_CURVES_MODIFIED;
+        }
       }
     }
 
@@ -1638,6 +1645,9 @@ void GeometryManager::device_update_preprocess(Device *device, Scene *scene, Pro
 
   if (device_update_flags & DEVICE_CURVE_DATA_MODIFIED) {
     dscene->curve_keys.tag_modified();
+  }
+
+  if (device_update_flags & DEVICE_CURVES_MODIFIED) {
     dscene->curves.tag_modified();
   }
 

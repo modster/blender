@@ -463,12 +463,13 @@ void Hair::apply_transform(const Transform &tfm, const bool apply_to_motion)
 void Hair::pack_curves(Scene *scene,
                        float4 *curve_key_co,
                        float4 *curve_data,
-                       size_t curvekey_offset)
+                       size_t curvekey_offset,
+                       bool pack_all_data)
 {
   size_t curve_keys_size = curve_keys.size();
 
   /* pack curve keys */
-  if (curve_keys_size) {
+  if (curve_keys_size && (curve_keys_is_modified() || curve_radius_is_modified() || pack_all_data)) {
     float3 *keys_ptr = curve_keys.data();
     float *radius_ptr = curve_radius.data();
 
@@ -477,20 +478,23 @@ void Hair::pack_curves(Scene *scene,
   }
 
   /* pack curve segments */
-  size_t curve_num = num_curves();
 
-  for (size_t i = 0; i < curve_num; i++) {
-    Curve curve = get_curve(i);
-    int shader_id = curve_shader[i];
-    Shader *shader = (shader_id < used_shaders.size()) ?
-                         static_cast<Shader *>(used_shaders[shader_id]) :
-                         scene->default_surface;
-    shader_id = scene->shader_manager->get_shader_id(shader, false);
+  if (curve_shader_is_modified() || curve_first_key_is_modified() || pack_all_data) {
+    size_t curve_num = num_curves();
 
-    curve_data[i] = make_float4(__int_as_float(curve.first_key + curvekey_offset),
-                                __int_as_float(curve.num_keys),
-                                __int_as_float(shader_id),
-                                0.0f);
+    for (size_t i = 0; i < curve_num; i++) {
+      Curve curve = get_curve(i);
+      int shader_id = curve_shader[i];
+      Shader *shader = (shader_id < used_shaders.size()) ?
+                           static_cast<Shader *>(used_shaders[shader_id]) :
+                           scene->default_surface;
+      shader_id = scene->shader_manager->get_shader_id(shader, false);
+
+      curve_data[i] = make_float4(__int_as_float(curve.first_key + curvekey_offset),
+                                  __int_as_float(curve.num_keys),
+                                  __int_as_float(shader_id),
+                                  0.0f);
+    }
   }
 }
 

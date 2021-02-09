@@ -144,7 +144,8 @@ class Hair : public Geometry {
   void get_uv_tiles(ustring map, unordered_set<int> &tiles) override;
 
   /* BVH */
-  void pack_curves(Scene *scene, float4 *curve_key_co, float4 *curve_data, size_t curvekey_offset);
+  void pack_curves(Scene *scene, float4 *curve_key_co, float4 *curve_data, size_t curvekey_offset,
+                   bool pack_all_data);
 
   void pack_primitives(PackedBVH *pack, int object, uint visibility, bool pack_all) override;
 };
