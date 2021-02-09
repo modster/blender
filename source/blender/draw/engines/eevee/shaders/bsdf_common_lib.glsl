@@ -1,6 +1,15 @@
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 
+vec3 diffuse_dominant_dir(vec3 N, vec3 vis_cone_dir, float vis_cone_aperture_cos)
+{
+  /* TODO(fclem) revisit this. bent too much towards vis_cone_dir. */
+  vis_cone_aperture_cos *= sqr(vis_cone_aperture_cos);
+
+  N = mix(vis_cone_dir, N, vis_cone_aperture_cos);
+  return normalize(N);
+}
+
 vec3 specular_dominant_dir(vec3 N, vec3 V, float roughness)
 {
   vec3 R = -reflect(V, N);
