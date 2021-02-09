@@ -56,15 +56,6 @@
 
 #include "DEG_depsgraph_query.h"
 
-/* We treat pressure, strength and vertex colors as dimensions in the curve fitting like the
- * position. But this means that e.g. a high pressure will change the shape of the
- * higher-dimensional fitted curve which will in turn change the shape of the projected
- * 3-dimensional curve. But we don't really want the pressure or something else than the position
- * to influence the shape. So this COORD_FITTING_INFLUENCE will "dampen" the effect of the other
- * attributes affecting the shape. Ideally, we fit the other attributes separate from the position.
- */
-#define COORD_FITTING_INFLUENCE 20.0f
-
 /* -------------------------------------------------------------------- */
 /** \name Convert to curve object
  * \{ */
@@ -573,29 +564,76 @@ void BKE_gpencil_convert_curve(Main *bmain,
 /** \name Edit-Curve Kernel Functions
  * \{ */
 
+typedef struct tCurveFitPoint {
+  float x, y, z;
+  float pressure;
+  float strength;
+  float color[4];
+} tCurveFitPoint;
+
+#define CURVE_FIT_POINT_DIM 9
+
+/* We treat pressure, strength and vertex colors as dimensions in the curve fitting like the
+ * position. But this means that e.g. a high pressure will change the shape of the
+ * higher-dimensional fitted curve which will in turn change the shape of the projected
+ * 3-dimensional curve. But we don't really want the pressure or something else than the position
+ * to influence the shape. So this COORD_FITTING_INFLUENCE will "dampen" the effect of the other
+ * attributes affecting the shape. Ideally, we fit the other attributes separate from the position.
+ */
+#define COORD_FITTING_INFLUENCE 20.0f
+
 typedef struct tGPCurveSegment {
+  struct tGPCurveSegment *next, *prev;
+
   float *point_array;
   uint32_t point_array_len;
-  uint32_t start_idx, end_idx;
-  uint32_t length;
 
+  bGPDcurve_point *curve_points;
   float *cubic_array;
   uint32_t cubic_array_len;
+
   uint32_t *cubic_orig_index;
   uint32_t *corners_index_array;
   uint32_t corners_index_len;
-} tGPCurvePointIsland;
+
+} tGPCurveSegment;
+
+static void gpencil_free_curve_segment(tGPCurveSegment *tcs)
+{
+  if (tcs == NULL) {
+    return;
+  }
+
+  if (tcs->point_array != NULL) {
+    MEM_freeN(tcs->point_array);
+  }
+  if (tcs->curve_points != NULL) {
+    MEM_freeN(tcs->curve_points);
+  }
+  if (tcs->cubic_array != NULL) {
+    MEM_freeN(tcs->cubic_array);
+  }
+  if (tcs->cubic_orig_index != NULL) {
+    MEM_freeN(tcs->cubic_orig_index);
+  }
+  if (tcs->corners_index_array != NULL) {
+    MEM_freeN(tcs->corners_index_array);
+  }
+  
+  MEM_freeN(tcs);
+}
 
 static int gpencil_count_tagged_curve_segments(bGPDstroke *gps)
 {
   bGPDcurve *gpc = gps->editcurve;
   /* Handle single point edgecase. */
   if (gpc->tot_curve_points == 1) {
-    return (&gps->points[0]->flag & GP_SPOINT_TAG) ? 1 : 0;
+    return (gps->points[0].flag & GP_SPOINT_TAG) ? 1 : 0;
   }
 
   /* Iterate over segments. */
   const int tot_segments = gpc->tot_curve_points - 1;
+  int count = 0;
   for (int i = 0; i < tot_segments; i++) {
     int start_idx = gpc->curve_points[i].point_index;
     int end_idx = gpc->curve_points[i + 1].point_index;
@@ -702,6 +740,91 @@ static bGPDcurve *gpencil_stroke_editcurve_generate_edgecases(bGPDstroke *gps)
   }
 
   return NULL;
+}
+
+static tGPCurveSegment *gpencil_generate_curve_segment(bGPDstroke *gps,
+                                                       const float diag_length,
+                                                       const float error_threshold,
+                                                       const float corner_angle,
+                                                       const uint32_t start_idx,
+                                                       const uint32_t end_idx,
+                                                       const uint32_t offset)
+{
+  const uint32_t length = end_idx - start_idx + 1;
+
+  tGPCurveSegment *tcs = MEM_callocN(sizeof(tGPCurveSegment), __func__);
+  tcs->point_array_len = length * CURVE_FIT_POINT_DIM;
+  tcs->point_array = MEM_callocN(sizeof(float) * tcs->point_array_len, __func__);
+
+  float tmp_vec[3];
+  for (int i = 0; i < length; i++) {
+    bGPDspoint *pt = &gps->points[i + start_idx];
+    int row = i * CURVE_FIT_POINT_DIM;
+    tCurveFitPoint *cfpt = (tCurveFitPoint *)&tcs->point_array[row];
+    /* normalize coordinate to 0..1 */
+    sub_v3_v3v3(tmp_vec, &pt->x, gps->boundbox_min);
+    mul_v3_v3fl(&cfpt->x, tmp_vec, COORD_FITTING_INFLUENCE / diag_length);
+    cfpt->pressure = pt->pressure / diag_length;
+
+    /* strength and color are already normalized */
+    cfpt->strength = pt->strength / diag_length;
+    mul_v4_v4fl(cfpt->color, pt->vert_color, 1.0f / diag_length);
+  }
+
+  int r = curve_fit_cubic_to_points_refit_fl(tcs->point_array,
+                                             length,
+                                             CURVE_FIT_POINT_DIM,
+                                             error_threshold,
+                                             CURVE_FIT_CALC_HIGH_QUALIY,
+                                             NULL,
+                                             0,
+                                             corner_angle,
+                                             &tcs->cubic_array,
+                                             &tcs->cubic_array_len,
+                                             &tcs->cubic_orig_index,
+                                             &tcs->corners_index_array,
+                                             &tcs->corners_index_len);
+
+  if (r != 0 || tcs->cubic_array_len < 1) {
+    gpencil_free_curve_segment(tcs);
+    return NULL;
+  }
+
+  tcs->curve_points = MEM_callocN(sizeof(bGPDcurve_point) * tcs->cubic_array_len, __func__);
+
+  for (int i = 0; i < tcs->cubic_array_len; i++) {
+    bGPDcurve_point *cpt = &tcs->curve_points[i];
+    BezTriple *bezt = &cpt->bezt;
+    tCurveFitPoint *curve_point = (tCurveFitPoint *)&tcs->cubic_array[i * 3 * CURVE_FIT_POINT_DIM];
+
+    for (int j = 0; j < 3; j++) {
+      float *bez = &curve_point[j].x;
+      madd_v3_v3v3fl(bezt->vec[j], gps->boundbox_min, bez, diag_length / COORD_FITTING_INFLUENCE);
+    }
+
+    tCurveFitPoint *ctrl_point = &curve_point[1];
+    cpt->pressure = ctrl_point->pressure * diag_length;
+    cpt->strength = ctrl_point->strength * diag_length;
+    mul_v4_v4fl(cpt->vert_color, ctrl_point->color, diag_length);
+
+    /* default handle type */
+    bezt->h1 = HD_ALIGN;
+    bezt->h2 = HD_ALIGN;
+
+    cpt->point_index = tcs->cubic_orig_index[i] + offset;
+  }
+
+  /* Set handle type to HD_FREE for corner handles. */
+  if (tcs->corners_index_len > 0 && tcs->corners_index_array != NULL) {
+    for (int i = 0; i < tcs->corners_index_len; i++) {
+      bGPDcurve_point *cpt = &tcs->curve_points[tcs->corners_index_array[i]];
+      BezTriple *bezt = &cpt->bezt;
+      bezt->h1 = HD_FREE;
+      bezt->h2 = HD_FREE;
+    }
+  }
+
+  return tcs;
 }
 
 /**
@@ -837,40 +960,107 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_regenerate(bGPDstroke *gps,
 
   bGPDcurve *gpc = gps->editcurve;
   const int tot_segments = gpc->tot_curve_points - 1;
-  int point_offset = 0;
+  float diag_length = len_v3v3(gps->boundbox_min, gps->boundbox_max);
+
+  ListBase curve_segments = {NULL, NULL};
+
+  /* TODO: If the stroke is cyclic we need to move the start of the curve to the last curve point
+   * that is not tagged. */
+
+  tGPCurveSegment *tcs;
+  int new_tot_curve_points = 0, pt_offset = 0;
   for (int i = 0; i < tot_segments; i++) {
     int start_idx = gpc->curve_points[i].point_index;
-    int end_idx = gpc->curve_points[i + 1].point_index;
-    int segment_length = end_idx - start_idx + 1;
+    bGPDspoint *start_pt = &gps->points[start_idx];
+
     bool regen = false;
-    for (int j = start_idx; j <= end_idx; j++) {
-      bGPDspoint *pt = &gps->points[j];
-      if ((pt->flag & GP_SPOINT_TAG)) {
-        /* Regenerate this segment. */
+    if ((start_pt->flag & GP_SPOINT_TAG)) {
+      regen = true;
+    }
 
-        /* Allocate points */
-
-        /* Call curve_fit_nd */
-
-        /* Append all the resulting curve segments to listbase */
-
-        regen = true;
+    /* Find end point. */
+    int end_idx = start_idx;
+    for (int j = i + 1; j < gpc->tot_curve_points; j++, i++) {
+      end_idx = gpc->curve_points[j].point_index;
+      bGPDspoint *pt = &gps->points[end_idx];
+      if ((pt->flag & GP_SPOINT_TAG) == 0) {
         break;
       }
+      regen = true;
     }
 
     if (!regen) {
-      /* Save this segment. */
-
-      /* append curve segment to list base */
-
-      point_offset += segment_length;
+      /* Check if there are marked points between the control points. If there are, the segment
+       * must be regenerated. */
+      for (int k = start_idx + 1; k < end_idx; k++) {
+        bGPDspoint *pt = &gps->points[k];
+        if ((pt->flag & GP_SPOINT_TAG)) {
+          regen = true;
+          tcs = gpencil_generate_curve_segment(
+              gps, diag_length, error_threshold, corner_angle, start_idx, end_idx, pt_offset);
+          break;
+        }
+      }
     }
+    else {
+      /* Regenerate this segment. */
+      regen = true;
+      tcs = gpencil_generate_curve_segment(
+          gps, diag_length, error_threshold, corner_angle, start_idx, end_idx, pt_offset);
+    }
+
+    if (!regen) {
+      int start_cidx = i;
+      /* Find end point. This time for curve points that have not moved. */
+      int end_cidx = start_cidx;
+      for (int j = start_cidx + 1; j < gpc->tot_curve_points; j++, i++) {
+        bGPDspoint *pt = &gps->points[gpc->curve_points[j].point_index];
+        if (pt->flag & GP_SPOINT_TAG) {
+          break;
+        }
+        end_cidx = j;
+      }
+
+      tcs = MEM_callocN(sizeof(tGPCurveSegment), __func__);
+      tcs->cubic_array_len = end_cidx - start_cidx + 1;
+      tcs->point_array_len = gpc->curve_points[end_cidx].point_index -
+                             gpc->curve_points[start_cidx].point_index + 1;
+      tcs->curve_points = MEM_callocN(sizeof(bGPDcurve_point) * tcs->cubic_array_len, __func__);
+      memcpy(tcs->curve_points,
+             &gpc->curve_points[start_cidx],
+             sizeof(bGPDcurve_point) * tcs->cubic_array_len);
+
+      for (int j = 0; j < tcs->cubic_array_len; j++) {
+        bGPDcurve_point *cpt = &tcs->curve_points[j];
+        cpt->point_index += pt_offset;
+      }
+    }
+
+    pt_offset += tcs->point_array_len;
+    new_tot_curve_points += tcs->cubic_array_len;
+    BLI_addtail(&curve_segments, tcs);
   }
 
-  bGPDcurve *new_gpc;
+  /* TODO: If the stroke is cyclic we need to check if the last segment needs to be regenerated or
+   * saved. */
+  printf("new_tot_curve_points: %d\n", new_tot_curve_points);
+  bGPDcurve *new_gpc = BKE_gpencil_stroke_editcurve_new(new_tot_curve_points);
 
-  /* combine listbase curve segments to curve */
+  /* Combine listbase curve segments to gpencil curve. */
+  int offset = 0;
+  LISTBASE_FOREACH(tGPCurveSegment *, cs, &curve_segments) {
+    memcpy(&new_gpc->curve_points[offset],
+           cs->curve_points,
+           sizeof(bGPDcurve_point) * cs->cubic_array_len);
+    offset += cs->cubic_array_len;
+    printf("cs->cubic_array_len: %d\n", cs->cubic_array_len);
+  }
+
+
+  LISTBASE_FOREACH_MUTABLE(tGPCurveSegment *, cs, &curve_segments) {
+    gpencil_free_curve_segment(cs);
+  }
+  BLI_listbase_clear(&curve_segments);
 
   /* Free the old curve. */
   BKE_gpencil_free_stroke_editcurve(gps);

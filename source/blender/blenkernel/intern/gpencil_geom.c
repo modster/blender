@@ -1298,7 +1298,7 @@ void BKE_gpencil_stroke_geometry_update(bGPdata *gpd, bGPDstroke *gps)
      * unavoidable. Sculpting a curve also makes use of this. */
     if (gps->editcurve->flag & GP_CURVE_NEEDS_STROKE_UPDATE) {
       BKE_gpencil_stroke_editcurve_update(
-          gps, gpd->curve_edit_threshold, gpd->curve_edit_corner_angle);
+          gps, gpd->curve_edit_threshold, gpd->curve_edit_corner_angle, true);
       gps->editcurve->flag &= ~GP_CURVE_NEEDS_STROKE_UPDATE;
       gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
     }
