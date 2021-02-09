@@ -11,6 +11,9 @@ uniform float paddingSize;
 uniform float intensityFac;
 uniform float fireflyFactor;
 
+uniform float sampleCount;
+uniform float invSampleCount;
+
 in vec3 worldPosition;
 
 out vec4 FragColor;
@@ -53,7 +56,7 @@ void main()
   float weight = 0.0;
   vec3 out_radiance = vec3(0.0);
   for (float i = 0; i < sampleCount; i++) {
-    vec3 H = sample_ggx(i, roughnessSquared, N, T, B); /* Microfacet normal */
+    vec3 H = sample_ggx(i, invSampleCount, roughnessSquared, N, T, B); /* Microfacet normal */
     vec3 L = -reflect(V, H);
     float NL = dot(N, L);
 
