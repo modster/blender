@@ -180,6 +180,7 @@ template<typename T> class DataStore {
     }
 
     data.swap(other.data);
+    std::swap(frame_offset, other.frame_offset);
   }
 };
 
@@ -281,19 +282,25 @@ class AlembicObject : public Node {
   void set_object(Object *object);
   Object *get_object();
 
-  void load_all_data(CachedData &cached_data,
+  bool load_all_data(CachedData &cached_data,
                      AlembicProcedural *proc,
+                     const int frame,
                      Alembic::AbcGeom::IPolyMeshSchema &schema,
-                     Progress &progress);
-  void load_all_data(CachedData &cached_data,
+                     Progress &progress,
+                     bool for_prefetch);
+  bool load_all_data(CachedData &cached_data,
                      AlembicProcedural *proc,
+                     const int frame,
                      Alembic::AbcGeom::ISubDSchema &schema,
-                     Progress &progress);
-  void load_all_data(CachedData &cached_data,
+                     Progress &progress,
+                     bool for_prefetch);
+  bool load_all_data(CachedData &cached_data,
                      AlembicProcedural *proc,
+                     const int frame,
                      const Alembic::AbcGeom::ICurvesSchema &schema,
                      Progress &progress,
-                     float default_radius);
+                     float default_radius,
+                     bool for_prefetch);
 
   bool has_data_loaded(int frame) const;
 
