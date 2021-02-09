@@ -75,7 +75,7 @@ void closure_Glossy_light_eval(ClosureInputGlossy cl_in,
 
 void closure_Glossy_planar_eval(ClosureInputGlossy cl_in,
                                 ClosureEvalGlossy cl_eval,
-                                ClosureEvalCommon cl_common,
+                                inout ClosureEvalCommon cl_common,
                                 ClosurePlanarData planar,
                                 inout ClosureOutputGlossy cl_out)
 {
@@ -83,6 +83,10 @@ void closure_Glossy_planar_eval(ClosureInputGlossy cl_in,
   vec3 probe_radiance = probe_evaluate_planar(
       planar.id, planar.data, cl_common.P, cl_in.N, cl_common.V, cl_in.roughness);
   cl_out.radiance += planar.attenuation * probe_radiance;
+#else
+  /* HACK: Fix an issue with planar reflections still being counted inside the specular
+   * accumulator. This only works because we only use one Glossy closure in the resolve pass. */
+  cl_common.specular_accum += planar.attenuation;
 #endif
 }
 
