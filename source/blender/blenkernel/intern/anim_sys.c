@@ -2078,8 +2078,14 @@ static void animsys_evaluate_nla_domain(PointerRNA *ptr, NlaEvalData *channels, 
 {
   GSet *touched_actions = BLI_gset_ptr_new(__func__);
 
-  if (adt->action) {
-    nla_eval_domain_action(ptr, channels, adt->action, touched_actions);
+  /** Include domain of Action Track. */
+  if ((adt->flag & ADT_NLA_EDIT_ON) == 0) {
+    if (adt->action) {
+      nla_eval_domain_action(ptr, channels, adt->action, touched_actions);
+    }
+  }
+  else if (adt->tmpact && (adt->flag & ADT_NLA_EVAL_UPPER_TRACKS)) {
+    nla_eval_domain_action(ptr, channels, adt->tmpact, touched_actions);
   }
 
   /* NLA Data - Animation Data for Strips */
@@ -2186,7 +2192,8 @@ static void animsys_create_action_track_strip(const AnimData *adt,
 
   const bool tweaking = (adt->flag & ADT_NLA_EDIT_ON) != 0;
   const bool soloing = (adt->flag & ADT_NLA_SOLO_TRACK) != 0;
-  const bool actionstrip_evaluated = r_action_strip->act && !soloing && !tweaking;
+  const bool eval_upper = !tweaking || (adt->flag & ADT_NLA_EVAL_UPPER_TRACKS) != 0;
+  const bool actionstrip_evaluated = r_action_strip->act && !soloing && eval_upper;
   if (!actionstrip_evaluated) {
     r_action_strip->flag |= NLASTRIP_FLAG_MUTED;
   }
