@@ -20,6 +20,7 @@
 #include "render/attribute.h"
 #include "render/procedural.h"
 #include "util/util_set.h"
+#include "util/util_task.h"
 #include "util/util_transform.h"
 #include "util/util_vector.h"
 
@@ -374,6 +375,8 @@ class AlembicProcedural : public Procedural {
   Alembic::AbcGeom::IArchive archive;
   bool objects_loaded;
   Scene *scene_;
+
+  DedicatedTaskPool prefetch_pool;
 
  public:
   NODE_DECLARE

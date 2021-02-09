@@ -1454,6 +1454,8 @@ AlembicProcedural::AlembicProcedural() : Procedural(node_type)
 
 AlembicProcedural::~AlembicProcedural()
 {
+  prefetch_pool.cancel();
+
   ccl::set<Geometry *> geometries_set;
   ccl::set<Object *> objects_set;
   ccl::set<AlembicObject *> abc_objects_set;
@@ -2055,7 +2057,13 @@ void AlembicProcedural::build_caches(Progress &progress)
   }
 
   if (need_prefetch && get_cache_method() == CACHE_FRAME_COUNT) {
+    prefetch_pool.push([&](){
     const int prefetch_frame = static_cast<int>(get_frame()) + get_cache_frame_count() + 1;
+
+    if (prefetch_frame > get_end_frame()) {
+      std::cerr << "No more data to prefetch\n";
+      return;
+    }
 
     std::cerr << "Prefetching data for frame : " << prefetch_frame << '\n';
 
@@ -2101,9 +2109,8 @@ void AlembicProcedural::build_caches(Progress &progress)
       if (scale_is_modified() || object->get_cached_data().transforms.size() == 0) {
         object->setup_transform_cache(object->get_cached_data(), scale);
       }
-
-      memory_used += object->get_cached_data().memory_used();
     }
+    });
   }
 
   std::cerr << "AlembicProcedural memory usage : " << string_human_readable_size(memory_used)
