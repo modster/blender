@@ -573,6 +573,19 @@ void BKE_gpencil_convert_curve(Main *bmain,
 /** \name Edit-Curve Kernel Functions
  * \{ */
 
+typedef struct tGPCurveSegment {
+  float *point_array;
+  uint32_t point_array_len;
+  uint32_t start_idx, end_idx;
+  uint32_t length;
+
+  float *cubic_array;
+  uint32_t cubic_array_len;
+  uint32_t *cubic_orig_index;
+  uint32_t *corners_index_array;
+  uint32_t corners_index_len;
+} tGPCurvePointIsland;
+
 static int gpencil_count_tagged_curve_segments(bGPDstroke *gps)
 {
   bGPDcurve *gpc = gps->editcurve;
@@ -581,23 +594,36 @@ static int gpencil_count_tagged_curve_segments(bGPDstroke *gps)
     return (&gps->points[0]->flag & GP_SPOINT_TAG) ? 1 : 0;
   }
 
-  int i, j, count = 0;
-  for (i = 0, j = 0; i < gps->totpoints; i++) {
-    bGPDspoint *pt = &gps->points[i];
-    if ((pt->flag & GP_SPOINT_TAG) == 0) {
-      if (j + 1 < gpc->tot_curve_points && i >= &gpc->curve_points[j + 1]->point_index) {
-        j++;
+  /* Iterate over segments. */
+  const int tot_segments = gpc->tot_curve_points - 1;
+  for (int i = 0; i < tot_segments; i++) {
+    int start_idx = gpc->curve_points[i].point_index;
+    int end_idx = gpc->curve_points[i + 1].point_index;
+    for (int j = start_idx; j <= end_idx; j++) {
+      bGPDspoint *pt = &gps->points[j];
+      if ((pt->flag & GP_SPOINT_TAG)) {
+        count++;
+        break;
       }
-      continue;
     }
-    count++;
+  }
 
-    if (++j < gpc->tot_curve_points) {
-      bGPDcurve_point *cpt = &gpc->curve_points[j];
-      i = cpt->point_index;
+  /* Handle closing segment */
+  if (gps->flag & GP_STROKE_CYCLIC) {
+    int start_idx = gpc->curve_points[gpc->tot_curve_points - 1].point_index;
+    int end_idx = gps->totpoints - 1;
+
+    if ((gps->points[0].flag) & GP_SPOINT_TAG) {
+      count++;
     }
     else {
-      break;
+      for (int j = start_idx; j <= end_idx; j++) {
+        bGPDspoint *pt = &gps->points[j];
+        if ((pt->flag & GP_SPOINT_TAG)) {
+          count++;
+          break;
+        }
+      }
     }
   }
 
@@ -805,27 +831,50 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_regenerate(bGPDstroke *gps,
     return gpencil_stroke_editcurve_generate_edgecases(gps);
   }
 
+  /* The reason why we cant just take all the bad segments and regenerate them is because that
+   * will leave the control points at their original spot (if a control point moved, we should no
+   * longer treat it as a control point). Therefor the only option is to find */
+
   bGPDcurve *gpc = gps->editcurve;
+  const int tot_segments = gpc->tot_curve_points - 1;
+  int point_offset = 0;
+  for (int i = 0; i < tot_segments; i++) {
+    int start_idx = gpc->curve_points[i].point_index;
+    int end_idx = gpc->curve_points[i + 1].point_index;
+    int segment_length = end_idx - start_idx + 1;
+    bool regen = false;
+    for (int j = start_idx; j <= end_idx; j++) {
+      bGPDspoint *pt = &gps->points[j];
+      if ((pt->flag & GP_SPOINT_TAG)) {
+        /* Regenerate this segment. */
 
-  int i, j, count = 0;
-  for (i = 0, j = 0; i < gps->totpoints; i++) {
-    bGPDspoint *pt = &gps->points[i];
-    if ((pt->flag & GP_SPOINT_TAG) == 0) {
-      if (j + 1 < gpc->tot_curve_points && i >= &gpc->curve_points[j + 1]->point_index) {
-        j++;
+        /* Allocate points */
+
+        /* Call curve_fit_nd */
+
+        /* Append all the resulting curve segments to listbase */
+
+        regen = true;
+        break;
       }
-      continue;
     }
-    count++;
 
-    if (++j < gpc->tot_curve_points) {
-      bGPDcurve_point *cpt = &gpc->curve_points[j];
-      i = cpt->point_index;
-    }
-    else {
-      break;
+    if (!regen) {
+      /* Save this segment. */
+
+      /* append curve segment to list base */
+
+      point_offset += segment_length;
     }
   }
+
+  bGPDcurve *new_gpc;
+
+  /* combine listbase curve segments to curve */
+
+  /* Free the old curve. */
+  BKE_gpencil_free_stroke_editcurve(gps);
+  return new_gpc;
 }
 
 /**
@@ -867,6 +916,7 @@ void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps,
       editcurve = BKE_gpencil_stroke_editcurve_generate(gps, threshold, corner_angle);
     }
     else {
+      /* Some segments are unchanged. Do a partial update. */
       editcurve = BKE_gpencil_stroke_editcurve_regenerate(gps, threshold, corner_angle);
     }
   }
@@ -880,7 +930,7 @@ void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps,
   }
 
   if (editcurve == NULL) {
-    /* TODO: This should not happen. Maybe add an assert here? */
+    /* This should not happen. Maybe add an assert here? */
     return;
   }
 
