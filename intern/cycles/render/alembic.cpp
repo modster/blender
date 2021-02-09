@@ -1492,7 +1492,7 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
 
   bool need_shader_updates = false;
 
-  /* check for changes in shaders (newly requested atttributes) */
+  /* Check for changes in shaders (newly requested attributes). */
   foreach (Node *object_node, objects) {
     AlembicObject *object = static_cast<AlembicObject *>(object_node);
 
@@ -1760,7 +1760,7 @@ void AlembicProcedural::read_subd(Scene *scene,
 
   mesh->clear_non_sockets();
 
-  /* udpate sockets */
+  /* Update sockets. */
 
   cached_data.vertices.copy_to_socket(frame_time, mesh, mesh->get_verts_socket());
 
@@ -1791,7 +1791,7 @@ void AlembicProcedural::read_subd(Scene *scene,
 
   mesh->set_num_subd_faces(mesh->get_subd_shader().size());
 
-  /* udpate attributes */
+  /* Update attributes. */
 
   update_attributes(mesh->subd_attributes, cached_data, frame_time);
 

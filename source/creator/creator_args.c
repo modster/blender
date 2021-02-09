@@ -590,8 +590,6 @@ static int arg_handle_print_help(int UNUSED(argc), const char **UNUSED(argv), vo
   BLI_args_print_arg_doc(ba, "--debug-ghost");
   BLI_args_print_arg_doc(ba, "--debug-gpu");
   BLI_args_print_arg_doc(ba, "--debug-gpu-force-workarounds");
-  BLI_args_print_arg_doc(ba, "--debug-gpu-shaders");
-  BLI_args_print_arg_doc(ba, "--debug-gpumem");
   BLI_args_print_arg_doc(ba, "--debug-wm");
 #  ifdef WITH_XR_OPENXR
   BLI_args_print_arg_doc(ba, "--debug-xr");
@@ -1160,7 +1158,7 @@ static int arg_handle_env_system_set(int argc, const char **argv, void *UNUSED(d
   }
 
   for (; *ch_src; ch_src++, ch_dst++) {
-    *ch_dst = (*ch_src == '-') ? '_' : (*ch_src) - 32; /* toupper() */
+    *ch_dst = (*ch_src == '-') ? '_' : (*ch_src) - 32; /* Inline #toupper() */
   }
 
   *ch_dst = '\0';
@@ -1958,7 +1956,7 @@ static int arg_handle_load_file(int UNUSED(argc), const char **argv, void *data)
 
   if (success) {
     if (G.background) {
-      /* ensuer we use 'C->data.scene' for background render */
+      /* Ensure we use 'C->data.scene' for background render. */
       CTX_wm_window_set(C, NULL);
     }
   }

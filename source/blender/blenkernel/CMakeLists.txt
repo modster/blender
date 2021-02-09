@@ -78,9 +78,10 @@ set(SRC
   intern/armature.c
   intern/armature_deform.c
   intern/armature_update.c
-  intern/asset.c
+  intern/asset.cc
   intern/attribute.c
   intern/attribute_access.cc
+  intern/attribute_math.cc
   intern/autoexec.c
   intern/blender.c
   intern/blender_copybuffer.c
@@ -259,6 +260,7 @@ set(SRC
   intern/unit.c
   intern/volume.cc
   intern/volume_render.cc
+  intern/volume_to_mesh.cc
   intern/workspace.c
   intern/world.c
   intern/writeavi.c
@@ -413,6 +415,7 @@ set(SRC
   BKE_unit.h
   BKE_volume.h
   BKE_volume_render.h
+  BKE_volume_to_mesh.hh
   BKE_workspace.h
   BKE_world.h
   BKE_writeavi.h
@@ -683,7 +686,7 @@ endif()
 
 if(WITH_OPENVDB)
   list(APPEND INC
-     ../../../intern/openvdb
+    ../../../intern/openvdb
   )
   list(APPEND INC_SYS
     ${OPENVDB_INCLUDE_DIRS}
@@ -697,10 +700,10 @@ endif()
 
 if(WITH_QUADRIFLOW)
   list(APPEND INC
-     ../../../intern/quadriflow
+    ../../../intern/quadriflow
   )
   list(APPEND LIB
-     bf_intern_quadriflow
+    bf_intern_quadriflow
   )
   add_definitions(-DWITH_QUADRIFLOW)
 endif()
