@@ -48,10 +48,6 @@ void main()
 
   make_orthonormal_basis(N, T, B); /* Generate tangent space */
 
-  /* Noise to dither the samples */
-  /* Note : ghosting is better looking than noise. */
-  // setup_noise();
-
   /* Integrating Envmap */
   float weight = 0.0;
   vec3 out_radiance = vec3(0.0);

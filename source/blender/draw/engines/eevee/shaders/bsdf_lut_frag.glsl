@@ -16,7 +16,6 @@ void main()
   B = vec3(0.0, 1.0, 0.0);
   V = vec3(sqrt(1.0 - NV * NV), 0.0, NV);
 
-  setup_noise();
 
   /* Integrating BRDF */
   float brdf_accum = 0.0;

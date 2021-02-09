@@ -1,19 +1,5 @@
 
-#pragma BLENDER_REQUIRE(common_utiltex_lib.glsl)
-
 uniform sampler1D texHammersley;
-
-vec2 jitternoise = vec2(0.0);
-
-#ifndef UTIL_TEX
-#  define UTIL_TEX
-
-#endif /* UTIL_TEX */
-
-void setup_noise(void)
-{
-  jitternoise = texelfetch_noise_tex(gl_FragCoord.xy).rg; /* Global variable */
-}
 
 vec3 tangent_to_world(vec3 vector, vec3 N, vec3 T, vec3 B)
 {
@@ -25,12 +11,8 @@ vec3 hammersley_3d(float i, float invsamplenbr)
 {
   vec3 Xi; /* Theta, cos(Phi), sin(Phi) */
 
-  Xi.x = i * invsamplenbr; /* i/samples */
-  Xi.x = fract(Xi.x + jitternoise.x);
-
-  int u = int(mod(i + jitternoise.y * HAMMERSLEY_SIZE, HAMMERSLEY_SIZE));
-
-  Xi.yz = texelFetch(texHammersley, u, 0).rg;
+  Xi.x = i * invsamplenbr;
+  Xi.yz = texelFetch(texHammersley, i, 0).rg;
 
   return Xi;
 }
