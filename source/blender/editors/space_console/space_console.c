@@ -41,7 +41,6 @@
 #include "UI_resources.h"
 #include "UI_view2d.h"
 
-#include "GPU_framebuffer.h"
 #include "console_intern.h" /* own include */
 
 /* ******************** default callbacks for console space ***************** */
@@ -216,7 +215,7 @@ static void console_main_region_draw(const bContext *C, ARegion *region)
   /* clear and setup matrix */
   UI_ThemeClearColor(TH_BACK);
 
-  /* worlks best with no view2d matrix set */
+  /* Works best with no view2d matrix set. */
   UI_view2d_view_ortho(v2d);
 
   /* data... */

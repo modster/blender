@@ -165,7 +165,7 @@ void ED_view3d_update_viewmat(Depsgraph *depsgraph,
     rv3d->viewcamtexcofac[2] = rv3d->viewcamtexcofac[3] = 0.0f;
   }
 
-  /* calculate pixelsize factor once, is used for lights and obcenters */
+  /* Calculate pixel-size factor once, this is used for lights and object-centers. */
   {
     /* note:  '1.0f / len_v3(v1)'  replaced  'len_v3(rv3d->viewmat[0])'
      * because of float point precision problems at large values T23908. */
@@ -1676,6 +1676,7 @@ void ED_view3d_draw_offscreen(Depsgraph *depsgraph,
                               bool draw_background,
                               const char *viewname,
                               const bool do_color_management,
+                              const bool restore_rv3d_mats,
                               GPUOffScreen *ofs,
                               GPUViewport *viewport)
 {
@@ -1764,7 +1765,11 @@ void ED_view3d_draw_offscreen(Depsgraph *depsgraph,
   region->winy = orig.region_winy;
   region->winrct = orig.region_winrct;
 
-  ED_view3d_mats_rv3d_restore(region->regiondata, orig.rv3d_mats);
+  /* Optionally do _not_ restore rv3d matrices (e.g. they are used/stored in the ImBuff for
+   * reprojection, see texture_paint_image_from_view_exec(). */
+  if (restore_rv3d_mats) {
+    ED_view3d_mats_rv3d_restore(region->regiondata, orig.rv3d_mats);
+  }
   MEM_freeN(orig.rv3d_mats);
 
   UI_Theme_Restore(&orig.theme_state);
@@ -1856,6 +1861,7 @@ void ED_view3d_draw_offscreen_simple(Depsgraph *depsgraph,
                            draw_background,
                            viewname,
                            do_color_management,
+                           true,
                            ofs,
                            viewport);
 }
@@ -1876,6 +1882,7 @@ ImBuf *ED_view3d_draw_offscreen_imbuf(Depsgraph *depsgraph,
                                       eImBufFlags imbuf_flag,
                                       int alpha_mode,
                                       const char *viewname,
+                                      const bool restore_rv3d_mats,
                                       /* output vars */
                                       GPUOffScreen *ofs,
                                       char err_out[256])
@@ -1983,6 +1990,7 @@ ImBuf *ED_view3d_draw_offscreen_imbuf(Depsgraph *depsgraph,
                            draw_sky,
                            viewname,
                            do_color_management,
+                           restore_rv3d_mats,
                            ofs,
                            NULL);
 
@@ -2108,6 +2116,7 @@ ImBuf *ED_view3d_draw_offscreen_imbuf_simple(Depsgraph *depsgraph,
                                         imbuf_flag,
                                         alpha_mode,
                                         viewname,
+                                        true,
                                         ofs,
                                         err_out);
 }
@@ -2335,7 +2344,7 @@ void ED_view3d_depth_update(ARegion *region)
   }
 }
 
-/* Utility function to find the closest Z value, use for autodepth. */
+/* Utility function to find the closest Z value, use for auto-depth. */
 float view3d_depth_near(ViewDepths *d)
 {
   /* Convert to float for comparisons. */

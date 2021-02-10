@@ -516,7 +516,7 @@ bool ED_object_add_generic_get_opts(bContext *C,
     if (RNA_struct_property_is_set(op->ptr, "rotation")) {
       /* If rotation is set, always use it. Alignment (and corresponding user preference)
        * can be ignored since this is in world space anyways.
-       * To not confuse (e.g. on redo), dont set it to ALIGN_WORLD in the op UI though. */
+       * To not confuse (e.g. on redo), don't set it to #ALIGN_WORLD in the op UI though. */
       *is_view_aligned = false;
       RNA_float_get_array(op->ptr, "rotation", rot);
     }
@@ -1711,9 +1711,8 @@ static int object_speaker_add_exec(bContext *C, wmOperator *op)
   Object *ob = ED_object_add_type(C, OB_SPEAKER, NULL, loc, rot, false, local_view_bits);
   const bool is_liboverride = ID_IS_OVERRIDE_LIBRARY(ob);
 
-  /* to make it easier to start using this immediately in NLA, a default sound clip is created
-   * ready to be moved around to retime the sound and/or make new sound clips
-   */
+  /* To make it easier to start using this immediately in NLA, a default sound clip is created
+   * ready to be moved around to re-time the sound and/or make new sound clips. */
   {
     /* create new data for NLA hierarchy */
     AnimData *adt = BKE_animdata_add_id(&ob->id);

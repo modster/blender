@@ -309,6 +309,30 @@ void BKE_main_relations_free(Main *bmain)
   }
 }
 
+/** Set or clear given `tag` in all relation entries of given `bmain`. */
+void BKE_main_relations_tag_set(struct Main *bmain,
+                                const MainIDRelationsEntryTags tag,
+                                const bool value)
+{
+  if (bmain->relations == NULL) {
+    return;
+  }
+
+  GHashIterator *gh_iter;
+  for (gh_iter = BLI_ghashIterator_new(bmain->relations->relations_from_pointers);
+       !BLI_ghashIterator_done(gh_iter);
+       BLI_ghashIterator_step(gh_iter)) {
+    MainIDRelationsEntry *entry = BLI_ghashIterator_getValue(gh_iter);
+    if (value) {
+      entry->tags |= tag;
+    }
+    else {
+      entry->tags &= ~tag;
+    }
+  }
+  BLI_ghashIterator_free(gh_iter);
+}
+
 /**
  * Create a GSet storing all IDs present in given \a bmain, by their pointers.
  *

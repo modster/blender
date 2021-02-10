@@ -200,6 +200,8 @@ typedef enum eNodeSocketFlag {
   SOCK_NO_INTERNAL_LINK = (1 << 9),
   /** Draw socket in a more compact form. */
   SOCK_COMPACT = (1 << 10),
+  /** Make the input socket accept multiple incoming links in the UI. */
+  SOCK_MULTI_INPUT = (1 << 11),
 } eNodeSocketFlag;
 
 /* limit data in bNode to what we want to see saved? */
@@ -549,7 +551,6 @@ typedef struct bNodeSocketValueFloat {
 
 typedef struct bNodeSocketValueBoolean {
   char value;
-  char _pad[3];
 } bNodeSocketValueBoolean;
 
 typedef struct bNodeSocketValueVector {
@@ -829,7 +830,6 @@ typedef struct NodeColorspill {
 
 typedef struct NodeDilateErode {
   char falloff;
-  char _pad[7];
 } NodeDilateErode;
 
 typedef struct NodeMask {
@@ -838,7 +838,6 @@ typedef struct NodeMask {
 
 typedef struct NodeSetAlpha {
   char mode;
-  char _pad[7];
 } NodeSetAlpha;
 
 typedef struct NodeTexBase {
@@ -995,7 +994,6 @@ typedef struct NodeTrackPosData {
 typedef struct NodeTranslateData {
   char wrap_axis;
   char relative;
-  char _pad[6];
 } NodeTranslateData;
 
 typedef struct NodePlaneTrackDeformData {
@@ -1074,7 +1072,6 @@ typedef struct NodeCryptomatte {
 
 typedef struct NodeDenoise {
   char hdr;
-  char _pad[7];
 } NodeDenoise;
 
 typedef struct NodeAttributeCompare {
@@ -1096,8 +1093,6 @@ typedef struct NodeAttributeMath {
   uint8_t input_type_a;
   uint8_t input_type_b;
   uint8_t input_type_c;
-
-  char _pad[4];
 } NodeAttributeMath;
 
 typedef struct NodeAttributeMix {
@@ -1118,8 +1113,6 @@ typedef struct NodeAttributeVectorMath {
   uint8_t input_type_a;
   uint8_t input_type_b;
   uint8_t input_type_c;
-
-  char _pad[4];
 } NodeAttributeVectorMath;
 
 typedef struct NodeAttributeColorRamp {
@@ -1146,33 +1139,27 @@ typedef struct NodeGeometryRotatePoints {
 typedef struct NodeGeometryAlignRotationToVector {
   /* GeometryNodeAlignRotationToVectorAxis */
   uint8_t axis;
+  /* GeometryNodeAlignRotationToVectorPivotAxis */
+  uint8_t pivot_axis;
 
   /* GeometryNodeAttributeInputMode */
   uint8_t input_type_factor;
   uint8_t input_type_vector;
-
-  char _pad[5];
 } NodeGeometryAlignRotationToVector;
 
 typedef struct NodeGeometryPointScale {
   /* GeometryNodeAttributeInputMode */
   uint8_t input_type;
-
-  char _pad[7];
 } NodeGeometryPointScale;
 
 typedef struct NodeGeometryPointTranslate {
   /* GeometryNodeAttributeInputMode */
   uint8_t input_type;
-
-  char _pad[7];
 } NodeGeometryPointTranslate;
 
 typedef struct NodeGeometryObjectInfo {
   /* GeometryNodeTransformSpace. */
   uint8_t transform_space;
-
-  char _pad[7];
 } NodeGeometryObjectInfo;
 
 typedef struct NodeGeometryPointInstance {
@@ -1180,8 +1167,6 @@ typedef struct NodeGeometryPointInstance {
   uint8_t instance_type;
   /* GeometryNodePointInstanceFlag. */
   uint8_t flag;
-
-  char _pad[6];
 } NodeGeometryPointInstance;
 
 typedef struct NodeGeometryPointsToVolume {
@@ -1189,9 +1174,36 @@ typedef struct NodeGeometryPointsToVolume {
   uint8_t resolution_mode;
   /* GeometryNodeAttributeInputMode */
   uint8_t input_type_radius;
-
-  char _pad[6];
 } NodeGeometryPointsToVolume;
+
+typedef struct NodeGeometryCollectionInfo {
+  /* GeometryNodeTransformSpace. */
+  uint8_t transform_space;
+} NodeGeometryCollectionInfo;
+
+typedef struct NodeGeometryAttributeProximity {
+  /* GeometryNodeAttributeProximityTargetGeometryElement. */
+  uint8_t target_geometry_element;
+} NodeGeometryAttributeProximity;
+
+typedef struct NodeGeometryVolumeToMesh {
+  /* VolumeToMeshResolutionMode */
+  uint8_t resolution_mode;
+} NodeGeometryVolumeToMesh;
+
+typedef struct NodeAttributeCombineXYZ {
+  /* GeometryNodeAttributeInputMode. */
+  uint8_t input_type_x;
+  uint8_t input_type_y;
+  uint8_t input_type_z;
+
+  char _pad[1];
+} NodeAttributeCombineXYZ;
+
+typedef struct NodeAttributeSeparateXYZ {
+  /* GeometryNodeAttributeInputMode. */
+  uint8_t input_type;
+} NodeAttributeSeparateXYZ;
 
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
@@ -1580,6 +1592,12 @@ typedef enum NodeShaderOutputTarget {
 
 /* Geometry Nodes */
 
+typedef enum GeometryNodeAttributeProximityTargetGeometryElement {
+  GEO_NODE_ATTRIBUTE_PROXIMITY_TARGET_GEOMETRY_ELEMENT_POINTS = 0,
+  GEO_NODE_ATTRIBUTE_PROXIMITY_TARGET_GEOMETRY_ELEMENT_EDGES = 1,
+  GEO_NODE_ATTRIBUTE_PROXIMITY_TARGET_GEOMETRY_ELEMENT_FACES = 2,
+} GeometryNodeAttributeProximityTargetGeometryElement;
+
 /* Boolean Node */
 typedef enum GeometryNodeBooleanOperation {
   GEO_NODE_BOOLEAN_INTERSECT = 0,
@@ -1637,6 +1655,13 @@ typedef enum GeometryNodeAlignRotationToVectorAxis {
   GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_Y = 1,
   GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_Z = 2,
 } GeometryNodeAlignRotationToVectorAxis;
+
+typedef enum GeometryNodeAlignRotationToVectorPivotAxis {
+  GEO_NODE_ALIGN_ROTATION_TO_VECTOR_PIVOT_AXIS_AUTO = 0,
+  GEO_NODE_ALIGN_ROTATION_TO_VECTOR_PIVOT_AXIS_X = 1,
+  GEO_NODE_ALIGN_ROTATION_TO_VECTOR_PIVOT_AXIS_Y = 2,
+  GEO_NODE_ALIGN_ROTATION_TO_VECTOR_PIVOT_AXIS_Z = 3,
+} GeometryNodeAlignRotationToVectorPivotAxis;
 
 typedef enum GeometryNodeTransformSpace {
   GEO_NODE_TRANSFORM_SPACE_ORIGINAL = 0,

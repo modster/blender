@@ -138,11 +138,11 @@ set(OSL_VERSION 1.10.10)
 set(OSL_URI https://github.com/imageworks/OpenShadingLanguage/archive/Release-${OSL_VERSION}.tar.gz)
 set(OSL_HASH 00dec08a93c8084e53848b9ad047889f)
 
-set(PYTHON_VERSION 3.7.7)
-set(PYTHON_SHORT_VERSION 3.7)
-set(PYTHON_SHORT_VERSION_NO_DOTS 37)
+set(PYTHON_VERSION 3.9.1)
+set(PYTHON_SHORT_VERSION 3.9)
+set(PYTHON_SHORT_VERSION_NO_DOTS 39)
 set(PYTHON_URI https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz)
-set(PYTHON_HASH 172c650156f7bea68ce31b2fd01fa766)
+set(PYTHON_HASH 61981498e75ac8f00adcb908281fadb6)
 
 set(TBB_VERSION 2019_U9)
 set(TBB_URI https://github.com/oneapi-src/oneTBB/archive/${TBB_VERSION}.tar.gz)
@@ -156,16 +156,17 @@ set(NANOVDB_GIT_UID e62f7a0bf1e27397223c61ddeaaf57edf111b77f)
 set(NANOVDB_URI https://github.com/AcademySoftwareFoundation/openvdb/archive/${NANOVDB_GIT_UID}.tar.gz)
 set(NANOVDB_HASH 90919510bc6ccd630fedc56f748cb199)
 
-set(IDNA_VERSION 2.9)
-set(CHARDET_VERSION 3.0.4)
-set(URLLIB3_VERSION 1.25.9)
-set(CERTIFI_VERSION 2020.4.5.2)
-set(REQUESTS_VERSION 2.23.0)
+set(IDNA_VERSION 2.10)
+set(CHARDET_VERSION 4.0.0)
+set(URLLIB3_VERSION 1.26.3)
+set(CERTIFI_VERSION 2020.12.5)
+set(REQUESTS_VERSION 2.25.1)
+set(CYTHON_VERSION 0.29.21)
 
-set(NUMPY_VERSION 1.17.5)
-set(NUMPY_SHORT_VERSION 1.17)
+set(NUMPY_VERSION 1.19.5)
+set(NUMPY_SHORT_VERSION 1.19)
 set(NUMPY_URI https://github.com/numpy/numpy/releases/download/v${NUMPY_VERSION}/numpy-${NUMPY_VERSION}.zip)
-set(NUMPY_HASH 763a5646fa6eef7a22f4895bca0524f2)
+set(NUMPY_HASH f6a1b48717c552bbc18f1adc3cc1fe0e)
 
 set(LAME_VERSION 3.100)
 set(LAME_URI http://downloads.sourceforge.net/project/lame/lame/3.100/lame-${LAME_VERSION}.tar.gz)
@@ -265,7 +266,7 @@ set(PUGIXML_URI https://github.com/zeux/pugixml/archive/v${PUGIXML_VERSION}.tar.
 set(PUGIXML_HASH 0c208b0664c7fb822bf1b49ad035e8fd)
 
 set(FLEXBISON_VERSION 2.5.5)
-set(FLEXBISON_URI http://prdownloads.sourceforge.net/winflexbison//win_flex_bison-2.5.5.zip)
+set(FLEXBISON_URI http://prdownloads.sourceforge.net/winflexbison/win_flex_bison-2.5.5.zip)
 set(FLEXBISON_HASH d87a3938194520d904013abef3df10ce)
 
 # Libraries to keep Python modules static on Linux.
@@ -309,7 +310,7 @@ set(LIBGLU_URI ftp://ftp.freedesktop.org/pub/mesa/glu/glu-${LIBGLU_VERSION}.tar.
 set(LIBGLU_HASH 151aef599b8259efe9acd599c96ea2a3)
 
 set(MESA_VERSION 18.3.1)
-set(MESA_URI ftp://ftp.freedesktop.org/pub/mesa//mesa-${MESA_VERSION}.tar.xz)
+set(MESA_URI ftp://ftp.freedesktop.org/pub/mesa/mesa-${MESA_VERSION}.tar.xz)
 set(MESA_HASH d60828056d77bfdbae0970f9b15fb1be)
 
 set(NASM_VERSION 2.15.02)
@@ -331,3 +332,7 @@ set(GMP_HASH a325e3f09e6d91e62101e59f9bda3ec1)
 set(POTRACE_VERSION 1.16)
 set(POTRACE_URI http://potrace.sourceforge.net/download/${POTRACE_VERSION}/potrace-${POTRACE_VERSION}.tar.gz)
 set(POTRACE_HASH 5f0bd87ddd9a620b0c4e65652ef93d69)
+
+set(HARU_VERSION 2_3_0)
+set(HARU_URI https://github.com/libharu/libharu/archive/RELEASE_${HARU_VERSION}.tar.gz)
+set(HARU_HASH 4f916aa49c3069b3a10850013c507460)
