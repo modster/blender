@@ -300,6 +300,8 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
 
   const bool import_instance_proxies = RNA_boolean_get(op->ptr, "import_instance_proxies");
 
+  const bool import_visible_only = RNA_boolean_get(op->ptr, "import_visible_only");
+
   const bool create_collection = RNA_boolean_get(op->ptr, "create_collection");
 
   char *prim_path_mask = malloc(1024);
@@ -349,6 +351,7 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
       import_guide,
       import_proxy,
       import_render,
+      import_visible_only,
   };
 
   bool ok = USD_import(C, filename, &params, as_background_job);
@@ -402,6 +405,9 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
 
   row = uiLayoutRow(box, false);
   uiItemR(row, ptr, "import_instance_proxies", 0, NULL, ICON_NONE);
+
+  row = uiLayoutRow(box, false);
+  uiItemR(row, ptr, "import_visible_only", 0, NULL, ICON_NONE);
 
   row = uiLayoutRow(box, false);
   uiItemR(row, ptr, "create_collection", 0, NULL, ICON_NONE);
@@ -534,6 +540,14 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   "Import Instance Proxies",
                   "If enabled, USD instances will be traversed with instance proxies, "
                   "creating a unique Blender object for each instance");
+
+  RNA_def_boolean(ot->srna,
+                  "import_visible_only",
+                  true,
+                  "Visible Prims Only",
+                  "If enabled, invisible USD prims won't be imported. "
+                  "Only applies to prims with a non-animating visibility attribute.  "
+                  "Prims with animating visibility will always be imported");
 
   RNA_def_boolean(ot->srna,
                   "create_collection",

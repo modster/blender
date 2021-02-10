@@ -66,6 +66,7 @@ struct USDImportParams {
   bool import_guide;
   bool import_proxy;
   bool import_render;
+  bool import_visible_only;
 };
 
 /* The USD_export takes a as_background_job parameter, and returns a boolean.
