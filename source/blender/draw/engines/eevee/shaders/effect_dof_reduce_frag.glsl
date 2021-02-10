@@ -83,6 +83,11 @@ float dof_scatter_coc_radius_rejection(float coc)
   return saturate((abs(coc) - scatterCocThreshold) * rejection_hardness);
 }
 
+float fast_luma(vec3 color)
+{
+  return (2.0 * color.g) + color.r + color.b;
+}
+
 /* Lightweight version of neighborhood clamping found in TAA. */
 vec3 dof_neighborhood_clamping(vec3 color)
 {
@@ -90,26 +95,28 @@ vec3 dof_neighborhood_clamping(vec3 color)
   vec2 uv = gl_FragCoord.xy * texel_size;
   vec4 ofs = vec4(-1, 1, -1, 1) * texel_size.xxyy;
 
-  /* Color bounding box clamping. 3x3 cross neighborhood. */
-  vec3 c01 = textureLod(colorBuffer, uv + ofs.xz, 0.0).rgb;
-  vec3 c21 = textureLod(colorBuffer, uv + ofs.xw, 0.0).rgb;
-  vec3 c10 = textureLod(colorBuffer, uv + ofs.yz, 0.0).rgb;
-  vec3 c12 = textureLod(colorBuffer, uv + ofs.yw, 0.0).rgb;
+  /* Luma clamping. 3x3 square neighborhood. */
+  float c00 = fast_luma(textureLod(colorBuffer, uv + ofs.xz, 0.0).rgb);
+  float c01 = fast_luma(textureLod(colorBuffer, uv + ofs.xz * vec2(1.0, 0.0), 0.0).rgb);
+  float c02 = fast_luma(textureLod(colorBuffer, uv + ofs.xw, 0.0).rgb);
 
-  /* AABB minmax */
-  vec3 min_col = min4(c12, c01, c21, c10);
-  vec3 max_col = max4(c12, c01, c21, c10);
+  float c10 = fast_luma(textureLod(colorBuffer, uv + ofs.xz * vec2(0.0, 1.0), 0.0).rgb);
+  float c11 = fast_luma(color);
+  float c12 = fast_luma(textureLod(colorBuffer, uv + ofs.xw * vec2(0.0, 1.0), 0.0).rgb);
 
-  /* note: only clips towards aabb center (but fast!) */
-  vec3 center = 0.5 * (max_col + min_col);
-  vec3 extents = 0.5 * (max_col - min_col);
-  vec3 dist = color - center;
-  vec3 ts = abs(extents) / max(abs(dist), vec3(0.0001));
-  float t = saturate(min_v3(ts));
+  float c20 = fast_luma(textureLod(colorBuffer, uv + ofs.yz, 0.0).rgb);
+  float c21 = fast_luma(textureLod(colorBuffer, uv + ofs.yz * vec2(1.0, 0.0), 0.0).rgb);
+  float c22 = fast_luma(textureLod(colorBuffer, uv + ofs.yw, 0.0).rgb);
 
-  t = mix(1.0, t, colorNeighborClamping);
+  float avg_luma = avg8(c00, c01, c02, c10, c12, c20, c21, c22);
+  float max_luma = max8(c00, c01, c02, c10, c12, c20, c21, c22);
 
-  return center + dist * t;
+  float upper_bound = mix(max_luma, avg_luma, colorNeighborClamping);
+  upper_bound = mix(c11, upper_bound, colorNeighborClamping);
+
+  float clamped_luma = min(upper_bound, c11);
+
+  return color * clamped_luma * safe_rcp(c11);
 }
 
 /* Simple copy pass where we select what pixels to scatter. Also the resolution might change.
