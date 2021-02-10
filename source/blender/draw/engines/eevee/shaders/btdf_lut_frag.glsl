@@ -11,18 +11,17 @@ void main()
   float x = floor(gl_FragCoord.x) / (LUT_SIZE - 1.0);
   float y = floor(gl_FragCoord.y) / (LUT_SIZE - 1.0);
 
-  float ior = sqrt(x);
-  ior = clamp(sqrt(ior), 0.0, 0.99995);
+  float ior = clamp(sqrt(x), 0.05, 0.999);
   /* ior is sin of critical angle. */
   float critical_cos = sqrt(1.0 - saturate(ior * ior));
 
-  /* Manual fit to range. */
-  y = y * 1.45 + 0.05;
-  /* Remap for better accuracy. */
-  float NV = 1.0 - y * y;
-  /* Center LUT around critical angle to always have a sharp cut if roughness is 0. */
-  NV += critical_cos;
-  NV = clamp(NV, 0.0, 0.9999);
+  y = y * 2.0 - 1.0;
+  /* Maximize texture usage on both sides of the critical angle. */
+  y *= (y > 0.0) ? (1.0 - critical_cos) : critical_cos;
+  /* Center LUT around critical angle to avoid strange interpolation issues when the critical
+   * angle is changing. */
+  y += critical_cos;
+  float NV = clamp(y, 1e-4, 0.9999);
 
   float a = z * z;
   float a2 = clamp(a * a, 1e-8, 0.9999);
@@ -56,7 +55,7 @@ void main()
       vec3 L = refract(-V, H, eta);
       float NL = -L.z;
 
-      if ((NL > 0.0) && (fresnel < 1.0)) {
+      if ((NL > 0.0) && (fresnel < 0.999)) {
         float LH = dot(L, H);
 
         /* Balancing the adjustments made in G1_Smith. */
@@ -72,6 +71,17 @@ void main()
   }
   btdf_accum /= sampleCount * sampleCount;
   fresnel_accum /= sampleCount * sampleCount;
+
+  if (z == 0.0) {
+    /* Perfect mirror. Increased precision because the roughness is clamped. */
+    fresnel_accum = F_eta(ior, NV);
+  }
+
+  if (x == 0.0) {
+    /* Special case. */
+    fresnel_accum = 1.0;
+    btdf_accum = 0.0;
+  }
 
   /* There is place to put multiscater result (which is a little bit different still)
    * and / or lobe fitting for better sampling of  */

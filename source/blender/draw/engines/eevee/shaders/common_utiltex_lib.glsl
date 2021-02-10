@@ -40,35 +40,51 @@ vec2 brdf_lut(float cos_theta, float roughness)
   return textureLod(utilTex, vec3(lut_coords(cos_theta, roughness), BRDF_LUT_LAYER), 0.0).rg;
 }
 
+/* Return texture coordinates to sample Surface LUT. */
+vec3 lut_coords_btdf(float cos_theta, float roughness, float ior)
+{
+  /* ior is sin of critical angle. */
+  float critical_cos = sqrt(1.0 - ior * ior);
+
+  vec3 coords;
+  coords.x = sqr(ior);
+  coords.y = cos_theta;
+  coords.y -= critical_cos;
+  coords.y /= (coords.y > 0.0) ? (1.0 - critical_cos) : critical_cos;
+  coords.y = coords.y * 0.5 + 0.5;
+  coords.z = roughness;
+
+  coords = saturate(coords);
+
+  /* scale and bias coordinates, for correct filtered lookup */
+  coords.xy = coords.xy * (LUT_SIZE - 1.0) / LUT_SIZE + 0.5 / LUT_SIZE;
+
+  return coords;
+}
+
 /* Returns GGX BTDF in first component and fresnel in second. */
 vec2 btdf_lut(float cos_theta, float roughness, float ior)
 {
+  if (ior <= 1e-5) {
+    return vec2(0.0);
+  }
+
   if (ior >= 1.0) {
     vec2 split_sum = brdf_lut(cos_theta, roughness);
     float f0 = f0_from_ior(ior);
-    float fresnel = F_brdf_single_scatter(vec3(f0), vec3(1.0), split_sum).r;
+    /* Baked IOR for GGX BRDF. */
+    const float specular = 1.0;
+    const float eta_brdf = (2.0 / (1.0 - sqrt(0.08 * specular))) - 1.0;
+    /* Avoid harsh transition comming from ior == 1. */
+    float f90 = fast_sqrt(saturate(f0 / (f0_from_ior(eta_brdf) * 0.25)));
+    float fresnel = F_brdf_single_scatter(vec3(f0), vec3(f90), split_sum).r;
     /* Setting the BTDF to one is not really important since it is only used for multiscatter
      * and it's already quite close to ground truth. */
     float btdf = 1.0;
     return vec2(btdf, fresnel);
   }
 
-  /* ior is sin of critical angle. */
-  float critical_cos = sqrt(1.0 - ior * ior);
-
-  vec3 coords;
-  coords.x = sqr(ior);
-  coords.y = sqrt(1.0 + critical_cos - cos_theta);
-  coords.y = (coords.y - 0.05) / 1.45;
-  coords.z = roughness;
-
-  coords = saturate(coords);
-
-  coords.xy = coords.xy * (LUT_SIZE - 1.0) / LUT_SIZE + 0.5 / LUT_SIZE;
-  /* Bias the lookup in the NV direction to be able to do the clear cut
-   * at the end of the function. */
-  float clear_cut = saturate(roughness * lut_btdf_layer_count * 0.5);
-  coords.y -= clear_cut * 0.5 / LUT_SIZE;
+  vec3 coords = lut_coords_btdf(cos_theta, roughness, ior);
 
   float layer = coords.z * lut_btdf_layer_count;
   float layer_floored = floor(layer);
@@ -81,11 +97,6 @@ vec2 btdf_lut(float cos_theta, float roughness, float ior)
 
   /* Manual trilinear interpolation. */
   vec2 btdf = mix(btdf_low, btdf_high, layer - layer_floored);
-
-  /* Do a manual trim if roughness is low enough to avoid seeing the bilinear interpolation. */
-  if (clear_cut < 1.0 && cos_theta < critical_cos) {
-    btdf = mix(vec2(0.0, 1.0), btdf, clear_cut);
-  }
 
   return btdf;
 }
