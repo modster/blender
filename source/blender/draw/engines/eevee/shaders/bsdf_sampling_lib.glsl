@@ -1,4 +1,6 @@
 
+#pragma BLENDER_REQUIRE(bsdf_common_lib.glsl)
+
 uniform sampler1D texHammersley;
 
 vec3 tangent_to_world(vec3 vector, vec3 N, vec3 T, vec3 B)
@@ -12,7 +14,7 @@ vec3 hammersley_3d(float i, float invsamplenbr)
   vec3 Xi; /* Theta, cos(Phi), sin(Phi) */
 
   Xi.x = i * invsamplenbr;
-  Xi.yz = texelFetch(texHammersley, i, 0).rg;
+  Xi.yz = texelFetch(texHammersley, int(i), 0).rg;
 
   return Xi;
 }
