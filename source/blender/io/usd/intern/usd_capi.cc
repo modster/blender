@@ -57,11 +57,13 @@
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
+#include "BKE_object.h"
 #include "BKE_scene.h"
 #include "BKE_world.h"
 
 #include "BLI_fileops.h"
 #include "BLI_listbase.h"
+#include "BLI_math_matrix.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
 
@@ -747,7 +749,7 @@ void USD_free_handle(USDStageHandle *handle)
   delete archive;
 }
 
-void USD_get_transform(struct CacheReader *reader, float r_mat[4][4], float time, float scale)
+void USD_get_transform(struct CacheReader *reader, float r_mat_world[4][4], float time, float scale)
 {
   if (!reader) {
     return;
@@ -755,5 +757,23 @@ void USD_get_transform(struct CacheReader *reader, float r_mat[4][4], float time
   USDXformReader *usd_reader = reinterpret_cast<USDXformReader *>(reader);
 
   bool is_constant = false;
-  usd_reader->read_matrix(r_mat, time, scale, is_constant);
+
+  /* Convert from the local matrix we obtain from USD to world coordinates
+   * for Blender. This conversion is done here rather than by Blender due to
+   * work around the non-standard interpretation of CONSTRAINT_SPACE_LOCAL in
+   * BKE_constraint_mat_convertspace(). */
+  Object *object = usd_reader->object();
+  if (object->parent == nullptr) {
+    /* No parent, so local space is the same as world space. */
+    usd_reader->read_matrix(r_mat_world, time, scale, is_constant);
+    return;
+  }
+
+  float mat_parent[4][4];
+  BKE_object_get_parent_matrix(object, object->parent, mat_parent);
+
+  float mat_local[4][4];
+  usd_reader->read_matrix(mat_local, time, scale, is_constant);
+  mul_m4_m4m4(r_mat_world, mat_parent, object->parentinv);
+  mul_m4_m4m4(r_mat_world, r_mat_world, mat_local);
 }
