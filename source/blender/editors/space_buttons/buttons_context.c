@@ -33,6 +33,7 @@
 
 #include "DNA_armature_types.h"
 #include "DNA_brush_types.h"
+#include "DNA_collection_types.h"
 #include "DNA_linestyle_types.h"
 #include "DNA_material_types.h"
 #include "DNA_node_types.h"
@@ -162,7 +163,7 @@ static bool buttons_context_path_collection(ButsContextPath *path, wmWindow *win
     return true;
   }
   /* if we have a view layer, use the view layer's active collection */
-  else if (buttons_context_path_view_layer(path, window)) {
+  if (buttons_context_path_view_layer(path, window)) {
     ViewLayer *view_layer = path->ptr[path->len - 1].data;
     Collection *c = view_layer->active_collection->collection;
     if (c) {
