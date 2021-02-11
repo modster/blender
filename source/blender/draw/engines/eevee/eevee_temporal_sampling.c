@@ -155,7 +155,7 @@ void EEVEE_temporal_sampling_matrices_calc(EEVEE_EffectsInfo *effects, const dou
 
   /* Jitter is in pixel space. Focus distance in world space units. */
   float dof_jitter[2], focus_distance;
-  if (EEVEE_depth_of_field_jitter_get(effects, ht_point, dof_jitter, &focus_distance)) {
+  if (EEVEE_depth_of_field_jitter_get(effects, dof_jitter, &focus_distance)) {
     /* Convert to NDC space [-1..1]. */
     dof_jitter[0] /= viewport_size[0] * 0.5f;
     dof_jitter[1] /= viewport_size[1] * 0.5f;
@@ -230,6 +230,21 @@ void EEVEE_temporal_sampling_create_view(EEVEE_Data *vedata)
   DRW_view_clip_planes_set(effects->taa_view, NULL, 0);
 }
 
+int EEVEE_temporal_sampling_sample_count_get(const Scene *scene, const EEVEE_StorageList *stl)
+{
+  const bool is_render = DRW_state_is_image_render();
+  int sample_count = is_render ? scene->eevee.taa_render_samples : scene->eevee.taa_samples;
+  int timesteps = is_render ? stl->g_data->render_timesteps : 1;
+
+  sample_count = max_ii(0, sample_count);
+  sample_count = (sample_count == 0) ? TAA_MAX_SAMPLE : sample_count;
+  sample_count = divide_ceil_u(sample_count, timesteps);
+
+  int dof_sample_count = EEVEE_depth_of_field_sample_count_get(stl->effects, sample_count, NULL);
+  sample_count = dof_sample_count * divide_ceil_u(sample_count, dof_sample_count);
+  return sample_count;
+}
+
 int EEVEE_temporal_sampling_init(EEVEE_ViewLayerData *UNUSED(sldata), EEVEE_Data *vedata)
 {
   EEVEE_StorageList *stl = vedata->stl;
@@ -274,10 +289,12 @@ int EEVEE_temporal_sampling_init(EEVEE_ViewLayerData *UNUSED(sldata), EEVEE_Data
       view_is_valid = view_is_valid && (ED_screen_animation_no_scrub(wm) == NULL);
     }
 
-    const bool first_sample_only = EEVEE_renderpasses_only_first_sample_pass_active(vedata);
-    view_is_valid = view_is_valid && !first_sample_only;
-    effects->taa_total_sample = first_sample_only ? 1 : scene_eval->eevee.taa_samples;
-    MAX2(effects->taa_total_sample, 0);
+    effects->taa_total_sample = EEVEE_temporal_sampling_sample_count_get(scene_eval, stl);
+
+    if (EEVEE_renderpasses_only_first_sample_pass_active(vedata)) {
+      view_is_valid = false;
+      effects->taa_total_sample = 1;
+    }
 
     /* Motion blur steps could reset the sampling when camera is animated (see T79970). */
     if (!DRW_state_is_scene_render()) {

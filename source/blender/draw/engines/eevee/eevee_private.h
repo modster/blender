@@ -55,6 +55,9 @@ extern struct DrawEngineType draw_engine_eevee_type;
 #define MAX_BLOOM_STEP 16
 #define MAX_AOVS 64
 
+/* Special value chosen to not be altered by depth of field sample count. */
+#define TAA_MAX_SAMPLE 10000926
+
 // #define DEBUG_SHADOW_DISTRIBUTION
 
 /* Only define one of these. */
@@ -779,6 +782,7 @@ typedef struct EEVEE_EffectsInfo {
   float dof_jitter_radius;
   float dof_jitter_blades;
   float dof_jitter_focus;
+  int dof_jitter_ring_count;
   float dof_coc_params[2], dof_coc_near_dist, dof_coc_far_dist;
   float dof_bokeh_blades, dof_bokeh_rotation, dof_bokeh_aniso[2], dof_bokeh_max_size;
   float dof_bokeh_aniso_inv[2];
@@ -1079,7 +1083,8 @@ typedef struct EEVEE_PrivateData {
   /** For rendering planar reflections. */
   struct DRWView *planar_views[MAX_PLANAR];
 
-  int render_tot_samples;
+  int render_timesteps;
+  int render_sample_count_per_timestep;
 } EEVEE_PrivateData; /* Transient data */
 
 /* eevee_data.c */
@@ -1317,9 +1322,11 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata, O
 void EEVEE_depth_of_field_cache_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata);
 void EEVEE_depth_of_field_draw(EEVEE_Data *vedata);
 bool EEVEE_depth_of_field_jitter_get(EEVEE_EffectsInfo *effects,
-                                     const double ht_point[2],
                                      float r_jitter[2],
                                      float *r_focus_distance);
+int EEVEE_depth_of_field_sample_count_get(EEVEE_EffectsInfo *effects,
+                                          int sample_count,
+                                          int *r_ring_count);
 
 /* eevee_bloom.c */
 int EEVEE_bloom_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata);
@@ -1433,6 +1440,7 @@ int EEVEE_renderpasses_aov_hash(const ViewLayerAOV *aov);
 /* eevee_temporal_sampling.c */
 void EEVEE_temporal_sampling_reset(EEVEE_Data *vedata);
 void EEVEE_temporal_sampling_create_view(EEVEE_Data *vedata);
+int EEVEE_temporal_sampling_sample_count_get(const Scene *scene, const EEVEE_StorageList *stl);
 int EEVEE_temporal_sampling_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata);
 void EEVEE_temporal_sampling_offset_calc(const double ht_point[2],
                                          const float filter_size,

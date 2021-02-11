@@ -47,6 +47,8 @@
 #include "GPU_texture.h"
 #include "eevee_private.h"
 
+#define CAMERA_JITTER_RING_DENSITY 6
+
 static float coc_radius_from_camera_depth(bool is_ortho, EEVEE_EffectsInfo *fx, float camera_depth)
 {
   float multiplier = fx->dof_coc_params[0];
@@ -62,52 +64,96 @@ static float coc_radius_from_camera_depth(bool is_ortho, EEVEE_EffectsInfo *fx, 
   }
 }
 
-static void regular_polygon_sample(
-    float corners, float rotation, float u, float v, float r_sample[2])
+static float polygon_sides_length(float sides_count)
 {
-  /* Sample corner number and reuse u. */
-  float corner = floorf(u * corners);
-  u = u * corners - corner;
-  /* Uniform sampled triangle weights. */
-  u = sqrtf(u);
-  v = v * u;
-  u = 1.0f - u;
-  /* Point in triangle. */
-  float angle = M_PI / corners;
-  float p[2] = {(u + v) * cosf(angle), (u - v) * sinf(angle)};
-  /* Rotate. */
-  rotation += corner * 2.0f * angle;
-  float cr = cosf(rotation);
-  float sr = sinf(rotation);
-  r_sample[0] = cr * p[0] - sr * p[1];
-  r_sample[1] = sr * p[0] + cr * p[1];
+  return 2.0 * sin(M_PI / sides_count);
+}
+
+/* Returns intersection ratio between the radius edge at theta and the polygon edge.
+ * Start first corners at theta == 0. */
+static float circle_to_polygon_radius(float sides_count, float theta)
+{
+  /* From Graphics Gems from CryENGINE 3 (Siggraph 2013) by Tiago Sousa (slide 36). */
+  float side_angle = (2.0f * M_PI) / sides_count;
+  return cosf(side_angle * 0.5f) /
+         cosf(theta - side_angle * floorf((sides_count * theta + M_PI) / (2.0f * M_PI)));
+}
+
+/* Remap input angle to have homogenous spacing of points along a polygon edge.
+ * Expect theta to be in [0..2pi] range. */
+static float circle_to_polygon_angle(float sides_count, float theta)
+{
+  float side_angle = (2.0f * M_PI) / sides_count;
+  float halfside_angle = side_angle * 0.5f;
+  float side = floorf(theta / side_angle);
+  /* Length of segment from center to the middle of polygon side. */
+  float adjacent = circle_to_polygon_radius(sides_count, 0.0f);
+
+  /* This is the relative position of the sample on the polygon half side. */
+  float local_theta = theta - side * side_angle;
+  float ratio = (local_theta - halfside_angle) / halfside_angle;
+
+  float halfside_len = polygon_sides_length(sides_count) * 0.5f;
+  float opposite = ratio * halfside_len;
+
+  /* NOTE: atan(y_over_x) has output range [-M_PI_2..M_PI_2]. */
+  float final_local_theta = atanf(opposite / adjacent);
+
+  return side * side_angle + final_local_theta;
+}
+
+static int dof_jitter_total_sample_count(int ring_density, int ring_count)
+{
+  return ((ring_count * ring_count + ring_count) / 2) * ring_density + 1;
 }
 
 bool EEVEE_depth_of_field_jitter_get(EEVEE_EffectsInfo *fx,
-                                     const double ht_point[2],
                                      float r_jitter[2],
                                      float *r_focus_distance)
 {
   if (fx->dof_jitter_radius == 0.0f) {
     return false;
   }
-  /* Maybe would be better to have another sequence ? */
-  r_jitter[0] = ht_point[0];
-  r_jitter[1] = ht_point[1];
+
+  int ring_density = CAMERA_JITTER_RING_DENSITY;
+  int ring_count = fx->dof_jitter_ring_count;
+  int sample_count = dof_jitter_total_sample_count(ring_density, ring_count);
+
+  int s = fx->taa_current_sample - 1;
+
+  int ring = 0;
+  int ring_sample_count = 1;
+  int ring_sample = 1;
+
+  s = s * (ring_density - 1);
+  s = s % sample_count;
+
+  int samples_passed = 1;
+  while (s >= samples_passed) {
+    ring++;
+    ring_sample_count = ring * ring_density;
+    ring_sample = s - samples_passed;
+    ring_sample = (ring_sample + 1) % ring_sample_count;
+    samples_passed += ring_sample_count;
+  }
+
+  r_jitter[0] = (float)ring / ring_count;
+  r_jitter[1] = (float)ring_sample / ring_sample_count;
 
   {
     /* Bokeh shape parametrisation */
-    if (fx->dof_jitter_blades == 0.0f) {
-      float r = sqrtf(r_jitter[0]);
-      float T = r_jitter[1] * 2.0f * M_PI;
+    float r = r_jitter[0];
+    float T = r_jitter[1] * 2.0f * M_PI;
 
-      r_jitter[0] = r * cosf(T);
-      r_jitter[1] = r * sinf(T);
+    if (fx->dof_jitter_blades >= 3.0f) {
+      T = circle_to_polygon_angle(fx->dof_jitter_blades, T);
+      r *= circle_to_polygon_radius(fx->dof_jitter_blades, T);
     }
-    else {
-      regular_polygon_sample(
-          fx->dof_jitter_blades, fx->dof_bokeh_rotation, r_jitter[0], r_jitter[1], r_jitter);
-    }
+
+    T += fx->dof_bokeh_rotation;
+
+    r_jitter[0] = r * cosf(T);
+    r_jitter[1] = r * sinf(T);
 
     mul_v2_v2(r_jitter, fx->dof_bokeh_aniso);
   }
@@ -116,6 +162,36 @@ bool EEVEE_depth_of_field_jitter_get(EEVEE_EffectsInfo *fx,
 
   *r_focus_distance = fx->dof_jitter_focus;
   return true;
+}
+
+int EEVEE_depth_of_field_sample_count_get(EEVEE_EffectsInfo *fx,
+                                          int sample_count,
+                                          int *r_ring_count)
+{
+  if (fx->dof_jitter_radius == 0.0f) {
+    if (r_ring_count != NULL) {
+      *r_ring_count = 0;
+    }
+    return 1;
+  }
+
+  if (sample_count == TAA_MAX_SAMPLE) {
+    /* Special case for viewport continuous rendering. We clamp to a max sample to avoid the
+     * jittered dof never converging. */
+    sample_count = 1024;
+  }
+  /* Inversion of dof_jitter_total_sample_count. */
+  float x = 2.0f * (sample_count - 1.0f) / CAMERA_JITTER_RING_DENSITY;
+  /* Solving polynomial. We only search positive solution. */
+  float discriminant = 1.0f + 4.0f * x;
+  int ring_count = ceilf(0.5f * (sqrt(discriminant) - 1.0f));
+
+  sample_count = dof_jitter_total_sample_count(CAMERA_JITTER_RING_DENSITY, ring_count);
+
+  if (r_ring_count != NULL) {
+    *r_ring_count = ring_count;
+  }
+  return sample_count;
 }
 
 int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
@@ -185,18 +261,24 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
       effects->dof_jitter_focus = focus_dist;
       effects->dof_jitter_blades = blades;
 
-      int sample_count = DRW_state_is_image_render() ? stl->g_data->render_tot_samples :
-                                                       scene_eval->eevee.taa_samples;
-      /* Set to very high value in case of continuous rendering. */
-      sample_count = (sample_count == 0) ? 1024 : sample_count;
+      int sample_count = EEVEE_temporal_sampling_sample_count_get(scene_eval, stl);
+      sample_count = EEVEE_depth_of_field_sample_count_get(
+          effects, sample_count, &effects->dof_jitter_ring_count);
 
-      /* Compute a minimal overblur radius to fill the gaps between the samples.
-       * This is just the simplified form of dividing the area of the bokeh
-       * by the number of samples. */
-      float minimal_overblur = 1.0f / sqrtf(sample_count);
-      float user_overblur = scene_eval->eevee.bokeh_overblur / 100.0f;
+      if (effects->dof_jitter_ring_count == 0) {
+        effects->dof_jitter_radius = 0.0f;
+      }
+      else {
+        /* Compute a minimal overblur radius to fill the gaps between the samples.
+         * This is just the simplified form of dividing the area of the bokeh
+         * by the number of samples. */
+        float minimal_overblur = 1.0f / sqrtf(sample_count);
+        float user_overblur = scene_eval->eevee.bokeh_overblur / 100.0f;
 
-      effects->dof_coc_params[1] *= minimal_overblur + user_overblur;
+        effects->dof_coc_params[1] *= minimal_overblur + user_overblur;
+        /* Avoid dilating the shape. Overblur only soften. */
+        effects->dof_jitter_radius -= effects->dof_coc_params[1];
+      }
     }
     else {
       effects->dof_jitter_radius = 0.0f;
