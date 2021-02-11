@@ -36,7 +36,6 @@
 #include "DNA_color_types.h"      /* color management */
 #include "DNA_customdata_types.h" /* Scene's runtime cddata masks. */
 #include "DNA_layer_types.h"
-#include "DNA_lineart_types.h"
 #include "DNA_listBase.h"
 #include "DNA_vec_types.h"
 #include "DNA_view3d_types.h"
@@ -1672,34 +1671,6 @@ typedef struct SceneEEVEE {
   float overscan;
   float light_threshold;
 } SceneEEVEE;
-
-/* Line Art Global Settings */
-
-typedef enum eLineartPostProcessingStatus {
-  LRT_POST_PROCESSING_DISABLED = 0,
-  LRT_POST_PROCESSING_ENABLED = 1,
-} eLineartPostProcessingStatus;
-
-typedef enum eLineartMainFlags {
-  LRT_ENABLED = (1 << 0), /* Deprecated right now. */
-  /* For Line Art->GP and viewport to update automatically. */
-  LRT_AUTO_UPDATE = (1 << 1),
-  LRT_SAME_TAPER = (1 << 2),
-  /* Edge split modifier will cause problems in Line Art. */
-  LRT_DISABLE_EDGE_SPLITS = (1 << 3),
-  LRT_USE_CHAINING = (1 << 4),      /* Deprecated */
-  LRT_USE_INTERSECTIONS = (1 << 5), /* Deprecated, use flags in line_types */
-  /* Overwrite existing strokes in this frame. */
-  LRT_GPENCIL_OVERWRITE = (1 << 6),
-  LRT_INTERSECTION_AS_CONTOUR = (1 << 7),
-  LRT_EVERYTHING_AS_CONTOUR = (1 << 8),
-  LRT_ALLOW_DUPLI_OBJECTS = (1 << 9),
-  LRT_ALLOW_OVERLAPPING_EDGES = (1 << 10),
-  LRT_ALLOW_CLIPPING_BOUNDARIES = (1 << 11),
-  LRT_BAKING_FINAL_RANGE = (1 << 12),
-  LRT_BAKING_KEYFRAMES_ONLY = (1 << 13),
-  LRT_REMOVE_DOUBLES = (1 << 14),
-} eLineartMainFlags;
 
 typedef struct SceneGpencil {
   float smaa_threshold;

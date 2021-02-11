@@ -42,6 +42,17 @@ struct Material;
  * Edge flags and usage flags are used by with scene/object/gpencil modifier bits, and those values
  * needs to stay consistent throughout. */
 
+typedef enum eLineartMainFlags {
+  LRT_INTERSECTION_AS_CONTOUR = (1 << 0),
+  LRT_EVERYTHING_AS_CONTOUR = (1 << 1),
+  LRT_ALLOW_DUPLI_OBJECTS = (1 << 2),
+  LRT_ALLOW_OVERLAPPING_EDGES = (1 << 3),
+  LRT_ALLOW_CLIPPING_BOUNDARIES = (1 << 4),
+  LRT_BAKING_FINAL_RANGE = (1 << 5),
+  LRT_BAKING_KEYFRAMES_ONLY = (1 << 6),
+  LRT_REMOVE_DOUBLES = (1 << 7),
+} eLineartMainFlags;
+
 typedef enum eLineartEdgeFlag {
   LRT_EDGE_FLAG_EDGE_MARK = (1 << 0),
   LRT_EDGE_FLAG_CONTOUR = (1 << 1),
@@ -57,14 +68,5 @@ typedef enum eLineartEdgeFlag {
 } eLineartEdgeFlag;
 
 #define LRT_EDGE_FLAG_ALL_TYPE 0x3f
-
-typedef enum eLineartModeFlags {
-  LRT_LINE_LAYER_USE_SAME_STYLE = (1 << 0),      /* Share with object lineart flags */
-  LRT_LINE_LAYER_USE_MULTIPLE_LEVELS = (1 << 1), /* Share with object lineart flags */
-  LRT_LINE_LAYER_NORMAL_ENABLED = (1 << 2),
-  LRT_LINE_LAYER_NORMAL_INVERSE = (1 << 3),
-  LRT_LINE_LAYER_REPLACE_STROKES = (1 << 4),
-  LRT_LINE_LAYER_COLLECTION_FORCE = (1 << 5),
-} eLineartModeFlags;
 
 #endif

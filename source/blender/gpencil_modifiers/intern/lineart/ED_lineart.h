@@ -455,19 +455,18 @@ BLI_INLINE int lineart_LineIntersectTest2d(
       }
       return 0;
     }
-    else {
-      *aRatio = ratiod(a1[1], a2[1], ry);
-      if (fabs(b2[0] - b1[0]) > fabs(b2[1] - b1[1])) {
-        rr = ratiod(b1[0], b2[0], rx);
-      }
-      else {
-        rr = ratiod(b1[1], b2[1], ry);
-      }
-      if ((*aRatio) > 0 && (*aRatio) < 1 && rr > 0 && rr < 1) {
-        return 1;
-      }
-      return 0;
+
+    *aRatio = ratiod(a1[1], a2[1], ry);
+    if (fabs(b2[0] - b1[0]) > fabs(b2[1] - b1[1])) {
+      rr = ratiod(b1[0], b2[0], rx);
     }
+    else {
+      rr = ratiod(b1[1], b2[1], ry);
+    }
+    if ((*aRatio) > 0 && (*aRatio) < 1 && rr > 0 && rr < 1) {
+      return 1;
+    }
+    return 0;
   }
   return 0;
 
@@ -524,7 +523,10 @@ BLI_INLINE int lineart_LineIntersectTest2d(
 #endif
 }
 
-int ED_lineart_point_inside_triangled(double v[2], double v0[2], double v1[2], double v2[2]);
+int ED_lineart_point_inside_triangle(const double v[2],
+                                     const double v0[2],
+                                     const double v1[2],
+                                     const double v2[2]);
 
 struct Depsgraph;
 struct Scene;

@@ -73,11 +73,9 @@ static LineartRenderLine *lineart_line_get_connected(LineartBoundingArea *ba,
           *new_rv = LRT_OTHER_RV(nrl, nrl->l);
           return nrl;
         }
-        else {
-          if (rv->fbcoord[0] == nrl->r->fbcoord[0] && rv->fbcoord[1] == nrl->r->fbcoord[1]) {
-            *new_rv = LRT_OTHER_RV(nrl, nrl->r);
-            return nrl;
-          }
+        if (rv->fbcoord[0] == nrl->r->fbcoord[0] && rv->fbcoord[1] == nrl->r->fbcoord[1]) {
+          *new_rv = LRT_OTHER_RV(nrl, nrl->r);
+          return nrl;
         }
       }
       continue;
@@ -476,25 +474,24 @@ static LineartBoundingArea *lineart_bounding_area_get_rlci_recursive(
   if (root->child == NULL) {
     return root;
   }
-  else {
-    LineartBoundingArea *ch = root->child;
+
+  LineartBoundingArea *ch = root->child;
 #define IN_BOUND(ba, rlci) \
   ba.l <= rlci->pos[0] && ba.r >= rlci->pos[0] && ba.b <= rlci->pos[1] && ba.u >= rlci->pos[1]
 
-    if (IN_BOUND(ch[0], rlci)) {
-      return lineart_bounding_area_get_rlci_recursive(rb, &ch[0], rlci);
-    }
-    else if (IN_BOUND(ch[1], rlci)) {
-      return lineart_bounding_area_get_rlci_recursive(rb, &ch[1], rlci);
-    }
-    else if (IN_BOUND(ch[2], rlci)) {
-      return lineart_bounding_area_get_rlci_recursive(rb, &ch[2], rlci);
-    }
-    else if (IN_BOUND(ch[3], rlci)) {
-      return lineart_bounding_area_get_rlci_recursive(rb, &ch[3], rlci);
-    }
-#undef IN_BOUND
+  if (IN_BOUND(ch[0], rlci)) {
+    return lineart_bounding_area_get_rlci_recursive(rb, &ch[0], rlci);
   }
+  if (IN_BOUND(ch[1], rlci)) {
+    return lineart_bounding_area_get_rlci_recursive(rb, &ch[1], rlci);
+  }
+  if (IN_BOUND(ch[2], rlci)) {
+    return lineart_bounding_area_get_rlci_recursive(rb, &ch[2], rlci);
+  }
+  if (IN_BOUND(ch[3], rlci)) {
+    return lineart_bounding_area_get_rlci_recursive(rb, &ch[3], rlci);
+  }
+#undef IN_BOUND
   return NULL;
 }
 

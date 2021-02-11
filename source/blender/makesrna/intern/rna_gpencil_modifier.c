@@ -314,10 +314,10 @@ RNA_GP_MOD_VGROUP_NAME_SET(Opacity, vgname);
 RNA_GP_MOD_VGROUP_NAME_SET(Lattice, vgname);
 RNA_GP_MOD_VGROUP_NAME_SET(Smooth, vgname);
 RNA_GP_MOD_VGROUP_NAME_SET(Hook, vgname);
-RNA_GP_MOD_VGROUP_NAME_SET(Tint, vgname);
 RNA_GP_MOD_VGROUP_NAME_SET(Offset, vgname);
 RNA_GP_MOD_VGROUP_NAME_SET(Armature, vgname);
 RNA_GP_MOD_VGROUP_NAME_SET(Texture, vgname);
+RNA_GP_MOD_VGROUP_NAME_SET(Tint, vgname);
 RNA_GP_MOD_VGROUP_NAME_SET(Lineart, vgname);
 
 #  undef RNA_GP_MOD_VGROUP_NAME_SET

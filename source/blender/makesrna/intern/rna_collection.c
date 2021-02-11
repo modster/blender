@@ -26,8 +26,6 @@
 
 #include "BLI_utildefines.h"
 
-#include "MEM_guardedalloc.h"
-
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
 

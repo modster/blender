@@ -21,8 +21,7 @@
  * \ingroup editors
  */
 
-#ifndef __LRT_INTERN_H__
-#define __LRT_INTERN_H__
+#pragma once
 
 #include "BLI_linklist.h"
 #include "BLI_listbase.h"
@@ -34,14 +33,15 @@
 #include <math.h>
 #include <string.h>
 
+struct LineartStaticMemPool;
 struct LineartStaticMemPoolNode;
 struct LineartRenderLine;
 struct LineartRenderBuffer;
 
-void *lineart_list_append_pointer_pool(ListBase *h, struct LineartStaticMemPool *smp, void *p);
+void *lineart_list_append_pointer_pool(ListBase *h, struct LineartStaticMemPool *smp, void *data);
 void *lineart_list_append_pointer_pool_sized(ListBase *h,
                                              struct LineartStaticMemPool *smp,
-                                             void *p,
+                                             void *data,
                                              int size);
 void *list_push_pointer_static(ListBase *h, struct LineartStaticMemPool *smp, void *p);
 void *list_push_pointer_static_sized(ListBase *h,
@@ -52,14 +52,14 @@ void *list_push_pointer_static_sized(ListBase *h,
 void *lineart_list_pop_pointer_no_free(ListBase *h);
 void lineart_list_remove_pointer_item_no_free(ListBase *h, LinkData *lip);
 
-LineartStaticMemPoolNode *lineart_mem_new_static_pool(struct LineartStaticMemPool *smp,
-                                                      size_t size);
+struct LineartStaticMemPoolNode *lineart_mem_new_static_pool(struct LineartStaticMemPool *smp,
+                                                             size_t size);
 void *lineart_mem_aquire(struct LineartStaticMemPool *smp, size_t size);
 void *lineart_mem_aquire_thread(struct LineartStaticMemPool *smp, size_t size);
-void lineart_mem_destroy(LineartStaticMemPool *smp);
+void lineart_mem_destroy(struct LineartStaticMemPool *smp);
 
-void lineart_prepend_line_direct(LineartRenderLine **first, void *node);
-void lineart_prepend_pool(LinkNode **first, LineartStaticMemPool *smp, void *link);
+void lineart_prepend_line_direct(struct LineartRenderLine **first, void *node);
+void lineart_prepend_pool(LinkNode **first, struct LineartStaticMemPool *smp, void *link);
 
 void lineart_matrix_ortho_44d(double (*mProjection)[4],
                               double xMin,
@@ -73,7 +73,7 @@ void lineart_matrix_perspective_44d(
 
 int lineart_count_intersection_segment_count(struct LineartRenderBuffer *rb);
 
-void lineart_count_and_print_render_buffer_memory(LineartRenderBuffer *rb);
+void lineart_count_and_print_render_buffer_memory(struct LineartRenderBuffer *rb);
 
 #define LRT_ITER_ALL_LINES_BEGIN \
   LineartRenderLine *rl, *next_rl, **current_list; \
@@ -104,5 +104,3 @@ void lineart_count_and_print_render_buffer_memory(LineartRenderBuffer *rb);
 
 #define LRT_BOUND_AREA_CROSSES(b1, b2) \
   ((b1)[0] < (b2)[1] && (b1)[1] > (b2)[0] && (b1)[3] < (b2)[2] && (b1)[2] > (b2)[3])
-
-#endif

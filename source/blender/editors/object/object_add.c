@@ -1450,7 +1450,8 @@ static const EnumPropertyItem *object_gpencil_add_options(bContext *C,
                                                           PropertyRNA *UNUSED(prop),
                                                           bool *r_free)
 {
-  EnumPropertyItem *item = NULL, *item_ref = rna_enum_object_gpencil_type_items;
+  EnumPropertyItem *item = NULL;
+  const EnumPropertyItem *item_ref = rna_enum_object_gpencil_type_items;
   int totitem = 0;
   int i = 0;
   int orig_count = RNA_enum_items_count(item_ref);

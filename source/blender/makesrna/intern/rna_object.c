@@ -2661,6 +2661,7 @@ static void rna_def_object_display(BlenderRNA *brna)
 
   RNA_define_lib_overridable(false);
 }
+
 static void rna_def_object_lineart(BlenderRNA *brna)
 {
   StructRNA *srna;

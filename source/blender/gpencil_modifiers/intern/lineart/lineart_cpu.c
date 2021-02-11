@@ -151,11 +151,10 @@ static LineartRenderLineSegment *lineart_render_line_give_segment(LineartRenderB
     memset(rls, 0, sizeof(LineartRenderLineSegment));
     return rls;
   }
-  else {
-    BLI_spin_unlock(&rb->lock_cuts);
-    return (LineartRenderLineSegment *)lineart_mem_aquire_thread(&rb->render_data_pool,
-                                                                 sizeof(LineartRenderLineSegment));
-  }
+
+  BLI_spin_unlock(&rb->lock_cuts);
+  return (LineartRenderLineSegment *)lineart_mem_aquire_thread(&rb->render_data_pool,
+                                                               sizeof(LineartRenderLineSegment));
 }
 
 static void lineart_render_line_cut(LineartRenderBuffer *rb,
@@ -224,7 +223,7 @@ static void lineart_render_line_cut(LineartRenderBuffer *rb,
       untouched = 1;
       break;
     }
-    else if (rls->at > end) {
+    if (rls->at > end) {
       end_segment = rls;
       ns2 = lineart_render_line_give_segment(rb);
       break;
@@ -239,8 +238,9 @@ static void lineart_render_line_cut(LineartRenderBuffer *rb,
       ns2 = ns;
       end_segment = ns2;
     }
-    else
+    else {
       ns2 = lineart_render_line_give_segment(rb);
+    }
   }
 
   if (start_segment) {
@@ -445,7 +445,10 @@ static void lineart_main_occlusion_begin(LineartRenderBuffer *rb)
   MEM_freeN(rti);
 }
 
-int ED_lineart_point_inside_triangled(double v[2], double v0[2], double v1[2], double v2[2])
+int ED_lineart_point_inside_triangle(const double v[2],
+                                     const double v0[2],
+                                     const double v1[2],
+                                     const double v2[2])
 {
   double cl, c;
 
@@ -456,15 +459,15 @@ int ED_lineart_point_inside_triangled(double v[2], double v0[2], double v1[2], d
   if (c * cl <= 0) {
     return 0;
   }
-  else
-    c = cl;
+
+  c = cl;
 
   cl = (v2[0] - v[0]) * (v0[1] - v[1]) - (v2[1] - v[1]) * (v0[0] - v[0]);
   if (c * cl <= 0) {
     return 0;
   }
-  else
-    c = cl;
+
+  c = cl;
 
   cl = (v0[0] - v[0]) * (v1[1] - v[1]) - (v0[1] - v[1]) * (v1[0] - v[0]);
   if (c * cl <= 0) {
@@ -489,22 +492,20 @@ static int lineart_point_on_segment(double v[2], double v0[2], double v1[2])
   if (v1[0] - v0[0]) {
     c1 = ratiod(v0[0], v1[0], v[0]);
   }
-  else {
-    if (v[0] == v1[0]) {
-      c2 = ratiod(v0[1], v1[1], v[1]);
-      return (c2 >= 0 && c2 <= 1);
-    }
+  else if (v[0] == v1[0]) {
+    c2 = ratiod(v0[1], v1[1], v[1]);
+    return (c2 >= 0 && c2 <= 1);
   }
 
   if (v1[1] - v0[1]) {
     c2 = ratiod(v0[1], v1[1], v[1]);
   }
-  else {
-    if (v[1] == v1[1]) {
-      c1 = ratiod(v0[0], v1[0], v[0]);
-      return (c1 >= 0 && c1 <= 1);
-    }
+  else if (v[1] == v1[1]) {
+    c1 = ratiod(v0[0], v1[0], v[0]);
+    return (c1 >= 0 && c1 <= 1);
   }
+
+  // XXX FIXME seems like there is a chance that c1 and c2 is used uninitalized here.
 
   if (LRT_DOUBLE_CLOSE_ENOUGH(c1, c2) && c1 >= 0 && c1 <= 1) {
     return 1;
@@ -529,21 +530,22 @@ static int lineart_point_triangle_relation(double v[2], double v0[2], double v1[
   if ((r = c * cl) < 0) {
     return 0;
   }
-  else
-    c = cl;
+
+  c = cl;
 
   cl = (v2[0] - v[0]) * (v0[1] - v[1]) - (v2[1] - v[1]) * (v0[0] - v[0]);
   if ((r = c * cl) < 0) {
     return 0;
   }
-  else
-    c = cl;
+
+  c = cl;
 
   cl = (v0[0] - v[0]) * (v1[1] - v[1]) - (v0[1] - v[1]) * (v1[0] - v[0]);
   if ((r = c * cl) < 0) {
     return 0;
   }
-  else if (r == 0) {
+
+  if (r == 0) {
     return 1;
   }
 
@@ -703,6 +705,11 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
 
   new_rl = &((LineartRenderLine *)leln->pointer)[l_count];
 
+  // XXX FIXME
+  // Seems like the logic here is faulty.
+  // rl is not assinged so rl->l_obindex seems like it will read random values the first time
+  // around. l_obi and r_obi doesn't seem like they are initialized either...
+
 #define INCREASE_RL \
   l_count++; \
   l_obi = rl->l_obindex; \
@@ -777,7 +784,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
        *       |
        *       |
        *     (near)---------->(far)
- . */
+       */
       if (!in0) {
 
         /* cut point for line 2---|-----0. */
@@ -811,7 +818,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         /** note: inverting rl->l/r (left/right point) doesn't matter as long as
          * rt->rl and rt->v has the same sequence. and the winding direction
          * can be either CW or CCW but needs to be consistent throughout the calculation.
- . */
+         */
         rl->l = &rv[1];
         rl->r = &rv[0];
         /* only one adjacent triangle, because the other side is the near plane. */
@@ -941,7 +948,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
        *        |     ***  |
        *        |        **2
        *      (near)---------->(far)
- . */
+       */
       if (in0) {
         /* Cut point for line 0---|------1. */
         sub_v3_v3v3_db(vv1, rt->v[1]->gloc, cam_pos);
@@ -978,7 +985,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
 
         /** New line connects new point 0 and old point 1,
          * this is a border line.
- . */
+         */
 
         SELECT_RL(0, rt->v[1], &rv[0], rt1)
         SELECT_RL(2, rt->v[2], &rv[1], rt2)
@@ -1344,7 +1351,8 @@ static char lineart_test_feature_line(LineartRenderBuffer *rb,
   if ((result = dot_1 * dot_2) < 0 && (dot_1 + dot_2)) {
     return LRT_EDGE_FLAG_CONTOUR;
   }
-  else if (rb->use_crease && (dot_v3v3_db(rt1->gn, rt2->gn) < crease_threshold)) {
+
+  if (rb->use_crease && (dot_v3v3_db(rt1->gn, rt2->gn) < crease_threshold)) {
     if (!no_crease) {
       return LRT_EDGE_FLAG_CREASE;
     }
@@ -1669,29 +1677,21 @@ int ED_lineart_object_collection_usage_check(Collection *c, Object *ob)
   if (c->children.first == NULL) {
     if (BKE_collection_has_object(c, (Object *)(ob->id.orig_id))) {
       if (ob->lineart.usage == OBJECT_LRT_INHERENT) {
-        if (c->lineart_usage == COLLECTION_LRT_OCCLUSION_ONLY) {
-          return OBJECT_LRT_OCCLUSION_ONLY;
+        switch (c->lineart_usage) {
+          case COLLECTION_LRT_OCCLUSION_ONLY:
+            return OBJECT_LRT_OCCLUSION_ONLY;
+          case COLLECTION_LRT_EXCLUDE:
+            return OBJECT_LRT_EXCLUDE;
+          case COLLECTION_LRT_INTERSECTION_ONLY:
+            return OBJECT_LRT_INTERSECTION_ONLY;
+          case COLLECTION_LRT_NO_INTERSECTION:
+            return OBJECT_LRT_NO_INTERSECTION;
         }
-        else if (c->lineart_usage == COLLECTION_LRT_EXCLUDE) {
-          return OBJECT_LRT_EXCLUDE;
-        }
-        else if (c->lineart_usage == COLLECTION_LRT_INTERSECTION_ONLY) {
-          return OBJECT_LRT_INTERSECTION_ONLY;
-        }
-        else if (c->lineart_usage == COLLECTION_LRT_NO_INTERSECTION) {
-          return OBJECT_LRT_NO_INTERSECTION;
-        }
-        else {
-          return OBJECT_LRT_INHERENT;
-        }
+        return OBJECT_LRT_INHERENT;
       }
-      else {
-        return ob->lineart.usage;
-      }
+      return ob->lineart.usage;
     }
-    else {
-      return OBJECT_LRT_INHERENT;
-    }
+    return OBJECT_LRT_INHERENT;
   }
 
   LISTBASE_FOREACH (CollectionChild *, cc, &c->children) {
@@ -1769,12 +1769,12 @@ static bool lineart_another_edge_2v(const LineartRenderTriangle *rt,
     *r = rt->v[2];
     return true;
   }
-  else if (rt->v[1] == rv) {
+  if (rt->v[1] == rv) {
     *l = rt->v[2];
     *r = rt->v[0];
     return true;
   }
-  else if (rt->v[2] == rv) {
+  if (rt->v[2] == rv) {
     *l = rt->v[0];
     *r = rt->v[1];
     return true;
@@ -1844,7 +1844,7 @@ static int lineart_edge_from_triangle(const LineartRenderTriangle *rt, const Lin
 static int lineart_triangle_line_imagespace_intersection_v2(SpinLock *UNUSED(spl),
                                                             const LineartRenderTriangle *rt,
                                                             const LineartRenderLine *rl,
-                                                            const double *override_cam_loc,
+                                                            const double *override_camera_loc,
                                                             const char override_cam_is_persp,
                                                             const double vp[4][4],
                                                             const double *camera_dir,
@@ -1898,10 +1898,10 @@ static int lineart_triangle_line_imagespace_intersection_v2(SpinLock *UNUSED(spl
   copy_v3_v3_db(Cv, camera_dir);
 
   if (override_cam_is_persp) {
-    copy_v3_v3_db(vd4, override_cam_loc);
+    copy_v3_v3_db(vd4, override_camera_loc);
   }
   else {
-    copy_v4_v4_db(vd4, override_cam_loc);
+    copy_v4_v4_db(vd4, override_camera_loc);
   }
   if (override_cam_is_persp) {
     sub_v3_v3v3_db(Cv, vd4, rt->v[0]->gloc);
@@ -2038,7 +2038,7 @@ static int lineart_triangle_line_imagespace_intersection_v2(SpinLock *UNUSED(spl
     /*  printf("1 From %f to %f\n",*From, *To);. */
     return 1;
   }
-  else if (LF >= 0 && RF <= 0 && (dot_l || dot_r)) {
+  if (LF >= 0 && RF <= 0 && (dot_l || dot_r)) {
     *from = MAX2(cut, is[LCross]);
     *to = MIN2(1, is[RCross]);
     if (*from >= *to) {
@@ -2047,7 +2047,7 @@ static int lineart_triangle_line_imagespace_intersection_v2(SpinLock *UNUSED(spl
     /*  printf("2 From %f to %f\n",*From, *To);. */
     return 1;
   }
-  else if (LF <= 0 && RF >= 0 && (dot_l || dot_r)) {
+  if (LF <= 0 && RF >= 0 && (dot_l || dot_r)) {
     *from = MAX2(0, is[LCross]);
     *to = MIN2(cut, is[RCross]);
     if (*from >= *to) {
@@ -2056,9 +2056,8 @@ static int lineart_triangle_line_imagespace_intersection_v2(SpinLock *UNUSED(spl
     /*  printf("3 From %f to %f\n",*From, *To);. */
     return 1;
   }
-  else
-    return 0;
-  return 1;
+
+  return 0;
 }
 
 #undef INTERSECT_SORT_MIN_TO_MAX_3
@@ -2817,8 +2816,8 @@ static void lineart_bounding_area_split(LineartRenderBuffer *rb,
 }
 
 static int lineart_bounding_area_line_crossed(LineartRenderBuffer *UNUSED(fb),
-                                              double l[2],
-                                              double r[2],
+                                              const double l[2],
+                                              const double r[2],
                                               LineartBoundingArea *ba)
 {
   double vx, vy;
@@ -2842,25 +2841,19 @@ static int lineart_bounding_area_line_crossed(LineartRenderBuffer *UNUSED(fb),
   if (c1 * c <= 0) {
     return 1;
   }
-  else {
-    c = c1;
-  }
+  c = c1;
 
   c1 = vx * (converted[3] - l[1]) - vy * (converted[0] - l[0]);
   if (c1 * c <= 0) {
     return 1;
   }
-  else {
-    c = c1;
-  }
+  c = c1;
 
   c1 = vx * (converted[3] - l[1]) - vy * (converted[1] - l[0]);
   if (c1 * c <= 0) {
     return 1;
   }
-  else {
-    c = c1;
-  }
+  c = c1;
 
   return 0;
 }
@@ -2883,10 +2876,10 @@ static int lineart_bounding_area_triangle_covered(LineartRenderBuffer *fb,
     return 1;
   }
 
-  if (ED_lineart_point_inside_triangled(p1, FBC1, FBC2, FBC3) ||
-      ED_lineart_point_inside_triangled(p2, FBC1, FBC2, FBC3) ||
-      ED_lineart_point_inside_triangled(p3, FBC1, FBC2, FBC3) ||
-      ED_lineart_point_inside_triangled(p4, FBC1, FBC2, FBC3)) {
+  if (ED_lineart_point_inside_triangle(p1, FBC1, FBC2, FBC3) ||
+      ED_lineart_point_inside_triangle(p2, FBC1, FBC2, FBC3) ||
+      ED_lineart_point_inside_triangle(p3, FBC1, FBC2, FBC3) ||
+      ED_lineart_point_inside_triangle(p4, FBC1, FBC2, FBC3)) {
     return 1;
   }
 
@@ -3112,23 +3105,22 @@ static LineartBoundingArea *lineart_get_point_bounding_area_recursive(LineartBou
   if (ba->child == NULL) {
     return ba;
   }
-  else {
 #define IN_BOUND(i, x, y) \
   ba->child[i].l <= x && ba->child[i].r >= x && ba->child[i].b <= y && ba->child[i].u >= y
 
-    if (IN_BOUND(0, x, y)) {
-      return lineart_get_point_bounding_area_recursive(&ba->child[0], x, y);
-    }
-    else if (IN_BOUND(1, x, y)) {
-      return lineart_get_point_bounding_area_recursive(&ba->child[1], x, y);
-    }
-    else if (IN_BOUND(2, x, y)) {
-      return lineart_get_point_bounding_area_recursive(&ba->child[2], x, y);
-    }
-    else if (IN_BOUND(3, x, y)) {
-      return lineart_get_point_bounding_area_recursive(&ba->child[3], x, y);
-    }
+  if (IN_BOUND(0, x, y)) {
+    return lineart_get_point_bounding_area_recursive(&ba->child[0], x, y);
   }
+  if (IN_BOUND(1, x, y)) {
+    return lineart_get_point_bounding_area_recursive(&ba->child[1], x, y);
+  }
+  if (IN_BOUND(2, x, y)) {
+    return lineart_get_point_bounding_area_recursive(&ba->child[2], x, y);
+  }
+  if (IN_BOUND(3, x, y)) {
+    return lineart_get_point_bounding_area_recursive(&ba->child[3], x, y);
+  }
+
   return NULL;
 #undef IN_BOUND
 }
@@ -3390,8 +3382,9 @@ static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this
         }
       }
     }
-    else
+    else {
       return 0; /*  segment has no length. */
+    }
   }
   return 0;
 }
@@ -3440,7 +3433,6 @@ static LineartBoundingArea *lineart_get_bounding_area(LineartRenderBuffer *rb, d
 static LineartBoundingArea *linear_bounding_areat_first_possible(LineartRenderBuffer *rb,
                                                                  LineartRenderLine *rl)
 {
-  LineartBoundingArea *iba;
   double data[2] = {rl->l->fbcoord[0], rl->l->fbcoord[1]};
   double LU[2] = {-1, 1}, RU[2] = {1, 1}, LB[2] = {-1, -1}, RB[2] = {1, -1};
   double r = 1, sr = 1;
@@ -3448,29 +3440,26 @@ static LineartBoundingArea *linear_bounding_areat_first_possible(LineartRenderBu
   if (data[0] > -1 && data[0] < 1 && data[1] > -1 && data[1] < 1) {
     return lineart_get_bounding_area(rb, data[0], data[1]);
   }
-  else {
-    if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, LU, RU, &sr) && sr < r &&
-        sr > 0) {
-      r = sr;
-    }
-    if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, LB, RB, &sr) && sr < r &&
-        sr > 0) {
-      r = sr;
-    }
-    if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, LB, LU, &sr) && sr < r &&
-        sr > 0) {
-      r = sr;
-    }
-    if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, RB, RU, &sr) && sr < r &&
-        sr > 0) {
-      r = sr;
-    }
-    interp_v2_v2v2_db(data, rl->l->fbcoord, rl->r->fbcoord, r);
 
-    return lineart_get_bounding_area(rb, data[0], data[1]);
+  if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, LU, RU, &sr) && sr < r &&
+      sr > 0) {
+    r = sr;
   }
+  if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, LB, RB, &sr) && sr < r &&
+      sr > 0) {
+    r = sr;
+  }
+  if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, LB, LU, &sr) && sr < r &&
+      sr > 0) {
+    r = sr;
+  }
+  if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, RB, RU, &sr) && sr < r &&
+      sr > 0) {
+    r = sr;
+  }
+  interp_v2_v2v2_db(data, rl->l->fbcoord, rl->r->fbcoord, r);
 
-  return iba;
+  return lineart_get_bounding_area(rb, data[0], data[1]);
 }
 
 /* Calculations. */

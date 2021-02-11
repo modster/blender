@@ -98,92 +98,95 @@ static int lineart_gpencil_bake_strokes_invoke(bContext *C,
         scene->master_collection, ob, DAG_EVAL_RENDER) {
 
       int cleared = 0;
-      if (ob->type == OB_GPENCIL) {
-        LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
-          if (md->type == eGpencilModifierType_Lineart) {
-            lmd = (LineartGpencilModifierData *)md;
-            bGPdata *gpd = ob->data;
-            bGPDlayer *gpl = BKE_gpencil_layer_get_by_name(gpd, lmd->target_layer, 1);
-            bGPDframe *gpf = ((lineart->flags & LRT_BAKING_KEYFRAMES_ONLY) ?
-                                  BKE_gpencil_layer_frame_find(gpl, frame) :
-                                  BKE_gpencil_layer_frame_get(gpl, frame, GP_GETFRAME_ADD_NEW));
+      if (ob->type != OB_GPENCIL) {
+        continue;
+      }
 
-            if (!gpf) {
-              continue; /* happens when it's keyframe only. */
-            }
-
-            if (!frame_updated) {
-              /* Reset flags. LRT_SYNC_IGNORE prevent any line art modifiers run calculation
-               * function when depsgraph calls for modifier evalurates. */
-              ED_lineart_modifier_sync_flag_set(LRT_SYNC_IGNORE, false);
-              ED_lineart_calculation_flag_set(LRT_RENDER_IDLE);
-
-              BKE_scene_frame_set(scene, frame);
-              BKE_scene_graph_update_for_newframe(dg);
-
-              ED_lineart_update_render_progress(
-                  (int)((float)(frame - frame_begin) / frame_total * 100), NULL);
-
-              BLI_spin_lock(&lineart_share.lock_loader);
-              ED_lineart_compute_feature_lines_background(dg, 0);
-
-              /* Wait for loading finish. */
-              BLI_spin_lock(&lineart_share.lock_loader);
-              BLI_spin_unlock(&lineart_share.lock_loader);
-
-              while (!ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH) ||
-                     !ED_lineart_calculation_flag_check(LRT_RENDER_FINISHED)) {
-                /* Wait till it's done. */
-              }
-
-              ED_lineart_chain_clear_picked_flag(lineart_share.render_buffer);
-
-              frame_updated = true;
-            }
-
-            /* Clear original frame. */
-            if ((scene->lineart.flags & LRT_GPENCIL_OVERWRITE) && (!cleared)) {
-              BKE_gpencil_layer_frame_delete(gpl, gpf);
-              gpf = BKE_gpencil_layer_frame_get(gpl, frame, GP_GETFRAME_ADD_NEW);
-              cleared = 1;
-            }
-
-            rb = lineart_share.render_buffer;
-
-            if (rb->fuzzy_everything) {
-              use_types = LRT_EDGE_FLAG_CONTOUR;
-            }
-            else if (rb->fuzzy_intersections) {
-              use_types = lmd->line_types | LRT_EDGE_FLAG_INTERSECTION;
-            }
-            else {
-              use_types = lmd->line_types;
-            }
-
-            ED_lineart_gpencil_generate_with_type(
-                dg,
-                ob,
-                gpl,
-                gpf,
-                lmd->source_type,
-                lmd->source_type == LRT_SOURCE_OBJECT ? (void *)lmd->source_object :
-                                                        (void *)lmd->source_collection,
-                lmd->level_start,
-                lmd->use_multiple_levels ? lmd->level_end : lmd->level_start,
-                lmd->target_material ?
-                    BKE_gpencil_object_material_index_get(ob, lmd->target_material) :
-                    0,
-                use_types,
-                lmd->transparency_flags,
-                lmd->transparency_mask,
-                lmd->thickness,
-                lmd->opacity,
-                lmd->pre_sample_length,
-                lmd->source_vertex_group,
-                lmd->vgname,
-                lmd->flags);
-          }
+      LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+        if (md->type != eGpencilModifierType_Lineart) {
+          continue;
         }
+        lmd = (LineartGpencilModifierData *)md;
+        bGPdata *gpd = ob->data;
+        bGPDlayer *gpl = BKE_gpencil_layer_get_by_name(gpd, lmd->target_layer, 1);
+        bGPDframe *gpf = ((lineart->flags & LRT_BAKING_KEYFRAMES_ONLY) ?
+                              BKE_gpencil_layer_frame_find(gpl, frame) :
+                              BKE_gpencil_layer_frame_get(gpl, frame, GP_GETFRAME_ADD_NEW));
+
+        if (!gpf) {
+          continue; /* happens when it's keyframe only. */
+        }
+
+        if (!frame_updated) {
+          /* Reset flags. LRT_SYNC_IGNORE prevent any line art modifiers run calculation
+           * function when depsgraph calls for modifier evalurates. */
+          ED_lineart_modifier_sync_flag_set(LRT_SYNC_IGNORE, false);
+          ED_lineart_calculation_flag_set(LRT_RENDER_IDLE);
+
+          BKE_scene_frame_set(scene, frame);
+          BKE_scene_graph_update_for_newframe(dg);
+
+          ED_lineart_update_render_progress(
+              (int)((float)(frame - frame_begin) / frame_total * 100), NULL);
+
+          BLI_spin_lock(&lineart_share.lock_loader);
+          ED_lineart_compute_feature_lines_background(dg, 0);
+
+          /* Wait for loading finish. */
+          BLI_spin_lock(&lineart_share.lock_loader);
+          BLI_spin_unlock(&lineart_share.lock_loader);
+
+          while (!ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH) ||
+                 !ED_lineart_calculation_flag_check(LRT_RENDER_FINISHED)) {
+            /* Wait till it's done. */
+          }
+
+          ED_lineart_chain_clear_picked_flag(lineart_share.render_buffer);
+
+          frame_updated = true;
+        }
+
+        /* Clear original frame. */
+        if ((scene->lineart.flags & LRT_GPENCIL_OVERWRITE) && (!cleared)) {
+          BKE_gpencil_layer_frame_delete(gpl, gpf);
+          gpf = BKE_gpencil_layer_frame_get(gpl, frame, GP_GETFRAME_ADD_NEW);
+          cleared = 1;
+        }
+
+        rb = lineart_share.render_buffer;
+
+        if (rb->fuzzy_everything) {
+          use_types = LRT_EDGE_FLAG_CONTOUR;
+        }
+        else if (rb->fuzzy_intersections) {
+          use_types = lmd->line_types | LRT_EDGE_FLAG_INTERSECTION;
+        }
+        else {
+          use_types = lmd->line_types;
+        }
+
+        ED_lineart_gpencil_generate_with_type(
+            dg,
+            ob,
+            gpl,
+            gpf,
+            lmd->source_type,
+            lmd->source_type == LRT_SOURCE_OBJECT ? (void *)lmd->source_object :
+                                                    (void *)lmd->source_collection,
+            lmd->level_start,
+            lmd->use_multiple_levels ? lmd->level_end : lmd->level_start,
+            lmd->target_material ?
+                BKE_gpencil_object_material_index_get(ob, lmd->target_material) :
+                0,
+            use_types,
+            lmd->transparency_flags,
+            lmd->transparency_mask,
+            lmd->thickness,
+            lmd->opacity,
+            lmd->pre_sample_length,
+            lmd->source_vertex_group,
+            lmd->vgname,
+            lmd->flags);
       }
     }
     FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_END;
