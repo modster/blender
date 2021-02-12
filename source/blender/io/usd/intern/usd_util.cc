@@ -111,7 +111,7 @@ USDPrimReader *create_reader(const pxr::UsdStageRefPtr &stage,
   else if (params.import_volumes && prim.IsA<pxr::UsdVolVolume>()) {
     reader = new USDVolumeReader(stage, prim, params, settings);
   }
-  else {
+  else if (prim.IsA<pxr::UsdGeomImageable>()) {
     reader = new USDXformReader(stage, prim, params, settings);
   }
 
@@ -140,7 +140,7 @@ USDPrimReader *create_fake_reader(USDStageReader *archive, const pxr::UsdPrim &p
   else if (prim.IsA<pxr::UsdVolVolume>()) {
     reader = new USDVolumeReader(archive->stage(), prim, archive->params(), archive->settings());
   }
-  else {
+  else if (prim.IsA<pxr::UsdGeomImageable>()) {
     reader = new USDXformReader(archive->stage(), prim, archive->params(), archive->settings());
   }
   return reader;
