@@ -1714,8 +1714,6 @@ static void lineart_main_load_geometries(
   double proj[4][4], view[4][4], result[4][4];
   float inv[4][4];
 
-  memset(rb->material_pointers, 0, sizeof(void *) * 2048);
-
   Camera *cam = camera->data;
   float sensor = BKE_camera_sensor_size(cam->sensor_fit, cam->sensor_x, cam->sensor_y);
   double fov = focallength_to_fov(cam->lens, sensor);

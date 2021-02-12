@@ -48,9 +48,7 @@ typedef enum eLineartMainFlags {
   LRT_ALLOW_DUPLI_OBJECTS = (1 << 2),
   LRT_ALLOW_OVERLAPPING_EDGES = (1 << 3),
   LRT_ALLOW_CLIPPING_BOUNDARIES = (1 << 4),
-  LRT_BAKING_FINAL_RANGE = (1 << 5),
-  LRT_BAKING_KEYFRAMES_ONLY = (1 << 6),
-  LRT_REMOVE_DOUBLES = (1 << 7),
+  LRT_REMOVE_DOUBLES = (1 << 5),
 } eLineartMainFlags;
 
 typedef enum eLineartEdgeFlag {

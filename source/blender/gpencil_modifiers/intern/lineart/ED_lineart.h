@@ -210,9 +210,6 @@ typedef struct LineartRenderBuffer {
   double width_per_tile, height_per_tile;
   double view_projection[4][4];
 
-  int output_mode;
-  int output_aa_level;
-
   struct LineartBoundingArea *initial_bounding_areas;
   unsigned int bounding_area_count;
 
@@ -228,8 +225,6 @@ typedef struct LineartRenderBuffer {
   LineartStaticMemPool render_data_pool;
   ListBase wasted_cuts;
   SpinLock lock_cuts;
-
-  struct Material *material_pointers[2048];
 
   /*  Render status */
   double view_vector[3];
@@ -296,31 +291,7 @@ typedef struct LineartRenderBuffer {
   float chaining_image_threshold;
   float chaining_geometry_threshold;
   float angle_splitting_threshold;
-
-  /** For showing the progress with mouse cursor and stuff. */
-  wmWindow *main_window;
 } LineartRenderBuffer;
-
-typedef enum eLineartRenderStatus {
-  LRT_RENDER_IDLE = 0,
-  LRT_RENDER_RUNNING = 1,
-  LRT_RENDER_INCOMPELTE = 2, /* Not used yet. */
-  LRT_RENDER_FINISHED = 3,
-  LRT_RENDER_CANCELING = 4,
-} eLineartRenderStatus;
-
-typedef enum eLineartInitStatus {
-  LRT_INIT_ENGINE = (1 << 0),
-  LRT_INIT_LOCKS = (1 << 1),
-} eLineartInitStatus;
-
-typedef enum eLineartModifierSyncStatus {
-  LRT_SYNC_IDLE = 0,
-  LRT_SYNC_WAITING = 1,
-  LRT_SYNC_FRESH = 2,
-  LRT_SYNC_IGNORE = 3,
-  LRT_SYNC_CLEARING = 4,
-} eLineartModifierSyncStatus;
 
 #define DBL_TRIANGLE_LIM 1e-8
 #define DBL_EDGE_LIM 1e-9
@@ -533,7 +504,6 @@ struct Scene;
 struct LineartRenderBuffer;
 struct LineartGpencilModifierData;
 
-void ED_lineart_init_locks(void);
 struct LineartRenderBuffer *ED_lineart_create_render_buffer(
     struct Scene *s, struct LineartGpencilModifierData *lmd);
 void ED_lineart_destroy_render_data(struct LineartGpencilModifierData *lmd);
@@ -548,12 +518,6 @@ void ED_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshold
 
 int ED_lineart_chain_count(const LineartRenderLineChain *rlc);
 void ED_lineart_chain_clear_picked_flag(struct LineartRenderBuffer *rb);
-
-void ED_lineart_modifier_sync_flag_set(eLineartModifierSyncStatus flag, bool is_from_modifier);
-bool ED_lineart_modifier_sync_flag_check(eLineartModifierSyncStatus flag);
-void ED_lineart_modifier_sync_add_customer(void);
-void ED_lineart_modifier_sync_remove_customer(void);
-bool ED_lineart_modifier_sync_still_has_customer(void);
 
 int ED_lineart_compute_feature_lines_internal(struct Depsgraph *depsgraph,
                                               struct LineartGpencilModifierData *lmd);
@@ -613,19 +577,11 @@ void ED_lineart_gpencil_generate_with_type(LineartRenderBuffer *rb,
                                            const char *vgname,
                                            int modifier_flags);
 
-struct bContext;
-
-void ED_lineart_post_frame_update_external(struct bContext *C,
-                                           struct Scene *s,
-                                           struct Depsgraph *dg,
-                                           bool from_modifier);
-
 float ED_lineart_chain_compute_length(LineartRenderLineChain *rlc);
 
 struct wmOperatorType;
 
 /* Operator types */
-void SCENE_OT_lineart_update_strokes(struct wmOperatorType *ot);
 void SCENE_OT_lineart_bake_strokes(struct wmOperatorType *ot);
 
 void ED_operatortypes_lineart(void);
