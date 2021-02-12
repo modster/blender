@@ -604,23 +604,53 @@ static void gpencil_free_curve_segment(tGPCurveSegment *tcs)
     return;
   }
 
-  if (tcs->point_array != NULL) {
+  if (tcs->point_array != NULL && tcs->point_array_len > 0) {
     MEM_freeN(tcs->point_array);
   }
-  if (tcs->curve_points != NULL) {
+  if (tcs->curve_points != NULL && tcs->cubic_array_len > 0) {
     MEM_freeN(tcs->curve_points);
   }
-  if (tcs->cubic_array != NULL) {
-    MEM_freeN(tcs->cubic_array);
+  if (tcs->cubic_array != NULL && tcs->cubic_array_len > 0) {
+    free(tcs->cubic_array);
   }
-  if (tcs->cubic_orig_index != NULL) {
-    MEM_freeN(tcs->cubic_orig_index);
+  if (tcs->cubic_orig_index != NULL && tcs->cubic_array_len > 0) {
+    free(tcs->cubic_orig_index);
   }
-  if (tcs->corners_index_array != NULL) {
-    MEM_freeN(tcs->corners_index_array);
+  if (tcs->corners_index_array != NULL && tcs->corners_index_len > 0) {
+    free(tcs->corners_index_array);
   }
-  
+
   MEM_freeN(tcs);
+}
+
+static bool gpencil_is_segment_tagged(bGPDstroke *gps, const uint32_t cpt_start)
+{
+  bGPDcurve *gpc = gps->editcurve;
+  const bool is_cyclic = (gps->flag & GP_STROKE_CYCLIC);
+  const uint32_t cpt_end = (cpt_start + 1) % gpc->tot_curve_points;
+
+  const uint32_t start_pt_idx = gpc->curve_points[cpt_start].point_index;
+  const uint32_t end_pt_idx = gpc->curve_points[cpt_end].point_index;
+
+  if (!is_cyclic && (cpt_start == gpc->tot_curve_points - 1)) {
+    return false;
+  }
+
+  /* Check endpoints of segment frist. */
+  if ((gps->points[start_pt_idx].flag & GP_SPOINT_TAG) ||
+      (gps->points[end_pt_idx].flag & GP_SPOINT_TAG)) {
+    return true;
+  }
+
+  /* Iterate over all stroke points in between and check if any point is tagged. */
+  for (int i = start_pt_idx + 1; i < end_pt_idx - 1; i++) {
+    bGPDspoint *pt = &gps->points[i];
+    if ((pt->flag & GP_SPOINT_TAG)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 static int gpencil_count_tagged_curve_segments(bGPDstroke *gps)
@@ -631,41 +661,23 @@ static int gpencil_count_tagged_curve_segments(bGPDstroke *gps)
     return (gps->points[0].flag & GP_SPOINT_TAG) ? 1 : 0;
   }
 
-  /* Iterate over segments. */
-  const int tot_segments = gpc->tot_curve_points - 1;
+  /* Iterate over points and check if segment is tagged. */
   int count = 0;
-  for (int i = 0; i < tot_segments; i++) {
-    int start_idx = gpc->curve_points[i].point_index;
-    int end_idx = gpc->curve_points[i + 1].point_index;
-    for (int j = start_idx; j <= end_idx; j++) {
-      bGPDspoint *pt = &gps->points[j];
-      if ((pt->flag & GP_SPOINT_TAG)) {
-        count++;
-        break;
-      }
-    }
-  }
-
-  /* Handle closing segment */
-  if (gps->flag & GP_STROKE_CYCLIC) {
-    int start_idx = gpc->curve_points[gpc->tot_curve_points - 1].point_index;
-    int end_idx = gps->totpoints - 1;
-
-    if ((gps->points[0].flag) & GP_SPOINT_TAG) {
+  for (int i = 0; i < gpc->tot_curve_points; i++) {
+    if (gpencil_is_segment_tagged(gps, i)) {
       count++;
-    }
-    else {
-      for (int j = start_idx; j <= end_idx; j++) {
-        bGPDspoint *pt = &gps->points[j];
-        if ((pt->flag & GP_SPOINT_TAG)) {
-          count++;
-          break;
-        }
-      }
     }
   }
 
   return count;
+}
+
+static void gpencil_clear_point_tag(bGPDstroke *gps)
+{
+  for (int i = 0; i < gps->totpoints; i++) {
+    bGPDspoint *pt = &gps->points[i];
+    pt->flag &= ~GP_SPOINT_TAG;
+  }
 }
 
 static bGPDcurve *gpencil_stroke_editcurve_generate_edgecases(bGPDstroke *gps)
@@ -742,13 +754,14 @@ static bGPDcurve *gpencil_stroke_editcurve_generate_edgecases(bGPDstroke *gps)
   return NULL;
 }
 
-static tGPCurveSegment *gpencil_generate_curve_segment(bGPDstroke *gps,
+/* Helper: Generates a tGPCurveSegment using the stroke points in gps from the start index up to
+ * the end index. */
+static tGPCurveSegment *gpencil_fit_curve_to_points_ex(bGPDstroke *gps,
                                                        const float diag_length,
                                                        const float error_threshold,
                                                        const float corner_angle,
                                                        const uint32_t start_idx,
-                                                       const uint32_t end_idx,
-                                                       const uint32_t offset)
+                                                       const uint32_t end_idx)
 {
   const uint32_t length = end_idx - start_idx + 1;
 
@@ -771,11 +784,12 @@ static tGPCurveSegment *gpencil_generate_curve_segment(bGPDstroke *gps,
     mul_v4_v4fl(cfpt->color, pt->vert_color, 1.0f / diag_length);
   }
 
+  int calc_flag = CURVE_FIT_CALC_HIGH_QUALIY;
   int r = curve_fit_cubic_to_points_refit_fl(tcs->point_array,
                                              length,
                                              CURVE_FIT_POINT_DIM,
                                              error_threshold,
-                                             CURVE_FIT_CALC_HIGH_QUALIY,
+                                             calc_flag,
                                              NULL,
                                              0,
                                              corner_angle,
@@ -811,12 +825,20 @@ static tGPCurveSegment *gpencil_generate_curve_segment(bGPDstroke *gps,
     bezt->h1 = HD_ALIGN;
     bezt->h2 = HD_ALIGN;
 
-    cpt->point_index = tcs->cubic_orig_index[i] + offset;
+    /* Make sure to add the start index. */
+    cpt->point_index = tcs->cubic_orig_index[i] + start_idx;
   }
 
-  /* Set handle type to HD_FREE for corner handles. */
-  if (tcs->corners_index_len > 0 && tcs->corners_index_array != NULL) {
-    for (int i = 0; i < tcs->corners_index_len; i++) {
+  /* Set handle type to HD_FREE for corner handles. Ignore first and last. */
+  if (tcs->corners_index_array != NULL) {
+    uint i_start = 0, i_end = tcs->corners_index_len;
+
+    if ((tcs->corners_index_len >= 2) && (calc_flag & CURVE_FIT_CALC_CYCLIC) == 0) {
+      i_start += 1;
+      i_end -= 1;
+    }
+
+    for (uint i = i_start; i < i_end; i++) {
       bGPDcurve_point *cpt = &tcs->curve_points[tcs->corners_index_array[i]];
       BezTriple *bezt = &cpt->bezt;
       bezt->h1 = HD_FREE;
@@ -959,7 +981,8 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_regenerate(bGPDstroke *gps,
    * longer treat it as a control point). Therefor the only option is to find */
 
   bGPDcurve *gpc = gps->editcurve;
-  const int tot_segments = gpc->tot_curve_points - 1;
+  const int num_segments = gpc->tot_curve_points - 1;
+  printf("num_segments: %d\n", num_segments);
   float diag_length = len_v3v3(gps->boundbox_min, gps->boundbox_max);
 
   ListBase curve_segments = {NULL, NULL};
@@ -968,99 +991,63 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_regenerate(bGPDstroke *gps,
    * that is not tagged. */
 
   tGPCurveSegment *tcs;
-  int new_tot_curve_points = 0, pt_offset = 0;
-  for (int i = 0; i < tot_segments; i++) {
+  int j = 0, new_num_segments = 0;
+  for (int i = 0; i < num_segments; i = j) {
+    int island_length = 1;
     int start_idx = gpc->curve_points[i].point_index;
-    bGPDspoint *start_pt = &gps->points[start_idx];
+    bool is_tagged = gpencil_is_segment_tagged(gps, i);
 
-    bool regen = false;
-    if ((start_pt->flag & GP_SPOINT_TAG)) {
-      regen = true;
-    }
-
-    /* Find end point. */
-    int end_idx = start_idx;
-    for (int j = i + 1; j < gpc->tot_curve_points; j++, i++) {
+    /* Find the end of this island (tagged or un-tagged). */
+    int end_idx;
+    bGPDspoint *end_pt;
+    for (j = i + 1; j < gpc->tot_curve_points; j++, island_length++) {
       end_idx = gpc->curve_points[j].point_index;
-      bGPDspoint *pt = &gps->points[end_idx];
-      if ((pt->flag & GP_SPOINT_TAG) == 0) {
+      end_pt = &gps->points[end_idx];
+      if (!(is_tagged && (end_pt->flag & GP_SPOINT_TAG)) &&
+          (gpencil_is_segment_tagged(gps, j) != is_tagged)) {
         break;
       }
-      regen = true;
     }
 
-    if (!regen) {
-      /* Check if there are marked points between the control points. If there are, the segment
-       * must be regenerated. */
-      for (int k = start_idx + 1; k < end_idx; k++) {
-        bGPDspoint *pt = &gps->points[k];
-        if ((pt->flag & GP_SPOINT_TAG)) {
-          regen = true;
-          tcs = gpencil_generate_curve_segment(
-              gps, diag_length, error_threshold, corner_angle, start_idx, end_idx, pt_offset);
-          break;
-        }
-      }
+    printf("i: %d, j: %d, length: %d\n", i, j, island_length);
+
+    if (is_tagged) {
+      /* Regenerate this segment. */
+      tcs = gpencil_fit_curve_to_points_ex(
+          gps, diag_length, error_threshold, corner_angle, start_idx, end_idx);
     }
     else {
-      /* Regenerate this segment. */
-      regen = true;
-      tcs = gpencil_generate_curve_segment(
-          gps, diag_length, error_threshold, corner_angle, start_idx, end_idx, pt_offset);
-    }
-
-    if (!regen) {
-      int start_cidx = i;
-      /* Find end point. This time for curve points that have not moved. */
-      int end_cidx = start_cidx;
-      for (int j = start_cidx + 1; j < gpc->tot_curve_points; j++, i++) {
-        bGPDspoint *pt = &gps->points[gpc->curve_points[j].point_index];
-        if (pt->flag & GP_SPOINT_TAG) {
-          break;
-        }
-        end_cidx = j;
-      }
-
+      /* Save this segment. */
       tcs = MEM_callocN(sizeof(tGPCurveSegment), __func__);
-      tcs->cubic_array_len = end_cidx - start_cidx + 1;
-      tcs->point_array_len = gpc->curve_points[end_cidx].point_index -
-                             gpc->curve_points[start_cidx].point_index + 1;
+      tcs->cubic_array_len = island_length;
+      tcs->point_array_len = end_idx - start_idx + 1;
       tcs->curve_points = MEM_callocN(sizeof(bGPDcurve_point) * tcs->cubic_array_len, __func__);
       memcpy(tcs->curve_points,
-             &gpc->curve_points[start_cidx],
+             &gpc->curve_points[i],
              sizeof(bGPDcurve_point) * tcs->cubic_array_len);
-
-      for (int j = 0; j < tcs->cubic_array_len; j++) {
-        bGPDcurve_point *cpt = &tcs->curve_points[j];
-        cpt->point_index += pt_offset;
-      }
     }
 
-    pt_offset += tcs->point_array_len;
-    new_tot_curve_points += tcs->cubic_array_len;
+    new_num_segments += (tcs->cubic_array_len - 1);
+    printf("tcs->cubic_array_len: %d\n", tcs->cubic_array_len);
     BLI_addtail(&curve_segments, tcs);
   }
 
   /* TODO: If the stroke is cyclic we need to check if the last segment needs to be regenerated or
    * saved. */
-  printf("new_tot_curve_points: %d\n", new_tot_curve_points);
-  bGPDcurve *new_gpc = BKE_gpencil_stroke_editcurve_new(new_tot_curve_points);
+  printf("new_num_segments: %d\n", new_num_segments);
+  bGPDcurve *new_gpc = BKE_gpencil_stroke_editcurve_new(new_num_segments + 1);
 
   /* Combine listbase curve segments to gpencil curve. */
   int offset = 0;
-  LISTBASE_FOREACH(tGPCurveSegment *, cs, &curve_segments) {
+  LISTBASE_FOREACH_MUTABLE (tGPCurveSegment *, cs, &curve_segments) {
+    printf("from: %d, to: %d\n", offset, offset + cs->cubic_array_len - 1);
     memcpy(&new_gpc->curve_points[offset],
            cs->curve_points,
            sizeof(bGPDcurve_point) * cs->cubic_array_len);
-    offset += cs->cubic_array_len;
-    printf("cs->cubic_array_len: %d\n", cs->cubic_array_len);
-  }
+    offset += (cs->cubic_array_len - 1);
 
-
-  LISTBASE_FOREACH_MUTABLE(tGPCurveSegment *, cs, &curve_segments) {
     gpencil_free_curve_segment(cs);
   }
-  BLI_listbase_clear(&curve_segments);
 
   /* Free the old curve. */
   BKE_gpencil_free_stroke_editcurve(gps);
@@ -1108,6 +1095,7 @@ void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps,
     else {
       /* Some segments are unchanged. Do a partial update. */
       editcurve = BKE_gpencil_stroke_editcurve_regenerate(gps, threshold, corner_angle);
+      gpencil_clear_point_tag(gps);
     }
   }
   else {
