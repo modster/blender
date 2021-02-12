@@ -19,7 +19,7 @@ void node_bsdf_diffuse(vec4 color, float roughness, vec3 N, out Closure result)
   result.radiance = out_Diffuse_0.radiance;
 
   /* TODO(fclem) Try to not use this. */
-  closure_load_ssr_data(vec3(0.0), 0.0, in_Diffuse_0.N, -1, result);
+  closure_load_ssr_data(vec3(0.0), 0.0, in_Diffuse_0.N, -1.0, result);
 }
 
 #else
