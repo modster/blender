@@ -1467,7 +1467,8 @@ class VIEW3D_PT_tools_grease_pencil_brush_advanced(View3DPanel, Panel):
                     sub.prop(gp_settings, "fill_threshold", text="")
 
                 col.separator()
-                col.prop(gp_settings, "use_curve_data")
+                row = col.row(align=True)
+                row.prop(gp_settings, "use_fill_limit")
 
 
 class VIEW3D_PT_tools_grease_pencil_brush_stroke(Panel, View3DPanel):
