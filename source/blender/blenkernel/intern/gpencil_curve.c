@@ -982,7 +982,6 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_regenerate(bGPDstroke *gps,
 
   bGPDcurve *gpc = gps->editcurve;
   const int num_segments = gpc->tot_curve_points - 1;
-  printf("num_segments: %d\n", num_segments);
   float diag_length = len_v3v3(gps->boundbox_min, gps->boundbox_max);
 
   ListBase curve_segments = {NULL, NULL};
@@ -1009,8 +1008,6 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_regenerate(bGPDstroke *gps,
       }
     }
 
-    printf("i: %d, j: %d, length: %d\n", i, j, island_length);
-
     if (is_tagged) {
       /* Regenerate this segment. */
       tcs = gpencil_fit_curve_to_points_ex(
@@ -1028,19 +1025,17 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_regenerate(bGPDstroke *gps,
     }
 
     new_num_segments += (tcs->cubic_array_len - 1);
-    printf("tcs->cubic_array_len: %d\n", tcs->cubic_array_len);
     BLI_addtail(&curve_segments, tcs);
   }
 
   /* TODO: If the stroke is cyclic we need to check if the last segment needs to be regenerated or
    * saved. */
-  printf("new_num_segments: %d\n", new_num_segments);
   bGPDcurve *new_gpc = BKE_gpencil_stroke_editcurve_new(new_num_segments + 1);
 
   /* Combine listbase curve segments to gpencil curve. */
   int offset = 0;
   LISTBASE_FOREACH_MUTABLE (tGPCurveSegment *, cs, &curve_segments) {
-    printf("from: %d, to: %d\n", offset, offset + cs->cubic_array_len - 1);
+    /* TODO: don't override previous control point */
     memcpy(&new_gpc->curve_points[offset],
            cs->curve_points,
            sizeof(bGPDcurve_point) * cs->cubic_array_len);
