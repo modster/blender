@@ -1082,7 +1082,7 @@ static void gpencil_primitive_update_strokes(bContext *C, tGPDprimitive *tgpi)
   }
 
   /* If camera view or view projection, reproject flat to view to avoid perspective effect. */
-  if (((align_flag & GP_PROJECT_VIEWSPACE) && is_lock_axis_view) || is_camera) {
+  if ((!is_depth) && (((align_flag & GP_PROJECT_VIEWSPACE) && is_lock_axis_view) || is_camera)) {
     ED_gpencil_project_stroke_to_view(C, tgpi->gpl, gps);
   }
 
@@ -1375,6 +1375,12 @@ static void gpencil_primitive_interaction_end(bContext *C,
       ED_gpencil_stroke_close_by_distance(gps, 0.02f);
     }
     BKE_gpencil_stroke_geometry_update(tgpi->gpd, gps);
+  }
+
+  /* In Multiframe mode, duplicate the stroke in other frames. */
+  if (GPENCIL_MULTIEDIT_SESSIONS_ON(tgpi->gpd)) {
+    const bool tail = (ts->gpencil_flags & GP_TOOL_FLAG_PAINT_ONBACK);
+    BKE_gpencil_stroke_copy_to_keyframes(tgpi->gpd, tgpi->gpl, gpf, gps, tail);
   }
 
   DEG_id_tag_update(&tgpi->gpd->id, ID_RECALC_COPY_ON_WRITE);

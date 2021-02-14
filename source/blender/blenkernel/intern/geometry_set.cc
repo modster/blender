@@ -14,7 +14,6 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "BLI_listbase_wrapper.hh" /* TODO: Couldn't figure this out yet. */
 #include "BLI_map.hh"
 
 #include "BKE_attribute.h"
@@ -30,11 +29,12 @@
 #include "DNA_collection_types.h"
 #include "DNA_object_types.h"
 
+#include "BLI_rand.hh"
+
 #include "MEM_guardedalloc.h"
 
 using blender::float3;
 using blender::float4x4;
-using blender::ListBaseWrapper;
 using blender::Map;
 using blender::MutableSpan;
 using blender::Span;
@@ -386,6 +386,17 @@ void MeshComponent::copy_vertex_group_names_from_object(const Object &object)
   }
 }
 
+const blender::Map<std::string, int> &MeshComponent::vertex_group_names() const
+{
+  return vertex_group_names_;
+}
+
+/* This is only exposed for the internal attribute API. */
+blender::Map<std::string, int> &MeshComponent::vertex_group_names()
+{
+  return vertex_group_names_;
+}
+
 /* Get the mesh from this component. This method can be used by multiple threads at the same
  * time. Therefore, the returned mesh should not be modified. No ownership is transferred. */
 const Mesh *MeshComponent::get_for_read() const
@@ -575,6 +586,9 @@ bool InstancesComponent::is_empty() const
   return transforms_.size() == 0;
 }
 
+/**
+ * \note This doesn't extract instances from the "dupli" system for non-geometry-nodes instances.
+ */
 static GeometrySet object_get_geometry_set_for_read(const Object &object)
 {
   /* Objects evaluated with a nodes modifier will have a geometry set already. */
@@ -598,11 +612,12 @@ static GeometrySet object_get_geometry_set_for_read(const Object &object)
     }
   }
 
-  /* TODO: Cover the case of pointclouds without modifiers,
-   * they may not be covered by the #geometry_set_eval case above. */
+  /* TODO: Cover the case of pointclouds without modifiers-- they may not be covered by the
+   * #geometry_set_eval case above. */
+
   /* TODO: Add volume support. */
 
-  /* Return by value since there is no existing geometry set owned elsewhere to use. */
+  /* Return by value since there is not always an existing geometry set owned elsewhere to use. */
   return new_geometry_set;
 }
 
@@ -620,18 +635,27 @@ static void geometry_set_collect_recursive_collection(const Collection &collecti
                                                       const float4x4 &transform,
                                                       Vector<GeometryInstanceGroup> &r_sets);
 
+static void geometry_set_collect_recursive_collection_instance(
+    const Collection &collection, const float4x4 &transform, Vector<GeometryInstanceGroup> &r_sets)
+{
+  float4x4 offset_matrix;
+  unit_m4(offset_matrix.values);
+  sub_v3_v3(offset_matrix.values[3], collection.instance_offset);
+  const float4x4 instance_transform = transform * offset_matrix;
+  geometry_set_collect_recursive_collection(collection, instance_transform, r_sets);
+}
+
 static void geometry_set_collect_recursive_object(const Object &object,
                                                   const float4x4 &transform,
                                                   Vector<GeometryInstanceGroup> &r_sets)
 {
   GeometrySet instance_geometry_set = object_get_geometry_set_for_read(object);
-  const float4x4 object_transform = transform * object.obmat; /* TODO: Validate this. */
-  geometry_set_collect_recursive(instance_geometry_set, object_transform, r_sets);
+  geometry_set_collect_recursive(instance_geometry_set, transform, r_sets);
 
   if (object.type == OB_EMPTY) {
     const Collection *collection_instance = object.instance_collection;
     if (collection_instance != nullptr) {
-      geometry_set_collect_recursive_collection(*collection_instance, object_transform, r_sets);
+      geometry_set_collect_recursive_collection_instance(*collection_instance, transform, r_sets);
     }
   }
 }
@@ -643,7 +667,8 @@ static void geometry_set_collect_recursive_collection(const Collection &collecti
   LISTBASE_FOREACH (const CollectionObject *, collection_object, &collection.gobject) {
     BLI_assert(collection_object->ob != nullptr);
     const Object &object = *collection_object->ob;
-    geometry_set_collect_recursive_object(object, transform, r_sets);
+    const float4x4 object_transform = transform * object.obmat;
+    geometry_set_collect_recursive_object(object, object_transform, r_sets);
   }
   LISTBASE_FOREACH (const CollectionChild *, collection_child, &collection.children) {
     BLI_assert(collection_child->collection != nullptr);
@@ -666,7 +691,7 @@ static void geometry_set_collect_recursive(const GeometrySet &geometry_set,
     Span<InstancedData> instances = instances_component.instanced_data();
     for (const int i : instances.index_range()) {
       const InstancedData &data = instances[i];
-      const float4x4 &instance_transform = transform * transforms[i];
+      const float4x4 instance_transform = transform * transforms[i];
 
       if (data.type == INSTANCE_DATA_TYPE_OBJECT) {
         BLI_assert(data.data.object != nullptr);
@@ -676,7 +701,7 @@ static void geometry_set_collect_recursive(const GeometrySet &geometry_set,
       else if (data.type == INSTANCE_DATA_TYPE_COLLECTION) {
         BLI_assert(data.data.collection != nullptr);
         const Collection &collection = *data.data.collection;
-        geometry_set_collect_recursive_collection(collection, instance_transform, r_sets);
+        geometry_set_collect_recursive_collection_instance(collection, instance_transform, r_sets);
       }
     }
   }
@@ -687,8 +712,10 @@ static void geometry_set_collect_recursive(const GeometrySet &geometry_set,
  * instances and object instances will be expanded into the instances of their geometry components.
  * Even the instances in those geometry components' will be included.
  *
- * \note For convenience (to avoid duplication in the caller),
- * the returned vector also contains the argument geometry set.
+ * \note For convenience (to avoid duplication in the caller), the returned vector also contains
+ * the argument geometry set.
+ *
+ * \note This doesn't extract instances from the "dupli" system for non-geometry-nodes instances.
  */
 Vector<GeometryInstanceGroup> BKE_geometry_set_gather_instances(const GeometrySet &geometry_set)
 {
@@ -700,6 +727,68 @@ Vector<GeometryInstanceGroup> BKE_geometry_set_gather_instances(const GeometrySe
   geometry_set_collect_recursive(geometry_set, unit_transform, result_vector);
 
   return result_vector;
+}
+
+static blender::Array<int> generate_unique_instance_ids(Span<int> original_ids)
+{
+  using namespace blender;
+  Array<int> unique_ids(original_ids.size());
+
+  Set<int> used_unique_ids;
+  used_unique_ids.reserve(original_ids.size());
+  Vector<int> instances_with_id_collision;
+  for (const int instance_index : original_ids.index_range()) {
+    const int original_id = original_ids[instance_index];
+    if (used_unique_ids.add(original_id)) {
+      /* The original id has not been used by another instance yet. */
+      unique_ids[instance_index] = original_id;
+    }
+    else {
+      /* The original id of this instance collided with a previous instance, it needs to be looked
+       * at again in a second pass. Don't generate a new random id here, because this might collide
+       * with other existing ids. */
+      instances_with_id_collision.append(instance_index);
+    }
+  }
+
+  Map<int, RandomNumberGenerator> generator_by_original_id;
+  for (const int instance_index : instances_with_id_collision) {
+    const int original_id = original_ids[instance_index];
+    RandomNumberGenerator &rng = generator_by_original_id.lookup_or_add_cb(original_id, [&]() {
+      RandomNumberGenerator rng;
+      rng.seed_random(original_id);
+      return rng;
+    });
+
+    const int max_iteration = 100;
+    for (int iteration = 0;; iteration++) {
+      /* Try generating random numbers until an unused one has been found. */
+      const int random_id = rng.get_int32();
+      if (used_unique_ids.add(random_id)) {
+        /* This random id is not used by another instance. */
+        unique_ids[instance_index] = random_id;
+        break;
+      }
+      if (iteration == max_iteration) {
+        /* It seems to be very unlikely that we ever run into this case (assuming there are less
+         * than 2^30 instances). However, if that happens, it's better to use an id that is not
+         * unique than to be stuck in an infinite loop. */
+        unique_ids[instance_index] = original_id;
+        break;
+      }
+    }
+  }
+
+  return unique_ids;
+}
+
+blender::Span<int> InstancesComponent::almost_unique_ids() const
+{
+  std::lock_guard lock(almost_unique_ids_mutex_);
+  if (almost_unique_ids_.size() != ids_.size()) {
+    almost_unique_ids_ = generate_unique_instance_ids(ids_);
+  }
+  return almost_unique_ids_;
 }
 
 /** \} */
@@ -799,7 +888,7 @@ bool BKE_geometry_set_has_instances(const GeometrySet *geometry_set)
 
 int BKE_geometry_set_instances(const GeometrySet *geometry_set,
                                float (**r_transforms)[4][4],
-                               int **r_ids,
+                               const int **r_almost_unique_ids,
                                InstancedData **r_instanced_data)
 {
   const InstancesComponent *component = geometry_set->get_component_for_read<InstancesComponent>();
@@ -807,9 +896,8 @@ int BKE_geometry_set_instances(const GeometrySet *geometry_set,
     return 0;
   }
   *r_transforms = (float(*)[4][4])component->transforms().data();
-  *r_ids = (int *)component->ids().data();
   *r_instanced_data = (InstancedData *)component->instanced_data().data();
-  *r_instanced_data = (InstancedData *)component->instanced_data().data();
+  *r_almost_unique_ids = (const int *)component->almost_unique_ids().data();
   return component->instances_amount();
 }
 
