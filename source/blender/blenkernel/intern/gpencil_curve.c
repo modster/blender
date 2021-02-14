@@ -643,10 +643,20 @@ static bool gpencil_is_segment_tagged(bGPDstroke *gps, const uint32_t cpt_start)
   }
 
   /* Iterate over all stroke points in between and check if any point is tagged. */
-  for (int i = start_pt_idx + 1; i < end_pt_idx - 1; i++) {
-    bGPDspoint *pt = &gps->points[i];
-    if ((pt->flag & GP_SPOINT_TAG)) {
-      return true;
+  if (is_cyclic && (cpt_start == gpc->tot_curve_points - 1)) {
+    for (int i = start_pt_idx + 1; i < gps->totpoints; i++) {
+      bGPDspoint *pt = &gps->points[i];
+      if ((pt->flag & GP_SPOINT_TAG)) {
+        return true;
+      }
+    }
+  }
+  else {
+    for (int i = start_pt_idx + 1; i < end_pt_idx - 1; i++) {
+      bGPDspoint *pt = &gps->points[i];
+      if ((pt->flag & GP_SPOINT_TAG)) {
+        return true;
+      }
     }
   }
 
@@ -859,107 +869,15 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_generate(bGPDstroke *gps,
   if (gps->totpoints < 3) {
     return gpencil_stroke_editcurve_generate_edgecases(gps);
   }
-/* Point data: x, y, z, pressure, strength, r, g, b, a */
-#define POINT_DIM 9
 
-  float *points = MEM_callocN(sizeof(float) * gps->totpoints * POINT_DIM, __func__);
-  float diag_length = len_v3v3(gps->boundbox_min, gps->boundbox_max);
-  float tmp_vec[3];
+  const float diag_length = len_v3v3(gps->boundbox_min, gps->boundbox_max);
+  tGPCurveSegment *tcs = gpencil_fit_curve_to_points_ex(
+      gps, diag_length, error_threshold, corner_angle, 0, gps->totpoints - 1);
 
-  for (int i = 0; i < gps->totpoints; i++) {
-    bGPDspoint *pt = &gps->points[i];
-    int row = i * POINT_DIM;
+  bGPDcurve *editcurve = BKE_gpencil_stroke_editcurve_new(tcs->cubic_array_len);
+  memcpy(editcurve->curve_points, tcs->curve_points, sizeof(bGPDcurve_point) * tcs->cubic_array_len);
+  gpencil_free_curve_segment(tcs);
 
-    /* normalize coordinate to 0..1 */
-    sub_v3_v3v3(tmp_vec, &pt->x, gps->boundbox_min);
-    mul_v3_v3fl(&points[row], tmp_vec, COORD_FITTING_INFLUENCE / diag_length);
-    points[row + 3] = pt->pressure / diag_length;
-
-    /* strength and color are already normalized */
-    points[row + 4] = pt->strength / diag_length;
-    mul_v4_v4fl(&points[row + 5], pt->vert_color, 1.0f / diag_length);
-  }
-
-  uint calc_flag = CURVE_FIT_CALC_HIGH_QUALIY;
-  if (gps->totpoints > 2 && gps->flag & GP_STROKE_CYCLIC) {
-    calc_flag |= CURVE_FIT_CALC_CYCLIC;
-  }
-
-  float *r_cubic_array = NULL;
-  unsigned int r_cubic_array_len = 0;
-  unsigned int *r_cubic_orig_index = NULL;
-  unsigned int *r_corners_index_array = NULL;
-  unsigned int r_corners_index_len = 0;
-  int r = curve_fit_cubic_to_points_refit_fl(points,
-                                             gps->totpoints,
-                                             POINT_DIM,
-                                             error_threshold,
-                                             calc_flag,
-                                             NULL,
-                                             0,
-                                             corner_angle,
-                                             &r_cubic_array,
-                                             &r_cubic_array_len,
-                                             &r_cubic_orig_index,
-                                             &r_corners_index_array,
-                                             &r_corners_index_len);
-
-  if (r != 0 || r_cubic_array_len < 1) {
-    return NULL;
-  }
-
-  uint curve_point_size = 3 * POINT_DIM;
-
-  bGPDcurve *editcurve = BKE_gpencil_stroke_editcurve_new(r_cubic_array_len);
-
-  for (int i = 0; i < r_cubic_array_len; i++) {
-    bGPDcurve_point *cpt = &editcurve->curve_points[i];
-    BezTriple *bezt = &cpt->bezt;
-    float *curve_point = &r_cubic_array[i * curve_point_size];
-
-    for (int j = 0; j < 3; j++) {
-      float *bez = &curve_point[j * POINT_DIM];
-      madd_v3_v3v3fl(bezt->vec[j], gps->boundbox_min, bez, diag_length / COORD_FITTING_INFLUENCE);
-    }
-
-    float *ctrl_point = &curve_point[1 * POINT_DIM];
-    cpt->pressure = ctrl_point[3] * diag_length;
-    cpt->strength = ctrl_point[4] * diag_length;
-    mul_v4_v4fl(cpt->vert_color, &ctrl_point[5], diag_length);
-
-    /* default handle type */
-    bezt->h1 = HD_ALIGN;
-    bezt->h2 = HD_ALIGN;
-
-    cpt->point_index = r_cubic_orig_index[i];
-  }
-
-  if (r_corners_index_len > 0 && r_corners_index_array != NULL) {
-    int start = 0, end = r_corners_index_len;
-    if ((r_corners_index_len > 1) && (calc_flag & CURVE_FIT_CALC_CYCLIC) == 0) {
-      start = 1;
-      end = r_corners_index_len - 1;
-    }
-    for (int i = start; i < end; i++) {
-      bGPDcurve_point *cpt = &editcurve->curve_points[r_corners_index_array[i]];
-      BezTriple *bezt = &cpt->bezt;
-      bezt->h1 = HD_FREE;
-      bezt->h2 = HD_FREE;
-    }
-  }
-
-  MEM_freeN(points);
-  if (r_cubic_array) {
-    free(r_cubic_array);
-  }
-  if (r_corners_index_array) {
-    free(r_corners_index_array);
-  }
-  if (r_cubic_orig_index) {
-    free(r_cubic_orig_index);
-  }
-
-#undef POINT_DIM
   return editcurve;
 }
 
@@ -1030,23 +948,34 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_regenerate(bGPDstroke *gps,
 
   /* TODO: If the stroke is cyclic we need to check if the last segment needs to be regenerated or
    * saved. */
-  bGPDcurve *new_gpc = BKE_gpencil_stroke_editcurve_new(new_num_segments + 1);
+  bGPDcurve *editcurve = BKE_gpencil_stroke_editcurve_new(new_num_segments + 1);
+
+  /* Copy first point. */
+  tGPCurveSegment *frist_cs = (tGPCurveSegment *)&curve_segments.first;
+  memcpy(&editcurve->curve_points[0],
+         &frist_cs->curve_points[0],
+         sizeof(bGPDcurve_point));
 
   /* Combine listbase curve segments to gpencil curve. */
   int offset = 0;
   LISTBASE_FOREACH_MUTABLE (tGPCurveSegment *, cs, &curve_segments) {
-    /* TODO: don't override previous control point */
-    memcpy(&new_gpc->curve_points[offset],
-           cs->curve_points,
-           sizeof(bGPDcurve_point) * cs->cubic_array_len);
-    offset += (cs->cubic_array_len - 1);
+    /* Copy second handle of first point */
+    bGPDcurve_point *first_dst = &editcurve->curve_points[offset];
+    bGPDcurve_point *first_src = &cs->curve_points[0];
+    copy_v3_v3(first_dst->bezt.vec[2], first_src->bezt.vec[2]);
 
+    /* Copy the rest of the points. */
+    memcpy(&editcurve->curve_points[offset + 1],
+           &cs->curve_points[1],
+           sizeof(bGPDcurve_point) * (cs->cubic_array_len - 1));
+
+    offset += (cs->cubic_array_len - 1);
     gpencil_free_curve_segment(cs);
   }
 
   /* Free the old curve. */
   BKE_gpencil_free_stroke_editcurve(gps);
-  return new_gpc;
+  return editcurve;
 }
 
 /**
@@ -1108,6 +1037,9 @@ void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps,
   }
 
   gps->editcurve = editcurve;
+  if (do_partial_update) {
+    BKE_gpencil_editcurve_recalculate_handles(gps);
+  }
 }
 
 /**
