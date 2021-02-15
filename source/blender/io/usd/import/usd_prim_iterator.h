@@ -58,6 +58,9 @@ class USDPrimIterator {
 
   void cache_prototype_data(USDDataCache &r_cache) const;
 
+  void create_prototype_object_readers(
+      std::map<pxr::SdfPath, std::vector<USDXformableReader *>> &r_proto_readers) const;
+
   bool gather_objects_paths(ListBase *object_paths) const;
 
   void debug_traverse_stage() const;

@@ -23,6 +23,7 @@
 #include "usd_data_cache.h"
 #include "usd_importer_context.h"
 #include "usd_reader_camera.h"
+#include "usd_reader_instance.h"
 #include "usd_reader_light.h"
 #include "usd_reader_mesh.h"
 #include "usd_reader_shape.h"
@@ -122,9 +123,19 @@ USDXformableReader *USDPrimIterator::get_object_reader(const pxr::UsdPrim &prim)
 USDXformableReader *USDPrimIterator::get_object_reader(const pxr::UsdPrim &prim,
                                                        const USDImporterContext &context)
 {
+  if (!prim) {
+    return nullptr;
+  }
+
   USDXformableReader *result = nullptr;
 
-  if (prim.IsA<pxr::UsdGeomCamera>()) {
+  if (context.import_params.use_instancing && prim.IsInstance()) {
+    std::cout << "Have instance " << prim.GetPath() << std::endl;
+    std::cout << "    Instance type: " << prim.GetTypeName() << std::endl;
+    std::cout << "    Master: " << prim.GetMaster().GetPath() << std::endl;
+    result = new USDInstanceReader(prim, context);
+  }
+  else if (prim.IsA<pxr::UsdGeomCamera>()) {
     result = new USDCameraReader(prim, context);
   }
   else if (prim.IsA<pxr::UsdGeomMesh>()) {
@@ -197,8 +208,14 @@ void USDPrimIterator::create_object_readers(const pxr::UsdPrim &prim,
   std::vector<USDXformableReader *> child_readers;
 
   /* Recursively create readers for the child prims. */
-  pxr::UsdPrimSiblingRange child_prims = prim.GetFilteredChildren(
-      pxr::UsdTraverseInstanceProxies(pxr::UsdPrimDefaultPredicate));
+
+  pxr::Usd_PrimFlagsPredicate filter_predicate = pxr::UsdPrimDefaultPredicate;
+
+  if (!context.import_params.use_instancing) {
+    filter_predicate = pxr::UsdTraverseInstanceProxies(filter_predicate);
+  }
+
+  pxr::UsdPrimSiblingRange child_prims = prim.GetFilteredChildren(filter_predicate);
 
   int num_child_prims = 0;
   for (const pxr::UsdPrim &child_prim : child_prims) {
@@ -214,13 +231,14 @@ void USDPrimIterator::create_object_readers(const pxr::UsdPrim &prim,
   /* We prune away empty transform or scope hierarchies (we can add an import flag to make this
    * behavior optional).  Therefore, we skip this prim if it's an Xform or Scope and if
    * it has no corresponding child readers. */
-  if ((prim.IsA<pxr::UsdGeomXform>() || prim.IsA<pxr::UsdGeomScope>()) && child_readers.empty()) {
+  if (!context.import_params.use_instancing &&
+      (prim.IsA<pxr::UsdGeomXform>() || prim.IsA<pxr::UsdGeomScope>()) && child_readers.empty()) {
     return;
   }
 
   /* If this is an Xform prim, see if we can merge with the child reader. */
 
-  if (prim.IsA<pxr::UsdGeomXform>() && num_child_prims == 1 &&
+  if (prim.IsA<pxr::UsdGeomXform>() && child_readers.size() == 1 &&
       !child_readers.front()->merged_with_parent() &&
       child_readers.front()->can_merge_with_parent()) {
     child_readers.front()->set_merged_with_parent(true);
@@ -239,7 +257,7 @@ void USDPrimIterator::create_object_readers(const pxr::UsdPrim &prim,
     r_child_readers.push_back(reader);
     r_readers.push_back(reader);
   }
-  else {
+  else if (!child_readers.empty()) {
     /* No reader was allocated for this prim, so we pass our child readers back to the caller,
      * for possible handling by a parent reader. */
     r_child_readers.insert(r_child_readers.end(), child_readers.begin(), child_readers.end());
@@ -292,14 +310,53 @@ void USDPrimIterator::cache_prototype_data(USDDataCache &r_cache) const
   }
 }
 
+void USDPrimIterator::create_prototype_object_readers(
+    std::map<pxr::SdfPath, std::vector<USDXformableReader *>> &r_proto_readers) const
+{
+  if (!stage_) {
+    return;
+  }
+
+  std::vector<pxr::UsdPrim> protos = stage_->GetMasters();
+
+  for (const pxr::UsdPrim &proto_prim : protos) {
+
+    if (!proto_prim) {
+      continue;
+    }
+
+    std::cout << "master: " << proto_prim.GetPath() << std::endl;
+
+    std::vector<pxr::UsdPrim> insts = proto_prim.GetInstances();
+
+    for (const pxr::UsdPrim &inst : insts) {
+      if (inst) {
+        std::cout << "   inst: " << inst.GetPath() << std::endl;
+      }
+    }
+
+    std::vector<USDXformableReader *> proto_readers;
+    std::vector<USDXformableReader *> child_readers;
+
+    create_object_readers(proto_prim, context_, proto_readers, child_readers);
+
+    r_proto_readers.insert(std::make_pair(proto_prim.GetPath(), proto_readers));
+  }
+}
+
 bool USDPrimIterator::gather_objects_paths(ListBase *object_paths) const
 {
   if (!stage_) {
     return false;
   }
 
-  pxr::UsdPrimRange prims = stage_->Traverse(
-      pxr::UsdTraverseInstanceProxies(pxr::UsdPrimDefaultPredicate));
+  pxr::Usd_PrimFlagsPredicate filter_predicate = pxr::UsdPrimDefaultPredicate;
+
+  if (!context_.import_params.use_instancing) {
+    filter_predicate = pxr::UsdTraverseInstanceProxies(filter_predicate);
+  }
+
+  pxr::UsdPrimRange prims = stage_->Traverse(filter_predicate);
 
   for (const pxr::UsdPrim &prim : prims) {
     void *usd_path_void = MEM_callocN(sizeof(CacheObjectPath), "CacheObjectPath");

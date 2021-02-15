@@ -20,6 +20,7 @@
 #include "import/usd_data_cache.h"
 #include "import/usd_importer_context.h"
 #include "import/usd_prim_iterator.h"
+#include "import/usd_reader_instance.h"
 #include "import/usd_reader_mesh_base.h"
 #include "import/usd_reader_xformable.h"
 #include "usd.h"
@@ -110,6 +111,123 @@ static bool gather_objects_paths(const pxr::UsdPrim &object, ListBase *object_pa
 
    return true;*/
   return false;
+}
+
+static Collection *create_collection(Main *bmain, Collection *parent, const char *name)
+{
+  if (!bmain) {
+    return nullptr;
+  }
+
+  Collection *coll = BKE_collection_add(bmain, parent, name);
+
+  if (coll) {
+    id_fake_user_set(&coll->id);
+    DEG_id_tag_update(&coll->id, ID_RECALC_COPY_ON_WRITE);
+  }
+
+  return coll;
+}
+
+static void set_instance_collection(
+    USDInstanceReader *instance_reader,
+    const std::map<pxr::SdfPath, Collection *> &proto_collection_map)
+{
+  if (!instance_reader) {
+    return;
+  }
+
+  pxr::SdfPath proto_path = instance_reader->proto_path();
+
+  std::map<pxr::SdfPath, Collection *>::const_iterator it = proto_collection_map.find(proto_path);
+
+  if (it != proto_collection_map.end()) {
+    instance_reader->set_instance_collection(it->second);
+  }
+  else {
+    std::cerr << "WARNING: Couldn't find prototype collection for " << instance_reader->prim_path()
+              << std::endl;
+  }
+}
+
+static void create_proto_collections(
+    Main *bmain,
+    ViewLayer *view_layer,
+    Collection *parent_collection,
+    const std::map<pxr::SdfPath, std::vector<USDXformableReader *>> &proto_readers,
+    const std::vector<USDXformableReader *> &readers)
+{
+  Collection *all_protos_collection = create_collection(bmain, parent_collection, "prototypes");
+
+  std::map<pxr::SdfPath, Collection *> proto_collection_map;
+
+  for (const auto &pair : proto_readers) {
+
+    std::string proto_collection_name = pair.first.GetString();
+
+    // TODO(makowalski): Is it acceptable to have slashes in the collection names? Or should we
+    // replace them with another character, like an underscore, as in the following?
+    // std::replace(proto_collection_name.begin(), proto_collection_name.end(), '/', '_');
+
+    Collection *proto_collection = create_collection(
+        bmain, all_protos_collection, proto_collection_name.c_str());
+
+    LayerCollection *proto_lc = BKE_layer_collection_first_from_scene_collection(view_layer,
+                                                                                 proto_collection);
+    if (proto_lc) {
+      proto_lc->flag |= LAYER_COLLECTION_HIDE;
+    }
+
+    proto_collection_map.insert(std::make_pair(pair.first, proto_collection));
+  }
+
+  // Set the instance collections on the readers, including the prototype
+  // readers, as instancing may be recursive.
+
+  for (const auto &pair : proto_readers) {
+    for (USDXformableReader *reader : pair.second) {
+      if (USDInstanceReader *instance_reader = dynamic_cast<USDInstanceReader *>(reader)) {
+        set_instance_collection(instance_reader, proto_collection_map);
+      }
+    }
+  }
+
+  for (USDXformableReader *reader : readers) {
+    if (USDInstanceReader *instance_reader = dynamic_cast<USDInstanceReader *>(reader)) {
+      set_instance_collection(instance_reader, proto_collection_map);
+    }
+  }
+
+  // Add the prototype objects to the collections.
+  for (const auto &pair : proto_readers) {
+
+    std::map<pxr::SdfPath, Collection *>::const_iterator it = proto_collection_map.find(
+        pair.first);
+
+    if (it == proto_collection_map.end()) {
+      std::cerr << "WARNING: Couldn't find collection when adding objects for prototype "
+                << pair.first << std::endl;
+      continue;
+    }
+
+    for (USDXformableReader *reader : pair.second) {
+      Object *ob = reader->object();
+
+      if (!ob) {
+        continue;
+      }
+
+      Collection *coll = it->second;
+
+      BKE_collection_object_add(bmain, coll, ob);
+
+      DEG_id_tag_update(&coll->id, ID_RECALC_COPY_ON_WRITE);
+      DEG_id_tag_update_ex(bmain,
+                           &ob->id,
+                           ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION |
+                               ID_RECALC_BASE_FLAGS);
+    }
+  }
 }
 
 struct ExportJobData {
@@ -268,7 +386,7 @@ struct ImportJobData {
 
   pxr::UsdStageRefPtr stage;
   std::vector<USDXformableReader *> readers;
-  USDDataCache data_cache;
+  std::map<pxr::SdfPath, std::vector<USDXformableReader *>> proto_readers;
 };
 
 static void import_startjob(void *user_data, short *stop, short *do_update, float *progress)
@@ -329,9 +447,9 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
   *data->do_update = true;
   *data->progress = 0.1f;
 
-  /* Optionally, cache the prototype data for instancing. */
+  /* Optionally, create prototype readers for instancing. */
   if (data->params.use_instancing) {
-    usd_prim_iter.cache_prototype_data(data->data_cache);
+    usd_prim_iter.create_prototype_object_readers(data->proto_readers);
   }
 
   /* Get the xformable prim readers. */
@@ -349,7 +467,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
     USDXformableReader *reader = *iter;
 
     if (reader->valid()) {
-      reader->create_object(data->bmain, time, &data->data_cache);
+      reader->create_object(data->bmain, time, nullptr);
     }
     else {
       std::cerr << "Object " << reader->prim_path() << " in USD file " << data->filename
@@ -362,6 +480,26 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
     if (G.is_break) {
       data->was_cancelled = true;
       return;
+    }
+  }
+
+  if (data->params.use_instancing) {
+    for (const auto &pair : data->proto_readers) {
+
+      for (USDXformableReader *reader : pair.second) {
+        if (reader->valid()) {
+          reader->create_object(data->bmain, time, nullptr);
+        }
+        else {
+          std::cerr << "Object " << reader->prim_path() << " in USD file " << data->filename
+                    << " is invalid.\n";
+        }
+
+        if (G.is_break) {
+          data->was_cancelled = true;
+          return;
+        }
+      }
     }
   }
 
@@ -380,6 +518,23 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
     ob->parent = parent_reader ? parent_reader->object() : nullptr;
   }
 
+  if (data->params.use_instancing) {
+    for (const auto &pair : data->proto_readers) {
+
+      for (const USDXformableReader *reader : pair.second) {
+        Object *ob = reader->object();
+
+        if (!ob) {
+          continue;
+        }
+
+        const USDXformableReader *parent_reader = reader->parent();
+
+        ob->parent = parent_reader ? parent_reader->object() : nullptr;
+      }
+    }
+  }
+
   /* Setup transformations. */
   i = 0;
   for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
@@ -392,6 +547,20 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
     if (G.is_break) {
       data->was_cancelled = true;
       return;
+    }
+  }
+
+  if (data->params.use_instancing) {
+    for (const auto &pair : data->proto_readers) {
+
+      for (USDXformableReader *reader : pair.second) {
+        reader->set_object_transform(time, cache_file);
+
+        if (G.is_break) {
+          data->was_cancelled = true;
+          return;
+        }
+      }
     }
   }
 }
@@ -413,6 +582,19 @@ static void import_endjob(void *user_data)
         BKE_id_free_us(data->bmain, ob);
       }
     }
+
+    if (data->params.use_instancing) {
+      for (const auto &pair : data->proto_readers) {
+        for (USDXformableReader *reader : pair.second) {
+          Object *ob = reader->object();
+          /* It's possible that cancellation occurred between the creation of
+           * the reader and the creation of the Blender object. */
+          if (ob != NULL) {
+            BKE_id_free_us(data->bmain, ob);
+          }
+        }
+      }
+    }
   }
   else {
     /* Add object to scene. */
@@ -423,6 +605,11 @@ static void import_endjob(void *user_data)
     BKE_view_layer_base_deselect_all(view_layer);
 
     lc = BKE_layer_collection_get_active(view_layer);
+
+    if (data->params.use_instancing) {
+      create_proto_collections(
+          data->bmain, view_layer, lc->collection, data->proto_readers, data->readers);
+    }
 
     for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
       Object *ob = (*iter)->object();
@@ -462,6 +649,14 @@ static void import_endjob(void *user_data)
   }
 
   data->readers.clear();
+
+  if (data->params.use_instancing) {
+    for (const auto &pair : data->proto_readers) {
+      for (USDXformableReader *reader : pair.second) {
+        reader->decref();
+      }
+    }
+  }
 
   /* TODO(makowalski): Explicitly clear the data cache as well? */
 

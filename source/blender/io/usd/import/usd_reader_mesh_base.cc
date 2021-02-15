@@ -90,32 +90,6 @@ Mesh *USDMeshReaderBase::read_mesh(Main *bmain,
                                    USDDataCache *data_cache,
                                    bool &r_is_instance)
 {
-  /* If this prim is an instance proxy and instancing is enabled,
-   * return the shared mesh created by the instance prototype. */
-
-  if (this->context_.import_params.use_instancing && data_cache && this->prim_.IsInstanceProxy()) {
-
-    pxr::UsdPrim proto_prim = this->prim_.GetPrimInMaster();
-
-    if (proto_prim) {
-
-      pxr::SdfPath proto_path = proto_prim.GetPath();
-
-      Mesh *proto_mesh = data_cache->get_prototype_mesh(proto_path);
-
-      if (proto_mesh) {
-        /* Increment the user count before returning. */
-        id_us_plus(&proto_mesh->id);
-        r_is_instance = true;
-        return proto_mesh;
-      }
-
-      std::cerr << "WARNING: no cached mesh for prototype " << proto_path << " for instance "
-                << this->prim_path_ << std::endl;
-    }
-  }
-
-  /* Not sharing the prototype mesh, so create unique mesh data. */
   r_is_instance = false;
   return create_mesh(bmain, time);
 }
