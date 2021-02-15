@@ -130,9 +130,6 @@ USDXformableReader *USDPrimIterator::get_object_reader(const pxr::UsdPrim &prim,
   USDXformableReader *result = nullptr;
 
   if (context.import_params.use_instancing && prim.IsInstance()) {
-    std::cout << "Have instance " << prim.GetPath() << std::endl;
-    std::cout << "    Instance type: " << prim.GetTypeName() << std::endl;
-    std::cout << "    Master: " << prim.GetMaster().GetPath() << std::endl;
     result = new USDInstanceReader(prim, context);
   }
   else if (prim.IsA<pxr::UsdGeomCamera>()) {
@@ -323,16 +320,6 @@ void USDPrimIterator::create_prototype_object_readers(
 
     if (!proto_prim) {
       continue;
-    }
-
-    std::cout << "master: " << proto_prim.GetPath() << std::endl;
-
-    std::vector<pxr::UsdPrim> insts = proto_prim.GetInstances();
-
-    for (const pxr::UsdPrim &inst : insts) {
-      if (inst) {
-        std::cout << "   inst: " << inst.GetPath() << std::endl;
-      }
     }
 
     std::vector<USDXformableReader *> proto_readers;
