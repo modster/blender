@@ -254,6 +254,7 @@ class device_memory {
   void device_alloc();
   void device_free();
   void device_copy_to();
+  void device_copy_chunk_to(size_t chunk_offset, size_t chunk_size);
   void device_copy_from(int y, int w, int h, int elem);
   void device_zero();
 
@@ -262,6 +263,8 @@ class device_memory {
   Device *original_device;
   bool need_realloc_;
   bool modified;
+  bool has_chunks;
+  bool chunks_copied;
   size_t data_copied_ = 0;
   double time_copying_ = 0.0;
 };
@@ -329,6 +332,57 @@ template<typename T> class device_only_memory : public device_memory {
 
 template<typename T> class device_vector : public device_memory {
  public:
+    struct chunk {
+        device_vector<T> *parent_;
+        size_t offset_;
+        size_t size_;
+
+        chunk() : parent_(nullptr), offset_(0), size_(0) {}
+
+        chunk(device_vector<T> &parent, size_t offset, size_t size)
+          : parent_(&parent)
+          , offset_(offset)
+          , size_(size)
+        {
+          assert(offset < parent.size());
+          assert(offset + size < parent.size());
+          assert(parent.host_pointer != 0);
+          assert(parent.device_pointer != 0);
+        }
+
+        void copy_to_device()
+        {
+          parent_->chunks_copied = true;
+          parent_->copy_chunk_to_device(offset_ * sizeof(T), size_ * sizeof(T));
+        }
+
+        T *data()
+        {
+          return parent_->data() + offset_;
+        }
+
+        bool valid() const
+        {
+          return parent_ != nullptr;
+        }
+    };
+
+    chunk get_chunk(size_t offset, size_t size)
+    {
+      has_chunks = true;
+      /* handle case where there is no data, this is to support getting a chunk
+       * for delta compression when the feature is not supported by the device */
+      if (data_size == 0) {
+        return {};
+      }
+
+      if (!device_pointer) {
+        device_alloc();
+      }
+
+      return chunk(*this, offset, size);
+    }
+
   device_vector(Device *device, const char *name, MemoryType type)
       : device_memory(device, name, type)
   {
@@ -487,7 +541,20 @@ template<typename T> class device_vector : public device_memory {
       scoped_timer timer;
       device_copy_to();
       time_copying_ += timer.get_time();
-      data_copied_ = byte_size();
+
+      if (!chunks_copied) {
+        data_copied_ = byte_size();
+      }
+    }
+  }
+
+  void copy_chunk_to_device(size_t chunk_offset, size_t chunk_size)
+  {
+    if (data_size != 0) {
+      scoped_timer timer;
+      device_copy_chunk_to(chunk_offset, chunk_size);
+      time_copying_ += timer.get_time();
+      data_copied_ += chunk_size;
     }
   }
 
@@ -504,6 +571,8 @@ template<typename T> class device_vector : public device_memory {
   {
     modified = false;
     need_realloc_ = false;
+    has_chunks = false;
+    chunks_copied = false;
   }
 
   size_t byte_size() const

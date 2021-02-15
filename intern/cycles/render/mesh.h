@@ -222,12 +222,12 @@ class Mesh : public Geometry {
 
   void get_uv_tiles(ustring map, unordered_set<int> &tiles) override;
 
-  void pack_shaders(Scene *scene, uint *shader);
-  void pack_normals(float4 *vnormal);
+  void pack_shaders(Scene *scene, device_vector<uint>::chunk shader);
+  void pack_normals(device_vector<float4>::chunk vnormal);
   void pack_verts(const vector<uint> &tri_prim_index,
-                  uint4 *tri_vindex,
-                  uint *tri_patch,
-                  float2 *tri_patch_uv,
+                  device_vector<uint4>::chunk tri_vindex,
+                  device_vector<uint>::chunk tri_patch,
+                  device_vector<float2>::chunk tri_patch_uv,
                   size_t vert_offset,
                   size_t tri_offset);
   void pack_patches(uint *patch_data, uint vert_offset, uint face_offset, uint corner_offset);
@@ -253,6 +253,18 @@ class Mesh : public Geometry {
   size_t get_num_subd_verts()
   {
     return num_subd_verts;
+  }
+
+  template <typename T>
+  typename device_vector<T>::chunk get_verts_chunk(device_vector<T> &dvector)
+  {
+    return dvector.get_chunk(vert_offset, get_verts().size());
+  }
+
+  template <typename T>
+  typename device_vector<T>::chunk get_tris_chunk(device_vector<T> &dvector)
+  {
+    return dvector.get_chunk(prim_offset, num_triangles());
   }
 
  protected:

@@ -684,7 +684,7 @@ void Mesh::add_undisplaced()
   }
 }
 
-void Mesh::pack_shaders(Scene *scene, uint *tri_shader)
+void Mesh::pack_shaders(Scene *scene, device_vector<uint>::chunk tri_shader)
 {
   uint shader_id = 0;
   uint last_shader = -1;
@@ -703,11 +703,13 @@ void Mesh::pack_shaders(Scene *scene, uint *tri_shader)
       shader_id = scene->shader_manager->get_shader_id(shader, last_smooth);
     }
 
-    tri_shader[i] = shader_id;
+    tri_shader.data()[i] = shader_id;
   }
+
+  tri_shader.copy_to_device();
 }
 
-void Mesh::pack_normals(float4 *vnormal)
+void Mesh::pack_normals(device_vector<float4>::chunk vnormal)
 {
   Attribute *attr_vN = attributes.find(ATTR_STD_VERTEX_NORMAL);
   if (attr_vN == NULL) {
@@ -727,14 +729,16 @@ void Mesh::pack_normals(float4 *vnormal)
     if (do_transform)
       vNi = safe_normalize(transform_direction(&ntfm, vNi));
 
-    vnormal[i] = make_float4(vNi.x, vNi.y, vNi.z, 0.0f);
+    vnormal.data()[i] = make_float4(vNi.x, vNi.y, vNi.z, 0.0f);
   }
+
+  vnormal.copy_to_device();
 }
 
 void Mesh::pack_verts(const vector<uint> &tri_prim_index,
-                      uint4 *tri_vindex,
-                      uint *tri_patch,
-                      float2 *tri_patch_uv,
+                      device_vector<uint4>::chunk tri_vindex,
+                      device_vector<uint>::chunk tri_patch,
+                      device_vector<float2>::chunk tri_patch_uv,
                       size_t vert_offset,
                       size_t tri_offset)
 {
@@ -744,21 +748,26 @@ void Mesh::pack_verts(const vector<uint> &tri_prim_index,
     float2 *vert_patch_uv_ptr = vert_patch_uv.data();
 
     for (size_t i = 0; i < verts_size; i++) {
-      tri_patch_uv[i] = vert_patch_uv_ptr[i];
+      tri_patch_uv.data()[i] = vert_patch_uv_ptr[i];
     }
+
+    tri_patch_uv.copy_to_device();
   }
 
   size_t triangles_size = num_triangles();
 
   for (size_t i = 0; i < triangles_size; i++) {
     Triangle t = get_triangle(i);
-    tri_vindex[i] = make_uint4(t.v[0] + vert_offset,
+    tri_vindex.data()[i] = make_uint4(t.v[0] + vert_offset,
                                t.v[1] + vert_offset,
                                t.v[2] + vert_offset,
                                tri_prim_index[i + tri_offset]);
 
-    tri_patch[i] = (!get_num_subd_faces()) ? -1 : (triangle_patch[i] * 8 + patch_offset);
+    tri_patch.data()[i] = (!get_num_subd_faces()) ? -1 : (triangle_patch[i] * 8 + patch_offset);
   }
+
+  tri_vindex.copy_to_device();
+  tri_patch.copy_to_device();
 }
 
 void Mesh::pack_patches(uint *patch_data, uint vert_offset, uint face_offset, uint corner_offset)

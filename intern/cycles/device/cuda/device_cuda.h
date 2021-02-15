@@ -140,11 +140,15 @@ class CUDADevice : public Device {
 
   void generic_copy_to(device_memory &mem);
 
+  void generic_copy_chunk_to(device_memory &mem, size_t chunk_offset, size_t chunk_size);
+
   void generic_free(device_memory &mem);
 
   void mem_alloc(device_memory &mem) override;
 
   void mem_copy_to(device_memory &mem) override;
+
+  void mem_copy_chunk_to(device_memory &mem, size_t chunk_offset, size_t chunk_size) override;
 
   void mem_copy_from(device_memory &mem, int y, int w, int h, int elem) override;
 

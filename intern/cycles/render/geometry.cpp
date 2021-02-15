@@ -1062,11 +1062,11 @@ void GeometryManager::device_update_mesh(
     /* normals */
     progress.set_status("Updating Mesh", "Computing normals");
 
-    uint *tri_shader = dscene->tri_shader.alloc(tri_size);
-    float4 *vnormal = dscene->tri_vnormal.alloc(vert_size);
-    uint4 *tri_vindex = dscene->tri_vindex.alloc(tri_size);
-    uint *tri_patch = dscene->tri_patch.alloc(tri_size);
-    float2 *tri_patch_uv = dscene->tri_patch_uv.alloc(vert_size);
+    dscene->tri_shader.alloc(tri_size);
+    dscene->tri_vnormal.alloc(vert_size);
+    dscene->tri_vindex.alloc(tri_size);
+    dscene->tri_patch.alloc(tri_size);
+    dscene->tri_patch_uv.alloc(vert_size);
 
     const bool copy_all_data = dscene->tri_shader.need_realloc() ||
                                dscene->tri_vindex.need_realloc() ||
@@ -1074,30 +1074,49 @@ void GeometryManager::device_update_mesh(
                                dscene->tri_patch.need_realloc() ||
                                dscene->tri_patch_uv.need_realloc();
 
-    foreach (Geometry *geom, scene->geometry) {
-      if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
-        Mesh *mesh = static_cast<Mesh *>(geom);
-
-        if (mesh->shader_is_modified() || mesh->smooth_is_modified() ||
-            mesh->triangles_is_modified() || copy_all_data) {
-          mesh->pack_shaders(scene, &tri_shader[mesh->prim_offset]);
-        }
-
-        if (mesh->verts_is_modified() || copy_all_data) {
-          mesh->pack_normals(&vnormal[mesh->vert_offset]);
-        }
-
-        if (mesh->triangles_is_modified() || mesh->vert_patch_uv_is_modified() || copy_all_data) {
+    if (copy_all_data) {
+      foreach (Geometry *geom, scene->geometry) {
+        if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
+          Mesh *mesh = static_cast<Mesh *>(geom);
+          mesh->pack_shaders(scene, mesh->get_tris_chunk(dscene->tri_shader));
+          mesh->pack_normals(mesh->get_verts_chunk(dscene->tri_vnormal));
           mesh->pack_verts(tri_prim_index,
-                           &tri_vindex[mesh->prim_offset],
-                           &tri_patch[mesh->prim_offset],
-                           &tri_patch_uv[mesh->vert_offset],
+                           mesh->get_tris_chunk(dscene->tri_vindex),
+                           mesh->get_tris_chunk(dscene->tri_patch),
+                           mesh->get_verts_chunk(dscene->tri_patch_uv),
                            mesh->vert_offset,
                            mesh->prim_offset);
+          if (progress.get_cancel())
+            return;
         }
+      }
+    }
+    else {
+      foreach (Geometry *geom, scene->geometry) {
+        if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
+          Mesh *mesh = static_cast<Mesh *>(geom);
 
-        if (progress.get_cancel())
-          return;
+          if (mesh->shader_is_modified() || mesh->smooth_is_modified() ||
+              mesh->triangles_is_modified()) {
+            mesh->pack_shaders(scene, mesh->get_tris_chunk(dscene->tri_shader));
+          }
+
+          if (mesh->verts_is_modified()) {
+            mesh->pack_normals(mesh->get_verts_chunk(dscene->tri_vnormal));
+          }
+
+          if (mesh->triangles_is_modified() || mesh->vert_patch_uv_is_modified()) {
+            mesh->pack_verts(tri_prim_index,
+                             mesh->get_tris_chunk(dscene->tri_vindex),
+                             mesh->get_tris_chunk(dscene->tri_patch),
+                             mesh->get_verts_chunk(dscene->tri_patch_uv),
+                             mesh->vert_offset,
+                             mesh->prim_offset);
+          }
+
+          if (progress.get_cancel())
+            return;
+        }
       }
     }
 
@@ -1114,31 +1133,40 @@ void GeometryManager::device_update_mesh(
   if (curve_size != 0) {
     progress.set_status("Updating Mesh", "Copying Strands to device");
 
-    float4 *curve_keys = dscene->curve_keys.alloc(curve_key_size);
-    float4 *curves = dscene->curves.alloc(curve_size);
+    dscene->curve_keys.alloc(curve_key_size);
+    dscene->curves.alloc(curve_size);
 
     const bool copy_all_data = dscene->curve_keys.need_realloc() || dscene->curves.need_realloc();
 
-    foreach (Geometry *geom, scene->geometry) {
-      if (geom->is_hair()) {
-        Hair *hair = static_cast<Hair *>(geom);
-
-        bool curve_keys_co_modified = hair->curve_radius_is_modified() ||
-                                      hair->curve_keys_is_modified();
-        bool curve_data_modified = hair->curve_shader_is_modified() ||
-                                   hair->curve_first_key_is_modified();
-
-        if (!curve_keys_co_modified && !curve_data_modified && !copy_all_data) {
-          continue;
+    if (copy_all_data) {
+      foreach (Geometry *geom, scene->geometry) {
+        if (geom->is_hair()) {
+          Hair *hair = static_cast<Hair *>(geom);
+          hair->pack_curve_keys(hair->get_keys_chunk(dscene->curve_keys));
+          hair->pack_curve_segments(scene, hair->get_segments_chunk(dscene->curves));
         }
+      }
+    }
+    else {
+      foreach (Geometry *geom, scene->geometry) {
+        if (geom->is_hair()) {
+          Hair *hair = static_cast<Hair *>(geom);
 
-        hair->pack_curves(scene,
-                          &curve_keys[hair->curvekey_offset],
-                          &curves[hair->prim_offset],
-                          hair->curvekey_offset,
-            copy_all_data);
-        if (progress.get_cancel())
-          return;
+          const bool curve_keys_co_modified = hair->curve_radius_is_modified() ||
+                                        hair->curve_keys_is_modified();
+          if (curve_keys_co_modified) {
+            hair->pack_curve_keys(hair->get_keys_chunk(dscene->curve_keys));
+          }
+
+          const bool curve_data_modified = hair->curve_shader_is_modified() ||
+                                           hair->curve_first_key_is_modified();
+          if (curve_data_modified) {
+            hair->pack_curve_segments(scene, hair->get_segments_chunk(dscene->curves));
+          }
+
+          if (progress.get_cancel())
+            return;
+        }
       }
     }
 

@@ -1008,6 +1008,12 @@ void OpenCLDevice::mem_copy_to(device_memory &mem)
   }
 }
 
+void OpenCLDevice::mem_copy_chunk_to(device_memory &mem, size_t chunk_offset, size_t chunk_size)
+{
+  assert(mem.device_pointer);
+  assert(!"mem_copy_chunk_to not implemented for OpenCL !");
+}
+
 void OpenCLDevice::mem_copy_from(device_memory &mem, int y, int w, int h, int elem)
 {
   size_t offset = elem * y * w;

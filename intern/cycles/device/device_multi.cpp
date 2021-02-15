@@ -436,6 +436,23 @@ class MultiDevice : public Device {
     stats.mem_alloc(mem.device_size - existing_size);
   }
 
+  void mem_copy_chunk_to(device_memory &mem, size_t chunk_offset, size_t chunk_size) override
+  {
+    device_ptr existing_key = mem.device_pointer;
+    device_ptr key = (existing_key) ? existing_key : unique_key++;
+    size_t existing_size = mem.device_size;
+
+    foreach (const vector<SubDevice *> &island, peer_islands) {
+      SubDevice *owner_sub = find_suitable_mem_device(existing_key, island);
+      mem.device = owner_sub->device;
+      mem.device_pointer = (existing_key) ? owner_sub->ptr_map[existing_key] : 0;
+      mem.device_size = existing_size;
+
+      owner_sub->device->mem_copy_chunk_to(mem, chunk_offset, chunk_size);
+      owner_sub->ptr_map[key] = mem.device_pointer;
+    }
+  }
+
   void mem_copy_from(device_memory &mem, int y, int w, int h, int elem) override
   {
     device_ptr key = mem.device_pointer;

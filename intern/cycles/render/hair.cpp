@@ -460,42 +460,45 @@ void Hair::apply_transform(const Transform &tfm, const bool apply_to_motion)
   }
 }
 
-void Hair::pack_curves(Scene *scene,
-                       float4 *curve_key_co,
-                       float4 *curve_data,
-                       size_t curvekey_offset,
-                       bool pack_all_data)
+void Hair::pack_curve_keys(device_vector<float4>::chunk curve_key_co)
 {
   size_t curve_keys_size = curve_keys.size();
 
-  /* pack curve keys */
-  if (curve_keys_size && (curve_keys_is_modified() || curve_radius_is_modified() || pack_all_data)) {
+  if (curve_keys_size) {
     float3 *keys_ptr = curve_keys.data();
     float *radius_ptr = curve_radius.data();
 
-    for (size_t i = 0; i < curve_keys_size; i++)
-      curve_key_co[i] = make_float4(keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
-  }
-
-  /* pack curve segments */
-
-  if (curve_shader_is_modified() || curve_first_key_is_modified() || pack_all_data) {
-    size_t curve_num = num_curves();
-
-    for (size_t i = 0; i < curve_num; i++) {
-      Curve curve = get_curve(i);
-      int shader_id = curve_shader[i];
-      Shader *shader = (shader_id < used_shaders.size()) ?
-                           static_cast<Shader *>(used_shaders[shader_id]) :
-                           scene->default_surface;
-      shader_id = scene->shader_manager->get_shader_id(shader, false);
-
-      curve_data[i] = make_float4(__int_as_float(curve.first_key + curvekey_offset),
-                                  __int_as_float(curve.num_keys),
-                                  __int_as_float(shader_id),
-                                  0.0f);
+    for (size_t i = 0; i < curve_keys_size; i++) {
+      curve_key_co.data()[i] = make_float4(keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
     }
+
+    curve_key_co.copy_to_device();
   }
+}
+
+void Hair::pack_curve_segments(Scene *scene, device_vector<float4>::chunk curve_data)
+{
+  size_t curve_num = num_curves();
+
+  if (curve_num == 0) {
+    return;
+  }
+
+  for (size_t i = 0; i < curve_num; i++) {
+    Curve curve = get_curve(i);
+    int shader_id = curve_shader[i];
+    Shader *shader = (shader_id < used_shaders.size()) ?
+          static_cast<Shader *>(used_shaders[shader_id]) :
+          scene->default_surface;
+    shader_id = scene->shader_manager->get_shader_id(shader, false);
+
+    curve_data.data()[i] = make_float4(__int_as_float(curve.first_key + curvekey_offset),
+                                __int_as_float(curve.num_keys),
+                                __int_as_float(shader_id),
+                                0.0f);
+  }
+
+  curve_data.copy_to_device();
 }
 
 void Hair::pack_primitives(PackedBVH *pack, int object, uint visibility, bool pack_all)

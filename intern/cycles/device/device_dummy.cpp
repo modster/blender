@@ -46,6 +46,10 @@ class DummyDevice : public Device {
   {
   }
 
+  virtual void mem_copy_chunk_to(device_memory &, size_t, size_t) override
+  {
+  }
+
   virtual void mem_copy_from(device_memory &, int, int, int, int) override
   {
   }

@@ -35,7 +35,9 @@ device_memory::device_memory(Device *device, const char *name, MemoryType type)
       device_pointer(0),
       host_pointer(0),
       shared_pointer(0),
-      shared_counter(0)
+      shared_counter(0),
+      has_chunks(false),
+      chunks_copied(false)
 {
 }
 
@@ -74,7 +76,7 @@ void device_memory::host_free()
 
 void device_memory::device_alloc()
 {
-  assert(!device_pointer && type != MEM_TEXTURE && type != MEM_GLOBAL);
+  assert(!device_pointer && type != MEM_TEXTURE);
   device->mem_alloc(*this);
 }
 
@@ -89,6 +91,13 @@ void device_memory::device_copy_to()
 {
   if (host_pointer) {
     device->mem_copy_to(*this);
+  }
+}
+
+void device_memory::device_copy_chunk_to(size_t chunk_offset, size_t chunk_size)
+{
+  if (host_pointer) {
+    device->mem_copy_chunk_to(*this, chunk_offset, chunk_size);
   }
 }
 

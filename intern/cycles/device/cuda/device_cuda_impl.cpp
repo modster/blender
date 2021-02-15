@@ -946,6 +946,25 @@ void CUDADevice::generic_copy_to(device_memory &mem)
   }
 }
 
+void CUDADevice::generic_copy_chunk_to(device_memory &mem, size_t chunk_offset, size_t chunk_size)
+{
+  if (!mem.host_pointer || !mem.device_pointer) {
+    return;
+  }
+
+  // std::cerr << "[" << mem.name << "] copying a chunk of size " << chunk_size << " at offset " << chunk_offset << " (total size " << mem.memory_size() << ")\n";
+
+  /* If use_mapped_host of mem is false, the current device only uses device memory allocated by
+   * cuMemAlloc regardless of mem.host_pointer and mem.shared_pointer, and should copy data from
+   * mem.host_pointer. */
+  thread_scoped_lock lock(cuda_mem_map_mutex);
+  if (!cuda_mem_map[&mem].use_mapped_host || mem.host_pointer != mem.shared_pointer) {
+    const CUDAContextScope scope(this);
+    cuda_assert(
+        cuMemcpyHtoDAsync((CUdeviceptr)(mem.device_pointer + chunk_offset), (char *)mem.host_pointer + chunk_offset, chunk_size, NULL));
+  }
+}
+
 void CUDADevice::generic_free(device_memory &mem)
 {
   if (mem.device_pointer) {
@@ -992,7 +1011,16 @@ void CUDADevice::mem_alloc(device_memory &mem)
     assert(!"mem_alloc not supported for textures.");
   }
   else if (mem.type == MEM_GLOBAL) {
-    assert(!"mem_alloc not supported for global memory.");
+    if (mem.is_resident(this) && mem.has_chunks) {
+      if (mem.need_realloc_ || !mem.device_pointer) {
+        global_free(mem);
+      }
+      //std::cerr << "Allocating buffer for chunked memory : " << mem.name << '\n';
+      generic_alloc(mem);
+    }
+    else {
+      assert(!"mem_alloc not supported for global memory.");
+    }
   }
   else {
     generic_alloc(mem);
@@ -1005,7 +1033,7 @@ void CUDADevice::mem_copy_to(device_memory &mem)
     assert(!"mem_copy_to not supported for pixels.");
   }
   else if (mem.type == MEM_GLOBAL) {
-    if (mem.need_realloc_ || !mem.device_pointer) {
+    if (!mem.has_chunks && (mem.need_realloc_ || !mem.device_pointer)) {
       global_free(mem);
     }
     global_alloc(mem);
@@ -1019,6 +1047,17 @@ void CUDADevice::mem_copy_to(device_memory &mem)
       generic_alloc(mem);
     }
     generic_copy_to(mem);
+  }
+}
+
+void CUDADevice::mem_copy_chunk_to(device_memory &mem, size_t chunk_offset, size_t chunk_size)
+{
+  if (mem.type != MEM_GLOBAL) {
+    assert(!"mem_copy_chunk_to is only supported for global memory.");
+  }
+  else {
+    assert(mem.device_pointer);
+    generic_copy_chunk_to(mem, chunk_offset, chunk_size);
   }
 }
 
@@ -1101,13 +1140,17 @@ void CUDADevice::const_copy_to(const char *name, void *host, size_t size)
 void CUDADevice::global_alloc(device_memory &mem)
 {
   if (mem.is_resident(this)) {
-    if (mem.need_realloc_ || mem.device_pointer == 0) {
-      generic_alloc(mem);
-    }
+    if (!mem.has_chunks || !mem.chunks_copied) {
+      if (mem.device_pointer == 0) {
+        //std::cerr << "Allocating device memory for global memory : " << mem.name << '\n';
+        generic_alloc(mem);
+      }
 
-    generic_copy_to(mem);
+      generic_copy_to(mem);
+    }
   }
 
+ // std::cerr << "Setting up pointer for global memory : " << mem.name << '\n';
   const_copy_to(mem.name, &mem.device_pointer, sizeof(mem.device_pointer));
 }
 

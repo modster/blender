@@ -429,6 +429,7 @@ class OpenCLDevice : public Device {
 
   void mem_alloc(device_memory &mem);
   void mem_copy_to(device_memory &mem);
+  void mem_copy_chunk_to(device_memory &mem, size_t chunk_offset, size_t chunk_size);
   void mem_copy_from(device_memory &mem, int y, int w, int h, int elem);
   void mem_zero(device_memory &mem);
   void mem_free(device_memory &mem);
