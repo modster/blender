@@ -710,6 +710,7 @@ AlembicObject::AlembicObject() : Node(node_type)
 
 AlembicObject::~AlembicObject()
 {
+  delete prefetch_cache;
 }
 
 void AlembicObject::set_object(Object *object_)
