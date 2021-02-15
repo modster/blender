@@ -38,6 +38,7 @@ void register_node_type_geo_attribute_randomize(void);
 void register_node_type_geo_attribute_separate_xyz(void);
 void register_node_type_geo_attribute_vector_math(void);
 void register_node_type_geo_boolean(void);
+void register_node_type_geo_mesh_primitive_cube(void);
 void register_node_type_geo_collection_info(void);
 void register_node_type_geo_edge_split(void);
 void register_node_type_geo_is_viewport(void);

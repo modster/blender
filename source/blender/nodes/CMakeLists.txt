@@ -159,6 +159,7 @@ set(SRC
   geometry/nodes/node_geo_edge_split.cc
   geometry/nodes/node_geo_is_viewport.cc
   geometry/nodes/node_geo_join_geometry.cc
+  geometry/nodes/node_geo_mesh_primitive_cube.cc
   geometry/nodes/node_geo_object_info.cc
   geometry/nodes/node_geo_point_distribute.cc
   geometry/nodes/node_geo_point_instance.cc
