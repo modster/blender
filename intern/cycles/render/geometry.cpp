@@ -1079,7 +1079,7 @@ void GeometryManager::device_update_mesh(
         if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
           Mesh *mesh = static_cast<Mesh *>(geom);
           mesh->pack_shaders(scene, mesh->get_tris_chunk(dscene->tri_shader));
-          mesh->pack_normals(mesh->get_verts_chunk(dscene->tri_vnormal));
+          mesh->pack_normals(mesh->get_verts_chunk(dscene->tri_vnormal), {});
           mesh->pack_verts(tri_prim_index,
                            mesh->get_tris_chunk(dscene->tri_vindex),
                            mesh->get_tris_chunk(dscene->tri_patch),
@@ -1092,6 +1092,13 @@ void GeometryManager::device_update_mesh(
       }
     }
     else {
+      // we can do partial updates, so compute deltas from last update
+      device_vector<short> vnormal_deltas(scene->device, "__vnormal_deltas", MemoryType::MEM_READ_WRITE);
+
+      if (scene->device->supports_delta_compression()) {
+        vnormal_deltas.alloc(vert_size * 4);
+      }
+
       foreach (Geometry *geom, scene->geometry) {
         if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
           Mesh *mesh = static_cast<Mesh *>(geom);
@@ -1102,7 +1109,7 @@ void GeometryManager::device_update_mesh(
           }
 
           if (mesh->verts_is_modified()) {
-            mesh->pack_normals(mesh->get_verts_chunk(dscene->tri_vnormal));
+            mesh->pack_normals(mesh->get_verts_chunk(dscene->tri_vnormal), mesh->get_verts_chunk(vnormal_deltas, 4));
           }
 
           if (mesh->triangles_is_modified() || mesh->vert_patch_uv_is_modified()) {
@@ -1118,11 +1125,17 @@ void GeometryManager::device_update_mesh(
             return;
         }
       }
+
+      if (!scene->device->apply_delta_compression(dscene->tri_vnormal, vnormal_deltas)) {
+        progress.set_cancel("unable to apply delta");
+        return;
+      }
     }
 
     /* vertex coordinates */
     progress.set_status("Updating Mesh", "Copying Mesh to device");
 
+    /* update MEM_GLOBAL pointers */
     dscene->tri_shader.copy_to_device_if_modified();
     dscene->tri_vnormal.copy_to_device_if_modified();
     dscene->tri_vindex.copy_to_device_if_modified();
@@ -1142,12 +1155,21 @@ void GeometryManager::device_update_mesh(
       foreach (Geometry *geom, scene->geometry) {
         if (geom->is_hair()) {
           Hair *hair = static_cast<Hair *>(geom);
-          hair->pack_curve_keys(hair->get_keys_chunk(dscene->curve_keys));
+          hair->pack_curve_keys(hair->get_keys_chunk(dscene->curve_keys), {});
           hair->pack_curve_segments(scene, hair->get_segments_chunk(dscene->curves));
+          if (progress.get_cancel())
+            return;
         }
       }
     }
     else {
+      // we can do partial updates, so compute deltas from last update
+      device_vector<short> curve_keys_deltas(scene->device, "__curve_keys_deltas", MemoryType::MEM_READ_WRITE);
+
+      if (scene->device->supports_delta_compression()) {
+        curve_keys_deltas.alloc(curve_key_size * 4);
+      }
+
       foreach (Geometry *geom, scene->geometry) {
         if (geom->is_hair()) {
           Hair *hair = static_cast<Hair *>(geom);
@@ -1155,7 +1177,7 @@ void GeometryManager::device_update_mesh(
           const bool curve_keys_co_modified = hair->curve_radius_is_modified() ||
                                         hair->curve_keys_is_modified();
           if (curve_keys_co_modified) {
-            hair->pack_curve_keys(hair->get_keys_chunk(dscene->curve_keys));
+            hair->pack_curve_keys(hair->get_keys_chunk(dscene->curve_keys), hair->get_keys_chunk(curve_keys_deltas, 4));
           }
 
           const bool curve_data_modified = hair->curve_shader_is_modified() ||
@@ -1168,8 +1190,14 @@ void GeometryManager::device_update_mesh(
             return;
         }
       }
+
+      if (!scene->device->apply_delta_compression(dscene->curve_keys, curve_keys_deltas)) {
+        progress.set_cancel("unable to apply deltas");
+        return;
+      }
     }
 
+    /* update MEM_GLOBAL pointers */
     dscene->curve_keys.copy_to_device_if_modified();
     dscene->curves.copy_to_device_if_modified();
   }

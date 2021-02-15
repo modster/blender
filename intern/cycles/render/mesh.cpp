@@ -709,7 +709,7 @@ void Mesh::pack_shaders(Scene *scene, device_vector<uint>::chunk tri_shader)
   tri_shader.copy_to_device();
 }
 
-void Mesh::pack_normals(device_vector<float4>::chunk vnormal)
+void Mesh::pack_normals(device_vector<float4>::chunk vnormal, device_vector<short>::chunk vnormal_deltas)
 {
   Attribute *attr_vN = attributes.find(ATTR_STD_VERTEX_NORMAL);
   if (attr_vN == NULL) {
@@ -719,6 +719,7 @@ void Mesh::pack_normals(device_vector<float4>::chunk vnormal)
 
   bool do_transform = transform_applied;
   Transform ntfm = transform_normal;
+  const bool do_deltas = vnormal_deltas.size_ != 0;
 
   float3 *vN = attr_vN->data_float3();
   size_t verts_size = verts.size();
@@ -729,10 +730,27 @@ void Mesh::pack_normals(device_vector<float4>::chunk vnormal)
     if (do_transform)
       vNi = safe_normalize(transform_direction(&ntfm, vNi));
 
-    vnormal.data()[i] = make_float4(vNi.x, vNi.y, vNi.z, 0.0f);
+    float4 normal = make_float4(vNi.x, vNi.y, vNi.z, 0.0f);
+
+    if (do_deltas) {
+      const float4 current_normal = vnormal.data()[i];
+      const float4 delta = (normal - current_normal) * 32768.0f;
+
+      vnormal_deltas.data()[i * 4 + 0] = (short)(delta.x);
+      vnormal_deltas.data()[i * 4 + 1] = (short)(delta.y);
+      vnormal_deltas.data()[i * 4 + 2] = (short)(delta.z);
+    }
+
+    /* update host memory */
+    vnormal.data()[i] = normal;
   }
 
-  vnormal.copy_to_device();
+  if (do_deltas) {
+    vnormal_deltas.copy_to_device();
+  }
+  else {
+    vnormal.copy_to_device();
+  }
 }
 
 void Mesh::pack_verts(const vector<uint> &tri_prim_index,

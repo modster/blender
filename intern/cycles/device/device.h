@@ -456,6 +456,16 @@ class Device {
     return false;
   }
 
+  virtual bool supports_delta_compression()
+  {
+    return false;
+  }
+
+  virtual bool apply_delta_compression(device_memory &/*mem_orig*/, device_memory &/*mem_compressed*/)
+  {
+    return true;
+  }
+
   /* static */
   static Device *create(DeviceInfo &info,
                         Stats &stats,

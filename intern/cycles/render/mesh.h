@@ -223,7 +223,7 @@ class Mesh : public Geometry {
   void get_uv_tiles(ustring map, unordered_set<int> &tiles) override;
 
   void pack_shaders(Scene *scene, device_vector<uint>::chunk shader);
-  void pack_normals(device_vector<float4>::chunk vnormal);
+  void pack_normals(device_vector<float4>::chunk vnormal, device_vector<short>::chunk vnormal_deltas);
   void pack_verts(const vector<uint> &tri_prim_index,
                   device_vector<uint4>::chunk tri_vindex,
                   device_vector<uint>::chunk tri_patch,
@@ -256,9 +256,9 @@ class Mesh : public Geometry {
   }
 
   template <typename T>
-  typename device_vector<T>::chunk get_verts_chunk(device_vector<T> &dvector)
+  typename device_vector<T>::chunk get_verts_chunk(device_vector<T> &dvector, int elements = 1)
   {
-    return dvector.get_chunk(vert_offset, get_verts().size());
+    return dvector.get_chunk(vert_offset * elements, get_verts().size() * elements);
   }
 
   template <typename T>

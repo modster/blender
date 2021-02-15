@@ -1015,7 +1015,7 @@ void CUDADevice::mem_alloc(device_memory &mem)
       if (mem.need_realloc_ || !mem.device_pointer) {
         global_free(mem);
       }
-      //std::cerr << "Allocating buffer for chunked memory : " << mem.name << '\n';
+      // std::cerr << "Allocating buffer for chunked memory : " << mem.name << '\n';
       generic_alloc(mem);
     }
     else {
@@ -1052,8 +1052,9 @@ void CUDADevice::mem_copy_to(device_memory &mem)
 
 void CUDADevice::mem_copy_chunk_to(device_memory &mem, size_t chunk_offset, size_t chunk_size)
 {
-  if (mem.type != MEM_GLOBAL) {
-    assert(!"mem_copy_chunk_to is only supported for global memory.");
+  // MEM_READ_WRITE for deltas
+  if (mem.type != MEM_GLOBAL && mem.type != MEM_READ_WRITE) {
+    assert(!"mem_copy_chunk_to is only supported for global or read/write memory.");
   }
   else {
     assert(mem.device_pointer);
@@ -1140,17 +1141,18 @@ void CUDADevice::const_copy_to(const char *name, void *host, size_t size)
 void CUDADevice::global_alloc(device_memory &mem)
 {
   if (mem.is_resident(this)) {
-    if (!mem.has_chunks || !mem.chunks_copied) {
+    if (!mem.has_chunks) {
       if (mem.device_pointer == 0) {
-        //std::cerr << "Allocating device memory for global memory : " << mem.name << '\n';
+        // std::cerr << "Allocating device memory for global memory : " << mem.name << '\n';
         generic_alloc(mem);
       }
 
+      // std::cerr << "Copying device memory for global memory : " << mem.name << '\n';
       generic_copy_to(mem);
     }
   }
 
- // std::cerr << "Setting up pointer for global memory : " << mem.name << '\n';
+  // std::cerr << "Setting up pointer for global memory : " << mem.name << '\n';
   const_copy_to(mem.name, &mem.device_pointer, sizeof(mem.device_pointer));
 }
 
@@ -1406,6 +1408,11 @@ void CUDADevice::tex_free(device_texture &mem)
   }
 }
 
+bool CUDADevice::supports_delta_compression()
+{
+  return true;
+}
+
 #  define CUDA_GET_BLOCKSIZE(func, w, h) \
     int threads_per_block; \
     cuda_assert( \
@@ -1427,6 +1434,30 @@ void CUDADevice::tex_free(device_texture &mem)
 
 #  define CUDA_LAUNCH_KERNEL_1D(func, args) \
     cuda_assert(cuLaunchKernel(func, xblocks, yblocks, 1, threads_per_block, 1, 1, 0, 0, args, 0));
+
+bool CUDADevice::apply_delta_compression(device_memory &mem_orig, device_memory &mem_compressed)
+{
+  if (have_error())
+ return false;
+
+  CUDAContextScope scope(this);
+
+  assert(mem_orig.device_pointer != 0);
+  assert(mem_compressed.device_pointer != 0);
+  assert(mem_orig.data_size == mem_compressed.data_size);
+
+  CUfunction cu_apply_deltas;
+  cuda_assert(cuModuleGetFunction(
+   &cu_apply_deltas, cuModule, "kernel_cuda_apply_delta_compression"));
+
+  int size = (int)(mem_orig.data_size);
+
+  void *args[] = {&mem_orig.device_pointer, &mem_compressed.device_pointer, &size};
+  CUDA_GET_BLOCKSIZE_1D(cu_apply_deltas, mem_orig.data_size, 1);
+  CUDA_LAUNCH_KERNEL_1D(cu_apply_deltas, args);
+  cuda_assert(cuCtxSynchronize());
+  return !have_error();
+}
 
 bool CUDADevice::denoising_non_local_means(device_ptr image_ptr,
                                            device_ptr guide_ptr,

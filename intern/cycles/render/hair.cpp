@@ -460,7 +460,7 @@ void Hair::apply_transform(const Transform &tfm, const bool apply_to_motion)
   }
 }
 
-void Hair::pack_curve_keys(device_vector<float4>::chunk curve_key_co)
+void Hair::pack_curve_keys(device_vector<float4>::chunk curve_key_co, device_vector<short>::chunk keys_deltas)
 {
   size_t curve_keys_size = curve_keys.size();
 
@@ -468,11 +468,31 @@ void Hair::pack_curve_keys(device_vector<float4>::chunk curve_key_co)
     float3 *keys_ptr = curve_keys.data();
     float *radius_ptr = curve_radius.data();
 
+    const bool do_deltas = keys_deltas.valid();
+
     for (size_t i = 0; i < curve_keys_size; i++) {
-      curve_key_co.data()[i] = make_float4(keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
+      const float4 new_keys = make_float4(keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
+
+      if (do_deltas) {
+        const float4 old_keys = curve_key_co.data()[i];
+        const float4 delta = (new_keys - old_keys) * 32768.0f;
+
+        keys_deltas.data()[i * 4 + 0] = (short)(delta.x);
+        keys_deltas.data()[i * 4 + 1] = (short)(delta.y);
+        keys_deltas.data()[i * 4 + 2] = (short)(delta.z);
+        keys_deltas.data()[i * 4 + 3] = (short)(delta.w);
+      }
+
+      /* update host memory */
+      curve_key_co.data()[i] = new_keys;
     }
 
-    curve_key_co.copy_to_device();
+    if (do_deltas) {
+      keys_deltas.copy_to_device();
+    }
+    else {
+      curve_key_co.copy_to_device();
+    }
   }
 }
 

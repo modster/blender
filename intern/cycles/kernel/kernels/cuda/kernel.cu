@@ -228,5 +228,15 @@ kernel_cuda_bake(WorkTile *tile, uint total_work_size)
 }
 #endif
 
+extern "C" __global__ void
+CUDA_LAUNCH_BOUNDS(CUDA_THREADS_BLOCK_WIDTH, CUDA_KERNEL_MAX_REGISTERS)
+kernel_cuda_apply_delta_compression(float *ccl_restrict dst, const short *ccl_restrict src, int size)
+{
+  for (int i = 0; i < size; ++i) {
+    dst[i] = 0.0f;
+    //dst[i] = (float)src[i] * (1.0f / 32768.0f);
+  }
+}
+
 #endif
 

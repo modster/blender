@@ -141,9 +141,9 @@ class Hair : public Geometry {
   }
 
   template <typename T>
-  typename device_vector<T>::chunk get_keys_chunk(device_vector<T> &dvector)
+  typename device_vector<T>::chunk get_keys_chunk(device_vector<T> &dvector, int elements = 1)
   {
-    return dvector.get_chunk(curvekey_offset, get_curve_keys().size());
+    return dvector.get_chunk(curvekey_offset * elements, get_curve_keys().size() * elements);
   }
 
   template <typename T>
@@ -156,7 +156,7 @@ class Hair : public Geometry {
   void get_uv_tiles(ustring map, unordered_set<int> &tiles) override;
 
   /* BVH */
-  void pack_curve_keys(device_vector<float4>::chunk curve_key_co);
+  void pack_curve_keys(device_vector<float4>::chunk curve_key_co, device_vector<short>::chunk keys_deltas);
   void pack_curve_segments(Scene *scene, device_vector<float4>::chunk curve_data);
 
   void pack_primitives(PackedBVH *pack, int object, uint visibility, bool pack_all) override;

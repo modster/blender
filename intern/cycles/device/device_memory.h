@@ -346,8 +346,8 @@ template<typename T> class device_vector : public device_memory {
         {
           assert(offset < parent.size());
           assert(offset + size < parent.size());
-          assert(parent.host_pointer != 0);
-          assert(parent.device_pointer != 0);
+					assert(parent.host_pointer != 0);
+					assert(parent.device_pointer != 0);
         }
 
         void copy_to_device()
@@ -365,6 +365,7 @@ template<typename T> class device_vector : public device_memory {
         {
           return parent_ != nullptr;
         }
+
     };
 
     chunk get_chunk(size_t offset, size_t size)
