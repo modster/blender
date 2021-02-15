@@ -14,6 +14,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BKE_attribute_math.hh"
 #include "BKE_mesh.h"
 #include "BKE_persistent_data_handle.hh"
 #include "BKE_pointcloud.h"
@@ -38,162 +39,239 @@ static bNodeSocketTemplate geo_node_point_instance_out[] = {
 
 namespace blender::nodes {
 
-static void fill_new_attribute_from_input(const ReadAttribute &input_attribute,
-                                          WriteAttribute &out_attribute_a,
-                                          WriteAttribute &out_attribute_b,
-                                          Span<bool> a_or_b)
+static void gather_positions_from_component_instances(const GeometryComponent &component,
+                                                      const StringRef mask_attribute_name,
+                                                      Span<float4x4> transforms,
+                                                      MutableSpan<Vector<float3>> r_positions_a,
+                                                      MutableSpan<Vector<float3>> r_positions_b)
 {
-  fn::GSpan in_span = input_attribute.get_span();
-  int i_a = 0;
-  int i_b = 0;
-  for (int i_in = 0; i_in < in_span.size(); i_in++) {
-    const bool move_to_b = a_or_b[i_in];
-    if (move_to_b) {
-      out_attribute_b.set(i_b, in_span[i_in]);
-      i_b++;
+  if (component.attribute_domain_size(ATTR_DOMAIN_POINT) == 0) {
+    return;
+  }
+
+  const BooleanReadAttribute mask_attribute = component.attribute_get_for_read<bool>(
+      mask_attribute_name, ATTR_DOMAIN_POINT, false);
+  const Float3ReadAttribute position_attribute = component.attribute_get_for_read<float3>(
+      "position", ATTR_DOMAIN_POINT, {0.0f, 0.0f, 0.0f});
+
+  Span<bool> masks = mask_attribute.get_span();
+  Span<float3> component_positions = position_attribute.get_span();
+
+  for (const int instance_index : transforms.index_range()) {
+    const float4x4 &transform = transforms[instance_index];
+    for (const int i : masks.index_range()) {
+      if (masks[i]) {
+        r_positions_a[instance_index].append(transform * component_positions[i]);
+      }
+      else {
+        r_positions_b[instance_index].append(transform * component_positions[i]);
+      }
+    }
+  }
+}
+
+static void get_positions_from_instances(Span<GeometryInstanceGroup> set_groups,
+                                         const StringRef mask_attribute_name,
+                                         MutableSpan<Vector<float3>> r_positions_a,
+                                         MutableSpan<Vector<float3>> r_positions_b)
+{
+  int instance_index = 0;
+  for (const GeometryInstanceGroup &set_group : set_groups) {
+    const GeometrySet &set = set_group.geometry_set;
+
+    MutableSpan<Vector<float3>> set_instance_positions_a = r_positions_a.slice(
+        instance_index, set_group.transforms.size());
+    MutableSpan<Vector<float3>> set_instance_positions_b = r_positions_b.slice(
+        instance_index, set_group.transforms.size());
+
+    if (set.has<PointCloudComponent>()) {
+      gather_positions_from_component_instances(*set.get_component_for_read<PointCloudComponent>(),
+                                                mask_attribute_name,
+                                                set_group.transforms,
+                                                set_instance_positions_a,
+                                                set_instance_positions_b);
+    }
+    if (set.has<MeshComponent>()) {
+      gather_positions_from_component_instances(*set.get_component_for_read<MeshComponent>(),
+                                                mask_attribute_name,
+                                                set_group.transforms,
+                                                set_instance_positions_a,
+                                                set_instance_positions_b);
+    }
+
+    instance_index += set_group.transforms.size();
+  }
+}
+
+static PointCloud *create_point_cloud(Span<Vector<float3>> positions)
+{
+  int points_len = 0;
+  for (const Vector<float3> &instance_positions : positions) {
+    points_len += instance_positions.size();
+  }
+  PointCloud *pointcloud = BKE_pointcloud_new_nomain(points_len);
+  int point_index = 0;
+  for (const Vector<float3> &instance_positions : positions) {
+    memcpy(pointcloud->co + point_index, positions.data(), sizeof(float3) * positions.size());
+    point_index += instance_positions.size();
+  }
+
+  return pointcloud;
+}
+
+template<typename T>
+static void copy_from_span_and_mask(Span<T> span,
+                                    Span<bool> mask,
+                                    MutableSpan<T> out_span_a,
+                                    MutableSpan<T> out_span_b,
+                                    int &offset_a,
+                                    int &offset_b)
+{
+  for (const int i : span.index_range()) {
+    if (mask[i]) {
+      out_span_b[offset_b] = span[i];
+      offset_b++;
     }
     else {
-      out_attribute_a.set(i_a, in_span[i_in]);
-      i_a++;
+      out_span_a[offset_a] = span[i];
+      offset_a++;
     }
   }
 }
 
-/**
- * Move the original attribute values to the two output components.
- *
- * \note This assumes a consistent ordering of indices before and after the split,
- * which is true for points and a simple vertex array.
- */
-static void move_split_attributes(const GeometryComponent &in_component,
-                                  GeometryComponent &out_component_a,
-                                  GeometryComponent &out_component_b,
-                                  Span<bool> a_or_b)
+static void copy_attribute_from_component_instances(const GeometryComponent &component,
+                                                    const int instances_len,
+                                                    const StringRef mask_attribute_name,
+                                                    const StringRef attribute_name,
+                                                    const CustomDataType data_type,
+                                                    fn::GMutableSpan out_data_a,
+                                                    fn::GMutableSpan out_data_b,
+                                                    int &offset_a,
+                                                    int &offset_b)
 {
-  Set<std::string> attribute_names = in_component.attribute_names();
-
-  for (const std::string &name : attribute_names) {
-    ReadAttributePtr attribute = in_component.attribute_try_get_for_read(name);
-    BLI_assert(attribute);
-
-    /* Since this node only creates points and vertices, don't copy other attributes. */
-    if (attribute->domain() != ATTR_DOMAIN_POINT) {
-      continue;
-    }
-
-    const CustomDataType data_type = bke::cpp_type_to_custom_data_type(attribute->cpp_type());
-    const AttributeDomain domain = attribute->domain();
-
-    /* Don't try to create the attribute on the new component if it already exists (i.e. has been
-     * initialized by someone else). */
-    if (!out_component_a.attribute_exists(name)) {
-      if (!out_component_a.attribute_try_create(name, domain, data_type)) {
-        continue;
-      }
-    }
-    if (!out_component_b.attribute_exists(name)) {
-      if (!out_component_b.attribute_try_create(name, domain, data_type)) {
-        continue;
-      }
-    }
-
-    WriteAttributePtr out_attribute_a = out_component_a.attribute_try_get_for_write(name);
-    WriteAttributePtr out_attribute_b = out_component_b.attribute_try_get_for_write(name);
-    if (!out_attribute_a || !out_attribute_b) {
-      BLI_assert(false);
-      continue;
-    }
-
-    fill_new_attribute_from_input(*attribute, *out_attribute_a, *out_attribute_b, a_or_b);
-  }
-}
-
-/**
- * Find total in each new set and find which of the output sets each point will belong to.
- */
-static Array<bool> count_point_splits(const GeometryComponent &component,
-                                      const GeoNodeExecParams &params,
-                                      int *r_a_total,
-                                      int *r_b_total)
-{
-  const BooleanReadAttribute mask_attribute = params.get_input_attribute<bool>(
-      "Mask", component, ATTR_DOMAIN_POINT, false);
-  Array<bool> masks = mask_attribute.get_span();
-  const int in_total = masks.size();
-
-  *r_b_total = 0;
-  for (const bool mask : masks) {
-    if (mask) {
-      *r_b_total += 1;
-    }
-  }
-  *r_a_total = in_total - *r_b_total;
-
-  return masks;
-}
-
-static void separate_mesh(const MeshComponent &in_component,
-                          const GeoNodeExecParams &params,
-                          MeshComponent &out_component_a,
-                          MeshComponent &out_component_b)
-{
-  const int size = in_component.attribute_domain_size(ATTR_DOMAIN_POINT);
-  if (size == 0) {
+  if (component.attribute_domain_size(ATTR_DOMAIN_POINT) == 0) {
     return;
   }
 
-  int a_total;
-  int b_total;
-  Array<bool> a_or_b = count_point_splits(in_component, params, &a_total, &b_total);
+  const BooleanReadAttribute mask_attribute = component.attribute_get_for_read<bool>(
+      mask_attribute_name, ATTR_DOMAIN_POINT, false);
 
-  out_component_a.replace(BKE_mesh_new_nomain(a_total, 0, 0, 0, 0));
-  out_component_b.replace(BKE_mesh_new_nomain(b_total, 0, 0, 0, 0));
+  const ReadAttributePtr attribute = component.attribute_try_get_for_read(
+      attribute_name, ATTR_DOMAIN_POINT, data_type);
 
-  move_split_attributes(in_component, out_component_a, out_component_b, a_or_b);
+  Span<bool> masks = mask_attribute.get_span();
+
+  const int start_offset_a = offset_a;
+  const int start_offset_b = offset_b;
+
+  attribute_math::convert_to_static_type(data_type, [&](auto dummy) {
+    using T = decltype(dummy);
+    Span<T> span = attribute->get_span<T>();
+    MutableSpan<T> out_span_a = out_data_a.typed<T>();
+    MutableSpan<T> out_span_b = out_data_b.typed<T>();
+    copy_from_span_and_mask(span, masks, out_span_a, out_span_b, offset_a, offset_b);
+    const int copied_len_a = offset_a - start_offset_a;
+    const int copied_len_b = offset_b - start_offset_b;
+    for (int i = 1; i < instances_len; i++) {
+      memcpy(out_span_a.data() + offset_a,
+             out_span_a.data() + start_offset_a,
+             sizeof(T) * copied_len_a);
+      memcpy(out_span_b.data() + offset_b,
+             out_span_b.data() + start_offset_b,
+             sizeof(T) * copied_len_b);
+      offset_a += copied_len_a;
+      offset_b += copied_len_b;
+    }
+  });
 }
 
-static void separate_point_cloud(const PointCloudComponent &in_component,
-                                 const GeoNodeExecParams &params,
-                                 PointCloudComponent &out_component_a,
-                                 PointCloudComponent &out_component_b)
+static void copy_attributes_to_output(Span<GeometryInstanceGroup> set_groups,
+                                      Map<std::string, AttributeInfo> &result_attributes_info,
+                                      const StringRef mask_attribute_name,
+                                      PointCloudComponent &out_component_a,
+                                      PointCloudComponent &out_component_b)
 {
-  const int size = in_component.attribute_domain_size(ATTR_DOMAIN_POINT);
-  if (size == 0) {
-    return;
+  for (Map<std::string, AttributeInfo>::Item entry : result_attributes_info.items()) {
+    const StringRef attribute_name = entry.key;
+    /* The output domain is always #ATTR_DOMAIN_POINT, since we are creating a point cloud. */
+    const CustomDataType output_data_type = entry.value.data_type;
+
+    OutputAttributePtr attribute_out_a = out_component_a.attribute_try_get_for_output(
+        attribute_name, ATTR_DOMAIN_POINT, output_data_type);
+    OutputAttributePtr attribute_out_b = out_component_b.attribute_try_get_for_output(
+        attribute_name, ATTR_DOMAIN_POINT, output_data_type);
+    BLI_assert(attribute_out_a && attribute_out_b);
+    if (!attribute_out_a || attribute_out_b) {
+      continue;
+    }
+
+    fn::GMutableSpan out_span_a = attribute_out_a->get_span_for_write_only();
+    fn::GMutableSpan out_span_b = attribute_out_b->get_span_for_write_only();
+
+    int offset_a = 0;
+    int offset_b = 0;
+    for (const GeometryInstanceGroup &set_group : set_groups) {
+      const GeometrySet &set = set_group.geometry_set;
+
+      if (set.has<PointCloudComponent>()) {
+        copy_attribute_from_component_instances(*set.get_component_for_read<PointCloudComponent>(),
+                                                set_group.transforms.size(),
+                                                mask_attribute_name,
+                                                attribute_name,
+                                                output_data_type,
+                                                out_span_a,
+                                                out_span_b,
+                                                offset_a,
+                                                offset_b);
+      }
+      if (set.has<MeshComponent>()) {
+        copy_attribute_from_component_instances(*set.get_component_for_read<MeshComponent>(),
+                                                set_group.transforms.size(),
+                                                mask_attribute_name,
+                                                attribute_name,
+                                                output_data_type,
+                                                out_span_a,
+                                                out_span_b,
+                                                offset_a,
+                                                offset_b);
+      }
+    }
   }
-
-  int a_total;
-  int b_total;
-  Array<bool> a_or_b = count_point_splits(in_component, params, &a_total, &b_total);
-
-  out_component_a.replace(BKE_pointcloud_new_nomain(a_total));
-  out_component_b.replace(BKE_pointcloud_new_nomain(b_total));
-
-  move_split_attributes(in_component, out_component_a, out_component_b, a_or_b);
 }
 
 static void geo_node_point_separate_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  GeometrySet out_set_a(geometry_set);
+  const std::string mask_attribute_name = params.extract_input<std::string>("Mask");
+  GeometrySet out_set_a;
   GeometrySet out_set_b;
-
-  /* TODO: This is not necessary-- the input goemetry set can be read only,
-   * but it must be rewritten to handle instance groups. */
-  geometry_set = geometry_set_realize_instances(geometry_set);
-
-  if (geometry_set.has<PointCloudComponent>()) {
-    separate_point_cloud(*geometry_set.get_component_for_read<PointCloudComponent>(),
-                         params,
-                         out_set_a.get_component_for_write<PointCloudComponent>(),
-                         out_set_b.get_component_for_write<PointCloudComponent>());
+  if (mask_attribute_name.empty()) {
+    params.set_output("Geometry 1", std::move(geometry_set));
+    params.set_output("Geometry 2", std::move(out_set_b));
   }
-  if (geometry_set.has<MeshComponent>()) {
-    separate_mesh(*geometry_set.get_component_for_read<MeshComponent>(),
-                  params,
-                  out_set_a.get_component_for_write<MeshComponent>(),
-                  out_set_b.get_component_for_write<MeshComponent>());
+
+  Vector<GeometryInstanceGroup> set_groups = BKE_geometry_set_gather_instances(geometry_set);
+
+  int instances_len = 0;
+  for (const GeometryInstanceGroup &set_group : set_groups) {
+    instances_len += set_group.transforms.size();
   }
+
+  Array<Vector<float3>> positions_a(instances_len);
+  Array<Vector<float3>> positions_b(instances_len);
+  get_positions_from_instances(set_groups, mask_attribute_name, positions_a, positions_b);
+
+  PointCloudComponent &component_a = out_set_a.get_component_for_write<PointCloudComponent>();
+  PointCloudComponent &component_b = out_set_b.get_component_for_write<PointCloudComponent>();
+  component_a.replace(create_point_cloud(positions_a));
+  component_a.replace(create_point_cloud(positions_b));
+
+  Map<std::string, AttributeInfo> result_attributes_info;
+  gather_attribute_info(result_attributes_info, GeometryComponentType::Mesh, set_groups, {});
+  gather_attribute_info(result_attributes_info, GeometryComponentType::PointCloud, set_groups, {});
+
+  copy_attributes_to_output(
+      set_groups, result_attributes_info, mask_attribute_name, component_a, component_b);
 
   params.set_output("Geometry 1", std::move(out_set_a));
   params.set_output("Geometry 2", std::move(out_set_b));
