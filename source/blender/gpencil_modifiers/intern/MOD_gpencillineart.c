@@ -400,6 +400,22 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(layout, ptr, "soft_selection", 0, NULL, ICON_NONE);
 }
 
+static void baking_panel_draw(const bContext *UNUSED(C), Panel *panel)
+{
+  uiLayout *layout = panel->layout;
+
+  uiLayoutSetPropSep(layout, true);
+
+  // TODO come up with better names for these buttons!
+  uiItemO(layout, IFACE_("Bake Current Object"), ICON_NONE, "OBJECT_OT_lineart_bake_strokes");
+  uiItemO(layout,
+          IFACE_("Bake All Line Art Objects"),
+          ICON_NONE,
+          "OBJECT_OT_lineart_bake_all_strokes");
+  uiItemO(layout, IFACE_("Clear Current Object"), ICON_NONE, "OBJECT_OT_lineart_clear_strokes");
+  uiItemO(layout, IFACE_("Clear All Objects"), ICON_NONE, "OBJECT_OT_lineart_clear_all_strokes");
+}
+
 static void panelRegister(ARegionType *region_type)
 {
   PanelType *panel_type = gpencil_modifier_panel_register(
@@ -413,6 +429,8 @@ static void panelRegister(ARegionType *region_type)
       region_type, "chaining", "Chaining", NULL, chaining_panel_draw, panel_type);
   gpencil_modifier_subpanel_register(
       region_type, "vgroup", "Vertex Weight Transfer", NULL, vgroup_panel_draw, panel_type);
+  gpencil_modifier_subpanel_register(
+      region_type, "baking", "Baking", NULL, baking_panel_draw, panel_type);
 }
 
 GpencilModifierTypeInfo modifierType_Gpencil_Lineart = {

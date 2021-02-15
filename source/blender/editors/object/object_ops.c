@@ -37,6 +37,9 @@
 
 #include "object_intern.h"
 
+// TODO: Not nice, but here in the mean time to just try out the LineArt bake operators
+#include "../../gpencil_modifiers/intern/lineart/ED_lineart.h"
+
 /* ************************** registration **********************************/
 
 void ED_operatortypes_object(void)
@@ -153,6 +156,7 @@ void ED_operatortypes_object(void)
   WM_operatortype_append(OBJECT_OT_gpencil_modifier_apply);
   WM_operatortype_append(OBJECT_OT_gpencil_modifier_copy);
   WM_operatortype_append(OBJECT_OT_gpencil_modifier_copy_to_selected);
+  ED_operatortypes_lineart();
 
   /* shader fx */
   WM_operatortype_append(OBJECT_OT_shaderfx_add);

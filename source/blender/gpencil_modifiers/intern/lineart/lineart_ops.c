@@ -46,21 +46,130 @@
 
 #include "lineart_intern.h"
 
-#ifdef LINEART_WITH_BAKE
-
-static int lineart_gpencil_update_strokes_exec(bContext *C, wmOperator *UNUSED(op))
+static void clear_strokes(Object *ob, GpencilModifierData *md, int frame)
 {
+  if (md->type != eGpencilModifierType_Lineart) {
+    return;
+  }
+  LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
+  bGPdata *gpd = ob->data;
+
+  bGPDlayer *gpl = BKE_gpencil_layer_get_by_name(gpd, lmd->target_layer, 1);
+  if (!gpl) {
+    return;
+  }
+  bGPDframe *gpf = BKE_gpencil_layer_frame_find(gpl, frame);
+
+  if (!gpf) {
+    /* No greasepencil frame found. */
+    return;
+  }
+
+  BKE_gpencil_layer_frame_delete(gpl, gpf);
+}
+
+// TODO use the job system for baking so that the UI doesn't freeze on big bake tasks.
+static void bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int frame)
+{
+  if (md->type != eGpencilModifierType_Lineart) {
+    return;
+  }
+  LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
+  bGPdata *gpd = ob->data;
+
+  bGPDlayer *gpl = BKE_gpencil_layer_get_by_name(gpd, lmd->target_layer, 1);
+  if (!gpl) {
+    return;
+  }
+  bool only_use_existing_gp_frames = false;
+  bGPDframe *gpf = (only_use_existing_gp_frames ?
+                        BKE_gpencil_layer_frame_find(gpl, frame) :
+                        BKE_gpencil_layer_frame_get(gpl, frame, GP_GETFRAME_ADD_NEW));
+
+  if (!gpf) {
+    /* No greasepencil frame created or found. */
+    return;
+  }
+
+  ED_lineart_compute_feature_lines_internal(dg, lmd);
+
+  ED_lineart_gpencil_generate_with_type(
+      lmd->render_buffer,
+      dg,
+      ob,
+      gpl,
+      gpf,
+      lmd->source_type,
+      lmd->source_type == LRT_SOURCE_OBJECT ? (void *)lmd->source_object :
+                                              (void *)lmd->source_collection,
+      lmd->level_start,
+      lmd->use_multiple_levels ? lmd->level_end : lmd->level_start,
+      lmd->target_material ? BKE_gpencil_object_material_index_get(ob, lmd->target_material) : 0,
+      lmd->line_types,
+      lmd->transparency_flags,
+      lmd->transparency_mask,
+      lmd->thickness,
+      lmd->opacity,
+      lmd->pre_sample_length,
+      lmd->source_vertex_group,
+      lmd->vgname,
+      lmd->flags);
+
+  ED_lineart_destroy_render_data(lmd);
+}
+
+static int lineart_gpencil_bake_all_strokes_invoke(bContext *C,
+                                                   wmOperator *op,
+                                                   const wmEvent *UNUSED(event))
+{
+  Scene *scene = CTX_data_scene(C);
   Depsgraph *dg = CTX_data_depsgraph_pointer(C);
+  int frame;
+  int frame_begin = scene->r.sfra;
+  int frame_end = scene->r.efra;
+  int frame_orig = scene->r.cfra;
+  int frame_increment = scene->r.frame_step;
+  bool overwrite_frames = true;
 
-  BLI_spin_lock(&lineart_share.lock_loader);
+  for (frame = frame_begin; frame <= frame_end; frame += frame_increment) {
 
-  ED_lineart_compute_feature_lines_background(dg, 0);
+    BKE_scene_frame_set(scene, frame);
+    BKE_scene_graph_update_for_newframe(dg);
 
-  /* Wait for loading finish. */
-  BLI_spin_lock(&lineart_share.lock_loader);
-  BLI_spin_unlock(&lineart_share.lock_loader);
+    CTX_DATA_BEGIN (C, Object *, ob, visible_objects) {
+      if (ob->type != OB_GPENCIL) {
+        continue;
+      }
 
-  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED | ND_SPACE_PROPERTIES, NULL);
+      if (overwrite_frames) {
+        LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+          clear_strokes(ob, md, frame);
+        }
+      }
+
+      LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+        bake_strokes(ob, dg, md, frame);
+      }
+    }
+    CTX_DATA_END;
+  }
+
+  /* Restore original frame. */
+  BKE_scene_frame_set(scene, frame_orig);
+  BKE_scene_graph_update_for_newframe(dg);
+
+  BKE_report(op->reports, RPT_INFO, "Line Art baking is complete.");
+  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
+
+  return OPERATOR_FINISHED;
+}
+
+static int lineart_gpencil_bake_all_strokes_exec(bContext *C, wmOperator *UNUSED(op))
+{
+  Scene *scene = CTX_data_scene(C);
+
+  /* If confirmed in the dialog, then just turn off the master switch upon finished baking. */
+  // scene->lineart.flags &= (~LRT_AUTO_UPDATE);
 
   return OPERATOR_FINISHED;
 }
@@ -69,147 +178,42 @@ static int lineart_gpencil_bake_strokes_invoke(bContext *C,
                                                wmOperator *op,
                                                const wmEvent *UNUSED(event))
 {
+  Object *ob = CTX_data_active_object(C);
+
   Scene *scene = CTX_data_scene(C);
   Depsgraph *dg = CTX_data_depsgraph_pointer(C);
   int frame;
-  int frame_begin = ((lineart->flags & LRT_BAKING_FINAL_RANGE) ? MAX2(scene->r.sfra, 1) :
-                                                                 lineart->baking_preview_start);
-  int frame_end = ((lineart->flags & LRT_BAKING_FINAL_RANGE) ? scene->r.efra :
-                                                               lineart->baking_preview_end);
-  int frame_total = frame_end - frame_begin;
+  int frame_begin = scene->r.sfra;
+  int frame_end = scene->r.efra;
   int frame_orig = scene->r.cfra;
-  int frame_increment = ((lineart->flags & LRT_BAKING_KEYFRAMES_ONLY) ?
-                             1 :
-                             (lineart->baking_skip + 1));
-  LineartGpencilModifierData *lmd;
-  LineartRenderBuffer *rb;
-  int use_types;
-  bool frame_updated;
-
-  /* Needed for progress report. */
-  lineart_share.wm = CTX_wm_manager(C);
-  lineart_share.main_window = CTX_wm_window(C);
+  int frame_increment = scene->r.frame_step;
+  bool overwrite_frames = true;
 
   for (frame = frame_begin; frame <= frame_end; frame += frame_increment) {
 
-    frame_updated = false;
+    BKE_scene_frame_set(scene, frame);
+    BKE_scene_graph_update_for_newframe(dg);
+    if (ob->type != OB_GPENCIL) {
+      continue;
+    }
 
-    FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_BEGIN (
-        scene->master_collection, ob, DAG_EVAL_RENDER) {
-
-      int cleared = 0;
-      if (ob->type != OB_GPENCIL) {
-        continue;
-      }
-
+    if (overwrite_frames) {
       LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
-        if (md->type != eGpencilModifierType_Lineart) {
-          continue;
-        }
-        lmd = (LineartGpencilModifierData *)md;
-        bGPdata *gpd = ob->data;
-        bGPDlayer *gpl = BKE_gpencil_layer_get_by_name(gpd, lmd->target_layer, 1);
-        bGPDframe *gpf = ((lineart->flags & LRT_BAKING_KEYFRAMES_ONLY) ?
-                              BKE_gpencil_layer_frame_find(gpl, frame) :
-                              BKE_gpencil_layer_frame_get(gpl, frame, GP_GETFRAME_ADD_NEW));
-
-        if (!gpf) {
-          continue; /* happens when it's keyframe only. */
-        }
-
-        if (!frame_updated) {
-          /* Reset flags. LRT_SYNC_IGNORE prevent any line art modifiers run calculation
-           * function when depsgraph calls for modifier evalurates. */
-          ED_lineart_modifier_sync_flag_set(LRT_SYNC_IGNORE, false);
-          ED_lineart_calculation_flag_set(LRT_RENDER_IDLE);
-
-          BKE_scene_frame_set(scene, frame);
-          BKE_scene_graph_update_for_newframe(dg);
-
-          ED_lineart_update_render_progress(
-              (int)((float)(frame - frame_begin) / frame_total * 100), NULL);
-
-          BLI_spin_lock(&lineart_share.lock_loader);
-          ED_lineart_compute_feature_lines_background(dg, 0);
-
-          /* Wait for loading finish. */
-          BLI_spin_lock(&lineart_share.lock_loader);
-          BLI_spin_unlock(&lineart_share.lock_loader);
-
-          while (!ED_lineart_modifier_sync_flag_check(LRT_SYNC_FRESH) ||
-                 !ED_lineart_calculation_flag_check(LRT_RENDER_FINISHED)) {
-            /* Wait till it's done. */
-          }
-
-          ED_lineart_chain_clear_picked_flag(lineart_share.render_buffer);
-
-          frame_updated = true;
-        }
-
-        /* Clear original frame. */
-        if ((scene->lineart.flags & LRT_GPENCIL_OVERWRITE) && (!cleared)) {
-          BKE_gpencil_layer_frame_delete(gpl, gpf);
-          gpf = BKE_gpencil_layer_frame_get(gpl, frame, GP_GETFRAME_ADD_NEW);
-          cleared = 1;
-        }
-
-        rb = lineart_share.render_buffer;
-
-        if (rb->fuzzy_everything) {
-          use_types = LRT_EDGE_FLAG_CONTOUR;
-        }
-        else if (rb->fuzzy_intersections) {
-          use_types = lmd->line_types | LRT_EDGE_FLAG_INTERSECTION;
-        }
-        else {
-          use_types = lmd->line_types;
-        }
-
-        ED_lineart_gpencil_generate_with_type(
-            dg,
-            ob,
-            gpl,
-            gpf,
-            lmd->source_type,
-            lmd->source_type == LRT_SOURCE_OBJECT ? (void *)lmd->source_object :
-                                                    (void *)lmd->source_collection,
-            lmd->level_start,
-            lmd->use_multiple_levels ? lmd->level_end : lmd->level_start,
-            lmd->target_material ?
-                BKE_gpencil_object_material_index_get(ob, lmd->target_material) :
-                0,
-            use_types,
-            lmd->transparency_flags,
-            lmd->transparency_mask,
-            lmd->thickness,
-            lmd->opacity,
-            lmd->pre_sample_length,
-            lmd->source_vertex_group,
-            lmd->vgname,
-            lmd->flags);
+        clear_strokes(ob, md, frame);
       }
     }
-    FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_END;
+
+    LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+      bake_strokes(ob, dg, md, frame);
+    }
   }
 
   /* Restore original frame. */
   BKE_scene_frame_set(scene, frame_orig);
   BKE_scene_graph_update_for_newframe(dg);
 
-  ED_lineart_modifier_sync_flag_set(LRT_SYNC_IDLE, false);
-  ED_lineart_calculation_flag_set(LRT_RENDER_FINISHED);
-
   BKE_report(op->reports, RPT_INFO, "Line Art baking is complete.");
-  WM_operator_confirm_message_ex(C,
-                                 op,
-                                 "Line Art baking is complete.",
-                                 ICON_MOD_WIREFRAME,
-                                 "Disable Line Art master switch",
-                                 WM_OP_EXEC_REGION_WIN);
-
-  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED | ND_SPACE_PROPERTIES, NULL);
-
-  ED_lineart_update_render_progress(100, NULL);
+  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
 
   return OPERATOR_FINISHED;
 }
@@ -218,37 +222,128 @@ static int lineart_gpencil_bake_strokes_exec(bContext *C, wmOperator *UNUSED(op)
 {
   Scene *scene = CTX_data_scene(C);
 
-  /* If confirmed in the dialog, then just turn off the master switch upon finished baking. */
-  scene->lineart.flags &= (~LRT_AUTO_UPDATE);
+  return OPERATOR_FINISHED;
+}
+
+static int lineart_gpencil_clear_strokes_invoke(bContext *C,
+                                                wmOperator *op,
+                                                const wmEvent *UNUSED(event))
+{
+  Object *ob = CTX_data_active_object(C);
+  if (ob->type != OB_GPENCIL) {
+    return OPERATOR_CANCELLED;
+  }
+  LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+    if (md->type != eGpencilModifierType_Lineart) {
+      continue;
+    }
+    LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
+    bGPdata *gpd = ob->data;
+
+    bGPDlayer *gpl = BKE_gpencil_layer_get_by_name(gpd, lmd->target_layer, 1);
+    if (!gpl) {
+      continue;
+    }
+    BKE_gpencil_free_frames(gpl);
+  }
+
+  BKE_report(op->reports, RPT_INFO, "Line Art clear layers is complete.");
+  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
+  return OPERATOR_FINISHED;
+}
+
+static int lineart_gpencil_clear_strokes_exec(bContext *C, wmOperator *UNUSED(op))
+{
+  Scene *scene = CTX_data_scene(C);
 
   return OPERATOR_FINISHED;
 }
 
-/* Blocking 1 frame update. */
-void SCENE_OT_lineart_update_strokes(wmOperatorType *ot)
+static int lineart_gpencil_clear_all_strokes_invoke(bContext *C,
+                                                    wmOperator *op,
+                                                    const wmEvent *UNUSED(event))
 {
-  ot->name = "Update Line Art Strokes";
-  ot->description = "Update strokes for Line Art grease pencil targets";
-  ot->idname = "SCENE_OT_lineart_update_strokes";
+  // FIXME ASAN reports a mem leak here in CTX_DATA_BEGIN
+  CTX_DATA_BEGIN (C, Object *, ob, visible_objects) {
+    if (ob->type != OB_GPENCIL) {
+      return OPERATOR_CANCELLED;
+    }
+    LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+      if (md->type != eGpencilModifierType_Lineart) {
+        continue;
+      }
+      LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
+      bGPdata *gpd = ob->data;
 
-  ot->exec = lineart_gpencil_update_strokes_exec;
+      bGPDlayer *gpl = BKE_gpencil_layer_get_by_name(gpd, lmd->target_layer, 1);
+      if (!gpl) {
+        continue;
+      }
+      BKE_gpencil_free_frames(gpl);
+    }
+  }
+  CTX_DATA_END;
+
+  BKE_report(op->reports, RPT_INFO, "Line Art all clear layers is complete.");
+  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
+  return OPERATOR_FINISHED;
 }
 
-/* All frames in range. */
-void SCENE_OT_lineart_bake_strokes(wmOperatorType *ot)
+static int lineart_gpencil_clear_all_strokes_exec(bContext *C, wmOperator *UNUSED(op))
+{
+  Scene *scene = CTX_data_scene(C);
+
+  return OPERATOR_FINISHED;
+}
+
+/* Bake all line art modifiers on the current object. */
+void OBJECT_OT_lineart_bake_strokes(wmOperatorType *ot)
 {
   ot->name = "Bake Line Art Strokes";
-  ot->description = "Bake Line Art into grease pencil strokes for all frames";
-  ot->idname = "SCENE_OT_lineart_bake_strokes";
+  ot->description = "Bake Line Art all line art modifier on this object";
+  ot->idname = "OBJECT_OT_lineart_bake_strokes";
 
   ot->invoke = lineart_gpencil_bake_strokes_invoke;
   ot->exec = lineart_gpencil_bake_strokes_exec;
 }
 
-#endif
+/* Bake all lineart objects in the scene. */
+void OBJECT_OT_lineart_bake_all_strokes(wmOperatorType *ot)
+{
+  ot->name = "Bake All Line Art Strokes";
+  ot->description = "Bake All Line Art Modifiers In The Scene";
+  ot->idname = "OBJECT_OT_lineart_bake_all_strokes";
+
+  ot->invoke = lineart_gpencil_bake_all_strokes_invoke;
+  ot->exec = lineart_gpencil_bake_all_strokes_exec;
+}
+
+/* clear all line art modifiers on the current object. */
+void OBJECT_OT_lineart_clear_strokes(wmOperatorType *ot)
+{
+  ot->name = "Clear Line Art Strokes";
+  ot->description = "Clear Line Art grease pencil strokes for all frames";
+  ot->idname = "OBJECT_OT_lineart_clear_strokes";
+
+  ot->invoke = lineart_gpencil_clear_strokes_invoke;
+  ot->exec = lineart_gpencil_clear_strokes_exec;
+}
+
+/* clear all lineart objects in the scene. */
+void OBJECT_OT_lineart_clear_all_strokes(wmOperatorType *ot)
+{
+  ot->name = "Clear All Line Art Strokes";
+  ot->description = "Clear All Line Art Modifiers In The Scene";
+  ot->idname = "OBJECT_OT_lineart_clear_all_strokes";
+
+  ot->invoke = lineart_gpencil_clear_all_strokes_invoke;
+  ot->exec = lineart_gpencil_clear_all_strokes_exec;
+}
 
 void ED_operatortypes_lineart(void)
 {
-  // WM_operatortype_append(SCENE_OT_lineart_update_strokes);
-  // WM_operatortype_append(SCENE_OT_lineart_bake_strokes);
+  WM_operatortype_append(OBJECT_OT_lineart_bake_strokes);
+  WM_operatortype_append(OBJECT_OT_lineart_bake_all_strokes);
+  WM_operatortype_append(OBJECT_OT_lineart_clear_strokes);
+  WM_operatortype_append(OBJECT_OT_lineart_clear_all_strokes);
 }

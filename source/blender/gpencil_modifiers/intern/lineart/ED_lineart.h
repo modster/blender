@@ -582,6 +582,9 @@ float ED_lineart_chain_compute_length(LineartRenderLineChain *rlc);
 struct wmOperatorType;
 
 /* Operator types */
-void SCENE_OT_lineart_bake_strokes(struct wmOperatorType *ot);
+void OBJECT_OT_lineart_bake_strokes(struct wmOperatorType *ot);
+void OBJECT_OT_lineart_bake_all_strokes(struct wmOperatorType *ot);
+void OBJECT_OT_lineart_clear_strokes(struct wmOperatorType *ot);
+void OBJECT_OT_lineart_clear_all_strokes(struct wmOperatorType *ot);
 
 void ED_operatortypes_lineart(void);
