@@ -939,11 +939,16 @@ void CUDADevice::generic_copy_to(device_memory &mem)
    * cuMemAlloc regardless of mem.host_pointer and mem.shared_pointer, and should copy data from
    * mem.host_pointer. */
   thread_scoped_lock lock(cuda_mem_map_mutex);
+  auto &transfer_info = transfer_infos[mem.name];
+  transfer_info.bytes_copied += mem.memory_size();
+  transfer_info.total_size = mem.memory_size();
+  auto timer = scoped_timer();
   if (!cuda_mem_map[&mem].use_mapped_host || mem.host_pointer != mem.shared_pointer) {
     const CUDAContextScope scope(this);
     cuda_assert(
         cuMemcpyHtoD((CUdeviceptr)mem.device_pointer, mem.host_pointer, mem.memory_size()));
   }
+  transfer_info.time_spent_copying += timer.get_time();
 }
 
 void CUDADevice::generic_copy_chunk_to(device_memory &mem, size_t chunk_offset, size_t chunk_size)
@@ -958,11 +963,16 @@ void CUDADevice::generic_copy_chunk_to(device_memory &mem, size_t chunk_offset, 
    * cuMemAlloc regardless of mem.host_pointer and mem.shared_pointer, and should copy data from
    * mem.host_pointer. */
   thread_scoped_lock lock(cuda_mem_map_mutex);
+  auto &transfer_info = transfer_infos[mem.name];
+  transfer_info.bytes_copied += chunk_size;
+  transfer_info.total_size = mem.memory_size();
+  auto timer = scoped_timer();
   if (!cuda_mem_map[&mem].use_mapped_host || mem.host_pointer != mem.shared_pointer) {
     const CUDAContextScope scope(this);
     cuda_assert(
         cuMemcpyHtoDAsync((CUdeviceptr)(mem.device_pointer + chunk_offset), (char *)mem.host_pointer + chunk_offset, chunk_size, NULL));
   }
+  transfer_info.time_spent_copying += timer.get_time();
 }
 
 void CUDADevice::generic_free(device_memory &mem)

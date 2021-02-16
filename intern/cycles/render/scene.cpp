@@ -91,54 +91,19 @@ DeviceScene::DeviceScene(Device *device)
 
 void DeviceScene::print_data_transfered()
 {
+  auto device = bvh_nodes.device;
+
   DataTransferStats stats;
+  for (auto &info : device->transfer_infos) {
+    auto entry = DataTransferEntry();
+    entry.name = info.first;
+    entry.size = info.second.total_size;
+    entry.size_copied = info.second.bytes_copied;
+    entry.time = info.second.time_spent_copying;
+    stats.add_entry(entry);
+  }
 
-#define ADD_ENTRY_AND_CLEAR(dvector) \
-  stats.add_entry(dvector); \
-  dvector.time_copying(0.0); \
-  dvector.data_copied(0)
-
-  ADD_ENTRY_AND_CLEAR(bvh_nodes);
-  ADD_ENTRY_AND_CLEAR(bvh_leaf_nodes);
-  ADD_ENTRY_AND_CLEAR(object_node);
-  ADD_ENTRY_AND_CLEAR(prim_tri_index);
-  ADD_ENTRY_AND_CLEAR(prim_tri_verts);
-  ADD_ENTRY_AND_CLEAR(prim_type);
-  ADD_ENTRY_AND_CLEAR(prim_visibility);
-  ADD_ENTRY_AND_CLEAR(prim_index);
-  ADD_ENTRY_AND_CLEAR(prim_object);
-  ADD_ENTRY_AND_CLEAR(prim_time);
-  ADD_ENTRY_AND_CLEAR(tri_shader);
-  ADD_ENTRY_AND_CLEAR(tri_vnormal);
-  ADD_ENTRY_AND_CLEAR(tri_vindex);
-  ADD_ENTRY_AND_CLEAR(tri_patch);
-  ADD_ENTRY_AND_CLEAR(tri_patch_uv);
-  ADD_ENTRY_AND_CLEAR(curves);
-  ADD_ENTRY_AND_CLEAR(curve_keys);
-  ADD_ENTRY_AND_CLEAR(patches);
-  ADD_ENTRY_AND_CLEAR(objects);
-  ADD_ENTRY_AND_CLEAR(object_motion_pass);
-  ADD_ENTRY_AND_CLEAR(object_motion);
-  ADD_ENTRY_AND_CLEAR(object_flag);
-  ADD_ENTRY_AND_CLEAR(object_volume_step);
-  ADD_ENTRY_AND_CLEAR(camera_motion);
-  ADD_ENTRY_AND_CLEAR(attributes_map);
-  ADD_ENTRY_AND_CLEAR(attributes_float);
-  ADD_ENTRY_AND_CLEAR(attributes_float2);
-  ADD_ENTRY_AND_CLEAR(attributes_float3);
-  ADD_ENTRY_AND_CLEAR(attributes_uchar4);
-  ADD_ENTRY_AND_CLEAR(light_distribution);
-  ADD_ENTRY_AND_CLEAR(lights);
-  ADD_ENTRY_AND_CLEAR(light_background_marginal_cdf);
-  ADD_ENTRY_AND_CLEAR(light_background_conditional_cdf);
-  ADD_ENTRY_AND_CLEAR(particles);
-  ADD_ENTRY_AND_CLEAR(svm_nodes);
-  ADD_ENTRY_AND_CLEAR(shaders);
-  ADD_ENTRY_AND_CLEAR(lookup_table);
-  ADD_ENTRY_AND_CLEAR(sample_pattern_lut);
-  ADD_ENTRY_AND_CLEAR(ies_lights);
-
-#undef ADD_ENTRY_AND_CLEAR
+  device->transfer_infos.clear();
 
   std::cerr << "Data transfer statistics :\n";
   std::cerr << stats.full_report();

@@ -265,8 +265,6 @@ class device_memory {
   bool modified;
   bool has_chunks;
   bool chunks_copied;
-  size_t data_copied_ = 0;
-  double time_copying_ = 0.0;
 };
 
 /* Device Only Memory
@@ -539,23 +537,14 @@ template<typename T> class device_vector : public device_memory {
   void copy_to_device()
   {
     if (data_size != 0) {
-      scoped_timer timer;
       device_copy_to();
-      time_copying_ += timer.get_time();
-
-      if (!chunks_copied) {
-        data_copied_ = byte_size();
-      }
     }
   }
 
   void copy_chunk_to_device(size_t chunk_offset, size_t chunk_size)
   {
     if (data_size != 0) {
-      scoped_timer timer;
       device_copy_chunk_to(chunk_offset, chunk_size);
-      time_copying_ += timer.get_time();
-      data_copied_ += chunk_size;
     }
   }
 
@@ -574,31 +563,6 @@ template<typename T> class device_vector : public device_memory {
     need_realloc_ = false;
     has_chunks = false;
     chunks_copied = false;
-  }
-
-  size_t byte_size() const
-  {
-    return size() * sizeof(T);
-  }
-
-  size_t data_copied() const
-  {
-    return data_copied_;
-  }
-
-  double time_copying() const
-  {
-    return time_copying_;
-  }
-
-  void data_copied(size_t x)
-  {
-    data_copied_ = x;
-  }
-
-  void time_copying(double d)
-  {
-    time_copying_ = d;
   }
 
   void copy_from_device()

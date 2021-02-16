@@ -487,6 +487,14 @@ class Device {
 
   static void free_memory();
 
+  struct DeviceTransferInfo {
+   double time_spent_copying = 0.0;
+   size_t bytes_copied = 0;
+   size_t total_size = 0;
+  };
+
+  std::map<string, DeviceTransferInfo> transfer_infos;
+
  protected:
   /* Memory allocation, only accessed through device_memory. */
   friend class MultiDevice;
