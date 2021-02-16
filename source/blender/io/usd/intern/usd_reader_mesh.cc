@@ -553,6 +553,43 @@ void USDMeshReader::process_normals_face_varying(Mesh *mesh)
   MEM_freeN(lnors);
 }
 
+// Set USD uniform (per-face) normals as Blender loop normals.
+void USDMeshReader::process_normals_uniform(Mesh *mesh)
+{
+  if (m_normals.empty()) {
+    BKE_mesh_calc_normals(mesh);
+    return;
+  }
+
+  // Check for normals count mismatches to prevent crashes.
+  if (m_normals.size() != mesh->totpoly) {
+    std::cerr << "WARNING: uniform normal count mismatch for mesh " << mesh->id.name << std::endl;
+    BKE_mesh_calc_normals(mesh);
+    return;
+  }
+
+  float(*lnors)[3] = static_cast<float(*)[3]>(
+    MEM_malloc_arrayN(mesh->totloop, sizeof(float[3]), "USD::FaceNormals"));
+
+  MPoly *mpoly = mesh->mpoly;
+
+  for (int i = 0, e = mesh->totpoly; i < e; ++i, ++mpoly) {
+
+    for (int j = 0; j < mpoly->totloop; j++) {
+      int loop_index = mpoly->loopstart + j;
+      lnors[loop_index][0] = m_normals[i][0];
+      lnors[loop_index][1] = m_normals[i][1];
+      lnors[loop_index][2] = m_normals[i][2];
+    }
+  }
+
+  mesh->flag |= ME_AUTOSMOOTH;
+  BKE_mesh_set_custom_normals(mesh, lnors);
+
+  MEM_freeN(lnors);
+}
+
+
 void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
                                      ImportSettings *settings,
                                      Mesh *mesh,
@@ -599,8 +636,16 @@ void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
 
   if ((settings->read_flag & MOD_MESHSEQ_READ_POLY) != 0) {
     read_mpolys(mesh, mesh_prim, motionSampleTime);
-    if (m_normalInterpolation == pxr::UsdGeomTokens->faceVarying)
+    if (m_normalInterpolation == pxr::UsdGeomTokens->faceVarying) {
       process_normals_face_varying(mesh);
+    }
+    else if (m_normalInterpolation == pxr::UsdGeomTokens->uniform) {
+      process_normals_uniform(mesh);
+    }
+    else {
+      // Default
+      BKE_mesh_calc_normals(mesh);
+    }
   }
 
   // Process point normals after reading polys.  This
