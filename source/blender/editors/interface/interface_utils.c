@@ -544,7 +544,7 @@ int UI_icon_from_id(ID *id)
 int UI_icon_from_report_type(int type)
 {
   if (type & RPT_ERROR_ALL) {
-    return ICON_ERROR;
+    return ICON_CANCEL;
   }
   if (type & RPT_WARNING_ALL) {
     return ICON_ERROR;
@@ -552,7 +552,62 @@ int UI_icon_from_report_type(int type)
   if (type & RPT_INFO_ALL) {
     return ICON_INFO;
   }
-  return ICON_NONE;
+  if (type & RPT_DEBUG_ALL) {
+    return ICON_SYSTEM;
+  }
+  if (type & RPT_PROPERTY) {
+    return ICON_OPTIONS;
+  }
+  if (type & RPT_OPERATOR) {
+    return ICON_CHECKMARK;
+  }
+  return ICON_INFO;
+}
+
+int UI_icon_colorid_from_report_type(int type)
+{
+  if (type & RPT_ERROR_ALL) {
+    return TH_INFO_ERROR;
+  }
+  if (type & RPT_WARNING_ALL) {
+    return TH_INFO_WARNING;
+  }
+  if (type & RPT_INFO_ALL) {
+    return TH_INFO_INFO;
+  }
+  if (type & RPT_DEBUG_ALL) {
+    return TH_INFO_DEBUG;
+  }
+  if (type & RPT_PROPERTY) {
+    return TH_INFO_PROPERTY;
+  }
+  if (type & RPT_OPERATOR) {
+    return TH_INFO_OPERATOR;
+  }
+  return TH_INFO_WARNING;
+}
+
+int UI_text_colorid_from_report_type(int type)
+{
+  if (type & RPT_ERROR_ALL) {
+    return TH_INFO_ERROR_TEXT;
+  }
+  if (type & RPT_WARNING_ALL) {
+    return TH_INFO_WARNING_TEXT;
+  }
+  if (type & RPT_INFO_ALL) {
+    return TH_INFO_INFO_TEXT;
+  }
+  if (type & RPT_DEBUG_ALL) {
+    return TH_INFO_DEBUG_TEXT;
+  }
+  if (type & RPT_PROPERTY) {
+    return TH_INFO_PROPERTY_TEXT;
+  }
+  if (type & RPT_OPERATOR) {
+    return TH_INFO_OPERATOR_TEXT;
+  }
+  return TH_INFO_WARNING_TEXT;
 }
 
 /********************************** Misc **************************************/
