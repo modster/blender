@@ -270,6 +270,52 @@ void process_loop_normals(Mesh *mesh, const MeshSampleData &mesh_data)
   MEM_freeN(lnors);
 }
 
+// Set USD uniform (per-face) normals as Blender loop normals.
+void process_uniform_normals(Mesh *mesh, const MeshSampleData &mesh_data)
+{
+  if (!mesh) {
+    return;
+  }
+
+  size_t norm_count = mesh_data.normals.size();
+
+  if (norm_count == 0) {
+    process_no_normals(mesh);
+    return;
+  }
+
+  if (norm_count != mesh->totpoly) {
+    std::cerr << "WARNING: uniform normal count mismatch for mesh " << mesh->id.name << std::endl;
+    process_no_normals(mesh);
+    return;
+  }
+
+  float(*lnors)[3] = static_cast<float(*)[3]>(
+      MEM_malloc_arrayN(mesh->totloop, sizeof(float[3]), "USD::FaceNormals"));
+
+  MPoly *mpoly = mesh->mpoly;
+
+  for (int p = 0; p < mesh->totpoly; ++p, ++mpoly) {
+
+    for (int l = 0; l < mpoly->totloop; ++l) {
+      int loop_index = mpoly->loopstart + l;
+      if (mesh_data.y_up) {
+        copy_zup_from_yup(lnors[loop_index], mesh_data.normals[p].data());
+      }
+      else {
+        lnors[loop_index][0] = mesh_data.normals[p].data()[0];
+        lnors[loop_index][1] = mesh_data.normals[p].data()[1];
+        lnors[loop_index][2] = mesh_data.normals[p].data()[2];
+      }
+    }
+  }
+
+  mesh->flag |= ME_AUTOSMOOTH;
+  BKE_mesh_set_custom_normals(mesh, lnors);
+
+  MEM_freeN(lnors);
+}
+
 void process_vertex_normals(Mesh *mesh, const MeshSampleData &mesh_data)
 {
   if (!mesh) {
@@ -320,6 +366,9 @@ void process_normals(Mesh *mesh, const MeshSampleData &mesh_data)
   }
   else if (mesh_data.normals_interpolation == pxr::UsdGeomTokens->vertex) {
     process_vertex_normals(mesh, mesh_data); /* 'point normals' in Houdini. */
+  }
+  else if (mesh_data.normals_interpolation == pxr::UsdGeomTokens->uniform) {
+    process_uniform_normals(mesh, mesh_data); /* per-face normals. */
   }
   else {
     process_no_normals(mesh);
