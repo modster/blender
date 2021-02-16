@@ -24,8 +24,6 @@
 
 #include "wm_xr.h"
 
-enum wmXrActionType;
-enum wmXrOpFlag;
 struct wmXrActionSet;
 struct GHash;
 
@@ -131,7 +129,7 @@ typedef struct wmXrDrawData {
 
 typedef struct wmXrAction {
   char *name;
-  enum wmXrActionType type;
+  char type; /* wmXrActionType */
   unsigned int count_subaction_paths;
   char **subaction_paths;
   /** States for each subaction path. */
@@ -148,7 +146,7 @@ typedef struct wmXrAction {
   /** Operator to be called on XR events. */
   struct wmOperatorType *ot;
   IDProperty *op_properties;
-  enum wmXrOpFlag op_flag;
+  char op_flag; /* wmXrOpFlag */
 } wmXrAction;
 
 typedef struct wmXrActionSet {
