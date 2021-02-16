@@ -709,7 +709,8 @@ void Mesh::pack_shaders(Scene *scene, device_vector<uint>::chunk tri_shader)
   tri_shader.copy_to_device();
 }
 
-void Mesh::pack_normals(device_vector<float4>::chunk vnormal, device_vector<short>::chunk vnormal_deltas)
+void Mesh::pack_normals(device_vector<float4>::chunk vnormal,
+                        device_vector<short>::chunk vnormal_deltas)
 {
   Attribute *attr_vN = attributes.find(ATTR_STD_VERTEX_NORMAL);
   if (attr_vN == NULL) {
@@ -777,9 +778,9 @@ void Mesh::pack_verts(const vector<uint> &tri_prim_index,
   for (size_t i = 0; i < triangles_size; i++) {
     Triangle t = get_triangle(i);
     tri_vindex.data()[i] = make_uint4(t.v[0] + vert_offset,
-                               t.v[1] + vert_offset,
-                               t.v[2] + vert_offset,
-                               tri_prim_index[i + tri_offset]);
+                                      t.v[1] + vert_offset,
+                                      t.v[2] + vert_offset,
+                                      tri_prim_index[i + tri_offset]);
 
     tri_patch.data()[i] = (!get_num_subd_faces()) ? -1 : (triangle_patch[i] * 8 + patch_offset);
   }

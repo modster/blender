@@ -460,7 +460,8 @@ void Hair::apply_transform(const Transform &tfm, const bool apply_to_motion)
   }
 }
 
-void Hair::pack_curve_keys(device_vector<float4>::chunk curve_key_co, device_vector<short>::chunk keys_deltas)
+void Hair::pack_curve_keys(device_vector<float4>::chunk curve_key_co,
+                           device_vector<short>::chunk keys_deltas)
 {
   size_t curve_keys_size = curve_keys.size();
 
@@ -471,7 +472,8 @@ void Hair::pack_curve_keys(device_vector<float4>::chunk curve_key_co, device_vec
     const bool do_deltas = keys_deltas.valid();
 
     for (size_t i = 0; i < curve_keys_size; i++) {
-      const float4 new_keys = make_float4(keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
+      const float4 new_keys = make_float4(
+          keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
 
       if (do_deltas) {
         const float4 old_keys = curve_key_co.data()[i];
@@ -508,14 +510,14 @@ void Hair::pack_curve_segments(Scene *scene, device_vector<float4>::chunk curve_
     Curve curve = get_curve(i);
     int shader_id = curve_shader[i];
     Shader *shader = (shader_id < used_shaders.size()) ?
-          static_cast<Shader *>(used_shaders[shader_id]) :
-          scene->default_surface;
+                         static_cast<Shader *>(used_shaders[shader_id]) :
+                         scene->default_surface;
     shader_id = scene->shader_manager->get_shader_id(shader, false);
 
     curve_data.data()[i] = make_float4(__int_as_float(curve.first_key + curvekey_offset),
-                                __int_as_float(curve.num_keys),
-                                __int_as_float(shader_id),
-                                0.0f);
+                                       __int_as_float(curve.num_keys),
+                                       __int_as_float(shader_id),
+                                       0.0f);
   }
 
   curve_data.copy_to_device();

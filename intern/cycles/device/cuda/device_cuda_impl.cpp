@@ -957,7 +957,8 @@ void CUDADevice::generic_copy_chunk_to(device_memory &mem, size_t chunk_offset, 
     return;
   }
 
-  // std::cerr << "[" << mem.name << "] copying a chunk of size " << chunk_size << " at offset " << chunk_offset << " (total size " << mem.memory_size() << ")\n";
+  // std::cerr << "[" << mem.name << "] copying a chunk of size " << chunk_size << " at offset " <<
+  // chunk_offset << " (total size " << mem.memory_size() << ")\n";
 
   /* If use_mapped_host of mem is false, the current device only uses device memory allocated by
    * cuMemAlloc regardless of mem.host_pointer and mem.shared_pointer, and should copy data from
@@ -969,8 +970,10 @@ void CUDADevice::generic_copy_chunk_to(device_memory &mem, size_t chunk_offset, 
   auto timer = scoped_timer();
   if (!cuda_mem_map[&mem].use_mapped_host || mem.host_pointer != mem.shared_pointer) {
     const CUDAContextScope scope(this);
-    cuda_assert(
-        cuMemcpyHtoDAsync((CUdeviceptr)(mem.device_pointer + chunk_offset), (char *)mem.host_pointer + chunk_offset, chunk_size, NULL));
+    cuda_assert(cuMemcpyHtoDAsync((CUdeviceptr)(mem.device_pointer + chunk_offset),
+                                  (char *)mem.host_pointer + chunk_offset,
+                                  chunk_size,
+                                  NULL));
   }
   transfer_info.time_spent_copying += timer.get_time();
 }
@@ -1448,7 +1451,7 @@ bool CUDADevice::supports_delta_compression()
 bool CUDADevice::apply_delta_compression(device_memory &mem_orig, device_memory &mem_compressed)
 {
   if (have_error())
- return false;
+    return false;
 
   CUDAContextScope scope(this);
 
@@ -1457,8 +1460,8 @@ bool CUDADevice::apply_delta_compression(device_memory &mem_orig, device_memory 
   assert(mem_orig.data_size == mem_compressed.data_size);
 
   CUfunction cu_apply_deltas;
-  cuda_assert(cuModuleGetFunction(
-   &cu_apply_deltas, cuModule, "kernel_cuda_apply_delta_compression"));
+  cuda_assert(
+      cuModuleGetFunction(&cu_apply_deltas, cuModule, "kernel_cuda_apply_delta_compression"));
 
   int size = (int)(mem_orig.data_size);
 

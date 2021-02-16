@@ -112,9 +112,9 @@ class CUDADevice : public Device {
 
   bool check_peer_access(Device *peer_device) override;
 
-	bool supports_delta_compression() override;
+  bool supports_delta_compression() override;
 
-	bool apply_delta_compression(device_memory &, device_memory &) override;
+  bool apply_delta_compression(device_memory &, device_memory &) override;
 
   bool use_adaptive_compilation();
 
@@ -270,7 +270,7 @@ class CUDADevice : public Device {
 
   virtual void task_wait() override;
 
-	virtual void task_cancel() override;
+  virtual void task_cancel() override;
 };
 
 CCL_NAMESPACE_END

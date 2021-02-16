@@ -461,7 +461,8 @@ class Device {
     return false;
   }
 
-  virtual bool apply_delta_compression(device_memory &/*mem_orig*/, device_memory &/*mem_compressed*/)
+  virtual bool apply_delta_compression(device_memory & /*mem_orig*/,
+                                       device_memory & /*mem_compressed*/)
   {
     return true;
   }
@@ -488,9 +489,9 @@ class Device {
   static void free_memory();
 
   struct DeviceTransferInfo {
-   double time_spent_copying = 0.0;
-   size_t bytes_copied = 0;
-   size_t total_size = 0;
+    double time_spent_copying = 0.0;
+    size_t bytes_copied = 0;
+    size_t total_size = 0;
   };
 
   std::map<string, DeviceTransferInfo> transfer_infos;

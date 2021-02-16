@@ -330,57 +330,56 @@ template<typename T> class device_only_memory : public device_memory {
 
 template<typename T> class device_vector : public device_memory {
  public:
-    struct chunk {
-        device_vector<T> *parent_;
-        size_t offset_;
-        size_t size_;
+  struct chunk {
+    device_vector<T> *parent_;
+    size_t offset_;
+    size_t size_;
 
-        chunk() : parent_(nullptr), offset_(0), size_(0) {}
-
-        chunk(device_vector<T> &parent, size_t offset, size_t size)
-          : parent_(&parent)
-          , offset_(offset)
-          , size_(size)
-        {
-          assert(offset < parent.size());
-          assert(offset + size < parent.size());
-					assert(parent.host_pointer != 0);
-					assert(parent.device_pointer != 0);
-        }
-
-        void copy_to_device()
-        {
-          parent_->chunks_copied = true;
-          parent_->copy_chunk_to_device(offset_ * sizeof(T), size_ * sizeof(T));
-        }
-
-        T *data()
-        {
-          return parent_->data() + offset_;
-        }
-
-        bool valid() const
-        {
-          return parent_ != nullptr;
-        }
-
-    };
-
-    chunk get_chunk(size_t offset, size_t size)
+    chunk() : parent_(nullptr), offset_(0), size_(0)
     {
-      has_chunks = true;
-      /* handle case where there is no data, this is to support getting a chunk
-       * for delta compression when the feature is not supported by the device */
-      if (data_size == 0) {
-        return {};
-      }
-
-      if (!device_pointer) {
-        device_alloc();
-      }
-
-      return chunk(*this, offset, size);
     }
+
+    chunk(device_vector<T> &parent, size_t offset, size_t size)
+        : parent_(&parent), offset_(offset), size_(size)
+    {
+      assert(offset < parent.size());
+      assert(offset + size < parent.size());
+      assert(parent.host_pointer != 0);
+      assert(parent.device_pointer != 0);
+    }
+
+    void copy_to_device()
+    {
+      parent_->chunks_copied = true;
+      parent_->copy_chunk_to_device(offset_ * sizeof(T), size_ * sizeof(T));
+    }
+
+    T *data()
+    {
+      return parent_->data() + offset_;
+    }
+
+    bool valid() const
+    {
+      return parent_ != nullptr;
+    }
+  };
+
+  chunk get_chunk(size_t offset, size_t size)
+  {
+    has_chunks = true;
+    /* handle case where there is no data, this is to support getting a chunk
+     * for delta compression when the feature is not supported by the device */
+    if (data_size == 0) {
+      return {};
+    }
+
+    if (!device_pointer) {
+      device_alloc();
+    }
+
+    return chunk(*this, offset, size);
+  }
 
   device_vector(Device *device, const char *name, MemoryType type)
       : device_memory(device, name, type)

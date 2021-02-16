@@ -1093,7 +1093,8 @@ void GeometryManager::device_update_mesh(
     }
     else {
       // we can do partial updates, so compute deltas from last update
-      device_vector<short> vnormal_deltas(scene->device, "__vnormal_deltas", MemoryType::MEM_READ_WRITE);
+      device_vector<short> vnormal_deltas(
+          scene->device, "__vnormal_deltas", MemoryType::MEM_READ_WRITE);
 
       if (scene->device->supports_delta_compression()) {
         vnormal_deltas.alloc(vert_size * 4);
@@ -1109,7 +1110,8 @@ void GeometryManager::device_update_mesh(
           }
 
           if (mesh->verts_is_modified()) {
-            mesh->pack_normals(mesh->get_verts_chunk(dscene->tri_vnormal), mesh->get_verts_chunk(vnormal_deltas, 4));
+            mesh->pack_normals(mesh->get_verts_chunk(dscene->tri_vnormal),
+                               mesh->get_verts_chunk(vnormal_deltas, 4));
           }
 
           if (mesh->triangles_is_modified() || mesh->vert_patch_uv_is_modified()) {
@@ -1164,7 +1166,8 @@ void GeometryManager::device_update_mesh(
     }
     else {
       // we can do partial updates, so compute deltas from last update
-      device_vector<short> curve_keys_deltas(scene->device, "__curve_keys_deltas", MemoryType::MEM_READ_WRITE);
+      device_vector<short> curve_keys_deltas(
+          scene->device, "__curve_keys_deltas", MemoryType::MEM_READ_WRITE);
 
       if (scene->device->supports_delta_compression()) {
         curve_keys_deltas.alloc(curve_key_size * 4);
@@ -1175,9 +1178,10 @@ void GeometryManager::device_update_mesh(
           Hair *hair = static_cast<Hair *>(geom);
 
           const bool curve_keys_co_modified = hair->curve_radius_is_modified() ||
-                                        hair->curve_keys_is_modified();
+                                              hair->curve_keys_is_modified();
           if (curve_keys_co_modified) {
-            hair->pack_curve_keys(hair->get_keys_chunk(dscene->curve_keys), hair->get_keys_chunk(curve_keys_deltas, 4));
+            hair->pack_curve_keys(hair->get_keys_chunk(dscene->curve_keys),
+                                  hair->get_keys_chunk(curve_keys_deltas, 4));
           }
 
           const bool curve_data_modified = hair->curve_shader_is_modified() ||

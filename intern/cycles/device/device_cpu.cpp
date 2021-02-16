@@ -433,7 +433,9 @@ class CPUDevice : public Device {
     }
   }
 
-  virtual void mem_copy_chunk_to(device_memory &mem, size_t /*chunk_offset*/, size_t /*chunk_size*/) override
+  virtual void mem_copy_chunk_to(device_memory &mem,
+                                 size_t /*chunk_offset*/,
+                                 size_t /*chunk_size*/) override
   {
     if (mem.type != MEM_GLOBAL) {
       assert(!"mem_copy_chunk_to is only supported for global memory.");
