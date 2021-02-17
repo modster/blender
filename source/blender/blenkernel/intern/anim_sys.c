@@ -2505,9 +2505,7 @@ void nlasnapshot_enable_all_remap_domain(NlaEvalSnapshot *snapshot)
       continue;
     }
 
-    for (int j = 0; j < necs->length; j++) {
-      BLI_BITMAP_ENABLE(necs->remap_domain.ptr, j);
-    }
+    BLI_bitmap_set_all(necs->remap_domain.ptr, true, necs->length);
   }
 }
 
@@ -2562,7 +2560,6 @@ void nlasnapshot_blend(NlaEvalData *eval_data,
 
     if (upper_blendmode == NLASTRIP_MODE_COMBINE) {
       const int mix_mode = nec->mix_mode;
-
       if (mix_mode == NEC_MIX_QUATERNION) {
         if (!BLI_BITMAP_TEST_BOOL(upper_necs->blend_domain.ptr, 0)) {
           continue;
