@@ -82,6 +82,10 @@ typedef struct NlaEvalChannelSnapshot {
   /** For an upper snapshot channel, marks values that should be blended. */
   NlaValidMask blend_domain;
 
+  /** Only used for keyframe remapping. Any values not in the \a remap_domain should not be used
+   * for keyframing or remapping. */
+  NlaValidMask remap_domain;
+
   int length;   /* Number of values in the property. */
   bool is_base; /* Base snapshot of the channel. */
 
@@ -189,12 +193,21 @@ void nlasnapshot_enable_all_blend_domain(NlaEvalSnapshot *snapshot);
 
 void nlasnapshot_ensure_channels(NlaEvalData *eval_data, NlaEvalSnapshot *snapshot);
 
+void nlasnapshot_enable_all_remap_domain(NlaEvalSnapshot *snapshot);
+
 void nlasnapshot_blend(NlaEvalData *eval_data,
                        NlaEvalSnapshot *lower_snapshot,
                        NlaEvalSnapshot *upper_snapshot,
                        const short upper_blendmode,
                        const float upper_influence,
                        NlaEvalSnapshot *r_blended_snapshot);
+
+void nlasnapshot_blend_get_inverted_upper_snapshot(NlaEvalData *eval_data,
+                                                   NlaEvalSnapshot *lower_snapshot,
+                                                   NlaEvalSnapshot *blended_snapshot,
+                                                   const short upper_blendmode,
+                                                   const float upper_influence,
+                                                   NlaEvalSnapshot *r_upper_snapshot);
 
 #ifdef __cplusplus
 }

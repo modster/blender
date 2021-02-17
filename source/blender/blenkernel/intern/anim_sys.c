@@ -1051,6 +1051,7 @@ static NlaEvalChannelSnapshot *nlaevalchan_snapshot_new(NlaEvalChannel *nec)
   nec_snapshot->channel = nec;
   nec_snapshot->length = length;
   nlavalidmask_init(&nec_snapshot->blend_domain, length);
+  nlavalidmask_init(&nec_snapshot->remap_domain, length);
 
   return nec_snapshot;
 }
@@ -1061,6 +1062,7 @@ static void nlaevalchan_snapshot_free(NlaEvalChannelSnapshot *nec_snapshot)
   BLI_assert(!nec_snapshot->is_base);
 
   nlavalidmask_free(&nec_snapshot->blend_domain);
+  nlavalidmask_free(&nec_snapshot->remap_domain);
   MEM_freeN(nec_snapshot);
 }
 
@@ -2502,6 +2504,20 @@ void nlasnapshot_ensure_channels(NlaEvalData *eval_data, NlaEvalSnapshot *snapsh
   }
 }
 
+void nlasnapshot_enable_all_remap_domain(NlaEvalSnapshot *snapshot)
+{
+  for (int i = 0; i < snapshot->size; i++) {
+    NlaEvalChannelSnapshot *necs = nlaeval_snapshot_get(snapshot, i);
+    if (necs == NULL) {
+      continue;
+    }
+
+    for (int j = 0; j < necs->length; j++) {
+      BLI_BITMAP_ENABLE(necs->remap_domain.ptr, j);
+    }
+  }
+}
+
 /** Blends the \a lower_snapshot with the \a upper_snapshot into \a r_blended_snapshot according
  * to the given \a upper_blendmode and \a upper_influence.
  *
@@ -2546,6 +2562,7 @@ void nlasnapshot_blend(NlaEvalData *eval_data,
 
     if (upper_blendmode == NLASTRIP_MODE_COMBINE) {
       const int mix_mode = nec->mix_mode;
+
       if (mix_mode == NEC_MIX_QUATERNION) {
         if (!BLI_BITMAP_TEST_BOOL(upper_necs->blend_domain.ptr, 0)) {
           continue;
@@ -2555,6 +2572,8 @@ void nlasnapshot_blend(NlaEvalData *eval_data,
             lower_necs->values, upper_necs->values, upper_influence, result_necs->values);
       }
       else {
+        BLI_assert(ELEM(mix_mode, NEC_MIX_ADD, NEC_MIX_AXIS_ANGLE, NEC_MIX_MULTIPLY));
+
         for (int j = 0; j < length; j++) {
           if (!BLI_BITMAP_TEST_BOOL(upper_necs->blend_domain.ptr, j)) {
             continue;
@@ -2569,6 +2588,12 @@ void nlasnapshot_blend(NlaEvalData *eval_data,
       }
     }
     else {
+      BLI_assert(ELEM(upper_blendmode,
+                      NLASTRIP_MODE_ADD,
+                      NLASTRIP_MODE_SUBTRACT,
+                      NLASTRIP_MODE_MULTIPLY,
+                      NLASTRIP_MODE_REPLACE));
+
       for (int j = 0; j < length; j++) {
         if (!BLI_BITMAP_TEST_BOOL(upper_necs->blend_domain.ptr, j)) {
           continue;
@@ -2576,6 +2601,99 @@ void nlasnapshot_blend(NlaEvalData *eval_data,
 
         result_necs->values[j] = nla_blend_value(
             upper_blendmode, lower_necs->values[j], upper_necs->values[j], upper_influence);
+      }
+    }
+  }
+}
+
+/** Using  \a blended_snapshot and \a lower_snapshot, we can solve for the \a r_upper_snapshot.
+ *
+ * Only channels that exist within \a blended_snapshot are inverted.
+ *
+ * For \a r_upper_snapshot, disables \a NlaEvalChannelSnapshot->remap_domain for failed inversions.
+ * Only values within the \a remap_domain are processed.
+ */
+void nlasnapshot_blend_get_inverted_upper_snapshot(NlaEvalData *eval_data,
+                                                   NlaEvalSnapshot *lower_snapshot,
+                                                   NlaEvalSnapshot *blended_snapshot,
+                                                   const short upper_blendmode,
+                                                   const float upper_influence,
+                                                   NlaEvalSnapshot *r_upper_snapshot)
+{
+  nlaeval_snapshot_ensure_size(r_upper_snapshot, eval_data->num_channels);
+
+  LISTBASE_FOREACH (NlaEvalChannel *, nec, &eval_data->channels) {
+    const int length = nec->base_snapshot.length;
+
+    NlaEvalChannelSnapshot *blended_necs = nlaeval_snapshot_get(blended_snapshot, nec->index);
+    if (blended_necs == NULL) {
+      /** We assume the caller only wants a subset of channels to be inverted, those that exist
+       * within \a blended_snapshot. */
+      continue;
+    }
+
+    NlaEvalChannelSnapshot *lower_necs = nlaeval_snapshot_get(lower_snapshot, nec->index);
+    if (lower_necs == NULL) {
+      lower_necs = nlaeval_snapshot_find_channel(lower_snapshot->base, nec);
+    }
+
+    NlaEvalChannelSnapshot *result_necs = nlaeval_snapshot_ensure_channel(r_upper_snapshot, nec);
+    if (upper_blendmode == NLASTRIP_MODE_COMBINE) {
+      const int mix_mode = nec->mix_mode;
+
+      if (mix_mode == NEC_MIX_QUATERNION) {
+        if (!BLI_BITMAP_TEST_BOOL(blended_necs->remap_domain.ptr, 0)) {
+          BLI_bitmap_set_all(result_necs->remap_domain.ptr, false, 4);
+          continue;
+        }
+
+        if (!nla_combine_quaternion_get_inverted_strip_values(
+                lower_necs->values, blended_necs->values, upper_influence, result_necs->values)) {
+          BLI_bitmap_set_all(result_necs->remap_domain.ptr, false, 4);
+        }
+      }
+      else {
+        BLI_assert(ELEM(mix_mode, NEC_MIX_ADD, NEC_MIX_AXIS_ANGLE, NEC_MIX_MULTIPLY));
+
+        for (int j = 0; j < length; j++) {
+          if (!BLI_BITMAP_TEST_BOOL(blended_necs->remap_domain.ptr, j)) {
+            BLI_BITMAP_DISABLE(result_necs->remap_domain.ptr, j);
+            continue;
+          }
+
+          if (!nla_combine_get_inverted_strip_value(mix_mode,
+                                                    nec->base_snapshot.values[j],
+                                                    lower_necs->values[j],
+                                                    blended_necs->values[j],
+                                                    upper_influence,
+                                                    &result_necs->values[j])) {
+
+            BLI_BITMAP_DISABLE(result_necs->remap_domain.ptr, j);
+          }
+        }
+      }
+    }
+    else {
+      BLI_assert(ELEM(upper_blendmode,
+                      NLASTRIP_MODE_ADD,
+                      NLASTRIP_MODE_SUBTRACT,
+                      NLASTRIP_MODE_MULTIPLY,
+                      NLASTRIP_MODE_REPLACE));
+
+      for (int j = 0; j < length; j++) {
+        if (!BLI_BITMAP_TEST_BOOL(blended_necs->remap_domain.ptr, j)) {
+          BLI_BITMAP_DISABLE(result_necs->remap_domain.ptr, j);
+          continue;
+        }
+
+        if (!nla_blend_get_inverted_strip_value(upper_blendmode,
+                                                lower_necs->values[j],
+                                                blended_necs->values[j],
+                                                upper_influence,
+                                                &result_necs->values[j])) {
+
+          BLI_BITMAP_DISABLE(result_necs->remap_domain.ptr, j);
+        }
       }
     }
   }
@@ -2675,74 +2793,66 @@ bool BKE_animsys_nla_remap_keyframe_values(struct NlaKeyframingContext *context,
     return false;
   }
 
-  /* Find the evaluation channel for the NLA stack below current strip. */
-  NlaEvalChannelKey key = {
-      .ptr = *prop_ptr,
-      .prop = prop,
-  };
-  /**
-   * Remove lower NLA stack effects.
-   *
-   * Using the tweak strip's blended result and the lower snapshot value, we can solve for the
-   * tweak strip value it must evaluate to.
-   */
-  NlaEvalData *const lower_eval_data = &context->lower_eval_data;
-  NlaEvalChannel *const lower_nec = nlaevalchan_verify_key(lower_eval_data, NULL, &key);
+  /** Create \a blended_snapshot and fill with input \a values. */
+  NlaEvalData *eval_data = &context->lower_eval_data;
+  NlaEvalSnapshot blended_snapshot;
+  nlaeval_snapshot_init(&blended_snapshot, eval_data, NULL);
+  NlaEvalChannelSnapshot *blended_necs;
+  {
+    NlaEvalChannelKey key = {
+        .ptr = *prop_ptr,
+        .prop = prop,
+    };
 
-  if ((lower_nec->base_snapshot.length != count)) {
-    BLI_assert(!"invalid value count");
-    return false;
+    NlaEvalChannel *nec = nlaevalchan_verify_key(eval_data, NULL, &key);
+    BLI_assert(nec);
+    if (nec->base_snapshot.length != count) {
+      BLI_assert(!"invalid value count");
+      nlaeval_snapshot_free_data(&blended_snapshot);
+      return false;
+    }
+
+    blended_necs = nlaeval_snapshot_ensure_channel(&blended_snapshot, nec);
+    memcpy(blended_necs->values, values, sizeof(float) * count);
+    BLI_bitmap_set_all(blended_necs->remap_domain.ptr, true, count);
   }
 
-  /* Invert the blending operation to compute the desired strip values. */
-  NlaEvalChannelSnapshot *const lower_nec_snapshot = nlaeval_snapshot_find_channel(
-      &lower_eval_data->eval_snapshot, lower_nec);
+  /** Remove lower NLA stack effects. */
+  nlasnapshot_blend_get_inverted_upper_snapshot(eval_data,
+                                                &context->lower_eval_data.eval_snapshot,
+                                                &blended_snapshot,
+                                                blend_mode,
+                                                influence,
+                                                &blended_snapshot);
 
-  float *lower_values = lower_nec_snapshot->values;
+  /** Write results into \a values. */
+  bool successful_remap = true;
+  if (blended_necs->channel->mix_mode == NEC_MIX_QUATERNION &&
+      blend_mode == NLASTRIP_MODE_COMBINE) {
 
-  if (blend_mode == NLASTRIP_MODE_COMBINE) {
-    /* Quaternion combine handles all sub-channels as a unit. */
-    if (lower_nec->mix_mode == NEC_MIX_QUATERNION) {
-      if (r_force_all == NULL) {
-        return false;
-      }
-
+    if (r_force_all != NULL) {
       *r_force_all = true;
-
-      if (!nla_combine_quaternion_get_inverted_strip_values(
-              lower_values, values, influence, values)) {
-        return false;
-      }
+      index = -1;
     }
     else {
-      float *base_values = lower_nec->base_snapshot.values;
-
-      for (int i = 0; i < count; i++) {
-        if (ELEM(index, i, -1)) {
-          if (!nla_combine_get_inverted_strip_value(lower_nec->mix_mode,
-                                                    base_values[i],
-                                                    lower_values[i],
-                                                    values[i],
-                                                    influence,
-                                                    &values[i])) {
-            return false;
-          }
-        }
-      }
-    }
-  }
-  else {
-    for (int i = 0; i < count; i++) {
-      if (ELEM(index, i, -1)) {
-        if (!nla_blend_get_inverted_strip_value(
-                blend_mode, lower_values[i], values[i], influence, &values[i])) {
-          return false;
-        }
-      }
+      successful_remap = false;
     }
   }
 
-  return true;
+  for (int i = 0; i < count; i++) {
+    if (!ELEM(index, i, -1)) {
+      continue;
+    }
+    if (!BLI_BITMAP_TEST_BOOL(blended_necs->remap_domain.ptr, i)) {
+      successful_remap = false;
+    }
+
+    values[i] = blended_necs->values[i];
+  }
+
+  nlaeval_snapshot_free_data(&blended_snapshot);
+
+  return successful_remap;
 }
 
 /**
