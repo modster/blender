@@ -2644,10 +2644,9 @@ void nlasnapshot_blend_get_inverted_upper_snapshot(NlaEvalData *eval_data,
           continue;
         }
 
-        if (!nla_combine_quaternion_get_inverted_strip_values(
-                lower_necs->values, blended_necs->values, upper_influence, result_necs->values)) {
-          BLI_bitmap_set_all(result_necs->remap_domain.ptr, false, 4);
-        }
+        const bool success = nla_combine_quaternion_get_inverted_strip_values(
+            lower_necs->values, blended_necs->values, upper_influence, result_necs->values);
+        BLI_bitmap_set_all(result_necs->remap_domain.ptr, success, 4);
       }
       else {
         BLI_assert(ELEM(mix_mode, NEC_MIX_ADD, NEC_MIX_AXIS_ANGLE, NEC_MIX_MULTIPLY));
@@ -2658,15 +2657,13 @@ void nlasnapshot_blend_get_inverted_upper_snapshot(NlaEvalData *eval_data,
             continue;
           }
 
-          if (!nla_combine_get_inverted_strip_value(mix_mode,
-                                                    nec->base_snapshot.values[j],
-                                                    lower_necs->values[j],
-                                                    blended_necs->values[j],
-                                                    upper_influence,
-                                                    &result_necs->values[j])) {
-
-            BLI_BITMAP_DISABLE(result_necs->remap_domain.ptr, j);
-          }
+          const bool success = nla_combine_get_inverted_strip_value(mix_mode,
+                                                                    nec->base_snapshot.values[j],
+                                                                    lower_necs->values[j],
+                                                                    blended_necs->values[j],
+                                                                    upper_influence,
+                                                                    &result_necs->values[j]);
+          BLI_BITMAP_SET(result_necs->remap_domain.ptr, j, success);
         }
       }
     }
@@ -2683,14 +2680,12 @@ void nlasnapshot_blend_get_inverted_upper_snapshot(NlaEvalData *eval_data,
           continue;
         }
 
-        if (!nla_blend_get_inverted_strip_value(upper_blendmode,
-                                                lower_necs->values[j],
-                                                blended_necs->values[j],
-                                                upper_influence,
-                                                &result_necs->values[j])) {
-
-          BLI_BITMAP_DISABLE(result_necs->remap_domain.ptr, j);
-        }
+        const bool success = nla_blend_get_inverted_strip_value(upper_blendmode,
+                                                                lower_necs->values[j],
+                                                                blended_necs->values[j],
+                                                                upper_influence,
+                                                                &result_necs->values[j]);
+        BLI_BITMAP_SET(result_necs->remap_domain.ptr, j, success);
       }
     }
   }
