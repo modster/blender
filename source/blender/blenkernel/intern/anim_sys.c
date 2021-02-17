@@ -2497,13 +2497,6 @@ void nlasnapshot_enable_all_blend_domain(NlaEvalSnapshot *snapshot)
   }
 }
 
-void nlasnapshot_ensure_channels(NlaEvalData *eval_data, NlaEvalSnapshot *snapshot)
-{
-  LISTBASE_FOREACH (NlaEvalChannel *, nec, &eval_data->channels) {
-    nlaeval_snapshot_ensure_channel(snapshot, nec);
-  }
-}
-
 void nlasnapshot_enable_all_remap_domain(NlaEvalSnapshot *snapshot)
 {
   for (int i = 0; i < snapshot->size; i++) {
@@ -2515,6 +2508,13 @@ void nlasnapshot_enable_all_remap_domain(NlaEvalSnapshot *snapshot)
     for (int j = 0; j < necs->length; j++) {
       BLI_BITMAP_ENABLE(necs->remap_domain.ptr, j);
     }
+  }
+}
+
+void nlasnapshot_ensure_channels(NlaEvalData *eval_data, NlaEvalSnapshot *snapshot)
+{
+  LISTBASE_FOREACH (NlaEvalChannel *, nec, &eval_data->channels) {
+    nlaeval_snapshot_ensure_channel(snapshot, nec);
   }
 }
 

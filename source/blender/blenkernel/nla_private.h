@@ -82,8 +82,8 @@ typedef struct NlaEvalChannelSnapshot {
   /** For an upper snapshot channel, marks values that should be blended. */
   NlaValidMask blend_domain;
 
-  /** Only used for keyframe remapping. Any values not in the \a remap_domain should not be used
-   * for keyframing or remapping. */
+  /** Only used for keyframe remapping. Any values not in the \a remap_domain will not be used
+   * for keyframe remapping. */
   NlaValidMask remap_domain;
 
   int length;   /* Number of values in the property. */
@@ -191,9 +191,9 @@ void nladata_flush_channels(PointerRNA *ptr,
 
 void nlasnapshot_enable_all_blend_domain(NlaEvalSnapshot *snapshot);
 
-void nlasnapshot_ensure_channels(NlaEvalData *eval_data, NlaEvalSnapshot *snapshot);
-
 void nlasnapshot_enable_all_remap_domain(NlaEvalSnapshot *snapshot);
+
+void nlasnapshot_ensure_channels(NlaEvalData *eval_data, NlaEvalSnapshot *snapshot);
 
 void nlasnapshot_blend(NlaEvalData *eval_data,
                        NlaEvalSnapshot *lower_snapshot,
