@@ -61,6 +61,7 @@ Geometry::Geometry(const NodeType *node_type, const Type type)
     : Node(node_type), geometry_type(type), attributes(this, ATTR_PRIM_GEOMETRY)
 {
   need_update_rebuild = false;
+  need_update_bvh_for_offset = false;
 
   transform_applied = false;
   transform_negative_scaled = false;
@@ -241,6 +242,7 @@ void Geometry::compute_bvh(
   }
 
   need_update_rebuild = false;
+  need_update_bvh_for_offset = false;
 }
 
 bool Geometry::has_motion_blur() const
@@ -946,7 +948,8 @@ void GeometryManager::mesh_calc_offset(Scene *scene, BVHLayout bvh_layout)
       const bool has_optix_bvh = bvh_layout == BVH_LAYOUT_OPTIX ||
                                  bvh_layout == BVH_LAYOUT_MULTI_OPTIX ||
                                  bvh_layout == BVH_LAYOUT_MULTI_OPTIX_EMBREE;
-      geom->tag_bvh_update(has_optix_bvh);
+      geom->need_update_rebuild |= has_optix_bvh;
+      geom->need_update_bvh_for_offset = true;
     }
 
     if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
@@ -1965,7 +1968,9 @@ void GeometryManager::device_update(Device *device,
             displacement_done = true;
           }
         }
+      }
 
+      if (geom->is_modified() || geom->need_update_bvh_for_offset) {
         if (geom->need_build_bvh(bvh_layout)) {
           num_bvh++;
         }
@@ -2019,8 +2024,7 @@ void GeometryManager::device_update(Device *device,
 
     foreach (Geometry *geom, scene->geometry) {
       geom->vertex_pointer = vertex_pointer;
-
-      if (geom->is_modified()) {
+      if (geom->is_modified() || geom->need_update_bvh_for_offset) {
         need_update_scene_bvh = true;
 #if 1
         pool.push(function_bind(

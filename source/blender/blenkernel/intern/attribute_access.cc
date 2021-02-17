@@ -508,6 +508,96 @@ CustomDataType cpp_type_to_custom_data_type(const blender::fn::CPPType &type)
   return static_cast<CustomDataType>(-1);
 }
 
+static int attribute_data_type_complexity(const CustomDataType data_type)
+{
+  switch (data_type) {
+    case CD_PROP_BOOL:
+      return 0;
+    case CD_PROP_INT32:
+      return 1;
+    case CD_PROP_FLOAT:
+      return 2;
+    case CD_PROP_FLOAT2:
+      return 3;
+    case CD_PROP_FLOAT3:
+      return 4;
+    case CD_PROP_COLOR:
+      return 5;
+#if 0 /* These attribute types are not supported yet. */
+    case CD_MLOOPCOL:
+      return 3;
+    case CD_PROP_STRING:
+      return 6;
+#endif
+    default:
+      /* Only accept "generic" custom data types used by the attribute system. */
+      BLI_assert(false);
+      return 0;
+  }
+}
+
+CustomDataType attribute_data_type_highest_complexity(Span<CustomDataType> data_types)
+{
+  int highest_complexity = INT_MIN;
+  CustomDataType most_complex_type = CD_PROP_COLOR;
+
+  for (const CustomDataType data_type : data_types) {
+    const int complexity = attribute_data_type_complexity(data_type);
+    if (complexity > highest_complexity) {
+      highest_complexity = complexity;
+      most_complex_type = data_type;
+    }
+  }
+
+  return most_complex_type;
+}
+
+/**
+ * \note Generally the order should mirror the order of the domains
+ * established in each component's ComponentAttributeProviders.
+ */
+static int attribute_domain_priority(const AttributeDomain domain)
+{
+  switch (domain) {
+#if 0
+    case ATTR_DOMAIN_CURVE:
+      return 0;
+#endif
+    case ATTR_DOMAIN_POLYGON:
+      return 1;
+    case ATTR_DOMAIN_EDGE:
+      return 2;
+    case ATTR_DOMAIN_POINT:
+      return 3;
+    case ATTR_DOMAIN_CORNER:
+      return 4;
+    default:
+      /* Domain not supported in nodes yet. */
+      BLI_assert(false);
+      return 0;
+  }
+}
+
+/**
+ * Domains with a higher "information density" have a higher priority, in order
+ * to choose a domain that will not lose data through domain conversion.
+ */
+AttributeDomain attribute_domain_highest_priority(Span<AttributeDomain> domains)
+{
+  int highest_priority = INT_MIN;
+  AttributeDomain highest_priority_domain = ATTR_DOMAIN_CORNER;
+
+  for (const AttributeDomain domain : domains) {
+    const int priority = attribute_domain_priority(domain);
+    if (priority > highest_priority) {
+      highest_priority = priority;
+      highest_priority_domain = domain;
+    }
+  }
+
+  return highest_priority_domain;
+}
+
 /**
  * A #BuiltinAttributeProvider is responsible for exactly one attribute on a geometry component.
  * The attribute is identified by its name and has a fixed domain and type. Builtin attributes do
@@ -621,10 +711,12 @@ struct CustomDataAccessInfo {
 class BuiltinCustomDataLayerProvider final : public BuiltinAttributeProvider {
   using AsReadAttribute = ReadAttributePtr (*)(const void *data, const int domain_size);
   using AsWriteAttribute = WriteAttributePtr (*)(void *data, const int domain_size);
+  using UpdateOnWrite = void (*)(GeometryComponent &component);
   const CustomDataType stored_type_;
   const CustomDataAccessInfo custom_data_access_;
   const AsReadAttribute as_read_attribute_;
   const AsWriteAttribute as_write_attribute_;
+  const UpdateOnWrite update_on_write_;
 
  public:
   BuiltinCustomDataLayerProvider(std::string attribute_name,
@@ -636,13 +728,15 @@ class BuiltinCustomDataLayerProvider final : public BuiltinAttributeProvider {
                                  const DeletableEnum deletable,
                                  const CustomDataAccessInfo custom_data_access,
                                  const AsReadAttribute as_read_attribute,
-                                 const AsWriteAttribute as_write_attribute)
+                                 const AsWriteAttribute as_write_attribute,
+                                 const UpdateOnWrite update_on_write)
       : BuiltinAttributeProvider(
             std::move(attribute_name), domain, attribute_type, creatable, writable, deletable),
         stored_type_(stored_type),
         custom_data_access_(custom_data_access),
         as_read_attribute_(as_read_attribute),
-        as_write_attribute_(as_write_attribute)
+        as_write_attribute_(as_write_attribute),
+        update_on_write_(update_on_write)
   {
   }
 
@@ -678,6 +772,9 @@ class BuiltinCustomDataLayerProvider final : public BuiltinAttributeProvider {
     if (data != new_data) {
       custom_data_access_.update_custom_data_pointers(component);
       data = new_data;
+    }
+    if (update_on_write_ != nullptr) {
+      update_on_write_(component);
     }
     return as_write_attribute_(data, domain_size);
   }
@@ -1187,6 +1284,37 @@ static WriteAttributePtr make_vertex_position_write_attribute(void *data, const 
       ATTR_DOMAIN_POINT, MutableSpan<MVert>((MVert *)data, domain_size));
 }
 
+static void tag_normals_dirty_when_writing_position(GeometryComponent &component)
+{
+  Mesh *mesh = get_mesh_from_component_for_write(component);
+  if (mesh != nullptr) {
+    mesh->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+  }
+}
+
+static int get_material_index(const MPoly &mpoly)
+{
+  return static_cast<int>(mpoly.mat_nr);
+}
+
+static void set_material_index(MPoly &mpoly, const int &index)
+{
+  mpoly.mat_nr = static_cast<short>(std::clamp(index, 0, SHRT_MAX));
+}
+
+static ReadAttributePtr make_material_index_read_attribute(const void *data, const int domain_size)
+{
+  return std::make_unique<DerivedArrayReadAttribute<MPoly, int, get_material_index>>(
+      ATTR_DOMAIN_POLYGON, Span<MPoly>((const MPoly *)data, domain_size));
+}
+
+static WriteAttributePtr make_material_index_write_attribute(void *data, const int domain_size)
+{
+  return std::make_unique<
+      DerivedArrayWriteAttribute<MPoly, int, get_material_index, set_material_index>>(
+      ATTR_DOMAIN_POLYGON, MutableSpan<MPoly>((MPoly *)data, domain_size));
+}
+
 template<typename T, AttributeDomain Domain>
 static ReadAttributePtr make_array_read_attribute(const void *data, const int domain_size)
 {
@@ -1248,7 +1376,21 @@ static ComponentAttributeProviders create_attribute_providers_for_mesh()
                                                  BuiltinAttributeProvider::NonDeletable,
                                                  point_access,
                                                  make_vertex_position_read_attribute,
-                                                 make_vertex_position_write_attribute);
+                                                 make_vertex_position_write_attribute,
+                                                 tag_normals_dirty_when_writing_position);
+
+  static BuiltinCustomDataLayerProvider material_index("material_index",
+                                                       ATTR_DOMAIN_POLYGON,
+                                                       CD_PROP_INT32,
+                                                       CD_MPOLY,
+                                                       BuiltinAttributeProvider::NonCreatable,
+                                                       BuiltinAttributeProvider::Writable,
+                                                       BuiltinAttributeProvider::NonDeletable,
+                                                       polygon_access,
+                                                       make_material_index_read_attribute,
+                                                       make_material_index_write_attribute,
+                                                       nullptr);
+
   static MeshUVsAttributeProvider uvs;
   static VertexGroupsAttributeProvider vertex_groups;
   static CustomDataAttributeProvider corner_custom_data(ATTR_DOMAIN_CORNER, corner_access);
@@ -1256,7 +1398,7 @@ static ComponentAttributeProviders create_attribute_providers_for_mesh()
   static CustomDataAttributeProvider edge_custom_data(ATTR_DOMAIN_EDGE, edge_access);
   static CustomDataAttributeProvider polygon_custom_data(ATTR_DOMAIN_POLYGON, polygon_access);
 
-  return ComponentAttributeProviders({&position},
+  return ComponentAttributeProviders({&position, &material_index},
                                      {&uvs,
                                       &corner_custom_data,
                                       &vertex_groups,
@@ -1302,7 +1444,8 @@ static ComponentAttributeProviders create_attribute_providers_for_point_cloud()
       BuiltinAttributeProvider::NonDeletable,
       point_access,
       make_array_read_attribute<float3, ATTR_DOMAIN_POINT>,
-      make_array_write_attribute<float3, ATTR_DOMAIN_POINT>);
+      make_array_write_attribute<float3, ATTR_DOMAIN_POINT>,
+      nullptr);
   static BuiltinCustomDataLayerProvider radius(
       "radius",
       ATTR_DOMAIN_POINT,
@@ -1313,7 +1456,8 @@ static ComponentAttributeProviders create_attribute_providers_for_point_cloud()
       BuiltinAttributeProvider::Deletable,
       point_access,
       make_array_read_attribute<float, ATTR_DOMAIN_POINT>,
-      make_array_write_attribute<float, ATTR_DOMAIN_POINT>);
+      make_array_write_attribute<float, ATTR_DOMAIN_POINT>,
+      nullptr);
   static CustomDataAttributeProvider point_custom_data(ATTR_DOMAIN_POINT, point_access);
   return ComponentAttributeProviders({&position, &radius}, {&point_custom_data});
 }

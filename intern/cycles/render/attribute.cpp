@@ -696,7 +696,6 @@ void AttributeSet::clear_modified()
   foreach (Attribute &attr, attributes) {
     attr.modified = false;
   }
-
   modified = false;
 }
 
