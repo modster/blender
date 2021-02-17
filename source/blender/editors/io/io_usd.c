@@ -398,8 +398,9 @@ void WM_OT_usd_import(wmOperatorType *ot)
       "use_instancing",
       false,
       "Instancing",
-      "When checked, instanced USD references are imported as shared data in Blender. "
-      "When unchecked, instanced USD reference are imported as unique data in Blender");
+      "When checked, USD scenegraph instances are imported as collection instances in Blender. "
+      "(Note that point instancers are not yet handled by this option.)  "
+      "When unchecked, scenegraph instances are imported as unique data in Blender");
 
   RNA_def_float(ot->srna,
                 "light_intensity_scale",
