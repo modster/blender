@@ -219,7 +219,8 @@ bool BKE_animsys_nla_remap_keyframe_values(struct NlaKeyframingContext *context,
                                            float *values,
                                            int count,
                                            int index,
-                                           bool *r_force_all);
+                                           bool *r_force_all,
+                                           const struct AnimationEvalContext *anim_eval_context);
 void BKE_animsys_free_nla_keyframing_context_cache(struct ListBase *cache);
 
 /* ************************************* */
