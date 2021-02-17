@@ -120,7 +120,8 @@ static bool gpencil_select_poll(bContext *C)
     }
   }
 
-  /* we just need some visible strokes, and to be in editmode or other modes only to catch event */
+  /* We just need some visible strokes,
+   * and to be in edit-mode or other modes only to catch event. */
   if (GPENCIL_ANY_MODE(gpd)) {
     /* TODO: include a check for visible strokes? */
     if (gpd->layers.first) {
@@ -218,7 +219,8 @@ static bool gpencil_select_all_poll(bContext *C)
 {
   bGPdata *gpd = ED_gpencil_data_get_active(C);
 
-  /* we just need some visible strokes, and to be in editmode or other modes only to catch event */
+  /* We just need some visible strokes,
+   * and to be in edit-mode or other modes only to catch event. */
   if (GPENCIL_ANY_MODE(gpd)) {
     if (gpd->layers.first) {
       return true;
@@ -238,7 +240,7 @@ static int gpencil_select_all_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  /* if not edit/sculpt mode, the event is catched but not processed */
+  /* If not edit/sculpt mode, the event has been caught but not processed. */
   if (GPENCIL_NONE_EDIT_MODE(gpd)) {
     return OPERATOR_CANCELLED;
   }
@@ -297,7 +299,7 @@ static int gpencil_select_linked_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  /* if not edit/sculpt mode, the event is catched but not processed */
+  /* If not edit/sculpt mode, the event has been caught but not processed. */
   if (GPENCIL_NONE_EDIT_MODE(gpd)) {
     return OPERATOR_CANCELLED;
   }
@@ -374,7 +376,7 @@ static int gpencil_select_alternate_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  /* if not edit/sculpt mode, the event is catched but not processed */
+  /* If not edit/sculpt mode, the event has been caught but not processed. */
   if (GPENCIL_NONE_EDIT_MODE(gpd)) {
     return OPERATOR_CANCELLED;
   }
@@ -637,7 +639,7 @@ static bool gpencil_select_same_material(bContext *C)
     CTX_DATA_END;
   }
 
-  /* free memomy */
+  /* Free memory. */
   if (selected_colors != NULL) {
     BLI_gset_free(selected_colors, NULL);
   }
@@ -651,7 +653,7 @@ static int gpencil_select_grouped_exec(bContext *C, wmOperator *op)
 {
   eGP_SelectGrouped mode = RNA_enum_get(op->ptr, "type");
   bGPdata *gpd = ED_gpencil_data_get_active(C);
-  /* if not edit/sculpt mode, the event is catched but not processed */
+  /* If not edit/sculpt mode, the event has been caught but not processed. */
   if (GPENCIL_NONE_EDIT_MODE(gpd)) {
     return OPERATOR_CANCELLED;
   }
@@ -721,7 +723,7 @@ static int gpencil_select_first_exec(bContext *C, wmOperator *op)
   bGPdata *gpd = ED_gpencil_data_get_active(C);
   const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
 
-  /* if not edit/sculpt mode, the event is catched but not processed */
+  /* If not edit/sculpt mode, the event has been caught but not processed. */
   if (GPENCIL_NONE_EDIT_MODE(gpd)) {
     return OPERATOR_CANCELLED;
   }
@@ -828,7 +830,7 @@ static int gpencil_select_last_exec(bContext *C, wmOperator *op)
   bGPdata *gpd = ED_gpencil_data_get_active(C);
   const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
 
-  /* if not edit/sculpt mode, the event is catched but not processed */
+  /* If not edit/sculpt mode, the event has been caught but not processed. */
   if (GPENCIL_NONE_EDIT_MODE(gpd)) {
     return OPERATOR_CANCELLED;
   }
@@ -935,7 +937,7 @@ static int gpencil_select_more_exec(bContext *C, wmOperator *UNUSED(op))
 {
   bGPdata *gpd = ED_gpencil_data_get_active(C);
   const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
-  /* if not edit/sculpt mode, the event is catched but not processed */
+  /* If not edit/sculpt mode, the event has been caught but not processed. */
   if (GPENCIL_NONE_EDIT_MODE(gpd)) {
     return OPERATOR_CANCELLED;
   }
@@ -1075,7 +1077,7 @@ static int gpencil_select_less_exec(bContext *C, wmOperator *UNUSED(op))
   bGPdata *gpd = ED_gpencil_data_get_active(C);
   const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
 
-  /* if not edit/sculpt mode, the event is catched but not processed */
+  /* If not edit/sculpt mode, the event has been caught but not processed. */
   if (GPENCIL_NONE_EDIT_MODE(gpd)) {
     return OPERATOR_CANCELLED;
   }
@@ -1426,7 +1428,7 @@ static int gpencil_circle_select_exec(bContext *C, wmOperator *op)
 
   const float scale = ts->gp_sculpt.isect_threshold;
 
-  /* if not edit/sculpt mode, the event is catched but not processed */
+  /* If not edit/sculpt mode, the event has been caught but not processed. */
   if (GPENCIL_NONE_EDIT_MODE(gpd)) {
     return OPERATOR_CANCELLED;
   }

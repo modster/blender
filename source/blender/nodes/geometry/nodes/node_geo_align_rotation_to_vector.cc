@@ -39,7 +39,7 @@ static void geo_node_align_rotation_to_vector_layout(uiLayout *layout,
                                                      bContext *UNUSED(C),
                                                      PointerRNA *ptr)
 {
-  uiItemR(layout, ptr, "axis", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "axis", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
   uiItemR(layout, ptr, "pivot_axis", 0, IFACE_("Pivot"), ICON_NONE);
   uiLayout *col = uiLayoutColumn(layout, false);
   uiItemR(col, ptr, "input_type_factor", 0, IFACE_("Factor"), ICON_NONE);
@@ -162,6 +162,8 @@ static void align_rotations_on_component(GeometryComponent &component,
 static void geo_node_align_rotation_to_vector_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+
+  geometry_set = geometry_set_realize_instances(geometry_set);
 
   if (geometry_set.has<MeshComponent>()) {
     align_rotations_on_component(geometry_set.get_component_for_write<MeshComponent>(), params);
