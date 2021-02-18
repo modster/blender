@@ -709,7 +709,6 @@ void GPENCIL_OT_select_grouped(wmOperatorType *ot)
 static int gpencil_select_first_exec(bContext *C, wmOperator *op)
 {
   bGPdata *gpd = ED_gpencil_data_get_active(C);
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
 
   /* If not edit/sculpt mode, the event has been caught but not processed. */
   if (GPENCIL_NONE_EDIT_MODE(gpd)) {
@@ -722,29 +721,31 @@ static int gpencil_select_first_exec(bContext *C, wmOperator *op)
   bool changed = false;
   CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
     /* skip stroke if we're only manipulating selected strokes */
-    if (only_selected && !(gps->flag & GP_STROKE_SELECT)) {
+    if (only_selected &&
+        !((gps->flag & GP_STROKE_SELECT) ||
+          (GPENCIL_STROKE_IS_CURVE(gps) && gps->editcurve->flag & GP_CURVE_SELECT))) {
       continue;
     }
 
     /* select first point */
     BLI_assert(gps->totpoints >= 1);
 
-    if (is_curve_edit) {
-      if (gps->editcurve != NULL) {
-        bGPDcurve *gpc = gps->editcurve;
-        gpc->curve_points[0].flag |= GP_CURVE_POINT_SELECT;
-        BEZT_SEL_ALL(&gpc->curve_points[0].bezt);
-        gpc->flag |= GP_CURVE_SELECT;
-        gps->flag |= GP_STROKE_SELECT;
-        if ((extend == false) && (gps->totpoints > 1)) {
-          for (int i = 1; i < gpc->tot_curve_points; i++) {
-            bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
-            gpc_pt->flag &= ~GP_CURVE_POINT_SELECT;
-            BEZT_DESEL_ALL(&gpc_pt->bezt);
-          }
+    if (GPENCIL_STROKE_IS_CURVE(gps)) {
+      bGPDcurve *gpc = gps->editcurve;
+
+      gpc->curve_points[0].flag |= GP_CURVE_POINT_SELECT;
+      BEZT_SEL_ALL(&gpc->curve_points[0].bezt);
+      gpc->flag |= GP_CURVE_SELECT;
+
+      if ((extend == false) && (gpc->tot_curve_points > 1)) {
+        for (int i = 1; i < gpc->tot_curve_points; i++) {
+          bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
+          gpc_pt->flag &= ~GP_CURVE_POINT_SELECT;
+          BEZT_DESEL_ALL(&gpc_pt->bezt);
         }
-        changed = true;
       }
+
+      changed = true;
     }
     else {
       gps->points->flag |= GP_SPOINT_SELECT;
@@ -760,6 +761,7 @@ static int gpencil_select_first_exec(bContext *C, wmOperator *op)
           pt->flag &= ~GP_SPOINT_SELECT;
         }
       }
+
       changed = true;
     }
   }
@@ -816,7 +818,6 @@ void GPENCIL_OT_select_first(wmOperatorType *ot)
 static int gpencil_select_last_exec(bContext *C, wmOperator *op)
 {
   bGPdata *gpd = ED_gpencil_data_get_active(C);
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
 
   /* If not edit/sculpt mode, the event has been caught but not processed. */
   if (GPENCIL_NONE_EDIT_MODE(gpd)) {
@@ -829,29 +830,30 @@ static int gpencil_select_last_exec(bContext *C, wmOperator *op)
   bool changed = false;
   CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
     /* skip stroke if we're only manipulating selected strokes */
-    if (only_selected && !(gps->flag & GP_STROKE_SELECT)) {
+    if (only_selected &&
+        !((gps->flag & GP_STROKE_SELECT) ||
+          (GPENCIL_STROKE_IS_CURVE(gps) && gps->editcurve->flag & GP_CURVE_SELECT))) {
       continue;
     }
 
     /* select last point */
     BLI_assert(gps->totpoints >= 1);
 
-    if (is_curve_edit) {
-      if (gps->editcurve != NULL) {
-        bGPDcurve *gpc = gps->editcurve;
-        gpc->curve_points[gpc->tot_curve_points - 1].flag |= GP_CURVE_POINT_SELECT;
-        BEZT_SEL_ALL(&gpc->curve_points[gpc->tot_curve_points - 1].bezt);
-        gpc->flag |= GP_CURVE_SELECT;
-        gps->flag |= GP_STROKE_SELECT;
-        if ((extend == false) && (gps->totpoints > 1)) {
-          for (int i = 0; i < gpc->tot_curve_points - 1; i++) {
-            bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
-            gpc_pt->flag &= ~GP_CURVE_POINT_SELECT;
-            BEZT_DESEL_ALL(&gpc_pt->bezt);
-          }
+    if (GPENCIL_STROKE_IS_CURVE(gps)) {
+      bGPDcurve *gpc = gps->editcurve;
+
+      gpc->curve_points[gpc->tot_curve_points - 1].flag |= GP_CURVE_POINT_SELECT;
+      BEZT_SEL_ALL(&gpc->curve_points[gpc->tot_curve_points - 1].bezt);
+      gpc->flag |= GP_CURVE_SELECT;
+
+      if ((extend == false) && (gps->totpoints > 1)) {
+        for (int i = 0; i < gpc->tot_curve_points - 1; i++) {
+          bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
+          gpc_pt->flag &= ~GP_CURVE_POINT_SELECT;
+          BEZT_DESEL_ALL(&gpc_pt->bezt);
         }
-        changed = true;
       }
+      changed = true;
     }
     else {
       gps->points[gps->totpoints - 1].flag |= GP_SPOINT_SELECT;
