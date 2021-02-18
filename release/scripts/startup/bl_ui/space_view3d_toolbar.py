@@ -127,9 +127,13 @@ def draw_vpaint_symmetry(layout, vpaint, mesh):
     col = layout.column()
     row = col.row(heading="Mirror", align=True)
     row.prop(mesh, "use_mirror_x", text="X", toggle=True)
+    row = row.row(align=True)
+    row.active = not mesh.use_mirror_vertex_groups
     row.prop(mesh, "use_mirror_y", text="Y", toggle=True)
     row.prop(mesh, "use_mirror_z", text="Z", toggle=True)
 
+    col = layout.column()
+    col.active = not mesh.use_mirror_vertex_groups
     col.prop(vpaint, "radial_symmetry", text="Radial")
 
 
@@ -964,9 +968,9 @@ class VIEW3D_PT_tools_weightpaint_symmetry(Panel, View3DPaintPanel):
         draw_vpaint_symmetry(layout, wpaint, mesh)
 
         col = layout.column(align=True)
-        col.prop(mesh, 'use_mirror_vertex_group_x', text="Vertex Group X")
+        col.prop(mesh, 'use_mirror_vertex_groups')
         row = col.row()
-        row.active = mesh.use_mirror_vertex_group_x
+        row.active = mesh.use_mirror_vertex_groups
         row.prop(mesh, "use_mirror_topology")
 
 
