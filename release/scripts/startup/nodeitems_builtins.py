@@ -516,7 +516,17 @@ geometry_node_categories = [
         NodeItem("GeometryNodeTriangulate"),
         NodeItem("GeometryNodeEdgeSplit"),
         NodeItem("GeometryNodeSubdivisionSurface"),
+        # GeometryNodeCategory("GEO_MESH_PRIMITIVES", "Primitives", items=[
+        NodeItem("GeometryNodeMeshPlane"),
         NodeItem("GeometryNodeMeshCube"),
+        NodeItem("GeometryNodeMeshCircle"),
+        NodeItem("GeometryNodeMeshUVSphere"),
+        NodeItem("GeometryNodeMeshIcoSphere"),
+        NodeItem("GeometryNodeMeshCylinder"),
+        NodeItem("GeometryNodeMeshCone"),
+        NodeItem("GeometryNodeMeshTorus"),
+        NodeItem("GeometryNodeMeshGrid"),
+        # ]),
     ]),
     GeometryNodeCategory("GEO_POINT", "Point", items=[
         NodeItem("GeometryNodePointDistribute"),

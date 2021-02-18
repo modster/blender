@@ -143,9 +143,9 @@ static Mesh *create_cube_mesh(const float3 location, const float3 rotation, cons
     new_mesh.create_poly(poly_index * 4, 4);
   }
 
-  BKE_mesh_calc_normals(new_mesh.mesh);
-
   BLI_assert(BKE_mesh_validate(new_mesh.mesh, true, false));
+
+  BKE_mesh_calc_normals(new_mesh.mesh);
 
   return new_mesh.mesh;
 }
