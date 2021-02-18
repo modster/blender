@@ -160,7 +160,7 @@ static void deselect_all_selected(bContext *C)
     if (GPENCIL_STROKE_IS_CURVE(gps)) {
       bGPDcurve *gpc = gps->editcurve;
 
-      if(gpc->flag & GP_CURVE_SELECT) {
+      if (gpc->flag & GP_CURVE_SELECT) {
         /* Deselect the curve points. */
         for (uint32_t i = 0; i < gpc->tot_curve_points; i++) {
           bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
@@ -292,7 +292,6 @@ void GPENCIL_OT_select_all(wmOperatorType *ot)
 static int gpencil_select_linked_exec(bContext *C, wmOperator *op)
 {
   bGPdata *gpd = ED_gpencil_data_get_active(C);
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
 
   if (gpd == NULL) {
     BKE_report(op->reports, RPT_ERROR, "No Grease Pencil data");
@@ -304,9 +303,11 @@ static int gpencil_select_linked_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  if (is_curve_edit) {
-    GP_EDITABLE_CURVES_BEGIN(gps_iter, C, gpl, gps, gpc)
-    {
+  bool changed = false;
+  /* select all points in selected strokes */
+  CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
+    if (GPENCIL_STROKE_IS_CURVE(gps)) {
+      bGPDcurve *gpc = gps->editcurve;
       if (gpc->flag & GP_CURVE_SELECT) {
         for (int i = 0; i < gpc->tot_curve_points; i++) {
           bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
@@ -314,13 +315,10 @@ static int gpencil_select_linked_exec(bContext *C, wmOperator *op)
           gpc_pt->flag |= GP_CURVE_POINT_SELECT;
           BEZT_SEL_ALL(bezt);
         }
+        changed = true;
       }
     }
-    GP_EDITABLE_CURVES_END(gps_iter);
-  }
-  else {
-    /* select all points in selected strokes */
-    CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
+    else {
       if (gps->flag & GP_STROKE_SELECT) {
         bGPDspoint *pt;
         int i;
@@ -328,19 +326,24 @@ static int gpencil_select_linked_exec(bContext *C, wmOperator *op)
         for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
           pt->flag |= GP_SPOINT_SELECT;
         }
+
+        changed = true;
       }
     }
-    CTX_DATA_END;
+  }
+  CTX_DATA_END;
+
+  if (changed) {
+    /* updates */
+    DEG_id_tag_update(&gpd->id, ID_RECALC_GEOMETRY);
+
+    /* copy on write tag is needed, or else no refresh happens */
+    DEG_id_tag_update(&gpd->id, ID_RECALC_COPY_ON_WRITE);
+
+    WM_event_add_notifier(C, NC_GPENCIL | NA_SELECTED, NULL);
+    WM_event_add_notifier(C, NC_GEOM | ND_SELECT, NULL);
   }
 
-  /* updates */
-  DEG_id_tag_update(&gpd->id, ID_RECALC_GEOMETRY);
-
-  /* copy on write tag is needed, or else no refresh happens */
-  DEG_id_tag_update(&gpd->id, ID_RECALC_COPY_ON_WRITE);
-
-  WM_event_add_notifier(C, NC_GPENCIL | NA_SELECTED, NULL);
-  WM_event_add_notifier(C, NC_GEOM | ND_SELECT, NULL);
   return OPERATOR_FINISHED;
 }
 
