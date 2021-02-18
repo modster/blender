@@ -347,7 +347,7 @@ void USDMaterialImporter::set_node_input(const pxr::UsdShadeInput &usd_input,
       }
     }
     else if (shader_id == usdtokens::UsdPrimvarReader_float2) {
-      convert_usd_primvar_reader(
+      convert_usd_primvar_reader_float2(
           source_shader, source_name, dest_node, dest_socket_name, ntree, column + 1, r_ctx);
     }
   }
@@ -473,13 +473,17 @@ void USDMaterialImporter::convert_usd_uv_texture(const pxr::UsdShadeShader &usd_
   }
 }
 
-void USDMaterialImporter::convert_usd_primvar_reader(const pxr::UsdShadeShader &usd_shader,
-                                                     const pxr::TfToken &usd_source_name,
-                                                     bNode *dest_node,
-                                                     const char *dest_socket_name,
-                                                     bNodeTree *ntree,
-                                                     int column,
-                                                     NodePlacementContext &r_ctx) const
+/* This function creates a Blender UV Map node, under the simplifying assumption that
+ * UsdPrimvarReader_float2 shaders output UV coordinates.
+ * TODO(makowalski): investigate supporting conversion to other Blender node types
+ * (e.g., Attribute Nodes) if needed. */
+void USDMaterialImporter::convert_usd_primvar_reader_float2(const pxr::UsdShadeShader &usd_shader,
+                                                            const pxr::TfToken &usd_source_name,
+                                                            bNode *dest_node,
+                                                            const char *dest_socket_name,
+                                                            bNodeTree *ntree,
+                                                            int column,
+                                                            NodePlacementContext &r_ctx) const
 {
   if (!usd_shader || !dest_node || !ntree || !dest_socket_name || !bmain_) {
     return;

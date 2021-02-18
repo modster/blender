@@ -80,13 +80,13 @@ class USDMaterialImporter {
                               int column,
                               NodePlacementContext &r_ctx) const;
 
-  void convert_usd_primvar_reader(const pxr::UsdShadeShader &usd_shader,
-                                  const pxr::TfToken &usd_source_name,
-                                  bNode *dest_node,
-                                  const char *dest_socket_name,
-                                  bNodeTree *ntree,
-                                  int column,
-                                  NodePlacementContext &r_ctx) const;
+  void convert_usd_primvar_reader_float2(const pxr::UsdShadeShader &usd_shader,
+                                         const pxr::TfToken &usd_source_name,
+                                         bNode *dest_node,
+                                         const char *dest_socket_name,
+                                         bNodeTree *ntree,
+                                         int column,
+                                         NodePlacementContext &r_ctx) const;
 };
 
 }  // namespace blender::io::usd
