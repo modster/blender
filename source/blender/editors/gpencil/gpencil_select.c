@@ -926,106 +926,98 @@ void GPENCIL_OT_select_last(wmOperatorType *ot)
 static int gpencil_select_more_exec(bContext *C, wmOperator *UNUSED(op))
 {
   bGPdata *gpd = ED_gpencil_data_get_active(C);
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
   /* If not edit/sculpt mode, the event has been caught but not processed. */
   if (GPENCIL_NONE_EDIT_MODE(gpd)) {
     return OPERATOR_CANCELLED;
   }
 
   bool changed = false;
-  if (is_curve_edit) {
-    GP_EDITABLE_STROKES_BEGIN (gp_iter, C, gpl, gps) {
-      if (gps->editcurve != NULL && gps->flag & GP_STROKE_SELECT) {
-        bGPDcurve *editcurve = gps->editcurve;
+  CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
+    if (GPENCIL_STROKE_IS_CURVE(gps) && (gps->editcurve->flag & GP_CURVE_SELECT)) {
+      bGPDcurve *gpc = gps->editcurve;
 
-        bool prev_sel = false;
-        for (int i = 0; i < editcurve->tot_curve_points; i++) {
-          bGPDcurve_point *gpc_pt = &editcurve->curve_points[i];
-          BezTriple *bezt = &gpc_pt->bezt;
-          if (gpc_pt->flag & GP_CURVE_POINT_SELECT) {
-            /* selected point - just set flag for next point */
-            prev_sel = true;
-          }
-          else {
-            /* unselected point - expand selection if previous was selected... */
-            if (prev_sel) {
-              gpc_pt->flag |= GP_CURVE_POINT_SELECT;
-              BEZT_SEL_ALL(bezt);
-              changed = true;
-            }
-            prev_sel = false;
-          }
+      bool prev_sel = false;
+      for (int i = 0; i < gpc->tot_curve_points; i++) {
+        bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
+        BezTriple *bezt = &gpc_pt->bezt;
+        if (gpc_pt->flag & GP_CURVE_POINT_SELECT) {
+          /* selected point - just set flag for next point */
+          prev_sel = true;
         }
+        else {
+          /* unselected point - expand selection if previous was selected... */
+          if (prev_sel) {
+            gpc_pt->flag |= GP_CURVE_POINT_SELECT;
+            BEZT_SEL_ALL(bezt);
+            changed = true;
+          }
+          prev_sel = false;
+        }
+      }
 
-        prev_sel = false;
-        for (int i = editcurve->tot_curve_points - 1; i >= 0; i--) {
-          bGPDcurve_point *gpc_pt = &editcurve->curve_points[i];
-          BezTriple *bezt = &gpc_pt->bezt;
-          if (gpc_pt->flag & GP_CURVE_POINT_SELECT) {
-            prev_sel = true;
+      prev_sel = false;
+      for (int i = gpc->tot_curve_points - 1; i >= 0; i--) {
+        bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
+        BezTriple *bezt = &gpc_pt->bezt;
+        if (gpc_pt->flag & GP_CURVE_POINT_SELECT) {
+          prev_sel = true;
+        }
+        else {
+          /* unselected point - expand selection if previous was selected... */
+          if (prev_sel) {
+            gpc_pt->flag |= GP_CURVE_POINT_SELECT;
+            BEZT_SEL_ALL(bezt);
+            changed = true;
           }
-          else {
-            /* unselected point - expand selection if previous was selected... */
-            if (prev_sel) {
-              gpc_pt->flag |= GP_CURVE_POINT_SELECT;
-              BEZT_SEL_ALL(bezt);
-              changed = true;
-            }
-            prev_sel = false;
-          }
+          prev_sel = false;
         }
       }
     }
-    GP_EDITABLE_STROKES_END(gp_iter);
-  }
-  else {
-    CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
-      if (gps->flag & GP_STROKE_SELECT) {
-        bGPDspoint *pt;
-        int i;
-        bool prev_sel;
+    else if (gps->flag & GP_STROKE_SELECT) {
+      bGPDspoint *pt;
+      int i;
+      bool prev_sel;
 
-        /* First Pass: Go in forward order,
-         * expanding selection if previous was selected (pre changes).
-         * - This pass covers the "after" edges of selection islands
-         */
-        prev_sel = false;
-        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-          if (pt->flag & GP_SPOINT_SELECT) {
-            /* selected point - just set flag for next point */
-            prev_sel = true;
-          }
-          else {
-            /* unselected point - expand selection if previous was selected... */
-            if (prev_sel) {
-              pt->flag |= GP_SPOINT_SELECT;
-              changed = true;
-            }
-            prev_sel = false;
-          }
+      /* First Pass: Go in forward order,
+       * expanding selection if previous was selected (pre changes).
+       * - This pass covers the "after" edges of selection islands
+       */
+      prev_sel = false;
+      for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+        if (pt->flag & GP_SPOINT_SELECT) {
+          /* selected point - just set flag for next point */
+          prev_sel = true;
         }
+        else {
+          /* unselected point - expand selection if previous was selected... */
+          if (prev_sel) {
+            pt->flag |= GP_SPOINT_SELECT;
+            changed = true;
+          }
+          prev_sel = false;
+        }
+      }
 
-        /* Second Pass: Go in reverse order, doing the same as before (except in opposite order)
-         * - This pass covers the "before" edges of selection islands
-         */
-        prev_sel = false;
-        for (pt -= 1; i > 0; i--, pt--) {
-          if (pt->flag & GP_SPOINT_SELECT) {
-            prev_sel = true;
+      /* Second Pass: Go in reverse order, doing the same as before (except in opposite order)
+       * - This pass covers the "before" edges of selection islands
+       */
+      prev_sel = false;
+      for (pt -= 1; i > 0; i--, pt--) {
+        if (pt->flag & GP_SPOINT_SELECT) {
+          prev_sel = true;
+        }
+        else {
+          /* unselected point - expand selection if previous was selected... */
+          if (prev_sel) {
+            pt->flag |= GP_SPOINT_SELECT;
+            changed = true;
           }
-          else {
-            /* unselected point - expand selection if previous was selected... */
-            if (prev_sel) {
-              pt->flag |= GP_SPOINT_SELECT;
-              changed = true;
-            }
-            prev_sel = false;
-          }
+          prev_sel = false;
         }
       }
     }
-    CTX_DATA_END;
   }
+  CTX_DATA_END;
 
   if (changed) {
     /* updates */
@@ -1065,7 +1057,6 @@ void GPENCIL_OT_select_more(wmOperatorType *ot)
 static int gpencil_select_less_exec(bContext *C, wmOperator *UNUSED(op))
 {
   bGPdata *gpd = ED_gpencil_data_get_active(C);
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
 
   /* If not edit/sculpt mode, the event has been caught but not processed. */
   if (GPENCIL_NONE_EDIT_MODE(gpd)) {
@@ -1073,105 +1064,115 @@ static int gpencil_select_less_exec(bContext *C, wmOperator *UNUSED(op))
   }
 
   bool changed = false;
-  if (is_curve_edit) {
-    GP_EDITABLE_STROKES_BEGIN (gp_iter, C, gpl, gps) {
-      if (gps->editcurve != NULL && gps->flag & GP_STROKE_SELECT) {
-        bGPDcurve *editcurve = gps->editcurve;
-        int i;
+  CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
+    if (GPENCIL_STROKE_IS_CURVE(gps) && (gps->editcurve->flag & GP_CURVE_SELECT)) {
+      bGPDcurve *gpc = gps->editcurve;
+      int tot_selected = 0, num_deselected = 0;
 
-        bool prev_sel = false;
-        for (i = 0; i < editcurve->tot_curve_points; i++) {
-          bGPDcurve_point *gpc_pt = &editcurve->curve_points[i];
-          BezTriple *bezt = &gpc_pt->bezt;
-          if (gpc_pt->flag & GP_CURVE_POINT_SELECT) {
-            /* shrink if previous wasn't selected */
-            if (prev_sel == false) {
-              gpc_pt->flag &= ~GP_CURVE_POINT_SELECT;
-              BEZT_DESEL_ALL(bezt);
-              changed = true;
-            }
-            prev_sel = true;
+      bool prev_sel = false;
+      int i;
+      for (i = 0; i < gpc->tot_curve_points; i++) {
+        bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
+        BezTriple *bezt = &gpc_pt->bezt;
+        if (gpc_pt->flag & GP_CURVE_POINT_SELECT) {
+          /* shrink if previous wasn't selected */
+          if (prev_sel == false) {
+            gpc_pt->flag &= ~GP_CURVE_POINT_SELECT;
+            BEZT_DESEL_ALL(bezt);
+            changed = true;
+            num_deselected++;
           }
-          else {
-            /* mark previous as being unselected - and hence, is trigger for shrinking */
-            prev_sel = false;
-          }
+          prev_sel = true;
+          tot_selected++;
         }
-
-        /* Second Pass: Go in reverse order, doing the same as before (except in opposite order)
-         * - This pass covers the "before" edges of selection islands
-         */
-        prev_sel = false;
-        for (i = editcurve->tot_curve_points - 1; i > 0; i--) {
-          bGPDcurve_point *gpc_pt = &editcurve->curve_points[i];
-          BezTriple *bezt = &gpc_pt->bezt;
-          if (gpc_pt->flag & GP_CURVE_POINT_SELECT) {
-            /* shrink if previous wasn't selected */
-            if (prev_sel == false) {
-              gpc_pt->flag &= ~GP_CURVE_POINT_SELECT;
-              BEZT_DESEL_ALL(bezt);
-              changed = true;
-            }
-            prev_sel = true;
-          }
-          else {
-            /* mark previous as being unselected - and hence, is trigger for shrinking */
-            prev_sel = false;
-          }
+        else {
+          /* mark previous as being unselected - and hence, is trigger for shrinking */
+          prev_sel = false;
         }
       }
-    }
-    GP_EDITABLE_STROKES_END(gp_iter);
-  }
-  else {
-    CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
-      if (gps->flag & GP_STROKE_SELECT) {
-        bGPDspoint *pt;
-        int i;
-        bool prev_sel;
 
-        /* First Pass: Go in forward order, shrinking selection
-         * if previous was not selected (pre changes).
-         * - This pass covers the "after" edges of selection islands
-         */
-        prev_sel = false;
-        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-          if (pt->flag & GP_SPOINT_SELECT) {
-            /* shrink if previous wasn't selected */
-            if (prev_sel == false) {
-              pt->flag &= ~GP_SPOINT_SELECT;
-              changed = true;
-            }
-            prev_sel = true;
+      /* Second Pass: Go in reverse order, doing the same as before (except in opposite order)
+       * - This pass covers the "before" edges of selection islands
+       */
+      prev_sel = false;
+      for (i = gpc->tot_curve_points - 1; i > 0; i--) {
+        bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
+        BezTriple *bezt = &gpc_pt->bezt;
+        if (gpc_pt->flag & GP_CURVE_POINT_SELECT) {
+          /* shrink if previous wasn't selected */
+          if (prev_sel == false) {
+            gpc_pt->flag &= ~GP_CURVE_POINT_SELECT;
+            BEZT_DESEL_ALL(bezt);
+            changed = true;
+            num_deselected++;
           }
-          else {
-            /* mark previous as being unselected - and hence, is trigger for shrinking */
-            prev_sel = false;
-          }
+          prev_sel = true;
         }
-
-        /* Second Pass: Go in reverse order, doing the same as before (except in opposite order)
-         * - This pass covers the "before" edges of selection islands
-         */
-        prev_sel = false;
-        for (pt -= 1; i > 0; i--, pt--) {
-          if (pt->flag & GP_SPOINT_SELECT) {
-            /* shrink if previous wasn't selected */
-            if (prev_sel == false) {
-              pt->flag &= ~GP_SPOINT_SELECT;
-              changed = true;
-            }
-            prev_sel = true;
-          }
-          else {
-            /* mark previous as being unselected - and hence, is trigger for shrinking */
-            prev_sel = false;
-          }
+        else {
+          /* mark previous as being unselected - and hence, is trigger for shrinking */
+          prev_sel = false;
         }
       }
+
+      /* Deselect curve if all points are deselected. */
+      if (tot_selected - num_deselected == 0) {
+        gpc->flag &= ~GP_CURVE_SELECT;
+      }
     }
-    CTX_DATA_END;
+    else if (gps->flag & GP_STROKE_SELECT) {
+      bGPDspoint *pt;
+      int i, tot_selected = 0, num_deselected = 0;
+      bool prev_sel;
+
+      /* First Pass: Go in forward order, shrinking selection
+       * if previous was not selected (pre changes).
+       * - This pass covers the "after" edges of selection islands
+       */
+      prev_sel = false;
+      for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+        if (pt->flag & GP_SPOINT_SELECT) {
+          /* shrink if previous wasn't selected */
+          if (prev_sel == false) {
+            pt->flag &= ~GP_SPOINT_SELECT;
+            changed = true;
+            num_deselected++;
+          }
+          prev_sel = true;
+          tot_selected++;
+        }
+        else {
+          /* mark previous as being unselected - and hence, is trigger for shrinking */
+          prev_sel = false;
+        }
+      }
+
+      /* Second Pass: Go in reverse order, doing the same as before (except in opposite order)
+       * - This pass covers the "before" edges of selection islands
+       */
+      prev_sel = false;
+      for (pt -= 1; i > 0; i--, pt--) {
+        if (pt->flag & GP_SPOINT_SELECT) {
+          /* shrink if previous wasn't selected */
+          if (prev_sel == false) {
+            pt->flag &= ~GP_SPOINT_SELECT;
+            changed = true;
+            num_deselected++;
+          }
+          prev_sel = true;
+        }
+        else {
+          /* mark previous as being unselected - and hence, is trigger for shrinking */
+          prev_sel = false;
+        }
+      }
+
+      /* Deselect curve if all points are deselected. */
+      if (tot_selected - num_deselected == 0) {
+        gps->flag &= ~GP_STROKE_SELECT;
+      }
+    }
   }
+  CTX_DATA_END;
 
   if (changed) {
     /* updates */
