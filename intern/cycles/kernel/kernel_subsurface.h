@@ -27,7 +27,7 @@ subsurface_scatter_eval(ShaderData *sd, const ShaderClosure *sc, float disk_r, f
 {
   /* this is the veach one-sample model with balance heuristic, some pdf
    * factors drop out when using balance heuristic weighting */
-  float3 eval_sum = make_float3(0.0f, 0.0f, 0.0f);
+  float3 eval_sum = zero_float3();
   float pdf_sum = 0.0f;
   float sample_weight_inv = 0.0f;
 
@@ -62,7 +62,7 @@ subsurface_scatter_eval(ShaderData *sd, const ShaderClosure *sc, float disk_r, f
     }
   }
 
-  return (pdf_sum > 0.0f) ? eval_sum / pdf_sum : make_float3(0.0f, 0.0f, 0.0f);
+  return (pdf_sum > 0.0f) ? eval_sum / pdf_sum : zero_float3();
 }
 
 /* replace closures with a single diffuse bsdf closure after scatter step */
@@ -107,7 +107,7 @@ ccl_device void subsurface_scatter_setup_diffuse_bsdf(
 /* optionally do blurring of color and/or bump mapping, at the cost of a shader evaluation */
 ccl_device float3 subsurface_color_pow(float3 color, float exponent)
 {
-  color = max(color, make_float3(0.0f, 0.0f, 0.0f));
+  color = max(color, zero_float3());
 
   if (exponent == 1.0f) {
     /* nothing to do */
@@ -243,7 +243,7 @@ ccl_device_inline int subsurface_scatter_disk(KernelGlobals *kg,
     }
 #endif /* __OBJECT_MOTION__ */
     else {
-      ss_isect->weight[hit] = make_float3(0.0f, 0.0f, 0.0f);
+      ss_isect->weight[hit] = zero_float3();
       continue;
     }
 
@@ -390,8 +390,8 @@ ccl_device_forceinline float eval_phase_dwivedi(float v, float phase_log, float 
 
 ccl_device_forceinline float sample_phase_dwivedi(float v, float phase_log, float rand)
 {
-  /* Based on Eq. 10 from [2]: v - (v + 1) * pow((v - 1) / (v + 1), rand)
-   * Since we're already precomputing phase_log = log((v + 1) / (v - 1)) for the evaluation,
+  /* Based on Eq. 10 from [2]: `v - (v + 1) * pow((v - 1) / (v + 1), rand)`
+   * Since we're already pre-computing `phase_log = log((v + 1) / (v - 1))` for the evaluation,
    * we can implement the power function like this. */
   return v - (v + 1) * expf(-rand * phase_log);
 }
@@ -450,12 +450,12 @@ ccl_device_noinline
   /* Convert subsurface to volume coefficients.
    * The single-scattering albedo is named alpha to avoid confusion with the surface albedo. */
   float3 sigma_t, alpha;
-  float3 throughput = make_float3(1.0f, 1.0f, 1.0f);
+  float3 throughput = one_float3();
   subsurface_random_walk_coefficients(sc, &sigma_t, &alpha, &throughput);
   float3 sigma_s = sigma_t * alpha;
 
   /* Theoretically it should be better to use the exact alpha for the channel we're sampling at
-   * each bounce, but in practise there doesn't seem to be a noticeable difference in exchange
+   * each bounce, but in practice there doesn't seem to be a noticeable difference in exchange
    * for making the code significantly more complex and slower (if direction sampling depends on
    * the sampled channel, we need to compute its PDF per-channel and consider it for MIS later on).
    *
