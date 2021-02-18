@@ -372,7 +372,6 @@ static int gpencil_select_alternate_exec(bContext *C, wmOperator *op)
 {
   bGPdata *gpd = ED_gpencil_data_get_active(C);
   const bool unselect_ends = RNA_boolean_get(op->ptr, "unselect_ends");
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
 
   if (gpd == NULL) {
     BKE_report(op->reports, RPT_ERROR, "No Grease Pencil data");
@@ -385,10 +384,10 @@ static int gpencil_select_alternate_exec(bContext *C, wmOperator *op)
   }
 
   bool changed = false;
-  if (is_curve_edit) {
-    GP_EDITABLE_CURVES_BEGIN(gps_iter, C, gpl, gps, gpc)
-    {
-      if ((gps->flag & GP_STROKE_SELECT) && (gps->totpoints > 1)) {
+  CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
+    if (GPENCIL_STROKE_IS_CURVE(gps)) {
+      bGPDcurve *gpc = gps->editcurve;
+      if ((gpc->flag & GP_CURVE_SELECT) && (gpc->tot_curve_points > 1)) {
         int idx = 0;
         int start = 0;
         if (unselect_ends) {
@@ -418,15 +417,10 @@ static int gpencil_select_alternate_exec(bContext *C, wmOperator *op)
           BEZT_DESEL_ALL(&gpc_pt->bezt);
         }
 
-        BKE_gpencil_curve_sync_selection(gps);
         changed = true;
       }
     }
-    GP_EDITABLE_CURVES_END(gps_iter);
-  }
-  else {
-    /* select all points in selected strokes */
-    CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
+    else {
       if ((gps->flag & GP_STROKE_SELECT) && (gps->totpoints > 1)) {
         bGPDspoint *pt;
         int row = 0;
@@ -458,8 +452,8 @@ static int gpencil_select_alternate_exec(bContext *C, wmOperator *op)
         changed = true;
       }
     }
-    CTX_DATA_END;
   }
+  CTX_DATA_END;
 
   if (changed) {
     /* updates */
