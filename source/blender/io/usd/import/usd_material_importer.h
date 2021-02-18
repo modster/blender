@@ -29,6 +29,10 @@ struct bNodeTree;
 
 namespace blender::io::usd {
 
+// Helper struct used when arranging nodes in columns, keeping track the
+// occupancy information for a given column.  I.e., for column n,
+// column_offsets[n] is the y-offset (from top to bottom) of the occupied
+// region in that column.
 struct NodePlacementContext {
   float origx;
   float origy;
