@@ -1345,9 +1345,7 @@ void graph_draw_ghost_curves(bAnimContext *ac, SpaceGraph *sipo, ARegion *region
   immUniform1f("dash_width", 20.0f);
   immUniform1f("dash_factor", 0.5f);
 
-  /* Always draw extrapolation since currently ghost fcurve sample points may include extrapolated
-   * points. */
-  const bool draw_extrapolation = true;
+  const bool draw_extrapolation = (sipo->flag & SIPO_NO_DRAW_EXTRAPOLATION) == 0;
   /* the ghost curves are simply sampled F-Curves stored in sipo->runtime.ghost_curves */
   for (fcu = sipo->runtime.ghost_curves.first; fcu; fcu = fcu->next) {
     /* set whatever color the curve has set
