@@ -479,7 +479,7 @@ int ED_lineart_point_inside_triangle(const double v[2],
 
 static int lineart_point_on_segment(double v[2], double v0[2], double v1[2])
 {
-  double c1, c2;
+  double c1 = 1, c2 = 0; /* c1!=c2 by default. */
   double l0[2], l1[2];
 
   sub_v2_v2v2_db(l0, v, v0);
@@ -504,8 +504,6 @@ static int lineart_point_on_segment(double v[2], double v0[2], double v1[2])
     c1 = ratiod(v0[0], v1[0], v[0]);
     return (c1 >= 0 && c1 <= 1);
   }
-
-  // XXX FIXME seems like there is a chance that c1 and c2 is used uninitalized here.
 
   if (LRT_DOUBLE_CLOSE_ENOUGH(c1, c2) && c1 >= 0 && c1 <= 1) {
     return 1;
@@ -704,11 +702,8 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
                                         rb->triangle_size * (t_count + 1));
 
   new_rl = &((LineartRenderLine *)leln->pointer)[l_count];
-
-  // XXX FIXME
-  // Seems like the logic here is faulty.
-  // rl is not assinged so rl->l_obindex seems like it will read random values the first time
-  // around. l_obi and r_obi doesn't seem like they are initialized either...
+  /* Init rl to the last rl entry. */
+  rl = new_rl;
 
 #define INCREASE_RL \
   l_count++; \
