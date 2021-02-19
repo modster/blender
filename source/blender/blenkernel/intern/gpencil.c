@@ -1164,7 +1164,6 @@ void BKE_gpencil_curve_sync_selection(bGPDstroke *gps)
     return;
   }
 
-  gps->flag &= ~GP_STROKE_SELECT;
   gpc->flag &= ~GP_CURVE_SELECT;
 
   bool is_selected = false;
@@ -1186,7 +1185,6 @@ void BKE_gpencil_curve_sync_selection(bGPDstroke *gps)
 
   if (is_selected) {
     gpc->flag |= GP_CURVE_SELECT;
-    gps->flag |= GP_STROKE_SELECT;
   }
 }
 
