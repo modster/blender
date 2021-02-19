@@ -72,6 +72,7 @@ struct USDImportParams {
   bool import_guide;
   bool import_proxy;
   bool import_render;
+  bool set_material_blend;
 };
 
 /* The USD_import function takes a as_background_job parameter, and returns a boolean.

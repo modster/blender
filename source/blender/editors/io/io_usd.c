@@ -290,6 +290,8 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
   const bool import_proxy = RNA_boolean_get(op->ptr, "import_proxy");
   const bool import_render = RNA_boolean_get(op->ptr, "import_render");
 
+  const bool set_material_blend = RNA_boolean_get(op->ptr, "set_material_blend");
+
   /* Switch out of edit mode to avoid being stuck in it (T54326). */
   Object *obedit = CTX_data_edit_object(C);
   if (obedit) {
@@ -308,7 +310,8 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
                                    transform_constraint,
                                    import_guide,
                                    import_proxy,
-                                   import_render};
+                                   import_render,
+                                   set_material_blend};
 
   bool ok = USD_import(C, filename, &params, as_background_job);
 
@@ -349,6 +352,7 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   uiItemL(box, IFACE_("Experimental"), ICON_NONE);
   uiItemR(box, ptr, "use_instancing", 0, NULL, ICON_NONE);
   uiItemR(box, ptr, "import_usdpreview", 0, NULL, ICON_NONE);
+  uiItemR(box, ptr, "set_material_blend", 0, NULL, ICON_NONE);
 }
 
 void WM_OT_usd_import(wmOperatorType *ot)
@@ -418,6 +422,14 @@ void WM_OT_usd_import(wmOperatorType *ot)
       false,
       "Import UsdPreviewSurface",
       "When checked, convert UsdPreviewSurface shaders to Principled BSD shader networks");
+
+  RNA_def_boolean(ot->srna,
+                  "set_material_blend",
+                  false,
+                  "Set Material Blend",
+                  "When checked and if the Import UsdPreviewSurface option is enabled, "
+                  "the material blend method will automatically be set based on the "
+                  "shader's opacity and opacityThreshold inputs");
 
   RNA_def_boolean(ot->srna,
                   "is_sequence",

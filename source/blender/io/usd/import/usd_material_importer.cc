@@ -57,6 +57,7 @@ static const pxr::TfToken metallic("metallic", pxr::TfToken::Immortal);
 static const pxr::TfToken normal("normal", pxr::TfToken::Immortal);
 static const pxr::TfToken occlusion("occlusion", pxr::TfToken::Immortal);
 static const pxr::TfToken opacity("opacity", pxr::TfToken::Immortal);
+static const pxr::TfToken opacityThreshold("opacityThreshold", pxr::TfToken::Immortal);
 static const pxr::TfToken r("r", pxr::TfToken::Immortal);
 static const pxr::TfToken result("result", pxr::TfToken::Immortal);
 static const pxr::TfToken rgb("rgb", pxr::TfToken::Immortal);
@@ -121,6 +122,44 @@ static pxr::UsdShadeShader get_source_shader(const pxr::UsdShadeConnectableAPI &
     }
   }
   return pxr::UsdShadeShader();
+}
+
+// Returns true if the given shader may have opacity < 1.0, based
+// on heuristics.  Also returns the shader's opacityThreshold input
+// in r_opacity_threshold, if this input has an authored value.
+static bool needs_blend(const pxr::UsdShadeShader &usd_shader, float &r_opacity_threshold)
+{
+  if (!usd_shader) {
+    return false;
+  }
+
+  bool needs_blend;
+
+  if (pxr::UsdShadeInput opacity_input = usd_shader.GetInput(usdtokens::opacity)) {
+
+    if (opacity_input.HasConnectedSource()) {
+      needs_blend = true;
+    }
+    else {
+      pxr::VtValue val;
+      if (opacity_input.GetAttr().HasAuthoredValue() && opacity_input.GetAttr().Get(&val)) {
+        float opacity = val.Get<float>();
+        needs_blend = opacity < 1.0f;
+      }
+    }
+  }
+
+  if (pxr::UsdShadeInput opacity_threshold_input = usd_shader.GetInput(
+          usdtokens::opacityThreshold)) {
+
+    pxr::VtValue val;
+    if (opacity_threshold_input.GetAttr().HasAuthoredValue() &&
+        opacity_threshold_input.GetAttr().Get(&val)) {
+      r_opacity_threshold = val.Get<float>();
+    }
+  }
+
+  return needs_blend;
 }
 
 namespace blender::io::usd {
@@ -281,6 +320,21 @@ void USDMaterialImporter::import_usd_preview(Material *mtl,
   }
 
   nodeSetActive(ntree, output);
+
+  // Optionally, set the material blend mode.
+
+  if (context_.import_params.set_material_blend) {
+    float opacity_threshold = 0.0f;
+    if (needs_blend(usd_shader, opacity_threshold)) {
+      if (opacity_threshold > 0.0f) {
+        mtl->blend_method = MA_BM_CLIP;
+        mtl->alpha_threshold = opacity_threshold;
+      }
+      else {
+        mtl->blend_method = MA_BM_BLEND;
+      }
+    }
+  }
 }
 
 /* Convert the given USD shader input to an input on the given node. */
