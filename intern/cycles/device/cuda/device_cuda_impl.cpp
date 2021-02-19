@@ -1065,9 +1065,9 @@ void CUDADevice::mem_copy_to(device_memory &mem)
 
 void CUDADevice::mem_copy_chunk_to(device_memory &mem, size_t chunk_offset, size_t chunk_size)
 {
-  // MEM_READ_WRITE for deltas
-  if (mem.type != MEM_GLOBAL && mem.type != MEM_READ_WRITE) {
-    assert(!"mem_copy_chunk_to is only supported for global or read/write memory.");
+  /* MEM_READ_ONLY for deltas */
+  if (mem.type != MEM_GLOBAL && mem.type != MEM_READ_ONLY) {
+    assert(!"mem_copy_chunk_to is only supported for global or read only memory.");
   }
   else {
     assert(mem.device_pointer);

@@ -1065,11 +1065,11 @@ void GeometryManager::device_update_mesh(
     /* normals */
     progress.set_status("Updating Mesh", "Computing normals");
 
-    dscene->tri_shader.alloc(tri_size);
-    dscene->tri_vnormal.alloc(vert_size);
-    dscene->tri_vindex.alloc(tri_size);
-    dscene->tri_patch.alloc(tri_size);
-    dscene->tri_patch_uv.alloc(vert_size);
+    dscene->tri_shader.alloc_chunks(tri_size);
+    dscene->tri_vnormal.alloc_chunks(vert_size);
+    dscene->tri_vindex.alloc_chunks(tri_size);
+    dscene->tri_patch.alloc_chunks(tri_size);
+    dscene->tri_patch_uv.alloc_chunks(vert_size);
 
     const bool copy_all_data = dscene->tri_shader.need_realloc() ||
                                dscene->tri_vindex.need_realloc() ||
@@ -1077,49 +1077,30 @@ void GeometryManager::device_update_mesh(
                                dscene->tri_patch.need_realloc() ||
                                dscene->tri_patch_uv.need_realloc();
 
-    if (copy_all_data) {
-      foreach (Geometry *geom, scene->geometry) {
-        if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
-          Mesh *mesh = static_cast<Mesh *>(geom);
+    foreach (Geometry *geom, scene->geometry) {
+      if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
+        Mesh *mesh = static_cast<Mesh *>(geom);
+
+        if (mesh->shader_is_modified() || mesh->smooth_is_modified() ||
+            mesh->triangles_is_modified() || copy_all_data) {
           mesh->pack_shaders(scene, mesh->get_tris_chunk(dscene->tri_shader));
+        }
+
+        if (mesh->verts_is_modified() || copy_all_data) {
           mesh->pack_normals(mesh->get_verts_chunk(dscene->tri_vnormal));
+        }
+
+        if (mesh->triangles_is_modified() || mesh->vert_patch_uv_is_modified() || copy_all_data) {
           mesh->pack_verts(tri_prim_index,
                            mesh->get_tris_chunk(dscene->tri_vindex),
                            mesh->get_tris_chunk(dscene->tri_patch),
                            mesh->get_verts_chunk(dscene->tri_patch_uv),
                            mesh->vert_offset,
                            mesh->prim_offset);
-          if (progress.get_cancel())
-            return;
         }
-      }
-    }
-    else {
-      foreach (Geometry *geom, scene->geometry) {
-        if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
-          Mesh *mesh = static_cast<Mesh *>(geom);
 
-          if (mesh->shader_is_modified() || mesh->smooth_is_modified() ||
-              mesh->triangles_is_modified()) {
-            mesh->pack_shaders(scene, mesh->get_tris_chunk(dscene->tri_shader));
-          }
-
-          if (mesh->verts_is_modified()) {
-            mesh->pack_normals(mesh->get_verts_chunk(dscene->tri_vnormal));
-          }
-
-          if (mesh->triangles_is_modified() || mesh->vert_patch_uv_is_modified()) {
-            mesh->pack_verts(tri_prim_index,
-                             mesh->get_tris_chunk(dscene->tri_vindex),
-                             mesh->get_tris_chunk(dscene->tri_patch),
-                             mesh->get_verts_chunk(dscene->tri_patch_uv),
-                             mesh->vert_offset,
-                             mesh->prim_offset);
-          }
-
-          if (progress.get_cancel())
-            return;
-        }
+        if (progress.get_cancel())
+          return;
       }
     }
 
@@ -1137,59 +1118,46 @@ void GeometryManager::device_update_mesh(
   if (curve_size != 0) {
     progress.set_status("Updating Mesh", "Copying Strands to device");
 
-    dscene->curve_keys.alloc(curve_key_size);
-    dscene->curves.alloc(curve_size);
+    dscene->curve_keys.alloc_chunks(curve_key_size);
+    dscene->curves.alloc_chunks(curve_size);
 
     const bool copy_all_data = dscene->curve_keys.need_realloc() || dscene->curves.need_realloc();
 
-    if (copy_all_data) {
-      foreach (Geometry *geom, scene->geometry) {
-        if (geom->is_hair()) {
-          Hair *hair = static_cast<Hair *>(geom);
-          hair->pack_curve_keys(hair->get_keys_chunk(dscene->curve_keys), {});
-          hair->pack_curve_segments(scene, hair->get_segments_chunk(dscene->curves));
-          if (progress.get_cancel())
-            return;
+    device_vector<half4> curve_keys_deltas(
+          scene->device, "__curve_keys_deltas", MemoryType::MEM_READ_ONLY);
+
+    if (!copy_all_data && scene->device->supports_delta_compression()) {
+      /* We can do partial updates, so compute deltas from last update. */
+      curve_keys_deltas.alloc_chunks(curve_key_size);
+      /* Since we use chunks and not all of them may be copied, make sure data between copied chunks is not garbage. */
+      curve_keys_deltas.zero_to_device();
+    }
+
+    foreach (Geometry *geom, scene->geometry) {
+      if (geom->is_hair()) {
+        Hair *hair = static_cast<Hair *>(geom);
+
+        const bool curve_keys_co_modified = hair->curve_radius_is_modified() ||
+            hair->curve_keys_is_modified();
+        if (curve_keys_co_modified || copy_all_data) {
+          hair->pack_curve_keys(hair->get_keys_chunk(dscene->curve_keys),
+                                hair->get_keys_chunk(curve_keys_deltas));
         }
+
+        const bool curve_data_modified = hair->curve_shader_is_modified() ||
+            hair->curve_first_key_is_modified();
+        if (curve_data_modified || copy_all_data) {
+          hair->pack_curve_segments(scene, hair->get_segments_chunk(dscene->curves));
+        }
+
+        if (progress.get_cancel())
+          return;
       }
     }
-    else {
-      // we can do partial updates, so compute deltas from last update
-      device_vector<half4> curve_keys_deltas(
-          scene->device, "__curve_keys_deltas", MemoryType::MEM_READ_WRITE);
 
-      if (scene->device->supports_delta_compression()) {
-        curve_keys_deltas.alloc(curve_key_size * 4);
-        /* since we use chunks and not all chunks may be copied, make sure data between copied chunks is not garbage */
-        curve_keys_deltas.zero_to_device();
-      }
-
-      foreach (Geometry *geom, scene->geometry) {
-        if (geom->is_hair()) {
-          Hair *hair = static_cast<Hair *>(geom);
-
-          const bool curve_keys_co_modified = hair->curve_radius_is_modified() ||
-                                              hair->curve_keys_is_modified();
-          if (curve_keys_co_modified) {
-            hair->pack_curve_keys(hair->get_keys_chunk(dscene->curve_keys),
-                                  hair->get_keys_chunk(curve_keys_deltas));
-          }
-
-          const bool curve_data_modified = hair->curve_shader_is_modified() ||
-                                           hair->curve_first_key_is_modified();
-          if (curve_data_modified) {
-            hair->pack_curve_segments(scene, hair->get_segments_chunk(dscene->curves));
-          }
-
-          if (progress.get_cancel())
-            return;
-        }
-      }
-
-      if (curve_keys_deltas.size() != 0 && !scene->device->apply_delta_compression(dscene->curve_keys, curve_keys_deltas)) {
-        progress.set_cancel("unable to apply deltas");
-        return;
-      }
+    if (curve_keys_deltas.size() != 0 && !scene->device->apply_delta_compression(dscene->curve_keys, curve_keys_deltas)) {
+      progress.set_cancel("unable to apply deltas");
+      return;
     }
 
     /* update MEM_GLOBAL pointers */
@@ -1270,7 +1238,7 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
 
     pack.root_index = -1;
 
-    device_vector<half4> verts_deltas(scene->device, "__prim_tri_verts_deltas", MEM_READ_WRITE);
+    device_vector<half4> verts_deltas(scene->device, "__prim_tri_verts_deltas", MEM_READ_ONLY);
 
     if (!pack_all) {
       /* if we do not need to recreate the BVH, then only the vertices are updated, so we can
@@ -1278,11 +1246,8 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
       dscene->prim_tri_verts.give_data(pack.prim_tri_verts);
 
       if (scene->device->supports_delta_compression()) {
-        // float3 is 4 floats wide
-        verts_deltas.resize(pack.prim_tri_verts.size());
-        // hack to allocate outside of the multithreaded loop
-        verts_deltas.get_chunk(0, 0);
-        /* since we use chunks and not all chunks may be copied, make sure data between copied chunks is not garbage */
+        verts_deltas.alloc_chunks(pack.prim_tri_verts.size());
+        /* Since we use chunks and not all of them may be copied, make sure data between copied chunks is not garbage. */
         verts_deltas.zero_to_device();
       }
     }

@@ -847,8 +847,8 @@ void Mesh::pack_primitives(ccl::PackedBVH *pack, int object, uint visibility, bo
     }
   }
 
-  device_vector<half4>::chunk chunk = verts_deltas->get_chunk(prim_offset * 3, num_prims * 3);
-  const bool do_deltas = chunk.size_ != 0;
+  device_vector<half4>::chunk chunk = get_tris_chunk(*verts_deltas, 3);
+  const bool do_deltas = chunk.valid();
   half4 *chunk_data = chunk.data();
 
   for (size_t k = 0; k < num_prims; ++k) {

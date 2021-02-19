@@ -256,14 +256,14 @@ class Mesh : public Geometry {
   }
 
   template<typename T>
-  typename device_vector<T>::chunk get_verts_chunk(device_vector<T> &dvector, int elements = 1)
+  typename device_vector<T>::chunk get_verts_chunk(device_vector<T> &dvector)
   {
-    return dvector.get_chunk(vert_offset * elements, get_verts().size() * elements);
+    return dvector.get_chunk(vert_offset, get_verts().size());
   }
 
-  template<typename T> typename device_vector<T>::chunk get_tris_chunk(device_vector<T> &dvector)
+  template<typename T> typename device_vector<T>::chunk get_tris_chunk(device_vector<T> &dvector, int elements = 1)
   {
-    return dvector.get_chunk(prim_offset, num_triangles());
+    return dvector.get_chunk(prim_offset * elements, num_triangles() * elements);
   }
 
  protected:

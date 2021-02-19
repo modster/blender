@@ -330,11 +330,12 @@ template<typename T> class device_only_memory : public device_memory {
 
 template<typename T> class device_vector : public device_memory {
  public:
-  struct chunk {
+  class chunk {
     device_vector<T> *parent_;
     size_t offset_;
     size_t size_;
 
+   public:
     chunk() : parent_(nullptr), offset_(0), size_(0)
     {
     }
@@ -356,7 +357,7 @@ template<typename T> class device_vector : public device_memory {
 
     T *data()
     {
-      return parent_->data() + offset_;
+      return parent_ ? parent_->data() + offset_ : nullptr;
     }
 
     bool valid() const
@@ -367,15 +368,14 @@ template<typename T> class device_vector : public device_memory {
 
   chunk get_chunk(size_t offset, size_t size)
   {
-    has_chunks = true;
-    /* handle case where there is no data, this is to support getting a chunk
-     * for delta compression when the feature is not supported by the device */
+    assert(has_chunks);
+
+    /* Handle case where there is no data, this is to support getting a chunk
+     * for delta compression when the feature is not supported by the device or
+     * on frames where we have to do a full update, we then give an empty chunk
+     * to signal no delta compression should be done. */
     if (data_size == 0) {
       return {};
-    }
-
-    if (!device_pointer) {
-      device_alloc();
     }
 
     return chunk(*this, offset, size);
@@ -515,6 +515,16 @@ template<typename T> class device_vector : public device_memory {
   {
     need_realloc_ = true;
     tag_modified();
+  }
+
+  void alloc_chunks(size_t size)
+  {
+    alloc(size);
+
+    has_chunks = true;
+    if (!device_pointer) {
+      device_alloc();
+    }
   }
 
   size_t size() const
