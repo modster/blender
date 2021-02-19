@@ -1082,7 +1082,7 @@ void GeometryManager::device_update_mesh(
         if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
           Mesh *mesh = static_cast<Mesh *>(geom);
           mesh->pack_shaders(scene, mesh->get_tris_chunk(dscene->tri_shader));
-          mesh->pack_normals(mesh->get_verts_chunk(dscene->tri_vnormal), {});
+          mesh->pack_normals(mesh->get_verts_chunk(dscene->tri_vnormal));
           mesh->pack_verts(tri_prim_index,
                            mesh->get_tris_chunk(dscene->tri_vindex),
                            mesh->get_tris_chunk(dscene->tri_patch),
@@ -1095,14 +1095,6 @@ void GeometryManager::device_update_mesh(
       }
     }
     else {
-      // we can do partial updates, so compute deltas from last update
-      device_vector<short> vnormal_deltas(
-          scene->device, "__vnormal_deltas", MemoryType::MEM_READ_WRITE);
-
-      if (scene->device->supports_delta_compression()) {
-        vnormal_deltas.alloc(vert_size * 4);
-      }
-
       foreach (Geometry *geom, scene->geometry) {
         if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
           Mesh *mesh = static_cast<Mesh *>(geom);
@@ -1113,8 +1105,7 @@ void GeometryManager::device_update_mesh(
           }
 
           if (mesh->verts_is_modified()) {
-            mesh->pack_normals(mesh->get_verts_chunk(dscene->tri_vnormal),
-                               mesh->get_verts_chunk(vnormal_deltas, 4));
+            mesh->pack_normals(mesh->get_verts_chunk(dscene->tri_vnormal));
           }
 
           if (mesh->triangles_is_modified() || mesh->vert_patch_uv_is_modified()) {
@@ -1129,11 +1120,6 @@ void GeometryManager::device_update_mesh(
           if (progress.get_cancel())
             return;
         }
-      }
-
-      if (!scene->device->apply_delta_compression(dscene->tri_vnormal, vnormal_deltas)) {
-        progress.set_cancel("unable to apply delta");
-        return;
       }
     }
 
@@ -1169,11 +1155,13 @@ void GeometryManager::device_update_mesh(
     }
     else {
       // we can do partial updates, so compute deltas from last update
-      device_vector<short> curve_keys_deltas(
+      device_vector<half4> curve_keys_deltas(
           scene->device, "__curve_keys_deltas", MemoryType::MEM_READ_WRITE);
 
       if (scene->device->supports_delta_compression()) {
         curve_keys_deltas.alloc(curve_key_size * 4);
+        /* since we use chunks and not all chunks may be copied, make sure data between copied chunks is not garbage */
+        curve_keys_deltas.zero_to_device();
       }
 
       foreach (Geometry *geom, scene->geometry) {
@@ -1184,7 +1172,7 @@ void GeometryManager::device_update_mesh(
                                               hair->curve_keys_is_modified();
           if (curve_keys_co_modified) {
             hair->pack_curve_keys(hair->get_keys_chunk(dscene->curve_keys),
-                                  hair->get_keys_chunk(curve_keys_deltas, 4));
+                                  hair->get_keys_chunk(curve_keys_deltas));
           }
 
           const bool curve_data_modified = hair->curve_shader_is_modified() ||
@@ -1198,7 +1186,7 @@ void GeometryManager::device_update_mesh(
         }
       }
 
-      if (!scene->device->apply_delta_compression(dscene->curve_keys, curve_keys_deltas)) {
+      if (curve_keys_deltas.size() != 0 && !scene->device->apply_delta_compression(dscene->curve_keys, curve_keys_deltas)) {
         progress.set_cancel("unable to apply deltas");
         return;
       }
@@ -1282,10 +1270,21 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
 
     pack.root_index = -1;
 
+    device_vector<half4> verts_deltas(scene->device, "__prim_tri_verts_deltas", MEM_READ_WRITE);
+
     if (!pack_all) {
       /* if we do not need to recreate the BVH, then only the vertices are updated, so we can
        * safely retake the memory */
       dscene->prim_tri_verts.give_data(pack.prim_tri_verts);
+
+      if (scene->device->supports_delta_compression()) {
+        // float3 is 4 floats wide
+        verts_deltas.resize(pack.prim_tri_verts.size());
+        // hack to allocate outside of the multithreaded loop
+        verts_deltas.get_chunk(0, 0);
+        /* since we use chunks and not all chunks may be copied, make sure data between copied chunks is not garbage */
+        verts_deltas.zero_to_device();
+      }
     }
     else {
       /* It is not strictly necessary to skip those resizes we if do not have to repack, as the OS
@@ -1320,9 +1319,18 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
 
       const pair<int, uint> &info = geometry_to_object_info[geom];
       pool.push(function_bind(
-          &Geometry::pack_primitives, geom, &pack, info.first, info.second, pack_all));
+          &Geometry::pack_primitives, geom, &pack, info.first, info.second, pack_all, &verts_deltas));
     }
     pool.wait_work();
+
+    if (verts_deltas.size() != 0) {
+      dscene->prim_tri_verts.steal_data(pack.prim_tri_verts, false);
+
+      if (!scene->device->apply_delta_compression(dscene->prim_tri_verts, verts_deltas)) {
+        progress.set_cancel("unable to unpack deltas for the vertices");
+        return;
+      }
+    }
   }
 
   if (progress.get_cancel()) {

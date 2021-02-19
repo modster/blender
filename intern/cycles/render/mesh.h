@@ -223,8 +223,7 @@ class Mesh : public Geometry {
   void get_uv_tiles(ustring map, unordered_set<int> &tiles) override;
 
   void pack_shaders(Scene *scene, device_vector<uint>::chunk shader);
-  void pack_normals(device_vector<float4>::chunk vnormal,
-                    device_vector<short>::chunk vnormal_deltas);
+  void pack_normals(device_vector<float4>::chunk vnormal);
   void pack_verts(const vector<uint> &tri_prim_index,
                   device_vector<uint4>::chunk tri_vindex,
                   device_vector<uint>::chunk tri_patch,
@@ -233,7 +232,7 @@ class Mesh : public Geometry {
                   size_t tri_offset);
   void pack_patches(uint *patch_data, uint vert_offset, uint face_offset, uint corner_offset);
 
-  void pack_primitives(PackedBVH *pack, int object, uint visibility, bool pack_all) override;
+  void pack_primitives(PackedBVH *pack, int object, uint visibility, bool pack_all, device_vector<half4> *verts_deltas) override;
 
   void tessellate(DiagSplit *split);
 

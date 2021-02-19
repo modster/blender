@@ -160,6 +160,18 @@ ccl_device_inline half float_to_half(float f)
   return (value_bits | sign_bit);
 }
 
+ccl_device_inline half4 float4_to_half4(float4 f)
+{
+  half4 h;
+
+  h.x = float_to_half(f.x);
+  h.y = float_to_half(f.y);
+  h.z = float_to_half(f.z);
+  h.w = float_to_half(f.w);
+
+  return h;
+}
+
 #  endif
 
 #endif

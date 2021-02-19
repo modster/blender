@@ -1463,10 +1463,9 @@ bool CUDADevice::apply_delta_compression(device_memory &mem_orig, device_memory 
   cuda_assert(
       cuModuleGetFunction(&cu_apply_deltas, cuModule, "kernel_cuda_apply_delta_compression"));
 
-  int size = (int)(mem_orig.data_size);
-
-  void *args[] = {&mem_orig.device_pointer, &mem_compressed.device_pointer, &size};
-  CUDA_GET_BLOCKSIZE_1D(cu_apply_deltas, mem_orig.data_size, 1);
+  const int elements = (int)(mem_orig.data_size) * mem_orig.data_elements;
+  void *args[] = {&mem_orig.device_pointer, &mem_compressed.device_pointer};
+  CUDA_GET_BLOCKSIZE_1D(cu_apply_deltas, elements, 1);
   CUDA_LAUNCH_KERNEL_1D(cu_apply_deltas, args);
   cuda_assert(cuCtxSynchronize());
   return !have_error();

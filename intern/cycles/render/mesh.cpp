@@ -709,8 +709,7 @@ void Mesh::pack_shaders(Scene *scene, device_vector<uint>::chunk tri_shader)
   tri_shader.copy_to_device();
 }
 
-void Mesh::pack_normals(device_vector<float4>::chunk vnormal,
-                        device_vector<short>::chunk vnormal_deltas)
+void Mesh::pack_normals(device_vector<float4>::chunk vnormal)
 {
   Attribute *attr_vN = attributes.find(ATTR_STD_VERTEX_NORMAL);
   if (attr_vN == NULL) {
@@ -720,7 +719,6 @@ void Mesh::pack_normals(device_vector<float4>::chunk vnormal,
 
   bool do_transform = transform_applied;
   Transform ntfm = transform_normal;
-  const bool do_deltas = vnormal_deltas.size_ != 0;
 
   float3 *vN = attr_vN->data_float3();
   size_t verts_size = verts.size();
@@ -731,27 +729,10 @@ void Mesh::pack_normals(device_vector<float4>::chunk vnormal,
     if (do_transform)
       vNi = safe_normalize(transform_direction(&ntfm, vNi));
 
-    float4 normal = make_float4(vNi.x, vNi.y, vNi.z, 0.0f);
-
-    if (do_deltas) {
-      const float4 current_normal = vnormal.data()[i];
-      const float4 delta = (normal - current_normal) * 32768.0f;
-
-      vnormal_deltas.data()[i * 4 + 0] = (short)(delta.x);
-      vnormal_deltas.data()[i * 4 + 1] = (short)(delta.y);
-      vnormal_deltas.data()[i * 4 + 2] = (short)(delta.z);
-    }
-
-    /* update host memory */
-    vnormal.data()[i] = normal;
+    vnormal.data()[i] = make_float4(vNi.x, vNi.y, vNi.z, 0.0f);
   }
 
-  if (do_deltas) {
-    vnormal_deltas.copy_to_device();
-  }
-  else {
-    vnormal.copy_to_device();
-  }
+  vnormal.copy_to_device();
 }
 
 void Mesh::pack_verts(const vector<uint> &tri_prim_index,
@@ -835,7 +816,7 @@ void Mesh::pack_patches(uint *patch_data, uint vert_offset, uint face_offset, ui
   }
 }
 
-void Mesh::pack_primitives(ccl::PackedBVH *pack, int object, uint visibility, bool pack_all)
+void Mesh::pack_primitives(ccl::PackedBVH *pack, int object, uint visibility, bool pack_all, device_vector<half4> *verts_deltas)
 {
   if (triangles.empty())
     return;
@@ -866,11 +847,29 @@ void Mesh::pack_primitives(ccl::PackedBVH *pack, int object, uint visibility, bo
     }
   }
 
+  device_vector<half4>::chunk chunk = verts_deltas->get_chunk(prim_offset * 3, num_prims * 3);
+  const bool do_deltas = chunk.size_ != 0;
+  half4 *chunk_data = chunk.data();
+
   for (size_t k = 0; k < num_prims; ++k) {
     const Mesh::Triangle t = get_triangle(k);
-    prim_tri_verts[k * 3] = float3_to_float4(verts[t.v[0]]);
-    prim_tri_verts[k * 3 + 1] = float3_to_float4(verts[t.v[1]]);
-    prim_tri_verts[k * 3 + 2] = float3_to_float4(verts[t.v[2]]);
+
+    for (int i = 0; i < 3; ++i) {
+      const float4 new_vert = float3_to_float4(verts[t.v[i]]);
+
+      if (do_deltas) {
+        const float4 old_vert = prim_tri_verts[k * 3 + i];
+        const float4 delta = (new_vert - old_vert);
+        *chunk_data++ = float4_to_half4(delta);
+      }
+
+      /* update host memory */
+      prim_tri_verts[k * 3 + i] = new_vert;
+    }
+  }
+
+  if (do_deltas) {
+    chunk.copy_to_device();
   }
 }
 

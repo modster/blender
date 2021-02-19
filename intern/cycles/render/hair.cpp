@@ -461,7 +461,7 @@ void Hair::apply_transform(const Transform &tfm, const bool apply_to_motion)
 }
 
 void Hair::pack_curve_keys(device_vector<float4>::chunk curve_key_co,
-                           device_vector<short>::chunk keys_deltas)
+                           device_vector<half4>::chunk keys_deltas)
 {
   size_t curve_keys_size = curve_keys.size();
 
@@ -477,12 +477,8 @@ void Hair::pack_curve_keys(device_vector<float4>::chunk curve_key_co,
 
       if (do_deltas) {
         const float4 old_keys = curve_key_co.data()[i];
-        const float4 delta = (new_keys - old_keys) * 32768.0f;
-
-        keys_deltas.data()[i * 4 + 0] = (short)(delta.x);
-        keys_deltas.data()[i * 4 + 1] = (short)(delta.y);
-        keys_deltas.data()[i * 4 + 2] = (short)(delta.z);
-        keys_deltas.data()[i * 4 + 3] = (short)(delta.w);
+        const float4 delta = (new_keys - old_keys);
+        keys_deltas.data()[i] = float4_to_half4(delta);
       }
 
       /* update host memory */
@@ -523,7 +519,7 @@ void Hair::pack_curve_segments(Scene *scene, device_vector<float4>::chunk curve_
   curve_data.copy_to_device();
 }
 
-void Hair::pack_primitives(PackedBVH *pack, int object, uint visibility, bool pack_all)
+void Hair::pack_primitives(PackedBVH *pack, int object, uint visibility, bool pack_all, device_vector<half4> */*verts_deltas*/)
 {
   if (curve_first_key.empty())
     return;

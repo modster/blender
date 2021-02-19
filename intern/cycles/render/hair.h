@@ -157,10 +157,10 @@ class Hair : public Geometry {
 
   /* BVH */
   void pack_curve_keys(device_vector<float4>::chunk curve_key_co,
-                       device_vector<short>::chunk keys_deltas);
+                       device_vector<half4>::chunk keys_deltas);
   void pack_curve_segments(Scene *scene, device_vector<float4>::chunk curve_data);
 
-  void pack_primitives(PackedBVH *pack, int object, uint visibility, bool pack_all) override;
+  void pack_primitives(PackedBVH *pack, int object, uint visibility, bool pack_all, device_vector<half4> *verts_deltas) override;
 };
 
 CCL_NAMESPACE_END
