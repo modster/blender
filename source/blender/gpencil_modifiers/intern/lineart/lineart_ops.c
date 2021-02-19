@@ -263,11 +263,9 @@ static int lineart_gpencil_clear_all_strokes_invoke(bContext *C,
                                                     wmOperator *op,
                                                     const wmEvent *UNUSED(event))
 {
-  // FIXME ASAN reports a mem leak here in CTX_DATA_BEGIN
-  // Yiming: I'm not sure why here it leaks... I'm taling a look.
   CTX_DATA_BEGIN (C, Object *, ob, visible_objects) {
     if (ob->type != OB_GPENCIL) {
-      return OPERATOR_CANCELLED;
+      continue;
     }
     LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
       if (md->type != eGpencilModifierType_Lineart) {
