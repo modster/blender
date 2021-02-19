@@ -28,7 +28,7 @@
 #include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_mesh_primitive_circle_in[] = {
-    {SOCK_INT, N_("Vertices"), 16, 0.0f, 0.0f, 0.0f, 3, 4096},
+    {SOCK_INT, N_("Vertices"), 32, 0.0f, 0.0f, 0.0f, 3, 4096},
     {SOCK_FLOAT, N_("Radius"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
     {SOCK_VECTOR, N_("Location"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
     {SOCK_VECTOR, N_("Rotation"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_EULER},
@@ -44,6 +44,8 @@ static void geo_node_mesh_primitive_circle_layout(uiLayout *layout,
                                                   bContext *UNUSED(C),
                                                   PointerRNA *ptr)
 {
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
   uiItemR(layout, ptr, "fill_type", 0, nullptr, ICON_NONE);
 }
 
@@ -147,23 +149,33 @@ static Mesh *create_circle_mesh(const float3 location,
     }
   }
 
+  /* Align all vertex normals to the input rotation. */
+  for (MVert &vert : verts) {
+    normal_float_to_short_v3(vert.no, rotation);
+  }
+
   /* Create outer edges. */
-  for (const int i : IndexRange(verts_num - 1)) {
+  for (const int i : IndexRange(verts_num)) {
     MEdge &edge = edges[i];
     edge.v1 = i;
-    edge.v2 = i + 1;
+    edge.v2 = (i + 1) % verts_num;
   }
-  edges.last().v1 = verts_num - 1;
-  edges.last().v2 = 0;
 
+  /* Set loose edge flags. */
   if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_NONE) {
-    for (MEdge &edge : edges) {
+    for (const int i : IndexRange(verts_num)) {
+      MEdge &edge = edges[i];
       edge.flag |= ME_LOOSEEDGE;
     }
   }
 
   /* Create triangle fan edges. */
   if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN) {
+    for (const int i : IndexRange(verts_num)) {
+      MEdge &edge = edges[verts_num + i];
+      edge.v1 = verts_num;
+      edge.v2 = i;
+    }
   }
 
   /* Create corners. */
@@ -184,8 +196,11 @@ static Mesh *create_circle_mesh(const float3 location,
         loop.e = i;
         loop.v = i;
         MLoop &loop2 = loops[3 * i + 1];
-        loop2.e = verts_num + 1;
-        loop2.v = i + i;
+        loop2.e = verts_num + ((i + 1) % verts_num);
+        loop2.v = (i + 1) % verts_num;
+        MLoop &loop3 = loops[3 * i + 2];
+        loop3.e = verts_num + i;
+        loop3.v = verts_num;
       }
       break;
     }
@@ -202,11 +217,16 @@ static Mesh *create_circle_mesh(const float3 location,
       break;
     }
     case GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN: {
+      for (const int i : IndexRange(verts_num)) {
+        MPoly &poly = polys[i];
+        poly.loopstart = 3 * i;
+        poly.totloop = 3;
+      }
       break;
     }
   }
 
-  BLI_assert(BKE_mesh_validate(mesh, true, false));
+  BLI_assert(BKE_mesh_is_valid(mesh));
 
   return mesh;
 }
@@ -231,7 +251,11 @@ static void geo_node_mesh_primitive_circle_exec(GeoNodeExecParams params)
   const float3 location = params.extract_input<float3>("Location");
   const float3 rotation = params.extract_input<float3>("Rotation");
 
-  geometry_set.replace_mesh(create_circle_mesh(location, rotation, radius, verts_num, fill_type));
+  const float3 rotation_normalized = rotation.length_squared() == 0.0f ? float3(0.0f, 0.0f, 1.0f) :
+                                                                         rotation.normalized();
+
+  geometry_set.replace_mesh(
+      create_circle_mesh(location, rotation_normalized, radius, verts_num, fill_type));
 
   params.set_output("Geometry", geometry_set);
 }
