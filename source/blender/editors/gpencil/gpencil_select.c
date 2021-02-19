@@ -1227,8 +1227,7 @@ static bool gpencil_stroke_do_circle_sel(bGPdata *gpd,
                                          rcti *rect,
                                          const float diff_mat[4][4],
                                          const int selectmode,
-                                         const float scale,
-                                         const bool is_curve_edit)
+                                         const float scale)
 {
   bGPDspoint *pt = NULL;
   int x0 = 0, y0 = 0;
@@ -1292,23 +1291,13 @@ static bool gpencil_stroke_do_circle_sel(bGPdata *gpd,
     }
   }
 
-  /* If curve edit mode, generate the curve. */
-  if (is_curve_edit && hit && gps_active->editcurve == NULL) {
-    // BKE_gpencil_stroke_editcurve_update(gpd, gpl, gps_active);
-    gps_active->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
-    /* Select all curve points. */
-    select_all_curve_points(gps_active, gps_active->editcurve, false);
-    BKE_gpencil_stroke_geometry_update(gpd, gps_active);
-    changed = true;
-  }
-
   /* Ensure that stroke selection is in sync with its points. */
   BKE_gpencil_stroke_sync_selection(gps_active);
 
   return changed;
 }
 
-static bool gpencil_do_curve_circle_sel(bContext *C,
+static bool gpencil_curve_do_circle_sel(bContext *C,
                                         bGPDstroke *gps,
                                         bGPDcurve *gpc,
                                         const int mx,
@@ -1404,7 +1393,6 @@ static int gpencil_circle_select_exec(bContext *C, wmOperator *op)
   bGPdata *gpd = ED_gpencil_data_get_active(C);
   ToolSettings *ts = CTX_data_tool_settings(C);
   Object *ob = CTX_data_active_object(C);
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
 
   int selectmode;
   if (ob && ob->mode == OB_MODE_SCULPT_GPENCIL) {
@@ -1448,32 +1436,19 @@ static int gpencil_circle_select_exec(bContext *C, wmOperator *op)
   rect.xmax = mx + radius;
   rect.ymax = my + radius;
 
-  if (is_curve_edit) {
-    if (SEL_OP_USE_PRE_DESELECT(sel_op)) {
-      ED_gpencil_select_curve_toggle_all(C, SEL_DESELECT);
-      changed = true;
-    }
+  GP_SpaceConversion gsc = {NULL};
+  /* init space conversion stuff */
+  gpencil_point_conversion_init(C, &gsc);
 
-    GP_EDITABLE_CURVES_BEGIN(gps_iter, C, gpl, gps, gpc)
-    {
-      changed |= gpencil_do_curve_circle_sel(
-          C, gps, gpc, mx, my, radius, select, &rect, gps_iter.diff_mat, selectmode);
-    }
-    GP_EDITABLE_CURVES_END(gps_iter);
+  if (SEL_OP_USE_PRE_DESELECT(sel_op)) {
+    // ED_gpencil_select_curve_toggle_all(C, SEL_DESELECT);
+    ED_gpencil_select_toggle_all(C, SEL_DESELECT);
+    changed = true;
   }
 
-  if (changed == false) {
-    GP_SpaceConversion gsc = {NULL};
-    /* init space conversion stuff */
-    gpencil_point_conversion_init(C, &gsc);
-
-    if (SEL_OP_USE_PRE_DESELECT(sel_op)) {
-      ED_gpencil_select_toggle_all(C, SEL_DESELECT);
-      changed = true;
-    }
-
-    /* find visible strokes, and select if hit */
-    GP_EVALUATED_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
+  /* find visible strokes, and select if hit */
+  GP_EVALUATED_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
+    if (!GPENCIL_STROKE_IS_CURVE(gps)) {
       changed |= gpencil_stroke_do_circle_sel(gpd,
                                               gpl,
                                               gps,
@@ -1485,11 +1460,19 @@ static int gpencil_circle_select_exec(bContext *C, wmOperator *op)
                                               &rect,
                                               gpstroke_iter.diff_mat,
                                               selectmode,
-                                              scale,
-                                              is_curve_edit);
+                                              scale);
     }
-    GP_EVALUATED_STROKES_END(gpstroke_iter);
   }
+  GP_EVALUATED_STROKES_END(gpstroke_iter);
+
+  /* TODO: When curves are correctly evaluated by modifieres, etc. this should be moved in the loop
+   * above. */
+  GP_EDITABLE_CURVES_BEGIN(gps_iter, C, gpl, gps, gpc)
+  {
+    changed |= gpencil_curve_do_circle_sel(
+        C, gps, gpc, mx, my, radius, select, &rect, gps_iter.diff_mat, selectmode);
+  }
+  GP_EDITABLE_CURVES_END(gps_iter);
 
   /* updates */
   if (changed) {
