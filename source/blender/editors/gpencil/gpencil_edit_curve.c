@@ -238,7 +238,7 @@ static int gpencil_stroke_clear_curve_exec(bContext *C, wmOperator *op)
   GP_EDITABLE_CURVES_BEGIN(gps_iter, C, gpl, gps, gpc)
   {
     if (gpc->flag & GP_CURVE_SELECT) {
-      BKE_gpencil_stroke_editcurve_sync_selection(gps, gpc);
+      BKE_gpencil_stroke_editcurve_sync_selection(gpd, gps, gpc);
       BKE_gpencil_free_stroke_editcurve(gps);
       changed = true;
     }
