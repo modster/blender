@@ -31,6 +31,7 @@
 #include "BLT_translation.h"
 
 #include "DNA_collection_types.h"
+#include "DNA_defaults.h"
 #include "DNA_gpencil_modifier_types.h"
 #include "DNA_gpencil_types.h"
 #include "DNA_lineart_types.h"
@@ -70,16 +71,11 @@
 
 static void initData(GpencilModifierData *md)
 {
-  LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
-  lmd->line_types = LRT_EDGE_FLAG_ALL_TYPE;
-  lmd->thickness = 25;
-  lmd->opacity = 1.0f;
-  lmd->flags |= LRT_GPENCIL_MATCH_OUTPUT_VGROUP;
-  lmd->crease_threshold = DEG2RAD(140.0f);
-  lmd->calculation_flags |= (LRT_ALLOW_DUPLI_OBJECTS | LRT_REMOVE_DOUBLES);
-  lmd->angle_splitting_threshold = DEG2RAD(60.0f);
-  lmd->chaining_geometry_threshold = 0.001f;
-  lmd->chaining_image_threshold = 0.001f;
+  LineartGpencilModifierData *gpmd = (LineartGpencilModifierData *)md;
+
+  BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(gpmd, modifier));
+
+  MEMCPY_STRUCT_AFTER(gpmd, DNA_struct_default_get(LineartGpencilModifierData), modifier);
 }
 
 static void copyData(const GpencilModifierData *md, GpencilModifierData *target)
