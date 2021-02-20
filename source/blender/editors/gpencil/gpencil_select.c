@@ -174,7 +174,6 @@ static void deselect_all_selected(bContext *C)
           BEZT_DESEL_ALL(bezt);
         }
         gpc->flag &= ~GP_CURVE_SELECT;
-        BKE_gpencil_stroke_select_index_reset(gps);
       }
     }
     else {
@@ -188,7 +187,7 @@ static void deselect_all_selected(bContext *C)
       }
     }
 
-    BKE_gpencil_stroke_select_index_set(NULL, gps, true);
+    BKE_gpencil_stroke_select_index_reset(gps);
   }
   CTX_DATA_END;
 }
@@ -566,8 +565,6 @@ static bool gpencil_select_same_layer(bContext *C)
             BEZT_SEL_ALL(&gpc_pt->bezt);
           }
           gpc->flag |= GP_CURVE_SELECT;
-
-          changed = true;
         }
         else {
           bGPDspoint *pt;
@@ -578,12 +575,11 @@ static bool gpencil_select_same_layer(bContext *C)
           }
 
           gps->flag |= GP_STROKE_SELECT;
-          BKE_gpencil_stroke_select_index_set(gpd, gps);
-
-          changed = true;
+          
         }
 
-        BKE_gpencil_stroke_select_index_set(gpd, gps, false);
+        BKE_gpencil_stroke_select_index_set(gpd, gps);
+        changed = true;
       }
     }
   }
@@ -637,7 +633,7 @@ static bool gpencil_select_same_material(bContext *C)
         gps->flag |= GP_STROKE_SELECT;
       }
 
-      BKE_gpencil_stroke_select_index_set(gpd, gps, false);
+      BKE_gpencil_stroke_select_index_set(gpd, gps);
       changed = true;
     }
   }
@@ -764,7 +760,6 @@ static int gpencil_select_first_exec(bContext *C, wmOperator *op)
     else {
       gps->points->flag |= GP_SPOINT_SELECT;
       gps->flag |= GP_STROKE_SELECT;
-      BKE_gpencil_stroke_select_index_set(gpd, gps);
 
       /* deselect rest? */
       if ((extend == false) && (gps->totpoints > 1)) {
@@ -778,8 +773,8 @@ static int gpencil_select_first_exec(bContext *C, wmOperator *op)
       }
     }
 
-    changed = true;
     BKE_gpencil_stroke_select_index_set(gpd, gps);
+    changed = true;
   }
   CTX_DATA_END;
 
@@ -873,8 +868,7 @@ static int gpencil_select_last_exec(bContext *C, wmOperator *op)
     else {
       gps->points[gps->totpoints - 1].flag |= GP_SPOINT_SELECT;
       gps->flag |= GP_STROKE_SELECT;
-      BKE_gpencil_stroke_select_index_set(gpd, gps);
-
+      
       /* deselect rest? */
       if ((extend == false) && (gps->totpoints > 1)) {
         /* don't include the last point... */
@@ -887,7 +881,7 @@ static int gpencil_select_last_exec(bContext *C, wmOperator *op)
       }
     }
 
-    BKE_gpencil_stroke_select_index_set(gpd, gps, false);
+    BKE_gpencil_stroke_select_index_set(gpd, gps);
     changed = true;
   }
   CTX_DATA_END;

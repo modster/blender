@@ -1045,13 +1045,13 @@ void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps,
 /**
  * Sync the selection from stroke to editcurve
  */
-void BKE_gpencil_editcurve_stroke_sync_selection(bGPdata *UNUSED(gpd),
+void BKE_gpencil_editcurve_stroke_sync_selection(bGPdata *gpd,
                                                  bGPDstroke *gps,
                                                  bGPDcurve *gpc)
 {
   if (gps->flag & GP_STROKE_SELECT) {
     gpc->flag |= GP_CURVE_SELECT;
-    BKE_gpencil_stroke_select_index_set(gpd, gps, false);
+    BKE_gpencil_stroke_select_index_set(gpd, gps);
 
     for (int i = 0; i < gpc->tot_curve_points; i++) {
       bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
@@ -1069,7 +1069,7 @@ void BKE_gpencil_editcurve_stroke_sync_selection(bGPdata *UNUSED(gpd),
   else {
     gpc->flag &= ~GP_CURVE_SELECT;
     gpencil_editstroke_deselect_all(gpc);
-    BKE_gpencil_stroke_select_index_set(NULL, gps, true);
+    BKE_gpencil_stroke_select_index_reset(gps);
   }
 }
 

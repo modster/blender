@@ -244,7 +244,10 @@ static void gpencil_calc_points_factor(bContext *C,
         }
         gps->flag &= ~GP_STROKE_SELECT;
         BKE_gpencil_stroke_select_index_reset(gps);
+      }
+    }
   }
+  CTX_DATA_END;
 
   /* project in 2d plane */
   int direction = 0;
