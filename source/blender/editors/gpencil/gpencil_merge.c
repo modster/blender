@@ -134,7 +134,7 @@ static bGPDstroke *gpencil_prepare_stroke(bContext *C, wmOperator *op, int totpo
   /* stroke */
   bGPDstroke *gps = BKE_gpencil_stroke_new(MAX2(ob->actcol - 1, 0), totpoints, brush->size);
   gps->flag |= GP_STROKE_SELECT;
-  BKE_gpencil_stroke_select_index_set(gpd, gps, false);
+  BKE_gpencil_stroke_select_index_set(gpd, gps);
 
   if (cyclic) {
     gps->flag |= GP_STROKE_CYCLIC;
@@ -243,11 +243,8 @@ static void gpencil_calc_points_factor(bContext *C,
           }
         }
         gps->flag &= ~GP_STROKE_SELECT;
-        BKE_gpencil_stroke_select_index_set(NULL, gps, true);
-      }
-    }
+        BKE_gpencil_stroke_select_index_reset(gps);
   }
-  CTX_DATA_END;
 
   /* project in 2d plane */
   int direction = 0;

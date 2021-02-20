@@ -174,6 +174,7 @@ static void deselect_all_selected(bContext *C)
           BEZT_DESEL_ALL(bezt);
         }
         gpc->flag &= ~GP_CURVE_SELECT;
+        BKE_gpencil_stroke_select_index_reset(gps);
       }
     }
     else {
@@ -210,12 +211,12 @@ static void select_all_curve_points(bGPdata *gpd, bGPDstroke *gps, bGPDcurve *gp
   if (deselect == false) {
     gpc->flag |= GP_CURVE_SELECT;
     gps->flag |= GP_STROKE_SELECT;
-    BKE_gpencil_stroke_select_index_set(gpd, gps, false);
+    BKE_gpencil_stroke_select_index_set(gpd, gps);
   }
   else {
     gpc->flag &= ~GP_CURVE_SELECT;
     gps->flag &= ~GP_STROKE_SELECT;
-    BKE_gpencil_stroke_select_index_set(NULL, gps, true);
+    BKE_gpencil_stroke_select_index_reset(gps);
   }
 }
 
@@ -577,6 +578,7 @@ static bool gpencil_select_same_layer(bContext *C)
           }
 
           gps->flag |= GP_STROKE_SELECT;
+          BKE_gpencil_stroke_select_index_set(gpd, gps);
 
           changed = true;
         }
@@ -762,6 +764,7 @@ static int gpencil_select_first_exec(bContext *C, wmOperator *op)
     else {
       gps->points->flag |= GP_SPOINT_SELECT;
       gps->flag |= GP_STROKE_SELECT;
+      BKE_gpencil_stroke_select_index_set(gpd, gps);
 
       /* deselect rest? */
       if ((extend == false) && (gps->totpoints > 1)) {
@@ -776,7 +779,7 @@ static int gpencil_select_first_exec(bContext *C, wmOperator *op)
     }
 
     changed = true;
-    BKE_gpencil_stroke_select_index_set(gpd, gps, false);
+    BKE_gpencil_stroke_select_index_set(gpd, gps);
   }
   CTX_DATA_END;
 
@@ -858,7 +861,7 @@ static int gpencil_select_last_exec(bContext *C, wmOperator *op)
       gpc->curve_points[gpc->tot_curve_points - 1].flag |= GP_CURVE_POINT_SELECT;
       BEZT_SEL_ALL(&gpc->curve_points[gpc->tot_curve_points - 1].bezt);
       gpc->flag |= GP_CURVE_SELECT;
-
+      BKE_gpencil_stroke_select_index_set(gpd, gps);
       if ((extend == false) && (gps->totpoints > 1)) {
         for (int i = 0; i < gpc->tot_curve_points - 1; i++) {
           bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
@@ -870,6 +873,7 @@ static int gpencil_select_last_exec(bContext *C, wmOperator *op)
     else {
       gps->points[gps->totpoints - 1].flag |= GP_SPOINT_SELECT;
       gps->flag |= GP_STROKE_SELECT;
+      BKE_gpencil_stroke_select_index_set(gpd, gps);
 
       /* deselect rest? */
       if ((extend == false) && (gps->totpoints > 1)) {
@@ -1267,12 +1271,12 @@ static bool gpencil_stroke_do_circle_sel(bGPdata *gpd,
         if (select) {
           pt_active->flag |= GP_SPOINT_SELECT;
           gps_active->flag |= GP_STROKE_SELECT;
-          BKE_gpencil_stroke_select_index_set(gpd, gps_active, false);
+          BKE_gpencil_stroke_select_index_set(gpd, gps_active);
         }
         else {
           pt_active->flag &= ~GP_SPOINT_SELECT;
           gps_active->flag &= ~GP_STROKE_SELECT;
-          BKE_gpencil_stroke_select_index_set(NULL, gps_active, true);
+          BKE_gpencil_stroke_select_index_reset(gps_active);
         }
         changed = true;
         /* if stroke mode, don't check more points */
@@ -1794,7 +1798,7 @@ static bool gpencil_generic_stroke_select(bContext *C,
       }
 
       gps->flag &= ~GP_STROKE_SELECT;
-      BKE_gpencil_stroke_select_index_set(NULL, gps, true);
+      BKE_gpencil_stroke_select_index_reset(gps);
     }
     CTX_DATA_END;
 
@@ -2320,11 +2324,11 @@ static int gpencil_select_exec(bContext *C, wmOperator *op)
       /* stroke too... */
       if (deselect == false) {
         hit_stroke->flag |= GP_STROKE_SELECT;
-        BKE_gpencil_stroke_select_index_set(gpd, hit_stroke, false);
+        BKE_gpencil_stroke_select_index_set(gpd, hit_stroke);
       }
       else {
         hit_stroke->flag &= ~GP_STROKE_SELECT;
-        BKE_gpencil_stroke_select_index_set(NULL, hit_stroke, true);
+        BKE_gpencil_stroke_select_index_reset(hit_stroke);
       }
     }
   }
@@ -2336,13 +2340,13 @@ static int gpencil_select_exec(bContext *C, wmOperator *op)
         BEZT_SEL_IDX(&hit_curve_point->bezt, hit_curve_handle);
         hit_curve->flag |= GP_CURVE_SELECT;
         hit_stroke->flag |= GP_STROKE_SELECT;
-        BKE_gpencil_stroke_select_index_set(gpd, hit_stroke, false);
+        BKE_gpencil_stroke_select_index_set(gpd, hit_stroke);
       }
       else {
         /* we're adding selection, so selection must be true */
         hit_point->flag |= GP_SPOINT_SELECT;
         hit_stroke->flag |= GP_STROKE_SELECT;
-        BKE_gpencil_stroke_select_index_set(gpd, hit_stroke, false);
+        BKE_gpencil_stroke_select_index_set(gpd, hit_stroke);
 
         /* expand selection to segment */
         int selectmode;
@@ -2564,7 +2568,7 @@ static int gpencil_select_vertex_color_exec(bContext *C, wmOperator *op)
 
     if (gps_selected) {
       gps->flag |= GP_STROKE_SELECT;
-      BKE_gpencil_stroke_select_index_set(gpd, gps, false);
+      BKE_gpencil_stroke_select_index_set(gpd, gps);
 
       /* Extend stroke selection. */
       if (selectmode == GP_SELECTMODE_STROKE) {
