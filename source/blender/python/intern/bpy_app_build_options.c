@@ -32,7 +32,7 @@ static PyStructSequence_Field app_builtopts_info_fields[] = {
     {"codec_ffmpeg", NULL},  {"codec_sndfile", NULL},
     {"compositor", NULL},    {"cycles", NULL},
     {"cycles_osl", NULL},    {"freestyle", NULL},
-    {"lineart", NULL},       {"image_cineon", NULL},
+    {"potrace", NULL},       {"image_cineon", NULL},
     {"image_dds", NULL},     {"image_hdr", NULL},
     {"image_openexr", NULL}, {"image_openjpeg", NULL},
     {"image_tiff", NULL},    {"input_ndof", NULL},
@@ -45,7 +45,7 @@ static PyStructSequence_Field app_builtopts_info_fields[] = {
     {"openmp", NULL},        {"openvdb", NULL},
     {"alembic", NULL},       {"usd", NULL},
     {"fluid", NULL},         {"xr_openxr", NULL},
-    {"potrace", NULL},       {NULL},
+    {NULL},
 };
 
 static PyStructSequence_Desc app_builtopts_info_desc = {
