@@ -1182,7 +1182,7 @@ void ED_gpencil_stroke_reproject(Depsgraph *depsgraph,
   if (keep_original) {
     gps_active = BKE_gpencil_stroke_duplicate(gps, true, true);
     gps_active->flag &= ~GP_STROKE_SELECT;
-    BKE_gpencil_stroke_select_index_set(NULL, gps_active, true);
+    BKE_gpencil_stroke_select_index_reset(gps_active);
     for (i = 0, pt = gps_active->points; i < gps_active->totpoints; i++, pt++) {
       pt->flag &= ~GP_SPOINT_SELECT;
     }
@@ -1707,7 +1707,7 @@ void ED_gpencil_vgroup_select(bContext *C, Object *ob)
           }
 
           if (gps->flag & GP_STROKE_SELECT) {
-            BKE_gpencil_stroke_select_index_set(gpd, gps, false);
+            BKE_gpencil_stroke_select_index_set(gpd, gps);
           }
         }
       }
@@ -2631,7 +2631,7 @@ void ED_gpencil_select_toggle_all(bContext *C, int action)
             }
 
             gps->flag &= ~GP_STROKE_SELECT;
-            BKE_gpencil_stroke_select_index_set(NULL, gps, true);
+            BKE_gpencil_stroke_select_index_reset(gps);
           }
         }
       }
@@ -2669,11 +2669,11 @@ void ED_gpencil_select_toggle_all(bContext *C, int action)
       /* Change status of stroke */
       if (selected) {
         gps->flag |= GP_STROKE_SELECT;
-        BKE_gpencil_stroke_select_index_set(gpd, gps, false);
+        BKE_gpencil_stroke_select_index_set(gpd, gps);
       }
       else {
         gps->flag &= ~GP_STROKE_SELECT;
-        BKE_gpencil_stroke_select_index_set(NULL, gps, true);
+        BKE_gpencil_stroke_select_index_reset(gps);
       }
     }
     CTX_DATA_END;
@@ -2710,7 +2710,7 @@ void ED_gpencil_select_curve_toggle_all(bContext *C, int action)
       }
       gpc->flag &= ~GP_CURVE_SELECT;
       gps->flag &= ~GP_STROKE_SELECT;
-      BKE_gpencil_stroke_select_index_set(NULL, gps, true);
+      BKE_gpencil_stroke_select_index_reset(gps);
     }
     GP_EDITABLE_CURVES_END(gps_iter);
   }
@@ -2752,12 +2752,12 @@ void ED_gpencil_select_curve_toggle_all(bContext *C, int action)
       if (selected) {
         gpc->flag |= GP_CURVE_SELECT;
         gps->flag |= GP_STROKE_SELECT;
-        BKE_gpencil_stroke_select_index_set(gpd, gps, false);
+        BKE_gpencil_stroke_select_index_set(gpd, gps);
       }
       else {
         gpc->flag &= ~GP_CURVE_SELECT;
         gps->flag &= ~GP_STROKE_SELECT;
-        BKE_gpencil_stroke_select_index_set(NULL, gps, true);
+        BKE_gpencil_stroke_select_index_reset(gps);
       }
     }
     GP_EDITABLE_STROKES_END(gps_iter);
