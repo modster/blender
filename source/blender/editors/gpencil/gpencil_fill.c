@@ -723,7 +723,7 @@ static bool gpencil_render_offscreen(tGPDfill *tgpf)
     GPU_offscreen_read_pixels(offscreen, GPU_DATA_FLOAT, ibuf->rect_float);
   }
   else if (ibuf->rect) {
-    GPU_offscreen_read_pixels(offscreen, GPU_DATA_UNSIGNED_BYTE, ibuf->rect);
+    GPU_offscreen_read_pixels(offscreen, GPU_DATA_UBYTE, ibuf->rect);
   }
   if (ibuf->rect_float && ibuf->rect) {
     IMB_rect_from_float(ibuf);
@@ -1560,7 +1560,7 @@ static void gpencil_stroke_from_buffer(tGPDfill *tgpf)
   }
 
   /* If camera view or view projection, reproject flat to view to avoid perspective effect. */
-  if (((align_flag & GP_PROJECT_VIEWSPACE) && is_lock_axis_view) || is_camera) {
+  if ((!is_depth) && (((align_flag & GP_PROJECT_VIEWSPACE) && is_lock_axis_view) || (is_camera))) {
     ED_gpencil_project_stroke_to_view(tgpf->C, tgpf->gpl, gps);
   }
 

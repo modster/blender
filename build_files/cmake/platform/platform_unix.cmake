@@ -284,6 +284,10 @@ if(WITH_NANOVDB)
   endif()
 endif()
 
+if(WITH_CPU_SIMD)
+  find_package_wrapper(sse2neon)
+endif()
+
 if(WITH_ALEMBIC)
   find_package_wrapper(Alembic)
 
@@ -385,7 +389,7 @@ if(WITH_OPENIMAGEIO)
 endif()
 
 if(WITH_OPENCOLORIO)
-  find_package_wrapper(OpenColorIO)
+  find_package_wrapper(OpenColorIO 2.0.0)
 
   set(OPENCOLORIO_LIBRARIES ${OPENCOLORIO_LIBRARIES})
   set(OPENCOLORIO_LIBPATH)  # TODO, remove and reference the absolute path everywhere

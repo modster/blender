@@ -242,8 +242,8 @@ typedef enum eSpaceButtons_Flag {
 /* SpaceProperties.outliner_sync */
 typedef enum eSpaceButtons_OutlinerSync {
   PROPERTIES_SYNC_AUTO = 0,
-  PROPERTIES_SYNC_OFF = 1,
-  PROPERTIES_SYNC_ON = 2,
+  PROPERTIES_SYNC_NEVER = 1,
+  PROPERTIES_SYNC_ALWAYS = 2,
 } eSpaceButtons_OutlinerSync;
 
 /** \} */
@@ -1546,7 +1546,7 @@ typedef struct SpaceNode {
    */
   ListBase treepath;
 
-  /* The tree farthest down in the group heirarchy. */
+  /* The tree farthest down in the group hierarchy. */
   struct bNodeTree *edittree;
 
   struct bNodeTree *nodetree;
