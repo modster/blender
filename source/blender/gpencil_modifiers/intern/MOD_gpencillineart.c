@@ -39,9 +39,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 
-#ifdef WITH_LINEART
-#  include "ED_lineart.h"
-#endif
+#include "lineart/ED_lineart.h"
 
 #include "BKE_collection.h"
 #include "BKE_context.h"
@@ -83,7 +81,6 @@ static void copyData(const GpencilModifierData *md, GpencilModifierData *target)
   BKE_gpencil_modifier_copydata_generic(md, target);
 }
 
-#ifdef WITH_LINEART
 static void generate_strokes_actual(
     GpencilModifierData *md, Depsgraph *depsgraph, Object *ob, bGPDlayer *gpl, bGPDframe *gpf)
 {
@@ -115,11 +112,9 @@ static void generate_strokes_actual(
       lmd->vgname,
       lmd->flags);
 }
-#endif
 
 static bool isModifierDisabled(GpencilModifierData *md)
 {
-#ifdef WITH_LINEART
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
 
   if ((lmd->target_layer[0] == '\0') || (lmd->target_material == NULL)) {
@@ -135,10 +130,6 @@ static bool isModifierDisabled(GpencilModifierData *md)
   }
 
   return false;
-#else
-  UNUSED_VARS(md);
-  return true;
-#endif
 }
 static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Object *ob)
 {
@@ -164,7 +155,6 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
     return;
   }
 
-#ifdef WITH_LINEART
   ED_lineart_compute_feature_lines_internal(depsgraph, lmd);
 
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
@@ -172,7 +162,6 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
   ED_lineart_destroy_render_data(lmd);
 
   WM_main_add_notifier(NA_EDITED | NC_GPENCIL, NULL);
-#endif
 }
 
 static void bakeModifier(Main *UNUSED(bmain),
@@ -180,7 +169,6 @@ static void bakeModifier(Main *UNUSED(bmain),
                          GpencilModifierData *md,
                          Object *ob)
 {
-#ifdef WITH_LINEART
   bGPdata *gpd = ob->data;
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
 
@@ -198,9 +186,6 @@ static void bakeModifier(Main *UNUSED(bmain),
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
 
   ED_lineart_destroy_render_data(lmd);
-#else
-  UNUSED_VARS(depsgraph, md, ob);
-#endif
 }
 
 static bool isDisabled(GpencilModifierData *md, int UNUSED(userRenderParams))

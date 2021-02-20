@@ -57,8 +57,4 @@ set(LIB
   bf_editor_space_view3d
 )
 
-if(WITH_LINEART)
-  add_definitions(-DWITH_LINEART)
-endif()
-
 blender_add_lib(bf_editor_space_api "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

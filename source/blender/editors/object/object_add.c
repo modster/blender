@@ -1335,13 +1335,11 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
         ob_name = "Stroke";
         break;
       }
-#ifdef WITH_LINEART
       case GP_LRT_OBJECT:
       case GP_LRT_COLLECTION: {
         ob_name = "Line Art";
         break;
       }
-#endif
       default: {
         break;
       }
@@ -1382,7 +1380,6 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
       ED_gpencil_create_monkey(C, ob, mat);
       break;
     }
-#ifdef WITH_LINEART
     case GP_LRT_SCENE:
     case GP_LRT_COLLECTION:
     case GP_LRT_OBJECT: {
@@ -1423,7 +1420,6 @@ static int object_gpencil_add_exec(bContext *C, wmOperator *op)
       /* Stroke object is drawn in front of meshes by default. */
       ob->dtx |= OB_DRAW_IN_FRONT;
     }
-#endif
     case GP_EMPTY:
       /* do nothing */
       break;
@@ -1459,7 +1455,6 @@ static const EnumPropertyItem *object_gpencil_add_options(bContext *C,
   for (i = 0; i < orig_count; i++) {
     if (item_ref[i].value == GP_LRT_OBJECT || item_ref[i].value == GP_LRT_COLLECTION ||
         item_ref[i].value == GP_LRT_SCENE) {
-#ifdef WITH_LINEART
       if (item_ref[i].value == GP_LRT_SCENE) {
         /* separator before line art types */
         RNA_enum_item_add_separator(&item, &totitem);
@@ -1470,10 +1465,6 @@ static const EnumPropertyItem *object_gpencil_add_options(bContext *C,
           continue;
         }
       }
-#else
-      /* Don't show line art options when not compiled with one. */
-      continue;
-#endif
     }
     RNA_enum_item_add(&item, &totitem, &item_ref[i]);
   }

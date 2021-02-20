@@ -55,8 +55,4 @@ if(WITH_EXPERIMENTAL_FEATURES)
   add_definitions(-DWITH_HAIR_NODES)
 endif()
 
-if(WITH_LINEART)
-  add_definitions(-DWITH_LINEART)
-endif()
-
 blender_add_lib(bf_editor_space_buttons "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

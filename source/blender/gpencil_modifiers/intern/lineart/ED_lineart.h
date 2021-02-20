@@ -23,10 +23,6 @@
 
 #pragma once
 
-#ifndef WITH_LINEART
-#  error Lineart code included in non-Lineart-enabled build
-#endif
-
 #include "BLI_linklist.h"
 #include "BLI_listbase.h"
 #include "BLI_math.h"

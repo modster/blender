@@ -331,13 +331,6 @@ if(WITH_FREESTYLE)
   add_definitions(-DWITH_FREESTYLE)
 endif()
 
-if(WITH_LINEART)
-  add_definitions(-DWITH_LINEART)
-  list(APPEND INC
-  ../../gpencil_modifiers/intern/lineart
-  )
-endif()
-
 if(WITH_OPENSUBDIV)
   list(APPEND INC
     ../../../../intern/opensubdiv
@@ -449,12 +442,6 @@ set(LIB
   bf_editor_transform
   bf_editor_undo
 )
-
-if(WITH_LINEART)
-  list(APPEND LIB
-    bf_gpencil_lineart
-  )
-endif()
 
 add_definitions(${GL_DEFINITIONS})
 

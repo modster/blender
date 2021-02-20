@@ -71,6 +71,16 @@ set(SRC
   MOD_gpencil_modifiertypes.h
   intern/MOD_gpencil_ui_common.h
   intern/MOD_gpencil_util.h
+
+  # Lineart code
+  intern/lineart/lineart_ops.c
+  intern/lineart/lineart_cpu.c
+  intern/lineart/lineart_chain.c
+  intern/lineart/lineart_util.c
+
+  intern/lineart/lineart_intern.h
+  intern/lineart/ED_lineart.h
+
 )
 
 set(LIB
@@ -78,17 +88,6 @@ set(LIB
 
 if(WITH_INTERNATIONAL)
   add_definitions(-DWITH_INTERNATIONAL)
-endif()
-
-if(WITH_LINEART)
-  add_definitions(-DWITH_LINEART)
-  add_subdirectory(intern/lineart)
-  list(APPEND INC
-    intern/lineart
-  )
-  list(APPEND LIB
-    bf_gpencil_lineart
-  )
 endif()
 
 add_definitions(${GL_DEFINITIONS})

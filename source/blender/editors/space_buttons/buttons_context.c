@@ -600,11 +600,7 @@ static bool buttons_context_path(
       found = buttons_context_path_world(path);
       break;
     case BCONTEXT_COLLECTION: /* This is for Line Art collection flags */
-#ifdef WITH_LINEART
       found = buttons_context_path_collection(path, window);
-#else
-      BLI_assert(!"'WITH_LINEART' is off.");
-#endif
       break;
     case BCONTEXT_TOOL:
       found = true;

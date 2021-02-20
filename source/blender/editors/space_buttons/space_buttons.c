@@ -276,11 +276,7 @@ static const char *buttons_main_region_context_string(const short mainb)
     case BCONTEXT_WORLD:
       return "world";
     case BCONTEXT_COLLECTION:
-#ifdef WITH_LINEART
       return "collection";
-#else
-      BLI_assert(!"'WITH_LINEART' is off.");
-#endif
     case BCONTEXT_OBJECT:
       return "object";
     case BCONTEXT_DATA:

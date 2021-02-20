@@ -4016,7 +4016,7 @@ class VIEW3D_MT_edit_mesh_edges(Menu):
     def draw(self, _context):
         layout = self.layout
 
-        with_freestyle = bpy.app.build_options.freestyle or bpy.app.build_options.lineart
+        with_freestyle = bpy.app.build_options.freestyle
 
         layout.operator_context = 'INVOKE_REGION_WIN'
 

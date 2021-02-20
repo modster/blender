@@ -104,8 +104,7 @@ import bpy
 if bpy.app.build_options.freestyle:
     _modules.append("properties_freestyle")
 
-if bpy.app.build_options.lineart:
-    _modules.append("properties_lineart")
+_modules.append("properties_lineart")
 
 __import__(name=__name__, fromlist=_modules)
 _namespace = globals()
