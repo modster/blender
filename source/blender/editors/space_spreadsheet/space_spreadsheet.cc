@@ -30,18 +30,22 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "UI_interface.h"
+#include "UI_resources.h"
+#include "UI_view2d.h"
+
 #include "spreadsheet_intern.hh"
 
 static SpaceLink *spreadsheet_create(const ScrArea *UNUSED(area), const Scene *UNUSED(scene))
 {
-  SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)MEM_callocN(sizeof(SpaceSpreadsheet),
-                                                                   "spreadsheet space");
-  sspreadsheet->spacetype = SPACE_SPREADSHEET;
+  SpaceSpreadsheet *spreadsheet_space = (SpaceSpreadsheet *)MEM_callocN(sizeof(SpaceSpreadsheet),
+                                                                        "spreadsheet space");
+  spreadsheet_space->spacetype = SPACE_SPREADSHEET;
 
   {
     /* header */
     ARegion *region = (ARegion *)MEM_callocN(sizeof(ARegion), "spreadsheet header");
-    BLI_addtail(&sspreadsheet->regionbase, region);
+    BLI_addtail(&spreadsheet_space->regionbase, region);
     region->regiontype = RGN_TYPE_HEADER;
     region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
   }
@@ -49,11 +53,11 @@ static SpaceLink *spreadsheet_create(const ScrArea *UNUSED(area), const Scene *U
   {
     /* main window */
     ARegion *region = (ARegion *)MEM_callocN(sizeof(ARegion), "spreadsheet main region");
-    BLI_addtail(&sspreadsheet->regionbase, region);
+    BLI_addtail(&spreadsheet_space->regionbase, region);
     region->regiontype = RGN_TYPE_WINDOW;
   }
 
-  return (SpaceLink *)sspreadsheet;
+  return (SpaceLink *)spreadsheet_space;
 }
 
 static void spreadsheet_free(SpaceLink *UNUSED(sl))
@@ -77,8 +81,11 @@ static void spreadsheet_main_region_init(wmWindowManager *UNUSED(wm), ARegion *U
 {
 }
 
-static void spreadsheet_main_region_draw(const bContext *UNUSED(C), ARegion *UNUSED(region))
+static void spreadsheet_main_region_draw(const bContext *C, ARegion *UNUSED(region))
 {
+  SpaceSpreadsheet *spreadsheet_space = CTX_wm_space_spreadsheet(C);
+
+  UI_ThemeClearColor(TH_BACK);
 }
 
 static void spreadsheet_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
