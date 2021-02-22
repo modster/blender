@@ -145,6 +145,11 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
      "Properties",
      "Edit properties of active object and related data-blocks"},
     {SPACE_FILE, "FILE_BROWSER", ICON_FILEBROWSER, "File Browser", "Browse for files and assets"},
+    {SPACE_SPREADSHEET,
+     "SPREADSHEET",
+     ICON_NONE,
+     "Spreadsheet",
+     "Explore geometry data in a table"},
     {SPACE_USERPREF,
      "PREFERENCES",
      ICON_PREFERENCES,
@@ -577,6 +582,7 @@ static StructRNA *rna_Space_refine(struct PointerRNA *ptr)
     case SPACE_EMPTY:
     case SPACE_TOPBAR:
     case SPACE_STATUSBAR:
+    case SPACE_SPREADSHEET:
       break;
   }
 
