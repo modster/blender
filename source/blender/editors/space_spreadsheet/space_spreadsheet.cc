@@ -16,6 +16,7 @@
 
 #include <cstring>
 
+#include "BLI_index_range.hh"
 #include "BLI_listbase.h"
 #include "BLI_utildefines.h"
 
@@ -24,6 +25,8 @@
 #include "ED_screen.h"
 #include "ED_space_api.h"
 
+#include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
@@ -37,6 +40,8 @@
 #include "RNA_access.h"
 
 #include "spreadsheet_intern.hh"
+
+using blender::IndexRange;
 
 static SpaceLink *spreadsheet_create(const ScrArea *UNUSED(area), const Scene *UNUSED(scene))
 {
@@ -91,17 +96,26 @@ static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
 
   const uiStyle *style = UI_style_get_dpi();
   uiBlock *block = UI_block_begin(C, region, __func__, UI_EMBOSS);
+
   uiLayout *layout = UI_block_layout(
-      block, UI_LAYOUT_VERTICAL, UI_LAYOUT_HEADER, 100, 100, 200, 1, 0, style);
+      block, UI_LAYOUT_VERTICAL, UI_LAYOUT_HEADER, 100, region->winy, 200, 1, 0, style);
   UI_block_layout_set_current(block, layout);
 
   uiLayout *col = uiLayoutColumn(layout, false);
 
   Object *active_object = CTX_data_active_object(C);
-  if (active_object != nullptr) {
+  if (active_object != nullptr && active_object->type == OB_MESH) {
     PointerRNA ptr;
     RNA_pointer_create(&active_object->id, &RNA_Object, active_object, &ptr);
     uiItemR(col, &ptr, "location", 0, "", ICON_NONE);
+
+    Mesh *mesh = (Mesh *)active_object->data;
+    for (const int i : IndexRange(mesh->totvert)) {
+      char buffer[64];
+      const MVert &vert = mesh->mvert[i];
+      snprintf(buffer, sizeof(buffer), "%f, %f, %f", vert.co[0], vert.co[1], vert.co[2]);
+      uiItemL(col, buffer, ICON_NONE);
+    }
   }
 
   uiItemL(col, "Hello World", ICON_ADD);
