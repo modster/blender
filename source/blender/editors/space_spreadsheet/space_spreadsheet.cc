@@ -124,6 +124,7 @@ void ED_spacetype_spreadsheet(void)
   art->regionid = RGN_TYPE_HEADER;
   art->prefsizey = HEADERY;
   art->keymapflag = 0;
+  art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_VIEW2D | ED_KEYMAP_HEADER;
 
   art->init = spreadsheet_header_region_init;
   art->draw = spreadsheet_header_region_draw;

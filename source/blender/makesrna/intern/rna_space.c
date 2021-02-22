@@ -147,7 +147,7 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
     {SPACE_FILE, "FILE_BROWSER", ICON_FILEBROWSER, "File Browser", "Browse for files and assets"},
     {SPACE_SPREADSHEET,
      "SPREADSHEET",
-     ICON_NONE,
+     ICON_MOD_WIREFRAME, /* TODO: Use correct icon. */
      "Spreadsheet",
      "Explore geometry data in a table"},
     {SPACE_USERPREF,
