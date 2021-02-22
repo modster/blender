@@ -96,49 +96,33 @@ static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
 
   UI_ThemeClearColor(TH_BACK);
 
-  // const uiStyle *style = UI_style_get_dpi();
   uiBlock *block = UI_block_begin(C, region, __func__, UI_EMBOSS_NONE);
-
-  // uiLayout *layout = UI_block_layout(
-  //     block, UI_LAYOUT_VERTICAL, UI_LAYOUT_HEADER, 100, region->winy, 200, 1, 0, style);
-  // UI_block_layout_set_current(block, layout);
-
-  // uiLayout *col = uiLayoutColumn(layout, false);
 
   Object *active_object = CTX_data_active_object(C);
   if (active_object != nullptr && active_object->type == OB_MESH) {
-    // PointerRNA ptr;
-    // RNA_pointer_create(&active_object->id, &RNA_Object, active_object, &ptr);
-    // uiItemR(col, &ptr, "location", 0, "", ICON_NONE);
 
-    // Mesh *mesh = (Mesh *)active_object->data;
-    // for (const int i : IndexRange(mesh->totvert)) {
-    //   char buffer[64];
-    //   const MVert &vert = mesh->mvert[i];
-    //   snprintf(buffer, sizeof(buffer), "%f, %f, %f", vert.co[0], vert.co[1], vert.co[2]);
-    //   uiItemL(col, buffer, ICON_NONE);
-    // }
-    static float value = 42.5f;
-    uiBut *but = uiDefButF(block,
-                           UI_BTYPE_NUM,
-                           0,
-                           "Hey",
-                           0,
-                           300,
-                           150,
-                           UI_UNIT_Y,
-                           &value,
-                           0.0f,
-                           100.0f,
-                           0,
-                           0,
-                           "My tip");
-    UI_but_disable(but, "cannot edit");
+    Mesh *mesh = (Mesh *)active_object->data;
+    for (const int i : IndexRange(mesh->totvert)) {
+      const MVert &vert = mesh->mvert[i];
+      uiBut *but = uiDefButF(block,
+                             UI_BTYPE_NUM,
+                             0,
+                             "",
+                             0,
+                             i * UI_UNIT_Y,
+                             150,
+                             UI_UNIT_Y,
+                             (float *)vert.co,
+                             -100.0f,
+                             100.0f,
+                             0,
+                             0,
+                             "My tip");
+      UI_but_number_precision_set(but, 3);
+      UI_but_disable(but, "cannot edit");
+    }
   }
 
-  // uiItemL(col, "Hello World", ICON_ADD);
-
-  // UI_block_layout_resolve(block, nullptr, nullptr);
   UI_block_end(C, block);
   UI_block_draw(C, block);
 }
