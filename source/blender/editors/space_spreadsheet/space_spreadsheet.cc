@@ -39,6 +39,8 @@
 
 #include "RNA_access.h"
 
+#include "WM_types.h"
+
 #include "spreadsheet_intern.hh"
 
 using blender::IndexRange;
@@ -125,6 +127,12 @@ static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
   UI_block_draw(C, block);
 }
 
+static void spreadsheet_main_region_listener(const wmRegionListenerParams *params)
+{
+  /* TODO: Do more precise check. */
+  ED_region_tag_redraw(params->region);
+}
+
 static void spreadsheet_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
 {
   ED_region_header_init(region);
@@ -161,6 +169,7 @@ void ED_spacetype_spreadsheet(void)
 
   art->init = spreadsheet_main_region_init;
   art->draw = spreadsheet_main_region_draw;
+  art->listener = spreadsheet_main_region_listener;
   BLI_addhead(&st->regiontypes, art);
 
   /* regions: header */
