@@ -34,7 +34,26 @@
 
 static SpaceLink *spreadsheet_create(const ScrArea *UNUSED(area), const Scene *UNUSED(scene))
 {
-  return nullptr;
+  SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)MEM_callocN(sizeof(SpaceSpreadsheet),
+                                                                   "spreadsheet space");
+  sspreadsheet->spacetype = SPACE_SPREADSHEET;
+
+  {
+    /* header */
+    ARegion *region = (ARegion *)MEM_callocN(sizeof(ARegion), "spreadsheet header");
+    BLI_addtail(&sspreadsheet->regionbase, region);
+    region->regiontype = RGN_TYPE_HEADER;
+    region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
+  }
+
+  {
+    /* main window */
+    ARegion *region = (ARegion *)MEM_callocN(sizeof(ARegion), "spreadsheet main region");
+    BLI_addtail(&sspreadsheet->regionbase, region);
+    region->regiontype = RGN_TYPE_WINDOW;
+  }
+
+  return (SpaceLink *)sspreadsheet;
 }
 
 static void spreadsheet_free(SpaceLink *sl)
@@ -47,7 +66,7 @@ static void spreadsheet_init(wmWindowManager *UNUSED(wm), ScrArea *UNUSED(area))
 
 static SpaceLink *spreadsheet_duplicate(SpaceLink *sl)
 {
-  return nullptr;
+  return (SpaceLink *)MEM_dupallocN(sl);
 }
 
 static void spreadsheet_keymap(wmKeyConfig *keyconf)
