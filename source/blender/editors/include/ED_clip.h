@@ -123,6 +123,10 @@ void ED_clip_view_lock_state_store(const struct bContext *C, ClipViewLockState *
 void ED_clip_view_lock_state_restore_no_jump(const struct bContext *C,
                                              const ClipViewLockState *state);
 
+/* Reset runtime fields of all scopes of the given space.
+ * The scopes are tagged for an update in this call. */
+void ED_space_clip_scopes_reset_runtime(struct SpaceClip *space_clip);
+
 /* ** clip_ops.c ** */
 void ED_operatormacros_clip(void);
 

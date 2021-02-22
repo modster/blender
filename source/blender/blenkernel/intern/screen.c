@@ -59,6 +59,7 @@
 #include "BKE_idtype.h"
 #include "BKE_lib_id.h"
 #include "BKE_lib_query.h"
+#include "BKE_movieclip.h"
 #include "BKE_node.h"
 #include "BKE_screen.h"
 #include "BKE_workspace.h"
@@ -1685,11 +1686,11 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
       BLO_read_data_address(reader, &sfile->asset_params);
     }
     else if (sl->spacetype == SPACE_CLIP) {
-      SpaceClip *sclip = (SpaceClip *)sl;
+      SpaceClip *space_clip = (SpaceClip *)sl;
 
-      sclip->scopes.track_search = NULL;
-      sclip->scopes.track_preview = NULL;
-      sclip->scopes.ok = 0;
+      BKE_movieclip_scopes_reset_runtime(&space_clip->scopes);
+      BKE_movieclip_scopes_reset_runtime(&space_clip->scopes_prev);
+      BKE_movieclip_scopes_reset_runtime(&space_clip->scopes_next);
     }
   }
 

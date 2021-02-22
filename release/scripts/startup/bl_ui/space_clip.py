@@ -729,7 +729,17 @@ class CLIP_PT_track(CLIP_PT_tracking_panel, Panel):
         icon = 'LOCKED' if act_track.lock else 'UNLOCKED'
         sub.prop(act_track, "lock", text="", icon=icon)
 
-        layout.template_track(sc, "scopes")
+        col = layout.column()
+        col.label(text="Previous Keyframe")
+        col.template_track(sc, "scopes_prev")
+
+        col = layout.column()
+        col.label(text="Current Marker")
+        col.template_track(sc, "scopes")
+
+        col = layout.column()
+        col.label(text="Next Marker")
+        col.template_track(sc, "scopes_next")
 
         row = layout.row(align=True)
         sub = row.row(align=True)

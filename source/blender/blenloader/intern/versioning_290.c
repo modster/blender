@@ -59,6 +59,7 @@
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
 #include "BKE_mesh.h"
+#include "BKE_movieclip.h"
 #include "BKE_multires.h"
 #include "BKE_node.h"
 
@@ -1763,5 +1764,19 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
    */
   {
     /* Keep this block, even when empty. */
+
+    if (!DNA_struct_elem_find(fd->filesdna, "SpaceClip", "MovieClipScopes", "scopes_current")) {
+      LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+        LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+          LISTBASE_FOREACH (SpaceLink *, space, &area->spacedata) {
+            if (space->spacetype == SPACE_CLIP) {
+              SpaceClip *space_clip = (SpaceClip *)space;
+              BKE_movieclip_scopes_init_defaults(&space_clip->scopes_prev);
+              BKE_movieclip_scopes_init_defaults(&space_clip->scopes_next);
+            }
+          }
+        }
+      }
+    }
   }
 }

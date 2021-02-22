@@ -71,9 +71,35 @@ void BKE_movieclip_get_aspect(struct MovieClip *clip, float *aspx, float *aspy);
 bool BKE_movieclip_has_frame(struct MovieClip *clip, struct MovieClipUser *user);
 void BKE_movieclip_user_set_frame(struct MovieClipUser *user, int framenr);
 
-void BKE_movieclip_update_scopes(struct MovieClip *clip,
+/* -------------------------------------------------------------------- */
+/** \name Scopes
+ * \{ */
+
+typedef enum eScopesMarkerReference {
+  /* User marker which is a reference for the current frame from the "left" side. */
+  MOVIE_CLIP_SCOPES_REFERENCE_PREVIOUS,
+
+  /* Use marker from the current clip position. */
+  MOVIE_CLIP_SCOPES_REFERENCE_CURRENT,
+
+  /* User marker which is a reference for the current frame from the "right" side. */
+  MOVIE_CLIP_SCOPES_REFERENCE_NEXT,
+} eScopesMarkerReference;
+
+void BKE_movieclip_scopes_update(struct MovieClip *clip,
                                  struct MovieClipUser *user,
-                                 struct MovieClipScopes *scopes);
+                                 struct MovieClipScopes *scopes,
+                                 const eScopesMarkerReference reference);
+
+/* Initialize scopes settings to their desired defaults for a new space clip.
+ *
+ * NOTE: Overrides existing settings in the scopes. */
+void BKE_movieclip_scopes_init_defaults(struct MovieClipScopes *scopes);
+
+/* Reset any runtime fields (such as pointers) and tag the scopes for a update. */
+void BKE_movieclip_scopes_reset_runtime(struct MovieClipScopes *scopes);
+
+/** \} */
 
 void BKE_movieclip_get_cache_segments(struct MovieClip *clip,
                                       struct MovieClipUser *user,

@@ -324,7 +324,7 @@ void ED_clip_update_frame(const Main *mainp, int cfra)
         if (area->spacetype == SPACE_CLIP) {
           SpaceClip *sc = area->spacedata.first;
 
-          sc->scopes.ok = false;
+          clip_scopes_tag_update(sc);
 
           BKE_movieclip_user_set_frame(&sc->user, cfra);
         }
@@ -1138,6 +1138,19 @@ void ED_clip_view_lock_state_restore_no_jump(const bContext *C, const ClipViewLo
 
   space_clip->xlockof = state->offset_x + state->lock_offset_x - offset_x;
   space_clip->ylockof = state->offset_y + state->lock_offset_y - offset_y;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Scopes
+ * \{ */
+
+void ED_space_clip_scopes_reset_runtime(SpaceClip *space_clip)
+{
+  BKE_movieclip_scopes_reset_runtime(&space_clip->scopes);
+  BKE_movieclip_scopes_reset_runtime(&space_clip->scopes_prev);
+  BKE_movieclip_scopes_reset_runtime(&space_clip->scopes_next);
 }
 
 /** \} */

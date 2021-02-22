@@ -182,6 +182,24 @@ bool clip_view_has_locked_selection(const struct bContext *C);
 
 void clip_draw_sfra_efra(struct View2D *v2d, struct Scene *scene);
 
+/* -------------------------------------------------------------------- */
+/** \name Scopes
+ * \{ */
+
+/* Initialize scopes settings to their desired defaults for a new space clip.  */
+void clip_scopes_init_defaults(struct SpaceClip *space_clip);
+
+/* Tag all scopes of the given space for update. */
+void clip_scopes_tag_update(struct SpaceClip *space_clip);
+
+/* Reset all runtime pointers of scopes. Used from space duplication code. */
+void clip_scopes_reset_after_copy(struct SpaceClip *space_clip);
+
+/* Update all scopes from space clip's drawing routine. */
+void clip_scopes_update_on_draw(struct SpaceClip *space_clip);
+
+/** \} */
+
 /* tracking_ops.c */
 struct MovieTrackingTrack *tracking_marker_check_slide(
     struct bContext *C, const struct wmEvent *event, int *r_area, int *r_action, int *r_corner);

@@ -1709,7 +1709,82 @@ void BKE_movieclip_reload(Main *bmain, MovieClip *clip)
   }
 }
 
-void BKE_movieclip_update_scopes(MovieClip *clip, MovieClipUser *user, MovieClipScopes *scopes)
+/* Get marker which acts as a keyframe for the current one and has lower frame than the given
+ * one.
+ *
+ * If there is no such keyframed marker `NULL` is returned.
+ *
+ * TODO(sergey): Move to BKE so that proportional editing patch can use this function as well. */
+static MovieTrackingMarker *marker_previous_keyframe_get(MovieTrackingTrack *track,
+                                                         MovieTrackingMarker *marker)
+{
+  /* Start with the previous marker, so that if the current marker is a keyframe by itself it is
+   * not used as a result. */
+  MovieTrackingMarker *marker_it = marker - 1;
+
+  while (marker_it >= track->markers) {
+    if (marker_it->flag & MARKER_DISABLED) {
+      return NULL;
+    }
+    if ((marker_it->flag & MARKER_TRACKED) == 0) {
+      return marker_it;
+    }
+    --marker_it;
+  }
+
+  return NULL;
+}
+
+static MovieTrackingMarker *marker_next_keyframe_get(MovieTrackingTrack *track,
+                                                     MovieTrackingMarker *marker)
+{
+  /* Start with the next marker, so that if the current marker is a keyframe by itself it is
+   * not used as a result. */
+  MovieTrackingMarker *marker_it = marker + 1;
+
+  const MovieTrackingMarker *marker_end = track->markers + track->markersnr;
+
+  while (marker_it < marker_end) {
+    if (marker_it->flag & MARKER_DISABLED) {
+      return NULL;
+    }
+    if ((marker_it->flag & MARKER_TRACKED) == 0) {
+      return marker_it;
+    }
+    ++marker_it;
+  }
+
+  return NULL;
+}
+
+static MovieTrackingMarker *reference_marker_for_scopes_get(MovieClip *clip,
+                                                            MovieClipUser *user,
+                                                            MovieTrackingTrack *track,
+                                                            const eScopesMarkerReference reference)
+{
+  const int clip_framenr = BKE_movieclip_remap_scene_to_clip_frame(clip, user->framenr);
+  MovieTrackingMarker *current_marker = BKE_tracking_marker_get(track, clip_framenr);
+
+  switch (reference) {
+    case MOVIE_CLIP_SCOPES_REFERENCE_PREVIOUS:
+      return marker_previous_keyframe_get(track, current_marker);
+
+    case MOVIE_CLIP_SCOPES_REFERENCE_CURRENT:
+      return current_marker;
+
+    case MOVIE_CLIP_SCOPES_REFERENCE_NEXT:
+      return marker_next_keyframe_get(track, current_marker);
+  }
+
+  BLI_assert(!"Unhandled marker reference, should never happen.");
+
+  return NULL;
+}
+
+void BKE_movieclip_scopes_update(MovieClip *clip,
+                                 MovieClipUser *user,
+                                 MovieClipScopes *scopes,
+                                 const eScopesMarkerReference reference)
 {
   if (scopes->ok) {
     return;
@@ -1741,8 +1816,10 @@ void BKE_movieclip_update_scopes(MovieClip *clip, MovieClipUser *user, MovieClip
     return;
   }
 
-  const int framenr = BKE_movieclip_remap_scene_to_clip_frame(clip, user->framenr);
-  MovieTrackingMarker *marker = BKE_tracking_marker_get(track, framenr);
+  MovieTrackingMarker *marker = reference_marker_for_scopes_get(clip, user, track, reference);
+  if (marker == NULL) {
+    return;
+  }
 
   scopes->marker = marker;
   scopes->track = track;
@@ -1751,7 +1828,10 @@ void BKE_movieclip_update_scopes(MovieClip *clip, MovieClipUser *user, MovieClip
     scopes->track_disabled = true;
   }
   else {
-    ImBuf *ibuf = BKE_movieclip_get_ibuf(clip, user);
+    MovieClipUser marker_user = *user;
+    marker_user.framenr = BKE_movieclip_remap_clip_to_scene_frame(clip, marker->framenr);
+
+    ImBuf *ibuf = BKE_movieclip_get_ibuf(clip, &marker_user);
 
     scopes->track_disabled = false;
 
@@ -1801,6 +1881,27 @@ void BKE_movieclip_update_scopes(MovieClip *clip, MovieClipUser *user, MovieClip
     scopes->slide_scale[0] = pat_max[0] - pat_min[0];
     scopes->slide_scale[1] = pat_max[1] - pat_min[1];
   }
+
+  /* Disallow modifying marker of the references: they are not easily visible
+   * within their context so their modification is kind of not possible in an
+   * accurate manner.
+   * If really needed or requested by artists. this can be supported, but then
+   * the event handling code would need to be updated accordingly. */
+  if (reference != MOVIE_CLIP_SCOPES_REFERENCE_CURRENT) {
+    scopes->track_locked = true;
+  }
+}
+
+void BKE_movieclip_scopes_init_defaults(MovieClipScopes *scopes)
+{
+  scopes->track_preview_height = 120;
+}
+
+void BKE_movieclip_scopes_reset_runtime(MovieClipScopes *scopes)
+{
+  scopes->track_search = NULL;
+  scopes->track_preview = NULL;
+  scopes->ok = false;
 }
 
 static void movieclip_build_proxy_ibuf(

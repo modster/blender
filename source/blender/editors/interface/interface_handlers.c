@@ -7475,45 +7475,60 @@ static int ui_do_but_WAVEFORM(
   return WM_UI_HANDLER_CONTINUE;
 }
 
+static bool ui_numedit_but_TRACKPREVIEW_is_allowed(uiBut *but)
+{
+  const MovieClipScopes *scopes = (MovieClipScopes *)but->poin;
+
+  if (scopes->track_locked) {
+    return false;
+  }
+
+  return true;
+}
+
 static bool ui_numedit_but_TRACKPREVIEW(
     bContext *C, uiBut *but, uiHandleButtonData *data, int mx, int my, const bool shift)
 {
   MovieClipScopes *scopes = (MovieClipScopes *)but->poin;
-  const bool changed = true;
+
+  if (scopes->track_locked) {
+    return false;
+  }
 
   float dx = mx - data->draglastx;
   float dy = my - data->draglasty;
-
   if (shift) {
     dx /= 5.0f;
     dy /= 5.0f;
   }
 
-  if (!scopes->track_locked) {
-    const MovieClip *clip = CTX_data_edit_movieclip(C);
-    const int clip_framenr = BKE_movieclip_remap_scene_to_clip_frame(clip, scopes->scene_framenr);
-    if (scopes->marker->framenr != clip_framenr) {
-      scopes->marker = BKE_tracking_marker_ensure(scopes->track, clip_framenr);
-    }
-
-    scopes->marker->flag &= ~(MARKER_DISABLED | MARKER_TRACKED);
-    scopes->marker->pos[0] += -dx * scopes->slide_scale[0] / BLI_rctf_size_x(&but->block->rect);
-    scopes->marker->pos[1] += -dy * scopes->slide_scale[1] / BLI_rctf_size_y(&but->block->rect);
-
-    WM_event_add_notifier(C, NC_MOVIECLIP | NA_EDITED, NULL);
+  const MovieClip *clip = CTX_data_edit_movieclip(C);
+  const int clip_framenr = BKE_movieclip_remap_scene_to_clip_frame(clip, scopes->scene_framenr);
+  if (scopes->marker->framenr != clip_framenr) {
+    scopes->marker = BKE_tracking_marker_ensure(scopes->track, clip_framenr);
   }
+
+  scopes->marker->flag &= ~(MARKER_DISABLED | MARKER_TRACKED);
+  scopes->marker->pos[0] += -dx * scopes->slide_scale[0] / BLI_rctf_size_x(&but->block->rect);
+  scopes->marker->pos[1] += -dy * scopes->slide_scale[1] / BLI_rctf_size_y(&but->block->rect);
+
+  WM_event_add_notifier(C, NC_MOVIECLIP | NA_EDITED, NULL);
 
   scopes->ok = 0;
 
   data->draglastx = mx;
   data->draglasty = my;
 
-  return changed;
+  return true;
 }
 
 static int ui_do_but_TRACKPREVIEW(
     bContext *C, uiBlock *block, uiBut *but, uiHandleButtonData *data, const wmEvent *event)
 {
+  if (!ui_numedit_but_TRACKPREVIEW_is_allowed(but)) {
+    return WM_UI_HANDLER_CONTINUE;
+  }
+
   int mx = event->x;
   int my = event->y;
   ui_window_to_block(data->region, block, &mx, &my);

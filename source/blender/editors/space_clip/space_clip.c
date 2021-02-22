@@ -214,7 +214,7 @@ static void clip_scopes_tag_refresh(ScrArea *area)
     }
   }
 
-  sc->scopes.ok = false;
+  clip_scopes_tag_update(sc);
 }
 
 static void clip_scopes_check_gpencil_change(ScrArea *area)
@@ -245,7 +245,7 @@ static SpaceLink *clip_create(const ScrArea *area, const Scene *scene)
              SC_SHOW_GRAPH_FRAMES | SC_SHOW_ANNOTATION;
   sc->zoom = 1.0f;
   sc->path_length = 20;
-  sc->scopes.track_preview_height = 120;
+  clip_scopes_init_defaults(sc);
   sc->around = V3D_AROUND_CENTER_MEDIAN;
 
   /* header */
@@ -295,19 +295,22 @@ static SpaceLink *clip_create(const ScrArea *area, const Scene *scene)
 }
 
 /* not spacelink itself */
+
+static void clip_free_scopes(MovieClipScopes *scopes)
+{
+  IMB_freeImBuf(scopes->track_preview);
+  IMB_freeImBuf(scopes->track_search);
+}
+
 static void clip_free(SpaceLink *sl)
 {
   SpaceClip *sc = (SpaceClip *)sl;
 
   sc->clip = NULL;
 
-  if (sc->scopes.track_preview) {
-    IMB_freeImBuf(sc->scopes.track_preview);
-  }
-
-  if (sc->scopes.track_search) {
-    IMB_freeImBuf(sc->scopes.track_search);
-  }
+  clip_free_scopes(&sc->scopes);
+  clip_free_scopes(&sc->scopes_prev);
+  clip_free_scopes(&sc->scopes_next);
 }
 
 /* spacetype; init callback */
@@ -323,10 +326,7 @@ static SpaceLink *clip_duplicate(SpaceLink *sl)
 {
   SpaceClip *scn = MEM_dupallocN(sl);
 
-  /* clear or remove stuff from old */
-  scn->scopes.track_search = NULL;
-  scn->scopes.track_preview = NULL;
-  scn->scopes.ok = false;
+  clip_scopes_reset_after_copy(scn);
 
   return (SpaceLink *)scn;
 }
@@ -1290,9 +1290,9 @@ static void clip_properties_region_init(wmWindowManager *wm, ARegion *region)
 
 static void clip_properties_region_draw(const bContext *C, ARegion *region)
 {
-  SpaceClip *sc = CTX_wm_space_clip(C);
+  SpaceClip *space_clip = CTX_wm_space_clip(C);
 
-  BKE_movieclip_update_scopes(sc->clip, &sc->user, &sc->scopes);
+  clip_scopes_update_on_draw(space_clip);
 
   ED_region_panels(C, region);
 }

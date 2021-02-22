@@ -2401,7 +2401,7 @@ static void rna_SpaceClipEditor_clip_mode_update(Main *UNUSED(bmain),
     ED_area_tag_refresh(area);
   }
 
-  sc->scopes.ok = 0;
+  ED_space_clip_scopes_reset_runtime(sc);
 }
 
 static void rna_SpaceClipEditor_lock_selection_update(Main *UNUSED(bmain),
@@ -7040,7 +7040,24 @@ static void rna_def_space_clip(BlenderRNA *brna)
   prop = RNA_def_property(srna, "scopes", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_sdna(prop, NULL, "scopes");
   RNA_def_property_struct_type(prop, "MovieClipScopes");
-  RNA_def_property_ui_text(prop, "Scopes", "Scopes to visualize movie clip statistics");
+  RNA_def_property_ui_text(
+      prop, "Scopes", "Scopes to visualize movie clip statistics for the current marker");
+
+  prop = RNA_def_property(srna, "scopes_prev", PROP_POINTER, PROP_NONE);
+  RNA_def_property_pointer_sdna(prop, NULL, "scopes_prev");
+  RNA_def_property_struct_type(prop, "MovieClipScopes");
+  RNA_def_property_ui_text(
+      prop,
+      "Scopes Previous",
+      "Scopes to visualize movie clip statistics for the previous reference marker");
+
+  prop = RNA_def_property(srna, "scopes_next", PROP_POINTER, PROP_NONE);
+  RNA_def_property_pointer_sdna(prop, NULL, "scopes_next");
+  RNA_def_property_struct_type(prop, "MovieClipScopes");
+  RNA_def_property_ui_text(
+      prop,
+      "Scopes Next",
+      "Scopes to visualize movie clip statistics for the next reference marker");
 
   /* show names */
   prop = RNA_def_property(srna, "show_names", PROP_BOOLEAN, PROP_NONE);

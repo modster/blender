@@ -655,3 +655,45 @@ void clip_draw_sfra_efra(View2D *v2d, Scene *scene)
 
   immUnbindProgram();
 }
+
+/* -------------------------------------------------------------------- */
+/** \name Scopes
+ * \{ */
+
+void clip_scopes_init_defaults(SpaceClip *space_clip)
+{
+  BKE_movieclip_scopes_init_defaults(&space_clip->scopes);
+  BKE_movieclip_scopes_init_defaults(&space_clip->scopes_prev);
+  BKE_movieclip_scopes_init_defaults(&space_clip->scopes_next);
+}
+
+void clip_scopes_tag_update(SpaceClip *space_clip)
+{
+  space_clip->scopes.ok = false;
+  space_clip->scopes_prev.ok = false;
+  space_clip->scopes_next.ok = false;
+}
+
+void clip_scopes_reset_after_copy(SpaceClip *space_clip)
+{
+  BKE_movieclip_scopes_reset_runtime(&space_clip->scopes);
+  BKE_movieclip_scopes_reset_runtime(&space_clip->scopes_prev);
+  BKE_movieclip_scopes_reset_runtime(&space_clip->scopes_next);
+}
+
+void clip_scopes_update_on_draw(SpaceClip *space_clip)
+{
+  MovieClip *clip = space_clip->clip;
+  MovieClipUser *user = &space_clip->user;
+
+  BKE_movieclip_scopes_update(
+      clip, user, &space_clip->scopes, MOVIE_CLIP_SCOPES_REFERENCE_CURRENT);
+
+  BKE_movieclip_scopes_update(
+      clip, user, &space_clip->scopes_prev, MOVIE_CLIP_SCOPES_REFERENCE_PREVIOUS);
+
+  BKE_movieclip_scopes_update(
+      clip, user, &space_clip->scopes_next, MOVIE_CLIP_SCOPES_REFERENCE_NEXT);
+}
+
+/** \} */

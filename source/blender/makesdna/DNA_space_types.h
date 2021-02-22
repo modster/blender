@@ -1713,7 +1713,9 @@ typedef struct SpaceClip {
   /** Clip data. */
   struct MovieClip *clip;
   /** Different scoped displayed in space panels. */
-  struct MovieClipScopes scopes;
+  struct MovieClipScopes scopes; /* Scopes at the current frame */
+  struct MovieClipScopes scopes_prev;
+  struct MovieClipScopes scopes_next;
 
   /** Flags. */
   int flag;

@@ -88,6 +88,7 @@
 #include "BKE_main_idmap.h"
 #include "BKE_material.h"
 #include "BKE_modifier.h"
+#include "BKE_movieclip.h"
 #include "BKE_node.h" /* for tree type defines */
 #include "BKE_object.h"
 #include "BKE_packedFile.h"
@@ -2981,7 +2982,9 @@ static void lib_link_workspace_layout_restore(struct IDNameLib_Map *id_map,
           sclip->mask_info.mask = restore_pointer_by_name(
               id_map, (ID *)sclip->mask_info.mask, USER_REAL);
 
-          sclip->scopes.ok = 0;
+          BKE_movieclip_scopes_reset_runtime(&sclip->scopes);
+          BKE_movieclip_scopes_reset_runtime(&sclip->scopes_next);
+          BKE_movieclip_scopes_reset_runtime(&sclip->scopes_prev);
         }
       }
     }
