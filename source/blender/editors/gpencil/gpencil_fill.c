@@ -621,8 +621,8 @@ static bool gpencil_render_offscreen(tGPDfill *tgpf)
   }
 
   /* set temporary new size */
-  tgpf->bwinx = tgpf->region->sizex;
-  tgpf->bwiny = tgpf->region->sizey;
+  tgpf->bwinx = tgpf->region->winx;
+  tgpf->bwiny = tgpf->region->winy;
   tgpf->brect = tgpf->region->winrct;
 
   /* resize region */
@@ -723,7 +723,7 @@ static bool gpencil_render_offscreen(tGPDfill *tgpf)
     GPU_offscreen_read_pixels(offscreen, GPU_DATA_FLOAT, ibuf->rect_float);
   }
   else if (ibuf->rect) {
-    GPU_offscreen_read_pixels(offscreen, GPU_DATA_UNSIGNED_BYTE, ibuf->rect);
+    GPU_offscreen_read_pixels(offscreen, GPU_DATA_UBYTE, ibuf->rect);
   }
   if (ibuf->rect_float && ibuf->rect) {
     IMB_rect_from_float(ibuf);

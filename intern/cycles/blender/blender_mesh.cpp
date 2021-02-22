@@ -350,7 +350,7 @@ static void fill_generic_attribute(BL::Mesh &b_mesh,
 static void attr_create_generic(Scene *scene, Mesh *mesh, BL::Mesh &b_mesh, bool subdivision)
 {
   if (subdivision) {
-    /* TODO: Handle subdivison correctly. */
+    /* TODO: Handle subdivision correctly. */
     return;
   }
   AttributeSet &attributes = mesh->attributes;
@@ -427,6 +427,16 @@ static void attr_create_generic(Scene *scene, Mesh *mesh, BL::Mesh &b_mesh, bool
         fill_generic_attribute(b_mesh, data, element, [&](int i) {
           BL::Array<float, 4> v = b_color_attribute.data[i].color();
           return make_float4(v[0], v[1], v[2], v[3]);
+        });
+        break;
+      }
+      case BL::Attribute::data_type_FLOAT2: {
+        BL::Float2Attribute b_float2_attribute{b_attribute};
+        Attribute *attr = attributes.add(name, TypeFloat2, element);
+        float2 *data = attr->data_float2();
+        fill_generic_attribute(b_mesh, data, element, [&](int i) {
+          BL::Array<float, 2> v = b_float2_attribute.data[i].vector();
+          return make_float2(v[0], v[1]);
         });
         break;
       }
@@ -716,7 +726,7 @@ static void attr_create_pointiness(Scene *scene, Mesh *mesh, BL::Mesh &b_mesh, b
   /* STEP 2: Calculate vertex normals taking into account their possible
    *         duplicates which gets "welded" together.
    */
-  vector<float3> vert_normal(num_verts, make_float3(0.0f, 0.0f, 0.0f));
+  vector<float3> vert_normal(num_verts, zero_float3());
   /* First we accumulate all vertex normals in the original index. */
   for (int vert_index = 0; vert_index < num_verts; ++vert_index) {
     const float3 normal = get_float3(b_mesh.vertices[vert_index].normal());
@@ -733,7 +743,7 @@ static void attr_create_pointiness(Scene *scene, Mesh *mesh, BL::Mesh &b_mesh, b
   /* STEP 3: Calculate pointiness using single ring neighborhood. */
   vector<int> counter(num_verts, 0);
   vector<float> raw_data(num_verts, 0.0f);
-  vector<float3> edge_accum(num_verts, make_float3(0.0f, 0.0f, 0.0f));
+  vector<float3> edge_accum(num_verts, zero_float3());
   BL::Mesh::edges_iterator e;
   EdgeMap visited_edges;
   int edge_index = 0;
