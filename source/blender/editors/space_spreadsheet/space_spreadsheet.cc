@@ -34,6 +34,8 @@
 #include "UI_resources.h"
 #include "UI_view2d.h"
 
+#include "RNA_access.h"
+
 #include "spreadsheet_intern.hh"
 
 static SpaceLink *spreadsheet_create(const ScrArea *UNUSED(area), const Scene *UNUSED(scene))
@@ -81,11 +83,32 @@ static void spreadsheet_main_region_init(wmWindowManager *UNUSED(wm), ARegion *U
 {
 }
 
-static void spreadsheet_main_region_draw(const bContext *C, ARegion *UNUSED(region))
+static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
 {
-  SpaceSpreadsheet *spreadsheet_space = CTX_wm_space_spreadsheet(C);
+  // SpaceSpreadsheet *spreadsheet_space = CTX_wm_space_spreadsheet(C);
 
   UI_ThemeClearColor(TH_BACK);
+
+  const uiStyle *style = UI_style_get_dpi();
+  uiBlock *block = UI_block_begin(C, region, __func__, UI_EMBOSS);
+  uiLayout *layout = UI_block_layout(
+      block, UI_LAYOUT_VERTICAL, UI_LAYOUT_HEADER, 100, 100, 200, 1, 0, style);
+  UI_block_layout_set_current(block, layout);
+
+  uiLayout *col = uiLayoutColumn(layout, false);
+
+  Object *active_object = CTX_data_active_object(C);
+  if (active_object != nullptr) {
+    PointerRNA ptr;
+    RNA_pointer_create(&active_object->id, &RNA_Object, active_object, &ptr);
+    uiItemR(col, &ptr, "location", 0, "", ICON_NONE);
+  }
+
+  uiItemL(col, "Hello World", ICON_ADD);
+
+  UI_block_layout_resolve(block, nullptr, nullptr);
+  UI_block_end(C, block);
+  UI_block_draw(C, block);
 }
 
 static void spreadsheet_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
@@ -120,7 +143,7 @@ void ED_spacetype_spreadsheet(void)
   /* regions: main window */
   art = (ARegionType *)MEM_callocN(sizeof(ARegionType), "spacetype spreadsheet region");
   art->regionid = RGN_TYPE_WINDOW;
-  art->keymapflag = 0;
+  art->keymapflag = ED_KEYMAP_UI;
 
   art->init = spreadsheet_main_region_init;
   art->draw = spreadsheet_main_region_draw;
