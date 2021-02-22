@@ -56,7 +56,7 @@ static SpaceLink *spreadsheet_create(const ScrArea *UNUSED(area), const Scene *U
   return (SpaceLink *)sspreadsheet;
 }
 
-static void spreadsheet_free(SpaceLink *sl)
+static void spreadsheet_free(SpaceLink *UNUSED(sl))
 {
 }
 
@@ -69,15 +69,15 @@ static SpaceLink *spreadsheet_duplicate(SpaceLink *sl)
   return (SpaceLink *)MEM_dupallocN(sl);
 }
 
-static void spreadsheet_keymap(wmKeyConfig *keyconf)
+static void spreadsheet_keymap(wmKeyConfig *UNUSED(keyconf))
 {
 }
 
-static void spreadsheet_main_region_init(wmWindowManager *wm, ARegion *region)
+static void spreadsheet_main_region_init(wmWindowManager *UNUSED(wm), ARegion *UNUSED(region))
 {
 }
 
-static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
+static void spreadsheet_main_region_draw(const bContext *UNUSED(C), ARegion *UNUSED(region))
 {
 }
 
