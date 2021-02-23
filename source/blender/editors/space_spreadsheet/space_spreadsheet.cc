@@ -18,6 +18,7 @@
 
 #include "BLI_index_range.hh"
 #include "BLI_listbase.h"
+#include "BLI_rect.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_screen.h"
@@ -86,15 +87,28 @@ static void spreadsheet_keymap(wmKeyConfig *UNUSED(keyconf))
 {
 }
 
-static void spreadsheet_main_region_init(wmWindowManager *UNUSED(wm), ARegion *UNUSED(region))
+static void spreadsheet_main_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
 {
+  region->v2d.scroll = V2D_SCROLL_RIGHT | V2D_SCROLL_BOTTOM | V2D_SCROLL_HORIZONTAL_HIDE |
+                       V2D_SCROLL_VERTICAL_HIDE;
+  region->v2d.align = V2D_ALIGN_NO_NEG_X | V2D_ALIGN_NO_POS_Y;
+  region->v2d.keepzoom = V2D_LOCKZOOM_X | V2D_LOCKZOOM_Y | V2D_LIMITZOOM | V2D_KEEPASPECT;
+  region->v2d.keeptot = V2D_KEEPTOT_STRICT;
+  region->v2d.minzoom = region->v2d.maxzoom = 1.0f;
+
+  UI_view2d_region_reinit(&region->v2d, V2D_COMMONVIEW_LIST, region->winx, region->winy);
 }
 
 static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
 {
-  // SpaceSpreadsheet *spreadsheet_space = CTX_wm_space_spreadsheet(C);
-
   UI_ThemeClearColor(TH_BACK);
+
+  View2D *v2d = &region->v2d;
+  v2d->flag |= V2D_PIXELOFS_X | V2D_PIXELOFS_Y;
+  UI_view2d_view_ortho(v2d);
+
+  /* TODO: Properly compute width and height. */
+  UI_view2d_totRect_set(v2d, 5000, 5000);
 
   uiBlock *block = UI_block_begin(C, region, __func__, UI_EMBOSS_NONE);
 
@@ -109,7 +123,7 @@ static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
                              0,
                              "",
                              0,
-                             i * UI_UNIT_Y,
+                             -i * UI_UNIT_Y,
                              150,
                              UI_UNIT_Y,
                              (float *)vert.co,
@@ -165,7 +179,7 @@ void ED_spacetype_spreadsheet(void)
   /* regions: main window */
   art = (ARegionType *)MEM_callocN(sizeof(ARegionType), "spacetype spreadsheet region");
   art->regionid = RGN_TYPE_WINDOW;
-  art->keymapflag = ED_KEYMAP_UI;
+  art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_VIEW2D;
 
   art->init = spreadsheet_main_region_init;
   art->draw = spreadsheet_main_region_draw;
