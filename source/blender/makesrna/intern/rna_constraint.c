@@ -856,7 +856,7 @@ static void rna_def_constraint_headtail_common(StructRNA *srna)
 
   prop = RNA_def_property(srna, "head_tail", PROP_FLOAT, PROP_FACTOR);
   RNA_def_property_float_sdna(prop, "bConstraint", "headtail");
-  RNA_def_property_ui_text(prop, "Head/Tail", "Target along length of bone: Head=0, Tail=1");
+  RNA_def_property_ui_text(prop, "Head/Tail", "Target along length of bone: Head is 0, Tail is 1");
   RNA_def_property_update(prop, NC_OBJECT | ND_CONSTRAINT, "rna_Constraint_update");
 
   prop = RNA_def_property(srna, "use_bbone_shape", PROP_BOOLEAN, PROP_NONE);
@@ -1051,7 +1051,7 @@ static void rna_def_constraint_python(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "target_count", PROP_INT, PROP_NONE);
   RNA_def_property_int_sdna(prop, NULL, "tarnum");
-  RNA_def_property_ui_text(prop, "Number of Targets", "Usually only 1-3 are needed");
+  RNA_def_property_ui_text(prop, "Number of Targets", "Usually only 1 to 3 are needed");
   RNA_def_property_update(prop, NC_OBJECT | ND_CONSTRAINT, "rna_Constraint_dependency_update");
 
   prop = RNA_def_property(srna, "text", PROP_POINTER, PROP_NONE);
@@ -3032,7 +3032,7 @@ static void rna_def_constraint_spline_ik(BlenderRNA *brna)
       prop, "Use Original Scale", "Apply volume preservation over the original scaling");
   RNA_def_property_update(prop, NC_OBJECT | ND_CONSTRAINT, "rna_Constraint_update");
 
-  /* volume presevation for "volumetric" scale mode */
+  /* Volume preservation for "volumetric" scale mode. */
   prop = RNA_def_property(srna, "bulge", PROP_FLOAT, PROP_NONE);
   RNA_def_property_range(prop, 0.0, 100.0f);
   RNA_def_property_ui_text(

@@ -20,18 +20,32 @@
 
 #include "BKE_attribute_access.hh"
 #include "BKE_geometry_set.hh"
+#include "BKE_geometry_set_instances.hh"
+#include "BKE_node_ui_storage.hh"
 #include "BKE_persistent_data_handle.hh"
 
 #include "DNA_node_types.h"
 
+#include "NOD_derived_node_tree.hh"
+
+struct Depsgraph;
+struct ModifierData;
+
 namespace blender::nodes {
 
+using bke::BooleanReadAttribute;
+using bke::BooleanWriteAttribute;
 using bke::Color4fReadAttribute;
 using bke::Color4fWriteAttribute;
+using bke::Float2ReadAttribute;
+using bke::Float2WriteAttribute;
 using bke::Float3ReadAttribute;
 using bke::Float3WriteAttribute;
 using bke::FloatReadAttribute;
 using bke::FloatWriteAttribute;
+using bke::geometry_set_realize_instances;
+using bke::Int32ReadAttribute;
+using bke::Int32WriteAttribute;
 using bke::PersistentDataHandleMap;
 using bke::PersistentObjectHandle;
 using bke::ReadAttribute;
@@ -40,27 +54,34 @@ using bke::WriteAttribute;
 using bke::WriteAttributePtr;
 using fn::CPPType;
 using fn::GMutablePointer;
+using fn::GPointer;
 using fn::GValueMap;
 
 class GeoNodeExecParams {
  private:
-  const bNode &node_;
+  const DNode &node_;
   GValueMap<StringRef> &input_values_;
   GValueMap<StringRef> &output_values_;
   const PersistentDataHandleMap &handle_map_;
   const Object *self_object_;
+  const ModifierData *modifier_;
+  Depsgraph *depsgraph_;
 
  public:
-  GeoNodeExecParams(const bNode &node,
+  GeoNodeExecParams(const DNode &node,
                     GValueMap<StringRef> &input_values,
                     GValueMap<StringRef> &output_values,
                     const PersistentDataHandleMap &handle_map,
-                    const Object *self_object)
+                    const Object *self_object,
+                    const ModifierData *modifier,
+                    Depsgraph *depsgraph)
       : node_(node),
         input_values_(input_values),
         output_values_(output_values),
         handle_map_(handle_map),
-        self_object_(self_object)
+        self_object_(self_object),
+        modifier_(modifier),
+        depsgraph_(depsgraph)
   {
   }
 
@@ -92,12 +113,28 @@ class GeoNodeExecParams {
   }
 
   /**
-   * Get the input value for the input socket with the given identifier.
+   * Get input as vector for multi input socket with the given identifier.
    *
-   * This makes a copy of the value, which is fine for most types but should be avoided for
-   * geometry sets.
+   * This method can only be called once for each identifier.
    */
-  template<typename T> T get_input(StringRef identifier) const
+  template<typename T> Vector<T> extract_multi_input(StringRef identifier)
+  {
+    Vector<T> values;
+    values.append(input_values_.extract<T>(identifier));
+    int i = 1;
+    std::string sub_identifier = identifier + "[1]";
+    while (input_values_.contains(sub_identifier)) {
+      values.append(input_values_.extract<T>(sub_identifier));
+      i++;
+      sub_identifier = identifier + "[" + std::to_string(i) + "]";
+    }
+    return values;
+  }
+
+  /**
+   * Get the input value for the input socket with the given identifier.
+   */
+  template<typename T> const T &get_input(StringRef identifier) const
   {
 #ifdef DEBUG
     this->check_extract_input(identifier, &CPPType::get<T>());
@@ -119,6 +156,16 @@ class GeoNodeExecParams {
     output_values_.add_new_by_move(identifier, value);
   }
 
+  void set_output_by_copy(StringRef identifier, GPointer value)
+  {
+#ifdef DEBUG
+    BLI_assert(value.type() != nullptr);
+    BLI_assert(value.get() != nullptr);
+    this->check_set_output(identifier, *value.type());
+#endif
+    output_values_.add_new_by_copy(identifier, value);
+  }
+
   /**
    * Store the output value for the given socket identifier.
    */
@@ -135,7 +182,7 @@ class GeoNodeExecParams {
    */
   const bNode &node() const
   {
-    return node_;
+    return *node_.bnode();
   }
 
   const PersistentDataHandleMap &handle_map() const
@@ -148,9 +195,23 @@ class GeoNodeExecParams {
     return self_object_;
   }
 
+  Depsgraph *depsgraph() const
+  {
+    return depsgraph_;
+  }
+
+  /**
+   * Add an error message displayed at the top of the node when displaying the node tree,
+   * and potentially elsewhere in Blender.
+   */
+  void error_message_add(const NodeWarningType type, std::string message) const;
+
   /**
    * Creates a read-only attribute based on node inputs. The method automatically detects which
-   * input with the given name is available.
+   * input socket with the given name is available.
+   *
+   * \note This will add an error message if the string socket is active and
+   * the input attribute does not exist.
    */
   ReadAttributePtr get_input_attribute(const StringRef name,
                                        const GeometryComponent &component,
@@ -168,10 +229,25 @@ class GeoNodeExecParams {
     return this->get_input_attribute(name, component, domain, type, &default_value);
   }
 
+  /**
+   * Get the type of an input property or the associated constant socket types with the
+   * same names. Fall back to the default value if no attribute exists with the name.
+   */
+  CustomDataType get_input_attribute_data_type(const StringRef name,
+                                               const GeometryComponent &component,
+                                               const CustomDataType default_type) const;
+
+  AttributeDomain get_highest_priority_input_domain(Span<std::string> names,
+                                                    const GeometryComponent &component,
+                                                    const AttributeDomain default_domain) const;
+
  private:
   /* Utilities for detecting common errors at when using this class. */
   void check_extract_input(StringRef identifier, const CPPType *requested_type = nullptr) const;
   void check_set_output(StringRef identifier, const CPPType &value_type) const;
+
+  /* Find the active socket socket with the input name (not the identifier). */
+  const bNodeSocket *find_available_socket(const StringRef name) const;
 };
 
 }  // namespace blender::nodes

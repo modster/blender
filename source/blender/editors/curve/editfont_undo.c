@@ -279,7 +279,7 @@ static void *undofont_from_editfont(UndoFont *uf, Curve *cu)
                                  ((LinkData *)uf_arraystore.local_links.last)->data :
                                  NULL;
 
-    /* add oursrlves */
+    /* Add ourselves. */
     BLI_addtail(&uf_arraystore.local_links, BLI_genericNodeN(uf));
 
     uf_arraystore_compact_with_info(uf, uf_ref);
@@ -356,8 +356,11 @@ static bool font_undosys_step_encode(struct bContext *C, struct Main *bmain, Und
   return true;
 }
 
-static void font_undosys_step_decode(
-    struct bContext *C, struct Main *bmain, UndoStep *us_p, int UNUSED(dir), bool UNUSED(is_final))
+static void font_undosys_step_decode(struct bContext *C,
+                                     struct Main *bmain,
+                                     UndoStep *us_p,
+                                     const eUndoStepDir UNUSED(dir),
+                                     bool UNUSED(is_final))
 {
   /* TODO(campbell): undo_system: use low-level API to set mode. */
   ED_object_mode_set_ex(C, OB_MODE_EDIT, false, NULL);
@@ -398,7 +401,7 @@ void ED_font_undosys_type(UndoType *ut)
 
   ut->step_foreach_ID_ref = font_undosys_foreach_ID_ref;
 
-  ut->use_context = true;
+  ut->flags = UNDOTYPE_FLAG_NEED_CONTEXT_FOR_ENCODE;
 
   ut->step_size = sizeof(FontUndoStep);
 }

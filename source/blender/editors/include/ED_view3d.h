@@ -41,8 +41,6 @@ struct Camera;
 struct CustomData_MeshMasks;
 struct Depsgraph;
 struct EditBone;
-struct GPUOffScreen;
-struct GPUViewport;
 struct ID;
 struct MVert;
 struct Main;
@@ -55,7 +53,6 @@ struct RenderEngineType;
 struct Scene;
 struct ScrArea;
 struct View3D;
-struct View3DShading;
 struct ViewContext;
 struct ViewLayer;
 struct bContext;
@@ -64,8 +61,6 @@ struct bScreen;
 struct rctf;
 struct rcti;
 struct wmGizmo;
-struct wmOperator;
-struct wmOperatorType;
 struct wmWindow;
 struct wmWindowManager;
 
@@ -140,6 +135,11 @@ void ED_view3d_to_object(const struct Depsgraph *depsgraph,
                          const float ofs[3],
                          const float quat[4],
                          const float dist);
+
+bool ED_view3d_camera_to_view_selected(struct Main *bmain,
+                                       struct Depsgraph *depsgraph,
+                                       const struct Scene *scene,
+                                       struct Object *camera_ob);
 
 void ED_view3d_lastview_store(struct RegionView3D *rv3d);
 
@@ -465,7 +465,7 @@ float ED_view3d_radius_to_dist(const struct View3D *v3d,
 
 void imm_drawcircball(const float cent[3], float rad, const float tmat[4][4], unsigned int pos);
 
-/* backbuffer select and draw support */
+/* Back-buffer select and draw support. */
 void ED_view3d_backbuf_depth_validate(struct ViewContext *vc);
 int ED_view3d_backbuf_sample_size_clamp(struct ARegion *region, const float dist);
 
@@ -479,7 +479,7 @@ bool ED_view3d_autodist(struct Depsgraph *depsgraph,
                         const bool alphaoverride,
                         const float fallback_depth_pt[3]);
 
-/* only draw so ED_view3d_autodist_simple can be called many times after */
+/* Only draw so #ED_view3d_autodist_simple can be called many times after. */
 void ED_view3d_autodist_init(struct Depsgraph *depsgraph,
                              struct ARegion *region,
                              struct View3D *v3d,

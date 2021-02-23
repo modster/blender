@@ -41,6 +41,7 @@
 #include "BKE_context.h"
 #include "BKE_customdata.h"
 #include "BKE_mesh.h"
+#include "BKE_mesh_fair.h"
 #include "BKE_mesh_mapping.h"
 #include "BKE_multires.h"
 #include "BKE_node.h"
@@ -147,40 +148,42 @@ static void do_draw_face_sets_brush_task_cb_ex(void *__restrict userdata,
         float poly_center[3];
         BKE_mesh_calc_poly_center(p, &ss->mloop[p->loopstart], mvert, poly_center);
 
-        if (sculpt_brush_test_sq_fn(&test, poly_center)) {
-          const float fade = bstrength * SCULPT_brush_strength_factor(ss,
-                                                                      brush,
-                                                                      vd.co,
-                                                                      sqrtf(test.dist),
-                                                                      vd.no,
-                                                                      vd.fno,
-                                                                      vd.mask ? *vd.mask : 0.0f,
-                                                                      vd.index,
-                                                                      thread_id);
+        if (!sculpt_brush_test_sq_fn(&test, poly_center)) {
+          continue;
+        }
+        const float fade = bstrength * SCULPT_brush_strength_factor(ss,
+                                                                    brush,
+                                                                    vd.co,
+                                                                    sqrtf(test.dist),
+                                                                    vd.no,
+                                                                    vd.fno,
+                                                                    vd.mask ? *vd.mask : 0.0f,
+                                                                    vd.index,
+                                                                    thread_id);
 
-          if (fade > 0.05f && ss->face_sets[vert_map->indices[j]] > 0) {
-            ss->face_sets[vert_map->indices[j]] = abs(ss->cache->paint_face_set);
-          }
+        if (fade > 0.05f && ss->face_sets[vert_map->indices[j]] > 0) {
+          ss->face_sets[vert_map->indices[j]] = abs(ss->cache->paint_face_set);
         }
       }
     }
 
     else if (BKE_pbvh_type(ss->pbvh) == PBVH_GRIDS) {
       {
-        if (sculpt_brush_test_sq_fn(&test, vd.co)) {
-          const float fade = bstrength * SCULPT_brush_strength_factor(ss,
-                                                                      brush,
-                                                                      vd.co,
-                                                                      sqrtf(test.dist),
-                                                                      vd.no,
-                                                                      vd.fno,
-                                                                      vd.mask ? *vd.mask : 0.0f,
-                                                                      vd.index,
-                                                                      thread_id);
+        if (!sculpt_brush_test_sq_fn(&test, vd.co)) {
+          continue;
+        }
+        const float fade = bstrength * SCULPT_brush_strength_factor(ss,
+                                                                    brush,
+                                                                    vd.co,
+                                                                    sqrtf(test.dist),
+                                                                    vd.no,
+                                                                    vd.fno,
+                                                                    vd.mask ? *vd.mask : 0.0f,
+                                                                    vd.index,
+                                                                    thread_id);
 
-          if (fade > 0.05f) {
-            SCULPT_vertex_face_set_set(ss, vd.index, ss->cache->paint_face_set);
-          }
+        if (fade > 0.05f) {
+          SCULPT_vertex_face_set_set(ss, vd.index, ss->cache->paint_face_set);
         }
       }
     }
@@ -204,7 +207,7 @@ static void do_relax_face_sets_brush_task_cb_ex(void *__restrict userdata,
       ss, &test, data->brush->falloff_shape);
 
   const bool relax_face_sets = !(ss->cache->iteration_count % 3 == 0);
-  /* This operations needs a stregth tweak as the relax deformation is too weak by default. */
+  /* This operations needs a strength tweak as the relax deformation is too weak by default. */
   if (relax_face_sets) {
     bstrength *= 2.0f;
   }
@@ -213,23 +216,26 @@ static void do_relax_face_sets_brush_task_cb_ex(void *__restrict userdata,
 
   BKE_pbvh_vertex_iter_begin(ss->pbvh, data->nodes[n], vd, PBVH_ITER_UNIQUE)
   {
-    if (sculpt_brush_test_sq_fn(&test, vd.co)) {
-      if (relax_face_sets != SCULPT_vertex_has_unique_face_set(ss, vd.index)) {
-        const float fade = bstrength * SCULPT_brush_strength_factor(ss,
-                                                                    brush,
-                                                                    vd.co,
-                                                                    sqrtf(test.dist),
-                                                                    vd.no,
-                                                                    vd.fno,
-                                                                    vd.mask ? *vd.mask : 0.0f,
-                                                                    vd.index,
-                                                                    thread_id);
+    if (!sculpt_brush_test_sq_fn(&test, vd.co)) {
+      continue;
+    }
+    if (relax_face_sets == SCULPT_vertex_has_unique_face_set(ss, vd.index)) {
+      continue;
+    }
 
-        SCULPT_relax_vertex(ss, &vd, fade * bstrength, relax_face_sets, vd.co);
-        if (vd.mvert) {
-          vd.mvert->flag |= ME_VERT_PBVH_UPDATE;
-        }
-      }
+    const float fade = bstrength * SCULPT_brush_strength_factor(ss,
+                                                                brush,
+                                                                vd.co,
+                                                                sqrtf(test.dist),
+                                                                vd.no,
+                                                                vd.fno,
+                                                                vd.mask ? *vd.mask : 0.0f,
+                                                                vd.index,
+                                                                thread_id);
+
+    SCULPT_relax_vertex(ss, &vd, fade * bstrength, relax_face_sets, vd.co);
+    if (vd.mvert) {
+      vd.mvert->flag |= ME_VERT_PBVH_UPDATE;
     }
   }
   BKE_pbvh_vertex_iter_end;
@@ -312,7 +318,7 @@ static int sculpt_face_set_create_exec(bContext *C, wmOperator *op)
 
   const int mode = RNA_enum_get(op->ptr, "mode");
 
-  /* Dyntopo not suported. */
+  /* Dyntopo not supported. */
   if (BKE_pbvh_type(ss->pbvh) == PBVH_BMESH) {
     return OPERATOR_CANCELLED;
   }
@@ -581,44 +587,49 @@ static void sculpt_face_sets_init_flood_fill(Object *ob,
   int next_face_set = 1;
 
   for (int i = 0; i < totfaces; i++) {
-    if (!BLI_BITMAP_TEST(visited_faces, i)) {
-      GSQueue *queue;
-      queue = BLI_gsqueue_new(sizeof(int));
+    if (BLI_BITMAP_TEST(visited_faces, i)) {
+      continue;
+    }
+    GSQueue *queue;
+    queue = BLI_gsqueue_new(sizeof(int));
 
-      face_sets[i] = next_face_set;
-      BLI_BITMAP_ENABLE(visited_faces, i);
-      BLI_gsqueue_push(queue, &i);
+    face_sets[i] = next_face_set;
+    BLI_BITMAP_ENABLE(visited_faces, i);
+    BLI_gsqueue_push(queue, &i);
 
-      while (!BLI_gsqueue_is_empty(queue)) {
-        int from_f;
-        BLI_gsqueue_pop(queue, &from_f);
+    while (!BLI_gsqueue_is_empty(queue)) {
+      int from_f;
+      BLI_gsqueue_pop(queue, &from_f);
 
-        BMFace *f, *f_neighbor;
-        BMEdge *ed;
-        BMIter iter_a, iter_b;
+      BMFace *f, *f_neighbor;
+      BMEdge *ed;
+      BMIter iter_a, iter_b;
 
-        f = BM_face_at_index(bm, from_f);
+      f = BM_face_at_index(bm, from_f);
 
-        BM_ITER_ELEM (ed, &iter_a, f, BM_EDGES_OF_FACE) {
-          BM_ITER_ELEM (f_neighbor, &iter_b, ed, BM_FACES_OF_EDGE) {
-            if (f_neighbor != f) {
-              int neighbor_face_index = BM_elem_index_get(f_neighbor);
-              if (!BLI_BITMAP_TEST(visited_faces, neighbor_face_index)) {
-                if (test(bm, f, ed, f_neighbor, threshold)) {
-                  face_sets[neighbor_face_index] = next_face_set;
-                  BLI_BITMAP_ENABLE(visited_faces, neighbor_face_index);
-                  BLI_gsqueue_push(queue, &neighbor_face_index);
-                }
-              }
-            }
+      BM_ITER_ELEM (ed, &iter_a, f, BM_EDGES_OF_FACE) {
+        BM_ITER_ELEM (f_neighbor, &iter_b, ed, BM_FACES_OF_EDGE) {
+          if (f_neighbor == f) {
+            continue;
           }
+          int neighbor_face_index = BM_elem_index_get(f_neighbor);
+          if (BLI_BITMAP_TEST(visited_faces, neighbor_face_index)) {
+            continue;
+          }
+          if (!test(bm, f, ed, f_neighbor, threshold)) {
+            continue;
+          }
+
+          face_sets[neighbor_face_index] = next_face_set;
+          BLI_BITMAP_ENABLE(visited_faces, neighbor_face_index);
+          BLI_gsqueue_push(queue, &neighbor_face_index);
         }
       }
-
-      next_face_set += 1;
-
-      BLI_gsqueue_free(queue);
     }
+
+    next_face_set += 1;
+
+    BLI_gsqueue_free(queue);
   }
 
   MEM_SAFE_FREE(visited_faces);
@@ -1024,6 +1035,8 @@ typedef enum eSculptFaceSetEditMode {
   SCULPT_FACE_SET_EDIT_GROW = 0,
   SCULPT_FACE_SET_EDIT_SHRINK = 1,
   SCULPT_FACE_SET_EDIT_DELETE_GEOMETRY = 2,
+  SCULPT_FACE_SET_EDIT_FAIR_POSITIONS = 3,
+  SCULPT_FACE_SET_EDIT_FAIR_TANGENCY = 4,
 } eSculptFaceSetEditMode;
 
 static EnumPropertyItem prop_sculpt_face_sets_edit_types[] = {
@@ -1047,6 +1060,22 @@ static EnumPropertyItem prop_sculpt_face_sets_edit_types[] = {
         0,
         "Delete Geometry",
         "Deletes the faces that are assigned to the Face Set",
+    },
+    {
+        SCULPT_FACE_SET_EDIT_FAIR_POSITIONS,
+        "FAIR_POSITIONS",
+        0,
+        "Fair Positions",
+        "Creates a smooth as possible geometry patch from the Face Set minimizing changes in "
+        "vertex positions",
+    },
+    {
+        SCULPT_FACE_SET_EDIT_FAIR_TANGENCY,
+        "FAIR_TANGENCY",
+        0,
+        "Fair Tangency",
+        "Creates a smooth as possible geometry patch from the Face Set minimizing changes in "
+        "vertex tangents",
     },
     {0, NULL, 0, NULL, NULL},
 };
@@ -1181,6 +1210,29 @@ static void sculpt_face_set_delete_geometry(Object *ob,
   BM_mesh_free(bm);
 }
 
+static void sculpt_face_set_edit_fair_face_set(Object *ob,
+                                               const int active_face_set_id,
+                                               const int fair_order)
+{
+  SculptSession *ss = ob->sculpt;
+  const int totvert = SCULPT_vertex_count_get(ss);
+
+  Mesh *mesh = ob->data;
+  bool *fair_vertices = MEM_malloc_arrayN(sizeof(bool), totvert, "fair vertices");
+
+  SCULPT_boundary_info_ensure(ob);
+
+  for (int i = 0; i < totvert; i++) {
+    fair_vertices[i] = !SCULPT_vertex_is_boundary(ss, i) &&
+                       SCULPT_vertex_has_face_set(ss, i, active_face_set_id) &&
+                       SCULPT_vertex_has_unique_face_set(ss, i);
+  }
+
+  MVert *mvert = SCULPT_mesh_deformed_mverts_get(ss);
+  BKE_mesh_prefair_and_fair_vertices(mesh, mvert, fair_vertices, fair_order);
+  MEM_freeN(fair_vertices);
+}
+
 static void sculpt_face_set_apply_edit(Object *ob,
                                        const int active_face_set_id,
                                        const int mode,
@@ -1203,6 +1255,12 @@ static void sculpt_face_set_apply_edit(Object *ob,
     }
     case SCULPT_FACE_SET_EDIT_DELETE_GEOMETRY:
       sculpt_face_set_delete_geometry(ob, ss, active_face_set_id, modify_hidden);
+      break;
+    case SCULPT_FACE_SET_EDIT_FAIR_POSITIONS:
+      sculpt_face_set_edit_fair_face_set(ob, active_face_set_id, MESH_FAIRING_DEPTH_POSITION);
+      break;
+    case SCULPT_FACE_SET_EDIT_FAIR_TANGENCY:
+      sculpt_face_set_edit_fair_face_set(ob, active_face_set_id, MESH_FAIRING_DEPTH_TANGENCY);
       break;
   }
 }
@@ -1230,6 +1288,16 @@ static bool sculpt_face_set_edit_is_operation_valid(SculptSession *ss,
       return false;
     }
   }
+
+  if (ELEM(mode, SCULPT_FACE_SET_EDIT_FAIR_POSITIONS, SCULPT_FACE_SET_EDIT_FAIR_TANGENCY)) {
+    if (BKE_pbvh_type(ss->pbvh) == PBVH_GRIDS) {
+      /* TODO: Multires topology representation using grids and duplicates can't be used directly
+       * by the fair algorithm. Multires topology needs to be exposed in a different way or
+       * converted to a mesh for this operation. */
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -1287,11 +1355,38 @@ static void sculpt_face_set_edit_modify_face_sets(Object *ob,
   MEM_freeN(nodes);
 }
 
+static void sculpt_face_set_edit_modify_coordinates(bContext *C,
+                                                    Object *ob,
+                                                    const int active_face_set,
+                                                    const eSculptFaceSetEditMode mode)
+{
+  Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
+  SculptSession *ss = ob->sculpt;
+  PBVH *pbvh = ss->pbvh;
+  PBVHNode **nodes;
+  int totnode;
+  BKE_pbvh_search_gather(pbvh, NULL, NULL, &nodes, &totnode);
+  SCULPT_undo_push_begin(ob, "face set edit");
+  for (int i = 0; i < totnode; i++) {
+    BKE_pbvh_node_mark_update(nodes[i]);
+    SCULPT_undo_push_node(ob, nodes[i], SCULPT_UNDO_COORDS);
+  }
+  sculpt_face_set_apply_edit(ob, abs(active_face_set), mode, false);
+
+  if (ss->deform_modifiers_active || ss->shapekey_active) {
+    SCULPT_flush_stroke_deform(sd, ob, true);
+  }
+  SCULPT_flush_update_step(C, SCULPT_UPDATE_COORDS);
+  SCULPT_flush_update_done(C, ob, SCULPT_UPDATE_COORDS);
+  SCULPT_undo_push_end();
+  MEM_freeN(nodes);
+}
+
 static int sculpt_face_set_edit_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
   Object *ob = CTX_data_active_object(C);
   SculptSession *ss = ob->sculpt;
-  Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
 
   const int mode = RNA_enum_get(op->ptr, "mode");
   const bool modify_hidden = RNA_boolean_get(op->ptr, "modify_hidden");
@@ -1319,6 +1414,10 @@ static int sculpt_face_set_edit_invoke(bContext *C, wmOperator *op, const wmEven
     case SCULPT_FACE_SET_EDIT_GROW:
     case SCULPT_FACE_SET_EDIT_SHRINK:
       sculpt_face_set_edit_modify_face_sets(ob, active_face_set, mode, modify_hidden);
+      break;
+    case SCULPT_FACE_SET_EDIT_FAIR_POSITIONS:
+    case SCULPT_FACE_SET_EDIT_FAIR_TANGENCY:
+      sculpt_face_set_edit_modify_coordinates(C, ob, active_face_set, mode);
       break;
   }
 

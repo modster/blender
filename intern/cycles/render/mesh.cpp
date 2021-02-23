@@ -333,7 +333,7 @@ void Mesh::add_vertex(float3 P)
   tag_verts_modified();
 
   if (get_num_subd_faces()) {
-    vert_patch_uv.push_back_reserved(make_float2(0.0f, 0.0f));
+    vert_patch_uv.push_back_reserved(zero_float2());
     tag_vert_patch_uv_modified();
   }
 }
@@ -344,7 +344,7 @@ void Mesh::add_vertex_slow(float3 P)
   tag_verts_modified();
 
   if (get_num_subd_faces()) {
-    vert_patch_uv.push_back_slow(make_float2(0.0f, 0.0f));
+    vert_patch_uv.push_back_slow(zero_float2());
     tag_vert_patch_uv_modified();
   }
 }
@@ -494,7 +494,7 @@ void Mesh::compute_bounds()
 
   if (!bnds.valid()) {
     /* empty mesh */
-    bnds.grow(make_float3(0.0f, 0.0f, 0.0f));
+    bnds.grow(zero_float3());
   }
 
   bounds = bnds;
@@ -802,6 +802,45 @@ void Mesh::pack_patches(uint *patch_data, uint vert_offset, uint face_offset, ui
 
       ngons++;
     }
+  }
+}
+
+void Mesh::pack_primitives(ccl::PackedBVH *pack, int object, uint visibility, bool pack_all)
+{
+  if (triangles.empty())
+    return;
+
+  const size_t num_prims = num_triangles();
+
+  /* Use prim_offset for indexing as it is computed per geometry type, and prim_tri_verts does not
+   * contain data for Hair geometries. */
+  float4 *prim_tri_verts = &pack->prim_tri_verts[prim_offset * 3];
+  // 'pack->prim_time' is unused by Embree and OptiX
+
+  uint type = has_motion_blur() ? PRIMITIVE_MOTION_TRIANGLE : PRIMITIVE_TRIANGLE;
+
+  if (pack_all) {
+    /* Use optix_prim_offset for indexing as those arrays also contain data for Hair geometries. */
+    unsigned int *prim_tri_index = &pack->prim_tri_index[optix_prim_offset];
+    int *prim_type = &pack->prim_type[optix_prim_offset];
+    unsigned int *prim_visibility = &pack->prim_visibility[optix_prim_offset];
+    int *prim_index = &pack->prim_index[optix_prim_offset];
+    int *prim_object = &pack->prim_object[optix_prim_offset];
+
+    for (size_t k = 0; k < num_prims; ++k) {
+      prim_tri_index[k] = (prim_offset + k) * 3;
+      prim_type[k] = type;
+      prim_index[k] = prim_offset + k;
+      prim_object[k] = object;
+      prim_visibility[k] = visibility;
+    }
+  }
+
+  for (size_t k = 0; k < num_prims; ++k) {
+    const Mesh::Triangle t = get_triangle(k);
+    prim_tri_verts[k * 3] = float3_to_float4(verts[t.v[0]]);
+    prim_tri_verts[k * 3 + 1] = float3_to_float4(verts[t.v[1]]);
+    prim_tri_verts[k * 3 + 2] = float3_to_float4(verts[t.v[2]]);
   }
 }
 

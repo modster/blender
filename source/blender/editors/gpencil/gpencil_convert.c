@@ -41,6 +41,7 @@
 #include "DNA_collection_types.h"
 #include "DNA_curve_types.h"
 #include "DNA_gpencil_types.h"
+#include "DNA_material_types.h"
 #include "DNA_node_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
@@ -177,7 +178,7 @@ static void gpencil_strokepoint_convertcoords(bContext *C,
 
   /* apply parent transform */
   float fpt[3];
-  BKE_gpencil_parent_matrix_get(depsgraph, obact, gpl, diff_mat);
+  BKE_gpencil_layer_transform_matrix_get(depsgraph, obact, gpl, diff_mat);
   mul_v3_m4v3(fpt, diff_mat, &source_pt->x);
   copy_v3_v3(&pt->x, fpt);
 
@@ -369,7 +370,7 @@ static int gpencil_find_end_of_stroke_idx(tGpTimingData *gtd,
 static void gpencil_stroke_path_animation_preprocess_gaps(tGpTimingData *gtd,
                                                           RNG *rng,
                                                           int *nbr_gaps,
-                                                          float *tot_gaps_time)
+                                                          float *r_tot_gaps_time)
 {
   float delta_time = 0.0f;
 
@@ -386,10 +387,10 @@ static void gpencil_stroke_path_animation_preprocess_gaps(tGpTimingData *gtd,
   }
   gtd->tot_time -= delta_time;
 
-  *tot_gaps_time = (float)(*nbr_gaps) * gtd->gap_duration;
-  gtd->tot_time += *tot_gaps_time;
+  *r_tot_gaps_time = (float)(*nbr_gaps) * gtd->gap_duration;
+  gtd->tot_time += *r_tot_gaps_time;
   if (G.debug & G_DEBUG) {
-    printf("%f, %f, %f, %d\n", gtd->tot_time, delta_time, *tot_gaps_time, *nbr_gaps);
+    printf("%f, %f, %f, %d\n", gtd->tot_time, delta_time, *r_tot_gaps_time, *nbr_gaps);
   }
   if (gtd->gap_randomness > 0.0f) {
     BLI_rng_srandom(rng, gtd->seed);

@@ -296,11 +296,16 @@ NlaTrack *BKE_nlatrack_add(AnimData *adt, NlaTrack *prev, const bool is_liboverr
   nlt->flag = NLATRACK_SELECTED | NLATRACK_OVERRIDELIBRARY_LOCAL;
   nlt->index = BLI_listbase_count(&adt->nla_tracks);
 
-  /* add track to stack, and make it the active one */
-  if (is_liboverride) {
-    for (; prev != NULL && (prev->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0; prev = prev->next) {
+  /* In liboverride case, we only add local tracks after all those coming from the linked data,
+   * so we need to find the first local track. */
+  if (is_liboverride && prev != NULL && (prev->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0) {
+    NlaTrack *first_local = prev->next;
+    for (; first_local != NULL && (first_local->flag & NLATRACK_OVERRIDELIBRARY_LOCAL) == 0;
+         first_local = first_local->next) {
     }
+    prev = first_local != NULL ? first_local->prev : NULL;
   }
+  /* Add track to stack, and make it the active one. */
   if (prev != NULL) {
     BLI_insertlinkafter(&adt->nla_tracks, prev, nlt);
   }
@@ -334,11 +339,8 @@ NlaStrip *BKE_nlastrip_new(bAction *act)
   /* generic settings
    * - selected flag to highlight this to the user
    * - (XXX) disabled Auto-Blends, as this was often causing some unwanted effects
-   * - (XXX) synchronization of strip-length in accordance with changes to action-length
-   *   is not done though, since this should only really happens in editmode for strips now
-   *   though this decision is still subject to further review...
    */
-  strip->flag = NLASTRIP_FLAG_SELECT;
+  strip->flag = NLASTRIP_FLAG_SELECT | NLASTRIP_FLAG_SYNC_LENGTH;
 
   /* assign the action reference */
   strip->act = act;
@@ -1195,7 +1197,7 @@ bool BKE_nlatrack_get_bounds(NlaTrack *nlt, float bounds[2])
  * Check whether given NLA track is not local (i.e. from linked data) when the object is a library
  * override.
  *
- * \param nlt May be NULL, in which case we consider it as a non-local track case.
+ * \param nlt: May be NULL, in which case we consider it as a non-local track case.
  */
 bool BKE_nlatrack_is_nonlocal_in_liboverride(const ID *id, const NlaTrack *nlt)
 {

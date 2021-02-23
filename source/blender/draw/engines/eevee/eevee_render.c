@@ -157,7 +157,7 @@ void EEVEE_render_view_sync(EEVEE_Data *vedata, RenderEngine *engine, struct Dep
 {
   EEVEE_PrivateData *g_data = vedata->stl->g_data;
 
-  /* Set the pers & view matrix. */
+  /* Set the perspective & view matrix. */
   float winmat[4][4], viewmat[4][4], viewinv[4][4];
   /* TODO(sergey): Shall render hold pointer to an evaluated camera instead? */
   struct Object *ob_camera_eval = DEG_get_evaluated_object(depsgraph, g_data->cam_original_ob);
@@ -461,21 +461,13 @@ static void eevee_render_result_environment(RenderLayer *rl,
   EEVEE_RENDER_RESULT_MATERIAL_PASS(ENVIRONMENT, ENVIRONMENT)
 }
 
-static void eevee_render_result_volume_scatter(RenderLayer *rl,
-                                               const char *viewname,
-                                               const rcti *rect,
-                                               EEVEE_Data *vedata,
-                                               EEVEE_ViewLayerData *sldata)
+static void eevee_render_result_volume_light(RenderLayer *rl,
+                                             const char *viewname,
+                                             const rcti *rect,
+                                             EEVEE_Data *vedata,
+                                             EEVEE_ViewLayerData *sldata)
 {
-  EEVEE_RENDER_RESULT_MATERIAL_PASS(VOLUME_SCATTER, VOLUME_SCATTER)
-}
-static void eevee_render_result_volume_transmittance(RenderLayer *rl,
-                                                     const char *viewname,
-                                                     const rcti *rect,
-                                                     EEVEE_Data *vedata,
-                                                     EEVEE_ViewLayerData *sldata)
-{
-  EEVEE_RENDER_RESULT_MATERIAL_PASS(VOLUME_TRANSMITTANCE, VOLUME_TRANSMITTANCE)
+  EEVEE_RENDER_RESULT_MATERIAL_PASS(VOLUME_LIGHT, VOLUME_LIGHT)
 }
 
 static void eevee_render_result_aovs(RenderLayer *rl,
@@ -518,7 +510,6 @@ static void eevee_render_result_cryptomatte(RenderLayer *rl,
   if ((vedata->stl->g_data->render_passes & EEVEE_RENDER_PASS_CRYPTOMATTE) != 0) {
     EEVEE_cryptomatte_render_result(rl, viewname, rect, vedata, sldata);
   }
-  EEVEE_cryptomatte_free(vedata);
 }
 
 static void eevee_render_draw_background(EEVEE_Data *vedata)
@@ -565,14 +556,14 @@ void EEVEE_render_draw(EEVEE_Data *vedata, RenderEngine *engine, RenderLayer *rl
   DRW_render_instance_buffer_finish();
 
   /* Need to be called after DRW_render_instance_buffer_finish() */
-  /* Also we weed to have a correct fbo bound for DRW_hair_update */
+  /* Also we weed to have a correct FBO bound for DRW_hair_update */
   GPU_framebuffer_bind(fbl->main_fb);
   DRW_hair_update();
 
   /* Sort transparents before the loop. */
   DRW_pass_sort_shgroup_z(psl->transparent_pass);
 
-  uint tot_sample = stl->g_data->render_tot_samples;
+  uint tot_sample = stl->g_data->render_sample_count_per_timestep;
   uint render_samples = 0;
 
   /* SSR needs one iteration to start properly. */
@@ -696,8 +687,7 @@ void EEVEE_render_read_result(EEVEE_Data *vedata,
   eevee_render_result_emission(rl, viewname, rect, vedata, sldata);
   eevee_render_result_environment(rl, viewname, rect, vedata, sldata);
   eevee_render_result_bloom(rl, viewname, rect, vedata, sldata);
-  eevee_render_result_volume_scatter(rl, viewname, rect, vedata, sldata);
-  eevee_render_result_volume_transmittance(rl, viewname, rect, vedata, sldata);
+  eevee_render_result_volume_light(rl, viewname, rect, vedata, sldata);
   eevee_render_result_aovs(rl, viewname, rect, vedata, sldata);
   eevee_render_result_cryptomatte(rl, viewname, rect, vedata, sldata);
 }
@@ -730,8 +720,7 @@ void EEVEE_render_update_passes(RenderEngine *engine, Scene *scene, ViewLayer *v
   CHECK_PASS_LEGACY(GLOSSY_DIRECT, SOCK_RGBA, 3, "RGB");
   CHECK_PASS_LEGACY(EMIT, SOCK_RGBA, 3, "RGB");
   CHECK_PASS_LEGACY(ENVIRONMENT, SOCK_RGBA, 3, "RGB");
-  CHECK_PASS_EEVEE(VOLUME_SCATTER, SOCK_RGBA, 3, "RGB");
-  CHECK_PASS_EEVEE(VOLUME_TRANSMITTANCE, SOCK_RGBA, 3, "RGB");
+  CHECK_PASS_EEVEE(VOLUME_LIGHT, SOCK_RGBA, 3, "RGB");
   CHECK_PASS_EEVEE(BLOOM, SOCK_RGBA, 3, "RGB");
 
   LISTBASE_FOREACH (ViewLayerAOV *, aov, &view_layer->aovs) {

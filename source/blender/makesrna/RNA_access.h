@@ -14,6 +14,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+/* Use a define instead of `#pragma once` because of `rna_internal.h` */
 #ifndef __RNA_ACCESS_H__
 #define __RNA_ACCESS_H__
 
@@ -70,6 +71,8 @@ extern StructRNA RNA_ArrayGpencilModifier;
 extern StructRNA RNA_ArrayModifier;
 extern StructRNA RNA_Attribute;
 extern StructRNA RNA_AttributeGroup;
+extern StructRNA RNA_AssetMetaData;
+extern StructRNA RNA_AssetTag;
 extern StructRNA RNA_BackgroundImage;
 extern StructRNA RNA_BevelModifier;
 extern StructRNA RNA_BezierSplinePoint;
@@ -88,6 +91,7 @@ extern StructRNA RNA_BoidSettings;
 extern StructRNA RNA_BoidState;
 extern StructRNA RNA_Bone;
 extern StructRNA RNA_BoneGroup;
+extern StructRNA RNA_BoolAttribute;
 extern StructRNA RNA_BoolProperty;
 extern StructRNA RNA_BooleanModifier;
 extern StructRNA RNA_Brush;
@@ -147,6 +151,7 @@ extern StructRNA RNA_CompositorNodeDilateErode;
 extern StructRNA RNA_CompositorNodeDisplace;
 extern StructRNA RNA_CompositorNodeDistanceMatte;
 extern StructRNA RNA_CompositorNodeDoubleEdgeMask;
+extern StructRNA RNA_CompositorNodeExposure;
 extern StructRNA RNA_CompositorNodeFilter;
 extern StructRNA RNA_CompositorNodeFlip;
 extern StructRNA RNA_CompositorNodeGamma;
@@ -202,6 +207,7 @@ extern StructRNA RNA_CopyRotationConstraint;
 extern StructRNA RNA_CopyScaleConstraint;
 extern StructRNA RNA_CopyTransformsConstraint;
 extern StructRNA RNA_CorrectiveSmoothModifier;
+extern StructRNA RNA_CryptomatteEntry;
 extern StructRNA RNA_Curve;
 extern StructRNA RNA_CurveMap;
 extern StructRNA RNA_CurveMapPoint;
@@ -250,13 +256,16 @@ extern StructRNA RNA_FModifierPython;
 extern StructRNA RNA_FModifierStepped;
 extern StructRNA RNA_FaceMap;
 extern StructRNA RNA_FieldSettings;
+extern StructRNA RNA_FileAssetSelectParams;
 extern StructRNA RNA_FileBrowserFSMenuEntry;
+extern StructRNA RNA_FileSelectEntry;
 extern StructRNA RNA_FileSelectParams;
 extern StructRNA RNA_FloatAttribute;
 extern StructRNA RNA_FloatAttributeValue;
 extern StructRNA RNA_FloatColorAttribute;
 extern StructRNA RNA_FloatColorAttributeValue;
 extern StructRNA RNA_FloatProperty;
+extern StructRNA RNA_Float2Attribute;
 extern StructRNA RNA_FloorConstraint;
 extern StructRNA RNA_FluidDomainSettings;
 extern StructRNA RNA_FluidEffectorSettings;
@@ -567,7 +576,6 @@ extern StructRNA RNA_SimpleDeformModifier;
 extern StructRNA RNA_SimplifyGpencilModifier;
 extern StructRNA RNA_Simulation;
 extern StructRNA RNA_NodesModifier;
-extern StructRNA RNA_NodesModifierSettings;
 extern StructRNA RNA_GeometryNode;
 extern StructRNA RNA_GeometryNodeTree;
 extern StructRNA RNA_SkinModifier;
@@ -694,6 +702,7 @@ extern StructRNA RNA_UVProjector;
 extern StructRNA RNA_UVWarpModifier;
 extern StructRNA RNA_UnitSettings;
 extern StructRNA RNA_UnknownType;
+extern StructRNA RNA_UserAssetLibrary;
 extern StructRNA RNA_UserSolidLight;
 extern StructRNA RNA_VertexcolorGpencilModifier;
 extern StructRNA RNA_VectorFont;

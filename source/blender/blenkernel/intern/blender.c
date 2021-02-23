@@ -296,6 +296,7 @@ void BKE_blender_userdef_data_free(UserDef *userdef, bool clear_fonts)
   }
 
   BLI_freelistN(&userdef->autoexec_paths);
+  BLI_freelistN(&userdef->asset_libraries);
 
   BLI_freelistN(&userdef->uistyles);
   BLI_freelistN(&userdef->uifonts);
@@ -416,7 +417,7 @@ void BKE_blender_atexit_unregister(void (*func)(void *user_data), const void *us
       free(ae);
       return;
     }
-    ae_p = &ae;
+    ae_p = &ae->next;
     ae = ae->next;
   }
 }

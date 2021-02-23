@@ -114,7 +114,7 @@ typedef struct RenderResult {
 
   /* target image size */
   int rectx, recty;
-  short crop, sample_nr;
+  short sample_nr;
 
   /* The following rect32, rectf and rectz buffers are for temporary storage only,
    * for RenderResult structs created in #RE_AcquireResultImage - which do not have RenderView */
@@ -252,13 +252,11 @@ void RE_ChangeModeFlag(struct Render *re, int flag, bool clear);
 struct Object *RE_GetCamera(struct Render *re); /* return camera override if set */
 void RE_SetOverrideCamera(struct Render *re, struct Object *cam_ob);
 void RE_SetCamera(struct Render *re, struct Object *cam_ob);
-void RE_SetWindow(struct Render *re, const rctf *viewplane, float clip_start, float clip_end);
-void RE_SetOrtho(struct Render *re, const rctf *viewplane, float clip_start, float clip_end);
 
 /* get current view and window transform */
 void RE_GetViewPlane(struct Render *re, rctf *r_viewplane, rcti *r_disprect);
 
-/* set the render threads based on the command-line and autothreads setting */
+/* Set the render threads based on the command-line and auto-threads setting. */
 void RE_init_threadcount(Render *re);
 
 bool RE_WriteRenderViewsImage(struct ReportList *reports,

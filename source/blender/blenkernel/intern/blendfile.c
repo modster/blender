@@ -52,10 +52,12 @@
 #include "BKE_layer.h"
 #include "BKE_lib_id.h"
 #include "BKE_main.h"
+#include "BKE_preferences.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
 #include "BKE_studiolight.h"
+#include "BKE_undo_system.h"
 #include "BKE_workspace.h"
 
 #include "BLO_readfile.h"
@@ -147,7 +149,7 @@ static void setup_app_data(bContext *C,
     LOAD_UNDO,
   } mode;
 
-  if (params->undo_direction != 0) {
+  if (params->undo_direction != STEP_INVALID) {
     BLI_assert(bfd->curscene != NULL);
     mode = LOAD_UNDO;
   }
@@ -644,6 +646,12 @@ UserDef *BKE_blendfile_userdef_from_defaults(void)
 
   /* Default studio light. */
   BKE_studiolight_default(userdef->light_param, userdef->light_ambient);
+
+  BKE_preferences_asset_library_default_add(userdef);
+  /* Enable asset browser features by default for alpha testing.
+   * BLO_sanitize_experimental_features_userpref_blend() will disable it again for non-alpha
+   * builds. */
+  userdef->experimental.use_asset_browser = true;
 
   return userdef;
 }

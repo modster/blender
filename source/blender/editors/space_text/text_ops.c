@@ -2588,7 +2588,7 @@ static int text_scroll_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  txt_screen_skip(st, region, lines * U.wheellinescroll);
+  txt_screen_skip(st, region, lines * 3);
 
   ED_area_tag_redraw(CTX_wm_area(C));
 
@@ -3832,7 +3832,7 @@ static int text_resolve_conflict_invoke(bContext *C, wmOperator *op, const wmEve
   switch (BKE_text_file_modified_check(text)) {
     case 1:
       if (text->flags & TXT_ISDIRTY) {
-        /* modified locally and externally, ahhh. offer more possibilities. */
+        /* Modified locally and externally, ah. offer more possibilities. */
         pup = UI_popup_menu_begin(
             C, IFACE_("File Modified Outside and Inside Blender"), ICON_NONE);
         layout = UI_popup_menu_layout(pup);

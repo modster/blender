@@ -34,6 +34,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "DNA_collection_types.h"
 #include "DNA_defaults.h"
 #include "DNA_gpencil_types.h"
 #include "DNA_mask_types.h"
@@ -314,6 +315,8 @@ IDTypeInfo IDType_ID_SCR = {
     .blend_read_expand = NULL,
 
     .blend_read_undo_preserve = NULL,
+
+    .lib_override_apply_post = NULL,
 };
 
 /* ************ Spacetype/regiontype handling ************** */
@@ -1265,6 +1268,9 @@ static void write_area_regions(BlendWriter *writer, ScrArea *area)
       if (sfile->params) {
         BLO_write_struct(writer, FileSelectParams, sfile->params);
       }
+      if (sfile->asset_params) {
+        BLO_write_struct(writer, FileAssetSelectParams, sfile->asset_params);
+      }
     }
     else if (sl->spacetype == SPACE_SEQ) {
       BLO_write_struct(writer, SpaceSeq, sl);
@@ -1595,8 +1601,7 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
 
       BLO_read_list(reader, &snode->treepath);
       snode->edittree = NULL;
-      snode->iofsd = NULL;
-      BLI_listbase_clear(&snode->linkdrag);
+      snode->runtime = NULL;
     }
     else if (sl->spacetype == SPACE_TEXT) {
       SpaceText *st = (SpaceText *)sl;
@@ -1662,11 +1667,14 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
        * plus, it isn't saved to files yet!
        */
       sfile->folders_prev = sfile->folders_next = NULL;
+      BLI_listbase_clear(&sfile->folder_histories);
       sfile->files = NULL;
       sfile->layout = NULL;
       sfile->op = NULL;
       sfile->previews_timer = NULL;
+      sfile->tags = 0;
       BLO_read_data_address(reader, &sfile->params);
+      BLO_read_data_address(reader, &sfile->asset_params);
     }
     else if (sl->spacetype == SPACE_CLIP) {
       SpaceClip *sclip = (SpaceClip *)sl;
@@ -1750,8 +1758,11 @@ void BKE_screen_area_blend_read_lib(BlendLibReader *reader, ID *parent_id, ScrAr
         }
         break;
       }
-      case SPACE_FILE:
+      case SPACE_FILE: {
+        SpaceFile *sfile = (SpaceFile *)sl;
+        sfile->tags |= FILE_TAG_REBUILD_MAIN_FILES;
         break;
+      }
       case SPACE_ACTION: {
         SpaceAction *saction = (SpaceAction *)sl;
         bDopeSheet *ads = &saction->ads;

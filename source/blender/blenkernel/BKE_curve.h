@@ -22,7 +22,9 @@
  * \ingroup bke
  */
 
-#include "DNA_scene_types.h"
+#include "BLI_sys_types.h"
+
+#include "DNA_listBase.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -318,8 +320,8 @@ void BKE_curve_deform_coords(const struct Object *ob_curve,
                              const short flag,
                              const short defaxis);
 
-void BKE_curve_deform_coords_with_editmesh(const Object *ob_curve,
-                                           const Object *ob_target,
+void BKE_curve_deform_coords_with_editmesh(const struct Object *ob_curve,
+                                           const struct Object *ob_target,
                                            float (*vert_coords)[3],
                                            const int vert_coords_len,
                                            const int defgrp_index,
@@ -335,6 +337,18 @@ void BKE_curve_deform_co(const struct Object *ob_curve,
                          float r_mat[3][3]);
 
 /** \} */
+
+/* curve_convert.c */
+
+/* Create a new curve from the given object at its current state. This only works for curve and
+ * text objects, otherwise NULL is returned.
+ *
+ * If apply_modifiers is true and the object is a curve one, then spline deform modifiers are
+ * applied on the control points of the splines.
+ */
+struct Curve *BKE_curve_new_from_object(struct Object *object,
+                                        struct Depsgraph *depsgraph,
+                                        bool apply_modifiers);
 
 #ifdef __cplusplus
 }

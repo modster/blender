@@ -46,6 +46,7 @@
 #include "DNA_meshdata_types.h"
 #include "DNA_node_types.h"
 #include "DNA_object_fluidsim_types.h"
+#include "DNA_object_force_types.h"
 #include "DNA_object_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_sdna_types.h"
@@ -76,7 +77,7 @@
 #include "BKE_sound.h"
 #include "BKE_texture.h"
 
-#include "SEQ_sequencer.h"
+#include "SEQ_iterator.h"
 
 #include "NOD_socket.h"
 
@@ -411,7 +412,7 @@ static void do_versions_windowmanager_2_50(bScreen *screen)
 
     area_add_window_regions(area, area->spacedata.first, &area->regionbase);
 
-    /* space imageselect is deprecated */
+    /* Space image-select is deprecated. */
     for (sl = area->spacedata.first; sl; sl = sl->next) {
       if (sl->spacetype == SPACE_IMASEL) {
         sl->spacetype = SPACE_EMPTY; /* spacedata then matches */

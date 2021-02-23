@@ -31,6 +31,7 @@
 #endif
 
 #include "DNA_anim_types.h"
+#include "DNA_collection_types.h"
 #include "DNA_curve_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_space_types.h"
@@ -43,6 +44,7 @@
 #include "BKE_idprop.h"
 #include "BKE_keyconfig.h"
 #include "BKE_main.h"
+#include "BKE_preferences.h"
 
 #include "BLO_readfile.h"
 
@@ -255,7 +257,7 @@ static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
     FROM_DEFAULT_V4_UCHAR(space_node.nodeclass_attribute);
   }
 
-  if (!USER_VERSION_ATLEAST(292, 6)) {
+  if (!USER_VERSION_ATLEAST(292, 12)) {
     FROM_DEFAULT_V4_UCHAR(space_node.nodeclass_shader);
   }
 
@@ -270,6 +272,16 @@ static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
    */
   {
     /* Keep this block, even when empty. */
+    FROM_DEFAULT_V4_UCHAR(space_properties.active);
+
+    FROM_DEFAULT_V4_UCHAR(space_info.info_error);
+    FROM_DEFAULT_V4_UCHAR(space_info.info_warning);
+    FROM_DEFAULT_V4_UCHAR(space_info.info_info);
+    FROM_DEFAULT_V4_UCHAR(space_info.info_debug);
+    FROM_DEFAULT_V4_UCHAR(space_info.info_debug_text);
+    FROM_DEFAULT_V4_UCHAR(space_info.info_property);
+    FROM_DEFAULT_V4_UCHAR(space_info.info_error);
+    FROM_DEFAULT_V4_UCHAR(space_info.info_operator);
   }
 
 #undef FROM_DEFAULT_V4_UCHAR
@@ -328,9 +340,6 @@ void blo_do_versions_userdef(UserDef *userdef)
 #define USER_VERSION_ATLEAST(ver, subver) MAIN_VERSION_ATLEAST(userdef, ver, subver)
 
   /* the UserDef struct is not corrected with do_versions() .... ugh! */
-  if (userdef->wheellinescroll == 0) {
-    userdef->wheellinescroll = 3;
-  }
   if (userdef->menuthreshold1 == 0) {
     userdef->menuthreshold1 = 5;
     userdef->menuthreshold2 = 2;
@@ -821,6 +830,19 @@ void blo_do_versions_userdef(UserDef *userdef)
     userdef->uiflag &= ~USER_UIFLAG_UNUSED_3;
   }
 
+  if (!USER_VERSION_ATLEAST(292, 9)) {
+    if (BLI_listbase_is_empty(&userdef->asset_libraries)) {
+      BKE_preferences_asset_library_default_add(userdef);
+    }
+  }
+
+  if (!USER_VERSION_ATLEAST(293, 2)) {
+    /* Enable asset browser features by default for alpha testing.
+     * BLO_sanitize_experimental_features_userpref_blend() will disable it again for non-alpha
+     * builds. */
+    userdef->experimental.use_asset_browser = true;
+  }
+
   /**
    * Versioning code until next subversion bump goes here.
    *
@@ -832,6 +854,9 @@ void blo_do_versions_userdef(UserDef *userdef)
    */
   {
     /* Keep this block, even when empty. */
+    if (userdef->gizmo_size_navigate_v3d == 0) {
+      userdef->gizmo_size_navigate_v3d = 80;
+    }
   }
 
   LISTBASE_FOREACH (bTheme *, btheme, &userdef->themes) {

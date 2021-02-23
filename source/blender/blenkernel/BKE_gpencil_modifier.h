@@ -27,6 +27,9 @@ extern "C" {
 #endif
 
 struct ARegionType;
+struct BlendDataReader;
+struct BlendLibReader;
+struct BlendWriter;
 struct Depsgraph;
 struct GpencilModifierData;
 struct ID;
@@ -35,9 +38,6 @@ struct Main;
 struct ModifierUpdateDepsgraphContext;
 struct Object;
 struct Scene;
-struct BlendWriter;
-struct BlendDataReader;
-struct BlendLibReader;
 /* NOTE: bakeModifier() called from UI:
  * needs to create new data-blocks, hence the need for this. */
 struct bGPDframe;
@@ -248,7 +248,7 @@ typedef struct GpencilModifierTypeInfo {
 
 #define GPENCIL_MODIFIER_TYPE_PANEL_PREFIX "MOD_PT_gpencil_"
 
-/* Initialize modifier's global data (type info and some common global storages). */
+/* Initialize modifier's global data (type info and some common global storage). */
 void BKE_gpencil_modifier_init(void);
 
 void BKE_gpencil_modifierType_panel_id(GpencilModifierType type, char *r_idname);

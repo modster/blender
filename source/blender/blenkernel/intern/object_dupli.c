@@ -813,29 +813,56 @@ static const DupliGenerator gen_dupli_verts_pointcloud = {
 
 static void make_duplis_instances_component(const DupliContext *ctx)
 {
-  float(*positions)[3];
-  float(*rotations)[3];
-  float(*scales)[3];
-  Object **objects;
-  const int amount = BKE_geometry_set_instances(
-      ctx->object->runtime.geometry_set_eval, &positions, &rotations, &scales, &objects);
+  float(*instance_offset_matrices)[4][4];
+  InstancedData *instanced_data;
+  const int *almost_unique_ids;
+  const int amount = BKE_geometry_set_instances(ctx->object->runtime.geometry_set_eval,
+                                                &instance_offset_matrices,
+                                                &almost_unique_ids,
+                                                &instanced_data);
 
   for (int i = 0; i < amount; i++) {
-    Object *object = objects[i];
-    if (object == NULL) {
-      continue;
-    }
-    float scale_matrix[4][4];
-    size_to_mat4(scale_matrix, scales[i]);
-    float rotation_matrix[4][4];
-    eul_to_mat4(rotation_matrix, rotations[i]);
-    float matrix[4][4];
-    mul_m4_m4m4(matrix, rotation_matrix, scale_matrix);
-    copy_v3_v3(matrix[3], positions[i]);
-    mul_m4_m4_pre(matrix, ctx->object->obmat);
+    InstancedData *data = &instanced_data[i];
 
-    make_dupli(ctx, object, matrix, i);
-    make_recursive_duplis(ctx, object, matrix, i);
+    const int id = almost_unique_ids[i];
+
+    if (data->type == INSTANCE_DATA_TYPE_OBJECT) {
+      Object *object = data->data.object;
+      if (object != NULL) {
+        float matrix[4][4];
+        mul_m4_m4m4(matrix, ctx->object->obmat, instance_offset_matrices[i]);
+        make_dupli(ctx, object, matrix, id);
+
+        float space_matrix[4][4];
+        mul_m4_m4m4(space_matrix, instance_offset_matrices[i], object->imat);
+        mul_m4_m4_pre(space_matrix, ctx->object->obmat);
+        make_recursive_duplis(ctx, object, space_matrix, id);
+      }
+    }
+    else if (data->type == INSTANCE_DATA_TYPE_COLLECTION) {
+      Collection *collection = data->data.collection;
+      if (collection != NULL) {
+        float collection_matrix[4][4];
+        unit_m4(collection_matrix);
+        sub_v3_v3(collection_matrix[3], collection->instance_offset);
+        mul_m4_m4_pre(collection_matrix, instance_offset_matrices[i]);
+        mul_m4_m4_pre(collection_matrix, ctx->object->obmat);
+
+        eEvaluationMode mode = DEG_get_mode(ctx->depsgraph);
+        FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_BEGIN (collection, object, mode) {
+          if (object == ctx->object) {
+            continue;
+          }
+
+          float instance_matrix[4][4];
+          mul_m4_m4m4(instance_matrix, collection_matrix, object->obmat);
+
+          make_dupli(ctx, object, instance_matrix, id);
+          make_recursive_duplis(ctx, object, collection_matrix, id);
+        }
+        FOREACH_COLLECTION_VISIBLE_OBJECT_RECURSIVE_END;
+      }
+    }
   }
 }
 

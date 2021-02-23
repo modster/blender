@@ -235,6 +235,7 @@ class IMAGE_MT_image(Menu):
 
             layout.menu("IMAGE_MT_image_invert")
             layout.operator("image.resize", text="Resize")
+            layout.menu("IMAGE_MT_image_flip")
 
         if ima and not show_render:
             if ima.packed_file:
@@ -250,6 +251,13 @@ class IMAGE_MT_image(Menu):
             layout.operator("palette.extract_from_image", text="Extract Palette")
             layout.operator("gpencil.image_to_grease_pencil", text="Generate Grease Pencil")
 
+class IMAGE_MT_image_flip(Menu):
+    bl_label = "Flip"
+
+    def draw(self, _context):
+        layout = self.layout
+        layout.operator("image.flip", text="Horizontally").use_flip_horizontal = True
+        layout.operator("image.flip", text="Vertically").use_flip_vertical = True
 
 class IMAGE_MT_image_invert(Menu):
     bl_label = "Invert"
@@ -1465,7 +1473,7 @@ class IMAGE_PT_overlay(Panel):
     bl_ui_units_x = 13
 
     def draw(self, context):
-      pass
+        pass
 
 
 class IMAGE_PT_overlay_uv_edit(Panel):
@@ -1494,7 +1502,6 @@ class IMAGE_PT_overlay_uv_edit(Panel):
         subrow = row.row(align=True)
         subrow.active = uvedit.show_stretch
         subrow.prop(uvedit, "display_stretch_type", text="")
-
 
 
 class IMAGE_PT_overlay_uv_edit_geometry(Panel):
@@ -1527,7 +1534,6 @@ class IMAGE_PT_overlay_uv_edit_geometry(Panel):
         row = col.row()
         row.active = not uvedit.show_stretch
         row.prop(uvedit, "show_faces", text="Faces")
-
 
 
 class IMAGE_PT_overlay_texture_paint(Panel):
@@ -1586,6 +1592,7 @@ classes = (
     IMAGE_MT_select,
     IMAGE_MT_select_linked,
     IMAGE_MT_image,
+    IMAGE_MT_image_flip,
     IMAGE_MT_image_invert,
     IMAGE_MT_uvs,
     IMAGE_MT_uvs_showhide,

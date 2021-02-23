@@ -23,6 +23,7 @@
 #include "DNA_brush_types.h"
 #include "DNA_defaults.h"
 #include "DNA_gpencil_types.h"
+#include "DNA_material_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
@@ -374,7 +375,7 @@ static int brush_undo_preserve_cb(LibraryIDLinkCallbackData *cb_data)
 
 static void brush_undo_preserve(BlendLibReader *reader, ID *id_new, ID *id_old)
 {
-  /* Whole Brush is preserved accross undo's. */
+  /* Whole Brush is preserved across undo-steps. */
   BKE_lib_id_swap(NULL, id_new, id_old);
 
   /* `id_new` now has content from `id_old`, we need to ensure those old ID pointers are valid.
@@ -409,6 +410,8 @@ IDTypeInfo IDType_ID_BR = {
     .blend_read_expand = brush_blend_read_expand,
 
     .blend_read_undo_preserve = brush_undo_preserve,
+
+    .lib_override_apply_post = NULL,
 };
 
 static RNG *brush_rng;
@@ -972,12 +975,12 @@ void BKE_gpencil_brush_preset_set(Main *bmain, Brush *brush, const short type)
       break;
     }
     case GP_BRUSH_PRESET_FILL_AREA: {
-      brush->size = 20.0f;
+      brush->size = 5.0f;
 
       brush->gpencil_settings->fill_leak = 3;
       brush->gpencil_settings->fill_threshold = 0.1f;
       brush->gpencil_settings->fill_simplylvl = 1;
-      brush->gpencil_settings->fill_factor = 1;
+      brush->gpencil_settings->fill_factor = 1.0f;
 
       brush->gpencil_settings->draw_strength = 1.0f;
       brush->gpencil_settings->hardeness = 1.0f;
@@ -985,6 +988,8 @@ void BKE_gpencil_brush_preset_set(Main *bmain, Brush *brush, const short type)
       brush->gpencil_settings->draw_smoothfac = 0.1f;
       brush->gpencil_settings->draw_smoothlvl = 1;
       brush->gpencil_settings->draw_subdivide = 1;
+
+      brush->gpencil_settings->flag |= GP_BRUSH_FILL_SHOW_EXTENDLINES;
 
       brush->gpencil_settings->icon_id = GP_BRUSH_ICON_FILL;
       brush->gpencil_tool = GPAINT_TOOL_FILL;
@@ -1833,6 +1838,14 @@ void BKE_brush_sculpt_reset(Brush *br)
       br->flag &= ~BRUSH_SPACE_ATTEN;
       br->curve_preset = BRUSH_CURVE_SPHERE;
       break;
+    case SCULPT_TOOL_DISPLACEMENT_SMEAR:
+      br->alpha = 1.0f;
+      br->spacing = 5;
+      br->hardness = 0.7f;
+      br->flag &= ~BRUSH_ALPHA_PRESSURE;
+      br->flag &= ~BRUSH_SPACE_ATTEN;
+      br->curve_preset = BRUSH_CURVE_SMOOTHER;
+      break;
     default:
       break;
   }
@@ -1897,6 +1910,7 @@ void BKE_brush_sculpt_reset(Brush *br)
     case SCULPT_TOOL_MASK:
     case SCULPT_TOOL_DRAW_FACE_SETS:
     case SCULPT_TOOL_DISPLACEMENT_ERASER:
+    case SCULPT_TOOL_DISPLACEMENT_SMEAR:
       br->add_col[0] = 0.75f;
       br->add_col[1] = 0.75f;
       br->add_col[2] = 0.75f;

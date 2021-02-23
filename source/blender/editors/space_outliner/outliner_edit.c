@@ -331,7 +331,8 @@ static void do_item_rename(ARegion *region,
                 TSE_POSEGRP_BASE,
                 TSE_R_LAYER_BASE,
                 TSE_SCENE_COLLECTION_BASE,
-                TSE_VIEW_COLLECTION_BASE)) {
+                TSE_VIEW_COLLECTION_BASE,
+                TSE_LIBRARY_OVERRIDE_BASE)) {
     BKE_report(reports, RPT_WARNING, "Cannot edit builtin name");
   }
   else if (ELEM(tselem->type, TSE_SEQUENCE, TSE_SEQ_STRIP, TSE_SEQUENCE_DUP)) {
@@ -771,9 +772,7 @@ static int outliner_id_copy_tag(SpaceOutliner *space_outliner, ListBase *tree)
     }
 
     /* go over sub-tree */
-    if (TSELEM_OPEN(tselem, space_outliner)) {
-      num_ids += outliner_id_copy_tag(space_outliner, &te->subtree);
-    }
+    num_ids += outliner_id_copy_tag(space_outliner, &te->subtree);
   }
 
   return num_ids;
@@ -1253,8 +1252,7 @@ static void outliner_set_coordinates_element_recursive(SpaceOutliner *space_outl
   *starty -= UI_UNIT_Y;
 
   if (TSELEM_OPEN(tselem, space_outliner)) {
-    TreeElement *ten;
-    for (ten = te->subtree.first; ten; ten = ten->next) {
+    LISTBASE_FOREACH (TreeElement *, ten, &te->subtree) {
       outliner_set_coordinates_element_recursive(space_outliner, ten, startx + UI_UNIT_X, starty);
     }
   }
@@ -1383,7 +1381,7 @@ void OUTLINER_OT_show_active(wmOperatorType *ot)
   ot->name = "Show Active";
   ot->idname = "OUTLINER_OT_show_active";
   ot->description =
-      "Open up the tree and adjust the view so that the active Object is shown centered";
+      "Open up the tree and adjust the view so that the active object is shown centered";
 
   /* callbacks */
   ot->exec = outliner_show_active_exec;
@@ -1753,7 +1751,7 @@ static void tree_element_to_path(TreeElement *te,
 {
   ListBase hierarchy = {NULL, NULL};
   LinkData *ld;
-  TreeElement *tem, *temnext, *temsub;
+  TreeElement *tem, *temnext;
   TreeStoreElem *tse /* , *tsenext */ /* UNUSED */;
   PointerRNA *ptr, *nextptr;
   PropertyRNA *prop;
@@ -1823,7 +1821,7 @@ static void tree_element_to_path(TreeElement *te,
             /* otherwise use index */
             int index = 0;
 
-            for (temsub = tem->subtree.first; temsub; temsub = temsub->next, index++) {
+            LISTBASE_FOREACH (TreeElement *, temsub, &tem->subtree) {
               if (temsub == temnext) {
                 break;
               }

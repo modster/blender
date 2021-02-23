@@ -21,6 +21,7 @@ set(INC
   ../../blenkernel
   ../../blenlib
   ../../blentranslation
+  ../../compositor
   ../../depsgraph
   ../../draw
   ../../gpu
@@ -29,7 +30,6 @@ set(INC
   ../../makesrna
   ../../nodes
   ../../render
-  ../../compositor
   ../../windowmanager
   ../../../../intern/glew-mx
   ../../../../intern/guardedalloc
@@ -40,7 +40,7 @@ set(SRC
   drawnode.c
   node_add.c
   node_buttons.c
-  node_draw.c
+  node_draw.cc
   node_edit.c
   node_gizmo.c
   node_group.c

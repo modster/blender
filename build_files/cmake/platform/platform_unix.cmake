@@ -284,6 +284,10 @@ if(WITH_NANOVDB)
   endif()
 endif()
 
+if(WITH_CPU_SIMD)
+  find_package_wrapper(sse2neon)
+endif()
+
 if(WITH_ALEMBIC)
   find_package_wrapper(Alembic)
 
@@ -352,6 +356,11 @@ endif()
 
 if(WITH_PUGIXML)
   find_package_wrapper(PugiXML)
+
+  if(NOT PUGIXML_FOUND)
+    set(WITH_PUGIXML OFF)
+    message(STATUS "PugiXML not found, disabling WITH_PUGIXML")
+  endif()
 endif()
 
 if(WITH_OPENIMAGEIO)
@@ -380,7 +389,7 @@ if(WITH_OPENIMAGEIO)
 endif()
 
 if(WITH_OPENCOLORIO)
-  find_package_wrapper(OpenColorIO)
+  find_package_wrapper(OpenColorIO 2.0.0)
 
   set(OPENCOLORIO_LIBRARIES ${OPENCOLORIO_LIBRARIES})
   set(OPENCOLORIO_LIBPATH)  # TODO, remove and reference the absolute path everywhere
@@ -462,6 +471,14 @@ if(WITH_POTRACE)
   if(NOT POTRACE_FOUND)
     message(WARNING "potrace not found, disabling WITH_POTRACE")
     set(WITH_POTRACE OFF)
+  endif()
+endif()
+
+if(WITH_HARU)
+  find_package_wrapper(Haru)
+  if(NOT HARU_FOUND)
+    message(WARNING "Haru not found, disabling WITH_HARU")
+    set(WITH_HARU OFF)
   endif()
 endif()
 
@@ -610,7 +627,13 @@ endif()
 
 # GNU Compiler
 if(CMAKE_COMPILER_IS_GNUCC)
-  set(PLATFORM_CFLAGS "-pipe -fPIC -funsigned-char -fno-strict-aliasing")
+  # ffp-contract=off:
+  # Automatically turned on when building with "-march=native". This is
+  # explicitly turned off here as it will make floating point math give a bit
+  # different results. This will lead to automated test failures. So disable
+  # this until we support it. Seems to default to off in clang and the intel
+  # compiler.
+  set(PLATFORM_CFLAGS "-pipe -fPIC -funsigned-char -fno-strict-aliasing -ffp-contract=off")
 
   # `maybe-uninitialized` is unreliable in release builds, but fine in debug builds.
   set(GCC_EXTRA_FLAGS_RELEASE "-Wno-maybe-uninitialized")
@@ -683,4 +706,16 @@ set(PLATFORM_LINKFLAGS
 # for non-portable installs as typically used by Linux distributions.
 if(WITH_INSTALL_PORTABLE)
   string(APPEND CMAKE_EXE_LINKER_FLAGS " -no-pie")
+endif()
+
+if(WITH_COMPILER_CCACHE)
+  find_program(CCACHE_PROGRAM ccache)
+  if(CCACHE_PROGRAM)
+    # Makefiles and ninja
+    set(CMAKE_C_COMPILER_LAUNCHER   "${CCACHE_PROGRAM}" CACHE STRING "" FORCE)
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}" CACHE STRING "" FORCE)
+  else()
+    message(WARNING "Ccache NOT found, disabling WITH_COMPILER_CCACHE")
+    set(WITH_COMPILER_CCACHE OFF)
+  endif()
 endif()

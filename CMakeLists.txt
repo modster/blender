@@ -63,6 +63,9 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/build_files/cmake/platform")
 # avoid having empty buildtype
 if(NOT DEFINED CMAKE_BUILD_TYPE_INIT)
   set(CMAKE_BUILD_TYPE_INIT "Release")
+  # Internal logic caches this variable, avoid showing it by default
+  # since it's easy to accidentally set instead of the build type.
+  mark_as_advanced(CMAKE_BUILD_TYPE_INIT)
 endif()
 
 # Omit superfluous "Up-to-date" messages.
@@ -164,10 +167,6 @@ if(APPLE)
 endif()
 
 option(WITH_BUILDINFO     "Include extra build details (only disable for development & faster builds)" ON)
-if(${CMAKE_VERSION} VERSION_LESS 2.8.8)
-  # add_library OBJECT arg unsupported
-  set(WITH_BUILDINFO OFF)
-endif()
 set(BUILDINFO_OVERRIDE_DATE "" CACHE STRING "Use instead of the current date for reproducible builds (empty string disables this option)")
 set(BUILDINFO_OVERRIDE_TIME "" CACHE STRING "Use instead of the current time for reproducible builds (empty string disables this option)")
 set(CPACK_OVERRIDE_PACKAGENAME "" CACHE STRING "Use instead of the standard packagename (empty string disables this option)")
@@ -205,6 +204,7 @@ option(WITH_OPENVDB_BLOSC "Enable blosc compression for OpenVDB, only enable if 
 option(WITH_OPENVDB_3_ABI_COMPATIBLE "Assume OpenVDB library has been compiled with version 3 ABI compatibility" OFF)
 mark_as_advanced(WITH_OPENVDB_3_ABI_COMPATIBLE)
 option(WITH_NANOVDB       "Enable usage of NanoVDB data structure for rendering on the GPU" ON)
+option(WITH_HARU          "Enable features relying on Libharu (Grease pencil PDF export)" ON)
 
 # GHOST Windowing Library Options
 option(WITH_GHOST_DEBUG   "Enable debugging output for the GHOST library" OFF)
@@ -347,16 +347,21 @@ if(UNIX AND NOT APPLE)
 endif()
 
 option(WITH_PYTHON_INSTALL       "Copy system python into the blender install folder" ON)
+
+if((WITH_AUDASPACE AND NOT WITH_SYSTEM_AUDASPACE) OR WITH_MOD_FLUID)
+  option(WITH_PYTHON_NUMPY "Include NumPy in Blender (used by Audaspace and Mantaflow)"  ON)
+endif()
+
 if(WIN32 OR APPLE)
   # Windows and macOS have this bundled with Python libraries.
-elseif(WITH_PYTHON_INSTALL OR (WITH_AUDASPACE AND NOT WITH_SYSTEM_AUDASPACE))
+elseif(WITH_PYTHON_INSTALL OR WITH_PYTHON_NUMPY)
   set(PYTHON_NUMPY_PATH            "" CACHE PATH "Path to python site-packages or dist-packages containing 'numpy' module")
   mark_as_advanced(PYTHON_NUMPY_PATH)
-  set(PYTHON_NUMPY_INCLUDE_DIRS ${PYTHON_NUMPY_PATH}/numpy/core/include CACHE PATH "Path to the include directory of the numpy module")
+  set(PYTHON_NUMPY_INCLUDE_DIRS    "" CACHE PATH "Path to the include directory of the NumPy module")
   mark_as_advanced(PYTHON_NUMPY_INCLUDE_DIRS)
 endif()
 if(WITH_PYTHON_INSTALL)
-  option(WITH_PYTHON_INSTALL_NUMPY "Copy system numpy into the blender install folder"  ON)
+  option(WITH_PYTHON_INSTALL_NUMPY "Copy system NumPy into the blender install folder"  ON)
 
   if(UNIX AND NOT APPLE)
     option(WITH_PYTHON_INSTALL_REQUESTS "Copy system requests into the blender install folder" ON)
@@ -365,8 +370,8 @@ if(WITH_PYTHON_INSTALL)
   endif()
 endif()
 
-option(WITH_CPU_SSE              "Enable SIMD instruction if they're detected on the host machine" ON)
-mark_as_advanced(WITH_CPU_SSE)
+option(WITH_CPU_SIMD              "Enable SIMD instruction if they're detected on the host machine" ON)
+mark_as_advanced(WITH_CPU_SIMD)
 
 # Cycles
 option(WITH_CYCLES                  "Enable Cycles Render Engine" ON)
@@ -605,6 +610,12 @@ if(WIN32)
 
 endif()
 
+if(UNIX)
+  # See WITH_WINDOWS_SCCACHE for Windows.
+  option(WITH_COMPILER_CCACHE "Use ccache to improve rebuild times (Works with Ninja, Makefiles and Xcode)" OFF)
+  mark_as_advanced(WITH_COMPILER_CCACHE)
+endif()
+
 # The following only works with the Ninja generator in CMake >= 3.0.
 if("${CMAKE_GENERATOR}" MATCHES "Ninja")
   option(WITH_NINJA_POOL_JOBS
@@ -717,8 +728,12 @@ set_and_warn_dependency(WITH_TBB WITH_MOD_FLUID         OFF)
 # NanoVDB requires OpenVDB to convert the data structure
 set_and_warn_dependency(WITH_OPENVDB WITH_NANOVDB       OFF)
 
-# OpenVDB uses 'half' type from OpenEXR & fails to link without OpenEXR enabled.
+# OpenVDB and OpenColorIO uses 'half' type from OpenEXR
 set_and_warn_dependency(WITH_IMAGE_OPENEXR WITH_OPENVDB OFF)
+set_and_warn_dependency(WITH_IMAGE_OPENEXR WITH_OPENCOLORIO  OFF)
+
+# Haru needs `TIFFFaxBlackCodes` & `TIFFFaxWhiteCodes` symbols from TIFF.
+set_and_warn_dependency(WITH_IMAGE_TIFF WITH_HARU       OFF)
 
 # auto enable openimageio for cycles
 if(WITH_CYCLES)
@@ -758,14 +773,6 @@ if(WITH_GHOST_SDL OR WITH_HEADLESS)
   set(WITH_GHOST_XDND    OFF)
   set(WITH_INPUT_IME     OFF)
   set(WITH_XR_OPENXR     OFF)
-endif()
-
-if(WITH_CPU_SSE)
-  TEST_SSE_SUPPORT(COMPILER_SSE_FLAG COMPILER_SSE2_FLAG)
-else()
-  message(STATUS "SSE and SSE2 optimizations are DISABLED!")
-  set(COMPILER_SSE_FLAG)
-  set(COMPILER_SSE2_FLAG)
 endif()
 
 if(WITH_BUILDINFO)
@@ -816,8 +823,8 @@ if(WITH_PYTHON)
   # Do this before main 'platform_*' checks,
   # because UNIX will search for the old Python paths which may not exist.
   # giving errors about missing paths before this case is met.
-  if(DEFINED PYTHON_VERSION AND "${PYTHON_VERSION}" VERSION_LESS "3.7")
-    message(FATAL_ERROR "At least Python 3.7 is required to build")
+  if(DEFINED PYTHON_VERSION AND "${PYTHON_VERSION}" VERSION_LESS "3.9")
+    message(FATAL_ERROR "At least Python 3.9 is required to build")
   endif()
 
   file(GLOB RESULT "${CMAKE_SOURCE_DIR}/release/scripts/addons")
@@ -947,22 +954,55 @@ if(WITH_INTERNATIONAL)
   endif()
 endif()
 
-# See TEST_SSE_SUPPORT() for how this is defined.
+# See TEST_SSE_SUPPORT() and TEST_NEON_SUPPORT() for how these are defined.
+#
+# This is done globally, so that all modules can use it if available, and
+# because these are used in headers used by many modules.
+if(WITH_CPU_SIMD)
+  set(COMPILER_SSE_FLAG)
+  set(COMPILER_SSE2_FLAG)
 
-# Do it globally, SSE2 is required for quite some time now.
-# Doing it now allows to use SSE/SSE2 in inline headers.
-if(SUPPORT_SSE_BUILD)
-  string(PREPEND PLATFORM_CFLAGS "${COMPILER_SSE_FLAG} ")
-  add_definitions(-D__SSE__ -D__MMX__)
-endif()
-if(SUPPORT_SSE2_BUILD)
-  string(APPEND PLATFORM_CFLAGS " ${COMPILER_SSE2_FLAG}")
-  add_definitions(-D__SSE2__)
-  if(NOT SUPPORT_SSE_BUILD) # don't double up
-    add_definitions(-D__MMX__)
+  # Test Neon first since macOS Arm can compile and run x86-64 SSE binaries.
+  TEST_NEON_SUPPORT()
+  if(SUPPORT_NEON_BUILD)
+    # Neon
+    if(SSE2NEON_FOUND)
+      blender_include_dirs_sys("${SSE2NEON_INCLUDE_DIRS}")
+      add_definitions(-DWITH_SSE2NEON)
+    endif()
+  else()
+    # SSE
+    TEST_SSE_SUPPORT(COMPILER_SSE_FLAG COMPILER_SSE2_FLAG)
+    if(SUPPORT_SSE_BUILD)
+      string(PREPEND PLATFORM_CFLAGS "${COMPILER_SSE_FLAG} ")
+      add_definitions(-D__SSE__ -D__MMX__)
+    endif()
+    if(SUPPORT_SSE2_BUILD)
+      string(APPEND PLATFORM_CFLAGS " ${COMPILER_SSE2_FLAG}")
+      add_definitions(-D__SSE2__)
+      if(NOT SUPPORT_SSE_BUILD) # don't double up
+        add_definitions(-D__MMX__)
+      endif()
+    endif()
   endif()
-endif()
 
+  # Print instructions used
+  if(SUPPORT_NEON_BUILD)
+    if(SSE2NEON_FOUND)
+      message(STATUS "Neon SIMD instructions enabled")
+    else()
+      message(STATUS "Neon SIMD instructions detected but unused, requires sse2neon")
+    endif()
+  elseif(SUPPORT_SSE2_BUILD)
+    message(STATUS "SSE2 SIMD instructions enabled")
+  elseif(SUPPORT_SSE_BUILD)
+    message(STATUS "SSE SIMD instructions enabled")
+  else()
+    message(STATUS "No SIMD instructions detected")
+  endif()
+else()
+  message(STATUS "SIMD instructions disabled")
+endif()
 
 # set the endian define
 if(MSVC)
@@ -1007,6 +1047,9 @@ if(WITH_OPENVDB)
   if(WITH_OPENVDB_3_ABI_COMPATIBLE)
     list(APPEND OPENVDB_DEFINITIONS -DOPENVDB_3_ABI_COMPATIBLE)
   endif()
+
+  # OpenVDB headers use deprecated TBB headers, silence warning.
+  list(APPEND OPENVDB_DEFINITIONS -DTBB_SUPPRESS_DEPRECATED_MESSAGES=1)
 
   list(APPEND OPENVDB_INCLUDE_DIRS
     ${BOOST_INCLUDE_DIR}
@@ -1423,6 +1466,7 @@ if(CMAKE_COMPILER_IS_GNUCC)
   # gcc 4.2 gives annoying warnings on every file with this
   if(NOT "${CMAKE_C_COMPILER_VERSION}" VERSION_LESS "4.3")
     ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_UNINITIALIZED -Wuninitialized)
+    ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_UNINITIALIZED -Wuninitialized)
   endif()
 
   # versions before gcc4.6 give many BLI_math warnings
@@ -1487,11 +1531,13 @@ if(CMAKE_COMPILER_IS_GNUCC)
   ADD_CHECK_C_COMPILER_FLAG(C_REMOVE_STRICT_FLAGS C_WARN_NO_FORMAT                  -Wno-format)
   ADD_CHECK_C_COMPILER_FLAG(C_REMOVE_STRICT_FLAGS C_WARN_NO_SWITCH                  -Wno-switch)
   ADD_CHECK_C_COMPILER_FLAG(C_REMOVE_STRICT_FLAGS C_WARN_NO_UNUSED_VARIABLE         -Wno-unused-variable)
+  ADD_CHECK_C_COMPILER_FLAG(C_REMOVE_STRICT_FLAGS C_WARN_NO_UNUSED_VARIABLE         -Wno-uninitialized)
 
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_REMOVE_STRICT_FLAGS CXX_WARN_NO_CLASS_MEMACCESS     -Wno-class-memaccess)
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_REMOVE_STRICT_FLAGS CXX_WARN_NO_COMMENT             -Wno-comment)
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_REMOVE_STRICT_FLAGS CXX_WARN_NO_UNUSED_TYPEDEFS     -Wno-unused-local-typedefs)
   ADD_CHECK_CXX_COMPILER_FLAG(CXX_REMOVE_STRICT_FLAGS CXX_WARN_NO_UNUSED_VARIABLE     -Wno-unused-variable)
+  ADD_CHECK_CXX_COMPILER_FLAG(CXX_REMOVE_STRICT_FLAGS CXX_WARN_NO_UNUSED_VARIABLE     -Wno-uninitialized)
 
   if(CMAKE_COMPILER_IS_GNUCC AND (NOT "${CMAKE_C_COMPILER_VERSION}" VERSION_LESS "7.0"))
     ADD_CHECK_C_COMPILER_FLAG(C_REMOVE_STRICT_FLAGS C_WARN_NO_IMPLICIT_FALLTHROUGH    -Wno-implicit-fallthrough)
@@ -1621,19 +1667,16 @@ if(WITH_PYTHON)
 
   if(WIN32 OR APPLE)
     # Windows and macOS have this bundled with Python libraries.
-  elseif((WITH_PYTHON_INSTALL AND WITH_PYTHON_INSTALL_NUMPY) OR (WITH_AUDASPACE AND NOT WITH_SYSTEM_AUDASPACE))
+  elseif((WITH_PYTHON_INSTALL AND WITH_PYTHON_INSTALL_NUMPY) OR WITH_PYTHON_NUMPY)
     if(("${PYTHON_NUMPY_PATH}" STREQUAL "") OR (${PYTHON_NUMPY_PATH} MATCHES NOTFOUND))
-      find_python_package(numpy)
-      unset(PYTHON_NUMPY_INCLUDE_DIRS CACHE)
-      set(PYTHON_NUMPY_INCLUDE_DIRS ${PYTHON_NUMPY_PATH}/numpy/core/include CACHE PATH "Path to the include directory of the numpy module")
-      mark_as_advanced(PYTHON_NUMPY_INCLUDE_DIRS)
+      find_python_package(numpy "core/include")
     endif()
   endif()
 
   if(WIN32 OR APPLE)
     # pass, we have this in lib/python/site-packages
   elseif(WITH_PYTHON_INSTALL_REQUESTS)
-    find_python_package(requests)
+    find_python_package(requests "")
   endif()
 endif()
 
@@ -1756,8 +1799,20 @@ if(WITH_BLENDER)
   # internal and external library information first, for test linking
   add_subdirectory(source)
 elseif(WITH_CYCLES_STANDALONE)
+  add_subdirectory(intern/glew-mx)
+  add_subdirectory(intern/guardedalloc)
+  add_subdirectory(intern/libc_compat)
+  add_subdirectory(intern/numaapi)
+  add_subdirectory(intern/sky)
+
   add_subdirectory(intern/cycles)
   add_subdirectory(extern/clew)
+  if(WITH_CYCLES_LOGGING)
+    if(NOT WITH_SYSTEM_GFLAGS)
+      add_subdirectory(extern/gflags)
+    endif()
+    add_subdirectory(extern/glog)
+  endif()
   if(WITH_CUDA_DYNLOAD)
     add_subdirectory(extern/cuew)
   endif()
@@ -1767,15 +1822,14 @@ elseif(WITH_CYCLES_STANDALONE)
 endif()
 
 #-----------------------------------------------------------------------------
+# Testing
+add_subdirectory(tests)
+
+#-----------------------------------------------------------------------------
 # Blender Application
 if(WITH_BLENDER)
   add_subdirectory(source/creator)
 endif()
-
-
-#-----------------------------------------------------------------------------
-# Testing
-add_subdirectory(tests)
 
 
 #-----------------------------------------------------------------------------
@@ -1831,6 +1885,7 @@ if(FIRST_RUN)
   info_cfg_option(WITH_FFTW3)
   info_cfg_option(WITH_FREESTYLE)
   info_cfg_option(WITH_GMP)
+  info_cfg_option(WITH_HARU)
   info_cfg_option(WITH_IK_ITASC)
   info_cfg_option(WITH_IK_SOLVER)
   info_cfg_option(WITH_INPUT_NDOF)
@@ -1839,6 +1894,8 @@ if(FIRST_RUN)
   info_cfg_option(WITH_OPENCOLORIO)
   info_cfg_option(WITH_OPENIMAGEDENOISE)
   info_cfg_option(WITH_OPENVDB)
+  info_cfg_option(WITH_POTRACE)
+  info_cfg_option(WITH_PUGIXML)
   info_cfg_option(WITH_QUADRIFLOW)
   info_cfg_option(WITH_TBB)
   info_cfg_option(WITH_USD)

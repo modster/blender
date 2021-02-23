@@ -37,6 +37,7 @@
 /* all types are needed here, in order to do memory operations */
 #include "DNA_ID.h"
 #include "DNA_anim_types.h"
+#include "DNA_collection_types.h"
 #include "DNA_gpencil_types.h"
 #include "DNA_key_types.h"
 #include "DNA_node_types.h"
@@ -55,6 +56,7 @@
 
 #include "BKE_anim_data.h"
 #include "BKE_armature.h"
+#include "BKE_asset.h"
 #include "BKE_bpath.h"
 #include "BKE_context.h"
 #include "BKE_global.h"
@@ -110,6 +112,8 @@ IDTypeInfo IDType_ID_LINK_PLACEHOLDER = {
     .blend_read_expand = NULL,
 
     .blend_read_undo_preserve = NULL,
+
+    .lib_override_apply_post = NULL,
 };
 
 /* GS reads the memory pointed at in a specific ordering.
@@ -1085,8 +1089,6 @@ void *BKE_libblock_alloc(Main *bmain, short type, const char *name, const int fl
       /* alphabetic insertion: is in new_id */
       BKE_main_unlock(bmain);
 
-      BKE_lib_libblock_session_uuid_ensure(id);
-
       /* TODO to be removed from here! */
       if ((flag & LIB_ID_CREATE_NO_DEG_TAG) == 0) {
         DEG_id_type_tag(bmain, type);
@@ -1094,6 +1096,13 @@ void *BKE_libblock_alloc(Main *bmain, short type, const char *name, const int fl
     }
     else {
       BLI_strncpy(id->name + 2, name, sizeof(id->name) - 2);
+    }
+
+    /* We also need to ensure a valid `session_uuid` for some non-main data (like embedded IDs).
+     * IDs not allocated however should not need those (this would e.g. avoid generating session
+     * uuids for depsgraph CoW IDs, if it was using this function). */
+    if ((flag & LIB_ID_CREATE_NO_ALLOCATE) == 0) {
+      BKE_lib_libblock_session_uuid_ensure(id);
     }
   }
 
@@ -1254,10 +1263,17 @@ void BKE_libblock_copy_ex(Main *bmain, const ID *id, ID **r_newid, const int ori
 
   /* We may need our own flag to control that at some point, but for now 'no main' one should be
    * good enough. */
-  if ((orig_flag & LIB_ID_CREATE_NO_MAIN) == 0 && ID_IS_OVERRIDE_LIBRARY(id)) {
-    /* We do not want to copy existing override rules here, as they would break the proper
-     * remapping between IDs. Proper overrides rules will be re-generated anyway. */
-    BKE_lib_override_library_copy(new_id, id, false);
+  if ((orig_flag & LIB_ID_CREATE_NO_MAIN) == 0) {
+    if (ID_IS_OVERRIDE_LIBRARY_REAL(id)) {
+      /* We do not want to copy existing override rules here, as they would break the proper
+       * remapping between IDs. Proper overrides rules will be re-generated anyway. */
+      BKE_lib_override_library_copy(new_id, id, false);
+    }
+    else if (ID_IS_OVERRIDE_LIBRARY_VIRTUAL(id)) {
+      /* Just ensure virtual overrides do get properly tagged, there is not actual override data to
+       * copy here. */
+      new_id->flag |= LIB_EMBEDDED_DATA_LIB_OVERRIDE;
+    }
   }
 
   if (id_can_have_animdata(new_id)) {
@@ -1779,32 +1795,31 @@ static void library_make_local_copying_check(ID *id,
     return; /* Already checked, nothing else to do. */
   }
 
-  MainIDRelationsEntry *entry = BLI_ghash_lookup(id_relations->id_used_to_user, id);
+  MainIDRelationsEntry *entry = BLI_ghash_lookup(id_relations->relations_from_pointers, id);
   BLI_gset_insert(loop_tags, id);
-  for (; entry != NULL; entry = entry->next) {
-
-    /* Used_to_user stores ID pointer, not pointer to ID pointer. */
-    ID *par_id = (ID *)entry->id_pointer;
-
+  for (MainIDRelationsEntryItem *from_id_entry = entry->from_ids; from_id_entry != NULL;
+       from_id_entry = from_id_entry->next) {
     /* Our oh-so-beloved 'from' pointers... Those should always be ignored here, since the actual
      * relation we want to check is in the other way around. */
-    if (entry->usage_flag & IDWALK_CB_LOOPBACK) {
+    if (from_id_entry->usage_flag & IDWALK_CB_LOOPBACK) {
       continue;
     }
+
+    ID *from_id = from_id_entry->id_pointer.from;
 
     /* Shape-keys are considered 'private' to their owner ID here, and never tagged
      * (since they cannot be linked), so we have to switch effective parent to their owner.
      */
-    if (GS(par_id->name) == ID_KE) {
-      par_id = ((Key *)par_id)->from;
+    if (GS(from_id->name) == ID_KE) {
+      from_id = ((Key *)from_id)->from;
     }
 
-    if (par_id->lib == NULL) {
+    if (from_id->lib == NULL) {
       /* Local user, early out to avoid some gset querying... */
       continue;
     }
-    if (!BLI_gset_haskey(done_ids, par_id)) {
-      if (BLI_gset_haskey(loop_tags, par_id)) {
+    if (!BLI_gset_haskey(done_ids, from_id)) {
+      if (BLI_gset_haskey(loop_tags, from_id)) {
         /* We are in a 'dependency loop' of IDs, this does not say us anything, skip it.
          * Note that this is the situation that can lead to archipelagoes of linked data-blocks
          * (since all of them have non-local users, they would all be duplicated,
@@ -1813,10 +1828,10 @@ static void library_make_local_copying_check(ID *id,
         continue;
       }
       /* Else, recursively check that user ID. */
-      library_make_local_copying_check(par_id, loop_tags, id_relations, done_ids);
+      library_make_local_copying_check(from_id, loop_tags, id_relations, done_ids);
     }
 
-    if (par_id->tag & LIB_TAG_DOIT) {
+    if (from_id->tag & LIB_TAG_DOIT) {
       /* This user will be fully local in future, so far so good,
        * nothing to do here but check next user. */
     }
@@ -2264,6 +2279,12 @@ bool BKE_id_is_in_global_main(ID *id)
   return (id == NULL || BLI_findindex(which_libbase(G_MAIN, GS(id->name)), id) != -1);
 }
 
+bool BKE_id_can_be_asset(const ID *id)
+{
+  return !ID_IS_LINKED(id) && !ID_IS_OVERRIDE_LIBRARY(id) &&
+         BKE_idtype_idcode_is_linkable(GS(id->name));
+}
+
 /************************* Datablock order in UI **************************/
 
 static int *id_order_get(ID *id)
@@ -2361,6 +2382,10 @@ void BKE_id_reorder(const ListBase *lb, ID *id, ID *relative, bool after)
 
 void BKE_id_blend_write(BlendWriter *writer, ID *id)
 {
+  if (id->asset_data) {
+    BKE_asset_metadata_write(writer, id->asset_data);
+  }
+
   /* ID_WM's id->properties are considered runtime only, and never written in .blend file. */
   if (id->properties && !ELEM(GS(id->name), ID_WM)) {
     IDP_BlendWrite(writer, id->properties);

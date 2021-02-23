@@ -22,10 +22,11 @@ set(INC
   .
   composite
   function
+  geometry
   intern
   shader
-  geometry
   texture
+  ../editors/include
   ../blenkernel
   ../blenlib
   ../blentranslation
@@ -73,6 +74,7 @@ set(SRC
   composite/nodes/node_composite_distanceMatte.c
   composite/nodes/node_composite_doubleEdgeMask.c
   composite/nodes/node_composite_ellipsemask.c
+  composite/nodes/node_composite_exposure.c
   composite/nodes/node_composite_filter.c
   composite/nodes/node_composite_flip.c
   composite/nodes/node_composite_gamma.c
@@ -133,23 +135,44 @@ set(SRC
   function/nodes/node_fn_combine_strings.cc
   function/nodes/node_fn_float_compare.cc
   function/nodes/node_fn_group_instance_id.cc
+  function/nodes/node_fn_input_string.cc
+  function/nodes/node_fn_input_vector.cc
   function/nodes/node_fn_object_transforms.cc
   function/nodes/node_fn_random_float.cc
   function/nodes/node_fn_switch.cc
   function/node_function_util.cc
 
+  geometry/nodes/node_geo_align_rotation_to_vector.cc
+  geometry/nodes/node_geo_attribute_color_ramp.cc
+  geometry/nodes/node_geo_attribute_combine_xyz.cc
+  geometry/nodes/node_geo_attribute_compare.cc
+  geometry/nodes/node_geo_attribute_fill.cc
   geometry/nodes/node_geo_attribute_math.cc
-  geometry/nodes/node_geo_common.cc
+  geometry/nodes/node_geo_attribute_mix.cc
+  geometry/nodes/node_geo_attribute_proximity.cc
+  geometry/nodes/node_geo_attribute_randomize.cc
+  geometry/nodes/node_geo_attribute_sample_texture.cc
+  geometry/nodes/node_geo_attribute_separate_xyz.cc
+  geometry/nodes/node_geo_attribute_vector_math.cc
   geometry/nodes/node_geo_boolean.cc
+  geometry/nodes/node_geo_collection_info.cc
+  geometry/nodes/node_geo_common.cc
   geometry/nodes/node_geo_edge_split.cc
+  geometry/nodes/node_geo_is_viewport.cc
   geometry/nodes/node_geo_join_geometry.cc
   geometry/nodes/node_geo_object_info.cc
-  geometry/nodes/node_geo_subdivision_surface.cc
   geometry/nodes/node_geo_point_distribute.cc
   geometry/nodes/node_geo_point_instance.cc
-  geometry/nodes/node_geo_random_attribute.cc
+  geometry/nodes/node_geo_point_rotate.cc
+  geometry/nodes/node_geo_point_scale.cc
+  geometry/nodes/node_geo_point_separate.cc
+  geometry/nodes/node_geo_point_translate.cc
+  geometry/nodes/node_geo_points_to_volume.cc
+  geometry/nodes/node_geo_subdivision_surface.cc
+  geometry/nodes/node_geo_subdivision_surface_simple.cc
   geometry/nodes/node_geo_transform.cc
   geometry/nodes/node_geo_triangulate.cc
+  geometry/nodes/node_geo_volume_to_mesh.cc
   geometry/node_geometry_exec.cc
   geometry/node_geometry_tree.cc
   geometry/node_geometry_util.cc
@@ -295,12 +318,13 @@ set(SRC
   NOD_composite.h
   NOD_derived_node_tree.hh
   NOD_function.h
+  NOD_geometry.h
+  NOD_geometry_exec.hh
+  NOD_math_functions.hh
   NOD_node_tree_dependencies.hh
   NOD_node_tree_multi_function.hh
   NOD_node_tree_ref.hh
   NOD_shader.h
-  NOD_geometry.h
-  NOD_math_functions.hh
   NOD_socket.h
   NOD_static_types.h
   NOD_texture.h
@@ -311,9 +335,9 @@ set(SRC
 )
 
 set(LIB
+  bf_bmesh
   bf_functions
   bf_intern_sky
-  bf_bmesh
 )
 
 if(WITH_PYTHON)
@@ -334,6 +358,13 @@ if(WITH_INTERNATIONAL)
   add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
+if(WITH_TBB)
+  list(APPEND INC_SYS
+    ${TBB_INCLUDE_DIRS}
+  )
+  add_definitions(-DWITH_TBB)
+endif()
+
 if(WITH_IMAGE_OPENEXR)
   add_definitions(-DWITH_OPENEXR)
 endif()
@@ -351,6 +382,13 @@ endif()
 
 if(WITH_OPENSUBDIV)
   add_definitions(-DWITH_OPENSUBDIV)
+endif()
+
+if(WITH_OPENVDB)
+  list(APPEND INC_SYS
+    ${OPENVDB_INCLUDE_DIRS}
+  )
+  add_definitions(-DWITH_OPENVDB ${OPENVDB_DEFINITIONS})
 endif()
 
 blender_add_lib(bf_nodes "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

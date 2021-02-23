@@ -208,6 +208,7 @@ static uiBlock *template_common_search_menu(const bContext *C,
                                             void *search_arg,
                                             uiButHandleFunc search_exec_fn,
                                             void *active_item,
+                                            uiButSearchTooltipFn item_tooltip_fn,
                                             const int preview_rows,
                                             const int preview_cols,
                                             float scale)
@@ -284,6 +285,7 @@ static uiBlock *template_common_search_menu(const bContext *C,
                          NULL,
                          search_exec_fn,
                          active_item);
+  UI_but_func_search_set_tooltip(but, item_tooltip_fn);
 
   UI_block_bounds_set_normal(block, 0.3f * U.widget_unit);
   UI_block_direction_set(block, UI_DIR_DOWN);
@@ -347,7 +349,7 @@ static bool id_search_allows_id(TemplateID *template_ui, const int flag, ID *id,
     }
   }
 
-  /* Hide dot-datablocks, but only if filter does not force them visible. */
+  /* Hide dot prefixed data-blocks, but only if filter does not force them visible. */
   if (U.uiflag & USER_HIDE_DOT) {
     if ((id->name[2] == '.') && (query[0] != '.')) {
       return false;
@@ -407,7 +409,7 @@ static void id_search_cb(const bContext *C,
   }
 
   ID **filtered_ids;
-  int filtered_amount = BLI_string_search_query(search, str, (void ***)&filtered_ids);
+  const int filtered_amount = BLI_string_search_query(search, str, (void ***)&filtered_ids);
 
   for (int i = 0; i < filtered_amount; i++) {
     if (!id_search_add(C, template_ui, items, filtered_ids[i])) {
@@ -444,7 +446,7 @@ static void id_search_cb_tagged(const bContext *C,
   }
 
   ID **filtered_ids;
-  int filtered_amount = BLI_string_search_query(search, str, (void ***)&filtered_ids);
+  const int filtered_amount = BLI_string_search_query(search, str, (void ***)&filtered_ids);
 
   for (int i = 0; i < filtered_amount; i++) {
     if (!id_search_add(C, template_ui, items, filtered_ids[i])) {
@@ -485,6 +487,31 @@ static void id_search_cb_objects_from_scene(const bContext *C,
   id_search_cb_tagged(C, arg_template, str, items);
 }
 
+static ARegion *template_ID_search_menu_item_tooltip(
+    bContext *C, ARegion *region, const rcti *item_rect, void *arg, void *active)
+{
+  TemplateID *template_ui = arg;
+  ID *active_id = active;
+  StructRNA *type = RNA_property_pointer_type(&template_ui->ptr, template_ui->prop);
+
+  uiSearchItemTooltipData tooltip_data = {0};
+
+  tooltip_data.name = active_id->name + 2;
+  BLI_snprintf(tooltip_data.description,
+               sizeof(tooltip_data.description),
+               TIP_("Choose %s data-block to be assigned to this user"),
+               RNA_struct_ui_name(type));
+  if (ID_IS_LINKED(active_id)) {
+    BLI_snprintf(tooltip_data.hint,
+                 sizeof(tooltip_data.hint),
+                 TIP_("Source library: %s\n%s"),
+                 active_id->lib->id.name + 2,
+                 active_id->lib->filepath);
+  }
+
+  return UI_tooltip_create_from_search_item_generic(C, region, item_rect, &tooltip_data);
+}
+
 /* ID Search browse menu, open */
 static uiBlock *id_search_menu(bContext *C, ARegion *region, void *arg_litem)
 {
@@ -512,6 +539,7 @@ static uiBlock *id_search_menu(bContext *C, ARegion *region, void *arg_litem)
                                      &template_ui,
                                      template_ID_set_property_exec_fn,
                                      active_item_ptr.data,
+                                     template_ID_search_menu_item_tooltip,
                                      template_ui.prv_rows,
                                      template_ui.prv_cols,
                                      template_ui.scale);
@@ -530,14 +558,13 @@ void UI_context_active_but_prop_get_templateID(bContext *C,
                                                PointerRNA *r_ptr,
                                                PropertyRNA **r_prop)
 {
-  TemplateID *template_ui;
   uiBut *but = UI_context_active_but_get(C);
 
   memset(r_ptr, 0, sizeof(*r_ptr));
   *r_prop = NULL;
 
   if (but && but->func_argN) {
-    template_ui = but->func_argN;
+    TemplateID *template_ui = but->func_argN;
     *r_ptr = template_ui->ptr;
     *r_prop = template_ui->prop;
   }
@@ -883,19 +910,18 @@ static void template_ID(const bContext *C,
                         const bool hide_buttons)
 {
   uiBut *but;
-  uiBlock *block;
-  PointerRNA idptr;
-  // ListBase *lb; // UNUSED
-  ID *id, *idfrom;
   const bool editable = RNA_property_editable(&template_ui->ptr, template_ui->prop);
   const bool use_previews = template_ui->preview = (flag & UI_ID_PREVIEWS) != 0;
 
-  idptr = RNA_property_pointer_get(&template_ui->ptr, template_ui->prop);
-  id = idptr.data;
-  idfrom = template_ui->ptr.owner_id;
+  PointerRNA idptr = RNA_property_pointer_get(&template_ui->ptr, template_ui->prop);
+  ID *id = idptr.data;
+  ID *idfrom = template_ui->ptr.owner_id;
   // lb = template_ui->idlb;
 
-  block = uiLayoutGetBlock(layout);
+  /* Allow operators to take the ID from context. */
+  uiLayoutSetContextPointer(layout, "id", &idptr);
+
+  uiBlock *block = uiLayoutGetBlock(layout);
   UI_block_align_begin(block);
 
   if (idptr.type) {
@@ -903,7 +929,7 @@ static void template_ID(const bContext *C,
   }
 
   if (text) {
-    /* Add label resepecting the separated layout property split state. */
+    /* Add label respecting the separated layout property split state. */
     uiItemL_respect_property_split(layout, text, ICON_NONE);
   }
 
@@ -1299,19 +1325,14 @@ static void ui_template_id(uiLayout *layout,
                            const bool live_icon,
                            const bool hide_buttons)
 {
-  TemplateID *template_ui;
-  PropertyRNA *prop;
-  StructRNA *type;
-  short idcode;
-
-  prop = RNA_struct_find_property(ptr, propname);
+  PropertyRNA *prop = RNA_struct_find_property(ptr, propname);
 
   if (!prop || RNA_property_type(prop) != PROP_POINTER) {
     RNA_warning("pointer property not found: %s.%s", RNA_struct_identifier(ptr->type), propname);
     return;
   }
 
-  template_ui = MEM_callocN(sizeof(TemplateID), "TemplateID");
+  TemplateID *template_ui = MEM_callocN(sizeof(TemplateID), "TemplateID");
   template_ui->ptr = *ptr;
   template_ui->prop = prop;
   template_ui->prv_rows = prv_rows;
@@ -1332,8 +1353,8 @@ static void ui_template_id(uiLayout *layout,
     flag |= UI_ID_OPEN;
   }
 
-  type = RNA_property_pointer_type(ptr, prop);
-  idcode = RNA_type_to_ID_code(type);
+  StructRNA *type = RNA_property_pointer_type(ptr, prop);
+  short idcode = RNA_type_to_ID_code(type);
   template_ui->idcode = idcode;
   template_ui->idlb = which_libbase(CTX_data_main(C), idcode);
 
@@ -1532,12 +1553,9 @@ void uiTemplateAnyID(uiLayout *layout,
                      const char *proptypename,
                      const char *text)
 {
-  PropertyRNA *propID, *propType;
-  uiLayout *split, *row, *sub;
-
   /* get properties... */
-  propID = RNA_struct_find_property(ptr, propname);
-  propType = RNA_struct_find_property(ptr, proptypename);
+  PropertyRNA *propID = RNA_struct_find_property(ptr, propname);
+  PropertyRNA *propType = RNA_struct_find_property(ptr, proptypename);
 
   if (!propID || RNA_property_type(propID) != PROP_POINTER) {
     RNA_warning("pointer property not found: %s.%s", RNA_struct_identifier(ptr->type), propname);
@@ -1552,10 +1570,10 @@ void uiTemplateAnyID(uiLayout *layout,
   /* Start drawing UI Elements using standard defines */
 
   /* NOTE: split amount here needs to be synced with normal labels */
-  split = uiLayoutSplit(layout, 0.33f, false);
+  uiLayout *split = uiLayoutSplit(layout, 0.33f, false);
 
   /* FIRST PART ................................................ */
-  row = uiLayoutRow(split, false);
+  uiLayout *row = uiLayoutRow(split, false);
 
   /* Label - either use the provided text, or will become "ID-Block:" */
   if (text) {
@@ -1574,7 +1592,7 @@ void uiTemplateAnyID(uiLayout *layout,
 
   /* HACK: special group just for the enum,
    * otherwise we get ugly layout with text included too... */
-  sub = uiLayoutRow(row, true);
+  uiLayout *sub = uiLayoutRow(row, true);
   uiLayoutSetAlignment(sub, UI_LAYOUT_ALIGN_LEFT);
 
   uiItemFullR(sub, ptr, propType, 0, 0, UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
@@ -1629,6 +1647,7 @@ static uiBlock *template_search_menu(bContext *C, ARegion *region, void *arg_tem
                                      &template_search,
                                      template_search_exec_fn,
                                      active_ptr.data,
+                                     NULL,
                                      template_search.preview_rows,
                                      template_search.preview_cols,
                                      1.0f);
@@ -1772,18 +1791,15 @@ static TemplateSearch *template_search_setup(PointerRNA *ptr,
                                              PointerRNA *searchptr,
                                              const char *const searchpropname)
 {
-  TemplateSearch *template_search;
-  PropertyRNA *prop, *searchprop;
-
-  prop = RNA_struct_find_property(ptr, propname);
+  PropertyRNA *prop = RNA_struct_find_property(ptr, propname);
 
   if (!prop || RNA_property_type(prop) != PROP_POINTER) {
     RNA_warning("pointer property not found: %s.%s", RNA_struct_identifier(ptr->type), propname);
     return NULL;
   }
-  searchprop = template_search_get_searchprop(ptr, prop, searchptr, searchpropname);
+  PropertyRNA *searchprop = template_search_get_searchprop(ptr, prop, searchptr, searchpropname);
 
-  template_search = MEM_callocN(sizeof(*template_search), __func__);
+  TemplateSearch *template_search = MEM_callocN(sizeof(*template_search), __func__);
   template_search->search_data.target_ptr = *ptr;
   template_search->search_data.target_prop = prop;
   template_search->search_data.search_ptr = *searchptr;
@@ -1859,18 +1875,15 @@ void uiTemplatePathBuilder(uiLayout *layout,
                            PointerRNA *UNUSED(root_ptr),
                            const char *text)
 {
-  PropertyRNA *propPath;
-  uiLayout *row;
-
   /* check that properties are valid */
-  propPath = RNA_struct_find_property(ptr, propname);
+  PropertyRNA *propPath = RNA_struct_find_property(ptr, propname);
   if (!propPath || RNA_property_type(propPath) != PROP_STRING) {
     RNA_warning("path property not found: %s.%s", RNA_struct_identifier(ptr->type), propname);
     return;
   }
 
   /* Start drawing UI Elements using standard defines */
-  row = uiLayoutRow(layout, true);
+  uiLayout *row = uiLayoutRow(layout, true);
 
   /* Path (existing string) Widget */
   uiItemR(row, ptr, propname, 0, text, ICON_RNA);
@@ -1971,7 +1984,7 @@ static bool constraint_panel_is_bone(Panel *panel)
  */
 static void constraint_reorder(bContext *C, Panel *panel, int new_index)
 {
-  bool constraint_from_bone = constraint_panel_is_bone(panel);
+  const bool constraint_from_bone = constraint_panel_is_bone(panel);
 
   PointerRNA *con_ptr = UI_panel_custom_data_get(panel);
   bConstraint *con = (bConstraint *)con_ptr->data;
@@ -2011,13 +2024,18 @@ static void set_constraint_expand_flag(const bContext *UNUSED(C), Panel *panel, 
 /**
  * Function with void * argument for #uiListPanelIDFromDataFunc.
  *
- * \note: Constraint panel types are assumed to be named with the struct name field
+ * \note Constraint panel types are assumed to be named with the struct name field
  * concatenated to the defined prefix.
  */
 static void object_constraint_panel_id(void *md_link, char *r_name)
 {
   bConstraint *con = (bConstraint *)md_link;
   const bConstraintTypeInfo *cti = BKE_constraint_typeinfo_from_type(con->type);
+
+  /* Cannot get TypeInfo for invalid/legacy constraints. */
+  if (cti == NULL) {
+    return;
+  }
 
   strcpy(r_name, CONSTRAINT_TYPE_PANEL_PREFIX);
   strcat(r_name, cti->structName);
@@ -2027,6 +2045,11 @@ static void bone_constraint_panel_id(void *md_link, char *r_name)
 {
   bConstraint *con = (bConstraint *)md_link;
   const bConstraintTypeInfo *cti = BKE_constraint_typeinfo_from_type(con->type);
+
+  /* Cannot get TypeInfo for invalid/legacy constraints. */
+  if (cti == NULL) {
+    return;
+  }
 
   strcpy(r_name, CONSTRAINT_BONE_TYPE_PANEL_PREFIX);
   strcat(r_name, cti->structName);
@@ -2058,6 +2081,10 @@ void uiTemplateConstraints(uiLayout *UNUSED(layout), bContext *C, bool use_bone_
     UI_panels_free_instanced(C, region);
     bConstraint *con = (constraints == NULL) ? NULL : constraints->first;
     for (int i = 0; con; i++, con = con->next) {
+      /* Dont show invalid/legacy constraints. */
+      if (con->type == CONSTRAINT_TYPE_NULL) {
+        continue;
+      }
       /* Dont show temporary constraints (AutoIK and targetless IK constraints). */
       if (con->type == CONSTRAINT_TYPE_KINEMATIC) {
         bKinematicConstraint *data = con->data;
@@ -2087,6 +2114,10 @@ void uiTemplateConstraints(uiLayout *UNUSED(layout), bContext *C, bool use_bone_
     /* Assuming there's only one group of instanced panels, update the custom data pointers. */
     Panel *panel = region->panels.first;
     LISTBASE_FOREACH (bConstraint *, con, constraints) {
+      /* Dont show invalid/legacy constraints. */
+      if (con->type == CONSTRAINT_TYPE_NULL) {
+        continue;
+      }
       /* Dont show temporary constraints (AutoIK and targetless IK constraints). */
       if (con->type == CONSTRAINT_TYPE_KINEMATIC) {
         bKinematicConstraint *data = con->data;
@@ -2639,7 +2670,7 @@ static void draw_constraint_header(uiLayout *layout, Object *ob, bConstraint *co
   }
   else {
     /* enabled */
-    UI_block_emboss_set(block, UI_EMBOSS_NONE);
+    UI_block_emboss_set(block, UI_EMBOSS_NONE_OR_STATUS);
     uiItemR(layout, &ptr, "mute", 0, "", 0);
     UI_block_emboss_set(block, UI_EMBOSS);
 
@@ -3038,7 +3069,7 @@ static uiBlock *colorband_tools_func(bContext *C, ARegion *region, void *coba_v)
   const uiStyle *style = UI_style_get_dpi();
   ColorBand *coba = coba_v;
   short yco = 0;
-  short menuwidth = 10 * UI_UNIT_X;
+  const short menuwidth = 10 * UI_UNIT_X;
 
   uiBlock *block = UI_block_begin(C, region, __func__, UI_EMBOSS_PULLDOWN);
   UI_block_func_butmenu_set(block, colorband_tools_dofunc, coba);
@@ -3353,7 +3384,7 @@ void uiTemplateColorRamp(uiLayout *layout, PointerRNA *ptr, const char *propname
     return;
   }
 
-  PointerRNA cptr = RNA_property_pointer_get(ptr, prop);
+  const PointerRNA cptr = RNA_property_pointer_get(ptr, prop);
   if (!cptr.data || !RNA_struct_is_a(cptr.type, &RNA_ColorRamp)) {
     return;
   }
@@ -3429,8 +3460,8 @@ static uiBlock *ui_icon_view_menu_cb(bContext *C, ARegion *region, void *arg_lit
 
   /* arg_litem is malloced, can be freed by parent button */
   args = *((IconViewMenuArgs *)arg_litem);
-  int w = UI_UNIT_X * (args.icon_scale);
-  int h = UI_UNIT_X * (args.icon_scale + args.show_labels);
+  const int w = UI_UNIT_X * (args.icon_scale);
+  const int h = UI_UNIT_X * (args.icon_scale + args.show_labels);
 
   uiBlock *block = UI_block_begin(C, region, "_popup", UI_EMBOSS_PULLDOWN);
   UI_block_flag_enable(block, UI_BLOCK_LOOP | UI_BLOCK_NO_FLIP);
@@ -3441,11 +3472,11 @@ static uiBlock *ui_icon_view_menu_cb(bContext *C, ARegion *region, void *arg_lit
   RNA_property_enum_items(C, &args.ptr, args.prop, &item, NULL, &free);
 
   for (int a = 0; item[a].identifier; a++) {
-    int x = (a % 8) * w;
-    int y = -(a / 8) * h;
+    const int x = (a % 8) * w;
+    const int y = -(a / 8) * h;
 
-    int icon = item[a].icon;
-    int value = item[a].value;
+    const int icon = item[a].icon;
+    const int value = item[a].value;
     uiBut *but;
     if (args.show_labels) {
       but = uiDefIconTextButR_prop(block,
@@ -3521,7 +3552,7 @@ void uiTemplateIconView(uiLayout *layout,
   bool free_items;
   const EnumPropertyItem *items;
   RNA_property_enum_items(block->evil_C, ptr, prop, &items, &tot_items, &free_items);
-  int value = RNA_property_enum_get(ptr, prop);
+  const int value = RNA_property_enum_get(ptr, prop);
   int icon = ICON_NONE;
   RNA_enum_icon_from_value(items, value, &icon);
 
@@ -3581,7 +3612,7 @@ void uiTemplateHistogram(uiLayout *layout, PointerRNA *ptr, const char *propname
     return;
   }
 
-  PointerRNA cptr = RNA_property_pointer_get(ptr, prop);
+  const PointerRNA cptr = RNA_property_pointer_get(ptr, prop);
   if (!cptr.data || !RNA_struct_is_a(cptr.type, &RNA_Histogram)) {
     return;
   }
@@ -3631,7 +3662,7 @@ void uiTemplateWaveform(uiLayout *layout, PointerRNA *ptr, const char *propname)
     return;
   }
 
-  PointerRNA cptr = RNA_property_pointer_get(ptr, prop);
+  const PointerRNA cptr = RNA_property_pointer_get(ptr, prop);
   if (!cptr.data || !RNA_struct_is_a(cptr.type, &RNA_Scopes)) {
     return;
   }
@@ -3693,7 +3724,7 @@ void uiTemplateVectorscope(uiLayout *layout, PointerRNA *ptr, const char *propna
     return;
   }
 
-  PointerRNA cptr = RNA_property_pointer_get(ptr, prop);
+  const PointerRNA cptr = RNA_property_pointer_get(ptr, prop);
   if (!cptr.data || !RNA_struct_is_a(cptr.type, &RNA_Scopes)) {
     return;
   }
@@ -4353,7 +4384,7 @@ static void curvemap_buttons_layout(uiLayout *layout,
 
   UI_but_funcN_set(bt, rna_update_cb, MEM_dupallocN(cb), NULL);
 
-  int icon = (cumap->flag & CUMA_DO_CLIP) ? ICON_CLIPUV_HLT : ICON_CLIPUV_DEHLT;
+  const int icon = (cumap->flag & CUMA_DO_CLIP) ? ICON_CLIPUV_HLT : ICON_CLIPUV_DEHLT;
   bt = uiDefIconBlockBut(
       block, curvemap_clipping_func, cumap, 0, icon, 0, 0, dx, dx, TIP_("Clipping Options"));
   UI_but_funcN_set(bt, rna_update_cb, MEM_dupallocN(cb), NULL);
@@ -4379,7 +4410,7 @@ static void curvemap_buttons_layout(uiLayout *layout,
   UI_block_funcN_set(block, rna_update_cb, MEM_dupallocN(cb), NULL);
 
   /* curve itself */
-  int size = max_ii(uiLayoutGetWidth(layout), UI_UNIT_X);
+  const int size = max_ii(uiLayoutGetWidth(layout), UI_UNIT_X);
   row = uiLayoutRow(layout, false);
   uiButCurveMapping *curve_but = (uiButCurveMapping *)uiDefBut(
       block, UI_BTYPE_CURVE, 0, "", 0, 0, size, 8.0f * UI_UNIT_X, cumap, 0.0f, 1.0f, 0, 0, "");
@@ -4907,7 +4938,7 @@ static void CurveProfile_buttons_layout(uiLayout *layout, PointerRNA *ptr, RNAUp
   UI_but_funcN_set(bt, CurveProfile_buttons_reverse, MEM_dupallocN(cb), profile);
 
   /* Clipping toggle */
-  int icon = (profile->flag & PROF_USE_CLIP) ? ICON_CLIPUV_HLT : ICON_CLIPUV_DEHLT;
+  const int icon = (profile->flag & PROF_USE_CLIP) ? ICON_CLIPUV_HLT : ICON_CLIPUV_DEHLT;
   bt = uiDefIconBut(block,
                     UI_BTYPE_BUT,
                     0,
@@ -4929,7 +4960,7 @@ static void CurveProfile_buttons_layout(uiLayout *layout, PointerRNA *ptr, RNAUp
   /* The path itself */
   int path_width = max_ii(uiLayoutGetWidth(layout), UI_UNIT_X);
   path_width = min_ii(path_width, (int)(16.0f * UI_UNIT_X));
-  int path_height = path_width;
+  const int path_height = path_width;
   uiLayoutRow(layout, false);
   uiDefBut(block,
            UI_BTYPE_CURVEPROFILE,
@@ -5354,7 +5385,7 @@ void uiTemplatePalette(uiLayout *layout,
     return;
   }
 
-  PointerRNA cptr = RNA_property_pointer_get(ptr, prop);
+  const PointerRNA cptr = RNA_property_pointer_get(ptr, prop);
   if (!cptr.data || !RNA_struct_is_a(cptr.type, &RNA_Palette)) {
     return;
   }
@@ -5494,10 +5525,10 @@ static void handle_layer_buttons(bContext *C, void *arg1, void *arg2)
   uiBut *but = arg1;
   const int cur = POINTER_AS_INT(arg2);
   wmWindow *win = CTX_wm_window(C);
-  int shift = win->eventstate->shift;
+  const int shift = win->eventstate->shift;
 
   if (!shift) {
-    int tot = RNA_property_array_length(&but->rnapoin, but->rnaprop);
+    const int tot = RNA_property_array_length(&but->rnapoin, but->rnaprop);
 
     /* Normally clicking only selects one layer */
     RNA_property_boolean_set_index(&but->rnapoin, but->rnaprop, cur, true);
@@ -5839,7 +5870,7 @@ static void uilist_prepare(uiList *ui_list,
     ui_list->flag &= ~UILST_SCROLL_TO_ACTIVE_ITEM;
   }
 
-  int max_scroll = max_ii(0, dyn_data->height - rows);
+  const int max_scroll = max_ii(0, dyn_data->height - rows);
   CLAMP(ui_list->list_scroll, 0, max_scroll);
   ui_list->list_last_len = len;
   dyn_data->visual_height = rows;
@@ -5944,14 +5975,14 @@ void uiTemplateList(uiLayout *layout,
   }
 
   if (prop) {
-    PropertyType type = RNA_property_type(prop);
+    const PropertyType type = RNA_property_type(prop);
     if (type != PROP_COLLECTION) {
       RNA_warning("Expected a collection data property");
       return;
     }
   }
 
-  PropertyType activetype = RNA_property_type(activeprop);
+  const PropertyType activetype = RNA_property_type(activeprop);
   if (activetype != PROP_INT) {
     RNA_warning("Expected an integer active data property");
     return;
@@ -6169,6 +6200,10 @@ void uiTemplateList(uiLayout *layout,
                     active_propname,
                     org_i,
                     flt_flag);
+
+          /* Items should be able to set context pointers for the layout. But the list-row button
+           * swallows events, so it needs the context storage too for handlers to see it. */
+          but->context = uiLayoutGetContextStore(sub);
 
           /* If we are "drawing" active item, set all labels as active. */
           if (i == activei) {
@@ -6777,18 +6812,32 @@ void uiTemplateReportsBanner(uiLayout *layout, bContext *C)
   width = min_ii((int)(rti->widthfac * width), width);
   width = max_ii(width, 10 * UI_DPI_FAC);
 
-  /* make a box around the report to make it stand out */
   UI_block_align_begin(block);
-  but = uiDefBut(
-      block, UI_BTYPE_ROUNDBOX, 0, "", 0, 0, UI_UNIT_X + 5, UI_UNIT_Y, NULL, 0.0f, 0.0f, 0, 0, "");
-  /* set the report's bg color in but->col - UI_BTYPE_ROUNDBOX feature */
-  rgba_float_to_uchar(but->col, rti->col);
 
+  /* Background for icon. */
   but = uiDefBut(block,
                  UI_BTYPE_ROUNDBOX,
                  0,
                  "",
-                 UI_UNIT_X + 5,
+                 0,
+                 0,
+                 UI_UNIT_X + (6 * UI_DPI_FAC),
+                 UI_UNIT_Y,
+                 NULL,
+                 0.0f,
+                 0.0f,
+                 0,
+                 0,
+                 "");
+  /* UI_BTYPE_ROUNDBOX's bg color is set in but->col. */
+  UI_GetThemeColorType4ubv(UI_icon_colorid_from_report_type(report->type), SPACE_INFO, but->col);
+
+  /* Background for the rest of the message. */
+  but = uiDefBut(block,
+                 UI_BTYPE_ROUNDBOX,
+                 0,
+                 "",
+                 UI_UNIT_X + (6 * UI_DPI_FAC),
                  0,
                  UI_UNIT_X + width,
                  UI_UNIT_Y,
@@ -6798,46 +6847,39 @@ void uiTemplateReportsBanner(uiLayout *layout, bContext *C)
                  0,
                  0,
                  "");
-  rgba_float_to_uchar(but->col, rti->col);
+
+  /* Use icon background at low opacity to highlight, but still contrasting with area TH_TEXT. */
+  UI_GetThemeColorType4ubv(UI_icon_colorid_from_report_type(report->type), SPACE_INFO, but->col);
+  but->col[3] = 64;
 
   UI_block_align_end(block);
-
-  /* icon and report message on top */
-  const int icon = UI_icon_from_report_type(report->type);
-
-  /* XXX: temporary operator to dump all reports to a text block, but only if more than 1 report
-   * to be shown instead of icon when appropriate...
-   */
   UI_block_emboss_set(block, UI_EMBOSS_NONE);
 
-  if (reports->list.first != reports->list.last) {
-    uiDefIconButO(block,
-                  UI_BTYPE_BUT,
-                  "SCREEN_OT_info_log_show",
-                  WM_OP_INVOKE_REGION_WIN,
-                  icon,
-                  2,
-                  0,
-                  UI_UNIT_X,
-                  UI_UNIT_Y,
-                  TIP_("Click to see the remaining reports in text block: 'Recent Reports'"));
-  }
-  else {
-    uiDefIconBut(
-        block, UI_BTYPE_LABEL, 0, icon, 2, 0, UI_UNIT_X, UI_UNIT_Y, NULL, 0.0f, 0.0f, 0, 0, "");
-  }
+  /* The report icon itself. */
+  but = uiDefIconButO(block,
+                      UI_BTYPE_BUT,
+                      "SCREEN_OT_info_log_show",
+                      WM_OP_INVOKE_REGION_WIN,
+                      UI_icon_from_report_type(report->type),
+                      (3 * UI_DPI_FAC),
+                      0,
+                      UI_UNIT_X,
+                      UI_UNIT_Y,
+                      TIP_("Click to see the remaining reports in text block: 'Recent Reports'"));
+  UI_GetThemeColorType4ubv(UI_text_colorid_from_report_type(report->type), SPACE_INFO, but->col);
+  but->col[3] = 255; /* This theme color is RBG only, so have to set alpha here. */
 
+  /* The report message. */
   but = uiDefButO(block,
                   UI_BTYPE_BUT,
                   "SCREEN_OT_info_log_show",
                   WM_OP_INVOKE_REGION_WIN,
                   report->message,
-                  UI_UNIT_X + 5,
+                  UI_UNIT_X,
                   0,
-                  UI_UNIT_X + width,
+                  width + UI_UNIT_X,
                   UI_UNIT_Y,
                   "Show in Info Log");
-  rgba_float_to_uchar(but->col, rti->col);
 }
 
 void uiTemplateInputStatus(uiLayout *layout, struct bContext *C)
@@ -6974,7 +7016,6 @@ void uiTemplateKeymapItemProperties(uiLayout *layout, PointerRNA *ptr)
 
 /* -------------------------------------------------------------------- */
 /** \name Event Icon Template
- *
  * \{ */
 
 bool uiTemplateEventFromKeymapItem(struct uiLayout *layout,

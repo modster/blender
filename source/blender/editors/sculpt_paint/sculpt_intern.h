@@ -39,7 +39,6 @@
 struct AutomaskingCache;
 struct KeyBlock;
 struct Object;
-struct SculptPoseIKChainSegment;
 struct SculptUndoNode;
 struct bContext;
 
@@ -423,6 +422,10 @@ void SCULPT_cloth_plane_falloff_preview_draw(const uint gpuattr,
                                              const float outline_col[3],
                                              float outline_alpha);
 
+PBVHNode **SCULPT_cloth_brush_affected_nodes_gather(SculptSession *ss,
+                                                    Brush *brush,
+                                                    int *r_totnode);
+
 BLI_INLINE bool SCULPT_is_cloth_deform_brush(const Brush *brush)
 {
   return (brush->sculpt_tool == SCULPT_TOOL_CLOTH && ELEM(brush->cloth_deform_type,
@@ -452,7 +455,7 @@ BLI_INLINE bool SCULPT_tool_needs_all_pbvh_nodes(const Brush *brush)
   if (brush->sculpt_tool == SCULPT_TOOL_BOUNDARY) {
     /* Boundary needs all nodes because it is not possible to know where the boundary
      * deformation is going to be propagated before calculating it. */
-    /* TODO: after calculating the boudnary info in the first iteration, it should be
+    /* TODO: after calculating the boundary info in the first iteration, it should be
      * possible to get the nodes that have vertices included in any boundary deformation
      * and cache them. */
     return true;
@@ -508,7 +511,7 @@ void SCULPT_boundary_edges_preview_draw(const uint gpuattr,
                                         const float outline_alpha);
 void SCULPT_boundary_pivot_line_preview_draw(const uint gpuattr, struct SculptSession *ss);
 
-/* Multiplane Scrape Brush. */
+/* Multi-plane Scrape Brush. */
 void SCULPT_do_multiplane_scrape_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode);
 void SCULPT_multiplane_scrape_preview_draw(const uint gpuattr,
                                            Brush *brush,
@@ -922,6 +925,10 @@ typedef struct StrokeCache {
   float mouse_event[2];
 
   float (*prev_colors)[4];
+
+  /* Multires Displacement Smear. */
+  float (*prev_displacement)[3];
+  float (*limit_surface_co)[3];
 
   /* The rest is temporary storage that isn't saved as a property */
 

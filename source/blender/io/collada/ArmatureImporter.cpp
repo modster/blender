@@ -1037,7 +1037,9 @@ void ArmatureImporter::get_rna_path_for_joint(COLLADAFW::Node *node,
                                               char *joint_path,
                                               size_t count)
 {
-  BLI_snprintf(joint_path, count, "pose.bones[\"%s\"]", bc_get_joint_name(node));
+  char bone_name_esc[sizeof(((Bone *)nullptr)->name) * 2];
+  BLI_str_escape(bone_name_esc, bc_get_joint_name(node), sizeof(bone_name_esc));
+  BLI_snprintf(joint_path, count, "pose.bones[\"%s\"]", bone_name_esc);
 }
 
 /* gives a world-space mat */
@@ -1106,7 +1108,7 @@ BoneExtended &ArmatureImporter::add_bone_extended(EditBone *bone,
   }
 
   if (!has_connect && this->import_settings->auto_connect) {
-    /* auto connect only whyen parent has exactly one child*/
+    /* Auto connect only when parent has exactly one child. */
     connect_type = sibcount == 1;
   }
 

@@ -34,6 +34,7 @@
 
 #include "DNA_anim_types.h"
 #include "DNA_boid_types.h"
+#include "DNA_cloth_types.h"
 #include "DNA_curve_types.h"
 #include "DNA_listBase.h"
 #include "DNA_mesh_types.h"
@@ -474,20 +475,24 @@ void psys_tasks_create(ParticleThreadContext *ctx,
 {
   ParticleTask *tasks;
   int numtasks = min_ii(BLI_system_thread_count() * 4, endpart - startpart);
-  float particles_per_task = (float)(endpart - startpart) / (float)numtasks, p, pnext;
-  int i;
+  int particles_per_task = numtasks > 0 ? (endpart - startpart) / numtasks : 0;
+  int remainder = numtasks > 0 ? (endpart - startpart) - particles_per_task * numtasks : 0;
 
   tasks = MEM_callocN(sizeof(ParticleTask) * numtasks, "ParticleThread");
   *r_numtasks = numtasks;
   *r_tasks = tasks;
 
-  p = (float)startpart;
-  for (i = 0; i < numtasks; i++, p = pnext) {
-    pnext = p + particles_per_task;
-
+  int p = startpart;
+  for (int i = 0; i < numtasks; i++) {
     tasks[i].ctx = ctx;
-    tasks[i].begin = (int)p;
-    tasks[i].end = min_ii((int)pnext, endpart);
+    tasks[i].begin = p;
+    p = p + particles_per_task + (i < remainder ? 1 : 0);
+    tasks[i].end = p;
+  }
+
+  /* Verify that all particles are accounted for. */
+  if (numtasks > 0) {
+    BLI_assert(tasks[numtasks - 1].end == endpart);
   }
 }
 
@@ -1395,8 +1400,9 @@ void psys_update_particle_tree(ParticleSystem *psys, float cfra)
 static void psys_update_effectors(ParticleSimulationData *sim)
 {
   BKE_effectors_free(sim->psys->effectors);
+  bool use_rotation = (sim->psys->part->flag & PART_ROT_DYN) != 0;
   sim->psys->effectors = BKE_effectors_create(
-      sim->depsgraph, sim->ob, sim->psys, sim->psys->part->effector_weights);
+      sim->depsgraph, sim->ob, sim->psys, sim->psys->part->effector_weights, use_rotation);
   precalc_guides(sim, sim->psys->effectors);
 }
 
@@ -4978,6 +4984,24 @@ void particle_system_update(struct Depsgraph *depsgraph,
 
 /* ID looper */
 
+/* unfortunately PSys and modifier ID loopers are not directly compatible, so we need this struct
+ * and the callback below to map the former to the latter (thanks to psys embedding a Cloth
+ * modifier data struct now, for Hair physics simulations). */
+typedef struct ParticleSystemIDLoopForModifier {
+  ParticleSystem *psys;
+  ParticleSystemIDFunc func;
+  void *userdata;
+} ParticleSystemIDLoopForModifier;
+
+static void particlesystem_modifiersForeachIDLink(void *user_data,
+                                                  Object *UNUSED(object),
+                                                  ID **id_pointer,
+                                                  int cb_flag)
+{
+  ParticleSystemIDLoopForModifier *data = (ParticleSystemIDLoopForModifier *)user_data;
+  data->func(data->psys, id_pointer, data->userdata, cb_flag);
+}
+
 void BKE_particlesystem_id_loop(ParticleSystem *psys, ParticleSystemIDFunc func, void *userdata)
 {
   ParticleTarget *pt;
@@ -4985,6 +5009,16 @@ void BKE_particlesystem_id_loop(ParticleSystem *psys, ParticleSystemIDFunc func,
   func(psys, (ID **)&psys->part, userdata, IDWALK_CB_USER | IDWALK_CB_NEVER_NULL);
   func(psys, (ID **)&psys->target_ob, userdata, IDWALK_CB_NOP);
   func(psys, (ID **)&psys->parent, userdata, IDWALK_CB_NOP);
+
+  if (psys->clmd != NULL) {
+    const ModifierTypeInfo *mti = BKE_modifier_get_info(psys->clmd->modifier.type);
+
+    if (mti->foreachIDLink != NULL) {
+      ParticleSystemIDLoopForModifier data = {.psys = psys, .func = func, .userdata = userdata};
+      mti->foreachIDLink(
+          &psys->clmd->modifier, NULL, particlesystem_modifiersForeachIDLink, &data);
+    }
+  }
 
   for (pt = psys->targets.first; pt; pt = pt->next) {
     func(psys, (ID **)&pt->ob, userdata, IDWALK_CB_NOP);

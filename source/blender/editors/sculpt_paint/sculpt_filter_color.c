@@ -86,7 +86,7 @@ static EnumPropertyItem prop_color_filter_types[] = {
     {COLOR_FILTER_SATURATION, "SATURATION", 0, "Saturation", "Change saturation"},
     {COLOR_FILTER_VALUE, "VALUE", 0, "Value", "Change value"},
 
-    {COLOR_FILTER_BRIGHTNESS, "BRIGTHNESS", 0, "Brightness", "Change brightness"},
+    {COLOR_FILTER_BRIGHTNESS, "BRIGHTNESS", 0, "Brightness", "Change brightness"},
     {COLOR_FILTER_CONTRAST, "CONTRAST", 0, "Contrast", "Change contrast"},
 
     {COLOR_FILTER_SMOOTH, "SMOOTH", 0, "Smooth", "Smooth colors"},
@@ -328,9 +328,9 @@ void SCULPT_OT_color_filter(struct wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
   /* rna */
-  RNA_def_enum(ot->srna, "type", prop_color_filter_types, COLOR_FILTER_HUE, "Filter type", "");
+  RNA_def_enum(ot->srna, "type", prop_color_filter_types, COLOR_FILTER_HUE, "Filter Type", "");
   RNA_def_float(
-      ot->srna, "strength", 1.0f, -10.0f, 10.0f, "Strength", "Filter Strength", -10.0f, 10.0f);
+      ot->srna, "strength", 1.0f, -10.0f, 10.0f, "Strength", "Filter strength", -10.0f, 10.0f);
 
   PropertyRNA *prop = RNA_def_float_color(
       ot->srna, "fill_color", 3, NULL, 0.0f, FLT_MAX, "Fill Color", "", 0.0f, 1.0f);

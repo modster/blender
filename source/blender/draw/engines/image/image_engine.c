@@ -110,9 +110,7 @@ static void space_image_gpu_texture_get(Image *image,
     /* update multiindex and pass for the current eye */
     BKE_image_multilayer_index(image->rr, &sima->iuser);
   }
-  else {
-    BKE_image_multiview_index(image, &sima->iuser);
-  }
+  BKE_image_multiview_index(image, &sima->iuser);
 
   if (ibuf) {
     if (sima->flag & SI_SHOW_ZBUF && (ibuf->zbuf || ibuf->zbuf_float || (ibuf->channels == 1))) {
@@ -285,6 +283,7 @@ static void image_cache_image(IMAGE_Data *vedata, Image *image, ImageUser *iuser
 /* -------------------------------------------------------------------- */
 /** \name Engine Callbacks
  * \{ */
+
 static void IMAGE_engine_init(void *ved)
 {
   IMAGE_shader_library_ensure();
@@ -396,7 +395,8 @@ static void IMAGE_engine_free(void)
   IMAGE_shader_free();
 }
 
-/* \} */
+/** \} */
+
 static const DrawEngineDataSize IMAGE_data_size = DRW_VIEWPORT_DATA_SIZE(IMAGE_Data);
 
 DrawEngineType draw_engine_image_type = {
@@ -413,4 +413,5 @@ DrawEngineType draw_engine_image_type = {
     NULL,                  /* view_update */
     NULL,                  /* id_update */
     NULL,                  /* render_to_image */
+    NULL,                  /* store_metadata */
 };

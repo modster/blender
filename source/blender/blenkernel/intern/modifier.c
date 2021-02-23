@@ -38,6 +38,7 @@
 
 #include "DNA_armature_types.h"
 #include "DNA_cloth_types.h"
+#include "DNA_dynamicpaint_types.h"
 #include "DNA_fluid_types.h"
 #include "DNA_gpencil_modifier_types.h"
 #include "DNA_mesh_types.h"
@@ -463,7 +464,7 @@ void BKE_modifier_set_error(const Object *ob, ModifierData *md, const char *_for
  * then is NULL)
  * also used for some mesh tools to give warnings
  */
-int BKE_modifiers_get_cage_index(struct Scene *scene,
+int BKE_modifiers_get_cage_index(const Scene *scene,
                                  Object *ob,
                                  int *r_lastPossibleCageIndex,
                                  bool is_virtual)
@@ -578,7 +579,7 @@ bool BKE_modifier_is_enabled(const struct Scene *scene, ModifierData *md, int re
  * Check whether given modifier is not local (i.e. from linked data) when the object is a library
  * override.
  *
- * \param md May be NULL, in which case we consider it as a non-local modifier case.
+ * \param md: May be NULL, in which case we consider it as a non-local modifier case.
  */
 bool BKE_modifier_is_nonlocal_in_liboverride(const Object *ob, const ModifierData *md)
 {
@@ -586,7 +587,7 @@ bool BKE_modifier_is_nonlocal_in_liboverride(const Object *ob, const ModifierDat
           (md == NULL || (md->flag & eModifierFlag_OverrideLibrary_Local) == 0));
 }
 
-CDMaskLink *BKE_modifier_calc_data_masks(struct Scene *scene,
+CDMaskLink *BKE_modifier_calc_data_masks(const struct Scene *scene,
                                          Object *ob,
                                          ModifierData *md,
                                          CustomData_MeshMasks *final_datamask,
@@ -654,7 +655,7 @@ CDMaskLink *BKE_modifier_calc_data_masks(struct Scene *scene,
   return dataMasks;
 }
 
-ModifierData *BKE_modifier_get_last_preview(struct Scene *scene,
+ModifierData *BKE_modifier_get_last_preview(const struct Scene *scene,
                                             ModifierData *md,
                                             int required_mode)
 {
@@ -877,7 +878,7 @@ bool BKE_modifiers_uses_armature(Object *ob, bArmature *arm)
   return false;
 }
 
-bool BKE_modifiers_uses_subsurf_facedots(struct Scene *scene, Object *ob)
+bool BKE_modifiers_uses_subsurf_facedots(const struct Scene *scene, Object *ob)
 {
   /* Search (backward) in the modifier stack to find if we have a subsurf modifier (enabled) before
    * the last modifier displayed on cage (or if the subsurf is the last). */
@@ -918,7 +919,7 @@ bool BKE_modifier_is_correctable_deformed(ModifierData *md)
   return mti->deformMatricesEM != NULL;
 }
 
-bool BKE_modifiers_is_correctable_deformed(struct Scene *scene, Object *ob)
+bool BKE_modifiers_is_correctable_deformed(const struct Scene *scene, Object *ob)
 {
   VirtualModifierData virtualModifierData;
   ModifierData *md = BKE_modifiers_get_virtual_modifierlist(ob, &virtualModifierData);
@@ -1563,7 +1564,7 @@ void BKE_modifier_blend_read_data(BlendDataReader *reader, ListBase *lb, Object 
       }
     }
 
-    if (mti->blendRead != NULL) {
+    if ((mti != NULL) && (mti->blendRead != NULL)) {
       mti->blendRead(reader, md);
     }
   }

@@ -28,6 +28,7 @@
 #include "BKE_object.h"
 #include "BKE_screen.h"
 
+#include "DNA_material_types.h"
 #include "DNA_object_force_types.h"
 #include "DNA_object_types.h"
 #include "DNA_particle_types.h"
@@ -268,6 +269,11 @@ static void gpencil_modifier_ops_extra_draw(bContext *C, uiLayout *layout, void 
           CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Duplicate"),
           ICON_DUPLICATE,
           "OBJECT_OT_gpencil_modifier_copy");
+
+  uiItemO(layout,
+          CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Copy to Selected"),
+          0,
+          "OBJECT_OT_gpencil_modifier_copy_to_selected");
 
   uiItemS(layout);
 

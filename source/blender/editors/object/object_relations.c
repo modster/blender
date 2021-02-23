@@ -484,7 +484,7 @@ void OBJECT_OT_proxy_make(wmOperatorType *ot)
                       DummyRNA_DEFAULT_items,
                       0,
                       "Proxy Object",
-                      "Name of lib-linked/collection object to make a proxy for");
+                      "Name of library-linked/collection object to make a proxy for");
   RNA_def_enum_funcs(prop, proxy_collection_object_itemf);
   RNA_def_property_flag(prop, PROP_ENUM_NO_TRANSLATE);
   ot->prop = prop;
@@ -1554,6 +1554,7 @@ enum {
   MAKE_LINKS_DUPLICOLLECTION = 5,
   MAKE_LINKS_MODIFIERS = 6,
   MAKE_LINKS_FONTS = 7,
+  MAKE_LINKS_SHADERFX = 8,
 };
 
 /* Return true if make link data is allowed, false otherwise */
@@ -1566,7 +1567,11 @@ static bool allow_make_links_data(const int type, Object *ob_src, Object *ob_dst
       }
       break;
     case MAKE_LINKS_MATERIALS:
-      if (OB_TYPE_SUPPORT_MATERIAL(ob_src->type) && OB_TYPE_SUPPORT_MATERIAL(ob_dst->type)) {
+      if (OB_TYPE_SUPPORT_MATERIAL(ob_src->type) && OB_TYPE_SUPPORT_MATERIAL(ob_dst->type) &&
+          /* Linking non-grease-pencil materials to a grease-pencil object causes issues.
+           * We make sure that if one of the objects is a grease-pencil object, the other must be
+           * as well. */
+          ((ob_src->type == OB_GPENCIL) == (ob_dst->type == OB_GPENCIL))) {
         return true;
       }
       break;
@@ -1586,6 +1591,11 @@ static bool allow_make_links_data(const int type, Object *ob_src, Object *ob_dst
     case MAKE_LINKS_FONTS:
       if ((ob_src->data != ob_dst->data) && (ob_src->type == OB_FONT) &&
           (ob_dst->type == OB_FONT)) {
+        return true;
+      }
+      break;
+    case MAKE_LINKS_SHADERFX:
+      if ((ob_src->type == OB_GPENCIL) && (ob_dst->type == OB_GPENCIL)) {
         return true;
       }
       break;
@@ -1720,6 +1730,11 @@ static int make_links_data_exec(bContext *C, wmOperator *op)
                               ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION);
             break;
           }
+          case MAKE_LINKS_SHADERFX:
+            ED_object_shaderfx_link(ob_dst, ob_src);
+            DEG_id_tag_update(&ob_dst->id,
+                              ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION);
+            break;
         }
       }
     }
@@ -1775,19 +1790,33 @@ void OBJECT_OT_make_links_scene(wmOperatorType *ot)
 void OBJECT_OT_make_links_data(wmOperatorType *ot)
 {
   static const EnumPropertyItem make_links_items[] = {
-      {MAKE_LINKS_OBDATA, "OBDATA", 0, "Object Data", ""},
-      {MAKE_LINKS_MATERIALS, "MATERIAL", 0, "Materials", ""},
-      {MAKE_LINKS_ANIMDATA, "ANIMATION", 0, "Animation Data", ""},
-      {MAKE_LINKS_GROUP, "GROUPS", 0, "Collection", ""},
-      {MAKE_LINKS_DUPLICOLLECTION, "DUPLICOLLECTION", 0, "Instance Collection", ""},
-      {MAKE_LINKS_MODIFIERS, "MODIFIERS", 0, "Modifiers", ""},
-      {MAKE_LINKS_FONTS, "FONTS", 0, "Fonts", ""},
+      {MAKE_LINKS_OBDATA, "OBDATA", 0, "Link Object Data", "Replace assigned Object Data"},
+      {MAKE_LINKS_MATERIALS, "MATERIAL", 0, "Link Materials", "Replace assigned Materials"},
+      {MAKE_LINKS_ANIMDATA,
+       "ANIMATION",
+       0,
+       "Link Animation Data",
+       "Replace assigned Animation Data"},
+      {MAKE_LINKS_GROUP, "GROUPS", 0, "Link Collections", "Replace assigned Collections"},
+      {MAKE_LINKS_DUPLICOLLECTION,
+       "DUPLICOLLECTION",
+       0,
+       "Link Instance Collection",
+       "Replace assigned Collection Instance"},
+      {MAKE_LINKS_FONTS, "FONTS", 0, "Link Fonts to Text", "Replace Text object Fonts"},
+      {0, "", 0, NULL, NULL},
+      {MAKE_LINKS_MODIFIERS, "MODIFIERS", 0, "Copy Modifiers", "Replace Modifiers"},
+      {MAKE_LINKS_SHADERFX,
+       "EFFECTS",
+       0,
+       "Copy Grease Pencil Effects",
+       "Replace Grease Pencil Effects"},
       {0, NULL, 0, NULL, NULL},
   };
 
   /* identifiers */
-  ot->name = "Link Data";
-  ot->description = "Apply active object links to other selected objects";
+  ot->name = "Link/Transfer Data";
+  ot->description = "Transfer data from active object to selected objects";
   ot->idname = "OBJECT_OT_make_links_data";
 
   /* api callbacks */
@@ -2312,7 +2341,7 @@ void OBJECT_OT_make_local(wmOperatorType *ot)
 
 static bool make_override_library_object_overridable_check(Main *bmain, Object *object)
 {
-  /* An object is actually overrideable only if it is in at least one local collections.
+  /* An object is actually overridable only if it is in at least one local collection.
    * Unfortunately 'direct link' flag is not enough here. */
   LISTBASE_FOREACH (Collection *, collection, &bmain->collections) {
     if (!ID_IS_LINKED(collection) && BKE_collection_has_object(collection, object)) {
@@ -2515,7 +2544,7 @@ static bool convert_proxy_to_override_poll(bContext *C)
   return obact != NULL && obact->proxy != NULL;
 }
 
-static int convert_proxy_to_override_exec(bContext *C, wmOperator *UNUSED(op))
+static int convert_proxy_to_override_exec(bContext *C, wmOperator *op)
 {
   Main *bmain = CTX_data_main(C);
   Scene *scene = CTX_data_scene(C);
@@ -2528,6 +2557,15 @@ static int convert_proxy_to_override_exec(bContext *C, wmOperator *UNUSED(op))
   const bool is_override_instancing_object = ob_proxy_group != NULL;
 
   const bool success = BKE_lib_override_library_proxy_convert(bmain, scene, view_layer, ob_proxy);
+
+  if (!success) {
+    BKE_reportf(
+        op->reports,
+        RPT_ERROR_INVALID_INPUT,
+        "Could not create a library override from proxy '%s' (might use already local data?)",
+        ob_proxy->id.name + 2);
+    return OPERATOR_CANCELLED;
+  }
 
   /* Remove the instance empty from this scene, the items now have an overridden collection
    * instead. */
@@ -2544,7 +2582,7 @@ static int convert_proxy_to_override_exec(bContext *C, wmOperator *UNUSED(op))
 void OBJECT_OT_convert_proxy_to_override(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Convert Proxy To Override";
+  ot->name = "Convert Proxy to Override";
   ot->description = "Convert a proxy to a local library override";
   ot->idname = "OBJECT_OT_convert_proxy_to_override";
 

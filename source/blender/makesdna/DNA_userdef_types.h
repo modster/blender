@@ -375,7 +375,7 @@ typedef struct ThemeSpace {
   /** Two uses, for uvs with modifier applied on mesh and uvs during painting. */
   unsigned char uv_shadow[4];
 
-  /** Outliner - filter match. */
+  /** Search filter match, used for property search and in the outliner. */
   unsigned char match[4];
   /** Outliner - selected item. */
   unsigned char selected_highlight[4];
@@ -569,6 +569,13 @@ enum {
   USER_MENU_TYPE_PROP = 4,
 };
 
+typedef struct bUserAssetLibrary {
+  struct bUserAssetLibrary *next, *prev;
+
+  char name[64];   /* MAX_NAME */
+  char path[1024]; /* FILE_MAX */
+} bUserAssetLibrary;
+
 typedef struct SolidLight {
   int flag;
   float smooth;
@@ -632,10 +639,12 @@ typedef struct UserDef_Experimental {
   /* The following options are automatically sanitized (set to 0)
    * when the release cycle is not alpha. */
   char use_new_hair_type;
+  char use_new_point_cloud_type;
   char use_sculpt_vertex_colors;
   char use_switch_object_operator;
   char use_sculpt_tools_tilt;
-  char use_object_add_tool;
+  char use_asset_browser;
+  char _pad[7];
   /** `makesdna` does not allow empty structs. */
 } UserDef_Experimental;
 
@@ -664,6 +673,21 @@ typedef struct UserDef {
   /** 768 = FILE_MAXDIR. */
   char render_cachedir[768];
   char textudir[768];
+  /**
+   * Optional user location for scripts.
+   *
+   * This supports the same layout as Blender's scripts directory `release/scripts`.
+   *
+   * \note Unlike most paths, changing this is not fully supported at run-time,
+   * requiring a restart to properly take effect. Supporting this would cause complications as
+   * the script path can contain `startup`, `addons` & `modules` etc. properly unwinding the
+   * Python environment to the state it _would_ have been in gets complicated.
+   *
+   * Although this is partially supported as the `sys.path` is refreshed when loading preferences.
+   * This is done to support #PREFERENCES_OT_copy_prev which is available to the user when they
+   * launch with a new version of Blender. In this case setting the script path on top of
+   * factory settings will work without problems.
+   */
   char pythondir[768];
   char sounddir[768];
   char i18ndir[768];
@@ -681,8 +705,7 @@ typedef struct UserDef {
   short versions;
   short dbl_click_time;
 
-  char _pad0[2];
-  char wheellinescroll;
+  char _pad0[3];
   char mini_axis_type;
   /** #eUserpref_UI_Flag. */
   int uiflag;
@@ -739,6 +762,8 @@ typedef struct UserDef {
   struct ListBase autoexec_paths;
   /** #bUserMenu. */
   struct ListBase user_menus;
+  /** #bUserAssetLibrary */
+  struct ListBase asset_libraries;
 
   char keyconfigstr[64];
 
@@ -752,8 +777,12 @@ typedef struct UserDef {
   char _pad13[4];
   struct SolidLight light_param[4];
   float light_ambient[3];
-  char _pad3[4];
-  short gizmo_flag, gizmo_size;
+  char gizmo_flag;
+  /** Generic gizmo size. */
+  char gizmo_size;
+  /** Navigate gizmo size. */
+  char gizmo_size_navigate_v3d;
+  char _pad3[5];
   short edit_studio_light;
   short lookdev_sphere_size;
   short vbotimeout, vbocollectrate;
@@ -999,8 +1028,11 @@ typedef enum ePathCompare_Flag {
 
 /** #UserDef.viewzoom */
 typedef enum eViewZoom_Style {
-  USER_ZOOM_CONT = 0,
+  /** Update zoom continuously with a timer while dragging the cursor. */
+  USER_ZOOM_CONTINUE = 0,
+  /** Map changes in distance from the view center to zoom. */
   USER_ZOOM_SCALE = 1,
+  /** Map horizontal/vertical motion to zoom. */
   USER_ZOOM_DOLLY = 2,
 } eViewZoom_Style;
 
@@ -1190,7 +1222,7 @@ typedef enum eDupli_ID_Flags {
 
   USER_DUP_OBDATA = (~0) & ((1 << 24) - 1),
 
-  /* Those are not exposed as user preferences, only used internaly. */
+  /* Those are not exposed as user preferences, only used internally. */
   USER_DUP_OBJECT = (1 << 24),
   /* USER_DUP_COLLECTION = (1 << 25), */ /* UNUSED, keep because we may implement. */
 
