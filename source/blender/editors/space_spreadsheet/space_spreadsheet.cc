@@ -125,21 +125,23 @@ static void draw_row_indices(uiBlock *block,
     const int x = left_x;
     const int y = top_y - (i + 1) * row_height;
     const std::string number_string = std::to_string(i);
-    uiDefIconTextBut(block,
-                     UI_BTYPE_LABEL,
-                     0,
-                     ICON_NONE,
-                     number_string.c_str(),
-                     x,
-                     y,
-                     column_width,
-                     row_height,
-                     nullptr,
-                     0,
-                     0,
-                     0,
-                     0,
-                     nullptr);
+    uiBut *but = uiDefIconTextBut(block,
+                                  UI_BTYPE_LABEL,
+                                  0,
+                                  ICON_NONE,
+                                  number_string.c_str(),
+                                  x,
+                                  y,
+                                  column_width,
+                                  row_height,
+                                  nullptr,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  nullptr);
+    UI_but_drawflag_enable(but, UI_BUT_TEXT_RIGHT);
+    UI_but_drawflag_disable(but, UI_BUT_TEXT_LEFT);
   }
 }
 
