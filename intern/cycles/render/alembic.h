@@ -305,6 +305,8 @@ class AlembicObject : public Node {
 
   bool has_data_loaded(int frame) const;
 
+  /* Enumeration used to speed up the discrimination of an IObject as IObject::matches() methods
+   * are too expensive and show up in profiles. */
   enum AbcSchemaType {
     INVALID,
     POLY_MESH,

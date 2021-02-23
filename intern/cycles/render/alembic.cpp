@@ -1623,38 +1623,37 @@ void AlembicProcedural::load_objects(Scene *scene, Progress &progress)
     walk_hierarchy(root, root.getChildHeader(i), nullptr, object_map, progress);
   }
 
-  /* create nodes in the scene if not already done */
-  foreach (Node *node, objects) {
-    AlembicObject *abc_object = static_cast<AlembicObject *>(node);
+  /* Create nodes in the scene. */
+  for (std::pair<string, AlembicObject *> pair : object_map) {
+    AlembicObject *abc_object = pair.second;
 
-    /* only consider newly added objects */
-    if (abc_object->get_object() == nullptr) {
-      Geometry *geometry = nullptr;
+    Geometry *geometry = nullptr;
 
-      if (!abc_object->instance_of) {
-        if (abc_object->schema_type == AlembicObject::CURVES) {
-          geometry = scene->create_node<Hair>();
-        }
-        else if (abc_object->schema_type == AlembicObject::POLY_MESH ||
-                 abc_object->schema_type == AlembicObject::SUBD) {
-          geometry = scene->create_node<Mesh>();
-        }
-
-        geometry->set_owner(this);
-        geometry->name = abc_object->iobject.getName();
-
-        array<Node *> used_shaders = abc_object->get_used_shaders();
-        geometry->set_used_shaders(used_shaders);
-      }
-
-      /* create object*/
-      Object *object = scene->create_node<Object>();
-      object->set_owner(this);
-      object->set_geometry(geometry);
-      object->name = abc_object->iobject.getName();
-
-      abc_object->set_object(object);
+    if (!abc_object->instance_of) {
+    if (abc_object->schema_type == AlembicObject::CURVES) {
+      geometry = scene_->create_node<Hair>();
     }
+    else if (abc_object->schema_type == AlembicObject::POLY_MESH ||
+             abc_object->schema_type == AlembicObject::SUBD) {
+      geometry = scene_->create_node<Mesh>();
+    }
+    else {
+      continue;
+    }
+
+    geometry->set_owner(this);
+    geometry->name = abc_object->iobject.getName();
+    }
+
+    array<Node *> used_shaders = abc_object->get_used_shaders();
+    geometry->set_used_shaders(used_shaders);
+
+    Object *object = scene_->create_node<Object>();
+    object->set_owner(this);
+    object->set_geometry(geometry);
+    object->name = abc_object->iobject.getName();
+
+    abc_object->set_object(object);
   }
 
   /* Share geometries between instances. */
