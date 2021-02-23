@@ -368,7 +368,8 @@ template<typename T> class device_vector : public device_memory {
 
   chunk get_chunk(size_t offset, size_t size)
   {
-    assert(has_chunks);
+    /* we may unconditionally ask for chunks, even if alloc_chunks was not called */
+    assert(has_chunks || data_size == 0);
 
     /* Handle case where there is no data, this is to support getting a chunk
      * for delta compression when the feature is not supported by the device or
