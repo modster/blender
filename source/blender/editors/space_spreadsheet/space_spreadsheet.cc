@@ -275,26 +275,6 @@ static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
       const MeshComponent &component = *geometry_set.get_component_for_read<MeshComponent>();
       spreadsheet_draw_readonly_table(block, component, ATTR_DOMAIN_POINT);
     }
-
-    // for (const int i : IndexRange(mesh->totvert)) {
-    //   const MVert &vert = mesh->mvert[i];
-    //   uiBut *but = uiDefButF(block,
-    //                          UI_BTYPE_NUM,
-    //                          0,
-    //                          "",
-    //                          0,
-    //                          -i * UI_UNIT_Y,
-    //                          150,
-    //                          UI_UNIT_Y,
-    //                          (float *)vert.co,
-    //                          -100.0f,
-    //                          100.0f,
-    //                          0,
-    //                          0,
-    //                          "My tip");
-    //   UI_but_number_precision_set(but, 3);
-    //   UI_but_disable(but, "cannot edit");
-    // }
   }
 
   UI_block_end(C, block);
