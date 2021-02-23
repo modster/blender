@@ -5916,6 +5916,62 @@ static char *uilist_item_tooltip_func(bContext *UNUSED(C), void *argN, const cha
   return BLI_sprintfN("%s - %s", tip, dyn_tooltip);
 }
 
+/**
+ * \brief ui_list_create
+ *
+ * \note Note that \a layout_type may be NULL.
+ */
+static uiList *ui_list_create(bContext *C,
+                              uiListType *ui_list_type,
+                              const char ui_list_id[UI_MAX_NAME_STR],
+                              int layout_type,
+                              int activei,
+                              bool sort_reverse,
+                              bool sort_lock)
+{
+  /* Allows to work in popups. */
+  ARegion *region = CTX_wm_menu(C);
+  if (region == NULL) {
+    region = CTX_wm_region(C);
+  }
+  uiList *ui_list = BLI_findstring(&region->ui_lists, ui_list_id, offsetof(uiList, list_id));
+
+  if (!ui_list) {
+    ui_list = MEM_callocN(sizeof(uiList), "uiList");
+    BLI_strncpy(ui_list->list_id, ui_list_id, sizeof(ui_list->list_id));
+    BLI_addtail(&region->ui_lists, ui_list);
+    ui_list->list_grip = -UI_LIST_AUTO_SIZE_THRESHOLD; /* Force auto size by default. */
+    if (sort_reverse) {
+      ui_list->filter_sort_flag |= UILST_FLT_SORT_REVERSE;
+    }
+    if (sort_lock) {
+      ui_list->filter_sort_flag |= UILST_FLT_SORT_LOCK;
+    }
+  }
+
+  if (!ui_list->dyn_data) {
+    ui_list->dyn_data = MEM_callocN(sizeof(uiListDyn), "uiList.dyn_data");
+  }
+  uiListDyn *dyn_data = ui_list->dyn_data;
+
+  /* Because we can't actually pass type across save&load... */
+  ui_list->type = ui_list_type;
+  ui_list->layout_type = layout_type;
+
+  /* Reset filtering data. */
+  MEM_SAFE_FREE(dyn_data->items_filter_flags);
+  MEM_SAFE_FREE(dyn_data->items_filter_neworder);
+  dyn_data->items_len = dyn_data->items_shown = -1;
+
+  /* When active item changed since last draw, scroll to it. */
+  if (activei != ui_list->list_last_activei) {
+    ui_list->flag |= UILST_SCROLL_TO_ACTIVE_ITEM;
+    ui_list->list_last_activei = activei;
+  }
+
+  return ui_list;
+}
+
 void uiTemplateList(uiLayout *layout,
                     bContext *C,
                     const char *listtype_name,
@@ -6017,45 +6073,9 @@ void uiTemplateList(uiLayout *layout,
   BLI_snprintf(
       ui_list_id, sizeof(ui_list_id), "%s_%s", ui_list_type->idname, list_id ? list_id : "");
 
-  /* Allows to work in popups. */
-  ARegion *region = CTX_wm_menu(C);
-  if (region == NULL) {
-    region = CTX_wm_region(C);
-  }
-  uiList *ui_list = BLI_findstring(&region->ui_lists, ui_list_id, offsetof(uiList, list_id));
-
-  if (!ui_list) {
-    ui_list = MEM_callocN(sizeof(uiList), "uiList");
-    BLI_strncpy(ui_list->list_id, ui_list_id, sizeof(ui_list->list_id));
-    BLI_addtail(&region->ui_lists, ui_list);
-    ui_list->list_grip = -UI_LIST_AUTO_SIZE_THRESHOLD; /* Force auto size by default. */
-    if (sort_reverse) {
-      ui_list->filter_sort_flag |= UILST_FLT_SORT_REVERSE;
-    }
-    if (sort_lock) {
-      ui_list->filter_sort_flag |= UILST_FLT_SORT_LOCK;
-    }
-  }
-
-  if (!ui_list->dyn_data) {
-    ui_list->dyn_data = MEM_callocN(sizeof(uiListDyn), "uiList.dyn_data");
-  }
+  uiList *ui_list = ui_list_create(
+      C, ui_list_type, ui_list_id, layout_type, activei, sort_reverse, sort_lock);
   uiListDyn *dyn_data = ui_list->dyn_data;
-
-  /* Because we can't actually pass type across save&load... */
-  ui_list->type = ui_list_type;
-  ui_list->layout_type = layout_type;
-
-  /* Reset filtering data. */
-  MEM_SAFE_FREE(dyn_data->items_filter_flags);
-  MEM_SAFE_FREE(dyn_data->items_filter_neworder);
-  dyn_data->items_len = dyn_data->items_shown = -1;
-
-  /* When active item changed since last draw, scroll to it. */
-  if (activei != ui_list->list_last_activei) {
-    ui_list->flag |= UILST_SCROLL_TO_ACTIVE_ITEM;
-    ui_list->list_last_activei = activei;
-  }
 
   /* Filter list items! (not for compact layout, though) */
   if (dataptr->data && prop) {
@@ -6370,6 +6390,94 @@ void uiTemplateList(uiLayout *layout,
                   0,
                   V2D_SCROLL_WIDTH,
                   UI_UNIT_Y * dyn_data->visual_height,
+                  &ui_list->list_scroll,
+                  0,
+                  dyn_data->height - dyn_data->visual_height,
+                  dyn_data->visual_height,
+                  0,
+                  "");
+      }
+      break;
+    case UILST_LAYOUT_FLEXIBLE_GRID:
+      box = uiLayoutListBox(layout, ui_list, active_dataptr, activeprop);
+      /* For grip button. */
+      glob = uiLayoutColumn(box, true);
+      /* For scrollbar. */
+      row = uiLayoutRow(glob, false);
+
+      /* TODO ED_fileselect_init_layout(). Share somehow? */
+      float size_x = (96.0f / 20.0f) * UI_UNIT_X;
+      float size_y = (96.0f / 20.0f) * UI_UNIT_Y;
+
+      const int cols_per_row = MAX2((uiLayoutGetWidth(box) - V2D_SCROLL_WIDTH) / size_x, 1);
+      uiLayout *grid = uiLayoutGridFlow(row, true, cols_per_row, true, true, true);
+
+      uilist_prepare(ui_list, len, activei, rows, maxrows, cols_per_row, &layoutdata);
+
+      if (dataptr->data && prop) {
+        /* create list items */
+        for (i = layoutdata.start_idx; i < layoutdata.end_idx; i++) {
+          PointerRNA *itemptr = &items_ptr[i].item;
+          const int org_i = items_ptr[i].org_idx;
+          const int flt_flag = items_ptr[i].flt_flag;
+
+          overlap = uiLayoutOverlap(grid);
+          col = uiLayoutColumn(overlap, false);
+
+          uiBlock *subblock = uiLayoutGetBlock(col);
+          UI_block_flag_enable(subblock, UI_BLOCK_LIST_ITEM);
+
+          but = uiDefButR_prop(subblock,
+                               UI_BTYPE_LISTROW,
+                               0,
+                               "",
+                               0,
+                               0,
+                               size_x,
+                               size_y,
+                               active_dataptr,
+                               activeprop,
+                               0,
+                               0,
+                               org_i,
+                               0,
+                               0,
+                               NULL);
+          UI_but_drawflag_enable(but, UI_BUT_NO_TOOLTIP);
+
+          col = uiLayoutColumn(overlap, false);
+
+          icon = UI_icon_from_rnaptr(C, itemptr, rnaicon, false);
+          draw_item(ui_list,
+                    C,
+                    col,
+                    dataptr,
+                    itemptr,
+                    icon,
+                    active_dataptr,
+                    active_propname,
+                    org_i,
+                    flt_flag);
+
+          /* If we are "drawing" active item, set all labels as active. */
+          if (i == activei) {
+            ui_layout_list_set_labels_active(col);
+          }
+
+          UI_block_flag_disable(subblock, UI_BLOCK_LIST_ITEM);
+        }
+      }
+
+      if (len > layoutdata.visual_items) {
+        /* col = */ uiLayoutColumn(row, false);
+        uiDefButI(block,
+                  UI_BTYPE_SCROLL,
+                  0,
+                  "",
+                  0,
+                  0,
+                  V2D_SCROLL_WIDTH,
+                  size_y * dyn_data->visual_height,
                   &ui_list->list_scroll,
                   0,
                   dyn_data->height - dyn_data->visual_height,

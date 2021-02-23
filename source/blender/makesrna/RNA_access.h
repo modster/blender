@@ -469,6 +469,7 @@ extern StructRNA RNA_Paint;
 extern StructRNA RNA_PaintCurve;
 extern StructRNA RNA_PaintToolSlot;
 extern StructRNA RNA_Palette;
+extern StructRNA RNA_PaletteColors;
 extern StructRNA RNA_PaletteColor;
 extern StructRNA RNA_Panel;
 extern StructRNA RNA_Particle;

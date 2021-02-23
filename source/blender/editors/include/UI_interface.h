@@ -2196,6 +2196,7 @@ int uiTemplateRecentFiles(struct uiLayout *layout, int rows);
 void uiTemplateFileSelectPath(uiLayout *layout,
                               struct bContext *C,
                               struct FileSelectParams *params);
+void uiTemplateAssetView(struct uiLayout *layout, struct bContext *C);
 
 /* items */
 void uiItemO(uiLayout *layout, const char *name, int icon, const char *opname);
@@ -2449,6 +2450,7 @@ typedef struct uiDragColorHandle {
 
 void ED_operatortypes_ui(void);
 void ED_keymap_ui(struct wmKeyConfig *keyconf);
+void ED_uilisttypes_ui(void);
 
 void UI_drop_color_copy(struct wmDrag *drag, struct wmDropBox *drop);
 bool UI_drop_color_poll(struct bContext *C,

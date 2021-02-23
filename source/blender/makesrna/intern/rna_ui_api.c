@@ -1677,6 +1677,10 @@ void RNA_api_ui_layout(StructRNA *srna)
   RNA_def_property_ui_text(parm, "Item", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   api_ui_item_common_text(func);
+
+  func = RNA_def_function(srna, "template_asset_view", "uiTemplateAssetView");
+  RNA_def_function_ui_description(func, "Item. A scrollable list of assets in a grid view");
+  RNA_def_function_flag(func, FUNC_USE_CONTEXT);
 }
 
 #endif
