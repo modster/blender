@@ -301,6 +301,7 @@ DefNode(GeometryNode, GEO_NODE_ATTRIBUTE_SEPARATE_XYZ, def_geo_attribute_separat
 DefNode(GeometryNode, GEO_NODE_SUBDIVISION_SURFACE_SIMPLE, 0, "SUBDIVISION_SURFACE_SIMPLE", SubdivisionSurfaceSimple, "Simple Subdivision Surface", "")
 DefNode(GeometryNode, GEO_NODE_MESH_PRIMITIVE_CUBE, 0, "MESH_PRIMITIVE_CUBE", MeshCube, "Cube", "")
 DefNode(GeometryNode, GEO_NODE_MESH_PRIMITIVE_CIRCLE, def_geo_mesh_circle, "MESH_PRIMITIVE_CIRCLE", MeshCircle, "Circle", "")
+DefNode(GeometryNode, GEO_NODE_MESH_PRIMITIVE_UV_SPHERE, 0, "MESH_PRIMITIVE_UV_SPHERE", MeshUVSphere, "UV Sphere", "")
 
 /* undefine macros */
 #undef DefNode
