@@ -104,8 +104,7 @@ static void spreadsheet_keymap(wmKeyConfig *UNUSED(keyconf))
 
 static void spreadsheet_main_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
 {
-  region->v2d.scroll = V2D_SCROLL_RIGHT | V2D_SCROLL_BOTTOM | V2D_SCROLL_HORIZONTAL_HIDE |
-                       V2D_SCROLL_VERTICAL_HIDE;
+  region->v2d.scroll = V2D_SCROLL_RIGHT | V2D_SCROLL_BOTTOM;
   region->v2d.align = V2D_ALIGN_NO_NEG_X | V2D_ALIGN_NO_POS_Y;
   region->v2d.keepzoom = V2D_LOCKZOOM_X | V2D_LOCKZOOM_Y | V2D_LIMITZOOM | V2D_KEEPASPECT;
   region->v2d.keeptot = V2D_KEEPTOT_STRICT;
@@ -279,6 +278,9 @@ static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
 
   UI_block_end(C, block);
   UI_block_draw(C, block);
+
+  UI_view2d_view_restore(C);
+  UI_view2d_scrollers_draw(v2d, NULL);
 }
 
 static void spreadsheet_main_region_listener(const wmRegionListenerParams *params)
