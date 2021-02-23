@@ -30,6 +30,8 @@
 
 #include "NOD_shader.h"
 
+/* TODO: move eMTLSyntaxElement out of following file into a more neutral place */
+#include "obj_export_io.hh"
 #include "obj_import_mtl.hh"
 #include "parser_string_utils.hh"
 
@@ -318,7 +320,7 @@ void ShaderNodetreeWrap::set_bsdf_socket_values()
 
   set_property_of_socket(SOCK_RGBA, "Base Color", {base_color, 3}, bsdf_.get());
   set_property_of_socket(SOCK_RGBA, "Emission", {emission_color, 3}, bsdf_.get());
-  if (mtl_mat_.texture_maps.contains_as("Emission")) {
+  if (mtl_mat_.texture_maps.contains_as(eMTLSyntaxElement::map_Ke)) {
     set_property_of_socket(SOCK_FLOAT, "Emission Strength", {1.0f}, bsdf_.get());
   }
   set_property_of_socket(SOCK_FLOAT, "Specular", {specular}, bsdf_.get());
@@ -334,7 +336,7 @@ void ShaderNodetreeWrap::set_bsdf_socket_values()
  */
 void ShaderNodetreeWrap::add_image_textures(Main *bmain)
 {
-  for (const Map<const std::string, tex_map_XX>::Item texture_map :
+  for (const Map<const eMTLSyntaxElement, tex_map_XX>::Item texture_map :
        mtl_mat_.texture_maps.items()) {
     if (texture_map.value.image_path.empty()) {
       /* No Image texture node of this map type can be added to this material. */
@@ -346,7 +348,7 @@ void ShaderNodetreeWrap::add_image_textures(Main *bmain)
     unique_node_ptr texture_coordinate(add_node_to_tree(SH_NODE_TEX_COORD));
     unique_node_ptr normal_map = nullptr;
 
-    if (texture_map.key == "map_Bump") {
+    if (texture_map.key == eMTLSyntaxElement::map_Bump) {
       normal_map.reset(add_node_to_tree(SH_NODE_NORMAL_MAP));
       const float bump = std::max(0.0f, mtl_mat_.map_Bump_strength);
       set_property_of_socket(SOCK_FLOAT, "Strength", {bump}, normal_map.get());
