@@ -19,6 +19,8 @@ set(INC
   ../include
   ../../blenkernel
   ../../blenlib
+  ../../depsgraph
+  ../../functions
   ../../makesdna
   ../../makesrna
   ../../windowmanager
