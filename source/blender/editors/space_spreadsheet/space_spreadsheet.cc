@@ -47,6 +47,7 @@
 
 #include "spreadsheet_intern.hh"
 
+using blender::float3;
 using blender::IndexRange;
 using blender::MutableSpan;
 using blender::Set;
@@ -54,6 +55,7 @@ using blender::Span;
 using blender::StringRef;
 using blender::StringRefNull;
 using blender::Vector;
+using blender::bke::ReadAttribute;
 using blender::bke::ReadAttributePtr;
 using blender::fn::CPPType;
 using blender::fn::GMutableSpan;
@@ -112,74 +114,138 @@ static void spreadsheet_main_region_init(wmWindowManager *UNUSED(wm), ARegion *r
   UI_view2d_region_reinit(&region->v2d, V2D_COMMONVIEW_LIST, region->winx, region->winy);
 }
 
+static void draw_row_indices(uiBlock *block,
+                             const int amount,
+                             const int left_x,
+                             const int top_y,
+                             const int column_width,
+                             const int row_height)
+{
+  for (const int i : IndexRange(amount)) {
+    const int x = left_x;
+    const int y = top_y - (i + 1) * row_height;
+    const std::string number_string = std::to_string(i);
+    uiDefIconTextBut(block,
+                     UI_BTYPE_LABEL,
+                     0,
+                     ICON_NONE,
+                     number_string.c_str(),
+                     x,
+                     y,
+                     column_width,
+                     row_height,
+                     nullptr,
+                     0,
+                     0,
+                     0,
+                     0,
+                     nullptr);
+  }
+}
+
+static void draw_attribute_column(uiBlock *block,
+                                  const StringRefNull attribute_name,
+                                  const ReadAttribute &attribute,
+                                  const int left_x,
+                                  const int top_y,
+                                  const int row_height,
+                                  int *r_right_x)
+{
+  const int width = 100;
+  uiDefIconTextBut(block,
+                   UI_BTYPE_LABEL,
+                   0,
+                   ICON_NONE,
+                   attribute_name.c_str(),
+                   left_x,
+                   top_y - row_height,
+                   width,
+                   row_height,
+                   nullptr,
+                   0,
+                   0,
+                   0,
+                   0,
+                   nullptr);
+  const CustomDataType data_type = attribute.custom_data_type();
+  const int domain_size = attribute.size();
+  switch (data_type) {
+    case CD_PROP_FLOAT: {
+      const blender::bke::FloatReadAttribute float_attribute = attribute;
+      for (const int i : IndexRange(domain_size)) {
+        const float value = float_attribute[i];
+        std::string value_str = std::to_string(value);
+        const int x = left_x;
+        const int y = top_y - (i + 2) * row_height;
+        uiDefIconTextBut(block,
+                         UI_BTYPE_LABEL,
+                         0,
+                         ICON_NONE,
+                         value_str.c_str(),
+                         x,
+                         y,
+                         width,
+                         row_height,
+                         nullptr,
+                         0,
+                         0,
+                         0,
+                         0,
+                         nullptr);
+      }
+      break;
+    }
+    case CD_PROP_FLOAT3: {
+      break;
+    }
+    default:
+      break;
+  }
+  *r_right_x = left_x + width;
+}
+
 static void spreadsheet_draw_readonly_table(uiBlock *block,
                                             const GeometryComponent &component,
                                             const AttributeDomain domain)
 {
-  Set<std::string> attribute_names = component.attribute_names();
+
   struct AttributeWithName {
-    ReadAttributePtr attribute;
     std::string name;
+    ReadAttributePtr attribute;
   };
+
   Vector<AttributeWithName> attribute_columns;
-  for (StringRef attribute_name : attribute_names) {
-    ReadAttributePtr attribute = component.attribute_try_get_for_read(attribute_name);
-    if (!attribute) {
-      continue;
+  component.attribute_foreach([&](StringRefNull name, const AttributeMetaData &meta_data) {
+    if (meta_data.domain == domain) {
+      ReadAttributePtr attribute = component.attribute_try_get_for_read(name);
+      attribute_columns.append({name, std::move(attribute)});
     }
-    if (attribute->domain() == domain) {
-      attribute_columns.append({std::move(attribute), attribute_name});
-    }
-  }
+    return true;
+  });
+
   std::sort(
       attribute_columns.begin(),
       attribute_columns.end(),
       [](const AttributeWithName &a, const AttributeWithName &b) { return a.name < b.name; });
 
-  int current_x = UI_UNIT_X * 2;
-  int current_y = -UI_UNIT_Y;
-  for (const AttributeWithName &data : attribute_columns) {
-    const int width = 5 * UI_UNIT_X;
-    const int height = UI_UNIT_Y;
-    uiDefIconTextBut(block,
-                     UI_BTYPE_LABEL,
-                     0,
-                     ICON_NONE,
-                     data.name.c_str(),
-                     current_x,
-                     current_y,
-                     width,
-                     height,
-                     nullptr,
-                     0.0f,
-                     0.0f,
-                     0.0f,
-                     0.0f,
-                     nullptr);
-    current_x += width;
-  }
+  const int index_column_width = UI_UNIT_X * 2;
+  const int row_height = UI_UNIT_Y;
 
   const int domain_size = component.attribute_domain_size(domain);
-  for (const int i : IndexRange(domain_size)) {
-    const int x = 0;
-    const int y = -UI_UNIT_Y * (i + 2);
-    const int width = UI_UNIT_X;
-    const int height = UI_UNIT_Y;
-    uiDefIconTextBut(block,
-                     UI_BTYPE_LABEL,
-                     0,
-                     ICON_NONE,
-                     std::to_string(i).c_str(),
-                     x,
-                     y,
-                     width,
-                     height,
-                     nullptr,
-                     0.0f,
-                     0.0f,
-                     0.0f,
-                     0.0f,
-                     nullptr);
+
+  draw_row_indices(block, domain_size, 0, -row_height, index_column_width, row_height);
+
+  int current_column_left_x = index_column_width;
+  for (const AttributeWithName &attribute_data : attribute_columns) {
+    int right_x;
+    draw_attribute_column(block,
+                          attribute_data.name,
+                          *attribute_data.attribute,
+                          current_column_left_x,
+                          0,
+                          row_height,
+                          &right_x);
+    current_column_left_x = right_x;
   }
 }
 
