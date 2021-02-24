@@ -352,11 +352,8 @@ static void draw_column_headers(const bContext *C,
     const int right_x = left_x + column_layout.width;
 
     rcti rect;
-    BLI_rcti_init(&rect,
-                  left_x,
-                  right_x,
-                  region->winy - spreadsheet_layout.index_column_width,
-                  region->winy);
+    BLI_rcti_init(
+        &rect, left_x, right_x, region->winy - spreadsheet_layout.title_row_height, region->winy);
     if (column_layout.header_drawer != nullptr) {
       column_layout.header_drawer->draw_header(column_headers_block, rect);
     }
@@ -476,7 +473,7 @@ static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
   SpreadsheetLayout spreadsheet_layout;
   spreadsheet_layout.index_column_width = 2 * UI_UNIT_X;
   spreadsheet_layout.row_height = UI_UNIT_Y;
-  spreadsheet_layout.title_row_height = 1.5 * UI_UNIT_Y;
+  spreadsheet_layout.title_row_height = 1.25 * UI_UNIT_Y;
   spreadsheet_layout.columns.append({100, &my_header_drawer, &my_cell_drawer});
   spreadsheet_layout.columns.append({200, &my_header_drawer, &my_cell_drawer});
   spreadsheet_layout.columns.append({100, &my_header_drawer, &my_cell_drawer});
