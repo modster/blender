@@ -21,6 +21,7 @@ set(INC
   ../../blenlib
   ../../depsgraph
   ../../functions
+  ../../gpu
   ../../makesdna
   ../../makesrna
   ../../windowmanager
