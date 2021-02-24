@@ -45,6 +45,8 @@
 
 #include "WM_types.h"
 
+#include "GPU_immediate.h"
+
 #include "spreadsheet_intern.hh"
 
 using blender::float3;
@@ -113,26 +115,208 @@ static void spreadsheet_main_region_init(wmWindowManager *UNUSED(wm), ARegion *r
   UI_view2d_region_reinit(&region->v2d, V2D_COMMONVIEW_LIST, region->winx, region->winy);
 }
 
-static void draw_row_indices(uiBlock *block,
-                             const int amount,
-                             const int left_x,
-                             const int top_y,
-                             const int column_width,
-                             const int row_height)
-{
-  for (const int i : IndexRange(amount)) {
-    const int x = left_x;
-    const int y = top_y - (i + 1) * row_height;
-    const std::string number_string = std::to_string(i);
+class ColumnHeaderDrawer {
+ public:
+  virtual ~ColumnHeaderDrawer() = default;
+  virtual void draw_header(uiBlock *block, const rcti &rect) const = 0;
+};
+
+class CellDrawer {
+ public:
+  virtual ~CellDrawer() = default;
+  virtual void draw_cell(uiBlock *block, const rcti &rect, const int index) const = 0;
+};
+
+struct SpreadsheetColumnLayout {
+  int width;
+  const ColumnHeaderDrawer *header_drawer = nullptr;
+  const CellDrawer *cell_drawer = nullptr;
+};
+
+struct SpreadsheetLayout {
+  int index_column_width;
+  int title_row_height;
+  int row_height;
+  Vector<SpreadsheetColumnLayout> columns;
+};
+
+class TextColumnHeaderDrawer final : public ColumnHeaderDrawer {
+ private:
+  std::string text_;
+
+ public:
+  TextColumnHeaderDrawer(std::string text) : text_(std::move(text))
+  {
+  }
+
+  void draw_header(uiBlock *block, const rcti &rect) const final
+  {
     uiBut *but = uiDefIconTextBut(block,
                                   UI_BTYPE_LABEL,
                                   0,
                                   ICON_NONE,
-                                  number_string.c_str(),
+                                  text_.c_str(),
+                                  rect.xmin,
+                                  rect.ymin,
+                                  BLI_rcti_size_x(&rect),
+                                  BLI_rcti_size_y(&rect),
+                                  nullptr,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  nullptr);
+    UI_but_drawflag_disable(but, UI_BUT_TEXT_LEFT);
+    UI_but_drawflag_disable(but, UI_BUT_TEXT_RIGHT);
+  }
+};
+
+class ConstantTextCellDrawer final : public CellDrawer {
+ private:
+  std::string text_;
+
+ public:
+  ConstantTextCellDrawer(std::string text) : text_(std::move(text))
+  {
+  }
+
+  void draw_cell(uiBlock *block, const rcti &rect, const int UNUSED(index)) const final
+  {
+    uiDefIconTextBut(block,
+                     UI_BTYPE_LABEL,
+                     0,
+                     ICON_NONE,
+                     text_.c_str(),
+                     rect.xmin,
+                     rect.ymin,
+                     BLI_rcti_size_x(&rect),
+                     BLI_rcti_size_y(&rect),
+                     nullptr,
+                     0,
+                     0,
+                     0,
+                     0,
+                     nullptr);
+  }
+};
+
+static void draw_index_column_background(const uint pos,
+                                         const ARegion *region,
+                                         const SpreadsheetLayout &spreadsheet_layout)
+{
+  immUniformThemeColorShade(TH_BACK, 11);
+  immRecti(pos,
+           0,
+           region->winy - spreadsheet_layout.title_row_height,
+           spreadsheet_layout.index_column_width,
+           0);
+}
+
+static void draw_alternating_row_overlay(const uint pos,
+                                         const int scroll_offset_y,
+                                         const ARegion *region,
+                                         const SpreadsheetLayout &spreadsheet_layout)
+{
+  immUniformThemeColor(TH_ROW_ALTERNATE);
+  GPU_blend(GPU_BLEND_ALPHA);
+  const int row_pair_height = spreadsheet_layout.row_height * 2;
+  const int row_top_y = region->winy - spreadsheet_layout.title_row_height -
+                        scroll_offset_y % row_pair_height;
+  for (const int i : IndexRange(region->winy / row_pair_height + 1)) {
+    int x_left = 0;
+    int x_right = region->winx;
+    int y_top = row_top_y - i * row_pair_height;
+    int y_bottom = y_top - spreadsheet_layout.row_height;
+    y_top = std::min(y_top, region->winy - spreadsheet_layout.title_row_height);
+    y_bottom = std::min(y_bottom, region->winy - spreadsheet_layout.title_row_height);
+    immRecti(pos, x_left, y_top, x_right, y_bottom);
+  }
+  GPU_blend(GPU_BLEND_NONE);
+}
+
+static void draw_title_row_background(const uint pos,
+                                      const ARegion *region,
+                                      const SpreadsheetLayout &spreadsheet_layout)
+{
+  immUniformThemeColorShade(TH_BACK, 11);
+  immRecti(pos, 0, region->winy, region->winx, region->winy - spreadsheet_layout.title_row_height);
+}
+
+static void draw_separator_lines(const uint pos,
+                                 const int scroll_offset_x,
+                                 const ARegion *region,
+                                 const SpreadsheetLayout &spreadsheet_layout)
+{
+  immUniformThemeColorShade(TH_BACK, -11);
+
+  immBeginAtMost(GPU_PRIM_LINES, spreadsheet_layout.columns.size() * 2 + 4);
+
+  /* Index column line. */
+  immVertex2i(pos, spreadsheet_layout.index_column_width, region->winy);
+  immVertex2i(pos, spreadsheet_layout.index_column_width, 0);
+
+  /* Title row line. */
+  immVertex2i(pos, 0, region->winy - spreadsheet_layout.title_row_height);
+  immVertex2i(pos, region->winx, region->winy - spreadsheet_layout.title_row_height);
+
+  /* Column separator lines. */
+  int line_x = spreadsheet_layout.index_column_width - scroll_offset_x;
+  for (const int i : spreadsheet_layout.columns.index_range()) {
+    const SpreadsheetColumnLayout &column = spreadsheet_layout.columns[i];
+    line_x += column.width;
+    if (line_x >= spreadsheet_layout.index_column_width) {
+      immVertex2i(pos, line_x, region->winy);
+      immVertex2i(pos, line_x, 0);
+    }
+  }
+  immEnd();
+}
+
+static void get_visible_rows(const SpreadsheetLayout &spreadsheet_layout,
+                             const ARegion *region,
+                             const int scroll_offset_y,
+                             int *r_first_row,
+                             int *r_max_visible_rows)
+{
+  *r_first_row = -scroll_offset_y / spreadsheet_layout.row_height;
+  *r_max_visible_rows = region->winy / spreadsheet_layout.row_height + 1;
+}
+
+static void draw_row_indices(const int scroll_offset_y,
+                             const Span<int64_t> row_indices,
+                             const bContext *C,
+                             ARegion *region,
+                             const SpreadsheetLayout &spreadsheet_layout)
+{
+  GPU_scissor_test(true);
+  GPU_scissor(0,
+              0,
+              spreadsheet_layout.index_column_width,
+              region->winy - spreadsheet_layout.title_row_height);
+
+  uiBlock *indices_block = UI_block_begin(C, region, __func__, UI_EMBOSS_NONE);
+  int first_row, max_visible_rows;
+  get_visible_rows(spreadsheet_layout, region, scroll_offset_y, &first_row, &max_visible_rows);
+  for (const int i : IndexRange(first_row, max_visible_rows)) {
+    if (i >= row_indices.size()) {
+      break;
+    }
+    const int index = row_indices[i];
+    const std::string index_str = std::to_string(index);
+    const int x = 0;
+    const int y = region->winy - spreadsheet_layout.title_row_height -
+                  (i + 1) * spreadsheet_layout.row_height - scroll_offset_y;
+    const int width = spreadsheet_layout.index_column_width;
+    const int height = spreadsheet_layout.row_height;
+    uiBut *but = uiDefIconTextBut(indices_block,
+                                  UI_BTYPE_LABEL,
+                                  0,
+                                  ICON_NONE,
+                                  index_str.c_str(),
                                   x,
                                   y,
-                                  column_width,
-                                  row_height,
+                                  width,
+                                  height,
                                   nullptr,
                                   0,
                                   0,
@@ -142,145 +326,166 @@ static void draw_row_indices(uiBlock *block,
     UI_but_drawflag_enable(but, UI_BUT_TEXT_RIGHT);
     UI_but_drawflag_disable(but, UI_BUT_TEXT_LEFT);
   }
+
+  UI_block_end(C, indices_block);
+  UI_block_draw(C, indices_block);
+
+  GPU_scissor_test(false);
 }
 
-static void draw_attribute_column(uiBlock *block,
-                                  const StringRefNull attribute_name,
-                                  const ReadAttribute &attribute,
-                                  const int left_x,
-                                  const int top_y,
-                                  const int row_height,
-                                  int *r_right_x)
+static void draw_column_headers(const bContext *C,
+                                ARegion *region,
+                                const SpreadsheetLayout &spreadsheet_layout,
+                                const int scroll_offset_x)
 {
-  const int width = 100;
-  uiDefIconTextBut(block,
-                   UI_BTYPE_LABEL,
-                   0,
-                   ICON_NONE,
-                   attribute_name.c_str(),
-                   left_x,
-                   top_y - row_height,
-                   width,
-                   row_height,
-                   nullptr,
-                   0,
-                   0,
-                   0,
-                   0,
-                   nullptr);
-  const CustomDataType data_type = attribute.custom_data_type();
-  const int domain_size = attribute.size();
-  switch (data_type) {
-    case CD_PROP_FLOAT: {
-      const blender::bke::FloatReadAttribute float_attribute = attribute;
-      for (const int i : IndexRange(domain_size)) {
-        const float value = float_attribute[i];
-        std::string value_str = std::to_string(value);
-        const int x = left_x;
-        const int y = top_y - (i + 2) * row_height;
-        uiDefIconTextBut(block,
-                         UI_BTYPE_LABEL,
-                         0,
-                         ICON_NONE,
-                         value_str.c_str(),
-                         x,
-                         y,
-                         width,
-                         row_height,
-                         nullptr,
-                         0,
-                         0,
-                         0,
-                         0,
-                         nullptr);
+  GPU_scissor_test(true);
+  GPU_scissor(spreadsheet_layout.index_column_width + 1,
+              region->winy - spreadsheet_layout.title_row_height,
+              region->winx - spreadsheet_layout.index_column_width,
+              spreadsheet_layout.title_row_height);
+
+  uiBlock *column_headers_block = UI_block_begin(C, region, __func__, UI_EMBOSS_NONE);
+
+  int left_x = spreadsheet_layout.index_column_width - scroll_offset_x;
+  for (const int i : spreadsheet_layout.columns.index_range()) {
+    const SpreadsheetColumnLayout &column_layout = spreadsheet_layout.columns[i];
+    const int right_x = left_x + column_layout.width;
+
+    rcti rect;
+    BLI_rcti_init(&rect,
+                  left_x,
+                  right_x,
+                  region->winy - spreadsheet_layout.index_column_width,
+                  region->winy);
+    if (column_layout.header_drawer != nullptr) {
+      column_layout.header_drawer->draw_header(column_headers_block, rect);
+    }
+
+    left_x = right_x;
+  }
+
+  UI_block_end(C, column_headers_block);
+  UI_block_draw(C, column_headers_block);
+
+  GPU_scissor_test(false);
+}
+
+static void draw_cell_contents(const bContext *C,
+                               ARegion *region,
+                               const SpreadsheetLayout &spreadsheet_layout,
+                               const Span<int64_t> row_indices,
+                               const int scroll_offset_x,
+                               const int scroll_offset_y)
+{
+  GPU_scissor_test(true);
+  GPU_scissor(spreadsheet_layout.index_column_width + 1,
+              0,
+              region->winx - spreadsheet_layout.index_column_width,
+              region->winy - spreadsheet_layout.title_row_height);
+
+  uiBlock *cells_block = UI_block_begin(C, region, __func__, UI_EMBOSS_NONE);
+
+  int first_row, max_visible_rows;
+  get_visible_rows(spreadsheet_layout, region, scroll_offset_y, &first_row, &max_visible_rows);
+
+  int left_x = spreadsheet_layout.index_column_width - scroll_offset_x;
+  for (const int column_index : spreadsheet_layout.columns.index_range()) {
+    const SpreadsheetColumnLayout &column_layout = spreadsheet_layout.columns[column_index];
+    const int right_x = left_x + column_layout.width;
+
+    for (const int i : IndexRange(first_row, max_visible_rows)) {
+      if (i >= row_indices.size()) {
+        break;
       }
-      break;
+      const int bottom_y = region->winy - spreadsheet_layout.title_row_height -
+                           (i + 1) * spreadsheet_layout.row_height - scroll_offset_y;
+      const int top_y = bottom_y + spreadsheet_layout.row_height;
+      rcti rect;
+      BLI_rcti_init(&rect, left_x, right_x, bottom_y, top_y);
+
+      const int index = row_indices[i];
+
+      if (column_layout.cell_drawer != nullptr) {
+        column_layout.cell_drawer->draw_cell(cells_block, rect, index);
+      }
     }
-    case CD_PROP_FLOAT3: {
-      break;
-    }
-    default:
-      break;
+
+    left_x = right_x;
   }
-  *r_right_x = left_x + width;
+
+  UI_block_end(C, cells_block);
+  UI_block_draw(C, cells_block);
+
+  GPU_scissor_test(false);
 }
 
-static void spreadsheet_draw_readonly_table(uiBlock *block,
-                                            const GeometryComponent &component,
-                                            const AttributeDomain domain)
+static void draw_spreadsheet(const bContext *C,
+                             const SpreadsheetLayout &spreadsheet_layout,
+                             ARegion *region,
+                             Span<int64_t> row_indices)
 {
+  UI_ThemeClearColor(TH_BACK);
 
-  struct AttributeWithName {
-    std::string name;
-    ReadAttributePtr attribute;
-  };
+  View2D *v2d = &region->v2d;
+  const int scroll_offset_y = v2d->cur.ymax;
+  const int scroll_offset_x = v2d->cur.xmin;
 
-  Vector<AttributeWithName> attribute_columns;
-  component.attribute_foreach([&](StringRefNull name, const AttributeMetaData &meta_data) {
-    if (meta_data.domain == domain) {
-      ReadAttributePtr attribute = component.attribute_try_get_for_read(name);
-      attribute_columns.append({name, std::move(attribute)});
-    }
-    return true;
-  });
+  GPUVertFormat *format = immVertexFormat();
+  uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_I32, 2, GPU_FETCH_INT_TO_FLOAT);
+  immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 
-  std::sort(
-      attribute_columns.begin(),
-      attribute_columns.end(),
-      [](const AttributeWithName &a, const AttributeWithName &b) { return a.name < b.name; });
+  draw_index_column_background(pos, region, spreadsheet_layout);
+  draw_alternating_row_overlay(pos, scroll_offset_y, region, spreadsheet_layout);
+  draw_title_row_background(pos, region, spreadsheet_layout);
+  draw_separator_lines(pos, scroll_offset_x, region, spreadsheet_layout);
 
-  const int index_column_width = UI_UNIT_X * 2;
-  const int row_height = UI_UNIT_Y;
+  immUnbindProgram();
 
-  const int domain_size = component.attribute_domain_size(domain);
+  draw_row_indices(scroll_offset_y, row_indices, C, region, spreadsheet_layout);
+  draw_column_headers(C, region, spreadsheet_layout, scroll_offset_x);
+  draw_cell_contents(C, region, spreadsheet_layout, row_indices, scroll_offset_x, scroll_offset_y);
 
-  draw_row_indices(block, domain_size, 0, -row_height, index_column_width, row_height);
+  rcti scroller_mask;
+  BLI_rcti_init(&scroller_mask,
+                spreadsheet_layout.index_column_width,
+                region->winx,
+                0,
+                region->winy - spreadsheet_layout.title_row_height);
+  UI_view2d_scrollers_draw(v2d, &scroller_mask);
+}
 
-  int current_column_left_x = index_column_width;
-  for (const AttributeWithName &attribute_data : attribute_columns) {
-    int right_x;
-    draw_attribute_column(block,
-                          attribute_data.name,
-                          *attribute_data.attribute,
-                          current_column_left_x,
-                          0,
-                          row_height,
-                          &right_x);
-    current_column_left_x = right_x;
+static void update_view2d_tot_rect(const SpreadsheetLayout &spreadsheet_layout,
+                                   ARegion *region,
+                                   const int row_amount)
+{
+  int column_width_sum = 0;
+  for (const SpreadsheetColumnLayout &column_layout : spreadsheet_layout.columns) {
+    column_width_sum += column_layout.width;
   }
+  UI_view2d_totRect_set(&region->v2d,
+                        column_width_sum + spreadsheet_layout.index_column_width,
+                        row_amount * spreadsheet_layout.row_height +
+                            spreadsheet_layout.title_row_height);
 }
 
 static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
 {
-  UI_ThemeClearColor(TH_BACK);
+  TextColumnHeaderDrawer my_header_drawer{"Hello"};
+  ConstantTextCellDrawer my_cell_drawer{"test"};
 
-  Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
+  SpreadsheetLayout spreadsheet_layout;
+  spreadsheet_layout.index_column_width = 2 * UI_UNIT_X;
+  spreadsheet_layout.row_height = UI_UNIT_Y;
+  spreadsheet_layout.title_row_height = 1.5 * UI_UNIT_Y;
+  spreadsheet_layout.columns.append({100, &my_header_drawer, &my_cell_drawer});
+  spreadsheet_layout.columns.append({200, &my_header_drawer, &my_cell_drawer});
+  spreadsheet_layout.columns.append({100, &my_header_drawer, &my_cell_drawer});
+  spreadsheet_layout.columns.append({200, &my_header_drawer, &my_cell_drawer});
+  spreadsheet_layout.columns.append({80, &my_header_drawer, &my_cell_drawer});
 
-  View2D *v2d = &region->v2d;
-  v2d->flag |= V2D_PIXELOFS_X | V2D_PIXELOFS_Y;
-  UI_view2d_view_ortho(v2d);
-
-  /* TODO: Properly compute width and height. */
-  UI_view2d_totRect_set(v2d, 5000, 5000);
-
-  uiBlock *block = UI_block_begin(C, region, __func__, UI_EMBOSS_NONE);
-
-  Object *object = CTX_data_active_object(C);
-  if (object != nullptr && object->type == OB_MESH) {
-    Object *object_eval = DEG_get_evaluated_object(depsgraph, object);
-    const GeometrySet &geometry_set = *object_eval->runtime.geometry_set_eval;
-
-    if (geometry_set.has<MeshComponent>()) {
-      const MeshComponent &component = *geometry_set.get_component_for_read<MeshComponent>();
-      spreadsheet_draw_readonly_table(block, component, ATTR_DOMAIN_POINT);
-    }
-  }
-
-  UI_block_end(C, block);
-  UI_block_draw(C, block);
-
-  UI_view2d_view_restore(C);
-  UI_view2d_scrollers_draw(v2d, NULL);
+  const int row_amount = 101;
+  draw_spreadsheet(C, spreadsheet_layout, region, IndexRange(row_amount).as_span());
+  update_view2d_tot_rect(spreadsheet_layout, region, row_amount);
 }
 
 static void spreadsheet_main_region_listener(const wmRegionListenerParams *params)
