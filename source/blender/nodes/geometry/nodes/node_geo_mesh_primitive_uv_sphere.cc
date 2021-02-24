@@ -45,22 +45,26 @@ namespace blender::nodes {
 
 static int vert_total(const int segments, const int rings)
 {
-  return 0;
+  return segments * (rings - 1) + 2;
 }
 
 static int edge_total(const int segments, const int rings)
 {
-  return 0;
+  return segments * (rings + 2);
 }
 
 static int corner_total(const int segments, const int rings)
 {
-  return 0;
+  const int quad_corners = 4 * segments * (rings - 2);
+  const int tri_corners = 3 * segments * 2;
+  return quad_corners + tri_corners;
 }
 
 static int face_total(const int segments, const int rings)
 {
-  return 0;
+  const int quads = segments * (rings - 2);
+  const int triangles = segments * 2;
+  return quads + triangles;
 }
 
 static Mesh *create_uv_sphere_mesh(const float3 location,
