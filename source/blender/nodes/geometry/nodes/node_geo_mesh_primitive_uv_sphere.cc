@@ -103,12 +103,11 @@ static void calculate_edge_indices(MutableSpan<MEdge> edges, const int segments,
   int edge_index = 0;
 
   /* Add the edges connecting the top vertex to the first ring. */
-  int vert_index = 1;
-  for (const int UNUSED(segment) : IndexRange(segments)) {
+  const int first_vert_ring_index_start = 1;
+  for (const int segment : IndexRange(segments)) {
     MEdge &edge = edges[edge_index++];
     edge.v1 = 0;
-    edge.v2 = vert_index;
-    vert_index++;
+    edge.v2 = first_vert_ring_index_start + segment;
   }
 
   int ring_vert_index_start = 1;
@@ -134,24 +133,40 @@ static void calculate_edge_indices(MutableSpan<MEdge> edges, const int segments,
   }
 
   /* Add the edges connecting the last ring to the bottom vertex. */
-  vert_index = segments * (rings - 2) + 1;
   const int last_vert_index = vert_total(segments, rings) - 1;
-  for (const int UNUSED(segment) : IndexRange(segments)) {
+  const int last_vert_ring_start = last_vert_index - segments;
+  for (const int segment : IndexRange(segments)) {
     MEdge &edge = edges[edge_index++];
     edge.v1 = last_vert_index;
-    edge.v2 = vert_index;
+    edge.v2 = last_vert_ring_start + segment;
   }
+
+  Map<std::pair<int, int>, int> edge_duplicates_map;
+  for (const int i : edges.index_range()) {
+    const MEdge &edge = edges[i];
+    BLI_assert(edge.v1 != edge.v2);
+    if (edge_duplicates_map.contains({edge.v1, edge.v2}) ||
+        edge_duplicates_map.contains({edge.v2, edge.v1})) {
+      const int bad_index_new = edge_duplicates_map.lookup({edge.v1, edge.v2});
+      BLI_assert(false);
+    }
+    edge_duplicates_map.add({edge.v1, edge.v2}, i);
+  }
+
+  BLI_assert(edge_index == edges.size());
 }
 
 static void calculate_faces(MutableSpan<MLoop> loops,
                             MutableSpan<MPoly> polys,
                             const int segments,
-                            const int rings)
+                            const int rings,
+                            Span<MEdge> edges)
 {
   int loop_index = 0;
   int poly_index = 0;
 
   /* Add the triangles conntected to the top vertex. */
+  const int first_vert_ring_index_start = 1;
   for (const int segment : IndexRange(segments)) {
     MPoly &poly = polys[poly_index++];
     poly.loopstart = loop_index;
@@ -162,19 +177,19 @@ static void calculate_faces(MutableSpan<MLoop> loops,
     loop_a.e = segment;
 
     MLoop &loop_b = loops[loop_index++];
-    loop_b.v = 1 + segment;
+    loop_b.v = first_vert_ring_index_start + segment;
     loop_b.e = segments + segment;
 
     MLoop &loop_c = loops[loop_index++];
-    loop_c.v = 1 + (segment + 1) % segments;
+    loop_c.v = first_vert_ring_index_start + (segment + 1) % segments;
     loop_c.e = (segment + 1) % segments;
   }
 
   int ring_vert_index_start = 1;
+  int ring_edge_index_start = segments;
   for (const int ring : IndexRange(rings - 2)) {
     const int next_ring_vert_index_start = ring_vert_index_start + segments;
 
-    const int ring_edge_index_start = ring * segments * 2;
     const int next_ring_edge_index_start = ring_edge_index_start + segments * 2;
 
     const int ring_vertical_edge_index_start = ring_edge_index_start + segments;
@@ -199,13 +214,24 @@ static void calculate_faces(MutableSpan<MLoop> loops,
       MLoop &loop_d = loops[loop_index++];
       loop_d.v = next_ring_vert_index_start + segment;
       loop_d.e = ring_vertical_edge_index_start + segment;
+
+      BLI_assert(ELEM(loop_a.v, edges[loop_a.e].v1, edges[loop_a.e].v2));
+      BLI_assert(ELEM(loop_b.v, edges[loop_b.e].v1, edges[loop_b.e].v2));
+      BLI_assert(ELEM(loop_c.v, edges[loop_c.e].v1, edges[loop_c.e].v2));
+      BLI_assert(ELEM(loop_d.v, edges[loop_d.e].v1, edges[loop_d.e].v2));
+
+      BLI_assert(ELEM(loop_b.v, edges[loop_a.e].v1, edges[loop_a.e].v2));
+      BLI_assert(ELEM(loop_c.v, edges[loop_b.e].v1, edges[loop_b.e].v2));
+      BLI_assert(ELEM(loop_d.v, edges[loop_c.e].v1, edges[loop_c.e].v2));
+      BLI_assert(ELEM(loop_a.v, edges[loop_d.e].v1, edges[loop_d.e].v2));
     }
     ring_vert_index_start += segments;
+    ring_edge_index_start += segments;
   }
 
   /* Add the triangles connected to the bottom vertex. */
-  const int last_edge_ring_start = edge_total(segments, rings) - segments * 2 - 1;
-  const int bottom_edge_fan_start = last_edge_ring_start - segments;
+  const int last_edge_ring_start = segments * rings;
+  const int bottom_edge_fan_start = last_edge_ring_start + segments;
   const int last_vert_index = vert_total(segments, rings) - 1;
   const int last_vert_ring_start = last_vert_index - segments;
   for (const int segment : IndexRange(segments)) {
@@ -215,16 +241,27 @@ static void calculate_faces(MutableSpan<MLoop> loops,
 
     MLoop &loop_a = loops[loop_index++];
     loop_a.v = last_vert_index;
-    loop_a.e = last_edge_ring_start + segment;
+    loop_a.e = bottom_edge_fan_start + segment;
 
     MLoop &loop_b = loops[loop_index++];
     loop_b.v = last_vert_ring_start + segment;
-    loop_b.e = bottom_edge_fan_start + segment;
+    loop_b.e = last_edge_ring_start + segment;
 
     MLoop &loop_c = loops[loop_index++];
     loop_c.v = last_vert_ring_start + (segment + 1) % segments;
     loop_c.e = bottom_edge_fan_start + ((segment + 1) % segments);
+
+    BLI_assert(ELEM(loop_a.v, edges[loop_a.e].v1, edges[loop_a.e].v2));
+    BLI_assert(ELEM(loop_b.v, edges[loop_b.e].v1, edges[loop_b.e].v2));
+    BLI_assert(ELEM(loop_c.v, edges[loop_c.e].v1, edges[loop_c.e].v2));
+
+    BLI_assert(ELEM(loop_b.v, edges[loop_a.e].v1, edges[loop_a.e].v2));
+    BLI_assert(ELEM(loop_c.v, edges[loop_b.e].v1, edges[loop_b.e].v2));
+    BLI_assert(ELEM(loop_a.v, edges[loop_c.e].v1, edges[loop_c.e].v2));
   }
+
+  BLI_assert(poly_index == polys.size());
+  BLI_assert(loop_index == loops.size());
 }
 
 static Mesh *create_uv_sphere_mesh(const float3 location,
@@ -250,9 +287,9 @@ static Mesh *create_uv_sphere_mesh(const float3 location,
 
   calculate_edge_indices(edges, segments, rings);
 
-  calculate_faces(loops, polys, segments, rings);
+  calculate_faces(loops, polys, segments, rings, edges);
 
-  // BLI_assert(BKE_mesh_is_valid(mesh));
+  BLI_assert(BKE_mesh_is_valid(mesh));
 
   return mesh;
 }
