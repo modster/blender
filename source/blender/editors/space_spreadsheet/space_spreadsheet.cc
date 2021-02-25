@@ -399,21 +399,23 @@ static void draw_cell_contents(const bContext *C,
     const SpreadsheetColumnLayout &column_layout = spreadsheet_layout.columns[column_index];
     const int right_x = left_x + column_layout.width;
 
-    for (const int i : IndexRange(first_row, max_visible_rows)) {
-      if (i >= row_indices.size()) {
-        break;
-      }
+    if (right_x >= spreadsheet_layout.index_column_width && left_x <= region->winx) {
+      for (const int i : IndexRange(first_row, max_visible_rows)) {
+        if (i >= row_indices.size()) {
+          break;
+        }
 
-      if (column_layout.cell_drawer != nullptr) {
-        CellDrawParams params;
-        params.block = cells_block;
-        params.xmin = left_x;
-        params.ymin = region->winy - spreadsheet_layout.title_row_height -
-                      (i + 1) * spreadsheet_layout.row_height - scroll_offset_y;
-        params.width = column_layout.width;
-        params.height = spreadsheet_layout.row_height;
-        params.index = row_indices[i];
-        column_layout.cell_drawer->draw_cell(params);
+        if (column_layout.cell_drawer != nullptr) {
+          CellDrawParams params;
+          params.block = cells_block;
+          params.xmin = left_x;
+          params.ymin = region->winy - spreadsheet_layout.title_row_height -
+                        (i + 1) * spreadsheet_layout.row_height - scroll_offset_y;
+          params.width = column_layout.width;
+          params.height = spreadsheet_layout.row_height;
+          params.index = row_indices[i];
+          column_layout.cell_drawer->draw_cell(params);
+        }
       }
     }
 
