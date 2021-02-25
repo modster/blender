@@ -19,6 +19,7 @@
 #include "BLI_index_range.hh"
 #include "BLI_listbase.h"
 #include "BLI_rect.h"
+#include "BLI_resource_collector.hh"
 #include "BLI_utildefines.h"
 
 #include "BKE_geometry_set.hh"
@@ -52,6 +53,7 @@
 using blender::float3;
 using blender::IndexRange;
 using blender::MutableSpan;
+using blender::ResourceCollector;
 using blender::Set;
 using blender::Span;
 using blender::StringRef;
@@ -225,7 +227,7 @@ static void draw_alternating_row_overlay(const uint pos,
   for (const int i : IndexRange(region->winy / row_pair_height + 1)) {
     int x_left = 0;
     int x_right = region->winx;
-    int y_top = row_top_y - i * row_pair_height;
+    int y_top = row_top_y - i * row_pair_height - spreadsheet_layout.row_height;
     int y_bottom = y_top - spreadsheet_layout.row_height;
     y_top = std::min(y_top, region->winy - spreadsheet_layout.title_row_height);
     y_bottom = std::min(y_bottom, region->winy - spreadsheet_layout.title_row_height);
@@ -465,20 +467,74 @@ static void update_view2d_tot_rect(const SpreadsheetLayout &spreadsheet_layout,
                             spreadsheet_layout.title_row_height);
 }
 
+static ID *get_used_id(const bContext *C)
+{
+  SpaceSpreadsheet *sspreadsheet = CTX_wm_space_spreadsheet(C);
+  if (sspreadsheet->pinned_id != nullptr) {
+    return sspreadsheet->pinned_id;
+  }
+  Object *active_object = CTX_data_active_object(C);
+  return (ID *)active_object;
+}
+
+static void gather_spreadsheet_data(const bContext *C,
+                                    SpreadsheetLayout &spreadsheet_layout,
+                                    ResourceCollector &resources)
+{
+  Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
+  ID *used_id = get_used_id(C);
+  if (used_id == nullptr) {
+    return;
+  }
+  const ID_Type id_type = GS(used_id->name);
+  if (id_type != ID_OB) {
+    return;
+  }
+  Object *used_object_orig = (Object *)used_id;
+  if (used_object_orig->type != OB_MESH) {
+    return;
+  }
+  Object *used_object_cow = DEG_get_evaluated_object(depsgraph, used_object_orig);
+  const GeometrySet *geometry_set = used_object_cow->runtime.geometry_set_eval;
+  if (geometry_set == nullptr) {
+    return;
+  }
+  const GeometryComponent *component = geometry_set->get_component_for_read<MeshComponent>();
+  if (component == nullptr) {
+    return;
+  }
+
+  Vector<std::string> attribute_names;
+
+  component->attribute_foreach(
+      [&](const StringRef attribute_name, const AttributeMetaData &UNUSED(meta_data)) {
+        attribute_names.append(attribute_name);
+        return true;
+      });
+
+  std::sort(attribute_names.begin(),
+            attribute_names.end(),
+            [](const std::string &a, const std::string &b) {
+              return BLI_strcasecmp_natural(a.c_str(), b.c_str()) < 0;
+            });
+
+  for (StringRef attribute_name : attribute_names) {
+    ReadAttributePtr attribute = component->attribute_try_get_for_read(attribute_name);
+    TextColumnHeaderDrawer &header_drawer = resources.construct<TextColumnHeaderDrawer>(
+        "attribute header drawer", attribute_name);
+    spreadsheet_layout.columns.append({100, &header_drawer, nullptr});
+  }
+}
+
 static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
 {
-  TextColumnHeaderDrawer my_header_drawer{"Hello"};
-  ConstantTextCellDrawer my_cell_drawer{"test"};
+  ResourceCollector resources;
 
   SpreadsheetLayout spreadsheet_layout;
   spreadsheet_layout.index_column_width = 2 * UI_UNIT_X;
   spreadsheet_layout.row_height = UI_UNIT_Y;
   spreadsheet_layout.title_row_height = 1.25 * UI_UNIT_Y;
-  spreadsheet_layout.columns.append({100, &my_header_drawer, &my_cell_drawer});
-  spreadsheet_layout.columns.append({200, &my_header_drawer, &my_cell_drawer});
-  spreadsheet_layout.columns.append({100, &my_header_drawer, &my_cell_drawer});
-  spreadsheet_layout.columns.append({200, &my_header_drawer, &my_cell_drawer});
-  spreadsheet_layout.columns.append({80, &my_header_drawer, &my_cell_drawer});
+  gather_spreadsheet_data(C, spreadsheet_layout, resources);
 
   const int row_amount = 101;
   draw_spreadsheet(C, spreadsheet_layout, region, IndexRange(row_amount).as_span());
