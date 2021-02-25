@@ -636,6 +636,26 @@ static void gather_spreadsheet_data(const bContext *C,
         }
         break;
       }
+      case CD_PROP_COLOR: {
+        static std::array<char, 4> channel_char = {'R', 'G', 'B', 'A'};
+        for (const int i : IndexRange(4)) {
+          std::string header_name = attribute_name + " " + channel_char[i];
+          ColumnHeaderDrawer &header_drawer = resources.construct<TextColumnHeaderDrawer>(
+              "attribute header drawer", header_name);
+
+          auto get_value = [attribute, i](int index) {
+            blender::Color4f value;
+            attribute->get(index, &value);
+            return value[i];
+          };
+
+          CellDrawer &cell_drawer = resources.construct<FloatCellDrawer<decltype(get_value)>>(
+              "float cell drawer", get_value);
+
+          spreadsheet_layout.columns.append({100, &header_drawer, &cell_drawer});
+        }
+        break;
+      }
       case CD_PROP_INT32: {
         ColumnHeaderDrawer &header_drawer = resources.construct<TextColumnHeaderDrawer>(
             "attribute header drawer", attribute_name);
