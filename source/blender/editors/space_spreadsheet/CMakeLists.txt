@@ -20,6 +20,7 @@ set(INC
   ../../blenkernel
   ../../blenlib
   ../../blenfont
+  ../../bmesh
   ../../depsgraph
   ../../functions
   ../../gpu
@@ -32,8 +33,14 @@ set(INC
 
 set(SRC
   space_spreadsheet.cc
+  spreadsheet_draw.cc
+  spreadsheet_drawers.cc
+  spreadsheet_from_geometry.cc
   spreadsheet_ops.cc
 
+  spreadsheet_draw.hh
+  spreadsheet_drawers.hh
+  spreadsheet_from_geometry.hh
   spreadsheet_intern.hh
 )
 
