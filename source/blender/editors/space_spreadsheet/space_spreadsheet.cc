@@ -649,6 +649,26 @@ static void gather_spreadsheet_data(const bContext *C,
         spreadsheet_layout.columns.append({100, &header_drawer, &cell_drawer});
         break;
       }
+      case CD_PROP_FLOAT2: {
+        static std::array<char, 2> axis_char = {'X', 'Y'};
+        for (const int i : IndexRange(2)) {
+          std::string header_name = attribute_name + " " + axis_char[i];
+          ColumnHeaderDrawer &header_drawer = resources.construct<TextColumnHeaderDrawer>(
+              "attribute header drawer", header_name);
+
+          auto get_value = [attribute, i](int index) {
+            blender::float2 value;
+            attribute->get(index, &value);
+            return value[i];
+          };
+
+          CellDrawer &cell_drawer = resources.construct<FloatCellDrawer<decltype(get_value)>>(
+              "float cell drawer", get_value);
+
+          spreadsheet_layout.columns.append({100, &header_drawer, &cell_drawer});
+        }
+        break;
+      }
       case CD_PROP_FLOAT3: {
         static std::array<char, 3> axis_char = {'X', 'Y', 'Z'};
         for (const int i : IndexRange(3)) {
