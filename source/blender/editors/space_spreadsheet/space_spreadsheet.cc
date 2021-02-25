@@ -776,11 +776,14 @@ static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
   ResourceCollector resources;
 
   SpreadsheetLayout spreadsheet_layout;
-  spreadsheet_layout.index_column_width = 2 * UI_UNIT_X;
-  spreadsheet_layout.row_height = UI_UNIT_Y;
-  spreadsheet_layout.title_row_height = 1.25 * UI_UNIT_Y;
   int row_amount;
   gather_spreadsheet_data(C, spreadsheet_layout, resources, &row_amount);
+  const std::string last_index_str = std::to_string(row_amount - 1);
+  const int fontid = UI_style_get()->widget.uifont_id;
+  spreadsheet_layout.index_column_width = last_index_str.size() * BLF_width(fontid, "0", 1) +
+                                          UI_UNIT_X * 0.75;
+  spreadsheet_layout.row_height = UI_UNIT_Y;
+  spreadsheet_layout.title_row_height = 1.25 * UI_UNIT_Y;
 
   draw_spreadsheet(C, spreadsheet_layout, region, IndexRange(row_amount).as_span());
   update_view2d_tot_rect(spreadsheet_layout, region, row_amount);
