@@ -1846,6 +1846,8 @@ typedef struct SpaceSpreadsheet {
   char link_flag;
   char _pad0[6];
   /* End 'SpaceLink' header. */
+
+  struct ID *pinned_id;
 } SpaceSpreadsheet;
 
 /** \} */

@@ -505,6 +505,12 @@ static void spreadsheet_header_region_free(ARegion *UNUSED(region))
 {
 }
 
+static void spreadsheet_header_region_listener(const wmRegionListenerParams *params)
+{
+  /* TODO: Do more precise check. */
+  ED_region_tag_redraw(params->region);
+}
+
 void ED_spacetype_spreadsheet(void)
 {
   SpaceType *st = (SpaceType *)MEM_callocN(sizeof(SpaceType), "spacetype spreadsheet");
@@ -540,6 +546,7 @@ void ED_spacetype_spreadsheet(void)
   art->init = spreadsheet_header_region_init;
   art->draw = spreadsheet_header_region_draw;
   art->free = spreadsheet_header_region_free;
+  art->listener = spreadsheet_header_region_listener;
   BLI_addhead(&st->regiontypes, art);
 
   BKE_spacetype_register(st);

@@ -576,13 +576,14 @@ static StructRNA *rna_Space_refine(struct PointerRNA *ptr)
       return &RNA_SpacePreferences;
     case SPACE_CLIP:
       return &RNA_SpaceClipEditor;
+    case SPACE_SPREADSHEET:
+      return &RNA_SpaceSpreadsheet;
 
       /* Currently no type info. */
     case SPACE_SCRIPT:
     case SPACE_EMPTY:
     case SPACE_TOPBAR:
     case SPACE_STATUSBAR:
-    case SPACE_SPREADSHEET:
       break;
   }
 
@@ -2980,6 +2981,14 @@ static void rna_SpaceFileBrowser_browse_mode_update(Main *UNUSED(bmain),
 {
   ScrArea *area = rna_area_from_space(ptr);
   ED_area_tag_refresh(area);
+}
+
+static void rna_SpaceSpreadsheet_pinned_id_set(PointerRNA *ptr,
+                                               PointerRNA value,
+                                               struct ReportList *UNUSED(reports))
+{
+  SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)ptr->data;
+  sspreadsheet->pinned_id = value.data;
 }
 
 #else
@@ -7175,6 +7184,21 @@ static void rna_def_space_clip(BlenderRNA *brna)
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_CLIP, NULL);
 }
 
+static void rna_def_space_spreadsheet(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  srna = RNA_def_struct(brna, "SpaceSpreadsheet", "Space");
+  RNA_def_struct_ui_text(srna, "Space Spreadsheet", "Spreadsheet space data");
+
+  prop = RNA_def_property(srna, "pinned_id", PROP_POINTER, PROP_NONE);
+  RNA_def_property_flag(prop, PROP_EDITABLE);
+  RNA_def_property_pointer_funcs(prop, NULL, "rna_SpaceSpreadsheet_pinned_id_set", NULL, NULL);
+  RNA_def_property_ui_text(prop, "Pinned ID", "Data-block whose values are displayed");
+  RNA_def_property_update(prop, NC_SPACE, NULL);
+}
+
 void RNA_def_space(BlenderRNA *brna)
 {
   rna_def_space(brna);
@@ -7200,6 +7224,7 @@ void RNA_def_space(BlenderRNA *brna)
   rna_def_node_tree_path(brna);
   rna_def_space_node(brna);
   rna_def_space_clip(brna);
+  rna_def_space_spreadsheet(brna);
 }
 
 #endif
