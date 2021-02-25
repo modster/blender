@@ -549,6 +549,37 @@ template<typename GetValueF> class IntCellDrawer : public CellDrawer {
   }
 };
 
+template<typename GetValueF> class BoolCellDrawer : public CellDrawer {
+ private:
+  const GetValueF get_value_;
+
+ public:
+  BoolCellDrawer(GetValueF get_value) : get_value_(std::move(get_value))
+  {
+  }
+
+  void draw_cell(const CellDrawParams &params) const final
+  {
+    const bool value = get_value_(params.index);
+    const int icon = value ? ICON_CHECKBOX_HLT : ICON_CHECKBOX_DEHLT;
+    uiDefIconTextBut(params.block,
+                     UI_BTYPE_LABEL,
+                     0,
+                     icon,
+                     "",
+                     params.xmin,
+                     params.ymin,
+                     params.width,
+                     params.height,
+                     nullptr,
+                     0,
+                     0,
+                     0,
+                     0,
+                     nullptr);
+  }
+};
+
 static void gather_spreadsheet_data(const bContext *C,
                                     SpreadsheetLayout &spreadsheet_layout,
                                     ResourceCollector &resources,
@@ -670,6 +701,22 @@ static void gather_spreadsheet_data(const bContext *C,
 
         CellDrawer &cell_drawer = resources.construct<IntCellDrawer<decltype(get_value)>>(
             "int cell drawer", get_value);
+
+        spreadsheet_layout.columns.append({100, &header_drawer, &cell_drawer});
+        break;
+      }
+      case CD_PROP_BOOL: {
+        ColumnHeaderDrawer &header_drawer = resources.construct<TextColumnHeaderDrawer>(
+            "attribute header drawer", attribute_name);
+
+        auto get_value = [attribute](int index) {
+          bool value;
+          attribute->get(index, &value);
+          return value;
+        };
+
+        CellDrawer &cell_drawer = resources.construct<BoolCellDrawer<decltype(get_value)>>(
+            "bool cell drawer", get_value);
 
         spreadsheet_layout.columns.append({100, &header_drawer, &cell_drawer});
         break;
