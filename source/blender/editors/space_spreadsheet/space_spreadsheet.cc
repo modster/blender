@@ -123,10 +123,17 @@ class ColumnHeaderDrawer {
   virtual void draw_header(uiBlock *block, const rcti &rect) const = 0;
 };
 
+struct CellDrawParams {
+  uiBlock *block;
+  int xmin, ymin;
+  int width, height;
+  int index;
+};
+
 class CellDrawer {
  public:
   virtual ~CellDrawer() = default;
-  virtual void draw_cell(uiBlock *block, const rcti &rect, const int index) const = 0;
+  virtual void draw_cell(const CellDrawParams &params) const = 0;
 };
 
 struct SpreadsheetColumnLayout {
@@ -182,17 +189,17 @@ class ConstantTextCellDrawer final : public CellDrawer {
   {
   }
 
-  void draw_cell(uiBlock *block, const rcti &rect, const int UNUSED(index)) const final
+  void draw_cell(const CellDrawParams &params) const final
   {
-    uiDefIconTextBut(block,
+    uiDefIconTextBut(params.block,
                      UI_BTYPE_LABEL,
                      0,
                      ICON_NONE,
                      text_.c_str(),
-                     rect.xmin,
-                     rect.ymin,
-                     BLI_rcti_size_x(&rect),
-                     BLI_rcti_size_y(&rect),
+                     params.xmin,
+                     params.ymin,
+                     params.width,
+                     params.height,
                      nullptr,
                      0,
                      0,
@@ -396,16 +403,17 @@ static void draw_cell_contents(const bContext *C,
       if (i >= row_indices.size()) {
         break;
       }
-      const int bottom_y = region->winy - spreadsheet_layout.title_row_height -
-                           (i + 1) * spreadsheet_layout.row_height - scroll_offset_y;
-      const int top_y = bottom_y + spreadsheet_layout.row_height;
-      rcti rect;
-      BLI_rcti_init(&rect, left_x, right_x, bottom_y, top_y);
-
-      const int index = row_indices[i];
 
       if (column_layout.cell_drawer != nullptr) {
-        column_layout.cell_drawer->draw_cell(cells_block, rect, index);
+        CellDrawParams params;
+        params.block = cells_block;
+        params.xmin = left_x;
+        params.ymin = region->winy - spreadsheet_layout.title_row_height -
+                      (i + 1) * spreadsheet_layout.row_height - scroll_offset_y;
+        params.width = column_layout.width;
+        params.height = spreadsheet_layout.row_height;
+        params.index = row_indices[i];
+        column_layout.cell_drawer->draw_cell(params);
       }
     }
 
@@ -477,10 +485,43 @@ static ID *get_used_id(const bContext *C)
   return (ID *)active_object;
 }
 
+template<typename GetValueF> class FloatCellDrawer : public CellDrawer {
+ private:
+  const GetValueF get_value_;
+
+ public:
+  FloatCellDrawer(GetValueF get_value) : get_value_(std::move(get_value))
+  {
+  }
+
+  void draw_cell(const CellDrawParams &params) const final
+  {
+    const float value = get_value_(params.index);
+    const std::string value_str = std::to_string(value);
+    uiDefIconTextBut(params.block,
+                     UI_BTYPE_LABEL,
+                     0,
+                     ICON_NONE,
+                     value_str.c_str(),
+                     params.xmin,
+                     params.ymin,
+                     params.width,
+                     params.height,
+                     nullptr,
+                     0,
+                     0,
+                     0,
+                     0,
+                     nullptr);
+  }
+};
+
 static void gather_spreadsheet_data(const bContext *C,
                                     SpreadsheetLayout &spreadsheet_layout,
-                                    ResourceCollector &resources)
+                                    ResourceCollector &resources,
+                                    int *r_row_amount)
 {
+  *r_row_amount = 0;
   Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
   ID *used_id = get_used_id(C);
   if (used_id == nullptr) {
@@ -520,10 +561,56 @@ static void gather_spreadsheet_data(const bContext *C,
 
   for (StringRef attribute_name : attribute_names) {
     ReadAttributePtr attribute = component->attribute_try_get_for_read(attribute_name);
-    TextColumnHeaderDrawer &header_drawer = resources.construct<TextColumnHeaderDrawer>(
-        "attribute header drawer", attribute_name);
-    spreadsheet_layout.columns.append({100, &header_drawer, nullptr});
+    if (attribute->domain() != ATTR_DOMAIN_POINT) {
+      continue;
+    }
+
+    const CustomDataType data_type = attribute->custom_data_type();
+    switch (data_type) {
+      case CD_PROP_FLOAT: {
+        TextColumnHeaderDrawer &header_drawer = resources.construct<TextColumnHeaderDrawer>(
+            "attribute header drawer", attribute_name);
+
+        auto get_value = [attribute = std::move(attribute)](int index) {
+          float value;
+          attribute->get(index, &value);
+          return value;
+        };
+
+        CellDrawer &cell_drawer = resources.construct<FloatCellDrawer<decltype(get_value)>>(
+            "float cell drawer", std::move(get_value));
+
+        spreadsheet_layout.columns.append({100, &header_drawer, &cell_drawer});
+        break;
+      }
+      case CD_PROP_FLOAT3: {
+        ReadAttribute *attribute_ptr = attribute.get();
+        resources.add(std::move(attribute), "read attribute");
+        static std::array<char, 3> axis_char = {'X', 'Y', 'Z'};
+        for (const int i : IndexRange(3)) {
+          std::string header_name = attribute_name + " " + axis_char[i];
+          ColumnHeaderDrawer &header_drawer = resources.construct<TextColumnHeaderDrawer>(
+              "attribute header drawer", header_name);
+
+          auto get_value = [attribute_ptr, i](int index) {
+            float3 value;
+            attribute_ptr->get(index, &value);
+            return value[i];
+          };
+
+          CellDrawer &cell_drawer = resources.construct<FloatCellDrawer<decltype(get_value)>>(
+              "float cell drawer", get_value);
+
+          spreadsheet_layout.columns.append({100, &header_drawer, &cell_drawer});
+        }
+        break;
+      }
+      default:
+        break;
+    }
   }
+
+  *r_row_amount = component->attribute_domain_size(ATTR_DOMAIN_POINT);
 }
 
 static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
@@ -534,9 +621,9 @@ static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
   spreadsheet_layout.index_column_width = 2 * UI_UNIT_X;
   spreadsheet_layout.row_height = UI_UNIT_Y;
   spreadsheet_layout.title_row_height = 1.25 * UI_UNIT_Y;
-  gather_spreadsheet_data(C, spreadsheet_layout, resources);
+  int row_amount;
+  gather_spreadsheet_data(C, spreadsheet_layout, resources, &row_amount);
 
-  const int row_amount = 101;
   draw_spreadsheet(C, spreadsheet_layout, region, IndexRange(row_amount).as_span());
   update_view2d_tot_rect(spreadsheet_layout, region, row_amount);
 }
