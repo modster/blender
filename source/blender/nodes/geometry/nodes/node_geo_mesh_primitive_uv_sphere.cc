@@ -50,11 +50,13 @@ static int vert_total(const int segments, const int rings)
 
 static int edge_total(const int segments, const int rings)
 {
+  return 0;
   return segments * (rings + 2);
 }
 
 static int corner_total(const int segments, const int rings)
 {
+  return 0;
   const int quad_corners = 4 * segments * (rings - 2);
   const int tri_corners = 3 * segments * 2;
   return quad_corners + tri_corners;
@@ -62,6 +64,7 @@ static int corner_total(const int segments, const int rings)
 
 static int face_total(const int segments, const int rings)
 {
+  return 0;
   const int quads = segments * (rings - 2);
   const int triangles = segments * 2;
   return quads + triangles;
@@ -86,6 +89,33 @@ static Mesh *create_uv_sphere_mesh(const float3 location,
   MutableSpan<MLoop> loops = MutableSpan<MLoop>(mesh->mloop, mesh->totloop);
   MutableSpan<MPoly> polys = MutableSpan<MPoly>(mesh->mpoly, mesh->totpoly);
 
+  const float delta_theta = (2 * M_PI) / segments;
+  const float delta_phi = (2 * M_PI) / rings;
+  const float phi_start = -M_PI + delta_theta;
+
+  copy_v3_v3(verts[0].co, float3(0.0f, 0.0f, radius));
+  normal_float_to_short_v3(verts[0].no, float3(0.0f, 0.0f, 1.0f));
+  copy_v3_v3(verts.last().co, float3(0.0f, 0.0f, radius));
+  normal_float_to_short_v3(verts.last().no, float3(0.0f, 0.0f, -1.0f));
+
+  float theta = 0.0f;
+  int vert_index = 1;
+  for (const int segment : IndexRange(segments)) {
+    float phi = phi_start;
+    for (const int ring : IndexRange(rings - 1)) {
+      const float x = sinf(phi) * cosf(theta);
+      const float y = sinf(phi) * sinf(theta);
+      const float z = sinf(phi);
+      // const float z = cosf(phi);
+      const float3 unit_sphere_point = float3(x, y, z);
+      copy_v3_v3(verts[vert_index].co, float3(x, y, z) * radius);
+      normal_float_to_short_v3(verts[vert_index].no, unit_sphere_point);
+      ++vert_index;
+      phi += delta_phi;
+    }
+    theta += delta_theta;
+  }
+
   BLI_assert(BKE_mesh_is_valid(mesh));
 
   return mesh;
@@ -95,10 +125,8 @@ static void geo_node_mesh_primitive_uv_sphere_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set;
 
-  const bNode &node = params.node();
-
-  const int segments_num = params.extract_input<int>("Vertices");
-  const int rings_num = params.extract_input<int>("Vertices");
+  const int segments_num = params.extract_input<int>("Segments");
+  const int rings_num = params.extract_input<int>("Rings");
   if (segments_num < 3 || rings_num < 3) {
     params.set_output("Geometry", geometry_set);
     return;
@@ -108,14 +136,8 @@ static void geo_node_mesh_primitive_uv_sphere_exec(GeoNodeExecParams params)
   const float3 location = params.extract_input<float3>("Location");
   const float3 rotation = params.extract_input<float3>("Rotation");
 
-  if (rotation.length_squared() == 0.0f) {
-    params.error_message_add(NodeWarningType::Warning, "Rotation is zero");
-  }
-  const float3 rotation_normalized = rotation.length_squared() == 0.0f ? float3(0.0f, 0.0f, 1.0f) :
-                                                                         rotation.normalized();
-
   geometry_set.replace_mesh(
-      create_uv_sphere_mesh(location, rotation_normalized, radius, segments_num, rings_num));
+      create_uv_sphere_mesh(location, rotation, radius, segments_num, rings_num));
 
   params.set_output("Geometry", geometry_set);
 }
