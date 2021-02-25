@@ -88,8 +88,8 @@ static void calculate_vertex_coords_and_normals(MutableSpan<MVert> verts,
       const float y = sinf(theta) * sinf(phi);
       copy_v3_v3(verts[vert_index].co, float3(x, y, z) * radius);
       normal_float_to_short_v3(verts[vert_index].no, float3(x, y, z));
-      vert_index++;
       phi += delta_phi;
+      vert_index++;
     }
     theta += delta_theta;
   }
@@ -105,35 +105,29 @@ static void calculate_edge_indices(MutableSpan<MEdge> edges, const int segments,
   /* Add the edges connecting the top vertex to the first ring. */
   int vert_index = 1;
   for (const int UNUSED(segment) : IndexRange(segments)) {
-    MEdge &edge = edges[edge_index];
-    edge.flag |= ME_LOOSEEDGE;
+    MEdge &edge = edges[edge_index++];
     edge.v1 = 0;
     edge.v2 = vert_index;
     vert_index++;
-    edge_index++;
   }
 
   int ring_vert_index_start = 1;
   for (const int ring : IndexRange(rings - 1)) {
-    int next_ring_vert_index_start = ring_vert_index_start + segments;
+    const int next_ring_vert_index_start = ring_vert_index_start + segments;
 
     /* Add the edges running along each ring. */
     for (const int segment : IndexRange(segments)) {
-      MEdge &edge_in_ring = edges[edge_index];
-      edge_in_ring.flag |= ME_LOOSEEDGE;
+      MEdge &edge_in_ring = edges[edge_index++];
       edge_in_ring.v1 = ring_vert_index_start + segment;
       edge_in_ring.v2 = ring_vert_index_start + ((segment + 1) % segments);
-      edge_index++;
     }
 
     /* Add the edges connecting to the next ring. */
     if (ring < rings - 2) {
       for (const int segment : IndexRange(segments)) {
-        MEdge &edge_to_next_ring = edges[edge_index];
-        edge_to_next_ring.flag |= ME_LOOSEEDGE;
+        MEdge &edge_to_next_ring = edges[edge_index++];
         edge_to_next_ring.v1 = ring_vert_index_start + segment;
         edge_to_next_ring.v2 = next_ring_vert_index_start + segment;
-        edge_index++;
       }
     }
     ring_vert_index_start += segments;
@@ -143,12 +137,9 @@ static void calculate_edge_indices(MutableSpan<MEdge> edges, const int segments,
   vert_index = segments * (rings - 2) + 1;
   const int last_vert_index = vert_total(segments, rings) - 1;
   for (const int UNUSED(segment) : IndexRange(segments)) {
-    MEdge &edge = edges[edge_index];
-    edge.flag |= ME_LOOSEEDGE;
+    MEdge &edge = edges[edge_index++];
     edge.v1 = last_vert_index;
     edge.v2 = vert_index;
-    vert_index++;
-    edge_index++;
   }
 }
 
@@ -162,24 +153,77 @@ static void calculate_faces(MutableSpan<MLoop> loops,
 
   /* Add the triangles conntected to the top vertex. */
   for (const int segment : IndexRange(segments)) {
-    MPoly &poly = polys[poly_index];
+    MPoly &poly = polys[poly_index++];
     poly.loopstart = loop_index;
     poly.totloop = 3;
 
-    MLoop &loop_a = loops[loop_index];
-    loop_a.e = segment;
+    MLoop &loop_a = loops[loop_index++];
     loop_a.v = 0;
-    loop_index++;
+    loop_a.e = segment;
 
-    MLoop &loop_b = loops[loop_index];
-    loop_b.e = segments + segment;
+    MLoop &loop_b = loops[loop_index++];
     loop_b.v = 1 + segment;
-    loop_index++;
+    loop_b.e = segments + segment;
 
-    MLoop &loop_c = loops[loop_index];
-    loop_c.e = (segments + 1) % segments;
+    MLoop &loop_c = loops[loop_index++];
     loop_c.v = 1 + (segment + 1) % segments;
-    loop_index++;
+    loop_c.e = (segment + 1) % segments;
+  }
+
+  int ring_vert_index_start = 1;
+  for (const int ring : IndexRange(rings - 2)) {
+    const int next_ring_vert_index_start = ring_vert_index_start + segments;
+
+    const int ring_edge_index_start = ring * segments * 2;
+    const int next_ring_edge_index_start = ring_edge_index_start + segments * 2;
+
+    const int ring_vertical_edge_index_start = ring_edge_index_start + segments;
+
+    for (const int segment : IndexRange(segments)) {
+      MPoly &poly = polys[poly_index++];
+      poly.loopstart = loop_index;
+      poly.totloop = 4;
+
+      MLoop &loop_a = loops[loop_index++];
+      loop_a.v = ring_vert_index_start + segment;
+      loop_a.e = ring_edge_index_start + segment;
+
+      MLoop &loop_b = loops[loop_index++];
+      loop_b.v = ring_vert_index_start + ((segment + 1) % segments);
+      loop_b.e = ring_vertical_edge_index_start + ((segment + 1) % segments);
+
+      MLoop &loop_c = loops[loop_index++];
+      loop_c.v = next_ring_vert_index_start + ((segment + 1) % segments);
+      loop_c.e = next_ring_edge_index_start + segment;
+
+      MLoop &loop_d = loops[loop_index++];
+      loop_d.v = next_ring_vert_index_start + segment;
+      loop_d.e = ring_vertical_edge_index_start + segment;
+    }
+    ring_vert_index_start += segments;
+  }
+
+  /* Add the triangles connected to the bottom vertex. */
+  const int last_edge_ring_start = edge_total(segments, rings) - segments * 2 - 1;
+  const int bottom_edge_fan_start = last_edge_ring_start - segments;
+  const int last_vert_index = vert_total(segments, rings) - 1;
+  const int last_vert_ring_start = last_vert_index - segments;
+  for (const int segment : IndexRange(segments)) {
+    MPoly &poly = polys[poly_index++];
+    poly.loopstart = loop_index;
+    poly.totloop = 3;
+
+    MLoop &loop_a = loops[loop_index++];
+    loop_a.v = last_vert_index;
+    loop_a.e = last_edge_ring_start + segment;
+
+    MLoop &loop_b = loops[loop_index++];
+    loop_b.v = last_vert_ring_start + segment;
+    loop_b.e = bottom_edge_fan_start + segment;
+
+    MLoop &loop_c = loops[loop_index++];
+    loop_c.v = last_vert_ring_start + (segment + 1) % segments;
+    loop_c.e = bottom_edge_fan_start + ((segment + 1) % segments);
   }
 }
 
@@ -204,9 +248,9 @@ static Mesh *create_uv_sphere_mesh(const float3 location,
 
   calculate_vertex_coords_and_normals(verts, radius, segments, rings);
 
-  // calculate_edge_indices(edges, segments, rings);
+  calculate_edge_indices(edges, segments, rings);
 
-  // calculate_faces(loops, polys, segments, rings);
+  calculate_faces(loops, polys, segments, rings);
 
   // BLI_assert(BKE_mesh_is_valid(mesh));
 
