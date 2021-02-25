@@ -15,6 +15,8 @@
  */
 
 #include <cstring>
+#include <iomanip>
+#include <sstream>
 
 #include "BLI_index_range.hh"
 #include "BLI_listbase.h"
@@ -47,6 +49,8 @@
 #include "WM_types.h"
 
 #include "GPU_immediate.h"
+
+#include "BLF_api.h"
 
 #include "spreadsheet_intern.hh"
 
@@ -499,7 +503,9 @@ template<typename GetValueF> class FloatCellDrawer : public CellDrawer {
   void draw_cell(const CellDrawParams &params) const final
   {
     const float value = get_value_(params.index);
-    const std::string value_str = std::to_string(value);
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(3) << value;
+    const std::string value_str = ss.str();
     uiDefIconTextBut(params.block,
                      UI_BTYPE_LABEL,
                      0,
@@ -623,6 +629,16 @@ static void gather_spreadsheet_data(const bContext *C,
               return BLI_strcasecmp_natural(a.c_str(), b.c_str()) < 0;
             });
 
+  const int fontid = UI_style_get()->widget.uifont_id;
+  const int header_name_padding = UI_UNIT_X;
+  const int minimum_column_width = 2 * UI_UNIT_X;
+
+  auto get_column_width = [&](StringRef name) {
+    const int text_width = BLF_width(fontid, name.data(), name.size());
+    const int column_width = std::max(text_width + header_name_padding, minimum_column_width);
+    return column_width;
+  };
+
   for (StringRef attribute_name : attribute_names) {
     ReadAttributePtr owned_attribute = component->attribute_try_get_for_read(attribute_name);
     if (owned_attribute->domain() != ATTR_DOMAIN_POINT) {
@@ -646,7 +662,8 @@ static void gather_spreadsheet_data(const bContext *C,
         CellDrawer &cell_drawer = resources.construct<FloatCellDrawer<decltype(get_value)>>(
             "float cell drawer", get_value);
 
-        spreadsheet_layout.columns.append({100, &header_drawer, &cell_drawer});
+        spreadsheet_layout.columns.append(
+            {get_column_width(attribute_name), &header_drawer, &cell_drawer});
         break;
       }
       case CD_PROP_FLOAT2: {
@@ -665,7 +682,8 @@ static void gather_spreadsheet_data(const bContext *C,
           CellDrawer &cell_drawer = resources.construct<FloatCellDrawer<decltype(get_value)>>(
               "float cell drawer", get_value);
 
-          spreadsheet_layout.columns.append({100, &header_drawer, &cell_drawer});
+          spreadsheet_layout.columns.append(
+              {get_column_width(header_name), &header_drawer, &cell_drawer});
         }
         break;
       }
@@ -685,7 +703,8 @@ static void gather_spreadsheet_data(const bContext *C,
           CellDrawer &cell_drawer = resources.construct<FloatCellDrawer<decltype(get_value)>>(
               "float cell drawer", get_value);
 
-          spreadsheet_layout.columns.append({100, &header_drawer, &cell_drawer});
+          spreadsheet_layout.columns.append(
+              {get_column_width(header_name), &header_drawer, &cell_drawer});
         }
         break;
       }
@@ -705,7 +724,8 @@ static void gather_spreadsheet_data(const bContext *C,
           CellDrawer &cell_drawer = resources.construct<FloatCellDrawer<decltype(get_value)>>(
               "float cell drawer", get_value);
 
-          spreadsheet_layout.columns.append({100, &header_drawer, &cell_drawer});
+          spreadsheet_layout.columns.append(
+              {get_column_width(header_name), &header_drawer, &cell_drawer});
         }
         break;
       }
@@ -722,7 +742,8 @@ static void gather_spreadsheet_data(const bContext *C,
         CellDrawer &cell_drawer = resources.construct<IntCellDrawer<decltype(get_value)>>(
             "int cell drawer", get_value);
 
-        spreadsheet_layout.columns.append({100, &header_drawer, &cell_drawer});
+        spreadsheet_layout.columns.append(
+            {get_column_width(attribute_name), &header_drawer, &cell_drawer});
         break;
       }
       case CD_PROP_BOOL: {
@@ -738,7 +759,8 @@ static void gather_spreadsheet_data(const bContext *C,
         CellDrawer &cell_drawer = resources.construct<BoolCellDrawer<decltype(get_value)>>(
             "bool cell drawer", get_value);
 
-        spreadsheet_layout.columns.append({100, &header_drawer, &cell_drawer});
+        spreadsheet_layout.columns.append(
+            {get_column_width(attribute_name), &header_drawer, &cell_drawer});
         break;
       }
       default:
