@@ -516,6 +516,37 @@ template<typename GetValueF> class FloatCellDrawer : public CellDrawer {
   }
 };
 
+template<typename GetValueF> class IntCellDrawer : public CellDrawer {
+ private:
+  const GetValueF get_value_;
+
+ public:
+  IntCellDrawer(GetValueF get_value) : get_value_(std::move(get_value))
+  {
+  }
+
+  void draw_cell(const CellDrawParams &params) const final
+  {
+    const int value = get_value_(params.index);
+    const std::string value_str = std::to_string(value);
+    uiDefIconTextBut(params.block,
+                     UI_BTYPE_LABEL,
+                     0,
+                     ICON_NONE,
+                     value_str.c_str(),
+                     params.xmin,
+                     params.ymin,
+                     params.width,
+                     params.height,
+                     nullptr,
+                     0,
+                     0,
+                     0,
+                     0,
+                     nullptr);
+  }
+};
+
 static void gather_spreadsheet_data(const bContext *C,
                                     SpreadsheetLayout &spreadsheet_layout,
                                     ResourceCollector &resources,
@@ -560,41 +591,41 @@ static void gather_spreadsheet_data(const bContext *C,
             });
 
   for (StringRef attribute_name : attribute_names) {
-    ReadAttributePtr attribute = component->attribute_try_get_for_read(attribute_name);
-    if (attribute->domain() != ATTR_DOMAIN_POINT) {
+    ReadAttributePtr owned_attribute = component->attribute_try_get_for_read(attribute_name);
+    if (owned_attribute->domain() != ATTR_DOMAIN_POINT) {
       continue;
     }
+    ReadAttribute *attribute = owned_attribute.get();
+    resources.add(std::move(owned_attribute), "read attribute");
 
     const CustomDataType data_type = attribute->custom_data_type();
     switch (data_type) {
       case CD_PROP_FLOAT: {
-        TextColumnHeaderDrawer &header_drawer = resources.construct<TextColumnHeaderDrawer>(
+        ColumnHeaderDrawer &header_drawer = resources.construct<TextColumnHeaderDrawer>(
             "attribute header drawer", attribute_name);
 
-        auto get_value = [attribute = std::move(attribute)](int index) {
+        auto get_value = [attribute](int index) {
           float value;
           attribute->get(index, &value);
           return value;
         };
 
         CellDrawer &cell_drawer = resources.construct<FloatCellDrawer<decltype(get_value)>>(
-            "float cell drawer", std::move(get_value));
+            "float cell drawer", get_value);
 
         spreadsheet_layout.columns.append({100, &header_drawer, &cell_drawer});
         break;
       }
       case CD_PROP_FLOAT3: {
-        ReadAttribute *attribute_ptr = attribute.get();
-        resources.add(std::move(attribute), "read attribute");
         static std::array<char, 3> axis_char = {'X', 'Y', 'Z'};
         for (const int i : IndexRange(3)) {
           std::string header_name = attribute_name + " " + axis_char[i];
           ColumnHeaderDrawer &header_drawer = resources.construct<TextColumnHeaderDrawer>(
               "attribute header drawer", header_name);
 
-          auto get_value = [attribute_ptr, i](int index) {
+          auto get_value = [attribute, i](int index) {
             float3 value;
-            attribute_ptr->get(index, &value);
+            attribute->get(index, &value);
             return value[i];
           };
 
@@ -603,6 +634,22 @@ static void gather_spreadsheet_data(const bContext *C,
 
           spreadsheet_layout.columns.append({100, &header_drawer, &cell_drawer});
         }
+        break;
+      }
+      case CD_PROP_INT32: {
+        ColumnHeaderDrawer &header_drawer = resources.construct<TextColumnHeaderDrawer>(
+            "attribute header drawer", attribute_name);
+
+        auto get_value = [attribute](int index) {
+          int value;
+          attribute->get(index, &value);
+          return value;
+        };
+
+        CellDrawer &cell_drawer = resources.construct<IntCellDrawer<decltype(get_value)>>(
+            "int cell drawer", get_value);
+
+        spreadsheet_layout.columns.append({100, &header_drawer, &cell_drawer});
         break;
       }
       default:
