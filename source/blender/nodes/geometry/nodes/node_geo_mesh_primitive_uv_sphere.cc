@@ -145,8 +145,7 @@ static void calculate_edge_indices(MutableSpan<MEdge> edges, const int segments,
 static void calculate_faces(MutableSpan<MLoop> loops,
                             MutableSpan<MPoly> polys,
                             const int segments,
-                            const int rings,
-                            Span<MEdge> edges)
+                            const int rings)
 {
   int loop_index = 0;
   int poly_index = 0;
@@ -183,21 +182,36 @@ static void calculate_faces(MutableSpan<MLoop> loops,
       poly.loopstart = loop_index;
       poly.totloop = 4;
 
+      // MLoop &loop_a = loops[loop_index++];
+      // loop_a.v = ring_vert_index_start + segment;
+      // loop_a.e = ring_edge_index_start + segment;
+
+      // MLoop &loop_b = loops[loop_index++];
+      // loop_b.v = ring_vert_index_start + ((segment + 1) % segments);
+      // loop_b.e = ring_vertical_edge_index_start + ((segment + 1) % segments);
+
+      // MLoop &loop_c = loops[loop_index++];
+      // loop_c.v = next_ring_vert_index_start + ((segment + 1) % segments);
+      // loop_c.e = next_ring_edge_index_start + segment;
+
+      // MLoop &loop_d = loops[loop_index++];
+      // loop_d.v = next_ring_vert_index_start + segment;
+      // loop_d.e = ring_vertical_edge_index_start + segment;
       MLoop &loop_a = loops[loop_index++];
       loop_a.v = ring_vert_index_start + segment;
-      loop_a.e = ring_edge_index_start + segment;
+      loop_a.e = ring_vertical_edge_index_start + segment;
 
       MLoop &loop_b = loops[loop_index++];
-      loop_b.v = ring_vert_index_start + ((segment + 1) % segments);
-      loop_b.e = ring_vertical_edge_index_start + ((segment + 1) % segments);
+      loop_b.v = next_ring_vert_index_start + segment;
+      loop_b.e = next_ring_edge_index_start + segment;
 
       MLoop &loop_c = loops[loop_index++];
       loop_c.v = next_ring_vert_index_start + ((segment + 1) % segments);
-      loop_c.e = next_ring_edge_index_start + segment;
+      loop_c.e = ring_vertical_edge_index_start + ((segment + 1) % segments);
 
       MLoop &loop_d = loops[loop_index++];
-      loop_d.v = next_ring_vert_index_start + segment;
-      loop_d.e = ring_vertical_edge_index_start + segment;
+      loop_d.v = ring_vert_index_start + ((segment + 1) % segments);
+      loop_d.e = ring_edge_index_start + segment;
     }
     ring_vert_index_start += segments;
     ring_edge_index_start += segments * 2;
@@ -215,15 +229,15 @@ static void calculate_faces(MutableSpan<MLoop> loops,
 
     MLoop &loop_a = loops[loop_index++];
     loop_a.v = last_vert_index;
-    loop_a.e = bottom_edge_fan_start + segment;
+    loop_a.e = bottom_edge_fan_start + ((segment + 1) % segments);
 
     MLoop &loop_b = loops[loop_index++];
-    loop_b.v = last_vert_ring_start + segment;
+    loop_b.v = last_vert_ring_start + (segment + 1) % segments;
     loop_b.e = last_edge_ring_start + segment;
 
     MLoop &loop_c = loops[loop_index++];
-    loop_c.v = last_vert_ring_start + (segment + 1) % segments;
-    loop_c.e = bottom_edge_fan_start + ((segment + 1) % segments);
+    loop_c.v = last_vert_ring_start + segment;
+    loop_c.e = bottom_edge_fan_start + segment;
   }
 }
 
@@ -250,7 +264,7 @@ static Mesh *create_uv_sphere_mesh(const float3 location,
 
   calculate_edge_indices(edges, segments, rings);
 
-  calculate_faces(loops, polys, segments, rings, edges);
+  calculate_faces(loops, polys, segments, rings);
 
   BLI_assert(BKE_mesh_is_valid(mesh));
 
