@@ -175,9 +175,7 @@ static void calculate_faces(MutableSpan<MLoop> loops,
   int ring_edge_index_start = segments;
   for (const int UNUSED(ring) : IndexRange(rings - 2)) {
     const int next_ring_vert_index_start = ring_vert_index_start + segments;
-
     const int next_ring_edge_index_start = ring_edge_index_start + segments * 2;
-
     const int ring_vertical_edge_index_start = ring_edge_index_start + segments;
 
     for (const int segment : IndexRange(segments)) {
