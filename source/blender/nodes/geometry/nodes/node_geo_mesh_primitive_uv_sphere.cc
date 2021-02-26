@@ -140,20 +140,6 @@ static void calculate_edge_indices(MutableSpan<MEdge> edges, const int segments,
     edge.v1 = last_vert_index;
     edge.v2 = last_vert_ring_start + segment;
   }
-
-  Map<std::pair<int, int>, int> edge_duplicates_map;
-  for (const int i : edges.index_range()) {
-    const MEdge &edge = edges[i];
-    BLI_assert(edge.v1 != edge.v2);
-    if (edge_duplicates_map.contains({edge.v1, edge.v2}) ||
-        edge_duplicates_map.contains({edge.v2, edge.v1})) {
-      const int bad_index_new = edge_duplicates_map.lookup({edge.v1, edge.v2});
-      BLI_assert(false);
-    }
-    edge_duplicates_map.add({edge.v1, edge.v2}, i);
-  }
-
-  BLI_assert(edge_index == edges.size());
 }
 
 static void calculate_faces(MutableSpan<MLoop> loops,
@@ -214,16 +200,6 @@ static void calculate_faces(MutableSpan<MLoop> loops,
       MLoop &loop_d = loops[loop_index++];
       loop_d.v = next_ring_vert_index_start + segment;
       loop_d.e = ring_vertical_edge_index_start + segment;
-
-      BLI_assert(ELEM(loop_a.v, edges[loop_a.e].v1, edges[loop_a.e].v2));
-      BLI_assert(ELEM(loop_b.v, edges[loop_b.e].v1, edges[loop_b.e].v2));
-      BLI_assert(ELEM(loop_c.v, edges[loop_c.e].v1, edges[loop_c.e].v2));
-      BLI_assert(ELEM(loop_d.v, edges[loop_d.e].v1, edges[loop_d.e].v2));
-
-      BLI_assert(ELEM(loop_b.v, edges[loop_a.e].v1, edges[loop_a.e].v2));
-      BLI_assert(ELEM(loop_c.v, edges[loop_b.e].v1, edges[loop_b.e].v2));
-      BLI_assert(ELEM(loop_d.v, edges[loop_c.e].v1, edges[loop_c.e].v2));
-      BLI_assert(ELEM(loop_a.v, edges[loop_d.e].v1, edges[loop_d.e].v2));
     }
     ring_vert_index_start += segments;
     ring_edge_index_start += segments * 2;
@@ -250,18 +226,7 @@ static void calculate_faces(MutableSpan<MLoop> loops,
     MLoop &loop_c = loops[loop_index++];
     loop_c.v = last_vert_ring_start + (segment + 1) % segments;
     loop_c.e = bottom_edge_fan_start + ((segment + 1) % segments);
-
-    BLI_assert(ELEM(loop_a.v, edges[loop_a.e].v1, edges[loop_a.e].v2));
-    BLI_assert(ELEM(loop_b.v, edges[loop_b.e].v1, edges[loop_b.e].v2));
-    BLI_assert(ELEM(loop_c.v, edges[loop_c.e].v1, edges[loop_c.e].v2));
-
-    BLI_assert(ELEM(loop_b.v, edges[loop_a.e].v1, edges[loop_a.e].v2));
-    BLI_assert(ELEM(loop_c.v, edges[loop_b.e].v1, edges[loop_b.e].v2));
-    BLI_assert(ELEM(loop_a.v, edges[loop_c.e].v1, edges[loop_c.e].v2));
   }
-
-  BLI_assert(poly_index == polys.size());
-  BLI_assert(loop_index == loops.size());
 }
 
 static Mesh *create_uv_sphere_mesh(const float3 location,
