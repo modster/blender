@@ -166,8 +166,11 @@ void ED_outliner_selected_objects_get(const bContext *C, ListBase *objects)
 bool ED_outliner_collections_editor_poll(bContext *C)
 {
   SpaceOutliner *space_outliner = CTX_wm_space_outliner(C);
-  return (space_outliner != NULL) &&
-         ELEM(space_outliner->outlinevis, SO_VIEW_LAYER, SO_SCENES, SO_LIBRARIES);
+  return (space_outliner != NULL) && ELEM(space_outliner->outlinevis,
+                                          SO_VIEW_LAYER,
+                                          SO_SCENES,
+                                          SO_LIBRARIES,
+                                          SO_OVERRIDES_LIBRARY);
 }
 
 static bool outliner_view_layer_collections_editor_poll(bContext *C)
