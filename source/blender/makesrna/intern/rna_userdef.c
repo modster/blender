@@ -3893,7 +3893,7 @@ static void rna_def_userdef_themes(BlenderRNA *brna)
       {20, "CLIP_EDITOR", ICON_TRACKER, "Movie Clip Editor", ""},
       {21, "TOPBAR", ICON_TOPBAR, "Top Bar", ""},
       {22, "STATUSBAR", ICON_STATUSBAR, "Status Bar", ""},
-      {23, "SPREADSHEET", ICON_MOD_WIREFRAME, "Spreadsheet"}, /* TODO: Use correct icon. */
+      {23, "SPREADSHEET", ICON_SPREADSHEET, "Spreadsheet"},
       {0, NULL, 0, NULL, NULL},
   };
 
