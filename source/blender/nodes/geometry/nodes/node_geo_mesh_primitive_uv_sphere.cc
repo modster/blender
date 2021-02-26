@@ -187,7 +187,7 @@ static void calculate_faces(MutableSpan<MLoop> loops,
 
   int ring_vert_index_start = 1;
   int ring_edge_index_start = segments;
-  for (const int ring : IndexRange(rings - 2)) {
+  for (const int UNUSED(ring) : IndexRange(rings - 2)) {
     const int next_ring_vert_index_start = ring_vert_index_start + segments;
 
     const int next_ring_edge_index_start = ring_edge_index_start + segments * 2;
@@ -226,11 +226,11 @@ static void calculate_faces(MutableSpan<MLoop> loops,
       BLI_assert(ELEM(loop_a.v, edges[loop_d.e].v1, edges[loop_d.e].v2));
     }
     ring_vert_index_start += segments;
-    ring_edge_index_start += segments;
+    ring_edge_index_start += segments * 2;
   }
 
   /* Add the triangles connected to the bottom vertex. */
-  const int last_edge_ring_start = segments * rings;
+  const int last_edge_ring_start = segments * (rings - 2) * 2 + segments;
   const int bottom_edge_fan_start = last_edge_ring_start + segments;
   const int last_vert_index = vert_total(segments, rings) - 1;
   const int last_vert_ring_start = last_vert_index - segments;
