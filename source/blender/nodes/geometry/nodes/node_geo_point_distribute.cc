@@ -29,6 +29,7 @@
 #include "BKE_attribute_math.hh"
 #include "BKE_bvhutils.h"
 #include "BKE_deform.h"
+#include "BKE_geometry_set_instances.hh"
 #include "BKE_mesh.h"
 #include "BKE_mesh_runtime.h"
 #include "BKE_pointcloud.h"
@@ -37,6 +38,9 @@
 #include "UI_resources.h"
 
 #include "node_geometry_util.hh"
+
+using blender::bke::AttributeKind;
+using blender::bke::GeometryInstanceGroup;
 
 static bNodeSocketTemplate geo_node_point_distribute_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
@@ -108,9 +112,9 @@ static int sample_mesh_surface(const Mesh &mesh,
     const int v0_index = mesh.mloop[v0_loop].v;
     const int v1_index = mesh.mloop[v1_loop].v;
     const int v2_index = mesh.mloop[v2_loop].v;
-    const float3 v0_pos = transform * mesh.mvert[v0_index].co;
-    const float3 v1_pos = transform * mesh.mvert[v1_index].co;
-    const float3 v2_pos = transform * mesh.mvert[v2_index].co;
+    const float3 v0_pos = transform * float3(mesh.mvert[v0_index].co);
+    const float3 v1_pos = transform * float3(mesh.mvert[v1_index].co);
+    const float3 v2_pos = transform * float3(mesh.mvert[v2_index].co);
 
     float looptri_density_factor = 1.0f;
     if (density_factors != nullptr) {
@@ -337,12 +341,12 @@ BLI_NOINLINE static void interpolate_attribute(const Mesh &mesh,
 BLI_NOINLINE static void interpolate_existing_attributes(
     Span<GeometryInstanceGroup> sets,
     Span<int> group_start_indices,
-    Map<std::string, AttributeInfo> &attributes,
+    Map<std::string, AttributeKind> &attributes,
     GeometryComponent &component,
     Span<Vector<float3>> bary_coords_array,
     Span<Vector<int>> looptri_indices_array)
 {
-  for (Map<std::string, AttributeInfo>::Item entry : attributes.items()) {
+  for (Map<std::string, AttributeKind>::Item entry : attributes.items()) {
     StringRef attribute_name = entry.key;
     const CustomDataType output_data_type = entry.value.data_type;
     /* The output domain is always #ATTR_DOMAIN_POINT, since we are creating a point cloud. */
@@ -476,7 +480,7 @@ BLI_NOINLINE static void compute_special_attributes(Span<GeometryInstanceGroup> 
 BLI_NOINLINE static void add_remaining_point_attributes(
     Span<GeometryInstanceGroup> sets,
     Span<int> group_start_indices,
-    Map<std::string, AttributeInfo> &attributes,
+    Map<std::string, AttributeKind> &attributes,
     GeometryComponent &component,
     Span<Vector<float3>> bary_coords_array,
     Span<Vector<int>> looptri_indices_array)
@@ -511,7 +515,7 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
 
   const int seed = params.get_input<int>("Seed");
 
-  Vector<GeometryInstanceGroup> sets = BKE_geometry_set_gather_instances(geometry_set);
+  Vector<GeometryInstanceGroup> sets = bke::geometry_set_gather_instances(geometry_set);
   int instances_len = 0;
   for (GeometryInstanceGroup set_group : sets) {
     instances_len += set_group.transforms.size();
@@ -542,7 +546,7 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
       switch (distribute_method) {
         case GEO_NODE_POINT_DISTRIBUTE_RANDOM: {
           const FloatReadAttribute density_factors = component.attribute_get_for_read<float>(
-              density_attribute_name, ATTR_DOMAIN_POINT, 1.0f);
+              density_attribute_name, ATTR_DOMAIN_CORNER, 1.0f);
           initial_points_len += sample_mesh_surface(mesh,
                                                     transform,
                                                     density,
@@ -582,7 +586,7 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
       const MeshComponent &component = *set.get_component_for_read<MeshComponent>();
       const Mesh &mesh = *component.get_for_read();
       const FloatReadAttribute density_factors = component.attribute_get_for_read<float>(
-          density_attribute_name, ATTR_DOMAIN_POINT, 1.0f);
+          density_attribute_name, ATTR_DOMAIN_CORNER, 1.0f);
 
       for (const int UNUSED(i_set_instance) : set_group.transforms.index_range()) {
         Vector<float3> &positions = positions_array[i_instance];
@@ -631,9 +635,9 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
       geometry_set_out.get_component_for_write<PointCloudComponent>();
   point_component.replace(pointcloud);
 
-  Map<std::string, AttributeInfo> attributes;
-  gather_attribute_info(
-      attributes, GeometryComponentType::Mesh, sets, {"position", "normal", "id"});
+  Map<std::string, AttributeKind> attributes;
+  bke::gather_attribute_info(
+      attributes, {GeometryComponentType::Mesh}, sets, {"position", "normal", "id"});
   add_remaining_point_attributes(sets,
                                  group_start_indices,
                                  attributes,

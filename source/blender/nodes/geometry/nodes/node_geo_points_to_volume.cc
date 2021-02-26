@@ -28,6 +28,9 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+using blender::bke::AttributeKind;
+using blender::bke::GeometryInstanceGroup;
+
 static bNodeSocketTemplate geo_node_points_to_volume_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_FLOAT, N_("Density"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
@@ -189,7 +192,7 @@ static void initialize_volume_component_from_points(const GeometrySet &geometry_
   Vector<float3> positions;
   Vector<float> radii;
 
-  Vector<GeometryInstanceGroup> set_groups = BKE_geometry_set_gather_instances(geometry_set_in);
+  Vector<GeometryInstanceGroup> set_groups = bke::geometry_set_gather_instances(geometry_set_in);
   for (const GeometryInstanceGroup &set_group : set_groups) {
     const GeometrySet &set = set_group.geometry_set;
 

@@ -37,6 +37,9 @@ static bNodeSocketTemplate geo_node_point_instance_out[] = {
     {-1, ""},
 };
 
+using blender::bke::AttributeKind;
+using blender::bke::GeometryInstanceGroup;
+
 namespace blender::nodes {
 
 static void gather_positions_from_component_instances(const GeometryComponent &component,
@@ -186,12 +189,12 @@ static void copy_attribute_from_component_instances(const GeometryComponent &com
 }
 
 static void copy_attributes_to_output(Span<GeometryInstanceGroup> set_groups,
-                                      Map<std::string, AttributeInfo> &result_attributes_info,
+                                      Map<std::string, AttributeKind> &result_attributes_info,
                                       const StringRef mask_attribute_name,
                                       PointCloudComponent &out_component_a,
                                       PointCloudComponent &out_component_b)
 {
-  for (Map<std::string, AttributeInfo>::Item entry : result_attributes_info.items()) {
+  for (Map<std::string, AttributeKind>::Item entry : result_attributes_info.items()) {
     const StringRef attribute_name = entry.key;
     /* The output domain is always #ATTR_DOMAIN_POINT, since we are creating a point cloud. */
     const CustomDataType output_data_type = entry.value.data_type;
@@ -250,7 +253,7 @@ static void geo_node_point_separate_exec(GeoNodeExecParams params)
     params.set_output("Geometry 2", std::move(out_set_b));
   }
 
-  Vector<GeometryInstanceGroup> set_groups = BKE_geometry_set_gather_instances(geometry_set);
+  Vector<GeometryInstanceGroup> set_groups = bke::geometry_set_gather_instances(geometry_set);
 
   int instances_len = 0;
   for (const GeometryInstanceGroup &set_group : set_groups) {
@@ -266,9 +269,11 @@ static void geo_node_point_separate_exec(GeoNodeExecParams params)
   component_a.replace(create_point_cloud(positions_a));
   component_a.replace(create_point_cloud(positions_b));
 
-  Map<std::string, AttributeInfo> result_attributes_info;
-  gather_attribute_info(result_attributes_info, GeometryComponentType::Mesh, set_groups, {});
-  gather_attribute_info(result_attributes_info, GeometryComponentType::PointCloud, set_groups, {});
+  Map<std::string, AttributeKind> result_attributes_info;
+  bke::gather_attribute_info(result_attributes_info,
+                             {GeometryComponentType::Mesh, GeometryComponentType::PointCloud},
+                             set_groups,
+                             {});
 
   copy_attributes_to_output(
       set_groups, result_attributes_info, mask_attribute_name, component_a, component_b);

@@ -168,13 +168,15 @@ static Array<std::optional<InstancedData>> get_instanced_data(const GeoNodeExecP
   return instances_data;
 }
 
-static void add_instances_from_component_transforms(InstancesComponent &instances,
-                                                    const GeometryComponent &src_geometry,
-                                                    const GeoNodeExecParams &params,
-                                                    Span<float4x4> transforms)
+static void add_instances_from_geometry_component(InstancesComponent &instances,
+                                                  const GeometryComponent &src_geometry,
+                                                  const GeoNodeExecParams &params)
 {
   const AttributeDomain domain = ATTR_DOMAIN_POINT;
-  const int size = src_geometry.attribute_domain_size(domain) * transforms.size();
+
+  const int domain_size = src_geometry.attribute_domain_size(domain);
+  Array<std::optional<InstancedData>> instances_data = get_instanced_data(
+      params, src_geometry, domain_size);
 
   Float3ReadAttribute positions = src_geometry.attribute_get_for_read<float3>(
       "position", domain, {0, 0, 0});
@@ -184,18 +186,11 @@ static void add_instances_from_component_transforms(InstancesComponent &instance
       "scale", domain, {1, 1, 1});
   Int32ReadAttribute ids = src_geometry.attribute_get_for_read<int>("id", domain, -1);
 
-  /* HANS-TODO: This is quite broken, don't do this here. And really, why fill an array... */
-  Array<std::optional<InstancedData>> instances_data = get_instanced_data(
-      params, src_geometry, size);
-
-  for (const float4x4 &transform : transforms) {
-    for (const int i : IndexRange(size)) {
-      if (instances_data[i].has_value()) {
-        float4x4 instance_transform;
-        loc_eul_size_to_mat4(instance_transform.values, positions[i], rotations[i], scales[i]);
-        instance_transform = transform * instance_transform;
-        instances.add_instance(*instances_data[i], instance_transform, ids[i]);
-      }
+  for (const int i : IndexRange(domain_size)) {
+    if (instances_data[i].has_value()) {
+      float transform[4][4];
+      loc_eul_size_to_mat4(transform, positions[i], rotations[i], scales[i]);
+      instances.add_instance(*instances_data[i], transform, ids[i]);
     }
   }
 }
@@ -203,24 +198,20 @@ static void add_instances_from_component_transforms(InstancesComponent &instance
 static void geo_node_point_instance_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-
   GeometrySet geometry_set_out;
+
+  /* TODO: This node should be able to instance on the input instances component
+   * rather than making the entire input geometry set real. */
+  geometry_set = geometry_set_realize_instances(geometry_set);
+
   InstancesComponent &instances = geometry_set_out.get_component_for_write<InstancesComponent>();
-
-  Vector<GeometryInstanceGroup> set_groups = BKE_geometry_set_gather_instances(geometry_set);
-  for (const GeometryInstanceGroup &set_group : set_groups) {
-    const GeometrySet &set = set_group.geometry_set;
-
-    if (set.has<MeshComponent>()) {
-      add_instances_from_component_transforms(
-          instances, *set.get_component_for_read<MeshComponent>(), params, set_group.transforms);
-    }
-    if (set.has<PointCloudComponent>()) {
-      add_instances_from_component_transforms(instances,
-                                              *set.get_component_for_read<PointCloudComponent>(),
-                                              params,
-                                              set_group.transforms);
-    }
+  if (geometry_set.has<MeshComponent>()) {
+    add_instances_from_geometry_component(
+        instances, *geometry_set.get_component_for_read<MeshComponent>(), params);
+  }
+  if (geometry_set.has<PointCloudComponent>()) {
+    add_instances_from_geometry_component(
+        instances, *geometry_set.get_component_for_read<PointCloudComponent>(), params);
   }
 
   params.set_output("Geometry", std::move(geometry_set_out));
