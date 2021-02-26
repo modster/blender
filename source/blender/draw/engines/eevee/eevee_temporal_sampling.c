@@ -151,7 +151,9 @@ void EEVEE_temporal_sampling_matrices_calc(EEVEE_EffectsInfo *effects, const dou
   float ofs[2];
   EEVEE_temporal_sampling_offset_calc(ht_point, rd->gauss, ofs);
 
-  window_translate_m4(winmat, persmat, ofs[0] / viewport_size[0], ofs[1] / viewport_size[1]);
+  if (effects->taa_current_sample > 1) {
+    window_translate_m4(winmat, persmat, ofs[0] / viewport_size[0], ofs[1] / viewport_size[1]);
+  }
 
   /* Jitter is in pixel space. Focus distance in world space units. */
   float dof_jitter[2], focus_distance;
@@ -173,18 +175,18 @@ void EEVEE_temporal_sampling_matrices_calc(EEVEE_EffectsInfo *effects, const dou
       /* Get focus distance in NDC. */
       float focus_pt[3] = {0.0f, 0.0f, -focus_distance};
       mul_project_m4_v3(winmat, focus_pt);
-      /* Get pixel footprint in viewspace. */
+      /* Get pixel footprint in view-space. */
       float jitter_scaled[3] = {dof_jitter[0], dof_jitter[1], focus_pt[2]};
       float center[3] = {0.0f, 0.0f, focus_pt[2]};
       mul_project_m4_v3(wininv, jitter_scaled);
       mul_project_m4_v3(wininv, center);
 
-      /* FIXME(fclem) The offset is noticeably large and the culling might make object pop out
-       * of the bluring radius. To fix this, use custom enlarged culling matrix. */
+      /* FIXME(fclem): The offset is noticeably large and the culling might make object pop out
+       * of the blurring radius. To fix this, use custom enlarged culling matrix. */
       sub_v2_v2v2(jitter_scaled, jitter_scaled, center);
       add_v2_v2(viewmat[3], jitter_scaled);
 
-      window_translate_m4(winmat, persmat, dof_jitter[0], dof_jitter[1]);
+      window_translate_m4(winmat, persmat, -dof_jitter[0], -dof_jitter[1]);
     }
   }
 

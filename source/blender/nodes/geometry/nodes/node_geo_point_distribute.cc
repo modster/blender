@@ -102,19 +102,21 @@ static int sample_mesh_surface(const Mesh &mesh,
   int points_len = 0;
   for (const int looptri_index : looptris.index_range()) {
     const MLoopTri &looptri = looptris[looptri_index];
-    const int v0_index = mesh.mloop[looptri.tri[0]].v;
-    const int v1_index = mesh.mloop[looptri.tri[1]].v;
-    const int v2_index = mesh.mloop[looptri.tri[2]].v;
-
-    const float3 v0_pos = transform * float3(mesh.mvert[v0_index].co);
-    const float3 v1_pos = transform * float3(mesh.mvert[v1_index].co);
-    const float3 v2_pos = transform * float3(mesh.mvert[v2_index].co);
+    const int v0_loop = looptri.tri[0];
+    const int v1_loop = looptri.tri[1];
+    const int v2_loop = looptri.tri[2];
+    const int v0_index = mesh.mloop[v0_loop].v;
+    const int v1_index = mesh.mloop[v1_loop].v;
+    const int v2_index = mesh.mloop[v2_loop].v;
+    const float3 v0_pos = transform * mesh.mvert[v0_index].co;
+    const float3 v1_pos = transform * mesh.mvert[v1_index].co;
+    const float3 v2_pos = transform * mesh.mvert[v2_index].co;
 
     float looptri_density_factor = 1.0f;
     if (density_factors != nullptr) {
-      const float v0_density_factor = std::max(0.0f, (*density_factors)[v0_index]);
-      const float v1_density_factor = std::max(0.0f, (*density_factors)[v1_index]);
-      const float v2_density_factor = std::max(0.0f, (*density_factors)[v2_index]);
+      const float v0_density_factor = std::max(0.0f, (*density_factors)[v0_loop]);
+      const float v1_density_factor = std::max(0.0f, (*density_factors)[v1_loop]);
+      const float v2_density_factor = std::max(0.0f, (*density_factors)[v2_loop]);
       looptri_density_factor = (v0_density_factor + v1_density_factor + v2_density_factor) / 3.0f;
     }
     const float area = area_tri_v3(v0_pos, v1_pos, v2_pos);
@@ -219,13 +221,13 @@ BLI_NOINLINE static void update_elimination_mask_based_on_density_factors(
     const MLoopTri &looptri = looptris[looptri_indices[i]];
     const float3 bary_coord = bary_coords[i];
 
-    const int v0_index = mesh.mloop[looptri.tri[0]].v;
-    const int v1_index = mesh.mloop[looptri.tri[1]].v;
-    const int v2_index = mesh.mloop[looptri.tri[2]].v;
+    const int v0_loop = looptri.tri[0];
+    const int v1_loop = looptri.tri[1];
+    const int v2_loop = looptri.tri[2];
 
-    const float v0_density_factor = std::max(0.0f, density_factors[v0_index]);
-    const float v1_density_factor = std::max(0.0f, density_factors[v1_index]);
-    const float v2_density_factor = std::max(0.0f, density_factors[v2_index]);
+    const float v0_density_factor = std::max(0.0f, density_factors[v0_loop]);
+    const float v1_density_factor = std::max(0.0f, density_factors[v1_loop]);
+    const float v2_density_factor = std::max(0.0f, density_factors[v2_loop]);
 
     const float probablity = attribute_math::mix3<float>(
         bary_coord, v0_density_factor, v1_density_factor, v2_density_factor);
@@ -456,7 +458,7 @@ BLI_NOINLINE static void compute_special_attributes(Span<GeometryInstanceGroup> 
         const float3 v1_pos = mesh.mvert[v1_index].co;
         const float3 v2_pos = mesh.mvert[v2_index].co;
 
-        ids[i] = (int)(bary_coord.hash()) + looptri_index;
+        ids[i] = (int)(bary_coord.hash()) + (uint64_t)looptri_index;
         normal_tri_v3(normals[i], v0_pos, v1_pos, v2_pos);
         rotations[i] = normal_to_euler_rotation(normals[i]);
       }
@@ -489,10 +491,11 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   GeometrySet geometry_set_out;
 
-  const GeometryNodePointDistributeMethod distribute_method =
-      static_cast<GeometryNodePointDistributeMethod>(params.node().custom1);
+  const GeometryNodePointDistributeMode distribute_method =
+      static_cast<GeometryNodePointDistributeMode>(params.node().custom1);
 
   if (!geometry_set.has_mesh() && !geometry_set.has_instances()) {
+    params.error_message_add(NodeWarningType::Error, "Geometry must contain a mesh.");
     params.set_output("Geometry", std::move(geometry_set_out));
     return;
   }

@@ -124,6 +124,13 @@ static void seq_convert_transform_crop(const Scene *scene,
                                        Sequence *seq,
                                        const eSpaceSeq_Proxy_RenderSize render_size)
 {
+  if (seq->strip->transform == NULL) {
+    seq->strip->transform = MEM_callocN(sizeof(struct StripTransform), "StripTransform");
+  }
+  if (seq->strip->crop == NULL) {
+    seq->strip->crop = MEM_callocN(sizeof(struct StripCrop), "StripCrop");
+  }
+
   StripCrop *c = seq->strip->crop;
   StripTransform *t = seq->strip->transform;
   int old_image_center_x = scene->r.xsch / 2;
@@ -1054,14 +1061,6 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
     }
 
-    /* Set the minimum sequence interpolate for grease pencil. */
-    if (!DNA_struct_elem_find(fd->filesdna, "GP_Interpolate_Settings", "int", "step")) {
-      LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
-        ToolSettings *ts = scene->toolsettings;
-        ts->gp_interpolate.step = 1;
-      }
-    }
-
     /* Hair and PointCloud attributes. */
     for (Hair *hair = bmain->hairs.first; hair != NULL; hair = hair->id.next) {
       do_versions_point_attributes(&hair->pdata);
@@ -1432,7 +1431,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
               if (matte_id == NULL || strlen(storage->matte_id) == 0) {
                 continue;
               }
-              BKE_cryptomatte_matte_id_to_entries(NULL, storage, storage->matte_id);
+              BKE_cryptomatte_matte_id_to_entries(storage, storage->matte_id);
               MEM_SAFE_FREE(storage->matte_id);
             }
           }
@@ -1711,13 +1710,43 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
         continue;
       }
       LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
-        if (node->type == GEO_NODE_POINT_INSTANCE && node->storage == NULL) {
+        if (node->type == GEO_NODE_ATTRIBUTE_RANDOMIZE && node->storage == NULL) {
           NodeAttributeRandomize *data = (NodeAttributeRandomize *)MEM_callocN(
               sizeof(NodeAttributeRandomize), __func__);
           data->data_type = node->custom1;
           data->operation = GEO_NODE_ATTRIBUTE_RANDOMIZE_REPLACE_CREATE;
           node->storage = data;
         }
+      }
+    }
+    FOREACH_NODETREE_END;
+  }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 293, 9)) {
+    if (!DNA_struct_elem_find(fd->filesdna, "SceneEEVEE", "float", "bokeh_overblur")) {
+      LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+        scene->eevee.bokeh_neighbor_max = 10.0f;
+        scene->eevee.bokeh_denoise_fac = 0.75f;
+        scene->eevee.bokeh_overblur = 5.0f;
+      }
+    }
+
+    /* Add subpanels for FModifiers, which requires a field to store expansion. */
+    if (!DNA_struct_elem_find(fd->filesdna, "FModifier", "short", "ui_expand_flag")) {
+      LISTBASE_FOREACH (bAction *, act, &bmain->actions) {
+        LISTBASE_FOREACH (FCurve *, fcu, &act->curves) {
+          LISTBASE_FOREACH (FModifier *, fcm, &fcu->modifiers) {
+            SET_FLAG_FROM_TEST(fcm->ui_expand_flag,
+                               fcm->flag & FMODIFIER_FLAG_EXPANDED,
+                               UI_PANEL_DATA_EXPAND_ROOT);
+          }
+        }
+      }
+    }
+
+    FOREACH_NODETREE_BEGIN (bmain, ntree, id) {
+      if (ntree->type == NTREE_GEOMETRY) {
+        version_node_socket_name(ntree, GEO_NODE_ATTRIBUTE_PROXIMITY, "Result", "Distance");
       }
     }
     FOREACH_NODETREE_END;
@@ -1733,14 +1762,6 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
    * \note Keep this message at the bottom of the function.
    */
   {
-    if (!DNA_struct_elem_find(fd->filesdna, "SceneEEVEE", "float", "bokeh_overblur")) {
-      LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
-        scene->eevee.bokeh_neighbor_max = 10.0f;
-        scene->eevee.bokeh_denoise_fac = 0.75f;
-        scene->eevee.bokeh_overblur = 5.0f;
-      }
-    }
-
     /* Keep this block, even when empty. */
   }
 }

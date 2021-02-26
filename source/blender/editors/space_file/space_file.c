@@ -558,7 +558,7 @@ static void file_main_region_draw(const bContext *C, ARegion *region)
     v2d->keepofs |= V2D_LOCKOFS_Y;
 
     /* XXX this happens on scaling down Screen (like from startup.blend) */
-    /* view2d has no type specific for filewindow case, which doesn't scroll vertically */
+    /* view2d has no type specific for file-window case, which doesn't scroll vertically. */
     if (v2d->cur.ymax < 0) {
       v2d->cur.ymin -= v2d->cur.ymax;
       v2d->cur.ymax = 0;
@@ -766,7 +766,7 @@ static void file_dropboxes(void)
 {
   ListBase *lb = WM_dropboxmap_find("Window", SPACE_EMPTY, RGN_TYPE_WINDOW);
 
-  WM_dropbox_add(lb, "FILE_OT_filepath_drop", filepath_drop_poll, filepath_drop_copy);
+  WM_dropbox_add(lb, "FILE_OT_filepath_drop", filepath_drop_poll, filepath_drop_copy, NULL);
 }
 
 static int file_space_subtype_get(ScrArea *area)
