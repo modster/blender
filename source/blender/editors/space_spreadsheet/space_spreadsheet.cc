@@ -45,6 +45,7 @@
 
 #include "RNA_access.h"
 
+#include "WM_api.h"
 #include "WM_types.h"
 
 #include "BLF_api.h"
@@ -102,7 +103,7 @@ static void spreadsheet_keymap(wmKeyConfig *UNUSED(keyconf))
 {
 }
 
-static void spreadsheet_main_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
+static void spreadsheet_main_region_init(wmWindowManager *wm, ARegion *region)
 {
   region->v2d.scroll = V2D_SCROLL_RIGHT | V2D_SCROLL_BOTTOM;
   region->v2d.align = V2D_ALIGN_NO_NEG_X | V2D_ALIGN_NO_POS_Y;
@@ -111,6 +112,9 @@ static void spreadsheet_main_region_init(wmWindowManager *UNUSED(wm), ARegion *r
   region->v2d.minzoom = region->v2d.maxzoom = 1.0f;
 
   UI_view2d_region_reinit(&region->v2d, V2D_COMMONVIEW_LIST, region->winx, region->winy);
+
+  wmKeyMap *keymap = WM_keymap_ensure(wm->defaultconf, "View2D Buttons List", 0, 0);
+  WM_event_add_keymap_handler(&region->handlers, keymap);
 }
 
 static ID *get_used_id(const bContext *C)
