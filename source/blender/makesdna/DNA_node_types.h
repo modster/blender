@@ -1231,6 +1231,12 @@ typedef struct NodeGeometryMeshCircle {
   uint8_t fill_type;
 } NodeGeometryMeshCircle;
 
+typedef struct NodeGeometryMeshCylinder {
+  /* GeometryNodeMeshCircleFillType. */
+  uint8_t fill_type_top;
+  uint8_t fill_type_bottom;
+} NodeGeometryMeshCylinder;
+
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
 #define NODE_SCRIPT_EXTERNAL 1

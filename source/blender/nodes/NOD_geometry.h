@@ -44,6 +44,7 @@ void register_node_type_geo_is_viewport(void);
 void register_node_type_geo_join_geometry(void);
 void register_node_type_geo_mesh_primitive_circle(void);
 void register_node_type_geo_mesh_primitive_cube(void);
+void register_node_type_geo_mesh_primitive_cylinder(void);
 void register_node_type_geo_mesh_primitive_uv_sphere(void);
 void register_node_type_geo_object_info(void);
 void register_node_type_geo_point_distribute(void);

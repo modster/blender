@@ -182,21 +182,6 @@ static void calculate_faces(MutableSpan<MLoop> loops,
       poly.loopstart = loop_index;
       poly.totloop = 4;
 
-      // MLoop &loop_a = loops[loop_index++];
-      // loop_a.v = ring_vert_index_start + segment;
-      // loop_a.e = ring_edge_index_start + segment;
-
-      // MLoop &loop_b = loops[loop_index++];
-      // loop_b.v = ring_vert_index_start + ((segment + 1) % segments);
-      // loop_b.e = ring_vertical_edge_index_start + ((segment + 1) % segments);
-
-      // MLoop &loop_c = loops[loop_index++];
-      // loop_c.v = next_ring_vert_index_start + ((segment + 1) % segments);
-      // loop_c.e = next_ring_edge_index_start + segment;
-
-      // MLoop &loop_d = loops[loop_index++];
-      // loop_d.v = next_ring_vert_index_start + segment;
-      // loop_d.e = ring_vertical_edge_index_start + segment;
       MLoop &loop_a = loops[loop_index++];
       loop_a.v = ring_vert_index_start + segment;
       loop_a.e = ring_vertical_edge_index_start + segment;
