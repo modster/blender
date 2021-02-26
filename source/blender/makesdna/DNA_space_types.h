@@ -1848,9 +1848,18 @@ typedef struct SpaceSpreadsheet {
   /* End 'SpaceLink' header. */
 
   struct ID *pinned_id;
+
+  /* eSpaceSpreadsheet_FilterFlag. */
+  uint8_t filter_flag;
+
+  char _pad1[7];
 } SpaceSpreadsheet;
 
 /** \} */
+
+typedef enum eSpaceSpreadsheet_FilterFlag {
+  SPREADSHEET_FILTER_SELECTED_ONLY = (1 << 0),
+} eSpaceSpreadsheet_FilterFlag;
 
 /* -------------------------------------------------------------------- */
 /** \name Space Defines (eSpace_Type)

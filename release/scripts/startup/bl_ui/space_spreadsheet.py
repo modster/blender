@@ -36,7 +36,10 @@ class SPREADSHEET_HT_header(bpy.types.Header):
 
         layout.operator("spreadsheet.toggle_pin", text="", icon='PINNED' if pinned_id else 'UNPINNED', emboss=False)
 
+        layout.separator_spacer()
 
+        if isinstance(used_id, bpy.types.Object) and used_id.mode == 'EDIT':
+            layout.prop(space, "show_only_selected", text="Selected Only")
 
 
 classes = (

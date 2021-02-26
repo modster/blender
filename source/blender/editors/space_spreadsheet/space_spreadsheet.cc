@@ -16,10 +16,12 @@
 
 #include <cstring>
 
+#include "BLI_array.hh"
 #include "BLI_index_range.hh"
 #include "BLI_listbase.h"
 #include "BLI_resource_collector.hh"
 
+#include "BKE_editmesh.h"
 #include "BKE_mesh_wrapper.h"
 #include "BKE_modifier.h"
 #include "BKE_screen.h"
@@ -47,11 +49,15 @@
 
 #include "BLF_api.h"
 
+#include "bmesh.h"
+
 #include "spreadsheet_from_geometry.hh"
 #include "spreadsheet_intern.hh"
 
+using blender::Array;
 using blender::IndexRange;
 using blender::ResourceCollector;
+using blender::Vector;
 
 using namespace blender::ed::spreadsheet;
 
@@ -121,6 +127,8 @@ static void gather_spreadsheet_data(const bContext *C,
                                     SpreadsheetLayout &spreadsheet_layout,
                                     ResourceCollector &resources)
 {
+  SpaceSpreadsheet *sspreadsheet = CTX_wm_space_spreadsheet(C);
+
   Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
   ID *used_id = get_used_id(C);
   if (used_id == nullptr) {
@@ -130,11 +138,11 @@ static void gather_spreadsheet_data(const bContext *C,
   if (id_type != ID_OB) {
     return;
   }
-  Object *used_object_orig = (Object *)used_id;
-  if (used_object_orig->type != OB_MESH) {
+  Object *object_orig = (Object *)used_id;
+  if (object_orig->type != OB_MESH) {
     return;
   }
-  Object *object_eval = DEG_get_evaluated_object(depsgraph, used_object_orig);
+  Object *object_eval = DEG_get_evaluated_object(depsgraph, object_orig);
   if (object_eval == nullptr) {
     return;
   }
@@ -166,8 +174,42 @@ static void gather_spreadsheet_data(const bContext *C,
   const AttributeDomain domain = ATTR_DOMAIN_POINT;
   columns_from_geometry_attributes(*component, domain, resources, spreadsheet_layout);
   const int row_amount = component->attribute_domain_size(domain);
-  spreadsheet_layout.visible_rows = IndexRange(row_amount).as_span();
   spreadsheet_layout.row_index_digits = std::to_string(std::max(0, row_amount - 1)).size();
+
+  const bool show_only_selected = sspreadsheet->filter_flag & SPREADSHEET_FILTER_SELECTED_ONLY;
+  if (object_orig->mode == OB_MODE_EDIT && show_only_selected) {
+    Vector<int64_t> &visible_rows = resources.construct<Vector<int64_t>>("visible rows");
+    const MeshComponent *mesh_component = (const MeshComponent *)component;
+    const Mesh *mesh_eval = mesh_component->get_for_read();
+    Mesh *mesh_orig = (Mesh *)object_orig->data;
+    BMesh *bm = mesh_orig->edit_mesh->bm;
+    BM_mesh_elem_index_ensure(bm, BM_VERT);
+
+    int *orig_indices = (int *)CustomData_get_layer(&mesh_eval->vdata, CD_ORIGINDEX);
+    if (orig_indices != nullptr) {
+      for (const int i_eval : IndexRange(mesh_eval->totvert)) {
+        const int i_orig = orig_indices[i_eval];
+        if (i_orig >= 0 && i_orig < bm->totvert) {
+          BMVert *vert = bm->vtable[i_orig];
+          if (BM_elem_flag_test(vert, BM_ELEM_SELECT)) {
+            visible_rows.append(i_eval);
+          }
+        }
+      }
+    }
+    else if (mesh_eval->totvert == bm->totvert) {
+      for (const int i : IndexRange(mesh_eval->totvert)) {
+        BMVert *vert = bm->vtable[i];
+        if (BM_elem_flag_test(vert, BM_ELEM_SELECT)) {
+          visible_rows.append(i);
+        }
+      }
+    }
+    spreadsheet_layout.visible_rows = visible_rows.as_span();
+  }
+  else {
+    spreadsheet_layout.visible_rows = IndexRange(row_amount).as_span();
+  }
 }
 
 static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
