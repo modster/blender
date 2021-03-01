@@ -1721,18 +1721,29 @@ static MovieTrackingMarker *marker_previous_keyframe_get(MovieTrackingTrack *tra
   /* Start with the previous marker, so that if the current marker is a keyframe by itself it is
    * not used as a result. */
   MovieTrackingMarker *marker_it = marker - 1;
+  MovieTrackingMarker *last_known_marker = NULL;
+  bool gap_encountered = false;
 
   while (marker_it >= track->markers) {
     if (marker_it->flag & MARKER_DISABLED) {
-      return NULL;
+      gap_encountered = true;
+      --marker_it;
+      continue;
     }
+
+    if (gap_encountered) {
+      return marker_it;
+    }
+
+    last_known_marker = marker_it;
+
     if ((marker_it->flag & MARKER_TRACKED) == 0) {
       return marker_it;
     }
     --marker_it;
   }
 
-  return NULL;
+  return last_known_marker;
 }
 
 static MovieTrackingMarker *marker_next_keyframe_get(MovieTrackingTrack *track,
@@ -1741,20 +1752,30 @@ static MovieTrackingMarker *marker_next_keyframe_get(MovieTrackingTrack *track,
   /* Start with the next marker, so that if the current marker is a keyframe by itself it is
    * not used as a result. */
   MovieTrackingMarker *marker_it = marker + 1;
-
+  MovieTrackingMarker *last_known_marker = NULL;
   const MovieTrackingMarker *marker_end = track->markers + track->markersnr;
+  bool gap_encountered = false;
 
   while (marker_it < marker_end) {
     if (marker_it->flag & MARKER_DISABLED) {
-      return NULL;
+      gap_encountered = true;
+      ++marker_it;
+      continue;
     }
+
+    if (gap_encountered) {
+      return marker_it;
+    }
+
+    last_known_marker = marker_it;
+
     if ((marker_it->flag & MARKER_TRACKED) == 0) {
       return marker_it;
     }
     ++marker_it;
   }
 
-  return NULL;
+  return last_known_marker;
 }
 
 static MovieTrackingMarker *reference_marker_for_scopes_get(MovieClip *clip,

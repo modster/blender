@@ -730,7 +730,7 @@ class CLIP_PT_track(CLIP_PT_tracking_panel, Panel):
         sub.prop(act_track, "lock", text="", icon=icon)
 
         col = layout.column()
-        col.label(text="Previous Keyframe")
+        col.label(text="Previous Reference")
         col.template_track(sc, "scopes_prev")
 
         col = layout.column()
@@ -738,7 +738,7 @@ class CLIP_PT_track(CLIP_PT_tracking_panel, Panel):
         col.template_track(sc, "scopes")
 
         col = layout.column()
-        col.label(text="Next Marker")
+        col.label(text="Next Reference")
         col.template_track(sc, "scopes_next")
 
         row = layout.row(align=True)
