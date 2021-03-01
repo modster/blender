@@ -376,10 +376,10 @@ USE_CXX11=true
 CLANG_FORMAT_VERSION_MIN="6.0"
 CLANG_FORMAT_VERSION_MAX="10.0"
 
-PYTHON_VERSION="3.9.1"
+PYTHON_VERSION="3.9.2"
 PYTHON_VERSION_SHORT="3.9"
 PYTHON_VERSION_MIN="3.7"
-PYTHON_VERSION_MAX="3.10"
+PYTHON_VERSION_MAX="3.11"
 PYTHON_VERSION_INSTALLED=$PYTHON_VERSION_SHORT
 PYTHON_FORCE_BUILD=false
 PYTHON_FORCE_REBUILD=false
@@ -526,10 +526,10 @@ ALEMBIC_FORCE_BUILD=false
 ALEMBIC_FORCE_REBUILD=false
 ALEMBIC_SKIP=false
 
-USD_VERSION="20.08"
-USD_VERSION_SHORT="20.08"
+USD_VERSION="21.02"
+USD_VERSION_SHORT="21.02"
 USD_VERSION_MIN="20.05"
-USD_VERSION_MAX="21.00"
+USD_VERSION_MAX="22.00"
 USD_FORCE_BUILD=false
 USD_FORCE_REBUILD=false
 USD_SKIP=false
@@ -1732,7 +1732,7 @@ compile_OCIO() {
   fi
 
   # To be changed each time we make edits that would modify the compiled result!
-  ocio_magic=2
+  ocio_magic=3
   _init_ocio
 
   # Force having own builds for the dependencies.
@@ -1802,11 +1802,11 @@ compile_OCIO() {
     make -j$THREADS && make install
 
     # Force linking against static libs
-    rm -f $_inst/lib/*.so*
+    #rm -f $_inst/lib/*.so*
 
     # Additional depencencies
-    cp ext/dist/lib/libtinyxml.a $_inst/lib
-    cp ext/dist/lib/libyaml-cpp.a $_inst/lib
+    #cp ext/dist/lib/libtinyxml.a $_inst/lib
+    #cp ext/dist/lib/libyaml-cpp.a $_inst/lib
 
     make clean
 

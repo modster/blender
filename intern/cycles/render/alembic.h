@@ -320,7 +320,6 @@ class AlembicObject : public Node {
 
   MatrixSampleMap xform_samples;
   Alembic::AbcGeom::IObject iobject;
-  Transform xform;
 
   CachedData &get_cached_data()
   {
