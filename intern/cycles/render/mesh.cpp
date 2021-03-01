@@ -816,27 +816,28 @@ void Mesh::pack_patches(uint *patch_data, uint vert_offset, uint face_offset, ui
   }
 }
 
-void Mesh::pack_primitives(ccl::PackedBVH *pack, int object, uint visibility, bool pack_all, device_vector<half4> *verts_deltas)
+void Mesh::pack_primitives(DeviceScene *dscene, int object, uint visibility, bool pack_all, device_vector<ushort4> *verts_deltas)
 {
   if (triangles.empty())
     return;
 
   const size_t num_prims = num_triangles();
 
-  /* Use prim_offset for indexing as it is computed per geometry type, and prim_tri_verts does not
-   * contain data for Hair geometries. */
-  float4 *prim_tri_verts = &pack->prim_tri_verts[prim_offset * 3];
-  // 'pack->prim_time' is unused by Embree and OptiX
-
   uint type = has_motion_blur() ? PRIMITIVE_MOTION_TRIANGLE : PRIMITIVE_TRIANGLE;
 
   if (pack_all) {
     /* Use optix_prim_offset for indexing as those arrays also contain data for Hair geometries. */
-    unsigned int *prim_tri_index = &pack->prim_tri_index[optix_prim_offset];
-    int *prim_type = &pack->prim_type[optix_prim_offset];
-    unsigned int *prim_visibility = &pack->prim_visibility[optix_prim_offset];
-    int *prim_index = &pack->prim_index[optix_prim_offset];
-    int *prim_object = &pack->prim_object[optix_prim_offset];
+    device_vector<unsigned int>::chunk prim_tri_index_chunk = get_optix_chunk(dscene->prim_tri_index);
+    unsigned int *prim_tri_index = prim_tri_index_chunk.data();
+    device_vector<int>::chunk prim_type_chunk = get_optix_chunk(dscene->prim_type);
+    int *prim_type = prim_type_chunk.data();
+    device_vector<unsigned int>::chunk prim_visibility_chunk = get_optix_chunk(dscene->prim_visibility);
+    unsigned int *prim_visibility = prim_visibility_chunk.data();
+    device_vector<int>::chunk prim_index_chunk = get_optix_chunk(dscene->prim_index);
+    int *prim_index = prim_index_chunk.data();
+    device_vector<int>::chunk prim_object_chunk = get_optix_chunk(dscene->prim_object);
+    int *prim_object = prim_object_chunk.data();
+    // 'dscene->prim_time' is unused by Embree and OptiX
 
     for (size_t k = 0; k < num_prims; ++k) {
       prim_tri_index[k] = (prim_offset + k) * 3;
@@ -845,11 +846,40 @@ void Mesh::pack_primitives(ccl::PackedBVH *pack, int object, uint visibility, bo
       prim_object[k] = object;
       prim_visibility[k] = visibility;
     }
+
+    prim_tri_index_chunk.copy_to_device();
+    prim_type_chunk.copy_to_device();
+    prim_visibility_chunk.copy_to_device();
+    prim_index_chunk.copy_to_device();
+    prim_object_chunk.copy_to_device();
   }
 
-  device_vector<half4>::chunk chunk = get_tris_chunk(*verts_deltas, 3);
-  const bool do_deltas = chunk.valid();
-  half4 *chunk_data = chunk.data();
+  device_vector<float4>::chunk verts_chunk = get_tris_chunk(dscene->prim_tri_verts, 3);
+  float4 *prim_tri_verts = verts_chunk.data();
+
+  device_vector<ushort4>::chunk delta_chunk = get_tris_chunk(*verts_deltas, 3);
+  bool do_deltas = delta_chunk.valid();
+  ushort4 *chunk_data = delta_chunk.data();
+  float delta_magnitude = 0.0f;
+
+  /* first compute the maximum change, we do this here to account for displacement */
+  if (do_deltas) {
+    for (size_t k = 0; k < num_prims; ++k) {
+      const Mesh::Triangle t = get_triangle(k);
+
+      for (int i = 0; i < 3; ++i) {
+        const float4 new_vert = float3_to_float4(verts[t.v[i]]);
+        const float4 old_vert = prim_tri_verts[k * 3 + i];
+        const float4 delta = (new_vert - old_vert);
+        delta_magnitude = std::max(delta_magnitude, std::abs(delta.x));
+        delta_magnitude = std::max(delta_magnitude, std::abs(delta.y));
+        delta_magnitude = std::max(delta_magnitude, std::abs(delta.z));
+      }
+    }
+
+    /* only accept if in the range (-1, 1) */
+    do_deltas = delta_magnitude <= 1.0f;
+  }
 
   for (size_t k = 0; k < num_prims; ++k) {
     const Mesh::Triangle t = get_triangle(k);
@@ -859,8 +889,17 @@ void Mesh::pack_primitives(ccl::PackedBVH *pack, int object, uint visibility, bo
 
       if (do_deltas) {
         const float4 old_vert = prim_tri_verts[k * 3 + i];
-        const float4 delta = (new_vert - old_vert);
-        *chunk_data++ = float4_to_half4(delta);
+        /* map to (0, 1) */
+        const float4 delta = (new_vert - old_vert) * 0.5f + 0.5f;
+
+        ushort4 quantized_delta;
+        /* map to (0, 65535) */
+        quantized_delta.x = static_cast<ushort>(delta.x * 65535.0f);
+        quantized_delta.y = static_cast<ushort>(delta.y * 65535.0f);
+        quantized_delta.z = static_cast<ushort>(delta.z * 65535.0f);
+        quantized_delta.w = 0;
+
+        *chunk_data++ = quantized_delta;
       }
 
       /* update host memory */
@@ -869,7 +908,10 @@ void Mesh::pack_primitives(ccl::PackedBVH *pack, int object, uint visibility, bo
   }
 
   if (do_deltas) {
-    chunk.copy_to_device();
+    delta_chunk.copy_to_device();
+  }
+  else {
+    verts_chunk.copy_to_device();
   }
 }
 

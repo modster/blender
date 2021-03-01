@@ -448,30 +448,17 @@ template<typename T> class device_vector : public device_memory {
   }
 
   /* Take over data from an existing array. */
-  void steal_data(array<T> &from, bool new_data = true)
+  void steal_data(array<T> &from)
   {
-    /* only false if the data does not come from an earlier call to give_data */
-    if (new_data) {
-      device_free();
-      host_free();
-    }
+    device_free();
+    host_free();
 
     data_size = from.size();
     data_width = 0;
     data_height = 0;
     data_depth = 0;
     host_pointer = from.steal_pointer();
-    assert(!new_data || device_pointer == 0);
-  }
-
-  void give_data(array<T> &to)
-  {
-    to.set_data((T *)host_pointer, data_size);
-    data_size = 0;
-    data_width = 0;
-    data_height = 0;
-    data_depth = 0;
-    host_pointer = 0;
+    assert(device_pointer == 0);
   }
 
   /* Free device and host memory. */

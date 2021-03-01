@@ -461,7 +461,7 @@ void Hair::apply_transform(const Transform &tfm, const bool apply_to_motion)
 }
 
 void Hair::pack_curve_keys(device_vector<float4>::chunk curve_key_co,
-                           device_vector<half4>::chunk keys_deltas)
+                           device_vector<ushort4>::chunk keys_deltas)
 {
   size_t curve_keys_size = curve_keys.size();
 
@@ -469,7 +469,26 @@ void Hair::pack_curve_keys(device_vector<float4>::chunk curve_key_co,
     float3 *keys_ptr = curve_keys.data();
     float *radius_ptr = curve_radius.data();
 
-    const bool do_deltas = keys_deltas.valid();
+    bool do_deltas = keys_deltas.valid();
+    float delta_magnitude = 0.0f;
+
+    /* first compute the maximum change, we do this here to account for displacement */
+    if (do_deltas) {
+      for (size_t i = 0; i < curve_keys_size; i++) {
+        const float4 old_keys = curve_key_co.data()[i];
+        const float3 new_keys = keys_ptr[i];
+
+        const float delta_x = (new_keys.x - old_keys.x);
+        const float delta_y = (new_keys.y - old_keys.y);
+        const float delta_z = (new_keys.z - old_keys.z);
+        delta_magnitude = std::max(delta_magnitude, std::abs(delta_x));
+        delta_magnitude = std::max(delta_magnitude, std::abs(delta_y));
+        delta_magnitude = std::max(delta_magnitude, std::abs(delta_z));
+      }
+
+      /* only accept if in the range (-1, 1) */
+      do_deltas = delta_magnitude <= 1.0f;
+    }
 
     for (size_t i = 0; i < curve_keys_size; i++) {
       const float4 new_keys = make_float4(
@@ -477,8 +496,18 @@ void Hair::pack_curve_keys(device_vector<float4>::chunk curve_key_co,
 
       if (do_deltas) {
         const float4 old_keys = curve_key_co.data()[i];
-        const float4 delta = (new_keys - old_keys);
-        keys_deltas.data()[i] = float4_to_half4(delta);
+        /* map to (0, 1) */
+        const float4 delta = (new_keys - old_keys) * 0.5f + 0.5f;
+
+        ushort4 quantized_delta;
+        /* map to (0, 65535) */
+        quantized_delta.x = static_cast<ushort>(delta.x * 65535.0f);
+        quantized_delta.y = static_cast<ushort>(delta.y * 65535.0f);
+        quantized_delta.z = static_cast<ushort>(delta.z * 65535.0f);
+        /* if radius changed, we have to rebuild, so this can safely be 0 */
+        quantized_delta.w = 0;
+
+        keys_deltas.data()[i] = quantized_delta;
       }
 
       /* update host memory */
@@ -519,7 +548,7 @@ void Hair::pack_curve_segments(Scene *scene, device_vector<float4>::chunk curve_
   curve_data.copy_to_device();
 }
 
-void Hair::pack_primitives(PackedBVH *pack, int object, uint visibility, bool pack_all, device_vector<half4> */*verts_deltas*/)
+void Hair::pack_primitives(DeviceScene *dscene, int object, uint visibility, bool pack_all, device_vector<ushort4> */*verts_deltas*/)
 {
   if (curve_first_key.empty())
     return;
@@ -529,12 +558,17 @@ void Hair::pack_primitives(PackedBVH *pack, int object, uint visibility, bool pa
     return;
   }
 
-  unsigned int *prim_tri_index = &pack->prim_tri_index[optix_prim_offset];
-  int *prim_type = &pack->prim_type[optix_prim_offset];
-  unsigned int *prim_visibility = &pack->prim_visibility[optix_prim_offset];
-  int *prim_index = &pack->prim_index[optix_prim_offset];
-  int *prim_object = &pack->prim_object[optix_prim_offset];
-  // 'pack->prim_time' is unused by Embree and OptiX
+  device_vector<unsigned int>::chunk prim_tri_index_chunk = get_optix_chunk(dscene->prim_tri_index);
+  unsigned int *prim_tri_index = prim_tri_index_chunk.data();
+  device_vector<int>::chunk prim_type_chunk = get_optix_chunk(dscene->prim_type);
+  int *prim_type = prim_type_chunk.data();
+  device_vector<unsigned int>::chunk prim_visibility_chunk = get_optix_chunk(dscene->prim_visibility);
+  unsigned int *prim_visibility = prim_visibility_chunk.data();
+  device_vector<int>::chunk prim_index_chunk = get_optix_chunk(dscene->prim_index);
+  int *prim_index = prim_index_chunk.data();
+  device_vector<int>::chunk prim_object_chunk = get_optix_chunk(dscene->prim_object);
+  int *prim_object = prim_object_chunk.data();
+  // 'dscene->prim_time' is unused by Embree and OptiX
 
   uint type = has_motion_blur() ?
                   ((curve_shape == CURVE_RIBBON) ? PRIMITIVE_MOTION_CURVE_RIBBON :
@@ -553,6 +587,12 @@ void Hair::pack_primitives(PackedBVH *pack, int object, uint visibility, bool pa
       prim_object[index] = object;
     }
   }
+
+  prim_tri_index_chunk.copy_to_device();
+  prim_type_chunk.copy_to_device();
+  prim_visibility_chunk.copy_to_device();
+  prim_index_chunk.copy_to_device();
+  prim_object_chunk.copy_to_device();
 }
 
 CCL_NAMESPACE_END

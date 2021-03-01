@@ -1826,6 +1826,14 @@ class OptiXDevice : public CUDADevice {
     }
   }
 
+  bool supports_delta_compression() override
+  {
+    /* We do this in OptiXDevice instead of CUDADevice, as CUDA uses BVH2 which
+     * does not supports delta compression due to PackedBVH preventing us from
+     * partially copying the vertex buffers. */
+    return true;
+  }
+
   void task_wait() override
   {
     // Wait for all queued tasks to finish

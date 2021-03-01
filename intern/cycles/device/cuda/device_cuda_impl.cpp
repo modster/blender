@@ -1421,11 +1421,6 @@ void CUDADevice::tex_free(device_texture &mem)
   }
 }
 
-bool CUDADevice::supports_delta_compression()
-{
-  return true;
-}
-
 #  define CUDA_GET_BLOCKSIZE(func, w, h) \
     int threads_per_block; \
     cuda_assert( \

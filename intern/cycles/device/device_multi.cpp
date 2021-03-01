@@ -818,6 +818,32 @@ class MultiDevice : public Device {
     }
   }
 
+  bool supports_delta_compression() override
+  {
+    foreach (SubDevice &sub, devices) {
+      if (sub.device->supports_delta_compression()) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool apply_delta_compression(device_memory &orig_mem, device_memory &compressed_mem) override
+  {
+    foreach (SubDevice &sub, devices) {
+      if (!sub.device->supports_delta_compression()) {
+        continue;
+      }
+
+      if (!sub.device->apply_delta_compression(orig_mem, compressed_mem)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   void task_wait() override
   {
     foreach (SubDevice &sub, devices)

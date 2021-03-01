@@ -1123,7 +1123,7 @@ void GeometryManager::device_update_mesh(
 
     const bool copy_all_data = dscene->curve_keys.need_realloc() || dscene->curves.need_realloc();
 
-    device_vector<half4> curve_keys_deltas(
+    device_vector<ushort4> curve_keys_deltas(
           scene->device, "__curve_keys_deltas", MemoryType::MEM_READ_ONLY);
 
     if (!copy_all_data && scene->device->supports_delta_compression()) {
@@ -1212,7 +1212,6 @@ void GeometryManager::device_update_mesh(
 void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &progress)
 {
   const bool pack_all = scene->bvh == nullptr;
-  PackedBVH pack;
 
   progress.set_status("Updating Scene BVH", "Packing BVH primitives");
   {
@@ -1236,30 +1235,24 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
       }
     }
 
-    pack.root_index = -1;
-
-    device_vector<half4> verts_deltas(scene->device, "__prim_tri_verts_deltas", MEM_READ_ONLY);
+    device_vector<ushort4> verts_deltas(scene->device, "__prim_tri_verts_deltas", MEM_READ_ONLY);
 
     if (!pack_all) {
-      /* if we do not need to recreate the BVH, then only the vertices are updated, so we can
-       * safely retake the memory */
-      dscene->prim_tri_verts.give_data(pack.prim_tri_verts);
-
       if (scene->device->supports_delta_compression()) {
-        verts_deltas.alloc_chunks(pack.prim_tri_verts.size());
+        verts_deltas.alloc_chunks(dscene->prim_tri_verts.size());
         /* Since we use chunks and not all of them may be copied, make sure data between copied chunks is not garbage. */
         verts_deltas.zero_to_device();
       }
     }
     else {
-      /* It is not strictly necessary to skip those resizes we if do not have to repack, as the OS
-       * will not allocate pages if we do not touch them, however it does help catching bugs. */
-      pack.prim_tri_index.resize(num_prims);
-      pack.prim_tri_verts.resize(num_tri_verts);
-      pack.prim_type.resize(num_prims);
-      pack.prim_index.resize(num_prims);
-      pack.prim_object.resize(num_prims);
-      pack.prim_visibility.resize(num_prims);
+      /* It is not strictly necessary to skip those allocations we if do not have to repack,
+       * however it does help catching bugs. */
+      dscene->prim_tri_index.alloc_chunks(num_prims);
+      dscene->prim_tri_verts.alloc_chunks(num_tri_verts);
+      dscene->prim_type.alloc_chunks(num_prims);
+      dscene->prim_index.alloc_chunks(num_prims);
+      dscene->prim_object.alloc_chunks(num_prims);
+      dscene->prim_visibility.alloc_chunks(num_prims);
     }
 
     // Merge visibility flags of all objects and find object index for non-instanced geometry
@@ -1284,13 +1277,11 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
 
       const pair<int, uint> &info = geometry_to_object_info[geom];
       pool.push(function_bind(
-          &Geometry::pack_primitives, geom, &pack, info.first, info.second, pack_all, &verts_deltas));
+          &Geometry::pack_primitives, geom, dscene, info.first, info.second, pack_all, &verts_deltas));
     }
     pool.wait_work();
 
     if (verts_deltas.size() != 0) {
-      dscene->prim_tri_verts.steal_data(pack.prim_tri_verts, false);
-
       if (!scene->device->apply_delta_compression(dscene->prim_tri_verts, verts_deltas)) {
         progress.set_cancel("unable to unpack deltas for the vertices");
         return;
@@ -1302,6 +1293,8 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
     return;
   }
 
+  PackedBVH pack;
+  pack.root_index = -1;
   device_update_packed_bvh(pack, dscene, scene, false, progress);
 }
 
@@ -1319,47 +1312,49 @@ void GeometryManager::device_update_packed_bvh(
 
   /* When using BVH2, we always have to copy/update the data as its layout is dependent on the
    * BVH's leaf nodes which may be different when the objects or vertices move. */
+  if (has_bvh2_layout) {
+    if (pack.nodes.size()) {
+      dscene->bvh_nodes.steal_data(pack.nodes);
+      dscene->bvh_nodes.copy_to_device();
+    }
+    if (pack.leaf_nodes.size()) {
+      dscene->bvh_leaf_nodes.steal_data(pack.leaf_nodes);
+      dscene->bvh_leaf_nodes.copy_to_device();
+    }
+    if (pack.object_node.size()) {
+      dscene->object_node.steal_data(pack.object_node);
+      dscene->object_node.copy_to_device();
+    }
+    if (pack.prim_tri_index.size() && (dscene->prim_tri_index.need_realloc())) {
+      dscene->prim_tri_index.steal_data(pack.prim_tri_index);
+    }
+    if (pack.prim_tri_verts.size()) {
+      dscene->prim_tri_verts.steal_data(pack.prim_tri_verts);
+    }
+    if (pack.prim_type.size() && (dscene->prim_type.need_realloc())) {
+      dscene->prim_type.steal_data(pack.prim_type);
+    }
+    if (pack.prim_visibility.size() && (dscene->prim_visibility.need_realloc())) {
+      dscene->prim_visibility.steal_data(pack.prim_visibility);
+    }
+    if (pack.prim_index.size() && (dscene->prim_index.need_realloc())) {
+      dscene->prim_index.steal_data(pack.prim_index);
+      dscene->prim_index.copy_to_device();
+    }
+    if (pack.prim_object.size() && (dscene->prim_object.need_realloc())) {
+      dscene->prim_object.steal_data(pack.prim_object);
+    }
+    if (pack.prim_time.size() && (dscene->prim_time.need_realloc())) {
+      dscene->prim_time.steal_data(pack.prim_time);
+      dscene->prim_time.copy_to_device();
+    }
+  }
 
-  if (pack.nodes.size()) {
-    dscene->bvh_nodes.steal_data(pack.nodes);
-    dscene->bvh_nodes.copy_to_device();
-  }
-  if (pack.leaf_nodes.size()) {
-    dscene->bvh_leaf_nodes.steal_data(pack.leaf_nodes);
-    dscene->bvh_leaf_nodes.copy_to_device();
-  }
-  if (pack.object_node.size()) {
-    dscene->object_node.steal_data(pack.object_node);
-    dscene->object_node.copy_to_device();
-  }
-  if (pack.prim_tri_index.size() && (dscene->prim_tri_index.need_realloc() || has_bvh2_layout)) {
-    dscene->prim_tri_index.steal_data(pack.prim_tri_index);
-    dscene->prim_tri_index.copy_to_device();
-  }
-  if (pack.prim_tri_verts.size()) {
-    dscene->prim_tri_verts.steal_data(pack.prim_tri_verts);
-    dscene->prim_tri_verts.copy_to_device();
-  }
-  if (pack.prim_type.size() && (dscene->prim_type.need_realloc() || has_bvh2_layout)) {
-    dscene->prim_type.steal_data(pack.prim_type);
-    dscene->prim_type.copy_to_device();
-  }
-  if (pack.prim_visibility.size() && (dscene->prim_visibility.need_realloc() || has_bvh2_layout)) {
-    dscene->prim_visibility.steal_data(pack.prim_visibility);
-    dscene->prim_visibility.copy_to_device();
-  }
-  if (pack.prim_index.size() && (dscene->prim_index.need_realloc() || has_bvh2_layout)) {
-    dscene->prim_index.steal_data(pack.prim_index);
-    dscene->prim_index.copy_to_device();
-  }
-  if (pack.prim_object.size() && (dscene->prim_object.need_realloc() || has_bvh2_layout)) {
-    dscene->prim_object.steal_data(pack.prim_object);
-    dscene->prim_object.copy_to_device();
-  }
-  if (pack.prim_time.size() && (dscene->prim_time.need_realloc() || has_bvh2_layout)) {
-    dscene->prim_time.steal_data(pack.prim_time);
-    dscene->prim_time.copy_to_device();
-  }
+  dscene->prim_tri_index.copy_to_device_if_modified();
+  dscene->prim_tri_verts.copy_to_device_if_modified();
+  dscene->prim_type.copy_to_device_if_modified();
+  dscene->prim_visibility.copy_to_device_if_modified();
+  dscene->prim_object.copy_to_device_if_modified();
 
   dscene->data.bvh.root = pack.root_index;
   // dscene->data.bvh.bvh_layout = bparams.bvh_layout;
