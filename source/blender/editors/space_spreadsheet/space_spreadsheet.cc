@@ -195,8 +195,34 @@ static void spreadsheet_header_region_free(ARegion *UNUSED(region))
 
 static void spreadsheet_header_region_listener(const wmRegionListenerParams *params)
 {
-  /* TODO: Do more precise check. */
-  ED_region_tag_redraw(params->region);
+  ARegion *region = params->region;
+  wmNotifier *wmn = params->notifier;
+
+  switch (wmn->category) {
+    case NC_SCENE: {
+      switch (wmn->data) {
+        case ND_OB_ACTIVE: {
+          ED_region_tag_redraw(region);
+          break;
+        }
+      }
+      break;
+    }
+    case NC_OBJECT: {
+      ED_region_tag_redraw(region);
+      break;
+    }
+    case NC_SPACE: {
+      if (wmn->data == ND_SPACE_SPREADSHEET) {
+        ED_region_tag_redraw(region);
+      }
+      break;
+    }
+    case NC_GEOM: {
+      ED_region_tag_redraw(region);
+      break;
+    }
+  }
 }
 
 void ED_spacetype_spreadsheet(void)
