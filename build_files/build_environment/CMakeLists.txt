@@ -31,6 +31,7 @@
 #
 # MAC OS X USAGE:
 #   Install with homebrew: brew install autoconf automake bison cmake libtool pkg-config yasm
+#   Additional requirements for macOS arm64: brew install flex
 #   Run "make deps" from main Blender directory
 #
 # LINUX USAGE:
@@ -71,7 +72,6 @@ include(cmake/opensubdiv.cmake)
 include(cmake/sdl.cmake)
 include(cmake/opencollada.cmake)
 include(cmake/llvm.cmake)
-include(cmake/clang.cmake)
 if(APPLE)
   include(cmake/openmp.cmake)
 endif()

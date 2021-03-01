@@ -2046,7 +2046,7 @@ wmPaintCursor *WM_paint_cursor_activate(short space_type,
 bool WM_paint_cursor_end(wmPaintCursor *handle)
 {
   wmWindowManager *wm = G_MAIN->wm.first;
-  for (wmPaintCursor *pc = wm->paintcursors.first; pc; pc = pc->next) {
+  LISTBASE_FOREACH (wmPaintCursor *, pc, &wm->paintcursors) {
     if (pc == (wmPaintCursor *)handle) {
       BLI_remlink(&wm->paintcursors, pc);
       MEM_freeN(pc);
@@ -2054,6 +2054,19 @@ bool WM_paint_cursor_end(wmPaintCursor *handle)
     }
   }
   return false;
+}
+
+void WM_paint_cursor_remove_by_type(wmWindowManager *wm, void *draw_fn, void (*free)(void *))
+{
+  LISTBASE_FOREACH_MUTABLE (wmPaintCursor *, pc, &wm->paintcursors) {
+    if (pc->draw == draw_fn) {
+      if (free) {
+        free(pc->customdata);
+      }
+      BLI_remlink(&wm->paintcursors, pc);
+      MEM_freeN(pc);
+    }
+  }
 }
 
 /** \} */
@@ -2994,7 +3007,7 @@ static void WM_OT_radial_control(wmOperatorType *ot)
 {
   ot->name = "Radial Control";
   ot->idname = "WM_OT_radial_control";
-  ot->description = "Set some size property (like e.g. brush size) with mouse wheel";
+  ot->description = "Set some size property (e.g. brush size) with mouse wheel";
 
   ot->invoke = radial_control_invoke;
   ot->modal = radial_control_modal;
