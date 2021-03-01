@@ -22,11 +22,11 @@
 
 #include "spreadsheet_draw.hh"
 
+struct bContext;
+
 namespace blender::ed::spreadsheet {
 
-void columns_from_geometry_attributes(const GeometryComponent &component,
-                                      const AttributeDomain domain,
-                                      ResourceCollector &resources,
-                                      SpreadsheetLayout &spreadsheet_layout);
+std::unique_ptr<SpreadsheetDrawer> spreadsheet_drawer_from_geometry_attributes(
+    const bContext *C, Object *object_eval);
 
 }  // namespace blender::ed::spreadsheet

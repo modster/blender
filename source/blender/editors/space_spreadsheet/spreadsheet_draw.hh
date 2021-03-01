@@ -25,48 +25,36 @@ struct ARegion;
 
 namespace blender::ed::spreadsheet {
 
-struct HeaderDrawParams {
-  uiBlock *block;
-  int xmin, ymin;
-  int width, height;
-};
-
-class HeaderDrawer {
- public:
-  virtual ~HeaderDrawer() = default;
-  virtual void draw_header(const HeaderDrawParams &params) const = 0;
-};
-
 struct CellDrawParams {
   uiBlock *block;
   int xmin, ymin;
   int width, height;
-  int index;
 };
 
-class CellDrawer {
+class SpreadsheetDrawer {
  public:
-  virtual ~CellDrawer() = default;
-  virtual void draw_cell(const CellDrawParams &params) const = 0;
-};
-
-struct SpreadsheetColumnLayout {
-  int width;
-  const HeaderDrawer *header_drawer = nullptr;
-  const CellDrawer *cell_drawer = nullptr;
-};
-
-struct SpreadsheetLayout {
-  int index_column_width;
-  int header_row_height;
+  int left_column_width;
+  int top_row_height;
   int row_height;
-  int row_index_digits;
-  Span<int64_t> visible_rows;
-  Vector<SpreadsheetColumnLayout> columns;
+  int tot_rows = 0;
+  int tot_columns = 0;
+
+  SpreadsheetDrawer();
+  virtual ~SpreadsheetDrawer();
+
+  virtual void draw_top_row_cell(int column_index, const CellDrawParams &params) const;
+
+  virtual void draw_left_column_cell(int row_index, const CellDrawParams &params) const;
+
+  virtual void draw_content_cell(int row_index,
+                                 int column_index,
+                                 const CellDrawParams &params) const;
+
+  virtual int column_width(int column_index) const;
 };
 
 void draw_spreadsheet_in_region(const bContext *C,
                                 ARegion *region,
-                                const SpreadsheetLayout &spreadsheet_layout);
+                                const SpreadsheetDrawer &spreadsheet_drawer);
 
 }  // namespace blender::ed::spreadsheet
