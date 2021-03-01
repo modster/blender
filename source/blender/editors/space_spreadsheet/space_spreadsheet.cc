@@ -16,29 +16,19 @@
 
 #include <cstring>
 
-#include "BLI_array.hh"
-#include "BLI_index_range.hh"
 #include "BLI_listbase.h"
-#include "BLI_resource_collector.hh"
 
-#include "BKE_editmesh.h"
-#include "BKE_mesh_wrapper.h"
-#include "BKE_modifier.h"
 #include "BKE_screen.h"
 
 #include "ED_screen.h"
 #include "ED_space_api.h"
 
-#include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
 
 #include "MEM_guardedalloc.h"
 
-#include "UI_interface.h"
-#include "UI_resources.h"
 #include "UI_view2d.h"
 
 #include "DEG_depsgraph_query.h"
@@ -54,11 +44,6 @@
 
 #include "spreadsheet_from_geometry.hh"
 #include "spreadsheet_intern.hh"
-
-using blender::Array;
-using blender::IndexRange;
-using blender::ResourceCollector;
-using blender::Vector;
 
 using namespace blender::ed::spreadsheet;
 
@@ -155,8 +140,6 @@ static std::unique_ptr<SpreadsheetDrawer> generate_spreadsheet_drawer(const bCon
 
 static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
 {
-  ResourceCollector resources;
-
   std::unique_ptr<SpreadsheetDrawer> drawer = generate_spreadsheet_drawer(C);
   if (!drawer) {
     drawer = std::make_unique<FallbackSpreadsheetDrawer>();
