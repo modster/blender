@@ -1681,6 +1681,12 @@ void RNA_api_ui_layout(StructRNA *srna)
   func = RNA_def_function(srna, "template_asset_view", "uiTemplateAssetView");
   RNA_def_function_ui_description(func, "Item. A scrollable list of assets in a grid view");
   RNA_def_function_flag(func, FUNC_USE_CONTEXT);
+  parm = RNA_def_pointer(
+      func, "data", "AnyType", "", "Data from which to take the active asset library property");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+  parm = RNA_def_string(
+      func, "asset_library_property", NULL, 0, "", "Identifier of the asset library");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 }
 
 #endif

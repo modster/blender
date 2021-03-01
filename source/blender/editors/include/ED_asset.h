@@ -24,13 +24,35 @@
 extern "C" {
 #endif
 
+struct AssetLibraryReference;
+
 bool ED_asset_mark_id(const struct bContext *C, struct ID *id);
 bool ED_asset_clear_id(struct ID *id);
 
 bool ED_asset_can_make_single_from_context(const struct bContext *C);
 
+int ED_asset_library_reference_to_enum_value(const struct AssetLibraryReference *library);
+AssetLibraryReference ED_asset_library_reference_from_enum_value(int value);
+
+void ED_assetlist_fetch(const struct AssetLibraryReference *library_reference, const bContext *C);
+void ED_assetlist_ensure_previews_job(const struct AssetLibraryReference *library_reference,
+                                      bContext *C);
+void ED_assetlist_storage_exit(void);
+
+struct FileDirEntry;
+struct ImBuf *ED_assetlist_asset_image_get(const struct FileDirEntry *file);
+const char *ED_assetlist_library_path(const AssetLibraryReference *library_reference);
+
 void ED_operatortypes_asset(void);
 
 #ifdef __cplusplus
 }
+#endif
+
+/* TODO move to C++ asset-list header? */
+#ifdef __cplusplus
+#  include "BLI_function_ref.hh"
+/* Can return false to stop iterating. */
+using AssetListIterFn = blender::FunctionRef<bool(FileDirEntry &)>;
+void ED_assetlist_iterate(const AssetLibraryReference *library_reference, AssetListIterFn fn);
 #endif

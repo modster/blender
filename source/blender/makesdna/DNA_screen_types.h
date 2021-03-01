@@ -269,6 +269,8 @@ typedef struct uiListDyn {
   int resize;
   int resize_prev;
 
+  void *customdata;
+
   /* Filtering data. */
   /** Items_len length. */
   int *items_filter_flags;

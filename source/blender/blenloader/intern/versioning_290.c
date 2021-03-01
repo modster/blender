@@ -1755,4 +1755,21 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
 
     /* Keep this block, even when empty. */
   }
+
+  {
+    if (!DNA_struct_elem_find(
+            fd->filesdna, "View3D", "AssetLibraryReference", "active_asset_library")) {
+      LISTBASE_FOREACH (bScreen *, screen, &bmain->screens) {
+        LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+          LISTBASE_FOREACH (SpaceLink *, space, &area->spacedata) {
+            if (space->spacetype == SPACE_VIEW3D) {
+              View3D *v3d = (View3D *)space;
+              v3d->active_asset_library.type = ASSET_LIBRARY_LOCAL;
+              v3d->active_asset_library.custom_library_index = -1;
+            }
+          }
+        }
+      }
+    }
+  }
 }

@@ -30,6 +30,7 @@ set(INC_SYS
 
 set(SRC
   asset_edit.cc
+  asset_list.cc
   asset_ops.cc
 )
 

@@ -2151,6 +2151,31 @@ void uiTemplateList(uiLayout *layout,
                     int columns,
                     bool sort_reverse,
                     bool sort_lock);
+struct TemplateListIterData;
+typedef void (*uiTemplateListItemIterFn)(struct TemplateListIterData *iter_data,
+                                         struct PointerRNA *itemptr);
+typedef void (*uiTemplateListItemsIterFn)(struct PointerRNA *dataptr,
+                                          struct PropertyRNA *prop,
+                                          struct TemplateListIterData *iter_data,
+                                          uiTemplateListItemIterFn fn,
+                                          void *customdata);
+void uiTemplateList_ex(uiLayout *layout,
+                       struct bContext *C,
+                       uiTemplateListItemsIterFn iter_items,
+                       const char *listtype_name,
+                       const char *list_id,
+                       struct PointerRNA *dataptr,
+                       const char *propname,
+                       struct PointerRNA *active_dataptr,
+                       const char *active_propname,
+                       const char *item_dyntip_propname,
+                       int rows,
+                       int maxrows,
+                       int layout_type,
+                       int columns,
+                       bool sort_reverse,
+                       bool sort_lock,
+                       void *customdata);
 void uiTemplateNodeLink(uiLayout *layout,
                         struct bContext *C,
                         struct bNodeTree *ntree,
@@ -2196,7 +2221,10 @@ int uiTemplateRecentFiles(struct uiLayout *layout, int rows);
 void uiTemplateFileSelectPath(uiLayout *layout,
                               struct bContext *C,
                               struct FileSelectParams *params);
-void uiTemplateAssetView(struct uiLayout *layout, struct bContext *C);
+void uiTemplateAssetView(struct uiLayout *layout,
+                         struct bContext *C,
+                         struct PointerRNA *ptr,
+                         const char *asset_library_propname);
 
 /* items */
 void uiItemO(uiLayout *layout, const char *name, int icon, const char *opname);

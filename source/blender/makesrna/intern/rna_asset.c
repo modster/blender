@@ -35,6 +35,8 @@
 
 #  include "BLI_listbase.h"
 
+#  include "ED_asset.h"
+
 #  include "RNA_access.h"
 
 static AssetTag *rna_AssetMetaData_tag_new(AssetMetaData *asset_data,
@@ -129,6 +131,73 @@ static void rna_AssetMetaData_active_tag_range(
   *max = *softmax = MAX2(asset_data->tot_tags - 1, 0);
 }
 
+int rna_asset_library_reference_get(const AssetLibraryReference *library)
+{
+  return ED_asset_library_reference_to_enum_value(library);
+}
+
+void rna_asset_library_reference_set(AssetLibraryReference *library, int value)
+{
+  *library = ED_asset_library_reference_from_enum_value(value);
+}
+
+const EnumPropertyItem *rna_asset_library_reference_itemf(bContext *UNUSED(C),
+                                                          PointerRNA *UNUSED(ptr),
+                                                          PropertyRNA *UNUSED(prop),
+                                                          bool *r_free)
+{
+  const EnumPropertyItem predefined_items[] = {
+      /* For the future. */
+      // {ASSET_REPO_BUNDLED, "BUNDLED", 0, "Bundled", "Show the default user assets"},
+      {ASSET_LIBRARY_LOCAL,
+       "LOCAL",
+       ICON_BLENDER,
+       "Current File",
+       "Show the assets currently available in this Blender session"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  EnumPropertyItem *item = NULL;
+  int totitem = 0;
+
+  /* Add separator if needed. */
+  if (!BLI_listbase_is_empty(&U.asset_libraries)) {
+    const EnumPropertyItem sepr = {0, "", 0, "Custom", NULL};
+    RNA_enum_item_add(&item, &totitem, &sepr);
+  }
+
+  int i = 0;
+  for (bUserAssetLibrary *user_library = U.asset_libraries.first; user_library;
+       user_library = user_library->next, i++) {
+    /* Note that the path itself isn't checked for validity here. If an invalid library path is
+     * used, the Asset Browser can give a nice hint on what's wrong. */
+    const bool is_valid = (user_library->name[0] && user_library->path[0]);
+    if (!is_valid) {
+      continue;
+    }
+
+    /* Use library path as description, it's a nice hint for users. */
+    EnumPropertyItem tmp = {ASSET_LIBRARY_CUSTOM + i,
+                            user_library->name,
+                            ICON_NONE,
+                            user_library->name,
+                            user_library->path};
+    RNA_enum_item_add(&item, &totitem, &tmp);
+  }
+
+  if (totitem) {
+    const EnumPropertyItem sepr = {0, "", 0, "Built-in", NULL};
+    RNA_enum_item_add(&item, &totitem, &sepr);
+  }
+
+  /* Add predefined items. */
+  RNA_enum_items_add(&item, &totitem, predefined_items);
+
+  RNA_enum_item_end(&item, &totitem);
+  *r_free = true;
+  return item;
+}
+
 #else
 
 static void rna_def_asset_tag(BlenderRNA *brna)
@@ -213,6 +282,18 @@ static void rna_def_asset_data(BlenderRNA *brna)
   prop = RNA_def_property(srna, "active_tag", PROP_INT, PROP_NONE);
   RNA_def_property_int_funcs(prop, NULL, NULL, "rna_AssetMetaData_active_tag_range");
   RNA_def_property_ui_text(prop, "Active Tag", "Index of the tag set for editing");
+}
+
+void rna_def_asset_library_reference_common(struct StructRNA *srna,
+                                            int update_flag,
+                                            const char *get,
+                                            const char *set)
+{
+  PropertyRNA *prop = RNA_def_property(srna, "active_asset_library", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, DummyRNA_NULL_items);
+  RNA_def_property_enum_funcs(prop, get, set, "rna_asset_library_reference_itemf");
+  RNA_def_property_ui_text(prop, "Asset Library", "");
+  RNA_def_property_update(prop, update_flag, NULL);
 }
 
 void RNA_def_asset(BlenderRNA *brna)

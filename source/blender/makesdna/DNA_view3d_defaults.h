@@ -79,6 +79,12 @@
     .rotation_axis = {0, 1, 0}, \
   }
 
+#define _DNA_DEFAULT_AssetLibraryReference \
+{ \
+    .type = ASSET_LIBRARY_LOCAL, \
+    .custom_library_index = -1, \
+}
+
 #define _DNA_DEFAULT_View3D \
   { \
     .spacetype = SPACE_VIEW3D, \
@@ -88,6 +94,7 @@
     .gridsubdiv = 10, \
     .shading = _DNA_DEFAULT_View3DShading, \
     .overlay = _DNA_DEFAULT_View3DOverlay, \
+    .active_asset_library = _DNA_DEFAULT_AssetLibraryReference, \
  \
     .gridflag = V3D_SHOW_X | V3D_SHOW_Y | V3D_SHOW_FLOOR | V3D_SHOW_ORTHO_GRID, \
  \

@@ -77,6 +77,7 @@ void filelist_init_icons(void);
 void filelist_free_icons(void);
 struct ImBuf *filelist_getimage(struct FileList *filelist, const int index);
 struct ImBuf *filelist_file_getimage(const FileDirEntry *file);
+struct ImBuf *filelist_geticon_image_ex(const FileDirEntry *file);
 struct ImBuf *filelist_geticon_image(struct FileList *filelist, const int index);
 int filelist_geticon(struct FileList *filelist, const int index, const bool is_main);
 
