@@ -32,7 +32,7 @@ namespace blender::ed::spreadsheet {
 SpreadsheetDrawer::SpreadsheetDrawer()
 {
   left_column_width = UI_UNIT_X * 2;
-  top_row_height = UI_UNIT_Y * 1.25;
+  top_row_height = UI_UNIT_Y * 1.1f;
   row_height = UI_UNIT_Y;
 }
 
