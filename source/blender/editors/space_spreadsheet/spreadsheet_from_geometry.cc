@@ -68,8 +68,8 @@ class GeometryAttributeSpreadsheetDrawer : public SpreadsheetDrawer {
   std::unique_ptr<ResourceCollector> resources_;
   /* Information about how to draw the individual columns. */
   Vector<std::unique_ptr<AttributeColumn>> columns_;
-  /* This is used to filter the selected rows. It might point to a vector living in the resources
-   * collector above. */
+  /* This is used to filter the selected rows. The referenced data lives at least as long as the
+   * resource collector above. */
   Span<int64_t> visible_rows_;
 
  public:
