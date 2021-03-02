@@ -800,7 +800,7 @@ static void draw_keylist(View2D *v2d,
                                    color_id,
                                    ab->cfra,
                                    ypos - quarter_icon_sz,
-                                   ab->next->cfra - 1.0f,
+                                   ab->next->cfra,
                                    ypos + quarter_icon_sz,
                                    (ab->block.sel) ? sel_mhcol : unsel_mhcol);
         }
