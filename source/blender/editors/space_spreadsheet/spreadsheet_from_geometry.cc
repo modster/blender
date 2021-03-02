@@ -330,7 +330,7 @@ static void add_columns_for_attribute(const ReadAttribute *attribute,
   }
 }
 
-static GeometrySet get_geometry_set_to_display_data_from(Object *object_eval)
+static GeometrySet get_display_geometry_set(Object *object_eval)
 {
   GeometrySet geometry_set;
   if (object_eval->mode == OB_MODE_EDIT) {
@@ -345,6 +345,7 @@ static GeometrySet get_geometry_set_to_display_data_from(Object *object_eval)
   }
   else {
     if (object_eval->runtime.geometry_set_eval != nullptr) {
+      /* This does not copy the geometry data itself. */
       geometry_set = *object_eval->runtime.geometry_set_eval;
     }
   }
@@ -403,8 +404,8 @@ std::unique_ptr<SpreadsheetDrawer> spreadsheet_drawer_from_geometry_attributes(c
 {
   /* Create a resource collector that owns stuff that needs to live until drawing is done. */
   std::unique_ptr<ResourceCollector> resources = std::make_unique<ResourceCollector>();
-  GeometrySet &geometry_set = resources->add_value(
-      get_geometry_set_to_display_data_from(object_eval), "geometry set");
+  GeometrySet &geometry_set = resources->add_value(get_display_geometry_set(object_eval),
+                                                   "geometry set");
 
   const AttributeDomain domain = ATTR_DOMAIN_POINT;
   const GeometryComponentType component_type = GeometryComponentType::Mesh;
@@ -429,9 +430,8 @@ std::unique_ptr<SpreadsheetDrawer> spreadsheet_drawer_from_geometry_attributes(c
       C, object_eval, static_cast<const MeshComponent *>(component), *resources);
 
   const int domain_size = component->attribute_domain_size(domain);
-  auto drawer = std::make_unique<GeometryAttributeSpreadsheetDrawer>(
+  return std::make_unique<GeometryAttributeSpreadsheetDrawer>(
       std::move(resources), std::move(columns), visible_rows, domain_size);
-  return drawer;
 }
 
 }  // namespace blender::ed::spreadsheet
