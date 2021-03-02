@@ -364,7 +364,7 @@ static Span<int64_t> filter_visible_mesh_vertex_rows(const bContext *C,
     const Mesh *mesh_eval = component->get_for_read();
     Mesh *mesh_orig = (Mesh *)object_orig->data;
     BMesh *bm = mesh_orig->edit_mesh->bm;
-    BM_mesh_elem_index_ensure(bm, BM_VERT);
+    BM_mesh_elem_table_ensure(bm, BM_VERT);
 
     int *orig_indices = (int *)CustomData_get_layer(&mesh_eval->vdata, CD_ORIGINDEX);
     if (orig_indices != nullptr) {
