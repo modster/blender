@@ -155,6 +155,7 @@ static void spreadsheet_main_region_listener(const wmRegionListenerParams *param
   switch (wmn->category) {
     case NC_SCENE: {
       switch (wmn->data) {
+        case ND_MODE:
         case ND_OB_ACTIVE: {
           ED_region_tag_redraw(region);
           break;
@@ -201,6 +202,7 @@ static void spreadsheet_header_region_listener(const wmRegionListenerParams *par
   switch (wmn->category) {
     case NC_SCENE: {
       switch (wmn->data) {
+        case ND_MODE:
         case ND_OB_ACTIVE: {
           ED_region_tag_redraw(region);
           break;
