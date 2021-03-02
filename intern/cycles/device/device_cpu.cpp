@@ -387,7 +387,13 @@ class CPUDevice : public Device {
       assert(!"mem_alloc not supported for textures.");
     }
     else if (mem.type == MEM_GLOBAL) {
-      assert(!"mem_alloc not supported for global memory.");
+      if (!mem.has_chunks) {
+        assert(!"mem_alloc not supported for global memory.");
+      }
+      else {
+        global_free(mem);
+        global_alloc(mem);
+      }
     }
     else {
       if (mem.name) {
@@ -414,7 +420,9 @@ class CPUDevice : public Device {
   virtual void mem_copy_to(device_memory &mem) override
   {
     if (mem.type == MEM_GLOBAL) {
-      global_free(mem);
+      if (!mem.has_chunks) {
+        global_free(mem);
+      }
       global_alloc(mem);
     }
     else if (mem.type == MEM_TEXTURE) {

@@ -234,6 +234,7 @@ class device_memory {
   bool is_resident(Device *sub_device) const;
 
  protected:
+  friend class CPUDevice;
   friend class CUDADevice;
   friend class OptiXDevice;
 
