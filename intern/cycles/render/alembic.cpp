@@ -1529,7 +1529,7 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
   }
 
   if (!objects_loaded || objects_is_modified()) {
-    load_objects(scene, progress);
+    load_objects(progress);
     objects_loaded = true;
   }
 
@@ -1604,7 +1604,7 @@ AlembicObject *AlembicProcedural::get_or_create_object(const ustring &path)
   return object;
 }
 
-void AlembicProcedural::load_objects(Scene *scene, Progress &progress)
+void AlembicProcedural::load_objects(Progress &progress)
 {
   unordered_map<string, AlembicObject *> object_map;
 
@@ -1630,19 +1630,19 @@ void AlembicProcedural::load_objects(Scene *scene, Progress &progress)
     Geometry *geometry = nullptr;
 
     if (!abc_object->instance_of) {
-    if (abc_object->schema_type == AlembicObject::CURVES) {
-      geometry = scene_->create_node<Hair>();
-    }
-    else if (abc_object->schema_type == AlembicObject::POLY_MESH ||
-             abc_object->schema_type == AlembicObject::SUBD) {
-      geometry = scene_->create_node<Mesh>();
-    }
-    else {
-      continue;
-    }
+      if (abc_object->schema_type == AlembicObject::CURVES) {
+        geometry = scene_->create_node<Hair>();
+      }
+      else if (abc_object->schema_type == AlembicObject::POLY_MESH ||
+               abc_object->schema_type == AlembicObject::SUBD) {
+        geometry = scene_->create_node<Mesh>();
+      }
+      else {
+        continue;
+      }
 
-    geometry->set_owner(this);
-    geometry->name = abc_object->iobject.getName();
+      geometry->set_owner(this);
+      geometry->name = abc_object->iobject.getName();
     }
 
     array<Node *> used_shaders = abc_object->get_used_shaders();
