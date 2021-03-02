@@ -316,6 +316,7 @@ GHOST_WindowWin32::~GHOST_WindowWin32()
   if (m_wintab.handle) {
     if (m_wintab.close && m_wintab.tablet) {
       m_wintab.close(m_wintab.tablet);
+      printf("Window %p Tablet %p Closed Wintab\n", getHWND(), m_wintab.tablet);
     }
 
     FreeLibrary(m_wintab.handle);
@@ -1016,6 +1017,7 @@ void GHOST_WindowWin32::processWin32TabletActivateEvent(WORD state)
     return;
   }
 
+  printf("Window %p Tablet %p Wintab activate event\n", getHWND(), m_wintab.tablet);
   if (m_wintab.enable && m_wintab.tablet) {
     m_wintab.enable(m_wintab.tablet, state);
 
