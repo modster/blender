@@ -89,9 +89,9 @@ static void draw_alternating_row_overlay(const uint pos,
   GPU_blend(GPU_BLEND_NONE);
 }
 
-static void draw_header_row_background(const uint pos,
-                                       const ARegion *region,
-                                       const SpreadsheetDrawer &drawer)
+static void draw_top_row_background(const uint pos,
+                                    const ARegion *region,
+                                    const SpreadsheetDrawer &drawer)
 {
   immUniformThemeColorShade(TH_BACK, 11);
   immRecti(pos, 0, region->winy, region->winx, region->winy - drawer.top_row_height);
@@ -106,11 +106,11 @@ static void draw_separator_lines(const uint pos,
 
   immBeginAtMost(GPU_PRIM_LINES, drawer.tot_columns * 2 + 4);
 
-  /* Index column line. */
+  /* Left column line. */
   immVertex2i(pos, drawer.left_column_width, region->winy);
   immVertex2i(pos, drawer.left_column_width, 0);
 
-  /* Header row line. */
+  /* Top row line. */
   immVertex2i(pos, 0, region->winy - drawer.top_row_height);
   immVertex2i(pos, region->winx, region->winy - drawer.top_row_height);
 
@@ -179,7 +179,7 @@ static void draw_top_row_content(const bContext *C,
               region->winx - drawer.left_column_width,
               drawer.top_row_height);
 
-  uiBlock *column_headers_block = UI_block_begin(C, region, __func__, UI_EMBOSS_NONE);
+  uiBlock *first_row_block = UI_block_begin(C, region, __func__, UI_EMBOSS_NONE);
 
   int left_x = drawer.left_column_width - scroll_offset_x;
   for (const int column_index : IndexRange(drawer.tot_columns)) {
@@ -187,7 +187,7 @@ static void draw_top_row_content(const bContext *C,
     const int right_x = left_x + column_width;
 
     CellDrawParams params;
-    params.block = column_headers_block;
+    params.block = first_row_block;
     params.xmin = left_x;
     params.ymin = region->winy - drawer.top_row_height;
     params.width = column_width;
@@ -197,8 +197,8 @@ static void draw_top_row_content(const bContext *C,
     left_x = right_x;
   }
 
-  UI_block_end(C, column_headers_block);
-  UI_block_draw(C, column_headers_block);
+  UI_block_end(C, first_row_block);
+  UI_block_draw(C, first_row_block);
 
   GPU_scissor_test(false);
 }
@@ -281,7 +281,7 @@ void draw_spreadsheet_in_region(const bContext *C,
 
   draw_index_column_background(pos, region, drawer);
   draw_alternating_row_overlay(pos, scroll_offset_y, region, drawer);
-  draw_header_row_background(pos, region, drawer);
+  draw_top_row_background(pos, region, drawer);
   draw_separator_lines(pos, scroll_offset_x, region, drawer);
 
   immUnbindProgram();
