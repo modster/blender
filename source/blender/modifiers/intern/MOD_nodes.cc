@@ -314,10 +314,10 @@ class GeometryNodesEvaluator {
     }
 
     /* Multi-input sockets contain a vector of inputs. */
-    if (socket_to_compute.socket->is_multi_input_socket()) {
+    if (socket_to_compute->is_multi_input_socket()) {
       Vector<GMutablePointer> values;
       for (const XXXSocket from_socket : from_sockets) {
-        if (from_socket.socket->is_output()) {
+        if (from_socket->is_output()) {
           XXXOutputSocket from_output_socket{from_socket};
           const std::pair<XXXInputSocket, XXXOutputSocket> key = std::make_pair(
               socket_to_compute, from_output_socket);
@@ -342,7 +342,7 @@ class GeometryNodesEvaluator {
     }
 
     const XXXSocket from_socket = from_sockets[0];
-    if (from_socket.socket->is_output()) {
+    if (from_socket->is_output()) {
       const XXXOutputSocket from_output_socket{from_socket};
       const std::pair<XXXInputSocket, XXXOutputSocket> key = std::make_pair(socket_to_compute,
                                                                             from_output_socket);
@@ -364,7 +364,7 @@ class GeometryNodesEvaluator {
 
   void foreach_origin_socket(XXXInputSocket to_socket, FunctionRef<void(XXXSocket)> callback) const
   {
-    for (const OutputSocketRef *linked_socket : to_socket.socket->linked_sockets()) {
+    for (const OutputSocketRef *linked_socket : to_socket->linked_sockets()) {
       const NodeRef &linked_node = linked_socket->node();
       XXXOutputSocket linked_xxx_socket{to_socket.context, linked_socket};
       if (linked_node.is_group_input_node()) {
@@ -374,7 +374,7 @@ class GeometryNodesEvaluator {
         else {
           XXXInputSocket socket_in_parent_group =
               linked_xxx_socket.get_corresponding_group_node_input();
-          if (socket_in_parent_group.socket->is_linked()) {
+          if (socket_in_parent_group->is_linked()) {
             this->foreach_origin_socket(socket_in_parent_group, callback);
           }
           else {
@@ -384,7 +384,7 @@ class GeometryNodesEvaluator {
       }
       else if (linked_node.is_group_node()) {
         XXXInputSocket socket_in_group = linked_xxx_socket.get_corresponding_group_output_socket();
-        if (socket_in_group.socket->is_linked()) {
+        if (socket_in_group->is_linked()) {
           this->foreach_origin_socket(socket_in_group, callback);
         }
         else {
@@ -399,12 +399,11 @@ class GeometryNodesEvaluator {
 
   void compute_output_and_forward(const XXXOutputSocket socket_to_compute)
   {
-    const XXXNode node{socket_to_compute.context, &socket_to_compute.socket->node()};
+    const XXXNode node{socket_to_compute.context, &socket_to_compute->node()};
 
-    if (!socket_to_compute.socket->is_available()) {
+    if (!socket_to_compute->is_available()) {
       /* If the output is not available, use a default value. */
-      const CPPType &type = *blender::nodes::socket_cpp_type_get(
-          *socket_to_compute.socket->typeinfo());
+      const CPPType &type = *blender::nodes::socket_cpp_type_get(*socket_to_compute->typeinfo());
       void *buffer = allocator_.allocate(type.size(), type.alignment());
       type.copy_to_uninitialized(type.default_value(), buffer);
       this->forward_to_inputs(socket_to_compute, {type, buffer});
@@ -550,7 +549,7 @@ class GeometryNodesEvaluator {
     const CPPType &from_type = *value_to_forward.type();
     Vector<XXXInputSocket> to_sockets_same_type;
     for (const XXXInputSocket &to_socket : to_sockets_all) {
-      const CPPType &to_type = *blender::nodes::socket_cpp_type_get(*to_socket.socket->typeinfo());
+      const CPPType &to_type = *blender::nodes::socket_cpp_type_get(*to_socket->typeinfo());
       const std::pair<XXXInputSocket, XXXOutputSocket> key = std::make_pair(to_socket,
                                                                             from_socket);
       if (from_type == to_type) {
@@ -601,7 +600,7 @@ class GeometryNodesEvaluator {
   void foreach_input_to_forward_to(XXXOutputSocket from_socket,
                                    FunctionRef<void(XXXInputSocket)> callback) const
   {
-    for (const InputSocketRef *linked_socket : from_socket.socket->linked_sockets()) {
+    for (const InputSocketRef *linked_socket : from_socket->linked_sockets()) {
       const NodeRef &linked_node = linked_socket->node();
       XXXInputSocket linked_xxx_socket{from_socket.context, linked_socket};
       if (linked_node.is_group_output_node()) {
@@ -632,8 +631,8 @@ class GeometryNodesEvaluator {
 
   GMutablePointer get_unlinked_input_value(const XXXInputSocket &socket)
   {
-    bNodeSocket *bsocket = socket.socket->bsocket();
-    const CPPType &type = *blender::nodes::socket_cpp_type_get(*socket.socket->typeinfo());
+    bNodeSocket *bsocket = socket->bsocket();
+    const CPPType &type = *blender::nodes::socket_cpp_type_get(*socket->typeinfo());
     void *buffer = allocator_.allocate(type.size(), type.alignment());
 
     if (bsocket->type == SOCK_OBJECT) {

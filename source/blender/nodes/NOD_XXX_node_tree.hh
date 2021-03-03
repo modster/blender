@@ -95,6 +95,7 @@ struct XXXSocket {
   friend bool operator!=(const XXXSocket &a, const XXXSocket &b);
 
   operator bool() const;
+  const SocketRef *operator->() const;
 
   uint64_t hash() const;
 };
@@ -111,6 +112,7 @@ struct XXXInputSocket {
   friend bool operator!=(const XXXInputSocket &a, const XXXInputSocket &b);
 
   operator bool() const;
+  const InputSocketRef *operator->() const;
 
   uint64_t hash() const;
 
@@ -132,6 +134,7 @@ struct XXXOutputSocket {
   friend bool operator!=(const XXXOutputSocket &a, const XXXOutputSocket &b);
 
   operator bool() const;
+  const OutputSocketRef *operator->() const;
 
   uint64_t hash() const;
 
@@ -299,6 +302,11 @@ inline XXXSocket::operator bool() const
   return socket != nullptr;
 }
 
+inline const SocketRef *XXXSocket::operator->() const
+{
+  return socket;
+}
+
 inline uint64_t XXXSocket::hash() const
 {
   return DefaultHash<XXXNodeTreeContext>{}(context) ^ DefaultHash<const SocketRef *>{}(socket);
@@ -335,6 +343,11 @@ inline XXXInputSocket::operator bool() const
   return socket != nullptr;
 }
 
+inline const InputSocketRef *XXXInputSocket::operator->() const
+{
+  return socket;
+}
+
 inline uint64_t XXXInputSocket::hash() const
 {
   return DefaultHash<XXXNodeTreeContext>{}(context) ^
@@ -368,6 +381,11 @@ inline bool operator!=(const XXXOutputSocket &a, const XXXOutputSocket &b)
 inline XXXOutputSocket::operator bool() const
 {
   return socket != nullptr;
+}
+
+inline const OutputSocketRef *XXXOutputSocket::operator->() const
+{
+  return socket;
 }
 
 inline uint64_t XXXOutputSocket::hash() const
