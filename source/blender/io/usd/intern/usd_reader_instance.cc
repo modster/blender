@@ -48,7 +48,7 @@ void USDInstanceReader::createObject(Main *bmain, double motionSampleTime)
 
 void USDInstanceReader::set_instance_collection(Collection *coll)
 {
-  if (coll && this->m_object) {
+  if (this->m_object) {
     this->m_object->instance_collection = coll;
   }
 }

@@ -591,8 +591,8 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
       "use_instancing",
       false,
       "Instancing",
-      "When checked, USD scenegraph instances are imported as collection instances in Blender. "
-      "(Note that point instancers are not yet handled by this option.)");
+      "When checked, USD scenegraph instances are imported as collection instances in Blender.  "
+      "Note that point instancers are not yet handled by this option");
 }
 
 #endif /* WITH_USD */
