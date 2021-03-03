@@ -106,16 +106,21 @@ class SocketRef : NonCopyable, NonMovable {
   StringRefNull idname() const;
   StringRefNull name() const;
   StringRefNull identifier() const;
+  bNodeSocketType *typeinfo() const;
 
   bNodeSocket *bsocket() const;
   bNode *bnode() const;
   bNodeTree *btree() const;
+
+  bool is_available() const;
 };
 
 class InputSocketRef final : public SocketRef {
  public:
   Span<const OutputSocketRef *> linked_sockets() const;
   Span<const OutputSocketRef *> directly_linked_sockets() const;
+
+  bool is_multi_input_socket() const;
 };
 
 class OutputSocketRef final : public SocketRef {
@@ -321,6 +326,11 @@ inline StringRefNull SocketRef::identifier() const
   return bsocket_->identifier;
 }
 
+inline bNodeSocketType *SocketRef::typeinfo() const
+{
+  return bsocket_->typeinfo;
+}
+
 inline bNodeSocket *SocketRef::bsocket() const
 {
   return bsocket_;
@@ -336,6 +346,11 @@ inline bNodeTree *SocketRef::btree() const
   return node_->btree();
 }
 
+inline bool SocketRef::is_available() const
+{
+  return (bsocket_->flag & SOCK_UNAVAIL) == 0;
+}
+
 /* --------------------------------------------------------------------
  * InputSocketRef inline methods.
  */
@@ -348,6 +363,11 @@ inline Span<const OutputSocketRef *> InputSocketRef::linked_sockets() const
 inline Span<const OutputSocketRef *> InputSocketRef::directly_linked_sockets() const
 {
   return directly_linked_sockets_.as_span().cast<const OutputSocketRef *>();
+}
+
+inline bool InputSocketRef::is_multi_input_socket() const
+{
+  return bsocket_->flag & SOCK_MULTI_INPUT;
 }
 
 /* --------------------------------------------------------------------

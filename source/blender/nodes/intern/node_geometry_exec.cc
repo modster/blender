@@ -30,7 +30,7 @@ namespace blender::nodes {
 
 void GeoNodeExecParams::error_message_add(const NodeWarningType type, std::string message) const
 {
-  bNodeTree *btree_cow = node_.node_ref().tree().btree();
+  bNodeTree *btree_cow = node_.node->btree();
   BLI_assert(btree_cow != nullptr);
   if (btree_cow == nullptr) {
     return;
@@ -40,12 +40,12 @@ void GeoNodeExecParams::error_message_add(const NodeWarningType type, std::strin
   const NodeTreeEvaluationContext context(*self_object_, *modifier_);
 
   BKE_nodetree_error_message_add(
-      *btree_original, context, *node_.bnode(), type, std::move(message));
+      *btree_original, context, *node_.node->bnode(), type, std::move(message));
 }
 
 const bNodeSocket *GeoNodeExecParams::find_available_socket(const StringRef name) const
 {
-  for (const DSocket *socket : node_.inputs()) {
+  for (const InputSocketRef *socket : node_.node->inputs()) {
     if (socket->is_available() && socket->name() == name) {
       return socket->bsocket();
     }
@@ -176,7 +176,7 @@ void GeoNodeExecParams::check_extract_input(StringRef identifier,
                                             const CPPType *requested_type) const
 {
   bNodeSocket *found_socket = nullptr;
-  for (const DSocket *socket : node_.inputs()) {
+  for (const InputSocketRef *socket : node_.node->inputs()) {
     if (socket->identifier() == identifier) {
       found_socket = socket->bsocket();
       break;
@@ -186,7 +186,7 @@ void GeoNodeExecParams::check_extract_input(StringRef identifier,
   if (found_socket == nullptr) {
     std::cout << "Did not find an input socket with the identifier '" << identifier << "'.\n";
     std::cout << "Possible identifiers are: ";
-    for (const DSocket *socket : node_.inputs()) {
+    for (const InputSocketRef *socket : node_.node->inputs()) {
       if (socket->is_available()) {
         std::cout << "'" << socket->identifier() << "', ";
       }
@@ -218,7 +218,7 @@ void GeoNodeExecParams::check_extract_input(StringRef identifier,
 void GeoNodeExecParams::check_set_output(StringRef identifier, const CPPType &value_type) const
 {
   bNodeSocket *found_socket = nullptr;
-  for (const DSocket *socket : node_.outputs()) {
+  for (const OutputSocketRef *socket : node_.node->outputs()) {
     if (socket->identifier() == identifier) {
       found_socket = socket->bsocket();
       break;
@@ -228,7 +228,7 @@ void GeoNodeExecParams::check_set_output(StringRef identifier, const CPPType &va
   if (found_socket == nullptr) {
     std::cout << "Did not find an output socket with the identifier '" << identifier << "'.\n";
     std::cout << "Possible identifiers are: ";
-    for (const DSocket *socket : node_.outputs()) {
+    for (const OutputSocketRef *socket : node_.node->outputs()) {
       if (socket->is_available()) {
         std::cout << "'" << socket->identifier() << "', ";
       }

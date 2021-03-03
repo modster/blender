@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "BLI_function_ref.hh"
+
 #include "NOD_node_tree_ref.hh"
 
 namespace blender::nodes {
@@ -31,7 +33,8 @@ struct XXXOutputSocket;
 
 class XXXNodeTreeContextInfo {
  private:
-  XXXNodeTreeContextInfo *parent_;
+  XXXNodeTreeContextInfo *parent_context_info_;
+  const NodeRef *parent_node_;
   const NodeTreeRef *tree_;
   Map<const NodeRef *, XXXNodeTreeContextInfo *> children_;
 
@@ -39,6 +42,10 @@ class XXXNodeTreeContextInfo {
 
  public:
   const NodeTreeRef &tree() const;
+  const XXXNodeTreeContextInfo *parent_context_info() const;
+  const NodeRef *parent_node() const;
+  const XXXNodeTreeContextInfo *child_context_info(const NodeRef &node) const;
+  bool is_root() const;
 };
 
 class XXXNodeTreeContext {
@@ -107,6 +114,9 @@ struct XXXInputSocket {
   uint64_t hash() const;
 
   XXXOutputSocket try_get_single_origin() const;
+
+  XXXOutputSocket get_corresponding_group_node_output() const;
+  XXXOutputSocket get_corresponding_group_input_socket() const;
 };
 
 struct XXXOutputSocket {
@@ -123,6 +133,9 @@ struct XXXOutputSocket {
   operator bool() const;
 
   uint64_t hash() const;
+
+  XXXInputSocket get_corresponding_group_node_input() const;
+  XXXInputSocket get_corresponding_group_output_socket() const;
 };
 
 class XXXNodeTree {
@@ -137,9 +150,11 @@ class XXXNodeTree {
   const XXXNodeTreeContextInfo &root_context_info() const;
 
  private:
-  XXXNodeTreeContextInfo &construct_context_info_recursively(XXXNodeTreeContextInfo *parent,
-                                                             bNodeTree &btree,
-                                                             NodeTreeRefMap &node_tree_refs);
+  XXXNodeTreeContextInfo &construct_context_info_recursively(
+      XXXNodeTreeContextInfo *parent_context_info,
+      const NodeRef *parent_node,
+      bNodeTree &btree,
+      NodeTreeRefMap &node_tree_refs);
   void destruct_context_info_recursively(XXXNodeTreeContextInfo *context_info);
 };
 
@@ -161,6 +176,27 @@ using nodes::XXXSocket;
 inline const NodeTreeRef &XXXNodeTreeContextInfo::tree() const
 {
   return *tree_;
+}
+
+inline const XXXNodeTreeContextInfo *XXXNodeTreeContextInfo::parent_context_info() const
+{
+  return parent_context_info_;
+}
+
+inline const NodeRef *XXXNodeTreeContextInfo::parent_node() const
+{
+  return parent_node_;
+}
+
+inline const XXXNodeTreeContextInfo *XXXNodeTreeContextInfo::child_context_info(
+    const NodeRef &node) const
+{
+  return children_.lookup_default(&node, nullptr);
+}
+
+inline bool XXXNodeTreeContextInfo::is_root() const
+{
+  return parent_context_info_ == nullptr;
 }
 
 /* --------------------------------------------------------------------
@@ -199,6 +235,7 @@ inline const XXXNodeTreeContextInfo &XXXNodeTreeContext::info() const
 inline XXXNode::XXXNode(XXXNodeTreeContext context, const NodeRef *node)
     : context(context), node(node)
 {
+  BLI_assert(node == nullptr || &node->tree() == &context.info().tree());
 }
 
 inline bool operator==(const XXXNode &a, const XXXNode &b)
@@ -228,6 +265,7 @@ inline uint64_t XXXNode::hash() const
 inline XXXSocket::XXXSocket(XXXNodeTreeContext context, const SocketRef *socket)
     : context(context), socket(socket)
 {
+  BLI_assert(socket == nullptr || &socket->tree() == &context.info().tree());
 }
 
 inline XXXSocket::XXXSocket(const XXXInputSocket &input_socket)
@@ -267,11 +305,13 @@ inline uint64_t XXXSocket::hash() const
 inline XXXInputSocket::XXXInputSocket(XXXNodeTreeContext context, const InputSocketRef *socket)
     : context(context), socket(socket)
 {
+  BLI_assert(socket == nullptr || &socket->tree() == &context.info().tree());
 }
 
 inline XXXInputSocket::XXXInputSocket(const XXXSocket &base_socket)
     : context(base_socket.context), socket(&base_socket.socket->as_input())
 {
+  BLI_assert(socket == nullptr || &socket->tree() == &context.info().tree());
 }
 
 inline bool operator==(const XXXInputSocket &a, const XXXInputSocket &b)
