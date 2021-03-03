@@ -413,7 +413,7 @@ class GeometryNodesEvaluator {
 
     /* Prepare inputs required to execute the node. */
     GValueMap<StringRef> node_inputs_map{allocator_};
-    for (const InputSocketRef *input_socket : node.node->inputs()) {
+    for (const InputSocketRef *input_socket : node->inputs()) {
       if (input_socket->is_available()) {
         Vector<GMutablePointer> values = this->get_input_values({node.context, input_socket});
         for (int i = 0; i < values.size(); ++i) {
@@ -433,7 +433,7 @@ class GeometryNodesEvaluator {
     this->execute_node(node, params);
 
     /* Forward computed outputs to linked input sockets. */
-    for (const OutputSocketRef *output_socket : node.node->outputs()) {
+    for (const OutputSocketRef *output_socket : node->outputs()) {
       if (output_socket->is_available()) {
         GMutablePointer value = node_outputs_map.extract(output_socket->identifier());
         this->forward_to_inputs({node.context, output_socket}, value);
@@ -466,7 +466,7 @@ class GeometryNodesEvaluator {
 
   void store_ui_hints(const XXXNode node, GeoNodeExecParams params) const
   {
-    for (const InputSocketRef *dsocket : node.node->inputs()) {
+    for (const InputSocketRef *dsocket : node->inputs()) {
       if (!dsocket->is_available()) {
         continue;
       }
@@ -474,7 +474,7 @@ class GeometryNodesEvaluator {
         continue;
       }
 
-      bNodeTree *btree_cow = node.node->btree();
+      bNodeTree *btree_cow = node->btree();
       bNodeTree *btree_original = (bNodeTree *)DEG_get_original_id((ID *)btree_cow);
       const NodeTreeEvaluationContext context(*self_object_, *modifier_);
 
@@ -485,7 +485,7 @@ class GeometryNodesEvaluator {
         component->attribute_foreach(
             [&](StringRefNull attribute_name, const AttributeMetaData &UNUSED(meta_data)) {
               BKE_nodetree_attribute_hint_add(
-                  *btree_original, context, *node.node->bnode(), attribute_name);
+                  *btree_original, context, *node->bnode(), attribute_name);
               return true;
             });
       }
@@ -499,7 +499,7 @@ class GeometryNodesEvaluator {
     MFContextBuilder fn_context;
     MFParamsBuilder fn_params{fn, 1};
     Vector<GMutablePointer> input_data;
-    for (const InputSocketRef *dsocket : node.node->inputs()) {
+    for (const InputSocketRef *dsocket : node->inputs()) {
       if (dsocket->is_available()) {
         GMutablePointer data = params.extract_input(dsocket->identifier());
         fn_params.add_readonly_single_input(GSpan(*data.type(), data.get(), 1));
@@ -507,7 +507,7 @@ class GeometryNodesEvaluator {
       }
     }
     Vector<GMutablePointer> output_data;
-    for (const OutputSocketRef *dsocket : node.node->outputs()) {
+    for (const OutputSocketRef *dsocket : node->outputs()) {
       if (dsocket->is_available()) {
         const CPPType &type = *blender::nodes::socket_cpp_type_get(*dsocket->typeinfo());
         void *buffer = allocator_.allocate(type.size(), type.alignment());
@@ -520,10 +520,10 @@ class GeometryNodesEvaluator {
       value.destruct();
     }
     int output_index = 0;
-    for (const int i : node.node->outputs().index_range()) {
-      if (node.node->output(i).is_available()) {
+    for (const int i : node->outputs().index_range()) {
+      if (node->output(i).is_available()) {
         GMutablePointer value = output_data[output_index];
-        params.set_output_by_move(node.node->output(i).identifier(), value);
+        params.set_output_by_move(node->output(i).identifier(), value);
         value.destruct();
         output_index++;
       }
@@ -532,7 +532,7 @@ class GeometryNodesEvaluator {
 
   void execute_unknown_node(const XXXNode node, GeoNodeExecParams params)
   {
-    for (const OutputSocketRef *socket : node.node->outputs()) {
+    for (const OutputSocketRef *socket : node->outputs()) {
       if (socket->is_available()) {
         const CPPType &type = *blender::nodes::socket_cpp_type_get(*socket->typeinfo());
         params.set_output_by_copy(socket->identifier(), {type, type.default_value()});

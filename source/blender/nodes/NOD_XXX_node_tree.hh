@@ -77,6 +77,7 @@ struct XXXNode {
   friend bool operator!=(const XXXNode &a, const XXXNode &b);
 
   operator bool() const;
+  const NodeRef *operator->() const;
 
   uint64_t hash() const;
 };
@@ -251,6 +252,11 @@ inline bool operator!=(const XXXNode &a, const XXXNode &b)
 inline XXXNode::operator bool() const
 {
   return node != nullptr;
+}
+
+inline const NodeRef *XXXNode::operator->() const
+{
+  return node;
 }
 
 inline uint64_t XXXNode::hash() const
