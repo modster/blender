@@ -65,62 +65,62 @@ void XXXNodeTree::destruct_context_recursively(XXXNodeTreeContext *context)
 XXXOutputSocket XXXInputSocket::get_corresponding_group_node_output() const
 {
   BLI_assert(*this);
-  BLI_assert(socket->node().is_group_output_node());
-  BLI_assert(socket->index() < socket->node().inputs().size() - 1);
+  BLI_assert(socket_ref->node().is_group_output_node());
+  BLI_assert(socket_ref->index() < socket_ref->node().inputs().size() - 1);
 
   const XXXNodeTreeContext *parent_context = context->parent_context();
   const NodeRef *parent_node = context->parent_node();
   BLI_assert(parent_context != nullptr);
   BLI_assert(parent_node != nullptr);
 
-  const int socket_index = socket->index();
+  const int socket_index = socket_ref->index();
   return {parent_context, &parent_node->output(socket_index)};
 }
 
 XXXOutputSocket XXXInputSocket::get_corresponding_group_input_socket() const
 {
   BLI_assert(*this);
-  BLI_assert(socket->node().is_group_node());
+  BLI_assert(socket_ref->node().is_group_node());
 
-  const XXXNodeTreeContext *child_context = context->child_context(socket->node());
+  const XXXNodeTreeContext *child_context = context->child_context(socket_ref->node());
   BLI_assert(child_context != nullptr);
 
   const NodeTreeRef &child_tree = child_context->tree();
   Span<const NodeRef *> group_input_nodes = child_tree.nodes_by_type("NodeGroupInput");
   BLI_assert(!group_input_nodes.is_empty());
 
-  const int socket_index = socket->index();
+  const int socket_index = socket_ref->index();
   return {child_context, &group_input_nodes[0]->output(socket_index)};
 }
 
 XXXInputSocket XXXOutputSocket::get_corresponding_group_node_input() const
 {
   BLI_assert(*this);
-  BLI_assert(socket->node().is_group_input_node());
-  BLI_assert(socket->index() < socket->node().outputs().size() - 1);
+  BLI_assert(socket_ref->node().is_group_input_node());
+  BLI_assert(socket_ref->index() < socket_ref->node().outputs().size() - 1);
 
   const XXXNodeTreeContext *parent_context = context->parent_context();
   const NodeRef *parent_node = context->parent_node();
   BLI_assert(parent_context != nullptr);
   BLI_assert(parent_node != nullptr);
 
-  const int socket_index = socket->index();
+  const int socket_index = socket_ref->index();
   return {parent_context, &parent_node->input(socket_index)};
 }
 
 XXXInputSocket XXXOutputSocket::get_corresponding_group_output_socket() const
 {
   BLI_assert(*this);
-  BLI_assert(socket->node().is_group_node());
+  BLI_assert(socket_ref->node().is_group_node());
 
-  const XXXNodeTreeContext *child_context = context->child_context(socket->node());
+  const XXXNodeTreeContext *child_context = context->child_context(socket_ref->node());
   BLI_assert(child_context != nullptr);
 
   const NodeTreeRef &child_tree = child_context->tree();
   Span<const NodeRef *> group_output_nodes = child_tree.nodes_by_type("NodeGroupOutput");
   BLI_assert(!group_output_nodes.is_empty());
 
-  const int socket_index = socket->index();
+  const int socket_index = socket_ref->index();
   return {child_context, &group_output_nodes[0]->input(socket_index)};
 }
 

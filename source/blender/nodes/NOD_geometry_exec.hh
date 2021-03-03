@@ -183,7 +183,7 @@ class GeoNodeExecParams {
    */
   const bNode &node() const
   {
-    return *node_.node->bnode();
+    return *node_->bnode();
   }
 
   const PersistentDataHandleMap &handle_map() const
