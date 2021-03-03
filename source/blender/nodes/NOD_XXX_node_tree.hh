@@ -43,11 +43,14 @@ class XXXNodeTreeContextInfo {
 
 class XXXNodeTreeContext {
  private:
-  XXXNodeTreeContextInfo *context_info_ = nullptr;
+  const XXXNodeTreeContextInfo *context_info_ = nullptr;
 
   friend XXXNodeTree;
 
  public:
+  XXXNodeTreeContext() = default;
+  XXXNodeTreeContext(const XXXNodeTreeContextInfo *context_info);
+
   friend bool operator==(const XXXNodeTreeContext &a, const XXXNodeTreeContext &b);
   friend bool operator!=(const XXXNodeTreeContext &a, const XXXNodeTreeContext &b);
 
@@ -77,7 +80,6 @@ struct XXXSocket {
 
   XXXSocket() = default;
   XXXSocket(XXXNodeTreeContext context, const SocketRef *socket);
-
   XXXSocket(const XXXInputSocket &input_socket);
   XXXSocket(const XXXOutputSocket &output_socket);
 
@@ -153,6 +155,11 @@ inline const NodeTreeRef &XXXNodeTreeContextInfo::tree() const
 /* --------------------------------------------------------------------
  * XXXNodeTreeContext inline methods.
  */
+
+inline XXXNodeTreeContext::XXXNodeTreeContext(const XXXNodeTreeContextInfo *context_info)
+    : context_info_(context_info)
+{
+}
 
 inline bool operator==(const XXXNodeTreeContext &a, const XXXNodeTreeContext &b)
 {
