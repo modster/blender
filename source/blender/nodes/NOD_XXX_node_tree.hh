@@ -143,6 +143,16 @@ class XXXNodeTree {
   void destruct_context_info_recursively(XXXNodeTreeContextInfo *context_info);
 };
 
+namespace xxx_node_tree_types {
+using nodes::XXXInputSocket;
+using nodes::XXXNode;
+using nodes::XXXNodeTree;
+using nodes::XXXNodeTreeContext;
+using nodes::XXXNodeTreeContextInfo;
+using nodes::XXXOutputSocket;
+using nodes::XXXSocket;
+}  // namespace xxx_node_tree_types
+
 /* --------------------------------------------------------------------
  * XXXNodeTreeContextInfo inline methods.
  */
