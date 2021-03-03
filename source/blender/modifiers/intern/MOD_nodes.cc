@@ -70,6 +70,7 @@
 #include "MOD_nodes.h"
 #include "MOD_ui_common.h"
 
+#include "NOD_XXX_node_tree.hh"
 #include "NOD_derived_node_tree.hh"
 #include "NOD_geometry.h"
 #include "NOD_geometry_exec.hh"
@@ -92,6 +93,7 @@ using blender::fn::GValueMap;
 using blender::nodes::GeoNodeExecParams;
 using namespace blender::nodes::derived_node_tree_types;
 using namespace blender::fn::multi_function_types;
+using namespace blender::nodes::xxx_node_tree_types;
 
 static void initData(ModifierData *md)
 {
@@ -1126,8 +1128,9 @@ static void modifyGeometry(ModifierData *md,
 
   check_property_socket_sync(ctx->object, md);
 
-  blender::nodes::NodeTreeRefMap tree_refs;
+  NodeTreeRefMap tree_refs;
   DerivedNodeTree tree{nmd->node_group, tree_refs};
+  XXXNodeTree xxx_tree{*nmd->node_group, tree_refs};
 
   if (tree.has_link_cycles()) {
     BKE_modifier_set_error(ctx->object, md, "Node group has cycles");

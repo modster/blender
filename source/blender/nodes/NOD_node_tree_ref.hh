@@ -221,6 +221,15 @@ using NodeTreeRefMap = Map<bNodeTree *, std::unique_ptr<const NodeTreeRef>>;
 
 const NodeTreeRef &get_tree_ref_from_map(NodeTreeRefMap &node_tree_refs, bNodeTree &btree);
 
+namespace node_tree_ref_types {
+using nodes::InputSocketRef;
+using nodes::NodeRef;
+using nodes::NodeTreeRef;
+using nodes::NodeTreeRefMap;
+using nodes::OutputSocketRef;
+using nodes::SocketRef;
+}  // namespace node_tree_ref_types
+
 /* --------------------------------------------------------------------
  * SocketRef inline methods.
  */

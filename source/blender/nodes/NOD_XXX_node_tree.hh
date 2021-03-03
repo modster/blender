@@ -144,6 +144,7 @@ class XXXNodeTree {
 };
 
 namespace xxx_node_tree_types {
+using namespace node_tree_ref_types;
 using nodes::XXXInputSocket;
 using nodes::XXXNode;
 using nodes::XXXNodeTree;
