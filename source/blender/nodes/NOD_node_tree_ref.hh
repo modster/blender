@@ -219,6 +219,8 @@ class NodeTreeRef : NonCopyable, NonMovable {
 
 using NodeTreeRefMap = Map<bNodeTree *, std::unique_ptr<const NodeTreeRef>>;
 
+const NodeTreeRef &get_tree_ref_from_map(NodeTreeRefMap &node_tree_refs, bNodeTree &btree);
+
 /* --------------------------------------------------------------------
  * SocketRef inline methods.
  */
