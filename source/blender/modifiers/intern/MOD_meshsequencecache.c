@@ -141,67 +141,70 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
 
 #  ifdef WITH_ALEMBIC
     case CACHEFILE_TYPE_ALEMBIC:
-  if (!mcmd->reader || !STREQ(mcmd->reader_object_path, mcmd->object_path)) {
-    STRNCPY(mcmd->reader_object_path, mcmd->object_path);
-    BKE_cachefile_reader_open(cache_file, &mcmd->reader, ctx->object, mcmd->object_path);
-    if (!mcmd->reader) {
-      BKE_modifier_set_error(
-          ctx->object, md, "Could not create Alembic reader for file %s", cache_file->filepath);
-      return mesh;
-    }
-  }
+      if (!mcmd->reader || !STREQ(mcmd->reader_object_path, mcmd->object_path)) {
+        STRNCPY(mcmd->reader_object_path, mcmd->object_path);
+        BKE_cachefile_reader_open(cache_file, &mcmd->reader, ctx->object, mcmd->object_path);
+        if (!mcmd->reader) {
+          BKE_modifier_set_error(ctx->object,
+                                 md,
+                                 "Could not create Alembic reader for file %s",
+                                 cache_file->filepath);
+          return mesh;
+        }
+      }
 
-  /* If this invocation is for the ORCO mesh, and the mesh in Alembic hasn't changed topology, we
-   * must return the mesh as-is instead of deforming it. */
-  if (ctx->flag & MOD_APPLY_ORCO &&
-      !ABC_mesh_topology_changed(mcmd->reader, ctx->object, mesh, time, &err_str)) {
-    return mesh;
-  }
+      /* If this invocation is for the ORCO mesh, and the mesh in Alembic hasn't changed topology,
+       * we must return the mesh as-is instead of deforming it. */
+      if (ctx->flag & MOD_APPLY_ORCO &&
+          !ABC_mesh_topology_changed(mcmd->reader, ctx->object, mesh, time, &err_str)) {
+        return mesh;
+      }
 
-  if (me != NULL) {
-    MVert *mvert = mesh->mvert;
-    MEdge *medge = mesh->medge;
-    MPoly *mpoly = mesh->mpoly;
+      if (me != NULL) {
+        MVert *mvert = mesh->mvert;
+        MEdge *medge = mesh->medge;
+        MPoly *mpoly = mesh->mpoly;
 
-    /* TODO(sybren+bastien): possibly check relevant custom data layers (UV/color depending on
-     * flags) and duplicate those too. */
-    if ((me->mvert == mvert) || (me->medge == medge) || (me->mpoly == mpoly)) {
-      /* We need to duplicate data here, otherwise we'll modify org mesh, see T51701. */
-      mesh = (Mesh *)BKE_id_copy_ex(NULL,
-                                    &mesh->id,
-                                    NULL,
-                                    LIB_ID_CREATE_NO_MAIN | LIB_ID_CREATE_NO_USER_REFCOUNT |
-                                        LIB_ID_CREATE_NO_DEG_TAG | LIB_ID_COPY_NO_PREVIEW);
-    }
-  }
+        /* TODO(sybren+bastien): possibly check relevant custom data layers (UV/color depending on
+         * flags) and duplicate those too. */
+        if ((me->mvert == mvert) || (me->medge == medge) || (me->mpoly == mpoly)) {
+          /* We need to duplicate data here, otherwise we'll modify org mesh, see T51701. */
+          mesh = (Mesh *)BKE_id_copy_ex(NULL,
+                                        &mesh->id,
+                                        NULL,
+                                        LIB_ID_CREATE_NO_MAIN | LIB_ID_CREATE_NO_USER_REFCOUNT |
+                                            LIB_ID_CREATE_NO_DEG_TAG | LIB_ID_COPY_NO_PREVIEW);
+        }
+      }
 
-  Mesh *result = ABC_read_mesh(mcmd->reader, ctx->object, mesh, time, &err_str, mcmd->read_flag);
+      Mesh *result = ABC_read_mesh(
+          mcmd->reader, ctx->object, mesh, time, &err_str, mcmd->read_flag);
 
-  mcmd->velocity_delta = 1.0f;
-  if (mcmd->cache_file->velocity_unit == CACHEFILE_VELOCITY_UNIT_SECOND) {
-    mcmd->velocity_delta /= FPS;
-  }
+      mcmd->velocity_delta = 1.0f;
+      if (mcmd->cache_file->velocity_unit == CACHEFILE_VELOCITY_UNIT_SECOND) {
+        mcmd->velocity_delta /= FPS;
+      }
 
-  mcmd->last_lookup_time = time;
+      mcmd->last_lookup_time = time;
 
-  if (result != NULL) {
-    mcmd->num_vertices = result->totvert;
-  }
+      if (result != NULL) {
+        mcmd->num_vertices = result->totvert;
+      }
 
-  if (err_str) {
-    BKE_modifier_set_error(ctx->object, md, "%s", err_str);
-  }
+      if (err_str) {
+        BKE_modifier_set_error(ctx->object, md, "%s", err_str);
+      }
 
-  if (!ELEM(result, NULL, mesh) && (mesh != org_mesh)) {
-    BKE_id_free(NULL, mesh);
-    mesh = org_mesh;
-  }
+      if (!ELEM(result, NULL, mesh) && (mesh != org_mesh)) {
+        BKE_id_free(NULL, mesh);
+        mesh = org_mesh;
+      }
 
-  if (!result) {
-    result = mesh;
-  }
-  return result;
-  break;
+      if (!result) {
+        result = mesh;
+      }
+      return result;
+      break;
 #  endif
 #  ifdef WITH_USD
     case CACHEFILE_TYPE_USD:
@@ -210,7 +213,8 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
         BKE_cachefile_reader_open(cache_file, &mcmd->reader, ctx->object, mcmd->object_path);
         if (!mcmd->reader) {
           printf("Could not create usd reader\n");
-          BKE_modifier_set_error(ctx->object, md, "Could not create USD reader for file %s", cache_file->filepath);
+          BKE_modifier_set_error(
+              ctx->object, md, "Could not create USD reader for file %s", cache_file->filepath);
           return mesh;
         }
       }

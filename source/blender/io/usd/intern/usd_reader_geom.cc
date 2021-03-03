@@ -107,5 +107,5 @@ void USDGeomReader::addSubdivModifier()
   ModifierData *md = BKE_modifier_new(eModifierType_Subsurf);
   BLI_addtail(&m_object->modifiers, md);
 
-  //SubsurfModifierData *subd = reinterpret_cast<SubsurfModifierData *>(md);
+  // SubsurfModifierData *subd = reinterpret_cast<SubsurfModifierData *>(md);
 }

@@ -95,7 +95,10 @@ class USDStageReader {
 
   void clear_proto_readers(bool decref);
 
-  const ProtoReaderMap &proto_readers() const { return m_proto_readers; };
+  const ProtoReaderMap &proto_readers() const
+  {
+    return m_proto_readers;
+  };
 };
 
 };  // namespace blender::io::usd

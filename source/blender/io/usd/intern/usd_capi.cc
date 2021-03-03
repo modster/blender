@@ -135,11 +135,11 @@ static Collection *create_collection(Main *bmain, Collection *parent, const char
 }
 
 /* Set the instance collection on the given instance reader.
-*  The collection is assigned from the given map based on
-*  the prototype (maser) prim path. */
+ *  The collection is assigned from the given map based on
+ *  the prototype (maser) prim path. */
 static void set_instance_collection(
-  USDInstanceReader *instance_reader,
-  const std::map<pxr::SdfPath, Collection *> &proto_collection_map)
+    USDInstanceReader *instance_reader,
+    const std::map<pxr::SdfPath, Collection *> &proto_collection_map)
 {
   if (!instance_reader) {
     return;
@@ -154,17 +154,16 @@ static void set_instance_collection(
   }
   else {
     std::cerr << "WARNING: Couldn't find prototype collection for " << instance_reader->prim_path()
-      << std::endl;
+              << std::endl;
   }
 }
 
 /* Create instance collections for the USD instance readers. */
-static void create_proto_collections(
-  Main *bmain,
-  ViewLayer *view_layer,
-  Collection *parent_collection,
-  const USDStageReader::ProtoReaderMap &proto_readers,
-  const std::vector<USDPrimReader *> &readers)
+static void create_proto_collections(Main *bmain,
+                                     ViewLayer *view_layer,
+                                     Collection *parent_collection,
+                                     const USDStageReader::ProtoReaderMap &proto_readers,
+                                     const std::vector<USDPrimReader *> &readers)
 {
   Collection *all_protos_collection = create_collection(bmain, parent_collection, "prototypes");
 
@@ -179,10 +178,10 @@ static void create_proto_collections(
     // std::replace(proto_collection_name.begin(), proto_collection_name.end(), '/', '_');
 
     Collection *proto_collection = create_collection(
-      bmain, all_protos_collection, proto_collection_name.c_str());
+        bmain, all_protos_collection, proto_collection_name.c_str());
 
     LayerCollection *proto_lc = BKE_layer_collection_first_from_scene_collection(view_layer,
-      proto_collection);
+                                                                                 proto_collection);
     if (proto_lc) {
       proto_lc->flag |= LAYER_COLLECTION_HIDE;
     }
@@ -211,11 +210,11 @@ static void create_proto_collections(
   for (const auto &pair : proto_readers) {
 
     std::map<pxr::SdfPath, Collection *>::const_iterator it = proto_collection_map.find(
-      pair.first);
+        pair.first);
 
     if (it == proto_collection_map.end()) {
       std::cerr << "WARNING: Couldn't find collection when adding objects for prototype "
-        << pair.first << std::endl;
+                << pair.first << std::endl;
       continue;
     }
 
@@ -232,9 +231,9 @@ static void create_proto_collections(
 
       DEG_id_tag_update(&coll->id, ID_RECALC_COPY_ON_WRITE);
       DEG_id_tag_update_ex(bmain,
-        &ob->id,
-        ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION |
-        ID_RECALC_BASE_FLAGS);
+                           &ob->id,
+                           ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY | ID_RECALC_ANIMATION |
+                               ID_RECALC_BASE_FLAGS);
     }
   }
 }
@@ -582,7 +581,7 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
       }
 
       /* TODO(makowalski): Here and below, should we call
-      *  readObjectData() with the actual time? */
+       *  readObjectData() with the actual time? */
       reader->readObjectData(data->bmain, 0.0);
 
       Object *ob = reader->object();
@@ -678,7 +677,7 @@ static void import_endjob(void *customdata)
 
     if (data->archive && !data->archive->proto_readers().empty()) {
       create_proto_collections(
-        data->bmain, view_layer, lc->collection, data->archive->proto_readers(), data->readers);
+          data->bmain, view_layer, lc->collection, data->archive->proto_readers(), data->readers);
     }
 
     for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
@@ -923,7 +922,10 @@ void USD_free_handle(USDStageHandle *handle)
   delete archive;
 }
 
-void USD_get_transform(struct CacheReader *reader, float r_mat_world[4][4], float time, float scale)
+void USD_get_transform(struct CacheReader *reader,
+                       float r_mat_world[4][4],
+                       float time,
+                       float scale)
 {
   if (!reader) {
     return;

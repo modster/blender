@@ -157,13 +157,13 @@ typedef enum CustomDataType {
   CD_PROP_FLOAT2 = 49,
 
   CD_PROP_BOOL = 50,
- 
-  CD_VALUE_FLOAT    = 51,
-  CD_VALUE_INT      = 52,
-  CD_VALUE_F3       = 53,
-  CD_VALUE_I3       = 54,
 
-  CD_VELOCITY         = 55,
+  CD_VALUE_FLOAT = 51,
+  CD_VALUE_INT = 52,
+  CD_VALUE_F3 = 53,
+  CD_VALUE_I3 = 54,
+
+  CD_VELOCITY = 55,
 
   CD_NUMTYPES = 56,
 } CustomDataType;

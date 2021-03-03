@@ -22,9 +22,9 @@
  */
 
 #ifdef WITH_USD
-#  include <string.h>
-#  include "DNA_space_types.h"
 #  include "DNA_modifier_types.h"
+#  include "DNA_space_types.h"
+#  include <string.h>
 
 #  include "BKE_context.h"
 #  include "BKE_main.h"
@@ -546,7 +546,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   "Import Instance Proxies",
                   "If enabled, USD instances will be traversed with instance proxies, "
                   "creating a unique Blender object for each instance.  Note that "
-                  "this option is ignored if the Instancing option is also checked"  );
+                  "this option is ignored if the Instancing option is also checked");
 
   RNA_def_boolean(ot->srna,
                   "import_visible_only",
@@ -584,15 +584,15 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
   RNA_def_boolean(ot->srna, "import_proxy", true, "Proxy", "When checked, import proxy geometry");
 
   RNA_def_boolean(
-    ot->srna, "import_render", true, "Render", "When checked, import final render geometry");
+      ot->srna, "import_render", true, "Render", "When checked, import final render geometry");
 
   RNA_def_boolean(
-    ot->srna,
-    "use_instancing",
-    false,
-    "Instancing",
-    "When checked, USD scenegraph instances are imported as collection instances in Blender. "
-    "(Note that point instancers are not yet handled by this option.)");
+      ot->srna,
+      "use_instancing",
+      false,
+      "Instancing",
+      "When checked, USD scenegraph instances are imported as collection instances in Blender. "
+      "(Note that point instancers are not yet handled by this option.)");
 }
 
 #endif /* WITH_USD */

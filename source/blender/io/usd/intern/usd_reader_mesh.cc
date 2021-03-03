@@ -569,7 +569,7 @@ void USDMeshReader::process_normals_uniform(Mesh *mesh)
   }
 
   float(*lnors)[3] = static_cast<float(*)[3]>(
-    MEM_malloc_arrayN(mesh->totloop, sizeof(float[3]), "USD::FaceNormals"));
+      MEM_malloc_arrayN(mesh->totloop, sizeof(float[3]), "USD::FaceNormals"));
 
   MPoly *mpoly = mesh->mpoly;
 
@@ -588,7 +588,6 @@ void USDMeshReader::process_normals_uniform(Mesh *mesh)
 
   MEM_freeN(lnors);
 }
-
 
 void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
                                      ImportSettings *settings,

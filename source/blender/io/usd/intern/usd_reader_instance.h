@@ -28,22 +28,21 @@ namespace blender::io::usd {
 
 /* Wraps the UsdGeomXform schema. Creates a Blender Empty object. */
 
- class USDInstanceReader : public USDXformReader {
+class USDInstanceReader : public USDXformReader {
 
-  public:
-   USDInstanceReader(pxr::UsdStageRefPtr stage,
-                     const pxr::UsdPrim &object,
-                     const USDImportParams &import_params,
-                     ImportSettings &settings);
+ public:
+  USDInstanceReader(pxr::UsdStageRefPtr stage,
+                    const pxr::UsdPrim &object,
+                    const USDImportParams &import_params,
+                    ImportSettings &settings);
 
-   bool valid() const override;
+  bool valid() const override;
 
-   void createObject(Main *bmain, double motionSampleTime) override;
+  void createObject(Main *bmain, double motionSampleTime) override;
 
-   void set_instance_collection(Collection *coll);
+  void set_instance_collection(Collection *coll);
 
-   pxr::SdfPath proto_path() const;
-
- };
+  pxr::SdfPath proto_path() const;
+};
 
 }  // namespace blender::io::usd

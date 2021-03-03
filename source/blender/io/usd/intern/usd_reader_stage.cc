@@ -72,11 +72,9 @@ bool USDStageReader::valid() const
   return true;
 }
 
-
 /* Returns true if the given prim should be excluded from the
  * traversal because it's invisible. */
-bool _prune_by_visibility(const pxr::UsdGeomImageable &imageable,
-                          const USDImportParams &params)
+bool _prune_by_visibility(const pxr::UsdGeomImageable &imageable, const USDImportParams &params)
 {
   if (imageable && params.import_visible_only) {
     if (pxr::UsdAttribute visibility_attr = imageable.GetVisibilityAttr()) {
@@ -94,21 +92,19 @@ bool _prune_by_visibility(const pxr::UsdGeomImageable &imageable,
   return false;
 }
 
-
 /* Returns true if the given prim should be excluded from the
  * traversal because it has a purpose which was not requested
  * by the user; e.g., the prim represents guide geometry and
  * the import_guide parameter is toggled off. */
-bool _prune_by_purpose(const pxr::UsdGeomImageable &imageable,
-                       const USDImportParams &params)
+bool _prune_by_purpose(const pxr::UsdGeomImageable &imageable, const USDImportParams &params)
 {
   if (imageable && !(params.import_guide && params.import_proxy && params.import_render)) {
     if (pxr::UsdAttribute purpose_attr = imageable.GetPurposeAttr()) {
       pxr::TfToken purpose;
       purpose_attr.Get(&purpose);
       if ((!params.import_guide && purpose == pxr::UsdGeomTokens->guide) ||
-        (!params.import_proxy && purpose == pxr::UsdGeomTokens->proxy) ||
-        (!params.import_render && purpose == pxr::UsdGeomTokens->render)) {
+          (!params.import_proxy && purpose == pxr::UsdGeomTokens->proxy) ||
+          (!params.import_render && purpose == pxr::UsdGeomTokens->render)) {
         return true;
       }
     }
@@ -255,4 +251,3 @@ void USDStageReader::clear_proto_readers(bool decref)
 }
 
 }  // Namespace blender::io::usd
-
