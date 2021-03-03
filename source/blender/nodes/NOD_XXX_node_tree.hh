@@ -22,7 +22,6 @@
 
 namespace blender::nodes {
 
-class XXXNodeTreeContextInfo;
 class XXXNodeTreeContext;
 class XXXNodeTree;
 
@@ -31,47 +30,29 @@ struct XXXSocket;
 struct XXXInputSocket;
 struct XXXOutputSocket;
 
-class XXXNodeTreeContextInfo {
+class XXXNodeTreeContext {
  private:
-  XXXNodeTreeContextInfo *parent_context_info_;
+  XXXNodeTreeContext *parent_context_;
   const NodeRef *parent_node_;
   const NodeTreeRef *tree_;
-  Map<const NodeRef *, XXXNodeTreeContextInfo *> children_;
+  Map<const NodeRef *, XXXNodeTreeContext *> children_;
 
   friend XXXNodeTree;
 
  public:
   const NodeTreeRef &tree() const;
-  const XXXNodeTreeContextInfo *parent_context_info() const;
+  const XXXNodeTreeContext *parent_context() const;
   const NodeRef *parent_node() const;
-  const XXXNodeTreeContextInfo *child_context_info(const NodeRef &node) const;
+  const XXXNodeTreeContext *child_context(const NodeRef &node) const;
   bool is_root() const;
 };
 
-class XXXNodeTreeContext {
- private:
-  const XXXNodeTreeContextInfo *context_info_ = nullptr;
-
-  friend XXXNodeTree;
-
- public:
-  XXXNodeTreeContext() = default;
-  XXXNodeTreeContext(const XXXNodeTreeContextInfo *context_info);
-
-  friend bool operator==(const XXXNodeTreeContext &a, const XXXNodeTreeContext &b);
-  friend bool operator!=(const XXXNodeTreeContext &a, const XXXNodeTreeContext &b);
-
-  uint64_t hash() const;
-
-  const XXXNodeTreeContextInfo &info() const;
-};
-
 struct XXXNode {
-  XXXNodeTreeContext context;
+  const XXXNodeTreeContext *context = nullptr;
   const NodeRef *node = nullptr;
 
   XXXNode() = default;
-  XXXNode(XXXNodeTreeContext context, const NodeRef *node);
+  XXXNode(const XXXNodeTreeContext *context, const NodeRef *node);
 
   friend bool operator==(const XXXNode &a, const XXXNode &b);
   friend bool operator!=(const XXXNode &a, const XXXNode &b);
@@ -83,11 +64,11 @@ struct XXXNode {
 };
 
 struct XXXSocket {
-  XXXNodeTreeContext context;
-  const SocketRef *socket;
+  const XXXNodeTreeContext *context = nullptr;
+  const SocketRef *socket = nullptr;
 
   XXXSocket() = default;
-  XXXSocket(XXXNodeTreeContext context, const SocketRef *socket);
+  XXXSocket(const XXXNodeTreeContext *context, const SocketRef *socket);
   XXXSocket(const XXXInputSocket &input_socket);
   XXXSocket(const XXXOutputSocket &output_socket);
 
@@ -101,11 +82,11 @@ struct XXXSocket {
 };
 
 struct XXXInputSocket {
-  XXXNodeTreeContext context;
+  const XXXNodeTreeContext *context = nullptr;
   const InputSocketRef *socket = nullptr;
 
   XXXInputSocket() = default;
-  XXXInputSocket(XXXNodeTreeContext context, const InputSocketRef *socket);
+  XXXInputSocket(const XXXNodeTreeContext *context, const InputSocketRef *socket);
   explicit XXXInputSocket(const XXXSocket &base_socket);
 
   friend bool operator==(const XXXInputSocket &a, const XXXInputSocket &b);
@@ -123,11 +104,11 @@ struct XXXInputSocket {
 };
 
 struct XXXOutputSocket {
-  XXXNodeTreeContext context;
+  const XXXNodeTreeContext *context = nullptr;
   const OutputSocketRef *socket = nullptr;
 
   XXXOutputSocket() = default;
-  XXXOutputSocket(XXXNodeTreeContext context, const OutputSocketRef *socket);
+  XXXOutputSocket(const XXXNodeTreeContext *context, const OutputSocketRef *socket);
   explicit XXXOutputSocket(const XXXSocket &base_socket);
 
   friend bool operator==(const XXXOutputSocket &a, const XXXOutputSocket &b);
@@ -145,21 +126,20 @@ struct XXXOutputSocket {
 class XXXNodeTree {
  private:
   LinearAllocator<> allocator_;
-  XXXNodeTreeContextInfo *root_context_info_;
+  XXXNodeTreeContext *root_context_;
 
  public:
   XXXNodeTree(bNodeTree &btree, NodeTreeRefMap &node_tree_refs);
   ~XXXNodeTree();
 
-  const XXXNodeTreeContextInfo &root_context_info() const;
+  const XXXNodeTreeContext &root_context() const;
 
  private:
-  XXXNodeTreeContextInfo &construct_context_info_recursively(
-      XXXNodeTreeContextInfo *parent_context_info,
-      const NodeRef *parent_node,
-      bNodeTree &btree,
-      NodeTreeRefMap &node_tree_refs);
-  void destruct_context_info_recursively(XXXNodeTreeContextInfo *context_info);
+  XXXNodeTreeContext &construct_context_recursively(XXXNodeTreeContext *parent_context,
+                                                    const NodeRef *parent_node,
+                                                    bNodeTree &btree,
+                                                    NodeTreeRefMap &node_tree_refs);
+  void destruct_context_recursively(XXXNodeTreeContext *context);
 };
 
 namespace xxx_node_tree_types {
@@ -168,78 +148,47 @@ using nodes::XXXInputSocket;
 using nodes::XXXNode;
 using nodes::XXXNodeTree;
 using nodes::XXXNodeTreeContext;
-using nodes::XXXNodeTreeContextInfo;
 using nodes::XXXOutputSocket;
 using nodes::XXXSocket;
 }  // namespace xxx_node_tree_types
 
 /* --------------------------------------------------------------------
- * XXXNodeTreeContextInfo inline methods.
+ * XXXNodeTreeContext inline methods.
  */
 
-inline const NodeTreeRef &XXXNodeTreeContextInfo::tree() const
+inline const NodeTreeRef &XXXNodeTreeContext::tree() const
 {
   return *tree_;
 }
 
-inline const XXXNodeTreeContextInfo *XXXNodeTreeContextInfo::parent_context_info() const
+inline const XXXNodeTreeContext *XXXNodeTreeContext::parent_context() const
 {
-  return parent_context_info_;
+  return parent_context_;
 }
 
-inline const NodeRef *XXXNodeTreeContextInfo::parent_node() const
+inline const NodeRef *XXXNodeTreeContext::parent_node() const
 {
   return parent_node_;
 }
 
-inline const XXXNodeTreeContextInfo *XXXNodeTreeContextInfo::child_context_info(
-    const NodeRef &node) const
+inline const XXXNodeTreeContext *XXXNodeTreeContext::child_context(const NodeRef &node) const
 {
   return children_.lookup_default(&node, nullptr);
 }
 
-inline bool XXXNodeTreeContextInfo::is_root() const
+inline bool XXXNodeTreeContext::is_root() const
 {
-  return parent_context_info_ == nullptr;
-}
-
-/* --------------------------------------------------------------------
- * XXXNodeTreeContext inline methods.
- */
-
-inline XXXNodeTreeContext::XXXNodeTreeContext(const XXXNodeTreeContextInfo *context_info)
-    : context_info_(context_info)
-{
-}
-
-inline bool operator==(const XXXNodeTreeContext &a, const XXXNodeTreeContext &b)
-{
-  return a.context_info_ == b.context_info_;
-}
-
-inline bool operator!=(const XXXNodeTreeContext &a, const XXXNodeTreeContext &b)
-{
-  return !(a == b);
-}
-
-inline uint64_t XXXNodeTreeContext::hash() const
-{
-  return DefaultHash<XXXNodeTreeContextInfo *>{}(context_info_);
-}
-
-inline const XXXNodeTreeContextInfo &XXXNodeTreeContext::info() const
-{
-  return *context_info_;
+  return parent_context_ == nullptr;
 }
 
 /* --------------------------------------------------------------------
  * XXXNode inline methods.
  */
 
-inline XXXNode::XXXNode(XXXNodeTreeContext context, const NodeRef *node)
+inline XXXNode::XXXNode(const XXXNodeTreeContext *context, const NodeRef *node)
     : context(context), node(node)
 {
-  BLI_assert(node == nullptr || &node->tree() == &context.info().tree());
+  BLI_assert(node == nullptr || &node->tree() == &context->tree());
 }
 
 inline bool operator==(const XXXNode &a, const XXXNode &b)
@@ -264,17 +213,17 @@ inline const NodeRef *XXXNode::operator->() const
 
 inline uint64_t XXXNode::hash() const
 {
-  return DefaultHash<XXXNodeTreeContext>{}(context) ^ DefaultHash<const NodeRef *>{}(node);
+  return DefaultHash<const XXXNodeTreeContext *>{}(context) ^ DefaultHash<const NodeRef *>{}(node);
 }
 
 /* --------------------------------------------------------------------
  * XXXSocket inline methods.
  */
 
-inline XXXSocket::XXXSocket(XXXNodeTreeContext context, const SocketRef *socket)
+inline XXXSocket::XXXSocket(const XXXNodeTreeContext *context, const SocketRef *socket)
     : context(context), socket(socket)
 {
-  BLI_assert(socket == nullptr || &socket->tree() == &context.info().tree());
+  BLI_assert(socket == nullptr || &socket->tree() == &context->tree());
 }
 
 inline XXXSocket::XXXSocket(const XXXInputSocket &input_socket)
@@ -309,23 +258,25 @@ inline const SocketRef *XXXSocket::operator->() const
 
 inline uint64_t XXXSocket::hash() const
 {
-  return DefaultHash<XXXNodeTreeContext>{}(context) ^ DefaultHash<const SocketRef *>{}(socket);
+  return DefaultHash<const XXXNodeTreeContext *>{}(context) ^
+         DefaultHash<const SocketRef *>{}(socket);
 }
 
 /* --------------------------------------------------------------------
  * XXXInputSocket inline methods.
  */
 
-inline XXXInputSocket::XXXInputSocket(XXXNodeTreeContext context, const InputSocketRef *socket)
+inline XXXInputSocket::XXXInputSocket(const XXXNodeTreeContext *context,
+                                      const InputSocketRef *socket)
     : context(context), socket(socket)
 {
-  BLI_assert(socket == nullptr || &socket->tree() == &context.info().tree());
+  BLI_assert(socket == nullptr || &socket->tree() == &context->tree());
 }
 
 inline XXXInputSocket::XXXInputSocket(const XXXSocket &base_socket)
     : context(base_socket.context), socket(&base_socket.socket->as_input())
 {
-  BLI_assert(socket == nullptr || &socket->tree() == &context.info().tree());
+  BLI_assert(socket == nullptr || &socket->tree() == &context->tree());
 }
 
 inline bool operator==(const XXXInputSocket &a, const XXXInputSocket &b)
@@ -350,7 +301,7 @@ inline const InputSocketRef *XXXInputSocket::operator->() const
 
 inline uint64_t XXXInputSocket::hash() const
 {
-  return DefaultHash<XXXNodeTreeContext>{}(context) ^
+  return DefaultHash<const XXXNodeTreeContext *>{}(context) ^
          DefaultHash<const InputSocketRef *>{}(socket);
 }
 
@@ -358,7 +309,8 @@ inline uint64_t XXXInputSocket::hash() const
  * XXXOutputSocket inline methods.
  */
 
-inline XXXOutputSocket::XXXOutputSocket(XXXNodeTreeContext context, const OutputSocketRef *socket)
+inline XXXOutputSocket::XXXOutputSocket(const XXXNodeTreeContext *context,
+                                        const OutputSocketRef *socket)
     : context(context), socket(socket)
 {
 }
@@ -390,7 +342,7 @@ inline const OutputSocketRef *XXXOutputSocket::operator->() const
 
 inline uint64_t XXXOutputSocket::hash() const
 {
-  return DefaultHash<XXXNodeTreeContext>{}(context) ^
+  return DefaultHash<const XXXNodeTreeContext *>{}(context) ^
          DefaultHash<const OutputSocketRef *>{}(socket);
 }
 
@@ -398,9 +350,9 @@ inline uint64_t XXXOutputSocket::hash() const
  * XXXNodeTree inline methods.
  */
 
-inline const XXXNodeTreeContextInfo &XXXNodeTree::root_context_info() const
+inline const XXXNodeTreeContext &XXXNodeTree::root_context() const
 {
-  return *root_context_info_;
+  return *root_context_;
 }
 
 }  // namespace blender::nodes

@@ -368,7 +368,7 @@ class GeometryNodesEvaluator {
       const NodeRef &linked_node = linked_socket->node();
       XXXOutputSocket linked_xxx_socket{to_socket.context, linked_socket};
       if (linked_node.is_group_input_node()) {
-        if (to_socket.context.info().is_root()) {
+        if (to_socket.context->is_root()) {
           callback(linked_xxx_socket);
         }
         else {
@@ -604,7 +604,7 @@ class GeometryNodesEvaluator {
       const NodeRef &linked_node = linked_socket->node();
       XXXInputSocket linked_xxx_socket{from_socket.context, linked_socket};
       if (linked_node.is_group_output_node()) {
-        if (from_socket.context.info().is_root()) {
+        if (from_socket.context->is_root()) {
           callback(linked_xxx_socket);
         }
         else {
@@ -1058,7 +1058,7 @@ static void fill_data_handle_map(const NodesModifierSettings &settings,
 {
   Set<ID *> used_ids;
   find_used_ids_from_settings(settings, used_ids);
-  find_used_ids_from_nodes(*tree.root_context_info().tree().btree(), used_ids);
+  find_used_ids_from_nodes(*tree.root_context().tree().btree(), used_ids);
 
   int current_handle = 0;
   for (ID *id : used_ids) {
@@ -1101,7 +1101,7 @@ static GeometrySet compute_geometry(const XXXNodeTree &tree,
 
   Map<XXXOutputSocket, GMutablePointer> group_inputs;
 
-  XXXNodeTreeContext root_context{&tree.root_context_info()};
+  const XXXNodeTreeContext *root_context = &tree.root_context();
   if (group_input_sockets.size() > 0) {
     Span<const OutputSocketRef *> remaining_input_sockets = group_input_sockets;
 
@@ -1209,7 +1209,7 @@ static void modifyGeometry(ModifierData *md,
     return;
   }
 
-  const NodeTreeRef &root_tree_ref = xxx_tree.root_context_info().tree();
+  const NodeTreeRef &root_tree_ref = xxx_tree.root_context().tree();
   Span<const NodeRef *> input_nodes = root_tree_ref.nodes_by_type("NodeGroupInput");
   Span<const NodeRef *> output_nodes = root_tree_ref.nodes_by_type("NodeGroupOutput");
 
