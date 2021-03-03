@@ -1339,7 +1339,6 @@ void GeometryManager::device_update_packed_bvh(
     }
     if (pack.prim_index.size() && (dscene->prim_index.need_realloc())) {
       dscene->prim_index.steal_data(pack.prim_index);
-      dscene->prim_index.copy_to_device();
     }
     if (pack.prim_object.size() && (dscene->prim_object.need_realloc())) {
       dscene->prim_object.steal_data(pack.prim_object);
@@ -1355,6 +1354,7 @@ void GeometryManager::device_update_packed_bvh(
   dscene->prim_type.copy_to_device_if_modified();
   dscene->prim_visibility.copy_to_device_if_modified();
   dscene->prim_object.copy_to_device_if_modified();
+  dscene->prim_index.copy_to_device_if_modified();
 
   dscene->data.bvh.root = pack.root_index;
   // dscene->data.bvh.bvh_layout = bparams.bvh_layout;
