@@ -265,7 +265,8 @@ bool ui_but_contains_point_px_icon(const uiBut *but, ARegion *region, const wmEv
 }
 
 /* x and y are only used in case event is NULL... */
-uiBut *ui_but_find_mouse_over_ex(ARegion *region, const int x, const int y, const bool labeledit)
+uiBut *ui_but_find_mouse_over_ex(
+    ARegion *region, const int x, const int y, const bool labeledit, uiButFindPoll find_poll)
 {
   uiBut *butover = NULL;
 
@@ -277,6 +278,9 @@ uiBut *ui_but_find_mouse_over_ex(ARegion *region, const int x, const int y, cons
     ui_window_to_block_fl(region, block, &mx, &my);
 
     LISTBASE_FOREACH_BACKWARD (uiBut *, but, &block->buttons) {
+      if (find_poll && find_poll(but) == false) {
+        continue;
+      }
       if (ui_but_is_interactive(but, labeledit)) {
         if (but->pie_dir != UI_RADIAL_NONE) {
           if (ui_but_isect_pie_seg(block, but)) {
@@ -305,7 +309,7 @@ uiBut *ui_but_find_mouse_over_ex(ARegion *region, const int x, const int y, cons
 
 uiBut *ui_but_find_mouse_over(ARegion *region, const wmEvent *event)
 {
-  return ui_but_find_mouse_over_ex(region, event->x, event->y, event->ctrl != 0);
+  return ui_but_find_mouse_over_ex(region, event->x, event->y, event->ctrl != 0, NULL);
 }
 
 uiBut *ui_but_find_rect_over(const struct ARegion *region, const rcti *rect_px)

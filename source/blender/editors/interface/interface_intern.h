@@ -1108,10 +1108,12 @@ bool ui_but_contains_point_px(const uiBut *but, const struct ARegion *region, in
 uiBut *ui_list_find_mouse_over(struct ARegion *region,
                                const struct wmEvent *event) ATTR_WARN_UNUSED_RESULT;
 
+typedef bool (*uiButFindPoll)(const uiBut *but);
 uiBut *ui_but_find_mouse_over_ex(struct ARegion *region,
                                  const int x,
                                  const int y,
-                                 const bool labeledit) ATTR_WARN_UNUSED_RESULT;
+                                 const bool labeledit,
+                                 uiButFindPoll find_poll) ATTR_WARN_UNUSED_RESULT;
 uiBut *ui_but_find_mouse_over(struct ARegion *region,
                               const struct wmEvent *event) ATTR_WARN_UNUSED_RESULT;
 uiBut *ui_but_find_rect_over(const struct ARegion *region,
