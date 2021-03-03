@@ -36,11 +36,14 @@ class XXXNodeTreeContextInfo {
   Map<const NodeRef *, XXXNodeTreeContextInfo *> children_;
 
   friend XXXNodeTree;
+
+ public:
+  const NodeTreeRef &tree() const;
 };
 
 class XXXNodeTreeContext {
  private:
-  XXXNodeTreeContextInfo *context_ = nullptr;
+  XXXNodeTreeContextInfo *context_info_ = nullptr;
 
   friend XXXNodeTree;
 
@@ -49,6 +52,8 @@ class XXXNodeTreeContext {
   friend bool operator!=(const XXXNodeTreeContext &a, const XXXNodeTreeContext &b);
 
   uint64_t hash() const;
+
+  const XXXNodeTreeContextInfo &info() const;
 };
 
 struct XXXNode {
@@ -107,6 +112,8 @@ class XXXNodeTree {
   XXXNodeTree(bNodeTree &btree, NodeTreeRefMap &node_tree_refs);
   ~XXXNodeTree();
 
+  const XXXNodeTreeContextInfo &root_context_info() const;
+
  private:
   XXXNodeTreeContextInfo &construct_context_info_recursively(XXXNodeTreeContextInfo *parent,
                                                              bNodeTree &btree,
@@ -115,12 +122,21 @@ class XXXNodeTree {
 };
 
 /* --------------------------------------------------------------------
+ * XXXNodeTreeContextInfo inline methods.
+ */
+
+inline const NodeTreeRef &XXXNodeTreeContextInfo::tree() const
+{
+  return *tree_;
+}
+
+/* --------------------------------------------------------------------
  * XXXNodeTreeContext inline methods.
  */
 
 inline bool operator==(const XXXNodeTreeContext &a, const XXXNodeTreeContext &b)
 {
-  return a.context_ == b.context_;
+  return a.context_info_ == b.context_info_;
 }
 
 inline bool operator!=(const XXXNodeTreeContext &a, const XXXNodeTreeContext &b)
@@ -130,7 +146,12 @@ inline bool operator!=(const XXXNodeTreeContext &a, const XXXNodeTreeContext &b)
 
 inline uint64_t XXXNodeTreeContext::hash() const
 {
-  return DefaultHash<XXXNodeTreeContextInfo *>{}(context_);
+  return DefaultHash<XXXNodeTreeContextInfo *>{}(context_info_);
+}
+
+inline const XXXNodeTreeContextInfo &XXXNodeTreeContext::info() const
+{
+  return *context_info_;
 }
 
 /* --------------------------------------------------------------------
@@ -229,6 +250,15 @@ inline uint64_t XXXOutputSocket::hash() const
 {
   return DefaultHash<XXXNodeTreeContext>{}(context) ^
          DefaultHash<const OutputSocketRef *>{}(socket);
+}
+
+/* --------------------------------------------------------------------
+ * XXXNodeTree inline methods.
+ */
+
+inline const XXXNodeTreeContextInfo &XXXNodeTree::root_context_info() const
+{
+  return *root_context_info_;
 }
 
 }  // namespace blender::nodes
