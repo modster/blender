@@ -63,6 +63,8 @@ struct XXXNode {
   friend bool operator==(const XXXNode &a, const XXXNode &b);
   friend bool operator!=(const XXXNode &a, const XXXNode &b);
 
+  operator bool() const;
+
   uint64_t hash() const;
 };
 
@@ -76,6 +78,8 @@ struct XXXSocket {
   friend bool operator==(const XXXSocket &a, const XXXSocket &b);
   friend bool operator!=(const XXXSocket &a, const XXXSocket &b);
 
+  operator bool() const;
+
   uint64_t hash() const;
 };
 
@@ -88,6 +92,8 @@ struct XXXInputSocket {
   friend bool operator==(const XXXInputSocket &a, const XXXInputSocket &b);
   friend bool operator!=(const XXXInputSocket &a, const XXXInputSocket &b);
 
+  operator bool() const;
+
   uint64_t hash() const;
 };
 
@@ -99,6 +105,8 @@ struct XXXOutputSocket {
 
   friend bool operator==(const XXXOutputSocket &a, const XXXOutputSocket &b);
   friend bool operator!=(const XXXOutputSocket &a, const XXXOutputSocket &b);
+
+  operator bool() const;
 
   uint64_t hash() const;
 };
@@ -168,6 +176,11 @@ inline bool operator!=(const XXXNode &a, const XXXNode &b)
   return !(a == b);
 }
 
+inline XXXNode::operator bool() const
+{
+  return node != nullptr;
+}
+
 inline uint64_t XXXNode::hash() const
 {
   return DefaultHash<XXXNodeTreeContext>{}(context) ^ DefaultHash<const NodeRef *>{}(node);
@@ -197,6 +210,11 @@ inline bool operator!=(const XXXSocket &a, const XXXSocket &b)
   return !(a == b);
 }
 
+inline XXXSocket::operator bool() const
+{
+  return socket != nullptr;
+}
+
 inline uint64_t XXXSocket::hash() const
 {
   return DefaultHash<XXXNodeTreeContext>{}(context) ^ DefaultHash<const SocketRef *>{}(socket);
@@ -219,6 +237,11 @@ inline bool operator==(const XXXInputSocket &a, const XXXInputSocket &b)
 inline bool operator!=(const XXXInputSocket &a, const XXXInputSocket &b)
 {
   return !(a == b);
+}
+
+inline XXXInputSocket::operator bool() const
+{
+  return socket != nullptr;
 }
 
 inline uint64_t XXXInputSocket::hash() const
@@ -244,6 +267,11 @@ inline bool operator==(const XXXOutputSocket &a, const XXXOutputSocket &b)
 inline bool operator!=(const XXXOutputSocket &a, const XXXOutputSocket &b)
 {
   return !(a == b);
+}
+
+inline XXXOutputSocket::operator bool() const
+{
+  return socket != nullptr;
 }
 
 inline uint64_t XXXOutputSocket::hash() const
