@@ -18,8 +18,31 @@
 
 namespace blender::nodes {
 
-XXXNodeTree::XXXNodeTree(bNodeTree *btree, NodeTreeRefMap &node_tree_refs)
+XXXNodeTree::XXXNodeTree(bNodeTree &btree, NodeTreeRefMap &node_tree_refs)
 {
+  root_context_info_ = &this->construct_context_info_recursively(nullptr, btree, node_tree_refs);
+}
+
+XXXNodeTreeContextInfo &XXXNodeTree::construct_context_info_recursively(
+    XXXNodeTreeContextInfo *parent, bNodeTree &btree, NodeTreeRefMap &node_tree_refs)
+{
+  XXXNodeTreeContextInfo &context_info = *allocator_.construct<XXXNodeTreeContextInfo>();
+  context_info.parent_ = parent;
+  context_info.tree_ = &get_tree_ref_from_map(node_tree_refs, btree);
+
+  for (const NodeRef *node : context_info.tree_->nodes()) {
+    if (node->is_group_node()) {
+      bNode *bnode = node->bnode();
+      bNodeTree *child_btree = reinterpret_cast<bNodeTree *>(bnode->id);
+      if (child_btree != nullptr) {
+        XXXNodeTreeContextInfo &child = this->construct_context_info_recursively(
+            &context_info, *child_btree, node_tree_refs);
+        context_info.children_.add_new(node, &child);
+      }
+    }
+  }
+
+  return context_info;
 }
 
 XXXNodeTree::~XXXNodeTree()

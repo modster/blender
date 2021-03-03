@@ -25,7 +25,7 @@ class XXXNodeTree;
 class XXXNodeTreeContextInfo {
  private:
   XXXNodeTreeContextInfo *parent_;
-  NodeTreeRef *tree_;
+  const NodeTreeRef *tree_;
   Map<const NodeRef *, XXXNodeTreeContextInfo *> children_;
 
   friend XXXNodeTree;
@@ -64,10 +64,13 @@ class XXXNodeTree {
   XXXNodeTreeContextInfo *root_context_info_;
 
  public:
-  XXXNodeTree(bNodeTree *btree, NodeTreeRefMap &node_tree_refs);
+  XXXNodeTree(bNodeTree &btree, NodeTreeRefMap &node_tree_refs);
   ~XXXNodeTree();
 
  private:
+  XXXNodeTreeContextInfo &construct_context_info_recursively(XXXNodeTreeContextInfo *parent,
+                                                             bNodeTree &btree,
+                                                             NodeTreeRefMap &node_tree_refs);
   void destruct_context_info_recursively(XXXNodeTreeContextInfo *context_info);
 };
 
