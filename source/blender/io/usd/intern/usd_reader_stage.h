@@ -33,6 +33,7 @@ struct Scene;
 #include <pxr/pxr.h>
 #include <pxr/usd/usd/stage.h>
 
+#include <map>
 #include <vector>
 
 struct ImportSettings;
@@ -45,11 +46,18 @@ namespace blender::io::usd {
  */
 
 class USDStageReader {
+ public:
+  typedef std::map<pxr::SdfPath, std::vector<USDPrimReader *>> ProtoReaderMap;
+
+ protected:
   pxr::UsdStageRefPtr m_stage;
   USDImportParams m_params;
   ImportSettings m_settings;
 
   std::vector<USDPrimReader *> m_readers;
+
+  // Readers for scenegraph instance prototypes.
+  ProtoReaderMap m_proto_readers;
 
  public:
   USDStageReader(struct Main *bmain, const char *filename);
@@ -84,6 +92,10 @@ class USDStageReader {
   }
 
   void clear_readers();
+
+  void clear_proto_readers(bool decref);
+
+  const ProtoReaderMap &proto_readers() const { return m_proto_readers; };
 };
 
 };  // namespace blender::io::usd

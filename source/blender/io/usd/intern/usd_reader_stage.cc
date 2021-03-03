@@ -139,8 +139,10 @@ static USDPrimReader *_handlePrim(Main *bmain,
 
   USDPrimReader *reader = NULL;
 
-  // This check prevents the pseudo 'root' prim to be added
-  if (prim != stage->GetPseudoRoot()) {
+  // This check prevents the stage pseudo 'root' prim
+  // or the root prims of scenegraph 'master' prototypes
+  // from being added.
+  if (!(prim.IsPseudoRoot() || prim.IsMaster())) {
     reader = blender::io::usd::create_reader(stage, prim, params, settings);
     if (reader == NULL)
       return NULL;
@@ -154,7 +156,7 @@ static USDPrimReader *_handlePrim(Main *bmain,
 
   pxr::Usd_PrimFlagsPredicate filter_predicate = pxr::UsdPrimDefaultPredicate;
 
-  if (params.import_instance_proxies) {
+  if (!params.use_instancing && params.import_instance_proxies) {
     filter_predicate = pxr::UsdTraverseInstanceProxies(filter_predicate);
   }
 
@@ -201,6 +203,17 @@ std::vector<USDPrimReader *> USDStageReader::collect_readers(Main *bmain,
   m_stage->SetInterpolationType(pxr::UsdInterpolationType::UsdInterpolationTypeHeld);
   _handlePrim(bmain, m_stage, params, root, NULL, m_readers, settings);
 
+  if (params.use_instancing) {
+    // Collect the scenegraph instance prototypes.
+    std::vector<pxr::UsdPrim> protos = m_stage->GetMasters();
+
+    for (const pxr::UsdPrim &proto_prim : protos) {
+      std::vector<USDPrimReader *> proto_readers;
+      _handlePrim(bmain, m_stage, params, proto_prim, NULL, proto_readers, settings);
+      m_proto_readers.insert(std::make_pair(proto_prim.GetPath(), proto_readers));
+    }
+  }
+
   return m_readers;
 }
 
@@ -212,6 +225,33 @@ void USDStageReader::clear_readers()
       delete *iter;
     }
   }
+
+  m_readers.clear();
+}
+
+void USDStageReader::clear_proto_readers(bool decref)
+{
+  for (auto &pair : m_proto_readers) {
+
+    for (USDPrimReader *reader : pair.second) {
+
+      if (!reader) {
+        continue;
+      }
+
+      if (decref) {
+        reader->decref();
+      }
+
+      if (reader->refcount() == 0) {
+        delete reader;
+      }
+    }
+
+    pair.second.clear();
+  }
+
+  m_proto_readers.clear();
 }
 
 }  // Namespace blender::io::usd

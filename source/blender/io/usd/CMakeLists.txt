@@ -68,6 +68,7 @@ set(SRC
   intern/usd_reader_camera.cc
   intern/usd_reader_curve.cc
   intern/usd_reader_geom.cc
+  intern/usd_reader_instance.cc
   intern/usd_reader_light.cc
   intern/usd_reader_mesh.cc
   intern/usd_reader_nurbs.cc
@@ -92,6 +93,7 @@ set(SRC
   intern/usd_reader_camera.h
   intern/usd_reader_curve.h
   intern/usd_reader_geom.h
+  intern/usd_reader_instance.h
   intern/usd_reader_light.h
   intern/usd_reader_mesh.h
   intern/usd_reader_nurbs.h

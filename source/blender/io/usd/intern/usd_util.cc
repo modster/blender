@@ -22,6 +22,7 @@
 #include "usd_reader_camera.h"
 #include "usd_reader_curve.h"
 #include "usd_reader_geom.h"
+#include "usd_reader_instance.h"
 #include "usd_reader_light.h"
 #include "usd_reader_mesh.h"
 #include "usd_reader_nurbs.h"
@@ -93,7 +94,10 @@ USDPrimReader *create_reader(const pxr::UsdStageRefPtr &stage,
 {
   USDPrimReader *reader = nullptr;
 
-  if (params.import_cameras && prim.IsA<pxr::UsdGeomCamera>()) {
+  if (params.use_instancing && prim.IsInstance()) {
+    reader = new USDInstanceReader(stage, prim, params, settings);
+  }
+  else if (params.import_cameras && prim.IsA<pxr::UsdGeomCamera>()) {
     reader = new USDCameraReader(stage, prim, params, settings);
   }
   else if (params.import_curves && prim.IsA<pxr::UsdGeomBasisCurves>()) {
@@ -122,6 +126,8 @@ USDPrimReader *create_reader(const pxr::UsdStageRefPtr &stage,
 USDPrimReader *create_fake_reader(USDStageReader *archive, const pxr::UsdPrim &prim)
 {
   USDPrimReader *reader = nullptr;
+
+  // TODO(makowalski): Handle true instancing?
   if (prim.IsA<pxr::UsdGeomCamera>()) {
     reader = new USDCameraReader(archive->stage(), prim, archive->params(), archive->settings());
   }
