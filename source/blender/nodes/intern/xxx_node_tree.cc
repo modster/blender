@@ -32,6 +32,7 @@ XXXNodeTreeContext &XXXNodeTree::construct_context_recursively(XXXNodeTreeContex
   context.parent_context_ = parent_context;
   context.parent_node_ = parent_node;
   context.tree_ = &get_tree_ref_from_map(node_tree_refs, btree);
+  used_node_tree_refs_.add(context.tree_);
 
   for (const NodeRef *node : context.tree_->nodes()) {
     if (node->is_group_node()) {
@@ -60,6 +61,16 @@ void XXXNodeTree::destruct_context_recursively(XXXNodeTreeContext *context)
     this->destruct_context_recursively(child);
   }
   context->~XXXNodeTreeContext();
+}
+
+bool XXXNodeTree::has_link_cycles() const
+{
+  for (const NodeTreeRef *tree_ref : used_node_tree_refs_) {
+    if (tree_ref->has_link_cycles()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 XXXOutputSocket XXXInputSocket::get_corresponding_group_node_output() const

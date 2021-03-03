@@ -17,6 +17,7 @@
 #pragma once
 
 #include "BLI_function_ref.hh"
+#include "BLI_vector_set.hh"
 
 #include "NOD_node_tree_ref.hh"
 
@@ -125,12 +126,16 @@ class XXXNodeTree {
  private:
   LinearAllocator<> allocator_;
   XXXNodeTreeContext *root_context_;
+  VectorSet<const NodeTreeRef *> used_node_tree_refs_;
 
  public:
   XXXNodeTree(bNodeTree &btree, NodeTreeRefMap &node_tree_refs);
   ~XXXNodeTree();
 
   const XXXNodeTreeContext &root_context() const;
+  Span<const NodeTreeRef *> used_node_tree_refs() const;
+
+  bool has_link_cycles() const;
 
  private:
   XXXNodeTreeContext &construct_context_recursively(XXXNodeTreeContext *parent_context,
@@ -352,6 +357,11 @@ inline uint64_t XXXOutputSocket::hash() const
 inline const XXXNodeTreeContext &XXXNodeTree::root_context() const
 {
   return *root_context_;
+}
+
+inline Span<const NodeTreeRef *> XXXNodeTree::used_node_tree_refs() const
+{
+  return used_node_tree_refs_;
 }
 
 }  // namespace blender::nodes

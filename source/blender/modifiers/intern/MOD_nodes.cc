@@ -72,7 +72,6 @@
 #include "MOD_ui_common.h"
 
 #include "NOD_XXX_node_tree.hh"
-#include "NOD_derived_node_tree.hh"
 #include "NOD_geometry.h"
 #include "NOD_geometry_exec.hh"
 #include "NOD_node_tree_multi_function.hh"
@@ -93,7 +92,6 @@ using blender::bke::PersistentObjectHandle;
 using blender::fn::GMutablePointer;
 using blender::fn::GValueMap;
 using blender::nodes::GeoNodeExecParams;
-using namespace blender::nodes::derived_node_tree_types;
 using namespace blender::fn::multi_function_types;
 using namespace blender::nodes::xxx_node_tree_types;
 
@@ -465,11 +463,11 @@ class GeometryNodesEvaluator {
 
   void store_ui_hints(const XXXNode node, GeoNodeExecParams params) const
   {
-    for (const InputSocketRef *dsocket : node->inputs()) {
-      if (!dsocket->is_available()) {
+    for (const InputSocketRef *socket_ref : node->inputs()) {
+      if (!socket_ref->is_available()) {
         continue;
       }
-      if (dsocket->bsocket()->type != SOCK_GEOMETRY) {
+      if (socket_ref->bsocket()->type != SOCK_GEOMETRY) {
         continue;
       }
 
@@ -477,7 +475,7 @@ class GeometryNodesEvaluator {
       bNodeTree *btree_original = (bNodeTree *)DEG_get_original_id((ID *)btree_cow);
       const NodeTreeEvaluationContext context(*self_object_, *modifier_);
 
-      const GeometrySet &geometry_set = params.get_input<GeometrySet>(dsocket->identifier());
+      const GeometrySet &geometry_set = params.get_input<GeometrySet>(socket_ref->identifier());
       const Vector<const GeometryComponent *> components = geometry_set.get_components_for_read();
 
       for (const GeometryComponent *component : components) {
@@ -498,17 +496,17 @@ class GeometryNodesEvaluator {
     MFContextBuilder fn_context;
     MFParamsBuilder fn_params{fn, 1};
     Vector<GMutablePointer> input_data;
-    for (const InputSocketRef *dsocket : node->inputs()) {
-      if (dsocket->is_available()) {
-        GMutablePointer data = params.extract_input(dsocket->identifier());
+    for (const InputSocketRef *socket_ref : node->inputs()) {
+      if (socket_ref->is_available()) {
+        GMutablePointer data = params.extract_input(socket_ref->identifier());
         fn_params.add_readonly_single_input(GSpan(*data.type(), data.get(), 1));
         input_data.append(data);
       }
     }
     Vector<GMutablePointer> output_data;
-    for (const OutputSocketRef *dsocket : node->outputs()) {
-      if (dsocket->is_available()) {
-        const CPPType &type = *blender::nodes::socket_cpp_type_get(*dsocket->typeinfo());
+    for (const OutputSocketRef *socket_ref : node->outputs()) {
+      if (socket_ref->is_available()) {
+        const CPPType &type = *blender::nodes::socket_cpp_type_get(*socket_ref->typeinfo());
         void *buffer = allocator_.allocate(type.size(), type.alignment());
         fn_params.add_uninitialized_single_output(GMutableSpan(type, buffer, 1));
         output_data.append(GMutablePointer(type, buffer));
@@ -1201,15 +1199,14 @@ static void modifyGeometry(ModifierData *md,
   check_property_socket_sync(ctx->object, md);
 
   NodeTreeRefMap tree_refs;
-  DerivedNodeTree tree{nmd->node_group, tree_refs};
-  XXXNodeTree xxx_tree{*nmd->node_group, tree_refs};
+  XXXNodeTree tree{*nmd->node_group, tree_refs};
 
   if (tree.has_link_cycles()) {
     BKE_modifier_set_error(ctx->object, md, "Node group has cycles");
     return;
   }
 
-  const NodeTreeRef &root_tree_ref = xxx_tree.root_context().tree();
+  const NodeTreeRef &root_tree_ref = tree.root_context().tree();
   Span<const NodeRef *> input_nodes = root_tree_ref.nodes_by_type("NodeGroupInput");
   Span<const NodeRef *> output_nodes = root_tree_ref.nodes_by_type("NodeGroupOutput");
 
@@ -1239,7 +1236,7 @@ static void modifyGeometry(ModifierData *md,
   reset_tree_ui_storage(tree.used_node_tree_refs(), *ctx->object, *md);
 
   geometry_set = compute_geometry(
-      xxx_tree, group_inputs, *group_outputs[0], std::move(geometry_set), nmd, ctx);
+      tree, group_inputs, *group_outputs[0], std::move(geometry_set), nmd, ctx);
 }
 
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
