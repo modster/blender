@@ -20,16 +20,22 @@
 
 namespace blender::nodes {
 
+class XXXNodeTree;
+
 class XXXNodeTreeContextInfo {
  private:
   XXXNodeTreeContextInfo *parent_;
   NodeTreeRef *tree_;
   Map<const NodeRef *, XXXNodeTreeContextInfo *> children_;
+
+  friend XXXNodeTree;
 };
 
 class XXXNodeTreeContext {
  private:
   XXXNodeTreeContextInfo *context_;
+
+  friend XXXNodeTree;
 };
 
 struct XXXNode {
@@ -60,6 +66,9 @@ class XXXNodeTree {
  public:
   XXXNodeTree(bNodeTree *btree, NodeTreeRefMap &node_tree_refs);
   ~XXXNodeTree();
+
+ private:
+  void destruct_context_info_recursively(XXXNodeTreeContextInfo *context_info);
 };
 
 }  // namespace blender::nodes

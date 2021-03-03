@@ -24,6 +24,16 @@ XXXNodeTree::XXXNodeTree(bNodeTree *btree, NodeTreeRefMap &node_tree_refs)
 
 XXXNodeTree::~XXXNodeTree()
 {
+  /* Has to be destructed manually, because the context info is allocated in a linear allocator. */
+  this->destruct_context_info_recursively(root_context_info_);
+}
+
+void XXXNodeTree::destruct_context_info_recursively(XXXNodeTreeContextInfo *context_info)
+{
+  for (XXXNodeTreeContextInfo *child : context_info->children_.values()) {
+    destruct_context_info_recursively(child);
+  }
+  context_info->~XXXNodeTreeContextInfo();
 }
 
 }  // namespace blender::nodes
