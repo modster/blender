@@ -97,8 +97,6 @@ struct XXXInputSocket {
 
   uint64_t hash() const;
 
-  XXXOutputSocket try_get_single_origin() const;
-
   XXXOutputSocket get_corresponding_group_node_output() const;
   XXXOutputSocket get_corresponding_group_input_socket() const;
 };

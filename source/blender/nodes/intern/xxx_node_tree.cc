@@ -57,20 +57,9 @@ XXXNodeTree::~XXXNodeTree()
 void XXXNodeTree::destruct_context_recursively(XXXNodeTreeContext *context)
 {
   for (XXXNodeTreeContext *child : context->children_.values()) {
-    destruct_context_recursively(child);
+    this->destruct_context_recursively(child);
   }
   context->~XXXNodeTreeContext();
-}
-
-XXXOutputSocket XXXInputSocket::try_get_single_origin() const
-{
-  BLI_assert(*this);
-  Span<const OutputSocketRef *> origins = socket->linked_sockets();
-  if (origins.size() != 1) {
-    return {};
-  }
-  const OutputSocketRef *origin = origins[0];
-  return {context, origin};
 }
 
 XXXOutputSocket XXXInputSocket::get_corresponding_group_node_output() const
