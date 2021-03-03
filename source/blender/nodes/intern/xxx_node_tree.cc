@@ -59,4 +59,14 @@ void XXXNodeTree::destruct_context_info_recursively(XXXNodeTreeContextInfo *cont
   context_info->~XXXNodeTreeContextInfo();
 }
 
+XXXOutputSocket XXXInputSocket::try_get_single_origin() const
+{
+  Span<const OutputSocketRef *> origins = socket->linked_sockets();
+  if (origins.size() != 1) {
+    return {};
+  }
+  const OutputSocketRef *origin = origins[0];
+  return {context, origin};
+}
+
 }  // namespace blender::nodes

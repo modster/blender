@@ -60,6 +60,9 @@ struct XXXNode {
   XXXNodeTreeContext context;
   const NodeRef *node = nullptr;
 
+  XXXNode() = default;
+  XXXNode(XXXNodeTreeContext context, const NodeRef *node);
+
   friend bool operator==(const XXXNode &a, const XXXNode &b);
   friend bool operator!=(const XXXNode &a, const XXXNode &b);
 
@@ -71,6 +74,9 @@ struct XXXNode {
 struct XXXSocket {
   XXXNodeTreeContext context;
   const SocketRef *socket;
+
+  XXXSocket() = default;
+  XXXSocket(XXXNodeTreeContext context, const SocketRef *socket);
 
   XXXSocket(const XXXInputSocket &input_socket);
   XXXSocket(const XXXOutputSocket &output_socket);
@@ -87,6 +93,8 @@ struct XXXInputSocket {
   XXXNodeTreeContext context;
   const InputSocketRef *socket = nullptr;
 
+  XXXInputSocket() = default;
+  XXXInputSocket(XXXNodeTreeContext context, const InputSocketRef *socket);
   explicit XXXInputSocket(const XXXSocket &base_socket);
 
   friend bool operator==(const XXXInputSocket &a, const XXXInputSocket &b);
@@ -95,12 +103,16 @@ struct XXXInputSocket {
   operator bool() const;
 
   uint64_t hash() const;
+
+  XXXOutputSocket try_get_single_origin() const;
 };
 
 struct XXXOutputSocket {
   XXXNodeTreeContext context;
   const OutputSocketRef *socket = nullptr;
 
+  XXXOutputSocket() = default;
+  XXXOutputSocket(XXXNodeTreeContext context, const OutputSocketRef *socket);
   explicit XXXOutputSocket(const XXXSocket &base_socket);
 
   friend bool operator==(const XXXOutputSocket &a, const XXXOutputSocket &b);
@@ -166,6 +178,11 @@ inline const XXXNodeTreeContextInfo &XXXNodeTreeContext::info() const
  * XXXNode inline methods.
  */
 
+inline XXXNode::XXXNode(XXXNodeTreeContext context, const NodeRef *node)
+    : context(context), node(node)
+{
+}
+
 inline bool operator==(const XXXNode &a, const XXXNode &b)
 {
   return a.context == b.context && a.node == b.node;
@@ -189,6 +206,11 @@ inline uint64_t XXXNode::hash() const
 /* --------------------------------------------------------------------
  * XXXSocket inline methods.
  */
+
+inline XXXSocket::XXXSocket(XXXNodeTreeContext context, const SocketRef *socket)
+    : context(context), socket(socket)
+{
+}
 
 inline XXXSocket::XXXSocket(const XXXInputSocket &input_socket)
     : context(input_socket.context), socket(input_socket.socket)
@@ -224,6 +246,11 @@ inline uint64_t XXXSocket::hash() const
  * XXXInputSocket inline methods.
  */
 
+inline XXXInputSocket::XXXInputSocket(XXXNodeTreeContext context, const InputSocketRef *socket)
+    : context(context), socket(socket)
+{
+}
+
 inline XXXInputSocket::XXXInputSocket(const XXXSocket &base_socket)
     : context(base_socket.context), socket(&base_socket.socket->as_input())
 {
@@ -253,6 +280,11 @@ inline uint64_t XXXInputSocket::hash() const
 /* --------------------------------------------------------------------
  * XXXOutputSocket inline methods.
  */
+
+inline XXXOutputSocket::XXXOutputSocket(XXXNodeTreeContext context, const OutputSocketRef *socket)
+    : context(context), socket(socket)
+{
+}
 
 inline XXXOutputSocket::XXXOutputSocket(const XXXSocket &base_socket)
     : context(base_socket.context), socket(&base_socket.socket->as_output())
