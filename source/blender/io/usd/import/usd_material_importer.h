@@ -50,6 +50,24 @@ struct NodePlacementContext {
 
 /* Converts USD materials to Blender representation. */
 
+// The current implementation converts UsdPreviewSurface to Blender
+// nodes as follows:
+//
+// UsdPreviewSurface -> Pricipled BSDF
+// UsdUVTexture -> Texture Image + Normal Map
+// UsdPrimvarReader_float2 -> UV Map
+//
+// Limitations: arbitrary primvar readers or UsdTransform2d not yet
+// supported. For UsdPreviewSurface, only the file and st inputs
+// are handled, and the color space is retrieved from the texture
+// metadata.
+//
+// TODO(makowalski):  Investigate adding support for converting additional
+// shaders and inputs.  Supporting certain types of inputs, such as texture
+// scale and bias, will probably require creating Blender Group nodes with
+// the corresponding inputs.
+
+
 class USDMaterialImporter {
  protected:
   USDImporterContext context_;

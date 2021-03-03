@@ -68,6 +68,7 @@ static const pxr::TfToken st("st", pxr::TfToken::Immortal);
 static const pxr::TfToken varname("varname", pxr::TfToken::Immortal);
 
 // Color space names
+static const pxr::TfToken raw("raw", pxr::TfToken::Immortal);
 static const pxr::TfToken RAW("RAW", pxr::TfToken::Immortal);
 
 // USD shader names.
@@ -498,7 +499,7 @@ void USDMaterialImporter::convert_usd_uv_texture(const pxr::UsdShadeShader &usd_
           // assuming sRGB otherwise, but more complex logic might be
           // required if the color space is "auto".
           pxr::TfToken colorSpace = file_input.GetAttr().GetColorSpace();
-          if (colorSpace == usdtokens::RAW) {
+          if (colorSpace == usdtokens::RAW || colorSpace == usdtokens::raw) {
             STRNCPY(image->colorspace_settings.name, "Raw");
           }
         }
