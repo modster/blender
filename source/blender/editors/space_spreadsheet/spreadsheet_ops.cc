@@ -16,6 +16,6 @@
 
 #include "spreadsheet_intern.hh"
 
-void spreadsheet_operatortypes(void)
+void spreadsheet_operatortypes()
 {
 }

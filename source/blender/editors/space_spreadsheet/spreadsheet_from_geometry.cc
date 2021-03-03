@@ -392,11 +392,9 @@ static Span<int64_t> filter_visible_mesh_vertex_rows(const bContext *C,
     /* This is safe, because the vector lives in the resource collector. */
     return visible_rows.as_span();
   }
-  else {
-    /* No filter is used. */
-    const int domain_size = component->attribute_domain_size(ATTR_DOMAIN_POINT);
-    return IndexRange(domain_size).as_span();
-  }
+  /* No filter is used. */
+  const int domain_size = component->attribute_domain_size(ATTR_DOMAIN_POINT);
+  return IndexRange(domain_size).as_span();
 }
 
 std::unique_ptr<SpreadsheetDrawer> spreadsheet_drawer_from_geometry_attributes(const bContext *C,
