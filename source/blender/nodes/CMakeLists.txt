@@ -296,6 +296,7 @@ set(SRC
   texture/node_texture_tree.c
   texture/node_texture_util.c
 
+  intern/derived_node_tree.cc
   intern/math_functions.cc
   intern/node_common.c
   intern/node_exec.c
@@ -306,7 +307,6 @@ set(SRC
   intern/node_tree_ref.cc
   intern/node_util.c
   intern/type_callbacks.cc
-  intern/derived_node_tree.cc
 
   composite/node_composite_util.h
   function/node_function_util.hh
@@ -316,6 +316,7 @@ set(SRC
 
   NOD_common.h
   NOD_composite.h
+  NOD_derived_node_tree.hh
   NOD_function.h
   NOD_geometry.h
   NOD_geometry_exec.hh
@@ -328,7 +329,6 @@ set(SRC
   NOD_static_types.h
   NOD_texture.h
   NOD_type_callbacks.hh
-  NOD_derived_node_tree.hh
   intern/node_common.h
   intern/node_exec.h
   intern/node_util.h
