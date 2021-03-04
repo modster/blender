@@ -1398,7 +1398,9 @@ void GeometryManager::device_update_bvh(Device *device,
 
   device->build_bvh(bvh, progress, can_refit);
 
-  std::cerr << "Total time spent building tlas : " << std::abs(bvh->build_time) << '\n';
+  if (scene->update_stats) {
+	std::cerr << "Total time spent building tlas : " << std::abs(bvh->build_time) << '\n';
+  }
 
   if (progress.get_cancel()) {
     return;
@@ -2013,28 +2015,30 @@ void GeometryManager::device_update(Device *device,
     pool.wait_work(&summary);
     VLOG(2) << "Objects BVH build pool statistics:\n" << summary.full_report();
 
-    auto total_build_time = 0.0;
-    auto total_build_time_mesh = 0.0;
-    auto total_build_time_curves = 0.0;
-    for (Geometry *geom : scene->geometry) {
-      if (!geom->bvh) {
-        continue;
-      }
+	if (scene->update_stats) {
+		auto total_build_time = 0.0;
+		auto total_build_time_mesh = 0.0;
+		auto total_build_time_curves = 0.0;
+		for (Geometry *geom : scene->geometry) {
+		  if (!geom->bvh) {
+			continue;
+		  }
 
-      total_build_time += std::abs(geom->bvh->build_time);
+		  total_build_time += std::abs(geom->bvh->build_time);
 
-      if (geom->is_mesh()) {
-        total_build_time_mesh += std::abs(geom->bvh->build_time);
-      }
-      else if (geom->is_hair()) {
-        total_build_time_curves += std::abs(geom->bvh->build_time);
-      }
+		  if (geom->is_mesh()) {
+			total_build_time_mesh += std::abs(geom->bvh->build_time);
+		  }
+		  else if (geom->is_hair()) {
+			total_build_time_curves += std::abs(geom->bvh->build_time);
+		  }
 
-      geom->bvh->build_time = 0.0;
-    }
-    std::cerr << "Total time spent building BLAS : " << total_build_time << '\n';
-    std::cerr << "Total time spent building mesh BLAS : " << total_build_time_mesh << '\n';
-    std::cerr << "Total time spent building hair BLAS : " << total_build_time_curves << '\n';
+		  geom->bvh->build_time = 0.0;
+		}
+		std::cerr << "Total time spent building BLAS : " << total_build_time << '\n';
+		std::cerr << "Total time spent building mesh BLAS : " << total_build_time_mesh << '\n';
+		std::cerr << "Total time spent building hair BLAS : " << total_build_time_curves << '\n';
+	}
   }
 
   foreach (Shader *shader, scene->shaders) {
