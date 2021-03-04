@@ -306,9 +306,11 @@ class GeometryNodesEvaluator {
     socket_to_compute.foreach_origin_socket(
         [&](XXXSocket socket) { from_sockets.append(socket); });
 
+    const CPPType &type = *blender::nodes::socket_cpp_type_get(*socket_to_compute->typeinfo());
+
     if (from_sockets.is_empty()) {
       /* The input is not connected, use the value from the socket itself. */
-      return {get_unlinked_input_value(socket_to_compute)};
+      return {get_unlinked_input_value(socket_to_compute, type)};
     }
 
     /* Multi-input sockets contain a vector of inputs. */
@@ -330,9 +332,8 @@ class GeometryNodesEvaluator {
           }
         }
         else {
-          /* This is an unlinked group input. */
           XXXInputSocket from_input_socket{from_socket};
-          GMutablePointer value = get_unlinked_input_value(from_input_socket);
+          GMutablePointer value = get_unlinked_input_value(from_input_socket, type);
           values.append(value);
         }
       }
@@ -355,9 +356,8 @@ class GeometryNodesEvaluator {
       return {value_by_input_.pop(key)};
     }
 
-    /* This is an unlinked group input. */
     const XXXInputSocket from_input_socket{from_socket};
-    return {get_unlinked_input_value(from_input_socket)};
+    return {get_unlinked_input_value(from_input_socket, type)};
   }
 
   void compute_output_and_forward(const XXXOutputSocket socket_to_compute)
@@ -592,7 +592,8 @@ class GeometryNodesEvaluator {
     value_by_input_.add_new(key, value);
   }
 
-  GMutablePointer get_unlinked_input_value(const XXXInputSocket &socket)
+  GMutablePointer get_unlinked_input_value(const XXXInputSocket &socket,
+                                           const CPPType &required_type)
   {
     bNodeSocket *bsocket = socket->bsocket();
     const CPPType &type = *blender::nodes::socket_cpp_type_get(*socket->typeinfo());
@@ -612,7 +613,19 @@ class GeometryNodesEvaluator {
       blender::nodes::socket_cpp_value_get(*bsocket, buffer);
     }
 
-    return {type, buffer};
+    if (type == required_type) {
+      return {type, buffer};
+    }
+    if (conversions_.is_convertible(type, required_type)) {
+      void *converted_buffer = allocator_.allocate(required_type.size(),
+                                                   required_type.alignment());
+      conversions_.convert(type, required_type, buffer, converted_buffer);
+      type.destruct(buffer);
+      return {required_type, converted_buffer};
+    }
+    void *default_buffer = allocator_.allocate(required_type.size(), required_type.alignment());
+    type.copy_to_uninitialized(type.default_value(), default_buffer);
+    return {required_type, default_buffer};
   }
 };
 
