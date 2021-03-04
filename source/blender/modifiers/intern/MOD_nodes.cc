@@ -306,41 +306,30 @@ class GeometryNodesEvaluator {
     socket_to_compute.foreach_origin_socket(
         [&](XXXSocket socket) { from_sockets.append(socket); });
 
-    const CPPType &type = *blender::nodes::socket_cpp_type_get(*socket_to_compute->typeinfo());
-
-    if (from_sockets.is_empty()) {
-      /* The input is not connected, use the value from the socket itself. */
-      return {get_unlinked_input_value(socket_to_compute, type)};
-    }
-
     /* Multi-input sockets contain a vector of inputs. */
     if (socket_to_compute->is_multi_input_socket()) {
       Vector<GMutablePointer> values;
       for (const XXXSocket from_socket : from_sockets) {
-        if (from_socket->is_output()) {
-          XXXOutputSocket from_output_socket{from_socket};
-          const std::pair<XXXInputSocket, XXXOutputSocket> key = std::make_pair(
-              socket_to_compute, from_output_socket);
-          std::optional<GMutablePointer> value = value_by_input_.pop_try(key);
-          if (value.has_value()) {
-            values.append(*value);
-          }
-          else {
-            this->compute_output_and_forward(from_output_socket);
-            GMutablePointer value = value_by_input_.pop(key);
-            values.append(value);
-          }
-        }
-        else {
-          XXXInputSocket from_input_socket{from_socket};
-          GMutablePointer value = get_unlinked_input_value(from_input_socket, type);
-          values.append(value);
-        }
+        GMutablePointer value = get_input_from_incoming_link(socket_to_compute, from_socket);
+        values.append(value);
       }
       return values;
     }
 
+    if (from_sockets.is_empty()) {
+      /* The input is not connected, use the value from the socket itself. */
+      const CPPType &type = *blender::nodes::socket_cpp_type_get(*socket_to_compute->typeinfo());
+      return {get_unlinked_input_value(socket_to_compute, type)};
+    }
+
     const XXXSocket from_socket = from_sockets[0];
+    GMutablePointer value = this->get_input_from_incoming_link(socket_to_compute, from_socket);
+    return {value};
+  }
+
+  GMutablePointer get_input_from_incoming_link(const XXXInputSocket socket_to_compute,
+                                               const XXXSocket from_socket)
+  {
     if (from_socket->is_output()) {
       const XXXOutputSocket from_output_socket{from_socket};
       const std::pair<XXXInputSocket, XXXOutputSocket> key = std::make_pair(socket_to_compute,
@@ -356,6 +345,8 @@ class GeometryNodesEvaluator {
       return {value_by_input_.pop(key)};
     }
 
+    /* Get value from an unlinked input socket. */
+    const CPPType &type = *blender::nodes::socket_cpp_type_get(*socket_to_compute->typeinfo());
     const XXXInputSocket from_input_socket{from_socket};
     return {get_unlinked_input_value(from_input_socket, type)};
   }
