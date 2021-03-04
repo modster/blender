@@ -73,6 +73,22 @@ bool XXXNodeTree::has_link_cycles() const
   return false;
 }
 
+void XXXNodeTree::foreach_node(FunctionRef<void(XXXNode)> callback) const
+{
+  this->foreach_node_in_context_recursive(*root_context_, callback);
+}
+
+void XXXNodeTree::foreach_node_in_context_recursive(const XXXNodeTreeContext &context,
+                                                    FunctionRef<void(XXXNode)> callback) const
+{
+  for (const NodeRef *node_ref : context.tree_->nodes()) {
+    callback(XXXNode(&context, node_ref));
+  }
+  for (const XXXNodeTreeContext *child_context : context.children_.values()) {
+    this->foreach_node_in_context_recursive(*child_context, callback);
+  }
+}
+
 XXXOutputSocket XXXInputSocket::get_corresponding_group_node_output() const
 {
   BLI_assert(*this);
@@ -133,6 +149,42 @@ XXXInputSocket XXXOutputSocket::get_corresponding_group_output_socket() const
 
   const int socket_index = socket_ref->index();
   return {child_context, &group_output_nodes[0]->input(socket_index)};
+}
+
+void XXXInputSocket::foreach_origin_socket(FunctionRef<void(XXXSocket)> callback) const
+{
+  BLI_assert(*this);
+  for (const OutputSocketRef *linked_socket : socket_ref->linked_sockets()) {
+    const NodeRef &linked_node = linked_socket->node();
+    XXXOutputSocket linked_xxx_socket{context, linked_socket};
+    if (linked_node.is_group_input_node()) {
+      if (context->is_root()) {
+        callback(linked_xxx_socket);
+      }
+      else {
+        XXXInputSocket socket_in_parent_group =
+            linked_xxx_socket.get_corresponding_group_node_input();
+        if (socket_in_parent_group->is_linked()) {
+          socket_in_parent_group.foreach_origin_socket(callback);
+        }
+        else {
+          callback(socket_in_parent_group);
+        }
+      }
+    }
+    else if (linked_node.is_group_node()) {
+      XXXInputSocket socket_in_group = linked_xxx_socket.get_corresponding_group_output_socket();
+      if (socket_in_group->is_linked()) {
+        socket_in_group.foreach_origin_socket(callback);
+      }
+      else {
+        callback(socket_in_group);
+      }
+    }
+    else {
+      callback(linked_xxx_socket);
+    }
+  }
 }
 
 }  // namespace blender::nodes

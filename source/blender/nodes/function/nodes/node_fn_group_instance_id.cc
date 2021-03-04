@@ -24,14 +24,7 @@ static bNodeSocketTemplate fn_node_group_instance_id_out[] = {
 static void fn_node_group_instance_id_expand_in_mf_network(
     blender::nodes::NodeMFNetworkBuilder &builder)
 {
-  const blender::nodes::DNode &node = builder.dnode();
-  std::string id = "/";
-  for (const blender::nodes::DParentNode *parent = node.parent(); parent;
-       parent = parent->parent()) {
-    id = "/" + parent->node_ref().name() + id;
-  }
-  builder.construct_and_set_matching_fn<blender::fn::CustomMF_Constant<std::string>>(
-      std::move(id));
+  builder.set_not_implemented();
 }
 
 void register_node_type_fn_group_instance_id()

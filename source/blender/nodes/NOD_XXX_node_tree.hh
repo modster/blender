@@ -100,6 +100,8 @@ struct XXXInputSocket {
 
   XXXOutputSocket get_corresponding_group_node_output() const;
   XXXOutputSocket get_corresponding_group_input_socket() const;
+
+  void foreach_origin_socket(FunctionRef<void(XXXSocket)> callback) const;
 };
 
 struct XXXOutputSocket {
@@ -136,6 +138,7 @@ class XXXNodeTree {
   Span<const NodeTreeRef *> used_node_tree_refs() const;
 
   bool has_link_cycles() const;
+  void foreach_node(FunctionRef<void(XXXNode)> callback) const;
 
  private:
   XXXNodeTreeContext &construct_context_recursively(XXXNodeTreeContext *parent_context,
@@ -143,6 +146,9 @@ class XXXNodeTree {
                                                     bNodeTree &btree,
                                                     NodeTreeRefMap &node_tree_refs);
   void destruct_context_recursively(XXXNodeTreeContext *context);
+
+  void foreach_node_in_context_recursive(const XXXNodeTreeContext &context,
+                                         FunctionRef<void(XXXNode)> callback) const;
 };
 
 namespace xxx_node_tree_types {

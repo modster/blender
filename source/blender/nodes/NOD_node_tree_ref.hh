@@ -155,6 +155,7 @@ class NodeRef : NonCopyable, NonMovable {
   PointerRNA *rna() const;
   StringRefNull idname() const;
   StringRefNull name() const;
+  bNodeType *typeinfo() const;
 
   int id() const;
 
@@ -436,6 +437,11 @@ inline StringRefNull NodeRef::idname() const
 inline StringRefNull NodeRef::name() const
 {
   return bnode_->name;
+}
+
+inline bNodeType *NodeRef::typeinfo() const
+{
+  return bnode_->typeinfo;
 }
 
 inline int NodeRef::id() const

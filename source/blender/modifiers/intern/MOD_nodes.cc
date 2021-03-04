@@ -303,8 +303,8 @@ class GeometryNodesEvaluator {
   Vector<GMutablePointer> get_input_values(const XXXInputSocket socket_to_compute)
   {
     Vector<XXXSocket> from_sockets;
-    this->foreach_origin_socket(socket_to_compute,
-                                [&](XXXSocket socket) { from_sockets.append(socket); });
+    socket_to_compute.foreach_origin_socket(
+        [&](XXXSocket socket) { from_sockets.append(socket); });
 
     if (from_sockets.is_empty()) {
       /* The input is not connected, use the value from the socket itself. */
@@ -358,41 +358,6 @@ class GeometryNodesEvaluator {
     /* This is an unlinked group input. */
     const XXXInputSocket from_input_socket{from_socket};
     return {get_unlinked_input_value(from_input_socket)};
-  }
-
-  void foreach_origin_socket(XXXInputSocket to_socket, FunctionRef<void(XXXSocket)> callback) const
-  {
-    for (const OutputSocketRef *linked_socket : to_socket->linked_sockets()) {
-      const NodeRef &linked_node = linked_socket->node();
-      XXXOutputSocket linked_xxx_socket{to_socket.context, linked_socket};
-      if (linked_node.is_group_input_node()) {
-        if (to_socket.context->is_root()) {
-          callback(linked_xxx_socket);
-        }
-        else {
-          XXXInputSocket socket_in_parent_group =
-              linked_xxx_socket.get_corresponding_group_node_input();
-          if (socket_in_parent_group->is_linked()) {
-            this->foreach_origin_socket(socket_in_parent_group, callback);
-          }
-          else {
-            callback(socket_in_parent_group);
-          }
-        }
-      }
-      else if (linked_node.is_group_node()) {
-        XXXInputSocket socket_in_group = linked_xxx_socket.get_corresponding_group_output_socket();
-        if (socket_in_group->is_linked()) {
-          this->foreach_origin_socket(socket_in_group, callback);
-        }
-        else {
-          callback(socket_in_group);
-        }
-      }
-      else {
-        callback(linked_xxx_socket);
-      }
-    }
   }
 
   void compute_output_and_forward(const XXXOutputSocket socket_to_compute)
@@ -451,7 +416,7 @@ class GeometryNodesEvaluator {
     }
 
     /* Use the multi-function implementation if it exists. */
-    const MultiFunction *multi_function = nullptr;  // mf_by_node_.lookup_default(&node, nullptr);
+    const MultiFunction *multi_function = mf_by_node_.lookup_default(node, nullptr);
     if (multi_function != nullptr) {
       this->execute_multi_function_node(node, params, *multi_function);
       return;
@@ -1092,7 +1057,7 @@ static GeometrySet compute_geometry(const XXXNodeTree &tree,
 {
   blender::ResourceCollector resources;
   blender::LinearAllocator<> &allocator = resources.linear_allocator();
-  blender::nodes::MultiFunctionByNode mf_by_node = {}; /* TODO */
+  blender::nodes::MultiFunctionByNode mf_by_node = get_multi_function_per_node(tree, resources);
 
   PersistentDataHandleMap handle_map;
   fill_data_handle_map(nmd->settings, tree, handle_map);

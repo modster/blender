@@ -112,11 +112,11 @@ static void sh_node_math_expand_in_mf_network(blender::nodes::NodeMFNetworkBuild
 {
   const blender::fn::MultiFunction &base_function = get_base_multi_function(builder);
 
-  const blender::nodes::DNode &dnode = builder.dnode();
+  const blender::nodes::XXXNode &dnode = builder.dnode();
   blender::fn::MFNetwork &network = builder.network();
   blender::fn::MFFunctionNode &base_node = network.add_function(base_function);
 
-  builder.network_map().add_try_match(dnode.inputs(), base_node.inputs());
+  builder.network_map().add_try_match(*dnode.context, dnode->inputs(), base_node.inputs());
 
   const bool clamp_output = builder.bnode().custom2 != 0;
   if (clamp_output) {
@@ -126,10 +126,12 @@ static void sh_node_math_expand_in_mf_network(blender::nodes::NodeMFNetworkBuild
                                                               }};
     blender::fn::MFFunctionNode &clamp_node = network.add_function(clamp_fn);
     network.add_link(base_node.output(0), clamp_node.input(0));
-    builder.network_map().add(dnode.output(0), clamp_node.output(0));
+    builder.network_map().add(blender::nodes::XXXOutputSocket(dnode.context, &dnode->output(0)),
+                              clamp_node.output(0));
   }
   else {
-    builder.network_map().add(dnode.output(0), base_node.output(0));
+    builder.network_map().add(blender::nodes::XXXOutputSocket(dnode.context, &dnode->output(0)),
+                              base_node.output(0));
   }
 }
 
