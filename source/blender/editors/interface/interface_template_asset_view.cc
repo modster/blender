@@ -98,20 +98,21 @@ static void asset_view_draw_item(uiList *ui_list,
     /* TODO ED_fileselect_init_layout(). Share somehow? */
     float size_x = (96.0f / 20.0f) * UI_UNIT_X;
     float size_y = (96.0f / 20.0f) * UI_UNIT_Y;
-    uiBut *but = uiDefIconBut(block,
-                              UI_BTYPE_LABEL,
-                              0,
-                              file->preview_icon_id,
-                              0,
-                              0,
-                              size_x,
-                              size_y,
-                              nullptr,
-                              0,
-                              0,
-                              0,
-                              0,
-                              "");
+    uiBut *but = uiDefIconTextBut(block,
+                                  UI_BTYPE_PREVIEW_TILE,
+                                  0,
+                                  file->preview_icon_id,
+                                  file->name,
+                                  0,
+                                  0,
+                                  size_x,
+                                  size_y,
+                                  nullptr,
+                                  0,
+                                  0,
+                                  0,
+                                  0,
+                                  "");
     ui_def_but_icon(but, file->preview_icon_id, UI_HAS_ICON | UI_BUT_ICON_PREVIEW);
     asset_view_item_but_drag_set(but, list_data, file);
   }
