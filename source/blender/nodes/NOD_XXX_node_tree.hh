@@ -48,12 +48,17 @@ class XXXNodeTreeContext {
   bool is_root() const;
 };
 
-struct XXXNode {
-  const XXXNodeTreeContext *context = nullptr;
-  const NodeRef *node_ref = nullptr;
+class XXXNode {
+ private:
+  const XXXNodeTreeContext *context_ = nullptr;
+  const NodeRef *node_ref_ = nullptr;
 
+ public:
   XXXNode() = default;
   XXXNode(const XXXNodeTreeContext *context, const NodeRef *node);
+
+  const XXXNodeTreeContext *context() const;
+  const NodeRef *node_ref() const;
 
   friend bool operator==(const XXXNode &a, const XXXNode &b);
   friend bool operator!=(const XXXNode &a, const XXXNode &b);
@@ -190,14 +195,24 @@ inline bool XXXNodeTreeContext::is_root() const
  */
 
 inline XXXNode::XXXNode(const XXXNodeTreeContext *context, const NodeRef *node_ref)
-    : context(context), node_ref(node_ref)
+    : context_(context), node_ref_(node_ref)
 {
   BLI_assert(node_ref == nullptr || &node_ref->tree() == &context->tree());
 }
 
+inline const XXXNodeTreeContext *XXXNode::context() const
+{
+  return context_;
+}
+
+inline const NodeRef *XXXNode::node_ref() const
+{
+  return node_ref_;
+}
+
 inline bool operator==(const XXXNode &a, const XXXNode &b)
 {
-  return a.context == b.context && a.node_ref == b.node_ref;
+  return a.context_ == b.context_ && a.node_ref_ == b.node_ref_;
 }
 
 inline bool operator!=(const XXXNode &a, const XXXNode &b)
@@ -207,18 +222,18 @@ inline bool operator!=(const XXXNode &a, const XXXNode &b)
 
 inline XXXNode::operator bool() const
 {
-  return node_ref != nullptr;
+  return node_ref_ != nullptr;
 }
 
 inline const NodeRef *XXXNode::operator->() const
 {
-  return node_ref;
+  return node_ref_;
 }
 
 inline uint64_t XXXNode::hash() const
 {
-  return DefaultHash<const XXXNodeTreeContext *>{}(context) ^
-         DefaultHash<const NodeRef *>{}(node_ref);
+  return DefaultHash<const XXXNodeTreeContext *>{}(context_) ^
+         DefaultHash<const NodeRef *>{}(node_ref_);
 }
 
 /* --------------------------------------------------------------------

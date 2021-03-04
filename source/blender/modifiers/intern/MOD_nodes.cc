@@ -377,7 +377,7 @@ class GeometryNodesEvaluator {
     GValueMap<StringRef> node_inputs_map{allocator_};
     for (const InputSocketRef *input_socket : node->inputs()) {
       if (input_socket->is_available()) {
-        Vector<GMutablePointer> values = this->get_input_values({node.context, input_socket});
+        Vector<GMutablePointer> values = this->get_input_values({node.context(), input_socket});
         for (int i = 0; i < values.size(); ++i) {
           /* Values from Multi Input Sockets are stored in input map with the format
            * <identifier>[<index>]. */
@@ -398,7 +398,7 @@ class GeometryNodesEvaluator {
     for (const OutputSocketRef *output_socket : node->outputs()) {
       if (output_socket->is_available()) {
         GMutablePointer value = node_outputs_map.extract(output_socket->identifier());
-        this->forward_to_inputs({node.context, output_socket}, value);
+        this->forward_to_inputs({node.context(), output_socket}, value);
       }
     }
   }

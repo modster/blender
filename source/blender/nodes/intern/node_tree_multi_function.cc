@@ -88,8 +88,8 @@ static void insert_dummy_node(CommonMFNetworkBuilderData &common, const XXXNode 
   fn::MFDummyNode &dummy_node = common.network.add_dummy(
       dnode->name(), input_types, output_types, input_names, output_names);
 
-  common.network_map.add(*dnode.context, input_dsockets, dummy_node.inputs());
-  common.network_map.add(*dnode.context, output_dsockets, dummy_node.outputs());
+  common.network_map.add(*dnode.context(), input_dsockets, dummy_node.inputs());
+  common.network_map.add(*dnode.context(), output_dsockets, dummy_node.outputs());
 }
 
 static bool has_data_sockets(const XXXNode &dnode)
@@ -115,7 +115,7 @@ static void foreach_node_to_insert(CommonMFNetworkBuilderData &common,
       return;
     }
     /* Don't insert non-root group input/output nodes, because they will be inlined. */
-    if (!dnode.context->is_root()) {
+    if (!dnode.context()->is_root()) {
       if (dnode->is_group_input_node() || dnode->is_group_output_node()) {
         return;
       }
@@ -274,7 +274,7 @@ static void insert_links_and_unlinked_inputs(CommonMFNetworkBuilderData &common)
 {
   foreach_node_to_insert(common, [&](const XXXNode dnode) {
     for (const InputSocketRef *socket_ref : dnode->inputs()) {
-      const XXXInputSocket to_dsocket{dnode.context, socket_ref};
+      const XXXInputSocket to_dsocket{dnode.context(), socket_ref};
       if (!to_dsocket->is_available()) {
         continue;
       }
@@ -396,14 +396,15 @@ static NodeExpandType get_node_expand_type(MFNetworkTreeMap &network_map,
   for (const InputSocketRef *dsocket : dnode->inputs()) {
     if (dsocket->is_available()) {
       for (fn::MFInputSocket *mf_input :
-           network_map.lookup(XXXInputSocket(dnode.context, dsocket))) {
+           network_map.lookup(XXXInputSocket(dnode.context(), dsocket))) {
         check_mf_node(mf_input->node());
       }
     }
   }
   for (const OutputSocketRef *dsocket : dnode->outputs()) {
     if (dsocket->is_available()) {
-      fn::MFOutputSocket &mf_output = network_map.lookup(XXXOutputSocket(dnode.context, dsocket));
+      fn::MFOutputSocket &mf_output = network_map.lookup(
+          XXXOutputSocket(dnode.context(), dsocket));
       check_mf_node(mf_output.node());
     }
   }
@@ -430,7 +431,7 @@ static const fn::MultiFunction &create_function_for_node_that_expands_into_multi
       MFDataType data_type = *socket_mf_type_get(*dsocket->typeinfo());
       fn::MFOutputSocket &fn_input = network.add_input(data_type.to_string(), data_type);
       for (fn::MFInputSocket *mf_input :
-           network_map.lookup(XXXInputSocket(dnode.context, dsocket))) {
+           network_map.lookup(XXXInputSocket(dnode.context(), dsocket))) {
         network.add_link(fn_input, *mf_input);
         dummy_fn_inputs.append(&fn_input);
       }
@@ -439,7 +440,8 @@ static const fn::MultiFunction &create_function_for_node_that_expands_into_multi
   Vector<const fn::MFInputSocket *> dummy_fn_outputs;
   for (const OutputSocketRef *dsocket : dnode->outputs()) {
     if (dsocket->is_available()) {
-      fn::MFOutputSocket &mf_output = network_map.lookup(XXXOutputSocket(dnode.context, dsocket));
+      fn::MFOutputSocket &mf_output = network_map.lookup(
+          XXXOutputSocket(dnode.context(), dsocket));
       MFDataType data_type = mf_output.data_type();
       fn::MFInputSocket &fn_output = network.add_output(data_type.to_string(), data_type);
       network.add_link(mf_output, fn_output);

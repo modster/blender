@@ -112,10 +112,10 @@ class MFNetworkTreeMap {
 
   void add_try_match(const XXXNode &dnode, fn::MFNode &node)
   {
-    this->add_try_match(*dnode.context,
+    this->add_try_match(*dnode.context(),
                         dnode->inputs().cast<const SocketRef *>(),
                         node.inputs().cast<fn::MFSocket *>());
-    this->add_try_match(*dnode.context,
+    this->add_try_match(*dnode.context(),
                         dnode->outputs().cast<const SocketRef *>(),
                         node.outputs().cast<fn::MFSocket *>());
   }
