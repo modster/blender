@@ -122,6 +122,8 @@ struct XXXOutputSocket {
 
   XXXInputSocket get_corresponding_group_node_input() const;
   XXXInputSocket get_corresponding_group_output_socket() const;
+
+  void foreach_target_socket(FunctionRef<void(XXXInputSocket)> callback) const;
 };
 
 class XXXNodeTree {

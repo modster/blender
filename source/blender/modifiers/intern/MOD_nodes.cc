@@ -506,8 +506,8 @@ class GeometryNodesEvaluator {
   {
     /* For all sockets that are linked with the from_socket push the value to their node. */
     Vector<XXXInputSocket> to_sockets_all;
-    this->foreach_input_to_forward_to(
-        from_socket, [&](XXXInputSocket to_socket) { to_sockets_all.append(to_socket); });
+    from_socket.foreach_target_socket(
+        [&](XXXInputSocket to_socket) { to_sockets_all.append(to_socket); });
 
     const CPPType &from_type = *value_to_forward.type();
     Vector<XXXInputSocket> to_sockets_same_type;
@@ -556,32 +556,6 @@ class GeometryNodesEvaluator {
         void *buffer = allocator_.allocate(type.size(), type.alignment());
         type.copy_to_uninitialized(value_to_forward.get(), buffer);
         add_value_to_input_socket(key, GMutablePointer{type, buffer});
-      }
-    }
-  }
-
-  void foreach_input_to_forward_to(XXXOutputSocket from_socket,
-                                   FunctionRef<void(XXXInputSocket)> callback) const
-  {
-    for (const InputSocketRef *linked_socket : from_socket->linked_sockets()) {
-      const NodeRef &linked_node = linked_socket->node();
-      XXXInputSocket linked_xxx_socket{from_socket.context, linked_socket};
-      if (linked_node.is_group_output_node()) {
-        if (from_socket.context->is_root()) {
-          callback(linked_xxx_socket);
-        }
-        else {
-          XXXOutputSocket socket_in_parent_group =
-              linked_xxx_socket.get_corresponding_group_node_output();
-          this->foreach_input_to_forward_to(socket_in_parent_group, callback);
-        }
-      }
-      else if (linked_node.is_group_node()) {
-        XXXOutputSocket socket_in_group = linked_xxx_socket.get_corresponding_group_input_socket();
-        this->foreach_input_to_forward_to(socket_in_group, callback);
-      }
-      else {
-        callback(linked_xxx_socket);
       }
     }
   }

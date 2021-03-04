@@ -187,4 +187,29 @@ void XXXInputSocket::foreach_origin_socket(FunctionRef<void(XXXSocket)> callback
   }
 }
 
+void XXXOutputSocket::foreach_target_socket(FunctionRef<void(XXXInputSocket)> callback) const
+{
+  for (const InputSocketRef *linked_socket : socket_ref->linked_sockets()) {
+    const NodeRef &linked_node = linked_socket->node();
+    XXXInputSocket linked_xxx_socket{context, linked_socket};
+    if (linked_node.is_group_output_node()) {
+      if (context->is_root()) {
+        callback(linked_xxx_socket);
+      }
+      else {
+        XXXOutputSocket socket_in_parent_group =
+            linked_xxx_socket.get_corresponding_group_node_output();
+        socket_in_parent_group.foreach_target_socket(callback);
+      }
+    }
+    else if (linked_node.is_group_node()) {
+      XXXOutputSocket socket_in_group = linked_xxx_socket.get_corresponding_group_input_socket();
+      socket_in_group.foreach_target_socket(callback);
+    }
+    else {
+      callback(linked_xxx_socket);
+    }
+  }
+}
+
 }  // namespace blender::nodes
