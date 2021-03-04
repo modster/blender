@@ -59,12 +59,11 @@ class XXXNode {
 
   const XXXNodeTreeContext *context() const;
   const NodeRef *node_ref() const;
+  const NodeRef *operator->() const;
 
   friend bool operator==(const XXXNode &a, const XXXNode &b);
   friend bool operator!=(const XXXNode &a, const XXXNode &b);
-
   operator bool() const;
-  const NodeRef *operator->() const;
 
   uint64_t hash() const;
 };
@@ -82,12 +81,11 @@ class XXXSocket {
 
   const XXXNodeTreeContext *context() const;
   const SocketRef *socket_ref() const;
+  const SocketRef *operator->() const;
 
   friend bool operator==(const XXXSocket &a, const XXXSocket &b);
   friend bool operator!=(const XXXSocket &a, const XXXSocket &b);
-
   operator bool() const;
-  const SocketRef *operator->() const;
 
   uint64_t hash() const;
 };
@@ -99,7 +97,6 @@ class XXXInputSocket : public XXXSocket {
   explicit XXXInputSocket(const XXXSocket &base_socket);
 
   const InputSocketRef *socket_ref() const;
-
   const InputSocketRef *operator->() const;
 
   XXXOutputSocket get_corresponding_group_node_output() const;
@@ -115,7 +112,6 @@ class XXXOutputSocket : public XXXSocket {
   explicit XXXOutputSocket(const XXXSocket &base_socket);
 
   const OutputSocketRef *socket_ref() const;
-
   const OutputSocketRef *operator->() const;
 
   XXXInputSocket get_corresponding_group_node_input() const;
