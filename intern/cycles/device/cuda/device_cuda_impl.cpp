@@ -1448,6 +1448,8 @@ bool CUDADevice::apply_delta_compression(device_memory &mem_orig, device_memory 
   if (have_error())
     return false;
 
+  scoped_timer timer;
+
   CUDAContextScope scope(this);
 
   assert(mem_orig.device_pointer != 0);
@@ -1463,6 +1465,7 @@ bool CUDADevice::apply_delta_compression(device_memory &mem_orig, device_memory 
   CUDA_GET_BLOCKSIZE_1D(cu_apply_deltas, elements, 1);
   CUDA_LAUNCH_KERNEL_1D(cu_apply_deltas, args);
   cuda_assert(cuCtxSynchronize());
+  std::cerr << "Time spent applying deltas : " << timer.get_time() << '\n';
   return !have_error();
 }
 
