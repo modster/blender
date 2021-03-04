@@ -150,6 +150,11 @@ void CachedData::invalidate_last_loaded_time(bool attributes_only)
 
 void CachedData::set_time_sampling(TimeSampling time_sampling)
 {
+  /* Transforms are always stored for the entire animation so no offset should be applied
+   * for the lookup. This is because the transforms are flattened from the hierarchy when
+   * loading the objects, and they are cheap to store, so there is no need to complicate
+   * the logic to retrieve and compute/flatten them. */
+  transforms.set_time_sampling(time_sampling, 0);
   curve_first_key.set_time_sampling(time_sampling, frame_offset);
   curve_keys.set_time_sampling(time_sampling, frame_offset);
   curve_radius.set_time_sampling(time_sampling, frame_offset);
@@ -163,7 +168,6 @@ void CachedData::set_time_sampling(TimeSampling time_sampling)
   subd_ptex_offset.set_time_sampling(time_sampling, frame_offset);
   subd_smooth.set_time_sampling(time_sampling, frame_offset);
   subd_start_corner.set_time_sampling(time_sampling, frame_offset);
-  transforms.set_time_sampling(time_sampling, frame_offset);
   triangles.set_time_sampling(time_sampling, frame_offset);
   triangles_loops.set_time_sampling(time_sampling, frame_offset);
   vertices.set_time_sampling(time_sampling, frame_offset);
@@ -266,7 +270,8 @@ static set<chrono_t> get_relevant_sample_times(AlembicProcedural *proc,
       start_frame_index += proc->get_cache_frame_count();
     }
 
-    end_frame_index = start_frame_index + proc->get_cache_frame_count();
+    /* -1 as the last frame will be included below */
+    end_frame_index = start_frame_index + proc->get_cache_frame_count() - 1;
   }
 
   cached_data.frame_start = static_cast<int>(start_frame_index);
@@ -837,6 +842,7 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
   ccl::set<chrono_t> times = get_relevant_sample_times(
       proc, cached_data, frame, *time_sampling, schema.getNumSamples());
 
+  /* this should be done after get_relevant_sample_times or frame_offset will be invalid! */
   cached_data.set_time_sampling(*time_sampling);
 
   /* read topology */
@@ -914,10 +920,12 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
   AttributeRequestSet requested_attributes = get_requested_attributes();
 
   const TimeSamplingPtr time_sampling = schema.getTimeSampling();
-  cached_data.set_time_sampling(*time_sampling);
 
   ccl::set<chrono_t> times = get_relevant_sample_times(
       proc, cached_data, frame, *time_sampling, schema.getNumSamples());
+
+  /* this should be done after get_relevant_sample_times or frame_offset will be invalid! */
+  cached_data.set_time_sampling(*time_sampling);
 
   /* read topology */
   foreach (chrono_t time, times) {
@@ -1055,10 +1063,12 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
   cached_data.clear();
 
   const TimeSamplingPtr time_sampling = schema.getTimeSampling();
-  cached_data.set_time_sampling(*time_sampling);
 
   ccl::set<chrono_t> times = get_relevant_sample_times(
       proc, cached_data, frame, *time_sampling, schema.getNumSamples());
+
+  /* this should be done after get_relevant_sample_times or frame_offset will be invalid! */
+  cached_data.set_time_sampling(*time_sampling);
 
   foreach (chrono_t time, times) {
     if (progress.get_cancel()) {

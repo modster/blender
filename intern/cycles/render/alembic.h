@@ -83,9 +83,21 @@ template<typename T> class DataStore {
       return nullptr;
     }
 
+    /* TimeSampling works by matching a frame time to an index, however it expects
+     * frame time 0 == index 0, but since we may load data by chunks of frames,
+     * index 0 may not be frame time 0, so we need to offset the size to pretend
+     * we have the required amount of frame data. This offset should only be applied
+     * if we have more than one frame worth of data (for now we it is guaranteed that
+     * we either have dat for one single frame, or for all the frames of the animation,
+     * this may change in the future). */
+    size_t size_offset = 0;
+    if (size() != 1) {
+      size_offset = frame_offset;
+    }
+
     std::pair<size_t, Alembic::Abc::chrono_t> index_pair;
-    index_pair = time_sampling.getNearIndex(time, data.size() + frame_offset);
-    DataTimePair &data_pair = data[index_pair.first - frame_offset];
+    index_pair = time_sampling.getNearIndex(time, data.size() + size_offset);
+    DataTimePair &data_pair = data[index_pair.first - size_offset];
 
     if (last_loaded_time == data_pair.time) {
       return nullptr;
