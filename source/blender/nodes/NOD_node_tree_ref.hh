@@ -67,6 +67,7 @@ class OutputSocketRef;
 class NodeRef;
 class NodeTreeRef;
 class LinkRef;
+class InternalLinkRef;
 
 class SocketRef : NonCopyable, NonMovable {
  protected:
@@ -137,6 +138,7 @@ class NodeRef : NonCopyable, NonMovable {
   int id_;
   Vector<InputSocketRef *> inputs_;
   Vector<OutputSocketRef *> outputs_;
+  Vector<InternalLinkRef *> internal_links_;
 
   friend NodeTreeRef;
 
@@ -145,6 +147,7 @@ class NodeRef : NonCopyable, NonMovable {
 
   Span<const InputSocketRef *> inputs() const;
   Span<const OutputSocketRef *> outputs() const;
+  Span<const InternalLinkRef *> internal_links() const;
 
   const InputSocketRef &input(int index) const;
   const OutputSocketRef &output(int index) const;
@@ -177,6 +180,21 @@ class LinkRef : NonCopyable, NonMovable {
  public:
   const OutputSocketRef &from() const;
   const InputSocketRef &to() const;
+
+  bNodeLink *blink() const;
+};
+
+class InternalLinkRef : NonCopyable, NonMovable {
+ private:
+  InputSocketRef *from_;
+  OutputSocketRef *to_;
+  bNodeLink *blink_;
+
+  friend NodeTreeRef;
+
+ public:
+  const InputSocketRef &from() const;
+  const OutputSocketRef &to() const;
 
   bNodeLink *blink() const;
 };
@@ -404,6 +422,11 @@ inline Span<const OutputSocketRef *> NodeRef::outputs() const
   return outputs_;
 }
 
+inline Span<const InternalLinkRef *> NodeRef::internal_links() const
+{
+  return internal_links_;
+}
+
 inline const InputSocketRef &NodeRef::input(int index) const
 {
   return *inputs_[index];
@@ -489,6 +512,25 @@ inline const InputSocketRef &LinkRef::to() const
 }
 
 inline bNodeLink *LinkRef::blink() const
+{
+  return blink_;
+}
+
+/* --------------------------------------------------------------------
+ * InternalLinkRef inline methods.
+ */
+
+inline const InputSocketRef &InternalLinkRef::from() const
+{
+  return *from_;
+}
+
+inline const OutputSocketRef &InternalLinkRef::to() const
+{
+  return *to_;
+}
+
+inline bNodeLink *InternalLinkRef::blink() const
 {
   return blink_;
 }

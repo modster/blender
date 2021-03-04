@@ -157,7 +157,16 @@ void XXXInputSocket::foreach_origin_socket(FunctionRef<void(XXXSocket)> callback
   for (const OutputSocketRef *linked_socket : socket_ref->linked_sockets()) {
     const NodeRef &linked_node = linked_socket->node();
     XXXOutputSocket linked_xxx_socket{context, linked_socket};
-    if (linked_node.is_group_input_node()) {
+
+    if (linked_node.is_muted()) {
+      for (const InternalLinkRef *internal_link : linked_node.internal_links()) {
+        if (&internal_link->to() == linked_socket) {
+          XXXInputSocket input_of_muted_node{context, &internal_link->from()};
+          input_of_muted_node.foreach_origin_socket(callback);
+        }
+      }
+    }
+    else if (linked_node.is_group_input_node()) {
       if (context->is_root()) {
         callback(linked_xxx_socket);
       }
@@ -192,7 +201,16 @@ void XXXOutputSocket::foreach_target_socket(FunctionRef<void(XXXInputSocket)> ca
   for (const InputSocketRef *linked_socket : socket_ref->linked_sockets()) {
     const NodeRef &linked_node = linked_socket->node();
     XXXInputSocket linked_xxx_socket{context, linked_socket};
-    if (linked_node.is_group_output_node()) {
+
+    if (linked_node.is_muted()) {
+      for (const InternalLinkRef *internal_link : linked_node.internal_links()) {
+        if (&internal_link->from() == linked_socket) {
+          XXXOutputSocket output_of_muted_node{context, &internal_link->to()};
+          output_of_muted_node.foreach_target_socket(callback);
+        }
+      }
+    }
+    else if (linked_node.is_group_output_node()) {
       if (context->is_root()) {
         callback(linked_xxx_socket);
       }
