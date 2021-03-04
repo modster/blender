@@ -128,7 +128,11 @@ class Geometry : public Node {
                    int n,
                    int total);
 
-  virtual void pack_primitives(DeviceScene *dscene, int object, uint visibility, bool pack_all, device_vector<ushort4> *verts_deltas) = 0;
+  virtual void pack_primitives(DeviceScene *dscene,
+                               int object,
+                               uint visibility,
+                               bool pack_all,
+                               device_vector<ushort4> *verts_deltas) = 0;
 
   /* Check whether the geometry should have own BVH built separately. Briefly,
    * own BVH is needed for geometry, if:

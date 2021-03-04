@@ -140,8 +140,7 @@ class Hair : public Geometry {
     return curve_keys.size() - curve_first_key.size();
   }
 
-  template<typename T>
-  typename device_vector<T>::chunk get_keys_chunk(device_vector<T> &dvector)
+  template<typename T> typename device_vector<T>::chunk get_keys_chunk(device_vector<T> &dvector)
   {
     return dvector.get_chunk(curvekey_offset, get_curve_keys().size());
   }
@@ -152,8 +151,7 @@ class Hair : public Geometry {
     return dvector.get_chunk(prim_offset, num_curves());
   }
 
-  template<typename T>
-  typename device_vector<T>::chunk get_optix_chunk(device_vector<T> &dvector)
+  template<typename T> typename device_vector<T>::chunk get_optix_chunk(device_vector<T> &dvector)
   {
     return dvector.get_chunk(optix_prim_offset, num_segments());
   }
@@ -166,7 +164,11 @@ class Hair : public Geometry {
                        device_vector<ushort4>::chunk keys_deltas);
   void pack_curve_segments(Scene *scene, device_vector<float4>::chunk curve_data);
 
-  void pack_primitives(DeviceScene *dscene, int object, uint visibility, bool pack_all, device_vector<ushort4> *verts_deltas) override;
+  void pack_primitives(DeviceScene *dscene,
+                       int object,
+                       uint visibility,
+                       bool pack_all,
+                       device_vector<ushort4> *verts_deltas) override;
 };
 
 CCL_NAMESPACE_END

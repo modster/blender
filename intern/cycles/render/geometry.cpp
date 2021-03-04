@@ -1124,12 +1124,13 @@ void GeometryManager::device_update_mesh(
     const bool copy_all_data = dscene->curve_keys.need_realloc() || dscene->curves.need_realloc();
 
     device_vector<ushort4> curve_keys_deltas(
-          scene->device, "__curve_keys_deltas", MemoryType::MEM_READ_ONLY);
+        scene->device, "__curve_keys_deltas", MemoryType::MEM_READ_ONLY);
 
     if (!copy_all_data && scene->device->supports_delta_compression()) {
       /* We can do partial updates, so compute deltas from last update. */
       curve_keys_deltas.alloc_chunks(curve_key_size);
-      /* Since we use chunks and not all of them may be copied, make sure data between copied chunks is not garbage. */
+      /* Since we use chunks and not all of them may be copied, make sure data between copied
+       * chunks is not garbage. */
       curve_keys_deltas.zero_to_device();
     }
 
@@ -1138,14 +1139,14 @@ void GeometryManager::device_update_mesh(
         Hair *hair = static_cast<Hair *>(geom);
 
         const bool curve_keys_co_modified = hair->curve_radius_is_modified() ||
-            hair->curve_keys_is_modified();
+                                            hair->curve_keys_is_modified();
         if (curve_keys_co_modified || copy_all_data) {
           hair->pack_curve_keys(hair->get_keys_chunk(dscene->curve_keys),
                                 hair->get_keys_chunk(curve_keys_deltas));
         }
 
         const bool curve_data_modified = hair->curve_shader_is_modified() ||
-            hair->curve_first_key_is_modified();
+                                         hair->curve_first_key_is_modified();
         if (curve_data_modified || copy_all_data) {
           hair->pack_curve_segments(scene, hair->get_segments_chunk(dscene->curves));
         }
@@ -1155,7 +1156,8 @@ void GeometryManager::device_update_mesh(
       }
     }
 
-    if (curve_keys_deltas.size() != 0 && !scene->device->apply_delta_compression(dscene->curve_keys, curve_keys_deltas)) {
+    if (curve_keys_deltas.size() != 0 &&
+        !scene->device->apply_delta_compression(dscene->curve_keys, curve_keys_deltas)) {
       progress.set_cancel("unable to apply deltas");
       return;
     }
@@ -1242,7 +1244,8 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
       dscene->prim_tri_verts.alloc_chunks(num_tri_verts);
       if (scene->device->supports_delta_compression()) {
         verts_deltas.alloc_chunks(dscene->prim_tri_verts.size());
-        /* Since we use chunks and not all of them may be copied, make sure data between copied chunks is not garbage. */
+        /* Since we use chunks and not all of them may be copied, make sure data between copied
+         * chunks is not garbage. */
         verts_deltas.zero_to_device();
       }
     }
@@ -1278,8 +1281,13 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
       }
 
       const pair<int, uint> &info = geometry_to_object_info[geom];
-      pool.push(function_bind(
-          &Geometry::pack_primitives, geom, dscene, info.first, info.second, pack_all, &verts_deltas));
+      pool.push(function_bind(&Geometry::pack_primitives,
+                              geom,
+                              dscene,
+                              info.first,
+                              info.second,
+                              pack_all,
+                              &verts_deltas));
     }
     pool.wait_work();
 
@@ -1399,7 +1407,7 @@ void GeometryManager::device_update_bvh(Device *device,
   device->build_bvh(bvh, progress, can_refit);
 
   if (scene->update_stats) {
-	std::cerr << "Total time spent building tlas : " << std::abs(bvh->build_time) << '\n';
+    std::cerr << "Total time spent building tlas : " << std::abs(bvh->build_time) << '\n';
   }
 
   if (progress.get_cancel()) {
@@ -2015,30 +2023,30 @@ void GeometryManager::device_update(Device *device,
     pool.wait_work(&summary);
     VLOG(2) << "Objects BVH build pool statistics:\n" << summary.full_report();
 
-	if (scene->update_stats) {
-		auto total_build_time = 0.0;
-		auto total_build_time_mesh = 0.0;
-		auto total_build_time_curves = 0.0;
-		for (Geometry *geom : scene->geometry) {
-		  if (!geom->bvh) {
-			continue;
-		  }
+    if (scene->update_stats) {
+      auto total_build_time = 0.0;
+      auto total_build_time_mesh = 0.0;
+      auto total_build_time_curves = 0.0;
+      for (Geometry *geom : scene->geometry) {
+        if (!geom->bvh) {
+          continue;
+        }
 
-		  total_build_time += std::abs(geom->bvh->build_time);
+        total_build_time += std::abs(geom->bvh->build_time);
 
-		  if (geom->is_mesh()) {
-			total_build_time_mesh += std::abs(geom->bvh->build_time);
-		  }
-		  else if (geom->is_hair()) {
-			total_build_time_curves += std::abs(geom->bvh->build_time);
-		  }
+        if (geom->is_mesh()) {
+          total_build_time_mesh += std::abs(geom->bvh->build_time);
+        }
+        else if (geom->is_hair()) {
+          total_build_time_curves += std::abs(geom->bvh->build_time);
+        }
 
-		  geom->bvh->build_time = 0.0;
-		}
-		std::cerr << "Total time spent building BLAS : " << total_build_time << '\n';
-		std::cerr << "Total time spent building mesh BLAS : " << total_build_time_mesh << '\n';
-		std::cerr << "Total time spent building hair BLAS : " << total_build_time_curves << '\n';
-	}
+        geom->bvh->build_time = 0.0;
+      }
+      std::cerr << "Total time spent building BLAS : " << total_build_time << '\n';
+      std::cerr << "Total time spent building mesh BLAS : " << total_build_time_mesh << '\n';
+      std::cerr << "Total time spent building hair BLAS : " << total_build_time_curves << '\n';
+    }
   }
 
   foreach (Shader *shader, scene->shaders) {

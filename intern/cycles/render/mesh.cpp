@@ -816,7 +816,11 @@ void Mesh::pack_patches(uint *patch_data, uint vert_offset, uint face_offset, ui
   }
 }
 
-void Mesh::pack_primitives(DeviceScene *dscene, int object, uint visibility, bool pack_all, device_vector<ushort4> *verts_deltas)
+void Mesh::pack_primitives(DeviceScene *dscene,
+                           int object,
+                           uint visibility,
+                           bool pack_all,
+                           device_vector<ushort4> *verts_deltas)
 {
   if (triangles.empty())
     return;
@@ -827,11 +831,13 @@ void Mesh::pack_primitives(DeviceScene *dscene, int object, uint visibility, boo
 
   if (pack_all) {
     /* Use optix_prim_offset for indexing as those arrays also contain data for Hair geometries. */
-    device_vector<unsigned int>::chunk prim_tri_index_chunk = get_optix_chunk(dscene->prim_tri_index);
+    device_vector<unsigned int>::chunk prim_tri_index_chunk = get_optix_chunk(
+        dscene->prim_tri_index);
     unsigned int *prim_tri_index = prim_tri_index_chunk.data();
     device_vector<int>::chunk prim_type_chunk = get_optix_chunk(dscene->prim_type);
     int *prim_type = prim_type_chunk.data();
-    device_vector<unsigned int>::chunk prim_visibility_chunk = get_optix_chunk(dscene->prim_visibility);
+    device_vector<unsigned int>::chunk prim_visibility_chunk = get_optix_chunk(
+        dscene->prim_visibility);
     unsigned int *prim_visibility = prim_visibility_chunk.data();
     device_vector<int>::chunk prim_index_chunk = get_optix_chunk(dscene->prim_index);
     int *prim_index = prim_index_chunk.data();

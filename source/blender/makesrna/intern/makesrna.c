@@ -1452,12 +1452,14 @@ static char *rna_def_property_lookup_int_func(FILE *f,
   }
 
 #if 1
-  //if (prop->flag_internal & PROP_INTERN_RAW_ARRAY) {
-  if (STREQ(nextfunc, "rna_iterator_array_next") && dp->dnalengthname && !STREQ(dp->dnalengthname + 1, "data.totlayer")) {
+  // if (prop->flag_internal & PROP_INTERN_RAW_ARRAY) {
+  if (STREQ(nextfunc, "rna_iterator_array_next") && dp->dnalengthname &&
+      !STREQ(dp->dnalengthname + 1, "data.totlayer")) {
     fprintf(f, "    int found = 0;\n");
     fprintf(f, "    %s *data = (%s *)ptr->data;\n\n", dp->dnastructname, dp->dnastructname);
 
-    //fprintf(f, "    printf(\"Accessing array with index: %%s (index %%d)\\n\", __func__, index);\n");
+    // fprintf(f, "    printf(\"Accessing array with index: %%s (index %%d)\\n\", __func__,
+    // index);\n");
 
     fprintf(f, "    if (!data->%s || data->%s == 0) {\n", dp->dnaname, dp->dnalengthname);
     fprintf(f, "        return 0;\n");
@@ -1465,7 +1467,9 @@ static char *rna_def_property_lookup_int_func(FILE *f,
 
     fprintf(f, "    if (index < 0 || index >= data->%s) {\n", dp->dnalengthname);
     fprintf(f, "#ifdef __GNUC__\n");
-    fprintf(f, "        printf(\"Array iterator out of range: %%s (index %%d)\\n\", __func__, index);\n");
+    fprintf(
+        f,
+        "        printf(\"Array iterator out of range: %%s (index %%d)\\n\", __func__, index);\n");
     fprintf(f, "#else\n");
     fprintf(f, "        printf(\"Array iterator out of range: (index %%d)\\n\", index);\n");
     fprintf(f, "#endif\n");
@@ -1477,7 +1481,10 @@ static char *rna_def_property_lookup_int_func(FILE *f,
 
     // TODO: skip (CustomData -> rna_#name#_check (name: uv_layer, ...)
 
-    fprintf(f, "    result.type = rna_%s_%s.item_type;\n", srna->identifier, rna_safe_id(prop->identifier));
+    fprintf(f,
+            "    result.type = rna_%s_%s.item_type;\n",
+            srna->identifier,
+            rna_safe_id(prop->identifier));
     fprintf(f, "    result.owner_id = ptr->owner_id;\n");
 
     // TODO: refine

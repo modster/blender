@@ -232,7 +232,11 @@ class Mesh : public Geometry {
                   size_t tri_offset);
   void pack_patches(uint *patch_data, uint vert_offset, uint face_offset, uint corner_offset);
 
-  void pack_primitives(DeviceScene *dscene, int object, uint visibility, bool pack_all, device_vector<ushort4> *verts_deltas) override;
+  void pack_primitives(DeviceScene *dscene,
+                       int object,
+                       uint visibility,
+                       bool pack_all,
+                       device_vector<ushort4> *verts_deltas) override;
 
   void tessellate(DiagSplit *split);
 
@@ -255,19 +259,18 @@ class Mesh : public Geometry {
     return num_subd_verts;
   }
 
-  template<typename T>
-  typename device_vector<T>::chunk get_verts_chunk(device_vector<T> &dvector)
+  template<typename T> typename device_vector<T>::chunk get_verts_chunk(device_vector<T> &dvector)
   {
     return dvector.get_chunk(vert_offset, get_verts().size());
   }
 
-  template<typename T> typename device_vector<T>::chunk get_tris_chunk(device_vector<T> &dvector, int elements = 1)
+  template<typename T>
+  typename device_vector<T>::chunk get_tris_chunk(device_vector<T> &dvector, int elements = 1)
   {
     return dvector.get_chunk(prim_offset * elements, num_triangles() * elements);
   }
 
-  template<typename T>
-  typename device_vector<T>::chunk get_optix_chunk(device_vector<T> &dvector)
+  template<typename T> typename device_vector<T>::chunk get_optix_chunk(device_vector<T> &dvector)
   {
     return dvector.get_chunk(optix_prim_offset, num_triangles());
   }
