@@ -1238,6 +1238,8 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
     device_vector<ushort4> verts_deltas(scene->device, "__prim_tri_verts_deltas", MEM_READ_ONLY);
 
     if (!pack_all) {
+      /* need to always call this, otherwise chunks are not detected */
+      dscene->prim_tri_verts.alloc_chunks(num_tri_verts);
       if (scene->device->supports_delta_compression()) {
         verts_deltas.alloc_chunks(dscene->prim_tri_verts.size());
         /* Since we use chunks and not all of them may be copied, make sure data between copied chunks is not garbage. */
