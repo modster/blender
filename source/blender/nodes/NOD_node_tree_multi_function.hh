@@ -90,7 +90,7 @@ class MFNetworkTreeMap {
     sockets_by_xxx_socket_.add(dsocket, &socket);
   }
 
-  void add(const XXXNodeTreeContext &context,
+  void add(const XXXTreeContext &context,
            Span<const InputSocketRef *> dsockets,
            Span<fn::MFInputSocket *> sockets)
   {
@@ -100,7 +100,7 @@ class MFNetworkTreeMap {
     }
   }
 
-  void add(const XXXNodeTreeContext &context,
+  void add(const XXXTreeContext &context,
            Span<const OutputSocketRef *> dsockets,
            Span<fn::MFOutputSocket *> sockets)
   {
@@ -120,7 +120,7 @@ class MFNetworkTreeMap {
                         node.outputs().cast<fn::MFSocket *>());
   }
 
-  void add_try_match(const XXXNodeTreeContext &context,
+  void add_try_match(const XXXTreeContext &context,
                      Span<const InputSocketRef *> dsockets,
                      Span<fn::MFInputSocket *> sockets)
   {
@@ -128,7 +128,7 @@ class MFNetworkTreeMap {
         context, dsockets.cast<const SocketRef *>(), sockets.cast<fn::MFSocket *>());
   }
 
-  void add_try_match(const XXXNodeTreeContext &context,
+  void add_try_match(const XXXTreeContext &context,
                      Span<const OutputSocketRef *> dsockets,
                      Span<fn::MFOutputSocket *> sockets)
   {
@@ -136,7 +136,7 @@ class MFNetworkTreeMap {
         context, dsockets.cast<const SocketRef *>(), sockets.cast<fn::MFSocket *>());
   }
 
-  void add_try_match(const XXXNodeTreeContext &context,
+  void add_try_match(const XXXTreeContext &context,
                      Span<const SocketRef *> dsockets,
                      Span<fn::MFSocket *> sockets)
   {

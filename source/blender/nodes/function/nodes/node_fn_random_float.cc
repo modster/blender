@@ -70,7 +70,7 @@ static void fn_node_random_float_expand_in_mf_network(
   blender::nodes::XXXNode node = builder.dnode();
   const blender::DefaultHash<blender::StringRefNull> hasher;
   function_seed = 33 * function_seed + hasher(node->name());
-  for (const blender::nodes::XXXNodeTreeContext *context = node.context(); context != nullptr;
+  for (const blender::nodes::XXXTreeContext *context = node.context(); context != nullptr;
        context = context->parent_context()) {
     function_seed = 33 * function_seed + hasher(context->parent_node()->name());
   }

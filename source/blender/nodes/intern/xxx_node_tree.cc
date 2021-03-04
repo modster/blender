@@ -23,12 +23,12 @@ XXXNodeTree::XXXNodeTree(bNodeTree &btree, NodeTreeRefMap &node_tree_refs)
   root_context_ = &this->construct_context_recursively(nullptr, nullptr, btree, node_tree_refs);
 }
 
-XXXNodeTreeContext &XXXNodeTree::construct_context_recursively(XXXNodeTreeContext *parent_context,
-                                                               const NodeRef *parent_node,
-                                                               bNodeTree &btree,
-                                                               NodeTreeRefMap &node_tree_refs)
+XXXTreeContext &XXXNodeTree::construct_context_recursively(XXXTreeContext *parent_context,
+                                                           const NodeRef *parent_node,
+                                                           bNodeTree &btree,
+                                                           NodeTreeRefMap &node_tree_refs)
 {
-  XXXNodeTreeContext &context = *allocator_.construct<XXXNodeTreeContext>();
+  XXXTreeContext &context = *allocator_.construct<XXXTreeContext>();
   context.parent_context_ = parent_context;
   context.parent_node_ = parent_node;
   context.tree_ = &get_tree_ref_from_map(node_tree_refs, btree);
@@ -39,7 +39,7 @@ XXXNodeTreeContext &XXXNodeTree::construct_context_recursively(XXXNodeTreeContex
       bNode *bnode = node->bnode();
       bNodeTree *child_btree = reinterpret_cast<bNodeTree *>(bnode->id);
       if (child_btree != nullptr) {
-        XXXNodeTreeContext &child = this->construct_context_recursively(
+        XXXTreeContext &child = this->construct_context_recursively(
             &context, node, *child_btree, node_tree_refs);
         context.children_.add_new(node, &child);
       }
@@ -55,12 +55,12 @@ XXXNodeTree::~XXXNodeTree()
   this->destruct_context_recursively(root_context_);
 }
 
-void XXXNodeTree::destruct_context_recursively(XXXNodeTreeContext *context)
+void XXXNodeTree::destruct_context_recursively(XXXTreeContext *context)
 {
-  for (XXXNodeTreeContext *child : context->children_.values()) {
+  for (XXXTreeContext *child : context->children_.values()) {
     this->destruct_context_recursively(child);
   }
-  context->~XXXNodeTreeContext();
+  context->~XXXTreeContext();
 }
 
 bool XXXNodeTree::has_link_cycles() const
@@ -78,13 +78,13 @@ void XXXNodeTree::foreach_node(FunctionRef<void(XXXNode)> callback) const
   this->foreach_node_in_context_recursive(*root_context_, callback);
 }
 
-void XXXNodeTree::foreach_node_in_context_recursive(const XXXNodeTreeContext &context,
+void XXXNodeTree::foreach_node_in_context_recursive(const XXXTreeContext &context,
                                                     FunctionRef<void(XXXNode)> callback) const
 {
   for (const NodeRef *node_ref : context.tree_->nodes()) {
     callback(XXXNode(&context, node_ref));
   }
-  for (const XXXNodeTreeContext *child_context : context.children_.values()) {
+  for (const XXXTreeContext *child_context : context.children_.values()) {
     this->foreach_node_in_context_recursive(*child_context, callback);
   }
 }
@@ -95,7 +95,7 @@ XXXOutputSocket XXXInputSocket::get_corresponding_group_node_output() const
   BLI_assert(socket_ref_->node().is_group_output_node());
   BLI_assert(socket_ref_->index() < socket_ref_->node().inputs().size() - 1);
 
-  const XXXNodeTreeContext *parent_context = context_->parent_context();
+  const XXXTreeContext *parent_context = context_->parent_context();
   const NodeRef *parent_node = context_->parent_node();
   BLI_assert(parent_context != nullptr);
   BLI_assert(parent_node != nullptr);
@@ -109,7 +109,7 @@ XXXOutputSocket XXXInputSocket::get_corresponding_group_input_socket() const
   BLI_assert(*this);
   BLI_assert(socket_ref_->node().is_group_node());
 
-  const XXXNodeTreeContext *child_context = context_->child_context(socket_ref_->node());
+  const XXXTreeContext *child_context = context_->child_context(socket_ref_->node());
   BLI_assert(child_context != nullptr);
 
   const NodeTreeRef &child_tree = child_context->tree();
@@ -126,7 +126,7 @@ XXXInputSocket XXXOutputSocket::get_corresponding_group_node_input() const
   BLI_assert(socket_ref_->node().is_group_input_node());
   BLI_assert(socket_ref_->index() < socket_ref_->node().outputs().size() - 1);
 
-  const XXXNodeTreeContext *parent_context = context_->parent_context();
+  const XXXTreeContext *parent_context = context_->parent_context();
   const NodeRef *parent_node = context_->parent_node();
   BLI_assert(parent_context != nullptr);
   BLI_assert(parent_node != nullptr);
@@ -140,7 +140,7 @@ XXXInputSocket XXXOutputSocket::get_corresponding_group_output_socket() const
   BLI_assert(*this);
   BLI_assert(socket_ref_->node().is_group_node());
 
-  const XXXNodeTreeContext *child_context = context_->child_context(socket_ref_->node());
+  const XXXTreeContext *child_context = context_->child_context(socket_ref_->node());
   BLI_assert(child_context != nullptr);
 
   const NodeTreeRef &child_tree = child_context->tree();

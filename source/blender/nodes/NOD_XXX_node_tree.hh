@@ -23,7 +23,7 @@
 
 namespace blender::nodes {
 
-class XXXNodeTreeContext;
+class XXXTreeContext;
 class XXXNodeTree;
 
 struct XXXNode;
@@ -31,33 +31,33 @@ struct XXXSocket;
 struct XXXInputSocket;
 struct XXXOutputSocket;
 
-class XXXNodeTreeContext {
+class XXXTreeContext {
  private:
-  XXXNodeTreeContext *parent_context_;
+  XXXTreeContext *parent_context_;
   const NodeRef *parent_node_;
   const NodeTreeRef *tree_;
-  Map<const NodeRef *, XXXNodeTreeContext *> children_;
+  Map<const NodeRef *, XXXTreeContext *> children_;
 
   friend XXXNodeTree;
 
  public:
   const NodeTreeRef &tree() const;
-  const XXXNodeTreeContext *parent_context() const;
+  const XXXTreeContext *parent_context() const;
   const NodeRef *parent_node() const;
-  const XXXNodeTreeContext *child_context(const NodeRef &node) const;
+  const XXXTreeContext *child_context(const NodeRef &node) const;
   bool is_root() const;
 };
 
 class XXXNode {
  private:
-  const XXXNodeTreeContext *context_ = nullptr;
+  const XXXTreeContext *context_ = nullptr;
   const NodeRef *node_ref_ = nullptr;
 
  public:
   XXXNode() = default;
-  XXXNode(const XXXNodeTreeContext *context, const NodeRef *node);
+  XXXNode(const XXXTreeContext *context, const NodeRef *node);
 
-  const XXXNodeTreeContext *context() const;
+  const XXXTreeContext *context() const;
   const NodeRef *node_ref() const;
   const NodeRef *operator->() const;
 
@@ -70,16 +70,16 @@ class XXXNode {
 
 class XXXSocket {
  protected:
-  const XXXNodeTreeContext *context_ = nullptr;
+  const XXXTreeContext *context_ = nullptr;
   const SocketRef *socket_ref_ = nullptr;
 
  public:
   XXXSocket() = default;
-  XXXSocket(const XXXNodeTreeContext *context, const SocketRef *socket);
+  XXXSocket(const XXXTreeContext *context, const SocketRef *socket);
   XXXSocket(const XXXInputSocket &input_socket);
   XXXSocket(const XXXOutputSocket &output_socket);
 
-  const XXXNodeTreeContext *context() const;
+  const XXXTreeContext *context() const;
   const SocketRef *socket_ref() const;
   const SocketRef *operator->() const;
 
@@ -93,7 +93,7 @@ class XXXSocket {
 class XXXInputSocket : public XXXSocket {
  public:
   XXXInputSocket() = default;
-  XXXInputSocket(const XXXNodeTreeContext *context, const InputSocketRef *socket);
+  XXXInputSocket(const XXXTreeContext *context, const InputSocketRef *socket);
   explicit XXXInputSocket(const XXXSocket &base_socket);
 
   const InputSocketRef *socket_ref() const;
@@ -108,7 +108,7 @@ class XXXInputSocket : public XXXSocket {
 class XXXOutputSocket : public XXXSocket {
  public:
   XXXOutputSocket() = default;
-  XXXOutputSocket(const XXXNodeTreeContext *context, const OutputSocketRef *socket);
+  XXXOutputSocket(const XXXTreeContext *context, const OutputSocketRef *socket);
   explicit XXXOutputSocket(const XXXSocket &base_socket);
 
   const OutputSocketRef *socket_ref() const;
@@ -123,27 +123,27 @@ class XXXOutputSocket : public XXXSocket {
 class XXXNodeTree {
  private:
   LinearAllocator<> allocator_;
-  XXXNodeTreeContext *root_context_;
+  XXXTreeContext *root_context_;
   VectorSet<const NodeTreeRef *> used_node_tree_refs_;
 
  public:
   XXXNodeTree(bNodeTree &btree, NodeTreeRefMap &node_tree_refs);
   ~XXXNodeTree();
 
-  const XXXNodeTreeContext &root_context() const;
+  const XXXTreeContext &root_context() const;
   Span<const NodeTreeRef *> used_node_tree_refs() const;
 
   bool has_link_cycles() const;
   void foreach_node(FunctionRef<void(XXXNode)> callback) const;
 
  private:
-  XXXNodeTreeContext &construct_context_recursively(XXXNodeTreeContext *parent_context,
-                                                    const NodeRef *parent_node,
-                                                    bNodeTree &btree,
-                                                    NodeTreeRefMap &node_tree_refs);
-  void destruct_context_recursively(XXXNodeTreeContext *context);
+  XXXTreeContext &construct_context_recursively(XXXTreeContext *parent_context,
+                                                const NodeRef *parent_node,
+                                                bNodeTree &btree,
+                                                NodeTreeRefMap &node_tree_refs);
+  void destruct_context_recursively(XXXTreeContext *context);
 
-  void foreach_node_in_context_recursive(const XXXNodeTreeContext &context,
+  void foreach_node_in_context_recursive(const XXXTreeContext &context,
                                          FunctionRef<void(XXXNode)> callback) const;
 };
 
@@ -152,36 +152,36 @@ using namespace node_tree_ref_types;
 using nodes::XXXInputSocket;
 using nodes::XXXNode;
 using nodes::XXXNodeTree;
-using nodes::XXXNodeTreeContext;
 using nodes::XXXOutputSocket;
 using nodes::XXXSocket;
+using nodes::XXXTreeContext;
 }  // namespace xxx_node_tree_types
 
 /* --------------------------------------------------------------------
- * XXXNodeTreeContext inline methods.
+ * XXXTreeContext inline methods.
  */
 
-inline const NodeTreeRef &XXXNodeTreeContext::tree() const
+inline const NodeTreeRef &XXXTreeContext::tree() const
 {
   return *tree_;
 }
 
-inline const XXXNodeTreeContext *XXXNodeTreeContext::parent_context() const
+inline const XXXTreeContext *XXXTreeContext::parent_context() const
 {
   return parent_context_;
 }
 
-inline const NodeRef *XXXNodeTreeContext::parent_node() const
+inline const NodeRef *XXXTreeContext::parent_node() const
 {
   return parent_node_;
 }
 
-inline const XXXNodeTreeContext *XXXNodeTreeContext::child_context(const NodeRef &node) const
+inline const XXXTreeContext *XXXTreeContext::child_context(const NodeRef &node) const
 {
   return children_.lookup_default(&node, nullptr);
 }
 
-inline bool XXXNodeTreeContext::is_root() const
+inline bool XXXTreeContext::is_root() const
 {
   return parent_context_ == nullptr;
 }
@@ -190,13 +190,13 @@ inline bool XXXNodeTreeContext::is_root() const
  * XXXNode inline methods.
  */
 
-inline XXXNode::XXXNode(const XXXNodeTreeContext *context, const NodeRef *node_ref)
+inline XXXNode::XXXNode(const XXXTreeContext *context, const NodeRef *node_ref)
     : context_(context), node_ref_(node_ref)
 {
   BLI_assert(node_ref == nullptr || &node_ref->tree() == &context->tree());
 }
 
-inline const XXXNodeTreeContext *XXXNode::context() const
+inline const XXXTreeContext *XXXNode::context() const
 {
   return context_;
 }
@@ -228,7 +228,7 @@ inline const NodeRef *XXXNode::operator->() const
 
 inline uint64_t XXXNode::hash() const
 {
-  return DefaultHash<const XXXNodeTreeContext *>{}(context_) ^
+  return DefaultHash<const XXXTreeContext *>{}(context_) ^
          DefaultHash<const NodeRef *>{}(node_ref_);
 }
 
@@ -236,7 +236,7 @@ inline uint64_t XXXNode::hash() const
  * XXXSocket inline methods.
  */
 
-inline XXXSocket::XXXSocket(const XXXNodeTreeContext *context, const SocketRef *socket_ref)
+inline XXXSocket::XXXSocket(const XXXTreeContext *context, const SocketRef *socket_ref)
     : context_(context), socket_ref_(socket_ref)
 {
   BLI_assert(socket_ref == nullptr || &socket_ref->tree() == &context->tree());
@@ -252,7 +252,7 @@ inline XXXSocket::XXXSocket(const XXXOutputSocket &output_socket)
 {
 }
 
-inline const XXXNodeTreeContext *XXXSocket::context() const
+inline const XXXTreeContext *XXXSocket::context() const
 {
   return context_;
 }
@@ -284,7 +284,7 @@ inline const SocketRef *XXXSocket::operator->() const
 
 inline uint64_t XXXSocket::hash() const
 {
-  return DefaultHash<const XXXNodeTreeContext *>{}(context_) ^
+  return DefaultHash<const XXXTreeContext *>{}(context_) ^
          DefaultHash<const SocketRef *>{}(socket_ref_);
 }
 
@@ -292,7 +292,7 @@ inline uint64_t XXXSocket::hash() const
  * XXXInputSocket inline methods.
  */
 
-inline XXXInputSocket::XXXInputSocket(const XXXNodeTreeContext *context,
+inline XXXInputSocket::XXXInputSocket(const XXXTreeContext *context,
                                       const InputSocketRef *socket_ref)
     : XXXSocket(context, socket_ref)
 {
@@ -317,7 +317,7 @@ inline const InputSocketRef *XXXInputSocket::operator->() const
  * XXXOutputSocket inline methods.
  */
 
-inline XXXOutputSocket::XXXOutputSocket(const XXXNodeTreeContext *context,
+inline XXXOutputSocket::XXXOutputSocket(const XXXTreeContext *context,
                                         const OutputSocketRef *socket_ref)
     : XXXSocket(context, socket_ref)
 {
@@ -342,7 +342,7 @@ inline const OutputSocketRef *XXXOutputSocket::operator->() const
  * XXXNodeTree inline methods.
  */
 
-inline const XXXNodeTreeContext &XXXNodeTree::root_context() const
+inline const XXXTreeContext &XXXNodeTree::root_context() const
 {
   return *root_context_;
 }

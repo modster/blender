@@ -1051,7 +1051,7 @@ static GeometrySet compute_geometry(const XXXNodeTree &tree,
 
   Map<XXXOutputSocket, GMutablePointer> group_inputs;
 
-  const XXXNodeTreeContext *root_context = &tree.root_context();
+  const XXXTreeContext *root_context = &tree.root_context();
   if (group_input_sockets.size() > 0) {
     Span<const OutputSocketRef *> remaining_input_sockets = group_input_sockets;
 
