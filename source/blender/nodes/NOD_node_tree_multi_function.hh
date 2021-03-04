@@ -26,7 +26,6 @@
 #include "FN_multi_function_network.hh"
 
 #include "NOD_XXX_node_tree.hh"
-#include "NOD_derived_node_tree.hh"
 #include "NOD_type_callbacks.hh"
 
 #include "BLI_multi_value_map.hh"

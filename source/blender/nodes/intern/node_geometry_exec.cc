@@ -20,7 +20,6 @@
 
 #include "DEG_depsgraph_query.h"
 
-#include "NOD_derived_node_tree.hh"
 #include "NOD_geometry_exec.hh"
 #include "NOD_type_callbacks.hh"
 
