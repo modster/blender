@@ -242,7 +242,9 @@ kernel_cuda_apply_delta_compression(float *ccl_restrict dst, const unsigned shor
    * or
    * r = 2 / 65535 * q - 1
    */
-  dst[x] += 0.000030518f * f - 1.0f;
+  if (src[x] != 0) {
+    dst[x] += 0.000030518f * (f - 32767.0f);
+  }
 }
 
 #endif
