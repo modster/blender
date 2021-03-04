@@ -362,7 +362,7 @@ class GeometryNodesEvaluator {
 
   void compute_output_and_forward(const XXXOutputSocket socket_to_compute)
   {
-    const XXXNode node{socket_to_compute.context, &socket_to_compute->node()};
+    const XXXNode node{socket_to_compute.context(), &socket_to_compute->node()};
 
     if (!socket_to_compute->is_available()) {
       /* If the output is not available, use a default value. */

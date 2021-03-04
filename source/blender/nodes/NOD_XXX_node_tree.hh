@@ -64,14 +64,19 @@ struct XXXNode {
   uint64_t hash() const;
 };
 
-struct XXXSocket {
-  const XXXNodeTreeContext *context = nullptr;
-  const SocketRef *socket_ref = nullptr;
+class XXXSocket {
+ protected:
+  const XXXNodeTreeContext *context_ = nullptr;
+  const SocketRef *socket_ref_ = nullptr;
 
+ public:
   XXXSocket() = default;
   XXXSocket(const XXXNodeTreeContext *context, const SocketRef *socket);
   XXXSocket(const XXXInputSocket &input_socket);
   XXXSocket(const XXXOutputSocket &output_socket);
+
+  const XXXNodeTreeContext *context() const;
+  const SocketRef *socket_ref() const;
 
   friend bool operator==(const XXXSocket &a, const XXXSocket &b);
   friend bool operator!=(const XXXSocket &a, const XXXSocket &b);
@@ -82,21 +87,15 @@ struct XXXSocket {
   uint64_t hash() const;
 };
 
-struct XXXInputSocket {
-  const XXXNodeTreeContext *context = nullptr;
-  const InputSocketRef *socket_ref = nullptr;
-
+class XXXInputSocket : public XXXSocket {
+ public:
   XXXInputSocket() = default;
   XXXInputSocket(const XXXNodeTreeContext *context, const InputSocketRef *socket);
   explicit XXXInputSocket(const XXXSocket &base_socket);
 
-  friend bool operator==(const XXXInputSocket &a, const XXXInputSocket &b);
-  friend bool operator!=(const XXXInputSocket &a, const XXXInputSocket &b);
+  const InputSocketRef *socket_ref() const;
 
-  operator bool() const;
   const InputSocketRef *operator->() const;
-
-  uint64_t hash() const;
 
   XXXOutputSocket get_corresponding_group_node_output() const;
   XXXOutputSocket get_corresponding_group_input_socket() const;
@@ -104,21 +103,15 @@ struct XXXInputSocket {
   void foreach_origin_socket(FunctionRef<void(XXXSocket)> callback) const;
 };
 
-struct XXXOutputSocket {
-  const XXXNodeTreeContext *context = nullptr;
-  const OutputSocketRef *socket_ref = nullptr;
-
+class XXXOutputSocket : public XXXSocket {
+ public:
   XXXOutputSocket() = default;
   XXXOutputSocket(const XXXNodeTreeContext *context, const OutputSocketRef *socket);
   explicit XXXOutputSocket(const XXXSocket &base_socket);
 
-  friend bool operator==(const XXXOutputSocket &a, const XXXOutputSocket &b);
-  friend bool operator!=(const XXXOutputSocket &a, const XXXOutputSocket &b);
+  const OutputSocketRef *socket_ref() const;
 
-  operator bool() const;
   const OutputSocketRef *operator->() const;
-
-  uint64_t hash() const;
 
   XXXInputSocket get_corresponding_group_node_input() const;
   XXXInputSocket get_corresponding_group_output_socket() const;
@@ -233,24 +226,34 @@ inline uint64_t XXXNode::hash() const
  */
 
 inline XXXSocket::XXXSocket(const XXXNodeTreeContext *context, const SocketRef *socket_ref)
-    : context(context), socket_ref(socket_ref)
+    : context_(context), socket_ref_(socket_ref)
 {
   BLI_assert(socket_ref == nullptr || &socket_ref->tree() == &context->tree());
 }
 
 inline XXXSocket::XXXSocket(const XXXInputSocket &input_socket)
-    : context(input_socket.context), socket_ref(input_socket.socket_ref)
+    : XXXSocket(input_socket.context_, input_socket.socket_ref_)
 {
 }
 
 inline XXXSocket::XXXSocket(const XXXOutputSocket &output_socket)
-    : context(output_socket.context), socket_ref(output_socket.socket_ref)
+    : XXXSocket(output_socket.context_, output_socket.socket_ref_)
 {
+}
+
+inline const XXXNodeTreeContext *XXXSocket::context() const
+{
+  return context_;
+}
+
+inline const SocketRef *XXXSocket::socket_ref() const
+{
+  return socket_ref_;
 }
 
 inline bool operator==(const XXXSocket &a, const XXXSocket &b)
 {
-  return a.context == b.context && a.socket_ref == b.socket_ref;
+  return a.context_ == b.context_ && a.socket_ref_ == b.socket_ref_;
 }
 
 inline bool operator!=(const XXXSocket &a, const XXXSocket &b)
@@ -260,18 +263,18 @@ inline bool operator!=(const XXXSocket &a, const XXXSocket &b)
 
 inline XXXSocket::operator bool() const
 {
-  return socket_ref != nullptr;
+  return socket_ref_ != nullptr;
 }
 
 inline const SocketRef *XXXSocket::operator->() const
 {
-  return socket_ref;
+  return socket_ref_;
 }
 
 inline uint64_t XXXSocket::hash() const
 {
-  return DefaultHash<const XXXNodeTreeContext *>{}(context) ^
-         DefaultHash<const SocketRef *>{}(socket_ref);
+  return DefaultHash<const XXXNodeTreeContext *>{}(context_) ^
+         DefaultHash<const SocketRef *>{}(socket_ref_);
 }
 
 /* --------------------------------------------------------------------
@@ -280,41 +283,23 @@ inline uint64_t XXXSocket::hash() const
 
 inline XXXInputSocket::XXXInputSocket(const XXXNodeTreeContext *context,
                                       const InputSocketRef *socket_ref)
-    : context(context), socket_ref(socket_ref)
+    : XXXSocket(context, socket_ref)
 {
-  BLI_assert(socket_ref == nullptr || &socket_ref->tree() == &context->tree());
 }
 
-inline XXXInputSocket::XXXInputSocket(const XXXSocket &base_socket)
-    : context(base_socket.context), socket_ref(&base_socket.socket_ref->as_input())
+inline XXXInputSocket::XXXInputSocket(const XXXSocket &base_socket) : XXXSocket(base_socket)
 {
-  BLI_assert(socket_ref == nullptr || &socket_ref->tree() == &context->tree());
+  BLI_assert(base_socket->is_input());
 }
 
-inline bool operator==(const XXXInputSocket &a, const XXXInputSocket &b)
+inline const InputSocketRef *XXXInputSocket::socket_ref() const
 {
-  return a.context == b.context && a.socket_ref == b.socket_ref;
-}
-
-inline bool operator!=(const XXXInputSocket &a, const XXXInputSocket &b)
-{
-  return !(a == b);
-}
-
-inline XXXInputSocket::operator bool() const
-{
-  return socket_ref != nullptr;
+  return (const InputSocketRef *)socket_ref_;
 }
 
 inline const InputSocketRef *XXXInputSocket::operator->() const
 {
-  return socket_ref;
-}
-
-inline uint64_t XXXInputSocket::hash() const
-{
-  return DefaultHash<const XXXNodeTreeContext *>{}(context) ^
-         DefaultHash<const InputSocketRef *>{}(socket_ref);
+  return (const InputSocketRef *)socket_ref_;
 }
 
 /* --------------------------------------------------------------------
@@ -323,39 +308,23 @@ inline uint64_t XXXInputSocket::hash() const
 
 inline XXXOutputSocket::XXXOutputSocket(const XXXNodeTreeContext *context,
                                         const OutputSocketRef *socket_ref)
-    : context(context), socket_ref(socket_ref)
+    : XXXSocket(context, socket_ref)
 {
 }
 
-inline XXXOutputSocket::XXXOutputSocket(const XXXSocket &base_socket)
-    : context(base_socket.context), socket_ref(&base_socket.socket_ref->as_output())
+inline XXXOutputSocket::XXXOutputSocket(const XXXSocket &base_socket) : XXXSocket(base_socket)
 {
+  BLI_assert(base_socket->is_output());
 }
 
-inline bool operator==(const XXXOutputSocket &a, const XXXOutputSocket &b)
+inline const OutputSocketRef *XXXOutputSocket::socket_ref() const
 {
-  return a.context == b.context && a.socket_ref == b.socket_ref;
-}
-
-inline bool operator!=(const XXXOutputSocket &a, const XXXOutputSocket &b)
-{
-  return !(a == b);
-}
-
-inline XXXOutputSocket::operator bool() const
-{
-  return socket_ref != nullptr;
+  return (const OutputSocketRef *)socket_ref_;
 }
 
 inline const OutputSocketRef *XXXOutputSocket::operator->() const
 {
-  return socket_ref;
-}
-
-inline uint64_t XXXOutputSocket::hash() const
-{
-  return DefaultHash<const XXXNodeTreeContext *>{}(context) ^
-         DefaultHash<const OutputSocketRef *>{}(socket_ref);
+  return (const OutputSocketRef *)socket_ref_;
 }
 
 /* --------------------------------------------------------------------

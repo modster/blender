@@ -92,82 +92,82 @@ void XXXNodeTree::foreach_node_in_context_recursive(const XXXNodeTreeContext &co
 XXXOutputSocket XXXInputSocket::get_corresponding_group_node_output() const
 {
   BLI_assert(*this);
-  BLI_assert(socket_ref->node().is_group_output_node());
-  BLI_assert(socket_ref->index() < socket_ref->node().inputs().size() - 1);
+  BLI_assert(socket_ref_->node().is_group_output_node());
+  BLI_assert(socket_ref_->index() < socket_ref_->node().inputs().size() - 1);
 
-  const XXXNodeTreeContext *parent_context = context->parent_context();
-  const NodeRef *parent_node = context->parent_node();
+  const XXXNodeTreeContext *parent_context = context_->parent_context();
+  const NodeRef *parent_node = context_->parent_node();
   BLI_assert(parent_context != nullptr);
   BLI_assert(parent_node != nullptr);
 
-  const int socket_index = socket_ref->index();
+  const int socket_index = socket_ref_->index();
   return {parent_context, &parent_node->output(socket_index)};
 }
 
 XXXOutputSocket XXXInputSocket::get_corresponding_group_input_socket() const
 {
   BLI_assert(*this);
-  BLI_assert(socket_ref->node().is_group_node());
+  BLI_assert(socket_ref_->node().is_group_node());
 
-  const XXXNodeTreeContext *child_context = context->child_context(socket_ref->node());
+  const XXXNodeTreeContext *child_context = context_->child_context(socket_ref_->node());
   BLI_assert(child_context != nullptr);
 
   const NodeTreeRef &child_tree = child_context->tree();
   Span<const NodeRef *> group_input_nodes = child_tree.nodes_by_type("NodeGroupInput");
   BLI_assert(!group_input_nodes.is_empty());
 
-  const int socket_index = socket_ref->index();
+  const int socket_index = socket_ref_->index();
   return {child_context, &group_input_nodes[0]->output(socket_index)};
 }
 
 XXXInputSocket XXXOutputSocket::get_corresponding_group_node_input() const
 {
   BLI_assert(*this);
-  BLI_assert(socket_ref->node().is_group_input_node());
-  BLI_assert(socket_ref->index() < socket_ref->node().outputs().size() - 1);
+  BLI_assert(socket_ref_->node().is_group_input_node());
+  BLI_assert(socket_ref_->index() < socket_ref_->node().outputs().size() - 1);
 
-  const XXXNodeTreeContext *parent_context = context->parent_context();
-  const NodeRef *parent_node = context->parent_node();
+  const XXXNodeTreeContext *parent_context = context_->parent_context();
+  const NodeRef *parent_node = context_->parent_node();
   BLI_assert(parent_context != nullptr);
   BLI_assert(parent_node != nullptr);
 
-  const int socket_index = socket_ref->index();
+  const int socket_index = socket_ref_->index();
   return {parent_context, &parent_node->input(socket_index)};
 }
 
 XXXInputSocket XXXOutputSocket::get_corresponding_group_output_socket() const
 {
   BLI_assert(*this);
-  BLI_assert(socket_ref->node().is_group_node());
+  BLI_assert(socket_ref_->node().is_group_node());
 
-  const XXXNodeTreeContext *child_context = context->child_context(socket_ref->node());
+  const XXXNodeTreeContext *child_context = context_->child_context(socket_ref_->node());
   BLI_assert(child_context != nullptr);
 
   const NodeTreeRef &child_tree = child_context->tree();
   Span<const NodeRef *> group_output_nodes = child_tree.nodes_by_type("NodeGroupOutput");
   BLI_assert(!group_output_nodes.is_empty());
 
-  const int socket_index = socket_ref->index();
+  const int socket_index = socket_ref_->index();
   return {child_context, &group_output_nodes[0]->input(socket_index)};
 }
 
 void XXXInputSocket::foreach_origin_socket(FunctionRef<void(XXXSocket)> callback) const
 {
   BLI_assert(*this);
-  for (const OutputSocketRef *linked_socket : socket_ref->linked_sockets()) {
+  for (const OutputSocketRef *linked_socket : socket_ref_->as_input().linked_sockets()) {
     const NodeRef &linked_node = linked_socket->node();
-    XXXOutputSocket linked_xxx_socket{context, linked_socket};
+    XXXOutputSocket linked_xxx_socket{context_, linked_socket};
 
     if (linked_node.is_muted()) {
       for (const InternalLinkRef *internal_link : linked_node.internal_links()) {
         if (&internal_link->to() == linked_socket) {
-          XXXInputSocket input_of_muted_node{context, &internal_link->from()};
+          XXXInputSocket input_of_muted_node{context_, &internal_link->from()};
           input_of_muted_node.foreach_origin_socket(callback);
         }
       }
     }
     else if (linked_node.is_group_input_node()) {
-      if (context->is_root()) {
+      if (context_->is_root()) {
         callback(linked_xxx_socket);
       }
       else {
@@ -198,20 +198,20 @@ void XXXInputSocket::foreach_origin_socket(FunctionRef<void(XXXSocket)> callback
 
 void XXXOutputSocket::foreach_target_socket(FunctionRef<void(XXXInputSocket)> callback) const
 {
-  for (const InputSocketRef *linked_socket : socket_ref->linked_sockets()) {
+  for (const InputSocketRef *linked_socket : socket_ref_->as_output().linked_sockets()) {
     const NodeRef &linked_node = linked_socket->node();
-    XXXInputSocket linked_xxx_socket{context, linked_socket};
+    XXXInputSocket linked_xxx_socket{context_, linked_socket};
 
     if (linked_node.is_muted()) {
       for (const InternalLinkRef *internal_link : linked_node.internal_links()) {
         if (&internal_link->from() == linked_socket) {
-          XXXOutputSocket output_of_muted_node{context, &internal_link->to()};
+          XXXOutputSocket output_of_muted_node{context_, &internal_link->to()};
           output_of_muted_node.foreach_target_socket(callback);
         }
       }
     }
     else if (linked_node.is_group_output_node()) {
-      if (context->is_root()) {
+      if (context_->is_root()) {
         callback(linked_xxx_socket);
       }
       else {
