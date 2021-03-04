@@ -1110,13 +1110,14 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
 
       for (int j = 0; j < num_vertices; j++) {
         const V3f &f = position->get()[offset + j];
-        curve_keys.push_back_reserved(make_float3_from_yup(f));
+        // todo(@kevindietrich): we are reading too much data?
+        curve_keys.push_back_slow(make_float3_from_yup(f));
 
         if (do_radius) {
           radius = (*radiuses)[offset + j];
         }
 
-        curve_radius.push_back_reserved(radius * radius_scale);
+        curve_radius.push_back_slow(radius * radius_scale);
       }
 
       if (!is_homogenous || cached_data.curve_first_key.size() == 0) {
