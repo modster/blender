@@ -51,7 +51,7 @@ const fn::MultiFunction &NodeMFNetworkBuilder::get_default_fn(StringRef name)
   return fn;
 }
 
-static void insert_dummy_node(CommonMFNetworkBuilderData &common, const XXXNode &dnode)
+static void insert_dummy_node(CommonMFNetworkBuilderData &common, const DNode &dnode)
 {
   constexpr int stack_capacity = 10;
 
@@ -92,7 +92,7 @@ static void insert_dummy_node(CommonMFNetworkBuilderData &common, const XXXNode 
   common.network_map.add(*dnode.context(), output_dsockets, dummy_node.outputs());
 }
 
-static bool has_data_sockets(const XXXNode &dnode)
+static bool has_data_sockets(const DNode &dnode)
 {
   for (const InputSocketRef *socket : dnode->inputs()) {
     if (socket_is_mf_data_socket(*socket->bsocket()->typeinfo)) {
@@ -108,9 +108,9 @@ static bool has_data_sockets(const XXXNode &dnode)
 }
 
 static void foreach_node_to_insert(CommonMFNetworkBuilderData &common,
-                                   FunctionRef<void(XXXNode)> callback)
+                                   FunctionRef<void(DNode)> callback)
 {
-  common.tree.foreach_node([&](const XXXNode dnode) {
+  common.tree.foreach_node([&](const DNode dnode) {
     if (dnode->is_group_node()) {
       return;
     }
@@ -130,7 +130,7 @@ static void foreach_node_to_insert(CommonMFNetworkBuilderData &common,
  */
 static void insert_nodes(CommonMFNetworkBuilderData &common)
 {
-  foreach_node_to_insert(common, [&](const XXXNode dnode) {
+  foreach_node_to_insert(common, [&](const DNode dnode) {
     const bNodeType *node_type = dnode->typeinfo();
     if (node_type->expand_in_mf_network != nullptr) {
       NodeMFNetworkBuilder builder{common, dnode};
@@ -256,7 +256,7 @@ static fn::MFOutputSocket &insert_default_value_for_type(CommonMFNetworkBuilderD
 }
 
 static fn::MFOutputSocket *insert_unlinked_input(CommonMFNetworkBuilderData &common,
-                                                 const XXXInputSocket &dsocket)
+                                                 const DInputSocket &dsocket)
 {
   bNodeSocket *bsocket = dsocket->bsocket();
   bNodeSocketType *socktype = bsocket->typeinfo;
@@ -272,9 +272,9 @@ static fn::MFOutputSocket *insert_unlinked_input(CommonMFNetworkBuilderData &com
 
 static void insert_links_and_unlinked_inputs(CommonMFNetworkBuilderData &common)
 {
-  foreach_node_to_insert(common, [&](const XXXNode dnode) {
+  foreach_node_to_insert(common, [&](const DNode dnode) {
     for (const InputSocketRef *socket_ref : dnode->inputs()) {
-      const XXXInputSocket to_dsocket{dnode.context(), socket_ref};
+      const DInputSocket to_dsocket{dnode.context(), socket_ref};
       if (!to_dsocket->is_available()) {
         continue;
       }
@@ -286,8 +286,8 @@ static void insert_links_and_unlinked_inputs(CommonMFNetworkBuilderData &common)
       BLI_assert(to_sockets.size() >= 1);
       const fn::MFDataType to_type = to_sockets[0]->data_type();
 
-      Vector<XXXSocket> from_dsockets;
-      to_dsocket.foreach_origin_socket([&](XXXSocket socket) { from_dsockets.append(socket); });
+      Vector<DSocket> from_dsockets;
+      to_dsocket.foreach_origin_socket([&](DSocket socket) { from_dsockets.append(socket); });
       if (from_dsockets.size() > 1) {
         fn::MFOutputSocket &from_socket = insert_default_value_for_type(common, to_type);
         for (fn::MFInputSocket *to_socket : to_sockets) {
@@ -304,14 +304,14 @@ static void insert_links_and_unlinked_inputs(CommonMFNetworkBuilderData &common)
         continue;
       }
       if (from_dsockets[0]->is_input()) {
-        XXXInputSocket from_dsocket{from_dsockets[0]};
+        DInputSocket from_dsocket{from_dsockets[0]};
         fn::MFOutputSocket *built_socket = insert_unlinked_input(common, from_dsocket);
         for (fn::MFInputSocket *to_socket : to_sockets) {
           common.network.add_link(*built_socket, *to_socket);
         }
         continue;
       }
-      XXXOutputSocket from_dsocket{from_dsockets[0]};
+      DOutputSocket from_dsocket{from_dsockets[0]};
       fn::MFOutputSocket *from_socket = &common.network_map.lookup(from_dsocket);
       const fn::MFDataType from_type = from_socket->data_type();
 
@@ -343,7 +343,7 @@ static void insert_links_and_unlinked_inputs(CommonMFNetworkBuilderData &common)
  * processing.
  */
 MFNetworkTreeMap insert_node_tree_into_mf_network(fn::MFNetwork &network,
-                                                  const XXXNodeTree &tree,
+                                                  const DerivedNodeTree &tree,
                                                   ResourceCollector &resources)
 {
   MFNetworkTreeMap network_map{tree, network};
@@ -371,7 +371,7 @@ enum class NodeExpandType {
  * function node, the corresponding function is returned as well.
  */
 static NodeExpandType get_node_expand_type(MFNetworkTreeMap &network_map,
-                                           const XXXNode &dnode,
+                                           const DNode &dnode,
                                            const fn::MultiFunction **r_single_function)
 {
   const fn::MFFunctionNode *single_function_node = nullptr;
@@ -396,15 +396,14 @@ static NodeExpandType get_node_expand_type(MFNetworkTreeMap &network_map,
   for (const InputSocketRef *dsocket : dnode->inputs()) {
     if (dsocket->is_available()) {
       for (fn::MFInputSocket *mf_input :
-           network_map.lookup(XXXInputSocket(dnode.context(), dsocket))) {
+           network_map.lookup(DInputSocket(dnode.context(), dsocket))) {
         check_mf_node(mf_input->node());
       }
     }
   }
   for (const OutputSocketRef *dsocket : dnode->outputs()) {
     if (dsocket->is_available()) {
-      fn::MFOutputSocket &mf_output = network_map.lookup(
-          XXXOutputSocket(dnode.context(), dsocket));
+      fn::MFOutputSocket &mf_output = network_map.lookup(DOutputSocket(dnode.context(), dsocket));
       check_mf_node(mf_output.node());
     }
   }
@@ -420,7 +419,7 @@ static NodeExpandType get_node_expand_type(MFNetworkTreeMap &network_map,
 }
 
 static const fn::MultiFunction &create_function_for_node_that_expands_into_multiple(
-    const XXXNode &dnode,
+    const DNode &dnode,
     fn::MFNetwork &network,
     MFNetworkTreeMap &network_map,
     ResourceCollector &resources)
@@ -431,7 +430,7 @@ static const fn::MultiFunction &create_function_for_node_that_expands_into_multi
       MFDataType data_type = *socket_mf_type_get(*dsocket->typeinfo());
       fn::MFOutputSocket &fn_input = network.add_input(data_type.to_string(), data_type);
       for (fn::MFInputSocket *mf_input :
-           network_map.lookup(XXXInputSocket(dnode.context(), dsocket))) {
+           network_map.lookup(DInputSocket(dnode.context(), dsocket))) {
         network.add_link(fn_input, *mf_input);
         dummy_fn_inputs.append(&fn_input);
       }
@@ -440,8 +439,7 @@ static const fn::MultiFunction &create_function_for_node_that_expands_into_multi
   Vector<const fn::MFInputSocket *> dummy_fn_outputs;
   for (const OutputSocketRef *dsocket : dnode->outputs()) {
     if (dsocket->is_available()) {
-      fn::MFOutputSocket &mf_output = network_map.lookup(
-          XXXOutputSocket(dnode.context(), dsocket));
+      fn::MFOutputSocket &mf_output = network_map.lookup(DOutputSocket(dnode.context(), dsocket));
       MFDataType data_type = mf_output.data_type();
       fn::MFInputSocket &fn_output = network.add_output(data_type.to_string(), data_type);
       network.add_link(mf_output, fn_output);
@@ -458,7 +456,7 @@ static const fn::MultiFunction &create_function_for_node_that_expands_into_multi
  * Returns a single multi-function for every node that supports it. This makes it easier to reuse
  * the multi-function implementation of nodes in different contexts.
  */
-MultiFunctionByNode get_multi_function_per_node(const XXXNodeTree &tree,
+MultiFunctionByNode get_multi_function_per_node(const DerivedNodeTree &tree,
                                                 ResourceCollector &resources)
 {
   /* Build a network that nodes can insert themselves into. However, the individual nodes are not
@@ -469,7 +467,7 @@ MultiFunctionByNode get_multi_function_per_node(const XXXNodeTree &tree,
 
   CommonMFNetworkBuilderData common{resources, network, network_map, tree};
 
-  tree.foreach_node([&](XXXNode dnode) {
+  tree.foreach_node([&](DNode dnode) {
     const bNodeType *node_type = dnode->typeinfo();
     if (node_type->expand_in_mf_network == nullptr) {
       /* This node does not have a multi-function implementation. */

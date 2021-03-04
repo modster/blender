@@ -18,17 +18,17 @@
 
 namespace blender::nodes {
 
-XXXNodeTree::XXXNodeTree(bNodeTree &btree, NodeTreeRefMap &node_tree_refs)
+DerivedNodeTree::DerivedNodeTree(bNodeTree &btree, NodeTreeRefMap &node_tree_refs)
 {
   root_context_ = &this->construct_context_recursively(nullptr, nullptr, btree, node_tree_refs);
 }
 
-XXXTreeContext &XXXNodeTree::construct_context_recursively(XXXTreeContext *parent_context,
-                                                           const NodeRef *parent_node,
-                                                           bNodeTree &btree,
-                                                           NodeTreeRefMap &node_tree_refs)
+DTreeContext &DerivedNodeTree::construct_context_recursively(DTreeContext *parent_context,
+                                                             const NodeRef *parent_node,
+                                                             bNodeTree &btree,
+                                                             NodeTreeRefMap &node_tree_refs)
 {
-  XXXTreeContext &context = *allocator_.construct<XXXTreeContext>();
+  DTreeContext &context = *allocator_.construct<DTreeContext>();
   context.parent_context_ = parent_context;
   context.parent_node_ = parent_node;
   context.tree_ = &get_tree_ref_from_map(node_tree_refs, btree);
@@ -39,7 +39,7 @@ XXXTreeContext &XXXNodeTree::construct_context_recursively(XXXTreeContext *paren
       bNode *bnode = node->bnode();
       bNodeTree *child_btree = reinterpret_cast<bNodeTree *>(bnode->id);
       if (child_btree != nullptr) {
-        XXXTreeContext &child = this->construct_context_recursively(
+        DTreeContext &child = this->construct_context_recursively(
             &context, node, *child_btree, node_tree_refs);
         context.children_.add_new(node, &child);
       }
@@ -49,21 +49,21 @@ XXXTreeContext &XXXNodeTree::construct_context_recursively(XXXTreeContext *paren
   return context;
 }
 
-XXXNodeTree::~XXXNodeTree()
+DerivedNodeTree::~DerivedNodeTree()
 {
   /* Has to be destructed manually, because the context info is allocated in a linear allocator. */
   this->destruct_context_recursively(root_context_);
 }
 
-void XXXNodeTree::destruct_context_recursively(XXXTreeContext *context)
+void DerivedNodeTree::destruct_context_recursively(DTreeContext *context)
 {
-  for (XXXTreeContext *child : context->children_.values()) {
+  for (DTreeContext *child : context->children_.values()) {
     this->destruct_context_recursively(child);
   }
-  context->~XXXTreeContext();
+  context->~DTreeContext();
 }
 
-bool XXXNodeTree::has_link_cycles() const
+bool DerivedNodeTree::has_link_cycles() const
 {
   for (const NodeTreeRef *tree_ref : used_node_tree_refs_) {
     if (tree_ref->has_link_cycles()) {
@@ -73,29 +73,29 @@ bool XXXNodeTree::has_link_cycles() const
   return false;
 }
 
-void XXXNodeTree::foreach_node(FunctionRef<void(XXXNode)> callback) const
+void DerivedNodeTree::foreach_node(FunctionRef<void(DNode)> callback) const
 {
   this->foreach_node_in_context_recursive(*root_context_, callback);
 }
 
-void XXXNodeTree::foreach_node_in_context_recursive(const XXXTreeContext &context,
-                                                    FunctionRef<void(XXXNode)> callback) const
+void DerivedNodeTree::foreach_node_in_context_recursive(const DTreeContext &context,
+                                                        FunctionRef<void(DNode)> callback) const
 {
   for (const NodeRef *node_ref : context.tree_->nodes()) {
-    callback(XXXNode(&context, node_ref));
+    callback(DNode(&context, node_ref));
   }
-  for (const XXXTreeContext *child_context : context.children_.values()) {
+  for (const DTreeContext *child_context : context.children_.values()) {
     this->foreach_node_in_context_recursive(*child_context, callback);
   }
 }
 
-XXXOutputSocket XXXInputSocket::get_corresponding_group_node_output() const
+DOutputSocket DInputSocket::get_corresponding_group_node_output() const
 {
   BLI_assert(*this);
   BLI_assert(socket_ref_->node().is_group_output_node());
   BLI_assert(socket_ref_->index() < socket_ref_->node().inputs().size() - 1);
 
-  const XXXTreeContext *parent_context = context_->parent_context();
+  const DTreeContext *parent_context = context_->parent_context();
   const NodeRef *parent_node = context_->parent_node();
   BLI_assert(parent_context != nullptr);
   BLI_assert(parent_node != nullptr);
@@ -104,12 +104,12 @@ XXXOutputSocket XXXInputSocket::get_corresponding_group_node_output() const
   return {parent_context, &parent_node->output(socket_index)};
 }
 
-XXXOutputSocket XXXInputSocket::get_corresponding_group_input_socket() const
+DOutputSocket DInputSocket::get_corresponding_group_input_socket() const
 {
   BLI_assert(*this);
   BLI_assert(socket_ref_->node().is_group_node());
 
-  const XXXTreeContext *child_context = context_->child_context(socket_ref_->node());
+  const DTreeContext *child_context = context_->child_context(socket_ref_->node());
   BLI_assert(child_context != nullptr);
 
   const NodeTreeRef &child_tree = child_context->tree();
@@ -120,13 +120,13 @@ XXXOutputSocket XXXInputSocket::get_corresponding_group_input_socket() const
   return {child_context, &group_input_nodes[0]->output(socket_index)};
 }
 
-XXXInputSocket XXXOutputSocket::get_corresponding_group_node_input() const
+DInputSocket DOutputSocket::get_corresponding_group_node_input() const
 {
   BLI_assert(*this);
   BLI_assert(socket_ref_->node().is_group_input_node());
   BLI_assert(socket_ref_->index() < socket_ref_->node().outputs().size() - 1);
 
-  const XXXTreeContext *parent_context = context_->parent_context();
+  const DTreeContext *parent_context = context_->parent_context();
   const NodeRef *parent_node = context_->parent_node();
   BLI_assert(parent_context != nullptr);
   BLI_assert(parent_node != nullptr);
@@ -135,12 +135,12 @@ XXXInputSocket XXXOutputSocket::get_corresponding_group_node_input() const
   return {parent_context, &parent_node->input(socket_index)};
 }
 
-XXXInputSocket XXXOutputSocket::get_corresponding_group_output_socket() const
+DInputSocket DOutputSocket::get_corresponding_group_output_socket() const
 {
   BLI_assert(*this);
   BLI_assert(socket_ref_->node().is_group_node());
 
-  const XXXTreeContext *child_context = context_->child_context(socket_ref_->node());
+  const DTreeContext *child_context = context_->child_context(socket_ref_->node());
   BLI_assert(child_context != nullptr);
 
   const NodeTreeRef &child_tree = child_context->tree();
@@ -151,28 +151,27 @@ XXXInputSocket XXXOutputSocket::get_corresponding_group_output_socket() const
   return {child_context, &group_output_nodes[0]->input(socket_index)};
 }
 
-void XXXInputSocket::foreach_origin_socket(FunctionRef<void(XXXSocket)> callback) const
+void DInputSocket::foreach_origin_socket(FunctionRef<void(DSocket)> callback) const
 {
   BLI_assert(*this);
   for (const OutputSocketRef *linked_socket : socket_ref_->as_input().linked_sockets()) {
     const NodeRef &linked_node = linked_socket->node();
-    XXXOutputSocket linked_xxx_socket{context_, linked_socket};
+    DOutputSocket linked_dsocket{context_, linked_socket};
 
     if (linked_node.is_muted()) {
       for (const InternalLinkRef *internal_link : linked_node.internal_links()) {
         if (&internal_link->to() == linked_socket) {
-          XXXInputSocket input_of_muted_node{context_, &internal_link->from()};
+          DInputSocket input_of_muted_node{context_, &internal_link->from()};
           input_of_muted_node.foreach_origin_socket(callback);
         }
       }
     }
     else if (linked_node.is_group_input_node()) {
       if (context_->is_root()) {
-        callback(linked_xxx_socket);
+        callback(linked_dsocket);
       }
       else {
-        XXXInputSocket socket_in_parent_group =
-            linked_xxx_socket.get_corresponding_group_node_input();
+        DInputSocket socket_in_parent_group = linked_dsocket.get_corresponding_group_node_input();
         if (socket_in_parent_group->is_linked()) {
           socket_in_parent_group.foreach_origin_socket(callback);
         }
@@ -182,7 +181,7 @@ void XXXInputSocket::foreach_origin_socket(FunctionRef<void(XXXSocket)> callback
       }
     }
     else if (linked_node.is_group_node()) {
-      XXXInputSocket socket_in_group = linked_xxx_socket.get_corresponding_group_output_socket();
+      DInputSocket socket_in_group = linked_dsocket.get_corresponding_group_output_socket();
       if (socket_in_group->is_linked()) {
         socket_in_group.foreach_origin_socket(callback);
       }
@@ -191,41 +190,41 @@ void XXXInputSocket::foreach_origin_socket(FunctionRef<void(XXXSocket)> callback
       }
     }
     else {
-      callback(linked_xxx_socket);
+      callback(linked_dsocket);
     }
   }
 }
 
-void XXXOutputSocket::foreach_target_socket(FunctionRef<void(XXXInputSocket)> callback) const
+void DOutputSocket::foreach_target_socket(FunctionRef<void(DInputSocket)> callback) const
 {
   for (const InputSocketRef *linked_socket : socket_ref_->as_output().linked_sockets()) {
     const NodeRef &linked_node = linked_socket->node();
-    XXXInputSocket linked_xxx_socket{context_, linked_socket};
+    DInputSocket linked_dsocket{context_, linked_socket};
 
     if (linked_node.is_muted()) {
       for (const InternalLinkRef *internal_link : linked_node.internal_links()) {
         if (&internal_link->from() == linked_socket) {
-          XXXOutputSocket output_of_muted_node{context_, &internal_link->to()};
+          DOutputSocket output_of_muted_node{context_, &internal_link->to()};
           output_of_muted_node.foreach_target_socket(callback);
         }
       }
     }
     else if (linked_node.is_group_output_node()) {
       if (context_->is_root()) {
-        callback(linked_xxx_socket);
+        callback(linked_dsocket);
       }
       else {
-        XXXOutputSocket socket_in_parent_group =
-            linked_xxx_socket.get_corresponding_group_node_output();
+        DOutputSocket socket_in_parent_group =
+            linked_dsocket.get_corresponding_group_node_output();
         socket_in_parent_group.foreach_target_socket(callback);
       }
     }
     else if (linked_node.is_group_node()) {
-      XXXOutputSocket socket_in_group = linked_xxx_socket.get_corresponding_group_input_socket();
+      DOutputSocket socket_in_group = linked_dsocket.get_corresponding_group_input_socket();
       socket_in_group.foreach_target_socket(callback);
     }
     else {
-      callback(linked_xxx_socket);
+      callback(linked_dsocket);
     }
   }
 }

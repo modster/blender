@@ -93,7 +93,7 @@ using blender::fn::GMutablePointer;
 using blender::fn::GValueMap;
 using blender::nodes::GeoNodeExecParams;
 using namespace blender::fn::multi_function_types;
-using namespace blender::nodes::xxx_node_tree_types;
+using namespace blender::nodes::derived_node_tree_types;
 
 static void initData(ModifierData *md)
 {
@@ -256,8 +256,8 @@ static bool isDisabled(const struct Scene *UNUSED(scene),
 class GeometryNodesEvaluator {
  private:
   blender::LinearAllocator<> allocator_;
-  Map<std::pair<XXXInputSocket, XXXOutputSocket>, GMutablePointer> value_by_input_;
-  Vector<XXXInputSocket> group_outputs_;
+  Map<std::pair<DInputSocket, DOutputSocket>, GMutablePointer> value_by_input_;
+  Vector<DInputSocket> group_outputs_;
   blender::nodes::MultiFunctionByNode &mf_by_node_;
   const blender::nodes::DataTypeConversions &conversions_;
   const PersistentDataHandleMap &handle_map_;
@@ -266,8 +266,8 @@ class GeometryNodesEvaluator {
   Depsgraph *depsgraph_;
 
  public:
-  GeometryNodesEvaluator(const Map<XXXOutputSocket, GMutablePointer> &group_input_data,
-                         Vector<XXXInputSocket> group_outputs,
+  GeometryNodesEvaluator(const Map<DOutputSocket, GMutablePointer> &group_input_data,
+                         Vector<DInputSocket> group_outputs,
                          blender::nodes::MultiFunctionByNode &mf_by_node,
                          const PersistentDataHandleMap &handle_map,
                          const Object *self_object,
@@ -289,7 +289,7 @@ class GeometryNodesEvaluator {
   Vector<GMutablePointer> execute()
   {
     Vector<GMutablePointer> results;
-    for (const XXXInputSocket &group_output : group_outputs_) {
+    for (const DInputSocket &group_output : group_outputs_) {
       Vector<GMutablePointer> result = this->get_input_values(group_output);
       results.append(result[0]);
     }
@@ -300,16 +300,15 @@ class GeometryNodesEvaluator {
   }
 
  private:
-  Vector<GMutablePointer> get_input_values(const XXXInputSocket socket_to_compute)
+  Vector<GMutablePointer> get_input_values(const DInputSocket socket_to_compute)
   {
-    Vector<XXXSocket> from_sockets;
-    socket_to_compute.foreach_origin_socket(
-        [&](XXXSocket socket) { from_sockets.append(socket); });
+    Vector<DSocket> from_sockets;
+    socket_to_compute.foreach_origin_socket([&](DSocket socket) { from_sockets.append(socket); });
 
     /* Multi-input sockets contain a vector of inputs. */
     if (socket_to_compute->is_multi_input_socket()) {
       Vector<GMutablePointer> values;
-      for (const XXXSocket from_socket : from_sockets) {
+      for (const DSocket from_socket : from_sockets) {
         GMutablePointer value = get_input_from_incoming_link(socket_to_compute, from_socket);
         values.append(value);
       }
@@ -322,18 +321,18 @@ class GeometryNodesEvaluator {
       return {get_unlinked_input_value(socket_to_compute, type)};
     }
 
-    const XXXSocket from_socket = from_sockets[0];
+    const DSocket from_socket = from_sockets[0];
     GMutablePointer value = this->get_input_from_incoming_link(socket_to_compute, from_socket);
     return {value};
   }
 
-  GMutablePointer get_input_from_incoming_link(const XXXInputSocket socket_to_compute,
-                                               const XXXSocket from_socket)
+  GMutablePointer get_input_from_incoming_link(const DInputSocket socket_to_compute,
+                                               const DSocket from_socket)
   {
     if (from_socket->is_output()) {
-      const XXXOutputSocket from_output_socket{from_socket};
-      const std::pair<XXXInputSocket, XXXOutputSocket> key = std::make_pair(socket_to_compute,
-                                                                            from_output_socket);
+      const DOutputSocket from_output_socket{from_socket};
+      const std::pair<DInputSocket, DOutputSocket> key = std::make_pair(socket_to_compute,
+                                                                        from_output_socket);
       std::optional<GMutablePointer> value = value_by_input_.pop_try(key);
       if (value.has_value()) {
         /* This input has been computed before, return it directly. */
@@ -347,13 +346,13 @@ class GeometryNodesEvaluator {
 
     /* Get value from an unlinked input socket. */
     const CPPType &type = *blender::nodes::socket_cpp_type_get(*socket_to_compute->typeinfo());
-    const XXXInputSocket from_input_socket{from_socket};
+    const DInputSocket from_input_socket{from_socket};
     return {get_unlinked_input_value(from_input_socket, type)};
   }
 
-  void compute_output_and_forward(const XXXOutputSocket socket_to_compute)
+  void compute_output_and_forward(const DOutputSocket socket_to_compute)
   {
-    const XXXNode node{socket_to_compute.context(), &socket_to_compute->node()};
+    const DNode node{socket_to_compute.context(), &socket_to_compute->node()};
 
     if (!socket_to_compute->is_available()) {
       /* If the output is not available, use a default value. */
@@ -394,7 +393,7 @@ class GeometryNodesEvaluator {
     }
   }
 
-  void execute_node(const XXXNode node, GeoNodeExecParams params)
+  void execute_node(const DNode node, GeoNodeExecParams params)
   {
     const bNode &bnode = params.node();
 
@@ -417,7 +416,7 @@ class GeometryNodesEvaluator {
     this->execute_unknown_node(node, params);
   }
 
-  void store_ui_hints(const XXXNode node, GeoNodeExecParams params) const
+  void store_ui_hints(const DNode node, GeoNodeExecParams params) const
   {
     for (const InputSocketRef *socket_ref : node->inputs()) {
       if (!socket_ref->is_available()) {
@@ -445,7 +444,7 @@ class GeometryNodesEvaluator {
     }
   }
 
-  void execute_multi_function_node(const XXXNode node,
+  void execute_multi_function_node(const DNode node,
                                    GeoNodeExecParams params,
                                    const MultiFunction &fn)
   {
@@ -483,7 +482,7 @@ class GeometryNodesEvaluator {
     }
   }
 
-  void execute_unknown_node(const XXXNode node, GeoNodeExecParams params)
+  void execute_unknown_node(const DNode node, GeoNodeExecParams params)
   {
     for (const OutputSocketRef *socket : node->outputs()) {
       if (socket->is_available()) {
@@ -493,19 +492,18 @@ class GeometryNodesEvaluator {
     }
   }
 
-  void forward_to_inputs(const XXXOutputSocket from_socket, GMutablePointer value_to_forward)
+  void forward_to_inputs(const DOutputSocket from_socket, GMutablePointer value_to_forward)
   {
     /* For all sockets that are linked with the from_socket push the value to their node. */
-    Vector<XXXInputSocket> to_sockets_all;
+    Vector<DInputSocket> to_sockets_all;
     from_socket.foreach_target_socket(
-        [&](XXXInputSocket to_socket) { to_sockets_all.append(to_socket); });
+        [&](DInputSocket to_socket) { to_sockets_all.append(to_socket); });
 
     const CPPType &from_type = *value_to_forward.type();
-    Vector<XXXInputSocket> to_sockets_same_type;
-    for (const XXXInputSocket &to_socket : to_sockets_all) {
+    Vector<DInputSocket> to_sockets_same_type;
+    for (const DInputSocket &to_socket : to_sockets_all) {
       const CPPType &to_type = *blender::nodes::socket_cpp_type_get(*to_socket->typeinfo());
-      const std::pair<XXXInputSocket, XXXOutputSocket> key = std::make_pair(to_socket,
-                                                                            from_socket);
+      const std::pair<DInputSocket, DOutputSocket> key = std::make_pair(to_socket, from_socket);
       if (from_type == to_type) {
         to_sockets_same_type.append(to_socket);
       }
@@ -527,23 +525,21 @@ class GeometryNodesEvaluator {
     }
     else if (to_sockets_same_type.size() == 1) {
       /* This value is only used on one input socket, no need to copy it. */
-      const XXXInputSocket to_socket = to_sockets_same_type[0];
-      const std::pair<XXXInputSocket, XXXOutputSocket> key = std::make_pair(to_socket,
-                                                                            from_socket);
+      const DInputSocket to_socket = to_sockets_same_type[0];
+      const std::pair<DInputSocket, DOutputSocket> key = std::make_pair(to_socket, from_socket);
 
       add_value_to_input_socket(key, value_to_forward);
     }
     else {
       /* Multiple inputs use the value, make a copy for every input except for one. */
-      const XXXInputSocket first_to_socket = to_sockets_same_type[0];
-      Span<XXXInputSocket> other_to_sockets = to_sockets_same_type.as_span().drop_front(1);
+      const DInputSocket first_to_socket = to_sockets_same_type[0];
+      Span<DInputSocket> other_to_sockets = to_sockets_same_type.as_span().drop_front(1);
       const CPPType &type = *value_to_forward.type();
-      const std::pair<XXXInputSocket, XXXOutputSocket> first_key = std::make_pair(first_to_socket,
-                                                                                  from_socket);
-      add_value_to_input_socket(first_key, value_to_forward);
-      for (const XXXInputSocket &to_socket : other_to_sockets) {
-        const std::pair<XXXInputSocket, XXXOutputSocket> key = std::make_pair(to_socket,
+      const std::pair<DInputSocket, DOutputSocket> first_key = std::make_pair(first_to_socket,
                                                                               from_socket);
+      add_value_to_input_socket(first_key, value_to_forward);
+      for (const DInputSocket &to_socket : other_to_sockets) {
+        const std::pair<DInputSocket, DOutputSocket> key = std::make_pair(to_socket, from_socket);
         void *buffer = allocator_.allocate(type.size(), type.alignment());
         type.copy_to_uninitialized(value_to_forward.get(), buffer);
         add_value_to_input_socket(key, GMutablePointer{type, buffer});
@@ -551,13 +547,13 @@ class GeometryNodesEvaluator {
     }
   }
 
-  void add_value_to_input_socket(const std::pair<XXXInputSocket, XXXOutputSocket> key,
+  void add_value_to_input_socket(const std::pair<DInputSocket, DOutputSocket> key,
                                  GMutablePointer value)
   {
     value_by_input_.add_new(key, value);
   }
 
-  GMutablePointer get_unlinked_input_value(const XXXInputSocket &socket,
+  GMutablePointer get_unlinked_input_value(const DInputSocket &socket,
                                            const CPPType &required_type)
   {
     bNodeSocket *bsocket = socket->bsocket();
@@ -994,7 +990,7 @@ static void initialize_group_input(NodesModifierData &nmd,
 }
 
 static void fill_data_handle_map(const NodesModifierSettings &settings,
-                                 const XXXNodeTree &tree,
+                                 const DerivedNodeTree &tree,
                                  PersistentDataHandleMap &handle_map)
 {
   Set<ID *> used_ids;
@@ -1026,7 +1022,7 @@ static void reset_tree_ui_storage(Span<const blender::nodes::NodeTreeRef *> tree
  * Currently, this uses a fairly basic and inefficient algorithm that might compute things more
  * often than necessary. It's going to be replaced soon.
  */
-static GeometrySet compute_geometry(const XXXNodeTree &tree,
+static GeometrySet compute_geometry(const DerivedNodeTree &tree,
                                     Span<const OutputSocketRef *> group_input_sockets,
                                     const InputSocketRef &socket_to_compute,
                                     GeometrySet input_geometry_set,
@@ -1040,9 +1036,9 @@ static GeometrySet compute_geometry(const XXXNodeTree &tree,
   PersistentDataHandleMap handle_map;
   fill_data_handle_map(nmd->settings, tree, handle_map);
 
-  Map<XXXOutputSocket, GMutablePointer> group_inputs;
+  Map<DOutputSocket, GMutablePointer> group_inputs;
 
-  const XXXTreeContext *root_context = &tree.root_context();
+  const DTreeContext *root_context = &tree.root_context();
   if (group_input_sockets.size() > 0) {
     Span<const OutputSocketRef *> remaining_input_sockets = group_input_sockets;
 
@@ -1065,7 +1061,7 @@ static GeometrySet compute_geometry(const XXXNodeTree &tree,
     }
   }
 
-  Vector<XXXInputSocket> group_outputs;
+  Vector<DInputSocket> group_outputs;
   group_outputs.append({root_context, &socket_to_compute});
 
   GeometryNodesEvaluator evaluator{group_inputs,
@@ -1142,7 +1138,7 @@ static void modifyGeometry(ModifierData *md,
   check_property_socket_sync(ctx->object, md);
 
   NodeTreeRefMap tree_refs;
-  XXXNodeTree tree{*nmd->node_group, tree_refs};
+  DerivedNodeTree tree{*nmd->node_group, tree_refs};
 
   if (tree.has_link_cycles()) {
     BKE_modifier_set_error(ctx->object, md, "Node group has cycles");

@@ -46,17 +46,17 @@ class MFNetworkTreeMap {
    * Input sockets in a node tree can have multiple corresponding sockets in the generated
    * MFNetwork. This is because nodes are allowed to expand into multiple multi-function nodes.
    */
-  const XXXNodeTree &tree_;
+  const DerivedNodeTree &tree_;
   fn::MFNetwork &network_;
-  MultiValueMap<XXXSocket, fn::MFSocket *> sockets_by_xxx_socket_;
+  MultiValueMap<DSocket, fn::MFSocket *> sockets_by_dsocket_;
 
  public:
-  MFNetworkTreeMap(const XXXNodeTree &tree, fn::MFNetwork &network)
+  MFNetworkTreeMap(const DerivedNodeTree &tree, fn::MFNetwork &network)
       : tree_(tree), network_(network)
   {
   }
 
-  const XXXNodeTree &tree() const
+  const DerivedNodeTree &tree() const
   {
     return tree_;
   }
@@ -71,46 +71,46 @@ class MFNetworkTreeMap {
     return network_;
   }
 
-  void add(const XXXSocket &dsocket, fn::MFSocket &socket)
+  void add(const DSocket &dsocket, fn::MFSocket &socket)
   {
     BLI_assert(dsocket->is_input() == socket.is_input());
-    BLI_assert(dsocket->is_input() || sockets_by_xxx_socket_.lookup(dsocket).is_empty());
-    sockets_by_xxx_socket_.add(dsocket, &socket);
+    BLI_assert(dsocket->is_input() || sockets_by_dsocket_.lookup(dsocket).is_empty());
+    sockets_by_dsocket_.add(dsocket, &socket);
   }
 
-  void add(const XXXInputSocket &dsocket, fn::MFInputSocket &socket)
+  void add(const DInputSocket &dsocket, fn::MFInputSocket &socket)
   {
-    sockets_by_xxx_socket_.add(dsocket, &socket);
+    sockets_by_dsocket_.add(dsocket, &socket);
   }
 
-  void add(const XXXOutputSocket &dsocket, fn::MFOutputSocket &socket)
+  void add(const DOutputSocket &dsocket, fn::MFOutputSocket &socket)
   {
     /* There can be at most one matching output socket. */
-    BLI_assert(sockets_by_xxx_socket_.lookup(dsocket).is_empty());
-    sockets_by_xxx_socket_.add(dsocket, &socket);
+    BLI_assert(sockets_by_dsocket_.lookup(dsocket).is_empty());
+    sockets_by_dsocket_.add(dsocket, &socket);
   }
 
-  void add(const XXXTreeContext &context,
+  void add(const DTreeContext &context,
            Span<const InputSocketRef *> dsockets,
            Span<fn::MFInputSocket *> sockets)
   {
     assert_same_size(dsockets, sockets);
     for (int i : dsockets.index_range()) {
-      this->add(XXXInputSocket(&context, dsockets[i]), *sockets[i]);
+      this->add(DInputSocket(&context, dsockets[i]), *sockets[i]);
     }
   }
 
-  void add(const XXXTreeContext &context,
+  void add(const DTreeContext &context,
            Span<const OutputSocketRef *> dsockets,
            Span<fn::MFOutputSocket *> sockets)
   {
     assert_same_size(dsockets, sockets);
     for (int i : dsockets.index_range()) {
-      this->add(XXXOutputSocket(&context, dsockets[i]), *sockets[i]);
+      this->add(DOutputSocket(&context, dsockets[i]), *sockets[i]);
     }
   }
 
-  void add_try_match(const XXXNode &dnode, fn::MFNode &node)
+  void add_try_match(const DNode &dnode, fn::MFNode &node)
   {
     this->add_try_match(*dnode.context(),
                         dnode->inputs().cast<const SocketRef *>(),
@@ -120,7 +120,7 @@ class MFNetworkTreeMap {
                         node.outputs().cast<fn::MFSocket *>());
   }
 
-  void add_try_match(const XXXTreeContext &context,
+  void add_try_match(const DTreeContext &context,
                      Span<const InputSocketRef *> dsockets,
                      Span<fn::MFInputSocket *> sockets)
   {
@@ -128,7 +128,7 @@ class MFNetworkTreeMap {
         context, dsockets.cast<const SocketRef *>(), sockets.cast<fn::MFSocket *>());
   }
 
-  void add_try_match(const XXXTreeContext &context,
+  void add_try_match(const DTreeContext &context,
                      Span<const OutputSocketRef *> dsockets,
                      Span<fn::MFOutputSocket *> sockets)
   {
@@ -136,7 +136,7 @@ class MFNetworkTreeMap {
         context, dsockets.cast<const SocketRef *>(), sockets.cast<fn::MFSocket *>());
   }
 
-  void add_try_match(const XXXTreeContext &context,
+  void add_try_match(const DTreeContext &context,
                      Span<const SocketRef *> dsockets,
                      Span<fn::MFSocket *> sockets)
   {
@@ -149,22 +149,22 @@ class MFNetworkTreeMap {
         continue;
       }
       fn::MFSocket *socket = sockets[used_sockets];
-      this->add(XXXSocket(&context, dsocket), *socket);
+      this->add(DSocket(&context, dsocket), *socket);
       used_sockets++;
     }
   }
 
-  fn::MFOutputSocket &lookup(const XXXOutputSocket &dsocket)
+  fn::MFOutputSocket &lookup(const DOutputSocket &dsocket)
   {
-    return sockets_by_xxx_socket_.lookup(dsocket)[0]->as_output();
+    return sockets_by_dsocket_.lookup(dsocket)[0]->as_output();
   }
 
-  Span<fn::MFInputSocket *> lookup(const XXXInputSocket &dsocket)
+  Span<fn::MFInputSocket *> lookup(const DInputSocket &dsocket)
   {
-    return sockets_by_xxx_socket_.lookup(dsocket).cast<fn::MFInputSocket *>();
+    return sockets_by_dsocket_.lookup(dsocket).cast<fn::MFInputSocket *>();
   }
 
-  fn::MFInputSocket &lookup_dummy(const XXXInputSocket &dsocket)
+  fn::MFInputSocket &lookup_dummy(const DInputSocket &dsocket)
   {
     Span<fn::MFInputSocket *> sockets = this->lookup(dsocket);
     BLI_assert(sockets.size() == 1);
@@ -173,16 +173,16 @@ class MFNetworkTreeMap {
     return socket;
   }
 
-  fn::MFOutputSocket &lookup_dummy(const XXXOutputSocket &dsocket)
+  fn::MFOutputSocket &lookup_dummy(const DOutputSocket &dsocket)
   {
     fn::MFOutputSocket &socket = this->lookup(dsocket);
     BLI_assert(socket.node().is_dummy());
     return socket;
   }
 
-  bool is_mapped(const XXXSocket &dsocket) const
+  bool is_mapped(const DSocket &dsocket) const
   {
-    return !sockets_by_xxx_socket_.lookup(dsocket).is_empty();
+    return !sockets_by_dsocket_.lookup(dsocket).is_empty();
   }
 };
 
@@ -193,7 +193,7 @@ struct CommonMFNetworkBuilderData {
   ResourceCollector &resources;
   fn::MFNetwork &network;
   MFNetworkTreeMap &network_map;
-  const XXXNodeTree &tree;
+  const DerivedNodeTree &tree;
 };
 
 class MFNetworkBuilderBase {
@@ -253,7 +253,7 @@ class SocketMFNetworkBuilder : public MFNetworkBuilderBase {
   fn::MFOutputSocket *built_socket_ = nullptr;
 
  public:
-  SocketMFNetworkBuilder(CommonMFNetworkBuilderData &common, const XXXSocket &dsocket)
+  SocketMFNetworkBuilder(CommonMFNetworkBuilderData &common, const DSocket &dsocket)
       : MFNetworkBuilderBase(common), bsocket_(dsocket->bsocket())
   {
   }
@@ -322,10 +322,10 @@ class SocketMFNetworkBuilder : public MFNetworkBuilderBase {
  */
 class NodeMFNetworkBuilder : public MFNetworkBuilderBase {
  private:
-  XXXNode node_;
+  DNode node_;
 
  public:
-  NodeMFNetworkBuilder(CommonMFNetworkBuilderData &common, XXXNode node)
+  NodeMFNetworkBuilder(CommonMFNetworkBuilderData &common, DNode node)
       : MFNetworkBuilderBase(common), node_(node)
   {
   }
@@ -374,18 +374,18 @@ class NodeMFNetworkBuilder : public MFNetworkBuilderBase {
   /**
    * Returns the node that is currently being built.
    */
-  const XXXNode &dnode() const
+  const DNode &dnode() const
   {
     return node_;
   }
 };
 
 MFNetworkTreeMap insert_node_tree_into_mf_network(fn::MFNetwork &network,
-                                                  const XXXNodeTree &tree,
+                                                  const DerivedNodeTree &tree,
                                                   ResourceCollector &resources);
 
-using MultiFunctionByNode = Map<XXXNode, const fn::MultiFunction *>;
-MultiFunctionByNode get_multi_function_per_node(const XXXNodeTree &tree,
+using MultiFunctionByNode = Map<DNode, const fn::MultiFunction *>;
+MultiFunctionByNode get_multi_function_per_node(const DerivedNodeTree &tree,
                                                 ResourceCollector &resources);
 
 class DataTypeConversions {
