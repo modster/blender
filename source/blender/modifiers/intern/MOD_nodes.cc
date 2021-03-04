@@ -71,7 +71,7 @@
 #include "MOD_nodes.h"
 #include "MOD_ui_common.h"
 
-#include "NOD_XXX_node_tree.hh"
+#include "NOD_derived_node_tree.hh"
 #include "NOD_geometry.h"
 #include "NOD_geometry_exec.hh"
 #include "NOD_node_tree_multi_function.hh"

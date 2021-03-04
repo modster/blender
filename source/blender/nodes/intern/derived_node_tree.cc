@@ -14,7 +14,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "NOD_XXX_node_tree.hh"
+#include "NOD_derived_node_tree.hh"
 
 namespace blender::nodes {
 

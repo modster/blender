@@ -26,7 +26,7 @@
 
 #include "DNA_node_types.h"
 
-#include "NOD_XXX_node_tree.hh"
+#include "NOD_derived_node_tree.hh"
 
 struct Depsgraph;
 struct ModifierData;
