@@ -260,10 +260,10 @@ static fn::MFOutputSocket *insert_unlinked_input(CommonMFNetworkBuilderData &com
 {
   bNodeSocket *bsocket = dsocket->bsocket();
   bNodeSocketType *socktype = bsocket->typeinfo;
-  BLI_assert(socktype->expand_in_mf_network != nullptr);
+  BLI_assert(socket_is_mf_data_socket(*socktype));
 
   SocketMFNetworkBuilder builder{common, dsocket};
-  socktype->expand_in_mf_network(builder);
+  socket_expand_in_mf_network(builder);
 
   fn::MFOutputSocket *built_socket = builder.built_socket();
   BLI_assert(built_socket != nullptr);
