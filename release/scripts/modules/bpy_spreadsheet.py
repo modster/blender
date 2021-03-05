@@ -19,26 +19,28 @@
 import bpy
 
 class SpreadsheetDrawer:
+    def __init__(self):
+        self.objects = list(bpy.context.selected_objects)
+
     def get_row_amount(self):
-        return 10
+        return len(self.objects)
 
     def get_column_amount(self):
-        return 3
+        return 2
 
     def get_top_row_cell(self, column_index):
-        return "Column: " + str(column_index)
+        return ("Name", "Pass Index")[column_index]
 
     def get_left_column_cell(self, row_index):
-        return row_index + 100
+        return row_index
 
     def get_content_cell(self, row_index, column_index):
-        return row_index * column_index + 10
+        ob = self.objects[row_index]
+        if column_index == 0:
+            return (ob, "name")
+        elif column_index == 1:
+            return (ob, "pass_index")
 
-registered_drawers = {}
-
-def register_spreadsheet_drawer(spreadsheet_space: bpy.types.SpaceSpreadsheet, drawer: SpreadsheetDrawer):
-    registered_drawers[id(spreadsheet_space)] = drawer
 
 def get_spreadsheet_drawer(spreadsheet_space: bpy.types.SpaceSpreadsheet):
     return SpreadsheetDrawer()
-    # return registered_drawers.get(id(spreadsheet_space))
