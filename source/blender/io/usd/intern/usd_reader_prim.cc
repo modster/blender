@@ -42,10 +42,13 @@ USDPrimReader::USDPrimReader(pxr::UsdStageRefPtr stage,
                              ImportSettings &settings)
     : m_name(object.GetName().GetString()),
       m_prim_path(object.GetPrimPath().GetString()),
+      m_object(nullptr),
       m_prim(object),
       m_stage(stage),
       m_import_params(import_params),
-      m_settings(&settings)
+      m_parent_reader(nullptr),
+      m_settings(&settings),
+      m_refcount(0)
 {
   //@TODO(bjs): This should be handled better
   if (m_name == "/")
