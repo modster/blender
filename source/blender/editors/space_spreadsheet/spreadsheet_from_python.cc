@@ -138,21 +138,25 @@ class PythonSpreadsheetDrawer : public SpreadsheetDrawer {
     }
     if (PyTuple_Check(py_cell_content)) {
       PyObject *py_rna_ptr = PyTuple_GetItem(py_cell_content, 0);
-      PyObject *py_name = PyTuple_GetItem(py_cell_content, 1);
-      const char *prop_name = PyUnicode_AsUTF8(py_name);
+      PyObject *py_prop_path = PyTuple_GetItem(py_cell_content, 1);
+      const char *prop_path = PyUnicode_AsUTF8(py_prop_path);
       BPy_StructRNA *py_struct_rna = (BPy_StructRNA *)py_rna_ptr;
-      PointerRNA ptr = py_struct_rna->ptr;
-      PropertyRNA *prop = RNA_struct_find_property(&ptr, prop_name);
-      uiDefAutoButR(params.block,
-                    &ptr,
-                    prop,
-                    -1,
-                    "",
-                    ICON_NONE,
-                    params.xmin,
-                    params.ymin,
-                    params.width,
-                    params.height);
+      PointerRNA ptr;
+      PropertyRNA *prop = nullptr;
+      int index;
+      RNA_path_resolve_full(&py_struct_rna->ptr, prop_path, &ptr, &prop, &index);
+      if (prop != nullptr) {
+        uiDefAutoButR(params.block,
+                      &ptr,
+                      prop,
+                      index,
+                      "",
+                      ICON_NONE,
+                      params.xmin,
+                      params.ymin,
+                      params.width,
+                      params.height);
+      }
     }
   }
 };

@@ -19,28 +19,42 @@
 import bpy
 
 class SpreadsheetDrawer:
-    def __init__(self):
-        self.objects = list(bpy.context.selected_objects)
+    def get_row_amount(self):
+        return 0
+
+    def get_column_amount(self):
+        return 0
+
+    def get_top_row_cell(self, column_index):
+        return None
+
+    def get_left_column_cell(self, row_index):
+        return None
+
+    def get_content_cell(self, row_index, column_index):
+        return None
+
+class ObjectPropertiesSpreadsheet(SpreadsheetDrawer):
+    def __init__(self, objects, property_names):
+        self.objects = objects
+        self.property_names = property_names
 
     def get_row_amount(self):
         return len(self.objects)
 
     def get_column_amount(self):
-        return 2
+        return len(self.property_names)
 
     def get_top_row_cell(self, column_index):
-        return ("Name", "Pass Index")[column_index]
+        return self.property_names[column_index]
 
     def get_left_column_cell(self, row_index):
         return row_index
 
     def get_content_cell(self, row_index, column_index):
         ob = self.objects[row_index]
-        if column_index == 0:
-            return (ob, "name")
-        elif column_index == 1:
-            return (ob, "pass_index")
+        return (ob, self.property_names[column_index])
 
 
 def get_spreadsheet_drawer(spreadsheet_space: bpy.types.SpaceSpreadsheet):
-    return SpreadsheetDrawer()
+    return ObjectPropertiesSpreadsheet(list(bpy.context.selected_objects), ["name", "location.x", "location.y", "location.z"])
