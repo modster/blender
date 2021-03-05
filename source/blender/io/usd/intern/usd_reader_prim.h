@@ -103,7 +103,7 @@ class USDPrimReader {
                 const pxr::UsdPrim &object,
                 const USDImportParams &import_params,
                 ImportSettings &settings);
-  ~USDPrimReader();
+  virtual ~USDPrimReader();
 
   const pxr::UsdPrim &prim() const;
 
