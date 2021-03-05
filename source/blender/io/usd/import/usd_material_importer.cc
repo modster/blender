@@ -134,7 +134,7 @@ static bool needs_blend(const pxr::UsdShadeShader &usd_shader, float &r_opacity_
     return false;
   }
 
-  bool needs_blend;
+  bool needs_blend = false;
 
   if (pxr::UsdShadeInput opacity_input = usd_shader.GetInput(usdtokens::opacity)) {
 
