@@ -1148,6 +1148,10 @@ void AlembicObject::setup_transform_cache(CachedData &cached_data, float scale)
   cached_data.transforms.clear();
   cached_data.transforms.invalidate_last_loaded_time();
 
+  if (xform_time_sampling) {
+    cached_data.transforms.set_time_sampling(*xform_time_sampling, 0);
+  }
+
   if (xform_samples.size() == 0) {
     Transform tfm = transform_scale(make_float3(scale));
     cached_data.transforms.add_data(tfm, 0.0);
@@ -1636,7 +1640,7 @@ void AlembicProcedural::load_objects(Progress &progress)
   IObject root = archive.getTop();
 
   for (size_t i = 0; i < root.getNumChildren(); ++i) {
-    walk_hierarchy(root, root.getChildHeader(i), nullptr, object_map, progress);
+    walk_hierarchy(root, root.getChildHeader(i), {}, object_map, progress);
   }
 
   /* Create nodes in the scene. */
@@ -1696,6 +1700,10 @@ void AlembicProcedural::read_mesh(Scene *scene,
 
   Object *object = abc_object->get_object();
   cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
+
+  if (object->is_modified()) {
+    object->tag_update(scene);
+  }
 
   if (abc_object->instance_of) {
     return;
@@ -1758,6 +1766,10 @@ void AlembicProcedural::read_subd(Scene *scene,
 
   Object *object = abc_object->get_object();
   cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
+
+  if (object->is_modified()) {
+    object->tag_update(scene);
+  }
 
   if (abc_object->instance_of) {
     return;
@@ -1848,6 +1860,10 @@ void AlembicProcedural::read_curves(Scene *scene,
   Object *object = abc_object->get_object();
   cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
 
+  if (object->is_modified()) {
+    object->tag_update(scene);
+  }
+
   if (abc_object->instance_of) {
     return;
   }
@@ -1882,7 +1898,7 @@ void AlembicProcedural::read_curves(Scene *scene,
 void AlembicProcedural::walk_hierarchy(
     IObject parent,
     const ObjectHeader &header,
-    MatrixSampleMap *xform_samples,
+    MatrixSamplesData matrix_samples_data,
     const unordered_map<std::string, AlembicObject *> &object_map,
     Progress &progress)
 {
@@ -1904,7 +1920,7 @@ void AlembicProcedural::walk_hierarchy(
       MatrixSampleMap local_xform_samples;
 
       MatrixSampleMap *temp_xform_samples = nullptr;
-      if (xform_samples == nullptr) {
+      if (matrix_samples_data.samples == nullptr) {
         /* If there is no parent transforms, fill the map directly. */
         temp_xform_samples = &concatenated_xform_samples;
       }
@@ -1919,11 +1935,13 @@ void AlembicProcedural::walk_hierarchy(
         temp_xform_samples->insert({sample_time, sample.getMatrix()});
       }
 
-      if (xform_samples != nullptr) {
-        concatenate_xform_samples(*xform_samples, local_xform_samples, concatenated_xform_samples);
+      if (matrix_samples_data.samples != nullptr) {
+        concatenate_xform_samples(
+            *matrix_samples_data.samples, local_xform_samples, concatenated_xform_samples);
       }
 
-      xform_samples = &concatenated_xform_samples;
+      matrix_samples_data.samples = &concatenated_xform_samples;
+      matrix_samples_data.time_sampling = ts;
     }
 
     next_object = xform;
@@ -1939,8 +1957,9 @@ void AlembicProcedural::walk_hierarchy(
       abc_object->iobject = subd;
       abc_object->schema_type = AlembicObject::SUBD;
 
-      if (xform_samples) {
-        abc_object->xform_samples = *xform_samples;
+      if (matrix_samples_data.samples) {
+        abc_object->xform_samples = *matrix_samples_data.samples;
+        abc_object->xform_time_sampling = matrix_samples_data.time_sampling;
       }
     }
 
@@ -1957,8 +1976,9 @@ void AlembicProcedural::walk_hierarchy(
       abc_object->iobject = mesh;
       abc_object->schema_type = AlembicObject::POLY_MESH;
 
-      if (xform_samples) {
-        abc_object->xform_samples = *xform_samples;
+      if (matrix_samples_data.samples) {
+        abc_object->xform_samples = *matrix_samples_data.samples;
+        abc_object->xform_time_sampling = matrix_samples_data.time_sampling;
       }
     }
 
@@ -1975,8 +1995,9 @@ void AlembicProcedural::walk_hierarchy(
       abc_object->iobject = curves;
       abc_object->schema_type = AlembicObject::CURVES;
 
-      if (xform_samples) {
-        abc_object->xform_samples = *xform_samples;
+      if (matrix_samples_data.samples) {
+        abc_object->xform_samples = *matrix_samples_data.samples;
+        abc_object->xform_time_sampling = matrix_samples_data.time_sampling;
       }
     }
 
@@ -2003,8 +2024,9 @@ void AlembicProcedural::walk_hierarchy(
           abc_object->iobject = next_object;
           abc_object->instance_of = iter->second;
 
-          if (xform_samples) {
-            abc_object->xform_samples = *xform_samples;
+          if (matrix_samples_data.samples) {
+            abc_object->xform_samples = *matrix_samples_data.samples;
+            abc_object->xform_time_sampling = matrix_samples_data.time_sampling;
           }
         }
       }
@@ -2014,7 +2036,7 @@ void AlembicProcedural::walk_hierarchy(
   if (next_object.valid()) {
     for (size_t i = 0; i < next_object.getNumChildren(); ++i) {
       walk_hierarchy(
-          next_object, next_object.getChildHeader(i), xform_samples, object_map, progress);
+          next_object, next_object.getChildHeader(i), matrix_samples_data, object_map, progress);
     }
   }
 }

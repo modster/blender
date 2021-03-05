@@ -39,6 +39,11 @@ class Shader;
 
 using MatrixSampleMap = std::map<Alembic::Abc::chrono_t, Alembic::Abc::M44d>;
 
+struct MatrixSamplesData {
+  MatrixSampleMap *samples = nullptr;
+  Alembic::AbcCoreAbstract::TimeSamplingPtr time_sampling;
+};
+
 /* Helpers to detect if some type is a ccl::array. */
 template<typename> struct is_array : public std::false_type {
 };
@@ -330,6 +335,7 @@ class AlembicObject : public Node {
 
   AlembicObject *instance_of = nullptr;
 
+  Alembic::AbcCoreAbstract::TimeSamplingPtr xform_time_sampling;
   MatrixSampleMap xform_samples;
   Alembic::AbcGeom::IObject iobject;
 
@@ -464,7 +470,7 @@ class AlembicProcedural : public Procedural {
    * way for each IObject. */
   void walk_hierarchy(Alembic::AbcGeom::IObject parent,
                       const Alembic::AbcGeom::ObjectHeader &ohead,
-                      MatrixSampleMap *xform_samples,
+                      MatrixSamplesData matrix_samples_data,
                       const unordered_map<string, AlembicObject *> &object_map,
                       Progress &progress);
 
