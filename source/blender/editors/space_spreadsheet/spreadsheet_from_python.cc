@@ -117,6 +117,25 @@ class PythonSpreadsheetDrawer : public SpreadsheetDrawer {
                        0,
                        nullptr);
     }
+    if (PyLong_Check(py_cell_content)) {
+      const int value = PyLong_AsLong(py_cell_content);
+      const std::string value_str = std::to_string(value);
+      uiDefIconTextBut(params.block,
+                       UI_BTYPE_LABEL,
+                       0,
+                       ICON_NONE,
+                       value_str.c_str(),
+                       params.xmin,
+                       params.ymin,
+                       params.width,
+                       params.height,
+                       nullptr,
+                       0,
+                       0,
+                       0,
+                       0,
+                       nullptr);
+    }
   }
 };
 

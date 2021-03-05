@@ -29,10 +29,10 @@ class SpreadsheetDrawer:
         return "Column: " + str(column_index)
 
     def get_left_column_cell(self, row_index):
-        return str(row_index + 100)
+        return row_index + 100
 
     def get_content_cell(self, row_index, column_index):
-        return str(row_index * column_index)
+        return row_index * column_index + 10
 
 registered_drawers = {}
 
