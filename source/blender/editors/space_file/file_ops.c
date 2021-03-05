@@ -1253,7 +1253,7 @@ void FILE_OT_reset_recent(wmOperatorType *ot)
 {
   /* identifiers */
   ot->name = "Reset Recent";
-  ot->description = "Reset Recent files";
+  ot->description = "Reset recent files";
   ot->idname = "FILE_OT_reset_recent";
 
   /* api callbacks */
@@ -1777,7 +1777,7 @@ static int file_refresh_exec(bContext *C, wmOperator *UNUSED(unused))
 void FILE_OT_refresh(struct wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Refresh Filelist";
+  ot->name = "Refresh File List";
   ot->description = "Refresh the file list";
   ot->idname = "FILE_OT_refresh";
 
@@ -2230,8 +2230,7 @@ static int file_directory_new_exec(bContext *C, wmOperator *op)
     params->rename_flag = FILE_PARAMS_RENAME_PENDING;
   }
 
-  /* set timer to smoothly view newly generated file */
-  /* max 30 frs/sec */
+  /* Set timer to smoothly view newly generated file. */
   if (sfile->smoothscroll_timer != NULL) {
     WM_event_remove_timer(wm, CTX_wm_window(C), sfile->smoothscroll_timer);
   }
