@@ -70,6 +70,7 @@ set(SRC
   intern/usd_reader_geom.cc
   intern/usd_reader_instance.cc
   intern/usd_reader_light.cc
+  intern/usd_reader_material.cc
   intern/usd_reader_mesh.cc
   intern/usd_reader_nurbs.cc
   intern/usd_reader_prim.cc
@@ -95,6 +96,7 @@ set(SRC
   intern/usd_reader_geom.h
   intern/usd_reader_instance.h
   intern/usd_reader_light.h
+  intern/usd_reader_material.h
   intern/usd_reader_mesh.h
   intern/usd_reader_nurbs.h
   intern/usd_reader_prim.h

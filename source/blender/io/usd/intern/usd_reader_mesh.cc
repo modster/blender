@@ -15,6 +15,7 @@
  */
 
 #include "usd_reader_mesh.h"
+#include "usd_reader_material.h"
 #include "usd_reader_prim.h"
 
 #include "MEM_guardedalloc.h"
@@ -89,10 +90,16 @@ static void build_mat_map(const Main *bmain, std::map<std::string, Material *> &
 
 static void assign_materials(Main *bmain,
                              Object *ob,
-                             const std::map<std::string, int> &mat_index_map)
+                             const std::map<pxr::SdfPath, int> &mat_index_map,
+                             const USDImportParams &params,
+                             pxr::UsdStageRefPtr stage)
 {
+  if (!(stage && bmain && ob)) {
+    return;
+  }
+
   bool can_assign = true;
-  std::map<std::string, int>::const_iterator it = mat_index_map.begin();
+  std::map<pxr::SdfPath, int>::const_iterator it = mat_index_map.begin();
 
   int matcount = 0;
   for (; it != mat_index_map.end(); ++it, matcount++) {
@@ -111,21 +118,40 @@ static void assign_materials(Main *bmain,
   if (can_assign) {
     it = mat_index_map.begin();
 
+    blender::io::usd::USDMaterialReader mat_reader(params, bmain);
+
     for (; it != mat_index_map.end(); ++it) {
-      std::string mat_name = it->first;
+      std::string mat_name = it->first.GetName();
       mat_iter = mat_map.find(mat_name.c_str());
 
-      Material *assigned_mat;
+      Material *assigned_mat = nullptr;
 
       if (mat_iter == mat_map.end()) {
-        assigned_mat = BKE_material_add(bmain, mat_name.c_str());
-        mat_map[mat_name] = assigned_mat;
+
+        // Look up the USD material.
+        pxr::UsdPrim prim = stage->GetPrimAtPath(it->first);
+        pxr::UsdShadeMaterial usd_mat(prim);
+
+        if (usd_mat) {
+          assigned_mat = mat_reader.add_material(usd_mat);
+          if (assigned_mat) {
+            mat_map[mat_name] = assigned_mat;
+          }
+        }
+        else {
+          std::cout << "WARNING: Couldn't get USD material " << it->first << std::endl;
+        }
       }
       else {
         assigned_mat = mat_iter->second;
       }
 
-      BKE_object_material_assign(bmain, ob, assigned_mat, it->second, BKE_MAT_ASSIGN_OBDATA);
+      if (assigned_mat) {
+        BKE_object_material_assign(bmain, ob, assigned_mat, it->second, BKE_MAT_ASSIGN_OBDATA);
+      }
+      else {
+        std::cout << "WARNING: Couldn't assign material " << mat_name << std::endl;
+      }
     }
   }
 }
@@ -315,7 +341,7 @@ void USDMeshReader::read_uvs(Mesh *mesh,
 
   struct UVSample {
     pxr::VtVec2fArray uvs;
-    pxr::VtIntArray indices; // Non-empty for indexed UVs
+    pxr::VtIntArray indices;  // Non-empty for indexed UVs
     pxr::TfToken interpolation;
   };
 
@@ -388,8 +414,9 @@ void USDMeshReader::read_uvs(Mesh *mesh,
         const UVSample &sample = uv_primvars[layer_idx];
 
         // For Vertex interpolation, use the vertex index.
-        int usd_uv_index =
-          sample.interpolation == pxr::UsdGeomTokens->vertex ? mesh->mloop[loop_index].v : loop_index;
+        int usd_uv_index = sample.interpolation == pxr::UsdGeomTokens->vertex ?
+                               mesh->mloop[loop_index].v :
+                               loop_index;
 
         // Handle indexed UVs.
         usd_uv_index = sample.indices.empty() ? usd_uv_index : sample.indices[usd_uv_index];
@@ -687,7 +714,7 @@ void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
 void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
                                              MPoly *mpoly,
                                              int totpoly,
-                                             std::map<std::string, int> &r_mat_map)
+                                             std::map<pxr::SdfPath, int> &r_mat_map)
 {
   pxr::UsdShadeMaterialBindingAPI api = pxr::UsdShadeMaterialBindingAPI(m_prim);
   std::vector<pxr::UsdGeomSubset> subsets = api.GetMaterialBindSubsets();
@@ -697,13 +724,18 @@ void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
     for (pxr::UsdGeomSubset &subset : subsets) {
       pxr::UsdShadeMaterialBindingAPI subsetAPI = pxr::UsdShadeMaterialBindingAPI(
           subset.GetPrim());
-      std::string materialName = subsetAPI.GetDirectBinding().GetMaterialPath().GetName();
 
-      if (r_mat_map.find(materialName) == r_mat_map.end()) {
-        r_mat_map[materialName] = 1 + current_mat++;
+      pxr::SdfPath materialPath = subsetAPI.GetDirectBinding().GetMaterialPath();
+
+      if (materialPath.IsEmpty()) {
+        continue;
       }
 
-      const int mat_idx = r_mat_map[materialName] - 1;
+      if (r_mat_map.find(materialPath) == r_mat_map.end()) {
+        r_mat_map[materialPath] = 1 + current_mat++;
+      }
+
+      const int mat_idx = r_mat_map[materialPath] - 1;
 
       pxr::UsdAttribute indicesAttribute = subset.GetIndicesAttr();
       pxr::VtIntArray indices;
@@ -716,15 +748,22 @@ void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
     }
   }
   else {
-    r_mat_map[api.GetDirectBinding().GetMaterialPath().GetName()] = 1;
+    pxr::SdfPath materialPath = api.GetDirectBinding().GetMaterialPath();
+    if (!materialPath.IsEmpty()) {
+      r_mat_map[materialPath] = 1;
+    }
   }
 }
 
 void USDMeshReader::readFaceSetsSample(Main *bmain, Mesh *mesh, const double motionSampleTime)
 {
-  std::map<std::string, int> mat_map;
+  if (!m_import_params.import_materials) {
+    return;
+  }
+
+  std::map<pxr::SdfPath, int> mat_map;
   assign_facesets_to_mpoly(motionSampleTime, mesh->mpoly, mesh->totpoly, mat_map);
-  utils::assign_materials(bmain, m_object, mat_map);
+  utils::assign_materials(bmain, m_object, mat_map, this->m_import_params, this->m_stage);
 }
 
 Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
@@ -821,8 +860,8 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
      * the material slots that were created when the object was loaded from
      * USD are still valid now. */
     size_t num_polys = active_mesh->totpoly;
-    if (num_polys > 0) {
-      std::map<std::string, int> mat_map;
+    if (num_polys > 0 && m_import_params.import_materials) {
+      std::map<pxr::SdfPath, int> mat_map;
       assign_facesets_to_mpoly(motionSampleTime, active_mesh->mpoly, num_polys, mat_map);
     }
   }

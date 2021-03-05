@@ -55,7 +55,7 @@ class USDMeshReader : public USDGeomReader {
   void assign_facesets_to_mpoly(double motionSampleTime,
                                 struct MPoly *mpoly,
                                 int totpoly,
-                                std::map<std::string, int> &r_mat_map);
+                                std::map<pxr::SdfPath, int> &r_mat_map);
 
   void read_mpolys(Mesh *mesh, pxr::UsdGeomMesh mesh_prim, double motionSampleTime);
   void read_uvs(Mesh *mesh,
