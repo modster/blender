@@ -57,4 +57,5 @@ class ObjectPropertiesSpreadsheet(SpreadsheetDrawer):
 
 
 def get_spreadsheet_drawer(spreadsheet_space: bpy.types.SpaceSpreadsheet):
-    return ObjectPropertiesSpreadsheet(list(bpy.context.selected_objects), ["name", "location.x", "location.y", "location.z"])
+    prop_names = ["name", "location.x", "location.y", "location.z", '["a"]']
+    return ObjectPropertiesSpreadsheet(list(bpy.context.selected_objects), prop_names)
