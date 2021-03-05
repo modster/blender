@@ -495,7 +495,7 @@ int ED_lineart_point_inside_triangled(double v[2], double v0[2], double v1[2], d
 
 static int lineart_point_on_segment(double v[2], double v0[2], double v1[2])
 {
-  double c1, c2;
+  double c1 = 0, c2 = 0;
   double l0[2], l1[2];
 
   sub_v2_v2v2_db(l0, v, v0);
@@ -721,6 +721,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
                                         rb->triangle_size * (t_count + 1));
 
   new_rl = &((LineartRenderLine *)leln->pointer)[l_count];
+  rl = new_rl;
 
 #define INCREASE_RL \
   l_count++; \
