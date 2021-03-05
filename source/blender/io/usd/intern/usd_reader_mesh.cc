@@ -312,8 +312,14 @@ void USDMeshReader::read_uvs(Mesh *mesh,
   unsigned int uv_index = 0;
 
   const CustomData *ldata = &mesh->ldata;
-  std::vector<pxr::VtVec2fArray> uv_primvars;
-  uv_primvars.resize(ldata->totlayer);
+
+  struct UVSample {
+    pxr::VtVec2fArray uvs;
+    pxr::VtIntArray indices; // Non-empty for indexed UVs
+    pxr::TfToken interpolation;
+  };
+
+  std::vector<UVSample> uv_primvars(ldata->totlayer);
 
   if (m_hasUVs) {
     for (int layer_idx = 0; layer_idx < ldata->totlayer; layer_idx++) {
@@ -322,7 +328,6 @@ void USDMeshReader::read_uvs(Mesh *mesh,
       if (layer->type != CD_MLOOPUV) {
         continue;
       }
-      pxr::VtVec2fArray uvs;
 
       pxr::TfToken uv_token;
 
@@ -349,9 +354,11 @@ void USDMeshReader::read_uvs(Mesh *mesh,
         continue;
       }
 
-      mesh_prim.GetPrimvar(uv_token).Get<pxr::VtVec2fArray>(&uvs, motionSampleTime);
-
-      uv_primvars[layer_idx] = uvs;
+      if (pxr::UsdGeomPrimvar uv_primvar = mesh_prim.GetPrimvar(uv_token)) {
+        uv_primvar.Get<pxr::VtVec2fArray>(&uv_primvars[layer_idx].uvs, motionSampleTime);
+        uv_primvar.GetIndices(&uv_primvars[layer_idx].indices, motionSampleTime);
+        uv_primvars[layer_idx].interpolation = uv_primvar.GetInterpolation();
+      }
     }
   }
 
@@ -374,23 +381,31 @@ void USDMeshReader::read_uvs(Mesh *mesh,
         }
 
         // Early out if no uvs loaded
-        if (uv_primvars[layer_idx].empty()) {
+        if (uv_primvars[layer_idx].uvs.empty()) {
           continue;
         }
 
-        pxr::VtVec2fArray &uvs = uv_primvars[layer_idx];
+        const UVSample &sample = uv_primvars[layer_idx];
+
+        // For Vertex interpolation, use the vertex index.
+        int usd_uv_index =
+          sample.interpolation == pxr::UsdGeomTokens->vertex ? mesh->mloop[loop_index].v : loop_index;
+
+        // Handle indexed UVs.
+        usd_uv_index = sample.indices.empty() ? usd_uv_index : sample.indices[usd_uv_index];
+
+        if (usd_uv_index >= sample.uvs.size()) {
+          continue;
+        }
 
         MLoopUV *mloopuv = static_cast<MLoopUV *>(layer->data);
         if (m_isLeftHanded)
-          uv_index = loop_index;
-        else
           uv_index = rev_loop_index;
+        else
+          uv_index = loop_index;
 
-        if (uv_index >= uvs.size()) {
-          continue;
-        }
-        mloopuv[uv_index].uv[0] = uvs[uv_index][0];
-        mloopuv[uv_index].uv[1] = uvs[uv_index][1];
+        mloopuv[uv_index].uv[0] = sample.uvs[usd_uv_index][0];
+        mloopuv[uv_index].uv[1] = sample.uvs[usd_uv_index][1];
       }
     }
   }
