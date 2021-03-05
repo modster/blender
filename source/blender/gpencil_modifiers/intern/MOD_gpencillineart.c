@@ -392,7 +392,7 @@ static void baking_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemO(layout,
           IFACE_("Bake All Line Art Objects"),
           ICON_NONE,
-          "OBJECT_OT_lineart_bake_all_strokes");
+          "OBJECT_OT_lineart_bake_strokes_all_gp");
   uiItemO(layout, IFACE_("Clear Current Object"), ICON_NONE, "OBJECT_OT_lineart_clear_strokes");
   uiItemO(layout, IFACE_("Clear All Objects"), ICON_NONE, "OBJECT_OT_lineart_clear_all_strokes");
 }

@@ -579,7 +579,7 @@ struct wmOperatorType;
 
 /* Operator types */
 void OBJECT_OT_lineart_bake_strokes(struct wmOperatorType *ot);
-void OBJECT_OT_lineart_bake_all_strokes(struct wmOperatorType *ot);
+void OBJECT_OT_lineart_bake_strokes_all_gp(struct wmOperatorType *ot);
 void OBJECT_OT_lineart_clear_strokes(struct wmOperatorType *ot);
 void OBJECT_OT_lineart_clear_all_strokes(struct wmOperatorType *ot);
 
