@@ -120,6 +120,11 @@ static void bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int
 }
 
 typedef struct LineartBakeJob {
+  wmWindowManager *wm;
+  void *owner;
+  short *stop, *do_update;
+  float *progress;
+
   /* C or ob must have one != NULL. */
   bContext *C;
   Object *ob;
@@ -152,6 +157,8 @@ static void lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob)
     LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
       bake_strokes(ob, bj->dg, md, frame);
     }
+
+    *bj->progress = (float)(frame - bj->frame_begin) / (bj->frame_end - bj->frame_begin);
   }
 }
 
@@ -161,6 +168,8 @@ static void lineart_gpencil_bake_startjob(void *customdata,
                                           float *progress)
 {
   LineartBakeJob *bj = (LineartBakeJob *)customdata;
+  bj->do_update = do_update;
+  bj->progress = progress;
 
   if (bj->ob) {
     /* Which means only bake one line art gpencil object, specified by bj->ob. */
