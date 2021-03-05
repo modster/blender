@@ -34,13 +34,13 @@ class SpreadsheetDrawer:
     def get_content_cell(self, row_index, column_index):
         return None
 
-class ObjectPropertiesSpreadsheet(SpreadsheetDrawer):
-    def __init__(self, objects, property_names):
-        self.objects = objects
+class PropertiesSpreadsheet(SpreadsheetDrawer):
+    def __init__(self, owners, property_names):
+        self.owners = owners
         self.property_names = property_names
 
     def get_row_amount(self):
-        return len(self.objects)
+        return len(self.owners)
 
     def get_column_amount(self):
         return len(self.property_names)
@@ -52,10 +52,10 @@ class ObjectPropertiesSpreadsheet(SpreadsheetDrawer):
         return row_index
 
     def get_content_cell(self, row_index, column_index):
-        ob = self.objects[row_index]
-        return (ob, self.property_names[column_index])
+        owner = self.owners[row_index]
+        return (owner, self.property_names[column_index])
 
 
 def get_spreadsheet_drawer(spreadsheet_space: bpy.types.SpaceSpreadsheet):
     prop_names = ["name", "location.x", "location.y", "location.z", '["a"]']
-    return ObjectPropertiesSpreadsheet(list(bpy.context.selected_objects), prop_names)
+    return PropertiesSpreadsheet(list(bpy.context.selected_objects), prop_names)
