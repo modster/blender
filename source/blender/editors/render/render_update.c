@@ -107,7 +107,7 @@ void ED_render_view3d_update(Depsgraph *depsgraph,
        * way we could avoid some unecessary updating.
        */
       if (updated) {
-        ED_lineart_post_frame_update_external(C, scene, update_ctx->depsgraph, false);
+        ED_lineart_post_frame_update_external(C, scene, depsgraph, false);
       }
 #endif
 
