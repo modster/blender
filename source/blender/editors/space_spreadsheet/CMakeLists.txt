@@ -31,18 +31,25 @@ set(INC
   ../../../../intern/guardedalloc
 )
 
+set(INC_SYS
+  ${PYTHON_INCLUDE_DIRS}
+)
+
 set(SRC
   space_spreadsheet.cc
   spreadsheet_draw.cc
   spreadsheet_from_geometry.cc
+  spreadsheet_from_python.cc
   spreadsheet_ops.cc
 
   spreadsheet_draw.hh
   spreadsheet_from_geometry.hh
+  spreadsheet_from_python.hh
   spreadsheet_intern.hh
 )
 
 set(LIB
 )
+
 
 blender_add_lib(bf_editor_space_spreadsheet "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

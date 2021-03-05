@@ -43,6 +43,7 @@
 #include "bmesh.h"
 
 #include "spreadsheet_from_geometry.hh"
+#include "spreadsheet_from_python.hh"
 #include "spreadsheet_intern.hh"
 
 using namespace blender::ed::spreadsheet;
@@ -102,40 +103,12 @@ static void spreadsheet_main_region_init(wmWindowManager *wm, ARegion *region)
   WM_event_add_keymap_handler(&region->handlers, keymap);
 }
 
-static ID *get_used_id(const bContext *C)
-{
-  SpaceSpreadsheet *sspreadsheet = CTX_wm_space_spreadsheet(C);
-  if (sspreadsheet->pinned_id != nullptr) {
-    return sspreadsheet->pinned_id;
-  }
-  Object *active_object = CTX_data_active_object(C);
-  return (ID *)active_object;
-}
-
 class FallbackSpreadsheetDrawer : public SpreadsheetDrawer {
 };
 
 static std::unique_ptr<SpreadsheetDrawer> generate_spreadsheet_drawer(const bContext *C)
 {
-  Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
-  ID *used_id = get_used_id(C);
-  if (used_id == nullptr) {
-    return {};
-  }
-  const ID_Type id_type = GS(used_id->name);
-  if (id_type != ID_OB) {
-    return {};
-  }
-  Object *object_orig = (Object *)used_id;
-  if (object_orig->type != OB_MESH) {
-    return {};
-  }
-  Object *object_eval = DEG_get_evaluated_object(depsgraph, object_orig);
-  if (object_eval == nullptr) {
-    return {};
-  }
-
-  return spreadsheet_drawer_from_geometry_attributes(C, object_eval);
+  return spreadsheet_drawer_from_python(C);
 }
 
 static void spreadsheet_main_region_draw(const bContext *C, ARegion *region)
