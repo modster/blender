@@ -69,7 +69,7 @@ struct NodePlacementContext {
 
 class USDMaterialReader {
  protected:
-   USDImportParams m_params;
+  USDImportParams m_params;
 
   Main *bmain_;
 
