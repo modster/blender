@@ -125,6 +125,11 @@ static void deformStroke(GpencilModifierData *md,
 
     mul_m4_v3(mat, &pt->x);
   }
+
+  if (GPENCIL_STROKE_IS_CURVE(gps)) {
+    gps->editcurve->flag |= GP_CURVE_NEEDS_STROKE_UPDATE;
+  }
+
   /* Calc geometry data. */
   BKE_gpencil_stroke_geometry_update(gpd, gps);
 }

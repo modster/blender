@@ -2779,19 +2779,38 @@ void BKE_gpencil_frame_original_pointers_update(const struct bGPDframe *gpf_orig
     /* Assign original stroke pointer. */
     if (gps_eval != NULL) {
       gps_eval->runtime.gps_orig = gps_orig;
+      if (GPENCIL_STROKE_IS_CURVE(gps_orig)) {
+        bGPDcurve *gpc_orig = gps_orig->editcurve;
+        bGPDcurve *gpc_eval = gps_eval->editcurve;
 
-      /* Assign original point pointer. */
-      for (int i = 0; i < gps_orig->totpoints; i++) {
-        if (i > gps_eval->totpoints - 1) {
-          break;
+        gpc_eval->runtime.gpc_orig = gpc_orig;
+        for (int i = 0; i < gpc_orig->tot_curve_points; i++) {
+          if (i > gpc_eval->tot_curve_points - 1) {
+            break;
+          }
+          bGPDcurve_point *gpc_pt_orig = &gpc_orig->curve_points[i];
+          bGPDcurve_point *gpc_pt_eval = &gpc_eval->curve_points[i];
+          gpc_pt_orig->runtime.gpc_pt_orig = NULL;
+          gpc_pt_orig->runtime.idx_orig = i;
+          gpc_pt_eval->runtime.gpc_pt_orig = gpc_pt_orig;
+          gpc_pt_eval->runtime.idx_orig = i;
         }
-        bGPDspoint *pt_orig = &gps_orig->points[i];
-        bGPDspoint *pt_eval = &gps_eval->points[i];
-        pt_orig->runtime.pt_orig = NULL;
-        pt_orig->runtime.idx_orig = i;
-        pt_eval->runtime.pt_orig = pt_orig;
-        pt_eval->runtime.idx_orig = i;
       }
+      else {
+        /* Assign original point pointer. */
+        for (int i = 0; i < gps_orig->totpoints; i++) {
+          if (i > gps_eval->totpoints - 1) {
+            break;
+          }
+          bGPDspoint *pt_orig = &gps_orig->points[i];
+          bGPDspoint *pt_eval = &gps_eval->points[i];
+          pt_orig->runtime.pt_orig = NULL;
+          pt_orig->runtime.idx_orig = i;
+          pt_eval->runtime.pt_orig = pt_orig;
+          pt_eval->runtime.idx_orig = i;
+        }
+      }
+      
       /* Increase pointer. */
       gps_eval = gps_eval->next;
     }

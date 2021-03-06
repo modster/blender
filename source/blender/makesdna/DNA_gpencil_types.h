@@ -180,6 +180,14 @@ typedef enum eGPDpalette_Flag {
 /* ***************************************** */
 /* GP Curve Point */
 
+typedef struct bGPDcpoint_Runtime {
+  /* Original curve point */
+  struct bGPDcurve_point *gpc_pt_orig;
+  /* Original index array position */
+  int idx_orig;
+  char _pad0[4];
+} bGPDcpoint_Runtime;
+
 typedef struct bGPDcurve_point {
   /** Bezier Triple for the handles and control points. */
   BezTriple bezt;
@@ -202,7 +210,8 @@ typedef struct bGPDcurve_point {
 
   /** Vertex Color RGBA (A=mix factor). */
   float vert_color[4];
-  char _pad[4];
+  
+  bGPDcpoint_Runtime runtime;
 } bGPDcurve_point;
 
 /* bGPDcurve_point->flag */
@@ -213,6 +222,11 @@ typedef enum eGPDcurve_point_Flag {
 /* ***************************************** */
 /* GP Curve */
 
+typedef struct bGPDcurve_Runtime {
+  struct bGPDcurve *gpc_orig;
+  void *_pad;
+} bGPDcurve_Runtime;
+
 /* Curve for Bezier Editing. */
 typedef struct bGPDcurve {
   /** Array of curve points. */
@@ -222,6 +236,7 @@ typedef struct bGPDcurve {
   /** General flag. */
   short flag;
   char _pad[2];
+  bGPDcurve_Runtime runtime;
 } bGPDcurve;
 
 /* bGPDcurve_Flag->flag */
