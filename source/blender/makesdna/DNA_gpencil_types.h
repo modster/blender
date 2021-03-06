@@ -237,6 +237,10 @@ typedef struct bGPDcurve {
   short flag;
   char _pad[2];
   bGPDcurve_Runtime runtime;
+
+  /** Vertex weight data. */
+  struct MDeformVert *dvert;
+  void *_pad2;
 } bGPDcurve;
 
 /* bGPDcurve_Flag->flag */

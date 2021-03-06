@@ -102,34 +102,62 @@ static void deformStroke(GpencilModifierData *md,
   }
   bGPdata *gpd = ob->data;
 
-  for (int i = 0; i < gps->totpoints; i++) {
-    bGPDspoint *pt = &gps->points[i];
-    MDeformVert *dvert = gps->dvert != NULL ? &gps->dvert[i] : NULL;
-
-    /* Verify vertex group. */
-    const float weight = get_modifier_point_weight(
-        dvert, (mmd->flag & GP_OFFSET_INVERT_VGROUP) != 0, def_nr);
-    if (weight < 0.0f) {
-      continue;
-    }
-    /* Calculate matrix. */
-    mul_v3_v3fl(loc, mmd->loc, weight);
-    mul_v3_v3fl(rot, mmd->rot, weight);
-    mul_v3_v3fl(scale, mmd->scale, weight);
-    add_v3_fl(scale, 1.0);
-    loc_eul_size_to_mat4(mat, loc, rot, scale);
-
-    /* Apply scale to thickness. */
-    float unit_scale = (scale[0] + scale[1] + scale[2]) / 3.0f;
-    pt->pressure *= unit_scale;
-
-    mul_m4_v3(mat, &pt->x);
-  }
-
   if (GPENCIL_STROKE_IS_CURVE(gps)) {
-    gps->editcurve->flag |= GP_CURVE_NEEDS_STROKE_UPDATE;
-  }
+    bGPDcurve *gpc = gps->editcurve;
+    for (int i = 0; i < gpc->tot_curve_points; i++) {
+      bGPDcurve_point *pt = &gpc->curve_points[i];
+      BezTriple *bezt = &pt->bezt;
+      MDeformVert *dvert = (gpc->dvert != NULL) ? &gpc->dvert[i] : NULL;
 
+      /* Verify vertex group. */
+      const float weight = get_modifier_point_weight(
+          dvert, (mmd->flag & GP_OFFSET_INVERT_VGROUP) != 0, def_nr);
+      if (weight < 0.0f) {
+        continue;
+      }
+      /* Calculate matrix. */
+      mul_v3_v3fl(loc, mmd->loc, weight);
+      mul_v3_v3fl(rot, mmd->rot, weight);
+      mul_v3_v3fl(scale, mmd->scale, weight);
+      add_v3_fl(scale, 1.0);
+      loc_eul_size_to_mat4(mat, loc, rot, scale);
+
+      /* Apply scale to thickness. */
+      float unit_scale = (scale[0] + scale[1] + scale[2]) / 3.0f;
+      pt->pressure *= unit_scale;
+
+      for (int j = 0; j < 3; j++) {
+        mul_m4_v3(mat, bezt->vec[j]);
+      }
+    }
+    gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
+  }
+  else {
+    for (int i = 0; i < gps->totpoints; i++) {
+      bGPDspoint *pt = &gps->points[i];
+      MDeformVert *dvert = gps->dvert != NULL ? &gps->dvert[i] : NULL;
+
+      /* Verify vertex group. */
+      const float weight = get_modifier_point_weight(
+          dvert, (mmd->flag & GP_OFFSET_INVERT_VGROUP) != 0, def_nr);
+      if (weight < 0.0f) {
+        continue;
+      }
+      /* Calculate matrix. */
+      mul_v3_v3fl(loc, mmd->loc, weight);
+      mul_v3_v3fl(rot, mmd->rot, weight);
+      mul_v3_v3fl(scale, mmd->scale, weight);
+      add_v3_fl(scale, 1.0);
+      loc_eul_size_to_mat4(mat, loc, rot, scale);
+
+      /* Apply scale to thickness. */
+      float unit_scale = (scale[0] + scale[1] + scale[2]) / 3.0f;
+      pt->pressure *= unit_scale;
+
+      mul_m4_v3(mat, &pt->x);
+    }
+  }
+  
   /* Calc geometry data. */
   BKE_gpencil_stroke_geometry_update(gpd, gps);
 }
