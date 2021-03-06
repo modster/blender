@@ -1297,8 +1297,9 @@ void BKE_gpencil_stroke_geometry_update(bGPdata *gpd, bGPDstroke *gps)
      * NOTE: Normally the stroke points of a curve should not be updated directly. Only if it is
      * unavoidable. Sculpting a curve also makes use of this. */
     if (gps->editcurve->flag & GP_CURVE_NEEDS_STROKE_UPDATE) {
+      /* TODO: Make do-partial-update variable */
       BKE_gpencil_stroke_editcurve_update(
-          gps, gpd->curve_edit_threshold, gpd->curve_edit_corner_angle, true);
+          gps, gpd->curve_edit_threshold, gpd->curve_edit_corner_angle, false);
       gps->editcurve->flag &= ~GP_CURVE_NEEDS_STROKE_UPDATE;
       gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
     }
