@@ -1325,13 +1325,15 @@ static bool gpencil_curve_do_circle_sel(bContext *C,
   View3D *v3d = CTX_wm_view3d(C);
   Object *ob = CTX_data_active_object(C);
   bGPdata *gpd = ob->data;
+  bGPDcurve *gpc_active = (gpc->runtime.gpc_orig) ? gpc->runtime.gpc_orig : gpc;
 
   const bool only_selected = (v3d->overlay.handle_display == CURVE_HANDLE_SELECTED);
 
   bool hit = false;
   for (int i = 0; i < gpc->tot_curve_points; i++) {
     bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
-    BezTriple *bezt = &gpc_pt->bezt;
+    bGPDcurve_point *gpc_active_pt = (gpc_pt->runtime.gpc_pt_orig) ? gpc_pt->runtime.gpc_pt_orig : gpc_pt;
+    BezTriple *bezt = &gpc_active_pt->bezt;
 
     if (bezt->hide == 1) {
       continue;
@@ -1369,13 +1371,13 @@ static bool gpencil_curve_do_circle_sel(bContext *C,
         hit = true;
         /* change selection */
         if (select) {
-          gpc_pt->flag |= GP_CURVE_POINT_SELECT;
+          gpc_active_pt->flag |= GP_CURVE_POINT_SELECT;
           BEZT_SEL_IDX(bezt, j);
         }
         else {
           BEZT_DESEL_IDX(bezt, j);
           if (!BEZT_ISSEL_ANY(bezt)) {
-            gpc_pt->flag &= ~GP_CURVE_POINT_SELECT;
+            gpc_active_pt->flag &= ~GP_CURVE_POINT_SELECT;
           }
         }
       }
@@ -1386,14 +1388,15 @@ static bool gpencil_curve_do_circle_sel(bContext *C,
   if (hit && (selectmode == GP_SELECTMODE_STROKE)) {
     for (int i = 0; i < gpc->tot_curve_points; i++) {
       bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
-      BezTriple *bezt = &gpc_pt->bezt;
+      bGPDcurve_point *gpc_active_pt = (gpc_pt->runtime.gpc_pt_orig) ? gpc_pt->runtime.gpc_pt_orig : gpc_pt;
+      BezTriple *bezt = &gpc_active_pt->bezt;
 
       if (select) {
-        gpc_pt->flag |= GP_CURVE_POINT_SELECT;
+        gpc_active_pt->flag |= GP_CURVE_POINT_SELECT;
         BEZT_SEL_ALL(bezt);
       }
       else {
-        gpc_pt->flag &= ~GP_CURVE_POINT_SELECT;
+        gpc_active_pt->flag &= ~GP_CURVE_POINT_SELECT;
         BEZT_DESEL_ALL(bezt);
       }
     }
@@ -1464,7 +1467,12 @@ static int gpencil_circle_select_exec(bContext *C, wmOperator *op)
 
   /* find visible strokes, and select if hit */
   GP_EVALUATED_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
-    if (!GPENCIL_STROKE_IS_CURVE(gps)) {
+    if (GPENCIL_STROKE_IS_CURVE(gps)) {
+      bGPDcurve *gpc = gps->editcurve;
+      changed |= gpencil_curve_do_circle_sel(
+        C, gps, gpc, mx, my, radius, select, &rect, gpstroke_iter.diff_mat, selectmode);
+    }
+    else {
       changed |= gpencil_stroke_do_circle_sel(gpd,
                                               gpl,
                                               gps,
@@ -1480,15 +1488,6 @@ static int gpencil_circle_select_exec(bContext *C, wmOperator *op)
     }
   }
   GP_EVALUATED_STROKES_END(gpstroke_iter);
-
-  /* TODO: When curves are correctly evaluated by modifieres, etc. this should be moved in the loop
-   * above. */
-  GP_EDITABLE_CURVES_BEGIN(gps_iter, C, gpl, gps, gpc)
-  {
-    changed |= gpencil_curve_do_circle_sel(
-        C, gps, gpc, mx, my, radius, select, &rect, gps_iter.diff_mat, selectmode);
-  }
-  GP_EDITABLE_CURVES_END(gps_iter);
 
   /* updates */
   if (changed) {
