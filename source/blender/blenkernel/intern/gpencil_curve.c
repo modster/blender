@@ -821,6 +821,7 @@ static tGPCurveSegment *gpencil_fit_curve_to_points_ex(bGPDstroke *gps,
     BezTriple *bezt = &cpt->bezt;
     tCurveFitPoint *curve_point = (tCurveFitPoint *)&tcs->cubic_array[i * 3 * CURVE_FIT_POINT_DIM];
 
+    /* Loop over bezier triple and fill coordinates. */
     for (int j = 0; j < 3; j++) {
       float *bez = &curve_point[j].x;
       madd_v3_v3v3fl(bezt->vec[j], gps->boundbox_min, bez, diag_length / COORD_FITTING_INFLUENCE);
@@ -831,12 +832,18 @@ static tGPCurveSegment *gpencil_fit_curve_to_points_ex(bGPDstroke *gps,
     cpt->strength = ctrl_point->strength * diag_length;
     mul_v4_v4fl(cpt->vert_color, ctrl_point->color, diag_length);
 
-    /* default handle type */
+    /* Default handle type */
     bezt->h1 = HD_ALIGN;
     bezt->h2 = HD_ALIGN;
 
     /* Make sure to add the start index. */
     cpt->point_index = tcs->cubic_orig_index[i] + start_idx;
+
+    /* Select the curve point if the original stroke point was selected. */
+    if (gps->points[cpt->point_index].flag & GP_SPOINT_SELECT) {
+      cpt->flag |= GP_CURVE_POINT_SELECT;
+      BEZT_SEL_ALL(bezt);
+    }
   }
 
   /* Set handle type to HD_FREE for corner handles. Ignore first and last. */
@@ -875,7 +882,8 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_generate(bGPDstroke *gps,
       gps, diag_length, error_threshold, corner_angle, 0, gps->totpoints - 1);
 
   bGPDcurve *editcurve = BKE_gpencil_stroke_editcurve_new(tcs->cubic_array_len);
-  memcpy(editcurve->curve_points, tcs->curve_points, sizeof(bGPDcurve_point) * tcs->cubic_array_len);
+  memcpy(
+      editcurve->curve_points, tcs->curve_points, sizeof(bGPDcurve_point) * tcs->cubic_array_len);
   gpencil_free_curve_segment(tcs);
 
   return editcurve;
@@ -952,9 +960,7 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_regenerate(bGPDstroke *gps,
 
   /* Copy first point. */
   tGPCurveSegment *frist_cs = (tGPCurveSegment *)&curve_segments.first;
-  memcpy(&editcurve->curve_points[0],
-         &frist_cs->curve_points[0],
-         sizeof(bGPDcurve_point));
+  memcpy(&editcurve->curve_points[0], &frist_cs->curve_points[0], sizeof(bGPDcurve_point));
 
   /* Combine listbase curve segments to gpencil curve. */
   int offset = 0;
@@ -1000,8 +1006,16 @@ void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps,
   }
 
   bGPDcurve *editcurve = NULL;
+  short prev_flag = 0;
 
+  /* If editcurve exists save the selection to the stroke points (only for syncing later). */
+  if (GPENCIL_STROKE_IS_CURVE(gps)) {
+    BKE_gpencil_stroke_editcurve_sync_selection(NULL, gps, gps->editcurve);
+  }
+
+  /* Do a partial update by only updating the curve segments that contain tagged points. */
   if (do_partial_update && gps->editcurve != NULL) {
+    prev_flag = gps->editcurve->flag;
     /* Find the segments that need an update, then update them. */
     const int tot_num_segments = (gps->flag & GP_STROKE_CYCLIC) ?
                                      gps->editcurve->tot_curve_points :
@@ -1025,6 +1039,7 @@ void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps,
   else {
     /* Do a full update. Delete the old curve and generate a new one. */
     if (gps->editcurve != NULL) {
+      prev_flag = gps->editcurve->flag;
       BKE_gpencil_free_stroke_editcurve(gps);
     }
 
@@ -1037,6 +1052,10 @@ void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps,
   }
 
   gps->editcurve = editcurve;
+  if (prev_flag) {
+    gps->editcurve->flag = prev_flag;
+  }
+
   if (do_partial_update) {
     BKE_gpencil_editcurve_recalculate_handles(gps);
   }
@@ -1045,9 +1064,7 @@ void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps,
 /**
  * Sync the selection from stroke to editcurve
  */
-void BKE_gpencil_editcurve_stroke_sync_selection(bGPdata *gpd,
-                                                 bGPDstroke *gps,
-                                                 bGPDcurve *gpc)
+void BKE_gpencil_editcurve_stroke_sync_selection(bGPdata *gpd, bGPDstroke *gps, bGPDcurve *gpc)
 {
   if (gps->flag & GP_STROKE_SELECT) {
     gpc->flag |= GP_CURVE_SELECT;
@@ -1080,7 +1097,9 @@ void BKE_gpencil_stroke_editcurve_sync_selection(bGPdata *gpd, bGPDstroke *gps, 
 {
   if (gpc->flag & GP_CURVE_SELECT) {
     gps->flag |= GP_STROKE_SELECT;
-    BKE_gpencil_stroke_select_index_set(gpd, gps);
+    if (gpd != NULL) {
+      BKE_gpencil_stroke_select_index_set(gpd, gps);
+    }
 
     for (int i = 0; i < gpc->tot_curve_points - 1; i++) {
       bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
@@ -1134,7 +1153,9 @@ void BKE_gpencil_stroke_editcurve_sync_selection(bGPdata *gpd, bGPDstroke *gps, 
   }
   else {
     gps->flag &= ~GP_STROKE_SELECT;
-    BKE_gpencil_stroke_select_index_reset(gps);
+    if (gpd != NULL) {
+      BKE_gpencil_stroke_select_index_reset(gps);
+    }
     for (int i = 0; i < gps->totpoints; i++) {
       bGPDspoint *pt = &gps->points[i];
       pt->flag &= ~GP_SPOINT_SELECT;
