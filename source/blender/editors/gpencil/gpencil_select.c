@@ -1331,9 +1331,10 @@ static bool gpencil_curve_do_circle_sel(bContext *C,
   bool hit = false;
   for (int i = 0; i < gpc_active->tot_curve_points; i++) {
     bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
+    BezTriple *bezt = &gpc_pt->bezt;
     bGPDcurve_point *gpc_active_pt = (gpc_pt->runtime.gpc_pt_orig) ? gpc_pt->runtime.gpc_pt_orig :
                                                                      gpc_pt;
-    BezTriple *bezt = &gpc_active_pt->bezt;
+    BezTriple *bezt_active = &gpc_active_pt->bezt;
 
     if (bezt->hide == 1) {
       continue;
@@ -1372,11 +1373,11 @@ static bool gpencil_curve_do_circle_sel(bContext *C,
         /* change selection */
         if (select) {
           gpc_active_pt->flag |= GP_CURVE_POINT_SELECT;
-          BEZT_SEL_IDX(bezt, j);
+          BEZT_SEL_IDX(bezt_active, j);
         }
         else {
-          BEZT_DESEL_IDX(bezt, j);
-          if (!BEZT_ISSEL_ANY(bezt)) {
+          BEZT_DESEL_IDX(bezt_active, j);
+          if (!BEZT_ISSEL_ANY(bezt_active)) {
             gpc_active_pt->flag &= ~GP_CURVE_POINT_SELECT;
           }
         }
@@ -1391,15 +1392,15 @@ static bool gpencil_curve_do_circle_sel(bContext *C,
       bGPDcurve_point *gpc_active_pt = (gpc_pt->runtime.gpc_pt_orig) ?
                                            gpc_pt->runtime.gpc_pt_orig :
                                            gpc_pt;
-      BezTriple *bezt = &gpc_active_pt->bezt;
+      BezTriple *bezt_active = &gpc_active_pt->bezt;
 
       if (select) {
         gpc_active_pt->flag |= GP_CURVE_POINT_SELECT;
-        BEZT_SEL_ALL(bezt);
+        BEZT_SEL_ALL(bezt_active);
       }
       else {
         gpc_active_pt->flag &= ~GP_CURVE_POINT_SELECT;
-        BEZT_DESEL_ALL(bezt);
+        BEZT_DESEL_ALL(bezt_active);
       }
     }
 
@@ -1927,33 +1928,37 @@ static int gpencil_generic_select_exec(bContext *C,
     bGPDstroke *gps_active = (gps->runtime.gps_orig) ? gps->runtime.gps_orig : gps;
     if (GPENCIL_STROKE_IS_CURVE(gps_active)) {
       bGPDcurve *gpc = gps->editcurve;
-      changed |= gpencil_generic_curve_select(C,
-                                              ob,
-                                              gpd,
-                                              gps,
-                                              gpc,
-                                              &gpstroke_iter,
-                                              &gsc,
-                                              is_inside_fn,
-                                              box,
-                                              user_data,
-                                              strokemode,
-                                              sel_op);
+      if (gpencil_generic_curve_select(C,
+                                       ob,
+                                       gpd,
+                                       gps,
+                                       gpc,
+                                       &gpstroke_iter,
+                                       &gsc,
+                                       is_inside_fn,
+                                       box,
+                                       user_data,
+                                       strokemode,
+                                       sel_op)) {
+        changed = true;
+      }
     }
     else {
-      changed |= gpencil_generic_stroke_select(ob,
-                                               gpd,
-                                               gpl,
-                                               gps,
-                                               &gpstroke_iter,
-                                               &gsc,
-                                               is_inside_fn,
-                                               box,
-                                               user_data,
-                                               strokemode,
-                                               segmentmode,
-                                               sel_op,
-                                               scale);
+      if (gpencil_generic_stroke_select(ob,
+                                        gpd,
+                                        gpl,
+                                        gps,
+                                        &gpstroke_iter,
+                                        &gsc,
+                                        is_inside_fn,
+                                        box,
+                                        user_data,
+                                        strokemode,
+                                        segmentmode,
+                                        sel_op,
+                                        scale)) {
+        changed = true;
+      }
     }
   }
   GP_EVALUATED_STROKES_END(gpstroke_iter);
