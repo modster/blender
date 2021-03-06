@@ -224,7 +224,7 @@ void GPENCIL_OT_stroke_make_curve(wmOperatorType *ot)
 /** \name Clear curve from stroke operator
  * \{ */
 
-static int gpencil_stroke_clear_curve_exec(bContext *C, wmOperator *op)
+static int gpencil_stroke_clear_curve_exec(bContext *C)
 {
   Object *ob = CTX_data_active_object(C);
   bGPdata *gpd = ob->data;

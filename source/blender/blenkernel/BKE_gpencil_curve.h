@@ -53,8 +53,12 @@ void BKE_gpencil_stroke_editcurve_update(struct bGPDstroke *gps,
                                          const float threshold,
                                          const float corner_angle,
                                          const bool do_partial_update);
-void BKE_gpencil_editcurve_stroke_sync_selection(struct bGPdata *gpd, struct bGPDstroke *gps, struct bGPDcurve *gpc);
-void BKE_gpencil_stroke_editcurve_sync_selection(struct bGPdata *gpd, struct bGPDstroke *gps, struct bGPDcurve *gpc);
+void BKE_gpencil_editcurve_stroke_sync_selection(struct bGPdata *gpd,
+                                                 struct bGPDstroke *gps,
+                                                 struct bGPDcurve *gpc);
+void BKE_gpencil_stroke_editcurve_sync_selection(struct bGPdata *gpd,
+                                                 struct bGPDstroke *gps,
+                                                 struct bGPDcurve *gpc);
 void BKE_gpencil_stroke_update_geometry_from_editcurve(struct bGPDstroke *gps,
                                                        const uint resolution,
                                                        const bool is_adaptive);
