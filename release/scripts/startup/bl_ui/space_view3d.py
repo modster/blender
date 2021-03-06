@@ -1055,7 +1055,7 @@ class VIEW3D_MT_snap(Menu):
 class VIEW3D_MT_uv_map(Menu):
     bl_label = "UV Mapping"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("uv.unwrap")
@@ -1809,7 +1809,7 @@ class VIEW3D_MT_select_edit_armature(Menu):
 class VIEW3D_MT_paint_gpencil(Menu):
     bl_label = "Paint"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("gpencil.vertex_color_set", text="Set Vertex Colors")
@@ -2225,7 +2225,7 @@ class VIEW3D_MT_object(Menu):
     bl_context = "objectmode"
     bl_label = "Object"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.menu("VIEW3D_MT_transform_object")
@@ -2704,7 +2704,7 @@ class VIEW3D_MT_object_constraints(Menu):
 class VIEW3D_MT_object_quick_effects(Menu):
     bl_label = "Quick Effects"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator("object.quick_fur")
