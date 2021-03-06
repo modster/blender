@@ -2458,8 +2458,12 @@ void GPENCIL_OT_select(wmOperatorType *ot)
   prop = RNA_def_boolean(ot->srna, "use_shift_extend", false, "Extend", "");
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
+/** \} */
 
-/* Select by Vertex Color. */
+/* -------------------------------------------------------------------- */
+/** \name Select by Vertex Color
+ * \{ */
+
 /* Helper to create a hash of colors. */
 static void gpencil_selected_hue_table(bContext *C,
                                        Object *ob,
@@ -2479,22 +2483,43 @@ static void gpencil_selected_hue_table(bContext *C,
         if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
           continue;
         }
-        if ((gps->flag & GP_STROKE_SELECT) == 0) {
-          continue;
-        }
 
         /* Read all points to get all colors selected. */
-        bGPDspoint *pt;
-        int i;
-        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-          if (((pt->flag & GP_SPOINT_SELECT) == 0) || (pt->vert_color[3] == 0.0f)) {
+        if (GPENCIL_STROKE_IS_CURVE(gps)) {
+          bGPDcurve *gpc = gps->editcurve;
+          if ((gpc->flag & GP_CURVE_SELECT) == 0) {
             continue;
           }
-          /* Round Hue value. */
-          rgb_to_hsv_compat_v(pt->vert_color, hsv);
-          uint key = truncf(hsv[0] * range);
-          if (!BLI_ghash_haskey(hue_table, POINTER_FROM_INT(key))) {
-            BLI_ghash_insert(hue_table, POINTER_FROM_INT(key), POINTER_FROM_INT(key));
+
+          for (int i = 0; i < gpc->tot_curve_points; i++) {
+            bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
+            if (((gpc_pt->flag & GP_CURVE_POINT_SELECT) == 0) || (gpc_pt->vert_color[3] == 0.0f)) {
+              continue;
+            }
+            /* Round Hue value. */
+            rgb_to_hsv_compat_v(gpc_pt->vert_color, hsv);
+            uint key = truncf(hsv[0] * range);
+            if (!BLI_ghash_haskey(hue_table, POINTER_FROM_INT(key))) {
+              BLI_ghash_insert(hue_table, POINTER_FROM_INT(key), POINTER_FROM_INT(key));
+            }
+          }
+        }
+        else {
+          if ((gps->flag & GP_STROKE_SELECT) == 0) {
+            continue;
+          }
+
+          for (int i = 0; i < gps->totpoints; i++) {
+            bGPDspoint *pt = &gps->points[i];
+            if (((pt->flag & GP_SPOINT_SELECT) == 0) || (pt->vert_color[3] == 0.0f)) {
+              continue;
+            }
+            /* Round Hue value. */
+            rgb_to_hsv_compat_v(pt->vert_color, hsv);
+            uint key = truncf(hsv[0] * range);
+            if (!BLI_ghash_haskey(hue_table, POINTER_FROM_INT(key))) {
+              BLI_ghash_insert(hue_table, POINTER_FROM_INT(key), POINTER_FROM_INT(key));
+            }
           }
         }
       }
@@ -2548,39 +2573,77 @@ static int gpencil_select_vertex_color_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
+  deselect_all_selected(C);
+
   /* Select any visible stroke that uses any of these colors. */
   CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
-    bGPDspoint *pt;
-    int i;
-    bool gps_selected = false;
-    /* Check all stroke points. */
-    for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-      if (pt->vert_color[3] == 0.0f) {
-        continue;
+    if (GPENCIL_STROKE_IS_CURVE(gps)) {
+      bGPDcurve *gpc = gps->editcurve;
+      bool gpc_selected = false;
+      for (int i = 0; i < gpc->tot_curve_points; i++) {
+        bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
+        if (gpc_pt->vert_color[3] == 0.0f) {
+          continue;
+        }
+
+        /* Only check Hue to get value and saturation full ranges. */
+        float hsv[3];
+        /* Round Hue value. */
+        rgb_to_hsv_compat_v(gpc_pt->vert_color, hsv);
+        uint key = truncf(hsv[0] * range);
+
+        if (BLI_ghash_haskey(hue_table, POINTER_FROM_INT(key))) {
+          gpc_pt->flag |= GP_CURVE_POINT_SELECT;
+          BEZT_SEL_ALL(&gpc_pt->bezt);
+          gpc_selected = true;
+          changed = true;
+        }
       }
 
-      /* Only check Hue to get value and saturation full ranges. */
-      float hsv[3];
-      /* Round Hue value. */
-      rgb_to_hsv_compat_v(pt->vert_color, hsv);
-      uint key = truncf(hsv[0] * range);
+      if (gpc_selected) {
+        gpc->flag |= GP_CURVE_SELECT;
+        BKE_gpencil_stroke_select_index_set(gpd, gps);
 
-      if (BLI_ghash_haskey(hue_table, POINTER_FROM_INT(key))) {
-        pt->flag |= GP_SPOINT_SELECT;
-        gps_selected = true;
+        /* Extend selection. */
+        if (selectmode == GP_SELECTMODE_STROKE) {
+          select_all_curve_points(gpd, gps, gpc, false);
+        }
       }
     }
+    else {
+      bGPDspoint *pt;
+      int i;
+      bool gps_selected = false;
+      /* Check all stroke points. */
+      for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+        if (pt->vert_color[3] == 0.0f) {
+          continue;
+        }
 
-    if (gps_selected) {
-      gps->flag |= GP_STROKE_SELECT;
-      BKE_gpencil_stroke_select_index_set(gpd, gps);
+        /* Only check Hue to get value and saturation full ranges. */
+        float hsv[3];
+        /* Round Hue value. */
+        rgb_to_hsv_compat_v(pt->vert_color, hsv);
+        uint key = truncf(hsv[0] * range);
 
-      /* Extend stroke selection. */
-      if (selectmode == GP_SELECTMODE_STROKE) {
-        bGPDspoint *pt1 = NULL;
+        if (BLI_ghash_haskey(hue_table, POINTER_FROM_INT(key))) {
+          pt->flag |= GP_SPOINT_SELECT;
+          gps_selected = true;
+          changed = true;
+        }
+      }
 
-        for (i = 0, pt1 = gps->points; i < gps->totpoints; i++, pt1++) {
-          pt1->flag |= GP_SPOINT_SELECT;
+      if (gps_selected) {
+        gps->flag |= GP_STROKE_SELECT;
+        BKE_gpencil_stroke_select_index_set(gpd, gps);
+
+        /* Extend stroke selection. */
+        if (selectmode == GP_SELECTMODE_STROKE) {
+          bGPDspoint *pt1 = NULL;
+
+          for (i = 0, pt1 = gps->points; i < gps->totpoints; i++, pt1++) {
+            pt1->flag |= GP_SPOINT_SELECT;
+          }
         }
       }
     }
