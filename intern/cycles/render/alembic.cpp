@@ -1580,13 +1580,13 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
     }
 
     if (object->schema_type == AlembicObject::POLY_MESH) {
-      read_mesh(scene, object, frame_time);
+      read_mesh(object, frame_time);
     }
     else if (object->schema_type == AlembicObject::CURVES) {
-      read_curves(scene, object, frame_time);
+      read_curves(object, frame_time);
     }
     else if (object->schema_type == AlembicObject::SUBD) {
-      read_subd(scene, object, frame_time);
+      read_subd(object, frame_time);
     }
 
     object->clear_modified();
@@ -1688,8 +1688,7 @@ void AlembicProcedural::load_objects(Progress &progress)
   }
 }
 
-void AlembicProcedural::read_mesh(Scene *scene,
-                                  AlembicObject *abc_object,
+void AlembicProcedural::read_mesh(AlembicObject *abc_object,
                                   Abc::chrono_t frame_time)
 {
   Mesh *mesh = static_cast<Mesh *>(abc_object->get_object()->get_geometry());
@@ -1702,7 +1701,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
   cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
 
   if (object->is_modified()) {
-    object->tag_update(scene);
+      object->tag_update(scene_);
   }
 
   if (abc_object->instance_of) {
@@ -1739,7 +1738,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
 
   /* we don't yet support arbitrary attributes, for now add vertex
    * coordinates as generated coordinates if requested */
-  if (mesh->need_attribute(scene, ATTR_STD_GENERATED)) {
+  if (mesh->need_attribute(scene_, ATTR_STD_GENERATED)) {
     Attribute *attr = mesh->attributes.add(ATTR_STD_GENERATED);
     memcpy(
         attr->data_float3(), mesh->get_verts().data(), sizeof(float3) * mesh->get_verts().size());
@@ -1747,12 +1746,11 @@ void AlembicProcedural::read_mesh(Scene *scene,
 
   if (mesh->is_modified()) {
     bool need_rebuild = mesh->triangles_is_modified();
-    mesh->tag_update(scene, need_rebuild);
+    mesh->tag_update(scene_, need_rebuild);
   }
 }
 
-void AlembicProcedural::read_subd(Scene *scene,
-                                  AlembicObject *abc_object,
+void AlembicProcedural::read_subd(AlembicObject *abc_object,
                                   Abc::chrono_t frame_time)
 {
   Mesh *mesh = static_cast<Mesh *>(abc_object->get_object()->get_geometry());
@@ -1768,7 +1766,7 @@ void AlembicProcedural::read_subd(Scene *scene,
   cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
 
   if (object->is_modified()) {
-    object->tag_update(scene);
+    object->tag_update(scene_);
   }
 
   if (abc_object->instance_of) {
@@ -1829,7 +1827,7 @@ void AlembicProcedural::read_subd(Scene *scene,
 
   /* we don't yet support arbitrary attributes, for now add vertex
    * coordinates as generated coordinates if requested */
-  if (mesh->need_attribute(scene, ATTR_STD_GENERATED)) {
+  if (mesh->need_attribute(scene_, ATTR_STD_GENERATED)) {
     Attribute *attr = mesh->attributes.add(ATTR_STD_GENERATED);
     memcpy(
         attr->data_float3(), mesh->get_verts().data(), sizeof(float3) * mesh->get_verts().size());
@@ -1843,12 +1841,11 @@ void AlembicProcedural::read_subd(Scene *scene,
                         (mesh->subd_start_corner_is_modified()) ||
                         (mesh->subd_face_corners_is_modified());
 
-    mesh->tag_update(scene, need_rebuild);
+    mesh->tag_update(scene_, need_rebuild);
   }
 }
 
-void AlembicProcedural::read_curves(Scene *scene,
-                                    AlembicObject *abc_object,
+void AlembicProcedural::read_curves(AlembicObject *abc_object,
                                     Abc::chrono_t frame_time)
 {
   Hair *hair = static_cast<Hair *>(abc_object->get_object()->get_geometry());
@@ -1861,7 +1858,7 @@ void AlembicProcedural::read_curves(Scene *scene,
   cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
 
   if (object->is_modified()) {
-    object->tag_update(scene);
+    object->tag_update(scene_);
   }
 
   if (abc_object->instance_of) {
@@ -1882,7 +1879,7 @@ void AlembicProcedural::read_curves(Scene *scene,
 
   /* we don't yet support arbitrary attributes, for now add first keys as generated coordinates if
    * requested */
-  if (hair->need_attribute(scene, ATTR_STD_GENERATED)) {
+  if (hair->need_attribute(scene_, ATTR_STD_GENERATED)) {
     Attribute *attr_generated = hair->attributes.add(ATTR_STD_GENERATED);
     float3 *generated = attr_generated->data_float3();
 
@@ -1892,7 +1889,7 @@ void AlembicProcedural::read_curves(Scene *scene,
   }
 
   const bool rebuild = (hair->curve_keys_is_modified() || hair->curve_radius_is_modified());
-  hair->tag_update(scene, rebuild);
+  hair->tag_update(scene_, rebuild);
 }
 
 void AlembicProcedural::walk_hierarchy(
