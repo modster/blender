@@ -39,6 +39,10 @@ class USDXformReader : public USDPrimReader {
   void readObjectData(Main *bmain, double motionSampleTime) override;
 
   void read_matrix(float r_mat[4][4], const float time, const float scale, bool &is_constant);
+
+  // Returns true if this reader represents an object that is the root of the
+  // transform hierarchy.
+  bool is_root_xform_object() const;
 };
 
 #endif /* __USD_READER_XFORM_H__ */

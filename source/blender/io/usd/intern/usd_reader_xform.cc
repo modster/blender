@@ -39,6 +39,7 @@ extern "C" {
 }
 
 #include <pxr/base/gf/math.h>
+#include <pxr/base/gf/matrix4f.h>
 #include <pxr/pxr.h>
 #include <pxr/usd/usd/prim.h>
 #include <pxr/usd/usd/primRange.h>
@@ -62,7 +63,7 @@ void USDXformReader::readObjectData(Main *bmain, double motionSampleTime)
   bool is_constant;
   float transform_from_usd[4][4];
 
-  read_matrix(transform_from_usd, motionSampleTime, 1.0f, is_constant);
+  read_matrix(transform_from_usd, motionSampleTime, m_import_params.scale, is_constant);
 
   if (!is_constant) {
     bConstraint *con = BKE_constraint_add_for_object(
@@ -85,36 +86,82 @@ void USDXformReader::read_matrix(float r_mat[4][4] /* local matrix */,
                                  bool &is_constant)
 {
   is_constant = true;
-  pxr::UsdGeomXformable xformable = pxr::UsdGeomXformable(
-      m_prim);  // pxr::UsdGeomXformable::Get(m_stage, m_prim.GetPath());
+  unit_m4(r_mat);
+
+  pxr::UsdGeomXformable xformable(m_prim);
+
+  if (!xformable) {
+    // This might happen if the prim is a Scope.
+    return;
+  }
 
   bool resetsXformStack = false;
   std::vector<pxr::UsdGeomXformOp> orderedXformOps = xformable.GetOrderedXformOps(
       &resetsXformStack);
 
-  unit_m4(r_mat);
-
-  if (orderedXformOps.size() <= 0)
-    return;
-
-  int opCount = 0;
   for (std::vector<pxr::UsdGeomXformOp>::iterator I = orderedXformOps.begin();
        I != orderedXformOps.end();
        ++I) {
 
     pxr::UsdGeomXformOp &xformOp = (*I);
 
-    is_constant = !xformOp.MightBeTimeVarying();
+    if (xformOp.MightBeTimeVarying()) {
+      is_constant = false;
+    }
 
-    pxr::GfMatrix4d mat = xformOp.GetOpTransform(time) * pxr::GfMatrix4d(1.0f).SetScale(scale);
+    // Note, we don't apply the scale here because the XformOps may
+    // be empty, in which case this code won't be reached.
+    pxr::GfMatrix4d mat = xformOp.GetOpTransform(time);
+
+    // Convert the result to a float matrix.
+    pxr::GfMatrix4f mat4f(mat);
 
     float t_mat[4][4];
-    for (int i = 0; i < 4; ++i) {
-      for (int j = 0; j < 4; ++j) {
-        t_mat[j][i] = mat[j][i];
-      }
-    }
+    mat4f.Get(t_mat);
+
     mul_m4_m4m4(r_mat, r_mat, t_mat);
-    opCount++;
   }
+
+  /* Apply scaling only to root objects, parenting will propagate it. */
+  if (scale != 1.0 && is_root_xform_object()) {
+    float scale_mat[4][4];
+    scale_m4_fl(scale_mat, scale);
+    mul_m4_m4m4(r_mat, scale_mat, r_mat);
+  }
+}
+
+bool USDXformReader::is_root_xform_object() const
+{
+  // It's not sufficient to check for a null parent to determine
+  // if the current object is the root, because the parent could
+  // represent a scope, which is not xformable.  E.g., an Xform
+  // parented to a single Scope would be considered the root.
+
+  if (m_prim.IsInMaster()) {
+    // We don't consider prototypes to be root prims,
+    // because we never want to apply global scaling
+    // or rotations to the ptototypes themselves.
+    return false;
+  }
+
+  if (m_prim.IsA<pxr::UsdGeomXformable>()) {
+    // If we don't have an ancestor that also wraps
+    // UsdGeomXformable, then we are the root.
+    const USDPrimReader *cur_parent = m_parent_reader;
+
+    while (cur_parent) {
+      if (cur_parent->prim().IsA<pxr::UsdGeomXformable>()) {
+        return false;
+      }
+      cur_parent = cur_parent->parent();
+    }
+
+    if (!cur_parent) {
+      // No ancestor prim was an xformable, so we
+      // are the root.
+      return true;
+    }
+  }
+
+  return false;
 }
