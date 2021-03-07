@@ -122,11 +122,19 @@ void USDXformReader::read_matrix(float r_mat[4][4] /* local matrix */,
     mul_m4_m4m4(r_mat, r_mat, t_mat);
   }
 
-  /* Apply scaling only to root objects, parenting will propagate it. */
-  if (scale != 1.0 && is_root_xform_object()) {
-    float scale_mat[4][4];
-    scale_m4_fl(scale_mat, scale);
-    mul_m4_m4m4(r_mat, scale_mat, r_mat);
+  /* Apply global scaling and rotation only to root objects, parenting
+   * will propagate it. */
+  if ((scale != 1.0 || m_settings->do_convert_mat) && is_root_xform_object()) {
+
+    if (scale != 1.0f) {
+      float scale_mat[4][4];
+      scale_m4_fl(scale_mat, scale);
+      mul_m4_m4m4(r_mat, scale_mat, r_mat);
+    }
+
+    if (m_settings->do_convert_mat) {
+      mul_m4_m4m4(r_mat, m_settings->conversion_mat, r_mat);
+    }
   }
 }
 

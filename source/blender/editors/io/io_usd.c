@@ -316,6 +316,8 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
   const bool import_usd_preview = RNA_boolean_get(op->ptr, "import_usd_preview");
   const bool set_material_blend = RNA_boolean_get(op->ptr, "set_material_blend");
 
+  const bool convert_to_z_up = RNA_boolean_get(op->ptr, "convert_to_z_up");
+
   int offset = 0;
   int sequence_len = 1;
 
@@ -360,6 +362,7 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
       use_instancing,
       import_usd_preview,
       set_material_blend,
+      convert_to_z_up,
   };
 
   bool ok = USD_import(C, filename, &params, as_background_job);
@@ -419,6 +422,9 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
 
   row = uiLayoutRow(box, false);
   uiItemR(row, ptr, "create_collection", 0, NULL, ICON_NONE);
+
+  row = uiLayoutRow(box, false);
+  uiItemR(row, ptr, "convert_to_z_up", 0, NULL, ICON_NONE);
 
   // row = uiLayoutRow(box, false);
   // uiItemR(row, ptr, "prim_path_mask", 0, NULL, ICON_NONE);
@@ -615,6 +621,13 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   "When checked and if the Import Usd Preview option is enabled, "
                   "the material blend method will automatically be set based on the "
                   "shader's opacity and opacityThreshold inputs");
+
+  RNA_def_boolean(ot->srna,
+    "convert_to_z_up",
+    false,
+    "Convert to Z Up",
+    "When checked and if the USD stage up-axis is Y, apply a rotation "
+    "to the imported objects to convert their orientation to Z up ");
 }
 
 #endif /* WITH_USD */

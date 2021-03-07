@@ -65,6 +65,7 @@
 #include "BLI_fileops.h"
 #include "BLI_listbase.h"
 #include "BLI_math_matrix.h"
+#include "BLI_math_rotation.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
 
@@ -236,6 +237,26 @@ static void create_proto_collections(Main *bmain,
                                ID_RECALC_BASE_FLAGS);
     }
   }
+}
+
+// Update the given import settings with the global rotation matrix to orient
+// imported objects with Z-up, if necessary
+static void set_global_rotation(pxr::UsdStageRefPtr stage, ImportSettings &r_settings)
+{
+  if (!stage || pxr::UsdGeomGetStageUpAxis(stage) == pxr::UsdGeomTokens->z) {
+    // Nothing to do.
+    return;
+  }
+
+  r_settings.do_convert_mat = true;
+
+  // Rotate 90 degrees about the X-axis.
+  float rmat[3][3];
+  float axis[3] = { 1.0f, 0.0f, 0.0f };
+  axis_angle_normalized_to_mat3(rmat, axis, M_PI/2.0f);
+
+  unit_m4(r_settings.conversion_mat);
+  copy_m4_m3(r_settings.conversion_mat, rmat);
 }
 
 /* ********************** Export file ********************** */
@@ -548,6 +569,10 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
         RPT_ERROR, "USD Import: unable to find suitable USD plugin to read %s", data->filename);
     data->import_ok = false;
     return;
+  }
+
+  if (data->params.convert_to_z_up) {
+    set_global_rotation(archive->stage(), data->settings);
   }
 
   // Set up the stage for animated data.
