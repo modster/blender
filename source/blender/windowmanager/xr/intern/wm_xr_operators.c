@@ -600,6 +600,11 @@ static void WM_OT_xr_select_raycast(wmOperatorType *ot)
 
   WM_operator_properties_mouse_select(ot);
 
+  /* Override "deselect_all" default value. */
+  PropertyRNA *prop = RNA_struct_type_find_property(ot->srna, "deselect_all");
+  BLI_assert(prop != NULL);
+  RNA_def_property_boolean_default(prop, true);
+
   RNA_def_float(ot->srna,
                 "distance",
                 BVH_RAYCAST_DIST_MAX,
