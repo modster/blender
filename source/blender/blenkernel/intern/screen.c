@@ -533,7 +533,7 @@ void BKE_spacedata_copylist(ListBase *lb1, ListBase *lb2)
 /* facility to set locks for drawing to survive (render) threads accessing drawing data */
 /* lock can become bitflag too */
 /* should be replaced in future by better local data handling for threads */
-void BKE_spacedata_draw_locks(int set)
+void BKE_spacedata_draw_locks(bool set)
 {
   LISTBASE_FOREACH (SpaceType *, st, &spacetypes) {
     LISTBASE_FOREACH (ARegionType *, art, &st->regiontypes) {
@@ -1681,6 +1681,7 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
       sfile->op = NULL;
       sfile->previews_timer = NULL;
       sfile->tags = 0;
+      sfile->runtime = NULL;
       BLO_read_data_address(reader, &sfile->params);
       BLO_read_data_address(reader, &sfile->asset_params);
     }

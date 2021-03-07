@@ -124,7 +124,7 @@ static ID *outliner_ID_drop_find(bContext *C, const wmEvent *event, short idcode
   TreeElement *te = outliner_drop_find(C, event);
   TreeStoreElem *tselem = (te) ? TREESTORE(te) : NULL;
 
-  if (te && te->idcode == idcode && tselem->type == 0) {
+  if (te && (te->idcode == idcode) && (tselem->type == TSE_SOME_ID)) {
     return tselem->id;
   }
   return NULL;
@@ -215,7 +215,7 @@ static bool is_collection_element(TreeElement *te)
 static bool is_object_element(TreeElement *te)
 {
   TreeStoreElem *tselem = TREESTORE(te);
-  return tselem->type == 0 && te->idcode == ID_OB;
+  return (tselem->type == TSE_SOME_ID) && te->idcode == ID_OB;
 }
 
 static bool is_pchan_element(TreeElement *te)
@@ -281,7 +281,7 @@ static int outliner_get_insert_index(TreeElement *drag_te,
 static bool parent_drop_allowed(TreeElement *te, Object *potential_child)
 {
   TreeStoreElem *tselem = TREESTORE(te);
-  if (te->idcode != ID_OB || tselem->type != 0) {
+  if ((te->idcode != ID_OB) || (tselem->type != TSE_SOME_ID)) {
     return false;
   }
 
@@ -421,7 +421,7 @@ static int parent_drop_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   TreeElement *te = outliner_drop_find(C, event);
   TreeStoreElem *tselem = te ? TREESTORE(te) : NULL;
 
-  if (!(te && te->idcode == ID_OB && tselem->type == 0)) {
+  if (!(te && (te->idcode == ID_OB) && (tselem->type == TSE_SOME_ID))) {
     return OPERATOR_CANCELLED;
   }
 
@@ -1213,11 +1213,23 @@ static bool collection_drop_poll(bContext *C,
             *r_tooltip = TIP_("Move after collection");
           }
           break;
-        case TE_INSERT_INTO:
+        case TE_INSERT_INTO: {
           tselem->flag |= TSE_DRAG_INTO;
           changed = true;
-          *r_tooltip = TIP_("Move inside collection (Ctrl to link, Shift to parent)");
+
+          /* Check the type of the drag IDs to avoid the incorrect "Shift to parent"
+           * for collections. Checking the type of the first ID works fine here since
+           * all drag IDs are the same type. */
+          wmDragID *drag_id = (wmDragID *)drag->ids.first;
+          const bool is_object = (GS(drag_id->id->name) == ID_OB);
+          if (is_object) {
+            *r_tooltip = TIP_("Move inside collection (Ctrl to link, Shift to parent)");
+          }
+          else {
+            *r_tooltip = TIP_("Move inside collection (Ctrl to link)");
+          }
           break;
+        }
       }
     }
     if (changed) {
