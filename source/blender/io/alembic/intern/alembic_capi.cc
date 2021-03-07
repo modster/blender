@@ -466,6 +466,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
    * it is not used by anyone, its use count will off by one. */
   id_us_min(&cache_file->id);
 
+  cache_file->default_radius = data->settings.default_radius;
   cache_file->is_sequence = data->settings.is_sequence;
   cache_file->scale = data->settings.scale;
   STRNCPY(cache_file->filepath, data->filename);
@@ -666,7 +667,7 @@ bool ABC_import(bContext *C,
                 int sequence_len,
                 int offset,
                 bool validate_meshes,
-                bool force_modifier,
+                bool always_add_modifier,
                 float default_radius,
                 bool as_background_job)
 {
@@ -686,7 +687,7 @@ bool ABC_import(bContext *C,
   job->settings.sequence_len = sequence_len;
   job->settings.sequence_offset = offset;
   job->settings.validate_meshes = validate_meshes;
-  job->settings.force_modifier = force_modifier;
+  job->settings.always_add_modifier = always_add_modifier;
   job->settings.default_radius = default_radius;
   job->error_code = ABC_NO_ERROR;
   job->was_cancelled = false;

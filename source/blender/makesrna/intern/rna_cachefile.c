@@ -106,10 +106,13 @@ static void rna_def_cachefile(BlenderRNA *brna)
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
   prop = RNA_def_property(srna, "use_proxies", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_ui_text(prop,
-                           "Use Cycles Procedural",
-                           "Load data using the Cycles procedural during preview renders, display "
-                           "boxes in the viewport");
+  RNA_def_property_ui_text(
+      prop,
+      "Use Viewport Proxy",
+      "Display boxes in the viewport as placeholders for the objects, Cycles will use a "
+      "procedural to load the objects during viewport rendering in experimental mode, "
+      "other render engines will also receive a placeholder and should take care of loading the "
+      "Alembic data themselves if possible");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
   /* ----------------- For Scene time ------------------- */

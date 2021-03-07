@@ -118,6 +118,7 @@
 #include "intern/node/deg_node_operation.h"
 #include "intern/node/deg_node_time.h"
 
+#include "intern/depsgraph.h"
 #include "intern/depsgraph_relation.h"
 #include "intern/depsgraph_type.h"
 
@@ -2068,7 +2069,7 @@ void DepsgraphRelationBuilder::build_object_data_geometry(Object *object)
         ctx.node = reinterpret_cast<::DepsNodeHandle *>(&handle);
         mti->updateDepsgraph(md, &ctx);
       }
-      if (BKE_object_modifier_use_time(object, md)) {
+      if (BKE_object_modifier_use_time(object, md, graph_->mode)) {
         TimeSourceKey time_src_key;
         add_relation(time_src_key, obdata_ubereval_key, "Time Source");
       }
@@ -2581,6 +2582,10 @@ void DepsgraphRelationBuilder::build_cachefile(CacheFile *cache_file)
   if (built_map_.checkIsBuiltAndTag(cache_file)) {
     return;
   }
+  /* Do not build relations for this cache_file if set to use proxies so dependant modifiers are
+   * not evaluated.
+   * Evaluating the data from the CacheFile is therefore left to the render engines supporting it.
+   */
   if (cache_file->use_proxies) {
     return;
   }

@@ -95,7 +95,7 @@ void AbcPointsReader::readObjectData(Main *bmain, const Alembic::Abc::ISampleSel
   m_object = BKE_object_add_only_object(bmain, OB_MESH, m_object_name.c_str());
   m_object->data = mesh;
 
-  if (m_settings->force_modifier || has_animations(m_schema, m_settings)) {
+  if (m_settings->always_add_modifier || has_animations(m_schema, m_settings)) {
     addCacheModifier();
   }
 }

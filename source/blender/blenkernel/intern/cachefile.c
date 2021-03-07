@@ -339,9 +339,9 @@ float BKE_cachefile_time_offset(const CacheFile *cache_file, const float time, c
   return cache_file->is_sequence ? frame : frame / fps - time_offset;
 }
 
-bool BKE_cache_file_use_proxies(Depsgraph *depsgraph, CacheFile *cache_file)
+bool BKE_cache_file_use_proxies(CacheFile *cache_file, const int dag_eval_mode)
 {
   /* proxies are only used for display in the viewport */
-  const bool is_final_render = DEG_get_mode(depsgraph) == DAG_EVAL_RENDER;
+  const bool is_final_render = (eEvaluationMode)dag_eval_mode == DAG_EVAL_RENDER;
   return cache_file->use_proxies && !is_final_render;
 }

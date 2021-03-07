@@ -591,7 +591,7 @@ static void ui_alembic_import_settings(uiLayout *layout, PointerRNA *imfptr)
   uiItemR(col, imfptr, "set_frame_range", 0, NULL, ICON_NONE);
   uiItemR(col, imfptr, "is_sequence", 0, NULL, ICON_NONE);
   uiItemR(col, imfptr, "validate_meshes", 0, NULL, ICON_NONE);
-  uiItemR(col, imfptr, "force_modifier", 0, NULL, ICON_NONE);
+  uiItemR(col, imfptr, "always_add_modifier", 0, NULL, ICON_NONE);
   uiItemR(box, imfptr, "default_radius", 0, NULL, ICON_NONE);
 }
 
@@ -626,7 +626,7 @@ static int wm_alembic_import_exec(bContext *C, wmOperator *op)
   const bool is_sequence = RNA_boolean_get(op->ptr, "is_sequence");
   const bool set_frame_range = RNA_boolean_get(op->ptr, "set_frame_range");
   const bool validate_meshes = RNA_boolean_get(op->ptr, "validate_meshes");
-  const bool force_modifier = RNA_boolean_get(op->ptr, "force_modifier");
+  const bool always_add_modifier = RNA_boolean_get(op->ptr, "always_add_modifier");
   const bool as_background_job = RNA_boolean_get(op->ptr, "as_background_job");
   const float default_radius = RNA_float_get(op->ptr, "default_radius");
 
@@ -655,7 +655,7 @@ static int wm_alembic_import_exec(bContext *C, wmOperator *op)
                        sequence_len,
                        offset,
                        validate_meshes,
-                       force_modifier,
+                       always_add_modifier,
                        default_radius,
                        as_background_job);
 
@@ -707,9 +707,9 @@ void WM_OT_alembic_import(wmOperatorType *ot)
                   "Check imported mesh objects for invalid data (slow)");
 
   RNA_def_boolean(ot->srna,
-                  "force_modifier",
+                  "always_add_modifier",
                   false,
-                  "Force Modifier",
+                  "Always Add Modifier",
                   "Add a cache modifier for every object in the Alembic archive, even if they are "
                   "not animated");
 

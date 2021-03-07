@@ -571,8 +571,8 @@ static inline BL::FluidDomainSettings object_fluid_gas_domain_find(BL::Object &b
 static inline BL::MeshSequenceCacheModifier object_mesh_cache_find(BL::Object &b_ob,
                                                                    bool check_velocity)
 {
-  if (b_ob.modifiers.length() > 0) {
-    BL::Modifier b_mod = b_ob.modifiers[b_ob.modifiers.length() - 1];
+  for (int i = b_ob.modifiers.length() - 1; i >= 0; --i) {
+    BL::Modifier b_mod = b_ob.modifiers[i];
 
     if (b_mod.type() == BL::Modifier::type_MESH_SEQUENCE_CACHE) {
       BL::MeshSequenceCacheModifier mesh_cache = BL::MeshSequenceCacheModifier(b_mod);
@@ -585,6 +585,13 @@ static inline BL::MeshSequenceCacheModifier object_mesh_cache_find(BL::Object &b
 
       return mesh_cache;
     }
+
+    /* Skip possible particles system modifiers as they do not modify the geometry. */
+    if (b_mod.type() == BL::Modifier::type_PARTICLE_SYSTEM) {
+      continue;
+    }
+
+    break;
   }
 
   return BL::MeshSequenceCacheModifier(PointerRNA_NULL);

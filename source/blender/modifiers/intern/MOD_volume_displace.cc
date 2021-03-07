@@ -94,7 +94,7 @@ static void foreachTexLink(ModifierData *md, Object *ob, TexWalkFunc walk, void 
   walk(userData, ob, md, "texture");
 }
 
-static bool dependsOnTime(ModifierData *md)
+static bool dependsOnTime(ModifierData *md, const int UNUSED(dag_eval_mode))
 {
   VolumeDisplaceModifierData *vdmd = reinterpret_cast<VolumeDisplaceModifierData *>(md);
   if (vdmd->texture) {

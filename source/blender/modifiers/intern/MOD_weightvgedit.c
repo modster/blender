@@ -112,7 +112,7 @@ static void requiredDataMask(Object *UNUSED(ob),
   /* No need to ask for CD_PREVIEW_MLOOPCOL... */
 }
 
-static bool dependsOnTime(ModifierData *md)
+static bool dependsOnTime(ModifierData *md, const int UNUSED(dag_eval_mode))
 {
   WeightVGEditModifierData *wmd = (WeightVGEditModifierData *)md;
 

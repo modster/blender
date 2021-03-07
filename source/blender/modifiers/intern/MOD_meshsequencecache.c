@@ -110,6 +110,44 @@ static bool isDisabled(const struct Scene *UNUSED(scene),
   return (mcmd->cache_file == NULL) || (mcmd->object_path[0] == '\0');
 }
 
+static Mesh *generate_bounding_box_mesh(Object *object, Mesh *org_mesh)
+{
+  BoundBox *bb = BKE_object_boundbox_get(object);
+  Mesh *result = BKE_mesh_new_nomain_from_template(org_mesh, 8, 0, 0, 24, 6);
+
+  MVert *mvert = result->mvert;
+  for (int i = 0; i < 8; ++i) {
+    copy_v3_v3(mvert[i].co, bb->vec[i]);
+  }
+
+  /* See DNA_object_types.h for the diagram showing the order of the vertices for a BoundBox. */
+  static unsigned int loops_v[6][4] = {
+      {0, 4, 5, 1},
+      {4, 7, 6, 5},
+      {7, 3, 2, 6},
+      {3, 0, 1, 2},
+      {1, 5, 6, 2},
+      {3, 7, 4, 0},
+  };
+
+  MLoop *mloop = result->mloop;
+  for (int i = 0; i < 6; ++i) {
+    for (int j = 0; j < 4; ++j, ++mloop) {
+      mloop->v = loops_v[i][j];
+    }
+  }
+
+  MPoly *mpoly = result->mpoly;
+  for (int i = 0; i < 6; ++i) {
+    mpoly[i].loopstart = i * 4;
+    mpoly[i].totloop = 4;
+  }
+
+  BKE_mesh_calc_edges(result, false, false);
+
+  return result;
+}
+
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
 {
 #ifdef WITH_ALEMBIC
@@ -136,41 +174,8 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   }
 
   /* Do not process data if using proxies, return a box instead for displaying in the viewport. */
-  if (BKE_cache_file_use_proxies(ctx->depsgraph, cache_file)) {
-    BoundBox *bb = BKE_object_boundbox_get(ctx->object);
-    Mesh *result = BKE_mesh_new_nomain_from_template(org_mesh, 8, 0, 0, 24, 6);
-
-    MVert *mvert = result->mvert;
-    for (int i = 0; i < 8; ++i) {
-      copy_v3_v3(mvert[i].co, bb->vec[i]);
-    }
-
-    /* See DNA_object_types.h for the diagram showing the order of the vertices for a BoundBox. */
-    static unsigned int loops_v[6][4] = {
-        {0, 4, 5, 1},
-        {4, 7, 6, 5},
-        {7, 3, 2, 6},
-        {3, 0, 1, 2},
-        {1, 5, 6, 2},
-        {3, 7, 4, 0},
-    };
-
-    MLoop *mloop = result->mloop;
-    for (int i = 0; i < 6; ++i) {
-      for (int j = 0; j < 4; ++j, ++mloop) {
-        mloop->v = loops_v[i][j];
-      }
-    }
-
-    MPoly *mpoly = result->mpoly;
-    for (int i = 0; i < 6; ++i) {
-      mpoly[i].loopstart = i * 4;
-      mpoly[i].totloop = 4;
-    }
-
-    BKE_mesh_calc_edges(result, false, false);
-
-    return result;
+  if (BKE_cache_file_use_proxies(cache_file, (const int)DEG_get_mode(ctx->depsgraph))) {
+    return generate_bounding_box_mesh(ctx->object, org_mesh);
   }
 
   /* If this invocation is for the ORCO mesh, and the mesh in Alembic hasn't changed topology, we
@@ -226,12 +231,13 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
 #endif
 }
 
-static bool dependsOnTime(ModifierData *md)
+static bool dependsOnTime(ModifierData *md, const int dag_eval_mode)
 {
 #ifdef WITH_ALEMBIC
   MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)md;
   /* Do not evaluate animations if using proxies. */
-  return (mcmd->cache_file != NULL) && !mcmd->cache_file->use_proxies;
+  return (mcmd->cache_file != NULL) &&
+         !BKE_cache_file_use_proxies(mcmd->cache_file, dag_eval_mode);
 #else
   UNUSED_VARS(md);
   return false;

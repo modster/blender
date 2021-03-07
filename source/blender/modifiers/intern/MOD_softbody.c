@@ -62,7 +62,7 @@ static void deformVerts(ModifierData *UNUSED(md),
       ctx->depsgraph, scene, ctx->object, DEG_get_ctime(ctx->depsgraph), vertexCos, numVerts);
 }
 
-static bool dependsOnTime(ModifierData *UNUSED(md))
+static bool dependsOnTime(ModifierData *UNUSED(md), const int UNUSED(dag_eval_mode))
 {
   return true;
 }

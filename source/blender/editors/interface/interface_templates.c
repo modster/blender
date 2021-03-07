@@ -7251,22 +7251,8 @@ void uiTemplateCacheFile(uiLayout *layout,
   row = uiLayoutRow(layout, false);
   uiItemR(row, &fileptr, "is_sequence", 0, NULL, ICON_NONE);
 
-  /* Check for presence of Cycles and Experimental feature set to display the use_proxies
-   * option. */
-  Scene *scene = CTX_data_scene(C);
-  PointerRNA scene_ptr;
-  RNA_id_pointer_create(&scene->id, &scene_ptr);
-  if (BKE_scene_uses_cycles(scene)) {
-    PointerRNA cycles_ptr = RNA_pointer_get(&scene_ptr, "cycles");
-    if (RNA_enum_get(&cycles_ptr, "feature_set") == 1) { /* EXPERIMENTAL */
-      row = uiLayoutRow(layout, false);
-      uiItemR(row, &fileptr, "use_proxies", 0, NULL, ICON_NONE);
-
-      uiItemR(layout, &fileptr, "cache_method", 0, NULL, ICON_NONE);
-      uiItemR(layout, &fileptr, "cache_memory_limit", 0, NULL, ICON_NONE);
-      uiItemR(layout, &fileptr, "cache_frame_count", 0, NULL, ICON_NONE);
-    }
-  }
+  row = uiLayoutRow(layout, false);
+  uiItemR(row, &fileptr, "use_proxies", 0, NULL, ICON_NONE);
 
   row = uiLayoutRowWithHeading(layout, true, IFACE_("Override Frame"));
   sub = uiLayoutRow(row, true);

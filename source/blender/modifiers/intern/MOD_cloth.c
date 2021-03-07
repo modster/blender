@@ -219,7 +219,7 @@ static void copyData(const ModifierData *md, ModifierData *target, const int fla
   tclmd->solver_result = NULL;
 }
 
-static bool dependsOnTime(ModifierData *UNUSED(md))
+static bool dependsOnTime(ModifierData *UNUSED(md), const int UNUSED(dag_eval_mode))
 {
   return true;
 }

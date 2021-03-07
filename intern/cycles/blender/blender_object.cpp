@@ -596,26 +596,35 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
     /* Load per-object culling data. */
     culling.init_object(scene, b_ob);
 
-    /* Ensure the object geom supporting the hair is processed before adding
-     * the hair processing task to the task pool, calling .to_mesh() on the
-     * same object in parallel does not work. */
-    const bool sync_hair = b_instance.show_particles() && object_has_particle_hair(b_ob);
-
     /* Object itself. */
     if (b_instance.show_self()) {
 #ifdef WITH_ALEMBIC
-      BL::MeshSequenceCacheModifier b_mesh_cache = object_mesh_cache_find(b_ob, false);
+      bool use_procedural = false;
+      BL::MeshSequenceCacheModifier b_mesh_cache(PointerRNA_NULL);
 
-      /* experimental as blender does not have good support for procedurals at the moment
-       * only available in the viewport at the moment since we load data for all the frames at once
-       * skip in the motion case, as the motion blur data will be handled in the procedural */
-      if (!motion && b_v3d && b_mesh_cache && experimental &&
-          b_mesh_cache.cache_file().use_proxies()) {
-        sync_procedural(b_ob, b_mesh_cache);
+      /* Experimental as Blender does not have good support for procedurals at the moment, also
+       * only available in preview renders since currently do not have a good cache policy, the
+       * data being loaded at once for all the frames. */
+      if (experimental && b_v3d) {
+        b_mesh_cache = object_mesh_cache_find(b_ob, false);
+        use_procedural = b_mesh_cache && b_mesh_cache.cache_file().use_proxies();
+      }
+
+      if (use_procedural) {
+        /* Skip in the motion case, as generating motion blur data will be handled in the
+         * procedural. */
+        if (!motion) {
+          sync_procedural(b_ob, b_mesh_cache);
+        }
       }
       else
 #endif
       {
+        /* Ensure the object geom supporting the hair is processed before adding
+         * the hair processing task to the task pool, calling .to_mesh() on the
+         * same object in parallel does not work. */
+        const bool sync_hair = b_instance.show_particles() && object_has_particle_hair(b_ob);
+
         sync_object(b_depsgraph,
                     b_view_layer,
                     b_instance,
@@ -625,20 +634,20 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
                     culling,
                     &use_portal,
                     sync_hair ? NULL : &geom_task_pool);
-      }
-    }
 
-    /* Particle hair as separate object. */
-    if (sync_hair) {
-      sync_object(b_depsgraph,
-                  b_view_layer,
-                  b_instance,
-                  motion_time,
-                  true,
-                  show_lights,
-                  culling,
-                  &use_portal,
-                  &geom_task_pool);
+        /* Particle hair as separate object. */
+        if (sync_hair) {
+          sync_object(b_depsgraph,
+                      b_view_layer,
+                      b_instance,
+                      motion_time,
+                      true,
+                      show_lights,
+                      culling,
+                      &use_portal,
+                      &geom_task_pool);
+        }
+      }
     }
 
     cancel = progress.get_cancel();

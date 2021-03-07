@@ -60,7 +60,12 @@ void BKE_cachefile_reader_open(struct CacheFile *cache_file,
                                const char *object_path);
 void BKE_cachefile_reader_free(struct CacheFile *cache_file, struct CacheReader **reader);
 
-bool BKE_cache_file_use_proxies(struct Depsgraph *depsgraph, struct CacheFile *cache_file);
+/* Determine whether the CacheFile should use proxies. If so, data is not read from the
+ * file and bouding boxes (the proxies) are used to represent the objects in the Scene. Render
+ * engines will receive the bounding box as a placeholder but can instead load the data directly
+ * if they support it.
+ */
+bool BKE_cache_file_use_proxies(struct CacheFile *cache_file, const int dag_eval_mode);
 
 #ifdef __cplusplus
 }

@@ -132,7 +132,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
 #endif /* WITH_FLUID */
 }
 
-static bool dependsOnTime(ModifierData *UNUSED(md))
+static bool dependsOnTime(ModifierData *UNUSED(md), const int UNUSED(dag_eval_mode))
 {
   return true;
 }

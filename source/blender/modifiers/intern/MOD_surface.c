@@ -98,7 +98,7 @@ static void freeData(ModifierData *md)
   }
 }
 
-static bool dependsOnTime(ModifierData *UNUSED(md))
+static bool dependsOnTime(ModifierData *UNUSED(md), const int UNUSED(dag_eval_mode))
 {
   return true;
 }
