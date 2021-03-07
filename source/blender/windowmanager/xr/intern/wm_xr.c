@@ -144,7 +144,6 @@ bool wm_xr_events_handle(wmWindowManager *wm)
 
 /* -------------------------------------------------------------------- */
 /** \name XR Runtime Data
- *
  * \{ */
 
 wmXrRuntimeData *wm_xr_runtime_data_create(void)

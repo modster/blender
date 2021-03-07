@@ -31,6 +31,7 @@
 #include "BLI_color.hh"
 #include "BLI_float2.hh"
 #include "BLI_span.hh"
+#include "BLI_threads.h"
 
 #include "CLG_log.h"
 
@@ -685,7 +686,8 @@ class DynamicAttributesProvider {
     return false;
   };
 
-  virtual void list(const GeometryComponent &component, Set<std::string> &r_names) const = 0;
+  virtual bool foreach_attribute(const GeometryComponent &component,
+                                 const AttributeForeachCallback callback) const = 0;
   virtual void supported_domains(Vector<AttributeDomain> &r_domains) const = 0;
 };
 
@@ -711,11 +713,13 @@ struct CustomDataAccessInfo {
 class BuiltinCustomDataLayerProvider final : public BuiltinAttributeProvider {
   using AsReadAttribute = ReadAttributePtr (*)(const void *data, const int domain_size);
   using AsWriteAttribute = WriteAttributePtr (*)(void *data, const int domain_size);
+  using UpdateOnRead = void (*)(const GeometryComponent &component);
   using UpdateOnWrite = void (*)(GeometryComponent &component);
   const CustomDataType stored_type_;
   const CustomDataAccessInfo custom_data_access_;
   const AsReadAttribute as_read_attribute_;
   const AsWriteAttribute as_write_attribute_;
+  const UpdateOnRead update_on_read_;
   const UpdateOnWrite update_on_write_;
 
  public:
@@ -729,6 +733,7 @@ class BuiltinCustomDataLayerProvider final : public BuiltinAttributeProvider {
                                  const CustomDataAccessInfo custom_data_access,
                                  const AsReadAttribute as_read_attribute,
                                  const AsWriteAttribute as_write_attribute,
+                                 const UpdateOnRead update_on_read,
                                  const UpdateOnWrite update_on_write)
       : BuiltinAttributeProvider(
             std::move(attribute_name), domain, attribute_type, creatable, writable, deletable),
@@ -736,6 +741,7 @@ class BuiltinCustomDataLayerProvider final : public BuiltinAttributeProvider {
         custom_data_access_(custom_data_access),
         as_read_attribute_(as_read_attribute),
         as_write_attribute_(as_write_attribute),
+        update_on_read_(update_on_read),
         update_on_write_(update_on_write)
   {
   }
@@ -746,6 +752,11 @@ class BuiltinCustomDataLayerProvider final : public BuiltinAttributeProvider {
     if (custom_data == nullptr) {
       return {};
     }
+
+    if (update_on_read_ != nullptr) {
+      update_on_read_(component);
+    }
+
     const int domain_size = component.attribute_domain_size(domain_);
     const void *data = CustomData_get_layer(custom_data, stored_type_);
     if (data == nullptr) {
@@ -964,17 +975,23 @@ class CustomDataAttributeProvider final : public DynamicAttributesProvider {
     return true;
   }
 
-  void list(const GeometryComponent &component, Set<std::string> &r_names) const final
+  bool foreach_attribute(const GeometryComponent &component,
+                         const AttributeForeachCallback callback) const final
   {
     const CustomData *custom_data = custom_data_access_.get_const_custom_data(component);
     if (custom_data == nullptr) {
-      return;
+      return true;
     }
     for (const CustomDataLayer &layer : Span(custom_data->layers, custom_data->totlayer)) {
-      if (this->type_is_supported((CustomDataType)layer.type)) {
-        r_names.add(layer.name);
+      const CustomDataType data_type = (CustomDataType)layer.type;
+      if (this->type_is_supported(data_type)) {
+        AttributeMetaData meta_data{domain_, data_type};
+        if (!callback(layer.name, meta_data)) {
+          return false;
+        }
       }
     }
+    return true;
   }
 
   void supported_domains(Vector<AttributeDomain> &r_domains) const final
@@ -1019,22 +1036,47 @@ static const Mesh *get_mesh_from_component_for_read(const GeometryComponent &com
 }
 
 /**
- * This attribute provider makes uv maps available as float2 attributes.
+ * This attribute provider is used for uv maps and vertex colors.
  */
-class MeshUVsAttributeProvider final : public DynamicAttributesProvider {
+class NamedLegacyCustomDataProvider final : public DynamicAttributesProvider {
+ private:
+  using AsReadAttribute = ReadAttributePtr (*)(const void *data, const int domain_size);
+  using AsWriteAttribute = WriteAttributePtr (*)(void *data, const int domain_size);
+  const AttributeDomain domain_;
+  const CustomDataType attribute_type_;
+  const CustomDataType stored_type_;
+  const CustomDataAccessInfo custom_data_access_;
+  const AsReadAttribute as_read_attribute_;
+  const AsWriteAttribute as_write_attribute_;
+
  public:
+  NamedLegacyCustomDataProvider(const AttributeDomain domain,
+                                const CustomDataType attribute_type,
+                                const CustomDataType stored_type,
+                                const CustomDataAccessInfo custom_data_access,
+                                const AsReadAttribute as_read_attribute,
+                                const AsWriteAttribute as_write_attribute)
+      : domain_(domain),
+        attribute_type_(attribute_type),
+        stored_type_(stored_type),
+        custom_data_access_(custom_data_access),
+        as_read_attribute_(as_read_attribute),
+        as_write_attribute_(as_write_attribute)
+  {
+  }
+
   ReadAttributePtr try_get_for_read(const GeometryComponent &component,
                                     const StringRef attribute_name) const final
   {
-    const Mesh *mesh = get_mesh_from_component_for_read(component);
-    if (mesh == nullptr) {
+    const CustomData *custom_data = custom_data_access_.get_const_custom_data(component);
+    if (custom_data == nullptr) {
       return {};
     }
-    for (const CustomDataLayer &layer : Span(mesh->ldata.layers, mesh->ldata.totlayer)) {
-      if (layer.type == CD_MLOOPUV) {
+    for (const CustomDataLayer &layer : Span(custom_data->layers, custom_data->totlayer)) {
+      if (layer.type == stored_type_) {
         if (layer.name == attribute_name) {
-          return std::make_unique<DerivedArrayReadAttribute<MLoopUV, float2, get_loop_uv>>(
-              ATTR_DOMAIN_CORNER, Span(static_cast<const MLoopUV *>(layer.data), mesh->totloop));
+          const int domain_size = component.attribute_domain_size(domain_);
+          return as_read_attribute_(layer.data, domain_size);
         }
       }
     }
@@ -1044,22 +1086,21 @@ class MeshUVsAttributeProvider final : public DynamicAttributesProvider {
   WriteAttributePtr try_get_for_write(GeometryComponent &component,
                                       const StringRef attribute_name) const final
   {
-    Mesh *mesh = get_mesh_from_component_for_write(component);
-    if (mesh == nullptr) {
+    CustomData *custom_data = custom_data_access_.get_custom_data(component);
+    if (custom_data == nullptr) {
       return {};
     }
-    for (CustomDataLayer &layer : MutableSpan(mesh->ldata.layers, mesh->ldata.totlayer)) {
-      if (layer.type == CD_MLOOPUV) {
+    for (CustomDataLayer &layer : MutableSpan(custom_data->layers, custom_data->totlayer)) {
+      if (layer.type == stored_type_) {
         if (layer.name == attribute_name) {
+          const int domain_size = component.attribute_domain_size(domain_);
           void *data_old = layer.data;
           void *data_new = CustomData_duplicate_referenced_layer_named(
-              &mesh->ldata, CD_MLOOPUV, layer.name, mesh->totloop);
+              custom_data, stored_type_, layer.name, domain_size);
           if (data_old != data_new) {
-            BKE_mesh_update_customdata_pointers(mesh, false);
+            custom_data_access_.update_custom_data_pointers(component);
           }
-          return std::make_unique<
-              DerivedArrayWriteAttribute<MLoopUV, float2, get_loop_uv, set_loop_uv>>(
-              ATTR_DOMAIN_CORNER, MutableSpan(static_cast<MLoopUV *>(layer.data), mesh->totloop));
+          return as_write_attribute_(layer.data, domain_size);
         }
       }
     }
@@ -1068,47 +1109,45 @@ class MeshUVsAttributeProvider final : public DynamicAttributesProvider {
 
   bool try_delete(GeometryComponent &component, const StringRef attribute_name) const final
   {
-    Mesh *mesh = get_mesh_from_component_for_write(component);
-    if (mesh == nullptr) {
+    CustomData *custom_data = custom_data_access_.get_custom_data(component);
+    if (custom_data == nullptr) {
       return false;
     }
-    for (const int i : IndexRange(mesh->ldata.totlayer)) {
-      const CustomDataLayer &layer = mesh->ldata.layers[i];
-      if (layer.type == CD_MLOOPUV && layer.name == attribute_name) {
-        CustomData_free_layer(&mesh->ldata, CD_MLOOPUV, mesh->totloop, i);
-        return true;
+    for (const int i : IndexRange(custom_data->totlayer)) {
+      const CustomDataLayer &layer = custom_data->layers[i];
+      if (layer.type == stored_type_) {
+        if (layer.name == attribute_name) {
+          const int domain_size = component.attribute_domain_size(domain_);
+          CustomData_free_layer(custom_data, stored_type_, domain_size, i);
+          custom_data_access_.update_custom_data_pointers(component);
+          return true;
+        }
       }
     }
     return false;
   }
 
-  void list(const GeometryComponent &component, Set<std::string> &r_names) const final
+  bool foreach_attribute(const GeometryComponent &component,
+                         const AttributeForeachCallback callback) const final
   {
-    const Mesh *mesh = get_mesh_from_component_for_read(component);
-    if (mesh == nullptr) {
-      return;
+    const CustomData *custom_data = custom_data_access_.get_const_custom_data(component);
+    if (custom_data == nullptr) {
+      return true;
     }
-    for (const CustomDataLayer &layer : Span(mesh->ldata.layers, mesh->ldata.totlayer)) {
-      if (layer.type == CD_MLOOPUV) {
-        r_names.add(layer.name);
+    for (const CustomDataLayer &layer : Span(custom_data->layers, custom_data->totlayer)) {
+      if (layer.type == stored_type_) {
+        AttributeMetaData meta_data{domain_, attribute_type_};
+        if (!callback(layer.name, meta_data)) {
+          return false;
+        }
       }
     }
+    return true;
   }
 
   void supported_domains(Vector<AttributeDomain> &r_domains) const final
   {
-    r_domains.append_non_duplicates(ATTR_DOMAIN_CORNER);
-  }
-
- private:
-  static float2 get_loop_uv(const MLoopUV &uv)
-  {
-    return float2(uv.uv);
-  }
-
-  static void set_loop_uv(MLoopUV &uv, const float2 &co)
-  {
-    copy_v2_v2(uv.uv, co);
+    r_domains.append_non_duplicates(domain_);
   }
 };
 
@@ -1187,16 +1226,22 @@ class VertexGroupsAttributeProvider final : public DynamicAttributesProvider {
     return true;
   }
 
-  void list(const GeometryComponent &component, Set<std::string> &r_names) const final
+  bool foreach_attribute(const GeometryComponent &component,
+                         const AttributeForeachCallback callback) const final
   {
     BLI_assert(component.type() == GeometryComponentType::Mesh);
     const MeshComponent &mesh_component = static_cast<const MeshComponent &>(component);
-    mesh_component.vertex_group_names().foreach_item(
-        [&](StringRef name, const int vertex_group_index) {
-          if (vertex_group_index >= 0) {
-            r_names.add(name);
-          }
-        });
+    for (const auto item : mesh_component.vertex_group_names().items()) {
+      const StringRefNull name = item.key;
+      const int vertex_group_index = item.value;
+      if (vertex_group_index >= 0) {
+        AttributeMetaData meta_data{ATTR_DOMAIN_POINT, CD_PROP_FLOAT};
+        if (!callback(name, meta_data)) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   void supported_domains(Vector<AttributeDomain> &r_domains) const final
@@ -1292,6 +1337,113 @@ static void tag_normals_dirty_when_writing_position(GeometryComponent &component
   }
 }
 
+static int get_material_index(const MPoly &mpoly)
+{
+  return static_cast<int>(mpoly.mat_nr);
+}
+
+static void set_material_index(MPoly &mpoly, const int &index)
+{
+  mpoly.mat_nr = static_cast<short>(std::clamp(index, 0, SHRT_MAX));
+}
+
+static ReadAttributePtr make_material_index_read_attribute(const void *data, const int domain_size)
+{
+  return std::make_unique<DerivedArrayReadAttribute<MPoly, int, get_material_index>>(
+      ATTR_DOMAIN_POLYGON, Span<MPoly>((const MPoly *)data, domain_size));
+}
+
+static WriteAttributePtr make_material_index_write_attribute(void *data, const int domain_size)
+{
+  return std::make_unique<
+      DerivedArrayWriteAttribute<MPoly, int, get_material_index, set_material_index>>(
+      ATTR_DOMAIN_POLYGON, MutableSpan<MPoly>((MPoly *)data, domain_size));
+}
+
+static float3 get_vertex_normal(const MVert &vert)
+{
+  float3 result;
+  normal_short_to_float_v3(result, vert.no);
+  return result;
+}
+
+static ReadAttributePtr make_vertex_normal_read_attribute(const void *data, const int domain_size)
+{
+  return std::make_unique<DerivedArrayReadAttribute<MVert, float3, get_vertex_normal>>(
+      ATTR_DOMAIN_POINT, Span<MVert>((const MVert *)data, domain_size));
+}
+
+static void update_vertex_normals_when_dirty(const GeometryComponent &component)
+{
+  const Mesh *mesh = get_mesh_from_component_for_read(component);
+  if (mesh == nullptr) {
+    return;
+  }
+
+  /* Since normals are derived data, `const` write access to them is okay. However, ensure that
+   * two threads don't use write normals to a mesh at the same time. Note that this relies on
+   * the idempotence of the operation; calculating the normals just fills the #MVert struct
+   * rather than allocating new memory. */
+  if (mesh->runtime.cd_dirty_vert & CD_MASK_NORMAL) {
+    ThreadMutex *mesh_eval_mutex = (ThreadMutex *)mesh->runtime.eval_mutex;
+    BLI_mutex_lock(mesh_eval_mutex);
+
+    /* Check again to avoid a second thread needlessly recalculating the same normals. */
+    if (mesh->runtime.cd_dirty_vert & CD_MASK_NORMAL) {
+      BKE_mesh_calc_normals(const_cast<Mesh *>(mesh));
+    }
+
+    BLI_mutex_unlock(mesh_eval_mutex);
+  }
+}
+
+static float2 get_loop_uv(const MLoopUV &uv)
+{
+  return float2(uv.uv);
+}
+
+static void set_loop_uv(MLoopUV &uv, const float2 &co)
+{
+  copy_v2_v2(uv.uv, co);
+}
+
+static ReadAttributePtr make_uvs_read_attribute(const void *data, const int domain_size)
+{
+  return std::make_unique<DerivedArrayReadAttribute<MLoopUV, float2, get_loop_uv>>(
+      ATTR_DOMAIN_CORNER, Span((const MLoopUV *)data, domain_size));
+}
+
+static WriteAttributePtr make_uvs_write_attribute(void *data, const int domain_size)
+{
+  return std::make_unique<DerivedArrayWriteAttribute<MLoopUV, float2, get_loop_uv, set_loop_uv>>(
+      ATTR_DOMAIN_CORNER, MutableSpan((MLoopUV *)data, domain_size));
+}
+
+static Color4f get_loop_color(const MLoopCol &col)
+{
+  Color4f value;
+  rgba_uchar_to_float(value, &col.r);
+  return value;
+}
+
+static void set_loop_color(MLoopCol &col, const Color4f &value)
+{
+  rgba_float_to_uchar(&col.r, value);
+}
+
+static ReadAttributePtr make_vertex_color_read_attribute(const void *data, const int domain_size)
+{
+  return std::make_unique<DerivedArrayReadAttribute<MLoopCol, Color4f, get_loop_color>>(
+      ATTR_DOMAIN_CORNER, Span((const MLoopCol *)data, domain_size));
+}
+
+static WriteAttributePtr make_vertex_color_write_attribute(void *data, const int domain_size)
+{
+  return std::make_unique<
+      DerivedArrayWriteAttribute<MLoopCol, Color4f, get_loop_color, set_loop_color>>(
+      ATTR_DOMAIN_CORNER, MutableSpan((MLoopCol *)data, domain_size));
+}
+
 template<typename T, AttributeDomain Domain>
 static ReadAttributePtr make_array_read_attribute(const void *data, const int domain_size)
 {
@@ -1354,16 +1506,58 @@ static ComponentAttributeProviders create_attribute_providers_for_mesh()
                                                  point_access,
                                                  make_vertex_position_read_attribute,
                                                  make_vertex_position_write_attribute,
+                                                 nullptr,
                                                  tag_normals_dirty_when_writing_position);
-  static MeshUVsAttributeProvider uvs;
+
+  static BuiltinCustomDataLayerProvider material_index("material_index",
+                                                       ATTR_DOMAIN_POLYGON,
+                                                       CD_PROP_INT32,
+                                                       CD_MPOLY,
+                                                       BuiltinAttributeProvider::NonCreatable,
+                                                       BuiltinAttributeProvider::Writable,
+                                                       BuiltinAttributeProvider::NonDeletable,
+                                                       polygon_access,
+                                                       make_material_index_read_attribute,
+                                                       make_material_index_write_attribute,
+                                                       nullptr,
+                                                       nullptr);
+
+  static BuiltinCustomDataLayerProvider vertex_normal("vertex_normal",
+                                                      ATTR_DOMAIN_POINT,
+                                                      CD_PROP_FLOAT3,
+                                                      CD_MVERT,
+                                                      BuiltinAttributeProvider::NonCreatable,
+                                                      BuiltinAttributeProvider::Readonly,
+                                                      BuiltinAttributeProvider::NonDeletable,
+                                                      point_access,
+                                                      make_vertex_normal_read_attribute,
+                                                      nullptr,
+                                                      update_vertex_normals_when_dirty,
+                                                      nullptr);
+
+  static NamedLegacyCustomDataProvider uvs(ATTR_DOMAIN_CORNER,
+                                           CD_PROP_FLOAT2,
+                                           CD_MLOOPUV,
+                                           corner_access,
+                                           make_uvs_read_attribute,
+                                           make_uvs_write_attribute);
+
+  static NamedLegacyCustomDataProvider vertex_colors(ATTR_DOMAIN_CORNER,
+                                                     CD_PROP_COLOR,
+                                                     CD_MLOOPCOL,
+                                                     corner_access,
+                                                     make_vertex_color_read_attribute,
+                                                     make_vertex_color_write_attribute);
+
   static VertexGroupsAttributeProvider vertex_groups;
   static CustomDataAttributeProvider corner_custom_data(ATTR_DOMAIN_CORNER, corner_access);
   static CustomDataAttributeProvider point_custom_data(ATTR_DOMAIN_POINT, point_access);
   static CustomDataAttributeProvider edge_custom_data(ATTR_DOMAIN_EDGE, edge_access);
   static CustomDataAttributeProvider polygon_custom_data(ATTR_DOMAIN_POLYGON, polygon_access);
 
-  return ComponentAttributeProviders({&position},
+  return ComponentAttributeProviders({&position, &material_index, &vertex_normal},
                                      {&uvs,
+                                      &vertex_colors,
                                       &corner_custom_data,
                                       &vertex_groups,
                                       &point_custom_data,
@@ -1409,6 +1603,7 @@ static ComponentAttributeProviders create_attribute_providers_for_point_cloud()
       point_access,
       make_array_read_attribute<float3, ATTR_DOMAIN_POINT>,
       make_array_write_attribute<float3, ATTR_DOMAIN_POINT>,
+      nullptr,
       nullptr);
   static BuiltinCustomDataLayerProvider radius(
       "radius",
@@ -1421,6 +1616,7 @@ static ComponentAttributeProviders create_attribute_providers_for_point_cloud()
       point_access,
       make_array_read_attribute<float, ATTR_DOMAIN_POINT>,
       make_array_write_attribute<float, ATTR_DOMAIN_POINT>,
+      nullptr,
       nullptr);
   static CustomDataAttributeProvider point_custom_data(ATTR_DOMAIN_POINT, point_access);
   return ComponentAttributeProviders({&position, &radius}, {&point_custom_data});
@@ -1532,9 +1728,12 @@ bool GeometryComponent::attribute_try_create(const StringRef attribute_name,
                                              const CustomDataType data_type)
 {
   using namespace blender::bke;
+  if (attribute_name.is_empty()) {
+    return false;
+  }
   const ComponentAttributeProviders *providers = this->get_attribute_providers();
   if (providers == nullptr) {
-    return {};
+    return false;
   }
   const BuiltinAttributeProvider *builtin_provider =
       providers->builtin_attribute_providers().lookup_default_as(attribute_name, nullptr);
@@ -1558,22 +1757,47 @@ bool GeometryComponent::attribute_try_create(const StringRef attribute_name,
 
 Set<std::string> GeometryComponent::attribute_names() const
 {
+  Set<std::string> attributes;
+  this->attribute_foreach([&](StringRefNull name, const AttributeMetaData &UNUSED(meta_data)) {
+    attributes.add(name);
+    return true;
+  });
+  return attributes;
+}
+
+void GeometryComponent::attribute_foreach(const AttributeForeachCallback callback) const
+{
   using namespace blender::bke;
   const ComponentAttributeProviders *providers = this->get_attribute_providers();
   if (providers == nullptr) {
-    return {};
+    return;
   }
-  Set<std::string> names;
+
+  /* Keep track handled attribute names to make sure that we do not return the same name twice. */
+  Set<std::string> handled_attribute_names;
+
   for (const BuiltinAttributeProvider *provider :
        providers->builtin_attribute_providers().values()) {
     if (provider->exists(*this)) {
-      names.add_new(provider->name());
+      AttributeMetaData meta_data{provider->domain(), provider->data_type()};
+      if (!callback(provider->name(), meta_data)) {
+        return;
+      }
+      handled_attribute_names.add_new(provider->name());
     }
   }
   for (const DynamicAttributesProvider *provider : providers->dynamic_attribute_providers()) {
-    provider->list(*this, names);
+    const bool continue_loop = provider->foreach_attribute(
+        *this, [&](StringRefNull name, const AttributeMetaData &meta_data) {
+          if (handled_attribute_names.add(name)) {
+            return callback(name, meta_data);
+          }
+          return true;
+        });
+    if (!continue_loop) {
+      return;
+    }
   }
-  return names;
 }
 
 bool GeometryComponent::attribute_exists(const blender::StringRef attribute_name) const
@@ -1726,7 +1950,7 @@ OutputAttributePtr GeometryComponent::attribute_try_get_for_output(const StringR
   if (!attribute) {
     this->attribute_try_create(attribute_name, domain, data_type);
     attribute = this->attribute_try_get_for_write(attribute_name);
-    if (default_value != nullptr) {
+    if (attribute && default_value != nullptr) {
       void *data = attribute->get_span_for_write_only().data();
       cpp_type->fill_initialized(default_value, data, attribute->size());
       attribute->apply_span();
@@ -1900,9 +2124,9 @@ int MeshComponent::attribute_domain_size(const AttributeDomain domain) const
 namespace blender::bke {
 
 template<typename T>
-void adapt_mesh_domain_corner_to_point_impl(const Mesh &mesh,
-                                            const TypedReadAttribute<T> &attribute,
-                                            MutableSpan<T> r_values)
+static void adapt_mesh_domain_corner_to_point_impl(const Mesh &mesh,
+                                                   const TypedReadAttribute<T> &attribute,
+                                                   MutableSpan<T> r_values)
 {
   BLI_assert(r_values.size() == mesh.totvert);
   attribute_math::DefaultMixer<T> mixer(r_values);
@@ -1935,6 +2159,38 @@ static ReadAttributePtr adapt_mesh_domain_corner_to_point(const Mesh &mesh,
   return new_attribute;
 }
 
+template<typename T>
+static void adapt_mesh_domain_point_to_corner_impl(const Mesh &mesh,
+                                                   const TypedReadAttribute<T> &attribute,
+                                                   MutableSpan<T> r_values)
+{
+  BLI_assert(r_values.size() == mesh.totloop);
+
+  for (const int loop_index : IndexRange(mesh.totloop)) {
+    const int vertex_index = mesh.mloop[loop_index].v;
+    r_values[loop_index] = attribute[vertex_index];
+  }
+}
+
+static ReadAttributePtr adapt_mesh_domain_point_to_corner(const Mesh &mesh,
+                                                          ReadAttributePtr attribute)
+{
+  ReadAttributePtr new_attribute;
+  const CustomDataType data_type = attribute->custom_data_type();
+  attribute_math::convert_to_static_type(data_type, [&](auto dummy) {
+    using T = decltype(dummy);
+    /* It is not strictly necessary to compute the value for all corners here. Instead one could
+     * lazily lookup the mesh topology when a specific index accessed. This can be more efficient
+     * when an algorithm only accesses very few of the corner values. However, for the algorithms
+     * we currently have, precomputing the array is fine. Also, it is easier to implement. */
+    Array<T> values(mesh.totloop);
+    adapt_mesh_domain_point_to_corner_impl<T>(mesh, *attribute, values);
+    new_attribute = std::make_unique<OwnedArrayReadAttribute<T>>(ATTR_DOMAIN_CORNER,
+                                                                 std::move(values));
+  });
+  return new_attribute;
+}
+
 }  // namespace blender::bke
 
 ReadAttributePtr MeshComponent::attribute_try_adapt_domain(ReadAttributePtr attribute,
@@ -1960,6 +2216,14 @@ ReadAttributePtr MeshComponent::attribute_try_adapt_domain(ReadAttributePtr attr
           break;
       }
       break;
+    }
+    case ATTR_DOMAIN_POINT: {
+      switch (new_domain) {
+        case ATTR_DOMAIN_CORNER:
+          return blender::bke::adapt_mesh_domain_point_to_corner(*mesh_, std::move(attribute));
+        default:
+          break;
+      }
     }
     default:
       break;

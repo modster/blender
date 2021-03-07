@@ -40,6 +40,8 @@ static void geo_node_attribute_separate_xyz_layout(uiLayout *layout,
                                                    bContext *UNUSED(C),
                                                    PointerRNA *ptr)
 {
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
   uiItemR(layout, ptr, "input_type", 0, IFACE_("Type"), ICON_NONE);
 }
 
@@ -144,6 +146,8 @@ static void separate_attribute(GeometryComponent &component, const GeoNodeExecPa
 static void geo_node_attribute_separate_xyz_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
+
+  geometry_set = geometry_set_realize_instances(geometry_set);
 
   if (geometry_set.has<MeshComponent>()) {
     separate_attribute(geometry_set.get_component_for_write<MeshComponent>(), params);

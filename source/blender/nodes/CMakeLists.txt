@@ -62,7 +62,7 @@ set(SRC
   composite/nodes/node_composite_composite.c
   composite/nodes/node_composite_cornerpin.c
   composite/nodes/node_composite_crop.c
-  composite/nodes/node_composite_cryptomatte.c
+  composite/nodes/node_composite_cryptomatte.cc
   composite/nodes/node_composite_curves.c
   composite/nodes/node_composite_defocus.c
   composite/nodes/node_composite_denoise.c
@@ -135,6 +135,7 @@ set(SRC
   function/nodes/node_fn_combine_strings.cc
   function/nodes/node_fn_float_compare.cc
   function/nodes/node_fn_group_instance_id.cc
+  function/nodes/node_fn_input_string.cc
   function/nodes/node_fn_input_vector.cc
   function/nodes/node_fn_object_transforms.cc
   function/nodes/node_fn_random_float.cc
@@ -148,9 +149,9 @@ set(SRC
   geometry/nodes/node_geo_attribute_fill.cc
   geometry/nodes/node_geo_attribute_math.cc
   geometry/nodes/node_geo_attribute_mix.cc
-  geometry/nodes/node_geo_attribute_sample_texture.cc
   geometry/nodes/node_geo_attribute_proximity.cc
   geometry/nodes/node_geo_attribute_randomize.cc
+  geometry/nodes/node_geo_attribute_sample_texture.cc
   geometry/nodes/node_geo_attribute_separate_xyz.cc
   geometry/nodes/node_geo_attribute_vector_math.cc
   geometry/nodes/node_geo_boolean.cc
@@ -168,6 +169,7 @@ set(SRC
   geometry/nodes/node_geo_point_translate.cc
   geometry/nodes/node_geo_points_to_volume.cc
   geometry/nodes/node_geo_subdivision_surface.cc
+  geometry/nodes/node_geo_subdivision_surface_simple.cc
   geometry/nodes/node_geo_transform.cc
   geometry/nodes/node_geo_triangulate.cc
   geometry/nodes/node_geo_volume_to_mesh.cc
@@ -257,7 +259,7 @@ set(SRC
   shader/nodes/node_shader_vectTransform.c
   shader/nodes/node_shader_vector_displacement.c
   shader/nodes/node_shader_vector_math.cc
-  shader/nodes/node_shader_vector_rotate.c
+  shader/nodes/node_shader_vector_rotate.cc
   shader/nodes/node_shader_vertex_color.c
   shader/nodes/node_shader_volume_absorption.c
   shader/nodes/node_shader_volume_info.c

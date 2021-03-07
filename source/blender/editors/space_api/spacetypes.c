@@ -282,6 +282,19 @@ void ED_region_surface_draw_cb_draw(ARegionType *art, int type)
   ed_region_draw_cb_draw(NULL, NULL, art, type);
 }
 
+void ED_region_draw_cb_remove_by_type(ARegionType *art, void *draw_fn, void (*free)(void *))
+{
+  LISTBASE_FOREACH_MUTABLE (RegionDrawCB *, rdc, &art->drawcalls) {
+    if (rdc->draw == draw_fn) {
+      if (free) {
+        free(rdc->customdata);
+      }
+      BLI_remlink(&art->drawcalls, rdc);
+      MEM_freeN(rdc);
+    }
+  }
+}
+
 /* ********************* space template *********************** */
 /* forward declare */
 void ED_spacetype_xxx(void);

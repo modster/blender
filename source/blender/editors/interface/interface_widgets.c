@@ -1180,7 +1180,7 @@ void UI_widgetbase_draw_cache_flush(void)
     /* draw single */
     GPU_batch_program_set_builtin(batch, GPU_SHADER_2D_WIDGET_BASE);
     GPU_batch_uniform_4fv_array(
-        batch, "parameters", MAX_WIDGET_PARAMETERS, (float(*)[4])g_widget_base_batch.params);
+        batch, "parameters", MAX_WIDGET_PARAMETERS, (const float(*)[4])g_widget_base_batch.params);
     GPU_batch_uniform_3fv(batch, "checkerColorAndSize", checker_params);
     GPU_batch_draw(batch);
   }
@@ -5237,8 +5237,9 @@ void ui_draw_menu_item(const uiFontStyle *fstyle,
 {
   uiWidgetType *wt = widget_type(UI_WTYPE_MENU_ITEM);
   const rcti _rect = *rect;
+  const int row_height = BLI_rcti_size_y(rect);
   int max_hint_width = INT_MAX;
-  int padding = 0.25f * UI_UNIT_X;
+  int padding = 0.25f * row_height;
   char *cpoin = NULL;
 
   wt->state(wt, state, 0, UI_EMBOSS_UNDEFINED);
@@ -5249,7 +5250,7 @@ void ui_draw_menu_item(const uiFontStyle *fstyle,
   /* text location offset */
   rect->xmin += padding;
   if (iconid) {
-    rect->xmin += UI_DPI_ICON_SIZE;
+    rect->xmin += row_height; /* Use square area for icon. */
   }
 
   /* cut string in 2 parts? */

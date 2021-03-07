@@ -449,7 +449,7 @@ static void oldnewmap_free(OldNewMap *onm)
 
 static void add_main_to_main(Main *mainvar, Main *from)
 {
-  ListBase *lbarray[MAX_LIBARRAY], *fromarray[MAX_LIBARRAY];
+  ListBase *lbarray[INDEX_ID_MAX], *fromarray[INDEX_ID_MAX];
   int a;
 
   set_listbasepointers(mainvar, lbarray);
@@ -517,7 +517,7 @@ void blo_split_main(ListBase *mainlist, Main *main)
     lib_main_array[i] = libmain;
   }
 
-  ListBase *lbarray[MAX_LIBARRAY];
+  ListBase *lbarray[INDEX_ID_MAX];
   i = set_listbasepointers(main, lbarray);
   while (i--) {
     ID *id = lbarray[i]->first;
@@ -1965,7 +1965,7 @@ void blo_end_packed_pointer_map(FileData *fd, Main *oldmain)
 /* undo file support: add all library pointers in lookup */
 void blo_add_library_pointer_map(ListBase *old_mainlist, FileData *fd)
 {
-  ListBase *lbarray[MAX_LIBARRAY];
+  ListBase *lbarray[INDEX_ID_MAX];
 
   LISTBASE_FOREACH (Main *, ptr, old_mainlist) {
     int i = set_listbasepointers(ptr, lbarray);
@@ -4552,7 +4552,7 @@ void BLO_main_expander(BLOExpandDoitCallback expand_doit_func)
  */
 void BLO_expand_main(void *fdhandle, Main *mainvar)
 {
-  ListBase *lbarray[MAX_LIBARRAY];
+  ListBase *lbarray[INDEX_ID_MAX];
   FileData *fd = fdhandle;
   ID *id;
   int a;
@@ -4605,6 +4605,13 @@ static bool object_in_any_collection(Main *bmain, Object *ob)
 {
   LISTBASE_FOREACH (Collection *, collection, &bmain->collections) {
     if (BKE_collection_has_object(collection, ob)) {
+      return true;
+    }
+  }
+
+  LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
+    if (scene->master_collection != NULL &&
+        BKE_collection_has_object(scene->master_collection, ob)) {
       return true;
     }
   }
@@ -4715,7 +4722,7 @@ static void add_loose_object_data_to_scene(Main *mainvar,
   }
 
   /* Loop over all ID types, instancing object-data for ID types that have support for it. */
-  ListBase *lbarray[MAX_LIBARRAY];
+  ListBase *lbarray[INDEX_ID_MAX];
   int i = set_listbasepointers(mainvar, lbarray);
   while (i--) {
     const short idcode = BKE_idtype_idcode_from_index(i);
@@ -4981,7 +4988,7 @@ static bool library_link_idcode_needs_tag_check(const short idcode, const int fl
  */
 static void library_link_clear_tag(Main *mainvar, const int flag)
 {
-  for (int i = 0; i < MAX_LIBARRAY; i++) {
+  for (int i = 0; i < INDEX_ID_MAX; i++) {
     const short idcode = BKE_idtype_idcode_from_index(i);
     BLI_assert(idcode != -1);
     if (library_link_idcode_needs_tag_check(idcode, flag)) {
@@ -5070,8 +5077,8 @@ static void split_main_newid(Main *mainptr, Main *main_newid)
   BLI_strncpy(main_newid->name, mainptr->name, sizeof(main_newid->name));
   main_newid->curlib = mainptr->curlib;
 
-  ListBase *lbarray[MAX_LIBARRAY];
-  ListBase *lbarray_newid[MAX_LIBARRAY];
+  ListBase *lbarray[INDEX_ID_MAX];
+  ListBase *lbarray_newid[INDEX_ID_MAX];
   int i = set_listbasepointers(mainptr, lbarray);
   set_listbasepointers(main_newid, lbarray_newid);
   while (i--) {
@@ -5229,7 +5236,7 @@ void *BLO_library_read_struct(FileData *fd, BHead *bh, const char *blockname)
 
 static int has_linked_ids_to_read(Main *mainvar)
 {
-  ListBase *lbarray[MAX_LIBARRAY];
+  ListBase *lbarray[INDEX_ID_MAX];
   int a = set_listbasepointers(mainvar, lbarray);
 
   while (a--) {
@@ -5244,7 +5251,7 @@ static int has_linked_ids_to_read(Main *mainvar)
 }
 
 static void read_library_linked_id(
-    ReportList *reports, FileData *fd, Main *mainvar, ID *id, ID **r_id)
+    FileData *basefd, FileData *fd, Main *mainvar, ID *id, ID **r_id)
 {
   BHead *bhead = NULL;
   const bool is_valid = BKE_idtype_idcode_is_linkable(GS(id->name)) ||
@@ -5255,7 +5262,7 @@ static void read_library_linked_id(
   }
 
   if (!is_valid) {
-    BLO_reportf_wrap(reports,
+    BLO_reportf_wrap(basefd->reports,
                      RPT_ERROR,
                      TIP_("LIB: %s: '%s' is directly linked from '%s' (parent '%s'), but is a "
                           "non-linkable data type"),
@@ -5274,13 +5281,14 @@ static void read_library_linked_id(
     read_libblock(fd, mainvar, bhead, id->tag, false, r_id);
   }
   else {
-    BLO_reportf_wrap(reports,
-                     RPT_WARNING,
+    BLO_reportf_wrap(basefd->reports,
+                     RPT_INFO,
                      TIP_("LIB: %s: '%s' missing from '%s', parent '%s'"),
                      BKE_idtype_idcode_to_name(GS(id->name)),
                      id->name + 2,
                      mainvar->curlib->filepath_abs,
                      library_parent_filepath(mainvar->curlib));
+    basefd->library_id_missing_count++;
 
     /* Generate a placeholder for this ID (simplified version of read_libblock actually...). */
     if (r_id) {
@@ -5296,7 +5304,7 @@ static void read_library_linked_ids(FileData *basefd,
 {
   GHash *loaded_ids = BLI_ghash_str_new(__func__);
 
-  ListBase *lbarray[MAX_LIBARRAY];
+  ListBase *lbarray[INDEX_ID_MAX];
   int a = set_listbasepointers(mainvar, lbarray);
 
   while (a--) {
@@ -5314,7 +5322,7 @@ static void read_library_linked_ids(FileData *basefd,
          * we go back to a single linked data when loading the file. */
         ID **realid = NULL;
         if (!BLI_ghash_ensure_p(loaded_ids, id->name, (void ***)&realid)) {
-          read_library_linked_id(basefd->reports, fd, mainvar, id, realid);
+          read_library_linked_id(basefd, fd, mainvar, id, realid);
         }
 
         /* realid shall never be NULL - unless some source file/lib is broken
@@ -5345,7 +5353,7 @@ static void read_library_clear_weak_links(FileData *basefd, ListBase *mainlist, 
 {
   /* Any remaining weak links at this point have been lost, silently drop
    * those by setting them to NULL pointers. */
-  ListBase *lbarray[MAX_LIBARRAY];
+  ListBase *lbarray[INDEX_ID_MAX];
   int a = set_listbasepointers(mainvar, lbarray);
 
   while (a--) {
@@ -5434,7 +5442,8 @@ static FileData *read_library_file_data(FileData *basefd,
 
   if (fd == NULL) {
     BLO_reportf_wrap(
-        basefd->reports, RPT_WARNING, TIP_("Cannot find lib '%s'"), mainptr->curlib->filepath_abs);
+        basefd->reports, RPT_INFO, TIP_("Cannot find lib '%s'"), mainptr->curlib->filepath_abs);
+    basefd->library_file_missing_count++;
   }
 
   return fd;
@@ -5528,6 +5537,15 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
     mainptr->curlib->filedata = NULL;
   }
   BKE_main_free(main_newid);
+
+  if (basefd->library_file_missing_count != 0 || basefd->library_id_missing_count != 0) {
+    BKE_reportf(basefd->reports,
+                RPT_WARNING,
+                "LIB: %d libraries and %d linked data-blocks are missing, please check the "
+                "Info and Outliner editors for details",
+                basefd->library_file_missing_count,
+                basefd->library_id_missing_count);
+  }
 }
 
 void *BLO_read_get_new_data_address(BlendDataReader *reader, const void *old_address)

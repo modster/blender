@@ -140,6 +140,7 @@
 
 static RecentFile *wm_file_history_find(const char *filepath);
 static void wm_history_file_free(RecentFile *recent);
+static void wm_history_files_free(void);
 static void wm_history_file_update(void);
 static void wm_history_file_write(void);
 
@@ -710,7 +711,7 @@ bool WM_file_read(bContext *C, const char *filepath, ReportList *reports)
   /* so we can get the error message */
   errno = 0;
 
-  WM_cursor_wait(1);
+  WM_cursor_wait(true);
 
   wm_file_read_pre(C, use_data, use_userdef);
 
@@ -808,7 +809,7 @@ bool WM_file_read(bContext *C, const char *filepath, ReportList *reports)
     }
   }
 
-  WM_cursor_wait(0);
+  WM_cursor_wait(false);
 
   return success;
 }
@@ -1188,7 +1189,7 @@ void wm_history_file_read(void)
 
   lines = BLI_file_read_as_lines(name);
 
-  BLI_listbase_clear(&G.recent_files);
+  wm_history_files_free();
 
   /* read list of recent opened files from recent-files.txt to memory */
   for (l = lines, num = 0; l && (num < U.recent_files); l = l->next) {
@@ -1217,6 +1218,13 @@ static void wm_history_file_free(RecentFile *recent)
   BLI_assert(BLI_findindex(&G.recent_files, recent) != -1);
   MEM_freeN(recent->filepath);
   BLI_freelinkN(&G.recent_files, recent);
+}
+
+static void wm_history_files_free(void)
+{
+  LISTBASE_FOREACH_MUTABLE (RecentFile *, recent, &G.recent_files) {
+    wm_history_file_free(recent);
+  }
 }
 
 static RecentFile *wm_file_history_find(const char *filepath)
@@ -1390,14 +1398,8 @@ static ImBuf *blend_file_thumb(const bContext *C,
   }
 
   if (ibuf) {
-    float aspect = (scene->r.xsch * scene->r.xasp) / (scene->r.ysch * scene->r.yasp);
-
     /* dirty oversampling */
     IMB_scaleImBuf(ibuf, BLEN_THUMB_SIZE, BLEN_THUMB_SIZE);
-
-    /* add pretty overlay */
-    IMB_thumb_overlay_blend(ibuf->rect, ibuf->x, ibuf->y, aspect);
-
     thumb = BKE_main_thumbnail_from_imbuf(NULL, ibuf);
   }
   else {
@@ -1496,7 +1498,7 @@ static bool wm_file_write(bContext *C,
   }
 
   /* don't forget not to return without! */
-  WM_cursor_wait(1);
+  WM_cursor_wait(true);
 
   ED_editors_flush_edits(bmain);
 
@@ -1558,7 +1560,7 @@ static bool wm_file_write(bContext *C,
     MEM_freeN(thumb);
   }
 
-  WM_cursor_wait(0);
+  WM_cursor_wait(false);
 
   return ok;
 }
@@ -1774,7 +1776,12 @@ static int wm_homefile_write_exec(bContext *C, wmOperator *op)
                      filepath,
                      fileflags,
                      &(const struct BlendFileWriteParams){
-                         .remap_mode = BLO_WRITE_PATH_REMAP_RELATIVE,
+                         /* Make all paths absolute when saving the startup file.
+                          * On load the `G.relbase_valid` will be false so the paths
+                          * wont have a base for resolving the relative paths. */
+                         .remap_mode = BLO_WRITE_PATH_REMAP_ABSOLUTE,
+                         /* Don't apply any path changes to the current blend file. */
+                         .use_save_as_copy = true,
                      },
                      op->reports) == 0) {
     printf("fail\n");

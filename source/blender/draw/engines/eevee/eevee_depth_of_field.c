@@ -273,9 +273,12 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
         float minimal_overblur = 1.0f / sqrtf(sample_count);
         float user_overblur = scene_eval->eevee.bokeh_overblur / 100.0f;
 
-        effects->dof_coc_params[1] *= minimal_overblur + user_overblur;
-        /* Avoid dilating the shape. Overblur only soften. */
-        effects->dof_jitter_radius -= effects->dof_coc_params[1];
+        minimal_overblur *= effects->dof_coc_params[1];
+        user_overblur *= effects->dof_coc_params[1];
+
+        effects->dof_coc_params[1] = minimal_overblur + user_overblur;
+        /* Avoid dilating the shape. Over-blur only soften. */
+        effects->dof_jitter_radius -= minimal_overblur + user_overblur * 0.5f;
       }
     }
     else {
@@ -536,7 +539,7 @@ static void dof_dilate_tiles_pass_draw(EEVEE_FramebufferList *fbl,
 }
 
 /**
- * Create mipmaped color & COC textures for gather passes.
+ * Create mipmapped color & COC textures for gather passes.
  **/
 static void dof_reduce_pass_init(EEVEE_FramebufferList *fbl,
                                  EEVEE_PassList *psl,
@@ -820,7 +823,7 @@ static void dof_filter_pass_init(EEVEE_FramebufferList *fbl,
 }
 
 /**
- * Do the Scatter convolution. A sprite is emited for every 4 pixels but is only expanded if the
+ * Do the Scatter convolution. A sprite is emitted for every 4 pixels but is only expanded if the
  * pixels are bright enough to be scattered.
  **/
 static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
@@ -1028,11 +1031,11 @@ void EEVEE_depth_of_field_draw(EEVEE_Data *vedata)
     }
 
     {
-      /* Holefill convolution. */
+      /* Hole-fill convolution. */
       GPU_framebuffer_bind(fbl->dof_gather_fg_holefill_fb);
       DRW_draw_pass(psl->dof_gather_fg_holefill);
 
-      /* NOTE: do not filter the holefill pass as we use it as out filter input buffer. */
+      /* NOTE: do not filter the hole-fill pass as we use it as out filter input buffer. */
     }
 
     GPU_framebuffer_bind(fx->target_buffer);

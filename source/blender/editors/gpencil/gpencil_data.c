@@ -1420,7 +1420,7 @@ void GPENCIL_OT_layer_merge(wmOperatorType *ot)
 
 /* ********************** Change Layer ***************************** */
 
-static int gpencil_layer_change_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(evt))
+static int gpencil_layer_change_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
 {
   uiPopupMenu *pup;
   uiLayout *layout;
@@ -1676,7 +1676,7 @@ void GPENCIL_OT_stroke_arrange(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Arrange Stroke";
   ot->idname = "GPENCIL_OT_stroke_arrange";
-  ot->description = "Arrange selected strokes up/down in the drawing order of the active layer";
+  ot->description = "Arrange selected strokes up/down in the display order of the active layer";
 
   /* callbacks */
   ot->exec = gpencil_stroke_arrange_exec;
@@ -3418,9 +3418,11 @@ static int gpencil_material_select_exec(bContext *C, wmOperator *op)
 
             if (!deselected) {
               gps->flag |= GP_STROKE_SELECT;
+              BKE_gpencil_stroke_select_index_set(gpd, gps);
             }
             else {
               gps->flag &= ~GP_STROKE_SELECT;
+              BKE_gpencil_stroke_select_index_reset(gps);
             }
             for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
               if (!deselected) {

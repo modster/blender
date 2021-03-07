@@ -54,6 +54,10 @@
 
 #include "node_intern.h" /* own include */
 
+/* -------------------------------------------------------------------- */
+/** \name Utilities
+ * \{ */
+
 /**
  * XXX Does some additional initialization on top of #nodeAddNode
  * Can be used with both custom and static nodes,
@@ -93,7 +97,12 @@ bNode *node_add_node(const bContext *C, const char *idname, int type, float locx
   return node;
 }
 
-/* ********************** Add reroute operator ***************** */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Add Reroute Operator
+ * \{ */
+
 static bool add_reroute_intersect_check(bNodeLink *link,
                                         float mcoords[][2],
                                         int tot,
@@ -309,7 +318,11 @@ void NODE_OT_add_reroute(wmOperatorType *ot)
   RNA_def_int(ot->srna, "cursor", WM_CURSOR_CROSS, 0, INT_MAX, "Cursor", "", 0, INT_MAX);
 }
 
-/* ****************** Add Node Group Operator  ******************* */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Add Node Group Operator
+ * \{ */
 
 static bNodeTree *node_add_group_get_and_poll_group_node_tree(Main *bmain,
                                                               wmOperator *op,
@@ -323,9 +336,6 @@ static bNodeTree *node_add_group_get_and_poll_group_node_tree(Main *bmain,
     return NULL;
   }
   if ((node_group->type != ntree->type) || !nodeGroupPoll(ntree, node_group)) {
-    if (RNA_boolean_get(op->ptr, "free_id_on_error")) {
-      BKE_id_delete(bmain, node_group);
-    }
     return NULL;
   }
 
@@ -389,8 +399,6 @@ static int node_add_group_invoke(bContext *C, wmOperator *op, const wmEvent *eve
 
 void NODE_OT_add_group(wmOperatorType *ot)
 {
-  PropertyRNA *prop;
-
   /* identifiers */
   ot->name = "Add Node Group";
   ot->description = "Add an existing node group to the current node editor";
@@ -405,16 +413,13 @@ void NODE_OT_add_group(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
 
   RNA_def_string(ot->srna, "name", "Mask", MAX_ID_NAME - 2, "Name", "Data-block name to assign");
-  prop = RNA_def_boolean(
-      ot->srna,
-      "free_id_on_error",
-      false,
-      "Free Group on Error",
-      "Free the named node group data-block if it could not be added to the tree");
-  RNA_def_property_flag(prop, PROP_HIDDEN);
 }
 
-/* ****************** Add File Node Operator  ******************* */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Add File Node Operator
+ * \{ */
 
 static bool node_add_file_poll(bContext *C)
 {
@@ -522,7 +527,11 @@ void NODE_OT_add_file(wmOperatorType *ot)
   RNA_def_string(ot->srna, "name", "Image", MAX_ID_NAME - 2, "Name", "Data-block name to assign");
 }
 
-/* ****************** Add Mask Node Operator  ******************* */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Add Mask Node Operator
+ * \{ */
 
 static bool node_add_mask_poll(bContext *C)
 {
@@ -583,7 +592,11 @@ void NODE_OT_add_mask(wmOperatorType *ot)
   RNA_def_string(ot->srna, "name", "Mask", MAX_ID_NAME - 2, "Name", "Data-block name to assign");
 }
 
-/********************** New node tree operator *********************/
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name New Node Tree Operator
+ * \{ */
 
 static int new_node_tree_exec(bContext *C, wmOperator *op)
 {
@@ -671,3 +684,5 @@ void NODE_OT_new_node_tree(wmOperatorType *ot)
   RNA_def_enum_funcs(prop, new_node_tree_type_itemf);
   RNA_def_string(ot->srna, "name", "NodeTree", MAX_ID_NAME - 2, "Name", "");
 }
+
+/** \} */

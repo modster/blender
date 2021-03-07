@@ -180,7 +180,7 @@ const EnumPropertyItem rna_enum_object_modifier_type_items[] = {
      "Skin",
      "Create a solid shape from vertices and edges, using the vertex radius to define the "
      "thickness"},
-    {eModifierType_Solidify, "SOLIDIFY", ICON_MOD_SOLIDIFY, "Solidify", " Make the surface thick"},
+    {eModifierType_Solidify, "SOLIDIFY", ICON_MOD_SOLIDIFY, "Solidify", "Make the surface thick"},
     {eModifierType_Subsurf,
      "SUBSURF",
      ICON_MOD_SUBSURF,
@@ -279,7 +279,7 @@ const EnumPropertyItem rna_enum_object_modifier_type_items[] = {
      "WAVE",
      ICON_MOD_WAVE,
      "Wave",
-     "Adds a ripple-like motion to an object’s geometry"},
+     "Adds a ripple-like motion to an object's geometry"},
     {eModifierType_VolumeDisplace,
      "VOLUME_DISPLACE",
      ICON_VOLUME_DATA,
@@ -1657,7 +1657,7 @@ static void rna_def_property_subdivision_common(StructRNA *srna)
       {SUBSURF_UV_SMOOTH_PRESERVE_BOUNDARIES,
        "PRESERVE_BOUNDARIES",
        0,
-       "Keep boundaries",
+       "Keep Boundaries",
        "UVs are smoothed, boundaries are kept sharp"},
       {SUBSURF_UV_SMOOTH_ALL, "SMOOTH_ALL", 0, "All", "UVs and boundaries are smoothed"},
       {0, NULL, 0, NULL, NULL},
@@ -1743,8 +1743,7 @@ static void rna_def_modifier_subsurf(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "show_only_control_edges", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flags", eSubsurfModifierFlag_ControlEdges);
-  RNA_def_property_ui_text(
-      prop, "Optimal Display", "Skip drawing/rendering of interior subdivided edges");
+  RNA_def_property_ui_text(prop, "Optimal Display", "Skip displaying interior subdivided edges");
   RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
   prop = RNA_def_property(srna, "use_creases", PROP_BOOLEAN, PROP_NONE);
@@ -4562,7 +4561,7 @@ static void rna_def_modifier_solidify(BlenderRNA *brna)
        0,
        "Complex",
        "Output a manifold mesh even if the base mesh is non-manifold, "
-       "where edges have 3 or more connecting faces."
+       "where edges have 3 or more connecting faces. "
        "This method is slower"},
       {0, NULL, 0, NULL, NULL},
   };
@@ -6740,7 +6739,7 @@ static void rna_def_modifier_normaledit(BlenderRNA *brna)
        "MUL",
        0,
        "Multiply",
-       "Copy product of old and new normals (*not* cross product)"},
+       "Copy product of old and new normals (not cross product)"},
       {0, NULL, 0, NULL, NULL},
   };
 

@@ -64,10 +64,17 @@ static void workbench_taa_jitter_init_order(float (*table)[2], int num)
     }
   }
 
-  /* move jitter table so that closest sample is in center */
+  float closest_sample[2];
+  copy_v2_v2(closest_sample, table[closest_index]);
   for (int index = 0; index < num; index++) {
-    sub_v2_v2(table[index], table[closest_index]);
-    mul_v2_fl(table[index], 2.0f);
+    /* move jitter table so that closest sample is in center */
+    sub_v2_v2(table[index], closest_sample);
+    for (int i = 0; i < 2; i++) {
+      /* Avoid samples outside range (wrap around). */
+      table[index][i] = fmodf(table[index][i] + 0.5f, 1.0f);
+      /* Recenter the distribution[-1..1]. */
+      table[index][i] = table[index][i] * 2.0f - 1.0f;
+    }
   }
 
   /* swap center sample to the start of the table */
@@ -244,11 +251,11 @@ void workbench_antialiasing_engine_init(WORKBENCH_Data *vedata)
     if (txl->smaa_search_tx == NULL) {
       txl->smaa_search_tx = GPU_texture_create_2d(
           "smaa_search", SEARCHTEX_WIDTH, SEARCHTEX_HEIGHT, 1, GPU_R8, NULL);
-      GPU_texture_update(txl->smaa_search_tx, GPU_DATA_UNSIGNED_BYTE, searchTexBytes);
+      GPU_texture_update(txl->smaa_search_tx, GPU_DATA_UBYTE, searchTexBytes);
 
       txl->smaa_area_tx = GPU_texture_create_2d(
           "smaa_area", AREATEX_WIDTH, AREATEX_HEIGHT, 1, GPU_RG8, NULL);
-      GPU_texture_update(txl->smaa_area_tx, GPU_DATA_UNSIGNED_BYTE, areaTexBytes);
+      GPU_texture_update(txl->smaa_area_tx, GPU_DATA_UBYTE, areaTexBytes);
 
       GPU_texture_filter_mode(txl->smaa_search_tx, true);
       GPU_texture_filter_mode(txl->smaa_area_tx, true);
@@ -285,7 +292,7 @@ static void workbench_antialiasing_weights_get(const float offset[2],
   for (int x = -1; x <= 1; x++) {
     for (int y = -1; y <= 1; y++, i++) {
       float sample_co[2] = {x, y};
-      add_v2_v2(sample_co, offset);
+      sub_v2_v2(sample_co, offset);
       float r = len_v2(sample_co);
       /* fclem: is radial distance ok here? */
       float weight = filter_blackman_harris(r, filter_width);
