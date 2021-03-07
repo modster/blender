@@ -25,7 +25,7 @@ NodeTreeRef::NodeTreeRef(bNodeTree *btree) : btree_(btree)
   Map<bNode *, NodeRef *> node_mapping;
 
   LISTBASE_FOREACH (bNode *, bnode, &btree->nodes) {
-    NodeRef &node = *allocator_.construct<NodeRef>();
+    NodeRef &node = *allocator_.construct<NodeRef>().release();
 
     node.tree_ = this;
     node.bnode_ = bnode;
@@ -33,7 +33,7 @@ NodeTreeRef::NodeTreeRef(bNodeTree *btree) : btree_(btree)
     RNA_pointer_create(&btree->id, &RNA_Node, bnode, &node.rna_);
 
     LISTBASE_FOREACH (bNodeSocket *, bsocket, &bnode->inputs) {
-      InputSocketRef &socket = *allocator_.construct<InputSocketRef>();
+      InputSocketRef &socket = *allocator_.construct<InputSocketRef>().release();
       socket.node_ = &node;
       socket.index_ = node.inputs_.append_and_get_index(&socket);
       socket.is_input_ = true;
@@ -43,13 +43,31 @@ NodeTreeRef::NodeTreeRef(bNodeTree *btree) : btree_(btree)
     }
 
     LISTBASE_FOREACH (bNodeSocket *, bsocket, &bnode->outputs) {
-      OutputSocketRef &socket = *allocator_.construct<OutputSocketRef>();
+      OutputSocketRef &socket = *allocator_.construct<OutputSocketRef>().release();
       socket.node_ = &node;
       socket.index_ = node.outputs_.append_and_get_index(&socket);
       socket.is_input_ = false;
       socket.bsocket_ = bsocket;
       socket.id_ = sockets_by_id_.append_and_get_index(&socket);
       RNA_pointer_create(&btree->id, &RNA_NodeSocket, bsocket, &socket.rna_);
+    }
+
+    LISTBASE_FOREACH (bNodeLink *, blink, &bnode->internal_links) {
+      InternalLinkRef &internal_link = *allocator_.construct<InternalLinkRef>().release();
+      internal_link.blink_ = blink;
+      for (InputSocketRef *socket_ref : node.inputs_) {
+        if (socket_ref->bsocket_ == blink->fromsock) {
+          internal_link.from_ = socket_ref;
+          break;
+        }
+      }
+      for (OutputSocketRef *socket_ref : node.outputs_) {
+        if (socket_ref->bsocket_ == blink->tosock) {
+          internal_link.to_ = socket_ref;
+          break;
+        }
+      }
+      node.internal_links_.append(&internal_link);
     }
 
     input_sockets_.extend(node.inputs_.as_span());
@@ -64,7 +82,7 @@ NodeTreeRef::NodeTreeRef(bNodeTree *btree) : btree_(btree)
     InputSocketRef &to_socket = this->find_input_socket(
         node_mapping, blink->tonode, blink->tosock);
 
-    LinkRef &link = *allocator_.construct<LinkRef>();
+    LinkRef &link = *allocator_.construct<LinkRef>().release();
     link.from_ = &from_socket;
     link.to_ = &to_socket;
     link.blink_ = blink;
@@ -227,6 +245,12 @@ std::string NodeTreeRef::to_dot() const
   }
 
   return digraph.to_dot_string();
+}
+
+const NodeTreeRef &get_tree_ref_from_map(NodeTreeRefMap &node_tree_refs, bNodeTree &btree)
+{
+  return *node_tree_refs.lookup_or_add_cb(&btree,
+                                          [&]() { return std::make_unique<NodeTreeRef>(&btree); });
 }
 
 }  // namespace blender::nodes
