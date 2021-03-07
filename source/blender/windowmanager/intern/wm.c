@@ -106,6 +106,21 @@ static void window_manager_foreach_id(ID *id, LibraryForeachIDData *data)
 static void write_wm_xr_data(BlendWriter *writer, wmXrData *xr_data)
 {
   BKE_screen_view3d_shading_blend_write(writer, &xr_data->session_settings.shading);
+
+  LISTBASE_FOREACH (XrActionConfig *, ac, &xr_data->session_settings.actionconfigs) {
+    BLO_write_struct(writer, XrActionConfig, ac);
+
+    LISTBASE_FOREACH (XrActionMap *, am, &ac->actionmaps) {
+      BLO_write_struct(writer, XrActionMap, am);
+
+      LISTBASE_FOREACH (XrActionMapItem *, ami, &am->items) {
+        BLO_write_struct(writer, XrActionMapItem, ami);
+        if (ami->op[0] && ami->op_properties) {
+          IDP_BlendWrite(writer, ami->op_properties);
+        }
+      }
+    }
+  }
 }
 
 static void window_manager_blend_write(BlendWriter *writer, ID *id, const void *id_address)
@@ -134,6 +149,35 @@ static void window_manager_blend_write(BlendWriter *writer, ID *id, const void *
 static void direct_link_wm_xr_data(BlendDataReader *reader, wmXrData *xr_data)
 {
   BKE_screen_view3d_shading_blend_read_data(reader, &xr_data->session_settings.shading);
+
+  BLO_read_list(reader, &xr_data->session_settings.actionconfigs);
+
+  LISTBASE_FOREACH (XrActionConfig *, ac, &xr_data->session_settings.actionconfigs) {
+    BLO_read_list(reader, &ac->actionmaps);
+
+    LISTBASE_FOREACH (XrActionMap *, am, &ac->actionmaps) {
+      BLO_read_list(reader, &am->items);
+
+      LISTBASE_FOREACH (XrActionMapItem *, ami, &am->items) {
+        if (ami->op[0] && ami->op_properties) {
+          BLO_read_data_address(reader, &ami->op_properties);
+          IDP_BlendDataRead(reader, &ami->op_properties);
+
+          ami->op_properties_ptr = MEM_callocN(sizeof(PointerRNA), "wmOpItemPtr");
+          WM_operator_properties_create(ami->op_properties_ptr, ami->op);
+          ami->op_properties_ptr->data = ami->op_properties;
+        }
+        else {
+          ami->op_properties = NULL;
+          ami->op_properties_ptr = NULL;
+        }
+      }
+    }
+  }
+
+  BLO_read_data_address(reader, &xr_data->session_settings.defaultconf);
+  BLO_read_data_address(reader, &xr_data->session_settings.addonconf);
+  BLO_read_data_address(reader, &xr_data->session_settings.userconf);
 }
 
 static void window_manager_blend_read_data(BlendDataReader *reader, ID *id)
@@ -507,6 +551,9 @@ void WM_check(bContext *C)
     /* Case: fileread. */
     if ((wm->initialized & WM_WINDOW_IS_INIT) == 0) {
       WM_keyconfig_init(C);
+#ifdef WITH_XR_OPENXR
+      WM_xr_actionconfig_init(C);
+#endif
       WM_autosave_init(wm);
     }
 
@@ -593,6 +640,11 @@ void wm_close_and_free(bContext *C, wmWindowManager *wm)
   wmKeyConfig *keyconf;
   while ((keyconf = BLI_pophead(&wm->keyconfigs))) {
     WM_keyconfig_free(keyconf);
+  }
+
+  XrActionConfig *actionconf;
+  while ((actionconf = BLI_pophead(&wm->xr.session_settings.actionconfigs))) {
+    WM_xr_actionconfig_free(actionconf);
   }
 
   BLI_freelistN(&wm->notifier_queue);

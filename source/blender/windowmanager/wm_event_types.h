@@ -392,9 +392,6 @@ enum {
 /* test whether the event is a NDOF event */
 #define ISNDOF(event_type) ((event_type) >= NDOF_MOTION && (event_type) < NDOF_LAST)
 
-/* test whether the event is an XR event */
-#define ISXR(event_type) ((event_type) == EVT_XR_ACTION)
-
 #define IS_EVENT_ACTIONZONE(event_type) \
   ELEM(event_type, EVT_ACTIONZONE_AREA, EVT_ACTIONZONE_REGION, EVT_ACTIONZONE_FULLSCREEN)
 

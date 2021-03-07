@@ -76,13 +76,13 @@ static wmXrAction *action_find(wmXrActionSet *action_set, const char *action_nam
 
 static wmXrAction *action_create(const char *action_set_name,
                                  const char *action_name,
-                                 wmXrActionType type,
+                                 eXrActionType type,
                                  unsigned int count_subaction_paths,
                                  const char **subaction_paths,
                                  float threshold,
                                  wmOperatorType *ot,
                                  IDProperty *op_properties,
-                                 wmXrOpFlag op_flag)
+                                 eXrOpFlag op_flag)
 {
   wmXrAction *action = MEM_callocN(sizeof(wmXrAction), __func__);
   action->name = MEM_mallocN(strlen(action_name) + 1, __func__);
@@ -221,13 +221,13 @@ void WM_xr_action_set_destroy(wmXrData *xr, const char *action_set_name, bool re
 bool WM_xr_action_create(wmXrData *xr,
                          const char *action_set_name,
                          const char *action_name,
-                         wmXrActionType type,
+                         eXrActionType type,
                          unsigned int count_subaction_paths,
                          const char **subaction_paths,
                          float threshold,
                          wmOperatorType *ot,
                          IDProperty *op_properties,
-                         wmXrOpFlag op_flag)
+                         eXrOpFlag op_flag)
 {
   wmXrActionSet *action_set = action_set_find(xr, action_set_name);
   if (!action_set) {
@@ -465,7 +465,7 @@ bool WM_xr_controller_pose_action_set(wmXrData *xr,
 bool WM_xr_action_state_get(const wmXrData *xr,
                             const char *action_set_name,
                             const char *action_name,
-                            wmXrActionType type,
+                            eXrActionType type,
                             const char *subaction_path,
                             void *r_state)
 {

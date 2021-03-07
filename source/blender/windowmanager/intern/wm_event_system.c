@@ -1957,14 +1957,6 @@ static bool wm_eventmatch(const wmEvent *winevent, const wmKeyMapItem *kmi)
     }
   }
 
-  if (ISXR(kmitype)) {
-    wmXrActionData *customdata = winevent->customdata;
-    if (!STREQ(kmi->xr_action_set, customdata->action_set) ||
-        !STREQ(kmi->xr_action, customdata->action)) {
-      return false;
-    }
-  }
-
   return true;
 }
 

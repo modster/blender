@@ -25,6 +25,7 @@
 #include "DNA_windowmanager_types.h"
 #include "DNA_xr_types.h"
 
+#include "RNA_access.h"
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
 
@@ -436,13 +437,15 @@ static bool rna_XrSessionState_action_create(bContext *C,
     WM_operator_bl_idname(idname, op);
     ot = WM_operatortype_find(idname, true);
     if (ot) {
-      /* Get properties from add-on key map for XR session. */
-      wmKeyMap *km = WM_keymap_list_find(
-          &wm->addonconf->keymaps, "XR Session", SPACE_EMPTY, RGN_TYPE_XR);
-      if (km) {
-        wmKeyMapItem *kmi = WM_keymap_item_find_xr(km, action_set_name, action_name);
-        if (kmi && STREQ(kmi->idname, idname)) {
-          op_properties = kmi->properties;
+      /* Get properties from active XR actionmap. */
+      XrActionConfig *ac = WM_xr_actionconfig_active_get(&wm->xr.session_settings);
+      if (ac) {
+        XrActionMap *am = WM_xr_actionmap_list_find(&ac->actionmaps, action_set_name);
+        if (am) {
+          XrActionMapItem *ami = WM_xr_actionmap_item_list_find(&am->items, action_name);
+          if (ami && STREQ(ami->op, op)) {
+            op_properties = ami->op_properties;
+          }
         }
       }
     }
@@ -459,7 +462,8 @@ static bool rna_XrSessionState_action_create(bContext *C,
                              op_properties,
                              op_flag);
 #  else
-  UNUSED_VARS(C, action_set_name, action_name, type, user_path0, user_path1, threshold, op, op_flag);
+  UNUSED_VARS(
+      C, action_set_name, action_name, type, user_path0, user_path1, threshold, op, op_flag);
   return false;
 #  endif
 }
@@ -728,7 +732,517 @@ static void rna_XrSessionState_controller_pose1_rotation_get(PointerRNA *ptr, fl
 #  endif
 }
 
+static XrActionMapItem *rna_XrActionMapItem_new(XrActionMap *am, const char *idname)
+{
+#  ifdef WITH_XR_OPENXR
+  return WM_xr_actionmap_item_ensure(am, idname);
+#  else
+  UNUSED_VARS(am, idname);
+  return NULL;
+#  endif
+}
+
+static XrActionMapItem *rna_XrActionMapItem_new_from_item(XrActionMap *am,
+                                                          const char *idname,
+                                                          XrActionMapItem *ami_src)
+{
+#  ifdef WITH_XR_OPENXR
+  return WM_xr_actionmap_item_add_copy(am, idname, ami_src);
+#  else
+  UNUSED_VARS(am, idname, ami_src);
+  return NULL;
+#  endif
+}
+
+static void rna_XrActionMapItem_remove(XrActionMap *am, ReportList *reports, PointerRNA *ami_ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ami_ptr->data;
+  if (WM_xr_actionmap_item_remove(am, ami) == false) {
+    BKE_reportf(reports,
+                RPT_ERROR,
+                "ActionMapItem '%s' cannot be removed from '%s'",
+                ami->idname,
+                am->idname);
+    return;
+  }
+  RNA_POINTER_INVALIDATE(ami_ptr);
+#  else
+  UNUSED_VARS(am, reports, ami_ptr);
+#  endif
+}
+
+static XrActionMapItem *rna_XrActionMapItem_find(XrActionMap *am, const char *idname)
+{
+#  ifdef WITH_XR_OPENXR
+  return WM_xr_actionmap_item_list_find(&am->items, idname);
+#  else
+  UNUSED_VARS(am, idname);
+  return NULL;
+#  endif
+}
+
+static PointerRNA rna_XrActionMapItem_op_properties_get(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ptr->data;
+  if (ami->op_properties_ptr) {
+    return *(ami->op_properties_ptr);
+  }
+#  else
+  UNUSED_VARS(ptr);
+#  endif
+  return PointerRNA_NULL;
+}
+
+static void rna_XrActionMapItem_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ptr->data;
+  WM_xr_actionmap_item_properties_update_ot(ami);
+#  else
+  UNUSED_VARS(ptr);
+#  endif
+}
+
+static XrActionMap *rna_XrActionMap_new(XrActionConfig *actionconf, const char *idname)
+{
+#  ifdef WITH_XR_OPENXR
+  return WM_xr_actionmap_ensure(actionconf, idname);
+#  else
+  UNUSED_VARS(actionconf, idname);
+  return NULL;
+#  endif
+}
+
+static XrActionMap *rna_XrActionMap_new_from_actionmap(XrActionConfig *actionconf,
+                                                       const char *idname,
+                                                       XrActionMap *am_src)
+{
+#  ifdef WITH_XR_OPENXR
+  return WM_xr_actionmap_add_copy(actionconf, idname, am_src);
+#  else
+  UNUSED_VARS(actionconf, idname, am_src);
+  return NULL;
+#  endif
+}
+
+static void rna_XrActionMap_remove(XrActionConfig *actionconf,
+                                   ReportList *reports,
+                                   PointerRNA *actionmap_ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMap *actionmap = actionmap_ptr->data;
+  if (WM_xr_actionmap_remove(actionconf, actionmap) == false) {
+    BKE_reportf(reports, RPT_ERROR, "ActionMap '%s' cannot be removed", actionmap->idname);
+    return;
+  }
+  RNA_POINTER_INVALIDATE(actionmap_ptr);
+#  else
+  UNUSED_VARS(actionconf, reports, actionmap_ptr);
+#  endif
+}
+
+static XrActionMap *rna_XrActionMap_find(XrActionConfig *actionconf, const char *idname)
+{
+#  ifdef WITH_XR_OPENXR
+  return WM_xr_actionmap_list_find(&actionconf->actionmaps, idname);
+#  else
+  UNUSED_VARS(actionconf, idname);
+  return NULL;
+#  endif
+}
+
+static XrActionConfig *rna_XrActionConfig_new(XrSessionSettings *settings, const char *name)
+{
+#  ifdef WITH_XR_OPENXR
+  return WM_xr_actionconfig_new_user(settings, name);
+#  else
+  UNUSED_VARS(settings, name);
+  return NULL;
+#  endif
+}
+
+static void rna_XrActionConfig_remove(XrSessionSettings *settings,
+                                      ReportList *reports,
+                                      PointerRNA *actionconf_ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionConfig *actionconf = actionconf_ptr->data;
+  if (WM_xr_actionconfig_remove(settings, actionconf) == false) {
+    BKE_reportf(reports, RPT_ERROR, "ActionConfig '%s' cannot be removed", actionconf->idname);
+    return;
+  }
+  RNA_POINTER_INVALIDATE(actionconf_ptr);
+#  else
+  UNUSED_VARS(settings, reports, actionconf_ptr);
+#  endif
+}
+
+static void rna_XrActionConfig_update(XrSessionSettings *settings)
+{
+#  ifdef WITH_XR_OPENXR
+  WM_xr_actionconfig_update(settings);
+#  else
+  UNUSED_VARS(settings);
+#  endif
+}
+
+static PointerRNA rna_XrSessionSettings_actionconfig_active_get(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrSessionSettings *settings = ptr->data;
+  XrActionConfig *ac = WM_xr_actionconfig_active_get(settings);
+  if (!ac) {
+    ac = settings->defaultconf;
+  }
+  return rna_pointer_inherit_refine(ptr, &RNA_XrActionConfig, ac);
+#  else
+  UNUSED_VARS(ptr);
+  return PointerRNA_NULL;
+#  endif
+}
+
+static void rna_XrSessionSettings_actionconfig_active_set(PointerRNA *ptr,
+                                                          PointerRNA value,
+                                                          struct ReportList *UNUSED(reports))
+{
+#  ifdef WITH_XR_OPENXR
+  XrSessionSettings *settings = ptr->data;
+  XrActionConfig *ac = value.data;
+  if (ac) {
+    WM_xr_actionconfig_active_set(settings, ac->idname);
+  }
+#  else
+  UNUSED_VARS(ptr, value);
+#  endif
+}
+
 #else /* RNA_RUNTIME */
+
+static const EnumPropertyItem rna_enum_xr_action_types[] = {
+    {XR_FLOAT_INPUT, "BUTTON", 0, "Button", "Button action"},
+    {XR_VECTOR2F_INPUT, "AXIS", 0, "Axis", "2D axis action"},
+    {XR_POSE_INPUT, "POSE", 0, "Pose", "3D pose action"},
+    {XR_VIBRATION_OUTPUT, "HAPTIC", 0, "Haptic", "Haptic output action"},
+    {0, NULL, 0, NULL, NULL},
+};
+
+static const EnumPropertyItem rna_enum_xr_op_flags[] = {
+    {XR_OP_PRESS,
+     "PRESS",
+     0,
+     "Press",
+     "Execute operator on button press (non-modal operators only)"},
+    {XR_OP_RELEASE,
+     "RELEASE",
+     0,
+     "Release",
+     "Execute operator on button release (non-modal operators only)"},
+    {XR_OP_MODAL, "MODAL", 0, "Modal", "Use modal execution (modal operators only)"},
+    {0, NULL, 0, NULL, NULL},
+};
+
+static void rna_def_xr_actionmap_items(BlenderRNA *brna, PropertyRNA *cprop)
+{
+  StructRNA *srna;
+
+  RNA_def_property_srna(cprop, "XrActionMapItems");
+  srna = RNA_def_struct(brna, "XrActionMapItems", NULL);
+  RNA_def_struct_sdna(srna, "XrActionMap");
+  RNA_def_struct_ui_text(srna, "XR Action Map Items", "Collection of XR action map items");
+
+  RNA_api_xr_actionmapitems(srna);
+}
+
+void RNA_api_xr_actionmapitems(StructRNA *srna)
+{
+  FunctionRNA *func;
+  PropertyRNA *parm;
+
+  func = RNA_def_function(srna, "new", "rna_XrActionMapItem_new");
+  parm = RNA_def_string(func, "idname", NULL, 0, "Name of the action map item", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "item", "XrActionMapItem", "Item", "Added action map item");
+  RNA_def_function_return(func, parm);
+
+  func = RNA_def_function(srna, "new_from_item", "rna_XrActionMapItem_new_from_item");
+  parm = RNA_def_string(func, "idname", NULL, 0, "Name of the action map item", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "item", "XrActionMapItem", "Item", "Item to use as a reference");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "result", "XrActionMapItem", "Item", "Added action map item");
+  RNA_def_function_return(func, parm);
+
+  func = RNA_def_function(srna, "remove", "rna_XrActionMapItem_remove");
+  RNA_def_function_flag(func, FUNC_USE_REPORTS);
+  parm = RNA_def_pointer(func, "item", "XrActionMapItem", "Item", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+  RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
+
+  func = RNA_def_function(srna, "find", "rna_XrActionMapItem_find");
+  parm = RNA_def_string(func, "name", NULL, XR_AMI_MAX_NAME, "Name", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "item", "XrActionMapItem", "Item", "Corresponding action map item");
+  RNA_def_function_return(func, parm);
+}
+
+static void rna_def_xr_actionmaps(BlenderRNA *brna, PropertyRNA *cprop)
+{
+  StructRNA *srna;
+
+  RNA_def_property_srna(cprop, "XrActionMaps");
+  srna = RNA_def_struct(brna, "XrActionMaps", NULL);
+  RNA_def_struct_sdna(srna, "XrActionConfig");
+  RNA_def_struct_ui_text(srna, "XR Action Maps", "Collection of XR action maps");
+
+  RNA_api_xr_actionmaps(srna);
+}
+
+void RNA_api_xr_actionmaps(StructRNA *srna)
+{
+  FunctionRNA *func;
+  PropertyRNA *parm;
+
+  func = RNA_def_function(srna, "new", "rna_XrActionMap_new");
+  parm = RNA_def_string(func, "name", NULL, XR_ACTIONMAP_MAX_NAME, "Name", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "actionmap", "XrActionMap", "Action Map", "Added action map");
+  RNA_def_function_return(func, parm);
+
+  func = RNA_def_function(srna, "new_from_actionmap", "rna_XrActionMap_new_from_actionmap");
+  parm = RNA_def_string(func, "name", NULL, XR_ACTIONMAP_MAX_NAME, "Name", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_pointer(
+      func, "actionmap", "XrActionMap", "Action Map", "Action map to use as a reference");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "result", "XrActionMap", "Action Map", "Added action map");
+  RNA_def_function_return(func, parm);
+
+  func = RNA_def_function(srna, "remove", "rna_XrActionMap_remove");
+  RNA_def_function_flag(func, FUNC_USE_REPORTS);
+  parm = RNA_def_pointer(func, "actionmap", "XrActionMap", "Action Map", "Removed action map");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+  RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
+
+  func = RNA_def_function(srna, "find", "rna_XrActionMap_find");
+  parm = RNA_def_string(func, "name", NULL, XR_ACTIONMAP_MAX_NAME, "Name", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_pointer(
+      func, "actionmap", "XrActionMap", "Action Map", "Corresponding action map");
+  RNA_def_function_return(func, parm);
+}
+
+static void rna_def_xr_actionconfigs(BlenderRNA *brna, PropertyRNA *cprop)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  RNA_def_property_srna(cprop, "XrActionConfigurations");
+  srna = RNA_def_struct(brna, "XrActionConfigurations", NULL);
+  RNA_def_struct_sdna(srna, "XrSessionSettings");
+  RNA_def_struct_ui_text(
+      srna, "XR Action Configurations", "Collection of XR action configurations");
+
+  prop = RNA_def_property(srna, "active", PROP_POINTER, PROP_NONE);
+  RNA_def_property_struct_type(prop, "XrActionConfig");
+  RNA_def_property_pointer_funcs(prop,
+                                 "rna_XrSessionSettings_actionconfig_active_get",
+                                 "rna_XrSessionSettings_actionconfig_active_set",
+                                 NULL,
+                                 NULL);
+  RNA_def_property_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(
+      prop, "Active XR Action Configuration", "Active XR action configuration (preset)");
+
+  prop = RNA_def_property(srna, "default", PROP_POINTER, PROP_NEVER_NULL);
+  RNA_def_property_pointer_sdna(prop, NULL, "defaultconf");
+  RNA_def_property_struct_type(prop, "XrActionConfig");
+  RNA_def_property_ui_text(
+      prop, "Default XR Action Configuration", "Default builtin XR action configuration");
+
+  prop = RNA_def_property(srna, "addon", PROP_POINTER, PROP_NEVER_NULL);
+  RNA_def_property_pointer_sdna(prop, NULL, "addonconf");
+  RNA_def_property_struct_type(prop, "XrActionConfig");
+  RNA_def_property_ui_text(prop,
+                           "Add-on XR Action Configuration",
+                           "XR action configuration that can be extended by add-ons");
+
+  prop = RNA_def_property(srna, "user", PROP_POINTER, PROP_NEVER_NULL);
+  RNA_def_property_pointer_sdna(prop, NULL, "userconf");
+  RNA_def_property_struct_type(prop, "XrActionConfig");
+  RNA_def_property_ui_text(prop,
+                           "User XR Action Configuration",
+                           "XR action configuration that can be extended by users");
+
+  RNA_api_xr_actionconfigs(srna);
+}
+
+void RNA_api_xr_actionconfigs(StructRNA *srna)
+{
+  FunctionRNA *func;
+  PropertyRNA *parm;
+
+  func = RNA_def_function(srna, "new", "rna_XrActionConfig_new");
+  parm = RNA_def_string(func, "name", NULL, XR_ACTIONCONF_MAX_NAME, "Name", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_pointer(func,
+                         "actionconfig",
+                         "XrActionConfig",
+                         "Action Configuration",
+                         "Added action configuration");
+  RNA_def_function_return(func, parm);
+
+  func = RNA_def_function(srna, "remove", "rna_XrActionConfig_remove");
+  RNA_def_function_flag(func, FUNC_USE_REPORTS);
+  parm = RNA_def_pointer(func,
+                         "actionconfig",
+                         "XrActionConfig",
+                         "Action Configuration",
+                         "Removed action configuration");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+  RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
+
+  RNA_def_function(srna, "update", "rna_XrActionConfig_update");
+}
+
+static void rna_def_xr_actionconfig(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  /* XrActionConfig */
+  srna = RNA_def_struct(brna, "XrActionConfig", NULL);
+  RNA_def_struct_sdna(srna, "XrActionConfig");
+  RNA_def_struct_ui_text(
+      srna, "XR Action Configuration", "XR action configuration, including action maps");
+
+  prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "idname");
+  RNA_def_property_ui_text(prop, "Name", "Name of the action configuration");
+  RNA_def_struct_name_property(srna, prop);
+
+  prop = RNA_def_property(srna, "actionmaps", PROP_COLLECTION, PROP_NONE);
+  RNA_def_property_struct_type(prop, "XrActionMap");
+  RNA_def_property_ui_text(
+      prop, "Action Maps", "Action maps configured as part of this configuration");
+  rna_def_xr_actionmaps(brna, prop);
+
+  prop = RNA_def_property(srna, "active_actionmap", PROP_INT, PROP_NONE);
+  RNA_def_property_int_sdna(prop, NULL, "actactionmap");
+  RNA_def_property_ui_text(prop, "Active Action Map", "Currently active action map");
+
+  prop = RNA_def_property(srna, "selected_actionmap", PROP_INT, PROP_NONE);
+  RNA_def_property_int_sdna(prop, NULL, "selactionmap");
+  RNA_def_property_ui_text(prop, "Selected Action Map", "Currently selected action map");
+
+  prop = RNA_def_property(srna, "is_user_defined", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flag", KEYCONF_USER);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(
+      prop, "User Defined", "Indicates that an action configuration was defined by the user");
+
+  /* XrActionMap */
+  srna = RNA_def_struct(brna, "XrActionMap", NULL);
+  RNA_def_struct_sdna(srna, "XrActionMap");
+  RNA_def_struct_ui_text(srna, "XR Action Map", "XR action map");
+
+  prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "idname");
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop, "Name", "Name of the action map");
+  RNA_def_struct_name_property(srna, prop);
+
+  prop = RNA_def_property(srna, "profile", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_maxlength(prop, 256);
+  RNA_def_property_ui_text(prop, "Profile", "OpenXR interaction profile path");
+
+  prop = RNA_def_property(srna, "actionmap_items", PROP_COLLECTION, PROP_NONE);
+  RNA_def_property_collection_sdna(prop, NULL, "items", NULL);
+  RNA_def_property_struct_type(prop, "XrActionMapItem");
+  RNA_def_property_ui_text(
+      prop, "Items", "Items in the actionmap, linking an operator to an XR action");
+  rna_def_xr_actionmap_items(brna, prop);
+
+  prop = RNA_def_property(srna, "selected_item", PROP_INT, PROP_NONE);
+  RNA_def_property_int_sdna(prop, NULL, "selitem");
+  RNA_def_property_ui_text(prop, "Selected Item", "Currently selected item");
+
+  /* XrActionMapItem */
+  srna = RNA_def_struct(brna, "XrActionMapItem", NULL);
+  RNA_def_struct_sdna(srna, "XrActionMapItem");
+  RNA_def_struct_ui_text(srna, "XR Action Map Item", "Item in an XR action map");
+
+  prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "idname");
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop, "Name", "Name of the action map item");
+  RNA_def_struct_name_property(srna, prop);
+
+  prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_enum_xr_action_types);
+  RNA_def_property_ui_text(prop, "Type", "Action type");
+  RNA_def_property_update(prop, 0, "rna_XrActionMapItem_update");
+
+  prop = RNA_def_property(srna, "user_path0", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_maxlength(prop, 64);
+  RNA_def_property_ui_text(prop, "User Path 0", "OpenXR user path");
+
+  prop = RNA_def_property(srna, "user_path1", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_maxlength(prop, 64);
+  RNA_def_property_ui_text(prop, "User Path 1", "OpenXR user path");
+
+  prop = RNA_def_property(srna, "component_path0", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_maxlength(prop, 192);
+  RNA_def_property_ui_text(prop, "Component Path 0", "OpenXR component path");
+
+  prop = RNA_def_property(srna, "component_path1", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_maxlength(prop, 192);
+  RNA_def_property_ui_text(prop, "Component Path 1", "OpenXR component path");
+
+  prop = RNA_def_property(srna, "threshold", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_range(prop, 0.0, 1.0);
+  RNA_def_property_ui_text(prop, "Input Threshold", "Input threshold for button/axis actions");
+
+  prop = RNA_def_property(srna, "op", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_maxlength(prop, OP_MAX_TYPENAME);
+  RNA_def_property_ui_text(
+      prop, "Operator", "Name of operator (translated) to call on action event");
+  RNA_def_property_update(prop, 0, "rna_XrActionMapItem_update");
+
+  prop = RNA_def_property(srna, "op_properties", PROP_POINTER, PROP_NONE);
+  RNA_def_property_struct_type(prop, "OperatorProperties");
+  RNA_def_property_pointer_funcs(prop, "rna_XrActionMapItem_op_properties_get", NULL, NULL, NULL);
+  RNA_def_property_ui_text(
+      prop, "Operator Properties", "Properties to set when the operator is called");
+  RNA_def_property_update(prop, 0, "rna_XrActionMapItem_update");
+
+  prop = RNA_def_property(srna, "op_flag", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_enum_xr_op_flags);
+  RNA_def_property_ui_text(prop, "Operator Flag", "Operator flag");
+
+  prop = RNA_def_property(srna, "pose_is_controller", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Is Controller", "Pose will be used for the VR controllers");
+
+  prop = RNA_def_property(srna, "pose_location", PROP_FLOAT, PROP_TRANSLATION);
+  RNA_def_property_ui_text(prop, "Pose Location Offset", "Pose location offset");
+
+  prop = RNA_def_property(srna, "pose_rotation", PROP_FLOAT, PROP_EULER);
+  RNA_def_property_ui_text(prop, "Pose Rotation Offset", "Pose rotation offset");
+
+  prop = RNA_def_property(srna, "haptic_duration", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_range(prop, 0.0, FLT_MAX);
+  RNA_def_property_ui_text(
+      prop, "Haptic Duration", "Haptic duration in seconds, 0 = minimum supported duration");
+
+  prop = RNA_def_property(srna, "haptic_frequency", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_range(prop, 0.0, FLT_MAX);
+  RNA_def_property_ui_text(prop, "Haptic Frequency", "Haptic frequency, 0 = default frequency");
+
+  prop = RNA_def_property(srna, "haptic_amplitude", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_range(prop, 0.0, 1.0);
+  RNA_def_property_ui_text(prop, "Haptic Amplitude", "Haptic amplitude (0 ~ 1)");
+}
 
 static void rna_def_xr_session_settings(BlenderRNA *brna)
 {
@@ -880,6 +1394,12 @@ static void rna_def_xr_session_settings(BlenderRNA *brna)
       prop, "Absolute Tracking", "Use unadjusted location/rotation as defined by the XR runtime");
   RNA_def_property_update(prop, NC_WM | ND_XR_DATA_CHANGED, NULL);
 
+  prop = RNA_def_property(srna, "actionconfigs", PROP_COLLECTION, PROP_NONE);
+  RNA_def_property_struct_type(prop, "XrActionConfig");
+  RNA_def_property_ui_text(
+      prop, "XR Action Configurations", "Registered XR action configurations");
+  rna_def_xr_actionconfigs(brna, prop);
+
   prop = RNA_def_property(srna, "headset_object", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_funcs(
       prop, NULL, "rna_XrSessionSettings_headset_object_set", NULL, NULL);
@@ -967,29 +1487,6 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   FunctionRNA *func;
   PropertyRNA *parm, *prop;
 
-  static const EnumPropertyItem action_types[] = {
-      {XR_FLOAT_INPUT, "BUTTON", 0, "Button", "Button action"},
-      {XR_VECTOR2F_INPUT, "AXIS", 0, "Axis", "2D axis action"},
-      {XR_POSE_INPUT, "POSE", 0, "Pose", "3D pose action"},
-      {XR_VIBRATION_OUTPUT, "HAPTIC", 0, "Haptic", "Haptic output action"},
-      {0, NULL, 0, NULL, NULL},
-  };
-
-  static const EnumPropertyItem op_flags[] = {
-      {XR_OP_PRESS,
-       "PRESS",
-       0,
-       "Press",
-       "Execute operator on button press (non-modal operators only)"},
-      {XR_OP_RELEASE,
-       "RELEASE",
-       0,
-       "Release",
-       "Execute operator on button release (non-modal operators only)"},
-      {XR_OP_MODAL, "MODAL", 0, "Modal", "Use modal execution (modal operators only)"},
-      {0, NULL, 0, NULL, NULL},
-  };
-
   srna = RNA_def_struct(brna, "XrSessionState", NULL);
   RNA_def_struct_clear_flag(srna, STRUCT_UNDO);
   RNA_def_struct_ui_text(srna, "Session State", "Runtime state information about the VR session");
@@ -1039,7 +1536,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
                         "Action name (must not contain upper case letters or special characters "
                         "other than '-', '_', or '.'");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
-  parm = RNA_def_enum(func, "type", action_types, 0, "Type", "Action type");
+  parm = RNA_def_enum(func, "type", rna_enum_xr_action_types, 0, "Type", "Action type");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_string(func, "user_path0", NULL, 64, "User Path 0", "User path 0");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
@@ -1059,7 +1556,7 @@ static void rna_def_xr_session_state(BlenderRNA *brna)
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_enum(func,
                       "op_flag",
-                      op_flags,
+                      rna_enum_xr_op_flags,
                       0,
                       "Operator Flag",
                       "When to execute the operator (press, release, or modal)");
@@ -1302,6 +1799,7 @@ void RNA_def_xr(BlenderRNA *brna)
 {
   RNA_define_animate_sdna(false);
 
+  rna_def_xr_actionconfig(brna);
   rna_def_xr_session_settings(brna);
   rna_def_xr_session_state(brna);
 

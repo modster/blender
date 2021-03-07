@@ -70,6 +70,7 @@ typedef struct wmXrSessionState {
   /** Last known controller data. */
   wmXrControllerData controllers[2];
 
+  /** Action sets. */
   struct GHash *action_sets; /* wmXrActionSet */
   /** Shared pointer with the GHash. The currently active action set that will be updated
    * on calls to wm_xr_session_actions_update().
@@ -129,7 +130,7 @@ typedef struct wmXrDrawData {
 
 typedef struct wmXrAction {
   char *name;
-  char type; /* wmXrActionType */
+  eXrActionType type;
   unsigned int count_subaction_paths;
   char **subaction_paths;
   /** States for each subaction path. */
@@ -146,7 +147,7 @@ typedef struct wmXrAction {
   /** Operator to be called on XR events. */
   struct wmOperatorType *ot;
   IDProperty *op_properties;
-  char op_flag; /* wmXrOpFlag */
+  eXrOpFlag op_flag;
 } wmXrAction;
 
 typedef struct wmXrActionSet {

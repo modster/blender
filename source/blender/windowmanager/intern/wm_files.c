@@ -196,6 +196,16 @@ static void wm_window_match_init(bContext *C, ListBase *wmlist)
       WM_event_remove_handlers(C, &win->modalhandlers);
       ED_screen_exit(C, win, WM_window_get_active_screen(win));
     }
+
+    /* Free XR actionconfigs. */
+    XrSessionSettings *xrsettings = &wm->xr.session_settings;
+    XrActionConfig *actionconf;
+    while ((actionconf = BLI_pophead(&xrsettings->actionconfigs))) {
+      WM_xr_actionconfig_free(actionconf);
+    }
+    xrsettings->defaultconf = NULL;
+    xrsettings->addonconf = NULL;
+    xrsettings->userconf = NULL;
   }
 
   /* reset active window */

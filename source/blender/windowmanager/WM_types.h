@@ -120,6 +120,7 @@ struct wmWindowManager;
 #include "BLI_compiler_attrs.h"
 #include "DNA_listBase.h"
 #include "DNA_vec_types.h"
+#include "DNA_xr_types.h"
 #include "RNA_types.h"
 
 /* exported types for WM */
@@ -676,28 +677,13 @@ typedef struct wmNDOFMotionData {
 } wmNDOFMotionData;
 #endif /* WITH_INPUT_NDOF */
 
-/** XR action type. Enum values match those in GHOST_XrActionType enum for consistency. */
-typedef enum wmXrActionType {
-  XR_BOOLEAN_INPUT = 1,
-  XR_FLOAT_INPUT = 2,
-  XR_VECTOR2F_INPUT = 3,
-  XR_POSE_INPUT = 4,
-  XR_VIBRATION_OUTPUT = 100,
-} wmXrActionType;
-
-typedef enum wmXrOpFlag {
-  XR_OP_PRESS = 0,
-  XR_OP_RELEASE = 1,
-  XR_OP_MODAL = 2,
-} wmXrOpFlag;
-
 typedef struct wmXrActionData {
   /** Action set name. */
   char action_set[64];
   /** Action name. */
   char action[64];
   /** Type. */
-  wmXrActionType type;
+  eXrActionType type;
   /** State. Set appropriately based on type. */
   float state[2];
 

@@ -140,11 +140,6 @@ static const EnumPropertyItem event_ndof_type_items[] = {
     {NDOF_BUTTON_C, "NDOF_BUTTON_C", 0, "Button C", ""},
     {0, NULL, 0, NULL, NULL},
 };
-
-static const EnumPropertyItem event_xr_type_items[] = {
-    {EVT_XR_ACTION, "XR_ACTION", 0, "XR Action", ""},
-    {0, NULL, 0, NULL, NULL},
-};
 #endif /* RNA_RUNTIME */
 
 /* not returned: CAPSLOCKKEY, UNKNOWNKEY */
@@ -1055,10 +1050,6 @@ static void rna_wmKeyMapItem_map_type_set(PointerRNA *ptr, int value)
         kmi->type = NDOF_MOTION;
         kmi->val = KM_NOTHING;
         break;
-      case KMI_TYPE_XR:
-        kmi->type = EVT_XR_ACTION;
-        kmi->val = KM_NOTHING;
-        break;
     }
   }
 }
@@ -1083,48 +1074,6 @@ static void rna_wmKeyMapItem_keymodifier_set(PointerRNA *ptr, int value)
   }
 }
 
-static void rna_wmKeyMapItem_xr_action_set_get(PointerRNA *ptr, char *value)
-{
-  wmKeyMapItem *kmi = ptr->data;
-  strcpy(value, kmi->xr_action_set);
-}
-
-static int rna_wmKeyMapItem_xr_action_set_length(PointerRNA *ptr)
-{
-  wmKeyMapItem *kmi = ptr->data;
-  return strlen(kmi->xr_action_set);
-}
-
-static void rna_wmKeyMapItem_xr_action_set_set(PointerRNA *ptr, const char *value)
-{
-  wmKeyMapItem *kmi = ptr->data;
-
-  if (!STREQ(value, kmi->xr_action_set)) {
-    strcpy(kmi->xr_action_set, value);
-  }
-}
-
-static void rna_wmKeyMapItem_xr_action_get(PointerRNA *ptr, char *value)
-{
-  wmKeyMapItem *kmi = ptr->data;
-  strcpy(value, kmi->xr_action);
-}
-
-static int rna_wmKeyMapItem_xr_action_length(PointerRNA *ptr)
-{
-  wmKeyMapItem *kmi = ptr->data;
-  return strlen(kmi->xr_action);
-}
-
-static void rna_wmKeyMapItem_xr_action_set(PointerRNA *ptr, const char *value)
-{
-  wmKeyMapItem *kmi = ptr->data;
-
-  if (!STREQ(value, kmi->xr_action)) {
-    strcpy(kmi->xr_action, value);
-  }
-}
-
 static const EnumPropertyItem *rna_KeyMapItem_type_itemf(bContext *UNUSED(C),
                                                          PointerRNA *ptr,
                                                          PropertyRNA *UNUSED(prop),
@@ -1146,9 +1095,6 @@ static const EnumPropertyItem *rna_KeyMapItem_type_itemf(bContext *UNUSED(C),
   }
   if (map_type == KMI_TYPE_TEXTINPUT) {
     return event_textinput_type_items;
-  }
-  if (map_type == KMI_TYPE_XR) {
-    return event_xr_type_items;
   }
   else {
     return rna_enum_event_type_items;
@@ -2291,7 +2237,7 @@ static void rna_def_event(BlenderRNA *brna)
   StructRNA *srna;
   PropertyRNA *prop;
 
-  static const EnumPropertyItem xr_types[] = {
+  static const EnumPropertyItem xr_action_types[] = {
       {XR_BOOLEAN_INPUT, "BOOLEAN", 0, "Boolean", "Boolean value"},
       {XR_FLOAT_INPUT, "FLOAT", 0, "Float", "Float value"},
       {XR_VECTOR2F_INPUT, "VECTOR2F", 0, "Vector2f", "2D float vector value"},
@@ -2438,7 +2384,7 @@ static void rna_def_event(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "xr_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-  RNA_def_property_enum_items(prop, xr_types);
+  RNA_def_property_enum_items(prop, xr_action_types);
   RNA_def_property_enum_funcs(prop, "rna_Event_xr_type_get", NULL, NULL);
   RNA_def_property_ui_text(prop, "XR Type", "XR action type");
 
@@ -2806,7 +2752,6 @@ static void rna_def_keyconfig(BlenderRNA *brna)
       {KMI_TYPE_NDOF, "NDOF", 0, "NDOF", ""},
       {KMI_TYPE_TEXTINPUT, "TEXTINPUT", 0, "Text Input", ""},
       {KMI_TYPE_TIMER, "TIMER", 0, "Timer", ""},
-      {KMI_TYPE_XR, "XR", 0, "XR", ""},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -2998,24 +2943,6 @@ static void rna_def_keyconfig(BlenderRNA *brna)
   RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_UI_EVENTS);
   RNA_def_property_enum_funcs(prop, NULL, "rna_wmKeyMapItem_keymodifier_set", NULL);
   RNA_def_property_ui_text(prop, "Key Modifier", "Regular key pressed as a modifier");
-  RNA_def_property_update(prop, 0, "rna_KeyMapItem_update");
-
-  prop = RNA_def_property(srna, "xr_action_set", PROP_STRING, PROP_NONE);
-  RNA_def_property_string_sdna(prop, NULL, "xr_action_set");
-  RNA_def_property_ui_text(prop, "XR Action Set", "XR action set name");
-  RNA_def_property_string_funcs(prop,
-                                "rna_wmKeyMapItem_xr_action_set_get",
-                                "rna_wmKeyMapItem_xr_action_set_length",
-                                "rna_wmKeyMapItem_xr_action_set_set");
-  RNA_def_property_update(prop, 0, "rna_KeyMapItem_update");
-
-  prop = RNA_def_property(srna, "xr_action", PROP_STRING, PROP_NONE);
-  RNA_def_property_string_sdna(prop, NULL, "xr_action");
-  RNA_def_property_ui_text(prop, "XR Action", "XR action name");
-  RNA_def_property_string_funcs(prop,
-                                "rna_wmKeyMapItem_xr_action_get",
-                                "rna_wmKeyMapItem_xr_action_length",
-                                "rna_wmKeyMapItem_xr_action_set");
   RNA_def_property_update(prop, 0, "rna_KeyMapItem_update");
 
   prop = RNA_def_property(srna, "repeat", PROP_BOOLEAN, PROP_NONE);

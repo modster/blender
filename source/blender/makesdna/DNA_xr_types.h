@@ -26,6 +26,8 @@
 extern "C" {
 #endif
 
+struct XrActionConfig;
+
 typedef struct XrSessionSettings {
   /** Shading settings, struct shared with 3D-View so settings are the same. */
   struct View3DShading shading;
@@ -52,8 +54,16 @@ typedef struct XrSessionSettings {
 
   int flag;
 
-  /** Objects whose location and rotation will be constrained to the XR headset/controller poses.
-   */
+  /** Known action configurations. */
+  ListBase actionconfigs;
+  /** Default configuration. */
+  struct XrActionConfig *defaultconf;
+  /** Addon configuration. */
+  struct XrActionConfig *addonconf;
+  /** User configuration. */
+  struct XrActionConfig *userconf;
+
+  /** Objects to constrain to XR headset/controller poses. */
   Object *headset_object;
   Object *controller0_object;
   Object *controller1_object;
@@ -63,6 +73,114 @@ typedef struct XrSessionSettings {
   char controller1_flag;
   char _pad3[5];
 } XrSessionSettings;
+
+typedef struct XrActionMapItem {
+  struct XrActionMapItem *next, *prev;
+
+  /** Unique name. */
+  char idname[64];
+  /** Type. */
+  char type; /** eXrActionType */
+  char _pad[1];
+
+  short flag;
+
+  /** Input threshold for float actions. */
+  float threshold;
+
+  /** OpenXR user paths. */
+  char user_path0[64];
+  char user_path1[64];
+  /** OpenXR component paths. */
+  char component_path0[192];
+  char component_path1[192];
+
+  /** Operator to be called on XR events. */
+  char op[64];
+  /** Operator properties, assigned to ptr->data and can be written to a file. */
+  IDProperty *op_properties;
+  /** RNA pointer to access properties. */
+  struct PointerRNA *op_properties_ptr;
+  char op_flag; /* eXrOpFlag */
+
+  /** Pose action properties. */
+  char pose_is_controller;
+  char _pad2[2];
+  float pose_location[3];
+  float pose_rotation[3];
+
+  /** Haptic action properties. */
+  float haptic_duration;
+  float haptic_frequency;
+  float haptic_amplitude;
+} XrActionMapItem;
+
+/** #XrActionMapItem.flag */
+enum {
+  XR_AMI_INACTIVE = (1 << 0),
+  XR_AMI_USER_MODIFIED = (1 << 1), /* Actionmap item has user modifications. */
+  XR_AMI_UPDATE = (1 << 2),
+};
+
+typedef struct XrActionMap {
+  struct XrActionMap *next, *prev;
+
+  /** Unique name. */
+  char idname[64];
+  /** OpenXR interaction profile path. */
+  char profile[256];
+
+  ListBase items; /* XrActionMapItem */
+  short selitem;
+  short flag;
+  char _pad[4];
+} XrActionMap;
+
+/** #XrActionMap.flag */
+enum {
+  XR_ACTIONMAP_USER = (1 << 0),          /* User actionmap. */
+  XR_ACTIONMAP_USER_MODIFIED = (1 << 1), /* Actionmap has user modifications. */
+  XR_ACTIONMAP_UPDATE = (1 << 2),
+};
+
+typedef struct XrActionConfig {
+  struct XrActionConfig *next, *prev;
+
+  /** Unique name. */
+  char idname[64];
+
+  ListBase actionmaps; /* XrActionMap */
+  short actactionmap;
+  short selactionmap;
+  short flag;
+  char _pad[2];
+} XrActionConfig;
+
+/** #XrActionConfig.flag */
+enum {
+  XR_ACTIONCONF_USER = (1 << 0), /* User action config. */
+};
+
+#define XR_ACTIONCONF_MAX_NAME 64
+#define XR_ACTIONMAP_MAX_NAME 64
+#define XR_AMI_MAX_NAME 64
+
+#define XR_ACTIONCONF_STR_DEFAULT "Blender"
+
+/** XR action type. Enum values match those in GHOST_XrActionType enum for consistency. */
+typedef enum eXrActionType {
+  XR_BOOLEAN_INPUT = 1,
+  XR_FLOAT_INPUT = 2,
+  XR_VECTOR2F_INPUT = 3,
+  XR_POSE_INPUT = 4,
+  XR_VIBRATION_OUTPUT = 100,
+} eXrActionType;
+
+typedef enum eXrOpFlag {
+  XR_OP_PRESS = 0,
+  XR_OP_RELEASE = 1,
+  XR_OP_MODAL = 2,
+} eXrOpFlag;
 
 typedef enum eXrSessionFlag {
   XR_SESSION_USE_POSITION_TRACKING = (1 << 0),

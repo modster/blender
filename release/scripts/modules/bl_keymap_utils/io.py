@@ -23,9 +23,7 @@
 
 __all__ = (
     "keyconfig_export_as_data",
-    "keyconfig_export_as_data_exec",
     "keyconfig_import_from_data",
-    "keyconfig_import_from_data_exec",
     "keyconfig_init_from_data",
     "keyconfig_merge",
     "keymap_init_from_data",
@@ -82,12 +80,6 @@ def kmi_args_as_data(kmi):
         ):
             s.append("\"repeat\": True")
 
-    if kmi.map_type == 'XR':
-        if kmi.xr_action_set:
-            s.append(f"\"xr_action_set\": '{kmi.xr_action_set}'")
-        if kmi.xr_action:
-            s.append(f"\"xr_action\": '{kmi.xr_action}'")
-
     return "{" + ", ".join(s) + "}"
 
 
@@ -143,7 +135,37 @@ def _kmi_attrs_or_none(level, kmi):
     return "".join(lines)
 
 
-def keyconfig_export_as_data_exec(export_keymaps, filepath):
+def keyconfig_export_as_data(wm, kc, filepath, *, all_keymaps=False):
+    # Alternate format
+
+    # Generate a list of keymaps to export:
+    #
+    # First add all user_modified keymaps (found in keyconfigs.user.keymaps list),
+    # then add all remaining keymaps from the currently active custom keyconfig.
+    #
+    # Sort the resulting list according to top context name,
+    # while this isn't essential, it makes comparing keymaps simpler.
+    #
+    # This will create a final list of keymaps that can be used as a "diff" against
+    # the default blender keyconfig, recreating the current setup from a fresh blender
+    # without needing to export keymaps which haven't been edited.
+
+    class FakeKeyConfig:
+        keymaps = []
+    edited_kc = FakeKeyConfig()
+    for km in wm.keyconfigs.user.keymaps:
+        if all_keymaps or km.is_user_modified:
+            edited_kc.keymaps.append(km)
+    # merge edited keymaps with non-default keyconfig, if it exists
+    if kc != wm.keyconfigs.default:
+        export_keymaps = keyconfig_merge(edited_kc, kc)
+    else:
+        export_keymaps = keyconfig_merge(edited_kc, edited_kc)
+
+    # Sort the keymap list by top context name before exporting,
+    # not essential, just convenient to order them predictably.
+    export_keymaps.sort(key=lambda k: k[0].name)
+
     with open(filepath, "w", encoding="utf-8") as fh:
         fw = fh.write
 
@@ -220,40 +242,6 @@ def keyconfig_export_as_data_exec(export_keymaps, filepath):
         fw("    )\n")
 
 
-def keyconfig_export_as_data(wm, kc, filepath, *, all_keymaps=False):
-    # Alternate format
-
-    # Generate a list of keymaps to export:
-    #
-    # First add all user_modified keymaps (found in keyconfigs.user.keymaps list),
-    # then add all remaining keymaps from the currently active custom keyconfig.
-    #
-    # Sort the resulting list according to top context name,
-    # while this isn't essential, it makes comparing keymaps simpler.
-    #
-    # This will create a final list of keymaps that can be used as a "diff" against
-    # the default blender keyconfig, recreating the current setup from a fresh blender
-    # without needing to export keymaps which haven't been edited.
-
-    class FakeKeyConfig:
-        keymaps = []
-    edited_kc = FakeKeyConfig()
-    for km in wm.keyconfigs.user.keymaps:
-        if all_keymaps or km.is_user_modified:
-            edited_kc.keymaps.append(km)
-    # merge edited keymaps with non-default keyconfig, if it exists
-    if kc != wm.keyconfigs.default:
-        export_keymaps = keyconfig_merge(edited_kc, kc)
-    else:
-        export_keymaps = keyconfig_merge(edited_kc, edited_kc)
-
-    # Sort the keymap list by top context name before exporting,
-    # not essential, just convenient to order them predictably.
-    export_keymaps.sort(key=lambda k: k[0].name)
-
-    keyconfig_export_as_data_exec(export_keymaps, filepath) 
-
-
 # -----------------------------------------------------------------------------
 # Import Functions
 
@@ -303,14 +291,6 @@ def keyconfig_init_from_data(kc, keyconfig_data):
         keymap_init_from_data(km, km_items, is_modal=km_args.get("modal", False))
 
 
-def keyconfig_import_from_data_exec(kc, keyconfig_data, keyconfig_version=(0, 0, 0)):
-    if keyconfig_version is not None:
-        from .versioning import keyconfig_update
-        keyconfig_data = keyconfig_update(keyconfig_data, keyconfig_version)
-    keyconfig_init_from_data(kc, keyconfig_data)
-    return kc
-
-
 def keyconfig_import_from_data(name, keyconfig_data, *, keyconfig_version=(0, 0, 0)):
     # Load data in the format defined above.
     #
@@ -319,7 +299,11 @@ def keyconfig_import_from_data(name, keyconfig_data, *, keyconfig_version=(0, 0,
     import bpy
     wm = bpy.context.window_manager
     kc = wm.keyconfigs.new(name)
-    keyconfig_import_from_data_exec(kc, keyconfig_data, keyconfig_version)
+    if keyconfig_version is not None:
+        from .versioning import keyconfig_update
+        keyconfig_data = keyconfig_update(keyconfig_data, keyconfig_version)
+    keyconfig_init_from_data(kc, keyconfig_data)
+    return kc
 
 
 # -----------------------------------------------------------------------------

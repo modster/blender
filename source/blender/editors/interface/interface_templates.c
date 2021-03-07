@@ -7017,6 +7017,42 @@ void uiTemplateKeymapItemProperties(uiLayout *layout, PointerRNA *ptr)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name XR Actionmap Template
+ * \{ */
+
+static void xr_actionmap_item_modified(bContext *UNUSED(C), void *ami_p, void *UNUSED(unused))
+{
+  XrActionMapItem *ami = (XrActionMapItem *)ami_p;
+  WM_xr_actionconfig_update_tag(NULL, ami);
+}
+
+void uiTemplateXrActionmapItemProperties(uiLayout *layout, PointerRNA *ptr)
+{
+#ifdef WITH_XR_OPENXR
+  PointerRNA propptr = RNA_pointer_get(ptr, "op_properties");
+
+  if (propptr.data) {
+    uiBut *but = uiLayoutGetBlock(layout)->buttons.last;
+
+    WM_operator_properties_sanitize(&propptr, false);
+    /* Use same template as keymap item properties. */
+    template_keymap_item_properties(layout, NULL, &propptr);
+
+    for (; but; but = but->next) {
+      if (but->rnaprop) {
+        UI_but_func_set(but, xr_actionmap_item_modified, ptr->data, NULL);
+        UI_but_flag_enable(but, UI_BUT_UPDATE_DELAY);
+      }
+    }
+  }
+#else
+  UNUSED_VARS(layout, ptr);
+#endif
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Event Icon Template
  * \{ */
 

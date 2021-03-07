@@ -177,9 +177,7 @@ static bool wm_keymap_item_equals(wmKeyMapItem *a, wmKeyMapItem *b)
           a->shift == b->shift && a->ctrl == b->ctrl && a->alt == b->alt && a->oskey == b->oskey &&
           a->keymodifier == b->keymodifier && a->maptype == b->maptype &&
           ((ISKEYBOARD(a->type) == 0) ||
-           (a->flag & KMI_REPEAT_IGNORE) == (b->flag & KMI_REPEAT_IGNORE)) &&
-          ((ISXR(a->type) == 0) ||
-           (STREQ(a->xr_action_set, b->xr_action_set) && STREQ(a->xr_action, b->xr_action))));
+           (a->flag & KMI_REPEAT_IGNORE) == (b->flag & KMI_REPEAT_IGNORE)));
 }
 
 /* properties can be NULL, otherwise the arg passed is used and ownership is given to the kmi */
@@ -216,9 +214,6 @@ int WM_keymap_item_map_type_get(const wmKeyMapItem *kmi)
   }
   if (kmi->type == KM_TEXTINPUT) {
     return KMI_TYPE_TEXTINPUT;
-  }
-  if (ISXR(kmi->type)) {
-    return KMI_TYPE_XR;
   }
   if (ELEM(kmi->type, TABLET_STYLUS, TABLET_ERASER)) {
     return KMI_TYPE_MOUSE;
@@ -1709,14 +1704,6 @@ bool WM_keymap_item_compare(const wmKeyMapItem *k1, const wmKeyMapItem *k2)
     return 0;
   }
 
-  if (!STREQ(k1->xr_action_set, k2->xr_action_set)) {
-    return 0;
-  }
-
-  if (!STREQ(k1->xr_action, k2->xr_action)) {
-    return 0;
-  }
-
   return 1;
 }
 
@@ -1973,9 +1960,6 @@ void WM_keymap_item_restore_to_default(wmWindowManager *wm, wmKeyMap *keymap, wm
     kmi->maptype = orig->maptype;
     kmi->flag = (kmi->flag & ~KMI_REPEAT_IGNORE) | (orig->flag & KMI_REPEAT_IGNORE);
 
-    BLI_strncpy(kmi->xr_action_set, orig->xr_action_set, sizeof(kmi->xr_action_set));
-    BLI_strncpy(kmi->xr_action, orig->xr_action, sizeof(kmi->xr_action));
-
     WM_keyconfig_update_tag(keymap, kmi);
   }
 
@@ -2005,20 +1989,6 @@ wmKeyMapItem *WM_keymap_item_find_id(wmKeyMap *keymap, int id)
 {
   LISTBASE_FOREACH (wmKeyMapItem *, kmi, &keymap->items) {
     if (kmi->id == id) {
-      return kmi;
-    }
-  }
-
-  return NULL;
-}
-
-wmKeyMapItem *WM_keymap_item_find_xr(wmKeyMap *keymap, const char *action_set, const char *action)
-{
-  wmKeyMapItem *kmi;
-
-  for (kmi = keymap->items.first; kmi; kmi = kmi->next) {
-    if (ISXR(kmi->type) && STREQ(kmi->xr_action_set, action_set) &&
-        STREQ(kmi->xr_action, action)) {
       return kmi;
     }
   }

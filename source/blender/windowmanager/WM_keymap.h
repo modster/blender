@@ -86,9 +86,6 @@ bool WM_keymap_remove(struct wmKeyConfig *keyconfig, struct wmKeyMap *keymap);
 bool WM_keymap_poll(struct bContext *C, struct wmKeyMap *keymap);
 
 wmKeyMapItem *WM_keymap_item_find_id(struct wmKeyMap *keymap, int id);
-wmKeyMapItem *WM_keymap_item_find_xr(struct wmKeyMap *keymap,
-                                     const char *action_set,
-                                     const char *action);
 bool WM_keymap_item_compare(const struct wmKeyMapItem *k1, const struct wmKeyMapItem *k2);
 
 /* keymap_utils.c */

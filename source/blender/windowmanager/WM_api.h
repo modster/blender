@@ -71,11 +71,6 @@ struct wmTabletData;
 struct wmNDOFMotionData;
 #endif
 
-#ifdef WITH_XR_OPENXR
-enum wmXrActionType;
-enum wmXrOpFlag;
-#endif
-
 typedef struct wmGizmo wmGizmo;
 typedef struct wmGizmoMap wmGizmoMap;
 typedef struct wmGizmoMapType wmGizmoMapType;
@@ -987,13 +982,13 @@ void WM_xr_action_set_destroy(wmXrData *xr, const char *action_set_name, bool re
 bool WM_xr_action_create(wmXrData *xr,
                          const char *action_set_name,
                          const char *action_name,
-                         enum wmXrActionType type,
+                         eXrActionType type,
                          unsigned int count_subaction_paths,
                          const char **subaction_paths,
                          float threshold,
                          struct wmOperatorType *ot,
                          struct IDProperty *op_properties,
-                         enum wmXrOpFlag op_flag);
+                         eXrOpFlag op_flag);
 void WM_xr_action_destroy(wmXrData *xr, const char *action_set_name, const char *action_name);
 bool WM_xr_action_space_create(wmXrData *xr,
                                const char *action_set_name,
@@ -1030,7 +1025,7 @@ bool WM_xr_controller_pose_action_set(wmXrData *xr,
 bool WM_xr_action_state_get(const wmXrData *xr,
                             const char *action_set_name,
                             const char *action_name,
-                            enum wmXrActionType type,
+                            eXrActionType type,
                             const char *subaction_path,
                             void *r_state);
 bool WM_xr_haptic_action_apply(wmXrData *xr,
@@ -1046,6 +1041,37 @@ void WM_xr_haptic_action_stop(wmXrData *xr,
                               const char *action_name,
                               unsigned int count,
                               const char *const *subaction_paths);
+
+/* wm_xr_actionmap.c */
+void WM_xr_actionconfig_init(struct bContext *C);
+void WM_xr_actionconfig_update_tag(XrActionMap *actionmap, XrActionMapItem *ami);
+void WM_xr_actionconfig_update(XrSessionSettings *settings);
+
+XrActionConfig *WM_xr_actionconfig_new(XrSessionSettings *settings,
+                                       const char *idname,
+                                       bool user_defined);
+XrActionConfig *WM_xr_actionconfig_new_user(XrSessionSettings *settings, const char *idname);
+void WM_xr_actionconfig_clear(XrActionConfig *actionconf);
+void WM_xr_actionconfig_free(XrActionConfig *actionconf);
+bool WM_xr_actionconfig_remove(XrSessionSettings *settings, XrActionConfig *actionconf);
+XrActionConfig *WM_xr_actionconfig_active_get(XrSessionSettings *settings);
+void WM_xr_actionconfig_active_set(XrSessionSettings *settings, const char *idname);
+
+XrActionMap *WM_xr_actionmap_ensure(XrActionConfig *actionconf, const char *idname);
+XrActionMap *WM_xr_actionmap_add_copy(XrActionConfig *actionconf,
+                                      const char *idname,
+                                      XrActionMap *am_src);
+void WM_xr_actionmap_clear(XrActionMap *actionmap);
+bool WM_xr_actionmap_remove(XrActionConfig *actionconf, XrActionMap *actionmap);
+XrActionMap *WM_xr_actionmap_list_find(ListBase *lb, const char *idname);
+
+XrActionMapItem *WM_xr_actionmap_item_ensure(XrActionMap *actionmap, const char *idname);
+XrActionMapItem *WM_xr_actionmap_item_add_copy(XrActionMap *actionmap,
+                                               const char *idname,
+                                               XrActionMapItem *ami_src);
+bool WM_xr_actionmap_item_remove(XrActionMap *actionmap, XrActionMapItem *ami);
+XrActionMapItem *WM_xr_actionmap_item_list_find(ListBase *lb, const char *idname);
+void WM_xr_actionmap_item_properties_update_ot(XrActionMapItem *ami);
 #endif
 
 #ifdef __cplusplus

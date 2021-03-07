@@ -433,6 +433,9 @@ void RNA_api_sound(struct StructRNA *srna);
 void RNA_api_vfont(struct StructRNA *srna);
 void RNA_api_workspace(struct StructRNA *srna);
 void RNA_api_workspace_tool(struct StructRNA *srna);
+void RNA_api_xr_actionconfigs(struct StructRNA *srna);
+void RNA_api_xr_actionmaps(struct StructRNA *srna);
+void RNA_api_xr_actionmapitems(struct StructRNA *srna);
 
 /* main collection functions */
 void RNA_def_main_cameras(BlenderRNA *brna, PropertyRNA *cprop);
