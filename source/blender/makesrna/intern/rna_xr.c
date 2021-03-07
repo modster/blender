@@ -389,7 +389,7 @@ static bool rna_XrSessionState_action_set_create(bContext *C, const char *action
   wmWindowManager *wm = CTX_wm_manager(C);
   return WM_xr_action_set_create(&wm->xr, action_set_name);
 #  else
-  UNUSED_VARS(C, name);
+  UNUSED_VARS(C, action_set_name);
   return false;
 #  endif
 }
@@ -459,7 +459,7 @@ static bool rna_XrSessionState_action_create(bContext *C,
                              op_properties,
                              op_flag);
 #  else
-  UNUSED_VARS(C, action_set_name, name, type, user_path0, user_path1, threshold, op, op_flag);
+  UNUSED_VARS(C, action_set_name, action_name, type, user_path0, user_path1, threshold, op, op_flag);
   return false;
 #  endif
 }
