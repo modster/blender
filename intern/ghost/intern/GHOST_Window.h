@@ -26,7 +26,7 @@
 
 #include "GHOST_IWindow.h"
 
-class GHOST_Context;
+#include "GHOST_Context.h"
 
 /**
  * Platform independent implementation of GHOST_IWindow.
@@ -106,7 +106,8 @@ class GHOST_Window : public GHOST_IWindow {
                                      void *extent,
                                      GHOST_TUns32 *fb_id)
   {
-    m_context->getVulkanBackbuffer(image, framebuffer, command_buffer, render_pass, extent, fb_id);
+    return m_context->getVulkanBackbuffer(
+        image, framebuffer, command_buffer, render_pass, extent, fb_id);
   };
 
   /**
