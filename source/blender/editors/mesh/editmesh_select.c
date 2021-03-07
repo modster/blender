@@ -995,7 +995,7 @@ bool EDBM_unified_findnearest(ViewContext *vc,
 /* -------------------------------------------------------------------- */
 /** \name Alternate Find Nearest Vert/Edge (optional boundary)
  *
- * \note This uses ray-cast method instead of backbuffer,
+ * \note This uses ray-cast method instead of back-buffer,
  * currently used for poly-build.
  * \{ */
 
@@ -1266,7 +1266,7 @@ static int edbm_select_similar_region_exec(bContext *C, wmOperator *op)
 
   groups_array = MEM_mallocN(sizeof(*groups_array) * bm->totfacesel, __func__);
   group_tot = BM_mesh_calc_face_groups(
-      bm, groups_array, &group_index, NULL, NULL, BM_ELEM_SELECT, BM_VERT);
+      bm, groups_array, &group_index, NULL, NULL, NULL, BM_ELEM_SELECT, BM_VERT);
 
   BM_mesh_elem_table_ensure(bm, BM_FACE);
 
@@ -2205,7 +2205,7 @@ void EDBM_selectmode_set(BMEditMesh *em)
     }
   }
   else if (em->selectmode & SCE_SELECT_FACE) {
-    /* deselect eges, and select again based on face select */
+    /* Deselect edges, and select again based on face select. */
     BM_ITER_MESH (eed, &iter, em->bm, BM_EDGES_OF_MESH) {
       BM_edge_select_set(em->bm, eed, false);
     }
@@ -2247,7 +2247,7 @@ void EDBM_selectmode_convert(BMEditMesh *em,
 
   /* first tag-to-select, then select --- this avoids a feedback loop */
 
-  /* have to find out what the selectionmode was previously */
+  /* Have to find out what the selection-mode was previously. */
   if (selectmode_old == SCE_SELECT_VERTEX) {
     if (bm->totvertsel == 0) {
       /* pass */
@@ -2687,8 +2687,8 @@ bool EDBM_selectmode_disable_multi(struct bContext *C,
  *
  * Overview of the algorithm:
  * - Groups faces surrounded by edges with 3+ faces using them.
- * - Calculates a cost of each face group comparing it's angle with the faces
- *   connected to it's non-manifold edges.
+ * - Calculates a cost of each face group comparing its angle with the faces
+ *   connected to its non-manifold edges.
  * - Mark the face group as interior, and mark connected face groups for recalculation.
  * - Continue to remove the face groups with the highest 'cost'.
  *
@@ -2822,7 +2822,7 @@ bool EDBM_select_interior_faces(BMEditMesh *em)
 
   fgroup_array = MEM_mallocN(sizeof(*fgroup_array) * bm->totface, __func__);
   fgroup_len = BM_mesh_calc_face_groups(
-      bm, fgroup_array, &fgroup_index, bm_interior_loop_filter_fn, NULL, 0, BM_EDGE);
+      bm, fgroup_array, &fgroup_index, bm_interior_loop_filter_fn, NULL, NULL, 0, BM_EDGE);
 
   int *fgroup_recalc_stack = MEM_mallocN(sizeof(*fgroup_recalc_stack) * fgroup_len, __func__);
   STACK_DECLARE(fgroup_recalc_stack);
@@ -3572,13 +3572,17 @@ static int edbm_select_linked_pick_invoke(bContext *C, wmOperator *op, const wmE
 
   edbm_select_linked_pick_ex(em, ele, sel, delimit);
 
-  /* to support redo */
-  BM_mesh_elem_index_ensure(bm, ele->head.htype);
-  index = EDBM_elem_to_index_any(em, ele);
-
-  /* TODO(MULTI_EDIT), index doesn't know which object,
-   * index selections isn't very common. */
-  RNA_int_set(op->ptr, "index", index);
+  /* To support redo. */
+  {
+    /* Note that the `base_index` can't be used as the index depends on the 3D Viewport
+     * which might not be available on redo. */
+    BM_mesh_elem_index_ensure(bm, ele->head.htype);
+    int object_index;
+    index = EDBM_elem_to_index_any_multi(vc.view_layer, em, ele, &object_index);
+    BLI_assert(object_index >= 0);
+    RNA_int_set(op->ptr, "object_index", object_index);
+    RNA_int_set(op->ptr, "index", index);
+  }
 
   DEG_id_tag_update(basact->object->data, ID_RECALC_SELECT);
   WM_event_add_notifier(C, NC_GEOM | ND_SELECT, basact->object->data);
@@ -3589,18 +3593,22 @@ static int edbm_select_linked_pick_invoke(bContext *C, wmOperator *op, const wmE
 
 static int edbm_select_linked_pick_exec(bContext *C, wmOperator *op)
 {
-  Object *obedit = CTX_data_edit_object(C);
-  BMEditMesh *em = BKE_editmesh_from_object(obedit);
-  BMesh *bm = em->bm;
-  int index;
-  const bool sel = !RNA_boolean_get(op->ptr, "deselect");
+  Object *obedit = NULL;
+  BMElem *ele;
 
-  index = RNA_int_get(op->ptr, "index");
-  if (index < 0 || index >= (bm->totvert + bm->totedge + bm->totface)) {
+  {
+    ViewLayer *view_layer = CTX_data_view_layer(C);
+    const int object_index = RNA_int_get(op->ptr, "object_index");
+    const int index = RNA_int_get(op->ptr, "index");
+    ele = EDBM_elem_from_index_any_multi(view_layer, object_index, index, &obedit);
+  }
+
+  if (ele == NULL) {
     return OPERATOR_CANCELLED;
   }
 
-  BMElem *ele = EDBM_elem_from_index_any(em, index);
+  BMEditMesh *em = BKE_editmesh_from_object(obedit);
+  const bool sel = !RNA_boolean_get(op->ptr, "deselect");
 
 #ifdef USE_LINKED_SELECT_DEFAULT_HACK
   int delimit = select_linked_delimit_default_from_op(op, em->selectmode);
@@ -3645,6 +3653,8 @@ void MESH_OT_select_linked_pick(wmOperatorType *ot)
 #endif
 
   /* use for redo */
+  prop = RNA_def_int(ot->srna, "object_index", -1, -1, INT_MAX, "", "", 0, INT_MAX);
+  RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
   prop = RNA_def_int(ot->srna, "index", -1, -1, INT_MAX, "", "", 0, INT_MAX);
   RNA_def_property_flag(prop, PROP_HIDDEN | PROP_SKIP_SAVE);
 }
@@ -4317,7 +4327,7 @@ void MESH_OT_edges_select_sharp(wmOperatorType *ot)
 
   /* identifiers */
   ot->name = "Select Sharp Edges";
-  ot->description = "Select all sharp-enough edges";
+  ot->description = "Select all sharp enough edges";
   ot->idname = "MESH_OT_edges_select_sharp";
 
   /* api callbacks */
@@ -4526,7 +4536,7 @@ static int edbm_select_non_manifold_exec(bContext *C, wmOperator *op)
 void MESH_OT_select_non_manifold(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Select Non Manifold";
+  ot->name = "Select Non-Manifold";
   ot->description = "Select all non-manifold vertices or edges";
   ot->idname = "MESH_OT_select_non_manifold";
 
@@ -4542,7 +4552,8 @@ void MESH_OT_select_non_manifold(wmOperatorType *ot)
   /* edges */
   RNA_def_boolean(ot->srna, "use_wire", true, "Wire", "Wire edges");
   RNA_def_boolean(ot->srna, "use_boundary", true, "Boundaries", "Boundary edges");
-  RNA_def_boolean(ot->srna, "use_multi_face", true, "Multiple Faces", "Edges shared by 3+ faces");
+  RNA_def_boolean(
+      ot->srna, "use_multi_face", true, "Multiple Faces", "Edges shared by more than two faces");
   RNA_def_boolean(ot->srna,
                   "use_non_contiguous",
                   true,
@@ -4562,7 +4573,7 @@ void MESH_OT_select_non_manifold(wmOperatorType *ot)
 static int edbm_select_random_exec(bContext *C, wmOperator *op)
 {
   const bool select = (RNA_enum_get(op->ptr, "action") == SEL_SELECT);
-  const float randfac = RNA_float_get(op->ptr, "percent") / 100.0f;
+  const float randfac = RNA_float_get(op->ptr, "ratio");
   const int seed = WM_operator_properties_select_random_seed_increment_get(op);
 
   ViewLayer *view_layer = CTX_data_view_layer(C);
@@ -5040,7 +5051,7 @@ static int verg_radial(const void *va, const void *vb)
 }
 
 /**
- * This function leaves faces tagged which are apart of the new region.
+ * This function leaves faces tagged which are a part of the new region.
  *
  * \note faces already tagged are ignored, to avoid finding the same regions twice:
  * important when we have regions with equal face counts, see: T40309

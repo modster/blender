@@ -120,7 +120,7 @@ static int imb_tiff_DummyMapProc(
  * \param data: Buffer to contain data (treat as (void *)).
  * \param n: Number of bytes to read.
  *
- * \return: Number of bytes actually read.
+ * \return Number of bytes actually read.
  *   0 = EOF.
  */
 static tsize_t imb_tiff_ReadProc(thandle_t handle, tdata_t data, tsize_t n)
@@ -188,8 +188,8 @@ static tsize_t imb_tiff_WriteProc(thandle_t handle, tdata_t data, tsize_t n)
  * SEEK_END - (This is unsupported and will return -1, indicating an
  *             error).
  *
- * \return: Resulting offset location within the file, measured in bytes from
- *          the beginning of the file.  (-1) indicates an error.
+ * \return Resulting offset location within the file, measured in bytes from
+ * the beginning of the file.  (-1) indicates an error.
  */
 static toff_t imb_tiff_SeekProc(thandle_t handle, toff_t ofs, int whence)
 {
@@ -234,7 +234,7 @@ static toff_t imb_tiff_SeekProc(thandle_t handle, toff_t ofs, int whence)
  *
  * \param handle: Handle of the TIFF file (pointer to #ImbTIFFMemFile).
  *
- * \return: 0
+ * \return 0
  */
 static int imb_tiff_CloseProc(thandle_t handle)
 {
@@ -258,7 +258,7 @@ static int imb_tiff_CloseProc(thandle_t handle)
 /**
  * Returns the size of an in-memory TIFF file in bytes.
  *
- * \return: Size of file (in bytes).
+ * \return Size of file (in bytes).
  */
 static toff_t imb_tiff_SizeProc(thandle_t handle)
 {
@@ -316,10 +316,13 @@ static TIFF *imb_tiff_client_open(ImbTIFFMemFile *memFile, const unsigned char *
  * hence my manual comparison. - Jonathan Merritt (lancelet) 4th Sept 2005.
  */
 #define IMB_TIFF_NCB 4 /* number of comparison bytes used */
-int imb_is_a_tiff(const unsigned char *buf)
+bool imb_is_a_tiff(const unsigned char *buf, size_t size)
 {
   const char big_endian[IMB_TIFF_NCB] = {0x4d, 0x4d, 0x00, 0x2a};
   const char lil_endian[IMB_TIFF_NCB] = {0x49, 0x49, 0x2a, 0x00};
+  if (size < IMB_TIFF_NCB) {
+    return false;
+  }
 
   return ((memcmp(big_endian, buf, IMB_TIFF_NCB) == 0) ||
           (memcmp(lil_endian, buf, IMB_TIFF_NCB) == 0));
@@ -509,7 +512,7 @@ static int imb_read_tiff_pixels(ImBuf *ibuf, TIFF *image)
   }
 
   if (success) {
-    /* Code seems to be not needed for 16 bits tif, on PPC G5 OSX (ton) */
+    /* Code seems to be not needed for 16 bits TIFF, on PPC G5 OSX (ton) */
     if (bitspersample < 16) {
       if (ENDIAN_ORDER == B_ENDIAN) {
         IMB_convert_rgba_to_abgr(tmpibuf);
@@ -556,7 +559,7 @@ void imb_inittiff(void)
  * \param flags: If flags has IB_test set then the file is not actually loaded,
  * but all other operations take place.
  *
- * \return: A newly allocated ImBuf structure if successful, otherwise NULL.
+ * \return A newly allocated #ImBuf structure if successful, otherwise NULL.
  */
 ImBuf *imb_loadtiff(const unsigned char *mem,
                     size_t size,
@@ -578,7 +581,7 @@ ImBuf *imb_loadtiff(const unsigned char *mem,
     fprintf(stderr, "imb_loadtiff: size < IMB_TIFF_NCB\n");
     return NULL;
   }
-  if (imb_is_a_tiff(mem) == 0) {
+  if (imb_is_a_tiff(mem, size) == 0) {
     return NULL;
   }
 
@@ -757,10 +760,9 @@ void imb_loadtiletiff(
  * \param name: Name of the TIFF file to create.
  * \param flags: Currently largely ignored.
  *
- * \return: 1 if the function is successful, 0 on failure.
+ * \return 1 if the function is successful, 0 on failure.
  */
-
-int imb_savetiff(ImBuf *ibuf, const char *filepath, int flags)
+bool imb_savetiff(ImBuf *ibuf, const char *filepath, int flags)
 {
   TIFF *image = NULL;
   uint16 samplesperpixel, bitspersample;
@@ -804,7 +806,7 @@ int imb_savetiff(ImBuf *ibuf, const char *filepath, int flags)
 
   /* open TIFF file for writing */
   if (flags & IB_mem) {
-    /* bork at the creation of a TIFF in memory */
+    /* Failed to allocate TIFF in memory. */
     fprintf(stderr,
             "imb_savetiff: creation of in-memory TIFF files is "
             "not yet supported.\n");
@@ -888,7 +890,7 @@ int imb_savetiff(ImBuf *ibuf, const char *filepath, int flags)
         /* convert from float source */
         float rgb[4];
 
-        if (channels_in_float == 3 || channels_in_float == 4) {
+        if (ELEM(channels_in_float, 3, 4)) {
           if (ibuf->float_colorspace || (ibuf->colormanage_flag & IMB_COLORMANAGE_IS_DATA)) {
             /* Float buffer was managed already, no need in color
              * space conversion.

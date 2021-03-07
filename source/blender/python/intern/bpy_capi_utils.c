@@ -38,16 +38,6 @@
 
 #include "../generic/py_capi_utils.h"
 
-static bContext *__py_context = NULL;
-bContext *BPy_GetContext(void)
-{
-  return __py_context;
-}
-void BPy_SetContext(bContext *C)
-{
-  __py_context = C;
-}
-
 char *BPy_enum_as_string(const EnumPropertyItem *item)
 {
   DynStr *dynstr = BLI_dynstr_new();
@@ -146,7 +136,7 @@ bool BPy_errors_to_report_ex(ReportList *reports,
                 RPT_ERROR,
                 TIP_("%s: %s\nlocation: %s:%d\n"),
                 error_prefix,
-                _PyUnicode_AsString(pystring),
+                PyUnicode_AsUTF8(pystring),
                 filename,
                 lineno);
 
@@ -154,12 +144,12 @@ bool BPy_errors_to_report_ex(ReportList *reports,
     fprintf(stderr,
             TIP_("%s: %s\nlocation: %s:%d\n"),
             error_prefix,
-            _PyUnicode_AsString(pystring),
+            PyUnicode_AsUTF8(pystring),
             filename,
             lineno);
   }
   else {
-    BKE_reportf(reports, RPT_ERROR, "%s: %s", error_prefix, _PyUnicode_AsString(pystring));
+    BKE_reportf(reports, RPT_ERROR, "%s: %s", error_prefix, PyUnicode_AsUTF8(pystring));
   }
 
   Py_DECREF(pystring);

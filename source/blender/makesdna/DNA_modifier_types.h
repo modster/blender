@@ -94,7 +94,10 @@ typedef enum ModifierType {
   eModifierType_WeightedNormal = 54,
   eModifierType_Weld = 55,
   eModifierType_Fluid = 56,
-  eModifierType_Simulation = 57,
+  eModifierType_Nodes = 57,
+  eModifierType_MeshToVolume = 58,
+  eModifierType_VolumeDisplace = 59,
+  eModifierType_VolumeToMesh = 60,
   NUM_MODIFIER_TYPES,
 } ModifierType;
 
@@ -103,8 +106,10 @@ typedef enum ModifierMode {
   eModifierMode_Render = (1 << 1),
   eModifierMode_Editmode = (1 << 2),
   eModifierMode_OnCage = (1 << 3),
-  /* Old modifier box expansion, just for versioning. */
+#ifdef DNA_DEPRECATED_ALLOW
+  /** Old modifier box expansion, just for versioning. */
   eModifierMode_Expanded_DEPRECATED = (1 << 4),
+#endif
   eModifierMode_Virtual = (1 << 5),
   eModifierMode_ApplyOnSpline = (1 << 6),
   eModifierMode_DisableTemporary = (1u << 31),
@@ -114,9 +119,9 @@ typedef struct ModifierData {
   struct ModifierData *next, *prev;
 
   int type, mode;
-  int stackindex;
+  char _pad0[4];
   short flag;
-  /* An "expand" bit for each of the modifier's (sub)panels. */
+  /* An "expand" bit for each of the modifier's (sub)panels (uiPanelDataExpansion). */
   short ui_expand_flag;
   /** MAX_NAME. */
   char name[64];
@@ -138,6 +143,11 @@ typedef enum {
   eModifierFlag_OverrideLibrary_Local = (1 << 0),
   /* This modifier does not own its caches, but instead shares them with another modifier. */
   eModifierFlag_SharedCaches = (1 << 1),
+  /**
+   * This modifier is the object's active modifier. Used for context in the node editor.
+   * Only one modifier on an object should have this flag set.
+   */
+  eModifierFlag_Active = (1 << 2),
 } ModifierFlag;
 
 /* not a real modifier */
@@ -161,6 +171,7 @@ typedef enum {
   eSubsurfModifierFlag_SubsurfUv_DEPRECATED = (1 << 3),
   eSubsurfModifierFlag_UseCrease = (1 << 4),
   eSubsurfModifierFlag_UseCustomNormals = (1 << 5),
+  eSubsurfModifierFlag_UseRecursiveSubdivision = (1 << 6),
 } SubsurfModifierFlag;
 
 typedef enum {
@@ -177,13 +188,19 @@ typedef enum {
   SUBSURF_UV_SMOOTH_ALL = 5,
 } eSubsurfUVSmooth;
 
+typedef enum {
+  SUBSURF_BOUNDARY_SMOOTH_ALL = 0,
+  SUBSURF_BOUNDARY_SMOOTH_PRESERVE_CORNERS = 1,
+} eSubsurfBoundarySmooth;
+
 typedef struct SubsurfModifierData {
   ModifierData modifier;
 
   short subdivType, levels, renderLevels, flags;
   short uv_smooth;
   short quality;
-  char _pad[4];
+  short boundary_smooth;
+  char _pad[2];
 
   /* TODO(sergey): Get rid of those with the old CCG subdivision code. */
   void *emCache, *mCache;
@@ -967,6 +984,12 @@ enum {
 typedef struct ParticleSystemModifierData {
   ModifierData modifier;
 
+  /**
+   * \note Storing the particle system pointer here is very weak, as it prevents modifiers' data
+   * copying to be self-sufficient (extra external code needs to ensure the pointer remains valid
+   * when the modifier data is copied from one object to another). See e.g.
+   * `BKE_object_copy_particlesystems` or `BKE_object_copy_modifier`.
+   */
   struct ParticleSystem *psys;
   /** Final Mesh - its topology may differ from orig mesh. */
   struct Mesh *mesh_final;
@@ -1037,10 +1060,12 @@ typedef struct MultiresModifierData {
   ModifierData modifier;
 
   char lvl, sculptlvl, renderlvl, totlvl;
-  char simple, flags, _pad[2];
+  char simple DNA_DEPRECATED;
+  char flags, _pad[2];
   short quality;
   short uv_smooth;
-  char _pad2[4];
+  short boundary_smooth;
+  char _pad2[2];
 } MultiresModifierData;
 
 typedef enum {
@@ -1205,12 +1230,14 @@ typedef struct SolidifyModifierData {
   char defgrp_name[64];
   char shell_defgrp_name[64];
   char rim_defgrp_name[64];
-  /** New surface offset leve.l*/
+  /** New surface offset level. */
   float offset;
-  /** Midpoint of the offset . */
+  /** Midpoint of the offset. */
   float offset_fac;
-  /** factor for the minimum weight to use when vgroups are used,
-   * avoids 0.0 weights giving duplicate geometry */
+  /**
+   * Factor for the minimum weight to use when vertex-groups are used,
+   * avoids 0.0 weights giving duplicate geometry.
+   */
   float offset_fac_vg;
   /** Clamp offset based on surrounding geometry. */
   float offset_clamp;
@@ -1570,6 +1597,10 @@ typedef struct WeightVGProximityModifierData {
   /** Name of vertex group to modify/weight. MAX_VGROUP_NAME. */
   char defgrp_name[64];
 
+  /* Mapping stuff. */
+  /** The custom mapping curve!. */
+  struct CurveMapping *cmap_curve;
+
   /* Proximity modes. */
   int proximity_mode;
   int proximity_flags;
@@ -1690,7 +1721,7 @@ typedef enum eRemeshModifierMode {
 typedef struct RemeshModifierData {
   ModifierData modifier;
 
-  /* floodfill option, controls how small components can be before they are removed */
+  /** Flood-fill option, controls how small components can be before they are removed. */
   float threshold;
 
   /* ratio between size of model and grid */
@@ -1978,17 +2009,23 @@ typedef struct WeldModifierData {
 
   /* The limit below which to merge vertices. */
   float merge_dist;
-  unsigned int max_interactions;
   /* Name of vertex group to use to mask, MAX_VGROUP_NAME. */
   char defgrp_name[64];
 
-  short flag;
-  char _pad[6];
+  char mode;
+  char flag;
+  char _pad[2];
 } WeldModifierData;
 
 /* WeldModifierData->flag */
 enum {
   MOD_WELD_INVERT_VGROUP = (1 << 0),
+};
+
+/* #WeldModifierData.mode */
+enum {
+  MOD_WELD_MODE_ALL = 0,
+  MOD_WELD_MODE_CONNECTED = 1,
 };
 
 typedef struct DataTransferModifierData {
@@ -2121,6 +2158,11 @@ enum {
   MOD_MESHSEQ_READ_POLY = (1 << 1),
   MOD_MESHSEQ_READ_UV = (1 << 2),
   MOD_MESHSEQ_READ_COLOR = (1 << 3),
+
+  /* Allow interpolation of mesh vertex positions. There is a heuristic to avoid interpolation when
+   * the mesh topology changes, but this heuristic sometimes fails. In these cases, users can
+   * disable interpolation with this flag. */
+  MOD_MESHSEQ_INTERPOLATE_VERTICES = (1 << 4),
 };
 
 typedef struct SDefBind {
@@ -2202,12 +2244,101 @@ enum {
 #define MOD_MESHSEQ_READ_ALL \
   (MOD_MESHSEQ_READ_VERT | MOD_MESHSEQ_READ_POLY | MOD_MESHSEQ_READ_UV | MOD_MESHSEQ_READ_COLOR)
 
-typedef struct SimulationModifierData {
+typedef struct NodesModifierSettings {
+  /* This stores data that is passed into the node group. */
+  struct IDProperty *properties;
+} NodesModifierSettings;
+
+typedef struct NodesModifierData {
+  ModifierData modifier;
+  struct bNodeTree *node_group;
+  struct NodesModifierSettings settings;
+} NodesModifierData;
+
+typedef struct MeshToVolumeModifierData {
   ModifierData modifier;
 
-  struct Simulation *simulation;
-  char *data_path;
-} SimulationModifierData;
+  /** This is the object that is supposed to be converted to a volume. */
+  struct Object *object;
+
+  /** MeshToVolumeModifierResolutionMode */
+  int resolution_mode;
+  /** Size of a voxel in object space. */
+  float voxel_size;
+  /** The desired amount of voxels along one axis. The actual amount of voxels might be slightly
+   * different. */
+  int voxel_amount;
+
+  /** If true, every cell in the enclosed volume gets a density. Otherwise, the interior_band_width
+   * is used. */
+  char fill_volume;
+  char _pad1[3];
+
+  /** Band widths are in object space. */
+  float interior_band_width;
+  float exterior_band_width;
+
+  float density;
+  char _pad2[4];
+} MeshToVolumeModifierData;
+
+/* MeshToVolumeModifierData->resolution_mode */
+typedef enum MeshToVolumeModifierResolutionMode {
+  MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_AMOUNT = 0,
+  MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_SIZE = 1,
+} MeshToVolumeModifierResolutionMode;
+
+typedef struct VolumeDisplaceModifierData {
+  ModifierData modifier;
+
+  struct Tex *texture;
+  struct Object *texture_map_object;
+  int texture_map_mode;
+
+  float strength;
+  float texture_mid_level[3];
+  float texture_sample_radius;
+} VolumeDisplaceModifierData;
+
+/* VolumeDisplaceModifierData->texture_map_mode */
+enum {
+  MOD_VOLUME_DISPLACE_MAP_LOCAL = 0,
+  MOD_VOLUME_DISPLACE_MAP_GLOBAL = 1,
+  MOD_VOLUME_DISPLACE_MAP_OBJECT = 2,
+};
+
+typedef struct VolumeToMeshModifierData {
+  ModifierData modifier;
+
+  /** This is the volume object that is supposed to be converted to a mesh. */
+  struct Object *object;
+
+  float threshold;
+  float adaptivity;
+
+  /** VolumeToMeshFlag */
+  uint32_t flag;
+
+  /** VolumeToMeshResolutionMode */
+  int resolution_mode;
+  float voxel_size;
+  int voxel_amount;
+
+  /** MAX_NAME */
+  char grid_name[64];
+} VolumeToMeshModifierData;
+
+/** VolumeToMeshModifierData->resolution_mode */
+typedef enum VolumeToMeshResolutionMode {
+  VOLUME_TO_MESH_RESOLUTION_MODE_GRID = 0,
+  VOLUME_TO_MESH_RESOLUTION_MODE_VOXEL_AMOUNT = 1,
+  VOLUME_TO_MESH_RESOLUTION_MODE_VOXEL_SIZE = 2,
+} VolumeToMeshResolutionMode;
+
+/** VolumeToMeshModifierData->flag */
+typedef enum VolumeToMeshFlag {
+  VOLUME_TO_MESH_USE_SMOOTH_SHADE = 1 << 0,
+} VolumeToMeshFlag;
 
 #ifdef __cplusplus
 }

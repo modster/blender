@@ -33,7 +33,7 @@ typedef enum eGPUWriteMask {
   GPU_WRITE_COLOR = (GPU_WRITE_RED | GPU_WRITE_GREEN | GPU_WRITE_BLUE | GPU_WRITE_ALPHA),
 } eGPUWriteMask;
 
-ENUM_OPERATORS(eGPUWriteMask)
+ENUM_OPERATORS(eGPUWriteMask, GPU_WRITE_COLOR)
 
 typedef enum eGPUBarrier {
   GPU_BARRIER_NONE = 0,
@@ -41,12 +41,12 @@ typedef enum eGPUBarrier {
   GPU_BARRIER_TEXTURE_FETCH = (1 << 1),
 } eGPUBarrier;
 
-ENUM_OPERATORS(eGPUBarrier)
+ENUM_OPERATORS(eGPUBarrier, GPU_BARRIER_TEXTURE_FETCH)
 
 /**
  * Defines the fixed pipeline blending equation.
  * SRC is the output color from the shader.
- * DST is the color from the framebuffer.
+ * DST is the color from the frame-buffer.
  * The blending equation is :
  *  (SRC * A) + (DST * B).
  * The blend mode will modify the A and B parameters.
@@ -64,13 +64,14 @@ typedef enum eGPUBlend {
    * NOTE: Does not modify alpha. */
   GPU_BLEND_INVERT,
   /** Order independent transparency.
-   * NOTE: Cannot be used as is. Needs special setup (framebuffer, shader ...). */
+   * NOTE: Cannot be used as is. Needs special setup (frame-buffer, shader ...). */
   GPU_BLEND_OIT,
   /** Special blend to add color under and multiply dst color by src alpha. */
   GPU_BLEND_BACKGROUND,
   /** Custom blend parameters using dual source blending : SRC0 + SRC1 * DST
    * NOTE: Can only be used with _ONE_ Draw Buffer and shader needs to be specialized. */
   GPU_BLEND_CUSTOM,
+  GPU_BLEND_ALPHA_UNDER_PREMUL,
 } eGPUBlend;
 
 typedef enum eGPUDepthTest {
@@ -156,11 +157,15 @@ eGPUDepthTest GPU_depth_test_get(void);
 eGPUWriteMask GPU_write_mask_get(void);
 uint GPU_stencil_mask_get(void);
 eGPUStencilTest GPU_stencil_test_get(void);
+float GPU_line_width_get(void);
 
 void GPU_flush(void);
 void GPU_finish(void);
 void GPU_apply_state(void);
-void GPU_force_state(void);
+
+void GPU_bgl_start(void);
+void GPU_bgl_end(void);
+bool GPU_bgl_get(void);
 
 void GPU_memory_barrier(eGPUBarrier barrier);
 

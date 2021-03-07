@@ -119,7 +119,7 @@ class BCAnimationCurve {
   std::string get_animation_name(Object *ob) const; /* xxx: this is collada specific */
   std::string get_channel_target() const;
   std::string get_channel_type() const;
-  std::string get_channel_posebone() const;  // returns "" if channel is not a bone channel
+  std::string get_channel_posebone() const; /* returns "" if channel is not a bone channel */
 
   int get_channel_index() const;
   int get_subindex() const;
@@ -133,7 +133,7 @@ class BCAnimationCurve {
 
   void get_frames(BCFrames &frames) const;
 
-  /* Curve edit functions create a copy of the underlaying FCurve */
+  /* Curve edit functions create a copy of the underlying #FCurve. */
   FCurve *get_edit_fcurve();
   bool add_value_from_rna(const int frame);
   bool add_value_from_matrix(const BCSample &sample, const int frame);

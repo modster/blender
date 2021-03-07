@@ -53,7 +53,7 @@
  *     Before:  +----v----+      After: +---------+
  * </pre>
  *
- * \note dissolves vert, in more situations then BM_disk_dissolve
+ * \note dissolves vert, in more situations than BM_disk_dissolve
  * (e.g. if the vert is part of a wire edge, etc).
  */
 bool BM_vert_dissolve(BMesh *bm, BMVert *v)
@@ -528,7 +528,7 @@ BMEdge *BM_vert_collapse_edge(
   /* Collapse between 2 edges */
 
   /* in this case we want to keep all faces and not join them,
-   * rather just get rid of the vertex - see bug [#28645] */
+   * rather just get rid of the vertex - see bug T28645. */
   BMVert *tv = BM_edge_other_vert(e_kill, v_kill);
   if (tv) {
     BMEdge *e2 = bmesh_disk_edge_next(e_kill, v_kill);
@@ -802,7 +802,7 @@ void BM_edge_calc_rotate(BMEdge *e, const bool ccw, BMLoop **r_l1, BMLoop **r_l2
   /* we know this will work */
   BM_edge_face_pair(e, &fa, &fb);
 
-  /* so we can use ccw variable correctly,
+  /* so we can use `ccw` variable correctly,
    * otherwise we could use the edges verts direct */
   BM_edge_ordered_verts(e, &v1, &v2);
 
@@ -886,7 +886,7 @@ bool BM_edge_rotate_check_degenerate(BMEdge *e, BMLoop *l1, BMLoop *l2)
   /* verts from the loops passed */
 
   BMVert *v1, *v2;
-  /* these are the opposite verts - the verts that _would_ be used if 'ccw' was inverted*/
+  /* These are the opposite verts - the verts that _would_ be used if `ccw` was inverted. */
   BMVert *v1_alt, *v2_alt;
 
   /* this should have already run */
@@ -1052,7 +1052,7 @@ BMEdge *BM_edge_rotate(BMesh *bm, BMEdge *e, const bool ccw, const short check_f
   if ((l1 = BM_face_vert_share_loop(f, v1)) && (l2 = BM_face_vert_share_loop(f, v2)) &&
       BM_face_split(bm, f, l1, l2, NULL, NULL, true)) {
     /* we should really be able to know the faces some other way,
-     * rather then fetching them back from the edge, but this is predictable
+     * rather than fetching them back from the edge, but this is predictable
      * where using the return values from face split isn't. - campbell */
     BMFace *fa, *fb;
     if (BM_edge_face_pair(e_new, &fa, &fb)) {
@@ -1070,7 +1070,7 @@ BMEdge *BM_edge_rotate(BMesh *bm, BMEdge *e, const bool ccw, const short check_f
         BM_face_normal_flip(bm, fb);
 
         if (ccw) {
-          /* needed otherwise ccw toggles direction */
+          /* Needed otherwise `ccw` toggles direction */
           e_new->l = e_new->l->radial_next;
         }
       }

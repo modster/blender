@@ -24,9 +24,6 @@ uniform sampler2D noiseTex;
 #define dof_distance dofParams.y
 #define dof_invsensorsize dofParams.z
 
-#define weighted_sum(a, b, c, d, e, e_sum) \
-  ((a)*e.x + (b)*e.y + (c)*e.z + (d)*e.w) / max(1e-6, e_sum);
-
 /* divide by sensor size to get the normalized size */
 #define calculate_coc(zdepth) \
   (dof_aperturesize * (dof_distance / zdepth - 1.0) * dof_invsensorsize)
@@ -89,8 +86,7 @@ void main()
   /* now write output to weighted buffers. */
   /* Take far plane pixels in priority. */
   vec4 w = any(notEqual(far_weights, vec4(0.0))) ? far_weights : near_weights;
-  float tot_weight = dot(w, vec4(1.0));
-  halfResColor = weighted_sum(color1, color2, color3, color4, w, tot_weight);
+  halfResColor = weighted_sum(color1, color2, color3, color4, w);
   halfResColor = clamp(halfResColor, 0.0, 3.0);
 
   normalizedCoc = encode_coc(coc_near, coc_far);
@@ -138,8 +134,7 @@ void main()
 
   /* now write output to weighted buffers. */
   vec4 w = any(notEqual(far_weights, vec4(0.0))) ? far_weights : near_weights;
-  float tot_weight = dot(w, vec4(1.0));
-  outColor = weighted_sum(color1, color2, color3, color4, w, tot_weight);
+  outColor = weighted_sum(color1, color2, color3, color4, w);
 
   outCocs = encode_coc(coc_near, coc_far);
 }
@@ -342,23 +337,23 @@ void main()
 
 #  define mnmx3(a, b, c) \
     mx3(a, b, c); \
-    s2(a, b);  // 3 exchanges
+    s2(a, b); /* 3 exchanges */
 #  define mnmx4(a, b, c, d) \
     s2(a, b); \
     s2(c, d); \
     s2(a, c); \
-    s2(b, d);  // 4 exchanges
+    s2(b, d); /* 4 exchanges */
 #  define mnmx5(a, b, c, d, e) \
     s2(a, b); \
     s2(c, d); \
     mn3(a, c, e); \
-    mx3(b, d, e);  // 6 exchanges
+    mx3(b, d, e); /* 6 exchanges */
 #  define mnmx6(a, b, c, d, e, f) \
     s2(a, d); \
     s2(b, e); \
     s2(c, f); \
     mn3(a, b, c); \
-    mx3(d, e, f);  // 7 exchanges
+    mx3(d, e, f); /* 7 exchanges */
 
   vec v[9];
 

@@ -27,6 +27,10 @@
 #include "DNA_boid_types.h"
 #include "DNA_defs.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct AnimData;
 
 typedef struct HairKey {
@@ -114,10 +118,10 @@ typedef struct ParticleData {
   /** Boids data. */
   BoidParticle *boid;
 
-  /** Amount of hair or keyed key.s*/
+  /** Amount of hair or keyed keys. */
   int totkey;
 
-  /** Dietime is not necessarily time+lifetime as. */
+  /** Die-time is not necessarily time+lifetime as. */
   float time, lifetime;
   /** Particles can die unnaturally (collision). */
   float dietime;
@@ -128,10 +132,13 @@ typedef struct ParticleData {
    */
   /** Index to vert/edge/face. */
   int num;
-  /** Index to derived mesh data (face) to avoid slow lookups. */
+  /**
+   * Index to derived mesh data (face) to avoid slow lookups. It can also have negative
+   * values DMCACHE_NOTFOUND and DMCACHE_ISCHILD.
+   */
   int num_dmcache;
 
-  /** Coordinates on face/edge number "num" and depth alon.g*/
+  /** Coordinates on face/edge number "num" and depth along. */
   float fuv[4], foffset;
   /* face normal for volume emission. */
 
@@ -272,7 +279,7 @@ typedef struct ParticleSettings {
 
   struct Collection *instance_collection;
   struct ListBase instance_weights;
-  struct Collection *force_group DNA_DEPRECATED;  // deprecated
+  struct Collection *force_group DNA_DEPRECATED; /* deprecated */
   struct Object *instance_object;
   struct Object *bb_ob;
   /** Old animation system, deprecated for 2.5. */
@@ -690,3 +697,7 @@ typedef enum eParticleTextureInfluence {
   PAMAP_CHILD = (PAMAP_CLUMP | PAMAP_KINK_FREQ | PAMAP_KINK_AMP | PAMAP_ROUGH | PAMAP_LENGTH |
                  PAMAP_TWIST),
 } eParticleTextureInfluence;
+
+#ifdef __cplusplus
+}
+#endif

@@ -113,7 +113,7 @@ static void planar_pool_ensure_alloc(EEVEE_Data *vedata, int num_planar_ref)
 {
   EEVEE_TextureList *txl = vedata->txl;
 
-  /* XXX TODO OPTIMISATION : This is a complete waist of texture memory.
+  /* XXX TODO OPTIMIZATION: This is a complete waist of texture memory.
    * Instead of allocating each planar probe for each viewport,
    * only alloc them once using the biggest viewport resolution. */
   const float *viewport_size = DRW_viewport_size_get();
@@ -377,7 +377,7 @@ void EEVEE_lightprobes_cache_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedat
         DRW_shgroup_uniform_vec3(grp, "screen_vecs", DRW_viewport_screenvecs_get(), 2);
         DRW_shgroup_uniform_float_copy(
             grp, "sphere_size", scene_eval->eevee.gi_cubemap_draw_size * 0.5f);
-        /* TODO (fclem) get rid of those UBO. */
+        /* TODO(fclem): get rid of those UBO. */
         DRW_shgroup_uniform_block(grp, "planar_block", sldata->planar_ubo);
         DRW_shgroup_uniform_block(grp, "grid_block", sldata->grid_ubo);
         DRW_shgroup_uniform_block(grp, "renderpass_block", sldata->renderpass_ubo.combined);
@@ -402,7 +402,7 @@ void EEVEE_lightprobes_cache_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedat
           DRW_shgroup_uniform_texture_ref(shgrp, "irradianceGrid", &lcache->grid_tx.tex);
           DRW_shgroup_uniform_float_copy(
               shgrp, "sphere_size", scene_eval->eevee.gi_irradiance_draw_size * 0.5f);
-          /* TODO (fclem) get rid of those UBO. */
+          /* TODO(fclem): get rid of those UBO. */
           DRW_shgroup_uniform_block(shgrp, "probe_block", sldata->probe_ubo);
           DRW_shgroup_uniform_block(shgrp, "planar_block", sldata->planar_ubo);
           DRW_shgroup_uniform_block(shgrp, "grid_block", sldata->grid_ubo);
@@ -704,11 +704,11 @@ static void lightbake_planar_ensure_view(EEVEE_PlanarReflection *eplanar,
 static void eevee_lightprobes_extract_from_cache(EEVEE_LightProbesInfo *pinfo, LightCache *lcache)
 {
   /* copy the entire cache for now (up to MAX_PROBE) */
-  /* TODO Frutum cull to only add visible probes. */
+  /* TODO: frustum cull to only add visible probes. */
   memcpy(pinfo->probe_data,
          lcache->cube_data,
          sizeof(EEVEE_LightProbe) * max_ii(1, min_ii(lcache->cube_len, MAX_PROBE)));
-  /* TODO compute the max number of grid based on sample count. */
+  /* TODO: compute the max number of grid based on sample count. */
   memcpy(pinfo->grid_data,
          lcache->grid_data,
          sizeof(EEVEE_LightGrid) * max_ii(1, min_ii(lcache->grid_len, MAX_GRID)));
@@ -1040,8 +1040,10 @@ void EEVEE_lightbake_filter_glossy(EEVEE_ViewLayerData *sldata,
     pinfo->padding_size *= pinfo->texel_size;
     pinfo->layer = probe_idx * 6;
     pinfo->roughness = i / (float)maxlevel;
-    pinfo->roughness *= pinfo->roughness;     /* Disney Roughness */
-    pinfo->roughness *= pinfo->roughness;     /* Distribute Roughness accros lod more evenly */
+    /* Disney Roughness */
+    pinfo->roughness = square_f(pinfo->roughness);
+    /* Distribute Roughness across lod more evenly */
+    pinfo->roughness = square_f(square_f(pinfo->roughness));
     CLAMP(pinfo->roughness, 1e-8f, 0.99999f); /* Avoid artifacts */
 
 #if 1 /* Variable Sample count and bias (fast) */

@@ -64,7 +64,7 @@ extern "C" {
 #  define S_ISDIR(x) (((x)&_S_IFDIR) == _S_IFDIR)
 #endif
 
-/* defines for using ISO C++ conformant names */
+/* Defines for using ISO C++ conferment names. */
 #if !defined(_MSC_VER) || _MSC_VER < 1900
 #  define snprintf _snprintf
 #endif
@@ -84,7 +84,7 @@ typedef unsigned int mode_t;
 /* python uses HAVE_SSIZE_T */
 #  ifndef HAVE_SSIZE_T
 #    define HAVE_SSIZE_T 1
-typedef long ssize_t;
+typedef SSIZE_T ssize_t;
 #  endif
 #endif
 

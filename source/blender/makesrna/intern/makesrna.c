@@ -29,6 +29,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_string.h"
 #include "BLI_system.h" /* for 'BLI_system_backtrace' stub. */
 #include "BLI_utildefines.h"
 
@@ -161,7 +162,7 @@ static int replace_if_different(const char *tmpfile, const char *dep_files[])
    * assumes dep_files is in the same dir as makesrna.c, which is true for now. */
 
   if (1) {
-    /* first check if makesrna.c is newer then generated files
+    /* first check if makesrna.c is newer than generated files
      * for development on makesrna.c you may want to disable this */
     if (file_older(orgfile, __FILE__)) {
       REN_IF_DIFF;
@@ -171,7 +172,7 @@ static int replace_if_different(const char *tmpfile, const char *dep_files[])
       REN_IF_DIFF;
     }
 
-    /* now check if any files we depend on are newer then any generated files */
+    /* now check if any files we depend on are newer than any generated files */
     if (dep_files) {
       int pass;
       for (pass = 0; dep_files[pass]; pass++) {
@@ -239,10 +240,8 @@ static int replace_if_different(const char *tmpfile, const char *dep_files[])
   if (cmp) {
     REN_IF_DIFF;
   }
-  else {
-    remove(tmpfile);
-    return 0;
-  }
+  remove(tmpfile);
+  return 0;
 
 #undef REN_IF_DIFF
 }
@@ -254,13 +253,13 @@ static const char *rna_safe_id(const char *id)
   if (STREQ(id, "default")) {
     return "default_value";
   }
-  else if (STREQ(id, "operator")) {
+  if (STREQ(id, "operator")) {
     return "operator_value";
   }
-  else if (STREQ(id, "new")) {
+  if (STREQ(id, "new")) {
     return "create";
   }
-  else if (STREQ(id, "co_return")) {
+  if (STREQ(id, "co_return")) {
     /* MSVC2015, C++ uses for coroutines */
     return "coord_return";
   }
@@ -286,14 +285,14 @@ static int cmp_property(const void *a, const void *b)
   if (STREQ(propa->identifier, "rna_type")) {
     return -1;
   }
-  else if (STREQ(propb->identifier, "rna_type")) {
+  if (STREQ(propb->identifier, "rna_type")) {
     return 1;
   }
 
   if (STREQ(propa->identifier, "name")) {
     return -1;
   }
-  else if (STREQ(propb->identifier, "name")) {
+  if (STREQ(propb->identifier, "name")) {
     return 1;
   }
 
@@ -551,9 +550,7 @@ static const char *rna_parameter_type_name(PropertyRNA *parm)
       if (parm->flag_parameter & PARM_RNAPTR) {
         return "PointerRNA";
       }
-      else {
-        return rna_find_dna_type((const char *)pparm->type);
-      }
+      return rna_find_dna_type((const char *)pparm->type);
     }
     case PROP_COLLECTION: {
       return "CollectionListBase";
@@ -581,8 +578,7 @@ static int rna_enum_bitmask(PropertyRNA *prop)
 
 static int rna_color_quantize(PropertyRNA *prop, PropertyDefRNA *dp)
 {
-  return ((prop->type == PROP_FLOAT) &&
-          (prop->subtype == PROP_COLOR || prop->subtype == PROP_COLOR_GAMMA) &&
+  return ((prop->type == PROP_FLOAT) && (ELEM(prop->subtype, PROP_COLOR, PROP_COLOR_GAMMA)) &&
           (IS_DNATYPE_FLOAT_COMPAT(dp->dnatype) == 0));
 }
 
@@ -675,7 +671,7 @@ static char *rna_def_property_get_func(
           return NULL;
         }
       }
-      else if (prop->type == PROP_INT || prop->type == PROP_ENUM) {
+      else if (ELEM(prop->type, PROP_INT, PROP_ENUM)) {
         if (IS_DNATYPE_INT_COMPAT(dp->dnatype) == 0) {
           CLOG_ERROR(&LOG,
                      "%s.%s is a '%s' but wrapped as type '%s'.",
@@ -765,9 +761,10 @@ static char *rna_def_property_get_func(
       fprintf(f, "static PointerRNA %s(CollectionPropertyIterator *iter)\n", func);
       fprintf(f, "{\n");
       if (manualfunc) {
-        if (STREQ(manualfunc, "rna_iterator_listbase_get") ||
-            STREQ(manualfunc, "rna_iterator_array_get") ||
-            STREQ(manualfunc, "rna_iterator_array_dereference_get")) {
+        if (STR_ELEM(manualfunc,
+                     "rna_iterator_listbase_get",
+                     "rna_iterator_array_get",
+                     "rna_iterator_array_dereference_get")) {
           fprintf(f,
                   "    return rna_pointer_inherit_refine(&iter->parent, &RNA_%s, %s(iter));\n",
                   (cprop->item_type) ? (const char *)cprop->item_type : "UnknownType",
@@ -2270,9 +2267,7 @@ static const char *rna_parameter_type_cpp_name(PropertyRNA *prop)
 
     return (const char *)pprop->type;
   }
-  else {
-    return rna_parameter_type_name(prop);
-  }
+  return rna_parameter_type_name(prop);
 }
 
 static void rna_def_struct_function_prototype_cpp(FILE *f,
@@ -3206,9 +3201,7 @@ static const char *rna_property_subtypename(PropertySubType type)
       if (RNA_SUBTYPE_UNIT(type)) {
         return rna_property_subtypename(type & ~RNA_SUBTYPE_UNIT(type));
       }
-      else {
-        return "PROP_SUBTYPE_UNKNOWN";
-      }
+      return "PROP_SUBTYPE_UNKNOWN";
     }
   }
 }
@@ -4277,6 +4270,7 @@ static RNAProcessItem PROCESS_ITEMS[] = {
     {"rna_animviz.c", NULL, RNA_def_animviz},
     {"rna_armature.c", "rna_armature_api.c", RNA_def_armature},
     {"rna_attribute.c", NULL, RNA_def_attribute},
+    {"rna_asset.c", NULL, RNA_def_asset},
     {"rna_boid.c", NULL, RNA_def_boid},
     {"rna_brush.c", NULL, RNA_def_brush},
     {"rna_cachefile.c", NULL, RNA_def_cachefile},
@@ -4315,7 +4309,7 @@ static RNAProcessItem PROCESS_ITEMS[] = {
     {"rna_packedfile.c", NULL, RNA_def_packedfile},
     {"rna_palette.c", NULL, RNA_def_palette},
     {"rna_particle.c", NULL, RNA_def_particle},
-#ifdef WITH_PARTICLE_NODES
+#ifdef WITH_POINT_CLOUD
     {"rna_pointcloud.c", NULL, RNA_def_pointcloud},
 #endif
     {"rna_pose.c", "rna_pose_api.c", RNA_def_pose},
@@ -4327,7 +4321,7 @@ static RNAProcessItem PROCESS_ITEMS[] = {
     {"rna_screen.c", NULL, RNA_def_screen},
     {"rna_sculpt_paint.c", NULL, RNA_def_sculpt_paint},
     {"rna_sequencer.c", "rna_sequencer_api.c", RNA_def_sequencer},
-#ifdef WITH_PARTICLE_NODES
+#ifdef WITH_GEOMETRY_NODES
     {"rna_simulation.c", NULL, RNA_def_simulation},
 #endif
     {"rna_space.c", "rna_space_api.c", RNA_def_space},
@@ -4442,7 +4436,7 @@ static void rna_generate(BlenderRNA *brna, FILE *f, const char *filename, const 
     }
   }
 
-  if (STREQ(filename, "rna_ID.c")) {
+  if (filename && STREQ(filename, "rna_ID.c")) {
     /* this is ugly, but we cannot have c files compiled for both
      * makesrna and blender with some build systems at the moment */
     fprintf(f, "#include \"rna_define.c\"\n\n");
@@ -4629,8 +4623,9 @@ static const char *cpp_classes =
     "            ++i; \\\n"
     "        } \\\n"
     "        sname##_##identifier##_end(&iter); \\\n"
-    "        if (!found) \\\n"
+    "        if (!found) { \\\n"
     "            memset(r_ptr, 0, sizeof(*r_ptr)); \\\n"
+    "        } \\\n"
     "        return found; \\\n"
     "    } \n"
     "#define COLLECTION_PROPERTY_LOOKUP_INT_true(sname, identifier) \\\n"
@@ -4638,8 +4633,9 @@ static const char *cpp_classes =
     "PointerRNA *r_ptr) \\\n"
     "    { \\\n"
     "        int found = sname##_##identifier##_lookup_int(ptr, key, r_ptr); \\\n"
-    "        if (!found) \\\n"
+    "        if (!found) { \\\n"
     "            memset(r_ptr, 0, sizeof(*r_ptr)); \\\n"
+    "        } \\\n"
     "        return found; \\\n"
     "    } \n"
     "#define COLLECTION_PROPERTY_LOOKUP_STRING_false(sname, identifier) \\\n"
@@ -4660,13 +4656,15 @@ static const char *cpp_classes =
     "                *r_ptr = iter.ptr; \\\n"
     "                found = 1; \\\n"
     "            } \\\n"
-    "            if (name_fixed != name) \\\n"
+    "            if (name_fixed != name) { \\\n"
     "                MEM_freeN((void *) name); \\\n"
+    "            } \\\n"
     "            sname##_##identifier##_next(&iter); \\\n"
     "        } \\\n"
     "        sname##_##identifier##_end(&iter); \\\n"
-    "        if (!found) \\\n"
+    "        if (!found) { \\\n"
     "            memset(r_ptr, 0, sizeof(*r_ptr)); \\\n"
+    "        } \\\n"
     "        return found; \\\n"
     "    } \n"
     "#define COLLECTION_PROPERTY_LOOKUP_STRING_true(sname, identifier) \\\n"
@@ -4674,8 +4672,9 @@ static const char *cpp_classes =
     "*key, PointerRNA *r_ptr) \\\n"
     "    { \\\n"
     "        int found = sname##_##identifier##_lookup_string(ptr, key, r_ptr); \\\n"
-    "        if (!found) \\\n"
+    "        if (!found) { \\\n"
     "            memset(r_ptr, 0, sizeof(*r_ptr)); \\\n"
+    "        } \\\n"
     "        return found; \\\n"
     "    } \n"
     "#define COLLECTION_PROPERTY(collection_funcs, type, sname, identifier, has_length, "
@@ -4759,7 +4758,13 @@ static const char *cpp_classes =
     "class CollectionIterator {\n"
     "public:\n"
     "    CollectionIterator() : iter(), t(iter.ptr), init(false) { iter.valid = false; }\n"
+    "    CollectionIterator(const PointerRNA &ptr) : CollectionIterator() { this->begin(ptr); }\n"
     "    ~CollectionIterator(void) { if (init) Tend(&iter); };\n"
+    "\n"
+    "    CollectionIterator(const CollectionIterator &other) = delete;\n"
+    "    CollectionIterator(CollectionIterator &&other) = delete;\n"
+    "    CollectionIterator &operator=(const CollectionIterator &other) = delete;\n"
+    "    CollectionIterator &operator=(CollectionIterator &&other) = delete;\n"
     "\n"
     "    operator bool(void)\n"
     "    { return iter.valid != 0; }\n"
@@ -4778,9 +4783,6 @@ static const char *cpp_classes =
     "true; }\n"
     "\n"
     "private:\n"
-    "    const CollectionIterator<T, Tbegin, Tnext, Tend>& operator = "
-    "(const CollectionIterator<T, Tbegin, Tnext, Tend>& /*copy*/) {}\n"
-    ""
     "    CollectionPropertyIterator iter;\n"
     "    T t;\n"
     "    bool init;\n"
@@ -4795,6 +4797,8 @@ static const char *cpp_classes =
     "\n"
     "    void begin(CollectionIterator<T, Tbegin, Tnext, Tend>& iter)\n"
     "    { iter.begin(ptr); }\n"
+    "    CollectionIterator<T, Tbegin, Tnext, Tend> begin()\n"
+    "    { return CollectionIterator<T, Tbegin, Tnext, Tend>(ptr); }\n"
     "    CollectionIterator<T, Tbegin, Tnext, Tend> end()\n"
     "    { return CollectionIterator<T, Tbegin, Tnext, Tend>(); } /* test */ \n"
     ""

@@ -32,7 +32,7 @@ namespace blender::gpu {
 /**
  * Implementation of Vertex Buffers.
  * Base class which is then specialized for each implementation (GL, VK, ...).
- **/
+ */
 class VertBuf {
  public:
   static size_t memory_usage;
@@ -48,11 +48,11 @@ class VertBuf {
   uchar *data = NULL;
 
  protected:
-  /** Usage hint for GL optimisation. */
+  /** Usage hint for GL optimization. */
   GPUUsageType usage_ = GPU_USAGE_STATIC;
 
  private:
-  /** This counter will only avoid freeing the GPUVertBuf, not the data. */
+  /** This counter will only avoid freeing the #GPUVertBuf, not the data. */
   int handle_refcount_ = 1;
 
  public:
@@ -62,7 +62,7 @@ class VertBuf {
   void init(const GPUVertFormat *format, GPUUsageType usage);
   void clear(void);
 
-  /* Data manament */
+  /* Data management. */
   void allocate(uint vert_len);
   void resize(uint vert_len);
   void upload(void);
@@ -105,7 +105,7 @@ class VertBuf {
   virtual void duplicate_data(VertBuf *dst) = 0;
 };
 
-/* Syntacting suggar. */
+/* Syntactic sugar. */
 static inline GPUVertBuf *wrap(VertBuf *vert)
 {
   return reinterpret_cast<GPUVertBuf *>(vert);

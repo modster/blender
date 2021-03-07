@@ -17,7 +17,7 @@
 /** \file
  * \ingroup pythonintern
  *
- * This adds helpers to #uiLayout which can't be added easily to RNA it's self.
+ * This adds helpers to #uiLayout which can't be added easily to RNA itself.
  */
 
 #include <Python.h>
@@ -27,6 +27,8 @@
 #include "../generic/py_capi_utils.h"
 
 #include "UI_interface.h"
+
+#include "RNA_types.h"
 
 #include "bpy_rna.h"
 #include "bpy_rna_ui.h"

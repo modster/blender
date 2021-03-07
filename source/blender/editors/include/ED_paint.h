@@ -53,6 +53,11 @@ void ED_imapaint_bucket_fill(struct bContext *C,
                              struct wmOperator *op,
                              const int mouse[2]);
 
+/* paint_image_proj.c */
+void ED_paint_data_warning(struct ReportList *reports, bool uvs, bool mat, bool tex, bool stencil);
+bool ED_paint_proj_mesh_data_check(
+    struct Scene *scene, struct Object *ob, bool *uvs, bool *mat, bool *tex, bool *stencil);
+
 /* image_undo.c */
 void ED_image_undo_push_begin(const char *name, int paint_mode);
 void ED_image_undo_push_begin_with_image(const char *name,
@@ -96,7 +101,7 @@ struct ListBase *ED_image_paint_tile_list_get(void);
 
 /* paint_curve_undo.c */
 void ED_paintcurve_undo_push_begin(const char *name);
-void ED_paintcurve_undo_push_end(void);
+void ED_paintcurve_undo_push_end(struct bContext *C);
 
 void ED_paintcurve_undosys_type(struct UndoType *ut);
 

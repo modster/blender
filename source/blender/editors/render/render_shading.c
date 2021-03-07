@@ -57,7 +57,6 @@
 #include "BKE_main.h"
 #include "BKE_material.h"
 #include "BKE_object.h"
-#include "BKE_paint.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
 #include "BKE_texture.h"
@@ -82,6 +81,7 @@
 #include "ED_mesh.h"
 #include "ED_node.h"
 #include "ED_object.h"
+#include "ED_paint.h"
 #include "ED_render.h"
 #include "ED_scene.h"
 #include "ED_screen.h"
@@ -90,11 +90,12 @@
 
 #include "UI_interface.h"
 
+#include "RE_engine.h"
 #include "RE_pipeline.h"
 
 #include "engines/eevee/eevee_lightcache.h"
 
-#include "render_intern.h"  // own include
+#include "render_intern.h" /* own include */
 
 static bool object_materials_supported_poll_ex(bContext *C, const Object *ob);
 
@@ -147,10 +148,18 @@ static bool object_materials_supported_poll_ex(bContext *C, const Object *ob)
   if (!ED_operator_object_active_local_editable_ex(C, ob)) {
     return false;
   }
+  if (!OB_TYPE_SUPPORT_MATERIAL(ob->type)) {
+    return false;
+  }
+
+  /* Material linked to object. */
+  if (ob->matbits && ob->actcol && ob->matbits[ob->actcol - 1]) {
+    return true;
+  }
+
+  /* Material linked to obdata. */
   const ID *data = ob->data;
-  return (OB_TYPE_SUPPORT_MATERIAL(ob->type) &&
-          /* Object data checks. */
-          data && !ID_IS_LINKED(data) && !ID_IS_OVERRIDE_LIBRARY(data));
+  return (data && !ID_IS_LINKED(data) && !ID_IS_OVERRIDE_LIBRARY(data));
 }
 
 static bool object_materials_supported_poll(bContext *C)
@@ -178,7 +187,7 @@ static int material_slot_add_exec(bContext *C, wmOperator *UNUSED(op))
 
   if (ob->mode & OB_MODE_TEXTURE_PAINT) {
     Scene *scene = CTX_data_scene(C);
-    BKE_paint_proj_mesh_data_check(scene, ob, NULL, NULL, NULL, NULL);
+    ED_paint_proj_mesh_data_check(scene, ob, NULL, NULL, NULL, NULL);
     WM_event_add_notifier(C, NC_SCENE | ND_TOOLSETTINGS, NULL);
   }
 
@@ -218,7 +227,7 @@ static int material_slot_remove_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  /* Removing material slots in edit mode screws things up, see bug #21822.*/
+  /* Removing material slots in edit mode screws things up, see bug T21822.*/
   if (ob == CTX_data_edit_object(C)) {
     BKE_report(op->reports, RPT_ERROR, "Unable to remove material slot in edit mode");
     return OPERATOR_CANCELLED;
@@ -228,7 +237,7 @@ static int material_slot_remove_exec(bContext *C, wmOperator *op)
 
   if (ob->mode & OB_MODE_TEXTURE_PAINT) {
     Scene *scene = CTX_data_scene(C);
-    BKE_paint_proj_mesh_data_check(scene, ob, NULL, NULL, NULL, NULL);
+    ED_paint_proj_mesh_data_check(scene, ob, NULL, NULL, NULL, NULL);
     WM_event_add_notifier(C, NC_SCENE | ND_TOOLSETTINGS, NULL);
   }
 
@@ -664,7 +673,7 @@ void OBJECT_OT_material_slot_move(wmOperatorType *ot)
 
 static int material_slot_remove_unused_exec(bContext *C, wmOperator *op)
 {
-  /* Removing material slots in edit mode screws things up, see bug #21822.*/
+  /* Removing material slots in edit mode screws things up, see bug T21822. */
   Object *ob_active = CTX_data_active_object(C);
   if (ob_active && BKE_object_is_in_editmode(ob_active)) {
     BKE_report(op->reports, RPT_ERROR, "Unable to remove material slot in edit mode");
@@ -705,7 +714,7 @@ static int material_slot_remove_unused_exec(bContext *C, wmOperator *op)
 
   if (ob_active->mode & OB_MODE_TEXTURE_PAINT) {
     Scene *scene = CTX_data_scene(C);
-    BKE_paint_proj_mesh_data_check(scene, ob_active, NULL, NULL, NULL, NULL);
+    ED_paint_proj_mesh_data_check(scene, ob_active, NULL, NULL, NULL, NULL);
     WM_event_add_notifier(C, NC_SCENE | ND_TOOLSETTINGS, NULL);
   }
 
@@ -751,8 +760,8 @@ static int new_material_exec(bContext *C, wmOperator *UNUSED(op))
 
   /* add or copy material */
   if (ma) {
-    Material *new_ma = NULL;
-    BKE_id_copy_ex(bmain, &ma->id, (ID **)&new_ma, LIB_ID_COPY_DEFAULT | LIB_ID_COPY_ACTIONS);
+    Material *new_ma = (Material *)BKE_id_copy_ex(
+        bmain, &ma->id, NULL, LIB_ID_COPY_DEFAULT | LIB_ID_COPY_ACTIONS);
     ma = new_ma;
   }
   else {
@@ -820,7 +829,7 @@ static int new_texture_exec(bContext *C, wmOperator *UNUSED(op))
 
   /* add or copy texture */
   if (tex) {
-    tex = BKE_texture_copy(bmain, tex);
+    tex = (Tex *)BKE_id_copy(bmain, &tex->id);
   }
   else {
     tex = BKE_texture_add(bmain, DATA_("Texture"));
@@ -873,7 +882,9 @@ static int new_world_exec(bContext *C, wmOperator *UNUSED(op))
 
   /* add or copy world */
   if (wo) {
-    wo = BKE_world_copy(bmain, wo);
+    World *new_wo = (World *)BKE_id_copy_ex(
+        bmain, &wo->id, NULL, LIB_ID_COPY_DEFAULT | LIB_ID_COPY_ACTIONS);
+    wo = new_wo;
   }
   else {
     wo = BKE_world_add(bmain, DATA_("World"));
@@ -1012,6 +1023,93 @@ void SCENE_OT_view_layer_remove(wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name View Layer Add AOV Operator
+ * \{ */
+
+static int view_layer_add_aov_exec(bContext *C, wmOperator *UNUSED(op))
+{
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+
+  BKE_view_layer_add_aov(view_layer);
+
+  RenderEngineType *engine_type = RE_engines_find(scene->r.engine);
+  if (engine_type->update_render_passes) {
+    RenderEngine *engine = RE_engine_create(engine_type);
+    if (engine) {
+      BKE_view_layer_verify_aov(engine, scene, view_layer);
+    }
+    RE_engine_free(engine);
+    engine = NULL;
+  }
+
+  DEG_id_tag_update(&scene->id, 0);
+  DEG_relations_tag_update(CTX_data_main(C));
+  WM_event_add_notifier(C, NC_SCENE | ND_LAYER, scene);
+
+  return OPERATOR_FINISHED;
+}
+
+void SCENE_OT_view_layer_add_aov(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Add AOV";
+  ot->idname = "SCENE_OT_view_layer_add_aov";
+  ot->description = "Add a Shader AOV";
+
+  /* api callbacks */
+  ot->exec = view_layer_add_aov_exec;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name View Layer Remove AOV Operator
+ * \{ */
+
+static int view_layer_remove_aov_exec(bContext *C, wmOperator *UNUSED(op))
+{
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  BKE_view_layer_remove_aov(view_layer, view_layer->active_aov);
+
+  RenderEngineType *engine_type = RE_engines_find(scene->r.engine);
+  if (engine_type->update_render_passes) {
+    RenderEngine *engine = RE_engine_create(engine_type);
+    if (engine) {
+      BKE_view_layer_verify_aov(engine, scene, view_layer);
+    }
+    RE_engine_free(engine);
+    engine = NULL;
+  }
+
+  DEG_id_tag_update(&scene->id, 0);
+  DEG_relations_tag_update(CTX_data_main(C));
+  WM_event_add_notifier(C, NC_SCENE | ND_LAYER, scene);
+
+  return OPERATOR_FINISHED;
+}
+
+void SCENE_OT_view_layer_remove_aov(wmOperatorType *ot)
+{
+  /* identifiers */
+  ot->name = "Remove AOV";
+  ot->idname = "SCENE_OT_view_layer_remove_aov";
+  ot->description = "Remove Active AOV";
+
+  /* api callbacks */
+  ot->exec = view_layer_remove_aov_exec;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Light Cache Bake Operator
  * \{ */
 
@@ -1090,7 +1188,7 @@ static int light_cache_bake_exec(bContext *C, wmOperator *op)
   EEVEE_lightbake_job(rj, &stop, &do_update, &progress);
   EEVEE_lightbake_job_data_free(rj);
 
-  // no redraw needed, we leave state as we entered it
+  /* No redraw needed, we leave state as we entered it. */
   ED_update_for_newframe(bmain, CTX_data_depsgraph_pointer(C));
 
   WM_event_add_notifier(C, NC_SCENE | NA_EDITED, scene);
@@ -1121,8 +1219,7 @@ static int light_cache_bake_invoke(bContext *C, wmOperator *op, const wmEvent *U
 
   /* store actual owner of job, so modal operator could check for it,
    * the reason of this is that active scene could change when rendering
-   * several layers from compositor [#31800]
-   */
+   * several layers from compositor T31800. */
   op->customdata = scene;
 
   WM_jobs_start(wm, wm_job);
@@ -1138,13 +1235,13 @@ void SCENE_OT_light_cache_bake(wmOperatorType *ot)
       {LIGHTCACHE_SUBSET_ALL,
        "ALL",
        0,
-       "All LightProbes",
+       "All Light Probes",
        "Bake both irradiance grids and reflection cubemaps"},
       {LIGHTCACHE_SUBSET_DIRTY,
        "DIRTY",
        0,
        "Dirty Only",
-       "Only bake lightprobes that are marked as dirty"},
+       "Only bake light probes that are marked as dirty"},
       {LIGHTCACHE_SUBSET_CUBE,
        "CUBEMAPS",
        0,
@@ -1661,7 +1758,7 @@ static int freestyle_linestyle_new_exec(bContext *C, wmOperator *op)
   }
   if (lineset->linestyle) {
     id_us_min(&lineset->linestyle->id);
-    lineset->linestyle = BKE_linestyle_copy(bmain, lineset->linestyle);
+    lineset->linestyle = (FreestyleLineStyle *)BKE_id_copy(bmain, &lineset->linestyle->id);
   }
   else {
     lineset->linestyle = BKE_linestyle_new(bmain, "LineStyle");

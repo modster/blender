@@ -23,6 +23,8 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "CLG_log.h"
+
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
 #include "DNA_collection_types.h"
@@ -49,6 +51,7 @@
 
 #include "BKE_anim_data.h"
 #include "BKE_animsys.h"
+#include "BKE_armature.h"
 #include "BKE_collection.h"
 #include "BKE_constraint.h"
 #include "BKE_context.h"
@@ -64,12 +67,10 @@
 #include "BKE_report.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
-#include "BKE_sequencer.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
 
-#include "ED_armature.h"
 #include "ED_object.h"
 #include "ED_outliner.h"
 #include "ED_scene.h"
@@ -89,7 +90,11 @@
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
 
+#include "SEQ_sequencer.h"
+
 #include "outliner_intern.h"
+
+static CLG_LogRef LOG = {"ed.outliner.tools"};
 
 /* -------------------------------------------------------------------- */
 /** \name ID/Library/Data Set/Un-link Utilities
@@ -394,11 +399,8 @@ static void outliner_do_libdata_operation(bContext *C,
                                           outliner_operation_fn operation_fn,
                                           void *user_data)
 {
-  TreeElement *te;
-  TreeStoreElem *tselem;
-
-  for (te = lb->first; te; te = te->next) {
-    tselem = TREESTORE(te);
+  LISTBASE_FOREACH (TreeElement *, te, lb) {
+    TreeStoreElem *tselem = TREESTORE(te);
     if (tselem->flag & TSE_SELECTED) {
       if ((tselem->type == 0 && te->idcode != 0) || tselem->type == TSE_LAYER_COLLECTION) {
         TreeStoreElem *tsep = te->parent ? TREESTORE(te->parent) : NULL;
@@ -433,12 +435,10 @@ static bool outliner_do_scene_operation(
     ListBase *lb,
     bool (*operation_fn)(bContext *, eOutliner_PropSceneOps, TreeElement *, TreeStoreElem *))
 {
-  TreeElement *te;
-  TreeStoreElem *tselem;
   bool success = false;
 
-  for (te = lb->first; te; te = te->next) {
-    tselem = TREESTORE(te);
+  LISTBASE_FOREACH (TreeElement *, te, lb) {
+    TreeStoreElem *tselem = TREESTORE(te);
     if (tselem->flag & TSE_SELECTED) {
       if (operation_fn(C, event, te, tselem)) {
         success = true;
@@ -735,6 +735,41 @@ static void id_local_fn(bContext *C,
       BKE_main_id_clear_newpoins(bmain);
     }
   }
+  else if (ID_IS_OVERRIDE_LIBRARY_REAL(tselem->id)) {
+    BKE_lib_override_library_free(&tselem->id->override_library, true);
+  }
+}
+
+static void object_proxy_to_override_convert_fn(bContext *C,
+                                                ReportList *reports,
+                                                Scene *UNUSED(scene),
+                                                TreeElement *UNUSED(te),
+                                                TreeStoreElem *UNUSED(tsep),
+                                                TreeStoreElem *tselem,
+                                                void *UNUSED(user_data))
+{
+  BLI_assert(TSE_IS_REAL_ID(tselem));
+  ID *id_proxy = tselem->id;
+  BLI_assert(GS(id_proxy->name) == ID_OB);
+  Object *ob_proxy = (Object *)id_proxy;
+  Scene *scene = CTX_data_scene(C);
+
+  if (ob_proxy->proxy == NULL) {
+    return;
+  }
+
+  if (!BKE_lib_override_library_proxy_convert(
+          CTX_data_main(C), scene, CTX_data_view_layer(C), ob_proxy)) {
+    BKE_reportf(
+        reports,
+        RPT_ERROR_INVALID_INPUT,
+        "Could not create a library override from proxy '%s' (might use already local data?)",
+        ob_proxy->id.name + 2);
+    return;
+  }
+
+  DEG_id_tag_update(&scene->id, ID_RECALC_BASE_FLAGS | ID_RECALC_COPY_ON_WRITE);
+  WM_event_add_notifier(C, NC_WINDOW, NULL);
 }
 
 typedef struct OutlinerLibOverrideData {
@@ -759,7 +794,7 @@ static void id_override_library_create_fn(bContext *C,
 
     id_root->tag |= LIB_TAG_DOIT;
 
-    /* For now, remapp all local usages of linked ID to local override one here. */
+    /* For now, remap all local usages of linked ID to local override one here. */
     ID *id_iter;
     FOREACH_MAIN_ID_BEGIN (bmain, id_iter) {
       if (ID_IS_LINKED(id_iter)) {
@@ -793,6 +828,9 @@ static void id_override_library_create_fn(bContext *C,
       BKE_main_id_tag_all(bmain, LIB_TAG_DOIT, false);
     }
   }
+  else {
+    CLOG_WARN(&LOG, "Could not create library override for data block '%s'", id_root->name);
+  }
 }
 
 static void id_override_library_reset_fn(bContext *C,
@@ -820,6 +858,9 @@ static void id_override_library_reset_fn(bContext *C,
 
     WM_event_add_notifier(C, NC_WM | ND_DATACHANGED, NULL);
     WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+  }
+  else {
+    CLOG_WARN(&LOG, "Could not reset library override of data block '%s'", id_root->name);
   }
 }
 
@@ -852,6 +893,9 @@ static void id_override_library_resync_fn(bContext *C,
 
     BKE_lib_override_library_resync(bmain, scene, CTX_data_view_layer(C), id_root);
   }
+  else {
+    CLOG_WARN(&LOG, "Could not resync library override of data block '%s'", id_root->name);
+  }
 }
 
 static void id_override_library_delete_fn(bContext *C,
@@ -882,6 +926,9 @@ static void id_override_library_delete_fn(bContext *C,
     }
 
     BKE_lib_override_library_delete(bmain, id_root);
+  }
+  else {
+    CLOG_WARN(&LOG, "Could not delete library override of data block '%s'", id_root->name);
   }
 }
 
@@ -988,8 +1035,7 @@ void outliner_do_object_operation_ex(bContext *C,
                                      void *user_data,
                                      bool recurse_selected)
 {
-  TreeElement *te;
-  for (te = lb->first; te; te = te->next) {
+  LISTBASE_FOREACH (TreeElement *, te, lb) {
     TreeStoreElem *tselem = TREESTORE(te);
     bool select_handled = false;
     if (tselem->flag & TSE_SELECTED) {
@@ -1076,11 +1122,10 @@ static void refreshdrivers_animdata_fn(int UNUSED(event),
                                        void *UNUSED(arg))
 {
   IdAdtTemplate *iat = (IdAdtTemplate *)tselem->id;
-  FCurve *fcu;
 
   /* Loop over drivers, performing refresh
    * (i.e. check graph_buttons.c and rna_fcurve.c for details). */
-  for (fcu = iat->adt->drivers.first; fcu; fcu = fcu->next) {
+  LISTBASE_FOREACH (FCurve *, fcu, &iat->adt->drivers) {
     fcu->flag &= ~FCURVE_DISABLED;
 
     if (fcu->driver) {
@@ -1177,7 +1222,7 @@ static void sequence_fn(int event, TreeElement *te, TreeStoreElem *tselem, void 
   Sequence *seq = (Sequence *)te->directdata;
   if (event == OL_DOP_SELECT) {
     Scene *scene = (Scene *)scene_ptr;
-    Editing *ed = BKE_sequencer_editing_get(scene, false);
+    Editing *ed = SEQ_editing_get(scene, false);
     if (BLI_findindex(ed->seqbasep, seq) != -1) {
       ED_sequencer_select_sequence_single(scene, seq, true);
     }
@@ -1295,11 +1340,8 @@ static void outliner_do_data_operation(
     void (*operation_fn)(int, TreeElement *, TreeStoreElem *, void *),
     void *arg)
 {
-  TreeElement *te;
-  TreeStoreElem *tselem;
-
-  for (te = lb->first; te; te = te->next) {
-    tselem = TREESTORE(te);
+  LISTBASE_FOREACH (TreeElement *, te, lb) {
+    TreeStoreElem *tselem = TREESTORE(te);
     if (tselem->flag & TSE_SELECTED) {
       if (tselem->type == type) {
         operation_fn(event, te, tselem, arg);
@@ -1397,13 +1439,8 @@ enum {
   OL_OP_DESELECT,
   OL_OP_SELECT_HIERARCHY,
   OL_OP_REMAP,
-  OL_OP_LOCALIZED, /* disabled, see below */
-  OL_OP_TOGVIS,
-  OL_OP_TOGSEL,
-  OL_OP_TOGREN,
   OL_OP_RENAME,
-  OL_OP_OBJECT_MODE_ENTER,
-  OL_OP_OBJECT_MODE_EXIT,
+  OL_OP_PROXY_TO_OVERRIDE_CONVERT,
 };
 
 static const EnumPropertyItem prop_object_op_types[] = {
@@ -1416,8 +1453,11 @@ static const EnumPropertyItem prop_object_op_types[] = {
      "Remap Users",
      "Make all users of selected data-blocks to use instead a new chosen one"},
     {OL_OP_RENAME, "RENAME", 0, "Rename", ""},
-    {OL_OP_OBJECT_MODE_ENTER, "OBJECT_MODE_ENTER", 0, "Enter Mode", ""},
-    {OL_OP_OBJECT_MODE_EXIT, "OBJECT_MODE_EXIT", 0, "Exit Mode", ""},
+    {OL_OP_PROXY_TO_OVERRIDE_CONVERT,
+     "OBJECT_PROXY_TO_OVERRIDE",
+     0,
+     "Convert Proxy to Override",
+     "Convert a Proxy object to a full library override, including all its dependencies"},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -1477,15 +1517,19 @@ static int outliner_object_operation_exec(bContext *C, wmOperator *op)
     /* No undo push here, operator does it itself (since it's a modal one, the op_undo_depth
      * trick does not work here). */
   }
-  else if (event == OL_OP_LOCALIZED) { /* disabled, see above enum (ton) */
-    outliner_do_object_operation(
-        C, op->reports, scene, space_outliner, &space_outliner->tree, id_local_fn);
-    str = "Localized Objects";
-  }
   else if (event == OL_OP_RENAME) {
     outliner_do_object_operation(
         C, op->reports, scene, space_outliner, &space_outliner->tree, item_rename_fn);
     str = "Rename Object";
+  }
+  else if (event == OL_OP_PROXY_TO_OVERRIDE_CONVERT) {
+    outliner_do_object_operation(C,
+                                 op->reports,
+                                 scene,
+                                 space_outliner,
+                                 &space_outliner->tree,
+                                 object_proxy_to_override_convert_fn);
+    str = "Convert Proxy to Override";
   }
   else {
     BLI_assert(0);
@@ -1651,9 +1695,12 @@ typedef enum eOutlinerIdOpTypes {
   OUTLINER_IDOP_INVALID = 0,
 
   OUTLINER_IDOP_UNLINK,
+  OUTLINER_IDOP_MARK_ASSET,
+  OUTLINER_IDOP_CLEAR_ASSET,
   OUTLINER_IDOP_LOCAL,
   OUTLINER_IDOP_OVERRIDE_LIBRARY_CREATE,
   OUTLINER_IDOP_OVERRIDE_LIBRARY_CREATE_HIERARCHY,
+  OUTLINER_IDOP_OVERRIDE_LIBRARY_PROXY_CONVERT,
   OUTLINER_IDOP_OVERRIDE_LIBRARY_RESET,
   OUTLINER_IDOP_OVERRIDE_LIBRARY_RESET_HIERARCHY,
   OUTLINER_IDOP_OVERRIDE_LIBRARY_RESYNC_HIERARCHY,
@@ -1675,6 +1722,8 @@ typedef enum eOutlinerIdOpTypes {
 /* TODO: implement support for changing the ID-block used. */
 static const EnumPropertyItem prop_id_op_types[] = {
     {OUTLINER_IDOP_UNLINK, "UNLINK", 0, "Unlink", ""},
+    {OUTLINER_IDOP_MARK_ASSET, "MARK_ASSET", 0, "Mark Asset", ""},
+    {OUTLINER_IDOP_CLEAR_ASSET, "CLEAR_ASSET", 0, "Clear Asset", ""},
     {OUTLINER_IDOP_LOCAL, "LOCAL", 0, "Make Local", ""},
     {OUTLINER_IDOP_SINGLE, "SINGLE", 0, "Make Single User", ""},
     {OUTLINER_IDOP_DELETE, "DELETE", ICON_X, "Delete", ""},
@@ -1694,6 +1743,11 @@ static const EnumPropertyItem prop_id_op_types[] = {
      0,
      "Add Library Override Hierarchy",
      "Add a local override of this linked data-block, and its hierarchy of dependencies"},
+    {OUTLINER_IDOP_OVERRIDE_LIBRARY_PROXY_CONVERT,
+     "OVERRIDE_LIBRARY_PROXY_CONVERT",
+     0,
+     "Convert Proxy to Override",
+     "Convert a Proxy object to a full library override, including all its dependencies"},
     {OUTLINER_IDOP_OVERRIDE_LIBRARY_RESET,
      "OVERRIDE_LIBRARY_RESET",
      0,
@@ -1738,24 +1792,50 @@ static bool outliner_id_operation_item_poll(bContext *C,
                                             const int enum_value)
 {
   SpaceOutliner *space_outliner = CTX_wm_space_outliner(C);
+  TreeElement *te = get_target_element(space_outliner);
+  TreeStoreElem *tselem = TREESTORE(te);
+  if (!TSE_IS_REAL_ID(tselem)) {
+    return false;
+  }
+
+  Object *ob = NULL;
+  if (GS(tselem->id->name) == ID_OB) {
+    ob = (Object *)tselem->id;
+  }
 
   switch (enum_value) {
+    case OUTLINER_IDOP_MARK_ASSET:
+    case OUTLINER_IDOP_CLEAR_ASSET:
+      return U.experimental.use_asset_browser;
     case OUTLINER_IDOP_OVERRIDE_LIBRARY_CREATE:
+      if (ID_IS_OVERRIDABLE_LIBRARY(tselem->id)) {
+        return true;
+      }
+      return false;
     case OUTLINER_IDOP_OVERRIDE_LIBRARY_CREATE_HIERARCHY:
-      return true;
+      if (ID_IS_OVERRIDABLE_LIBRARY(tselem->id) || (ID_IS_LINKED(tselem->id))) {
+        return true;
+      }
+      return false;
+    case OUTLINER_IDOP_OVERRIDE_LIBRARY_PROXY_CONVERT:
+      if (ob != NULL && ob->proxy != NULL) {
+        return true;
+      }
+      return false;
     case OUTLINER_IDOP_OVERRIDE_LIBRARY_RESET:
     case OUTLINER_IDOP_OVERRIDE_LIBRARY_RESET_HIERARCHY:
-      return true;
     case OUTLINER_IDOP_OVERRIDE_LIBRARY_RESYNC_HIERARCHY:
-      return true;
     case OUTLINER_IDOP_OVERRIDE_LIBRARY_DELETE_HIERARCHY:
-      return true;
+      if (ID_IS_OVERRIDE_LIBRARY_REAL(tselem->id)) {
+        return true;
+      }
+      return false;
     case OUTLINER_IDOP_SINGLE:
       if (!space_outliner || ELEM(space_outliner->outlinevis, SO_SCENES, SO_VIEW_LAYER)) {
         return true;
       }
-      /* TODO (dalai): enable in the few cases where this can be supported
-      (i.e., when we have a valid parent for the tselem). */
+      /* TODO(dalai): enable in the few cases where this can be supported
+       * (i.e., when we have a valid parent for the tselem). */
       return false;
   }
 
@@ -1875,6 +1955,14 @@ static int outliner_id_operation_exec(bContext *C, wmOperator *op)
       }
       break;
     }
+    case OUTLINER_IDOP_MARK_ASSET: {
+      WM_operator_name_call(C, "ASSET_OT_mark", WM_OP_EXEC_DEFAULT, NULL);
+      break;
+    }
+    case OUTLINER_IDOP_CLEAR_ASSET: {
+      WM_operator_name_call(C, "ASSET_OT_clear", WM_OP_EXEC_DEFAULT, NULL);
+      break;
+    }
     case OUTLINER_IDOP_LOCAL: {
       /* make local */
       outliner_do_libdata_operation(
@@ -1902,6 +1990,16 @@ static int outliner_id_operation_exec(bContext *C, wmOperator *op)
                                     id_override_library_create_fn,
                                     &(OutlinerLibOverrideData){.do_hierarchy = true});
       ED_undo_push(C, "Overridden Data Hierarchy");
+      break;
+    }
+    case OUTLINER_IDOP_OVERRIDE_LIBRARY_PROXY_CONVERT: {
+      outliner_do_object_operation(C,
+                                   op->reports,
+                                   scene,
+                                   space_outliner,
+                                   &space_outliner->tree,
+                                   object_proxy_to_override_convert_fn);
+      ED_undo_push(C, "Convert Proxy to Override");
       break;
     }
     case OUTLINER_IDOP_OVERRIDE_LIBRARY_RESET: {
@@ -2071,7 +2169,7 @@ static int outliner_id_operation_exec(bContext *C, wmOperator *op)
 void OUTLINER_OT_id_operation(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Outliner ID data Operation";
+  ot->name = "Outliner ID Data Operation";
   ot->idname = "OUTLINER_OT_id_operation";
 
   /* callbacks */
@@ -2081,7 +2179,7 @@ void OUTLINER_OT_id_operation(wmOperatorType *ot)
 
   ot->flag = 0;
 
-  ot->prop = RNA_def_enum(ot->srna, "type", prop_id_op_types, 0, "ID data Operation", "");
+  ot->prop = RNA_def_enum(ot->srna, "type", prop_id_op_types, 0, "ID Data Operation", "");
   RNA_def_enum_funcs(ot->prop, outliner_id_operation_itemf);
 }
 
@@ -2202,11 +2300,8 @@ static void outliner_do_id_set_operation(
     ID *newid,
     void (*operation_fn)(TreeElement *, TreeStoreElem *, TreeStoreElem *, ID *))
 {
-  TreeElement *te;
-  TreeStoreElem *tselem;
-
-  for (te = lb->first; te; te = te->next) {
-    tselem = TREESTORE(te);
+  LISTBASE_FOREACH (TreeElement *, te, lb) {
+    TreeStoreElem *tselem = TREESTORE(te);
     if (tselem->flag & TSE_SELECTED) {
       if (tselem->type == type) {
         TreeStoreElem *tsep = te->parent ? TREESTORE(te->parent) : NULL;
@@ -2336,9 +2431,6 @@ typedef enum eOutliner_AnimDataOps {
 
   OUTLINER_ANIMOP_REFRESH_DRV,
   OUTLINER_ANIMOP_CLEAR_DRV
-
-  /* OUTLINER_ANIMOP_COPY_DRIVERS, */
-  /* OUTLINER_ANIMOP_PASTE_DRIVERS */
 } eOutliner_AnimDataOps;
 
 static const EnumPropertyItem prop_animdata_op_types[] = {
@@ -2350,8 +2442,6 @@ static const EnumPropertyItem prop_animdata_op_types[] = {
     {OUTLINER_ANIMOP_SET_ACT, "SET_ACT", 0, "Set Action", ""},
     {OUTLINER_ANIMOP_CLEAR_ACT, "CLEAR_ACT", 0, "Unlink Action", ""},
     {OUTLINER_ANIMOP_REFRESH_DRV, "REFRESH_DRIVERS", 0, "Refresh Drivers", ""},
-    /* {OUTLINER_ANIMOP_COPY_DRIVERS, "COPY_DRIVERS", 0, "Copy Drivers", ""}, */
-    /* {OUTLINER_ANIMOP_PASTE_DRIVERS, "PASTE_DRIVERS", 0, "Paste Drivers", ""}, */
     {OUTLINER_ANIMOP_CLEAR_DRV, "CLEAR_DRIVERS", 0, "Clear Drivers", ""},
     {0, NULL, 0, NULL, NULL},
 };
@@ -2503,8 +2593,8 @@ void OUTLINER_OT_constraint_operation(wmOperatorType *ot)
  * \{ */
 
 static const EnumPropertyItem prop_modifier_op_types[] = {
-    {OL_MODIFIER_OP_TOGVIS, "TOGVIS", ICON_RESTRICT_VIEW_OFF, "Toggle viewport use", ""},
-    {OL_MODIFIER_OP_TOGREN, "TOGREN", ICON_RESTRICT_RENDER_OFF, "Toggle render use", ""},
+    {OL_MODIFIER_OP_TOGVIS, "TOGVIS", ICON_RESTRICT_VIEW_OFF, "Toggle Viewport Use", ""},
+    {OL_MODIFIER_OP_TOGREN, "TOGREN", ICON_RESTRICT_RENDER_OFF, "Toggle Render Use", ""},
     {OL_MODIFIER_OP_DELETE, "DELETE", ICON_X, "Delete", ""},
     {0, NULL, 0, NULL, NULL},
 };
@@ -2744,7 +2834,7 @@ static int do_outliner_operation_event(bContext *C,
     }
     if (datalevel == TSE_ID_BASE) {
       /* do nothing... there are no ops needed here yet */
-      return 0;
+      return OPERATOR_CANCELLED;
     }
     if (datalevel == TSE_CONSTRAINT) {
       return outliner_operator_menu(C, "OUTLINER_OT_constraint_operation");
@@ -2755,7 +2845,7 @@ static int do_outliner_operation_event(bContext *C,
     return outliner_operator_menu(C, "OUTLINER_OT_data_operation");
   }
 
-  return 0;
+  return OPERATOR_CANCELLED;
 }
 
 static int outliner_operation(bContext *C, wmOperator *op, const wmEvent *event)

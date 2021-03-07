@@ -21,12 +21,8 @@
  * \ingroup edtransform
  */
 
-#include "DNA_mesh_types.h"
-
 #include "MEM_guardedalloc.h"
 
-#include "BLI_compiler_compat.h"
-#include "BLI_ghash.h"
 #include "BLI_listbase.h"
 #include "BLI_math.h"
 
@@ -46,6 +42,7 @@
 #include "DEG_depsgraph_query.h"
 
 #include "transform.h"
+#include "transform_orientations.h"
 #include "transform_snap.h"
 
 /* Own include. */
@@ -183,8 +180,7 @@ static void ObjectToTransData(TransInfo *t, TransData *td, Object *ob)
   }
 
   /* axismtx has the real orientation */
-  copy_m3_m4(td->axismtx, ob->obmat);
-  normalize_m3(td->axismtx);
+  transform_orientations_create_from_axis(td->axismtx, UNPACK3(ob->obmat));
 
   td->con = ob->constraints.first;
 
@@ -225,7 +221,7 @@ static void ObjectToTransData(TransInfo *t, TransData *td, Object *ob)
   copy_m4_m4(ob->obmat, object_eval->obmat);
   /* Only copy negative scale flag, this is the only flag which is modified by
    * the BKE_object_where_is_calc(). The rest of the flags we need to keep,
-   * otherwise we might loose dupli flags  (see T61787). */
+   * otherwise we might lose dupli flags  (see T61787). */
   ob->transflag &= ~OB_NEG_SCALE;
   ob->transflag |= (object_eval->transflag & OB_NEG_SCALE);
 
@@ -251,8 +247,11 @@ static void ObjectToTransData(TransInfo *t, TransData *td, Object *ob)
 
     td->ext->irotAngle = ob->rotAngle;
     copy_v3_v3(td->ext->irotAxis, ob->rotAxis);
-    // td->ext->drotAngle = ob->drotAngle;          // XXX, not implemented
-    // copy_v3_v3(td->ext->drotAxis, ob->drotAxis); // XXX, not implemented
+    /* XXX, not implemented. */
+#if 0
+    td->ext->drotAngle = ob->drotAngle;
+    copy_v3_v3(td->ext->drotAxis, ob->drotAxis);
+#endif
   }
   else {
     td->ext->rot = NULL;
@@ -710,66 +709,6 @@ void createTransObject(bContext *C, TransInfo *t)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Texture Space Transform Creation
- *
- * Instead of transforming the selection, move the 2D/3D cursor.
- *
- * \{ */
-
-void createTransTexspace(TransInfo *t)
-{
-  ViewLayer *view_layer = t->view_layer;
-  TransData *td;
-  Object *ob;
-  ID *id;
-  short *texflag;
-
-  ob = OBACT(view_layer);
-
-  if (ob == NULL) {  // Shouldn't logically happen, but still...
-    return;
-  }
-
-  id = ob->data;
-  if (id == NULL || !ELEM(GS(id->name), ID_ME, ID_CU, ID_MB)) {
-    BKE_report(t->reports, RPT_ERROR, "Unsupported object type for text-space transform");
-    return;
-  }
-
-  if (BKE_object_obdata_is_libdata(ob)) {
-    BKE_report(t->reports, RPT_ERROR, "Linked data can't text-space transform");
-    return;
-  }
-
-  {
-    BLI_assert(t->data_container_len == 1);
-    TransDataContainer *tc = t->data_container;
-    tc->data_len = 1;
-    td = tc->data = MEM_callocN(sizeof(TransData), "TransTexspace");
-    td->ext = tc->data_ext = MEM_callocN(sizeof(TransDataExtension), "TransTexspace");
-  }
-
-  td->flag = TD_SELECTED;
-  copy_v3_v3(td->center, ob->obmat[3]);
-  td->ob = ob;
-
-  copy_m3_m4(td->mtx, ob->obmat);
-  copy_m3_m4(td->axismtx, ob->obmat);
-  normalize_m3(td->axismtx);
-  pseudoinverse_m3_m3(td->smtx, td->mtx, PSEUDOINVERSE_EPSILON);
-
-  if (BKE_object_obdata_texspace_get(ob, &texflag, &td->loc, &td->ext->size)) {
-    ob->dtx |= OB_TEXSPACE;
-    *texflag &= ~ME_AUTOSPACE;
-  }
-
-  copy_v3_v3(td->iloc, td->loc);
-  copy_v3_v3(td->ext->isize, td->ext->size);
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name Transform (Auto-Keyframing)
  * \{ */
 
@@ -788,7 +727,7 @@ static void autokeyframe_object(
   ID *id = &ob->id;
   FCurve *fcu;
 
-  // TODO: this should probably be done per channel instead...
+  /* TODO: this should probably be done per channel instead. */
   if (autokeyframe_cfra_can_key(scene, id)) {
     ReportList *reports = CTX_wm_reports(C);
     ToolSettings *ts = scene->toolsettings;
@@ -921,7 +860,6 @@ static bool motionpath_need_update_object(Scene *scene, Object *ob)
 
 /* -------------------------------------------------------------------- */
 /** \name Recalc Data object
- *
  * \{ */
 
 /* helper for recalcData() - for object transforms, typically in the 3D view */
@@ -959,10 +897,6 @@ void recalcData_objects(TransInfo *t)
        * otherwise proxies don't function correctly
        */
       DEG_id_tag_update(&ob->id, ID_RECALC_TRANSFORM);
-
-      if (t->flag & T_TEXTURE) {
-        DEG_id_tag_update(&ob->id, ID_RECALC_GEOMETRY);
-      }
     }
   }
 
@@ -988,7 +922,7 @@ void recalcData_objects(TransInfo *t)
 
 void special_aftertrans_update__object(bContext *C, TransInfo *t)
 {
-  BLI_assert(t->flag & (T_OBJECT | T_TEXTURE));
+  BLI_assert(t->options & CTX_OBJECT);
 
   Object *ob;
   const bool canceled = (t->state == TRANS_CANCEL);

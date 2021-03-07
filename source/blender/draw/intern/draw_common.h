@@ -22,11 +22,9 @@
 
 #pragma once
 
-struct DRWPass;
 struct DRWShadingGroup;
-struct GPUMaterial;
-struct ModifierData;
 struct FluidModifierData;
+struct ModifierData;
 struct Object;
 struct ParticleSystem;
 struct RegionView3D;
@@ -133,7 +131,7 @@ typedef struct GlobalsUboStorage {
   float colorCurrentFrame[4];
 
   float colorGrid[4];
-  float colorGridEmphasise[4];
+  float colorGridEmphasis[4];
   float colorGridAxisX[4];
   float colorGridAxisY[4];
   float colorGridAxisZ[4];

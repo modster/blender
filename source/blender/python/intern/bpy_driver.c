@@ -163,7 +163,7 @@ int bpy_pydriver_create_dict(void)
       PyObject *arg_key, *arg_value;
       Py_ssize_t arg_pos = 0;
       while (PyDict_Next(mod_math_dict, &arg_pos, &arg_key, &arg_value)) {
-        const char *arg_str = _PyUnicode_AsString(arg_key);
+        const char *arg_str = PyUnicode_AsUTF8(arg_key);
         if (arg_str[0] && arg_str[1] != '_') {
           PyDict_SetItem(bpy_pydriver_Dict__whitelist, arg_key, Py_None);
         }
@@ -266,7 +266,7 @@ static void pydriver_error(ChannelDriver *driver)
           "\nError in Driver: The following Python expression failed:\n\t'%s'\n\n",
           driver->expression);
 
-  // BPy_errors_to_report(NULL); // TODO - reports
+  // BPy_errors_to_report(NULL); /* TODO - reports */
   PyErr_Print();
   PyErr_Clear();
 }
@@ -363,7 +363,7 @@ static bool bpy_driver_secure_bytecode_validate(PyObject *expr_code, PyObject *d
         fprintf(stderr,
                 "\tBPY_driver_eval() - restricted access disallows name '%s', "
                 "enable auto-execution to support\n",
-                _PyUnicode_AsString(name));
+                PyUnicode_AsUTF8(name));
         return false;
       }
     }
@@ -494,7 +494,7 @@ float BPY_driver_exec(struct PathResolvedRNA *anim_rna,
   }
 
   /* needed since drivers are updated directly after undo where 'main' is
-   * re-allocated [#28807] */
+   * re-allocated T28807. */
   BPY_update_rna_module();
 
   /* init global dictionary for py-driver evaluation settings */
@@ -613,7 +613,7 @@ float BPY_driver_exec(struct PathResolvedRNA *anim_rna,
 
       fprintf(
           stderr, "\tBPY_driver_eval() - couldn't add variable '%s' to namespace\n", dvar->name);
-      // BPy_errors_to_report(NULL); // TODO - reports
+      // BPy_errors_to_report(NULL); /* TODO - reports */
       PyErr_Print();
       PyErr_Clear();
     }

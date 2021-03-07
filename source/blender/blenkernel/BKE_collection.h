@@ -35,10 +35,16 @@ extern "C" {
 
 struct BLI_Iterator;
 struct Base;
+struct BlendDataReader;
+struct BlendExpander;
+struct BlendLibReader;
+struct BlendWriter;
 struct Collection;
+struct Library;
 struct Main;
 struct Object;
 struct Scene;
+struct SceneCollection;
 struct ViewLayer;
 
 typedef struct CollectionParent {
@@ -71,8 +77,6 @@ struct Collection *BKE_collection_duplicate(struct Main *bmain,
 /* Master Collection for Scene */
 
 struct Collection *BKE_collection_master_add(void);
-struct Scene *BKE_collection_master_scene_search(const struct Main *bmain,
-                                                 const struct Collection *master_collection);
 
 /* Collection Objects */
 
@@ -159,6 +163,22 @@ bool BKE_collection_has_collection(struct Collection *parent, struct Collection 
 
 void BKE_collection_parent_relations_rebuild(struct Collection *collection);
 void BKE_main_collections_parent_relations_rebuild(struct Main *bmain);
+
+/* .blend file I/O */
+
+void BKE_collection_blend_write_nolib(struct BlendWriter *writer, struct Collection *collection);
+void BKE_collection_blend_read_data(struct BlendDataReader *reader, struct Collection *collection);
+void BKE_collection_blend_read_lib(struct BlendLibReader *reader, struct Collection *collection);
+void BKE_collection_blend_read_expand(struct BlendExpander *expander,
+                                      struct Collection *collection);
+
+void BKE_collection_compat_blend_read_data(struct BlendDataReader *reader,
+                                           struct SceneCollection *sc);
+void BKE_collection_compat_blend_read_lib(struct BlendLibReader *reader,
+                                          struct Library *lib,
+                                          struct SceneCollection *sc);
+void BKE_collection_compat_blend_read_expand(struct BlendExpander *expander,
+                                             struct SceneCollection *sc);
 
 /* Iteration callbacks. */
 

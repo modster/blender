@@ -8,6 +8,17 @@
 #
 #=============================================================================
 
+function(GET_BLENDER_TEST_INSTALL_DIR VARIABLE_NAME)
+  get_property(GENERATOR_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+  if(GENERATOR_IS_MULTI_CONFIG)
+    string(REPLACE "\${BUILD_TYPE}" "$<CONFIG>" TEST_INSTALL_DIR ${CMAKE_INSTALL_PREFIX})
+  else()
+    string(REPLACE "\${BUILD_TYPE}" "" TEST_INSTALL_DIR ${CMAKE_INSTALL_PREFIX})
+  endif()
+  set(${VARIABLE_NAME} "${TEST_INSTALL_DIR}" PARENT_SCOPE)
+endfunction()
+
+
 macro(BLENDER_SRC_GTEST_EX)
   if(WITH_GTESTS)
     set(options SKIP_ADD_TEST)
@@ -39,6 +50,7 @@ macro(BLENDER_SRC_GTEST_EX)
     add_definitions(${GLOG_DEFINES})
 
     add_executable(${TARGET_NAME} ${ARG_SRC} ${MANIFEST})
+    setup_platform_linker_flags(${TARGET_NAME})
     target_include_directories(${TARGET_NAME} PUBLIC "${TEST_INC}")
     target_include_directories(${TARGET_NAME} SYSTEM PUBLIC "${TEST_INC_SYS}")
     target_link_libraries(${TARGET_NAME} ${ARG_EXTRA_LIBS} ${PLATFORM_LINKLIBS})
@@ -74,13 +86,7 @@ macro(BLENDER_SRC_GTEST_EX)
       target_link_libraries(${TARGET_NAME} ${GMP_LIBRARIES})
     endif()
 
-    get_property(GENERATOR_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
-    if(GENERATOR_IS_MULTI_CONFIG)
-      string(REPLACE "\${BUILD_TYPE}" "$<CONFIG>" TEST_INSTALL_DIR ${CMAKE_INSTALL_PREFIX})
-    else()
-      string(REPLACE "\${BUILD_TYPE}" "" TEST_INSTALL_DIR ${CMAKE_INSTALL_PREFIX})
-    endif()
-
+    GET_BLENDER_TEST_INSTALL_DIR(TEST_INSTALL_DIR)
     set_target_properties(${TARGET_NAME} PROPERTIES
                           RUNTIME_OUTPUT_DIRECTORY         "${TESTS_OUTPUT_DIR}"
                           RUNTIME_OUTPUT_DIRECTORY_RELEASE "${TESTS_OUTPUT_DIR}"
@@ -93,9 +99,12 @@ macro(BLENDER_SRC_GTEST_EX)
 
       # Don't fail tests on leaks since these often happen in external libraries
       # that we can't fix.
-      set_tests_properties(${TARGET_NAME} PROPERTIES ENVIRONMENT LSAN_OPTIONS=exitcode=0)
+      set_tests_properties(${TARGET_NAME} PROPERTIES
+        ENVIRONMENT LSAN_OPTIONS=exitcode=0:$ENV{LSAN_OPTIONS}
+      )
     endif()
     if(WIN32)
+      set_target_properties(${TARGET_NAME} PROPERTIES VS_GLOBAL_VcpkgEnabled "false")
       unset(MANIFEST)
     endif()
     unset(TEST_INC)

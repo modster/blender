@@ -60,7 +60,7 @@
 #include "UI_resources.h"
 #include "UI_view2d.h"
 
-#include "graph_intern.h"  // own include
+#include "graph_intern.h" /* own include */
 
 /* ******************** default callbacks for ipo space ***************** */
 
@@ -163,7 +163,7 @@ static void graph_init(struct wmWindowManager *wm, ScrArea *area)
   /* force immediate init of any invalid F-Curve colors */
   /* XXX: but, don't do SIPO_TEMP_NEEDCHANSYNC (i.e. channel select state sync)
    * as this is run on each region resize; setting this here will cause selection
-   * state to be lost on area/region resizing. [#35744]
+   * state to be lost on area/region resizing. T35744.
    */
   ED_area_tag_refresh(area);
 }
@@ -317,7 +317,7 @@ static void graph_main_region_draw_overlay(const bContext *C, ARegion *region)
   ED_time_scrub_draw_current_frame(region, scene, sipo->flag & SIPO_DRAWTIME, draw_vert_line);
 
   /* scrollers */
-  // FIXME: args for scrollers depend on the type of data being shown...
+  /* FIXME: args for scrollers depend on the type of data being shown. */
   UI_view2d_scrollers_draw(v2d, NULL);
 
   /* scale numbers */
@@ -403,12 +403,11 @@ static void graph_buttons_region_draw(const bContext *C, ARegion *region)
   ED_region_panels(C, region);
 }
 
-static void graph_region_listener(wmWindow *UNUSED(win),
-                                  ScrArea *UNUSED(area),
-                                  ARegion *region,
-                                  wmNotifier *wmn,
-                                  const Scene *UNUSED(scene))
+static void graph_region_listener(const wmRegionListenerParams *params)
 {
+  ARegion *region = params->region;
+  wmNotifier *wmn = params->notifier;
+
   /* context changes */
   switch (wmn->category) {
     case NC_ANIMATION:
@@ -470,14 +469,14 @@ static void graph_region_listener(wmWindow *UNUSED(win),
   }
 }
 
-static void graph_region_message_subscribe(const struct bContext *UNUSED(C),
-                                           struct WorkSpace *UNUSED(workspace),
-                                           struct Scene *scene,
-                                           struct bScreen *screen,
-                                           struct ScrArea *area,
-                                           struct ARegion *region,
-                                           struct wmMsgBus *mbus)
+static void graph_region_message_subscribe(const wmRegionMessageSubscribeParams *params)
 {
+  struct wmMsgBus *mbus = params->message_bus;
+  Scene *scene = params->scene;
+  bScreen *screen = params->screen;
+  ScrArea *area = params->area;
+  ARegion *region = params->region;
+
   PointerRNA ptr;
   RNA_pointer_create(&screen->id, &RNA_SpaceGraphEditor, area->spacedata.first, &ptr);
 
@@ -546,11 +545,10 @@ static void graph_region_message_subscribe(const struct bContext *UNUSED(C),
 }
 
 /* editor level listener */
-static void graph_listener(wmWindow *UNUSED(win),
-                           ScrArea *area,
-                           wmNotifier *wmn,
-                           Scene *UNUSED(scene))
+static void graph_listener(const wmSpaceTypeListenerParams *params)
 {
+  ScrArea *area = params->area;
+  wmNotifier *wmn = params->notifier;
   SpaceGraph *sipo = (SpaceGraph *)area->spacedata.first;
 
   /* context changes */
@@ -615,10 +613,13 @@ static void graph_listener(wmWindow *UNUSED(win),
       }
       break;
 
-      // XXX: restore the case below if not enough updates occur...
-      // default:
-      //  if (wmn->data == ND_KEYS)
-      //      ED_area_tag_redraw(area);
+#if 0 /* XXX: restore the case below if not enough updates occur... */
+    default: {
+      if (wmn->data == ND_KEYS) {
+        ED_area_tag_redraw(area);
+      }
+    }
+#endif
   }
 }
 
@@ -763,7 +764,7 @@ static void graph_refresh(const bContext *C, ScrArea *area)
   }
 
   /* region updates? */
-  // XXX re-sizing y-extents of tot should go here?
+  /* XXX re-sizing y-extents of tot should go here? */
 
   /* Update the state of the animchannels in response to changes from the data they represent
    * NOTE: the temp flag is used to indicate when this needs to be done,

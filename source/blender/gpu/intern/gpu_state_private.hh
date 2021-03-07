@@ -56,9 +56,9 @@ union GPUState {
     uint32_t invert_facing : 1;
     uint32_t shadow_bias : 1;
     /** Number of clip distances enabled. */
-    /* TODO(fclem) This should be a shader property. */
+    /* TODO(fclem): This should be a shader property. */
     uint32_t clip_distances : 3;
-    /* TODO(fclem) remove, old opengl features. */
+    /* TODO(fclem): remove, old opengl features. */
     uint32_t polygon_smooth : 1;
     uint32_t line_smooth : 1;
   };
@@ -99,18 +99,18 @@ union GPUStateMutable {
     /** TODO remove */
     float depth_range[2];
     /** Positive if using program point size. */
-    /* TODO(fclem) should be passed as uniform to all shaders. */
+    /* TODO(fclem): should be passed as uniform to all shaders. */
     float point_size;
-    /** Not supported on every platform. Prefer using wideline shader. */
+    /** Not supported on every platform. Prefer using wide-line shader. */
     float line_width;
     /** Mutable stencil states. */
     uint8_t stencil_write_mask;
     uint8_t stencil_compare_mask;
     uint8_t stencil_reference;
     uint8_t _pad0;
-    /* IMPORTANT: ensure x64 stuct alignment. */
+    /* IMPORTANT: ensure x64 struct alignment. */
   };
-  /* Here to allow fast bitwise ops. */
+  /* Here to allow fast bit-wise ops. */
   uint64_t data[9];
 };
 
@@ -148,11 +148,12 @@ inline GPUStateMutable operator~(const GPUStateMutable &a)
 /**
  * State manager keeping track of the draw state and applying it before drawing.
  * Base class which is then specialized for each implementation (GL, VK, ...).
- **/
+ */
 class StateManager {
  public:
   GPUState state;
   GPUStateMutable mutable_state;
+  bool use_bgl = false;
 
  public:
   StateManager();

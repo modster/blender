@@ -24,8 +24,6 @@
 #include "DNA_gpencil_types.h"
 #include "DNA_image_types.h"
 #include "DNA_mask_types.h"
-#include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
@@ -37,14 +35,9 @@
 
 #include "BKE_colortools.h"
 #include "BKE_context.h"
-#include "BKE_editmesh.h"
 #include "BKE_image.h"
-#include "BKE_layer.h"
 #include "BKE_lib_id.h"
-#include "BKE_material.h"
-#include "BKE_scene.h"
 #include "BKE_screen.h"
-#include "BKE_workspace.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -56,7 +49,6 @@
 
 #include "ED_image.h"
 #include "ED_mask.h"
-#include "ED_mesh.h"
 #include "ED_node.h"
 #include "ED_render.h"
 #include "ED_screen.h"
@@ -65,19 +57,13 @@
 #include "ED_uvedit.h"
 
 #include "WM_api.h"
-#include "WM_message.h"
 #include "WM_types.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
 #include "UI_view2d.h"
 
-#include "GPU_batch_presets.h"
-#include "GPU_framebuffer.h"
-#include "GPU_viewport.h"
-
 #include "DRW_engine.h"
-#include "DRW_engine_types.h"
 
 #include "image_intern.h"
 
@@ -128,9 +114,10 @@ static SpaceLink *image_create(const ScrArea *UNUSED(area), const Scene *UNUSED(
   simage->lock = true;
   simage->flag = SI_SHOW_GPENCIL | SI_USE_ALPHA | SI_COORDFLOATS;
   simage->uv_opacity = 1.0f;
+  simage->overlay.flag = SI_OVERLAY_SHOW_OVERLAYS;
 
   BKE_imageuser_default(&simage->iuser);
-  simage->iuser.flag = IMA_SHOW_STEREO | IMA_ANIM_ALWAYS;
+  simage->iuser.flag = IMA_SHOW_STEREO | IMA_ANIM_ALWAYS | IMA_SHOW_MAX_RESOLUTION;
 
   BKE_scopes_new(&simage->scopes);
   simage->sample_line_hist.height = 100;
@@ -233,6 +220,7 @@ static void image_operatortypes(void)
   WM_operatortype_append(IMAGE_OT_pack);
   WM_operatortype_append(IMAGE_OT_unpack);
 
+  WM_operatortype_append(IMAGE_OT_flip);
   WM_operatortype_append(IMAGE_OT_invert);
   WM_operatortype_append(IMAGE_OT_resize);
 
@@ -292,7 +280,7 @@ static void image_dropboxes(void)
 {
   ListBase *lb = WM_dropboxmap_find("Image", SPACE_IMAGE, 0);
 
-  WM_dropbox_add(lb, "IMAGE_OT_open", image_drop_poll, image_drop_copy);
+  WM_dropbox_add(lb, "IMAGE_OT_open", image_drop_poll, image_drop_copy, NULL);
 }
 
 /**
@@ -319,8 +307,11 @@ static void image_refresh(const bContext *C, ScrArea *area)
   }
 }
 
-static void image_listener(wmWindow *win, ScrArea *area, wmNotifier *wmn, Scene *UNUSED(scene))
+static void image_listener(const wmSpaceTypeListenerParams *params)
 {
+  wmWindow *win = params->window;
+  ScrArea *area = params->area;
+  wmNotifier *wmn = params->notifier;
   SpaceImage *sima = (SpaceImage *)area->spacedata.first;
 
   /* context changes */
@@ -442,25 +433,28 @@ static void image_listener(wmWindow *win, ScrArea *area, wmNotifier *wmn, Scene 
 
 const char *image_context_dir[] = {"edit_image", "edit_mask", NULL};
 
-static int image_context(const bContext *C, const char *member, bContextDataResult *result)
+static int /*eContextResult*/ image_context(const bContext *C,
+                                            const char *member,
+                                            bContextDataResult *result)
 {
   SpaceImage *sima = CTX_wm_space_image(C);
 
   if (CTX_data_dir(member)) {
     CTX_data_dir_set(result, image_context_dir);
+    /* TODO(sybren): return CTX_RESULT_OK; */
   }
   else if (CTX_data_equals(member, "edit_image")) {
     CTX_data_id_pointer_set(result, (ID *)ED_space_image(sima));
-    return 1;
+    return CTX_RESULT_OK;
   }
   else if (CTX_data_equals(member, "edit_mask")) {
     Mask *mask = ED_space_image_get_mask(sima);
     if (mask) {
       CTX_data_id_pointer_set(result, &mask->id);
     }
-    return true;
+    return CTX_RESULT_OK;
   }
-  return 0;
+  return CTX_RESULT_MEMBER_NOT_FOUND;
 }
 
 static void IMAGE_GGT_gizmo2d(wmGizmoGroupType *gzgt)
@@ -599,8 +593,8 @@ static void image_main_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
 
-  // image space manages own v2d
-  // UI_view2d_region_reinit(&region->v2d, V2D_COMMONVIEW_STANDARD, region->winx, region->winy);
+  /* NOTE: don't use `UI_view2d_region_reinit(&region->v2d, ...)`
+   * since the space clip manages own v2d in #image_main_region_set_view2d */
 
   /* mask polls mode */
   keymap = WM_keymap_ensure(wm->defaultconf, "Mask Editing", 0, 0);
@@ -630,21 +624,13 @@ static void image_main_region_draw(const bContext *C, ARegion *region)
 {
   /* draw entirely, view changes should be handled here */
   SpaceImage *sima = CTX_wm_space_image(C);
-  Object *obact = CTX_data_active_object(C);
   Object *obedit = CTX_data_edit_object(C);
   Depsgraph *depsgraph = CTX_data_expect_evaluated_depsgraph(C);
   Mask *mask = NULL;
-  bool show_uvedit = false;
-  bool show_curve = false;
   Scene *scene = CTX_data_scene(C);
-  ViewLayer *view_layer = CTX_data_view_layer(C);
   View2D *v2d = &region->v2d;
-
-  GPUViewport *viewport = WM_draw_region_get_viewport(region);
-  GPUFrameBuffer *framebuffer_default, *framebuffer_overlay;
-
-  framebuffer_default = GPU_viewport_framebuffer_default_get(viewport);
-  framebuffer_overlay = GPU_viewport_framebuffer_overlay_get(viewport);
+  Image *image = ED_space_image(sima);
+  const bool show_viewer = (image && image->source == IMA_SRC_VIEWER);
 
   /* XXX not supported yet, disabling for now */
   scene->r.scemode &= ~R_COMP_CROP;
@@ -655,89 +641,47 @@ static void image_main_region_draw(const bContext *C, ARegion *region)
   image_main_region_set_view2d(sima, region);
 
   /* check for mask (delay draw) */
-  if (ED_space_image_show_uvedit(sima, obedit)) {
-    show_uvedit = true;
-  }
-  else if (sima->mode == SI_MODE_MASK) {
+  if (!ED_space_image_show_uvedit(sima, obedit) && sima->mode == SI_MODE_MASK) {
     mask = ED_space_image_get_mask(sima);
   }
-  else if (ED_space_image_paint_curve(C)) {
-    show_curve = true;
+
+  if (show_viewer) {
+    BLI_thread_lock(LOCK_DRAW_IMAGE);
+  }
+  DRW_draw_view(C);
+  if (show_viewer) {
+    BLI_thread_unlock(LOCK_DRAW_IMAGE);
   }
 
-  /* we draw image in pixelspace */
-  if (!U.experimental.use_image_editor_legacy_drawing) {
-    DRW_draw_view(C);
-    draw_image_main_helpers(C, region);
+  draw_image_main_helpers(C, region);
 
-    /* Draw Meta data of the image isn't added to the DrawManager as it is
-     * used in other areas as well. */
-    if (sima->flag & SI_DRAW_METADATA) {
-      void *lock;
-      /* `ED_space_image_get_zoom` temporarily locks the image, so this needs to be done before
-       * the image is locked when calling `ED_space_image_acquire_buffer`. */
-      float zoomx, zoomy;
-      ED_space_image_get_zoom(sima, region, &zoomx, &zoomy);
-      ImBuf *ibuf = ED_space_image_acquire_buffer(sima, &lock, 0);
-      if (ibuf) {
-        int x, y;
-        rctf frame;
-        BLI_rctf_init(&frame, 0.0f, ibuf->x, 0.0f, ibuf->y);
-        UI_view2d_view_to_region(&region->v2d, 0.0f, 0.0f, &x, &y);
-        ED_region_image_metadata_draw(x, y, ibuf, &frame, zoomx, zoomy);
-        ED_space_image_release_buffer(sima, ibuf, lock);
-      }
-    }
-
-    /* sample line */
-    UI_view2d_view_ortho(v2d);
-    draw_image_sample_line(sima);
-    UI_view2d_view_restore(C);
-  }
-  else {
-    GPU_framebuffer_bind(framebuffer_default);
-    GPU_clear_color(0.0f, 0.0f, 0.0f, 0.0f);
-
-    GPU_framebuffer_bind(framebuffer_overlay);
-
-    float col[3];
-    /* clear and setup matrix */
-    UI_GetThemeColor3fv(TH_BACK, col);
-    srgb_to_linearrgb_v3_v3(col, col);
-    GPU_clear_color(col[0], col[1], col[2], 1.0f);
-    GPU_depth_test(GPU_DEPTH_NONE);
-    draw_image_main(C, region);
-
-    /* and uvs in 0.0-1.0 space */
-    UI_view2d_view_ortho(v2d);
-
-    ED_region_draw_cb_draw(C, region, REGION_DRAW_PRE_VIEW);
-
-    ED_uvedit_draw_main(sima, scene, view_layer, obedit, obact, depsgraph);
-
-    ED_region_draw_cb_draw(C, region, REGION_DRAW_POST_VIEW);
-
-    if (sima->flag & SI_SHOW_GPENCIL) {
-      /* Grease Pencil too (in addition to UV's) */
-      draw_image_grease_pencil((bContext *)C, true);
-    }
-    /* sample line */
-    draw_image_sample_line(sima);
-
-    UI_view2d_view_restore(C);
-
-    if (sima->flag & SI_SHOW_GPENCIL) {
-      /* draw Grease Pencil - screen space only */
-      draw_image_grease_pencil((bContext *)C, false);
+  /* Draw Meta data of the image isn't added to the DrawManager as it is
+   * used in other areas as well. */
+  if (sima->overlay.flag & SI_OVERLAY_SHOW_OVERLAYS && sima->flag & SI_DRAW_METADATA) {
+    void *lock;
+    /* `ED_space_image_get_zoom` temporarily locks the image, so this needs to be done before
+     * the image is locked when calling `ED_space_image_acquire_buffer`. */
+    float zoomx, zoomy;
+    ED_space_image_get_zoom(sima, region, &zoomx, &zoomy);
+    ImBuf *ibuf = ED_space_image_acquire_buffer(sima, &lock, 0);
+    if (ibuf) {
+      int x, y;
+      rctf frame;
+      BLI_rctf_init(&frame, 0.0f, ibuf->x, 0.0f, ibuf->y);
+      UI_view2d_view_to_region(&region->v2d, 0.0f, 0.0f, &x, &y);
+      ED_region_image_metadata_draw(x, y, ibuf, &frame, zoomx, zoomy);
+      ED_space_image_release_buffer(sima, ibuf, lock);
     }
   }
+
+  /* sample line */
+  UI_view2d_view_ortho(v2d);
+  draw_image_sample_line(sima);
+  UI_view2d_view_restore(C);
 
   if (mask) {
-    Image *image = ED_space_image(sima);
-    int width, height, show_viewer;
+    int width, height;
     float aspx, aspy;
-
-    show_viewer = (image && image->source == IMA_SRC_VIEWER);
 
     if (show_viewer) {
       /* ED_space_image_get* will acquire image buffer which requires
@@ -756,7 +700,8 @@ static void image_main_region_draw(const bContext *C, ARegion *region)
     ED_mask_draw_region(depsgraph,
                         mask,
                         region,
-                        sima->mask_info.draw_flag,
+                        /* Mask overlay is drawn by image/overlay engine. */
+                        sima->mask_info.draw_flag & ~MASK_DRAWFLAG_OVERLAY,
                         sima->mask_info.draw_type,
                         sima->mask_info.overlay_mode,
                         width,
@@ -769,23 +714,16 @@ static void image_main_region_draw(const bContext *C, ARegion *region)
                         C);
   }
 
-  if ((show_uvedit || mask || show_curve) && U.experimental.use_image_editor_legacy_drawing) {
-    UI_view2d_view_ortho(v2d);
-    ED_image_draw_cursor(region, sima->cursor);
-    UI_view2d_view_restore(C);
-  }
-
   WM_gizmomap_draw(region->gizmo_map, C, WM_GIZMOMAP_DRAWSTEP_2D);
-
   draw_image_cache(C, region);
 }
 
-static void image_main_region_listener(wmWindow *UNUSED(win),
-                                       ScrArea *area,
-                                       ARegion *region,
-                                       wmNotifier *wmn,
-                                       const Scene *UNUSED(scene))
+static void image_main_region_listener(const wmRegionListenerParams *params)
 {
+  ScrArea *area = params->area;
+  ARegion *region = params->region;
+  wmNotifier *wmn = params->notifier;
+
   /* context changes */
   switch (wmn->category) {
     case NC_GEOM:
@@ -895,12 +833,11 @@ static void image_buttons_region_draw(const bContext *C, ARegion *region)
   ED_region_panels_draw(C, region);
 }
 
-static void image_buttons_region_listener(wmWindow *UNUSED(win),
-                                          ScrArea *UNUSED(area),
-                                          ARegion *region,
-                                          wmNotifier *wmn,
-                                          const Scene *UNUSED(scene))
+static void image_buttons_region_listener(const wmRegionListenerParams *params)
 {
+  ARegion *region = params->region;
+  wmNotifier *wmn = params->notifier;
+
   /* context changes */
   switch (wmn->category) {
     case NC_TEXTURE:
@@ -958,12 +895,11 @@ static void image_tools_region_draw(const bContext *C, ARegion *region)
   ED_region_panels(C, region);
 }
 
-static void image_tools_region_listener(wmWindow *UNUSED(win),
-                                        ScrArea *UNUSED(area),
-                                        ARegion *region,
-                                        wmNotifier *wmn,
-                                        const Scene *UNUSED(scene))
+static void image_tools_region_listener(const wmRegionListenerParams *params)
 {
+  ARegion *region = params->region;
+  wmNotifier *wmn = params->notifier;
+
   /* context changes */
   switch (wmn->category) {
     case NC_GPENCIL:
@@ -1015,12 +951,11 @@ static void image_header_region_draw(const bContext *C, ARegion *region)
   ED_region_header(C, region);
 }
 
-static void image_header_region_listener(wmWindow *UNUSED(win),
-                                         ScrArea *UNUSED(area),
-                                         ARegion *region,
-                                         wmNotifier *wmn,
-                                         const Scene *UNUSED(scene))
+static void image_header_region_listener(const wmRegionListenerParams *params)
 {
+  ARegion *region = params->region;
+  wmNotifier *wmn = params->notifier;
+
   /* context changes */
   switch (wmn->category) {
     case NC_SCENE:

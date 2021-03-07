@@ -128,6 +128,7 @@
  \
     .simplify_subsurf = 6, \
     .simplify_particles = 1.0f, \
+    .simplify_volumes = 1.0f, \
  \
     .border.xmin = 0.0f, \
     .border.ymin = 0.0f, \
@@ -207,8 +208,11 @@
     .gtao_factor = 1.0f, \
     .gtao_quality = 0.25f, \
  \
+    .bokeh_overblur = 5.0f, \
     .bokeh_max_size = 100.0f, \
     .bokeh_threshold = 1.0f, \
+    .bokeh_neighbor_max = 10.0f, \
+    .bokeh_denoise_fac = 0.75f, \
  \
     .bloom_color = {1.0f, 1.0f, 1.0f}, \
     .bloom_threshold = 0.8f, \

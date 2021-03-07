@@ -37,6 +37,7 @@
 
 #include "BLT_translation.h"
 
+#include "DNA_defaults.h"
 #include "DNA_gpencil_modifier_types.h"
 #include "DNA_gpencil_types.h"
 #include "DNA_object_types.h"
@@ -79,19 +80,13 @@ typedef struct tmpStrokes {
 static void initData(GpencilModifierData *md)
 {
   ArrayGpencilModifierData *gpmd = (ArrayGpencilModifierData *)md;
-  gpmd->count = 2;
-  gpmd->shift[0] = 1.0f;
-  gpmd->shift[1] = 0.0f;
-  gpmd->shift[2] = 0.0f;
-  zero_v3(gpmd->offset);
-  zero_v3(gpmd->rnd_scale);
-  gpmd->object = NULL;
-  gpmd->flag |= GP_ARRAY_USE_RELATIVE;
-  gpmd->seed = 1;
-  gpmd->material = NULL;
+
+  BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(gpmd, modifier));
+
+  MEMCPY_STRUCT_AFTER(gpmd, DNA_struct_default_get(ArrayGpencilModifierData), modifier);
 
   /* Open the first subpanel too, because it's activated by default. */
-  md->ui_expand_flag = (1 << 0) | (1 << 1);
+  md->ui_expand_flag = UI_PANEL_DATA_EXPAND_ROOT | UI_SUBPANEL_DATA_EXPAND_1;
 }
 
 static void copyData(const GpencilModifierData *md, GpencilModifierData *target)
@@ -242,9 +237,17 @@ static void generate_geometry(GpencilModifierData *md,
         /* To ensure a nice distribution, we use halton sequence and offset using the seed. */
         BLI_halton_3d(primes, offset, x, r);
 
-        for (int i = 0; i < 3; i++) {
-          rand[j][i] = fmodf(r[i] * 2.0 - 1.0 + rand_offset, 1.0f);
-          rand[j][i] = fmodf(sin(rand[j][i] * 12.9898 + j * 78.233) * 43758.5453, 1.0f);
+        if ((mmd->flag & GP_ARRAY_UNIFORM_RANDOM_SCALE) && j == 2) {
+          float rand_value;
+          rand_value = fmodf(r[0] * 2.0 - 1.0 + rand_offset, 1.0f);
+          rand_value = fmodf(sin(rand_value * 12.9898 + j * 78.233) * 43758.5453, 1.0f);
+          copy_v3_fl(rand[j], rand_value);
+        }
+        else {
+          for (int i = 0; i < 3; i++) {
+            rand[j][i] = fmodf(r[i] * 2.0 - 1.0 + rand_offset, 1.0f);
+            rand[j][i] = fmodf(sin(rand[j][i] * 12.9898 + j * 78.233) * 43758.5453, 1.0f);
+          }
         }
       }
       /* Calculate Random matrix. */
@@ -260,7 +263,7 @@ static void generate_geometry(GpencilModifierData *md,
       /* Duplicate original strokes to create this instance. */
       LISTBASE_FOREACH_BACKWARD (tmpStrokes *, iter, &stroke_cache) {
         /* Duplicate stroke */
-        bGPDstroke *gps_dst = BKE_gpencil_stroke_duplicate(iter->gps, true);
+        bGPDstroke *gps_dst = BKE_gpencil_stroke_duplicate(iter->gps, true, true);
 
         /* Move points */
         for (int i = 0; i < iter->gps->totpoints; i++) {
@@ -325,23 +328,12 @@ static void updateDepsgraph(GpencilModifierData *md, const ModifierUpdateDepsgra
   DEG_add_object_relation(ctx->node, ctx->object, DEG_OB_COMP_TRANSFORM, "Array Modifier");
 }
 
-static void foreachObjectLink(GpencilModifierData *md,
-                              Object *ob,
-                              ObjectWalkFunc walk,
-                              void *userData)
-{
-  ArrayGpencilModifierData *mmd = (ArrayGpencilModifierData *)md;
-
-  walk(userData, ob, &mmd->object, IDWALK_CB_NOP);
-}
-
 static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
 {
   ArrayGpencilModifierData *mmd = (ArrayGpencilModifierData *)md;
 
   walk(userData, ob, (ID **)&mmd->material, IDWALK_CB_USER);
-
-  foreachObjectLink(md, ob, (ObjectWalkFunc)walk, userData);
+  walk(userData, ob, (ID **)&mmd->object, IDWALK_CB_NOP);
 }
 
 static void panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -441,6 +433,7 @@ static void random_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(layout, ptr, "random_offset", 0, IFACE_("Offset"), ICON_NONE);
   uiItemR(layout, ptr, "random_rotation", 0, IFACE_("Rotation"), ICON_NONE);
   uiItemR(layout, ptr, "random_scale", 0, IFACE_("Scale"), ICON_NONE);
+  uiItemR(layout, ptr, "use_uniform_random_scale", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "seed", 0, NULL, ICON_NONE);
 }
 
@@ -492,7 +485,6 @@ GpencilModifierTypeInfo modifierType_Gpencil_Array = {
     /* isDisabled */ NULL,
     /* updateDepsgraph */ updateDepsgraph,
     /* dependsOnTime */ NULL,
-    /* foreachObjectLink */ foreachObjectLink,
     /* foreachIDLink */ foreachIDLink,
     /* foreachTexLink */ NULL,
     /* panelRegister */ panelRegister,

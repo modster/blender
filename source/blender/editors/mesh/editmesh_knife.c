@@ -210,7 +210,7 @@ typedef struct KnifeTool_OpData {
   /* run by the UI or not */
   bool is_interactive;
 
-  /* operatpr options */
+  /* Operator options. */
   bool cut_through;   /* preference, can be modified at runtime (that feature may go) */
   bool only_select;   /* set on initialization */
   bool select_result; /* set on initialization */
@@ -1600,7 +1600,7 @@ static void knife_find_line_hits(KnifeTool_OpData *kcd)
    * can end up being ~2000 units apart with an orthogonal perspective.
    *
    * (from ED_view3d_win_to_segment_clipped() above)
-   * this gives precision error; rather then solving properly
+   * this gives precision error; rather than solving properly
    * (which may involve using doubles everywhere!),
    * limit the distance between these points */
   if (kcd->is_ortho && (kcd->vc.rv3d->persp != RV3D_CAMOB)) {
@@ -1903,8 +1903,15 @@ static BMFace *knife_find_closest_face(KnifeTool_OpData *kcd,
 
   if (!f) {
     if (kcd->is_interactive) {
-      /* Try to use back-buffer selection method if ray casting failed. */
-      f = EDBM_face_find_nearest(&kcd->vc, &dist);
+      /* Try to use back-buffer selection method if ray casting failed.
+       *
+       * Apply the mouse coordinates to a copy of the view-context
+       * since we don't want to rely on this being set elsewhere. */
+      ViewContext vc = kcd->vc;
+      vc.mval[0] = (int)kcd->curr.mval[0];
+      vc.mval[1] = (int)kcd->curr.mval[1];
+
+      f = EDBM_face_find_nearest(&vc, &dist);
 
       /* cheat for now; just put in the origin instead
        * of a true coordinate on the face.
@@ -2745,8 +2752,6 @@ static int knifetool_invoke(bContext *C, wmOperator *op, const wmEvent *event)
     }
   }
 
-  view3d_operator_needs_opengl(C);
-
   /* alloc new customdata */
   kcd = op->customdata = MEM_callocN(sizeof(KnifeTool_OpData), __func__);
 
@@ -2824,7 +2829,6 @@ static int knifetool_modal(bContext *C, wmOperator *op, const wmEvent *event)
   em_setup_viewcontext(C, &kcd->vc);
   kcd->region = kcd->vc.region;
 
-  view3d_operator_needs_opengl(C);
   ED_view3d_init_mats_rv3d(obedit, kcd->vc.rv3d); /* needed to initialize clipping */
 
   if (kcd->mode == MODE_PANNING) {
@@ -3060,8 +3064,6 @@ void EDBM_mesh_knife(bContext *C, LinkNode *polys, bool use_tag, bool cut_throug
 {
   KnifeTool_OpData *kcd;
 
-  view3d_operator_needs_opengl(C);
-
   /* init */
   {
     const bool only_select = false;
@@ -3193,7 +3195,7 @@ void EDBM_mesh_knife(bContext *C, LinkNode *polys, bool use_tag, bool cut_throug
                 keep_search = true;
               }
               else {
-                /* don't loose time on this face again, set it as outside */
+                /* don't lose time on this face again, set it as outside */
                 F_ISECT_SET_OUTSIDE(f);
               }
             }

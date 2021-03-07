@@ -77,7 +77,7 @@ class AddPresetBase:
                 setattr(cls, attr, trans)
             return trans
 
-        name = name.lower().strip()
+        name = name.strip()
         name = bpy.path.display_name_to_filepath(name)
         trans = maketrans_init()
         # Strip surrounding "_" as they are displayed as spaces.
@@ -195,7 +195,7 @@ class AddPresetBase:
 
             # Do not remove bundled presets
             if is_path_builtin(filepath):
-                self.report({'WARNING'}, "You can't remove the default presets")
+                self.report({'WARNING'}, "Unable to remove default presets")
                 return {'CANCELLED'}
 
             try:
@@ -249,12 +249,12 @@ class ExecutePreset(Operator):
 
         # change the menu title to the most recently chosen option
         preset_class = getattr(bpy.types, self.menu_idname)
-        preset_class.bl_label = bpy.path.display_name(basename(filepath))
+        preset_class.bl_label = bpy.path.display_name(basename(filepath), title_case=False)
 
         ext = splitext(filepath)[1].lower()
 
         if ext not in {".py", ".xml"}:
-            self.report({'ERROR'}, "unknown filetype: %r" % ext)
+            self.report({'ERROR'}, "Unknown file type: %r" % ext)
             return {'CANCELLED'}
 
         if hasattr(preset_class, "reset_cb"):
@@ -388,12 +388,12 @@ class AddPresetFluid(AddPresetBase, Operator):
 
     preset_defines = [
         "fluid = bpy.context.fluid"
-        ]
+    ]
 
     preset_values = [
         "fluid.domain_settings.viscosity_base",
         "fluid.domain_settings.viscosity_exponent",
-        ]
+    ]
 
     preset_subdir = "fluid"
 
@@ -676,6 +676,7 @@ class AddPresetGpencilMaterial(AddPresetBase, Operator):
         "gpcolor.pixel_size",
         "gpcolor.mix_stroke_factor",
         "gpcolor.alignment_mode",
+        "gpcolor.alignment_rotation",
         "gpcolor.fill_style",
         "gpcolor.fill_color",
         "gpcolor.fill_image",
@@ -686,7 +687,6 @@ class AddPresetGpencilMaterial(AddPresetBase, Operator):
         "gpcolor.texture_offset",
         "gpcolor.texture_scale",
         "gpcolor.texture_angle",
-        "gpcolor.texture_opacity",
         "gpcolor.texture_clamp",
         "gpcolor.mix_factor",
         "gpcolor.show_stroke",

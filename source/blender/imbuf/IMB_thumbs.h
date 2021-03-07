@@ -48,7 +48,7 @@ typedef enum ThumbSource {
   THB_SOURCE_FONT,
 } ThumbSource;
 
-/* don't generate thumbs for images bigger then this (100mb) */
+/* don't generate thumbs for images bigger than this (100mb) */
 #define THUMB_SIZE_MAX (100 * 1024 * 1024)
 
 #define PREVIEW_RENDER_DEFAULT_HEIGHT 128
@@ -80,7 +80,6 @@ void IMB_thumb_makedirs(void);
 struct ImBuf *IMB_thumb_load_blend(const char *blen_path,
                                    const char *blen_group,
                                    const char *blen_id);
-void IMB_thumb_overlay_blend(unsigned int *thumb, int width, int height, float aspect);
 
 /* special function for previewing fonts */
 struct ImBuf *IMB_thumb_load_font(const char *filename, unsigned int x, unsigned int y);

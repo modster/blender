@@ -31,8 +31,8 @@ set(INC
   ../../makesrna
   ../../modifiers
   ../../python
+  ../../render
   ../../shader_fx
-  ../../render/extern/include
   ../../windowmanager
   ../../../../intern/clog
   ../../../../intern/glew-mx
@@ -84,6 +84,12 @@ endif()
 
 if(WITH_INTERNATIONAL)
   add_definitions(-DWITH_INTERNATIONAL)
+endif()
+
+if(WITH_EXPERIMENTAL_FEATURES)
+  add_definitions(-DWITH_GEOMETRY_NODES)
+  add_definitions(-DWITH_POINT_CLOUD)
+  add_definitions(-DWITH_HAIR_NODES)
 endif()
 
 blender_add_lib(bf_editor_object "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

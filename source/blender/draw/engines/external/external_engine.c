@@ -36,6 +36,7 @@
 
 #include "GPU_matrix.h"
 #include "GPU_shader.h"
+#include "GPU_state.h"
 #include "GPU_viewport.h"
 
 #include "external_engine.h" /* own include */
@@ -107,7 +108,7 @@ static void external_engine_init(void *vedata)
   const DRWContextState *draw_ctx = DRW_context_state_get();
   ARegion *region = draw_ctx->region;
 
-  /* Depth prepass */
+  /* Depth pre-pass. */
   if (!e_data.depth_sh) {
     const GPUShaderConfigData *sh_cfg = &GPU_shader_cfg_data[GPU_SHADER_CFG_DEFAULT];
 
@@ -243,6 +244,8 @@ static void external_draw_scene_do(void *vedata)
   type = rv3d->render_engine->type;
   type->view_draw(rv3d->render_engine, draw_ctx->evil_C, draw_ctx->depsgraph);
 
+  GPU_bgl_end();
+
   GPU_matrix_pop();
   GPU_matrix_pop_projection();
 
@@ -270,7 +273,7 @@ static void external_draw_scene(void *vedata)
   if (draw_ctx->evil_C) {
     const float clear_col[4] = {0, 0, 0, 0};
     /* This is to keep compatibility with external engine. */
-    /* TODO(fclem) remove it eventually. */
+    /* TODO(fclem): remove it eventually. */
     GPU_framebuffer_bind(dfbl->default_fb);
     GPU_framebuffer_clear_color(dfbl->default_fb, clear_col);
 
@@ -305,6 +308,7 @@ static DrawEngineType draw_engine_external_type = {
     &external_cache_populate,
     &external_cache_finish,
     &external_draw_scene,
+    NULL,
     NULL,
     NULL,
     NULL,

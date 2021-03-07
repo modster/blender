@@ -22,8 +22,6 @@
  * \ingroup edarmature
  */
 
-#include <assert.h>
-
 #include "DNA_armature_types.h"
 #include "DNA_constraint_types.h"
 #include "DNA_object_types.h"
@@ -128,12 +126,12 @@ void ED_armature_origin_set(
   bArmature *arm = ob->data;
   float cent[3];
 
-  /* Put the armature into editmode */
+  /* Put the armature into edit-mode. */
   if (is_editmode == false) {
     ED_armature_to_edit(arm);
   }
 
-  /* Find the centerpoint */
+  /* Find the center-point. */
   if (centermode == 2) {
     copy_v3_v3(cent, cursor);
     invert_m4_m4(ob->imat, ob->obmat);
@@ -175,7 +173,7 @@ void ED_armature_origin_set(
     ED_armature_edit_free(arm);
   }
 
-  /* Adjust object location for new centerpoint */
+  /* Adjust object location for new center-point. */
   if (centermode && (is_editmode == false)) {
     mul_mat3_m4_v3(ob->obmat, cent); /* omit translation part */
     add_v3_v3(ob->loc, cent);
@@ -415,7 +413,7 @@ static int armature_calc_roll_exec(bContext *C, wmOperator *op)
         copy_v3_v3(vec, mat[2]);
       }
       else { /* Axis */
-        assert(type <= 5);
+        BLI_assert(type <= 5);
         if (type < 3) {
           vec[type] = 1.0f;
         }
@@ -878,7 +876,7 @@ void ARMATURE_OT_fill(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Fill Between Joints";
   ot->idname = "ARMATURE_OT_fill";
-  ot->description = "Add bone between selected joint(s) and/or 3D-Cursor";
+  ot->description = "Add bone between selected joint(s) and/or 3D cursor";
 
   /* callbacks */
   ot->exec = armature_fill_bones_exec;
@@ -931,9 +929,9 @@ static int armature_switch_direction_exec(bContext *C, wmOperator *UNUSED(op))
     /* ensure that mirror bones will also be operated on */
     armature_tag_select_mirrored(arm);
 
-    /* clear BONE_TRANSFORM flags
-     * - used to prevent duplicate/canceling operations from occurring [#34123]
-     * - BONE_DONE cannot be used here as that's already used for mirroring
+    /* Clear BONE_TRANSFORM flags
+     * - Used to prevent duplicate/canceling operations from occurring T34123.
+     * - #BONE_DONE cannot be used here as that's already used for mirroring.
      */
     armature_clear_swap_done_flags(arm);
 
@@ -949,7 +947,7 @@ static int armature_switch_direction_exec(bContext *C, wmOperator *UNUSED(op))
          */
         parent = ebo->parent;
 
-        /* skip bone if already handled... [#34123] */
+        /* skip bone if already handled, see T34123. */
         if ((ebo->flag & BONE_TRANSFORM) == 0) {
           /* only if selected and editable */
           if (EBONE_VISIBLE(arm, ebo) && EBONE_EDITABLE(ebo)) {
@@ -1016,7 +1014,7 @@ void ARMATURE_OT_switch_direction(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Switch Direction";
   ot->idname = "ARMATURE_OT_switch_direction";
-  ot->description = "Change the direction that a chain of bones points in (head <-> tail swap)";
+  ot->description = "Change the direction that a chain of bones points in (head and tail swap)";
 
   /* api callbacks */
   ot->exec = armature_switch_direction_exec;

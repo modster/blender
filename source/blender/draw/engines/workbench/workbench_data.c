@@ -84,7 +84,7 @@ static WORKBENCH_ViewLayerData *workbench_view_layer_data_ensure_ex(struct ViewL
   return *vldata;
 }
 
-/* \} */
+/** \} */
 
 static void workbench_studiolight_data_update(WORKBENCH_PrivateData *wpd, WORKBENCH_UBO_World *wd)
 {
@@ -123,6 +123,7 @@ static void workbench_studiolight_data_update(WORKBENCH_PrivateData *wpd, WORKBE
       copy_v3_fl3(light->light_direction, 1.0f, 0.0f, 0.0f);
       copy_v3_fl(light->specular_color, 0.0f);
       copy_v3_fl(light->diffuse_color, 0.0f);
+      light->wrapped = 0.0f;
     }
   }
 
@@ -134,6 +135,15 @@ static void workbench_studiolight_data_update(WORKBENCH_PrivateData *wpd, WORKBE
   }
 
   wd->use_specular = workbench_is_specular_highlight_enabled(wpd);
+}
+
+void workbench_private_data_alloc(WORKBENCH_StorageList *stl)
+{
+  if (!stl->wpd) {
+    stl->wpd = MEM_callocN(sizeof(*stl->wpd), __func__);
+    stl->wpd->taa_sample_len_previous = -1;
+    stl->wpd->view_updated = true;
+  }
 }
 
 void workbench_private_data_init(WORKBENCH_PrivateData *wpd)
@@ -178,14 +188,21 @@ void workbench_private_data_init(WORKBENCH_PrivateData *wpd)
   }
 
   if (!v3d || (v3d->shading.type == OB_RENDER && BKE_scene_uses_blender_workbench(scene))) {
+    short shading_flag = scene->display.shading.flag;
+    if (XRAY_FLAG_ENABLED((&scene->display))) {
+      /* Disable shading options that aren't supported in transparency mode. */
+      shading_flag &= ~(V3D_SHADING_SHADOW | V3D_SHADING_CAVITY | V3D_SHADING_DEPTH_OF_FIELD);
+    }
+
     /* FIXME: This reproduce old behavior when workbench was separated in 2 engines.
      * But this is a workaround for a missing update tagging from operators. */
-    if ((v3d && (XRAY_ENABLED(v3d) != XRAY_ENABLED(&scene->display))) ||
-        (scene->display.shading.flag != wpd->shading.flag)) {
+    if ((XRAY_ENABLED(wpd) != XRAY_ENABLED(&scene->display)) ||
+        (shading_flag != wpd->shading.flag)) {
       wpd->view_updated = true;
     }
 
     wpd->shading = scene->display.shading;
+    wpd->shading.flag = shading_flag;
     if (XRAY_FLAG_ENABLED((&scene->display))) {
       wpd->shading.xray_alpha = XRAY_ALPHA((&scene->display));
     }
@@ -205,13 +222,20 @@ void workbench_private_data_init(WORKBENCH_PrivateData *wpd)
     }
   }
   else {
+    short shading_flag = v3d->shading.flag;
+    if (XRAY_ENABLED(v3d)) {
+      /* Disable shading options that aren't supported in transparency mode. */
+      shading_flag &= ~(V3D_SHADING_SHADOW | V3D_SHADING_CAVITY | V3D_SHADING_DEPTH_OF_FIELD);
+    }
+
     /* FIXME: This reproduce old behavior when workbench was separated in 2 engines.
      * But this is a workaround for a missing update tagging from operators. */
-    if (XRAY_ENABLED(v3d) != XRAY_ENABLED(wpd) || v3d->shading.flag != wpd->shading.flag) {
+    if (XRAY_ENABLED(v3d) != XRAY_ENABLED(wpd) || shading_flag != wpd->shading.flag) {
       wpd->view_updated = true;
     }
 
     wpd->shading = v3d->shading;
+    wpd->shading.flag = shading_flag;
     if (wpd->shading.type < OB_SOLID) {
       wpd->shading.light = V3D_LIGHTING_FLAT;
       wpd->shading.color_type = V3D_SHADING_OBJECT_COLOR;
@@ -219,8 +243,6 @@ void workbench_private_data_init(WORKBENCH_PrivateData *wpd)
     }
     else if (XRAY_ENABLED(v3d)) {
       wpd->shading.xray_alpha = XRAY_ALPHA(v3d);
-      /* Disable shading options that aren't supported in transparency mode. */
-      wpd->shading.flag &= ~(V3D_SHADING_SHADOW | V3D_SHADING_CAVITY | V3D_SHADING_DEPTH_OF_FIELD);
     }
     else {
       wpd->shading.xray_alpha = 1.0f;

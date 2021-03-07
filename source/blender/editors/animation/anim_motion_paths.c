@@ -331,7 +331,7 @@ static void motionpath_calculate_update_range(MPathTarget *mpt,
     int fcu_sfra = motionpath_get_prev_prev_keyframe(mpt, &fcu_keys, current_frame);
     int fcu_efra = motionpath_get_next_next_keyframe(mpt, &fcu_keys, current_frame);
 
-    /* Extend range furher, since accelleration compensation propagates even further away. */
+    /* Extend range further, since acceleration compensation propagates even further away. */
     if (fcu->auto_smoothing != FCURVE_SMOOTH_NONE) {
       fcu_sfra = motionpath_get_prev_prev_keyframe(mpt, &fcu_keys, fcu_sfra);
       fcu_efra = motionpath_get_next_next_keyframe(mpt, &fcu_keys, fcu_efra);
@@ -402,7 +402,7 @@ void animviz_calc_motionpaths(Depsgraph *depsgraph,
   /* TODO: Create a copy of background depsgraph that only contain these entities,
    * and only evaluates them.
    *
-   * For until that is done we force dependency graph to not be active, so we don't loose unkeyed
+   * For until that is done we force dependency graph to not be active, so we don't lose unkeyed
    * changes during updating the motion path.
    * This still doesn't include unkeyed changes to the path itself, but allows to have updates in
    * an environment when auto-keying and pose paste is used. */

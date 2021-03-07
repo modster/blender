@@ -29,11 +29,11 @@ blender_include_dirs(
   ../blender/blenloader
   ../blender/depsgraph
   ../blender/editors/include
-  ../blender/imbuf
-  ../blender/makesrna
-  ../blender/render/extern/include
   ../blender/gpu
+  ../blender/imbuf
   ../blender/makesdna
+  ../blender/makesrna
+  ../blender/render
   ../blender/windowmanager
 )
 
@@ -73,7 +73,10 @@ endif()
 
 if(WITH_TBB)
   blender_include_dirs(${TBB_INCLUDE_DIRS})
-  link_directories(${LIBDIR}/tbb/lib)
+  if(NOT APPLE)
+    # APPLE platform uses full paths for linking libraries.
+    link_directories(${LIBDIR}/tbb/lib)
+  endif()
 endif()
 
 
@@ -149,31 +152,46 @@ if(WITH_BUILDINFO)
   add_definitions(-DWITH_BUILDINFO)
   # --------------------------------------------------------------------------
   # These defines could all be moved into the header below
-  string(REPLACE " " "\ " BUILDINFO_CFLAGS "${CMAKE_C_FLAGS}")
-  string(REPLACE " " "\ " BUILDINFO_CXXFLAGS "${CMAKE_CXX_FLAGS}")
-  string(REPLACE " " "\ " BUILDINFO_LINKFLAGS "${PLATFORM_LINKFLAGS}")
-  add_definitions(
-    # # define in header now, else these get out of date on rebuilds.
-    # -DBUILD_DATE="${BUILD_DATE}"
-    # -DBUILD_TIME="${BUILD_TIME}"
-    # -DBUILD_COMMIT_TIMESTAMP="${BUILD_COMMIT_TIMESTAMP}"
-    # -DBUILD_COMMIT_TIME="${BUILD_COMMIT_TIME}"
-    # -DBUILD_COMMIT_DATE="${BUILD_COMMIT_DATE}"
-    # -DBUILD_HASH="${BUILD_HASH}"
-    # -DBUILD_BRANCH="${BUILD_BRANCH}"
-    -DWITH_BUILDINFO_HEADER # alternative to lines above
-    -DBUILD_PLATFORM="${CMAKE_SYSTEM_NAME}"
-    -DBUILD_TYPE="${CMAKE_BUILD_TYPE}"
-    -DBUILD_CFLAGS="${BUILDINFO_CFLAGS}"
-    -DBUILD_CXXFLAGS="${BUILDINFO_CXXFLAGS}"
-    -DBUILD_LINKFLAGS="${BUILDINFO_LINKFLAGS}"
-    -DBUILD_SYSTEM="CMake"
+
+  # Write strings into a separate header since we can escape C-strings
+  # in a way that's not practical when passing defines.
+  set(BUILD_PLATFORM "${CMAKE_SYSTEM_NAME}")
+  set(BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+  set(BUILD_CFLAGS "${CMAKE_C_FLAGS}")
+  set(BUILD_CXXFLAGS "${CMAKE_CXX_FLAGS}")
+  set(BUILD_LINKFLAGS "${PLATFORM_LINKFLAGS}")
+  set(BUILD_SYSTEM "CMake")
+
+  if(WITH_COMPILER_SHORT_FILE_MACRO)
+    # It's not necessary to include path information
+    # about the system building Blender in the executable.
+    string(REPLACE "${PLATFORM_CFLAGS_FMACRO_PREFIX_MAP}" " " BUILD_CFLAGS "${BUILD_CFLAGS}")
+    string(REPLACE "${PLATFORM_CFLAGS_FMACRO_PREFIX_MAP}" " " BUILD_CXXFLAGS "${BUILD_CXXFLAGS}")
+  endif()
+
+  # Use `configure_file` instead of definitions since properly
+  # escaping the multiple command line arguments which themselves
+  # contain strings and spaces becomes overly error-prone & complicated.
+  configure_file(
+    "${CMAKE_SOURCE_DIR}/build_files/cmake/buildinfo_static.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/buildinfo_static.h"
+    ESCAPE_QUOTES
+    @ONLY
   )
+
+  unset(BUILD_PLATFORM)
+  unset(BUILD_TYPE)
+  unset(BUILD_CFLAGS)
+  unset(BUILD_CXXFLAGS)
+  unset(BUILD_LINKFLAGS)
+  unset(BUILD_SYSTEM)
 
   # --------------------------------------------------------------------------
   # write header for values that change each build
   # note, generaed file is in build dir's source/creator
   #       except when used as an include path.
+
+  add_definitions(-DWITH_BUILDINFO_HEADER)
 
   # include the output directory, where the buildinfo.h file is generated
   include_directories(${CMAKE_CURRENT_BINARY_DIR})
@@ -256,13 +274,7 @@ if(WITH_PYTHON_MODULE)
   )
 
   if(APPLE)
-    set_target_properties(
-      blender
-      PROPERTIES
-        MACOSX_BUNDLE TRUE
-        LINK_FLAGS_RELEASE "${PLATFORM_LINKFLAGS}"
-        LINK_FLAGS_DEBUG "${PLATFORM_LINKFLAGS_DEBUG}"
-    )
+    set_target_properties(blender PROPERTIES MACOSX_BUNDLE TRUE)
   endif()
 
   if(WIN32)
@@ -285,35 +297,9 @@ endif()
 
 
 set(BLENDER_TEXT_FILES
-  ${CMAKE_SOURCE_DIR}/release/text/GPL-license.txt
-  ${CMAKE_SOURCE_DIR}/release/text/GPL3-license.txt
   ${CMAKE_SOURCE_DIR}/release/text/copyright.txt
   # generate this file
   # ${CMAKE_SOURCE_DIR}/release/text/readme.html
-  ${CMAKE_SOURCE_DIR}/release/datafiles/LICENSE-bfont.ttf.txt
-)
-
-if(WITH_PYTHON)
-  list(APPEND BLENDER_TEXT_FILES
-    ${CMAKE_SOURCE_DIR}/release/text/Python-license.txt
-  )
-endif()
-
-if(WITH_OPENCOLORIO)
-  list(APPEND BLENDER_TEXT_FILES
-    ${CMAKE_SOURCE_DIR}/release/text/ocio-license.txt
-  )
-endif()
-
-if(WITH_MEM_JEMALLOC)
-  list(APPEND BLENDER_TEXT_FILES
-    ${CMAKE_SOURCE_DIR}/release/text/jemalloc-license.txt
-  )
-endif()
-
-list(APPEND BLENDER_TEXT_FILES
-  ${CMAKE_SOURCE_DIR}/release/datafiles/LICENSE-droidsans.ttf.txt
-  ${CMAKE_SOURCE_DIR}/release/datafiles/LICENSE-bmonofont-i18n.ttf.txt
 )
 
 
@@ -588,7 +574,7 @@ if(UNIX AND NOT APPLE)
         DIRECTORY ${PYTHON_LIBPATH}/python${PYTHON_VERSION}
         DESTINATION ${TARGETDIR_VER}/python/${_target_LIB}
         PATTERN "__pycache__" EXCLUDE               # * any cache *
-        PATTERN "config-${PYTHON_VERSION}m/*.a" EXCLUDE  # static lib
+        PATTERN "config-${PYTHON_VERSION}/*.a" EXCLUDE  # static lib
         PATTERN "lib2to3" EXCLUDE                   # ./lib2to3
         PATTERN "site-packages/*" EXCLUDE           # ./site-packages/*
         PATTERN "tkinter" EXCLUDE                   # ./tkinter
@@ -778,7 +764,7 @@ elseif(WIN32)
         PATTERN "*.pyo" EXCLUDE                 # * any cache *
       )
 
-       install(
+      install(
         DIRECTORY ${LIBDIR}/python/${_PYTHON_VERSION_NO_DOTS}/lib
         DESTINATION ${BLENDER_VERSION}/python/
         CONFIGURATIONS Debug
@@ -786,7 +772,6 @@ elseif(WIN32)
         PATTERN "__pycache__" EXCLUDE           # * any cache *
         PATTERN "*.pyc" EXCLUDE                 # * any cache *
         PATTERN "*.pyo" EXCLUDE                 # * any cache *)
-
       )
 
       install(
@@ -818,13 +803,13 @@ elseif(WIN32)
 
       if(WINDOWS_PYTHON_DEBUG)
         install(
-          FILES ${LIBDIR}/python/37/libs/python${_PYTHON_VERSION_NO_DOTS}.pdb
+          FILES ${LIBDIR}/python/${_PYTHON_VERSION_NO_DOTS}/libs/python${_PYTHON_VERSION_NO_DOTS}.pdb
           DESTINATION "."
           CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel
         )
 
         install(
-          FILES ${LIBDIR}/python/37/libs/python${_PYTHON_VERSION_NO_DOTS}_d.pdb
+          FILES ${LIBDIR}/python/${_PYTHON_VERSION_NO_DOTS}/libs/python${_PYTHON_VERSION_NO_DOTS}_d.pdb
           DESTINATION "."
           CONFIGURATIONS Debug
         )
@@ -959,7 +944,7 @@ elseif(APPLE)
       PATTERN "__pycache__" EXCLUDE
       PATTERN "__MACOSX" EXCLUDE
       PATTERN ".DS_Store" EXCLUDE
-      PATTERN "config-${PYTHON_VERSION}m/*.a" EXCLUDE  # static lib
+      PATTERN "config-${PYTHON_VERSION}/*.a" EXCLUDE  # static lib
       PATTERN "lib2to3" EXCLUDE                   # ./lib2to3
       PATTERN "tkinter" EXCLUDE                   # ./tkinter
       PATTERN "lib-dynload/_tkinter.*" EXCLUDE    # ./lib-dynload/_tkinter.co
@@ -1083,6 +1068,12 @@ if(DEFINED BLENDER_TEXT_FILES_DESTINATION)
     FILES ${BLENDER_TEXT_FILES}
     DESTINATION "${BLENDER_TEXT_FILES_DESTINATION}"
   )
+
+  install(
+    DIRECTORY
+    ${CMAKE_SOURCE_DIR}/release/license
+    DESTINATION "${BLENDER_TEXT_FILES_DESTINATION}"
+)
 endif()
 
 # install more files specified elsewhere
@@ -1127,7 +1118,8 @@ add_dependencies(blender makesdna)
 target_link_libraries(blender ${LIB})
 unset(LIB)
 
-setup_liblinks(blender)
+setup_platform_linker_flags(blender)
+setup_platform_linker_libs(blender)
 
 if(APPLE)
   set_target_properties(blender PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/osx_locals.map)
@@ -1162,9 +1154,9 @@ if(WIN32)
       # CMAKE_BUILD_TYPE. This can be simplified by target_link_options and the $<CONFIG>
       # generator expression in newer cmake (2.13+) but until that time this fill have suffice.
       if(CMAKE_BUILD_TYPE)
-        set_property(TARGET blender APPEND PROPERTY LINK_FLAGS  " /PDBSTRIPPED:${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/blender_public.pdb")
+        set_property(TARGET blender APPEND_STRING PROPERTY LINK_FLAGS  " /PDBSTRIPPED:${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/blender_public.pdb")
       else()
-        set_property(TARGET blender APPEND PROPERTY LINK_FLAGS  " /PDBSTRIPPED:${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/blender_public.pdb")
+        set_property(TARGET blender APPEND_STRING PROPERTY LINK_FLAGS  " /PDBSTRIPPED:${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/blender_public.pdb")
       endif()
   endif()
 endif()

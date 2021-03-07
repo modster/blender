@@ -85,8 +85,8 @@ static TreeElement *outliner_dropzone_element(TreeElement *te,
   }
   /* Not it.  Let's look at its children. */
   if (children && (TREESTORE(te)->flag & TSE_CLOSED) == 0 && (te->subtree.first)) {
-    for (te = te->subtree.first; te; te = te->next) {
-      TreeElement *te_valid = outliner_dropzone_element(te, fmval, children);
+    LISTBASE_FOREACH (TreeElement *, te_sub, &te->subtree) {
+      TreeElement *te_valid = outliner_dropzone_element(te_sub, fmval, children);
       if (te_valid) {
         return te_valid;
       }
@@ -100,9 +100,7 @@ static TreeElement *outliner_dropzone_find(const SpaceOutliner *space_outliner,
                                            const float fmval[2],
                                            const bool children)
 {
-  TreeElement *te;
-
-  for (te = space_outliner->tree.first; te; te = te->next) {
+  LISTBASE_FOREACH (TreeElement *, te, &space_outliner->tree) {
     TreeElement *te_valid = outliner_dropzone_element(te, fmval, children);
     if (te_valid) {
       return te_valid;
@@ -141,6 +139,11 @@ static TreeElement *outliner_drop_insert_find(bContext *C,
   ARegion *region = CTX_wm_region(C);
   TreeElement *te_hovered;
   float view_mval[2];
+
+  /* Empty tree, e.g. while filtered. */
+  if (BLI_listbase_is_empty(&space_outliner->tree)) {
+    return NULL;
+  }
 
   UI_view2d_region_to_view(
       &region->v2d, event->mval[0], event->mval[1], &view_mval[0], &view_mval[1]);
@@ -335,7 +338,7 @@ static bool parent_drop_poll(bContext *C,
     ED_region_tag_redraw_no_rebuild(CTX_wm_region(C));
   }
 
-  Object *potential_child = (Object *)WM_drag_ID(drag, ID_OB);
+  Object *potential_child = (Object *)WM_drag_get_local_ID(drag, ID_OB);
   if (!potential_child) {
     return false;
   }
@@ -423,7 +426,7 @@ static int parent_drop_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   }
 
   Object *par = (Object *)tselem->id;
-  Object *ob = (Object *)WM_drag_ID_from_event(event, ID_OB);
+  Object *ob = (Object *)WM_drag_get_local_ID_from_event(event, ID_OB);
 
   if (ELEM(NULL, ob, par)) {
     return OPERATOR_CANCELLED;
@@ -447,7 +450,7 @@ static int parent_drop_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 void OUTLINER_OT_parent_drop(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Drop to Set Parent [+Alt keeps transforms]";
+  ot->name = "Drop to Set Parent (hold Alt to keep transforms)";
   ot->description = "Drag to parent in Outliner";
   ot->idname = "OUTLINER_OT_parent_drop";
 
@@ -475,7 +478,7 @@ static bool parent_clear_poll(bContext *C,
     }
   }
 
-  Object *ob = (Object *)WM_drag_ID(drag, ID_OB);
+  Object *ob = (Object *)WM_drag_get_local_ID(drag, ID_OB);
   if (!ob) {
     return false;
   }
@@ -495,7 +498,7 @@ static bool parent_clear_poll(bContext *C,
       case ID_OB:
         return ELEM(tselem->type, TSE_MODIFIER_BASE, TSE_CONSTRAINT_BASE);
       case ID_GR:
-        return event->shift;
+        return event->shift || ELEM(tselem->type, TSE_LIBRARY_OVERRIDE_BASE);
       default:
         return true;
     }
@@ -533,7 +536,7 @@ static int parent_clear_invoke(bContext *C, wmOperator *UNUSED(op), const wmEven
 void OUTLINER_OT_parent_clear(wmOperatorType *ot)
 {
   /* identifiers */
-  ot->name = "Drop to Clear Parent [+Alt keeps transforms]";
+  ot->name = "Drop to Clear Parent (hold Alt to keep transforms)";
   ot->description = "Drag to clear parent in Outliner";
   ot->idname = "OUTLINER_OT_parent_clear";
 
@@ -554,7 +557,7 @@ static bool scene_drop_poll(bContext *C,
                             const char **UNUSED(r_tooltip))
 {
   /* Ensure item under cursor is valid drop target */
-  Object *ob = (Object *)WM_drag_ID(drag, ID_OB);
+  Object *ob = (Object *)WM_drag_get_local_ID(drag, ID_OB);
   return (ob && (outliner_ID_drop_find(C, event, ID_SCE) != NULL));
 }
 
@@ -562,7 +565,7 @@ static int scene_drop_invoke(bContext *C, wmOperator *UNUSED(op), const wmEvent 
 {
   Main *bmain = CTX_data_main(C);
   Scene *scene = (Scene *)outliner_ID_drop_find(C, event, ID_SCE);
-  Object *ob = (Object *)WM_drag_ID_from_event(event, ID_OB);
+  Object *ob = (Object *)WM_drag_get_local_ID_from_event(event, ID_OB);
 
   if (ELEM(NULL, ob, scene) || ID_IS_LINKED(scene)) {
     return OPERATOR_CANCELLED;
@@ -622,7 +625,7 @@ static bool material_drop_poll(bContext *C,
                                const char **UNUSED(r_tooltip))
 {
   /* Ensure item under cursor is valid drop target */
-  Material *ma = (Material *)WM_drag_ID(drag, ID_MA);
+  Material *ma = (Material *)WM_drag_get_local_ID(drag, ID_MA);
   return (ma && (outliner_ID_drop_find(C, event, ID_OB) != NULL));
 }
 
@@ -630,7 +633,7 @@ static int material_drop_invoke(bContext *C, wmOperator *UNUSED(op), const wmEve
 {
   Main *bmain = CTX_data_main(C);
   Object *ob = (Object *)outliner_ID_drop_find(C, event, ID_OB);
-  Material *ma = (Material *)WM_drag_ID_from_event(event, ID_MA);
+  Material *ma = (Material *)WM_drag_get_local_ID_from_event(event, ID_MA);
 
   if (ELEM(NULL, ob, ma)) {
     return OPERATOR_CANCELLED;
@@ -643,6 +646,7 @@ static int material_drop_invoke(bContext *C, wmOperator *UNUSED(op), const wmEve
 
   BKE_object_material_assign(bmain, ob, ma, ob->totcol + 1, BKE_MAT_ASSIGN_USERPREF);
 
+  WM_event_add_notifier(C, NC_OBJECT | ND_OB_SHADING, ob);
   WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, CTX_wm_view3d(C));
   WM_event_add_notifier(C, NC_MATERIAL | ND_SHADING_LINKS, ma);
 
@@ -849,9 +853,14 @@ static bool datastack_drop_poll(bContext *C,
                                 const wmEvent *event,
                                 const char **r_tooltip)
 {
+  if (drag->type != WM_DRAG_DATASTACK) {
+    return false;
+  }
+
   SpaceOutliner *space_outliner = CTX_wm_space_outliner(C);
   ARegion *region = CTX_wm_region(C);
-  bool changed = outliner_flag_set(&space_outliner->tree, TSE_HIGHLIGHTED | TSE_DRAG_ANY, false);
+  bool changed = outliner_flag_set(
+      &space_outliner->tree, TSE_HIGHLIGHTED_ANY | TSE_DRAG_ANY, false);
 
   StackDropData *drop_data = drag->poin;
   if (!drop_data) {
@@ -964,7 +973,7 @@ static void datastack_drop_copy(bContext *C, StackDropData *drop_data)
       }
       else if (drop_data->ob_parent->type != OB_GPENCIL && ob_dst->type != OB_GPENCIL) {
         ED_object_modifier_copy_to_object(
-            ob_dst, drop_data->ob_parent, drop_data->drag_directdata);
+            C, ob_dst, drop_data->ob_parent, drop_data->drag_directdata);
       }
       break;
     case TSE_CONSTRAINT:
@@ -1170,7 +1179,8 @@ static bool collection_drop_poll(bContext *C,
 {
   SpaceOutliner *space_outliner = CTX_wm_space_outliner(C);
   ARegion *region = CTX_wm_region(C);
-  bool changed = outliner_flag_set(&space_outliner->tree, TSE_HIGHLIGHTED | TSE_DRAG_ANY, false);
+  bool changed = outliner_flag_set(
+      &space_outliner->tree, TSE_HIGHLIGHTED_ANY | TSE_DRAG_ANY, false);
 
   CollectionDrop data;
   if (!event->shift && collection_drop_init(C, drag, event, &data)) {
@@ -1365,16 +1375,18 @@ static int outliner_item_drag_drop_invoke(bContext *C,
     WM_operator_properties_free(&op_ptr);
   }
 
-  wmDrag *drag = WM_event_start_drag(C, data.icon, WM_DRAG_ID, NULL, 0.0, WM_DRAG_NOP);
+  const bool use_datastack_drag = ELEM(tselem->type,
+                                       TSE_MODIFIER,
+                                       TSE_MODIFIER_BASE,
+                                       TSE_CONSTRAINT,
+                                       TSE_CONSTRAINT_BASE,
+                                       TSE_GPENCIL_EFFECT,
+                                       TSE_GPENCIL_EFFECT_BASE);
 
-  if (ELEM(tselem->type,
-           TSE_MODIFIER,
-           TSE_MODIFIER_BASE,
-           TSE_CONSTRAINT,
-           TSE_CONSTRAINT_BASE,
-           TSE_GPENCIL_EFFECT,
-           TSE_GPENCIL_EFFECT_BASE)) {
+  const int wm_drag_type = use_datastack_drag ? WM_DRAG_DATASTACK : WM_DRAG_ID;
+  wmDrag *drag = WM_event_start_drag(C, data.icon, wm_drag_type, NULL, 0.0, WM_DRAG_NOP);
 
+  if (use_datastack_drag) {
     TreeElement *te_bone = NULL;
     bPoseChannel *pchan = outliner_find_parent_bone(te, &te_bone);
     datastack_drop_data_init(drag, (Object *)tselem->id, pchan, te, tselem, te->directdata);
@@ -1454,14 +1466,14 @@ static int outliner_item_drag_drop_invoke(bContext *C,
         parent = scene->master_collection;
       }
 
-      WM_drag_add_ID(drag, id, &parent->id);
+      WM_drag_add_local_ID(drag, id, &parent->id);
     }
 
     BLI_freelistN(&selected.selected_array);
   }
   else {
     /* Add single ID. */
-    WM_drag_add_ID(drag, data.drag_id, data.drag_parent);
+    WM_drag_add_local_ID(drag, data.drag_id, data.drag_parent);
   }
 
   ED_outliner_select_sync_from_outliner(C, space_outliner);
@@ -1471,7 +1483,7 @@ static int outliner_item_drag_drop_invoke(bContext *C,
 
 /* Outliner drag and drop. This operator mostly exists to support dragging
  * from outliner text instead of only from the icon, and also to show a
- * hint in the statusbar keymap. */
+ * hint in the status-bar key-map. */
 
 void OUTLINER_OT_item_drag_drop(wmOperatorType *ot)
 {
@@ -1492,10 +1504,10 @@ void outliner_dropboxes(void)
 {
   ListBase *lb = WM_dropboxmap_find("Outliner", SPACE_OUTLINER, RGN_TYPE_WINDOW);
 
-  WM_dropbox_add(lb, "OUTLINER_OT_parent_drop", parent_drop_poll, NULL);
-  WM_dropbox_add(lb, "OUTLINER_OT_parent_clear", parent_clear_poll, NULL);
-  WM_dropbox_add(lb, "OUTLINER_OT_scene_drop", scene_drop_poll, NULL);
-  WM_dropbox_add(lb, "OUTLINER_OT_material_drop", material_drop_poll, NULL);
-  WM_dropbox_add(lb, "OUTLINER_OT_datastack_drop", datastack_drop_poll, NULL);
-  WM_dropbox_add(lb, "OUTLINER_OT_collection_drop", collection_drop_poll, NULL);
+  WM_dropbox_add(lb, "OUTLINER_OT_parent_drop", parent_drop_poll, NULL, NULL);
+  WM_dropbox_add(lb, "OUTLINER_OT_parent_clear", parent_clear_poll, NULL, NULL);
+  WM_dropbox_add(lb, "OUTLINER_OT_scene_drop", scene_drop_poll, NULL, NULL);
+  WM_dropbox_add(lb, "OUTLINER_OT_material_drop", material_drop_poll, NULL, NULL);
+  WM_dropbox_add(lb, "OUTLINER_OT_datastack_drop", datastack_drop_poll, NULL, NULL);
+  WM_dropbox_add(lb, "OUTLINER_OT_collection_drop", collection_drop_poll, NULL, NULL);
 }

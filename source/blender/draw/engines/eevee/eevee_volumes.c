@@ -288,7 +288,7 @@ void EEVEE_volumes_cache_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata)
 
     if (grp) {
       DRW_shgroup_uniform_block(grp, "common_block", sldata->common_ubo);
-      /* TODO (fclem): remove those (need to clean the GLSL files). */
+      /* TODO(fclem): remove those (need to clean the GLSL files). */
       DRW_shgroup_uniform_block(grp, "grid_block", sldata->grid_ubo);
       DRW_shgroup_uniform_block(grp, "probe_block", sldata->probe_ubo);
       DRW_shgroup_uniform_block(grp, "planar_block", sldata->planar_ubo);
@@ -453,7 +453,7 @@ static bool eevee_volume_object_mesh_init(Scene *scene,
         DRW_shgroup_uniform_texture_ref(
             grp, gpu_grid->sampler_name, fds->tex_color ? &fds->tex_color : &e_data.dummy_one);
       }
-      else if (STREQ(gpu_grid->name, "flame") || STREQ(gpu_grid->name, "temperature")) {
+      else if (STR_ELEM(gpu_grid->name, "flame", "temperature")) {
         DRW_shgroup_uniform_texture_ref(
             grp, gpu_grid->sampler_name, fds->tex_flame ? &fds->tex_flame : &e_data.dummy_flame);
       }
@@ -530,7 +530,7 @@ void EEVEE_volumes_cache_object_add(EEVEE_ViewLayerData *sldata,
 
   DRWShadingGroup *grp = DRW_shgroup_material_create(mat, vedata->psl->volumetric_objects_ps);
 
-  /* TODO(fclem) remove those "unnecessary" UBOs */
+  /* TODO(fclem): remove those "unnecessary" UBOs */
   DRW_shgroup_uniform_block(grp, "planar_block", sldata->planar_ubo);
   DRW_shgroup_uniform_block(grp, "probe_block", sldata->probe_ubo);
   DRW_shgroup_uniform_block(grp, "shadow_block", sldata->shadow_ubo);
@@ -610,7 +610,8 @@ void EEVEE_volumes_cache_finish(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata)
         grp, NULL, USE_VOLUME_OPTI ? 1 : common_data->vol_tex_size[2]);
 
     DRW_PASS_CREATE(psl->volumetric_resolve_ps, DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_CUSTOM);
-    grp = DRW_shgroup_create(EEVEE_shaders_volumes_resolve_sh_get(), psl->volumetric_resolve_ps);
+    grp = DRW_shgroup_create(EEVEE_shaders_volumes_resolve_sh_get(false),
+                             psl->volumetric_resolve_ps);
     DRW_shgroup_uniform_texture_ref(grp, "inScattering", &txl->volume_scatter);
     DRW_shgroup_uniform_texture_ref(grp, "inTransmittance", &txl->volume_transmit);
     DRW_shgroup_uniform_texture_ref(grp, "inSceneDepth", &e_data.depth_src);
@@ -707,7 +708,7 @@ void EEVEE_volumes_compute(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata)
     DRW_stats_group_start("Volumetrics");
 
     /* We sample the shadow-maps using shadow sampler. We need to enable Comparison mode.
-     * TODO(fclem) avoid this by using sampler objects.*/
+     * TODO(fclem): avoid this by using sampler objects.*/
     GPU_texture_compare_mode(sldata->shadow_cube_pool, true);
     GPU_texture_compare_mode(sldata->shadow_cascade_pool, true);
 
@@ -787,7 +788,6 @@ void EEVEE_volumes_free(void)
 }
 
 /* -------------------------------------------------------------------- */
-
 /** \name Render Passes
  * \{ */
 
@@ -823,7 +823,7 @@ void EEVEE_volumes_output_init(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata, 
   DRW_PASS_CREATE(psl->volumetric_accum_ps, DRW_STATE_WRITE_COLOR | DRW_STATE_BLEND_ADD_FULL);
   DRWShadingGroup *grp = NULL;
   if ((effects->enabled_effects & EFFECT_VOLUMETRIC) != 0) {
-    grp = DRW_shgroup_create(EEVEE_shaders_volumes_resolve_sh_get(), psl->volumetric_accum_ps);
+    grp = DRW_shgroup_create(EEVEE_shaders_volumes_resolve_sh_get(true), psl->volumetric_accum_ps);
     DRW_shgroup_uniform_texture_ref(grp, "inScattering", &txl->volume_scatter);
     DRW_shgroup_uniform_texture_ref(grp, "inTransmittance", &txl->volume_transmit);
     DRW_shgroup_uniform_texture_ref(grp, "inSceneDepth", &e_data.depth_src);
@@ -853,4 +853,4 @@ void EEVEE_volumes_output_accumulate(EEVEE_ViewLayerData *UNUSED(sldata), EEVEE_
   }
 }
 
-/* \} */
+/** \} */

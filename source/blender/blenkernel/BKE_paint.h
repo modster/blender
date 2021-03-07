@@ -25,6 +25,7 @@
 
 #include "BLI_bitmap.h"
 #include "BLI_utildefines.h"
+#include "DNA_brush_enums.h"
 #include "DNA_object_enums.h"
 
 #ifdef __cplusplus
@@ -33,11 +34,14 @@ extern "C" {
 
 struct BMFace;
 struct BMesh;
+struct BlendDataReader;
+struct BlendLibReader;
+struct BlendWriter;
 struct Brush;
 struct CurveMapping;
 struct Depsgraph;
-struct EnumPropertyItem;
 struct EdgeSet;
+struct EnumPropertyItem;
 struct GHash;
 struct GridPaintMask;
 struct ImagePool;
@@ -54,7 +58,6 @@ struct Paint;
 struct PaintCurve;
 struct Palette;
 struct PaletteColor;
-struct ReportList;
 struct Scene;
 struct StrokeCache;
 struct SubdivCCG;
@@ -66,8 +69,6 @@ struct ViewLayer;
 struct bContext;
 struct bToolRef;
 struct tPaletteColorHSV;
-
-enum eOverlayFlags;
 
 extern const char PAINT_CURSOR_SCULPT[3];
 extern const char PAINT_CURSOR_VERTEX_PAINT[3];
@@ -137,7 +138,6 @@ void BKE_paint_set_overlay_override(enum eOverlayFlags flag);
 
 /* palettes */
 struct Palette *BKE_palette_add(struct Main *bmain, const char *name);
-struct Palette *BKE_palette_copy(struct Main *bmain, const struct Palette *palette);
 struct PaletteColor *BKE_palette_color_add(struct Palette *palette);
 bool BKE_palette_is_empty(const struct Palette *palette);
 void BKE_palette_color_remove(struct Palette *palette, struct PaletteColor *color);
@@ -154,7 +154,6 @@ bool BKE_palette_from_hash(struct Main *bmain,
 
 /* paint curves */
 struct PaintCurve *BKE_paint_curve_add(struct Main *bmain, const char *name);
-struct PaintCurve *BKE_paint_curve_copy(struct Main *bmain, const struct PaintCurve *pc);
 
 bool BKE_paint_ensure(struct ToolSettings *ts, struct Paint **r_paint);
 void BKE_paint_init(struct Main *bmain, struct Scene *sce, ePaintMode mode, const char col[3]);
@@ -182,11 +181,6 @@ void BKE_paint_palette_set(struct Paint *p, struct Palette *palette);
 void BKE_paint_curve_set(struct Brush *br, struct PaintCurve *pc);
 void BKE_paint_curve_clamp_endpoint_add_index(struct PaintCurve *pc, const int add_index);
 
-void BKE_paint_data_warning(
-    struct ReportList *reports, bool uvs, bool mat, bool tex, bool stencil);
-bool BKE_paint_proj_mesh_data_check(
-    struct Scene *scene, struct Object *ob, bool *uvs, bool *mat, bool *tex, bool *stencil);
-
 /* testing face select mode
  * Texture paint could be removed since selected faces are not used
  * however hiding faces is useful */
@@ -203,6 +197,8 @@ bool paint_is_bmesh_face_hidden(struct BMFace *f);
 
 /* paint masks */
 float paint_grid_paint_mask(const struct GridPaintMask *gpm, uint level, uint x, uint y);
+
+void BKE_paint_face_set_overlay_color_get(const int face_set, const int seed, uchar r_color[4]);
 
 /* stroke related */
 bool paint_calculate_rake_rotation(struct UnifiedPaintSettings *ups,
@@ -221,6 +217,15 @@ void BKE_paint_toolslots_brush_update_ex(struct Paint *paint, struct Brush *brus
 void BKE_paint_toolslots_brush_update(struct Paint *paint);
 void BKE_paint_toolslots_brush_validate(struct Main *bmain, struct Paint *paint);
 struct Brush *BKE_paint_toolslots_brush_get(struct Paint *paint, int slot_index);
+
+/* .blend I/O */
+void BKE_paint_blend_write(struct BlendWriter *writer, struct Paint *paint);
+void BKE_paint_blend_read_data(struct BlendDataReader *reader,
+                               const struct Scene *scene,
+                               struct Paint *paint);
+void BKE_paint_blend_read_lib(struct BlendLibReader *reader,
+                              struct Scene *scene,
+                              struct Paint *paint);
 
 #define SCULPT_FACE_SET_NONE 0
 
@@ -259,14 +264,29 @@ typedef struct SculptPoseIKChain {
 
 /* Cloth Brush */
 
+/* Cloth Simulation. */
+typedef enum eSculptClothNodeSimState {
+  /* Constraints were not built for this node, so it can't be simulated. */
+  SCULPT_CLOTH_NODE_UNINITIALIZED,
+
+  /* There are constraints for the geometry in this node, but it should not be simulated. */
+  SCULPT_CLOTH_NODE_INACTIVE,
+
+  /* There are constraints for this node and they should be used by the solver. */
+  SCULPT_CLOTH_NODE_ACTIVE,
+} eSculptClothNodeSimState;
+
 typedef enum eSculptClothConstraintType {
   /* Constraint that creates the structure of the cloth. */
   SCULPT_CLOTH_CONSTRAINT_STRUCTURAL = 0,
   /* Constraint that references the position of a vertex and a position in deformation_pos which
-     can be deformed by the tools. */
+   * can be deformed by the tools. */
   SCULPT_CLOTH_CONSTRAINT_DEFORMATION = 1,
-  /* Constarint that references the vertex position and its initial position. */
+  /* Constraint that references the vertex position and a editable soft-body position for
+   * plasticity. */
   SCULPT_CLOTH_CONSTRAINT_SOFTBODY = 2,
+  /* Constraint that references the vertex position and its initial position. */
+  SCULPT_CLOTH_CONSTRAINT_PIN = 3,
 } eSculptClothConstraintType;
 
 typedef struct SculptClothLengthConstraint {
@@ -284,6 +304,10 @@ typedef struct SculptClothLengthConstraint {
 
   float length;
   float strength;
+
+  /* Index in #SculptClothSimulation.node_state of the node from where this constraint was created.
+   * This constraints will only be used by the solver if the state is active. */
+  int node;
 
   eSculptClothConstraintType type;
 } SculptClothLengthConstraint;
@@ -303,14 +327,21 @@ typedef struct SculptClothSimulation {
 
   float mass;
   float damping;
+  float softbody_strength;
 
   float (*acceleration)[3];
   float (*pos)[3];
   float (*init_pos)[3];
+  float (*softbody_pos)[3];
   float (*prev_pos)[3];
   float (*last_iteration_pos)[3];
 
   struct ListBase *collider_list;
+
+  int totnode;
+  /** #PBVHNode pointer as a key, index in #SculptClothSimulation.node_state as value. */
+  struct GHash *node_state_index;
+  eSculptClothNodeSimState *node_state;
 } SculptClothSimulation;
 
 typedef struct SculptPersistentBase {
@@ -320,7 +351,7 @@ typedef struct SculptPersistentBase {
 } SculptPersistentBase;
 
 typedef struct SculptVertexInfo {
-  /* Idexed by vertex, stores and ID of its topologycally connected component. */
+  /* Indexed by vertex, stores and ID of its topologically connected component. */
   int *connected_component;
 
   /* Indexed by base mesh vertex index, stores if that vertex is a boundary. */
@@ -334,7 +365,7 @@ typedef struct SculptBoundaryEditInfo {
   /* How many steps were needed to reach this vertex from the boundary. */
   int num_propagation_steps;
 
-  /* Stregth that is used to deform this vertex. */
+  /* Strength that is used to deform this vertex. */
   float strength_factor;
 } SculptBoundaryEditInfo;
 
@@ -408,7 +439,7 @@ typedef struct SculptFakeNeighbors {
   /* Max distance used to calculate neighborhood information. */
   float current_max_distance;
 
-  /* Idexed by vertex, stores the vertex index of its fake neighbor if available. */
+  /* Indexed by vertex, stores the vertex index of its fake neighbor if available. */
   int *fake_neighbor_index;
 
 } SculptFakeNeighbors;
@@ -484,13 +515,22 @@ typedef struct SculptSession {
   int active_face_index;
   int active_grid_index;
 
+  /* When active, the cursor draws with faded colors, indicating that there is an action enabled.
+   */
+  bool draw_faded_cursor;
   float cursor_radius;
   float cursor_location[3];
   float cursor_normal[3];
   float cursor_sampled_normal[3];
   float cursor_view_normal[3];
 
-  /* TODO(jbakker): Replace rv3d adn v3d with ViewContext */
+  /* For Sculpt trimming gesture tools, initial raycast data from the position of the mouse when
+   * the gesture starts (intersection with the surface and if they ray hit the surface or not). */
+  float gesture_initial_location[3];
+  float gesture_initial_normal[3];
+  bool gesture_initial_hit;
+
+  /* TODO(jbakker): Replace rv3d and v3d with ViewContext */
   struct RegionView3D *rv3d;
   struct View3D *v3d;
   struct Scene *scene;
@@ -521,6 +561,10 @@ typedef struct SculptSession {
   float init_pivot_pos[3];
   float init_pivot_rot[4];
   float init_pivot_scale[3];
+
+  float prev_pivot_pos[3];
+  float prev_pivot_rot[4];
+  float prev_pivot_scale[3];
 
   union {
     struct {
@@ -585,6 +629,15 @@ void BKE_sculpt_bvh_update_from_ccg(struct PBVH *pbvh, struct SubdivCCG *subdiv_
 /* This ensure that all elements in the mesh (both vertices and grids) have their visibility
  * updated according to the face sets. */
 void BKE_sculpt_sync_face_set_visibility(struct Mesh *mesh, struct SubdivCCG *subdiv_ccg);
+
+/* Individual function to sync the Face Set visibility to mesh and grids. */
+void BKE_sculpt_sync_face_sets_visibility_to_base_mesh(struct Mesh *mesh);
+void BKE_sculpt_sync_face_sets_visibility_to_grids(struct Mesh *mesh,
+                                                   struct SubdivCCG *subdiv_ccg);
+
+void BKE_sculpt_face_sets_ensure_from_base_mesh_visibility(struct Mesh *mesh);
+
+void BKE_sculpt_ensure_orig_mesh_data(struct Scene *scene, struct Object *object);
 
 bool BKE_sculptsession_use_pbvh_draw(const struct Object *ob, const struct View3D *v3d);
 

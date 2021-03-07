@@ -84,8 +84,8 @@ struct BlendFileReadParams {
   uint skip_flags : 3; /* eBLOReadSkip */
   uint is_startup : 1;
 
-  /** Whether we are reading the memfile for an undo (< 0) or a redo (> 0). */
-  int undo_direction : 2;
+  /** Whether we are reading the memfile for an undo or a redo. */
+  int undo_direction; /* eUndoStepDir */
 };
 
 /* skip reading some data-block types (may want to skip screen data too). */
@@ -119,13 +119,23 @@ void BLO_blendfiledata_free(BlendFileData *bfd);
 /** \name BLO Blend File Handle API
  * \{ */
 
+struct BLODataBlockInfo {
+  char name[64]; /* MAX_NAME */
+  struct AssetMetaData *asset_data;
+};
+
 BlendHandle *BLO_blendhandle_from_file(const char *filepath, struct ReportList *reports);
 BlendHandle *BLO_blendhandle_from_memory(const void *mem, int memsize);
 
 struct LinkNode *BLO_blendhandle_get_datablock_names(BlendHandle *bh,
                                                      int ofblocktype,
-                                                     int *tot_names);
-struct LinkNode *BLO_blendhandle_get_previews(BlendHandle *bh, int ofblocktype, int *tot_prev);
+
+                                                     const bool use_assets_only,
+                                                     int *r_tot_names);
+struct LinkNode *BLO_blendhandle_get_datablock_info(BlendHandle *bh,
+                                                    int ofblocktype,
+                                                    int *r_tot_info_items);
+struct LinkNode *BLO_blendhandle_get_previews(BlendHandle *bh, int ofblocktype, int *r_tot_prev);
 struct LinkNode *BLO_blendhandle_get_linkable_groups(BlendHandle *bh);
 
 void BLO_blendhandle_close(BlendHandle *bh);
@@ -223,12 +233,12 @@ typedef void (*BLOExpandDoitCallback)(void *fdhandle, struct Main *mainvar, void
 void BLO_main_expander(BLOExpandDoitCallback expand_doit_func);
 void BLO_expand_main(void *fdhandle, struct Main *mainvar);
 
-/* Update defaults in startup.blend & userprefs.blend, without having to save and embed it */
+/**
+ * Update defaults in startup.blend, without having to save and embed it.
+ * \note defaults for preferences are stored in `userdef_default.c` and can be updated there.
+ */
 void BLO_update_defaults_startup_blend(struct Main *bmain, const char *app_template);
 void BLO_update_defaults_workspace(struct WorkSpace *workspace, const char *app_template);
-
-/* Version patch user preferences. */
-void BLO_version_defaults_userpref_blend(struct Main *bmain, struct UserDef *userdef);
 
 /* Disable unwanted experimental feature settings on startup. */
 void BLO_sanitize_experimental_features_userpref_blend(struct UserDef *userdef);

@@ -159,7 +159,7 @@ static void basic_cache_populate(void *vedata, Object *ob)
 {
   BASIC_StorageList *stl = ((BASIC_Data *)vedata)->stl;
 
-  /* TODO(fclem) fix selection of smoke domains. */
+  /* TODO(fclem): fix selection of smoke domains. */
 
   if (!DRW_object_is_renderable(ob) || (ob->dt < OB_SOLID)) {
     return;
@@ -257,6 +257,7 @@ DrawEngineType draw_engine_basic_type = {
     &basic_cache_populate,
     &basic_cache_finish,
     &basic_draw_scene,
+    NULL,
     NULL,
     NULL,
     NULL,

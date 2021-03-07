@@ -25,6 +25,10 @@
 
 #include "DNA_listBase.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * #FluidDomainSettings.flags
  * Domain flags.
@@ -48,6 +52,7 @@ enum {
   FLUID_DOMAIN_DELETE_IN_OBSTACLE = (1 << 14),  /* Delete fluid inside obstacles. */
   FLUID_DOMAIN_USE_DIFFUSION = (1 << 15), /* Use diffusion (e.g. viscosity, surface tension). */
   FLUID_DOMAIN_USE_RESUMABLE_CACHE = (1 << 16), /* Determine if cache should be resumable. */
+  FLUID_DOMAIN_USE_VISCOSITY = (1 << 17),       /* Use viscosity. */
 };
 
 /**
@@ -311,7 +316,6 @@ enum {
 #define FLUID_NAME_OBVEL_Z "z_obvel"
 #define FLUID_NAME_FRACTIONS "fractions"
 #define FLUID_NAME_INVELC "invelC"
-#define FLUID_NAME_INVEL "invel"
 #define FLUID_NAME_INVEL_X "x_invel"
 #define FLUID_NAME_INVEL_Y "y_invel"
 #define FLUID_NAME_INVEL_Z "z_invel"
@@ -464,6 +468,7 @@ enum {
 enum {
   VDB_PRECISION_HALF_FLOAT = 0,
   VDB_PRECISION_FULL_FLOAT = 1,
+  VDB_PRECISION_MINI_FLOAT = 2,
 };
 
 /* Deprecated values (i.e. all defines and enums below this line up until typedefs). */
@@ -586,10 +591,15 @@ typedef struct FluidDomainSettings {
   float particle_radius;
   float particle_band_width;
   float fractions_threshold;
+  float fractions_distance;
   float flip_ratio;
   int sys_particle_maximum;
   short simulation_method;
-  char _pad4[2];
+  char _pad4[6];
+
+  /* Viscosity options. */
+  float viscosity_value;
+  char _pad5[4];
 
   /* Diffusion options. */
   float surface_tension;
@@ -605,7 +615,7 @@ typedef struct FluidDomainSettings {
   int mesh_scale;
   int totvert;
   short mesh_generator;
-  char _pad5[6]; /* Unused. */
+  char _pad6[6]; /* Unused. */
 
   /* Secondary particle options. */
   int particle_type;
@@ -626,7 +636,7 @@ typedef struct FluidDomainSettings {
   int sndparticle_update_radius;
   char sndparticle_boundary;
   char sndparticle_combined_export;
-  char _pad6[6]; /* Unused. */
+  char _pad7[6]; /* Unused. */
 
   /* Fluid guiding options. */
   float guide_alpha;      /* Guiding weight scalar (determines strength). */
@@ -634,7 +644,7 @@ typedef struct FluidDomainSettings {
   float guide_vel_factor; /* Multiply guiding velocity by this factor. */
   int guide_res[3];       /* Res for velocity guide grids - independent from base res. */
   short guide_source;
-  char _pad7[2]; /* Unused. */
+  char _pad8[2]; /* Unused. */
 
   /* Cache options. */
   int cache_frame_start;
@@ -654,7 +664,7 @@ typedef struct FluidDomainSettings {
   char error[64]; /* Bake error description. */
   short cache_type;
   char cache_id[4]; /* Run-time only */
-  char _pad8[2];
+  char _pad9[2];    /* Unused. */
 
   /* Time options. */
   float dt;
@@ -689,19 +699,19 @@ typedef struct FluidDomainSettings {
   char interp_method;
   char gridlines_color_field; /* Simulation field used to color map onto gridlines. */
   char gridlines_cell_filter;
-  char _pad9[7];
+  char _pad10[7]; /* Unused. */
 
   /* OpenVDB cache options. */
   int openvdb_compression;
   float clipping;
   char openvdb_data_depth;
-  char _pad10[7]; /* Unused. */
+  char _pad11[7]; /* Unused. */
 
   /* -- Deprecated / unsed options (below). -- */
 
   /* View options. */
   int viewsettings;
-  char _pad11[4]; /* Unused. */
+  char _pad12[4]; /* Unused. */
 
   /* Pointcache options. */
   /* Smoke uses only one cache from now on (index [0]), but keeping the array for now for reading
@@ -711,7 +721,7 @@ typedef struct FluidDomainSettings {
   int cache_comp;
   int cache_high_comp;
   char cache_file_format;
-  char _pad12[7]; /* Unused. */
+  char _pad13[7]; /* Unused. */
 
 } FluidDomainSettings;
 
@@ -859,3 +869,7 @@ typedef struct FluidEffectorSettings {
   short guide_mode;
   char _pad2[2];
 } FluidEffectorSettings;
+
+#ifdef __cplusplus
+}
+#endif

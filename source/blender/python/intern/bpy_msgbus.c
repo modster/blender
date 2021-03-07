@@ -118,7 +118,7 @@ static int py_msgbus_rna_key_from_py(PyObject *py_sub,
       PointerRNA data_type_ptr = {
           .type = data_type,
       };
-      const char *data_prop_str = _PyUnicode_AsString(data_prop_py);
+      const char *data_prop_str = PyUnicode_AsUTF8(data_prop_py);
       PropertyRNA *data_prop = RNA_struct_find_property(&data_type_ptr, data_prop_str);
 
       if (data_prop == NULL) {
@@ -265,7 +265,7 @@ static PyObject *bpy_msgbus_subscribe_rna(PyObject *UNUSED(self), PyObject *args
   }
 
   /* Note: we may want to have a way to pass this in. */
-  bContext *C = (bContext *)BPy_GetContext();
+  bContext *C = BPY_context_get();
   struct wmMsgBus *mbus = CTX_wm_message_bus(C);
   wmMsgParams_RNA msg_key_params = {{0}};
 
@@ -340,7 +340,7 @@ static PyObject *bpy_msgbus_publish_rna(PyObject *UNUSED(self), PyObject *args, 
   }
 
   /* Note: we may want to have a way to pass this in. */
-  bContext *C = (bContext *)BPy_GetContext();
+  bContext *C = BPY_context_get();
   struct wmMsgBus *mbus = CTX_wm_message_bus(C);
   wmMsgParams_RNA msg_key_params = {{0}};
 
@@ -359,7 +359,7 @@ PyDoc_STRVAR(bpy_msgbus_clear_by_owner_doc,
              "   Clear all subscribers using this owner.\n");
 static PyObject *bpy_msgbus_clear_by_owner(PyObject *UNUSED(self), PyObject *py_owner)
 {
-  bContext *C = (bContext *)BPy_GetContext();
+  bContext *C = BPY_context_get();
   struct wmMsgBus *mbus = CTX_wm_message_bus(C);
   WM_msgbus_clear_by_owner(mbus, py_owner);
   Py_RETURN_NONE;

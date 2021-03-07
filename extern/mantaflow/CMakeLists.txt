@@ -31,6 +31,17 @@ if(MSVC_CLANG AND WITH_OPENMP AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0.1
   remove_cc_flag("-fopenmp")
 endif()
 
+# Exporting functions from the blender binary gives linker warnings on Apple arm64 systems.
+# For now and until Apple arm64 is officially supported, these will just be silenced here.
+# TODO (sebbas): Check if official arm64 devices give linker warnings without this block.
+
+if(APPLE AND ("${CMAKE_OSX_ARCHITECTURES}" STREQUAL "arm64"))
+  if(CMAKE_COMPILER_IS_GNUCXX OR "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+    string(APPEND CMAKE_C_FLAGS " -fvisibility=hidden")
+    string(APPEND CMAKE_CXX_FLAGS " -fvisibility=hidden")
+  endif()
+endif()
+
 set(MANTAVERSION "0.13")
 
 add_definitions(-DWITH_FLUID=1)
@@ -64,6 +75,8 @@ endif()
 
 if(WITH_OPENVDB)
   add_definitions(-DOPENVDB=1)
+  # OpenVDB headers use deprecated TBB headers, silence warning.
+  add_definitions(-DTBB_SUPPRESS_DEPRECATED_MESSAGES=1)
 endif()
 
 if(WITH_OPENVDB_BLOSC)
@@ -74,7 +87,7 @@ if(WIN32)
   add_definitions(-D_USE_MATH_DEFINES)
 endif()
 
-if(WITH_MANTA_NUMPY AND WITH_PYTHON_INSTALL_NUMPY)
+if(WITH_MANTA_NUMPY AND WITH_PYTHON_NUMPY)
   add_definitions(-DNUMPY=1)
 endif()
 
@@ -98,7 +111,7 @@ set(INC_SYS
   ${ZLIB_INCLUDE_DIRS}
 )
 
-if(WITH_MANTA_NUMPY AND WITH_PYTHON_INSTALL_NUMPY)
+if(WITH_MANTA_NUMPY AND WITH_PYTHON_NUMPY)
   list(APPEND INC_SYS
     ${PYTHON_NUMPY_INCLUDE_DIRS}
   )
@@ -120,6 +133,14 @@ if(WITH_OPENVDB)
   list(APPEND LIB
     ${OPENVDB_LIBRARIES}
   )
+  if(WIN32)
+    # OpenVDB emits lots of these, they should be suppressed through other
+    # means but MSVC 16.8/16.9 has broken this functionality, so C4251 is
+    # suppressed here explicitly. See
+    # https://developercommunity.visualstudio.com/content/problem/1167590/bug.html
+    # for details.
+    string(APPEND CMAKE_CXX_FLAGS " /wd4251")
+  endif()
 endif()
 
 set(SRC
@@ -189,6 +210,7 @@ set(SRC
   ${MANTA_PP}/plugin/ptsplugins.cpp
   ${MANTA_PP}/plugin/secondaryparticles.cpp
   ${MANTA_PP}/plugin/surfaceturbulence.cpp
+  ${MANTA_PP}/plugin/viscosity.cpp
   ${MANTA_PP}/plugin/vortexplugins.cpp
   ${MANTA_PP}/plugin/waveletturbulence.cpp
   ${MANTA_PP}/plugin/waves.cpp
@@ -244,8 +266,7 @@ if(WITH_MANTA_DEPENDENCIES)
     ${MANTA_DEP}/cnpy/cnpy.h
   )
 endif()
-
-if(WITH_MANTA_NUMPY AND WITH_PYTHON_INSTALL_NUMPY)
+if(WITH_MANTA_NUMPY AND WITH_PYTHON_NUMPY)
   list(APPEND SRC
     ${MANTA_PP}/plugin/numpyconvert.cpp
     ${MANTA_PP}/plugin/tfplugins.cpp

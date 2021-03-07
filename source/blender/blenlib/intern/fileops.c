@@ -58,7 +58,7 @@
 #include "BLI_fileops.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
-#include "BLI_sys_types.h"  // for intptr_t support
+#include "BLI_sys_types.h" /* for intptr_t support */
 #include "BLI_utildefines.h"
 
 #if 0 /* UNUSED */
@@ -158,7 +158,7 @@ char *BLI_file_ungzip_to_mem(const char *from_file, int *r_size)
   return mem;
 }
 
-#define CHUNK 256 * 1024
+#define CHUNK (256 * 1024)
 
 /* gzip byte array from memory and write it to file at certain position.
  * return size of gzip stream.
@@ -357,7 +357,12 @@ void *BLI_gzopen(const char *filename, const char *mode)
 
   /* xxx Creates file before transcribing the path */
   if (mode[0] == 'w') {
-    fclose(ufopen(filename, "a"));
+    FILE *file = ufopen(filename, "a");
+    if (file == NULL) {
+      /* File couldn't be opened, e.g. due to permission error. */
+      return NULL;
+    }
+    fclose(file);
   }
 
   /* temporary #if until we update all libraries to 1.2.7

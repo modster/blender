@@ -20,12 +20,7 @@
 /** \file
  * \ingroup gpu
  *
- * GPU Framebuffer
- * - this is a wrapper for an OpenGL framebuffer object (FBO). in practice
- *   multiple FBO's may be created.
- * - actual FBO creation & config is deferred until GPU_framebuffer_bind or
- *   GPU_framebuffer_check_valid to allow creation & config while another
- *   opengl context is bound (since FBOs are not shared between ogl contexts).
+ * Private frame buffer API.
  */
 
 #pragma once
@@ -54,8 +49,9 @@ typedef enum GPUAttachmentType : int {
    * the maximum number of COLOR attachments specified by glDrawBuffers. */
   GPU_FB_MAX_ATTACHMENT,
 
-  GPU_FB_MAX_COLOR_ATTACHMENT = (GPU_FB_MAX_ATTACHMENT - GPU_FB_COLOR_ATTACHMENT0),
 } GPUAttachmentType;
+
+#define GPU_FB_MAX_COLOR_ATTACHMENT (GPU_FB_MAX_ATTACHMENT - GPU_FB_COLOR_ATTACHMENT0)
 
 inline constexpr GPUAttachmentType operator-(GPUAttachmentType a, int b)
 {
@@ -99,10 +95,10 @@ class FrameBuffer {
   /** Debug name. */
   char name_[DEBUG_NAME_LEN];
   /** Frame-buffer state. */
-  int viewport_[4];
-  int scissor_[4];
+  int viewport_[4] = {0};
+  int scissor_[4] = {0};
   bool scissor_test_ = false;
-  bool dirty_state_;
+  bool dirty_state_ = true;
 
  public:
   FrameBuffer(const char *name);
@@ -209,7 +205,7 @@ class FrameBuffer {
   };
 };
 
-/* Syntacting suggar. */
+/* Syntactic sugar. */
 static inline GPUFrameBuffer *wrap(FrameBuffer *vert)
 {
   return reinterpret_cast<GPUFrameBuffer *>(vert);

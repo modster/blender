@@ -31,6 +31,7 @@
 #endif
 
 #include "DNA_anim_types.h"
+#include "DNA_collection_types.h"
 #include "DNA_curve_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_space_types.h"
@@ -43,13 +44,16 @@
 #include "BKE_idprop.h"
 #include "BKE_keyconfig.h"
 #include "BKE_main.h"
+#include "BKE_preferences.h"
 
-#include "BLO_readfile.h" /* Own include. */
+#include "BLO_readfile.h"
+
+#include "readfile.h" /* Own include. */
 
 #include "wm_event_types.h"
 
-/* Disallow access to global userdef. */
-#define U (_error_)
+/* For versioning we only ever want to manipulate preferences passed in. */
+#define U BLI_STATIC_ASSERT(false, "Global 'U' not allowed, only use arguments passed in!")
 
 static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
 {
@@ -240,17 +244,44 @@ static void do_versions_theme(const UserDef *userdef, bTheme *btheme)
     copy_v3_v3_uchar(btheme->space_node.grid, btheme->space_node.back);
   }
 
+  if (!USER_VERSION_ATLEAST(291, 9)) {
+    FROM_DEFAULT_V4_UCHAR(space_graph.vertex_active);
+  }
+
+  if (!USER_VERSION_ATLEAST(292, 5)) {
+    for (int i = 0; i < COLLECTION_COLOR_TOT; ++i) {
+      FROM_DEFAULT_V4_UCHAR(collection_color[i].color);
+    }
+    FROM_DEFAULT_V4_UCHAR(space_sequencer.row_alternate);
+    FROM_DEFAULT_V4_UCHAR(space_node.nodeclass_geometry);
+    FROM_DEFAULT_V4_UCHAR(space_node.nodeclass_attribute);
+  }
+
+  if (!USER_VERSION_ATLEAST(292, 12)) {
+    FROM_DEFAULT_V4_UCHAR(space_node.nodeclass_shader);
+  }
+
   /**
    * Versioning code until next subversion bump goes here.
    *
    * \note Be sure to check when bumping the version:
-   * - #BLO_version_defaults_userpref_blend in this file.
+   * - #blo_do_versions_userdef in this file.
    * - "versioning_{BLENDER_VERSION}.c"
    *
    * \note Keep this message at the bottom of the function.
    */
   {
     /* Keep this block, even when empty. */
+    FROM_DEFAULT_V4_UCHAR(space_properties.active);
+
+    FROM_DEFAULT_V4_UCHAR(space_info.info_error);
+    FROM_DEFAULT_V4_UCHAR(space_info.info_warning);
+    FROM_DEFAULT_V4_UCHAR(space_info.info_info);
+    FROM_DEFAULT_V4_UCHAR(space_info.info_debug);
+    FROM_DEFAULT_V4_UCHAR(space_info.info_debug_text);
+    FROM_DEFAULT_V4_UCHAR(space_info.info_property);
+    FROM_DEFAULT_V4_UCHAR(space_info.info_error);
+    FROM_DEFAULT_V4_UCHAR(space_info.info_operator);
   }
 
 #undef FROM_DEFAULT_V4_UCHAR
@@ -303,15 +334,12 @@ static bool keymap_item_has_invalid_wm_context_data_path(wmKeyMapItem *kmi,
 }
 
 /* patching UserDef struct and Themes */
-void BLO_version_defaults_userpref_blend(Main *bmain, UserDef *userdef)
+void blo_do_versions_userdef(UserDef *userdef)
 {
-
-#define USER_VERSION_ATLEAST(ver, subver) MAIN_VERSION_ATLEAST(bmain, ver, subver)
+  /* #UserDef & #Main happen to have the same struct member. */
+#define USER_VERSION_ATLEAST(ver, subver) MAIN_VERSION_ATLEAST(userdef, ver, subver)
 
   /* the UserDef struct is not corrected with do_versions() .... ugh! */
-  if (userdef->wheellinescroll == 0) {
-    userdef->wheellinescroll = 3;
-  }
   if (userdef->menuthreshold1 == 0) {
     userdef->menuthreshold1 = 5;
     userdef->menuthreshold2 = 2;
@@ -528,9 +556,14 @@ void BLO_version_defaults_userpref_blend(Main *bmain, UserDef *userdef)
     }
   }
 
-  /* NOTE!! from now on use userdef->versionfile and userdef->subversionfile */
-#undef USER_VERSION_ATLEAST
-#define USER_VERSION_ATLEAST(ver, subver) MAIN_VERSION_ATLEAST(userdef, ver, subver)
+  if (!USER_VERSION_ATLEAST(269, 4)) {
+    userdef->walk_navigation.mouse_speed = 1.0f;
+    userdef->walk_navigation.walk_speed = 2.5f; /* m/s */
+    userdef->walk_navigation.walk_speed_factor = 5.0f;
+    userdef->walk_navigation.view_height = 1.6f;   /* m */
+    userdef->walk_navigation.jump_height = 0.4f;   /* m */
+    userdef->walk_navigation.teleport_time = 0.2f; /* s */
+  }
 
   if (!USER_VERSION_ATLEAST(271, 5)) {
     userdef->pie_menu_radius = 100;
@@ -599,6 +632,8 @@ void BLO_version_defaults_userpref_blend(Main *bmain, UserDef *userdef)
   if (!USER_VERSION_ATLEAST(280, 33)) {
     /* Enable GLTF addon by default. */
     BKE_addon_ensure(&userdef->addons, "io_scene_gltf2");
+
+    userdef->pressure_threshold_max = 1.0f;
   }
 
   if (!USER_VERSION_ATLEAST(280, 35)) {
@@ -787,6 +822,27 @@ void BLO_version_defaults_userpref_blend(Main *bmain, UserDef *userdef)
     }
   }
 
+  if (!USER_VERSION_ATLEAST(292, 3)) {
+    if (userdef->pixelsize == 0.0f) {
+      userdef->pixelsize = 1.0f;
+    }
+    /* Clear old userdef flag for "Camera Parent Lock". */
+    userdef->uiflag &= ~USER_UIFLAG_UNUSED_3;
+  }
+
+  if (!USER_VERSION_ATLEAST(292, 9)) {
+    if (BLI_listbase_is_empty(&userdef->asset_libraries)) {
+      BKE_preferences_asset_library_default_add(userdef);
+    }
+  }
+
+  if (!USER_VERSION_ATLEAST(293, 2)) {
+    /* Enable asset browser features by default for alpha testing.
+     * BLO_sanitize_experimental_features_userpref_blend() will disable it again for non-alpha
+     * builds. */
+    userdef->experimental.use_asset_browser = true;
+  }
+
   /**
    * Versioning code until next subversion bump goes here.
    *
@@ -798,10 +854,9 @@ void BLO_version_defaults_userpref_blend(Main *bmain, UserDef *userdef)
    */
   {
     /* Keep this block, even when empty. */
-  }
-
-  if (userdef->pixelsize == 0.0f) {
-    userdef->pixelsize = 1.0f;
+    if (userdef->gizmo_size_navigate_v3d == 0) {
+      userdef->gizmo_size_navigate_v3d = 80;
+    }
   }
 
   LISTBASE_FOREACH (bTheme *, btheme, &userdef->themes) {
@@ -824,9 +879,8 @@ void BLO_sanitize_experimental_features_userpref_blend(UserDef *userdef)
   if (BKE_blender_version_is_alpha()) {
     return;
   }
-  userdef->experimental.use_new_particle_system = false;
-  userdef->experimental.use_new_hair_type = false;
-  userdef->experimental.use_sculpt_vertex_colors = false;
+
+  MEMSET_STRUCT_AFTER(&userdef->experimental, 0, SANITIZE_AFTER_HERE);
 }
 
 #undef USER_LMOUSESELECT

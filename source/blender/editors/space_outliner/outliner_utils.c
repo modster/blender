@@ -30,12 +30,12 @@
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
 
+#include "BKE_armature.h"
 #include "BKE_context.h"
 #include "BKE_layer.h"
 #include "BKE_object.h"
 #include "BKE_outliner_treehash.h"
 
-#include "ED_armature.h"
 #include "ED_outliner.h"
 #include "ED_screen.h"
 
@@ -62,7 +62,7 @@ void outliner_viewcontext_init(const bContext *C, TreeViewContext *tvc)
     tvc->ob_edit = OBEDIT_FROM_OBACT(tvc->obact);
 
     if ((tvc->obact->type == OB_ARMATURE) ||
-        /* This could be made into it's own function. */
+        /* This could be made into its own function. */
         ((tvc->obact->type == OB_MESH) && tvc->obact->mode & OB_MODE_WEIGHT_PAINT)) {
       tvc->ob_pose = BKE_object_pose_armature_get(tvc->obact);
     }
@@ -113,7 +113,7 @@ TreeElement *outliner_find_item_at_y(const SpaceOutliner *space_outliner,
 
 static TreeElement *outliner_find_item_at_x_in_row_recursive(const TreeElement *parent_te,
                                                              float view_co_x,
-                                                             bool *row_merged)
+                                                             bool *r_is_merged_icon)
 {
   TreeElement *child_te = parent_te->subtree.first;
 
@@ -125,13 +125,14 @@ static TreeElement *outliner_find_item_at_x_in_row_recursive(const TreeElement *
       return child_te;
     }
     if ((child_te->flag & TE_ICONROW_MERGED) && over_element) {
-      if (row_merged) {
-        *row_merged = true;
+      if (r_is_merged_icon) {
+        *r_is_merged_icon = true;
       }
       return child_te;
     }
 
-    TreeElement *te = outliner_find_item_at_x_in_row_recursive(child_te, view_co_x, row_merged);
+    TreeElement *te = outliner_find_item_at_x_in_row_recursive(
+        child_te, view_co_x, r_is_merged_icon);
     if (te != child_te) {
       return te;
     }
@@ -150,27 +151,32 @@ static TreeElement *outliner_find_item_at_x_in_row_recursive(const TreeElement *
  * \return a hovered child item or \a parent_te (if no hovered child found).
  */
 TreeElement *outliner_find_item_at_x_in_row(const SpaceOutliner *space_outliner,
-                                            const TreeElement *parent_te,
+                                            TreeElement *parent_te,
                                             float view_co_x,
-                                            bool *row_merged)
+                                            bool *r_is_merged_icon,
+                                            bool *r_is_over_icon)
 {
   /* if parent_te is opened, it doesn't show children in row */
+  TreeElement *te = parent_te;
   if (!TSELEM_OPEN(TREESTORE(parent_te), space_outliner)) {
-    return outliner_find_item_at_x_in_row_recursive(parent_te, view_co_x, row_merged);
+    te = outliner_find_item_at_x_in_row_recursive(parent_te, view_co_x, r_is_merged_icon);
   }
 
-  return (TreeElement *)parent_te;
+  if ((te != parent_te) || outliner_item_is_co_over_icon(parent_te, view_co_x)) {
+    *r_is_over_icon = true;
+  }
+
+  return te;
 }
 
-/* Find specific item from the treestore */
+/* Find specific item from the trees-tore. */
 TreeElement *outliner_find_tree_element(ListBase *lb, const TreeStoreElem *store_elem)
 {
-  TreeElement *te, *tes;
-  for (te = lb->first; te; te = te->next) {
+  LISTBASE_FOREACH (TreeElement *, te, lb) {
     if (te->store_elem == store_elem) {
       return te;
     }
-    tes = outliner_find_tree_element(&te->subtree, store_elem);
+    TreeElement *tes = outliner_find_tree_element(&te->subtree, store_elem);
     if (tes) {
       return tes;
     }
@@ -183,8 +189,7 @@ TreeElement *outliner_find_parent_element(ListBase *lb,
                                           TreeElement *parent_te,
                                           const TreeElement *child_te)
 {
-  TreeElement *te;
-  for (te = lb->first; te; te = te->next) {
+  LISTBASE_FOREACH (TreeElement *, te, lb) {
     if (te == child_te) {
       return parent_te;
     }
@@ -207,7 +212,8 @@ TreeElement *outliner_find_tse(SpaceOutliner *space_outliner, const TreeStoreEle
   }
 
   /* check if 'tse' is in treestore */
-  tselem = BKE_outliner_treehash_lookup_any(space_outliner->treehash, tse->type, tse->nr, tse->id);
+  tselem = BKE_outliner_treehash_lookup_any(
+      space_outliner->runtime->treehash, tse->type, tse->nr, tse->id);
   if (tselem) {
     return outliner_find_tree_element(&space_outliner->tree, tselem);
   }
@@ -360,6 +366,9 @@ float outliner_restrict_columns_width(const SpaceOutliner *space_outliner)
       num_columns = 3;
       break;
     case SO_VIEW_LAYER:
+      if (space_outliner->show_restrict_flags & SO_RESTRICT_ENABLE) {
+        num_columns++;
+      }
       if (space_outliner->show_restrict_flags & SO_RESTRICT_HOLDOUT) {
         num_columns++;
       }
@@ -428,6 +437,17 @@ bool outliner_item_is_co_over_name_icons(const TreeElement *te, float view_co_x)
   return outside_left && (view_co_x < te->xend);
 }
 
+bool outliner_item_is_co_over_icon(const TreeElement *te, float view_co_x)
+{
+  return (view_co_x > (te->xs + UI_UNIT_X)) && (view_co_x < (te->xs + UI_UNIT_X * 2));
+}
+
+/* Find if x coordinate is over element name. */
+bool outliner_item_is_co_over_name(const TreeElement *te, float view_co_x)
+{
+  return (view_co_x > (te->xs + UI_UNIT_X * 2)) && (view_co_x < te->xend);
+}
+
 /* Find if x coordinate is over element disclosure toggle */
 bool outliner_item_is_co_within_close_toggle(const TreeElement *te, float view_co_x)
 {
@@ -435,9 +455,11 @@ bool outliner_item_is_co_within_close_toggle(const TreeElement *te, float view_c
 }
 
 /* Scroll view vertically while keeping within total bounds */
-void outliner_scroll_view(ARegion *region, int delta_y)
+void outliner_scroll_view(SpaceOutliner *space_outliner, ARegion *region, int delta_y)
 {
-  int y_min = MIN2(region->v2d.cur.ymin, region->v2d.tot.ymin);
+  int tree_width, tree_height;
+  outliner_tree_dimensions(space_outliner, &tree_width, &tree_height);
+  int y_min = MIN2(region->v2d.cur.ymin, -tree_height);
 
   region->v2d.cur.ymax += delta_y;
   region->v2d.cur.ymin += delta_y;
@@ -465,7 +487,7 @@ void outliner_tag_redraw_avoid_rebuild_on_open_change(const SpaceOutliner *space
                                                       ARegion *region)
 {
   /* Avoid rebuild if possible. */
-  if (outliner_mode_requires_always_rebuild(space_outliner)) {
+  if (outliner_requires_rebuild_on_open_change(space_outliner)) {
     ED_region_tag_redraw(region);
   }
   else {
@@ -488,7 +510,7 @@ Base *ED_outliner_give_base_under_cursor(bContext *C, const int mval[2])
   te = outliner_find_item_at_y(space_outliner, &space_outliner->tree, view_mval[1]);
   if (te) {
     TreeStoreElem *tselem = TREESTORE(te);
-    if (tselem->type == 0) {
+    if ((tselem->type == 0) && (te->idcode == ID_OB)) {
       Object *ob = (Object *)tselem->id;
       base = (te->directdata) ? (Base *)te->directdata : BKE_view_layer_base_find(view_layer, ob);
     }

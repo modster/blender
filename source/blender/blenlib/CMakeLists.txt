@@ -54,6 +54,7 @@ set(SRC
   intern/BLI_memblock.c
   intern/BLI_memiter.c
   intern/BLI_mempool.c
+  intern/BLI_mmap.c
   intern/BLI_timer.c
   intern/DLRB_tree.c
   intern/array_store.c
@@ -191,6 +192,7 @@ set(SRC
   BLI_float3.hh
   BLI_float4x4.hh
   BLI_fnmatch.h
+  BLI_function_ref.hh
   BLI_ghash.h
   BLI_gsqueue.h
   BLI_hash.h
@@ -203,6 +205,7 @@ set(SRC
   BLI_heap_simple.h
   BLI_index_mask.hh
   BLI_index_range.hh
+  BLI_inplace_priority_queue.hh
   BLI_iterator.h
   BLI_jitter_2d.h
   BLI_kdopbvh.h
@@ -228,8 +231,8 @@ set(SRC
   BLI_math_geom.h
   BLI_math_inline.h
   BLI_math_interp.h
-  BLI_math_mpq.hh
   BLI_math_matrix.h
+  BLI_math_mpq.hh
   BLI_math_rotation.h
   BLI_math_solvers.h
   BLI_math_statistics.h
@@ -242,6 +245,7 @@ set(SRC
   BLI_mempool.h
   BLI_mesh_boolean.hh
   BLI_mesh_intersect.hh
+  BLI_mmap.h
   BLI_mpq2.hh
   BLI_mpq3.hh
   BLI_multi_value_map.hh
@@ -268,17 +272,19 @@ set(SRC
   BLI_strict_flags.h
   BLI_string.h
   BLI_string_cursor_utf8.h
-  BLI_string_search.h
   BLI_string_ref.hh
+  BLI_string_search.h
   BLI_string_utf8.h
   BLI_string_utils.h
   BLI_sys_types.h
   BLI_system.h
   BLI_task.h
+  BLI_task.hh
   BLI_threads.h
   BLI_timecode.h
   BLI_timeit.hh
   BLI_timer.h
+  BLI_user_counter.hh
   BLI_utildefines.h
   BLI_utildefines_iter.h
   BLI_utildefines_stack.h
@@ -304,6 +310,7 @@ set(LIB
   extern_wcwidth
 
   ${FREETYPE_LIBRARY}
+  ${ZLIB_LIBRARIES}
 )
 
 if(WITH_MEM_VALGRIND)
@@ -382,12 +389,14 @@ if(WITH_GTESTS)
     tests/BLI_disjoint_set_test.cc
     tests/BLI_edgehash_test.cc
     tests/BLI_expr_pylike_eval_test.cc
+    tests/BLI_function_ref_test.cc
     tests/BLI_ghash_test.cc
     tests/BLI_hash_mm2a_test.cc
     tests/BLI_heap_simple_test.cc
     tests/BLI_heap_test.cc
     tests/BLI_index_mask_test.cc
     tests/BLI_index_range_test.cc
+    tests/BLI_inplace_priority_queue_test.cc
     tests/BLI_kdopbvh_test.cc
     tests/BLI_linear_allocator_test.cc
     tests/BLI_linklist_lockfree_test.cc
@@ -399,6 +408,8 @@ if(WITH_GTESTS)
     tests/BLI_math_color_test.cc
     tests/BLI_math_geom_test.cc
     tests/BLI_math_matrix_test.cc
+    tests/BLI_math_rotation_test.cc
+    tests/BLI_math_solvers_test.cc
     tests/BLI_math_vector_test.cc
     tests/BLI_memiter_test.cc
     tests/BLI_memory_utils_test.cc
@@ -413,8 +424,8 @@ if(WITH_GTESTS)
     tests/BLI_span_test.cc
     tests/BLI_stack_cxx_test.cc
     tests/BLI_stack_test.cc
-    tests/BLI_string_search_test.cc
     tests/BLI_string_ref_test.cc
+    tests/BLI_string_search_test.cc
     tests/BLI_string_test.cc
     tests/BLI_string_utf8_test.cc
     tests/BLI_task_graph_test.cc
@@ -431,7 +442,7 @@ if(WITH_GTESTS)
     bf_blenlib
   )
   include(GTestTesting)
-  blender_add_test_lib(bf_blenlib_tests "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")
+  blender_add_test_executable(blenlib "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")
 
   add_subdirectory(tests/performance)
 endif()

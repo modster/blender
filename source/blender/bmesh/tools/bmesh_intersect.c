@@ -681,7 +681,7 @@ static void bm_isect_tri_tri(
     copy_v3_v3(t_scale[2], fv_b[2]->co);
     tri_v3_scale(UNPACK3(t_scale), 1.0f - s->epsilon.eps2x);
 
-    // second check for verts intersecting the triangle
+    /* second check for verts intersecting the triangle */
     for (i_a = 0; i_a < 3; i_a++) {
       if (BM_ELEM_API_FLAG_TEST(fv_a[i_a], VERT_VISIT_A)) {
         continue;
@@ -1036,7 +1036,7 @@ bool BM_mesh_intersect(BMesh *bm,
 #endif
 
   if (boolean_mode != BMESH_ISECT_BOOLEAN_NONE) {
-    /* keep original geometrty for raycast callbacks */
+    /* Keep original geometry for ray-cast callbacks. */
     float **cos;
     int i, j;
 
@@ -1533,7 +1533,7 @@ bool BM_mesh_intersect(BMesh *bm,
 
     groups_array = MEM_mallocN(sizeof(*groups_array) * (size_t)bm->totface, __func__);
     group_tot = BM_mesh_calc_face_groups(
-        bm, groups_array, &group_index, bm_loop_filter_fn, &user_data_wrap, 0, BM_EDGE);
+        bm, groups_array, &group_index, bm_loop_filter_fn, NULL, &user_data_wrap, 0, BM_EDGE);
 
 #ifdef USE_DUMP
     printf("%s: Total face-groups: %d\n", __func__, group_tot);
@@ -1546,7 +1546,7 @@ bool BM_mesh_intersect(BMesh *bm,
       bool do_remove, do_flip;
 
       {
-        /* for now assyme this is an OK face to test with (not degenerate!) */
+        /* For now assume this is an OK face to test with (not degenerate!) */
         BMFace *f = ftable[groups_array[fg]];
         float co[3];
         int hits;

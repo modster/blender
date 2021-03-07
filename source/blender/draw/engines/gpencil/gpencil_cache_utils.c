@@ -58,6 +58,17 @@ GPENCIL_tObject *gpencil_object_cache_add(GPENCIL_PrivateData *pd, Object *ob)
   tgp_ob->is_drawmode3d = (gpd->draw_mode == GP_DRAWMODE_3D) || pd->draw_depth_only;
   tgp_ob->object_scale = mat4_to_scale(ob->obmat);
 
+  /* Check if any material with holdout flag enabled. */
+  tgp_ob->do_mat_holdout = false;
+  for (int i = 0; i < ob->totcol; i++) {
+    MaterialGPencilStyle *gp_style = BKE_gpencil_material_settings(ob, i + 1);
+    if (((gp_style != NULL) && (gp_style->flag & GP_MATERIAL_IS_STROKE_HOLDOUT)) ||
+        ((gp_style->flag & GP_MATERIAL_IS_FILL_HOLDOUT))) {
+      tgp_ob->do_mat_holdout = true;
+      break;
+    }
+  }
+
   /* Find the normal most likely to represent the gpObject. */
   /* TODO: This does not work quite well if you use
    * strokes not aligned with the object axes. Maybe we could try to
@@ -259,12 +270,12 @@ GPENCIL_tLayer *gpencil_layer_cache_add(GPENCIL_PrivateData *pd,
 
   const bool is_in_front = (ob->dtx & OB_DRAW_IN_FRONT);
   const bool is_screenspace = (gpd->flag & GP_DATA_STROKE_KEEPTHICKNESS) != 0;
-  const bool overide_vertcol = (pd->v3d_color_type != -1);
+  const bool override_vertcol = (pd->v3d_color_type != -1);
   const bool is_vert_col_mode = (pd->v3d_color_type == V3D_SHADING_VERTEX_COLOR) ||
                                 GPENCIL_VERTEX_MODE(gpd) || pd->is_render;
   bool is_masked = (gpl->flag & GP_LAYER_USE_MASK) && !BLI_listbase_is_empty(&gpl->mask_layers);
 
-  float vert_col_opacity = (overide_vertcol) ?
+  float vert_col_opacity = (override_vertcol) ?
                                (is_vert_col_mode ? pd->vertex_paint_opacity : 0.0f) :
                                pd->is_render ? gpl->vertex_paint_opacity :
                                                pd->vertex_paint_opacity;
@@ -288,7 +299,7 @@ GPENCIL_tLayer *gpencil_layer_cache_add(GPENCIL_PrivateData *pd,
   if (is_masked) {
     bool valid_mask = false;
     /* Warning: only GP_MAX_MASKBITS amount of bits.
-     * TODO(fclem) Find a better system without any limitation. */
+     * TODO(fclem): Find a better system without any limitation. */
     tgp_layer->mask_bits = BLI_memblock_alloc(pd->gp_maskbit_pool);
     tgp_layer->mask_invert_bits = BLI_memblock_alloc(pd->gp_maskbit_pool);
     BLI_bitmap_set_all(tgp_layer->mask_bits, false, GP_MAX_MASKBITS);
@@ -354,7 +365,7 @@ GPENCIL_tLayer *gpencil_layer_cache_add(GPENCIL_PrivateData *pd,
     DRW_shgroup_call_procedural_triangles(grp, NULL, 1);
 
     if (gpl->blend_mode == eGplBlendMode_HardLight) {
-      /* We cannot do custom blending on MultiTarget framebuffers.
+      /* We cannot do custom blending on Multi-Target frame-buffers.
        * Workaround by doing 2 passes. */
       grp = DRW_shgroup_create(sh, tgp_layer->blend_ps);
       DRW_shgroup_state_disable(grp, DRW_STATE_BLEND_MUL);

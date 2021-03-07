@@ -43,7 +43,6 @@ struct wmEvent;
 struct wmKeyConfig;
 struct wmOperator;
 struct wmOperatorType;
-struct wmWindowManager;
 enum ePaintMode;
 enum ePaintSymmetryFlags;
 
@@ -341,6 +340,7 @@ typedef enum {
 void PAINT_OT_mask_flood_fill(struct wmOperatorType *ot);
 void PAINT_OT_mask_lasso_gesture(struct wmOperatorType *ot);
 void PAINT_OT_mask_box_gesture(struct wmOperatorType *ot);
+void PAINT_OT_mask_line_gesture(struct wmOperatorType *ot);
 
 /* paint_curve.c */
 void PAINTCURVE_OT_new(struct wmOperatorType *ot);

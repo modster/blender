@@ -26,13 +26,13 @@ static pthread_mutex_t oidn_lock = BLI_MUTEX_INITIALIZER;
 #endif
 #include <iostream>
 
-DenoiseOperation::DenoiseOperation() : SingleThreadedOperation()
+DenoiseOperation::DenoiseOperation()
 {
   this->addInputSocket(COM_DT_COLOR);
   this->addInputSocket(COM_DT_VECTOR);
   this->addInputSocket(COM_DT_COLOR);
   this->addOutputSocket(COM_DT_COLOR);
-  this->m_settings = NULL;
+  this->m_settings = nullptr;
 }
 void DenoiseOperation::initExecution()
 {
@@ -44,9 +44,9 @@ void DenoiseOperation::initExecution()
 
 void DenoiseOperation::deinitExecution()
 {
-  this->m_inputProgramColor = NULL;
-  this->m_inputProgramNormal = NULL;
-  this->m_inputProgramAlbedo = NULL;
+  this->m_inputProgramColor = nullptr;
+  this->m_inputProgramNormal = nullptr;
+  this->m_inputProgramAlbedo = nullptr;
   SingleThreadedOperation::deinitExecution();
 }
 
@@ -94,7 +94,11 @@ void DenoiseOperation::generateDenoise(float *data,
     return;
   }
 #ifdef WITH_OPENIMAGEDENOISE
-  if (BLI_cpu_support_sse41()) {
+  /* Always supported through Accelerate framework BNNS on macOS. */
+#  ifndef __APPLE__
+  if (BLI_cpu_support_sse41())
+#  endif
+  {
     oidn::DeviceRef device = oidn::newDevice();
     device.commit();
 

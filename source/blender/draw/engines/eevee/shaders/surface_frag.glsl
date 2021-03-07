@@ -3,8 +3,13 @@
 #pragma BLENDER_REQUIRE(common_hair_lib.glsl)
 #pragma BLENDER_REQUIRE(common_utiltex_lib.glsl)
 
-#pragma BLENDER_REQUIRE(closure_lib.glsl)
-#pragma BLENDER_REQUIRE(closure_lit_lib.glsl)
+#pragma BLENDER_REQUIRE(closure_type_lib.glsl)
+#pragma BLENDER_REQUIRE(closure_eval_lib.glsl)
+#pragma BLENDER_REQUIRE(closure_eval_diffuse_lib.glsl)
+#pragma BLENDER_REQUIRE(closure_eval_glossy_lib.glsl)
+#pragma BLENDER_REQUIRE(closure_eval_translucent_lib.glsl)
+#pragma BLENDER_REQUIRE(closure_eval_refraction_lib.glsl)
+
 #pragma BLENDER_REQUIRE(surface_lib.glsl)
 #pragma BLENDER_REQUIRE(volumetric_lib.glsl)
 
@@ -61,11 +66,11 @@ void main()
 #ifdef USE_SSS
   float fac = float(!sssToggle);
 
-  /* TODO(fclem) we shouldn't need this.
+  /* TODO(fclem): we shouldn't need this.
    * Just disable USE_SSS when USE_REFRACTION is enabled. */
 #  ifdef USE_REFRACTION
   /* SSRefraction pass is done after the SSS pass.
-   * In order to not loose the diffuse light totally we
+   * In order to not lose the diffuse light totally we
    * need to merge the SSS radiance to the main radiance. */
   fac = 1.0;
 #  endif

@@ -35,6 +35,7 @@
 #include "BLT_translation.h"
 
 #include "DNA_collection_types.h"
+#include "DNA_defaults.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
@@ -48,6 +49,7 @@
 #include "BKE_lib_query.h"
 #include "BKE_material.h"
 #include "BKE_mesh.h"
+#include "BKE_mesh_boolean_convert.h"
 #include "BKE_mesh_wrapper.h"
 #include "BKE_modifier.h"
 #include "BKE_screen.h"
@@ -69,20 +71,24 @@
 #include "tools/bmesh_boolean.h"
 #include "tools/bmesh_intersect.h"
 
-// #define DEBUG_TIME
 #ifdef DEBUG_TIME
 #  include "PIL_time.h"
 #  include "PIL_time_utildefines.h"
+#endif
+
+#ifdef WITH_GMP
+const bool bypass_bmesh = true;
+#else
+const bool bypass_bmesh = false;
 #endif
 
 static void initData(ModifierData *md)
 {
   BooleanModifierData *bmd = (BooleanModifierData *)md;
 
-  bmd->double_threshold = 1e-6f;
-  bmd->operation = eBooleanModifierOp_Difference;
-  bmd->solver = eBooleanModifierSolver_Exact;
-  bmd->flag = eBooleanModifierFlag_Object;
+  BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(bmd, modifier));
+
+  MEMCPY_STRUCT_AFTER(bmd, DNA_struct_default_get(BooleanModifierData), modifier);
 }
 
 static bool isDisabled(const struct Scene *UNUSED(scene),
@@ -96,16 +102,10 @@ static bool isDisabled(const struct Scene *UNUSED(scene),
     return !bmd->object || bmd->object->type != OB_MESH;
   }
   if (bmd->flag & eBooleanModifierFlag_Collection) {
-    return !col;
+    /* The Exact solver tolerates an empty collection. */
+    return !col && bmd->solver != eBooleanModifierSolver_Exact;
   }
   return false;
-}
-
-static void foreachObjectLink(ModifierData *md, Object *ob, ObjectWalkFunc walk, void *userData)
-{
-  BooleanModifierData *bmd = (BooleanModifierData *)md;
-
-  walk(userData, ob, &bmd->object, IDWALK_CB_NOP);
 }
 
 static void foreachIDLink(ModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
@@ -113,9 +113,7 @@ static void foreachIDLink(ModifierData *md, Object *ob, IDWalkFunc walk, void *u
   BooleanModifierData *bmd = (BooleanModifierData *)md;
 
   walk(userData, ob, (ID **)&bmd->collection, IDWALK_CB_NOP);
-
-  /* Needed for the object operand to work. */
-  foreachObjectLink(md, ob, (ObjectWalkFunc)walk, userData);
+  walk(userData, ob, (ID **)&bmd->object, IDWALK_CB_NOP);
 }
 
 static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
@@ -157,7 +155,7 @@ static Mesh *get_quick_mesh(
           result = mesh_self;
         }
         else {
-          BKE_id_copy_ex(NULL, &mesh_operand_ob->id, (ID **)&result, LIB_ID_COPY_LOCALIZE);
+          result = (Mesh *)BKE_id_copy_ex(NULL, &mesh_operand_ob->id, NULL, LIB_ID_COPY_LOCALIZE);
 
           float imat[4][4];
           float omat[4][4];
@@ -197,7 +195,7 @@ static int bm_face_isect_pair(BMFace *f, void *UNUSED(user_data))
   return BM_elem_flag_test(f, BM_FACE_TAG) ? 1 : 0;
 }
 
-static bool BMD_error_messages(ModifierData *md, Collection *col)
+static bool BMD_error_messages(const Object *ob, ModifierData *md, Collection *col)
 {
   BooleanModifierData *bmd = (BooleanModifierData *)md;
 
@@ -210,21 +208,21 @@ static bool BMD_error_messages(ModifierData *md, Collection *col)
 #ifndef WITH_GMP
   /* If compiled without GMP, return a error. */
   if (use_exact) {
-    BKE_modifier_set_error(md, "Compiled without GMP, using fast solver");
+    BKE_modifier_set_error(ob, md, "Compiled without GMP, using fast solver");
     error_returns_result = false;
   }
 #endif
 
   /* If intersect is selected using fast solver, return a error. */
   if (operand_collection && operation_intersect && !use_exact) {
-    BKE_modifier_set_error(md, "Cannot execute, intersect only available using exact solver");
+    BKE_modifier_set_error(ob, md, "Cannot execute, intersect only available using exact solver");
     error_returns_result = true;
   }
 
   /* If the selected collection is empty and using fast solver, return a error. */
   if (operand_collection) {
     if (!use_exact && BKE_collection_is_empty(col)) {
-      BKE_modifier_set_error(md, "Cannot execute, fast solver and empty collection");
+      BKE_modifier_set_error(ob, md, "Cannot execute, fast solver and empty collection");
       error_returns_result = true;
     }
 
@@ -233,7 +231,7 @@ static bool BMD_error_messages(ModifierData *md, Collection *col)
       FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (col, operand_ob) {
         if (operand_ob->type != OB_MESH) {
           BKE_modifier_set_error(
-              md, "Cannot execute, the selected collection contains non mesh objects");
+              ob, md, "Cannot execute, the selected collection contains non mesh objects");
           error_returns_result = true;
         }
       }
@@ -282,6 +280,27 @@ static BMesh *BMD_mesh_bm_create(
   return bm;
 }
 
+/* Snap entries that are near 0 or 1 or -1 to those values. */
+static void clean_obmat(float cleaned[4][4], const float mat[4][4])
+{
+  const float fuzz = 1e-6f;
+  for (int i = 0; i < 4; i++) {
+    for (int j = 0; j < 4; j++) {
+      float f = mat[i][j];
+      if (fabsf(f) <= fuzz) {
+        f = 0.0f;
+      }
+      else if (fabsf(f - 1.0f) <= fuzz) {
+        f = 1.0f;
+      }
+      else if (fabsf(f + 1.0f) <= fuzz) {
+        f = -1.0f;
+      }
+      cleaned[i][j] = f;
+    }
+  }
+}
+
 static void BMD_mesh_intersection(BMesh *bm,
                                   ModifierData *md,
                                   const ModifierEvalContext *ctx,
@@ -298,6 +317,14 @@ static void BMD_mesh_intersection(BMesh *bm,
   int tottri;
   BMLoop *(*looptris)[3];
 
+#ifdef WITH_GMP
+  const bool use_exact = bmd->solver == eBooleanModifierSolver_Exact;
+  const bool use_self = (bmd->flag & eBooleanModifierFlag_Self) != 0;
+#else
+  const bool use_exact = false;
+  const bool use_self = false;
+#endif
+
   looptris = MEM_malloc_arrayN(looptris_tot, sizeof(*looptris), __func__);
 
   BM_mesh_calc_tessellation_beauty(bm, looptris, &tottri);
@@ -313,8 +340,22 @@ static void BMD_mesh_intersection(BMesh *bm,
     float imat[4][4];
     float omat[4][4];
 
-    invert_m4_m4(imat, object->obmat);
-    mul_m4_m4m4(omat, imat, operand_ob->obmat);
+    if (use_exact) {
+      /* The user-expected coplanar faces will actually be coplanar more
+       * often if use an object matrix that doesn't multiply by values
+       * other than 0, -1, or 1 in the scaling part of the matrix.
+       */
+      float cleaned_object_obmat[4][4];
+      float cleaned_operand_obmat[4][4];
+      clean_obmat(cleaned_object_obmat, object->obmat);
+      invert_m4_m4(imat, cleaned_object_obmat);
+      clean_obmat(cleaned_operand_obmat, operand_ob->obmat);
+      mul_m4_m4m4(omat, imat, cleaned_operand_obmat);
+    }
+    else {
+      invert_m4_m4(imat, object->obmat);
+      mul_m4_m4m4(omat, imat, operand_ob->obmat);
+    }
 
     BMVert *eve;
     i = 0;
@@ -379,16 +420,9 @@ static void BMD_mesh_intersection(BMesh *bm,
     use_island_connect = (bmd->bm_flag & eBooleanModifierBMeshFlag_BMesh_NoConnectRegions) == 0;
   }
 
-#ifdef WITH_GMP
-  const bool use_exact = bmd->solver == eBooleanModifierSolver_Exact;
-  const bool use_self = (bmd->flag & eBooleanModifierFlag_Self) != 0;
-#else
-  const bool use_exact = false;
-  const bool use_self = false;
-#endif
-
   if (use_exact) {
-    BM_mesh_boolean(bm, looptris, tottri, bm_face_isect_pair, NULL, 2, use_self, bmd->operation);
+    BM_mesh_boolean(
+        bm, looptris, tottri, bm_face_isect_pair, NULL, 2, use_self, false, bmd->operation);
   }
   else {
     BM_mesh_intersect(bm,
@@ -435,22 +469,25 @@ static Mesh *collection_boolean_exact(BooleanModifierData *bmd,
   BLI_array_append(meshes, mesh);
   BLI_array_append(objects, ctx->object);
   Mesh *col_mesh;
-  FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (col, ob) {
-    if (ob->type == OB_MESH && ob != ctx->object) {
-      col_mesh = BKE_modifier_get_evaluated_mesh_from_evaluated_object(ob, false);
-      /* XXX This is utterly non-optimal, we may go from a bmesh to a mesh back to a bmesh!
-       * But for 2.90 better not try to be smart here. */
-      BKE_mesh_wrapper_ensure_mdata(col_mesh);
-      BLI_array_append(meshes, col_mesh);
-      BLI_array_append(objects, ob);
-      bat.totvert += col_mesh->totvert;
-      bat.totedge += col_mesh->totedge;
-      bat.totloop += col_mesh->totloop;
-      bat.totface += col_mesh->totpoly;
-      ++num_shapes;
+  /* Allow col to be empty: then target mesh will just remove self-intersections. */
+  if (col) {
+    FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (col, ob) {
+      if (ob->type == OB_MESH && ob != ctx->object) {
+        col_mesh = BKE_modifier_get_evaluated_mesh_from_evaluated_object(ob, false);
+        /* XXX This is utterly non-optimal, we may go from a bmesh to a mesh back to a bmesh!
+         * But for 2.90 better not try to be smart here. */
+        BKE_mesh_wrapper_ensure_mdata(col_mesh);
+        BLI_array_append(meshes, col_mesh);
+        BLI_array_append(objects, ob);
+        bat.totvert += col_mesh->totvert;
+        bat.totedge += col_mesh->totedge;
+        bat.totloop += col_mesh->totloop;
+        bat.totface += col_mesh->totpoly;
+        ++num_shapes;
+      }
     }
+    FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
   }
-  FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
   int *shape_face_end = MEM_mallocN(num_shapes * sizeof(int), __func__);
   int *shape_vert_end = MEM_mallocN(num_shapes * sizeof(int), __func__);
   bool is_neg_mat0 = is_negative_m4(ctx->object->obmat);
@@ -497,7 +534,9 @@ static Mesh *collection_boolean_exact(BooleanModifierData *bmd,
    * The Exact solver doesn't need normals on the input faces. */
   float imat[4][4];
   float omat[4][4];
-  invert_m4_m4(imat, ctx->object->obmat);
+  float cleaned_object_obmat[4][4];
+  clean_obmat(cleaned_object_obmat, ctx->object->obmat);
+  invert_m4_m4(imat, cleaned_object_obmat);
   int curshape = 0;
   int curshape_vert_end = shape_vert_end[0];
   BMVert *eve;
@@ -507,7 +546,8 @@ static Mesh *collection_boolean_exact(BooleanModifierData *bmd,
     if (i == curshape_vert_end) {
       curshape++;
       curshape_vert_end = shape_vert_end[curshape];
-      mul_m4_m4m4(omat, imat, objects[curshape]->obmat);
+      clean_obmat(cleaned_object_obmat, objects[curshape]->obmat);
+      mul_m4_m4m4(omat, imat, cleaned_object_obmat);
     }
     if (curshape > 0) {
       mul_m4_v3(omat, eve->co);
@@ -548,7 +588,7 @@ static Mesh *collection_boolean_exact(BooleanModifierData *bmd,
 
   BM_mesh_elem_index_ensure(bm, BM_FACE);
   BM_mesh_boolean(
-      bm, looptris, tottri, bm_face_isect_nary, shape, num_shapes, true, bmd->operation);
+      bm, looptris, tottri, bm_face_isect_nary, shape, num_shapes, true, false, bmd->operation);
 
   result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
   BM_mesh_free(bm);
@@ -566,6 +606,68 @@ static Mesh *collection_boolean_exact(BooleanModifierData *bmd,
   return result;
 }
 
+#ifdef WITH_GMP
+/* New method: bypass trip through BMesh. */
+static Mesh *exact_boolean_mesh(BooleanModifierData *bmd,
+                                const ModifierEvalContext *ctx,
+                                Mesh *mesh)
+{
+  Mesh *result;
+  Mesh *mesh_operand;
+  Mesh **meshes = NULL;
+  const float(**obmats)[4][4] = NULL;
+  BLI_array_declare(meshes);
+  BLI_array_declare(obmats);
+
+#  ifdef DEBUG_TIME
+  TIMEIT_START(boolean_bmesh);
+#  endif
+
+  BLI_array_append(meshes, mesh);
+  BLI_array_append(obmats, &ctx->object->obmat);
+  if (bmd->flag & eBooleanModifierFlag_Object) {
+    if (bmd->object == NULL) {
+      return mesh;
+    }
+    mesh_operand = BKE_modifier_get_evaluated_mesh_from_evaluated_object(bmd->object, false);
+    BKE_mesh_wrapper_ensure_mdata(mesh_operand);
+    BLI_array_append(meshes, mesh_operand);
+    BLI_array_append(obmats, &bmd->object->obmat);
+  }
+  else if (bmd->flag & eBooleanModifierFlag_Collection) {
+    Collection *collection = bmd->collection;
+    /* Allow collection to be empty: then target mesh will just removed self-intersections. */
+    if (collection) {
+      FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (collection, ob) {
+        if (ob->type == OB_MESH && ob != ctx->object) {
+          Mesh *collection_mesh = BKE_modifier_get_evaluated_mesh_from_evaluated_object(ob, false);
+          BKE_mesh_wrapper_ensure_mdata(collection_mesh);
+          BLI_array_append(meshes, collection_mesh);
+          BLI_array_append(obmats, &ob->obmat);
+        }
+      }
+      FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
+    }
+  }
+
+  const bool use_self = (bmd->flag & eBooleanModifierFlag_Self) != 0;
+  result = BKE_mesh_boolean((const Mesh **)meshes,
+                            (const float(**)[4][4])obmats,
+                            BLI_array_len(meshes),
+                            use_self,
+                            bmd->operation);
+
+  BLI_array_free(meshes);
+  BLI_array_free(obmats);
+
+#  ifdef DEBUG_TIME
+  TIMEIT_END(boolean_bmesh);
+#  endif
+
+  return result;
+}
+#endif
+
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
 {
   BooleanModifierData *bmd = (BooleanModifierData *)md;
@@ -573,12 +675,15 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   Mesh *result = mesh;
   Mesh *mesh_operand_ob;
   BMesh *bm;
-  Collection *col = bmd->collection;
+  Collection *collection = bmd->collection;
 
   bool is_flip = false;
   const bool confirm_return = true;
 #ifdef WITH_GMP
   const bool use_exact = bmd->solver == eBooleanModifierSolver_Exact;
+  if (use_exact && bypass_bmesh) {
+    return exact_boolean_mesh(bmd, ctx, mesh);
+  }
 #else
   const bool use_exact = false;
 #endif
@@ -592,11 +697,19 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
       return result;
     }
 
-    BMD_error_messages(md, NULL);
+    BMD_error_messages(ctx->object, md, NULL);
 
     Object *operand_ob = bmd->object;
 
+#ifdef DEBUG_TIME
+    TIMEIT_BLOCK_INIT(operand_get_evaluated_mesh);
+    TIMEIT_BLOCK_START(operand_get_evaluated_mesh);
+#endif
     mesh_operand_ob = BKE_modifier_get_evaluated_mesh_from_evaluated_object(operand_ob, false);
+#ifdef DEBUG_TIME
+    TIMEIT_BLOCK_END(operand_get_evaluated_mesh);
+    TIMEIT_BLOCK_STATS(operand_get_evaluated_mesh);
+#endif
 
     if (mesh_operand_ob) {
       /* XXX This is utterly non-optimal, we may go from a bmesh to a mesh back to a bmesh!
@@ -608,11 +721,35 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
       result = get_quick_mesh(object, mesh, operand_ob, mesh_operand_ob, bmd->operation);
 
       if (result == NULL) {
+#ifdef DEBUG_TIME
+        TIMEIT_BLOCK_INIT(object_BMD_mesh_bm_create);
+        TIMEIT_BLOCK_START(object_BMD_mesh_bm_create);
+#endif
         bm = BMD_mesh_bm_create(mesh, object, mesh_operand_ob, operand_ob, &is_flip);
+#ifdef DEBUG_TIME
+        TIMEIT_BLOCK_END(object_BMD_mesh_bm_create);
+        TIMEIT_BLOCK_STATS(object_BMD_mesh_bm_create);
+#endif
 
+#ifdef DEBUG_TIME
+        TIMEIT_BLOCK_INIT(BMD_mesh_intersection);
+        TIMEIT_BLOCK_START(BMD_mesh_intersection);
+#endif
         BMD_mesh_intersection(bm, md, ctx, mesh_operand_ob, object, operand_ob, is_flip);
+#ifdef DEBUG_TIME
+        TIMEIT_BLOCK_END(BMD_mesh_intersection);
+        TIMEIT_BLOCK_STATS(BMD_mesh_intersection);
+#endif
 
+#ifdef DEBUG_TIME
+        TIMEIT_BLOCK_INIT(BKE_mesh_from_bmesh_for_eval_nomain);
+        TIMEIT_BLOCK_START(BKE_mesh_from_bmesh_for_eval_nomain);
+#endif
         result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
+#ifdef DEBUG_TIME
+        TIMEIT_BLOCK_END(BKE_mesh_from_bmesh_for_eval_nomain);
+        TIMEIT_BLOCK_STATS(BKE_mesh_from_bmesh_for_eval_nomain);
+#endif
         BM_mesh_free(bm);
         result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
       }
@@ -620,18 +757,18 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
       /* if new mesh returned, return it; otherwise there was
        * an error, so delete the modifier object */
       if (result == NULL) {
-        BKE_modifier_set_error(md, "Cannot execute boolean operation");
+        BKE_modifier_set_error(object, md, "Cannot execute boolean operation");
       }
     }
   }
 
   else {
-    if (col == NULL && !use_exact) {
+    if (collection == NULL && !use_exact) {
       return result;
     }
 
     /* Return result for certain errors. */
-    if (BMD_error_messages(md, col) == confirm_return) {
+    if (BMD_error_messages(ctx->object, md, collection) == confirm_return) {
       return result;
     }
 
@@ -639,7 +776,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
       result = collection_boolean_exact(bmd, ctx, mesh);
     }
     else {
-      FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (col, operand_ob) {
+      FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (collection, operand_ob) {
         if (operand_ob->type == OB_MESH && operand_ob != ctx->object) {
 
           mesh_operand_ob = BKE_modifier_get_evaluated_mesh_from_evaluated_object(operand_ob,
@@ -649,33 +786,22 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
             /* XXX This is utterly non-optimal, we may go from a bmesh to a mesh back to a bmesh!
              * But for 2.90 better not try to be smart here. */
             BKE_mesh_wrapper_ensure_mdata(mesh_operand_ob);
-            /* when one of objects is empty (has got no faces) we could speed up
-             * calculation a bit returning one of objects' derived meshes (or empty one)
-             * Returning mesh is depended on modifiers operation (sergey) */
-            result = get_quick_mesh(object, mesh, operand_ob, mesh_operand_ob, bmd->operation);
 
-            if (result == NULL) {
-              bm = BMD_mesh_bm_create(mesh, object, mesh_operand_ob, operand_ob, &is_flip);
+            bm = BMD_mesh_bm_create(mesh, object, mesh_operand_ob, operand_ob, &is_flip);
 
-              BMD_mesh_intersection(bm, md, ctx, mesh_operand_ob, object, operand_ob, is_flip);
+            BMD_mesh_intersection(bm, md, ctx, mesh_operand_ob, object, operand_ob, is_flip);
 
-              /* Needed for multiple objects to work. */
-              BM_mesh_bm_to_me(NULL,
-                               bm,
-                               mesh,
-                               (&(struct BMeshToMeshParams){
-                                   .calc_object_remap = false,
-                               }));
+            /* Needed for multiple objects to work. */
+            BM_mesh_bm_to_me(NULL,
+                             bm,
+                             mesh,
+                             (&(struct BMeshToMeshParams){
+                                 .calc_object_remap = false,
+                             }));
 
-              result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
-              BM_mesh_free(bm);
-              result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
-            }
-            /* if new mesh returned, return it; otherwise there was
-             * an error, so delete the modifier object */
-            if (result == NULL) {
-              BKE_modifier_set_error(md, "Cannot execute boolean operation");
-            }
+            result = BKE_mesh_from_bmesh_for_eval_nomain(bm, NULL, mesh);
+            BM_mesh_free(bm);
+            result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
           }
         }
       }
@@ -751,8 +877,10 @@ ModifierTypeInfo modifierType_Boolean = {
     /* name */ "Boolean",
     /* structName */ "BooleanModifierData",
     /* structSize */ sizeof(BooleanModifierData),
+    /* srna */ &RNA_BooleanModifier,
     /* type */ eModifierTypeType_Nonconstructive,
     /* flags */ eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsEditmode,
+    /* icon */ ICON_MOD_BOOLEAN,
 
     /* copyData */ BKE_modifier_copydata_generic,
 
@@ -762,7 +890,7 @@ ModifierTypeInfo modifierType_Boolean = {
     /* deformMatricesEM */ NULL,
     /* modifyMesh */ modifyMesh,
     /* modifyHair */ NULL,
-    /* modifyPointCloud */ NULL,
+    /* modifyGeometrySet */ NULL,
     /* modifyVolume */ NULL,
 
     /* initData */ initData,
@@ -772,7 +900,6 @@ ModifierTypeInfo modifierType_Boolean = {
     /* updateDepsgraph */ updateDepsgraph,
     /* dependsOnTime */ NULL,
     /* dependsOnNormals */ NULL,
-    /* foreachObjectLink */ foreachObjectLink,
     /* foreachIDLink */ foreachIDLink,
     /* foreachTexLink */ NULL,
     /* freeRuntimeData */ NULL,

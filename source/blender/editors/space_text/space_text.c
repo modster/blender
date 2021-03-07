@@ -33,7 +33,6 @@
 #include "BKE_global.h"
 #include "BKE_lib_id.h"
 #include "BKE_screen.h"
-#include "BKE_text.h"
 
 #include "ED_screen.h"
 #include "ED_space_api.h"
@@ -47,7 +46,6 @@
 
 #include "RNA_access.h"
 
-#include "GPU_framebuffer.h"
 #include "text_format.h"
 #include "text_intern.h" /* own include */
 
@@ -117,16 +115,15 @@ static SpaceLink *text_duplicate(SpaceLink *sl)
 
   /* clear or remove stuff from old */
 
-  stextn->runtime.drawcache = NULL; /* space need it's own cache */
+  stextn->runtime.drawcache = NULL; /* space need its own cache */
 
   return (SpaceLink *)stextn;
 }
 
-static void text_listener(wmWindow *UNUSED(win),
-                          ScrArea *area,
-                          wmNotifier *wmn,
-                          Scene *UNUSED(scene))
+static void text_listener(const wmSpaceTypeListenerParams *params)
 {
+  ScrArea *area = params->area;
+  wmNotifier *wmn = params->notifier;
   SpaceText *st = area->spacedata.first;
 
   /* context changes */
@@ -248,22 +245,24 @@ static void text_keymap(struct wmKeyConfig *keyconf)
 
 const char *text_context_dir[] = {"edit_text", NULL};
 
-static int text_context(const bContext *C, const char *member, bContextDataResult *result)
+static int /*eContextResult*/ text_context(const bContext *C,
+                                           const char *member,
+                                           bContextDataResult *result)
 {
   SpaceText *st = CTX_wm_space_text(C);
 
   if (CTX_data_dir(member)) {
     CTX_data_dir_set(result, text_context_dir);
-    return 1;
+    return CTX_RESULT_OK;
   }
   if (CTX_data_equals(member, "edit_text")) {
     if (st->text != NULL) {
       CTX_data_id_pointer_set(result, &st->text->id);
     }
-    return 1;
+    return CTX_RESULT_OK;
   }
 
-  return 0;
+  return CTX_RESULT_MEMBER_NOT_FOUND;
 }
 
 /********************* main region ********************/
@@ -355,7 +354,7 @@ static bool text_drop_paste_poll(bContext *UNUSED(C),
 static void text_drop_paste(wmDrag *drag, wmDropBox *drop)
 {
   char *text;
-  ID *id = WM_drag_ID(drag, 0);
+  ID *id = WM_drag_get_local_ID(drag, 0);
 
   /* copy drag path to properties */
   text = RNA_path_full_ID_py(G_MAIN, id);
@@ -368,8 +367,8 @@ static void text_dropboxes(void)
 {
   ListBase *lb = WM_dropboxmap_find("Text", SPACE_TEXT, RGN_TYPE_WINDOW);
 
-  WM_dropbox_add(lb, "TEXT_OT_open", text_drop_poll, text_drop_copy);
-  WM_dropbox_add(lb, "TEXT_OT_insert", text_drop_paste_poll, text_drop_paste);
+  WM_dropbox_add(lb, "TEXT_OT_open", text_drop_poll, text_drop_copy, NULL);
+  WM_dropbox_add(lb, "TEXT_OT_insert", text_drop_paste_poll, text_drop_paste, NULL);
 }
 
 /* ************* end drop *********** */

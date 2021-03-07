@@ -26,7 +26,7 @@
 /* Maybe gpu_texture.c is a better place for this. */
 static bool drw_texture_format_supports_framebuffer(eGPUTextureFormat format)
 {
-  /* Some formats do not work with framebuffers. */
+  /* Some formats do not work with frame-buffers. */
   switch (format) {
     /* Only add formats that are COMPATIBLE with FB.
      * Generally they are multiple of 16bit. */
@@ -43,6 +43,7 @@ static bool drw_texture_format_supports_framebuffer(eGPUTextureFormat format)
     case GPU_RG16F:
     case GPU_RG16I:
     case GPU_RG32F:
+    case GPU_RGB10_A2:
     case GPU_R11F_G11F_B10F:
     case GPU_RGBA8:
     case GPU_RGBA16:
@@ -72,6 +73,7 @@ void drw_texture_set_parameters(GPUTexture *tex, DRWTextureFlag flags)
   else {
     GPU_texture_filter_mode(tex, flags & DRW_TEX_FILTER);
   }
+  GPU_texture_anisotropic_filter(tex, false);
   GPU_texture_wrap_mode(tex, flags & DRW_TEX_WRAP, true);
   GPU_texture_compare_mode(tex, flags & DRW_TEX_COMPARE);
 }

@@ -51,6 +51,7 @@
 extern "C" {
 #endif
 
+struct BlendWriter;
 struct GHash;
 struct ID;
 struct Library;
@@ -59,8 +60,6 @@ struct Main;
 struct PointerRNA;
 struct PropertyRNA;
 struct bContext;
-struct BlendWriter;
-struct BlendDataReader;
 
 size_t BKE_libblock_get_alloc_info(short type, const char **name);
 void *BKE_libblock_alloc_notest(short type) ATTR_WARN_UNUSED_RESULT;
@@ -99,6 +98,12 @@ enum {
   /** Do not tag new ID for update in depsgraph. */
   LIB_ID_CREATE_NO_DEG_TAG = 1 << 8,
 
+  /** Very similar to #LIB_ID_CREATE_NO_MAIN, and should never be used with it (typically combined
+   * with #LIB_ID_CREATE_LOCALIZE or #LIB_ID_COPY_LOCALIZE in fact).
+   * It ensures that IDs created with it will get the #LIB_TAG_LOCALIZED tag, and uses some
+   * specific code in some copy cases (mostly for node trees). */
+  LIB_ID_CREATE_LOCAL = 1 << 9,
+
   /* *** Specific options to some ID types or usages. *** */
   /* *** May be ignored by unrelated ID copying functions. *** */
   /** Object only, needed by make_local code. */
@@ -120,13 +125,18 @@ enum {
   LIB_ID_COPY_KEEP_LIB = 1 << 25,
   /** EXCEPTION! Deep-copy shapekeys used by copied obdata ID. */
   LIB_ID_COPY_SHAPEKEY = 1 << 26,
+  /** EXCEPTION! Specific deep-copy of node trees used e.g. for rendering purposes. */
+  LIB_ID_COPY_NODETREE_LOCALIZE = 1 << 27,
 
   /* *** Helper 'defines' gathering most common flag sets. *** */
   /** Shapekeys are not real ID's, more like local data to geometry IDs... */
   LIB_ID_COPY_DEFAULT = LIB_ID_COPY_SHAPEKEY,
+
+  /** Create a local, outside of bmain, data-block to work on. */
+  LIB_ID_CREATE_LOCALIZE = LIB_ID_CREATE_NO_MAIN | LIB_ID_CREATE_NO_USER_REFCOUNT |
+                           LIB_ID_CREATE_NO_DEG_TAG,
   /** Generate a local copy, outside of bmain, to work on (used by COW e.g.). */
-  LIB_ID_COPY_LOCALIZE = LIB_ID_CREATE_NO_MAIN | LIB_ID_CREATE_NO_USER_REFCOUNT |
-                         LIB_ID_CREATE_NO_DEG_TAG | LIB_ID_COPY_NO_PREVIEW | LIB_ID_COPY_CACHES,
+  LIB_ID_COPY_LOCALIZE = LIB_ID_CREATE_LOCALIZE | LIB_ID_COPY_NO_PREVIEW | LIB_ID_COPY_CACHES,
 };
 
 void BKE_libblock_copy_ex(struct Main *bmain,
@@ -190,7 +200,7 @@ void BKE_id_free(struct Main *bmain, void *idv);
 void BKE_id_free_us(struct Main *bmain, void *idv) ATTR_NONNULL();
 
 void BKE_id_delete(struct Main *bmain, void *idv) ATTR_NONNULL();
-void BKE_id_multi_tagged_delete(struct Main *bmain) ATTR_NONNULL();
+size_t BKE_id_multi_tagged_delete(struct Main *bmain) ATTR_NONNULL();
 
 void BKE_libblock_management_main_add(struct Main *bmain, void *idv);
 void BKE_libblock_management_main_remove(struct Main *bmain, void *idv);
@@ -209,7 +219,7 @@ void id_fake_user_set(struct ID *id);
 void id_fake_user_clear(struct ID *id);
 void BKE_id_clear_newpoin(struct ID *id);
 
-/** Flags to control make local code behaviour. */
+/** Flags to control make local code behavior. */
 enum {
   /** Making that ID local is part of making local a whole library. */
   LIB_ID_MAKELOCAL_FULL_LIBRARY = 1 << 0,
@@ -226,8 +236,11 @@ bool id_single_user(struct bContext *C,
                     struct PointerRNA *ptr,
                     struct PropertyRNA *prop);
 bool BKE_id_copy_is_allowed(const struct ID *id);
-bool BKE_id_copy(struct Main *bmain, const struct ID *id, struct ID **newid);
-bool BKE_id_copy_ex(struct Main *bmain, const struct ID *id, struct ID **r_newid, const int flag);
+struct ID *BKE_id_copy(struct Main *bmain, const struct ID *id);
+struct ID *BKE_id_copy_ex(struct Main *bmain,
+                          const struct ID *id,
+                          struct ID **r_newid,
+                          const int flag);
 struct ID *BKE_id_copy_for_duplicate(struct Main *bmain,
                                      struct ID *id,
                                      const uint duplicate_flags);
@@ -283,6 +296,8 @@ void BKE_id_tag_set_atomic(struct ID *id, int tag);
 void BKE_id_tag_clear_atomic(struct ID *id, int tag);
 
 bool BKE_id_is_in_global_main(struct ID *id);
+
+bool BKE_id_can_be_asset(const struct ID *id);
 
 void BKE_id_ordered_list(struct ListBase *ordered_lb, const struct ListBase *lb);
 void BKE_id_reorder(const struct ListBase *lb, struct ID *id, struct ID *relative, bool after);

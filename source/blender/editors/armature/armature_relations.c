@@ -685,7 +685,7 @@ static int separate_armature_exec(bContext *C, wmOperator *op)
     separate_armature_bones(bmain, ob_old, true);
     separate_armature_bones(bmain, ob_new, false);
 
-    /* 4) fix links before depsgraph flushes */  // err... or after?
+    /* 4) fix links before depsgraph flushes, err... or after? */
     separated_armature_fix_links(bmain, ob_old, ob_new);
 
     DEG_id_tag_update(&ob_old->id, ID_RECALC_GEOMETRY); /* this is the original one */
@@ -948,7 +948,7 @@ void ARMATURE_OT_parent_set(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
   RNA_def_enum(
-      ot->srna, "type", prop_editarm_make_parent_types, 0, "ParentType", "Type of parenting");
+      ot->srna, "type", prop_editarm_make_parent_types, 0, "Parent Type", "Type of parenting");
 }
 
 static const EnumPropertyItem prop_editarm_clear_parent_types[] = {
@@ -1029,7 +1029,7 @@ void ARMATURE_OT_parent_clear(wmOperatorType *ot)
                           "type",
                           prop_editarm_clear_parent_types,
                           0,
-                          "ClearType",
+                          "Clear Type",
                           "What way to clear parenting");
 }
 

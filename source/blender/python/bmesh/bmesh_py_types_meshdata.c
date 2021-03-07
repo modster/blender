@@ -120,7 +120,7 @@ static void bm_init_types_bmloopuv(void)
 
   BPy_BMLoopUV_Type.tp_name = "BMLoopUV";
 
-  BPy_BMLoopUV_Type.tp_doc = NULL;  // todo
+  BPy_BMLoopUV_Type.tp_doc = NULL; /* todo */
 
   BPy_BMLoopUV_Type.tp_getset = bpy_bmloopuv_getseters;
 
@@ -233,7 +233,7 @@ static void bm_init_types_bmvertskin(void)
 
   BPy_BMVertSkin_Type.tp_name = "BMVertSkin";
 
-  BPy_BMVertSkin_Type.tp_doc = NULL;  // todo
+  BPy_BMVertSkin_Type.tp_doc = NULL; /* todo */
 
   BPy_BMVertSkin_Type.tp_getset = bpy_bmvertskin_getseters;
 
@@ -272,12 +272,12 @@ PyObject *BPy_BMVertSkin_CreatePyObject(struct MVertSkin *mvertskin)
 #define MLOOPCOL_FROM_CAPSULE(color_capsule) \
   ((MLoopCol *)PyCapsule_GetPointer(color_capsule, NULL))
 
-static void mloopcol_to_float(const MLoopCol *mloopcol, float r_col[3])
+static void mloopcol_to_float(const MLoopCol *mloopcol, float r_col[4])
 {
   rgba_uchar_to_float(r_col, (const uchar *)&mloopcol->r);
 }
 
-static void mloopcol_from_float(MLoopCol *mloopcol, const float col[3])
+static void mloopcol_from_float(MLoopCol *mloopcol, const float col[4])
 {
   rgba_float_to_uchar((uchar *)&mloopcol->r, col);
 }
@@ -645,7 +645,7 @@ static void bm_init_types_bmdvert(void)
 
   BPy_BMDeformVert_Type.tp_name = "BMDeformVert";
 
-  BPy_BMDeformVert_Type.tp_doc = NULL;  // todo
+  BPy_BMDeformVert_Type.tp_doc = NULL; /* todo */
 
   BPy_BMDeformVert_Type.tp_as_sequence = &bpy_bmdeformvert_as_sequence;
   BPy_BMDeformVert_Type.tp_as_mapping = &bpy_bmdeformvert_as_mapping;

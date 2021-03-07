@@ -38,6 +38,8 @@
 /* Allow using deprecated functionality for .blend file I/O. */
 #define DNA_DEPRECATED_ALLOW
 
+#include "DNA_defaults.h"
+
 #include "DNA_constraint_types.h"
 #include "DNA_gpencil_types.h"
 #include "DNA_movieclip_types.h"
@@ -85,6 +87,17 @@
 #endif
 
 static void free_buffers(MovieClip *clip);
+
+static void movie_clip_init_data(ID *id)
+{
+  MovieClip *movie_clip = (MovieClip *)id;
+  BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(movie_clip, id));
+
+  MEMCPY_STRUCT_AFTER(movie_clip, DNA_struct_default_get(MovieClip), id);
+
+  BKE_tracking_settings_init(&movie_clip->tracking);
+  BKE_color_managed_colorspace_settings_init(&movie_clip->colorspace_settings);
+}
 
 static void movie_clip_copy_data(Main *UNUSED(bmain), ID *id_dst, const ID *id_src, const int flag)
 {
@@ -261,6 +274,7 @@ static void movieclip_blend_read_data(BlendDataReader *reader, ID *id)
   MovieTracking *tracking = &clip->tracking;
 
   BLO_read_data_address(reader, &clip->adt);
+  BKE_animdata_blend_read_data(reader, clip->adt);
 
   direct_link_movieTracks(reader, &tracking->tracks);
   direct_link_moviePlaneTracks(reader, &tracking->plane_tracks);
@@ -335,17 +349,22 @@ IDTypeInfo IDType_ID_MC = {
     .translation_context = BLT_I18NCONTEXT_ID_MOVIECLIP,
     .flags = 0,
 
-    .init_data = NULL,
+    .init_data = movie_clip_init_data,
     .copy_data = movie_clip_copy_data,
     .free_data = movie_clip_free_data,
     .make_local = NULL,
     .foreach_id = movie_clip_foreach_id,
     .foreach_cache = movie_clip_foreach_cache,
+    .owner_get = NULL,
 
     .blend_write = movieclip_blend_write,
     .blend_read_data = movieclip_blend_read_data,
     .blend_read_lib = movieclip_blend_read_lib,
     .blend_read_expand = NULL,
+
+    .blend_read_undo_preserve = NULL,
+
+    .lib_override_apply_post = NULL,
 };
 
 /*********************** movieclip buffer loaders *************************/
@@ -506,7 +525,7 @@ static void movieclip_convert_multilayer_add_pass(void *UNUSED(layer),
     MEM_freeN(rect);
     return;
   }
-  if (STREQ(pass_name, RE_PASSNAME_COMBINED) || STREQ(chan_id, "RGBA") || STREQ(chan_id, "RGB")) {
+  if (STREQ(pass_name, RE_PASSNAME_COMBINED) || STR_ELEM(chan_id, "RGBA", "RGB")) {
     ctx->combined_pass = rect;
     ctx->num_combined_channels = num_channels;
   }
@@ -687,6 +706,8 @@ typedef struct MovieClipCache {
     float polynomial_k[3];
     float division_k[2];
     float nuke_k[2];
+    float brown_k[4];
+    float brown_p[2];
     short distortion_model;
     bool undistortion_used;
 
@@ -919,20 +940,7 @@ static MovieClip *movieclip_alloc(Main *bmain, const char *name)
 {
   MovieClip *clip;
 
-  clip = BKE_libblock_alloc(bmain, ID_MC, name, 0);
-
-  clip->aspx = clip->aspy = 1.0f;
-
-  BKE_tracking_settings_init(&clip->tracking);
-  BKE_color_managed_colorspace_settings_init(&clip->colorspace_settings);
-
-  clip->proxy.build_size_flag = IMB_PROXY_25;
-  clip->proxy.build_tc_flag = IMB_TC_RECORD_RUN | IMB_TC_FREE_RUN |
-                              IMB_TC_INTERPOLATED_REC_DATE_FREE_RUN | IMB_TC_RECORD_RUN_NO_GAPS;
-  clip->proxy.quality = 90;
-
-  clip->start_frame = 1;
-  clip->frame_offset = 0;
+  clip = BKE_id_new(bmain, ID_MC, name);
 
   return clip;
 }
@@ -1134,7 +1142,15 @@ static bool check_undistortion_cache_flags(const MovieClip *clip)
   if (!equals_v2v2(&camera->division_k1, cache->postprocessed.division_k)) {
     return false;
   }
+
   if (!equals_v2v2(&camera->nuke_k1, cache->postprocessed.nuke_k)) {
+    return false;
+  }
+
+  if (!equals_v4v4(&camera->brown_k1, cache->postprocessed.brown_k)) {
+    return false;
+  }
+  if (!equals_v2v2(&camera->brown_p1, cache->postprocessed.brown_p)) {
     return false;
   }
 
@@ -1240,6 +1256,8 @@ static void put_postprocessed_frame_to_cache(
     copy_v3_v3(cache->postprocessed.polynomial_k, &camera->k1);
     copy_v2_v2(cache->postprocessed.division_k, &camera->division_k1);
     copy_v2_v2(cache->postprocessed.nuke_k, &camera->nuke_k1);
+    copy_v4_v4(cache->postprocessed.brown_k, &camera->brown_k1);
+    copy_v2_v2(cache->postprocessed.brown_p, &camera->brown_p1);
     cache->postprocessed.undistortion_used = true;
   }
   else {
@@ -1711,76 +1729,78 @@ void BKE_movieclip_update_scopes(MovieClip *clip, MovieClipUser *user, MovieClip
   scopes->track = NULL;
   scopes->track_locked = true;
 
-  if (clip) {
-    MovieTrackingTrack *act_track = BKE_tracking_track_get_active(&clip->tracking);
+  scopes->scene_framenr = user->framenr;
+  scopes->ok = true;
 
-    if (act_track) {
-      MovieTrackingTrack *track = act_track;
-      int framenr = BKE_movieclip_remap_scene_to_clip_frame(clip, user->framenr);
-      MovieTrackingMarker *marker = BKE_tracking_marker_get(track, framenr);
-
-      scopes->marker = marker;
-      scopes->track = track;
-
-      if (marker->flag & MARKER_DISABLED) {
-        scopes->track_disabled = true;
-      }
-      else {
-        ImBuf *ibuf = BKE_movieclip_get_ibuf(clip, user);
-
-        scopes->track_disabled = false;
-
-        if (ibuf && (ibuf->rect || ibuf->rect_float)) {
-          MovieTrackingMarker undist_marker = *marker;
-
-          if (user->render_flag & MCLIP_PROXY_RENDER_UNDISTORT) {
-            int width, height;
-            float aspy = 1.0f / clip->tracking.camera.pixel_aspect;
-
-            BKE_movieclip_get_size(clip, user, &width, &height);
-
-            undist_marker.pos[0] *= width;
-            undist_marker.pos[1] *= height * aspy;
-
-            BKE_tracking_undistort_v2(
-                &clip->tracking, width, height, undist_marker.pos, undist_marker.pos);
-
-            undist_marker.pos[0] /= width;
-            undist_marker.pos[1] /= height * aspy;
-          }
-
-          scopes->track_search = BKE_tracking_get_search_imbuf(
-              ibuf, track, &undist_marker, true, true);
-
-          scopes->undist_marker = undist_marker;
-
-          scopes->frame_width = ibuf->x;
-          scopes->frame_height = ibuf->y;
-
-          scopes->use_track_mask = (track->flag & TRACK_PREVIEW_ALPHA) != 0;
-        }
-
-        IMB_freeImBuf(ibuf);
-      }
-
-      if ((track->flag & TRACK_LOCKED) == 0) {
-        float pat_min[2], pat_max[2];
-
-        scopes->track_locked = false;
-
-        /* XXX: would work fine with non-transformed patterns, but would likely fail
-         *      with transformed patterns, but that would be easier to debug when
-         *      we'll have real pattern sampling (at least to test) */
-        BKE_tracking_marker_pattern_minmax(marker, pat_min, pat_max);
-
-        scopes->slide_scale[0] = pat_max[0] - pat_min[0];
-        scopes->slide_scale[1] = pat_max[1] - pat_min[1];
-      }
-    }
+  if (clip == NULL) {
+    return;
   }
 
-  scopes->framenr = user->framenr;
-  scopes->ok = true;
+  MovieTrackingTrack *track = BKE_tracking_track_get_active(&clip->tracking);
+  if (track == NULL) {
+    return;
+  }
+
+  const int framenr = BKE_movieclip_remap_scene_to_clip_frame(clip, user->framenr);
+  MovieTrackingMarker *marker = BKE_tracking_marker_get(track, framenr);
+
+  scopes->marker = marker;
+  scopes->track = track;
+
+  if (marker->flag & MARKER_DISABLED) {
+    scopes->track_disabled = true;
+  }
+  else {
+    ImBuf *ibuf = BKE_movieclip_get_ibuf(clip, user);
+
+    scopes->track_disabled = false;
+
+    if (ibuf && (ibuf->rect || ibuf->rect_float)) {
+      MovieTrackingMarker undist_marker = *marker;
+
+      if (user->render_flag & MCLIP_PROXY_RENDER_UNDISTORT) {
+        int width, height;
+        float aspy = 1.0f / clip->tracking.camera.pixel_aspect;
+
+        BKE_movieclip_get_size(clip, user, &width, &height);
+
+        undist_marker.pos[0] *= width;
+        undist_marker.pos[1] *= height * aspy;
+
+        BKE_tracking_undistort_v2(
+            &clip->tracking, width, height, undist_marker.pos, undist_marker.pos);
+
+        undist_marker.pos[0] /= width;
+        undist_marker.pos[1] /= height * aspy;
+      }
+
+      scopes->track_search = BKE_tracking_get_search_imbuf(
+          ibuf, track, &undist_marker, true, true);
+
+      scopes->undist_marker = undist_marker;
+
+      scopes->frame_width = ibuf->x;
+      scopes->frame_height = ibuf->y;
+
+      scopes->use_track_mask = (track->flag & TRACK_PREVIEW_ALPHA) != 0;
+    }
+
+    IMB_freeImBuf(ibuf);
+  }
+
+  if ((track->flag & TRACK_LOCKED) == 0) {
+    float pat_min[2], pat_max[2];
+
+    scopes->track_locked = false;
+
+    /* XXX: would work fine with non-transformed patterns, but would likely fail
+     *      with transformed patterns, but that would be easier to debug when
+     *      we'll have real pattern sampling (at least to test) */
+    BKE_tracking_marker_pattern_minmax(marker, pat_min, pat_max);
+
+    scopes->slide_scale[0] = pat_max[0] - pat_min[0];
+    scopes->slide_scale[1] = pat_max[1] - pat_min[1];
+  }
 }
 
 static void movieclip_build_proxy_ibuf(
@@ -1904,13 +1924,6 @@ void BKE_movieclip_build_proxy_frame_for_ibuf(MovieClip *clip,
       IMB_freeImBuf(tmpibuf);
     }
   }
-}
-
-MovieClip *BKE_movieclip_copy(Main *bmain, const MovieClip *clip)
-{
-  MovieClip *clip_copy;
-  BKE_id_copy(bmain, &clip->id, (ID **)&clip_copy);
-  return clip_copy;
 }
 
 float BKE_movieclip_remap_scene_to_clip_frame(const MovieClip *clip, float framenr)
@@ -2104,7 +2117,8 @@ GPUTexture *BKE_movieclip_get_gpu_texture(MovieClip *clip, MovieClipUser *cuser)
   /* This only means RGBA16F instead of RGBA32F. */
   const bool high_bitdepth = false;
   const bool store_premultiplied = ibuf->rect_float ? false : true;
-  *tex = IMB_create_gpu_texture(clip->id.name + 2, ibuf, high_bitdepth, store_premultiplied);
+  *tex = IMB_create_gpu_texture(
+      clip->id.name + 2, ibuf, high_bitdepth, store_premultiplied, false);
 
   /* Do not generate mips for movieclips... too slow. */
   GPU_texture_mipmap_mode(*tex, false, true);

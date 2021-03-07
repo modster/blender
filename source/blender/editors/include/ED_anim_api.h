@@ -33,7 +33,11 @@ struct ID;
 struct ListBase;
 
 struct ARegion;
+struct ARegionType;
 struct Main;
+struct NlaStrip;
+struct FModifier;
+struct PanelType;
 struct ReportList;
 struct ScrArea;
 struct SpaceLink;
@@ -332,7 +336,7 @@ typedef enum eAnimFilter_Flags {
 } eAnimFilter_Flags;
 
 /* ---------- Flag Checking Macros ------------ */
-// xxx check on all of these flags again...
+/* XXX check on all of these flags again. */
 
 /* Dopesheet only */
 /* 'Scene' channels */
@@ -507,7 +511,7 @@ typedef enum eAnimChannels_SetFlag {
   ACHANNEL_SETFLAG_ADD = 1,
   /** on->off, off->on */
   ACHANNEL_SETFLAG_INVERT = 2,
-  /** some on -> all off // all on */
+  /** some on -> all off / all on */
   ACHANNEL_SETFLAG_TOGGLE = 3,
 } eAnimChannels_SetFlag;
 
@@ -620,9 +624,11 @@ void ANIM_flush_setting_anim_channels(bAnimContext *ac,
                                       eAnimChannel_Settings setting,
                                       eAnimChannels_SetFlag mode);
 
-/* Deselect all animation channels */
-void ANIM_deselect_anim_channels(
-    bAnimContext *ac, void *data, eAnimCont_Types datatype, bool test, eAnimChannels_SetFlag sel);
+/* Select or deselect animation channels */
+void ANIM_anim_channels_select_set(bAnimContext *ac, eAnimChannels_SetFlag sel);
+
+/* Toggle selection of animation channels */
+void ANIM_anim_channels_select_toggle(bAnimContext *ac);
 
 /* Set the 'active' channel of type channel_type, in the given action */
 void ANIM_set_active_channel(bAnimContext *ac,
@@ -673,11 +679,25 @@ void ANIM_draw_framerange(struct Scene *scene, struct View2D *v2d);
 
 /* ------------- UI Panel Drawing -------------- */
 
-/* draw a given F-Modifier for some layout/UI-Block */
-void ANIM_uiTemplate_fmodifier_draw(struct uiLayout *layout,
-                                    struct ID *fcurve_owner_id,
-                                    ListBase *modifiers,
-                                    struct FModifier *fcm);
+struct NlaStrip *ANIM_nla_context_strip(const struct bContext *C);
+struct FCurve *ANIM_graph_context_fcurve(const struct bContext *C);
+
+/* Needed for abstraction between the graph editor and the NLA editor. */
+typedef bool (*PanelTypePollFn)(const struct bContext *C, struct PanelType *pt);
+/* Avoid including "UI_interface.h" here. */
+typedef void (*uiListPanelIDFromDataFunc)(void *data_link, char *r_idname);
+
+void ANIM_fmodifier_panels(const struct bContext *C,
+                           struct ID *owner_id,
+                           struct ListBase *fmodifiers,
+                           uiListPanelIDFromDataFunc panel_id_fn);
+
+void ANIM_modifier_panels_register_graph_and_NLA(struct ARegionType *region_type,
+                                                 const char *modifier_panel_prefix,
+                                                 PanelTypePollFn poll_function);
+void ANIM_modifier_panels_register_graph_only(struct ARegionType *region_type,
+                                              const char *modifier_panel_prefix,
+                                              PanelTypePollFn poll_function);
 
 /* ------------- Copy/Paste Buffer -------------- */
 
@@ -730,7 +750,7 @@ void ANIM_nla_mapping_apply_fcurve(struct AnimData *adt,
 /* ..... */
 
 /* Perform auto-blending/extend refreshes after some operations */
-// NOTE: defined in space_nla/nla_edit.c, not in animation/
+/* NOTE: defined in space_nla/nla_edit.c, not in animation/ */
 void ED_nla_postop_refresh(bAnimContext *ac);
 
 /* ------------- Unit Conversion Mappings ------------- */

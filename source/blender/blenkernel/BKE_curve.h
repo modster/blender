@@ -22,7 +22,9 @@
  * \ingroup bke
  */
 
-#include "DNA_scene_types.h"
+#include "BLI_sys_types.h"
+
+#include "DNA_listBase.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -82,7 +84,6 @@ typedef struct CVKeyIndex {
 void BKE_curve_editfont_free(struct Curve *cu);
 void BKE_curve_init(struct Curve *cu, const short curve_type);
 struct Curve *BKE_curve_add(struct Main *bmain, const char *name, int type);
-struct Curve *BKE_curve_copy(struct Main *bmain, const struct Curve *cu);
 short BKE_curve_type_get(const struct Curve *cu);
 void BKE_curve_type_test(struct Object *ob);
 void BKE_curve_curve_dimension_update(struct Curve *cu);
@@ -158,6 +159,8 @@ void BKE_curve_forward_diff_tangent_bezier(
 void BKE_curve_rect_from_textbox(const struct Curve *cu,
                                  const struct TextBox *tb,
                                  struct rctf *r_rect);
+
+void BKE_curve_correct_bezpart(const float v1[2], float v2[2], float v3[2], const float v4[2]);
 
 /* ** Nurbs ** */
 
@@ -317,8 +320,8 @@ void BKE_curve_deform_coords(const struct Object *ob_curve,
                              const short flag,
                              const short defaxis);
 
-void BKE_curve_deform_coords_with_editmesh(const Object *ob_curve,
-                                           const Object *ob_target,
+void BKE_curve_deform_coords_with_editmesh(const struct Object *ob_curve,
+                                           const struct Object *ob_target,
                                            float (*vert_coords)[3],
                                            const int vert_coords_len,
                                            const int defgrp_index,
@@ -334,6 +337,18 @@ void BKE_curve_deform_co(const struct Object *ob_curve,
                          float r_mat[3][3]);
 
 /** \} */
+
+/* curve_convert.c */
+
+/* Create a new curve from the given object at its current state. This only works for curve and
+ * text objects, otherwise NULL is returned.
+ *
+ * If apply_modifiers is true and the object is a curve one, then spline deform modifiers are
+ * applied on the control points of the splines.
+ */
+struct Curve *BKE_curve_new_from_object(struct Object *object,
+                                        struct Depsgraph *depsgraph,
+                                        bool apply_modifiers);
 
 #ifdef __cplusplus
 }

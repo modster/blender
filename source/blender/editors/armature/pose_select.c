@@ -114,7 +114,7 @@ void ED_pose_bone_select(Object *ob, bPoseChannel *pchan, bool select)
   bArmature *arm;
 
   /* sanity checks */
-  // XXX: actually, we can probably still get away with no object - at most we have no updates
+  /* XXX: actually, we can probably still get away with no object - at most we have no updates */
   if (ELEM(NULL, ob, ob->pose, pchan, pchan->bone)) {
     return;
   }
@@ -133,13 +133,15 @@ void ED_pose_bone_select(Object *ob, bPoseChannel *pchan, bool select)
       arm->act_bone = NULL;
     }
 
-    // TODO: select and activate corresponding vgroup?
+    /* TODO: select and activate corresponding vgroup? */
     ED_pose_bone_select_tag_update(ob);
   }
 }
 
-/* called from editview.c, for mode-less pose selection */
-/* assumes scene obact and basact is still on old situation */
+/**
+ * Called for mode-less pose selection.
+ * assumes the active object is still on old situation.
+ */
 bool ED_armature_pose_select_pick_with_buffer(ViewLayer *view_layer,
                                               View3D *v3d,
                                               Base *base,
@@ -1090,6 +1092,7 @@ static bool pose_select_same_keyingset(bContext *C, ReportList *reports, bool ex
 
           if (boneName) {
             bPoseChannel *pchan = BKE_pose_channel_find_name(pose, boneName);
+            MEM_freeN(boneName);
 
             if (pchan) {
               /* select if bone is visible and can be affected */
@@ -1098,9 +1101,6 @@ static bool pose_select_same_keyingset(bContext *C, ReportList *reports, bool ex
                 changed = true;
               }
             }
-
-            /* free temp memory */
-            MEM_freeN(boneName);
           }
         }
       }

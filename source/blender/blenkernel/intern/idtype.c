@@ -36,6 +36,7 @@
 #include "BLT_translation.h"
 
 #include "DNA_ID.h"
+#include "DNA_collection_types.h"
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
 
@@ -489,6 +490,11 @@ void BKE_idtype_id_foreach_cache(struct ID *id,
   bNodeTree *nodetree = ntreeFromID(id);
   if (nodetree != NULL) {
     type_info = BKE_idtype_get_info_from_id(&nodetree->id);
+    if (type_info == NULL) {
+      /* Very old .blend file seem to have empty names for their embedded node trees, see
+       * `blo_do_versions_250()`. Assume those are nodetrees then. */
+      type_info = BKE_idtype_get_info_from_idcode(ID_NT);
+    }
     if (type_info->foreach_cache != NULL) {
       type_info->foreach_cache(&nodetree->id, function_callback, user_data);
     }

@@ -17,14 +17,11 @@
  * All rights reserved.
  *
  * The Original Code is: some of this file.
- *
- * */
+ */
 
 /** \file
  * \ingroup bli
  */
-
-#include <assert.h>
 
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
@@ -266,7 +263,7 @@ void rgb_to_hsl(float r, float g, float b, float *r_h, float *r_s, float *r_l)
   float h, s, l = min_ff(1.0, (cmax + cmin) / 2.0f);
 
   if (cmax == cmin) {
-    h = s = 0.0f;  // achromatic
+    h = s = 0.0f; /* achromatic */
   }
   else {
     float d = cmax - cmin;

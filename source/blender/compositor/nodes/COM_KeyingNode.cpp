@@ -32,7 +32,7 @@
 
 #include "COM_DilateErodeOperation.h"
 
-#include "COM_SetAlphaOperation.h"
+#include "COM_SetAlphaMultiplyOperation.h"
 
 #include "COM_GaussianAlphaXBlurOperation.h"
 #include "COM_GaussianAlphaYBlurOperation.h"
@@ -63,7 +63,7 @@ NodeOperationOutput *KeyingNode::setupPreBlur(NodeConverter &converter,
     converter.addLink(convertRGBToYCCOperation->getOutputSocket(0),
                       separateOperation->getInputSocket(0));
 
-    if (channel == 0 || channel == 3) {
+    if (ELEM(channel, 0, 3)) {
       converter.addLink(separateOperation->getOutputSocket(0),
                         combineOperation->getInputSocket(channel));
     }
@@ -228,7 +228,8 @@ void KeyingNode::convertToOperations(NodeConverter &converter,
   NodeOutput *outputImage = this->getOutputSocket(0);
   NodeOutput *outputMatte = this->getOutputSocket(1);
   NodeOutput *outputEdges = this->getOutputSocket(2);
-  NodeOperationOutput *postprocessedMatte = NULL, *postprocessedImage = NULL, *edgesMatte = NULL;
+  NodeOperationOutput *postprocessedMatte = nullptr, *postprocessedImage = nullptr,
+                      *edgesMatte = nullptr;
 
   /* keying operation */
   KeyingOperation *keyingOperation = new KeyingOperation();
@@ -238,10 +239,10 @@ void KeyingNode::convertToOperations(NodeConverter &converter,
   converter.mapInputSocket(inputScreen, keyingOperation->getInputSocket(1));
 
   if (keying_data->blur_pre) {
-    /* chroma preblur operation for input of keying operation  */
-    NodeOperationOutput *preBluredImage = setupPreBlur(
+    /* Chroma pre-blur operation for input of keying operation. */
+    NodeOperationOutput *preBlurredImage = setupPreBlur(
         converter, inputImage, keying_data->blur_pre);
-    converter.addLink(preBluredImage, keyingOperation->getInputSocket(0));
+    converter.addLink(preBlurredImage, keyingOperation->getInputSocket(0));
   }
   else {
     converter.mapInputSocket(inputImage, keyingOperation->getInputSocket(0));
@@ -322,7 +323,7 @@ void KeyingNode::convertToOperations(NodeConverter &converter,
   }
 
   /* set alpha channel to output image */
-  SetAlphaOperation *alphaOperation = new SetAlphaOperation();
+  SetAlphaMultiplyOperation *alphaOperation = new SetAlphaMultiplyOperation();
   converter.addOperation(alphaOperation);
 
   converter.mapInputSocket(inputImage, alphaOperation->getInputSocket(0));

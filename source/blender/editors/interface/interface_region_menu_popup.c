@@ -23,7 +23,6 @@
  * PopUp Menu Region
  */
 
-#include <assert.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -189,7 +188,7 @@ static uiBlock *ui_block_func_POPUP(bContext *C, uiPopupBlockHandle *handle, voi
     minwidth = uiLayoutGetUnitsX(pup->layout) * UI_UNIT_X;
   }
   else if (pup->but) {
-    /* minimum width to enforece */
+    /* Minimum width to enforce. */
     if (pup->but->drawstr[0]) {
       minwidth = BLI_rctf_size_x(&pup->but->rect);
     }
@@ -340,7 +339,7 @@ uiPopupBlockHandle *ui_popup_menu_create(
 #if 0
     /* if this is an rna button then we can assume its an enum
      * flipping enums is generally not good since the order can be
-     * important [#28786] */
+     * important T28786. */
     if (but->rnaprop && RNA_property_type(but->rnaprop) == PROP_ENUM) {
       pup->block->flag |= UI_BLOCK_NO_FLIP;
     }

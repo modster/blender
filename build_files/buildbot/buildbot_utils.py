@@ -24,6 +24,7 @@ import re
 import subprocess
 import sys
 
+
 def is_tool(name):
     """Check whether `name` is on PATH and marked as executable."""
 
@@ -31,6 +32,7 @@ def is_tool(name):
     from shutil import which
 
     return which(name) is not None
+
 
 class Builder:
     def __init__(self, name, branch, codesign):
@@ -48,21 +50,22 @@ class Builder:
         # Detect platform
         if name.startswith('mac'):
             self.platform = 'mac'
-            self.command_prefix =  []
+            self.command_prefix = []
         elif name.startswith('linux'):
             self.platform = 'linux'
             if is_tool('scl'):
-                self.command_prefix =  ['scl', 'enable', 'devtoolset-9', '--']
+                self.command_prefix = ['scl', 'enable', 'devtoolset-9', '--']
             else:
-                self.command_prefix =  []
+                self.command_prefix = []
         elif name.startswith('win'):
             self.platform = 'win'
-            self.command_prefix =  []
+            self.command_prefix = []
         else:
             raise ValueError('Unkonw platform for builder ' + self.platform)
 
         # Always 64 bit now
         self.bits = 64
+
 
 def create_builder_from_arguments():
     parser = argparse.ArgumentParser()
@@ -85,7 +88,6 @@ class VersionInfo:
         self.short_version = "%d.%02d" % (version_numbers[0], version_numbers[1])
         self.version = "%d.%02d.%d" % version_numbers
         self.version_cycle = self._parse_header_file(blender_h, 'BLENDER_VERSION_CYCLE')
-        self.version_cycle_number = self._parse_header_file(blender_h, 'BLENDER_VERSION_CYCLE_NUMBER')
         self.hash = self._parse_header_file(buildinfo_h, 'BUILD_HASH')[1:-1]
 
         if self.version_cycle == "release":
@@ -94,8 +96,7 @@ class VersionInfo:
             self.is_development_build = False
         elif self.version_cycle == "rc":
             # Release candidate
-            version_cycle = self.version_cycle + self.version_cycle_number
-            self.full_version = self.version + version_cycle
+            self.full_version = self.version + self.version_cycle
             self.is_development_build = False
         else:
             # Development build
@@ -104,7 +105,7 @@ class VersionInfo:
 
     def _parse_header_file(self, filename, define):
         import re
-        regex = re.compile("^#\s*define\s+%s\s+(.*)" % define)
+        regex = re.compile(r"^#\s*define\s+%s\s+(.*)" % define)
         with open(filename, "r") as file:
             for l in file:
                 match = regex.match(l)

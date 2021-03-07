@@ -17,6 +17,7 @@
 # ##### END GPL LICENSE BLOCK #####
 
 # <pep8 compliant>
+from __future__ import annotations
 
 import bpy
 from bpy.types import (
@@ -31,11 +32,7 @@ from bpy.props import (
     IntProperty,
     StringProperty,
 )
-
-# FIXME, we need a way to detect key repeat events.
-# unfortunately checking event previous values isn't reliable.
-use_toolbar_release_hack = True
-
+from bpy.app.translations import pgettext_iface as iface_
 
 rna_path_prop = StringProperty(
     name="Context Attributes",
@@ -47,18 +44,21 @@ rna_reverse_prop = BoolProperty(
     name="Reverse",
     description="Cycle backwards",
     default=False,
+    options={'SKIP_SAVE'},
 )
 
 rna_wrap_prop = BoolProperty(
     name="Wrap",
     description="Wrap back to the first/last values",
     default=False,
+    options={'SKIP_SAVE'},
 )
 
 rna_relative_prop = BoolProperty(
     name="Relative",
     description="Apply relative to the current value (delta)",
     default=False,
+    options={'SKIP_SAVE'},
 )
 
 rna_space_type_prop = EnumProperty(
@@ -232,6 +232,7 @@ class WM_OT_context_scale_int(Operator):
         name="Always Step",
         description="Always adjust the value by a minimum of 1 when 'value' is not 1.0",
         default=True,
+        options={'SKIP_SAVE'},
     )
 
     def execute(self, context):
@@ -740,10 +741,12 @@ class WM_OT_context_modal_mouse(Operator):
     input_scale: FloatProperty(
         description="Scale the mouse movement by this value before applying the delta",
         default=0.01,
+        options={'SKIP_SAVE'},
     )
     invert: BoolProperty(
         description="Invert the mouse input",
         default=False,
+        options={'SKIP_SAVE'},
     )
     initial_x: IntProperty(options={'HIDDEN'})
 
@@ -833,7 +836,7 @@ class WM_OT_context_modal_mouse(Operator):
 
 
 class WM_OT_url_open(Operator):
-    """Open a website in the web-browser"""
+    """Open a website in the web browser"""
     bl_idname = "wm.url_open"
     bl_label = ""
     bl_options = {'INTERNAL'}
@@ -850,16 +853,14 @@ class WM_OT_url_open(Operator):
 
 
 class WM_OT_url_open_preset(Operator):
-    """Open a preset website in the web-browser"""
+    """Open a preset website in the web browser"""
     bl_idname = "wm.url_open_preset"
     bl_label = "Open Preset Website"
     bl_options = {'INTERNAL'}
 
     type: EnumProperty(
         name="Site",
-        items=lambda self, _context: (
-            item for (item, _) in WM_OT_url_open_preset.preset_items
-        ),
+        items=WM_OT_url_open_preset._preset_items,
     )
 
     id: StringProperty(
@@ -892,7 +893,7 @@ class WM_OT_url_open_preset(Operator):
         (('BUG', "Bug",
           "Report a bug with pre-filled version information"),
          _url_from_bug),
-        (('BUG_ADDON', "Add-On Bug",
+        (('BUG_ADDON', "Add-on Bug",
           "Report a bug in an add-on"),
          _url_from_bug_addon),
         (('RELEASE_NOTES', "Release Notes",
@@ -913,6 +914,10 @@ class WM_OT_url_open_preset(Operator):
           "Lists committers to Blender's source code"),
          "https://www.blender.org/about/credits/"),
     ]
+
+    @staticmethod
+    def _preset_items(_self, _context):
+        return (item for (item, _) in WM_OT_url_open_preset.preset_items)
 
     def execute(self, context):
         url = None
@@ -973,7 +978,7 @@ class WM_OT_path_open(Operator):
         return {'FINISHED'}
 
 
-def _wm_doc_get_id(doc_id, do_url=True, url_prefix=""):
+def _wm_doc_get_id(doc_id, do_url=True, url_prefix="", report=None):
 
     def operator_exists_pair(a, b):
         # Not fast, this is only for docs.
@@ -1023,6 +1028,11 @@ def _wm_doc_get_id(doc_id, do_url=True, url_prefix=""):
             if rna_class is None:
                 # Check class for dynamically registered types.
                 rna_class = bpy.types.PropertyGroup.bl_rna_get_subclass_py(class_name)
+
+            if rna_class is None:
+                if report is not None:
+                    report({'ERROR'}, iface_("Type \"%s\" can not be found") % class_name)
+                return None
 
             # Detect if this is a inherited member and use that name instead.
             rna_parent = rna_class.bl_rna
@@ -1083,9 +1093,9 @@ class WM_OT_doc_view_manual(Operator):
                 return url
 
     def execute(self, _context):
-        rna_id = _wm_doc_get_id(self.doc_id, do_url=False)
+        rna_id = _wm_doc_get_id(self.doc_id, do_url=False, report=self.report)
         if rna_id is None:
-            return {'PASS_THROUGH'}
+            return {'CANCELLED'}
 
         url = self._lookup_rna_url(rna_id)
 
@@ -1117,9 +1127,9 @@ class WM_OT_doc_view(Operator):
         _prefix = ("https://docs.blender.org/api/master")
 
     def execute(self, _context):
-        url = _wm_doc_get_id(self.doc_id, do_url=True, url_prefix=self._prefix)
+        url = _wm_doc_get_id(self.doc_id, do_url=True, url_prefix=self._prefix, report=self.report)
         if url is None:
-            return {'PASS_THROUGH'}
+            return {'CANCELLED'}
 
         import webbrowser
         webbrowser.open(url)
@@ -1146,10 +1156,11 @@ rna_default = StringProperty(
     maxlen=1024,
 )
 
-rna_property = StringProperty(
+rna_custom_property = StringProperty(
     name="Property Name",
     description="Property name edit",
-    maxlen=1024,
+    # Match `MAX_IDPROP_NAME - 1` in Blender's source.
+    maxlen=63,
 )
 
 rna_min = FloatProperty(
@@ -1173,7 +1184,7 @@ rna_use_soft_limits = BoolProperty(
 
 rna_is_overridable_library = BoolProperty(
     name="Is Library Overridable",
-    description="Allow the property to be overridden when the Data-Block is linked",
+    description="Allow the property to be overridden when the data-block is linked",
     default=False,
 )
 
@@ -1195,7 +1206,7 @@ class WM_OT_properties_edit(Operator):
     bl_options = {'REGISTER', 'INTERNAL'}
 
     data_path: rna_path
-    property: rna_property
+    property: rna_custom_property
     value: rna_value
     default: rna_default
     min: rna_min
@@ -1209,10 +1220,13 @@ class WM_OT_properties_edit(Operator):
     )
     subtype: EnumProperty(
         name="Subtype",
-        items=lambda self, _context: WM_OT_properties_edit.subtype_items,
+        items=WM_OT_properties_edit._subtype_items_fn,
     )
 
     subtype_items = rna_vector_subtype_items
+
+    def _subtype_items_fn(_self, _context):
+        return WM_OT_properties_edit.subtype_items
 
     def _init_subtype(self, prop_type, is_array, subtype):
         subtype = subtype or 'NONE'
@@ -1236,7 +1250,7 @@ class WM_OT_properties_edit(Operator):
     def get_value_eval(self):
         try:
             value_eval = eval(self.value)
-            # assert else None -> None, not "None", see [#33431]
+            # assert else None -> None, not "None", see T33431.
             assert(type(value_eval) in {str, float, int, bool, tuple, list})
         except:
             value_eval = self.value
@@ -1246,7 +1260,7 @@ class WM_OT_properties_edit(Operator):
     def get_default_eval(self):
         try:
             default_eval = eval(self.default)
-            # assert else None -> None, not "None", see [#33431]
+            # assert else None -> None, not "None", see T33431.
             assert(type(default_eval) in {str, float, int, bool, tuple, list})
         except:
             default_eval = self.default
@@ -1264,6 +1278,7 @@ class WM_OT_properties_edit(Operator):
 
         data_path = self.data_path
         prop = self.property
+        prop_escape = bpy.utils.escape_identifier(prop)
 
         prop_old = getattr(self, "_last_prop", [None])[0]
 
@@ -1288,7 +1303,7 @@ class WM_OT_properties_edit(Operator):
 
         # Reassign
         item[prop] = value_eval
-        item.property_overridable_library_set('["%s"]' % prop, self.is_overridable_library)
+        item.property_overridable_library_set('["%s"]' % prop_escape, self.is_overridable_library)
         rna_idprop_ui_prop_update(item, prop)
 
         self._last_prop[:] = [prop]
@@ -1321,7 +1336,7 @@ class WM_OT_properties_edit(Operator):
 
         # If we have changed the type of the property, update its potential anim curves!
         if prop_type_old != prop_type_new:
-            data_path = '["%s"]' % bpy.utils.escape_identifier(prop)
+            data_path = '["%s"]' % prop_escape
             done = set()
 
             def _update(fcurves):
@@ -1347,8 +1362,8 @@ class WM_OT_properties_edit(Operator):
                     for nt in adt.nla_tracks:
                         _update_strips(nt.strips)
 
-        # otherwise existing buttons which reference freed
-        # memory may crash blender [#26510]
+        # Otherwise existing buttons which reference freed
+        # memory may crash Blender T26510.
         # context.area.tag_redraw()
         for win in context.window_manager.windows:
             for area in win.screen.areas:
@@ -1363,13 +1378,16 @@ class WM_OT_properties_edit(Operator):
             rna_idprop_value_item_type
         )
 
+        prop = self.property
+        prop_escape = bpy.utils.escape_identifier(prop)
+
         data_path = self.data_path
 
         if not data_path:
             self.report({'ERROR'}, "Data path not set")
             return {'CANCELLED'}
 
-        self._last_prop = [self.property]
+        self._last_prop = [prop]
 
         item = eval("context.%s" % data_path)
 
@@ -1378,9 +1396,8 @@ class WM_OT_properties_edit(Operator):
             return {'CANCELLED'}
 
         # retrieve overridable static
-        is_overridable = item.is_property_overridable_library('["%s"]' % self.property)
+        is_overridable = item.is_property_overridable_library('["%s"]' % prop_escape)
         self.is_overridable_library = bool(is_overridable)
-
 
         # default default value
         prop_type, is_array = rna_idprop_value_item_type(self.get_value_eval())
@@ -1390,7 +1407,7 @@ class WM_OT_properties_edit(Operator):
             self.default = ""
 
         # setup defaults
-        prop_ui = rna_idprop_ui_prop_get(item, self.property, False)  # don't create
+        prop_ui = rna_idprop_ui_prop_get(item, prop, False)  # don't create
         if prop_ui:
             self.min = prop_ui.get("min", -1000000000)
             self.max = prop_ui.get("max", 1000000000)
@@ -1548,7 +1565,7 @@ class WM_OT_properties_remove(Operator):
     bl_options = {'UNDO', 'INTERNAL'}
 
     data_path: rna_path
-    property: rna_property
+    property: rna_custom_property
 
     def execute(self, context):
         from rna_prop_ui import (
@@ -1599,7 +1616,7 @@ class WM_OT_sysinfo(Operator):
 
 
 class WM_OT_operator_cheat_sheet(Operator):
-    """List all the Operators in a text-block, useful for scripting"""
+    """List all the operators in a text-block, useful for scripting"""
     bl_idname = "wm.operator_cheat_sheet"
     bl_label = "Operator Cheat Sheet"
 
@@ -1620,7 +1637,7 @@ class WM_OT_operator_cheat_sheet(Operator):
         textblock = bpy.data.texts.new("OperatorList.txt")
         textblock.write('# %d Operators\n\n' % tot)
         textblock.write('\n'.join(op_strings))
-        self.report({'INFO'}, "See OperatorList.txt textblock")
+        self.report({'INFO'}, "See OperatorList.txt text block")
         return {'FINISHED'}
 
 
@@ -1661,7 +1678,7 @@ class WM_OT_owner_disable(Operator):
 class WM_OT_tool_set_by_id(Operator):
     """Set the tool by name (for keymaps)"""
     bl_idname = "wm.tool_set_by_id"
-    bl_label = "Set Tool By Name"
+    bl_label = "Set Tool by Name"
 
     name: StringProperty(
         name="Identifier",
@@ -1682,18 +1699,6 @@ class WM_OT_tool_set_by_id(Operator):
 
     space_type: rna_space_type_prop
 
-    if use_toolbar_release_hack:
-        def invoke(self, context, event):
-            # Hack :S
-            if not self.properties.is_property_set("name"):
-                WM_OT_toolbar._key_held = False
-                return {'PASS_THROUGH'}
-            elif (WM_OT_toolbar._key_held == event.type) and (event.value != 'RELEASE'):
-                return {'PASS_THROUGH'}
-            WM_OT_toolbar._key_held = None
-
-            return self.execute(context)
-
     def execute(self, context):
         from bl_ui.space_toolsystem_common import (
             activate_by_id,
@@ -1712,16 +1717,16 @@ class WM_OT_tool_set_by_id(Operator):
                 tool_settings.workspace_tool_type = 'FALLBACK'
             return {'FINISHED'}
         else:
-            self.report({'WARNING'}, "Tool %r not found for space %r." % (self.name, space_type))
+            self.report({'WARNING'}, "Tool %r not found for space %r" % (self.name, space_type))
             return {'CANCELLED'}
 
 
 class WM_OT_tool_set_by_index(Operator):
     """Set the tool by index (for keymaps)"""
     bl_idname = "wm.tool_set_by_index"
-    bl_label = "Set Tool By Index"
+    bl_label = "Set Tool by Index"
     index: IntProperty(
-        name="Index in toolbar",
+        name="Index in Toolbar",
         default=0,
     )
     cycle: BoolProperty(
@@ -1732,8 +1737,9 @@ class WM_OT_tool_set_by_index(Operator):
     )
 
     expand: BoolProperty(
-        description="Include tool sub-groups",
+        description="Include tool subgroups",
         default=True,
+        options={'SKIP_SAVE'},
     )
 
     as_fallback: BoolProperty(
@@ -1783,13 +1789,6 @@ class WM_OT_toolbar(Operator):
     @classmethod
     def poll(cls, context):
         return context.space_data is not None
-
-    if use_toolbar_release_hack:
-        _key_held = None
-
-        def invoke(self, context, event):
-            WM_OT_toolbar._key_held = event.type
-            return self.execute(context)
 
     @staticmethod
     def keymap_from_toolbar(context, space_type, use_fallback_keys=True, use_reset=True):
@@ -2067,7 +2066,7 @@ class WM_OT_batch_rename(Operator):
             # Enum identifiers are compared with 'object.type'.
             ('MESH', "Meshes", ""),
             ('CURVE', "Curves", ""),
-            ('META', "Meta Balls", ""),
+            ('META', "Metaballs", ""),
             ('ARMATURE', "Armatures", ""),
             ('LATTICE', "Lattices", ""),
             ('GPENCIL', "Grease Pencils", ""),
@@ -2158,13 +2157,13 @@ class WM_OT_batch_rename(Operator):
         object_data_type_attrs_map = {
             'MESH': ("meshes", "Mesh(es)"),
             'CURVE': ("curves", "Curve(s)"),
-            'META': ("metaballs", "MetaBall(s)"),
+            'META': ("metaballs", "Metaball(s)"),
             'ARMATURE': ("armatures", "Armature(s)"),
             'LATTICE': ("lattices", "Lattice(s)"),
             'GPENCIL': ("grease_pencils", "Grease Pencil(s)"),
             'CAMERA': ("cameras", "Camera(s)"),
             'SPEAKER': ("speakers", "Speaker(s)"),
-            'LIGHT_PROBE': ("light_probes", "LightProbe(s)"),
+            'LIGHT_PROBE': ("light_probes", "Light Probe(s)"),
         }
 
         # Finish with space types.
@@ -2198,8 +2197,7 @@ class WM_OT_batch_rename(Operator):
                         id
                         for ob in context.selected_objects
                         if ob.type == data_type
-                        for id in (ob.data,)
-                        if id is not None and id.library is None
+                        if (id := ob.data) is not None and id.library is None
                     ))
                     if only_selected else
                     [id for id in getattr(bpy.data, attr) if id.library is None],
@@ -2292,32 +2290,57 @@ class WM_OT_batch_rename(Operator):
 
         layout = self.layout
 
-        split = layout.split(factor=0.5)
-        split.label(text="Data Type:")
+        split = layout.split(align=True)
+        split.row(align=True).prop(self, "data_source", expand=True)
         split.prop(self, "data_type", text="")
-
-        split = layout.split(factor=0.5)
-        split.label(text="Rename %d %s:" % (len(self._data[0]), self._data[2]))
-        split.row().prop(self, "data_source", expand=True)
 
         for action in self.actions:
             box = layout.box()
+            split = box.split(factor=0.87)
 
-            row = box.row(align=True)
+            # Column 1: main content.
+            col = split.column()
+
+            # Label's width.
+            fac = 0.25
+
+            # Row 1: type.
+            row = col.split(factor=fac)
+            row.alignment = 'RIGHT'
+            row.label(text="Type")
             row.prop(action, "type", text="")
-            row.prop(action, "op_add", text="", icon='ADD')
-            row.prop(action, "op_remove", text="", icon='REMOVE')
 
             ty = action.type
             if ty == 'SET':
-                box.prop(action, "set_method")
-                box.prop(action, "set_name")
-            elif ty == 'STRIP':
-                box.row().prop(action, "strip_chars")
-                box.row().prop(action, "strip_part")
-            elif ty == 'REPLACE':
+                # Row 2: method.
+                row = col.split(factor=fac)
+                row.alignment = 'RIGHT'
+                row.label(text="Method")
+                row.row().prop(action, "set_method", expand=True)
 
-                row = box.row(align=True)
+                # Row 3: name.
+                row = col.split(factor=fac)
+                row.alignment = 'RIGHT'
+                row.label(text="Name")
+                row.prop(action, "set_name", text="")
+
+            elif ty == 'STRIP':
+                # Row 2: chars.
+                row = col.split(factor=fac)
+                row.alignment = 'RIGHT'
+                row.label(text="Characters")
+                row.row().prop(action, "strip_chars")
+
+                # Row 3: part.
+                row = col.split(factor=fac)
+                row.alignment = 'RIGHT'
+                row.label(text="Strip From")
+                row.row().prop(action, "strip_part")
+
+            elif ty == 'REPLACE':
+                # Row 2: find.
+                row = col.split(factor=fac)
+
                 re_error_src = None
                 if action.use_replace_regex_src:
                     try:
@@ -2325,13 +2348,24 @@ class WM_OT_batch_rename(Operator):
                     except Exception as ex:
                         re_error_src = str(ex)
                         row.alert = True
-                row.prop(action, "replace_src")
-                row.prop(action, "use_replace_regex_src", text="", icon='SORTBYEXT')
+
+                row.alignment = 'RIGHT'
+                row.label(text="Find")
+                sub = row.row(align=True)
+                sub.prop(action, "replace_src", text="")
+                sub.prop(action, "use_replace_regex_src", text="", icon='SORTBYEXT')
+
+                # Row.
                 if re_error_src is not None:
-                    box.label(text=re_error_src)
+                    row = col.split(factor=fac)
+                    row.label(text="")
+                    row.alert = True
+                    row.label(text=re_error_src)
+
+                # Row 3: replace.
+                row = col.split(factor=fac)
 
                 re_error_dst = None
-                row = box.row(align=True)
                 if action.use_replace_regex_src:
                     if action.use_replace_regex_dst:
                         if re_error_src is None:
@@ -2341,17 +2375,39 @@ class WM_OT_batch_rename(Operator):
                                 re_error_dst = str(ex)
                                 row.alert = True
 
-                row.prop(action, "replace_dst")
-                rowsub = row.row(align=True)
-                rowsub.active = action.use_replace_regex_src
-                rowsub.prop(action, "use_replace_regex_dst", text="", icon='SORTBYEXT')
-                if re_error_dst is not None:
-                    box.label(text=re_error_dst)
+                row.alignment = 'RIGHT'
+                row.label(text="Replace")
+                sub = row.row(align=True)
+                sub.prop(action, "replace_dst", text="")
+                subsub = sub.row(align=True)
+                subsub.active = action.use_replace_regex_src
+                subsub.prop(action, "use_replace_regex_dst", text="", icon='SORTBYEXT')
 
-                row = box.row()
+                # Row.
+                if re_error_dst is not None:
+                    row = col.split(factor=fac)
+                    row.label(text="")
+                    row.alert = True
+                    row.label(text=re_error_dst)
+
+                # Row 4: case.
+                row = col.split(factor=fac)
+                row.label(text="")
                 row.prop(action, "replace_match_case")
+
             elif ty == 'CASE':
-                box.row().prop(action, "case_method", expand=True)
+                # Row 2: method.
+                row = col.split(factor=fac)
+                row.alignment = 'RIGHT'
+                row.label(text="Convert To")
+                row.row().prop(action, "case_method", expand=True)
+
+            # Column 2: add-remove.
+            row = split.split(align=True)
+            row.prop(action, "op_remove", text="", icon='REMOVE')
+            row.prop(action, "op_add", text="", icon='ADD')
+
+        layout.label(text="Rename %d %s" % (len(self._data[0]), self._data[2]))
 
     def check(self, context):
         changed = False
@@ -2426,10 +2482,10 @@ class WM_OT_batch_rename(Operator):
         return wm.invoke_props_dialog(self, width=400)
 
 
-class WM_MT_splash(Menu):
-    bl_label = "Splash"
+class WM_MT_splash_quick_setup(Menu):
+    bl_label = "Quick Setup"
 
-    def draw_setup(self, context):
+    def draw(self, context):
         wm = context.window_manager
         # prefs = context.preferences
 
@@ -2517,18 +2573,11 @@ class WM_MT_splash(Menu):
         layout.separator()
         layout.separator()
 
+
+class WM_MT_splash(Menu):
+    bl_label = "Splash"
+
     def draw(self, context):
-        # Draw setup screen if no preferences have been saved yet.
-        import os
-
-        userconfig_path = bpy.utils.user_resource('CONFIG')
-        userdef_path = os.path.join(userconfig_path, "userpref.blend")
-
-        if not os.path.isfile(userdef_path):
-            self.draw_setup(context)
-            return
-
-        # Pass
         layout = self.layout
         layout.operator_context = 'EXEC_DEFAULT'
         layout.emboss = 'PULLDOWN_MENU'
@@ -2585,26 +2634,28 @@ class WM_MT_splash_about(Menu):
         layout = self.layout
         layout.operator_context = 'EXEC_DEFAULT'
 
-        layout.label(text="Blender is free software")
-        layout.label(text="Licensed under the GNU General Public License")
-        layout.separator()
-        layout.separator()
+        split = layout.split(factor=0.65)
 
-        split = layout.split()
-        split.emboss = 'PULLDOWN_MENU'
-        split.scale_y = 1.3
+        col = split.column(align=True)
+        col.scale_y = 0.8
+        col.label(text=bpy.app.version_string, translate=False)
+        col.separator(factor=2.5)
+        col.label(text=iface_("Date: %s %s") % (bpy.app.build_commit_date.decode('utf-8', 'replace'),
+                                                bpy.app.build_commit_time.decode('utf-8', 'replace')), translate=False)
+        col.label(text=iface_("Hash: %s") % bpy.app.build_hash.decode('ascii'), translate=False)
+        col.label(text=iface_("Branch: %s") % bpy.app.build_branch.decode('utf-8', 'replace'), translate=False)
+        col.separator(factor=2.0)
+        col.label(text="Blender is free software")
+        col.label(text="Licensed under the GNU General Public License")
 
-        col1 = split.column()
-
-        col1.operator("wm.url_open_preset", text="Release Notes", icon='URL').type = 'RELEASE_NOTES'
-        col1.operator("wm.url_open_preset", text="Credits", icon='URL').type = 'CREDITS'
-        col1.operator("wm.url_open", text="License", icon='URL').url = "https://www.blender.org/about/license/"
-
-        col2 = split.column()
-
-        col2.operator("wm.url_open_preset", text="Blender Website", icon='URL').type = 'BLENDER'
-        col2.operator("wm.url_open", text="Blender Store", icon='URL').url = "https://store.blender.org"
-        col2.operator("wm.url_open_preset", text="Development Fund", icon='FUND').type = 'FUND'
+        col = split.column(align=True)
+        col.emboss = 'PULLDOWN_MENU'
+        col.operator("wm.url_open_preset", text="Release Notes", icon='URL').type = 'RELEASE_NOTES'
+        col.operator("wm.url_open_preset", text="Credits", icon='URL').type = 'CREDITS'
+        col.operator("wm.url_open", text="License", icon='URL').url = "https://www.blender.org/about/license/"
+        col.operator("wm.url_open_preset", text="Blender Website", icon='URL').type = 'BLENDER'
+        col.operator("wm.url_open", text="Blender Store", icon='URL').url = "https://store.blender.org"
+        col.operator("wm.url_open_preset", text="Development Fund", icon='FUND').type = 'FUND'
 
 
 class WM_OT_drop_blend_file(Operator):
@@ -2675,6 +2726,7 @@ classes = (
     WM_OT_toolbar_prompt,
     BatchRenameAction,
     WM_OT_batch_rename,
+    WM_MT_splash_quick_setup,
     WM_MT_splash,
     WM_MT_splash_about,
 )

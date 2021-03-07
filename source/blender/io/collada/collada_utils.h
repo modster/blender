@@ -146,8 +146,6 @@ extern void bc_bubble_sort_by_Object_name(LinkNode *export_set);
 extern bool bc_is_root_bone(Bone *aBone, bool deform_bones_only);
 extern int bc_get_active_UVLayer(Object *ob);
 
-std::string bc_find_bonename_in_path(std::string path, std::string probe);
-
 inline std::string bc_string_after(const std::string &s, const std::string probe)
 {
   size_t i = s.rfind(probe);
@@ -384,7 +382,7 @@ double bc_get_alpha(Material *ma);
 double bc_get_ior(Material *ma);
 double bc_get_shininess(Material *ma);
 
-double bc_get_float_from_shader(bNode *shader, double &val, std::string nodeid);
+bool bc_get_float_from_shader(bNode *shader, double &val, std::string nodeid);
 COLLADASW::ColorOrTexture bc_get_cot_from_shader(bNode *shader,
                                                  std::string nodeid,
                                                  Color &default_color,

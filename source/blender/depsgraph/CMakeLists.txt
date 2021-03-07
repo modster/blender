@@ -24,9 +24,11 @@ set(INC
   ../blenlib
   ../bmesh
   ../draw
+  ../functions
   ../makesdna
   ../makesrna
   ../modifiers
+  ../sequencer
   ../windowmanager
   ../../../intern/atomic
   ../../../intern/guardedalloc

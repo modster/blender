@@ -23,9 +23,6 @@
 #include "BLI_string_utils.h"
 #include "BLI_sys_types.h" /* bool */
 
-// #include "BLI_dynstr.h"
-// #include "BLI_rand.h"
-
 #include "BKE_object.h"
 
 #include "DEG_depsgraph_query.h"
@@ -144,8 +141,8 @@ void EEVEE_shadows_caster_register(EEVEE_ViewLayerData *sldata, Object *ob)
   }
 
   if (ob->base_flag & BASE_FROM_DUPLI) {
-    /* Duplis will always refresh the shadowmaps as if they were deleted each frame. */
-    /* TODO(fclem) fix this. */
+    /* Duplis will always refresh the shadow-maps as if they were deleted each frame. */
+    /* TODO(fclem): fix this. */
     update = true;
   }
   else {
@@ -257,12 +254,12 @@ void EEVEE_shadows_update(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata)
     }
   }
 
-  /* TODO(fclem) This part can be slow, optimize it. */
+  /* TODO(fclem): This part can be slow, optimize it. */
   EEVEE_BoundBox *bbox = backbuffer->bbox;
   BoundSphere *bsphere = linfo->shadow_bounds;
   /* Search for deleted shadow casters or if shcaster WAS in shadow radius. */
   for (int i = 0; i < backbuffer->count; i++) {
-    /* If the shadowcaster has been deleted or updated. */
+    /* If the shadow-caster has been deleted or updated. */
     if (BLI_BITMAP_TEST(backbuffer->update, i)) {
       for (int j = 0; j < linfo->cube_len; j++) {
         if (!BLI_BITMAP_TEST(&linfo->sh_cube_update[0], j)) {
@@ -276,7 +273,7 @@ void EEVEE_shadows_update(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata)
   /* Search for updates in current shadow casters. */
   bbox = frontbuffer->bbox;
   for (int i = 0; i < frontbuffer->count; i++) {
-    /* If the shadowcaster has been updated. */
+    /* If the shadow-caster has been updated. */
     if (BLI_BITMAP_TEST(frontbuffer->update, i)) {
       for (int j = 0; j < linfo->cube_len; j++) {
         if (!BLI_BITMAP_TEST(&linfo->sh_cube_update[0], j)) {
@@ -352,7 +349,6 @@ void EEVEE_shadows_draw(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata, DRWView
 }
 
 /* -------------------------------------------------------------------- */
-
 /** \name Render Passes
  * \{ */
 
@@ -416,4 +412,4 @@ void EEVEE_shadow_output_accumulate(EEVEE_ViewLayerData *UNUSED(sldata), EEVEE_D
   }
 }
 
-/* \} */
+/** \} */

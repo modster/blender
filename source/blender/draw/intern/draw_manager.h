@@ -43,6 +43,9 @@
 
 #include "draw_instance_data.h"
 
+struct DupliObject;
+struct Object;
+
 /* Use draw manager to call GPU_select, see: DRW_draw_select_loop */
 #define USE_GPU_SELECT
 
@@ -263,14 +266,14 @@ typedef union DRWCommand {
   DRWCommandClear clear;
 } DRWCommand;
 
-/* Used for agregating calls into GPUVertBufs. */
+/** Used for aggregating calls into #GPUVertBuf's. */
 struct DRWCallBuffer {
   GPUVertBuf *buf;
   GPUVertBuf *buf_select;
   int count;
 };
 
-/* Used by DRWUniform.type */
+/** Used by #DRWUniform.type */
 typedef enum {
   DRW_UNIFORM_INT = 0,
   DRW_UNIFORM_INT_COPY,
@@ -286,6 +289,7 @@ typedef enum {
   /** Per drawcall uniforms/UBO */
   DRW_UNIFORM_BLOCK_OBMATS,
   DRW_UNIFORM_BLOCK_OBINFOS,
+  DRW_UNIFORM_BLOCK_OBATTRS,
   DRW_UNIFORM_RESOURCE_CHUNK,
   DRW_UNIFORM_RESOURCE_ID,
   /** Legacy / Fallback */
@@ -317,9 +321,11 @@ struct DRWUniform {
     float fvalue[4];
     /* DRW_UNIFORM_INT_COPY */
     int ivalue[4];
+    /* DRW_UNIFORM_BLOCK_OBATTRS */
+    struct GPUUniformAttrList *uniform_attrs;
   };
-  int location;      /* Uniform location or binding point for textures and ubos. */
-  uint8_t type;      /* DRWUniformType */
+  int location;      /* Uniform location or binding point for textures and UBO's. */
+  uint8_t type;      /* #DRWUniformType */
   uint8_t length;    /* Length of vector types. */
   uint8_t arraysize; /* Array size of scalar/vector types. */
 };
@@ -340,6 +346,9 @@ struct DRWShadingGroup {
     struct {
       int objectinfo;                /* Equal to 1 if the shader needs obinfos. */
       DRWResourceHandle pass_handle; /* Memblock key to parent pass. */
+
+      /* Set of uniform attributes used by this shader. */
+      struct GPUUniformAttrList *uniform_attrs;
     };
     /* This struct is used after cache populate if using the Z sorting.
      * It will not conflict with the above struct. */
@@ -417,10 +426,10 @@ struct DRWView {
  * In order to keep a cache friendly data structure,
  * we alloc most of our little data into chunks of multiple item.
  * Iteration, allocation and memory usage are better.
- * We loose a bit of memory by allocating more than what we need
+ * We lose a bit of memory by allocating more than what we need
  * but it's counterbalanced by not needing the linked-list pointers
  * for each item.
- **/
+ */
 
 typedef struct DRWUniformChunk {
   struct DRWUniformChunk *next; /* single-linked list */
@@ -495,7 +504,7 @@ typedef struct DRWManager {
   struct Object *dupli_origin;
   /** Ghash containing original objects. */
   struct GHash *dupli_ghash;
-  /** TODO(fclem) try to remove usage of this. */
+  /** TODO(fclem): try to remove usage of this. */
   DRWInstanceData *object_instance_data[MAX_INSTANCE_DATA_SIZE];
   /* Array of dupli_data (one for each enabled engine) to handle duplis. */
   void **dupli_datas;
@@ -542,7 +551,7 @@ typedef struct DRWManager {
   DRWView *view_active;
   DRWView *view_previous;
   uint primary_view_ct;
-  /** TODO(fclem) Remove this. Only here to support
+  /** TODO(fclem): Remove this. Only here to support
    * shaders without common_view_lib.glsl */
   DRWViewUboStorage view_storage_cpy;
 
@@ -567,7 +576,7 @@ typedef struct DRWManager {
   GPUDrawList *draw_list;
 
   struct {
-    /* TODO(fclem) optimize: use chunks. */
+    /* TODO(fclem): optimize: use chunks. */
     DRWDebugLine *lines;
     DRWDebugSphere *spheres;
   } debug;
@@ -598,3 +607,10 @@ void drw_resource_buffer_finish(ViewportMemoryPool *vmempool);
 GPUBatch *drw_cache_procedural_points_get(void);
 GPUBatch *drw_cache_procedural_lines_get(void);
 GPUBatch *drw_cache_procedural_triangles_get(void);
+
+void drw_uniform_attrs_pool_update(struct GHash *table,
+                                   struct GPUUniformAttrList *key,
+                                   DRWResourceHandle *handle,
+                                   struct Object *ob,
+                                   struct Object *dupli_parent,
+                                   struct DupliObject *dupli_source);

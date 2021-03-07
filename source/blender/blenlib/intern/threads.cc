@@ -21,9 +21,9 @@
  * \ingroup bli
  */
 
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cerrno>
+#include <cstdlib>
+#include <cstring>
 
 #include "MEM_guardedalloc.h"
 
@@ -119,8 +119,6 @@ static pthread_mutex_t _image_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t _image_draw_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t _viewer_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t _custom1_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t _rcache_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t _opengl_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t _nodes_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t _movieclip_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t _colormanage_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -134,13 +132,13 @@ static int num_threads_override = 0;
 /* just a max for security reasons */
 #define RE_MAX_THREAD BLENDER_MAX_THREADS
 
-typedef struct ThreadSlot {
+struct ThreadSlot {
   struct ThreadSlot *next, *prev;
   void *(*do_thread)(void *);
   void *callerdata;
   pthread_t pthread;
   int avail;
-} ThreadSlot;
+};
 
 void BLI_threadapi_init(void)
 {
@@ -291,9 +289,8 @@ void BLI_threadpool_clear(ListBase *threadbase)
 void BLI_threadpool_end(ListBase *threadbase)
 {
 
-  /* only needed if there's actually some stuff to end
-   * this way we don't end up decrementing thread_levels on an empty threadbase
-   * */
+  /* Only needed if there's actually some stuff to end
+   * this way we don't end up decrementing thread_levels on an empty `threadbase`. */
   if (threadbase == nullptr || BLI_listbase_is_empty(threadbase)) {
     return;
   }
@@ -368,10 +365,6 @@ static ThreadMutex *global_mutex_from_type(const int type)
       return &_viewer_lock;
     case LOCK_CUSTOM1:
       return &_custom1_lock;
-    case LOCK_RCACHE:
-      return &_rcache_lock;
-    case LOCK_OPENGL:
-      return &_opengl_lock;
     case LOCK_NODES:
       return &_nodes_lock;
     case LOCK_MOVIECLIP:
@@ -475,7 +468,7 @@ void BLI_spin_lock(SpinLock *spin)
 #elif defined(_MSC_VER)
   while (InterlockedExchangeAcquire(spin, 1)) {
     while (*spin) {
-      /* Spin-lock hint for processors with hyperthreading. */
+      /* Spin-lock hint for processors with hyper-threading. */
       YieldProcessor();
     }
   }

@@ -56,7 +56,7 @@ class HAIR_MT_add_attribute(Menu):
 
     @staticmethod
     def add_standard_attribute(layout, hair, name, data_type, domain):
-        exists = hair.attributes.get(name) != None
+        exists = hair.attributes.get(name) is not None
 
         col = layout.column()
         col.enabled = not exists
@@ -86,8 +86,9 @@ class HAIR_UL_attributes(UIList):
         domain = attribute.bl_rna.properties['domain'].enum_items[attribute.domain]
 
         split = layout.split(factor=0.5)
+        split.emboss = 'NONE'
         row = split.row()
-        row.prop(attribute, "name", text="", emboss=False)
+        row.prop(attribute, "name", text="")
         sub = split.split()
         sub.alignment = 'RIGHT'
         sub.active = False
@@ -106,12 +107,19 @@ class DATA_PT_hair_attributes(DataButtonsPanel, Panel):
         row = layout.row()
 
         col = row.column()
-        col.template_list("HAIR_UL_attributes", "attributes", hair, "attributes", hair.attributes, "active_index", rows=3)
+        col.template_list(
+            "HAIR_UL_attributes",
+            "attributes",
+            hair,
+            "attributes",
+            hair.attributes,
+            "active_index",
+            rows=3,
+        )
 
         col = row.column(align=True)
         col.menu("HAIR_MT_add_attribute", icon='ADD', text="")
         col.operator("geometry.attribute_remove", icon='REMOVE', text="")
-
 
 
 class DATA_PT_custom_props_hair(DataButtonsPanel, PropertyPanel, Panel):

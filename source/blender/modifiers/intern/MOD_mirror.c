@@ -25,6 +25,7 @@
 
 #include "BLT_translation.h"
 
+#include "DNA_defaults.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
@@ -59,16 +60,16 @@ static void initData(ModifierData *md)
 {
   MirrorModifierData *mmd = (MirrorModifierData *)md;
 
-  mmd->flag |= (MOD_MIR_AXIS_X | MOD_MIR_VGROUP);
-  mmd->tolerance = 0.001;
-  mmd->mirror_ob = NULL;
+  BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(mmd, modifier));
+
+  MEMCPY_STRUCT_AFTER(mmd, DNA_struct_default_get(MirrorModifierData), modifier);
 }
 
-static void foreachObjectLink(ModifierData *md, Object *ob, ObjectWalkFunc walk, void *userData)
+static void foreachIDLink(ModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
 {
   MirrorModifierData *mmd = (MirrorModifierData *)md;
 
-  walk(userData, ob, &mmd->mirror_ob, IDWALK_CB_NOP);
+  walk(userData, ob, (ID **)&mmd->mirror_ob, IDWALK_CB_NOP);
 }
 
 static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
@@ -80,20 +81,17 @@ static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphConte
   }
 }
 
-static Mesh *mirrorModifier__doMirror(MirrorModifierData *mmd,
-                                      const ModifierEvalContext *ctx,
-                                      Object *ob,
-                                      Mesh *mesh)
+static Mesh *mirrorModifier__doMirror(MirrorModifierData *mmd, Object *ob, Mesh *mesh)
 {
   Mesh *result = mesh;
 
   /* check which axes have been toggled and mirror accordingly */
   if (mmd->flag & MOD_MIR_AXIS_X) {
-    result = BKE_mesh_mirror_apply_mirror_on_axis(mmd, ctx, ob, result, 0);
+    result = BKE_mesh_mirror_apply_mirror_on_axis_for_modifier(mmd, ob, result, 0);
   }
   if (mmd->flag & MOD_MIR_AXIS_Y) {
     Mesh *tmp = result;
-    result = BKE_mesh_mirror_apply_mirror_on_axis(mmd, ctx, ob, result, 1);
+    result = BKE_mesh_mirror_apply_mirror_on_axis_for_modifier(mmd, ob, result, 1);
     if (tmp != mesh) {
       /* free intermediate results */
       BKE_id_free(NULL, tmp);
@@ -101,7 +99,7 @@ static Mesh *mirrorModifier__doMirror(MirrorModifierData *mmd,
   }
   if (mmd->flag & MOD_MIR_AXIS_Z) {
     Mesh *tmp = result;
-    result = BKE_mesh_mirror_apply_mirror_on_axis(mmd, ctx, ob, result, 2);
+    result = BKE_mesh_mirror_apply_mirror_on_axis_for_modifier(mmd, ob, result, 2);
     if (tmp != mesh) {
       /* free intermediate results */
       BKE_id_free(NULL, tmp);
@@ -116,7 +114,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   Mesh *result;
   MirrorModifierData *mmd = (MirrorModifierData *)md;
 
-  result = mirrorModifier__doMirror(mmd, ctx, ctx->object, mesh);
+  result = mirrorModifier__doMirror(mmd, ctx->object, mesh);
 
   if (result != mesh) {
     result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
@@ -216,12 +214,14 @@ ModifierTypeInfo modifierType_Mirror = {
     /* name */ "Mirror",
     /* structName */ "MirrorModifierData",
     /* structSize */ sizeof(MirrorModifierData),
+    /* srna */ &RNA_MirrorModifier,
     /* type */ eModifierTypeType_Constructive,
     /* flags */ eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsMapping |
         eModifierTypeFlag_SupportsEditmode | eModifierTypeFlag_EnableInEditmode |
         eModifierTypeFlag_AcceptsCVs |
         /* this is only the case when 'MOD_MIR_VGROUP' is used */
         eModifierTypeFlag_UsesPreview,
+    /* icon */ ICON_MOD_MIRROR,
 
     /* copyData */ BKE_modifier_copydata_generic,
 
@@ -231,7 +231,7 @@ ModifierTypeInfo modifierType_Mirror = {
     /* deformMatricesEM */ NULL,
     /* modifyMesh */ modifyMesh,
     /* modifyHair */ NULL,
-    /* modifyPointCloud */ NULL,
+    /* modifyGeometrySet */ NULL,
     /* modifyVolume */ NULL,
 
     /* initData */ initData,
@@ -241,8 +241,7 @@ ModifierTypeInfo modifierType_Mirror = {
     /* updateDepsgraph */ updateDepsgraph,
     /* dependsOnTime */ NULL,
     /* dependsOnNormals */ NULL,
-    /* foreachObjectLink */ foreachObjectLink,
-    /* foreachIDLink */ NULL,
+    /* foreachIDLink */ foreachIDLink,
     /* foreachTexLink */ NULL,
     /* freeRuntimeData */ NULL,
     /* panelRegister */ panelRegister,

@@ -22,11 +22,13 @@
  */
 
 #include <stddef.h>
+#include <string.h>
 
 #include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
 
+#include "DNA_defaults.h"
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_screen_types.h"
@@ -54,10 +56,10 @@
 static void initData(ModifierData *md)
 {
   ParticleSystemModifierData *psmd = (ParticleSystemModifierData *)md;
-  psmd->psys = NULL;
-  psmd->mesh_final = NULL;
-  psmd->mesh_original = NULL;
-  psmd->totdmvert = psmd->totdmedge = psmd->totdmface = 0;
+
+  BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(psmd, modifier));
+
+  MEMCPY_STRUCT_AFTER(psmd, DNA_struct_default_get(ParticleSystemModifierData), modifier);
 }
 static void freeData(ModifierData *md)
 {
@@ -88,6 +90,11 @@ static void copyData(const ModifierData *md, ModifierData *target, const int fla
   ParticleSystemModifierData *tpsmd = (ParticleSystemModifierData *)target;
 
   BKE_modifier_copydata_generic(md, target, flag);
+
+  /* NOTE: `psys` pointer here is just copied over from `md` to `target`. This is dangerous, as it
+   * will generate invalid data in case we are copying between different objects. Extra external
+   * code has to be called then to ensure proper remapping of that pointer. See e.g.
+   * `BKE_object_copy_particlesystems` or `BKE_object_copy_modifier`. */
 
   tpsmd->mesh_final = NULL;
   tpsmd->mesh_original = NULL;
@@ -312,12 +319,14 @@ ModifierTypeInfo modifierType_ParticleSystem = {
     /* name */ "ParticleSystem",
     /* structName */ "ParticleSystemModifierData",
     /* structSize */ sizeof(ParticleSystemModifierData),
+    /* srna */ &RNA_ParticleSystemModifier,
     /* type */ eModifierTypeType_OnlyDeform,
     /* flags */ eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsMapping |
         eModifierTypeFlag_UsesPointCache /* |
                           eModifierTypeFlag_SupportsEditmode |
                           eModifierTypeFlag_EnableInEditmode */
     ,
+    /* icon */ ICON_MOD_PARTICLES,
 
     /* copyData */ copyData,
 
@@ -327,7 +336,7 @@ ModifierTypeInfo modifierType_ParticleSystem = {
     /* deformMatricesEM */ NULL,
     /* modifyMesh */ NULL,
     /* modifyHair */ NULL,
-    /* modifyPointCloud */ NULL,
+    /* modifyGeometrySet */ NULL,
     /* modifyVolume */ NULL,
 
     /* initData */ initData,
@@ -337,7 +346,6 @@ ModifierTypeInfo modifierType_ParticleSystem = {
     /* updateDepsgraph */ NULL,
     /* dependsOnTime */ NULL,
     /* dependsOnNormals */ NULL,
-    /* foreachObjectLink */ NULL,
     /* foreachIDLink */ NULL,
     /* foreachTexLink */ NULL,
     /* freeRuntimeData */ NULL,

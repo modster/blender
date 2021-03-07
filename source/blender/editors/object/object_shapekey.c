@@ -36,7 +36,6 @@
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 
-#include "DNA_curve_types.h"
 #include "DNA_key_types.h"
 #include "DNA_lattice_types.h"
 #include "DNA_mesh_types.h"
@@ -44,7 +43,6 @@
 #include "DNA_object_types.h"
 
 #include "BKE_context.h"
-#include "BKE_curve.h"
 #include "BKE_key.h"
 #include "BKE_lattice.h"
 #include "BKE_main.h"
@@ -53,7 +51,7 @@
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
 
-#include "BLI_sys_types.h"  // for intptr_t support
+#include "BLI_sys_types.h" /* for intptr_t support */
 
 #include "ED_mesh.h"
 #include "ED_object.h"

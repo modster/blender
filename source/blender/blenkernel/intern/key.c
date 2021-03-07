@@ -108,7 +108,8 @@ static void shapekey_foreach_id(ID *id, LibraryForeachIDData *data)
 static void shapekey_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
   Key *key = (Key *)id;
-  if (key->id.us > 0 || BLO_write_is_undo(writer)) {
+  const bool is_undo = BLO_write_is_undo(writer);
+  if (key->id.us > 0 || is_undo) {
     /* write LibData */
     BLO_write_id_struct(writer, Key, id_address, &key->id);
     BKE_id_blend_write(writer, &key->id);
@@ -119,9 +120,15 @@ static void shapekey_blend_write(BlendWriter *writer, ID *id, const void *id_add
 
     /* direct data */
     LISTBASE_FOREACH (KeyBlock *, kb, &key->block) {
-      BLO_write_struct(writer, KeyBlock, kb);
-      if (kb->data) {
-        BLO_write_raw(writer, kb->totelem * key->elemsize, kb->data);
+      KeyBlock tmp_kb = *kb;
+      /* Do not store actual geometry data in case this is a library override ID. */
+      if (ID_IS_OVERRIDE_LIBRARY(key) && !is_undo) {
+        tmp_kb.totelem = 0;
+        tmp_kb.data = NULL;
+      }
+      BLO_write_struct_at_address(writer, KeyBlock, kb, &tmp_kb);
+      if (tmp_kb.data != NULL) {
+        BLO_write_raw(writer, tmp_kb.totelem * key->elemsize, tmp_kb.data);
       }
     }
   }
@@ -183,14 +190,14 @@ static void shapekey_blend_read_lib(BlendLibReader *reader, ID *id)
   Key *key = (Key *)id;
   BLI_assert((key->id.tag & LIB_TAG_EXTERN) == 0);
 
-  BLO_read_id_address(reader, key->id.lib, &key->ipo);  // XXX deprecated - old animation system
+  BLO_read_id_address(reader, key->id.lib, &key->ipo); /* XXX deprecated - old animation system */
   BLO_read_id_address(reader, key->id.lib, &key->from);
 }
 
 static void shapekey_blend_read_expand(BlendExpander *expander, ID *id)
 {
   Key *key = (Key *)id;
-  BLO_expand(expander, key->ipo);  // XXX deprecated - old animation system
+  BLO_expand(expander, key->ipo); /* XXX deprecated - old animation system */
 }
 
 IDTypeInfo IDType_ID_KE = {
@@ -209,11 +216,16 @@ IDTypeInfo IDType_ID_KE = {
     .make_local = NULL,
     .foreach_id = shapekey_foreach_id,
     .foreach_cache = NULL,
+    .owner_get = NULL, /* Could have one actually? */
 
     .blend_write = shapekey_blend_write,
     .blend_read_data = shapekey_blend_read_data,
     .blend_read_lib = shapekey_blend_read_lib,
     .blend_read_expand = shapekey_blend_read_expand,
+
+    .blend_read_undo_preserve = NULL,
+
+    .lib_override_apply_post = NULL,
 };
 
 #define KEY_MODE_DUMMY 0 /* use where mode isn't checked for */
@@ -249,7 +261,7 @@ Key *BKE_key_add(Main *bmain, ID *id) /* common function */
   Key *key;
   char *el;
 
-  key = BKE_libblock_alloc(bmain, ID_KE, "Key", 0);
+  key = BKE_id_new(bmain, ID_KE, "Key");
 
   key->type = KEY_NORMAL;
   key->from = id;
@@ -294,43 +306,6 @@ Key *BKE_key_add(Main *bmain, ID *id) /* common function */
   }
 
   return key;
-}
-
-Key *BKE_key_copy(Main *bmain, const Key *key)
-{
-  Key *key_copy;
-  BKE_id_copy(bmain, &key->id, (ID **)&key_copy);
-  return key_copy;
-}
-
-/* XXX TODO get rid of this! */
-Key *BKE_key_copy_nolib(Key *key)
-{
-  Key *keyn;
-  KeyBlock *kbn, *kb;
-
-  keyn = MEM_dupallocN(key);
-
-  keyn->adt = NULL;
-
-  BLI_duplicatelist(&keyn->block, &key->block);
-
-  kb = key->block.first;
-  kbn = keyn->block.first;
-  while (kbn) {
-
-    if (kbn->data) {
-      kbn->data = MEM_dupallocN(kbn->data);
-    }
-    if (kb == key->refkey) {
-      keyn->refkey = kbn;
-    }
-
-    kbn = kbn->next;
-    kb = kb->next;
-  }
-
-  return keyn;
 }
 
 /* Sort shape keys and Ipo curves after a change.  This assumes that at most
@@ -959,7 +934,7 @@ static void key_evaluate_relative(const int start,
         reffrom = refb->data;
 
         poin += start * poinsize;
-        reffrom += key->elemsize * start;  // key elemsize yes!
+        reffrom += key->elemsize * start; /* key elemsize yes! */
         from += key->elemsize * start;
 
         for (b = start; b < end; b += step) {
@@ -1651,7 +1626,7 @@ int BKE_keyblock_element_count_from_shape(const Key *key, const int shape_index)
   int result = 0;
   int index = 0;
   for (const KeyBlock *kb = key->block.first; kb; kb = kb->next, index++) {
-    if ((shape_index == -1) || (index == shape_index)) {
+    if (ELEM(shape_index, -1, index)) {
       result += kb->totelem;
     }
   }
@@ -1691,7 +1666,7 @@ void BKE_keyblock_data_get_from_shape(const Key *key, float (*arr)[3], const int
   uint8_t *elements = (uint8_t *)arr;
   int index = 0;
   for (const KeyBlock *kb = key->block.first; kb; kb = kb->next, index++) {
-    if ((shape_index == -1) || (index == shape_index)) {
+    if (ELEM(shape_index, -1, index)) {
       const int block_elem_len = kb->totelem * key->elemsize;
       memcpy(elements, kb->data, block_elem_len);
       elements += block_elem_len;
@@ -1721,7 +1696,7 @@ void BKE_keyblock_data_set_with_mat4(Key *key,
 
   int index = 0;
   for (KeyBlock *kb = key->block.first; kb; kb = kb->next, index++) {
-    if ((shape_index == -1) || (index == shape_index)) {
+    if (ELEM(shape_index, -1, index)) {
       const int block_elem_len = kb->totelem;
       float(*block_data)[3] = (float(*)[3])kb->data;
       for (int data_offset = 0; data_offset < block_elem_len; ++data_offset) {
@@ -1745,7 +1720,7 @@ void BKE_keyblock_curve_data_set_with_mat4(
 
   int index = 0;
   for (KeyBlock *kb = key->block.first; kb; kb = kb->next, index++) {
-    if ((shape_index == -1) || (index == shape_index)) {
+    if (ELEM(shape_index, -1, index)) {
       const int block_elem_size = kb->totelem * key->elemsize;
       BKE_keyblock_curve_data_transform(nurb, mat, elements, kb->data);
       elements += block_elem_size;
@@ -1761,7 +1736,7 @@ void BKE_keyblock_data_set(Key *key, const int shape_index, const void *data)
   const uint8_t *elements = data;
   int index = 0;
   for (KeyBlock *kb = key->block.first; kb; kb = kb->next, index++) {
-    if ((shape_index == -1) || (index == shape_index)) {
+    if (ELEM(shape_index, -1, index)) {
       const int block_elem_size = kb->totelem * key->elemsize;
       memcpy(kb->data, elements, block_elem_size);
       elements += block_elem_size;

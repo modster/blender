@@ -28,6 +28,8 @@ extern "C" {
  * \brief support for deformation groups and hooks.
  */
 
+struct BlendDataReader;
+struct BlendWriter;
 struct ListBase;
 struct MDeformVert;
 struct MEdge;
@@ -35,8 +37,6 @@ struct MLoop;
 struct MPoly;
 struct Object;
 struct bDeformGroup;
-struct BlendWriter;
-struct BlendDataReader;
 
 struct bDeformGroup *BKE_object_defgroup_new(struct Object *ob, const char *name);
 void BKE_defgroup_copy_list(struct ListBase *outbase, const struct ListBase *inbase);
@@ -79,6 +79,9 @@ float BKE_defvert_multipaint_collective_weight(const struct MDeformVert *dv,
                                                const bool *defbase_sel,
                                                int defbase_tot_sel,
                                                bool is_normalized);
+
+/* This much unlocked weight is considered equivalent to none. */
+#define VERTEX_WEIGHT_LOCK_EPSILON 1e-6f
 
 float BKE_defvert_calc_lock_relative_weight(float weight,
                                             float locked_weight,

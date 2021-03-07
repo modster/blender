@@ -230,7 +230,7 @@ static void pose_brush_grow_factor_task_cb_ex(void *__restrict userdata,
   SculptThreadedTaskData *data = userdata;
   PoseGrowFactorTLSData *gftd = tls->userdata_chunk;
   SculptSession *ss = data->ob->sculpt;
-  const char symm = data->sd->paint.symmetry_flags & PAINT_SYMM_AXIS_ALL;
+  const char symm = SCULPT_mesh_symmetry_xyz_get(data->ob);
   PBVHVertexIter vd;
   BKE_pbvh_vertex_iter_begin(ss->pbvh, data->nodes[n], vd, PBVH_ITER_UNIQUE)
   {
@@ -490,59 +490,64 @@ static bool pose_face_sets_floodfill_cb(
     is_vertex_valid = SCULPT_vertex_has_face_set(ss, index, data->current_face_set);
   }
 
-  if (is_vertex_valid) {
+  if (!is_vertex_valid) {
+    return visit_next;
+  }
 
-    if (!BLI_BITMAP_TEST(data->is_weighted, index)) {
-      data->pose_factor[index] = 1.0f;
-      BLI_BITMAP_ENABLE(data->is_weighted, index);
-      visit_next = true;
-    }
+  if (!BLI_BITMAP_TEST(data->is_weighted, index)) {
+    data->pose_factor[index] = 1.0f;
+    BLI_BITMAP_ENABLE(data->is_weighted, index);
+    visit_next = true;
+  }
 
-    /* Fallback origin accumulation. */
-    if (symmetry_check) {
-      add_v3_v3(data->fallback_origin, SCULPT_vertex_co_get(ss, index));
-      data->fallback_count++;
-    }
+  /* Fallback origin accumulation. */
+  if (symmetry_check) {
+    add_v3_v3(data->fallback_origin, SCULPT_vertex_co_get(ss, index));
+    data->fallback_count++;
+  }
 
-    if (symmetry_check && !SCULPT_vertex_has_unique_face_set(ss, index)) {
+  if (!symmetry_check || SCULPT_vertex_has_unique_face_set(ss, index)) {
+    return visit_next;
+  }
 
-      /* We only add coordinates for calculating the origin when it is possible to go from this
-       * vertex to another vertex in a valid face set for the next iteration. */
-      bool count_as_boundary = false;
+  /* We only add coordinates for calculating the origin when it is possible to go from this
+   * vertex to another vertex in a valid face set for the next iteration. */
+  bool count_as_boundary = false;
 
-      SculptVertexNeighborIter ni;
-      SCULPT_VERTEX_NEIGHBORS_ITER_BEGIN (ss, index, ni) {
-        int next_face_set_candidate = SCULPT_vertex_face_set_get(ss, ni.index);
+  SculptVertexNeighborIter ni;
+  SCULPT_VERTEX_NEIGHBORS_ITER_BEGIN (ss, index, ni) {
+    int next_face_set_candidate = SCULPT_vertex_face_set_get(ss, ni.index);
 
-        /* Check if we can get a valid face set for the next iteration from this neighbor. */
-        if (SCULPT_vertex_has_unique_face_set(ss, ni.index) &&
-            !BLI_gset_haskey(data->visited_face_sets, POINTER_FROM_INT(next_face_set_candidate))) {
-          if (!data->next_face_set_found) {
-            data->next_face_set = next_face_set_candidate;
-            data->next_vertex = ni.index;
-            data->next_face_set_found = true;
-          }
-          count_as_boundary = true;
-        }
+    /* Check if we can get a valid face set for the next iteration from this neighbor. */
+    if (SCULPT_vertex_has_unique_face_set(ss, ni.index) &&
+        !BLI_gset_haskey(data->visited_face_sets, POINTER_FROM_INT(next_face_set_candidate))) {
+      if (!data->next_face_set_found) {
+        data->next_face_set = next_face_set_candidate;
+        data->next_vertex = ni.index;
+        data->next_face_set_found = true;
       }
-      SCULPT_VERTEX_NEIGHBORS_ITER_END(ni);
-
-      /* Origin accumulation. */
-      if (count_as_boundary) {
-        add_v3_v3(data->pose_origin, SCULPT_vertex_co_get(ss, index));
-        data->tot_co++;
-      }
+      count_as_boundary = true;
     }
+  }
+  SCULPT_VERTEX_NEIGHBORS_ITER_END(ni);
+
+  /* Origin accumulation. */
+  if (count_as_boundary) {
+    add_v3_v3(data->pose_origin, SCULPT_vertex_co_get(ss, index));
+    data->tot_co++;
   }
   return visit_next;
 }
 
 /* Public functions. */
 
-/* Calculate the pose origin and (Optionaly the pose factor) that is used when using the pose brush
+/**
+ * Calculate the pose origin and (Optionally the pose factor)
+ * that is used when using the pose brush.
  *
- * r_pose_origin must be a valid pointer. the r_pose_factor is optional. When set to NULL it won't
- * be calculated. */
+ * \param r_pose_origin: Must be a valid pointer.
+ * \param r_pose_factor: Optional, when set to NULL it won't be calculated.
+ */
 void SCULPT_pose_calc_pose_data(Sculpt *sd,
                                 Object *ob,
                                 SculptSession *ss,
@@ -561,7 +566,7 @@ void SCULPT_pose_calc_pose_data(Sculpt *sd,
 
   PoseFloodFillData fdata = {
       .radius = radius,
-      .symm = sd->paint.symmetry_flags & PAINT_SYMM_AXIS_ALL,
+      .symm = SCULPT_mesh_symmetry_xyz_get(ob),
       .pose_factor = r_pose_factor,
       .tot_co = 0,
   };
@@ -735,7 +740,7 @@ static SculptPoseIKChain *pose_ik_chain_init_topology(Sculpt *sd,
      * iteration an the current iteration. */
     for (int j = 0; j < totvert; j++) {
       ik_chain->segments[i].weights[j] = pose_factor_grow[j] - pose_factor_grow_prev[j];
-      /* Store the current grow factor status for the next interation. */
+      /* Store the current grow factor status for the next iteration. */
       pose_factor_grow_prev[j] = pose_factor_grow[j];
     }
   }
@@ -777,7 +782,7 @@ static SculptPoseIKChain *pose_ik_chain_init_face_sets(
 
     PoseFloodFillData fdata = {
         .radius = radius,
-        .symm = sd->paint.symmetry_flags & PAINT_SYMM_AXIS_ALL,
+        .symm = SCULPT_mesh_symmetry_xyz_get(ob),
         .pose_factor = ik_chain->segments[s].weights,
         .tot_co = 0,
         .fallback_count = 0,
@@ -1134,7 +1139,7 @@ void SCULPT_do_pose_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode)
 {
   SculptSession *ss = ob->sculpt;
   Brush *brush = BKE_paint_brush(&sd->paint);
-  const ePaintSymmetryFlags symm = sd->paint.symmetry_flags & PAINT_SYMM_AXIS_ALL;
+  const ePaintSymmetryFlags symm = SCULPT_mesh_symmetry_xyz_get(ob);
 
   /* The pose brush applies all enabled symmetry axis in a single iteration, so the rest can be
    * ignored. */
@@ -1194,7 +1199,7 @@ void SCULPT_do_pose_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode)
         quat_to_mat4(ik_chain->segments[i].trans_mat[symm_it], symm_rot);
       }
 
-      /* Apply segement scale to the transform. */
+      /* Apply segment scale to the transform. */
       for (int scale_i = 0; scale_i < 3; scale_i++) {
         mul_v3_fl(ik_chain->segments[i].trans_mat[symm_it][scale_i],
                   ik_chain->segments[i].scale[scale_i]);

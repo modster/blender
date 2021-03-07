@@ -23,8 +23,8 @@
 
 #pragma once
 
-struct bConstraint;
 struct Object;
+struct bConstraint;
 
 #define TRANSDATABASIC \
   /** Extra data (mirrored element pointer, in editmode mesh to BMVert) \
@@ -53,10 +53,12 @@ typedef struct TransDataMirror {
 typedef struct TransDataExtension {
   /** Initial object drot. */
   float drot[3];
-  // /* Initial object drotAngle,    TODO: not yet implemented */
-  // float drotAngle;
-  // /* Initial object drotAxis, TODO: not yet implemented */
-  // float drotAxis[3];
+#if 0 /* TODO: not yet implemented */
+  /* Initial object drotAngle */
+  float drotAngle;
+  /* Initial object drotAxis */
+  float drotAxis[3];
+#endif
   /** Initial object delta quat. */
   float dquat[4];
   /** Initial object delta scale. */
@@ -120,11 +122,11 @@ typedef struct TransDataCurveHandleFlags {
 
 typedef struct TransData {
   TRANSDATABASIC;
-  /** Distance needed to affect element (for Proportionnal Editing). */
+  /** Distance needed to affect element (for Proportional Editing). */
   float dist;
-  /** Distance to the nearest element (for Proportionnal Editing). */
+  /** Distance to the nearest element (for Proportional Editing). */
   float rdist;
-  /** Factor of the transformation (for Proportionnal Editing). */
+  /** Factor of the transformation (for Proportional Editing). */
   float factor;
   /** Value pointer for special transforms. */
   float *val;
@@ -139,11 +141,11 @@ typedef struct TransData {
   struct Object *ob;
   /** For objects/bones, the first constraint in its constraint stack. */
   struct bConstraint *con;
-  /** For objects, poses. 1 single malloc per TransInfo! */
+  /** For objects, poses. 1 single allocation per #TransInfo! */
   TransDataExtension *ext;
   /** for curves, stores handle flags for modification/cancel. */
   TransDataCurveHandleFlags *hdata;
-  /** If set, copy of Object or PoseChannel protection. */
+  /** If set, copy of Object or #bPoseChannel protection. */
   short protectflag;
 } TransData;
 

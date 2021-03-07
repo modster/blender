@@ -67,7 +67,7 @@ static void InputSpringFlip(TransInfo *t, MouseInput *mi, const double mval[2], 
   InputSpring(t, mi, mval, output);
 
   /* flip scale */
-  /* values can become really big when zoomed in so use longs [#26598] */
+  /* values can become really big when zoomed in so use longs T26598. */
   if (((int64_t)((int)mi->center[0] - mval[0]) * (int64_t)((int)mi->center[0] - mi->imval[0]) +
        (int64_t)((int)mi->center[1] - mval[1]) * (int64_t)((int)mi->center[1] - mi->imval[1])) <
       0) {
@@ -438,7 +438,7 @@ void initMouseInputMode(TransInfo *t, MouseInput *mi, MouseInputMode mode)
   }
 
   /* if we've allocated new data, free the old data
-   * less hassle then checking before every alloc above */
+   * less hassle than checking before every alloc above */
   if (mi_data_prev && (mi_data_prev != mi->data)) {
     MEM_freeN(mi_data_prev);
   }
@@ -497,30 +497,6 @@ void applyMouseInput(TransInfo *t, MouseInput *mi, const int mval[2], float outp
   if (mi->post) {
     mi->post(t, output);
   }
-}
-
-eRedrawFlag handleMouseInput(TransInfo *t, MouseInput *mi, const wmEvent *event)
-{
-  eRedrawFlag redraw = TREDRAW_NOTHING;
-
-  switch (event->type) {
-    case EVT_LEFTSHIFTKEY:
-    case EVT_RIGHTSHIFTKEY:
-      if (event->val == KM_PRESS) {
-        t->modifiers |= MOD_PRECISION;
-        /* shift is modifier for higher precision transforn */
-        mi->precision = 1;
-        redraw = TREDRAW_HARD;
-      }
-      else if (event->val == KM_RELEASE) {
-        t->modifiers &= ~MOD_PRECISION;
-        mi->precision = 0;
-        redraw = TREDRAW_HARD;
-      }
-      break;
-  }
-
-  return redraw;
 }
 
 /** \} */

@@ -276,7 +276,7 @@ void ED_gpencil_layer_frames_duplicate(bGPDlayer *gpl)
       bGPDframe *gpfd;
 
       /* duplicate frame, and deselect self */
-      gpfd = BKE_gpencil_frame_duplicate(gpf);
+      gpfd = BKE_gpencil_frame_duplicate(gpf, true);
       gpf->flag &= ~GP_FRAME_SELECT;
 
       BLI_insertlinkafter(&gpl->frames, gpf, gpfd);
@@ -361,7 +361,7 @@ bool ED_gpencil_anim_copybuf_copy(bAnimContext *ac)
       /* if frame is selected, make duplicate it and its strokes */
       if (gpf->flag & GP_FRAME_SELECT) {
         /* make a copy of this frame */
-        bGPDframe *new_frame = BKE_gpencil_frame_duplicate(gpf);
+        bGPDframe *new_frame = BKE_gpencil_frame_duplicate(gpf, true);
         BLI_addtail(&copied_frames, new_frame);
 
         /* extend extents for keyframes encountered */
@@ -443,7 +443,7 @@ bool ED_gpencil_anim_copybuf_paste(bAnimContext *ac, const short offset_mode)
   }
 
   /* filter data */
-  // TODO: try doing it with selection, then without selection imits
+  /* TODO: try doing it with selection, then without selection limits. */
   filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_SEL |
             ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
   ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
@@ -486,7 +486,7 @@ bool ED_gpencil_anim_copybuf_paste(bAnimContext *ac, const short offset_mode)
          */
         for (gps = gpfs->strokes.first; gps; gps = gps->next) {
           /* make a copy of stroke, then of its points array */
-          gpsn = BKE_gpencil_stroke_duplicate(gps, true);
+          gpsn = BKE_gpencil_stroke_duplicate(gps, true, true);
 
           /* append stroke to frame */
           BLI_addtail(&gpf->strokes, gpsn);
@@ -649,7 +649,7 @@ static bool gpencil_frame_mirror_marker(bGPDframe *gpf, Scene *scene)
 }
 
 /* mirror selected gp-frames on... */
-// TODO: mirror over a specific time
+/* TODO: mirror over a specific time */
 void ED_gpencil_layer_mirror_frames(bGPDlayer *gpl, Scene *scene, short mode)
 {
   switch (mode) {

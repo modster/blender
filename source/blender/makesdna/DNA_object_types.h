@@ -38,9 +38,9 @@ extern "C" {
 
 struct AnimData;
 struct BoundBox;
-struct DerivedMesh;
+struct Curve;
 struct FluidsimSettings;
-struct GpencilBatchCache;
+struct GeometrySet;
 struct Ipo;
 struct Material;
 struct Mesh;
@@ -126,7 +126,10 @@ typedef struct Object_Runtime {
   /** Only used for drawing the parent/child help-line. */
   float parent_display_origin[3];
 
-  /** Selection id of this object; only available in the original object */
+  /**
+   * Selection id of this object. It might differ between an evaluated and its original object,
+   * when the object is being instanced.
+   */
   int select_id;
   char _pad1[3];
 
@@ -146,10 +149,20 @@ typedef struct Object_Runtime {
    */
   struct ID *data_orig;
   /**
-   * Object data structure created during object evaluation.
-   * It has all modifiers applied.
+   * Object data structure created during object evaluation. It has all modifiers applied.
+   * The type is determined by the type of the original object. For example, for mesh and curve
+   * objects, this is a mesh. For a volume object, this is a volume.
    */
   struct ID *data_eval;
+
+  /**
+   * Objects can evaluate to a geometry set instead of a single ID. In those cases, the evaluated
+   * geometry set will be stored here. An ID of the correct type is still stored in #data_eval.
+   * #geometry_set_eval might reference the ID pointed to by #data_eval as well, but does not own
+   * the data.
+   */
+  struct GeometrySet *geometry_set_eval;
+
   /**
    * Mesh structure created during object evaluation.
    * It has deformation only modifiers applied on it.
@@ -173,6 +186,12 @@ typedef struct Object_Runtime {
    * It created when Python calls `object.to_mesh()`.
    */
   struct Mesh *object_as_temp_mesh;
+
+  /**
+   * This is a curve representation of corresponding object.
+   * It created when Python calls `object.to_curve()`.
+   */
+  struct Curve *object_as_temp_curve;
 
   /** Runtime evaluated curve-specific data, not stored in the file. */
   struct CurveCache *curve_cache;
@@ -202,7 +221,7 @@ typedef struct Object {
   /** Old animation system, deprecated for 2.5. */
   struct Ipo *ipo DNA_DEPRECATED;
   /* struct Path *path; */
-  struct bAction *action DNA_DEPRECATED;  // XXX deprecated... old animation system
+  struct bAction *action DNA_DEPRECATED; /* XXX deprecated... old animation system */
   struct bAction *poselib;
   /** Pose data, armature objects only. */
   struct bPose *pose;
@@ -211,7 +230,7 @@ typedef struct Object {
 
   /** Grease Pencil data. */
   struct bGPdata *gpd
-      DNA_DEPRECATED;  // XXX deprecated... replaced by gpencil object, keep for readfile
+      DNA_DEPRECATED; /* XXX deprecated... replaced by gpencil object, keep for readfile */
 
   /** Settings for visualization of object-transform animation. */
   bAnimVizSettings avs;
@@ -219,8 +238,8 @@ typedef struct Object {
   bMotionPath *mpath;
   void *_pad0;
 
-  ListBase constraintChannels DNA_DEPRECATED;  // XXX deprecated... old animation system
-  ListBase effect DNA_DEPRECATED;              // XXX deprecated... keep for readfile
+  ListBase constraintChannels DNA_DEPRECATED; /* XXX deprecated... old animation system */
+  ListBase effect DNA_DEPRECATED;             /* XXX deprecated... keep for readfile */
   /** List of bDeformGroup (vertex groups) names and flag only. */
   ListBase defbase;
   /** List of ModifierData structures. */
@@ -352,8 +371,8 @@ typedef struct Object {
 
   /** Object constraints. */
   ListBase constraints;
-  ListBase nlastrips DNA_DEPRECATED;  // XXX deprecated... old animation system
-  ListBase hooks DNA_DEPRECATED;      // XXX deprecated... old animation system
+  ListBase nlastrips DNA_DEPRECATED; /* XXX deprecated... old animation system */
+  ListBase hooks DNA_DEPRECATED;     /* XXX deprecated... old animation system */
   /** Particle systems. */
   ListBase particlesystem;
 
@@ -366,7 +385,7 @@ typedef struct Object {
 
   /** If fluidsim enabled, store additional settings. */
   struct FluidsimSettings *fluidsimSettings
-      DNA_DEPRECATED;  // XXX deprecated... replaced by mantaflow, keep for readfile
+      DNA_DEPRECATED; /* XXX deprecated... replaced by mantaflow, keep for readfile */
 
   ListBase pc_ids;
 
@@ -419,6 +438,8 @@ typedef struct ObHook {
 
 /* used many places... should be specialized  */
 #define SELECT 1
+
+#define OBJECT_ACTIVE_MODIFIER_NONE -1
 
 /* type */
 enum {
@@ -508,7 +529,7 @@ enum {
 
 /* (short) transflag */
 enum {
-  OB_TRANSFLAG_UNUSED_0 = 1 << 0, /* cleared */
+  OB_TRANSFORM_ADJUST_ROOT_PARENT_FOR_VIEW_LOCK = 1 << 0,
   OB_TRANSFLAG_UNUSED_1 = 1 << 1, /* cleared */
   OB_NEG_SCALE = 1 << 2,
   OB_TRANSFLAG_UNUSED_3 = 1 << 3, /* cleared */

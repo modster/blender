@@ -31,7 +31,6 @@
 
 #include "DEG_depsgraph.h"
 
-struct bNodeSocket;
 struct CacheFile;
 struct Camera;
 struct Collection;
@@ -61,6 +60,7 @@ struct bAction;
 struct bArmature;
 struct bConstraint;
 struct bGPdata;
+struct bNodeSocket;
 struct bNodeTree;
 struct bPoseChannel;
 struct bSound;
@@ -151,6 +151,9 @@ class DepsgraphNodeBuilder : public DepsgraphBuilder {
       ID *id, NodeType comp_type, OperationCode opcode, const char *name = "", int name_tag = -1);
 
   virtual void build_id(ID *id);
+
+  /* Build function for ID types that do not need their own build_xxx() function. */
+  virtual void build_generic_id(ID *id);
 
   virtual void build_idproperties(IDProperty *id_property);
 
@@ -285,8 +288,8 @@ class DepsgraphNodeBuilder : public DepsgraphBuilder {
    * very root is visible (aka not restricted.). */
   bool is_parent_collection_visible_;
 
-  /* Indexed by original ID, values are IDInfo. */
-  Map<const ID *, IDInfo *> id_info_hash_;
+  /* Indexed by original ID.session_uuid, values are IDInfo. */
+  Map<uint, IDInfo *> id_info_hash_;
 
   /* Set of IDs which were already build. Makes it easier to keep track of
    * what was already built and what was not. */

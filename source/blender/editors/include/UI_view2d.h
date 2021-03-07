@@ -131,9 +131,6 @@ void UI_view2d_totRect_set_resize(struct View2D *v2d, int width, int height, boo
 
 void UI_view2d_mask_from_win(const struct View2D *v2d, struct rcti *r_mask);
 
-/* per tab offsets, returns 1 if tab changed */
-bool UI_view2d_tab_set(struct View2D *v2d, int tab);
-
 void UI_view2d_zoom_cache_reset(void);
 
 /* view matrix operations */
@@ -234,7 +231,7 @@ struct View2D *UI_view2d_fromcontext(const struct bContext *C);
 struct View2D *UI_view2d_fromcontext_rwin(const struct bContext *C);
 
 void UI_view2d_scroller_size_get(const struct View2D *v2d, float *r_x, float *r_y);
-void UI_view2d_scale_get(struct View2D *v2d, float *r_x, float *r_y);
+void UI_view2d_scale_get(const struct View2D *v2d, float *r_x, float *r_y);
 float UI_view2d_scale_get_x(const struct View2D *v2d);
 float UI_view2d_scale_get_y(const struct View2D *v2d);
 void UI_view2d_scale_get_inverse(const struct View2D *v2d, float *r_x, float *r_y);

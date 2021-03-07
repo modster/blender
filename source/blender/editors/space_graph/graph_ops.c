@@ -32,15 +32,11 @@
 
 #include "BKE_context.h"
 #include "BKE_global.h"
-#include "BKE_main.h"
 
 #include "UI_view2d.h"
 
 #include "ED_anim_api.h"
-#include "ED_markers.h"
-#include "ED_object.h"
 #include "ED_screen.h"
-#include "ED_select_utils.h"
 #include "ED_transform.h"
 
 #include "graph_intern.h"
@@ -54,7 +50,7 @@
 #include "WM_types.h"
 
 /* ************************** view-based operators **********************************/
-// XXX should these really be here?
+/* XXX should these really be here? */
 
 /* Set Cursor --------------------------------------------------------------------- */
 /* The 'cursor' in the Graph Editor consists of two parts:
@@ -66,7 +62,7 @@ static bool graphview_cursor_poll(bContext *C)
 {
   /* prevent changes during render */
   if (G.is_rendering) {
-    return 0;
+    return false;
   }
 
   return ED_operator_graphedit_active(C);
@@ -452,12 +448,14 @@ void graphedit_operatortypes(void)
   WM_operatortype_append(GRAPH_OT_snap);
   WM_operatortype_append(GRAPH_OT_mirror);
   WM_operatortype_append(GRAPH_OT_frame_jump);
+  WM_operatortype_append(GRAPH_OT_snap_cursor_value);
   WM_operatortype_append(GRAPH_OT_handle_type);
   WM_operatortype_append(GRAPH_OT_interpolation_type);
   WM_operatortype_append(GRAPH_OT_extrapolation_type);
   WM_operatortype_append(GRAPH_OT_easing_type);
   WM_operatortype_append(GRAPH_OT_sample);
   WM_operatortype_append(GRAPH_OT_bake);
+  WM_operatortype_append(GRAPH_OT_unbake);
   WM_operatortype_append(GRAPH_OT_sound_bake);
   WM_operatortype_append(GRAPH_OT_smooth);
   WM_operatortype_append(GRAPH_OT_clean);

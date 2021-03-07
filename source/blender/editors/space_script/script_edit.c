@@ -39,7 +39,7 @@
 
 #include "ED_screen.h"
 
-#include "script_intern.h"  // own include
+#include "script_intern.h" /* own include */
 
 #ifdef WITH_PYTHON
 #  include "BPY_extern_run.h"
@@ -152,7 +152,7 @@ void SCRIPT_OT_reload(wmOperatorType *ot)
 {
   /* identifiers */
   ot->name = "Reload Scripts";
-  ot->description = "Reload Scripts";
+  ot->description = "Reload scripts";
   ot->idname = "SCRIPT_OT_reload";
 
   /* api callbacks */

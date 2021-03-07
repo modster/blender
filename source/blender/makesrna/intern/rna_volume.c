@@ -228,8 +228,8 @@ static void rna_def_volume_grid(BlenderRNA *brna)
       {VOLUME_GRID_BOOLEAN, "BOOLEAN", 0, "Boolean", "Boolean"},
       {VOLUME_GRID_FLOAT, "FLOAT", 0, "Float", "Single precision float"},
       {VOLUME_GRID_DOUBLE, "DOUBLE", 0, "Double", "Double precision"},
-      {VOLUME_GRID_INT, "INT", 0, "Integer", "32 bit integer"},
-      {VOLUME_GRID_INT64, "INT64", 0, "Integer 64 bit", "64 bit integer"},
+      {VOLUME_GRID_INT, "INT", 0, "Integer", "32-bit integer"},
+      {VOLUME_GRID_INT64, "INT64", 0, "Integer 64-bit", "64-bit integer"},
       {VOLUME_GRID_MASK, "MASK", 0, "Mask", "No data, boolean mask of active voxels"},
       {VOLUME_GRID_STRING, "STRING", 0, "String", "Text string"},
       {VOLUME_GRID_VECTOR_FLOAT, "VECTOR_FLOAT", 0, "Float Vector", "3D float vector"},
@@ -343,6 +343,14 @@ static void rna_def_volume_grids(BlenderRNA *brna, PropertyRNA *cprop)
 
   func = RNA_def_function(srna, "unload", "BKE_volume_unload");
   RNA_def_function_ui_description(func, "Unload all grid and voxel data from memory");
+
+  func = RNA_def_function(srna, "save", "BKE_volume_save");
+  RNA_def_function_ui_description(func, "Save grids and metadata to file");
+  RNA_def_function_flag(func, FUNC_USE_MAIN | FUNC_USE_REPORTS);
+  parm = RNA_def_string_file_path(func, "filepath", NULL, 0, "", "File path to save to");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_boolean(func, "success", 0, "", "True if grid list was successfully loaded");
+  RNA_def_function_return(func, parm);
 }
 
 static void rna_def_volume_display(BlenderRNA *brna)
@@ -351,7 +359,7 @@ static void rna_def_volume_display(BlenderRNA *brna)
   PropertyRNA *prop;
 
   srna = RNA_def_struct(brna, "VolumeDisplay", NULL);
-  RNA_def_struct_ui_text(srna, "Volume Display", "Volume object display settings for 3d viewport");
+  RNA_def_struct_ui_text(srna, "Volume Display", "Volume object display settings for 3D viewport");
   RNA_def_struct_sdna(srna, "VolumeDisplay");
 
   prop = RNA_def_property(srna, "density", PROP_FLOAT, PROP_NONE);
@@ -406,16 +414,6 @@ static void rna_def_volume_display(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
-  static const EnumPropertyItem axis_slice_method_items[] = {
-      {VOLUME_AXIS_SLICE_FULL, "FULL", 0, "Full", "Slice the whole domain object"},
-      {VOLUME_AXIS_SLICE_SINGLE,
-       "SINGLE",
-       0,
-       "Single",
-       "Perform a single slice of the domain object"},
-      {0, NULL, 0, NULL, NULL},
-  };
-
   static const EnumPropertyItem axis_slice_position_items[] = {
       {VOLUME_SLICE_AXIS_AUTO,
        "AUTO",
@@ -444,14 +442,15 @@ static void rna_def_volume_display(BlenderRNA *brna)
       prop, "Interpolation", "Interpolation method to use for volumes in solid mode");
   RNA_def_property_update(prop, 0, "rna_Volume_update_display");
 
-  prop = RNA_def_property(srna, "axis_slice_method", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_items(prop, axis_slice_method_items);
-  RNA_def_property_ui_text(prop, "Method", "");
+  prop = RNA_def_property(srna, "use_slice", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "axis_slice_method", VOLUME_AXIS_SLICE_SINGLE);
+  RNA_def_property_ui_text(prop, "Slice", "Perform a single slice of the domain object");
   RNA_def_property_update(prop, 0, "rna_Volume_update_display");
 
   prop = RNA_def_property(srna, "slice_axis", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, axis_slice_position_items);
   RNA_def_property_ui_text(prop, "Axis", "");
+  RNA_def_property_update(prop, 0, "rna_Volume_update_display");
 
   prop = RNA_def_property(srna, "slice_depth", PROP_FLOAT, PROP_FACTOR);
   RNA_def_property_range(prop, 0.0, 1.0);
@@ -605,13 +604,13 @@ static void rna_def_volume(BlenderRNA *brna)
   prop = RNA_def_property(srna, "display", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_sdna(prop, NULL, "display");
   RNA_def_property_struct_type(prop, "VolumeDisplay");
-  RNA_def_property_ui_text(prop, "Display", "Volume display settings for 3d viewport");
+  RNA_def_property_ui_text(prop, "Display", "Volume display settings for 3D viewport");
 
   /* Render */
   prop = RNA_def_property(srna, "render", PROP_POINTER, PROP_NONE);
   RNA_def_property_pointer_sdna(prop, NULL, "render");
   RNA_def_property_struct_type(prop, "VolumeRender");
-  RNA_def_property_ui_text(prop, "Render", "Volume render settings for 3d viewport");
+  RNA_def_property_ui_text(prop, "Render", "Volume render settings for 3D viewport");
 
   /* Common */
   rna_def_animdata_common(srna);

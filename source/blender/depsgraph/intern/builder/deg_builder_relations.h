@@ -45,8 +45,6 @@
 #include "intern/node/deg_node_id.h"
 #include "intern/node/deg_node_operation.h"
 
-struct Base;
-struct bNodeSocket;
 struct CacheFile;
 struct Camera;
 struct Collection;
@@ -79,6 +77,7 @@ struct bAction;
 struct bArmature;
 struct bConstraint;
 struct bGPdata;
+struct bNodeSocket;
 struct bNodeTree;
 struct bPoseChannel;
 struct bSound;
@@ -199,6 +198,9 @@ class DepsgraphRelationBuilder : public DepsgraphBuilder {
 
   virtual void build_id(ID *id);
 
+  /* Build function for ID types that do not need their own build_xxx() function. */
+  virtual void build_generic_id(ID *id);
+
   virtual void build_idproperties(IDProperty *id_property);
 
   virtual void build_scene_render(Scene *scene, ViewLayer *view_layer);
@@ -241,6 +243,7 @@ class DepsgraphRelationBuilder : public DepsgraphBuilder {
                                                OperationNode *operation_from,
                                                ListBase *strips);
   virtual void build_animdata_drivers(ID *id);
+  virtual void build_animdata_force(ID *id);
   virtual void build_animation_images(ID *id);
   virtual void build_action(bAction *action);
   virtual void build_driver(ID *id, FCurve *fcurve);

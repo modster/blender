@@ -36,7 +36,6 @@
 #include "BKE_context.h"
 #include "BKE_editmesh.h"
 #include "BKE_mesh.h"
-#include "BKE_paint.h"
 #include "BKE_report.h"
 
 #include "DEG_depsgraph.h"
@@ -49,6 +48,7 @@
 
 #include "ED_mesh.h"
 #include "ED_object.h"
+#include "ED_paint.h"
 #include "ED_screen.h"
 #include "ED_uvedit.h"
 #include "ED_view3d.h"
@@ -609,7 +609,7 @@ static int mesh_uv_texture_add_exec(bContext *C, wmOperator *UNUSED(op))
 
   if (ob->mode & OB_MODE_TEXTURE_PAINT) {
     Scene *scene = CTX_data_scene(C);
-    BKE_paint_proj_mesh_data_check(scene, ob, NULL, NULL, NULL, NULL);
+    ED_paint_proj_mesh_data_check(scene, ob, NULL, NULL, NULL, NULL);
     WM_event_add_notifier(C, NC_SCENE | ND_TOOLSETTINGS, NULL);
   }
 
@@ -620,7 +620,7 @@ void MESH_OT_uv_texture_add(wmOperatorType *ot)
 {
   /* identifiers */
   ot->name = "Add UV Map";
-  ot->description = "Add UV Map";
+  ot->description = "Add UV map";
   ot->idname = "MESH_OT_uv_texture_add";
 
   /* api callbacks */
@@ -642,7 +642,7 @@ static int mesh_uv_texture_remove_exec(bContext *C, wmOperator *UNUSED(op))
 
   if (ob->mode & OB_MODE_TEXTURE_PAINT) {
     Scene *scene = CTX_data_scene(C);
-    BKE_paint_proj_mesh_data_check(scene, ob, NULL, NULL, NULL, NULL);
+    ED_paint_proj_mesh_data_check(scene, ob, NULL, NULL, NULL, NULL);
     WM_event_add_notifier(C, NC_SCENE | ND_TOOLSETTINGS, NULL);
   }
 
@@ -653,7 +653,7 @@ void MESH_OT_uv_texture_remove(wmOperatorType *ot)
 {
   /* identifiers */
   ot->name = "Remove UV Map";
-  ot->description = "Remove UV Map";
+  ot->description = "Remove UV map";
   ot->idname = "MESH_OT_uv_texture_remove";
 
   /* api callbacks */
@@ -843,7 +843,7 @@ void MESH_OT_customdata_mask_clear(wmOperatorType *ot)
 {
 
   /* identifiers */
-  ot->name = "Clear Sculpt-Mask Data";
+  ot->name = "Clear Sculpt Mask Data";
   ot->idname = "MESH_OT_customdata_mask_clear";
   ot->description = "Clear vertex sculpt masking data from the mesh";
 

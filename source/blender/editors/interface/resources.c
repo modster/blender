@@ -362,6 +362,9 @@ const uchar *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colorid)
         case TH_VERTEX_SELECT:
           cp = ts->vertex_select;
           break;
+        case TH_VERTEX_ACTIVE:
+          cp = ts->vertex_active;
+          break;
         case TH_VERTEX_BEVEL:
           cp = ts->vertex_bevel;
           break;
@@ -615,6 +618,12 @@ const uchar *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colorid)
           break;
         case TH_NODE_LAYOUT:
           cp = ts->nodeclass_layout;
+          break;
+        case TH_NODE_GEOMETRY:
+          cp = ts->nodeclass_geometry;
+          break;
+        case TH_NODE_ATTRIBUTE:
+          cp = ts->nodeclass_attribute;
           break;
         case TH_NODE_SHADER:
           cp = ts->nodeclass_shader;
@@ -1498,19 +1507,4 @@ void UI_make_axis_color(const uchar src_col[3], uchar dst_col[3], const char axi
       BLI_assert(0);
       break;
   }
-}
-
-/* patching UserDef struct and Themes */
-void init_userdef_do_versions(Main *bmain)
-{
-  BLO_version_defaults_userpref_blend(bmain, &U);
-
-  if (STREQ(U.tempdir, "/")) {
-    BKE_tempdir_system_init(U.tempdir);
-  }
-
-  /* Not versioning, just avoid errors. */
-#ifndef WITH_CYCLES
-  BKE_addon_remove_safe(&U.addons, "cycles");
-#endif
 }

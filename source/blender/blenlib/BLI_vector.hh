@@ -186,7 +186,7 @@ class Vector {
 
   template<typename InputIt,
            /* This constructor should not be called with e.g. Vector(3, 10), because that is
-              expected to produce the vector (10, 10, 10). */
+            * expected to produce the vector (10, 10, 10). */
            typename std::enable_if_t<!std::is_convertible_v<InputIt, int>> * = nullptr>
   Vector(InputIt first, InputIt last, Allocator allocator = {})
       : Vector(NoExceptConstructor(), allocator)
@@ -315,13 +315,13 @@ class Vector {
     return MutableSpan<T>(begin_, this->size());
   }
 
-  template<typename U, typename std::enable_if_t<is_convertible_pointer_v<T, U>> * = nullptr>
+  template<typename U, typename std::enable_if_t<is_span_convertible_pointer_v<T, U>> * = nullptr>
   operator Span<U>() const
   {
     return Span<U>(begin_, this->size());
   }
 
-  template<typename U, typename std::enable_if_t<is_convertible_pointer_v<T, U>> * = nullptr>
+  template<typename U, typename std::enable_if_t<is_span_convertible_pointer_v<T, U>> * = nullptr>
   operator MutableSpan<U>()
   {
     return MutableSpan<U>(begin_, this->size());

@@ -53,12 +53,7 @@ void workbench_engine_init(void *ved)
 
   workbench_shader_library_ensure();
 
-  if (!stl->wpd) {
-    stl->wpd = MEM_callocN(sizeof(*stl->wpd), __func__);
-    stl->wpd->taa_sample_len_previous = -1;
-    stl->wpd->view_updated = true;
-  }
-
+  workbench_private_data_alloc(stl);
   WORKBENCH_PrivateData *wpd = stl->wpd;
   workbench_private_data_init(wpd);
   workbench_update_world_ubo(wpd);
@@ -98,7 +93,7 @@ void workbench_cache_init(void *ved)
   workbench_volume_cache_init(vedata);
 }
 
-/* TODO(fclem) DRW_cache_object_surface_material_get needs a refactor to allow passing NULL
+/* TODO(fclem): DRW_cache_object_surface_material_get needs a refactor to allow passing NULL
  * instead of gpumat_array. Avoiding all this boilerplate code. */
 static struct GPUBatch **workbench_object_surface_material_get(Object *ob)
 {
@@ -422,7 +417,7 @@ void workbench_cache_finish(void *ved)
   WORKBENCH_FramebufferList *fbl = vedata->fbl;
   WORKBENCH_PrivateData *wpd = stl->wpd;
 
-  /* TODO(fclem) Only do this when really needed. */
+  /* TODO(fclem): Only do this when really needed. */
   {
     /* HACK we allocate the in front depth here to avoid the overhead when if is not needed. */
     DefaultFramebufferList *dfbl = DRW_viewport_framebuffer_list_get();
@@ -641,6 +636,7 @@ DrawEngineType draw_engine_workbench = {
     &workbench_view_update,
     &workbench_id_update,
     &workbench_render,
+    NULL,
 };
 
 RenderEngineType DRW_engine_viewport_workbench_type = {

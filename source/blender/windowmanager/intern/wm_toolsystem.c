@@ -521,7 +521,7 @@ void WM_toolsystem_refresh_active(bContext *C)
       /* Could skip loop for modes that don't depend on space type. */
       int space_type_mask_handled = 0;
       LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
-        /* Don't change the space type of the active tool, only update it's mode. */
+        /* Don't change the space type of the active tool, only update its mode. */
         const int space_type_mask = (1 << area->spacetype);
         if ((space_type_mask & WM_TOOLSYSTEM_SPACE_MASK) &&
             ((space_type_mask_handled & space_type_mask) == 0)) {
@@ -620,7 +620,7 @@ bToolRef *WM_toolsystem_ref_set_by_id_ex(
     bContext *C, WorkSpace *workspace, const bToolKey *tkey, const char *name, bool cycle)
 {
   wmOperatorType *ot = WM_operatortype_find("WM_OT_tool_set_by_id", false);
-  /* On startup, Python operatores are not yet loaded. */
+  /* On startup, Python operators are not yet loaded. */
   if (ot == NULL) {
     return NULL;
   }

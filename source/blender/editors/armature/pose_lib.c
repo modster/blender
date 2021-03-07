@@ -113,7 +113,7 @@ static int poselib_get_free_index(bAction *act)
 
   /* As poses are not stored in chronological order, we must iterate over this list
    * a few times until we don't make any new discoveries (mostly about the lower bound).
-   * Prevents problems with deleting then trying to add new poses [#27412]
+   * Prevents problems with deleting then trying to add new poses T27412.
    */
   do {
     changed = false;
@@ -1106,7 +1106,7 @@ static void poselib_keytag_pose(bContext *C, Scene *scene, tPoseLib_PreviewData 
     if (pchan) {
       if (!any_bone_selected || ((pchan->bone) && (pchan->bone->flag & BONE_SELECTED))) {
         if (autokey) {
-          /* add datasource override for the PoseChannel, to be used later */
+          /* Add data-source override for the PoseChannel, to be used later. */
           ANIM_relative_keyingset_add_source(&dsources, &pld->ob->id, &RNA_PoseBone, pchan);
 
           /* clear any unkeyed tags */
@@ -1142,7 +1142,7 @@ static void poselib_preview_apply(bContext *C, wmOperator *op)
 
   /* only recalc pose (and its dependencies) if pose has changed */
   if (pld->redraw == PL_PREVIEW_REDRAWALL) {
-    /* don't clear pose if firsttime */
+    /* Don't clear pose if first time. */
     if ((pld->flag & PL_PREVIEW_FIRSTTIME) == 0) {
       poselib_backup_restore(pld);
     }
@@ -1856,7 +1856,7 @@ void POSELIB_OT_browse_interactive(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_BLOCKING;
 
   /* properties */
-  // TODO: make the pose_index into a proper enum instead of a cryptic int...
+  /* TODO: make the pose_index into a proper enum instead of a cryptic int. */
   ot->prop = RNA_def_int(
       ot->srna,
       "pose_index",
@@ -1868,7 +1868,7 @@ void POSELIB_OT_browse_interactive(wmOperatorType *ot)
       0,
       INT_MAX);
 
-  // XXX: percentage vs factor?
+  /* XXX: percentage vs factor? */
   /* not used yet */
 #if 0
   RNA_def_float_factor(ot->srna,

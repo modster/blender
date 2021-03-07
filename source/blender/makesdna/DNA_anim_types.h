@@ -57,6 +57,13 @@ typedef struct FModifier {
   short type;
   /** Settings for the modifier. */
   short flag;
+  /**
+   * Expansion state for the modifier panel and its sub-panels, stored as a bit-field
+   * in depth-first order. (Maximum of `sizeof(short)` total panels).
+   */
+  short ui_expand_flag;
+
+  char _pad[6];
 
   /** The amount that the modifier should influence the value. */
   float influence;
@@ -82,7 +89,7 @@ typedef enum eFModifier_Types {
   FMODIFIER_TYPE_ENVELOPE = 3,
   FMODIFIER_TYPE_CYCLES = 4,
   FMODIFIER_TYPE_NOISE = 5,
-  /** Unimplemented - for applying: fft, high/low pass filters, etc. */
+  /** Unimplemented - for applying: FFT, high/low pass filters, etc. */
   FMODIFIER_TYPE_FILTER = 6,
   FMODIFIER_TYPE_PYTHON = 7,
   FMODIFIER_TYPE_LIMITS = 8,
@@ -96,8 +103,10 @@ typedef enum eFModifier_Types {
 typedef enum eFModifier_Flags {
   /** Modifier is not able to be evaluated for some reason, and should be skipped (internal). */
   FMODIFIER_FLAG_DISABLED = (1 << 0),
-  /** Modifier's data is expanded (in UI). */
+#ifdef DNA_DEPRECATED_ALLOW
+  /** Modifier's data is expanded (in UI). Deprecated, use `ui_expand_flag`. */
   FMODIFIER_FLAG_EXPANDED = (1 << 1),
+#endif
   /** Modifier is active one (in UI) for editing purposes. */
   FMODIFIER_FLAG_ACTIVE = (1 << 2),
   /** User wants modifier to be skipped. */
@@ -263,7 +272,7 @@ typedef struct FMod_Noise {
 
 /* modification modes */
 typedef enum eFMod_Noise_Modifications {
-  /** Modify existing curve, matching it's shape. */
+  /** Modify existing curve, matching its shape. */
   FCM_NOISE_MODIF_REPLACE = 0,
   /** Add noise to the curve. */
   FCM_NOISE_MODIF_ADD,
@@ -438,9 +447,10 @@ typedef enum eDriverVar_Types {
   /** 'final' transform for object/bones */
   DVAR_TYPE_TRANSFORM_CHAN,
 
-  /** Maximum number of variable types.
+  /**
+   * Maximum number of variable types.
    *
-   * \note This must always be th last item in this list,
+   * \note This must always be the last item in this list,
    * so add new types above this line.
    */
   MAX_DVAR_TYPES,
@@ -506,7 +516,7 @@ typedef struct ChannelDriver {
 
   /** Result of previous evaluation. */
   float curval;
-  // XXX to be implemented... this is like the constraint influence setting
+  /* XXX to be implemented... this is like the constraint influence setting. */
   /** Influence of driver on result. */
   float influence;
 
@@ -537,7 +547,7 @@ typedef enum eDriver_Flags {
   DRIVER_FLAG_INVALID = (1 << 0),
   DRIVER_FLAG_DEPRECATED = (1 << 1),
   /** Driver does replace value, but overrides (for layering of animation over driver) */
-  // TODO: this needs to be implemented at some stage or left out...
+  /* TODO: this needs to be implemented at some stage or left out... */
   // DRIVER_FLAG_LAYERING  = (1 << 2),
   /** Use when the expression needs to be recompiled. */
   DRIVER_FLAG_RECOMPILE = (1 << 3),
@@ -549,6 +559,9 @@ typedef enum eDriver_Flags {
 } eDriver_Flags;
 
 /* F-Curves -------------------------------------- */
+
+/** When #active_keyframe_index is set to this, the FCurve does not have an active keyframe. */
+#define FCURVE_ACTIVE_KEYFRAME_NONE -1
 
 /**
  * FPoint (fpt)
@@ -587,10 +600,18 @@ typedef struct FCurve {
   /** Total number of points which define the curve (i.e. size of arrays in FPoints). */
   unsigned int totvert;
 
+  /**
+   * Index of active keyframe in #bezt for numerical editing in the interface. A value of
+   * #FCURVE_ACTIVE_KEYFRAME_NONE indicates that the FCurve has no active keyframe.
+   *
+   * Do not access directly, use #BKE_fcurve_active_keyframe_index() and
+   * #BKE_fcurve_active_keyframe_set() instead.
+   */
+  int active_keyframe_index;
+
   /* value cache + settings */
   /** Value stored from last time curve was evaluated (not threadsafe, debug display only!). */
   float curval;
-  char _pad2[4];
   /** User-editable settings for this curve. */
   short flag;
   /** Value-extending mode for this curve (does not cover). */
@@ -601,9 +622,18 @@ typedef struct FCurve {
   char _pad[3];
 
   /* RNA - data link */
-  /** If applicable, the index of the RNA-array item to get. */
+  /**
+   * When the RNA property from `rna_path` is an array, use this to access the array index.
+   *
+   * \note This may be negative (as it wasn't prevented in 2.91 and older).
+   * Currently it silently fails to resolve the data-path in this case.
+   */
   int array_index;
-  /** RNA-path to resolve data-access. */
+  /**
+   * RNA-path to resolve data-access, see: #RNA_path_resolve_property.
+   *
+   * \note String look-ups for collection and custom-properties are escaped using #BLI_str_escape.
+   */
   char *rna_path;
 
   /* curve coloring (for editor) */
@@ -699,7 +729,7 @@ typedef struct NlaStrip {
   /** Action that is referenced by this strip (strip is 'user' of the action). */
   bAction *act;
 
-  /** F-Curves for controlling this strip's influence and timing */  // TODO: move o.ut?
+  /** F-Curves for controlling this strip's influence and timing */ /* TODO: move out? */
   ListBase fcurves;
   /** F-Curve modifiers to be applied to the entire strip's referenced F-Curves. */
   ListBase modifiers;
@@ -774,8 +804,8 @@ typedef enum eNlaStrip_Flag {
   NLASTRIP_FLAG_ACTIVE = (1 << 0),
   /* NLA strip is selected for editing */
   NLASTRIP_FLAG_SELECT = (1 << 1),
-  //  NLASTRIP_FLAG_SELECT_L      = (1 << 2),   // left handle selected
-  //  NLASTRIP_FLAG_SELECT_R      = (1 << 3),   // right handle selected
+  // NLASTRIP_FLAG_SELECT_L      = (1 << 2),   /* left handle selected. */
+  // NLASTRIP_FLAG_SELECT_R      = (1 << 3),   /* right handle selected. */
 
   /** NLA strip uses the same action that the action being tweaked uses
    * (not set for the tweaking one though). */
@@ -864,6 +894,10 @@ typedef enum eNlaTrack_Flag {
   /** track is not allowed to execute,
    * usually as result of tweaking being enabled (internal flag) */
   NLATRACK_DISABLED = (1 << 10),
+
+  /** This NLA track is added to an override ID, which means it is fully editable.
+   * Irrelevant in case the owner ID is not an override. */
+  NLATRACK_OVERRIDELIBRARY_LOCAL = 1 << 16,
 } eNlaTrack_Flag;
 
 /* ************************************ */
@@ -1047,8 +1081,12 @@ typedef struct AnimOverride {
  * See blenkernel/intern/anim_sys.c for details.
  */
 typedef struct AnimData {
-  /** active action - acts as the 'tweaking track' for the NLA */
+  /**
+   * Active action - acts as the 'tweaking track' for the NLA.
+   * Either use BKE_animdata_set_action() to set this, or call BKE_animdata_action_ensure_idroot()
+   * after setting. */
   bAction *action;
+
   /** temp-storage for the 'real' active action (i.e. the one used before the tweaking-action
    * took over to be edited in the Animation Editors)
    */

@@ -17,8 +17,7 @@
  * All rights reserved.
  *
  * The Original Code is: some of this file.
- *
- * */
+ */
 
 #pragma once
 
@@ -218,6 +217,9 @@ MINLINE unsigned int round_db_to_uint_clamp(double a);
 
 int pow_i(int base, int exp);
 double double_round(double x, int ndigits);
+
+float floor_power_of_10(float f);
+float ceil_power_of_10(float f);
 
 #ifdef BLI_MATH_GCC_WARN_PRAGMA
 #  pragma GCC diagnostic pop

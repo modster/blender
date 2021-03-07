@@ -39,6 +39,10 @@ struct wmTimer;
 #include "DNA_object_types.h"
 #include "DNA_view3d_enums.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct RegionView3D {
 
   /** GL_PROJECTION matrix. */
@@ -188,6 +192,7 @@ typedef struct View3DShading {
 
   /* Render pass displayed in the viewport. Is an `eScenePassType` where one bit is set */
   int render_pass;
+  char aov_name[64];
 
   struct IDProperty *prop;
   void *_pad2;
@@ -218,8 +223,12 @@ typedef struct View3DOverlay {
   /** Armature edit/pose mode settings. */
   float xray_alpha_bone;
 
+  /** Darken Inactive. */
+  float fade_alpha;
+
   /** Other settings. */
   float wireframe_threshold;
+  float wireframe_opacity;
 
   /** Grease pencil settings. */
   float gpencil_paper_opacity;
@@ -479,6 +488,7 @@ enum {
   V3D_SHADING_DEPTH_OF_FIELD = (1 << 11),
   V3D_SHADING_SCENE_LIGHTS_RENDER = (1 << 12),
   V3D_SHADING_SCENE_WORLD_RENDER = (1 << 13),
+  V3D_SHADING_STUDIOLIGHT_VIEW_ROTATION = (1 << 14),
 };
 
 /** #View3DShading.cavity_type */
@@ -502,6 +512,7 @@ enum {
   V3D_OVERLAY_HIDE_OBJECT_XTRAS = (1 << 9),
   V3D_OVERLAY_HIDE_OBJECT_ORIGINS = (1 << 10),
   V3D_OVERLAY_STATS = (1 << 11),
+  V3D_OVERLAY_FADE_INACTIVE = (1 << 12),
 };
 
 /** #View3DOverlay.edit_flag */
@@ -629,3 +640,7 @@ enum {
 /** #BKE_screen_view3d_zoom_to_fac() values above */
 #define RV3D_CAMZOOM_MIN_FACTOR 0.1657359312880714853f
 #define RV3D_CAMZOOM_MAX_FACTOR 44.9852813742385702928f
+
+#ifdef __cplusplus
+}
+#endif

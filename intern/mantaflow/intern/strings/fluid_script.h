@@ -35,15 +35,11 @@ import os.path, shutil, math, sys, gc, multiprocessing, platform, time\n\
 withMPBake = False # Bake files asynchronously\n\
 withMPSave = False # Save files asynchronously\n\
 isWindows = platform.system() != 'Darwin' and platform.system() != 'Linux'\n\
-# TODO (sebbas): Use this to simulate Windows multiprocessing (has default mode spawn)\n\
+# TODO(sebbas): Use this to simulate Windows multiprocessing (has default mode spawn)\n\
 #try:\n\
 #    multiprocessing.set_start_method('spawn')\n\
 #except:\n\
-#    pass\n\
-\n\
-bpy = sys.modules.get('bpy')\n\
-if bpy is not None:\n\
-    sys.executable = bpy.app.binary_path_python\n";
+#    pass\n";
 
 //////////////////////////////////////////////////////////////////////
 // DEBUG
@@ -82,6 +78,11 @@ const std::string fluid_solver_guiding =
     "\n\
 mantaMsg('Solver guiding')\n\
 sg$ID$ = Solver(name='solver_guiding$ID$', gridSize=gs_sg$ID$)\n";
+
+const std::string fluid_solver_viscosity =
+    "\n\
+mantaMsg('Solver viscosity')\n\
+sv$ID$ = Solver(name='solver_viscosity$ID$', gridSize=gs_sv$ID$, dim=dim_s$ID$)\n";
 
 //////////////////////////////////////////////////////////////////////
 // VARIABLES
@@ -122,7 +123,7 @@ timePerFrame_s$ID$ = $TIME_PER_FRAME$\n\
 # In Blender fluid.c: frame_length = DT_DEFAULT * (25.0 / fps) * time_scale\n\
 # with DT_DEFAULT = 0.1\n\
 frameLength_s$ID$ = $FRAME_LENGTH$\n\
-frameLengthUnscaled_s$ID$  = frameLength_s$ID$ / timeScale_s$ID$\n\
+frameLengthUnscaled_s$ID$ = frameLength_s$ID$ / timeScale_s$ID$\n\
 frameLengthRaw_s$ID$ = 0.1 * 25 # dt = 0.1 at 25 fps\n\
 \n\
 dt0_s$ID$          = $DT$\n\
@@ -137,7 +138,7 @@ end_frame_s$ID$     = $END_FRAME$\n\
 \n\
 # Fluid diffusion / viscosity\n\
 domainSize_s$ID$ = $FLUID_DOMAIN_SIZE$ # longest domain side in meters\n\
-viscosity_s$ID$ = $FLUID_VISCOSITY$ / (domainSize_s$ID$*domainSize_s$ID$) # kinematic viscosity in m^2/s\n\
+kinViscosity_s$ID$ = $FLUID_VISCOSITY$ / (domainSize_s$ID$*domainSize_s$ID$) # kinematic viscosity in m^2/s\n\
 \n\
 # Factors to convert Blender units to Manta units\n\
 ratioMetersToRes_s$ID$ = float(domainSize_s$ID$) / float(res_s$ID$) # [meters / cells]\n\
@@ -158,14 +159,12 @@ mantaMsg('scaleAcceleration is ' + str(scaleAcceleration_s$ID$))\n\
 scaleSpeedFrames_s$ID$ = ratioResToBLength_s$ID$ * ratioFrameToFramelength_s$ID$ # [blength/frame] to [cells/frameLength]\n\
 mantaMsg('scaleSpeed is ' + str(scaleSpeedFrames_s$ID$))\n\
 \n\
-scaleSpeedTime_s$ID$ = ratioResToBLength_s$ID$ * ratioBTimeToTimestep_s$ID$ # [blength/btime] to [cells/frameLength]\n\
-mantaMsg('scaleSpeedTime is ' + str(scaleSpeedTime_s$ID$))\n\
-\n\
 gravity_s$ID$ *= scaleAcceleration_s$ID$ # scale from world acceleration to cell based acceleration\n\
 \n\
 # OpenVDB options\n\
 vdbCompression_s$ID$ = $COMPRESSION_OPENVDB$\n\
-vdbPrecisionHalf_s$ID$ = $PRECISION_OPENVDB$\n\
+vdbPrecision_s$ID$ = $PRECISION_OPENVDB$\n\
+vdbClip_s$ID$ = $CLIP_OPENVDB$\n\
 \n\
 # Cache file names\n\
 file_data_s$ID$ = '$NAME_DATA$'\n\
@@ -204,6 +203,10 @@ gamma_sg$ID$ = $GUIDING_FACTOR$\n\
 tau_sg$ID$   = 1.0\n\
 sigma_sg$ID$ = 0.99/tau_sg$ID$\n\
 theta_sg$ID$ = 1.0\n";
+
+const std::string fluid_variables_viscosity =
+    "\n\
+gs_sv$ID$    = vec3($RESX$*2, $RESY$*2, $RESZ$*2)\n";
 
 const std::string fluid_with_obstacle =
     "\n\
@@ -271,8 +274,8 @@ const std::string fluid_alloc =
     "\n\
 mantaMsg('Fluid alloc data')\n\
 flags_s$ID$       = s$ID$.create(FlagGrid, name='$NAME_FLAGS$')\n\
-vel_s$ID$         = s$ID$.create(MACGrid, name='$NAME_VELOCITY$')\n\
-velTmp_s$ID$      = s$ID$.create(MACGrid, name='$NAME_VELOCITYTMP$')\n\
+vel_s$ID$         = s$ID$.create(MACGrid, name='$NAME_VELOCITY$', sparse=True)\n\
+velTmp_s$ID$      = s$ID$.create(MACGrid, name='$NAME_VELOCITYTMP$', sparse=True)\n\
 x_vel_s$ID$       = s$ID$.create(RealGrid, name='$NAME_VELOCITY_X$')\n\
 y_vel_s$ID$       = s$ID$.create(RealGrid, name='$NAME_VELOCITY_Y$')\n\
 z_vel_s$ID$       = s$ID$.create(RealGrid, name='$NAME_VELOCITY_Z$')\n\
@@ -343,7 +346,6 @@ const std::string fluid_alloc_invel =
     "\n\
 mantaMsg('Allocating initial velocity data')\n\
 invelC_s$ID$  = s$ID$.create(VecGrid, name='$NAME_INVELC$')\n\
-invel_s$ID$   = s$ID$.create(MACGrid, name='$NAME_INVEL$')\n\
 x_invel_s$ID$ = s$ID$.create(RealGrid, name='$NAME_INVEL_X$')\n\
 y_invel_s$ID$ = s$ID$.create(RealGrid, name='$NAME_INVEL_Y$')\n\
 z_invel_s$ID$ = s$ID$.create(RealGrid, name='$NAME_INVEL_Z$')\n";
@@ -375,23 +377,14 @@ def fluid_pre_step_$ID$():\n\
     \n\
     # Main vel grid is copied in adapt time step function\n\
     \n\
-    # translate obvels (world space) to grid space\n\
     if using_obstacle_s$ID$:\n\
         # Average out velocities from multiple obstacle objects at one cell\n\
         x_obvel_s$ID$.safeDivide(numObs_s$ID$)\n\
         y_obvel_s$ID$.safeDivide(numObs_s$ID$)\n\
         z_obvel_s$ID$.safeDivide(numObs_s$ID$)\n\
-        \n\
-        x_obvel_s$ID$.multConst(scaleSpeedFrames_s$ID$)\n\
-        y_obvel_s$ID$.multConst(scaleSpeedFrames_s$ID$)\n\
-        z_obvel_s$ID$.multConst(scaleSpeedFrames_s$ID$)\n\
         copyRealToVec3(sourceX=x_obvel_s$ID$, sourceY=y_obvel_s$ID$, sourceZ=z_obvel_s$ID$, target=obvelC_s$ID$)\n\
     \n\
-    # translate invels (world space) to grid space\n\
     if using_invel_s$ID$:\n\
-        x_invel_s$ID$.multConst(scaleSpeedTime_s$ID$)\n\
-        y_invel_s$ID$.multConst(scaleSpeedTime_s$ID$)\n\
-        z_invel_s$ID$.multConst(scaleSpeedTime_s$ID$)\n\
         copyRealToVec3(sourceX=x_invel_s$ID$, sourceY=y_invel_s$ID$, sourceZ=z_invel_s$ID$, target=invelC_s$ID$)\n\
     \n\
     if using_guiding_s$ID$:\n\
@@ -400,7 +393,6 @@ def fluid_pre_step_$ID$():\n\
         interpolateMACGrid(source=guidevel_sg$ID$, target=velT_s$ID$)\n\
         velT_s$ID$.multConst(vec3(gamma_sg$ID$))\n\
     \n\
-    # translate external forces (world space) to grid space\n\
     x_force_s$ID$.multConst(scaleSpeedFrames_s$ID$)\n\
     y_force_s$ID$.multConst(scaleSpeedFrames_s$ID$)\n\
     z_force_s$ID$.multConst(scaleSpeedFrames_s$ID$)\n\
@@ -420,7 +412,9 @@ def fluid_post_step_$ID$():\n\
     mantaMsg('Fluid post step')\n\
     \n\
     # Copy vel grid to reals grids (which Blender internal will in turn use for vel access)\n\
-    copyVec3ToReal(source=vel_s$ID$, targetX=x_vel_s$ID$, targetY=y_vel_s$ID$, targetZ=z_vel_s$ID$)\n";
+    copyVec3ToReal(source=vel_s$ID$, targetX=x_vel_s$ID$, targetY=y_vel_s$ID$, targetZ=z_vel_s$ID$)\n\
+    if using_guiding_s$ID$:\n\
+        copyVec3ToReal(source=guidevel_sg$ID$, targetX=x_guidevel_s$ID$, targetY=y_guidevel_s$ID$, targetZ=z_guidevel_s$ID$)\n";
 
 //////////////////////////////////////////////////////////////////////
 // DESTRUCTION
@@ -583,7 +577,7 @@ def bake_mesh_process_$ID$(framenr, format_data, format_mesh, path_mesh):\n\
     sm$ID$.timestep = frameLength_s$ID$ # no adaptive timestep for mesh\n\
     \n\
     #if using_smoke_s$ID$:\n\
-        # TODO (sebbas): Future update could include smoke mesh (vortex sheets)\n\
+        # TODO(sebbas): Future update could include smoke mesh (vortex sheets)\n\
     if using_liquid_s$ID$:\n\
         liquid_step_mesh_$ID$()\n\
         liquid_save_mesh_$ID$(path_mesh, framenr, format_mesh)\n\
@@ -607,7 +601,7 @@ def bake_particles_process_$ID$(framenr, format_particles, path_particles, resum
     sp$ID$.timestep = frameLength_s$ID$ # no adaptive timestep for particles\n\
     \n\
     #if using_smoke_s$ID$:\n\
-        # TODO (sebbas): Future update could include smoke particles (e.g. fire sparks)\n\
+        # TODO(sebbas): Future update could include smoke particles (e.g. fire sparks)\n\
     if using_liquid_s$ID$:\n\
         liquid_step_particles_$ID$()\n\
         liquid_save_particles_$ID$(path_particles, framenr, format_particles, resumable)\n\
@@ -627,10 +621,6 @@ def bake_guiding_process_$ID$(framenr, format_guiding, path_guiding, resumable):
     x_guidevel_s$ID$.safeDivide(numGuides_s$ID$)\n\
     y_guidevel_s$ID$.safeDivide(numGuides_s$ID$)\n\
     z_guidevel_s$ID$.safeDivide(numGuides_s$ID$)\n\
-    \n\
-    x_guidevel_s$ID$.multConst(scaleSpeedFrames_s$ID$)\n\
-    y_guidevel_s$ID$.multConst(scaleSpeedFrames_s$ID$)\n\
-    z_guidevel_s$ID$.multConst(scaleSpeedFrames_s$ID$)\n\
     copyRealToVec3(sourceX=x_guidevel_s$ID$, sourceY=y_guidevel_s$ID$, sourceZ=z_guidevel_s$ID$, target=guidevelC_s$ID$)\n\
     \n\
     mantaMsg('Extrapolating guiding velocity')\n\
@@ -688,7 +678,9 @@ const std::string fluid_load_guiding =
 def fluid_load_guiding_$ID$(path, framenr, file_format):\n\
     mantaMsg('Fluid load guiding, frame ' + str(framenr))\n\
     guidevel_sg$ID$.setName('$NAME_VELOCITY_GUIDE$')\n\
-    fluid_file_import_s$ID$(dict=fluid_guiding_dict_s$ID$, path=path, framenr=framenr, file_format=file_format, file_name=file_guiding_s$ID$)\n";
+    fluid_file_import_s$ID$(dict=fluid_guiding_dict_s$ID$, path=path, framenr=framenr, file_format=file_format, file_name=file_guiding_s$ID$)\n\
+    \n\
+    copyVec3ToReal(source=guidevel_sg$ID$, targetX=x_guidevel_s$ID$, targetY=y_guidevel_s$ID$, targetZ=z_guidevel_s$ID$)\n";
 
 const std::string fluid_load_vel =
     "\n\
@@ -704,7 +696,7 @@ def fluid_load_vel_$ID$(path, framenr, file_format):\n\
 
 const std::string fluid_file_export =
     "\n\
-def fluid_file_export_s$ID$(framenr, file_format, path, dict, file_name=None, mode_override=True, skip_subframes=True):\n\
+def fluid_file_export_s$ID$(framenr, file_format, path, dict, file_name=None, mode_override=True, skip_subframes=True, clipGrid=None):\n\
     if skip_subframes and ((timePerFrame_s$ID$ + dt0_s$ID$) < frameLength_s$ID$):\n\
         return\n\
     mantaMsg('Fluid file export, frame: ' + str(framenr))\n\
@@ -719,7 +711,7 @@ def fluid_file_export_s$ID$(framenr, file_format, path, dict, file_name=None, mo
             file = os.path.join(path, file_name + '_' + framenr + file_format)\n\
             if not os.path.isfile(file) or mode_override:\n\
                 if file_format == '.vdb':\n\
-                    saveCombined = save(name=file, objects=list(dict.values()), worldSize=domainSize_s$ID$, skipDeletedParts=True, compression=vdbCompression_s$ID$, precisionHalf=vdbPrecisionHalf_s$ID$)\n\
+                    saveCombined = save(name=file, objects=list(dict.values()), worldSize=domainSize_s$ID$, skipDeletedParts=True, compression=vdbCompression_s$ID$, precision=vdbPrecision_s$ID$, clip=vdbClip_s$ID$, clipGrid=clipGrid, meta=True)\n\
                 elif file_format == '.bobj.gz' or file_format == '.obj':\n\
                     for name, object in dict.items():\n\
                         if not os.path.isfile(file) or mode_override:\n\
@@ -770,7 +762,7 @@ while current_frame_s$ID$ <= end_frame_s$ID$:\n\
     \n\
     # Load already simulated data from cache:\n\
     if loop_cnt < from_cache_cnt:\n\
-        load(current_frame_s$ID$, cache_resumable)\n\
+        load_data(current_frame_s$ID$, cache_resumable)\n\
     \n\
     # Otherwise simulate new data\n\
     else:\n\

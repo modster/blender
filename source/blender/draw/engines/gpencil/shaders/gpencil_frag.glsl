@@ -89,14 +89,24 @@ void main()
   fragColor *= stroke_round_cap_mask(
       strokePt1, strokePt2, strokeAspect, strokeThickness, strokeHardeness);
 
-  /* For compatibility with colored alpha buffer.
-   * Note that we are limited to mono-chromatic alpha blending here
-   * because of the blend equation and the limit of 1 color target
-   * when using custom color blending. */
-  revealColor = vec4(0.0, 0.0, 0.0, fragColor.a);
+  /* To avoid aliasing artifacts, we reduce the opacity of small strokes. */
+  fragColor *= smoothstep(0.0, 1.0, unclampedThickness);
 
-  if (fragColor.a < 0.001) {
-    discard;
+  /* Holdout materials. */
+  if (GP_FLAG_TEST(matFlag, GP_STROKE_HOLDOUT | GP_FILL_HOLDOUT)) {
+    revealColor = fragColor.aaaa;
+  }
+  else {
+    /* NOT holdout materials.
+     * For compatibility with colored alpha buffer.
+     * Note that we are limited to mono-chromatic alpha blending here
+     * because of the blend equation and the limit of 1 color target
+     * when using custom color blending. */
+    revealColor = vec4(0.0, 0.0, 0.0, fragColor.a);
+
+    if (fragColor.a < 0.001) {
+      discard;
+    }
   }
 
   vec2 fb_size = max(vec2(textureSize(gpSceneDepthTexture, 0).xy),
@@ -108,7 +118,7 @@ void main()
     discard;
   }
 
-  /* FIXME(fclem) Grrr. This is bad for performance but it's the easiest way to not get
+  /* FIXME(fclem): Grrr. This is bad for performance but it's the easiest way to not get
    * depth written where the mask obliterate the layer. */
   float mask = texture(gpMaskTexture, uvs).r;
   if (mask < 0.001) {

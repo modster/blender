@@ -57,7 +57,7 @@ class MESH_MT_vertex_group_context_menu(Menu):
         layout.separator()
         props = layout.operator("object.vertex_group_lock", icon='LOCKED', text="Lock All")
         props.action, props.mask = 'LOCK', 'ALL'
-        props = layout.operator("object.vertex_group_lock", icon='UNLOCKED', text="UnLock All")
+        props = layout.operator("object.vertex_group_lock", icon='UNLOCKED', text="Unlock All")
         props.action, props.mask = 'UNLOCK', 'ALL'
         props = layout.operator("object.vertex_group_lock", text="Lock Invert All")
         props.action, props.mask = 'INVERT', 'ALL'
@@ -69,7 +69,7 @@ class MESH_MT_shape_key_context_menu(Menu):
     def draw(self, _context):
         layout = self.layout
 
-        layout.operator("object.shape_key_add", icon='ADD', text="New Shape From Mix").from_mix = True
+        layout.operator("object.shape_key_add", icon='ADD', text="New Shape from Mix").from_mix = True
         layout.separator()
         layout.operator("object.shape_key_mirror", icon='ARROW_LEFTRIGHT').use_topology = False
         layout.operator("object.shape_key_mirror", text="Mirror Shape Key (Topology)").use_topology = True
@@ -117,12 +117,13 @@ class MESH_UL_shape_keys(UIList):
             split = layout.split(factor=0.66, align=False)
             split.prop(key_block, "name", text="", emboss=False, icon_value=icon)
             row = split.row(align=True)
+            row.emboss = 'UI_EMBOSS_NONE_OR_STATUS'
             if key_block.mute or (obj.mode == 'EDIT' and not (obj.use_shape_key_edit_mode and obj.type == 'MESH')):
                 row.active = False
             if not item.id_data.use_relative:
-                row.prop(key_block, "frame", text="", emboss=False)
+                row.prop(key_block, "frame", text="")
             elif index > 0:
-                row.prop(key_block, "value", text="", emboss=False)
+                row.prop(key_block, "value", text="")
             else:
                 row.label(text="")
             row.prop(key_block, "mute", text="", emboss=False)
@@ -478,7 +479,15 @@ class DATA_PT_sculpt_vertex_colors(MeshButtonsPanel, Panel):
         row = layout.row()
         col = row.column()
 
-        col.template_list("MESH_UL_vcols", "svcols", me, "sculpt_vertex_colors", me.sculpt_vertex_colors, "active_index", rows=2)
+        col.template_list(
+            "MESH_UL_vcols",
+            "svcols",
+            me,
+            "sculpt_vertex_colors",
+            me.sculpt_vertex_colors,
+            "active_index",
+            rows=2,
+        )
 
         col = row.column(align=True)
         col.operator("mesh.sculpt_vertex_color_add", icon='ADD', text="")

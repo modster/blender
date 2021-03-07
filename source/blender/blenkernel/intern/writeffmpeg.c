@@ -37,6 +37,7 @@
 #  endif
 
 #  include "BLI_math_base.h"
+#  include "BLI_threads.h"
 #  include "BLI_utildefines.h"
 
 #  include "BKE_global.h"
@@ -249,7 +250,7 @@ static int write_audio_frame(FFMpegContext *context)
 
   return 0;
 }
-#  endif  // #ifdef WITH_AUDASPACE
+#  endif /* #ifdef WITH_AUDASPACE */
 
 /* Allocate a temporary frame */
 static AVFrame *alloc_picture(int pix_fmt, int width, int height)
@@ -566,8 +567,8 @@ static AVStream *alloc_video_stream(FFMpegContext *context,
   /* Set up the codec context */
 
   c = st->codec;
-  c->thread_count = 0;
-  c->thread_type = FF_THREAD_FRAME;
+  c->thread_count = BLI_system_thread_count();
+  c->thread_type = FF_THREAD_SLICE;
 
   c->codec_id = codec_id;
   c->codec_type = AVMEDIA_TYPE_VIDEO;
@@ -602,6 +603,8 @@ static AVStream *alloc_video_stream(FFMpegContext *context,
     c->time_base.den = (int)DENUM_MAX;
     c->time_base.num = (int)num;
   }
+
+  st->time_base = c->time_base;
 
   c->gop_size = context->ffmpeg_gop_size;
   c->max_b_frames = context->ffmpeg_max_b_frames;
@@ -778,8 +781,8 @@ static AVStream *alloc_audio_stream(FFMpegContext *context,
   st->id = 1;
 
   c = st->codec;
-  c->thread_count = 0;
-  c->thread_type = FF_THREAD_FRAME;
+  c->thread_count = BLI_system_thread_count();
+  c->thread_type = FF_THREAD_SLICE;
 
   c->codec_id = codec_id;
   c->codec_type = AVMEDIA_TYPE_AUDIO;
@@ -878,9 +881,9 @@ static AVStream *alloc_audio_stream(FFMpegContext *context,
 #  endif
 
   if (c->frame_size == 0) {
-    // used to be if ((c->codec_id >= CODEC_ID_PCM_S16LE) && (c->codec_id <= CODEC_ID_PCM_DVD))
-    // not sure if that is needed anymore, so let's try out if there are any
-    // complaints regarding some ffmpeg versions users might have
+    /* Used to be if ((c->codec_id >= CODEC_ID_PCM_S16LE) && (c->codec_id <= CODEC_ID_PCM_DVD))
+     * not sure if that is needed anymore, so let's try out if there are any
+     * complaints regarding some FFmpeg versions users might have. */
     context->audio_input_samples = FF_MIN_BUFFER_SIZE * 8 / c->bits_per_coded_sample / c->channels;
   }
   else {
@@ -1675,9 +1678,9 @@ static void ffmpeg_set_expert_options(RenderData *rd)
     /* This breaks compatibility for QT. */
     // BKE_ffmpeg_property_add_string(rd, "video", "flags:loop");
     BKE_ffmpeg_property_add_string(rd, "video", "cmp:chroma");
-    BKE_ffmpeg_property_add_string(rd, "video", "partitions:parti4x4");  // Deprecated.
-    BKE_ffmpeg_property_add_string(rd, "video", "partitions:partp8x8");  // Deprecated.
-    BKE_ffmpeg_property_add_string(rd, "video", "partitions:partb8x8");  // Deprecated.
+    BKE_ffmpeg_property_add_string(rd, "video", "partitions:parti4x4"); /* Deprecated. */
+    BKE_ffmpeg_property_add_string(rd, "video", "partitions:partp8x8"); /* Deprecated. */
+    BKE_ffmpeg_property_add_string(rd, "video", "partitions:partb8x8"); /* Deprecated. */
     BKE_ffmpeg_property_add_string(rd, "video", "me:hex");
     BKE_ffmpeg_property_add_string(rd, "video", "subq:6");
     BKE_ffmpeg_property_add_string(rd, "video", "me_range:16");
@@ -1749,7 +1752,7 @@ void BKE_ffmpeg_preset_set(RenderData *rd, int preset)
       rd->ffcodecdata.type = FFMPEG_MPEG2;
       rd->ffcodecdata.video_bitrate = 6000;
 
-      /* Don't set resolution, see [#21351]
+      /* Don't set resolution, see T21351.
        * rd->xsch = 720;
        * rd->ysch = isntsc ? 480 : 576; */
 
@@ -1787,7 +1790,7 @@ void BKE_ffmpeg_preset_set(RenderData *rd, int preset)
         rd->ffcodecdata.codec = AV_CODEC_ID_MPEG4;
       }
       else if (preset == FFMPEG_PRESET_THEORA) {
-        rd->ffcodecdata.type = FFMPEG_OGG;  // XXX broken
+        rd->ffcodecdata.type = FFMPEG_OGG; /* XXX broken */
         rd->ffcodecdata.codec = AV_CODEC_ID_THEORA;
       }
 

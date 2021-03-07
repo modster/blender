@@ -422,7 +422,7 @@ static void bvh_callback(void *userdata, int index, const BVHTreeRay *ray, BVHTr
   }
 }
 
-/* Raytracing for vertex to bone/vertex visibility */
+/* Ray-tracing for vertex to bone/vertex visibility. */
 static void heat_ray_tree_create(LaplacianSystem *sys)
 {
   const MLoopTri *looptri = sys->heat.mlooptri;
@@ -451,7 +451,7 @@ static void heat_ray_tree_create(LaplacianSystem *sys)
 
     BLI_bvhtree_insert(sys->heat.bvhtree, a, bb, 2);
 
-    // Setup inverse pointers to use on isect.orig
+    /* Setup inverse pointers to use on isect.orig */
     sys->heat.vltree[vtri[0]] = lt;
     sys->heat.vltree[vtri[1]] = lt;
     sys->heat.vltree[vtri[2]] = lt;
@@ -497,7 +497,7 @@ static float heat_source_distance(LaplacianSystem *sys, int vertex, int source)
 {
   float closest[3], d[3], dist, cosine;
 
-  /* compute euclidian distance */
+  /* compute Euclidean distance */
   closest_to_line_segment_v3(
       closest, sys->heat.verts[vertex], sys->heat.root[source], sys->heat.tip[source]);
 
@@ -1547,7 +1547,8 @@ static void meshdeform_matrix_solve(MeshDeformModifierData *mmd, MeshDeformBind 
       }
     }
     else {
-      BKE_modifier_set_error(&mmd->modifier, "Failed to find bind solution (increase precision?)");
+      BKE_modifier_set_error(
+          mmd->object, &mmd->modifier, "Failed to find bind solution (increase precision?)");
       error("Mesh Deform: failed to find bind solution.");
       break;
     }

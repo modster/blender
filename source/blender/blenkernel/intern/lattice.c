@@ -198,11 +198,16 @@ IDTypeInfo IDType_ID_LT = {
     .make_local = NULL,
     .foreach_id = lattice_foreach_id,
     .foreach_cache = NULL,
+    .owner_get = NULL,
 
     .blend_write = lattice_blend_write,
     .blend_read_data = lattice_blend_read_data,
     .blend_read_lib = lattice_blend_read_lib,
     .blend_read_expand = lattice_blend_read_expand,
+
+    .blend_read_undo_preserve = NULL,
+
+    .lib_override_apply_post = NULL,
 };
 
 int BKE_lattice_index_from_uvw(Lattice *lt, const int u, const int v, const int w)
@@ -311,25 +316,27 @@ void BKE_lattice_resize(Lattice *lt, int uNew, int vNew, int wNew, Object *ltOb)
   calc_lat_fudu(lt->flag, vNew, &fv, &dv);
   calc_lat_fudu(lt->flag, wNew, &fw, &dw);
 
-  /* If old size is different then resolution changed in interface,
+  /* If old size is different than resolution changed in interface,
    * try to do clever reinit of points. Pretty simply idea, we just
    * deform new verts by old lattice, but scaling them to match old
    * size first.
    */
   if (ltOb) {
-    if (uNew != 1 && lt->pntsu != 1) {
-      fu = lt->fu;
-      du = (lt->pntsu - 1) * lt->du / (uNew - 1);
+    const float default_size = 1.0;
+
+    if (uNew != 1) {
+      fu = -default_size / 2.0;
+      du = default_size / (uNew - 1);
     }
 
-    if (vNew != 1 && lt->pntsv != 1) {
-      fv = lt->fv;
-      dv = (lt->pntsv - 1) * lt->dv / (vNew - 1);
+    if (vNew != 1) {
+      fv = -default_size / 2.0;
+      dv = default_size / (vNew - 1);
     }
 
-    if (wNew != 1 && lt->pntsw != 1) {
-      fw = lt->fw;
-      dw = (lt->pntsw - 1) * lt->dw / (wNew - 1);
+    if (wNew != 1) {
+      fw = -default_size / 2.0;
+      dw = default_size / (wNew - 1);
     }
   }
 
@@ -394,18 +401,9 @@ Lattice *BKE_lattice_add(Main *bmain, const char *name)
 {
   Lattice *lt;
 
-  lt = BKE_libblock_alloc(bmain, ID_LT, name, 0);
-
-  lattice_init_data(&lt->id);
+  lt = BKE_id_new(bmain, ID_LT, name);
 
   return lt;
-}
-
-Lattice *BKE_lattice_copy(Main *bmain, const Lattice *lt)
-{
-  Lattice *lt_copy;
-  BKE_id_copy(bmain, &lt->id, (ID **)&lt_copy);
-  return lt_copy;
 }
 
 bool object_deform_mball(Object *ob, ListBase *dispbase)

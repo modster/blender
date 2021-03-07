@@ -1,6 +1,11 @@
 
 #pragma BLENDER_REQUIRE(common_math_lib.glsl)
 
+vec3 diffuse_dominant_dir(vec3 bent_normal)
+{
+  return bent_normal;
+}
+
 vec3 specular_dominant_dir(vec3 N, vec3 V, float roughness)
 {
   vec3 R = -reflect(V, N);
@@ -15,6 +20,7 @@ float ior_from_f0(float f0)
   return (-f - 1.0) / (f - 1.0);
 }
 
+/* Simplified form of F_eta(eta, 1.0). */
 float f0_from_ior(float eta)
 {
   float A = (eta - 1.0) / (eta + 1.0);
@@ -47,59 +53,46 @@ float F_eta(float eta, float cos_theta)
    * the refracted direction */
   float c = abs(cos_theta);
   float g = eta * eta - 1.0 + c * c;
-  float result;
-
   if (g > 0.0) {
     g = sqrt(g);
-    vec2 g_c = vec2(g) + vec2(c, -c);
-    float A = g_c.y / g_c.x;
-    A *= A;
-    g_c *= c;
-    float B = (g_c.y - 1.0) / (g_c.x + 1.0);
-    B *= B;
-    result = 0.5 * A * (1.0 + B);
+    float A = (g - c) / (g + c);
+    float B = (c * (g + c) - 1.0) / (c * (g - c) + 1.0);
+    return 0.5 * A * A * (1.0 + B * B);
   }
-  else {
-    result = 1.0; /* TIR (no refracted component) */
-  }
-
-  return result;
+  /* Total internal reflections. */
+  return 1.0;
 }
 
 /* Fresnel color blend base on fresnel factor */
 vec3 F_color_blend(float eta, float fresnel, vec3 f0_color)
 {
-  float f0 = F_eta(eta, 1.0);
-  float fac = saturate((fresnel - f0) / max(1e-8, 1.0 - f0));
+  float f0 = f0_from_ior(eta);
+  float fac = saturate((fresnel - f0) / (1.0 - f0));
   return mix(f0_color, vec3(1.0), fac);
 }
 
-/* Fresnel */
-vec3 F_schlick(vec3 f0, float cos_theta)
-{
-  float fac = 1.0 - cos_theta;
-  float fac2 = fac * fac;
-  fac = fac2 * fac2 * fac;
-
-  /* Unreal specular matching : if specular color is below 2% intensity,
-   * (using green channel for intensity) treat as shadowning */
-  return saturate(50.0 * dot(f0, vec3(0.3, 0.6, 0.1))) * fac + (1.0 - fac) * f0;
-}
-
-/* Fresnel approximation for LTC area lights (not MRP) */
-vec3 F_area(vec3 f0, vec3 f90, vec2 lut)
+/* Fresnel split-sum approximation. */
+vec3 F_brdf_single_scatter(vec3 f0, vec3 f90, vec2 lut)
 {
   /* Unreal specular matching : if specular color is below 2% intensity,
    * treat as shadowning */
-  return saturate(50.0 * dot(f0, vec3(0.3, 0.6, 0.1))) * lut.y * f90 + lut.x * f0;
+  return lut.y * f90 + lut.x * f0;
 }
 
-/* Fresnel approximation for IBL */
-vec3 F_ibl(vec3 f0, vec3 f90, vec2 lut)
+/* Multi-scattering brdf approximation from :
+ * "A Multiple-Scattering Microfacet Model for Real-Time Image-based Lighting"
+ * by Carmelo J. Fdez-Agüera. */
+vec3 F_brdf_multi_scatter(vec3 f0, vec3 f90, vec2 lut)
 {
-  /* Unreal specular matching : if specular color is below 2% intensity,
-   * treat as shadowning */
-  return saturate(50.0 * dot(f0, vec3(0.3, 0.6, 0.1))) * lut.y * f90 + lut.x * f0;
+  vec3 FssEss = lut.y * f90 + lut.x * f0;
+
+  float Ess = lut.x + lut.y;
+  float Ems = 1.0 - Ess;
+  vec3 Favg = f0 + (1.0 - f0) / 21.0;
+  vec3 Fms = FssEss * Favg / (1.0 - (1.0 - Ess) * Favg);
+  /* We don't do anything special for diffuse surfaces because the principle bsdf
+   * does not care about energy conservation of the specular layer for dielectrics. */
+  return FssEss + Fms * Ems;
 }
 
 /* GGX */
@@ -142,7 +135,7 @@ void accumulate_light(vec3 light, float fac, inout vec4 accum)
   accum += vec4(light, 1.0) * min(fac, (1.0 - accum.a));
 }
 
-/* ----------- Cone Aperture Approximation --------- */
+/* ----------- Cone angle Approximation --------- */
 
 /* Return a fitted cone angle given the input roughness */
 float cone_cosine(float r)

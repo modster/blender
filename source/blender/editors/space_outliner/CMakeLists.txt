@@ -25,7 +25,9 @@ set(INC
   ../../imbuf
   ../../makesdna
   ../../makesrna
+  ../../sequencer
   ../../windowmanager
+  ../../../../intern/clog
   ../../../../intern/glew-mx
   ../../../../intern/guardedalloc
 )
@@ -33,6 +35,7 @@ set(INC
 
 set(SRC
   outliner_collections.c
+  outliner_context.c
   outliner_dragdrop.c
   outliner_draw.c
   outliner_edit.c
@@ -43,8 +46,27 @@ set(SRC
   outliner_tree.c
   outliner_utils.c
   space_outliner.c
+  tree/common.cc
+  tree/tree_display.cc
+  tree/tree_display_data.cc
+  tree/tree_display_libraries.cc
+  tree/tree_display_orphaned.cc
+  tree/tree_display_scenes.cc
+  tree/tree_display_sequencer.cc
+  tree/tree_display_view_layer.cc
+  tree/tree_element.cc
+  tree/tree_element_anim_data.cc
+  tree/tree_element_driver_base.cc
+  tree/tree_element_nla.cc
 
   outliner_intern.h
+  tree/tree_display.h
+  tree/tree_display.hh
+  tree/tree_element.h
+  tree/tree_element.hh
+  tree/tree_element_anim_data.hh
+  tree/tree_element_driver_base.hh
+  tree/tree_element_nla.hh
 )
 
 set(LIB

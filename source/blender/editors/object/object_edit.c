@@ -24,7 +24,7 @@
 #include <ctype.h>
 #include <float.h>
 #include <math.h>
-#include <stddef.h>  //for offsetof
+#include <stddef.h> /* for offsetof */
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -114,7 +114,7 @@
 #include "WM_toolsystem.h"
 #include "WM_types.h"
 
-#include "object_intern.h"  // own include
+#include "object_intern.h" /* own include */
 
 static CLG_LogRef LOG = {"ed.object.edit"};
 
@@ -163,13 +163,32 @@ Object **ED_object_array_in_mode_or_selected(bContext *C,
   ScrArea *area = CTX_wm_area(C);
   ViewLayer *view_layer = CTX_data_view_layer(C);
   Object *ob_active = OBACT(view_layer);
+  ID *id_pin = NULL;
+  const bool use_objects_in_mode = (ob_active != NULL) &&
+                                   (ob_active->mode & (OB_MODE_EDIT | OB_MODE_POSE));
+  const char space_type = area ? area->spacetype : SPACE_EMPTY;
   Object **objects;
 
   Object *ob = NULL;
   bool use_ob = true;
-  if (area && (area->spacetype == SPACE_PROPERTIES)) {
-    /* May return pinned object. */
-    ob = ED_object_context(C);
+
+  if (space_type == SPACE_PROPERTIES) {
+    SpaceProperties *sbuts = area->spacedata.first;
+    id_pin = sbuts->pinid;
+  }
+
+  if (id_pin && (GS(id_pin->name) == ID_OB)) {
+    /* Pinned data takes priority, in this case ignore selection & other objects in the mode. */
+    ob = (Object *)id_pin;
+  }
+  else if ((space_type == SPACE_PROPERTIES) && (use_objects_in_mode == false)) {
+    /* When using the space-properties, we don't want to use the entire selection
+     * as the current active object may not be selected.
+     *
+     * This is not the case when we're in a mode that supports multi-mode editing,
+     * since the active object and all other objects in the mode will be included
+     * irrespective of selection. */
+    ob = ob_active;
   }
   else if (ob_active && (ob_active->mode &
                          (OB_MODE_ALL_PAINT | OB_MODE_ALL_SCULPT | OB_MODE_ALL_PAINT_GPENCIL))) {
@@ -192,10 +211,10 @@ Object **ED_object_array_in_mode_or_selected(bContext *C,
     }
   }
   else {
-    const View3D *v3d = (area && area->spacetype == SPACE_VIEW3D) ? area->spacedata.first : NULL;
+    const View3D *v3d = (space_type == SPACE_VIEW3D) ? area->spacedata.first : NULL;
     /* When in a mode that supports multiple active objects, use "objects in mode"
      * instead of the object's selection. */
-    if ((ob_active != NULL) && (ob_active->mode & (OB_MODE_EDIT | OB_MODE_POSE))) {
+    if (use_objects_in_mode) {
       objects = BKE_view_layer_array_from_objects_in_mode(view_layer,
                                                           v3d,
                                                           r_objects_len,
@@ -257,6 +276,7 @@ static int object_hide_view_clear_exec(bContext *C, wmOperator *op)
   BKE_layer_collection_sync(scene, view_layer);
   DEG_id_tag_update(&scene->id, ID_RECALC_BASE_FLAGS);
   WM_event_add_notifier(C, NC_SCENE | ND_OB_SELECT, scene);
+  WM_event_add_notifier(C, NC_SCENE | ND_OB_VISIBLE, scene);
 
   return OPERATOR_FINISHED;
 }
@@ -314,6 +334,7 @@ static int object_hide_view_set_exec(bContext *C, wmOperator *op)
   BKE_layer_collection_sync(scene, view_layer);
   DEG_id_tag_update(&scene->id, ID_RECALC_BASE_FLAGS);
   WM_event_add_notifier(C, NC_SCENE | ND_OB_SELECT, scene);
+  WM_event_add_notifier(C, NC_SCENE | ND_OB_VISIBLE, scene);
 
   return OPERATOR_FINISHED;
 }
@@ -430,7 +451,7 @@ static int object_hide_collection_invoke(bContext *C, wmOperator *op, const wmEv
 
   /* Open popup menu. */
   const char *title = CTX_IFACE_(op->type->translation_context, op->type->name);
-  uiPopupMenu *pup = UI_popup_menu_begin(C, title, ICON_GROUP);
+  uiPopupMenu *pup = UI_popup_menu_begin(C, title, ICON_OUTLINER_COLLECTION);
   uiLayout *layout = UI_popup_menu_layout(pup);
 
   ED_collection_hide_menu_draw(C, layout);
@@ -483,7 +504,7 @@ static bool mesh_needs_keyindex(Main *bmain, const Mesh *me)
     return false; /* will be added */
   }
 
-  for (const Object *ob = bmain->objects.first; ob; ob = ob->id.next) {
+  LISTBASE_FOREACH (const Object *, ob, &bmain->objects) {
     if ((ob->parent) && (ob->parent->data == me) && ELEM(ob->partype, PARVERT1, PARVERT3)) {
       return true;
     }
@@ -618,7 +639,7 @@ bool ED_object_editmode_exit_ex(Main *bmain, Scene *scene, Object *obedit, int f
 
   if (ED_object_editmode_load_ex(bmain, obedit, freedata) == false) {
     /* in rare cases (background mode) its possible active object
-     * is flagged for editmode, without 'obedit' being set [#35489] */
+     * is flagged for editmode, without 'obedit' being set T35489. */
     if (UNLIKELY(obedit && obedit->mode & OB_MODE_EDIT)) {
       obedit->mode &= ~OB_MODE_EDIT;
       /* Also happens when mesh is shared across multiple objects. [#T69834] */
@@ -629,12 +650,10 @@ bool ED_object_editmode_exit_ex(Main *bmain, Scene *scene, Object *obedit, int f
 
   /* freedata only 0 now on file saves and render */
   if (freedata) {
-    ListBase pidlist;
-    PTCacheID *pid;
-
     /* flag object caches as outdated */
+    ListBase pidlist;
     BKE_ptcache_ids_from_object(&pidlist, obedit, scene, 0);
-    for (pid = pidlist.first; pid; pid = pid->next) {
+    LISTBASE_FOREACH (PTCacheID *, pid, &pidlist) {
       /* particles don't need reset on geometry change */
       if (pid->type != PTCACHE_TYPE_PARTICLES) {
         pid->cache->flag |= PTCACHE_OUTDATED;
@@ -664,6 +683,32 @@ bool ED_object_editmode_exit(bContext *C, int flag)
   return ED_object_editmode_exit_ex(bmain, scene, obedit, flag);
 }
 
+bool ED_object_editmode_exit_multi_ex(Main *bmain, Scene *scene, ViewLayer *view_layer, int flag)
+{
+  Object *obedit = OBEDIT_FROM_VIEW_LAYER(view_layer);
+  if (obedit == NULL) {
+    return false;
+  }
+  bool changed = false;
+  const short obedit_type = obedit->type;
+
+  LISTBASE_FOREACH (Base *, base, &view_layer->object_bases) {
+    Object *ob = base->object;
+    if ((ob->type == obedit_type) && (ob->mode & OB_MODE_EDIT)) {
+      changed |= ED_object_editmode_exit_ex(bmain, scene, base->object, flag);
+    }
+  }
+  return changed;
+}
+
+bool ED_object_editmode_exit_multi(bContext *C, int flag)
+{
+  Main *bmain = CTX_data_main(C);
+  Scene *scene = CTX_data_scene(C);
+  ViewLayer *view_layer = CTX_data_view_layer(C);
+  return ED_object_editmode_exit_multi_ex(bmain, scene, view_layer, flag);
+}
+
 bool ED_object_editmode_enter_ex(Main *bmain, Scene *scene, Object *ob, int flag)
 {
   bool ok = false;
@@ -673,30 +718,35 @@ bool ED_object_editmode_enter_ex(Main *bmain, Scene *scene, Object *ob, int flag
     return false;
   }
 
-  /* this checks actual object->data, for cases when other scenes have it in editmode context */
-  if (BKE_object_is_in_editmode(ob)) {
-    return true;
-  }
-
   if (BKE_object_obdata_is_libdata(ob)) {
     /* Ideally the caller should check this. */
     CLOG_WARN(&LOG, "Unable to enter edit-mode on library data for object '%s'", ob->id.name + 2);
     return false;
   }
 
-  ob->restore_mode = ob->mode;
+  if ((ob->mode & OB_MODE_EDIT) == 0) {
+    ob->restore_mode = ob->mode;
 
-  ob->mode = OB_MODE_EDIT;
+    ob->mode = OB_MODE_EDIT;
+  }
+
+  /* This checks actual `object->data`,
+   * for cases when other scenes have it in edit-mode context.
+   *
+   * It's important to run this after setting the object's mode (above), since in rare cases
+   * the object may have the edit-data but not it's object-mode set. See T85974. */
+  if (BKE_object_is_in_editmode(ob)) {
+    return true;
+  }
 
   if (ob->type == OB_MESH) {
-    BMEditMesh *em;
-    ok = 1;
+    ok = true;
 
     const bool use_key_index = mesh_needs_keyindex(bmain, ob->data);
 
     EDBM_mesh_make(ob, scene->toolsettings->selectmode, use_key_index);
 
-    em = BKE_editmesh_from_object(ob);
+    BMEditMesh *em = BKE_editmesh_from_object(ob);
     if (LIKELY(em)) {
       /* order doesn't matter */
       EDBM_mesh_normals_update(em);
@@ -707,7 +757,7 @@ bool ED_object_editmode_enter_ex(Main *bmain, Scene *scene, Object *ob, int flag
   }
   else if (ob->type == OB_ARMATURE) {
     bArmature *arm = ob->data;
-    ok = 1;
+    ok = true;
     ED_armature_to_edit(arm);
     /* To ensure all goes in rest-position and without striding. */
 
@@ -719,7 +769,7 @@ bool ED_object_editmode_enter_ex(Main *bmain, Scene *scene, Object *ob, int flag
     WM_main_add_notifier(NC_SCENE | ND_MODE | NS_EDITMODE_ARMATURE, scene);
   }
   else if (ob->type == OB_FONT) {
-    ok = 1;
+    ok = true;
     ED_curve_editfont_make(ob);
 
     WM_main_add_notifier(NC_SCENE | ND_MODE | NS_EDITMODE_TEXT, scene);
@@ -727,7 +777,7 @@ bool ED_object_editmode_enter_ex(Main *bmain, Scene *scene, Object *ob, int flag
   else if (ob->type == OB_MBALL) {
     MetaBall *mb = ob->data;
 
-    ok = 1;
+    ok = true;
     ED_mball_editmball_make(ob);
 
     mb->needs_flush_to_id = 0;
@@ -735,13 +785,13 @@ bool ED_object_editmode_enter_ex(Main *bmain, Scene *scene, Object *ob, int flag
     WM_main_add_notifier(NC_SCENE | ND_MODE | NS_EDITMODE_MBALL, scene);
   }
   else if (ob->type == OB_LATTICE) {
-    ok = 1;
+    ok = true;
     BKE_editlattice_make(ob);
 
     WM_main_add_notifier(NC_SCENE | ND_MODE | NS_EDITMODE_LATTICE, scene);
   }
-  else if (ob->type == OB_SURF || ob->type == OB_CURVE) {
-    ok = 1;
+  else if (ELEM(ob->type, OB_SURF, OB_CURVE)) {
+    ok = true;
     ED_curve_editnurb_make(ob);
 
     WM_main_add_notifier(NC_SCENE | ND_MODE | NS_EDITMODE_CURVE, scene);
@@ -828,12 +878,12 @@ static bool editmode_toggle_poll(bContext *C)
   /* covers proxies too */
   if (ELEM(NULL, ob, ob->data) || ID_IS_LINKED(ob->data) || ID_IS_OVERRIDE_LIBRARY(ob) ||
       ID_IS_OVERRIDE_LIBRARY(ob->data)) {
-    return 0;
+    return false;
   }
 
   /* if hidden but in edit mode, we still display */
   if ((ob->restrictflag & OB_RESTRICT_VIEWPORT) && !(ob->mode & OB_MODE_EDIT)) {
-    return 0;
+    return false;
   }
 
   return OB_TYPE_SUPPORT_EDITMODE(ob->type);
@@ -843,8 +893,8 @@ void OBJECT_OT_editmode_toggle(wmOperatorType *ot)
 {
 
   /* identifiers */
-  ot->name = "Toggle Editmode";
-  ot->description = "Toggle object's editmode";
+  ot->name = "Toggle Edit Mode";
+  ot->description = "Toggle object's edit mode";
   ot->idname = "OBJECT_OT_editmode_toggle";
 
   /* api callbacks */
@@ -1378,7 +1428,7 @@ static int shade_smooth_exec(bContext *C, wmOperator *op)
     CTX_data_selected_editable_objects(C, &ctx_objects);
   }
 
-  for (CollectionPointerLink *ctx_ob = ctx_objects.first; ctx_ob; ctx_ob = ctx_ob->next) {
+  LISTBASE_FOREACH (CollectionPointerLink *, ctx_ob, &ctx_objects) {
     Object *ob = ctx_ob->ptr.data;
     ID *data = ob->data;
     if (data != NULL) {
@@ -1386,7 +1436,7 @@ static int shade_smooth_exec(bContext *C, wmOperator *op)
     }
   }
 
-  for (CollectionPointerLink *ctx_ob = ctx_objects.first; ctx_ob; ctx_ob = ctx_ob->next) {
+  LISTBASE_FOREACH (CollectionPointerLink *, ctx_ob, &ctx_objects) {
     /* Always un-tag all object data-blocks irrespective of our ability to operate on them. */
     Object *ob = ctx_ob->ptr.data;
     ID *data = ob->data;
@@ -1488,14 +1538,13 @@ static const EnumPropertyItem *object_mode_set_itemsf(bContext *C,
 {
   const EnumPropertyItem *input = rna_enum_object_mode_items;
   EnumPropertyItem *item = NULL;
-  Object *ob;
   int totitem = 0;
 
   if (!C) { /* needed for docs */
     return rna_enum_object_mode_items;
   }
 
-  ob = CTX_data_active_object(C);
+  Object *ob = CTX_data_active_object(C);
   if (ob) {
     const bool use_mode_particle_edit = (BLI_listbase_is_empty(&ob->particlesystem) == false) ||
                                         (ob->soft != NULL) ||
@@ -1722,8 +1771,6 @@ static int move_to_collection_exec(bContext *C, wmOperator *op)
   PropertyRNA *prop = RNA_struct_find_property(op->ptr, "collection_index");
   const bool is_link = STREQ(op->idname, "OBJECT_OT_link_to_collection");
   const bool is_new = RNA_boolean_get(op->ptr, "is_new");
-  Collection *collection;
-  ListBase objects = {NULL};
 
   if (!RNA_property_is_set(op->ptr, prop)) {
     BKE_report(op->reports, RPT_ERROR, "No collection selected");
@@ -1731,13 +1778,13 @@ static int move_to_collection_exec(bContext *C, wmOperator *op)
   }
 
   int collection_index = RNA_property_int_get(op->ptr, prop);
-  collection = BKE_collection_from_index(scene, collection_index);
+  Collection *collection = BKE_collection_from_index(scene, collection_index);
   if (collection == NULL) {
     BKE_report(op->reports, RPT_ERROR, "Unexpected error, collection not found");
     return OPERATOR_CANCELLED;
   }
 
-  objects = selected_objects_get(C);
+  ListBase objects = selected_objects_get(C);
 
   if (is_new) {
     char new_collection_name[MAX_NAME];
@@ -1800,11 +1847,9 @@ struct MoveToCollectionData {
 static int move_to_collection_menus_create(wmOperator *op, MoveToCollectionData *menu)
 {
   int index = menu->index;
-  for (CollectionChild *child = menu->collection->children.first; child != NULL;
-       child = child->next) {
+  LISTBASE_FOREACH (CollectionChild *, child, &menu->collection->children) {
     Collection *collection = child->collection;
-    MoveToCollectionData *submenu = MEM_callocN(sizeof(MoveToCollectionData),
-                                                "MoveToCollectionData submenu - expected memleak");
+    MoveToCollectionData *submenu = MEM_callocN(sizeof(MoveToCollectionData), __func__);
     BLI_addtail(&menu->submenus, submenu);
     submenu->collection = collection;
     submenu->index = ++index;
@@ -1816,8 +1861,7 @@ static int move_to_collection_menus_create(wmOperator *op, MoveToCollectionData 
 
 static void move_to_collection_menus_free_recursive(MoveToCollectionData *menu)
 {
-  for (MoveToCollectionData *submenu = menu->submenus.first; submenu != NULL;
-       submenu = submenu->next) {
+  LISTBASE_FOREACH (MoveToCollectionData *, submenu, &menu->submenus) {
     move_to_collection_menus_free_recursive(submenu);
   }
   BLI_freelistN(&menu->submenus);
@@ -1853,18 +1897,17 @@ static void move_to_collection_menu_create(bContext *C, uiLayout *layout, void *
   Scene *scene = CTX_data_scene(C);
   const int icon = (menu->collection == scene->master_collection) ?
                        ICON_SCENE_DATA :
-                       UI_collection_color_icon_get(menu->collection);
+                       UI_icon_color_from_collection(menu->collection);
   uiItemIntO(layout, name, icon, menu->ot->idname, "collection_index", menu->index);
 
-  for (MoveToCollectionData *submenu = menu->submenus.first; submenu != NULL;
-       submenu = submenu->next) {
+  LISTBASE_FOREACH (MoveToCollectionData *, submenu, &menu->submenus) {
     move_to_collection_menus_items(layout, submenu);
   }
 }
 
 static void move_to_collection_menus_items(uiLayout *layout, MoveToCollectionData *menu)
 {
-  const int icon = UI_collection_color_icon_get(menu->collection);
+  const int icon = UI_icon_color_from_collection(menu->collection);
 
   if (BLI_listbase_is_empty(&menu->submenus)) {
     uiItemIntO(layout,
@@ -1920,7 +1963,7 @@ static int move_to_collection_invoke(bContext *C, wmOperator *op, const wmEvent 
   Collection *master_collection = scene->master_collection;
 
   /* We need the data to be allocated so it's available during menu drawing.
-   * Technically we could use wmOperator->customdata. However there is no free callback
+   * Technically we could use #wmOperator.customdata. However there is no free callback
    * called to an operator that exit with OPERATOR_INTERFACE to launch a menu.
    *
    * So we are left with a memory that will necessarily leak. It's a small leak though.*/

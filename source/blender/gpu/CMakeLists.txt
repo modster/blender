@@ -45,6 +45,7 @@ set(INC
   ../nodes
   ../nodes/intern
 
+  ../../../intern/clog
   ../../../intern/ghost
   ../../../intern/glew-mx
   ../../../intern/guardedalloc
@@ -92,9 +93,9 @@ set(SRC
   opengl/gl_backend.cc
   opengl/gl_batch.cc
   opengl/gl_context.cc
-  opengl/gl_drawlist.cc
   opengl/gl_debug.cc
   opengl/gl_debug_layer.cc
+  opengl/gl_drawlist.cc
   opengl/gl_framebuffer.cc
   opengl/gl_immediate.cc
   opengl/gl_index_buffer.cc
@@ -149,12 +150,12 @@ set(SRC
   intern/gpu_material_library.h
   intern/gpu_matrix_private.h
   intern/gpu_node_graph.h
-  intern/gpu_private.h
   intern/gpu_platform_private.hh
+  intern/gpu_private.h
   intern/gpu_query.hh
   intern/gpu_select_private.h
-  intern/gpu_shader_private.hh
   intern/gpu_shader_interface.hh
+  intern/gpu_shader_private.hh
   intern/gpu_state_private.hh
   intern/gpu_texture_private.hh
   intern/gpu_uniform_buffer_private.hh
@@ -340,6 +341,7 @@ data_to_c_simple(shaders/material/gpu_shader_material_noise.glsl SRC)
 data_to_c_simple(shaders/material/gpu_shader_material_normal.glsl SRC)
 data_to_c_simple(shaders/material/gpu_shader_material_normal_map.glsl SRC)
 data_to_c_simple(shaders/material/gpu_shader_material_object_info.glsl SRC)
+data_to_c_simple(shaders/material/gpu_shader_material_output_aov.glsl SRC)
 data_to_c_simple(shaders/material/gpu_shader_material_output_material.glsl SRC)
 data_to_c_simple(shaders/material/gpu_shader_material_output_world.glsl SRC)
 data_to_c_simple(shaders/material/gpu_shader_material_particle_info.glsl SRC)
@@ -388,9 +390,6 @@ data_to_c_simple(shaders/material/gpu_shader_material_world_normals.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_gpencil_stroke_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_gpencil_stroke_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_gpencil_stroke_geom.glsl SRC)
-
-data_to_c_simple(shaders/gpu_shader_gpencil_fill_vert.glsl SRC)
-data_to_c_simple(shaders/gpu_shader_gpencil_fill_frag.glsl SRC)
 
 data_to_c_simple(shaders/gpu_shader_cfg_world_clip_lib.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_colorspace_lib.glsl SRC)

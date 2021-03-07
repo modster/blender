@@ -31,13 +31,13 @@
 extern "C" {
 #endif
 
+struct BlendDataReader;
+struct BlendExpander;
+struct BlendLibReader;
+struct BlendWriter;
 struct ID;
 struct LibraryForeachIDData;
 struct Main;
-struct BlendWriter;
-struct BlendDataReader;
-struct BlendLibReader;
-struct BlendExpander;
 
 /** IDTypeInfo.flags. */
 enum {
@@ -47,6 +47,8 @@ enum {
   IDTYPE_FLAGS_NO_LIBLINKING = 1 << 1,
   /** Indicates that the given IDType does not support making a library-linked ID local. */
   IDTYPE_FLAGS_NO_MAKELOCAL = 1 << 2,
+  /** Indicates that the given IDType does not have animation data. */
+  IDTYPE_FLAGS_NO_ANIMDATA = 1 << 3,
 };
 
 typedef struct IDCacheKey {
@@ -93,12 +95,20 @@ typedef void (*IDTypeForeachCacheFunction)(struct ID *id,
                                            IDTypeForeachCacheFunctionCallback function_callback,
                                            void *user_data);
 
+typedef struct ID *(*IDTypeEmbeddedOwnerGetFunction)(struct Main *bmain, struct ID *id);
+
 typedef void (*IDTypeBlendWriteFunction)(struct BlendWriter *writer,
                                          struct ID *id,
                                          const void *id_address);
 typedef void (*IDTypeBlendReadDataFunction)(struct BlendDataReader *reader, struct ID *id);
 typedef void (*IDTypeBlendReadLibFunction)(struct BlendLibReader *reader, struct ID *id);
 typedef void (*IDTypeBlendReadExpandFunction)(struct BlendExpander *expander, struct ID *id);
+
+typedef void (*IDTypeBlendReadUndoPreserve)(struct BlendLibReader *reader,
+                                            struct ID *id_new,
+                                            struct ID *id_old);
+
+typedef void (*IDTypeLibOverrideApplyPost)(struct ID *id_dst, struct ID *id_src);
 
 typedef struct IDTypeInfo {
   /* ********** General IDType data. ********** */
@@ -112,14 +122,14 @@ typedef struct IDTypeInfo {
    * Bitflag matching id_code, used for filtering (e.g. in file browser), see DNA_ID.h's
    * FILTER_ID_XX enums.
    */
-  int64_t id_filter;
+  uint64_t id_filter;
 
   /**
    * Define the position of this data-block type in the virtual list of all data in a Main that is
    * returned by `set_listbasepointers()`.
    * Very important, this has to be unique and below INDEX_ID_MAX, see DNA_ID.h.
    */
-  short main_listbase_index;
+  int main_listbase_index;
 
   /** Memory size of a data-block of that type. */
   size_t struct_size;
@@ -132,7 +142,7 @@ typedef struct IDTypeInfo {
   const char *translation_context;
 
   /** Generic info flags about that data-block type. */
-  int flags;
+  uint32_t flags;
 
   /* ********** ID management callbacks ********** */
 
@@ -174,6 +184,13 @@ typedef struct IDTypeInfo {
   IDTypeForeachCacheFunction foreach_cache;
 
   /**
+   * For embedded IDs, return their owner ID.
+   */
+  IDTypeEmbeddedOwnerGetFunction owner_get;
+
+  /* ********** Callbacks for reading and writing .blend files. ********** */
+
+  /**
    * Write all structs that should be saved in a .blend file.
    */
   IDTypeBlendWriteFunction blend_write;
@@ -192,6 +209,20 @@ typedef struct IDTypeInfo {
    * Specify which other id data blocks should be loaded when the current one is loaded.
    */
   IDTypeBlendReadExpandFunction blend_read_expand;
+
+  /**
+   * Allow an ID type to preserve some of its data across (memfile) undo steps.
+   *
+   * \note Called from #setup_app_data when undoing or redoing a memfile step.
+   */
+  IDTypeBlendReadUndoPreserve blend_read_undo_preserve;
+
+  /**
+   * Called after library override operations have been applied.
+   *
+   * \note Currently needed for some update operation on point caches.
+   */
+  IDTypeLibOverrideApplyPost lib_override_apply_post;
 } IDTypeInfo;
 
 /* ********** Declaration of each IDTypeInfo. ********** */

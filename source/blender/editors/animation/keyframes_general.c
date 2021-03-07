@@ -39,13 +39,11 @@
 
 #include "BKE_action.h"
 #include "BKE_curve.h"
-#include "BKE_deform.h"
 #include "BKE_fcurve.h"
 #include "BKE_main.h"
 #include "BKE_report.h"
 
 #include "RNA_access.h"
-#include "RNA_enum_types.h"
 
 #include "ED_anim_api.h"
 #include "ED_keyframes_edit.h"
@@ -117,6 +115,9 @@ bool delete_fcurve_keys(FCurve *fcu)
   /* Delete selected BezTriples */
   for (int i = 0; i < fcu->totvert; i++) {
     if (fcu->bezt[i].f2 & SELECT) {
+      if (i == fcu->active_keyframe_index) {
+        BKE_fcurve_active_keyframe_set(fcu, NULL);
+      }
       memmove(&fcu->bezt[i], &fcu->bezt[i + 1], sizeof(BezTriple) * (fcu->totvert - i - 1));
       fcu->totvert--;
       i--;
@@ -387,7 +388,7 @@ static void decimate_fcurve_segment(FCurve *fcu,
   BKE_curve_decimate_bezt_array(&fcu->bezt[bezt_segment_start_idx],
                                 bezt_segment_len,
                                 12, /* The actual resolution displayed in the viewport is dynamic
-                                       so we just pick a value that preserves the curve shape. */
+                                     * so we just pick a value that preserves the curve shape. */
                                 false,
                                 SELECT,
                                 BEZT_FLAG_TEMP_TAG,
@@ -482,7 +483,7 @@ typedef struct tSmooth_Bezt {
 } tSmooth_Bezt;
 
 /* Use a weighted moving-means method to reduce intensity of fluctuations */
-// TODO: introduce scaling factor for weighting falloff
+/* TODO: introduce scaling factor for weighting falloff */
 void smooth_fcurve(FCurve *fcu)
 {
   int totSel = 0;
@@ -764,16 +765,15 @@ short copy_animedit_keys(bAnimContext *ac, ListBase *anim_data)
      * Storing the relevant information here helps avoiding crashes if we undo-repaste. */
     if ((aci->id_type == ID_OB) && (((Object *)aci->id)->type == OB_ARMATURE) && aci->rna_path) {
       Object *ob = (Object *)aci->id;
-      bPoseChannel *pchan;
-      char *bone_name;
 
-      bone_name = BLI_str_quoted_substrN(aci->rna_path, "pose.bones[");
-      pchan = BKE_pose_channel_find_name(ob->pose, bone_name);
-      if (pchan) {
-        aci->is_bone = true;
-      }
+      char *bone_name = BLI_str_quoted_substrN(aci->rna_path, "pose.bones[");
       if (bone_name) {
+        bPoseChannel *pchan = BKE_pose_channel_find_name(ob->pose, bone_name);
         MEM_freeN(bone_name);
+
+        if (pchan) {
+          aci->is_bone = true;
+        }
       }
     }
 

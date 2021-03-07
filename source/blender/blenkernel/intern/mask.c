@@ -263,11 +263,16 @@ IDTypeInfo IDType_ID_MSK = {
     .make_local = NULL,
     .foreach_id = mask_foreach_id,
     .foreach_cache = NULL,
+    .owner_get = NULL,
 
     .blend_write = mask_blend_write,
     .blend_read_data = mask_blend_read_data,
     .blend_read_lib = mask_blend_read_lib,
     .blend_read_expand = mask_blend_read_expand,
+
+    .blend_read_undo_preserve = NULL,
+
+    .lib_override_apply_post = NULL,
 };
 
 static struct {
@@ -1053,34 +1058,6 @@ Mask *BKE_mask_new(Main *bmain, const char *name)
   return mask;
 }
 
-/* TODO(sergey): Use generic BKE_libblock_copy_nolib() instead. */
-/* TODO(bastien): Use new super cool & generic BKE_id_copy_ex() instead! */
-Mask *BKE_mask_copy_nolib(Mask *mask)
-{
-  Mask *mask_new;
-
-  mask_new = MEM_dupallocN(mask);
-
-  /*take care here! - we may want to copy anim data  */
-  mask_new->adt = NULL;
-
-  BLI_listbase_clear(&mask_new->masklayers);
-
-  BKE_mask_layer_copy_list(&mask_new->masklayers, &mask->masklayers);
-
-  /* enable fake user by default */
-  id_fake_user_set(&mask->id);
-
-  return mask_new;
-}
-
-Mask *BKE_mask_copy(Main *bmain, const Mask *mask)
-{
-  Mask *mask_copy;
-  BKE_id_copy(bmain, &mask->id, (ID **)&mask_copy);
-  return mask_copy;
-}
-
 void BKE_mask_point_free(MaskSplinePoint *point)
 {
   if (point->uw) {
@@ -1221,12 +1198,6 @@ void BKE_mask_layer_free_list(ListBase *masklayers)
 
     masklay = masklay_next;
   }
-}
-
-/** Free (or release) any data used by this mask (does not free the mask itself). */
-void BKE_mask_free(Mask *mask)
-{
-  mask_free_data(&mask->id);
 }
 
 void BKE_mask_coord_from_frame(float r_co[2], const float co[2], const float frame_size[2])

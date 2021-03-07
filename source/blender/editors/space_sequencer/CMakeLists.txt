@@ -26,6 +26,7 @@ set(INC
   ../../imbuf
   ../../makesdna
   ../../makesrna
+  ../../sequencer
   ../../windowmanager
   ../../../../intern/atomic
   ../../../../intern/glew-mx
@@ -41,6 +42,7 @@ set(SRC
   sequencer_modifier.c
   sequencer_ops.c
   sequencer_preview.c
+  sequencer_proxy.c
   sequencer_scopes.c
   sequencer_select.c
   sequencer_view.c

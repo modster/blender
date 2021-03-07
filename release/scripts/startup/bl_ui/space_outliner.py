@@ -239,10 +239,10 @@ class OUTLINER_MT_collection(Menu):
         if space.display_mode == 'VIEW_LAYER':
             layout.separator()
             layout.menu("OUTLINER_MT_collection_view_layer", icon='RENDERLAYERS')
-            layout.separator()
 
-            row = layout.row(align=True)
-            row.operator_enum("outliner.collection_color_tag_set", "color", icon_only=True)
+        layout.separator()
+        row = layout.row(align=True)
+        row.operator_enum("outliner.collection_color_tag_set", "color", icon_only=True)
 
         layout.separator()
 
@@ -323,7 +323,7 @@ class OUTLINER_PT_filter(Panel):
         display_mode = space.display_mode
 
         if display_mode == 'VIEW_LAYER':
-            layout.label(text="Restriction Toggles:")
+            layout.label(text="Restriction Toggles")
             row = layout.row(align=True)
             row.prop(space, "show_restrict_column_enable", text="")
             row.prop(space, "show_restrict_column_select", text="")
@@ -334,7 +334,7 @@ class OUTLINER_PT_filter(Panel):
             row.prop(space, "show_restrict_column_indirect_only", text="")
             layout.separator()
         elif display_mode == 'SCENES':
-            layout.label(text="Restriction Toggles:")
+            layout.label(text="Restriction Toggles")
             row = layout.row(align=True)
             row.prop(space, "show_restrict_column_select", text="")
             row.prop(space, "show_restrict_column_hide", text="")
@@ -345,18 +345,16 @@ class OUTLINER_PT_filter(Panel):
         if display_mode != 'DATA_API':
             col = layout.column(align=True)
             col.prop(space, "use_sort_alpha")
-            layout.separator()
 
         row = layout.row(align=True)
         row.prop(space, "use_sync_select", text="Sync Selection")
-        layout.separator()
 
         row = layout.row(align=True)
         row.prop(space, "show_mode_column", text="Show Mode Column")
         layout.separator()
 
         col = layout.column(align=True)
-        col.label(text="Search:")
+        col.label(text="Search")
         col.prop(space, "use_filter_complete", text="Exact Match")
         col.prop(space, "use_filter_case_sensitive", text="Case Sensitive")
 
@@ -365,17 +363,23 @@ class OUTLINER_PT_filter(Panel):
 
         layout.separator()
 
-        layout.label(text="Filter:")
+        layout.label(text="Filter")
 
         col = layout.column(align=True)
 
         row = col.row()
-        row.label(icon='GROUP')
+        row.label(icon='OUTLINER_COLLECTION')
         row.prop(space, "use_filter_collection", text="Collections")
+
         row = col.row()
         row.label(icon='OBJECT_DATAMODE')
         row.prop(space, "use_filter_object", text="Objects")
+        row = col.row(align=True)
+        row.label(icon='BLANK1')
         row.prop(space, "filter_state", text="")
+        sub = row.row(align=True)
+        sub.enabled = space.filter_state != 'ALL'
+        sub.prop(space, "filter_invert", text="", icon='ARROW_LEFTRIGHT')
 
         sub = col.column(align=True)
         sub.active = space.use_filter_object
@@ -406,6 +410,10 @@ class OUTLINER_PT_filter(Panel):
         row = sub.row()
         row.label(icon='EMPTY_DATA')
         row.prop(space, "use_filter_object_empty", text="Empties")
+        row = sub.row()
+        if bpy.data.libraries:
+            row.label(icon='LIBRARY_DATA_OVERRIDE')
+            row.prop(space, "use_filter_lib_override", text="Library Overrides")
 
         if (
                 bpy.data.curves or

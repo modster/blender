@@ -27,6 +27,7 @@ set(INC
   ../../imbuf
   ../../makesdna
   ../../makesrna
+  ../../sequencer
   ../../windowmanager
   ../../../../intern/clog
   ../../../../intern/glew-mx
@@ -38,6 +39,7 @@ set(SRC
   ed_transverts.c
   ed_util.c
   ed_util_imbuf.c
+  ed_util_ops.cc
   gizmo_utils.c
   numinput.c
   select_utils.c
@@ -46,6 +48,7 @@ set(SRC
   ../include/BIF_glutil.h
   ../include/ED_anim_api.h
   ../include/ED_armature.h
+  ../include/ED_asset.h
   ../include/ED_buttons.h
   ../include/ED_clip.h
   ../include/ED_curve.h

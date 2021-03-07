@@ -203,11 +203,12 @@ static void screenshot_draw(bContext *UNUSED(C), wmOperator *op)
 {
   uiLayout *layout = op->layout;
   ScreenshotData *scd = op->customdata;
-  PointerRNA ptr;
 
   uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
 
   /* image template */
+  PointerRNA ptr;
   RNA_pointer_create(NULL, &RNA_ImageFormatSettings, &scd->im_format, &ptr);
   uiTemplateImageSettings(layout, &ptr, false);
 
@@ -228,7 +229,6 @@ static bool screenshot_poll(bContext *C)
 
 void SCREEN_OT_screenshot(wmOperatorType *ot)
 {
-  /* weak: opname starting with 'save' makes filewindow give save-over */
   ot->name = "Save Screenshot";
   ot->idname = "SCREEN_OT_screenshot";
   ot->description = "Capture a picture of the active area or whole Blender window";
@@ -248,7 +248,7 @@ void SCREEN_OT_screenshot(wmOperatorType *ot)
                                  FILE_SAVE,
                                  WM_FILESEL_FILEPATH,
                                  FILE_DEFAULTDISPLAY,
-                                 FILE_SORT_ALPHA);
+                                 FILE_SORT_DEFAULT);
   RNA_def_boolean(ot->srna,
                   "full",
                   1,

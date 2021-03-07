@@ -44,7 +44,6 @@
 
 /* -------------------------------------------------------------------- */
 /** \name UVs Transform Creation
- *
  * \{ */
 
 static void UVsToTransData(const float aspect[2],
@@ -92,7 +91,7 @@ static void UVsToTransData(const float aspect[2],
  */
 static void uv_set_connectivity_distance(BMesh *bm, float *dists, const float aspect[2])
 {
-  /* Mostly copied from #editmesh_set_connectivity_distance. */
+  /* Mostly copied from #transform_convert_mesh_connectivity_distance. */
   BLI_LINKSTACK_DECLARE(queue, BMLoop *);
 
   /* Any BM_ELEM_TAG'd loop is added to 'queue_next', this makes sure that we don't add things
@@ -301,6 +300,9 @@ void createTransUVs(bContext *C, TransInfo *t)
 
       BM_elem_flag_enable(efa, BM_ELEM_TAG);
       BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
+        /* Make sure that the loop element flag is cleared for when we use it in
+         * uv_set_connectivity_distance later. */
+        BM_elem_flag_disable(l, BM_ELEM_TAG);
         if (uvedit_uv_select_test(scene, l, cd_loop_uv_offset)) {
           countsel++;
 
@@ -411,7 +413,6 @@ void createTransUVs(bContext *C, TransInfo *t)
 
 /* -------------------------------------------------------------------- */
 /** \name UVs Transform Flush
- *
  * \{ */
 
 static void flushTransUVs(TransInfo *t)

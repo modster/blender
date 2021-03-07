@@ -26,7 +26,6 @@
 #include "DNA_cachefile_types.h"
 #include "DNA_space_types.h"
 
-#include "BLI_listbase.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
 
@@ -134,7 +133,7 @@ void CACHEFILE_OT_open(wmOperatorType *ot)
                                  FILE_SAVE,
                                  WM_FILESEL_FILEPATH,
                                  FILE_DEFAULTDISPLAY,
-                                 FILE_SORT_ALPHA);
+                                 FILE_SORT_DEFAULT);
 }
 
 /* ***************************** Reload Operator **************************** */

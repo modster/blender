@@ -47,6 +47,7 @@
 
 CCL_NAMESPACE_BEGIN
 
+DeviceTypeMask BlenderSession::device_override = DEVICE_MASK_ALL;
 bool BlenderSession::headless = false;
 int BlenderSession::num_resumable_chunks = 0;
 int BlenderSession::current_resumable_chunk = 0;
@@ -237,6 +238,7 @@ void BlenderSession::reset_session(BL::BlendData &b_data, BL::Depsgraph &b_depsg
    * See note on create_session().
    */
   /* sync object should be re-created */
+  delete sync;
   sync = new BlenderSync(b_engine, b_data, b_scene, scene, !background, session->progress);
 
   BL::SpaceView3D b_null_space_view3d(PointerRNA_NULL);
@@ -258,6 +260,8 @@ void BlenderSession::reset_session(BL::BlendData &b_data, BL::Depsgraph &b_depsg
 
 void BlenderSession::free_session()
 {
+  session->cancel();
+
   delete sync;
   delete session;
 }
@@ -354,11 +358,7 @@ void BlenderSession::do_write_update_render_tile(RenderTile &rtile,
 
   if (do_read_only) {
     /* copy each pass */
-    BL::RenderLayer::passes_iterator b_iter;
-
-    for (b_rlay.passes.begin(b_iter); b_iter != b_rlay.passes.end(); ++b_iter) {
-      BL::RenderPass b_pass(*b_iter);
-
+    for (BL::RenderPass &b_pass : b_rlay.passes) {
       /* find matching pass type */
       PassType pass_type = BlenderSync::get_pass_type(b_pass);
       int components = b_pass.channels();
@@ -440,17 +440,17 @@ void BlenderSession::stamp_view_layer_metadata(Scene *scene, const string &view_
   }
 
   /* Write cryptomatte metadata. */
-  if (scene->film->cryptomatte_passes & CRYPT_OBJECT) {
+  if (scene->film->get_cryptomatte_passes() & CRYPT_OBJECT) {
     add_cryptomatte_layer(b_rr,
                           view_layer_name + ".CryptoObject",
                           scene->object_manager->get_cryptomatte_objects(scene));
   }
-  if (scene->film->cryptomatte_passes & CRYPT_MATERIAL) {
+  if (scene->film->get_cryptomatte_passes() & CRYPT_MATERIAL) {
     add_cryptomatte_layer(b_rr,
                           view_layer_name + ".CryptoMaterial",
                           scene->shader_manager->get_cryptomatte_materials(scene));
   }
-  if (scene->film->cryptomatte_passes & CRYPT_ASSET) {
+  if (scene->film->get_cryptomatte_passes() & CRYPT_ASSET) {
     add_cryptomatte_layer(b_rr,
                           view_layer_name + ".CryptoAsset",
                           scene->object_manager->get_cryptomatte_assets(scene));
@@ -470,6 +470,11 @@ void BlenderSession::stamp_view_layer_metadata(Scene *scene, const string &view_
 void BlenderSession::render(BL::Depsgraph &b_depsgraph_)
 {
   b_depsgraph = b_depsgraph_;
+
+  if (session->progress.get_cancel()) {
+    update_status_progress();
+    return;
+  }
 
   /* set callback to write out render results */
   session->write_render_tile_cb = function_bind(&BlenderSession::write_render_tile, this, _1);
@@ -501,9 +506,9 @@ void BlenderSession::render(BL::Depsgraph &b_depsgraph_)
 
   /* Set buffer params, using film settings from sync_render_passes. */
   buffer_params.passes = passes;
-  buffer_params.denoising_data_pass = scene->film->denoising_data_pass;
-  buffer_params.denoising_clean_pass = scene->film->denoising_clean_pass;
-  buffer_params.denoising_prefiltered_pass = scene->film->denoising_prefiltered_pass;
+  buffer_params.denoising_data_pass = scene->film->get_denoising_data_pass();
+  buffer_params.denoising_clean_pass = scene->film->get_denoising_clean_pass();
+  buffer_params.denoising_prefiltered_pass = scene->film->get_denoising_prefiltered_pass();
 
   BL::RenderResult::views_iterator b_view_iter;
 
@@ -540,9 +545,9 @@ void BlenderSession::render(BL::Depsgraph &b_depsgraph_)
     /* Make sure all views have different noise patterns. - hardcoded value just to make it random
      */
     if (view_index != 0) {
-      scene->integrator->seed += hash_uint2(scene->integrator->seed,
-                                            hash_uint2(view_index * 0xdeadbeef, 0));
-      scene->integrator->tag_update(scene);
+      int seed = scene->integrator->get_seed();
+      seed += hash_uint2(seed, hash_uint2(view_index * 0xdeadbeef, 0));
+      scene->integrator->set_seed(seed);
     }
 
     /* Update number of samples per layer. */
@@ -562,6 +567,10 @@ void BlenderSession::render(BL::Depsgraph &b_depsgraph_)
     session->reset(buffer_params, effective_layer_samples);
 
     /* render */
+    if (!b_engine.is_preview() && background && print_render_stats) {
+      scene->enable_update_stats();
+    }
+
     session->start();
     session->wait();
 
@@ -709,7 +718,7 @@ void BlenderSession::do_write_update_render_result(BL::RenderLayer &b_rlay,
   if (!buffers->copy_from_device())
     return;
 
-  float exposure = scene->film->exposure;
+  float exposure = scene->film->get_exposure();
 
   vector<float> pixels(rtile.w * rtile.h * 4);
 
@@ -722,10 +731,7 @@ void BlenderSession::do_write_update_render_result(BL::RenderLayer &b_rlay,
 
   if (!do_update_only) {
     /* copy each pass */
-    BL::RenderLayer::passes_iterator b_iter;
-
-    for (b_rlay.passes.begin(b_iter); b_iter != b_rlay.passes.end(); ++b_iter) {
-      BL::RenderPass b_pass(*b_iter);
+    for (BL::RenderPass &b_pass : b_rlay.passes) {
       int components = b_pass.channels();
 
       /* Copy pixels from regular render passes. */
@@ -826,10 +832,7 @@ void BlenderSession::synchronize(BL::Depsgraph &b_depsgraph_)
   session->set_denoising(session_params.denoising);
 
   /* Update film if denoising data was enabled or disabled. */
-  if (scene->film->denoising_data_pass != buffer_params.denoising_data_pass) {
-    scene->film->denoising_data_pass = buffer_params.denoising_data_pass;
-    scene->film->tag_update(scene);
-  }
+  scene->film->set_denoising_data_pass(buffer_params.denoising_data_pass);
 
   /* reset if needed */
   if (scene->need_reset()) {
@@ -888,7 +891,7 @@ bool BlenderSession::draw(int w, int h)
 
       sync->sync_view(b_v3d, b_rv3d, width, height);
 
-      if (scene->camera->need_update)
+      if (scene->camera->is_modified())
         reset = true;
 
       session->scene->mutex.unlock();
@@ -1103,8 +1106,7 @@ void BlenderSession::update_resumable_tile_manager(int num_samples)
   VLOG(1) << "Samples range start is " << range_start_sample << ", "
           << "number of samples to render is " << range_num_samples;
 
-  scene->integrator->start_sample = rounded_range_start_sample;
-  scene->integrator->tag_update(scene);
+  scene->integrator->set_start_sample(rounded_range_start_sample);
 
   session->tile_manager.range_start_sample = rounded_range_start_sample;
   session->tile_manager.range_num_samples = rounded_range_num_samples;

@@ -70,10 +70,11 @@ if(EXISTS ${LIBDIR})
   set(BOOST_LIBRARYDIR ${LIBDIR}/boost/lib)
   set(Boost_NO_SYSTEM_PATHS ON)
   set(OPENEXR_ROOT_DIR ${LIBDIR}/openexr)
+  set(CLANG_ROOT_DIR ${LIBDIR}/llvm)
 endif()
 
 if(WITH_STATIC_LIBS)
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++")
+  string(APPEND CMAKE_EXE_LINKER_FLAGS " -static-libstdc++")
 endif()
 
 # Wrapper to prefer static libraries
@@ -264,6 +265,7 @@ endif()
 if(WITH_OPENVDB)
   find_package_wrapper(OpenVDB)
   find_package_wrapper(Blosc)
+
   if(NOT OPENVDB_FOUND)
     set(WITH_OPENVDB OFF)
     set(WITH_OPENVDB_BLOSC OFF)
@@ -272,6 +274,19 @@ if(WITH_OPENVDB)
     set(WITH_OPENVDB_BLOSC OFF)
     message(STATUS "Blosc not found, disabling it for OpenVBD")
   endif()
+endif()
+
+if(WITH_NANOVDB)
+  find_package_wrapper(NanoVDB)
+
+  if(NOT NANOVDB_FOUND)
+    set(WITH_NANOVDB OFF)
+    message(STATUS "NanoVDB not found, disabling it")
+  endif()
+endif()
+
+if(WITH_CPU_SIMD)
+  find_package_wrapper(sse2neon)
 endif()
 
 if(WITH_ALEMBIC)
@@ -340,15 +355,17 @@ if(WITH_BOOST)
   endif()
 endif()
 
+if(WITH_PUGIXML)
+  find_package_wrapper(PugiXML)
+
+  if(NOT PUGIXML_FOUND)
+    set(WITH_PUGIXML OFF)
+    message(STATUS "PugiXML not found, disabling WITH_PUGIXML")
+  endif()
+endif()
+
 if(WITH_OPENIMAGEIO)
   find_package_wrapper(OpenImageIO)
-  if(NOT OPENIMAGEIO_PUGIXML_FOUND AND WITH_CYCLES_STANDALONE)
-    find_package_wrapper(PugiXML)
-  else()
-    set(PUGIXML_INCLUDE_DIR "${OPENIMAGEIO_INCLUDE_DIR/OpenImageIO}")
-    set(PUGIXML_LIBRARIES "")
-  endif()
-
   set(OPENIMAGEIO_LIBRARIES
     ${OPENIMAGEIO_LIBRARIES}
     ${PNG_LIBRARIES}
@@ -373,7 +390,7 @@ if(WITH_OPENIMAGEIO)
 endif()
 
 if(WITH_OPENCOLORIO)
-  find_package_wrapper(OpenColorIO)
+  find_package_wrapper(OpenColorIO 2.0.0)
 
   set(OPENCOLORIO_LIBRARIES ${OPENCOLORIO_LIBRARIES})
   set(OPENCOLORIO_LIBPATH)  # TODO, remove and reference the absolute path everywhere
@@ -404,7 +421,9 @@ if(WITH_LLVM)
   endif()
 
   find_package_wrapper(LLVM)
-
+  if(WITH_CLANG)
+    find_package_wrapper(Clang)
+  endif()
   # Symbol conflicts with same UTF library used by OpenCollada
   if(EXISTS ${LIBDIR})
     if(WITH_OPENCOLLADA AND (${LLVM_VERSION} VERSION_LESS "4.0.0"))
@@ -414,7 +433,13 @@ if(WITH_LLVM)
 
   if(NOT LLVM_FOUND)
     set(WITH_LLVM OFF)
+    set(WITH_CLANG OFF)
     message(STATUS "LLVM not found")
+  else()
+    if(NOT CLANG_FOUND)
+      set(WITH_CLANG OFF)
+      message(STATUS "Clang not found")
+    endif()
   endif()
 endif()
 
@@ -432,15 +457,6 @@ endif()
 
 if(WITH_TBB)
   find_package_wrapper(TBB)
-endif()
-
-if(WITH_GMP)
-  find_package(GMP)
-
-  if(NOT GMP_FOUND)
-    set(WITH_GMP OFF)
-    message(STATUS "GMP not found")
-  endif()
 endif()
 
 if(WITH_XR_OPENXR)
@@ -464,6 +480,14 @@ if(WITH_POTRACE)
   if(NOT POTRACE_FOUND)
     message(WARNING "potrace not found, disabling WITH_POTRACE")
     set(WITH_POTRACE OFF)
+  endif()
+endif()
+
+if(WITH_HARU)
+  find_package_wrapper(Haru)
+  if(NOT HARU_FOUND)
+    message(WARNING "Haru not found, disabling WITH_HARU")
+    set(WITH_HARU OFF)
   endif()
 endif()
 
@@ -612,14 +636,20 @@ endif()
 
 # GNU Compiler
 if(CMAKE_COMPILER_IS_GNUCC)
-  set(PLATFORM_CFLAGS "-pipe -fPIC -funsigned-char -fno-strict-aliasing")
+  # ffp-contract=off:
+  # Automatically turned on when building with "-march=native". This is
+  # explicitly turned off here as it will make floating point math give a bit
+  # different results. This will lead to automated test failures. So disable
+  # this until we support it. Seems to default to off in clang and the intel
+  # compiler.
+  set(PLATFORM_CFLAGS "-pipe -fPIC -funsigned-char -fno-strict-aliasing -ffp-contract=off")
 
   # `maybe-uninitialized` is unreliable in release builds, but fine in debug builds.
   set(GCC_EXTRA_FLAGS_RELEASE "-Wno-maybe-uninitialized")
   set(CMAKE_C_FLAGS_RELEASE          "${GCC_EXTRA_FLAGS_RELEASE} ${CMAKE_C_FLAGS_RELEASE}")
   set(CMAKE_C_FLAGS_RELWITHDEBINFO   "${GCC_EXTRA_FLAGS_RELEASE} ${CMAKE_C_FLAGS_RELWITHDEBINFO}")
   set(CMAKE_CXX_FLAGS_RELEASE        "${GCC_EXTRA_FLAGS_RELEASE} ${CMAKE_CXX_FLAGS_RELEASE}")
-  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${GCC_EXTRA_FLAGS_RELEASE} ${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+  string(PREPEND CMAKE_CXX_FLAGS_RELWITHDEBINFO "${GCC_EXTRA_FLAGS_RELEASE} ")
   unset(GCC_EXTRA_FLAGS_RELEASE)
 
   if(WITH_LINKER_GOLD)
@@ -627,8 +657,8 @@ if(CMAKE_COMPILER_IS_GNUCC)
       COMMAND ${CMAKE_C_COMPILER} -fuse-ld=gold -Wl,--version
       ERROR_QUIET OUTPUT_VARIABLE LD_VERSION)
     if("${LD_VERSION}" MATCHES "GNU gold")
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fuse-ld=gold")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fuse-ld=gold")
+      string(APPEND CMAKE_C_FLAGS " -fuse-ld=gold")
+      string(APPEND CMAKE_CXX_FLAGS " -fuse-ld=gold")
     else()
       message(STATUS "GNU gold linker isn't available, using the default system linker.")
     endif()
@@ -640,8 +670,8 @@ if(CMAKE_COMPILER_IS_GNUCC)
       COMMAND ${CMAKE_C_COMPILER} -fuse-ld=lld -Wl,--version
       ERROR_QUIET OUTPUT_VARIABLE LD_VERSION)
     if("${LD_VERSION}" MATCHES "LLD")
-      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fuse-ld=lld")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fuse-ld=lld")
+      string(APPEND CMAKE_C_FLAGS " -fuse-ld=lld")
+      string(APPEND CMAKE_CXX_FLAGS " -fuse-ld=lld")
     else()
       message(STATUS "LLD linker isn't available, using the default system linker.")
     endif()
@@ -666,12 +696,12 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "Intel")
   endif()
   mark_as_advanced(XILD)
 
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fp-model precise -prec_div -parallel")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fp-model precise -prec_div -parallel")
+  string(APPEND CMAKE_C_FLAGS " -fp-model precise -prec_div -parallel")
+  string(APPEND CMAKE_CXX_FLAGS " -fp-model precise -prec_div -parallel")
 
-  # set(PLATFORM_CFLAGS "${PLATFORM_CFLAGS} -diag-enable sc3")
+  # string(APPEND PLATFORM_CFLAGS " -diag-enable sc3")
   set(PLATFORM_CFLAGS "-pipe -fPIC -funsigned-char -fno-strict-aliasing")
-  set(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -static-intel")
+  string(APPEND PLATFORM_LINKFLAGS " -static-intel")
 endif()
 
 # Avoid conflicts with Mesa llvmpipe, Luxrender, and other plug-ins that may
@@ -684,5 +714,17 @@ set(PLATFORM_LINKFLAGS
 # browsers can't properly detect blender as an executable then. Still enabled
 # for non-portable installs as typically used by Linux distributions.
 if(WITH_INSTALL_PORTABLE)
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -no-pie")
+  string(APPEND CMAKE_EXE_LINKER_FLAGS " -no-pie")
+endif()
+
+if(WITH_COMPILER_CCACHE)
+  find_program(CCACHE_PROGRAM ccache)
+  if(CCACHE_PROGRAM)
+    # Makefiles and ninja
+    set(CMAKE_C_COMPILER_LAUNCHER   "${CCACHE_PROGRAM}" CACHE STRING "" FORCE)
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}" CACHE STRING "" FORCE)
+  else()
+    message(WARNING "Ccache NOT found, disabling WITH_COMPILER_CCACHE")
+    set(WITH_COMPILER_CCACHE OFF)
+  endif()
 endif()

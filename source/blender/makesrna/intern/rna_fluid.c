@@ -62,7 +62,7 @@ static void rna_Fluid_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerR
 {
   DEG_id_tag_update(ptr->owner_id, ID_RECALC_GEOMETRY);
 
-  // Needed for liquid domain objects
+  /* Needed for liquid domain objects */
   Object *ob = (Object *)ptr->owner_id;
   WM_main_add_notifier(NC_OBJECT | ND_DRAW, ob);
 }
@@ -81,6 +81,11 @@ static void rna_Fluid_datacache_reset(Main *UNUSED(bmain), Scene *UNUSED(scene),
     Object *ob = (Object *)ptr->owner_id;
     int cache_map = (FLUID_DOMAIN_OUTDATED_DATA | FLUID_DOMAIN_OUTDATED_NOISE |
                      FLUID_DOMAIN_OUTDATED_MESH | FLUID_DOMAIN_OUTDATED_PARTICLES);
+
+    /* In replay mode, always invalidate guiding cache too. */
+    if (settings->cache_type == FLUID_DOMAIN_CACHE_REPLAY) {
+      cache_map |= FLUID_DOMAIN_OUTDATED_GUIDE;
+    }
     BKE_fluid_cache_free(settings, ob, cache_map);
   }
 #  endif
@@ -490,7 +495,7 @@ static void rna_Fluid_combined_export_update(Main *bmain, Scene *scene, PointerR
     }
   }
   else {
-    // sanity check, should not occur
+    /* sanity check, should not occur */
     printf("ERROR: Unexpected combined export setting encountered!");
   }
 }
@@ -660,9 +665,202 @@ static void rna_Fluid_cache_directory_set(struct PointerRNA *ptr, const char *va
 
   BLI_strncpy(settings->cache_directory, value, sizeof(settings->cache_directory));
 
-  /* TODO (sebbas): Read cache state in order to set cache bake flags and cache pause frames
-   * correctly */
+  /* TODO(sebbas): Read cache state in order to set cache bake flags and cache pause frames
+   * correctly. */
   // settings->cache_flag = 0;
+}
+
+static const EnumPropertyItem *rna_Fluid_cobafield_itemf(bContext *UNUSED(C),
+                                                         PointerRNA *ptr,
+                                                         PropertyRNA *UNUSED(prop),
+                                                         bool *r_free)
+{
+  FluidDomainSettings *settings = (FluidDomainSettings *)ptr->data;
+
+  EnumPropertyItem *item = NULL;
+  EnumPropertyItem tmp = {0, "", 0, "", ""};
+  int totitem = 0;
+
+  tmp.value = FLUID_DOMAIN_FIELD_FLAGS;
+  tmp.identifier = "FLAGS";
+  tmp.icon = 0;
+  tmp.name = "Flags";
+  tmp.description = "Flag grid of the fluid domain";
+  RNA_enum_item_add(&item, &totitem, &tmp);
+
+  tmp.value = FLUID_DOMAIN_FIELD_PRESSURE;
+  tmp.identifier = "PRESSURE";
+  tmp.icon = 0;
+  tmp.name = "Pressure";
+  tmp.description = "Pressure field of the fluid domain";
+  RNA_enum_item_add(&item, &totitem, &tmp);
+
+  tmp.value = FLUID_DOMAIN_FIELD_VELOCITY_X;
+  tmp.identifier = "VELOCITY_X";
+  tmp.icon = 0;
+  tmp.name = "X Velocity";
+  tmp.description = "X component of the velocity field";
+  RNA_enum_item_add(&item, &totitem, &tmp);
+
+  tmp.value = FLUID_DOMAIN_FIELD_VELOCITY_Y;
+  tmp.identifier = "VELOCITY_Y";
+  tmp.icon = 0;
+  tmp.name = "Y Velocity";
+  tmp.description = "Y component of the velocity field";
+  RNA_enum_item_add(&item, &totitem, &tmp);
+
+  tmp.value = FLUID_DOMAIN_FIELD_VELOCITY_Z;
+  tmp.identifier = "VELOCITY_Z";
+  tmp.icon = 0;
+  tmp.name = "Z Velocity";
+  tmp.description = "Z component of the velocity field";
+  RNA_enum_item_add(&item, &totitem, &tmp);
+
+  tmp.value = FLUID_DOMAIN_FIELD_FORCE_X;
+  tmp.identifier = "FORCE_X";
+  tmp.icon = 0;
+  tmp.name = "X Force";
+  tmp.description = "X component of the force field";
+  RNA_enum_item_add(&item, &totitem, &tmp);
+
+  tmp.value = FLUID_DOMAIN_FIELD_FORCE_Y;
+  tmp.identifier = "FORCE_Y";
+  tmp.icon = 0;
+  tmp.name = "Y Force";
+  tmp.description = "Y component of the force field";
+  RNA_enum_item_add(&item, &totitem, &tmp);
+
+  tmp.value = FLUID_DOMAIN_FIELD_FORCE_Z;
+  tmp.identifier = "FORCE_Z";
+  tmp.icon = 0;
+  tmp.name = "Z Force";
+  tmp.description = "Z component of the force field";
+  RNA_enum_item_add(&item, &totitem, &tmp);
+
+  if (settings->type == FLUID_DOMAIN_TYPE_GAS) {
+    tmp.value = FLUID_DOMAIN_FIELD_COLOR_R;
+    tmp.identifier = "COLOR_R";
+    tmp.icon = 0;
+    tmp.name = "Red";
+    tmp.description = "Red component of the color field";
+    RNA_enum_item_add(&item, &totitem, &tmp);
+
+    tmp.value = FLUID_DOMAIN_FIELD_COLOR_G;
+    tmp.identifier = "COLOR_G";
+    tmp.icon = 0;
+    tmp.name = "Green";
+    tmp.description = "Green component of the color field";
+    RNA_enum_item_add(&item, &totitem, &tmp);
+
+    tmp.value = FLUID_DOMAIN_FIELD_COLOR_B;
+    tmp.identifier = "COLOR_B";
+    tmp.icon = 0;
+    tmp.name = "Blue";
+    tmp.description = "Blue component of the color field";
+    RNA_enum_item_add(&item, &totitem, &tmp);
+
+    tmp.value = FLUID_DOMAIN_FIELD_DENSITY;
+    tmp.identifier = "DENSITY";
+    tmp.icon = 0;
+    tmp.name = "Density";
+    tmp.description = "Quantity of soot in the fluid";
+    RNA_enum_item_add(&item, &totitem, &tmp);
+
+    tmp.value = FLUID_DOMAIN_FIELD_FLAME;
+    tmp.identifier = "FLAME";
+    tmp.icon = 0;
+    tmp.name = "Flame";
+    tmp.description = "Flame field";
+    RNA_enum_item_add(&item, &totitem, &tmp);
+
+    tmp.value = FLUID_DOMAIN_FIELD_FUEL;
+    tmp.identifier = "FUEL";
+    tmp.icon = 0;
+    tmp.name = "Fuel";
+    tmp.description = "Fuel field";
+    RNA_enum_item_add(&item, &totitem, &tmp);
+
+    tmp.value = FLUID_DOMAIN_FIELD_HEAT;
+    tmp.identifier = "HEAT";
+    tmp.icon = 0;
+    tmp.name = "Heat";
+    tmp.description = "Temperature of the fluid";
+    RNA_enum_item_add(&item, &totitem, &tmp);
+  }
+  else if (settings->type == FLUID_DOMAIN_TYPE_LIQUID) {
+    tmp.value = FLUID_DOMAIN_FIELD_PHI;
+    tmp.identifier = "PHI";
+    tmp.icon = 0;
+    tmp.name = "Fluid Levelset";
+    tmp.description = "Levelset representation of the fluid";
+    RNA_enum_item_add(&item, &totitem, &tmp);
+
+    tmp.value = FLUID_DOMAIN_FIELD_PHI_IN;
+    tmp.identifier = "PHI_IN";
+    tmp.icon = 0;
+    tmp.name = "Inflow Levelset";
+    tmp.description = "Levelset representation of the inflow";
+    RNA_enum_item_add(&item, &totitem, &tmp);
+
+    tmp.value = FLUID_DOMAIN_FIELD_PHI_OUT;
+    tmp.identifier = "PHI_OUT";
+    tmp.icon = 0;
+    tmp.name = "Outflow Levelset";
+    tmp.description = "Levelset representation of the outflow";
+    RNA_enum_item_add(&item, &totitem, &tmp);
+
+    tmp.value = FLUID_DOMAIN_FIELD_PHI_OBSTACLE;
+    tmp.identifier = "PHI_OBSTACLE";
+    tmp.icon = 0;
+    tmp.name = "Obstacle Levelset";
+    tmp.description = "Levelset representation of the obstacles";
+    RNA_enum_item_add(&item, &totitem, &tmp);
+  }
+
+  RNA_enum_item_end(&item, &totitem);
+  *r_free = true;
+
+  return item;
+}
+
+static const EnumPropertyItem *rna_Fluid_data_depth_itemf(bContext *UNUSED(C),
+                                                          PointerRNA *ptr,
+                                                          PropertyRNA *UNUSED(prop),
+                                                          bool *r_free)
+{
+  FluidDomainSettings *settings = (FluidDomainSettings *)ptr->data;
+
+  EnumPropertyItem *item = NULL;
+  EnumPropertyItem tmp = {0, "", 0, "", ""};
+  int totitem = 0;
+
+  tmp.value = VDB_PRECISION_FULL_FLOAT;
+  tmp.identifier = "32";
+  tmp.icon = 0;
+  tmp.name = "Full";
+  tmp.description = "Full float (Use 32 bit for all data)";
+  RNA_enum_item_add(&item, &totitem, &tmp);
+
+  tmp.value = VDB_PRECISION_HALF_FLOAT;
+  tmp.identifier = "16";
+  tmp.icon = 0;
+  tmp.name = "Half";
+  tmp.description = "Half float (Use 16 bit for all data)";
+  RNA_enum_item_add(&item, &totitem, &tmp);
+
+  if (settings->type == FLUID_DOMAIN_TYPE_LIQUID) {
+    tmp.value = VDB_PRECISION_MINI_FLOAT;
+    tmp.identifier = "8";
+    tmp.icon = 0;
+    tmp.name = "Mini";
+    tmp.description = "Mini float (Use 8 bit where possible, otherwise use 16 bit)";
+    RNA_enum_item_add(&item, &totitem, &tmp);
+  }
+
+  RNA_enum_item_end(&item, &totitem);
+  *r_free = true;
+
+  return item;
 }
 
 static void rna_Fluid_domaintype_set(struct PointerRNA *ptr, int value)
@@ -670,7 +868,7 @@ static void rna_Fluid_domaintype_set(struct PointerRNA *ptr, int value)
   FluidDomainSettings *settings = (FluidDomainSettings *)ptr->data;
   Object *ob = (Object *)ptr->owner_id;
   BKE_fluid_domain_type_set(ob, settings, value);
-  BKE_fluid_coba_field_sanitize(settings);
+  BKE_fluid_fields_sanitize(settings);
 }
 
 static char *rna_FluidDomainSettings_path(PointerRNA *ptr)
@@ -679,7 +877,7 @@ static char *rna_FluidDomainSettings_path(PointerRNA *ptr)
   ModifierData *md = (ModifierData *)settings->fmd;
   char name_esc[sizeof(md->name) * 2];
 
-  BLI_strescape(name_esc, md->name, sizeof(name_esc));
+  BLI_str_escape(name_esc, md->name, sizeof(name_esc));
   return BLI_sprintfN("modifiers[\"%s\"].domain_settings", name_esc);
 }
 
@@ -689,7 +887,7 @@ static char *rna_FluidFlowSettings_path(PointerRNA *ptr)
   ModifierData *md = (ModifierData *)settings->fmd;
   char name_esc[sizeof(md->name) * 2];
 
-  BLI_strescape(name_esc, md->name, sizeof(name_esc));
+  BLI_str_escape(name_esc, md->name, sizeof(name_esc));
   return BLI_sprintfN("modifiers[\"%s\"].flow_settings", name_esc);
 }
 
@@ -699,7 +897,7 @@ static char *rna_FluidEffectorSettings_path(PointerRNA *ptr)
   ModifierData *md = (ModifierData *)settings->fmd;
   char name_esc[sizeof(md->name) * 2];
 
-  BLI_strescape(name_esc, md->name, sizeof(name_esc));
+  BLI_str_escape(name_esc, md->name, sizeof(name_esc));
   return BLI_sprintfN("modifiers[\"%s\"].effector_settings", name_esc);
 }
 
@@ -1042,159 +1240,6 @@ static void rna_Fluid_flowtype_set(struct PointerRNA *ptr, int value)
   }
 }
 
-static const EnumPropertyItem *rna_Fluid_cobafield_itemf(bContext *UNUSED(C),
-                                                         PointerRNA *ptr,
-                                                         PropertyRNA *UNUSED(prop),
-                                                         bool *r_free)
-{
-  FluidDomainSettings *settings = (FluidDomainSettings *)ptr->data;
-
-  EnumPropertyItem *item = NULL;
-  EnumPropertyItem tmp = {0, "", 0, "", ""};
-  int totitem = 0;
-
-  tmp.value = FLUID_DOMAIN_FIELD_FLAGS;
-  tmp.identifier = "FLAGS";
-  tmp.icon = 0;
-  tmp.name = "Flags";
-  tmp.description = "Flag grid of the fluid domain";
-  RNA_enum_item_add(&item, &totitem, &tmp);
-
-  tmp.value = FLUID_DOMAIN_FIELD_PRESSURE;
-  tmp.identifier = "PRESSURE";
-  tmp.icon = 0;
-  tmp.name = "Pressure";
-  tmp.description = "Pressure field of the fluid domain";
-  RNA_enum_item_add(&item, &totitem, &tmp);
-
-  tmp.value = FLUID_DOMAIN_FIELD_VELOCITY_X;
-  tmp.identifier = "VELOCITY_X";
-  tmp.icon = 0;
-  tmp.name = "X Velocity";
-  tmp.description = "X component of the velocity field";
-  RNA_enum_item_add(&item, &totitem, &tmp);
-
-  tmp.value = FLUID_DOMAIN_FIELD_VELOCITY_Y;
-  tmp.identifier = "VELOCITY_Y";
-  tmp.icon = 0;
-  tmp.name = "Y Velocity";
-  tmp.description = "Y component of the velocity field";
-  RNA_enum_item_add(&item, &totitem, &tmp);
-
-  tmp.value = FLUID_DOMAIN_FIELD_VELOCITY_Z;
-  tmp.identifier = "VELOCITY_Z";
-  tmp.icon = 0;
-  tmp.name = "Z Velocity";
-  tmp.description = "Z component of the velocity field";
-  RNA_enum_item_add(&item, &totitem, &tmp);
-
-  tmp.value = FLUID_DOMAIN_FIELD_FORCE_X;
-  tmp.identifier = "FORCE_X";
-  tmp.icon = 0;
-  tmp.name = "X Force";
-  tmp.description = "X component of the force field";
-  RNA_enum_item_add(&item, &totitem, &tmp);
-
-  tmp.value = FLUID_DOMAIN_FIELD_FORCE_Y;
-  tmp.identifier = "FORCE_Y";
-  tmp.icon = 0;
-  tmp.name = "Y Force";
-  tmp.description = "Y component of the force field";
-  RNA_enum_item_add(&item, &totitem, &tmp);
-
-  tmp.value = FLUID_DOMAIN_FIELD_FORCE_Z;
-  tmp.identifier = "FORCE_Z";
-  tmp.icon = 0;
-  tmp.name = "Z Force";
-  tmp.description = "Z component of the force field";
-  RNA_enum_item_add(&item, &totitem, &tmp);
-
-  if (settings->type == FLUID_DOMAIN_TYPE_GAS) {
-    tmp.value = FLUID_DOMAIN_FIELD_COLOR_R;
-    tmp.identifier = "COLOR_R";
-    tmp.icon = 0;
-    tmp.name = "Red";
-    tmp.description = "Red component of the color field";
-    RNA_enum_item_add(&item, &totitem, &tmp);
-
-    tmp.value = FLUID_DOMAIN_FIELD_COLOR_G;
-    tmp.identifier = "COLOR_G";
-    tmp.icon = 0;
-    tmp.name = "Green";
-    tmp.description = "Green component of the color field";
-    RNA_enum_item_add(&item, &totitem, &tmp);
-
-    tmp.value = FLUID_DOMAIN_FIELD_COLOR_B;
-    tmp.identifier = "COLOR_B";
-    tmp.icon = 0;
-    tmp.name = "Blue";
-    tmp.description = "Blue component of the color field";
-    RNA_enum_item_add(&item, &totitem, &tmp);
-
-    tmp.value = FLUID_DOMAIN_FIELD_DENSITY;
-    tmp.identifier = "DENSITY";
-    tmp.icon = 0;
-    tmp.name = "Density";
-    tmp.description = "Quantity of soot in the fluid";
-    RNA_enum_item_add(&item, &totitem, &tmp);
-
-    tmp.value = FLUID_DOMAIN_FIELD_FLAME;
-    tmp.identifier = "FLAME";
-    tmp.icon = 0;
-    tmp.name = "Flame";
-    tmp.description = "Flame field";
-    RNA_enum_item_add(&item, &totitem, &tmp);
-
-    tmp.value = FLUID_DOMAIN_FIELD_FUEL;
-    tmp.identifier = "FUEL";
-    tmp.icon = 0;
-    tmp.name = "Fuel";
-    tmp.description = "Fuel field";
-    RNA_enum_item_add(&item, &totitem, &tmp);
-
-    tmp.value = FLUID_DOMAIN_FIELD_HEAT;
-    tmp.identifier = "HEAT";
-    tmp.icon = 0;
-    tmp.name = "Heat";
-    tmp.description = "Temperature of the fluid";
-    RNA_enum_item_add(&item, &totitem, &tmp);
-  }
-  else if (settings->type == FLUID_DOMAIN_TYPE_LIQUID) {
-    tmp.value = FLUID_DOMAIN_FIELD_PHI;
-    tmp.identifier = "PHI";
-    tmp.icon = 0;
-    tmp.name = "Fluid Levelset";
-    tmp.description = "Levelset representation of the fluid";
-    RNA_enum_item_add(&item, &totitem, &tmp);
-
-    tmp.value = FLUID_DOMAIN_FIELD_PHI_IN;
-    tmp.identifier = "PHI_IN";
-    tmp.icon = 0;
-    tmp.name = "Inflow Levelset";
-    tmp.description = "Levelset representation of the inflow";
-    RNA_enum_item_add(&item, &totitem, &tmp);
-
-    tmp.value = FLUID_DOMAIN_FIELD_PHI_OUT;
-    tmp.identifier = "PHI_OUT";
-    tmp.icon = 0;
-    tmp.name = "Outflow Levelset";
-    tmp.description = "Levelset representation of the outflow";
-    RNA_enum_item_add(&item, &totitem, &tmp);
-
-    tmp.value = FLUID_DOMAIN_FIELD_PHI_OBSTACLE;
-    tmp.identifier = "PHI_OBSTACLE";
-    tmp.icon = 0;
-    tmp.name = "Obstacle Levelset";
-    tmp.description = "Levelset representation of the obstacles";
-    RNA_enum_item_add(&item, &totitem, &tmp);
-  }
-
-  RNA_enum_item_end(&item, &totitem);
-  *r_free = true;
-
-  return item;
-}
-
 #else
 
 static void rna_def_fluid_mesh_vertices(BlenderRNA *brna)
@@ -1240,12 +1285,6 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
       {VDB_COMPRESSION_NONE, "NONE", 0, "None", "Do not use any compression"},
       {0, NULL, 0, NULL, NULL}};
 
-  static const EnumPropertyItem cache_comp_items[] = {
-      {SM_CACHE_LIGHT, "CACHELIGHT", 0, "Lite", "Fast but not so effective compression"},
-      {SM_CACHE_HEAVY, "CACHEHEAVY", 0, "Heavy", "Effective but slow compression"},
-      {0, NULL, 0, NULL, NULL},
-  };
-
   static const EnumPropertyItem smoke_highres_sampling_items[] = {
       {SM_HRES_FULLSAMPLE, "FULLSAMPLE", 0, "Full Sample", ""},
       {SM_HRES_LINEAR, "LINEAR", 0, "Linear", ""},
@@ -1263,9 +1302,9 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
       {FLUID_DOMAIN_CACHE_ALL, "ALL", 0, "All", "Bake all simulation settings at once"},
       {0, NULL, 0, NULL, NULL}};
 
-  static const EnumPropertyItem fluid_data_depth_items[] = {
-      {VDB_PRECISION_HALF_FLOAT, "16", 0, "Half", "Half float (16 bit data)"},
-      {VDB_PRECISION_FULL_FLOAT, "32", 0, "Full", "Full float (32 bit data)"},
+  /*  OpenVDB data depth - generated dynamically based on domain type */
+  static EnumPropertyItem fluid_data_depth_items[] = {
+      {0, "NONE", 0, "", ""},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -1303,12 +1342,6 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
   /*  Cache type - generated dynamically based on domain type */
   static EnumPropertyItem cache_file_type_items[] = {
       {0, "NONE", 0, "", ""},
-      {0, NULL, 0, NULL, NULL},
-  };
-
-  static const EnumPropertyItem axis_slice_method_items[] = {
-      {AXIS_SLICE_FULL, "FULL", 0, "Full", "Slice the whole domain object"},
-      {AXIS_SLICE_SINGLE, "SINGLE", 0, "Single", "Perform a single slice of the domain object"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -1428,8 +1461,16 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL}};
 
   static EnumPropertyItem simulation_methods[] = {
-      {FLUID_DOMAIN_METHOD_FLIP, "FLIP", 0, "FLIP", "Use FLIP as the simulation method"},
-      /*{FLUID_DOMAIN_METHOD_APIC, "APIC", 0, "APIC", "Use APIC as the simulation method"},*/
+      {FLUID_DOMAIN_METHOD_FLIP,
+       "FLIP",
+       0,
+       "FLIP",
+       "Use FLIP as the simulation method (more splashy behavior)"},
+      {FLUID_DOMAIN_METHOD_APIC,
+       "APIC",
+       0,
+       "APIC",
+       "Use APIC as the simulation method (more energetic and stable behavior)"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -1516,7 +1557,7 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
   RNA_def_property_dynamic_array_funcs(prop, "rna_FluidModifier_grid_get_length");
   RNA_def_property_float_funcs(prop, "rna_FluidModifier_temperature_grid_get", NULL, NULL);
   RNA_def_property_ui_text(
-      prop, "Temperature Grid", "Smoke temperature grid, range 0..1 represents 0..1000K");
+      prop, "Temperature Grid", "Smoke temperature grid, range 0 to 1 represents 0 to 1000K");
 #  endif /* WITH_FLUID */
 
   /* domain object data */
@@ -1792,6 +1833,7 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
   RNA_def_property_enum_sdna(prop, NULL, "simulation_method");
   RNA_def_property_enum_items(prop, simulation_methods);
   RNA_def_property_ui_text(prop, "Simulation Method", "Change the underlying simulation method");
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_domain_data_reset");
 
   prop = RNA_def_property(srna, "flip_ratio", PROP_FLOAT, PROP_NONE);
@@ -1867,10 +1909,20 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
   RNA_def_property_range(prop, 0.001, 1.0);
   RNA_def_property_ui_range(prop, 0.01, 1.0, 0.05, -1);
   RNA_def_property_ui_text(prop,
-                           "Obstacle-Fluid Threshold",
+                           "Obstacle Threshold",
                            "Determines how much fluid is allowed in an obstacle cell "
                            "(higher values will tag a boundary cell as an obstacle easier "
                            "and reduce the boundary smoothening effect)");
+  RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_datacache_reset");
+
+  prop = RNA_def_property(srna, "fractions_distance", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_range(prop, -5.0, 5.0);
+  RNA_def_property_ui_range(prop, 0.01, 5.0, 0.1, -1);
+  RNA_def_property_ui_text(prop,
+                           "Obstacle Distance",
+                           "Determines how far apart fluid and obstacle are (higher values will "
+                           "result in fluid being further away from obstacles, smaller values "
+                           "will let fluid move towards the inside of obstacles)");
   RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_datacache_reset");
 
   prop = RNA_def_property(srna, "sys_particle_maximum", PROP_INT, PROP_NONE);
@@ -1880,6 +1932,22 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
       prop,
       "System Maximum",
       "Maximum number of fluid particles that are allowed in this simulation");
+  RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_datacache_reset");
+
+  /* viscosity options */
+
+  prop = RNA_def_property(srna, "use_viscosity", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", FLUID_DOMAIN_USE_VISCOSITY);
+  RNA_def_property_ui_text(prop, "Use Viscosity", "Enable fluid viscosity settings");
+  RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_datacache_reset");
+
+  prop = RNA_def_property(srna, "viscosity_value", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_range(prop, 0.0, 10.0);
+  RNA_def_property_ui_range(prop, 0.0, 5.0, 1.0, 3);
+  RNA_def_property_ui_text(prop,
+                           "Strength",
+                           "Viscosity of liquid (higher values result in more viscous fluids, a "
+                           "value of 0 will still apply some viscosity)");
   RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_datacache_reset");
 
   /*  diffusion options */
@@ -1896,7 +1964,7 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop,
       "Tension",
-      "Surface tension of liquid (higher value results in greater hydrophobic behaviour)");
+      "Surface tension of liquid (higher value results in greater hydrophobic behavior)");
   RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_datacache_reset");
 
   prop = RNA_def_property(srna, "viscosity_base", PROP_FLOAT, PROP_NONE);
@@ -2188,13 +2256,13 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
   RNA_def_property_float_sdna(prop, NULL, "guide_alpha");
   RNA_def_property_range(prop, 1.0, 100.0);
   RNA_def_property_ui_text(prop, "Weight", "Guiding weight (higher value results in greater lag)");
-  RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_guidingcache_reset");
+  RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_datacache_reset");
 
   prop = RNA_def_property(srna, "guide_beta", PROP_INT, PROP_NONE);
   RNA_def_property_int_sdna(prop, NULL, "guide_beta");
   RNA_def_property_range(prop, 1, 50);
   RNA_def_property_ui_text(prop, "Size", "Guiding size (higher value results in larger vortices)");
-  RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_guidingcache_reset");
+  RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_datacache_reset");
 
   prop = RNA_def_property(srna, "guide_vel_factor", PROP_FLOAT, PROP_NONE);
   RNA_def_property_float_sdna(prop, NULL, "guide_vel_factor");
@@ -2203,7 +2271,7 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
       prop,
       "Velocity Factor",
       "Guiding velocity factor (higher value results in greater guiding velocities)");
-  RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_guidingcache_reset");
+  RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_datacache_reset");
 
   prop = RNA_def_property(srna, "guide_source", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "guide_source");
@@ -2226,9 +2294,9 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "flags", FLUID_DOMAIN_USE_GUIDE);
   RNA_def_property_ui_text(prop, "Use Guiding", "Enable fluid guiding");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-  RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_guidingcache_reset");
+  RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_update");
 
-  /*  cache options */
+  /* cache options */
 
   prop = RNA_def_property(srna, "cache_frame_start", PROP_INT, PROP_TIME);
   RNA_def_property_int_sdna(prop, NULL, "cache_frame_start");
@@ -2401,6 +2469,22 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_domain_data_reset");
 
+  prop = RNA_def_property(srna, "openvdb_cache_compress_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "openvdb_compression");
+  RNA_def_property_enum_items(prop, prop_compression_items);
+  RNA_def_property_ui_text(prop, "Compression", "Compression method to be used");
+  RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_domain_data_reset");
+
+  prop = RNA_def_property(srna, "openvdb_data_depth", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "openvdb_data_depth");
+  RNA_def_property_enum_items(prop, fluid_data_depth_items);
+  RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_Fluid_data_depth_itemf");
+  RNA_def_property_ui_text(
+      prop,
+      "Data Depth",
+      "Bit depth for fluid particles and grids (lower bit values reduce file size)");
+  RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_domain_data_reset");
+
   /* time options */
 
   prop = RNA_def_property(srna, "time_scale", PROP_FLOAT, PROP_NONE);
@@ -2439,10 +2523,9 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
 
   /* display settings */
 
-  prop = RNA_def_property(srna, "axis_slice_method", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "axis_slice_method");
-  RNA_def_property_enum_items(prop, axis_slice_method_items);
-  RNA_def_property_ui_text(prop, "Method", "");
+  prop = RNA_def_property(srna, "use_slice", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "axis_slice_method", AXIS_SLICE_SINGLE);
+  RNA_def_property_ui_text(prop, "Slice", "Perform a single slice of the domain object");
   RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
 
   prop = RNA_def_property(srna, "slice_axis", PROP_ENUM, PROP_NONE);
@@ -2609,37 +2692,6 @@ static void rna_def_fluid_domain_settings(BlenderRNA *brna)
   RNA_def_property_enum_items(prop, gridlines_cell_filter_items);
   RNA_def_property_ui_text(prop, "Cell Type", "Cell type to be highlighted");
   RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
-
-  /* -- Deprecated / unsed options (below)-- */
-
-  /* pointcache options */
-
-  prop = RNA_def_property(srna, "point_cache", PROP_POINTER, PROP_NONE);
-  RNA_def_property_flag(prop, PROP_NEVER_NULL);
-  RNA_def_property_pointer_sdna(prop, NULL, "point_cache[0]");
-  RNA_def_property_struct_type(prop, "PointCache");
-  RNA_def_property_ui_text(prop, "Point Cache", "");
-
-  prop = RNA_def_property(srna, "point_cache_compress_type", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "cache_comp");
-  RNA_def_property_enum_items(prop, cache_comp_items);
-  RNA_def_property_ui_text(prop, "Cache Compression", "Compression method to be used");
-
-  /* OpenVDB options */
-
-  prop = RNA_def_property(srna, "openvdb_cache_compress_type", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "openvdb_compression");
-  RNA_def_property_enum_items(prop, prop_compression_items);
-  RNA_def_property_ui_text(prop, "Compression", "Compression method to be used");
-
-  prop = RNA_def_property(srna, "openvdb_data_depth", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_bitflag_sdna(prop, NULL, "openvdb_data_depth");
-  RNA_def_property_enum_items(prop, fluid_data_depth_items);
-  RNA_def_property_ui_text(prop,
-                           "Data Depth",
-                           "Bit depth for writing all scalar (including vector) "
-                           "lower values reduce file size");
-  RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, NULL);
 }
 
 static void rna_def_fluid_flow_settings(BlenderRNA *brna)
@@ -2783,7 +2835,9 @@ static void rna_def_fluid_flow_settings(BlenderRNA *brna)
   RNA_def_property_array(prop, 3);
   RNA_def_property_range(prop, -1000.1, 1000.1);
   RNA_def_property_ui_text(
-      prop, "Initial", "Initial velocity in X, Y and Z direction in world space");
+      prop,
+      "Initial",
+      "Additional initial velocity in X, Y and Z direction (added to source velocity)");
   RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Fluid_flow_reset");
 
   prop = RNA_def_property(srna, "volume_density", PROP_FLOAT, PROP_NONE);

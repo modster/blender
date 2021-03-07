@@ -68,7 +68,8 @@ IDTypeInfo IDType_ID_LI = {
     .name = "Library",
     .name_plural = "libraries",
     .translation_context = BLT_I18NCONTEXT_ID_LIBRARY,
-    .flags = IDTYPE_FLAGS_NO_COPY | IDTYPE_FLAGS_NO_LIBLINKING | IDTYPE_FLAGS_NO_MAKELOCAL,
+    .flags = IDTYPE_FLAGS_NO_COPY | IDTYPE_FLAGS_NO_LIBLINKING | IDTYPE_FLAGS_NO_MAKELOCAL |
+             IDTYPE_FLAGS_NO_ANIMDATA,
 
     .init_data = NULL,
     .copy_data = NULL,
@@ -76,11 +77,16 @@ IDTypeInfo IDType_ID_LI = {
     .make_local = NULL,
     .foreach_id = library_foreach_id,
     .foreach_cache = NULL,
+    .owner_get = NULL,
 
     .blend_write = NULL,
     .blend_read_data = NULL,
     .blend_read_lib = NULL,
     .blend_read_expand = NULL,
+
+    .blend_read_undo_preserve = NULL,
+
+    .lib_override_apply_post = NULL,
 };
 
 void BKE_library_filepath_set(Main *bmain, Library *lib, const char *filepath)

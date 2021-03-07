@@ -402,7 +402,7 @@ void UI_view2d_region_reinit(View2D *v2d, short type, int winx, int winy)
  * Ensure View2D rects remain in a viable configuration
  * 'cur' is not allowed to be: larger than max, smaller than min, or outside of 'tot'
  */
-// XXX pre2.5 -> this used to be called  test_view2d()
+/* XXX pre2.5 -> this used to be called  test_view2d() */
 static void ui_view2d_curRect_validate_resize(View2D *v2d, bool resize)
 {
   float totwidth, totheight, curwidth, curheight, width, height;
@@ -616,7 +616,7 @@ static void ui_view2d_curRect_validate_resize(View2D *v2d, bool resize)
   if ((width != curwidth) || (height != curheight)) {
     float temp, dh;
 
-    /* resize from centerpoint, unless otherwise specified */
+    /* Resize from center-point, unless otherwise specified. */
     if (width != curwidth) {
       if (v2d->keepofs & V2D_LOCKOFS_X) {
         cur->xmax += width - BLI_rctf_size_x(cur);
@@ -994,7 +994,7 @@ void UI_view2d_totRect_set_resize(View2D *v2d, int width, int height, bool resiz
       printf("Error: View2D totRect set exiting: v2d=%p width=%d height=%d\n",
              (void *)v2d,
              width,
-             height);  // XXX temp debug info
+             height); /* XXX temp debug info */
     }
     return;
   }
@@ -1046,53 +1046,6 @@ void UI_view2d_totRect_set(View2D *v2d, int width, int height)
   UI_view2d_totRect_set_resize(v2d, width, height, false);
 }
 
-bool UI_view2d_tab_set(View2D *v2d, int tab)
-{
-  float default_offset[2] = {0.0f, 0.0f};
-  float *offset, *new_offset;
-  bool changed = false;
-
-  /* if tab changed, change offset */
-  if (tab != v2d->tab_cur && v2d->tab_offset) {
-    if (tab < v2d->tab_num) {
-      offset = &v2d->tab_offset[tab * 2];
-    }
-    else {
-      offset = default_offset;
-    }
-
-    v2d->cur.xmax += offset[0] - v2d->cur.xmin;
-    v2d->cur.xmin = offset[0];
-
-    v2d->cur.ymin += offset[1] - v2d->cur.ymax;
-    v2d->cur.ymax = offset[1];
-
-    /* validation should happen in subsequent totRect_set */
-
-    changed = true;
-  }
-
-  /* resize array if needed */
-  if (tab >= v2d->tab_num) {
-    new_offset = MEM_callocN(sizeof(float) * (tab + 1) * 2, "view2d tab offset");
-
-    if (v2d->tab_offset) {
-      memcpy(new_offset, v2d->tab_offset, sizeof(float) * v2d->tab_num * 2);
-      MEM_freeN(v2d->tab_offset);
-    }
-
-    v2d->tab_offset = new_offset;
-    v2d->tab_num = tab + 1;
-  }
-
-  /* set current tab and offset */
-  v2d->tab_cur = tab;
-  v2d->tab_offset[2 * tab + 0] = v2d->cur.xmin;
-  v2d->tab_offset[2 * tab + 1] = v2d->cur.ymax;
-
-  return changed;
-}
-
 void UI_view2d_zoom_cache_reset(void)
 {
   /* TODO(sergey): This way we avoid threading conflict with sequencer rendering
@@ -1103,9 +1056,9 @@ void UI_view2d_zoom_cache_reset(void)
     return;
   }
   /* While scaling we can accumulate fonts at many sizes (~20 or so).
-   * Not an issue with embedded font, but can use over 500Mb with i18n ones! See [#38244]. */
+   * Not an issue with embedded font, but can use over 500Mb with i18n ones! See T38244. */
 
-  /* note: only some views draw text, we could check for this case to avoid clearning cache */
+  /* Note: only some views draw text, we could check for this case to avoid cleaning cache. */
   BLF_cache_clear();
 }
 
@@ -1942,7 +1895,7 @@ void UI_view2d_scroller_size_get(const View2D *v2d, float *r_x, float *r_y)
  *
  * \param r_x, r_y: scale on each axis
  */
-void UI_view2d_scale_get(View2D *v2d, float *r_x, float *r_y)
+void UI_view2d_scale_get(const View2D *v2d, float *r_x, float *r_y)
 {
   if (r_x) {
     *r_x = UI_view2d_scale_get_x(v2d);

@@ -350,7 +350,7 @@ static int load_tex(Brush *br, ViewContext *vc, float zoom, bool col, bool prima
       eGPUTextureFormat format = col ? GPU_RGBA8 : GPU_R8;
       target->overlay_texture = GPU_texture_create_2d(
           "paint_cursor_overlay", size, size, 1, format, NULL);
-      GPU_texture_update(target->overlay_texture, GPU_DATA_UNSIGNED_BYTE, buffer);
+      GPU_texture_update(target->overlay_texture, GPU_DATA_UBYTE, buffer);
 
       if (!col) {
         GPU_texture_swizzle_set(target->overlay_texture, "rrrr");
@@ -358,7 +358,7 @@ static int load_tex(Brush *br, ViewContext *vc, float zoom, bool col, bool prima
     }
 
     if (init) {
-      GPU_texture_update(target->overlay_texture, GPU_DATA_UNSIGNED_BYTE, buffer);
+      GPU_texture_update(target->overlay_texture, GPU_DATA_UBYTE, buffer);
     }
 
     if (buffer) {
@@ -469,13 +469,13 @@ static int load_tex_cursor(Brush *br, ViewContext *vc, float zoom)
     if (!cursor_snap.overlay_texture) {
       cursor_snap.overlay_texture = GPU_texture_create_2d(
           "cursor_snap_overaly", size, size, 1, GPU_R8, NULL);
-      GPU_texture_update(cursor_snap.overlay_texture, GPU_DATA_UNSIGNED_BYTE, buffer);
+      GPU_texture_update(cursor_snap.overlay_texture, GPU_DATA_UBYTE, buffer);
 
       GPU_texture_swizzle_set(cursor_snap.overlay_texture, "rrrr");
     }
 
     if (init) {
-      GPU_texture_update(cursor_snap.overlay_texture, GPU_DATA_UNSIGNED_BYTE, buffer);
+      GPU_texture_update(cursor_snap.overlay_texture, GPU_DATA_UBYTE, buffer);
     }
 
     if (buffer) {
@@ -1090,7 +1090,7 @@ static void cursor_draw_point_with_symmetry(const uint gpuattr,
                                             Object *ob,
                                             const float radius)
 {
-  const char symm = sd->paint.symmetry_flags & PAINT_SYMM_AXIS_ALL;
+  const char symm = SCULPT_mesh_symmetry_xyz_get(ob);
   float location[3], symm_rot_mat[4][4];
 
   for (int i = 0; i <= symm; i++) {
@@ -1265,7 +1265,13 @@ static bool paint_cursor_context_init(bContext *C,
   pcontext->scene = CTX_data_scene(C);
   pcontext->ups = &pcontext->scene->toolsettings->unified_paint_settings;
   pcontext->paint = BKE_paint_get_active_from_context(C);
+  if (pcontext->paint == NULL) {
+    return false;
+  }
   pcontext->brush = BKE_paint_brush(pcontext->paint);
+  if (pcontext->brush == NULL) {
+    return false;
+  }
   pcontext->mode = BKE_paintmode_get_active_from_context(C);
 
   ED_view3d_viewcontext_init(C, &pcontext->vc, pcontext->depsgraph);
@@ -1303,6 +1309,11 @@ static bool paint_cursor_context_init(bContext *C,
 
   Object *active_object = pcontext->vc.obact;
   pcontext->ss = active_object ? active_object->sculpt : NULL;
+
+  if (pcontext->ss && pcontext->ss->draw_faded_cursor) {
+    pcontext->outline_alpha = 0.3f;
+    copy_v3_fl(pcontext->outline_col, 0.8f);
+  }
 
   pcontext->is_stroke_active = pcontext->ups->stroke_active;
 
@@ -1663,7 +1674,7 @@ static void paint_cursor_draw_3d_view_brush_cursor_inactive(PaintCursorContext *
 
   /* Cloth brush local simulation areas. */
   if (brush->sculpt_tool == SCULPT_TOOL_CLOTH &&
-      brush->cloth_simulation_area_type == BRUSH_CLOTH_SIMULATION_AREA_LOCAL) {
+      brush->cloth_simulation_area_type != BRUSH_CLOTH_SIMULATION_AREA_GLOBAL) {
     const float white[3] = {1.0f, 1.0f, 1.0f};
     const float zero_v[3] = {0.0f};
     /* This functions sets its own drawing space in order to draw the simulation limits when the
@@ -1744,7 +1755,7 @@ static void paint_cursor_cursor_draw_3d_view_brush_cursor_active(PaintCursorCont
     else if (brush->cloth_force_falloff_type == BRUSH_CLOTH_FORCE_FALLOFF_RADIAL &&
              brush->cloth_simulation_area_type == BRUSH_CLOTH_SIMULATION_AREA_LOCAL) {
       /* Display the simulation limits if sculpting outside them. */
-      /* This does not makes much sense of plane fallof as the fallof is infinte or global. */
+      /* This does not makes much sense of plane falloff as the falloff is infinite or global. */
 
       if (len_v3v3(ss->cache->true_location, ss->cache->true_initial_location) >
           ss->cache->radius * (1.0f + brush->cloth_sim_limit)) {
@@ -1839,28 +1850,22 @@ static void paint_cursor_update_anchored_location(PaintCursorContext *pcontext)
 
 static void paint_cursor_setup_2D_drawing(PaintCursorContext *pcontext)
 {
+  GPU_line_width(2.0f);
   GPU_blend(GPU_BLEND_ALPHA);
+  GPU_line_smooth(true);
   pcontext->pos = GPU_vertformat_attr_add(
       immVertexFormat(), "pos", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
-
-  float viewport[4];
-  GPU_viewport_size_get_f(viewport);
-  immBindBuiltinProgram(GPU_SHADER_3D_POLYLINE_UNIFORM_COLOR);
-  immUniform2fv("viewportSize", &viewport[2]);
-  immUniform1f("lineWidth", 2.0f * U.pixelsize);
+  immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
 }
 
 static void paint_cursor_setup_3D_drawing(PaintCursorContext *pcontext)
 {
+  GPU_line_width(2.0f);
   GPU_blend(GPU_BLEND_ALPHA);
+  GPU_line_smooth(true);
   pcontext->pos = GPU_vertformat_attr_add(
       immVertexFormat(), "pos", GPU_COMP_F32, 3, GPU_FETCH_FLOAT);
-
-  float viewport[4];
-  GPU_viewport_size_get_f(viewport);
-  immBindBuiltinProgram(GPU_SHADER_3D_POLYLINE_UNIFORM_COLOR);
-  immUniform2fv("viewportSize", &viewport[2]);
-  immUniform1f("lineWidth", 2.0f * U.pixelsize);
+  immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 }
 
 static void paint_cursor_restore_drawing_state(void)

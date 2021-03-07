@@ -34,7 +34,7 @@ CCL_NAMESPACE_BEGIN
 /* Disable workarounds, seems to be working fine on latest drivers. */
 #  define CYCLES_DISABLE_DRIVER_WORKAROUNDS
 
-/* Define CYCLES_DISABLE_DRIVER_WORKAROUNDS to disable workaounds for testing */
+/* Define CYCLES_DISABLE_DRIVER_WORKAROUNDS to disable workarounds for testing. */
 #  ifndef CYCLES_DISABLE_DRIVER_WORKAROUNDS
 /* Work around AMD driver hangs by ensuring each command is finished before doing anything else. */
 #    undef clEnqueueNDRangeKernel
@@ -230,8 +230,9 @@ class OpenCLCache {
       if (err != CL_SUCCESS) { \
         string message = string_printf( \
             "OpenCL error: %s in %s (%s:%d)", clewErrorString(err), #stmt, __FILE__, __LINE__); \
-        if ((device)->error_message() == "") \
+        if ((device)->error_message() == "") { \
           (device)->set_error(message); \
+        } \
         fprintf(stderr, "%s\n", message.c_str()); \
       } \
     } \
@@ -244,8 +245,9 @@ class OpenCLCache {
       if (err != CL_SUCCESS) { \
         string message = string_printf( \
             "OpenCL error: %s in %s (%s:%d)", clewErrorString(err), #stmt, __FILE__, __LINE__); \
-        if (error_msg == "") \
+        if (error_msg == "") { \
           error_msg = message; \
+        } \
         fprintf(stderr, "%s\n", message.c_str()); \
       } \
     } \
@@ -285,7 +287,7 @@ class OpenCLDevice : public Device {
 
     /* Try to load the program from device cache or disk */
     bool load();
-    /* Compile the kernel (first separate, failback to local) */
+    /* Compile the kernel (first separate, fail-back to local). */
     void compile();
     /* Create the OpenCL kernels after loading or compiling */
     void create_kernels();
@@ -626,7 +628,7 @@ class OpenCLDevice : public Device {
   void release_mem_object_safe(cl_mem mem);
   void release_program_safe(cl_program program);
 
-  /* ** Those guys are for workign around some compiler-specific bugs ** */
+  /* ** Those guys are for working around some compiler-specific bugs ** */
 
   cl_program load_cached_kernel(ustring key, thread_scoped_lock &cache_locker);
 

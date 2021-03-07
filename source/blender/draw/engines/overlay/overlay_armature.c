@@ -534,7 +534,7 @@ static void drw_shgroup_bone_custom_solid(ArmatureDrawContext *ctx,
                                           const float outline_color[4],
                                           Object *custom)
 {
-  /* TODO(fclem) arg... less than ideal but we never iter on this object
+  /* TODO(fclem): arg... less than ideal but we never iter on this object
    * to assure batch cache is valid. */
   drw_batch_cache_validate(custom);
 
@@ -568,7 +568,7 @@ static void drw_shgroup_bone_custom_solid(ArmatureDrawContext *ctx,
     DRW_buffer_add_entry_struct(buf, inst_data.mat);
   }
 
-  /* TODO(fclem) needs to be moved elsewhere. */
+  /* TODO(fclem): needs to be moved elsewhere. */
   drw_batch_cache_generate_requested_delayed(custom);
 }
 
@@ -577,7 +577,7 @@ static void drw_shgroup_bone_custom_wire(ArmatureDrawContext *ctx,
                                          const float color[4],
                                          Object *custom)
 {
-  /* TODO(fclem) arg... less than ideal but we never iter on this object
+  /* TODO(fclem): arg... less than ideal but we never iter on this object
    * to assure batch cache is valid. */
   drw_batch_cache_validate(custom);
 
@@ -592,7 +592,7 @@ static void drw_shgroup_bone_custom_wire(ArmatureDrawContext *ctx,
     DRW_buffer_add_entry_struct(buf, inst_data.mat);
   }
 
-  /* TODO(fclem) needs to be moved elsewhere. */
+  /* TODO(fclem): needs to be moved elsewhere. */
   drw_batch_cache_generate_requested_delayed(custom);
 }
 
@@ -726,7 +726,7 @@ static void set_pchan_colorset(ArmatureDrawContext *ctx, Object *ob, bPoseChanne
 
   /* only try to set custom color if enabled for armature */
   if (arm->flag & ARM_COL_CUSTOM) {
-    /* currently, a bone can only use a custom color set if it's group (if it has one),
+    /* currently, a bone can only use a custom color set if its group (if it has one),
      * has been set to use one
      */
     if (pchan->agrp_index) {
@@ -1691,13 +1691,13 @@ static void draw_bone_degrees_of_freedom(ArmatureDrawContext *ctx, bPoseChannel 
 
   unit_m4(posetrans);
   translate_m4(posetrans, pchan->pose_mat[3][0], pchan->pose_mat[3][1], pchan->pose_mat[3][2]);
-  /* in parent-bone pose space... */
+  /* In parent-bone pose space... */
   if (pchan->parent) {
     copy_m4_m4(tmp, pchan->parent->pose_mat);
     zero_v3(tmp[3]);
     mul_m4_m4m4(posetrans, posetrans, tmp);
   }
-  /* ... but own restspace */
+  /* ... but own rest-space. */
   mul_m4_m4m3(posetrans, posetrans, pchan->bone->bone_mat);
 
   float scale = pchan->bone->length * pchan->size[1];

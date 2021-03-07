@@ -122,7 +122,7 @@ extern void *(*MEM_calloc_arrayN)(size_t len,
 /**
  * Allocate a block of memory of size len, with tag name str. The
  * name must be a static, because only a pointer to it is stored !
- * */
+ */
 extern void *(*MEM_mallocN)(size_t len, const char *str) /* ATTR_MALLOC */ ATTR_WARN_UNUSED_RESULT
     ATTR_ALLOC_SIZE(1) ATTR_NONNULL(2);
 
@@ -130,7 +130,7 @@ extern void *(*MEM_mallocN)(size_t len, const char *str) /* ATTR_MALLOC */ ATTR_
  * Allocate a block of memory of size (len * size), with tag name str,
  * aborting in case of integer overflow to prevent vulnerabilities. The
  * name must be a static, because only a pointer to it is stored !
- * */
+ */
 extern void *(*MEM_malloc_arrayN)(size_t len,
                                   size_t size,
                                   const char *str) /* ATTR_MALLOC */ ATTR_WARN_UNUSED_RESULT
@@ -139,7 +139,7 @@ extern void *(*MEM_malloc_arrayN)(size_t len,
 /**
  * Allocate an aligned block of memory of size len, with tag name str. The
  * name must be a static, because only a pointer to it is stored !
- * */
+ */
 extern void *(*MEM_mallocN_aligned)(size_t len,
                                     size_t alignment,
                                     const char *str) /* ATTR_MALLOC */ ATTR_WARN_UNUSED_RESULT
@@ -226,7 +226,22 @@ void MEM_use_memleak_detection(bool enabled);
  * tests. */
 void MEM_enable_fail_on_memleak(void);
 
-/* Switch allocator to slower but fully guarded mode. */
+/* Switch allocator to fast mode, with less tracking.
+ *
+ * Use in the production code where performance is the priority, and exact details about allocation
+ * is not. This allocator keeps track of number of allocation and amount of allocated bytes, but it
+ * does not track of names of allocated blocks.
+ *
+ * NOTE: The switch between allocator types can only happen before any allocation did happen. */
+void MEM_use_lockfree_allocator(void);
+
+/* Switch allocator to slow fully guarded mode.
+ *
+ * Use for debug purposes. This allocator contains lock section around every allocator call, which
+ * makes it slow. What is gained with this is the ability to have list of allocated blocks (in an
+ * addition to the tracking of number of allocations and amount of allocated bytes).
+ *
+ * NOTE: The switch between allocator types can only happen before any allocation did happen. */
 void MEM_use_guarded_allocator(void);
 
 #ifdef __cplusplus
@@ -234,7 +249,7 @@ void MEM_use_guarded_allocator(void);
 #endif /* __cplusplus */
 
 #ifdef __cplusplus
-/* alloc funcs for C++ only */
+/* Allocation functions (for C++ only). */
 #  define MEM_CXX_CLASS_ALLOC_FUNCS(_id) \
    public: \
     void *operator new(size_t num_bytes) \
@@ -243,8 +258,9 @@ void MEM_use_guarded_allocator(void);
     } \
     void operator delete(void *mem) \
     { \
-      if (mem) \
+      if (mem) { \
         MEM_freeN(mem); \
+      } \
     } \
     void *operator new[](size_t num_bytes) \
     { \
@@ -252,8 +268,9 @@ void MEM_use_guarded_allocator(void);
     } \
     void operator delete[](void *mem) \
     { \
-      if (mem) \
+      if (mem) { \
         MEM_freeN(mem); \
+      } \
     } \
     void *operator new(size_t /*count*/, void *ptr) \
     { \

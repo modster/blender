@@ -49,12 +49,6 @@ set(LIB
 )
 
 if(WIN32 AND NOT UNIX)
-  list(APPEND SRC
-    intern/mmap_win.c
-
-    mmap_win.h
-  )
-
   list(APPEND INC_SYS
     ${PTHREADS_INC}
   )
@@ -92,5 +86,5 @@ if(WITH_GTESTS)
     bf_blenlib
   )
   include(GTestTesting)
-  blender_add_test_lib(bf_intern_guardedalloc_tests "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")
+  blender_add_test_executable(guardedalloc "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")
 endif()

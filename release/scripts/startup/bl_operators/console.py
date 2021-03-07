@@ -17,6 +17,7 @@
 # ##### END GPL LICENSE BLOCK #####
 
 # <pep8-80 compliant>
+from __future__ import annotations
 
 import bpy
 from bpy.types import Operator
@@ -85,7 +86,7 @@ class ConsoleAutocomplete(Operator):
 class ConsoleCopyAsScript(Operator):
     """Copy the console contents for use in a script"""
     bl_idname = "console.copy_as_script"
-    bl_label = "Copy to Clipboard (as script)"
+    bl_label = "Copy to Clipboard (as Script)"
 
     @classmethod
     def poll(cls, context):

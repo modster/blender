@@ -63,7 +63,7 @@ class DATA_PT_volume_file(DataButtonsPanel, Panel):
 
         layout.prop(volume, "filepath", text="")
 
-        if len(volume.filepath):
+        if volume.filepath:
             layout.use_property_split = True
             layout.use_property_decorate = False
 
@@ -76,11 +76,11 @@ class DATA_PT_volume_file(DataButtonsPanel, Panel):
                 col.prop(volume, "sequence_mode", text="Mode")
 
         error_msg = volume.grids.error_message
-        if len(error_msg):
-          layout.separator()
-          col = layout.column(align=True)
-          col.label(text="Failed to load volume:")
-          col.label(text=error_msg)
+        if error_msg:
+            layout.separator()
+            col = layout.column(align=True)
+            col.label(text="Failed to load volume:")
+            col.label(text=error_msg)
 
 
 class VOLUME_UL_grids(UIList):
@@ -88,6 +88,7 @@ class VOLUME_UL_grids(UIList):
         name = grid.name
         data_type = grid.bl_rna.properties['data_type'].enum_items[grid.data_type]
 
+        layout.emboss = 'NONE'
         layout.label(text=name)
         row = layout.row()
         row.alignment = 'RIGHT'
@@ -142,9 +143,6 @@ class DATA_PT_volume_viewport_display(DataButtonsPanel, Panel):
 
         volume = context.volume
         display = volume.display
-        axis_slice_method = display.axis_slice_method
-
-        do_full_slicing = (axis_slice_method == 'FULL')
 
         col = layout.column(align=True)
         col.prop(display, "wireframe_type")
@@ -152,14 +150,37 @@ class DATA_PT_volume_viewport_display(DataButtonsPanel, Panel):
         sub.active = display.wireframe_type in {'BOXES', 'POINTS'}
         sub.prop(display, "wireframe_detail", text="Detail")
 
-        col = layout.column(align=True)
+        col = layout.column()
         col.prop(display, "density")
         col.prop(display, "interpolation_method")
-        col.prop(display, "axis_slice_method")
-        
-        if not do_full_slicing:
-            col.prop(display, "slice_axis")
-            col.prop(display, "slice_depth")
+
+
+class DATA_PT_volume_viewport_display_slicing(DataButtonsPanel, Panel):
+    bl_label = ""
+    bl_parent_id = 'DATA_PT_volume_viewport_display'
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
+
+    def draw_header(self, context):
+        layout = self.layout
+
+        volume = context.volume
+        display = volume.display
+
+        layout.prop(display, "use_slice")
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
+        volume = context.volume
+        display = volume.display
+
+        layout.active = display.use_slice
+
+        col = layout.column()
+        col.prop(display, "slice_axis")
+        col.prop(display, "slice_depth")
 
 
 class DATA_PT_custom_props_volume(DataButtonsPanel, PropertyPanel, Panel):
@@ -173,6 +194,7 @@ classes = (
     DATA_PT_volume_grids,
     DATA_PT_volume_file,
     DATA_PT_volume_viewport_display,
+    DATA_PT_volume_viewport_display_slicing,
     DATA_PT_volume_render,
     DATA_PT_custom_props_volume,
     VOLUME_UL_grids,

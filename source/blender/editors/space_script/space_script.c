@@ -36,7 +36,6 @@
 #include "ED_space_api.h"
 
 #include "WM_api.h"
-#include "WM_types.h"
 
 #include "UI_resources.h"
 #include "UI_view2d.h"
@@ -44,8 +43,7 @@
 #ifdef WITH_PYTHON
 #endif
 
-#include "GPU_framebuffer.h"
-#include "script_intern.h"  // own include
+#include "script_intern.h" /* own include */
 
 // static script_run_python(char *funcname, )
 
@@ -85,8 +83,6 @@ static void script_free(SpaceLink *sl)
 #ifdef WITH_PYTHON
   /*free buttons references*/
   if (sscript->but_refs) {
-    // XXX      BPy_Set_DrawButtonsList(sscript->but_refs);
-    //      BPy_Free_DrawButtonsList();
     sscript->but_refs = NULL;
   }
 #endif
@@ -158,15 +154,12 @@ static void script_header_region_draw(const bContext *C, ARegion *region)
   ED_region_header(C, region);
 }
 
-static void script_main_region_listener(wmWindow *UNUSED(win),
-                                        ScrArea *UNUSED(area),
-                                        ARegion *UNUSED(region),
-                                        wmNotifier *UNUSED(wmn),
-                                        const Scene *UNUSED(scene))
+static void script_main_region_listener(const wmRegionListenerParams *UNUSED(params))
 {
-  /* context changes */
-  // XXX - Todo, need the ScriptSpace accessible to get the python script to run.
-  // BPY_run_script_space_listener()
+/* XXX - Todo, need the ScriptSpace accessible to get the python script to run. */
+#if 0
+  BPY_run_script_space_listener()
+#endif
 }
 
 /* only called once, from space/spacetypes.c */

@@ -54,6 +54,7 @@
 #include "DNA_camera_types.h"
 #include "DNA_defaults.h"
 #include "DNA_light_types.h"
+#include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
@@ -84,7 +85,6 @@
 #include "BKE_packedFile.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
-#include "BKE_sequencer.h" /* seq_foreground_frame_get() */
 #include "BKE_workspace.h"
 
 #include "BLF_api.h"
@@ -93,9 +93,11 @@
 
 #include "RE_pipeline.h"
 
+#include "SEQ_utils.h" /* SEQ_get_topmost_sequence() */
+
 #include "GPU_texture.h"
 
-#include "BLI_sys_types.h"  // for intptr_t support
+#include "BLI_sys_types.h" /* for intptr_t support */
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
@@ -188,6 +190,7 @@ static void image_free_data(ID *id)
   BKE_previewimg_free(&image->preview);
 
   BLI_freelistN(&image->tiles);
+  BLI_freelistN(&image->gpu_refresh_areas);
 }
 
 static void image_foreach_cache(ID *id,
@@ -224,14 +227,21 @@ static void image_foreach_cache(ID *id,
 static void image_blend_write(BlendWriter *writer, ID *id, const void *id_address)
 {
   Image *ima = (Image *)id;
-  if (ima->id.us > 0 || BLO_write_is_undo(writer)) {
+  const bool is_undo = BLO_write_is_undo(writer);
+  if (ima->id.us > 0 || is_undo) {
     ImagePackedFile *imapf;
 
-    /* Some trickery to keep forward compatibility of packed images. */
     BLI_assert(ima->packedfile == NULL);
-    if (ima->packedfiles.first != NULL) {
-      imapf = ima->packedfiles.first;
-      ima->packedfile = imapf->packedfile;
+    /* Do not store packed files in case this is a library override ID. */
+    if (ID_IS_OVERRIDE_LIBRARY(ima) && !is_undo) {
+      BLI_listbase_clear(&ima->packedfiles);
+    }
+    else {
+      /* Some trickery to keep forward compatibility of packed images. */
+      if (ima->packedfiles.first != NULL) {
+        imapf = ima->packedfiles.first;
+        ima->packedfile = imapf->packedfile;
+      }
     }
 
     /* write LibData */
@@ -289,6 +299,8 @@ static void image_blend_read_data(BlendDataReader *reader, ID *id)
   LISTBASE_FOREACH (ImageTile *, tile, &ima->tiles) {
     tile->ok = IMA_OK;
   }
+  ima->gpuflag = 0;
+  BLI_listbase_clear(&ima->gpu_refresh_areas);
 }
 
 static void image_blend_read_lib(BlendLibReader *UNUSED(reader), ID *id)
@@ -311,7 +323,7 @@ IDTypeInfo IDType_ID_IM = {
     .name = "Image",
     .name_plural = "images",
     .translation_context = BLT_I18NCONTEXT_ID_IMAGE,
-    .flags = 0,
+    .flags = IDTYPE_FLAGS_NO_ANIMDATA,
 
     .init_data = image_init_data,
     .copy_data = image_copy_data,
@@ -319,11 +331,16 @@ IDTypeInfo IDType_ID_IM = {
     .make_local = NULL,
     .foreach_id = NULL,
     .foreach_cache = image_foreach_cache,
+    .owner_get = NULL,
 
     .blend_write = image_blend_write,
     .blend_read_data = image_blend_read_data,
     .blend_read_lib = image_blend_read_lib,
     .blend_read_expand = NULL,
+
+    .blend_read_undo_preserve = NULL,
+
+    .lib_override_apply_post = NULL,
 };
 
 /* prototypes */
@@ -547,7 +564,7 @@ static Image *image_alloc(Main *bmain, const char *name, short source, short typ
   return ima;
 }
 
-/* Get the ibuf from an image cache by it's index and entry.
+/* Get the ibuf from an image cache by its index and entry.
  * Local use here only.
  *
  * Returns referenced image buffer if it exists, callee is to
@@ -598,14 +615,6 @@ static void copy_image_packedfiles(ListBase *lb_dst, const ListBase *lb_src)
 
     BLI_addtail(lb_dst, imapf_dst);
   }
-}
-
-/* empty image block, of similar type and filename */
-Image *BKE_image_copy(Main *bmain, const Image *ima)
-{
-  Image *ima_copy;
-  BKE_id_copy(bmain, &ima->id, (ID **)&ima_copy);
-  return ima_copy;
 }
 
 void BKE_image_merge(Main *bmain, Image *dest, Image *source)
@@ -673,7 +682,7 @@ ImageTile *BKE_image_get_tile(Image *ima, int tile_number)
 
   /* Tile number 0 is a special case and refers to the first tile, typically
    * coming from non-UDIM-aware code. */
-  if (tile_number == 0 || tile_number == 1001) {
+  if (ELEM(tile_number, 0, 1001)) {
     return ima->tiles.first;
   }
 
@@ -810,7 +819,7 @@ Image *BKE_image_load_exists_ex(Main *bmain, const char *filepath, bool *r_exist
 
   /* first search an identical filepath */
   for (ima = bmain->images.first; ima; ima = ima->id.next) {
-    if (ima->source != IMA_SRC_VIEWER && ima->source != IMA_SRC_GENERATED) {
+    if (!ELEM(ima->source, IMA_SRC_VIEWER, IMA_SRC_GENERATED)) {
       STRNCPY(strtest, ima->filepath);
       BLI_path_abs(strtest, ID_BLEND_PATH(bmain, &ima->id));
 
@@ -1321,7 +1330,7 @@ int BKE_image_imtype_to_ftype(const char imtype, ImbFormatOptions *r_options)
     return IMB_FTYPE_TIF;
   }
 #endif
-  if (imtype == R_IMF_IMTYPE_OPENEXR || imtype == R_IMF_IMTYPE_MULTILAYER) {
+  if (ELEM(imtype, R_IMF_IMTYPE_OPENEXR, R_IMF_IMTYPE_MULTILAYER)) {
     return IMB_FTYPE_OPENEXR;
   }
 #ifdef WITH_CINEON
@@ -1346,7 +1355,7 @@ int BKE_image_imtype_to_ftype(const char imtype, ImbFormatOptions *r_options)
 
 char BKE_image_ftype_to_imtype(const int ftype, const ImbFormatOptions *options)
 {
-  if (ftype == 0) {
+  if (ftype == IMB_FTYPE_NONE) {
     return R_IMF_IMTYPE_TARGA;
   }
   if (ftype == IMB_FTYPE_IMAGIC) {
@@ -1671,7 +1680,7 @@ static bool do_add_image_extension(char *string,
   }
 #endif
 #ifdef WITH_OPENEXR
-  else if (imtype == R_IMF_IMTYPE_OPENEXR || imtype == R_IMF_IMTYPE_MULTILAYER) {
+  else if (ELEM(imtype, R_IMF_IMTYPE_OPENEXR, R_IMF_IMTYPE_MULTILAYER)) {
     if (!BLI_path_extension_check(string, extension_test = ".exr")) {
       extension = extension_test;
     }
@@ -1820,7 +1829,7 @@ void BKE_imbuf_to_image_format(struct ImageFormatData *im_format, const ImBuf *i
       im_format->depth = R_IMF_CHAN_DEPTH_16;
     }
     if (custom_flags & OPENEXR_COMPRESS) {
-      im_format->exr_codec = R_IMF_EXR_CODEC_ZIP;  // Can't determine compression
+      im_format->exr_codec = R_IMF_EXR_CODEC_ZIP; /* Can't determine compression */
     }
     if (imbuf->zbuf_float) {
       im_format->flag |= R_IMF_FLAG_ZBUF;
@@ -2051,7 +2060,7 @@ static void stampdata(
   }
 
   if (use_dynamic && scene->r.stamp & R_STAMP_SEQSTRIP) {
-    const Sequence *seq = BKE_sequencer_foreground_frame_get(scene, scene->r.cfra);
+    const Sequence *seq = SEQ_get_topmost_sequence(scene, scene->r.cfra);
 
     if (seq) {
       STRNCPY(text, seq->name + 2);
@@ -2208,7 +2217,7 @@ void BKE_image_stamp_buf(Scene *scene,
   float w, h, pad;
   int x, y, y_ofs;
   float h_fixed;
-  const int mono = blf_mono_font_render;  // XXX
+  const int mono = blf_mono_font_render; /* XXX */
   struct ColorManagedDisplay *display;
   const char *display_device;
 
@@ -2958,13 +2967,11 @@ void BKE_imbuf_write_prepare(ImBuf *ibuf, const ImageFormatData *imf)
 
 int BKE_imbuf_write(ImBuf *ibuf, const char *name, const ImageFormatData *imf)
 {
-  int ok;
-
   BKE_imbuf_write_prepare(ibuf, imf);
 
   BLI_make_existing_file(name);
 
-  ok = IMB_saveiff(ibuf, name, IB_rect | IB_zbuf | IB_zbuffloat);
+  const bool ok = IMB_saveiff(ibuf, name, IB_rect | IB_zbuf | IB_zbuffloat);
   if (ok == 0) {
     perror(name);
   }
@@ -3896,6 +3903,7 @@ RenderResult *BKE_image_acquire_renderresult(Scene *scene, Image *ima)
     }
     else {
       rr = BKE_image_get_renderslot(ima, ima->render_slot)->render;
+      ima->gpuflag |= IMA_GPU_REFRESH;
     }
 
     /* set proper views */

@@ -23,11 +23,10 @@
  * - passing output paths to the visitor?, like render out.
  * - passing sequence strips with many images.
  * - passing directory paths - visitors don't know which path is a dir or a file.
- * */
+ */
 
 #include <sys/stat.h>
 
-#include <assert.h>
 #include <string.h>
 
 /* path/file handling stuff */
@@ -74,11 +73,12 @@
 #include "BKE_main.h"
 #include "BKE_node.h"
 #include "BKE_report.h"
-#include "BKE_sequencer.h"
 
 #include "BKE_bpath.h" /* own include */
 
 #include "CLG_log.h"
+
+#include "SEQ_iterator.h"
 
 #ifndef _MSC_VER
 #  include "BLI_strict_flags.h"

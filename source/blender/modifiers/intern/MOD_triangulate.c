@@ -18,12 +18,15 @@
  * \ingroup modifiers
  */
 
+#include <string.h>
+
 #include "MEM_guardedalloc.h"
 
 #include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
 
+#include "DNA_defaults.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
@@ -45,11 +48,17 @@
 #include "MOD_modifiertypes.h"
 #include "MOD_ui_common.h"
 
-static Mesh *triangulate_mesh(Mesh *mesh,
-                              const int quad_method,
-                              const int ngon_method,
-                              const int min_vertices,
-                              const int flag)
+Mesh *triangulate_mesh(Mesh *mesh,
+                       const int quad_method,
+                       const int ngon_method,
+                       const int min_vertices,
+                       const int flag);
+
+Mesh *triangulate_mesh(Mesh *mesh,
+                       const int quad_method,
+                       const int ngon_method,
+                       const int min_vertices,
+                       const int flag)
 {
   Mesh *result;
   BMesh *bm;
@@ -107,11 +116,12 @@ static void initData(ModifierData *md)
 {
   TriangulateModifierData *tmd = (TriangulateModifierData *)md;
 
+  BLI_assert(MEMCMP_STRUCT_AFTER_IS_ZERO(tmd, modifier));
+
+  MEMCPY_STRUCT_AFTER(tmd, DNA_struct_default_get(TriangulateModifierData), modifier);
+
   /* Enable in editmode by default */
   md->mode |= eModifierMode_Editmode;
-  tmd->quad_method = MOD_TRIANGULATE_QUAD_SHORTEDGE;
-  tmd->ngon_method = MOD_TRIANGULATE_NGON_BEAUTY;
-  tmd->min_vertices = 4;
 }
 
 static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *UNUSED(ctx), Mesh *mesh)
@@ -152,10 +162,12 @@ ModifierTypeInfo modifierType_Triangulate = {
     /* name */ "Triangulate",
     /* structName */ "TriangulateModifierData",
     /* structSize */ sizeof(TriangulateModifierData),
+    /* srna */ &RNA_TriangulateModifier,
     /* type */ eModifierTypeType_Constructive,
     /* flags */ eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsEditmode |
         eModifierTypeFlag_SupportsMapping | eModifierTypeFlag_EnableInEditmode |
         eModifierTypeFlag_AcceptsCVs,
+    /* icon */ ICON_MOD_TRIANGULATE,
 
     /* copyData */ BKE_modifier_copydata_generic,
 
@@ -165,7 +177,7 @@ ModifierTypeInfo modifierType_Triangulate = {
     /* deformMatricesEM */ NULL,
     /* modifyMesh */ modifyMesh,
     /* modifyHair */ NULL,
-    /* modifyPointCloud */ NULL,
+    /* modifyGeometrySet */ NULL,
     /* modifyVolume */ NULL,
 
     /* initData */ initData,
@@ -175,7 +187,6 @@ ModifierTypeInfo modifierType_Triangulate = {
     /* updateDepsgraph */ NULL,
     /* dependsOnTime */ NULL,
     /* dependsOnNormals */ NULL,
-    /* foreachObjectLink */ NULL,
     /* foreachIDLink */ NULL,
     /* foreachTexLink */ NULL,
     /* freeRuntimeData */ NULL,
