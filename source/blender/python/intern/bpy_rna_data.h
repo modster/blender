@@ -15,34 +15,15 @@
  */
 
 /** \file
- * \ingroup spoutliner
+ * \ingroup pythonintern
  */
 
 #pragma once
 
-#include "tree_element.hh"
+int BPY_rna_data_context_type_ready(void);
 
-namespace blender::ed::outliner {
+extern PyMethodDef BPY_rna_data_context_method_def;
 
-class TreeElementID : public AbstractTreeElement {
- public:
-  TreeElementID(TreeElement &legacy_te, const ID &id);
-
-  static TreeElementID *createFromID(TreeElement &legacy_te, const ID &id);
-
-  /**
-   * Expanding not implemented for all types yet. Once it is, this can be set to true or
-   * `AbstractTreeElement::expandValid()` can be removed altogether.
-   */
-  bool isExpandValid() const override
-  {
-    return false;
-  }
-};
-
-class TreeElementIDLibrary final : public TreeElementID {
- public:
-  TreeElementIDLibrary(TreeElement &legacy_te, const ID &id);
-};
-
-}  // namespace blender::ed::outliner
+#ifdef __cplusplus
+}
+#endif
