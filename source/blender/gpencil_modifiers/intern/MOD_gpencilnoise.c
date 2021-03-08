@@ -134,6 +134,7 @@ static void deformStroke(GpencilModifierData *md,
                          bGPDframe *gpf,
                          bGPDstroke *gps)
 {
+  bGPdata *gpd = ob->data;
   NoiseGpencilModifierData *mmd = (NoiseGpencilModifierData *)md;
   MDeformVert *dvert = NULL;
   /* Noise value in range [-1..1] */
@@ -259,6 +260,11 @@ static void deformStroke(GpencilModifierData *md,
       pt->uv_rot += (noise * 2.0f - 1.0f) * weight * mmd->factor_uvs * M_PI_2;
       CLAMP(pt->uv_rot, -M_PI_2, M_PI_2);
     }
+  }
+
+  if (GPENCIL_STROKE_IS_CURVE(gps)) {
+    gps->editcurve->flag |= GP_CURVE_NEEDS_STROKE_UPDATE;
+    BKE_gpencil_stroke_geometry_update(gpd, gps);
   }
 
   MEM_SAFE_FREE(noise_table_position);
