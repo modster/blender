@@ -252,8 +252,8 @@ static void set_global_rotation(pxr::UsdStageRefPtr stage, ImportSettings &r_set
 
   // Rotate 90 degrees about the X-axis.
   float rmat[3][3];
-  float axis[3] = { 1.0f, 0.0f, 0.0f };
-  axis_angle_normalized_to_mat3(rmat, axis, M_PI/2.0f);
+  float axis[3] = {1.0f, 0.0f, 0.0f};
+  axis_angle_normalized_to_mat3(rmat, axis, M_PI / 2.0f);
 
   unit_m4(r_settings.conversion_mat);
   copy_m4_m3(r_settings.conversion_mat, rmat);
