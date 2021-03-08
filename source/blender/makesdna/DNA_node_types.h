@@ -353,8 +353,8 @@ typedef struct bNode {
 /* XXX NODE_UPDATE is a generic update flag. More fine-grained updates
  * might be used in the future, but currently all work the same way.
  */
-#define NODE_UPDATE 0xFFFF /* generic update flag (includes all others) */
-#define NODE_UPDATE_ID 1 /* associated id data block has changed */
+#define NODE_UPDATE 0xFFFF     /* generic update flag (includes all others) */
+#define NODE_UPDATE_ID 1       /* associated id data block has changed */
 #define NODE_UPDATE_OPERATOR 2 /* node update triggered from update operator */
 
 /* Unique hash key for identifying node instances
@@ -401,7 +401,7 @@ typedef struct bNodeLink {
 /* link->flag */
 #define NODE_LINKFLAG_HILITE (1 << 0) /* link has been successfully validated */
 #define NODE_LINK_VALID (1 << 1)
-#define NODE_LINK_TEST (1 << 2) /* free test flag, undefined */
+#define NODE_LINK_TEST (1 << 2)           /* free test flag, undefined */
 #define NODE_LINK_TEMP_HIGHLIGHT (1 << 3) /* Link is highlighted for picking. */
 
 /* tree->edit_quality/tree->render_quality */
@@ -517,11 +517,11 @@ typedef struct bNodeTree {
 #define NTREE_TYPE_INIT 1
 
 /* ntree->flag */
-#define NTREE_DS_EXPAND (1 << 0) /* for animation editors */
-#define NTREE_COM_OPENCL (1 << 1) /* use opencl */
-#define NTREE_TWO_PASS (1 << 2) /* two pass */
+#define NTREE_DS_EXPAND (1 << 0)            /* for animation editors */
+#define NTREE_COM_OPENCL (1 << 1)           /* use opencl */
+#define NTREE_TWO_PASS (1 << 2)             /* two pass */
 #define NTREE_COM_GROUPNODE_BUFFER (1 << 3) /* use groupnode buffers */
-#define NTREE_VIEWER_BORDER (1 << 4) /* use a border for viewer nodes */
+#define NTREE_VIEWER_BORDER (1 << 4)        /* use a border for viewer nodes */
 /* NOTE: DEPRECATED, use (id->tag & LIB_TAG_LOCALIZED) instead. */
 
 /* tree is localized copy, free when deleting node groups */
@@ -1234,8 +1234,7 @@ typedef struct NodeGeometryMeshCircle {
 
 typedef struct NodeGeometryMeshCylinder {
   /* GeometryNodeMeshCircleFillType. */
-  uint8_t fill_type_top;
-  uint8_t fill_type_bottom;
+  uint8_t fill_type;
 } NodeGeometryMeshCylinder;
 
 /* script node mode */
@@ -1250,7 +1249,7 @@ typedef struct NodeGeometryMeshCylinder {
 #define NODE_IES_EXTERNAL 1
 
 /* frame node flags */
-#define NODE_FRAME_SHRINK 1 /* keep the bounding box minimal */
+#define NODE_FRAME_SHRINK 1     /* keep the bounding box minimal */
 #define NODE_FRAME_RESIZEABLE 2 /* test flag, if frame can be resized by user */
 
 /* proxy node flags */
