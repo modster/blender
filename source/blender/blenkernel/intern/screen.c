@@ -1342,6 +1342,9 @@ static void write_area_regions(BlendWriter *writer, ScrArea *area)
     else if (sl->spacetype == SPACE_INFO) {
       BLO_write_struct(writer, SpaceInfo, sl);
     }
+    else if (sl->spacetype == SPACE_SPREADSHEET) {
+      BLO_write_struct(writer, SpaceSpreadsheet, sl);
+    }
   }
 }
 
@@ -1681,6 +1684,7 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
       sfile->op = NULL;
       sfile->previews_timer = NULL;
       sfile->tags = 0;
+      sfile->runtime = NULL;
       BLO_read_data_address(reader, &sfile->params);
       BLO_read_data_address(reader, &sfile->asset_params);
     }

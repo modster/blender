@@ -301,11 +301,11 @@ typedef struct bNodeType {
   void (*free_self)(struct bNodeType *ntype);
 
   /* **** execution callbacks **** */
-  NodeInitExecFunction initexecfunc;
-  NodeFreeExecFunction freeexecfunc;
-  NodeExecFunction execfunc;
+  NodeInitExecFunction init_exec_fn;
+  NodeFreeExecFunction free_exec_fn;
+  NodeExecFunction exec_fn;
   /* gpu */
-  NodeGPUExecFunction gpufunc;
+  NodeGPUExecFunction gpu_fn;
 
   /* Expands the bNode into nodes in a multi-function network, which will be evaluated later on. */
   NodeExpandInMFNetworkFunction expand_in_mf_network;
@@ -829,10 +829,10 @@ void node_type_group_update(struct bNodeType *ntype,
                                                       struct bNode *node));
 
 void node_type_exec(struct bNodeType *ntype,
-                    NodeInitExecFunction initexecfunc,
-                    NodeFreeExecFunction freeexecfunc,
-                    NodeExecFunction execfunc);
-void node_type_gpu(struct bNodeType *ntype, NodeGPUExecFunction gpufunc);
+                    NodeInitExecFunction init_exec_fn,
+                    NodeFreeExecFunction free_exec_fn,
+                    NodeExecFunction exec_fn);
+void node_type_gpu(struct bNodeType *ntype, NodeGPUExecFunction gpu_fn);
 void node_type_internal_links(struct bNodeType *ntype,
                               void (*update_internal_links)(struct bNodeTree *, struct bNode *));
 
@@ -847,7 +847,7 @@ bool BKE_node_is_connected_to_output(struct bNodeTree *ntree, struct bNode *node
 /* ************** COMMON NODES *************** */
 
 #define NODE_UNDEFINED -2 /* node type is not registered */
-#define NODE_CUSTOM -1 /* for dynamically registered custom types */
+#define NODE_CUSTOM -1    /* for dynamically registered custom types */
 #define NODE_GROUP 2
 // #define NODE_FORLOOP 3       /* deprecated */
 // #define NODE_WHILELOOP   4   /* deprecated */
@@ -1348,7 +1348,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_BOOLEAN 1003
 #define GEO_NODE_POINT_DISTRIBUTE 1004
 #define GEO_NODE_POINT_INSTANCE 1005
-#define GEO_NODE_SUBDIVISION_SURFACE 1006
+#define GEO_NODE_SUBDIVIDE_SMOOTH 1006
 #define GEO_NODE_OBJECT_INFO 1007
 #define GEO_NODE_ATTRIBUTE_RANDOMIZE 1008
 #define GEO_NODE_ATTRIBUTE_MATH 1009
@@ -1371,7 +1371,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_VOLUME_TO_MESH 1026
 #define GEO_NODE_ATTRIBUTE_COMBINE_XYZ 1027
 #define GEO_NODE_ATTRIBUTE_SEPARATE_XYZ 1028
-#define GEO_NODE_SUBDIVISION_SURFACE_SIMPLE 1029
+#define GEO_NODE_SUBDIVIDE 1029
 #define GEO_NODE_MESH_PRIMITIVE_CUBE 1030
 #define GEO_NODE_MESH_PRIMITIVE_CIRCLE 1031
 #define GEO_NODE_MESH_PRIMITIVE_UV_SPHERE 1032

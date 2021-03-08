@@ -55,6 +55,7 @@ void ED_spacetype_userpref(void);
 void ED_spacetype_clip(void);
 void ED_spacetype_statusbar(void);
 void ED_spacetype_topbar(void);
+void ED_spacetype_spreadsheet(void);
 
 /* calls for instancing and freeing spacetype static data
  * called in WM_init_exit */
@@ -76,11 +77,6 @@ void ED_region_draw_cb_exit(struct ARegionType *, void *);
 void ED_region_draw_cb_remove_by_type(struct ARegionType *art,
                                       void *draw_fn,
                                       void (*free)(void *));
-/* generic callbacks */
-/* ed_util.c */
-void ED_region_draw_mouse_line_cb(const struct bContext *C,
-                                  struct ARegion *region,
-                                  void *arg_info);
 
 #ifdef __cplusplus
 }

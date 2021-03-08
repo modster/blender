@@ -916,7 +916,7 @@ void BKE_main_id_tag_idcode(struct Main *mainvar,
  */
 void BKE_main_id_tag_all(struct Main *mainvar, const int tag, const bool value)
 {
-  ListBase *lbarray[MAX_LIBARRAY];
+  ListBase *lbarray[INDEX_ID_MAX];
   int a;
 
   a = set_listbasepointers(mainvar, lbarray);
@@ -949,7 +949,7 @@ void BKE_main_id_flag_listbase(ListBase *lb, const int flag, const bool value)
  */
 void BKE_main_id_flag_all(Main *bmain, const int flag, const bool value)
 {
-  ListBase *lbarray[MAX_LIBARRAY];
+  ListBase *lbarray[INDEX_ID_MAX];
   int a;
   a = set_listbasepointers(bmain, lbarray);
   while (a--) {
@@ -1139,6 +1139,7 @@ static uint global_session_uuid = 0;
 void BKE_lib_libblock_session_uuid_ensure(ID *id)
 {
   if (id->session_uuid == MAIN_ID_SESSION_UUID_UNSET) {
+    BLI_assert((id->tag & LIB_TAG_TEMP_MAIN) == 0); /* Caller must ensure this. */
     id->session_uuid = atomic_add_and_fetch_uint32(&global_session_uuid, 1);
     /* In case overflow happens, still assign a valid ID. This way opening files many times works
      * correctly. */
@@ -1870,7 +1871,7 @@ void BKE_library_make_local(Main *bmain,
                             const bool untagged_only,
                             const bool set_fake)
 {
-  ListBase *lbarray[MAX_LIBARRAY];
+  ListBase *lbarray[INDEX_ID_MAX];
 
   LinkNode *todo_ids = NULL;
   LinkNode *copied_ids = NULL;
