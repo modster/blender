@@ -95,32 +95,15 @@ void USDXformReader::read_matrix(float r_mat[4][4] /* local matrix */,
     return;
   }
 
-  bool resetsXformStack = false;
-  std::vector<pxr::UsdGeomXformOp> orderedXformOps = xformable.GetOrderedXformOps(
-      &resetsXformStack);
+  is_constant = !xformable.TransformMightBeTimeVarying();
 
-  for (std::vector<pxr::UsdGeomXformOp>::iterator I = orderedXformOps.begin();
-       I != orderedXformOps.end();
-       ++I) {
+  pxr::GfMatrix4d usd_local_xf;
+  bool reset_xform_stack;
+  xformable.GetLocalTransformation(&usd_local_xf, &reset_xform_stack, time);
 
-    pxr::UsdGeomXformOp &xformOp = (*I);
-
-    if (xformOp.MightBeTimeVarying()) {
-      is_constant = false;
-    }
-
-    // Note, we don't apply the scale here because the XformOps may
-    // be empty, in which case this code won't be reached.
-    pxr::GfMatrix4d mat = xformOp.GetOpTransform(time);
-
-    // Convert the result to a float matrix.
-    pxr::GfMatrix4f mat4f(mat);
-
-    float t_mat[4][4];
-    mat4f.Get(t_mat);
-
-    mul_m4_m4m4(r_mat, r_mat, t_mat);
-  }
+  // Convert the result to a float matrix.
+  pxr::GfMatrix4f mat4f = pxr::GfMatrix4f(usd_local_xf);
+  mat4f.Get(r_mat);
 
   /* Apply global scaling and rotation only to root objects, parenting
    * will propagate it. */
