@@ -99,6 +99,7 @@ void USDLightReader::readObjectData(Main *bmain, double motionSampleTime)
   pxr::VtValue intensity;
   light_prim.GetIntensityAttr().Get(&intensity, motionSampleTime);
 
+
   blight->energy = intensity.Get<float>();
 
   // TODO: Not currently supported
@@ -115,7 +116,8 @@ void USDLightReader::readObjectData(Main *bmain, double motionSampleTime)
 
   pxr::VtValue color;
   light_prim.GetColorAttr().Get(&color, motionSampleTime);
-  pxr::GfVec3f color_vec = color.Get<pxr::GfVec3f>();
+  // Calling UncheckedGet() to silence compiler warning.
+  pxr::GfVec3f color_vec = color.UncheckedGet<pxr::GfVec3f>();
   blight->r = color_vec[0];
   blight->g = color_vec[1];
   blight->b = color_vec[2];
