@@ -503,6 +503,7 @@ void USDMeshReader::read_attributes(Mesh *mesh,
     void *cdata = CustomData_get_layer_named(cd, cd_type, name);
 
     if (!cdata) {
+      printf("attr name %s\n", name);
       cdata = CustomData_add_layer_named(cd, cd_type, CD_DEFAULT, NULL, num, name);
     }
     memcpy(cdata, data, num * type_size);
@@ -666,7 +667,11 @@ void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
     read_uvs_params(config, abc_mesh_data, schema.getUVsParam(), selector);
   }*/
 
-  if ((settings->read_flag & MOD_MESHSEQ_READ_VERT) != 0) {
+  // Note that for new meshes we always want to read verts and polys,
+  // regradless of the value of the read_flag, to avoid a crash downstream
+  // in code that expect this data to be there.
+
+  if (new_mesh || (settings->read_flag & MOD_MESHSEQ_READ_VERT) != 0) {
     for (int i = 0; i < m_positions.size(); i++) {
       MVert &mvert = mesh->mvert[i];
       mvert.co[0] = m_positions[i][0];
@@ -675,7 +680,7 @@ void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
     }
   }
 
-  if ((settings->read_flag & MOD_MESHSEQ_READ_POLY) != 0) {
+  if (new_mesh || (settings->read_flag & MOD_MESHSEQ_READ_POLY) != 0) {
     read_mpolys(mesh, mesh_prim, motionSampleTime);
     if (m_normalInterpolation == pxr::UsdGeomTokens->faceVarying) {
       process_normals_face_varying(mesh);
