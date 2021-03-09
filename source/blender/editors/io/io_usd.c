@@ -552,7 +552,7 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
 
   RNA_def_boolean(ot->srna,
                   "import_subdiv",
-                  true,
+                  false,
                   "Import Subdiv Scheme",
                   "If enabled, subdiv surface modifiers will be created based on USD "
                   "SubdivisionScheme attribute");
