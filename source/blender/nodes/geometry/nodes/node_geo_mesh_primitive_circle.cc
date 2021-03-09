@@ -61,7 +61,7 @@ static void geo_node_mesh_primitive_circle_init(bNodeTree *UNUSED(ntree), bNode 
 
 namespace blender::nodes {
 
-static int vert_total(const GeometryNodeMeshCircleFillType fill_type, const int verts_num)
+static int circle_vert_total(const GeometryNodeMeshCircleFillType fill_type, const int verts_num)
 {
   switch (fill_type) {
     case GEO_NODE_MESH_CIRCLE_FILL_NONE:
@@ -74,7 +74,7 @@ static int vert_total(const GeometryNodeMeshCircleFillType fill_type, const int 
   return 0;
 }
 
-static int edge_total(const GeometryNodeMeshCircleFillType fill_type, const int verts_num)
+static int circle_edge_total(const GeometryNodeMeshCircleFillType fill_type, const int verts_num)
 {
   switch (fill_type) {
     case GEO_NODE_MESH_CIRCLE_FILL_NONE:
@@ -87,7 +87,7 @@ static int edge_total(const GeometryNodeMeshCircleFillType fill_type, const int 
   return 0;
 }
 
-static int corner_total(const GeometryNodeMeshCircleFillType fill_type, const int verts_num)
+static int circle_corner_total(const GeometryNodeMeshCircleFillType fill_type, const int verts_num)
 {
   switch (fill_type) {
     case GEO_NODE_MESH_CIRCLE_FILL_NONE:
@@ -101,7 +101,7 @@ static int corner_total(const GeometryNodeMeshCircleFillType fill_type, const in
   return 0;
 }
 
-static int face_total(const GeometryNodeMeshCircleFillType fill_type, const int verts_num)
+static int circle_face_total(const GeometryNodeMeshCircleFillType fill_type, const int verts_num)
 {
   switch (fill_type) {
     case GEO_NODE_MESH_CIRCLE_FILL_NONE:
@@ -115,43 +115,37 @@ static int face_total(const GeometryNodeMeshCircleFillType fill_type, const int 
   return 0;
 }
 
-static Mesh *create_circle_mesh(const float3 location,
-                                const float3 rotation,
-                                const float radius,
+static Mesh *create_circle_mesh(const float radius,
                                 const int verts_num,
                                 const GeometryNodeMeshCircleFillType fill_type)
 {
-  float4x4 transform;
-  loc_eul_size_to_mat4(transform.values, location, rotation, float3(1.0f));
-
-  Mesh *mesh = BKE_mesh_new_nomain(vert_total(fill_type, verts_num),
-                                   edge_total(fill_type, verts_num),
+  Mesh *mesh = BKE_mesh_new_nomain(circle_vert_total(fill_type, verts_num),
+                                   circle_edge_total(fill_type, verts_num),
                                    0,
-                                   corner_total(fill_type, verts_num),
-                                   face_total(fill_type, verts_num));
+                                   circle_corner_total(fill_type, verts_num),
+                                   circle_face_total(fill_type, verts_num));
   MutableSpan<MVert> verts = MutableSpan<MVert>(mesh->mvert, mesh->totvert);
-  MutableSpan<MEdge> edges = MutableSpan<MEdge>(mesh->medge, mesh->totedge);
   MutableSpan<MLoop> loops = MutableSpan<MLoop>(mesh->mloop, mesh->totloop);
+  MutableSpan<MEdge> edges = MutableSpan<MEdge>(mesh->medge, mesh->totedge);
   MutableSpan<MPoly> polys = MutableSpan<MPoly>(mesh->mpoly, mesh->totpoly);
 
-  {
-    float angle = 0.0f;
-    const float angle_delta = 2.0f * M_PI / static_cast<float>(verts_num);
-    for (const int i : IndexRange(verts_num)) {
-      MVert &vert = verts[i];
-      float3 co = float3(std::cos(angle) * radius, std::sin(angle) * radius, 0.0f) + location;
+  float angle = 0.0f;
+  const float angle_delta = 2.0f * M_PI / static_cast<float>(verts_num);
+  for (const int i : IndexRange(verts_num)) {
+    MVert &vert = verts[i];
+    float3 co = float3(std::cos(angle) * radius, std::sin(angle) * radius, 0.0f);
 
-      copy_v3_v3(vert.co, co);
-      angle += angle_delta;
-    }
-    if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN) {
-      copy_v3_v3(verts.last().co, float3(0.0f, 0.0f, 0.0f));
-    }
+    copy_v3_v3(vert.co, co);
+    angle += angle_delta;
+  }
+  if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN) {
+    copy_v3_v3(verts.last().co, float3(0));
   }
 
   /* Align all vertex normals to the input rotation. */
+  short up_normal[3] = {0, 0, SHRT_MAX};
   for (MVert &vert : verts) {
-    normal_float_to_short_v3(vert.no, rotation);
+    copy_v3_v3_short(vert.no, up_normal);
   }
 
   /* Create outer edges. */
@@ -233,8 +227,6 @@ static Mesh *create_circle_mesh(const float3 location,
 
 static void geo_node_mesh_primitive_circle_exec(GeoNodeExecParams params)
 {
-  GeometrySet geometry_set;
-
   const bNode &node = params.node();
   const NodeGeometryMeshCircle &storage = *(const NodeGeometryMeshCircle *)node.storage;
 
@@ -243,7 +235,7 @@ static void geo_node_mesh_primitive_circle_exec(GeoNodeExecParams params)
 
   const int verts_num = params.extract_input<int>("Vertices");
   if (verts_num < 3) {
-    params.set_output("Geometry", geometry_set);
+    params.set_output("Geometry", GeometrySet());
     return;
   }
 
@@ -251,13 +243,14 @@ static void geo_node_mesh_primitive_circle_exec(GeoNodeExecParams params)
   const float3 location = params.extract_input<float3>("Location");
   const float3 rotation = params.extract_input<float3>("Rotation");
 
-  const float3 rotation_normalized = rotation.length_squared() == 0.0f ? float3(0.0f, 0.0f, 1.0f) :
-                                                                         rotation.normalized();
+  Mesh *mesh = create_circle_mesh(radius, verts_num, fill_type);
+  BLI_assert(BKE_mesh_is_valid(mesh));
 
-  geometry_set.replace_mesh(
-      create_circle_mesh(location, rotation_normalized, radius, verts_num, fill_type));
+  if (!location.is_zero() || !rotation.is_zero()) {
+    transform_mesh(mesh, location, rotation, float3(1));
+  }
 
-  params.set_output("Geometry", geometry_set);
+  params.set_output("Geometry", GeometrySet::create_with_mesh(mesh));
 }
 
 }  // namespace blender::nodes

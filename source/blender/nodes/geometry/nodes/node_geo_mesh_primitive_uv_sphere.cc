@@ -43,34 +43,34 @@ static bNodeSocketTemplate geo_node_mesh_primitive_uv_sphere_out[] = {
 
 namespace blender::nodes {
 
-static int vert_total(const int segments, const int rings)
+static int sphere_vert_total(const int segments, const int rings)
 {
   return segments * (rings - 1) + 2;
 }
 
-static int edge_total(const int segments, const int rings)
+static int sphere_edge_total(const int segments, const int rings)
 {
   return segments * (rings * 2 - 1);
 }
 
-static int corner_total(const int segments, const int rings)
+static int sphere_corner_total(const int segments, const int rings)
 {
   const int quad_corners = 4 * segments * (rings - 2);
   const int tri_corners = 3 * segments * 2;
   return quad_corners + tri_corners;
 }
 
-static int face_total(const int segments, const int rings)
+static int sphere_face_total(const int segments, const int rings)
 {
   const int quads = segments * (rings - 2);
   const int triangles = segments * 2;
   return quads + triangles;
 }
 
-static void calculate_vertex_coords_and_normals(MutableSpan<MVert> verts,
-                                                const float radius,
-                                                const int segments,
-                                                const int rings)
+static void calculate_sphere_vertex_data(MutableSpan<MVert> verts,
+                                         const float radius,
+                                         const int segments,
+                                         const int rings)
 {
   const float delta_theta = M_PI / rings;
   const float delta_phi = (2 * M_PI) / segments;
@@ -98,7 +98,9 @@ static void calculate_vertex_coords_and_normals(MutableSpan<MVert> verts,
   normal_float_to_short_v3(verts.last().no, float3(0.0f, 0.0f, -1.0f));
 }
 
-static void calculate_edge_indices(MutableSpan<MEdge> edges, const int segments, const int rings)
+static void calculate_sphere_edge_indices(MutableSpan<MEdge> edges,
+                                          const int segments,
+                                          const int rings)
 {
   int edge_index = 0;
 
@@ -133,7 +135,7 @@ static void calculate_edge_indices(MutableSpan<MEdge> edges, const int segments,
   }
 
   /* Add the edges connecting the last ring to the bottom vertex. */
-  const int last_vert_index = vert_total(segments, rings) - 1;
+  const int last_vert_index = sphere_vert_total(segments, rings) - 1;
   const int last_vert_ring_start = last_vert_index - segments;
   for (const int segment : IndexRange(segments)) {
     MEdge &edge = edges[edge_index++];
@@ -142,10 +144,10 @@ static void calculate_edge_indices(MutableSpan<MEdge> edges, const int segments,
   }
 }
 
-static void calculate_faces(MutableSpan<MLoop> loops,
-                            MutableSpan<MPoly> polys,
-                            const int segments,
-                            const int rings)
+static void calculate_sphere_faces(MutableSpan<MLoop> loops,
+                                   MutableSpan<MPoly> polys,
+                                   const int segments,
+                                   const int rings)
 {
   int loop_index = 0;
   int poly_index = 0;
@@ -205,7 +207,7 @@ static void calculate_faces(MutableSpan<MLoop> loops,
   /* Add the triangles connected to the bottom vertex. */
   const int last_edge_ring_start = segments * (rings - 2) * 2 + segments;
   const int bottom_edge_fan_start = last_edge_ring_start + segments;
-  const int last_vert_index = vert_total(segments, rings) - 1;
+  const int last_vert_index = sphere_vert_total(segments, rings) - 1;
   const int last_vert_ring_start = last_vert_index - segments;
   for (const int segment : IndexRange(segments)) {
     MPoly &poly = polys[poly_index++];
@@ -226,30 +228,23 @@ static void calculate_faces(MutableSpan<MLoop> loops,
   }
 }
 
-static Mesh *create_uv_sphere_mesh(const float3 location,
-                                   const float3 rotation,
-                                   const float radius,
-                                   const int segments,
-                                   const int rings)
+static Mesh *create_uv_sphere_mesh(const float radius, const int segments, const int rings)
 {
-  float4x4 transform;
-  loc_eul_size_to_mat4(transform.values, location, rotation, float3(1.0f));
-
-  Mesh *mesh = BKE_mesh_new_nomain(vert_total(segments, rings),
-                                   edge_total(segments, rings),
+  Mesh *mesh = BKE_mesh_new_nomain(sphere_vert_total(segments, rings),
+                                   sphere_edge_total(segments, rings),
                                    0,
-                                   corner_total(segments, rings),
-                                   face_total(segments, rings));
+                                   sphere_corner_total(segments, rings),
+                                   sphere_face_total(segments, rings));
   MutableSpan<MVert> verts = MutableSpan<MVert>(mesh->mvert, mesh->totvert);
   MutableSpan<MEdge> edges = MutableSpan<MEdge>(mesh->medge, mesh->totedge);
   MutableSpan<MLoop> loops = MutableSpan<MLoop>(mesh->mloop, mesh->totloop);
   MutableSpan<MPoly> polys = MutableSpan<MPoly>(mesh->mpoly, mesh->totpoly);
 
-  calculate_vertex_coords_and_normals(verts, radius, segments, rings);
+  calculate_sphere_vertex_data(verts, radius, segments, rings);
 
-  calculate_edge_indices(edges, segments, rings);
+  calculate_sphere_edge_indices(edges, segments, rings);
 
-  calculate_faces(loops, polys, segments, rings);
+  calculate_sphere_faces(loops, polys, segments, rings);
 
   BLI_assert(BKE_mesh_is_valid(mesh));
 
@@ -258,12 +253,10 @@ static Mesh *create_uv_sphere_mesh(const float3 location,
 
 static void geo_node_mesh_primitive_uv_sphere_exec(GeoNodeExecParams params)
 {
-  GeometrySet geometry_set;
-
   const int segments_num = params.extract_input<int>("Segments");
   const int rings_num = params.extract_input<int>("Rings");
   if (segments_num < 3 || rings_num < 3) {
-    params.set_output("Geometry", geometry_set);
+    params.set_output("Geometry", GeometrySet());
     return;
   }
 
@@ -271,10 +264,14 @@ static void geo_node_mesh_primitive_uv_sphere_exec(GeoNodeExecParams params)
   const float3 location = params.extract_input<float3>("Location");
   const float3 rotation = params.extract_input<float3>("Rotation");
 
-  geometry_set.replace_mesh(
-      create_uv_sphere_mesh(location, rotation, radius, segments_num, rings_num));
+  Mesh *mesh = create_uv_sphere_mesh(radius, segments_num, rings_num);
+  BLI_assert(BKE_mesh_is_valid(mesh));
 
-  params.set_output("Geometry", geometry_set);
+  if (!location.is_zero() || !rotation.is_zero()) {
+    transform_mesh(mesh, location, rotation, float3(1));
+  }
+
+  params.set_output("Geometry", GeometrySet::create_with_mesh(mesh));
 }
 
 }  // namespace blender::nodes
