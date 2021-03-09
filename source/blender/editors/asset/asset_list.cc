@@ -112,7 +112,7 @@ class AssetList {
   AssetList(const AssetList &) = delete;
   ~AssetList() = default;
 
-  void setup()
+  void setup(const AssetFilterSettings *filter_settings = nullptr)
   {
     FileList *files = filelist_.get();
 
@@ -145,13 +145,17 @@ class AssetList {
     filelist_setrecursion(files, 1);
     filelist_setsorting(files, FILE_SORT_ALPHA, false);
     filelist_setlibrary(files, &file_asset_lib_ref);
+    /* TODO different filtering settings require the list to be reread. That's a no-go for when we
+     * want to allow showing the same asset library with different filter settings (as in,
+     * different ID types). The filelist needs to be made smarter somehow, maybe goes together with
+     * the plan to separate the view (preview caching, filtering, etc. ) from the data. */
     filelist_setfilter_options(
         files,
         true,
         true,
         true, /* Just always hide parent, prefer to not add an extra user option for this. */
         FILE_TYPE_BLENDERLIB,
-        FILTER_ID_ALL,
+        filter_settings ? filter_settings->id_types : FILTER_ID_ALL,
         true,
         "",
         "");
@@ -230,7 +234,9 @@ class AssetListStorage {
   static AssetListMap global_storage_;
 
  public:
-  static void fetch_library(const AssetLibraryReference &library_reference, const bContext &C)
+  static void fetch_library(const AssetLibraryReference &library_reference,
+                            const bContext &C,
+                            const AssetFilterSettings *filter_settings = nullptr)
   {
     std::optional filesel_type = asset_library_reference_to_fileselect_type(library_reference);
     if (!filesel_type) {
@@ -241,7 +247,7 @@ class AssetListStorage {
     AssetList &list = std::get<0>(list_create_info);
     const bool is_new = std::get<1>(list_create_info);
     if (is_new) {
-      list.setup();
+      list.setup(filter_settings);
       list.fetch(C);
     }
   }
@@ -297,9 +303,11 @@ AssetListStorage::AssetListMap AssetListStorage::global_storage_{};
  * Invoke asset list reading, potentially in a parallel job. Won't wait until the job is done,
  * and may return earlier.
  */
-void ED_assetlist_fetch(const AssetLibraryReference *library_reference, const bContext *C)
+void ED_assetlist_fetch(const AssetLibraryReference *library_reference,
+                        const AssetFilterSettings *filter_settings,
+                        const bContext *C)
 {
-  AssetListStorage::fetch_library(*library_reference, *C);
+  AssetListStorage::fetch_library(*library_reference, *C, filter_settings);
 }
 
 void ED_assetlist_ensure_previews_job(const AssetLibraryReference *library_reference, bContext *C)

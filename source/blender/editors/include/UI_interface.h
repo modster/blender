@@ -34,6 +34,7 @@ extern "C" {
 /* Struct Declarations */
 
 struct ARegion;
+struct AssetFilterSettings;
 struct AutoComplete;
 struct EnumPropertyItem;
 struct FileSelectParams;
@@ -2232,7 +2233,8 @@ void uiTemplateFileSelectPath(uiLayout *layout,
 void uiTemplateAssetView(struct uiLayout *layout,
                          struct bContext *C,
                          struct PointerRNA *ptr,
-                         const char *asset_library_propname);
+                         const char *asset_library_propname,
+                         const struct AssetFilterSettings *filter_settings);
 
 /* items */
 void uiItemO(uiLayout *layout, const char *name, int icon, const char *opname);

@@ -250,6 +250,33 @@ static void rna_def_asset_tags_api(BlenderRNA *brna, PropertyRNA *cprop)
   RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
 }
 
+static void rna_def_asset_filter_settings(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  srna = RNA_def_struct(brna, "AssetFilterSettings", NULL);
+  RNA_def_struct_ui_text(srna, "Asset Filter Settings", "");
+
+  prop = RNA_def_property(srna, "tags", PROP_COLLECTION, PROP_NONE);
+  RNA_def_property_struct_type(prop, "AssetTag");
+  RNA_def_property_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(prop,
+                           "Tags",
+                           "Custom tags (name tokens) for the asset, used for filtering and "
+                           "general asset management");
+  RNA_def_property_srna(prop, "AssetTags");
+
+  for (int i = 0; rna_enum_id_type_filter_items[i].identifier; i++) {
+    prop = RNA_def_property(
+        srna, rna_enum_id_type_filter_items[i].identifier, PROP_BOOLEAN, PROP_NONE);
+    RNA_def_property_boolean_sdna(prop, NULL, "id_types", rna_enum_id_type_filter_items[i].flag);
+    RNA_def_property_ui_text(
+        prop, rna_enum_id_type_filter_items[i].name, rna_enum_id_type_filter_items[i].description);
+    RNA_def_property_ui_icon(prop, rna_enum_id_type_filter_items[i].icon, 0);
+  }
+}
+
 static void rna_def_asset_data(BlenderRNA *brna)
 {
   StructRNA *srna;
@@ -301,6 +328,7 @@ void RNA_def_asset(BlenderRNA *brna)
   RNA_define_animate_sdna(false);
 
   rna_def_asset_tag(brna);
+  rna_def_asset_filter_settings(brna);
   rna_def_asset_data(brna);
 
   RNA_define_animate_sdna(true);

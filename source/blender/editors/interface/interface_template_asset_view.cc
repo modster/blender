@@ -149,7 +149,8 @@ static void asset_view_template_list_item_iter_fn(PointerRNA *UNUSED(dataptr),
 void uiTemplateAssetView(uiLayout *layout,
                          bContext *C,
                          PointerRNA *ptr,
-                         const char *asset_library_propname)
+                         const char *asset_library_propname,
+                         const AssetFilterSettings *filter_settings)
 {
   Palette *palette = (Palette *)CTX_data_main(C)->palettes.first;
 
@@ -160,7 +161,7 @@ void uiTemplateAssetView(uiLayout *layout,
 
   AssetLibraryReference asset_library = ED_asset_library_reference_from_enum_value(
       RNA_property_enum_get(ptr, asset_library_prop));
-  ED_assetlist_fetch(&asset_library, C);
+  ED_assetlist_fetch(&asset_library, filter_settings, C);
   ED_assetlist_ensure_previews_job(&asset_library, C);
 
   AssetViewListData iter_data;

@@ -568,6 +568,47 @@ static void rna_uiTemplateEventFromKeymapItem(
   uiTemplateEventFromKeymapItem(layout, name, kmi, true);
 }
 
+static void rna_uiTemplateAssetView(uiLayout *layout,
+                                    bContext *C,
+                                    PointerRNA *ptr,
+                                    const char *asset_library_propname,
+                                    int filter_id_types)
+{
+  AssetFilterSettings filter_settings = {
+      .id_types = filter_id_types ? filter_id_types : FILTER_ID_ALL,
+  };
+  uiTemplateAssetView(layout, C, ptr, asset_library_propname, &filter_settings);
+}
+
+/**
+ * XXX Remove filter items that require more than 32 bits for storage. RNA enums don't support
+ * that currently.
+ */
+static const EnumPropertyItem *rna_uiTemplateAssetView_filter_id_types_itemf(
+    bContext *UNUSED(C), PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), bool *r_free)
+{
+  EnumPropertyItem *items = NULL;
+  int totitem = 0;
+
+  for (int i = 0; rna_enum_id_type_filter_items[i].identifier; i++) {
+    if (rna_enum_id_type_filter_items[i].flag > (1ULL << 31)) {
+      continue;
+    }
+
+    EnumPropertyItem tmp = {0, "", 0, "", ""};
+    tmp.value = rna_enum_id_type_filter_items[i].flag;
+    tmp.identifier = rna_enum_id_type_filter_items[i].identifier;
+    tmp.icon = rna_enum_id_type_filter_items[i].icon;
+    tmp.name = rna_enum_id_type_filter_items[i].name;
+    tmp.description = rna_enum_id_type_filter_items[i].description;
+    RNA_enum_item_add(&items, &totitem, &tmp);
+  }
+  RNA_enum_item_end(&items, &totitem);
+
+  *r_free = true;
+  return items;
+}
+
 static uiLayout *rna_uiLayoutRowWithHeading(
     uiLayout *layout, bool align, const char *heading, const char *heading_ctxt, bool translate)
 {
@@ -1678,7 +1719,7 @@ void RNA_api_ui_layout(StructRNA *srna)
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   api_ui_item_common_text(func);
 
-  func = RNA_def_function(srna, "template_asset_view", "uiTemplateAssetView");
+  func = RNA_def_function(srna, "template_asset_view", "rna_uiTemplateAssetView");
   RNA_def_function_ui_description(func, "Item. A scrollable list of assets in a grid view");
   RNA_def_function_flag(func, FUNC_USE_CONTEXT);
   parm = RNA_def_pointer(
@@ -1687,6 +1728,10 @@ void RNA_api_ui_layout(StructRNA *srna)
   parm = RNA_def_string(
       func, "asset_library_property", NULL, 0, "", "Identifier of the asset library");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_property(func, "filter_id_types", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(parm, DummyRNA_NULL_items);
+  RNA_def_property_enum_funcs(parm, NULL, NULL, "rna_uiTemplateAssetView_filter_id_types_itemf");
+  RNA_def_property_flag(parm, PROP_ENUM_FLAG);
 }
 
 #endif
