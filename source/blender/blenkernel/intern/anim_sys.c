@@ -1040,6 +1040,7 @@ static NlaEvalChannelSnapshot *nlaevalchan_snapshot_new(NlaEvalChannel *nec)
   nec_snapshot->channel = nec;
   nec_snapshot->length = length;
   nlavalidmask_init(&nec_snapshot->blend_domain, length);
+  nlavalidmask_init(&nec_snapshot->remap_domain, length);
 
   return nec_snapshot;
 }
@@ -1050,6 +1051,7 @@ static void nlaevalchan_snapshot_free(NlaEvalChannelSnapshot *nec_snapshot)
   BLI_assert(!nec_snapshot->is_base);
 
   nlavalidmask_free(&nec_snapshot->blend_domain);
+  nlavalidmask_free(&nec_snapshot->remap_domain);
   MEM_freeN(nec_snapshot);
 }
 
@@ -1428,6 +1430,141 @@ static NlaEvalChannel *nlaevalchan_verify(PointerRNA *ptr, NlaEvalData *nlaeval,
 
 /* ---------------------- */
 
+/** \returns true if solution exists and output written to. */
+static bool nla_blend_get_inverted_lower_value(const int blendmode,
+                                               const float strip_value,
+                                               const float blended_value,
+                                               const float influence,
+                                               float *r_lower_value)
+{
+  if (IS_EQF(influence, 0.0f)) {
+    *r_lower_value = blended_value;
+    return true;
+  }
+
+  switch (blendmode) {
+    case NLASTRIP_MODE_ADD:
+      /* Simply subtract the scaled value on to the stack. */
+      *r_lower_value = blended_value - (strip_value * influence);
+      return true;
+
+    case NLASTRIP_MODE_SUBTRACT:
+      /* Simply add the scaled value from the stack. */
+      *r_lower_value = blended_value + (strip_value * influence);
+      return true;
+
+    case NLASTRIP_MODE_MULTIPLY:
+
+      /** Division by zero. */
+      if (IS_EQF(-strip_value * influence, 1.0f - influence)) {
+        /** Resolve 0/0 to 1. */
+        if (IS_EQF(blended_value, 0.0f)) {
+          *r_lower_value = 1;
+          return true;
+        }
+        /** Division by zero. */
+        return false;
+      }
+      /* Math:
+       *     blended_value = inf * (lower_value * strip_value) + (1 - inf) * lower_value
+       *                   = lower_value * (inf * strip_value + (1-inf))
+       *         lower_value = blended_value / (inf * strip_value + (1-inf))
+       */
+      *r_lower_value = blended_value / (influence * strip_value + (1.0f - influence));
+      return true;
+
+    case NLASTRIP_MODE_COMBINE:
+      BLI_assert(!"combine mode");
+      return false;
+
+    default:
+
+      /** No solution if lower strip has 0 influence. */
+      if (IS_EQF(influence, 1.0f)) {
+        return false;
+      }
+
+      /** Math:
+       *
+       *  blended_value = lower_value * (1.0f - inf) + (strip_value * inf)
+       *  blended_value - (strip_value * inf) = lower_value * (1.0f - inf)
+       *  blended_value - (strip_value * inf) / (1.0f - inf) = lower_value
+       *
+       *  lower_value = blended_value - (strip_value * inf) / (1.0f - inf)
+       */
+      *r_lower_value = (blended_value - (strip_value * influence)) / (1.0f - influence);
+      return true;
+  }
+}
+
+/** \returns true if solution exists and output written to. */
+static bool nla_combine_get_inverted_lower_value(const int mix_mode,
+                                                 float base_value,
+                                                 const float strip_value,
+                                                 const float blended_value,
+                                                 const float influence,
+                                                 float *r_lower_value)
+{
+  if (IS_EQF(influence, 0.0f)) {
+    *r_lower_value = blended_value;
+    return true;
+  }
+
+  /* Perform blending. */
+  switch (mix_mode) {
+    case NEC_MIX_ADD:
+    case NEC_MIX_AXIS_ANGLE:
+      *r_lower_value = blended_value - (strip_value - base_value) * influence;
+      return true;
+    case NEC_MIX_MULTIPLY:
+      /** Division by zero. */
+      if (IS_EQF(strip_value, 0.0f)) {
+        /** Resolve 0/0 to 1. */
+        if (IS_EQF(blended_value, 0.0f)) {
+          *r_lower_value = 1.0f;
+          return true;
+        }
+        return false;
+      }
+
+      if (IS_EQF(base_value, 0.0f)) {
+        base_value = 1.0f;
+      }
+
+      *r_lower_value = blended_value / powf(strip_value / base_value, influence);
+      return true;
+
+    default:
+      BLI_assert(!"invalid mix mode");
+      return false;
+  }
+}
+
+static void nla_combine_quaternion_get_inverted_lower_values(const float strip_values[4],
+                                                             const float blended_values[4],
+                                                             const float influence,
+                                                             float r_lower_value[4])
+{
+  if (IS_EQF(influence, 0.0f)) {
+    normalize_qt_qt(r_lower_value, blended_values);
+    return;
+  }
+
+  /* blended_value = lower_values @ strip_values^infl
+   * blended_value @ inv(strip_values^inf) = lower_values
+   *
+   * Returns: lower_values = blended_value @ inv(strip_values^inf) */
+  float tmp_strip_values[4], tmp_blended[4];
+
+  normalize_qt_qt(tmp_strip_values, strip_values);
+  normalize_qt_qt(tmp_blended, blended_values);
+
+  pow_qt_fl_normalized(tmp_strip_values, influence);
+  invert_qt_normalized(tmp_strip_values);
+
+  mul_qt_qtqt(r_lower_value, tmp_blended, tmp_strip_values);
+}
+
 /* Blend the lower nla stack value and upper strip value of a channel according to mode and
  * influence. */
 static float nla_blend_value(const int blendmode,
@@ -1762,7 +1899,8 @@ static void nlasnapshot_from_action(PointerRNA *ptr,
 }
 
 /* evaluate action-clip strip */
-static void nlastrip_evaluate_actionclip(PointerRNA *ptr,
+static void nlastrip_evaluate_actionclip(const int evaluation_mode,
+                                         PointerRNA *ptr,
                                          NlaEvalData *channels,
                                          ListBase *modifiers,
                                          NlaEvalStrip *nes,
@@ -1786,22 +1924,49 @@ static void nlastrip_evaluate_actionclip(PointerRNA *ptr,
   /* join this strip's modifiers to the parent's modifiers (own modifiers first) */
   nlaeval_fmodifiers_join_stacks(&tmp_modifiers, &strip->modifiers, modifiers);
 
-  NlaEvalSnapshot strip_snapshot;
-  nlaeval_snapshot_init(&strip_snapshot, channels, NULL);
+  switch (evaluation_mode) {
+    case STRIP_EVAL_BLEND: {
 
-  nlasnapshot_from_action(
-      ptr, channels, &tmp_modifiers, strip->act, strip->strip_time, &strip_snapshot);
-  nlasnapshot_blend(
-      channels, snapshot, &strip_snapshot, strip->blendmode, strip->influence, snapshot);
+      NlaEvalSnapshot strip_snapshot;
+      nlaeval_snapshot_init(&strip_snapshot, channels, NULL);
 
-  nlaeval_snapshot_free_data(&strip_snapshot);
+      nlasnapshot_from_action(
+          ptr, channels, &tmp_modifiers, strip->act, strip->strip_time, &strip_snapshot);
+      nlasnapshot_blend(
+          channels, snapshot, &strip_snapshot, strip->blendmode, strip->influence, snapshot);
+
+      nlaeval_snapshot_free_data(&strip_snapshot);
+
+      break;
+    }
+    case STRIP_EVAL_BLEND_GET_INVERTED_LOWER_SNAPSHOT: {
+
+      NlaEvalSnapshot strip_snapshot;
+      nlaeval_snapshot_init(&strip_snapshot, channels, NULL);
+
+      nlasnapshot_from_action(
+          ptr, channels, &tmp_modifiers, strip->act, strip->strip_time, &strip_snapshot);
+      nlasnapshot_blend_get_inverted_lower_snapshot(
+          channels, snapshot, &strip_snapshot, strip->blendmode, strip->influence, snapshot);
+
+      nlaeval_snapshot_free_data(&strip_snapshot);
+
+      break;
+    }
+    case STRIP_EVAL_NOBLEND: {
+      nlasnapshot_from_action(
+          ptr, channels, &tmp_modifiers, strip->act, strip->strip_time, snapshot);
+      break;
+    }
+  }
 
   /* unlink this strip's modifiers from the parent's modifiers again */
   nlaeval_fmodifiers_split_stacks(&strip->modifiers, modifiers);
 }
 
 /* evaluate transition strip */
-static void nlastrip_evaluate_transition(PointerRNA *ptr,
+static void nlastrip_evaluate_transition(const int evaluation_mode,
+                                         PointerRNA *ptr,
                                          NlaEvalData *channels,
                                          ListBase *modifiers,
                                          NlaEvalStrip *nes,
@@ -1833,49 +1998,128 @@ static void nlastrip_evaluate_transition(PointerRNA *ptr,
     s2 = nes->strip->next;
   }
 
-  /* prepare template for 'evaluation strip'
-   * - based on the transition strip's evaluation strip data
-   * - strip_mode is NES_TIME_TRANSITION_* based on which endpoint
-   * - strip_time is the 'normalized' (i.e. in-strip) time for evaluation,
-   *   which doubles up as an additional weighting factor for the strip influences
-   *   which allows us to appear to be 'interpolating' between the two extremes
-   */
-  tmp_nes = *nes;
+  switch (evaluation_mode) {
+    case STRIP_EVAL_BLEND: {
 
-  /* evaluate these strips into a temp-buffer (tmp_channels) */
-  /* FIXME: modifier evaluation here needs some work... */
-  /* first strip */
-  tmp_nes.strip_mode = NES_TIME_TRANSITION_START;
-  tmp_nes.strip = s1;
-  tmp_nes.strip_time = s1->strip_time;
-  nlaeval_snapshot_init(&snapshot1, channels, snapshot);
-  nlastrip_evaluate(
-      ptr, channels, &tmp_modifiers, &tmp_nes, &snapshot1, anim_eval_context, flush_to_original);
+      /* prepare template for 'evaluation strip'
+       * - based on the transition strip's evaluation strip data
+       * - strip_mode is NES_TIME_TRANSITION_* based on which endpoint
+       * - strip_time is the 'normalized' (i.e. in-strip) time for evaluation,
+       *   which doubles up as an additional weighting factor for the strip influences
+       *   which allows us to appear to be 'interpolating' between the two extremes
+       */
+      tmp_nes = *nes;
 
-  /* second strip */
-  tmp_nes.strip_mode = NES_TIME_TRANSITION_END;
-  tmp_nes.strip = s2;
-  tmp_nes.strip_time = s2->strip_time;
-  nlaeval_snapshot_init(&snapshot2, channels, snapshot);
-  nlastrip_evaluate(
-      ptr, channels, &tmp_modifiers, &tmp_nes, &snapshot2, anim_eval_context, flush_to_original);
+      /* evaluate these strips into a temp-buffer (tmp_channels) */
+      /* FIXME: modifier evaluation here needs some work... */
+      /* first strip */
+      tmp_nes.strip_mode = NES_TIME_TRANSITION_START;
+      tmp_nes.strip = s1;
+      tmp_nes.strip_time = s1->strip_time;
+      nlaeval_snapshot_init(&snapshot1, channels, snapshot);
+      nlasnapshot_blend_strip(ptr,
+                              channels,
+                              &tmp_modifiers,
+                              &tmp_nes,
+                              &snapshot1,
+                              anim_eval_context,
+                              flush_to_original);
 
-  /** Replace \a snapshot2 NULL channels with base or default values so all channels blend. */
-  nlasnapshot_ensure_channels(channels, &snapshot2);
-  /** Mark all \a snapshot2 channel's values to blend. */
-  nlasnapshot_enable_all_blend_domain(&snapshot2);
-  nlasnapshot_blend(
-      channels, &snapshot1, &snapshot2, NLASTRIP_MODE_REPLACE, nes->strip_time, snapshot);
+      /* second strip */
+      tmp_nes.strip_mode = NES_TIME_TRANSITION_END;
+      tmp_nes.strip = s2;
+      tmp_nes.strip_time = s2->strip_time;
+      nlaeval_snapshot_init(&snapshot2, channels, snapshot);
+      nlasnapshot_blend_strip(ptr,
+                              channels,
+                              &tmp_modifiers,
+                              &tmp_nes,
+                              &snapshot2,
+                              anim_eval_context,
+                              flush_to_original);
 
-  nlaeval_snapshot_free_data(&snapshot1);
-  nlaeval_snapshot_free_data(&snapshot2);
+      /** Replace \a snapshot2 NULL channels with base or default values so all channels blend. */
+      nlasnapshot_ensure_channels(channels, &snapshot2);
+      /** Mark all \a snapshot2 channel's values to blend. */
+      nlasnapshot_enable_all_blend_domain(&snapshot2);
+      nlasnapshot_blend(
+          channels, &snapshot1, &snapshot2, NLASTRIP_MODE_REPLACE, nes->strip_time, snapshot);
+
+      nlaeval_snapshot_free_data(&snapshot1);
+      nlaeval_snapshot_free_data(&snapshot2);
+
+      break;
+    }
+    case STRIP_EVAL_BLEND_GET_INVERTED_LOWER_SNAPSHOT: {
+      /* No support for remapping values through a transition. Mark all channel values affected by
+       * transition as non-remappable. */
+      tmp_nes = *nes;
+
+      /** Process first strip. */
+      tmp_nes.strip_mode = NES_TIME_TRANSITION_START;
+      tmp_nes.strip = s1;
+      tmp_nes.strip_time = s1->strip_time;
+      nlaeval_snapshot_init(&snapshot1, channels, snapshot);
+      nlasnapshot_blend_strip_no_blend(
+          ptr, channels, &tmp_modifiers, &tmp_nes, &snapshot1, anim_eval_context);
+
+      /** Remove channel values affected by transition from the remap domain. */
+      LISTBASE_FOREACH (NlaEvalChannel *, nec, &channels->channels) {
+        NlaEvalChannelSnapshot *necs = nlaeval_snapshot_get(&snapshot1, nec->index);
+        if (necs == NULL) {
+          continue;
+        }
+        NlaEvalChannelSnapshot *output_necs = nlaeval_snapshot_ensure_channel(snapshot, nec);
+        for (int i = 0; i < necs->length; i++) {
+          if (BLI_BITMAP_TEST_BOOL(necs->blend_domain.ptr, i)) {
+            BLI_BITMAP_DISABLE(output_necs->remap_domain.ptr, i);
+          }
+        }
+      }
+
+      nlaeval_snapshot_free_data(&snapshot1);
+
+      /** Process second strip. */
+      tmp_nes.strip_mode = NES_TIME_TRANSITION_END;
+      tmp_nes.strip = s2;
+      tmp_nes.strip_time = s2->strip_time;
+      nlaeval_snapshot_init(&snapshot2, channels, snapshot);
+      nlasnapshot_blend_strip_no_blend(
+          ptr, channels, &tmp_modifiers, &tmp_nes, &snapshot2, anim_eval_context);
+
+      /** Remove channel values affected by transition from the remap domain. */
+      LISTBASE_FOREACH (NlaEvalChannel *, nec, &channels->channels) {
+        NlaEvalChannelSnapshot *necs = nlaeval_snapshot_get(&snapshot2, nec->index);
+        if (necs == NULL) {
+          continue;
+        }
+        NlaEvalChannelSnapshot *output_necs = nlaeval_snapshot_ensure_channel(snapshot, nec);
+        for (int i = 0; i < necs->length; i++) {
+          if (BLI_BITMAP_TEST_BOOL(necs->blend_domain.ptr, i)) {
+            BLI_BITMAP_DISABLE(output_necs->remap_domain.ptr, i);
+          }
+        }
+      }
+
+      nlaeval_snapshot_free_data(&snapshot2);
+
+      break;
+    }
+    case STRIP_EVAL_NOBLEND: {
+      BLI_assert(
+          "This case shouldn't occur. Transitions assumed to not reference other "
+          "transitions. ");
+      break;
+    }
+  }
 
   /* unlink this strip's modifiers from the parent's modifiers again */
   nlaeval_fmodifiers_split_stacks(&nes->strip->modifiers, modifiers);
 }
 
 /* evaluate meta-strip */
-static void nlastrip_evaluate_meta(PointerRNA *ptr,
+static void nlastrip_evaluate_meta(const int evaluation_mode,
+                                   PointerRNA *ptr,
                                    NlaEvalData *channels,
                                    ListBase *modifiers,
                                    NlaEvalStrip *nes,
@@ -1905,12 +2149,31 @@ static void nlastrip_evaluate_meta(PointerRNA *ptr,
                                                                              evaltime);
   tmp_nes = nlastrips_ctime_get_strip(NULL, &strip->strips, -1, &child_context, flush_to_original);
 
+  /* Assert currently supported modes. If new mode added, then assertion marks potentially missed
+   * area.
+   *
+   * Note: In the future if support is ever added to metastrips to support nested tracks, then
+   * STRIP_EVAL_BLEND and STRIP_EVAL_BLEND_GET_INVERTED_LOWER_SNAPSHOT cases are no longer
+   * equivalent. The output of nlastrips_ctime_get_strip() may return a list of strips. The only
+   * case difference should be the evaluation order.
+   */
+  BLI_assert(ELEM(evaluation_mode,
+                  STRIP_EVAL_BLEND,
+                  STRIP_EVAL_BLEND_GET_INVERTED_LOWER_SNAPSHOT,
+                  STRIP_EVAL_NOBLEND));
+
   /* directly evaluate child strip into accumulation buffer...
    * - there's no need to use a temporary buffer (as it causes issues [T40082])
    */
   if (tmp_nes) {
-    nlastrip_evaluate(
-        ptr, channels, &tmp_modifiers, tmp_nes, snapshot, &child_context, flush_to_original);
+    nlastrip_evaluate(evaluation_mode,
+                      ptr,
+                      channels,
+                      &tmp_modifiers,
+                      tmp_nes,
+                      snapshot,
+                      &child_context,
+                      flush_to_original);
 
     /* free temp eval-strip */
     MEM_freeN(tmp_nes);
@@ -1921,7 +2184,8 @@ static void nlastrip_evaluate_meta(PointerRNA *ptr,
 }
 
 /* evaluates the given evaluation strip */
-void nlastrip_evaluate(PointerRNA *ptr,
+void nlastrip_evaluate(const int evaluation_mode,
+                       PointerRNA *ptr,
                        NlaEvalData *channels,
                        ListBase *modifiers,
                        NlaEvalStrip *nes,
@@ -1946,15 +2210,27 @@ void nlastrip_evaluate(PointerRNA *ptr,
   /* actions to take depend on the type of strip */
   switch (strip->type) {
     case NLASTRIP_TYPE_CLIP: /* action-clip */
-      nlastrip_evaluate_actionclip(ptr, channels, modifiers, nes, snapshot);
+      nlastrip_evaluate_actionclip(evaluation_mode, ptr, channels, modifiers, nes, snapshot);
       break;
     case NLASTRIP_TYPE_TRANSITION: /* transition */
-      nlastrip_evaluate_transition(
-          ptr, channels, modifiers, nes, snapshot, anim_eval_context, flush_to_original);
+      nlastrip_evaluate_transition(evaluation_mode,
+                                   ptr,
+                                   channels,
+                                   modifiers,
+                                   nes,
+                                   snapshot,
+                                   anim_eval_context,
+                                   flush_to_original);
       break;
     case NLASTRIP_TYPE_META: /* meta */
-      nlastrip_evaluate_meta(
-          ptr, channels, modifiers, nes, snapshot, anim_eval_context, flush_to_original);
+      nlastrip_evaluate_meta(evaluation_mode,
+                             ptr,
+                             channels,
+                             modifiers,
+                             nes,
+                             snapshot,
+                             anim_eval_context,
+                             flush_to_original);
       break;
 
     default: /* do nothing */
@@ -1963,6 +2239,53 @@ void nlastrip_evaluate(PointerRNA *ptr,
 
   /* clear temp recursion safe-check */
   strip->flag &= ~NLASTRIP_FLAG_EDIT_TOUCHED;
+}
+
+void nlasnapshot_blend_strip(PointerRNA *ptr,
+                             NlaEvalData *channels,
+                             ListBase *modifiers,
+                             NlaEvalStrip *nes,
+                             NlaEvalSnapshot *snapshot,
+                             const struct AnimationEvalContext *anim_eval_context,
+                             const bool flush_to_original)
+{
+  nlastrip_evaluate(STRIP_EVAL_BLEND,
+                    ptr,
+                    channels,
+                    modifiers,
+                    nes,
+                    snapshot,
+                    anim_eval_context,
+                    flush_to_original);
+}
+
+void nlasnapshot_blend_strip_get_inverted_lower_snapshot(
+    PointerRNA *ptr,
+    NlaEvalData *channels,
+    ListBase *modifiers,
+    NlaEvalStrip *nes,
+    NlaEvalSnapshot *snapshot,
+    const struct AnimationEvalContext *anim_eval_context)
+{
+  nlastrip_evaluate(STRIP_EVAL_BLEND_GET_INVERTED_LOWER_SNAPSHOT,
+                    ptr,
+                    channels,
+                    modifiers,
+                    nes,
+                    snapshot,
+                    anim_eval_context,
+                    false);
+}
+
+void nlasnapshot_blend_strip_no_blend(PointerRNA *ptr,
+                                      NlaEvalData *channels,
+                                      ListBase *modifiers,
+                                      NlaEvalStrip *nes,
+                                      NlaEvalSnapshot *snapshot,
+                                      const struct AnimationEvalContext *anim_eval_context)
+{
+  nlastrip_evaluate(
+      STRIP_EVAL_NOBLEND, ptr, channels, modifiers, nes, snapshot, anim_eval_context, false);
 }
 
 /* write the accumulated settings to */
@@ -2065,8 +2388,14 @@ static void animsys_evaluate_nla_domain(PointerRNA *ptr, NlaEvalData *channels, 
 {
   GSet *touched_actions = BLI_gset_ptr_new(__func__);
 
-  if (adt->action) {
-    nla_eval_domain_action(ptr, channels, adt->action, touched_actions);
+  /** Include domain of Action Track. */
+  if ((adt->flag & ADT_NLA_EDIT_ON) == 0) {
+    if (adt->action) {
+      nla_eval_domain_action(ptr, channels, adt->action, touched_actions);
+    }
+  }
+  else if (adt->tmpact && (adt->flag & ADT_NLA_EVAL_UPPER_TRACKS)) {
+    nla_eval_domain_action(ptr, channels, adt->tmpact, touched_actions);
   }
 
   /* NLA Data - Animation Data for Strips */
@@ -2173,7 +2502,8 @@ static void animsys_create_action_track_strip(const AnimData *adt,
 
   const bool tweaking = (adt->flag & ADT_NLA_EDIT_ON) != 0;
   const bool soloing = (adt->flag & ADT_NLA_SOLO_TRACK) != 0;
-  const bool actionstrip_evaluated = r_action_strip->act && !soloing && !tweaking;
+  const bool eval_upper = !tweaking || (adt->flag & ADT_NLA_EVAL_UPPER_TRACKS) != 0;
+  const bool actionstrip_evaluated = r_action_strip->act && !soloing && eval_upper;
   if (!actionstrip_evaluated) {
     r_action_strip->flag |= NLASTRIP_FLAG_MUTED;
   }
@@ -2316,13 +2646,13 @@ static bool animsys_evaluate_nla_for_flush(NlaEvalData *echannels,
 
   /* Per strip, evaluate and accumulate on top of existing channels. */
   for (nes = estrips.first; nes; nes = nes->next) {
-    nlastrip_evaluate(ptr,
-                      echannels,
-                      NULL,
-                      nes,
-                      &echannels->eval_snapshot,
-                      anim_eval_context,
-                      flush_to_original);
+    nlasnapshot_blend_strip(ptr,
+                            echannels,
+                            NULL,
+                            nes,
+                            &echannels->eval_snapshot,
+                            anim_eval_context,
+                            flush_to_original);
   }
 
   /* Free temporary evaluation data that's not used elsewhere. */
@@ -2353,6 +2683,7 @@ static void animsys_evaluate_nla_for_keyframing(PointerRNA *ptr,
   short track_index = 0;
   bool has_strips = false;
 
+  ListBase *upper_estrips = &r_context->upper_estrips;
   ListBase lower_estrips = {NULL, NULL};
   NlaEvalStrip *nes;
 
@@ -2382,6 +2713,30 @@ static void animsys_evaluate_nla_for_keyframing(PointerRNA *ptr,
     }
   }
 
+  /* Get the upper stack of strips to evaluate at current time (influence calculated here). */
+  /* Var nlt exists only if tweak strip exists. */
+  if (nlt) {
+
+    /* Skip tweaked strip. */
+    nlt = nlt->next;
+    track_index++;
+
+    for (; nlt; nlt = nlt->next, track_index++) {
+
+      if (!is_nlatrack_evaluatable(adt, nlt)) {
+        continue;
+      }
+
+      if (nlt->strips.first) {
+        has_strips = true;
+      }
+
+      /* Get strip to evaluate for this channel. */
+      nes = nlastrips_ctime_get_strip(
+          upper_estrips, &nlt->strips, track_index, anim_eval_context, false);
+    }
+  }
+
   /** Note: Although we early out, we can still keyframe to the non-pushed action since the
    * keyframe remap function detects (r_context->strip.act == NULL) and will keyframe without
    * remapping.
@@ -2393,6 +2748,10 @@ static void animsys_evaluate_nla_for_keyframing(PointerRNA *ptr,
 
   /* Write r_context->eval_strip. */
   if (adt->flag & ADT_NLA_EDIT_ON) {
+    /* Append action_track_strip to upper estrips. */
+    NlaStrip *action_strip = &r_context->action_track_strip;
+    animsys_create_action_track_strip(adt, false, action_strip);
+    nlastrips_ctime_get_strip_single(upper_estrips, action_strip, anim_eval_context, false);
 
     NlaStrip *tweak_strip = &r_context->strip;
     animsys_create_tweak_strip(adt, true, tweak_strip);
@@ -2422,13 +2781,13 @@ static void animsys_evaluate_nla_for_keyframing(PointerRNA *ptr,
 
   /* For each strip, evaluate then accumulate on top of existing channels. */
   for (nes = lower_estrips.first; nes; nes = nes->next) {
-    nlastrip_evaluate(ptr,
-                      &r_context->lower_eval_data,
-                      NULL,
-                      nes,
-                      &r_context->lower_eval_data.eval_snapshot,
-                      anim_eval_context,
-                      false);
+    nlasnapshot_blend_strip(ptr,
+                            &r_context->lower_eval_data,
+                            NULL,
+                            nes,
+                            &r_context->lower_eval_data.eval_snapshot,
+                            anim_eval_context,
+                            false);
   }
 
   /* Free temporary evaluation data that's not used elsewhere. */
@@ -2481,6 +2840,18 @@ void nlasnapshot_enable_all_blend_domain(NlaEvalSnapshot *snapshot)
     }
 
     BLI_bitmap_set_all(necs->blend_domain.ptr, true, necs->length);
+  }
+}
+
+void nlasnapshot_enable_all_remap_domain(NlaEvalSnapshot *snapshot)
+{
+  for (int i = 0; i < snapshot->size; i++) {
+    NlaEvalChannelSnapshot *necs = nlaeval_snapshot_get(snapshot, i);
+    if (necs == NULL) {
+      continue;
+    }
+
+    BLI_bitmap_set_all(necs->remap_domain.ptr, true, necs->length);
   }
 }
 
@@ -2544,6 +2915,8 @@ void nlasnapshot_blend(NlaEvalData *eval_data,
             lower_necs->values, upper_necs->values, upper_influence, result_necs->values);
       }
       else {
+        BLI_assert(ELEM(mix_mode, NEC_MIX_ADD, NEC_MIX_AXIS_ANGLE, NEC_MIX_MULTIPLY));
+
         for (int j = 0; j < length; j++) {
           if (!BLI_BITMAP_TEST_BOOL(upper_necs->blend_domain.ptr, j)) {
             continue;
@@ -2558,6 +2931,12 @@ void nlasnapshot_blend(NlaEvalData *eval_data,
       }
     }
     else {
+      BLI_assert(ELEM(upper_blendmode,
+                      NLASTRIP_MODE_ADD,
+                      NLASTRIP_MODE_SUBTRACT,
+                      NLASTRIP_MODE_MULTIPLY,
+                      NLASTRIP_MODE_REPLACE));
+
       for (int j = 0; j < length; j++) {
         if (!BLI_BITMAP_TEST_BOOL(upper_necs->blend_domain.ptr, j)) {
           continue;
@@ -2565,6 +2944,231 @@ void nlasnapshot_blend(NlaEvalData *eval_data,
 
         result_necs->values[j] = nla_blend_value(
             upper_blendmode, lower_necs->values[j], upper_necs->values[j], upper_influence);
+      }
+    }
+  }
+}
+
+/** Using  \a blended_snapshot and \a lower_snapshot, we can solve for the \a r_upper_snapshot.
+ *
+ * Only channels that exist within \a blended_snapshot are inverted.
+ *
+ * For \a r_upper_snapshot, disables \a NlaEvalChannelSnapshot->remap_domain for failed inversions.
+ * Only values within the \a remap_domain are processed.
+ */
+void nlasnapshot_blend_get_inverted_upper_snapshot(NlaEvalData *eval_data,
+                                                   NlaEvalSnapshot *lower_snapshot,
+                                                   NlaEvalSnapshot *blended_snapshot,
+                                                   const short upper_blendmode,
+                                                   const float upper_influence,
+                                                   NlaEvalSnapshot *r_upper_snapshot)
+{
+  nlaeval_snapshot_ensure_size(r_upper_snapshot, eval_data->num_channels);
+
+  LISTBASE_FOREACH (NlaEvalChannel *, nec, &eval_data->channels) {
+    const int length = nec->base_snapshot.length;
+
+    NlaEvalChannelSnapshot *blended_necs = nlaeval_snapshot_get(blended_snapshot, nec->index);
+    if (blended_necs == NULL) {
+      /** We assume the caller only wants a subset of channels to be inverted, those that exist
+       * within \a blended_snapshot. */
+      continue;
+    }
+
+    NlaEvalChannelSnapshot *lower_necs = nlaeval_snapshot_get(lower_snapshot, nec->index);
+    if (lower_necs == NULL) {
+      lower_necs = nlaeval_snapshot_find_channel(lower_snapshot->base, nec);
+    }
+
+    NlaEvalChannelSnapshot *result_necs = nlaeval_snapshot_ensure_channel(r_upper_snapshot, nec);
+    if (upper_blendmode == NLASTRIP_MODE_COMBINE) {
+      const int mix_mode = nec->mix_mode;
+
+      if (mix_mode == NEC_MIX_QUATERNION) {
+        if (!BLI_BITMAP_TEST_BOOL(blended_necs->remap_domain.ptr, 0)) {
+          BLI_bitmap_set_all(result_necs->remap_domain.ptr, false, 4);
+          continue;
+        }
+
+        const bool success = nla_combine_quaternion_get_inverted_strip_values(
+            lower_necs->values, blended_necs->values, upper_influence, result_necs->values);
+        BLI_bitmap_set_all(result_necs->remap_domain.ptr, success, 4);
+      }
+      else {
+        BLI_assert(ELEM(mix_mode, NEC_MIX_ADD, NEC_MIX_AXIS_ANGLE, NEC_MIX_MULTIPLY));
+
+        for (int j = 0; j < length; j++) {
+          if (!BLI_BITMAP_TEST_BOOL(blended_necs->remap_domain.ptr, j)) {
+            BLI_BITMAP_DISABLE(result_necs->remap_domain.ptr, j);
+            continue;
+          }
+
+          const bool success = nla_combine_get_inverted_strip_value(mix_mode,
+                                                                    nec->base_snapshot.values[j],
+                                                                    lower_necs->values[j],
+                                                                    blended_necs->values[j],
+                                                                    upper_influence,
+                                                                    &result_necs->values[j]);
+          BLI_BITMAP_SET(result_necs->remap_domain.ptr, j, success);
+        }
+      }
+    }
+    else {
+      BLI_assert(ELEM(upper_blendmode,
+                      NLASTRIP_MODE_ADD,
+                      NLASTRIP_MODE_SUBTRACT,
+                      NLASTRIP_MODE_MULTIPLY,
+                      NLASTRIP_MODE_REPLACE));
+
+      for (int j = 0; j < length; j++) {
+        if (!BLI_BITMAP_TEST_BOOL(blended_necs->remap_domain.ptr, j)) {
+          BLI_BITMAP_DISABLE(result_necs->remap_domain.ptr, j);
+          continue;
+        }
+
+        const bool success = nla_blend_get_inverted_strip_value(upper_blendmode,
+                                                                lower_necs->values[j],
+                                                                blended_necs->values[j],
+                                                                upper_influence,
+                                                                &result_necs->values[j]);
+        BLI_BITMAP_SET(result_necs->remap_domain.ptr, j, success);
+      }
+    }
+  }
+}
+
+/** Using \a blended_snapshot and \a upper_snapshot, we can solve for the \a r_lower_snapshot.
+ *
+ * Only channels that exist within \a blended_snapshot are processed.
+ * Only blended values within the \a remap_domain are processed.
+ *
+ * Writes to \a r_upper_snapshot NlaEvalChannelSnapshot->remap_domain to match remapping success.
+ *
+ * Assumes caller marked upper values that are in the \a blend_domain. This determines whether the
+ * blended value came directly from the lower snapshot or a result of blending.
+ **/
+void nlasnapshot_blend_get_inverted_lower_snapshot(NlaEvalData *eval_data,
+                                                   NlaEvalSnapshot *blended_snapshot,
+                                                   NlaEvalSnapshot *upper_snapshot,
+                                                   const short upper_blendmode,
+                                                   const float upper_influence,
+                                                   NlaEvalSnapshot *r_lower_snapshot)
+{
+  nlaeval_snapshot_ensure_size(r_lower_snapshot, eval_data->num_channels);
+
+  const bool zero_upper_influence = IS_EQF(upper_influence, 0.0f);
+
+  LISTBASE_FOREACH (NlaEvalChannel *, nec, &eval_data->channels) {
+    const int length = nec->base_snapshot.length;
+
+    NlaEvalChannelSnapshot *blended_necs = nlaeval_snapshot_get(blended_snapshot, nec->index);
+    if (blended_necs == NULL) {
+      /** We assume the caller only wants a subset of channels to be inverted, those that exist
+       * within \a blended_snapshot. */
+      continue;
+    }
+
+    NlaEvalChannelSnapshot *result_necs = nlaeval_snapshot_ensure_channel(r_lower_snapshot, nec);
+
+    NlaEvalChannelSnapshot *upper_necs = nlaeval_snapshot_get(upper_snapshot, nec->index);
+    if (upper_necs == NULL || zero_upper_influence) {
+      for (int j = 0; j < length; j++) {
+        result_necs->values[j] = blended_necs->values[j];
+
+        const bool in_remap_domain = BLI_BITMAP_TEST_BOOL(blended_necs->remap_domain.ptr, j);
+        BLI_BITMAP_SET(result_necs->remap_domain.ptr, j, in_remap_domain);
+      }
+      continue;
+    }
+
+    if (upper_blendmode == NLASTRIP_MODE_COMBINE) {
+      const int mix_mode = nec->mix_mode;
+
+      if (mix_mode == NEC_MIX_QUATERNION) {
+        if (!BLI_BITMAP_TEST_BOOL(blended_necs->remap_domain.ptr, 0)) {
+          BLI_bitmap_set_all(result_necs->remap_domain.ptr, false, 4);
+          continue;
+        }
+
+        /* If blended values are not a result of blending the lower snapshot with the upper
+         * snapshot, then they should be equal.
+         *
+         * Just directly copy blended_necs to result_necs.
+         */
+        if (!BLI_BITMAP_TEST_BOOL(upper_necs->blend_domain.ptr, 0)) {
+          memcpy(result_necs->values, blended_necs->values, 4 * sizeof(float));
+          BLI_bitmap_set_all(result_necs->remap_domain.ptr, true, 4);
+          continue;
+        }
+
+        nla_combine_quaternion_get_inverted_lower_values(
+            upper_necs->values, blended_necs->values, upper_influence, result_necs->values);
+
+        BLI_bitmap_set_all(result_necs->remap_domain.ptr, true, 4);
+        continue;
+      }
+      else {
+        BLI_assert(ELEM(mix_mode, NEC_MIX_ADD, NEC_MIX_AXIS_ANGLE, NEC_MIX_MULTIPLY));
+
+        for (int j = 0; j < length; j++) {
+          if (!BLI_BITMAP_TEST_BOOL(blended_necs->remap_domain.ptr, j)) {
+            BLI_BITMAP_DISABLE(result_necs->remap_domain.ptr, j);
+            continue;
+          }
+
+          /* If blended values are not a result of blending the lower snapshot with the upper
+           * snapshot, then they should be equal.
+           *
+           * Just directly copy blended_necs to result_necs.
+           */
+          if (!BLI_BITMAP_TEST_BOOL(upper_necs->blend_domain.ptr, j)) {
+            result_necs->values[j] = blended_necs->values[j];
+            BLI_BITMAP_ENABLE(result_necs->remap_domain.ptr, j);
+            continue;
+          }
+
+          const bool success = nla_combine_get_inverted_lower_value(mix_mode,
+                                                                    nec->base_snapshot.values[j],
+                                                                    upper_necs->values[j],
+                                                                    blended_necs->values[j],
+                                                                    upper_influence,
+                                                                    &result_necs->values[j]);
+
+          BLI_BITMAP_SET(result_necs->remap_domain.ptr, j, success);
+        }
+      }
+    }
+    else {
+      BLI_assert(ELEM(upper_blendmode,
+                      NLASTRIP_MODE_ADD,
+                      NLASTRIP_MODE_SUBTRACT,
+                      NLASTRIP_MODE_MULTIPLY,
+                      NLASTRIP_MODE_REPLACE));
+
+      for (int j = 0; j < length; j++) {
+        if (!BLI_BITMAP_TEST_BOOL(blended_necs->remap_domain.ptr, j)) {
+          BLI_BITMAP_DISABLE(result_necs->remap_domain.ptr, j);
+          continue;
+        }
+
+        /* If blended values are not a result of blending the lower snapshot with the upper
+         * snapshot, then they should be equal.
+         *
+         * Just directly copy blended_necs to result_necs.
+         */
+        if (!BLI_BITMAP_TEST_BOOL(upper_necs->blend_domain.ptr, j)) {
+          result_necs->values[j] = blended_necs->values[j];
+          BLI_BITMAP_ENABLE(result_necs->remap_domain.ptr, j);
+          continue;
+        }
+
+        const bool success = nla_blend_get_inverted_lower_value(upper_blendmode,
+                                                                upper_necs->values[j],
+                                                                blended_necs->values[j],
+                                                                upper_influence,
+                                                                &result_necs->values[j]);
+
+        BLI_BITMAP_SET(result_necs->remap_domain.ptr, j, success);
       }
     }
   }
@@ -2593,9 +3197,11 @@ NlaKeyframingContext *BKE_animsys_get_nla_keyframing_context(
     return NULL;
   }
 
-  /* No remapping if editing an ordinary Replace action with full influence. */
+  /* No remapping if editing an ordinary Replace action with full influence and upper tracks not
+   * evaluated. */
   if (!(adt->flag & ADT_NLA_EDIT_ON) &&
-      (adt->act_blendmode == NLASTRIP_MODE_REPLACE && adt->act_influence == 1.0f)) {
+      (adt->act_blendmode == NLASTRIP_MODE_REPLACE && adt->act_influence == 1.0f) &&
+      (adt->flag & ADT_NLA_EVAL_UPPER_TRACKS) == 0) {
     return NULL;
   }
 
@@ -2635,7 +3241,8 @@ bool BKE_animsys_nla_remap_keyframe_values(struct NlaKeyframingContext *context,
                                            float *values,
                                            int count,
                                            int index,
-                                           bool *r_force_all)
+                                           bool *r_force_all,
+                                           const struct AnimationEvalContext *anim_eval_context)
 {
   if (r_force_all != NULL) {
     *r_force_all = false;
@@ -2651,11 +3258,13 @@ bool BKE_animsys_nla_remap_keyframe_values(struct NlaKeyframingContext *context,
     return false;
   }
 
-  /* Full influence Replace strips also require no correction. */
+  /* Full influence Replace strips also require no correction if there are no upper tracks
+   * evaluating. */
   int blend_mode = context->strip.blendmode;
   float influence = context->strip.influence;
 
-  if (blend_mode == NLASTRIP_MODE_REPLACE && influence == 1.0f) {
+  if (blend_mode == NLASTRIP_MODE_REPLACE && influence == 1.0f &&
+      BLI_listbase_is_empty(&context->upper_estrips)) {
     return true;
   }
 
@@ -2664,74 +3273,78 @@ bool BKE_animsys_nla_remap_keyframe_values(struct NlaKeyframingContext *context,
     return false;
   }
 
-  /* Find the evaluation channel for the NLA stack below current strip. */
-  NlaEvalChannelKey key = {
-      .ptr = *prop_ptr,
-      .prop = prop,
-  };
-  /**
-   * Remove lower NLA stack effects.
-   *
-   * Using the tweak strip's blended result and the lower snapshot value, we can solve for the
-   * tweak strip value it must evaluate to.
-   */
-  NlaEvalData *const lower_eval_data = &context->lower_eval_data;
-  NlaEvalChannel *const lower_nec = nlaevalchan_verify_key(lower_eval_data, NULL, &key);
+  /** Create \a blended_snapshot and fill with input \a values. */
+  NlaEvalData *eval_data = &context->lower_eval_data;
+  NlaEvalSnapshot blended_snapshot;
+  nlaeval_snapshot_init(&blended_snapshot, eval_data, NULL);
+  NlaEvalChannelSnapshot *blended_necs;
+  {
+    NlaEvalChannelKey key = {
+        .ptr = *prop_ptr,
+        .prop = prop,
+    };
 
-  if ((lower_nec->base_snapshot.length != count)) {
-    BLI_assert(!"invalid value count");
-    return false;
+    NlaEvalChannel *nec = nlaevalchan_verify_key(eval_data, NULL, &key);
+    BLI_assert(nec);
+    if (nec->base_snapshot.length != count) {
+      BLI_assert(!"invalid value count");
+      nlaeval_snapshot_free_data(&blended_snapshot);
+      return false;
+    }
+
+    blended_necs = nlaeval_snapshot_ensure_channel(&blended_snapshot, nec);
+    memcpy(blended_necs->values, values, sizeof(float) * count);
+    BLI_bitmap_set_all(blended_necs->remap_domain.ptr, true, count);
   }
 
-  /* Invert the blending operation to compute the desired strip values. */
-  NlaEvalChannelSnapshot *const lower_nec_snapshot = nlaeval_snapshot_find_channel(
-      &lower_eval_data->eval_snapshot, lower_nec);
+  /** Need to send id_ptr instead of prop_ptr so fcurve RNA paths resolve properly. */
+  PointerRNA id_ptr;
+  RNA_id_pointer_create(prop_ptr->owner_id, &id_ptr);
 
-  float *lower_values = lower_nec_snapshot->values;
+  /** Per iteration, remove effect of upper strip which gives output of nla stack below it. */
+  LISTBASE_FOREACH_BACKWARD (NlaEvalStrip *, nes, &context->upper_estrips) {
+    /** This will disable blended_necs->remap_domain bits if an upper strip is not invertible
+     * (full replace, multiply zero, or transition). Then there is no remap solution. */
+    nlasnapshot_blend_strip_get_inverted_lower_snapshot(
+        &id_ptr, eval_data, NULL, nes, &blended_snapshot, anim_eval_context);
+  }
 
-  if (blend_mode == NLASTRIP_MODE_COMBINE) {
-    /* Quaternion combine handles all sub-channels as a unit. */
-    if (lower_nec->mix_mode == NEC_MIX_QUATERNION) {
-      if (r_force_all == NULL) {
-        return false;
-      }
+  /** Remove lower NLA stack effects. */
+  nlasnapshot_blend_get_inverted_upper_snapshot(eval_data,
+                                                &context->lower_eval_data.eval_snapshot,
+                                                &blended_snapshot,
+                                                blend_mode,
+                                                influence,
+                                                &blended_snapshot);
 
+  /** Write results into \a values. */
+  bool successful_remap = true;
+  if (blended_necs->channel->mix_mode == NEC_MIX_QUATERNION &&
+      blend_mode == NLASTRIP_MODE_COMBINE) {
+
+    if (r_force_all != NULL) {
       *r_force_all = true;
-
-      if (!nla_combine_quaternion_get_inverted_strip_values(
-              lower_values, values, influence, values)) {
-        return false;
-      }
+      index = -1;
     }
     else {
-      float *base_values = lower_nec->base_snapshot.values;
-
-      for (int i = 0; i < count; i++) {
-        if (ELEM(index, i, -1)) {
-          if (!nla_combine_get_inverted_strip_value(lower_nec->mix_mode,
-                                                    base_values[i],
-                                                    lower_values[i],
-                                                    values[i],
-                                                    influence,
-                                                    &values[i])) {
-            return false;
-          }
-        }
-      }
-    }
-  }
-  else {
-    for (int i = 0; i < count; i++) {
-      if (ELEM(index, i, -1)) {
-        if (!nla_blend_get_inverted_strip_value(
-                blend_mode, lower_values[i], values[i], influence, &values[i])) {
-          return false;
-        }
-      }
+      successful_remap = false;
     }
   }
 
-  return true;
+  for (int i = 0; i < count; i++) {
+    if (!ELEM(index, i, -1)) {
+      continue;
+    }
+    if (!BLI_BITMAP_TEST_BOOL(blended_necs->remap_domain.ptr, i)) {
+      successful_remap = false;
+    }
+
+    values[i] = blended_necs->values[i];
+  }
+
+  nlaeval_snapshot_free_data(&blended_snapshot);
+
+  return successful_remap;
 }
 
 /**
@@ -2741,6 +3354,7 @@ void BKE_animsys_free_nla_keyframing_context_cache(struct ListBase *cache)
 {
   LISTBASE_FOREACH (NlaKeyframingContext *, ctx, cache) {
     MEM_SAFE_FREE(ctx->eval_strip);
+    BLI_freelistN(&ctx->upper_estrips);
     nlaeval_free(&ctx->lower_eval_data);
   }
 

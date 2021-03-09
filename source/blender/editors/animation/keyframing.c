@@ -1122,7 +1122,8 @@ static float *get_keyframe_values(ReportList *reports,
                                   float *buffer,
                                   int buffer_size,
                                   int *r_count,
-                                  bool *r_force_all)
+                                  bool *r_force_all,
+                                  const struct AnimationEvalContext *anim_eval_context)
 {
   float *values;
 
@@ -1140,9 +1141,11 @@ static float *get_keyframe_values(ReportList *reports,
 
   /* adjust the value for NLA factors */
   if (!BKE_animsys_nla_remap_keyframe_values(
-          nla_context, &ptr, prop, values, *r_count, index, r_force_all)) {
-    BKE_report(
-        reports, RPT_ERROR, "Could not insert keyframe due to zero NLA influence or base value");
+          nla_context, &ptr, prop, values, *r_count, index, r_force_all, anim_eval_context)) {
+    BKE_report(reports,
+               RPT_ERROR,
+               "Could not insert keyframe due to zero NLA influence, base value, or value "
+               "remapping failed");
 
     if (values != buffer) {
       MEM_freeN(values);
@@ -1306,7 +1309,8 @@ bool insert_keyframe_direct(ReportList *reports,
                                       value_buffer,
                                       RNA_MAX_ARRAY_LENGTH,
                                       &value_count,
-                                      NULL);
+                                      NULL,
+                                      anim_eval_context);
 
   if (values == NULL) {
     /* This happens if NLA rejects this insertion. */
@@ -1480,7 +1484,8 @@ int insert_keyframe(Main *bmain,
                                       value_buffer,
                                       RNA_MAX_ARRAY_LENGTH,
                                       &value_count,
-                                      &force_all);
+                                      &force_all,
+                                      anim_eval_context);
 
   if (values != NULL) {
     /* Key the entire array. */
