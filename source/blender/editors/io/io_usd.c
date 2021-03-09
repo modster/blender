@@ -318,6 +318,8 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
 
   const bool convert_to_z_up = RNA_boolean_get(op->ptr, "convert_to_z_up");
 
+  const float light_intensity_scale = RNA_float_get(op->ptr, "light_intensity_scale");
+
   int offset = 0;
   int sequence_len = 1;
 
@@ -336,34 +338,33 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
     ED_object_mode_set(C, OB_MODE_EDIT);
   }
 
-  struct USDImportParams params = {
-      scale,
-      vel_scale,
-      is_sequence,
-      set_frame_range,
-      sequence_len,
-      offset,
-      validate_meshes,
-      global_read_flag,
-      import_cameras,
-      import_curves,
-      import_lights,
-      import_materials,
-      import_meshes,
-      import_volumes,
-      prim_path_mask,
-      import_subdiv,
-      import_instance_proxies,
-      create_collection,
-      import_guide,
-      import_proxy,
-      import_render,
-      import_visible_only,
-      use_instancing,
-      import_usd_preview,
-      set_material_blend,
-      convert_to_z_up,
-  };
+  struct USDImportParams params = {scale,
+                                   vel_scale,
+                                   is_sequence,
+                                   set_frame_range,
+                                   sequence_len,
+                                   offset,
+                                   validate_meshes,
+                                   global_read_flag,
+                                   import_cameras,
+                                   import_curves,
+                                   import_lights,
+                                   import_materials,
+                                   import_meshes,
+                                   import_volumes,
+                                   prim_path_mask,
+                                   import_subdiv,
+                                   import_instance_proxies,
+                                   create_collection,
+                                   import_guide,
+                                   import_proxy,
+                                   import_render,
+                                   import_visible_only,
+                                   use_instancing,
+                                   import_usd_preview,
+                                   set_material_blend,
+                                   convert_to_z_up,
+                                   light_intensity_scale};
 
   bool ok = USD_import(C, filename, &params, as_background_job);
 
@@ -425,6 +426,9 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
 
   row = uiLayoutRow(box, false);
   uiItemR(row, ptr, "convert_to_z_up", 0, NULL, ICON_NONE);
+
+  row = uiLayoutRow(box, false);
+  uiItemR(row, ptr, "light_intensity_scale", 0, NULL, ICON_NONE);
 
   // row = uiLayoutRow(box, false);
   // uiItemR(row, ptr, "prim_path_mask", 0, NULL, ICON_NONE);
@@ -628,6 +632,16 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                   "Convert to Z Up",
                   "When checked and if the USD stage up-axis is Y, apply a rotation "
                   "to the imported objects to convert their orientation to Z up ");
+
+  RNA_def_float(ot->srna,
+                "light_intensity_scale",
+                1.0f,
+                0.0001f,
+                10000.0f,
+                "Light Intensity Scale",
+                "Value by which to scale the intensity of imported lights",
+                0.0001f,
+                1000.0f);
 }
 
 #endif /* WITH_USD */
