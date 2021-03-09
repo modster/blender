@@ -75,11 +75,16 @@ void transform_mesh(Mesh *mesh,
 
     /* https://www.scratchapixel.com/lessons/mathematics-physics-for-computer-graphics/
      * geometry/transforming-normals */
-    const float4x4 normal_matrix = matrix.inverted().transposed();
+    float rot[3][3];
+    eul_to_mat3(rot, rotation);
+    if (!invert_m3(rot)) {
+      return;
+    }
+    transpose_m3(rot);
     for (MVert &vert : MutableSpan(mesh->mvert, mesh->totvert)) {
       float3 normal;
       normal_short_to_float_v3(normal, vert.no);
-      normal = normal_matrix * normal;
+      mul_m3_v3(rot, normal);
       normal_float_to_short_v3(vert.no, normal);
     }
   }
