@@ -752,6 +752,38 @@ size_t Node::get_total_size_in_bytes() const
   return total_size;
 }
 
+
+size_t socket_array_size(const Node *node, const SocketType &socket)
+{
+    switch (socket.type) {
+      default:
+        return 0;
+
+      case SocketType::BOOLEAN_ARRAY:
+        return array_size_in_bytes<bool>(node, socket) / sizeof(bool);
+      case SocketType::FLOAT_ARRAY:
+        return array_size_in_bytes<float>(node, socket) / sizeof(float);
+      case SocketType::INT_ARRAY:
+        return array_size_in_bytes<int>(node, socket) / sizeof(int);
+      case SocketType::COLOR_ARRAY:
+        return array_size_in_bytes<float3>(node, socket) / sizeof(float3);
+      case SocketType::VECTOR_ARRAY:
+        return array_size_in_bytes<float3>(node, socket) / sizeof(float3);
+      case SocketType::POINT_ARRAY:
+        return array_size_in_bytes<float3>(node, socket) / sizeof(float3);
+      case SocketType::NORMAL_ARRAY:
+        return array_size_in_bytes<float3>(node, socket) / sizeof(float3);
+      case SocketType::POINT2_ARRAY:
+        return array_size_in_bytes<float2>(node, socket) / sizeof(float2);
+      case SocketType::STRING_ARRAY:
+        return array_size_in_bytes<ustring>(node, socket) / sizeof(ustring);
+      case SocketType::TRANSFORM_ARRAY:
+        return array_size_in_bytes<Transform>(node, socket) / sizeof(Transform);
+      case SocketType::NODE_ARRAY:
+        return array_size_in_bytes<void *>(node, socket) / sizeof(void *);
+    }
+}
+
 bool Node::is_a(const NodeType *type_)
 {
   for (const NodeType *base = type; base; base = base->base) {
@@ -817,10 +849,15 @@ template<typename T> void Node::set_if_different(const SocketType &input, array<
 
 void Node::print_modified_sockets() const
 {
-  printf("Node : %s\n", name.c_str());
+  fprintf(stderr, "Node : %s\n", name.c_str());
   for (auto &socket : type->inputs) {
     if (socket_is_modified(socket)) {
-      printf("-- socket modified : %s\n", socket.name.c_str());
+      if (socket.is_array()) {
+        fprintf(stderr, "-- socket modified : %s (%ld)\n", socket.name.c_str(), socket_array_size(this, socket));
+      }
+      else {
+        fprintf(stderr, "-- socket modified : %s\n", socket.name.c_str());
+      }
     }
   }
 }
