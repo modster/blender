@@ -1335,36 +1335,36 @@ void GeometryManager::device_update_packed_bvh(
       dscene->object_node.steal_data(pack.object_node);
       dscene->object_node.copy_to_device();
     }
-    if (pack.prim_tri_index.size() && (dscene->prim_tri_index.need_realloc())) {
+    if (pack.prim_tri_index.size()) {
       dscene->prim_tri_index.steal_data(pack.prim_tri_index);
     }
     if (pack.prim_tri_verts.size()) {
       dscene->prim_tri_verts.steal_data(pack.prim_tri_verts);
     }
-    if (pack.prim_type.size() && (dscene->prim_type.need_realloc())) {
+    if (pack.prim_type.size()) {
       dscene->prim_type.steal_data(pack.prim_type);
     }
-    if (pack.prim_visibility.size() && (dscene->prim_visibility.need_realloc())) {
+    if (pack.prim_visibility.size()) {
       dscene->prim_visibility.steal_data(pack.prim_visibility);
     }
-    if (pack.prim_index.size() && (dscene->prim_index.need_realloc())) {
+    if (pack.prim_index.size()) {
       dscene->prim_index.steal_data(pack.prim_index);
     }
-    if (pack.prim_object.size() && (dscene->prim_object.need_realloc())) {
+    if (pack.prim_object.size()) {
       dscene->prim_object.steal_data(pack.prim_object);
     }
-    if (pack.prim_time.size() && (dscene->prim_time.need_realloc())) {
+    if (pack.prim_time.size()) {
       dscene->prim_time.steal_data(pack.prim_time);
       dscene->prim_time.copy_to_device();
     }
   }
 
-  dscene->prim_tri_index.copy_to_device_if_modified();
-  dscene->prim_tri_verts.copy_to_device_if_modified();
-  dscene->prim_type.copy_to_device_if_modified();
-  dscene->prim_visibility.copy_to_device_if_modified();
-  dscene->prim_object.copy_to_device_if_modified();
-  dscene->prim_index.copy_to_device_if_modified();
+  dscene->prim_tri_index.copy_to_device();
+  dscene->prim_tri_verts.copy_to_device();
+  dscene->prim_type.copy_to_device();
+  dscene->prim_visibility.copy_to_device();
+  dscene->prim_object.copy_to_device();
+  dscene->prim_index.copy_to_device();
 
   dscene->data.bvh.root = pack.root_index;
   // dscene->data.bvh.bvh_layout = bparams.bvh_layout;
