@@ -450,7 +450,7 @@ typedef struct EnumPropertyRNA {
 
   PropEnumGetFunc get;
   PropEnumSetFunc set;
-  PropEnumItemFunc itemf;
+  PropEnumItemFunc item_fn;
 
   PropEnumGetFuncEx get_ex;
   PropEnumSetFuncEx set_ex;
@@ -468,7 +468,7 @@ typedef struct PointerPropertyRNA {
 
   PropPointerGetFunc get;
   PropPointerSetFunc set;
-  PropPointerTypeFunc typef;
+  PropPointerTypeFunc type_fn;
   /** unlike operators, 'set' can still run if poll fails, used for filtering display. */
   PropPointerPollFunc poll;
 

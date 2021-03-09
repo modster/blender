@@ -910,14 +910,14 @@ static const EnumPropertyItem *rna_EnumProperty_default_itemf(bContext *C,
     return DummyRNA_NULL_items;
   }
 
-  if ((eprop->itemf == NULL) || (eprop->itemf == rna_EnumProperty_default_itemf) ||
+  if ((eprop->item_fn == NULL) || (eprop->item_fn == rna_EnumProperty_default_itemf) ||
       (ptr->type == &RNA_EnumProperty) || (C == NULL)) {
     if (eprop->item) {
       return eprop->item;
     }
   }
 
-  return eprop->itemf(C, ptr, prop, r_free);
+  return eprop->item_fn(C, ptr, prop, r_free);
 }
 
 /* XXX - not sure this is needed? */
@@ -1279,12 +1279,22 @@ static int rna_property_override_diff_propptr(Main *bmain,
                                                                                   0);
 
   if (is_id) {
-    /* For now, once we deal with nodetrees we'll want to get rid of that one. */
-    //    BLI_assert(no_ownership);
+    /* Owned IDs (the ones we want to actually compare in depth, instead of just comparing pointer
+     * values) should be always properly tagged as 'virtual' overrides. */
+    ID *id = propptr_a->owner_id;
+    if (id != NULL && !ID_IS_OVERRIDE_LIBRARY(id)) {
+      id = propptr_b->owner_id;
+      if (id != NULL && !ID_IS_OVERRIDE_LIBRARY(id)) {
+        id = NULL;
+      }
+    }
+
+    BLI_assert(no_ownership || id == NULL || ID_IS_OVERRIDE_LIBRARY_VIRTUAL(id));
+    UNUSED_VARS_NDEBUG(id);
   }
 
   if (override) {
-    if (no_ownership /* || is_id */ || is_null || is_type_diff || !is_valid_for_diffing) {
+    if (no_ownership || is_null || is_type_diff || !is_valid_for_diffing) {
       /* In case this pointer prop does not own its data (or one is NULL), do not compare structs!
        * This is a quite safe path to infinite loop, among other nasty issues.
        * Instead, just compare pointers themselves. */
@@ -1304,9 +1314,9 @@ static int rna_property_override_diff_propptr(Main *bmain,
             BLI_assert(op->rna_prop_type == property_type);
           }
 
+          IDOverrideLibraryPropertyOperation *opop = NULL;
           if (created || rna_itemname_a != NULL || rna_itemname_b != NULL ||
               rna_itemindex_a != -1 || rna_itemindex_b != -1) {
-            IDOverrideLibraryPropertyOperation *opop;
             opop = BKE_lib_override_library_property_operation_get(op,
                                                                    IDOVERRIDE_LIBRARY_OP_REPLACE,
                                                                    rna_itemname_b,
@@ -1326,6 +1336,38 @@ static int rna_property_override_diff_propptr(Main *bmain,
           }
           else {
             BKE_lib_override_library_operations_tag(op, IDOVERRIDE_LIBRARY_TAG_UNUSED, false);
+          }
+
+          if (is_id && no_ownership) {
+            if (opop == NULL) {
+              opop = BKE_lib_override_library_property_operation_find(op,
+                                                                      rna_itemname_b,
+                                                                      rna_itemname_a,
+                                                                      rna_itemindex_b,
+                                                                      rna_itemindex_a,
+                                                                      true,
+                                                                      NULL);
+              BLI_assert(opop != NULL);
+            }
+
+            BLI_assert(propptr_a->data == propptr_a->owner_id);
+            BLI_assert(propptr_b->data == propptr_b->owner_id);
+            ID *id_a = propptr_a->data;
+            ID *id_b = propptr_b->data;
+            if (ELEM(NULL, id_a, id_b)) {
+              /* In case one of the pointer is NULL and not the other, we consider that the
+               * override is not matching its reference anymore. */
+              opop->flag &= ~IDOVERRIDE_LIBRARY_FLAG_IDPOINTER_MATCH_REFERENCE;
+            }
+            else if (id_a->override_library != NULL && id_a->override_library->reference == id_b) {
+              opop->flag |= IDOVERRIDE_LIBRARY_FLAG_IDPOINTER_MATCH_REFERENCE;
+            }
+            else if (id_b->override_library != NULL && id_b->override_library->reference == id_a) {
+              opop->flag |= IDOVERRIDE_LIBRARY_FLAG_IDPOINTER_MATCH_REFERENCE;
+            }
+            else {
+              opop->flag &= ~IDOVERRIDE_LIBRARY_FLAG_IDPOINTER_MATCH_REFERENCE;
+            }
           }
         }
       }
@@ -1429,8 +1471,8 @@ static int rna_property_override_diff_propptr(Main *bmain,
     }
   }
   else {
-    /* We could also use is_diff_pointer, but then we potentially lose the gt/lt info -
-     * and don't think performances are critical here for now anyway... */
+    /* We could also use is_diff_pointer, but then we potentially lose the greater-than/less-than
+     * info - and don't think performances are critical here for now anyway. */
     return !RNA_struct_equals(bmain, propptr_a, propptr_b, mode);
   }
 }
@@ -1468,7 +1510,6 @@ int rna_property_override_diff_default(Main *bmain,
                          rna_path != NULL;
 
   const bool no_ownership = (prop_a->rnaprop->flag & PROP_PTR_NO_OWNERSHIP) != 0;
-  const bool no_prop_name = (prop_a->rnaprop->flag_override & PROPOVERRIDE_NO_PROP_NAME) != 0;
 
   /* Note: we assume we only insert in ptr_a (i.e. we can only get new items in ptr_a),
    * and that we never remove anything. */
@@ -1724,6 +1765,11 @@ int rna_property_override_diff_default(Main *bmain,
     }
 
     case PROP_POINTER: {
+      /* Using property name check only makes sense for items of a collection, not for a single
+       * pointer.
+       * Doing this here avoids having to manually specify `PROPOVERRIDE_NO_PROP_NAME` to things
+       * like ShapeKey pointers. */
+      const bool no_prop_name = true;
       if (STREQ(prop_a->identifier, "rna_type")) {
         /* Dummy 'pass' answer, this is a meta-data and must be ignored... */
         return 0;
@@ -1752,6 +1798,8 @@ int rna_property_override_diff_default(Main *bmain,
     }
 
     case PROP_COLLECTION: {
+      const bool no_prop_name = (prop_a->rnaprop->flag_override & PROPOVERRIDE_NO_PROP_NAME) != 0;
+
       bool equals = true;
       bool abort = false;
       int idx_a = 0;
