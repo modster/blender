@@ -131,18 +131,15 @@ static Mesh *create_circle_mesh(const float radius,
 
   float angle = 0.0f;
   const float angle_delta = 2.0f * M_PI / static_cast<float>(verts_num);
-  for (const int i : IndexRange(verts_num)) {
-    MVert &vert = verts[i];
-    float3 co = float3(std::cos(angle) * radius, std::sin(angle) * radius, 0.0f);
-
-    copy_v3_v3(vert.co, co);
+  for (MVert &vert : verts) {
+    copy_v3_v3(vert.co, float3(std::cos(angle) * radius, std::sin(angle) * radius, 0.0f));
     angle += angle_delta;
   }
   if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN) {
     copy_v3_v3(verts.last().co, float3(0));
   }
 
-  /* Align all vertex normals to the input rotation. */
+  /* Point all vertex normals in the up direction. */
   short up_normal[3] = {0, 0, SHRT_MAX};
   for (MVert &vert : verts) {
     copy_v3_v3_short(vert.no, up_normal);
@@ -172,7 +169,7 @@ static Mesh *create_circle_mesh(const float radius,
     }
   }
 
-  /* Create corners. */
+  /* Create corners and faces. */
   switch (fill_type) {
     case GEO_NODE_MESH_CIRCLE_FILL_NONE:
       break;
@@ -182,6 +179,9 @@ static Mesh *create_circle_mesh(const float radius,
         loop.e = i;
         loop.v = i;
       }
+      MPoly &poly = polys[0];
+      poly.loopstart = 0;
+      poly.totloop = loops.size();
       break;
     }
     case GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN: {
@@ -195,23 +195,7 @@ static Mesh *create_circle_mesh(const float radius,
         MLoop &loop3 = loops[3 * i + 2];
         loop3.e = verts_num + i;
         loop3.v = verts_num;
-      }
-      break;
-    }
-  }
 
-  /* Create face(s). */
-  switch (fill_type) {
-    case GEO_NODE_MESH_CIRCLE_FILL_NONE:
-      break;
-    case GEO_NODE_MESH_CIRCLE_FILL_NGON: {
-      MPoly &poly = polys[0];
-      poly.loopstart = 0;
-      poly.totloop = loops.size();
-      break;
-    }
-    case GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN: {
-      for (const int i : IndexRange(verts_num)) {
         MPoly &poly = polys[i];
         poly.loopstart = 3 * i;
         poly.totloop = 3;
