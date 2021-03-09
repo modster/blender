@@ -503,7 +503,6 @@ void USDMeshReader::read_attributes(Mesh *mesh,
     void *cdata = CustomData_get_layer_named(cd, cd_type, name);
 
     if (!cdata) {
-      printf("attr name %s\n", name);
       cdata = CustomData_add_layer_named(cd, cd_type, CD_DEFAULT, NULL, num, name);
     }
     memcpy(cdata, data, num * type_size);
