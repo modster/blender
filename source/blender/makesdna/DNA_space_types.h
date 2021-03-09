@@ -66,6 +66,9 @@ typedef struct SpaceProperties_Runtime SpaceProperties_Runtime;
 /* Defined in `node_intern.h`. */
 typedef struct SpaceNode_Runtime SpaceNode_Runtime;
 
+/* Defined in `file_intern.h`. */
+typedef struct SpaceFile_Runtime SpaceFile_Runtime;
+
 /* -------------------------------------------------------------------- */
 /** \name SpaceLink (Base)
  * \{ */
@@ -490,6 +493,7 @@ typedef enum eGraphEdit_Flag {
   SIPO_NORMALIZE_FREEZE = (1 << 15),
   /* show markers region */
   SIPO_SHOW_MARKERS = (1 << 16),
+  SIPO_NO_DRAW_EXTRAPOLATION = (1 << 17),
 } eGraphEdit_Flag;
 
 /* SpaceGraph.mode (Graph Editor Mode) */
@@ -847,6 +851,8 @@ typedef struct SpaceFile {
 
   short recentnr, bookmarknr;
   short systemnr, system_bookmarknr;
+
+  SpaceFile_Runtime *runtime;
 } SpaceFile;
 
 /* SpaceFile.browse_mode (File Space Browsing Mode) */
@@ -1836,6 +1842,22 @@ typedef struct SpaceStatusBar {
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Spreadsheet
+ * \{ */
+
+typedef struct SpaceSpreadsheet {
+  SpaceLink *next, *prev;
+  /** Storage of regions for inactive spaces. */
+  ListBase regionbase;
+  char spacetype;
+  char link_flag;
+  char _pad0[6];
+  /* End 'SpaceLink' header. */
+} SpaceSpreadsheet;
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Space Defines (eSpace_Type)
  * \{ */
 
@@ -1872,8 +1894,9 @@ typedef enum eSpace_Type {
   SPACE_CLIP = 20,
   SPACE_TOPBAR = 21,
   SPACE_STATUSBAR = 22,
+  SPACE_SPREADSHEET = 23
 
-#define SPACE_TYPE_LAST SPACE_STATUSBAR
+#define SPACE_TYPE_LAST SPACE_SPREADSHEET
 } eSpace_Type;
 
 /* use for function args */
