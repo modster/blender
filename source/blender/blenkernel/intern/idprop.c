@@ -761,7 +761,7 @@ static void IDP_FreeGroup(IDProperty *prop, const bool do_id_user)
  * Return an int from an IDProperty with a compatible type. This should be avoided, but
  * it's sometimes necessary, for example when legacy files have incorrect property types.
  */
-int IDP_get_int(const IDProperty *prop)
+int IDP_get_as_int(const IDProperty *prop)
 {
   switch (prop->type) {
     case IDP_INT:
@@ -779,7 +779,7 @@ int IDP_get_int(const IDProperty *prop)
  * Return a double from an IDProperty with a compatible type. This should be avoided, but
  * it's sometimes necessary, for example when legacy files have incorrect property types.
  */
-double IDP_get_double(const IDProperty *prop)
+double IDP_get_as_double(const IDProperty *prop)
 {
   switch (prop->type) {
     case IDP_DOUBLE:
@@ -797,7 +797,7 @@ double IDP_get_double(const IDProperty *prop)
  * Return a float from an IDProperty with a compatible type. This should be avoided, but
  * it's sometimes necessary, for example when legacy files have incorrect property types.
  */
-float IDP_get_float(const IDProperty *prop)
+float IDP_get_as_float(const IDProperty *prop)
 {
   switch (prop->type) {
     case IDP_FLOAT:

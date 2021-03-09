@@ -185,9 +185,9 @@ void IDP_Reset(struct IDProperty *prop, const struct IDProperty *reference);
 #  define IDP_Id(prop) ((ID *)(prop)->data.pointer)
 #endif
 
-int IDP_get_int(const struct IDProperty *prop);
-float IDP_get_float(const struct IDProperty *prop);
-double IDP_get_double(const struct IDProperty *prop);
+int IDP_get_as_int(const struct IDProperty *prop);
+float IDP_get_as_float(const struct IDProperty *prop);
+double IDP_get_as_double(const struct IDProperty *prop);
 
 /**
  * Call a callback for each idproperty in the hierarchy under given root one (included).
