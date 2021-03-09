@@ -499,13 +499,22 @@ void USDMeshReader::read_attributes(Mesh *mesh,
       type_size = sizeof(pxr::GfVec3i);
       data = (void *)idata.cdata();
     }
+    else {
+      continue;
+    }
 
     void *cdata = CustomData_get_layer_named(cd, cd_type, name);
 
     if (!cdata) {
       cdata = CustomData_add_layer_named(cd, cd_type, CD_DEFAULT, NULL, num, name);
     }
-    memcpy(cdata, data, num * type_size);
+
+    if (cdata) {
+      memcpy(cdata, data, num * type_size);
+    }
+    else {
+      std::cerr << "WARNING: Couldn't add custom data layer " << name << std::endl;
+    }
   }
 }
 
