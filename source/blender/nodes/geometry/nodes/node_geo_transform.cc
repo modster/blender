@@ -20,6 +20,8 @@
 
 #include "BLI_math_matrix.h"
 
+#include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
 #include "DNA_pointcloud_types.h"
 #include "DNA_volume_types.h"
 
@@ -57,20 +59,29 @@ static bool use_translate(const float3 rotation, const float3 scale)
   return true;
 }
 
-static void transform_mesh(Mesh *mesh,
-                           const float3 translation,
-                           const float3 rotation,
-                           const float3 scale)
+void transform_mesh(Mesh *mesh,
+                    const float3 translation,
+                    const float3 rotation,
+                    const float3 scale)
 {
   /* Use only translation if rotation and scale are zero. */
   if (use_translate(rotation, scale)) {
     BKE_mesh_translate(mesh, translation, true);
   }
   else {
-    float mat[4][4];
-    loc_eul_size_to_mat4(mat, translation, rotation, scale);
-    BKE_mesh_transform(mesh, mat, true);
-    BKE_mesh_calc_normals(mesh);
+    float4x4 matrix;
+    loc_eul_size_to_mat4(matrix.values, translation, rotation, scale);
+    BKE_mesh_transform(mesh, matrix.values, true);
+
+    /* https://www.scratchapixel.com/lessons/mathematics-physics-for-computer-graphics/
+     * geometry/transforming-normals */
+    const float4x4 normal_matrix = matrix.inverted().transposed();
+    for (MVert &vert : MutableSpan(mesh->mvert, mesh->totvert)) {
+      float3 normal;
+      normal_short_to_float_v3(normal, vert.no);
+      normal = normal_matrix * normal;
+      normal_float_to_short_v3(vert.no, normal);
+    }
   }
 }
 

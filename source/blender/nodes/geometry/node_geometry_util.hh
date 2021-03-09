@@ -47,4 +47,9 @@ void update_attribute_input_socket_availabilities(bNode &node,
 Array<uint32_t> get_geometry_element_ids_as_uints(const GeometryComponent &component,
                                                   const AttributeDomain domain);
 
+void transform_mesh(Mesh *mesh,
+                    const float3 translation,
+                    const float3 rotation,
+                    const float3 scale);
+
 }  // namespace blender::nodes
