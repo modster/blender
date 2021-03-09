@@ -1148,6 +1148,10 @@ void AlembicObject::setup_transform_cache(CachedData &cached_data, float scale)
   cached_data.transforms.clear();
   cached_data.transforms.invalidate_last_loaded_time();
 
+  if (scale == 0.0f) {
+    scale = 1.0f;
+  }
+
   if (xform_time_sampling) {
     cached_data.transforms.set_time_sampling(*xform_time_sampling, 0);
   }
@@ -1700,6 +1704,9 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object,
   Object *object = abc_object->get_object();
   cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
 
+  print_transform("object tfm", object->get_tfm());
+  std::cerr << "cached_data.transforms.size() : " << cached_data.transforms.size() << '\n';
+
   if (object->is_modified()) {
       object->tag_update(scene_);
   }
@@ -1723,8 +1730,9 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object,
     for (size_t i = 0; i < triangle_data->size(); ++i) {
       int3 tri = (*triangle_data)[i];
       triangles.push_back_reserved(tri.x);
-      triangles.push_back_reserved(tri.y);
       triangles.push_back_reserved(tri.z);
+      triangles.push_back_reserved(tri.y);
+
       smooth.push_back_reserved(1);
     }
 
@@ -1748,6 +1756,8 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object,
     bool need_rebuild = mesh->triangles_is_modified();
     mesh->tag_update(scene_, need_rebuild);
   }
+
+  mesh->print_modified_sockets();
 }
 
 void AlembicProcedural::read_subd(AlembicObject *abc_object,
