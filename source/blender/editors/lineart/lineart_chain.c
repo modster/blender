@@ -202,8 +202,8 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
 
   LRT_ITER_ALL_LINES_BEGIN
   {
-
     if ((!(rl->flags & LRT_EDGE_FLAG_ALL_TYPE)) || (rl->flags & LRT_EDGE_FLAG_CHAIN_PICKED)) {
+      LRT_ITER_ALL_LINES_NEXT
       continue;
     }
 

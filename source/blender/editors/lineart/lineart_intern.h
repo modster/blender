@@ -81,7 +81,7 @@ void lineart_count_and_print_render_buffer_memory(LineartRenderBuffer *rb);
   for (current_list = &rb->contours; rl; rl = next_rl) { \
     next_rl = rl->next;
 
-#define LRT_ITER_ALL_LINES_END \
+#define LRT_ITER_ALL_LINES_NEXT \
   while (!next_rl) { \
     if (current_list == &rb->contours) { \
       current_list = &rb->crease_lines; \
@@ -99,7 +99,10 @@ void lineart_count_and_print_render_buffer_memory(LineartRenderBuffer *rb);
       break; \
     } \
     next_rl = *current_list; \
-  } \
+  }
+
+#define LRT_ITER_ALL_LINES_END \
+  LRT_ITER_ALL_LINES_NEXT \
   }
 
 #define LRT_BOUND_AREA_CROSSES(b1, b2) \
