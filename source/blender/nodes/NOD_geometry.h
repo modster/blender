@@ -46,6 +46,7 @@ void register_node_type_geo_mesh_primitive_circle(void);
 void register_node_type_geo_mesh_primitive_cube(void);
 void register_node_type_geo_mesh_primitive_cylinder(void);
 void register_node_type_geo_mesh_primitive_uv_sphere(void);
+void register_node_type_geo_mesh_primitive_ico_sphere(void);
 void register_node_type_geo_object_info(void);
 void register_node_type_geo_point_distribute(void);
 void register_node_type_geo_point_instance(void);
