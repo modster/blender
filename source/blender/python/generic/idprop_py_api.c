@@ -1606,7 +1606,7 @@ static PyObject *BPy_IDGroup_rna_ui_data_copy(BPy_IDProperty *self, PyObject *ar
   const char *key_dest;
 
   if (!PyArg_ParseTuple(
-          args, "O!ss:clear_rna", &BPy_IDGroup_Type, &group_src, &key_src, &key_dest)) {
+          args, "O!ss:copy_rna", &BPy_IDGroup_Type, &group_src, &key_src, &key_dest)) {
     Py_RETURN_NONE;
   }
 
