@@ -70,17 +70,17 @@ static void clear_strokes(Object *ob, GpencilModifierData *md, int frame)
   BKE_gpencil_layer_frame_delete(gpl, gpf);
 }
 
-static void bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int frame)
+static bool bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int frame)
 {
   if (md->type != eGpencilModifierType_Lineart) {
-    return;
+    return false;
   }
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
   bGPdata *gpd = ob->data;
 
   bGPDlayer *gpl = BKE_gpencil_layer_get_by_name(gpd, lmd->target_layer, 1);
   if (!gpl) {
-    return;
+    return false;
   }
   bool only_use_existing_gp_frames = false;
   bGPDframe *gpf = (only_use_existing_gp_frames ?
@@ -89,7 +89,7 @@ static void bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int
 
   if (!gpf) {
     /* No greasepencil frame created or found. */
-    return;
+    return false;
   }
 
   ED_lineart_compute_feature_lines_internal(dg, lmd);
@@ -117,6 +117,10 @@ static void bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int
       lmd->flags);
 
   ED_lineart_destroy_render_data(lmd);
+
+  md->mode &= ~(eGpencilModifierMode_Realtime | eGpencilModifierMode_Render);
+
+  return true;
 }
 
 typedef struct LineartBakeJob {
@@ -138,15 +142,16 @@ typedef struct LineartBakeJob {
   bool overwrite_frames;
 } LineartBakeJob;
 
-static void lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob)
+static bool lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob)
 {
+  bool touched = false;
+  if (ob->type != OB_GPENCIL) {
+    return false;
+  }
   for (int frame = bj->frame_begin; frame <= bj->frame_end; frame += bj->frame_increment) {
 
     BKE_scene_frame_set(bj->scene, frame);
     BKE_scene_graph_update_for_newframe(bj->dg);
-    if (ob->type != OB_GPENCIL) {
-      continue;
-    }
 
     if (bj->overwrite_frames) {
       LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
@@ -155,11 +160,14 @@ static void lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob)
     }
 
     LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
-      bake_strokes(ob, bj->dg, md, frame);
+      if (bake_strokes(ob, bj->dg, md, frame)) {
+        touched = true;
+      }
     }
 
     *bj->progress = (float)(frame - bj->frame_begin) / (bj->frame_end - bj->frame_begin);
   }
+  return true;
 }
 
 static void lineart_gpencil_bake_startjob(void *customdata,
@@ -173,11 +181,17 @@ static void lineart_gpencil_bake_startjob(void *customdata,
 
   if (bj->ob) {
     /* Which means only bake one line art gpencil object, specified by bj->ob. */
-    lineart_gpencil_bake_single_target(bj, bj->ob);
+    if (lineart_gpencil_bake_single_target(bj, bj->ob)) {
+      DEG_id_tag_update((struct ID *)bj->ob->data, ID_RECALC_GEOMETRY);
+      WM_event_add_notifier(bj->C, NC_GPENCIL | ND_DATA | NA_EDITED, bj->ob);
+    }
   }
   else {
     CTX_DATA_BEGIN (bj->C, Object *, ob, visible_objects) {
-      lineart_gpencil_bake_single_target(bj, ob);
+      if (lineart_gpencil_bake_single_target(bj, ob)) {
+        DEG_id_tag_update((struct ID *)ob->data, ID_RECALC_GEOMETRY);
+        WM_event_add_notifier(bj->C, NC_GPENCIL | ND_DATA | NA_EDITED, ob);
+      }
     }
     CTX_DATA_END;
   }
@@ -245,6 +259,7 @@ static int lineart_gpencil_bake_common(bContext *C,
   else {
     float pseduo_progress;
     lineart_gpencil_bake_startjob(bj, NULL, NULL, &pseduo_progress);
+
     MEM_freeN(bj);
 
     return OPERATOR_FINISHED;
@@ -307,8 +322,10 @@ static int lineart_gpencil_clear_strokes_exec(bContext *C, wmOperator *op)
     BKE_gpencil_free_frames(gpl);
   }
 
-  BKE_report(op->reports, RPT_INFO, "Line Art clear layers is complete.");
-  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
+  BKE_report(op->reports, RPT_INFO, "Line art cleared for this target.");
+
+  DEG_id_tag_update((struct ID *)ob->data, ID_RECALC_GEOMETRY);
+  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, ob);
   return OPERATOR_FINISHED;
 }
 static int lineart_gpencil_clear_strokes_all_targets_exec(bContext *C, wmOperator *op)
@@ -330,11 +347,12 @@ static int lineart_gpencil_clear_strokes_all_targets_exec(bContext *C, wmOperato
       }
       BKE_gpencil_free_frames(gpl);
     }
+    DEG_id_tag_update((struct ID *)ob->data, ID_RECALC_GEOMETRY);
+    WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, ob);
   }
   CTX_DATA_END;
 
-  BKE_report(op->reports, RPT_INFO, "Line Art all clear layers is complete.");
-  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
+  BKE_report(op->reports, RPT_INFO, "All line art targets are now cleared.");
   return OPERATOR_FINISHED;
 }
 
