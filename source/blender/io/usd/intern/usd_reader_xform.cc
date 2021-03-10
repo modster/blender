@@ -48,7 +48,6 @@ extern "C" {
 
 void USDXformReader::createObject(Main *bmain, double motionSampleTime)
 {
-  WM_reportf(RPT_WARNING, "Creating blender object for prim: %s", m_prim.GetPath().GetText());
   m_object = BKE_object_add_only_object(bmain, OB_EMPTY, m_name.c_str());
   m_object->empty_drawsize = 0.1f;
   m_object->data = NULL;
@@ -57,8 +56,6 @@ void USDXformReader::createObject(Main *bmain, double motionSampleTime)
 void USDXformReader::readObjectData(Main *bmain, double motionSampleTime)
 {
   USDPrimReader::readObjectData(bmain, motionSampleTime);
-
-  WM_reportf(RPT_WARNING, "Reading specific xform data: %s", m_prim.GetPath().GetText());
 
   bool is_constant;
   float transform_from_usd[4][4];

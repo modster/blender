@@ -214,8 +214,6 @@ void USDMeshReader::createObject(Main *bmain, double motionSampleTime)
 
 void USDMeshReader::readObjectData(Main *bmain, double motionSampleTime)
 {
-  WM_reportf(RPT_WARNING, "Reading specific mesh data: %s", m_prim.GetPath().GetText());
-
   Mesh *mesh = (Mesh *)m_object->data;
 
   m_isInitialLoad = true;

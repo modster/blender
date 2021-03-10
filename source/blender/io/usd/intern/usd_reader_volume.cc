@@ -56,7 +56,6 @@ extern "C" {
 
 void USDVolumeReader::createObject(Main *bmain, double motionSampleTime)
 {
-  WM_reportf(RPT_WARNING, "Creating volume for prim: %s", m_prim.GetPath().GetText());
   Volume *volume = (Volume *)BKE_volume_add(bmain, m_name.c_str());
   id_us_min(&volume->id);
 
@@ -66,8 +65,6 @@ void USDVolumeReader::createObject(Main *bmain, double motionSampleTime)
 
 void USDVolumeReader::readObjectData(Main *bmain, double motionSampleTime)
 {
-  WM_reportf(RPT_WARNING, "Reading specific volume data: %s", m_prim.GetPath().GetText());
-
   m_volume = pxr::UsdVolVolume::Get(m_stage, m_prim.GetPath());
 
   pxr::UsdVolVolume::FieldMap fields = m_volume.GetFieldPaths();

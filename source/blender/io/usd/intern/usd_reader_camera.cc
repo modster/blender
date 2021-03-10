@@ -48,7 +48,6 @@ extern "C" {
 
 void USDCameraReader::createObject(Main *bmain, double motionSampleTime)
 {
-  WM_reportf(RPT_WARNING, "Creating blender camera for prim: %s", m_prim.GetPath().GetText());
   Camera *bcam = static_cast<Camera *>(BKE_camera_add(bmain, m_name.c_str()));
 
   m_object = BKE_object_add_only_object(bmain, OB_CAMERA, m_name.c_str());

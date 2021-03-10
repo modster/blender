@@ -76,7 +76,6 @@ static bool set_knots(const pxr::VtDoubleArray &knots, float *&nu_knots)
 
 void USDNurbsReader::createObject(Main *bmain, double motionSampleTime)
 {
-  WM_reportf(RPT_WARNING, "Creating blender curve for prim: %s", m_prim.GetPath().GetText());
   m_curve = BKE_curve_add(bmain, m_name.c_str(), OB_CURVE);
 
   m_curve->flag |= CU_DEFORM_FILL | CU_3D;
@@ -89,8 +88,6 @@ void USDNurbsReader::createObject(Main *bmain, double motionSampleTime)
 
 void USDNurbsReader::readObjectData(Main *bmain, double motionSampleTime)
 {
-  WM_reportf(RPT_WARNING, "Reading specific camera data: %s", m_prim.GetPath().GetText());
-
   Curve *cu = (Curve *)m_object->data;
   read_curve_sample(cu, motionSampleTime);
 

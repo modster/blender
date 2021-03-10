@@ -58,7 +58,6 @@ extern "C" {
 
 void USDLightReader::createObject(Main *bmain, double motionSampleTime)
 {
-  WM_reportf(RPT_WARNING, "Creating blender light for prim: %s", m_prim.GetPath().GetText());
   Light *blight = static_cast<Light *>(BKE_light_add(bmain, m_name.c_str()));
 
   m_object = BKE_object_add_only_object(bmain, OB_LAMP, m_name.c_str());

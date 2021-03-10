@@ -497,7 +497,6 @@ struct ImportJobData {
 
 static void import_startjob(void *customdata, short *stop, short *do_update, float *progress)
 {
-  WM_reportf(RPT_WARNING, "Import start job: %s", 0);
   ImportJobData *data = static_cast<ImportJobData *>(customdata);
 
   data->stop = stop;
@@ -657,8 +656,6 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
 
 static void import_endjob(void *customdata)
 {
-  WM_reportf(RPT_WARNING, "Import end job: %s", 0);
-
   ImportJobData *data = static_cast<ImportJobData *>(customdata);
 
   std::vector<USDPrimReader *>::iterator iter;

@@ -81,7 +81,6 @@ bool USDPrimReader::valid() const
 
 void USDPrimReader::createObject(Main *bmain, double motionSampleTime)
 {
-  WM_reportf(RPT_WARNING, "Creating blender object for prim: %s", m_prim.GetPath().GetText());
   m_object = BKE_object_add_only_object(bmain, OB_EMPTY, m_name.c_str());
   m_object->empty_drawsize = 0.1f;
   m_object->data = NULL;
@@ -89,7 +88,6 @@ void USDPrimReader::createObject(Main *bmain, double motionSampleTime)
 
 void USDPrimReader::readObjectData(Main *bmain, double motionSampleTime)
 {
-  WM_reportf(RPT_WARNING, "Reading prim data: %s", m_prim.GetPath().GetText());
   // m_object = BKE_object_add_only_object(bmain, OB_EMPTY, m_prim_path.c_str());
   // m_object->data = NULL;
 }
