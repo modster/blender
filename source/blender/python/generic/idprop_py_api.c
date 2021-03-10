@@ -1327,7 +1327,7 @@ PyDoc_STRVAR(BPy_IDGroup_update_rna_doc,
              "                       soft_max=None, "
              "                       precision=None, "
              "                       step=None, "
-             "                       default_value=None, "
+             "                       default=None, "
              "                       description=None)\n"
              "\n"
              "   Update the RNA type information of the IDProperty used for interaction and\n"
@@ -1355,7 +1355,7 @@ static PyObject *BPy_IDGroup_update_rna(BPy_IDProperty *self, PyObject *args, Py
                                  "soft_max",
                                  "precision",
                                  "step",
-                                 "default_value",
+                                 "default",
                                  "description",
                                  NULL};
 
@@ -1450,11 +1450,11 @@ static void idprop_ui_data_to_dict_int(IDProperty *idprop, PyObject *dict)
     for (int i = 0; i < ui_data->default_array_len; i++) {
       PyList_SET_ITEM(list, i, PyLong_FromLong(ui_data->default_array[i]));
     }
-    PyDict_SetItemString(dict, "default_value", list);
+    PyDict_SetItemString(dict, "default", list);
     Py_DECREF(list);
   }
   else {
-    PyDict_SetItemString(dict, "default_value", item = PyLong_FromLong(ui_data->step));
+    PyDict_SetItemString(dict, "default", item = PyLong_FromLong(ui_data->step));
     Py_DECREF(item);
   }
 }
@@ -1481,11 +1481,11 @@ static void idprop_ui_data_to_dict_float(IDProperty *idprop, PyObject *dict)
     for (int i = 0; i < ui_data->default_array_len; i++) {
       PyList_SET_ITEM(list, i, PyFloat_FromDouble(ui_data->default_array[i]));
     }
-    PyDict_SetItemString(dict, "default_value", list);
+    PyDict_SetItemString(dict, "default", list);
     Py_DECREF(list);
   }
   else {
-    PyDict_SetItemString(dict, "default_value", item = PyFloat_FromDouble(ui_data->step));
+    PyDict_SetItemString(dict, "default", item = PyFloat_FromDouble(ui_data->step));
     Py_DECREF(item);
   }
 }
@@ -1495,7 +1495,7 @@ static void idprop_ui_data_to_dict_string(IDProperty *idprop, PyObject *dict)
   IDPropertyUIDataString *ui_data = (IDPropertyUIDataString *)idprop->ui_data;
   PyObject *item;
 
-  PyDict_SetItemString(dict, "default_value", item = PyUnicode_FromString(ui_data->default_value));
+  PyDict_SetItemString(dict, "default", item = PyUnicode_FromString(ui_data->default_value));
   Py_DECREF(item);
 }
 

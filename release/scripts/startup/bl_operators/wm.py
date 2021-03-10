@@ -1407,7 +1407,7 @@ class WM_OT_properties_edit(Operator):
                 self.max != self.soft_max
             )
         if prop_type in {int, float, str}:
-            self.default = str(rna_data["default_value"])
+            self.default = str(rna_data["default"])
 
         self._init_subtype(prop_type, is_array, self.subtype)
 
