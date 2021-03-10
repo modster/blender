@@ -96,7 +96,7 @@ static int corner_total(const GeometryNodeMeshCircleFillType fill_type, const in
     case GEO_NODE_MESH_CIRCLE_FILL_NGON:
       return verts_num * 6;
     case GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN:
-      return verts_num * 8;
+      return verts_num * 10;
   }
   BLI_assert(false);
   return 0;
@@ -131,119 +131,153 @@ static Mesh *create_cylinder_mesh(const float radius,
   MutableSpan<MLoop> loops = MutableSpan<MLoop>(mesh->mloop, mesh->totloop);
   MutableSpan<MPoly> polys = MutableSpan<MPoly>(mesh->mpoly, mesh->totpoly);
 
+  /* Calculate vertex data. */
+  const int top_verts_start = 0;
+  const int bottom_verts_start = verts_num;
   float angle = 0.0f;
   const float angle_delta = 2.0f * M_PI / static_cast<float>(verts_num);
   for (const int i : IndexRange(verts_num)) {
     float x = std::cos(angle) * radius;
     float y = std::sin(angle) * radius;
 
-    copy_v3_v3(verts[i].co, float3(x, y, depth));
-    copy_v3_v3(verts[verts_num + i].co, float3(x, y, -depth));
+    copy_v3_v3(verts[top_verts_start + i].co, float3(x, y, depth));
+    copy_v3_v3(verts[bottom_verts_start + i].co, float3(x, y, -depth));
     angle += angle_delta;
   }
-  if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN) {
-    copy_v3_v3(verts.last().co, float3(0.0f, 0.0f, depth));
-    copy_v3_v3(verts[verts.size() - 2].co, float3(0.0f, 0.0f, -depth));
-  }
 
-  /* Point all vertex normals in the up direction. */
-  short up_normal[3] = {0, 0, SHRT_MAX};
-  short down_normal[3] = {0, 0, SHRT_MIN};
-  for (const int i : IndexRange(verts_num)) {
-    copy_v3_v3_short(verts[i].no, up_normal);
-    copy_v3_v3_short(verts[verts_num + i].no, down_normal);
+  /* Add center vertices for the triangle fans. */
+  const int top_center_vert_index = verts.size() - 1;
+  const int bottom_center_vert_index = verts.size() - 2;
+  if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN) {
+    copy_v3_v3(verts[top_center_vert_index].co, float3(0.0f, 0.0f, depth));
+    copy_v3_v3(verts[bottom_center_vert_index].co, float3(0.0f, 0.0f, -depth));
   }
 
   /* Create outer edges. */
+  const int top_edges_start = 0;
+  const int connecting_edges_start = verts_num;
+  const int bottom_edges_start = verts_num * 2;
   for (const int i : IndexRange(verts_num)) {
-    MEdge &edge_top = edges[i];
-    edge_top.v1 = i;
-    edge_top.v2 = (i + 1) % verts_num;
-    MEdge &edge_bottom = edges[verts_num + i];
-    edge_top.v1 = verts_num + i;
-    edge_top.v2 = verts_num + (i + 1) % verts_num;
+    MEdge &edge_top = edges[top_edges_start + i];
+    edge_top.v1 = top_verts_start + i;
+    edge_top.v2 = top_verts_start + (i + 1) % verts_num;
+    MEdge &edge_connecting = edges[connecting_edges_start + i];
+    edge_connecting.v1 = top_verts_start + i;
+    edge_connecting.v2 = bottom_verts_start + i;
+    MEdge &edge_bottom = edges[bottom_edges_start + i];
+    edge_bottom.v1 = bottom_verts_start + i;
+    edge_bottom.v2 = bottom_verts_start + (i + 1) % verts_num;
   }
 
   /* Create triangle fan edges. */
+  const int top_fan_edges_start = verts_num * 3;
+  const int bottom_fan_edges_start = verts_num * 4;
   if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN) {
     for (const int i : IndexRange(verts_num)) {
-      MEdge &edge_top = edges[verts_num * 2 + i];
-      edge_top.v1 = verts.size() - 1;
-      edge_top.v2 = (i + 1) % verts_num;
-      MEdge &edge_bottom = edges[verts_num * 3 + i];
-      edge_top.v1 = verts.size() - 2;
-      edge_top.v2 = verts_num + i;
+      MEdge &edge_top = edges[top_fan_edges_start + i];
+      edge_top.v1 = top_center_vert_index;
+      edge_top.v2 = top_verts_start + i;
+      MEdge &edge_bottom = edges[bottom_fan_edges_start + i];
+      edge_bottom.v1 = bottom_center_vert_index;
+      edge_bottom.v2 = bottom_verts_start + i;
     }
   }
 
   /* Create top corners and faces. */
+  int loop_index = 0;
+  int poly_index = 0;
   switch (fill_type) {
     case GEO_NODE_MESH_CIRCLE_FILL_NONE:
       break;
     case GEO_NODE_MESH_CIRCLE_FILL_NGON: {
-      for (const int i : IndexRange(verts_num)) {
-        MLoop &loop_top = loops[i];
-        loop_top.e = i;
-        loop_top.v = i;
-        MLoop &loop_bottom = loops[verts_num + i];
-        loop_bottom.e = verts_num + i;
-        loop_bottom.v = verts_num + i;
-      }
-      MPoly &poly_top = polys[0];
-      poly_top.loopstart = 0;
-      poly_top.totloop = verts_num * 3;
-      MPoly &poly_bottom = polys[0];
-      poly_bottom.loopstart = 0;
-      poly_bottom.totloop = verts_num * 3;
+      MPoly &poly = polys[poly_index++];
+      poly.loopstart = loop_index;
+      poly.totloop = verts_num;
 
+      for (const int i : IndexRange(verts_num)) {
+        MLoop &loop = loops[loop_index++];
+        loop.v = top_verts_start + i;
+        loop.e = top_edges_start + i;
+      }
       break;
     }
     case GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN: {
-      /* WRONG. */
       for (const int i : IndexRange(verts_num)) {
-        MLoop &loop_top = loops[3 * i];
-        loop_top.e = i;
-        loop_top.v = i;
-        MLoop &loop2_top = loops[3 * i + 1];
-        loop2_top.e = verts_num * 2 + ((i + 1) % verts_num);
-        loop2_top.v = (i + 1) % verts_num;
-        MLoop &loop3_top = loops[3 * i + 2];
-        loop3_top.e = verts_num + i;
-        loop3_top.v = verts.size() - 1;
+        MPoly &poly = polys[poly_index++];
+        poly.loopstart = loop_index;
+        poly.totloop = 3;
 
-        MPoly &poly_top = polys[i];
-        poly_top.loopstart = 3 * i;
-        poly_top.totloop = 3;
-
-        MLoop &loop_bottom = loops[3 * i];
-        loop_bottom.e = i;
-        loop_bottom.v = i;
-        MLoop &loop2_bottom = loops[3 * i + 1];
-        loop2_bottom.e = verts_num + ((i + 1) % verts_num);
-        loop2_bottom.v = (i + 1) % verts_num;
-        MLoop &loop3_bottom = loops[3 * i + 2];
-        loop3_bottom.e = verts_num + i;
-        loop3_bottom.v = verts.size() - 2;
-
-        MPoly &poly_bottom = polys[i];
-        poly_bottom.loopstart = 3 * i;
-        poly_bottom.totloop = 3;
+        MLoop &loop1 = loops[loop_index++];
+        loop1.v = top_verts_start + i;
+        loop1.e = top_edges_start + i;
+        MLoop &loop2 = loops[loop_index++];
+        loop2.v = top_verts_start + (i + 1) % verts_num;
+        loop2.e = top_fan_edges_start + (i + 1) % verts_num;
+        MLoop &loop3 = loops[loop_index++];
+        loop3.v = top_center_vert_index;
+        loop3.e = top_fan_edges_start + i;
       }
       break;
     }
   }
 
   /* Create side corners and faces. */
-  const int side_corner_start = verts_num * 3;
   for (const int i : IndexRange(verts_num)) {
-    /* NOT DONE. */
-    MLoop &loop1 = loops[side_corner_start + i];
-    loop1.v = i;
-    loop1.e = i;
-    MLoop &loop2 = loops[side_corner_start + i];
-    loop1.v = i;
-    loop1.e = i;
+    MPoly &poly = polys[poly_index++];
+    poly.loopstart = loop_index;
+    poly.totloop = 4;
+
+    MLoop &loop1 = loops[loop_index++];
+    loop1.v = top_verts_start + i;
+    loop1.e = connecting_edges_start + i;
+    MLoop &loop2 = loops[loop_index++];
+    loop2.v = bottom_verts_start + i;
+    loop2.e = bottom_edges_start + i;
+    MLoop &loop3 = loops[loop_index++];
+    loop3.v = bottom_verts_start + (i + 1) % verts_num;
+    loop3.e = connecting_edges_start + (i + 1) % verts_num;
+    MLoop &loop4 = loops[loop_index++];
+    loop4.v = top_verts_start + (i + 1) % verts_num;
+    loop4.e = top_edges_start + i;
   }
+
+  /* Create bottom corners and faces. */
+  switch (fill_type) {
+    case GEO_NODE_MESH_CIRCLE_FILL_NONE:
+      break;
+    case GEO_NODE_MESH_CIRCLE_FILL_NGON: {
+      MPoly &poly = polys[poly_index++];
+      poly.loopstart = loop_index;
+      poly.totloop = verts_num;
+
+      for (const int i : IndexRange(verts_num)) {
+        MLoop &loop = loops[loop_index++];
+        loop.e = bottom_edges_start + i;
+        loop.v = bottom_verts_start + i;
+      }
+      break;
+    }
+    case GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN: {
+      for (const int i : IndexRange(verts_num)) {
+        MPoly &poly = polys[poly_index++];
+        poly.loopstart = loop_index;
+        poly.totloop = 3;
+
+        MLoop &loop1 = loops[loop_index++];
+        loop1.v = bottom_verts_start + i;
+        loop1.e = bottom_fan_edges_start + i;
+        MLoop &loop2 = loops[loop_index++];
+        loop2.v = bottom_center_vert_index;
+        loop2.e = bottom_fan_edges_start + (i + 1) % verts_num;
+        MLoop &loop3 = loops[loop_index++];
+        loop3.v = bottom_verts_start + (i + 1) % verts_num;
+        loop3.e = bottom_edges_start + i;
+      }
+      break;
+    }
+  }
+
+  BKE_mesh_calc_normals(mesh);
 
   return mesh;
 }
