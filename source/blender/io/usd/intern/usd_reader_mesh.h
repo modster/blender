@@ -64,6 +64,7 @@ class USDMeshReader : public USDGeomReader {
                 bool load_uvs = false);
   void read_attributes(Mesh *mesh, pxr::UsdGeomMesh mesh_prim, double motionSampleTime);
   void read_vels(Mesh *mesh, pxr::UsdGeomMesh mesh_prim, float vel_scale, double motionSampleTime);
+  void read_colors(Mesh *mesh, const pxr::UsdGeomMesh &mesh_prim, double motionSampleTime);
 
   void read_mesh_sample(const std::string &iobject_full_name,
                         ImportSettings *settings,

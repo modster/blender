@@ -587,7 +587,8 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
                       "Set read flag for all usd import mesh sequence cache modifiers");
 
   RNA_def_property_flag(prop, PROP_ENUM_FLAG);
-  RNA_def_property_enum_default(prop, MOD_MESHSEQ_READ_ALL);
+  RNA_def_property_enum_default(
+      prop, (MOD_MESHSEQ_READ_VERT | MOD_MESHSEQ_READ_POLY | MOD_MESHSEQ_READ_UV));
 
   RNA_def_string(ot->srna,
                  "prim_path_mask",

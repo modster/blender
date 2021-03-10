@@ -546,6 +546,90 @@ void USDMeshReader::read_vels(Mesh *mesh,
   }
 }
 
+void USDMeshReader::read_colors(Mesh *mesh,
+                                const pxr::UsdGeomMesh &mesh_prim,
+                                double motionSampleTime)
+{
+  if (!(mesh && mesh_prim && mesh->totloop > 0)) {
+    return;
+  }
+
+  pxr::UsdGeomPrimvar color_primvar = mesh_prim.GetDisplayColorPrimvar();
+
+  if (!color_primvar.HasValue()) {
+    return;
+  }
+
+  pxr::TfToken interp = color_primvar.GetInterpolation();
+
+  if (interp == pxr::UsdGeomTokens->varying) {
+    std::cerr << "WARNING: Unsupported varying interpolation for display colors\n" << std::endl;
+    return;
+  }
+
+  pxr::VtArray<pxr::GfVec3f> display_colors;
+
+  if (!color_primvar.ComputeFlattened(&display_colors)) {
+    std::cerr << "WARNING: Couldn't compute display colors\n" << std::endl;
+    return;
+  }
+
+  if ((interp == pxr::UsdGeomTokens->faceVarying && display_colors.size() != mesh->totloop) ||
+      (interp == pxr::UsdGeomTokens->vertex && display_colors.size() != mesh->totvert) ||
+      (interp == pxr::UsdGeomTokens->constant && display_colors.size() != 1) ||
+      (interp == pxr::UsdGeomTokens->uniform && display_colors.size() != mesh->totpoly)) {
+    std::cerr << "WARNING: display colors count mismatch\n" << std::endl;
+    return;
+  }
+
+  void *cd_ptr = add_customdata_cb(mesh, "displayColors", CD_MLOOPCOL);
+
+  if (!cd_ptr) {
+    std::cerr << "WARNING: Couldn't add displayColors custom data.\n";
+    return;
+  }
+
+  MLoopCol *colors = static_cast<MLoopCol *>(cd_ptr);
+
+  mesh->mloopcol = colors;
+
+  MPoly *poly = mesh->mpoly;
+
+  for (int i = 0, e = mesh->totpoly; i < e; ++i, ++poly) {
+    for (int j = 0; j < poly->totloop; ++j) {
+      int loop_index = poly->loopstart + j;
+
+      int usd_index = 0;  // Default for constant varying interpolation.
+
+      if (interp == pxr::UsdGeomTokens->vertex) {
+        usd_index = mesh->mloop[loop_index].v;
+      }
+      else if (interp == pxr::UsdGeomTokens->faceVarying) {
+        usd_index = poly->loopstart;
+        if (m_isLeftHanded) {
+          usd_index += poly->totloop - 1 - j;
+        }
+        else {
+          usd_index += j;
+        }
+      }
+      else if (interp == pxr::UsdGeomTokens->uniform) {
+        // Uniform varying uses the poly index.
+        usd_index = i;
+      }
+
+      if (usd_index >= display_colors.size()) {
+        continue;
+      }
+
+      colors[loop_index].r = unit_float_to_uchar_clamp(display_colors[usd_index][0]);
+      colors[loop_index].g = unit_float_to_uchar_clamp(display_colors[usd_index][1]);
+      colors[loop_index].b = unit_float_to_uchar_clamp(display_colors[usd_index][2]);
+      colors[loop_index].a = unit_float_to_uchar_clamp(1.0);
+    }
+  }
+}
+
 void USDMeshReader::process_normals_vertex_varying(Mesh *mesh)
 {
   if (m_normals.empty()) {
@@ -721,6 +805,10 @@ void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
 
   if ((settings->read_flag & MOD_MESHSEQ_READ_VELS) != 0) {
     read_vels(mesh, mesh_prim, settings->vel_scale, motionSampleTime);
+  }
+
+  if ((settings->read_flag & MOD_MESHSEQ_READ_COLOR) != 0) {
+    read_colors(mesh, mesh_prim, motionSampleTime);
   }
 }
 
