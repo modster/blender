@@ -197,7 +197,10 @@ static void lineart_gpencil_bake_endjob(void *customdata)
   WM_main_add_notifier(NC_GPENCIL | ND_DATA | NA_EDITED, bj->ob);
 }
 
-static int lineart_gpencil_bake_common_invoke(bContext *C, wmOperator *op, bool bake_all_targets)
+static int lineart_gpencil_bake_common(bContext *C,
+                                       wmOperator *op,
+                                       bool bake_all_targets,
+                                       bool do_background)
 {
   LineartBakeJob *bj = MEM_callocN(sizeof(LineartBakeJob), "LineartBakeJob");
 
@@ -218,41 +221,58 @@ static int lineart_gpencil_bake_common_invoke(bContext *C, wmOperator *op, bool 
   bj->frame_increment = scene->r.frame_step;
   bj->overwrite_frames = true;
 
-  wmJob *wm_job = WM_jobs_get(CTX_wm_manager(C),
-                              CTX_wm_window(C),
-                              CTX_data_scene(C),
-                              "Line Art",
-                              WM_JOB_PROGRESS,
-                              WM_JOB_TYPE_LINEART);
+  if (do_background) {
+    wmJob *wm_job = WM_jobs_get(CTX_wm_manager(C),
+                                CTX_wm_window(C),
+                                CTX_data_scene(C),
+                                "Line Art",
+                                WM_JOB_PROGRESS,
+                                WM_JOB_TYPE_LINEART);
 
-  WM_jobs_customdata_set(wm_job, bj, MEM_freeN);
-  WM_jobs_timer(wm_job, 0.1, NC_GPENCIL | ND_DATA | NA_EDITED, NC_GPENCIL | ND_DATA | NA_EDITED);
-  WM_jobs_callbacks(
-      wm_job, lineart_gpencil_bake_startjob, NULL, NULL, lineart_gpencil_bake_endjob);
+    WM_jobs_customdata_set(wm_job, bj, MEM_freeN);
+    WM_jobs_timer(wm_job, 0.1, NC_GPENCIL | ND_DATA | NA_EDITED, NC_GPENCIL | ND_DATA | NA_EDITED);
+    WM_jobs_callbacks(
+        wm_job, lineart_gpencil_bake_startjob, NULL, NULL, lineart_gpencil_bake_endjob);
 
-  WM_set_locked_interface(CTX_wm_manager(C), true);
+    WM_set_locked_interface(CTX_wm_manager(C), true);
 
-  WM_jobs_start(CTX_wm_manager(C), wm_job);
+    WM_jobs_start(CTX_wm_manager(C), wm_job);
 
-  WM_event_add_modal_handler(C, op);
+    WM_event_add_modal_handler(C, op);
 
-  return OPERATOR_RUNNING_MODAL;
+    return OPERATOR_RUNNING_MODAL;
+  }
+  else {
+    float pseduo_progress;
+    lineart_gpencil_bake_startjob(bj, NULL, NULL, &pseduo_progress);
+    MEM_freeN(bj);
+
+    return OPERATOR_FINISHED;
+  }
 }
 
-static int lineart_gpencil_bake_all_strokes_invoke(bContext *C,
-                                                   wmOperator *op,
-                                                   const wmEvent *UNUSED(event))
+static int lineart_gpencil_bake_strokes_all_targets_invoke(bContext *C,
+                                                           wmOperator *op,
+                                                           const wmEvent *UNUSED(event))
 {
-  return lineart_gpencil_bake_common_invoke(C, op, true);
+  return lineart_gpencil_bake_common(C, op, true, true);
 }
-
+static int lineart_gpencil_bake_strokes_all_targets_exec(bContext *C, wmOperator *op)
+{
+  return lineart_gpencil_bake_common(C, op, true, false);
+}
 static int lineart_gpencil_bake_strokes_invoke(bContext *C,
                                                wmOperator *op,
                                                const wmEvent *UNUSED(event))
 {
-  return lineart_gpencil_bake_common_invoke(C, op, false);
+  return lineart_gpencil_bake_common(C, op, false, true);
 }
+static int lineart_gpencil_bake_strokes_exec(bContext *C, wmOperator *op)
+{
+  return lineart_gpencil_bake_common(C, op, false, false);
 
+  return OPERATOR_FINISHED;
+}
 static int lineart_gpencil_bake_strokes_commom_modal(bContext *C,
                                                      wmOperator *op,
                                                      const wmEvent *UNUSED(event))
@@ -267,9 +287,7 @@ static int lineart_gpencil_bake_strokes_commom_modal(bContext *C,
   return OPERATOR_PASS_THROUGH;
 }
 
-static int lineart_gpencil_clear_strokes_invoke(bContext *C,
-                                                wmOperator *op,
-                                                const wmEvent *UNUSED(event))
+static int lineart_gpencil_clear_strokes_exec(bContext *C, wmOperator *op)
 {
   Object *ob = CTX_data_active_object(C);
   if (ob->type != OB_GPENCIL) {
@@ -293,17 +311,7 @@ static int lineart_gpencil_clear_strokes_invoke(bContext *C,
   WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
   return OPERATOR_FINISHED;
 }
-
-static int lineart_gpencil_clear_strokes_exec(bContext *C, wmOperator *UNUSED(op))
-{
-  Scene *scene = CTX_data_scene(C);
-
-  return OPERATOR_FINISHED;
-}
-
-static int lineart_gpencil_clear_all_strokes_invoke(bContext *C,
-                                                    wmOperator *op,
-                                                    const wmEvent *UNUSED(event))
+static int lineart_gpencil_clear_strokes_all_targets_exec(bContext *C, wmOperator *op)
 {
   CTX_DATA_BEGIN (C, Object *, ob, visible_objects) {
     if (ob->type != OB_GPENCIL) {
@@ -330,13 +338,6 @@ static int lineart_gpencil_clear_all_strokes_invoke(bContext *C,
   return OPERATOR_FINISHED;
 }
 
-static int lineart_gpencil_clear_all_strokes_exec(bContext *C, wmOperator *UNUSED(op))
-{
-  Scene *scene = CTX_data_scene(C);
-
-  return OPERATOR_FINISHED;
-}
-
 /* Bake all line art modifiers on the current object. */
 void OBJECT_OT_lineart_bake_strokes(wmOperatorType *ot)
 {
@@ -345,17 +346,19 @@ void OBJECT_OT_lineart_bake_strokes(wmOperatorType *ot)
   ot->idname = "OBJECT_OT_lineart_bake_strokes";
 
   ot->invoke = lineart_gpencil_bake_strokes_invoke;
+  ot->exec = lineart_gpencil_bake_strokes_exec;
   ot->modal = lineart_gpencil_bake_strokes_commom_modal;
 }
 
 /* Bake all lineart objects in the scene. */
-void OBJECT_OT_lineart_bake_strokes_all_gp(wmOperatorType *ot)
+void OBJECT_OT_lineart_bake_strokes_all(wmOperatorType *ot)
 {
-  ot->name = "Bake All Line Art Strokes";
-  ot->description = "Bake All Line Art Modifiers In The Scene";
-  ot->idname = "OBJECT_OT_lineart_bake_strokes_all_gp";
+  ot->name = "Bake Line Art For All Targets";
+  ot->description = "Bake all Line Art targets in the scene";
+  ot->idname = "OBJECT_OT_lineart_bake_strokes_all";
 
-  ot->invoke = lineart_gpencil_bake_all_strokes_invoke;
+  ot->invoke = lineart_gpencil_bake_strokes_all_targets_invoke;
+  ot->exec = lineart_gpencil_bake_strokes_all_targets_exec;
   ot->modal = lineart_gpencil_bake_strokes_commom_modal;
 }
 
@@ -363,28 +366,26 @@ void OBJECT_OT_lineart_bake_strokes_all_gp(wmOperatorType *ot)
 void OBJECT_OT_lineart_clear_strokes(wmOperatorType *ot)
 {
   ot->name = "Clear Line Art Strokes";
-  ot->description = "Clear Line Art grease pencil strokes for all frames";
+  ot->description = "Clear Line Art grease pencil strokes for this target";
   ot->idname = "OBJECT_OT_lineart_clear_strokes";
 
-  ot->invoke = lineart_gpencil_clear_strokes_invoke;
   ot->exec = lineart_gpencil_clear_strokes_exec;
 }
 
 /* clear all lineart objects in the scene. */
-void OBJECT_OT_lineart_clear_all_strokes(wmOperatorType *ot)
+void OBJECT_OT_lineart_clear_strokes_all_targets(wmOperatorType *ot)
 {
   ot->name = "Clear All Line Art Strokes";
-  ot->description = "Clear All Line Art Modifiers In The Scene";
-  ot->idname = "OBJECT_OT_lineart_clear_all_strokes";
+  ot->description = "Clear all Line Art targets in the scene";
+  ot->idname = "OBJECT_OT_lineart_clear_strokes_all";
 
-  ot->invoke = lineart_gpencil_clear_all_strokes_invoke;
-  ot->exec = lineart_gpencil_clear_all_strokes_exec;
+  ot->exec = lineart_gpencil_clear_strokes_all_targets_exec;
 }
 
 void ED_operatortypes_lineart(void)
 {
   WM_operatortype_append(OBJECT_OT_lineart_bake_strokes);
-  WM_operatortype_append(OBJECT_OT_lineart_bake_strokes_all_gp);
+  WM_operatortype_append(OBJECT_OT_lineart_bake_strokes_all);
   WM_operatortype_append(OBJECT_OT_lineart_clear_strokes);
-  WM_operatortype_append(OBJECT_OT_lineart_clear_all_strokes);
+  WM_operatortype_append(OBJECT_OT_lineart_clear_strokes_all_targets);
 }
