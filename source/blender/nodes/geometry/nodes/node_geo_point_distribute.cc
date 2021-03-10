@@ -149,7 +149,7 @@ BLI_NOINLINE static KDTree_3d *build_kdtree(Span<Vector<float3>> positions_all,
   KDTree_3d *kdtree = BLI_kdtree_3d_new(initial_points_len);
 
   int i_point = 0;
-  for (const Vector<float3> positions : positions_all) {
+  for (const Vector<float3> &positions : positions_all) {
     for (const float3 position : positions) {
       BLI_kdtree_3d_insert(kdtree, i_point, position);
       i_point++;
@@ -310,6 +310,23 @@ BLI_NOINLINE static void interpolate_attribute_corner(const Mesh &mesh,
 }
 
 template<typename T>
+BLI_NOINLINE static void interpolate_attribute_polygon(const Mesh &mesh,
+                                                       const Span<int> looptri_indices,
+                                                       const Span<T> data_in,
+                                                       MutableSpan<T> data_out)
+{
+  BLI_assert(data_in.size() == mesh.totpoly);
+  Span<MLoopTri> looptris = get_mesh_looptris(mesh);
+
+  for (const int i : data_out.index_range()) {
+    const int looptri_index = looptri_indices[i];
+    const MLoopTri &looptri = looptris[looptri_index];
+    const int poly_index = looptri.poly;
+    data_out[i] = data_in[poly_index];
+  }
+}
+
+template<typename T>
 BLI_NOINLINE static void interpolate_attribute(const Mesh &mesh,
                                                Span<float3> bary_coords,
                                                Span<int> looptri_indices,
@@ -325,6 +342,10 @@ BLI_NOINLINE static void interpolate_attribute(const Mesh &mesh,
     case ATTR_DOMAIN_CORNER: {
       interpolate_attribute_corner<T>(
           mesh, bary_coords, looptri_indices, source_span, output_span);
+      break;
+    }
+    case ATTR_DOMAIN_POLYGON: {
+      interpolate_attribute_polygon<T>(mesh, looptri_indices, source_span, output_span);
       break;
     }
     default: {
@@ -611,13 +632,13 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
       "Density Attribute");
 
   if (density <= 0.0f) {
-    params.set_output("Geometry", std::move(GeometrySet()));
+    params.set_output("Geometry", GeometrySet());
     return;
   }
 
   Vector<GeometryInstanceGroup> set_groups = bke::geometry_set_gather_instances(geometry_set);
   if (set_groups.is_empty()) {
-    params.set_output("Geometry", std::move(GeometrySet()));
+    params.set_output("Geometry", GeometrySet());
     return;
   }
 
@@ -631,7 +652,7 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
 
   if (set_groups.is_empty()) {
     params.error_message_add(NodeWarningType::Error, TIP_("Input geometry must contain a mesh"));
-    params.set_output("Geometry", std::move(GeometrySet()));
+    params.set_output("Geometry", GeometrySet());
     return;
   }
 
@@ -695,7 +716,7 @@ static void geo_node_point_distribute_exec(GeoNodeExecParams params)
 
   Map<std::string, AttributeKind> attributes;
   bke::gather_attribute_info(
-      attributes, {GeometryComponentType::Mesh}, set_groups, {"position", "normal", "id"});
+      attributes, {GEO_COMPONENT_TYPE_MESH}, set_groups, {"position", "normal", "id"});
   add_remaining_point_attributes(set_groups,
                                  instance_start_offsets,
                                  attributes,

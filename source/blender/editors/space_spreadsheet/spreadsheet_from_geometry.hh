@@ -12,18 +12,21 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright 2011, Blender Foundation.
  */
 
-#include "COM_ChunkOrderHotspot.h"
-#include <cmath>
+#pragma once
 
-double ChunkOrderHotspot::calc_distance(int x, int y)
-{
-  int dx = this->x - x;
-  int dy = this->y - y;
-  double result = sqrt((double)(dx * dx + dy * dy));
-  result += (double)this->addition;
-  return result;
-}
+#include "BKE_geometry_set.hh"
+
+#include "BLI_resource_collector.hh"
+
+#include "spreadsheet_draw.hh"
+
+struct bContext;
+
+namespace blender::ed::spreadsheet {
+
+std::unique_ptr<SpreadsheetDrawer> spreadsheet_drawer_from_geometry_attributes(
+    const bContext *C, Object *object_eval);
+
+}  // namespace blender::ed::spreadsheet
