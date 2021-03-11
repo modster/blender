@@ -201,6 +201,11 @@ void BKE_pose_apply_action(struct Object *ob,
                            struct bAction *action,
                            struct AnimationEvalContext *anim_eval_context);
 
+void BKE_pose_apply_action_blend(struct Object *ob,
+                                 struct bAction *action,
+                                 struct AnimationEvalContext *anim_eval_context,
+                                 float blend_factor);
+
 /* get_objectspace_bone_matrix has to be removed still */
 void get_objectspace_bone_matrix(struct Bone *bone,
                                  float M_accumulatedMatrix[4][4],

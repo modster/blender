@@ -621,6 +621,60 @@ static void animsys_evaluate_fcurves(PointerRNA *ptr,
   }
 }
 
+/* LERP between current value (blend_factor=0.0) and the value from the FCurve (blend_factor=1.0)
+ */
+static void animsys_blend_in_fcurves(PointerRNA *ptr,
+                                     ListBase *fcurves,
+                                     const AnimationEvalContext *anim_eval_context,
+                                     bool flush_to_original,
+                                     const float blend_factor)
+{
+  /* TODO(Sybren): add special cases for rotations, so that quaternions (and maybe also
+   * axis/angles) are handled properly. */
+  LISTBASE_FOREACH (FCurve *, fcu, fcurves) {
+
+    if (!is_fcurve_evaluatable(fcu)) {
+      continue;
+    }
+
+    PathResolvedRNA anim_rna;
+    if (!BKE_animsys_rna_path_resolve(ptr, fcu->rna_path, fcu->array_index, &anim_rna)) {
+      continue;
+    }
+
+    const float fcurve_value = calculate_fcurve(&anim_rna, fcu, anim_eval_context);
+
+    float current_value;
+    float value_to_write;
+    if (BKE_animsys_read_from_rna_path(&anim_rna, &current_value)) {
+      value_to_write = (1 - blend_factor) * current_value + blend_factor * fcurve_value;
+
+      switch (RNA_property_type(anim_rna.prop)) {
+        case PROP_BOOLEAN:
+          /* Without this, anything less than 1.0 is converted to 'False' by
+           * ANIMSYS_FLOAT_AS_BOOL(). This is probably not desirable for blends, where anything
+           * above a 50% blend should act more like the FCurve than like the current value. */
+          value_to_write = blend_factor < 0.5 ? current_value : fcurve_value;
+          break;
+        case PROP_INT:
+          ATTR_FALLTHROUGH;
+        case PROP_ENUM:
+          value_to_write = roundf(value_to_write);
+          break;
+      }
+    }
+    else {
+      /* Unable to read the current value for blending, so just apply the FCurve value instead. */
+      value_to_write = fcurve_value;
+    }
+
+    BKE_animsys_write_to_rna_path(&anim_rna, value_to_write);
+    if (flush_to_original) {
+      animsys_write_orig_anim_rna(ptr, fcu->rna_path, fcu->array_index, value_to_write);
+    }
+  }
+}
+
 /* ***************************************** */
 /* Driver Evaluation */
 
@@ -767,6 +821,17 @@ void animsys_evaluate_action(PointerRNA *ptr,
 
   /* calculate then execute each curve */
   animsys_evaluate_fcurves(ptr, &act->curves, anim_eval_context, flush_to_original);
+}
+
+/* Evaluate Action and blend it into the current values of the animated properties. */
+void animsys_blend_in_action(PointerRNA *ptr,
+                             bAction *act,
+                             const AnimationEvalContext *anim_eval_context,
+                             const bool flush_to_original,
+                             const float blend_factor)
+{
+  action_idcode_patch_check(ptr->owner_id, act);
+  animsys_blend_in_fcurves(ptr, &act->curves, anim_eval_context, flush_to_original, blend_factor);
 }
 
 /* ***************************************** */
