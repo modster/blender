@@ -51,72 +51,71 @@ template<typename> struct is_array : public std::false_type {
 template<typename T> struct is_array<array<T>> : public std::true_type {
 };
 
-template <typename T>
-class CacheLookupResult {
-    enum class State {
-      NEW_DATA,
-      ALREADY_LOADED,
-      NO_DATA_FOR_TIME,
-    };
+template<typename T> class CacheLookupResult {
+  enum class State {
+    NEW_DATA,
+    ALREADY_LOADED,
+    NO_DATA_FOR_TIME,
+  };
 
-    T *data_;
-    State state_;
+  T *data_;
+  State state_;
 
-  protected:
-    CacheLookupResult() = default;
+ protected:
+  CacheLookupResult() = default;
 
-  public:
-    static CacheLookupResult new_data(T *data)
-    {
-      CacheLookupResult result;
-      result.data_ = data;
-      result.state_ = State::NEW_DATA;
-      return result;
-    }
+ public:
+  static CacheLookupResult new_data(T *data)
+  {
+    CacheLookupResult result;
+    result.data_ = data;
+    result.state_ = State::NEW_DATA;
+    return result;
+  }
 
-    static CacheLookupResult no_data_found_for_time()
-    {
-      CacheLookupResult result;
-      result.data_ = nullptr;
-      result.state_ = State::NO_DATA_FOR_TIME;
-      return result;
-    }
+  static CacheLookupResult no_data_found_for_time()
+  {
+    CacheLookupResult result;
+    result.data_ = nullptr;
+    result.state_ = State::NO_DATA_FOR_TIME;
+    return result;
+  }
 
-    static CacheLookupResult already_loaded()
-    {
-      CacheLookupResult result;
-      result.data_ = nullptr;
-      result.state_ = State::ALREADY_LOADED;
-      return result;
-    }
+  static CacheLookupResult already_loaded()
+  {
+    CacheLookupResult result;
+    result.data_ = nullptr;
+    result.state_ = State::ALREADY_LOADED;
+    return result;
+  }
 
-    T &get_data()
-    {
-      assert(state_ == State::NEW_DATA);
-      assert(data_ != nullptr);
-      return *data_;
-    }
+  T &get_data()
+  {
+    assert(state_ == State::NEW_DATA);
+    assert(data_ != nullptr);
+    return *data_;
+  }
 
-    T *get_data_or_null()
-    {
-      // data_ should already be null if there is no new data
-      return data_;
-    }
+  T *get_data_or_null()
+  {
+    // data_ should already be null if there is no new data
+    return data_;
+  }
 
-    bool has_new_data() const
-    {
-      return state_ == State::NEW_DATA;
-    }
+  bool has_new_data() const
+  {
+    return state_ == State::NEW_DATA;
+  }
 
-    bool has_already_loaded() const
-    {
-      return state_ == State::ALREADY_LOADED;
-    }
+  bool has_already_loaded() const
+  {
+    return state_ == State::ALREADY_LOADED;
+  }
 
-    bool has_no_data_for_time() const
-    {
-      return state_ == State::NO_DATA_FOR_TIME;
-    }
+  bool has_no_data_for_time() const
+  {
+    return state_ == State::NO_DATA_FOR_TIME;
+  }
 };
 
 /* Store the data set for an animation at every time points, or at the beginning of the animation
@@ -544,18 +543,15 @@ class AlembicProcedural : public Procedural {
 
   /* Read the data for an IPolyMesh at the specified frame_time. Creates corresponding Geometry and
    * Object Nodes in the Cycles scene if none exist yet. */
-  void read_mesh(AlembicObject *abc_object,
-                 Alembic::AbcGeom::Abc::chrono_t frame_time);
+  void read_mesh(AlembicObject *abc_object, Alembic::AbcGeom::Abc::chrono_t frame_time);
 
   /* Read the data for an ICurves at the specified frame_time. Creates corresponding Geometry and
    * Object Nodes in the Cycles scene if none exist yet. */
-  void read_curves(AlembicObject *abc_object,
-                   Alembic::AbcGeom::Abc::chrono_t frame_time);
+  void read_curves(AlembicObject *abc_object, Alembic::AbcGeom::Abc::chrono_t frame_time);
 
   /* Read the data for an ISubD at the specified frame_time. Creates corresponding Geometry and
    * Object Nodes in the Cycles scene if none exist yet. */
-  void read_subd(AlembicObject *abc_object,
-                 Alembic::AbcGeom::Abc::chrono_t frame_time);
+  void read_subd(AlembicObject *abc_object, Alembic::AbcGeom::Abc::chrono_t frame_time);
 
   void build_caches(Progress &progress);
 };

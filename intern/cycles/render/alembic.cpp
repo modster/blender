@@ -509,8 +509,10 @@ static void add_uvs(AlembicProcedural *proc,
       continue;
     }
 
-    const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time).get_data_or_null();
-    const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time_no_check(time).get_data_or_null();
+    const array<int3> *triangles =
+        cached_data.triangles.data_for_time_no_check(time).get_data_or_null();
+    const array<int3> *triangles_loops =
+        cached_data.triangles_loops.data_for_time_no_check(time).get_data_or_null();
 
     if (!triangles || !triangles_loops) {
       continue;
@@ -557,7 +559,8 @@ static void add_normals(const Int32ArraySamplePtr face_indices,
                                                                     *normals.getTimeSampling());
       attr.std = ATTR_STD_VERTEX_NORMAL;
 
-      const array<float3> *vertices = cached_data.vertices.data_for_time_no_check(time).get_data_or_null();
+      const array<float3> *vertices =
+          cached_data.vertices.data_for_time_no_check(time).get_data_or_null();
 
       if (!vertices) {
         return;
@@ -593,7 +596,8 @@ static void add_normals(const Int32ArraySamplePtr face_indices,
                                                                     *normals.getTimeSampling());
       attr.std = ATTR_STD_VERTEX_NORMAL;
 
-      const array<float3> *vertices = cached_data.vertices.data_for_time_no_check(time).get_data_or_null();
+      const array<float3> *vertices =
+          cached_data.vertices.data_for_time_no_check(time).get_data_or_null();
 
       if (!vertices) {
         return;
@@ -1251,9 +1255,10 @@ void AlembicObject::read_attribute(CachedData &cached_data,
         attribute.element = ATTR_ELEMENT_CORNER;
         attribute.type_desc = TypeFloat2;
 
-        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time).get_data_or_null();
-        const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time_no_check(
-            time).get_data_or_null();
+        const array<int3> *triangles =
+            cached_data.triangles.data_for_time_no_check(time).get_data_or_null();
+        const array<int3> *triangles_loops =
+            cached_data.triangles_loops.data_for_time_no_check(time).get_data_or_null();
 
         if (!triangles || !triangles_loops) {
           return;
@@ -1306,7 +1311,8 @@ void AlembicObject::read_attribute(CachedData &cached_data,
         attribute.element = ATTR_ELEMENT_CORNER_BYTE;
         attribute.type_desc = TypeRGBA;
 
-        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time).get_data_or_null();
+        const array<int3> *triangles =
+            cached_data.triangles.data_for_time_no_check(time).get_data_or_null();
 
         if (!triangles) {
           return;
@@ -1362,7 +1368,8 @@ void AlembicObject::read_attribute(CachedData &cached_data,
         attribute.element = ATTR_ELEMENT_CORNER_BYTE;
         attribute.type_desc = TypeRGBA;
 
-        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time).get_data_or_null();
+        const array<int3> *triangles =
+            cached_data.triangles.data_for_time_no_check(time).get_data_or_null();
 
         if (!triangles) {
           return;
@@ -1695,8 +1702,7 @@ void AlembicProcedural::load_objects(Progress &progress)
   }
 }
 
-void AlembicProcedural::read_mesh(AlembicObject *abc_object,
-                                  Abc::chrono_t frame_time)
+void AlembicProcedural::read_mesh(AlembicObject *abc_object, Abc::chrono_t frame_time)
 {
   Mesh *mesh = static_cast<Mesh *>(abc_object->get_object()->get_geometry());
 
@@ -1708,7 +1714,7 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object,
   cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
 
   if (object->is_modified()) {
-      object->tag_update(scene_);
+    object->tag_update(scene_);
   }
 
   if (abc_object->instance_of) {
@@ -1760,8 +1766,7 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object,
   mesh->print_modified_sockets();
 }
 
-void AlembicProcedural::read_subd(AlembicObject *abc_object,
-                                  Abc::chrono_t frame_time)
+void AlembicProcedural::read_subd(AlembicObject *abc_object, Abc::chrono_t frame_time)
 {
   Mesh *mesh = static_cast<Mesh *>(abc_object->get_object()->get_geometry());
 
@@ -1855,8 +1860,7 @@ void AlembicProcedural::read_subd(AlembicObject *abc_object,
   }
 }
 
-void AlembicProcedural::read_curves(AlembicObject *abc_object,
-                                    Abc::chrono_t frame_time)
+void AlembicProcedural::read_curves(AlembicObject *abc_object, Abc::chrono_t frame_time)
 {
   Hair *hair = static_cast<Hair *>(abc_object->get_object()->get_geometry());
 
