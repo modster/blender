@@ -80,23 +80,14 @@ typedef enum ePoseBlendState {
 
 typedef struct PoseBlendData {
   ePoseBlendState state;
-  bool needs_redraw; /* TODO(Sybren): rename to 'needs_reblending'? */
+  bool needs_redraw;
   bool is_bone_selection_relevant;
 
   /** PoseChannelBackup structs for restoring poses. */
   ListBase backups;
-  size_t num_backups;
 
-  /** RNA-Pointer to Object 'ob' .*/
-  PointerRNA rna_ptr;
-  /** object to work on. */
-  Object *ob;
-  /** object's armature data. */
-  bArmature *arm;
-  /** object's pose. */
-  bPose *pose;
-  /** pose to use. */
-  bAction *act;
+  Object *ob;   /* Object to work on. */
+  bAction *act; /* Pose to blend in. */
 
   Scene *scene;  /* For auto-keying. */
   ScrArea *area; /* For drawing status text. */
@@ -113,61 +104,58 @@ typedef struct PoseChannelBackup {
 } PoseChannelBackup;
 
 /* Makes a copy of the current pose for restoration purposes - doesn't do constraints currently */
-static void poselib_backup_posecopy(PoseBlendData *pld)
+static void poselib_backup_posecopy(PoseBlendData *pbd)
 {
   /* TODO(Sybren): reuse same approach as in `armature_pose.cc` in this function. */
 
   /* See if bone selection is relevant. */
   bool all_bones_selected = true;
   bool no_bones_selected = true;
-  LISTBASE_FOREACH (bPoseChannel *, pchan, &pld->pose->chanbase) {
+  LISTBASE_FOREACH (bPoseChannel *, pchan, &pbd->ob->pose->chanbase) {
     const bool is_selected = (pchan->bone->flag & BONE_SELECTED) != 0;
     all_bones_selected &= is_selected;
     no_bones_selected &= !is_selected;
   }
 
   /* If no bones are selected, act as if all are. */
-  pld->is_bone_selection_relevant = !all_bones_selected && !no_bones_selected;
+  pbd->is_bone_selection_relevant = !all_bones_selected && !no_bones_selected;
 
-  pld->num_backups = 0;
-  LISTBASE_FOREACH (bActionGroup *, agrp, &pld->act->groups) {
-    bPoseChannel *pchan = BKE_pose_channel_find_name(pld->pose, agrp->name);
+  LISTBASE_FOREACH (bActionGroup *, agrp, &pbd->act->groups) {
+    bPoseChannel *pchan = BKE_pose_channel_find_name(pbd->ob->pose, agrp->name);
     if (pchan == NULL) {
       continue;
     }
 
-    if (pld->is_bone_selection_relevant && (pchan->bone->flag & BONE_SELECTED) == 0) {
+    if (pbd->is_bone_selection_relevant && (pchan->bone->flag & BONE_SELECTED) == 0) {
       continue;
     }
 
-    PoseChannelBackup *plb;
-    plb = MEM_callocN(sizeof(*plb), "PoseChannelBackup");
-    plb->pchan = pchan;
-    memcpy(&plb->olddata, plb->pchan, sizeof(plb->olddata));
+    PoseChannelBackup *chan_bak;
+    chan_bak = MEM_callocN(sizeof(*chan_bak), "PoseChannelBackup");
+    chan_bak->pchan = pchan;
+    memcpy(&chan_bak->olddata, chan_bak->pchan, sizeof(chan_bak->olddata));
 
     if (pchan->prop) {
-      plb->oldprops = IDP_CopyProperty(pchan->prop);
+      chan_bak->oldprops = IDP_CopyProperty(pchan->prop);
     }
 
-    BLI_addtail(&pld->backups, plb);
-
-    pld->num_backups++;
+    BLI_addtail(&pbd->backups, chan_bak);
   }
 
-  if (pld->state == POSE_BLEND_INIT) {
+  if (pbd->state == POSE_BLEND_INIT) {
     /* Ready for blending now. */
-    pld->state = POSE_BLEND_BLENDING;
+    pbd->state = POSE_BLEND_BLENDING;
   }
 }
 
 /* Restores backed-up pose. */
-static void poselib_backup_restore(PoseBlendData *pld)
+static void poselib_backup_restore(PoseBlendData *pbd)
 {
-  LISTBASE_FOREACH (PoseChannelBackup *, plb, &pld->backups) {
-    memcpy(plb->pchan, &plb->olddata, sizeof(plb->olddata));
+  LISTBASE_FOREACH (PoseChannelBackup *, chan_bak, &pbd->backups) {
+    memcpy(chan_bak->pchan, &chan_bak->olddata, sizeof(chan_bak->olddata));
 
-    if (plb->oldprops) {
-      IDP_SyncGroupValues(plb->pchan->prop, plb->oldprops);
+    if (chan_bak->oldprops) {
+      IDP_SyncGroupValues(chan_bak->pchan->prop, chan_bak->oldprops);
     }
 
     /* TODO: constraints settings aren't restored yet,
@@ -176,32 +164,32 @@ static void poselib_backup_restore(PoseBlendData *pld)
 }
 
 /* Free list of backups, including any side data it may use. */
-static void poselib_backup_free_data(PoseBlendData *pld)
+static void poselib_backup_free_data(PoseBlendData *pbd)
 {
-  for (PoseChannelBackup *plb = pld->backups.first; plb;) {
-    PoseChannelBackup *next = plb->next;
+  for (PoseChannelBackup *chan_bak = pbd->backups.first; chan_bak;) {
+    PoseChannelBackup *next = chan_bak->next;
 
-    if (plb->oldprops) {
-      IDP_FreeProperty(plb->oldprops);
+    if (chan_bak->oldprops) {
+      IDP_FreeProperty(chan_bak->oldprops);
     }
-    BLI_freelinkN(&pld->backups, plb);
+    BLI_freelinkN(&pbd->backups, chan_bak);
 
-    plb = next;
+    chan_bak = next;
   }
 }
 
 /* ---------------------------- */
 
 /* Auto-key/tag bones affected by the pose Action. */
-static void poselib_keytag_pose(bContext *C, Scene *scene, PoseBlendData *pld)
+static void poselib_keytag_pose(bContext *C, Scene *scene, PoseBlendData *pbd)
 {
-  bPose *pose = pld->pose;
-  bAction *act = pld->act;
+  bPose *pose = pbd->ob->pose;
+  bAction *act = pbd->act;
   bActionGroup *agrp;
 
   KeyingSet *ks = ANIM_get_keyingset_for_autokeying(scene, ANIM_KS_WHOLE_CHARACTER_ID);
   ListBase dsources = {NULL, NULL};
-  const bool autokey = autokeyframe_cfra_can_key(scene, &pld->ob->id);
+  const bool autokey = autokeyframe_cfra_can_key(scene, &pbd->ob->id);
 
   /* start tagging/keying */
   for (agrp = act->groups.first; agrp; agrp = agrp->next) {
@@ -211,13 +199,13 @@ static void poselib_keytag_pose(bContext *C, Scene *scene, PoseBlendData *pld)
       continue;
     }
 
-    if (pld->is_bone_selection_relevant && (pchan->bone->flag & BONE_SELECTED) == 0) {
+    if (pbd->is_bone_selection_relevant && (pchan->bone->flag & BONE_SELECTED) == 0) {
       continue;
     }
 
     if (autokey) {
       /* Add data-source override for the PoseChannel, to be used later. */
-      ANIM_relative_keyingset_add_source(&dsources, &pld->ob->id, &RNA_PoseBone, pchan);
+      ANIM_relative_keyingset_add_source(&dsources, &pbd->ob->id, &RNA_PoseBone, pchan);
 
       /* clear any unkeyed tags */
       if (pchan->bone) {
@@ -246,9 +234,9 @@ static void poselib_keytag_pose(bContext *C, Scene *scene, PoseBlendData *pld)
 /* Apply the relevant changes to the pose */
 static void poselib_blend_apply(bContext *C, wmOperator *op)
 {
-  PoseBlendData *pld = (PoseBlendData *)op->customdata;
+  PoseBlendData *pbd = (PoseBlendData *)op->customdata;
 
-  if (pld->state == POSE_BLEND_BLENDING) {
+  if (pbd->state == POSE_BLEND_BLENDING) {
     /* TODO(Sybren): implement these: */
     ED_workspace_status_text(C,
                              TIP_("Tab: show original pose; Mousewheel: change blend percentage"));
@@ -257,19 +245,19 @@ static void poselib_blend_apply(bContext *C, wmOperator *op)
     ED_workspace_status_text(C, TIP_("Tab: show blended pose"));
   }
 
-  if (!pld->needs_redraw) {
+  if (!pbd->needs_redraw) {
     return;
   }
-  pld->needs_redraw = false;
+  pbd->needs_redraw = false;
 
-  poselib_backup_restore(pld);
+  poselib_backup_restore(pbd);
 
   /* The pose needs updating, whether it's for restoring the original pose or for showing the
    * result of the blend. */
-  DEG_id_tag_update(&pld->ob->id, ID_RECALC_GEOMETRY);
-  WM_event_add_notifier(C, NC_OBJECT | ND_POSE, pld->ob);
+  DEG_id_tag_update(&pbd->ob->id, ID_RECALC_GEOMETRY);
+  WM_event_add_notifier(C, NC_OBJECT | ND_POSE, pbd->ob);
 
-  if (pld->state != POSE_BLEND_BLENDING) {
+  if (pbd->state != POSE_BLEND_BLENDING) {
     return;
   }
 
@@ -277,7 +265,7 @@ static void poselib_blend_apply(bContext *C, wmOperator *op)
   struct Depsgraph *depsgraph = CTX_data_depsgraph_pointer(C);
   AnimationEvalContext anim_eval_context = BKE_animsys_eval_context_construct(depsgraph, 0.0f);
   /* TODO(Sybren): blend instead of just apply. */
-  BKE_pose_apply_action(pld->ob, pld->act, &anim_eval_context);
+  BKE_pose_apply_action(pbd->ob, pbd->act, &anim_eval_context);
 }
 
 /* ---------------------------- */
@@ -285,7 +273,7 @@ static void poselib_blend_apply(bContext *C, wmOperator *op)
 /* Return operator return value. */
 static int poselib_blend_handle_event(bContext *UNUSED(C), wmOperator *op, const wmEvent *event)
 {
-  PoseBlendData *pld = op->customdata;
+  PoseBlendData *pbd = op->customdata;
 
   /* only accept 'press' event, and ignore 'release', so that we don't get double actions */
   if (ELEM(event->val, KM_PRESS, KM_NOTHING) == 0) {
@@ -323,7 +311,7 @@ static int poselib_blend_handle_event(bContext *UNUSED(C), wmOperator *op, const
     /* Exit - cancel. */
     case EVT_ESCKEY:
     case RIGHTMOUSE:
-      pld->state = POSE_BLEND_CANCEL;
+      pbd->state = POSE_BLEND_CANCEL;
       break;
 
     /* Exit - confirm. */
@@ -331,21 +319,21 @@ static int poselib_blend_handle_event(bContext *UNUSED(C), wmOperator *op, const
     case EVT_RETKEY:
     case EVT_PADENTER:
     case EVT_SPACEKEY:
-      pld->state = POSE_BLEND_CONFIRM;
+      pbd->state = POSE_BLEND_CONFIRM;
       break;
 
     /* TODO(Sybren): toggle between original pose and poselib pose. */
     case EVT_TABKEY:
-      pld->state = pld->state == POSE_BLEND_BLENDING ? POSE_BLEND_ORIGINAL : POSE_BLEND_BLENDING;
-      pld->needs_redraw = true;
+      pbd->state = pbd->state == POSE_BLEND_BLENDING ? POSE_BLEND_ORIGINAL : POSE_BLEND_BLENDING;
+      pbd->needs_redraw = true;
       break;
 
     /* TODO(Sybren): add events for changing the blend amount. */
     case WHEELUPMOUSE:
-      pld->needs_redraw = true;
+      pbd->needs_redraw = true;
       break;
     case WHEELDOWNMOUSE:
-      pld->needs_redraw = true;
+      pbd->needs_redraw = true;
       break;
   }
 
@@ -397,30 +385,26 @@ static bool poselib_blend_init_data(bContext *C, wmOperator *op)
   }
 
   /* Set up blend state info. */
-  PoseBlendData *pld;
-  op->customdata = pld = MEM_callocN(sizeof(PoseBlendData), "PoseLib Preview Data");
+  PoseBlendData *pbd;
+  op->customdata = pbd = MEM_callocN(sizeof(PoseBlendData), "PoseLib Preview Data");
 
   /* get basic data */
-  pld->ob = ob;
-  pld->arm = ob->data;
-  pld->pose = ob->pose;
-  pld->act = (bAction *)id;
+  pbd->ob = ob;
+  pbd->ob->pose = ob->pose;
+  pbd->act = (bAction *)id;
 
-  pld->scene = CTX_data_scene(C);
-  pld->area = CTX_wm_area(C);
+  pbd->scene = CTX_data_scene(C);
+  pbd->area = CTX_wm_area(C);
 
-  pld->state = POSE_BLEND_INIT;
-  pld->needs_redraw = true;
-
-  /* Get ID pointer for applying poses. */
-  RNA_id_pointer_create(&ob->id, &pld->rna_ptr);
+  pbd->state = POSE_BLEND_INIT;
+  pbd->needs_redraw = true;
 
   /* Make backups for blending and restoring the pose. */
-  poselib_backup_posecopy(pld);
+  poselib_backup_posecopy(pbd);
 
   /* Set pose flags to ensure the depsgraph evaluation doesn't overwrite it. */
-  pld->pose->flag &= ~POSE_DO_UNLOCK;
-  pld->pose->flag |= POSE_LOCKED;
+  pbd->ob->pose->flag &= ~POSE_DO_UNLOCK;
+  pbd->ob->pose->flag |= POSE_LOCKED;
 
   return true;
 }
@@ -428,20 +412,20 @@ static bool poselib_blend_init_data(bContext *C, wmOperator *op)
 /* After previewing poses */
 static void poselib_blend_cleanup(bContext *C, wmOperator *op)
 {
-  PoseBlendData *pld = (PoseBlendData *)op->customdata;
+  PoseBlendData *pbd = (PoseBlendData *)op->customdata;
 
   /* Redraw the header so that it doesn't show any of our stuff anymore. */
-  ED_area_status_text(pld->area, NULL);
+  ED_area_status_text(pbd->area, NULL);
   ED_workspace_status_text(C, NULL);
 
   /* This signals the depsgraph to unlock and reevaluate the pose on the next evaluation. */
-  bPose *pose = pld->pose;
+  bPose *pose = pbd->ob->pose;
   pose->flag |= POSE_DO_UNLOCK;
 
-  switch (pld->state) {
+  switch (pbd->state) {
     case POSE_BLEND_CONFIRM: {
-      Scene *scene = pld->scene;
-      poselib_keytag_pose(C, scene, pld);
+      Scene *scene = pbd->scene;
+      poselib_keytag_pose(C, scene, pbd);
       break;
     }
 
@@ -449,25 +433,26 @@ static void poselib_blend_cleanup(bContext *C, wmOperator *op)
     case POSE_BLEND_BLENDING:
     case POSE_BLEND_ORIGINAL:
       /* Cleanup should not be called directly from these states. */
+      BLI_assert(!"poselib_blend_cleanup: unexpected pose blend state");
       BKE_report(op->reports, RPT_ERROR, "Internal pose library error, cancelling operator");
       ATTR_FALLTHROUGH;
     case POSE_BLEND_CANCEL:
-      poselib_backup_restore(pld);
+      poselib_backup_restore(pbd);
       break;
   }
 
-  DEG_id_tag_update(&pld->ob->id, ID_RECALC_GEOMETRY);
-  WM_event_add_notifier(C, NC_OBJECT | ND_POSE, pld->ob);
+  DEG_id_tag_update(&pbd->ob->id, ID_RECALC_GEOMETRY);
+  WM_event_add_notifier(C, NC_OBJECT | ND_POSE, pbd->ob);
 
   /* Free temp data for operator */
-  poselib_backup_free_data(pld);
+  poselib_backup_free_data(pbd);
   MEM_SAFE_FREE(op->customdata);
 }
 
 static int poselib_blend_exit(bContext *C, wmOperator *op)
 {
-  PoseBlendData *pld = op->customdata;
-  const ePoseBlendState exit_state = pld->state;
+  PoseBlendData *pbd = op->customdata;
+  const ePoseBlendState exit_state = pbd->state;
 
   poselib_blend_cleanup(C, op);
 
@@ -488,12 +473,12 @@ static int poselib_blend_modal(bContext *C, wmOperator *op, const wmEvent *event
 {
   const int operator_result = poselib_blend_handle_event(C, op, event);
 
-  const PoseBlendData *pld = op->customdata;
-  if (ELEM(pld->state, POSE_BLEND_CONFIRM, POSE_BLEND_CANCEL)) {
+  const PoseBlendData *pbd = op->customdata;
+  if (ELEM(pbd->state, POSE_BLEND_CONFIRM, POSE_BLEND_CANCEL)) {
     return poselib_blend_exit(C, op);
   }
 
-  if (pld->needs_redraw) {
+  if (pbd->needs_redraw) {
     poselib_blend_apply(C, op);
   }
 
@@ -523,8 +508,8 @@ static int poselib_blend_exec(bContext *C, wmOperator *op)
 
   poselib_blend_apply(C, op);
 
-  PoseBlendData *pld = op->customdata;
-  pld->state = POSE_BLEND_CONFIRM;
+  PoseBlendData *pbd = op->customdata;
+  pbd->state = POSE_BLEND_CONFIRM;
   return poselib_blend_exit(C, op);
 }
 
