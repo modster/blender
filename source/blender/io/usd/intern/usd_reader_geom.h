@@ -20,6 +20,8 @@
 
 struct Mesh;
 
+namespace blender::io::usd {
+
 class USDGeomReader : public USDXformReader {
 
  public:
@@ -47,3 +49,5 @@ class USDGeomReader : public USDXformReader {
 
   bool topology_changed(Mesh *existing_mesh, double motionSampleTime);
 };
+
+}  // namespace blender::io::usd

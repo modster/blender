@@ -36,6 +36,8 @@ extern "C" {
 #include "WM_types.h"
 }
 
+namespace blender::io::usd {
+
 USDPrimReader::USDPrimReader(pxr::UsdStageRefPtr stage,
                              const pxr::UsdPrim &object,
                              const USDImportParams &import_params,
@@ -109,3 +111,5 @@ void USDPrimReader::decref()
   m_refcount--;
   BLI_assert(m_refcount >= 0);
 }
+
+}  // namespace blender::io::usd

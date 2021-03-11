@@ -46,6 +46,8 @@ extern "C" {
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdGeom/xform.h>
 
+namespace blender::io::usd {
+
 void USDXformReader::createObject(Main *bmain, double motionSampleTime)
 {
   m_object = BKE_object_add_only_object(bmain, OB_EMPTY, m_name.c_str());
@@ -153,3 +155,5 @@ bool USDXformReader::is_root_xform_object() const
 
   return false;
 }
+
+}  // namespace blender::io::usd

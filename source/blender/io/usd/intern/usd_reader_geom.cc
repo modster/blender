@@ -59,6 +59,8 @@ extern "C" {
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdGeom/mesh.h>
 
+namespace blender::io::usd {
+
 void USDGeomReader::createObject(Main *bmain, double motionSampleTime)
 {
 }
@@ -105,3 +107,5 @@ void USDGeomReader::addSubdivModifier()
   ModifierData *md = BKE_modifier_new(eModifierType_Subsurf);
   BLI_addtail(&m_object->modifiers, md);
 }
+
+}  // namespace blender::io::usd

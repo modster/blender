@@ -18,6 +18,8 @@
 #include "usd.h"
 #include "usd_reader_prim.h"
 
+namespace blender::io::usd {
+
 class USDXformReader : public USDPrimReader {
 
  public:
@@ -38,3 +40,5 @@ class USDXformReader : public USDPrimReader {
   // transform hierarchy.
   bool is_root_xform_object() const;
 };
+
+}  // namespace blender::io::usd

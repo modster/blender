@@ -20,6 +20,8 @@
 
 #include "pxr/usd/usdVol/volume.h"
 
+namespace blender::io::usd {
+
 class USDVolumeReader : public USDXformReader {
 
  public:
@@ -36,3 +38,5 @@ class USDVolumeReader : public USDXformReader {
 
   pxr::UsdVolVolume m_volume;
 };
+
+}  // namespace blender::io::usd

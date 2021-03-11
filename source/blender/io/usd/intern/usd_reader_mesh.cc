@@ -183,6 +183,8 @@ static void *add_customdata_cb(Mesh *mesh, const char *name, int data_type)
   return cd_ptr;
 }
 
+namespace blender::io::usd {
+
 USDMeshReader::USDMeshReader(pxr::UsdStageRefPtr stage,
                              const pxr::UsdPrim &object,
                              const USDImportParams &import_params,
@@ -905,3 +907,5 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
 
   return active_mesh;
 }
+
+}  // namespace blender::io::usd

@@ -74,6 +74,8 @@ static bool set_knots(const pxr::VtDoubleArray &knots, float *&nu_knots)
   return true;
 }
 
+namespace blender::io::usd {
+
 void USDNurbsReader::createObject(Main *bmain, double motionSampleTime)
 {
   m_curve = BKE_curve_add(bmain, m_name.c_str(), OB_CURVE);
@@ -268,3 +270,5 @@ Mesh *USDNurbsReader::read_mesh(struct Mesh *existing_mesh,
 
   return BKE_mesh_new_nomain_from_curve(m_object);
 }
+
+}  // namespace blender::io::usd

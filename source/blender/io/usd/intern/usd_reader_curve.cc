@@ -57,6 +57,8 @@ extern "C" {
 #include <pxr/usd/usdGeom/basisCurves.h>
 #include <pxr/usd/usdGeom/curves.h>
 
+namespace blender::io::usd {
+
 void USDCurvesReader::createObject(Main *bmain, double motionSampleTime)
 {
   m_curve = BKE_curve_add(bmain, m_name.c_str(), OB_CURVE);
@@ -263,3 +265,5 @@ Mesh *USDCurvesReader::read_mesh(struct Mesh *existing_mesh,
 
   return BKE_mesh_new_nomain_from_curve(m_object);
 }
+
+}  // namespace blender::io::usd

@@ -32,15 +32,10 @@
 #include "usd.h"
 #include "usd_exporter_context.h"
 
-class USDPrimReader;
-struct ImportSettings;
-
-struct Light;
-
-struct Material;
-struct bNodeTree;
-
 namespace blender::io::usd {
+
+struct ImportSettings;
+class USDPrimReader;
 
 USDPrimReader *create_reader(const pxr::UsdStageRefPtr &stage,
                              const pxr::UsdPrim &prim,

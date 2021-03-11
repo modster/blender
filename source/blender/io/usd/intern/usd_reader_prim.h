@@ -34,6 +34,8 @@ struct Main;
 struct Mesh;
 struct Object;
 
+namespace blender::io::usd {
+
 struct ImportSettings {
   bool do_convert_mat;
   float conversion_mat[4][4];
@@ -132,3 +134,5 @@ class USDPrimReader {
     return m_prim_path;
   }
 };
+
+}  // namespace blender::io::usd

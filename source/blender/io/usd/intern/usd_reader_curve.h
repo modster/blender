@@ -22,6 +22,8 @@
 
 struct Curve;
 
+namespace blender::io::usd {
+
 class USDCurvesReader : public USDGeomReader {
 
  public:
@@ -48,3 +50,5 @@ class USDCurvesReader : public USDGeomReader {
   pxr::UsdGeomBasisCurves curve_prim;
   Curve *m_curve;
 };
+
+}  // namespace blender::io::usd

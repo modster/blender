@@ -18,6 +18,8 @@
 #include "usd.h"
 #include "usd_reader_xform.h"
 
+namespace blender::io::usd {
+
 class USDCameraReader : public USDXformReader {
 
  public:
@@ -32,3 +34,5 @@ class USDCameraReader : public USDXformReader {
   void createObject(Main *bmain, double motionSampleTime) override;
   void readObjectData(Main *bmain, double motionSampleTime) override;
 };
+
+}  // namespace blender::io::usd

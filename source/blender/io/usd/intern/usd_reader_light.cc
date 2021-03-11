@@ -56,6 +56,8 @@ extern "C" {
 
 #include <iostream>
 
+namespace blender::io::usd {
+
 void USDLightReader::createObject(Main *bmain, double motionSampleTime)
 {
   Light *blight = static_cast<Light *>(BKE_light_add(bmain, m_name.c_str()));
@@ -196,3 +198,5 @@ void USDLightReader::readObjectData(Main *bmain, double motionSampleTime)
 
   USDXformReader::readObjectData(bmain, motionSampleTime);
 }
+
+}  // namespace blender::io::usd

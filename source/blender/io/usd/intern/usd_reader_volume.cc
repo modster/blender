@@ -54,6 +54,8 @@ extern "C" {
 
 #include <iostream>
 
+namespace blender::io::usd {
+
 void USDVolumeReader::createObject(Main *bmain, double motionSampleTime)
 {
   Volume *volume = (Volume *)BKE_volume_add(bmain, m_name.c_str());
@@ -121,3 +123,5 @@ void USDVolumeReader::readObjectData(Main *bmain, double motionSampleTime)
 
   USDXformReader::readObjectData(bmain, motionSampleTime);
 }
+
+}  // namespace blender::io::usd

@@ -18,6 +18,8 @@
 #include "usd.h"
 #include "usd_reader_xform.h"
 
+namespace blender::io::usd {
+
 class USDLightReader : public USDXformReader {
 
  public:
@@ -33,3 +35,5 @@ class USDLightReader : public USDXformReader {
 
   void readObjectData(Main *bmain, double motionSampleTime) override;
 };
+
+}  // namespace blender::io::usd

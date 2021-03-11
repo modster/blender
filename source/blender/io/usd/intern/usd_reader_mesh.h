@@ -19,7 +19,9 @@
 #include "usd.h"
 #include "usd_reader_geom.h"
 
-typedef float f3Data[3];
+struct MPoly;
+
+namespace blender::io::usd {
 
 class USDMeshReader : public USDGeomReader {
 
@@ -90,3 +92,5 @@ class USDMeshReader : public USDGeomReader {
   // implemented. Note this will break if face or positions vary...
   bool m_isInitialLoad;
 };
+
+}  // namespace blender::io::usd

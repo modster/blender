@@ -46,6 +46,8 @@ extern "C" {
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdGeom/camera.h>
 
+namespace blender::io::usd {
+
 void USDCameraReader::createObject(Main *bmain, double motionSampleTime)
 {
   Camera *bcam = static_cast<Camera *>(BKE_camera_add(bmain, m_name.c_str()));
@@ -102,3 +104,5 @@ void USDCameraReader::readObjectData(Main *bmain, double motionSampleTime)
 
   USDXformReader::readObjectData(bmain, motionSampleTime);
 }
+
+}  // namespace blender::io::usd
