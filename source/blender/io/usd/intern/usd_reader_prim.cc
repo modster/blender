@@ -81,21 +81,6 @@ bool USDPrimReader::valid() const
   return prim_.IsValid();
 }
 
-void USDPrimReader::create_object(Main *bmain, double motionSampleTime)
-{
-  object_ = BKE_object_add_only_object(bmain, OB_EMPTY, name_.c_str());
-  object_->empty_drawsize = 0.1f;
-  object_->data = NULL;
-}
-
-void USDPrimReader::read_object_data(Main *bmain, double motionSampleTime)
-{
-}
-
-void USDPrimReader::add_cache_modifier()
-{
-}
-
 int USDPrimReader::refcount() const
 {
   return refcount_;

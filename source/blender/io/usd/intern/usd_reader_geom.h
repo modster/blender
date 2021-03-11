@@ -44,7 +44,7 @@ class USDGeomReader : public USDXformReader {
                           float vel_scale,
                           const char **err_str);
 
-  void add_cache_modifier() override;
+  void add_cache_modifier();
   void add_subdiv_modifier();
 
   bool topology_changed(Mesh *existing_mesh, double motionSampleTime);

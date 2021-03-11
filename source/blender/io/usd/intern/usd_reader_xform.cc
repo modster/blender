@@ -57,8 +57,6 @@ void USDXformReader::create_object(Main *bmain, double motionSampleTime)
 
 void USDXformReader::read_object_data(Main *bmain, double motionSampleTime)
 {
-  USDPrimReader::read_object_data(bmain, motionSampleTime);
-
   bool is_constant;
   float transform_from_usd[4][4];
 
