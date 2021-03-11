@@ -430,9 +430,6 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   row = uiLayoutRow(box, false);
   uiItemR(row, ptr, "light_intensity_scale", 0, NULL, ICON_NONE);
 
-  // row = uiLayoutRow(box, false);
-  // uiItemR(row, ptr, "prim_path_mask", 0, NULL, ICON_NONE);
-
   uiLayout *prim_path_mask_box = uiLayoutBox(box);
   row = uiLayoutRow(prim_path_mask_box, false);
   uiItemL(row, IFACE_("Prim Path Mask:"), ICON_NONE);

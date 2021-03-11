@@ -98,7 +98,6 @@ class USDPrimReader {
   int m_refcount;
 
  public:
-  // USDPrimReader(pxr::UsdPrim* prim, ImportSettings &settings);
   USDPrimReader(pxr::UsdStageRefPtr stage,
                 const pxr::UsdPrim &object,
                 const USDImportParams &import_params,
@@ -139,101 +138,5 @@ class USDPrimReader {
     return m_prim_path;
   }
 };
-
-// template<typename Schema> static bool has_animations(Schema &schema, ImportSettings *settings)
-// {
-//   return settings->is_sequence || !schema.isConstant();
-// }
-
-// class USDObjectReader {
-//  protected:
-//   std::string m_name;
-//   std::string m_object_name;
-//   std::string m_data_name;
-//   Object *m_object;
-//   pxr::UsdPrim m_iobject;
-
-//   ImportSettings *m_settings;
-
-//   chrono_t m_min_time;
-//   chrono_t m_max_time;
-
-//   /* Use reference counting since the same reader may be used by multiple
-//    * modifiers and/or constraints. */
-//   int m_refcount;
-
-//   bool m_inherits_xform;
-
-//  public:
-//   USDObjectReader *parent_reader;
-
-//  public:
-//   explicit USDObjectReader(const pxr::UsdPrim &object, ImportSettings &settings);
-
-//   virtual ~USDObjectReader();
-
-//   const Alembic::USD::IObject &iobject() const;
-
-//   typedef std::vector<USDObjectReader *> ptr_vector;
-
-//   /**
-//    * Returns the transform of this object. This can be the Alembic object
-//    * itself (in case of an Empty) or it can be the parent Alembic object.
-//    */
-//   virtual Alembic::USDGeom::IXform xform();
-
-//   Object *object() const;
-//   void object(Object *ob);
-
-//   const std::string &name() const
-//   {
-//     return m_name;
-//   }
-//   const std::string &object_name() const
-//   {
-//     return m_object_name;
-//   }
-//   const std::string &data_name() const
-//   {
-//     return m_data_name;
-//   }
-//   bool inherits_xform() const
-//   {
-//     return m_inherits_xform;
-//   }
-
-//   virtual bool valid() const = 0;
-//   virtual bool accepts_object_type(const Alembic::USDCoreAbstract::ObjectHeader &alembic_header,
-//                                    const Object *const ob,
-//                                    const char **err_str) const = 0;
-
-//   virtual void readObjectData(Main *bmain, const Alembic::USD::ISampleSelector &sample_sel) = 0;
-
-//   virtual struct Mesh *read_mesh(struct Mesh *mesh,
-//                                  const Alembic::USD::ISampleSelector &sample_sel,
-//                                  int read_flag,
-//                                  const char **err_str);
-//   virtual bool topology_changed(Mesh *existing_mesh,
-//                                 const Alembic::USD::ISampleSelector &sample_sel);
-
-//   /** Reads the object matrix and sets up an object transform if animated. */
-//   void setupObjectTransform(const float time);
-
-//   void addCacheModifier();
-
-//   chrono_t minTime() const;
-//   chrono_t maxTime() const;
-
-//   int refcount() const;
-//   void incref();
-//   void decref();
-
-//   void read_matrix(float r_mat[4][4], const float time, const float scale, bool &is_constant);
-
-//  protected:
-//   void determine_inherits_xform();
-// };
-
-// Imath::M44d get_matrix(const Alembic::USDGeom::IXformSchema &schema, const float time);
 
 #endif /* __USD_READER_OBJECT_H__ */

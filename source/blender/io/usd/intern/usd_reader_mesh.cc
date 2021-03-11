@@ -202,14 +202,6 @@ void USDMeshReader::createObject(Main *bmain, double motionSampleTime)
 
   m_object = BKE_object_add_only_object(bmain, OB_MESH, m_name.c_str());
   m_object->data = mesh;
-
-  /*
-      if (m_settings->validate_meshes) {
-      BKE_mesh_validate(mesh, false, false);
-      }
-
-      readFaceSetsSample(bmain, mesh, sample_sel);
-  */
 }
 
 void USDMeshReader::readObjectData(Main *bmain, double motionSampleTime)
@@ -731,31 +723,8 @@ void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
 {
 
   pxr::UsdAttribute normalsAttr = mesh_prim.GetNormalsAttr();
-  /*pxr::UsdAttribute faceVertCountsAttr = mesh_prim.GetFaceVertexCountsAttr();
-  pxr::UsdAttribute faceVertIndicesAttr = mesh_prim.GetFaceVertexIndicesAttr();*/
-
   std::vector<pxr::UsdGeomPrimvar> primvars = mesh_prim.GetPrimvars();
-  /*pxr::UsdAttribute pointsAttr = mesh_prim.GetPointsAttr();*/
   pxr::UsdAttribute subdivSchemeAttr = mesh_prim.GetSubdivisionSchemeAttr();
-
-  /*pxr::VtIntArray face_indices;
-  faceVertIndicesAttr.Get(&face_indices, motionSampleTime);
-  pxr::VtIntArray face_counts;
-  faceVertIndicesAttr.Get(&face_counts, motionSampleTime);
-  pxr::VtVec3fArray positions;
-  pointsAttr.Get(&positions, motionSampleTime);*/
-
-  /*get_weight_and_index(config, schema.getTimeSampling(), schema.getNumSamples());
-
-  if (config.weight != 0.0f) {
-    Alembic::AbcGeom::IPolyMeshSchema::Sample ceil_sample;
-    schema.get(ceil_sample, Alembic::Abc::ISampleSelector(config.ceil_index));
-    abc_mesh_data.ceil_positions = ceil_sample.getPositions();
-  }
-
-  if ((settings->read_flag & MOD_MESHSEQ_READ_UV) != 0) {
-    read_uvs_params(config, abc_mesh_data, schema.getUVsParam(), selector);
-  }*/
 
   // Note that for new meshes we always want to read verts and polys,
   // regradless of the value of the read_flag, to avoid a crash downstream
@@ -873,10 +842,6 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
 {
   mesh_prim = pxr::UsdGeomMesh::Get(m_stage, m_prim.GetPath());
 
-  // pxr::UsdAttribute normalsAttr = mesh_prim.GetNormalsAttr();
-  // pxr::UsdAttribute faceVertCountsAttr = mesh_prim.GetFaceVertexCountsAttr();
-  // pxr::UsdAttribute faceVertIndicesAttr = mesh_prim.GetFaceVertexIndicesAttr();
-
   mesh_prim.GetOrientationAttr().Get(&m_orientation);
   if (m_orientation == pxr::UsdGeomTokens->leftHanded)
     m_isLeftHanded = true;
@@ -901,16 +866,6 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
     }
   }
 
-  // pxr::UsdAttribute pointsAttr = mesh_prim.GetPointsAttr();
-  // pxr::UsdAttribute subdivSchemeAttr = mesh_prim.GetSubdivisionSchemeAttr();
-
-  // pxr::VtIntArray face_indices;
-  // faceVertIndicesAttr.Get(&face_indices, motionSampleTime);
-  // pxr::VtIntArray face_counts;
-  // faceVertCountsAttr.Get(&face_counts, motionSampleTime);
-  // pxr::VtVec3fArray positions;
-  // pointsAttr.Get(&positions, motionSampleTime);
-
   Mesh *active_mesh = existing_mesh;
   bool new_mesh = false;
 
@@ -928,24 +883,7 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
       void *cd_ptr = add_customdata_cb(active_mesh, token.GetText(), CD_MLOOPUV);
       active_mesh->mloopuv = static_cast<MLoopUV *>(cd_ptr);
     }
-
-    // settings.read_flag |= MOD_MESHSEQ_READ_ALL;
   }
-  // else {
-  /* If the face count changed (e.g. by triangulation), only read points.
-   * This prevents crash from T49813.
-   * TODO(kevin): perhaps find a better way to do this? */
-  /*if (face_counts.size() != existing_mesh->totpoly ||
-      face_indices.size() != existing_mesh->totloop) {
-    //settings.read_flag = MOD_MESHSEQ_READ_VERT;
-    std::cout << "Mismatch vert counts\n";
-    if (err_str) {
-      *err_str =
-          "Topology has changed, perhaps by triangulating the"
-          " mesh. Only vertices will be read!";
-    }
-  }
-}*/
 
   read_mesh_sample(m_prim.GetPath().GetString().c_str(),
                    &settings,

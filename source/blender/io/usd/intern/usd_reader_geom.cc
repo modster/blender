@@ -66,7 +66,6 @@ void USDGeomReader::createObject(Main *bmain, double motionSampleTime)
 bool USDGeomReader::valid() const
 {
   return true;
-  // return m_schema.valid();
 }
 
 bool USDGeomReader::topology_changed(Mesh *existing_mesh, double motionSampleTime)
@@ -97,7 +96,6 @@ void USDGeomReader::addCacheModifier()
   mcmd->cache_file = m_settings->cache_file;
   id_us_plus(&mcmd->cache_file->id);
   mcmd->read_flag = m_import_params.global_read_flag;
-  // mcmd->vel_fac = m_settings->vel_scale;
 
   BLI_strncpy(mcmd->object_path, m_prim.GetPath().GetString().c_str(), FILE_MAX);
 }
@@ -106,6 +104,4 @@ void USDGeomReader::addSubdivModifier()
 {
   ModifierData *md = BKE_modifier_new(eModifierType_Subsurf);
   BLI_addtail(&m_object->modifiers, md);
-
-  // SubsurfModifierData *subd = reinterpret_cast<SubsurfModifierData *>(md);
 }

@@ -88,8 +88,6 @@ void USDPrimReader::createObject(Main *bmain, double motionSampleTime)
 
 void USDPrimReader::readObjectData(Main *bmain, double motionSampleTime)
 {
-  // m_object = BKE_object_add_only_object(bmain, OB_EMPTY, m_prim_path.c_str());
-  // m_object->data = NULL;
 }
 
 void USDPrimReader::addCacheModifier()

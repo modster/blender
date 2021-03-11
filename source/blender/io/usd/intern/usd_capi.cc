@@ -576,11 +576,8 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
 
   // Set up the stage for animated data.
   if (data->params.set_frame_range) {
-    // archive->stage()->SetTimeCodesPerSecond(FPS);
     scene->r.sfra = archive->stage()->GetStartTimeCode();
     scene->r.efra = archive->stage()->GetEndTimeCode();
-    // archive->usd_stage->SetStartTimeCode(scene->r.sfra);
-    // usd_stage->SetEndTimeCode(scene->r.efra);
   }
 
   *data->progress = 0.15f;
@@ -770,8 +767,6 @@ bool USD_import(struct bContext *C,
   /* Using new here since MEM_* funcs do not call ctor to properly initialize
    * data. */
   ImportJobData *job = new ImportJobData();
-  // USD::ImportJobData *job = static_cast<USD::ImportJobData
-  // *>(MEM_mallocN(sizeof(USD::ImportJobData), "ImportJobData"));
   job->bmain = CTX_data_main(C);
   job->scene = CTX_data_scene(C);
   job->view_layer = CTX_data_view_layer(C);
@@ -833,12 +828,6 @@ static USDPrimReader *get_usd_reader(CacheReader *reader, Object *ob, const char
     *err_str = "Invalid object: verify object path";
     return NULL;
   }
-
-  /*const ObjectHeader &header = iobject.getHeader();
-  if (!usd_reader->accepts_object_type(header, ob, err_str)) {*/
-  /* err_str is set by acceptsObjectType() */
-  /*return NULL;
-}*/
 
   return usd_reader;
 }
