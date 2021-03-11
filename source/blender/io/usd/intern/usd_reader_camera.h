@@ -23,11 +23,10 @@ namespace blender::io::usd {
 class USDCameraReader : public USDXformReader {
 
  public:
-  USDCameraReader(pxr::UsdStageRefPtr stage,
-                  const pxr::UsdPrim &object,
+  USDCameraReader(const pxr::UsdPrim &object,
                   const USDImportParams &import_params,
                   ImportSettings &settings)
-      : USDXformReader(stage, object, import_params, settings)
+      : USDXformReader(object, import_params, settings)
   {
   }
 

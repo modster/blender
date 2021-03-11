@@ -67,7 +67,11 @@ void USDVolumeReader::create_object(Main *bmain, double motionSampleTime)
 
 void USDVolumeReader::read_object_data(Main *bmain, double motionSampleTime)
 {
-  volume_ = pxr::UsdVolVolume::Get(stage_, prim_.GetPath());
+  volume_ = pxr::UsdVolVolume(prim_);
+
+  if (!volume_) {
+    return;
+  }
 
   pxr::UsdVolVolume::FieldMap fields = volume_.GetFieldPaths();
 
@@ -78,7 +82,7 @@ void USDVolumeReader::read_object_data(Main *bmain, double motionSampleTime)
 
   for (auto it = fields.begin(); it != fields.end(); ++it) {
 
-    pxr::UsdPrim fieldPrim = stage_->GetPrimAtPath(it->second);
+    pxr::UsdPrim fieldPrim = prim_.GetStage()->GetPrimAtPath(it->second);
 
     if (fieldPrim.IsA<pxr::UsdVolOpenVDBAsset>()) {
       pxr::UsdVolOpenVDBAsset fieldBase(fieldPrim);

@@ -26,11 +26,10 @@
 
 namespace blender::io::usd {
 
-USDInstanceReader::USDInstanceReader(pxr::UsdStageRefPtr stage,
-                                     const pxr::UsdPrim &object,
+USDInstanceReader::USDInstanceReader(const pxr::UsdPrim &object,
                                      const USDImportParams &import_params,
                                      ImportSettings &settings)
-    : USDXformReader(stage, object, import_params, settings)
+    : USDXformReader(object, import_params, settings)
 {
 }
 

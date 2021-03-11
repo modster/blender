@@ -27,11 +27,10 @@ class USDVolumeReader : public USDXformReader {
   pxr::UsdVolVolume volume_;
 
  public:
-  USDVolumeReader(pxr::UsdStageRefPtr stage,
-                  const pxr::UsdPrim &object,
+  USDVolumeReader(const pxr::UsdPrim &object,
                   const USDImportParams &import_params,
                   ImportSettings &settings)
-      : USDXformReader(stage, object, import_params, settings)
+      : USDXformReader(object, import_params, settings)
   {
   }
 

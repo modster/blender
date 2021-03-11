@@ -70,7 +70,12 @@ void USDLightReader::read_object_data(Main *bmain, double motionSampleTime)
 {
   Light *blight = (Light *)object_->data;
 
-  pxr::UsdLuxLight light_prim = pxr::UsdLuxLight::Get(stage_, prim_.GetPath());
+  pxr::UsdLuxLight light_prim(prim_);
+
+  if (!light_prim) {
+    return;
+  }
+
   pxr::UsdLuxShapingAPI shapingAPI(light_prim);
 
   // Set light type
@@ -133,7 +138,8 @@ void USDLightReader::read_object_data(Main *bmain, double motionSampleTime)
   switch (blight->type) {
     case LA_AREA:
       if (blight->area_shape == LA_AREA_RECT && prim_.IsA<pxr::UsdLuxRectLight>()) {
-        pxr::UsdLuxRectLight rect_light = pxr::UsdLuxRectLight::Get(stage_, prim_.GetPath());
+
+        pxr::UsdLuxRectLight rect_light(prim_);
 
         pxr::VtValue width;
         rect_light.GetWidthAttr().Get(&width, motionSampleTime);
@@ -146,7 +152,8 @@ void USDLightReader::read_object_data(Main *bmain, double motionSampleTime)
       }
 
       if (blight->area_shape == LA_AREA_DISK && prim_.IsA<pxr::UsdLuxDiskLight>()) {
-        pxr::UsdLuxDiskLight disk_light = pxr::UsdLuxDiskLight::Get(stage_, prim_.GetPath());
+
+        pxr::UsdLuxDiskLight disk_light(prim_);
 
         pxr::VtValue radius;
         disk_light.GetRadiusAttr().Get(&radius, motionSampleTime);
@@ -156,7 +163,8 @@ void USDLightReader::read_object_data(Main *bmain, double motionSampleTime)
       break;
     case LA_LOCAL:
       if (prim_.IsA<pxr::UsdLuxSphereLight>()) {
-        pxr::UsdLuxSphereLight sphere_light = pxr::UsdLuxSphereLight::Get(stage_, prim_.GetPath());
+
+        pxr::UsdLuxSphereLight sphere_light(prim_);
 
         pxr::VtValue radius;
         sphere_light.GetRadiusAttr().Get(&radius, motionSampleTime);
@@ -166,7 +174,8 @@ void USDLightReader::read_object_data(Main *bmain, double motionSampleTime)
       break;
     case LA_SPOT:
       if (prim_.IsA<pxr::UsdLuxSphereLight>()) {
-        pxr::UsdLuxSphereLight sphere_light = pxr::UsdLuxSphereLight::Get(stage_, prim_.GetPath());
+
+        pxr::UsdLuxSphereLight sphere_light(prim_);
 
         pxr::VtValue radius;
         sphere_light.GetRadiusAttr().Get(&radius, motionSampleTime);
@@ -184,8 +193,7 @@ void USDLightReader::read_object_data(Main *bmain, double motionSampleTime)
       break;
     case LA_SUN:
       if (prim_.IsA<pxr::UsdLuxDistantLight>()) {
-        pxr::UsdLuxDistantLight distant_light = pxr::UsdLuxDistantLight::Get(stage_,
-                                                                             prim_.GetPath());
+        pxr::UsdLuxDistantLight distant_light(prim_);
 
         pxr::VtValue angle;
         distant_light.GetAngleAttr().Get(&angle, motionSampleTime);

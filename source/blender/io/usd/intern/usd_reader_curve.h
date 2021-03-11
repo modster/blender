@@ -30,11 +30,10 @@ class USDCurvesReader : public USDGeomReader {
   Curve *curve_;
 
  public:
-  USDCurvesReader(pxr::UsdStageRefPtr stage,
-                  const pxr::UsdPrim &object,
+  USDCurvesReader(const pxr::UsdPrim &object,
                   const USDImportParams &import_params,
                   ImportSettings &settings)
-      : USDGeomReader(stage, object, import_params, settings)
+      : USDGeomReader(object, import_params, settings)
   {
   }
 

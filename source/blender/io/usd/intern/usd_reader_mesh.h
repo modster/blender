@@ -48,8 +48,7 @@ class USDMeshReader : public USDGeomReader {
   bool is_initial_load_;
 
  public:
-  USDMeshReader(pxr::UsdStageRefPtr stage,
-                const pxr::UsdPrim &object,
+  USDMeshReader(const pxr::UsdPrim &object,
                 const USDImportParams &import_params,
                 ImportSettings &settings);
 

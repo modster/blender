@@ -60,7 +60,11 @@ void USDCameraReader::read_object_data(Main *bmain, double motionSampleTime)
 {
   Camera *bcam = (Camera *)object_->data;
 
-  pxr::UsdGeomCamera cam_prim = pxr::UsdGeomCamera::Get(stage_, prim_.GetPath());
+  pxr::UsdGeomCamera cam_prim(prim_);
+
+  if (!cam_prim) {
+    return;
+  }
 
   pxr::VtValue val;
   cam_prim.GetFocalLengthAttr().Get(&val, motionSampleTime);

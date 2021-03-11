@@ -87,67 +87,66 @@ extern "C" {
 
 namespace blender::io::usd {
 
-USDPrimReader *create_reader(const pxr::UsdStageRefPtr &stage,
-                             const pxr::UsdPrim &prim,
+USDPrimReader *create_reader(const pxr::UsdPrim &prim,
                              const USDImportParams &params,
                              ImportSettings &settings)
 {
   USDPrimReader *reader = nullptr;
 
   if (params.use_instancing && prim.IsInstance()) {
-    reader = new USDInstanceReader(stage, prim, params, settings);
+    reader = new USDInstanceReader(prim, params, settings);
   }
   else if (params.import_cameras && prim.IsA<pxr::UsdGeomCamera>()) {
-    reader = new USDCameraReader(stage, prim, params, settings);
+    reader = new USDCameraReader(prim, params, settings);
   }
   else if (params.import_curves && prim.IsA<pxr::UsdGeomBasisCurves>()) {
-    reader = new USDCurvesReader(stage, prim, params, settings);
+    reader = new USDCurvesReader(prim, params, settings);
   }
   else if (params.import_curves && prim.IsA<pxr::UsdGeomNurbsCurves>()) {
-    reader = new USDNurbsReader(stage, prim, params, settings);
+    reader = new USDNurbsReader(prim, params, settings);
   }
   else if (params.import_meshes && prim.IsA<pxr::UsdGeomMesh>()) {
-    reader = new USDMeshReader(stage, prim, params, settings);
+    reader = new USDMeshReader(prim, params, settings);
   }
   else if (params.import_lights && prim.IsA<pxr::UsdLuxLight>()) {
-    reader = new USDLightReader(stage, prim, params, settings);
+    reader = new USDLightReader(prim, params, settings);
   }
   else if (params.import_volumes && prim.IsA<pxr::UsdVolVolume>()) {
-    reader = new USDVolumeReader(stage, prim, params, settings);
+    reader = new USDVolumeReader(prim, params, settings);
   }
   else if (prim.IsA<pxr::UsdGeomImageable>()) {
-    reader = new USDXformReader(stage, prim, params, settings);
+    reader = new USDXformReader(prim, params, settings);
   }
 
   return reader;
 }
 
 // TODO: The handle does not have the proper import params or settings
-USDPrimReader *create_fake_reader(USDStageReader *archive, const pxr::UsdPrim &prim)
+USDPrimReader *create_reader(class USDStageReader *archive, const pxr::UsdPrim &prim)
 {
   USDPrimReader *reader = nullptr;
 
   // TODO(makowalski): Handle true instancing?
   if (prim.IsA<pxr::UsdGeomCamera>()) {
-    reader = new USDCameraReader(archive->stage(), prim, archive->params(), archive->settings());
+    reader = new USDCameraReader(prim, archive->params(), archive->settings());
   }
   else if (prim.IsA<pxr::UsdGeomBasisCurves>()) {
-    reader = new USDCurvesReader(archive->stage(), prim, archive->params(), archive->settings());
+    reader = new USDCurvesReader(prim, archive->params(), archive->settings());
   }
   else if (prim.IsA<pxr::UsdGeomNurbsCurves>()) {
-    reader = new USDNurbsReader(archive->stage(), prim, archive->params(), archive->settings());
+    reader = new USDNurbsReader(prim, archive->params(), archive->settings());
   }
   else if (prim.IsA<pxr::UsdGeomMesh>()) {
-    reader = new USDMeshReader(archive->stage(), prim, archive->params(), archive->settings());
+    reader = new USDMeshReader(prim, archive->params(), archive->settings());
   }
   else if (prim.IsA<pxr::UsdLuxLight>()) {
-    reader = new USDLightReader(archive->stage(), prim, archive->params(), archive->settings());
+    reader = new USDLightReader(prim, archive->params(), archive->settings());
   }
   else if (prim.IsA<pxr::UsdVolVolume>()) {
-    reader = new USDVolumeReader(archive->stage(), prim, archive->params(), archive->settings());
+    reader = new USDVolumeReader(prim, archive->params(), archive->settings());
   }
   else if (prim.IsA<pxr::UsdGeomImageable>()) {
-    reader = new USDXformReader(archive->stage(), prim, archive->params(), archive->settings());
+    reader = new USDXformReader(prim, archive->params(), archive->settings());
   }
   return reader;
 }

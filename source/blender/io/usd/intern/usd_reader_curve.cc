@@ -85,7 +85,11 @@ void USDCurvesReader::read_object_data(Main *bmain, double motionSampleTime)
 
 void USDCurvesReader::read_curve_sample(Curve *cu, double motionSampleTime)
 {
-  curve_prim_ = pxr::UsdGeomBasisCurves::Get(stage_, prim_.GetPath());
+  curve_prim_ = pxr::UsdGeomBasisCurves(prim_);
+
+  if (!curve_prim_) {
+    return;
+  }
 
   pxr::UsdAttribute widthsAttr = curve_prim_.GetWidthsAttr();
   pxr::UsdAttribute vertexAttr = curve_prim_.GetCurveVertexCountsAttr();
@@ -199,7 +203,9 @@ Mesh *USDCurvesReader::read_mesh(struct Mesh *existing_mesh,
                                  float vel_scale,
                                  const char **err_str)
 {
-  pxr::UsdGeomCurves curve_prim_ = pxr::UsdGeomCurves::Get(stage_, prim_.GetPath());
+  // TODO(makowalski): here and elsewhere, move curve_prim_ initialization to
+  // the constructor.
+  pxr::UsdGeomCurves curve_prim_(prim_);
 
   pxr::UsdAttribute widthsAttr = curve_prim_.GetWidthsAttr();
   pxr::UsdAttribute vertexAttr = curve_prim_.GetCurveVertexCountsAttr();

@@ -889,7 +889,7 @@ CacheReader *CacheReader_open_usd_object(USDStageHandle *handle,
   }
 
   // TODO: The handle does not have the proper import params or settings
-  USDPrimReader *usd_reader = create_fake_reader(archive, prim);
+  USDPrimReader *usd_reader = create_reader(archive, prim);
 
   if (usd_reader == NULL) {
     /* This object is not supported */

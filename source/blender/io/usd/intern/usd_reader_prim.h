@@ -85,15 +85,13 @@ class USDPrimReader {
   std::string prim_path_;
   Object *object_;
   pxr::UsdPrim prim_;
-  pxr::UsdStageRefPtr stage_;
   const USDImportParams &import_params_;
   USDPrimReader *parent_reader_;
   ImportSettings *settings_;
   int refcount_;
 
  public:
-  USDPrimReader(pxr::UsdStageRefPtr stage,
-                const pxr::UsdPrim &object,
+  USDPrimReader(const pxr::UsdPrim &object,
                 const USDImportParams &import_params,
                 ImportSettings &settings);
   virtual ~USDPrimReader();

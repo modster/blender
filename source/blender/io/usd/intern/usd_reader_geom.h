@@ -25,11 +25,10 @@ namespace blender::io::usd {
 class USDGeomReader : public USDXformReader {
 
  public:
-  USDGeomReader(pxr::UsdStageRefPtr stage,
-                const pxr::UsdPrim &object,
+  USDGeomReader(const pxr::UsdPrim &object,
                 const USDImportParams &import_params,
                 ImportSettings &settings)
-      : USDXformReader(stage, object, import_params, settings)
+      : USDXformReader(object, import_params, settings)
   {
   }
 

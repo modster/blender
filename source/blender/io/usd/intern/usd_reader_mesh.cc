@@ -185,11 +185,10 @@ static void *add_customdata_cb(Mesh *mesh, const char *name, int data_type)
 
 namespace blender::io::usd {
 
-USDMeshReader::USDMeshReader(pxr::UsdStageRefPtr stage,
-                             const pxr::UsdPrim &object,
+USDMeshReader::USDMeshReader(const pxr::UsdPrim &object,
                              const USDImportParams &import_params,
                              ImportSettings &settings)
-    : USDGeomReader(stage, object, import_params, settings),
+    : USDGeomReader(object, import_params, settings),
       is_left_handed_(false),
       last_num_positions_(-1),
       has_uvs_(false),
@@ -213,6 +212,7 @@ void USDMeshReader::read_object_data(Main *bmain, double motionSampleTime)
   is_initial_load_ = true;
   Mesh *read_mesh = this->read_mesh(
       mesh, motionSampleTime, import_params_.global_read_flag, 1.0f, NULL);
+
   is_initial_load_ = false;
   if (read_mesh != mesh) {
     /* XXX fixme after 2.80; mesh->flag isn't copied by BKE_mesh_nomain_to_mesh() */
@@ -833,7 +833,7 @@ void USDMeshReader::readFaceSetsSample(Main *bmain, Mesh *mesh, const double mot
 
   std::map<pxr::SdfPath, int> mat_map;
   assign_facesets_to_mpoly(motionSampleTime, mesh->mpoly, mesh->totpoly, mat_map);
-  utils::assign_materials(bmain, object_, mat_map, this->import_params_, this->stage_);
+  utils::assign_materials(bmain, object_, mat_map, this->import_params_, this->prim_.GetStage());
 }
 
 Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
@@ -842,7 +842,11 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
                                float vel_scale,
                                const char **err_str)
 {
-  mesh_prim_ = pxr::UsdGeomMesh::Get(stage_, prim_.GetPath());
+  mesh_prim_ = pxr::UsdGeomMesh(prim_);
+
+  if (!mesh_prim_) {
+    return existing_mesh;
+  }
 
   mesh_prim_.GetOrientationAttr().Get(&orientation_);
   if (orientation_ == pxr::UsdGeomTokens->leftHanded)

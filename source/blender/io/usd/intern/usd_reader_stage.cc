@@ -139,7 +139,7 @@ static USDPrimReader *_handlePrim(Main *bmain,
   // or the root prims of scenegraph 'master' prototypes
   // from being added.
   if (!(prim.IsPseudoRoot() || prim.IsMaster())) {
-    reader = blender::io::usd::create_reader(stage, prim, params, settings);
+    reader = blender::io::usd::create_reader(prim, params, settings);
     if (reader == NULL)
       return NULL;
 

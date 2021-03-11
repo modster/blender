@@ -37,11 +37,10 @@ namespace blender::io::usd {
 struct ImportSettings;
 class USDPrimReader;
 
-USDPrimReader *create_reader(const pxr::UsdStageRefPtr &stage,
-                             const pxr::UsdPrim &prim,
+USDPrimReader *create_reader(const pxr::UsdPrim &prim,
                              const USDImportParams &params,
                              ImportSettings &settings);
 
-USDPrimReader *create_fake_reader(class USDStageReader *archive, const pxr::UsdPrim &prim);
+USDPrimReader *create_reader(class USDStageReader *archive, const pxr::UsdPrim &prim);
 
 }  // Namespace blender::io::usd

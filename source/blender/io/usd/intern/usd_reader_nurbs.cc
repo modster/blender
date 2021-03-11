@@ -102,7 +102,7 @@ void USDNurbsReader::read_object_data(Main *bmain, double motionSampleTime)
 
 void USDNurbsReader::read_curve_sample(Curve *cu, double motionSampleTime)
 {
-  curve_prim_ = pxr::UsdGeomNurbsCurves::Get(stage_, prim_.GetPath());
+  curve_prim_ = pxr::UsdGeomNurbsCurves(prim_);
 
   pxr::UsdAttribute widthsAttr = curve_prim_.GetWidthsAttr();
   pxr::UsdAttribute vertexAttr = curve_prim_.GetCurveVertexCountsAttr();
@@ -204,7 +204,7 @@ Mesh *USDNurbsReader::read_mesh(struct Mesh *existing_mesh,
                                 float vel_scale,
                                 const char **err_str)
 {
-  pxr::UsdGeomCurves curve_prim_ = pxr::UsdGeomCurves::Get(stage_, prim_.GetPath());
+  pxr::UsdGeomCurves curve_prim_(prim_);
 
   pxr::UsdAttribute widthsAttr = curve_prim_.GetWidthsAttr();
   pxr::UsdAttribute vertexAttr = curve_prim_.GetCurveVertexCountsAttr();
