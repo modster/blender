@@ -93,6 +93,25 @@ void VKTexture::update_sub(
 {
 }
 
+void VKTexture::swizzle_set(const char swizzle_mask[4])
+{
+  vk_swizzle_.r = swizzle_to_vk(swizzle_mask[0]);
+  vk_swizzle_.g = swizzle_to_vk(swizzle_mask[1]);
+  vk_swizzle_.b = swizzle_to_vk(swizzle_mask[2]);
+  vk_swizzle_.a = swizzle_to_vk(swizzle_mask[3]);
+
+  /* The swizzling changed, we need to reconstruct all views. */
+  VkDevice device = context_->device_get();
+  for (VkImageView view : views_) {
+    if (view != VK_NULL_HANDLE) {
+      /* WARNING: This is potentially unsafe since the views might already be in used.
+       * In practice, swizzle_set is always used just after initialization or before usage. */
+      vkDestroyImageView(device, view, nullptr);
+      view = VK_NULL_HANDLE;
+    }
+  }
+}
+
 VkImageView VKTexture::create_image_view(int mip, int layer)
 {
   VkDevice device = context_->device_get();
@@ -104,19 +123,12 @@ VkImageView VKTexture::create_image_view(int mip, int layer)
   range.levelCount = (mip > -1) ? 1 : VK_REMAINING_MIP_LEVELS;
   range.layerCount = (layer > -1) ? 1 : VK_REMAINING_ARRAY_LAYERS;
 
-  /* TODO correct swizzling. */
-  VkComponentMapping components;
-  components.r = VK_COMPONENT_SWIZZLE_R;
-  components.g = VK_COMPONENT_SWIZZLE_G;
-  components.b = VK_COMPONENT_SWIZZLE_B;
-  components.a = VK_COMPONENT_SWIZZLE_A;
-
   VkImageViewCreateInfo info = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
   info.flags = 0;
   info.image = vk_image_;
   info.viewType = to_vk_image_view_type(type_);
   info.format = vk_format_;
-  info.components = components;
+  info.components = vk_swizzle_;
   info.subresourceRange = range;
 
   VkImageView view;
