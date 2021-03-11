@@ -15,15 +15,8 @@
  */
 #pragma once
 
-/** \file
- * \ingroup busd
- */
-
-#ifndef __USD_READER_LIGHT_H__
-#  define __USD_READER_LIGHT_H__
-
-#  include "usd.h"
-#  include "usd_reader_xform.h"
+#include "usd.h"
+#include "usd_reader_xform.h"
 
 class USDLightReader : public USDXformReader {
 
@@ -37,7 +30,6 @@ class USDLightReader : public USDXformReader {
   }
 
   void createObject(Main *bmain, double motionSampleTime) override;
+
   void readObjectData(Main *bmain, double motionSampleTime) override;
 };
-
-#endif /* __USD_READER_LIGHT_H__ */
