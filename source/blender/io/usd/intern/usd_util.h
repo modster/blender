@@ -13,13 +13,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-
-/** \file
- * \ingroup busd
- */
-
-#ifndef __USD_UTIL_H__
-#define __USD_UTIL_H__
+#pragma once
 
 #include <string>
 
@@ -52,8 +46,7 @@ USDPrimReader *create_reader(const pxr::UsdStageRefPtr &stage,
                              const pxr::UsdPrim &prim,
                              const USDImportParams &params,
                              ImportSettings &settings);
+
 USDPrimReader *create_fake_reader(class USDStageReader *archive, const pxr::UsdPrim &prim);
 
 }  // Namespace blender::io::usd
-
-#endif /* __USD_UTIL_H__ */

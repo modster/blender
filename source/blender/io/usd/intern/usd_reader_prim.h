@@ -13,13 +13,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-
-/** \file
- * \ingroup busd
- */
-
-#ifndef __USD_READER_OBJECT_H__
-#define __USD_READER_OBJECT_H__
+#pragma once
 
 #include "usd.h"
 
@@ -138,5 +132,3 @@ class USDPrimReader {
     return m_prim_path;
   }
 };
-
-#endif /* __USD_READER_OBJECT_H__ */

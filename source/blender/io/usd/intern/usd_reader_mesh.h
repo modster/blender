@@ -13,13 +13,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-
-/** \file
- * \ingroup busd
- */
-
-#ifndef __USD_READER_MESH_H__
-#define __USD_READER_MESH_H__
+#pragma once
 
 #include "pxr/usd/usdGeom/mesh.h"
 #include "usd.h"
@@ -96,5 +90,3 @@ class USDMeshReader : public USDGeomReader {
   // implemented. Note this will break if face or positions vary...
   bool m_isInitialLoad;
 };
-
-#endif /* __USD_READER_MESH_H__ */

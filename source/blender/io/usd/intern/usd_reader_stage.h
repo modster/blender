@@ -16,13 +16,7 @@
  * The Original Code is Copyright (C) 2016 Kévin Dietrich.
  * All rights reserved.
  */
-
-/** \file
- * \ingroup busd
- */
-
-#ifndef __USD_READER_ARCHIVE_H__
-#define __USD_READER_ARCHIVE_H__
+#pragma once
 
 struct Main;
 struct Scene;
@@ -102,5 +96,3 @@ class USDStageReader {
 };
 
 };  // namespace blender::io::usd
-
-#endif /* __USD_READER_ARCHIVE_H__ */

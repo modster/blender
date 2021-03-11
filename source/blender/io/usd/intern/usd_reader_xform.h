@@ -13,13 +13,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-
-/** \file
- * \ingroup busd
- */
-
-#ifndef __USD_READER_XFORM_H__
-#define __USD_READER_XFORM_H__
+#pragma once
 
 #include "usd.h"
 #include "usd_reader_prim.h"
@@ -44,5 +38,3 @@ class USDXformReader : public USDPrimReader {
   // transform hierarchy.
   bool is_root_xform_object() const;
 };
-
-#endif /* __USD_READER_XFORM_H__ */

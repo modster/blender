@@ -13,13 +13,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
-
-/** \file
- * \ingroup busd
- */
-
-#ifndef __USD_READER_CURVES_H__
-#define __USD_READER_CURVES_H__
+#pragma once
 
 #include "usd.h"
 #include "usd_reader_geom.h"
@@ -54,5 +48,3 @@ class USDCurvesReader : public USDGeomReader {
   pxr::UsdGeomBasisCurves curve_prim;
   Curve *m_curve;
 };
-
-#endif /* __USD_READER_CURVES_H__ */
