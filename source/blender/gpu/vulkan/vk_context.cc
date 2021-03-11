@@ -61,7 +61,7 @@ VKContext::VKContext(void *ghost_window, void *ghost_context)
   }
 
   /* For offscreen contexts. Default framebuffer is empty. */
-  back_left = new VKFrameBuffer("back_left");
+  active_fb = back_left = new VKFrameBuffer("back_left");
 
   {
     VmaAllocatorCreateInfo info = {};
