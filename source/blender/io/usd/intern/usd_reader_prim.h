@@ -104,8 +104,8 @@ class USDPrimReader {
 
   virtual bool valid() const;
 
-  virtual void createObject(Main *bmain, double motionSampleTime);
-  virtual void readObjectData(Main *bmain, double motionSampleTime);
+  virtual void create_object(Main *bmain, double motionSampleTime);
+  virtual void read_object_data(Main *bmain, double motionSampleTime);
 
   Object *object() const;
   void object(Object *ob);
@@ -123,7 +123,7 @@ class USDPrimReader {
   void incref();
   void decref();
 
-  virtual void addCacheModifier();
+  virtual void add_cache_modifier();
 
   const std::string &name() const
   {

@@ -31,8 +31,8 @@ class USDXformReader : public USDPrimReader {
   {
   }
 
-  void createObject(Main *bmain, double motionSampleTime) override;
-  void readObjectData(Main *bmain, double motionSampleTime) override;
+  void create_object(Main *bmain, double motionSampleTime) override;
+  void read_object_data(Main *bmain, double motionSampleTime) override;
 
   void read_matrix(float r_mat[4][4], const float time, const float scale, bool &is_constant);
 

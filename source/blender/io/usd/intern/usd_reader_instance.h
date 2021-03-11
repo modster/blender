@@ -38,7 +38,7 @@ class USDInstanceReader : public USDXformReader {
 
   bool valid() const override;
 
-  void createObject(Main *bmain, double motionSampleTime) override;
+  void create_object(Main *bmain, double motionSampleTime) override;
 
   void set_instance_collection(Collection *coll);
 

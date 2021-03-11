@@ -48,7 +48,7 @@ extern "C" {
 
 namespace blender::io::usd {
 
-void USDCameraReader::createObject(Main *bmain, double motionSampleTime)
+void USDCameraReader::create_object(Main *bmain, double motionSampleTime)
 {
   Camera *bcam = static_cast<Camera *>(BKE_camera_add(bmain, m_name.c_str()));
 
@@ -56,7 +56,7 @@ void USDCameraReader::createObject(Main *bmain, double motionSampleTime)
   m_object->data = bcam;
 }
 
-void USDCameraReader::readObjectData(Main *bmain, double motionSampleTime)
+void USDCameraReader::read_object_data(Main *bmain, double motionSampleTime)
 {
   Camera *bcam = (Camera *)m_object->data;
 
@@ -102,7 +102,7 @@ void USDCameraReader::readObjectData(Main *bmain, double motionSampleTime)
     bcam->ortho_scale = max_ff(verAp.Get<float>(), horAp.Get<float>());
   }
 
-  USDXformReader::readObjectData(bmain, motionSampleTime);
+  USDXformReader::read_object_data(bmain, motionSampleTime);
 }
 
 }  // namespace blender::io::usd

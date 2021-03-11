@@ -56,7 +56,7 @@ extern "C" {
 
 namespace blender::io::usd {
 
-void USDVolumeReader::createObject(Main *bmain, double motionSampleTime)
+void USDVolumeReader::create_object(Main *bmain, double motionSampleTime)
 {
   Volume *volume = (Volume *)BKE_volume_add(bmain, m_name.c_str());
   id_us_min(&volume->id);
@@ -65,7 +65,7 @@ void USDVolumeReader::createObject(Main *bmain, double motionSampleTime)
   m_object->data = volume;
 }
 
-void USDVolumeReader::readObjectData(Main *bmain, double motionSampleTime)
+void USDVolumeReader::read_object_data(Main *bmain, double motionSampleTime)
 {
   m_volume = pxr::UsdVolVolume::Get(m_stage, m_prim.GetPath());
 
@@ -121,7 +121,7 @@ void USDVolumeReader::readObjectData(Main *bmain, double motionSampleTime)
     }
   }
 
-  USDXformReader::readObjectData(bmain, motionSampleTime);
+  USDXformReader::read_object_data(bmain, motionSampleTime);
 }
 
 }  // namespace blender::io::usd

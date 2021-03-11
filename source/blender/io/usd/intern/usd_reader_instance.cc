@@ -39,7 +39,7 @@ bool USDInstanceReader::valid() const
   return m_prim.IsValid() && m_prim.IsInstance();
 }
 
-void USDInstanceReader::createObject(Main *bmain, double motionSampleTime)
+void USDInstanceReader::create_object(Main *bmain, double motionSampleTime)
 {
   this->m_object = BKE_object_add_only_object(bmain, OB_EMPTY, m_name.c_str());
   this->m_object->data = nullptr;

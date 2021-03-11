@@ -35,8 +35,8 @@ class USDNurbsReader : public USDGeomReader {
   {
   }
 
-  void createObject(Main *bmain, double motionSampleTime) override;
-  void readObjectData(Main *bmain, double motionSampleTime) override;
+  void create_object(Main *bmain, double motionSampleTime) override;
+  void read_object_data(Main *bmain, double motionSampleTime) override;
 
   void read_curve_sample(Curve *cu, double motionSampleTime);
 

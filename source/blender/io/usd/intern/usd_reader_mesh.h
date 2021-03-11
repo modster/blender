@@ -33,8 +33,8 @@ class USDMeshReader : public USDGeomReader {
 
   bool valid() const override;
 
-  void createObject(Main *bmain, double motionSampleTime) override;
-  void readObjectData(Main *bmain, double motionSampleTime) override;
+  void create_object(Main *bmain, double motionSampleTime) override;
+  void read_object_data(Main *bmain, double motionSampleTime) override;
 
   struct Mesh *read_mesh(struct Mesh *existing_mesh,
                          double motionSampleTime,

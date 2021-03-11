@@ -76,7 +76,7 @@ static bool set_knots(const pxr::VtDoubleArray &knots, float *&nu_knots)
 
 namespace blender::io::usd {
 
-void USDNurbsReader::createObject(Main *bmain, double motionSampleTime)
+void USDNurbsReader::create_object(Main *bmain, double motionSampleTime)
 {
   m_curve = BKE_curve_add(bmain, m_name.c_str(), OB_CURVE);
 
@@ -88,16 +88,16 @@ void USDNurbsReader::createObject(Main *bmain, double motionSampleTime)
   m_object->data = m_curve;
 }
 
-void USDNurbsReader::readObjectData(Main *bmain, double motionSampleTime)
+void USDNurbsReader::read_object_data(Main *bmain, double motionSampleTime)
 {
   Curve *cu = (Curve *)m_object->data;
   read_curve_sample(cu, motionSampleTime);
 
   if (curve_prim.GetPointsAttr().ValueMightBeTimeVarying()) {
-    addCacheModifier();
+    add_cache_modifier();
   }
 
-  USDXformReader::readObjectData(bmain, motionSampleTime);
+  USDXformReader::read_object_data(bmain, motionSampleTime);
 }
 
 void USDNurbsReader::read_curve_sample(Curve *cu, double motionSampleTime)

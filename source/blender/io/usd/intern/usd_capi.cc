@@ -602,8 +602,8 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
       }
 
       /* TODO(makowalski): Here and below, should we call
-       *  readObjectData() with the actual time? */
-      reader->readObjectData(data->bmain, 0.0);
+       *  read_object_data() with the actual time? */
+      reader->read_object_data(data->bmain, 0.0);
 
       Object *ob = reader->object();
 
@@ -625,7 +625,7 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
     Object *ob = (*iter)->object();
 
     USDPrimReader *reader = (*iter);
-    reader->readObjectData(data->bmain, 0.0);
+    reader->read_object_data(data->bmain, 0.0);
 
     USDPrimReader *parent = (*iter)->parent();
 

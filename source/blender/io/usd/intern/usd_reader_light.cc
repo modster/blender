@@ -58,7 +58,7 @@ extern "C" {
 
 namespace blender::io::usd {
 
-void USDLightReader::createObject(Main *bmain, double motionSampleTime)
+void USDLightReader::create_object(Main *bmain, double motionSampleTime)
 {
   Light *blight = static_cast<Light *>(BKE_light_add(bmain, m_name.c_str()));
 
@@ -66,7 +66,7 @@ void USDLightReader::createObject(Main *bmain, double motionSampleTime)
   m_object->data = blight;
 }
 
-void USDLightReader::readObjectData(Main *bmain, double motionSampleTime)
+void USDLightReader::read_object_data(Main *bmain, double motionSampleTime)
 {
   Light *blight = (Light *)m_object->data;
 
@@ -196,7 +196,7 @@ void USDLightReader::readObjectData(Main *bmain, double motionSampleTime)
       break;
   }
 
-  USDXformReader::readObjectData(bmain, motionSampleTime);
+  USDXformReader::read_object_data(bmain, motionSampleTime);
 }
 
 }  // namespace blender::io::usd

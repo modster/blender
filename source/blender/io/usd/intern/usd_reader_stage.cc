@@ -144,7 +144,7 @@ static USDPrimReader *_handlePrim(Main *bmain,
       return NULL;
 
     reader->parent(parent_reader);
-    reader->createObject(bmain, 0.0);
+    reader->create_object(bmain, 0.0);
 
     readers.push_back(reader);
     reader->incref();

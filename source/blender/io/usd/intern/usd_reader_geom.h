@@ -35,8 +35,8 @@ class USDGeomReader : public USDXformReader {
 
   bool valid() const override;
 
-  virtual void createObject(Main *bmain, double motionSampleTime) override;
-  virtual void readObjectData(Main *bmain, double motionSampleTime) override;
+  virtual void create_object(Main *bmain, double motionSampleTime) override;
+  virtual void read_object_data(Main *bmain, double motionSampleTime) override;
 
   virtual Mesh *read_mesh(struct Mesh *existing_mesh,
                           double motionSampleTime,
@@ -44,8 +44,8 @@ class USDGeomReader : public USDXformReader {
                           float vel_scale,
                           const char **err_str);
 
-  void addCacheModifier() override;
-  void addSubdivModifier();
+  void add_cache_modifier() override;
+  void add_subdiv_modifier();
 
   bool topology_changed(Mesh *existing_mesh, double motionSampleTime);
 };

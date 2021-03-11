@@ -198,7 +198,7 @@ USDMeshReader::USDMeshReader(pxr::UsdStageRefPtr stage,
 {
 }
 
-void USDMeshReader::createObject(Main *bmain, double motionSampleTime)
+void USDMeshReader::create_object(Main *bmain, double motionSampleTime)
 {
   Mesh *mesh = BKE_mesh_add(bmain, m_name.c_str());
 
@@ -206,7 +206,7 @@ void USDMeshReader::createObject(Main *bmain, double motionSampleTime)
   m_object->data = mesh;
 }
 
-void USDMeshReader::readObjectData(Main *bmain, double motionSampleTime)
+void USDMeshReader::read_object_data(Main *bmain, double motionSampleTime)
 {
   Mesh *mesh = (Mesh *)m_object->data;
 
@@ -228,7 +228,7 @@ void USDMeshReader::readObjectData(Main *bmain, double motionSampleTime)
     m_isTimeVarying = true;
 
   if (m_isTimeVarying) {
-    addCacheModifier();
+    add_cache_modifier();
   }
 
   if (m_import_params.import_subdiv) {
@@ -236,11 +236,11 @@ void USDMeshReader::readObjectData(Main *bmain, double motionSampleTime)
     mesh_prim.GetSubdivisionSchemeAttr().Get(&subdivScheme, motionSampleTime);
 
     if (subdivScheme == pxr::UsdGeomTokens->catmullClark) {
-      addSubdivModifier();
+      add_subdiv_modifier();
     }
   }
 
-  USDXformReader::readObjectData(bmain, motionSampleTime);
+  USDXformReader::read_object_data(bmain, motionSampleTime);
 }
 
 bool USDMeshReader::valid() const

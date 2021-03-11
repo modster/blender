@@ -61,7 +61,7 @@ extern "C" {
 
 namespace blender::io::usd {
 
-void USDGeomReader::createObject(Main *bmain, double motionSampleTime)
+void USDGeomReader::create_object(Main *bmain, double motionSampleTime)
 {
 }
 
@@ -75,7 +75,7 @@ bool USDGeomReader::topology_changed(Mesh *existing_mesh, double motionSampleTim
   return true;
 }
 
-void USDGeomReader::readObjectData(Main *bmain, double motionSampleTime)
+void USDGeomReader::read_object_data(Main *bmain, double motionSampleTime)
 {
 }
 
@@ -88,7 +88,7 @@ Mesh *USDGeomReader::read_mesh(struct Mesh *existing_mesh,
   return nullptr;
 }
 
-void USDGeomReader::addCacheModifier()
+void USDGeomReader::add_cache_modifier()
 {
   ModifierData *md = BKE_modifier_new(eModifierType_MeshSequenceCache);
   BLI_addtail(&m_object->modifiers, md);
@@ -102,7 +102,7 @@ void USDGeomReader::addCacheModifier()
   BLI_strncpy(mcmd->object_path, m_prim.GetPath().GetString().c_str(), FILE_MAX);
 }
 
-void USDGeomReader::addSubdivModifier()
+void USDGeomReader::add_subdiv_modifier()
 {
   ModifierData *md = BKE_modifier_new(eModifierType_Subsurf);
   BLI_addtail(&m_object->modifiers, md);
