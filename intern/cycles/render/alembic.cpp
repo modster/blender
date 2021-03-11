@@ -509,8 +509,8 @@ static void add_uvs(AlembicProcedural *proc,
       continue;
     }
 
-    const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
-    const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time_no_check(time);
+    const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time).get_data_or_null();
+    const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time_no_check(time).get_data_or_null();
 
     if (!triangles || !triangles_loops) {
       continue;
@@ -557,7 +557,7 @@ static void add_normals(const Int32ArraySamplePtr face_indices,
                                                                     *normals.getTimeSampling());
       attr.std = ATTR_STD_VERTEX_NORMAL;
 
-      const array<float3> *vertices = cached_data.vertices.data_for_time_no_check(time);
+      const array<float3> *vertices = cached_data.vertices.data_for_time_no_check(time).get_data_or_null();
 
       if (!vertices) {
         return;
@@ -593,7 +593,7 @@ static void add_normals(const Int32ArraySamplePtr face_indices,
                                                                     *normals.getTimeSampling());
       attr.std = ATTR_STD_VERTEX_NORMAL;
 
-      const array<float3> *vertices = cached_data.vertices.data_for_time_no_check(time);
+      const array<float3> *vertices = cached_data.vertices.data_for_time_no_check(time).get_data_or_null();
 
       if (!vertices) {
         return;
@@ -1251,9 +1251,9 @@ void AlembicObject::read_attribute(CachedData &cached_data,
         attribute.element = ATTR_ELEMENT_CORNER;
         attribute.type_desc = TypeFloat2;
 
-        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
+        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time).get_data_or_null();
         const array<int3> *triangles_loops = cached_data.triangles_loops.data_for_time_no_check(
-            time);
+            time).get_data_or_null();
 
         if (!triangles || !triangles_loops) {
           return;
@@ -1306,7 +1306,7 @@ void AlembicObject::read_attribute(CachedData &cached_data,
         attribute.element = ATTR_ELEMENT_CORNER_BYTE;
         attribute.type_desc = TypeRGBA;
 
-        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
+        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time).get_data_or_null();
 
         if (!triangles) {
           return;
@@ -1362,7 +1362,7 @@ void AlembicObject::read_attribute(CachedData &cached_data,
         attribute.element = ATTR_ELEMENT_CORNER_BYTE;
         attribute.type_desc = TypeRGBA;
 
-        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time);
+        const array<int3> *triangles = cached_data.triangles.data_for_time_no_check(time).get_data_or_null();
 
         if (!triangles) {
           return;
@@ -1401,7 +1401,7 @@ static void update_attributes(AttributeSet &attributes, CachedData &cached_data,
   set<Attribute *> cached_attributes;
 
   for (CachedData::CachedAttribute &attribute : cached_data.attributes) {
-    const array<char> *attr_data = attribute.data.data_for_time(frame_time);
+    const array<char> *attr_data = attribute.data.data_for_time(frame_time).get_data_or_null();
 
     Attribute *attr = nullptr;
     if (attribute.std != ATTR_STD_NONE) {
@@ -1722,7 +1722,7 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object,
 
   cached_data.shader.copy_to_socket(frame_time, mesh, mesh->get_shader_socket());
 
-  array<int3> *triangle_data = cached_data.triangles.data_for_time(frame_time);
+  array<int3> *triangle_data = cached_data.triangles.data_for_time(frame_time).get_data_or_null();
   if (triangle_data) {
     array<int> triangles;
     array<bool> smooth;

@@ -51,6 +51,74 @@ template<typename> struct is_array : public std::false_type {
 template<typename T> struct is_array<array<T>> : public std::true_type {
 };
 
+template <typename T>
+class CacheLookupResult {
+    enum class State {
+      NEW_DATA,
+      ALREADY_LOADED,
+      NO_DATA_FOR_TIME,
+    };
+
+    T *data_;
+    State state_;
+
+  protected:
+    CacheLookupResult() = default;
+
+  public:
+    static CacheLookupResult new_data(T *data)
+    {
+      CacheLookupResult result;
+      result.data_ = data;
+      result.state_ = State::NEW_DATA;
+      return result;
+    }
+
+    static CacheLookupResult no_data_found_for_time()
+    {
+      CacheLookupResult result;
+      result.data_ = nullptr;
+      result.state_ = State::NO_DATA_FOR_TIME;
+      return result;
+    }
+
+    static CacheLookupResult already_loaded()
+    {
+      CacheLookupResult result;
+      result.data_ = nullptr;
+      result.state_ = State::ALREADY_LOADED;
+      return result;
+    }
+
+    T &get_data()
+    {
+      assert(state_ == State::NEW_DATA);
+      assert(data_ != nullptr);
+      return *data_;
+    }
+
+    T *get_data_or_null()
+    {
+      // data_ should already be null if there is no new data
+      return data_;
+    }
+
+    bool has_new_data() const
+    {
+      return state_ == State::NEW_DATA;
+    }
+
+    bool has_already_loaded() const
+    {
+      return state_ == State::ALREADY_LOADED;
+    }
+
+    bool has_no_data_for_time() const
+    {
+      return state_ == State::NO_DATA_FOR_TIME;
+    }
+};
+
 /* Store the data set for an animation at every time points, or at the beginning of the animation
  * for constant data.
  *
@@ -82,10 +150,10 @@ template<typename T> class DataStore {
 
   /* Get the data for the specified time.
    * Return nullptr if there is no data or if the data for this time was already loaded. */
-  T *data_for_time(double time)
+  CacheLookupResult<T> data_for_time(double time)
   {
     if (size() == 0) {
-      return nullptr;
+      return CacheLookupResult<T>::no_data_found_for_time();
     }
 
     /* TimeSampling works by matching a frame time to an index, however it expects
@@ -105,26 +173,26 @@ template<typename T> class DataStore {
     DataTimePair &data_pair = data[index_pair.first - size_offset];
 
     if (last_loaded_time == data_pair.time) {
-      return nullptr;
+      return CacheLookupResult<T>::already_loaded();
     }
 
     last_loaded_time = data_pair.time;
 
-    return &data_pair.data;
+    return CacheLookupResult<T>::new_data(&data_pair.data);
   }
 
   /* get the data for the specified time, but do not check if the data was already loaded for this
    * time return nullptr if there is no data */
-  T *data_for_time_no_check(double time)
+  CacheLookupResult<T> data_for_time_no_check(double time)
   {
     if (size() == 0) {
-      return nullptr;
+      return CacheLookupResult<T>::no_data_found_for_time();
     }
 
     std::pair<size_t, Alembic::Abc::chrono_t> index_pair;
     index_pair = time_sampling.getNearIndex(time, data.size());
     DataTimePair &data_pair = data[index_pair.first];
-    return &data_pair.data;
+    return CacheLookupResult<T>::new_data(&data_pair.data);
   }
 
   void add_data(T &data_, double time)
@@ -164,15 +232,15 @@ template<typename T> class DataStore {
    * data for this time or it was already loaded, do nothing. */
   void copy_to_socket(double time, Node *node, const SocketType *socket)
   {
-    T *data_ = data_for_time(time);
+    CacheLookupResult<T> result = data_for_time(time);
 
-    if (data_ == nullptr) {
+    if (!result.has_new_data()) {
       return;
     }
 
     /* TODO(kevindietrich): arrays are emptied when passed to the sockets, so for now we copy the
      * arrays to avoid reloading the data */
-    T value = *data_;
+    T value = result.get_data();
     node->set(*socket, value);
   }
 
