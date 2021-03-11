@@ -48,7 +48,7 @@ static void geo_node_mesh_primitive_cone_layout(uiLayout *layout,
 {
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
-  uiItemR(layout, ptr, "fill_type", 0, IFACE_("Fill"), ICON_NONE);
+  uiItemR(layout, ptr, "fill_type", 0, nullptr, ICON_NONE);
 }
 
 static void geo_node_mesh_primitive_cone_init(bNodeTree *UNUSED(ntree), bNode *node)
