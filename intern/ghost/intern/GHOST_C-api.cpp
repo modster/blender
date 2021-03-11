@@ -497,6 +497,13 @@ GHOST_TDrawingContextType GHOST_GetDrawingContextType(GHOST_WindowHandle windowh
   return window->getDrawingContextType();
 }
 
+GHOST_ContextHandle GHOST_GetDrawingContext(GHOST_WindowHandle windowhandle)
+{
+  GHOST_IWindow *window = (GHOST_IWindow *)windowhandle;
+
+  return (GHOST_ContextHandle)window->getDrawingContext();
+}
+
 GHOST_TSuccess GHOST_SetDrawingContextType(GHOST_WindowHandle windowhandle,
                                            GHOST_TDrawingContextType type)
 {

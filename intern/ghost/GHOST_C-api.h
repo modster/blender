@@ -544,6 +544,13 @@ extern int GHOST_GetValid(GHOST_WindowHandle windowhandle);
 extern GHOST_TDrawingContextType GHOST_GetDrawingContextType(GHOST_WindowHandle windowhandle);
 
 /**
+ * Returns the drawing context used in this window.
+ * \param windowhandle: The handle to the window.
+ * \return The window drawing context.
+ */
+extern GHOST_ContextHandle GHOST_GetDrawingContext(GHOST_WindowHandle windowhandle);
+
+/**
  * Tries to install a rendering context in this window.
  * \param windowhandle: The handle to the window.
  * \param type: The type of rendering context installed.

@@ -30,6 +30,8 @@
 #include <stdlib.h>
 #include <string>
 
+class GHOST_IContext;
+
 /**
  * Interface for GHOST windows.
  *
@@ -70,6 +72,12 @@ class GHOST_IWindow {
    * \return The current type of drawing context.
    */
   virtual GHOST_TDrawingContextType getDrawingContextType() = 0;
+
+  /**
+   * Returns the type of drawing context used in this window.
+   * \return The current type of drawing context.
+   */
+  virtual GHOST_IContext *getDrawingContext() = 0;
 
   /**
    * Tries to install a rendering context in this window.

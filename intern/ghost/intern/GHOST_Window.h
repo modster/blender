@@ -246,6 +246,12 @@ class GHOST_Window : public GHOST_IWindow {
   inline GHOST_TDrawingContextType getDrawingContextType();
 
   /**
+   * Returns the drawing context used in this window.
+   * \return The drawing context.
+   */
+  inline GHOST_IContext *getDrawingContext();
+
+  /**
    * Tries to install a rendering context in this window.
    * Child classes do not need to overload this method,
    * They should overload #newDrawingContext instead.
@@ -426,6 +432,11 @@ class GHOST_Window : public GHOST_IWindow {
 inline GHOST_TDrawingContextType GHOST_Window::getDrawingContextType()
 {
   return m_drawingContextType;
+}
+
+inline GHOST_IContext *GHOST_Window::getDrawingContext()
+{
+  return m_context;
 }
 
 inline bool GHOST_Window::getCursorVisibility() const
