@@ -83,6 +83,9 @@ typedef struct PoseBlendData {
   bool needs_redraw;
   bool is_bone_selection_relevant;
 
+  /* Blend factor, interval [0, 1] for interpolating between current and given pose. */
+  float blend_factor;
+
   /** PoseChannelBackup structs for restoring poses. */
   ListBase backups;
 
@@ -91,6 +94,9 @@ typedef struct PoseBlendData {
 
   Scene *scene;  /* For auto-keying. */
   ScrArea *area; /* For drawing status text. */
+
+  /** Info-text to print in header. */
+  char headerstr[UI_MAX_DRAW_STR];
 } PoseBlendData;
 
 /* simple struct for storing backup info for one pose channel */
@@ -237,11 +243,17 @@ static void poselib_blend_apply(bContext *C, wmOperator *op)
   PoseBlendData *pbd = (PoseBlendData *)op->customdata;
 
   if (pbd->state == POSE_BLEND_BLENDING) {
-    /* TODO(Sybren): implement these: */
-    ED_workspace_status_text(C,
-                             TIP_("Tab: show original pose; Mousewheel: change blend percentage"));
+    BLI_snprintf(pbd->headerstr,
+                 sizeof(pbd->headerstr),
+                 TIP_("PoseLib blending: \"%s\" at %3.0f%%"),
+                 pbd->act->id.name + 2,
+                 pbd->blend_factor * 100);
+    ED_area_status_text(pbd->area, pbd->headerstr);
+
+    ED_workspace_status_text(C, TIP_("Tab: show original pose; Wheel: change blend percentage"));
   }
   else {
+    ED_area_status_text(pbd->area, TIP_("PoseLib showing original pose"));
     ED_workspace_status_text(C, TIP_("Tab: show blended pose"));
   }
 
@@ -328,11 +340,13 @@ static int poselib_blend_handle_event(bContext *UNUSED(C), wmOperator *op, const
       pbd->needs_redraw = true;
       break;
 
-    /* TODO(Sybren): add events for changing the blend amount. */
+    /* TODO(Sybren): use better UI for slider. */
     case WHEELUPMOUSE:
+      pbd->blend_factor = fmin(pbd->blend_factor + 0.1f, 1.0f);
       pbd->needs_redraw = true;
       break;
     case WHEELDOWNMOUSE:
+      pbd->blend_factor = fmax(pbd->blend_factor - 0.1f, 0.0f);
       pbd->needs_redraw = true;
       break;
   }
@@ -398,6 +412,7 @@ static bool poselib_blend_init_data(bContext *C, wmOperator *op)
 
   pbd->state = POSE_BLEND_INIT;
   pbd->needs_redraw = true;
+  pbd->blend_factor = 0.5f;
 
   /* Make backups for blending and restoring the pose. */
   poselib_backup_posecopy(pbd);
