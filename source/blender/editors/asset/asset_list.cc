@@ -25,6 +25,8 @@
 
 #include <optional>
 
+#include "BKE_screen.h"
+
 #include "BLI_function_ref.hh"
 #include "BLI_hash.hh"
 #include "BLI_map.hh"
@@ -36,6 +38,7 @@
 
 #include "ED_asset.h"
 #include "ED_fileselect.h"
+#include "ED_screen.h"
 
 /* XXX uses private header of file-space. */
 #include "../space_file/filelist.h"
@@ -131,15 +134,6 @@ class AssetList {
           &U, library_ref_.custom_library_index);
     }
 
-    char path[FILE_MAXDIR] = "";
-    if (user_library) {
-      BLI_strncpy(path, user_library->path, sizeof(path));
-      filelist_setdir(files, path);
-    }
-    else {
-      filelist_setdir(files, path);
-    }
-
     /* Relevant bits from file_refresh(). */
     /* TODO pass options properly. */
     filelist_setrecursion(files, 1);
@@ -151,7 +145,7 @@ class AssetList {
      * the plan to separate the view (preview caching, filtering, etc. ) from the data. */
     filelist_setfilter_options(
         files,
-        true,
+        filter_settings != nullptr,
         true,
         true, /* Just always hide parent, prefer to not add an extra user option for this. */
         FILE_TYPE_BLENDERLIB,
@@ -159,19 +153,38 @@ class AssetList {
         true,
         "",
         "");
+
+    char path[FILE_MAXDIR] = "";
+    if (user_library) {
+      BLI_strncpy(path, user_library->path, sizeof(path));
+      filelist_setdir(files, path);
+    }
+    else {
+      filelist_setdir(files, path);
+    }
   }
 
   void fetch(const bContext &C)
   {
     FileList *files = filelist_.get();
 
+    if (filelist_needs_force_reset(files)) {
+      filelist_readjob_stop(CTX_wm_manager(&C), CTX_data_scene(&C));
+      filelist_clear(files);
+    }
+
     if (filelist_needs_reading(files)) {
       if (!filelist_pending(files)) {
-        filelist_readjob_start(files, &C);
+        filelist_readjob_start(files, NC_ASSET | ND_ASSET_LIST_READING, &C);
       }
     }
     filelist_sort(files);
     filelist_filter(files);
+  }
+
+  bool needsRefetch() const
+  {
+    return filelist_needs_force_reset(filelist_.get());
   }
 
   void iterate(AssetListIterFn fn)
@@ -202,9 +215,8 @@ class AssetList {
     {
       const bool previews_running = filelist_cache_previews_running(files);
       if (previews_running && !previews_timer) {
-        /* TODO NC_WINDOW_to force full redraw.  */
         previews_timer = WM_event_add_timer_notifier(
-            CTX_wm_manager(C), CTX_wm_window(C), NC_WINDOW, 0.01);
+            CTX_wm_manager(C), CTX_wm_window(C), NC_ASSET | ND_ASSET_LIST_PREVIEW, 0.01);
       }
       if (!previews_running && previews_timer) {
         /* Preview is not running, no need to keep generating update events! */
@@ -212,6 +224,44 @@ class AssetList {
         previews_timer = NULL;
       }
     }
+  }
+
+  /**
+   * \return True if the asset-list needs a UI redraw.
+   */
+  bool listen(const wmNotifier &notifier) const
+  {
+    switch (notifier.category) {
+      case NC_ASSET:
+        if (ELEM(notifier.data, ND_ASSET_LIST_READING, ND_ASSET_LIST_PREVIEW)) {
+          return true;
+        }
+        if (ELEM(notifier.action, NA_ADDED, NA_REMOVED)) {
+          return true;
+        }
+        break;
+    }
+
+    return false;
+  }
+
+  void tagMainDataDirty() const
+  {
+    FileList *files = filelist_.get();
+
+    if (filelist_needs_reset_on_main_changes(files)) {
+      /* Full refresh of the file list if local asset data was changed. Refreshing this view
+       * is cheap and users expect this to be updated immediately. */
+      filelist_tag_force_reset(files);
+    }
+  }
+
+  void remapID(ID * /*id_old*/, ID * /*id_new*/) const
+  {
+    /* Trigger full refetch  of the file list if main data was changed, don't even attempt remap
+     * pointers. We could give file list types a id-remap callback, but it's probably not worth it.
+     * Refreshing local file lists is relatively cheap. */
+    tagMainDataDirty();
   }
 
   blender::StringRef filepath()
@@ -246,7 +296,7 @@ class AssetListStorage {
     std::tuple list_create_info = ensure_list_storage(library_reference, *filesel_type);
     AssetList &list = std::get<0>(list_create_info);
     const bool is_new = std::get<1>(list_create_info);
-    if (is_new) {
+    if (is_new || list.needsRefetch()) {
       list.setup(filter_settings);
       list.fetch(C);
     }
@@ -260,6 +310,20 @@ class AssetListStorage {
   static AssetList *lookup_list(const AssetLibraryReference &library_ref)
   {
     return global_storage_.lookup_ptr(library_ref);
+  }
+
+  static void tagMainDataDirty()
+  {
+    for (AssetList &list : global_storage_.values()) {
+      list.tagMainDataDirty();
+    }
+  }
+
+  static void remapID(ID *id_new, ID *id_old)
+  {
+    for (AssetList &list : global_storage_.values()) {
+      list.remapID(id_new, id_old);
+    }
   }
 
  private:
@@ -319,11 +383,6 @@ void ED_assetlist_ensure_previews_job(const AssetLibraryReference *library_refer
   }
 }
 
-void ED_assetlist_storage_exit()
-{
-  AssetListStorage::destruct();
-}
-
 /* TODO expose AssetList with an iterator? */
 void ED_assetlist_iterate(const AssetLibraryReference *library_reference, AssetListIterFn fn)
 {
@@ -350,6 +409,49 @@ const char *ED_assetlist_library_path(const AssetLibraryReference *library_refer
     return list->filepath().data();
   }
   return nullptr;
+}
+
+/**
+ * \return True if the region needs a UI redraw.
+ */
+bool ED_assetlist_listen(const AssetLibraryReference *library_reference,
+                         const wmNotifier *notifier)
+{
+  AssetList *list = AssetListStorage::lookup_list(*library_reference);
+  if (list) {
+    return list->listen(*notifier);
+  }
+  return false;
+}
+
+/**
+ * Tag all asset lists in the storage that show main data as needing an update (refetch).
+ *
+ * This only tags the data. If the asset list is visible on screen, the space is still responsible
+ * for ensuring the necessary redraw. It can use #ED_assetlist_listen() to check if the asset-list
+ * needs a redraw for a given notifier.
+ */
+void ED_assetlist_storage_tag_main_data_dirty()
+{
+  AssetListStorage::tagMainDataDirty();
+}
+
+/**
+ * Remapping of ID pointers within the asset lists. Typically called when an ID is deleted to clear
+ * all references to it (\a id_new is null then).
+ */
+void ED_assetlist_storage_id_remap(ID *id_old, ID *id_new)
+{
+  AssetListStorage::remapID(id_old, id_new);
+}
+
+/**
+ * Can't wait for static deallocation to run. There's nested data allocated with our guarded
+ * allocator, it will complain about unfreed memory on exit.
+ */
+void ED_assetlist_storage_exit()
+{
+  AssetListStorage::destruct();
 }
 
 /** \} */

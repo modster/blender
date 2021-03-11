@@ -46,6 +46,9 @@ bool ED_asset_mark_id(const bContext *C, ID *id)
 
   UI_icon_render_id(C, nullptr, id, ICON_SIZE_PREVIEW, true);
 
+  /* Important for asset storage to update properly! */
+  ED_assetlist_storage_tag_main_data_dirty();
+
   return true;
 }
 
@@ -57,6 +60,9 @@ bool ED_asset_clear_id(ID *id)
   BKE_asset_metadata_free(&id->asset_data);
   /* Don't clear fake user here, there's no guarantee that it was actually set by
    * #ED_asset_mark_id(), it might have been something/someone else. */
+
+  /* Important for asset storage to update properly! */
+  ED_assetlist_storage_tag_main_data_dirty();
 
   return true;
 }

@@ -28,6 +28,7 @@
 #include "BLO_readfile.h"
 
 #include "ED_asset.h"
+#include "ED_screen.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -45,7 +46,7 @@
 #include "RNA_access.h"
 
 struct AssetViewListData {
-  AssetLibraryReference *asset_library;
+  AssetLibraryReference asset_library;
   bScreen *screen;
 };
 
@@ -57,7 +58,8 @@ static void asset_view_item_but_drag_set(uiBut *but,
     UI_but_drag_set_id(but, id);
   }
   else {
-    const blender::StringRef asset_list_path = ED_assetlist_library_path(list_data->asset_library);
+    const blender::StringRef asset_list_path = ED_assetlist_library_path(
+        &list_data->asset_library);
     char blend_path[FILE_MAX_LIBEXTRA];
 
     char path[FILE_MAX_LIBEXTRA];
@@ -116,12 +118,22 @@ static void asset_view_draw_item(uiList *ui_list,
   asset_view_item_but_drag_set(but, list_data, file);
 }
 
+static void asset_view_listener(uiList *ui_list, wmRegionListenerParams *params)
+{
+  AssetViewListData *list_data = (AssetViewListData *)ui_list->dyn_data->customdata;
+
+  if (ED_assetlist_listen(&list_data->asset_library, params->notifier)) {
+    ED_region_tag_redraw(params->region);
+  }
+}
+
 static uiListType *UI_UL_asset_view(void)
 {
   uiListType *list_type = (uiListType *)MEM_callocN(sizeof(*list_type), __func__);
 
   BLI_strncpy(list_type->idname, "UI_UL_asset_view", sizeof(list_type->idname));
   list_type->draw_item = asset_view_draw_item;
+  list_type->listener = asset_view_listener;
 
   return list_type;
 }
@@ -138,7 +150,7 @@ static void asset_view_template_list_item_iter_fn(PointerRNA *UNUSED(dataptr),
                                                   void *customdata)
 {
   AssetViewListData *asset_iter_data = (AssetViewListData *)customdata;
-  ED_assetlist_iterate(asset_iter_data->asset_library, [&](FileDirEntry &file) {
+  ED_assetlist_iterate(&asset_iter_data->asset_library, [&](FileDirEntry &file) {
     PointerRNA itemptr;
     RNA_pointer_create(&asset_iter_data->screen->id, &RNA_FileSelectEntry, &file, &itemptr);
     fn(iter_data, &itemptr);
@@ -164,9 +176,10 @@ void uiTemplateAssetView(uiLayout *layout,
   ED_assetlist_fetch(&asset_library, filter_settings, C);
   ED_assetlist_ensure_previews_job(&asset_library, C);
 
-  AssetViewListData iter_data;
-  iter_data.asset_library = &asset_library;
-  iter_data.screen = CTX_wm_screen(C);
+  AssetViewListData *list_data = (AssetViewListData *)MEM_mallocN(sizeof(*list_data),
+                                                                  "AssetViewListData");
+  list_data->asset_library = asset_library;
+  list_data->screen = CTX_wm_screen(C);
 
   /* TODO can we store more properties in the UIList? Asset specific filtering,  */
   /* TODO how can this be refreshed on updates? Maybe a notifier listener callback for the
@@ -176,21 +189,26 @@ void uiTemplateAssetView(uiLayout *layout,
   PointerRNA rna_nullptr = PointerRNA_NULL;
   /* TODO can we have some kind of model-view API to handle referencing, filtering and lazy loading
    * (of previews) of the items? */
-  uiTemplateList_ex(col,
-                    C,
-                    asset_view_template_list_item_iter_fn,
-                    "UI_UL_asset_view",
-                    "asset_view",
-                    &rna_nullptr,
-                    "",
-                    &colors_poin,
-                    "active_index",
-                    nullptr,
-                    0,
-                    0,
-                    UILST_LAYOUT_BIG_PREVIEW_GRID,
-                    0,
-                    false,
-                    false,
-                    &iter_data);
+  uiList *list = uiTemplateList_ex(col,
+                                   C,
+                                   asset_view_template_list_item_iter_fn,
+                                   "UI_UL_asset_view",
+                                   "asset_view",
+                                   &rna_nullptr,
+                                   "",
+                                   &colors_poin,
+                                   "active_index",
+                                   nullptr,
+                                   0,
+                                   0,
+                                   UILST_LAYOUT_BIG_PREVIEW_GRID,
+                                   0,
+                                   false,
+                                   false,
+                                   list_data);
+
+  if (!list) {
+    /* List creation failed. */
+    MEM_freeN(list_data);
+  }
 }

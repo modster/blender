@@ -269,6 +269,7 @@ typedef struct uiListDyn {
   int resize;
   int resize_prev;
 
+  /* Allocated custom data. Free'ed together with the uiList (and when re-assigning). */
   void *customdata;
 
   /* Filtering data. */

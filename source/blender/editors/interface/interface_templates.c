@@ -6730,23 +6730,23 @@ static void ui_template_list_layout_draw(bContext *C,
   }
 }
 
-void uiTemplateList_ex(uiLayout *layout,
-                       bContext *C,
-                       uiTemplateListItemsIterFn iter_items,
-                       const char *listtype_name,
-                       const char *list_id,
-                       PointerRNA *dataptr,
-                       const char *propname,
-                       PointerRNA *active_dataptr,
-                       const char *active_propname,
-                       const char *item_dyntip_propname,
-                       int rows,
-                       int maxrows,
-                       int layout_type,
-                       int columns,
-                       bool sort_reverse,
-                       bool sort_lock,
-                       void *customdata)
+uiList *uiTemplateList_ex(uiLayout *layout,
+                          bContext *C,
+                          uiTemplateListItemsIterFn iter_items,
+                          const char *listtype_name,
+                          const char *list_id,
+                          PointerRNA *dataptr,
+                          const char *propname,
+                          PointerRNA *active_dataptr,
+                          const char *active_propname,
+                          const char *item_dyntip_propname,
+                          int rows,
+                          int maxrows,
+                          int layout_type,
+                          int columns,
+                          bool sort_reverse,
+                          bool sort_lock,
+                          void *customdata)
 {
   TemplateListInputData input_data = {0};
   uiListType *ui_list_type;
@@ -6759,7 +6759,7 @@ void uiTemplateList_ex(uiLayout *layout,
                                       item_dyntip_propname,
                                       &input_data,
                                       &ui_list_type)) {
-    return;
+    return NULL;
   }
 
   uiListDrawItemFunc draw_item = ui_list_type->draw_item ? ui_list_type->draw_item :
@@ -6772,6 +6772,7 @@ void uiTemplateList_ex(uiLayout *layout,
   uiList *ui_list = ui_list_ensure(C, ui_list_type, list_id, layout_type, sort_reverse, sort_lock);
   uiListDyn *dyn_data = ui_list->dyn_data;
 
+  MEM_SAFE_FREE(dyn_data->customdata);
   dyn_data->customdata = customdata;
 
   /* When active item changed since last draw, scroll to it. */
@@ -6795,6 +6796,8 @@ void uiTemplateList_ex(uiLayout *layout,
   ui_template_list_layout_draw(C, ui_list, layout, &input_data, &items, &layout_data);
 
   ui_template_list_free_items(&items);
+
+  return ui_list;
 }
 
 static void template_list_rna_collection_iter_fn(PointerRNA *dataptr,

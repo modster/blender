@@ -24,7 +24,10 @@
 extern "C" {
 #endif
 
+struct AssetFilterSettings;
 struct AssetLibraryReference;
+struct bContext;
+struct wmNotifier;
 
 bool ED_asset_mark_id(const struct bContext *C, struct ID *id);
 bool ED_asset_clear_id(struct ID *id);
@@ -32,18 +35,23 @@ bool ED_asset_clear_id(struct ID *id);
 bool ED_asset_can_make_single_from_context(const struct bContext *C);
 
 int ED_asset_library_reference_to_enum_value(const struct AssetLibraryReference *library);
-AssetLibraryReference ED_asset_library_reference_from_enum_value(int value);
+struct AssetLibraryReference ED_asset_library_reference_from_enum_value(int value);
 
 void ED_assetlist_fetch(const struct AssetLibraryReference *library_reference,
                         const struct AssetFilterSettings *filter_settings,
-                        const bContext *C);
+                        const struct bContext *C);
 void ED_assetlist_ensure_previews_job(const struct AssetLibraryReference *library_reference,
-                                      bContext *C);
+                                      struct bContext *C);
+void ED_assetlist_storage_tag_main_data_dirty(void);
+void ED_assetlist_storage_id_remap(struct ID *id_old, struct ID *id_new);
 void ED_assetlist_storage_exit(void);
 
 struct FileDirEntry;
 struct ImBuf *ED_assetlist_asset_image_get(const struct FileDirEntry *file);
-const char *ED_assetlist_library_path(const AssetLibraryReference *library_reference);
+const char *ED_assetlist_library_path(const struct AssetLibraryReference *library_reference);
+
+bool ED_assetlist_listen(const struct AssetLibraryReference *library_reference,
+                         const struct wmNotifier *notifier);
 
 void ED_operatortypes_asset(void);
 
