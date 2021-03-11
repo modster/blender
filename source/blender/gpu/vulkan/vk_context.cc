@@ -52,12 +52,32 @@ VKContext::VKContext(void *ghost_window, void *ghost_context)
                          &device_,
                          &graphic_queue_familly_);
 
+  vkGetDeviceQueue(device_, graphic_queue_familly_, 0, &graphic_queue_);
+
+  {
+    VkCommandPoolCreateInfo info = {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+    info.queueFamilyIndex = graphic_queue_familly_;
+    vkCreateCommandPool(device_, &info, nullptr, &graphic_cmd_pool_);
+  }
+
   /* For offscreen contexts. Default framebuffer is empty. */
   back_left = new VKFrameBuffer("back_left");
+
+  {
+    VmaAllocatorCreateInfo info = {};
+    /* TODO use same vulkan version as GHOST. */
+    info.vulkanApiVersion = VK_API_VERSION_1_0;
+    info.physicalDevice = physical_device_;
+    info.device = device_;
+    info.instance = instance_;
+    vmaCreateAllocator(&info, &mem_allocator_);
+  }
 }
 
 VKContext::~VKContext()
 {
+  vkDestroyCommandPool(device_, graphic_cmd_pool_, nullptr);
+  vmaDestroyAllocator(mem_allocator_);
 }
 
 void VKContext::activate()
@@ -93,6 +113,50 @@ void VKContext::activate()
 void VKContext::deactivate()
 {
   immDeactivate();
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Command buffers
+ * \{ */
+
+VkCommandBuffer VKContext::single_use_command_buffer_begin(void)
+{
+  VkCommandBuffer cmd_buf;
+  {
+    VkCommandBufferAllocateInfo info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+    info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    info.commandPool = graphic_cmd_pool_;
+    info.commandBufferCount = 1;
+    vkAllocateCommandBuffers(device_, &info, &cmd_buf);
+  }
+  {
+    VkCommandBufferBeginInfo info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(cmd_buf, &info);
+  }
+  return cmd_buf;
+}
+
+void VKContext::single_use_command_buffer_end(VkCommandBuffer cmd_buf)
+{
+  vkEndCommandBuffer(cmd_buf);
+
+  this->submit_and_wait(cmd_buf);
+
+  vkFreeCommandBuffers(device_, graphic_cmd_pool_, 1, &cmd_buf);
+}
+
+void VKContext::submit_and_wait(VkCommandBuffer cmd_buf)
+{
+  {
+    VkSubmitInfo info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+    info.commandBufferCount = 1;
+    info.pCommandBuffers = &cmd_buf;
+    vkQueueSubmit(graphic_queue_, 1, &info, VK_NULL_HANDLE);
+  }
+  vkQueueWaitIdle(graphic_queue_);
 }
 
 /** \} */
