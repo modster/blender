@@ -29,6 +29,8 @@
 #include "BLI_utildefines.h"
 #include "MEM_guardedalloc.h"
 
+#include "BKE_global.h"
+
 #include "GPU_state.h"
 
 #include "../generic/py_capi_utils.h"
@@ -1115,6 +1117,25 @@ static PyObject *Buffer_repr(Buffer *self)
     ret_set_##ret gl##funcname(arg_var arg_list); \
     ret_ret_##ret; \
   }
+
+#ifdef WITH_VULKAN
+#  undef BGL_Wrap
+#  define BGL_Wrap(funcname, ret, arg_list) \
+    static PyObject *Method_##funcname(PyObject *UNUSED(self), PyObject *args) \
+    { \
+      arg_def arg_list; \
+      ret_def_##ret; \
+      if (!PyArg_ParseTuple(args, arg_str arg_list, arg_ref arg_list)) { \
+        return NULL; \
+      } \
+      if (G.debug & G_DEBUG_VK_CONTEXT) { \
+        return NULL; \
+      } \
+      GPU_bgl_start(); \
+      ret_set_##ret gl##funcname(arg_var arg_list); \
+      ret_ret_##ret; \
+    }
+#endif
 
 /* GL_VERSION_1_0 */
 BGL_Wrap(BlendFunc, void, (GLenum, GLenum));
