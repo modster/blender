@@ -516,8 +516,10 @@ geometry_node_categories = [
         NodeItem("GeometryNodeBoolean"),
         NodeItem("GeometryNodeTriangulate"),
         NodeItem("GeometryNodeEdgeSplit"),
-        NodeItem("GeometryNodeSubdivisionSurface"),
-        # GeometryNodeCategory("GEO_MESH_PRIMITIVES", "Primitives", items=[
+        NodeItem("GeometryNodeSubdivideSmooth"),
+        NodeItem("GeometryNodeSubdivide"),
+
+        # These should be in a submenu, but that requires refactoring to remove NodeItem.
         NodeItem("GeometryNodeMeshPlane"),
         NodeItem("GeometryNodeMeshCube"),
         NodeItem("GeometryNodeMeshCircle"),
@@ -527,10 +529,6 @@ geometry_node_categories = [
         NodeItem("GeometryNodeMeshCone"),
         NodeItem("GeometryNodeMeshTorus"),
         NodeItem("GeometryNodeMeshGrid"),
-        # ]),
-        NodeItem("GeometryNodeSubdivisionSurfaceSimple"),
-        NodeItem("GeometryNodeSubdivideSmooth"),
-        NodeItem("GeometryNodeSubdivide"),
     ]),
     GeometryNodeCategory("GEO_POINT", "Point", items=[
         NodeItem("GeometryNodePointDistribute"),
