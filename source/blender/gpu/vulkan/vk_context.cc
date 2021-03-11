@@ -39,6 +39,10 @@ VKContext::VKContext(void *ghost_window, void *ghost_context)
 {
   ghost_window_ = ghost_window;
 
+  if (ghost_window != nullptr) {
+    ghost_context = GHOST_GetDrawingContext((GHOST_WindowHandle)ghost_window);
+  }
+
   state_manager = new VKStateManager();
   imm = new VKImmediate();
 

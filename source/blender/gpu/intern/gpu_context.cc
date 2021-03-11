@@ -103,7 +103,7 @@ Context *Context::get()
 
 /* -------------------------------------------------------------------- */
 
-GPUContext *GPU_context_create(void *ghost_window)
+GPUContext *GPU_context_create(void *ghost_window, void *ghost_context)
 {
   if (GPUBackend::get() == nullptr) {
     /* FIXME We should get the context type from ghost instead of guessing it. */
@@ -116,7 +116,7 @@ GPUContext *GPU_context_create(void *ghost_window)
     GPU_backend_init(type);
   }
 
-  Context *ctx = GPUBackend::get()->context_alloc(ghost_window, nullptr);
+  Context *ctx = GPUBackend::get()->context_alloc(ghost_window, ghost_context);
 
   GPU_context_active_set(wrap(ctx));
   return wrap(ctx);

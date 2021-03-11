@@ -265,7 +265,7 @@ static void drw_deferred_shader_add(GPUMaterial *mat, bool deferred)
     }
     else {
       comp->gl_context = WM_opengl_context_create();
-      comp->gpu_context = GPU_context_create(NULL);
+      comp->gpu_context = GPU_context_create(NULL, comp->gl_context);
       GPU_context_active_set(NULL);
 
       WM_opengl_context_activate(DST.gl_context);
