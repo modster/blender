@@ -1082,7 +1082,7 @@ void GHOST_GetVulkanBackbuffer(GHOST_WindowHandle windowhandle,
                                void *command_buffer,
                                void *render_pass,
                                void *extent,
-                               uint32_t *fb_id);
+                               GHOST_TUns32 *fb_id);
 
 #endif
 

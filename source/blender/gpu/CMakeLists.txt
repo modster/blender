@@ -200,6 +200,7 @@ if(WITH_VULKAN)
 
   list(APPEND SRC
     vulkan/vk_backend.cc
+    vulkan/vk_context.cc
     vulkan/vk_framebuffer.cc
 
     vulkan/vk_backend.hh

@@ -46,7 +46,7 @@ void GPU_backend_exit(void);
 /** Opaque type hiding blender::gpu::Context. */
 typedef struct GPUContext GPUContext;
 
-GPUContext *GPU_context_create(void *ghost_window, void *ghost_context);
+GPUContext *GPU_context_create(void *ghost_window);
 void GPU_context_discard(GPUContext *);
 
 void GPU_context_active_set(GPUContext *);

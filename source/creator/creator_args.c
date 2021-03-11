@@ -563,7 +563,7 @@ static int arg_handle_print_help(int UNUSED(argc), const char **UNUSED(argv), vo
 
   printf("\n");
   printf("Graphic Backend Options:\n");
-  BLI_argsPrintArgDoc(ba, "--gpu-backend");
+  BLI_args_print_arg_doc(ba, "--gpu-backend");
 
   printf("\n");
   printf("Debug Options:\n");
@@ -2103,6 +2103,8 @@ void main_args_setup(bContext *C, bArgs *ba)
   BLI_args_add(ba, NULL, "--log-show-timestamp", CB(arg_handle_log_show_timestamp_set), ba);
   BLI_args_add(ba, NULL, "--log-file", CB(arg_handle_log_file_set), ba);
 
+  BLI_args_add(ba, NULL, "--gpu-backend", CB(arg_gpu_backend_set), ba);
+
   BLI_args_add(ba, "-d", "--debug", CB(arg_handle_debug_mode_set), ba);
 
 #  ifdef WITH_FFMPEG
@@ -2169,143 +2171,107 @@ void main_args_setup(bContext *C, bArgs *ba)
 #  ifdef WITH_CYCLES_LOGGING
   BLI_args_add(ba, NULL, "--debug-cycles", CB(arg_handle_debug_mode_cycles), NULL);
 #  endif
+  BLI_args_add(ba, NULL, "--debug-memory", CB(arg_handle_debug_mode_memory_set), NULL);
 
-  BLI_argsAdd(ba, 1, NULL, "--debug-memory", CB(arg_handle_debug_mode_memory_set), NULL);
+  BLI_args_add(ba, NULL, "--debug-value", CB(arg_handle_debug_value_set), NULL);
+  BLI_args_add(ba,
+               NULL,
+               "--debug-jobs",
+               CB_EX(arg_handle_debug_mode_generic_set, jobs),
+               (void *)G_DEBUG_JOBS);
+  BLI_args_add(
+      ba, NULL, "--debug-gpu", CB_EX(arg_handle_debug_mode_generic_set, gpu), (void *)G_DEBUG_GPU);
+  BLI_args_add(ba,
+               NULL,
+               "--debug-depsgraph",
+               CB_EX(arg_handle_debug_mode_generic_set, depsgraph),
+               (void *)G_DEBUG_DEPSGRAPH);
+  BLI_args_add(ba,
+               NULL,
+               "--debug-depsgraph-build",
+               CB_EX(arg_handle_debug_mode_generic_set, depsgraph_build),
+               (void *)G_DEBUG_DEPSGRAPH_BUILD);
+  BLI_args_add(ba,
+               NULL,
+               "--debug-depsgraph-eval",
+               CB_EX(arg_handle_debug_mode_generic_set, depsgraph_eval),
+               (void *)G_DEBUG_DEPSGRAPH_EVAL);
+  BLI_args_add(ba,
+               NULL,
+               "--debug-depsgraph-tag",
+               CB_EX(arg_handle_debug_mode_generic_set, depsgraph_tag),
+               (void *)G_DEBUG_DEPSGRAPH_TAG);
+  BLI_args_add(ba,
+               NULL,
+               "--debug-depsgraph-time",
+               CB_EX(arg_handle_debug_mode_generic_set, depsgraph_time),
+               (void *)G_DEBUG_DEPSGRAPH_TIME);
+  BLI_args_add(ba,
 
-  BLI_argsAdd(ba, 1, NULL, "--debug-value", CB(arg_handle_debug_value_set), NULL);
-  BLI_argsAdd(ba,
-              1,
-              NULL,
-              "--debug-jobs",
-              CB_EX(arg_handle_debug_mode_generic_set, jobs),
-              (void *)G_DEBUG_JOBS);
-  BLI_argsAdd(ba,
-              1,
-              NULL,
-              "--debug-gpu",
-              CB_EX(arg_handle_debug_mode_generic_set, gpu),
-              (void *)G_DEBUG_GPU);
-  BLI_argsAdd(ba,
-              1,
-              NULL,
-              "--debug-depsgraph",
-              CB_EX(arg_handle_debug_mode_generic_set, depsgraph),
-              (void *)G_DEBUG_DEPSGRAPH);
-  BLI_argsAdd(ba,
-              1,
-              NULL,
-              "--debug-depsgraph-build",
-              CB_EX(arg_handle_debug_mode_generic_set, depsgraph_build),
-              (void *)G_DEBUG_DEPSGRAPH_BUILD);
-  BLI_argsAdd(ba,
-              1,
-              NULL,
-              "--debug-depsgraph-eval",
-              CB_EX(arg_handle_debug_mode_generic_set, depsgraph_eval),
-              (void *)G_DEBUG_DEPSGRAPH_EVAL);
-  BLI_argsAdd(ba,
-              1,
-              NULL,
-              "--debug-depsgraph-tag",
-              CB_EX(arg_handle_debug_mode_generic_set, depsgraph_tag),
-              (void *)G_DEBUG_DEPSGRAPH_TAG);
-  BLI_argsAdd(ba,
-              1,
-              NULL,
-              "--debug-depsgraph-time",
-              CB_EX(arg_handle_debug_mode_generic_set, depsgraph_time),
-              (void *)G_DEBUG_DEPSGRAPH_TIME);
-  BLI_argsAdd(ba,
-              1,
-              NULL,
-              "--debug-depsgraph-no-threads",
-              CB_EX(arg_handle_debug_mode_generic_set, depsgraph_no_threads),
-              (void *)G_DEBUG_DEPSGRAPH_NO_THREADS);
-  BLI_argsAdd(ba,
-              1,
-              NULL,
-              "--debug-depsgraph-pretty",
-              CB_EX(arg_handle_debug_mode_generic_set, depsgraph_pretty),
-              (void *)G_DEBUG_DEPSGRAPH_PRETTY);
-  BLI_argsAdd(ba,
-              1,
-              NULL,
-              "--debug-depsgraph-uuid",
-              CB_EX(arg_handle_debug_mode_generic_set, depsgraph_build),
-              (void *)G_DEBUG_DEPSGRAPH_UUID);
-  BLI_argsAdd(ba,
-              1,
-              NULL,
-              "--debug-gpumem",
-              CB_EX(arg_handle_debug_mode_generic_set, gpumem),
-              (void *)G_DEBUG_GPU_MEM);
-  BLI_argsAdd(ba,
-              1,
-              NULL,
-              "--debug-gpu-shaders",
-              CB_EX(arg_handle_debug_mode_generic_set, gpumem),
-              (void *)G_DEBUG_GPU_SHADERS);
-  BLI_argsAdd(ba,
-              1,
-              NULL,
-              "--debug-gpu-force-workarounds",
-              CB_EX(arg_handle_debug_mode_generic_set, gpumem),
-              (void *)G_DEBUG_GPU_FORCE_WORKAROUNDS);
-  BLI_argsAdd(ba, 1, NULL, "--debug-exit-on-error", CB(arg_handle_debug_exit_on_error), NULL);
+               NULL,
+               "--debug-depsgraph-no-threads",
+               CB_EX(arg_handle_debug_mode_generic_set, depsgraph_no_threads),
+               (void *)G_DEBUG_DEPSGRAPH_NO_THREADS);
+  BLI_args_add(ba,
+               NULL,
+               "--debug-depsgraph-pretty",
+               CB_EX(arg_handle_debug_mode_generic_set, depsgraph_pretty),
+               (void *)G_DEBUG_DEPSGRAPH_PRETTY);
+  BLI_args_add(ba,
+               NULL,
+               "--debug-depsgraph-uuid",
+               CB_EX(arg_handle_debug_mode_generic_set, depsgraph_build),
+               (void *)G_DEBUG_DEPSGRAPH_UUID);
+  BLI_args_add(ba,
+               NULL,
+               "--debug-gpu-force-workarounds",
+               CB_EX(arg_handle_debug_mode_generic_set, gpu_force_workarounds),
+               (void *)G_DEBUG_GPU_FORCE_WORKAROUNDS);
+  BLI_args_add(ba, NULL, "--debug-exit-on-error", CB(arg_handle_debug_exit_on_error), NULL);
 
-  BLI_argsAdd(ba, 1, NULL, "--verbose", CB(arg_handle_verbosity_set), NULL);
+  BLI_args_add(ba, NULL, "--verbose", CB(arg_handle_verbosity_set), NULL);
 
-  BLI_argsAdd(ba, 1, NULL, "--app-template", CB(arg_handle_app_template), NULL);
-  BLI_argsAdd(ba, 1, NULL, "--factory-startup", CB(arg_handle_factory_startup_set), NULL);
-  BLI_argsAdd(ba, 1, NULL, "--enable-event-simulate", CB(arg_handle_enable_event_simulate), NULL);
+  BLI_args_add(ba, NULL, "--app-template", CB(arg_handle_app_template), NULL);
+  BLI_args_add(ba, NULL, "--factory-startup", CB(arg_handle_factory_startup_set), NULL);
+  BLI_args_add(ba, NULL, "--enable-event-simulate", CB(arg_handle_enable_event_simulate), NULL);
 
-  BLI_argsAdd(ba, 1, NULL, "--gpu-backend", CB(arg_gpu_backend_set), NULL);
+  /* Pass: Custom Window Stuff. */
+  BLI_args_pass_set(ba, ARG_PASS_SETTINGS_GUI);
+  BLI_args_add(ba, "-p", "--window-geometry", CB(arg_handle_window_geometry), NULL);
+  BLI_args_add(ba, "-w", "--window-border", CB(arg_handle_with_borders), NULL);
+  BLI_args_add(ba, "-W", "--window-fullscreen", CB(arg_handle_without_borders), NULL);
+  BLI_args_add(ba, "-M", "--window-maximized", CB(arg_handle_window_maximized), NULL);
+  BLI_args_add(ba, NULL, "--no-window-focus", CB(arg_handle_no_window_focus), NULL);
+  BLI_args_add(ba, "-con", "--start-console", CB(arg_handle_start_with_console), NULL);
+  BLI_args_add(ba, "-R", NULL, CB(arg_handle_register_extension), NULL);
+  BLI_args_add(ba, "-r", NULL, CB_EX(arg_handle_register_extension, silent), ba);
+  BLI_args_add(ba, NULL, "--no-native-pixels", CB(arg_handle_native_pixels_set), ba);
 
-  /* TODO, add user env vars? */
-  BLI_argsAdd(
-      ba, 1, NULL, "--env-system-datafiles", CB_EX(arg_handle_env_system_set, datafiles), NULL);
-  BLI_argsAdd(
-      ba, 1, NULL, "--env-system-scripts", CB_EX(arg_handle_env_system_set, scripts), NULL);
-  BLI_argsAdd(ba, 1, NULL, "--env-system-python", CB_EX(arg_handle_env_system_set, python), NULL);
+  /* Pass: Disabling Things & Forcing Settings. */
+  BLI_args_pass_set(ba, ARG_PASS_SETTINGS_FORCE);
+  BLI_args_add_case(ba, "-noaudio", 1, NULL, 0, CB(arg_handle_audio_disable), NULL);
+  BLI_args_add_case(ba, "-setaudio", 1, NULL, 0, CB(arg_handle_audio_set), NULL);
 
-  BLI_argsAdd(
-      ba, 1, NULL, "--python-use-system-env", CB(arg_handle_python_use_system_env_set), NULL);
+  /* Pass: Processing Arguments. */
+  BLI_args_pass_set(ba, ARG_PASS_FINAL);
+  BLI_args_add(ba, "-f", "--render-frame", CB(arg_handle_render_frame), C);
+  BLI_args_add(ba, "-a", "--render-anim", CB(arg_handle_render_animation), C);
+  BLI_args_add(ba, "-S", "--scene", CB(arg_handle_scene_set), C);
+  BLI_args_add(ba, "-s", "--frame-start", CB(arg_handle_frame_start_set), C);
+  BLI_args_add(ba, "-e", "--frame-end", CB(arg_handle_frame_end_set), C);
+  BLI_args_add(ba, "-j", "--frame-jump", CB(arg_handle_frame_skip_set), C);
+  BLI_args_add(ba, "-P", "--python", CB(arg_handle_python_file_run), C);
+  BLI_args_add(ba, NULL, "--python-text", CB(arg_handle_python_text_run), C);
+  BLI_args_add(ba, NULL, "--python-expr", CB(arg_handle_python_expr_run), C);
+  BLI_args_add(ba, NULL, "--python-console", CB(arg_handle_python_console_run), C);
+  BLI_args_add(ba, NULL, "--python-exit-code", CB(arg_handle_python_exit_code_set), NULL);
+  BLI_args_add(ba, NULL, "--addons", CB(arg_handle_addons_set), C);
 
-  /* second pass: custom window stuff */
-  BLI_argsAdd(ba, 2, "-p", "--window-geometry", CB(arg_handle_window_geometry), NULL);
-  BLI_argsAdd(ba, 2, "-w", "--window-border", CB(arg_handle_with_borders), NULL);
-  BLI_argsAdd(ba, 2, "-W", "--window-fullscreen", CB(arg_handle_without_borders), NULL);
-  BLI_argsAdd(ba, 2, "-M", "--window-maximized", CB(arg_handle_window_maximized), NULL);
-  BLI_argsAdd(ba, 2, NULL, "--no-window-focus", CB(arg_handle_no_window_focus), NULL);
-  BLI_argsAdd(ba, 2, "-con", "--start-console", CB(arg_handle_start_with_console), NULL);
-  BLI_argsAdd(ba, 2, "-R", NULL, CB(arg_handle_register_extension), NULL);
-  BLI_argsAdd(ba, 2, "-r", NULL, CB_EX(arg_handle_register_extension, silent), ba);
-  BLI_argsAdd(ba, 2, NULL, "--no-native-pixels", CB(arg_handle_native_pixels_set), ba);
+  BLI_args_add(ba, "-o", "--render-output", CB(arg_handle_output_set), C);
+  BLI_args_add(ba, "-E", "--engine", CB(arg_handle_engine_set), C);
 
-  /* third pass: disabling things and forcing settings */
-  BLI_argsAddCase(ba, 3, "-noaudio", 1, NULL, 0, CB(arg_handle_audio_disable), NULL);
-  BLI_argsAddCase(ba, 3, "-setaudio", 1, NULL, 0, CB(arg_handle_audio_set), NULL);
-
-  /* fourth pass: processing arguments */
-  BLI_argsAdd(ba, 4, "-f", "--render-frame", CB(arg_handle_render_frame), C);
-  BLI_argsAdd(ba, 4, "-a", "--render-anim", CB(arg_handle_render_animation), C);
-  BLI_argsAdd(ba, 4, "-S", "--scene", CB(arg_handle_scene_set), C);
-  BLI_argsAdd(ba, 4, "-s", "--frame-start", CB(arg_handle_frame_start_set), C);
-  BLI_argsAdd(ba, 4, "-e", "--frame-end", CB(arg_handle_frame_end_set), C);
-  BLI_argsAdd(ba, 4, "-j", "--frame-jump", CB(arg_handle_frame_skip_set), C);
-  BLI_argsAdd(ba, 4, "-P", "--python", CB(arg_handle_python_file_run), C);
-  BLI_argsAdd(ba, 4, NULL, "--python-text", CB(arg_handle_python_text_run), C);
-  BLI_argsAdd(ba, 4, NULL, "--python-expr", CB(arg_handle_python_expr_run), C);
-  BLI_argsAdd(ba, 4, NULL, "--python-console", CB(arg_handle_python_console_run), C);
-  BLI_argsAdd(ba, 4, NULL, "--python-exit-code", CB(arg_handle_python_exit_code_set), NULL);
-  BLI_argsAdd(ba, 4, NULL, "--addons", CB(arg_handle_addons_set), C);
-
-  BLI_argsAdd(ba, 4, "-o", "--render-output", CB(arg_handle_output_set), C);
-  BLI_argsAdd(ba, 4, "-E", "--engine", CB(arg_handle_engine_set), C);
-
-  BLI_argsAdd(ba, 4, "-F", "--render-format", CB(arg_handle_image_type_set), C);
-  BLI_argsAdd(ba, 1, "-t", "--threads", CB(arg_handle_threads_set), NULL);
-  BLI_argsAdd(ba, 4, "-x", "--use-extension", CB(arg_handle_extension_set), C);
+  BLI_args_add(ba, "-F", "--render-format", CB(arg_handle_image_type_set), C);
+  BLI_args_add(ba, "-x", "--use-extension", CB(arg_handle_extension_set), C);
 
   BLI_args_add(ba, NULL, "--open-last", CB(arg_handle_load_last_file), C);
 

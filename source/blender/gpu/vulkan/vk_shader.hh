@@ -69,6 +69,11 @@ class VKShader : public Shader {
 
   void vertformat_from_shader(GPUVertFormat *format) const override{};
 
+  int program_handle_get() const override
+  {
+    return 0;
+  }
+
   MEM_CXX_CLASS_ALLOC_FUNCS("VKShader");
 };
 

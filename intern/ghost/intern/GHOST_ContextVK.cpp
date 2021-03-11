@@ -216,13 +216,12 @@ GHOST_TSuccess GHOST_ContextVK::swapBuffers()
 
   vkWaitForFences(m_device, 1, &m_in_flight_fences[m_currentFrame], VK_TRUE, UINT64_MAX);
 
-  uint32_t m_currentImageId;
   VkResult result = vkAcquireNextImageKHR(m_device,
                                           m_swapchain,
                                           UINT64_MAX,
                                           m_image_available_semaphores[m_currentFrame],
                                           VK_NULL_HANDLE,
-                                          &m_currentImageId);
+                                          &m_currentImage);
 
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     /* Swapchain is out of date. Recreate swapchain and skip this frame. */
@@ -238,10 +237,10 @@ GHOST_TSuccess GHOST_ContextVK::swapBuffers()
   }
 
   /* Check if a previous frame is using this image (i.e. there is its fence to wait on) */
-  if (m_in_flight_images[m_currentImageId] != VK_NULL_HANDLE) {
-    vkWaitForFences(m_device, 1, &m_in_flight_images[m_currentImageId], VK_TRUE, UINT64_MAX);
+  if (m_in_flight_images[m_currentImage] != VK_NULL_HANDLE) {
+    vkWaitForFences(m_device, 1, &m_in_flight_images[m_currentImage], VK_TRUE, UINT64_MAX);
   }
-  m_in_flight_images[m_currentImageId] = m_in_flight_fences[m_currentFrame];
+  m_in_flight_images[m_currentImage] = m_in_flight_fences[m_currentFrame];
 
   VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
 
@@ -251,7 +250,7 @@ GHOST_TSuccess GHOST_ContextVK::swapBuffers()
   submit_info.pWaitSemaphores = &m_image_available_semaphores[m_currentFrame];
   submit_info.pWaitDstStageMask = wait_stages;
   submit_info.commandBufferCount = 1;
-  submit_info.pCommandBuffers = &m_command_buffers[m_currentImageId];
+  submit_info.pCommandBuffers = &m_command_buffers[m_currentImage];
   submit_info.signalSemaphoreCount = 1;
   submit_info.pSignalSemaphores = &m_render_finished_semaphores[m_currentFrame];
 
@@ -265,7 +264,7 @@ GHOST_TSuccess GHOST_ContextVK::swapBuffers()
   present_info.pWaitSemaphores = &m_render_finished_semaphores[m_currentFrame];
   present_info.swapchainCount = 1;
   present_info.pSwapchains = &m_swapchain;
-  present_info.pImageIndices = &m_currentImageId;
+  present_info.pImageIndices = &m_currentImage;
   present_info.pResults = NULL;
 
   result = vkQueuePresentKHR(m_present_queue, &present_info);
@@ -298,9 +297,9 @@ GHOST_TSuccess GHOST_ContextVK::getVulkanBackbuffer(void *image,
   if (m_swapchain == VK_NULL_HANDLE) {
     return GHOST_kFailure;
   }
-  *((VkImage *)image) = m_swapchain_images[m_currentImageId];
-  *((VkFramebuffer *)framebuffer) = m_swapchain_framebuffers[m_currentImageId];
-  *((VkCommandBuffer *)command_buffer) = m_command_buffers[m_currentImageId];
+  *((VkImage *)image) = m_swapchain_images[m_currentImage];
+  *((VkFramebuffer *)framebuffer) = m_swapchain_framebuffers[m_currentImage];
+  *((VkCommandBuffer *)command_buffer) = m_command_buffers[m_currentImage];
   *((VkRenderPass *)render_pass) = m_render_pass;
   *((VkExtent2D *)extent) = m_render_extent;
   *fb_id = m_swapchain_id * 10 + m_currentFrame;
@@ -311,7 +310,7 @@ GHOST_TSuccess GHOST_ContextVK::getVulkanBackbuffer(void *image,
 GHOST_TSuccess GHOST_ContextVK::getVulkanHandles(void *r_instance,
                                                  void *r_physical_device,
                                                  void *r_device,
-                                                 GHOST_TUns32 *r_graphic_queue_familly);
+                                                 GHOST_TUns32 *r_graphic_queue_familly)
 {
   *((VkInstance *)r_instance) = m_instance;
   *((VkPhysicalDevice *)r_physical_device) = m_physical_device;

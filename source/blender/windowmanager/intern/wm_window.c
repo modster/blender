@@ -572,6 +572,7 @@ static void wm_window_ghostwindow_add(wmWindowManager *wm,
                                                    win->sizex,
                                                    win->sizey,
                                                    (GHOST_TWindowState)win->windowstate,
+                                                   is_dialog,
                                                    contextType,
                                                    glSettings);
 

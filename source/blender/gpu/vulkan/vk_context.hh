@@ -50,7 +50,7 @@ class VKContext : public Context {
 
  public:
   VKContext(void *ghost_window, void *ghost_context);
-  ~VKContext(){};
+  ~VKContext();
 
   void activate(void) override;
   void deactivate(void) override;

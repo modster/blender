@@ -50,6 +50,8 @@ class VKFrameBuffer : public FrameBuffer {
   VkRenderPass render_pass_ = VK_NULL_HANDLE;
   /* Number of layers if the attachments are layered textures. */
   int depth_ = 1;
+  /** Internal frame-buffers are immutable. */
+  bool immutable_;
 
  public:
   /**
@@ -67,7 +69,7 @@ class VKFrameBuffer : public FrameBuffer {
                 VkRenderPass render_pass,
                 VkExtent2D extent);
 
-  ~VKFrameBuffer(){};
+  ~VKFrameBuffer();
 
   void bind(bool enabled_srgb) override{};
 

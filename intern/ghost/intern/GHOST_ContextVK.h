@@ -191,7 +191,7 @@ class GHOST_ContextVK : public GHOST_Context {
   /** frame modulo swapchain_len. Used as index for sync objects. */
   int m_currentFrame = 0;
   /** Image index in the swapchain. Used as index for render objects. */
-  int m_currentImage = 0;
+  uint32_t m_currentImage = 0;
   /** Used to unique framebuffer ids to return when swapchain is recreated. */
   uint32_t m_swapchain_id = 0;
 
