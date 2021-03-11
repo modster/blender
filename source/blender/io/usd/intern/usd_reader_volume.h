@@ -23,6 +23,8 @@
 namespace blender::io::usd {
 
 class USDVolumeReader : public USDXformReader {
+ private:
+  pxr::UsdVolVolume volume_;
 
  public:
   USDVolumeReader(pxr::UsdStageRefPtr stage,
@@ -35,8 +37,6 @@ class USDVolumeReader : public USDXformReader {
 
   void create_object(Main *bmain, double motionSampleTime) override;
   void read_object_data(Main *bmain, double motionSampleTime) override;
-
-  pxr::UsdVolVolume m_volume;
 };
 
 }  // namespace blender::io::usd

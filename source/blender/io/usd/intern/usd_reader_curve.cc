@@ -61,22 +61,22 @@ namespace blender::io::usd {
 
 void USDCurvesReader::create_object(Main *bmain, double motionSampleTime)
 {
-  m_curve = BKE_curve_add(bmain, m_name.c_str(), OB_CURVE);
+  curve_ = BKE_curve_add(bmain, name_.c_str(), OB_CURVE);
 
-  m_curve->flag |= CU_DEFORM_FILL | CU_3D;
-  m_curve->actvert = CU_ACT_NONE;
-  m_curve->resolu = 2;
+  curve_->flag |= CU_DEFORM_FILL | CU_3D;
+  curve_->actvert = CU_ACT_NONE;
+  curve_->resolu = 2;
 
-  m_object = BKE_object_add_only_object(bmain, OB_CURVE, m_name.c_str());
-  m_object->data = m_curve;
+  object_ = BKE_object_add_only_object(bmain, OB_CURVE, name_.c_str());
+  object_->data = curve_;
 }
 
 void USDCurvesReader::read_object_data(Main *bmain, double motionSampleTime)
 {
-  Curve *cu = (Curve *)m_object->data;
+  Curve *cu = (Curve *)object_->data;
   read_curve_sample(cu, motionSampleTime);
 
-  if (curve_prim.GetPointsAttr().ValueMightBeTimeVarying()) {
+  if (curve_prim_.GetPointsAttr().ValueMightBeTimeVarying()) {
     add_cache_modifier();
   }
 
@@ -85,11 +85,11 @@ void USDCurvesReader::read_object_data(Main *bmain, double motionSampleTime)
 
 void USDCurvesReader::read_curve_sample(Curve *cu, double motionSampleTime)
 {
-  curve_prim = pxr::UsdGeomBasisCurves::Get(m_stage, m_prim.GetPath());
+  curve_prim_ = pxr::UsdGeomBasisCurves::Get(stage_, prim_.GetPath());
 
-  pxr::UsdAttribute widthsAttr = curve_prim.GetWidthsAttr();
-  pxr::UsdAttribute vertexAttr = curve_prim.GetCurveVertexCountsAttr();
-  pxr::UsdAttribute pointsAttr = curve_prim.GetPointsAttr();
+  pxr::UsdAttribute widthsAttr = curve_prim_.GetWidthsAttr();
+  pxr::UsdAttribute vertexAttr = curve_prim_.GetCurveVertexCountsAttr();
+  pxr::UsdAttribute pointsAttr = curve_prim_.GetPointsAttr();
 
   pxr::VtIntArray usdCounts;
 
@@ -102,30 +102,30 @@ void USDCurvesReader::read_curve_sample(Curve *cu, double motionSampleTime)
   pxr::VtFloatArray usdWidths;
   widthsAttr.Get(&usdWidths, motionSampleTime);
 
-  pxr::UsdAttribute basisAttr = curve_prim.GetBasisAttr();
+  pxr::UsdAttribute basisAttr = curve_prim_.GetBasisAttr();
   pxr::TfToken basis;
   basisAttr.Get(&basis, motionSampleTime);
 
-  pxr::UsdAttribute typeAttr = curve_prim.GetTypeAttr();
+  pxr::UsdAttribute typeAttr = curve_prim_.GetTypeAttr();
   pxr::TfToken type;
   typeAttr.Get(&type, motionSampleTime);
 
-  pxr::UsdAttribute wrapAttr = curve_prim.GetWrapAttr();
+  pxr::UsdAttribute wrapAttr = curve_prim_.GetWrapAttr();
   pxr::TfToken wrap;
   wrapAttr.Get(&wrap, motionSampleTime);
 
   pxr::VtVec3fArray usdNormals;
-  curve_prim.GetNormalsAttr().Get(&usdNormals, motionSampleTime);
+  curve_prim_.GetNormalsAttr().Get(&usdNormals, motionSampleTime);
 
   // If normals, extrude, else bevel
   // Perhaps to be replaced by Blender/USD Schema
   if (usdNormals.size() > 0) {
     // Set extrusion to 1.0f;
-    m_curve->ext1 = 1.0f;
+    curve_->ext1 = 1.0f;
   }
   else {
     // Set bevel depth to 1.0f;
-    m_curve->ext2 = 1.0f;
+    curve_->ext2 = 1.0f;
   }
 
   size_t idx = 0;
@@ -179,7 +179,7 @@ void USDCurvesReader::read_curve_sample(Curve *cu, double motionSampleTime)
       bp->f1 = SELECT;
       bp->weight = weight;
 
-      float radius = m_curve->width;
+      float radius = curve_->width;
       if (idx < usdWidths.size())
         radius = usdWidths[idx];
 
@@ -199,11 +199,11 @@ Mesh *USDCurvesReader::read_mesh(struct Mesh *existing_mesh,
                                  float vel_scale,
                                  const char **err_str)
 {
-  pxr::UsdGeomCurves curve_prim = pxr::UsdGeomCurves::Get(m_stage, m_prim.GetPath());
+  pxr::UsdGeomCurves curve_prim_ = pxr::UsdGeomCurves::Get(stage_, prim_.GetPath());
 
-  pxr::UsdAttribute widthsAttr = curve_prim.GetWidthsAttr();
-  pxr::UsdAttribute vertexAttr = curve_prim.GetCurveVertexCountsAttr();
-  pxr::UsdAttribute pointsAttr = curve_prim.GetPointsAttr();
+  pxr::UsdAttribute widthsAttr = curve_prim_.GetWidthsAttr();
+  pxr::UsdAttribute vertexAttr = curve_prim_.GetCurveVertexCountsAttr();
+  pxr::UsdAttribute pointsAttr = curve_prim_.GetPointsAttr();
 
   pxr::VtIntArray usdCounts;
 
@@ -215,7 +215,7 @@ Mesh *USDCurvesReader::read_mesh(struct Mesh *existing_mesh,
 
   int vertex_idx = 0;
   int curve_idx;
-  Curve *curve = static_cast<Curve *>(m_object->data);
+  Curve *curve = static_cast<Curve *>(object_->data);
 
   const int curve_count = BLI_listbase_count(&curve->nurb);
   bool same_topology = curve_count == num_subcurves;
@@ -263,7 +263,7 @@ Mesh *USDCurvesReader::read_mesh(struct Mesh *existing_mesh,
     }
   }
 
-  return BKE_mesh_new_nomain_from_curve(m_object);
+  return BKE_mesh_new_nomain_from_curve(object_);
 }
 
 }  // namespace blender::io::usd

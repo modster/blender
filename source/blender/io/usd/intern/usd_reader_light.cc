@@ -60,38 +60,38 @@ namespace blender::io::usd {
 
 void USDLightReader::create_object(Main *bmain, double motionSampleTime)
 {
-  Light *blight = static_cast<Light *>(BKE_light_add(bmain, m_name.c_str()));
+  Light *blight = static_cast<Light *>(BKE_light_add(bmain, name_.c_str()));
 
-  m_object = BKE_object_add_only_object(bmain, OB_LAMP, m_name.c_str());
-  m_object->data = blight;
+  object_ = BKE_object_add_only_object(bmain, OB_LAMP, name_.c_str());
+  object_->data = blight;
 }
 
 void USDLightReader::read_object_data(Main *bmain, double motionSampleTime)
 {
-  Light *blight = (Light *)m_object->data;
+  Light *blight = (Light *)object_->data;
 
-  pxr::UsdLuxLight light_prim = pxr::UsdLuxLight::Get(m_stage, m_prim.GetPath());
+  pxr::UsdLuxLight light_prim = pxr::UsdLuxLight::Get(stage_, prim_.GetPath());
   pxr::UsdLuxShapingAPI shapingAPI(light_prim);
 
   // Set light type
 
-  if (m_prim.IsA<pxr::UsdLuxDiskLight>()) {
+  if (prim_.IsA<pxr::UsdLuxDiskLight>()) {
     blight->type = LA_AREA;
     blight->area_shape = LA_AREA_DISK;
     // Ellipse lights are not currently supported
   }
-  else if (m_prim.IsA<pxr::UsdLuxRectLight>()) {
+  else if (prim_.IsA<pxr::UsdLuxRectLight>()) {
     blight->type = LA_AREA;
     blight->area_shape = LA_AREA_RECT;
   }
-  else if (m_prim.IsA<pxr::UsdLuxSphereLight>()) {
+  else if (prim_.IsA<pxr::UsdLuxSphereLight>()) {
     blight->type = LA_LOCAL;
 
     if (shapingAPI.GetShapingConeAngleAttr().IsAuthored()) {
       blight->type = LA_SPOT;
     }
   }
-  else if (m_prim.IsA<pxr::UsdLuxDistantLight>()) {
+  else if (prim_.IsA<pxr::UsdLuxDistantLight>()) {
     blight->type = LA_SUN;
   }
 
@@ -100,7 +100,7 @@ void USDLightReader::read_object_data(Main *bmain, double motionSampleTime)
   pxr::VtValue intensity;
   light_prim.GetIntensityAttr().Get(&intensity, motionSampleTime);
 
-  blight->energy = intensity.Get<float>() * this->m_import_params.light_intensity_scale;
+  blight->energy = intensity.Get<float>() * this->import_params_.light_intensity_scale;
 
   // TODO: Not currently supported
   // pxr::VtValue exposure;
@@ -132,8 +132,8 @@ void USDLightReader::read_object_data(Main *bmain, double motionSampleTime)
 
   switch (blight->type) {
     case LA_AREA:
-      if (blight->area_shape == LA_AREA_RECT && m_prim.IsA<pxr::UsdLuxRectLight>()) {
-        pxr::UsdLuxRectLight rect_light = pxr::UsdLuxRectLight::Get(m_stage, m_prim.GetPath());
+      if (blight->area_shape == LA_AREA_RECT && prim_.IsA<pxr::UsdLuxRectLight>()) {
+        pxr::UsdLuxRectLight rect_light = pxr::UsdLuxRectLight::Get(stage_, prim_.GetPath());
 
         pxr::VtValue width;
         rect_light.GetWidthAttr().Get(&width, motionSampleTime);
@@ -145,8 +145,8 @@ void USDLightReader::read_object_data(Main *bmain, double motionSampleTime)
         blight->area_sizey = height.Get<float>();
       }
 
-      if (blight->area_shape == LA_AREA_DISK && m_prim.IsA<pxr::UsdLuxDiskLight>()) {
-        pxr::UsdLuxDiskLight disk_light = pxr::UsdLuxDiskLight::Get(m_stage, m_prim.GetPath());
+      if (blight->area_shape == LA_AREA_DISK && prim_.IsA<pxr::UsdLuxDiskLight>()) {
+        pxr::UsdLuxDiskLight disk_light = pxr::UsdLuxDiskLight::Get(stage_, prim_.GetPath());
 
         pxr::VtValue radius;
         disk_light.GetRadiusAttr().Get(&radius, motionSampleTime);
@@ -155,9 +155,8 @@ void USDLightReader::read_object_data(Main *bmain, double motionSampleTime)
       }
       break;
     case LA_LOCAL:
-      if (m_prim.IsA<pxr::UsdLuxSphereLight>()) {
-        pxr::UsdLuxSphereLight sphere_light = pxr::UsdLuxSphereLight::Get(m_stage,
-                                                                          m_prim.GetPath());
+      if (prim_.IsA<pxr::UsdLuxSphereLight>()) {
+        pxr::UsdLuxSphereLight sphere_light = pxr::UsdLuxSphereLight::Get(stage_, prim_.GetPath());
 
         pxr::VtValue radius;
         sphere_light.GetRadiusAttr().Get(&radius, motionSampleTime);
@@ -166,9 +165,8 @@ void USDLightReader::read_object_data(Main *bmain, double motionSampleTime)
       }
       break;
     case LA_SPOT:
-      if (m_prim.IsA<pxr::UsdLuxSphereLight>()) {
-        pxr::UsdLuxSphereLight sphere_light = pxr::UsdLuxSphereLight::Get(m_stage,
-                                                                          m_prim.GetPath());
+      if (prim_.IsA<pxr::UsdLuxSphereLight>()) {
+        pxr::UsdLuxSphereLight sphere_light = pxr::UsdLuxSphereLight::Get(stage_, prim_.GetPath());
 
         pxr::VtValue radius;
         sphere_light.GetRadiusAttr().Get(&radius, motionSampleTime);
@@ -185,9 +183,9 @@ void USDLightReader::read_object_data(Main *bmain, double motionSampleTime)
       }
       break;
     case LA_SUN:
-      if (m_prim.IsA<pxr::UsdLuxDistantLight>()) {
-        pxr::UsdLuxDistantLight distant_light = pxr::UsdLuxDistantLight::Get(m_stage,
-                                                                             m_prim.GetPath());
+      if (prim_.IsA<pxr::UsdLuxDistantLight>()) {
+        pxr::UsdLuxDistantLight distant_light = pxr::UsdLuxDistantLight::Get(stage_,
+                                                                             prim_.GetPath());
 
         pxr::VtValue angle;
         distant_light.GetAngleAttr().Get(&angle, motionSampleTime);

@@ -163,7 +163,7 @@ static void set_instance_collection(
 static void create_proto_collections(Main *bmain,
                                      ViewLayer *view_layer,
                                      Collection *parent_collection,
-                                     const USDStageReader::ProtoReaderMap &proto_readers,
+                                     const ProtoReaderMap &proto_readers,
                                      const std::vector<USDPrimReader *> &readers)
 {
   Collection *all_protos_collection = create_collection(bmain, parent_collection, "prototypes");

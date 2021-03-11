@@ -50,9 +50,9 @@ namespace blender::io::usd {
 
 void USDXformReader::create_object(Main *bmain, double motionSampleTime)
 {
-  m_object = BKE_object_add_only_object(bmain, OB_EMPTY, m_name.c_str());
-  m_object->empty_drawsize = 0.1f;
-  m_object->data = NULL;
+  object_ = BKE_object_add_only_object(bmain, OB_EMPTY, name_.c_str());
+  object_->empty_drawsize = 0.1f;
+  object_->data = NULL;
 }
 
 void USDXformReader::read_object_data(Main *bmain, double motionSampleTime)
@@ -62,19 +62,19 @@ void USDXformReader::read_object_data(Main *bmain, double motionSampleTime)
   bool is_constant;
   float transform_from_usd[4][4];
 
-  read_matrix(transform_from_usd, motionSampleTime, m_import_params.scale, is_constant);
+  read_matrix(transform_from_usd, motionSampleTime, import_params_.scale, is_constant);
 
   if (!is_constant) {
     bConstraint *con = BKE_constraint_add_for_object(
-        m_object, NULL, CONSTRAINT_TYPE_TRANSFORM_CACHE);
+        object_, NULL, CONSTRAINT_TYPE_TRANSFORM_CACHE);
     bTransformCacheConstraint *data = static_cast<bTransformCacheConstraint *>(con->data);
-    BLI_strncpy(data->object_path, m_prim.GetPath().GetText(), FILE_MAX);
+    BLI_strncpy(data->object_path, prim_.GetPath().GetText(), FILE_MAX);
 
-    data->cache_file = m_settings->cache_file;
+    data->cache_file = settings_->cache_file;
     id_us_plus(&data->cache_file->id);
   }
 
-  BKE_object_apply_mat4(m_object, transform_from_usd, true, false);
+  BKE_object_apply_mat4(object_, transform_from_usd, true, false);
 }
 
 typedef float m4[4];
@@ -87,7 +87,7 @@ void USDXformReader::read_matrix(float r_mat[4][4] /* local matrix */,
   is_constant = true;
   unit_m4(r_mat);
 
-  pxr::UsdGeomXformable xformable(m_prim);
+  pxr::UsdGeomXformable xformable(prim_);
 
   if (!xformable) {
     // This might happen if the prim is a Scope.
@@ -106,7 +106,7 @@ void USDXformReader::read_matrix(float r_mat[4][4] /* local matrix */,
 
   /* Apply global scaling and rotation only to root objects, parenting
    * will propagate it. */
-  if ((scale != 1.0 || m_settings->do_convert_mat) && is_root_xform_object()) {
+  if ((scale != 1.0 || settings_->do_convert_mat) && is_root_xform_object()) {
 
     if (scale != 1.0f) {
       float scale_mat[4][4];
@@ -114,8 +114,8 @@ void USDXformReader::read_matrix(float r_mat[4][4] /* local matrix */,
       mul_m4_m4m4(r_mat, scale_mat, r_mat);
     }
 
-    if (m_settings->do_convert_mat) {
-      mul_m4_m4m4(r_mat, m_settings->conversion_mat, r_mat);
+    if (settings_->do_convert_mat) {
+      mul_m4_m4m4(r_mat, settings_->conversion_mat, r_mat);
     }
   }
 }
@@ -127,17 +127,17 @@ bool USDXformReader::is_root_xform_object() const
   // represent a scope, which is not xformable.  E.g., an Xform
   // parented to a single Scope would be considered the root.
 
-  if (m_prim.IsInMaster()) {
+  if (prim_.IsInMaster()) {
     // We don't consider prototypes to be root prims,
     // because we never want to apply global scaling
     // or rotations to the ptototypes themselves.
     return false;
   }
 
-  if (m_prim.IsA<pxr::UsdGeomXformable>()) {
+  if (prim_.IsA<pxr::UsdGeomXformable>()) {
     // If we don't have an ancestor that also wraps
     // UsdGeomXformable, then we are the root.
-    const USDPrimReader *cur_parent = m_parent_reader;
+    const USDPrimReader *cur_parent = parent_reader_;
 
     while (cur_parent) {
       if (cur_parent->prim().IsA<pxr::UsdGeomXformable>()) {

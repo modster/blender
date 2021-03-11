@@ -190,50 +190,50 @@ USDMeshReader::USDMeshReader(pxr::UsdStageRefPtr stage,
                              const USDImportParams &import_params,
                              ImportSettings &settings)
     : USDGeomReader(stage, object, import_params, settings),
-      m_isLeftHanded(false),
-      m_lastNumPositions(-1),
-      m_hasUVs(false),
-      m_isTimeVarying(false),
-      m_isInitialLoad(false)
+      is_left_handed_(false),
+      last_num_positions_(-1),
+      has_uvs_(false),
+      is_time_varying_(false),
+      is_initial_load_(false)
 {
 }
 
 void USDMeshReader::create_object(Main *bmain, double motionSampleTime)
 {
-  Mesh *mesh = BKE_mesh_add(bmain, m_name.c_str());
+  Mesh *mesh = BKE_mesh_add(bmain, name_.c_str());
 
-  m_object = BKE_object_add_only_object(bmain, OB_MESH, m_name.c_str());
-  m_object->data = mesh;
+  object_ = BKE_object_add_only_object(bmain, OB_MESH, name_.c_str());
+  object_->data = mesh;
 }
 
 void USDMeshReader::read_object_data(Main *bmain, double motionSampleTime)
 {
-  Mesh *mesh = (Mesh *)m_object->data;
+  Mesh *mesh = (Mesh *)object_->data;
 
-  m_isInitialLoad = true;
+  is_initial_load_ = true;
   Mesh *read_mesh = this->read_mesh(
-      mesh, motionSampleTime, m_import_params.global_read_flag, 1.0f, NULL);
-  m_isInitialLoad = false;
+      mesh, motionSampleTime, import_params_.global_read_flag, 1.0f, NULL);
+  is_initial_load_ = false;
   if (read_mesh != mesh) {
     /* XXX fixme after 2.80; mesh->flag isn't copied by BKE_mesh_nomain_to_mesh() */
     /* read_mesh can be freed by BKE_mesh_nomain_to_mesh(), so get the flag before that happens. */
     short autosmooth = (read_mesh->flag & ME_AUTOSMOOTH);
-    BKE_mesh_nomain_to_mesh(read_mesh, mesh, m_object, &CD_MASK_MESH, true);
+    BKE_mesh_nomain_to_mesh(read_mesh, mesh, object_, &CD_MASK_MESH, true);
     mesh->flag |= autosmooth;
   }
 
   readFaceSetsSample(bmain, mesh, motionSampleTime);
 
-  if (mesh_prim.GetPointsAttr().ValueMightBeTimeVarying())
-    m_isTimeVarying = true;
+  if (mesh_prim_.GetPointsAttr().ValueMightBeTimeVarying())
+    is_time_varying_ = true;
 
-  if (m_isTimeVarying) {
+  if (is_time_varying_) {
     add_cache_modifier();
   }
 
-  if (m_import_params.import_subdiv) {
+  if (import_params_.import_subdiv) {
     pxr::TfToken subdivScheme;
-    mesh_prim.GetSubdivisionSchemeAttr().Get(&subdivScheme, motionSampleTime);
+    mesh_prim_.GetSubdivisionSchemeAttr().Get(&subdivScheme, motionSampleTime);
 
     if (subdivScheme == pxr::UsdGeomTokens->catmullClark) {
       add_subdiv_modifier();
@@ -245,46 +245,46 @@ void USDMeshReader::read_object_data(Main *bmain, double motionSampleTime)
 
 bool USDMeshReader::valid() const
 {
-  return mesh_prim.GetPrim().IsValid();
+  return mesh_prim_.GetPrim().IsValid();
 }
 
 bool USDMeshReader::topology_changed(Mesh *existing_mesh, double motionSampleTime)
 {
-  pxr::UsdAttribute faceVertCountsAttr = mesh_prim.GetFaceVertexCountsAttr();
-  pxr::UsdAttribute faceVertIndicesAttr = mesh_prim.GetFaceVertexIndicesAttr();
-  pxr::UsdAttribute pointsAttr = mesh_prim.GetPointsAttr();
-  pxr::UsdAttribute normalsAttr = mesh_prim.GetNormalsAttr();
+  pxr::UsdAttribute faceVertCountsAttr = mesh_prim_.GetFaceVertexCountsAttr();
+  pxr::UsdAttribute faceVertIndicesAttr = mesh_prim_.GetFaceVertexIndicesAttr();
+  pxr::UsdAttribute pointsAttr = mesh_prim_.GetPointsAttr();
+  pxr::UsdAttribute normalsAttr = mesh_prim_.GetNormalsAttr();
 
-  faceVertIndicesAttr.Get(&m_face_indices, motionSampleTime);
-  faceVertCountsAttr.Get(&m_face_counts, motionSampleTime);
-  pointsAttr.Get(&m_positions, motionSampleTime);
+  faceVertIndicesAttr.Get(&face_indices_, motionSampleTime);
+  faceVertCountsAttr.Get(&face_counts_, motionSampleTime);
+  pointsAttr.Get(&positions_, motionSampleTime);
 
   // If 'normals' and 'primvars:normals' are both specified, the latter has precedence.
-  pxr::UsdGeomPrimvar primvar = mesh_prim.GetPrimvar(usdtokens::normalsPrimvar);
+  pxr::UsdGeomPrimvar primvar = mesh_prim_.GetPrimvar(usdtokens::normalsPrimvar);
   if (primvar.HasValue()) {
-    primvar.ComputeFlattened(&m_normals, motionSampleTime);
-    m_normalInterpolation = primvar.GetInterpolation();
+    primvar.ComputeFlattened(&normals_, motionSampleTime);
+    normal_interpolation_ = primvar.GetInterpolation();
   }
   else {
-    mesh_prim.GetNormalsAttr().Get(&m_normals, motionSampleTime);
-    m_normalInterpolation = mesh_prim.GetNormalsInterpolation();
+    mesh_prim_.GetNormalsAttr().Get(&normals_, motionSampleTime);
+    normal_interpolation_ = mesh_prim_.GetNormalsInterpolation();
   }
 
-  if (m_lastNumPositions != m_positions.size()) {
-    m_lastNumPositions = m_positions.size();
+  if (last_num_positions_ != positions_.size()) {
+    last_num_positions_ = positions_.size();
     return true;
   }
 
   return false;
 }
 
-void USDMeshReader::read_mpolys(Mesh *mesh, pxr::UsdGeomMesh mesh_prim, double motionSampleTime)
+void USDMeshReader::read_mpolys(Mesh *mesh, pxr::UsdGeomMesh mesh_prim_, double motionSampleTime)
 {
   MPoly *mpolys = mesh->mpoly;
   MLoop *mloops = mesh->mloop;
 
-  pxr::UsdAttribute faceVertCountsAttr = mesh_prim.GetFaceVertexCountsAttr();
-  pxr::UsdAttribute faceVertIndicesAttr = mesh_prim.GetFaceVertexIndicesAttr();
+  pxr::UsdAttribute faceVertCountsAttr = mesh_prim_.GetFaceVertexCountsAttr();
+  pxr::UsdAttribute faceVertIndicesAttr = mesh_prim_.GetFaceVertexIndicesAttr();
 
   pxr::VtIntArray face_counts;
   faceVertCountsAttr.Get(&face_counts, motionSampleTime);
@@ -310,7 +310,7 @@ void USDMeshReader::read_mpolys(Mesh *mesh, pxr::UsdGeomMesh mesh_prim, double m
 
     for (int f = 0; f < face_size; f++, loop_index++, rev_loop_index--) {
       MLoop &loop = mloops[loop_index];
-      if (m_isLeftHanded)
+      if (is_left_handed_)
         loop.v = face_indices[rev_loop_index];
       else
         loop.v = face_indices[loop_index];
@@ -321,7 +321,7 @@ void USDMeshReader::read_mpolys(Mesh *mesh, pxr::UsdGeomMesh mesh_prim, double m
 }
 
 void USDMeshReader::read_uvs(Mesh *mesh,
-                             pxr::UsdGeomMesh mesh_prim,
+                             pxr::UsdGeomMesh mesh_prim_,
                              double motionSampleTime,
                              bool load_uvs)
 {
@@ -339,7 +339,7 @@ void USDMeshReader::read_uvs(Mesh *mesh,
 
   std::vector<UVSample> uv_primvars(ldata->totlayer);
 
-  if (m_hasUVs) {
+  if (has_uvs_) {
     for (int layer_idx = 0; layer_idx < ldata->totlayer; layer_idx++) {
       const CustomDataLayer *layer = &ldata->layers[layer_idx];
       std::string layer_name = std::string(layer->name);
@@ -350,29 +350,29 @@ void USDMeshReader::read_uvs(Mesh *mesh,
       pxr::TfToken uv_token;
 
       // If first time seeing uv token, store in map of <layer->uid, TfToken>
-      if (uv_token_map.find(layer_name) == uv_token_map.end()) {
+      if (uv_token_map_.find(layer_name) == uv_token_map_.end()) {
         uv_token = pxr::TfToken(layer_name);
-        uv_token_map.insert(std::make_pair(layer_name, uv_token));
+        uv_token_map_.insert(std::make_pair(layer_name, uv_token));
       }
       else
-        uv_token = uv_token_map.at(layer_name);
+        uv_token = uv_token_map_.at(layer_name);
 
       // Early out if no token found, this should never happen
       if (uv_token.IsEmpty()) {
         continue;
       }
       // Early out if not first load and uvs arent animated
-      if (!load_uvs && primvar_varying_map.find(uv_token) != primvar_varying_map.end() &&
-          !primvar_varying_map.at(uv_token)) {
+      if (!load_uvs && primvar_varying_map_.find(uv_token) != primvar_varying_map_.end() &&
+          !primvar_varying_map_.at(uv_token)) {
         continue;
       }
 
       // Early out if mesh doesn't have primvar
-      if (!mesh_prim.HasPrimvar(uv_token)) {
+      if (!mesh_prim_.HasPrimvar(uv_token)) {
         continue;
       }
 
-      if (pxr::UsdGeomPrimvar uv_primvar = mesh_prim.GetPrimvar(uv_token)) {
+      if (pxr::UsdGeomPrimvar uv_primvar = mesh_prim_.GetPrimvar(uv_token)) {
         uv_primvar.Get<pxr::VtVec2fArray>(&uv_primvars[layer_idx].uvs, motionSampleTime);
         uv_primvar.GetIndices(&uv_primvars[layer_idx].indices, motionSampleTime);
         uv_primvars[layer_idx].interpolation = uv_primvar.GetInterpolation();
@@ -380,8 +380,8 @@ void USDMeshReader::read_uvs(Mesh *mesh,
     }
   }
 
-  for (int i = 0; i < m_face_counts.size(); i++) {
-    const int face_size = m_face_counts[i];
+  for (int i = 0; i < face_counts_.size(); i++) {
+    const int face_size = face_counts_[i];
 
     rev_loop_index = loop_index + (face_size - 1);
 
@@ -418,7 +418,7 @@ void USDMeshReader::read_uvs(Mesh *mesh,
         }
 
         MLoopUV *mloopuv = static_cast<MLoopUV *>(layer->data);
-        if (m_isLeftHanded)
+        if (is_left_handed_)
           uv_index = rev_loop_index;
         else
           uv_index = loop_index;
@@ -431,11 +431,11 @@ void USDMeshReader::read_uvs(Mesh *mesh,
 }
 
 void USDMeshReader::read_attributes(Mesh *mesh,
-                                    pxr::UsdGeomMesh mesh_prim,
+                                    pxr::UsdGeomMesh mesh_prim_,
                                     double motionSampleTime)
 {
   CustomData *cd = &mesh->vdata;
-  std::vector<pxr::UsdGeomPrimvar> primvars = mesh_prim.GetPrimvars();
+  std::vector<pxr::UsdGeomPrimvar> primvars = mesh_prim_.GetPrimvars();
 
   for (pxr::UsdGeomPrimvar p : primvars) {
     int cd_type = 0;
@@ -446,8 +446,8 @@ void USDMeshReader::read_attributes(Mesh *mesh,
     if (!p.HasAuthoredValue())
       continue;
 
-    if (!m_isInitialLoad &&
-        primvar_varying_map.find(p.GetPrimvarName()) == primvar_varying_map.end())
+    if (!is_initial_load_ &&
+        primvar_varying_map_.find(p.GetPrimvarName()) == primvar_varying_map_.end())
       continue;
 
     const char *name = p.GetPrimvarName().GetString().c_str();
@@ -511,14 +511,14 @@ void USDMeshReader::read_attributes(Mesh *mesh,
 }
 
 void USDMeshReader::read_vels(Mesh *mesh,
-                              pxr::UsdGeomMesh mesh_prim,
+                              pxr::UsdGeomMesh mesh_prim_,
                               float vel_scale,
                               double motionSampleTime)
 {
   pxr::VtVec3fArray velocities;
-  pxr::UsdAttribute vel_attr = mesh_prim.GetVelocitiesAttr();
+  pxr::UsdAttribute vel_attr = mesh_prim_.GetVelocitiesAttr();
 
-  if (!m_isInitialLoad && !vel_attr.ValueMightBeTimeVarying())
+  if (!is_initial_load_ && !vel_attr.ValueMightBeTimeVarying())
     return;
 
   vel_attr.Get<pxr::VtVec3fArray>(&velocities, motionSampleTime);
@@ -539,14 +539,14 @@ void USDMeshReader::read_vels(Mesh *mesh,
 }
 
 void USDMeshReader::read_colors(Mesh *mesh,
-                                const pxr::UsdGeomMesh &mesh_prim,
+                                const pxr::UsdGeomMesh &mesh_prim_,
                                 double motionSampleTime)
 {
-  if (!(mesh && mesh_prim && mesh->totloop > 0)) {
+  if (!(mesh && mesh_prim_ && mesh->totloop > 0)) {
     return;
   }
 
-  pxr::UsdGeomPrimvar color_primvar = mesh_prim.GetDisplayColorPrimvar();
+  pxr::UsdGeomPrimvar color_primvar = mesh_prim_.GetDisplayColorPrimvar();
 
   if (!color_primvar.HasValue()) {
     return;
@@ -598,7 +598,7 @@ void USDMeshReader::read_colors(Mesh *mesh,
       }
       else if (interp == pxr::UsdGeomTokens->faceVarying) {
         usd_index = poly->loopstart;
-        if (m_isLeftHanded) {
+        if (is_left_handed_) {
           usd_index += poly->totloop - 1 - j;
         }
         else {
@@ -624,26 +624,26 @@ void USDMeshReader::read_colors(Mesh *mesh,
 
 void USDMeshReader::process_normals_vertex_varying(Mesh *mesh)
 {
-  if (m_normals.empty()) {
+  if (normals_.empty()) {
     BKE_mesh_calc_normals(mesh);
     return;
   }
 
-  for (int i = 0; i < m_normals.size(); i++) {
+  for (int i = 0; i < normals_.size(); i++) {
     MVert &mvert = mesh->mvert[i];
-    normal_float_to_short_v3(mvert.no, m_normals[i].data());
+    normal_float_to_short_v3(mvert.no, normals_[i].data());
   }
 }
 
 void USDMeshReader::process_normals_face_varying(Mesh *mesh)
 {
-  if (m_normals.empty()) {
+  if (normals_.empty()) {
     BKE_mesh_calc_normals(mesh);
     return;
   }
 
   // Check for normals count mismatches to prevent crashes.
-  if (m_normals.size() != mesh->totloop) {
+  if (normals_.size() != mesh->totloop) {
     std::cerr << "WARNING: loop normal count mismatch for mesh " << mesh->id.name << std::endl;
     BKE_mesh_calc_normals(mesh);
     return;
@@ -651,7 +651,7 @@ void USDMeshReader::process_normals_face_varying(Mesh *mesh)
 
   mesh->flag |= ME_AUTOSMOOTH;
 
-  long int loop_count = m_normals.size();
+  long int loop_count = normals_.size();
 
   float(*lnors)[3] = static_cast<float(*)[3]>(
       MEM_malloc_arrayN(loop_count, sizeof(float[3]), "USD::FaceNormals"));
@@ -663,16 +663,16 @@ void USDMeshReader::process_normals_face_varying(Mesh *mesh)
       int blender_index = mpoly->loopstart + j;
 
       int usd_index = mpoly->loopstart;
-      if (m_isLeftHanded) {
+      if (is_left_handed_) {
         usd_index += mpoly->totloop - 1 - j;
       }
       else {
         usd_index += j;
       }
 
-      lnors[blender_index][0] = m_normals[usd_index][0];
-      lnors[blender_index][1] = m_normals[usd_index][1];
-      lnors[blender_index][2] = m_normals[usd_index][2];
+      lnors[blender_index][0] = normals_[usd_index][0];
+      lnors[blender_index][1] = normals_[usd_index][1];
+      lnors[blender_index][2] = normals_[usd_index][2];
     }
   }
   BKE_mesh_set_custom_normals(mesh, lnors);
@@ -683,13 +683,13 @@ void USDMeshReader::process_normals_face_varying(Mesh *mesh)
 // Set USD uniform (per-face) normals as Blender loop normals.
 void USDMeshReader::process_normals_uniform(Mesh *mesh)
 {
-  if (m_normals.empty()) {
+  if (normals_.empty()) {
     BKE_mesh_calc_normals(mesh);
     return;
   }
 
   // Check for normals count mismatches to prevent crashes.
-  if (m_normals.size() != mesh->totpoly) {
+  if (normals_.size() != mesh->totpoly) {
     std::cerr << "WARNING: uniform normal count mismatch for mesh " << mesh->id.name << std::endl;
     BKE_mesh_calc_normals(mesh);
     return;
@@ -704,9 +704,9 @@ void USDMeshReader::process_normals_uniform(Mesh *mesh)
 
     for (int j = 0; j < mpoly->totloop; j++) {
       int loop_index = mpoly->loopstart + j;
-      lnors[loop_index][0] = m_normals[i][0];
-      lnors[loop_index][1] = m_normals[i][1];
-      lnors[loop_index][2] = m_normals[i][2];
+      lnors[loop_index][0] = normals_[i][0];
+      lnors[loop_index][1] = normals_[i][1];
+      lnors[loop_index][2] = normals_[i][2];
     }
   }
 
@@ -719,34 +719,34 @@ void USDMeshReader::process_normals_uniform(Mesh *mesh)
 void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
                                      ImportSettings *settings,
                                      Mesh *mesh,
-                                     const pxr::UsdGeomMesh &mesh_prim,
+                                     const pxr::UsdGeomMesh &mesh_prim_,
                                      double motionSampleTime,
                                      bool new_mesh)
 {
 
-  pxr::UsdAttribute normalsAttr = mesh_prim.GetNormalsAttr();
-  std::vector<pxr::UsdGeomPrimvar> primvars = mesh_prim.GetPrimvars();
-  pxr::UsdAttribute subdivSchemeAttr = mesh_prim.GetSubdivisionSchemeAttr();
+  pxr::UsdAttribute normalsAttr = mesh_prim_.GetNormalsAttr();
+  std::vector<pxr::UsdGeomPrimvar> primvars = mesh_prim_.GetPrimvars();
+  pxr::UsdAttribute subdivSchemeAttr = mesh_prim_.GetSubdivisionSchemeAttr();
 
   // Note that for new meshes we always want to read verts and polys,
   // regradless of the value of the read_flag, to avoid a crash downstream
   // in code that expect this data to be there.
 
   if (new_mesh || (settings->read_flag & MOD_MESHSEQ_READ_VERT) != 0) {
-    for (int i = 0; i < m_positions.size(); i++) {
+    for (int i = 0; i < positions_.size(); i++) {
       MVert &mvert = mesh->mvert[i];
-      mvert.co[0] = m_positions[i][0];
-      mvert.co[1] = m_positions[i][1];
-      mvert.co[2] = m_positions[i][2];
+      mvert.co[0] = positions_[i][0];
+      mvert.co[1] = positions_[i][1];
+      mvert.co[2] = positions_[i][2];
     }
   }
 
   if (new_mesh || (settings->read_flag & MOD_MESHSEQ_READ_POLY) != 0) {
-    read_mpolys(mesh, mesh_prim, motionSampleTime);
-    if (m_normalInterpolation == pxr::UsdGeomTokens->faceVarying) {
+    read_mpolys(mesh, mesh_prim_, motionSampleTime);
+    if (normal_interpolation_ == pxr::UsdGeomTokens->faceVarying) {
       process_normals_face_varying(mesh);
     }
-    else if (m_normalInterpolation == pxr::UsdGeomTokens->uniform) {
+    else if (normal_interpolation_ == pxr::UsdGeomTokens->uniform) {
       process_normals_uniform(mesh);
     }
     else {
@@ -760,24 +760,24 @@ void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
   // and we invoke BKE_mesh_calc_normals(mesh), which requires
   // edges to be defined.
   if ((settings->read_flag & MOD_MESHSEQ_READ_VERT) != 0 &&
-      m_normalInterpolation == pxr::UsdGeomTokens->vertex) {
+      normal_interpolation_ == pxr::UsdGeomTokens->vertex) {
     process_normals_vertex_varying(mesh);
   }
 
   if ((settings->read_flag & MOD_MESHSEQ_READ_UV) != 0) {
-    read_uvs(mesh, mesh_prim, motionSampleTime, new_mesh);
+    read_uvs(mesh, mesh_prim_, motionSampleTime, new_mesh);
   }
 
   if ((settings->read_flag & MOD_MESHSEQ_READ_ATTR) != 0) {
-    read_attributes(mesh, mesh_prim, motionSampleTime);
+    read_attributes(mesh, mesh_prim_, motionSampleTime);
   }
 
   if ((settings->read_flag & MOD_MESHSEQ_READ_VELS) != 0) {
-    read_vels(mesh, mesh_prim, settings->vel_scale, motionSampleTime);
+    read_vels(mesh, mesh_prim_, settings->vel_scale, motionSampleTime);
   }
 
   if ((settings->read_flag & MOD_MESHSEQ_READ_COLOR) != 0) {
-    read_colors(mesh, mesh_prim, motionSampleTime);
+    read_colors(mesh, mesh_prim_, motionSampleTime);
   }
 }
 
@@ -786,7 +786,7 @@ void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
                                              int totpoly,
                                              std::map<pxr::SdfPath, int> &r_mat_map)
 {
-  pxr::UsdShadeMaterialBindingAPI api = pxr::UsdShadeMaterialBindingAPI(m_prim);
+  pxr::UsdShadeMaterialBindingAPI api = pxr::UsdShadeMaterialBindingAPI(prim_);
   std::vector<pxr::UsdGeomSubset> subsets = api.GetMaterialBindSubsets();
 
   int current_mat = 0;
@@ -827,13 +827,13 @@ void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
 
 void USDMeshReader::readFaceSetsSample(Main *bmain, Mesh *mesh, const double motionSampleTime)
 {
-  if (!m_import_params.import_materials) {
+  if (!import_params_.import_materials) {
     return;
   }
 
   std::map<pxr::SdfPath, int> mat_map;
   assign_facesets_to_mpoly(motionSampleTime, mesh->mpoly, mesh->totpoly, mat_map);
-  utils::assign_materials(bmain, m_object, mat_map, this->m_import_params, this->m_stage);
+  utils::assign_materials(bmain, object_, mat_map, this->import_params_, this->stage_);
 }
 
 Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
@@ -842,21 +842,21 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
                                float vel_scale,
                                const char **err_str)
 {
-  mesh_prim = pxr::UsdGeomMesh::Get(m_stage, m_prim.GetPath());
+  mesh_prim_ = pxr::UsdGeomMesh::Get(stage_, prim_.GetPath());
 
-  mesh_prim.GetOrientationAttr().Get(&m_orientation);
-  if (m_orientation == pxr::UsdGeomTokens->leftHanded)
-    m_isLeftHanded = true;
+  mesh_prim_.GetOrientationAttr().Get(&orientation_);
+  if (orientation_ == pxr::UsdGeomTokens->leftHanded)
+    is_left_handed_ = true;
 
   std::vector<pxr::TfToken> uv_tokens;
 
-  std::vector<pxr::UsdGeomPrimvar> primvars = mesh_prim.GetPrimvars();
+  std::vector<pxr::UsdGeomPrimvar> primvars = mesh_prim_.GetPrimvars();
 
   for (pxr::UsdGeomPrimvar p : primvars) {
-    if (primvar_varying_map.find(p.GetPrimvarName()) == primvar_varying_map.end()) {
-      primvar_varying_map.insert(std::make_pair(p.GetPrimvarName(), p.ValueMightBeTimeVarying()));
+    if (primvar_varying_map_.find(p.GetPrimvarName()) == primvar_varying_map_.end()) {
+      primvar_varying_map_.insert(std::make_pair(p.GetPrimvarName(), p.ValueMightBeTimeVarying()));
       if (p.ValueMightBeTimeVarying())
-        m_isTimeVarying = true;
+        is_time_varying_ = true;
     }
 
     // Assume all uvs are stored in one of these primvar types...
@@ -864,7 +864,7 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
         p.GetTypeName() == pxr::SdfValueTypeNames->TexCoord2fArray ||
         p.GetTypeName() == pxr::SdfValueTypeNames->TexCoord2dArray) {
       uv_tokens.push_back(p.GetBaseName());
-      m_hasUVs = true;
+      has_uvs_ = true;
     }
   }
 
@@ -879,7 +879,7 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
   if (topology_changed(existing_mesh, motionSampleTime)) {
     new_mesh = true;
     active_mesh = BKE_mesh_new_nomain_from_template(
-        existing_mesh, m_positions.size(), 0, 0, m_face_indices.size(), m_face_counts.size());
+        existing_mesh, positions_.size(), 0, 0, face_indices_.size(), face_counts_.size());
 
     for (pxr::TfToken token : uv_tokens) {
       void *cd_ptr = add_customdata_cb(active_mesh, token.GetText(), CD_MLOOPUV);
@@ -887,19 +887,19 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
     }
   }
 
-  read_mesh_sample(m_prim.GetPath().GetString().c_str(),
+  read_mesh_sample(prim_.GetPath().GetString().c_str(),
                    &settings,
                    active_mesh,
-                   mesh_prim,
+                   mesh_prim_,
                    motionSampleTime,
-                   new_mesh || m_isInitialLoad);
+                   new_mesh || is_initial_load_);
 
   if (new_mesh) {
     /* Here we assume that the number of materials doesn't change, i.e. that
      * the material slots that were created when the object was loaded from
      * USD are still valid now. */
     size_t num_polys = active_mesh->totpoly;
-    if (num_polys > 0 && m_import_params.import_materials) {
+    if (num_polys > 0 && import_params_.import_materials) {
       std::map<pxr::SdfPath, int> mat_map;
       assign_facesets_to_mpoly(motionSampleTime, active_mesh->mpoly, num_polys, mat_map);
     }

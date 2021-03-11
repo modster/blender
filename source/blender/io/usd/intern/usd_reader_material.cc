@@ -189,7 +189,7 @@ void compute_node_loc(
 }  // namespace
 
 USDMaterialReader::USDMaterialReader(const USDImportParams &params, Main *bmain)
-    : m_params(params), bmain_(bmain)
+    : params_(params), bmain_(bmain)
 {
 }
 
@@ -205,7 +205,7 @@ Material *USDMaterialReader::add_material(const pxr::UsdShadeMaterial &usd_mater
   Material *mtl = BKE_material_add(bmain_, mtl_name.c_str());
 
   /* Optionally, create shader nodes to represent a UsdPreviewSurface. */
-  if (m_params.import_usd_preview) {
+  if (params_.import_usd_preview) {
     import_usd_preview(mtl, usd_material);
   }
 
@@ -324,7 +324,7 @@ void USDMaterialReader::import_usd_preview(Material *mtl,
 
   // Optionally, set the material blend mode.
 
-  if (m_params.set_material_blend) {
+  if (params_.set_material_blend) {
     float opacity_threshold = 0.0f;
     if (needs_blend(usd_shader, opacity_threshold)) {
       if (opacity_threshold > 0.0f) {

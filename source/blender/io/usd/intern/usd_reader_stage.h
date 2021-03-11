@@ -39,19 +39,19 @@ namespace blender::io::usd {
  * the stream objects remain valid as long as the archives are open.
  */
 
+typedef std::map<pxr::SdfPath, std::vector<USDPrimReader *>> ProtoReaderMap;
+
 class USDStageReader {
- public:
-  typedef std::map<pxr::SdfPath, std::vector<USDPrimReader *>> ProtoReaderMap;
 
  protected:
-  pxr::UsdStageRefPtr m_stage;
-  USDImportParams m_params;
-  ImportSettings m_settings;
+  pxr::UsdStageRefPtr stage_;
+  USDImportParams params_;
+  ImportSettings settings_;
 
-  std::vector<USDPrimReader *> m_readers;
+  std::vector<USDPrimReader *> readers_;
 
   // Readers for scenegraph instance prototypes.
-  ProtoReaderMap m_proto_readers;
+  ProtoReaderMap proto_readers_;
 
  public:
   USDStageReader(struct Main *bmain, const char *filename);
@@ -65,24 +65,24 @@ class USDStageReader {
 
   pxr::UsdStageRefPtr stage()
   {
-    return m_stage;
+    return stage_;
   }
   USDImportParams &params()
   {
-    return m_params;
+    return params_;
   }
   ImportSettings &settings()
   {
-    return m_settings;
+    return settings_;
   }
 
   void params(USDImportParams &a_params)
   {
-    m_params = a_params;
+    params_ = a_params;
   }
   void settings(ImportSettings &a_settings)
   {
-    m_settings = a_settings;
+    settings_ = a_settings;
   }
 
   void clear_readers();
@@ -91,7 +91,7 @@ class USDStageReader {
 
   const ProtoReaderMap &proto_readers() const
   {
-    return m_proto_readers;
+    return proto_readers_;
   };
 };
 

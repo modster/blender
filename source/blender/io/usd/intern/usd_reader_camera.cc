@@ -50,17 +50,17 @@ namespace blender::io::usd {
 
 void USDCameraReader::create_object(Main *bmain, double motionSampleTime)
 {
-  Camera *bcam = static_cast<Camera *>(BKE_camera_add(bmain, m_name.c_str()));
+  Camera *bcam = static_cast<Camera *>(BKE_camera_add(bmain, name_.c_str()));
 
-  m_object = BKE_object_add_only_object(bmain, OB_CAMERA, m_name.c_str());
-  m_object->data = bcam;
+  object_ = BKE_object_add_only_object(bmain, OB_CAMERA, name_.c_str());
+  object_->data = bcam;
 }
 
 void USDCameraReader::read_object_data(Main *bmain, double motionSampleTime)
 {
-  Camera *bcam = (Camera *)m_object->data;
+  Camera *bcam = (Camera *)object_->data;
 
-  pxr::UsdGeomCamera cam_prim = pxr::UsdGeomCamera::Get(m_stage, m_prim.GetPath());
+  pxr::UsdGeomCamera cam_prim = pxr::UsdGeomCamera::Get(stage_, prim_.GetPath());
 
   pxr::VtValue val;
   cam_prim.GetFocalLengthAttr().Get(&val, motionSampleTime);

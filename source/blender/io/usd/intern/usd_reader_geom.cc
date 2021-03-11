@@ -91,21 +91,21 @@ Mesh *USDGeomReader::read_mesh(struct Mesh *existing_mesh,
 void USDGeomReader::add_cache_modifier()
 {
   ModifierData *md = BKE_modifier_new(eModifierType_MeshSequenceCache);
-  BLI_addtail(&m_object->modifiers, md);
+  BLI_addtail(&object_->modifiers, md);
 
   MeshSeqCacheModifierData *mcmd = reinterpret_cast<MeshSeqCacheModifierData *>(md);
 
-  mcmd->cache_file = m_settings->cache_file;
+  mcmd->cache_file = settings_->cache_file;
   id_us_plus(&mcmd->cache_file->id);
-  mcmd->read_flag = m_import_params.global_read_flag;
+  mcmd->read_flag = import_params_.global_read_flag;
 
-  BLI_strncpy(mcmd->object_path, m_prim.GetPath().GetString().c_str(), FILE_MAX);
+  BLI_strncpy(mcmd->object_path, prim_.GetPath().GetString().c_str(), FILE_MAX);
 }
 
 void USDGeomReader::add_subdiv_modifier()
 {
   ModifierData *md = BKE_modifier_new(eModifierType_Subsurf);
-  BLI_addtail(&m_object->modifiers, md);
+  BLI_addtail(&object_->modifiers, md);
 }
 
 }  // namespace blender::io::usd

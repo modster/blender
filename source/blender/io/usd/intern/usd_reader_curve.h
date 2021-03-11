@@ -25,6 +25,9 @@ struct Curve;
 namespace blender::io::usd {
 
 class USDCurvesReader : public USDGeomReader {
+ protected:
+  pxr::UsdGeomBasisCurves curve_prim_;
+  Curve *curve_;
 
  public:
   USDCurvesReader(pxr::UsdStageRefPtr stage,
@@ -45,10 +48,6 @@ class USDCurvesReader : public USDGeomReader {
                   int read_flag,
                   float vel_scale,
                   const char **err_str) override;
-
- protected:
-  pxr::UsdGeomBasisCurves curve_prim;
-  Curve *m_curve;
 };
 
 }  // namespace blender::io::usd

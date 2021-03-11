@@ -56,14 +56,14 @@ namespace blender::io::usd {
 
 USDStageReader::USDStageReader(struct Main *bmain, const char *filename)
 {
-  m_stage = pxr::UsdStage::Open(filename);
+  stage_ = pxr::UsdStage::Open(filename);
 }
 
 USDStageReader::~USDStageReader()
 {
   clear_readers();
 
-  m_stage->Unload();
+  stage_->Unload();
 }
 
 bool USDStageReader::valid() const
@@ -169,20 +169,20 @@ std::vector<USDPrimReader *> USDStageReader::collect_readers(Main *bmain,
                                                              const USDImportParams &params,
                                                              ImportSettings &settings)
 {
-  m_params = params;
-  m_settings = settings;
+  params_ = params;
+  settings_ = settings;
 
   clear_readers();
 
   // Iterate through stage
-  pxr::UsdPrim root = m_stage->GetPseudoRoot();
+  pxr::UsdPrim root = stage_->GetPseudoRoot();
 
   std::string prim_path_mask(params.prim_path_mask);
 
   if (prim_path_mask.size() > 0) {
     std::cout << prim_path_mask << '\n';
     pxr::SdfPath path = pxr::SdfPath(prim_path_mask);
-    pxr::UsdPrim prim = m_stage->GetPrimAtPath(path.StripAllVariantSelections());
+    pxr::UsdPrim prim = stage_->GetPrimAtPath(path.StripAllVariantSelections());
     if (prim.IsValid()) {
       root = prim;
       if (path.ContainsPrimVariantSelection()) {
@@ -196,38 +196,38 @@ std::vector<USDPrimReader *> USDStageReader::collect_readers(Main *bmain,
     }
   }
 
-  m_stage->SetInterpolationType(pxr::UsdInterpolationType::UsdInterpolationTypeHeld);
-  _handlePrim(bmain, m_stage, params, root, NULL, m_readers, settings);
+  stage_->SetInterpolationType(pxr::UsdInterpolationType::UsdInterpolationTypeHeld);
+  _handlePrim(bmain, stage_, params, root, NULL, readers_, settings);
 
   if (params.use_instancing) {
     // Collect the scenegraph instance prototypes.
-    std::vector<pxr::UsdPrim> protos = m_stage->GetMasters();
+    std::vector<pxr::UsdPrim> protos = stage_->GetMasters();
 
     for (const pxr::UsdPrim &proto_prim : protos) {
       std::vector<USDPrimReader *> proto_readers;
-      _handlePrim(bmain, m_stage, params, proto_prim, NULL, proto_readers, settings);
-      m_proto_readers.insert(std::make_pair(proto_prim.GetPath(), proto_readers));
+      _handlePrim(bmain, stage_, params, proto_prim, NULL, proto_readers, settings);
+      proto_readers_.insert(std::make_pair(proto_prim.GetPath(), proto_readers));
     }
   }
 
-  return m_readers;
+  return readers_;
 }
 
 void USDStageReader::clear_readers()
 {
   std::vector<USDPrimReader *>::iterator iter;
-  for (iter = m_readers.begin(); iter != m_readers.end(); ++iter) {
+  for (iter = readers_.begin(); iter != readers_.end(); ++iter) {
     if (((USDPrimReader *)*iter)->refcount() == 0) {
       delete *iter;
     }
   }
 
-  m_readers.clear();
+  readers_.clear();
 }
 
 void USDStageReader::clear_proto_readers(bool decref)
 {
-  for (auto &pair : m_proto_readers) {
+  for (auto &pair : proto_readers_) {
 
     for (USDPrimReader *reader : pair.second) {
 
@@ -247,7 +247,7 @@ void USDStageReader::clear_proto_readers(bool decref)
     pair.second.clear();
   }
 
-  m_proto_readers.clear();
+  proto_readers_.clear();
 }
 
 }  // Namespace blender::io::usd

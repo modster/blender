@@ -81,17 +81,15 @@ struct ImportSettings {
 class USDPrimReader {
 
  protected:
-  std::string m_name;
-  std::string m_prim_path;
-  Object *m_object;
-  pxr::UsdPrim m_prim;
-  pxr::UsdStageRefPtr m_stage;
-  const USDImportParams &m_import_params;
-  USDPrimReader *m_parent_reader;
-
-  ImportSettings *m_settings;
-
-  int m_refcount;
+  std::string name_;
+  std::string prim_path_;
+  Object *object_;
+  pxr::UsdPrim prim_;
+  pxr::UsdStageRefPtr stage_;
+  const USDImportParams &import_params_;
+  USDPrimReader *parent_reader_;
+  ImportSettings *settings_;
+  int refcount_;
 
  public:
   USDPrimReader(pxr::UsdStageRefPtr stage,
@@ -112,11 +110,11 @@ class USDPrimReader {
 
   USDPrimReader *parent() const
   {
-    return m_parent_reader;
+    return parent_reader_;
   }
   void parent(USDPrimReader *parent)
   {
-    m_parent_reader = parent;
+    parent_reader_ = parent;
   }
 
   int refcount() const;
@@ -127,11 +125,11 @@ class USDPrimReader {
 
   const std::string &name() const
   {
-    return m_name;
+    return name_;
   }
   const std::string &prim_path() const
   {
-    return m_prim_path;
+    return prim_path_;
   }
 };
 

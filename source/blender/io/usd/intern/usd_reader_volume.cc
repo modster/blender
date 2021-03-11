@@ -58,27 +58,27 @@ namespace blender::io::usd {
 
 void USDVolumeReader::create_object(Main *bmain, double motionSampleTime)
 {
-  Volume *volume = (Volume *)BKE_volume_add(bmain, m_name.c_str());
+  Volume *volume = (Volume *)BKE_volume_add(bmain, name_.c_str());
   id_us_min(&volume->id);
 
-  m_object = BKE_object_add_only_object(bmain, OB_VOLUME, m_name.c_str());
-  m_object->data = volume;
+  object_ = BKE_object_add_only_object(bmain, OB_VOLUME, name_.c_str());
+  object_->data = volume;
 }
 
 void USDVolumeReader::read_object_data(Main *bmain, double motionSampleTime)
 {
-  m_volume = pxr::UsdVolVolume::Get(m_stage, m_prim.GetPath());
+  volume_ = pxr::UsdVolVolume::Get(stage_, prim_.GetPath());
 
-  pxr::UsdVolVolume::FieldMap fields = m_volume.GetFieldPaths();
+  pxr::UsdVolVolume::FieldMap fields = volume_.GetFieldPaths();
 
   std::string filepath;
 
-  Volume *volume = (Volume *)m_object->data;
+  Volume *volume = (Volume *)object_->data;
   VolumeGrid *defaultGrid = BKE_volume_grid_active_get(volume);
 
   for (auto it = fields.begin(); it != fields.end(); ++it) {
 
-    pxr::UsdPrim fieldPrim = m_stage->GetPrimAtPath(it->second);
+    pxr::UsdPrim fieldPrim = stage_->GetPrimAtPath(it->second);
 
     if (fieldPrim.IsA<pxr::UsdVolOpenVDBAsset>()) {
       pxr::UsdVolOpenVDBAsset fieldBase(fieldPrim);
