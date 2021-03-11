@@ -40,6 +40,10 @@
 #include <cstring>
 #include <iostream>
 
+/* Set to 0 to allow devices that do not have the required features.
+ * This allows development on OSX until we really needs these features. */
+#define STRICT_REQUIREMENTS 1
+
 using namespace std;
 
 static const char *vulkan_error_as_string(VkResult result)
@@ -473,9 +477,11 @@ GHOST_TSuccess GHOST_ContextVK::pickPhysicalDevice(vector<const char *> required
       DEBUG_PRINTF("  - Device does not support logicOp.\n");
     }
 
+#if STRICT_REQUIREMENTS
     if (!features.geometryShader || !features.dualSrcBlend || !features.logicOp) {
       continue;
     }
+#endif
 
     int device_score = 0;
     switch (device_properties.deviceType) {
@@ -934,9 +940,11 @@ GHOST_TSuccess GHOST_ContextVK::initializeDrawingContext()
   }
 
   VkPhysicalDeviceFeatures device_features = {};
+#if STRICT_REQUIREMENTS
   device_features.geometryShader = VK_TRUE;
   device_features.dualSrcBlend = VK_TRUE;
   device_features.logicOp = VK_TRUE;
+#endif
 
   VkDeviceCreateInfo device_create_info = {};
   device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
