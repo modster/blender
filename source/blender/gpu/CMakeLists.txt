@@ -181,9 +181,21 @@ set(SRC
   opengl/gl_vertex_buffer.hh
 )
 
+set(LIB
+  ${BLENDER_GL_LIBRARIES}
+)
+
 if(WITH_VULKAN)
   list(APPEND INC_SYS
     ${Vulkan_INCLUDE_DIRS}
+  )
+
+  list(APPEND LIB
+    extern_vulkan_memory_allocator
+  )
+
+  list(APPEND INC
+    ../../../extern/vulkan_memory_allocator
   )
 
   list(APPEND SRC
@@ -207,10 +219,6 @@ if(WITH_VULKAN)
     vulkan/vk_vertex_buffer.hh
   )
 endif()
-
-set(LIB
-  ${BLENDER_GL_LIBRARIES}
-)
 
 if(NOT WITH_SYSTEM_GLEW)
   list(APPEND LIB
