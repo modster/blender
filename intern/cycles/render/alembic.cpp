@@ -1707,9 +1707,6 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object,
   Object *object = abc_object->get_object();
   cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
 
-  print_transform("object tfm", object->get_tfm());
-  std::cerr << "cached_data.transforms.size() : " << cached_data.transforms.size() << '\n';
-
   if (object->is_modified()) {
       object->tag_update(scene_);
   }
