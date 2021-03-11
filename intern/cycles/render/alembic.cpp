@@ -573,7 +573,8 @@ static void add_normals(const Int32ArraySamplePtr face_indices,
 
       for (size_t i = 0; i < face_indices->size(); ++i) {
         int point_index = face_indices_array[i];
-        data_float3[point_index] = make_float3_from_yup(values->get()[i]);
+        // todo: figure this out
+        data_float3[point_index] = -make_float3_from_yup(values->get()[i]);
       }
 
       attr.data.add_data(data, time);
