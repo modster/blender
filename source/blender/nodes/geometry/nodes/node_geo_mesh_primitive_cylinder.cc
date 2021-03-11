@@ -415,14 +415,11 @@ Mesh *create_cylinder_or_cone_mesh(const float radius_top,
       poly.loopstart = loop_index;
       poly.totloop = verts_num;
 
-      /* Go backwards to reverse normal. */
-      // for (int i = verts_num - 1; i >= 0; i--) {
       for (const int i : IndexRange(verts_num)) {
+        /* Go backwards to reverse surface normal. */
         MLoop &loop = loops[loop_index++];
-        // loop.e = bottom_edges_start + verts_num - i - 1;
-        // loop.v = bottom_verts_start + verts_num - i - 1;
-        loop.e = bottom_edges_start + i;
-        loop.v = bottom_verts_start + i;
+        loop.v = bottom_verts_start + verts_num - 1 - i;
+        loop.e = bottom_edges_start + verts_num - 1 - (i + 1) % verts_num;
       }
     }
     else if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN) {
