@@ -752,7 +752,7 @@ size_t Node::get_total_size_in_bytes() const
   return total_size;
 }
 
-size_t socket_array_size(const Node *node, const SocketType &socket)
+static size_t socket_array_size(const Node *node, const SocketType &socket)
 {
   switch (socket.type) {
     default:
@@ -853,7 +853,7 @@ void Node::print_modified_sockets() const
     if (socket_is_modified(socket)) {
       if (socket.is_array()) {
         fprintf(stderr,
-                "-- socket modified : %s (%ld)\n",
+                "-- socket modified : %s (%lu)\n",
                 socket.name.c_str(),
                 socket_array_size(this, socket));
       }

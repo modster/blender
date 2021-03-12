@@ -1763,8 +1763,6 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object, Abc::chrono_t frame
     bool need_rebuild = mesh->triangles_is_modified();
     mesh->tag_update(scene_, need_rebuild);
   }
-
-  mesh->print_modified_sockets();
 }
 
 void AlembicProcedural::read_subd(AlembicObject *abc_object, Abc::chrono_t frame_time)
