@@ -65,11 +65,6 @@ void USDGeomReader::create_object(Main *bmain, double motionSampleTime)
 {
 }
 
-bool USDGeomReader::valid() const
-{
-  return true;
-}
-
 bool USDGeomReader::topology_changed(Mesh *existing_mesh, double motionSampleTime)
 {
   return true;

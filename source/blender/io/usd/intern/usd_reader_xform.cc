@@ -75,8 +75,6 @@ void USDXformReader::read_object_data(Main *bmain, double motionSampleTime)
   BKE_object_apply_mat4(object_, transform_from_usd, true, false);
 }
 
-typedef float m4[4];
-
 void USDXformReader::read_matrix(float r_mat[4][4] /* local matrix */,
                                  const float time,
                                  const float scale,

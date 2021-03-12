@@ -50,9 +50,6 @@ USDPrimReader::USDPrimReader(const pxr::UsdPrim &object,
       settings_(&settings),
       refcount_(0)
 {
-  //@TODO(bjs): This should be handled better
-  if (name_ == "/")
-    name_ = "root";
 }
 
 USDPrimReader::~USDPrimReader()

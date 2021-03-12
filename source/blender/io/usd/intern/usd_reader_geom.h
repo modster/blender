@@ -32,8 +32,6 @@ class USDGeomReader : public USDXformReader {
   {
   }
 
-  bool valid() const override;
-
   virtual void create_object(Main *bmain, double motionSampleTime) override;
   virtual void read_object_data(Main *bmain, double motionSampleTime) override;
 
