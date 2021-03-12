@@ -24,8 +24,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 /* #include <time.h> */
-#include "ED_lineart.h"
 #include "MEM_guardedalloc.h"
+#include "MOD_lineart.h"
 #include <math.h>
 
 #include "lineart_intern.h"

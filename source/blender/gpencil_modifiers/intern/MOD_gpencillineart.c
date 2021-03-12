@@ -39,7 +39,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 
-#include "lineart/ED_lineart.h"
+#include "lineart/MOD_lineart.h"
 
 #include "BKE_collection.h"
 #include "BKE_context.h"
@@ -90,7 +90,7 @@ static void generate_strokes_actual(
     printf("LRT: Generating from modifier.\n");
   }
 
-  ED_lineart_gpencil_generate(
+  MOD_lineart_gpencil_generate(
       lmd->render_buffer,
       depsgraph,
       ob,
@@ -160,11 +160,11 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
     return;
   }
 
-  ED_lineart_compute_feature_lines(depsgraph, lmd);
+  MOD_lineart_compute_feature_lines(depsgraph, lmd);
 
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
 
-  ED_lineart_destroy_render_data(lmd);
+  MOD_lineart_destroy_render_data(lmd);
 
   WM_main_add_notifier(NA_EDITED | NC_GPENCIL, NULL);
 }
@@ -186,11 +186,11 @@ static void bakeModifier(Main *UNUSED(bmain),
     return;
   }
 
-  ED_lineart_compute_feature_lines(depsgraph, lmd);
+  MOD_lineart_compute_feature_lines(depsgraph, lmd);
 
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
 
-  ED_lineart_destroy_render_data(lmd);
+  MOD_lineart_destroy_render_data(lmd);
 }
 
 static bool isDisabled(GpencilModifierData *md, int UNUSED(userRenderParams))

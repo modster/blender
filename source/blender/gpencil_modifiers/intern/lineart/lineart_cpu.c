@@ -21,7 +21,7 @@
  * \ingroup editors
  */
 
-#include "ED_lineart.h"
+#include "MOD_lineart.h"
 
 #include "BLI_alloca.h"
 #include "BLI_linklist.h"
@@ -434,7 +434,7 @@ static void lineart_occlusion_worker(TaskPool *__restrict UNUSED(pool), LineartR
 }
 
 /* All internal functions starting with lineart_main_ is called inside
- * ED_lineart_compute_feature_lines function.
+ * MOD_lineart_compute_feature_lines function.
  * This function handles all occlusion calculation. */
 static void lineart_main_occlusion_begin(LineartRenderBuffer *rb)
 {
@@ -2533,7 +2533,7 @@ static void lineart_destroy_render_data(LineartRenderBuffer *rb)
   lineart_mem_destroy(&rb->render_data_pool);
 }
 
-void ED_lineart_destroy_render_data(LineartGpencilModifierData *lmd)
+void MOD_lineart_destroy_render_data(LineartGpencilModifierData *lmd)
 {
   LineartRenderBuffer *rb = lmd->render_buffer;
 
@@ -3137,9 +3137,9 @@ static int lineart_get_line_bounding_areas(LineartRenderBuffer *rb,
 }
 
 /* This only gets initial "biggest" tile. */
-LineartBoundingArea *ED_lineart_get_point_bounding_area_rb(LineartRenderBuffer *rb,
-                                                           double x,
-                                                           double y)
+LineartBoundingArea *MOD_lineart_get_point_bounding_area_rb(LineartRenderBuffer *rb,
+                                                            double x,
+                                                            double y)
 {
   double sp_w = rb->width_per_tile, sp_h = rb->height_per_tile;
   int col, row;
@@ -3211,12 +3211,12 @@ static LineartBoundingArea *lineart_get_bounding_area_deep(LineartRenderBuffer *
 }
 
 /* Wrapper for more convenience. */
-LineartBoundingArea *ED_lineart_get_point_bounding_area_deep_rb(LineartRenderBuffer *rb,
-                                                                double x,
-                                                                double y)
+LineartBoundingArea *MOD_lineart_get_point_bounding_area_deep_rb(LineartRenderBuffer *rb,
+                                                                 double x,
+                                                                 double y)
 {
   LineartBoundingArea *ba;
-  if ((ba = ED_lineart_get_point_bounding_area_rb(rb, x, y)) != NULL) {
+  if ((ba = MOD_lineart_get_point_bounding_area_rb(rb, x, y)) != NULL) {
     return lineart_get_bounding_area_deep(rb, x, y);
   }
   return NULL;
@@ -3513,7 +3513,7 @@ static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this
 /* Calculations. */
 
 /** Parent thread locking should be done before this very function is called. */
-int ED_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModifierData *lmd)
+int MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModifierData *lmd)
 {
   LineartRenderBuffer *rb;
   Scene *scene = DEG_get_evaluated_scene(depsgraph);
@@ -3568,9 +3568,9 @@ int ED_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModifie
     lineart_main_occlusion_begin(rb);
 
     /* Chaining is all single threaded. See lineart_chain.c */
-    ED_lineart_chain_feature_lines(rb);
+    MOD_lineart_chain_feature_lines(rb);
 
-    ED_lineart_chain_split_for_fixed_occlusion(rb);
+    MOD_lineart_chain_split_for_fixed_occlusion(rb);
 
     /* If both chaining thresholds are zero, then we allow at least image space chaining to do a
      * little bit of work so we don't end up in fragmented strokes. */
@@ -3580,22 +3580,22 @@ int ED_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModifie
     }
 
     /* do_geometry_space = true */
-    ED_lineart_chain_connect(rb, true);
+    MOD_lineart_chain_connect(rb, true);
 
     /* After chaining, we need to clear flags so we can do another round in image space. */
-    ED_lineart_chain_clear_picked_flag(rb);
+    MOD_lineart_chain_clear_picked_flag(rb);
 
     /* do_geometry_space = false (it's image_space) */
-    ED_lineart_chain_connect(rb, false);
+    MOD_lineart_chain_connect(rb, false);
 
     /* Clear again so we don't confuse GPencil generation calls. */
-    ED_lineart_chain_clear_picked_flag(rb);
+    MOD_lineart_chain_clear_picked_flag(rb);
 
     /* This configuration ensures there won't be accidental lost of short unchained segments. */
-    ED_lineart_chain_discard_short(rb, MIN3(t_image, t_geom, 0.001f) - FLT_EPSILON);
+    MOD_lineart_chain_discard_short(rb, MIN3(t_image, t_geom, 0.001f) - FLT_EPSILON);
 
     if (rb->angle_splitting_threshold > FLT_EPSILON) {
-      ED_lineart_chain_split_angle(rb, rb->angle_splitting_threshold);
+      MOD_lineart_chain_split_angle(rb, rb->angle_splitting_threshold);
     }
   }
 
@@ -3707,7 +3707,7 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
     /* rlc->picked = 1; */
 
     int array_idx = 0;
-    int count = ED_lineart_chain_count(rlc);
+    int count = MOD_lineart_chain_count(rlc);
     bGPDstroke *gps = BKE_gpencil_stroke_add(gpf, color_idx, count, thickness, false);
 
     float *stroke_data = MEM_callocN(sizeof(float) * count * GP_PRIM_DATABUF_SIZE,
@@ -3792,25 +3792,25 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
 }
 
 /* Wrapper for external calls. */
-void ED_lineart_gpencil_generate(LineartRenderBuffer *rb,
-                                 Depsgraph *depsgraph,
-                                 Object *ob,
-                                 bGPDlayer *gpl,
-                                 bGPDframe *gpf,
-                                 char source_type,
-                                 void *source_reference,
-                                 int level_start,
-                                 int level_end,
-                                 int mat_nr,
-                                 short line_types,
-                                 unsigned char transparency_flags,
-                                 unsigned char transparency_mask,
-                                 short thickness,
-                                 float opacity,
-                                 float pre_sample_length,
-                                 const char *source_vgname,
-                                 const char *vgname,
-                                 int modifier_flags)
+void MOD_lineart_gpencil_generate(LineartRenderBuffer *rb,
+                                  Depsgraph *depsgraph,
+                                  Object *ob,
+                                  bGPDlayer *gpl,
+                                  bGPDframe *gpf,
+                                  char source_type,
+                                  void *source_reference,
+                                  int level_start,
+                                  int level_end,
+                                  int mat_nr,
+                                  short line_types,
+                                  unsigned char transparency_flags,
+                                  unsigned char transparency_mask,
+                                  short thickness,
+                                  float opacity,
+                                  float pre_sample_length,
+                                  const char *source_vgname,
+                                  const char *vgname,
+                                  int modifier_flags)
 {
 
   if (!gpl || !gpf || !ob) {

@@ -79,7 +79,7 @@ set(SRC
   intern/lineart/lineart_util.c
 
   intern/lineart/lineart_intern.h
-  intern/lineart/ED_lineart.h
+  intern/lineart/MOD_lineart.h
 
 )
 

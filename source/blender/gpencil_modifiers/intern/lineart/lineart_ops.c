@@ -45,7 +45,7 @@
 
 #include "UI_resources.h"
 
-#include "ED_lineart.h"
+#include "MOD_lineart.h"
 
 #include "lineart_intern.h"
 
@@ -93,9 +93,9 @@ static bool bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int
     return false;
   }
 
-  ED_lineart_compute_feature_lines(dg, lmd);
+  MOD_lineart_compute_feature_lines(dg, lmd);
 
-  ED_lineart_gpencil_generate(
+  MOD_lineart_gpencil_generate(
       lmd->render_buffer,
       dg,
       ob,
@@ -117,7 +117,7 @@ static bool bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int
       lmd->vgname,
       lmd->flags);
 
-  ED_lineart_destroy_render_data(lmd);
+  MOD_lineart_destroy_render_data(lmd);
 
   return true;
 }
@@ -431,7 +431,7 @@ void OBJECT_OT_lineart_clear_all(wmOperatorType *ot)
   ot->exec = lineart_gpencil_clear_strokes_all_exec;
 }
 
-void ED_operatortypes_lineart(void)
+void WM_operatortypes_lineart(void)
 {
   WM_operatortype_append(OBJECT_OT_lineart_bake_strokes);
   WM_operatortype_append(OBJECT_OT_lineart_bake_strokes_all);

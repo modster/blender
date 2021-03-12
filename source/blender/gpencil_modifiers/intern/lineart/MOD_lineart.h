@@ -29,7 +29,6 @@
 #include "BLI_threads.h"
 
 #include "DNA_lineart_types.h"
-#include "DNA_windowmanager_types.h"
 
 #include <math.h>
 #include <string.h>
@@ -497,62 +496,56 @@ struct Scene;
 struct LineartRenderBuffer;
 struct LineartGpencilModifierData;
 
-void ED_lineart_destroy_render_data(struct LineartGpencilModifierData *lmd);
+void MOD_lineart_destroy_render_data(struct LineartGpencilModifierData *lmd);
 
-void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb);
-void ED_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb);
-void ED_lineart_chain_connect(LineartRenderBuffer *rb, const bool do_geometry_space);
-void ED_lineart_chain_discard_short(LineartRenderBuffer *rb, const float threshold);
-void ED_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshold_rad);
+void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb);
+void MOD_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb);
+void MOD_lineart_chain_connect(LineartRenderBuffer *rb, const bool do_geometry_space);
+void MOD_lineart_chain_discard_short(LineartRenderBuffer *rb, const float threshold);
+void MOD_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshold_rad);
 
-int ED_lineart_chain_count(const LineartRenderLineChain *rlc);
-void ED_lineart_chain_clear_picked_flag(struct LineartRenderBuffer *rb);
+int MOD_lineart_chain_count(const LineartRenderLineChain *rlc);
+void MOD_lineart_chain_clear_picked_flag(struct LineartRenderBuffer *rb);
 
-int ED_lineart_compute_feature_lines(struct Depsgraph *depsgraph,
-                                     struct LineartGpencilModifierData *lmd);
+int MOD_lineart_compute_feature_lines(struct Depsgraph *depsgraph,
+                                      struct LineartGpencilModifierData *lmd);
 
 struct Scene;
 
-LineartBoundingArea *ED_lineart_get_point_bounding_area_rb(LineartRenderBuffer *rb,
-                                                           double x,
-                                                           double y);
+LineartBoundingArea *MOD_lineart_get_point_bounding_area_rb(LineartRenderBuffer *rb,
+                                                            double x,
+                                                            double y);
 
-LineartBoundingArea *ED_lineart_get_point_bounding_area_deep_rb(LineartRenderBuffer *rb,
-                                                                double x,
-                                                                double y);
+LineartBoundingArea *MOD_lineart_get_point_bounding_area_deep_rb(LineartRenderBuffer *rb,
+                                                                 double x,
+                                                                 double y);
 
 struct bGPDlayer;
 struct bGPDframe;
 struct GpencilModifierData;
 
-void ED_lineart_gpencil_generate(LineartRenderBuffer *rb,
-                                 struct Depsgraph *depsgraph,
-                                 struct Object *ob,
-                                 struct bGPDlayer *gpl,
-                                 struct bGPDframe *gpf,
-                                 char source_type,
-                                 void *source_reference,
-                                 int level_start,
-                                 int level_end,
-                                 int mat_nr,
-                                 short line_types,
-                                 unsigned char transparency_flags,
-                                 unsigned char transparency_mask,
-                                 short thickness,
-                                 float opacity,
-                                 float pre_sample_length,
-                                 const char *source_vgname,
-                                 const char *vgname,
-                                 int modifier_flags);
+void MOD_lineart_gpencil_generate(LineartRenderBuffer *rb,
+                                  struct Depsgraph *depsgraph,
+                                  struct Object *ob,
+                                  struct bGPDlayer *gpl,
+                                  struct bGPDframe *gpf,
+                                  char source_type,
+                                  void *source_reference,
+                                  int level_start,
+                                  int level_end,
+                                  int mat_nr,
+                                  short line_types,
+                                  unsigned char transparency_flags,
+                                  unsigned char transparency_mask,
+                                  short thickness,
+                                  float opacity,
+                                  float pre_sample_length,
+                                  const char *source_vgname,
+                                  const char *vgname,
+                                  int modifier_flags);
 
-float ED_lineart_chain_compute_length(LineartRenderLineChain *rlc);
+float MOD_lineart_chain_compute_length(LineartRenderLineChain *rlc);
 
 struct wmOperatorType;
-
-/* Operator types */
-void OBJECT_OT_lineart_bake_strokes(struct wmOperatorType *ot);
-void OBJECT_OT_lineart_bake_strokes_all(struct wmOperatorType *ot);
-void OBJECT_OT_lineart_clear(struct wmOperatorType *ot);
-void OBJECT_OT_lineart_clear_all(struct wmOperatorType *ot);
 
 void ED_operatortypes_lineart(void);
