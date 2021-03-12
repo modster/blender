@@ -34,11 +34,6 @@ struct ImportSettings;
 
 namespace blender::io::usd {
 
-/* Wrappers around input and output archives. The goal is to be able to use
- * streams so that unicode paths work on Windows (T49112), and to make sure that
- * the stream objects remain valid as long as the archives are open.
- */
-
 typedef std::map<pxr::SdfPath, std::vector<USDPrimReader *>> ProtoReaderMap;
 
 class USDStageReader {
@@ -66,9 +61,9 @@ class USDStageReader {
   // primitive types specified by the user in the import options.
   static USDPrimReader *create_reader(class USDStageReader *archive, const pxr::UsdPrim &prim);
 
-  std::vector<USDPrimReader *> collect_readers(struct Main *bmain,
-                                               const USDImportParams &params,
-                                               ImportSettings &settings);
+  void collect_readers(struct Main *bmain,
+                       const USDImportParams &params,
+                       ImportSettings &settings);
 
   bool valid() const;
 
@@ -94,13 +89,18 @@ class USDStageReader {
     settings_ = a_settings;
   }
 
-  void clear_readers();
+  void clear_readers(bool decref = true);
 
-  void clear_proto_readers(bool decref);
+  void clear_proto_readers(bool decref = true);
 
   const ProtoReaderMap &proto_readers() const
   {
     return proto_readers_;
+  };
+
+  const std::vector<USDPrimReader *> &readers() const
+  {
+    return readers_;
   };
 };
 

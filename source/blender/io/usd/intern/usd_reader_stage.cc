@@ -71,7 +71,8 @@ USDStageReader::USDStageReader(struct Main *bmain, const char *filename)
 
 USDStageReader::~USDStageReader()
 {
-  clear_readers();
+  clear_readers(true);
+  clear_proto_readers(true);
 
   if (stage_) {
     stage_->Unload();
@@ -240,14 +241,15 @@ static USDPrimReader *_handlePrim(Main *bmain,
   return reader;
 }
 
-std::vector<USDPrimReader *> USDStageReader::collect_readers(Main *bmain,
-                                                             const USDImportParams &params,
-                                                             ImportSettings &settings)
+void USDStageReader::collect_readers(Main *bmain,
+                                     const USDImportParams &params,
+                                     ImportSettings &settings)
 {
   params_ = params;
   settings_ = settings;
 
-  clear_readers();
+  clear_readers(true);
+  clear_proto_readers(true);
 
   // Iterate through stage
   pxr::UsdPrim root = stage_->GetPseudoRoot();
@@ -261,7 +263,7 @@ std::vector<USDPrimReader *> USDStageReader::collect_readers(Main *bmain,
     if (prim.IsValid()) {
       root = prim;
       if (path.ContainsPrimVariantSelection()) {
-        // TODO: This will not work properly with setting variants on child prims
+        // TODO(makowalski): This will not work properly with setting variants on child prims
         while (path.ContainsPrimVariantSelection()) {
           std::pair<std::string, std::string> variantSelection = path.GetVariantSelection();
           root.GetVariantSet(variantSelection.first).SetVariantSelection(variantSelection.second);
@@ -284,16 +286,21 @@ std::vector<USDPrimReader *> USDStageReader::collect_readers(Main *bmain,
       proto_readers_.insert(std::make_pair(proto_prim.GetPath(), proto_readers));
     }
   }
-
-  return readers_;
 }
 
-void USDStageReader::clear_readers()
+void USDStageReader::clear_readers(bool decref)
 {
-  std::vector<USDPrimReader *>::iterator iter;
-  for (iter = readers_.begin(); iter != readers_.end(); ++iter) {
-    if (((USDPrimReader *)*iter)->refcount() == 0) {
-      delete *iter;
+  for (USDPrimReader *reader : readers_) {
+    if (!reader) {
+      continue;
+    }
+
+    if (decref) {
+      reader->decref();
+    }
+
+    if (reader->refcount() == 0) {
+      delete reader;
     }
   }
 

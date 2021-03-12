@@ -483,7 +483,6 @@ struct ImportJobData {
   ImportSettings settings;
 
   USDStageReader *archive;
-  std::vector<USDPrimReader *> readers;
 
   short *stop;
   short *do_update;
@@ -502,6 +501,7 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
   data->do_update = do_update;
   data->progress = progress;
   data->was_canceled = false;
+  data->archive = nullptr;
 
   // G.is_rendering = true;
   WM_set_locked_interface(data->wm, true);
@@ -581,11 +581,11 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
 
   *data->progress = 0.15f;
 
-  data->readers = archive->collect_readers(data->bmain, data->params, data->settings);
+  archive->collect_readers(data->bmain, data->params, data->settings);
 
   *data->progress = 0.2f;
 
-  const float size = static_cast<float>(data->readers.size());
+  const float size = static_cast<float>(archive->readers().size());
   size_t i = 0;
 
   /* Setup parenthood */
@@ -601,7 +601,7 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
       }
 
       /* TODO(makowalski): Here and below, should we call
-       *  read_object_data() with the actual time? */
+       * read_object_data() with the actual time? */
       reader->read_object_data(data->bmain, 0.0);
 
       Object *ob = reader->object();
@@ -618,17 +618,19 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
     }
   }
 
-  std::vector<USDPrimReader *>::iterator iter;
+  for (USDPrimReader *reader : archive->readers()) {
 
-  for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-    Object *ob = (*iter)->object();
+    if (!reader) {
+      continue;
+    }
 
-    USDPrimReader *reader = (*iter);
+    Object *ob = reader->object();
+
     reader->read_object_data(data->bmain, 0.0);
 
-    USDPrimReader *parent = (*iter)->parent();
+    USDPrimReader *parent = reader->parent();
 
-    if (parent == NULL /*|| !reader->inherits_xform()*/) {
+    if (parent == NULL) {
       ob->parent = NULL;
     }
     else {
@@ -654,36 +656,34 @@ static void import_endjob(void *customdata)
 {
   ImportJobData *data = static_cast<ImportJobData *>(customdata);
 
-  std::vector<USDPrimReader *>::iterator iter;
-
   /* Delete objects on cancellation. */
-  if (data->was_canceled) {
-    for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-      Object *ob = (*iter)->object();
+  if (data->was_canceled && data->archive) {
 
-      /* It's possible that cancellation occurred between the creation of
-       * the reader and the creation of the Blender object. */
-      if (ob == NULL) {
+    for (USDPrimReader *reader : data->archive->readers()) {
+
+      if (!reader) {
         continue;
       }
 
-      BKE_id_free_us(data->bmain, ob);
+      /* It's possible that cancellation occurred between the creation of
+       * the reader and the creation of the Blender object. */
+      if (Object *ob = reader->object()) {
+        BKE_id_free_us(data->bmain, ob);
+      }
     }
 
-    if (data->archive) {
-      for (const auto &pair : data->archive->proto_readers()) {
-        for (USDPrimReader *reader : pair.second) {
-          Object *ob = reader->object();
-          /* It's possible that cancellation occurred between the creation of
-           * the reader and the creation of the Blender object. */
-          if (ob != NULL) {
-            BKE_id_free_us(data->bmain, ob);
-          }
+    for (const auto &pair : data->archive->proto_readers()) {
+      for (USDPrimReader *reader : pair.second) {
+
+        /* It's possible that cancellation occurred between the creation of
+         * the reader and the creation of the Blender object. */
+        if (Object *ob = reader->object()) {
+          BKE_id_free_us(data->bmain, ob);
         }
       }
     }
   }
-  else {
+  else if (data->archive) {
     /* Add object to scene. */
     Base *base;
     LayerCollection *lc;
@@ -693,13 +693,25 @@ static void import_endjob(void *customdata)
 
     lc = BKE_layer_collection_get_active(view_layer);
 
-    if (data->archive && !data->archive->proto_readers().empty()) {
-      create_proto_collections(
-          data->bmain, view_layer, lc->collection, data->archive->proto_readers(), data->readers);
+    if (!data->archive->proto_readers().empty()) {
+      create_proto_collections(data->bmain,
+                               view_layer,
+                               lc->collection,
+                               data->archive->proto_readers(),
+                               data->archive->readers());
     }
 
-    for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-      Object *ob = (*iter)->object();
+    for (USDPrimReader *reader : data->archive->readers()) {
+
+      if (!reader) {
+        continue;
+      }
+
+      Object *ob = reader->object();
+
+      if (!ob) {
+        continue;
+      }
 
       BKE_collection_object_add(data->bmain, lc->collection, ob);
 
@@ -717,17 +729,6 @@ static void import_endjob(void *customdata)
     DEG_id_tag_update(&data->scene->id, ID_RECALC_BASE_FLAGS);
     DEG_relations_tag_update(data->bmain);
   }
-
-  for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
-    USDPrimReader *reader = *iter;
-    reader->decref();
-
-    if (reader->refcount() == 0) {
-      delete reader;
-    }
-  }
-
-  data->archive->clear_proto_readers(true);
 
   WM_set_locked_interface(data->wm, false);
 
@@ -748,7 +749,7 @@ static void import_freejob(void *user_data)
 {
   ImportJobData *data = static_cast<ImportJobData *>(user_data);
 
-  // delete data->archive;
+  delete data->archive;
   delete data;
 }
 
