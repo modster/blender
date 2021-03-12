@@ -26,7 +26,10 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_listbase.h"
+#include "BLI_path_util.h"
 #include "BLI_string.h"
+
+#include "BLO_readfile.h"
 
 #include "BLT_translation.h"
 
@@ -55,6 +58,7 @@
 
 #include "UI_interface.h"
 
+#include "ED_fileselect.h"
 #include "ED_keyframing.h"
 #include "ED_object.h"
 #include "ED_screen.h"
@@ -76,6 +80,12 @@ typedef struct PoseBlendData {
   bool needs_redraw;
   bool is_bone_selection_relevant;
 
+  /* For temp-loading the Action from the pose library, if necessary. */
+  struct Main *temp_main;
+  BlendHandle *blendhandle;
+  struct LibraryLink_Params liblink_params;
+  Library *lib;
+
   /* Blend factor, interval [0, 1] for interpolating between current and given pose. */
   float blend_factor;
 
@@ -85,7 +95,7 @@ typedef struct PoseBlendData {
   Object *ob;   /* Object to work on. */
   bAction *act; /* Pose to blend in. */
 
-  Scene *scene;  /* For auto-keying. */
+  Scene *scene;         /* For auto-keying. */
   struct ScrArea *area; /* For drawing status text. */
 
   /** Info-text to print in header. */
@@ -367,6 +377,93 @@ static Object *get_poselib_object(bContext *C)
   return BKE_object_pose_armature_get(CTX_data_active_object(C));
 }
 
+static const char *poselib_asset_file_path(bContext *C)
+{
+  /* TODO: make this work in other areas as well, not just the file/asset browser. */
+  SpaceFile *sfile = CTX_wm_space_file(C);
+  FileAssetSelectParams *params = ED_fileselect_get_asset_params(sfile);
+  if (params == NULL) {
+    return NULL;
+  }
+
+  static char asset_path[FILE_MAX_LIBEXTRA];
+  BLI_path_join(
+      asset_path, sizeof(asset_path), params->base_params.dir, params->base_params.file, NULL);
+  return asset_path;
+}
+
+static bAction *poselib_tempload_enter(bContext *C, wmOperator *op)
+{
+  PoseBlendData *pbd = op->customdata;
+
+  const char *libname = poselib_asset_file_path(C);
+  char blend_file_path[FILE_MAX_LIBEXTRA];
+  char *group = NULL;
+  char *asset_name = NULL;
+  BLO_library_path_explode(libname, blend_file_path, &group, &asset_name);
+
+  if (strcmp(group, "Action")) {
+    BKE_reportf(op->reports,
+                RPT_ERROR,
+                "Selected asset \"%s\" is a %s, expected Action",
+                asset_name,
+                group);
+    return NULL;
+  }
+
+  pbd->blendhandle = BLO_blendhandle_from_file(blend_file_path, op->reports);
+
+  const int flags = /*FILE_LINK | */ FILE_ASSETS_ONLY;
+  const int id_tag_extra = LIB_TAG_TEMP_MAIN;
+
+  BLO_library_link_params_init_with_context(&pbd->liblink_params,
+                                            CTX_data_main(C),
+                                            flags,
+                                            id_tag_extra,
+                                            NULL /*CTX_data_scene(C) */,
+                                            NULL /*CTX_data_view_layer(C) */,
+                                            NULL /*CTX_wm_view3d(C) */);
+
+  pbd->temp_main = BLO_library_link_begin(
+      &pbd->blendhandle, blend_file_path, &pbd->liblink_params);
+
+  ID *new_id = BLO_library_link_named_part(
+      pbd->temp_main, &pbd->blendhandle, ID_AC, asset_name, &pbd->liblink_params);
+  if (new_id == NULL) {
+    BKE_reportf(op->reports, RPT_ERROR, "Unable to load %s from %s", asset_name, blend_file_path);
+    return NULL;
+  }
+  BLI_assert(GS(new_id->name) == ID_AC);
+
+  return (bAction *)new_id;
+}
+
+static void poselib_tempload_exit(PoseBlendData *pbd)
+{
+  if (pbd->temp_main == NULL) {
+    return;
+  }
+
+  BLO_library_link_end(pbd->temp_main, &pbd->blendhandle, &pbd->liblink_params);
+  BLO_blendhandle_close(pbd->blendhandle);
+  pbd->temp_main = NULL;
+}
+
+static bAction *poselib_blend_init_get_action(bContext *C, wmOperator *op)
+{
+  /* 'id' is available when the asset is in the "Current File" library. */
+  ID *id = CTX_data_pointer_get_type(C, "id", &RNA_ID).data;
+  if (id != NULL) {
+    if (GS(id->name) != ID_AC) {
+      BKE_reportf(op->reports, RPT_ERROR, "Context key 'id' (%s) is not an Action", id->name);
+      return NULL;
+    }
+    return (bAction *)id;
+  }
+
+  return poselib_tempload_enter(C, op);
+}
+
 /* Return true on success, false if the context isn't suitable. */
 static bool poselib_blend_init_data(bContext *C, wmOperator *op)
 {
@@ -379,25 +476,21 @@ static bool poselib_blend_init_data(bContext *C, wmOperator *op)
     return false;
   }
 
-  /* TODO(Sybren): properly get action from context. */
-  ID *id = CTX_data_pointer_get_type(C, "id", &RNA_ID).data;
-  if (id == NULL) {
-    BKE_report(op->reports, RPT_ERROR, "Context does not contain 'id'");
-    return false;
-  }
-  if (GS(id->name) != ID_AC) {
-    BKE_reportf(op->reports, RPT_ERROR, "Context key 'id' (%s) is not an Action", id->name);
-    return false;
-  }
-
   /* Set up blend state info. */
   PoseBlendData *pbd;
   op->customdata = pbd = MEM_callocN(sizeof(PoseBlendData), "PoseLib Preview Data");
 
+  /* TODO(Sybren): properly get action from context. */
+  bAction *action = poselib_blend_init_get_action(C, op);
+  if (action == NULL) {
+    BKE_report(op->reports, RPT_ERROR, "Context does not contain a pose Action");
+    return false;
+  }
+
   /* get basic data */
   pbd->ob = ob;
   pbd->ob->pose = ob->pose;
-  pbd->act = (bAction *)id;
+  pbd->act = action;
 
   pbd->scene = CTX_data_scene(C);
   pbd->area = CTX_wm_area(C);
@@ -416,10 +509,9 @@ static bool poselib_blend_init_data(bContext *C, wmOperator *op)
   return true;
 }
 
-/* After previewing poses */
 static void poselib_blend_cleanup(bContext *C, wmOperator *op)
 {
-  PoseBlendData *pbd = (PoseBlendData *)op->customdata;
+  PoseBlendData *pbd = op->customdata;
 
   /* Redraw the header so that it doesn't show any of our stuff anymore. */
   ED_area_status_text(pbd->area, NULL);
@@ -450,6 +542,16 @@ static void poselib_blend_cleanup(bContext *C, wmOperator *op)
 
   DEG_id_tag_update(&pbd->ob->id, ID_RECALC_GEOMETRY);
   WM_event_add_notifier(C, NC_OBJECT | ND_POSE, pbd->ob);
+}
+
+static void poselib_blend_free(wmOperator *op)
+{
+  PoseBlendData *pbd = op->customdata;
+  if (pbd == NULL) {
+    return;
+  }
+
+  poselib_tempload_exit(pbd);
 
   /* Free temp data for operator */
   poselib_backup_free_data(pbd);
@@ -462,6 +564,7 @@ static int poselib_blend_exit(bContext *C, wmOperator *op)
   const ePoseBlendState exit_state = pbd->state;
 
   poselib_blend_cleanup(C, op);
+  poselib_blend_free(op);
 
   if (exit_state == POSE_BLEND_CANCEL) {
     return OPERATOR_CANCELLED;
@@ -496,6 +599,7 @@ static int poselib_blend_modal(bContext *C, wmOperator *op, const wmEvent *event
 static int poselib_blend_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
 {
   if (!poselib_blend_init_data(C, op)) {
+    poselib_blend_free(op);
     return OPERATOR_CANCELLED;
   }
 
@@ -510,6 +614,7 @@ static int poselib_blend_invoke(bContext *C, wmOperator *op, const wmEvent *UNUS
 static int poselib_blend_exec(bContext *C, wmOperator *op)
 {
   if (!poselib_blend_init_data(C, op)) {
+    poselib_blend_free(op);
     return OPERATOR_CANCELLED;
   }
 
