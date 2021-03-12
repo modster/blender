@@ -23,10 +23,10 @@ namespace blender::io::usd {
 class USDXformReader : public USDPrimReader {
 
  public:
-  USDXformReader(const pxr::UsdPrim &object,
+  USDXformReader(const pxr::UsdPrim &prim,
                  const USDImportParams &import_params,
                  const ImportSettings &settings)
-      : USDPrimReader(object, import_params, settings)
+      : USDPrimReader(prim, import_params, settings)
   {
   }
 

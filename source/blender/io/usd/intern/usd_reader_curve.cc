@@ -203,9 +203,9 @@ Mesh *USDCurvesReader::read_mesh(struct Mesh *existing_mesh,
                                  float vel_scale,
                                  const char **err_str)
 {
-  // TODO(makowalski): here and elsewhere, move curve_prim_ initialization to
-  // the constructor.
-  pxr::UsdGeomCurves curve_prim_(prim_);
+  if (!curve_prim_) {
+    return existing_mesh;
+  }
 
   pxr::UsdAttribute widthsAttr = curve_prim_.GetWidthsAttr();
   pxr::UsdAttribute vertexAttr = curve_prim_.GetCurveVertexCountsAttr();

@@ -185,10 +185,11 @@ static void *add_customdata_cb(Mesh *mesh, const char *name, int data_type)
 
 namespace blender::io::usd {
 
-USDMeshReader::USDMeshReader(const pxr::UsdPrim &object,
+USDMeshReader::USDMeshReader(const pxr::UsdPrim &prim,
                              const USDImportParams &import_params,
                              const ImportSettings &settings)
-    : USDGeomReader(object, import_params, settings),
+    : USDGeomReader(prim, import_params, settings),
+      mesh_prim_(prim),
       is_left_handed_(false),
       last_num_positions_(-1),
       has_uvs_(false),
@@ -224,8 +225,9 @@ void USDMeshReader::read_object_data(Main *bmain, double motionSampleTime)
 
   readFaceSetsSample(bmain, mesh, motionSampleTime);
 
-  if (mesh_prim_.GetPointsAttr().ValueMightBeTimeVarying())
+  if (mesh_prim_.GetPointsAttr().ValueMightBeTimeVarying()) {
     is_time_varying_ = true;
+  }
 
   if (is_time_varying_) {
     add_cache_modifier();
@@ -245,7 +247,7 @@ void USDMeshReader::read_object_data(Main *bmain, double motionSampleTime)
 
 bool USDMeshReader::valid() const
 {
-  return mesh_prim_.GetPrim().IsValid();
+  return static_cast<bool>(mesh_prim_);
 }
 
 bool USDMeshReader::topology_changed(Mesh *existing_mesh, double motionSampleTime)
@@ -734,8 +736,6 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
                                float vel_scale,
                                const char **err_str)
 {
-  mesh_prim_ = pxr::UsdGeomMesh(prim_);
-
   if (!mesh_prim_) {
     return existing_mesh;
   }

@@ -38,13 +38,13 @@ extern "C" {
 
 namespace blender::io::usd {
 
-USDPrimReader::USDPrimReader(const pxr::UsdPrim &object,
+USDPrimReader::USDPrimReader(const pxr::UsdPrim &prim,
                              const USDImportParams &import_params,
                              const ImportSettings &settings)
-    : name_(object.GetName().GetString()),
-      prim_path_(object.GetPrimPath().GetString()),
+    : name_(prim.GetName().GetString()),
+      prim_path_(prim.GetPrimPath().GetString()),
       object_(nullptr),
-      prim_(object),
+      prim_(prim),
       import_params_(import_params),
       parent_reader_(nullptr),
       settings_(&settings),

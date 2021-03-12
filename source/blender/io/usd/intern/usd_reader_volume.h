@@ -27,11 +27,16 @@ class USDVolumeReader : public USDXformReader {
   pxr::UsdVolVolume volume_;
 
  public:
-  USDVolumeReader(const pxr::UsdPrim &object,
+  USDVolumeReader(const pxr::UsdPrim &prim,
                   const USDImportParams &import_params,
                   const ImportSettings &settings)
-      : USDXformReader(object, import_params, settings)
+      : USDXformReader(prim, import_params, settings), volume_(prim)
   {
+  }
+
+  bool valid() const override
+  {
+    return static_cast<bool>(volume_);
   }
 
   void create_object(Main *bmain, double motionSampleTime) override;

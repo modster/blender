@@ -67,8 +67,6 @@ void USDVolumeReader::create_object(Main *bmain, double motionSampleTime)
 
 void USDVolumeReader::read_object_data(Main *bmain, double motionSampleTime)
 {
-  volume_ = pxr::UsdVolVolume(prim_);
-
   if (!volume_) {
     return;
   }
