@@ -67,7 +67,3 @@ if(WITH_BLENDER)
 endif()
 
 add_subdirectory(datafiles)
-
-if(WITH_LINEART)
-  add_definitions(-DWITH_LINEART)
-endif()
