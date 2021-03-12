@@ -45,6 +45,7 @@
 
 #include "UI_resources.h"
 
+#include "MOD_gpencil_lineart.h"
 #include "MOD_lineart.h"
 
 #include "lineart_intern.h"
@@ -73,9 +74,6 @@ static void clear_strokes(Object *ob, GpencilModifierData *md, int frame)
 
 static bool bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int frame)
 {
-  if (md->type != eGpencilModifierType_Lineart) {
-    return false;
-  }
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
   bGPdata *gpd = ob->data;
 
@@ -130,7 +128,7 @@ typedef struct LineartBakeJob {
 
   /* C or ob must have one != NULL. */
   bContext *C;
-  Object *ob;
+  LinkNode *objects;
   Scene *scene;
   Depsgraph *dg;
   int frame;
@@ -141,59 +139,47 @@ typedef struct LineartBakeJob {
   bool overwrite_frames;
 } LineartBakeJob;
 
-static bool lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob)
+static bool lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob, int frame)
 {
   bool touched = false;
-  if (ob->type != OB_GPENCIL) {
+  if (ob->type != OB_GPENCIL || G.is_break) {
     return false;
   }
-  for (int frame = bj->frame_begin; frame <= bj->frame_end; frame += bj->frame_increment) {
 
-    BKE_scene_frame_set(bj->scene, frame);
-    BKE_scene_graph_update_for_newframe(bj->dg);
-
-    if (bj->overwrite_frames) {
-      LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
-        clear_strokes(ob, md, frame);
-      }
-    }
-
+  if (bj->overwrite_frames) {
     LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
-      if (bake_strokes(ob, bj->dg, md, frame)) {
-        touched = true;
-      }
+      clear_strokes(ob, md, frame);
     }
-
-    if (G.is_break) {
-      return touched;
-    }
-
-    *bj->progress = (float)(frame - bj->frame_begin) / (bj->frame_end - bj->frame_begin);
   }
+
+  LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+    if (bake_strokes(ob, bj->dg, md, frame)) {
+      touched = true;
+    }
+  }
+
   return touched;
 }
 
 static void lineart_gpencil_guard_modifiers(LineartBakeJob *bj, bool guard_set, bool hide_modifier)
 {
-  CTX_DATA_BEGIN (bj->C, Object *, ob, visible_objects) {
-    if (ob->type == OB_GPENCIL) {
-      LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
-        if (md->type == eGpencilModifierType_Lineart) {
-          LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
-          if (guard_set) {
-            lmd->flags |= LRT_GPENCIL_IS_BAKING;
-          }
-          else {
-            lmd->flags &= (~LRT_GPENCIL_IS_BAKING);
-          }
-          if (hide_modifier) {
-            md->mode &= ~(eGpencilModifierMode_Realtime | eGpencilModifierMode_Render);
-          }
+  for (LinkNode *l = bj->objects; l; l = l->next) {
+    Object *ob = l->link;
+    LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+      if (md->type == eGpencilModifierType_Lineart) {
+        LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
+        if (guard_set) {
+          lmd->flags |= LRT_GPENCIL_IS_BAKING;
+        }
+        else {
+          lmd->flags &= (~LRT_GPENCIL_IS_BAKING);
+        }
+        if (hide_modifier) {
+          md->mode &= ~(eGpencilModifierMode_Realtime | eGpencilModifierMode_Render);
         }
       }
     }
   }
-  CTX_DATA_END;
 }
 
 static void lineart_gpencil_bake_startjob(void *customdata,
@@ -208,22 +194,29 @@ static void lineart_gpencil_bake_startjob(void *customdata,
 
   lineart_gpencil_guard_modifiers(bj, true, false);
 
-  if (bj->ob) {
-    /* Which means only bake one line art gpencil object, specified by bj->ob. */
-    if (lineart_gpencil_bake_single_target(bj, bj->ob)) {
-      DEG_id_tag_update((struct ID *)bj->ob->data, ID_RECALC_GEOMETRY);
-      WM_event_add_notifier(bj->C, NC_GPENCIL | ND_DATA | NA_EDITED, bj->ob);
+  for (int frame = bj->frame_begin; frame <= bj->frame_end; frame += bj->frame_increment) {
+
+    if (G.is_break) {
+      G.is_break = false;
+      break;
     }
-  }
-  else {
-    CTX_DATA_BEGIN (bj->C, Object *, ob, visible_objects) {
-      if (lineart_gpencil_bake_single_target(bj, ob)) {
+
+    BKE_scene_frame_set(bj->scene, frame);
+    BKE_scene_graph_update_for_newframe(bj->dg);
+
+    for (LinkNode *l = bj->objects; l; l = l->next) {
+      Object *ob = l->link;
+      if (lineart_gpencil_bake_single_target(bj, ob, frame)) {
         DEG_id_tag_update((struct ID *)ob->data, ID_RECALC_GEOMETRY);
         WM_event_add_notifier(bj->C, NC_GPENCIL | ND_DATA | NA_EDITED, ob);
       }
     }
-    CTX_DATA_END;
+
+    *bj->progress = (float)(frame - bj->frame_begin) / (bj->frame_end - bj->frame_begin);
   }
+
+  /* This need to be reset manually. */
+  G.is_break = false;
 
   /* Restore original frame. */
   BKE_scene_frame_set(bj->scene, bj->frame_orig);
@@ -239,7 +232,12 @@ static void lineart_gpencil_bake_endjob(void *customdata)
   WM_set_locked_interface(CTX_wm_manager(bj->C), false);
 
   WM_main_add_notifier(NC_SCENE | ND_FRAME, bj->scene);
-  WM_main_add_notifier(NC_GPENCIL | ND_DATA | NA_EDITED, bj->ob);
+
+  for (LinkNode *l = bj->objects; l; l = l->next) {
+    WM_main_add_notifier(NC_GPENCIL | ND_DATA | NA_EDITED, (Object *)l->link);
+  }
+
+  BLI_linklist_free(bj->objects, NULL);
 }
 
 static int lineart_gpencil_bake_common(bContext *C,
@@ -249,14 +247,28 @@ static int lineart_gpencil_bake_common(bContext *C,
 {
   LineartBakeJob *bj = MEM_callocN(sizeof(LineartBakeJob), "LineartBakeJob");
 
-  bj->C = C;
   if (!bake_all_targets) {
-    bj->ob = CTX_data_active_object(C);
-    if (!bj->ob || bj->ob->type != OB_GPENCIL) {
+    Object *ob = CTX_data_active_object(C);
+    if (!ob || ob->type != OB_GPENCIL) {
       WM_report(RPT_ERROR, "No active object or active object isn't a GPencil object.");
       return OPERATOR_FINISHED;
     }
+    BLI_linklist_prepend(&bj->objects, ob);
   }
+  else {
+    /* CTX_DATA_BEGIN is not available for interating in objects while using the Job system. */
+    CTX_DATA_BEGIN (C, Object *, ob, visible_objects) {
+      if (ob->type == OB_GPENCIL) {
+        LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+          if (md->type == eGpencilModifierType_Lineart) {
+            BLI_linklist_prepend(&bj->objects, ob);
+          }
+        }
+      }
+    }
+    CTX_DATA_END;
+  }
+  bj->C = C;
   Scene *scene = CTX_data_scene(C);
   bj->scene = scene;
   bj->dg = CTX_data_depsgraph_pointer(C);
@@ -269,7 +281,7 @@ static int lineart_gpencil_bake_common(bContext *C,
   if (do_background) {
     wmJob *wm_job = WM_jobs_get(CTX_wm_manager(C),
                                 CTX_wm_window(C),
-                                CTX_data_scene(C),
+                                scene,
                                 "Line Art",
                                 WM_JOB_PROGRESS,
                                 WM_JOB_TYPE_LINEART);
@@ -291,6 +303,7 @@ static int lineart_gpencil_bake_common(bContext *C,
     float pseduo_progress;
     lineart_gpencil_bake_startjob(bj, NULL, NULL, &pseduo_progress);
 
+    BLI_linklist_free(bj->objects, NULL);
     MEM_freeN(bj);
 
     return OPERATOR_FINISHED;
@@ -333,11 +346,10 @@ static int lineart_gpencil_bake_strokes_commom_modal(bContext *C,
   return OPERATOR_PASS_THROUGH;
 }
 
-static int lineart_gpencil_clear_strokes_exec(bContext *C, wmOperator *op)
+static void lineart_gpencil_clear_strokes_exec_common(Object *ob)
 {
-  Object *ob = CTX_data_active_object(C);
   if (ob->type != OB_GPENCIL) {
-    return OPERATOR_CANCELLED;
+    return;
   }
   LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
     if (md->type != eGpencilModifierType_Lineart) {
@@ -351,39 +363,32 @@ static int lineart_gpencil_clear_strokes_exec(bContext *C, wmOperator *op)
       continue;
     }
     BKE_gpencil_free_frames(gpl);
+
+    md->mode |= eGpencilModifierMode_Realtime | eGpencilModifierMode_Render;
   }
-
-  BKE_report(op->reports, RPT_INFO, "Line art cleared for this target.");
-
   DEG_id_tag_update((struct ID *)ob->data, ID_RECALC_GEOMETRY);
+}
+
+static int lineart_gpencil_clear_strokes_exec(bContext *C, wmOperator *op)
+{
+  Object *ob = CTX_data_active_object(C);
+
+  lineart_gpencil_clear_strokes_exec_common(ob);
+
   WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, ob);
+
   return OPERATOR_FINISHED;
 }
 static int lineart_gpencil_clear_strokes_all_exec(bContext *C, wmOperator *op)
 {
   CTX_DATA_BEGIN (C, Object *, ob, visible_objects) {
-    if (ob->type != OB_GPENCIL) {
-      continue;
-    }
-    LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
-      if (md->type != eGpencilModifierType_Lineart) {
-        continue;
-      }
-      LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
-      bGPdata *gpd = ob->data;
-
-      bGPDlayer *gpl = BKE_gpencil_layer_get_by_name(gpd, lmd->target_layer, 1);
-      if (!gpl) {
-        continue;
-      }
-      BKE_gpencil_free_frames(gpl);
-    }
-    DEG_id_tag_update((struct ID *)ob->data, ID_RECALC_GEOMETRY);
+    lineart_gpencil_clear_strokes_exec_common(ob);
     WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, ob);
   }
   CTX_DATA_END;
 
-  BKE_report(op->reports, RPT_INFO, "All line art targets are now cleared.");
+  BKE_report(op->reports, RPT_INFO, "All line art objects are now cleared.");
+
   return OPERATOR_FINISHED;
 }
 

@@ -2395,11 +2395,6 @@ static LineartRenderLine *lineart_triangle_intersect(LineartRenderBuffer *rb,
   result->tl = rt;
   result->tr = testing;
 
-  /** TODO: Use bit flags similar to transparency_mask to select intersection pairs, or to use rt
-   * address as rt's are continuously allocated in memory for each object. object_ref is removed.
-   */
-  /* result->object_ref = rt->object_ref;. */
-
   LineartRenderLineSegment *rls = lineart_mem_aquire(&rb->render_data_pool,
                                                      sizeof(LineartRenderLineSegment));
   BLI_addtail(&result->segments, rls);
@@ -3748,7 +3743,6 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
                 int sindex = 0, vindex;
                 LISTBASE_FOREACH (LineartRenderLineChainItem *, rlci, &rlc->chain) {
                   vindex = rlci->index;
-                  /* XXX: Here doesn't have post-modifier dvert!. */
                   if (vindex >= me->totvert) {
                     break;
                   }
