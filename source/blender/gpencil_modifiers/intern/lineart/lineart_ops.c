@@ -369,7 +369,7 @@ static void lineart_gpencil_clear_strokes_exec_common(Object *ob)
   DEG_id_tag_update((struct ID *)ob->data, ID_RECALC_GEOMETRY);
 }
 
-static int lineart_gpencil_clear_strokes_exec(bContext *C, wmOperator *op)
+static int lineart_gpencil_clear_strokes_exec(bContext *C, wmOperator *UNUSED(op))
 {
   Object *ob = CTX_data_active_object(C);
 
