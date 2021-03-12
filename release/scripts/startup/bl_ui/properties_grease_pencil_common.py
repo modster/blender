@@ -381,6 +381,14 @@ class GPENCIL_MT_cleanup(Menu):
         if ob.mode != 'PAINT_GPENCIL':
             layout.operator("gpencil.reproject")
 
+class GPENCIL_MT_stroke_type(Menu):
+    bl_label = "Set Stroke Type"
+
+    def draw(self, contect):
+        layout = self.layout
+        layout.operator("gpencil.stroke_set_type", text="Poly", icon='OUTLINER_DATA_GREASEPENCIL').type = 'POLY'
+        layout.operator("gpencil.stroke_set_type", text="Bézier", icon='HANDLE_ALIGNED').type = 'BEZIER'
+
 
 class GPENCIL_UL_annotation_layer(UIList):
     def draw_item(self, _context, layout, _data, item, icon, _active_data, _active_propname, _index):
@@ -922,6 +930,7 @@ classes = (
     GPENCIL_MT_move_to_layer,
     GPENCIL_MT_layer_active,
     GPENCIL_MT_material_active,
+    GPENCIL_MT_stroke_type,
 
     GPENCIL_MT_gpencil_draw_delete,
     GPENCIL_MT_layer_mask_menu,

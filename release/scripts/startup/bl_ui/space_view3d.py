@@ -5012,6 +5012,7 @@ class VIEW3D_MT_edit_gpencil_stroke(Menu):
         layout.operator_menu_enum("gpencil.stroke_caps_set", text="Toggle Caps", property="type")
         layout.operator("gpencil.stroke_flip", text="Switch Direction")
         layout.prop(settings, "use_scale_thickness", text="Scale Thickness")
+        layout.menu("GPENCIL_MT_stroke_type")
 
         layout.separator()
         layout.operator("gpencil.reset_transform_fill", text="Reset Fill Transform")
@@ -7084,6 +7085,10 @@ class VIEW3D_MT_gpencil_edit_context_menu(Menu):
 
             col.menu("VIEW3D_MT_mirror", text="Mirror")
             col.menu("VIEW3D_MT_snap", text="Snap")
+
+            col.separator()
+
+            col.menu("GPENCIL_MT_stroke_type")
 
             col.separator()
 
