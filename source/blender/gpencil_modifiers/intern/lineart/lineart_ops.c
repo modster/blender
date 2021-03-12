@@ -27,6 +27,7 @@
 
 #include "BKE_collection.h"
 #include "BKE_context.h"
+#include "BKE_global.h"
 #include "BKE_gpencil.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
@@ -165,6 +166,10 @@ static bool lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob)
       }
     }
 
+    if (G.is_break) {
+      return touched;
+    }
+
     *bj->progress = (float)(frame - bj->frame_begin) / (bj->frame_end - bj->frame_begin);
   }
   return touched;
@@ -176,6 +181,7 @@ static void lineart_gpencil_bake_startjob(void *customdata,
                                           float *progress)
 {
   LineartBakeJob *bj = (LineartBakeJob *)customdata;
+  bj->stop = stop;
   bj->do_update = do_update;
   bj->progress = progress;
 
