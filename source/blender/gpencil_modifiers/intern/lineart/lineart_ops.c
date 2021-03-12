@@ -161,22 +161,14 @@ static bool lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob, i
   return touched;
 }
 
-static void lineart_gpencil_guard_modifiers(LineartBakeJob *bj, bool guard_set, bool hide_modifier)
+static void lineart_gpencil_guard_modifiers(LineartBakeJob *bj)
 {
   for (LinkNode *l = bj->objects; l; l = l->next) {
     Object *ob = l->link;
     LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
       if (md->type == eGpencilModifierType_Lineart) {
         LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
-        if (guard_set) {
-          lmd->flags |= LRT_GPENCIL_IS_BAKING;
-        }
-        else {
-          lmd->flags &= (~LRT_GPENCIL_IS_BAKING);
-        }
-        if (hide_modifier) {
-          md->mode &= ~(eGpencilModifierMode_Realtime | eGpencilModifierMode_Render);
-        }
+        lmd->flags |= LRT_GPENCIL_IS_BAKED;
       }
     }
   }
@@ -192,7 +184,7 @@ static void lineart_gpencil_bake_startjob(void *customdata,
   bj->do_update = do_update;
   bj->progress = progress;
 
-  lineart_gpencil_guard_modifiers(bj, true, false);
+  lineart_gpencil_guard_modifiers(bj);
 
   for (int frame = bj->frame_begin; frame <= bj->frame_end; frame += bj->frame_increment) {
 
@@ -221,8 +213,6 @@ static void lineart_gpencil_bake_startjob(void *customdata,
   /* Restore original frame. */
   BKE_scene_frame_set(bj->scene, bj->frame_orig);
   BKE_scene_graph_update_for_newframe(bj->dg);
-
-  lineart_gpencil_guard_modifiers(bj, false, true);
 }
 
 static void lineart_gpencil_bake_endjob(void *customdata)
@@ -365,6 +355,8 @@ static void lineart_gpencil_clear_strokes_exec_common(Object *ob)
     BKE_gpencil_free_frames(gpl);
 
     md->mode |= eGpencilModifierMode_Realtime | eGpencilModifierMode_Render;
+
+    lmd->flags &= (~LRT_GPENCIL_IS_BAKED);
   }
   DEG_id_tag_update((struct ID *)ob->data, ID_RECALC_GEOMETRY);
 }

@@ -130,7 +130,7 @@ static bool isModifierDisabled(GpencilModifierData *md)
   }
 
   /* Preventing calculation in depsgraph when baking frames. */
-  if (lmd->flags & LRT_GPENCIL_IS_BAKING) {
+  if (lmd->flags & LRT_GPENCIL_IS_BAKED) {
     return true;
   }
 
@@ -247,8 +247,10 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   PointerRNA obj_data_ptr = RNA_pointer_get(&ob_ptr, "data");
 
   int source_type = RNA_enum_get(ptr, "source_type");
+  bool is_baked = RNA_boolean_get(ptr, "is_baked");
 
   uiLayoutSetPropSep(layout, true);
+  uiLayoutSetEnabled(layout, !is_baked);
 
   uiItemR(layout, ptr, "source_type", 0, NULL, ICON_NONE);
 
@@ -292,7 +294,10 @@ static void style_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayout *layout = panel->layout;
 
+  bool is_baked = RNA_boolean_get(ptr, "is_baked");
+
   uiLayoutSetPropSep(layout, true);
+  uiLayoutSetEnabled(layout, !is_baked);
 
   uiLayout *column = uiLayoutColumn(layout, true);
 
@@ -307,7 +312,10 @@ static void occlusion_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayout *layout = panel->layout;
 
+  bool is_baked = RNA_boolean_get(ptr, "is_baked");
+
   uiLayoutSetPropSep(layout, true);
+  uiLayoutSetEnabled(layout, !is_baked);
 
   bool use_multiple_levels = RNA_boolean_get(ptr, "use_multiple_levels");
   bool use_transparency = RNA_boolean_get(ptr, "use_transparency");
@@ -350,7 +358,10 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayout *layout = panel->layout;
 
+  bool is_baked = RNA_boolean_get(ptr, "is_baked");
+
   uiLayoutSetPropSep(layout, true);
+  uiLayoutSetEnabled(layout, !is_baked);
 
   uiLayout *column = uiLayoutColumn(layout, true);
   uiItemR(column, ptr, "chaining_geometry_threshold", 0, NULL, ICON_NONE);
@@ -368,7 +379,10 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayout *layout = panel->layout, *row;
 
+  bool is_baked = RNA_boolean_get(ptr, "is_baked");
+
   uiLayoutSetPropSep(layout, true);
+  uiLayoutSetEnabled(layout, !is_baked);
 
   uiLayout *column = uiLayoutColumn(layout, true);
 
@@ -389,10 +403,22 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
 static void baking_panel_draw(const bContext *UNUSED(C), Panel *panel)
 {
   uiLayout *layout = panel->layout;
+  PointerRNA ob_ptr;
+  PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
+
+  bool is_baked = RNA_boolean_get(ptr, "is_baked");
 
   uiLayoutSetPropSep(layout, true);
 
+  if (is_baked) {
+    uiLayout *column = uiLayoutColumn(layout, false);
+    uiLayoutSetPropSep(column, false);
+    uiItemL(column, "Modifier has baked data.", ICON_NONE);
+    uiItemR(column, ptr, "is_baked", UI_ITEM_R_TOGGLE, "Continue Without Clearing", ICON_NONE);
+  }
+
   uiLayout *column = uiLayoutColumn(layout, false);
+  uiLayoutSetEnabled(column, !is_baked);
   uiItemO(column, NULL, ICON_NONE, "OBJECT_OT_lineart_bake_strokes");
   uiItemO(column, NULL, ICON_NONE, "OBJECT_OT_lineart_bake_strokes_all");
 

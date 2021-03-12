@@ -820,7 +820,7 @@ typedef enum eLineArtGPencilModifierFlags {
   LRT_GPENCIL_INVERT_SOURCE_VGROUP = (1 << 0),
   LRT_GPENCIL_MATCH_OUTPUT_VGROUP = (1 << 1),
   LRT_GPENCIL_SOFT_SELECTION = (1 << 2),
-  LRT_GPENCIL_IS_BAKING = (1 << 3),
+  LRT_GPENCIL_IS_BAKED = (1 << 3),
 } eLineArtGPencilModifierFlags;
 
 typedef enum eLineartGpencilTransparencyFlags {
