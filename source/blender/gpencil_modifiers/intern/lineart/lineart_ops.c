@@ -119,8 +119,6 @@ static bool bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int
 
   ED_lineart_destroy_render_data(lmd);
 
-  md->mode &= ~(eGpencilModifierMode_Realtime | eGpencilModifierMode_Render);
-
   return true;
 }
 
@@ -175,6 +173,29 @@ static bool lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob)
   return touched;
 }
 
+static void lineart_gpencil_guard_modifiers(LineartBakeJob *bj, bool guard_set, bool hide_modifier)
+{
+  CTX_DATA_BEGIN (bj->C, Object *, ob, visible_objects) {
+    if (ob->type == OB_GPENCIL) {
+      LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+        if (md->type == eGpencilModifierType_Lineart) {
+          LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
+          if (guard_set) {
+            lmd->flags |= LRT_GPENCIL_IS_BAKING;
+          }
+          else {
+            lmd->flags &= (~LRT_GPENCIL_IS_BAKING);
+          }
+          if (hide_modifier) {
+            md->mode &= ~(eGpencilModifierMode_Realtime | eGpencilModifierMode_Render);
+          }
+        }
+      }
+    }
+  }
+  CTX_DATA_END;
+}
+
 static void lineart_gpencil_bake_startjob(void *customdata,
                                           short *stop,
                                           short *do_update,
@@ -184,6 +205,8 @@ static void lineart_gpencil_bake_startjob(void *customdata,
   bj->stop = stop;
   bj->do_update = do_update;
   bj->progress = progress;
+
+  lineart_gpencil_guard_modifiers(bj, true, false);
 
   if (bj->ob) {
     /* Which means only bake one line art gpencil object, specified by bj->ob. */
@@ -205,6 +228,8 @@ static void lineart_gpencil_bake_startjob(void *customdata,
   /* Restore original frame. */
   BKE_scene_frame_set(bj->scene, bj->frame_orig);
   BKE_scene_graph_update_for_newframe(bj->dg);
+
+  lineart_gpencil_guard_modifiers(bj, false, true);
 }
 
 static void lineart_gpencil_bake_endjob(void *customdata)

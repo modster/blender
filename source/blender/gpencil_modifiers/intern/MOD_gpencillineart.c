@@ -129,6 +129,11 @@ static bool isModifierDisabled(GpencilModifierData *md)
     return true;
   }
 
+  /* Preventing calculation in depsgraph when baking frames. */
+  if (lmd->flags & LRT_GPENCIL_IS_BAKING) {
+    return false;
+  }
+
   return false;
 }
 static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Object *ob)
