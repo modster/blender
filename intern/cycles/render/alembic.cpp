@@ -501,8 +501,6 @@ static void add_uvs(AlembicProcedural *proc,
     }
 
     const ISampleSelector iss = ISampleSelector(time);
-    const IV2fGeomParam::Sample sample = uvs.getExpandedValue(iss);
-
     const IV2fGeomParam::Sample uvsample = uvs.getIndexedValue(iss);
 
     if (!uvsample.valid()) {
@@ -834,6 +832,7 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
     return true;
   }
 
+  /* Only load data for the original Geometry. */
   if (instance_of) {
     return false;
   }
@@ -916,11 +915,12 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
     return true;
   }
 
+  cached_data.clear();
+
+  /* Only load data for the original Geometry. */
   if (instance_of) {
     return false;
   }
-
-  cached_data.clear();
 
   AttributeRequestSet requested_attributes = get_requested_attributes();
 
@@ -1061,11 +1061,12 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
     return true;
   }
 
+  cached_data.clear();
+
+  /* Only load data for the original Geometry. */
   if (instance_of) {
     return false;
   }
-
-  cached_data.clear();
 
   const TimeSamplingPtr time_sampling = schema.getTimeSampling();
 
@@ -1677,10 +1678,10 @@ void AlembicProcedural::load_objects(Progress &progress)
 
       geometry->set_owner(this);
       geometry->name = abc_object->iobject.getName();
-    }
 
-    array<Node *> used_shaders = abc_object->get_used_shaders();
-    geometry->set_used_shaders(used_shaders);
+      array<Node *> used_shaders = abc_object->get_used_shaders();
+      geometry->set_used_shaders(used_shaders);
+    }
 
     Object *object = scene_->create_node<Object>();
     object->set_owner(this);
@@ -1704,8 +1705,6 @@ void AlembicProcedural::load_objects(Progress &progress)
 
 void AlembicProcedural::read_mesh(AlembicObject *abc_object, Abc::chrono_t frame_time)
 {
-  Mesh *mesh = static_cast<Mesh *>(abc_object->get_object()->get_geometry());
-
   CachedData &cached_data = abc_object->get_cached_data();
 
   /* update sockets */
@@ -1717,9 +1716,12 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object, Abc::chrono_t frame
     object->tag_update(scene_);
   }
 
+  /* Only update sockets for the original Geometry. */
   if (abc_object->instance_of) {
     return;
   }
+
+  Mesh *mesh = static_cast<Mesh *>(object->get_geometry());
 
   cached_data.vertices.copy_to_socket(frame_time, mesh, mesh->get_verts_socket());
 
@@ -1768,14 +1770,14 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object, Abc::chrono_t frame
 
 void AlembicProcedural::read_subd(AlembicObject *abc_object, Abc::chrono_t frame_time)
 {
-  Mesh *mesh = static_cast<Mesh *>(abc_object->get_object()->get_geometry());
-
-  /* Alembic is OpenSubDiv compliant, there is no option to set another subdivision type. */
-  mesh->set_subdivision_type(Mesh::SubdivisionType::SUBDIVISION_CATMULL_CLARK);
-  mesh->set_subd_max_level(abc_object->get_subd_max_level());
-  mesh->set_subd_dicing_rate(abc_object->get_subd_dicing_rate());
-
   CachedData &cached_data = abc_object->get_cached_data();
+
+  if (abc_object->subd_max_level_is_modified() || abc_object->subd_dicing_rate_is_modified()) {
+    /* need to reset the current data is something changed */
+    cached_data.invalidate_last_loaded_time();
+  }
+
+  /* Update sockets. */
 
   Object *object = abc_object->get_object();
   cached_data.transforms.copy_to_socket(frame_time, object, object->get_tfm_socket());
@@ -1793,6 +1795,8 @@ void AlembicProcedural::read_subd(AlembicObject *abc_object, Abc::chrono_t frame
     cached_data.invalidate_last_loaded_time();
   }
 
+  Mesh *mesh = static_cast<Mesh *>(object->get_geometry());
+
   /* Cycles overwrites the original triangles when computing displacement, so we always have to
    * repass the data if something is animated (vertices most likely) to avoid buffer overflows. */
   if (!cached_data.is_constant()) {
@@ -1805,7 +1809,10 @@ void AlembicProcedural::read_subd(AlembicObject *abc_object, Abc::chrono_t frame
 
   mesh->clear_non_sockets();
 
-  /* Update sockets. */
+  /* Alembic is OpenSubDiv compliant, there is no option to set another subdivision type. */
+  mesh->set_subdivision_type(Mesh::SubdivisionType::SUBDIVISION_CATMULL_CLARK);
+  mesh->set_subd_max_level(abc_object->get_subd_max_level());
+  mesh->set_subd_dicing_rate(abc_object->get_subd_dicing_rate());
 
   cached_data.vertices.copy_to_socket(frame_time, mesh, mesh->get_verts_socket());
 
@@ -1862,8 +1869,6 @@ void AlembicProcedural::read_subd(AlembicObject *abc_object, Abc::chrono_t frame
 
 void AlembicProcedural::read_curves(AlembicObject *abc_object, Abc::chrono_t frame_time)
 {
-  Hair *hair = static_cast<Hair *>(abc_object->get_object()->get_geometry());
-
   CachedData &cached_data = abc_object->get_cached_data();
 
   /* update sockets */
@@ -1875,9 +1880,12 @@ void AlembicProcedural::read_curves(AlembicObject *abc_object, Abc::chrono_t fra
     object->tag_update(scene_);
   }
 
+  /* Only update sockets for the original Geometry. */
   if (abc_object->instance_of) {
     return;
   }
+
+  Hair *hair = static_cast<Hair *>(object->get_geometry());
 
   cached_data.curve_keys.copy_to_socket(frame_time, hair, hair->get_curve_keys_socket());
 
@@ -2017,18 +2025,25 @@ void AlembicProcedural::walk_hierarchy(
   else if (IFaceSet::matches(header)) {
     // ignore the face set, it will be read along with the data
   }
+  else if (IPoints::matches(header)) {
+    // unsupported for now
+  }
+  else if (INuPatch::matches(header)) {
+    // unsupported for now
+  }
   else {
-    // unsupported type for now (Points, NuPatch)
     next_object = parent.getChild(header.getName());
 
     if (next_object.isInstanceRoot()) {
       unordered_map<std::string, AlembicObject *>::const_iterator iter;
 
+      /* Was this object asked to be rendered? */
       iter = object_map.find(next_object.getFullName());
 
       if (iter != object_map.end()) {
         AlembicObject *abc_object = iter->second;
 
+        /* Only try to render an instance if the original object is also rendered. */
         iter = object_map.find(next_object.instanceSourcePath());
 
         if (iter != object_map.end()) {

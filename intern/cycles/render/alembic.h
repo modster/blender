@@ -51,6 +51,8 @@ template<typename> struct is_array : public std::false_type {
 template<typename T> struct is_array<array<T>> : public std::true_type {
 };
 
+/* Holds the data for a cache lookup at a given time, as well as informations to
+ * help disambiguate successes or failures to get data from the cache. */
 template<typename T> class CacheLookupResult {
   enum class State {
     NEW_DATA,
@@ -58,63 +60,66 @@ template<typename T> class CacheLookupResult {
     NO_DATA_FOR_TIME,
   };
 
-  T *data_;
-  State state_;
+  T *data;
+  State state;
 
  protected:
+  /* Prevent default construction outside of the class: for a valid result, we
+   * should use the static functions below. */
   CacheLookupResult() = default;
 
  public:
-  static CacheLookupResult new_data(T *data)
+  static CacheLookupResult new_data(T *data_)
   {
     CacheLookupResult result;
-    result.data_ = data;
-    result.state_ = State::NEW_DATA;
+    result.data = data_;
+    result.state = State::NEW_DATA;
     return result;
   }
 
   static CacheLookupResult no_data_found_for_time()
   {
     CacheLookupResult result;
-    result.data_ = nullptr;
-    result.state_ = State::NO_DATA_FOR_TIME;
+    result.data = nullptr;
+    result.state = State::NO_DATA_FOR_TIME;
     return result;
   }
 
   static CacheLookupResult already_loaded()
   {
     CacheLookupResult result;
-    result.data_ = nullptr;
-    result.state_ = State::ALREADY_LOADED;
+    result.data = nullptr;
+    result.state = State::ALREADY_LOADED;
     return result;
   }
 
-  T &get_data()
+  /* This should only be call if new data is available. */
+  const T &get_data() const
   {
-    assert(state_ == State::NEW_DATA);
-    assert(data_ != nullptr);
-    return *data_;
+    assert(state == State::NEW_DATA);
+    assert(data != nullptr);
+    return *data;
   }
 
-  T *get_data_or_null()
+  T *get_data_or_null() const
   {
-    // data_ should already be null if there is no new data
-    return data_;
+    // data_ should already be null if there is no new data so no need to check
+    return data;
   }
 
   bool has_new_data() const
   {
-    return state_ == State::NEW_DATA;
+    return state == State::NEW_DATA;
   }
 
   bool has_already_loaded() const
   {
-    return state_ == State::ALREADY_LOADED;
+    return state == State::ALREADY_LOADED;
   }
 
   bool has_no_data_for_time() const
   {
-    return state_ == State::NO_DATA_FOR_TIME;
+    return state == State::NO_DATA_FOR_TIME;
   }
 };
 
