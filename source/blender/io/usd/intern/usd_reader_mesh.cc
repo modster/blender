@@ -671,11 +671,19 @@ void USDMeshReader::assign_facesets_to_mpoly(double motionSampleTime,
                                              std::map<pxr::SdfPath, int> &r_mat_map)
 {
   pxr::UsdShadeMaterialBindingAPI api = pxr::UsdShadeMaterialBindingAPI(prim_);
-  std::vector<pxr::UsdGeomSubset> subsets = api.GetMaterialBindSubsets();
+
+  /* Find the geom subsets that have bound materials.
+   * We don't call pxr::UsdShadeMaterialBindingAPI::GetMaterialBindSubsets()
+   * because this function returns only those subsets that are in the 'materialBind'
+   * family, but, in practice, applications (like Houdini) might export subsets
+   * in different families that are bound to materials.
+   * TODO(makowalski): Reassess if the above is the best approach. */
+  const std::vector<pxr::UsdGeomSubset> subsets = pxr::UsdGeomSubset::GetAllGeomSubsets(
+      mesh_prim_);
 
   int current_mat = 0;
   if (subsets.size() > 0) {
-    for (pxr::UsdGeomSubset &subset : subsets) {
+    for (const pxr::UsdGeomSubset &subset : subsets) {
       pxr::UsdShadeMaterialBindingAPI subsetAPI = pxr::UsdShadeMaterialBindingAPI(
           subset.GetPrim());
 
