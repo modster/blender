@@ -415,7 +415,7 @@ void OBJECT_OT_lineart_bake_strokes_all(wmOperatorType *ot)
 void OBJECT_OT_lineart_clear(wmOperatorType *ot)
 {
   ot->name = "Clear Baked Line Art";
-  ot->description = "Clear all strokes in current GPencil obejct.";
+  ot->description = "Clear all strokes in current GPencil obejct";
   ot->idname = "OBJECT_OT_lineart_clear";
 
   ot->exec = lineart_gpencil_clear_strokes_exec;
