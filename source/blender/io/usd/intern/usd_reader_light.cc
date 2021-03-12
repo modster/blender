@@ -15,26 +15,13 @@
  */
 
 #include "usd_reader_light.h"
-#include "usd_reader_prim.h"
 
 extern "C" {
-#include "DNA_cachefile_types.h"
-#include "DNA_constraint_types.h"
 #include "DNA_light_types.h"
-#include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
-#include "DNA_space_types.h" /* for FILE_MAX */
 
-#include "BKE_constraint.h"
 #include "BKE_light.h"
-#include "BKE_modifier.h"
 #include "BKE_object.h"
-
-#include "BLI_listbase.h"
-#include "BLI_math.h"
-#include "BLI_math_geom.h"
-#include "BLI_string.h"
-#include "BLI_utildefines.h"
 
 #include "WM_api.h"
 #include "WM_types.h"

@@ -36,30 +36,6 @@
 #include <pxr/usd/usdGeom/scope.h>
 #include <pxr/usd/usdLux/light.h>
 
-extern "C" {
-#include "DEG_depsgraph.h"
-#include "DEG_depsgraph_build.h"
-#include "DEG_depsgraph_query.h"
-
-#include "DNA_node_types.h"
-#include "DNA_scene_types.h"
-#include "DNA_world_types.h"
-
-#include "BKE_blender_version.h"
-#include "BKE_context.h"
-#include "BKE_global.h"
-#include "BKE_main.h"
-#include "BKE_node.h"
-#include "BKE_scene.h"
-#include "BKE_world.h"
-
-#include "BLI_fileops.h"
-#include "BLI_path_util.h"
-#include "BLI_string.h"
-
-#include "WM_api.h"
-#include "WM_types.h"
-}
 #include <iostream>
 
 namespace blender::io::usd {
