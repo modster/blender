@@ -37,7 +37,6 @@
 
 #include "object_intern.h"
 
-// TODO: Not nice, but here in the mean time to just try out the LineArt bake operators
 #include "MOD_gpencil_lineart.h"
 
 /* ************************** registration **********************************/
