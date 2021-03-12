@@ -3167,32 +3167,7 @@ LineartBoundingArea *ED_lineart_get_point_bounding_area_rb(LineartRenderBuffer *
   return &rb->initial_bounding_areas[row * 4 + col];
 }
 
-static LineartBoundingArea *lineart_get_point_bounding_area_recursive(LineartBoundingArea *ba,
-                                                                      double x,
-                                                                      double y)
-{
-  if (ba->child == NULL) {
-    return ba;
-  }
-#define IN_BOUND(i, x, y) \
-  ba->child[i].l <= x && ba->child[i].r >= x && ba->child[i].b <= y && ba->child[i].u >= y
-
-  if (IN_BOUND(0, x, y)) {
-    return lineart_get_point_bounding_area_recursive(&ba->child[0], x, y);
-  }
-  if (IN_BOUND(1, x, y)) {
-    return lineart_get_point_bounding_area_recursive(&ba->child[1], x, y);
-  }
-  if (IN_BOUND(2, x, y)) {
-    return lineart_get_point_bounding_area_recursive(&ba->child[2], x, y);
-  }
-  if (IN_BOUND(3, x, y)) {
-    return lineart_get_point_bounding_area_recursive(&ba->child[3], x, y);
-  }
-
-  return NULL;
-#undef IN_BOUND
-}
+static LineartBoundingArea *lineart_get_bounding_area(LineartRenderBuffer *rb, double x, double y);
 
 /* Wrapper for more convenience. */
 LineartBoundingArea *ED_lineart_get_point_bounding_area_recursive_rb(LineartRenderBuffer *rb,
@@ -3201,7 +3176,7 @@ LineartBoundingArea *ED_lineart_get_point_bounding_area_recursive_rb(LineartRend
 {
   LineartBoundingArea *ba;
   if ((ba = ED_lineart_get_point_bounding_area_rb(rb, x, y)) != NULL) {
-    return lineart_get_point_bounding_area_recursive(ba, x, y);
+    return lineart_get_bounding_area(rb, x, y);
   }
   return NULL;
 }
