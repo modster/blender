@@ -1470,29 +1470,23 @@ void BKE_gpencil_editcurve_recalculate_handles(bGPDstroke *gps)
   bGPDcurve_point *gpc_last = &gpc->curve_points[gpc->tot_curve_points - 1];
   bGPDcurve_point *gpc_first_next = &gpc->curve_points[1];
   bGPDcurve_point *gpc_last_prev = &gpc->curve_points[gpc->tot_curve_points - 2];
-  if (gps->flag & GP_STROKE_CYCLIC) {
-    if (gpc_first->flag & GP_CURVE_POINT_SELECT || gpc_last->flag & GP_CURVE_POINT_SELECT) {
-      BezTriple *bezt_first = &gpc_first->bezt;
-      BezTriple *bezt_last = &gpc_last->bezt;
-      BezTriple *bezt_first_next = &gpc_first_next->bezt;
-      BezTriple *bezt_last_prev = &gpc_last_prev->bezt;
 
+  if (gpc_first->flag & GP_CURVE_POINT_SELECT || gpc_last->flag & GP_CURVE_POINT_SELECT) {
+    BezTriple *bezt_first = &gpc_first->bezt;
+    BezTriple *bezt_last = &gpc_last->bezt;
+    BezTriple *bezt_first_next = &gpc_first_next->bezt;
+    BezTriple *bezt_last_prev = &gpc_last_prev->bezt;
+
+    if (gps->flag & GP_STROKE_CYCLIC) {
       BKE_nurb_handle_calc(bezt_first, bezt_last, bezt_first_next, false, 0);
       BKE_nurb_handle_calc(bezt_last, bezt_last_prev, bezt_first, false, 0);
-      changed = true;
     }
-  }
-  else {
-    if (gpc_first->flag & GP_CURVE_POINT_SELECT || gpc_last->flag & GP_CURVE_POINT_SELECT) {
-      BezTriple *bezt_first = &gpc_first->bezt;
-      BezTriple *bezt_last = &gpc_last->bezt;
-      BezTriple *bezt_first_next = &gpc_first_next->bezt;
-      BezTriple *bezt_last_prev = &gpc_last_prev->bezt;
-
+    else {
       BKE_nurb_handle_calc(bezt_first, NULL, bezt_first_next, false, 0);
       BKE_nurb_handle_calc(bezt_last, bezt_last_prev, NULL, false, 0);
-      changed = true;
     }
+
+    changed = true;
   }
 
   if (changed) {
