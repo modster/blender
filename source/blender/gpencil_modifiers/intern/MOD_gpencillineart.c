@@ -131,7 +131,7 @@ static bool isModifierDisabled(GpencilModifierData *md)
 
   /* Preventing calculation in depsgraph when baking frames. */
   if (lmd->flags & LRT_GPENCIL_IS_BAKING) {
-    return false;
+    return true;
   }
 
   return false;
