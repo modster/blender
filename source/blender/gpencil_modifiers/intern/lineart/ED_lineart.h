@@ -551,8 +551,8 @@ struct wmOperatorType;
 
 /* Operator types */
 void OBJECT_OT_lineart_bake_strokes(struct wmOperatorType *ot);
-void OBJECT_OT_lineart_bake_strokes_all_targets(struct wmOperatorType *ot);
-void OBJECT_OT_lineart_clear_strokes(struct wmOperatorType *ot);
-void OBJECT_OT_lineart_clear_strokes_all_targets(struct wmOperatorType *ot);
+void OBJECT_OT_lineart_bake_strokes_all(struct wmOperatorType *ot);
+void OBJECT_OT_lineart_clear(struct wmOperatorType *ot);
+void OBJECT_OT_lineart_clear_all(struct wmOperatorType *ot);
 
 void ED_operatortypes_lineart(void);

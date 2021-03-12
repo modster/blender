@@ -297,13 +297,13 @@ static int lineart_gpencil_bake_common(bContext *C,
   }
 }
 
-static int lineart_gpencil_bake_strokes_all_targets_invoke(bContext *C,
-                                                           wmOperator *op,
-                                                           const wmEvent *UNUSED(event))
+static int lineart_gpencil_bake_strokes_all_invoke(bContext *C,
+                                                   wmOperator *op,
+                                                   const wmEvent *UNUSED(event))
 {
   return lineart_gpencil_bake_common(C, op, true, true);
 }
-static int lineart_gpencil_bake_strokes_all_targets_exec(bContext *C, wmOperator *op)
+static int lineart_gpencil_bake_strokes_all_exec(bContext *C, wmOperator *op)
 {
   return lineart_gpencil_bake_common(C, op, true, false);
 }
@@ -359,7 +359,7 @@ static int lineart_gpencil_clear_strokes_exec(bContext *C, wmOperator *op)
   WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, ob);
   return OPERATOR_FINISHED;
 }
-static int lineart_gpencil_clear_strokes_all_targets_exec(bContext *C, wmOperator *op)
+static int lineart_gpencil_clear_strokes_all_exec(bContext *C, wmOperator *op)
 {
   CTX_DATA_BEGIN (C, Object *, ob, visible_objects) {
     if (ob->type != OB_GPENCIL) {
@@ -390,8 +390,8 @@ static int lineart_gpencil_clear_strokes_all_targets_exec(bContext *C, wmOperato
 /* Bake all line art modifiers on the current object. */
 void OBJECT_OT_lineart_bake_strokes(wmOperatorType *ot)
 {
-  ot->name = "Bake Line Art Strokes";
-  ot->description = "Bake Line Art all line art modifier on this object";
+  ot->name = "Bake Line Art";
+  ot->description = "Bake Line Art for current GPencil object";
   ot->idname = "OBJECT_OT_lineart_bake_strokes";
 
   ot->invoke = lineart_gpencil_bake_strokes_invoke;
@@ -400,41 +400,41 @@ void OBJECT_OT_lineart_bake_strokes(wmOperatorType *ot)
 }
 
 /* Bake all lineart objects in the scene. */
-void OBJECT_OT_lineart_bake_strokes_all_targets(wmOperatorType *ot)
+void OBJECT_OT_lineart_bake_strokes_all(wmOperatorType *ot)
 {
-  ot->name = "Bake Line Art For All Targets";
-  ot->description = "Bake all Line Art targets in the scene";
-  ot->idname = "OBJECT_OT_lineart_bake_strokes_all_targets";
+  ot->name = "Bake Line Art (All)";
+  ot->description = "Bake all GPencil objects who has at least one Line Art modifier";
+  ot->idname = "OBJECT_OT_lineart_bake_strokes_all";
 
-  ot->invoke = lineart_gpencil_bake_strokes_all_targets_invoke;
-  ot->exec = lineart_gpencil_bake_strokes_all_targets_exec;
+  ot->invoke = lineart_gpencil_bake_strokes_all_invoke;
+  ot->exec = lineart_gpencil_bake_strokes_all_exec;
   ot->modal = lineart_gpencil_bake_strokes_commom_modal;
 }
 
 /* clear all line art modifiers on the current object. */
-void OBJECT_OT_lineart_clear_strokes(wmOperatorType *ot)
+void OBJECT_OT_lineart_clear(wmOperatorType *ot)
 {
-  ot->name = "Clear Line Art Strokes";
-  ot->description = "Clear Line Art grease pencil strokes for this target";
-  ot->idname = "OBJECT_OT_lineart_clear_strokes";
+  ot->name = "Clear Baked Line Art";
+  ot->description = "Clear all strokes in current GPencil obejct.";
+  ot->idname = "OBJECT_OT_lineart_clear";
 
   ot->exec = lineart_gpencil_clear_strokes_exec;
 }
 
 /* clear all lineart objects in the scene. */
-void OBJECT_OT_lineart_clear_strokes_all_targets(wmOperatorType *ot)
+void OBJECT_OT_lineart_clear_all(wmOperatorType *ot)
 {
-  ot->name = "Clear All Line Art Strokes";
-  ot->description = "Clear all Line Art targets in the scene";
-  ot->idname = "OBJECT_OT_lineart_clear_strokes_all";
+  ot->name = "Clear Baked Line Art (All)";
+  ot->description = "Clear all strokes in all GPencil obejcts who has a Line Art modifier";
+  ot->idname = "OBJECT_OT_lineart_clear_all";
 
-  ot->exec = lineart_gpencil_clear_strokes_all_targets_exec;
+  ot->exec = lineart_gpencil_clear_strokes_all_exec;
 }
 
 void ED_operatortypes_lineart(void)
 {
   WM_operatortype_append(OBJECT_OT_lineart_bake_strokes);
-  WM_operatortype_append(OBJECT_OT_lineart_bake_strokes_all_targets);
-  WM_operatortype_append(OBJECT_OT_lineart_clear_strokes);
-  WM_operatortype_append(OBJECT_OT_lineart_clear_strokes_all_targets);
+  WM_operatortype_append(OBJECT_OT_lineart_bake_strokes_all);
+  WM_operatortype_append(OBJECT_OT_lineart_clear);
+  WM_operatortype_append(OBJECT_OT_lineart_clear_all);
 }

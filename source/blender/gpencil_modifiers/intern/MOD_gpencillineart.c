@@ -392,14 +392,13 @@ static void baking_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayoutSetPropSep(layout, true);
 
-  // TODO come up with better names for these buttons!
-  uiItemO(layout, IFACE_("Bake Current Object"), ICON_NONE, "OBJECT_OT_lineart_bake_strokes");
-  uiItemO(layout,
-          IFACE_("Bake All Line Art Objects"),
-          ICON_NONE,
-          "OBJECT_OT_lineart_bake_strokes_all_targets");
-  uiItemO(layout, IFACE_("Clear Current Object"), ICON_NONE, "OBJECT_OT_lineart_clear_strokes");
-  uiItemO(layout, IFACE_("Clear All Objects"), ICON_NONE, "OBJECT_OT_lineart_clear_strokes_all");
+  uiLayout *column = uiLayoutColumn(layout, false);
+  uiItemO(column, NULL, ICON_NONE, "OBJECT_OT_lineart_bake_strokes");
+  uiItemO(column, NULL, ICON_NONE, "OBJECT_OT_lineart_bake_strokes_all");
+
+  column = uiLayoutColumn(layout, false);
+  uiItemO(column, NULL, ICON_NONE, "OBJECT_OT_lineart_clear");
+  uiItemO(column, NULL, ICON_NONE, "OBJECT_OT_lineart_clear_all");
 }
 
 static void panelRegister(ARegionType *region_type)
