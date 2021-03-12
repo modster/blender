@@ -694,7 +694,7 @@ typedef enum eSpaceSeq_OverlayType {
  * custom library. Otherwise idname is not used.
  */
 typedef struct FileSelectAssetLibraryUID {
-  short type;
+  short type; /* eFileAssetLibrary_Type */
   char _pad[2];
   /**
    * If showing a custom asset library (#FILE_ASSET_LIBRARY_CUSTOM), this is the index of the
@@ -1858,7 +1858,12 @@ typedef struct SpaceSpreadsheet {
   /* eSpaceSpreadsheet_FilterFlag. */
   uint8_t filter_flag;
 
-  char _pad1[7];
+  /* #GeometryComponentType. */
+  uint8_t geometry_component_type;
+  /* #AttributeDomain. */
+  uint8_t attribute_domain;
+
+  char _pad1[5];
 } SpaceSpreadsheet;
 
 /** \} */
