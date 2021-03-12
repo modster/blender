@@ -25,50 +25,43 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "BLI_blenlib.h"
-#include "BLI_dlrbTree.h"
 #include "BLI_listbase.h"
-#include "BLI_string_utils.h"
+#include "BLI_string.h"
 
 #include "BLT_translation.h"
 
+#include "DNA_action_types.h"
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_space_types.h"
 
 #include "BKE_action.h"
 #include "BKE_animsys.h"
 #include "BKE_armature.h"
-#include "BKE_idprop.h"
-#include "BKE_lib_id.h"
-#include "BKE_main.h"
-#include "BKE_object.h"
-
 #include "BKE_context.h"
+#include "BKE_idprop.h"
+#include "BKE_object.h"
 #include "BKE_report.h"
 
 #include "DEG_depsgraph.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
-#include "RNA_enum_types.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
 
 #include "UI_interface.h"
-#include "UI_resources.h"
 
-#include "ED_anim_api.h"
-#include "ED_armature.h"
-#include "ED_keyframes_draw.h"
-#include "ED_keyframes_edit.h"
 #include "ED_keyframing.h"
 #include "ED_object.h"
 #include "ED_screen.h"
 
 #include "armature_intern.h"
+
+struct ScrArea;
 
 typedef enum ePoseBlendState {
   POSE_BLEND_INIT,
@@ -93,7 +86,7 @@ typedef struct PoseBlendData {
   bAction *act; /* Pose to blend in. */
 
   Scene *scene;  /* For auto-keying. */
-  ScrArea *area; /* For drawing status text. */
+  struct ScrArea *area; /* For drawing status text. */
 
   /** Info-text to print in header. */
   char headerstr[UI_MAX_DRAW_STR];
