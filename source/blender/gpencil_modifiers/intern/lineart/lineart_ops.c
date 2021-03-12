@@ -92,7 +92,7 @@ static bool bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int
     return false;
   }
 
-  ED_lineart_compute_feature_lines_internal(dg, lmd);
+  ED_lineart_compute_feature_lines(dg, lmd);
 
   ED_lineart_gpencil_generate_with_type(
       lmd->render_buffer,
@@ -167,7 +167,7 @@ static bool lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob)
 
     *bj->progress = (float)(frame - bj->frame_begin) / (bj->frame_end - bj->frame_begin);
   }
-  return true;
+  return touched;
 }
 
 static void lineart_gpencil_bake_startjob(void *customdata,
@@ -369,11 +369,11 @@ void OBJECT_OT_lineart_bake_strokes(wmOperatorType *ot)
 }
 
 /* Bake all lineart objects in the scene. */
-void OBJECT_OT_lineart_bake_strokes_all(wmOperatorType *ot)
+void OBJECT_OT_lineart_bake_strokes_all_targets(wmOperatorType *ot)
 {
   ot->name = "Bake Line Art For All Targets";
   ot->description = "Bake all Line Art targets in the scene";
-  ot->idname = "OBJECT_OT_lineart_bake_strokes_all";
+  ot->idname = "OBJECT_OT_lineart_bake_strokes_all_targets";
 
   ot->invoke = lineart_gpencil_bake_strokes_all_targets_invoke;
   ot->exec = lineart_gpencil_bake_strokes_all_targets_exec;
@@ -403,7 +403,7 @@ void OBJECT_OT_lineart_clear_strokes_all_targets(wmOperatorType *ot)
 void ED_operatortypes_lineart(void)
 {
   WM_operatortype_append(OBJECT_OT_lineart_bake_strokes);
-  WM_operatortype_append(OBJECT_OT_lineart_bake_strokes_all);
+  WM_operatortype_append(OBJECT_OT_lineart_bake_strokes_all_targets);
   WM_operatortype_append(OBJECT_OT_lineart_clear_strokes);
   WM_operatortype_append(OBJECT_OT_lineart_clear_strokes_all_targets);
 }

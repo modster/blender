@@ -110,6 +110,7 @@ typedef struct LineartRenderVert {
   double gloc[3];
   double fbcoord[4];
 
+  /* Scene global index. */
   int index;
 
   /** Intersection data flag is here, when LRT_VERT_HAS_INTERSECTION_DATA is set,
@@ -275,6 +276,7 @@ typedef struct LineartRenderBuffer {
   bool fuzzy_intersections;
   bool fuzzy_everything;
   bool allow_boundaries;
+  bool allow_overlapping_edges;
   bool remove_doubles;
 
   /** Keep an copy of these data so when line art is running it's self-contained. */
@@ -490,43 +492,34 @@ BLI_INLINE int lineart_LineIntersectTest2d(
 #endif
 }
 
-int ED_lineart_point_inside_triangle(const double v[2],
-                                     const double v0[2],
-                                     const double v1[2],
-                                     const double v2[2]);
-
 struct Depsgraph;
 struct Scene;
 struct LineartRenderBuffer;
 struct LineartGpencilModifierData;
 
-struct LineartRenderBuffer *ED_lineart_create_render_buffer(
-    struct Scene *s, struct LineartGpencilModifierData *lmd);
 void ED_lineart_destroy_render_data(struct LineartGpencilModifierData *lmd);
-
-int ED_lineart_object_collection_usage_check(struct Collection *c, struct Object *o);
 
 void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb);
 void ED_lineart_chain_split_for_fixed_occlusion(LineartRenderBuffer *rb);
-void ED_lineart_chain_connect(LineartRenderBuffer *rb, const int do_geometry_space);
+void ED_lineart_chain_connect(LineartRenderBuffer *rb, const bool do_geometry_space);
 void ED_lineart_chain_discard_short(LineartRenderBuffer *rb, const float threshold);
 void ED_lineart_chain_split_angle(LineartRenderBuffer *rb, float angle_threshold_rad);
 
 int ED_lineart_chain_count(const LineartRenderLineChain *rlc);
 void ED_lineart_chain_clear_picked_flag(struct LineartRenderBuffer *rb);
 
-int ED_lineart_compute_feature_lines_internal(struct Depsgraph *depsgraph,
-                                              struct LineartGpencilModifierData *lmd);
+int ED_lineart_compute_feature_lines(struct Depsgraph *depsgraph,
+                                     struct LineartGpencilModifierData *lmd);
 
 struct Scene;
 
-LineartBoundingArea *ED_lineart_get_point_bounding_area(LineartRenderBuffer *rb,
-                                                        double x,
-                                                        double y);
+LineartBoundingArea *ED_lineart_get_point_bounding_area_rb(LineartRenderBuffer *rb,
+                                                           double x,
+                                                           double y);
 
-LineartBoundingArea *ED_lineart_get_point_bounding_area_deep(LineartRenderBuffer *rb,
-                                                             double x,
-                                                             double y);
+LineartBoundingArea *ED_lineart_get_point_bounding_area_recursive_rb(LineartRenderBuffer *rb,
+                                                                     double x,
+                                                                     double y);
 
 struct bGPDlayer;
 struct bGPDframe;
@@ -579,8 +572,8 @@ struct wmOperatorType;
 
 /* Operator types */
 void OBJECT_OT_lineart_bake_strokes(struct wmOperatorType *ot);
-void OBJECT_OT_lineart_bake_strokes_all(struct wmOperatorType *ot);
+void OBJECT_OT_lineart_bake_strokes_all_targets(struct wmOperatorType *ot);
 void OBJECT_OT_lineart_clear_strokes(struct wmOperatorType *ot);
-void OBJECT_OT_lineart_clear_strokes_all(struct wmOperatorType *ot);
+void OBJECT_OT_lineart_clear_strokes_all_targets(struct wmOperatorType *ot);
 
 void ED_operatortypes_lineart(void);

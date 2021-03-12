@@ -155,7 +155,7 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
     return;
   }
 
-  ED_lineart_compute_feature_lines_internal(depsgraph, lmd);
+  ED_lineart_compute_feature_lines(depsgraph, lmd);
 
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
 
@@ -181,7 +181,7 @@ static void bakeModifier(Main *UNUSED(bmain),
     return;
   }
 
-  ED_lineart_compute_feature_lines_internal(depsgraph, lmd);
+  ED_lineart_compute_feature_lines(depsgraph, lmd);
 
   generate_strokes_actual(md, depsgraph, ob, gpl, gpf);
 
@@ -392,7 +392,7 @@ static void baking_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemO(layout,
           IFACE_("Bake All Line Art Objects"),
           ICON_NONE,
-          "OBJECT_OT_lineart_bake_strokes_all");
+          "OBJECT_OT_lineart_bake_strokes_all_targets");
   uiItemO(layout, IFACE_("Clear Current Object"), ICON_NONE, "OBJECT_OT_lineart_clear_strokes");
   uiItemO(layout, IFACE_("Clear All Objects"), ICON_NONE, "OBJECT_OT_lineart_clear_strokes_all");
 }
