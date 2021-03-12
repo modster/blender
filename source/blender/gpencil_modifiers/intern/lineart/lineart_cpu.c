@@ -3167,16 +3167,57 @@ LineartBoundingArea *ED_lineart_get_point_bounding_area_rb(LineartRenderBuffer *
   return &rb->initial_bounding_areas[row * 4 + col];
 }
 
-static LineartBoundingArea *lineart_get_bounding_area(LineartRenderBuffer *rb, double x, double y);
+static LineartBoundingArea *lineart_get_bounding_area_deep(LineartRenderBuffer *rb,
+                                                           double x,
+                                                           double y)
+{
+  LineartBoundingArea *iba;
+  double sp_w = rb->width_per_tile, sp_h = rb->height_per_tile;
+  int c = (int)((x + 1.0) / sp_w);
+  int r = rb->tile_count_y - (int)((y + 1.0) / sp_h) - 1;
+  if (r < 0) {
+    r = 0;
+  }
+  if (c < 0) {
+    c = 0;
+  }
+  if (r >= rb->tile_count_y) {
+    r = rb->tile_count_y - 1;
+  }
+  if (c >= rb->tile_count_x) {
+    c = rb->tile_count_x - 1;
+  }
+
+  iba = &rb->initial_bounding_areas[r * 4 + c];
+  while (iba->child) {
+    if (x > iba->cx) {
+      if (y > iba->cy) {
+        iba = &iba->child[0];
+      }
+      else {
+        iba = &iba->child[3];
+      }
+    }
+    else {
+      if (y > iba->cy) {
+        iba = &iba->child[1];
+      }
+      else {
+        iba = &iba->child[2];
+      }
+    }
+  }
+  return iba;
+}
 
 /* Wrapper for more convenience. */
-LineartBoundingArea *ED_lineart_get_point_bounding_area_recursive_rb(LineartRenderBuffer *rb,
-                                                                     double x,
-                                                                     double y)
+LineartBoundingArea *ED_lineart_get_point_bounding_area_deep_rb(LineartRenderBuffer *rb,
+                                                                double x,
+                                                                double y)
 {
   LineartBoundingArea *ba;
   if ((ba = ED_lineart_get_point_bounding_area_rb(rb, x, y)) != NULL) {
-    return lineart_get_bounding_area(rb, x, y);
+    return lineart_get_bounding_area_deep(rb, x, y);
   }
   return NULL;
 }
@@ -3435,48 +3476,6 @@ static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this
   return 0;
 }
 
-/* FIXME: Duplicated? */
-static LineartBoundingArea *lineart_get_bounding_area(LineartRenderBuffer *rb, double x, double y)
-{
-  LineartBoundingArea *iba;
-  double sp_w = rb->width_per_tile, sp_h = rb->height_per_tile;
-  int c = (int)((x + 1.0) / sp_w);
-  int r = rb->tile_count_y - (int)((y + 1.0) / sp_h) - 1;
-  if (r < 0) {
-    r = 0;
-  }
-  if (c < 0) {
-    c = 0;
-  }
-  if (r >= rb->tile_count_y) {
-    r = rb->tile_count_y - 1;
-  }
-  if (c >= rb->tile_count_x) {
-    c = rb->tile_count_x - 1;
-  }
-
-  iba = &rb->initial_bounding_areas[r * 4 + c];
-  while (iba->child) {
-    if (x > iba->cx) {
-      if (y > iba->cy) {
-        iba = &iba->child[0];
-      }
-      else {
-        iba = &iba->child[3];
-      }
-    }
-    else {
-      if (y > iba->cy) {
-        iba = &iba->child[1];
-      }
-      else {
-        iba = &iba->child[2];
-      }
-    }
-  }
-  return iba;
-}
-
 static LineartBoundingArea *lineart_line_first_bounding_area(LineartRenderBuffer *rb,
                                                              LineartRenderLine *rl)
 {
@@ -3485,7 +3484,7 @@ static LineartBoundingArea *lineart_line_first_bounding_area(LineartRenderBuffer
   double r = 1, sr = 1;
 
   if (data[0] > -1 && data[0] < 1 && data[1] > -1 && data[1] < 1) {
-    return lineart_get_bounding_area(rb, data[0], data[1]);
+    return lineart_get_bounding_area_deep(rb, data[0], data[1]);
   }
 
   if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, LU, RU, &sr) && sr < r &&
@@ -3506,7 +3505,7 @@ static LineartBoundingArea *lineart_line_first_bounding_area(LineartRenderBuffer
   }
   interp_v2_v2v2_db(data, rl->l->fbcoord, rl->r->fbcoord, r);
 
-  return lineart_get_bounding_area(rb, data[0], data[1]);
+  return lineart_get_bounding_area_deep(rb, data[0], data[1]);
 }
 
 /* Calculations. */

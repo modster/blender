@@ -230,7 +230,7 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
     }
 
     /*  step 1: grow left. */
-    ba = ED_lineart_get_point_bounding_area_recursive_rb(rb, rl->l->fbcoord[0], rl->l->fbcoord[1]);
+    ba = ED_lineart_get_point_bounding_area_deep_rb(rb, rl->l->fbcoord[0], rl->l->fbcoord[1]);
     new_rv = rl->l;
     rls = rl->segments.first;
     VERT_COORD_TO_FLOAT(new_rv);
@@ -317,8 +317,7 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                  last_transparency,
                                  new_rl->r_obindex);
       }
-      ba = ED_lineart_get_point_bounding_area_recursive_rb(
-          rb, new_rv->fbcoord[0], new_rv->fbcoord[1]);
+      ba = ED_lineart_get_point_bounding_area_deep_rb(rb, new_rv->fbcoord[0], new_rv->fbcoord[1]);
     }
 
     /* Restore normal value. */
@@ -370,7 +369,7 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                rl->r_obindex);
 
     /*  step 3: grow right. */
-    ba = ED_lineart_get_point_bounding_area_recursive_rb(rb, rl->r->fbcoord[0], rl->r->fbcoord[1]);
+    ba = ED_lineart_get_point_bounding_area_deep_rb(rb, rl->r->fbcoord[0], rl->r->fbcoord[1]);
     new_rv = rl->r;
     /*  below already done in step 2. */
     /*  lineart_chain_push_point(rb,rlc,new_rv->fbcoord[0],new_rv->fbcoord[1],rl->flags,0);
@@ -457,8 +456,7 @@ void ED_lineart_chain_feature_lines(LineartRenderBuffer *rb)
                                    last_transparency,
                                    new_rl->r_obindex);
       }
-      ba = ED_lineart_get_point_bounding_area_recursive_rb(
-          rb, new_rv->fbcoord[0], new_rv->fbcoord[1]);
+      ba = ED_lineart_get_point_bounding_area_deep_rb(rb, new_rv->fbcoord[0], new_rv->fbcoord[1]);
     }
     if (rb->fuzzy_everything) {
       rlc->type = LRT_EDGE_FLAG_CONTOUR;

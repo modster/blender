@@ -517,9 +517,9 @@ LineartBoundingArea *ED_lineart_get_point_bounding_area_rb(LineartRenderBuffer *
                                                            double x,
                                                            double y);
 
-LineartBoundingArea *ED_lineart_get_point_bounding_area_recursive_rb(LineartRenderBuffer *rb,
-                                                                     double x,
-                                                                     double y);
+LineartBoundingArea *ED_lineart_get_point_bounding_area_deep_rb(LineartRenderBuffer *rb,
+                                                                double x,
+                                                                double y);
 
 struct bGPDlayer;
 struct bGPDframe;
