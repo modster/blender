@@ -291,15 +291,15 @@ static int lineart_gpencil_bake_common(bContext *C,
 
     return OPERATOR_RUNNING_MODAL;
   }
-  else {
-    float pseduo_progress;
-    lineart_gpencil_bake_startjob(bj, NULL, NULL, &pseduo_progress);
 
-    BLI_linklist_free(bj->objects, NULL);
-    MEM_freeN(bj);
+  float pseduo_progress;
+  short pseduo_do_update;
+  lineart_gpencil_bake_startjob(bj, NULL, &pseduo_do_update, &pseduo_progress);
 
-    return OPERATOR_FINISHED;
-  }
+  BLI_linklist_free(bj->objects, NULL);
+  MEM_freeN(bj);
+
+  return OPERATOR_FINISHED;
 }
 
 static int lineart_gpencil_bake_strokes_all_invoke(bContext *C,
