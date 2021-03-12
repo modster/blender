@@ -227,6 +227,12 @@ typedef struct tGPDprimitive {
 
 } tGPDprimitive;
 
+/* Stroke types enum definition. */
+typedef enum eGPStrokeType {
+  STROKE_POLY = 0,
+  STROKE_BEZIER = 1,
+} eGPStrokeType;
+
 bool gpencil_stroke_inside_circle(const float mval[2], int rad, int x0, int y0, int x1, int y1);
 
 void gpencil_point_conversion_init(struct bContext *C, GP_SpaceConversion *r_gsc);
@@ -398,8 +404,7 @@ void GPENCIL_OT_recalc_geometry(struct wmOperatorType *ot);
 /* stroke editcurve */
 
 void GPENCIL_OT_stroke_editcurve_set_handle_type(struct wmOperatorType *ot);
-void GPENCIL_OT_stroke_make_curve(struct wmOperatorType *ot);
-void GPENCIL_OT_stroke_clear_curve(struct wmOperatorType *ot);
+void GPENCIL_OT_stroke_set_type(struct wmOperatorType *ot);
 
 /* stroke sculpting -- */
 
