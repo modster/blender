@@ -57,7 +57,6 @@ class COLLECTION_PT_collection_flags(CollectionButtonsPanel, Panel):
         row = layout.row()
         col = row.column(align=True)
         col.prop(collection, "hide_select", text="Selectable", toggle=False, invert_checkbox=True)
-        col.prop(collection, "hide_viewport", toggle=False)
         col.prop(collection, "hide_render", toggle=False)
 
 
