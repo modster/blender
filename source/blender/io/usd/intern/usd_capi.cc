@@ -544,7 +544,6 @@ static void import_startjob(void *customdata, short *stop, short *do_update, flo
 
   data->archive = archive;
   data->settings.cache_file = cache_file;
-  data->settings.vel_scale = data->params.vel_scale;
 
   *data->do_update = true;
   *data->progress = 0.05f;

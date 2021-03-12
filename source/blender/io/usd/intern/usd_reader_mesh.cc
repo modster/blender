@@ -430,114 +430,6 @@ void USDMeshReader::read_uvs(Mesh *mesh,
   }
 }
 
-void USDMeshReader::read_attributes(Mesh *mesh,
-                                    pxr::UsdGeomMesh mesh_prim_,
-                                    double motionSampleTime)
-{
-  CustomData *cd = &mesh->vdata;
-  std::vector<pxr::UsdGeomPrimvar> primvars = mesh_prim_.GetPrimvars();
-
-  for (pxr::UsdGeomPrimvar p : primvars) {
-    int cd_type = 0;
-    size_t num = 0;
-    size_t type_size = 0;
-    void *data;
-
-    if (!p.HasAuthoredValue())
-      continue;
-
-    if (!is_initial_load_ &&
-        primvar_varying_map_.find(p.GetPrimvarName()) == primvar_varying_map_.end())
-      continue;
-
-    const char *name = p.GetPrimvarName().GetString().c_str();
-    if (p.GetTypeName() == pxr::SdfValueTypeNames->TexCoord2hArray ||
-        p.GetTypeName() == pxr::SdfValueTypeNames->TexCoord2fArray ||
-        p.GetTypeName() == pxr::SdfValueTypeNames->TexCoord2dArray) {
-      continue;
-    }
-    else if (p.GetTypeName() == pxr::SdfValueTypeNames->Color3fArray ||
-             p.GetTypeName() == pxr::SdfValueTypeNames->Double3Array ||
-             p.GetTypeName() == pxr::SdfValueTypeNames->Float3Array) {
-      cd_type = CD_VALUE_F3;
-      pxr::VtVec3fArray idata;
-      p.Get<pxr::VtVec3fArray>(&idata, motionSampleTime);
-      num = idata.size();
-      type_size = sizeof(pxr::GfVec3f);
-      data = (void *)idata.cdata();
-    }
-    else if (p.GetTypeName() == pxr::SdfValueTypeNames->FloatArray ||
-             p.GetTypeName() == pxr::SdfValueTypeNames->DoubleArray) {
-      cd_type = CD_VALUE_FLOAT;
-      pxr::VtFloatArray idata;
-      p.Get<pxr::VtFloatArray>(&idata, motionSampleTime);
-      num = idata.size();
-      type_size = sizeof(float);
-      data = (void *)idata.cdata();
-    }
-    else if (p.GetTypeName() == pxr::SdfValueTypeNames->IntArray) {
-      cd_type = CD_VALUE_INT;
-      pxr::VtIntArray idata;
-      p.Get<pxr::VtIntArray>(&idata, motionSampleTime);
-      num = idata.size();
-      type_size = sizeof(int);
-      data = (void *)idata.cdata();
-    }
-    else if (p.GetTypeName() == pxr::SdfValueTypeNames->Int3Array) {
-      cd_type = CD_VALUE_I3;
-      pxr::VtVec3iArray idata;
-      p.Get<pxr::VtVec3iArray>(&idata, motionSampleTime);
-      num = idata.size();
-      type_size = sizeof(pxr::GfVec3i);
-      data = (void *)idata.cdata();
-    }
-    else {
-      continue;
-    }
-
-    void *cdata = CustomData_get_layer_named(cd, cd_type, name);
-
-    if (!cdata) {
-      cdata = CustomData_add_layer_named(cd, cd_type, CD_DEFAULT, NULL, num, name);
-    }
-
-    if (cdata) {
-      memcpy(cdata, data, num * type_size);
-    }
-    else {
-      std::cerr << "WARNING: Couldn't add custom data layer " << name << std::endl;
-    }
-  }
-}
-
-void USDMeshReader::read_vels(Mesh *mesh,
-                              pxr::UsdGeomMesh mesh_prim_,
-                              float vel_scale,
-                              double motionSampleTime)
-{
-  pxr::VtVec3fArray velocities;
-  pxr::UsdAttribute vel_attr = mesh_prim_.GetVelocitiesAttr();
-
-  if (!is_initial_load_ && !vel_attr.ValueMightBeTimeVarying())
-    return;
-
-  vel_attr.Get<pxr::VtVec3fArray>(&velocities, motionSampleTime);
-
-  if (velocities.size() <= 0)
-    return;
-
-  float(*vdata)[3] = (float(*)[3])CustomData_add_layer(
-      &mesh->vdata, CD_VELOCITY, CD_DEFAULT, NULL, mesh->totvert);
-
-  if (vdata) {
-    for (int i = 0; i < mesh->totvert; i++) {
-      vdata[i][0] = velocities[i][0] * vel_scale;
-      vdata[i][1] = velocities[i][1] * vel_scale;
-      vdata[i][2] = velocities[i][2] * vel_scale;
-    }
-  }
-}
-
 void USDMeshReader::read_colors(Mesh *mesh,
                                 const pxr::UsdGeomMesh &mesh_prim_,
                                 double motionSampleTime)
@@ -766,14 +658,6 @@ void USDMeshReader::read_mesh_sample(const std::string &iobject_full_name,
 
   if ((settings->read_flag & MOD_MESHSEQ_READ_UV) != 0) {
     read_uvs(mesh, mesh_prim_, motionSampleTime, new_mesh);
-  }
-
-  if ((settings->read_flag & MOD_MESHSEQ_READ_ATTR) != 0) {
-    read_attributes(mesh, mesh_prim_, motionSampleTime);
-  }
-
-  if ((settings->read_flag & MOD_MESHSEQ_READ_VELS) != 0) {
-    read_vels(mesh, mesh_prim_, settings->vel_scale, motionSampleTime);
   }
 
   if ((settings->read_flag & MOD_MESHSEQ_READ_COLOR) != 0) {

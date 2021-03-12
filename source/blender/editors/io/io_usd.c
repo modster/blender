@@ -78,8 +78,6 @@ const EnumPropertyItem rna_enum_usd_import_read_flags[] = {
     {MOD_MESHSEQ_READ_POLY, "POLY", 0, "Faces", ""},
     {MOD_MESHSEQ_READ_UV, "UV", 0, "UV", ""},
     {MOD_MESHSEQ_READ_COLOR, "COLOR", 0, "Color", ""},
-    {MOD_MESHSEQ_READ_ATTR, "ATTR", 0, "Attributes", ""},
-    {MOD_MESHSEQ_READ_VELS, "VELS", 0, "Velocities", ""},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -282,7 +280,6 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
   RNA_string_get(op->ptr, "filepath", filename);
 
   const float scale = RNA_float_get(op->ptr, "scale");
-  const float vel_scale = RNA_float_get(op->ptr, "vel_scale");
   const bool is_sequence = RNA_boolean_get(op->ptr, "is_sequence");
   const bool set_frame_range = RNA_boolean_get(op->ptr, "set_frame_range");
   const bool validate_meshes = RNA_boolean_get(op->ptr, "validate_meshes");
@@ -339,7 +336,6 @@ static int wm_usd_import_exec(bContext *C, wmOperator *op)
   }
 
   struct USDImportParams params = {scale,
-                                   vel_scale,
                                    is_sequence,
                                    set_frame_range,
                                    sequence_len,
@@ -392,8 +388,6 @@ static void wm_usd_import_draw(bContext *UNUSED(C), wmOperator *op)
   uiItemL(row, IFACE_("Manual Transform:"), ICON_NONE);
   row = uiLayoutRow(box, false);
   uiItemR(row, ptr, "scale", 0, NULL, ICON_NONE);
-  row = uiLayoutRow(box, false);
-  uiItemR(row, ptr, "vel_scale", 0, NULL, ICON_NONE);
 
   box = uiLayoutBox(layout);
   row = uiLayoutRow(box, false);
@@ -490,15 +484,6 @@ void WM_OT_usd_import(struct wmOperatorType *ot)
       "Value by which to enlarge or shrink the objects with respect to the world's origin",
       0.0001f,
       1000.0f);
-  RNA_def_float(ot->srna,
-                "vel_scale",
-                1.0f,
-                0.0001f,
-                1000.0f,
-                "Velocity Scale",
-                "Amount to scale velocity",
-                0.0001f,
-                1000.0f);
 
   RNA_def_boolean(
       ot->srna,
