@@ -112,18 +112,18 @@ static void lineart_bounding_area_link_triangle(LineartRenderBuffer *rb,
                                                 int recursive_level,
                                                 bool do_intersection);
 
-static int lineart_triangle_line_imagespace_intersection_v2(SpinLock *spl,
-                                                            const LineartRenderTriangle *rt,
-                                                            const LineartRenderLine *rl,
-                                                            const double *override_camera_loc,
-                                                            const bool override_cam_is_persp,
-                                                            const bool allow_overlapping_edges,
-                                                            const double vp[4][4],
-                                                            const double *camera_dir,
-                                                            const float cam_shift_x,
-                                                            const float cam_shift_y,
-                                                            double *from,
-                                                            double *to);
+static int lineart_triangle_line_image_space_occlusion(SpinLock *spl,
+                                                       const LineartRenderTriangle *rt,
+                                                       const LineartRenderLine *rl,
+                                                       const double *override_camera_loc,
+                                                       const bool override_cam_is_persp,
+                                                       const bool allow_overlapping_edges,
+                                                       const double vp[4][4],
+                                                       const double *camera_dir,
+                                                       const float cam_shift_x,
+                                                       const float cam_shift_y,
+                                                       double *from,
+                                                       double *to);
 
 static void lineart_add_line_to_list(LineartRenderBuffer *rb, LineartRenderLine *rl);
 
@@ -304,42 +304,6 @@ static void lineart_line_cut(LineartRenderBuffer *rb,
   rl->min_occ = min_occ;
 }
 
-static int lineart_occlusion_make_task_info(LineartRenderBuffer *rb, LineartRenderTaskInfo *rti)
-{
-  LineartRenderLine *data;
-  int i;
-  int res = 0;
-
-  BLI_spin_lock(&rb->lock_task);
-
-#define LRT_ASSIGN_OCCLUSION_TASK(name) \
-  if (rb->name##_managed) { \
-    data = rb->name##_managed; \
-    rti->name = (void *)data; \
-    for (i = 0; i < LRT_THREAD_LINE_COUNT && data; i++) { \
-      data = data->next; \
-    } \
-    rti->name##_end = data; \
-    rb->name##_managed = data; \
-    res = 1; \
-  } \
-  else { \
-    rti->name = NULL; \
-  }
-
-  LRT_ASSIGN_OCCLUSION_TASK(contour);
-  LRT_ASSIGN_OCCLUSION_TASK(intersection);
-  LRT_ASSIGN_OCCLUSION_TASK(crease);
-  LRT_ASSIGN_OCCLUSION_TASK(material);
-  LRT_ASSIGN_OCCLUSION_TASK(edge_mark);
-
-#undef LRT_ASSIGN_OCCLUSION_TASK
-
-  BLI_spin_unlock(&rb->lock_task);
-
-  return res;
-}
-
 /* To see if given line is connected to an adjacent intersection line. */
 BLI_INLINE bool lineart_occlusion_is_adjacent_intersection(LineartRenderLine *rl,
                                                            LineartRenderTriangle *rt)
@@ -379,18 +343,18 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb,
         continue;
       }
       rt->testing[thread_id] = rl;
-      if (lineart_triangle_line_imagespace_intersection_v2(&rb->lock_task,
-                                                           (void *)rt,
-                                                           rl,
-                                                           rb->camera_pos,
-                                                           rb->cam_is_persp,
-                                                           rb->allow_overlapping_edges,
-                                                           rb->view_projection,
-                                                           rb->view_vector,
-                                                           rb->shift_x,
-                                                           rb->shift_y,
-                                                           &l,
-                                                           &r)) {
+      if (lineart_triangle_line_image_space_occlusion(&rb->lock_task,
+                                                      (void *)rt,
+                                                      rl,
+                                                      rb->camera_pos,
+                                                      rb->cam_is_persp,
+                                                      rb->allow_overlapping_edges,
+                                                      rb->view_projection,
+                                                      rb->view_vector,
+                                                      rb->shift_x,
+                                                      rb->shift_y,
+                                                      &l,
+                                                      &r)) {
         lineart_line_cut(rb, rl, l, r, rt->base.transparency_mask);
         if (rl->min_occ > rb->max_occlusion_level) {
           /* No need to caluclate any longer on this line because no level more than set value is
@@ -402,6 +366,42 @@ static void lineart_occlusion_single_line(LineartRenderBuffer *rb,
     /* Marching along rl->l to rl->r, searching each possible bounding areas it may touch. */
     nba = lineart_bounding_area_next(nba, rl, x, y, k, positive_x, positive_y, &x, &y);
   }
+}
+
+static int lineart_occlusion_make_task_info(LineartRenderBuffer *rb, LineartRenderTaskInfo *rti)
+{
+  LineartRenderLine *data;
+  int i;
+  int res = 0;
+
+  BLI_spin_lock(&rb->lock_task);
+
+#define LRT_ASSIGN_OCCLUSION_TASK(name) \
+  if (rb->name##_managed) { \
+    data = rb->name##_managed; \
+    rti->name = (void *)data; \
+    for (i = 0; i < LRT_THREAD_LINE_COUNT && data; i++) { \
+      data = data->next; \
+    } \
+    rti->name##_end = data; \
+    rb->name##_managed = data; \
+    res = 1; \
+  } \
+  else { \
+    rti->name = NULL; \
+  }
+
+  LRT_ASSIGN_OCCLUSION_TASK(contour);
+  LRT_ASSIGN_OCCLUSION_TASK(intersection);
+  LRT_ASSIGN_OCCLUSION_TASK(crease);
+  LRT_ASSIGN_OCCLUSION_TASK(material);
+  LRT_ASSIGN_OCCLUSION_TASK(edge_mark);
+
+#undef LRT_ASSIGN_OCCLUSION_TASK
+
+  BLI_spin_unlock(&rb->lock_task);
+
+  return res;
 }
 
 static void lineart_occlusion_worker(TaskPool *__restrict UNUSED(pool), LineartRenderTaskInfo *rti)
@@ -1884,18 +1884,18 @@ static int lineart_edge_from_triangle(const LineartRenderTriangle *rt,
  * in ratio from rl->l to rl->r. the line is later cutted with
  * these two values.
  */
-static int lineart_triangle_line_imagespace_intersection_v2(SpinLock *UNUSED(spl),
-                                                            const LineartRenderTriangle *rt,
-                                                            const LineartRenderLine *rl,
-                                                            const double *override_camera_loc,
-                                                            const bool override_cam_is_persp,
-                                                            const bool allow_overlapping_edges,
-                                                            const double vp[4][4],
-                                                            const double *camera_dir,
-                                                            const float cam_shift_x,
-                                                            const float cam_shift_y,
-                                                            double *from,
-                                                            double *to)
+static int lineart_triangle_line_image_space_occlusion(SpinLock *UNUSED(spl),
+                                                       const LineartRenderTriangle *rt,
+                                                       const LineartRenderLine *rl,
+                                                       const double *override_camera_loc,
+                                                       const bool override_cam_is_persp,
+                                                       const bool allow_overlapping_edges,
+                                                       const double vp[4][4],
+                                                       const double *camera_dir,
+                                                       const float cam_shift_x,
+                                                       const float cam_shift_y,
+                                                       double *from,
+                                                       double *to)
 {
   double is[3] = {0};
   int order[3];
@@ -3222,7 +3222,7 @@ LineartBoundingArea *ED_lineart_get_point_bounding_area_deep_rb(LineartRenderBuf
   return NULL;
 }
 
-/* Sequentially add triangles into render buffer. */
+/* Sequentially add triangles into render buffer. This also does intersection along the way. */
 static void lineart_main_add_triangles(LineartRenderBuffer *rb)
 {
   LineartRenderTriangle *rt;
@@ -3254,6 +3254,40 @@ static void lineart_main_add_triangles(LineartRenderBuffer *rb)
       rt = (void *)(((unsigned char *)rt) + rb->triangle_size);
     }
   }
+}
+
+/* This function gets the tile for the point rl->l, and later use lineart_bounding_area_next() to
+ * get next along the way. */
+static LineartBoundingArea *lineart_line_first_bounding_area(LineartRenderBuffer *rb,
+                                                             LineartRenderLine *rl)
+{
+  double data[2] = {rl->l->fbcoord[0], rl->l->fbcoord[1]};
+  double LU[2] = {-1, 1}, RU[2] = {1, 1}, LB[2] = {-1, -1}, RB[2] = {1, -1};
+  double r = 1, sr = 1;
+
+  if (data[0] > -1 && data[0] < 1 && data[1] > -1 && data[1] < 1) {
+    return lineart_get_bounding_area_deep(rb, data[0], data[1]);
+  }
+
+  if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, LU, RU, &sr) && sr < r &&
+      sr > 0) {
+    r = sr;
+  }
+  if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, LB, RB, &sr) && sr < r &&
+      sr > 0) {
+    r = sr;
+  }
+  if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, LB, LU, &sr) && sr < r &&
+      sr > 0) {
+    r = sr;
+  }
+  if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, RB, RU, &sr) && sr < r &&
+      sr > 0) {
+    r = sr;
+  }
+  interp_v2_v2v2_db(data, rl->l->fbcoord, rl->r->fbcoord, r);
+
+  return lineart_get_bounding_area_deep(rb, data[0], data[1]);
 }
 
 /** This march along one render line in image space and
@@ -3476,38 +3510,6 @@ static LineartBoundingArea *lineart_bounding_area_next(LineartBoundingArea *this
   return 0;
 }
 
-static LineartBoundingArea *lineart_line_first_bounding_area(LineartRenderBuffer *rb,
-                                                             LineartRenderLine *rl)
-{
-  double data[2] = {rl->l->fbcoord[0], rl->l->fbcoord[1]};
-  double LU[2] = {-1, 1}, RU[2] = {1, 1}, LB[2] = {-1, -1}, RB[2] = {1, -1};
-  double r = 1, sr = 1;
-
-  if (data[0] > -1 && data[0] < 1 && data[1] > -1 && data[1] < 1) {
-    return lineart_get_bounding_area_deep(rb, data[0], data[1]);
-  }
-
-  if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, LU, RU, &sr) && sr < r &&
-      sr > 0) {
-    r = sr;
-  }
-  if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, LB, RB, &sr) && sr < r &&
-      sr > 0) {
-    r = sr;
-  }
-  if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, LB, LU, &sr) && sr < r &&
-      sr > 0) {
-    r = sr;
-  }
-  if (lineart_LineIntersectTest2d(rl->l->fbcoord, rl->r->fbcoord, RB, RU, &sr) && sr < r &&
-      sr > 0) {
-    r = sr;
-  }
-  interp_v2_v2v2_db(data, rl->l->fbcoord, rl->r->fbcoord, r);
-
-  return lineart_get_bounding_area_deep(rb, data[0], data[1]);
-}
-
 /* Calculations. */
 
 /** Parent thread locking should be done before this very function is called. */
@@ -3617,26 +3619,26 @@ static int lineart_rb_line_types(LineartRenderBuffer *rb)
   return types;
 }
 
-void ED_lineart_gpencil_generate(LineartRenderBuffer *rb,
-                                 Depsgraph *depsgraph,
-                                 Object *gpencil_object,
-                                 float (*gp_obmat_inverse)[4],
-                                 bGPDlayer *UNUSED(gpl),
-                                 bGPDframe *gpf,
-                                 int level_start,
-                                 int level_end,
-                                 int material_nr,
-                                 Object *source_object,
-                                 Collection *source_collection,
-                                 int types,
-                                 unsigned char transparency_flags,
-                                 unsigned char transparency_mask,
-                                 short thickness,
-                                 float opacity,
-                                 float pre_sample_length,
-                                 const char *source_vgname,
-                                 const char *vgname,
-                                 int modifier_flags)
+static void lineart_gpencil_generate(LineartRenderBuffer *rb,
+                                     Depsgraph *depsgraph,
+                                     Object *gpencil_object,
+                                     float (*gp_obmat_inverse)[4],
+                                     bGPDlayer *UNUSED(gpl),
+                                     bGPDframe *gpf,
+                                     int level_start,
+                                     int level_end,
+                                     int material_nr,
+                                     Object *source_object,
+                                     Collection *source_collection,
+                                     int types,
+                                     unsigned char transparency_flags,
+                                     unsigned char transparency_mask,
+                                     short thickness,
+                                     float opacity,
+                                     float pre_sample_length,
+                                     const char *source_vgname,
+                                     const char *vgname,
+                                     int modifier_flags)
 {
   if (rb == NULL) {
     if (G.debug_value == 4000) {
@@ -3789,25 +3791,26 @@ void ED_lineart_gpencil_generate(LineartRenderBuffer *rb,
   }
 }
 
-void ED_lineart_gpencil_generate_with_type(LineartRenderBuffer *rb,
-                                           Depsgraph *depsgraph,
-                                           Object *ob,
-                                           bGPDlayer *gpl,
-                                           bGPDframe *gpf,
-                                           char source_type,
-                                           void *source_reference,
-                                           int level_start,
-                                           int level_end,
-                                           int mat_nr,
-                                           short line_types,
-                                           unsigned char transparency_flags,
-                                           unsigned char transparency_mask,
-                                           short thickness,
-                                           float opacity,
-                                           float pre_sample_length,
-                                           const char *source_vgname,
-                                           const char *vgname,
-                                           int modifier_flags)
+/* Wrapper for external calls. */
+void ED_lineart_gpencil_generate(LineartRenderBuffer *rb,
+                                 Depsgraph *depsgraph,
+                                 Object *ob,
+                                 bGPDlayer *gpl,
+                                 bGPDframe *gpf,
+                                 char source_type,
+                                 void *source_reference,
+                                 int level_start,
+                                 int level_end,
+                                 int mat_nr,
+                                 short line_types,
+                                 unsigned char transparency_flags,
+                                 unsigned char transparency_mask,
+                                 short thickness,
+                                 float opacity,
+                                 float pre_sample_length,
+                                 const char *source_vgname,
+                                 const char *vgname,
+                                 int modifier_flags)
 {
 
   if (!gpl || !gpf || !ob) {
@@ -3838,24 +3841,24 @@ void ED_lineart_gpencil_generate_with_type(LineartRenderBuffer *rb,
   }
   float gp_obmat_inverse[4][4];
   invert_m4_m4(gp_obmat_inverse, ob->obmat);
-  ED_lineart_gpencil_generate(rb,
-                              depsgraph,
-                              ob,
-                              gp_obmat_inverse,
-                              gpl,
-                              gpf,
-                              level_start,
-                              level_end,
-                              mat_nr,
-                              source_object,
-                              source_collection,
-                              use_types,
-                              transparency_flags,
-                              transparency_mask,
-                              thickness,
-                              opacity,
-                              pre_sample_length,
-                              source_vgname,
-                              vgname,
-                              modifier_flags);
+  lineart_gpencil_generate(rb,
+                           depsgraph,
+                           ob,
+                           gp_obmat_inverse,
+                           gpl,
+                           gpf,
+                           level_start,
+                           level_end,
+                           mat_nr,
+                           source_object,
+                           source_collection,
+                           use_types,
+                           transparency_flags,
+                           transparency_mask,
+                           thickness,
+                           opacity,
+                           pre_sample_length,
+                           source_vgname,
+                           vgname,
+                           modifier_flags);
 }

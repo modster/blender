@@ -95,7 +95,7 @@ static bool bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int
 
   ED_lineart_compute_feature_lines(dg, lmd);
 
-  ED_lineart_gpencil_generate_with_type(
+  ED_lineart_gpencil_generate(
       lmd->render_buffer,
       dg,
       ob,
