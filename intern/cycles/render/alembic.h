@@ -160,21 +160,8 @@ template<typename T> class DataStore {
       return CacheLookupResult<T>::no_data_found_for_time();
     }
 
-    /* TimeSampling works by matching a frame time to an index, however it expects
-     * frame time 0 == index 0, but since we may load data by chunks of frames,
-     * index 0 may not be frame time 0, so we need to offset the size to pretend
-     * we have the required amount of frame data. This offset should only be applied
-     * if we have more than one frame worth of data (for now we it is guaranteed that
-     * we either have dat for one single frame, or for all the frames of the animation,
-     * this may change in the future). */
-    size_t size_offset = 0;
-    if (size() != 1) {
-      size_offset = frame_offset;
-    }
-
-    std::pair<size_t, Alembic::Abc::chrono_t> index_pair;
-    index_pair = time_sampling.getNearIndex(time, data.size() + size_offset);
-    DataTimePair &data_pair = data[index_pair.first - size_offset];
+    const size_t index = get_index_for_time(time);
+    DataTimePair &data_pair = data[index];
 
     if (last_loaded_time == data_pair.time) {
       return CacheLookupResult<T>::already_loaded();
@@ -193,9 +180,8 @@ template<typename T> class DataStore {
       return CacheLookupResult<T>::no_data_found_for_time();
     }
 
-    std::pair<size_t, Alembic::Abc::chrono_t> index_pair;
-    index_pair = time_sampling.getNearIndex(time, data.size());
-    DataTimePair &data_pair = data[index_pair.first];
+    const size_t index = get_index_for_time(time);
+    DataTimePair &data_pair = data[index];
     return CacheLookupResult<T>::new_data(&data_pair.data);
   }
 
@@ -271,6 +257,26 @@ template<typename T> class DataStore {
 
     data.swap(other.data);
     std::swap(frame_offset, other.frame_offset);
+  }
+
+ private:
+  size_t get_index_for_time(double time)
+  {
+    /* TimeSampling works by matching a frame time to an index, however it expects
+     * frame time 0 == index 0, but since we may load data by chunks of frames,
+     * index 0 may not be frame time 0, so we need to offset the size to pretend
+     * we have the required amount of frame data. This offset should only be applied
+     * if we have more than one frame worth of data (for now we it is guaranteed that
+     * we either have dat for one single frame, or for all the frames of the animation,
+     * this may change in the future). */
+    size_t size_offset = 0;
+    if (size() != 1) {
+      size_offset = frame_offset;
+    }
+
+    std::pair<size_t, Alembic::Abc::chrono_t> index_pair;
+    index_pair = time_sampling.getNearIndex(time, data.size() + size_offset);
+    return index_pair.first - size_offset;
   }
 };
 
