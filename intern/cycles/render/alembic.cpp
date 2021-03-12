@@ -574,8 +574,7 @@ static void add_normals(const Int32ArraySamplePtr face_indices,
 
       for (size_t i = 0; i < face_indices->size(); ++i) {
         int point_index = face_indices_array[i];
-        // todo: figure this out
-        data_float3[point_index] = -make_float3_from_yup(values->get()[i]);
+        data_float3[point_index] = make_float3_from_yup(values->get()[i]);
       }
 
       attr.data.add_data(data, time);
@@ -1738,8 +1737,8 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object, Abc::chrono_t frame
     for (size_t i = 0; i < triangle_data->size(); ++i) {
       int3 tri = (*triangle_data)[i];
       triangles.push_back_reserved(tri.x);
-      triangles.push_back_reserved(tri.z);
       triangles.push_back_reserved(tri.y);
+      triangles.push_back_reserved(tri.z);
 
       smooth.push_back_reserved(1);
     }
