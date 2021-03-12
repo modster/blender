@@ -63,13 +63,14 @@ USDStageReader::~USDStageReader()
 {
   clear_readers();
 
-  stage_->Unload();
+  if (stage_) {
+    stage_->Unload();
+  }
 }
 
 bool USDStageReader::valid() const
 {
-  // TODO: Implement
-  return true;
+  return stage_;
 }
 
 /* Returns true if the given prim should be excluded from the
