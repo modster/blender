@@ -74,7 +74,6 @@
 
 #include "usd_reader_geom.h"
 #include "usd_reader_prim.h"
-#include "usd_util.h"
 
 #include <iostream>
 
@@ -889,7 +888,7 @@ CacheReader *CacheReader_open_usd_object(USDStageHandle *handle,
   }
 
   // TODO: The handle does not have the proper import params or settings
-  USDPrimReader *usd_reader = create_reader(archive, prim);
+  USDPrimReader *usd_reader = USDStageReader::create_reader(archive, prim);
 
   if (usd_reader == NULL) {
     /* This object is not supported */

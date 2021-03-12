@@ -20,11 +20,21 @@
 #include "usd_reader_stage.h"
 #include "usd_reader_camera.h"
 #include "usd_reader_curve.h"
+#include "usd_reader_instance.h"
+#include "usd_reader_light.h"
 #include "usd_reader_mesh.h"
+#include "usd_reader_nurbs.h"
 #include "usd_reader_prim.h"
+#include "usd_reader_volume.h"
 #include "usd_reader_xform.h"
 
-#include "usd_util.h"
+#include <pxr/pxr.h>
+#include <pxr/usd/usdGeom/camera.h>
+#include <pxr/usd/usdGeom/curves.h>
+#include <pxr/usd/usdGeom/mesh.h>
+#include <pxr/usd/usdGeom/nurbsCurves.h>
+#include <pxr/usd/usdGeom/scope.h>
+#include <pxr/usd/usdLux/light.h>
 
 extern "C" {
 #include "DEG_depsgraph.h"
@@ -71,6 +81,70 @@ USDStageReader::~USDStageReader()
 bool USDStageReader::valid() const
 {
   return stage_;
+}
+
+USDPrimReader *USDStageReader::create_reader(const pxr::UsdPrim &prim,
+                                             const USDImportParams &params,
+                                             ImportSettings &settings)
+{
+  USDPrimReader *reader = nullptr;
+
+  if (params.use_instancing && prim.IsInstance()) {
+    reader = new USDInstanceReader(prim, params, settings);
+  }
+  else if (params.import_cameras && prim.IsA<pxr::UsdGeomCamera>()) {
+    reader = new USDCameraReader(prim, params, settings);
+  }
+  else if (params.import_curves && prim.IsA<pxr::UsdGeomBasisCurves>()) {
+    reader = new USDCurvesReader(prim, params, settings);
+  }
+  else if (params.import_curves && prim.IsA<pxr::UsdGeomNurbsCurves>()) {
+    reader = new USDNurbsReader(prim, params, settings);
+  }
+  else if (params.import_meshes && prim.IsA<pxr::UsdGeomMesh>()) {
+    reader = new USDMeshReader(prim, params, settings);
+  }
+  else if (params.import_lights && prim.IsA<pxr::UsdLuxLight>()) {
+    reader = new USDLightReader(prim, params, settings);
+  }
+  else if (params.import_volumes && prim.IsA<pxr::UsdVolVolume>()) {
+    reader = new USDVolumeReader(prim, params, settings);
+  }
+  else if (prim.IsA<pxr::UsdGeomImageable>()) {
+    reader = new USDXformReader(prim, params, settings);
+  }
+
+  return reader;
+}
+
+// TODO(makowalski): The handle does not have the proper import params or settings
+USDPrimReader *USDStageReader::create_reader(class USDStageReader *archive,
+                                             const pxr::UsdPrim &prim)
+{
+  USDPrimReader *reader = nullptr;
+
+  if (prim.IsA<pxr::UsdGeomCamera>()) {
+    reader = new USDCameraReader(prim, archive->params(), archive->settings());
+  }
+  else if (prim.IsA<pxr::UsdGeomBasisCurves>()) {
+    reader = new USDCurvesReader(prim, archive->params(), archive->settings());
+  }
+  else if (prim.IsA<pxr::UsdGeomNurbsCurves>()) {
+    reader = new USDNurbsReader(prim, archive->params(), archive->settings());
+  }
+  else if (prim.IsA<pxr::UsdGeomMesh>()) {
+    reader = new USDMeshReader(prim, archive->params(), archive->settings());
+  }
+  else if (prim.IsA<pxr::UsdLuxLight>()) {
+    reader = new USDLightReader(prim, archive->params(), archive->settings());
+  }
+  else if (prim.IsA<pxr::UsdVolVolume>()) {
+    reader = new USDVolumeReader(prim, archive->params(), archive->settings());
+  }
+  else if (prim.IsA<pxr::UsdGeomImageable>()) {
+    reader = new USDXformReader(prim, archive->params(), archive->settings());
+  }
+  return reader;
 }
 
 /* Returns true if the given prim should be excluded from the
@@ -140,7 +214,7 @@ static USDPrimReader *_handlePrim(Main *bmain,
   // or the root prims of scenegraph 'master' prototypes
   // from being added.
   if (!(prim.IsPseudoRoot() || prim.IsMaster())) {
-    reader = blender::io::usd::create_reader(prim, params, settings);
+    reader = USDStageReader::create_reader(prim, params, settings);
     if (reader == NULL)
       return NULL;
 

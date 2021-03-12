@@ -16,7 +16,6 @@
 
 #include "usd_reader_light.h"
 #include "usd_reader_prim.h"
-#include "usd_util.h"
 
 extern "C" {
 #include "DNA_cachefile_types.h"
