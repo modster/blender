@@ -30,11 +30,16 @@ class USDNurbsReader : public USDGeomReader {
   Curve *curve_;
 
  public:
-  USDNurbsReader(const pxr::UsdPrim &object,
+  USDNurbsReader(const pxr::UsdPrim &prim,
                  const USDImportParams &import_params,
                  const ImportSettings &settings)
-      : USDGeomReader(object, import_params, settings)
+      : USDGeomReader(prim, import_params, settings), curve_prim_(prim), curve_(nullptr)
   {
+  }
+
+  bool valid() const override
+  {
+    return static_cast<bool>(curve_prim_);
   }
 
   void create_object(Main *bmain, double motionSampleTime) override;

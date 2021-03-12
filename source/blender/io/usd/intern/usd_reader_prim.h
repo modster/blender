@@ -91,7 +91,7 @@ class USDPrimReader {
   int refcount_;
 
  public:
-  USDPrimReader(const pxr::UsdPrim &object,
+  USDPrimReader(const pxr::UsdPrim &prim,
                 const USDImportParams &import_params,
                 const ImportSettings &settings);
   virtual ~USDPrimReader();

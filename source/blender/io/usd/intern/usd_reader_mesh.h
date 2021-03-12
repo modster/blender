@@ -48,7 +48,7 @@ class USDMeshReader : public USDGeomReader {
   bool is_initial_load_;
 
  public:
-  USDMeshReader(const pxr::UsdPrim &object,
+  USDMeshReader(const pxr::UsdPrim &prim,
                 const USDImportParams &import_params,
                 const ImportSettings &settings);
 
