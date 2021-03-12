@@ -102,7 +102,7 @@ static void deformStroke(GpencilModifierData *md,
   }
   bGPdata *gpd = ob->data;
 
-  if (GPENCIL_STROKE_IS_CURVE(gps)) {
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
     bGPDcurve *gpc = gps->editcurve;
     for (int i = 0; i < gpc->tot_curve_points; i++) {
       bGPDcurve_point *pt = &gpc->curve_points[i];

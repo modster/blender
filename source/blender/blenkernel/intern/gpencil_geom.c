@@ -1291,7 +1291,7 @@ void BKE_gpencil_stroke_geometry_update(bGPdata *gpd, bGPDstroke *gps)
   }
 
   /* If the stroke is a curve, update stroke points first. */
-  if (GPENCIL_STROKE_IS_CURVE(gps)) {
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
 
     /* If the stroke geometry was updated, refit the curve.
      * NOTE: Normally the stroke points of a curve should not be updated directly. Only if it is

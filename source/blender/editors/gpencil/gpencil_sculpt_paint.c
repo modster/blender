@@ -305,7 +305,7 @@ static void gpencil_update_geometry(bGPdata *gpd)
 
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
         if (gps->flag & GP_STROKE_TAG) {
-          if (GPENCIL_STROKE_IS_CURVE(gps)) {
+          if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
             gps->editcurve->flag |= GP_CURVE_NEEDS_STROKE_UPDATE;
           }
           BKE_gpencil_stroke_geometry_update(gpd, gps);
@@ -1452,7 +1452,7 @@ static bool gpencil_sculpt_brush_do_stroke(tGP_BrushEditData *gso,
   bool include_last = false;
   bool changed = false;
   float rot_eval = 0.0f;
-  const bool is_curve = GPENCIL_STROKE_IS_CURVE(gps_active);
+  const bool is_curve = GPENCIL_STROKE_TYPE_BEZIER(gps_active);
 
   if (gps->totpoints == 1) {
     bGPDspoint pt_temp;

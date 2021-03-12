@@ -2779,7 +2779,7 @@ void BKE_gpencil_frame_original_pointers_update(const struct bGPDframe *gpf_orig
     /* Assign original stroke pointer. */
     if (gps_eval != NULL) {
       gps_eval->runtime.gps_orig = gps_orig;
-      if (GPENCIL_STROKE_IS_CURVE(gps_orig)) {
+      if (GPENCIL_STROKE_TYPE_BEZIER(gps_orig)) {
         bGPDcurve *gpc_orig = gps_orig->editcurve;
         bGPDcurve *gpc_eval = gps_eval->editcurve;
 

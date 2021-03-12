@@ -681,7 +681,7 @@ struct GP_EditableStrokes_Iter {
             /* skip strokes that are invalid for current view */ \
             if (ED_gpencil_stroke_can_use(C, gps) == false) \
               continue; \
-            if (!GPENCIL_STROKE_IS_CURVE(gps)) \
+            if (!GPENCIL_STROKE_TYPE_BEZIER(gps)) \
               continue; \
             bGPDcurve *gpc = gps->editcurve; \
     /* ... Do Stuff With Curves ...  */

@@ -162,7 +162,7 @@ static void deselect_all_selected(bContext *C)
   gpd->select_last_index = 0;
 
   CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
-    if (GPENCIL_STROKE_IS_CURVE(gps)) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
       bGPDcurve *gpc = gps->editcurve;
 
       if (gpc->flag & GP_CURVE_SELECT) {
@@ -315,7 +315,7 @@ static int gpencil_select_linked_exec(bContext *C, wmOperator *op)
   bool changed = false;
   /* select all points in selected strokes */
   CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
-    if (GPENCIL_STROKE_IS_CURVE(gps)) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
       bGPDcurve *gpc = gps->editcurve;
       if (gpc->flag & GP_CURVE_SELECT) {
         for (int i = 0; i < gpc->tot_curve_points; i++) {
@@ -394,7 +394,7 @@ static int gpencil_select_alternate_exec(bContext *C, wmOperator *op)
 
   bool changed = false;
   CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
-    if (GPENCIL_STROKE_IS_CURVE(gps)) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
       bGPDcurve *gpc = gps->editcurve;
       if ((gpc->flag & GP_CURVE_SELECT) && (gpc->tot_curve_points > 1)) {
         int idx = 0;
@@ -544,7 +544,7 @@ static bool gpencil_select_same_layer(bContext *C)
       }
 
       if (gps->flag & GP_STROKE_SELECT ||
-          (GPENCIL_STROKE_IS_CURVE(gps) && gps->editcurve->flag & GP_CURVE_SELECT)) {
+          (GPENCIL_STROKE_TYPE_BEZIER(gps) && gps->editcurve->flag & GP_CURVE_SELECT)) {
         found = true;
         break;
       }
@@ -557,7 +557,7 @@ static bool gpencil_select_same_layer(bContext *C)
           continue;
         }
 
-        if (GPENCIL_STROKE_IS_CURVE(gps)) {
+        if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
           bGPDcurve *gpc = gps->editcurve;
           for (int i = 0; i < gpc->tot_curve_points; i++) {
             bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
@@ -596,7 +596,7 @@ static bool gpencil_select_same_material(bContext *C)
 
   CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
     if (gps->flag & GP_STROKE_SELECT ||
-        (GPENCIL_STROKE_IS_CURVE(gps) && gps->editcurve->flag & GP_CURVE_SELECT)) {
+        (GPENCIL_STROKE_TYPE_BEZIER(gps) && gps->editcurve->flag & GP_CURVE_SELECT)) {
       /* add instead of insert here, otherwise the uniqueness check gets skipped,
        * and we get many duplicate entries...
        */
@@ -610,7 +610,7 @@ static bool gpencil_select_same_material(bContext *C)
   /* Second, select any visible stroke that uses these colors */
   CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
     if (BLI_gset_haskey(selected_colors, &gps->mat_nr)) {
-      if (GPENCIL_STROKE_IS_CURVE(gps)) {
+      if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
         bGPDcurve *gpc = gps->editcurve;
         for (int i = 0; i < gpc->tot_curve_points; i++) {
           bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
@@ -734,14 +734,14 @@ static int gpencil_select_first_exec(bContext *C, wmOperator *op)
     /* skip stroke if we're only manipulating selected strokes */
     if (only_selected &&
         !((gps->flag & GP_STROKE_SELECT) ||
-          (GPENCIL_STROKE_IS_CURVE(gps) && gps->editcurve->flag & GP_CURVE_SELECT))) {
+          (GPENCIL_STROKE_TYPE_BEZIER(gps) && gps->editcurve->flag & GP_CURVE_SELECT))) {
       continue;
     }
 
     /* select first point */
     BLI_assert(gps->totpoints >= 1);
 
-    if (GPENCIL_STROKE_IS_CURVE(gps)) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
       bGPDcurve *gpc = gps->editcurve;
 
       gpc->curve_points[0].flag |= GP_CURVE_POINT_SELECT;
@@ -842,14 +842,14 @@ static int gpencil_select_last_exec(bContext *C, wmOperator *op)
     /* skip stroke if we're only manipulating selected strokes */
     if (only_selected &&
         !((gps->flag & GP_STROKE_SELECT) ||
-          (GPENCIL_STROKE_IS_CURVE(gps) && gps->editcurve->flag & GP_CURVE_SELECT))) {
+          (GPENCIL_STROKE_TYPE_BEZIER(gps) && gps->editcurve->flag & GP_CURVE_SELECT))) {
       continue;
     }
 
     /* select last point */
     BLI_assert(gps->totpoints >= 1);
 
-    if (GPENCIL_STROKE_IS_CURVE(gps)) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
       bGPDcurve *gpc = gps->editcurve;
 
       gpc->curve_points[gpc->tot_curve_points - 1].flag |= GP_CURVE_POINT_SELECT;
@@ -943,7 +943,7 @@ static int gpencil_select_more_exec(bContext *C, wmOperator *UNUSED(op))
 
   bool changed = false;
   CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
-    if (GPENCIL_STROKE_IS_CURVE(gps) && (gps->editcurve->flag & GP_CURVE_SELECT)) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps) && (gps->editcurve->flag & GP_CURVE_SELECT)) {
       bGPDcurve *gpc = gps->editcurve;
 
       bool prev_sel = false;
@@ -1075,7 +1075,7 @@ static int gpencil_select_less_exec(bContext *C, wmOperator *UNUSED(op))
 
   bool changed = false;
   CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
-    if (GPENCIL_STROKE_IS_CURVE(gps) && (gps->editcurve->flag & GP_CURVE_SELECT)) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps) && (gps->editcurve->flag & GP_CURVE_SELECT)) {
       bGPDcurve *gpc = gps->editcurve;
       int tot_selected = 0, num_deselected = 0;
 
@@ -1478,7 +1478,7 @@ static int gpencil_circle_select_exec(bContext *C, wmOperator *op)
 
   /* find visible strokes, and select if hit */
   GP_EVALUATED_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
-    if (GPENCIL_STROKE_IS_CURVE(gps)) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
       bGPDcurve *gpc = gps->editcurve;
       changed |= gpencil_curve_do_circle_sel(
           C, gps, gpc, mx, my, radius, select, &rect, gpstroke_iter.diff_mat, selectmode);
@@ -1926,7 +1926,7 @@ static int gpencil_generic_select_exec(bContext *C,
 
   GP_EVALUATED_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
     bGPDstroke *gps_active = (gps->runtime.gps_orig) ? gps->runtime.gps_orig : gps;
-    if (GPENCIL_STROKE_IS_CURVE(gps_active)) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps_active)) {
       bGPDcurve *gpc = gps->editcurve;
       if (gpencil_generic_curve_select(C,
                                        ob,
@@ -2243,7 +2243,7 @@ static int gpencil_select_exec(bContext *C, wmOperator *op)
   /* First Pass: Find point which gets hit */
   GP_EVALUATED_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
     bGPDstroke *gps_active = (gps->runtime.gps_orig) ? gps->runtime.gps_orig : gps;
-    if (GPENCIL_STROKE_IS_CURVE(gps_active)) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps_active)) {
       bGPDcurve *gpc = gps->editcurve;
       bGPDcurve *gpc_active = (gpc->runtime.gpc_orig) ? gpc->runtime.gpc_orig : gpc;
       if (gpencil_select_curve_point_closest(C,
@@ -2490,7 +2490,7 @@ static void gpencil_selected_hue_table(bContext *C,
         }
 
         /* Read all points to get all colors selected. */
-        if (GPENCIL_STROKE_IS_CURVE(gps)) {
+        if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
           bGPDcurve *gpc = gps->editcurve;
           if ((gpc->flag & GP_CURVE_SELECT) == 0) {
             continue;
@@ -2582,7 +2582,7 @@ static int gpencil_select_vertex_color_exec(bContext *C, wmOperator *op)
 
   /* Select any visible stroke that uses any of these colors. */
   CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
-    if (GPENCIL_STROKE_IS_CURVE(gps)) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
       bGPDcurve *gpc = gps->editcurve;
       bool gpc_selected = false;
       for (int i = 0; i < gpc->tot_curve_points; i++) {

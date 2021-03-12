@@ -1009,7 +1009,7 @@ void BKE_gpencil_stroke_editcurve_update(bGPDstroke *gps,
   short prev_flag = 0;
 
   /* If editcurve exists save the selection to the stroke points (only for syncing later). */
-  if (GPENCIL_STROKE_IS_CURVE(gps)) {
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
     BKE_gpencil_stroke_editcurve_sync_selection(NULL, gps, gps->editcurve);
   }
 

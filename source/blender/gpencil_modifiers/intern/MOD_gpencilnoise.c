@@ -262,7 +262,7 @@ static void deformStroke(GpencilModifierData *md,
     }
   }
 
-  if (GPENCIL_STROKE_IS_CURVE(gps)) {
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
     gps->editcurve->flag |= GP_CURVE_NEEDS_STROKE_UPDATE;
     BKE_gpencil_stroke_geometry_update(gpd, gps);
   }

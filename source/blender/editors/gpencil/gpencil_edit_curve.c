@@ -146,7 +146,7 @@ static int gpencil_stroke_make_curve_exec(bContext *C, wmOperator *op)
 
   bool changed = false;
   GP_EDITABLE_STROKES_BEGIN (gps_iter, C, gpl, gps) {
-    if (!GPENCIL_STROKE_IS_CURVE(gps) && (gps->flag & GP_STROKE_SELECT)) {
+    if (!GPENCIL_STROKE_TYPE_BEZIER(gps) && (gps->flag & GP_STROKE_SELECT)) {
       BKE_gpencil_stroke_editcurve_update(gps, threshold, corner_angle, false);
       if (gps->editcurve != NULL) {
         bGPDcurve *gpc = gps->editcurve;

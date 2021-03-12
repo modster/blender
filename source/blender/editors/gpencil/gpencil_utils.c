@@ -2577,7 +2577,7 @@ void ED_gpencil_select_toggle_all(bContext *C, int action)
     action = SEL_SELECT;
 
     CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
-      if (GPENCIL_STROKE_IS_CURVE(gps)) {
+      if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
         bGPDcurve *gpc = gps->editcurve;
         if (gpc->flag & GP_CURVE_SELECT) {
           action = SEL_DESELECT;
@@ -2617,7 +2617,7 @@ void ED_gpencil_select_toggle_all(bContext *C, int action)
           if (!ED_gpencil_stroke_can_use(C, gps))
             continue;
 
-          if (GPENCIL_STROKE_IS_CURVE(gps)) {
+          if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
             bGPDcurve *gpc = gps->editcurve;
             for (uint32_t i = 0; i < gpc->tot_curve_points; i++) {
               bGPDcurve_point *pt = &gpc->curve_points[i];
@@ -2644,7 +2644,7 @@ void ED_gpencil_select_toggle_all(bContext *C, int action)
     CTX_DATA_BEGIN (C, bGPDstroke *, gps, editable_gpencil_strokes) {
       bool selected = false;
 
-      if (GPENCIL_STROKE_IS_CURVE(gps)) {
+      if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
         bGPDcurve *gpc = gps->editcurve;
 
         for (uint32_t i = 0; i < gpc->tot_curve_points; i++) {

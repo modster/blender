@@ -882,7 +882,11 @@ typedef enum eGP_DrawMode {
 
 #define GPENCIL_PLAY_ON(gpd) ((gpd) && ((gpd)->runtime.playing == 1))
 
-#define GPENCIL_STROKE_IS_CURVE(gps) ((gps) && ((gps)->editcurve != NULL))
+/* True if the stroke has curve data (is of type BEZIER). */
+#define GPENCIL_STROKE_TYPE_BEZIER(gps) ((gps) && ((gps)->editcurve != NULL))
+
+/* True if the stroke is of type POLY */
+#define GPENCIL_STROKE_TYPE_POLY(gps) ((gps) && ((gps)->editcurve == NULL))
 
 #ifdef __cplusplus
 }
