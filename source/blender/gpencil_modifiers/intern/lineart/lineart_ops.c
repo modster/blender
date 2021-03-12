@@ -204,7 +204,9 @@ static void lineart_gpencil_bake_startjob(void *customdata,
       }
     }
 
+    /* Update and refresh the progress bar. */
     *bj->progress = (float)(frame - bj->frame_begin) / (bj->frame_end - bj->frame_begin);
+    *bj->do_update = true;
   }
 
   /* This need to be reset manually. */
