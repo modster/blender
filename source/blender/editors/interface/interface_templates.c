@@ -7255,7 +7255,6 @@ void uiTemplateCacheFile(uiLayout *layout,
   uiItemR(row, &fileptr, "use_proxies", 0, NULL, ICON_NONE);
 
   uiItemR(layout, &fileptr, "cache_method", 0, NULL, ICON_NONE);
-  uiItemR(layout, &fileptr, "cache_memory_limit", 0, NULL, ICON_NONE);
   uiItemR(layout, &fileptr, "cache_frame_count", 0, NULL, ICON_NONE);
 
   row = uiLayoutRowWithHeading(layout, true, IFACE_("Override Frame"));

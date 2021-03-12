@@ -221,7 +221,6 @@ static void rna_def_cachefile(BlenderRNA *brna)
   static const EnumPropertyItem cache_method_items[] = {
       {CACHEFILE_CACHE_ALL_DATA, "ALL_DATA", 0, "All Data", ""},
       {CACHEFILE_CACHE_FRAME_COUNT, "FRAME_COUNT", 0, "Frame Count", ""},
-      {CACHEFILE_CACHE_MEMORY_LIMIT, "MEMORY_LIMIT", 0, "Memory Limit", ""},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -232,13 +231,6 @@ static void rna_def_cachefile(BlenderRNA *brna)
       prop, "Cache Method", "Define how the data is stored memory for faster updates");
   RNA_def_property_update(prop, 0, "rna_CacheFile_update");
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-
-  prop = RNA_def_property(srna, "cache_memory_limit", PROP_INT, PROP_NONE);
-  RNA_def_property_int_sdna(prop, NULL, "cache_memory_limit");
-  RNA_def_property_range(prop, 0, INT_MAX);
-  RNA_def_property_ui_text(
-      prop, "Memory Limit", "Maximum size of the data stored in memory, expressed in megabytes");
-  RNA_def_property_update(prop, 0, "rna_CacheFile_update");
 
   prop = RNA_def_property(srna, "cache_frame_count", PROP_INT, PROP_NONE);
   RNA_def_property_int_sdna(prop, NULL, "cache_frame_count");

@@ -1467,9 +1467,7 @@ NODE_DEFINE(AlembicProcedural)
   static NodeEnum cache_method_enum;
   cache_method_enum.insert("combined", CACHE_ALL_DATA);
   cache_method_enum.insert("depth", CACHE_FRAME_COUNT);
-  cache_method_enum.insert("normal", CACHE_MEMORY_LIMIT);
   SOCKET_ENUM(cache_method, "Cache Method", cache_method_enum, CACHE_ALL_DATA);
-  SOCKET_UINT(cache_memory_limit, "Cache Memory Limit", 1024);
   SOCKET_INT(cache_frame_count, "Cache Frame Count", 10);
 
   return type;
@@ -1569,8 +1567,7 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
 
   const chrono_t frame_time = (chrono_t)((frame - frame_offset) / frame_rate);
 
-  if (cache_method_is_modified() || cache_frame_count_is_modified() ||
-      cache_memory_limit_is_modified()) {
+  if (cache_method_is_modified() || cache_frame_count_is_modified()) {
     for (Node *node : objects) {
       AlembicObject *object = static_cast<AlembicObject *>(node);
       object->get_cached_data().clear();

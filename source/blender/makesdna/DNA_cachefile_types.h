@@ -64,7 +64,6 @@ enum {
 enum {
   CACHEFILE_CACHE_ALL_DATA,
   CACHEFILE_CACHE_FRAME_COUNT,
-  CACHEFILE_CACHE_MEMORY_LIMIT,
 };
 
 typedef struct CacheFile {
@@ -104,8 +103,7 @@ typedef struct CacheFile {
   char velocity_name[64];
 
   char cache_method;
-  char _pad[7];
-  int cache_memory_limit;
+  char _pad[3];
   int cache_frame_count;
 
   /* Runtime */
