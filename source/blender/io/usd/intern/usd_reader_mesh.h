@@ -50,7 +50,7 @@ class USDMeshReader : public USDGeomReader {
  public:
   USDMeshReader(const pxr::UsdPrim &object,
                 const USDImportParams &import_params,
-                ImportSettings &settings);
+                const ImportSettings &settings);
 
   bool valid() const override;
 

@@ -87,13 +87,13 @@ class USDPrimReader {
   pxr::UsdPrim prim_;
   const USDImportParams &import_params_;
   USDPrimReader *parent_reader_;
-  ImportSettings *settings_;
+  const ImportSettings *settings_;
   int refcount_;
 
  public:
   USDPrimReader(const pxr::UsdPrim &object,
                 const USDImportParams &import_params,
-                ImportSettings &settings);
+                const ImportSettings &settings);
   virtual ~USDPrimReader();
 
   const pxr::UsdPrim &prim() const;

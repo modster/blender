@@ -32,7 +32,7 @@ class USDNurbsReader : public USDGeomReader {
  public:
   USDNurbsReader(const pxr::UsdPrim &object,
                  const USDImportParams &import_params,
-                 ImportSettings &settings)
+                 const ImportSettings &settings)
       : USDGeomReader(object, import_params, settings)
   {
   }

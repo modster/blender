@@ -187,7 +187,7 @@ namespace blender::io::usd {
 
 USDMeshReader::USDMeshReader(const pxr::UsdPrim &object,
                              const USDImportParams &import_params,
-                             ImportSettings &settings)
+                             const ImportSettings &settings)
     : USDGeomReader(object, import_params, settings),
       is_left_handed_(false),
       last_num_positions_(-1),

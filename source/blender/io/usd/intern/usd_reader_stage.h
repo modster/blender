@@ -54,16 +54,16 @@ class USDStageReader {
 
   static USDPrimReader *create_reader(const pxr::UsdPrim &prim,
                                       const USDImportParams &params,
-                                      ImportSettings &settings);
+                                      const ImportSettings &settings);
 
   // This version of create_reader() does not filter by primitive type.  I.e.,
   // it will convert any prim to a reader, if possible, regardless of the
   // primitive types specified by the user in the import options.
-  static USDPrimReader *create_reader(class USDStageReader *archive, const pxr::UsdPrim &prim);
+  static USDPrimReader *create_reader(const USDStageReader *archive, const pxr::UsdPrim &prim);
 
   void collect_readers(struct Main *bmain,
                        const USDImportParams &params,
-                       ImportSettings &settings);
+                       const ImportSettings &settings);
 
   bool valid() const;
 
@@ -71,20 +71,21 @@ class USDStageReader {
   {
     return stage_;
   }
-  USDImportParams &params()
+  const USDImportParams &params() const
   {
     return params_;
   }
-  ImportSettings &settings()
+
+  const ImportSettings &settings() const
   {
     return settings_;
   }
 
-  void params(USDImportParams &a_params)
+  void params(const USDImportParams &a_params)
   {
     params_ = a_params;
   }
-  void settings(ImportSettings &a_settings)
+  void settings(const ImportSettings &a_settings)
   {
     settings_ = a_settings;
   }

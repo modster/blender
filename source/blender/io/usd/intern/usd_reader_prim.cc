@@ -40,7 +40,7 @@ namespace blender::io::usd {
 
 USDPrimReader::USDPrimReader(const pxr::UsdPrim &object,
                              const USDImportParams &import_params,
-                             ImportSettings &settings)
+                             const ImportSettings &settings)
     : name_(object.GetName().GetString()),
       prim_path_(object.GetPrimPath().GetString()),
       object_(nullptr),

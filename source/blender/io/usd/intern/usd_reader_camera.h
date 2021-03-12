@@ -25,7 +25,7 @@ class USDCameraReader : public USDXformReader {
  public:
   USDCameraReader(const pxr::UsdPrim &object,
                   const USDImportParams &import_params,
-                  ImportSettings &settings)
+                  const ImportSettings &settings)
       : USDXformReader(object, import_params, settings)
   {
   }

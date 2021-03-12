@@ -86,7 +86,7 @@ bool USDStageReader::valid() const
 
 USDPrimReader *USDStageReader::create_reader(const pxr::UsdPrim &prim,
                                              const USDImportParams &params,
-                                             ImportSettings &settings)
+                                             const ImportSettings &settings)
 {
   USDPrimReader *reader = nullptr;
 
@@ -119,7 +119,7 @@ USDPrimReader *USDStageReader::create_reader(const pxr::UsdPrim &prim,
 }
 
 // TODO(makowalski): The handle does not have the proper import params or settings
-USDPrimReader *USDStageReader::create_reader(class USDStageReader *archive,
+USDPrimReader *USDStageReader::create_reader(const USDStageReader *archive,
                                              const pxr::UsdPrim &prim)
 {
   USDPrimReader *reader = nullptr;
@@ -195,7 +195,7 @@ static USDPrimReader *_handlePrim(Main *bmain,
                                   pxr::UsdPrim prim,
                                   USDPrimReader *parent_reader,
                                   std::vector<USDPrimReader *> &readers,
-                                  ImportSettings &settings)
+                                  const ImportSettings &settings)
 {
   if (prim.IsA<pxr::UsdGeomImageable>()) {
     pxr::UsdGeomImageable imageable(prim);
@@ -243,7 +243,7 @@ static USDPrimReader *_handlePrim(Main *bmain,
 
 void USDStageReader::collect_readers(Main *bmain,
                                      const USDImportParams &params,
-                                     ImportSettings &settings)
+                                     const ImportSettings &settings)
 {
   params_ = params;
   settings_ = settings;

@@ -25,7 +25,7 @@ class USDXformReader : public USDPrimReader {
  public:
   USDXformReader(const pxr::UsdPrim &object,
                  const USDImportParams &import_params,
-                 ImportSettings &settings)
+                 const ImportSettings &settings)
       : USDPrimReader(object, import_params, settings)
   {
   }
