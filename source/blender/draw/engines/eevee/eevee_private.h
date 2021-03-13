@@ -63,7 +63,6 @@ extern struct DrawEngineType draw_engine_eevee_type;
 /* Only define one of these. */
 // #define IRRADIANCE_SH_L2
 #define IRRADIANCE_HL2
-#define HAMMERSLEY_SIZE 1024
 
 #if defined(IRRADIANCE_SH_L2)
 #  define SHADER_IRRADIANCE "#define IRRADIANCE_SH_L2\n"
@@ -200,13 +199,6 @@ enum {
   KEY_HAIR = (1 << 2),
   KEY_SHADOW = (1 << 3),
 };
-
-/* SSR shader variations */
-typedef enum EEVEE_SSRShaderOptions {
-  SSR_RESOLVE = (1 << 0),
-  SSR_FULL_TRACE = (1 << 1),
-  SSR_MAX_SHADER = (1 << 2),
-} EEVEE_SSRShaderOptions;
 
 /* DOF Gather pass shader variations */
 typedef enum EEVEE_DofGatherPass {
@@ -608,7 +600,6 @@ typedef struct EEVEE_LightProbesInfo {
   float texel_size;
   float padding_size;
   float samples_len;
-  float samples_len_inv;
   float near_clip;
   float far_clip;
   float roughness;
@@ -732,8 +723,6 @@ typedef struct EEVEE_EffectsInfo {
   bool reflection_trace_full;
   bool ssr_was_persp;
   bool ssr_was_valid_double_buffer;
-  int ssr_neighbor_ofs;
-  int ssr_halfres_ofs[2];
   struct GPUTexture *ssr_normal_input; /* Textures from pool */
   struct GPUTexture *ssr_specrough_input;
   struct GPUTexture *ssr_hit_output;
@@ -1180,7 +1169,6 @@ void EEVEE_sample_ellipse(int sample_ofs,
 void EEVEE_random_rotation_m4(int sample_ofs, float scale, float r_mat[4][4]);
 
 /* eevee_shaders.c */
-void EEVEE_shaders_lightprobe_shaders_init(void);
 void EEVEE_shaders_material_shaders_init(void);
 struct DRWShaderLibrary *EEVEE_shader_lib_get(void);
 struct GPUShader *EEVEE_shaders_bloom_blit_get(bool high_quality);
@@ -1218,7 +1206,8 @@ struct GPUShader *EEVEE_shaders_effect_motion_blur_velocity_tiles_expand_sh_get(
 struct GPUShader *EEVEE_shaders_effect_ambient_occlusion_sh_get(void);
 struct GPUShader *EEVEE_shaders_effect_ambient_occlusion_layer_sh_get(void);
 struct GPUShader *EEVEE_shaders_effect_ambient_occlusion_debug_sh_get(void);
-struct GPUShader *EEVEE_shaders_effect_screen_raytrace_sh_get(EEVEE_SSRShaderOptions options);
+struct GPUShader *EEVEE_shaders_effect_reflection_trace_sh_get(void);
+struct GPUShader *EEVEE_shaders_effect_reflection_resolve_sh_get(void);
 struct GPUShader *EEVEE_shaders_renderpasses_post_process_sh_get(void);
 struct GPUShader *EEVEE_shaders_cryptomatte_sh_get(bool is_hair);
 struct GPUShader *EEVEE_shaders_shadow_sh_get(void);
