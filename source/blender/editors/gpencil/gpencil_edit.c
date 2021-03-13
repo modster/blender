@@ -2305,7 +2305,11 @@ static int gpencil_delete_selected_strokes(bContext *C)
           }
 
           /* free stroke if selected */
-          if (gps->flag & GP_STROKE_SELECT) {
+          bool is_stroke_selected = GPENCIL_STROKE_TYPE_BEZIER(gps) ?
+                                        gps->editcurve->flag & GP_CURVE_SELECT :
+                                        gps->flag & GP_STROKE_SELECT;
+
+          if (is_stroke_selected) {
             BLI_remlink(&gpf->strokes, gps);
             /* free stroke memory arrays, then stroke itself */
             BKE_gpencil_free_stroke(gps);
@@ -2691,7 +2695,6 @@ static int gpencil_delete_selected_points(bContext *C)
 {
   Object *ob = CTX_data_active_object(C);
   bGPdata *gpd = ED_gpencil_data_get_active(C);
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
   bool changed = false;
 
@@ -2717,23 +2720,27 @@ static int gpencil_delete_selected_points(bContext *C)
             continue;
           }
 
-          if (gps->flag & GP_STROKE_SELECT) {
-            /* deselect old stroke, since it will be used as template for the new strokes */
-            gps->flag &= ~GP_STROKE_SELECT;
-            BKE_gpencil_stroke_select_index_reset(gps);
+          if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+            bGPDcurve *gpc = gps->editcurve;
+            if (gpc->flag & GP_CURVE_SELECT) {
+              gpc->flag &= ~GP_CURVE_SELECT;
+              BKE_gpencil_stroke_select_index_reset(gps);
 
-            if (is_curve_edit) {
-              bGPDcurve *gpc = gps->editcurve;
               BKE_gpencil_curve_delete_tagged_points(
                   gpd, gpf, gps, gps->next, gpc, GP_CURVE_POINT_SELECT);
+              changed = true;
             }
-            else {
+          }
+          else {
+            if (gps->flag & GP_STROKE_SELECT) {
+              /* deselect old stroke, since it will be used as template for the new strokes */
+              gps->flag &= ~GP_STROKE_SELECT;
+              BKE_gpencil_stroke_select_index_reset(gps);
               /* delete unwanted points by splitting stroke into several smaller ones */
               BKE_gpencil_stroke_delete_tagged_points(
                   gpd, gpf, gps, gps->next, GP_SPOINT_SELECT, false, 0);
+              changed = true;
             }
-
-            changed = true;
           }
         }
       }
