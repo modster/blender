@@ -365,6 +365,10 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetEnabled(layout, !is_baked);
 
   uiLayout *column = uiLayoutColumn(layout, true);
+  uiItemR(column, ptr, "fuzzy_intersections", 0, NULL, ICON_NONE);
+  uiItemR(column, ptr, "fuzzy_everything", 0, NULL, ICON_NONE);
+
+  column = uiLayoutColumn(layout, true);
   uiItemR(column, ptr, "chaining_geometry_threshold", 0, NULL, ICON_NONE);
   uiItemR(column, ptr, "chaining_image_threshold", 0, NULL, ICON_NONE);
 
