@@ -213,7 +213,7 @@ static void lineart_line_cut(LineartRenderBuffer *rb,
     untouched = 1;
   }
   for (rls = start_segment; rls; rls = rls->next) {
-    /* We we cut at existing cutting point (e.g. where the line's occluded by a triangle strip) */
+    /* We we cut at existing cutting point (e.g. where the line's occluded by a triangle strip). */
     if (LRT_DOUBLE_CLOSE_ENOUGH(rls->at, end)) {
       end_segment = rls;
       ns2 = end_segment;
@@ -532,7 +532,7 @@ static int lineart_point_on_segment(double v[2], double v0[2], double v1[2])
   return 0;
 }
 
-/* Result: 0-outside 1-on the edge 2-inside */
+/* Result: 0-outside 1-on the edge 2-inside. */
 static int lineart_point_triangle_relation(double v[2], double v0[2], double v1[2], double v2[2])
 {
   double cl, c;
@@ -1939,7 +1939,7 @@ static int lineart_triangle_line_image_space_occlusion(SpinLock *UNUSED(spl),
   b = lineart_LineIntersectTest2d(LFBC, RFBC, FBC1, FBC2, &is[1]);
   c = lineart_LineIntersectTest2d(LFBC, RFBC, FBC2, FBC0, &is[2]);
 
-  /* sort the intersection distance */
+  /* sort the intersection distance. */
   INTERSECT_SORT_MIN_TO_MAX_3(is[0], is[1], is[2], order);
 
   sub_v3_v3v3_db(Lv, rl->l->gloc, rt->v[0]->gloc);
@@ -3568,14 +3568,14 @@ int MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModifi
     return OPERATOR_FINISHED;
   }
 
-  /* This is the acceleration strucrure, a lot like BVH in 3D */
+  /* This is the acceleration strucrure, a lot like BVH in 3D. */
   lineart_main_bounding_area_make_initial(rb);
 
   /* We need to get cut into triangles that are crossing near/far plans, only this way can we get
    * correct coordinates of those clipped lines. Done in two steps,
-   * setting clip_far==false for near plane */
+   * setting clip_far==false for near plane. */
   lineart_main_cull_triangles(rb, false);
-  /* clip_far==true for far plane */
+  /* clip_far==true for far plane. */
   lineart_main_cull_triangles(rb, true);
 
   /* Triangle adjacent info pointers are no longer used. This saves memory. */
@@ -3608,7 +3608,7 @@ int MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModifi
      * where the splitting point could be any cut in rl->segments. */
     MOD_lineart_chain_split_for_fixed_occlusion(rb);
 
-    /* Then we connect chains based on the _approximity_ of their end points in geometry or image
+    /* Then we connect chains based on the _proximity_ of their end points in geometry or image
      * space, here's the place threashold value gets involved. */
 
     /* If both chaining thresholds are zero, then we allow at least image space chaining to do a
@@ -3618,13 +3618,13 @@ int MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModifi
       t_image = 0.001f;
     }
 
-    /* do_geometry_space = true */
+    /* do_geometry_space = true. */
     MOD_lineart_chain_connect(rb, true);
 
     /* After chaining, we need to clear flags so we can do another round in image space. */
     MOD_lineart_chain_clear_picked_flag(rb);
 
-    /* do_geometry_space = false (it's image_space) */
+    /* do_geometry_space = false (it's image_space). */
     MOD_lineart_chain_connect(rb, false);
 
     /* Clear again so we don't confuse GPencil generation calls. */
@@ -3743,7 +3743,7 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
     }
 
     /* Preserved: If we ever do async generation, this picked flag should be set here. */
-    /* rlc->picked = 1; */
+    /* rlc->picked = 1;. */
 
     int array_idx = 0;
     int count = MOD_lineart_chain_count(rlc);

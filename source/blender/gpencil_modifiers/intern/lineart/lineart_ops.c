@@ -330,7 +330,7 @@ static int lineart_gpencil_bake_strokes_commom_modal(bContext *C,
 {
   Scene *scene = (Scene *)op->customdata;
 
-  /* no running blender, remove handler and pass through */
+  /* no running blender, remove handler and pass through. */
   if (0 == WM_jobs_test(CTX_wm_manager(C), scene, WM_JOB_TYPE_LINEART)) {
     return OPERATOR_FINISHED | OPERATOR_PASS_THROUGH;
   }

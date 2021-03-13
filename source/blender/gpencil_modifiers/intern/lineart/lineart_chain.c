@@ -186,7 +186,7 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
   LineartRenderLineSegment *rls;
   int last_occlusion;
   unsigned char last_transparency;
-  /* for converting from double */
+  /* for converting from double. */
   float use_fbcoord[2];
   float use_gpos[3];
 
