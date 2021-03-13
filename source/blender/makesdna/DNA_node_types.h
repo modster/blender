@@ -1221,6 +1221,11 @@ typedef struct NodeAttributeCombineXYZ {
   char _pad[1];
 } NodeAttributeCombineXYZ;
 
+typedef struct NodeAttributeSeparateXYZ {
+  /* GeometryNodeAttributeInputMode. */
+  uint8_t input_type;
+} NodeAttributeSeparateXYZ;
+
 typedef struct NodeAttributeConvert {
   /* CustomDataType. */
   uint8_t data_type;
@@ -1228,11 +1233,6 @@ typedef struct NodeAttributeConvert {
   /* AttributeDomain. */
   int16_t domain;
 } NodeAttributeConvert;
-
-typedef struct NodeAttributeSeparateXYZ {
-  /* GeometryNodeAttributeInputMode. */
-  uint8_t input_type;
-} NodeAttributeSeparateXYZ;
 
 typedef struct NodeGeometryMeshCircle {
   /* GeometryNodeMeshCircleFillType. */

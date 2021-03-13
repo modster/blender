@@ -520,16 +520,15 @@ geometry_node_categories = [
         NodeItem("GeometryNodeSubdivideSmooth"),
         NodeItem("GeometryNodeSubdivide"),
 
-        # These should be in a submenu, but that requires refactoring to remove NodeItem.
-        NodeItem("GeometryNodeMeshPlane"),
+        # These should be in a submenu, but that requires a refactor to build the add menu manually.
         NodeItem("GeometryNodeMeshCube"),
         NodeItem("GeometryNodeMeshCircle"),
         NodeItem("GeometryNodeMeshUVSphere"),
         NodeItem("GeometryNodeMeshIcoSphere"),
         NodeItem("GeometryNodeMeshCylinder"),
         NodeItem("GeometryNodeMeshCone"),
-        NodeItem("GeometryNodeMeshTorus"),
-        NodeItem("GeometryNodeMeshGrid"),
+        # NodeItem("GeometryNodeMeshPlane"),
+        # NodeItem("GeometryNodeMeshGrid"),
     ]),
     GeometryNodeCategory("GEO_POINT", "Point", items=[
         NodeItem("GeometryNodePointDistribute"),
