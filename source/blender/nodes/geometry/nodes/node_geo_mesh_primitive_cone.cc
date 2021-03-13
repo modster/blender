@@ -335,15 +335,15 @@ Mesh *create_cylinder_or_cone_mesh(const float radius_top,
         poly.loopstart = loop_index;
         poly.totloop = 3;
 
-        MLoop &loop1 = loops[loop_index++];
-        loop1.v = top_verts_start + i;
-        loop1.e = top_edges_start + i;
-        MLoop &loop2 = loops[loop_index++];
-        loop2.v = top_verts_start + (i + 1) % verts_num;
-        loop2.e = top_fan_edges_start + (i + 1) % verts_num;
-        MLoop &loop3 = loops[loop_index++];
-        loop3.v = top_center_vert_index;
-        loop3.e = top_fan_edges_start + i;
+        MLoop &loop_a = loops[loop_index++];
+        loop_a.v = top_verts_start + i;
+        loop_a.e = top_edges_start + i;
+        MLoop &loop_b = loops[loop_index++];
+        loop_b.v = top_verts_start + (i + 1) % verts_num;
+        loop_b.e = top_fan_edges_start + (i + 1) % verts_num;
+        MLoop &loop_c = loops[loop_index++];
+        loop_c.v = top_center_vert_index;
+        loop_c.e = top_fan_edges_start + i;
       }
     }
   }
@@ -356,18 +356,18 @@ Mesh *create_cylinder_or_cone_mesh(const float radius_top,
       poly.loopstart = loop_index;
       poly.totloop = 4;
 
-      MLoop &loop1 = loops[loop_index++];
-      loop1.v = top_verts_start + i;
-      loop1.e = connecting_edges_start + i;
-      MLoop &loop2 = loops[loop_index++];
-      loop2.v = bottom_verts_start + i;
-      loop2.e = bottom_edges_start + i;
-      MLoop &loop3 = loops[loop_index++];
-      loop3.v = bottom_verts_start + (i + 1) % verts_num;
-      loop3.e = connecting_edges_start + (i + 1) % verts_num;
-      MLoop &loop4 = loops[loop_index++];
-      loop4.v = top_verts_start + (i + 1) % verts_num;
-      loop4.e = top_edges_start + i;
+      MLoop &loop_a = loops[loop_index++];
+      loop_a.v = top_verts_start + i;
+      loop_a.e = connecting_edges_start + i;
+      MLoop &loop_b = loops[loop_index++];
+      loop_b.v = bottom_verts_start + i;
+      loop_b.e = bottom_edges_start + i;
+      MLoop &loop_c = loops[loop_index++];
+      loop_c.v = bottom_verts_start + (i + 1) % verts_num;
+      loop_c.e = connecting_edges_start + (i + 1) % verts_num;
+      MLoop &loop_d = loops[loop_index++];
+      loop_d.v = top_verts_start + (i + 1) % verts_num;
+      loop_d.e = top_edges_start + i;
     }
   }
   else {
@@ -378,15 +378,15 @@ Mesh *create_cylinder_or_cone_mesh(const float radius_top,
         poly.loopstart = loop_index;
         poly.totloop = 3;
 
-        MLoop &loop1 = loops[loop_index++];
-        loop1.v = top_verts_start + i;
-        loop1.e = connecting_edges_start + i;
-        MLoop &loop2 = loops[loop_index++];
-        loop2.v = bottom_verts_start;
-        loop2.e = connecting_edges_start + (i + 1) % verts_num;
-        MLoop &loop3 = loops[loop_index++];
-        loop3.v = top_verts_start + (i + 1) % verts_num;
-        loop3.e = top_edges_start + i;
+        MLoop &loop_a = loops[loop_index++];
+        loop_a.v = top_verts_start + i;
+        loop_a.e = connecting_edges_start + i;
+        MLoop &loop_b = loops[loop_index++];
+        loop_b.v = bottom_verts_start;
+        loop_b.e = connecting_edges_start + (i + 1) % verts_num;
+        MLoop &loop_c = loops[loop_index++];
+        loop_c.v = top_verts_start + (i + 1) % verts_num;
+        loop_c.e = top_edges_start + i;
       }
     }
     else {
@@ -396,15 +396,15 @@ Mesh *create_cylinder_or_cone_mesh(const float radius_top,
         poly.loopstart = loop_index;
         poly.totloop = 3;
 
-        MLoop &loop1 = loops[loop_index++];
-        loop1.v = bottom_verts_start + i;
-        loop1.e = bottom_edges_start + i;
-        MLoop &loop2 = loops[loop_index++];
-        loop2.v = bottom_verts_start + (i + 1) % verts_num;
-        loop2.e = connecting_edges_start + (i + 1) % verts_num;
-        MLoop &loop3 = loops[loop_index++];
-        loop3.v = top_verts_start;
-        loop3.e = connecting_edges_start + i;
+        MLoop &loop_a = loops[loop_index++];
+        loop_a.v = bottom_verts_start + i;
+        loop_a.e = bottom_edges_start + i;
+        MLoop &loop_b = loops[loop_index++];
+        loop_b.v = bottom_verts_start + (i + 1) % verts_num;
+        loop_b.e = connecting_edges_start + (i + 1) % verts_num;
+        MLoop &loop_c = loops[loop_index++];
+        loop_c.v = top_verts_start;
+        loop_c.e = connecting_edges_start + i;
       }
     }
   }
@@ -429,15 +429,15 @@ Mesh *create_cylinder_or_cone_mesh(const float radius_top,
         poly.loopstart = loop_index;
         poly.totloop = 3;
 
-        MLoop &loop1 = loops[loop_index++];
-        loop1.v = bottom_verts_start + i;
-        loop1.e = bottom_fan_edges_start + i;
-        MLoop &loop2 = loops[loop_index++];
-        loop2.v = bottom_center_vert_index;
-        loop2.e = bottom_fan_edges_start + (i + 1) % verts_num;
-        MLoop &loop3 = loops[loop_index++];
-        loop3.v = bottom_verts_start + (i + 1) % verts_num;
-        loop3.e = bottom_edges_start + i;
+        MLoop &loop_a = loops[loop_index++];
+        loop_a.v = bottom_verts_start + i;
+        loop_a.e = bottom_fan_edges_start + i;
+        MLoop &loop_b = loops[loop_index++];
+        loop_b.v = bottom_center_vert_index;
+        loop_b.e = bottom_fan_edges_start + (i + 1) % verts_num;
+        MLoop &loop_c = loops[loop_index++];
+        loop_c.v = bottom_verts_start + (i + 1) % verts_num;
+        loop_c.e = bottom_edges_start + i;
       }
     }
   }

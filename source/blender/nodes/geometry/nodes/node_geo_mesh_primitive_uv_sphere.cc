@@ -158,15 +158,12 @@ static void calculate_sphere_faces(MutableSpan<MLoop> loops,
     MPoly &poly = polys[poly_index++];
     poly.loopstart = loop_index;
     poly.totloop = 3;
-
     MLoop &loop_a = loops[loop_index++];
     loop_a.v = 0;
     loop_a.e = segment;
-
     MLoop &loop_b = loops[loop_index++];
     loop_b.v = first_vert_ring_index_start + segment;
     loop_b.e = segments + segment;
-
     MLoop &loop_c = loops[loop_index++];
     loop_c.v = first_vert_ring_index_start + (segment + 1) % segments;
     loop_c.e = (segment + 1) % segments;
@@ -187,15 +184,12 @@ static void calculate_sphere_faces(MutableSpan<MLoop> loops,
       MLoop &loop_a = loops[loop_index++];
       loop_a.v = ring_vert_index_start + segment;
       loop_a.e = ring_vertical_edge_index_start + segment;
-
       MLoop &loop_b = loops[loop_index++];
       loop_b.v = next_ring_vert_index_start + segment;
       loop_b.e = next_ring_edge_index_start + segment;
-
       MLoop &loop_c = loops[loop_index++];
       loop_c.v = next_ring_vert_index_start + ((segment + 1) % segments);
       loop_c.e = ring_vertical_edge_index_start + ((segment + 1) % segments);
-
       MLoop &loop_d = loops[loop_index++];
       loop_d.v = ring_vert_index_start + ((segment + 1) % segments);
       loop_d.e = ring_edge_index_start + segment;
@@ -217,11 +211,9 @@ static void calculate_sphere_faces(MutableSpan<MLoop> loops,
     MLoop &loop_a = loops[loop_index++];
     loop_a.v = last_vert_index;
     loop_a.e = bottom_edge_fan_start + ((segment + 1) % segments);
-
     MLoop &loop_b = loops[loop_index++];
     loop_b.v = last_vert_ring_start + (segment + 1) % segments;
     loop_b.e = last_edge_ring_start + segment;
-
     MLoop &loop_c = loops[loop_index++];
     loop_c.v = last_vert_ring_start + segment;
     loop_c.e = bottom_edge_fan_start + segment;

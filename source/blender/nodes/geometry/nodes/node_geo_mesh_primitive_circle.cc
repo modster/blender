@@ -174,31 +174,32 @@ static Mesh *create_circle_mesh(const float radius,
     case GEO_NODE_MESH_CIRCLE_FILL_NONE:
       break;
     case GEO_NODE_MESH_CIRCLE_FILL_NGON: {
+      MPoly &poly = polys[0];
+      poly.loopstart = 0;
+      poly.totloop = loops.size();
+
       for (const int i : IndexRange(verts_num)) {
         MLoop &loop = loops[i];
         loop.e = i;
         loop.v = i;
       }
-      MPoly &poly = polys[0];
-      poly.loopstart = 0;
-      poly.totloop = loops.size();
       break;
     }
     case GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN: {
       for (const int i : IndexRange(verts_num)) {
-        MLoop &loop = loops[3 * i];
-        loop.e = i;
-        loop.v = i;
-        MLoop &loop2 = loops[3 * i + 1];
-        loop2.e = verts_num + ((i + 1) % verts_num);
-        loop2.v = (i + 1) % verts_num;
-        MLoop &loop3 = loops[3 * i + 2];
-        loop3.e = verts_num + i;
-        loop3.v = verts_num;
-
         MPoly &poly = polys[i];
         poly.loopstart = 3 * i;
         poly.totloop = 3;
+
+        MLoop &loop_a = loops[3 * i];
+        loop_a.e = i;
+        loop_a.v = i;
+        MLoop &loop_b = loops[3 * i + 1];
+        loop_b.e = verts_num + ((i + 1) % verts_num);
+        loop_b.v = (i + 1) % verts_num;
+        MLoop &loop_c = loops[3 * i + 2];
+        loop_c.e = verts_num + i;
+        loop_c.v = verts_num;
       }
       break;
     }
