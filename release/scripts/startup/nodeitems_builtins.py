@@ -520,7 +520,7 @@ geometry_node_categories = [
         NodeItem("GeometryNodeSubdivideSmooth"),
         NodeItem("GeometryNodeSubdivide"),
 
-        # These should be in a submenu, but that requires a refactor to build the add menu manually.
+        # These should be in a sub-menu, but that requires a refactor to build the add menu manually.
         NodeItem("GeometryNodeMeshCube"),
         NodeItem("GeometryNodeMeshCircle"),
         NodeItem("GeometryNodeMeshUVSphere"),
