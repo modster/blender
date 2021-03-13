@@ -846,24 +846,85 @@ static void gpencil_duplicate_points(bGPdata *gpd,
                                      ListBase *new_strokes,
                                      const char *layername)
 {
-  bGPDspoint *pt;
-  int i;
-
   int start_idx = -1;
 
-  /* Step through the original stroke's points:
-   * - We accumulate selected points (from start_idx to current index)
-   *   and then convert that to a new stroke
-   */
-  for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-    /* searching for start, are waiting for end? */
-    if (start_idx == -1) {
-      /* is this the first selected point for a new island? */
-      if (pt->flag & GP_SPOINT_SELECT) {
-        start_idx = i;
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+    bGPDcurve *gpc = gps->editcurve;
+    for (int i = 0; i < gpc->tot_curve_points; i++) {
+      bGPDcurve_point *cpt = &gpc->curve_points[i];
+      if (start_idx == -1) {
+        if (cpt->flag & GP_CURVE_POINT_SELECT) {
+          start_idx = i;
+        }
+        continue;
       }
+
+      size_t len = 0;
+
+      if ((cpt->flag & GP_CURVE_POINT_SELECT) == 0) {
+        len = i - start_idx;
+      }
+      else if (i == gpc->tot_curve_points - 1) {
+        len = i - start_idx + 1;
+      }
+
+      if (len < 1) {
+        continue;
+      }
+
+      /* make a stupid copy first of the entire stroke (to get the flags too) */
+      bGPDstroke *gpsd = BKE_gpencil_stroke_duplicate((bGPDstroke *)gps, false, false);
+
+      /* saves original layer name */
+      BLI_strncpy(gpsd->runtime.tmp_layerinfo, layername, sizeof(gpsd->runtime.tmp_layerinfo));
+
+      /* To avoid a curve update, we just copy the points. */
+      int start_idx_stroke = gpc->curve_points[start_idx].point_index;
+      int len_stroke = (gpc->curve_points[start_idx + len - 1].point_index - start_idx_stroke) + 1;
+
+      gpsd->points = MEM_mallocN(sizeof(bGPDspoint) * len_stroke, "gps stroke points copy");
+      memcpy(gpsd->points, gps->points + start_idx_stroke, sizeof(bGPDspoint) * len_stroke);
+      gpsd->totpoints = len_stroke;
+
+      gpsd->editcurve = BKE_gpencil_stroke_editcurve_new(len);
+      bGPDcurve *gpcd = gpsd->editcurve;
+      memcpy(gpcd->curve_points, gpc->curve_points + start_idx, sizeof(bGPDcurve_point) * len);
+
+      /* TODO: Copy vertex weights*/
+      for (uint32_t j = 0; j < gpcd->tot_curve_points; j++) {
+        bGPDcurve_point *gpcd_pt = &gpcd->curve_points[j];
+        BezTriple *bezt = &gpcd_pt->bezt;
+        gpcd_pt->flag |= GP_CURVE_POINT_SELECT;
+        BEZT_SEL_ALL(bezt);
+      }
+      gpcd->flag |= GP_CURVE_SELECT;
+
+      BKE_gpencil_stroke_geometry_update(gpd, gpsd);
+
+      /* add to temp buffer */
+      gpsd->next = gpsd->prev = NULL;
+
+      BLI_addtail(new_strokes, gpsd);
+
+      start_idx = -1;
     }
-    else {
+  }
+  else {
+    /* Step through the original stroke's points:
+     * - We accumulate selected points (from start_idx to current index)
+     *   and then convert that to a new stroke
+     */
+    for (int i = 0; i < gps->totpoints; i++) {
+      bGPDspoint *pt = &gps->points[i];
+      /* searching for start, are waiting for end? */
+      if (start_idx == -1) {
+        /* is this the first selected point for a new island? */
+        if (pt->flag & GP_SPOINT_SELECT) {
+          start_idx = i;
+        }
+        continue;
+      }
+
       size_t len = 0;
 
       /* is this the end of current island yet?
@@ -877,45 +938,47 @@ static void gpencil_duplicate_points(bGPdata *gpd,
         len = i - start_idx + 1;
       }
 
-      /* make copies of the relevant data */
-      if (len) {
-        bGPDstroke *gpsd;
-
-        /* make a stupid copy first of the entire stroke (to get the flags too) */
-        gpsd = BKE_gpencil_stroke_duplicate((bGPDstroke *)gps, false, true);
-
-        /* saves original layer name */
-        BLI_strncpy(gpsd->runtime.tmp_layerinfo, layername, sizeof(gpsd->runtime.tmp_layerinfo));
-
-        /* now, make a new points array, and copy of the relevant parts */
-        gpsd->points = MEM_mallocN(sizeof(bGPDspoint) * len, "gps stroke points copy");
-        memcpy(gpsd->points, gps->points + start_idx, sizeof(bGPDspoint) * len);
-        gpsd->totpoints = len;
-
-        if (gps->dvert != NULL) {
-          gpsd->dvert = MEM_mallocN(sizeof(MDeformVert) * len, "gps stroke weights copy");
-          memcpy(gpsd->dvert, gps->dvert + start_idx, sizeof(MDeformVert) * len);
-
-          /* Copy weights */
-          int e = start_idx;
-          for (int j = 0; j < gpsd->totpoints; j++) {
-            MDeformVert *dvert_dst = &gps->dvert[e];
-            MDeformVert *dvert_src = &gps->dvert[j];
-            dvert_dst->dw = MEM_dupallocN(dvert_src->dw);
-            e++;
-          }
-        }
-
-        BKE_gpencil_stroke_geometry_update(gpd, gpsd);
-
-        /* add to temp buffer */
-        gpsd->next = gpsd->prev = NULL;
-
-        BLI_addtail(new_strokes, gpsd);
-
-        /* cleanup + reset for next */
-        start_idx = -1;
+      if (len < 1) {
+        continue;
       }
+
+      /* make copies of the relevant data */
+      bGPDstroke *gpsd;
+
+      /* make a stupid copy first of the entire stroke (to get the flags too) */
+      gpsd = BKE_gpencil_stroke_duplicate((bGPDstroke *)gps, false, false);
+
+      /* saves original layer name */
+      BLI_strncpy(gpsd->runtime.tmp_layerinfo, layername, sizeof(gpsd->runtime.tmp_layerinfo));
+
+      /* now, make a new points array, and copy of the relevant parts */
+      gpsd->points = MEM_mallocN(sizeof(bGPDspoint) * len, "gps stroke points copy");
+      memcpy(gpsd->points, gps->points + start_idx, sizeof(bGPDspoint) * len);
+      gpsd->totpoints = len;
+
+      if (gps->dvert != NULL) {
+        gpsd->dvert = MEM_mallocN(sizeof(MDeformVert) * len, "gps stroke weights copy");
+        memcpy(gpsd->dvert, gps->dvert + start_idx, sizeof(MDeformVert) * len);
+
+        /* Copy weights */
+        int e = start_idx;
+        for (int j = 0; j < gpsd->totpoints; j++) {
+          MDeformVert *dvert_dst = &gps->dvert[e];
+          MDeformVert *dvert_src = &gps->dvert[j];
+          dvert_dst->dw = MEM_dupallocN(dvert_src->dw);
+          e++;
+        }
+      }
+
+      BKE_gpencil_stroke_geometry_update(gpd, gpsd);
+
+      /* add to temp buffer */
+      gpsd->next = gpsd->prev = NULL;
+
+      BLI_addtail(new_strokes, gpsd);
+
+      /* cleanup + reset for next */
+      start_idx = -1;
     }
   }
 }
@@ -923,7 +986,6 @@ static void gpencil_duplicate_points(bGPdata *gpd,
 static int gpencil_duplicate_exec(bContext *C, wmOperator *op)
 {
   bGPdata *gpd = ED_gpencil_data_get_active(C);
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
 
   if (gpd == NULL) {
     BKE_report(op->reports, RPT_ERROR, "No Grease Pencil data");
@@ -936,74 +998,108 @@ static int gpencil_duplicate_exec(bContext *C, wmOperator *op)
   }
 
   bool changed = false;
-  if (is_curve_edit) {
-    BKE_report(op->reports, RPT_ERROR, "Not implemented!");
-  }
-  else {
-    /* for each visible (and editable) layer's selected strokes,
-     * copy the strokes into a temporary buffer, then append
-     * once all done
-     */
-    CTX_DATA_BEGIN (C, bGPDlayer *, gpl, editable_gpencil_layers) {
-      ListBase new_strokes = {NULL, NULL};
-      bGPDframe *gpf = gpl->actframe;
-      bGPDstroke *gps;
+  /* for each visible (and editable) layer's selected strokes,
+   * copy the strokes into a temporary buffer, then append
+   * once all done
+   */
+  CTX_DATA_BEGIN (C, bGPDlayer *, gpl, editable_gpencil_layers) {
+    ListBase new_strokes = {NULL, NULL};
+    bGPDframe *gpf = gpl->actframe;
 
-      if (gpf == NULL) {
+    if (gpf == NULL) {
+      continue;
+    }
+
+    /* make copies of selected strokes, and deselect these once we're done */
+    LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+      /* skip strokes that are invalid for current view */
+      if (ED_gpencil_stroke_can_use(C, gps) == false) {
         continue;
       }
 
-      /* make copies of selected strokes, and deselect these once we're done */
-      for (gps = gpf->strokes.first; gps; gps = gps->next) {
-        /* skip strokes that are invalid for current view */
-        if (ED_gpencil_stroke_can_use(C, gps) == false) {
+      if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+        bGPDcurve *gpc = gps->editcurve;
+        if ((gpc->flag & GP_CURVE_SELECT) == 0) {
           continue;
         }
 
-        if (gps->flag & GP_STROKE_SELECT) {
-          if (gps->totpoints == 1) {
-            /* Special Case: If there's just a single point in this stroke... */
-            bGPDstroke *gpsd;
+        if (gpc->tot_curve_points == 1) {
+          /* Special Case: If there's just a single point in this stroke... */
+          bGPDstroke *gpsd;
 
-            /* make direct copies of the stroke and its points */
-            gpsd = BKE_gpencil_stroke_duplicate(gps, true, true);
+          /* make direct copies of the stroke and its points */
+          gpsd = BKE_gpencil_stroke_duplicate(gps, true, true);
 
-            BLI_strncpy(
-                gpsd->runtime.tmp_layerinfo, gpl->info, sizeof(gpsd->runtime.tmp_layerinfo));
+          BLI_strncpy(gpsd->runtime.tmp_layerinfo, gpl->info, sizeof(gpsd->runtime.tmp_layerinfo));
 
-            /* Initialize triangle information. */
-            BKE_gpencil_stroke_geometry_update(gpd, gpsd);
+          /* Initialize triangle information. */
+          BKE_gpencil_stroke_geometry_update(gpd, gpsd);
 
-            /* add to temp buffer */
-            gpsd->next = gpsd->prev = NULL;
-            BLI_addtail(&new_strokes, gpsd);
-          }
-          else {
-            /* delegate to a helper, as there's too much to fit in here (for copying subsets)... */
-            gpencil_duplicate_points(gpd, gps, &new_strokes, gpl->info);
-          }
-
-          /* deselect original stroke, or else the originals get moved too
-           * (when using the copy + move macro)
-           */
-          bGPDspoint *pt;
-          int i;
-          for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-            pt->flag &= ~GP_SPOINT_SELECT;
-          }
-          gps->flag &= ~GP_STROKE_SELECT;
-          BKE_gpencil_stroke_select_index_reset(gps);
-
-          changed = true;
+          /* add to temp buffer */
+          gpsd->next = gpsd->prev = NULL;
+          BLI_addtail(&new_strokes, gpsd);
         }
-      }
+        else {
+          gpencil_duplicate_points(gpd, gps, &new_strokes, gpl->info);
+        }
 
-      /* add all new strokes in temp buffer to the frame (preventing double-copies) */
-      BLI_movelisttolist(&gpf->strokes, &new_strokes);
-      BLI_assert(new_strokes.first == NULL);
+        /* Deselect the points */
+        for (uint32_t i = 0; i < gpc->tot_curve_points; i++) {
+          bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
+          BezTriple *bezt = &gpc_pt->bezt;
+          gpc_pt->flag &= ~GP_CURVE_POINT_SELECT;
+          BEZT_DESEL_ALL(bezt);
+        }
+        gpc->flag &= ~GP_CURVE_SELECT;
+        BKE_gpencil_stroke_select_index_reset(gps);
+
+        changed = true;
+      }
+      else {
+        if ((gps->flag & GP_STROKE_SELECT) == 0) {
+          continue;
+        }
+
+        if (gps->totpoints == 1) {
+          /* Special Case: If there's just a single point in this stroke... */
+          bGPDstroke *gpsd;
+
+          /* make direct copies of the stroke and its points */
+          gpsd = BKE_gpencil_stroke_duplicate(gps, true, true);
+
+          BLI_strncpy(gpsd->runtime.tmp_layerinfo, gpl->info, sizeof(gpsd->runtime.tmp_layerinfo));
+
+          /* Initialize triangle information. */
+          BKE_gpencil_stroke_geometry_update(gpd, gpsd);
+
+          /* add to temp buffer */
+          gpsd->next = gpsd->prev = NULL;
+          BLI_addtail(&new_strokes, gpsd);
+        }
+        else {
+          /* delegate to a helper, as there's too much to fit in here (for copying subsets)... */
+          gpencil_duplicate_points(gpd, gps, &new_strokes, gpl->info);
+        }
+
+        /* deselect original stroke, or else the originals get moved too
+         * (when using the copy + move macro)
+         */
+        for (int i = 0; i < gps->totpoints; i++) {
+          bGPDspoint *pt = &gps->points[i];
+          pt->flag &= ~GP_SPOINT_SELECT;
+        }
+        gps->flag &= ~GP_STROKE_SELECT;
+        BKE_gpencil_stroke_select_index_reset(gps);
+
+        changed = true;
+      }
     }
-    CTX_DATA_END;
+
+    /* add all new strokes in temp buffer to the frame (preventing double-copies) */
+    BLI_movelisttolist(&gpf->strokes, &new_strokes);
+    BLI_assert(new_strokes.first == NULL);
   }
+  CTX_DATA_END;
 
   if (changed) {
     /* updates */
