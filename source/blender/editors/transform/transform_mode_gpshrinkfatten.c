@@ -73,16 +73,16 @@ static void applyGPShrinkFatten(TransInfo *t, const int UNUSED(mval[2]))
   bool recalc = false;
   FOREACH_TRANS_DATA_CONTAINER (t, tc) {
     TransData *td = tc->data;
-    bGPdata *gpd = td->ob->data;
-    const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
-    /* Only recalculate data when in curve edit mode. */
-    if (is_curve_edit) {
-      recalc = true;
-    }
 
     for (i = 0; i < tc->data_len; i++, td++) {
       if (td->flag & TD_SKIP) {
         continue;
+      }
+
+      /* Only recalculate data for bezier strokes. */
+      bGPDstroke *gps = td->extra;
+      if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+        recalc = true;
       }
 
       if (td->val) {
