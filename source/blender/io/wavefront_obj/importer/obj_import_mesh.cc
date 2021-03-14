@@ -41,6 +41,7 @@
 #include "bmesh_tools.h"
 
 #include "DNA_customdata_types.h"
+#include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
@@ -382,12 +383,9 @@ void MeshFromGeometry::create_materials(
 
     const MTLMaterial &curr_mat = *materials.lookup_as(material_name);
     ShaderNodetreeWrap mat_wrap{bmain, curr_mat};
-/* TODO howardt: fix this. */
-#if 0
     mat->use_nodes = true;
     mat->nodetree = mat_wrap.get_nodetree();
     ntreeUpdateTree(bmain, mat->nodetree);
-#endif
   }
 }
 

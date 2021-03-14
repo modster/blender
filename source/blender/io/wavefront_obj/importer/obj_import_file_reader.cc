@@ -550,13 +550,14 @@ void MTLParser::parse_and_store(Map<string, std::unique_ptr<MTLMaterial>> &r_mtl
     /* Parse image textures. */
     else if (line_key.find("map_") != StringRef::not_found) {
       /* TODO howardt: fix this */
-#if 0
-      if (!current_mtlmaterial->texture_maps.contains_as(string(line_key))) {
+      eMTLSyntaxElement line_key_enum = mtl_line_key_str_to_enum(line_key);
+      if (line_key_enum == eMTLSyntaxElement::string ||
+          !current_mtlmaterial->texture_maps.contains_as(line_key_enum)) {
         /* No supported texture map found. */
         std::cerr << "Texture map type not supported:'" << line_key << "'" << std::endl;
         continue;
       }
-      tex_map_XX &tex_map = current_mtlmaterial->texture_maps.lookup(string(line_key));
+      tex_map_XX &tex_map = current_mtlmaterial->texture_maps.lookup(line_key_enum);
       Vector<StringRef> str_map_xx_split;
       split_by_char(rest_line, ' ', str_map_xx_split);
 
@@ -596,7 +597,6 @@ void MTLParser::parse_and_store(Map<string, std::unique_ptr<MTLMaterial>> &r_mtl
       /* Skip all unsupported options and arguments. */
       tex_map.image_path = string(skip_unsupported_options(rest_line));
       tex_map.mtl_dir_path = mtl_dir_path_;
-#endif
     }
   }
 }
