@@ -2887,7 +2887,6 @@ static int gpencil_snap_to_grid(bContext *C, wmOperator *UNUSED(op))
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   Object *obact = CTX_data_active_object(C);
   const float gridf = ED_view3d_grid_view_scale(scene, v3d, region, NULL);
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
 
   bool changed = false;
   LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
@@ -2909,39 +2908,60 @@ static int gpencil_snap_to_grid(bContext *C, wmOperator *UNUSED(op))
           continue;
         }
 
-        if (is_curve_edit) {
-          if (gps->editcurve == NULL) {
+        if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+          bGPDcurve *gpc = gps->editcurve;
+          if ((gpc->flag & GP_CURVE_SELECT) == 0) {
             continue;
           }
           float inv_diff_mat[4][4];
           invert_m4_m4_safe(inv_diff_mat, diff_mat);
 
-          bGPDcurve *gpc = gps->editcurve;
           for (int i = 0; i < gpc->tot_curve_points; i++) {
             bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
             BezTriple *bezt = &gpc_pt->bezt;
             if (gpc_pt->flag & GP_CURVE_POINT_SELECT) {
-              float tmp0[3], tmp1[3], tmp2[3], offset[3];
-              mul_v3_m4v3(tmp0, diff_mat, bezt->vec[0]);
-              mul_v3_m4v3(tmp1, diff_mat, bezt->vec[1]);
-              mul_v3_m4v3(tmp2, diff_mat, bezt->vec[2]);
+              /* We move the entire handle if the control point is selected. */
+              if (bezt->f2 & SELECT) {
+                float tmp[3], offset[3];
+                mul_v3_m4v3(tmp, diff_mat, bezt->vec[1]);
 
-              /* calculate the offset vector */
-              offset[0] = gridf * floorf(0.5f + tmp1[0] / gridf) - tmp1[0];
-              offset[1] = gridf * floorf(0.5f + tmp1[1] / gridf) - tmp1[1];
-              offset[2] = gridf * floorf(0.5f + tmp1[2] / gridf) - tmp1[2];
+                /* calculate the offset vector */
+                offset[0] = gridf * floorf(0.5f + tmp[0] / gridf) - tmp[0];
+                offset[1] = gridf * floorf(0.5f + tmp[1] / gridf) - tmp[1];
+                offset[2] = gridf * floorf(0.5f + tmp[2] / gridf) - tmp[2];
 
-              /* shift bezTriple */
-              add_v3_v3(bezt->vec[0], offset);
-              add_v3_v3(bezt->vec[1], offset);
-              add_v3_v3(bezt->vec[2], offset);
+                /* shift bezTriple */
+                add_v3_v3(bezt->vec[0], offset);
+                add_v3_v3(bezt->vec[1], offset);
+                add_v3_v3(bezt->vec[2], offset);
 
-              mul_v3_m4v3(tmp0, inv_diff_mat, bezt->vec[0]);
-              mul_v3_m4v3(tmp1, inv_diff_mat, bezt->vec[1]);
-              mul_v3_m4v3(tmp2, inv_diff_mat, bezt->vec[2]);
-              copy_v3_v3(bezt->vec[0], tmp0);
-              copy_v3_v3(bezt->vec[1], tmp1);
-              copy_v3_v3(bezt->vec[2], tmp2);
+                mul_v3_m4v3(bezt->vec[0], inv_diff_mat, bezt->vec[0]);
+                mul_v3_m4v3(bezt->vec[1], inv_diff_mat, bezt->vec[1]);
+                mul_v3_m4v3(bezt->vec[2], inv_diff_mat, bezt->vec[2]);
+              }
+              else {
+                /* Move the handles to the grid individually. */
+                float tmp0[3], tmp1[3];
+                mul_v3_m4v3(tmp0, diff_mat, bezt->vec[0]);
+                mul_v3_m4v3(tmp1, diff_mat, bezt->vec[2]);
+
+                /* Calculate nearest point on the grid. */
+                tmp0[0] = gridf * floorf(0.5f + tmp0[0] / gridf);
+                tmp0[1] = gridf * floorf(0.5f + tmp0[1] / gridf);
+                tmp0[2] = gridf * floorf(0.5f + tmp0[2] / gridf);
+
+                tmp1[0] = gridf * floorf(0.5f + tmp1[0] / gridf);
+                tmp1[1] = gridf * floorf(0.5f + tmp1[1] / gridf);
+                tmp1[2] = gridf * floorf(0.5f + tmp1[2] / gridf);
+
+                /* Write to the selected handles. */
+                if (bezt->f1 & SELECT) {
+                  mul_v3_m4v3(bezt->vec[0], inv_diff_mat, tmp0);
+                }
+                if (bezt->f3 & SELECT) {
+                  mul_v3_m4v3(bezt->vec[2], inv_diff_mat, tmp1);
+                }
+              }
 
               changed = true;
             }
@@ -2954,6 +2974,9 @@ static int gpencil_snap_to_grid(bContext *C, wmOperator *UNUSED(op))
           }
         }
         else {
+          if ((gps->flag & GP_STROKE_SELECT) == 0) {
+            continue;
+          }
           /* TODO: if entire stroke is selected, offset entire stroke by same amount? */
           for (int i = 0; i < gps->totpoints; i++) {
             bGPDspoint *pt = &gps->points[i];
