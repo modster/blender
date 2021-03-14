@@ -3226,9 +3226,6 @@ static bool gpencil_stroke_points_centroid(Depsgraph *depsgraph,
       BKE_gpencil_layer_transform_matrix_get(depsgraph, obact, gpl, diff_mat);
 
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-        bGPDspoint *pt;
-        int i;
-
         /* skip strokes that are invalid for current view */
         if (ED_gpencil_stroke_can_use(C, gps) == false) {
           continue;
@@ -3237,13 +3234,45 @@ static bool gpencil_stroke_points_centroid(Depsgraph *depsgraph,
         if (ED_gpencil_stroke_material_editable(obact, gpl, gps) == false) {
           continue;
         }
-        /* only continue if this stroke is selected (editable doesn't guarantee this)... */
-        if ((gps->flag & GP_STROKE_SELECT) == 0) {
-          continue;
-        }
 
-        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-          if (pt->flag & GP_SPOINT_SELECT) {
+        if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+          bGPDcurve *gpc = gps->editcurve;
+          if ((gpc->flag & GP_CURVE_SELECT) == 0) {
+            continue;
+          }
+
+          for (int i = 0; i < gpc->tot_curve_points; i++) {
+            bGPDcurve_point *cpt = &gpc->curve_points[i];
+            BezTriple *bezt = &cpt->bezt;
+            if ((cpt->flag * GP_CURVE_POINT_SELECT) == 0) {
+              continue;
+            }
+
+            float fpt[3];
+            for (int j = 0; j < 3; j++) {
+              if (BEZT_ISSEL_IDX(bezt, j)) {
+                mul_v3_m4v3(fpt, diff_mat, bezt->vec[j]);
+
+                add_v3_v3(r_centroid, fpt);
+                minmax_v3v3_v3(r_min, r_max, fpt);
+                (*count)++;
+              }
+            }
+          }
+
+          changed = true;
+        }
+        else {
+          /* only continue if this stroke is selected (editable doesn't guarantee this)... */
+          if ((gps->flag & GP_STROKE_SELECT) == 0) {
+            continue;
+          }
+
+          for (int i = 0; i < gps->totpoints; i++) {
+            bGPDspoint *pt = &gps->points[i];
+            if ((pt->flag & GP_SPOINT_SELECT) == 0) {
+              continue;
+            }
             /* apply parent transformations */
             float fpt[3];
             mul_v3_m4v3(fpt, diff_mat, &pt->x);
@@ -3253,9 +3282,8 @@ static bool gpencil_stroke_points_centroid(Depsgraph *depsgraph,
 
             (*count)++;
           }
+          changed = true;
         }
-
-        changed = true;
       }
     }
   }
@@ -3263,12 +3291,11 @@ static bool gpencil_stroke_points_centroid(Depsgraph *depsgraph,
   return changed;
 }
 
-static int gpencil_snap_cursor_to_sel(bContext *C, wmOperator *op)
+static int gpencil_snap_cursor_to_sel(bContext *C, wmOperator *UNUSED(op))
 {
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   Object *obact = CTX_data_active_object(C);
   bGPdata *gpd = ED_gpencil_data_get_active(C);
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
 
   Scene *scene = CTX_data_scene(C);
 
@@ -3280,12 +3307,7 @@ static int gpencil_snap_cursor_to_sel(bContext *C, wmOperator *op)
   INIT_MINMAX(min, max);
 
   bool changed = false;
-  if (is_curve_edit) {
-    BKE_report(op->reports, RPT_ERROR, "Not implemented!");
-  }
-  else {
-    changed = gpencil_stroke_points_centroid(depsgraph, C, obact, gpd, centroid, min, max, &count);
-  }
+  changed = gpencil_stroke_points_centroid(depsgraph, C, obact, gpd, centroid, min, max, &count);
 
   if (changed) {
     if (scene->toolsettings->transform_pivot_point == V3D_AROUND_CENTER_BOUNDS) {
