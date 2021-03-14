@@ -3035,7 +3035,6 @@ void GPENCIL_OT_snap_to_grid(wmOperatorType *ot)
 static int gpencil_snap_to_cursor(bContext *C, wmOperator *op)
 {
   bGPdata *gpd = ED_gpencil_data_get_active(C);
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
   Scene *scene = CTX_data_scene(C);
   Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
   Object *obact = CTX_data_active_object(C);
@@ -3044,53 +3043,118 @@ static int gpencil_snap_to_cursor(bContext *C, wmOperator *op)
   const float *cursor_global = scene->cursor.location;
 
   bool changed = false;
-  if (is_curve_edit) {
-    BKE_report(op->reports, RPT_ERROR, "Not implemented!");
-  }
-  else {
-    LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
-      /* only editable and visible layers are considered */
-      if (BKE_gpencil_layer_is_editable(gpl) && (gpl->actframe != NULL)) {
-        bGPDframe *gpf = gpl->actframe;
-        float diff_mat[4][4];
+  LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
+    /* only editable and visible layers are considered */
+    if (BKE_gpencil_layer_is_editable(gpl) && (gpl->actframe != NULL)) {
+      bGPDframe *gpf = gpl->actframe;
+      float diff_mat[4][4];
 
-        /* calculate difference matrix */
-        BKE_gpencil_layer_transform_matrix_get(depsgraph, obact, gpl, diff_mat);
+      /* calculate difference matrix */
+      BKE_gpencil_layer_transform_matrix_get(depsgraph, obact, gpl, diff_mat);
 
-        LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-          bGPDspoint *pt;
-          int i;
+      LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+        /* skip strokes that are invalid for current view */
+        if (ED_gpencil_stroke_can_use(C, gps) == false) {
+          continue;
+        }
+        /* check if the color is editable */
+        if (ED_gpencil_stroke_material_editable(obact, gpl, gps) == false) {
+          continue;
+        }
 
-          /* skip strokes that are invalid for current view */
-          if (ED_gpencil_stroke_can_use(C, gps) == false) {
-            continue;
+        bool is_stroke_selected = GPENCIL_STROKE_TYPE_BEZIER(gps) ?
+                                      (bool)(gps->editcurve->flag & GP_CURVE_SELECT) :
+                                      (bool)(gps->flag & GP_STROKE_SELECT);
+
+        /* only continue if this stroke is selected (editable doesn't guarantee this)... */
+        if ((is_stroke_selected) == 0) {
+          continue;
+        }
+
+        if (use_offset) {
+          /* TODO: Allow using midpoint instead? */
+          float offset[3];
+
+          /* To avoid recalculating the curve, we will offset the curve data first and then all the
+           * stroke points. */
+          if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+            float tmp[3];
+            bGPDcurve *gpc = gps->editcurve;
+            /* Calculate offset. */
+            mul_v3_m4v3(tmp, diff_mat, gpc->curve_points->bezt.vec[1]);
+            sub_v3_v3v3(offset, cursor_global, tmp);
+
+            /* Offset points. */
+            for (int i = 0; i < gpc->tot_curve_points; i++) {
+              bGPDcurve_point *cpt = &gpc->curve_points[i];
+              BezTriple *bezt = &cpt->bezt;
+              for (int j = 0; j < 3; j++) {
+                add_v3_v3(bezt->vec[j], offset);
+              }
+            }
           }
-          /* check if the color is editable */
-          if (ED_gpencil_stroke_material_editable(obact, gpl, gps) == false) {
-            continue;
-          }
-          /* only continue if this stroke is selected (editable doesn't guarantee this)... */
-          if ((gps->flag & GP_STROKE_SELECT) == 0) {
-            continue;
-          }
-
-          if (use_offset) {
-            float offset[3];
-
+          else {
             /* compute offset from first point of stroke to cursor */
-            /* TODO: Allow using midpoint instead? */
             sub_v3_v3v3(offset, cursor_global, &gps->points->x);
+          }
 
-            /* apply offset to all points in the stroke */
-            for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-              add_v3_v3(&pt->x, offset);
+          /* apply offset to all points in the stroke */
+          for (int i = 0; i < gps->totpoints; i++) {
+            bGPDspoint *pt = &gps->points[i];
+            add_v3_v3(&pt->x, offset);
+          }
+
+          changed = true;
+        }
+        else {
+          if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+            float inv_diff_mat[4][4];
+            invert_m4_m4_safe(inv_diff_mat, diff_mat);
+
+            bGPDcurve *gpc = gps->editcurve;
+            for (int i = 0; i < gpc->tot_curve_points; i++) {
+              bGPDcurve_point *cpt = &gpc->curve_points[i];
+              BezTriple *bezt = &cpt->bezt;
+              if ((cpt->flag & GP_CURVE_POINT_SELECT) == 0) {
+                continue;
+              }
+
+              float cur[3];
+              mul_v3_m4v3(cur, inv_diff_mat, cursor_global);
+
+              /* If the control point is selected, snap it to the cursor and offset the handles
+               * accordingly. */
+              if (bezt->f2 & SELECT) {
+                float offset[3];
+                sub_v3_v3v3(offset, cur, bezt->vec[1]);
+
+                for (int j = 0; j < 3; j++) {
+                  add_v3_v3(bezt->vec[j], offset);
+                }
+              }
+              /* Snap the handles to the cursor. */
+              else {
+                if (bezt->f1 & SELECT) {
+                  copy_v3_v3(bezt->vec[0], cur);
+                }
+                if (bezt->f3 & SELECT) {
+                  copy_v3_v3(bezt->vec[2], cur);
+                }
+              }
+
+              changed = true;
             }
 
-            changed = true;
+            if (changed) {
+              BKE_gpencil_editcurve_recalculate_handles(gps);
+              gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
+              BKE_gpencil_stroke_geometry_update(gpd, gps);
+            }
           }
           else {
             /* affect each selected point */
-            for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+            for (int i = 0; i < gps->totpoints; i++) {
+              bGPDspoint *pt = &gps->points[i];
               if (pt->flag & GP_SPOINT_SELECT) {
                 copy_v3_v3(&pt->x, cursor_global);
                 gpencil_apply_parent_point(depsgraph, obact, gpl, pt);
