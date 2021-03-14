@@ -3742,11 +3742,6 @@ static int gpencil_stroke_join_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
-  if (is_curve_edit) {
-    return OPERATOR_CANCELLED;
-  }
-
   if (activegpl->flag & GP_LAYER_LOCKED) {
     return OPERATOR_CANCELLED;
   }
@@ -3766,29 +3761,34 @@ static int gpencil_stroke_join_exec(bContext *C, wmOperator *op)
 
     /* Add all stroke selected of the frame. */
     LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-      if (gps->flag & GP_STROKE_SELECT) {
-        /* skip strokes that are invalid for current view */
-        if (ED_gpencil_stroke_can_use(C, gps) == false) {
-          continue;
-        }
-        /* check if the color is editable. */
-        if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
-          continue;
-        }
-        elem = &strokes_list[tot_strokes];
-        elem->gpf = gpf;
-        elem->gps = gps;
-        elem->used = false;
+      bool is_stroke_selected = GPENCIL_STROKE_TYPE_BEZIER(gps) ?
+                                    (bool)(gps->editcurve->flag & GP_CURVE_SELECT) :
+                                    (bool)(gps->flag & GP_STROKE_SELECT);
 
-        tot_strokes++;
-        /* Limit the number of strokes. */
-        if (tot_strokes == max_join_strokes) {
-          BKE_reportf(op->reports,
-                      RPT_WARNING,
-                      "Too many strokes selected, only joined first %d strokes",
-                      max_join_strokes);
-          break;
-        }
+      if (!is_stroke_selected) {
+        continue;
+      }
+      /* skip strokes that are invalid for current view */
+      if (ED_gpencil_stroke_can_use(C, gps) == false) {
+        continue;
+      }
+      /* check if the color is editable. */
+      if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
+        continue;
+      }
+      elem = &strokes_list[tot_strokes];
+      elem->gpf = gpf;
+      elem->gps = gps;
+      elem->used = false;
+
+      tot_strokes++;
+      /* Limit the number of strokes. */
+      if (tot_strokes == max_join_strokes) {
+        BKE_reportf(op->reports,
+                    RPT_WARNING,
+                    "Too many strokes selected, only joined first %d strokes",
+                    max_join_strokes);
+        break;
       }
     }
   }
@@ -3828,6 +3828,10 @@ static int gpencil_stroke_join_exec(bContext *C, wmOperator *op)
   if (type == GP_STROKE_JOIN) {
     for (int i = 0; i < tot_strokes; i++) {
       elem = &strokes_list[i];
+      if (GPENCIL_STROKE_TYPE_BEZIER(elem->gps) != GPENCIL_STROKE_TYPE_BEZIER(gps_new)) {
+        continue;
+      }
+
       BLI_remlink(&elem->gpf->strokes, elem->gps);
       BKE_gpencil_free_stroke(elem->gps);
     }

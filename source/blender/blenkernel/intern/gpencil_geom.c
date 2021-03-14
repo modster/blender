@@ -2679,49 +2679,108 @@ void BKE_gpencil_stroke_set_random_color(bGPDstroke *gps)
   }
 }
 
+static void gpencil_flip_beztriple(BezTriple *bezt)
+{
+  /* Flip handle position. */
+  float tmp[3];
+  copy_v3_v3(tmp, bezt->vec[0]);
+  copy_v3_v3(bezt->vec[0], bezt->vec[2]);
+  copy_v3_v3(bezt->vec[2], tmp);
+
+  /* Flip type and slection flag. */
+  SWAP(uint8_t, bezt->h1, bezt->h2);
+  SWAP(uint8_t, bezt->f1, bezt->f3);
+}
+
 /* Flip stroke. */
 void BKE_gpencil_stroke_flip(bGPDstroke *gps)
 {
-  int end = gps->totpoints - 1;
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+    bGPDcurve *gpc = gps->editcurve;
 
-  for (int i = 0; i < gps->totpoints / 2; i++) {
-    bGPDspoint *point, *point2;
-    bGPDspoint pt;
+    int end = gpc->tot_curve_points - 1;
+    for (int i = 0; i < gpc->tot_curve_points / 2; i++) {
+      bGPDcurve_point *cpt_first = &gpc->curve_points[i];
+      bGPDcurve_point *cpt_last = &gpc->curve_points[end];
+      bGPDcurve_point temp;
 
-    /* save first point */
-    point = &gps->points[i];
-    pt.x = point->x;
-    pt.y = point->y;
-    pt.z = point->z;
-    pt.flag = point->flag;
-    pt.pressure = point->pressure;
-    pt.strength = point->strength;
-    pt.time = point->time;
-    copy_v4_v4(pt.vert_color, point->vert_color);
+      memcpy(&temp.bezt, &cpt_first->bezt, sizeof(BezTriple));
+      temp.pressure = cpt_first->pressure;
+      temp.strength = cpt_first->strength;
+      temp.point_index = cpt_first->point_index;
+      temp.flag = cpt_first->flag;
+      temp.uv_fac = cpt_first->uv_fac;
+      temp.uv_rot = cpt_first->uv_rot;
+      copy_v2_v2(temp.uv_fill, cpt_first->uv_fill);
+      copy_v4_v4(temp.vert_color, cpt_first->vert_color);
 
-    /* replace first point with last point */
-    point2 = &gps->points[end];
-    point->x = point2->x;
-    point->y = point2->y;
-    point->z = point2->z;
-    point->flag = point2->flag;
-    point->pressure = point2->pressure;
-    point->strength = point2->strength;
-    point->time = point2->time;
-    copy_v4_v4(point->vert_color, point2->vert_color);
+      memcpy(&cpt_first->bezt, &cpt_last->bezt, sizeof(BezTriple));
+      gpencil_flip_beztriple(&cpt_first->bezt);
+      cpt_first->pressure = cpt_last->pressure;
+      cpt_first->strength = cpt_last->strength;
+      cpt_first->point_index = cpt_last->point_index;
+      cpt_first->flag = cpt_last->flag;
+      cpt_first->uv_fac = cpt_last->uv_fac;
+      cpt_first->uv_rot = cpt_last->uv_rot;
+      copy_v2_v2(cpt_first->uv_fill, cpt_last->uv_fill);
+      copy_v4_v4(cpt_first->vert_color, cpt_last->vert_color);
 
-    /* replace last point with first saved before */
-    point = &gps->points[end];
-    point->x = pt.x;
-    point->y = pt.y;
-    point->z = pt.z;
-    point->flag = pt.flag;
-    point->pressure = pt.pressure;
-    point->strength = pt.strength;
-    point->time = pt.time;
-    copy_v4_v4(point->vert_color, pt.vert_color);
+      memcpy(&cpt_last->bezt, &temp.bezt, sizeof(BezTriple));
+      gpencil_flip_beztriple(&cpt_last->bezt);
+      cpt_last->pressure = temp.pressure;
+      cpt_last->strength = temp.strength;
+      cpt_last->point_index = temp.point_index;
+      cpt_last->flag = temp.flag;
+      cpt_last->uv_fac = temp.uv_fac;
+      cpt_last->uv_rot = temp.uv_rot;
+      copy_v2_v2(cpt_last->uv_fill, temp.uv_fill);
+      copy_v4_v4(cpt_last->vert_color, temp.vert_color);
 
-    end--;
+      end--;
+    }
+  }
+  else {
+    int end = gps->totpoints - 1;
+
+    for (int i = 0; i < gps->totpoints / 2; i++) {
+      bGPDspoint *point, *point2;
+      bGPDspoint pt;
+
+      /* save first point */
+      point = &gps->points[i];
+      pt.x = point->x;
+      pt.y = point->y;
+      pt.z = point->z;
+      pt.flag = point->flag;
+      pt.pressure = point->pressure;
+      pt.strength = point->strength;
+      pt.time = point->time;
+      copy_v4_v4(pt.vert_color, point->vert_color);
+
+      /* replace first point with last point */
+      point2 = &gps->points[end];
+      point->x = point2->x;
+      point->y = point2->y;
+      point->z = point2->z;
+      point->flag = point2->flag;
+      point->pressure = point2->pressure;
+      point->strength = point2->strength;
+      point->time = point2->time;
+      copy_v4_v4(point->vert_color, point2->vert_color);
+
+      /* replace last point with first saved before */
+      point = &gps->points[end];
+      point->x = pt.x;
+      point->y = pt.y;
+      point->z = pt.z;
+      point->flag = pt.flag;
+      point->pressure = pt.pressure;
+      point->strength = pt.strength;
+      point->time = pt.time;
+      copy_v4_v4(point->vert_color, pt.vert_color);
+
+      end--;
+    }
   }
 }
 
@@ -3149,12 +3208,16 @@ void BKE_gpencil_stroke_join(bGPDstroke *gps_a,
 {
   bGPDspoint point;
   bGPDspoint *pt;
-  int i;
   const float delta[3] = {1.0f, 1.0f, 1.0f};
   float deltatime = 0.0f;
 
   /* sanity checks */
   if (ELEM(NULL, gps_a, gps_b)) {
+    return;
+  }
+
+  /* Cannot join strokes of different types for now... */
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps_a) != GPENCIL_STROKE_TYPE_BEZIER(gps_b)) {
     return;
   }
 
@@ -3210,28 +3273,54 @@ void BKE_gpencil_stroke_join(bGPDstroke *gps_a,
     BKE_gpencil_stroke_flip(gps_b);
   }
 
-  /* don't visibly link the first and last points? */
-  if (leave_gaps) {
-    /* 1st: add one tail point to start invisible area */
-    point = gps_a->points[gps_a->totpoints - 1];
-    deltatime = point.time;
+  const float thickness_ratio = (fit_thickness && gps_a->thickness > 0.0f) ?
+                                    (float)gps_b->thickness / (float)gps_a->thickness :
+                                    1.0f;
 
-    gpencil_stroke_copy_point(gps_a, NULL, &point, delta, 0.0f, 0.0f, 0.0f);
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps_a)) {
+    /* TODO: Support leave gaps. */
+    bGPDcurve *gpc_a = gps_a->editcurve;
+    bGPDcurve *gpc_b = gps_b->editcurve;
 
-    /* 2nd: add one head point to finish invisible area */
-    point = gps_b->points[0];
-    gpencil_stroke_copy_point(gps_a, NULL, &point, delta, 0.0f, 0.0f, deltatime);
+    int old_num_points = gpc_a->tot_curve_points;
+    gpc_a->tot_curve_points += gpc_b->tot_curve_points;
+    gpc_a->curve_points = MEM_recallocN(gpc_a->curve_points,
+                                        sizeof(bGPDcurve_point) * gpc_a->tot_curve_points);
+
+    memcpy(gpc_a->curve_points + old_num_points,
+           gpc_b->curve_points,
+           sizeof(bGPDcurve_point) * gpc_b->tot_curve_points);
+    /* TODO: copy dvert curve data. */
+
+    /* Rescale other points. */
+    for (int i = old_num_points; i < gpc_a->tot_curve_points; i++) {
+      bGPDcurve_point *cpt = &gpc_a->curve_points[i];
+      cpt->pressure *= thickness_ratio;
+    }
+
+    gps_a->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
   }
+  else {
+    /* don't visibly link the first and last points? */
+    if (leave_gaps) {
+      /* 1st: add one tail point to start invisible area */
+      point = gps_a->points[gps_a->totpoints - 1];
+      deltatime = point.time;
 
-  const float ratio = (fit_thickness && gps_a->thickness > 0.0f) ?
-                          (float)gps_b->thickness / (float)gps_a->thickness :
-                          1.0f;
+      gpencil_stroke_copy_point(gps_a, NULL, &point, delta, 0.0f, 0.0f, 0.0f);
 
-  /* 3rd: add all points */
-  for (i = 0, pt = gps_b->points; i < gps_b->totpoints && pt; i++, pt++) {
-    MDeformVert *dvert = (gps_b->dvert) ? &gps_b->dvert[i] : NULL;
-    gpencil_stroke_copy_point(
-        gps_a, dvert, pt, delta, pt->pressure * ratio, pt->strength, deltatime);
+      /* 2nd: add one head point to finish invisible area */
+      point = gps_b->points[0];
+      gpencil_stroke_copy_point(gps_a, NULL, &point, delta, 0.0f, 0.0f, deltatime);
+    }
+
+    /* 3rd: add all points */
+    for (int i = 0; i < gps_b->totpoints && pt; i++) {
+      pt = &gps_b->points[i];
+      MDeformVert *dvert = (gps_b->dvert) ? &gps_b->dvert[i] : NULL;
+      gpencil_stroke_copy_point(
+          gps_a, dvert, pt, delta, pt->pressure * thickness_ratio, pt->strength, deltatime);
+    }
   }
 }
 
