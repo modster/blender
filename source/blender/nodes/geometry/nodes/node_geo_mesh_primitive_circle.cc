@@ -196,8 +196,6 @@ static Mesh *create_circle_mesh(const float radius,
     }
   }
 
-  BLI_assert(BKE_mesh_is_valid(mesh));
-
   return mesh;
 }
 
@@ -220,6 +218,7 @@ static void geo_node_mesh_primitive_circle_exec(GeoNodeExecParams params)
   const float3 rotation = params.extract_input<float3>("Rotation");
 
   Mesh *mesh = create_circle_mesh(radius, verts_num, fill_type);
+
   BLI_assert(BKE_mesh_is_valid(mesh));
 
   if (!location.is_zero() || !rotation.is_zero()) {
