@@ -732,24 +732,25 @@ static void rna_XrSessionState_controller_pose1_rotation_get(PointerRNA *ptr, fl
 #  endif
 }
 
-static XrActionMapItem *rna_XrActionMapItem_new(XrActionMap *am, const char *idname)
+static XrActionMapItem *rna_XrActionMapItem_new(XrActionMap *am,
+                                                const char *idname,
+                                                bool replace_existing)
 {
 #  ifdef WITH_XR_OPENXR
-  return WM_xr_actionmap_item_ensure(am, idname);
+  return WM_xr_actionmap_item_new(am, idname, replace_existing);
 #  else
-  UNUSED_VARS(am, idname);
+  UNUSED_VARS(am, idname, replace_existing);
   return NULL;
 #  endif
 }
 
 static XrActionMapItem *rna_XrActionMapItem_new_from_item(XrActionMap *am,
-                                                          const char *idname,
                                                           XrActionMapItem *ami_src)
 {
 #  ifdef WITH_XR_OPENXR
-  return WM_xr_actionmap_item_add_copy(am, idname, ami_src);
+  return WM_xr_actionmap_item_add_copy(am, ami_src);
 #  else
-  UNUSED_VARS(am, idname, ami_src);
+  UNUSED_VARS(am, ami_src);
   return NULL;
 #  endif
 }
@@ -795,6 +796,26 @@ static PointerRNA rna_XrActionMapItem_op_properties_get(PointerRNA *ptr)
   return PointerRNA_NULL;
 }
 
+static void rna_XrActionMapItem_name_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  wmWindowManager *wm = bmain->wm.first;
+  if (wm) {
+    XrSessionSettings *settings = &wm->xr.session_settings;
+    XrActionConfig *actionconf = WM_xr_actionconfig_active_get(settings);
+    if (actionconf) {
+      XrActionMap *actionmap = BLI_findlink(&actionconf->actionmaps, actionconf->selactionmap);
+      if (actionmap) {
+        XrActionMapItem *ami = ptr->data;
+        WM_xr_actionmap_item_ensure_unique(actionmap, ami);
+      }
+    }
+  }
+#  else
+  UNUSED_VARS(bmain, ptr);
+#  endif
+}
+
 static void rna_XrActionMapItem_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 #  ifdef WITH_XR_OPENXR
@@ -805,24 +826,25 @@ static void rna_XrActionMapItem_update(Main *UNUSED(bmain), Scene *UNUSED(scene)
 #  endif
 }
 
-static XrActionMap *rna_XrActionMap_new(XrActionConfig *actionconf, const char *idname)
+static XrActionMap *rna_XrActionMap_new(XrActionConfig *actionconf,
+                                        const char *idname,
+                                        bool replace_existing)
 {
 #  ifdef WITH_XR_OPENXR
-  return WM_xr_actionmap_ensure(actionconf, idname);
+  return WM_xr_actionmap_new(actionconf, idname, replace_existing);
 #  else
-  UNUSED_VARS(actionconf, idname);
+  UNUSED_VARS(actionconf, idname, replace_existing);
   return NULL;
 #  endif
 }
 
 static XrActionMap *rna_XrActionMap_new_from_actionmap(XrActionConfig *actionconf,
-                                                       const char *idname,
                                                        XrActionMap *am_src)
 {
 #  ifdef WITH_XR_OPENXR
-  return WM_xr_actionmap_add_copy(actionconf, idname, am_src);
+  return WM_xr_actionmap_add_copy(actionconf, am_src);
 #  else
-  UNUSED_VARS(actionconf, idname, am_src);
+  UNUSED_VARS(actionconf, am_src);
   return NULL;
 #  endif
 }
@@ -853,10 +875,27 @@ static XrActionMap *rna_XrActionMap_find(XrActionConfig *actionconf, const char 
 #  endif
 }
 
+static void rna_XrActionMap_name_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  wmWindowManager *wm = bmain->wm.first;
+  if (wm) {
+    XrSessionSettings *settings = &wm->xr.session_settings;
+    XrActionConfig *actionconf = WM_xr_actionconfig_active_get(settings);
+    if (actionconf) {
+      XrActionMap *actionmap = ptr->data;
+      WM_xr_actionmap_ensure_unique(actionconf, actionmap);
+    }
+  }
+#  else
+  UNUSED_VARS(bmain, ptr);
+#  endif
+}
+
 static XrActionConfig *rna_XrActionConfig_new(XrSessionSettings *settings, const char *name)
 {
 #  ifdef WITH_XR_OPENXR
-  return WM_xr_actionconfig_new_user(settings, name);
+  return WM_xr_actionconfig_new(settings, name, true);
 #  else
   UNUSED_VARS(settings, name);
   return NULL;
@@ -963,12 +1002,16 @@ void RNA_api_xr_actionmapitems(StructRNA *srna)
   func = RNA_def_function(srna, "new", "rna_XrActionMapItem_new");
   parm = RNA_def_string(func, "idname", NULL, 0, "Name of the action map item", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_boolean(func,
+                         "replace_existing",
+                         true,
+                         "Replace Existing",
+                         "Replace any existing item with same name");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_pointer(func, "item", "XrActionMapItem", "Item", "Added action map item");
   RNA_def_function_return(func, parm);
 
   func = RNA_def_function(srna, "new_from_item", "rna_XrActionMapItem_new_from_item");
-  parm = RNA_def_string(func, "idname", NULL, 0, "Name of the action map item", "");
-  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_pointer(func, "item", "XrActionMapItem", "Item", "Item to use as a reference");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
   parm = RNA_def_pointer(func, "result", "XrActionMapItem", "Item", "Added action map item");
@@ -1007,12 +1050,16 @@ void RNA_api_xr_actionmaps(StructRNA *srna)
   func = RNA_def_function(srna, "new", "rna_XrActionMap_new");
   parm = RNA_def_string(func, "name", NULL, XR_ACTIONMAP_MAX_NAME, "Name", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_boolean(func,
+                         "replace_existing",
+                         true,
+                         "Replace Existing",
+                         "Replace any existing actionmap with same name");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_pointer(func, "actionmap", "XrActionMap", "Action Map", "Added action map");
   RNA_def_function_return(func, parm);
 
   func = RNA_def_function(srna, "new_from_actionmap", "rna_XrActionMap_new_from_actionmap");
-  parm = RNA_def_string(func, "name", NULL, XR_ACTIONMAP_MAX_NAME, "Name", "");
-  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_pointer(
       func, "actionmap", "XrActionMap", "Action Map", "Action map to use as a reference");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
@@ -1149,8 +1196,8 @@ static void rna_def_xr_actionconfig(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
   RNA_def_property_string_sdna(prop, NULL, "idname");
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop, "Name", "Name of the action map");
+  RNA_def_property_update(prop, 0, "rna_XrActionMap_name_update");
   RNA_def_struct_name_property(srna, prop);
 
   prop = RNA_def_property(srna, "profile", PROP_STRING, PROP_NONE);
@@ -1175,8 +1222,8 @@ static void rna_def_xr_actionconfig(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
   RNA_def_property_string_sdna(prop, NULL, "idname");
-  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop, "Name", "Name of the action map item");
+  RNA_def_property_update(prop, 0, "rna_XrActionMapItem_name_update");
   RNA_def_struct_name_property(srna, prop);
 
   prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);

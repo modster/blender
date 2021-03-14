@@ -117,9 +117,7 @@ typedef struct XrActionMapItem {
 
 /** #XrActionMapItem.flag */
 enum {
-  XR_AMI_INACTIVE = (1 << 0),
-  XR_AMI_USER_MODIFIED = (1 << 1), /* Actionmap item has user modifications. */
-  XR_AMI_UPDATE = (1 << 2),
+  XR_AMI_UPDATE = (1 << 0),
 };
 
 typedef struct XrActionMap {
@@ -138,9 +136,7 @@ typedef struct XrActionMap {
 
 /** #XrActionMap.flag */
 enum {
-  XR_ACTIONMAP_USER = (1 << 0),          /* User actionmap. */
-  XR_ACTIONMAP_USER_MODIFIED = (1 << 1), /* Actionmap has user modifications. */
-  XR_ACTIONMAP_UPDATE = (1 << 2),
+  XR_ACTIONMAP_UPDATE = (1 << 0),
 };
 
 typedef struct XrActionConfig {
@@ -164,8 +160,6 @@ enum {
 #define XR_ACTIONCONF_MAX_NAME 64
 #define XR_ACTIONMAP_MAX_NAME 64
 #define XR_AMI_MAX_NAME 64
-
-#define XR_ACTIONCONF_STR_DEFAULT "Blender"
 
 /** XR action type. Enum values match those in GHOST_XrActionType enum for consistency. */
 typedef enum eXrActionType {

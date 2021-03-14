@@ -74,8 +74,7 @@ static wmXrAction *action_find(wmXrActionSet *action_set, const char *action_nam
   return actions ? BLI_ghash_lookup(actions, action_name) : NULL;
 }
 
-static wmXrAction *action_create(const char *action_set_name,
-                                 const char *action_name,
+static wmXrAction *action_create(const char *action_name,
                                  eXrActionType type,
                                  unsigned int count_subaction_paths,
                                  const char **subaction_paths,
@@ -268,8 +267,7 @@ bool WM_xr_action_create(wmXrData *xr,
   }
 
   if (!action_find(action_set, action_name)) {
-    wmXrAction *action = action_create(action_set_name,
-                                       action_name,
+    wmXrAction *action = action_create(action_name,
                                        type,
                                        count_subaction_paths,
                                        subaction_paths,

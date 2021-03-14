@@ -852,11 +852,11 @@ static void wm_xr_session_action_set_update(const XrSessionSettings *settings,
     GHashIterator *ghi = BLI_ghashIterator_new(actions);
     GHOST_XrActionInfo *info = infos;
     GHASH_ITER (*ghi, actions) {
-      const wmXrAction *action = BLI_ghashIterator_getValue(ghi);
-      info->name = action->name;
+      wmXrAction *action = BLI_ghashIterator_getValue(ghi);
+      info->name = (const char *)action->name;
       info->type = action->type;
       info->count_subaction_paths = action->count_subaction_paths;
-      info->subaction_paths = action->subaction_paths;
+      info->subaction_paths = (const char **)action->subaction_paths;
       info->states = action->states;
       ++info;
     }

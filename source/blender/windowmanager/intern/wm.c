@@ -110,13 +110,16 @@ static void write_wm_xr_data(BlendWriter *writer, wmXrData *xr_data)
   LISTBASE_FOREACH (XrActionConfig *, ac, &xr_data->session_settings.actionconfigs) {
     BLO_write_struct(writer, XrActionConfig, ac);
 
-    LISTBASE_FOREACH (XrActionMap *, am, &ac->actionmaps) {
-      BLO_write_struct(writer, XrActionMap, am);
+    /* Only write actionmaps for user configs. */
+    if ((ac->flag & XR_ACTIONCONF_USER) != 0) {
+      LISTBASE_FOREACH (XrActionMap *, am, &ac->actionmaps) {
+        BLO_write_struct(writer, XrActionMap, am);
 
-      LISTBASE_FOREACH (XrActionMapItem *, ami, &am->items) {
-        BLO_write_struct(writer, XrActionMapItem, ami);
-        if (ami->op[0] && ami->op_properties) {
-          IDP_BlendWrite(writer, ami->op_properties);
+        LISTBASE_FOREACH (XrActionMapItem *, ami, &am->items) {
+          BLO_write_struct(writer, XrActionMapItem, ami);
+          if (ami->op[0] && ami->op_properties) {
+            IDP_BlendWrite(writer, ami->op_properties);
+          }
         }
       }
     }
@@ -478,6 +481,47 @@ void WM_operator_handlers_clear(wmWindowManager *wm, wmOperatorType *ot)
       }
     }
   }
+}
+
+void WM_xr_actionmap_item_properties_free(XrActionMapItem *ami)
+{
+  if (ami->op_properties_ptr) {
+    WM_operator_properties_free(ami->op_properties_ptr);
+    MEM_freeN(ami->op_properties_ptr);
+    ami->op_properties_ptr = NULL;
+    ami->op_properties = NULL;
+  }
+  else {
+    BLI_assert(ami->op_properties == NULL);
+  }
+}
+
+void WM_xr_actionmap_clear(XrActionMap *actionmap)
+{
+  LISTBASE_FOREACH (XrActionMapItem *, ami, &actionmap->items) {
+    WM_xr_actionmap_item_properties_free(ami);
+  }
+
+  BLI_freelistN(&actionmap->items);
+
+  actionmap->selitem = 0;
+}
+
+void WM_xr_actionconfig_clear(XrActionConfig *actionconf)
+{
+  LISTBASE_FOREACH (XrActionMap *, am, &actionconf->actionmaps) {
+    WM_xr_actionmap_clear(am);
+  }
+
+  BLI_freelistN(&actionconf->actionmaps);
+
+  actionconf->selactionmap = actionconf->actactionmap = 0;
+}
+
+void WM_xr_actionconfig_free(XrActionConfig *actionconf)
+{
+  WM_xr_actionconfig_clear(actionconf);
+  MEM_freeN(actionconf);
 }
 
 /* ****************************************** */

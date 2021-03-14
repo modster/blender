@@ -477,7 +477,7 @@ int WM_event_absolute_delta_y(const struct wmEvent *event)
  * \{ */
 
 void WM_event_xr_data(const wmEvent *event,
-                      char **action_set,
+                      char **actionmap,
                       char **action,
                       char *type,
                       float state[2],
@@ -488,8 +488,8 @@ void WM_event_xr_data(const wmEvent *event,
 {
   const wmXrActionData *data = event->customdata;
 
-  if (action_set) {
-    strcpy(*action_set, data->action_set);
+  if (actionmap) {
+    strcpy(*actionmap, data->actionmap);
   }
   if (action) {
     strcpy(*action, data->action);

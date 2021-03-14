@@ -678,8 +678,8 @@ typedef struct wmNDOFMotionData {
 #endif /* WITH_INPUT_NDOF */
 
 typedef struct wmXrActionData {
-  /** Action set name. */
-  char action_set[64];
+  /** Action map name. */
+  char actionmap[64];
   /** Action name. */
   char action[64];
   /** Type. */

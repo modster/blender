@@ -1050,29 +1050,35 @@ void WM_xr_actionconfig_update(XrSessionSettings *settings);
 XrActionConfig *WM_xr_actionconfig_new(XrSessionSettings *settings,
                                        const char *idname,
                                        bool user_defined);
-XrActionConfig *WM_xr_actionconfig_new_user(XrSessionSettings *settings, const char *idname);
-void WM_xr_actionconfig_clear(XrActionConfig *actionconf);
-void WM_xr_actionconfig_free(XrActionConfig *actionconf);
 bool WM_xr_actionconfig_remove(XrSessionSettings *settings, XrActionConfig *actionconf);
 XrActionConfig *WM_xr_actionconfig_active_get(XrSessionSettings *settings);
 void WM_xr_actionconfig_active_set(XrSessionSettings *settings, const char *idname);
 
-XrActionMap *WM_xr_actionmap_ensure(XrActionConfig *actionconf, const char *idname);
-XrActionMap *WM_xr_actionmap_add_copy(XrActionConfig *actionconf,
-                                      const char *idname,
-                                      XrActionMap *am_src);
-void WM_xr_actionmap_clear(XrActionMap *actionmap);
+XrActionMap *WM_xr_actionmap_new(XrActionConfig *actionconf,
+                                 const char *idname,
+                                 bool replace_existing);
+void WM_xr_actionmap_ensure_unique(XrActionConfig *actionconf, XrActionMap *actionmap);
+XrActionMap *WM_xr_actionmap_add_copy(XrActionConfig *actionconf, XrActionMap *am_src);
 bool WM_xr_actionmap_remove(XrActionConfig *actionconf, XrActionMap *actionmap);
 XrActionMap *WM_xr_actionmap_list_find(ListBase *lb, const char *idname);
 
-XrActionMapItem *WM_xr_actionmap_item_ensure(XrActionMap *actionmap, const char *idname);
-XrActionMapItem *WM_xr_actionmap_item_add_copy(XrActionMap *actionmap,
-                                               const char *idname,
-                                               XrActionMapItem *ami_src);
+XrActionMapItem *WM_xr_actionmap_item_new(XrActionMap *actionmap,
+                                          const char *idname,
+                                          bool replace_existing);
+void WM_xr_actionmap_item_ensure_unique(XrActionMap *actionmap, XrActionMapItem *ami);
+XrActionMapItem *WM_xr_actionmap_item_add_copy(XrActionMap *actionmap, XrActionMapItem *ami_src);
 bool WM_xr_actionmap_item_remove(XrActionMap *actionmap, XrActionMapItem *ami);
 XrActionMapItem *WM_xr_actionmap_item_list_find(ListBase *lb, const char *idname);
 void WM_xr_actionmap_item_properties_update_ot(XrActionMapItem *ami);
 #endif
+
+/* wm.c */
+/* These need to be accessible even when WITH_XR_OPENXR is not defined since actionmaps can be
+ * stored in files. */
+void WM_xr_actionconfig_free(XrActionConfig *actionconf);
+void WM_xr_actionconfig_clear(XrActionConfig *actionconf);
+void WM_xr_actionmap_clear(XrActionMap *actionmap);
+void WM_xr_actionmap_item_properties_free(XrActionMapItem *ami);
 
 #ifdef __cplusplus
 }

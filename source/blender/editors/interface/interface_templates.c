@@ -7020,11 +7020,13 @@ void uiTemplateKeymapItemProperties(uiLayout *layout, PointerRNA *ptr)
 /** \name XR Actionmap Template
  * \{ */
 
+#ifdef WITH_XR_OPENXR
 static void xr_actionmap_item_modified(bContext *UNUSED(C), void *ami_p, void *UNUSED(unused))
 {
   XrActionMapItem *ami = (XrActionMapItem *)ami_p;
   WM_xr_actionconfig_update_tag(NULL, ami);
 }
+#endif
 
 void uiTemplateXrActionmapItemProperties(uiLayout *layout, PointerRNA *ptr)
 {

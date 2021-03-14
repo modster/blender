@@ -5033,7 +5033,7 @@ void wm_event_add_xrevent(const char *action_set_name,
   event->is_repeat = false;
 
   wmXrActionData *data = MEM_callocN(sizeof(wmXrActionData), __func__);
-  strcpy(data->action_set, action_set_name);
+  strcpy(data->actionmap, action_set_name);
   strcpy(data->action, action->name);
   data->type = action->type;
 

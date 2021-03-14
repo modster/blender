@@ -364,10 +364,6 @@ typedef struct wmKeyMapItem {
   short shift, ctrl, alt, oskey;
   /** Raw-key modifier. */
   short keymodifier;
-  /** XR action set name. */
-  char xr_action_set[64];
-  /** XR action name. */
-  char xr_action[64];
 
   /* flag: inactive, expanded */
   short flag;

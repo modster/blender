@@ -700,7 +700,7 @@ static bool rna_Event_is_xr_get(PointerRNA *ptr)
   return WM_event_is_xr(event);
 }
 
-static void rna_Event_xr_action_set_get(PointerRNA *ptr, char *value)
+static void rna_Event_xr_actionmap_get(PointerRNA *ptr, char *value)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
@@ -711,12 +711,12 @@ static void rna_Event_xr_action_set_get(PointerRNA *ptr, char *value)
   }
 }
 
-static int rna_Event_xr_action_set_length(PointerRNA *ptr)
+static int rna_Event_xr_actionmap_length(PointerRNA *ptr)
 {
   const wmEvent *event = ptr->data;
   if (WM_event_is_xr(event)) {
     wmXrActionData *data = event->customdata;
-    return strlen(data->action_set) + 1;
+    return strlen(data->actionmap) + 1;
   }
   else {
     return 0;
@@ -2370,11 +2370,11 @@ static void rna_def_event(BlenderRNA *brna)
   RNA_def_property_boolean_funcs(prop, "rna_Event_is_xr_get", NULL);
   RNA_def_property_ui_text(prop, "Is XR", "The event has XR data");
 
-  prop = RNA_def_property(srna, "xr_action_set", PROP_STRING, PROP_NONE);
+  prop = RNA_def_property(srna, "xr_actionmap", PROP_STRING, PROP_NONE);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_string_funcs(
-      prop, "rna_Event_xr_action_set_get", "rna_Event_xr_action_set_length", NULL);
-  RNA_def_property_ui_text(prop, "XR Action Set", "XR action set name");
+      prop, "rna_Event_xr_actionmap_get", "rna_Event_xr_actionmap_length", NULL);
+  RNA_def_property_ui_text(prop, "XR Action Map", "XR action map name");
 
   prop = RNA_def_property(srna, "xr_action", PROP_STRING, PROP_NONE);
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
