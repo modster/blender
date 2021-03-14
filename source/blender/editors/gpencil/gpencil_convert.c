@@ -1378,6 +1378,7 @@ static void gpencil_layer_to_curve(bContext *C,
       nu = NULL;
     }
 
+    /* TODO: check if the strok is of type BEZIER. In that case the conversion can be less expensive. */
     switch (mode) {
       case GP_STROKECONVERT_PATH:
         gpencil_stroke_to_path(C,

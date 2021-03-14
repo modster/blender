@@ -4082,6 +4082,7 @@ static int gpencil_recalc_geometry_exec(bContext *C, wmOperator *UNUSED(op))
   LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
     LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+        /* TODO: maybe add an option to only include selected strokes? */
         BKE_gpencil_stroke_geometry_update(gpd, gps);
       }
     }

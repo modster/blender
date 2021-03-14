@@ -1290,12 +1290,12 @@ void BKE_gpencil_stroke_geometry_update(bGPdata *gpd, bGPDstroke *gps)
     return;
   }
 
-  /* If the stroke is a curve, update stroke points first. */
+  /* Update stroke points first if it's a bezier stroke. */
   if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
 
     /* If the stroke geometry was updated, refit the curve.
      * NOTE: Normally the stroke points of a curve should not be updated directly. Only if it is
-     * unavoidable. Sculpting a curve also makes use of this. */
+     * unavoidable. Sculpting bezier strokes also makes use of this. */
     if (gps->editcurve->flag & GP_CURVE_NEEDS_STROKE_UPDATE) {
       /* TODO: Make do-partial-update variable */
       BKE_gpencil_stroke_editcurve_update(
