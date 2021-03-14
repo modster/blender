@@ -1418,7 +1418,7 @@ static int gpencil_extrude_exec(bContext *C, wmOperator *op)
           continue;
         }
 
-        LISTBASE_FOREACH(bGPDstroke *, gps, &gpf->strokes) {
+        LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
           /* skip strokes that are invalid for current view */
           if (ED_gpencil_stroke_can_use(C, gps) == false) {
             continue;
@@ -1955,8 +1955,12 @@ static int gpencil_move_to_layer_exec(bContext *C, wmOperator *op)
         continue;
       }
 
+      bool is_stroke_selected = GPENCIL_STROKE_TYPE_BEZIER(gps) ?
+                                    gps->editcurve->flag & GP_CURVE_SELECT :
+                                    gps->flag & GP_STROKE_SELECT;
+
       /* TODO: Don't just move entire strokes - instead, only copy the selected portions... */
-      if (gps->flag & GP_STROKE_SELECT) {
+      if (is_stroke_selected) {
         BLI_remlink(&gpf->strokes, gps);
         BLI_addtail(&strokes, gps);
       }
