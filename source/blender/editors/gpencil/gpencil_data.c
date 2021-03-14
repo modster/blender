@@ -1606,7 +1606,6 @@ static int gpencil_stroke_arrange_exec(bContext *C, wmOperator *op)
           }
         }
 
-        
         if (gpf_lock) {
           continue;
         }
@@ -1745,21 +1744,26 @@ static int gpencil_stroke_change_color_exec(bContext *C, wmOperator *op)
 
         LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
           /* only if selected */
-          if (gps->flag & GP_STROKE_SELECT) {
-            /* skip strokes that are invalid for current view */
-            if (ED_gpencil_stroke_can_use(C, gps) == false) {
-              continue;
-            }
-            /* check if the color is editable */
-            if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
-              continue;
-            }
-
-            /* assign new color */
-            gps->mat_nr = idx;
-
-            changed = true;
+          bool is_stroke_selected = GPENCIL_STROKE_TYPE_BEZIER(gps) ?
+                                        (bool)(gps->editcurve->flag & GP_CURVE_SELECT) :
+                                        (bool)(gps->flag & GP_STROKE_SELECT);
+          if (!is_stroke_selected) {
+            continue;
           }
+
+          /* skip strokes that are invalid for current view */
+          if (ED_gpencil_stroke_can_use(C, gps) == false) {
+            continue;
+          }
+          /* check if the color is editable */
+          if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
+            continue;
+          }
+
+          /* assign new color */
+          gps->mat_nr = idx;
+
+          changed = true;
         }
       }
       /* if not multiedit, exit loop*/
