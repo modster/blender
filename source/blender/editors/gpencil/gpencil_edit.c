@@ -890,6 +890,20 @@ static void gpencil_duplicate_points(bGPdata *gpd,
       bGPDcurve *gpcd = gpsd->editcurve;
       memcpy(gpcd->curve_points, gpc->curve_points + start_idx, sizeof(bGPDcurve_point) * len);
 
+      if (gps->dvert != NULL) {
+        gpsd->dvert = MEM_mallocN(sizeof(MDeformVert) * len, "gps stroke weights copy");
+        memcpy(gpsd->dvert, gps->dvert + start_idx, sizeof(MDeformVert) * len);
+
+        /* Copy weights */
+        int e = start_idx;
+        for (int j = 0; j < gpsd->totpoints; j++) {
+          MDeformVert *dvert_dst = &gps->dvert[e];
+          MDeformVert *dvert_src = &gps->dvert[j];
+          dvert_dst->dw = MEM_dupallocN(dvert_src->dw);
+          e++;
+        }
+      }
+
       /* TODO: Copy vertex weights*/
       for (uint32_t j = 0; j < gpcd->tot_curve_points; j++) {
         bGPDcurve_point *gpcd_pt = &gpcd->curve_points[j];
@@ -1528,8 +1542,6 @@ static void gpencil_strokes_copypastebuf_colors_name_to_material_free(GHash *nam
 /* Free copy/paste buffer data */
 void ED_gpencil_strokes_copybuf_free(void)
 {
-  bGPDstroke *gps, *gpsn;
-
   /* Free the colors buffer
    * NOTE: This is done before the strokes so that the ptrs are still safe
    */
@@ -1539,23 +1551,12 @@ void ED_gpencil_strokes_copybuf_free(void)
   }
 
   /* Free the stroke buffer */
-  for (gps = gpencil_strokes_copypastebuf.first; gps; gps = gpsn) {
-    gpsn = gps->next;
-
-    if (gps->points) {
-      MEM_freeN(gps->points);
-    }
-    if (gps->dvert) {
-      BKE_gpencil_free_stroke_weights(gps);
-      MEM_freeN(gps->dvert);
-    }
-
-    MEM_SAFE_FREE(gps->triangles);
-
-    BLI_freelinkN(&gpencil_strokes_copypastebuf, gps);
+  LISTBASE_FOREACH_MUTABLE (bGPDstroke *, gps, &gpencil_strokes_copypastebuf) {
+    BLI_remlink(&gpencil_strokes_copypastebuf, gps);
+    BKE_gpencil_free_stroke(gps);
   }
 
-  gpencil_strokes_copypastebuf.first = gpencil_strokes_copypastebuf.last = NULL;
+  BLI_listbase_clear(&gpencil_strokes_copypastebuf);
 }
 
 /**
@@ -1601,7 +1602,6 @@ static int gpencil_strokes_copy_exec(bContext *C, wmOperator *op)
   Main *bmain = CTX_data_main(C);
   Object *ob = CTX_data_active_object(C);
   bGPdata *gpd = ED_gpencil_data_get_active(C);
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
 
   if (gpd == NULL) {
     BKE_report(op->reports, RPT_ERROR, "No Grease Pencil data");
@@ -1616,62 +1616,54 @@ static int gpencil_strokes_copy_exec(bContext *C, wmOperator *op)
   /* clear the buffer first */
   ED_gpencil_strokes_copybuf_free();
 
-  if (is_curve_edit) {
-    BKE_report(op->reports, RPT_ERROR, "Not implemented!");
-  }
-  else {
-    /* for each visible (and editable) layer's selected strokes,
-     * copy the strokes into a temporary buffer, then append
-     * once all done
-     */
-    CTX_DATA_BEGIN (C, bGPDlayer *, gpl, editable_gpencil_layers) {
-      bGPDframe *gpf = gpl->actframe;
-      bGPDstroke *gps;
+  /* for each visible (and editable) layer's selected strokes,
+   * copy the strokes into a temporary buffer, then append
+   * once all done
+   */
+  CTX_DATA_BEGIN (C, bGPDlayer *, gpl, editable_gpencil_layers) {
+    bGPDframe *gpf = gpl->actframe;
 
-      if (gpf == NULL) {
+    if (gpf == NULL) {
+      continue;
+    }
+
+    /* make copies of selected strokes, and deselect these once we're done */
+    LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+      /* skip strokes that are invalid for current view */
+      if (ED_gpencil_stroke_can_use(C, gps) == false) {
         continue;
       }
 
-      /* make copies of selected strokes, and deselect these once we're done */
-      for (gps = gpf->strokes.first; gps; gps = gps->next) {
-        /* skip strokes that are invalid for current view */
-        if (ED_gpencil_stroke_can_use(C, gps) == false) {
-          continue;
+      bool is_stroke_selected = GPENCIL_STROKE_TYPE_BEZIER(gps) ?
+                                    (bool)(gps->editcurve->flag & GP_CURVE_SELECT) :
+                                    (bool)(gps->flag & GP_STROKE_SELECT);
+
+      if (is_stroke_selected) {
+        if (gps->totpoints == 1) {
+          /* Special Case: If there's just a single point in this stroke... */
+          bGPDstroke *gpsd;
+
+          /* make direct copies of the stroke and its points */
+          gpsd = BKE_gpencil_stroke_duplicate(gps, true, true);
+
+          /* saves original layer name */
+          BLI_strncpy(gpsd->runtime.tmp_layerinfo, gpl->info, sizeof(gpsd->runtime.tmp_layerinfo));
+
+          /* Calc geometry data. */
+          BKE_gpencil_stroke_geometry_update(gpd, gpsd);
+
+          /* add to temp buffer */
+          gpsd->next = gpsd->prev = NULL;
+          BLI_addtail(&gpencil_strokes_copypastebuf, gpsd);
         }
-
-        if (gps->flag & GP_STROKE_SELECT) {
-          if (gps->totpoints == 1) {
-            /* Special Case: If there's just a single point in this stroke... */
-            bGPDstroke *gpsd;
-
-            /* make direct copies of the stroke and its points */
-            gpsd = BKE_gpencil_stroke_duplicate(gps, false, true);
-
-            /* saves original layer name */
-            BLI_strncpy(
-                gpsd->runtime.tmp_layerinfo, gpl->info, sizeof(gpsd->runtime.tmp_layerinfo));
-            gpsd->points = MEM_dupallocN(gps->points);
-            if (gps->dvert != NULL) {
-              gpsd->dvert = MEM_dupallocN(gps->dvert);
-              BKE_gpencil_stroke_weights_duplicate(gps, gpsd);
-            }
-
-            /* Calc geometry data. */
-            BKE_gpencil_stroke_geometry_update(gpd, gpsd);
-
-            /* add to temp buffer */
-            gpsd->next = gpsd->prev = NULL;
-            BLI_addtail(&gpencil_strokes_copypastebuf, gpsd);
-          }
-          else {
-            /* delegate to a helper, as there's too much to fit in here (for copying subsets)... */
-            gpencil_duplicate_points(gpd, gps, &gpencil_strokes_copypastebuf, gpl->info);
-          }
+        else {
+          /* delegate to a helper, as there's too much to fit in here (for copying subsets)... */
+          gpencil_duplicate_points(gpd, gps, &gpencil_strokes_copypastebuf, gpl->info);
         }
       }
     }
-    CTX_DATA_END;
   }
+  CTX_DATA_END;
 
   /* Build up hash of material colors used in these strokes */
   if (gpencil_strokes_copypastebuf.first) {
@@ -1749,7 +1741,6 @@ static int gpencil_strokes_paste_exec(bContext *C, wmOperator *op)
 {
   Object *ob = CTX_data_active_object(C);
   bGPdata *gpd = (bGPdata *)ob->data;
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
   bGPDlayer *gpl = BKE_gpencil_layer_active_get(gpd); /* only use active for copy merge */
   Scene *scene = CTX_data_scene(C);
   bGPDframe *gpf;
@@ -1814,54 +1805,50 @@ static int gpencil_strokes_paste_exec(bContext *C, wmOperator *op)
   /* Ensure that all the necessary colors exist */
   new_colors = gpencil_copybuf_validate_colormap(C);
 
-  if (is_curve_edit) {
-    BKE_report(op->reports, RPT_ERROR, "Not implemented!");
-  }
-  else {
-    /* Copy over the strokes from the buffer (and adjust the colors) */
-    bGPDstroke *gps_init = (!on_back) ? gpencil_strokes_copypastebuf.first :
-                                        gpencil_strokes_copypastebuf.last;
-    for (bGPDstroke *gps = gps_init; gps; gps = (!on_back) ? gps->next : gps->prev) {
-      if (ED_gpencil_stroke_can_use(C, gps)) {
-        /* Need to verify if layer exists */
-        if (type != GP_COPY_TO_ACTIVE) {
-          gpl = BLI_findstring(
-              &gpd->layers, gps->runtime.tmp_layerinfo, offsetof(bGPDlayer, info));
-          if (gpl == NULL) {
-            /* no layer - use active (only if layer deleted before paste) */
-            gpl = BKE_gpencil_layer_active_get(gpd);
-          }
-        }
-
-        /* Ensure we have a frame to draw into
-         * NOTE: Since this is an op which creates strokes,
-         *       we are obliged to add a new frame if one
-         *       doesn't exist already
-         */
-        gpf = BKE_gpencil_layer_frame_get(gpl, CFRA, GP_GETFRAME_ADD_NEW);
-        if (gpf) {
-          /* Create new stroke */
-          bGPDstroke *new_stroke = BKE_gpencil_stroke_duplicate(gps, true, true);
-          new_stroke->runtime.tmp_layerinfo[0] = '\0';
-          new_stroke->next = new_stroke->prev = NULL;
-
-          /* Calc geometry data. */
-          BKE_gpencil_stroke_geometry_update(gpd, new_stroke);
-
-          if (on_back) {
-            BLI_addhead(&gpf->strokes, new_stroke);
-          }
-          else {
-            BLI_addtail(&gpf->strokes, new_stroke);
-          }
-
-          /* Remap material */
-          Material *ma = BLI_ghash_lookup(new_colors, POINTER_FROM_INT(new_stroke->mat_nr));
-          new_stroke->mat_nr = BKE_gpencil_object_material_index_get(ob, ma);
-          CLAMP_MIN(new_stroke->mat_nr, 0);
-        }
+  /* Copy over the strokes from the buffer (and adjust the colors) */
+  bGPDstroke *gps_init = (!on_back) ? gpencil_strokes_copypastebuf.first :
+                                      gpencil_strokes_copypastebuf.last;
+  for (bGPDstroke *gps = gps_init; gps; gps = (!on_back) ? gps->next : gps->prev) {
+    if (!ED_gpencil_stroke_can_use(C, gps)) {
+      continue;
+    }
+    /* Need to verify if layer exists */
+    if (type != GP_COPY_TO_ACTIVE) {
+      gpl = BLI_findstring(&gpd->layers, gps->runtime.tmp_layerinfo, offsetof(bGPDlayer, info));
+      if (gpl == NULL) {
+        /* no layer - use active (only if layer deleted before paste) */
+        gpl = BKE_gpencil_layer_active_get(gpd);
       }
     }
+
+    /* Ensure we have a frame to draw into
+     * NOTE: Since this is an op which creates strokes,
+     *       we are obliged to add a new frame if one
+     *       doesn't exist already
+     */
+    gpf = BKE_gpencil_layer_frame_get(gpl, CFRA, GP_GETFRAME_ADD_NEW);
+    if (gpf == NULL) {
+      continue;
+    }
+    /* Create new stroke */
+    bGPDstroke *new_stroke = BKE_gpencil_stroke_duplicate(gps, true, true);
+    new_stroke->runtime.tmp_layerinfo[0] = '\0';
+    new_stroke->next = new_stroke->prev = NULL;
+
+    /* Calc geometry data. */
+    BKE_gpencil_stroke_geometry_update(gpd, new_stroke);
+
+    if (on_back) {
+      BLI_addhead(&gpf->strokes, new_stroke);
+    }
+    else {
+      BLI_addtail(&gpf->strokes, new_stroke);
+    }
+
+    /* Remap material */
+    Material *ma = BLI_ghash_lookup(new_colors, POINTER_FROM_INT(new_stroke->mat_nr));
+    new_stroke->mat_nr = BKE_gpencil_object_material_index_get(ob, ma);
+    CLAMP_MIN(new_stroke->mat_nr, 0);
   }
 
   /* free temp data */
