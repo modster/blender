@@ -199,8 +199,6 @@ class VIEW3D_PT_tools_meshedit_options(View3DPanel, Panel):
         ob = context.active_object
         mesh = ob.data
 
-        split = layout.split()
-
         row = layout.row(align=True, heading="Transform")
         row.prop(tool_settings, "use_transform_correct_face_attributes")
 
@@ -332,6 +330,17 @@ class VIEW3D_PT_tools_particlemode(Panel, View3DPaintPanel):
 
         layout.use_property_split = True
         layout.use_property_decorate = False  # No animation.
+
+        from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
+        tool_context = ToolSelectPanelHelper.tool_active_from_context(context)
+
+        if not tool_context:
+            # If there is no active tool, then there can't be an active brush.
+            tool = None
+
+        if not tool_context.has_datablock:
+            # tool.has_datablock is always true for tools that use brushes.
+            tool = None
 
         if tool is not None:
             col = layout.column()
@@ -622,10 +631,10 @@ class VIEW3D_PT_tools_brush_texture(Panel, View3DPaintPanel):
 
         settings = self.paint_settings(context)
         brush = settings.brush
+        tex_slot = brush.texture_slot
 
         col = layout.column()
-
-        col.template_ID_preview(brush, "texture", new="texture.new", rows=3, cols=8)
+        col.template_ID_preview(tex_slot, "texture", new="texture.new", rows=3, cols=8)
 
         brush_texture_settings(col, brush, context.sculpt_object)
 
@@ -649,8 +658,9 @@ class VIEW3D_PT_tools_mask_texture(Panel, View3DPaintPanel, TextureMaskPanel):
         brush = context.tool_settings.image_paint.brush
 
         col = layout.column()
+        mask_tex_slot = brush.mask_texture_slot
 
-        col.template_ID_preview(brush, "mask_texture", new="texture.new", rows=3, cols=8)
+        col.template_ID_preview(mask_tex_slot, "texture", new="texture.new", rows=3, cols=8)
 
         brush_mask_texture_settings(col, brush)
 
@@ -1341,8 +1351,6 @@ class VIEW3D_PT_tools_grease_pencil_brush_select(Panel, View3DPanel, GreasePenci
         if context.mode == 'PAINT_GPENCIL':
             brush = tool_settings.gpencil_paint.brush
             if brush is not None:
-                gp_settings = brush.gpencil_settings
-
                 col.prop(brush, "use_custom_icon", toggle=True, icon='FILE_IMAGE', text="")
 
                 if brush.use_custom_icon:
@@ -1481,8 +1489,9 @@ class VIEW3D_PT_tools_grease_pencil_brush_stroke(Panel, View3DPanel):
         brush = context.tool_settings.gpencil_paint.brush
         return brush is not None and brush.gpencil_tool == 'DRAW'
 
-    def draw(self, context):
-        layout = self.layout
+    def draw(self, _context):
+        # layout = self.layout
+        pass
 
 
 class VIEW3D_PT_tools_grease_pencil_brush_stabilizer(Panel, View3DPanel):

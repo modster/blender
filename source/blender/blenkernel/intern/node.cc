@@ -367,6 +367,36 @@ static void node_foreach_cache(ID *id,
   }
 }
 
+static ID *node_owner_get(Main *bmain, ID *id)
+{
+  if ((id->flag & LIB_EMBEDDED_DATA) == 0) {
+    return id;
+  }
+  /* TODO: Sort this NO_MAIN or not for embedded node trees. See T86119. */
+  // BLI_assert((id->tag & LIB_TAG_NO_MAIN) == 0);
+
+  ListBase *lists[] = {&bmain->materials,
+                       &bmain->lights,
+                       &bmain->worlds,
+                       &bmain->textures,
+                       &bmain->scenes,
+                       &bmain->linestyles,
+                       &bmain->simulations,
+                       nullptr};
+
+  bNodeTree *ntree = (bNodeTree *)id;
+  for (int i = 0; lists[i] != nullptr; i++) {
+    LISTBASE_FOREACH (ID *, id_iter, lists[i]) {
+      if (ntreeFromID(id_iter) == ntree) {
+        return id_iter;
+      }
+    }
+  }
+
+  BLI_assert(!"Embedded node tree with no owner. Critical Main inconsistency.");
+  return nullptr;
+}
+
 static void write_node_socket_default_value(BlendWriter *writer, bNodeSocket *sock)
 {
   if (sock->default_value == nullptr) {
@@ -510,18 +540,11 @@ void ntreeBlendWrite(BlendWriter *writer, bNodeTree *ntree)
       }
       else if ((ntree->type == NTREE_COMPOSIT) && (node->type == CMP_NODE_CRYPTOMATTE)) {
         NodeCryptomatte *nc = (NodeCryptomatte *)node->storage;
-        /* Update the matte_id so the files can be opened in versions that don't
-         * use `CryptomatteEntry`. */
-        MEM_SAFE_FREE(nc->matte_id);
-        nc->matte_id = BKE_cryptomatte_entries_to_matte_id(nc);
-        if (nc->matte_id) {
-          BLO_write_string(writer, nc->matte_id);
-        }
+        BLO_write_string(writer, nc->matte_id);
         LISTBASE_FOREACH (CryptomatteEntry *, entry, &nc->entries) {
           BLO_write_struct(writer, CryptomatteEntry, entry);
         }
         BLO_write_struct_by_name(writer, node->typeinfo->storagename, node->storage);
-        MEM_SAFE_FREE(nc->matte_id);
       }
       else if (node->type == FN_NODE_INPUT_STRING) {
         NodeInputString *storage = (NodeInputString *)node->storage;
@@ -916,6 +939,7 @@ IDTypeInfo IDType_ID_NT = {
     /* make_local */ nullptr,
     /* foreach_id */ node_foreach_id,
     /* foreach_cache */ node_foreach_cache,
+    /* owner_get */ node_owner_get,
 
     /* blend_write */ ntree_blend_write,
     /* blend_read_data */ ntree_blend_read_data,
@@ -1544,6 +1568,8 @@ const char *nodeStaticSocketType(int type, int subtype)
           return "NodeSocketFloatAngle";
         case PROP_TIME:
           return "NodeSocketFloatTime";
+        case PROP_DISTANCE:
+          return "NodeSocketFloatDistance";
         case PROP_NONE:
         default:
           return "NodeSocketFloat";
@@ -1613,6 +1639,8 @@ const char *nodeStaticSocketInterfaceType(int type, int subtype)
           return "NodeSocketInterfaceFloatAngle";
         case PROP_TIME:
           return "NodeSocketInterfaceFloatTime";
+        case PROP_DISTANCE:
+          return "NodeSocketInterfaceFloatDistance";
         case PROP_NONE:
         default:
           return "NodeSocketInterfaceFloat";
@@ -2471,7 +2499,7 @@ static void node_preview_init_tree_recursive(bNodeInstanceHash *previews,
                                              bNodeInstanceKey parent_key,
                                              int xsize,
                                              int ysize,
-                                             int create)
+                                             bool create_previews)
 {
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
     bNodeInstanceKey key = BKE_node_instance_key(parent_key, ntree, node);
@@ -2480,16 +2508,17 @@ static void node_preview_init_tree_recursive(bNodeInstanceHash *previews,
       node->preview_xsize = xsize;
       node->preview_ysize = ysize;
 
-      BKE_node_preview_verify(previews, key, xsize, ysize, create);
+      BKE_node_preview_verify(previews, key, xsize, ysize, create_previews);
     }
 
     if (node->type == NODE_GROUP && node->id) {
-      node_preview_init_tree_recursive(previews, (bNodeTree *)node->id, key, xsize, ysize, create);
+      node_preview_init_tree_recursive(
+          previews, (bNodeTree *)node->id, key, xsize, ysize, create_previews);
     }
   }
 }
 
-void BKE_node_preview_init_tree(bNodeTree *ntree, int xsize, int ysize, int create_previews)
+void BKE_node_preview_init_tree(bNodeTree *ntree, int xsize, int ysize, bool create_previews)
 {
   if (!ntree) {
     return;
@@ -2978,29 +3007,6 @@ bNodeTree *ntreeFromID(ID *id)
 {
   bNodeTree **nodetree = BKE_ntree_ptr_from_id(id);
   return (nodetree != nullptr) ? *nodetree : nullptr;
-}
-
-/* Finds and returns the datablock that privately owns the given tree, or null. */
-ID *BKE_node_tree_find_owner_ID(Main *bmain, struct bNodeTree *ntree)
-{
-  ListBase *lists[] = {&bmain->materials,
-                       &bmain->lights,
-                       &bmain->worlds,
-                       &bmain->textures,
-                       &bmain->scenes,
-                       &bmain->linestyles,
-                       &bmain->simulations,
-                       nullptr};
-
-  for (int i = 0; lists[i] != nullptr; i++) {
-    LISTBASE_FOREACH (ID *, id, lists[i]) {
-      if (ntreeFromID(id) == ntree) {
-        return id;
-      }
-    }
-  }
-
-  return nullptr;
 }
 
 bool ntreeNodeExists(const bNodeTree *ntree, const bNode *testnode)
@@ -3546,7 +3552,8 @@ void nodeSetActive(bNodeTree *ntree, bNode *node)
         tnode->flag &= ~NODE_ACTIVE_ID;
       }
     }
-    if (node->typeinfo->nclass == NODE_CLASS_TEXTURE) {
+    if ((node->typeinfo->nclass == NODE_CLASS_TEXTURE) ||
+        (node->typeinfo->type == GEO_NODE_ATTRIBUTE_SAMPLE_TEXTURE)) {
       tnode->flag &= ~NODE_ACTIVE_TEXTURE;
     }
   }
@@ -3555,7 +3562,8 @@ void nodeSetActive(bNodeTree *ntree, bNode *node)
   if (node->id) {
     node->flag |= NODE_ACTIVE_ID;
   }
-  if (node->typeinfo->nclass == NODE_CLASS_TEXTURE) {
+  if ((node->typeinfo->nclass == NODE_CLASS_TEXTURE) ||
+      (node->typeinfo->type == GEO_NODE_ATTRIBUTE_SAMPLE_TEXTURE)) {
     node->flag |= NODE_ACTIVE_TEXTURE;
   }
 }
@@ -4471,18 +4479,18 @@ void node_type_group_update(struct bNodeType *ntype,
 }
 
 void node_type_exec(struct bNodeType *ntype,
-                    NodeInitExecFunction initexecfunc,
-                    NodeFreeExecFunction freeexecfunc,
-                    NodeExecFunction execfunc)
+                    NodeInitExecFunction init_exec_fn,
+                    NodeFreeExecFunction free_exec_fn,
+                    NodeExecFunction exec_fn)
 {
-  ntype->initexecfunc = initexecfunc;
-  ntype->freeexecfunc = freeexecfunc;
-  ntype->execfunc = execfunc;
+  ntype->init_exec_fn = init_exec_fn;
+  ntype->free_exec_fn = free_exec_fn;
+  ntype->exec_fn = exec_fn;
 }
 
-void node_type_gpu(struct bNodeType *ntype, NodeGPUExecFunction gpufunc)
+void node_type_gpu(struct bNodeType *ntype, NodeGPUExecFunction gpu_fn)
 {
-  ntype->gpufunc = gpufunc;
+  ntype->gpu_fn = gpu_fn;
 }
 
 void node_type_internal_links(bNodeType *ntype,
@@ -4784,6 +4792,7 @@ static void registerGeometryNodes()
   register_node_type_geo_attribute_color_ramp();
   register_node_type_geo_attribute_combine_xyz();
   register_node_type_geo_attribute_compare();
+  register_node_type_geo_attribute_convert();
   register_node_type_geo_attribute_fill();
   register_node_type_geo_attribute_math();
   register_node_type_geo_attribute_mix();
@@ -4791,6 +4800,7 @@ static void registerGeometryNodes()
   register_node_type_geo_attribute_randomize();
   register_node_type_geo_attribute_separate_xyz();
   register_node_type_geo_attribute_vector_math();
+  register_node_type_geo_attribute_remove();
   register_node_type_geo_boolean();
   register_node_type_geo_collection_info();
   register_node_type_geo_edge_split();
@@ -4805,8 +4815,8 @@ static void registerGeometryNodes()
   register_node_type_geo_point_translate();
   register_node_type_geo_points_to_volume();
   register_node_type_geo_sample_texture();
-  register_node_type_geo_subdivision_surface();
-  register_node_type_geo_subdivision_surface_simple();
+  register_node_type_geo_subdivide_smooth();
+  register_node_type_geo_subdivide();
   register_node_type_geo_transform();
   register_node_type_geo_triangulate();
   register_node_type_geo_volume_to_mesh();

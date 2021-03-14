@@ -3428,12 +3428,12 @@ void UI_blocklist_free_inactive(const bContext *C, ListBase *lb)
 {
   LISTBASE_FOREACH_MUTABLE (uiBlock *, block, lb) {
     if (!block->handle) {
-      if (!block->active) {
-        BLI_remlink(lb, block);
-        UI_block_free(C, block);
+      if (block->active) {
+        block->active = false;
       }
       else {
-        block->active = false;
+        BLI_remlink(lb, block);
+        UI_block_free(C, block);
       }
     }
   }
@@ -6661,11 +6661,20 @@ void UI_but_func_search_set_tooltip(uiBut *but, uiButSearchTooltipFn tooltip_fn)
   but_search->item_tooltip_fn = tooltip_fn;
 }
 
+void UI_but_func_search_set_results_are_suggestions(uiBut *but, const bool value)
+{
+  uiButSearch *but_search = (uiButSearch *)but;
+  BLI_assert(but->type == UI_BTYPE_SEARCH_MENU);
+
+  but_search->results_are_suggestions = value;
+}
+
 /* Callbacks for operator search button. */
 static void operator_enum_search_update_fn(const struct bContext *C,
                                            void *but,
                                            const char *str,
-                                           uiSearchItems *items)
+                                           uiSearchItems *items,
+                                           const bool UNUSED(is_first))
 {
   wmOperatorType *ot = ((uiBut *)but)->optype;
   PropertyRNA *prop = ot->prop;

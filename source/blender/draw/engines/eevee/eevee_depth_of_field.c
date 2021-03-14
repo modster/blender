@@ -273,9 +273,12 @@ int EEVEE_depth_of_field_init(EEVEE_ViewLayerData *UNUSED(sldata),
         float minimal_overblur = 1.0f / sqrtf(sample_count);
         float user_overblur = scene_eval->eevee.bokeh_overblur / 100.0f;
 
-        effects->dof_coc_params[1] *= minimal_overblur + user_overblur;
+        minimal_overblur *= effects->dof_coc_params[1];
+        user_overblur *= effects->dof_coc_params[1];
+
+        effects->dof_coc_params[1] = minimal_overblur + user_overblur;
         /* Avoid dilating the shape. Over-blur only soften. */
-        effects->dof_jitter_radius -= effects->dof_coc_params[1];
+        effects->dof_jitter_radius -= minimal_overblur + user_overblur * 0.5f;
       }
     }
     else {
@@ -831,7 +834,7 @@ static void dof_scatter_pass_init(EEVEE_FramebufferList *fbl,
   int input_size[2], target_size[2];
   GPU_texture_get_mipmap_size(fx->dof_half_res_color_tx, 0, input_size);
   GPU_texture_get_mipmap_size(fx->dof_bg_color_tx, 0, target_size);
-  /* Draw a sprite for every four halfres pixels. */
+  /* Draw a sprite for every four half-res pixels. */
   int sprite_count = (input_size[0] / 2) * (input_size[1] / 2);
   float target_texel_size[2] = {1.0f / target_size[0], 1.0f / target_size[1]};
   const bool use_bokeh_tx = (fx->dof_bokeh_gather_lut_tx != NULL);

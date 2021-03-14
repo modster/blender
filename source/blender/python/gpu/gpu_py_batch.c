@@ -39,7 +39,6 @@
 #include "../generic/py_capi_utils.h"
 
 #include "gpu_py.h"
-#include "gpu_py_api.h"
 #include "gpu_py_element.h"
 #include "gpu_py_shader.h"
 #include "gpu_py_vertex_buffer.h"
@@ -280,8 +279,8 @@ static void pygpu_batch__tp_dealloc(BPyGPUBatch *self)
   GPU_batch_discard(self->batch);
 
 #ifdef USE_GPU_PY_REFERENCES
+  PyObject_GC_UnTrack(self);
   if (self->references) {
-    PyObject_GC_UnTrack(self);
     pygpu_batch__tp_clear(self);
     Py_XDECREF(self->references);
   }

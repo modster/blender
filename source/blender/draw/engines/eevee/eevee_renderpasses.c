@@ -255,10 +255,6 @@ void EEVEE_renderpasses_cache_finish(EEVEE_ViewLayerData *sldata, EEVEE_Data *ve
   else {
     psl->renderpass_pass = NULL;
   }
-
-  if ((g_data->render_passes & (EEVEE_RENDER_PASS_CRYPTOMATTE)) != 0) {
-    EEVEE_cryptomatte_cache_finish(sldata, vedata);
-  }
 }
 
 /* Post-process data to construct a specific render-pass
@@ -494,7 +490,7 @@ void EEVEE_renderpasses_draw_debug(EEVEE_Data *vedata)
       tx = txl->maxzbuffer;
       break;
     case 2:
-      tx = effects->ssr_pdf_output;
+      /* UNUSED */
       break;
     case 3:
       tx = effects->ssr_normal_input;

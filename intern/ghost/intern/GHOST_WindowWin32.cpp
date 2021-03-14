@@ -92,15 +92,10 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
 {
   wchar_t *title_16 = alloc_utf16_from_8((char *)title, 0);
   RECT win_rect = {left, top, (long)(left + width), (long)(top + height)};
-  RECT parent_rect = {0, 0, 0, 0};
 
   // Initialize tablet variables
   memset(&m_wintab, 0, sizeof(m_wintab));
   m_tabletData = GHOST_TABLET_DATA_NONE;
-
-  if (parentwindow) {
-    GetWindowRect(m_parentWindowHwnd, &parent_rect);
-  }
 
   DWORD style = parentwindow ?
                     WS_POPUPWINDOW | WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SIZEBOX :
@@ -124,9 +119,7 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
   MONITORINFOEX monitor;
   monitor.cbSize = sizeof(MONITORINFOEX);
   monitor.dwFlags = 0;
-  GetMonitorInfo(
-      MonitorFromRect(parentwindow ? &parent_rect : &win_rect, MONITOR_DEFAULTTONEAREST),
-      &monitor);
+  GetMonitorInfo(MonitorFromRect(&win_rect, MONITOR_DEFAULTTONEAREST), &monitor);
 
   /* Adjust our requested size to allow for caption and borders and constrain to monitor. */
   AdjustWindowRectEx(&win_rect, WS_CAPTION, FALSE, 0);
@@ -299,8 +292,6 @@ GHOST_WindowWin32::GHOST_WindowWin32(GHOST_SystemWin32 *system,
       if (m_wintab.enable && m_wintab.tablet) {
         m_wintab.enable(m_wintab.tablet, TRUE);
       }
-
-      m_wintab.info(WTI_INTERFACE, IFC_NDEVICES, &m_wintab.numDevices);
     }
   }
   CoCreateInstance(
@@ -1033,7 +1024,7 @@ bool GHOST_WindowWin32::useTabletAPI(GHOST_TTabletAPI api) const
     return true;
   }
   else if (m_system->getTabletAPI() == GHOST_kTabletAutomatic) {
-    if (m_wintab.numDevices)
+    if (m_wintab.tablet)
       return api == GHOST_kTabletWintab;
     else
       return api == GHOST_kTabletNative;
@@ -1073,14 +1064,6 @@ void GHOST_WindowWin32::processWin32TabletInitEvent()
   }
 
   m_tabletData.Active = GHOST_kTabletModeNone;
-}
-
-void GHOST_WindowWin32::processWintabInfoChangeEvent(LPARAM lParam)
-{
-  /* Update number of connected Wintab digitizers */
-  if (LOWORD(lParam) == WTI_INTERFACE && HIWORD(lParam) == IFC_NDEVICES) {
-    m_wintab.info(WTI_INTERFACE, IFC_NDEVICES, &m_wintab.numDevices);
-  }
 }
 
 void GHOST_WindowWin32::processWin32TabletEvent(WPARAM wParam, LPARAM lParam)
@@ -1210,7 +1193,7 @@ GHOST_TSuccess GHOST_WindowWin32::setWindowCustomCursorShape(GHOST_TUns8 *bitmap
   GHOST_TUns32 fullBitRow, fullMaskRow;
   int x, y, cols;
 
-  cols = sizeX / 8; /* Number of whole bytes per row (width of bm/mask). */
+  cols = sizeX / 8; /* Number of whole bytes per row (width of bitmap/mask). */
   if (sizeX % 8)
     cols++;
 

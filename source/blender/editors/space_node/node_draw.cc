@@ -37,6 +37,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_map.hh"
 #include "BLI_math.h"
+#include "BLI_set.hh"
 #include "BLI_span.hh"
 #include "BLI_string_ref.hh"
 #include "BLI_vector.hh"
@@ -81,9 +82,8 @@
 #  include "COM_compositor.h"
 #endif
 
-using blender::Map;
+using blender::Set;
 using blender::Span;
-using blender::StringRef;
 using blender::Vector;
 
 extern "C" {
@@ -304,16 +304,6 @@ void ED_node_sort(bNodeTree *ntree)
   }
 }
 
-static void do_node_internal_buttons(bContext *C, void *UNUSED(node_v), int event)
-{
-  if (event == B_NODE_EXEC) {
-    SpaceNode *snode = CTX_wm_space_node(C);
-    if (snode && snode->id) {
-      ED_node_tag_update_id(snode->id);
-    }
-  }
-}
-
 static void node_uiblocks_init(const bContext *C, bNodeTree *ntree)
 {
   /* Add node uiBlocks in drawing order - prevents events going to overlapping nodes. */
@@ -323,7 +313,6 @@ static void node_uiblocks_init(const bContext *C, bNodeTree *ntree)
     char uiblockstr[32];
     BLI_snprintf(uiblockstr, sizeof(uiblockstr), "node buttons %p", (void *)node);
     node->block = UI_block_begin(C, CTX_wm_region(C), uiblockstr, UI_EMBOSS);
-    UI_block_func_handle_set(node->block, do_node_internal_buttons, node);
 
     /* this cancels events for background nodes */
     UI_block_flag_enable(node->block, UI_BLOCK_CLIP_EVENTS);
@@ -793,7 +782,11 @@ static void node_socket_draw_multi_input(const float color[4],
       &rect, color, nullptr, 1.0f, color_outline, outline_width, width - outline_width * 0.5f);
 }
 
-static void node_socket_outline_color_get(bool selected, float r_outline_color[4])
+static const float virtual_node_socket_outline_color[4] = {0.5, 0.5, 0.5, 1.0};
+
+static void node_socket_outline_color_get(const bool selected,
+                                          const int socket_type,
+                                          float r_outline_color[4])
 {
   if (selected) {
     UI_GetThemeColor4fv(TH_TEXT_HI, r_outline_color);
@@ -802,6 +795,12 @@ static void node_socket_outline_color_get(bool selected, float r_outline_color[4
   else {
     copy_v4_fl(r_outline_color, 0.0f);
     r_outline_color[3] = 0.6f;
+  }
+
+  /* Until there is a better place for per socket color,
+   * the outline color for virtual sockets is set  here. */
+  if (socket_type == SOCK_CUSTOM) {
+    copy_v4_v4(r_outline_color, virtual_node_socket_outline_color);
   }
 }
 
@@ -838,7 +837,7 @@ static void node_socket_draw_nested(const bContext *C,
   float outline_color[4];
 
   node_socket_color_get((bContext *)C, ntree, node_ptr, sock, color);
-  node_socket_outline_color_get(selected, outline_color);
+  node_socket_outline_color_get(selected, sock->type, outline_color);
 
   node_socket_draw(sock,
                    color,
@@ -864,7 +863,7 @@ void ED_node_socket_draw(bNodeSocket *sock, const rcti *rect, const float color[
   rcti draw_rect = *rect;
   float outline_color[4] = {0};
 
-  node_socket_outline_color_get(sock->flag & SELECT, outline_color);
+  node_socket_outline_color_get(sock->flag & SELECT, sock->type, outline_color);
 
   BLI_rcti_resize(&draw_rect, size, size);
 
@@ -1179,7 +1178,7 @@ void node_draw_sockets(const View2D *v2d,
     float color[4];
     float outline_color[4];
     node_socket_color_get((bContext *)C, ntree, &node_ptr, socket, color);
-    node_socket_outline_color_get(selected, outline_color);
+    node_socket_outline_color_get(selected, socket->type, outline_color);
 
     node_socket_draw_multi_input(color, outline_color, width, height, socket->locx, socket->locy);
   }
@@ -1239,49 +1238,24 @@ static char *node_errors_tooltip_fn(bContext *UNUSED(C), void *argN, const char 
 
   for (const NodeWarning &warning : warnings.drop_back(1)) {
     complete_string += warning.message;
+    /* Adding the period is not ideal for multi-line messages, but it is consistent
+     * with other tooltip implementations in Blender, so it is added here. */
+    complete_string += '.';
     complete_string += '\n';
   }
 
+  /* Let the tooltip system automatically add the last period. */
   complete_string += warnings.last().message;
-
-  /* Remove the last period-- the tooltip system adds this automatically. */
-  if (complete_string.back() == '.') {
-    complete_string.pop_back();
-  }
 
   return BLI_strdupn(complete_string.c_str(), complete_string.size());
 }
 
 #define NODE_HEADER_ICON_SIZE (0.8f * U.widget_unit)
 
-static const NodeUIStorage *node_ui_storage_get_from_context(const bContext *C,
-                                                             const bNodeTree &ntree,
-                                                             const bNode &node)
-{
-  const NodeTreeUIStorage *ui_storage = ntree.ui_storage;
-  if (ui_storage == nullptr) {
-    return nullptr;
-  }
-
-  const Object *active_object = CTX_data_active_object(C);
-  const ModifierData *active_modifier = BKE_object_active_modifier(active_object);
-  if (active_object == nullptr || active_modifier == nullptr) {
-    return nullptr;
-  }
-
-  const NodeTreeEvaluationContext context(*active_object, *active_modifier);
-  const Map<std::string, NodeUIStorage> *storage = ui_storage->context_map.lookup_ptr(context);
-  if (storage == nullptr) {
-    return nullptr;
-  }
-
-  return storage->lookup_ptr_as(StringRef(node.name));
-}
-
 static void node_add_error_message_button(
     const bContext *C, bNodeTree &ntree, bNode &node, const rctf &rect, float &icon_offset)
 {
-  const NodeUIStorage *node_ui_storage = node_ui_storage_get_from_context(C, ntree, node);
+  const NodeUIStorage *node_ui_storage = BKE_node_tree_ui_storage_get_from_context(C, ntree, node);
   if (node_ui_storage == nullptr || node_ui_storage->warnings.is_empty()) {
     return;
   }
@@ -1370,7 +1344,7 @@ static void node_draw_basis(const bContext *C,
     UI_block_emboss_set(node->block, UI_EMBOSS_NONE);
     uiBut *but = uiDefIconBut(node->block,
                               UI_BTYPE_BUT_TOGGLE,
-                              B_REDR,
+                              0,
                               ICON_MATERIAL,
                               iconofs,
                               rct->ymax - NODE_DY,
@@ -1396,7 +1370,7 @@ static void node_draw_basis(const bContext *C,
     UI_block_emboss_set(node->block, UI_EMBOSS_NONE);
     uiBut *but = uiDefIconBut(node->block,
                               UI_BTYPE_BUT_TOGGLE,
-                              B_REDR,
+                              0,
                               ICON_NODETREE,
                               iconofs,
                               rct->ymax - NODE_DY,
@@ -1448,7 +1422,7 @@ static void node_draw_basis(const bContext *C,
     UI_block_emboss_set(node->block, UI_EMBOSS_NONE);
     uiBut *but = uiDefBut(node->block,
                           UI_BTYPE_BUT_TOGGLE,
-                          B_REDR,
+                          0,
                           "",
                           rct->xmin + 0.35f * U.widget_unit,
                           rct->ymax - NODE_DY / 2.2f - but_size / 2,
@@ -1623,7 +1597,7 @@ static void node_draw_hidden(const bContext *C,
     UI_block_emboss_set(node->block, UI_EMBOSS_NONE);
     uiBut *but = uiDefBut(node->block,
                           UI_BTYPE_BUT_TOGGLE,
-                          B_REDR,
+                          0,
                           "",
                           rct->xmin + 0.35f * U.widget_unit,
                           centy - but_size / 2,
@@ -1774,10 +1748,11 @@ static void count_mutli_input_socket_links(bNodeTree *ntree, SpaceNode *snode)
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
     LISTBASE_FOREACH (struct bNodeSocket *, socket, &node->inputs) {
       if (socket->flag & SOCK_MULTI_INPUT) {
+        Set<bNodeSocket *> visited_from_sockets;
         socket->total_inputs = 0;
         LISTBASE_FOREACH (bNodeLink *, link, &ntree->links) {
           if (link->tosock == socket) {
-            socket->total_inputs++;
+            visited_from_sockets.add(link->fromsock);
           }
         }
         /* Count temporary links going into this socket. */
@@ -1785,10 +1760,11 @@ static void count_mutli_input_socket_links(bNodeTree *ntree, SpaceNode *snode)
           LISTBASE_FOREACH (LinkData *, linkdata, &nldrag->links) {
             bNodeLink *link = (bNodeLink *)linkdata->data;
             if (link->tosock == socket) {
-              socket->total_inputs++;
+              visited_from_sockets.add(link->fromsock);
             }
           }
         }
+        socket->total_inputs = visited_from_sockets.size();
       }
     }
   }
@@ -1808,25 +1784,6 @@ void node_update_nodetree(const bContext *C, bNodeTree *ntree)
   }
 }
 
-static bool compare_link_by_angle_to_node(const bNodeLink *link_a, const bNodeLink *link_b)
-{
-  BLI_assert(link_a->tosock == link_b->tosock);
-  const float socket_location[2] = {link_a->tosock->locx, link_a->tosock->locy};
-  const float up_direction[2] = {0.0f, 1.0f};
-
-  float delta_a[2] = {link_a->fromsock->locx - socket_location[0],
-                      link_a->fromsock->locy - socket_location[1]};
-  normalize_v2(delta_a);
-  const float angle_a = angle_normalized_v2v2(up_direction, delta_a);
-
-  float delta_b[2] = {link_b->fromsock->locx - socket_location[0],
-                      link_b->fromsock->locy - socket_location[1]};
-  normalize_v2(delta_b);
-  const float angle_b = angle_normalized_v2v2(up_direction, delta_b);
-
-  return angle_a > angle_b;
-}
-
 static void node_draw(const bContext *C,
                       ARegion *region,
                       SpaceNode *snode,
@@ -1840,42 +1797,6 @@ static void node_draw(const bContext *C,
 }
 
 #define USE_DRAW_TOT_UPDATE
-
-/**
- * Automatically sort the input links to multi-input sockets to avoid crossing noodles.
- */
-static void sort_multi_input_socket_links(bNodeTree *ntree, SpaceNode *snode)
-{
-  LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
-    LISTBASE_FOREACH (bNodeSocket *, socket, &node->inputs) {
-      if (socket->flag & SOCK_MULTI_INPUT) {
-        /* The total is calculated in #node_update_nodetree, which runs before this draw step. */
-        const int total_inputs = socket->total_inputs;
-        Vector<bNodeLink *> input_links;
-        input_links.reserve(total_inputs);
-
-        LISTBASE_FOREACH (bNodeLink *, link, &ntree->links) {
-          if (link->tosock == socket) {
-            input_links.append(link);
-          }
-        }
-        LISTBASE_FOREACH (bNodeLinkDrag *, nldrag, &snode->runtime->linkdrag) {
-          LISTBASE_FOREACH (LinkData *, linkdata, &nldrag->links) {
-            bNodeLink *link = (bNodeLink *)linkdata->data;
-            if (link->tosock == socket) {
-              input_links.append(link);
-            }
-          }
-        }
-
-        std::sort(input_links.begin(), input_links.end(), compare_link_by_angle_to_node);
-        for (const int i : input_links.index_range()) {
-          input_links[i]->multi_input_socket_index = i;
-        }
-      }
-    }
-  }
-}
 
 void node_draw_nodetree(const bContext *C,
                         ARegion *region,
@@ -1912,8 +1833,6 @@ void node_draw_nodetree(const bContext *C,
   /* Node lines. */
   GPU_blend(GPU_BLEND_ALPHA);
   nodelink_batch_start(snode);
-
-  sort_multi_input_socket_links(ntree, snode);
 
   LISTBASE_FOREACH (bNodeLink *, link, &ntree->links) {
     if (!nodeLinkIsHidden(link)) {

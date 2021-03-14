@@ -161,12 +161,12 @@ def _template_items_tool_select_actions(operator, *, type, value):
 
 
 # This could have a more generic name, for now use for circle select.
-def _template_items_tool_select_actions_simple(operator, *, type, value, properties=[]):
+def _template_items_tool_select_actions_simple(operator, *, type, value, properties=()):
     kmi_args = {"type": type, "value": value}
     return [
         # Don't define 'SET' here, take from the tool options.
         (operator, kmi_args,
-         {"properties": properties}),
+         {"properties": [*properties]}),
         (operator, {**kmi_args, "shift": True},
          {"properties": [*properties, ("mode", 'ADD')]}),
         (operator, {**kmi_args, "ctrl": True},
@@ -1309,6 +1309,7 @@ def km_file_browser_main(params):
          {"properties": [("mode", 'ADD')]}),
         ("file.highlight", {"type": 'MOUSEMOVE', "value": 'ANY', "any": True}, None),
         ("file.sort_column_ui_context", {"type": 'LEFTMOUSE', "value": 'PRESS', "any": True}, None),
+        ("file.view_selected", {"type": 'F', "value": 'PRESS'}, None),
     ])
 
     return keymap
@@ -1911,7 +1912,7 @@ def km_console(params):
         ("console.delete", {"type": 'BACK_SPACE', "value": 'PRESS', "repeat": True},
          {"properties": [("type", 'PREVIOUS_CHARACTER')]}),
         ("console.delete", {"type": 'BACK_SPACE', "value": 'PRESS', "shift": True, "repeat": True},
-         {"properties": [("type", 'PREVIOUS_CHARACTER')], "repeat": True}),
+         {"properties": [("type", 'PREVIOUS_CHARACTER')]}),
         ("console.delete", {"type": 'DEL', "value": 'PRESS', "ctrl": True, "repeat": True},
          {"properties": [("type", 'NEXT_WORD')]}),
         ("console.delete", {"type": 'BACK_SPACE', "value": 'PRESS', "ctrl": True, "repeat": True},
@@ -3394,7 +3395,8 @@ def km_sculpt(params):
          {"properties": [("data_path", 'scene.tool_settings.sculpt.show_mask')]}),
         # Dynamic topology
         ("sculpt.dynamic_topology_toggle", {"type": 'D', "value": 'PRESS', "ctrl": True}, None),
-        ("sculpt.set_detail_size", {"type": 'D', "value": 'PRESS', "shift": True}, None),
+        ("sculpt.dyntopo_detail_size_edit", {"type": 'D', "value": 'PRESS', "shift": True}, None),
+        ("sculpt.set_detail_size", {"type": 'D', "value": 'PRESS', "shift": True, "alt": True}, None),
         # Remesh
         ("object.voxel_remesh", {"type": 'R', "value": 'PRESS', "ctrl": True}, None),
         ("object.quadriflow_remesh", {"type": 'R', "value": 'PRESS', "ctrl": True, "alt": True}, None),
@@ -3847,10 +3849,10 @@ def km_knife_tool_modal_map(_params):
         ("ADD_CUT_CLOSED", {"type": 'LEFTMOUSE', "value": 'DOUBLE_CLICK', "any": True}, None),
         ("ADD_CUT", {"type": 'LEFTMOUSE', "value": 'ANY', "any": True}, None),
         ("NEW_CUT", {"type": 'E', "value": 'PRESS'}, None),
-        ("SNAP_MIDPOINTS_ON", {"type": 'LEFT_CTRL', "value": 'PRESS', "any": False}, None),
-        ("SNAP_MIDPOINTS_OFF", {"type": 'LEFT_CTRL', "value": 'RELEASE', "any": False}, None),
-        ("SNAP_MIDPOINTS_ON", {"type": 'RIGHT_CTRL', "value": 'PRESS', "any": False}, None),
-        ("SNAP_MIDPOINTS_OFF", {"type": 'RIGHT_CTRL', "value": 'RELEASE', "any": False}, None),
+        ("SNAP_MIDPOINTS_ON", {"type": 'LEFT_CTRL', "value": 'PRESS'}, None),
+        ("SNAP_MIDPOINTS_OFF", {"type": 'LEFT_CTRL', "value": 'RELEASE'}, None),
+        ("SNAP_MIDPOINTS_ON", {"type": 'RIGHT_CTRL', "value": 'PRESS'}, None),
+        ("SNAP_MIDPOINTS_OFF", {"type": 'RIGHT_CTRL', "value": 'RELEASE'}, None),
         ("IGNORE_SNAP_ON", {"type": 'LEFT_SHIFT', "value": 'PRESS', "any": True}, None),
         ("IGNORE_SNAP_OFF", {"type": 'LEFT_SHIFT', "value": 'RELEASE', "any": True}, None),
         ("IGNORE_SNAP_ON", {"type": 'RIGHT_SHIFT', "value": 'PRESS', "any": True}, None),

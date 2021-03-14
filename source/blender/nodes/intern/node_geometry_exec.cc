@@ -20,7 +20,6 @@
 
 #include "DEG_depsgraph_query.h"
 
-#include "NOD_derived_node_tree.hh"
 #include "NOD_geometry_exec.hh"
 #include "NOD_type_callbacks.hh"
 
@@ -30,7 +29,7 @@ namespace blender::nodes {
 
 void GeoNodeExecParams::error_message_add(const NodeWarningType type, std::string message) const
 {
-  bNodeTree *btree_cow = node_.node_ref().tree().btree();
+  bNodeTree *btree_cow = node_->btree();
   BLI_assert(btree_cow != nullptr);
   if (btree_cow == nullptr) {
     return;
@@ -40,12 +39,12 @@ void GeoNodeExecParams::error_message_add(const NodeWarningType type, std::strin
   const NodeTreeEvaluationContext context(*self_object_, *modifier_);
 
   BKE_nodetree_error_message_add(
-      *btree_original, context, *node_.bnode(), type, std::move(message));
+      *btree_original, context, *node_->bnode(), type, std::move(message));
 }
 
 const bNodeSocket *GeoNodeExecParams::find_available_socket(const StringRef name) const
 {
-  for (const DSocket *socket : node_.inputs()) {
+  for (const InputSocketRef *socket : node_->inputs()) {
     if (socket->is_available() && socket->name() == name) {
       return socket->bsocket();
     }
@@ -75,10 +74,11 @@ ReadAttributePtr GeoNodeExecParams::get_input_attribute(const StringRef name,
     }
 
     /* If the attribute doesn't exist, use the default value and output an error message
-     * (except when the field is empty, to avoid spamming error messages). */
-    if (!name.empty()) {
+     * (except when the field is empty, to avoid spamming error messages, and not when
+     * the domain is empty and we don't expect an attribute anyway). */
+    if (!name.empty() && component.attribute_domain_size(domain) != 0) {
       this->error_message_add(NodeWarningType::Error,
-                              std::string("No attribute with name '") + name + "'.");
+                              TIP_("No attribute with name \"") + name + "\"");
     }
     return component.attribute_get_constant_for_read(domain, type, default_value);
   }
@@ -175,7 +175,7 @@ void GeoNodeExecParams::check_extract_input(StringRef identifier,
                                             const CPPType *requested_type) const
 {
   bNodeSocket *found_socket = nullptr;
-  for (const DSocket *socket : node_.inputs()) {
+  for (const InputSocketRef *socket : node_->inputs()) {
     if (socket->identifier() == identifier) {
       found_socket = socket->bsocket();
       break;
@@ -185,7 +185,7 @@ void GeoNodeExecParams::check_extract_input(StringRef identifier,
   if (found_socket == nullptr) {
     std::cout << "Did not find an input socket with the identifier '" << identifier << "'.\n";
     std::cout << "Possible identifiers are: ";
-    for (const DSocket *socket : node_.inputs()) {
+    for (const InputSocketRef *socket : node_->inputs()) {
       if (socket->is_available()) {
         std::cout << "'" << socket->identifier() << "', ";
       }
@@ -217,7 +217,7 @@ void GeoNodeExecParams::check_extract_input(StringRef identifier,
 void GeoNodeExecParams::check_set_output(StringRef identifier, const CPPType &value_type) const
 {
   bNodeSocket *found_socket = nullptr;
-  for (const DSocket *socket : node_.outputs()) {
+  for (const OutputSocketRef *socket : node_->outputs()) {
     if (socket->identifier() == identifier) {
       found_socket = socket->bsocket();
       break;
@@ -227,7 +227,7 @@ void GeoNodeExecParams::check_set_output(StringRef identifier, const CPPType &va
   if (found_socket == nullptr) {
     std::cout << "Did not find an output socket with the identifier '" << identifier << "'.\n";
     std::cout << "Possible identifiers are: ";
-    for (const DSocket *socket : node_.outputs()) {
+    for (const OutputSocketRef *socket : node_->outputs()) {
       if (socket->is_available()) {
         std::cout << "'" << socket->identifier() << "', ";
       }

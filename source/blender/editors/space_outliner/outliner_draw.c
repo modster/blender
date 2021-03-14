@@ -21,7 +21,6 @@
  * \ingroup spoutliner
  */
 
-#include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
 #include "DNA_collection_types.h"
 #include "DNA_constraint_types.h"
@@ -45,7 +44,6 @@
 #include "BKE_armature.h"
 #include "BKE_context.h"
 #include "BKE_deform.h"
-#include "BKE_fcurve.h"
 #include "BKE_gpencil.h"
 #include "BKE_idtype.h"
 #include "BKE_layer.h"
@@ -56,14 +54,11 @@
 #include "BKE_object.h"
 #include "BKE_particle.h"
 #include "BKE_report.h"
-#include "BKE_scene.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
 
 #include "ED_armature.h"
-#include "ED_keyframing.h"
-#include "ED_object.h"
 #include "ED_outliner.h"
 #include "ED_screen.h"
 
@@ -675,7 +670,7 @@ static void namebutton_fn(bContext *C, void *tsep, char *oldname)
   if (ts && tselem) {
     TreeElement *te = outliner_find_tree_element(&space_outliner->tree, tselem);
 
-    if (tselem->type == 0) {
+    if (tselem->type == TSE_SOME_ID) {
       BLI_libblock_ensure_unique_name(bmain, tselem->id->name);
 
       switch (GS(tselem->id->name)) {
@@ -1100,11 +1095,11 @@ static void outliner_draw_restrictbuts(uiBlock *block,
           UI_but_drawflag_enable(bt, UI_BUT_ICON_REVERSE);
         }
       }
-      else if ((tselem->type == 0 && te->idcode == ID_OB) &&
+      else if (((tselem->type == TSE_SOME_ID) && (te->idcode == ID_OB)) &&
                (te->flag & TE_CHILD_NOT_IN_COLLECTION)) {
         /* Don't show restrict columns for children that are not directly inside the collection. */
       }
-      else if (tselem->type == 0 && te->idcode == ID_OB) {
+      else if ((tselem->type == TSE_SOME_ID) && (te->idcode == ID_OB)) {
         PointerRNA ptr;
         Object *ob = (Object *)tselem->id;
         RNA_id_pointer_create(&ob->id, &ptr);
@@ -1699,7 +1694,7 @@ static void outliner_draw_userbuts(uiBlock *block,
   LISTBASE_FOREACH (TreeElement *, te, lb) {
     TreeStoreElem *tselem = TREESTORE(te);
     if (te->ys + 2 * UI_UNIT_Y >= region->v2d.cur.ymin && te->ys <= region->v2d.cur.ymax) {
-      if (tselem->type == 0) {
+      if (tselem->type == TSE_SOME_ID) {
         uiBut *bt;
         ID *id = tselem->id;
         const char *tip = NULL;
@@ -1949,7 +1944,7 @@ static void outliner_draw_mode_column_toggle(uiBlock *block,
                                              TreeStoreElem *tselem,
                                              const bool lock_object_modes)
 {
-  if (tselem->type != 0 || te->idcode != ID_OB) {
+  if ((tselem->type != TSE_SOME_ID) || (te->idcode != ID_OB)) {
     return;
   }
 
@@ -2046,7 +2041,7 @@ TreeElementIcon tree_element_get_icon(TreeStoreElem *tselem, TreeElement *te)
 {
   TreeElementIcon data = {0};
 
-  if (tselem->type) {
+  if (tselem->type != TSE_SOME_ID) {
     switch (tselem->type) {
       case TSE_ANIM_DATA:
         data.icon = ICON_ANIM_DATA; /* XXX */
@@ -2825,7 +2820,8 @@ int tree_element_id_type_to_index(TreeElement *te)
 {
   TreeStoreElem *tselem = TREESTORE(te);
 
-  const int id_index = tselem->type == 0 ? BKE_idtype_idcode_to_index(te->idcode) : INDEX_ID_GR;
+  const int id_index = (tselem->type == TSE_SOME_ID) ? BKE_idtype_idcode_to_index(te->idcode) :
+                                                       INDEX_ID_GR;
   if (id_index < INDEX_ID_OB) {
     return id_index;
   }
@@ -2862,9 +2858,9 @@ static void outliner_draw_iconrow(bContext *C,
     te->flag &= ~(TE_ICONROW | TE_ICONROW_MERGED);
 
     /* object hierarchy always, further constrained on level */
-    if (level < 1 || (tselem->type == 0 && te->idcode == ID_OB)) {
+    if ((level < 1) || ((tselem->type == TSE_SOME_ID) && (te->idcode == ID_OB))) {
       /* active blocks get white circle */
-      if (tselem->type == 0) {
+      if (tselem->type == TSE_SOME_ID) {
         if (te->idcode == ID_OB) {
           active = (tvc->obact == (Object *)tselem->id) ? OL_DRAWSEL_NORMAL : OL_DRAWSEL_NONE;
         }
@@ -2879,7 +2875,7 @@ static void outliner_draw_iconrow(bContext *C,
         active = tree_element_type_active_state_get(C, tvc, te, tselem);
       }
 
-      if (!ELEM(tselem->type, 0, TSE_LAYER_COLLECTION, TSE_R_LAYER, TSE_GP_LAYER)) {
+      if (!ELEM(tselem->type, TSE_SOME_ID, TSE_LAYER_COLLECTION, TSE_R_LAYER, TSE_GP_LAYER)) {
         outliner_draw_iconrow_doit(block, te, fstyle, xmax, offsx, ys, alpha_fac, active, 1);
       }
       else {
@@ -2954,7 +2950,7 @@ static bool element_should_draw_faded(const TreeViewContext *tvc,
                                       const TreeElement *te,
                                       const TreeStoreElem *tselem)
 {
-  if (tselem->type == 0) {
+  if (tselem->type == TSE_SOME_ID) {
     switch (te->idcode) {
       case ID_OB: {
         const Object *ob = (const Object *)tselem->id;
@@ -3023,7 +3019,7 @@ static void outliner_draw_tree_element(bContext *C,
     GPU_blend(GPU_BLEND_ALPHA);
 
     /* Colors for active/selected data. */
-    if (tselem->type == 0) {
+    if (tselem->type == TSE_SOME_ID) {
       if (te->idcode == ID_OB) {
         Object *ob = (Object *)tselem->id;
         Base *base = (te->directdata) ? (Base *)te->directdata :
@@ -3080,7 +3076,7 @@ static void outliner_draw_tree_element(bContext *C,
     if (tselem->type == TSE_VIEW_COLLECTION_BASE) {
       /* Scene collection in view layer can't expand/collapse. */
     }
-    else if (te->subtree.first || (tselem->type == 0 && te->idcode == ID_SCE) ||
+    else if (te->subtree.first || ((tselem->type == TSE_SOME_ID) && (te->idcode == ID_SCE)) ||
              (te->flag & TE_LAZY_CLOSED)) {
       /* Open/close icon, only when sub-levels, except for scene. */
       int icon_x = startx;
@@ -3117,7 +3113,7 @@ static void outliner_draw_tree_element(bContext *C,
       offsx += 2 * ufac;
     }
 
-    if (ELEM(tselem->type, 0, TSE_LAYER_COLLECTION) ||
+    if (ELEM(tselem->type, TSE_SOME_ID, TSE_LAYER_COLLECTION) ||
         ((tselem->type == TSE_RNA_STRUCT) && RNA_struct_is_ID(te->rnaptr.type))) {
       const BIFIconID lib_icon = UI_icon_from_library(tselem->id);
       if (lib_icon != ICON_NONE) {
@@ -3143,7 +3139,7 @@ static void outliner_draw_tree_element(bContext *C,
     /* Closed item, we draw the icons, not when it's a scene, or master-server list though. */
     if (!TSELEM_OPEN(tselem, space_outliner)) {
       if (te->subtree.first) {
-        if (tselem->type == 0 && te->idcode == ID_SCE) {
+        if ((tselem->type == TSE_SOME_ID) && (te->idcode == ID_SCE)) {
           /* Pass. */
         }
         /* this tree element always has same amount of branches, so don't draw */
@@ -3210,7 +3206,7 @@ static bool subtree_contains_object(ListBase *lb)
 {
   LISTBASE_FOREACH (TreeElement *, te, lb) {
     TreeStoreElem *tselem = TREESTORE(te);
-    if (tselem->type == 0 && te->idcode == ID_OB) {
+    if ((tselem->type == TSE_SOME_ID) && (te->idcode == ID_OB)) {
       return true;
     }
   }
@@ -3265,7 +3261,7 @@ static void outliner_draw_hierarchy_lines_recursive(uint pos,
 
         y = *starty;
       }
-      else if (tselem->type == 0 && te->idcode == ID_OB) {
+      else if ((tselem->type == TSE_SOME_ID) && (te->idcode == ID_OB)) {
         if (subtree_contains_object(&te->subtree)) {
           draw_hierarchy_line = true;
           is_object_line = true;

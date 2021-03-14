@@ -416,6 +416,7 @@ else()
   option(LLVM_STATIC                  "Link with LLVM static libraries" OFF)
 endif()
 mark_as_advanced(LLVM_STATIC)
+option(WITH_CLANG                   "Use Clang" OFF)
 
 # disable for now, but plan to support on all platforms eventually
 option(WITH_MEM_JEMALLOC   "Enable malloc replacement (http://www.canonware.com/jemalloc)" ON)
@@ -742,6 +743,7 @@ if(WITH_CYCLES)
   # auto enable llvm for cycles_osl
   if(WITH_CYCLES_OSL)
     set(WITH_LLVM ON CACHE BOOL "" FORCE)
+    set(WITH_CLANG ON CACHE BOOL "" FORCE)
   endif()
 else()
   set(WITH_CYCLES_OSL OFF)
@@ -899,6 +901,18 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "Release")
   endif()
 endif()
 
+# Test SIMD support, before platform includes to determine if sse2neon is needed.
+if(WITH_CPU_SIMD)
+  set(COMPILER_SSE_FLAG)
+  set(COMPILER_SSE2_FLAG)
+
+  # Test Neon first since macOS Arm can compile and run x86-64 SSE binaries.
+  TEST_NEON_SUPPORT()
+  if(NOT SUPPORT_NEON_BUILD)
+    TEST_SSE_SUPPORT(COMPILER_SSE_FLAG COMPILER_SSE2_FLAG)
+  endif()
+endif()
+
 # ----------------------------------------------------------------------------
 # Main Platform Checks
 #
@@ -954,16 +968,11 @@ if(WITH_INTERNATIONAL)
   endif()
 endif()
 
-# See TEST_SSE_SUPPORT() and TEST_NEON_SUPPORT() for how these are defined.
+# Enable SIMD support if detected by TEST_SSE_SUPPORT() or TEST_NEON_SUPPORT().
 #
 # This is done globally, so that all modules can use it if available, and
 # because these are used in headers used by many modules.
 if(WITH_CPU_SIMD)
-  set(COMPILER_SSE_FLAG)
-  set(COMPILER_SSE2_FLAG)
-
-  # Test Neon first since macOS Arm can compile and run x86-64 SSE binaries.
-  TEST_NEON_SUPPORT()
   if(SUPPORT_NEON_BUILD)
     # Neon
     if(SSE2NEON_FOUND)
@@ -972,7 +981,6 @@ if(WITH_CPU_SIMD)
     endif()
   else()
     # SSE
-    TEST_SSE_SUPPORT(COMPILER_SSE_FLAG COMPILER_SSE2_FLAG)
     if(SUPPORT_SSE_BUILD)
       string(PREPEND PLATFORM_CFLAGS "${COMPILER_SSE_FLAG} ")
       add_definitions(-D__SSE__ -D__MMX__)
@@ -1213,6 +1221,7 @@ if(WITH_OPENMP)
     if(NOT WITH_OPENMP_STATIC)
       string(APPEND CMAKE_C_FLAGS " ${OpenMP_C_FLAGS}")
       string(APPEND CMAKE_CXX_FLAGS " ${OpenMP_CXX_FLAGS}")
+      string(APPEND CMAKE_EXE_LINKER_FLAGS " ${OpenMP_LINKER_FLAGS}")
     else()
       # Typically avoid adding flags as defines but we can't
       # pass OpenMP flags to the linker for static builds, meaning
@@ -1881,6 +1890,7 @@ if(FIRST_RUN)
   info_cfg_text("Build Options:")
   info_cfg_option(WITH_ALEMBIC)
   info_cfg_option(WITH_BULLET)
+  info_cfg_option(WITH_CLANG)
   info_cfg_option(WITH_CYCLES)
   info_cfg_option(WITH_FFTW3)
   info_cfg_option(WITH_FREESTYLE)

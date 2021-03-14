@@ -178,29 +178,23 @@ void gather_attribute_info(Map<std::string, AttributeKind> &attributes,
       }
       const GeometryComponent &component = *set.get_component_for_read(component_type);
 
-      for (const std::string &name : component.attribute_names()) {
+      component.attribute_foreach([&](StringRefNull name, const AttributeMetaData &meta_data) {
         if (ignored_attributes.contains(name)) {
-          continue;
+          return true;
         }
-        const ReadAttributePtr read_attribute = component.attribute_try_get_for_read(name);
-        if (!read_attribute) {
-          continue;
-        }
-        const AttributeDomain domain = read_attribute->domain();
-        const CustomDataType data_type = read_attribute->custom_data_type();
-
-        auto add_info = [&, data_type, domain](AttributeKind *attribute_kind) {
-          attribute_kind->domain = domain;
-          attribute_kind->data_type = data_type;
+        auto add_info = [&](AttributeKind *attribute_kind) {
+          attribute_kind->domain = meta_data.domain;
+          attribute_kind->data_type = meta_data.data_type;
         };
-        auto modify_info = [&, data_type, domain](AttributeKind *attribute_kind) {
-          attribute_kind->domain = domain; /* TODO: Use highest priority domain. */
+        auto modify_info = [&](AttributeKind *attribute_kind) {
+          attribute_kind->domain = meta_data.domain; /* TODO: Use highest priority domain. */
           attribute_kind->data_type = bke::attribute_data_type_highest_complexity(
-              {attribute_kind->data_type, data_type});
+              {attribute_kind->data_type, meta_data.data_type});
         };
 
         attributes.add_or_modify(name, add_info, modify_info);
-      }
+        return true;
+      });
     }
   }
 }
@@ -377,14 +371,17 @@ static void join_instance_groups_mesh(Span<GeometryInstanceGroup> set_groups,
   dst_component.replace(new_mesh);
 
   Vector<GeometryComponentType> component_types;
-  component_types.append(GeometryComponentType::Mesh);
+  component_types.append(GEO_COMPONENT_TYPE_MESH);
   if (convert_points_to_vertices) {
-    component_types.append(GeometryComponentType::PointCloud);
+    component_types.append(GEO_COMPONENT_TYPE_POINT_CLOUD);
   }
 
   /* Don't copy attributes that are stored directly in the mesh data structs. */
   Map<std::string, AttributeKind> attributes;
-  gather_attribute_info(attributes, component_types, set_groups, {"position", "material_index"});
+  gather_attribute_info(attributes,
+                        component_types,
+                        set_groups,
+                        {"position", "material_index", "normal", "shade_smooth"});
   join_attributes(
       set_groups, component_types, attributes, static_cast<GeometryComponent &>(dst_component));
 }
@@ -405,9 +402,9 @@ static void join_instance_groups_pointcloud(Span<GeometryInstanceGroup> set_grou
   PointCloud *pointcloud = BKE_pointcloud_new_nomain(totpoint);
   dst_component.replace(pointcloud);
   Map<std::string, AttributeKind> attributes;
-  gather_attribute_info(attributes, {GeometryComponentType::PointCloud}, set_groups, {});
+  gather_attribute_info(attributes, {GEO_COMPONENT_TYPE_POINT_CLOUD}, set_groups, {});
   join_attributes(set_groups,
-                  {GeometryComponentType::PointCloud},
+                  {GEO_COMPONENT_TYPE_POINT_CLOUD},
                   attributes,
                   static_cast<GeometryComponent &>(dst_component));
 }

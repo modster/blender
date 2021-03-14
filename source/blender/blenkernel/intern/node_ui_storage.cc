@@ -16,6 +16,8 @@
 
 #include "CLG_log.h"
 
+#include <mutex>
+
 #include "BLI_map.hh"
 #include "BLI_string_ref.hh"
 #include "BLI_vector.hh"
@@ -23,7 +25,9 @@
 #include "DNA_node_types.h"
 #include "DNA_object_types.h"
 
+#include "BKE_context.h"
 #include "BKE_node_ui_storage.hh"
+#include "BKE_object.h"
 
 static CLG_LogRef LOG = {"bke.node_ui_storage"};
 
@@ -31,11 +35,49 @@ using blender::Map;
 using blender::StringRef;
 using blender::Vector;
 
+/* Use a global mutex because otherwise it would have to be stored directly in the
+ * bNodeTree struct in DNA. This could change if the node tree had a runtime struct. */
+static std::mutex global_ui_storage_mutex;
+
 static void ui_storage_ensure(bNodeTree &ntree)
 {
+  /* As an optimization, only acquire a lock if the UI storage doesn't exist,
+   * because it only needs to be allocated once for every node tree. */
   if (ntree.ui_storage == nullptr) {
-    ntree.ui_storage = new NodeTreeUIStorage();
+    std::lock_guard<std::mutex> lock(global_ui_storage_mutex);
+    /* Check again-- another thread may have allocated the storage while this one waited. */
+    if (ntree.ui_storage == nullptr) {
+      ntree.ui_storage = new NodeTreeUIStorage();
+    }
   }
+}
+
+const NodeUIStorage *BKE_node_tree_ui_storage_get_from_context(const bContext *C,
+                                                               const bNodeTree &ntree,
+                                                               const bNode &node)
+{
+  const NodeTreeUIStorage *ui_storage = ntree.ui_storage;
+  if (ui_storage == nullptr) {
+    return nullptr;
+  }
+
+  const Object *active_object = CTX_data_active_object(C);
+  if (active_object == nullptr) {
+    return nullptr;
+  }
+
+  const ModifierData *active_modifier = BKE_object_active_modifier(active_object);
+  if (active_modifier == nullptr) {
+    return nullptr;
+  }
+
+  const NodeTreeEvaluationContext context(*active_object, *active_modifier);
+  const Map<std::string, NodeUIStorage> *storage = ui_storage->context_map.lookup_ptr(context);
+  if (storage == nullptr) {
+    return nullptr;
+  }
+
+  return storage->lookup_ptr_as(StringRef(node.name));
 }
 
 /**
@@ -48,6 +90,7 @@ void BKE_nodetree_ui_storage_free_for_context(bNodeTree &ntree,
 {
   NodeTreeUIStorage *ui_storage = ntree.ui_storage;
   if (ui_storage != nullptr) {
+    std::lock_guard<std::mutex> lock(ui_storage->context_map_mutex);
     ui_storage->context_map.remove(context);
   }
 }
@@ -83,13 +126,14 @@ static void node_error_message_log(bNodeTree &ntree,
   }
 }
 
-static NodeUIStorage &find_node_ui_storage(bNodeTree &ntree,
-                                           const NodeTreeEvaluationContext &context,
-                                           const bNode &node)
+static NodeUIStorage &node_ui_storage_ensure(bNodeTree &ntree,
+                                             const NodeTreeEvaluationContext &context,
+                                             const bNode &node)
 {
   ui_storage_ensure(ntree);
   NodeTreeUIStorage &ui_storage = *ntree.ui_storage;
 
+  std::lock_guard<std::mutex> lock(ui_storage.context_map_mutex);
   Map<std::string, NodeUIStorage> &node_tree_ui_storage =
       ui_storage.context_map.lookup_or_add_default(context);
 
@@ -107,6 +151,15 @@ void BKE_nodetree_error_message_add(bNodeTree &ntree,
 {
   node_error_message_log(ntree, node, message, type);
 
-  NodeUIStorage &node_ui_storage = find_node_ui_storage(ntree, context, node);
+  NodeUIStorage &node_ui_storage = node_ui_storage_ensure(ntree, context, node);
   node_ui_storage.warnings.append({type, std::move(message)});
+}
+
+void BKE_nodetree_attribute_hint_add(bNodeTree &ntree,
+                                     const NodeTreeEvaluationContext &context,
+                                     const bNode &node,
+                                     const StringRef attribute_name)
+{
+  NodeUIStorage &node_ui_storage = node_ui_storage_ensure(ntree, context, node);
+  node_ui_storage.attribute_name_hints.add_as(attribute_name);
 }
