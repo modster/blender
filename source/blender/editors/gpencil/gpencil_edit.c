@@ -4650,11 +4650,11 @@ static int gpencil_stroke_separate_exec(bContext *C, wmOperator *op)
   bGPdata *gpd_dst = NULL;
   bGPDlayer *gpl_dst = NULL;
   bGPDframe *gpf_dst = NULL;
-  bGPDspoint *pt;
   Material *ma = NULL;
-  int i, idx;
+  int idx;
 
   eGP_SeparateModes mode = RNA_enum_get(op->ptr, "mode");
+  const bool keep_ends = RNA_boolean_get(op->ptr, "keep_ends");
 
   /* sanity checks */
   if (ELEM(NULL, gpd_src)) {
@@ -4667,7 +4667,6 @@ static int gpencil_stroke_separate_exec(bContext *C, wmOperator *op)
   }
 
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd_src);
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd_src);
 
   /* Create a new object. */
   /* Take into account user preferences for duplicating actions. */
@@ -4699,6 +4698,13 @@ static int gpencil_stroke_separate_exec(bContext *C, wmOperator *op)
           gpf_dst = NULL;
 
           LISTBASE_FOREACH_MUTABLE (bGPDstroke *, gps, &gpf->strokes) {
+            bool is_stroke_selected = GPENCIL_STROKE_TYPE_BEZIER(gps) ?
+                                          (bool)(gps->editcurve->flag & GP_CURVE_SELECT) :
+                                          (bool)(gps->flag & GP_STROKE_SELECT);
+
+            if (!is_stroke_selected) {
+              continue;
+            }
 
             /* skip strokes that are invalid for current view */
             if (ED_gpencil_stroke_can_use(C, gps) == false) {
@@ -4708,67 +4714,199 @@ static int gpencil_stroke_separate_exec(bContext *C, wmOperator *op)
             if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
               continue;
             }
-            /* Separate selected strokes. */
-            if (gps->flag & GP_STROKE_SELECT) {
-              /* add layer if not created before */
-              if (gpl_dst == NULL) {
-                gpl_dst = BKE_gpencil_layer_addnew(gpd_dst, gpl->info, false);
-              }
 
-              /* add frame if not created before */
-              if (gpf_dst == NULL) {
-                gpf_dst = BKE_gpencil_layer_frame_get(gpl_dst, gpf->framenum, GP_GETFRAME_ADD_NEW);
-              }
+            /* add layer if not created before */
+            if (gpl_dst == NULL) {
+              gpl_dst = BKE_gpencil_layer_addnew(gpd_dst, gpl->info, false);
+            }
 
-              /* add duplicate materials */
+            /* add frame if not created before */
+            if (gpf_dst == NULL) {
+              gpf_dst = BKE_gpencil_layer_frame_get(gpl_dst, gpf->framenum, GP_GETFRAME_ADD_NEW);
+            }
 
-              /* XXX same material can be in multiple slots. */
-              ma = BKE_gpencil_material(ob, gps->mat_nr + 1);
+            /* add duplicate materials */
 
-              idx = BKE_gpencil_object_material_ensure(bmain, ob_dst, ma);
+            /* XXX same material can be in multiple slots. */
+            ma = BKE_gpencil_material(ob, gps->mat_nr + 1);
 
-              /* selected points mode */
-              if (mode == GP_SEPARATE_POINT) {
-                if (is_curve_edit) {
-                  BKE_report(op->reports, RPT_ERROR, "Not implemented!");
+            idx = BKE_gpencil_object_material_ensure(bmain, ob_dst, ma);
+
+            /* selected points mode */
+            if (mode == GP_SEPARATE_POINT) {
+              /* make copy of source stroke */
+              bGPDstroke *gps_dst = BKE_gpencil_stroke_duplicate(gps, true, true);
+
+              /* Reassign material. */
+              gps_dst->mat_nr = idx;
+
+              /* link to destination frame */
+              BLI_addtail(&gpf_dst->strokes, gps_dst);
+
+              if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+                bGPDcurve *gpc_src = gps->editcurve;
+                bGPDcurve *gpc_dst = gps_dst->editcurve;
+
+                /* Flip the selection */
+                for (int i = 0; i < gpc_dst->tot_curve_points; i++) {
+                  bGPDcurve_point *cpt = &gpc_dst->curve_points[i];
+                  BezTriple *bezt = &cpt->bezt;
+                  if (cpt->flag & GP_CURVE_POINT_SELECT) {
+                    cpt->flag &= ~GP_CURVE_POINT_SELECT;
+                    BEZT_DESEL_ALL(bezt);
+                  }
+                  else {
+                    cpt->flag |= GP_CURVE_POINT_SELECT;
+                    BEZT_SEL_ALL(bezt);
+                  }
                 }
-                else {
-                  /* make copy of source stroke */
-                  bGPDstroke *gps_dst = BKE_gpencil_stroke_duplicate(gps, true, true);
 
-                  /* Reassign material. */
-                  gps_dst->mat_nr = idx;
+                if (keep_ends) {
+                  /* Shrink the selection in the original stroke to keep the connecting points. */
+                  int tot_selected = 0, num_deselected = 0;
 
-                  /* link to destination frame */
-                  BLI_addtail(&gpf_dst->strokes, gps_dst);
-
-                  /* Invert selection status of all points in destination stroke */
-                  for (i = 0, pt = gps_dst->points; i < gps_dst->totpoints; i++, pt++) {
-                    pt->flag ^= GP_SPOINT_SELECT;
+                  bool prev_sel = false;
+                  int i;
+                  for (i = 0; i < gpc_src->tot_curve_points; i++) {
+                    bGPDcurve_point *gpc_pt = &gpc_src->curve_points[i];
+                    BezTriple *bezt = &gpc_pt->bezt;
+                    if (gpc_pt->flag & GP_CURVE_POINT_SELECT) {
+                      /* shrink if previous wasn't selected */
+                      if (prev_sel == false) {
+                        gpc_pt->flag &= ~GP_CURVE_POINT_SELECT;
+                        BEZT_DESEL_ALL(bezt);
+                        num_deselected++;
+                      }
+                      prev_sel = true;
+                      tot_selected++;
+                    }
+                    else {
+                      /* mark previous as being unselected - and hence, is trigger for shrinking */
+                      prev_sel = false;
+                    }
                   }
 
-                  /* delete selected points from destination stroke */
-                  BKE_gpencil_stroke_delete_tagged_points(
-                      gpd_dst, gpf_dst, gps_dst, NULL, GP_SPOINT_SELECT, false, 0);
+                  /* Second Pass: Go in reverse order, doing the same as before (except in opposite
+                   * order)
+                   * - This pass covers the "before" edges of selection islands
+                   */
+                  prev_sel = false;
+                  for (i = gpc_src->tot_curve_points - 1; i > 0; i--) {
+                    bGPDcurve_point *gpc_pt = &gpc_src->curve_points[i];
+                    BezTriple *bezt = &gpc_pt->bezt;
+                    if (gpc_pt->flag & GP_CURVE_POINT_SELECT) {
+                      /* shrink if previous wasn't selected */
+                      if (prev_sel == false) {
+                        gpc_pt->flag &= ~GP_CURVE_POINT_SELECT;
+                        BEZT_DESEL_ALL(bezt);
+                        num_deselected++;
+                      }
+                      prev_sel = true;
+                    }
+                    else {
+                      /* mark previous as being unselected - and hence, is trigger for shrinking */
+                      prev_sel = false;
+                    }
+                  }
 
-                  /* delete selected points from origin stroke */
-                  BKE_gpencil_stroke_delete_tagged_points(
-                      gpd_src, gpf, gps, gps->next, GP_SPOINT_SELECT, false, 0);
+                  /* Deselect curve if all points are deselected. */
+                  if (tot_selected - num_deselected == 0) {
+                    gpc_src->flag &= ~GP_CURVE_SELECT;
+                  }
                 }
+
+                BKE_gpencil_curve_delete_tagged_points(
+                    gpd_dst, gpf_dst, gps_dst, NULL, gpc_dst, GP_CURVE_POINT_SELECT);
+
+                BKE_gpencil_curve_delete_tagged_points(
+                    gpd_src, gpf, gps, gps->next, gpc_src, GP_CURVE_POINT_SELECT);
               }
-              /* selected strokes mode */
-              else if (mode == GP_SEPARATE_STROKE) {
-                /* deselect old stroke */
+              else {
+
+                /* Invert selection status of all points in destination stroke */
+                for (int i = 0; i < gps_dst->totpoints; i++) {
+                  bGPDspoint *pt = &gps_dst->points[i];
+                  pt->flag ^= GP_SPOINT_SELECT;
+                }
+
+                if (keep_ends) {
+                  bGPDspoint *pt;
+                  int i, tot_selected = 0, num_deselected = 0;
+                  bool prev_sel;
+
+                  /* First Pass: Go in forward order, shrinking selection
+                   * if previous was not selected (pre changes).
+                   * - This pass covers the "after" edges of selection islands
+                   */
+                  prev_sel = false;
+                  for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+                    if (pt->flag & GP_SPOINT_SELECT) {
+                      /* shrink if previous wasn't selected */
+                      if (prev_sel == false) {
+                        pt->flag &= ~GP_SPOINT_SELECT;
+                        num_deselected++;
+                      }
+                      prev_sel = true;
+                      tot_selected++;
+                    }
+                    else {
+                      /* mark previous as being unselected - and hence, is trigger for shrinking */
+                      prev_sel = false;
+                    }
+                  }
+
+                  /* Second Pass: Go in reverse order, doing the same as before (except in opposite
+                   * order)
+                   * - This pass covers the "before" edges of selection islands
+                   */
+                  prev_sel = false;
+                  for (pt -= 1; i > 0; i--, pt--) {
+                    if (pt->flag & GP_SPOINT_SELECT) {
+                      /* shrink if previous wasn't selected */
+                      if (prev_sel == false) {
+                        pt->flag &= ~GP_SPOINT_SELECT;
+                        num_deselected++;
+                      }
+                      prev_sel = true;
+                    }
+                    else {
+                      /* mark previous as being unselected - and hence, is trigger for shrinking */
+                      prev_sel = false;
+                    }
+                  }
+
+                  /* Deselect stroke if all points are deselected. */
+                  if (tot_selected - num_deselected == 0) {
+                    gps->flag &= ~GP_STROKE_SELECT;
+                  }
+                }
+
+                /* delete selected points from destination stroke */
+                BKE_gpencil_stroke_delete_tagged_points(
+                    gpd_dst, gpf_dst, gps_dst, NULL, GP_SPOINT_SELECT, false, 0);
+
+                /* delete selected points from origin stroke */
+                BKE_gpencil_stroke_delete_tagged_points(
+                    gpd_src, gpf, gps, gps->next, GP_SPOINT_SELECT, false, 0);
+              }
+            }
+            /* selected strokes mode */
+            else if (mode == GP_SEPARATE_STROKE) {
+              /* deselect old stroke */
+              if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+                gps->editcurve->flag &= ~GP_CURVE_SELECT;
+              }
+              else {
                 gps->flag &= ~GP_STROKE_SELECT;
-                BKE_gpencil_stroke_select_index_reset(gps);
-                /* unlink from source frame */
-                BLI_remlink(&gpf->strokes, gps);
-                gps->prev = gps->next = NULL;
-                /* relink to destination frame */
-                BLI_addtail(&gpf_dst->strokes, gps);
-                /* Reassign material. */
-                gps->mat_nr = idx;
               }
+              BKE_gpencil_stroke_select_index_reset(gps);
+              /* unlink from source frame */
+              BLI_remlink(&gpf->strokes, gps);
+              gps->prev = gps->next = NULL;
+              /* relink to destination frame */
+              BLI_addtail(&gpf_dst->strokes, gps);
+              /* Reassign material. */
+              gps->mat_nr = idx;
             }
           }
         }
@@ -4843,8 +4981,28 @@ static int gpencil_stroke_separate_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
+static bool gpencil_stroke_separate_poll_property(const bContext *UNUSED(C),
+                                                  wmOperator *op,
+                                                  const PropertyRNA *prop)
+{
+  const char *prop_id = RNA_property_identifier(prop);
+
+  /* Only show connect keep_ends in GP_SEPARATE_POINT mode. */
+  if (STREQ(prop_id, "keep_ends")) {
+    const int type = RNA_enum_get(op->ptr, "mode");
+    if (type == GP_SEPARATE_POINT) {
+      return true;
+    }
+    return false;
+  }
+
+  return true;
+}
+
 void GPENCIL_OT_stroke_separate(wmOperatorType *ot)
 {
+  PropertyRNA *prop;
+
   static const EnumPropertyItem separate_type[] = {
       {GP_SEPARATE_POINT, "POINT", 0, "Selected Points", "Separate the selected points"},
       {GP_SEPARATE_STROKE, "STROKE", 0, "Selected Strokes", "Separate the selected strokes"},
@@ -4861,12 +5019,19 @@ void GPENCIL_OT_stroke_separate(wmOperatorType *ot)
   ot->invoke = WM_menu_invoke;
   ot->exec = gpencil_stroke_separate_exec;
   ot->poll = gpencil_strokes_edit3d_poll;
+  ot->poll_property = gpencil_stroke_separate_poll_property;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
   /* properties */
   ot->prop = RNA_def_enum(ot->srna, "mode", separate_type, GP_SEPARATE_POINT, "Mode", "");
+
+  prop = RNA_def_boolean(ot->srna,
+                         "keep_ends",
+                         false,
+                         "Keep Ends",
+                         "Seperate the selected points, but keep the ends in both");
 }
 
 /** \} */
