@@ -3882,7 +3882,7 @@ void GPENCIL_OT_stroke_join(wmOperatorType *ot)
 /** \name Stroke Flip Operator
  * \{ */
 
-static int gpencil_stroke_flip_exec(bContext *C, wmOperator *op)
+static int gpencil_stroke_flip_exec(bContext *C, wmOperator *UNUSED(op))
 {
   bGPdata *gpd = ED_gpencil_data_get_active(C);
   Object *ob = CTX_data_active_object(C);
@@ -3892,7 +3892,6 @@ static int gpencil_stroke_flip_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
   bool changed = false;
   /* read all selected strokes */
   CTX_DATA_BEGIN (C, bGPDlayer *, gpl, editable_gpencil_layers) {
@@ -3902,26 +3901,27 @@ static int gpencil_stroke_flip_exec(bContext *C, wmOperator *op)
     }
 
     LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-      if (gps->flag & GP_STROKE_SELECT) {
-        /* skip strokes that are invalid for current view */
-        if (ED_gpencil_stroke_can_use(C, gps) == false) {
-          continue;
-        }
-        /* check if the color is editable */
-        if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
-          continue;
-        }
+      bool is_stroke_selected = GPENCIL_STROKE_TYPE_BEZIER(gps) ?
+                                    (bool)(gps->editcurve->flag & GP_CURVE_SELECT) :
+                                    (bool)(gps->flag & GP_STROKE_SELECT);
 
-        if (is_curve_edit) {
-          BKE_report(op->reports, RPT_ERROR, "Not implemented!");
-        }
-        else {
-          /* Flip stroke. */
-          BKE_gpencil_stroke_flip(gps);
-        }
-
-        changed = true;
+      if (!is_stroke_selected) {
+        continue;
       }
+
+      /* skip strokes that are invalid for current view */
+      if (ED_gpencil_stroke_can_use(C, gps) == false) {
+        continue;
+      }
+      /* check if the color is editable */
+      if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
+        continue;
+      }
+
+      /* Flip stroke. */
+      BKE_gpencil_stroke_flip(gps);
+
+      changed = true;
     }
   }
   CTX_DATA_END;
