@@ -230,7 +230,7 @@ void WM_xr_actionmap_item_ensure_unique(XrActionMap *actionmap, XrActionMapItem 
       idx = 0;
     }
     else {
-      BLI_snprintf(suffix, XR_AMI_MAX_NAME, "%i", idx);
+      BLI_snprintf(suffix, XR_AMI_MAX_NAME, "%zu", idx);
     }
   }
 
@@ -373,7 +373,7 @@ void WM_xr_actionmap_ensure_unique(XrActionConfig *actionconf, XrActionMap *acti
       idx = 0;
     }
     else {
-      BLI_snprintf(suffix, XR_ACTIONMAP_MAX_NAME, "%i", idx);
+      BLI_snprintf(suffix, XR_ACTIONMAP_MAX_NAME, "%zu", idx);
     }
   }
 
