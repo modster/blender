@@ -742,8 +742,9 @@ static LineartChainRegisterEntry *lineart_chain_get_closest_cre(LineartRenderBuf
       }
     }
   }
-  float adjacent_new_len =
-      dist; /* We want a closer point anyway. So using modified dist is fine. */
+
+  /* We want a closer point anyway. So using modified dist is fine. */
+  float adjacent_new_len = dist;
   LineartChainRegisterEntry *adjacent_closest;
 
 #define LRT_TEST_ADJACENT_AREAS(dist_to, list) \

@@ -3068,6 +3068,24 @@ static void lineart_bounding_area_link_line(LineartRenderBuffer *rb,
   }
 }
 
+/* Link lines to their respective bounding areas. */
+static void lineart_main_link_lines(LineartRenderBuffer *rb)
+{
+  LRT_ITER_ALL_LINES_BEGIN
+  {
+    int r1, r2, c1, c2, row, col;
+    if (lineart_get_line_bounding_areas(rb, rl, &r1, &r2, &c1, &c2)) {
+      for (row = r1; row != r2 + 1; row++) {
+        for (col = c1; col != c2 + 1; col++) {
+          lineart_bounding_area_link_line(
+              rb, &rb->initial_bounding_areas[row * LRT_BA_ROWS + col], rl);
+        }
+      }
+    }
+  }
+  LRT_ITER_ALL_LINES_END
+}
+
 static int lineart_get_triangle_bounding_areas(LineartRenderBuffer *rb,
                                                LineartRenderTriangle *rt,
                                                int *rowbegin,
@@ -3588,13 +3606,16 @@ int MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModifi
    * do its job. */
   lineart_main_add_triangles(rb);
 
+  /* Link lines to acceleration structure, this can only be done after perspective division, if we
+   * do it after triangles being added, the acceleration structure has already been subdivided,
+   * this way we do less list manipulations. */
+  lineart_main_link_lines(rb);
+
   /* "intersection_only" is preserved for being called in a standalone fashion.
    * If so the data will already be available at the stage. Otherwise we do the occlusion and
    * chaining etc.*/
 
   if (!intersections_only) {
-    float t_image = lmd->chaining_image_threshold;
-    float t_geom = lmd->chaining_geometry_threshold;
 
     /* Occlusion is work-and-wait. This call will not return before work is completed. */
     lineart_main_occlusion_begin(rb);
@@ -3613,9 +3634,11 @@ int MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModifi
 
     /* If both chaining thresholds are zero, then we allow at least image space chaining to do a
      * little bit of work so we don't end up in fragmented strokes. */
-    if (t_image < FLT_EPSILON && t_geom < FLT_EPSILON) {
-      t_geom = 0.0f;
-      t_image = 0.001f;
+    float *t_image = &lmd->chaining_image_threshold;
+    float *t_geom = &lmd->chaining_geometry_threshold;
+    if (*t_image < FLT_EPSILON && *t_geom < FLT_EPSILON) {
+      *t_geom = 0.0f;
+      *t_image = 0.001f;
     }
 
     /* do_geometry_space = true. */
@@ -3631,7 +3654,7 @@ int MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModifi
     MOD_lineart_chain_clear_picked_flag(rb);
 
     /* This configuration ensures there won't be accidental lost of short unchained segments. */
-    MOD_lineart_chain_discard_short(rb, MIN3(t_image, t_geom, 0.001f) - FLT_EPSILON);
+    MOD_lineart_chain_discard_short(rb, MIN3(*t_image, *t_geom, 0.001f) - FLT_EPSILON);
 
     if (rb->angle_splitting_threshold > FLT_EPSILON) {
       MOD_lineart_chain_split_angle(rb, rb->angle_splitting_threshold);
