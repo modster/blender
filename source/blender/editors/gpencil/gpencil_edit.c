@@ -3415,8 +3415,6 @@ static int gpencil_stroke_cyclical_set_exec(bContext *C, wmOperator *op)
   const int type = RNA_enum_get(op->ptr, "type");
   const bool geometry = RNA_boolean_get(op->ptr, "geometry");
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
-  bGPDstroke *gps = NULL;
 
   /* sanity checks */
   if (ELEM(NULL, gpd)) {
@@ -3434,11 +3432,18 @@ static int gpencil_stroke_cyclical_set_exec(bContext *C, wmOperator *op)
           continue;
         }
 
-        for (gps = gpf->strokes.first; gps; gps = gps->next) {
+        LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
           MaterialGPencilStyle *gp_style = BKE_gpencil_material_settings(ob, gps->mat_nr + 1);
           /* skip strokes that are not selected or invalid for current view */
-          if (((gps->flag & GP_STROKE_SELECT) == 0) ||
-              ED_gpencil_stroke_can_use(C, gps) == false) {
+          bool is_stroke_selected = GPENCIL_STROKE_TYPE_BEZIER(gps) ?
+                                        (bool)(gps->editcurve->flag & GP_CURVE_SELECT) :
+                                        (bool)(gps->flag & GP_STROKE_SELECT);
+
+          if (!is_stroke_selected) {
+            continue;
+          }
+
+          if (ED_gpencil_stroke_can_use(C, gps) == false) {
             continue;
           }
           /* skip hidden or locked colors */
@@ -3468,7 +3473,7 @@ static int gpencil_stroke_cyclical_set_exec(bContext *C, wmOperator *op)
 
           if (before != (gps->flag & GP_STROKE_CYCLIC)) {
             /* Create new geometry. */
-            if (is_curve_edit) {
+            if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
               BKE_gpencil_editcurve_recalculate_handles(gps);
               gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
               BKE_gpencil_stroke_geometry_update(gpd, gps);
@@ -3500,22 +3505,6 @@ static int gpencil_stroke_cyclical_set_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
-static bool gpencil_cyclical_set_curve_edit_poll_property(const bContext *C,
-                                                          wmOperator *UNUSED(op),
-                                                          const PropertyRNA *prop)
-{
-  bGPdata *gpd = ED_gpencil_data_get_active(C);
-  if (gpd != NULL && GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd)) {
-    const char *prop_id = RNA_property_identifier(prop);
-    /* Only show type in curve edit mode */
-    if (!STREQ(prop_id, "type")) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 /**
  * Similar to #CURVE_OT_cyclic_toggle or #MASK_OT_cyclic_toggle, but with
  * option to force opened/closed strokes instead of just toggle behavior.
@@ -3539,15 +3528,17 @@ void GPENCIL_OT_stroke_cyclical_set(wmOperatorType *ot)
   /* api callbacks */
   ot->exec = gpencil_stroke_cyclical_set_exec;
   ot->poll = gpencil_active_layer_poll;
-  ot->poll_property = gpencil_cyclical_set_curve_edit_poll_property;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
   /* properties */
   ot->prop = RNA_def_enum(ot->srna, "type", cyclic_type, GP_STROKE_CYCLIC_TOGGLE, "Type", "");
-  prop = RNA_def_boolean(
-      ot->srna, "geometry", false, "Create Geometry", "Create new geometry for closing stroke");
+  prop = RNA_def_boolean(ot->srna,
+                         "geometry",
+                         false,
+                         "Create Geometry",
+                         "Create new geometry for closing stroke (only applies for poly strokes)");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
