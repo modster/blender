@@ -1252,6 +1252,8 @@ typedef struct NodeGeometryMeshCone {
 typedef struct NodeGeometryMeshLine {
   /* GeometryNodeMeshLineMode. */
   uint8_t mode;
+  /* GeometryNodeMeshLineCountMode. */
+  uint8_t count_mode;
 } NodeGeometryMeshLine;
 
 /* script node mode */
@@ -1737,9 +1739,14 @@ typedef enum GeometryNodeMeshCircleFillType {
 } GeometryNodeMeshCircleFillType;
 
 typedef enum GeometryNodeMeshLineMode {
-  GEO_NODE_MESH_LINE_MODE_START_END = 0,
-  GEO_NODE_MESH_LINE_MODE_DIRECTION = 1,
+  GEO_NODE_MESH_LINE_MODE_END_POINTS = 0,
+  GEO_NODE_MESH_LINE_MODE_OFFSET = 1,
 } GeometryNodeMeshLineMode;
+
+typedef enum GeometryNodeMeshLineCountMode {
+  GEO_NODE_MESH_LINE_COUNT_TOTAL = 0,
+  GEO_NODE_MESH_LINE_COUNT_RESOLUTION = 1,
+} GeometryNodeMeshLineCountMode;
 
 #ifdef __cplusplus
 }
