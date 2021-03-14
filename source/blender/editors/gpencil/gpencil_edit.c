@@ -4137,7 +4137,7 @@ static void gpencil_smooth_stroke(bContext *C, wmOperator *op)
   }
 
   GP_EDITABLE_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
-    if (gps->flag & GP_STROKE_SELECT) {
+    if (gps->flag & GP_STROKE_SELECT && GPENCIL_STROKE_TYPE_POLY(gps)) {
       for (int r = 0; r < repeat; r++) {
         for (int i = 0; i < gps->totpoints; i++) {
           bGPDspoint *pt = &gps->points[i];
@@ -4298,12 +4298,12 @@ static int gpencil_stroke_subdivide_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
-
   bool changed = false;
-  if (is_curve_edit) {
-    GP_EDITABLE_CURVES_BEGIN(gps_iter, C, gpl, gps, gpc)
-    {
+
+  /* Go through each editable + selected stroke */
+  GP_EDITABLE_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+      bGPDcurve *gpc = gps->editcurve;
       if (gpc->flag & GP_CURVE_SELECT) {
         BKE_gpencil_editcurve_subdivide(gps, cuts);
         BKE_gpencil_editcurve_recalculate_handles(gps);
@@ -4312,11 +4312,7 @@ static int gpencil_stroke_subdivide_exec(bContext *C, wmOperator *op)
         changed = true;
       }
     }
-    GP_EDITABLE_CURVES_END(gps_iter);
-  }
-  else {
-    /* Go through each editable + selected stroke */
-    GP_EDITABLE_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
+    else {
       if (gps->flag & GP_STROKE_SELECT) {
         gpencil_stroke_subdivide(gps, cuts);
         /* Calc geometry data. */
@@ -4324,12 +4320,12 @@ static int gpencil_stroke_subdivide_exec(bContext *C, wmOperator *op)
         changed = true;
       }
     }
-    GP_EDITABLE_STROKES_END(gpstroke_iter);
+  }
+  GP_EDITABLE_STROKES_END(gpstroke_iter);
 
-    if (changed) {
-      /* smooth stroke */
-      gpencil_smooth_stroke(C, op);
-    }
+  if (changed) {
+    /* smooth stroke */
+    gpencil_smooth_stroke(C, op);
   }
 
   if (changed) {
@@ -4339,22 +4335,6 @@ static int gpencil_stroke_subdivide_exec(bContext *C, wmOperator *op)
   }
 
   return OPERATOR_FINISHED;
-}
-
-static bool gpencil_subdivide_curve_edit_poll_property(const bContext *C,
-                                                       wmOperator *UNUSED(op),
-                                                       const PropertyRNA *prop)
-{
-  bGPdata *gpd = ED_gpencil_data_get_active(C);
-  if (gpd != NULL && GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd)) {
-    const char *prop_id = RNA_property_identifier(prop);
-    /* Only show number_cuts in curve edit mode */
-    if (!STREQ(prop_id, "number_cuts")) {
-      return false;
-    }
-  }
-
-  return true;
 }
 
 void GPENCIL_OT_stroke_subdivide(wmOperatorType *ot)
@@ -4371,7 +4351,6 @@ void GPENCIL_OT_stroke_subdivide(wmOperatorType *ot)
   /* api callbacks */
   ot->exec = gpencil_stroke_subdivide_exec;
   ot->poll = gpencil_active_layer_poll;
-  ot->poll_property = gpencil_subdivide_curve_edit_poll_property;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
