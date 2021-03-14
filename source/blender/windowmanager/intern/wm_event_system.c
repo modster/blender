@@ -582,6 +582,13 @@ void wm_event_do_notifiers(bContext *C)
         }
 
         ED_screen_areas_iter (win, screen, area) {
+          if ((note->category == NC_SPACE) && note->reference) {
+            /* Filter out notifiers sent to other spaces. RNA sets the reference to the owning ID
+             * though, the screen, so let notifiers through that reference the entire screen. */
+            if ((note->reference != area->spacedata.first) && (note->reference != screen)) {
+              continue;
+            }
+          }
           wmSpaceTypeListenerParams area_params = {
               .window = win,
               .area = area,
@@ -1324,7 +1331,7 @@ static int wm_operator_invoke(bContext *C,
       op->flag |= OP_IS_INVOKE;
     }
 
-    /* /initialize setting from previous run. */
+    /* Initialize setting from previous run. */
     if (!is_nested_call && use_last_properties) { /* Not called by py script. */
       WM_operator_last_properties_init(op);
     }
@@ -3027,7 +3034,7 @@ static int wm_handlers_do(bContext *C, wmEvent *event, ListBase *handlers)
        * wasn't handled, the KM_RELEASE will become a KM_CLICK */
 
       if (event->val == KM_PRESS) {
-        if (event->prevval != KM_PRESS) {
+        if (event->is_repeat == false) {
           win->event_queue_check_click = true;
           win->event_queue_check_drag = true;
         }
@@ -3215,7 +3222,7 @@ static void wm_event_drag_and_drop_test(wmWindowManager *wm, wmWindow *win, wmEv
   else if (event->type == LEFTMOUSE && event->val == KM_RELEASE) {
     event->type = EVT_DROP;
 
-    /* Vreate customdata, first free existing. */
+    /* Create customdata, first free existing. */
     if (event->customdata) {
       if (event->customdatafree) {
         MEM_freeN(event->customdata);
@@ -3226,7 +3233,7 @@ static void wm_event_drag_and_drop_test(wmWindowManager *wm, wmWindow *win, wmEv
     event->customdata = &wm->drags;
     event->customdatafree = 1;
 
-    /* Vlear drop icon. */
+    /* Clear drop icon. */
     screen->do_draw_drag = true;
 
     /* restore cursor (disabled, see wm_dragdrop.c) */

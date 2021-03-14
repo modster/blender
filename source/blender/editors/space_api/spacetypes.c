@@ -95,6 +95,7 @@ void ED_spacetypes_init(void)
   ED_spacetype_clip();
   ED_spacetype_statusbar();
   ED_spacetype_topbar();
+  ED_spacetype_spreadsheet();
 
   /* Register operator types for screen and all spaces. */
   ED_operatortypes_userpref();
@@ -262,7 +263,7 @@ void ED_region_draw_cb_exit(ARegionType *art, void *handle)
 
 static void ed_region_draw_cb_draw(const bContext *C, ARegion *region, ARegionType *art, int type)
 {
-  LISTBASE_FOREACH (RegionDrawCB *, rdc, &art->drawcalls) {
+  LISTBASE_FOREACH_MUTABLE (RegionDrawCB *, rdc, &art->drawcalls) {
     if (rdc->type == type) {
       rdc->draw(C, region, rdc->customdata);
 
