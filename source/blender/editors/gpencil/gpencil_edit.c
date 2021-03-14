@@ -1401,9 +1401,7 @@ static int gpencil_extrude_exec(bContext *C, wmOperator *op)
 {
   Object *obact = CTX_data_active_object(C);
   bGPdata *gpd = (bGPdata *)obact->data;
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
-  bGPDstroke *gps = NULL;
 
   if (gpd == NULL) {
     BKE_report(op->reports, RPT_ERROR, "No Grease Pencil data");
@@ -1420,16 +1418,13 @@ static int gpencil_extrude_exec(bContext *C, wmOperator *op)
           continue;
         }
 
-        for (gps = gpf->strokes.first; gps; gps = gps->next) {
+        LISTBASE_FOREACH(bGPDstroke *, gps, &gpf->strokes) {
           /* skip strokes that are invalid for current view */
           if (ED_gpencil_stroke_can_use(C, gps) == false) {
             continue;
           }
 
-          if (is_curve_edit) {
-            if (gps->editcurve == NULL) {
-              continue;
-            }
+          if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
             bGPDcurve *gpc = gps->editcurve;
             if (gpc->flag & GP_CURVE_SELECT) {
               gpencil_curve_extrude_points(gpd, gpf, gps, gpc);
