@@ -14,9 +14,6 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "BLI_map.hh"
-#include "BLI_math_matrix.h"
-
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 
@@ -170,38 +167,32 @@ static Mesh *create_circle_mesh(const float radius,
   }
 
   /* Create corners and faces. */
-  switch (fill_type) {
-    case GEO_NODE_MESH_CIRCLE_FILL_NONE:
-      break;
-    case GEO_NODE_MESH_CIRCLE_FILL_NGON: {
-      MPoly &poly = polys[0];
-      poly.loopstart = 0;
-      poly.totloop = loops.size();
+  if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_NGON) {
+    MPoly &poly = polys[0];
+    poly.loopstart = 0;
+    poly.totloop = loops.size();
 
-      for (const int i : IndexRange(verts_num)) {
-        MLoop &loop = loops[i];
-        loop.e = i;
-        loop.v = i;
-      }
-      break;
+    for (const int i : IndexRange(verts_num)) {
+      MLoop &loop = loops[i];
+      loop.e = i;
+      loop.v = i;
     }
-    case GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN: {
-      for (const int i : IndexRange(verts_num)) {
-        MPoly &poly = polys[i];
-        poly.loopstart = 3 * i;
-        poly.totloop = 3;
+  }
+  else if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN) {
+    for (const int i : IndexRange(verts_num)) {
+      MPoly &poly = polys[i];
+      poly.loopstart = 3 * i;
+      poly.totloop = 3;
 
-        MLoop &loop_a = loops[3 * i];
-        loop_a.e = i;
-        loop_a.v = i;
-        MLoop &loop_b = loops[3 * i + 1];
-        loop_b.e = verts_num + ((i + 1) % verts_num);
-        loop_b.v = (i + 1) % verts_num;
-        MLoop &loop_c = loops[3 * i + 2];
-        loop_c.e = verts_num + i;
-        loop_c.v = verts_num;
-      }
-      break;
+      MLoop &loop_a = loops[3 * i];
+      loop_a.e = i;
+      loop_a.v = i;
+      MLoop &loop_b = loops[3 * i + 1];
+      loop_b.e = verts_num + ((i + 1) % verts_num);
+      loop_b.v = (i + 1) % verts_num;
+      MLoop &loop_c = loops[3 * i + 2];
+      loop_c.e = verts_num + i;
+      loop_c.v = verts_num;
     }
   }
 
