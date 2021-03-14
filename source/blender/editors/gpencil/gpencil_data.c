@@ -1562,7 +1562,6 @@ static int gpencil_stroke_arrange_exec(bContext *C, wmOperator *op)
     ListBase selected = {NULL};
 
     bGPDframe *init_gpf = (is_multiedit) ? gpl->frames.first : gpl->actframe;
-    bGPDstroke *gps = NULL;
 
     for (bGPDframe *gpf = init_gpf; gpf; gpf = gpf->next) {
       if ((gpf == gpl->actframe) || ((gpf->flag & GP_FRAME_SELECT) && (is_multiedit))) {
@@ -1571,78 +1570,86 @@ static int gpencil_stroke_arrange_exec(bContext *C, wmOperator *op)
         }
         bool gpf_lock = false;
         /* verify if any selected stroke is in the extreme of the stack and select to move */
-        for (gps = gpf->strokes.first; gps; gps = gps->next) {
+        LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+          bool is_stroke_selected = GPENCIL_STROKE_TYPE_BEZIER(gps) ?
+                                        (bool)(gps->editcurve->flag & GP_CURVE_SELECT) :
+                                        (bool)(gps->flag & GP_STROKE_SELECT);
           /* only if selected */
-          if (gps->flag & GP_STROKE_SELECT) {
-            /* skip strokes that are invalid for current view */
-            if (ED_gpencil_stroke_can_use(C, gps) == false) {
+          if (!is_stroke_selected) {
+            continue;
+          }
+          /* skip strokes that are invalid for current view */
+          if (ED_gpencil_stroke_can_use(C, gps) == false) {
+            continue;
+          }
+          /* check if the color is editable */
+          if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
+            continue;
+          }
+          /* some stroke is already at front*/
+          if (ELEM(direction, GP_STROKE_MOVE_TOP, GP_STROKE_MOVE_UP)) {
+            if (gps == gpf->strokes.last) {
+              gpf_lock = true;
               continue;
             }
-            /* check if the color is editable */
-            if (ED_gpencil_stroke_material_editable(ob, gpl, gps) == false) {
+          }
+          /* Some stroke is already at bottom. */
+          if (ELEM(direction, GP_STROKE_MOVE_BOTTOM, GP_STROKE_MOVE_DOWN)) {
+            if (gps == gpf->strokes.first) {
+              gpf_lock = true;
               continue;
             }
-            /* some stroke is already at front*/
-            if (ELEM(direction, GP_STROKE_MOVE_TOP, GP_STROKE_MOVE_UP)) {
-              if (gps == gpf->strokes.last) {
-                gpf_lock = true;
-                continue;
-              }
-            }
-            /* Some stroke is already at bottom. */
-            if (ELEM(direction, GP_STROKE_MOVE_BOTTOM, GP_STROKE_MOVE_DOWN)) {
-              if (gps == gpf->strokes.first) {
-                gpf_lock = true;
-                continue;
-              }
-            }
-            /* add to list (if not locked) */
-            if (!gpf_lock) {
-              BLI_addtail(&selected, BLI_genericNodeN(gps));
-            }
+          }
+          /* add to list (if not locked) */
+          if (!gpf_lock) {
+            BLI_addtail(&selected, BLI_genericNodeN(gps));
           }
         }
+
+        
+        if (gpf_lock) {
+          continue;
+        }
+
         /* Now do the movement of the stroke */
-        if (!gpf_lock) {
-          switch (direction) {
-            /* Bring to Front */
-            case GP_STROKE_MOVE_TOP:
-              LISTBASE_FOREACH (LinkData *, link, &selected) {
-                gps = link->data;
-                BLI_remlink(&gpf->strokes, gps);
-                BLI_addtail(&gpf->strokes, gps);
-                changed = true;
-              }
-              break;
-            /* Bring Forward */
-            case GP_STROKE_MOVE_UP:
-              LISTBASE_FOREACH_BACKWARD (LinkData *, link, &selected) {
-                gps = link->data;
-                BLI_listbase_link_move(&gpf->strokes, gps, 1);
-                changed = true;
-              }
-              break;
-            /* Send Backward */
-            case GP_STROKE_MOVE_DOWN:
-              LISTBASE_FOREACH (LinkData *, link, &selected) {
-                gps = link->data;
-                BLI_listbase_link_move(&gpf->strokes, gps, -1);
-                changed = true;
-              }
-              break;
-            /* Send to Back */
-            case GP_STROKE_MOVE_BOTTOM:
-              LISTBASE_FOREACH_BACKWARD (LinkData *, link, &selected) {
-                gps = link->data;
-                BLI_remlink(&gpf->strokes, gps);
-                BLI_addhead(&gpf->strokes, gps);
-                changed = true;
-              }
-              break;
-            default:
-              BLI_assert(0);
-              break;
-          }
+        switch (direction) {
+          /* Bring to Front */
+          case GP_STROKE_MOVE_TOP:
+            LISTBASE_FOREACH (LinkData *, link, &selected) {
+              bGPDstroke *gps = link->data;
+              BLI_remlink(&gpf->strokes, gps);
+              BLI_addtail(&gpf->strokes, gps);
+              changed = true;
+            }
+            break;
+          /* Bring Forward */
+          case GP_STROKE_MOVE_UP:
+            LISTBASE_FOREACH_BACKWARD (LinkData *, link, &selected) {
+              bGPDstroke *gps = link->data;
+              BLI_listbase_link_move(&gpf->strokes, gps, 1);
+              changed = true;
+            }
+            break;
+          /* Send Backward */
+          case GP_STROKE_MOVE_DOWN:
+            LISTBASE_FOREACH (LinkData *, link, &selected) {
+              bGPDstroke *gps = link->data;
+              BLI_listbase_link_move(&gpf->strokes, gps, -1);
+              changed = true;
+            }
+            break;
+          /* Send to Back */
+          case GP_STROKE_MOVE_BOTTOM:
+            LISTBASE_FOREACH_BACKWARD (LinkData *, link, &selected) {
+              bGPDstroke *gps = link->data;
+              BLI_remlink(&gpf->strokes, gps);
+              BLI_addhead(&gpf->strokes, gps);
+              changed = true;
+            }
+            break;
+          default:
+            BLI_assert(0);
+            break;
         }
         BLI_freelistN(&selected);
       }
