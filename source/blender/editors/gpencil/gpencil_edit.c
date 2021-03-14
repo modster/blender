@@ -3959,7 +3959,6 @@ static int gpencil_strokes_reproject_exec(bContext *C, wmOperator *op)
   int oldframe = (int)DEG_get_ctime(depsgraph);
   const eGP_ReprojectModes mode = RNA_enum_get(op->ptr, "type");
   const bool keep_original = RNA_boolean_get(op->ptr, "keep_original");
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
 
   /* Init snap context for geometry projection. */
   SnapObjectContext *sctx = NULL;
@@ -3973,33 +3972,32 @@ static int gpencil_strokes_reproject_exec(bContext *C, wmOperator *op)
 
   /* Go through each editable + selected stroke, adjusting each of its points one by one... */
   GP_EDITABLE_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
-    bool curve_select = false;
-    if (is_curve_edit && gps->editcurve != NULL) {
-      curve_select = gps->editcurve->flag & GP_CURVE_SELECT;
+    bool is_stroke_selected = GPENCIL_STROKE_TYPE_BEZIER(gps) ?
+                                  (bool)(gps->editcurve->flag & GP_CURVE_SELECT) :
+                                  (bool)(gps->flag & GP_STROKE_SELECT);
+
+    if (!is_stroke_selected) {
+      continue;
     }
 
-    if (gps->flag & GP_STROKE_SELECT || curve_select) {
-
-      /* update frame to get the new location of objects */
-      if ((mode == GP_REPROJECT_SURFACE) && (cfra_prv != gpf_->framenum)) {
-        cfra_prv = gpf_->framenum;
-        CFRA = gpf_->framenum;
-        BKE_scene_graph_update_for_newframe(depsgraph);
-      }
-
-      ED_gpencil_stroke_reproject(depsgraph, &gsc, sctx, gpl, gpf_, gps, mode, keep_original);
-
-      // if (is_curve_edit && gps->editcurve != NULL) {
-      //   BKE_gpencil_stroke_editcurve_update(gpd, gpl, gps);
-      //   /* Update the selection from the stroke to the curve. */
-      //   BKE_gpencil_editcurve_stroke_sync_selection(gps, gps->editcurve);
-
-      //   gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
-      //   BKE_gpencil_stroke_geometry_update(gpd, gps);
-      // }
-
-      changed = true;
+    /* update frame to get the new location of objects */
+    if ((mode == GP_REPROJECT_SURFACE) && (cfra_prv != gpf_->framenum)) {
+      cfra_prv = gpf_->framenum;
+      CFRA = gpf_->framenum;
+      BKE_scene_graph_update_for_newframe(depsgraph);
     }
+
+    ED_gpencil_stroke_reproject(depsgraph, &gsc, sctx, gpl, gpf_, gps, mode, keep_original);
+
+    /* TODO: Reproject curve data and regenerate stroke.
+     * Right now we are using the projected points to regenerate the curve. This will most likely
+     * change the handles which is usually not wanted.*/
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+      gps->editcurve->flag |= GP_CURVE_NEEDS_STROKE_UPDATE;
+      BKE_gpencil_stroke_geometry_update(gpd, gps);
+    }
+
+    changed = true;
   }
   GP_EDITABLE_STROKES_END(gpstroke_iter);
 
