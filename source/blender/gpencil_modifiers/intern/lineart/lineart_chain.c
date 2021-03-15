@@ -334,7 +334,8 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
       }
       normalize_v3(N);
     }
-    /*  Step 2: this line. */
+    /*  Step 2: Adding all cuts from the given line, so we can continue connecting the right side
+     * of the line. */
     rls = rl->segments.first;
     last_occlusion = ((LineartRenderLineSegment *)rls)->occlusion;
     last_transparency = ((LineartRenderLineSegment *)rls)->transparency_mask;
