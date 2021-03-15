@@ -26,7 +26,7 @@
 static bNodeSocketTemplate geo_node_mesh_primitive_ico_sphere_in[] = {
     {SOCK_FLOAT, N_("Radius"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
     {SOCK_INT, N_("Subdivisions"), 1, 0, 0, 0, 0, 7},
-    {SOCK_VECTOR, N_("Translation"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
+    {SOCK_VECTOR, N_("Location"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
     {SOCK_VECTOR, N_("Rotation"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_EULER},
     {-1, ""},
 };
@@ -70,7 +70,7 @@ static void geo_node_mesh_primitive_ico_sphere_exec(GeoNodeExecParams params)
   /* Anything above 8 is not likely to be purposeful and will be very slow. */
   const int subdivisions = std::min(params.extract_input<int>("Subdivisions"), 8);
   const float radius = params.extract_input<float>("Radius");
-  const float3 location = params.extract_input<float3>("Translation");
+  const float3 location = params.extract_input<float3>("Location");
   const float3 rotation = params.extract_input<float3>("Rotation");
 
   Mesh *mesh = create_ico_sphere_mesh(location, rotation, subdivisions, radius);
