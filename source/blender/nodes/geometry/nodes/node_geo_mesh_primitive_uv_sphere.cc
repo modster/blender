@@ -217,7 +217,7 @@ static void calculate_sphere_faces(MutableSpan<MLoop> loops,
   }
 }
 
-static void calculate_uvs(Mesh *mesh, const float segments, const float rings)
+static void calculate_sphere_uvs(Mesh *mesh, const float segments, const float rings)
 {
   MeshComponent mesh_component;
   mesh_component.replace(mesh, GeometryOwnershipType::Editable);
@@ -274,7 +274,7 @@ static Mesh *create_uv_sphere_mesh(const float radius, const int segments, const
 
   calculate_sphere_faces(loops, polys, segments, rings);
 
-  calculate_uvs(mesh, segments, rings);
+  calculate_sphere_uvs(mesh, segments, rings);
 
   BLI_assert(BKE_mesh_is_valid(mesh));
 
