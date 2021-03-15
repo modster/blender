@@ -67,12 +67,13 @@ typedef struct LineartRenderTriangle {
 
 typedef struct LineartRenderTriangleThread {
   struct LineartRenderTriangle base;
-  /** This variable is used to store per-thread triangle-line testing pair,
-   *  also re-used to store triangle-triangle pair for intersection testing stage.
-   *  Do not directly use LineartRenderTriangleThread, but use it as a pointer,
-   * the size of LineartRenderTriangle is dynamically allocated to contain set thread number of
-   * "testing" field, at least one thread is present, thus we always have at least testing[0].*/
-  struct LineartRenderLine *testing[127];
+  /* This variable is used to store per-thread triangle-line testing pair,
+   * also re-used to store triangle-triangle pair for intersection testing stage.
+   * Do not directly use LineartRenderTriangleThread.
+   * The size of LineartRenderTriangle is dynamically allocated to contain set thread number of
+   * "testing" field. Worker threads will test lines against the "base" triangle.
+   * At least one thread is present, thus we always have at least testing[0]. */
+  struct LineartRenderLine *testing;
 } LineartRenderTriangleThread;
 
 typedef enum eLineArtElementNodeFlag {

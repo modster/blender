@@ -3575,7 +3575,8 @@ int MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModifi
 
   rb = lineart_create_render_buffer(scene, lmd);
 
-  /* Triangle size varies based on thread count. */
+  /* Triangle thread testing data size varies depending on the thread count.
+   * See definition of LineartRenderTriangleThread for details. */
   rb->triangle_size = lineart_triangle_size_get(scene, rb);
 
   /* This is used to limit calculation to a certain level to save time, lines who have higher
@@ -3588,11 +3589,11 @@ int MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModifi
       depsgraph, scene, scene->camera, rb, lmd->calculation_flags & LRT_ALLOW_DUPLI_OBJECTS);
 
   if (!rb->vertex_buffer_pointers.first) {
-    /* Nothing loaded, early return. */
+    /* No geometry loaded, return early. */
     return OPERATOR_FINISHED;
   }
 
-  /* This is the acceleration strucrure, a lot like BVH in 3D. */
+  /* Initialize the bounding box acceleration structure, it's a lot like BVH in 3D. */
   lineart_main_bounding_area_make_initial(rb);
 
   /* We need to get cut into triangles that are crossing near/far plans, only this way can we get
@@ -3602,9 +3603,10 @@ int MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModifi
   /* clip_far==true for far plane. */
   lineart_main_cull_triangles(rb, true);
 
-  /* Triangle adjacent info pointers are no longer used. This saves memory. */
+  /* At this point triangle adjacent info pointers is no longer needed, free them. */
   lineart_main_free_adjacent_data(rb);
 
+  /* Do the perspective division after clipping is done. */
   lineart_main_perspective_division(rb);
 
   /* Triangle intersections are done here during sequential adding of them. Only after this,
