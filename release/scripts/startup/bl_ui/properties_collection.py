@@ -63,7 +63,7 @@ class COLLECTION_PT_collection_flags(CollectionButtonsPanel, Panel):
 
 
 class COLLECTION_PT_lineart_collection(CollectionButtonsPanel, Panel):
-    bl_label = "Collection Line Art"
+    bl_label = "Line Art"
 
     def draw(self, context):
         layout = self.layout
@@ -74,10 +74,22 @@ class COLLECTION_PT_lineart_collection(CollectionButtonsPanel, Panel):
         row = layout.row()
         row.prop(collection, "lineart_usage")
 
+class COLLECTION_PT_instancing(CollectionButtonsPanel, Panel):
+    bl_label = "Instancing"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+        collection = context.collection
+
+        row = layout.row()
+        row.prop(collection, "instance_offset")
 
 classes = (
     COLLECTION_PT_collection_flags,
     COLLECTION_PT_lineart_collection,
+    COLLECTION_PT_instancing,
 )
 
 if __name__ == "__main__":  # only for live edit.
