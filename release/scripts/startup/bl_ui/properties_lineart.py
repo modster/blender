@@ -28,6 +28,7 @@ class LineartButtonsPanel:
 
 class OBJECT_PT_lineart(LineartButtonsPanel, Panel):
     bl_label = "Line Art"
+    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
