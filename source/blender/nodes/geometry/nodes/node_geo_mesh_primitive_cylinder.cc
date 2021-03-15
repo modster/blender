@@ -79,8 +79,7 @@ static void geo_node_mesh_primitive_cylinder_exec(GeoNodeExecParams params)
   const float3 rotation = params.extract_input<float3>("Rotation");
 
   /* The cylinder is a special case of the cone mesh where the top and bottom radius are equal. */
-  Mesh *mesh = create_cylinder_or_cone_mesh(
-      location, rotation, radius, radius, depth, verts_num, fill_type);
+  Mesh *mesh = create_cylinder_or_cone_mesh(radius, radius, depth, verts_num, fill_type);
 
   transform_mesh(mesh, location, rotation, float3(1));
 

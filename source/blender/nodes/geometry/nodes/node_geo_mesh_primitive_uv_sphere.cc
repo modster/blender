@@ -17,12 +17,13 @@
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 
-#include "BKE_lib_id.h"
 #include "BKE_mesh.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "BKE_lib_id.h"
+#include "BLI_timeit.hh"
 #include "bmesh.h"
 
 #include "node_geometry_util.hh"
