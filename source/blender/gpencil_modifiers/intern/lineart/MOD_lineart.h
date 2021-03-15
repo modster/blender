@@ -514,11 +514,11 @@ int MOD_lineart_compute_feature_lines(struct Depsgraph *depsgraph,
 
 struct Scene;
 
-LineartBoundingArea *MOD_lineart_get_parent_bounding_area_rb(LineartRenderBuffer *rb,
-                                                             double x,
-                                                             double y);
+LineartBoundingArea *MOD_lineart_get_parent_bounding_area(LineartRenderBuffer *rb,
+                                                          double x,
+                                                          double y);
 
-LineartBoundingArea *MOD_lineart_get_bounding_area_rb(LineartRenderBuffer *rb, double x, double y);
+LineartBoundingArea *MOD_lineart_get_bounding_area(LineartRenderBuffer *rb, double x, double y);
 
 struct bGPDlayer;
 struct bGPDframe;
