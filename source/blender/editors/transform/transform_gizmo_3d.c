@@ -653,7 +653,6 @@ int ED_transform_calc_gizmo_stats(const bContext *C,
   Object *ob = OBACT(view_layer);
   bGPdata *gpd = CTX_data_gpencil_data(C);
   const bool is_gp_edit = GPENCIL_ANY_MODE(gpd);
-  const bool is_curve_edit = GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
   int a, totsel = 0;
 
   const int pivot_point = scene->toolsettings->transform_pivot_point;
@@ -712,11 +711,7 @@ int ED_transform_calc_gizmo_stats(const bContext *C,
             continue;
           }
 
-          if (is_curve_edit) {
-            if (gps->editcurve == NULL) {
-              continue;
-            }
-
+          if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
             bGPDcurve *gpc = gps->editcurve;
             if (gpc->flag & GP_CURVE_SELECT) {
               for (uint32_t i = 0; i < gpc->tot_curve_points; i++) {
