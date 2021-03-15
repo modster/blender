@@ -59,7 +59,9 @@ typedef struct LineartRenderTriangle {
   unsigned char transparency_mask;
   unsigned char flags; /* eLineartTriangleFlags */
 
-  /* Now only use single link list, because we don't need to go back in order. */
+  /* Only use single link list, because we don't need to go back in order.
+   * This variable is also reused to store the pointer to adjacent lines of this triangle before
+   * intersection statge */
   struct LinkNode *intersecting_verts;
 } LineartRenderTriangle;
 
@@ -512,13 +514,11 @@ int MOD_lineart_compute_feature_lines(struct Depsgraph *depsgraph,
 
 struct Scene;
 
-LineartBoundingArea *MOD_lineart_get_point_bounding_area_rb(LineartRenderBuffer *rb,
-                                                            double x,
-                                                            double y);
+LineartBoundingArea *MOD_lineart_get_parent_bounding_area_rb(LineartRenderBuffer *rb,
+                                                             double x,
+                                                             double y);
 
-LineartBoundingArea *MOD_lineart_get_point_bounding_area_deep_rb(LineartRenderBuffer *rb,
-                                                                 double x,
-                                                                 double y);
+LineartBoundingArea *MOD_lineart_get_bounding_area_rb(LineartRenderBuffer *rb, double x, double y);
 
 struct bGPDlayer;
 struct bGPDframe;
