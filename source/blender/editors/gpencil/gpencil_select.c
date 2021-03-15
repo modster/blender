@@ -1637,7 +1637,7 @@ static bool gpencil_generic_curve_select(bContext *C,
 {
   View3D *v3d = CTX_wm_view3d(C);
   bGPDstroke *gps_active = (gps->runtime.gps_orig) ? gps->runtime.gps_orig : gps;
-  bGPDcurve *gpc_active = (gpc->runtime.gpc_orig) ? gpc->runtime.gpc_orig : gpc;
+  bGPDcurve *gpc_active = gps_active->editcurve;
 
   const bool handle_only_selected = (v3d->overlay.handle_display == CURVE_HANDLE_SELECTED);
   const bool handle_all = (v3d->overlay.handle_display == CURVE_HANDLE_ALL);
@@ -1646,13 +1646,12 @@ static bool gpencil_generic_curve_select(bContext *C,
   bool changed = false;
   bool whole = false;
   bool any_select = false;
-  for (int i = 0; i < gpc->tot_curve_points; i++) {
-    bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
-    BezTriple *bezt = &gpc_pt->bezt;
-
+  for (int i = 0; i < gpc_active->tot_curve_points; i++) {
+    bGPDcurve_point *gpc_pt = &gpc_active->curve_points[i];
     bGPDcurve_point *gpc_pt_active = (gpc_pt->runtime.gpc_pt_orig) ? gpc_pt->runtime.gpc_pt_orig :
                                                                      gpc_pt;
     BezTriple *bezt_active = &gpc_pt_active->bezt;
+    printf("%d: %f\n", i, bezt_active->vec[1][0]);
 
     if (bezt_active->hide == 1) {
       continue;
@@ -1665,7 +1664,7 @@ static bool gpencil_generic_curve_select(bContext *C,
       for (int j = 0; j < 3; j++) {
         const bool is_select = BEZT_ISSEL_IDX(bezt_active, j);
         bool is_inside = is_inside_fn(
-            gsc->region, gpstroke_iter->diff_mat, bezt->vec[j], user_data);
+            gsc->region, gpstroke_iter->diff_mat, bezt_active->vec[j], user_data);
         if (strokemode) {
           if (is_inside) {
             hit = true;
@@ -1700,7 +1699,8 @@ static bool gpencil_generic_curve_select(bContext *C,
     /* if the handles are not visible only check ctrl point (vec[1])*/
     else {
       const bool is_select = bezt_active->f2;
-      bool is_inside = is_inside_fn(gsc->region, gpstroke_iter->diff_mat, bezt->vec[1], user_data);
+      bool is_inside = is_inside_fn(
+          gsc->region, gpstroke_iter->diff_mat, bezt_active->vec[1], user_data);
       if (strokemode) {
         if (is_inside) {
           hit = true;
@@ -1927,7 +1927,7 @@ static int gpencil_generic_select_exec(bContext *C,
   GP_EVALUATED_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
     bGPDstroke *gps_active = (gps->runtime.gps_orig) ? gps->runtime.gps_orig : gps;
     if (GPENCIL_STROKE_TYPE_BEZIER(gps_active)) {
-      bGPDcurve *gpc = gps->editcurve;
+      bGPDcurve *gpc = gps_active->editcurve;
       if (gpencil_generic_curve_select(C,
                                        ob,
                                        gpd,
