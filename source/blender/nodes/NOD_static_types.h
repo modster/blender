@@ -308,6 +308,7 @@ DefNode(GeometryNode, GEO_NODE_MESH_PRIMITIVE_CYLINDER, def_geo_mesh_cylinder, "
 DefNode(GeometryNode, GEO_NODE_MESH_PRIMITIVE_ICO_SPHERE, 0, "MESH_PRIMITIVE_ICO_SPHERE", MeshIcoSphere, "Ico Sphere", "")
 DefNode(GeometryNode, GEO_NODE_MESH_PRIMITIVE_CONE, def_geo_mesh_cone, "MESH_PRIMITIVE_CONE", MeshCone, "Cone", "")
 DefNode(GeometryNode, GEO_NODE_MESH_PRIMITIVE_LINE, def_geo_mesh_line, "MESH_PRIMITIVE_LINE", MeshLine, "Line", "")
+DefNode(GeometryNode, GEO_NODE_MESH_PRIMITIVE_PLANE, 0, "MESH_PRIMITIVE_PLANE", MeshPlane, "Plane", "")
 
 /* undefine macros */
 #undef DefNode

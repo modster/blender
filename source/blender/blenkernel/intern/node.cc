@@ -4812,6 +4812,7 @@ static void registerGeometryNodes()
   register_node_type_geo_mesh_primitive_cylinder();
   register_node_type_geo_mesh_primitive_ico_sphere();
   register_node_type_geo_mesh_primitive_line();
+  register_node_type_geo_mesh_primitive_plane();
   register_node_type_geo_mesh_primitive_uv_sphere();
   register_node_type_geo_object_info();
   register_node_type_geo_point_distribute();

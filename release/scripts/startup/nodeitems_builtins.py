@@ -527,9 +527,8 @@ geometry_node_categories = [
         NodeItem("GeometryNodeMeshIcoSphere"),
         NodeItem("GeometryNodeMeshCylinder"),
         NodeItem("GeometryNodeMeshCone"),
-        NodeItem("GeometryNodeMeshLine")
-        # NodeItem("GeometryNodeMeshPlane"),
-        # NodeItem("GeometryNodeMeshGrid"),
+        NodeItem("GeometryNodeMeshLine"),
+        NodeItem("GeometryNodeMeshPlane"),
     ]),
     GeometryNodeCategory("GEO_POINT", "Point", items=[
         NodeItem("GeometryNodePointDistribute"),
