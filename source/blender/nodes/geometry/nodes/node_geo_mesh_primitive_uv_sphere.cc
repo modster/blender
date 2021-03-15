@@ -168,7 +168,7 @@ static void calculate_sphere_faces(MutableSpan<MLoop> loops,
 
   int ring_vert_index_start = 1;
   int ring_edge_index_start = segments;
-  for (const int UNUSED(ring) : IndexRange(rings - 2)) {
+  for (const int UNUSED(ring) : IndexRange(1, rings - 2)) {
     const int next_ring_vert_index_start = ring_vert_index_start + segments;
     const int next_ring_edge_index_start = ring_edge_index_start + segments * 2;
     const int ring_vertical_edge_index_start = ring_edge_index_start + segments;
@@ -185,10 +185,10 @@ static void calculate_sphere_faces(MutableSpan<MLoop> loops,
       loop_b.v = next_ring_vert_index_start + segment;
       loop_b.e = next_ring_edge_index_start + segment;
       MLoop &loop_c = loops[loop_index++];
-      loop_c.v = next_ring_vert_index_start + ((segment + 1) % segments);
-      loop_c.e = ring_vertical_edge_index_start + ((segment + 1) % segments);
+      loop_c.v = next_ring_vert_index_start + (segment + 1) % segments;
+      loop_c.e = ring_vertical_edge_index_start + (segment + 1) % segments;
       MLoop &loop_d = loops[loop_index++];
-      loop_d.v = ring_vert_index_start + ((segment + 1) % segments);
+      loop_d.v = ring_vert_index_start + (segment + 1) % segments;
       loop_d.e = ring_edge_index_start + segment;
     }
     ring_vert_index_start += segments;
@@ -207,13 +207,50 @@ static void calculate_sphere_faces(MutableSpan<MLoop> loops,
 
     MLoop &loop_a = loops[loop_index++];
     loop_a.v = last_vert_index;
-    loop_a.e = bottom_edge_fan_start + ((segment + 1) % segments);
+    loop_a.e = bottom_edge_fan_start + (segment + 1) % segments;
     MLoop &loop_b = loops[loop_index++];
     loop_b.v = last_vert_ring_start + (segment + 1) % segments;
     loop_b.e = last_edge_ring_start + segment;
     MLoop &loop_c = loops[loop_index++];
     loop_c.v = last_vert_ring_start + segment;
     loop_c.e = bottom_edge_fan_start + segment;
+  }
+}
+
+static void calculate_uv_attribute(MeshComponent &mesh_component,
+                                   const float segments,
+                                   const float rings)
+{
+  OutputAttributePtr uv_attribute = mesh_component.attribute_try_get_for_output(
+      "uv", ATTR_DOMAIN_CORNER, CD_PROP_FLOAT2, nullptr);
+  MutableSpan<float2> uvs = uv_attribute->get_span_for_write_only<float2>();
+
+  int loop_index = 0;
+  const float dy = 1.0f / rings;
+
+  for (const int i_segment : IndexRange(segments)) {
+    const float segment = static_cast<float>(i_segment);
+    uvs[loop_index++] = float2((segment + 0.5f) / segments, 0.0f);
+    uvs[loop_index++] = float2((segment + 1.0f) / segments, dy);
+    uvs[loop_index++] = float2(segment / segments, dy);
+  }
+
+  for (const int i_ring : IndexRange(1, rings - 2)) {
+    const float ring = static_cast<float>(i_ring);
+    for (const int i_segment : IndexRange(segments)) {
+      const float segment = static_cast<float>(i_segment);
+      uvs[loop_index++] = float2(segment / segments, ring / rings);
+      uvs[loop_index++] = float2((segment + 1.0f) / segments, ring / rings);
+      uvs[loop_index++] = float2((segment + 1.0f) / segments, (ring + 1.0f) / rings);
+      uvs[loop_index++] = float2(segment / segments, (ring + 1.0f) / rings);
+    }
+  }
+
+  for (const int i_segment : IndexRange(segments)) {
+    const float segment = static_cast<float>(i_segment);
+    uvs[loop_index++] = float2((segment + 0.5f) / segments, 1.0f);
+    uvs[loop_index++] = float2((segment + 1.0f) / segments, 1.0f - dy);
+    uvs[loop_index++] = float2(segment / segments, 1.0f - dy);
   }
 }
 
@@ -254,11 +291,15 @@ static void geo_node_mesh_primitive_uv_sphere_exec(GeoNodeExecParams params)
   const float3 rotation = params.extract_input<float3>("Rotation");
 
   Mesh *mesh = create_uv_sphere_mesh(radius, segments_num, rings_num);
-  BLI_assert(BKE_mesh_is_valid(mesh));
 
   transform_mesh(mesh, location, rotation, float3(1));
 
-  params.set_output("Geometry", GeometrySet::create_with_mesh(mesh));
+  GeometrySet result_set = GeometrySet::create_with_mesh(mesh);
+
+  calculate_uv_attribute(
+      result_set.get_component_for_write<MeshComponent>(), segments_num, rings_num);
+
+  params.set_output("Geometry", result_set);
 }
 
 }  // namespace blender::nodes
