@@ -46,18 +46,20 @@ class COLLECTION_PT_collection_flags(CollectionButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
         collection = context.collection
         vl = context.view_layer
         vlc = vl.active_layer_collection
 
-        row = layout.row()
-        col = row.column(align=True)
-        col.prop(vlc, "holdout", toggle=False)
-        col.prop(vlc, "indirect_only", toggle=False)
-        row = layout.row()
-        col = row.column(align=True)
+        col = layout.column(align=True)
         col.prop(collection, "hide_select", text="Selectable", toggle=False, invert_checkbox=True)
         col.prop(collection, "hide_render", toggle=False)
+
+        col = layout.column(align=True)
+        col.prop(vlc, "holdout", toggle=False)
+        col.prop(vlc, "indirect_only", toggle=False)
 
 
 class COLLECTION_PT_lineart_collection(CollectionButtonsPanel, Panel):
