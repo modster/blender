@@ -83,8 +83,6 @@ static void geo_node_mesh_primitive_cylinder_exec(GeoNodeExecParams params)
 
   transform_mesh(mesh, location, rotation, float3(1));
 
-  BLI_assert(BKE_mesh_is_valid(mesh));
-
   params.set_output("Geometry", GeometrySet::create_with_mesh(mesh));
 }
 

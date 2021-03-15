@@ -217,10 +217,10 @@ static void calculate_sphere_faces(MutableSpan<MLoop> loops,
   }
 }
 
-static void calculate_uv_attribute(MeshComponent &mesh_component,
-                                   const float segments,
-                                   const float rings)
+static void calculate_uvs(Mesh *mesh, const float segments, const float rings)
 {
+  MeshComponent mesh_component;
+  mesh_component.replace(mesh, GeometryOwnershipType::Editable);
   OutputAttributePtr uv_attribute = mesh_component.attribute_try_get_for_output(
       "uv", ATTR_DOMAIN_CORNER, CD_PROP_FLOAT2, nullptr);
   MutableSpan<float2> uvs = uv_attribute->get_span_for_write_only<float2>();
@@ -252,6 +252,8 @@ static void calculate_uv_attribute(MeshComponent &mesh_component,
     uvs[loop_index++] = float2((segment + 1.0f) / segments, 1.0f - dy);
     uvs[loop_index++] = float2(segment / segments, 1.0f - dy);
   }
+
+  uv_attribute.apply_span_and_save();
 }
 
 static Mesh *create_uv_sphere_mesh(const float radius, const int segments, const int rings)
@@ -271,6 +273,8 @@ static Mesh *create_uv_sphere_mesh(const float radius, const int segments, const
   calculate_sphere_edge_indices(edges, segments, rings);
 
   calculate_sphere_faces(loops, polys, segments, rings);
+
+  calculate_uvs(mesh, segments, rings);
 
   BLI_assert(BKE_mesh_is_valid(mesh));
 
@@ -294,12 +298,7 @@ static void geo_node_mesh_primitive_uv_sphere_exec(GeoNodeExecParams params)
 
   transform_mesh(mesh, location, rotation, float3(1));
 
-  GeometrySet result_set = GeometrySet::create_with_mesh(mesh);
-
-  calculate_uv_attribute(
-      result_set.get_component_for_write<MeshComponent>(), segments_num, rings_num);
-
-  params.set_output("Geometry", result_set);
+  params.set_output("Geometry", GeometrySet::create_with_mesh(mesh));
 }
 
 }  // namespace blender::nodes

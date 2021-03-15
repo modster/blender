@@ -188,6 +188,94 @@ static int face_total(const GeometryNodeMeshCircleFillType fill_type,
   return face_total;
 }
 
+static void calculate_uvs(Mesh *mesh,
+                          const bool use_top,
+                          const bool use_bottom,
+                          const int verts_num,
+                          const GeometryNodeMeshCircleFillType fill_type)
+{
+  MeshComponent mesh_component;
+  mesh_component.replace(mesh, GeometryOwnershipType::Editable);
+  OutputAttributePtr uv_attribute = mesh_component.attribute_try_get_for_output(
+      "uv", ATTR_DOMAIN_CORNER, CD_PROP_FLOAT2, nullptr);
+  MutableSpan<float2> uvs = uv_attribute->get_span_for_write_only<float2>();
+
+  Array<float2> circle(verts_num);
+  float angle = 0.0f;
+  const float angle_delta = 2.0f * M_PI / static_cast<float>(verts_num);
+  for (const int i : IndexRange(verts_num)) {
+    circle[i].x = std::cos(angle) * 0.225f + 0.25f;
+    circle[i].y = std::sin(angle) * 0.225f + 0.25f;
+    angle += angle_delta;
+  }
+
+  int loop_index = 0;
+  if (use_top) {
+    if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_NGON) {
+      for (const int i : IndexRange(verts_num)) {
+        uvs[loop_index++] = circle[i];
+      }
+    }
+    else if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN) {
+      for (const int i : IndexRange(verts_num)) {
+        uvs[loop_index++] = circle[i];
+        uvs[loop_index++] = circle[(i + 1) % verts_num];
+        uvs[loop_index++] = float2(0.25f, 0.25f);
+      }
+    }
+  }
+
+  /* Create side corners and faces. */
+  if (use_top && use_bottom) {
+    const float bottom = (fill_type == GEO_NODE_MESH_CIRCLE_FILL_NONE) ? 0.0f : 0.5f;
+    /* Quads connect the top and bottom. */
+    for (const int i : IndexRange(verts_num)) {
+      const float vert = static_cast<float>(i);
+      uvs[loop_index++] = float2(vert / verts_num, bottom);
+      uvs[loop_index++] = float2((vert + 1.0f) / verts_num, bottom);
+      uvs[loop_index++] = float2((vert + 1.0f) / verts_num, 1.0f);
+      uvs[loop_index++] = float2(vert / verts_num, 1.0f);
+    }
+  }
+  else {
+    /* Triangles connect the top and bottom section. */
+    if (use_top) {
+      for (const int i : IndexRange(verts_num)) {
+        uvs[loop_index++] = circle[i] + float2(0.5f, 0.0f);
+        uvs[loop_index++] = float2(0.75f, 0.25f);
+        uvs[loop_index++] = circle[(i + 1) % verts_num] + float2(0.5f, 0.0f);
+      }
+    }
+    else {
+      BLI_assert(use_bottom);
+      for (const int i : IndexRange(verts_num)) {
+        uvs[loop_index++] = circle[i];
+        uvs[loop_index++] = circle[(i + 1) % verts_num];
+        uvs[loop_index++] = float2(0.25f, 0.25f);
+      }
+    }
+  }
+
+  /* Create bottom corners and faces. */
+  if (use_bottom) {
+    if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_NGON) {
+      for (const int i : IndexRange(verts_num)) {
+        /* Go backwards because of reversed face normal. */
+        uvs[loop_index++] = circle[verts_num - 1 - i] + float2(0.5f, 0.0f);
+      }
+    }
+    else if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN) {
+      for (const int i : IndexRange(verts_num)) {
+        uvs[loop_index++] = circle[i] + float2(0.5f, 0.0f);
+        uvs[loop_index++] = float2(0.75f, 0.25f);
+        uvs[loop_index++] = circle[(i + 1) % verts_num] + float2(0.5f, 0.0f);
+      }
+    }
+  }
+
+  uv_attribute.apply_span_and_save();
+}
+
 Mesh *create_cylinder_or_cone_mesh(const float radius_top,
                                    const float radius_bottom,
                                    const float depth,
@@ -441,6 +529,10 @@ Mesh *create_cylinder_or_cone_mesh(const float radius_top,
 
   BKE_mesh_calc_normals(mesh);
 
+  calculate_uvs(mesh, use_top, use_bottom, verts_num, fill_type);
+
+  BLI_assert(BKE_mesh_is_valid(mesh));
+
   return mesh;
 }
 
@@ -466,8 +558,6 @@ static void geo_node_mesh_primitive_cone_exec(GeoNodeExecParams params)
 
   Mesh *mesh = create_cylinder_or_cone_mesh(
       radius_top, radius_bottom, depth, verts_num, fill_type);
-
-  BLI_assert(BKE_mesh_is_valid(mesh));
 
   /* Transform the mesh so that the base of the cone is at the origin. */
   transform_mesh(mesh, location + float3(0.0f, 0.0f, depth), rotation, float3(1));
