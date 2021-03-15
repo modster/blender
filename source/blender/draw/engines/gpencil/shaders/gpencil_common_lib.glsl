@@ -149,7 +149,7 @@ void blend_mode_output(
   }
 }
 
-IN_OUT ShaderStageInterface
+IN_OUT GpencilShaderStageInterface
 {
   vec4 finalColorMul;
   vec4 finalColorAdd;

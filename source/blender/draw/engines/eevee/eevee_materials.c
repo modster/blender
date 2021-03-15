@@ -30,9 +30,11 @@
 #include "BLI_rand.h"
 #include "BLI_string_utils.h"
 
+#include "BKE_gpencil.h"
 #include "BKE_paint.h"
 #include "BKE_particle.h"
 
+#include "DNA_gpencil_types.h"
 #include "DNA_hair_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_view3d_types.h"
@@ -228,6 +230,8 @@ void EEVEE_materials_init(EEVEE_ViewLayerData *sldata,
 {
   const DRWContextState *draw_ctx = DRW_context_state_get();
   EEVEE_PrivateData *g_data = stl->g_data;
+
+  g_data->cfra = (int)DEG_get_ctime(draw_ctx->depsgraph);
 
   if (!e_data.util_tex) {
     EEVEE_shaders_material_shaders_init();
@@ -470,6 +474,7 @@ BLI_INLINE void material_shadow(EEVEE_Data *vedata,
                                 EEVEE_ViewLayerData *sldata,
                                 Material *ma,
                                 bool is_hair,
+                                bool is_gpencil,
                                 EeveeMaterialCache *emc)
 {
   EEVEE_PrivateData *pd = vedata->stl->g_data;
@@ -484,6 +489,7 @@ BLI_INLINE void material_shadow(EEVEE_Data *vedata,
     int mat_options = VAR_MAT_MESH | VAR_MAT_DEPTH;
     SET_FLAG_FROM_TEST(mat_options, use_shadow_shader, VAR_MAT_HASH);
     SET_FLAG_FROM_TEST(mat_options, is_hair, VAR_MAT_HAIR);
+    SET_FLAG_FROM_TEST(mat_options, is_gpencil, VAR_MAT_GPENCIL);
     GPUMaterial *gpumat = (use_shadow_shader) ?
                               EEVEE_material_get(vedata, scene, ma, NULL, mat_options) :
                               EEVEE_material_default_get(scene, ma, mat_options);
@@ -521,7 +527,8 @@ BLI_INLINE void material_shadow(EEVEE_Data *vedata,
 static EeveeMaterialCache material_opaque(EEVEE_Data *vedata,
                                           EEVEE_ViewLayerData *sldata,
                                           Material *ma,
-                                          const bool is_hair)
+                                          const bool is_hair,
+                                          const bool is_gpencil)
 {
   EEVEE_EffectsInfo *effects = vedata->stl->effects;
   EEVEE_PrivateData *pd = vedata->stl->g_data;
@@ -529,7 +536,7 @@ static EeveeMaterialCache material_opaque(EEVEE_Data *vedata,
   const DRWContextState *draw_ctx = DRW_context_state_get();
   Scene *scene = draw_ctx->scene;
 
-  const bool do_cull = !is_hair && (ma->blend_flag & MA_BL_CULL_BACKFACE) != 0;
+  const bool do_cull = !is_gpencil && !is_hair && (ma->blend_flag & MA_BL_CULL_BACKFACE) != 0;
   const bool use_gpumat = (ma->use_nodes && ma->nodetree);
   const bool use_ssrefract = use_gpumat && ((ma->blend_flag & MA_BL_SS_REFRACTION) != 0) &&
                              ((effects->enabled_effects & EFFECT_REFRACT) != 0);
@@ -537,7 +544,7 @@ static EeveeMaterialCache material_opaque(EEVEE_Data *vedata,
 
   /* HACK: Assume the struct will never be smaller than our variations.
    * This allow us to only keep one ghash and avoid bigger keys comparisons/hashing. */
-  void *key = (char *)ma + is_hair;
+  void *key = (char *)ma + is_hair + is_gpencil * 2;
   /* Search for other material instances (sharing the same Material data-block). */
   EeveeMaterialCache **emc_p, *emc;
   if (BLI_ghash_ensure_p(pd->material_hash, key, (void ***)&emc_p)) {
@@ -546,7 +553,7 @@ static EeveeMaterialCache material_opaque(EEVEE_Data *vedata,
 
   *emc_p = emc = BLI_memblock_alloc(sldata->material_cache);
 
-  material_shadow(vedata, sldata, ma, is_hair, emc);
+  material_shadow(vedata, sldata, ma, is_hair, is_gpencil, emc);
 
   {
     /* Depth Pass */
@@ -554,6 +561,7 @@ static EeveeMaterialCache material_opaque(EEVEE_Data *vedata,
     SET_FLAG_FROM_TEST(mat_options, use_ssrefract, VAR_MAT_REFRACT);
     SET_FLAG_FROM_TEST(mat_options, use_depth_shader, VAR_MAT_HASH);
     SET_FLAG_FROM_TEST(mat_options, is_hair, VAR_MAT_HAIR);
+    SET_FLAG_FROM_TEST(mat_options, is_gpencil, VAR_MAT_GPENCIL);
     GPUMaterial *gpumat = (use_depth_shader) ?
                               EEVEE_material_get(vedata, scene, ma, NULL, mat_options) :
                               EEVEE_material_default_get(scene, ma, mat_options);
@@ -595,6 +603,7 @@ static EeveeMaterialCache material_opaque(EEVEE_Data *vedata,
     int mat_options = VAR_MAT_MESH;
     SET_FLAG_FROM_TEST(mat_options, use_ssrefract, VAR_MAT_REFRACT);
     SET_FLAG_FROM_TEST(mat_options, is_hair, VAR_MAT_HAIR);
+    SET_FLAG_FROM_TEST(mat_options, is_gpencil, VAR_MAT_GPENCIL);
     GPUMaterial *gpumat = EEVEE_material_get(vedata, scene, ma, NULL, mat_options);
     const bool use_sss = GPU_material_flag_get(gpumat, GPU_MATFLAG_SSS);
 
@@ -609,7 +618,7 @@ static EeveeMaterialCache material_opaque(EEVEE_Data *vedata,
         psl->material_cull_ps,
     }[option];
     /* Hair are rendered inside the non-cull pass but needs to have a separate cache key */
-    option = option * 2 + is_hair;
+    option = option * 3 + is_hair + is_gpencil * 2;
 
     /* Search for the same shaders usage in the pass. */
     /* HACK: Assume the struct will never be smaller than our variations.
@@ -663,7 +672,7 @@ static EeveeMaterialCache material_transparent(EEVEE_Data *vedata,
                         DRW_STATE_DEPTH_LESS_EQUAL | DRW_STATE_DEPTH_EQUAL |
                         DRW_STATE_BLEND_CUSTOM);
 
-  material_shadow(vedata, sldata, ma, false, &emc);
+  material_shadow(vedata, sldata, ma, false, false, &emc);
 
   if (use_prepass) {
     /* Depth prepass */
@@ -730,15 +739,20 @@ BLI_INLINE Material *eevee_object_material_get(Object *ob, int slot, bool holdou
   return ma;
 }
 
-BLI_INLINE EeveeMaterialCache eevee_material_cache_get(
-    EEVEE_Data *vedata, EEVEE_ViewLayerData *sldata, Object *ob, int slot, bool is_hair)
+BLI_INLINE EeveeMaterialCache eevee_material_cache_get(EEVEE_Data *vedata,
+                                                       EEVEE_ViewLayerData *sldata,
+                                                       Object *ob,
+                                                       int slot,
+                                                       bool is_hair,
+                                                       bool is_gpencil)
 {
   const bool holdout = (ob->base_flag & BASE_HOLDOUT) != 0;
   EeveeMaterialCache matcache;
   Material *ma = eevee_object_material_get(ob, slot, holdout);
   switch (ma->blend_method) {
     case MA_BM_BLEND:
-      if (!is_hair) {
+      /* TODO(fclem) support gpencil transparent materials. */
+      if (!is_hair && !is_gpencil) {
         matcache = material_transparent(vedata, sldata, ma);
         break;
       }
@@ -747,7 +761,7 @@ BLI_INLINE EeveeMaterialCache eevee_material_cache_get(
     case MA_BM_CLIP:
     case MA_BM_HASHED:
     default:
-      matcache = material_opaque(vedata, sldata, ma, is_hair);
+      matcache = material_opaque(vedata, sldata, ma, is_hair, is_gpencil);
       break;
   }
   return matcache;
@@ -761,7 +775,8 @@ static void eevee_hair_cache_populate(EEVEE_Data *vedata,
                                       int matnr,
                                       bool *cast_shadow)
 {
-  EeveeMaterialCache matcache = eevee_material_cache_get(vedata, sldata, ob, matnr - 1, true);
+  EeveeMaterialCache matcache = eevee_material_cache_get(
+      vedata, sldata, ob, matnr - 1, true, false);
 
   if (matcache.depth_grp) {
     *matcache.depth_grp_p = DRW_shgroup_hair_create_sub(ob, psys, md, matcache.depth_grp);
@@ -816,7 +831,7 @@ void EEVEE_materials_cache_populate(EEVEE_Data *vedata,
 
     EeveeMaterialCache *matcache = BLI_array_alloca(matcache, materials_len);
     for (int i = 0; i < materials_len; i++) {
-      matcache[i] = eevee_material_cache_get(vedata, sldata, ob, i, false);
+      matcache[i] = eevee_material_cache_get(vedata, sldata, ob, i, false, false);
     }
 
     /* Only support single volume material for now. */
@@ -920,6 +935,114 @@ void EEVEE_object_hair_cache_populate(EEVEE_Data *vedata,
                                       bool *cast_shadow)
 {
   eevee_hair_cache_populate(vedata, sldata, ob, NULL, NULL, HAIR_MATERIAL_NR, cast_shadow);
+}
+
+typedef struct gpIterData {
+  Object *ob;
+  DRWShadingGroup *stroke_shadow_grp;
+  DRWShadingGroup *fill_shadow_grp;
+  int cfra;
+  float plane[4];
+} gpIterData;
+
+static void eevee_gpencil_layer_cache_populate(bGPDlayer *gpl,
+                                               bGPDframe *UNUSED(gpf),
+                                               bGPDstroke *UNUSED(gps),
+                                               void *thunk)
+{
+  gpIterData *iter = (gpIterData *)thunk;
+  bGPdata *gpd = (bGPdata *)iter->ob->data;
+
+  const bool is_screenspace = (gpd->flag & GP_DATA_STROKE_KEEPTHICKNESS) != 0;
+  const bool is_stroke_order_3d = (gpd->draw_mode == GP_DRAWMODE_3D);
+
+  float object_scale = mat4_to_scale(iter->ob->obmat);
+  /* Negate thickness sign to tag that strokes are in screen space.
+   * Convert to world units (by default, 1 meter = 2000 px). */
+  float thickness_scale = (is_screenspace) ? -1.0f : (gpd->pixfactor / 2000.0f);
+
+  DRWShadingGroup *grp = iter->stroke_shadow_grp = DRW_shgroup_create_sub(iter->stroke_shadow_grp);
+  DRW_shgroup_uniform_bool_copy(grp, "strokeOrder3d", is_stroke_order_3d);
+  DRW_shgroup_uniform_vec2_copy(grp, "sizeViewportInv", DRW_viewport_invert_size_get());
+  DRW_shgroup_uniform_vec2_copy(grp, "sizeViewport", DRW_viewport_size_get());
+  DRW_shgroup_uniform_float_copy(grp, "thicknessScale", object_scale);
+  DRW_shgroup_uniform_float_copy(grp, "thicknessOffset", (float)gpl->line_change);
+  DRW_shgroup_uniform_float_copy(grp, "thicknessWorldScale", thickness_scale);
+  DRW_shgroup_uniform_vec4_copy(grp, "gpDepthPlane", iter->plane);
+}
+
+static void eevee_gpencil_stroke_cache_populate(bGPDlayer *UNUSED(gpl),
+                                                bGPDframe *UNUSED(gpf),
+                                                bGPDstroke *gps,
+                                                void *thunk)
+{
+  gpIterData *iter = (gpIterData *)thunk;
+
+  MaterialGPencilStyle *gp_style = BKE_gpencil_material_settings(iter->ob, gps->mat_nr + 1);
+
+  bool hide_material = (gp_style->flag & GP_MATERIAL_HIDE) != 0;
+  bool show_stroke = (gp_style->flag & GP_MATERIAL_STROKE_SHOW) != 0;
+  // TODO: What about simplify Fill?
+  bool show_fill = (gps->tot_triangles > 0) && (gp_style->flag & GP_MATERIAL_FILL_SHOW) != 0;
+
+  if (hide_material) {
+    return;
+  }
+
+  if (show_fill) {
+    struct GPUBatch *geom = DRW_cache_gpencil_fills_get(iter->ob, iter->cfra);
+    int vfirst = gps->runtime.fill_start * 3;
+    int vcount = gps->tot_triangles * 3;
+    DRW_shgroup_call_range(iter->fill_shadow_grp, iter->ob, geom, vfirst, vcount);
+  }
+
+  if (show_stroke) {
+    struct GPUBatch *geom = DRW_cache_gpencil_strokes_get(iter->ob, iter->cfra);
+    /* Start one vert before to have gl_InstanceID > 0 (see shader). */
+    int vfirst = gps->runtime.stroke_start - 1;
+    /* Include "potential" cyclic vertex and start adj vertex (see shader). */
+    int vcount = gps->totpoints + 1 + 1;
+    DRW_shgroup_call_instance_range(iter->stroke_shadow_grp, iter->ob, geom, vfirst, vcount);
+  }
+}
+
+void EEVEE_gpencil_cache_populate(EEVEE_Data *vedata,
+                                  EEVEE_ViewLayerData *sldata,
+                                  Object *ob,
+                                  bool *cast_shadow)
+{
+  EEVEE_PrivateData *pd = vedata->stl->g_data;
+  EeveeMaterialCache matcache = eevee_material_cache_get(vedata, sldata, ob, 0, false, true);
+
+  gpIterData iter = {
+      .ob = ob,
+      .stroke_shadow_grp = NULL,
+      .fill_shadow_grp = NULL,
+      .cfra = pd->cfra,
+  };
+
+  // if (gpd->draw_mode == GP_DRAWMODE_2D) {
+  //   gpencil_depth_plane(ob, iter.plane);
+  // }
+
+  if (matcache.shadow_grp) {
+    iter.stroke_shadow_grp = matcache.shadow_grp;
+    iter.fill_shadow_grp = DRW_shgroup_create_sub(matcache.shadow_grp);
+
+    *matcache.shadow_grp_p = matcache.shadow_grp = iter.fill_shadow_grp;
+    *cast_shadow = true;
+  }
+
+  bool any_material_visible = matcache.shadow_grp != NULL;
+  if (any_material_visible) {
+    BKE_gpencil_visible_stroke_iter(NULL,
+                                    ob,
+                                    eevee_gpencil_layer_cache_populate,
+                                    eevee_gpencil_stroke_cache_populate,
+                                    &iter,
+                                    false,
+                                    pd->cfra);
+  }
 }
 
 void EEVEE_materials_cache_finish(EEVEE_ViewLayerData *UNUSED(sldata), EEVEE_Data *vedata)

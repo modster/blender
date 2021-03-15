@@ -184,6 +184,7 @@ extern char datatoc_common_hair_lib_glsl[];
 extern char datatoc_common_math_lib_glsl[];
 extern char datatoc_common_math_geom_lib_glsl[];
 extern char datatoc_common_view_lib_glsl[];
+extern char datatoc_gpencil_common_lib_glsl[];
 extern char datatoc_gpu_shader_common_obinfos_lib_glsl[];
 
 extern char datatoc_ambient_occlusion_lib_glsl[];
@@ -290,6 +291,7 @@ static void eevee_shader_library_ensure(void)
     DRW_SHADER_LIB_ADD(e_data.lib, common_view_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, common_uniforms_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, gpu_shader_common_obinfos_lib);
+    DRW_SHADER_LIB_ADD(e_data.lib, gpencil_common_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, random_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, renderpass_lib);
     DRW_SHADER_LIB_ADD(e_data.lib, bsdf_common_lib);
@@ -1357,6 +1359,9 @@ static char *eevee_get_defines(int options)
   }
   if ((options & VAR_MAT_HAIR) != 0) {
     BLI_dynstr_append(ds, "#define HAIR_SHADER\n");
+  }
+  if ((options & VAR_MAT_GPENCIL) != 0) {
+    BLI_dynstr_append(ds, "#define GPENCIL_SHADER\n");
   }
   if ((options & VAR_WORLD_PROBE) != 0) {
     BLI_dynstr_append(ds, "#define PROBE_CAPTURE\n");

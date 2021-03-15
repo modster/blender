@@ -1,10 +1,7 @@
 
 #pragma BLENDER_REQUIRE(common_hair_lib.glsl)
 #pragma BLENDER_REQUIRE(common_view_lib.glsl)
-
-#ifndef HAIR_SHADER
-in vec3 pos;
-#endif
+#pragma BLENDER_REQUIRE(gpencil_common_lib.glsl)
 
 void main()
 {
@@ -23,13 +20,20 @@ void main()
                               time,
                               thickness,
                               thick_time);
+#elif defined(GPENCIL_SHADER)
+  /* TODO */
+  vec3 worldPosition = vec3(0.0);
 #else
-  vec3 worldPosition = point_object_to_world(pos);
+  vec3 worldPosition = point_object_to_world(pos.xyz);
 #endif
 
   gl_Position = point_world_to_ndc(worldPosition);
 
 #ifdef CLIP_PLANES
   gl_ClipDistance[0] = dot(vec4(worldPosition.xyz, 1.0), clipPlanes[0]);
+#endif
+
+#if defined(GPENCIL_SHADER)
+  gpencil_vertex();
 #endif
 }

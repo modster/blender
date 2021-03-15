@@ -256,6 +256,9 @@ void EEVEE_render_cache(void *vedata,
       Scene *scene = DEG_get_evaluated_scene(depsgraph);
       EEVEE_volumes_cache_object_add(sldata, vedata, scene, ob);
     }
+    else if (ob->type == OB_GPENCIL) {
+      EEVEE_gpencil_cache_populate(vedata, sldata, ob, &cast_shadow);
+    }
     else if (ob->type == OB_LIGHTPROBE) {
       EEVEE_lightprobes_cache_add(sldata, vedata, ob);
     }

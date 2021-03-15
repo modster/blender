@@ -176,7 +176,7 @@ enum {
   VAR_MAT_MESH = (1 << 0),
   VAR_MAT_VOLUME = (1 << 1),
   VAR_MAT_HAIR = (1 << 2),
-  /* VAR_MAT_PROBE = (1 << 3), UNUSED */
+  VAR_MAT_GPENCIL = (1 << 3),
   VAR_MAT_BLEND = (1 << 4),
   VAR_MAT_LOOKDEV = (1 << 5),
   VAR_MAT_HOLDOUT = (1 << 6),
@@ -1064,6 +1064,9 @@ typedef struct EEVEE_PrivateData {
   /** For rendering planar reflections. */
   struct DRWView *planar_views[MAX_PLANAR];
 
+  /** For rendering Gpencil Objects. */
+  int cfra;
+
   int render_timesteps;
   int render_sample_count_per_timestep;
 } EEVEE_PrivateData; /* Transient data */
@@ -1111,6 +1114,10 @@ void EEVEE_object_hair_cache_populate(EEVEE_Data *vedata,
                                       EEVEE_ViewLayerData *sldata,
                                       Object *ob,
                                       bool *cast_shadow);
+void EEVEE_gpencil_cache_populate(EEVEE_Data *vedata,
+                                  EEVEE_ViewLayerData *sldata,
+                                  Object *ob,
+                                  bool *cast_shadow);
 void EEVEE_materials_cache_finish(EEVEE_ViewLayerData *sldata, EEVEE_Data *vedata);
 void EEVEE_materials_free(void);
 void EEVEE_update_noise(EEVEE_PassList *psl, EEVEE_FramebufferList *fbl, const double offsets[3]);
