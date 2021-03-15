@@ -48,6 +48,7 @@
 #include "BKE_lib_query.h"
 #include "BKE_lib_remap.h"
 #include "BKE_main.h"
+#include "BKE_report.h"
 #include "BKE_scene.h"
 
 #include "BLI_ghash.h"
@@ -650,53 +651,59 @@ static void lib_override_library_create_post_process(
 {
   BKE_main_collection_sync(bmain);
 
-  switch (GS(id_root->name)) {
-    case ID_GR: {
-      Object *ob_reference = id_reference != NULL && GS(id_reference->name) == ID_OB ?
-                                 (Object *)id_reference :
-                                 NULL;
-      Collection *collection_new = ((Collection *)id_root->newid);
-      if (ob_reference != NULL) {
-        BKE_collection_add_from_object(bmain, scene, ob_reference, collection_new);
-      }
-      else if (id_reference != NULL) {
-        BKE_collection_add_from_collection(
-            bmain, scene, ((Collection *)id_reference), collection_new);
-      }
-      else {
-        BKE_collection_add_from_collection(bmain, scene, ((Collection *)id_root), collection_new);
-      }
+  if (id_root->newid != NULL) {
+    switch (GS(id_root->name)) {
+      case ID_GR: {
+        Object *ob_reference = id_reference != NULL && GS(id_reference->name) == ID_OB ?
+                                   (Object *)id_reference :
+                                   NULL;
+        Collection *collection_new = ((Collection *)id_root->newid);
+        if (ob_reference != NULL) {
+          BKE_collection_add_from_object(bmain, scene, ob_reference, collection_new);
+        }
+        else if (id_reference != NULL) {
+          BLI_assert(GS(id_reference->name) == ID_GR);
+          BKE_collection_add_from_collection(
+              bmain, scene, ((Collection *)id_reference), collection_new);
+        }
+        else {
+          BKE_collection_add_from_collection(
+              bmain, scene, ((Collection *)id_root), collection_new);
+        }
 
-      FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (collection_new, ob_new) {
-        if (ob_new != NULL && ob_new->id.override_library != NULL) {
-          if (ob_reference != NULL) {
-            Base *base;
-            if ((base = BKE_view_layer_base_find(view_layer, ob_new)) == NULL) {
-              BKE_collection_object_add_from(bmain, scene, ob_reference, ob_new);
-              base = BKE_view_layer_base_find(view_layer, ob_new);
+        FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (collection_new, ob_new) {
+          if (ob_new != NULL && ob_new->id.override_library != NULL) {
+            if (ob_reference != NULL) {
+              Base *base;
+              if ((base = BKE_view_layer_base_find(view_layer, ob_new)) == NULL) {
+                BKE_collection_object_add_from(bmain, scene, ob_reference, ob_new);
+                base = BKE_view_layer_base_find(view_layer, ob_new);
+                DEG_id_tag_update_ex(
+                    bmain, &ob_new->id, ID_RECALC_TRANSFORM | ID_RECALC_BASE_FLAGS);
+              }
+
+              if (ob_new == (Object *)ob_reference->id.newid) {
+                /* TODO: is setting active needed? */
+                BKE_view_layer_base_select_and_set_active(view_layer, base);
+              }
+            }
+            else if (BKE_view_layer_base_find(view_layer, ob_new) == NULL) {
+              BKE_collection_object_add(bmain, collection_new, ob_new);
               DEG_id_tag_update_ex(bmain, &ob_new->id, ID_RECALC_TRANSFORM | ID_RECALC_BASE_FLAGS);
             }
-
-            if (ob_new == (Object *)ob_reference->id.newid) {
-              /* TODO: is setting active needed? */
-              BKE_view_layer_base_select_and_set_active(view_layer, base);
-            }
-          }
-          else if (BKE_view_layer_base_find(view_layer, ob_new) == NULL) {
-            BKE_collection_object_add(bmain, collection_new, ob_new);
-            DEG_id_tag_update_ex(bmain, &ob_new->id, ID_RECALC_TRANSFORM | ID_RECALC_BASE_FLAGS);
           }
         }
+        FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
+        break;
       }
-      FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
-      break;
+      case ID_OB: {
+        BKE_collection_object_add_from(
+            bmain, scene, (Object *)id_root, ((Object *)id_root->newid));
+        break;
+      }
+      default:
+        break;
     }
-    case ID_OB: {
-      BKE_collection_object_add_from(bmain, scene, (Object *)id_root, ((Object *)id_root->newid));
-      break;
-    }
-    default:
-      break;
   }
 
   /* We need to ensure all new overrides of objects are properly instantiated. */
@@ -829,7 +836,8 @@ bool BKE_lib_override_library_proxy_convert(Main *bmain,
  * \param id_root: The root liboverride ID to resync from.
  * \return true if override was successfully resynced.
  */
-bool BKE_lib_override_library_resync(Main *bmain, Scene *scene, ViewLayer *view_layer, ID *id_root)
+bool BKE_lib_override_library_resync(
+    Main *bmain, Scene *scene, ViewLayer *view_layer, ID *id_root, const bool do_hierarchy_enforce)
 {
   BLI_assert(ID_IS_OVERRIDE_LIBRARY_REAL(id_root));
 
@@ -978,8 +986,14 @@ bool BKE_lib_override_library_resync(Main *bmain, Scene *scene, ViewLayer *view_
           }
         }
 
-        RNA_struct_override_apply(
-            bmain, &rnaptr_dst, &rnaptr_src, NULL, id_override_new->override_library);
+        RNA_struct_override_apply(bmain,
+                                  &rnaptr_dst,
+                                  &rnaptr_src,
+                                  NULL,
+                                  id_override_new->override_library,
+                                  do_hierarchy_enforce ?
+                                      RNA_OVERRIDE_APPLY_FLAG_IGNORE_ID_POINTERS :
+                                      RNA_OVERRIDE_APPLY_FLAG_NOP);
       }
     }
   }
@@ -1144,7 +1158,7 @@ void BKE_lib_override_library_main_resync(Main *bmain, Scene *scene, ViewLayer *
           continue;
         }
         do_continue = true;
-        const bool success = BKE_lib_override_library_resync(bmain, scene, view_layer, id);
+        const bool success = BKE_lib_override_library_resync(bmain, scene, view_layer, id, false);
         CLOG_INFO(&LOG, 2, "Resynced %s, success: %d", id->name, success);
         break;
       }
@@ -1525,6 +1539,53 @@ bool BKE_lib_override_library_property_operation_operands_validate(
   }
 
   return true;
+}
+
+/** Check against potential  \a bmain. */
+void BKE_lib_override_library_validate(Main *UNUSED(bmain), ID *id, ReportList *reports)
+{
+  if (id->override_library == NULL) {
+    return;
+  }
+  if (id->override_library->reference == NULL) {
+    /* This is a template ID, could be linked or local, not an override. */
+    return;
+  }
+  if (id->override_library->reference == id) {
+    /* Very serious data corruption, cannot do much about it besides removing the reference
+     * (therefore making the id a local override template one only). */
+    BKE_reportf(reports,
+                RPT_ERROR,
+                "Data corruption: data-block '%s' is using itself as library override reference",
+                id->name);
+    id->override_library->reference = NULL;
+    return;
+  }
+  if (id->override_library->reference->lib == NULL) {
+    /* Very serious data corruption, cannot do much about it besides removing the reference
+     * (therefore making the id a local override template one only). */
+    BKE_reportf(reports,
+                RPT_ERROR,
+                "Data corruption: data-block '%s' is using another local data-block ('%s') as "
+                "library override reference",
+                id->name,
+                id->override_library->reference->name);
+    id->override_library->reference = NULL;
+    return;
+  }
+}
+
+/** Check against potential  \a bmain. */
+void BKE_lib_override_library_main_validate(Main *bmain, ReportList *reports)
+{
+  ID *id;
+
+  FOREACH_MAIN_ID_BEGIN (bmain, id) {
+    if (id->override_library != NULL) {
+      BKE_lib_override_library_validate(bmain, id, reports);
+    }
+  }
+  FOREACH_MAIN_ID_END;
 }
 
 /**
@@ -2104,8 +2165,12 @@ void BKE_lib_override_library_update(Main *bmain, ID *local)
     RNA_id_pointer_create(local->override_library->storage, rnaptr_storage);
   }
 
-  RNA_struct_override_apply(
-      bmain, &rnaptr_dst, &rnaptr_src, rnaptr_storage, local->override_library);
+  RNA_struct_override_apply(bmain,
+                            &rnaptr_dst,
+                            &rnaptr_src,
+                            rnaptr_storage,
+                            local->override_library,
+                            RNA_OVERRIDE_APPLY_FLAG_NOP);
 
   /* This also transfers all pointers (memory) owned by local to tmp_id, and vice-versa.
    * So when we'll free tmp_id, we'll actually free old, outdated data from local. */
