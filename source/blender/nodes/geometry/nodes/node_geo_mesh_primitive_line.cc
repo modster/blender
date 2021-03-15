@@ -144,12 +144,12 @@ static void geo_node_mesh_primitive_line_exec(GeoNodeExecParams params)
     float3 delta;
     if (count_mode == GEO_NODE_MESH_LINE_COUNT_RESOLUTION) {
       const float resolution = params.extract_input<float>("Resolution");
-      count = total_delta.length() / resolution;
+      count = total_delta.length() / resolution + 1;
       delta = total_delta.normalized() * resolution;
     }
     else if (count_mode == GEO_NODE_MESH_LINE_COUNT_TOTAL) {
       count = params.extract_input<int>("Count");
-      delta = total_delta / count;
+      delta = total_delta / (float)(count - 1);
     }
 
     if (count > 0) {
