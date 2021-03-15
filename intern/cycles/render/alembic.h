@@ -129,12 +129,25 @@ template<typename T> class CacheLookupResult {
  * The data is supposed to be stored in chronological order, and is looked up using the current
  * animation time in seconds using the TimeSampling from the Alembic property. */
 template<typename T> class DataStore {
-  struct DataTimePair {
+  /* Holds information to map a cache entry for a given time to an index into the data array. */
+  struct TimeIndexPair {
+    /* Frame time for this entry. */
     double time = 0;
-    T data{};
+    /* Frame time for the data pointed to by `index`. */
+    double source_time = 0;
+    /* Index into the data array. */
+    size_t index = 0;
   };
 
-  vector<DataTimePair> data{};
+  /* This is the actual data that is stored. We deduplicate data across frames to avoid storing
+   * values if they have not changed yet (e.g. the triangles for a building before fracturing, or a
+   * fluid simulation before a break or splash) */
+  vector<T> data{};
+
+  /* This is used to map they entry for a given time to an index into the data array, multiple
+   * frames can point to the same index. */
+  vector<TimeIndexPair> index_data_map{};
+
   Alembic::AbcCoreAbstract::TimeSampling time_sampling{};
 
   double last_loaded_time = std::numeric_limits<double>::max();
@@ -160,16 +173,15 @@ template<typename T> class DataStore {
       return CacheLookupResult<T>::no_data_found_for_time();
     }
 
-    const size_t index = get_index_for_time(time);
-    DataTimePair &data_pair = data[index];
+    const TimeIndexPair &index = get_index_for_time(time);
 
-    if (last_loaded_time == data_pair.time) {
+    if (last_loaded_time == index.time || last_loaded_time == index.source_time) {
       return CacheLookupResult<T>::already_loaded();
     }
 
-    last_loaded_time = data_pair.time;
+    last_loaded_time = index.source_time;
 
-    return CacheLookupResult<T>::new_data(&data_pair.data);
+    return CacheLookupResult<T>::new_data(&data[index.index]);
   }
 
   /* get the data for the specified time, but do not check if the data was already loaded for this
@@ -180,21 +192,27 @@ template<typename T> class DataStore {
       return CacheLookupResult<T>::no_data_found_for_time();
     }
 
-    const size_t index = get_index_for_time(time);
-    DataTimePair &data_pair = data[index];
-    return CacheLookupResult<T>::new_data(&data_pair.data);
+    const TimeIndexPair &index = get_index_for_time(time);
+    return CacheLookupResult<T>::new_data(&data[index.index]);
   }
 
   void add_data(T &data_, double time)
   {
+    index_data_map.push_back({time, time, data.size()});
+
     if constexpr (is_array<T>::value) {
       data.emplace_back();
-      data.back().data.steal_data(data_);
-      data.back().time = time;
+      data.back().steal_data(data_);
       return;
     }
 
-    data.push_back({time, data_});
+    data.push_back(data_);
+  }
+
+  void reuse_data_for_last_time(double time)
+  {
+    const TimeIndexPair &data_index = index_data_map.back();
+    index_data_map.push_back({time, data_index.source_time, data_index.index});
   }
 
   bool is_constant() const
@@ -239,8 +257,8 @@ template<typename T> class DataStore {
     if constexpr (is_array<T>::value) {
       size_t mem_used = 0;
 
-      for (const DataTimePair &pair : data) {
-        mem_used += pair.data.size() * sizeof(T);
+      for (const T &array : data) {
+        mem_used += array.size() * sizeof(T);
       }
 
       return mem_used;
@@ -260,7 +278,7 @@ template<typename T> class DataStore {
   }
 
  private:
-  size_t get_index_for_time(double time)
+  const TimeIndexPair &get_index_for_time(double time) const
   {
     /* TimeSampling works by matching a frame time to an index, however it expects
      * frame time 0 == index 0, but since we may load data by chunks of frames,
@@ -275,8 +293,8 @@ template<typename T> class DataStore {
     }
 
     std::pair<size_t, Alembic::Abc::chrono_t> index_pair;
-    index_pair = time_sampling.getNearIndex(time, data.size() + size_offset);
-    return index_pair.first - size_offset;
+    index_pair = time_sampling.getNearIndex(time, index_data_map.size() + size_offset);
+    return index_data_map[index_pair.first - size_offset];
   }
 };
 
