@@ -82,6 +82,7 @@ static void copyData(const GpencilModifierData *md, GpencilModifierData *target)
 
 static void gpencil_deform_verts(ArmatureGpencilModifierData *mmd, Object *target, bGPDstroke *gps)
 {
+  bGPdata *gpd = target->data;
   bGPDspoint *pt = gps->points;
   float(*vert_coords)[3] = MEM_mallocN(sizeof(float[3]) * gps->totpoints, __func__);
   int i;
@@ -108,6 +109,11 @@ static void gpencil_deform_verts(ArmatureGpencilModifierData *mmd, Object *targe
   pt = gps->points;
   for (i = 0; i < gps->totpoints; i++, pt++) {
     copy_v3_v3(&pt->x, vert_coords[i]);
+  }
+
+  if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+    gps->editcurve->flag |= GP_CURVE_NEEDS_STROKE_UPDATE;
+    BKE_gpencil_stroke_geometry_update(gpd, gps);
   }
 
   MEM_freeN(vert_coords);
