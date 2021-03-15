@@ -654,9 +654,7 @@ static void animsys_blend_in_fcurves(PointerRNA *ptr,
           /* Without this, anything less than 1.0 is converted to 'False' by
            * ANIMSYS_FLOAT_AS_BOOL(). This is probably not desirable for blends, where anything
            * above a 50% blend should act more like the FCurve than like the current value. */
-          ATTR_FALLTHROUGH;
         case PROP_INT:
-          ATTR_FALLTHROUGH;
         case PROP_ENUM:
           value_to_write = roundf(value_to_write);
           break;
