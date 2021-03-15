@@ -162,7 +162,7 @@ const EnumPropertyItem rna_enum_object_gpencil_type_items[] = {
     {GP_MONKEY, "MONKEY", ICON_MONKEY, "Monkey", "Construct a Suzanne grease pencil object"},
     {GP_LRT_SCENE,
      "LRT_SCENE",
-     ICON_SCENE,
+     ICON_SCENE_DATA,
      "Scene Line Art",
      "Quickly set up Line Art for the whole scene"},
     {GP_LRT_COLLECTION,
