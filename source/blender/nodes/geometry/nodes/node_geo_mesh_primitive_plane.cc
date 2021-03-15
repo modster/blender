@@ -43,6 +43,23 @@ static bNodeSocketTemplate geo_node_mesh_primitive_plane_out[] = {
 
 namespace blender::nodes {
 
+static void calculate_uvs(Mesh *mesh, Span<MVert> verts, Span<MLoop> loops, const float size)
+{
+  MeshComponent mesh_component;
+  mesh_component.replace(mesh, GeometryOwnershipType::Editable);
+  OutputAttributePtr uv_attribute = mesh_component.attribute_try_get_for_output(
+      "uv", ATTR_DOMAIN_CORNER, CD_PROP_FLOAT2, nullptr);
+  MutableSpan<float2> uvs = uv_attribute->get_span_for_write_only<float2>();
+
+  for (const int i : loops.index_range()) {
+    const float3 &co = verts[loops[i].v].co;
+    uvs[i].x = (co.x + size) / (size * 2.0f);
+    uvs[i].y = (co.y + size) / (size * 2.0f);
+  }
+
+  uv_attribute.apply_span_and_save();
+}
+
 static Mesh *create_plane_mesh(const int verts_x, const int verts_y, const float size)
 {
   const int edges_x = verts_x - 1;
@@ -57,10 +74,9 @@ static Mesh *create_plane_mesh(const int verts_x, const int verts_y, const float
   MutableSpan<MEdge> edges = MutableSpan<MEdge>(mesh->medge, mesh->totedge);
   MutableSpan<MPoly> polys = MutableSpan<MPoly>(mesh->mpoly, mesh->totpoly);
 
-  const float dx = size * 2.0f / (edges_x);
-  const float dy = size * 2.0f / (edges_y);
-
   {
+    const float dx = size * 2.0f / edges_x;
+    const float dy = size * 2.0f / edges_y;
     float x = -size;
     for (const int x_index : IndexRange(verts_x)) {
       float y = -size;
@@ -124,6 +140,8 @@ static Mesh *create_plane_mesh(const int verts_x, const int verts_y, const float
       loop_d.e = y_edges_start + edges_y * x + y;
     }
   }
+
+  calculate_uvs(mesh, verts, loops, size);
 
   return mesh;
 }
