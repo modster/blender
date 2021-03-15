@@ -1651,7 +1651,6 @@ static bool gpencil_generic_curve_select(bContext *C,
     bGPDcurve_point *gpc_pt_active = (gpc_pt->runtime.gpc_pt_orig) ? gpc_pt->runtime.gpc_pt_orig :
                                                                      gpc_pt;
     BezTriple *bezt_active = &gpc_pt_active->bezt;
-    printf("%d: %f\n", i, bezt_active->vec[1][0]);
 
     if (bezt_active->hide == 1) {
       continue;
