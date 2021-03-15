@@ -121,7 +121,8 @@ static void poselib_backup_posecopy(PoseBlendData *pbd)
   bool all_bones_selected = true;
   bool no_bones_selected = true;
   LISTBASE_FOREACH (bPoseChannel *, pchan, &pbd->ob->pose->chanbase) {
-    const bool is_selected = (pchan->bone->flag & BONE_SELECTED) != 0;
+    const bool is_selected = (pchan->bone->flag & BONE_SELECTED) != 0 &&
+                             (pchan->bone->flag & BONE_HIDDEN_P) == 0;
     all_bones_selected &= is_selected;
     no_bones_selected &= !is_selected;
   }
