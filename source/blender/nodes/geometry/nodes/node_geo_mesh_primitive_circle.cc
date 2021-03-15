@@ -221,9 +221,7 @@ static void geo_node_mesh_primitive_circle_exec(GeoNodeExecParams params)
 
   BLI_assert(BKE_mesh_is_valid(mesh));
 
-  if (!location.is_zero() || !rotation.is_zero()) {
-    transform_mesh(mesh, location, rotation, float3(1));
-  }
+  transform_mesh(mesh, location, rotation, float3(1));
 
   params.set_output("Geometry", GeometrySet::create_with_mesh(mesh));
 }

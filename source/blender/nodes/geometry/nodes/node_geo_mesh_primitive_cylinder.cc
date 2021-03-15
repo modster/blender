@@ -81,9 +81,7 @@ static void geo_node_mesh_primitive_cylinder_exec(GeoNodeExecParams params)
   /* The cylinder is a special case of the cone mesh where the top and bottom radius are equal. */
   Mesh *mesh = create_cylinder_or_cone_mesh(radius, radius, depth, verts_num, fill_type);
 
-  if (!location.is_zero() || !rotation.is_zero()) {
-    transform_mesh(mesh, location, rotation, float3(1));
-  }
+  transform_mesh(mesh, location, rotation, float3(1));
 
   BLI_assert(BKE_mesh_is_valid(mesh));
 
