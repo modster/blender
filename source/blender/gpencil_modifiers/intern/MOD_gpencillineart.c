@@ -247,8 +247,8 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   PointerRNA obj_data_ptr = RNA_pointer_get(&ob_ptr, "data");
 
-  int source_type = RNA_enum_get(ptr, "source_type");
-  bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  const int source_type = RNA_enum_get(ptr, "source_type");
+  const bool is_baked = RNA_boolean_get(ptr, "is_baked");
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
@@ -256,7 +256,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(layout, ptr, "source_type", 0, NULL, ICON_NONE);
 
   if (source_type == LRT_SOURCE_OBJECT) {
-    uiItemR(layout, ptr, "source_object", 0, NULL, ICON_CUBE);
+    uiItemR(layout, ptr, "source_object", 0, NULL, ICON_OBJECT_DATA);
   }
   else if (source_type == LRT_SOURCE_COLLECTION) {
     uiItemR(layout, ptr, "source_collection", 0, NULL, ICON_OUTLINER_COLLECTION);
@@ -265,20 +265,20 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
     /* Source is Scene. */
   }
 
-  uiLayout *column = uiLayoutColumn(layout, true);
+  uiLayout *col = uiLayoutColumn(layout, true);
 
-  uiItemR(column, ptr, "use_contour", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "use_contour", 0, NULL, ICON_NONE);
 
-  bool use_crease = RNA_boolean_get(ptr, "use_crease");
+  const bool use_crease = RNA_boolean_get(ptr, "use_crease");
 
-  uiItemR(column, ptr, "use_crease", 0, "Crease", ICON_NONE);
+  uiItemR(col, ptr, "use_crease", 0, "Crease", ICON_NONE);
   if (use_crease) {
-    uiItemR(column, ptr, "crease_threshold", UI_ITEM_R_SLIDER, "Threshold", ICON_NONE);
+    uiItemR(col, ptr, "crease_threshold", UI_ITEM_R_SLIDER, "Threshold", ICON_NONE);
   }
 
-  uiItemR(column, ptr, "use_material", 0, "Material", ICON_NONE);
-  uiItemR(column, ptr, "use_edge_mark", 0, "Edge Marks", ICON_NONE);
-  uiItemR(column, ptr, "use_intersection", 0, "Intersection", ICON_NONE);
+  uiItemR(col, ptr, "use_material", 0, "Material", ICON_NONE);
+  uiItemR(col, ptr, "use_edge_mark", 0, "Edge Marks", ICON_NONE);
+  uiItemR(col, ptr, "use_intersection", 0, "Intersection", ICON_NONE);
 
   uiItemPointerR(layout, ptr, "target_layer", &obj_data_ptr, "layers", NULL, ICON_GREASEPENCIL);
   uiItemPointerR(
@@ -295,16 +295,16 @@ static void style_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayout *layout = panel->layout;
 
-  bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  const bool is_baked = RNA_boolean_get(ptr, "is_baked");
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
-  uiLayout *column = uiLayoutColumn(layout, true);
+  uiLayout *col = uiLayoutColumn(layout, true);
 
-  uiItemR(column, ptr, "thickness", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+  uiItemR(col, ptr, "thickness", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 
-  uiItemR(column, ptr, "opacity", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+  uiItemR(col, ptr, "opacity", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 }
 
 static void occlusion_panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -313,13 +313,13 @@ static void occlusion_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayout *layout = panel->layout;
 
-  bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  const bool is_baked = RNA_boolean_get(ptr, "is_baked");
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
-  bool use_multiple_levels = RNA_boolean_get(ptr, "use_multiple_levels");
-  bool use_transparency = RNA_boolean_get(ptr, "use_transparency");
+  const bool use_multiple_levels = RNA_boolean_get(ptr, "use_multiple_levels");
+  const bool use_transparency = RNA_boolean_get(ptr, "use_transparency");
 
   uiItemR(layout, ptr, "use_multiple_levels", 0, "Multiple Levels", ICON_NONE);
 
@@ -334,14 +334,14 @@ static void occlusion_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiItemR(layout, ptr, "use_transparency", 0, "Transparency", ICON_NONE);
 
-  uiLayout *column = uiLayoutColumn(layout, true);
+  uiLayout *col = uiLayoutColumn(layout, true);
 
   if (use_transparency) {
-    uiItemR(column, ptr, "transparency_match", 0, "Match", ICON_NONE);
+    uiItemR(col, ptr, "transparency_match", 0, "Match", ICON_NONE);
   }
 
   if (use_transparency) {
-    uiLayout *row = uiLayoutRow(column, true);
+    uiLayout *row = uiLayoutRow(col, true);
     uiItemR(row, ptr, "transparency_mask_0", UI_ITEM_R_TOGGLE, "0", ICON_NONE);
     uiItemR(row, ptr, "transparency_mask_1", UI_ITEM_R_TOGGLE, "1", ICON_NONE);
     uiItemR(row, ptr, "transparency_mask_2", UI_ITEM_R_TOGGLE, "2", ICON_NONE);
@@ -359,18 +359,18 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayout *layout = panel->layout;
 
-  bool is_baked = RNA_boolean_get(ptr, "is_baked");
+  const bool is_baked = RNA_boolean_get(ptr, "is_baked");
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
-  uiLayout *column = uiLayoutColumn(layout, true);
-  uiItemR(column, ptr, "fuzzy_intersections", 0, NULL, ICON_NONE);
-  uiItemR(column, ptr, "fuzzy_everything", 0, NULL, ICON_NONE);
+  uiLayout *col = uiLayoutColumn(layout, true);
+  uiItemR(col, ptr, "fuzzy_intersections", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "fuzzy_everything", 0, NULL, ICON_NONE);
 
-  column = uiLayoutColumn(layout, true);
-  uiItemR(column, ptr, "chaining_geometry_threshold", 0, NULL, ICON_NONE);
-  uiItemR(column, ptr, "chaining_image_threshold", 0, NULL, ICON_NONE);
+  col = uiLayoutColumn(layout, true);
+  uiItemR(col, ptr, "chaining_geometry_threshold", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "chaining_image_threshold", 0, NULL, ICON_NONE);
 
   uiItemR(layout, ptr, "pre_sample_length", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 
@@ -382,24 +382,24 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
   PointerRNA ob_ptr;
   PointerRNA *ptr = gpencil_modifier_panel_get_property_pointers(panel, &ob_ptr);
 
-  uiLayout *layout = panel->layout, *row;
+  uiLayout *layout = panel->layout;
 
   bool is_baked = RNA_boolean_get(ptr, "is_baked");
 
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
-  uiLayout *column = uiLayoutColumn(layout, true);
+  uiLayout *col = uiLayoutColumn(layout, true);
 
-  row = uiLayoutRow(column, true);
+  uiLayout *row = uiLayoutRow(col, true);
   uiItemR(row, ptr, "source_vertex_group", 0, "Filter Source", ICON_GROUP_VERTEX);
   uiItemR(row, ptr, "invert_source_vertex_group", UI_ITEM_R_TOGGLE, "", ICON_ARROW_LEFTRIGHT);
 
-  uiItemR(column, ptr, "match_output_vertex_group", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "match_output_vertex_group", 0, NULL, ICON_NONE);
 
   bool match_output = RNA_boolean_get(ptr, "match_output_vertex_group");
   if (!match_output) {
-    uiItemPointerR(column, ptr, "vertex_group", &ob_ptr, "vertex_groups", "Target", ICON_NONE);
+    uiItemPointerR(col, ptr, "vertex_group", &ob_ptr, "vertex_groups", "Target", ICON_NONE);
   }
 
   uiItemR(layout, ptr, "soft_selection", 0, NULL, ICON_NONE);
@@ -416,20 +416,20 @@ static void baking_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetPropSep(layout, true);
 
   if (is_baked) {
-    uiLayout *column = uiLayoutColumn(layout, false);
-    uiLayoutSetPropSep(column, false);
-    uiItemL(column, "Modifier has baked data.", ICON_NONE);
-    uiItemR(column, ptr, "is_baked", UI_ITEM_R_TOGGLE, "Continue Without Clearing", ICON_NONE);
+    uiLayout *col = uiLayoutColumn(layout, false);
+    uiLayoutSetPropSep(col, false);
+    uiItemL(col, "Modifier has baked data.", ICON_NONE);
+    uiItemR(col, ptr, "is_baked", UI_ITEM_R_TOGGLE, "Continue Without Clearing", ICON_NONE);
   }
 
-  uiLayout *column = uiLayoutColumn(layout, false);
-  uiLayoutSetEnabled(column, !is_baked);
-  uiItemO(column, NULL, ICON_NONE, "OBJECT_OT_lineart_bake_strokes");
-  uiItemO(column, NULL, ICON_NONE, "OBJECT_OT_lineart_bake_strokes_all");
+  uiLayout *col = uiLayoutColumn(layout, false);
+  uiLayoutSetEnabled(col, !is_baked);
+  uiItemO(col, NULL, ICON_NONE, "OBJECT_OT_lineart_bake_strokes");
+  uiItemO(col, NULL, ICON_NONE, "OBJECT_OT_lineart_bake_strokes_all");
 
-  column = uiLayoutColumn(layout, false);
-  uiItemO(column, NULL, ICON_NONE, "OBJECT_OT_lineart_clear");
-  uiItemO(column, NULL, ICON_NONE, "OBJECT_OT_lineart_clear_all");
+  col = uiLayoutColumn(layout, false);
+  uiItemO(col, NULL, ICON_NONE, "OBJECT_OT_lineart_clear");
+  uiItemO(col, NULL, ICON_NONE, "OBJECT_OT_lineart_clear_all");
 }
 
 static void panelRegister(ARegionType *region_type)
