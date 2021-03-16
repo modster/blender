@@ -7017,7 +7017,7 @@ class VIEW3D_PT_asset_testing(Panel):
 
         workspace = context.workspace
 
-        layout.template_asset_view(workspace, "active_asset_library")
+        layout.template_asset_view(workspace, "active_asset_library", workspace, "active_pose_asset_index")
 
 
 # Grease Pencil Object - Multiframe falloff tools

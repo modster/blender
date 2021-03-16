@@ -116,13 +116,14 @@ def register():
         for cls in mod.classes:
             register_class(cls)
 
-    # space_userprefs.py
     from bpy.props import (
         EnumProperty,
+        IntProperty,
         StringProperty,
     )
-    from bpy.types import WindowManager
+    from bpy.types import WorkSpace, WindowManager
 
+    # space_userprefs.py
     def addon_filter_items(_self, _context):
         import addon_utils
 
@@ -161,6 +162,14 @@ def register():
         description="Display support level",
         default={'OFFICIAL', 'COMMUNITY'},
         options={'ENUM_FLAG'},
+    )
+    # done...
+
+    # space_view3d.py
+    WorkSpace.active_pose_asset_index = IntProperty(
+        name="Active Pose Asset",
+        # TODO explain which list the index belongs to, or how it can be used to get the pose.
+        description="Per workspace index of the active pose asset"
     )
     # done...
 
