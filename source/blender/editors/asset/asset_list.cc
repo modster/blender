@@ -285,7 +285,6 @@ class AssetList {
  */
 class AssetListStorage {
   using AssetListMap = Map<AssetLibraryReferenceWrapper, AssetList>;
-  static AssetListMap global_storage_;
 
  public:
   static void fetch_library(const AssetLibraryReference &library_reference,
@@ -308,24 +307,24 @@ class AssetListStorage {
 
   static void destruct()
   {
-    global_storage_.~AssetListMap();
+    global_storage().~AssetListMap();
   }
 
   static AssetList *lookup_list(const AssetLibraryReference &library_ref)
   {
-    return global_storage_.lookup_ptr(library_ref);
+    return global_storage().lookup_ptr(library_ref);
   }
 
   static void tagMainDataDirty()
   {
-    for (AssetList &list : global_storage_.values()) {
+    for (AssetList &list : global_storage().values()) {
       list.tagMainDataDirty();
     }
   }
 
   static void remapID(ID *id_new, ID *id_old)
   {
-    for (AssetList &list : global_storage_.values()) {
+    for (AssetList &list : global_storage().values()) {
       list.remapID(id_new, id_old);
     }
   }
@@ -351,15 +350,24 @@ class AssetListStorage {
   static std::tuple<AssetList &, is_new_t> ensure_list_storage(
       const AssetLibraryReference &library_reference, eFileSelectType filesel_type)
   {
-    if (AssetList *list = global_storage_.lookup_ptr(library_reference)) {
+    AssetListMap &storage = global_storage();
+
+    if (AssetList *list = storage.lookup_ptr(library_reference)) {
       return {*list, false};
     }
-    global_storage_.add(library_reference, AssetList(filesel_type, library_reference));
-    return {global_storage_.lookup(library_reference), true};
+    storage.add(library_reference, AssetList(filesel_type, library_reference));
+    return {storage.lookup(library_reference), true};
+  }
+
+  /**
+   * Wrapper for Construct on First Use idiom, to avoid the Static Initialization Fiasco.
+   */
+  static AssetListMap &global_storage()
+  {
+    static AssetListMap global_storage_;
+    return global_storage_;
   }
 };
-
-AssetListStorage::AssetListMap AssetListStorage::global_storage_{};
 
 /** \} */
 
