@@ -90,7 +90,7 @@ typedef struct PoseBlendData {
   ListBase backups;
 
   Object *ob;   /* Object to work on. */
-  bAction *act; /* Pose to blend in. */
+  bAction *act; /* Pose to blend into the current pose. */
 
   Scene *scene;         /* For auto-keying. */
   struct ScrArea *area; /* For drawing status text. */
