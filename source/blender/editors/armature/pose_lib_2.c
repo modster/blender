@@ -382,6 +382,9 @@ static const char *poselib_asset_file_path(bContext *C)
 {
   /* TODO: make this work in other areas as well, not just the file/asset browser. */
   SpaceFile *sfile = CTX_wm_space_file(C);
+  if (sfile == NULL) {
+    return NULL;
+  }
   FileAssetSelectParams *params = ED_fileselect_get_asset_params(sfile);
   if (params == NULL) {
     return NULL;
@@ -398,6 +401,10 @@ static bAction *poselib_tempload_enter(bContext *C, wmOperator *op)
   PoseBlendData *pbd = op->customdata;
 
   const char *libname = poselib_asset_file_path(C);
+  if (libname == NULL) {
+    return NULL;
+  }
+
   char blend_file_path[FILE_MAX_LIBEXTRA];
   char *group = NULL;
   char *asset_name = NULL;
