@@ -21,6 +21,8 @@
 #include "DNA_space_types.h"
 #include "DNA_userdef_types.h"
 
+#include "BKE_screen.h"
+
 #include "BLI_path_util.h"
 #include "BLI_string.h"
 #include "BLI_string_ref.hh"
@@ -32,18 +34,13 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "RNA_access.h"
+
 #include "UI_interface.h"
 
 #include "WM_api.h"
 
 #include "interface_intern.h"
-
-/* TODO temporary includes for palettes. */
-#include "BKE_global.h"
-#include "BKE_main.h"
-#include "BKE_screen.h"
-#include "DNA_brush_types.h"
-#include "RNA_access.h"
 
 struct AssetViewListData {
   AssetLibraryReference asset_library;
@@ -160,19 +157,20 @@ static void asset_view_template_list_item_iter_fn(PointerRNA *UNUSED(dataptr),
 
 void uiTemplateAssetView(uiLayout *layout,
                          bContext *C,
-                         PointerRNA *ptr,
+                         PointerRNA *asset_library_dataptr,
                          const char *asset_library_propname,
+                         PointerRNA *active_dataptr,
+                         const char *active_propname,
                          const AssetFilterSettings *filter_settings)
 {
-  Palette *palette = (Palette *)CTX_data_main(C)->palettes.first;
-
   uiLayout *col = uiLayoutColumn(layout, false);
 
-  PropertyRNA *asset_library_prop = RNA_struct_find_property(ptr, asset_library_propname);
-  uiItemFullR(col, ptr, asset_library_prop, RNA_NO_INDEX, 0, 0, "", 0);
+  PropertyRNA *asset_library_prop = RNA_struct_find_property(asset_library_dataptr,
+                                                             asset_library_propname);
+  uiItemFullR(col, asset_library_dataptr, asset_library_prop, RNA_NO_INDEX, 0, 0, "", 0);
 
   AssetLibraryReference asset_library = ED_asset_library_reference_from_enum_value(
-      RNA_property_enum_get(ptr, asset_library_prop));
+      RNA_property_enum_get(asset_library_dataptr, asset_library_prop));
   ED_assetlist_fetch(&asset_library, filter_settings, C);
   ED_assetlist_ensure_previews_job(&asset_library, C);
 
@@ -181,11 +179,6 @@ void uiTemplateAssetView(uiLayout *layout,
   list_data->asset_library = asset_library;
   list_data->screen = CTX_wm_screen(C);
 
-  /* TODO can we store more properties in the UIList? Asset specific filtering,  */
-  /* TODO how can this be refreshed on updates? Maybe a notifier listener callback for the
-   * uiListType? */
-  PointerRNA colors_poin;
-  RNA_pointer_create(&palette->id, &RNA_PaletteColors, palette, &colors_poin);
   PointerRNA rna_nullptr = PointerRNA_NULL;
   /* TODO can we have some kind of model-view API to handle referencing, filtering and lazy loading
    * (of previews) of the items? */
@@ -196,8 +189,8 @@ void uiTemplateAssetView(uiLayout *layout,
                                    "asset_view",
                                    &rna_nullptr,
                                    "",
-                                   &colors_poin,
-                                   "active_index",
+                                   active_dataptr,
+                                   active_propname,
                                    nullptr,
                                    0,
                                    0,

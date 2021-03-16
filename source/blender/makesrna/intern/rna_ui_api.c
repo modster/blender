@@ -572,14 +572,22 @@ static void rna_uiTemplateEventFromKeymapItem(
 
 static void rna_uiTemplateAssetView(uiLayout *layout,
                                     bContext *C,
-                                    PointerRNA *ptr,
+                                    PointerRNA *asset_library_dataptr,
                                     const char *asset_library_propname,
+                                    PointerRNA *active_dataptr,
+                                    const char *active_propname,
                                     int filter_id_types)
 {
   AssetFilterSettings filter_settings = {
       .id_types = filter_id_types ? filter_id_types : FILTER_ID_ALL,
   };
-  uiTemplateAssetView(layout, C, ptr, asset_library_propname, &filter_settings);
+  uiTemplateAssetView(layout,
+                      C,
+                      asset_library_dataptr,
+                      asset_library_propname,
+                      active_dataptr,
+                      active_propname,
+                      &filter_settings);
 }
 
 /**
@@ -1724,11 +1732,28 @@ void RNA_api_ui_layout(StructRNA *srna)
   func = RNA_def_function(srna, "template_asset_view", "rna_uiTemplateAssetView");
   RNA_def_function_ui_description(func, "Item. A scrollable list of assets in a grid view");
   RNA_def_function_flag(func, FUNC_USE_CONTEXT);
-  parm = RNA_def_pointer(
-      func, "data", "AnyType", "", "Data from which to take the active asset library property");
+  parm = RNA_def_pointer(func,
+                         "asset_library_dataptr",
+                         "AnyType",
+                         "",
+                         "Data from which to take the active asset library property");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
   parm = RNA_def_string(
       func, "asset_library_property", NULL, 0, "", "Identifier of the asset library");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_pointer(func,
+                         "active_dataptr",
+                         "AnyType",
+                         "",
+                         "Data from which to take the integer property, index of the active item");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+  parm = RNA_def_string(
+      func,
+      "active_propname",
+      NULL,
+      0,
+      "",
+      "Identifier of the integer property in active_data, index of the active item");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_property(func, "filter_id_types", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(parm, DummyRNA_NULL_items);

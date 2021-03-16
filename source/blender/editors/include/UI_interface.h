@@ -2235,8 +2235,10 @@ void uiTemplateFileSelectPath(uiLayout *layout,
                               struct FileSelectParams *params);
 void uiTemplateAssetView(struct uiLayout *layout,
                          struct bContext *C,
-                         struct PointerRNA *ptr,
+                         struct PointerRNA *asset_library_dataptr,
                          const char *asset_library_propname,
+                         struct PointerRNA *active_dataptr,
+                         const char *active_propname,
                          const struct AssetFilterSettings *filter_settings);
 
 /* items */
