@@ -7500,6 +7500,42 @@ class TOPBAR_PT_gpencil_vertexcolor(GreasePencilVertexcolorPanel, Panel):
         return ob and ob.type == 'GPENCIL'
 
 
+class VIEW3D_PT_asset_tools(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "Assets"
+    bl_label = "Asset Tools"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="Hello World")
+        props = layout.operator("asset.setup_weight_paint_tool", text="Create Weights")
+        props.vertex_group_name = "Hello"
+
+class ASSET_OT_setup_weight_paint_tool(bpy.types.Operator):
+    bl_idname = "asset.setup_weight_paint_tool"
+    bl_label = "Setup weight paint tool"
+    bl_description = "Setup weight paint tool"
+
+    vertex_group_name: bpy.props.StringProperty()
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object and context.active_object.type == 'MESH'
+
+    def execute(self, context):
+        ob = context.active_object
+
+        name = self.vertex_group_name
+        if not name in ob.vertex_groups:
+            ob.vertex_groups.new(name=name)
+        ob.vertex_groups.active = ob.vertex_groups[name]
+
+        if ob.mode != 'WEIGHT_PAINT':
+            bpy.ops.object.mode_set(mode='WEIGHT_PAINT')
+        return {'FINISHED'}
+
+
 classes = (
     VIEW3D_HT_header,
     VIEW3D_HT_tool_header,
@@ -7730,6 +7766,8 @@ classes = (
     TOPBAR_PT_gpencil_materials,
     TOPBAR_PT_gpencil_vertexcolor,
     TOPBAR_PT_annotation_layers,
+    VIEW3D_PT_asset_tools,
+    ASSET_OT_setup_weight_paint_tool,
 )
 
 
