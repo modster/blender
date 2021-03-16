@@ -1324,12 +1324,11 @@ static bool gpencil_curve_do_circle_sel(bContext *C,
   View3D *v3d = CTX_wm_view3d(C);
   Object *ob = CTX_data_active_object(C);
   bGPdata *gpd = ob->data;
-  bGPDcurve *gpc_active = (gpc->runtime.gpc_orig) ? gpc->runtime.gpc_orig : gpc;
 
   const bool only_selected = (v3d->overlay.handle_display == CURVE_HANDLE_SELECTED);
 
   bool hit = false;
-  for (int i = 0; i < gpc_active->tot_curve_points; i++) {
+  for (int i = 0; i < gpc->tot_curve_points; i++) {
     bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
     BezTriple *bezt = &gpc_pt->bezt;
     bGPDcurve_point *gpc_active_pt = (gpc_pt->runtime.gpc_pt_orig) ? gpc_pt->runtime.gpc_pt_orig :
@@ -1387,7 +1386,7 @@ static bool gpencil_curve_do_circle_sel(bContext *C,
 
   /* select the entire curve */
   if (hit && (selectmode == GP_SELECTMODE_STROKE)) {
-    for (int i = 0; i < gpc_active->tot_curve_points; i++) {
+    for (int i = 0; i < gpc->tot_curve_points; i++) {
       bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
       bGPDcurve_point *gpc_active_pt = (gpc_pt->runtime.gpc_pt_orig) ?
                                            gpc_pt->runtime.gpc_pt_orig :
@@ -1405,10 +1404,10 @@ static bool gpencil_curve_do_circle_sel(bContext *C,
     }
 
     if (select) {
-      gpc_active->flag |= GP_CURVE_SELECT;
+      gpc->flag |= GP_CURVE_SELECT;
     }
     else {
-      gpc_active->flag &= ~GP_CURVE_SELECT;
+      gpc->flag &= ~GP_CURVE_SELECT;
     }
   }
   else {
@@ -1637,7 +1636,6 @@ static bool gpencil_generic_curve_select(bContext *C,
 {
   View3D *v3d = CTX_wm_view3d(C);
   bGPDstroke *gps_active = (gps->runtime.gps_orig) ? gps->runtime.gps_orig : gps;
-  bGPDcurve *gpc_active = gps_active->editcurve;
 
   const bool handle_only_selected = (v3d->overlay.handle_display == CURVE_HANDLE_SELECTED);
   const bool handle_all = (v3d->overlay.handle_display == CURVE_HANDLE_ALL);
@@ -1767,10 +1765,10 @@ static bool gpencil_generic_curve_select(bContext *C,
       }
 
       if (sel_op_result) {
-        gpc_active->flag |= GP_CURVE_SELECT;
+        gpc->flag |= GP_CURVE_SELECT;
       }
       else {
-        gpc_active->flag &= ~GP_CURVE_SELECT;
+        gpc->flag &= ~GP_CURVE_SELECT;
       }
       changed = true;
     }
@@ -2116,10 +2114,12 @@ static bool gpencil_select_curve_point_closest(bContext *C,
   for (int i = 0; i < gpc->tot_curve_points; i++) {
     bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
     BezTriple *bezt = &gpc_pt->bezt;
-    bGPDcurve_point *gpc_active_pt = (gpc_pt->runtime.gpc_pt_orig) ? gpc_pt->runtime.gpc_pt_orig :
-                                                                     gpc_pt;
 
-    if (bezt->hide == 1) {
+    bGPDcurve_point *gpc_pt_active = (gpc_pt->runtime.gpc_pt_orig) ? gpc_pt->runtime.gpc_pt_orig :
+                                                                     gpc_pt;
+    BezTriple *bezt_active = &gpc_pt_active->bezt;
+
+    if (bezt_active->hide == 1) {
       continue;
     }
 
@@ -2136,7 +2136,7 @@ static bool gpencil_select_curve_point_closest(bContext *C,
         const int pt_distance = len_manhattan_v2v2_int(mval, screen_co);
 
         if (pt_distance <= radius_squared && pt_distance < *hit_distance) {
-          *r_pt = gpc_active_pt;
+          *r_pt = gpc_pt_active;
           *handle_idx = j;
           *hit_distance = pt_distance;
           hit = true;
@@ -2244,7 +2244,6 @@ static int gpencil_select_exec(bContext *C, wmOperator *op)
     bGPDstroke *gps_active = (gps->runtime.gps_orig) ? gps->runtime.gps_orig : gps;
     if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
       bGPDcurve *gpc = gps->editcurve;
-      bGPDcurve *gpc_active = (gpc->runtime.gpc_orig) ? gpc->runtime.gpc_orig : gpc;
       if (gpencil_select_curve_point_closest(C,
                                              gpc,
                                              &gpstroke_iter,
@@ -2254,16 +2253,16 @@ static int gpencil_select_exec(bContext *C, wmOperator *op)
                                              &hit_curve_handle_idx,
                                              &hit_distance)) {
         hit_layer = gpl;
-        hit_stroke = gps_active;
+        hit_stroke = gps;
         hit_point = &gps->points[hit_curve_point->point_index];
-        hit_curve = gpc_active;
+        hit_curve = gpc;
       }
     }
     else {
       if (gpencil_select_stroke_point_closest(
               gps, &gpstroke_iter, &gsc, mval, radius_squared, &hit_point, &hit_distance)) {
         hit_layer = gpl;
-        hit_stroke = gps_active;
+        hit_stroke = gps;
       }
     }
   }
