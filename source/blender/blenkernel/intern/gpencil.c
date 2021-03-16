@@ -1688,7 +1688,6 @@ bGPDlayer *BKE_gpencil_layer_get_by_name(bGPdata *gpd, char *name, int first_if_
   return NULL;
 }
 
-/* set the active gp-layer */
 /**
  * Set active grease pencil layer.
  * \param gpd: Grease pencil data-block
@@ -2462,7 +2461,6 @@ int BKE_gpencil_object_material_get_index_name(Object *ob, char *name)
   return -1;
 }
 
-/* Create a default palette */
 /**
  * Create a default palette.
  * \param bmain: Main pointer
