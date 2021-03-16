@@ -755,8 +755,7 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
   const bool is_edit = GPENCIL_ANY_EDIT_MODE(gpd);
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
   const bool is_render = (bool)(DEG_get_mode(depsgraph) == DAG_EVAL_RENDER);
-  const bool do_modifiers = (bool)((!is_multiedit) &&
-                                   (ob->greasepencil_modifiers.first != NULL) &&
+  const bool do_modifiers = (bool)((!is_multiedit) && (ob->greasepencil_modifiers.first != NULL) &&
                                    (!GPENCIL_SIMPLIFY_MODIF(scene)));
   if (!do_modifiers) {
     return;
@@ -791,6 +790,13 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
 
           if (mti->deformStroke) {
             LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+              /* TODO: While we implement modifier logic for Bezier type, we remove any Bezier data
+               * to keep running modifiers. Bezier types will be implement in the future, but
+               * we need keep the actual code running. (antoniov/filedescriptor) */
+              if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+                BKE_gpencil_free_stroke_editcurve(gps);
+              }
+
               mti->deformStroke(md, depsgraph, ob, gpl, gpf, gps);
             }
           }

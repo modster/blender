@@ -1040,7 +1040,10 @@ void BKE_gpencil_frame_copy_strokes(bGPDframe *gpf_src, struct bGPDframe *gpf_ds
   BLI_listbase_clear(&gpf_dst->strokes);
   LISTBASE_FOREACH (bGPDstroke *, gps_src, &gpf_src->strokes) {
     /* make copy of source stroke */
-    gps_dst = BKE_gpencil_stroke_duplicate(gps_src, true, true);
+    /* TODO: While Bezier type is not implemented in modifiers, don't copy the curve data. When
+     * this implementation will be ready, the copy curves parameter must be set again to `true`.
+     * (antoniov/filedescriptor) */
+    gps_dst = BKE_gpencil_stroke_duplicate(gps_src, true, false);
     BLI_addtail(&gpf_dst->strokes, gps_dst);
   }
 }
@@ -2779,7 +2782,7 @@ void BKE_gpencil_frame_original_pointers_update(const struct bGPDframe *gpf_orig
     /* Assign original stroke pointer. */
     if (gps_eval != NULL) {
       gps_eval->runtime.gps_orig = gps_orig;
-      if (GPENCIL_STROKE_TYPE_BEZIER(gps_orig)) {
+      if ((GPENCIL_STROKE_TYPE_BEZIER(gps_orig)) && (GPENCIL_STROKE_TYPE_BEZIER(gps_eval))) {
         bGPDcurve *gpc_orig = gps_orig->editcurve;
         bGPDcurve *gpc_eval = gps_eval->editcurve;
 
