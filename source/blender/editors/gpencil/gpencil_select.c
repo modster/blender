@@ -1637,7 +1637,7 @@ static bool gpencil_generic_curve_select(bContext *C,
 {
   View3D *v3d = CTX_wm_view3d(C);
   bGPDstroke *gps_active = (gps->runtime.gps_orig) ? gps->runtime.gps_orig : gps;
-  bGPDcurve *gpc_active = (gpc->runtime.gpc_orig) ? gpc->runtime.gpc_orig : gpc;
+  bGPDcurve *gpc_active = gps_active->editcurve;
 
   const bool handle_only_selected = (v3d->overlay.handle_display == CURVE_HANDLE_SELECTED);
   const bool handle_all = (v3d->overlay.handle_display == CURVE_HANDLE_ALL);
@@ -1925,8 +1925,7 @@ static int gpencil_generic_select_exec(bContext *C,
   }
 
   GP_EVALUATED_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
-    bGPDstroke *gps_active = (gps->runtime.gps_orig) ? gps->runtime.gps_orig : gps;
-    if (GPENCIL_STROKE_TYPE_BEZIER(gps_active)) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
       bGPDcurve *gpc = gps->editcurve;
       if (gpencil_generic_curve_select(C,
                                        ob,
