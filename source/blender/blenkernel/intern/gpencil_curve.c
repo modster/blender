@@ -1025,9 +1025,7 @@ void BKE_gpencil_stroke_editcurve_regenerate_single(bGPDstroke *gps,
   else {
     length = (end_pt_idx - start_pt_idx) + 1;
   }
-
-  printf("start_pt_idx: %d, end_pt_idx: %d, length: %d\n", start_pt_idx, end_pt_idx, length);
-
+  
   uint32_t point_array_len = length * POINT_DIM;
   float *point_array = MEM_callocN(sizeof(float) * point_array_len, __func__);
 
