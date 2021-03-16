@@ -210,7 +210,7 @@ typedef struct bGPDcurve_point {
 
   /** Vertex Color RGBA (A=mix factor). */
   float vert_color[4];
-  
+
   bGPDcpoint_Runtime runtime;
 } bGPDcurve_point;
 
@@ -221,11 +221,6 @@ typedef enum eGPDcurve_point_Flag {
 
 /* ***************************************** */
 /* GP Curve */
-
-typedef struct bGPDcurve_Runtime {
-  struct bGPDcurve *gpc_orig;
-  void *_pad;
-} bGPDcurve_Runtime;
 
 /* Curve for Bezier Editing. */
 typedef struct bGPDcurve {
@@ -239,8 +234,7 @@ typedef struct bGPDcurve {
   /** Vertex weight data. */
   struct MDeformVert *dvert;
   void *_pad2;
-  
-  bGPDcurve_Runtime runtime;
+
 } bGPDcurve;
 
 /* bGPDcurve_Flag->flag */

@@ -2786,7 +2786,6 @@ void BKE_gpencil_frame_original_pointers_update(const struct bGPDframe *gpf_orig
         bGPDcurve *gpc_orig = gps_orig->editcurve;
         bGPDcurve *gpc_eval = gps_eval->editcurve;
 
-        gpc_eval->runtime.gpc_orig = gpc_orig;
         for (int i = 0; i < gpc_orig->tot_curve_points; i++) {
           if (i > gpc_eval->tot_curve_points - 1) {
             break;
@@ -2813,7 +2812,7 @@ void BKE_gpencil_frame_original_pointers_update(const struct bGPDframe *gpf_orig
           pt_eval->runtime.idx_orig = i;
         }
       }
-      
+
       /* Increase pointer. */
       gps_eval = gps_eval->next;
     }
