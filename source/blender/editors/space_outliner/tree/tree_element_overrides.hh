@@ -16,8 +16,6 @@
 
 /** \file
  * \ingroup spoutliner
- *
- * Tree element classes for the tree elements directly representing an ID (#TSE_SOME_ID).
  */
 
 #pragma once
@@ -26,30 +24,26 @@
 
 namespace blender::ed::outliner {
 
-class TreeElementID : public AbstractTreeElement {
- protected:
+struct TreeElementOverridesData {
+  ID &id;
+  IDOverrideLibraryProperty &override_property;
+};
+
+class TreeElementOverridesBase final : public AbstractTreeElement {
   ID &id_;
 
  public:
-  TreeElementID(TreeElement &legacy_te, ID &id);
+  TreeElementOverridesBase(TreeElement &legacy_te, ID &id);
 
-  static TreeElementID *createFromID(TreeElement &legacy_te, ID &id);
+  void expand(SpaceOutliner &) const override;
+};
 
-  void postExpand(SpaceOutliner &) const override;
-  bool expandPoll(const SpaceOutliner &) const override;
+class TreeElementOverridesProperty final : public AbstractTreeElement {
+  ID &id_;
+  IDOverrideLibraryProperty &override_prop_;
 
-  /**
-   * Expanding not implemented for all types yet. Once it is, this can be set to true or
-   * `AbstractTreeElement::expandValid()` can be removed altogether.
-   */
-  bool isExpandValid() const override
-  {
-    return false;
-  }
-
- protected:
-  /* ID types with animation data can use this. */
-  void expand_animation_data(SpaceOutliner &, const AnimData *) const;
+ public:
+  TreeElementOverridesProperty(TreeElement &legacy_te, TreeElementOverridesData &override_data);
 };
 
 }  // namespace blender::ed::outliner
