@@ -421,12 +421,10 @@ static bAction *poselib_tempload_enter(bContext *C, wmOperator *op)
 
   pbd->blendhandle = BLO_blendhandle_from_file(blend_file_path, op->reports);
 
-  const int flags = /*FILE_LINK | */ FILE_ASSETS_ONLY;
   const int id_tag_extra = LIB_TAG_TEMP_MAIN;
-
   BLO_library_link_params_init_with_context(&pbd->liblink_params,
                                             CTX_data_main(C),
-                                            flags,
+                                            0,
                                             id_tag_extra,
                                             NULL /*CTX_data_scene(C) */,
                                             NULL /*CTX_data_view_layer(C) */,
