@@ -81,10 +81,7 @@ typedef struct PoseBlendData {
   bool is_bone_selection_relevant;
 
   /* For temp-loading the Action from the pose library, if necessary. */
-  struct Main *temp_main;
-  BlendHandle *blendhandle;
-  struct LibraryLink_Params liblink_params;
-  Library *lib;
+  TempLibraryContext *temp_lib_context;
 
   /* Blend factor, interval [0, 1] for interpolating between current and given pose. */
   float blend_factor;
@@ -419,40 +416,25 @@ static bAction *poselib_tempload_enter(bContext *C, wmOperator *op)
     return NULL;
   }
 
-  pbd->blendhandle = BLO_blendhandle_from_file(blend_file_path, op->reports);
+  pbd->temp_lib_context = BLO_library_temp_load_id(
+      CTX_data_main(C), blend_file_path, ID_AC, asset_name, op->reports);
 
-  const int id_tag_extra = LIB_TAG_TEMP_MAIN;
-  BLO_library_link_params_init_with_context(&pbd->liblink_params,
-                                            CTX_data_main(C),
-                                            0,
-                                            id_tag_extra,
-                                            NULL /*CTX_data_scene(C) */,
-                                            NULL /*CTX_data_view_layer(C) */,
-                                            NULL /*CTX_wm_view3d(C) */);
-
-  pbd->temp_main = BLO_library_link_begin(
-      &pbd->blendhandle, blend_file_path, &pbd->liblink_params);
-
-  ID *new_id = BLO_library_link_named_part(
-      pbd->temp_main, &pbd->blendhandle, ID_AC, asset_name, &pbd->liblink_params);
-  if (new_id == NULL) {
+  if (pbd->temp_lib_context == NULL || pbd->temp_lib_context->temp_id == NULL) {
     BKE_reportf(op->reports, RPT_ERROR, "Unable to load %s from %s", asset_name, blend_file_path);
     return NULL;
   }
-  BLI_assert(GS(new_id->name) == ID_AC);
 
-  return (bAction *)new_id;
+  BLI_assert(GS(pbd->temp_lib_context->temp_id->name) == ID_AC);
+  return (bAction *)pbd->temp_lib_context->temp_id;
 }
 
 static void poselib_tempload_exit(PoseBlendData *pbd)
 {
-  if (pbd->temp_main == NULL) {
+  if (pbd->temp_lib_context == NULL) {
     return;
   }
-
-  BLO_library_link_end(pbd->temp_main, &pbd->blendhandle, &pbd->liblink_params);
-  BLO_blendhandle_close(pbd->blendhandle);
-  pbd->temp_main = NULL;
+  BLO_library_temp_free(pbd->temp_lib_context);
+  pbd->temp_lib_context = NULL;
 }
 
 static bAction *poselib_blend_init_get_action(bContext *C, wmOperator *op)
