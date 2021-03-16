@@ -284,7 +284,8 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemPointerR(
       layout, ptr, "target_material", &obj_data_ptr, "materials", NULL, ICON_SHADING_TEXTURE);
 
-  uiItemR(layout, ptr, "remove_doubles", 0, "Allow Overlapping Edges", ICON_NONE);
+  uiItemR(layout, ptr, "remove_doubles", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "allow_overlapping_edges", 0, "Overlapping Edges As Contour", ICON_NONE);
 
   gpencil_modifier_panel_end(layout, ptr);
 }
