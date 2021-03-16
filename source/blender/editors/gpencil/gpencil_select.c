@@ -1251,7 +1251,7 @@ static bool gpencil_stroke_do_circle_sel(bGPdata *gpd,
     pt_active = (pt->runtime.pt_orig) ? pt->runtime.pt_orig : pt;
 
     bGPDspoint pt_temp;
-    gpencil_point_to_parent_space(pt_active, diff_mat, &pt_temp);
+    gpencil_point_to_parent_space(pt, diff_mat, &pt_temp);
     gpencil_point_to_xy(gsc, gps, &pt_temp, &x0, &y0);
 
     /* do boundbox check first */
@@ -2253,7 +2253,7 @@ static int gpencil_select_exec(bContext *C, wmOperator *op)
                                              &hit_curve_handle_idx,
                                              &hit_distance)) {
         hit_layer = gpl;
-        hit_stroke = gps;
+        hit_stroke = gps_active;
         hit_point = &gps->points[hit_curve_point->point_index];
         hit_curve = gpc;
       }
@@ -2262,7 +2262,7 @@ static int gpencil_select_exec(bContext *C, wmOperator *op)
       if (gpencil_select_stroke_point_closest(
               gps, &gpstroke_iter, &gsc, mval, radius_squared, &hit_point, &hit_distance)) {
         hit_layer = gpl;
-        hit_stroke = gps;
+        hit_stroke = gps_active;
       }
     }
   }
