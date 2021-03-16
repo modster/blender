@@ -272,7 +272,6 @@ void animsys_evaluate_action(struct PointerRNA *ptr,
 void animsys_blend_in_action(struct PointerRNA *ptr,
                              struct bAction *act,
                              const AnimationEvalContext *anim_eval_context,
-                             bool flush_to_original,
                              float blend_factor);
 
 /* Evaluate Action Group */

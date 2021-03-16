@@ -40,7 +40,7 @@ namespace {
 using BoneNameSet = blender::Set<std::string>;
 
 using ActionApplier =
-    blender::FunctionRef<void(PointerRNA *, bAction *, const AnimationEvalContext *, bool)>;
+    blender::FunctionRef<void(PointerRNA *, bAction *, const AnimationEvalContext *)>;
 
 // Forward declarations.
 BoneNameSet pose_apply_find_selected_bones(const bPose *pose);
@@ -59,7 +59,12 @@ void BKE_pose_apply_action(struct Object *ob,
                            struct bAction *action,
                            struct AnimationEvalContext *anim_eval_context)
 {
-  pose_apply(ob, action, anim_eval_context, animsys_evaluate_action);
+  auto evaluate_and_apply =
+      [](PointerRNA *ptr, bAction *act, const AnimationEvalContext *anim_eval_context) {
+        animsys_evaluate_action(ptr, act, anim_eval_context, false);
+      };
+
+  pose_apply(ob, action, anim_eval_context, evaluate_and_apply);
 }
 
 void BKE_pose_apply_action_blend(struct Object *ob,
@@ -69,9 +74,8 @@ void BKE_pose_apply_action_blend(struct Object *ob,
 {
   auto evaluate_and_blend = [blend_factor](PointerRNA *ptr,
                                            bAction *act,
-                                           const AnimationEvalContext *anim_eval_context,
-                                           const bool flush_to_original) {
-    animsys_blend_in_action(ptr, act, anim_eval_context, flush_to_original, blend_factor);
+                                           const AnimationEvalContext *anim_eval_context) {
+    animsys_blend_in_action(ptr, act, anim_eval_context, blend_factor);
   };
 
   pose_apply(ob, action, anim_eval_context, evaluate_and_blend);
@@ -101,7 +105,7 @@ void pose_apply(struct Object *ob,
   PointerRNA pose_owner_ptr;
   RNA_id_pointer_create(&ob->id, &pose_owner_ptr);
 
-  applier(&pose_owner_ptr, action, anim_eval_context, false);
+  applier(&pose_owner_ptr, action, anim_eval_context);
 
   if (limit_to_selected_bones) {
     pose_apply_restore_fcurves(action);
