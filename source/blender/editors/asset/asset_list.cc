@@ -113,13 +113,17 @@ class AssetList {
   {
   }
   AssetList(const AssetList &) = delete;
-  ~AssetList() = default;
+  ~AssetList()
+  {
+    /* Destructs the owned pointer. */
+    filelist_ = nullptr;
+  }
 
   void setup(const AssetFilterSettings *filter_settings = nullptr)
   {
     FileList *files = filelist_.get();
 
-    /* TODO there should only be one. */
+    /* TODO there should only be one (FileSelectAssetLibraryUID vs. AssetLibraryReference). */
     FileSelectAssetLibraryUID file_asset_lib_ref;
     file_asset_lib_ref.type = library_ref_.type;
     file_asset_lib_ref.custom_library_index = library_ref_.custom_library_index;
