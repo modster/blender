@@ -194,16 +194,20 @@ int ED_buttons_tabs_list(SpaceProperties *sbuts, short *context_tabs_array)
     context_tabs_array[length] = BCONTEXT_VIEW_LAYER;
     length++;
   }
-  if (sbuts->pathflag & (1 << BCONTEXT_VIEW_LAYER)) {
-    context_tabs_array[length] = BCONTEXT_COLLECTION;
-    length++;
-  }
   if (sbuts->pathflag & (1 << BCONTEXT_SCENE)) {
     context_tabs_array[length] = BCONTEXT_SCENE;
     length++;
   }
   if (sbuts->pathflag & (1 << BCONTEXT_WORLD)) {
     context_tabs_array[length] = BCONTEXT_WORLD;
+    length++;
+  }
+  if (length != 0) {
+    context_tabs_array[length] = -1;
+    length++;
+  }
+  if (sbuts->pathflag & (1 << BCONTEXT_VIEW_LAYER)) {
+    context_tabs_array[length] = BCONTEXT_COLLECTION;
     length++;
   }
   if (length != 0) {
