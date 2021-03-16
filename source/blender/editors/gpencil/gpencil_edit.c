@@ -2318,359 +2318,478 @@ static int gpencil_delete_selected_strokes(bContext *C)
 
 /* ----------------------------------- */
 
-static bool gpencil_dissolve_selected_curve_points(bContext *C,
-                                                   bGPdata *gpd,
-                                                   eGP_DissolveMode mode)
+static void gpencil_refit_single_from_to(bGPDstroke *gps,
+                                         bGPDcurve *gpc,
+                                         bGPDcurve_point *new_points,
+                                         int from_start,
+                                         int from_end,
+                                         int to_start,
+                                         int to_end,
+                                         float error_threshold)
 {
-  bool changed = false;
-  GP_EDITABLE_CURVES_BEGIN(gps_iter, C, gpl, gps, gpc)
-  {
-    if (gpc->flag & GP_CURVE_SELECT) {
-      int first = 0, last = 0;
-      int num_points_remaining = gpc->tot_curve_points;
+  bGPDcurve_point *cpt_start = &gpc->curve_points[from_start];
+  bGPDcurve_point *cpt_end = &gpc->curve_points[from_end];
+  bGPDcurve_point *new_cpt_start = &new_points[to_start];
+  bGPDcurve_point *new_cpt_end = &new_points[to_end];
 
-      switch (mode) {
-        case GP_DISSOLVE_POINTS:
-          for (int i = 0; i < gpc->tot_curve_points; i++) {
-            bGPDcurve_point *cpt = &gpc->curve_points[i];
-            if (cpt->flag & GP_CURVE_POINT_SELECT) {
-              num_points_remaining--;
-            }
-          }
-          break;
-        case GP_DISSOLVE_BETWEEN:
-          first = -1;
-          for (int i = 0; i < gpc->tot_curve_points; i++) {
-            bGPDcurve_point *cpt = &gpc->curve_points[i];
-            if (cpt->flag & GP_CURVE_POINT_SELECT) {
-              if (first < 0) {
-                first = i;
-              }
-              last = i;
-            }
-          }
+  BKE_gpencil_stroke_editcurve_regenerate_single(gps, from_start, from_end, error_threshold);
 
-          for (int i = first + 1; i < last; i++) {
-            bGPDcurve_point *cpt = &gpc->curve_points[i];
-            if ((cpt->flag & GP_CURVE_POINT_SELECT) == 0) {
-              num_points_remaining--;
-            }
-          }
-          break;
-        case GP_DISSOLVE_UNSELECT:
-          for (int i = 0; i < gpc->tot_curve_points; i++) {
-            bGPDcurve_point *cpt = &gpc->curve_points[i];
-            if ((cpt->flag & GP_CURVE_POINT_SELECT) == 0) {
-              num_points_remaining--;
-            }
-          }
-          break;
-        default:
-          return false;
-          break;
-      }
-
-      if (num_points_remaining < 1) {
-        /* Delete stroke */
-        BLI_remlink(&gpf_->strokes, gps);
-        BKE_gpencil_free_stroke(gps);
-      }
-      else {
-        bGPDcurve_point *new_points = MEM_callocN(sizeof(bGPDcurve_point) * num_points_remaining,
-                                                  __func__);
-
-        int idx = 0;
-        switch (mode) {
-          case GP_DISSOLVE_POINTS:
-            for (int i = 0; i < gpc->tot_curve_points; i++) {
-              bGPDcurve_point *cpt = &gpc->curve_points[i];
-              bGPDcurve_point *new_cpt = &new_points[idx];
-              if ((cpt->flag & GP_CURVE_POINT_SELECT) == 0) {
-                *new_cpt = *cpt;
-                idx++;
-              }
-            }
-            break;
-          case GP_DISSOLVE_BETWEEN:
-            for (int i = 0; i < first; i++) {
-              bGPDcurve_point *cpt = &gpc->curve_points[i];
-              bGPDcurve_point *new_cpt = &new_points[idx];
-
-              *new_cpt = *cpt;
-              idx++;
-            }
-
-            for (int i = first; i < last; i++) {
-              bGPDcurve_point *cpt = &gpc->curve_points[i];
-              bGPDcurve_point *new_cpt = &new_points[idx];
-              if (cpt->flag & GP_CURVE_POINT_SELECT) {
-                *new_cpt = *cpt;
-                idx++;
-              }
-            }
-
-            for (int i = last; i < gpc->tot_curve_points; i++) {
-              bGPDcurve_point *cpt = &gpc->curve_points[i];
-              bGPDcurve_point *new_cpt = &new_points[idx];
-
-              *new_cpt = *cpt;
-              idx++;
-            }
-            break;
-          case GP_DISSOLVE_UNSELECT:
-            for (int i = 0; i < gpc->tot_curve_points; i++) {
-              bGPDcurve_point *cpt = &gpc->curve_points[i];
-              bGPDcurve_point *new_cpt = &new_points[idx];
-              if (cpt->flag & GP_CURVE_POINT_SELECT) {
-                *new_cpt = *cpt;
-                idx++;
-              }
-            }
-            break;
-          default:
-            return false;
-            break;
-        }
-
-        if (gpc->curve_points != NULL) {
-          MEM_freeN(gpc->curve_points);
-        }
-
-        gpc->curve_points = new_points;
-        gpc->tot_curve_points = num_points_remaining;
-
-        BKE_gpencil_editcurve_recalculate_handles(gps);
-        gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
-        BKE_gpencil_stroke_geometry_update(gpd, gps);
-      }
-
-      changed = true;
-    }
-  }
-  GP_EDITABLE_CURVES_END(gps_iter);
-
-  return changed;
+  memcpy(new_cpt_start, cpt_start, sizeof(bGPDcurve_point));
+  memcpy(new_cpt_end, cpt_end, sizeof(bGPDcurve_point));
 }
 
-static bool gpencil_dissolve_selected_stroke_points(bContext *C,
-                                                    bGPdata *gpd,
+static bool gpencil_dissolve_selected_curve_points(bGPdata *gpd,
+                                                   bGPDframe *gpf,
+                                                   bGPDstroke *gps,
+                                                   bGPDcurve *gpc,
+                                                   eGP_DissolveMode mode,
+                                                   const bool do_segments_refit,
+                                                   const float error_threshold)
+{
+  if ((gpc->flag & GP_CURVE_SELECT) == 0) {
+    return false;
+  }
+  int first = -1, last = 0;
+  int num_points_remaining = gpc->tot_curve_points;
+  const bool is_cyclic = (gps->flag & GP_STROKE_CYCLIC);
+
+  switch (mode) {
+    case GP_DISSOLVE_POINTS:
+      for (int i = 0; i < gpc->tot_curve_points; i++) {
+        bGPDcurve_point *cpt = &gpc->curve_points[i];
+        if (cpt->flag & GP_CURVE_POINT_SELECT) {
+          num_points_remaining--;
+        }
+        else {
+          if (first < 0) {
+            first = i;
+          }
+          last = i;
+        }
+      }
+      break;
+    case GP_DISSOLVE_BETWEEN:
+      for (int i = 0; i < gpc->tot_curve_points; i++) {
+        bGPDcurve_point *cpt = &gpc->curve_points[i];
+        if (cpt->flag & GP_CURVE_POINT_SELECT) {
+          if (first < 0) {
+            first = i;
+          }
+          last = i;
+        }
+      }
+
+      for (int i = first + 1; i < last; i++) {
+        bGPDcurve_point *cpt = &gpc->curve_points[i];
+        if ((cpt->flag & GP_CURVE_POINT_SELECT) == 0) {
+          num_points_remaining--;
+        }
+      }
+      break;
+    case GP_DISSOLVE_UNSELECT:
+      for (int i = 0; i < gpc->tot_curve_points; i++) {
+        bGPDcurve_point *cpt = &gpc->curve_points[i];
+        if ((cpt->flag & GP_CURVE_POINT_SELECT) == 0) {
+          num_points_remaining--;
+        }
+        else {
+          if (first < 0) {
+            first = i;
+          }
+          last = i;
+        }
+      }
+      break;
+    default:
+      return false;
+      break;
+  }
+
+  if (num_points_remaining < 1) {
+    /* Delete stroke */
+    BLI_remlink(&gpf->strokes, gps);
+    BKE_gpencil_free_stroke(gps);
+    return true;
+  }
+  else if (num_points_remaining == gpc->tot_curve_points) {
+    /* Nothing to do so return. */
+    return true;
+  }
+
+  bGPDcurve_point *new_points = MEM_callocN(sizeof(bGPDcurve_point) * num_points_remaining,
+                                            __func__);
+
+  /* Should have at least one selected and one deselected point here. */
+  BLI_assert(first >= 0);
+
+  int new_idx = 0, start = 0, end = 0;
+  switch (mode) {
+    case GP_DISSOLVE_POINTS:
+      start = end = first;
+      for (int i = first; i < gpc->tot_curve_points; i++) {
+        bGPDcurve_point *cpt = &gpc->curve_points[i];
+        bGPDcurve_point *new_cpt = &new_points[new_idx];
+        if ((cpt->flag & GP_CURVE_POINT_SELECT) == 0) {
+          *new_cpt = *cpt;
+
+          /* Check that the indices are in bounds. */
+          if (do_segments_refit && (end > start) && (start > 0) && (end < gpc->tot_curve_points)) {
+            /* Refit this segment. */
+            gpencil_refit_single_from_to(
+                gps, gpc, new_points, start - 1, end, new_idx - 1, new_idx, error_threshold);
+
+            start = end = i;
+          }
+
+          new_idx++;
+          start++;
+        }
+
+        end++;
+      }
+      break;
+    case GP_DISSOLVE_BETWEEN:
+      for (int i = 0; i < first; i++) {
+        bGPDcurve_point *cpt = &gpc->curve_points[i];
+        bGPDcurve_point *new_cpt = &new_points[new_idx];
+
+        *new_cpt = *cpt;
+        new_idx++;
+      }
+
+      start = end = first;
+
+      for (int i = first; i < last; i++) {
+        bGPDcurve_point *cpt = &gpc->curve_points[i];
+        bGPDcurve_point *new_cpt = &new_points[new_idx];
+        if (cpt->flag & GP_CURVE_POINT_SELECT) {
+          *new_cpt = *cpt;
+
+          if (do_segments_refit && (end > start) && (start > first)) {
+            /* Refit this segment. */
+            gpencil_refit_single_from_to(
+                gps, gpc, new_points, start - 1, end, new_idx - 1, new_idx, error_threshold);
+
+            start = end = i;
+          }
+
+          new_idx++;
+          start++;
+        }
+
+        end++;
+      }
+
+      if (do_segments_refit && (end > start) && (start > first) && (end < gpc->tot_curve_points)) {
+        /* Refit this segment. */
+        gpencil_refit_single_from_to(
+            gps, gpc, new_points, start - 1, end, new_idx - 1, new_idx, error_threshold);
+      }
+
+      for (int i = last; i < gpc->tot_curve_points; i++) {
+        bGPDcurve_point *cpt = &gpc->curve_points[i];
+        bGPDcurve_point *new_cpt = &new_points[new_idx];
+
+        *new_cpt = *cpt;
+        new_idx++;
+      }
+      break;
+    case GP_DISSOLVE_UNSELECT:
+      start = end = first;
+      for (int i = first; i < gpc->tot_curve_points; i++) {
+        bGPDcurve_point *cpt = &gpc->curve_points[i];
+        bGPDcurve_point *new_cpt = &new_points[new_idx];
+        if (cpt->flag & GP_CURVE_POINT_SELECT) {
+          *new_cpt = *cpt;
+
+          if (do_segments_refit && (end > start) && (start > 0) && (end < gpc->tot_curve_points)) {
+            /* Refit this segment. */
+            gpencil_refit_single_from_to(
+                gps, gpc, new_points, start - 1, end, new_idx - 1, new_idx, error_threshold);
+
+            start = end = i;
+          }
+
+          new_idx++;
+          start++;
+        }
+
+        end++;
+      }
+      break;
+    default:
+      return false;
+      break;
+  }
+
+  if (is_cyclic && do_segments_refit) {
+    /* Make sure that there is at least one segment that needs updating. */
+    if (last != first && first >= 0 && last >= 0 &&
+        !(first == 0 && last == (gpc->tot_curve_points - 1))) {
+
+      /* Refit this segment. */
+      gpencil_refit_single_from_to(
+          gps, gpc, new_points, last, first, num_points_remaining - 1, 0, error_threshold);
+    }
+  }
+
+  if (gpc->curve_points != NULL) {
+    MEM_freeN(gpc->curve_points);
+  }
+
+  gpc->curve_points = new_points;
+  gpc->tot_curve_points = num_points_remaining;
+
+  BKE_gpencil_editcurve_recalculate_handles(gps);
+  gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
+  BKE_gpencil_stroke_geometry_update(gpd, gps);
+
+  return true;
+}
+
+static bool gpencil_dissolve_selected_stroke_points(bGPdata *gpd,
+                                                    bGPDframe *gpf,
+                                                    bGPDstroke *gps,
                                                     eGP_DissolveMode mode)
 {
   bool changed = false;
   int first = 0;
   int last = 0;
 
-  GP_EDITABLE_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
-    /* the stroke must have at least one point selected for any operator */
-    if (gps->flag & GP_STROKE_SELECT) {
-      bGPDspoint *pt;
-      MDeformVert *dvert = NULL;
-      int i;
+  /* the stroke must have at least one point selected for any operator */
+  if (gps->flag & GP_STROKE_SELECT) {
+    bGPDspoint *pt;
+    MDeformVert *dvert = NULL;
+    int i;
 
-      int tot = gps->totpoints; /* number of points in new buffer */
+    int tot = gps->totpoints; /* number of points in new buffer */
 
-      /* first pass: count points to remove */
+    /* first pass: count points to remove */
+    switch (mode) {
+      case GP_DISSOLVE_POINTS:
+        /* Count how many points are selected (i.e. how many to remove) */
+        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+          if (pt->flag & GP_SPOINT_SELECT) {
+            /* selected point - one of the points to remove */
+            tot--;
+          }
+        }
+        break;
+      case GP_DISSOLVE_BETWEEN:
+        /* need to find first and last point selected */
+        first = -1;
+        last = 0;
+        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+          if (pt->flag & GP_SPOINT_SELECT) {
+            if (first < 0) {
+              first = i;
+            }
+            last = i;
+          }
+        }
+        /* count unselected points in the range */
+        for (i = first, pt = gps->points + first; i < last; i++, pt++) {
+          if ((pt->flag & GP_SPOINT_SELECT) == 0) {
+            tot--;
+          }
+        }
+        break;
+      case GP_DISSOLVE_UNSELECT:
+        /* count number of unselected points */
+        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+          if ((pt->flag & GP_SPOINT_SELECT) == 0) {
+            tot--;
+          }
+        }
+        break;
+      default:
+        return false;
+        break;
+    }
+
+    /* if no points are left, we simply delete the entire stroke */
+    if (tot <= 0) {
+      /* remove the entire stroke */
+      BLI_remlink(&gpf->strokes, gps);
+      BKE_gpencil_free_stroke(gps);
+    }
+    else {
+      /* just copy all points to keep into a smaller buffer */
+      bGPDspoint *new_points = MEM_callocN(sizeof(bGPDspoint) * tot, "new gp stroke points copy");
+      bGPDspoint *npt = new_points;
+
+      MDeformVert *new_dvert = NULL;
+      MDeformVert *ndvert = NULL;
+
+      if (gps->dvert != NULL) {
+        new_dvert = MEM_callocN(sizeof(MDeformVert) * tot, "new gp stroke weights copy");
+        ndvert = new_dvert;
+      }
+
       switch (mode) {
         case GP_DISSOLVE_POINTS:
-          /* Count how many points are selected (i.e. how many to remove) */
+          (gps->dvert != NULL) ? dvert = gps->dvert : NULL;
           for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-            if (pt->flag & GP_SPOINT_SELECT) {
-              /* selected point - one of the points to remove */
-              tot--;
+            if ((pt->flag & GP_SPOINT_SELECT) == 0) {
+              *npt = *pt;
+              npt++;
+
+              if (gps->dvert != NULL) {
+                *ndvert = *dvert;
+                ndvert->dw = MEM_dupallocN(dvert->dw);
+                ndvert++;
+              }
+            }
+            if (gps->dvert != NULL) {
+              dvert++;
             }
           }
           break;
         case GP_DISSOLVE_BETWEEN:
-          /* need to find first and last point selected */
-          first = -1;
-          last = 0;
-          for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-            if (pt->flag & GP_SPOINT_SELECT) {
-              if (first < 0) {
-                first = i;
-              }
-              last = i;
+          /* copy first segment */
+          (gps->dvert != NULL) ? dvert = gps->dvert : NULL;
+          for (i = 0, pt = gps->points; i < first; i++, pt++) {
+            *npt = *pt;
+            npt++;
+
+            if (gps->dvert != NULL) {
+              *ndvert = *dvert;
+              ndvert->dw = MEM_dupallocN(dvert->dw);
+              ndvert++;
+              dvert++;
             }
           }
-          /* count unselected points in the range */
+          /* copy segment (selected points) */
+          (gps->dvert != NULL) ? dvert = gps->dvert + first : NULL;
           for (i = first, pt = gps->points + first; i < last; i++, pt++) {
-            if ((pt->flag & GP_SPOINT_SELECT) == 0) {
-              tot--;
+            if (pt->flag & GP_SPOINT_SELECT) {
+              *npt = *pt;
+              npt++;
+
+              if (gps->dvert != NULL) {
+                *ndvert = *dvert;
+                ndvert->dw = MEM_dupallocN(dvert->dw);
+                ndvert++;
+              }
+            }
+            if (gps->dvert != NULL) {
+              dvert++;
             }
           }
+          /* copy last segment */
+          (gps->dvert != NULL) ? dvert = gps->dvert + last : NULL;
+          for (i = last, pt = gps->points + last; i < gps->totpoints; i++, pt++) {
+            *npt = *pt;
+            npt++;
+
+            if (gps->dvert != NULL) {
+              *ndvert = *dvert;
+              ndvert->dw = MEM_dupallocN(dvert->dw);
+              ndvert++;
+              dvert++;
+            }
+          }
+
           break;
         case GP_DISSOLVE_UNSELECT:
-          /* count number of unselected points */
+          /* copy any selected point */
+          (gps->dvert != NULL) ? dvert = gps->dvert : NULL;
           for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-            if ((pt->flag & GP_SPOINT_SELECT) == 0) {
-              tot--;
+            if (pt->flag & GP_SPOINT_SELECT) {
+              *npt = *pt;
+              npt++;
+
+              if (gps->dvert != NULL) {
+                *ndvert = *dvert;
+                ndvert->dw = MEM_dupallocN(dvert->dw);
+                ndvert++;
+              }
+            }
+            if (gps->dvert != NULL) {
+              dvert++;
             }
           }
           break;
-        default:
-          return false;
-          break;
       }
 
-      /* if no points are left, we simply delete the entire stroke */
-      if (tot <= 0) {
-        /* remove the entire stroke */
-        BLI_remlink(&gpf_->strokes, gps);
-        BKE_gpencil_free_stroke(gps);
+      /* free the old buffer */
+      if (gps->points) {
+        MEM_freeN(gps->points);
       }
-      else {
-        /* just copy all points to keep into a smaller buffer */
-        bGPDspoint *new_points = MEM_callocN(sizeof(bGPDspoint) * tot,
-                                             "new gp stroke points copy");
-        bGPDspoint *npt = new_points;
-
-        MDeformVert *new_dvert = NULL;
-        MDeformVert *ndvert = NULL;
-
-        if (gps->dvert != NULL) {
-          new_dvert = MEM_callocN(sizeof(MDeformVert) * tot, "new gp stroke weights copy");
-          ndvert = new_dvert;
-        }
-
-        switch (mode) {
-          case GP_DISSOLVE_POINTS:
-            (gps->dvert != NULL) ? dvert = gps->dvert : NULL;
-            for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-              if ((pt->flag & GP_SPOINT_SELECT) == 0) {
-                *npt = *pt;
-                npt++;
-
-                if (gps->dvert != NULL) {
-                  *ndvert = *dvert;
-                  ndvert->dw = MEM_dupallocN(dvert->dw);
-                  ndvert++;
-                }
-              }
-              if (gps->dvert != NULL) {
-                dvert++;
-              }
-            }
-            break;
-          case GP_DISSOLVE_BETWEEN:
-            /* copy first segment */
-            (gps->dvert != NULL) ? dvert = gps->dvert : NULL;
-            for (i = 0, pt = gps->points; i < first; i++, pt++) {
-              *npt = *pt;
-              npt++;
-
-              if (gps->dvert != NULL) {
-                *ndvert = *dvert;
-                ndvert->dw = MEM_dupallocN(dvert->dw);
-                ndvert++;
-                dvert++;
-              }
-            }
-            /* copy segment (selected points) */
-            (gps->dvert != NULL) ? dvert = gps->dvert + first : NULL;
-            for (i = first, pt = gps->points + first; i < last; i++, pt++) {
-              if (pt->flag & GP_SPOINT_SELECT) {
-                *npt = *pt;
-                npt++;
-
-                if (gps->dvert != NULL) {
-                  *ndvert = *dvert;
-                  ndvert->dw = MEM_dupallocN(dvert->dw);
-                  ndvert++;
-                }
-              }
-              if (gps->dvert != NULL) {
-                dvert++;
-              }
-            }
-            /* copy last segment */
-            (gps->dvert != NULL) ? dvert = gps->dvert + last : NULL;
-            for (i = last, pt = gps->points + last; i < gps->totpoints; i++, pt++) {
-              *npt = *pt;
-              npt++;
-
-              if (gps->dvert != NULL) {
-                *ndvert = *dvert;
-                ndvert->dw = MEM_dupallocN(dvert->dw);
-                ndvert++;
-                dvert++;
-              }
-            }
-
-            break;
-          case GP_DISSOLVE_UNSELECT:
-            /* copy any selected point */
-            (gps->dvert != NULL) ? dvert = gps->dvert : NULL;
-            for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-              if (pt->flag & GP_SPOINT_SELECT) {
-                *npt = *pt;
-                npt++;
-
-                if (gps->dvert != NULL) {
-                  *ndvert = *dvert;
-                  ndvert->dw = MEM_dupallocN(dvert->dw);
-                  ndvert++;
-                }
-              }
-              if (gps->dvert != NULL) {
-                dvert++;
-              }
-            }
-            break;
-        }
-
-        /* free the old buffer */
-        if (gps->points) {
-          MEM_freeN(gps->points);
-        }
-        if (gps->dvert) {
-          BKE_gpencil_free_stroke_weights(gps);
-          MEM_freeN(gps->dvert);
-        }
-
-        /* save the new buffer */
-        gps->points = new_points;
-        gps->dvert = new_dvert;
-        gps->totpoints = tot;
-
-        /* Calc geometry data. */
-        BKE_gpencil_stroke_geometry_update(gpd, gps);
-
-        /* deselect the stroke, since none of its selected points will still be selected */
-        gps->flag &= ~GP_STROKE_SELECT;
-        BKE_gpencil_stroke_select_index_reset(gps);
-        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-          pt->flag &= ~GP_SPOINT_SELECT;
-        }
+      if (gps->dvert) {
+        BKE_gpencil_free_stroke_weights(gps);
+        MEM_freeN(gps->dvert);
       }
 
-      changed = true;
+      /* save the new buffer */
+      gps->points = new_points;
+      gps->dvert = new_dvert;
+      gps->totpoints = tot;
+
+      /* Calc geometry data. */
+      BKE_gpencil_stroke_geometry_update(gpd, gps);
+
+      /* deselect the stroke, since none of its selected points will still be selected */
+      gps->flag &= ~GP_STROKE_SELECT;
+      BKE_gpencil_stroke_select_index_reset(gps);
+      for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
+        pt->flag &= ~GP_SPOINT_SELECT;
+      }
     }
+
+    changed = true;
   }
-  GP_EDITABLE_STROKES_END(gpstroke_iter);
 
   return changed;
 }
 
 /* Delete selected points but keep the stroke */
-static int gpencil_dissolve_selected_points(bContext *C, eGP_DissolveMode mode)
+static int gpencil_dissolve_selected_points(bContext *C,
+                                            eGP_DissolveMode mode,
+                                            const bool do_segments_refit,
+                                            const float error_threshold)
 {
   Object *ob = CTX_data_active_object(C);
   bGPdata *gpd = (bGPdata *)ob->data;
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
-  bool changed = false;
+  const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
 
-  if (is_curve_edit) {
-    changed = gpencil_dissolve_selected_curve_points(C, gpd, mode);
+  bool changed = false;
+  CTX_DATA_BEGIN (C, bGPDlayer *, gpl, editable_gpencil_layers) {
+    bGPDframe *init_gpf = (is_multiedit) ? gpl->frames.first : gpl->actframe;
+
+    for (bGPDframe *gpf = init_gpf; gpf; gpf = gpf->next) {
+      if ((gpf == gpl->actframe) || ((gpf->flag & GP_FRAME_SELECT) && (is_multiedit))) {
+
+        if (gpf == NULL) {
+          continue;
+        }
+
+        /* Use LISTBASE_FOREACH_MUTABLE because strokes might be entirely deleted. */
+        LISTBASE_FOREACH_MUTABLE (bGPDstroke *, gps, &gpf->strokes) {
+          if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+            bGPDcurve *gpc = gps->editcurve;
+            if (gpencil_dissolve_selected_curve_points(
+                    gpd, gpf, gps, gpc, mode, do_segments_refit, error_threshold)) {
+              changed = true;
+            }
+          }
+          else {
+            if (gpencil_dissolve_selected_stroke_points(gpd, gpf, gps, mode)) {
+              changed = true;
+            }
+          }
+        }
+      }
+    }
   }
-  else {
-    changed = gpencil_dissolve_selected_stroke_points(C, gpd, mode);
-  }
+  CTX_DATA_END;
 
   if (changed) {
     DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
     WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
     return OPERATOR_FINISHED;
   }
+
   return OPERATOR_CANCELLED;
 }
 
@@ -2820,8 +2939,10 @@ void GPENCIL_OT_delete(wmOperatorType *ot)
 static int gpencil_dissolve_exec(bContext *C, wmOperator *op)
 {
   eGP_DissolveMode mode = RNA_enum_get(op->ptr, "type");
+  const bool do_segments_refit = RNA_boolean_get(op->ptr, "do_segments_refit");
+  const float error_threshold = RNA_float_get(op->ptr, "error_threshold");
 
-  return gpencil_dissolve_selected_points(C, mode);
+  return gpencil_dissolve_selected_points(C, mode, do_segments_refit, error_threshold);
 }
 
 void GPENCIL_OT_dissolve(wmOperatorType *ot)
@@ -2857,6 +2978,22 @@ void GPENCIL_OT_dissolve(wmOperatorType *ot)
                           0,
                           "Type",
                           "Method used for dissolving stroke points");
+
+  ot->prop = RNA_def_boolean(ot->srna,
+                             "do_segments_refit",
+                             false,
+                             "Refit Segments",
+                             "Try to match the previous shape of bézier stroke segment");
+
+  ot->prop = RNA_def_float(ot->srna,
+                           "error_threshold",
+                           GP_DEFAULT_CURVE_ERROR,
+                           0.0f,
+                           100.0f,
+                           "Threshold",
+                           "Bézier curve fitting error threshold",
+                           0.0f,
+                           3.0f);
 }
 
 /** \} */
@@ -5001,8 +5138,6 @@ static bool gpencil_stroke_separate_poll_property(const bContext *UNUSED(C),
 
 void GPENCIL_OT_stroke_separate(wmOperatorType *ot)
 {
-  PropertyRNA *prop;
-
   static const EnumPropertyItem separate_type[] = {
       {GP_SEPARATE_POINT, "POINT", 0, "Selected Points", "Separate the selected points"},
       {GP_SEPARATE_STROKE, "STROKE", 0, "Selected Strokes", "Separate the selected strokes"},
@@ -5027,11 +5162,11 @@ void GPENCIL_OT_stroke_separate(wmOperatorType *ot)
   /* properties */
   ot->prop = RNA_def_enum(ot->srna, "mode", separate_type, GP_SEPARATE_POINT, "Mode", "");
 
-  prop = RNA_def_boolean(ot->srna,
-                         "keep_ends",
-                         false,
-                         "Keep Ends",
-                         "Seperate the selected points, but keep the ends in both");
+  RNA_def_boolean(ot->srna,
+                  "keep_ends",
+                  false,
+                  "Keep Ends",
+                  "Seperate the selected points, but keep the ends in both");
 }
 
 /** \} */
