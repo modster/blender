@@ -699,6 +699,42 @@ class NODE_PT_annotation(AnnotationDataPanel, Panel):
         snode = context.space_data
         return snode is not None and snode.node_tree is not None
 
+class NODE_PT_asset_tools(Panel):
+    bl_label = "Asset Tools"
+    bl_space_type = 'NODE_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = "Node"
+
+    @classmethod
+    def poll(cls, context):
+        snode = context.space_data
+        return snode.tree_type == 'GeometryNodeTree'
+
+    def draw(self, context):
+        layout = self.layout
+        snode = context.space_data
+        ntree = snode.node_tree
+        layout.operator("node.asset_tool_add", text="Add Asset Tool")
+
+        for asset_tool in ntree.asset_tools:
+            layout.prop(asset_tool, "weight_group_name", text="")
+
+
+class NODE_OT_asset_tool_add(bpy.types.Operator):
+    bl_idname = "node.asset_tool_add"
+    bl_label = "Add Asset Tool"
+    bl_description = "Add asset tool"
+
+    @classmethod
+    def poll(cls, context):
+        snode = context.space_data
+        return snode.node_tree is not None
+
+    def execute(self, context):
+        ntree = context.space_data.node_tree
+        ntree.asset_tools.new()
+        return {'FINISHED'}
+
 
 def node_draw_tree_view(_layout, _context):
     pass
@@ -743,6 +779,8 @@ classes = (
     NODE_PT_quality,
     NODE_PT_annotation,
     NODE_UL_interface_sockets,
+    NODE_PT_asset_tools,
+    NODE_OT_asset_tool_add,
 
     node_panel(EEVEE_MATERIAL_PT_settings),
     node_panel(MATERIAL_PT_viewport),
