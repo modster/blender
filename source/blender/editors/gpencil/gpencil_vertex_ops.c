@@ -59,7 +59,7 @@ static const EnumPropertyItem gpencil_modesEnumPropertyItem_mode[] = {
 };
 
 /* Helper: Check if any stroke is selected. */
-static bool is_any_stroke_selected(bContext *C, const bool is_multiedit, const bool is_curve_edit)
+static bool is_any_stroke_selected(bContext *C, const bool is_multiedit)
 {
   bool is_selected = false;
 
@@ -82,10 +82,7 @@ static bool is_any_stroke_selected(bContext *C, const bool is_multiedit, const b
             continue;
           }
 
-          if (is_curve_edit) {
-            if (gps->editcurve == NULL) {
-              continue;
-            }
+          if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
             bGPDcurve *gpc = gps->editcurve;
             if (gpc->flag & GP_CURVE_SELECT) {
               is_selected = true;
@@ -136,7 +133,7 @@ static int gpencil_vertexpaint_brightness_contrast_exec(bContext *C, wmOperator 
   bGPdata *gpd = (bGPdata *)ob->data;
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
   const eGp_Vertex_Mode mode = RNA_enum_get(op->ptr, "mode");
-  const bool any_selected = is_any_stroke_selected(C, is_multiedit, false);
+  const bool any_selected = is_any_stroke_selected(C, is_multiedit);
 
   float gain, offset;
   {
@@ -254,7 +251,7 @@ static int gpencil_vertexpaint_hsv_exec(bContext *C, wmOperator *op)
 
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
   const eGp_Vertex_Mode mode = RNA_enum_get(op->ptr, "mode");
-  const bool any_selected = is_any_stroke_selected(C, is_multiedit, false);
+  const bool any_selected = is_any_stroke_selected(C, is_multiedit);
   float hue = RNA_float_get(op->ptr, "h");
   float sat = RNA_float_get(op->ptr, "s");
   float val = RNA_float_get(op->ptr, "v");
@@ -373,7 +370,7 @@ static int gpencil_vertexpaint_invert_exec(bContext *C, wmOperator *op)
 
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
   const eGp_Vertex_Mode mode = RNA_enum_get(op->ptr, "mode");
-  const bool any_selected = is_any_stroke_selected(C, is_multiedit, false);
+  const bool any_selected = is_any_stroke_selected(C, is_multiedit);
 
   bool changed = false;
   CTX_DATA_BEGIN (C, bGPDlayer *, gpl, editable_gpencil_layers) {
@@ -463,7 +460,7 @@ static int gpencil_vertexpaint_levels_exec(bContext *C, wmOperator *op)
 
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
   const eGp_Vertex_Mode mode = RNA_enum_get(op->ptr, "mode");
-  const bool any_selected = is_any_stroke_selected(C, is_multiedit, false);
+  const bool any_selected = is_any_stroke_selected(C, is_multiedit);
   float gain = RNA_float_get(op->ptr, "gain");
   float offset = RNA_float_get(op->ptr, "offset");
 
@@ -563,7 +560,7 @@ static int gpencil_vertexpaint_set_exec(bContext *C, wmOperator *op)
 
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
   const eGp_Vertex_Mode mode = RNA_enum_get(op->ptr, "mode");
-  const bool any_selected = is_any_stroke_selected(C, is_multiedit, false);
+  const bool any_selected = is_any_stroke_selected(C, is_multiedit);
   float factor = RNA_float_get(op->ptr, "factor");
 
   bool changed = false;
@@ -1060,6 +1057,14 @@ static void gpencil_reset_vertex(bGPDstroke *gps, eGp_Vertex_Mode mode)
   }
 
   if (mode != GPPAINT_MODE_FILL) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+      bGPDcurve *gpc = gps->editcurve;
+      for (int i = 0; i < gpc->tot_curve_points; i++) {
+        bGPDcurve_point *gpc_pt = &gpc->curve_points[i];
+        zero_v4(gpc_pt->vert_color);
+      }
+    }
+    
     bGPDspoint *pt;
     for (int i = 0; i < gps->totpoints; i++) {
       pt = &gps->points[i];
@@ -1072,12 +1077,11 @@ static int gpencil_stroke_reset_vertex_color_exec(bContext *C, wmOperator *op)
 {
   Object *obact = CTX_data_active_object(C);
   bGPdata *gpd = (bGPdata *)obact->data;
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
   const eGp_Vertex_Mode mode = RNA_enum_get(op->ptr, "mode");
 
   /* First need to check if there are something selected. If not, apply to all strokes. */
-  const bool any_selected = is_any_stroke_selected(C, is_multiedit, is_curve_edit);
+  const bool any_selected = is_any_stroke_selected(C, is_multiedit);
 
   /* Reset Vertex colors. */
   bool changed = false;
@@ -1096,10 +1100,7 @@ static int gpencil_stroke_reset_vertex_color_exec(bContext *C, wmOperator *op)
             continue;
           }
 
-          if (is_curve_edit) {
-            if (gps->editcurve == NULL) {
-              continue;
-            }
+          if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
             bGPDcurve *gpc = gps->editcurve;
             if ((!any_selected) || (gpc->flag & GP_CURVE_SELECT)) {
               gpencil_reset_vertex(gps, mode);
