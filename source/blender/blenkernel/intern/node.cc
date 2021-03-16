@@ -60,6 +60,7 @@
 
 #include "BKE_anim_data.h"
 #include "BKE_animsys.h"
+#include "BKE_asset_tool.h"
 #include "BKE_colortools.h"
 #include "BKE_cryptomatte.h"
 #include "BKE_global.h"
@@ -221,6 +222,12 @@ static void ntree_copy_data(Main *UNUSED(bmain), ID *id_dst, const ID *id_src, c
   /* Don't copy error messages in the runtime struct.
    * They should be filled during execution anyway. */
   ntree_dst->ui_storage = nullptr;
+
+  BLI_listbase_clear(&ntree_dst->asset_tools);
+  LISTBASE_FOREACH (AssetTool *, asset_tool_src, &ntree_src->asset_tools) {
+    AssetTool *asset_tool_dst = BKE_asset_tool_copy(asset_tool_src);
+    BLI_addtail(&ntree_dst->asset_tools, asset_tool_dst);
+  }
 }
 
 static void ntree_free_data(ID *id)
@@ -276,6 +283,10 @@ static void ntree_free_data(ID *id)
   }
 
   delete ntree->ui_storage;
+
+  LISTBASE_FOREACH_MUTABLE (AssetTool *, asset_tool, &ntree->asset_tools) {
+    BKE_asset_tool_free(asset_tool);
+  }
 }
 
 static void library_foreach_node_socket(LibraryForeachIDData *data, bNodeSocket *sock)
@@ -583,6 +594,8 @@ void ntreeBlendWrite(BlendWriter *writer, bNodeTree *ntree)
   LISTBASE_FOREACH (bNodeSocket *, sock, &ntree->outputs) {
     write_node_socket_interface(writer, sock);
   }
+
+  BLO_write_struct_list(writer, AssetTool, &ntree->asset_tools);
 }
 
 static void ntree_blend_write(BlendWriter *writer, ID *id, const void *id_address)
@@ -758,6 +771,8 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
     BLO_read_data_address(reader, &link->fromsock);
     BLO_read_data_address(reader, &link->tosock);
   }
+
+  BLO_read_list(reader, &ntree->asset_tools);
 
   /* TODO, should be dealt by new generic cache handling of IDs... */
   ntree->previews = nullptr;

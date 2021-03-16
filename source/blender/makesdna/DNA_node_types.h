@@ -473,6 +473,9 @@ typedef struct bNodeTree {
    */
   ListBase inputs, outputs;
 
+  /* List of #AssetTool. */
+  ListBase asset_tools;
+
   /* Node preview hash table
    * Only available in base node trees (e.g. scene->node_tree)
    */
@@ -536,6 +539,13 @@ typedef enum eNodeTreeUpdate {
   /* group has changed (generic flag including all other group flags) */
   NTREE_UPDATE_GROUP = (NTREE_UPDATE_GROUP_IN | NTREE_UPDATE_GROUP_OUT),
 } eNodeTreeUpdate;
+
+typedef struct AssetTool {
+  struct AssetTool *next;
+  struct AssetTool *prev;
+
+  char weight_group_name[64];
+} AssetTool;
 
 /* socket value structs for input buttons
  * DEPRECATED now using ID properties

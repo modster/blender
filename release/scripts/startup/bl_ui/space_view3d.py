@@ -7508,9 +7508,22 @@ class VIEW3D_PT_asset_tools(Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout.label(text="Hello World")
-        props = layout.operator("asset.setup_weight_paint_tool", text="Create Weights")
-        props.vertex_group_name = "Hello"
+
+        ob = context.active_object
+        if ob is None:
+            return
+
+        for modifier in ob.modifiers:
+            if modifier.type != 'NODES':
+                continue
+            if modifier.node_group is None:
+                continue
+            node_group = modifier.node_group
+            for asset_tool in node_group.asset_tools:
+                group_name = asset_tool.weight_group_name
+                props = layout.operator("asset.setup_weight_paint_tool", text=group_name)
+                props.vertex_group_name = group_name
+
 
 class ASSET_OT_setup_weight_paint_tool(bpy.types.Operator):
     bl_idname = "asset.setup_weight_paint_tool"

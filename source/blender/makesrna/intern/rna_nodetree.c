@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "BLI_listbase.h"
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 
@@ -37,6 +38,7 @@
 #include "DNA_texture_types.h"
 
 #include "BKE_animsys.h"
+#include "BKE_asset_tool.h"
 #include "BKE_attribute.h"
 #include "BKE_cryptomatte.h"
 #include "BKE_image.h"
@@ -4297,6 +4299,24 @@ static void rna_NodeInputString_string_set(PointerRNA *ptr, const char *value)
     storage->string = NULL;
   }
 }
+
+static PointerRNA rna_AssetToolGroup_new(bNodeTree *ntree)
+{
+  AssetTool *asset_tool = BKE_asset_tool_new();
+  BLI_addtail(&ntree->asset_tools, asset_tool);
+  PointerRNA ptr;
+  RNA_pointer_create(&ntree->id, &RNA_AssetTool, asset_tool, &ptr);
+  return ptr;
+}
+
+static void rna_AssetToolGroup_remove(bNodeTree *ntree, PointerRNA *asset_tool_ptr)
+{
+  AssetTool *asset_tool = (AssetTool *)asset_tool_ptr->data;
+  BLI_remlink(&ntree->asset_tools, asset_tool);
+  BKE_asset_tool_free(asset_tool);
+  RNA_POINTER_INVALIDATE(asset_tool_ptr);
+}
+
 #else
 
 static const EnumPropertyItem prop_image_layer_items[] = {
@@ -10963,6 +10983,41 @@ static void rna_def_node_tree_sockets_api(BlenderRNA *brna, PropertyRNA *cprop, 
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 }
 
+static void rna_def_asset_tool(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  srna = RNA_def_struct(brna, "AssetTool", NULL);
+  RNA_def_struct_ui_text(srna, "Asset Tool", "Tool for a specific asset");
+
+  prop = RNA_def_property(srna, "weight_group_name", PROP_STRING, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Weight Group Name", "Name of a vertex group");
+}
+
+static void rna_def_asset_tool_group(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  FunctionRNA *func;
+  PropertyRNA *parm;
+
+  srna = RNA_def_struct(brna, "AssetToolGroup", NULL);
+  RNA_def_struct_ui_text(srna, "Asset Tool Group", "Group of asset tools");
+  RNA_def_struct_sdna(srna, "bNodeTree");
+
+  func = RNA_def_function(srna, "new", "rna_AssetToolGroup_new");
+  RNA_def_function_ui_description(func, "Add an asset tool");
+  parm = RNA_def_pointer(func, "asset_tool", "AssetTool", "", "New asset tool");
+  RNA_def_parameter_flags(parm, 0, PARM_RNAPTR);
+  RNA_def_function_return(func, parm);
+
+  func = RNA_def_function(srna, "remove", "rna_AssetToolGroup_remove");
+  RNA_def_function_ui_description(func, "Remove an asset tool");
+  parm = RNA_def_pointer(func, "asset_tool", "AssetTool", "", "Asset tool to remove");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+  RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
+}
+
 static void rna_def_nodetree(BlenderRNA *brna)
 {
   StructRNA *srna;
@@ -10987,6 +11042,12 @@ static void rna_def_nodetree(BlenderRNA *brna)
   RNA_def_struct_ui_icon(srna, ICON_NODETREE);
   RNA_def_struct_refine_func(srna, "rna_NodeTree_refine");
   RNA_def_struct_register_funcs(srna, "rna_NodeTree_register", "rna_NodeTree_unregister", NULL);
+
+  prop = RNA_def_property(srna, "asset_tools", PROP_COLLECTION, PROP_NONE);
+  RNA_def_property_collection_sdna(prop, NULL, "asset_tools", NULL);
+  RNA_def_property_struct_type(prop, "AssetTool");
+  RNA_def_property_ui_text(prop, "Asset Tools", "Tools for this asset");
+  RNA_def_property_srna(prop, "AssetToolGroup");
 
   prop = RNA_def_property(srna, "view_center", PROP_FLOAT, PROP_XYZ);
   RNA_def_property_array(prop, 2);
@@ -11299,6 +11360,9 @@ void RNA_def_nodetree(BlenderRNA *brna)
   rna_def_function_node(brna);
 
   rna_def_nodetree(brna);
+
+  rna_def_asset_tool(brna);
+  rna_def_asset_tool_group(brna);
 
   rna_def_node_socket_standard_types(brna);
 

@@ -80,6 +80,7 @@ set(SRC
   intern/armature_pose.cc
   intern/armature_update.c
   intern/asset.cc
+  intern/asset_tool.cc
   intern/attribute.c
   intern/attribute_access.cc
   intern/attribute_math.cc
@@ -284,6 +285,7 @@ set(SRC
   BKE_appdir.h
   BKE_armature.h
   BKE_asset.h
+  BKE_asset_tool.h
   BKE_attribute.h
   BKE_attribute_access.hh
   BKE_attribute_math.hh
