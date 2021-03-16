@@ -265,29 +265,7 @@ static void generate_geometry(GpencilModifierData *md,
         /* Duplicate stroke */
         bGPDstroke *gps_dst = BKE_gpencil_stroke_duplicate(iter->gps, true, true);
 
-        /* Bezier type. */
-        if (GPENCIL_STROKE_TYPE_BEZIER(gps_dst)) {
-          bGPDcurve *gpc = gps_dst->editcurve;
-          for (int i = 0; i < gpc->tot_curve_points; i++) {
-            bGPDcurve_point *pt = &gpc->curve_points[i];
-            BezTriple *bezt = &pt->bezt;
-
-            for (int j = 0; j < 3; j++) {
-              /* Apply randomness matrix. */
-              mul_m4_v3(mat_rnd, bezt->vec[j]);
-              /* Apply object local transform (Rot/Scale). */
-              if ((mmd->flag & GP_ARRAY_USE_OB_OFFSET) && (mmd->object)) {
-                mul_m4_v3(mat, bezt->vec[j]);
-              }
-              /* Global Rotate and scale. */
-              mul_mat3_m4_v3(current_offset, bezt->vec[j]);
-              /* Global translate. */
-              add_v3_v3(bezt->vec[j], current_offset[3]);
-            }
-          }
-        }
-
-        /* Polygon type. Do always because point data is used by draw manager. */
+        /* Move points */
         for (int i = 0; i < iter->gps->totpoints; i++) {
           bGPDspoint *pt = &gps_dst->points[i];
           /* Apply randomness matrix. */
