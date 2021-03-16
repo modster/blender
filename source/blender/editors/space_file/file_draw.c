@@ -48,6 +48,7 @@
 
 #include "IMB_imbuf_types.h"
 
+#include "DNA_asset_types.h"
 #include "DNA_userdef_types.h"
 #include "DNA_windowmanager_types.h"
 
@@ -1065,7 +1066,7 @@ bool file_draw_hint_if_invalid(const SpaceFile *sfile, const ARegion *region)
     return false;
   }
   /* Check if the library exists. */
-  if ((asset_params->asset_library.type == FILE_ASSET_LIBRARY_LOCAL) ||
+  if ((asset_params->asset_library.type == ASSET_LIBRARY_LOCAL) ||
       filelist_is_dir(sfile->files, asset_params->base_params.dir)) {
     return false;
   }

@@ -7006,6 +7006,20 @@ class VIEW3D_PT_context_properties(Panel):
             rna_prop_ui.draw(self.layout, context, member, object, False)
 
 
+class VIEW3D_PT_asset_testing(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_label = "Asset Testing"
+    bl_category = "Assets"
+
+    def draw(self, context):
+        layout = self.layout
+
+        workspace = context.workspace
+
+        layout.template_asset_view(workspace, "active_asset_library")
+
+
 # Grease Pencil Object - Multiframe falloff tools
 class VIEW3D_PT_gpencil_multi_frame(Panel):
     bl_space_type = 'VIEW_3D'
@@ -7719,6 +7733,7 @@ classes = (
     VIEW3D_PT_transform_orientations,
     VIEW3D_PT_overlay_gpencil_options,
     VIEW3D_PT_context_properties,
+    VIEW3D_PT_asset_testing,
     VIEW3D_PT_paint_vertex_context_menu,
     VIEW3D_PT_paint_texture_context_menu,
     VIEW3D_PT_paint_weight_context_menu,

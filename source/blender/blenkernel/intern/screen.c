@@ -683,6 +683,9 @@ void BKE_area_region_free(SpaceType *st, ARegion *region)
       if (dyn_data->items_filter_neworder) {
         MEM_freeN(dyn_data->items_filter_neworder);
       }
+      if (dyn_data->customdata) {
+        MEM_freeN(dyn_data->customdata);
+      }
       MEM_freeN(dyn_data);
     }
     if (uilst->properties) {

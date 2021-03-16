@@ -1525,7 +1525,7 @@ static void ui_drag_toggle_set(bContext *C, uiDragToggleHandle *drag_info, const
    */
   if (drag_info->is_xy_lock_init == false) {
     /* first store the buttons original coords */
-    uiBut *but = ui_but_find_mouse_over_ex(region, xy_input[0], xy_input[1], true);
+    uiBut *but = ui_but_find_mouse_over_ex(region, xy_input[0], xy_input[1], true, NULL);
 
     if (but) {
       if (but->flag & UI_BUT_DRAG_LOCK) {
@@ -1596,7 +1596,7 @@ static int ui_handler_region_drag_toggle(bContext *C, const wmEvent *event, void
     wmWindow *win = CTX_wm_window(C);
     ARegion *region = CTX_wm_region(C);
     uiBut *but = ui_but_find_mouse_over_ex(
-        region, drag_info->xy_init[0], drag_info->xy_init[1], true);
+        region, drag_info->xy_init[0], drag_info->xy_init[1], true, NULL);
 
     if (but) {
       ui_apply_but_undo(but);
@@ -4165,7 +4165,7 @@ static uiBut *ui_but_list_row_text_activate(bContext *C,
                                             uiButtonActivateType activate_type)
 {
   ARegion *region = CTX_wm_region(C);
-  uiBut *labelbut = ui_but_find_mouse_over_ex(region, event->x, event->y, true);
+  uiBut *labelbut = ui_but_find_mouse_over_ex(region, event->x, event->y, true, NULL);
 
   if (labelbut && labelbut->type == UI_BTYPE_TEXT && !(labelbut->flag & UI_BUT_DISABLED)) {
     /* exit listrow */
@@ -7683,6 +7683,7 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
     case UI_BTYPE_IMAGE:
     case UI_BTYPE_PROGRESS_BAR:
     case UI_BTYPE_NODE_SOCKET:
+    case UI_BTYPE_PREVIEW_TILE:
       retval = ui_do_but_EXIT(C, but, data, event);
       break;
     case UI_BTYPE_HISTOGRAM:
@@ -9017,6 +9018,11 @@ static int ui_handle_button_event(bContext *C, const wmEvent *event, uiBut *but)
   return retval;
 }
 
+static bool ui_but_is_listrow(const uiBut *but)
+{
+  return but->type == UI_BTYPE_LISTROW;
+}
+
 static int ui_handle_list_event(bContext *C, const wmEvent *event, ARegion *region, uiBut *listbox)
 {
   int retval = WM_UI_HANDLER_CONTINUE;
@@ -9050,7 +9056,23 @@ static int ui_handle_list_event(bContext *C, const wmEvent *event, ARegion *regi
     }
   }
 
-  if (val == KM_PRESS) {
+  /* Pass selection to the underlying listrow button if the foreground button didn't catch it.
+   * KM_CLICK is only sent after an uncaught release event, so the forground button gets all
+   * regular events (including mouse presses to start dragging) and this part only kicks in if it
+   * hasn't handled the release event. Note that if there's no overlaid button, the row selects on
+   * the press event already via regular UI_BTYPE_LISTROW handling. */
+  if (ELEM(type, LEFTMOUSE) && (val == KM_CLICK)) {
+    uiBut *listrow = ui_but_find_mouse_over_ex(
+        region, event->x, event->y, false, ui_but_is_listrow);
+
+    if (listrow) {
+      /* Simulate click on listrow button itself (which may be overlapped by another button). */
+      UI_but_execute(C, region, listrow);
+      /* Could probably also return CONTINUE, in case other buttons want to act on click. */
+      retval = WM_UI_HANDLER_BREAK;
+    }
+  }
+  else if (val == KM_PRESS) {
     if ((ELEM(type, EVT_UPARROWKEY, EVT_DOWNARROWKEY) &&
          !IS_EVENT_MOD(event, shift, ctrl, alt, oskey)) ||
         ((ELEM(type, WHEELUPMOUSE, WHEELDOWNMOUSE) && event->ctrl &&

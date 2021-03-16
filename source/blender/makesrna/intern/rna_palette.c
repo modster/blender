@@ -128,6 +128,11 @@ static void rna_def_palettecolors(BlenderRNA *brna, PropertyRNA *cprop)
       prop, "rna_Palette_active_color_get", "rna_Palette_active_color_set", NULL, NULL);
   RNA_def_property_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop, "Active Palette Color", "");
+
+  /* XXX just for testing. */
+  prop = RNA_def_property(srna, "active_index", PROP_INT, PROP_NONE);
+  RNA_def_property_int_sdna(prop, NULL, "active_color");
+  RNA_def_property_ui_text(prop, "Active Palette Color Index", "");
 }
 
 static void rna_def_palettecolor(BlenderRNA *brna)

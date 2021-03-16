@@ -1022,8 +1022,18 @@ void ui_draw_menu_item(const struct uiFontStyle *fstyle,
                        int state,
                        uiMenuItemSeparatorType separator_type,
                        int *r_xmax);
-void ui_draw_preview_item(
-    const struct uiFontStyle *fstyle, rcti *rect, const char *name, int iconid, int state);
+void ui_draw_preview_item(const struct uiFontStyle *fstyle,
+                          rcti *rect,
+                          const char *name,
+                          int iconid,
+                          int state,
+                          eFontStyle_Align text_align);
+void ui_draw_preview_item_stateless(const struct uiFontStyle *fstyle,
+                                    rcti *rect,
+                                    const char *name,
+                                    int iconid,
+                                    const uchar text_col[4],
+                                    eFontStyle_Align text_align);
 
 #define UI_TEXT_MARGIN_X 0.4f
 #define UI_POPUP_MARGIN (UI_DPI_FAC * 12)
@@ -1108,10 +1118,12 @@ bool ui_but_contains_point_px(const uiBut *but, const struct ARegion *region, in
 uiBut *ui_list_find_mouse_over(struct ARegion *region,
                                const struct wmEvent *event) ATTR_WARN_UNUSED_RESULT;
 
+typedef bool (*uiButFindPoll)(const uiBut *but);
 uiBut *ui_but_find_mouse_over_ex(struct ARegion *region,
                                  const int x,
                                  const int y,
-                                 const bool labeledit) ATTR_WARN_UNUSED_RESULT;
+                                 const bool labeledit,
+                                 uiButFindPoll find_poll) ATTR_WARN_UNUSED_RESULT;
 uiBut *ui_but_find_mouse_over(struct ARegion *region,
                               const struct wmEvent *event) ATTR_WARN_UNUSED_RESULT;
 uiBut *ui_but_find_rect_over(const struct ARegion *region,

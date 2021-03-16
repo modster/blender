@@ -77,6 +77,7 @@ void filelist_init_icons(void);
 void filelist_free_icons(void);
 struct ImBuf *filelist_getimage(struct FileList *filelist, const int index);
 struct ImBuf *filelist_file_getimage(const FileDirEntry *file);
+struct ImBuf *filelist_geticon_image_ex(const FileDirEntry *file);
 struct ImBuf *filelist_geticon_image(struct FileList *filelist, const int index);
 int filelist_geticon(struct FileList *filelist, const int index, const bool is_main);
 
@@ -140,7 +141,9 @@ struct BlendHandle *filelist_lib(struct FileList *filelist);
 bool filelist_islibrary(struct FileList *filelist, char *dir, char **r_group);
 void filelist_freelib(struct FileList *filelist);
 
-void filelist_readjob_start(struct FileList *filelist, const struct bContext *C);
+void filelist_readjob_start(struct FileList *filelist,
+                            int space_notifier,
+                            const struct bContext *C);
 void filelist_readjob_stop(struct wmWindowManager *wm, struct Scene *owner_scene);
 int filelist_readjob_running(struct wmWindowManager *wm, struct Scene *owner_scene);
 

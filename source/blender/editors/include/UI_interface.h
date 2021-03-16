@@ -34,6 +34,7 @@ extern "C" {
 /* Struct Declarations */
 
 struct ARegion;
+struct AssetFilterSettings;
 struct AutoComplete;
 struct EnumPropertyItem;
 struct FileSelectParams;
@@ -375,6 +376,9 @@ typedef enum {
   /** Buttons with value >= #UI_BTYPE_SEARCH_MENU don't get undo pushes. */
   UI_BTYPE_SEARCH_MENU = 41 << 9,
   UI_BTYPE_EXTRA = 42 << 9,
+  /** A preview image (#PreviewImage), with text under it. Typically bigger than normal buttons and
+   * laid out in a grid, e.g. like the File Browser in thumbnail display mode. */
+  UI_BTYPE_PREVIEW_TILE = 43 << 9,
   UI_BTYPE_HOTKEY_EVENT = 46 << 9,
   /** Non-interactive image, used for splash screen */
   UI_BTYPE_IMAGE = 47 << 9,
@@ -2159,6 +2163,31 @@ void uiTemplateList(uiLayout *layout,
                     int columns,
                     bool sort_reverse,
                     bool sort_lock);
+struct TemplateListIterData;
+typedef void (*uiTemplateListItemIterFn)(struct TemplateListIterData *iter_data,
+                                         struct PointerRNA *itemptr);
+typedef void (*uiTemplateListItemsIterFn)(struct PointerRNA *dataptr,
+                                          struct PropertyRNA *prop,
+                                          struct TemplateListIterData *iter_data,
+                                          uiTemplateListItemIterFn fn,
+                                          void *customdata);
+struct uiList *uiTemplateList_ex(uiLayout *layout,
+                                 struct bContext *C,
+                                 uiTemplateListItemsIterFn iter_items,
+                                 const char *listtype_name,
+                                 const char *list_id,
+                                 struct PointerRNA *dataptr,
+                                 const char *propname,
+                                 struct PointerRNA *active_dataptr,
+                                 const char *active_propname,
+                                 const char *item_dyntip_propname,
+                                 int rows,
+                                 int maxrows,
+                                 int layout_type,
+                                 int columns,
+                                 bool sort_reverse,
+                                 bool sort_lock,
+                                 void *customdata);
 void uiTemplateNodeLink(uiLayout *layout,
                         struct bContext *C,
                         struct bNodeTree *ntree,
@@ -2204,6 +2233,11 @@ int uiTemplateRecentFiles(struct uiLayout *layout, int rows);
 void uiTemplateFileSelectPath(uiLayout *layout,
                               struct bContext *C,
                               struct FileSelectParams *params);
+void uiTemplateAssetView(struct uiLayout *layout,
+                         struct bContext *C,
+                         struct PointerRNA *ptr,
+                         const char *asset_library_propname,
+                         const struct AssetFilterSettings *filter_settings);
 
 /* items */
 void uiItemO(uiLayout *layout, const char *name, int icon, const char *opname);
@@ -2457,6 +2491,7 @@ typedef struct uiDragColorHandle {
 
 void ED_operatortypes_ui(void);
 void ED_keymap_ui(struct wmKeyConfig *keyconf);
+void ED_uilisttypes_ui(void);
 
 void UI_drop_color_copy(struct wmDrag *drag, struct wmDropBox *drop);
 bool UI_drop_color_poll(struct bContext *C,

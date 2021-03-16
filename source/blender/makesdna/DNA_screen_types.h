@@ -269,6 +269,9 @@ typedef struct uiListDyn {
   int resize;
   int resize_prev;
 
+  /* Allocated custom data. Free'ed together with the uiList (and when re-assigning). */
+  void *customdata;
+
   /* Filtering data. */
   /** Items_len length. */
   int *items_filter_flags;
@@ -583,6 +586,7 @@ enum {
   UILST_LAYOUT_DEFAULT = 0,
   UILST_LAYOUT_COMPACT = 1,
   UILST_LAYOUT_GRID = 2,
+  UILST_LAYOUT_BIG_PREVIEW_GRID = 3,
 };
 
 /** #uiList.flag */
