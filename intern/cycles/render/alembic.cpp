@@ -834,6 +834,173 @@ void AlembicObject::read_face_sets(SchemaType &schema,
   }
 }
 
+static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono_t> &times)
+{
+  if (cached_data.vertices.size() == 0 || cached_data.vertices.size() == 1) {
+    return;
+  }
+
+  static ustring deltas_string = ustring("deltas");
+
+  auto &attr_delta = cached_data.add_attribute(deltas_string, cached_data.vertices.get_time_sampling());
+  attr_delta.std = ATTR_STD_NONE;
+  attr_delta.element = ATTR_ELEMENT_VERTEX;
+  attr_delta.type_desc = TypeUInt16;
+
+  ccl::set<chrono_t>::iterator begin = times.begin();
+
+  chrono_t previous_time = *begin++;
+
+  attr_delta.data.add_no_data(previous_time);
+
+  while (begin != times.end()) {
+    const chrono_t current_time = *begin++;
+
+    const array<float3> *current_vertices = cached_data.vertices.data_for_time_no_check(current_time).get_data_or_null();
+    const array<float3> *previous_vertices = cached_data.vertices.data_for_time_no_check(previous_time).get_data_or_null();
+
+    previous_time = current_time;
+
+    if (!current_vertices || !previous_vertices) {
+      attr_delta.data.add_no_data(current_time);
+      continue;
+    }
+
+    if (current_vertices->size() != previous_vertices->size()) {
+      attr_delta.data.add_no_data(current_time);
+      continue;
+    }
+
+    /* We need the triangles, as the vertices in the device arrays are laid out per triangle. */
+    const array<int3> *current_triangles = cached_data.triangles.data_for_time_no_check(current_time).get_data_or_null();
+
+    if (!current_triangles) {
+      attr_delta.data.add_no_data(current_time);
+      continue;
+    }
+
+    /* first compute the maximum change, we do this here to account for displacement */
+    float delta_magnitude = 0.0f;
+
+    for (size_t t = 0; t < current_triangles->size(); ++t) {
+      const int3 triangle = (*current_triangles)[t];
+
+      for (int i = 0; i < 3; ++i) {
+        const float3 current_vertex = (*current_vertices)[triangle[i]];
+        const float3 previous_vertex = (*previous_vertices)[triangle[i]];
+        const float3 delta = current_vertex - previous_vertex;
+        delta_magnitude = std::max(delta_magnitude, std::abs(delta.x));
+        delta_magnitude = std::max(delta_magnitude, std::abs(delta.y));
+        delta_magnitude = std::max(delta_magnitude, std::abs(delta.z));
+      }
+    }
+
+    /* only accept if in the range (-1, 1) */
+    if (delta_magnitude > 1.0f) {
+      attr_delta.data.add_no_data(current_time);
+      continue;
+    }
+
+    array<char> delta_data(current_triangles->size() * sizeof(ushort4) * 3);
+    ushort4 *delta_ptr = reinterpret_cast<ushort4 *>(delta_data.data());
+
+    for (size_t t = 0; t < current_triangles->size(); ++t) {
+      const int3 triangle = (*current_triangles)[t];
+
+      for (int i = 0; i < 3; ++i) {
+        const float3 current_vertex = (*current_vertices)[triangle[i]];
+        const float3 previous_vertex = (*previous_vertices)[triangle[i]];
+        const float3 delta = (current_vertex - previous_vertex) * 0.5f + 0.5f;
+        ushort4 quantized_delta;
+        /* map to (0, 65535) */
+        quantized_delta.x = static_cast<ushort>(delta.x * 65535.0f);
+        quantized_delta.y = static_cast<ushort>(delta.y * 65535.0f);
+        quantized_delta.z = static_cast<ushort>(delta.z * 65535.0f);
+        quantized_delta.w = 0;
+
+        *delta_ptr++ = quantized_delta;
+      }
+    }
+
+    attr_delta.data.add_data(delta_data, current_time);
+  }
+}
+
+static void compute_curve_deltas(CachedData &cached_data, const ccl::set<chrono_t> &times)
+{
+  if (cached_data.curve_keys.size() == 0 || cached_data.curve_keys.size() == 1) {
+    return;
+  }
+
+  static ustring deltas_string = ustring("deltas");
+
+  auto &attr_delta = cached_data.add_attribute(deltas_string, cached_data.curve_keys.get_time_sampling());
+  attr_delta.std = ATTR_STD_NONE;
+  attr_delta.element = ATTR_ELEMENT_CURVE_KEY;
+  attr_delta.type_desc = TypeUInt16;
+
+  ccl::set<chrono_t>::iterator begin = times.begin();
+
+  chrono_t previous_time = *begin++;
+
+  attr_delta.data.add_no_data(previous_time);
+
+  while (begin != times.end()) {
+    const chrono_t current_time = *begin++;
+
+    const array<float3> *current_curve_keys = cached_data.curve_keys.data_for_time_no_check(current_time).get_data_or_null();
+    const array<float3> *previous_curve_keys = cached_data.curve_keys.data_for_time_no_check(previous_time).get_data_or_null();
+
+    previous_time = current_time;
+
+    if (!current_curve_keys || !previous_curve_keys) {
+      attr_delta.data.add_no_data(current_time);
+      continue;
+    }
+
+    if (current_curve_keys->size() != previous_curve_keys->size()) {
+      attr_delta.data.add_no_data(current_time);
+      continue;
+    }
+
+    float delta_magnitude = 0.0f;
+
+    for (size_t t = 0; t < current_curve_keys->size(); ++t) {
+      const float3 current_key = (*current_curve_keys)[t];
+      const float3 previous_key = (*previous_curve_keys)[t];
+      const float3 delta = current_key - previous_key;
+      delta_magnitude = std::max(delta_magnitude, std::abs(delta.x));
+      delta_magnitude = std::max(delta_magnitude, std::abs(delta.y));
+      delta_magnitude = std::max(delta_magnitude, std::abs(delta.z));
+    }
+
+    /* only accept if in the range (-1, 1) */
+    if (delta_magnitude > 1.0f) {
+      attr_delta.data.add_no_data(current_time);
+      continue;
+    }
+
+    array<char> delta_data(current_curve_keys->size() * sizeof(ushort4));
+    ushort4 *delta_ptr = reinterpret_cast<ushort4 *>(delta_data.data());
+
+    for (size_t t = 0; t < current_curve_keys->size(); ++t) {
+      const float3 current_key = (*current_curve_keys)[t];
+      const float3 previous_key = (*previous_curve_keys)[t];
+      const float3 delta = (current_key - previous_key) * 0.5f + 0.5f;
+      ushort4 quantized_delta;
+      /* map to (0, 65535) */
+      quantized_delta.x = static_cast<ushort>(delta.x * 65535.0f);
+      quantized_delta.y = static_cast<ushort>(delta.y * 65535.0f);
+      quantized_delta.z = static_cast<ushort>(delta.z * 65535.0f);
+      quantized_delta.w = 0;
+
+      *delta_ptr++ = quantized_delta;
+    }
+
+    attr_delta.data.add_data(delta_data, current_time);
+  }
+}
+
 bool AlembicObject::load_all_data(CachedData &cached_data,
                                   AlembicProcedural *proc,
                                   const int frame,
@@ -922,6 +1089,8 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
   if (uvs.valid()) {
     add_uvs(proc, frame, uvs, cached_data, progress);
   }
+
+  compute_vertex_deltas(cached_data, times);
 
   data_loaded = true;
   return true;
@@ -1168,6 +1337,8 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
   }
 
   // TODO(@kevindietrich): attributes, need example files
+
+  compute_curve_deltas(cached_data, times);
 
   data_loaded = true;
   return true;
@@ -1433,7 +1604,11 @@ static void update_attributes(AttributeSet &attributes, CachedData &cached_data,
   set<Attribute *> cached_attributes;
 
   for (CachedData::CachedAttribute &attribute : cached_data.attributes) {
-    const array<char> *attr_data = attribute.data.data_for_time(frame_time).get_data_or_null();
+    const CacheLookupResult<array<char>> result = attribute.data.data_for_time(frame_time);
+
+    if (result.has_no_data_for_time()) {
+      continue;
+    }
 
     Attribute *attr = nullptr;
     if (attribute.std != ATTR_STD_NONE) {
@@ -1446,18 +1621,20 @@ static void update_attributes(AttributeSet &attributes, CachedData &cached_data,
 
     cached_attributes.insert(attr);
 
-    if (!attr_data) {
+    if (!result.has_new_data()) {
       /* no new data */
       continue;
     }
 
+    const ccl::array<char> &attr_data = result.get_data();
+
     /* weak way of detecting if the topology has changed
      * todo: reuse code from device_update patch */
-    if (attr->buffer.size() != attr_data->size()) {
-      attr->buffer.resize(attr_data->size());
+    if (attr->buffer.size() != attr_data.size()) {
+      attr->buffer.resize(attr_data.size());
     }
 
-    memcpy(attr->data(), attr_data->data(), attr_data->size());
+    memcpy(attr->data(), attr_data.data(), attr_data.size());
     attr->modified = true;
   }
 

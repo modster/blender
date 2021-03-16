@@ -866,6 +866,8 @@ void Mesh::pack_primitives(DeviceScene *dscene,
   device_vector<ushort4>::chunk delta_chunk = get_tris_chunk(*verts_deltas, 3);
   bool do_deltas = delta_chunk.valid();
   ushort4 *chunk_data = delta_chunk.data();
+
+#if 0
   float delta_magnitude = 0.0f;
 
   /* first compute the maximum change, we do this here to account for displacement */
@@ -912,6 +914,27 @@ void Mesh::pack_primitives(DeviceScene *dscene,
       prim_tri_verts[k * 3 + i] = new_vert;
     }
   }
+#else
+  if (do_deltas) {
+    auto attr = attributes.find(ustring("deltas"));
+
+    if (attr) {
+      memcpy(chunk_data, attr->data(), num_prims * sizeof(ushort4) * 3);
+    }
+    else {
+      do_deltas = false;
+    }
+  }
+
+  /* update host memory */
+  for (size_t k = 0; k < num_prims; ++k) {
+    const Mesh::Triangle t = get_triangle(k);
+
+    for (int i = 0; i < 3; ++i) {
+      prim_tri_verts[k * 3 + i] = float3_to_float4(verts[t.v[i]]);
+    }
+  }
+#endif
 
   if (do_deltas) {
     delta_chunk.copy_to_device();

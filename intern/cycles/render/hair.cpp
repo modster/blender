@@ -470,6 +470,8 @@ void Hair::pack_curve_keys(device_vector<float4>::chunk curve_key_co,
     float *radius_ptr = curve_radius.data();
 
     bool do_deltas = keys_deltas.valid();
+
+#if 0
     float delta_magnitude = 0.0f;
 
     /* first compute the maximum change, we do this here to account for displacement */
@@ -513,6 +515,24 @@ void Hair::pack_curve_keys(device_vector<float4>::chunk curve_key_co,
       /* update host memory */
       curve_key_co.data()[i] = new_keys;
     }
+#else
+    if (do_deltas) {
+      auto attr = attributes.find(ustring("deltas"));
+
+      if (attr) {
+        memcpy(keys_deltas.data(), attr->data(), curve_keys_size * sizeof(ushort4));
+      }
+      else {
+        do_deltas = false;
+      }
+    }
+
+    for (size_t i = 0; i < curve_keys_size; i++) {
+      /* update host memory */
+      curve_key_co.data()[i] = make_float4(
+            keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
+    }
+#endif
 
     if (do_deltas) {
       keys_deltas.copy_to_device();

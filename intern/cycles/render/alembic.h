@@ -175,6 +175,10 @@ template<typename T> class DataStore {
 
     const TimeIndexPair &index = get_index_for_time(time);
 
+    if (index.index == -1ul) {
+      return CacheLookupResult<T>::no_data_found_for_time();
+    }
+
     if (last_loaded_time == index.time || last_loaded_time == index.source_time) {
       return CacheLookupResult<T>::already_loaded();
     }
@@ -193,6 +197,11 @@ template<typename T> class DataStore {
     }
 
     const TimeIndexPair &index = get_index_for_time(time);
+
+    if (index.index == -1ul) {
+      return CacheLookupResult<T>::no_data_found_for_time();
+    }
+
     return CacheLookupResult<T>::new_data(&data[index.index]);
   }
 
@@ -213,6 +222,11 @@ template<typename T> class DataStore {
   {
     const TimeIndexPair &data_index = index_data_map.back();
     index_data_map.push_back({time, data_index.source_time, data_index.index});
+  }
+
+  void add_no_data(double time)
+  {
+    index_data_map.push_back({ time, time, -1ul });
   }
 
   bool is_constant() const
@@ -258,7 +272,7 @@ template<typename T> class DataStore {
       size_t mem_used = 0;
 
       for (const T &array : data) {
-        mem_used += array.size() * sizeof(T);
+        mem_used += array.size() * sizeof(array[0]);
       }
 
       return mem_used;
