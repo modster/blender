@@ -2999,7 +2999,9 @@ static void rna_SpaceSpreadsheet_geometry_component_type_update(Main *UNUSED(bma
                                                                 PointerRNA *ptr)
 {
   SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)ptr->data;
-  if (sspreadsheet->geometry_component_type == GEO_COMPONENT_TYPE_POINT_CLOUD) {
+  if (ELEM(sspreadsheet->geometry_component_type,
+           GEO_COMPONENT_TYPE_POINT_CLOUD,
+           GEO_COMPONENT_TYPE_INSTANCES)) {
     sspreadsheet->attribute_domain = ATTR_DOMAIN_POINT;
   }
 }
@@ -7268,6 +7270,11 @@ static void rna_def_space_spreadsheet(BlenderRNA *brna)
        ICON_POINTCLOUD_DATA,
        "Point Cloud",
        "Point cloud component containing only point data"},
+      {GEO_COMPONENT_TYPE_INSTANCES,
+       "INSTANCES",
+       ICON_EMPTY_AXIS,
+       "Instances",
+       "Instances of objects or collections"},
       {0, NULL, 0, NULL, NULL},
   };
 

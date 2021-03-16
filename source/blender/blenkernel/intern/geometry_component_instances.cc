@@ -14,6 +14,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "BLI_float3.hh"
 #include "BLI_float4x4.hh"
 #include "BLI_map.hh"
 #include "BLI_rand.hh"
@@ -23,13 +24,18 @@
 
 #include "DNA_collection_types.h"
 
+#include "BKE_attribute_access.hh"
 #include "BKE_geometry_set.hh"
 
+#include "attribute_access_intern.hh"
+
+using blender::float3;
 using blender::float4x4;
 using blender::Map;
 using blender::MutableSpan;
 using blender::Set;
 using blender::Span;
+using blender::bke::ReadAttributePtr;
 
 /* -------------------------------------------------------------------- */
 /** \name Geometry Component Implementation
@@ -168,6 +174,114 @@ blender::Span<int> InstancesComponent::almost_unique_ids() const
     almost_unique_ids_ = generate_unique_instance_ids(ids_);
   }
   return almost_unique_ids_;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Attribute Access
+ * \{ */
+
+int InstancesComponent::attribute_domain_size(const AttributeDomain domain) const
+{
+  BLI_assert(this->attribute_domain_supported(domain));
+  switch (domain) {
+    case ATTR_DOMAIN_POINT:
+      return this->instances_amount();
+    default:
+      BLI_assert(false);
+      break;
+  }
+  return 0;
+}
+
+namespace blender::bke {
+
+static float3 get_matrix_position(const float4x4 &matrix)
+{
+  return matrix.translation();
+}
+
+static void set_matrix_position(float4x4 &matrix, const float3 &translation)
+{
+  copy_v3_v3(matrix.ptr()[3], translation);
+}
+
+template<float3 (*GetFunc)(const float4x4 &), void (*SetFunc)(float4x4 &, const float3 &)>
+class Float4x4AttributeProvider final : public BuiltinAttributeProvider {
+ public:
+  Float4x4AttributeProvider(std::string attribute_name)
+      : BuiltinAttributeProvider(std::move(attribute_name),
+                                 ATTR_DOMAIN_POINT,
+                                 CD_PROP_FLOAT3,
+                                 NonCreatable,
+                                 Writable,
+                                 NonDeletable)
+  {
+  }
+
+  ReadAttributePtr try_get_for_read(const GeometryComponent &component) const final
+  {
+    const InstancesComponent &instances_component = static_cast<const InstancesComponent &>(
+        component);
+    if (instances_component.transforms().size() == 0) {
+      return {};
+    }
+
+    return std::make_unique<DerivedArrayReadAttribute<float4x4, float3, GetFunc>>(
+        ATTR_DOMAIN_POINT, instances_component.transforms());
+  }
+
+  WriteAttributePtr try_get_for_write(GeometryComponent &component) const final
+  {
+    const InstancesComponent &instances_component = static_cast<const InstancesComponent &>(
+        component);
+    if (instances_component.transforms().size() == 0) {
+      return {};
+    }
+
+    return std::make_unique<DerivedArrayWriteAttribute<float4x4, float3, GetFunc, SetFunc>>(
+        ATTR_DOMAIN_POINT, instances_component.transforms());
+  }
+
+  bool try_delete(GeometryComponent &UNUSED(component)) const final
+  {
+    return false;
+  }
+
+  bool try_create(GeometryComponent &UNUSED(component)) const final
+  {
+    return false;
+  }
+
+  bool exists(const GeometryComponent &component) const final
+  {
+    return component.attribute_domain_size(ATTR_DOMAIN_POINT) != 0;
+  }
+};
+
+/**
+ * In this function all the attribute providers for the instances component are created. Most data
+ * in this function is statically allocated, because it does not change over time.
+ */
+static ComponentAttributeProviders create_attribute_providers_for_instances()
+{
+  // auto get_position = [](const float4x4 &matrix) { return matrix.translation(); };
+  // auto set_position = [](float4x4 &matrix, const float3 &translation) {
+  //   copy_v3_v3(matrix.ptr()[3], translation);
+  // };
+  static Float4x4AttributeProvider<get_matrix_position, set_matrix_position> position("position");
+  return ComponentAttributeProviders({&position /*, &rotation, &scale*/}, {});
+}
+
+}  // namespace blender::bke
+
+const blender::bke::ComponentAttributeProviders *InstancesComponent::get_attribute_providers()
+    const
+{
+  static blender::bke::ComponentAttributeProviders providers =
+      blender::bke::create_attribute_providers_for_instances();
+  return &providers;
 }
 
 /** \} */

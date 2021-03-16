@@ -79,6 +79,11 @@ struct float4x4 {
     return m * float3(v);
   }
 
+  float3 translation() const
+  {
+    return float3(values[3]);
+  }
+
   float4x4 inverted() const
   {
     float4x4 result;

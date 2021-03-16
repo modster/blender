@@ -452,7 +452,12 @@ class InstancesComponent : public GeometryComponent {
 
   bool is_empty() const final;
 
+  int attribute_domain_size(const AttributeDomain domain) const final;
+
   static constexpr inline GeometryComponentType static_type = GEO_COMPONENT_TYPE_INSTANCES;
+
+ private:
+  const blender::bke::ComponentAttributeProviders *get_attribute_providers() const final;
 };
 
 /** A geometry component that stores volume grids. */
