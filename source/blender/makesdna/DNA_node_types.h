@@ -1066,15 +1066,39 @@ typedef struct CryptomatteEntry {
   char _pad[4];
 } CryptomatteEntry;
 
-typedef struct NodeCryptomatte {
+typedef struct CryptomatteLayer {
+  struct CryptomatteEntry *next, *prev;
+  char name[64];
+} CryptomatteLayer;
+
+typedef struct NodeCryptomatte_Runtime {
+  /* Contains `CryptomatteLayer`. */
+  ListBase layers;
+  /* Temp storage for the cryptomatte picker. */
   float add[3];
   float remove[3];
-  /* Stores `entries` as a string for opening in 2.80-2.91. */
-  char *matte_id;
+} NodeCryptomatte_Runtime;
+
+typedef struct NodeCryptomatte {
+  /* iuser needs to be first element due to RNA limitations.
+   * When we define the ImageData properties, we can't define them from
+   * storage->iuser, so storage needs to be casted to ImageUser directly. */
+  ImageUser iuser;
+
   /* Contains `CryptomatteEntry`. */
   ListBase entries;
+
+  /* MAX_NAME */
+  char layer_name[64];
+  /* Stores `entries` as a string for opening in 2.80-2.91. */
+  char *matte_id;
+
+  /** Legacy attributes */
+  /* Number of input sockets. */
   int num_inputs;
+
   char _pad[4];
+  NodeCryptomatte_Runtime runtime;
 } NodeCryptomatte;
 
 typedef struct NodeDenoise {
@@ -1225,6 +1249,14 @@ typedef struct NodeAttributeSeparateXYZ {
   /* GeometryNodeAttributeInputMode. */
   uint8_t input_type;
 } NodeAttributeSeparateXYZ;
+
+typedef struct NodeAttributeConvert {
+  /* CustomDataType. */
+  uint8_t data_type;
+  char _pad[1];
+  /* AttributeDomain. */
+  int16_t domain;
+} NodeAttributeConvert;
 
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
