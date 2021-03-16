@@ -663,8 +663,6 @@ static void animsys_blend_in_fcurves(PointerRNA *ptr,
                                      const AnimationEvalContext *anim_eval_context,
                                      const float blend_factor)
 {
-  /* TODO(Sybren): add special cases for rotations, so that quaternions (and maybe also
-   * axis/angles) are handled properly. */
   char *channel_to_skip = NULL;
   int num_channels_to_skip = 0;
   LISTBASE_FOREACH (FCurve *, fcu, fcurves) {
@@ -698,6 +696,7 @@ static void animsys_blend_in_fcurves(PointerRNA *ptr,
       num_channels_to_skip = 3;
       continue;
     }
+    /* TODO(Sybren): do something similar as above for Euler and Axis/Angle representations. */
 
     const float fcurve_value = calculate_fcurve(&anim_rna, fcu, anim_eval_context);
 
