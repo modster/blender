@@ -217,6 +217,7 @@ typedef struct bGPDcurve_point {
 /* bGPDcurve_point->flag */
 typedef enum eGPDcurve_point_Flag {
   GP_CURVE_POINT_SELECT = (1 << 0),
+  GP_CURVE_POINT_TAG = (1 << 1),
 } eGPDcurve_point_Flag;
 
 /* ***************************************** */

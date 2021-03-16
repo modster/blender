@@ -3104,6 +3104,7 @@ void BKE_gpencil_curve_delete_tagged_points(bGPdata *gpd,
              sizeof(bGPDcurve_point) * island_length);
 
       BKE_gpencil_editcurve_recalculate_handles(new_stroke);
+      BKE_gpencil_curve_sync_selection(gpd, new_stroke);
       new_stroke->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
 
       /* Calc geometry data. */
@@ -3137,6 +3138,7 @@ void BKE_gpencil_curve_delete_tagged_points(bGPdata *gpd,
            sizeof(bGPDcurve_point) * first_tot_points);
 
     BKE_gpencil_editcurve_recalculate_handles(gps_last);
+    BKE_gpencil_curve_sync_selection(gpd, gps_last);
     gps_last->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
 
     /* Calc geometry data. */
