@@ -73,7 +73,7 @@ typedef struct LineartRenderTriangleThread {
    * The size of LineartRenderTriangle is dynamically allocated to contain set thread number of
    * "testing" field. Worker threads will test lines against the "base" triangle.
    * At least one thread is present, thus we always have at least testing[0]. */
-  struct LineartRenderLine **testing;
+  struct LineartRenderLine *testing[1];
 } LineartRenderTriangleThread;
 
 typedef enum eLineArtElementNodeFlag {
