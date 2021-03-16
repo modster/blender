@@ -7523,6 +7523,7 @@ class VIEW3D_PT_asset_tools(Panel):
                 group_name = asset_tool.weight_group_name
                 props = layout.operator("asset.setup_weight_paint_tool", text=group_name)
                 props.vertex_group_name = group_name
+                props.default_weight = asset_tool.default_weight
             for socket in node_group.inputs[1:]:
                 layout.prop(modifier, f'["{socket.identifier}"]', text=socket.name)
 
@@ -7534,6 +7535,7 @@ class ASSET_OT_setup_weight_paint_tool(bpy.types.Operator):
     bl_description = "Setup weight paint tool"
 
     vertex_group_name: bpy.props.StringProperty()
+    default_weight: bpy.props.FloatProperty(default=1.0)
 
     @classmethod
     def poll(cls, context):
@@ -7542,13 +7544,16 @@ class ASSET_OT_setup_weight_paint_tool(bpy.types.Operator):
     def execute(self, context):
         ob = context.active_object
 
-        name = self.vertex_group_name
-        if not name in ob.vertex_groups:
-            ob.vertex_groups.new(name=name)
-        ob.vertex_groups.active = ob.vertex_groups[name]
-
         if ob.mode != 'WEIGHT_PAINT':
             bpy.ops.object.mode_set(mode='WEIGHT_PAINT')
+
+        name = self.vertex_group_name
+        if not name in ob.vertex_groups:
+            group = ob.vertex_groups.new(name=name)
+            group.add(list(range(len(ob.data.vertices))), self.default_weight, 'REPLACE')
+
+        ob.vertex_groups.active = ob.vertex_groups[name]
+
         return {'FINISHED'}
 
 

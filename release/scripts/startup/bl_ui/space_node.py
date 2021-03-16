@@ -717,7 +717,9 @@ class NODE_PT_asset_tools(Panel):
         layout.operator("node.asset_tool_add", text="Add Asset Tool")
 
         for asset_tool in ntree.asset_tools:
-            layout.prop(asset_tool, "weight_group_name", text="")
+            col = layout.column(align=True)
+            col.prop(asset_tool, "weight_group_name", text="")
+            col.prop(asset_tool, "default_weight", text="")
 
 
 class NODE_OT_asset_tool_add(bpy.types.Operator):

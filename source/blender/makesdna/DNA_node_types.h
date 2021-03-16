@@ -545,6 +545,8 @@ typedef struct AssetTool {
   struct AssetTool *prev;
 
   char weight_group_name[64];
+  float default_weight;
+  char _pad[4];
 } AssetTool;
 
 /* socket value structs for input buttons

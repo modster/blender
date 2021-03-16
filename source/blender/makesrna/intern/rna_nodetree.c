@@ -10993,6 +10993,10 @@ static void rna_def_asset_tool(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "weight_group_name", PROP_STRING, PROP_NONE);
   RNA_def_property_ui_text(prop, "Weight Group Name", "Name of a vertex group");
+
+  prop = RNA_def_property(srna, "default_weight", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Default Weight", "");
+  RNA_def_property_ui_range(prop, 0.0, 1.0f, 0.1, 4);
 }
 
 static void rna_def_asset_tool_group(BlenderRNA *brna)
