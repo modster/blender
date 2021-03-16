@@ -7523,6 +7523,9 @@ class VIEW3D_PT_asset_tools(Panel):
                 group_name = asset_tool.weight_group_name
                 props = layout.operator("asset.setup_weight_paint_tool", text=group_name)
                 props.vertex_group_name = group_name
+            for socket in node_group.inputs[1:]:
+                layout.prop(modifier, f'["{socket.identifier}"]', text=socket.name)
+
 
 
 class ASSET_OT_setup_weight_paint_tool(bpy.types.Operator):
