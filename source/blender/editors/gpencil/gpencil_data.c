@@ -1642,7 +1642,6 @@ static int gpencil_stroke_arrange_exec(bContext *C, wmOperator *op)
             default:
               BLI_assert(0);
               break;
-              changed = true;
           }
         }
         BLI_freelistN(&selected);
