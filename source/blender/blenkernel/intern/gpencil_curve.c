@@ -985,6 +985,102 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_regenerate(bGPDstroke *gps,
 }
 
 /**
+ * Regenerate the handles for the segment from `start_idx` to `end_idx` by refitting the curve to
+ * the points. As an example, this is used by the dissolve operator to fit the curve to a segment
+ * where the curve poitns have been deleted. Note: `start_idx` can be greater than `end_idx`. If
+ * this is the case and the stroke is cyclic, then the fitting will use the points from the end and
+ * beginning of the stroke.
+ */
+void BKE_gpencil_stroke_editcurve_regenerate_single(bGPDstroke *gps,
+                                                    uint32_t start_idx,
+                                                    uint32_t end_idx,
+                                                    const float error_threshold)
+{
+#define POINT_DIM 3
+  if (!GPENCIL_STROKE_TYPE_BEZIER(gps) || (start_idx == end_idx)) {
+    return;
+  }
+  bGPDcurve *gpc = gps->editcurve;
+  const float diag_length = len_v3v3(gps->boundbox_min, gps->boundbox_max);
+
+  BLI_assert(start_idx < gpc->tot_curve_points && end_idx < gpc->tot_curve_points);
+
+  bGPDcurve_point *start = &gpc->curve_points[start_idx];
+  bGPDcurve_point *end = &gpc->curve_points[end_idx];
+
+  BezTriple *bezt_prev = &start->bezt;
+  BezTriple *bezt_next = &end->bezt;
+
+  const uint32_t start_pt_idx = start->point_index;
+  const uint32_t end_pt_idx = end->point_index;
+
+  const bool is_cyclic = (bool)(gps->flag & GP_STROKE_CYCLIC);
+  uint32_t length = 0;
+  if (start_pt_idx > end_pt_idx) {
+    if (!is_cyclic) {
+      return;
+    }
+    length = (gps->totpoints - start_pt_idx) + end_pt_idx + 1;
+  }
+  else {
+    length = (end_pt_idx - start_pt_idx) + 1;
+  }
+
+  printf("start_pt_idx: %d, end_pt_idx: %d, length: %d\n", start_pt_idx, end_pt_idx, length);
+
+  uint32_t point_array_len = length * POINT_DIM;
+  float *point_array = MEM_callocN(sizeof(float) * point_array_len, __func__);
+
+  float tmp_vec[3];
+  for (int i = 0; i < length; i++) {
+    int idx = (i + start_pt_idx) % gps->totpoints;
+    bGPDspoint *pt = &gps->points[idx];
+    float *point = &point_array[i * POINT_DIM];
+    /* normalize coordinate to 0..1 */
+    sub_v3_v3v3(tmp_vec, &pt->x, gps->boundbox_min);
+    mul_v3_v3fl(point, tmp_vec, 1.0f / diag_length);
+  }
+
+  float tan_l[3], tan_r[3];
+
+  sub_v3_v3v3(tan_l, bezt_prev->vec[1], bezt_prev->vec[2]);
+  normalize_v3(tan_l);
+  sub_v3_v3v3(tan_r, bezt_next->vec[0], bezt_next->vec[1]);
+  normalize_v3(tan_r);
+
+  float error_sq;
+  uint error_index;
+  int r = curve_fit_cubic_to_points_single_fl(point_array,
+                                              length,
+                                              NULL,
+                                              POINT_DIM,
+                                              error_threshold,
+                                              tan_l,
+                                              tan_r,
+                                              bezt_prev->vec[2],
+                                              bezt_next->vec[0],
+                                              &error_sq,
+                                              &error_index);
+  if (r != 0) {
+    MEM_freeN(point_array);
+    return;
+  }
+
+  madd_v3_v3v3fl(bezt_prev->vec[2], gps->boundbox_min, bezt_prev->vec[2], diag_length);
+  madd_v3_v3v3fl(bezt_next->vec[0], gps->boundbox_min, bezt_next->vec[0], diag_length);
+
+  if (!ELEM(bezt_prev->h2, HD_FREE, HD_ALIGN)) {
+    bezt_prev->h2 = (bezt_prev->h2 == HD_VECT) ? HD_FREE : HD_ALIGN;
+  }
+  if (!ELEM(bezt_next->h1, HD_FREE, HD_ALIGN)) {
+    bezt_next->h1 = (bezt_next->h1 == HD_VECT) ? HD_FREE : HD_ALIGN;
+  }
+
+  MEM_freeN(point_array);
+#undef POINT_DIM
+}
+
+/**
  * Updates the editcurve for a stroke.
  * \param gps: The stroke.
  * \param threshold: Fitting threshold. The gernerated curve should not deviate more than this
