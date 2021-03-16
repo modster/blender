@@ -505,7 +505,7 @@ static bool poselib_blend_init_data(bContext *C, wmOperator *op)
 
   pbd->state = POSE_BLEND_INIT;
   pbd->needs_redraw = true;
-  pbd->blend_factor = 0.5f;
+  pbd->blend_factor = RNA_float_get(op->ptr, "blend_factor");
 
   /* Make backups for blending and restoring the pose. */
   poselib_backup_posecopy(pbd);
@@ -662,17 +662,13 @@ void POSELIB_OT_blend_pose(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
   /* Properties: */
-  // RNA_def_pointer(ot->srna, "pose_action", "Action", "Pose Action", "Action to apply as pose");
-
-#if 0
   RNA_def_float_factor(ot->srna,
                        "blend_factor",
-                       1.0f,
+                       0.5f,
                        0.0f,
                        1.0f,
                        "Blend Factor",
                        "Amount that the pose is applied on top of the existing poses",
                        0.0f,
                        1.0f);
-#endif
 }
