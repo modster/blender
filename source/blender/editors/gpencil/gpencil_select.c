@@ -2242,7 +2242,7 @@ static int gpencil_select_exec(bContext *C, wmOperator *op)
   /* First Pass: Find point which gets hit */
   GP_EVALUATED_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
     bGPDstroke *gps_active = (gps->runtime.gps_orig) ? gps->runtime.gps_orig : gps;
-    if (GPENCIL_STROKE_TYPE_BEZIER(gps_active)) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
       bGPDcurve *gpc = gps->editcurve;
       bGPDcurve *gpc_active = (gpc->runtime.gpc_orig) ? gpc->runtime.gpc_orig : gpc;
       if (gpencil_select_curve_point_closest(C,
