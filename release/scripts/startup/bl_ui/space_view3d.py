@@ -7015,9 +7015,9 @@ class VIEW3D_PT_asset_testing(Panel):
     def draw(self, context):
         layout = self.layout
 
-        v3d = context.space_data
+        workspace = context.workspace
 
-        layout.template_asset_view(v3d, "active_asset_library")
+        layout.template_asset_view(workspace, "active_asset_library")
 
 
 # Grease Pencil Object - Multiframe falloff tools

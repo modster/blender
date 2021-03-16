@@ -1471,18 +1471,6 @@ static int rna_SpaceView3D_icon_from_show_object_viewport_get(PointerRNA *ptr)
   return ICON_VIS_SEL_11 + (view_value << 1) + select_value;
 }
 
-static int rna_SpaceView3D_active_asset_library_get(PointerRNA *ptr)
-{
-  const View3D *v3d = (View3D *)ptr->data;
-  return rna_asset_library_reference_get(&v3d->active_asset_library);
-}
-
-static void rna_SpaceView3D_active_asset_library_set(PointerRNA *ptr, int value)
-{
-  View3D *v3d = (View3D *)ptr->data;
-  rna_asset_library_reference_set(&v3d->active_asset_library, value);
-}
-
 static char *rna_View3DShading_path(PointerRNA *UNUSED(ptr))
 {
   return BLI_strdup("shading");
@@ -4797,12 +4785,6 @@ static void rna_def_space_view3d(BlenderRNA *brna)
   }
 
   /* Nested Structs */
-
-  /* TODO NC_WINDOW to force full redraw... */
-  rna_def_asset_library_reference_common(srna,
-                                         NC_WINDOW,
-                                         "rna_SpaceView3D_active_asset_library_get",
-                                         "rna_SpaceView3D_active_asset_library_set");
 
   prop = RNA_def_property(srna, "shading", PROP_POINTER, PROP_NONE);
   RNA_def_property_flag(prop, PROP_NEVER_NULL);

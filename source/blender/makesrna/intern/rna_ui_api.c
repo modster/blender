@@ -50,6 +50,8 @@ const EnumPropertyItem rna_enum_icon_items[] = {
 
 #ifdef RNA_RUNTIME
 
+#  include "DNA_asset_types.h"
+
 const char *rna_translate_ui_text(
     const char *text, const char *text_ctxt, StructRNA *type, PropertyRNA *prop, bool translate)
 {

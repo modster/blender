@@ -311,16 +311,18 @@ static void rna_def_asset_data(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Active Tag", "Index of the tag set for editing");
 }
 
-void rna_def_asset_library_reference_common(struct StructRNA *srna,
-                                            int update_flag,
-                                            const char *get,
-                                            const char *set)
+/**
+ * \note the UI text and updating has to be set by the caller.
+ */
+PropertyRNA *rna_def_asset_library_reference_common(struct StructRNA *srna,
+                                                    const char *get,
+                                                    const char *set)
 {
   PropertyRNA *prop = RNA_def_property(srna, "active_asset_library", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, DummyRNA_NULL_items);
   RNA_def_property_enum_funcs(prop, get, set, "rna_asset_library_reference_itemf");
-  RNA_def_property_ui_text(prop, "Asset Library", "");
-  RNA_def_property_update(prop, update_flag, NULL);
+
+  return prop;
 }
 
 void RNA_def_asset(BlenderRNA *brna)

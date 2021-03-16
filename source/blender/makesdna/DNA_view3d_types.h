@@ -32,7 +32,6 @@ struct ViewDepths;
 struct bGPdata;
 struct wmTimer;
 
-#include "DNA_asset_types.h"
 #include "DNA_defs.h"
 #include "DNA_image_types.h"
 #include "DNA_listBase.h"
@@ -350,9 +349,6 @@ typedef struct View3D {
   float stereo3d_convergence_factor;
   float stereo3d_volume_alpha;
   float stereo3d_convergence_alpha;
-
-  /** Asset-viewer settings. */
-  AssetLibraryReference active_asset_library;
 
   /** Display settings. */
   View3DShading shading;
