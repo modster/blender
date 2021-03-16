@@ -265,20 +265,24 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
     /* Source is Scene. */
   }
 
-  uiLayout *col = uiLayoutColumn(layout, true);
+  uiLayout *col = uiLayoutColumnWithHeading(layout, true, IFACE_("Edge Types"));
 
-  uiItemR(col, ptr, "use_contour", 0, NULL, ICON_NONE);
-
-  const bool use_crease = RNA_boolean_get(ptr, "use_crease");
-
-  uiItemR(col, ptr, "use_crease", 0, "Crease", ICON_NONE);
-  if (use_crease) {
-    uiItemR(col, ptr, "crease_threshold", UI_ITEM_R_SLIDER, "Threshold", ICON_NONE);
-  }
-
+  uiItemR(col, ptr, "use_contour", 0, "Contour", ICON_NONE);
   uiItemR(col, ptr, "use_material", 0, "Material", ICON_NONE);
   uiItemR(col, ptr, "use_edge_mark", 0, "Edge Marks", ICON_NONE);
   uiItemR(col, ptr, "use_intersection", 0, "Intersection", ICON_NONE);
+
+  uiLayout *row = uiLayoutRow(col, true);
+  /* Don't automatically add the "animate property" button. */
+  uiLayoutSetPropDecorate(row, false);
+
+  const bool use_crease = RNA_boolean_get(ptr, "use_crease");
+  uiLayout *sub = uiLayoutRow(row, true);
+  uiItemR(sub, ptr, "use_crease", 0, "Crease", ICON_NONE);
+  sub = uiLayoutRow(sub, true);
+  uiLayoutSetEnabled(sub, use_crease);
+  uiItemR(sub, ptr, "crease_threshold", UI_ITEM_R_SLIDER, "", ICON_NONE);
+  uiItemDecoratorR(row, ptr, "crease_threshold", 0);
 
   uiItemPointerR(layout, ptr, "target_layer", &obj_data_ptr, "layers", NULL, ICON_GREASEPENCIL);
   uiItemPointerR(
@@ -301,11 +305,9 @@ static void style_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
-  uiLayout *col = uiLayoutColumn(layout, true);
+  uiItemR(layout, ptr, "thickness", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 
-  uiItemR(col, ptr, "thickness", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
-
-  uiItemR(col, ptr, "opacity", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "opacity", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 }
 
 static void occlusion_panel_draw(const bContext *UNUSED(C), Panel *panel)
@@ -365,7 +367,7 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetEnabled(layout, !is_baked);
 
-  uiLayout *col = uiLayoutColumn(layout, true);
+  uiLayout *col = uiLayoutColumnWithHeading(layout, true, IFACE_("Chain"));
   uiItemR(col, ptr, "fuzzy_intersections", 0, NULL, ICON_NONE);
   uiItemR(col, ptr, "fuzzy_everything", 0, NULL, ICON_NONE);
 

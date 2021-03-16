@@ -2327,23 +2327,22 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
 
   srna = RNA_def_struct(brna, "LineartGpencilModifier", "GpencilModifier");
   RNA_def_struct_ui_text(
-      srna, "Line Art Modifier", "Genreate Line Art strokes from selected source");
+      srna, "Line Art Modifier", "Generate Line Art strokes from selected source");
   RNA_def_struct_sdna(srna, "LineartGpencilModifierData");
   RNA_def_struct_ui_icon(srna, ICON_MOD_EDGESPLIT);
 
   prop = RNA_def_property(srna, "fuzzy_intersections", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_INTERSECTION_AS_CONTOUR);
-  RNA_def_property_ui_text(
-      prop,
-      "Intersection As Contour",
-      "Treat intersection lines as contour so those lines can be chained together");
+  RNA_def_property_ui_text(prop,
+                           "Intersection With Contour",
+                           "Treat intersection and contour lines as if they were the same type so "
+                           "they can be chained together");
   RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "fuzzy_everything", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_EVERYTHING_AS_CONTOUR);
-  RNA_def_property_ui_text(prop,
-                           "All Lines As Contour",
-                           "Treat all lines as contour so those lines can be chained together");
+  RNA_def_property_ui_text(
+      prop, "All Lines", "Treat all lines as the same line type so they can be chained together");
   RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "allow_duplication", PROP_BOOLEAN, PROP_NONE);
