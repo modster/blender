@@ -31,8 +31,8 @@ static bNodeSocketTemplate geo_node_mesh_primitive_plane_in[] = {
     {SOCK_FLOAT, N_("Size"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
     {SOCK_INT, N_("Vertices X"), 10, 0.0f, 0.0f, 0.0f, 2, 1000},
     {SOCK_INT, N_("Vertices Y"), 10, 0.0f, 0.0f, 0.0f, 2, 1000},
-    {SOCK_VECTOR, N_("Location"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
-    {SOCK_VECTOR, N_("Rotation"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_EULER},
+    {SOCK_VECTOR, N_("Location"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
+    {SOCK_VECTOR, N_("Rotation"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_EULER},
     {-1, ""},
 };
 
@@ -69,10 +69,10 @@ static Mesh *create_plane_mesh(const int verts_x, const int verts_y, const float
                                    0,
                                    edges_x * edges_y * 4,
                                    edges_x * edges_y);
-  MutableSpan<MVert> verts = MutableSpan<MVert>(mesh->mvert, mesh->totvert);
-  MutableSpan<MLoop> loops = MutableSpan<MLoop>(mesh->mloop, mesh->totloop);
-  MutableSpan<MEdge> edges = MutableSpan<MEdge>(mesh->medge, mesh->totedge);
-  MutableSpan<MPoly> polys = MutableSpan<MPoly>(mesh->mpoly, mesh->totpoly);
+  MutableSpan<MVert> verts{mesh->mvert, mesh->totvert};
+  MutableSpan<MLoop> loops{mesh->mloop, mesh->totloop};
+  MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
+  MutableSpan<MPoly> polys{mesh->mpoly, mesh->totpoly};
 
   {
     const float dx = size * 2.0f / edges_x;
@@ -81,7 +81,10 @@ static Mesh *create_plane_mesh(const int verts_x, const int verts_y, const float
     for (const int x_index : IndexRange(verts_x)) {
       float y = -size;
       for (const int y_index : IndexRange(verts_y)) {
-        copy_v3_v3(verts[x_index * verts_y + y_index].co, float3(x, y, 0.0f));
+        const int vert_index = x_index * verts_y + y_index;
+        verts[vert_index].co[0] = x;
+        verts[vert_index].co[1] = y;
+        verts[vert_index].co[2] = 0.0f;
         y += dy;
       }
       x += dx;
@@ -89,7 +92,7 @@ static Mesh *create_plane_mesh(const int verts_x, const int verts_y, const float
   }
 
   /* Point all vertex normals in the up direction. */
-  short up_normal[3] = {0, 0, SHRT_MAX};
+  const short up_normal[3] = {0, 0, SHRT_MAX};
   for (MVert &vert : verts) {
     copy_v3_v3_short(vert.no, up_normal);
   }

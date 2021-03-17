@@ -39,8 +39,7 @@ static bNodeSocketTemplate geo_node_mesh_primitive_line_in[] = {
      -FLT_MAX,
      FLT_MAX,
      PROP_TRANSLATION},
-    {SOCK_VECTOR, N_("End Location"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
-    {SOCK_VECTOR, N_("Offset"), 1.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
+    {SOCK_VECTOR, N_("Offset"), 0.0f, 0.0f, 1.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
     {-1, ""},
 };
 
@@ -77,22 +76,23 @@ static void geo_node_mesh_primitive_line_update(bNodeTree *UNUSED(tree), bNode *
   bNodeSocket *count_socket = (bNodeSocket *)node->inputs.first;
   bNodeSocket *resolution_socket = count_socket->next;
   bNodeSocket *start_socket = resolution_socket->next;
-  bNodeSocket *end_socket = start_socket->next;
-  bNodeSocket *offset_socket = end_socket->next;
+  bNodeSocket *end_and_offset_socket = start_socket->next;
 
   const NodeGeometryMeshLine &storage = *(const NodeGeometryMeshLine *)node->storage;
   const GeometryNodeMeshLineMode mode = (const GeometryNodeMeshLineMode)storage.mode;
   const GeometryNodeMeshLineCountMode count_mode = (const GeometryNodeMeshLineCountMode)
                                                        storage.count_mode;
 
-  nodeSetSocketAvailability(end_socket, mode == GEO_NODE_MESH_LINE_MODE_END_POINTS);
+  node_sock_label(end_and_offset_socket,
+                  (mode == GEO_NODE_MESH_LINE_MODE_END_POINTS) ? N_("End Location") :
+                                                                 N_("Offset"));
+
   nodeSetSocketAvailability(resolution_socket,
                             mode == GEO_NODE_MESH_LINE_MODE_END_POINTS &&
                                 count_mode == GEO_NODE_MESH_LINE_COUNT_RESOLUTION);
   nodeSetSocketAvailability(count_socket,
                             mode == GEO_NODE_MESH_LINE_MODE_OFFSET ||
                                 count_mode == GEO_NODE_MESH_LINE_COUNT_TOTAL);
-  nodeSetSocketAvailability(offset_socket, mode == GEO_NODE_MESH_LINE_MODE_OFFSET);
 }
 
 namespace blender::nodes {
@@ -108,9 +108,13 @@ static void fill_edge_data(MutableSpan<MEdge> edges)
 
 static Mesh *create_line_mesh(const float3 start, const float3 delta, const int count)
 {
+  if (count < 1) {
+    return nullptr;
+  }
+
   Mesh *mesh = BKE_mesh_new_nomain(count, count - 1, 0, 0, 0);
-  MutableSpan<MVert> verts = MutableSpan<MVert>(mesh->mvert, mesh->totvert);
-  MutableSpan<MEdge> edges = MutableSpan<MEdge>(mesh->medge, mesh->totedge);
+  MutableSpan<MVert> verts{mesh->mvert, mesh->totvert};
+  MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
 
   short normal[3];
   normal_float_to_short_v3(normal, delta.normalized());
@@ -137,23 +141,23 @@ static void geo_node_mesh_primitive_line_exec(GeoNodeExecParams params)
   Mesh *mesh = nullptr;
   const float3 start = params.extract_input<float3>("Start Location");
   if (mode == GEO_NODE_MESH_LINE_MODE_END_POINTS) {
-    const float3 end = params.extract_input<float3>("End Location");
+    /* The label switches to "End Location", but the same socket is used. */
+    const float3 end = params.extract_input<float3>("Offset");
     const float3 total_delta = end - start;
 
-    int count;
-    float3 delta;
     if (count_mode == GEO_NODE_MESH_LINE_COUNT_RESOLUTION) {
-      const float resolution = params.extract_input<float>("Resolution");
-      count = total_delta.length() / resolution + 1;
-      delta = total_delta.normalized() * resolution;
+      /* Don't allow asymptotic count increase for low resolution values. */
+      const float resolution = std::max(params.extract_input<float>("Resolution"), 0.0001f);
+      const int count = total_delta.length() / resolution + 1;
+      const float3 delta = total_delta.normalized() * resolution;
+      mesh = create_line_mesh(start, delta, count);
     }
     else if (count_mode == GEO_NODE_MESH_LINE_COUNT_TOTAL) {
-      count = params.extract_input<int>("Count");
-      delta = total_delta / (float)(count - 1);
-    }
-
-    if (count > 0) {
-      mesh = create_line_mesh(start, delta, count);
+      const int count = params.extract_input<int>("Count");
+      if (count > 1) {
+        const float3 delta = total_delta / (float)(count - 1);
+        mesh = create_line_mesh(start, delta, count);
+      }
     }
   }
   else if (mode == GEO_NODE_MESH_LINE_MODE_OFFSET) {

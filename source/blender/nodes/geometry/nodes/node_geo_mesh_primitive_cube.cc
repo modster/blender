@@ -25,8 +25,8 @@
 
 static bNodeSocketTemplate geo_node_mesh_primitive_cube_in[] = {
     {SOCK_FLOAT, N_("Size"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_VECTOR, N_("Location"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
-    {SOCK_VECTOR, N_("Rotation"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_EULER},
+    {SOCK_VECTOR, N_("Location"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
+    {SOCK_VECTOR, N_("Rotation"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_EULER},
     {-1, ""},
 };
 
@@ -53,8 +53,8 @@ static Mesh *create_cube_mesh(const float3 location, const float3 rotation, cons
                size,
                true);
 
-  Mesh *mesh = (Mesh *)BKE_id_new_nomain(ID_ME, NULL);
-  BM_mesh_bm_to_me_for_eval(bm, mesh, NULL);
+  Mesh *mesh = (Mesh *)BKE_id_new_nomain(ID_ME, nullptr);
+  BM_mesh_bm_to_me_for_eval(bm, mesh, nullptr);
   BM_mesh_free(bm);
 
   return mesh;

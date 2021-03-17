@@ -27,8 +27,8 @@
 static bNodeSocketTemplate geo_node_mesh_primitive_circle_in[] = {
     {SOCK_INT, N_("Vertices"), 32, 0.0f, 0.0f, 0.0f, 3, 4096},
     {SOCK_FLOAT, N_("Radius"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_VECTOR, N_("Location"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
-    {SOCK_VECTOR, N_("Rotation"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_EULER},
+    {SOCK_VECTOR, N_("Location"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
+    {SOCK_VECTOR, N_("Rotation"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_EULER},
     {-1, ""},
 };
 
@@ -121,10 +121,10 @@ static Mesh *create_circle_mesh(const float radius,
                                    0,
                                    circle_corner_total(fill_type, verts_num),
                                    circle_face_total(fill_type, verts_num));
-  MutableSpan<MVert> verts = MutableSpan<MVert>(mesh->mvert, mesh->totvert);
-  MutableSpan<MLoop> loops = MutableSpan<MLoop>(mesh->mloop, mesh->totloop);
-  MutableSpan<MEdge> edges = MutableSpan<MEdge>(mesh->medge, mesh->totedge);
-  MutableSpan<MPoly> polys = MutableSpan<MPoly>(mesh->mpoly, mesh->totpoly);
+  MutableSpan<MVert> verts{mesh->mvert, mesh->totvert};
+  MutableSpan<MLoop> loops{mesh->mloop, mesh->totloop};
+  MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
+  MutableSpan<MPoly> polys{mesh->mpoly, mesh->totpoly};
 
   float angle = 0.0f;
   const float angle_delta = 2.0f * M_PI / static_cast<float>(verts_num);
@@ -137,7 +137,7 @@ static Mesh *create_circle_mesh(const float radius,
   }
 
   /* Point all vertex normals in the up direction. */
-  short up_normal[3] = {0, 0, SHRT_MAX};
+  const short up_normal[3] = {0, 0, SHRT_MAX};
   for (MVert &vert : verts) {
     copy_v3_v3_short(vert.no, up_normal);
   }

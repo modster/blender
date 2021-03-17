@@ -26,8 +26,8 @@
 static bNodeSocketTemplate geo_node_mesh_primitive_ico_sphere_in[] = {
     {SOCK_FLOAT, N_("Radius"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
     {SOCK_INT, N_("Subdivisions"), 1, 0, 0, 0, 0, 7},
-    {SOCK_VECTOR, N_("Location"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
-    {SOCK_VECTOR, N_("Rotation"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_EULER},
+    {SOCK_VECTOR, N_("Location"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
+    {SOCK_VECTOR, N_("Rotation"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_EULER},
     {-1, ""},
 };
 
@@ -54,12 +54,12 @@ static Mesh *create_ico_sphere_mesh(const float3 location,
                BMO_FLAG_DEFAULTS,
                "create_icosphere subdivisions=%i diameter=%f matrix=%m4 calc_uvs=%b",
                subdivisions,
-               radius,
+               std::abs(radius),
                transform.values,
                true);
 
-  Mesh *mesh = (Mesh *)BKE_id_new_nomain(ID_ME, NULL);
-  BM_mesh_bm_to_me_for_eval(bm, mesh, NULL);
+  Mesh *mesh = (Mesh *)BKE_id_new_nomain(ID_ME, nullptr);
+  BM_mesh_bm_to_me_for_eval(bm, mesh, nullptr);
   BM_mesh_free(bm);
 
   return mesh;
@@ -67,8 +67,7 @@ static Mesh *create_ico_sphere_mesh(const float3 location,
 
 static void geo_node_mesh_primitive_ico_sphere_exec(GeoNodeExecParams params)
 {
-  /* Anything above 8 is not likely to be purposeful and will be very slow. */
-  const int subdivisions = std::min(params.extract_input<int>("Subdivisions"), 8);
+  const int subdivisions = std::min(params.extract_input<int>("Subdivisions"), 10);
   const float radius = params.extract_input<float>("Radius");
   const float3 location = params.extract_input<float3>("Location");
   const float3 rotation = params.extract_input<float3>("Rotation");
