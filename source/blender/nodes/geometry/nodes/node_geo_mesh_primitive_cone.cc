@@ -282,8 +282,8 @@ Mesh *create_cylinder_or_cone_mesh(const float radius_top,
                                    const int verts_num,
                                    const GeometryNodeMeshCircleFillType fill_type)
 {
-  const bool top_is_point = radius_top != 0.0f;
-  const bool bottom_is_point = radius_bottom != 0.0f;
+  const bool top_is_point = radius_top == 0.0f;
+  const bool bottom_is_point = radius_bottom == 0.0f;
   /* Handle the case of a line / single point before everything else to avoid
    * the need to check for it later. */
   if (top_is_point && bottom_is_point) {
@@ -291,7 +291,7 @@ Mesh *create_cylinder_or_cone_mesh(const float radius_top,
     Mesh *mesh = BKE_mesh_new_nomain(single_vertex ? 1 : 2, single_vertex ? 0 : 1, 0, 0, 0);
     copy_v3_v3(mesh->mvert[0].co, float3(0.0f, 0.0f, depth));
     if (single_vertex) {
-      short up[3] = {0, 0, SHRT_MAX};
+      const short up[3] = {0, 0, SHRT_MAX};
       copy_v3_v3_short(mesh->mvert[0].no, up);
       return mesh;
     }
@@ -304,15 +304,15 @@ Mesh *create_cylinder_or_cone_mesh(const float radius_top,
   }
 
   Mesh *mesh = BKE_mesh_new_nomain(
-      vert_total(fill_type, verts_num, !top_is_point, !bottom_is_point),
-      edge_total(fill_type, verts_num, !top_is_point, !bottom_is_point),
+      vert_total(fill_type, verts_num, top_is_point, bottom_is_point),
+      edge_total(fill_type, verts_num, top_is_point, bottom_is_point),
       0,
-      corner_total(fill_type, verts_num, !top_is_point, !bottom_is_point),
-      face_total(fill_type, verts_num, !top_is_point, !bottom_is_point));
-  MutableSpan<MVert> verts = MutableSpan<MVert>(mesh->mvert, mesh->totvert);
-  MutableSpan<MEdge> edges = MutableSpan<MEdge>(mesh->medge, mesh->totedge);
-  MutableSpan<MLoop> loops = MutableSpan<MLoop>(mesh->mloop, mesh->totloop);
-  MutableSpan<MPoly> polys = MutableSpan<MPoly>(mesh->mpoly, mesh->totpoly);
+      corner_total(fill_type, verts_num, top_is_point, bottom_is_point),
+      face_total(fill_type, verts_num, top_is_point, bottom_is_point));
+  MutableSpan<MVert> verts{mesh->mvert, mesh->totvert};
+  MutableSpan<MLoop> loops{mesh->mloop, mesh->totloop};
+  MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
+  MutableSpan<MPoly> polys{mesh->mpoly, mesh->totpoly};
 
   /* Calculate vertex positions. */
   const int top_verts_start = 0;
@@ -331,16 +331,16 @@ Mesh *create_cylinder_or_cone_mesh(const float radius_top,
     }
     angle += angle_delta;
   }
-  if (!!top_is_point) {
+  if (top_is_point) {
     copy_v3_v3(verts[top_verts_start].co, float3(0.0f, 0.0f, depth));
   }
-  if (!!bottom_is_point) {
+  if (bottom_is_point) {
     copy_v3_v3(verts[bottom_verts_start].co, float3(0.0f, 0.0f, -depth));
   }
 
   /* Add center vertices for the triangle fans at the end. */
-  const int top_center_vert_index = bottom_verts_start + (!bottom_is_point ? verts_num : 1);
-  const int bottom_center_vert_index = top_center_vert_index + (!top_is_point ? 1 : 0);
+  const int top_center_vert_index = bottom_verts_start + (bottom_is_point ? 1 : verts_num);
+  const int bottom_center_vert_index = top_center_vert_index + (top_is_point ? 0 : 1);
   if (fill_type == GEO_NODE_MESH_CIRCLE_FILL_TRIANGLE_FAN) {
     if (!top_is_point) {
       copy_v3_v3(verts[top_center_vert_index].co, float3(0.0f, 0.0f, depth));

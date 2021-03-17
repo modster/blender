@@ -26,7 +26,7 @@
 
 static bNodeSocketTemplate geo_node_mesh_primitive_uv_sphere_in[] = {
     {SOCK_INT, N_("Segments"), 32, 0.0f, 0.0f, 0.0f, 3, 1024},
-    {SOCK_INT, N_("Rings"), 16, 0.0f, 0.0f, 0.0f, 3, 1024},
+    {SOCK_INT, N_("Rings"), 16, 0.0f, 0.0f, 0.0f, 2, 1024},
     {SOCK_FLOAT, N_("Radius"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
     {SOCK_VECTOR, N_("Location"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
     {SOCK_VECTOR, N_("Rotation"), 0.0f, 0.0f, 0.0f, 1.0f, -FLT_MAX, FLT_MAX, PROP_EULER},
@@ -81,8 +81,8 @@ static void calculate_sphere_vertex_data(MutableSpan<MVert> verts,
     float phi = 0.0f;
     const float z = cosf(theta);
     for (const int UNUSED(segment) : IndexRange(segments)) {
-      const float x = sinf(theta) * cosf(phi);
-      const float y = sinf(theta) * sinf(phi);
+      const float x = std::sin(theta) * std::cos(phi);
+      const float y = std::sin(theta) * std::sin(phi);
       copy_v3_v3(verts[vert_index].co, float3(x, y, z) * radius);
       normal_float_to_short_v3(verts[vert_index].no, float3(x, y, z));
       phi += delta_phi;
@@ -263,10 +263,10 @@ static Mesh *create_uv_sphere_mesh(const float radius, const int segments, const
                                    0,
                                    sphere_corner_total(segments, rings),
                                    sphere_face_total(segments, rings));
-  MutableSpan<MVert> verts = MutableSpan<MVert>(mesh->mvert, mesh->totvert);
-  MutableSpan<MEdge> edges = MutableSpan<MEdge>(mesh->medge, mesh->totedge);
-  MutableSpan<MLoop> loops = MutableSpan<MLoop>(mesh->mloop, mesh->totloop);
-  MutableSpan<MPoly> polys = MutableSpan<MPoly>(mesh->mpoly, mesh->totpoly);
+  MutableSpan<MVert> verts{mesh->mvert, mesh->totvert};
+  MutableSpan<MLoop> loops{mesh->mloop, mesh->totloop};
+  MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
+  MutableSpan<MPoly> polys{mesh->mpoly, mesh->totpoly};
 
   calculate_sphere_vertex_data(verts, radius, segments, rings);
 
@@ -285,7 +285,7 @@ static void geo_node_mesh_primitive_uv_sphere_exec(GeoNodeExecParams params)
 {
   const int segments_num = params.extract_input<int>("Segments");
   const int rings_num = params.extract_input<int>("Rings");
-  if (segments_num < 3 || rings_num < 3) {
+  if (segments_num < 3 || rings_num < 2) {
     params.set_output("Geometry", GeometrySet());
     return;
   }
