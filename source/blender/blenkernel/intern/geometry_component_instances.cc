@@ -207,6 +207,30 @@ static void set_matrix_position(float4x4 &matrix, const float3 &translation)
   copy_v3_v3(matrix.ptr()[3], translation);
 }
 
+static float3 get_matrix_rotation(const float4x4 &matrix)
+{
+  return matrix.to_euler();
+}
+
+static void set_matrix_rotation(float4x4 &matrix, const float3 &rotation)
+{
+  float4x4 rotation_matrix;
+  loc_eul_size_to_mat4(rotation_matrix.values, float3(0), rotation, float3(1));
+  matrix = matrix * rotation_matrix;
+}
+
+static float3 get_matrix_scale(const float4x4 &matrix)
+{
+  return matrix.scale();
+}
+
+static void set_matrix_scale(float4x4 &matrix, const float3 &scale)
+{
+  float4x4 scale_matrix;
+  size_to_mat4(scale_matrix.values, scale);
+  matrix = matrix * scale_matrix;
+}
+
 template<float3 (*GetFunc)(const float4x4 &), void (*SetFunc)(float4x4 &, const float3 &)>
 class Float4x4AttributeProvider final : public BuiltinAttributeProvider {
  public:
@@ -224,7 +248,7 @@ class Float4x4AttributeProvider final : public BuiltinAttributeProvider {
   {
     const InstancesComponent &instances_component = static_cast<const InstancesComponent &>(
         component);
-    if (instances_component.transforms().size() == 0) {
+    if (instances_component.instances_amount() == 0) {
       return {};
     }
 
@@ -234,9 +258,8 @@ class Float4x4AttributeProvider final : public BuiltinAttributeProvider {
 
   WriteAttributePtr try_get_for_write(GeometryComponent &component) const final
   {
-    const InstancesComponent &instances_component = static_cast<const InstancesComponent &>(
-        component);
-    if (instances_component.transforms().size() == 0) {
+    InstancesComponent &instances_component = static_cast<InstancesComponent &>(component);
+    if (instances_component.instances_amount() == 0) {
       return {};
     }
 
@@ -266,12 +289,10 @@ class Float4x4AttributeProvider final : public BuiltinAttributeProvider {
  */
 static ComponentAttributeProviders create_attribute_providers_for_instances()
 {
-  // auto get_position = [](const float4x4 &matrix) { return matrix.translation(); };
-  // auto set_position = [](float4x4 &matrix, const float3 &translation) {
-  //   copy_v3_v3(matrix.ptr()[3], translation);
-  // };
   static Float4x4AttributeProvider<get_matrix_position, set_matrix_position> position("position");
-  return ComponentAttributeProviders({&position /*, &rotation, &scale*/}, {});
+  static Float4x4AttributeProvider<get_matrix_rotation, set_matrix_rotation> rotation("rotation");
+  static Float4x4AttributeProvider<get_matrix_scale, set_matrix_scale> scale("scale");
+  return ComponentAttributeProviders({&position, &rotation, &scale}, {});
 }
 
 }  // namespace blender::bke
