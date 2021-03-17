@@ -538,7 +538,8 @@ void ntreeBlendWrite(BlendWriter *writer, bNodeTree *ntree)
         }
         BLO_write_struct_by_name(writer, node->typeinfo->storagename, node->storage);
       }
-      else if ((ntree->type == NTREE_COMPOSIT) && (node->type == CMP_NODE_CRYPTOMATTE)) {
+      else if ((ntree->type == NTREE_COMPOSIT) &&
+               (ELEM(node->type, CMP_NODE_CRYPTOMATTE, CMP_NODE_CRYPTOMATTE_LEGACY))) {
         NodeCryptomatte *nc = (NodeCryptomatte *)node->storage;
         BLO_write_string(writer, nc->matte_id);
         LISTBASE_FOREACH (CryptomatteEntry *, entry, &nc->entries) {
@@ -703,10 +704,12 @@ void ntreeBlendReadData(BlendDataReader *reader, bNodeTree *ntree)
           iuser->scene = nullptr;
           break;
         }
+        case CMP_NODE_CRYPTOMATTE_LEGACY:
         case CMP_NODE_CRYPTOMATTE: {
           NodeCryptomatte *nc = (NodeCryptomatte *)node->storage;
           BLO_read_data_address(reader, &nc->matte_id);
           BLO_read_list(reader, &nc->entries);
+          BLI_listbase_clear(&nc->runtime.layers);
           break;
         }
         case TEX_NODE_IMAGE: {
@@ -903,7 +906,8 @@ void ntreeBlendReadExpand(BlendExpander *expander, bNodeTree *ntree)
   }
 
   LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
-    if (node->id && node->type != CMP_NODE_R_LAYERS) {
+    if (node->id && !(node->type == CMP_NODE_R_LAYERS) &&
+        !(node->type == CMP_NODE_CRYPTOMATTE && node->custom1 == CMP_CRYPTOMATTE_SRC_RENDER)) {
       BLO_expand(expander, node->id);
     }
 
@@ -1568,6 +1572,8 @@ const char *nodeStaticSocketType(int type, int subtype)
           return "NodeSocketFloatAngle";
         case PROP_TIME:
           return "NodeSocketFloatTime";
+        case PROP_DISTANCE:
+          return "NodeSocketFloatDistance";
         case PROP_NONE:
         default:
           return "NodeSocketFloat";
@@ -1637,6 +1643,8 @@ const char *nodeStaticSocketInterfaceType(int type, int subtype)
           return "NodeSocketInterfaceFloatAngle";
         case PROP_TIME:
           return "NodeSocketInterfaceFloatTime";
+        case PROP_DISTANCE:
+          return "NodeSocketInterfaceFloatDistance";
         case PROP_NONE:
         default:
           return "NodeSocketInterfaceFloat";
@@ -4603,6 +4611,7 @@ static void registerCompositNodes()
   register_node_type_cmp_keyingscreen();
   register_node_type_cmp_keying();
   register_node_type_cmp_cryptomatte();
+  register_node_type_cmp_cryptomatte_legacy();
 
   register_node_type_cmp_translate();
   register_node_type_cmp_rotate();
@@ -4788,6 +4797,7 @@ static void registerGeometryNodes()
   register_node_type_geo_attribute_color_ramp();
   register_node_type_geo_attribute_combine_xyz();
   register_node_type_geo_attribute_compare();
+  register_node_type_geo_attribute_convert();
   register_node_type_geo_attribute_fill();
   register_node_type_geo_attribute_math();
   register_node_type_geo_attribute_mix();
@@ -4801,6 +4811,14 @@ static void registerGeometryNodes()
   register_node_type_geo_edge_split();
   register_node_type_geo_is_viewport();
   register_node_type_geo_join_geometry();
+  register_node_type_geo_mesh_primitive_circle();
+  register_node_type_geo_mesh_primitive_cone();
+  register_node_type_geo_mesh_primitive_cube();
+  register_node_type_geo_mesh_primitive_cylinder();
+  register_node_type_geo_mesh_primitive_ico_sphere();
+  register_node_type_geo_mesh_primitive_line();
+  register_node_type_geo_mesh_primitive_plane();
+  register_node_type_geo_mesh_primitive_uv_sphere();
   register_node_type_geo_object_info();
   register_node_type_geo_point_distribute();
   register_node_type_geo_point_instance();
