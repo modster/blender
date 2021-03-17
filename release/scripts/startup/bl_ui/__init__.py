@@ -117,11 +117,16 @@ def register():
             register_class(cls)
 
     from bpy.props import (
+        CollectionProperty,
         EnumProperty,
         IntProperty,
         StringProperty,
     )
-    from bpy.types import WorkSpace, WindowManager
+    from bpy.types import (
+        AssetHandle,
+        WindowManager,
+        WorkSpace,
+    )
 
     # space_userprefs.py
     def addon_filter_items(_self, _context):
@@ -170,6 +175,11 @@ def register():
         name="Active Pose Asset",
         # TODO explain which list the index belongs to, or how it can be used to get the pose.
         description="Per workspace index of the active pose asset"
+    )
+    # Register for window-manager. This is a global property that shouldn't be
+    # written to files.
+    WindowManager.pose_assets = CollectionProperty(
+        type=AssetHandle
     )
     # done...
 

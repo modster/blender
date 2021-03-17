@@ -574,6 +574,8 @@ static void rna_uiTemplateAssetView(uiLayout *layout,
                                     bContext *C,
                                     PointerRNA *asset_library_dataptr,
                                     const char *asset_library_propname,
+                                    PointerRNA *assets_dataptr,
+                                    const char *assets_propname,
                                     PointerRNA *active_dataptr,
                                     const char *active_propname,
                                     int filter_id_types)
@@ -585,6 +587,8 @@ static void rna_uiTemplateAssetView(uiLayout *layout,
                       C,
                       asset_library_dataptr,
                       asset_library_propname,
+                      assets_dataptr,
+                      assets_propname,
                       active_dataptr,
                       active_propname,
                       &filter_settings);
@@ -1739,7 +1743,13 @@ void RNA_api_ui_layout(StructRNA *srna)
                          "Data from which to take the active asset library property");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
   parm = RNA_def_string(
-      func, "asset_library_property", NULL, 0, "", "Identifier of the asset library");
+      func, "asset_library_propname", NULL, 0, "", "Identifier of the asset library property");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_pointer(
+      func, "assets_dataptr", "AnyType", "", "Data from which to take the asset list property");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+  parm = RNA_def_string(
+      func, "assets_propname", NULL, 0, "", "Identifier of the asset list property");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_pointer(func,
                          "active_dataptr",
