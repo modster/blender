@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "render/alembic.h"
 #include "render/camera.h"
 #include "render/graph.h"
 #include "render/integrator.h"
@@ -28,8 +29,6 @@
 #include "blender/blender_object_cull.h"
 #include "blender/blender_sync.h"
 #include "blender/blender_util.h"
-
-#include "render/alembic.h"
 
 #include "util/util_foreach.h"
 #include "util/util_hash.h"
