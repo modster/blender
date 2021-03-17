@@ -209,12 +209,10 @@ static void select_all_curve_points(bGPdata *gpd, bGPDstroke *gps, bGPDcurve *gp
 
   if (deselect == false) {
     gpc->flag |= GP_CURVE_SELECT;
-    gps->flag |= GP_STROKE_SELECT;
     BKE_gpencil_stroke_select_index_set(gpd, gps);
   }
   else {
     gpc->flag &= ~GP_CURVE_SELECT;
-    gps->flag &= ~GP_STROKE_SELECT;
     BKE_gpencil_stroke_select_index_reset(gps);
   }
 }
