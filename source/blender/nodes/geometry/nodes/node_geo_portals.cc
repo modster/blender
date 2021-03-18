@@ -116,7 +116,7 @@ void register_node_type_portal_in()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, NODE_PORTAL_IN, "Portal In", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, NODE_PORTAL_IN, "Portal In", NODE_CLASS_LAYOUT, 0);
   node_type_socket_templates(&ntype, node_portal_in, nullptr);
   node_type_init(&ntype, blender::nodes::node_portal_in_init);
   node_type_update(&ntype, blender::nodes::node_portal_in_update);
@@ -130,7 +130,7 @@ void register_node_type_portal_out()
 {
   static bNodeType ntype;
 
-  geo_node_type_base(&ntype, NODE_PORTAL_OUT, "Portal Out", NODE_CLASS_GEOMETRY, 0);
+  geo_node_type_base(&ntype, NODE_PORTAL_OUT, "Portal Out", NODE_CLASS_LAYOUT, 0);
   node_type_socket_templates(&ntype, nullptr, node_portal_out);
   node_type_init(&ntype, blender::nodes::node_portal_out_init);
   node_type_update(&ntype, blender::nodes::node_portal_out_update);
