@@ -627,6 +627,7 @@ struct bNodeLink *nodeAddLink(struct bNodeTree *ntree,
                               struct bNodeSocket *tosock);
 void nodeRemLink(struct bNodeTree *ntree, struct bNodeLink *link);
 void nodeRemSocketLinks(struct bNodeTree *ntree, struct bNodeSocket *sock);
+void nodeMuteLinkToggle(struct bNodeTree *ntree, struct bNodeLink *link);
 bool nodeLinkIsHidden(const struct bNodeLink *link);
 void nodeInternalRelink(struct bNodeTree *ntree, struct bNode *node);
 
@@ -1289,10 +1290,11 @@ void ntreeCompositCryptomatteSyncFromRemove(bNode *node);
 bNodeSocket *ntreeCompositCryptomatteAddSocket(bNodeTree *ntree, bNode *node);
 int ntreeCompositCryptomatteRemoveSocket(bNodeTree *ntree, bNode *node);
 void ntreeCompositCryptomatteLayerPrefix(const bNode *node, char *r_prefix, size_t prefix_len);
-
 /* Update the runtime layer names with the cryptomatte layer names of the references
  * render layer or image. */
 void ntreeCompositCryptomatteUpdateLayerNames(bNode *node);
+struct CryptomatteSession *ntreeCompositCryptomatteSession(bNode *node);
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -1358,7 +1360,7 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 #define GEO_NODE_BOOLEAN 1003
 #define GEO_NODE_POINT_DISTRIBUTE 1004
 #define GEO_NODE_POINT_INSTANCE 1005
-#define GEO_NODE_SUBDIVIDE_SMOOTH 1006
+#define GEO_NODE_SUBDIVISION_SURFACE 1006
 #define GEO_NODE_OBJECT_INFO 1007
 #define GEO_NODE_ATTRIBUTE_RANDOMIZE 1008
 #define GEO_NODE_ATTRIBUTE_MATH 1009
