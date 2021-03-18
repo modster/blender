@@ -195,8 +195,13 @@ void DInputSocket::foreach_origin_socket(FunctionRef<void(DSocket)> callback,
           node_storage->portal_id);
       if (portal_in_nodes.size() == 1) {
         const NodeRef *portal_in_node = portal_in_nodes[0];
-        DInputSocket input_of_portal{context_, &portal_in_node->input(0)};
-        input_of_portal.foreach_origin_socket(callback);
+        DInputSocket input_of_portal{context_, &portal_in_node->input(linked_socket->index())};
+        if (input_of_portal->is_linked()) {
+          input_of_portal.foreach_origin_socket(callback);
+        }
+        else {
+          callback(input_of_portal);
+        }
       }
     }
     else if (linked_node.is_group_input_node()) {
@@ -261,7 +266,7 @@ void DOutputSocket::foreach_target_socket(FunctionRef<void(DInputSocket)> callba
       Span<const NodeRef *> portal_out_nodes = context_->tree().portal_out_nodes_by_id(
           node_storage->portal_id);
       for (const NodeRef *portal_out_node : portal_out_nodes) {
-        DOutputSocket output_of_portal{context_, &portal_out_node->output(0)};
+        DOutputSocket output_of_portal{context_, &portal_out_node->output(linked_socket->index())};
         output_of_portal.foreach_target_socket(callback);
       }
     }

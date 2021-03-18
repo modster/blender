@@ -23,13 +23,16 @@
 
 #include "RNA_access.h"
 
-static bNodeSocketTemplate node_portal_in[] = {
+static bNodeSocketTemplate node_portal_sockets[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
-    {-1, ""},
-};
-
-static bNodeSocketTemplate node_portal_out[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
+    {SOCK_FLOAT, N_("Float"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
+    {SOCK_VECTOR, N_("Vector"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX},
+    {SOCK_RGBA, N_("Color"), 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f},
+    {SOCK_INT, N_("Integer"), 0, 0, 0, 0, -10000, 10000},
+    {SOCK_BOOLEAN, N_("Boolean")},
+    {SOCK_STRING, N_("String")},
+    {SOCK_OBJECT, N_("Object")},
+    {SOCK_COLLECTION, N_("Collection")},
     {-1, ""},
 };
 
@@ -117,7 +120,7 @@ void register_node_type_portal_in()
   static bNodeType ntype;
 
   geo_node_type_base(&ntype, NODE_PORTAL_IN, "Portal In", NODE_CLASS_LAYOUT, 0);
-  node_type_socket_templates(&ntype, node_portal_in, nullptr);
+  node_type_socket_templates(&ntype, node_portal_sockets, nullptr);
   node_type_init(&ntype, blender::nodes::node_portal_in_init);
   node_type_update(&ntype, blender::nodes::node_portal_in_update);
   node_type_storage(
@@ -131,7 +134,7 @@ void register_node_type_portal_out()
   static bNodeType ntype;
 
   geo_node_type_base(&ntype, NODE_PORTAL_OUT, "Portal Out", NODE_CLASS_LAYOUT, 0);
-  node_type_socket_templates(&ntype, nullptr, node_portal_out);
+  node_type_socket_templates(&ntype, nullptr, node_portal_sockets);
   node_type_init(&ntype, blender::nodes::node_portal_out_init);
   node_type_update(&ntype, blender::nodes::node_portal_out_update);
   node_type_storage(
