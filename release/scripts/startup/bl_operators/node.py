@@ -467,6 +467,41 @@ class NODE_OT_paste_portal(Operator):
         copied_portal = None
         return {'FINISHED'}
 
+class NODE_OT_add_portal(Operator):
+    '''Add portal'''
+    bl_idname = "node.add_portal"
+    bl_label = "Add Portal"
+
+    @classmethod
+    def poll(cls, context):
+        if context.space_data.type != 'NODE_EDITOR':
+            return False
+        ntree = context.space_data.node_tree
+        if ntree is None:
+            return False
+        return True
+
+    def invoke(self, context, event):
+        ntree = context.space_data.node_tree
+        bpy.ops.node.add_and_link_node(type="NodePortalIn")
+        portal_in = ntree.nodes[-1]
+        bpy.ops.node.add_and_link_node(type="NodePortalOut")
+        portal_out = ntree.nodes[-1]
+
+        portal_in.location.x -= 200
+        portal_out.location.x += 60
+
+        for node in ntree.nodes:
+            node.select = False
+
+        portal_in.select = True
+        portal_out.select = True
+
+        portal_out.portal_id = portal_in.portal_id
+
+        bpy.ops.node.translate_attach("INVOKE_DEFAULT")
+        return {'FINISHED'}
+
 classes = (
     NodeSetting,
 
@@ -479,4 +514,5 @@ classes = (
     NODE_OT_goto_page,
     NODE_OT_copy_portal,
     NODE_OT_paste_portal,
+    NODE_OT_add_portal,
 )

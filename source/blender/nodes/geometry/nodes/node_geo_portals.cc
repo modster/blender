@@ -64,12 +64,24 @@ static void node_portal_in_init(bNodeTree *UNUSED(tree), bNode *node)
   NodePortalIn *data = (NodePortalIn *)MEM_callocN(sizeof(NodePortalIn), __func__);
   data->portal_id = rand();
   node->storage = data;
+
+  LISTBASE_FOREACH (bNodeSocket *, socket, &node->inputs) {
+    if (!STREQ(socket->name, "Geometry")) {
+      socket->flag |= SOCK_HIDDEN;
+    }
+  }
 }
 
 static void node_portal_out_init(bNodeTree *UNUSED(tree), bNode *node)
 {
   NodePortalOut *data = (NodePortalOut *)MEM_callocN(sizeof(NodePortalOut), __func__);
   node->storage = data;
+
+  LISTBASE_FOREACH (bNodeSocket *, socket, &node->outputs) {
+    if (!STREQ(socket->name, "Geometry")) {
+      socket->flag |= SOCK_HIDDEN;
+    }
+  }
 }
 
 static void node_portal_in_update(bNodeTree *UNUSED(ntree), bNode *node)

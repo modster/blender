@@ -249,6 +249,8 @@ class NODE_MT_add(bpy.types.Menu):
             # actual node submenus are defined by draw functions from node categories
             nodeitems_utils.draw_node_categories_menu(self, context)
 
+            layout.operator("node.add_portal")
+
 
 class NODE_MT_view(Menu):
     bl_label = "View"
