@@ -255,7 +255,11 @@ class MATERIAL_PT_gpencil_options(GPMaterialButtonsPanel, Panel):
 
         ma = context.material
         gpcolor = ma.grease_pencil
-        layout.prop(gpcolor, "pass_index")
+        row = layout.row()
+        row.prop(gpcolor, "show_shadows")
+        row = layout.row()
+        row.prop(gpcolor, "pass_index")
+
 
 
 class MATERIAL_PT_gpencil_material_presets(PresetPanel, Panel):

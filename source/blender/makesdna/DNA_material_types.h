@@ -137,6 +137,8 @@ typedef enum eMaterialGPencilStyle_Flag {
   GP_MATERIAL_IS_STROKE_HOLDOUT = (1 << 13),
   /* Material used as fill masking. */
   GP_MATERIAL_IS_FILL_HOLDOUT = (1 << 14),
+  /* Show Eevee shadows */
+  GP_MATERIAL_SHOW_SHADOWS = (1 << 15),
 } eMaterialGPencilStyle_Flag;
 
 typedef enum eMaterialGPencilStyle_Mode {
