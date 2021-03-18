@@ -312,14 +312,14 @@ class NODE_OT_follow_portal(Operator):
     @classmethod
     def poll(cls, context):
         space = context.space_data
-        return space.type == 'NODE_EDITOR'
+        return (space.type == 'NODE_EDITOR'
+            and space.node_tree
+            and space.node_tree.nodes.active.bl_idname in ('NodePortalIn', 'NodePortalOut'))
 
     def execute(self, context):
         space = context.space_data
         ntree = space.node_tree
         old_active_node = ntree.nodes.active
-        if old_active_node is None or old_active_node.bl_idname not in ('NodePortalIn', 'NodePortalOut'):
-            return {'CANCELLED'}
 
         portal_id = old_active_node.portal_id
         if old_active_node.bl_idname == 'NodePortalIn':

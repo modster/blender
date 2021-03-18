@@ -1830,7 +1830,7 @@ def km_node_editor(params):
         ])
 
     items.extend([
-        ("node.follow_portal", {"type": 'O', "value": 'PRESS'}, None),
+        ("node.follow_portal", {"type": 'TAB', "value": 'PRESS'}, None),
         ("node.select_box", {"type": params.select_tweak, "value": 'ANY'},
          {"properties": [("tweak", True)]}),
         ("node.select_lasso", {"type": 'EVT_TWEAK_L', "value": 'ANY', "ctrl": True, "alt": True},
