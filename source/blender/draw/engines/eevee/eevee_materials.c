@@ -44,6 +44,8 @@
 
 #include "DEG_depsgraph_query.h"
 
+#include "ED_screen.h"
+
 #include "eevee_engine.h"
 #include "eevee_lut.h"
 #include "eevee_private.h"
@@ -232,6 +234,12 @@ void EEVEE_materials_init(EEVEE_ViewLayerData *sldata,
   EEVEE_PrivateData *g_data = stl->g_data;
 
   g_data->cfra = (int)DEG_get_ctime(draw_ctx->depsgraph);
+  /* Grease pencil simplify. */
+  const bool playing = (draw_ctx->evil_C != NULL) ?
+                           ED_screen_animation_playing(CTX_wm_manager(draw_ctx->evil_C)) != NULL :
+                           false;
+  Scene *scene = draw_ctx->scene;
+  g_data->gpencil_simplify_fill = GPENCIL_SIMPLIFY_FILL(scene, playing);
 
   if (!e_data.util_tex) {
     EEVEE_shaders_material_shaders_init();
@@ -938,6 +946,7 @@ void EEVEE_object_hair_cache_populate(EEVEE_Data *vedata,
 }
 
 typedef struct gpIterData {
+  EEVEE_PrivateData *pd;
   Object *ob;
   DRWShadingGroup *stroke_shadow_grp;
   DRWShadingGroup *fill_shadow_grp;
@@ -981,10 +990,11 @@ static void eevee_gpencil_stroke_cache_populate(bGPDlayer *UNUSED(gpl),
   MaterialGPencilStyle *gp_style = BKE_gpencil_material_settings(iter->ob, gps->mat_nr + 1);
 
   const bool show_shadows = (gp_style->flag & GP_MATERIAL_SHOW_SHADOWS) != 0;
+  const bool simplify_fill = iter->pd->gpencil_simplify_fill;
   const bool hide_material = (gp_style->flag & GP_MATERIAL_HIDE) != 0;
   const bool show_stroke = (gp_style->flag & GP_MATERIAL_STROKE_SHOW) != 0;
-  // TODO: What about simplify Fill?
-  const bool show_fill = (gps->tot_triangles > 0) && (gp_style->flag & GP_MATERIAL_FILL_SHOW) != 0;
+  const bool show_fill = (!simplify_fill) && (gps->tot_triangles > 0) &&
+                         (gp_style->flag & GP_MATERIAL_FILL_SHOW) != 0;
 
   if ((hide_material) || (!show_shadows)) {
     return;
@@ -1017,6 +1027,7 @@ void EEVEE_gpencil_cache_populate(EEVEE_Data *vedata,
 
   gpIterData iter = {
       .ob = ob,
+      .pd = pd,
       .stroke_shadow_grp = NULL,
       .fill_shadow_grp = NULL,
       .cfra = pd->cfra,

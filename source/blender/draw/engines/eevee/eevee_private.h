@@ -1066,6 +1066,8 @@ typedef struct EEVEE_PrivateData {
 
   /** For rendering Gpencil Objects. */
   int cfra;
+  /** Simplify grease pencil fill. */
+  bool gpencil_simplify_fill;
 
   int render_timesteps;
   int render_sample_count_per_timestep;
