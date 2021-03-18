@@ -19,6 +19,10 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "WM_types.h"
+
+#include "RNA_access.h"
+
 static bNodeSocketTemplate node_portal_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {-1, ""},
@@ -29,16 +33,54 @@ static bNodeSocketTemplate node_portal_out[] = {
     {-1, ""},
 };
 
+// static bool output_with_id_exists(const bNodeTree &ntree, const int portal_id)
+// {
+//   LISTBASE_FOREACH (bNode *, node, &ntree.nodes) {
+//     if (node->type == NODE_PORTAL_OUT) {
+//       if (((NodePortalOut *)node->storage)->portal_id == portal_id) {
+//         return true;
+//       }
+//     }
+//   }
+//   return false;
+// }
+
 static void node_portal_in_layout(uiLayout *UNUSED(layout),
                                   bContext *UNUSED(C),
                                   PointerRNA *UNUSED(ptr))
 {
+  // uiItemR(layout, ptr, "portal_id", 0, IFACE_("Portal ID"), ICON_NONE);
+
+  // bNodeTree &ntree = *(bNodeTree *)ptr->owner_id;
+  // bNode *node = (bNode *)ptr->data;
+  // int portal_id = RNA_int_get(ptr, "portal_id");
+
+  // if (!output_with_id_exists(ntree, portal_id)) {
+  //   PointerRNA op_ptr;
+  //   uiItemFullO(layout,
+  //               "node.add_node",
+  //               "Add Endpoint",
+  //               ICON_NONE,
+  //               nullptr,
+  //               WM_OP_INVOKE_DEFAULT,
+  //               0,
+  //               &op_ptr);
+  //   RNA_string_set(&op_ptr, "type", "NodePortalOut");
+  //   RNA_boolean_set(&op_ptr, "use_transform", true);
+  //   PropertyRNA *settings_prop = RNA_struct_find_property(&op_ptr, "settings");
+  //   PointerRNA item_ptr;
+  //   RNA_property_collection_add(&op_ptr, settings_prop, &item_ptr);
+  //   RNA_string_set(&item_ptr, "name", "portal_id");
+  //   std::string portal_id_str = std::to_string(RNA_int_get(ptr, "portal_id"));
+  //   RNA_string_set(&item_ptr, "value", portal_id_str.c_str());
+  // }
 }
 
 static void node_portal_out_layout(uiLayout *UNUSED(layout),
                                    bContext *UNUSED(C),
                                    PointerRNA *UNUSED(ptr))
 {
+  // uiItemR(layout, ptr, "portal_id", 0, IFACE_("Portal ID"), ICON_NONE);
 }
 
 namespace blender::nodes {
@@ -46,6 +88,7 @@ namespace blender::nodes {
 static void node_portal_in_init(bNodeTree *UNUSED(tree), bNode *node)
 {
   NodePortalIn *data = (NodePortalIn *)MEM_callocN(sizeof(NodePortalIn), __func__);
+  data->portal_id = rand();
   node->storage = data;
 }
 

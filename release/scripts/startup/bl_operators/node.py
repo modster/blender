@@ -323,7 +323,7 @@ class NODE_OT_follow_portal(Operator):
 
         portal_id = old_active_node.portal_id
         if old_active_node.bl_idname == 'NodePortalIn':
-            out_nodes = [n for n in ntree.nodes if n.bl_idname == 'NodePortalOut']
+            out_nodes = [n for n in ntree.nodes if n.bl_idname == 'NodePortalOut' and n.portal_id == portal_id]
             if len(out_nodes) != 1:
                 return {'CANCELLED'}
             out_node = out_nodes[0]
@@ -332,7 +332,7 @@ class NODE_OT_follow_portal(Operator):
             out_node.select = True
             ntree.nodes.active = out_node
         if old_active_node.bl_idname == 'NodePortalOut':
-            in_nodes = [n for n in ntree.nodes if n.bl_idname == 'NodePortalIn']
+            in_nodes = [n for n in ntree.nodes if n.bl_idname == 'NodePortalIn' and n.portal_id == portal_id]
             if len(in_nodes) != 1:
                 return {'CANCELLED'}
             in_node = in_nodes[0]
@@ -398,6 +398,62 @@ class NODE_OT_goto_page(Operator):
         return {'FINISHED'}
 
 
+copied_portal = None
+
+def get_nodes_with_portal_id(ntree, portal_id):
+    return [n for n in ntree.nodes if getattr(n, "portal_id", None) == portal_id]
+
+class NODE_OT_copy_portal(Operator):
+    '''Copy portal'''
+    bl_idname = "node.copy_portal"
+    bl_label = "Copy Portal"
+
+    @classmethod
+    def poll(cls, context):
+        try:
+            context.space_data.node_tree.nodes.active.portal_id
+            return True
+        except:
+            return False
+
+    def execute(self, context):
+        global copied_portal
+        node = context.space_data.node_tree.nodes.active
+        copied_portal = (node.bl_idname, node.portal_id)
+        return {'FINISHED'}
+
+class NODE_OT_paste_portal(Operator):
+    '''Paste portal'''
+    bl_idname = "node.paste_portal"
+    bl_label = "Paste Portal"
+
+    @classmethod
+    def poll(cls, context):
+        if context.space_data.type != 'NODE_EDITOR':
+            return False
+        ntree = context.space_data.node_tree
+        if ntree is None:
+            return False
+        if copied_portal is None:
+            return False
+        return len(get_nodes_with_portal_id(ntree, copied_portal[1])) == 1
+
+    def invoke(self, context, event):
+        global copied_portal
+
+        ntree = context.space_data.node_tree
+        new_idname = "NodePortalIn" if copied_portal[0] == "NodePortalOut" else "NodePortalOut"
+
+        bpy.ops.node.add_and_link_node(type=new_idname)
+        new_node = ntree.nodes[-1]
+
+        new_node.portal_id = copied_portal[1]
+
+        bpy.ops.node.translate_attach("INVOKE_DEFAULT")
+
+        copied_portal = None
+        return {'FINISHED'}
+
 classes = (
     NodeSetting,
 
@@ -408,4 +464,6 @@ classes = (
     NODE_OT_tree_path_parent,
     NODE_OT_follow_portal,
     NODE_OT_goto_page,
+    NODE_OT_copy_portal,
+    NODE_OT_paste_portal,
 )

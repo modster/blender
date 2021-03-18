@@ -173,6 +173,11 @@ class NODE_HT_header(Header):
                 props = row.operator("node.goto_page", text=str(page))
                 props.page = page
 
+            row = layout.row(align=True)
+            row.label(text="Portal")
+            row.operator("node.copy_portal", text="Copy")
+            row.operator("node.paste_portal", text="Paste")
+
         else:
             # Custom node tree is edited as independent ID block
             NODE_MT_editor_menus.draw_collapsible(context, layout)
