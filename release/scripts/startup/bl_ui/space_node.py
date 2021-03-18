@@ -168,9 +168,14 @@ class NODE_HT_header(Header):
                 else:
                     row.template_ID(snode, "node_tree", new="node.new_geometry_nodes_modifier")
 
+            import bl_operators.node as node_module
+            current_page = node_module.get_current_page(context)
+
             row = layout.row(align=True)
-            for page in range(5):
-                props = row.operator("node.goto_page", text=str(page))
+            for page in range(1, 6):
+                subrow = row.row(align=True)
+                subrow.enabled = page != current_page
+                props = subrow.operator("node.goto_page", text=str(page))
                 props.page = page
 
             row = layout.row(align=True)

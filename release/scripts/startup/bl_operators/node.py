@@ -344,18 +344,31 @@ class NODE_OT_follow_portal(Operator):
         bpy.ops.node.view_selected()
         return {'FINISHED'}
 
-PAGE_SIZE = 10000
+PAGE_SIZE = 20000
 
 def get_page_center(page):
-    return Vector((page * PAGE_SIZE, 0))
+    return Vector(((page - 1) * PAGE_SIZE, 0))
+
+def position_is_on_page(pos, page):
+    page_center = get_page_center(page)
+    return (abs(page_center.x - pos[0]) < PAGE_SIZE / 2
+        and abs(page_center.y - pos[1]) < PAGE_SIZE / 2)
 
 def node_is_on_page(node, page):
-    page_center = get_page_center(page)
-    return (abs(page_center.x - node.location.x) < PAGE_SIZE / 2
-        and abs(page_center.y - node.location.y) < PAGE_SIZE / 2)
+    return position_is_on_page(node.location, page)
 
 def get_nodes_on_page(ntree, page):
     return [n for n in ntree.nodes if node_is_on_page(n, page)]
+
+def get_current_page(context):
+    for region in context.area.regions:
+        if region.type != 'WINDOW':
+            continue
+        pos = region.view2d.region_to_view(0, 0)
+        for page in range(10):
+            if position_is_on_page(pos, page):
+                return page
+    return None
 
 class NODE_OT_goto_page(Operator):
     '''Goto page'''
