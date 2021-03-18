@@ -175,12 +175,8 @@ class NODE_HT_header(Header):
             for page in range(1, 6):
                 subrow = row.row(align=True)
                 subrow.enabled = page != current_page
-                props = subrow.operator("node.goto_page", text=str(page))
+                props = subrow.operator("node.view_page", text=str(page))
                 props.page = page
-
-            row = layout.row(align=True)
-            row.operator("node.copy_portal", text="Copy Portal")
-            row.operator("node.paste_portal", text="Paste Portal")
 
         else:
             # Custom node tree is edited as independent ID block

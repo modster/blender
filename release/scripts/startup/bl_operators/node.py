@@ -370,10 +370,10 @@ def get_current_page(context):
                 return page
     return None
 
-class NODE_OT_goto_page(Operator):
-    '''Goto page'''
-    bl_idname = "node.goto_page"
-    bl_label = "Goto Page"
+class NODE_OT_view_page(Operator):
+    '''View page'''
+    bl_idname = "node.view_page"
+    bl_label = "View Page"
 
     page: bpy.props.IntProperty(default=0)
 
@@ -381,6 +381,12 @@ class NODE_OT_goto_page(Operator):
     def poll(cls, context):
         space = context.space_data
         return space.type == 'NODE_EDITOR'
+
+    def invoke(self, context, event):
+        if event.ctrl:
+            bpy.ops.node.move_to_page('INVOKE_DEFAULT', page=self.page)
+            return {'FINISHED'}
+        return self.execute(context)
 
     def execute(self, context):
         space = context.space_data
@@ -410,61 +416,38 @@ class NODE_OT_goto_page(Operator):
 
         return {'FINISHED'}
 
+class NODE_OT_move_to_page(Operator):
+    '''Move to page'''
+    bl_idname = "node.move_to_page"
+    bl_label = "Move to Page"
 
-copied_portal = None
-
-def get_nodes_with_portal_id(ntree, portal_id):
-    return [n for n in ntree.nodes if getattr(n, "portal_id", None) == portal_id]
-
-class NODE_OT_copy_portal(Operator):
-    '''Copy portal'''
-    bl_idname = "node.copy_portal"
-    bl_label = "Copy Portal"
+    page: IntProperty()
 
     @classmethod
     def poll(cls, context):
-        try:
-            context.space_data.node_tree.nodes.active.portal_id
-            return True
-        except:
-            return False
+        space = context.space_data
+        return space.type == 'NODE_EDITOR'
 
     def execute(self, context):
-        global copied_portal
-        node = context.space_data.node_tree.nodes.active
-        copied_portal = (node.bl_idname, node.portal_id)
-        return {'FINISHED'}
-
-class NODE_OT_paste_portal(Operator):
-    '''Paste portal'''
-    bl_idname = "node.paste_portal"
-    bl_label = "Paste Portal"
-
-    @classmethod
-    def poll(cls, context):
-        if context.space_data.type != 'NODE_EDITOR':
-            return False
         ntree = context.space_data.node_tree
-        if ntree is None:
-            return False
-        if copied_portal is None:
-            return False
-        return len(get_nodes_with_portal_id(ntree, copied_portal[1])) == 1
+        nodes_to_move = [n for n in ntree.nodes if n.select]
+        if len(nodes_to_move) == 0:
+            return {'CANCELLED'}
 
-    def invoke(self, context, event):
-        global copied_portal
+        old_center = sum((n.location for n in nodes_to_move), Vector((0, 0))) / len(nodes_to_move)
+        new_center = get_page_center(self.page)
+        offset = new_center - old_center
 
-        ntree = context.space_data.node_tree
-        new_idname = "NodePortalIn" if copied_portal[0] == "NodePortalOut" else "NodePortalOut"
+        view2d = context.region.view2d
+        old_center_region = Vector(view2d.view_to_region(old_center.x, old_center.y, clip=False))
+        new_center_region = Vector(view2d.view_to_region(new_center.x, new_center.y, clip=False))
+        offset_region = new_center_region - old_center_region
 
-        bpy.ops.node.add_and_link_node(type=new_idname)
-        new_node = ntree.nodes[-1]
+        for node in nodes_to_move:
+            node.location += offset
 
-        new_node.portal_id = copied_portal[1]
+        bpy.ops.view2d.pan(deltax=offset_region.x, deltay=offset_region.y)
 
-        bpy.ops.node.translate_attach("INVOKE_DEFAULT")
-
-        copied_portal = None
         return {'FINISHED'}
 
 class NODE_OT_add_portal(Operator):
@@ -511,8 +494,7 @@ classes = (
     NODE_OT_collapse_hide_unused_toggle,
     NODE_OT_tree_path_parent,
     NODE_OT_follow_portal,
-    NODE_OT_goto_page,
-    NODE_OT_copy_portal,
-    NODE_OT_paste_portal,
+    NODE_OT_view_page,
     NODE_OT_add_portal,
+    NODE_OT_move_to_page,
 )
