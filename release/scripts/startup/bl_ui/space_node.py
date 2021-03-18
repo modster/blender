@@ -174,9 +174,8 @@ class NODE_HT_header(Header):
                 props.page = page
 
             row = layout.row(align=True)
-            row.label(text="Portal")
-            row.operator("node.copy_portal", text="Copy")
-            row.operator("node.paste_portal", text="Paste")
+            row.operator("node.copy_portal", text="Copy Portal")
+            row.operator("node.paste_portal", text="Paste Portal")
 
         else:
             # Custom node tree is edited as independent ID block
