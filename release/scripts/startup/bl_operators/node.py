@@ -303,6 +303,47 @@ class NODE_OT_tree_path_parent(Operator):
         return {'FINISHED'}
 
 
+class NODE_OT_follow_portal(Operator):
+    '''Follow portal'''
+    bl_idname = "node.follow_portal"
+    bl_label = "Follow Portal"
+
+    @classmethod
+    def poll(cls, context):
+        space = context.space_data
+        return space.type == 'NODE_EDITOR'
+
+    def execute(self, context):
+        space = context.space_data
+        ntree = space.node_tree
+        old_active_node = ntree.nodes.active
+        if old_active_node is None or old_active_node.bl_idname not in ('NodePortalIn', 'NodePortalOut'):
+            return {'CANCELLED'}
+
+        portal_id = old_active_node.portal_id
+        if old_active_node.bl_idname == 'NodePortalIn':
+            out_nodes = [n for n in ntree.nodes if n.bl_idname == 'NodePortalOut']
+            if len(out_nodes) != 1:
+                return {'CANCELLED'}
+            out_node = out_nodes[0]
+            for node in ntree.nodes:
+                node.select = False
+            out_node.select = True
+            ntree.nodes.active = out_node
+        if old_active_node.bl_idname == 'NodePortalOut':
+            in_nodes = [n for n in ntree.nodes if n.bl_idname == 'NodePortalIn']
+            if len(in_nodes) != 1:
+                return {'CANCELLED'}
+            in_node = in_nodes[0]
+            for node in ntree.nodes:
+                node.select = False
+            in_node.select = True
+            ntree.nodes.active = in_node
+
+        bpy.ops.node.view_selected()
+        return {'FINISHED'}
+
+
 classes = (
     NodeSetting,
 
@@ -311,4 +352,5 @@ classes = (
     NODE_OT_add_search,
     NODE_OT_collapse_hide_unused_toggle,
     NODE_OT_tree_path_parent,
+    NODE_OT_follow_portal,
 )
