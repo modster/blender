@@ -46,7 +46,8 @@ static void gather_positions_from_component_instances(const GeometryComponent &c
                                                       const StringRef mask_attribute_name,
                                                       Span<float4x4> transforms,
                                                       MutableSpan<Vector<float3>> r_positions_a,
-                                                      MutableSpan<Vector<float3>> r_positions_b)
+                                                      MutableSpan<Vector<float3>> r_positions_b,
+                                                      int &instance_index)
 {
   if (component.attribute_domain_size(ATTR_DOMAIN_POINT) == 0) {
     return;
@@ -58,18 +59,22 @@ static void gather_positions_from_component_instances(const GeometryComponent &c
       "position", ATTR_DOMAIN_POINT, {0.0f, 0.0f, 0.0f});
 
   Span<bool> masks = mask_attribute.get_span();
-  Span<float3> component_positions = position_attribute.get_span();
+  Span<float3> source_positions = position_attribute.get_span();
 
-  for (const int instance_index : transforms.index_range()) {
-    const float4x4 &transform = transforms[instance_index];
+  for (const int i_set_instance : transforms.index_range()) {
+    const float4x4 &transform = transforms[i_set_instance];
+    Vector<float3> &instance_result_positions_a = r_positions_a[instance_index];
+    Vector<float3> &instance_result_positions_b = r_positions_b[instance_index];
     for (const int i : masks.index_range()) {
       if (masks[i]) {
-        r_positions_a[instance_index].append(transform * component_positions[i]);
+        instance_result_positions_b.append(transform * source_positions[i]);
       }
       else {
-        r_positions_b[instance_index].append(transform * component_positions[i]);
+        instance_result_positions_a.append(transform * source_positions[i]);
       }
     }
+
+    instance_index++;
   }
 }
 
@@ -81,28 +86,22 @@ static void get_positions_from_instances(Span<GeometryInstanceGroup> set_groups,
   int instance_index = 0;
   for (const GeometryInstanceGroup &set_group : set_groups) {
     const GeometrySet &set = set_group.geometry_set;
-
-    MutableSpan<Vector<float3>> set_instance_positions_a = r_positions_a.slice(
-        instance_index, set_group.transforms.size());
-    MutableSpan<Vector<float3>> set_instance_positions_b = r_positions_b.slice(
-        instance_index, set_group.transforms.size());
-
-    if (set.has<PointCloudComponent>()) {
-      gather_positions_from_component_instances(*set.get_component_for_read<PointCloudComponent>(),
-                                                mask_attribute_name,
-                                                set_group.transforms,
-                                                set_instance_positions_a,
-                                                set_instance_positions_b);
-    }
     if (set.has<MeshComponent>()) {
       gather_positions_from_component_instances(*set.get_component_for_read<MeshComponent>(),
                                                 mask_attribute_name,
                                                 set_group.transforms,
-                                                set_instance_positions_a,
-                                                set_instance_positions_b);
+                                                r_positions_a,
+                                                r_positions_b,
+                                                instance_index);
     }
-
-    instance_index += set_group.transforms.size();
+    if (set.has<PointCloudComponent>()) {
+      gather_positions_from_component_instances(*set.get_component_for_read<PointCloudComponent>(),
+                                                mask_attribute_name,
+                                                set_group.transforms,
+                                                r_positions_a,
+                                                r_positions_b,
+                                                instance_index);
+    }
   }
 }
 
@@ -113,37 +112,39 @@ static PointCloud *create_point_cloud(Span<Vector<float3>> positions)
     points_len += instance_positions.size();
   }
   PointCloud *pointcloud = BKE_pointcloud_new_nomain(points_len);
-  int point_index = 0;
+  int offset = 0;
   for (const Vector<float3> &instance_positions : positions) {
-    memcpy(pointcloud->co + point_index, positions.data(), sizeof(float3) * positions.size());
-    point_index += instance_positions.size();
+    memcpy(pointcloud->co + offset, positions.data(), sizeof(float3) * instance_positions.size());
+    offset += instance_positions.size();
   }
+
+  uninitialized_fill_n(pointcloud->radius, pointcloud->totpoint, 0.05f);
 
   return pointcloud;
 }
 
 template<typename T>
-static void copy_from_span_and_mask(Span<T> span,
-                                    Span<bool> mask,
-                                    MutableSpan<T> out_span_a,
-                                    MutableSpan<T> out_span_b,
+static void copy_data_based_on_mask(Span<T> data,
+                                    Span<bool> masks,
+                                    MutableSpan<T> out_data_a,
+                                    MutableSpan<T> out_data_b,
                                     int &offset_a,
                                     int &offset_b)
 {
-  for (const int i : span.index_range()) {
-    if (mask[i]) {
-      out_span_b[offset_b] = span[i];
+  for (const int i : data.index_range()) {
+    if (masks[i]) {
+      out_data_b[offset_b] = data[i];
       offset_b++;
     }
     else {
-      out_span_a[offset_a] = span[i];
+      out_data_a[offset_a] = data[i];
       offset_a++;
     }
   }
 }
 
 static void copy_attribute_from_component_instances(const GeometryComponent &component,
-                                                    const int instances_len,
+                                                    Span<float4x4> transforms,
                                                     const StringRef mask_attribute_name,
                                                     const StringRef attribute_name,
                                                     const CustomDataType data_type,
@@ -158,11 +159,25 @@ static void copy_attribute_from_component_instances(const GeometryComponent &com
 
   const BooleanReadAttribute mask_attribute = component.attribute_get_for_read<bool>(
       mask_attribute_name, ATTR_DOMAIN_POINT, false);
+  Span<bool> masks = mask_attribute.get_span();
 
   const ReadAttributePtr attribute = component.attribute_try_get_for_read(
       attribute_name, ATTR_DOMAIN_POINT, data_type);
 
-  Span<bool> masks = mask_attribute.get_span();
+  /* Advance offsets if the attribute doesn't exist. Note that this is inefficient since we already
+   * have this information, but we would need to keep track of the size of each component's result
+   * points. */
+  if (!attribute) {
+    for (const int i : masks.index_range()) {
+      if (masks[i]) {
+        offset_b++;
+      }
+      else {
+        offset_a++;
+      }
+    }
+    return;
+  }
 
   const int start_offset_a = offset_a;
   const int start_offset_b = offset_b;
@@ -172,10 +187,12 @@ static void copy_attribute_from_component_instances(const GeometryComponent &com
     Span<T> span = attribute->get_span<T>();
     MutableSpan<T> out_span_a = out_data_a.typed<T>();
     MutableSpan<T> out_span_b = out_data_b.typed<T>();
-    copy_from_span_and_mask(span, masks, out_span_a, out_span_b, offset_a, offset_b);
+    copy_data_based_on_mask(span, masks, out_span_a, out_span_b, offset_a, offset_b);
     const int copied_len_a = offset_a - start_offset_a;
     const int copied_len_b = offset_b - start_offset_b;
-    for (int i = 1; i < instances_len; i++) {
+
+    /* The data is the same for every instance of the same geometry, so just copy it. */
+    for (int i = 1; i < transforms.size(); i++) {
       memcpy(out_span_a.data() + offset_a,
              out_span_a.data() + start_offset_a,
              sizeof(T) * copied_len_a);
@@ -204,7 +221,7 @@ static void copy_attributes_to_output(Span<GeometryInstanceGroup> set_groups,
     OutputAttributePtr attribute_out_b = out_component_b.attribute_try_get_for_output(
         attribute_name, ATTR_DOMAIN_POINT, output_data_type);
     BLI_assert(attribute_out_a && attribute_out_b);
-    if (!attribute_out_a || attribute_out_b) {
+    if (!attribute_out_a || !attribute_out_b) {
       continue;
     }
 
@@ -215,10 +232,10 @@ static void copy_attributes_to_output(Span<GeometryInstanceGroup> set_groups,
     int offset_b = 0;
     for (const GeometryInstanceGroup &set_group : set_groups) {
       const GeometrySet &set = set_group.geometry_set;
-
-      if (set.has<PointCloudComponent>()) {
-        copy_attribute_from_component_instances(*set.get_component_for_read<PointCloudComponent>(),
-                                                set_group.transforms.size(),
+      Span<float4x4> transforms = set_group.transforms;
+      if (set.has<MeshComponent>()) {
+        copy_attribute_from_component_instances(*set.get_component_for_read<MeshComponent>(),
+                                                transforms,
                                                 mask_attribute_name,
                                                 attribute_name,
                                                 output_data_type,
@@ -227,9 +244,9 @@ static void copy_attributes_to_output(Span<GeometryInstanceGroup> set_groups,
                                                 offset_a,
                                                 offset_b);
       }
-      if (set.has<MeshComponent>()) {
-        copy_attribute_from_component_instances(*set.get_component_for_read<MeshComponent>(),
-                                                set_group.transforms.size(),
+      if (set.has<PointCloudComponent>()) {
+        copy_attribute_from_component_instances(*set.get_component_for_read<PointCloudComponent>(),
+                                                transforms,
                                                 mask_attribute_name,
                                                 attribute_name,
                                                 output_data_type,
@@ -239,6 +256,9 @@ static void copy_attributes_to_output(Span<GeometryInstanceGroup> set_groups,
                                                 offset_b);
       }
     }
+
+    attribute_out_a.apply_span_and_save();
+    attribute_out_b.apply_span_and_save();
   }
 }
 
@@ -246,10 +266,6 @@ static void geo_node_point_separate_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   const std::string mask_attribute_name = params.extract_input<std::string>("Mask");
-  if (mask_attribute_name.empty()) {
-    params.set_output("Geometry 1", std::move(GeometrySet()));
-    params.set_output("Geometry 2", std::move(GeometrySet()));
-  }
 
   Vector<GeometryInstanceGroup> set_groups = bke::geometry_set_gather_instances(geometry_set);
 
@@ -259,6 +275,12 @@ static void geo_node_point_separate_exec(GeoNodeExecParams params)
     if (!set.has_mesh() && !set.has_pointcloud()) {
       set_groups.remove_and_reorder(i);
     }
+  }
+
+  if (set_groups.is_empty()) {
+    params.set_output("Geometry 1", std::move(GeometrySet()));
+    params.set_output("Geometry 2", std::move(GeometrySet()));
+    return;
   }
 
   int instances_len = 0;
