@@ -240,7 +240,7 @@ void BKE_id_free_us(Main *bmain, void *idv) /* test users */
 static size_t id_delete(Main *bmain, const bool do_tagged_deletion)
 {
   const int tag = LIB_TAG_DOIT;
-  ListBase *lbarray[MAX_LIBARRAY];
+  ListBase *lbarray[INDEX_ID_MAX];
   Link dummy_link = {0};
   int base_count, i;
 
@@ -300,11 +300,15 @@ static size_t id_delete(Main *bmain, const bool do_tagged_deletion)
          * links, this can lead to nasty crashing here in second, actual deleting loop.
          * Also, this will also flag users of deleted data that cannot be unlinked
          * (object using deleted obdata, etc.), so that they also get deleted. */
-        BKE_libblock_remap_locked(
-            bmain, id, NULL, ID_REMAP_FLAG_NEVER_NULL_USAGE | ID_REMAP_FORCE_NEVER_NULL_USAGE);
+        BKE_libblock_remap_locked(bmain,
+                                  id,
+                                  NULL,
+                                  (ID_REMAP_FLAG_NEVER_NULL_USAGE |
+                                   ID_REMAP_FORCE_NEVER_NULL_USAGE |
+                                   ID_REMAP_FORCE_INTERNAL_RUNTIME_POINTERS));
         /* Since we removed ID from Main,
          * we also need to unlink its own other IDs usages ourself. */
-        BKE_libblock_relink_ex(bmain, id, NULL, NULL, 0);
+        BKE_libblock_relink_ex(bmain, id, NULL, NULL, ID_REMAP_FORCE_INTERNAL_RUNTIME_POINTERS);
       }
     }
 
@@ -337,8 +341,12 @@ static size_t id_delete(Main *bmain, const bool do_tagged_deletion)
            * actual deleting loop.
            * Also, this will also flag users of deleted data that cannot be unlinked
            * (object using deleted obdata, etc.), so that they also get deleted. */
-          BKE_libblock_remap_locked(
-              bmain, id, NULL, ID_REMAP_FLAG_NEVER_NULL_USAGE | ID_REMAP_FORCE_NEVER_NULL_USAGE);
+          BKE_libblock_remap_locked(bmain,
+                                    id,
+                                    NULL,
+                                    (ID_REMAP_FLAG_NEVER_NULL_USAGE |
+                                     ID_REMAP_FORCE_NEVER_NULL_USAGE |
+                                     ID_REMAP_FORCE_INTERNAL_RUNTIME_POINTERS));
         }
       }
     }

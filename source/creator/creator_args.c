@@ -610,6 +610,7 @@ static int arg_handle_print_help(int UNUSED(argc), const char **UNUSED(argv), vo
 
   printf("\n");
   printf("Misc Options:\n");
+  BLI_args_print_arg_doc(ba, "--open-last");
   BLI_args_print_arg_doc(ba, "--app-template");
   BLI_args_print_arg_doc(ba, "--factory-startup");
   BLI_args_print_arg_doc(ba, "--enable-event-simulate");
@@ -868,6 +869,8 @@ static const char arg_handle_log_set_doc[] =
     "\tEnable logging categories, taking a single comma separated argument.\n"
     "\tMultiple categories can be matched using a '.*' suffix,\n"
     "\tso '--log \"wm.*\"' logs every kind of window-manager message.\n"
+    "\tSub-string can be matched using a '*' prefix and suffix,\n"
+    "\tso '--log \"*undo*\"' logs every kind of undo-related message.\n"
     "\tUse \"^\" prefix to ignore, so '--log \"*,^wm.operator.*\"' logs all except for "
     "'wm.operators.*'\n"
     "\tUse \"*\" to log everything.";
@@ -1148,7 +1151,7 @@ static const char arg_handle_env_system_set_doc_python[] =
 
 static int arg_handle_env_system_set(int argc, const char **argv, void *UNUSED(data))
 {
-  /* "--env-system-scripts" --> "BLENDER_SYSTEM_SCRIPTS" */
+  /* `--env-system-scripts` -> `BLENDER_SYSTEM_SCRIPTS` */
 
   char env[64] = "BLENDER";
   char *ch_dst = env + 7;           /* skip BLENDER */
@@ -1319,7 +1322,7 @@ static int arg_handle_audio_disable(int UNUSED(argc),
                                     const char **UNUSED(argv),
                                     void *UNUSED(data))
 {
-  BKE_sound_force_device("Null");
+  BKE_sound_force_device("None");
   return 0;
 }
 
@@ -1327,7 +1330,7 @@ static const char arg_handle_audio_set_doc[] =
     "\n\t"
     "Force sound system to a specific device."
     "\n\t"
-    "'NULL' 'SDL' 'OPENAL' 'JACK'.";
+    "'None' 'SDL' 'OpenAL' 'CoreAudio' 'JACK' 'PulseAudio' 'WASAPI'.";
 static int arg_handle_audio_set(int argc, const char **argv, void *UNUSED(data))
 {
   if (argc < 1) {
@@ -2008,7 +2011,7 @@ static int arg_handle_load_last_file(int UNUSED(argc), const char **UNUSED(argv)
 
   const RecentFile *recent_file = G.recent_files.first;
   const char *fake_argv[] = {recent_file->filepath};
-  return arg_handle_load_file(1, fake_argv, data);
+  return arg_handle_load_file(ARRAY_SIZE(fake_argv), fake_argv, data);
 }
 
 void main_args_setup(bContext *C, bArgs *ba)

@@ -1816,11 +1816,11 @@ static bool save_image_op(
   opts->save_as_render = (RNA_struct_find_property(op->ptr, "save_as_render") &&
                           RNA_boolean_get(op->ptr, "save_as_render"));
 
-  WM_cursor_wait(1);
+  WM_cursor_wait(true);
 
   bool ok = BKE_image_save(op->reports, bmain, ima, iuser, opts);
 
-  WM_cursor_wait(0);
+  WM_cursor_wait(false);
 
   /* Remember file path for next save. */
   BLI_strncpy(G.ima, opts->filepath, sizeof(G.ima));
@@ -3146,6 +3146,23 @@ void IMAGE_OT_unpack(wmOperatorType *ot)
 /* -------------------------------------------------------------------- */
 /** \name Sample Image Operator
  * \{ */
+
+/* Returns mouse position in image space. */
+bool ED_space_image_get_position(SpaceImage *sima, struct ARegion *ar, int mval[2], float fpos[2])
+{
+  void *lock;
+  ImBuf *ibuf = ED_space_image_acquire_buffer(sima, &lock, 0);
+
+  if (ibuf == NULL) {
+    ED_space_image_release_buffer(sima, ibuf, lock);
+    return false;
+  }
+
+  UI_view2d_region_to_view(&ar->v2d, mval[0], mval[1], &fpos[0], &fpos[1]);
+
+  ED_space_image_release_buffer(sima, ibuf, lock);
+  return true;
+}
 
 /* Returns color in linear space, matching ED_space_node_color_sample(). */
 bool ED_space_image_color_sample(

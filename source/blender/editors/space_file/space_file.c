@@ -173,6 +173,7 @@ static void file_free(SpaceLink *sl)
 
   MEM_SAFE_FREE(sfile->params);
   MEM_SAFE_FREE(sfile->asset_params);
+  MEM_SAFE_FREE(sfile->runtime);
 
   if (sfile->layout) {
     MEM_freeN(sfile->layout);
@@ -188,6 +189,12 @@ static void file_init(wmWindowManager *UNUSED(wm), ScrArea *area)
   if (sfile->layout) {
     sfile->layout->dirty = true;
   }
+
+  if (sfile->runtime == NULL) {
+    sfile->runtime = MEM_callocN(sizeof(*sfile->runtime), __func__);
+  }
+  /* Validate the params right after file read. */
+  fileselect_refresh_params(sfile);
 }
 
 static void file_exit(wmWindowManager *wm, ScrArea *area)
@@ -209,6 +216,7 @@ static SpaceLink *file_duplicate(SpaceLink *sl)
 
   /* clear or remove stuff from old */
   sfilen->op = NULL; /* file window doesn't own operators */
+  sfilen->runtime = NULL;
 
   sfilen->previews_timer = NULL;
   sfilen->smoothscroll_timer = NULL;
@@ -392,6 +400,35 @@ static void file_refresh(const bContext *C, ScrArea *area)
   ED_area_tag_redraw(area);
 }
 
+void file_on_reload_callback_register(SpaceFile *sfile,
+                                      onReloadFn callback,
+                                      onReloadFnData custom_data)
+{
+  sfile->runtime->on_reload = callback;
+  sfile->runtime->on_reload_custom_data = custom_data;
+}
+
+static void file_on_reload_callback_call(SpaceFile *sfile)
+{
+  if (sfile->runtime->on_reload == NULL) {
+    return;
+  }
+
+  sfile->runtime->on_reload(sfile, sfile->runtime->on_reload_custom_data);
+
+  sfile->runtime->on_reload = NULL;
+  sfile->runtime->on_reload_custom_data = NULL;
+}
+
+static void file_reset_filelist_showing_main_data(ScrArea *area, SpaceFile *sfile)
+{
+  if (sfile->files && filelist_needs_reset_on_main_changes(sfile->files)) {
+    /* Full refresh of the file list if local asset data was changed. Refreshing this view
+     * is cheap and users expect this to be updated immediately. */
+    file_tag_reset_list(area, sfile);
+  }
+}
+
 static void file_listener(const wmSpaceTypeListenerParams *params)
 {
   ScrArea *area = params->area;
@@ -418,13 +455,29 @@ static void file_listener(const wmSpaceTypeListenerParams *params)
             ED_area_tag_refresh(area);
           }
           break;
+        case ND_SPACE_CHANGED:
+          /* If the space was just turned into a file/asset browser, the file-list may need to be
+           * updated to reflect latest changes in main data. */
+          file_reset_filelist_showing_main_data(area, sfile);
+          break;
+      }
+      switch (wmn->action) {
+        case NA_JOB_FINISHED:
+          file_on_reload_callback_call(sfile);
+          break;
       }
       break;
     case NC_ASSET: {
-      if (sfile->files && filelist_needs_reset_on_main_changes(sfile->files)) {
-        /* Full refresh of the file list if local asset data was changed. Refreshing this view is
-         * cheap and users expect this to be updated immediately. */
-        file_tag_reset_list(area, sfile);
+      switch (wmn->action) {
+        case NA_SELECTED:
+        case NA_ACTIVATED:
+          ED_area_tag_refresh(area);
+          break;
+        case NA_ADDED:
+        case NA_REMOVED:
+        case NA_EDITED:
+          file_reset_filelist_showing_main_data(area, sfile);
+          break;
       }
       break;
     }
@@ -464,8 +517,7 @@ static void file_main_region_listener(const wmRegionListenerParams *params)
       }
       break;
     case NC_ID:
-      if (ELEM(wmn->action, NA_RENAME)) {
-        /* In case the filelist shows ID names. */
+      if (ELEM(wmn->action, NA_SELECTED, NA_ACTIVATED, NA_RENAME)) {
         ED_region_tag_redraw(region);
       }
       break;
@@ -620,6 +672,7 @@ static void file_operatortypes(void)
   WM_operatortype_append(FILE_OT_smoothscroll);
   WM_operatortype_append(FILE_OT_filepath_drop);
   WM_operatortype_append(FILE_OT_start_filter);
+  WM_operatortype_append(FILE_OT_view_selected);
 }
 
 /* NOTE: do not add .blend file reading on this level */
@@ -847,13 +900,11 @@ static void file_id_remap(ScrArea *area, SpaceLink *sl, ID *UNUSED(old_id), ID *
 {
   SpaceFile *sfile = (SpaceFile *)sl;
 
-  /* If the file shows main data (IDs), tag it for reset. */
-  if (sfile->files && filelist_needs_reset_on_main_changes(sfile->files)) {
-    /* Full refresh of the file list if main data was changed, don't even attempt remap pointers.
-     * We could give file list types a id-remap callback, but it's probably not worth it.
-     * Refreshing local file lists is relatively cheap. */
-    file_tag_reset_list(area, sfile);
-  }
+  /* If the file shows main data (IDs), tag it for reset.
+   * Full reset of the file list if main data was changed, don't even attempt remap pointers.
+   * We could give file list types a id-remap callback, but it's probably not worth it.
+   * Refreshing local file lists is relatively cheap. */
+  file_reset_filelist_showing_main_data(area, sfile);
 }
 
 /* only called once, from space/spacetypes.c */

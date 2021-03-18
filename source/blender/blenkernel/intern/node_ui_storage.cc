@@ -62,8 +62,12 @@ const NodeUIStorage *BKE_node_tree_ui_storage_get_from_context(const bContext *C
   }
 
   const Object *active_object = CTX_data_active_object(C);
+  if (active_object == nullptr) {
+    return nullptr;
+  }
+
   const ModifierData *active_modifier = BKE_object_active_modifier(active_object);
-  if (active_object == nullptr || active_modifier == nullptr) {
+  if (active_modifier == nullptr) {
     return nullptr;
   }
 
@@ -154,8 +158,11 @@ void BKE_nodetree_error_message_add(bNodeTree &ntree,
 void BKE_nodetree_attribute_hint_add(bNodeTree &ntree,
                                      const NodeTreeEvaluationContext &context,
                                      const bNode &node,
-                                     const StringRef attribute_name)
+                                     const StringRef attribute_name,
+                                     const AttributeDomain domain,
+                                     const CustomDataType data_type)
 {
   NodeUIStorage &node_ui_storage = node_ui_storage_ensure(ntree, context, node);
-  node_ui_storage.attribute_name_hints.add_as(attribute_name);
+  node_ui_storage.attribute_hints.add_as(attribute_name,
+                                         AvailableAttributeInfo{domain, data_type});
 }

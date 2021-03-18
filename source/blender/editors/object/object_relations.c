@@ -893,10 +893,10 @@ bool ED_object_parent_set(ReportList *reports,
           reports, depsgraph, scene, ob, par, ARM_GROUPS_ENVELOPE, xmirror);
     }
     else if (partype == PAR_ARMATURE_AUTO) {
-      WM_cursor_wait(1);
+      WM_cursor_wait(true);
       ED_object_vgroup_calc_from_armature(
           reports, depsgraph, scene, ob, par, ARM_GROUPS_AUTO, xmirror);
-      WM_cursor_wait(0);
+      WM_cursor_wait(false);
     }
     /* get corrected inverse */
     ob->partype = PAROBJECT;
@@ -912,9 +912,9 @@ bool ED_object_parent_set(ReportList *reports,
       ED_gpencil_add_armature_weights(C, reports, ob, par, GP_PAR_ARMATURE_NAME);
     }
     else if (ELEM(partype, PAR_ARMATURE_AUTO, PAR_ARMATURE_ENVELOPE)) {
-      WM_cursor_wait(1);
+      WM_cursor_wait(true);
       ED_gpencil_add_armature_weights(C, reports, ob, par, GP_PAR_ARMATURE_AUTO);
-      WM_cursor_wait(0);
+      WM_cursor_wait(false);
     }
     /* get corrected inverse */
     ob->partype = PAROBJECT;
@@ -1756,7 +1756,7 @@ static int make_links_data_exec(bContext *C, wmOperator *op)
   }
 
   DEG_relations_tag_update(bmain);
-  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, CTX_wm_view3d(C));
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, NULL);
   WM_event_add_notifier(C, NC_ANIMATION | ND_NLA_ACTCHANGE, CTX_wm_view3d(C));
   WM_event_add_notifier(C, NC_OBJECT, NULL);
 
@@ -2712,7 +2712,7 @@ static int drop_named_material_invoke(bContext *C, wmOperator *op, const wmEvent
   DEG_id_tag_update(&base->object->id, ID_RECALC_TRANSFORM);
 
   WM_event_add_notifier(C, NC_OBJECT | ND_OB_SHADING, base->object);
-  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, CTX_wm_view3d(C));
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, NULL);
   WM_event_add_notifier(C, NC_MATERIAL | ND_SHADING_LINKS, ma);
 
   return OPERATOR_FINISHED;

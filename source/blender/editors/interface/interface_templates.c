@@ -5485,7 +5485,7 @@ void uiTemplatePalette(uiLayout *layout,
   }
 }
 
-void uiTemplateCryptoPicker(uiLayout *layout, PointerRNA *ptr, const char *propname)
+void uiTemplateCryptoPicker(uiLayout *layout, PointerRNA *ptr, const char *propname, int icon)
 {
   PropertyRNA *prop = RNA_struct_find_property(ptr, propname);
 
@@ -5500,7 +5500,7 @@ void uiTemplateCryptoPicker(uiLayout *layout, PointerRNA *ptr, const char *propn
                                  UI_BTYPE_BUT,
                                  "UI_OT_eyedropper_color",
                                  WM_OP_INVOKE_DEFAULT,
-                                 ICON_EYEDROPPER,
+                                 icon,
                                  RNA_property_ui_name(prop),
                                  0,
                                  0,
@@ -5510,10 +5510,6 @@ void uiTemplateCryptoPicker(uiLayout *layout, PointerRNA *ptr, const char *propn
   but->rnapoin = *ptr;
   but->rnaprop = prop;
   but->rnaindex = -1;
-
-  PointerRNA *opptr = UI_but_operator_ptr_get(but);
-  /* Important for crypto-matte operation. */
-  RNA_boolean_set(opptr, "use_accumulate", false);
 }
 
 /** \} */
@@ -6383,9 +6379,9 @@ void uiTemplateList(uiLayout *layout,
   }
 
   if (glob) {
-    /* About UI_BTYPE_GRIP drag-resize:
+    /* About #UI_BTYPE_GRIP drag-resize:
      * We can't directly use results from a grip button, since we have a
-     * rather complex behavior here (sizing by discrete steps and, overall, autosize feature).
+     * rather complex behavior here (sizing by discrete steps and, overall, auto-size feature).
      * Since we *never* know whether we are grip-resizing or not
      * (because there is no callback for when a button enters/leaves its "edit mode"),
      * we use the fact that grip-controlled value (dyn_data->resize) is completely handled
@@ -6393,7 +6389,7 @@ void uiTemplateList(uiLayout *layout,
      *
      * It is only meaningful when we are not resizing,
      * in which case this gives us the correct "init drag" value.
-     * Note we cannot affect dyn_data->resize_prev here,
+     * Note we cannot affect `dyn_data->resize_prev here`,
      * since this value is not controlled by the grip!
      */
     dyn_data->resize = dyn_data->resize_prev +

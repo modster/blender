@@ -279,8 +279,8 @@ static void pygpu_batch__tp_dealloc(BPyGPUBatch *self)
   GPU_batch_discard(self->batch);
 
 #ifdef USE_GPU_PY_REFERENCES
+  PyObject_GC_UnTrack(self);
   if (self->references) {
-    PyObject_GC_UnTrack(self);
     pygpu_batch__tp_clear(self);
     Py_XDECREF(self->references);
   }
@@ -295,18 +295,10 @@ PyDoc_STRVAR(
     "\n"
     "   Reusable container for drawable geometry.\n"
     "\n"
-    "   :arg type: One of these primitive types: {\n"
-    "       `POINTS`,\n"
-    "       `LINES`,\n"
-    "       `TRIS`,\n"
-    "       `LINE_STRIP`,\n"
-    "       `LINE_LOOP`,\n"
-    "       `TRI_STRIP`,\n"
-    "       `TRI_FAN`,\n"
-    "       `LINES_ADJ`,\n"
-    "       `TRIS_ADJ`,\n"
-    "       `LINE_STRIP_ADJ` }\n"
-    "   :type type: `str`\n"
+    "   :arg type: The primitive type of geometry to be drawn.\n"
+    "      Possible values are `POINTS`, `LINES`, `TRIS`, `LINE_STRIP`, `LINE_LOOP`, `TRI_STRIP`, "
+    "`TRI_FAN`, `LINES_ADJ`, `TRIS_ADJ` and `LINE_STRIP_ADJ`.\n"
+    "   :type type: str\n"
     "   :arg buf: Vertex buffer containing all or some of the attributes required for drawing.\n"
     "   :type buf: :class:`gpu.types.GPUVertBuf`\n"
     "   :arg elem: An optional index buffer.\n"

@@ -3267,7 +3267,7 @@ void RNA_def_property_enum_funcs(PropertyRNA *prop,
         eprop->set = (PropEnumSetFunc)set;
       }
       if (item) {
-        eprop->itemf = (PropEnumItemFunc)item;
+        eprop->item_fn = (PropEnumItemFunc)item;
       }
       break;
     }
@@ -3292,7 +3292,7 @@ void RNA_def_property_enum_funcs_runtime(PropertyRNA *prop,
     eprop->set_ex = setfunc;
   }
   if (itemfunc) {
-    eprop->itemf = itemfunc;
+    eprop->item_fn = itemfunc;
   }
 
   if (getfunc || setfunc) {
@@ -3303,12 +3303,6 @@ void RNA_def_property_enum_funcs_runtime(PropertyRNA *prop,
       prop->flag &= ~PROP_EDITABLE;
     }
   }
-}
-
-void RNA_def_property_enum_py_data(PropertyRNA *prop, void *py_data)
-{
-  EnumPropertyRNA *eprop = (EnumPropertyRNA *)prop;
-  eprop->py_data = py_data;
 }
 
 void RNA_def_property_string_funcs(PropertyRNA *prop,
@@ -3373,7 +3367,7 @@ void RNA_def_property_string_funcs_runtime(PropertyRNA *prop,
 }
 
 void RNA_def_property_pointer_funcs(
-    PropertyRNA *prop, const char *get, const char *set, const char *typef, const char *poll)
+    PropertyRNA *prop, const char *get, const char *set, const char *type_fn, const char *poll)
 {
   StructRNA *srna = DefRNA.laststruct;
 
@@ -3392,8 +3386,8 @@ void RNA_def_property_pointer_funcs(
       if (set) {
         pprop->set = (PropPointerSetFunc)set;
       }
-      if (typef) {
-        pprop->typef = (PropPointerTypeFunc)typef;
+      if (type_fn) {
+        pprop->type_fn = (PropPointerTypeFunc)type_fn;
       }
       if (poll) {
         pprop->poll = (PropPointerPollFunc)poll;
@@ -3821,7 +3815,7 @@ PropertyRNA *RNA_def_enum_flag(StructOrFunctionRNA *cont_,
 void RNA_def_enum_funcs(PropertyRNA *prop, EnumPropertyItemFunc itemfunc)
 {
   EnumPropertyRNA *eprop = (EnumPropertyRNA *)prop;
-  eprop->itemf = itemfunc;
+  eprop->item_fn = itemfunc;
 }
 
 PropertyRNA *RNA_def_float(StructOrFunctionRNA *cont_,
@@ -4632,10 +4626,27 @@ void RNA_def_property_duplicate_pointers(StructOrFunctionRNA *cont_, PropertyRNA
   prop->flag_internal |= PROP_INTERN_FREE_POINTERS;
 }
 
+static void (*g_py_data_clear_fn)(PropertyRNA *prop) = NULL;
+
+/**
+ * Set the callback used to decrement the user count of a property.
+ *
+ * This function is called when freeing each dynamically defined property.
+ */
+void RNA_def_property_free_pointers_set_py_data_callback(
+    void (*py_data_clear_fn)(PropertyRNA *prop))
+{
+  g_py_data_clear_fn = py_data_clear_fn;
+}
+
 void RNA_def_property_free_pointers(PropertyRNA *prop)
 {
   if (prop->flag_internal & PROP_INTERN_FREE_POINTERS) {
     int a;
+
+    if (g_py_data_clear_fn) {
+      g_py_data_clear_fn(prop);
+    }
 
     if (prop->identifier) {
       MEM_freeN((void *)prop->identifier);

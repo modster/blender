@@ -98,7 +98,7 @@ const EnumPropertyItem rna_enum_preference_section_items[] = {
 };
 
 static const EnumPropertyItem audio_device_items[] = {
-    {0, "Null", 0, "None", "Null device - there will be no audio output"},
+    {0, "None", 0, "None", "No device - there will be no audio output"},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -3847,6 +3847,26 @@ static void rna_def_userdef_theme_space_statusbar(BlenderRNA *brna)
   rna_def_userdef_theme_spaces_main(srna);
 }
 
+static void rna_def_userdef_theme_space_spreadsheet(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  /* space_spreadsheet */
+
+  srna = RNA_def_struct(brna, "ThemeSpreadsheet", NULL);
+  RNA_def_struct_sdna(srna, "ThemeSpace");
+  RNA_def_struct_clear_flag(srna, STRUCT_UNDO);
+  RNA_def_struct_ui_text(srna, "Theme Spreadsheet", "Theme settings for the Spreadsheet");
+
+  prop = RNA_def_property(srna, "row_alternate", PROP_FLOAT, PROP_COLOR_GAMMA);
+  RNA_def_property_array(prop, 4);
+  RNA_def_property_ui_text(prop, "Alternate Rows", "Overlay color on every other row");
+  RNA_def_property_update(prop, 0, "rna_userdef_theme_update");
+
+  rna_def_userdef_theme_spaces_main(srna);
+}
+
 static void rna_def_userdef_themes(BlenderRNA *brna)
 {
   StructRNA *srna;
@@ -3873,14 +3893,14 @@ static void rna_def_userdef_themes(BlenderRNA *brna)
       {20, "CLIP_EDITOR", ICON_TRACKER, "Movie Clip Editor", ""},
       {21, "TOPBAR", ICON_TOPBAR, "Top Bar", ""},
       {22, "STATUSBAR", ICON_STATUSBAR, "Status Bar", ""},
+      {23, "SPREADSHEET", ICON_SPREADSHEET, "Spreadsheet"},
       {0, NULL, 0, NULL, NULL},
   };
 
   srna = RNA_def_struct(brna, "Theme", NULL);
   RNA_def_struct_sdna(srna, "bTheme");
   RNA_def_struct_clear_flag(srna, STRUCT_UNDO);
-  RNA_def_struct_ui_text(
-      srna, "Theme", "User interface styling and color settings");
+  RNA_def_struct_ui_text(srna, "Theme", "User interface styling and color settings");
 
   prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
   RNA_def_property_ui_text(prop, "Name", "Name of the theme");
@@ -4002,6 +4022,12 @@ static void rna_def_userdef_themes(BlenderRNA *brna)
   RNA_def_property_pointer_sdna(prop, NULL, "space_statusbar");
   RNA_def_property_struct_type(prop, "ThemeStatusBar");
   RNA_def_property_ui_text(prop, "Status Bar", "");
+
+  prop = RNA_def_property(srna, "spreadsheet", PROP_POINTER, PROP_NONE);
+  RNA_def_property_flag(prop, PROP_NEVER_NULL);
+  RNA_def_property_pointer_sdna(prop, NULL, "space_spreadsheet");
+  RNA_def_property_struct_type(prop, "ThemeSpreadsheet");
+  RNA_def_property_ui_text(prop, "Spreadsheet", "");
   /* end space types */
 
   prop = RNA_def_property(srna, "bone_color_sets", PROP_COLLECTION, PROP_NONE);
@@ -4255,6 +4281,7 @@ static void rna_def_userdef_dothemes(BlenderRNA *brna)
   rna_def_userdef_theme_space_clip(brna);
   rna_def_userdef_theme_space_topbar(brna);
   rna_def_userdef_theme_space_statusbar(brna);
+  rna_def_userdef_theme_space_spreadsheet(brna);
   rna_def_userdef_theme_colorset(brna);
   rna_def_userdef_theme_collection_color(brna);
   rna_def_userdef_themes(brna);
@@ -4270,7 +4297,8 @@ static void rna_def_userdef_solidlight(BlenderRNA *brna)
   srna = RNA_def_struct(brna, "UserSolidLight", NULL);
   RNA_def_struct_sdna(srna, "SolidLight");
   RNA_def_struct_clear_flag(srna, STRUCT_UNDO);
-  RNA_def_struct_ui_text(srna, "Solid Light", "Light used for Studio lighting in solid shading mode");
+  RNA_def_struct_ui_text(
+      srna, "Solid Light", "Light used for Studio lighting in solid shading mode");
 
   prop = RNA_def_property(srna, "use", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", 1);
@@ -4815,7 +4843,8 @@ static void rna_def_userdef_view(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "use_text_antialiasing", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_negative_sdna(prop, NULL, "text_render", USER_TEXT_DISABLE_AA);
-  RNA_def_property_ui_text(prop, "Text Anti-Aliasing", "Smooth jagged edges of user interface text");
+  RNA_def_property_ui_text(
+      prop, "Text Anti-Aliasing", "Smooth jagged edges of user interface text");
   RNA_def_property_update(prop, 0, "rna_userdef_text_update");
 
   prop = RNA_def_property(srna, "text_hinting", PROP_ENUM, PROP_NONE);
@@ -5349,6 +5378,16 @@ static void rna_def_userdef_system(BlenderRNA *brna)
       {0, NULL, 0, NULL, NULL},
   };
 
+  static const EnumPropertyItem seq_proxy_setup_options[] = {
+      {USER_SEQ_PROXY_SETUP_MANUAL, "MANUAL", 0, "Manual", "Set up proxies manually"},
+      {USER_SEQ_PROXY_SETUP_AUTOMATIC,
+       "AUTOMATIC",
+       0,
+       "Automatic",
+       "Build proxies for added movie and image strips in each preview size"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
   srna = RNA_def_struct(brna, "PreferencesSystem", NULL);
   RNA_def_struct_sdna(srna, "UserDef");
   RNA_def_struct_nested(brna, srna, "Preferences");
@@ -5415,6 +5454,13 @@ static void rna_def_userdef_system(BlenderRNA *brna)
       prop,
       "Disk Cache Compression Level",
       "Smaller compression will result in larger files, but less decoding overhead");
+
+  /* Sequencer proxy setup */
+
+  prop = RNA_def_property(srna, "sequencer_proxy_setup", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, seq_proxy_setup_options);
+  RNA_def_property_enum_sdna(prop, NULL, "sequencer_proxy_setup");
+  RNA_def_property_ui_text(prop, "Proxy setup", "When and how proxies are created");
 
   prop = RNA_def_property(srna, "scrollback", PROP_INT, PROP_UNSIGNED);
   RNA_def_property_int_sdna(prop, NULL, "scrollback");
@@ -6061,7 +6107,9 @@ static void rna_def_userdef_filepaths(BlenderRNA *brna)
   prop = RNA_def_property(srna, "use_relative_paths", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", USER_RELPATHS);
   RNA_def_property_ui_text(
-      prop, "Relative Paths", "Default relative path option for the file selector");
+      prop,
+      "Relative Paths",
+      "Default relative path option for the file selector, when no path is defined yet");
 
   prop = RNA_def_property(srna, "use_file_compression", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", USER_FILECOMPRESS);
@@ -6186,7 +6234,8 @@ static void rna_def_userdef_filepaths(BlenderRNA *brna)
   RNA_def_property_boolean_sdna(prop, NULL, "flag", USER_SAVE_PREVIEWS);
   RNA_def_property_ui_text(prop,
                            "Save Preview Images",
-                           "Enables automatic saving of preview images in the .blend file");
+                           "Enables automatic saving of preview images in the .blend file "
+                           "as well as a thumbnail of the .blend");
 
   rna_def_userdef_filepaths_asset_library(brna);
 
@@ -6212,6 +6261,14 @@ static void rna_def_userdef_experimental(BlenderRNA *brna)
       prop,
       "Undo Legacy",
       "Use legacy undo (slower than the new default one, but may be more stable in some cases)");
+
+  prop = RNA_def_property(srna, "override_auto_resync", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "no_override_auto_resync", 1);
+  RNA_def_property_ui_text(
+      prop,
+      "Override Auto Resync",
+      "Enable library overrides automatic resync detection and process on file load. Disable when "
+      "dealing with older .blend files that need manual Resync (Enforce) handling");
 
   prop = RNA_def_property(srna, "use_new_point_cloud_type", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "use_new_point_cloud_type", 1);

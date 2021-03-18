@@ -1,4 +1,4 @@
-﻿/*
+/*
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -65,6 +65,12 @@ typedef struct SpaceProperties_Runtime SpaceProperties_Runtime;
 
 /* Defined in `node_intern.h`. */
 typedef struct SpaceNode_Runtime SpaceNode_Runtime;
+
+/* Defined in `file_intern.h`. */
+typedef struct SpaceFile_Runtime SpaceFile_Runtime;
+
+/* Defined in `spreadsheet_intern.hh`. */
+typedef struct SpaceSpreadsheet_Runtime SpaceSpreadsheet_Runtime;
 
 /* -------------------------------------------------------------------- */
 /** \name SpaceLink (Base)
@@ -222,6 +228,7 @@ typedef enum eSpaceButtons_Context {
   BCONTEXT_TOOL = 14,
   BCONTEXT_SHADERFX = 15,
   BCONTEXT_OUTPUT = 16,
+  BCONTEXT_COLLECTION = 17,
 
   /* Keep last. */
   BCONTEXT_TOT,
@@ -489,6 +496,7 @@ typedef enum eGraphEdit_Flag {
   SIPO_NORMALIZE_FREEZE = (1 << 15),
   /* show markers region */
   SIPO_SHOW_MARKERS = (1 << 16),
+  SIPO_NO_DRAW_EXTRAPOLATION = (1 << 17),
 } eGraphEdit_Flag;
 
 /* SpaceGraph.mode (Graph Editor Mode) */
@@ -639,6 +647,7 @@ typedef enum eSpaceSeq_Flag {
   SEQ_SHOW_STRIP_NAME = (1 << 14),
   SEQ_SHOW_STRIP_SOURCE = (1 << 15),
   SEQ_SHOW_STRIP_DURATION = (1 << 16),
+  SEQ_USE_PROXIES = (1 << 17),
 } eSpaceSeq_Flag;
 
 /* SpaceSeq.view */
@@ -690,7 +699,7 @@ typedef enum eSpaceSeq_OverlayType {
  * custom library. Otherwise idname is not used.
  */
 typedef struct FileSelectAssetLibraryUID {
-  short type;
+  short type; /* eFileAssetLibrary_Type */
   char _pad[2];
   /**
    * If showing a custom asset library (#FILE_ASSET_LIBRARY_CUSTOM), this is the index of the
@@ -846,6 +855,8 @@ typedef struct SpaceFile {
 
   short recentnr, bookmarknr;
   short systemnr, system_bookmarknr;
+
+  SpaceFile_Runtime *runtime;
 } SpaceFile;
 
 /* SpaceFile.browse_mode (File Space Browsing Mode) */
@@ -1835,6 +1846,47 @@ typedef struct SpaceStatusBar {
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Spreadsheet
+ * \{ */
+
+typedef struct SpaceSpreadsheet {
+  SpaceLink *next, *prev;
+  /** Storage of regions for inactive spaces. */
+  ListBase regionbase;
+  char spacetype;
+  char link_flag;
+  char _pad0[6];
+  /* End 'SpaceLink' header. */
+
+  struct ID *pinned_id;
+
+  /* eSpaceSpreadsheet_FilterFlag. */
+  uint8_t filter_flag;
+
+  /* #GeometryComponentType. */
+  uint8_t geometry_component_type;
+  /* #AttributeDomain. */
+  uint8_t attribute_domain;
+  /* eSpaceSpreadsheet_ObjectContext. */
+  uint8_t object_eval_state;
+
+  char _pad1[4];
+
+  SpaceSpreadsheet_Runtime *runtime;
+} SpaceSpreadsheet;
+
+/** \} */
+
+typedef enum eSpaceSpreadsheet_FilterFlag {
+  SPREADSHEET_FILTER_SELECTED_ONLY = (1 << 0),
+} eSpaceSpreadsheet_FilterFlag;
+
+typedef enum eSpaceSpreadsheet_ObjectEvalState {
+  SPREADSHEET_OBJECT_EVAL_STATE_FINAL = 0,
+  SPREADSHEET_OBJECT_EVAL_STATE_ORIGINAL = 1,
+} eSpaceSpreadsheet_Context;
+
+/* -------------------------------------------------------------------- */
 /** \name Space Defines (eSpace_Type)
  * \{ */
 
@@ -1871,8 +1923,9 @@ typedef enum eSpace_Type {
   SPACE_CLIP = 20,
   SPACE_TOPBAR = 21,
   SPACE_STATUSBAR = 22,
+  SPACE_SPREADSHEET = 23
 
-#define SPACE_TYPE_LAST SPACE_STATUSBAR
+#define SPACE_TYPE_LAST SPACE_SPREADSHEET
 } eSpace_Type;
 
 /* use for function args */

@@ -287,6 +287,9 @@ typedef struct wmNotifier {
 #define NC_TEXT (12 << 24)
 #define NC_WORLD (13 << 24)
 #define NC_ANIMATION (14 << 24)
+/* When passing a space as reference data with this (e.g. `WM_event_add_notifier(..., space)`),
+ * the notifier will only be sent to this space. That avoids unnecessary updates for unrelated
+ * spaces. */
 #define NC_SPACE (15 << 24)
 #define NC_GEOM (16 << 24)
 #define NC_NODE (17 << 24)
@@ -427,6 +430,7 @@ typedef struct wmNotifier {
 #define ND_SPACE_CHANGED (19 << 16) /*sent to a new editor type after it's replaced an old one*/
 #define ND_SPACE_CLIP (20 << 16)
 #define ND_SPACE_FILE_PREVIEW (21 << 16)
+#define ND_SPACE_SPREADSHEET (22 << 16)
 
 /* subtype, 256 entries too */
 #define NOTE_SUBTYPE 0x0000FF00
@@ -461,6 +465,7 @@ typedef struct wmNotifier {
 #define NA_SELECTED 6
 #define NA_ACTIVATED 7
 #define NA_PAINTING 8
+#define NA_JOB_FINISHED 9
 
 /* ************** Gesture Manager data ************** */
 
@@ -611,10 +616,6 @@ typedef struct wmEvent {
   short shift, ctrl, alt, oskey;
   /** Raw-key modifier (allow using any key as a modifier). */
   short keymodifier;
-
-  /** Set in case a #KM_PRESS went by unhandled. */
-  char check_click;
-  char check_drag;
 
   /** Tablet info, available for mouse move and button events. */
   wmTabletData tablet;

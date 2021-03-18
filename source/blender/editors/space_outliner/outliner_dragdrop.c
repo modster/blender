@@ -26,28 +26,21 @@
 #include "MEM_guardedalloc.h"
 
 #include "DNA_collection_types.h"
-#include "DNA_constraint_types.h"
 #include "DNA_material_types.h"
-#include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
 #include "DNA_space_types.h"
 
 #include "BLI_listbase.h"
-#include "BLI_string.h"
 
 #include "BLT_translation.h"
 
 #include "BKE_collection.h"
-#include "BKE_constraint.h"
 #include "BKE_context.h"
 #include "BKE_layer.h"
-#include "BKE_lib_id.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
 #include "BKE_object.h"
 #include "BKE_report.h"
-#include "BKE_scene.h"
-#include "BKE_shader_fx.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_build.h"
@@ -57,12 +50,9 @@
 #include "ED_screen.h"
 
 #include "UI_interface.h"
-#include "UI_resources.h"
 #include "UI_view2d.h"
 
 #include "RNA_access.h"
-#include "RNA_define.h"
-#include "RNA_enum_types.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -124,7 +114,7 @@ static ID *outliner_ID_drop_find(bContext *C, const wmEvent *event, short idcode
   TreeElement *te = outliner_drop_find(C, event);
   TreeStoreElem *tselem = (te) ? TREESTORE(te) : NULL;
 
-  if (te && te->idcode == idcode && tselem->type == 0) {
+  if (te && (te->idcode == idcode) && (tselem->type == TSE_SOME_ID)) {
     return tselem->id;
   }
   return NULL;
@@ -215,7 +205,7 @@ static bool is_collection_element(TreeElement *te)
 static bool is_object_element(TreeElement *te)
 {
   TreeStoreElem *tselem = TREESTORE(te);
-  return tselem->type == 0 && te->idcode == ID_OB;
+  return (tselem->type == TSE_SOME_ID) && te->idcode == ID_OB;
 }
 
 static bool is_pchan_element(TreeElement *te)
@@ -281,7 +271,7 @@ static int outliner_get_insert_index(TreeElement *drag_te,
 static bool parent_drop_allowed(TreeElement *te, Object *potential_child)
 {
   TreeStoreElem *tselem = TREESTORE(te);
-  if (te->idcode != ID_OB || tselem->type != 0) {
+  if ((te->idcode != ID_OB) || (tselem->type != TSE_SOME_ID)) {
     return false;
   }
 
@@ -421,7 +411,7 @@ static int parent_drop_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   TreeElement *te = outliner_drop_find(C, event);
   TreeStoreElem *tselem = te ? TREESTORE(te) : NULL;
 
-  if (!(te && te->idcode == ID_OB && tselem->type == 0)) {
+  if (!(te && (te->idcode == ID_OB) && (tselem->type == TSE_SOME_ID))) {
     return OPERATOR_CANCELLED;
   }
 
@@ -647,7 +637,7 @@ static int material_drop_invoke(bContext *C, wmOperator *UNUSED(op), const wmEve
   BKE_object_material_assign(bmain, ob, ma, ob->totcol + 1, BKE_MAT_ASSIGN_USERPREF);
 
   WM_event_add_notifier(C, NC_OBJECT | ND_OB_SHADING, ob);
-  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, CTX_wm_view3d(C));
+  WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, NULL);
   WM_event_add_notifier(C, NC_MATERIAL | ND_SHADING_LINKS, ma);
 
   return OPERATOR_FINISHED;
