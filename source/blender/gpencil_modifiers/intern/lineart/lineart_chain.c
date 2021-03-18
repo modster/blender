@@ -215,17 +215,17 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
     LineartVert *new_rv;
     float N[3] = {0};
 
-    if (e->tl) {
-      N[0] += e->tl->gn[0];
-      N[1] += e->tl->gn[1];
-      N[2] += e->tl->gn[2];
+    if (e->t1) {
+      N[0] += e->t1->gn[0];
+      N[1] += e->t1->gn[1];
+      N[2] += e->t1->gn[2];
     }
-    if (e->tr) {
-      N[0] += e->tr->gn[0];
-      N[1] += e->tr->gn[1];
-      N[2] += e->tr->gn[2];
+    if (e->t2) {
+      N[0] += e->t2->gn[0];
+      N[1] += e->t2->gn[1];
+      N[2] += e->t2->gn[2];
     }
-    if (e->tl || e->tr) {
+    if (e->t1 || e->t2) {
       normalize_v3(N);
     }
 
@@ -246,17 +246,17 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
     while (ba && (new_e = lineart_line_get_connected(ba, new_rv, &new_rv, e->flags))) {
       new_e->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;
 
-      if (new_e->tl || new_e->tr) {
+      if (new_e->t1 || new_e->t2) {
         zero_v3(N);
-        if (new_e->tl) {
-          N[0] += new_e->tl->gn[0];
-          N[1] += new_e->tl->gn[1];
-          N[2] += new_e->tl->gn[2];
+        if (new_e->t1) {
+          N[0] += new_e->t1->gn[0];
+          N[1] += new_e->t1->gn[1];
+          N[2] += new_e->t1->gn[2];
         }
-        if (new_e->tr) {
-          N[0] += new_e->tr->gn[0];
-          N[1] += new_e->tr->gn[1];
-          N[2] += new_e->tr->gn[2];
+        if (new_e->t2) {
+          N[0] += new_e->t2->gn[0];
+          N[1] += new_e->t2->gn[1];
+          N[2] += new_e->t2->gn[2];
         }
         normalize_v3(N);
       }
@@ -321,17 +321,17 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
     }
 
     /* Restore normal value. */
-    if (e->tl || e->tr) {
+    if (e->t1 || e->t2) {
       zero_v3(N);
-      if (e->tl) {
-        N[0] += e->tl->gn[0];
-        N[1] += e->tl->gn[1];
-        N[2] += e->tl->gn[2];
+      if (e->t1) {
+        N[0] += e->t1->gn[0];
+        N[1] += e->t1->gn[1];
+        N[2] += e->t1->gn[2];
       }
-      if (e->tr) {
-        N[0] += e->tr->gn[0];
-        N[1] += e->tr->gn[1];
-        N[2] += e->tr->gn[2];
+      if (e->t2) {
+        N[0] += e->t2->gn[0];
+        N[1] += e->t2->gn[1];
+        N[2] += e->t2->gn[2];
       }
       normalize_v3(N);
     }
@@ -376,17 +376,17 @@ void MOD_lineart_chain_feature_lines(LineartRenderBuffer *rb)
     while (ba && (new_e = lineart_line_get_connected(ba, new_rv, &new_rv, e->flags))) {
       new_e->flags |= LRT_EDGE_FLAG_CHAIN_PICKED;
 
-      if (new_e->tl || new_e->tr) {
+      if (new_e->t1 || new_e->t2) {
         zero_v3(N);
-        if (new_e->tl) {
-          N[0] += new_e->tl->gn[0];
-          N[1] += new_e->tl->gn[1];
-          N[2] += new_e->tl->gn[2];
+        if (new_e->t1) {
+          N[0] += new_e->t1->gn[0];
+          N[1] += new_e->t1->gn[1];
+          N[2] += new_e->t1->gn[2];
         }
-        if (new_e->tr) {
-          N[0] += new_e->tr->gn[0];
-          N[1] += new_e->tr->gn[1];
-          N[2] += new_e->tr->gn[2];
+        if (new_e->t2) {
+          N[0] += new_e->t2->gn[0];
+          N[1] += new_e->t2->gn[1];
+          N[2] += new_e->t2->gn[2];
         }
         normalize_v3(N);
       }

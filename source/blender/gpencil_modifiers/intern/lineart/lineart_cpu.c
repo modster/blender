@@ -774,16 +774,16 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
     e->v2 = (v2_link); \
     e->flags = new_flag; \
     e->object_ref = ob; \
-    e->tl = ((old_e->tl == rt) ? (newrt) : (old_e->tl)); \
-    e->tr = ((old_e->tr == rt) ? (newrt) : (old_e->tr)); \
+    e->t1 = ((old_e->t1 == rt) ? (newrt) : (old_e->t1)); \
+    e->t2 = ((old_e->t2 == rt) ? (newrt) : (old_e->t2)); \
     lineart_add_edge_to_list(rb, e); \
   }
 
 #define RELINK_RL(e_num, newrt) \
   if (rta->e[e_num]) { \
     old_e = rta->e[e_num]; \
-    old_e->tl = ((old_e->tl == rt) ? (newrt) : (old_e->tl)); \
-    old_e->tr = ((old_e->tr == rt) ? (newrt) : (old_e->tr)); \
+    old_e->t1 = ((old_e->t1 == rt) ? (newrt) : (old_e->t1)); \
+    old_e->t2 = ((old_e->t2 == rt) ? (newrt) : (old_e->t2)); \
   }
 
 #define REMOVE_TRIANGLE_RL \
@@ -865,7 +865,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         e->v2 = &rv[0];
         /* Only one adjacent triangle, because the other side is the near plane. */
         /* Use tl or tr doesn't matter. */
-        e->tl = rt1;
+        e->t1 = rt1;
         e->object_ref = ob;
 
         /* New line connecting original point 0 and a new point, only when it's a selected line. */
@@ -909,7 +909,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         }
         e->v1 = &rv[0];
         e->v2 = &rv[1];
-        e->tl = rt1;
+        e->t1 = rt1;
         e->object_ref = ob;
 
         SELECT_RL(2, rt->v[2], &rv[0], rt1)
@@ -950,7 +950,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         }
         e->v1 = &rv[1];
         e->v2 = &rv[0];
-        e->tl = rt1;
+        e->t1 = rt1;
         e->object_ref = ob;
 
         SELECT_RL(1, rt->v[1], &rv[0], rt1)
@@ -1022,7 +1022,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         }
         e->v1 = &rv[1];
         e->v2 = &rv[0];
-        e->tl = rt1;
+        e->t1 = rt1;
         e->object_ref = ob;
 
         /* New line connects new point 0 and old point 1,
@@ -1075,7 +1075,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         }
         e->v1 = &rv[1];
         e->v2 = &rv[0];
-        e->tl = rt1;
+        e->t1 = rt1;
         e->object_ref = ob;
 
         SELECT_RL(1, rt->v[2], &rv[0], rt1)
@@ -1123,7 +1123,7 @@ static void lineart_triangle_cull_single(LineartRenderBuffer *rb,
         }
         e->v1 = &rv[1];
         e->v2 = &rv[0];
-        e->tl = rt1;
+        e->t1 = rt1;
         e->object_ref = ob;
 
         SELECT_RL(2, rt->v[0], &rv[0], rt1)
@@ -1691,12 +1691,12 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       la_e->v2_obindex = la_e->v2->index - global_i;
       if (e->l) {
         int findex = BM_elem_index_get(e->l->f);
-        la_e->tl = lineart_triangle_from_index(rb, ort, findex);
-        lineart_triangle_adjacent_assign(la_e->tl, &orta[findex], la_e);
+        la_e->t1 = lineart_triangle_from_index(rb, ort, findex);
+        lineart_triangle_adjacent_assign(la_e->t1, &orta[findex], la_e);
         if (e->l->radial_next && e->l->radial_next != e->l) {
           findex = BM_elem_index_get(e->l->radial_next->f);
-          la_e->tr = lineart_triangle_from_index(rb, ort, findex);
-          lineart_triangle_adjacent_assign(la_e->tr, &orta[findex], la_e);
+          la_e->t2 = lineart_triangle_from_index(rb, ort, findex);
+          lineart_triangle_adjacent_assign(la_e->t2, &orta[findex], la_e);
         }
       }
       la_e->flags = e->head.hflag;
@@ -1880,7 +1880,7 @@ static bool lineart_edge_from_triangle(const LineartTriangle *rt,
                                        bool allow_overlapping_edges)
 {
   /* Normally we just determine from the pointer address. */
-  if (e->tl == rt || e->tr == rt) {
+  if (e->t1 == rt || e->t2 == rt) {
     return true;
   }
   /* If allows overlapping, then we compare the vertex coordinates one by one to determine if one
@@ -2459,8 +2459,8 @@ static LineartEdge *lineart_triangle_intersect(LineartRenderBuffer *rb,
   result = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartEdge));
   result->v1 = v1;
   result->v2 = v2;
-  result->tl = rt;
-  result->tr = testing;
+  result->t1 = rt;
+  result->t2 = testing;
 
   LineartLineSegment *rls = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartLineSegment));
   BLI_addtail(&result->segments, rls);
