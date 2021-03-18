@@ -2425,7 +2425,7 @@ static LineartEdge *lineart_triangle_intersect(LineartRenderBuffer *rb,
 
   result = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartEdge));
   result->v1 = v1;
-  result->v1 = v2;
+  result->v2 = v2;
   result->tl = rt;
   result->tr = testing;
 
