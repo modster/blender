@@ -289,6 +289,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiItemR(layout, ptr, "remove_doubles", 0, NULL, ICON_NONE);
   uiItemR(layout, ptr, "allow_overlapping_edges", 0, "Overlapping Edges As Contour", ICON_NONE);
+  uiItemR(layout, ptr, "allow_duplication", 0, NULL, ICON_NONE);
 
   gpencil_modifier_panel_end(layout, ptr);
 }
