@@ -2504,25 +2504,28 @@ static void lineart_triangle_intersect_in_bounding_area(LineartRenderBuffer *rb,
     testing_triangle = lip->data;
     rtt = (LineartTriangleThread *)testing_triangle;
 
-    if (testing_triangle == rt || rtt->testing_e[0] == (LineartEdge *)rt ||
-        (testing_triangle->flags & LRT_TRIANGLE_NO_INTERSECTION) ||
+    if (testing_triangle == rt || rtt->testing_e[0] == (LineartEdge *)rt) {
+      continue;
+    }
+    rtt->testing_e[0] = (LineartEdge *)rt;
+
+    if ((testing_triangle->flags & LRT_TRIANGLE_NO_INTERSECTION) ||
         ((testing_triangle->flags & LRT_TRIANGLE_INTERSECTION_ONLY) &&
-         (rt->flags & LRT_TRIANGLE_INTERSECTION_ONLY)) ||
-        lineart_triangle_share_edge(rt, testing_triangle)) {
+         (rt->flags & LRT_TRIANGLE_INTERSECTION_ONLY))) {
       continue;
     }
 
-    rtt->testing_e[0] = (LineartEdge *)rt;
     double *RG0 = testing_triangle->v[0]->gloc, *RG1 = testing_triangle->v[1]->gloc,
            *RG2 = testing_triangle->v[2]->gloc;
 
-    /* Bounding box not overlapping, not potential of intersecting. */
+    /* Bounding box not overlapping or triangles share edges, not potential of intersecting. */
     if ((MIN3(G0[2], G1[2], G2[2]) > MAX3(RG0[2], RG1[2], RG2[2])) ||
         (MAX3(G0[2], G1[2], G2[2]) < MIN3(RG0[2], RG1[2], RG2[2])) ||
         (MIN3(G0[0], G1[0], G2[0]) > MAX3(RG0[0], RG1[0], RG2[0])) ||
         (MAX3(G0[0], G1[0], G2[0]) < MIN3(RG0[0], RG1[0], RG2[0])) ||
         (MIN3(G0[1], G1[1], G2[1]) > MAX3(RG0[1], RG1[1], RG2[1])) ||
-        (MAX3(G0[1], G1[1], G2[1]) < MIN3(RG0[1], RG1[1], RG2[1]))) {
+        (MAX3(G0[1], G1[1], G2[1]) < MIN3(RG0[1], RG1[1], RG2[1])) ||
+        lineart_triangle_share_edge(rt, testing_triangle)) {
       continue;
     }
 
