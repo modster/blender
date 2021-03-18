@@ -1719,21 +1719,19 @@ static void lineart_geometry_object_load(Depsgraph *dg,
 #undef LRT_MESH_FINISH
 }
 
-static bool _lineart_object_not_in_source(LineartRenderBuffer *rb, Object *ob)
+static bool _lineart_object_not_in_source_collection(Collection *source, Object *ob)
 {
-  if (rb->_source_type == LRT_SOURCE_SCENE) {
+  CollectionChild *cc;
+  Collection *c = source->id.orig_id ? (Collection *)source->id.orig_id : source;
+  if (BKE_collection_has_object(c, (Object *)(ob->id.orig_id))) {
     return false;
   }
-  else if (rb->_source_type == LRT_SOURCE_OBJECT) {
-    return (ob != rb->_source_object);
-  }
-  else if (rb->_source_type == LRT_SOURCE_COLLECTION) {
-    if (!BKE_collection_has_object((Collection *)rb->_source_collection->id.orig_id,
-                                   (Object *)(ob->id.orig_id))) {
-      return true;
+  for (cc = source->children.first; cc; cc = cc->next) {
+    if (!_lineart_object_not_in_source_collection(cc->collection, ob)) {
+      return false;
     }
   }
-  return false;
+  return true;
 }
 
 /* See if this object in such collection is used for generating line art,
@@ -1782,8 +1780,15 @@ static int lineart_usage_check(Collection *c, Object *ob, LineartRenderBuffer *_
 
   /* Temp solution to speed up calculation in the modifier without cache. See the definition of
    * rb->_source_type for details. */
-  if (_lineart_object_not_in_source(_rb, ob)) {
-    return OBJECT_LRT_OCCLUSION_ONLY;
+  if (_rb->_source_type == LRT_SOURCE_OBJECT) {
+    if (ob != _rb->_source_object) {
+      return OBJECT_LRT_OCCLUSION_ONLY;
+    }
+  }
+  else if (_rb->_source_type == LRT_SOURCE_COLLECTION) {
+    if (_lineart_object_not_in_source_collection(_rb->_source_collection, ob)) {
+      return OBJECT_LRT_OCCLUSION_ONLY;
+    }
   }
 
   return OBJECT_LRT_INHERENT;
