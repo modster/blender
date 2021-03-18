@@ -2163,17 +2163,8 @@ void uiTemplateList(uiLayout *layout,
                     int columns,
                     bool sort_reverse,
                     bool sort_lock);
-struct TemplateListIterData;
-typedef void (*uiTemplateListItemIterFn)(struct TemplateListIterData *iter_data,
-                                         struct PointerRNA *itemptr);
-typedef void (*uiTemplateListItemsIterFn)(struct PointerRNA *dataptr,
-                                          struct PropertyRNA *prop,
-                                          struct TemplateListIterData *iter_data,
-                                          uiTemplateListItemIterFn fn,
-                                          void *customdata);
 struct uiList *uiTemplateList_ex(uiLayout *layout,
                                  struct bContext *C,
-                                 uiTemplateListItemsIterFn iter_items,
                                  const char *listtype_name,
                                  const char *list_id,
                                  struct PointerRNA *dataptr,
@@ -2237,6 +2228,8 @@ void uiTemplateAssetView(struct uiLayout *layout,
                          struct bContext *C,
                          struct PointerRNA *asset_library_dataptr,
                          const char *asset_library_propname,
+                         struct PointerRNA *assets_dataptr,
+                         const char *assets_propname,
                          struct PointerRNA *active_dataptr,
                          const char *active_propname,
                          const struct AssetFilterSettings *filter_settings);

@@ -1916,7 +1916,9 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
    */
   {
     /* Keep this block, even when empty. */
+  }
 
+  {
     if (!DNA_struct_elem_find(
             fd->filesdna, "WorkSpace", "AssetLibraryReference", "active_asset_library")) {
       LISTBASE_FOREACH (WorkSpace *, workspace, &bmain->workspaces) {

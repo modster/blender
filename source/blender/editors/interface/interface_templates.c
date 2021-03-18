@@ -102,7 +102,7 @@
 // #define USE_OP_RESET_BUT
 
 /* defines for templateID/TemplateSearch */
-#define TEMPLATE_SEARCH_TEXTBUT_WIDTH (UI_UNIT_X * 6)
+#define TEMPLATE_SEARCH_TEXTBUT_MIN_WIDTH (UI_UNIT_X * 6)
 #define TEMPLATE_SEARCH_TEXTBUT_HEIGHT UI_UNIT_Y
 
 void UI_template_fix_linking(void)
@@ -124,6 +124,33 @@ void uiTemplateHeader(uiLayout *layout, bContext *C)
 /* -------------------------------------------------------------------- */
 /** \name Search Menu Helpers
  * \{ */
+
+static int template_search_textbut_width(PointerRNA *ptr, PropertyRNA *name_prop)
+{
+  char str[UI_MAX_DRAW_STR];
+  int buf_len = 0;
+
+  BLI_assert(RNA_property_type(name_prop) == PROP_STRING);
+
+  const char *name = RNA_property_string_get_alloc(ptr, name_prop, str, sizeof(str), &buf_len);
+
+  const uiFontStyle *fstyle = UI_FSTYLE_WIDGET;
+  const int margin = UI_UNIT_X * 0.75f;
+  const int estimated_width = UI_fontstyle_string_width(fstyle, name) + margin;
+
+  if (name != str) {
+    MEM_freeN((void *)name);
+  }
+
+  /* Clamp to some min/max width. */
+  return CLAMPIS(
+      estimated_width, TEMPLATE_SEARCH_TEXTBUT_MIN_WIDTH, TEMPLATE_SEARCH_TEXTBUT_MIN_WIDTH * 3);
+}
+
+static int template_search_textbut_height(void)
+{
+  return TEMPLATE_SEARCH_TEXTBUT_HEIGHT;
+}
 
 /**
  * Add a block button for the search menu for templateID and templateSearch.
@@ -954,6 +981,10 @@ static void template_ID(const bContext *C,
     char name[UI_MAX_NAME_STR];
     const bool user_alert = (id->us <= 0);
 
+    const int width = template_search_textbut_width(&idptr,
+                                                    RNA_struct_find_property(&idptr, "name"));
+    const int height = template_search_textbut_height();
+
     // text_idbutton(id, name);
     name[0] = '\0';
     but = uiDefButR(block,
@@ -962,8 +993,8 @@ static void template_ID(const bContext *C,
                     name,
                     0,
                     0,
-                    TEMPLATE_SEARCH_TEXTBUT_WIDTH,
-                    TEMPLATE_SEARCH_TEXTBUT_HEIGHT,
+                    width,
+                    height,
                     &idptr,
                     "name",
                     -1,
@@ -1682,16 +1713,10 @@ static void template_search_add_button_name(uiBlock *block,
                                             PointerRNA *active_ptr,
                                             const StructRNA *type)
 {
-  uiDefAutoButR(block,
-                active_ptr,
-                RNA_struct_name_property(type),
-                0,
-                "",
-                ICON_NONE,
-                0,
-                0,
-                TEMPLATE_SEARCH_TEXTBUT_WIDTH,
-                TEMPLATE_SEARCH_TEXTBUT_HEIGHT);
+  PropertyRNA *name_prop = RNA_struct_name_property(type);
+  const int width = template_search_textbut_width(active_ptr, name_prop);
+  const int height = template_search_textbut_height();
+  uiDefAutoButR(block, active_ptr, name_prop, 0, "", ICON_NONE, 0, 0, width, height);
 }
 
 static void template_search_add_button_operator(uiBlock *block,
@@ -5817,6 +5842,9 @@ typedef struct {
   int active_item_idx;
 } TemplateListInputData;
 
+/**
+ * Internal wrapper for a single item in the list (well, actually stored as a vector).
+ */
 typedef struct {
   PointerRNA item;
   int org_idx;
@@ -5848,24 +5876,6 @@ typedef struct {
   int start_idx;    /* Index of first item to display. */
   int end_idx;      /* Index of last item to display + 1. */
 } TemplateListVisualInfo;
-
-/**
- * For internal use only, but external users that set the iterator-callback via #uiTemplate
- */
-typedef struct TemplateListIterData {
-  uiListDyn *dyn_data;
-
-  _uilist_item *items_ptr;
-
-  int filter_exclude;
-  bool order_reverse;
-  bool activei_mapping_pending;
-  int activei;
-
-  /* Just for the callback */
-  int current_iter_idx;
-  int reorder_idx;
-} TemplateListIterData;
 
 /**
  * Validate input parameters and initialize \a r_data from that. Plus find the list-type and return
@@ -5939,44 +5949,43 @@ static bool ui_template_list_data_retrieve(const char *listtype_name,
   return true;
 }
 
-static void ui_template_list_count_items_cb(TemplateListIterData *iter_data,
-                                            PointerRNA *UNUSED(itemptr))
+static void ui_template_list_collect_items(PointerRNA *list_ptr,
+                                           PropertyRNA *list_prop,
+                                           uiListDyn *dyn_data,
+                                           int filter_exclude,
+                                           bool order_reverse,
+                                           int activei,
+                                           TemplateListItems *r_items)
 {
-  iter_data->dyn_data->items_shown++;
-  iter_data->dyn_data->items_len++;
-}
+  int i = 0;
+  int reorder_i = 0;
+  bool activei_mapping_pending = true;
 
-static void ui_template_list_collect_item_cb(TemplateListIterData *iter_data, PointerRNA *itemptr)
-{
-  uiListDyn *dyn_data = iter_data->dyn_data;
+  RNA_PROP_BEGIN (list_ptr, itemptr, list_prop) {
+    if (!dyn_data->items_filter_flags ||
+        ((dyn_data->items_filter_flags[i] & UILST_FLT_ITEM) ^ filter_exclude)) {
+      int new_order_idx;
+      if (dyn_data->items_filter_neworder) {
+        new_order_idx = dyn_data->items_filter_neworder[reorder_i++];
+        new_order_idx = order_reverse ? dyn_data->items_shown - new_order_idx - 1 : new_order_idx;
+      }
+      else {
+        new_order_idx = order_reverse ? dyn_data->items_shown - ++reorder_i : reorder_i++;
+      }
+      // printf("%s: ii: %d\n", __func__, ii);
+      r_items->item_vec[new_order_idx].item = itemptr;
+      r_items->item_vec[new_order_idx].org_idx = i;
+      r_items->item_vec[new_order_idx].flt_flag = dyn_data->items_filter_flags ?
+                                                      dyn_data->items_filter_flags[i] :
+                                                      0;
 
-  if (!dyn_data->items_filter_flags ||
-      ((dyn_data->items_filter_flags[iter_data->current_iter_idx] & UILST_FLT_ITEM) ^
-       iter_data->filter_exclude)) {
-    int new_order_idx;
-    if (dyn_data->items_filter_neworder) {
-      new_order_idx = dyn_data->items_filter_neworder[iter_data->reorder_idx++];
-      new_order_idx = iter_data->order_reverse ? dyn_data->items_shown - new_order_idx - 1 :
-                                                 new_order_idx;
-    }
-    else {
-      new_order_idx = iter_data->order_reverse ? dyn_data->items_shown - ++iter_data->reorder_idx :
-                                                 iter_data->reorder_idx++;
-    }
-    // printf("%s: ii: %d\n", __func__, ii);
-    iter_data->items_ptr[new_order_idx].item = *itemptr;
-    iter_data->items_ptr[new_order_idx].org_idx = iter_data->current_iter_idx;
-    iter_data->items_ptr[new_order_idx].flt_flag =
-        dyn_data->items_filter_flags ? dyn_data->items_filter_flags[iter_data->current_iter_idx] :
-                                       0;
-
-    if (iter_data->activei_mapping_pending && iter_data->activei == iter_data->current_iter_idx) {
-      iter_data->activei = new_order_idx;
-      /* So that we do not map again activei! */
-      iter_data->activei_mapping_pending = false;
-    }
+      if (activei_mapping_pending && activei == i) {
+        activei = new_order_idx;
+        /* So that we do not map again activei! */
+        activei_mapping_pending = false;
+      }
 #if 0 /* For now, do not alter active element, even if it will be hidden... */
-          else if (activei < iter_data->current_iter_idx) {
+          else if (activei < i) {
             /* We do not want an active but invisible item!
              * Only exception is when all items are filtered out...
              */
@@ -5986,14 +5995,19 @@ static void ui_template_list_collect_item_cb(TemplateListIterData *iter_data, Po
             }
             else {
               activei = new_order_idx;
-              RNA_property_int_set(active_dataptr, activeprop, iter_data->current_iter_idx);
+              RNA_property_int_set(active_dataptr, activeprop, i);
             }
           }
-          prev_i = iter_data->current_iter_idx;
+          prev_i = i;
           prev_ii = new_order_idx;
 #endif
+    }
+    i++;
   }
-  iter_data->current_iter_idx++;
+  RNA_PROP_END;
+
+  /* If mapping is still pending, no active item was found. Mark as invalid (-1) */
+  r_items->active_item_idx = activei_mapping_pending ? -1 : activei;
 }
 
 /**
@@ -6002,7 +6016,6 @@ static void ui_template_list_collect_item_cb(TemplateListIterData *iter_data, Po
 static void ui_template_list_collect_display_items(bContext *C,
                                                    uiList *ui_list,
                                                    const TemplateListInputData *input_data,
-                                                   const uiTemplateListItemsIterFn iter_items_fn,
                                                    const uiListFilterItemsFunc filter_items_fn,
                                                    TemplateListItems *r_items)
 {
@@ -6010,8 +6023,7 @@ static void ui_template_list_collect_display_items(bContext *C,
   memset(r_items, 0, sizeof(*r_items));
 
   /* Filter list items! (not for compact layout, though) */
-  if ((ui_list->layout_type == UILST_LAYOUT_BIG_PREVIEW_GRID) ||
-      (input_data->dataptr && input_data->dataptr->data && input_data->prop)) {
+  if (input_data->dataptr->data && input_data->prop) {
     const int filter_exclude = ui_list->filter_flag & UILST_FLT_EXCLUDE;
     const bool order_reverse = (ui_list->filter_sort_flag & UILST_FLT_SORT_REVERSE) != 0;
     int items_shown;
@@ -6022,18 +6034,6 @@ static void ui_template_list_collect_display_items(bContext *C,
     if (ui_list->layout_type == UILST_LAYOUT_COMPACT) {
       dyn_data->items_len = dyn_data->items_shown = RNA_property_collection_length(
           input_data->dataptr, input_data->prop);
-    }
-    /* TODO support filtering. */
-    else if (ui_list->layout_type == UILST_LAYOUT_BIG_PREVIEW_GRID) {
-      TemplateListIterData iter_data = {
-          .dyn_data = dyn_data,
-      };
-      dyn_data->items_len = dyn_data->items_shown = 0;
-      iter_items_fn(input_data->dataptr,
-                    input_data->prop,
-                    &iter_data,
-                    ui_template_list_count_items_cb,
-                    dyn_data->customdata);
     }
     else {
       // printf("%s: filtering...\n", __func__);
@@ -6046,23 +6046,13 @@ static void ui_template_list_collect_display_items(bContext *C,
       r_items->item_vec = MEM_mallocN(sizeof(*r_items->item_vec) * items_shown, __func__);
       // printf("%s: items shown: %d.\n", __func__, items_shown);
 
-      TemplateListIterData iter_data = {
-          .dyn_data = dyn_data,
-          .items_ptr = r_items->item_vec,
-          .filter_exclude = filter_exclude,
-          .order_reverse = order_reverse,
-          .activei_mapping_pending = true,
-          .activei = input_data->active_item_idx,
-      };
-
-      iter_items_fn(input_data->dataptr,
-                    input_data->prop,
-                    &iter_data,
-                    ui_template_list_collect_item_cb,
-                    dyn_data->customdata);
-
-      /* If mapping is still pending, no active item was found. Mark as invalid (-1) */
-      r_items->active_item_idx = iter_data.activei_mapping_pending ? -1 : iter_data.activei;
+      ui_template_list_collect_items(input_data->dataptr,
+                                     input_data->prop,
+                                     dyn_data,
+                                     filter_exclude,
+                                     order_reverse,
+                                     input_data->active_item_idx,
+                                     r_items);
     }
     if (dyn_data->items_shown >= 0) {
       r_items->tot_items = dyn_data->items_shown;
@@ -6256,7 +6246,7 @@ static void ui_template_list_layout_draw(bContext *C,
   uiBlock *block = uiLayoutGetBlock(layout);
 
   /* get icon */
-  if (input_data->dataptr && input_data->dataptr->data && input_data->prop) {
+  if (input_data->dataptr->data && input_data->prop) {
     StructRNA *ptype = RNA_property_pointer_type(input_data->dataptr, input_data->prop);
     rnaicon = RNA_struct_ui_icon(ptype);
   }
@@ -6276,7 +6266,7 @@ static void ui_template_list_layout_draw(bContext *C,
       uilist_prepare(ui_list, items, &adjusted_layout_data, &visual_info);
 
       int i = 0;
-      if (input_data->dataptr && input_data->dataptr->data && input_data->prop) {
+      if (input_data->dataptr->data && input_data->prop) {
         /* create list items */
         for (i = visual_info.start_idx; i < visual_info.end_idx; i++) {
           PointerRNA *itemptr = &items->item_vec[i].item;
@@ -6370,9 +6360,8 @@ static void ui_template_list_layout_draw(bContext *C,
     case UILST_LAYOUT_COMPACT:
       row = uiLayoutRow(layout, true);
 
-      if ((input_data->dataptr && input_data->dataptr->data && input_data->prop) &&
-          (dyn_data->items_shown > 0) && (items->active_item_idx >= 0) &&
-          (items->active_item_idx < dyn_data->items_shown)) {
+      if ((input_data->dataptr->data && input_data->prop) && (dyn_data->items_shown > 0) &&
+          (items->active_item_idx >= 0) && (items->active_item_idx < dyn_data->items_shown)) {
         PointerRNA *itemptr = &items->item_vec[items->active_item_idx].item;
         const int org_i = items->item_vec[items->active_item_idx].org_idx;
 
@@ -6536,8 +6525,7 @@ static void ui_template_list_layout_draw(bContext *C,
       adjusted_layout_data.columns = cols_per_row;
       uilist_prepare(ui_list, items, &adjusted_layout_data, &visual_info);
 
-      /* TODO hack! */
-      if (true || (input_data->dataptr->data && input_data->prop)) {
+      if (input_data->dataptr->data && input_data->prop) {
         /* create list items */
         for (int i = visual_info.start_idx; i < visual_info.end_idx; i++) {
           PointerRNA *itemptr = &items->item_vec[i].item;
@@ -6728,7 +6716,6 @@ static void ui_template_list_layout_draw(bContext *C,
 
 uiList *uiTemplateList_ex(uiLayout *layout,
                           bContext *C,
-                          uiTemplateListItemsIterFn iter_items,
                           const char *listtype_name,
                           const char *list_id,
                           PointerRNA *dataptr,
@@ -6778,8 +6765,7 @@ uiList *uiTemplateList_ex(uiLayout *layout,
   }
 
   TemplateListItems items;
-  ui_template_list_collect_display_items(
-      C, ui_list, &input_data, iter_items, filter_items, &items);
+  ui_template_list_collect_display_items(C, ui_list, &input_data, filter_items, &items);
 
   TemplateListLayoutDrawData layout_data = {
       .draw_item = draw_item,
@@ -6794,18 +6780,6 @@ uiList *uiTemplateList_ex(uiLayout *layout,
   ui_template_list_free_items(&items);
 
   return ui_list;
-}
-
-static void template_list_rna_collection_iter_fn(PointerRNA *dataptr,
-                                                 PropertyRNA *prop,
-                                                 TemplateListIterData *iter_data,
-                                                 uiTemplateListItemIterFn fn,
-                                                 void *UNUSED(customdata))
-{
-  RNA_PROP_BEGIN (dataptr, itemptr, prop) {
-    fn(iter_data, &itemptr);
-  }
-  RNA_PROP_END;
 }
 
 void uiTemplateList(uiLayout *layout,
@@ -6826,7 +6800,6 @@ void uiTemplateList(uiLayout *layout,
 {
   uiTemplateList_ex(layout,
                     C,
-                    template_list_rna_collection_iter_fn,
                     listtype_name,
                     list_id,
                     dataptr,

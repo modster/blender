@@ -87,11 +87,16 @@ static void asset_view_draw_item(uiList *ui_list,
 {
   AssetViewListData *list_data = (AssetViewListData *)ui_list->dyn_data->customdata;
 
-  PropertyRNA *nameprop = RNA_struct_name_property(itemptr->type);
-  char str[MAX_NAME];
-  RNA_property_string_get(itemptr, nameprop, str);
+  BLI_assert(RNA_struct_is_a(itemptr->type, &RNA_AssetHandle));
 
-  FileDirEntry *file = (FileDirEntry *)itemptr->data;
+  PropertyRNA *file_data_prop = RNA_struct_find_property(itemptr, "file_data");
+  PointerRNA fileptr = RNA_property_pointer_get(itemptr, file_data_prop);
+  FileDirEntry *file = (FileDirEntry *)fileptr.data;
+
+  PropertyRNA *nameprop = RNA_struct_name_property(fileptr.type);
+  char str[MAX_NAME];
+  RNA_property_string_get(&fileptr, nameprop, str);
+
   uiBlock *block = uiLayoutGetBlock(layout);
   /* TODO ED_fileselect_init_layout(). Share somehow? */
   float size_x = (96.0f / 20.0f) * UI_UNIT_X;
@@ -140,17 +145,38 @@ void ED_uilisttypes_ui()
   WM_uilisttype_add(UI_UL_asset_view());
 }
 
-static void asset_view_template_list_item_iter_fn(PointerRNA *UNUSED(dataptr),
-                                                  PropertyRNA *UNUSED(prop),
-                                                  TemplateListIterData *iter_data,
-                                                  uiTemplateListItemIterFn fn,
-                                                  void *customdata)
+static void asset_view_template_refresh_asset_collection(
+    const AssetLibraryReference &asset_library,
+    PointerRNA &assets_dataptr,
+    const char *assets_propname)
 {
-  AssetViewListData *asset_iter_data = (AssetViewListData *)customdata;
-  ED_assetlist_iterate(&asset_iter_data->asset_library, [&](FileDirEntry &file) {
-    PointerRNA itemptr;
-    RNA_pointer_create(&asset_iter_data->screen->id, &RNA_FileSelectEntry, &file, &itemptr);
-    fn(iter_data, &itemptr);
+  PropertyRNA *assets_prop = RNA_struct_find_property(&assets_dataptr, assets_propname);
+  if (!assets_prop) {
+    RNA_warning("Asset collection not found");
+    return;
+  }
+  if (!RNA_struct_is_a(RNA_property_pointer_type(&assets_dataptr, assets_prop),
+                       &RNA_AssetHandle)) {
+    RNA_warning("Expected a collection property for AssetHandle items");
+    return;
+  }
+
+  RNA_property_collection_clear(&assets_dataptr, assets_prop);
+
+  ED_assetlist_iterate(&asset_library, [&](FileDirEntry &file) {
+    PointerRNA itemptr, fileptr;
+    RNA_property_collection_add(&assets_dataptr, assets_prop, &itemptr);
+
+    RNA_pointer_create(nullptr, &RNA_FileSelectEntry, &file, &fileptr);
+    RNA_pointer_set(&itemptr, "file_data", fileptr);
+
+    /* Copy name from file to asset-handle name ID-property. */
+    char name[MAX_NAME];
+    PropertyRNA *file_name_prop = RNA_struct_name_property(fileptr.type);
+    RNA_property_string_get(&fileptr, file_name_prop, name);
+    PropertyRNA *asset_name_prop = RNA_struct_name_property(&RNA_AssetHandle);
+    RNA_property_string_set(&itemptr, asset_name_prop, name);
+
     return true;
   });
 }
@@ -159,6 +185,8 @@ void uiTemplateAssetView(uiLayout *layout,
                          bContext *C,
                          PointerRNA *asset_library_dataptr,
                          const char *asset_library_propname,
+                         PointerRNA *assets_dataptr,
+                         const char *assets_propname,
                          PointerRNA *active_dataptr,
                          const char *active_propname,
                          const AssetFilterSettings *filter_settings)
@@ -174,21 +202,21 @@ void uiTemplateAssetView(uiLayout *layout,
   ED_assetlist_fetch(&asset_library, filter_settings, C);
   ED_assetlist_ensure_previews_job(&asset_library, C);
 
+  asset_view_template_refresh_asset_collection(asset_library, *assets_dataptr, assets_propname);
+
   AssetViewListData *list_data = (AssetViewListData *)MEM_mallocN(sizeof(*list_data),
                                                                   "AssetViewListData");
   list_data->asset_library = asset_library;
   list_data->screen = CTX_wm_screen(C);
 
-  PointerRNA rna_nullptr = PointerRNA_NULL;
   /* TODO can we have some kind of model-view API to handle referencing, filtering and lazy loading
    * (of previews) of the items? */
   uiList *list = uiTemplateList_ex(col,
                                    C,
-                                   asset_view_template_list_item_iter_fn,
                                    "UI_UL_asset_view",
                                    "asset_view",
-                                   &rna_nullptr,
-                                   "",
+                                   assets_dataptr,
+                                   assets_propname,
                                    active_dataptr,
                                    active_propname,
                                    nullptr,

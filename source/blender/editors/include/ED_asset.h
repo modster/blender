@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "DNA_asset_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
