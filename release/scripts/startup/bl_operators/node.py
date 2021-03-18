@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import bpy
 import nodeitems_utils
+from mathutils import Vector
 from bpy.types import (
     Operator,
     PropertyGroup,
@@ -343,6 +344,59 @@ class NODE_OT_follow_portal(Operator):
         bpy.ops.node.view_selected()
         return {'FINISHED'}
 
+PAGE_SIZE = 10000
+
+def get_page_center(page):
+    return Vector((page * PAGE_SIZE, 0))
+
+def node_is_on_page(node, page):
+    page_center = get_page_center(page)
+    return (abs(page_center.x - node.location.x) < PAGE_SIZE / 2
+        and abs(page_center.y - node.location.y) < PAGE_SIZE / 2)
+
+def get_nodes_on_page(ntree, page):
+    return [n for n in ntree.nodes if node_is_on_page(n, page)]
+
+class NODE_OT_goto_page(Operator):
+    '''Goto page'''
+    bl_idname = "node.goto_page"
+    bl_label = "Goto Page"
+
+    page: bpy.props.IntProperty(default=0)
+
+    @classmethod
+    def poll(cls, context):
+        space = context.space_data
+        return space.type == 'NODE_EDITOR'
+
+    def execute(self, context):
+        space = context.space_data
+        ntree = space.node_tree
+        for node in ntree.nodes:
+            node.select = False
+
+        nodes_on_page = get_nodes_on_page(ntree, self.page)
+        if len(nodes_on_page) > 0:
+            for node in nodes_on_page:
+                node.select = True
+            bpy.ops.node.view_selected()
+            for node in nodes_on_page:
+                node.select = False
+            ntree.nodes.active = None
+        else:
+            page_center = get_page_center(self.page)
+            new_node = ntree.nodes.new('NodeReroute')
+            new_node.select = True
+            new_node.location = page_center
+
+            context_copy = context.copy()
+            def update_after_draw():
+                bpy.ops.node.view_selected(context_copy)
+                ntree.nodes.remove(new_node)
+            bpy.app.timers.register(update_after_draw, first_interval=0.01)
+
+        return {'FINISHED'}
+
 
 classes = (
     NodeSetting,
@@ -353,4 +407,5 @@ classes = (
     NODE_OT_collapse_hide_unused_toggle,
     NODE_OT_tree_path_parent,
     NODE_OT_follow_portal,
+    NODE_OT_goto_page,
 )

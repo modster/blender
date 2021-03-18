@@ -168,6 +168,11 @@ class NODE_HT_header(Header):
                 else:
                     row.template_ID(snode, "node_tree", new="node.new_geometry_nodes_modifier")
 
+            row = layout.row(align=True)
+            for page in range(5):
+                props = row.operator("node.goto_page", text=str(page))
+                props.page = page
+
         else:
             # Custom node tree is edited as independent ID block
             NODE_MT_editor_menus.draw_collapsible(context, layout)
