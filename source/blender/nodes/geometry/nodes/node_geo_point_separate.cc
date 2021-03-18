@@ -246,14 +246,20 @@ static void geo_node_point_separate_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
   const std::string mask_attribute_name = params.extract_input<std::string>("Mask");
-  GeometrySet out_set_a;
-  GeometrySet out_set_b;
   if (mask_attribute_name.empty()) {
-    params.set_output("Geometry 1", std::move(geometry_set));
-    params.set_output("Geometry 2", std::move(out_set_b));
+    params.set_output("Geometry 1", std::move(GeometrySet()));
+    params.set_output("Geometry 2", std::move(GeometrySet()));
   }
 
   Vector<GeometryInstanceGroup> set_groups = bke::geometry_set_gather_instances(geometry_set);
+
+  /* Remove any set inputs that don't contain points, to avoid checking later on. */
+  for (int i = set_groups.size() - 1; i >= 0; i--) {
+    const GeometrySet &set = set_groups[i].geometry_set;
+    if (!set.has_mesh() && !set.has_pointcloud()) {
+      set_groups.remove_and_reorder(i);
+    }
+  }
 
   int instances_len = 0;
   for (const GeometryInstanceGroup &set_group : set_groups) {
@@ -264,19 +270,20 @@ static void geo_node_point_separate_exec(GeoNodeExecParams params)
   Array<Vector<float3>> positions_b(instances_len);
   get_positions_from_instances(set_groups, mask_attribute_name, positions_a, positions_b);
 
-  PointCloudComponent &component_a = out_set_a.get_component_for_write<PointCloudComponent>();
-  PointCloudComponent &component_b = out_set_b.get_component_for_write<PointCloudComponent>();
-  component_a.replace(create_point_cloud(positions_a));
-  component_a.replace(create_point_cloud(positions_b));
+  GeometrySet out_set_a = GeometrySet::create_with_pointcloud(create_point_cloud(positions_a));
+  GeometrySet out_set_b = GeometrySet::create_with_pointcloud(create_point_cloud(positions_b));
 
   Map<std::string, AttributeKind> result_attributes_info;
   bke::gather_attribute_info(result_attributes_info,
-                             {GeometryComponentType::Mesh, GeometryComponentType::PointCloud},
+                             {GEO_COMPONENT_TYPE_MESH, GEO_COMPONENT_TYPE_POINT_CLOUD},
                              set_groups,
-                             {});
+                             {"position"});
 
-  copy_attributes_to_output(
-      set_groups, result_attributes_info, mask_attribute_name, component_a, component_b);
+  copy_attributes_to_output(set_groups,
+                            result_attributes_info,
+                            mask_attribute_name,
+                            out_set_a.get_component_for_write<PointCloudComponent>(),
+                            out_set_b.get_component_for_write<PointCloudComponent>());
 
   params.set_output("Geometry 1", std::move(out_set_a));
   params.set_output("Geometry 2", std::move(out_set_b));
