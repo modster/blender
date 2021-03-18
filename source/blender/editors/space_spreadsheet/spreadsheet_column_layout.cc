@@ -172,6 +172,24 @@ class ColumnLayoutDrawer : public SpreadsheetDrawer {
                        0,
                        nullptr);
     }
+    else if (std::holds_alternative<IconText>(cell_value.value)) {
+      const IconText value = *std::get_if<IconText>(&cell_value.value);
+      uiDefIconTextBut(params.block,
+                       UI_BTYPE_LABEL,
+                       0,
+                       value.icon_id,
+                       value.string.data(),
+                       params.xmin,
+                       params.ymin,
+                       params.width,
+                       params.height,
+                       nullptr,
+                       0,
+                       0,
+                       0,
+                       0,
+                       nullptr);
+    }
   }
 
   int column_width(int column_index) const final

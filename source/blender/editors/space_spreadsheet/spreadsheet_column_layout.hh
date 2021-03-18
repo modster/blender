@@ -22,6 +22,11 @@
 
 namespace blender::ed::spreadsheet {
 
+struct IconText {
+  int icon_id;
+  StringRefNull string;
+};
+
 /**
  * This is a small type that can hold the value of a cell in a spreadsheet. This type allows us to
  * decouple the drawing of individual cells from the code that generates the data to be displayed.
@@ -30,7 +35,7 @@ class CellValue {
  public:
   /* The implementation just uses a `std::variant` for simplicity. It can be encapsulated better,
    * but it's not really worth the complixity for now. */
-  using VariantType = std::variant<std::monostate, int, float, bool>;
+  using VariantType = std::variant<std::monostate, int, float, bool, IconText>;
 
   VariantType value;
 };

@@ -79,6 +79,25 @@ struct float4x4 {
     return m * float3(v);
   }
 
+  float3 translation() const
+  {
+    return float3(values[3]);
+  }
+
+  float3 to_euler() const
+  {
+    float3 euler;
+    mat4_to_eul(euler, values);
+    return euler;
+  }
+
+  float3 scale() const
+  {
+    float3 scale;
+    mat4_to_size(scale, values);
+    return scale;
+  }
+
   float4x4 inverted() const
   {
     float4x4 result;
