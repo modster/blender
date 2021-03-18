@@ -39,9 +39,9 @@ bool ED_asset_can_make_single_from_context(const struct bContext *C);
 int ED_asset_library_reference_to_enum_value(const struct AssetLibraryReference *library);
 struct AssetLibraryReference ED_asset_library_reference_from_enum_value(int value);
 
-void ED_assetlist_fetch(const struct AssetLibraryReference *library_reference,
-                        const struct AssetFilterSettings *filter_settings,
-                        const struct bContext *C);
+void ED_assetlist_storage_fetch(const struct AssetLibraryReference *library_reference,
+                                const struct AssetFilterSettings *filter_settings,
+                                const struct bContext *C);
 void ED_assetlist_ensure_previews_job(const struct AssetLibraryReference *library_reference,
                                       struct bContext *C);
 void ED_assetlist_storage_tag_main_data_dirty(void);
