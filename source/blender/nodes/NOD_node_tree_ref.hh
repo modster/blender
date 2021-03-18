@@ -169,6 +169,8 @@ class NodeRef : NonCopyable, NonMovable {
   bool is_group_input_node() const;
   bool is_group_output_node() const;
   bool is_muted() const;
+  bool is_portal_in() const;
+  bool is_portal_out() const;
 };
 
 class LinkRef : NonCopyable, NonMovable {
@@ -213,6 +215,8 @@ class NodeTreeRef : NonCopyable, NonMovable {
   Vector<OutputSocketRef *> output_sockets_;
   Vector<LinkRef *> links_;
   MultiValueMap<const bNodeType *, NodeRef *> nodes_by_type_;
+  MultiValueMap<int, NodeRef *> portal_in_nodes_by_id_;
+  MultiValueMap<int, NodeRef *> portal_out_nodes_by_id_;
 
  public:
   NodeTreeRef(bNodeTree *btree);
@@ -227,6 +231,9 @@ class NodeTreeRef : NonCopyable, NonMovable {
   Span<const OutputSocketRef *> output_sockets() const;
 
   Span<const LinkRef *> links() const;
+
+  Span<const NodeRef *> portal_in_nodes_by_id(int portal_id) const;
+  Span<const NodeRef *> portal_out_nodes_by_id(int portal_id) const;
 
   bool has_link_cycles() const;
 
@@ -507,6 +514,16 @@ inline bool NodeRef::is_muted() const
   return (bnode_->flag & NODE_MUTED) != 0;
 }
 
+inline bool NodeRef::is_portal_in() const
+{
+  return bnode_->type == NODE_PORTAL_IN;
+}
+
+inline bool NodeRef::is_portal_out() const
+{
+  return bnode_->type == NODE_PORTAL_OUT;
+}
+
 /* --------------------------------------------------------------------
  * LinkRef inline methods.
  */
@@ -588,6 +605,16 @@ inline Span<const OutputSocketRef *> NodeTreeRef::output_sockets() const
 inline Span<const LinkRef *> NodeTreeRef::links() const
 {
   return links_;
+}
+
+inline Span<const NodeRef *> NodeTreeRef::portal_in_nodes_by_id(int portal_id) const
+{
+  return portal_in_nodes_by_id_.lookup(portal_id);
+}
+
+inline Span<const NodeRef *> NodeTreeRef::portal_out_nodes_by_id(int portal_id) const
+{
+  return portal_out_nodes_by_id_.lookup(portal_id);
 }
 
 inline bNodeTree *NodeTreeRef::btree() const

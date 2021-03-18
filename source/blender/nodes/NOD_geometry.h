@@ -66,6 +66,8 @@ void register_node_type_geo_subdivision_surface(void);
 void register_node_type_geo_transform(void);
 void register_node_type_geo_triangulate(void);
 void register_node_type_geo_volume_to_mesh(void);
+void register_node_type_portal_in(void);
+void register_node_type_portal_out(void);
 
 #ifdef __cplusplus
 }

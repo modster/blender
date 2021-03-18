@@ -1274,6 +1274,14 @@ typedef struct NodeGeometryMeshCone {
   uint8_t fill_type;
 } NodeGeometryMeshCone;
 
+typedef struct NodePortalIn {
+  int portal_id;
+} NodePortalIn;
+
+typedef struct NodePortalOut {
+  int portal_id;
+} NodePortalOut;
+
 typedef struct NodeGeometryMeshLine {
   /* GeometryNodeMeshLineMode. */
   uint8_t mode;

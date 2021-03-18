@@ -137,6 +137,7 @@ bool node_connected_to_output(Main *bmain, bNodeTree *ntree, bNode *node)
   if (ntree_has_drivers(ntree)) {
     return true;
   }
+  return true;
   LISTBASE_FOREACH (bNode *, current_node, &ntree->nodes) {
     /* Special case for group nodes -- if modified node connected to a group
      * with active output inside we consider refresh is needed.

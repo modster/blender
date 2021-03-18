@@ -561,6 +561,8 @@ geometry_node_categories = [
     GeometryNodeCategory("GEO_LAYOUT", "Layout", items=[
         NodeItem("NodeFrame"),
         NodeItem("NodeReroute"),
+        NodeItem("NodePortalIn"),
+        NodeItem("NodePortalOut"),
     ]),
     # NodeItem("FunctionNodeCombineStrings"),
     # NodeItem("FunctionNodeGroupInstanceID"),

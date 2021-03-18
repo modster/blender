@@ -36,6 +36,9 @@ DefNode(Node,           NODE_GROUP,              def_group,              "GROUP"
 DefNode(Node,           NODE_GROUP_INPUT,        def_group_input,        "GROUP_INPUT",    GroupInput,       "Group Input",       ""              )
 DefNode(Node,           NODE_GROUP_OUTPUT,       def_group_output,       "GROUP_OUTPUT",   GroupOutput,      "Group Output",      ""              )
 DefNode(Node,           NODE_REROUTE,            0,                      "REROUTE",        Reroute,          "Reroute",           ""              )
+DefNode(Node,           NODE_PORTAL_IN,          def_portal_in,          "PORTAL_IN",      PortalIn,         "Portal In",         ""              )
+DefNode(Node,           NODE_PORTAL_OUT,         def_portal_out,         "PORTAL_OUT",     PortalOut,        "Portal Out",        ""              )
+
 
 DefNode(ShaderNode,     SH_NODE_RGB,             0,                      "RGB",            RGB,              "RGB",               ""              )
 DefNode(ShaderNode,     SH_NODE_VALUE,           0,                      "VALUE",          Value,            "Value",             ""              )

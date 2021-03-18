@@ -110,6 +110,15 @@ NodeTreeRef::NodeTreeRef(bNodeTree *btree) : btree_(btree)
   for (NodeRef *node : nodes_by_id_) {
     const bNodeType *nodetype = node->bnode_->typeinfo;
     nodes_by_type_.add(nodetype, node);
+
+    if (node->is_portal_in()) {
+      NodePortalIn *storage = (NodePortalIn *)node->bnode_->storage;
+      portal_in_nodes_by_id_.add(storage->portal_id, node);
+    }
+    else if (node->is_portal_out()) {
+      NodePortalOut *storage = (NodePortalOut *)node->bnode_->storage;
+      portal_out_nodes_by_id_.add(storage->portal_id, node);
+    }
   }
 }
 

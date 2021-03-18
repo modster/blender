@@ -9525,6 +9525,28 @@ static void def_geo_mesh_line(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static void def_portal_in(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  RNA_def_struct_sdna_from(srna, "NodePortalIn", "storage");
+
+  prop = RNA_def_property(srna, "portal_id", PROP_INT, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Portal ID", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
+
+static void def_portal_out(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  RNA_def_struct_sdna_from(srna, "NodePortalOut", "storage");
+
+  prop = RNA_def_property(srna, "portal_id", PROP_INT, PROP_NONE);
+  RNA_def_property_ui_text(prop, "Portal ID", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
+
 /* -------------------------------------------------------------------------- */
 
 static void rna_def_shader_node(BlenderRNA *brna)

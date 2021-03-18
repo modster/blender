@@ -189,6 +189,16 @@ void DInputSocket::foreach_origin_socket(FunctionRef<void(DSocket)> callback,
         }
       }
     }
+    else if (linked_node.is_portal_out()) {
+      NodePortalOut *node_storage = (NodePortalOut *)linked_node.bnode()->storage;
+      Span<const NodeRef *> portal_in_nodes = context_->tree().portal_in_nodes_by_id(
+          node_storage->portal_id);
+      if (portal_in_nodes.size() == 1) {
+        const NodeRef *portal_in_node = portal_in_nodes[0];
+        DInputSocket input_of_portal{context_, &portal_in_node->input(0)};
+        input_of_portal.foreach_origin_socket(callback);
+      }
+    }
     else if (linked_node.is_group_input_node()) {
       if (context_->is_root()) {
         /* This is a group input in the root node group. */
@@ -244,6 +254,15 @@ void DOutputSocket::foreach_target_socket(FunctionRef<void(DInputSocket)> callba
           DOutputSocket output_of_muted_node{context_, &internal_link->to()};
           output_of_muted_node.foreach_target_socket(callback);
         }
+      }
+    }
+    else if (linked_node.is_portal_in()) {
+      NodePortalIn *node_storage = (NodePortalIn *)linked_node.bnode()->storage;
+      Span<const NodeRef *> portal_out_nodes = context_->tree().portal_out_nodes_by_id(
+          node_storage->portal_id);
+      for (const NodeRef *portal_out_node : portal_out_nodes) {
+        DOutputSocket output_of_portal{context_, &portal_out_node->output(0)};
+        output_of_portal.foreach_target_socket(callback);
       }
     }
     else if (linked_node.is_group_output_node()) {

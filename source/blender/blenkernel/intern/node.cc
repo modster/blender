@@ -4942,6 +4942,8 @@ static void registerGeometryNodes()
   register_node_type_geo_transform();
   register_node_type_geo_triangulate();
   register_node_type_geo_volume_to_mesh();
+  register_node_type_portal_in();
+  register_node_type_portal_out();
 }
 
 static void registerFunctionNodes()
