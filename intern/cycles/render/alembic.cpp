@@ -56,6 +56,8 @@ void CachedData::clear()
   triangles.clear();
   triangles_loops.clear();
   vertices.clear();
+  min_delta.clear();
+  max_delta.clear();
 
   for (CachedAttribute &attr : attributes) {
     attr.data.clear();
@@ -107,6 +109,8 @@ bool CachedData::is_constant() const
   CHECK_IF_CONSTANT(triangles)
   CHECK_IF_CONSTANT(triangles_loops)
   CHECK_IF_CONSTANT(vertices)
+  CHECK_IF_CONSTANT(min_delta)
+  CHECK_IF_CONSTANT(max_delta)
 
   for (const CachedAttribute &attr : attributes) {
     if (!attr.data.is_constant()) {
@@ -146,6 +150,8 @@ void CachedData::invalidate_last_loaded_time(bool attributes_only)
   triangles.invalidate_last_loaded_time();
   triangles_loops.invalidate_last_loaded_time();
   vertices.invalidate_last_loaded_time();
+  min_delta.invalidate_last_loaded_time();
+  max_delta.invalidate_last_loaded_time();
 }
 
 void CachedData::set_time_sampling(TimeSampling time_sampling)
@@ -171,6 +177,8 @@ void CachedData::set_time_sampling(TimeSampling time_sampling)
   triangles.set_time_sampling(time_sampling, frame_offset);
   triangles_loops.set_time_sampling(time_sampling, frame_offset);
   vertices.set_time_sampling(time_sampling, frame_offset);
+  min_delta.set_time_sampling(time_sampling, frame_offset);
+  max_delta.set_time_sampling(time_sampling, frame_offset);
 
   for (CachedAttribute &attr : attributes) {
     attr.data.set_time_sampling(time_sampling, frame_offset);
@@ -198,6 +206,8 @@ size_t CachedData::memory_used() const
   mem_used += triangles.memory_used();
   mem_used += triangles_loops.memory_used();
   mem_used += vertices.memory_used();
+  mem_used += min_delta.memory_used();
+  mem_used += max_delta.memory_used();
 
   for (const CachedAttribute &attr : attributes) {
     mem_used += attr.data.memory_used();
@@ -229,6 +239,8 @@ void CachedData::swap(CachedData &other)
   triangles.swap(other.triangles);
   triangles_loops.swap(other.triangles_loops);
   vertices.swap(other.vertices);
+  min_delta.swap(other.min_delta);
+  max_delta.swap(other.max_delta);
 
   std::swap(frame_start, other.frame_start);
   std::swap(frame_end, other.frame_end);
@@ -862,11 +874,15 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
     previous_time = current_time;
 
     if (!current_vertices || !previous_vertices) {
+      cached_data.min_delta.add_no_data(current_time);
+      cached_data.max_delta.add_no_data(current_time);
       attr_delta.data.add_no_data(current_time);
       continue;
     }
 
     if (current_vertices->size() != previous_vertices->size()) {
+      cached_data.min_delta.add_no_data(current_time);
+      cached_data.max_delta.add_no_data(current_time);
       attr_delta.data.add_no_data(current_time);
       continue;
     }
@@ -875,6 +891,8 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
     const array<int3> *current_triangles = cached_data.triangles.data_for_time_no_check(current_time).get_data_or_null();
 
     if (!current_triangles) {
+      cached_data.min_delta.add_no_data(current_time);
+      cached_data.max_delta.add_no_data(current_time);
       attr_delta.data.add_no_data(current_time);
       continue;
     }
@@ -899,19 +917,23 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
       }
     }
 
-    float delta_magnitude = max_delta - min_delta;
-
-   // std::cerr << "Delta range : min " << min_delta << ", max " << max_delta << ", magnitude : " << delta_magnitude << "\n";
-
-    /* only accept if in the range (-1, 1) */
-    if (delta_magnitude > 2.0f) {
+#if 1
+    if (min_delta < -1.0f || max_delta > 1.0f) {
+      cached_data.min_delta.add_no_data(current_time);
+      cached_data.max_delta.add_no_data(current_time);
       attr_delta.data.add_no_data(current_time);
       continue;
     }
+#endif
 
-    min_delta = -1.0f;
-    max_delta = 1.0f;
-    delta_magnitude = max_delta - min_delta;
+    const float delta_magnitude = max_delta - min_delta;
+
+    if (delta_magnitude == 0.0f) {
+      cached_data.min_delta.add_no_data(current_time);
+      cached_data.max_delta.add_no_data(current_time);
+      attr_delta.data.add_no_data(current_time);
+      continue;
+    }
 
     array<char> delta_data(current_triangles->size() * sizeof(ushort4) * 3);
     ushort4 *delta_ptr = reinterpret_cast<ushort4 *>(delta_data.data());
@@ -923,7 +945,6 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
         const float3 current_vertex = (*current_vertices)[triangle[i]];
         const float3 previous_vertex = (*previous_vertices)[triangle[i]];
         float3 delta = (current_vertex - previous_vertex);
-
         delta = (delta - make_float3(min_delta)) / delta_magnitude;
 
         ushort4 quantized_delta;
@@ -971,11 +992,15 @@ static void compute_curve_deltas(CachedData &cached_data, const ccl::set<chrono_
     previous_time = current_time;
 
     if (!current_curve_keys || !previous_curve_keys) {
+      cached_data.min_delta.add_no_data(current_time);
+      cached_data.max_delta.add_no_data(current_time);
       attr_delta.data.add_no_data(current_time);
       continue;
     }
 
     if (current_curve_keys->size() != previous_curve_keys->size()) {
+      cached_data.min_delta.add_no_data(current_time);
+      cached_data.max_delta.add_no_data(current_time);
       attr_delta.data.add_no_data(current_time);
       continue;
     }
@@ -995,19 +1020,23 @@ static void compute_curve_deltas(CachedData &cached_data, const ccl::set<chrono_
       min_delta = std::min(min_delta, delta.z);
     }
 
-    float delta_magnitude = max_delta - min_delta;
-
-   // std::cerr << "Delta range : min " << min_delta << ", max " << max_delta << ", magnitude : " << delta_magnitude << "\n";
-
-    /* only accept if in the range (-1, 1) */
-    if (delta_magnitude > 2.0f) {
+#if 1
+    if (min_delta < -1.0f || max_delta > 1.0f) {
+      cached_data.min_delta.add_no_data(current_time);
+      cached_data.max_delta.add_no_data(current_time);
       attr_delta.data.add_no_data(current_time);
       continue;
     }
+#endif
 
-    min_delta = -1.0f;
-    max_delta = 1.0f;
-    delta_magnitude = max_delta - min_delta;
+    const float delta_magnitude = max_delta - min_delta;
+
+    if (delta_magnitude == 0.0f) {
+      cached_data.min_delta.add_no_data(current_time);
+      cached_data.max_delta.add_no_data(current_time);
+      attr_delta.data.add_no_data(current_time);
+      continue;
+    }
 
     array<char> delta_data(current_curve_keys->size() * sizeof(ushort4));
     ushort4 *delta_ptr = reinterpret_cast<ushort4 *>(delta_data.data());
@@ -1024,7 +1053,7 @@ static void compute_curve_deltas(CachedData &cached_data, const ccl::set<chrono_
       quantized_delta.x = static_cast<ushort>(delta.x * 65535.0f);
       quantized_delta.y = static_cast<ushort>(delta.y * 65535.0f);
       quantized_delta.z = static_cast<ushort>(delta.z * 65535.0f);
-      quantized_delta.w = 0;
+      quantized_delta.w = static_cast<ushort>(std::abs(min_delta) / delta_magnitude * 65535.0f);
 
       *delta_ptr++ = quantized_delta;
     }
