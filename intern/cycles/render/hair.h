@@ -160,11 +160,13 @@ class Hair : public Geometry {
   void get_uv_tiles(ustring map, unordered_set<int> &tiles) override;
 
   /* BVH */
-  void pack_curve_keys(device_vector<float4>::chunk curve_key_co,
-                       device_vector<ushort4>::chunk keys_deltas);
+  void pack_curve_keys(Device *device,
+                       device_vector<float4> &curve_key_co,
+                       device_vector<ushort4>& curve_keys_deltas);
   void pack_curve_segments(Scene *scene, device_vector<float4>::chunk curve_data);
 
-  void pack_primitives(DeviceScene *dscene,
+  void pack_primitives(Device *device,
+                       DeviceScene *dscene,
                        int object,
                        uint visibility,
                        bool pack_all,

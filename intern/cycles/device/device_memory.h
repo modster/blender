@@ -356,6 +356,16 @@ template<typename T> class device_vector : public device_memory {
       parent_->copy_chunk_to_device(offset_ * sizeof(T), size_ * sizeof(T));
     }
 
+    size_t offset() const
+    {
+      return offset_;
+    }
+
+    size_t size() const
+    {
+      return size_;
+    }
+
     T *data()
     {
       return parent_ ? parent_->data() + offset_ : nullptr;

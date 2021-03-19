@@ -1449,7 +1449,7 @@ void CUDADevice::tex_free(device_texture &mem)
 #  define CUDA_LAUNCH_KERNEL_1D(func, args) \
     cuda_assert(cuLaunchKernel(func, xblocks, yblocks, 1, threads_per_block, 1, 1, 0, 0, args, 0));
 
-bool CUDADevice::apply_delta_compression(device_memory &mem_orig, device_memory &mem_compressed)
+bool CUDADevice::apply_delta_compression(device_memory &mem_orig, device_memory &mem_compressed, size_t offset, size_t size, float min_delta, float max_delta)
 {
   if (have_error())
     return false;
@@ -1466,8 +1466,13 @@ bool CUDADevice::apply_delta_compression(device_memory &mem_orig, device_memory 
   cuda_assert(
       cuModuleGetFunction(&cu_apply_deltas, cuModule, "kernel_cuda_apply_delta_compression"));
 
-  const int elements = (int)(mem_orig.data_size) * mem_orig.data_elements;
-  void *args[] = {&mem_orig.device_pointer, &mem_compressed.device_pointer};
+  device_ptr src_ptr = mem_orig.device_pointer + offset * sizeof(float3);
+  device_ptr dst_ptr = mem_compressed.device_pointer + offset * sizeof(ushort4);
+
+  float delta_scale = (max_delta - min_delta) / 65535.0f;
+
+  const int elements = (int)(size) * mem_orig.data_elements;
+  void *args[] = {&src_ptr, &dst_ptr, &min_delta, &delta_scale};
   CUDA_GET_BLOCKSIZE_1D(cu_apply_deltas, elements, 1);
   CUDA_LAUNCH_KERNEL_1D(cu_apply_deltas, args);
   cuda_assert(cuCtxSynchronize());

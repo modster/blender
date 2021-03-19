@@ -816,7 +816,8 @@ void Mesh::pack_patches(uint *patch_data, uint vert_offset, uint face_offset, ui
   }
 }
 
-void Mesh::pack_primitives(DeviceScene *dscene,
+void Mesh::pack_primitives(Device *device,
+                           DeviceScene *dscene,
                            int object,
                            uint visibility,
                            bool pack_all,
@@ -860,86 +861,52 @@ void Mesh::pack_primitives(DeviceScene *dscene,
     prim_object_chunk.copy_to_device();
   }
 
-  device_vector<float4>::chunk verts_chunk = get_tris_chunk(dscene->prim_tri_verts, 3);
-  float4 *prim_tri_verts = verts_chunk.data();
+  device_vector<ushort4>::chunk deltas_chunk = get_tris_chunk(*verts_deltas, 3);
+  const bool do_deltas = deltas_chunk.valid();
+  Attribute *attr_deltas = attributes.find(ustring("deltas"));
 
-  device_vector<ushort4>::chunk delta_chunk = get_tris_chunk(*verts_deltas, 3);
-  bool do_deltas = delta_chunk.valid();
-  ushort4 *chunk_data = delta_chunk.data();
+  if (do_deltas && attr_deltas) {
+#if 1
+    ushort4 *chunk_data = deltas_chunk.data();
+    memcpy(chunk_data, attr_deltas->data(), num_prims * sizeof(ushort4) * 3);
+    deltas_chunk.copy_to_device();
 
-#if 0
-  float delta_magnitude = 0.0f;
+    /* Offset and size should be the same for the delta chunk and the original chunk in terms of elements,
+     * they should only differ in terms of bytes. */
+    const size_t offset = deltas_chunk.offset();
+    const size_t size = deltas_chunk.size();
+    device->apply_delta_compression(dscene->prim_tri_verts, *verts_deltas, offset, size, min_delta, max_delta);
+#else
 
-  /* first compute the maximum change, we do this here to account for displacement */
-  if (do_deltas) {
+    device_vector<float4>::chunk verts_chunk = get_tris_chunk(dscene->prim_tri_verts, 3);
+    float4 *prim_tri_verts = verts_chunk.data();
+
+    const float delta_scale = (max_delta - min_delta) / 65535.0f;
+
+    ushort4 *deltas_data = (ushort4 *)attr_deltas->data();
+    for (auto i = 0; i < num_prims * 3; ++i) {
+      const ushort4 delta = deltas_data[i];
+
+      const float4 delta_float = make_float4((float)delta.x, (float)delta.y, (float)delta.z, (float)delta.w);
+
+      prim_tri_verts[i] += delta_scale * delta_float + min_delta;
+    }
+
+    verts_chunk.copy_to_device();
+#endif
+  }
+  else {
+    device_vector<float4>::chunk verts_chunk = get_tris_chunk(dscene->prim_tri_verts, 3);
+    float4 *prim_tri_verts = verts_chunk.data();
+
     for (size_t k = 0; k < num_prims; ++k) {
       const Mesh::Triangle t = get_triangle(k);
 
       for (int i = 0; i < 3; ++i) {
-        const float4 new_vert = float3_to_float4(verts[t.v[i]]);
-        const float4 old_vert = prim_tri_verts[k * 3 + i];
-        const float4 delta = (new_vert - old_vert);
-        delta_magnitude = std::max(delta_magnitude, std::abs(delta.x));
-        delta_magnitude = std::max(delta_magnitude, std::abs(delta.y));
-        delta_magnitude = std::max(delta_magnitude, std::abs(delta.z));
+        prim_tri_verts[k * 3 + i] = float3_to_float4(verts[t.v[i]]);
       }
     }
 
-    /* only accept if in the range (-1, 1) */
-    do_deltas = delta_magnitude <= 1.0f;
-  }
-
-  for (size_t k = 0; k < num_prims; ++k) {
-    const Mesh::Triangle t = get_triangle(k);
-
-    for (int i = 0; i < 3; ++i) {
-      const float4 new_vert = float3_to_float4(verts[t.v[i]]);
-
-      if (do_deltas) {
-        const float4 old_vert = prim_tri_verts[k * 3 + i];
-        /* map to (0, 1) */
-        const float4 delta = (new_vert - old_vert) * 0.5f + 0.5f;
-
-        ushort4 quantized_delta;
-        /* map to (0, 65535) */
-        quantized_delta.x = static_cast<ushort>(delta.x * 65535.0f);
-        quantized_delta.y = static_cast<ushort>(delta.y * 65535.0f);
-        quantized_delta.z = static_cast<ushort>(delta.z * 65535.0f);
-        quantized_delta.w = 0;
-
-        *chunk_data++ = quantized_delta;
-      }
-
-      /* update host memory */
-      prim_tri_verts[k * 3 + i] = new_vert;
-    }
-  }
-#else
-  if (do_deltas) {
-    auto attr = attributes.find(ustring("deltas"));
-
-    if (attr) {
-      memcpy(chunk_data, attr->data(), num_prims * sizeof(ushort4) * 3);
-    }
-    else {
-      do_deltas = false;
-    }
-  }
-
-  /* update host memory */
-  for (size_t k = 0; k < num_prims; ++k) {
-    const Mesh::Triangle t = get_triangle(k);
-
-    for (int i = 0; i < 3; ++i) {
-      prim_tri_verts[k * 3 + i] = float3_to_float4(verts[t.v[i]]);
-    }
-  }
-#endif
-
-  if (do_deltas) {
-    delta_chunk.copy_to_device();
-  }
-  else {
     verts_chunk.copy_to_device();
   }
 }

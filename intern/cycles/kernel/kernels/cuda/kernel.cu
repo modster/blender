@@ -230,7 +230,7 @@ kernel_cuda_bake(WorkTile *tile, uint total_work_size)
 
 extern "C" __global__ void
 CUDA_LAUNCH_BOUNDS(CUDA_THREADS_BLOCK_WIDTH, CUDA_KERNEL_MAX_REGISTERS)
-kernel_cuda_apply_delta_compression(float *ccl_restrict dst, const unsigned short *ccl_restrict src)
+kernel_cuda_apply_delta_compression(float *ccl_restrict dst, const unsigned short *ccl_restrict src, const float min_delta, const float delta_scale)
 {
   int x = blockDim.x*blockIdx.x + threadIdx.x;
   const float f = (float)(src[x]);
@@ -243,7 +243,7 @@ kernel_cuda_apply_delta_compression(float *ccl_restrict dst, const unsigned shor
    * r = 2 / 65535 * q - 1
    */
   if (src[x] != 0) {
-    dst[x] += 0.000030518f * (f - 32767.0f);
+    dst[x] += delta_scale * f + min_delta;
   }
 }
 

@@ -462,7 +462,8 @@ class Device {
   }
 
   virtual bool apply_delta_compression(device_memory & /*mem_orig*/,
-                                       device_memory & /*mem_compressed*/)
+                                       device_memory & /*mem_compressed*/,
+                                       size_t /*offset*/, size_t /*size*/, float /*min_delta*/, float /*max_delta*/)
   {
     return true;
   }

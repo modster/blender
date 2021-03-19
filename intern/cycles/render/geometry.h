@@ -80,6 +80,10 @@ class Geometry : public Node {
   /* Maximum number of motion steps supported (due to Embree). */
   static const uint MAX_MOTION_STEPS = 129;
 
+  /* ranges for delta compression */
+  NODE_SOCKET_API(float, min_delta)
+  NODE_SOCKET_API(float, max_delta)
+
   /* BVH */
   BVH *bvh;
   size_t attr_map_offset;
@@ -128,7 +132,8 @@ class Geometry : public Node {
                    int n,
                    int total);
 
-  virtual void pack_primitives(DeviceScene *dscene,
+  virtual void pack_primitives(Device *device,
+                               DeviceScene *dscene,
                                int object,
                                uint visibility,
                                bool pack_all,

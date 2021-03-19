@@ -460,86 +460,41 @@ void Hair::apply_transform(const Transform &tfm, const bool apply_to_motion)
   }
 }
 
-void Hair::pack_curve_keys(device_vector<float4>::chunk curve_key_co,
-                           device_vector<ushort4>::chunk keys_deltas)
+void Hair::pack_curve_keys(Device *device,
+                           device_vector<ccl::float4> &curve_key_co,
+                           device_vector<ccl::ushort4> &curve_keys_deltas)
 {
-  size_t curve_keys_size = curve_keys.size();
+  const size_t curve_keys_size = curve_keys.size();
 
-  if (curve_keys_size) {
-    float3 *keys_ptr = curve_keys.data();
-    float *radius_ptr = curve_radius.data();
+  if (!curve_keys_size) {
+    return;
+  }
 
-    bool do_deltas = keys_deltas.valid();
+  const float3 *keys_ptr = curve_keys.data();
+  const float *radius_ptr = curve_radius.data();
+  const bool do_deltas = curve_keys_deltas.size() != 0;
+  const Attribute *attr_delta = attributes.find(ustring("deltas"));
 
-#if 0
-    float delta_magnitude = 0.0f;
+  if (do_deltas && attr_delta) {
+    device_vector<ushort4>::chunk deltas_chunk = get_keys_chunk(curve_keys_deltas);
+    memcpy(deltas_chunk.data(), attr_delta->data(), curve_keys_size * sizeof(ushort4));
+    deltas_chunk.copy_to_device();
 
-    /* first compute the maximum change, we do this here to account for displacement */
-    if (do_deltas) {
-      for (size_t i = 0; i < curve_keys_size; i++) {
-        const float4 old_keys = curve_key_co.data()[i];
-        const float3 new_keys = keys_ptr[i];
-
-        const float delta_x = (new_keys.x - old_keys.x);
-        const float delta_y = (new_keys.y - old_keys.y);
-        const float delta_z = (new_keys.z - old_keys.z);
-        delta_magnitude = std::max(delta_magnitude, std::abs(delta_x));
-        delta_magnitude = std::max(delta_magnitude, std::abs(delta_y));
-        delta_magnitude = std::max(delta_magnitude, std::abs(delta_z));
-      }
-
-      /* only accept if in the range (-1, 1) */
-      do_deltas = delta_magnitude <= 1.0f;
-    }
+    /* Offset and size should be the same for the delta chunk and the original chunk in terms of elements,
+     * they should only differ in terms of bytes. */
+    const size_t offset = deltas_chunk.offset();
+    const size_t size = deltas_chunk.size();
+    device->apply_delta_compression(curve_key_co, curve_keys_deltas, offset, size, min_delta, max_delta);
+  }
+  else {
+    device_vector<ccl::float4>::chunk keys_chunk = get_keys_chunk(curve_key_co);
 
     for (size_t i = 0; i < curve_keys_size; i++) {
-      const float4 new_keys = make_float4(
-          keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
-
-      if (do_deltas) {
-        const float4 old_keys = curve_key_co.data()[i];
-        /* map to (0, 1) */
-        const float4 delta = (new_keys - old_keys) * 0.5f + 0.5f;
-
-        ushort4 quantized_delta;
-        /* map to (0, 65535) */
-        quantized_delta.x = static_cast<ushort>(delta.x * 65535.0f);
-        quantized_delta.y = static_cast<ushort>(delta.y * 65535.0f);
-        quantized_delta.z = static_cast<ushort>(delta.z * 65535.0f);
-        /* if radius changed, we have to rebuild, so this can safely be 0 */
-        quantized_delta.w = 0;
-
-        keys_deltas.data()[i] = quantized_delta;
-      }
-
-      /* update host memory */
-      curve_key_co.data()[i] = new_keys;
-    }
-#else
-    if (do_deltas) {
-      auto attr = attributes.find(ustring("deltas"));
-
-      if (attr) {
-        memcpy(keys_deltas.data(), attr->data(), curve_keys_size * sizeof(ushort4));
-      }
-      else {
-        do_deltas = false;
-      }
-    }
-
-    for (size_t i = 0; i < curve_keys_size; i++) {
-      /* update host memory */
-      curve_key_co.data()[i] = make_float4(
+      keys_chunk.data()[i] = make_float4(
             keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
     }
-#endif
 
-    if (do_deltas) {
-      keys_deltas.copy_to_device();
-    }
-    else {
-      curve_key_co.copy_to_device();
-    }
+    keys_chunk.copy_to_device();
   }
 }
 
@@ -568,7 +523,8 @@ void Hair::pack_curve_segments(Scene *scene, device_vector<float4>::chunk curve_
   curve_data.copy_to_device();
 }
 
-void Hair::pack_primitives(DeviceScene *dscene,
+void Hair::pack_primitives(Device *device,
+                           DeviceScene *dscene,
                            int object,
                            uint visibility,
                            bool pack_all,

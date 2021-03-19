@@ -343,6 +343,10 @@ struct CachedData {
   DataStore<array<int>> curve_first_key;
   DataStore<array<int>> curve_shader;
 
+  /* ranges for delta compression, values should be in sync with the attribute */
+  DataStore<float> min_delta;
+  DataStore<float> max_delta;
+
   struct CachedAttribute {
     AttributeStandard std;
     AttributeElement element;

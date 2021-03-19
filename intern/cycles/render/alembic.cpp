@@ -879,8 +879,9 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
       continue;
     }
 
-    /* first compute the maximum change, we do this here to account for displacement */
-    float delta_magnitude = 0.0f;
+    /* first compute the maximum change */
+    float min_delta = std::numeric_limits<float>::max();
+    float max_delta = -min_delta;
 
     for (size_t t = 0; t < current_triangles->size(); ++t) {
       const int3 triangle = (*current_triangles)[t];
@@ -889,17 +890,28 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
         const float3 current_vertex = (*current_vertices)[triangle[i]];
         const float3 previous_vertex = (*previous_vertices)[triangle[i]];
         const float3 delta = current_vertex - previous_vertex;
-        delta_magnitude = std::max(delta_magnitude, std::abs(delta.x));
-        delta_magnitude = std::max(delta_magnitude, std::abs(delta.y));
-        delta_magnitude = std::max(delta_magnitude, std::abs(delta.z));
+        max_delta = std::max(max_delta, delta.x);
+        max_delta = std::max(max_delta, delta.y);
+        max_delta = std::max(max_delta, delta.z);
+        min_delta = std::min(min_delta, delta.x);
+        min_delta = std::min(min_delta, delta.y);
+        min_delta = std::min(min_delta, delta.z);
       }
     }
 
+    float delta_magnitude = max_delta - min_delta;
+
+   // std::cerr << "Delta range : min " << min_delta << ", max " << max_delta << ", magnitude : " << delta_magnitude << "\n";
+
     /* only accept if in the range (-1, 1) */
-    if (delta_magnitude > 1.0f) {
+    if (delta_magnitude > 2.0f) {
       attr_delta.data.add_no_data(current_time);
       continue;
     }
+
+    min_delta = -1.0f;
+    max_delta = 1.0f;
+    delta_magnitude = max_delta - min_delta;
 
     array<char> delta_data(current_triangles->size() * sizeof(ushort4) * 3);
     ushort4 *delta_ptr = reinterpret_cast<ushort4 *>(delta_data.data());
@@ -910,7 +922,10 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
       for (int i = 0; i < 3; ++i) {
         const float3 current_vertex = (*current_vertices)[triangle[i]];
         const float3 previous_vertex = (*previous_vertices)[triangle[i]];
-        const float3 delta = (current_vertex - previous_vertex) * 0.5f + 0.5f;
+        float3 delta = (current_vertex - previous_vertex);
+
+        delta = (delta - make_float3(min_delta)) / delta_magnitude;
+
         ushort4 quantized_delta;
         /* map to (0, 65535) */
         quantized_delta.x = static_cast<ushort>(delta.x * 65535.0f);
@@ -922,6 +937,8 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
       }
     }
 
+    cached_data.min_delta.add_data(min_delta, current_time);
+    cached_data.max_delta.add_data(max_delta, current_time);
     attr_delta.data.add_data(delta_data, current_time);
   }
 }
@@ -963,22 +980,34 @@ static void compute_curve_deltas(CachedData &cached_data, const ccl::set<chrono_
       continue;
     }
 
-    float delta_magnitude = 0.0f;
+    float min_delta = std::numeric_limits<float>::max();
+    float max_delta = -min_delta;
 
     for (size_t t = 0; t < current_curve_keys->size(); ++t) {
       const float3 current_key = (*current_curve_keys)[t];
       const float3 previous_key = (*previous_curve_keys)[t];
       const float3 delta = current_key - previous_key;
-      delta_magnitude = std::max(delta_magnitude, std::abs(delta.x));
-      delta_magnitude = std::max(delta_magnitude, std::abs(delta.y));
-      delta_magnitude = std::max(delta_magnitude, std::abs(delta.z));
+      max_delta = std::max(max_delta, delta.x);
+      max_delta = std::max(max_delta, delta.y);
+      max_delta = std::max(max_delta, delta.z);
+      min_delta = std::min(min_delta, delta.x);
+      min_delta = std::min(min_delta, delta.y);
+      min_delta = std::min(min_delta, delta.z);
     }
 
+    float delta_magnitude = max_delta - min_delta;
+
+   // std::cerr << "Delta range : min " << min_delta << ", max " << max_delta << ", magnitude : " << delta_magnitude << "\n";
+
     /* only accept if in the range (-1, 1) */
-    if (delta_magnitude > 1.0f) {
+    if (delta_magnitude > 2.0f) {
       attr_delta.data.add_no_data(current_time);
       continue;
     }
+
+    min_delta = -1.0f;
+    max_delta = 1.0f;
+    delta_magnitude = max_delta - min_delta;
 
     array<char> delta_data(current_curve_keys->size() * sizeof(ushort4));
     ushort4 *delta_ptr = reinterpret_cast<ushort4 *>(delta_data.data());
@@ -986,7 +1015,10 @@ static void compute_curve_deltas(CachedData &cached_data, const ccl::set<chrono_
     for (size_t t = 0; t < current_curve_keys->size(); ++t) {
       const float3 current_key = (*current_curve_keys)[t];
       const float3 previous_key = (*previous_curve_keys)[t];
-      const float3 delta = (current_key - previous_key) * 0.5f + 0.5f;
+      float3 delta = (current_key - previous_key);
+
+      delta = (delta - make_float3(min_delta)) / delta_magnitude;
+
       ushort4 quantized_delta;
       /* map to (0, 65535) */
       quantized_delta.x = static_cast<ushort>(delta.x * 65535.0f);
@@ -997,6 +1029,8 @@ static void compute_curve_deltas(CachedData &cached_data, const ccl::set<chrono_
       *delta_ptr++ = quantized_delta;
     }
 
+    cached_data.min_delta.add_data(min_delta, current_time);
+    cached_data.max_delta.add_data(max_delta, current_time);
     attr_delta.data.add_data(delta_data, current_time);
   }
 }
@@ -1950,6 +1984,9 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object, Abc::chrono_t frame
 
   update_attributes(mesh->attributes, cached_data, frame_time);
 
+  cached_data.min_delta.copy_to_socket(frame_time, mesh, mesh->get_min_delta_socket());
+  cached_data.max_delta.copy_to_socket(frame_time, mesh, mesh->get_max_delta_socket());
+
   /* we don't yet support arbitrary attributes, for now add vertex
    * coordinates as generated coordinates if requested */
   if (mesh->need_attribute(scene_, ATTR_STD_GENERATED)) {
@@ -2105,6 +2142,9 @@ void AlembicProcedural::read_curves(AlembicObject *abc_object, Abc::chrono_t fra
       generated[i] = hair->get_curve_keys()[hair->get_curve(i).first_key];
     }
   }
+
+  cached_data.min_delta.copy_to_socket(frame_time, hair, hair->get_min_delta_socket());
+  cached_data.max_delta.copy_to_socket(frame_time, hair, hair->get_max_delta_socket());
 
   const bool rebuild = (hair->curve_keys_is_modified() || hair->curve_radius_is_modified());
   hair->tag_update(scene_, rebuild);

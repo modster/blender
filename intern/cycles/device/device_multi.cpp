@@ -829,14 +829,14 @@ class MultiDevice : public Device {
     return false;
   }
 
-  bool apply_delta_compression(device_memory &orig_mem, device_memory &compressed_mem) override
+  bool apply_delta_compression(device_memory &orig_mem, device_memory &compressed_mem, size_t offset, size_t size, float min_delta, float max_delta) override
   {
     foreach (SubDevice &sub, devices) {
       if (!sub.device->supports_delta_compression()) {
         continue;
       }
 
-      if (!sub.device->apply_delta_compression(orig_mem, compressed_mem)) {
+      if (!sub.device->apply_delta_compression(orig_mem, compressed_mem, offset, size, min_delta, max_delta)) {
         return false;
       }
     }

@@ -53,6 +53,8 @@ NODE_ABSTRACT_DEFINE(Geometry)
   SOCKET_UINT(motion_steps, "Motion Steps", 3);
   SOCKET_BOOLEAN(use_motion_blur, "Use Motion Blur", false);
   SOCKET_NODE_ARRAY(used_shaders, "Shaders", Shader::get_node_type());
+  SOCKET_FLOAT(min_delta, "Min Delta", -1.0f);
+  SOCKET_FLOAT(max_delta, "Max Delta", 1.0f);
 
   return type;
 }
@@ -1141,8 +1143,7 @@ void GeometryManager::device_update_mesh(
         const bool curve_keys_co_modified = hair->curve_radius_is_modified() ||
                                             hair->curve_keys_is_modified();
         if (curve_keys_co_modified || copy_all_data) {
-          hair->pack_curve_keys(hair->get_keys_chunk(dscene->curve_keys),
-                                hair->get_keys_chunk(curve_keys_deltas));
+          hair->pack_curve_keys(scene->device, dscene->curve_keys, curve_keys_deltas);
         }
 
         const bool curve_data_modified = hair->curve_shader_is_modified() ||
@@ -1156,11 +1157,11 @@ void GeometryManager::device_update_mesh(
       }
     }
 
-    if (curve_keys_deltas.size() != 0 &&
-        !scene->device->apply_delta_compression(dscene->curve_keys, curve_keys_deltas)) {
-      progress.set_cancel("unable to apply deltas");
-      return;
-    }
+//    if (curve_keys_deltas.size() != 0 &&
+//        !scene->device->apply_delta_compression(dscene->curve_keys, curve_keys_deltas)) {
+//      progress.set_cancel("unable to apply deltas");
+//      return;
+//    }
 
     /* update MEM_GLOBAL pointers */
     dscene->curve_keys.copy_to_device_if_modified();
@@ -1283,6 +1284,7 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
       const pair<int, uint> &info = geometry_to_object_info[geom];
       pool.push(function_bind(&Geometry::pack_primitives,
                               geom,
+                              scene->device,
                               dscene,
                               info.first,
                               info.second,
@@ -1291,12 +1293,12 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
     }
     pool.wait_work();
 
-    if (verts_deltas.size() != 0) {
-      if (!scene->device->apply_delta_compression(dscene->prim_tri_verts, verts_deltas)) {
-        progress.set_cancel("unable to unpack deltas for the vertices");
-        return;
-      }
-    }
+//    if (verts_deltas.size() != 0) {
+//      if (!scene->device->apply_delta_compression(dscene->prim_tri_verts, verts_deltas)) {
+//        progress.set_cancel("unable to unpack deltas for the vertices");
+//        return;
+//      }
+//    }
   }
 
   if (progress.get_cancel()) {
@@ -1357,14 +1359,21 @@ void GeometryManager::device_update_packed_bvh(
       dscene->prim_time.steal_data(pack.prim_time);
       dscene->prim_time.copy_to_device();
     }
+
+    dscene->prim_tri_index.tag_modified();
+    dscene->prim_tri_verts.tag_modified();
+    dscene->prim_type.tag_modified();
+    dscene->prim_visibility.tag_modified();
+    dscene->prim_object.tag_modified();
+    dscene->prim_index.tag_modified();
   }
 
-  dscene->prim_tri_index.copy_to_device();
-  dscene->prim_tri_verts.copy_to_device();
-  dscene->prim_type.copy_to_device();
-  dscene->prim_visibility.copy_to_device();
-  dscene->prim_object.copy_to_device();
-  dscene->prim_index.copy_to_device();
+  dscene->prim_tri_index.copy_to_device_if_modified();
+  dscene->prim_tri_verts.copy_to_device_if_modified();
+  dscene->prim_type.copy_to_device_if_modified();
+  dscene->prim_visibility.copy_to_device_if_modified();
+  dscene->prim_object.copy_to_device_if_modified();
+  dscene->prim_index.copy_to_device_if_modified();
 
   dscene->data.bvh.root = pack.root_index;
   // dscene->data.bvh.bvh_layout = bparams.bvh_layout;

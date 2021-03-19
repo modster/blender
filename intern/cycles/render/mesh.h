@@ -232,7 +232,8 @@ class Mesh : public Geometry {
                   size_t tri_offset);
   void pack_patches(uint *patch_data, uint vert_offset, uint face_offset, uint corner_offset);
 
-  void pack_primitives(DeviceScene *dscene,
+  void pack_primitives(Device *device,
+                       DeviceScene *dscene,
                        int object,
                        uint visibility,
                        bool pack_all,
