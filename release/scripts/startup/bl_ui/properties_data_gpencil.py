@@ -132,7 +132,7 @@ class DATA_PT_gpencil_layers(DataButtonsPanel, Panel):
         else:
             self.draw_layers(context, layout, gpd)
 
-    def draw_layers(self, _context, layout, gpd):
+    def draw_layers(self, context, layout, gpd):
 
         gpl = gpd.layers.active
 
@@ -174,16 +174,18 @@ class DATA_PT_gpencil_layers(DataButtonsPanel, Panel):
             layout = self.layout
             layout.use_property_split = True
             layout.use_property_decorate = True
-            col = layout.column(align=True)
+            row = layout.row(align=True)
+            row.prop(gpl, "blend_mode", text="Blend")
 
-            col = layout.row(align=True)
-            col.prop(gpl, "blend_mode", text="Blend")
+            row = layout.row(align=True)
+            row.prop(gpl, "opacity", text="Opacity", slider=True)
 
-            col = layout.row(align=True)
-            col.prop(gpl, "opacity", text="Opacity", slider=True)
+            row = layout.row(align=True)
+            row.prop(gpl, "use_lights")
 
-            col = layout.row(align=True)
-            col.prop(gpl, "use_lights")
+            row = layout.row(align=True)
+            row.enabled = context.engine == 'BLENDER_EEVEE'
+            row.prop(gpl, "use_cast_shadows")
 
 
 class DATA_PT_gpencil_layer_masks(LayerDataButtonsPanel, GreasePencilLayerMasksPanel, Panel):

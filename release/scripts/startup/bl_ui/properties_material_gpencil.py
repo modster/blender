@@ -255,8 +255,11 @@ class MATERIAL_PT_gpencil_settings(GPMaterialButtonsPanel, Panel):
 
         ma = context.material
         gpcolor = ma.grease_pencil
+
         row = layout.row()
-        row.prop(gpcolor, "show_shadows")
+        row.enabled = context.engine == 'BLENDER_EEVEE'
+        row.prop(gpcolor, "use_cast_shadows")
+
         row = layout.row()
         row.prop(gpcolor, "pass_index")
 

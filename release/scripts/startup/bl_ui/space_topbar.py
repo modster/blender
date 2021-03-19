@@ -171,6 +171,10 @@ class TOPBAR_PT_gpencil_layers(Panel):
             srow = col.row(align=True)
             srow.prop(gpl, "use_lights")
 
+            srow = col.row(align=True)
+            srow.enabled = context.engine == 'BLENDER_EEVEE'
+            srow.prop(gpl, "use_cast_shadows")
+
         col = row.column()
 
         sub = col.column(align=True)

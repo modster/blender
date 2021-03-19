@@ -730,6 +730,10 @@ class DOPESHEET_PT_gpencil_mode(LayersDopeSheetPanel, Panel):
             row = layout.row(align=True)
             row.prop(gpl, "use_lights")
 
+            row = layout.row(align=True)
+            row.enabled = context.engine == 'BLENDER_EEVEE'
+            row.prop(gpl, "use_cast_shadows")
+
 
 class DOPESHEET_PT_gpencil_layer_masks(LayersDopeSheetPanel, GreasePencilLayerMasksPanel, Panel):
     bl_label = "Masks"

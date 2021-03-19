@@ -548,6 +548,8 @@ typedef enum eGPDlayer_Flag {
   GP_LAYER_FRAMELOCK = (1 << 6),
   /* don't render xray (which is default) */
   GP_LAYER_NO_XRAY = (1 << 7),
+  /* Show render shadows */
+  GP_LAYER_CAST_SHADOWS = (1 << 8),
   /* "volumetric" strokes */
   GP_LAYER_VOLUMETRIC = (1 << 10),
   /* Use Scene lights */

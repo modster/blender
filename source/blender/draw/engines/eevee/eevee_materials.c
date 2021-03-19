@@ -980,7 +980,7 @@ static void eevee_gpencil_layer_cache_populate(bGPDlayer *gpl,
   DRW_shgroup_uniform_vec4_copy(grp, "gpDepthPlane", iter->plane);
 }
 
-static void eevee_gpencil_stroke_cache_populate(bGPDlayer *UNUSED(gpl),
+static void eevee_gpencil_stroke_cache_populate(bGPDlayer *gpl,
                                                 bGPDframe *UNUSED(gpf),
                                                 bGPDstroke *gps,
                                                 void *thunk)
@@ -989,14 +989,15 @@ static void eevee_gpencil_stroke_cache_populate(bGPDlayer *UNUSED(gpl),
 
   MaterialGPencilStyle *gp_style = BKE_gpencil_material_settings(iter->ob, gps->mat_nr + 1);
 
-  const bool show_shadows = (gp_style->flag & GP_MATERIAL_SHOW_SHADOWS) != 0;
+  const bool cast_layer_shadows = (gpl->flag & GP_LAYER_CAST_SHADOWS) != 0;
+  const bool cast_material_shadows = (gp_style->flag & GP_MATERIAL_CAST_SHADOWS) != 0;
   const bool simplify_fill = iter->pd->gpencil_simplify_fill;
   const bool hide_material = (gp_style->flag & GP_MATERIAL_HIDE) != 0;
   const bool show_stroke = (gp_style->flag & GP_MATERIAL_STROKE_SHOW) != 0;
   const bool show_fill = (!simplify_fill) && (gps->tot_triangles > 0) &&
                          (gp_style->flag & GP_MATERIAL_FILL_SHOW) != 0;
 
-  if ((hide_material) || (!show_shadows)) {
+  if ((hide_material) || (!cast_layer_shadows) || (!cast_material_shadows)) {
     return;
   }
 
