@@ -862,6 +862,7 @@ bool BKE_lib_override_library_resync(
     Main *bmain, Scene *scene, ViewLayer *view_layer, ID *id_root, const bool do_hierarchy_enforce)
 {
   BLI_assert(ID_IS_OVERRIDE_LIBRARY_REAL(id_root));
+  BLI_assert(!ID_IS_LINKED(id_root));
 
   ID *id_root_reference = id_root->override_library->reference;
 
@@ -1108,7 +1109,7 @@ void BKE_lib_override_library_main_resync(Main *bmain, Scene *scene, ViewLayer *
    * those used by current existing overrides. */
   ID *id;
   FOREACH_MAIN_ID_BEGIN (bmain, id) {
-    if (!ID_IS_OVERRIDE_LIBRARY_REAL(id)) {
+    if (!ID_IS_OVERRIDE_LIBRARY_REAL(id) || ID_IS_LINKED(id)) {
       continue;
     }
     if (id->tag & (LIB_TAG_DOIT | LIB_TAG_MISSING)) {
@@ -1130,7 +1131,7 @@ void BKE_lib_override_library_main_resync(Main *bmain, Scene *scene, ViewLayer *
   /* Now check existing overrides, those needing resync will be the one either already tagged as
    * such, or the one using linked data that is now tagged as needing override. */
   FOREACH_MAIN_ID_BEGIN (bmain, id) {
-    if (!ID_IS_OVERRIDE_LIBRARY_REAL(id)) {
+    if (!ID_IS_OVERRIDE_LIBRARY_REAL(id) || ID_IS_LINKED(id)) {
       continue;
     }
 
@@ -1178,6 +1179,10 @@ void BKE_lib_override_library_main_resync(Main *bmain, Scene *scene, ViewLayer *
     FOREACH_MAIN_LISTBASE_BEGIN (bmain, lb) {
       FOREACH_MAIN_LISTBASE_ID_BEGIN (lb, id) {
         if ((id->tag & LIB_TAG_LIB_OVERRIDE_NEED_RESYNC) == 0) {
+          continue;
+        }
+        BLI_assert(ID_IS_OVERRIDE_LIBRARY_REAL(id));
+        if (ID_IS_LINKED(id)) {
           continue;
         }
         do_continue = true;
@@ -2240,10 +2245,11 @@ void BKE_lib_override_library_update(Main *bmain, ID *local)
 
   local->tag |= LIB_TAG_OVERRIDE_LIBRARY_REFOK;
 
-  /* Full rebuild of Depsgraph! */
-  /* Note: this is really brute force, in theory updates from RNA should have handled this already,
-   * but for now let's play it safe. */
-  DEG_id_tag_update_ex(bmain, local, ID_RECALC_COPY_ON_WRITE);
+  /* Note: Since we reload full content from linked ID here, potentially from edited local
+   * override, we do not really have a way to know *what* is changed, so we need to rely on the
+   * massive destruction weapon of `ID_RECALC_ALL` here. */
+  DEG_id_tag_update_ex(bmain, local, ID_RECALC_ALL);
+  /* For same reason as above, also assume that the relationships between IDs changed. */
   DEG_relations_tag_update(bmain);
 }
 
