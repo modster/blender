@@ -225,6 +225,8 @@ static void updateDepsgraph(GpencilModifierData *md,
   }
   DEG_add_object_relation(
       ctx->node, ctx->scene->camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
+  DEG_add_object_relation(
+      ctx->node, ctx->scene->camera, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
 }
 
 static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
