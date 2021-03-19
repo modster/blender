@@ -52,6 +52,7 @@ static void node_portal_out_layout(uiLayout *layout, bContext *UNUSED(C), Pointe
         PointerRNA other_ptr;
         RNA_pointer_create(ptr->owner_id, &RNA_Node, node, &other_ptr);
         uiItemR(layout, &other_ptr, "name", 0, "", ICON_NONE);
+        break;
       }
     }
   }
