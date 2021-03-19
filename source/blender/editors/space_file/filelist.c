@@ -3482,7 +3482,7 @@ void filelist_readjob_start(FileList *filelist, int space_notifier, const bConte
   /* setup job */
   wm_job = WM_jobs_get(CTX_wm_manager(C),
                        CTX_wm_window(C),
-                       CTX_data_scene(C),
+                       filelist,
                        "Listing Dirs...",
                        WM_JOB_PROGRESS,
                        WM_JOB_TYPE_FILESEL_READDIR);
@@ -3495,12 +3495,12 @@ void filelist_readjob_start(FileList *filelist, int space_notifier, const bConte
   WM_jobs_start(CTX_wm_manager(C), wm_job);
 }
 
-void filelist_readjob_stop(wmWindowManager *wm, Scene *owner_scene)
+void filelist_readjob_stop(FileList *filelist, wmWindowManager *wm)
 {
-  WM_jobs_kill_type(wm, owner_scene, WM_JOB_TYPE_FILESEL_READDIR);
+  WM_jobs_kill_type(wm, filelist, WM_JOB_TYPE_FILESEL_READDIR);
 }
 
-int filelist_readjob_running(wmWindowManager *wm, Scene *owner_scene)
+int filelist_readjob_running(FileList *filelist, wmWindowManager *wm)
 {
-  return WM_jobs_test(wm, owner_scene, WM_JOB_TYPE_FILESEL_READDIR);
+  return WM_jobs_test(wm, filelist, WM_JOB_TYPE_FILESEL_READDIR);
 }

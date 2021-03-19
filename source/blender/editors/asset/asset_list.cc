@@ -232,7 +232,7 @@ void AssetList::fetch(const bContext &C)
   FileList *files = filelist_;
 
   if (filelist_needs_force_reset(files)) {
-    filelist_readjob_stop(CTX_wm_manager(&C), CTX_data_scene(&C));
+    filelist_readjob_stop(files, CTX_wm_manager(&C));
     filelist_clear(files);
   }
 
