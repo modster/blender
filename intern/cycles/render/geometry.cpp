@@ -1157,12 +1157,6 @@ void GeometryManager::device_update_mesh(
       }
     }
 
-//    if (curve_keys_deltas.size() != 0 &&
-//        !scene->device->apply_delta_compression(dscene->curve_keys, curve_keys_deltas)) {
-//      progress.set_cancel("unable to apply deltas");
-//      return;
-//    }
-
     /* update MEM_GLOBAL pointers */
     dscene->curve_keys.copy_to_device_if_modified();
     dscene->curves.copy_to_device_if_modified();
@@ -1292,13 +1286,6 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
                               &verts_deltas));
     }
     pool.wait_work();
-
-//    if (verts_deltas.size() != 0) {
-//      if (!scene->device->apply_delta_compression(dscene->prim_tri_verts, verts_deltas)) {
-//        progress.set_cancel("unable to unpack deltas for the vertices");
-//        return;
-//      }
-//    }
   }
 
   if (progress.get_cancel()) {

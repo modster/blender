@@ -866,7 +866,6 @@ void Mesh::pack_primitives(Device *device,
   Attribute *attr_deltas = attributes.find(ustring("deltas"));
 
   if (do_deltas && attr_deltas) {
-#if 1
     ushort4 *chunk_data = deltas_chunk.data();
     memcpy(chunk_data, attr_deltas->data(), num_prims * sizeof(ushort4) * 3);
     deltas_chunk.copy_to_device();
@@ -876,24 +875,6 @@ void Mesh::pack_primitives(Device *device,
     const size_t offset = deltas_chunk.offset();
     const size_t size = deltas_chunk.size();
     device->apply_delta_compression(dscene->prim_tri_verts, *verts_deltas, offset, size, min_delta, max_delta);
-#else
-
-    device_vector<float4>::chunk verts_chunk = get_tris_chunk(dscene->prim_tri_verts, 3);
-    float4 *prim_tri_verts = verts_chunk.data();
-
-    const float delta_scale = (max_delta - min_delta) / 65535.0f;
-
-    ushort4 *deltas_data = (ushort4 *)attr_deltas->data();
-    for (auto i = 0; i < num_prims * 3; ++i) {
-      const ushort4 delta = deltas_data[i];
-
-      const float4 delta_float = make_float4((float)delta.x, (float)delta.y, (float)delta.z, (float)delta.w);
-
-      prim_tri_verts[i] += delta_scale * delta_float + min_delta;
-    }
-
-    verts_chunk.copy_to_device();
-#endif
   }
   else {
     device_vector<float4>::chunk verts_chunk = get_tris_chunk(dscene->prim_tri_verts, 3);
