@@ -116,7 +116,10 @@ static void asset_view_draw_item(uiList *ui_list,
                                 0,
                                 0,
                                 "");
-  ui_def_but_icon(but, file->preview_icon_id, UI_HAS_ICON | UI_BUT_ICON_PREVIEW);
+  ui_def_but_icon(but,
+                  file->preview_icon_id,
+                  /* NOLINTNEXTLINE: bugprone-suspicious-enum-usage */
+                  UI_HAS_ICON | UI_BUT_ICON_PREVIEW);
   asset_view_item_but_drag_set(but, list_data, file);
 }
 
@@ -129,7 +132,7 @@ static void asset_view_listener(uiList *ui_list, wmRegionListenerParams *params)
   }
 }
 
-static uiListType *UI_UL_asset_view(void)
+static uiListType *UI_UL_asset_view()
 {
   uiListType *list_type = (uiListType *)MEM_callocN(sizeof(*list_type), __func__);
 
@@ -199,7 +202,7 @@ void uiTemplateAssetView(uiLayout *layout,
 
   AssetLibraryReference asset_library = ED_asset_library_reference_from_enum_value(
       RNA_property_enum_get(asset_library_dataptr, asset_library_prop));
-  ED_assetlist_fetch(&asset_library, filter_settings, C);
+  ED_assetlist_storage_fetch(&asset_library, filter_settings, C);
   ED_assetlist_ensure_previews_job(&asset_library, C);
 
   asset_view_template_refresh_asset_collection(asset_library, *assets_dataptr, assets_propname);
