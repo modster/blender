@@ -1461,6 +1461,7 @@ bool CUDADevice::apply_delta_compression(device_memory &mem_orig, device_memory 
   assert(mem_orig.device_pointer != 0);
   assert(mem_compressed.device_pointer != 0);
   assert(mem_orig.data_size == mem_compressed.data_size);
+  assert((size + offset) <= mem_orig.data_size);
 
   CUfunction cu_apply_deltas;
   cuda_assert(
@@ -1468,15 +1469,14 @@ bool CUDADevice::apply_delta_compression(device_memory &mem_orig, device_memory 
 
   device_ptr src_ptr = mem_orig.device_pointer + offset * sizeof(float3);
   device_ptr dst_ptr = mem_compressed.device_pointer + offset * sizeof(ushort4);
-
   float delta_scale = (max_delta - min_delta) / 65535.0f;
 
-  const int elements = (int)(size) * mem_orig.data_elements;
-  void *args[] = {&src_ptr, &dst_ptr, &min_delta, &delta_scale};
+  int elements = (int)(size) * mem_orig.data_elements;
+  void *args[] = {&src_ptr, &dst_ptr, &min_delta, &delta_scale, &elements};
   CUDA_GET_BLOCKSIZE_1D(cu_apply_deltas, elements, 1);
   CUDA_LAUNCH_KERNEL_1D(cu_apply_deltas, args);
   cuda_assert(cuCtxSynchronize());
-  std::cerr << "Time spent applying deltas : " << timer.get_time() << '\n';
+  //std::cerr << "Time spent applying deltas : " << timer.get_time() << '\n';
   return !have_error();
 }
 
