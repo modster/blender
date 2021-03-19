@@ -819,7 +819,7 @@ typedef enum eLineartGpencilModifierSource {
 typedef enum eLineArtGPencilModifierFlags {
   LRT_GPENCIL_INVERT_SOURCE_VGROUP = (1 << 0),
   LRT_GPENCIL_MATCH_OUTPUT_VGROUP = (1 << 1),
-  LRT_GPENCIL_BINARY_WEIGHTS = (1 << 2),
+  LRT_GPENCIL_SOFT_SELECTION = (1 << 2),
   LRT_GPENCIL_IS_BAKED = (1 << 3),
 } eLineArtGPencilModifierFlags;
 
@@ -864,7 +864,8 @@ typedef struct LineartGpencilModifierData {
   float angle_splitting_threshold;
 
   /* CPU mode */
-  float chaining_threshold;
+  float chaining_geometry_threshold;
+  float chaining_image_threshold;
 
   float resample_length;
 
@@ -874,7 +875,6 @@ typedef struct LineartGpencilModifierData {
   /* Additional Switches. */
   int flags;
 
-  float weight_threshold;
   int _pad;
 
   /* Runtime only. */
