@@ -2382,25 +2382,24 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_range(prop, 0.0f, DEG2RAD(180.0f));
   RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
+  prop = RNA_def_property(srna, "weight_threshold", PROP_FLOAT, PROP_ANGLE);
+  RNA_def_property_ui_text(
+      prop, "Weight Threshold", "Treat all weights above this value as 1 in binary weights mode.");
+  /*  Don't allow value very close to PI, or we get a lot of small segments.*/
+  RNA_def_property_ui_range(prop, 0.0f, DEG2RAD(179.5f), 0.01f, 1);
+  RNA_def_property_range(prop, 0.0f, DEG2RAD(180.0f));
+  RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
+
   prop = RNA_def_property(srna, "remove_doubles", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "calculation_flags", LRT_REMOVE_DOUBLES);
   RNA_def_property_ui_text(
       prop, "Remove Doubles", "Remove doubles from the source geometry before generating stokes");
   RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
-  prop = RNA_def_property(srna, "chaining_geometry_threshold", PROP_FLOAT, PROP_DISTANCE);
-  RNA_def_property_ui_text(prop,
-                           "Geometry Threshold",
-                           "Segments with a geometric distance between them lower than this "
-                           "will be chained together");
-  RNA_def_property_ui_range(prop, 0.0f, 0.5f, 0.001f, 3);
-  RNA_def_property_range(prop, 0.0f, 0.5f);
-  RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
-
-  prop = RNA_def_property(srna, "chaining_image_threshold", PROP_FLOAT, PROP_DISTANCE);
+  prop = RNA_def_property(srna, "chaining_threshold", PROP_FLOAT, PROP_DISTANCE);
   RNA_def_property_ui_text(
       prop,
-      "Image Threshold",
+      "Threshold",
       "Segments with an image distance smaller than this will be chained together");
   RNA_def_property_ui_range(prop, 0.0f, 0.3f, 0.001f, 4);
   RNA_def_property_range(prop, 0.0f, 0.3f);
@@ -2508,10 +2507,11 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Match Output", "Match output vertex group based on name");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
-  prop = RNA_def_property(srna, "soft_selection", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_GPENCIL_SOFT_SELECTION);
-  RNA_def_property_ui_text(
-      prop, "Clip", "Preserve original vertex weight instead of clipping to 0/1");
+  prop = RNA_def_property(srna, "binary_weights", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "flags", LRT_GPENCIL_BINARY_WEIGHTS);
+  RNA_def_property_ui_text(prop,
+                           "Binary Weights",
+                           "Use a threshold to clip weights instead of preserving the original");
   RNA_def_property_update(prop, 0, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "is_baked", PROP_BOOLEAN, PROP_NONE);

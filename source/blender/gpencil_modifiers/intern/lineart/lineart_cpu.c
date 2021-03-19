@@ -2644,8 +2644,7 @@ static LineartRenderBuffer *lineart_create_render_buffer(Scene *scene,
 
   rb->crease_threshold = cos(M_PI - lmd->crease_threshold);
   rb->angle_splitting_threshold = lmd->angle_splitting_threshold;
-  rb->chaining_image_threshold = lmd->chaining_image_threshold;
-  rb->chaining_geometry_threshold = lmd->chaining_geometry_threshold;
+  rb->chaining_threshold = lmd->chaining_threshold;
 
   rb->fuzzy_intersections = (lmd->calculation_flags & LRT_INTERSECTION_AS_CONTOUR) != 0;
   rb->fuzzy_everything = (lmd->calculation_flags & LRT_EVERYTHING_AS_CONTOUR) != 0;
@@ -3676,32 +3675,19 @@ int MOD_lineart_compute_feature_lines(Depsgraph *depsgraph, LineartGpencilModifi
      * spit, where the splitting point could be any cut in e->segments. */
     MOD_lineart_chain_split_for_fixed_occlusion(rb);
 
-    /* Then we connect chains based on the _proximity_ of their end points in geometry or image
-     * space, here's the place threashold value gets involved. */
-
-    /* If both chaining thresholds are zero, then we allow at least image space chaining to do a
-     * little bit of work so we don't end up in fragmented strokes. */
-    float *t_image = &lmd->chaining_image_threshold;
-    float *t_geom = &lmd->chaining_geometry_threshold;
-    if (*t_image < FLT_EPSILON && *t_geom < FLT_EPSILON) {
-      *t_geom = 0.0f;
-      *t_image = 0.001f;
-    }
+    /* Then we connect chains based on the _proximity_ of their end points in image space, here's
+     * the place threashold value gets involved. */
 
     /* do_geometry_space = true. */
-    MOD_lineart_chain_connect(rb, true);
+    MOD_lineart_chain_connect(rb);
 
-    /* After chaining, we need to clear flags so we can do another round in image space. */
+    /* Clear picked flags so we don't confuse GPencil generation calls. */
     MOD_lineart_chain_clear_picked_flag(rb);
 
-    /* do_geometry_space = false (it's image_space). */
-    MOD_lineart_chain_connect(rb, false);
-
-    /* Clear again so we don't confuse GPencil generation calls. */
-    MOD_lineart_chain_clear_picked_flag(rb);
+    float *t_image = &lmd->chaining_threshold;
 
     /* This configuration ensures there won't be accidental lost of short unchained segments. */
-    MOD_lineart_chain_discard_short(rb, MIN3(*t_image, *t_geom, 0.001f) - FLT_EPSILON);
+    MOD_lineart_chain_discard_short(rb, MIN2(*t_image, 0.001f) - FLT_EPSILON);
 
     if (rb->angle_splitting_threshold > FLT_EPSILON) {
       MOD_lineart_chain_split_angle(rb, rb->angle_splitting_threshold);
@@ -3745,7 +3731,8 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
                                      float resample_length,
                                      const char *source_vgname,
                                      const char *vgname,
-                                     int modifier_flags)
+                                     int modifier_flags,
+                                     float weight_threshold)
 {
   if (rb == NULL) {
     if (G.debug_value == 4000) {
@@ -3776,7 +3763,7 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
   int enabled_types = lineart_rb_edge_types(rb);
   bool invert_input = modifier_flags & LRT_GPENCIL_INVERT_SOURCE_VGROUP;
   bool match_output = modifier_flags & LRT_GPENCIL_MATCH_OUTPUT_VGROUP;
-  bool preserve_weight = modifier_flags & LRT_GPENCIL_SOFT_SELECTION;
+  bool binary_weight = modifier_flags & LRT_GPENCIL_BINARY_WEIGHTS;
 
   LISTBASE_FOREACH (LineartLineChain *, rlc, &rb->chains) {
 
@@ -3860,7 +3847,7 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
                   }
                   MDeformWeight *mdw = BKE_defvert_ensure_index(&me->dvert[vindex], dindex);
                   MDeformWeight *gdw = BKE_defvert_ensure_index(&gps->dvert[sindex], gpdg);
-                  if (preserve_weight) {
+                  if (!binary_weight) {
                     float use_weight = mdw->weight;
                     if (invert_input) {
                       use_weight = 1 - use_weight;
@@ -3916,7 +3903,8 @@ void MOD_lineart_gpencil_generate(LineartRenderBuffer *rb,
                                   float resample_length,
                                   const char *source_vgname,
                                   const char *vgname,
-                                  int modifier_flags)
+                                  int modifier_flags,
+                                  float weight_threshold)
 {
 
   if (!gpl || !gpf || !ob) {
@@ -3966,5 +3954,6 @@ void MOD_lineart_gpencil_generate(LineartRenderBuffer *rb,
                            resample_length,
                            source_vgname,
                            vgname,
-                           modifier_flags);
+                           modifier_flags,
+                           weight_threshold);
 }
