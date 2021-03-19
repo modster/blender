@@ -288,9 +288,9 @@
     .edge_types = LRT_EDGE_FLAG_ALL_TYPE, \
     .thickness = 25, \
     .opacity = 1.0f, \
-    .flags = LRT_GPENCIL_MATCH_OUTPUT_VGROUP | LRT_GPENCIL_BINARY_WEIGHTS, \
+    .flags = LRT_GPENCIL_MATCH_OUTPUT_VGROUP, \
     .crease_threshold = DEG2RAD(140.0f), \
-    .calculation_flags = LRT_ALLOW_DUPLI_OBJECTS | LRT_REMOVE_DOUBLES | LRT_ALLOW_OVERLAPPING_EDGES | LRT_ALLOW_CLIPPING_BOUNDARIES, \
+    .calculation_flags = LRT_ALLOW_DUPLI_OBJECTS | LRT_ALLOW_CLIPPING_BOUNDARIES, \
     .angle_splitting_threshold = DEG2RAD(60.0f), \
     .chaining_threshold = 0.001f, \
     .weight_threshold = 0.5f, \
