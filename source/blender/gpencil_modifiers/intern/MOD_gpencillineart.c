@@ -424,7 +424,11 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   col = uiLayoutColumn(layout, true);
   uiItemR(col, ptr, "binary_weights", 0, NULL, ICON_NONE);
-  uiItemR(col, ptr, "weight_threshold", 0, NULL, ICON_NONE);
+
+  const bool binary_weights = RNA_boolean_get(ptr, "binary_weights");
+  if (binary_weights) {
+    uiItemR(col, ptr, "weight_threshold", 0, IFACE_("Threshold"), ICON_NONE);
+  }
 }
 
 static void baking_panel_draw(const bContext *UNUSED(C), Panel *panel)
