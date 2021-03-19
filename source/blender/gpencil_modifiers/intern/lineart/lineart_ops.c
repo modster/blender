@@ -113,7 +113,8 @@ static bool bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int
       lmd->resample_length,
       lmd->source_vertex_group,
       lmd->vgname,
-      lmd->flags);
+      lmd->flags,
+      lmd->weight_threshold);
 
   MOD_lineart_destroy_render_data(lmd);
 

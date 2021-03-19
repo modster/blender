@@ -110,7 +110,8 @@ static void generate_strokes_actual(
       lmd->resample_length,
       lmd->source_vertex_group,
       lmd->vgname,
-      lmd->flags);
+      lmd->flags,
+      lmd->weight_threshold);
 }
 
 static bool isModifierDisabled(GpencilModifierData *md)
@@ -421,7 +422,9 @@ static void vgroup_panel_draw(const bContext *UNUSED(C), Panel *panel)
         col, ptr, "vertex_group", &ob_ptr, "vertex_groups", IFACE_("Target"), ICON_NONE);
   }
 
+  col = uiLayoutColumn(layout, true);
   uiItemR(col, ptr, "binary_weights", 0, NULL, ICON_NONE);
+  uiItemR(col, ptr, "weight_threshold", 0, NULL, ICON_NONE);
 }
 
 static void baking_panel_draw(const bContext *UNUSED(C), Panel *panel)

@@ -2382,12 +2382,10 @@ static void rna_def_modifier_gpencillineart(BlenderRNA *brna)
   RNA_def_property_range(prop, 0.0f, DEG2RAD(180.0f));
   RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
-  prop = RNA_def_property(srna, "weight_threshold", PROP_FLOAT, PROP_ANGLE);
+  prop = RNA_def_property(srna, "weight_threshold", PROP_FLOAT, PROP_NONE);
   RNA_def_property_ui_text(
       prop, "Weight Threshold", "Treat all weights above this value as 1 in binary weights mode.");
-  /*  Don't allow value very close to PI, or we get a lot of small segments.*/
-  RNA_def_property_ui_range(prop, 0.0f, DEG2RAD(179.5f), 0.01f, 1);
-  RNA_def_property_range(prop, 0.0f, DEG2RAD(180.0f));
+  RNA_def_property_ui_range(prop, 0.0f, 1.0f, 0.01f, 1);
   RNA_def_property_update(prop, NC_SCENE, "rna_GpencilModifier_update");
 
   prop = RNA_def_property(srna, "remove_doubles", PROP_BOOLEAN, PROP_NONE);

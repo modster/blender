@@ -3855,7 +3855,7 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
                     gdw->weight = MAX2(use_weight, gdw->weight);
                   }
                   else {
-                    if (mdw->weight > 0.999f) {
+                    if (mdw->weight > weight_threshold) {
                       gdw->weight = 1.0f;
                     }
                   }
