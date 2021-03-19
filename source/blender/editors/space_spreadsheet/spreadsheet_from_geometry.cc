@@ -64,7 +64,7 @@ static void add_columns_for_instances(const InstancesComponent &instances_compon
         }
       }));
 
-  columns.last().get()->default_width = 8.0f;
+  columns.last()->default_width = 8.0f;
 
   static std::array<char, 3> axis_char = {'X', 'Y', 'Z'};
   for (const int i : {0, 1, 2}) {

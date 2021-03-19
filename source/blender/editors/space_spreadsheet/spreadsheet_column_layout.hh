@@ -20,10 +20,8 @@
 
 #include "spreadsheet_draw.hh"
 
-// struct Object;
-// struct Collection;
-#include "DNA_collection_types.h"
-#include "DNA_object_types.h"
+struct Object;
+struct Collection;
 
 namespace blender::ed::spreadsheet {
 
