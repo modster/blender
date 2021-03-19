@@ -27,7 +27,7 @@
 static bNodeSocketTemplate geo_node_mesh_primitive_cylinder_in[] = {
     {SOCK_INT, N_("Vertices"), 32, 0.0f, 0.0f, 0.0f, 3, 4096},
     {SOCK_FLOAT, N_("Radius"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("Depth"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
+    {SOCK_FLOAT, N_("Depth"), 2.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
     {SOCK_VECTOR, N_("Location"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
     {SOCK_VECTOR, N_("Rotation"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_EULER},
     {-1, ""},
@@ -52,7 +52,7 @@ static void geo_node_mesh_primitive_cylinder_init(bNodeTree *UNUSED(ntree), bNod
   NodeGeometryMeshCylinder *node_storage = (NodeGeometryMeshCylinder *)MEM_callocN(
       sizeof(NodeGeometryMeshCylinder), __func__);
 
-  node_storage->fill_type = GEO_NODE_MESH_CIRCLE_FILL_NONE;
+  node_storage->fill_type = GEO_NODE_MESH_CIRCLE_FILL_NGON;
 
   node->storage = node_storage;
 }
@@ -81,8 +81,6 @@ static void geo_node_mesh_primitive_cylinder_exec(GeoNodeExecParams params)
   /* The cylinder is a special case of the cone mesh where the top and bottom radius are equal. */
   Mesh *mesh = create_cylinder_or_cone_mesh(
       location, rotation, radius, radius, depth, verts_num, fill_type);
-
-  transform_mesh(mesh, location, rotation, float3(1));
 
   params.set_output("Geometry", GeometrySet::create_with_mesh(mesh));
 }
