@@ -29,8 +29,6 @@
 
 #include "DEG_depsgraph_query.h"
 
-#include "UI_resources.h"
-
 #include "bmesh.h"
 
 #include "spreadsheet_from_geometry.hh"
@@ -40,34 +38,6 @@ namespace blender::ed::spreadsheet {
 
 using blender::bke::ReadAttribute;
 using blender::bke::ReadAttributePtr;
-
-static StringRefNull instance_data_name(const InstancedData &data)
-{
-  switch (data.type) {
-    case INSTANCE_DATA_TYPE_OBJECT: {
-      const ID *id = reinterpret_cast<const ID *>(data.data.object);
-      return id->name + 2;
-    }
-    case INSTANCE_DATA_TYPE_COLLECTION: {
-      const ID *id = reinterpret_cast<const ID *>(data.data.object);
-      return id->name + 2;
-    }
-  }
-  return nullptr;
-}
-
-static int instance_data_icon_id(const InstancedData &data)
-{
-  switch (data.type) {
-    case INSTANCE_DATA_TYPE_OBJECT: {
-      return ICON_OBJECT_DATA;
-    }
-    case INSTANCE_DATA_TYPE_COLLECTION: {
-      return ICON_OUTLINER_COLLECTION;
-    }
-  }
-  return ICON_BLANK1;
-}
 
 static void add_columns_for_instances(const InstancesComponent &instances_component,
                                       SpreadsheetColumnLayout &column_layout,
@@ -82,8 +52,19 @@ static void add_columns_for_instances(const InstancesComponent &instances_compon
   columns.append(spreadsheet_column_from_function(
       "Name", [instance_data](int index, CellValue &r_cell_value) {
         const InstancedData &data = instance_data[index];
-        r_cell_value.value = IconText{instance_data_icon_id(data), instance_data_name(data)};
+        if (data.type == INSTANCE_DATA_TYPE_OBJECT) {
+          if (data.data.object != nullptr) {
+            r_cell_value.value = ObjectCellValue{data.data.object};
+          }
+        }
+        else if (data.type == INSTANCE_DATA_TYPE_COLLECTION) {
+          if (data.data.collection != nullptr) {
+            r_cell_value.value = CollectionCellValue{data.data.collection};
+          }
+        }
       }));
+
+  columns.last().get()->default_width = 8.0f;
 
   static std::array<char, 3> axis_char = {'X', 'Y', 'Z'};
   for (const int i : {0, 1, 2}) {
