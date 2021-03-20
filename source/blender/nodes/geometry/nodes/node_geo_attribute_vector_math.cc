@@ -138,9 +138,7 @@ static CustomDataType operation_get_result_type(const NodeVectorMathOperation op
     case NODE_VECTOR_MATH_LENGTH:
       return CD_PROP_FLOAT;
   }
-
-  BLI_assert(false);
-  return CD_PROP_FLOAT3;
+  BLI_UNREACHABLE_ABORT;
 }
 
 namespace blender::nodes {

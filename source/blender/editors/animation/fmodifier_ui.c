@@ -83,8 +83,7 @@ static ListBase *fmodifier_list_space_specific(const bContext *C)
   }
 
   /* This should not be called in any other space. */
-  BLI_assert(false);
-  return NULL;
+  BLI_UNREACHABLE_ABORT;
 }
 
 /**

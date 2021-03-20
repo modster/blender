@@ -65,8 +65,7 @@ GeometryComponent *GeometryComponent::create(GeometryComponentType component_typ
     case GEO_COMPONENT_TYPE_VOLUME:
       return new VolumeComponent();
   }
-  BLI_assert(false);
-  return nullptr;
+  BLI_UNREACHABLE_ABORT;
 }
 
 void GeometryComponent::user_add() const

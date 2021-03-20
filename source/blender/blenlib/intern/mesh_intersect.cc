@@ -1936,8 +1936,7 @@ static IMesh extract_subdivided_tri(const CDT_data &cd,
   }
   if (t_in_cdt == -1) {
     std::cout << "Could not find " << t << " in cdt input tris\n";
-    BLI_assert(false);
-    return IMesh();
+    BLI_UNREACHABLE_ABORT;
   }
   int t_orig = in_tm.face(t)->orig;
   constexpr int inline_buf_size = 20;

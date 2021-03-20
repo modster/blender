@@ -572,8 +572,7 @@ bool MFNetworkEvaluationStorage::is_same_value_for_every_index(const MFOutputSoc
     case ValueType::OutputVector:
       return static_cast<OutputVectorValue *>(any_value)->vector_array->size() == 1;
   }
-  BLI_assert(false);
-  return false;
+  BLI_UNREACHABLE_ABORT;
 }
 
 bool MFNetworkEvaluationStorage::socket_has_buffer_for_output(const MFOutputSocket &socket)
@@ -967,9 +966,7 @@ GVSpan MFNetworkEvaluationStorage::get_single_input__full(const MFInputSocket &s
     BLI_assert(value->is_computed);
     return value->span;
   }
-
-  BLI_assert(false);
-  return GVSpan(CPPType::get<float>());
+  BLI_UNREACHABLE_ABORT;
 }
 
 GVSpan MFNetworkEvaluationStorage::get_single_input__single(const MFInputSocket &socket)
@@ -995,8 +992,7 @@ GVSpan MFNetworkEvaluationStorage::get_single_input__single(const MFInputSocket 
     return value->span;
   }
 
-  BLI_assert(false);
-  return GVSpan(CPPType::get<float>());
+  BLI_UNREACHABLE_ABORT;
 }
 
 GVArraySpan MFNetworkEvaluationStorage::get_vector_input__full(const MFInputSocket &socket)
@@ -1022,9 +1018,7 @@ GVArraySpan MFNetworkEvaluationStorage::get_vector_input__full(const MFInputSock
     OutputVectorValue *value = static_cast<OutputVectorValue *>(any_value);
     return *value->vector_array;
   }
-
-  BLI_assert(false);
-  return GVArraySpan(CPPType::get<float>());
+  BLI_UNREACHABLE_ABORT;
 }
 
 GVArraySpan MFNetworkEvaluationStorage::get_vector_input__single(const MFInputSocket &socket)
@@ -1048,9 +1042,7 @@ GVArraySpan MFNetworkEvaluationStorage::get_vector_input__single(const MFInputSo
     BLI_assert(value->vector_array->size() == 1);
     return *value->vector_array;
   }
-
-  BLI_assert(false);
-  return GVArraySpan(CPPType::get<float>());
+  BLI_UNREACHABLE_ABORT;
 }
 
 /** \} */

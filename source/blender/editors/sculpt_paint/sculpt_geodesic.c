@@ -315,8 +315,7 @@ float *SCULPT_geodesic_distances_create(Object *ob,
     case PBVH_GRIDS:
       return SCULPT_geodesic_fallback_create(ob, initial_vertices);
   }
-  BLI_assert(false);
-  return NULL;
+  BLI_UNREACHABLE_ABORT;
 }
 
 float *SCULPT_geodesic_from_vertex_and_symm(Sculpt *sd,

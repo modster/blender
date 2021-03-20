@@ -61,8 +61,7 @@ template<typename T> class VArraySpanBase {
       case VArraySpanCategory::StartsAndSizes:
         return virtual_size_ == 1;
     }
-    BLI_assert(false);
-    return false;
+    BLI_UNREACHABLE_ABORT;
   }
 
   bool is_empty() const
@@ -127,8 +126,7 @@ template<typename T> class VArraySpan : public VArraySpanBase<T> {
         return VSpan<T>(Span<T>(this->data_.starts_and_sizes.starts[index],
                                 this->data_.starts_and_sizes.sizes[index]));
     }
-    BLI_assert(false);
-    return {};
+    BLI_UNREACHABLE_ABORT;
   }
 };
 
@@ -198,8 +196,7 @@ class GVArraySpan : public VArraySpanBase<void> {
         return GVSpan(GSpan(
             *type_, data_.starts_and_sizes.starts[index], data_.starts_and_sizes.sizes[index]));
     }
-    BLI_assert(false);
-    return GVSpan(*type_);
+    BLI_UNREACHABLE_ABORT;
   }
 };
 

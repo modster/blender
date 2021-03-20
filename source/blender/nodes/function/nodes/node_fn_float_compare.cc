@@ -93,9 +93,7 @@ static const blender::fn::MultiFunction &get_multi_function(bNode &node)
     case NODE_FLOAT_COMPARE_NOT_EQUAL:
       return not_equal_fn;
   }
-
-  BLI_assert(false);
-  return blender::fn::dummy_multi_function;
+  BLI_UNREACHABLE_ABORT;
 }
 
 static void node_float_compare_expand_in_mf_network(blender::nodes::NodeMFNetworkBuilder &builder)

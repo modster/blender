@@ -141,8 +141,7 @@ InputSocketRef &NodeTreeRef::find_input_socket(Map<bNode *, NodeRef *> &node_map
       return *socket;
     }
   }
-  BLI_assert(false);
-  return *node->inputs_[0];
+  BLI_UNREACHABLE_ABORT;
 }
 
 OutputSocketRef &NodeTreeRef::find_output_socket(Map<bNode *, NodeRef *> &node_mapping,
@@ -155,8 +154,7 @@ OutputSocketRef &NodeTreeRef::find_output_socket(Map<bNode *, NodeRef *> &node_m
       return *socket;
     }
   }
-  BLI_assert(false);
-  return *node->outputs_[0];
+  BLI_UNREACHABLE_ABORT;
 }
 
 void NodeTreeRef::create_linked_socket_caches()

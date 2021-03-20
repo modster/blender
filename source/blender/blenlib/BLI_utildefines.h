@@ -28,6 +28,7 @@
 /* avoid many includes for now */
 #include "BLI_compiler_compat.h"
 #include "BLI_sys_types.h"
+#include "BLI_unreachable.h"
 #include "BLI_utildefines_variadic.h"
 
 /* We could remove in future. */

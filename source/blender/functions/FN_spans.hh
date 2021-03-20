@@ -213,8 +213,7 @@ template<typename T> struct VSpanBase {
       case VSpanCategory::FullPointerArray:
         return virtual_size_ == 1;
     }
-    BLI_assert(false);
-    return false;
+    BLI_UNREACHABLE_ABORT;
   }
 
   bool is_full_array() const
@@ -227,8 +226,7 @@ template<typename T> struct VSpanBase {
       case VSpanCategory::FullPointerArray:
         return virtual_size_ <= 1;
     }
-    BLI_assert(false);
-    return false;
+    BLI_UNREACHABLE_ABORT;
   }
 
   bool is_empty() const
@@ -304,8 +302,7 @@ template<typename T> class VSpan : public VSpanBase<T> {
       case VSpanCategory::FullPointerArray:
         return *this->data_.full_pointer_array.data[index];
     }
-    BLI_assert(false);
-    return *this->data_.single.data;
+    BLI_UNREACHABLE_ABORT;
   }
 
   const T &as_single_element() const
@@ -417,8 +414,7 @@ class GVSpan : public VSpanBase<void> {
       case VSpanCategory::FullPointerArray:
         return this->data_.full_pointer_array.data[index];
     }
-    BLI_assert(false);
-    return this->data_.single.data;
+    BLI_UNREACHABLE_ABORT;
   }
 
   template<typename T> VSpan<T> typed() const

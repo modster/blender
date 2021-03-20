@@ -299,8 +299,7 @@ static int attribute_data_type_complexity(const CustomDataType data_type)
 #endif
     default:
       /* Only accept "generic" custom data types used by the attribute system. */
-      BLI_assert(false);
-      return 0;
+      BLI_UNREACHABLE_ABORT;
   }
 }
 
@@ -341,8 +340,7 @@ static int attribute_domain_priority(const AttributeDomain domain)
       return 4;
     default:
       /* Domain not supported in nodes yet. */
-      BLI_assert(false);
-      return 0;
+      BLI_UNREACHABLE_ABORT;
   }
 }
 
@@ -703,8 +701,7 @@ bool GeometryComponent::attribute_domain_supported(const AttributeDomain domain)
 
 int GeometryComponent::attribute_domain_size(const AttributeDomain UNUSED(domain)) const
 {
-  BLI_assert(false);
-  return 0;
+  BLI_UNREACHABLE_ABORT;
 }
 
 ReadAttributePtr GeometryComponent::attribute_try_get_for_read(

@@ -74,9 +74,7 @@ static const blender::fn::MultiFunction &get_multi_function(bNode &bnode)
     case NODE_BOOLEAN_MATH_NOT:
       return not_fn;
   }
-
-  BLI_assert(false);
-  return blender::fn::dummy_multi_function;
+  BLI_UNREACHABLE_ABORT;
 }
 
 static void node_boolean_expand_in_mf_network(blender::nodes::NodeMFNetworkBuilder &builder)

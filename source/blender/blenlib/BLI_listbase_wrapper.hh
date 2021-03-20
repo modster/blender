@@ -26,6 +26,7 @@
  */
 
 #include "BLI_listbase.h"
+#include "BLI_unreachable.h"
 #include "DNA_listBase.h"
 
 namespace blender {
@@ -105,8 +106,7 @@ template<typename T> class ListBaseWrapper {
       }
       index++;
     }
-    BLI_assert(false);
-    return -1;
+    BLI_UNREACHABLE_ABORT;
   }
 };
 

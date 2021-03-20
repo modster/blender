@@ -104,8 +104,7 @@ static bool operation_use_input_b(const NodeMathOperation operation)
     case NODE_MATH_TRUNC:
       return false;
   }
-  BLI_assert(false);
-  return false;
+  BLI_UNREACHABLE_ABORT;
 }
 
 static void geo_node_attribute_math_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)

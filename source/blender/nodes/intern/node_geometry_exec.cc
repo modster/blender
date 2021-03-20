@@ -97,8 +97,7 @@ ReadAttributePtr GeoNodeExecParams::get_input_attribute(const StringRef name,
     return component.attribute_get_constant_for_read_converted(
         domain, CD_PROP_COLOR, type, &value);
   }
-  BLI_assert(false);
-  return component.attribute_get_constant_for_read(domain, type, default_value);
+  BLI_UNREACHABLE_ABORT;
 }
 
 CustomDataType GeoNodeExecParams::get_input_attribute_data_type(
@@ -133,8 +132,7 @@ CustomDataType GeoNodeExecParams::get_input_attribute_data_type(
     return CD_PROP_BOOL;
   }
 
-  BLI_assert(false);
-  return default_type;
+  BLI_UNREACHABLE_ABORT;
 }
 
 /**

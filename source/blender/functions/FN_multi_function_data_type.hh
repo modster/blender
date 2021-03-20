@@ -104,8 +104,7 @@ class MFDataType {
       case Vector:
         return type_->name() + " Vector";
     }
-    BLI_assert(false);
-    return "";
+    BLI_UNREACHABLE_ABORT;
   }
 
   uint64_t hash() const

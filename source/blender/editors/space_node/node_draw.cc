@@ -1196,7 +1196,7 @@ static int node_error_type_to_icon(const NodeWarningType type)
   }
 
   BLI_assert(false);
-  return ICON_ERROR;
+  BLI_UNREACHABLE_ABORT;
 }
 
 static uint8_t node_error_type_priority(const NodeWarningType type)
@@ -1209,9 +1209,7 @@ static uint8_t node_error_type_priority(const NodeWarningType type)
     case NodeWarningType::Info:
       return 1;
   }
-
-  BLI_assert(false);
-  return 0;
+  BLI_UNREACHABLE_ABORT;
 }
 
 static NodeWarningType node_error_highest_priority(Span<NodeWarning> warnings)

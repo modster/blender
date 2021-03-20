@@ -129,8 +129,7 @@ class MFParamType {
         break;
       }
     }
-    BLI_assert(false);
-    return SingleInput;
+    BLI_UNREACHABLE_ABORT;
   }
 
   bool is_input_or_mutable() const

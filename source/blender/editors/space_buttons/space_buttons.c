@@ -308,8 +308,7 @@ static const char *buttons_main_region_context_string(const short mainb)
   }
 
   /* All the cases should be handled. */
-  BLI_assert(false);
-  return "";
+  BLI_UNREACHABLE_ABORT;
 }
 
 static void buttons_main_region_layout_properties(const bContext *C,

@@ -1920,14 +1920,12 @@ void add_edge_constraint(
     constexpr int unreasonably_large_crossings = 100000;
     if (!ok || crossings.size() == unreasonably_large_crossings) {
       /* Shouldn't happen but if does, just bail out. */
-      BLI_assert(false);
-      return;
+      BLI_UNREACHABLE_ABORT;
     }
     if (crossings[n].lambda == 0) {
       if (crossings[n].vert->visit_index == visit) {
         /* Shouldn't happen but if it does, just bail out. */
-        BLI_assert(false);
-        return;
+        BLI_UNREACHABLE_ABORT;
       }
       crossings[n].vert->visit_index = visit;
     }

@@ -642,8 +642,7 @@ static bool parse_add_func(ExprParseState *state, eOpCode code, int args, void *
       break;
 
     default:
-      BLI_assert(false);
-      return false;
+      BLI_UNREACHABLE_ABORT;
   }
 
   parse_add_op(state, code, 1 - args)->arg.ptr = funcptr;

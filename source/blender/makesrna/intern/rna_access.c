@@ -352,8 +352,7 @@ static bool rna_idproperty_ui_set_default(PointerRNA *ptr,
           IDP_Double(item) = value->d;
           break;
         default:
-          BLI_assert(false);
-          return false;
+          BLI_UNREACHABLE_ABORT;
       }
     }
     else {

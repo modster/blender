@@ -831,7 +831,7 @@ static const char *get_effector_defname(ePFieldType type)
   }
 
   BLI_assert(false);
-  return CTX_DATA_(BLT_I18NCONTEXT_ID_OBJECT, "Field");
+  BLI_UNREACHABLE_ABORT;
 }
 
 static int effector_add_exec(bContext *C, wmOperator *op)

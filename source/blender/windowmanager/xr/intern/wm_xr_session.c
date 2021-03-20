@@ -468,8 +468,7 @@ static void wm_xr_session_surface_free_data(wmSurface *surface)
 static wmSurface *wm_xr_session_surface_create(void)
 {
   if (g_xr_surface) {
-    BLI_assert(false);
-    return g_xr_surface;
+    BLI_UNREACHABLE_ABORT;
   }
 
   wmSurface *surface = MEM_callocN(sizeof(*surface), __func__);

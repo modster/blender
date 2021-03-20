@@ -83,8 +83,7 @@ static int oedge_cmp(const void *a1, const void *a2)
     return -1;
   }
   /* Should never get here, no two edges should be the same. */
-  BLI_assert(false);
-  return 0;
+  BLI_UNREACHABLE_ABORT;
 }
 
 BLI_INLINE bool is_boundary_edge(uint i_a, uint i_b, const uint coord_last)

@@ -277,8 +277,7 @@ struct DisplaceGridOp {
         return index_to_object * object_to_world * world_to_texture;
       }
     }
-    BLI_assert(false);
-    return {};
+    BLI_UNREACHABLE_ABORT;
   }
 };
 
