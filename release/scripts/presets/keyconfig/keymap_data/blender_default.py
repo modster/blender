@@ -7230,6 +7230,7 @@ def generate_keymaps(params=None):
         km_3d_view_tool_paint_gpencil_curve_pen(params),
         km_3d_view_tool_paint_gpencil_interpolate(params),
         km_3d_view_tool_edit_gpencil_select(params),
+        km_3d_view_tool_edit_gpencil_select_box(params),
         km_3d_view_tool_edit_gpencil_select_circle(params),
         km_3d_view_tool_edit_gpencil_select_lasso(params),
         km_3d_view_tool_edit_gpencil_extrude(params),
