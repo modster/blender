@@ -196,12 +196,12 @@ static void gpencil_hook_co_apply(struct GPHookData_cb *tData, float weight, bGP
 }
 
 /* deform stroke */
-static void deformStroke(GpencilModifierData *md,
-                         Depsgraph *UNUSED(depsgraph),
-                         Object *ob,
-                         bGPDlayer *gpl,
-                         bGPDframe *UNUSED(gpf),
-                         bGPDstroke *gps)
+static void deformPolyline(GpencilModifierData *md,
+                           Depsgraph *UNUSED(depsgraph),
+                           Object *ob,
+                           bGPDlayer *gpl,
+                           bGPDframe *UNUSED(gpf),
+                           bGPDstroke *gps)
 {
   HookGpencilModifierData *mmd = (HookGpencilModifierData *)md;
   if (!mmd->object) {
@@ -304,7 +304,7 @@ static void bakeModifier(Main *UNUSED(bmain),
 
       /* compute hook effects on this frame */
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-        deformStroke(md, depsgraph, ob, gpl, gpf, gps);
+        deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
       }
     }
   }
@@ -432,7 +432,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Hook = {
 
     /* copyData */ copyData,
 
-    /* deformStroke */ deformStroke,
+    /* deformPolyline */ deformPolyline,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,

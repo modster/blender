@@ -383,7 +383,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Multiply = {
 
     /* copyData */ copyData,
 
-    /* deformStroke */ NULL,
+    /* deformPolyline */ NULL,
     /* generateStrokes */ generateStrokes,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,

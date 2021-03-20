@@ -269,7 +269,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Mirror = {
 
     /* copyData */ copyData,
 
-    /* deformStroke */ NULL,
+    /* deformPolyline */ NULL,
     /* generateStrokes */ generateStrokes,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,

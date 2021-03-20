@@ -755,8 +755,7 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
   const bool is_edit = GPENCIL_ANY_EDIT_MODE(gpd);
   const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
   const bool is_render = (bool)(DEG_get_mode(depsgraph) == DAG_EVAL_RENDER);
-  const bool do_modifiers = (bool)((!is_multiedit) &&
-                                   (ob->greasepencil_modifiers.first != NULL) &&
+  const bool do_modifiers = (bool)((!is_multiedit) && (ob->greasepencil_modifiers.first != NULL) &&
                                    (!GPENCIL_SIMPLIFY_MODIF(scene)));
   if (!do_modifiers) {
     return;
@@ -782,16 +781,16 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
       }
 
       /* Apply deform modifiers and Time remap (only change geometry). */
-      if ((time_remap) || (mti && mti->deformStroke)) {
+      if ((time_remap) || (mti && mti->deformPolyline)) {
         LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
           bGPDframe *gpf = BKE_gpencil_frame_retime_get(depsgraph, scene, ob, gpl);
           if (gpf == NULL) {
             continue;
           }
 
-          if (mti->deformStroke) {
+          if (mti->deformPolyline) {
             LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-              mti->deformStroke(md, depsgraph, ob, gpl, gpf, gps);
+              mti->deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
             }
           }
         }

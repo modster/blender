@@ -114,12 +114,12 @@ static void gpencil_deform_verts(ArmatureGpencilModifierData *mmd, Object *targe
 }
 
 /* deform stroke */
-static void deformStroke(GpencilModifierData *md,
-                         Depsgraph *UNUSED(depsgraph),
-                         Object *ob,
-                         bGPDlayer *UNUSED(gpl),
-                         bGPDframe *UNUSED(gpf),
-                         bGPDstroke *gps)
+static void deformPolyline(GpencilModifierData *md,
+                           Depsgraph *UNUSED(depsgraph),
+                           Object *ob,
+                           bGPDlayer *UNUSED(gpl),
+                           bGPDframe *UNUSED(gpf),
+                           bGPDstroke *gps)
 {
   ArmatureGpencilModifierData *mmd = (ArmatureGpencilModifierData *)md;
   if (!mmd->object) {
@@ -158,7 +158,7 @@ static void bakeModifier(Main *UNUSED(bmain),
 
       /* compute armature effects on this frame */
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-        deformStroke(md_eval, depsgraph, object_eval, gpl, gpf, gps);
+        deformPolyline(md_eval, depsgraph, object_eval, gpl, gpf, gps);
       }
     }
   }
@@ -239,7 +239,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Armature = {
 
     /* copyData */ copyData,
 
-    /* deformStroke */ deformStroke,
+    /* deformPolyline */ deformPolyline,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,

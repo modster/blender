@@ -127,12 +127,12 @@ BLI_INLINE float table_sample(float *table, float x)
 /**
  * Apply noise effect based on stroke direction.
  */
-static void deformStroke(GpencilModifierData *md,
-                         Depsgraph *depsgraph,
-                         Object *ob,
-                         bGPDlayer *gpl,
-                         bGPDframe *gpf,
-                         bGPDstroke *gps)
+static void deformPolyline(GpencilModifierData *md,
+                           Depsgraph *depsgraph,
+                           Object *ob,
+                           bGPDlayer *gpl,
+                           bGPDframe *gpf,
+                           bGPDstroke *gps)
 {
   NoiseGpencilModifierData *mmd = (NoiseGpencilModifierData *)md;
   MDeformVert *dvert = NULL;
@@ -277,7 +277,7 @@ static void bakeModifier(struct Main *UNUSED(bmain),
   LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
     LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-        deformStroke(md, depsgraph, ob, gpl, gpf, gps);
+        deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
       }
     }
   }
@@ -363,7 +363,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Noise = {
 
     /* copyData */ copyData,
 
-    /* deformStroke */ deformStroke,
+    /* deformPolyline */ deformPolyline,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,
