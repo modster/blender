@@ -3348,21 +3348,6 @@ def km_grease_pencil_stroke_edit_mode(params):
 
     return keymap
 
-def km_grease_pencil_stroke_curve_edit_mode(_params):
-    items = []
-    keymap = (
-        "Grease Pencil Stroke Curve Edit Mode",
-        {"space_type": 'EMPTY', "region_type": 'WINDOW'},
-        {"items": items},
-    )
-
-    items.extend([
-        # Set handle type
-        ("gpencil.stroke_editcurve_set_handle_type", {"type": 'V', "value": 'PRESS'}, None),
-    ])
-
-    return keymap
-
 def km_grease_pencil_stroke_paint_mode(params):
     items = []
     keymap = (
@@ -6801,7 +6786,7 @@ def km_3d_view_tool_paint_gpencil_curve_pen(params):
         "3D View Tool: Paint Gpencil, Curve Pen",
         {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
         {"items": [
-            ("gpencil.draw_curve", {"type": params.tool_mouse, "value": 'PRESS'}, {"properties":[("wait_for_input", False)]}),
+            ("gpencil.draw_curve", {"type": params.tool_mouse, "value": 'PRESS'}, {"properties":[]}),
         ]},
     )
 
@@ -7070,7 +7055,6 @@ def generate_keymaps(params=None):
 
         # Modes.
         km_grease_pencil(params),
-        km_grease_pencil_stroke_curve_edit_mode(params),
         km_grease_pencil_stroke_edit_mode(params),
         km_grease_pencil_stroke_paint_mode(params),
         km_grease_pencil_stroke_paint_draw_brush(params),
