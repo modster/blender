@@ -38,6 +38,7 @@
 
 #include "BKE_brush.h"
 #include "BKE_context.h"
+#include "BKE_global.h"
 #include "BKE_gpencil.h"
 #include "BKE_gpencil_curve.h"
 #include "BKE_gpencil_geom.h"
@@ -113,14 +114,7 @@ static void gpencil_curve_draw_exit(bContext *C, wmOperator *op);
 
 static void debug_print_state(tGPDcurve_draw *tcd)
 {
-  const char *state_str[] = {
-      "MOVE",
-      "VECTOR",
-      "ALIGN",
-      "FREE",
-      "THICK",
-      "ALPHA"
-  };
+  const char *state_str[] = {"MOVE", "VECTOR", "ALIGN", "FREE", "THICK", "ALPHA"};
   printf("State: %s\tMouse x=%d\ty=%d\tpressed:%s\n",
          state_str[tcd->state],
          tcd->imval[0],
@@ -180,7 +174,7 @@ static void gpencil_pop_curve_point(bContext *C, tGPDcurve_draw *tcd)
   bGPDcurve *gpc = tcd->gpc;
   const int old_num_points = gpc->tot_curve_points;
   const int new_num_points = old_num_points - 1;
-  printf("old: %d, new: %d\n", old_num_points, new_num_points);
+  // printf("old: %d, new: %d\n", old_num_points, new_num_points);
 
   /* Create new stroke and curve */
   bGPDstroke *new_stroke = BKE_gpencil_stroke_duplicate(tcd->gps, false, false);
@@ -268,7 +262,6 @@ static void gpencil_curve_draw_init(bContext *C, wmOperator *op, const wmEvent *
   BKE_paint_brush_set(paint, brush);
   BrushGpencilSettings *brush_settings = brush->gpencil_settings;
   tcd->brush = brush;
-  printf("Brush size: %d\n", brush->size);
 
   /* Get active layer or create a new one. */
   bGPDlayer *gpl = CTX_data_active_gpencil_layer(C);
@@ -340,7 +333,6 @@ static void gpencil_curve_draw_init(bContext *C, wmOperator *op, const wmEvent *
 
 static void gpencil_curve_draw_update(bContext *C, tGPDcurve_draw *tcd)
 {
-  // printf("Update curve draw\n");
   bGPdata *gpd = tcd->gpd;
   bGPDstroke *gps = tcd->gps;
   bGPDcurve *gpc = tcd->gpc;
@@ -405,7 +397,9 @@ static void gpencil_curve_draw_update(bContext *C, tGPDcurve_draw *tcd)
 
 static void gpencil_curve_draw_confirm(bContext *C, wmOperator *op, tGPDcurve_draw *tcd)
 {
-  printf("Confirm curve draw\n");
+  if (G.debug & G_DEBUG) {
+    printf("Confirm curve draw\n");
+  }
   bGPDcurve *gpc = tcd->gpc;
   int tot_points = gpc->tot_curve_points;
   bGPDcurve_point *cpt = &gpc->curve_points[tot_points - 1];
@@ -417,7 +411,9 @@ static void gpencil_curve_draw_confirm(bContext *C, wmOperator *op, tGPDcurve_dr
 
 static void gpencil_curve_draw_exit(bContext *C, wmOperator *op)
 {
-  printf("Exit curve draw\n");
+  if (G.debug & G_DEBUG) {
+    printf("Exit curve draw\n");
+  }
   tGPDcurve_draw *tcd = op->customdata;
   bGPdata *gpd = tcd->gpd;
 
@@ -434,7 +430,9 @@ static void gpencil_curve_draw_exit(bContext *C, wmOperator *op)
 
 static int gpencil_curve_draw_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  printf("Invoke curve draw\n");
+  if (G.debug & G_DEBUG) {
+    printf("Invoke curve draw\n");
+  }
   wmWindow *win = CTX_wm_window(C);
 
   /* Set cursor to dot. */
@@ -579,20 +577,26 @@ static int gpencil_curve_draw_modal(bContext *C, wmOperator *op, const wmEvent *
     }
   }
 
-  debug_print_state(tcd);
+  if (G.debug & G_DEBUG) {
+    debug_print_state(tcd);
+  }
   copy_v2_v2_int(tcd->imval_prev, tcd->imval);
   return OPERATOR_RUNNING_MODAL;
 }
 
 static void gpencil_curve_draw_cancel(bContext *C, wmOperator *op)
 {
-  printf("Cancel curve draw\n");
+  if (G.debug & G_DEBUG) {
+    printf("Cancel curve draw\n");
+  }
   gpencil_curve_draw_exit(C, op);
 }
 
 static bool gpencil_curve_draw_poll(bContext *C)
 {
-  printf("Poll curve draw\n");
+  if (G.debug & G_DEBUG) {
+    printf("Poll curve draw\n");
+  }
   ScrArea *area = CTX_wm_area(C);
   if (area && area->spacetype != SPACE_VIEW3D) {
     return false;
