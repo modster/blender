@@ -557,7 +557,7 @@ typedef enum eBrushGPaintTool {
   GPAINT_TOOL_FILL = 1,
   GPAINT_TOOL_ERASE = 2,
   GPAINT_TOOL_TINT = 3,
-  GPAINT_TOOL_CURVE = 4,
+  GPAINT_TOOL_CURVE = 4, /* UNUSED */
 } eBrushGPaintTool;
 
 /* BrushGpencilSettings->brush type */

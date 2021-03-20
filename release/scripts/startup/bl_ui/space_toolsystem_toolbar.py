@@ -1906,21 +1906,6 @@ class _defs_gpencil_paint:
         )
 
     @ToolDef.from_fn
-    def curve_pen():
-        def draw_settings(context, layout, tool):
-            pass
-
-        return dict(
-            idname="builtin.curve_pen",
-            label="Curve Pen",
-            icon="",
-            cursor='DOT',
-            widget=None,
-            keymap=(),
-            draw_settings=draw_settings,
-        )
-
-    @ToolDef.from_fn
     def cutter():
         def draw_settings(_context, layout, tool):
             props = tool.operator_properties("gpencil.stroke_cutter")
@@ -2058,7 +2043,7 @@ class _defs_gpencil_paint:
         return dict(
             idname="builtin.curve_pen",
             label="Curve Pen",
-            icon="",
+            icon="none",
             cursor='DOT',
             widget=None,
             keymap=(),
