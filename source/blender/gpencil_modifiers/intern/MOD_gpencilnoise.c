@@ -364,6 +364,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Noise = {
     /* copyData */ copyData,
 
     /* deformPolyline */ deformPolyline,
+    /* deformBezier */ NULL,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,

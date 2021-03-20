@@ -630,6 +630,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Build = {
     /* copyData */ copyData,
 
     /* deformPolyline */ NULL,
+    /* deformBezier */ NULL,
     /* generateStrokes */ generateStrokes,
     /* bakeModifier */ NULL,
     /* remapTime */ NULL,

@@ -487,6 +487,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Lineart = {
     /* copyData. */ copyData,
 
     /* deformPolyline. */ NULL,
+    /* deformBezier. */ NULL,
     /* generateStrokes. */ generateStrokes,
     /* bakeModifier. */ bakeModifier,
     /* remapTime. */ NULL,

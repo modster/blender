@@ -781,16 +781,20 @@ void BKE_gpencil_modifiers_calc(Depsgraph *depsgraph, Scene *scene, Object *ob)
       }
 
       /* Apply deform modifiers and Time remap (only change geometry). */
-      if ((time_remap) || (mti && mti->deformPolyline)) {
+      if ((time_remap) || (mti && mti->deformPolyline) || (mti && mti->deformBezier)) {
         LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
           bGPDframe *gpf = BKE_gpencil_frame_retime_get(depsgraph, scene, ob, gpl);
           if (gpf == NULL) {
             continue;
           }
-
-          if (mti->deformPolyline) {
-            LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-              mti->deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
+          LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+            if (!GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+              if (mti->deformPolyline) {
+                mti->deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
+              }
+            }
+            else if (mti->deformBezier) {
+              mti->deformBezier(md, depsgraph, ob, gpl, gpf, gps);
             }
           }
         }

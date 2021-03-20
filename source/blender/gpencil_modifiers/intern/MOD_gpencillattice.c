@@ -272,6 +272,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Lattice = {
     /* copyData */ copyData,
 
     /* deformPolyline */ deformPolyline,
+    /* deformBezier */ NULL,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,

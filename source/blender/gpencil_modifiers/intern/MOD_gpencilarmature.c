@@ -240,6 +240,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Armature = {
     /* copyData */ copyData,
 
     /* deformPolyline */ deformPolyline,
+    /* deformBezier */ NULL,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,

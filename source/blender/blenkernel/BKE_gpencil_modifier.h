@@ -138,6 +138,17 @@ typedef struct GpencilModifierTypeInfo {
                          struct bGPDstroke *gps);
 
   /**
+   *  Callback for GP "bezier stroke" modifiers that operate on the
+   * shape and parameters of the provided strokes (e.g. Thickness, Noise, etc.)
+   */
+  void (*deformBezier)(struct GpencilModifierData *md,
+                       struct Depsgraph *depsgraph,
+                       struct Object *ob,
+                       struct bGPDlayer *gpl,
+                       struct bGPDframe *gpf,
+                       struct bGPDstroke *gps);
+
+  /**
    * Callback for GP "geometry" modifiers that create extra geometry
    * in the frame (e.g. Array)
    */
