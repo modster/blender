@@ -105,6 +105,7 @@ static int wm_obj_export_exec(bContext *C, wmOperator *op)
   }
   struct OBJExportParams export_params;
   RNA_string_get(op->ptr, "filepath", export_params.filepath);
+  export_params.blen_filepath = CTX_data_main(C)->name;
   export_params.export_animation = RNA_boolean_get(op->ptr, "export_animation");
   export_params.start_frame = RNA_int_get(op->ptr, "start_frame");
   export_params.end_frame = RNA_int_get(op->ptr, "end_frame");

@@ -77,6 +77,7 @@ struct OBJExportParamsDefault {
   OBJExportParamsDefault()
   {
     params.filepath[0] = '\0';
+    params.blen_filepath = '\0';
     params.export_animation = false;
     params.start_frame = 0;
     params.end_frame = 1;

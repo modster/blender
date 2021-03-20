@@ -116,7 +116,7 @@ class MTLWriter : NonMovable, NonCopyable {
  public:
   MTLWriter(const char *obj_filepath) noexcept(false);
 
-  void write_header() const;
+  void write_header(const char *blen_filepath) const;
   StringRefNull mtl_file_path() const;
   void append_materials(const OBJMesh &mesh_to_export);
 

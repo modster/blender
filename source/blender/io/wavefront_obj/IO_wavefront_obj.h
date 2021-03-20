@@ -55,6 +55,9 @@ struct OBJExportParams {
   /** Full path to the destination .OBJ file. */
   char filepath[FILE_MAX];
 
+  /** Full path to current blender file (used for comments in output). */
+  const char *blen_filepath;
+
   /** Whether multiple frames should be exported. */
   bool export_animation;
   /** The first frame to be exported. */

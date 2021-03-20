@@ -160,7 +160,7 @@ static void write_mesh_objects(Vector<std::unique_ptr<OBJMesh>> exportable_as_me
       print_exception_error(ex);
     }
     if (mtl_writer) {
-      mtl_writer->write_header();
+      mtl_writer->write_header(export_params.blen_filepath);
       obj_writer.write_mtllib_name(mtl_writer->mtl_file_path());
     }
   }

@@ -25,6 +25,8 @@
 
 #include "BKE_blender_version.h"
 
+#include "BLI_path_util.h"
+
 #include "obj_export_mesh.hh"
 #include "obj_export_mtl.hh"
 #include "obj_export_nurbs.hh"
@@ -476,11 +478,14 @@ MTLWriter::MTLWriter(const char *obj_filepath) noexcept(false)
   std::cout << "Material Library created at: " << mtl_filepath_ << std::endl;
 }
 
-void MTLWriter::write_header() const
+void MTLWriter::write_header(const char *blen_filepath) const
 {
   using namespace std::string_literals;
+  const char *blen_basename = (blen_filepath && blen_filepath[0] != '\0') ?
+                                  BLI_path_basename(blen_filepath) :
+                                  "None";
   file_handler_->write<eMTLSyntaxElement::string>("# Blender "s + BKE_blender_version_string() +
-                                                  "\n");
+                                                  " MTL File: '" + blen_basename + "'\n");
   file_handler_->write<eMTLSyntaxElement::string>("# www.blender.org\n");
 }
 
