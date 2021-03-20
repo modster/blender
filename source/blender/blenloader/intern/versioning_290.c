@@ -36,6 +36,7 @@
 #include "DNA_gpencil_modifier_types.h"
 #include "DNA_gpencil_types.h"
 #include "DNA_hair_types.h"
+#include "DNA_light_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
@@ -1892,6 +1893,18 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
+  if (!MAIN_VERSION_ATLEAST(bmain, 293, 13)) {
+    LISTBASE_FOREACH (bNodeTree *, ntree, &bmain->nodetrees) {
+      if (ntree->type == NTREE_GEOMETRY) {
+        LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+          if (STREQ(node->idname, "GeometryNodeSubdivideSmooth")) {
+            STRNCPY(node->idname, "GeometryNodeSubdivisionSurface");
+          }
+        }
+      }
+    }
+  }
+
   /**
    * Versioning code until next subversion bump goes here.
    *
@@ -1903,5 +1916,12 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
    */
   {
     /* Keep this block, even when empty. */
+
+    if (!DNA_struct_elem_find(fd->filesdna, "Light", "float", "diff_fac")) {
+      LISTBASE_FOREACH (Light *, light, &bmain->lights) {
+        light->diff_fac = 1.0f;
+        light->volume_fac = 1.0f;
+      }
+    }
   }
 }

@@ -29,6 +29,7 @@
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_gpencil.h"
+#include "BKE_gpencil_modifier.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
 
@@ -49,6 +50,24 @@
 #include "MOD_lineart.h"
 
 #include "lineart_intern.h"
+
+static bool lineart_mod_is_disabled(GpencilModifierData *md)
+{
+  BLI_assert(md->type == eGpencilModifierType_Lineart);
+
+  const GpencilModifierTypeInfo *info = BKE_gpencil_modifier_get_info(md->type);
+
+  LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
+
+  /* Toggle on and off the baked flag as we are only interested in if something else is disabling
+   * it. We can assume that the guard function has already toggled this on for all modifiers that
+   * are sent here. */
+  lmd->flags &= (~LRT_GPENCIL_IS_BAKED);
+  bool disabled = info->isDisabled(md, 0);
+  lmd->flags |= LRT_GPENCIL_IS_BAKED;
+
+  return disabled;
+}
 
 static void clear_strokes(Object *ob, GpencilModifierData *md, int frame)
 {
@@ -74,6 +93,11 @@ static void clear_strokes(Object *ob, GpencilModifierData *md, int frame)
 
 static bool bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int frame)
 {
+  /* Modifier data sanity check. */
+  if (lineart_mod_is_disabled(md)) {
+    return false;
+  }
+
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
   bGPdata *gpd = ob->data;
 
@@ -105,12 +129,12 @@ static bool bake_strokes(Object *ob, Depsgraph *dg, GpencilModifierData *md, int
       lmd->level_start,
       lmd->use_multiple_levels ? lmd->level_end : lmd->level_start,
       lmd->target_material ? BKE_gpencil_object_material_index_get(ob, lmd->target_material) : 0,
-      lmd->line_types,
+      lmd->edge_types,
       lmd->transparency_flags,
       lmd->transparency_mask,
       lmd->thickness,
       lmd->opacity,
-      lmd->pre_sample_length,
+      lmd->resample_length,
       lmd->source_vertex_group,
       lmd->vgname,
       lmd->flags);
@@ -148,11 +172,16 @@ static bool lineart_gpencil_bake_single_target(LineartBakeJob *bj, Object *ob, i
 
   if (bj->overwrite_frames) {
     LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
-      clear_strokes(ob, md, frame);
+      if (md->type == eGpencilModifierType_Lineart) {
+        clear_strokes(ob, md, frame);
+      }
     }
   }
 
   LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
+    if (md->type != eGpencilModifierType_Lineart) {
+      continue;
+    }
     if (bake_strokes(ob, bj->dg, md, frame)) {
       touched = true;
     }
@@ -254,6 +283,7 @@ static int lineart_gpencil_bake_common(bContext *C,
         LISTBASE_FOREACH (GpencilModifierData *, md, &ob->greasepencil_modifiers) {
           if (md->type == eGpencilModifierType_Lineart) {
             BLI_linklist_prepend(&bj->objects, ob);
+            break;
           }
         }
       }
@@ -355,6 +385,7 @@ static void lineart_gpencil_clear_strokes_exec_common(Object *ob)
       continue;
     }
     BKE_gpencil_free_frames(gpl);
+    BKE_gpencil_frame_addnew(gpl, 0);
 
     md->mode |= eGpencilModifierMode_Realtime | eGpencilModifierMode_Render;
 
@@ -402,7 +433,7 @@ void OBJECT_OT_lineart_bake_strokes(wmOperatorType *ot)
 void OBJECT_OT_lineart_bake_strokes_all(wmOperatorType *ot)
 {
   ot->name = "Bake Line Art (All)";
-  ot->description = "Bake all GPencil objects who has at least one Line Art modifier";
+  ot->description = "Bake all Grease Pencil objects that have a line art modifier";
   ot->idname = "OBJECT_OT_lineart_bake_strokes_all";
 
   ot->invoke = lineart_gpencil_bake_strokes_all_invoke;
@@ -424,7 +455,7 @@ void OBJECT_OT_lineart_clear(wmOperatorType *ot)
 void OBJECT_OT_lineart_clear_all(wmOperatorType *ot)
 {
   ot->name = "Clear Baked Line Art (All)";
-  ot->description = "Clear all strokes in all GPencil obejcts who has a Line Art modifier";
+  ot->description = "Clear all strokes in all Grease Pencil objects that have a line art modifier";
   ot->idname = "OBJECT_OT_lineart_clear_all";
 
   ot->exec = lineart_gpencil_clear_strokes_all_exec;

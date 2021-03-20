@@ -456,9 +456,13 @@ class GeometryNodesEvaluator {
 
       for (const GeometryComponent *component : components) {
         component->attribute_foreach(
-            [&](StringRefNull attribute_name, const AttributeMetaData &UNUSED(meta_data)) {
-              BKE_nodetree_attribute_hint_add(
-                  *btree_original, context, *node->bnode(), attribute_name);
+            [&](StringRefNull attribute_name, const AttributeMetaData &meta_data) {
+              BKE_nodetree_attribute_hint_add(*btree_original,
+                                              context,
+                                              *node->bnode(),
+                                              attribute_name,
+                                              meta_data.domain,
+                                              meta_data.data_type);
               return true;
             });
       }
@@ -582,12 +586,12 @@ class GeometryNodesEvaluator {
     void *buffer = allocator_.allocate(type.size(), type.alignment());
 
     if (bsocket->type == SOCK_OBJECT) {
-      Object *object = ((bNodeSocketValueObject *)bsocket->default_value)->value;
+      Object *object = socket->default_value<bNodeSocketValueObject>()->value;
       PersistentObjectHandle object_handle = handle_map_.lookup(object);
       new (buffer) PersistentObjectHandle(object_handle);
     }
     else if (bsocket->type == SOCK_COLLECTION) {
-      Collection *collection = ((bNodeSocketValueCollection *)bsocket->default_value)->value;
+      Collection *collection = socket->default_value<bNodeSocketValueCollection>()->value;
       PersistentCollectionHandle collection_handle = handle_map_.lookup(collection);
       new (buffer) PersistentCollectionHandle(collection_handle);
     }
@@ -606,7 +610,7 @@ class GeometryNodesEvaluator {
       return {required_type, converted_buffer};
     }
     void *default_buffer = allocator_.allocate(required_type.size(), required_type.alignment());
-    type.copy_to_uninitialized(type.default_value(), default_buffer);
+    required_type.copy_to_uninitialized(required_type.default_value(), default_buffer);
     return {required_type, default_buffer};
   }
 };
