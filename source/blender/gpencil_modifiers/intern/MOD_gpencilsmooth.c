@@ -86,12 +86,12 @@ static void copyData(const GpencilModifierData *md, GpencilModifierData *target)
 /**
  * Apply smooth effect based on stroke direction.
  */
-static void deformStroke(GpencilModifierData *md,
-                         Depsgraph *UNUSED(depsgraph),
-                         Object *ob,
-                         bGPDlayer *gpl,
-                         bGPDframe *UNUSED(gpf),
-                         bGPDstroke *gps)
+static void deformPolyline(GpencilModifierData *md,
+                           Depsgraph *UNUSED(depsgraph),
+                           Object *ob,
+                           bGPDlayer *gpl,
+                           bGPDframe *UNUSED(gpf),
+                           bGPDstroke *gps)
 {
   SmoothGpencilModifierData *mmd = (SmoothGpencilModifierData *)md;
   const int def_nr = BKE_object_defgroup_name_index(ob, mmd->vgname);
@@ -163,7 +163,7 @@ static void bakeModifier(struct Main *UNUSED(bmain),
   LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd->layers) {
     LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-        deformStroke(md, depsgraph, ob, gpl, gpf, gps);
+        deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
       }
     }
   }
@@ -234,7 +234,8 @@ GpencilModifierTypeInfo modifierType_Gpencil_Smooth = {
 
     /* copyData */ copyData,
 
-    /* deformStroke */ deformStroke,
+    /* deformPolyline */ deformPolyline,
+    /* deformBezier */ NULL,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,

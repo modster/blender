@@ -266,7 +266,8 @@ GpencilModifierTypeInfo modifierType_Gpencil_Time = {
 
     /* copyData */ copyData,
 
-    /* deformStroke */ NULL,
+    /* deformPolyline */ NULL,
+    /* deformBezier */ NULL,
     /* generateStrokes */ NULL,
     /* bakeModifier */ NULL,
     /* remapTime */ remapTime,

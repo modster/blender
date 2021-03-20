@@ -477,7 +477,8 @@ GpencilModifierTypeInfo modifierType_Gpencil_Array = {
 
     /* copyData */ copyData,
 
-    /* deformStroke */ NULL,
+    /* deformPolyline */ NULL,
+    /* deformBezier */ NULL,
     /* generateStrokes */ generateStrokes,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,

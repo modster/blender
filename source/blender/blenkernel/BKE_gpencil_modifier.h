@@ -119,7 +119,7 @@ typedef struct GpencilModifierTypeInfo {
   void (*copyData)(const struct GpencilModifierData *md, struct GpencilModifierData *target);
 
   /**
-   * Callback for GP "stroke" modifiers that operate on the
+   * Callback for GP "polyline stroke" modifiers that operate on the
    * shape and parameters of the provided strokes (e.g. Thickness, Noise, etc.)
    *
    * The gpl parameter contains the GP layer that the strokes come from.
@@ -130,7 +130,18 @@ typedef struct GpencilModifierTypeInfo {
    * The gps parameter contains the GP stroke to operate on. This is usually a copy
    * of the original (unmodified and saved to files) stroke data.
    */
-  void (*deformStroke)(struct GpencilModifierData *md,
+  void (*deformPolyline)(struct GpencilModifierData *md,
+                         struct Depsgraph *depsgraph,
+                         struct Object *ob,
+                         struct bGPDlayer *gpl,
+                         struct bGPDframe *gpf,
+                         struct bGPDstroke *gps);
+
+  /**
+   *  Callback for GP "bezier stroke" modifiers that operate on the
+   * shape and parameters of the provided strokes (e.g. Thickness, Noise, etc.)
+   */
+  void (*deformBezier)(struct GpencilModifierData *md,
                        struct Depsgraph *depsgraph,
                        struct Object *ob,
                        struct bGPDlayer *gpl,
