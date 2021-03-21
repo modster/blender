@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <variant>
+#include <any>
 
 #include "spreadsheet_draw.hh"
 
@@ -39,12 +39,9 @@ struct CollectionCellValue {
  */
 class CellValue {
  public:
-  /* The implementation just uses a `std::variant` for simplicity. It can be encapsulated better,
+  /* The implementation just uses a `std::any` for simplicity. It can be encapsulated better,
    * but it's not really worth the complixity for now. */
-  using VariantType =
-      std::variant<std::monostate, int, float, bool, ObjectCellValue, CollectionCellValue>;
-
-  VariantType value;
+  std::any value;
 };
 
 /**

@@ -118,9 +118,8 @@ class ColumnLayoutDrawer : public SpreadsheetDrawer {
     CellValue cell_value;
     column.get_value(real_index, cell_value);
 
-    if (std::holds_alternative<int>(cell_value.value)) {
-      const int value = *std::get_if<int>(&cell_value.value);
-      const std::string value_str = std::to_string(value);
+    if (const int *value = std::any_cast<int>(&cell_value.value)) {
+      const std::string value_str = std::to_string(*value);
       uiDefIconTextBut(params.block,
                        UI_BTYPE_LABEL,
                        0,
@@ -137,10 +136,9 @@ class ColumnLayoutDrawer : public SpreadsheetDrawer {
                        0,
                        nullptr);
     }
-    else if (std::holds_alternative<float>(cell_value.value)) {
-      const float value = *std::get_if<float>(&cell_value.value);
+    else if (const float *value = std::any_cast<float>(&cell_value.value)) {
       std::stringstream ss;
-      ss << std::fixed << std::setprecision(3) << value;
+      ss << std::fixed << std::setprecision(3) << *value;
       const std::string value_str = ss.str();
       uiDefIconTextBut(params.block,
                        UI_BTYPE_LABEL,
@@ -158,9 +156,8 @@ class ColumnLayoutDrawer : public SpreadsheetDrawer {
                        0,
                        nullptr);
     }
-    else if (std::holds_alternative<bool>(cell_value.value)) {
-      const bool value = *std::get_if<bool>(&cell_value.value);
-      const int icon = value ? ICON_CHECKBOX_HLT : ICON_CHECKBOX_DEHLT;
+    else if (const bool *value = std::any_cast<bool>(&cell_value.value)) {
+      const int icon = (*value) ? ICON_CHECKBOX_HLT : ICON_CHECKBOX_DEHLT;
       uiDefIconTextBut(params.block,
                        UI_BTYPE_LABEL,
                        0,
@@ -177,13 +174,12 @@ class ColumnLayoutDrawer : public SpreadsheetDrawer {
                        0,
                        nullptr);
     }
-    else if (std::holds_alternative<ObjectCellValue>(cell_value.value)) {
-      const ObjectCellValue value = *std::get_if<ObjectCellValue>(&cell_value.value);
+    else if (const ObjectCellValue *value = std::any_cast<ObjectCellValue>(&cell_value.value)) {
       uiDefIconTextBut(params.block,
                        UI_BTYPE_LABEL,
                        0,
                        ICON_OBJECT_DATA,
-                       reinterpret_cast<const ID *const>(value.object)->name + 2,
+                       reinterpret_cast<const ID *const>(value->object)->name + 2,
                        params.xmin,
                        params.ymin,
                        params.width,
@@ -195,13 +191,13 @@ class ColumnLayoutDrawer : public SpreadsheetDrawer {
                        0,
                        nullptr);
     }
-    else if (std::holds_alternative<CollectionCellValue>(cell_value.value)) {
-      const CollectionCellValue value = *std::get_if<CollectionCellValue>(&cell_value.value);
+    else if (const CollectionCellValue *value = std::any_cast<CollectionCellValue>(
+                 &cell_value.value)) {
       uiDefIconTextBut(params.block,
                        UI_BTYPE_LABEL,
                        0,
                        ICON_OUTLINER_COLLECTION,
-                       reinterpret_cast<const ID *const>(value.collection)->name + 2,
+                       reinterpret_cast<const ID *const>(value->collection)->name + 2,
                        params.xmin,
                        params.ymin,
                        params.width,
