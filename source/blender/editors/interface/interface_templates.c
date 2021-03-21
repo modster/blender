@@ -5832,9 +5832,9 @@ static void uilist_filter_items_default(struct uiList *ui_list,
  * Populated through #ui_template_list_data_retrieve().
  */
 typedef struct {
-  PointerRNA *dataptr;
+  PointerRNA dataptr;
   PropertyRNA *prop;
-  PointerRNA *active_dataptr;
+  PointerRNA active_dataptr;
   PropertyRNA *activeprop;
   const char *item_dyntip_propname;
 
@@ -5893,6 +5893,8 @@ static bool ui_template_list_data_retrieve(const char *listtype_name,
                                            TemplateListInputData *r_input_data,
                                            uiListType **r_list_type)
 {
+  memset(r_input_data, 0, sizeof(*r_input_data));
+
   /* Forbid default UI_UL_DEFAULT_CLASS_NAME list class without a custom list_id! */
   if (STREQ(UI_UL_DEFAULT_CLASS_NAME, listtype_name) && !(list_id && list_id[0])) {
     RNA_warning("template_list using default '%s' UIList class must provide a custom list_id",
@@ -5905,8 +5907,8 @@ static bool ui_template_list_data_retrieve(const char *listtype_name,
     return false;
   }
 
+  r_input_data->dataptr = *dataptr;
   if (dataptr->data) {
-    r_input_data->dataptr = dataptr;
     r_input_data->prop = RNA_struct_find_property(dataptr, propname);
     if (!r_input_data->prop) {
       RNA_warning("Property not found: %s.%s", RNA_struct_identifier(dataptr->type), propname);
@@ -5914,7 +5916,7 @@ static bool ui_template_list_data_retrieve(const char *listtype_name,
     }
   }
 
-  r_input_data->active_dataptr = active_dataptr;
+  r_input_data->active_dataptr = *active_dataptr;
   r_input_data->activeprop = RNA_struct_find_property(active_dataptr, active_propname);
   if (!r_input_data->activeprop) {
     RNA_warning(
@@ -5942,7 +5944,7 @@ static bool ui_template_list_data_retrieve(const char *listtype_name,
     return false;
   }
 
-  r_input_data->active_item_idx = RNA_property_int_get(r_input_data->active_dataptr,
+  r_input_data->active_item_idx = RNA_property_int_get(&r_input_data->active_dataptr,
                                                        r_input_data->activeprop);
   r_input_data->item_dyntip_propname = item_dyntip_propname;
 
@@ -6015,7 +6017,7 @@ static void ui_template_list_collect_items(PointerRNA *list_ptr,
  */
 static void ui_template_list_collect_display_items(bContext *C,
                                                    uiList *ui_list,
-                                                   const TemplateListInputData *input_data,
+                                                   TemplateListInputData *input_data,
                                                    const uiListFilterItemsFunc filter_items_fn,
                                                    TemplateListItems *r_items)
 {
@@ -6023,7 +6025,7 @@ static void ui_template_list_collect_display_items(bContext *C,
   memset(r_items, 0, sizeof(*r_items));
 
   /* Filter list items! (not for compact layout, though) */
-  if (input_data->dataptr->data && input_data->prop) {
+  if (input_data->dataptr.data && input_data->prop) {
     const int filter_exclude = ui_list->filter_flag & UILST_FLT_EXCLUDE;
     const bool order_reverse = (ui_list->filter_sort_flag & UILST_FLT_SORT_REVERSE) != 0;
     int items_shown;
@@ -6033,11 +6035,11 @@ static void ui_template_list_collect_display_items(bContext *C,
 
     if (ui_list->layout_type == UILST_LAYOUT_COMPACT) {
       dyn_data->items_len = dyn_data->items_shown = RNA_property_collection_length(
-          input_data->dataptr, input_data->prop);
+          &input_data->dataptr, input_data->prop);
     }
     else {
       // printf("%s: filtering...\n", __func__);
-      filter_items_fn(ui_list, C, input_data->dataptr, RNA_property_identifier(input_data->prop));
+      filter_items_fn(ui_list, C, &input_data->dataptr, RNA_property_identifier(input_data->prop));
       // printf("%s: filtering done.\n", __func__);
     }
 
@@ -6046,7 +6048,7 @@ static void ui_template_list_collect_display_items(bContext *C,
       r_items->item_vec = MEM_mallocN(sizeof(*r_items->item_vec) * items_shown, __func__);
       // printf("%s: items shown: %d.\n", __func__, items_shown);
 
-      ui_template_list_collect_items(input_data->dataptr,
+      ui_template_list_collect_items(&input_data->dataptr,
                                      input_data->prop,
                                      dyn_data,
                                      filter_exclude,
@@ -6246,8 +6248,8 @@ static void ui_template_list_layout_draw(bContext *C,
   uiBlock *block = uiLayoutGetBlock(layout);
 
   /* get icon */
-  if (input_data->dataptr->data && input_data->prop) {
-    StructRNA *ptype = RNA_property_pointer_type(input_data->dataptr, input_data->prop);
+  if (input_data->dataptr.data && input_data->prop) {
+    StructRNA *ptype = RNA_property_pointer_type(&input_data->dataptr, input_data->prop);
     rnaicon = RNA_struct_ui_icon(ptype);
   }
 
@@ -6255,7 +6257,7 @@ static void ui_template_list_layout_draw(bContext *C,
   switch (ui_list->layout_type) {
     case UILST_LAYOUT_DEFAULT: {
       /* layout */
-      box = uiLayoutListBox(layout, ui_list, input_data->active_dataptr, input_data->activeprop);
+      box = uiLayoutListBox(layout, ui_list, &input_data->active_dataptr, input_data->activeprop);
       glob = uiLayoutColumn(box, true);
       row = uiLayoutRow(glob, false);
       col = uiLayoutColumn(row, true);
@@ -6266,7 +6268,7 @@ static void ui_template_list_layout_draw(bContext *C,
       uilist_prepare(ui_list, items, &adjusted_layout_data, &visual_info);
 
       int i = 0;
-      if (input_data->dataptr->data && input_data->prop) {
+      if (input_data->dataptr.data && input_data->prop) {
         /* create list items */
         for (i = visual_info.start_idx; i < visual_info.end_idx; i++) {
           PointerRNA *itemptr = &items->item_vec[i].item;
@@ -6290,7 +6292,7 @@ static void ui_template_list_layout_draw(bContext *C,
                                0,
                                UI_UNIT_X * 10,
                                UI_UNIT_Y,
-                               input_data->active_dataptr,
+                               &input_data->active_dataptr,
                                input_data->activeprop,
                                0,
                                0,
@@ -6312,10 +6314,10 @@ static void ui_template_list_layout_draw(bContext *C,
           layout_data->draw_item(ui_list,
                                  C,
                                  sub,
-                                 input_data->dataptr,
+                                 &input_data->dataptr,
                                  itemptr,
                                  icon,
-                                 input_data->active_dataptr,
+                                 &input_data->active_dataptr,
                                  active_propname,
                                  org_i,
                                  flt_flag);
@@ -6360,7 +6362,7 @@ static void ui_template_list_layout_draw(bContext *C,
     case UILST_LAYOUT_COMPACT:
       row = uiLayoutRow(layout, true);
 
-      if ((input_data->dataptr->data && input_data->prop) && (dyn_data->items_shown > 0) &&
+      if ((input_data->dataptr.data && input_data->prop) && (dyn_data->items_shown > 0) &&
           (items->active_item_idx >= 0) && (items->active_item_idx < dyn_data->items_shown)) {
         PointerRNA *itemptr = &items->item_vec[items->active_item_idx].item;
         const int org_i = items->item_vec[items->active_item_idx].org_idx;
@@ -6372,10 +6374,10 @@ static void ui_template_list_layout_draw(bContext *C,
         layout_data->draw_item(ui_list,
                                C,
                                row,
-                               input_data->dataptr,
+                               &input_data->dataptr,
                                itemptr,
                                icon,
-                               input_data->active_dataptr,
+                               &input_data->active_dataptr,
                                active_propname,
                                org_i,
                                0);
@@ -6396,7 +6398,7 @@ static void ui_template_list_layout_draw(bContext *C,
                                    0,
                                    UI_UNIT_X * 5,
                                    UI_UNIT_Y,
-                                   input_data->active_dataptr,
+                                   &input_data->active_dataptr,
                                    input_data->activeprop,
                                    0,
                                    0,
@@ -6409,7 +6411,7 @@ static void ui_template_list_layout_draw(bContext *C,
       }
       break;
     case UILST_LAYOUT_GRID: {
-      box = uiLayoutListBox(layout, ui_list, input_data->active_dataptr, input_data->activeprop);
+      box = uiLayoutListBox(layout, ui_list, &input_data->active_dataptr, input_data->activeprop);
       glob = uiLayoutColumn(box, true);
       row = uiLayoutRow(glob, false);
       col = uiLayoutColumn(row, true);
@@ -6418,7 +6420,7 @@ static void ui_template_list_layout_draw(bContext *C,
       uilist_prepare(ui_list, items, layout_data, &visual_info);
 
       int i = 0;
-      if (input_data->dataptr->data && input_data->prop) {
+      if (input_data->dataptr.data && input_data->prop) {
         /* create list items */
         for (i = visual_info.start_idx; i < visual_info.end_idx; i++) {
           PointerRNA *itemptr = &items->item_vec[i].item;
@@ -6446,7 +6448,7 @@ static void ui_template_list_layout_draw(bContext *C,
                                0,
                                UI_UNIT_X * 10,
                                UI_UNIT_Y,
-                               input_data->active_dataptr,
+                               &input_data->active_dataptr,
                                input_data->activeprop,
                                0,
                                0,
@@ -6462,10 +6464,10 @@ static void ui_template_list_layout_draw(bContext *C,
           layout_data->draw_item(ui_list,
                                  C,
                                  sub,
-                                 input_data->dataptr,
+                                 &input_data->dataptr,
                                  itemptr,
                                  icon,
-                                 input_data->active_dataptr,
+                                 &input_data->active_dataptr,
                                  active_propname,
                                  org_i,
                                  flt_flag);
@@ -6508,7 +6510,7 @@ static void ui_template_list_layout_draw(bContext *C,
       break;
     }
     case UILST_LAYOUT_BIG_PREVIEW_GRID:
-      box = uiLayoutListBox(layout, ui_list, input_data->active_dataptr, input_data->activeprop);
+      box = uiLayoutListBox(layout, ui_list, &input_data->active_dataptr, input_data->activeprop);
       /* For grip button. */
       glob = uiLayoutColumn(box, true);
       /* For scrollbar. */
@@ -6525,7 +6527,7 @@ static void ui_template_list_layout_draw(bContext *C,
       adjusted_layout_data.columns = cols_per_row;
       uilist_prepare(ui_list, items, &adjusted_layout_data, &visual_info);
 
-      if (input_data->dataptr->data && input_data->prop) {
+      if (input_data->dataptr.data && input_data->prop) {
         /* create list items */
         for (int i = visual_info.start_idx; i < visual_info.end_idx; i++) {
           PointerRNA *itemptr = &items->item_vec[i].item;
@@ -6546,7 +6548,7 @@ static void ui_template_list_layout_draw(bContext *C,
                                0,
                                size_x,
                                size_y,
-                               input_data->active_dataptr,
+                               &input_data->active_dataptr,
                                input_data->activeprop,
                                0,
                                0,
@@ -6562,10 +6564,10 @@ static void ui_template_list_layout_draw(bContext *C,
           layout_data->draw_item(ui_list,
                                  C,
                                  col,
-                                 input_data->dataptr,
+                                 &input_data->dataptr,
                                  itemptr,
                                  icon,
-                                 input_data->active_dataptr,
+                                 &input_data->active_dataptr,
                                  active_propname,
                                  org_i,
                                  flt_flag);
