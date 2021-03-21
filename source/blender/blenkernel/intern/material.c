@@ -294,7 +294,7 @@ void BKE_gpencil_material_attr_init(Material *ma)
     gp_style->texture_pixsize = 100.0f;
     gp_style->mix_factor = 0.5f;
 
-    gp_style->flag |= GP_MATERIAL_STROKE_SHOW;
+    gp_style->flag |= GP_MATERIAL_STROKE_SHOW | GP_MATERIAL_CAST_SHADOWS;
   }
 }
 
