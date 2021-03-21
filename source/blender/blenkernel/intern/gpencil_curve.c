@@ -1751,8 +1751,77 @@ void BKE_gpencil_editcurve_subdivide(bGPDstroke *gps, const int cuts)
   }
 }
 
-void gpencil_editcurve_dissolve_single_smallest_error()
+/* Helper: Dissolve the curve point with the lowest re-fit error. Dissolve only if error is under
+ * `threshold`. Returns true if a point was dissolved. */
+static bool gpencil_editcurve_dissolve_smallest_error_curve_point(bGPDstroke *gps,
+                                                                  bGPDcurve *gpc,
+                                                                  const float diag_length,
+                                                                  const bool is_cyclic,
+                                                                  const float threshold)
 {
+  bool changed = false;
+  /* Duplicate the curve point array. */
+  bGPDcurve_point *curve_point_array = MEM_dupallocN(gpc->curve_points);
+
+  float lowest_error = FLT_MAX;
+  int lowest_error_idx = 0;
+  /* Loop over control point pairs with one control point in between.
+   * Find the control point that produces the lowest error when removed. */
+  for (int i = 0; i < gpc->tot_curve_points - 2; i++) {
+    bGPDcurve_point *cpt_prev = &curve_point_array[i];
+    bGPDcurve_point *cpt_next = &curve_point_array[i + 2];
+
+    float error_sq;
+    /* Regenerate the handles between cpt_prev and cpt_next as if the point in the middle didn't
+     * exist. Get the re-fit error. */
+    gpencil_stroke_editcurve_regenerate_single_ex(cpt_prev,
+                                                  cpt_next,
+                                                  gps->points,
+                                                  gps->totpoints,
+                                                  gps->boundbox_min,
+                                                  diag_length,
+                                                  is_cyclic,
+                                                  0.0f,
+                                                  &error_sq);
+
+    if (error_sq < lowest_error) {
+      lowest_error = error_sq;
+      lowest_error_idx = i + 1;
+    }
+  }
+
+  /* Dissolve the control point with the lowest error found. */
+  if (sqrtf(lowest_error) < threshold) {
+    int new_tot_curve_points = gpc->tot_curve_points - 1;
+    bGPDcurve_point *new_points = MEM_callocN(sizeof(bGPDcurve_point) * new_tot_curve_points,
+                                              __func__);
+    /* Copy all other points. Skip the point that will be dissolved. */
+    memcpy(new_points, gpc->curve_points, lowest_error_idx * sizeof(bGPDcurve_point));
+    memcpy(new_points + lowest_error_idx,
+           gpc->curve_points + lowest_error_idx + 1,
+           (new_tot_curve_points - lowest_error_idx) * sizeof(bGPDcurve_point));
+
+    /* Get the start and end points of the segment. */
+    bGPDcurve_point *cpt_start = &curve_point_array[lowest_error_idx - 1];
+    bGPDcurve_point *cpt_end = &curve_point_array[lowest_error_idx + 1];
+    bGPDcurve_point *new_cpt_start = &new_points[lowest_error_idx - 1];
+    bGPDcurve_point *new_cpt_end = &new_points[lowest_error_idx];
+
+    /* Write the new handles. */
+    copy_v3_v3(new_cpt_start->bezt.vec[2], cpt_start->bezt.vec[2]);
+    copy_v3_v3(new_cpt_end->bezt.vec[0], cpt_end->bezt.vec[0]);
+
+    /* Overwrite curve points. */
+    MEM_freeN(gpc->curve_points);
+    gpc->curve_points = new_points;
+    gpc->tot_curve_points = new_tot_curve_points;
+
+    changed = true;
+  }
+
+  MEM_freeN(curve_point_array);
+
+  return changed;
 }
 
 /**
@@ -1768,67 +1837,32 @@ void BKE_gpencil_editcurve_simplify_adaptive(bGPDstroke *gps, const float thresh
   const bool is_cyclic = gps->flag & GP_STROKE_CYCLIC;
   const float diag_length = len_v3v3(gps->boundbox_min, gps->boundbox_max);
 
-  float lowest_error = 0;
+  bool changed = true;
   /* Loop until we have removed all points that causes an error less than `threshold`. */
-  while (gpc->tot_curve_points > 2 && sqrtf(lowest_error) < threshold) {
-    /* Duplicate the curve point array. */
-    bGPDcurve_point *curve_point_array = MEM_dupallocN(gpc->curve_points);
-
-    lowest_error = FLT_MAX;
-    int lowest_error_idx = 0;
-    /* Loop over control point pairs with one control point in between.
-     * Find the control point that produces the lowest error when removed. */
-    for (int i = 0; i < gpc->tot_curve_points - 2; i++) {
-      bGPDcurve_point *cpt_prev = &curve_point_array[i];
-      bGPDcurve_point *cpt_next = &curve_point_array[i + 2];
-
-      float error_sq;
-      /* Regenerate the handles between cpt_prev and cpt_next as if the point in the middle didn't
-       * exist. Get the re-fit error. */
-      gpencil_stroke_editcurve_regenerate_single_ex(cpt_prev,
-                                                    cpt_next,
-                                                    gps->points,
-                                                    gps->totpoints,
-                                                    gps->boundbox_min,
-                                                    diag_length,
-                                                    is_cyclic,
-                                                    0.0f,
-                                                    &error_sq);
-
-      if (error_sq < lowest_error) {
-        lowest_error = error_sq;
-        lowest_error_idx = i + 1;
-      }
-    }
-
-    /* Dissolve the control point with the lowest error found. */
-    if (sqrtf(lowest_error) < threshold) {
-      int new_tot_curve_points = gpc->tot_curve_points - 1;
-      bGPDcurve_point *new_points = MEM_callocN(sizeof(bGPDcurve_point) * new_tot_curve_points,
-                                                __func__);
-      /* Copy all other points. Skip the point that will be dissolved. */
-      memcpy(new_points, gpc->curve_points, lowest_error_idx * sizeof(bGPDcurve_point));
-      memcpy(new_points + lowest_error_idx,
-             gpc->curve_points + lowest_error_idx + 1,
-             (new_tot_curve_points - lowest_error_idx) * sizeof(bGPDcurve_point));
-
-      /* Get the start and end points of the segment. */
-      bGPDcurve_point *cpt_start = &curve_point_array[lowest_error_idx - 1];
-      bGPDcurve_point *cpt_end = &curve_point_array[lowest_error_idx + 1];
-      bGPDcurve_point *new_cpt_start = &new_points[lowest_error_idx - 1];
-      bGPDcurve_point *new_cpt_end = &new_points[lowest_error_idx];
-
-      /* Write the new handles. */
-      copy_v3_v3(new_cpt_start->bezt.vec[2], cpt_start->bezt.vec[2]);
-      copy_v3_v3(new_cpt_end->bezt.vec[0], cpt_end->bezt.vec[0]);
-
-      /* Overwrite curve points. */
-      MEM_freeN(gpc->curve_points);
-      gpc->curve_points = new_points;
-      gpc->tot_curve_points = new_tot_curve_points;
-    }
-
-    MEM_freeN(curve_point_array);
+  while (gpc->tot_curve_points > 2 && changed) {
+    changed = gpencil_editcurve_dissolve_smallest_error_curve_point(
+        gps, gpc, diag_length, is_cyclic, threshold);
   }
 }
+
+/**
+ * Simplify Fixed
+ * Dissolves `count` curve points with the lowest refit-error.
+ */
+void BKE_gpencil_editcurve_simplify_fixed(bGPDstroke *gps, const int count)
+{
+  bGPDcurve *gpc = gps->editcurve;
+  if (gpc == NULL || gpc->tot_curve_points < 3 || count < 1) {
+    return;
+  }
+  const bool is_cyclic = gps->flag & GP_STROKE_CYCLIC;
+  const float diag_length = len_v3v3(gps->boundbox_min, gps->boundbox_max);
+
+  /* Loop until we have removed all points that causes an error less than `threshold`. */
+  for (int i = count; i >= 0 && gpc->tot_curve_points > 2; i--) {
+    gpencil_editcurve_dissolve_smallest_error_curve_point(
+        gps, gpc, diag_length, is_cyclic, FLT_MAX);
+  }
+}
+
 /** \} */
