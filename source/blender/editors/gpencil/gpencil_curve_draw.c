@@ -174,7 +174,9 @@ static void gpencil_pop_curve_point(bContext *C, tGPDcurve_draw *tcd)
   bGPDcurve *gpc = tcd->gpc;
   const int old_num_points = gpc->tot_curve_points;
   const int new_num_points = old_num_points - 1;
-  // printf("old: %d, new: %d\n", old_num_points, new_num_points);
+  if (G.debug & G_DEBUG) {
+    printf("old: %d, new: %d\n", old_num_points, new_num_points);
+  }
 
   /* Create new stroke and curve */
   bGPDstroke *new_stroke = BKE_gpencil_stroke_duplicate(tcd->gps, false, false);
@@ -624,7 +626,7 @@ void GPENCIL_OT_draw_curve(wmOperatorType *ot)
   /* identifiers */
   ot->name = "Grease Pencil Draw Curve";
   ot->idname = "GPENCIL_OT_draw_curve";
-  ot->description = "Draw a bezier curve in the active grease pencil object";
+  ot->description = "Draw a bézier stroke in the active grease pencil object";
 
   /* api callbacks */
   ot->invoke = gpencil_curve_draw_invoke;
