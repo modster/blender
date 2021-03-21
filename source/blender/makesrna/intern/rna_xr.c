@@ -783,6 +783,46 @@ static XrActionMapItem *rna_XrActionMapItem_find(XrActionMap *am, const char *id
 #  endif
 }
 
+static void rna_XrActionMapItem_op_name_get(PointerRNA *ptr, char *value)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ptr->data;
+  if (ami->op[0]) {
+    if (ami->op_properties_ptr) {
+      wmOperatorType *ot = WM_operatortype_find(ami->op, 1);
+      if (ot) {
+        strcpy(value, WM_operatortype_name(ot, ami->op_properties_ptr));
+        return;
+      }
+    }
+    strcpy(value, ami->op);
+    return;
+  }
+#  else
+  UNUSED_VARS(ptr);
+#  endif
+  value[0] = '\0';
+}
+
+static int rna_XrActionMapItem_op_name_length(PointerRNA *ptr)
+{
+#  ifdef WITH_XR_OPENXR
+  XrActionMapItem *ami = ptr->data;
+  if (ami->op[0]) {
+    if (ami->op_properties_ptr) {
+      wmOperatorType *ot = WM_operatortype_find(ami->op, 1);
+      if (ot) {
+        return strlen(WM_operatortype_name(ot, ami->op_properties_ptr));
+      }
+    }
+    return strlen(ami->op);
+  }
+#  else
+  UNUSED_VARS(ptr);
+#  endif
+  return 0;
+}
+
 static PointerRNA rna_XrActionMapItem_op_properties_get(PointerRNA *ptr)
 {
 #  ifdef WITH_XR_OPENXR
@@ -1253,9 +1293,15 @@ static void rna_def_xr_actionconfig(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "op", PROP_STRING, PROP_NONE);
   RNA_def_property_string_maxlength(prop, OP_MAX_TYPENAME);
-  RNA_def_property_ui_text(
-      prop, "Operator", "Name of operator (translated) to call on action event");
+  RNA_def_property_ui_text(prop, "Operator", "Identifier of operator to call on action event");
   RNA_def_property_update(prop, 0, "rna_XrActionMapItem_update");
+
+  prop = RNA_def_property(srna, "op_name", PROP_STRING, PROP_NONE);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_ui_text(
+      prop, "Operator Name", "Name of operator (translated) to call on action event");
+  RNA_def_property_string_funcs(
+      prop, "rna_XrActionMapItem_op_name_get", "rna_XrActionMapItem_op_name_length", NULL);
 
   prop = RNA_def_property(srna, "op_properties", PROP_POINTER, PROP_NONE);
   RNA_def_property_struct_type(prop, "OperatorProperties");
