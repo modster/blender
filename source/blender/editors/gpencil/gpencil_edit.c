@@ -4523,23 +4523,25 @@ static int gpencil_stroke_simplify_exec(bContext *C, wmOperator *op)
     return OPERATOR_CANCELLED;
   }
 
-  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
-
   bool changed = false;
-  if (is_curve_edit) {
-    BKE_report(op->reports, RPT_ERROR, "Not implemented!");
-  }
-  else {
-    /* Go through each editable + selected stroke */
-    GP_EDITABLE_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
-      if (gps->flag & GP_STROKE_SELECT) {
-        /* simplify stroke using Ramer-Douglas-Peucker algorithm */
-        BKE_gpencil_stroke_simplify_adaptive(gpd, gps, factor);
+  /* Go through each editable + selected stroke */
+  GP_EDITABLE_STROKES_BEGIN (gpstroke_iter, C, gpl, gps) {
+    if (GPENCIL_STROKE_TYPE_BEZIER(gps)) {
+      if (gps->editcurve->flag & GP_CURVE_SELECT) {
+        BKE_gpencil_editcurve_simplify_adaptive(gps, factor);
+        BKE_gpencil_editcurve_recalculate_handles(gps);
+        gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
+        BKE_gpencil_stroke_geometry_update(gpd, gps);
         changed = true;
       }
     }
-    GP_EDITABLE_STROKES_END(gpstroke_iter);
+    else if (gps->flag & GP_STROKE_SELECT) {
+      /* simplify stroke using Ramer-Douglas-Peucker algorithm */
+      BKE_gpencil_stroke_simplify_adaptive(gpd, gps, factor);
+      changed = true;
+    }
   }
+  GP_EDITABLE_STROKES_END(gpstroke_iter);
 
   if (changed) {
     /* notifiers */

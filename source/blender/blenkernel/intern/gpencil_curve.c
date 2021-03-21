@@ -984,58 +984,44 @@ bGPDcurve *BKE_gpencil_stroke_editcurve_regenerate(bGPDstroke *gps,
   return editcurve;
 }
 
-/**
- * Regenerate the handles for the segment from `start_idx` to `end_idx` by refitting the curve to
- * the points. As an example, this is used by the dissolve operator to fit the curve to a segment
- * where the curve poitns have been deleted. Note: `start_idx` can be greater than `end_idx`. If
- * this is the case and the stroke is cyclic, then the fitting will use the points from the end and
- * beginning of the stroke.
- */
-void BKE_gpencil_stroke_editcurve_regenerate_single(bGPDstroke *gps,
-                                                    uint32_t start_idx,
-                                                    uint32_t end_idx,
-                                                    const float error_threshold)
+static void gpencil_stroke_editcurve_regenerate_single_ex(bGPDcurve_point *start,
+                                                          bGPDcurve_point *end,
+                                                          bGPDspoint *points,
+                                                          const int totpoints,
+                                                          const float boundbox_min[3],
+                                                          const float diag_length,
+                                                          const bool is_cyclic,
+                                                          const float error_threshold,
+                                                          float *r_error_sq)
 {
 #define POINT_DIM 3
-  if (!GPENCIL_STROKE_TYPE_BEZIER(gps) || (start_idx == end_idx)) {
-    return;
-  }
-  bGPDcurve *gpc = gps->editcurve;
-  const float diag_length = len_v3v3(gps->boundbox_min, gps->boundbox_max);
-
-  BLI_assert(start_idx < gpc->tot_curve_points && end_idx < gpc->tot_curve_points);
-
-  bGPDcurve_point *start = &gpc->curve_points[start_idx];
-  bGPDcurve_point *end = &gpc->curve_points[end_idx];
-
   BezTriple *bezt_prev = &start->bezt;
   BezTriple *bezt_next = &end->bezt;
 
   const uint32_t start_pt_idx = start->point_index;
   const uint32_t end_pt_idx = end->point_index;
 
-  const bool is_cyclic = (bool)(gps->flag & GP_STROKE_CYCLIC);
   uint32_t length = 0;
   if (start_pt_idx > end_pt_idx) {
     if (!is_cyclic) {
       return;
     }
-    length = (gps->totpoints - start_pt_idx) + end_pt_idx + 1;
+    length = (totpoints - start_pt_idx) + end_pt_idx + 1;
   }
   else {
     length = (end_pt_idx - start_pt_idx) + 1;
   }
-  
+
   uint32_t point_array_len = length * POINT_DIM;
   float *point_array = MEM_callocN(sizeof(float) * point_array_len, __func__);
 
   float tmp_vec[3];
   for (int i = 0; i < length; i++) {
-    int idx = (i + start_pt_idx) % gps->totpoints;
-    bGPDspoint *pt = &gps->points[idx];
+    int idx = (i + start_pt_idx) % totpoints;
+    bGPDspoint *pt = &points[idx];
     float *point = &point_array[i * POINT_DIM];
     /* normalize coordinate to 0..1 */
-    sub_v3_v3v3(tmp_vec, &pt->x, gps->boundbox_min);
+    sub_v3_v3v3(tmp_vec, &pt->x, boundbox_min);
     mul_v3_v3fl(point, tmp_vec, 1.0f / diag_length);
   }
 
@@ -1064,8 +1050,8 @@ void BKE_gpencil_stroke_editcurve_regenerate_single(bGPDstroke *gps,
     return;
   }
 
-  madd_v3_v3v3fl(bezt_prev->vec[2], gps->boundbox_min, bezt_prev->vec[2], diag_length);
-  madd_v3_v3v3fl(bezt_next->vec[0], gps->boundbox_min, bezt_next->vec[0], diag_length);
+  madd_v3_v3v3fl(bezt_prev->vec[2], boundbox_min, bezt_prev->vec[2], diag_length);
+  madd_v3_v3v3fl(bezt_next->vec[0], boundbox_min, bezt_next->vec[0], diag_length);
 
   if (!ELEM(bezt_prev->h2, HD_FREE, HD_ALIGN)) {
     bezt_prev->h2 = (bezt_prev->h2 == HD_VECT) ? HD_FREE : HD_ALIGN;
@@ -1075,7 +1061,45 @@ void BKE_gpencil_stroke_editcurve_regenerate_single(bGPDstroke *gps,
   }
 
   MEM_freeN(point_array);
+
+  if (r_error_sq != NULL) {
+    *r_error_sq = error_sq;
+  }
 #undef POINT_DIM
+}
+
+/**
+ * Regenerate the handles for the segment from `start_idx` to `end_idx` by refitting the curve to
+ * the points. As an example, this is used by the dissolve operator to fit the curve to a segment
+ * where the curve poitns have been deleted.
+ * Note: `start_idx` can be greater than `end_idx`. If this is the case and the stroke is cyclic,
+ * then the fitting will use the points from the end and beginning of the stroke.
+ */
+void BKE_gpencil_stroke_editcurve_regenerate_single(bGPDstroke *gps,
+                                                    uint32_t start_idx,
+                                                    uint32_t end_idx,
+                                                    const float error_threshold)
+{
+  if (!GPENCIL_STROKE_TYPE_BEZIER(gps) || (start_idx == end_idx)) {
+    return;
+  }
+  bGPDcurve *gpc = gps->editcurve;
+  const float diag_length = len_v3v3(gps->boundbox_min, gps->boundbox_max);
+
+  BLI_assert(start_idx < gpc->tot_curve_points && end_idx < gpc->tot_curve_points);
+
+  bGPDcurve_point *start = &gpc->curve_points[start_idx];
+  bGPDcurve_point *end = &gpc->curve_points[end_idx];
+
+  gpencil_stroke_editcurve_regenerate_single_ex(start,
+                                                end,
+                                                gps->points,
+                                                gps->totpoints,
+                                                gps->boundbox_min,
+                                                diag_length,
+                                                gps->flag & GP_STROKE_CYCLIC,
+                                                error_threshold,
+                                                NULL);
 }
 
 /**
@@ -1727,4 +1751,84 @@ void BKE_gpencil_editcurve_subdivide(bGPDstroke *gps, const int cuts)
   }
 }
 
+void gpencil_editcurve_dissolve_single_smallest_error()
+{
+}
+
+/**
+ * Simplify Adaptive
+ * Dissolves all the curve points with a refit-error that is less than threshold.
+ */
+void BKE_gpencil_editcurve_simplify_adaptive(bGPDstroke *gps, const float threshold)
+{
+  bGPDcurve *gpc = gps->editcurve;
+  if (gpc == NULL || gpc->tot_curve_points < 3) {
+    return;
+  }
+  const bool is_cyclic = gps->flag & GP_STROKE_CYCLIC;
+  const float diag_length = len_v3v3(gps->boundbox_min, gps->boundbox_max);
+
+  float lowest_error = 0;
+  /* Loop until we have removed all points that causes an error less than `threshold`. */
+  while (gpc->tot_curve_points > 2 && sqrtf(lowest_error) < threshold) {
+    /* Duplicate the curve point array. */
+    bGPDcurve_point *curve_point_array = MEM_dupallocN(gpc->curve_points);
+
+    lowest_error = FLT_MAX;
+    int lowest_error_idx = 0;
+    /* Loop over control point pairs with one control point in between.
+     * Find the control point that produces the lowest error when removed. */
+    for (int i = 0; i < gpc->tot_curve_points - 2; i++) {
+      bGPDcurve_point *cpt_prev = &curve_point_array[i];
+      bGPDcurve_point *cpt_next = &curve_point_array[i + 2];
+
+      float error_sq;
+      /* Regenerate the handles between cpt_prev and cpt_next as if the point in the middle didn't
+       * exist. Get the re-fit error. */
+      gpencil_stroke_editcurve_regenerate_single_ex(cpt_prev,
+                                                    cpt_next,
+                                                    gps->points,
+                                                    gps->totpoints,
+                                                    gps->boundbox_min,
+                                                    diag_length,
+                                                    is_cyclic,
+                                                    0.0f,
+                                                    &error_sq);
+
+      if (error_sq < lowest_error) {
+        lowest_error = error_sq;
+        lowest_error_idx = i + 1;
+      }
+    }
+
+    /* Dissolve the control point with the lowest error found. */
+    if (sqrtf(lowest_error) < threshold) {
+      int new_tot_curve_points = gpc->tot_curve_points - 1;
+      bGPDcurve_point *new_points = MEM_callocN(sizeof(bGPDcurve_point) * new_tot_curve_points,
+                                                __func__);
+      /* Copy all other points. Skip the point that will be dissolved. */
+      memcpy(new_points, gpc->curve_points, lowest_error_idx * sizeof(bGPDcurve_point));
+      memcpy(new_points + lowest_error_idx,
+             gpc->curve_points + lowest_error_idx + 1,
+             (new_tot_curve_points - lowest_error_idx) * sizeof(bGPDcurve_point));
+
+      /* Get the start and end points of the segment. */
+      bGPDcurve_point *cpt_start = &curve_point_array[lowest_error_idx - 1];
+      bGPDcurve_point *cpt_end = &curve_point_array[lowest_error_idx + 1];
+      bGPDcurve_point *new_cpt_start = &new_points[lowest_error_idx - 1];
+      bGPDcurve_point *new_cpt_end = &new_points[lowest_error_idx];
+
+      /* Write the new handles. */
+      copy_v3_v3(new_cpt_start->bezt.vec[2], cpt_start->bezt.vec[2]);
+      copy_v3_v3(new_cpt_end->bezt.vec[0], cpt_end->bezt.vec[0]);
+
+      /* Overwrite curve points. */
+      MEM_freeN(gpc->curve_points);
+      gpc->curve_points = new_points;
+      gpc->tot_curve_points = new_tot_curve_points;
+    }
+
+    MEM_freeN(curve_point_array);
+  }
+}
 /** \} */

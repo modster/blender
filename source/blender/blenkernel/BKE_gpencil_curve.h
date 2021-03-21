@@ -70,6 +70,7 @@ void BKE_gpencil_stroke_update_geometry_from_editcurve(struct bGPDstroke *gps,
                                                        const bool is_adaptive);
 void BKE_gpencil_editcurve_recalculate_handles(struct bGPDstroke *gps);
 void BKE_gpencil_editcurve_subdivide(struct bGPDstroke *gps, const int cuts);
+void BKE_gpencil_editcurve_simplify_adaptive(struct bGPDstroke *gps, const float threshold);
 
 #ifdef __cplusplus
 }
