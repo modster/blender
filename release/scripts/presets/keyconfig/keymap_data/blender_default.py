@@ -7016,9 +7016,9 @@ def generate_keymaps(params=None):
         km_view2d(params),
         km_view2d_buttons_list(params),
         km_user_interface(params),
+        km_property_editor(params),
 
         # Editors.
-        km_property_editor(params),
         km_outliner(params),
         km_uv_editor(params),
         km_view3d_generic(params),
