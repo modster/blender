@@ -25,7 +25,6 @@
 
 #include "BLI_utildefines.h"
 
-#include "BLI_blenlib.h"
 #include "BLI_math_vector.h"
 
 #include "BLT_translation.h"
@@ -34,7 +33,6 @@
 #include "DNA_defaults.h"
 #include "DNA_gpencil_modifier_types.h"
 #include "DNA_gpencil_types.h"
-#include "DNA_lineart_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
@@ -48,7 +46,6 @@
 #include "BKE_gpencil_modifier.h"
 #include "BKE_lib_query.h"
 #include "BKE_main.h"
-#include "BKE_material.h"
 #include "BKE_screen.h"
 
 #include "UI_interface.h"
@@ -62,7 +59,6 @@
 
 #include "MOD_gpencil_modifiertypes.h"
 #include "MOD_gpencil_ui_common.h"
-#include "MOD_gpencil_util.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -141,9 +137,9 @@ static void generateStrokes(GpencilModifierData *md, Depsgraph *depsgraph, Objec
   LineartGpencilModifierData *lmd = (LineartGpencilModifierData *)md;
   bGPdata *gpd = ob->data;
 
-  /* Guard early, don't trigger calculation when no gpencil frame is present. Probably should
-   * disable in the isModifierDisabled() function but we need addtional arg for depsgraph and
-   * gpd. */
+  /* Guard early, don't trigger calculation when no grease-pencil frame is present.
+   * Probably should disable in the #isModifierDisabled() function
+   * but we need additional argument for depsgraph and `gpd`. */
   bGPDlayer *gpl = BKE_gpencil_layer_get_by_name(gpd, lmd->target_layer, 1);
   if (gpl == NULL) {
     return;
@@ -225,6 +221,8 @@ static void updateDepsgraph(GpencilModifierData *md,
   }
   DEG_add_object_relation(
       ctx->node, ctx->scene->camera, DEG_OB_COMP_TRANSFORM, "Line Art Modifier");
+  DEG_add_object_relation(
+      ctx->node, ctx->scene->camera, DEG_OB_COMP_PARAMETERS, "Line Art Modifier");
 }
 
 static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
@@ -289,6 +287,7 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
           IFACE_("Overlapping Edges As Contour"),
           ICON_NONE);
   uiItemR(layout, ptr, "allow_duplication", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "allow_clipping_boundaries", 0, NULL, ICON_NONE);
 
   gpencil_modifier_panel_end(layout, ptr);
 }
@@ -387,9 +386,7 @@ static void chaining_panel_draw(const bContext *UNUSED(C), Panel *panel)
   uiItemR(col, ptr, "fuzzy_intersections", 0, NULL, ICON_NONE);
   uiItemR(col, ptr, "fuzzy_everything", 0, NULL, ICON_NONE);
 
-  col = uiLayoutColumn(layout, true);
-  uiItemR(col, ptr, "chaining_geometry_threshold", 0, NULL, ICON_NONE);
-  uiItemR(col, ptr, "chaining_image_threshold", 0, NULL, ICON_NONE);
+  uiItemR(layout, ptr, "chaining_image_threshold", 0, NULL, ICON_NONE);
 
   uiItemR(layout, ptr, "resample_length", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 
