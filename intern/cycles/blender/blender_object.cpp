@@ -510,12 +510,18 @@ void BlenderSync::sync_procedural(BL::Object &b_ob, BL::MeshSequenceCacheModifie
 
   procedural->set_scale(cache_file.scale());
 
+  procedural->set_ignore_subdivision(cache_file.ignore_subdivision());
+
   if (cache_file.cache_method() == BL::CacheFile::cache_method_ALL_DATA) {
     procedural->set_cache_method(AlembicProcedural::CACHE_ALL_DATA);
   }
   else if (cache_file.cache_method() == BL::CacheFile::cache_method_FRAME_COUNT) {
     procedural->set_cache_method(AlembicProcedural::CACHE_FRAME_COUNT);
     procedural->set_cache_frame_count(cache_file.cache_frame_count());
+    procedural->set_use_prefetching(cache_file.use_prefetching());
+  }
+  else {
+    procedural->set_cache_method(AlembicProcedural::NO_CACHE);
   }
 
   /* create or update existing AlembicObjects */

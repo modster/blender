@@ -7250,8 +7250,14 @@ void uiTemplateCacheFile(uiLayout *layout,
   row = uiLayoutRow(layout, false);
   uiItemR(row, &fileptr, "use_proxies", 0, NULL, ICON_NONE);
 
-  uiItemR(layout, &fileptr, "cache_method", 0, NULL, ICON_NONE);
-  uiItemR(layout, &fileptr, "cache_frame_count", 0, NULL, ICON_NONE);
+  row = uiLayoutRow(layout, false);
+  uiItemR(row, &fileptr, "cache_method", 0, NULL, ICON_NONE);
+  sub = uiLayoutRow(layout, true);
+  uiLayoutSetActive(sub, RNA_enum_get(&fileptr, "cache_method") == CACHEFILE_CACHE_FRAME_COUNT);
+  uiItemR(sub, &fileptr, "cache_frame_count", 0, NULL, ICON_NONE);
+  sub = uiLayoutRow(layout, true);
+  uiLayoutSetActive(sub, RNA_enum_get(&fileptr, "cache_method") == CACHEFILE_CACHE_FRAME_COUNT);
+  uiItemR(sub, &fileptr, "use_prefetching", 0, NULL, ICON_NONE);
 
   row = uiLayoutRowWithHeading(layout, true, IFACE_("Override Frame"));
   sub = uiLayoutRow(row, true);
@@ -7275,6 +7281,8 @@ void uiTemplateCacheFile(uiLayout *layout,
   uiItemR(layout, &fileptr, "velocity_unit", 0, NULL, ICON_NONE);
 
   uiItemR(layout, &fileptr, "default_radius", 0, NULL, ICON_NONE);
+
+  uiItemR(layout, &fileptr, "ignore_subdivision", 0, NULL, ICON_NONE);
 
   /* TODO: unused for now, so no need to expose. */
 #if 0

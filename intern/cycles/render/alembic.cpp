@@ -285,6 +285,11 @@ static set<chrono_t> get_relevant_sample_times(AlembicProcedural *proc,
     /* -1 as the last frame will be included below */
     end_frame_index = start_frame_index + proc->get_cache_frame_count() - 1;
   }
+  else {
+    /* NO_CACHE, only load the current frame */
+    start_frame_index = (double)(proc->get_frame());
+    end_frame_index = start_frame_index;
+  }
 
   cached_data.frame_start = static_cast<int>(start_frame_index);
   cached_data.frame_end = static_cast<int>(end_frame_index);
@@ -1192,6 +1197,11 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
     array<int> polygon_to_shader;
     read_face_sets(schema, polygon_to_shader, iss);
 
+    if (proc->get_ignore_subdivision()) {
+      add_triangles(face_counts, face_indices, time, cached_data, polygon_to_shader);
+      continue;
+    }
+
     /* read faces */
     array<int> subd_start_corner;
     array<int> shader;
@@ -1282,6 +1292,10 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
       cached_data.subd_creases_edge.add_data(creases_edge, time);
       cached_data.subd_creases_weight.add_data(creases_weight, time);
     }
+  }
+
+  if (proc->get_ignore_subdivision()) {
+    compute_vertex_deltas(cached_data, times);
   }
 
   /* TODO(@kevindietrich) : attributes, need test files */
@@ -1720,6 +1734,9 @@ NODE_DEFINE(AlembicProcedural)
   cache_method_enum.insert("depth", CACHE_FRAME_COUNT);
   SOCKET_ENUM(cache_method, "Cache Method", cache_method_enum, CACHE_ALL_DATA);
   SOCKET_INT(cache_frame_count, "Cache Frame Count", 10);
+  SOCKET_BOOLEAN(use_prefetching, "Use Prefetching", false);
+
+  SOCKET_BOOLEAN(ignore_subdivision, "Ignore Subdivision", false);
 
   return type;
 }
@@ -1821,8 +1838,20 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
   if (cache_method_is_modified() || cache_frame_count_is_modified()) {
     for (Node *node : objects) {
       AlembicObject *object = static_cast<AlembicObject *>(node);
-      object->get_cached_data().clear();
-      object->data_loaded = false;
+      object->clear_all_caches();
+    }
+  }
+
+  /* Clear the subdivision caches as the data is stored differently. */
+  if (ignore_subdivision_is_modified()) {
+    for (Node *node : objects) {
+      AlembicObject *object = static_cast<AlembicObject *>(node);
+
+      if (object->schema_type != AlembicObject::SUBD) {
+        continue;
+      }
+
+      object->clear_all_caches();
     }
   }
 
@@ -2018,6 +2047,11 @@ void AlembicProcedural::read_mesh(AlembicObject *abc_object, Abc::chrono_t frame
 
 void AlembicProcedural::read_subd(AlembicObject *abc_object, Abc::chrono_t frame_time)
 {
+  if (ignore_subdivision) {
+    read_mesh(abc_object, frame_time);
+    return;
+  }
+
   CachedData &cached_data = abc_object->get_cached_data();
 
   if (abc_object->subd_max_level_is_modified() || abc_object->subd_dicing_rate_is_modified()) {
@@ -2383,7 +2417,7 @@ void AlembicProcedural::build_caches(Progress &progress)
     memory_used += object->get_cached_data().memory_used();
   }
 
-  if (need_prefetch && get_cache_method() == CACHE_FRAME_COUNT) {
+  if (need_prefetch && get_cache_method() == CACHE_FRAME_COUNT && get_use_prefetching()) {
     prefetch_pool.push([&]() {
       const int prefetch_frame = static_cast<int>(get_frame()) + get_cache_frame_count() + 1;
 

@@ -468,6 +468,19 @@ class AlembicObject : public Node {
     return cached_data_.is_constant();
   }
 
+  void clear_all_caches()
+  {
+    cached_data_.clear();
+
+    if (prefetch_cache) {
+      prefetch_cache->clear();
+      delete prefetch_cache;
+      prefetch_cache = nullptr;
+    }
+
+    data_loaded = false;
+  }
+
   Object *object = nullptr;
 
   bool data_loaded = false;
@@ -551,14 +564,21 @@ class AlembicProcedural : public Procedural {
   /* Cache control. */
 
   enum CacheMethod {
-    CACHE_ALL_DATA,
+    NO_CACHE,
     CACHE_FRAME_COUNT,
+    CACHE_ALL_DATA,
   };
 
   NODE_SOCKET_API(int, cache_method)
 
   /* Maximum number of frames to hold in cache. */
   NODE_SOCKET_API(int, cache_frame_count)
+
+  /* Whether to preload data in a secondary cache, only valid if cache method is CACHE_FRAME_COUNT. */
+  NODE_SOCKET_API(bool, use_prefetching)
+
+  /* Treat subdivision objects as regular polygon meshes. */
+  NODE_SOCKET_API(bool, ignore_subdivision)
 
   AlembicProcedural();
   ~AlembicProcedural();

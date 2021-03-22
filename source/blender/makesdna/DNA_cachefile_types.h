@@ -62,6 +62,7 @@ enum {
 /* CacheFile::cache_method
  * Determines what scheme is used to cache data. */
 enum {
+  CACHEFILE_NO_CACHE,
   CACHEFILE_CACHE_ALL_DATA,
   CACHEFILE_CACHE_FRAME_COUNT,
 };
@@ -103,7 +104,9 @@ typedef struct CacheFile {
   char velocity_name[64];
 
   char cache_method;
-  char _pad[3];
+  char use_prefetching;
+  char ignore_subdivision;
+  char _pad;
   int cache_frame_count;
 
   /* Runtime */
