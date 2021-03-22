@@ -183,6 +183,7 @@ class SceneParams {
   bool persistent_data;
   int texture_limit;
   int max_bvh_refits;
+  int max_delta_compression_frames;
 
   bool background;
 
@@ -200,6 +201,7 @@ class SceneParams {
     texture_limit = 0;
     background = true;
     max_bvh_refits = 10;
+    max_delta_compression_frames = 10;
   }
 
   bool modified(const SceneParams &params)

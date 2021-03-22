@@ -821,7 +821,8 @@ void Mesh::pack_primitives(Device *device,
                            int object,
                            uint visibility,
                            bool pack_all,
-                           device_vector<ushort4> *verts_deltas)
+                           device_vector<ushort4> *verts_deltas,
+                           int max_delta_compression_frames)
 {
   if (triangles.empty())
     return;
@@ -865,7 +866,9 @@ void Mesh::pack_primitives(Device *device,
   const bool do_deltas = deltas_chunk.valid();
   Attribute *attr_deltas = attributes.find(ustring("deltas"));
 
-  if (do_deltas && attr_deltas) {
+  if (do_deltas && attr_deltas && current_delta_frames_count < max_delta_compression_frames) {
+    current_delta_frames_count += 1;
+
     ushort4 *chunk_data = deltas_chunk.data();
     memcpy(chunk_data, attr_deltas->data(), num_prims * sizeof(ushort4) * 3);
     deltas_chunk.copy_to_device();
@@ -877,6 +880,8 @@ void Mesh::pack_primitives(Device *device,
     device->apply_delta_compression(dscene->prim_tri_verts, *verts_deltas, offset, size, min_delta, max_delta);
   }
   else {
+    current_delta_frames_count = 0;
+
     device_vector<float4>::chunk verts_chunk = get_tris_chunk(dscene->prim_tri_verts, 3);
     float4 *prim_tri_verts = verts_chunk.data();
 

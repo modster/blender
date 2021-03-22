@@ -684,6 +684,12 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
         default=10,
         min=1,
     )
+    max_delta_compression_frames: IntProperty(
+        name="Max Delta Compression Frames",
+        description="Maximum number of consecutive frame where delta compression is used to avoid accumulating errors",
+        default=10,
+        min=1,
+    )
     debug_use_spatial_splits: BoolProperty(
         name="Use Spatial Splits",
         description="Use BVH spatial splits: longer builder time, faster render",

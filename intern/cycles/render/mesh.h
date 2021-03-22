@@ -237,7 +237,8 @@ class Mesh : public Geometry {
                        int object,
                        uint visibility,
                        bool pack_all,
-                       device_vector<ushort4> *verts_deltas) override;
+                       device_vector<ushort4> *verts_deltas,
+                       int max_delta_compression_frames) override;
 
   void tessellate(DiagSplit *split);
 

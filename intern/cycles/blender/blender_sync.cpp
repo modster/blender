@@ -777,6 +777,7 @@ SceneParams BlenderSync::get_scene_params(BL::Scene &b_scene, bool background)
   params.use_bvh_unaligned_nodes = RNA_boolean_get(&cscene, "debug_use_hair_bvh");
   params.num_bvh_time_steps = RNA_int_get(&cscene, "debug_bvh_time_steps");
   params.max_bvh_refits = RNA_int_get(&cscene, "max_bvh_refits");
+  params.max_delta_compression_frames = RNA_int_get(&cscene, "max_delta_compression_frames");
 
   PointerRNA csscene = RNA_pointer_get(&b_scene.ptr, "cycles_curves");
   params.hair_subdivisions = get_int(csscene, "subdivisions");

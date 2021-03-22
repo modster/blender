@@ -59,6 +59,8 @@ class Geometry : public Node {
 
   device_ptr vertex_pointer = 0;
 
+  int current_delta_frames_count = 0;
+
   Type geometry_type;
 
   /* Attributes */
@@ -137,7 +139,8 @@ class Geometry : public Node {
                                int object,
                                uint visibility,
                                bool pack_all,
-                               device_vector<ushort4> *verts_deltas) = 0;
+                               device_vector<ushort4> *verts_deltas,
+                               int max_delta_compression_frames) = 0;
 
   /* Check whether the geometry should have own BVH built separately. Briefly,
    * own BVH is needed for geometry, if:

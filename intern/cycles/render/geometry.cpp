@@ -1143,7 +1143,8 @@ void GeometryManager::device_update_mesh(
         const bool curve_keys_co_modified = hair->curve_radius_is_modified() ||
                                             hair->curve_keys_is_modified();
         if (curve_keys_co_modified || copy_all_data) {
-          hair->pack_curve_keys(scene->device, dscene->curve_keys, curve_keys_deltas);
+          hair->pack_curve_keys(scene->device, dscene->curve_keys, curve_keys_deltas,
+                                scene->params.max_delta_compression_frames);
         }
 
         const bool curve_data_modified = hair->curve_shader_is_modified() ||
@@ -1283,7 +1284,8 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
                               info.first,
                               info.second,
                               pack_all,
-                              &verts_deltas));
+                              &verts_deltas,
+                              scene->params.max_delta_compression_frames));
     }
     pool.wait_work();
   }

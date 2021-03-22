@@ -731,6 +731,8 @@ class CYCLES_RENDER_PT_performance_acceleration_structure(CyclesButtonsPanel, Pa
         sub.prop(cscene, "debug_bvh_time_steps")
         sub = col.column()
         sub.prop(cscene, "max_bvh_refits")
+        sub = col.column()
+        sub.prop(cscene, "max_delta_compression_frames")
 
 
 class CYCLES_RENDER_PT_performance_final_render(CyclesButtonsPanel, Panel):

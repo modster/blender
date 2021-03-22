@@ -462,7 +462,8 @@ void Hair::apply_transform(const Transform &tfm, const bool apply_to_motion)
 
 void Hair::pack_curve_keys(Device *device,
                            device_vector<ccl::float4> &curve_key_co,
-                           device_vector<ccl::ushort4> &curve_keys_deltas)
+                           device_vector<ccl::ushort4> &curve_keys_deltas,
+                           int max_delta_compression_frames)
 {
   const size_t curve_keys_size = curve_keys.size();
 
@@ -475,7 +476,9 @@ void Hair::pack_curve_keys(Device *device,
   const bool do_deltas = curve_keys_deltas.size() != 0;
   const Attribute *attr_delta = attributes.find(ustring("deltas"));
 
-  if (do_deltas && attr_delta) {
+  if (do_deltas && attr_delta && current_delta_frames_count < max_delta_compression_frames) {
+    current_delta_frames_count += 1;
+
     device_vector<ushort4>::chunk deltas_chunk = get_keys_chunk(curve_keys_deltas);
     memcpy(deltas_chunk.data(), attr_delta->data(), curve_keys_size * sizeof(ushort4));
     deltas_chunk.copy_to_device();
@@ -487,6 +490,7 @@ void Hair::pack_curve_keys(Device *device,
     device->apply_delta_compression(curve_key_co, curve_keys_deltas, offset, size, min_delta, max_delta);
   }
   else {
+    current_delta_frames_count = 0;
     device_vector<ccl::float4>::chunk keys_chunk = get_keys_chunk(curve_key_co);
 
     for (size_t i = 0; i < curve_keys_size; i++) {
@@ -523,12 +527,13 @@ void Hair::pack_curve_segments(Scene *scene, device_vector<float4>::chunk curve_
   curve_data.copy_to_device();
 }
 
-void Hair::pack_primitives(Device *device,
+void Hair::pack_primitives(Device */*device*/,
                            DeviceScene *dscene,
                            int object,
                            uint visibility,
                            bool pack_all,
-                           device_vector<ushort4> * /*verts_deltas*/)
+                           device_vector<ushort4> * /*verts_deltas*/,
+                           int /*max_delta_compression_frames*/)
 {
   if (curve_first_key.empty())
     return;
