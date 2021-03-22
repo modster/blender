@@ -34,7 +34,7 @@ Attribute::Attribute(
   assert(type == TypeDesc::TypeFloat || type == TypeDesc::TypeColor ||
          type == TypeDesc::TypePoint || type == TypeDesc::TypeVector ||
          type == TypeDesc::TypeNormal || type == TypeDesc::TypeMatrix || type == TypeFloat2 ||
-         type == TypeFloat4 || type == TypeRGBA || type == TypeUInt16);
+         type == TypeFloat4 || type == TypeRGBA || type == TypeUInt8Array4);
 
   if (element == ATTR_ELEMENT_VOXEL) {
     buffer.resize(sizeof(ImageHandle));
@@ -361,6 +361,8 @@ const char *Attribute::standard_name(AttributeStandard std)
       return "pointiness";
     case ATTR_STD_RANDOM_PER_ISLAND:
       return "random_per_island";
+    case ATTR_STD_DELTAS:
+      return "deltas";
     case ATTR_STD_NOT_FOUND:
     case ATTR_STD_NONE:
     case ATTR_STD_NUM:
@@ -523,6 +525,9 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
       case ATTR_STD_RANDOM_PER_ISLAND:
         attr = add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_FACE);
         break;
+      case ATTR_STD_DELTAS:
+        attr = add(name, TypeUInt8Array4, ATTR_ELEMENT_VERTEX);
+        break;
       default:
         assert(0);
         break;
@@ -578,6 +583,9 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
         break;
       case ATTR_STD_RANDOM_PER_ISLAND:
         attr = add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_FACE);
+        break;
+      case ATTR_STD_DELTAS:
+        attr = add(name, TypeUInt8Array4, ATTR_ELEMENT_VERTEX);
         break;
       default:
         assert(0);

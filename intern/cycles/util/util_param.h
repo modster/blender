@@ -34,6 +34,10 @@ static constexpr TypeDesc TypeFloatArray4(TypeDesc::FLOAT,
                                           TypeDesc::SCALAR,
                                           TypeDesc::NOSEMANTICS,
                                           4);
+static constexpr TypeDesc TypeUInt8Array4(TypeDesc::UINT8,
+                                          TypeDesc::SCALAR,
+                                          TypeDesc::NOSEMANTICS,
+                                          4);
 
 CCL_NAMESPACE_END
 

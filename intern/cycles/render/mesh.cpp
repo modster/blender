@@ -864,7 +864,7 @@ void Mesh::pack_primitives(Device *device,
 
   device_vector<ushort4>::chunk deltas_chunk = get_tris_chunk(*verts_deltas, 3);
   const bool do_deltas = deltas_chunk.valid();
-  Attribute *attr_deltas = attributes.find(ustring("deltas"));
+  Attribute *attr_deltas = attributes.find(ATTR_STD_DELTAS);
 
   if (do_deltas && attr_deltas && current_delta_frames_count < max_delta_compression_frames) {
     current_delta_frames_count += 1;

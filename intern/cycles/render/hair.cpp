@@ -474,7 +474,7 @@ void Hair::pack_curve_keys(Device *device,
   const float3 *keys_ptr = curve_keys.data();
   const float *radius_ptr = curve_radius.data();
   const bool do_deltas = curve_keys_deltas.size() != 0;
-  const Attribute *attr_delta = attributes.find(ustring("deltas"));
+  const Attribute *attr_delta = attributes.find(ATTR_STD_DELTAS);
 
   if (do_deltas && attr_delta && current_delta_frames_count < max_delta_compression_frames) {
     current_delta_frames_count += 1;

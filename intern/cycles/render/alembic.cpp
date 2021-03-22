@@ -857,12 +857,12 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
     return;
   }
 
-  static ustring deltas_string = ustring("deltas");
+  const ustring deltas_string = ustring("deltas");
 
   auto &attr_delta = cached_data.add_attribute(deltas_string, cached_data.vertices.get_time_sampling());
-  attr_delta.std = ATTR_STD_NONE;
+  attr_delta.std = ATTR_STD_DELTAS;
   attr_delta.element = ATTR_ELEMENT_VERTEX;
-  attr_delta.type_desc = TypeUInt16;
+  attr_delta.type_desc = TypeUInt8Array4;
 
   ccl::set<chrono_t>::iterator begin = times.begin();
 
@@ -972,12 +972,12 @@ static void compute_curve_deltas(CachedData &cached_data, const ccl::set<chrono_
     return;
   }
 
-  static ustring deltas_string = ustring("deltas");
+  const ustring deltas_string = ustring("deltas");
 
   auto &attr_delta = cached_data.add_attribute(deltas_string, cached_data.curve_keys.get_time_sampling());
-  attr_delta.std = ATTR_STD_NONE;
+  attr_delta.std = ATTR_STD_DELTAS;
   attr_delta.element = ATTR_ELEMENT_CURVE_KEY;
-  attr_delta.type_desc = TypeUInt16;
+  attr_delta.type_desc = TypeUInt8Array4;
 
   ccl::set<chrono_t>::iterator begin = times.begin();
 
