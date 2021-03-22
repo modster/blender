@@ -863,6 +863,8 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
 
   chrono_t previous_time = *begin++;
 
+  cached_data.min_delta.add_no_data(previous_time);
+  cached_data.max_delta.add_no_data(previous_time);
   attr_delta.data.add_no_data(previous_time);
 
   while (begin != times.end()) {
@@ -981,6 +983,8 @@ static void compute_curve_deltas(CachedData &cached_data, const ccl::set<chrono_
 
   chrono_t previous_time = *begin++;
 
+  cached_data.min_delta.add_no_data(previous_time);
+  cached_data.max_delta.add_no_data(previous_time);
   attr_delta.data.add_no_data(previous_time);
 
   while (begin != times.end()) {

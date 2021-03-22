@@ -185,6 +185,8 @@ template<typename T> class DataStore {
 
     last_loaded_time = index.source_time;
 
+		assert(index.index < data.size());
+
     return CacheLookupResult<T>::new_data(&data[index.index]);
   }
 
@@ -201,6 +203,8 @@ template<typename T> class DataStore {
     if (index.index == -1ul) {
       return CacheLookupResult<T>::no_data_found_for_time();
     }
+
+		assert(index.index < data.size());
 
     return CacheLookupResult<T>::new_data(&data[index.index]);
   }
@@ -287,6 +291,7 @@ template<typename T> class DataStore {
       return;
     }
 
+		index_data_map.swap(other.index_data_map);
     data.swap(other.data);
     std::swap(frame_offset, other.frame_offset);
   }
