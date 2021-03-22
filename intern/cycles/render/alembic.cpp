@@ -919,15 +919,6 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
       }
     }
 
-#if 1
-    if (min_delta < -1.0f || max_delta > 1.0f) {
-      cached_data.min_delta.add_no_data(current_time);
-      cached_data.max_delta.add_no_data(current_time);
-      attr_delta.data.add_no_data(current_time);
-      continue;
-    }
-#endif
-
     const float delta_magnitude = max_delta - min_delta;
 
     if (delta_magnitude == 0.0f) {
@@ -1023,15 +1014,6 @@ static void compute_curve_deltas(CachedData &cached_data, const ccl::set<chrono_
       min_delta = std::min(min_delta, delta.y);
       min_delta = std::min(min_delta, delta.z);
     }
-
-#if 1
-    if (min_delta < -1.0f || max_delta > 1.0f) {
-      cached_data.min_delta.add_no_data(current_time);
-      cached_data.max_delta.add_no_data(current_time);
-      attr_delta.data.add_no_data(current_time);
-      continue;
-    }
-#endif
 
     const float delta_magnitude = max_delta - min_delta;
 
