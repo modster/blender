@@ -64,6 +64,7 @@ set(SRC
   intern/draw_color_management.c
   intern/draw_common.c
   intern/draw_debug.c
+  intern/draw_view_data.cc
   intern/draw_fluid.c
   intern/draw_hair.c
   intern/draw_instance_data.c
@@ -157,7 +158,6 @@ set(SRC
   engines/overlay/overlay_wireframe.c
 
   DRW_engine.h
-  DRW_engine_types.h
   DRW_select_buffer.h
   intern/DRW_render.h
   intern/draw_cache.h
@@ -167,6 +167,7 @@ set(SRC
   intern/draw_color_management.h
   intern/draw_common.h
   intern/draw_debug.h
+  intern/draw_view_data.h
   intern/draw_hair_private.h
   intern/draw_instance_data.h
   intern/draw_manager.h

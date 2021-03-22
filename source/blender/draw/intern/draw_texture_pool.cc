@@ -117,7 +117,6 @@ GPUTexture *DRW_texture_pool_query(
 void DRW_texture_pool_reset(DRWTexturePool *pool)
 {
   pool->last_user_id = -1;
-  printf("handles.size %ld\n", pool->handles.size());
 
   for (auto it = pool->handles.rbegin(); it != pool->handles.rend(); ++it) {
     DRWTexturePoolHandle &handle = *it;

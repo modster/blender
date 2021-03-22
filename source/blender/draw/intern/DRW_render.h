@@ -24,8 +24,6 @@
 
 #pragma once
 
-#include "DRW_engine_types.h"
-
 #include "BLI_listbase.h"
 #include "BLI_math_matrix.h"
 #include "BLI_math_vector.h"
@@ -56,6 +54,7 @@
 
 #include "draw_debug.h"
 #include "draw_manager_profiling.h"
+#include "draw_view_data.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -132,6 +131,10 @@ typedef struct DrawEngineType {
                           struct RenderLayer *layer,
                           const struct rcti *rect);
   void (*store_metadata)(void *vedata, struct RenderResult *render_result);
+
+  /** Index of the type in the list. Used for dupli data. Set at runtime. */
+  /** TODO(fclem) Can we avoid this? */
+  int index;
 } DrawEngineType;
 
 /* Textures */

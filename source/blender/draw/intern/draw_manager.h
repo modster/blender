@@ -478,6 +478,35 @@ typedef struct DRWDebugSphere {
   float color[4];
 } DRWDebugSphere;
 
+/* ------------- Memory Pools ------------ */
+
+/* Contains memory pools information */
+typedef struct DRWData {
+  /** Instance data. */
+  DRWInstanceDataList *idatalist;
+  /** Mempools for drawcalls. */
+  struct BLI_memblock *commands;
+  struct BLI_memblock *commands_small;
+  struct BLI_memblock *callbuffers;
+  struct BLI_memblock *obmats;
+  struct BLI_memblock *obinfos;
+  struct BLI_memblock *cullstates;
+  struct BLI_memblock *shgroups;
+  struct BLI_memblock *uniforms;
+  struct BLI_memblock *views;
+  struct BLI_memblock *passes;
+  struct BLI_memblock *images;
+  struct GPUUniformBuf **matrices_ubo;
+  struct GPUUniformBuf **obinfos_ubo;
+  struct GHash *obattrs_ubo_pool;
+  uint ubo_len;
+  /** Texture pool to reuse temp texture across engines. */
+  /* TODO(fclem) the pool could be shared even between viewports. */
+  struct DRWTexturePool *texture_pool;
+  /** Per stereo view data. Contains engine data and default framebuffers. */
+  struct DRWViewData *view_data[2];
+} DRWData;
+
 /* ------------- DRAW MANAGER ------------ */
 
 #define DST_MAX_SLOTS 64  /* Cannot be changed without modifying RST.bound_tex_slots */
@@ -487,8 +516,10 @@ typedef struct DRWDebugSphere {
 typedef struct DRWManager {
   /* TODO clean up this struct a bit */
   /* Cache generation */
-  ViewportMemoryPool *vmempool;
-  DRWInstanceDataList *idatalist;
+  /* TODO(fclem) Rename to data. */
+  DRWData *vmempool;
+  /** Active view data structure for one of the 2 stereo view. Not related to DRWView. */
+  struct DRWViewData *view_data_active;
   /* State of the object being evaluated if already allocated. */
   DRWResourceHandle ob_handle;
   /** True if current DST.ob_state has its matching DRWObjectInfos init. */
@@ -540,10 +571,6 @@ typedef struct DRWManager {
 
   /* Convenience pointer to text_store owned by the viewport */
   struct DRWTextStore **text_store_p;
-
-  ListBase enabled_engines; /* RenderEngineType */
-  void **vedata_array;      /* ViewportEngineData */
-  int enabled_engine_count; /* Length of enabled_engines list. */
 
   bool buffer_finish_called; /* Avoid bad usage of DRW_render_instance_buffer_finish */
 
@@ -601,7 +628,7 @@ void drw_batch_cache_validate(Object *ob);
 void drw_batch_cache_generate_requested(struct Object *ob);
 void drw_batch_cache_generate_requested_delayed(Object *ob);
 
-void drw_resource_buffer_finish(ViewportMemoryPool *vmempool);
+void drw_resource_buffer_finish(DRWData *vmempool);
 
 /* Procedural Drawing */
 GPUBatch *drw_cache_procedural_points_get(void);
@@ -614,3 +641,10 @@ void drw_uniform_attrs_pool_update(struct GHash *table,
                                    struct Object *ob,
                                    struct Object *dupli_parent,
                                    struct DupliObject *dupli_source);
+
+double *drw_engine_data_cache_time_get(GPUViewport *viewport);
+void *drw_engine_data_engine_data_create(GPUViewport *viewport, void *engine_type);
+void *drw_engine_data_engine_data_get(GPUViewport *viewport, void *engine_handle);
+bool drw_engine_data_engines_data_validate(GPUViewport *viewport, void **engine_handle_array);
+void drw_engine_data_cache_release(GPUViewport *viewport);
+void drw_engine_data_free(GPUViewport *viewport);
