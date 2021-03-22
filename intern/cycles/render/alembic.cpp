@@ -851,7 +851,7 @@ void AlembicObject::read_face_sets(SchemaType &schema,
   }
 }
 
-static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono_t> &times)
+static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono_t> &times, Progress &progress)
 {
   if (cached_data.vertices.size() == 0 || cached_data.vertices.size() == 1) {
     return;
@@ -873,6 +873,10 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
   attr_delta.data.add_no_data(previous_time);
 
   while (begin != times.end()) {
+    if (progress.get_cancel()) {
+      return;
+    }
+
     const chrono_t current_time = *begin++;
 
     const array<float3> *current_vertices = cached_data.vertices.data_for_time_no_check(current_time).get_data_or_null();
@@ -962,7 +966,7 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
   }
 }
 
-static void compute_curve_deltas(CachedData &cached_data, const ccl::set<chrono_t> &times)
+static void compute_curve_deltas(CachedData &cached_data, const ccl::set<chrono_t> &times, Progress &progress)
 {
   if (cached_data.curve_keys.size() == 0 || cached_data.curve_keys.size() == 1) {
     return;
@@ -984,6 +988,10 @@ static void compute_curve_deltas(CachedData &cached_data, const ccl::set<chrono_
   attr_delta.data.add_no_data(previous_time);
 
   while (begin != times.end()) {
+    if (progress.get_cancel()) {
+      return;
+    }
+
     const chrono_t current_time = *begin++;
 
     const array<float3> *current_curve_keys = cached_data.curve_keys.data_for_time_no_check(current_time).get_data_or_null();
@@ -1144,7 +1152,7 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
     add_uvs(proc, frame, uvs, cached_data, progress);
   }
 
-  compute_vertex_deltas(cached_data, times);
+  compute_vertex_deltas(cached_data, times, progress);
 
   data_loaded = true;
   return true;
@@ -1295,7 +1303,7 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
   }
 
   if (proc->get_ignore_subdivision()) {
-    compute_vertex_deltas(cached_data, times);
+    compute_vertex_deltas(cached_data, times, progress);
   }
 
   /* TODO(@kevindietrich) : attributes, need test files */
@@ -1401,7 +1409,7 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
 
   // TODO(@kevindietrich): attributes, need example files
 
-  compute_curve_deltas(cached_data, times);
+  compute_curve_deltas(cached_data, times, progress);
 
   data_loaded = true;
   return true;
