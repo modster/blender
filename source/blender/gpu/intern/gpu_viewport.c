@@ -46,6 +46,9 @@
 
 #include "DRW_engine.h"
 
+/* Temp. needed to free texture pool. */
+#include "./intern/draw_texture_pool.h"
+
 #include "MEM_guardedalloc.h"
 
 static const int default_fbl_len = (sizeof(DefaultFramebufferList)) / sizeof(void *);
@@ -989,6 +992,10 @@ void GPU_viewport_free(GPUViewport *viewport)
 
   MEM_freeN(viewport->fbl);
   MEM_freeN(viewport->txl);
+
+  if (viewport->vmempool.texture_pool != NULL) {
+    DRW_texture_pool_free(viewport->vmempool.texture_pool);
+  }
 
   if (viewport->vmempool.commands != NULL) {
     BLI_memblock_destroy(viewport->vmempool.commands, NULL);

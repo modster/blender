@@ -87,6 +87,7 @@
 #include "draw_manager_profiling.h"
 #include "draw_manager_testing.h"
 #include "draw_manager_text.h"
+#include "draw_texture_pool.h"
 
 /* only for callbacks */
 #include "draw_cache_impl.h"
@@ -571,6 +572,11 @@ static void drw_viewport_var_init(void)
     DST.default_framebuffer = fbl->default_fb;
 
     DST.vmempool = GPU_viewport_mempool_get(DST.viewport);
+
+    if (DST.vmempool->texture_pool == NULL) {
+      DST.vmempool->texture_pool = DRW_texture_pool_create();
+    }
+    DRW_texture_pool_reset(DST.vmempool->texture_pool);
 
     if (DST.vmempool->commands == NULL) {
       DST.vmempool->commands = BLI_memblock_create(sizeof(DRWCommandChunk));

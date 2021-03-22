@@ -59,6 +59,7 @@ typedef struct ViewportMemoryPool {
   struct GPUUniformBuf **matrices_ubo;
   struct GPUUniformBuf **obinfos_ubo;
   struct GHash *obattrs_ubo_pool;
+  struct DRWTexturePool *texture_pool;
   uint ubo_len;
 } ViewportMemoryPool;
 

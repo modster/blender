@@ -75,6 +75,7 @@ set(SRC
   intern/draw_manager_text.c
   intern/draw_manager_texture.c
   intern/draw_select_buffer.c
+  intern/draw_texture_pool.cc
   intern/draw_view.c
   engines/basic/basic_engine.c
   engines/image/image_engine.c
@@ -172,6 +173,7 @@ set(SRC
   intern/draw_manager_profiling.h
   intern/draw_manager_testing.h
   intern/draw_manager_text.h
+  intern/draw_texture_pool.h
   intern/draw_view.h
   intern/smaa_textures.h
   engines/basic/basic_engine.h
