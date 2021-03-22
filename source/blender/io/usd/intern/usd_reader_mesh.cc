@@ -749,18 +749,35 @@ Mesh *USDMeshReader::read_mesh(Mesh *existing_mesh,
   std::vector<pxr::UsdGeomPrimvar> primvars = mesh_prim_.GetPrimvars();
 
   for (pxr::UsdGeomPrimvar p : primvars) {
-    if (primvar_varying_map_.find(p.GetPrimvarName()) == primvar_varying_map_.end()) {
-      primvar_varying_map_.insert(std::make_pair(p.GetPrimvarName(), p.ValueMightBeTimeVarying()));
-      if (p.ValueMightBeTimeVarying())
-        is_time_varying_ = true;
+
+    pxr::TfToken name = p.GetPrimvarName();
+    pxr::SdfValueTypeName type = p.GetTypeName();
+
+    bool is_uv = false;
+
+    /* Assume all uvs are stored in one of these primvar types */
+    if (type == pxr::SdfValueTypeNames->TexCoord2hArray ||
+        type == pxr::SdfValueTypeNames->TexCoord2fArray ||
+        type == pxr::SdfValueTypeNames->TexCoord2dArray) {
+      is_uv = true;
+    }
+    /* In some cases, the st primvar is stored as float2 values. */
+    else if (name == usdtokens::st && type == pxr::SdfValueTypeNames->Float2Array) {
+      is_uv = true;
     }
 
-    // Assume all uvs are stored in one of these primvar types...
-    if (p.GetTypeName() == pxr::SdfValueTypeNames->TexCoord2hArray ||
-        p.GetTypeName() == pxr::SdfValueTypeNames->TexCoord2fArray ||
-        p.GetTypeName() == pxr::SdfValueTypeNames->TexCoord2dArray) {
+    if (is_uv) {
       uv_tokens.push_back(p.GetBaseName());
       has_uvs_ = true;
+
+      /* Record whether the UVs might be time varying. */
+      if (primvar_varying_map_.find(name) == primvar_varying_map_.end()) {
+        bool might_be_time_varying = p.ValueMightBeTimeVarying();
+        primvar_varying_map_.insert(std::make_pair(name, might_be_time_varying));
+        if (might_be_time_varying) {
+          is_time_varying_ = true;
+        }
+      }
     }
   }
 
