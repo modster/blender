@@ -1287,7 +1287,7 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
   /* TODO(@kevindietrich) : attributes, need test files */
 
   data_loaded = true;
-  return false;
+  return true;
 }
 
 bool AlembicObject::load_all_data(CachedData &cached_data,
