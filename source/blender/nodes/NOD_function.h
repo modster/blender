@@ -20,6 +20,12 @@
 extern "C" {
 #endif
 
+extern struct bNodeTreeType *ntreeType_Function;
+
+void register_node_tree_type_function(void);
+
+void register_node_type_function_group(void);
+
 void register_node_type_fn_boolean_math(void);
 void register_node_type_fn_float_compare(void);
 void register_node_type_fn_input_string(void);

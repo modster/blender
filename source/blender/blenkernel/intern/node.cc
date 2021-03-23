@@ -4946,6 +4946,8 @@ static void registerGeometryNodes()
 
 static void registerFunctionNodes()
 {
+  register_node_type_function_group();
+
   register_node_type_fn_boolean_math();
   register_node_type_fn_float_compare();
   register_node_type_fn_input_string();

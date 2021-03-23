@@ -281,6 +281,7 @@ extern StructRNA RNA_FreestyleModuleSettings;
 extern StructRNA RNA_FreestyleSettings;
 extern StructRNA RNA_Function;
 extern StructRNA RNA_FunctionNode;
+extern StructRNA RNA_FunctionNodeTree;
 extern StructRNA RNA_GPencilFrame;
 extern StructRNA RNA_GPencilInterpolateSettings;
 extern StructRNA RNA_GPencilLayer;

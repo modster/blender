@@ -512,6 +512,7 @@ typedef struct bNodeTree {
 #define NTREE_COMPOSIT 1
 #define NTREE_TEXTURE 2
 #define NTREE_GEOMETRY 3
+#define NTREE_FUNCTION 4
 
 /* ntree->init, flag */
 #define NTREE_TYPE_INIT 1

@@ -68,9 +68,11 @@
 #include "IMB_imbuf_types.h"
 
 #include "NOD_composite.h"
+#include "NOD_function.h"
 #include "NOD_geometry.h"
 #include "NOD_shader.h"
 #include "NOD_texture.h"
+
 #include "node_intern.h" /* own include */
 
 #define USE_ESC_COMPO
@@ -463,6 +465,11 @@ bool ED_node_is_texture(struct SpaceNode *snode)
 bool ED_node_is_geometry(struct SpaceNode *snode)
 {
   return STREQ(snode->tree_idname, ntreeType_Geometry->idname);
+}
+
+bool ED_node_is_function(struct SpaceNode *snode)
+{
+  return STREQ(snode->tree_idname, ntreeType_Function->idname);
 }
 
 /* assumes nothing being done in ntree yet, sets the default in/out node */

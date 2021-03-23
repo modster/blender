@@ -72,6 +72,7 @@
 #include "IMB_imbuf_types.h"
 
 #include "NOD_composite.h"
+#include "NOD_function.h"
 #include "NOD_geometry.h"
 #include "NOD_shader.h"
 #include "NOD_texture.h"
@@ -3286,6 +3287,7 @@ void ED_node_init_butfuncs(void)
   ntreeType_Shader->ui_icon = ICON_NODE_MATERIAL;
   ntreeType_Texture->ui_icon = ICON_NODE_TEXTURE;
   ntreeType_Geometry->ui_icon = ICON_NODETREE;
+  ntreeType_Function->ui_icon = ICON_NODETREE;
 }
 
 void ED_init_custom_node_type(bNodeType *ntype)
