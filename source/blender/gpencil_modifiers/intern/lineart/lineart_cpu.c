@@ -1641,13 +1641,14 @@ static void lineart_geometry_object_load(Depsgraph *dg,
 
     orig_ob = ob->id.orig_id ? (Object *)ob->id.orig_id : ob;
 
-    BLI_spin_lock(rb->lock_task);
+    BLI_spin_lock(&rb->lock_task);
     reln = lineart_list_append_pointer_pool_sized(
         &rb->vertex_buffer_pointers, &rb->render_data_pool, orv, sizeof(LineartElementLinkNode));
-    BLI_spin_unlock(rb->lock_task);
+    BLI_spin_unlock(&rb->lock_task);
 
     reln->element_count = bm->totvert;
     reln->object_ref = orig_ob;
+    obi->v_reln = reln;
 
     if (ob->lineart.flags & OBJECT_LRT_OWN_CREASE) {
       use_crease = cosf(M_PI - ob->lineart.crease_threshold);
@@ -1662,10 +1663,10 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       reln->flags |= LRT_ELEMENT_BORDER_ONLY;
     }
 
-    BLI_spin_lock(rb->lock_task);
+    BLI_spin_lock(&rb->lock_task);
     reln = lineart_list_append_pointer_pool_sized(
         &rb->triangle_buffer_pointers, &rb->render_data_pool, ort, sizeof(LineartElementLinkNode));
-    BLI_spin_unlock(rb->lock_task);
+    BLI_spin_unlock(&rb->lock_task);
     reln->element_count = bm->totface;
     reln->object_ref = orig_ob;
     reln->flags |= (usage == OBJECT_LRT_NO_INTERSECTION ? LRT_ELEMENT_NO_INTERSECTION : 0);
@@ -1743,10 +1744,10 @@ static void lineart_geometry_object_load(Depsgraph *dg,
     o_la_e = lineart_mem_aquire_thread(&rb->render_data_pool, sizeof(LineartEdge) * allocate_la_e);
     o_la_s = lineart_mem_aquire_thread(&rb->render_data_pool,
                                        sizeof(LineartLineSegment) * allocate_la_e);
-    BLI_spin_lock(rb->lock_task);
+    BLI_spin_lock(&rb->lock_task);
     reln = lineart_list_append_pointer_pool_sized(
         &rb->line_buffer_pointers, &rb->render_data_pool, o_la_e, sizeof(LineartElementLinkNode));
-    BLI_spin_unlock(rb->lock_task);
+    BLI_spin_unlock(&rb->lock_task);
     reln->element_count = allocate_la_e;
     reln->object_ref = orig_ob;
 
@@ -1961,6 +1962,9 @@ static void lineart_main_load_geometries(
 
   for (int i = 0; i < thread_count; i++) {
     for (LineartObjectInfo *obi = olti[i].pending; obi; obi = obi->next) {
+      if (!obi->v_reln) {
+        continue;
+      }
       LineartVert *v = (LineartVert *)obi->v_reln->pointer;
       int v_count = obi->v_reln->element_count;
       for (int vi = 0; vi < v_count; vi++) {
