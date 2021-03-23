@@ -28,6 +28,7 @@
 #include "BLI_listbase.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
+#include "BLI_utildefines.h"
 
 #include "BLO_readfile.h"
 
@@ -283,6 +284,16 @@ static void poselib_blend_apply(bContext *C, wmOperator *op)
 
 /* ---------------------------- */
 
+static void poselib_blend_step_factor(PoseBlendData *pbd,
+                                      const float blend_factor_step,
+                                      const bool reduce_step)
+{
+  const float step_size = reduce_step ? blend_factor_step / 10.0f : blend_factor_step;
+  const float new_factor = pbd->blend_factor + step_size;
+  pbd->blend_factor = CLAMPIS(new_factor, 0.0f, 1.0f);
+  pbd->needs_redraw = true;
+}
+
 /* Return operator return value. */
 static int poselib_blend_handle_event(bContext *UNUSED(C), wmOperator *op, const wmEvent *event)
 {
@@ -343,12 +354,10 @@ static int poselib_blend_handle_event(bContext *UNUSED(C), wmOperator *op, const
 
     /* TODO(Sybren): use better UI for slider. */
     case WHEELUPMOUSE:
-      pbd->blend_factor = fmin(pbd->blend_factor + 0.1f, 1.0f);
-      pbd->needs_redraw = true;
+      poselib_blend_step_factor(pbd, 0.1f, event->shift);
       break;
     case WHEELDOWNMOUSE:
-      pbd->blend_factor = fmax(pbd->blend_factor - 0.1f, 0.0f);
-      pbd->needs_redraw = true;
+      poselib_blend_step_factor(pbd, -0.1f, event->shift);
       break;
   }
 
