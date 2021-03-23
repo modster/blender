@@ -420,7 +420,7 @@ static bAction *poselib_tempload_enter(bContext *C, wmOperator *op)
   if (strcmp(group, "Action")) {
     BKE_reportf(op->reports,
                 RPT_ERROR,
-                "Selected asset \"%s\" is a %s, expected Action",
+                TIP_("Selected asset \"%s\" is a %s, expected Action"),
                 asset_name,
                 group);
     return NULL;
@@ -430,7 +430,8 @@ static bAction *poselib_tempload_enter(bContext *C, wmOperator *op)
       CTX_data_main(C), blend_file_path, ID_AC, asset_name, op->reports);
 
   if (pbd->temp_lib_context == NULL || pbd->temp_lib_context->temp_id == NULL) {
-    BKE_reportf(op->reports, RPT_ERROR, "Unable to load %s from %s", asset_name, blend_file_path);
+    BKE_reportf(
+        op->reports, RPT_ERROR, TIP_("Unable to load %s from %s"), asset_name, blend_file_path);
     return NULL;
   }
 
@@ -453,7 +454,8 @@ static bAction *poselib_blend_init_get_action(bContext *C, wmOperator *op)
   ID *id = CTX_data_pointer_get_type(C, "id", &RNA_ID).data;
   if (id != NULL) {
     if (GS(id->name) != ID_AC) {
-      BKE_reportf(op->reports, RPT_ERROR, "Context key 'id' (%s) is not an Action", id->name);
+      BKE_reportf(
+          op->reports, RPT_ERROR, TIP_("Context key 'id' (%s) is not an Action"), id->name);
       return NULL;
     }
     return (bAction *)id;
@@ -470,7 +472,7 @@ static bool poselib_blend_init_data(bContext *C, wmOperator *op)
   /* check if valid poselib */
   Object *ob = get_poselib_object(C);
   if (ELEM(NULL, ob, ob->pose, ob->data)) {
-    BKE_report(op->reports, RPT_ERROR, "Pose lib is only for armatures in pose mode");
+    BKE_report(op->reports, RPT_ERROR, TIP_("Pose lib is only for armatures in pose mode"));
     return false;
   }
 
