@@ -1567,7 +1567,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       ob->type == OB_FONT) {
 
     if (ob->type == OB_MESH) {
-      use_mesh = DEG_get_evaluated_object(dg, ob)->data;
+      use_mesh = ob->data;
     }
     else {
       use_mesh = BKE_mesh_new_from_object(NULL, ob, false);
@@ -1929,14 +1929,12 @@ static void lineart_main_load_geometries(
   /* This memory is in render buffer memory pool. so we don't need to free those after loading. */
   LineartObjectLoadTaskInfo *olti = lineart_mem_aquire(
       &rb->render_data_pool, sizeof(LineartObjectLoadTaskInfo) * thread_count);
-  olti->rb = rb;
-  olti->dg = depsgraph;
 
   int to_thread = 0;
   DEG_OBJECT_ITER_BEGIN (depsgraph, ob, flags) {
     LineartObjectInfo *obi = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartObjectInfo));
     obi->override_usage = lineart_usage_check(scene->master_collection, ob, rb);
-    obi->ob = ob;
+    obi->ob = DEG_get_evaluated_object(depsgraph, ob);
 
     obi->next = olti[to_thread].pending;
     olti[to_thread].pending = obi;
@@ -1951,6 +1949,8 @@ static void lineart_main_load_geometries(
   TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
 
   for (int i = 0; i < thread_count; i++) {
+    olti[i].rb = rb;
+    olti[i].dg = depsgraph;
     BLI_task_pool_push(tp, (TaskRunFunction)lineart_object_load_worker, &olti[i], 0, NULL);
   }
   BLI_task_pool_work_and_wait(tp);
