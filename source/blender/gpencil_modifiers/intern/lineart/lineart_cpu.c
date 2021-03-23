@@ -1523,9 +1523,7 @@ static void lineart_triangle_adjacent_assign(LineartTriangle *rt,
   }
 }
 
-static void lineart_geometry_object_load(Depsgraph *dg,
-                                         LineartObjectInfo *obi,
-                                         LineartRenderBuffer *rb)
+static void lineart_geometry_object_load(LineartObjectInfo *obi, LineartRenderBuffer *rb)
 {
   BMesh *bm;
   BMVert *v;
@@ -1536,8 +1534,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
   LineartLineSegment *la_s;
   LineartTriangle *rt;
   LineartTriangleAdjacent *orta;
-  double new_mvp[4][4], new_mv[4][4], normal[4][4];
-  float imat[4][4];
+  double(*new_mvp)[4] = obi->new_mvp, (*new_mv)[4] = obi->new_mv, (*normal)[4] = obi->normal;
   LineartElementLinkNode *reln;
   LineartVert *orv;
   LineartEdge *o_la_e;
@@ -1545,252 +1542,200 @@ static void lineart_geometry_object_load(Depsgraph *dg,
   LineartTriangle *ort;
   Object *orig_ob;
   int CanFindFreestyle = 0;
-  Object *ob = obi->ob;
   int i;
   Mesh *use_mesh;
   float use_crease = 0;
 
-  int usage = obi->override_usage ? obi->override_usage : ob->lineart.usage;
+  int usage = obi->override_usage;
 
-#define LRT_MESH_FINISH \
-  BM_mesh_free(bm); \
-  if (ob->type != OB_MESH) { \
-    BKE_mesh_free(use_mesh); \
-    MEM_freeN(use_mesh); \
+  bm = obi->original_bm;
+
+  if (rb->remove_doubles) {
+    BMEditMesh *em = BKE_editmesh_create(bm, false);
+    BMOperator findop, weldop;
+
+    /* See bmesh_opdefines.c and bmesh_operators.c for op names and argument formatting. */
+    BMO_op_initf(bm, &findop, BMO_FLAG_DEFAULTS, "find_doubles verts=%av dist=%f", 0.0001);
+
+    BMO_op_exec(bm, &findop);
+
+    /* Weld the vertices. */
+    BMO_op_init(bm, &weldop, BMO_FLAG_DEFAULTS, "weld_verts");
+    BMO_slot_copy(&findop, slots_out, "targetmap.out", &weldop, slots_in, "targetmap");
+    BMO_op_exec(bm, &weldop);
+
+    BMO_op_finish(bm, &findop);
+    BMO_op_finish(bm, &weldop);
+
+    MEM_freeN(em);
   }
 
-  if (usage == OBJECT_LRT_EXCLUDE) {
-    return;
+  BM_mesh_elem_hflag_disable_all(bm, BM_FACE | BM_EDGE, BM_ELEM_TAG, false);
+  BM_mesh_triangulate(
+      bm, MOD_TRIANGULATE_QUAD_FIXED, MOD_TRIANGULATE_NGON_BEAUTY, 4, false, NULL, NULL, NULL);
+  BM_mesh_normals_update(bm);
+  BM_mesh_elem_table_ensure(bm, BM_VERT | BM_EDGE | BM_FACE);
+  BM_mesh_elem_index_ensure(bm, BM_VERT | BM_EDGE | BM_FACE);
+
+  if (CustomData_has_layer(&bm->edata, CD_FREESTYLE_EDGE)) {
+    CanFindFreestyle = 1;
   }
 
-  if (ob->type == OB_MESH || ob->type == OB_MBALL || ob->type == OB_CURVE || ob->type == OB_SURF ||
-      ob->type == OB_FONT) {
+  /* Only allocate memory for verts and tris as we don't know how many lines we will generate
+   * yet. */
+  orv = lineart_mem_aquire_thread(&rb->render_data_pool, sizeof(LineartVert) * bm->totvert);
+  ort = lineart_mem_aquire_thread(&rb->render_data_pool, bm->totface * rb->triangle_size);
 
-    if (ob->type == OB_MESH) {
-      use_mesh = ob->data;
-    }
-    else {
-      use_mesh = BKE_mesh_new_from_object(NULL, ob, false);
-    }
+  orig_ob = obi->original_ob;
 
-    /* In case we can not get any mesh geometry data from the object */
-    if (!use_mesh) {
-      return;
-    }
+  BLI_spin_lock(&rb->lock_task);
+  reln = lineart_list_append_pointer_pool_sized(
+      &rb->vertex_buffer_pointers, &rb->render_data_pool, orv, sizeof(LineartElementLinkNode));
+  BLI_spin_unlock(&rb->lock_task);
 
-    /* First we need to prepare the matrix used for transforming this specific object.  */
-    mul_m4db_m4db_m4fl_uniq(new_mvp, rb->view_projection, ob->obmat);
-    mul_m4db_m4db_m4fl_uniq(new_mv, rb->view, ob->obmat);
+  reln->element_count = bm->totvert;
+  reln->object_ref = orig_ob;
+  obi->v_reln = reln;
 
-    invert_m4_m4(imat, ob->obmat);
-    transpose_m4(imat);
-    copy_m4d_m4(normal, imat);
-
-    if (use_mesh->edit_mesh) {
-      /* Do not use edit_mesh directly because we will modify it, so create a copy. */
-      bm = BM_mesh_copy(use_mesh->edit_mesh->bm);
-    }
-    else {
-      const BMAllocTemplate allocsize = BMALLOC_TEMPLATE_FROM_ME(((Mesh *)(use_mesh)));
-      bm = BM_mesh_create(&allocsize,
-                          &((struct BMeshCreateParams){
-                              .use_toolflags = true,
-                          }));
-      BM_mesh_bm_from_me(bm,
-                         use_mesh,
-                         &((struct BMeshFromMeshParams){
-                             .calc_face_normal = true,
-                         }));
-    }
-
-    if (rb->remove_doubles) {
-      BMEditMesh *em = BKE_editmesh_create(bm, false);
-      BMOperator findop, weldop;
-
-      /* See bmesh_opdefines.c and bmesh_operators.c for op names and argument formatting. */
-      BMO_op_initf(bm, &findop, BMO_FLAG_DEFAULTS, "find_doubles verts=%av dist=%f", 0.0001);
-
-      BMO_op_exec(bm, &findop);
-
-      /* Weld the vertices. */
-      BMO_op_init(bm, &weldop, BMO_FLAG_DEFAULTS, "weld_verts");
-      BMO_slot_copy(&findop, slots_out, "targetmap.out", &weldop, slots_in, "targetmap");
-      BMO_op_exec(bm, &weldop);
-
-      BMO_op_finish(bm, &findop);
-      BMO_op_finish(bm, &weldop);
-
-      MEM_freeN(em);
-    }
-
-    BM_mesh_elem_hflag_disable_all(bm, BM_FACE | BM_EDGE, BM_ELEM_TAG, false);
-    BM_mesh_triangulate(
-        bm, MOD_TRIANGULATE_QUAD_FIXED, MOD_TRIANGULATE_NGON_BEAUTY, 4, false, NULL, NULL, NULL);
-    BM_mesh_normals_update(bm);
-    BM_mesh_elem_table_ensure(bm, BM_VERT | BM_EDGE | BM_FACE);
-    BM_mesh_elem_index_ensure(bm, BM_VERT | BM_EDGE | BM_FACE);
-
-    if (CustomData_has_layer(&bm->edata, CD_FREESTYLE_EDGE)) {
-      CanFindFreestyle = 1;
-    }
-
-    /* Only allocate memory for verts and tris as we don't know how many lines we will generate
-     * yet. */
-    orv = lineart_mem_aquire_thread(&rb->render_data_pool, sizeof(LineartVert) * bm->totvert);
-    ort = lineart_mem_aquire_thread(&rb->render_data_pool, bm->totface * rb->triangle_size);
-
-    orig_ob = ob->id.orig_id ? (Object *)ob->id.orig_id : ob;
-
-    BLI_spin_lock(&rb->lock_task);
-    reln = lineart_list_append_pointer_pool_sized(
-        &rb->vertex_buffer_pointers, &rb->render_data_pool, orv, sizeof(LineartElementLinkNode));
-    BLI_spin_unlock(&rb->lock_task);
-
-    reln->element_count = bm->totvert;
-    reln->object_ref = orig_ob;
-    obi->v_reln = reln;
-
-    if (ob->lineart.flags & OBJECT_LRT_OWN_CREASE) {
-      use_crease = cosf(M_PI - ob->lineart.crease_threshold);
-    }
-    else {
-      use_crease = rb->crease_threshold;
-    }
-
-    /* FIXME(Yiming): Hack for getting clean 3D text, the seam that extruded text object creates
-     * erroneous detection on creases. Future configuration should allow options. */
-    if (ob->type == OB_FONT) {
-      reln->flags |= LRT_ELEMENT_BORDER_ONLY;
-    }
-
-    BLI_spin_lock(&rb->lock_task);
-    reln = lineart_list_append_pointer_pool_sized(
-        &rb->triangle_buffer_pointers, &rb->render_data_pool, ort, sizeof(LineartElementLinkNode));
-    BLI_spin_unlock(&rb->lock_task);
-    reln->element_count = bm->totface;
-    reln->object_ref = orig_ob;
-    reln->flags |= (usage == OBJECT_LRT_NO_INTERSECTION ? LRT_ELEMENT_NO_INTERSECTION : 0);
-
-    /* Note this memory is not from pool, will be deleted after culling. */
-    orta = MEM_callocN(sizeof(LineartTriangleAdjacent) * bm->totface, "LineartTriangleAdjacent");
-    /* Link is minimal so we use pool anyway. */
-    lineart_list_append_pointer_pool(&rb->triangle_adjacent_pointers, &rb->render_data_pool, orta);
-
-    for (i = 0; i < bm->totvert; i++) {
-      v = BM_vert_at_index(bm, i);
-      lineart_vert_transform(v, i, orv, new_mv, new_mvp);
-      orv[i].index = i;
-    }
-    /* Register a global index increment. See #lineart_triangle_share_edge() and
-     * #lineart_main_load_geometries() for detailed. It's okay that global_vindex might eventually
-     * overflow, in such large scene it's virtually impossible for two vertex of the same numeric
-     * index to come close together. */
-    obi->global_i_offset = bm->totvert;
-
-    rt = ort;
-    for (i = 0; i < bm->totface; i++) {
-      f = BM_face_at_index(bm, i);
-
-      loop = f->l_first;
-      rt->v[0] = &orv[BM_elem_index_get(loop->v)];
-      loop = loop->next;
-      rt->v[1] = &orv[BM_elem_index_get(loop->v)];
-      loop = loop->next;
-      rt->v[2] = &orv[BM_elem_index_get(loop->v)];
-
-      /* Transparency bit assignment. */
-      Material *mat = BKE_object_material_get(ob, f->mat_nr + 1);
-      rt->transparency_mask = ((mat && (mat->lineart.flags & LRT_MATERIAL_TRANSPARENCY_ENABLED)) ?
-                                   mat->lineart.transparency_mask :
-                                   0);
-
-      double gn[3];
-      copy_v3db_v3fl(gn, f->no);
-      mul_v3_mat3_m4v3_db(rt->gn, normal, gn);
-      normalize_v3_db(rt->gn);
-
-      if (usage == OBJECT_LRT_INTERSECTION_ONLY) {
-        rt->flags |= LRT_TRIANGLE_INTERSECTION_ONLY;
-      }
-      else if (usage == OBJECT_LRT_NO_INTERSECTION || usage == OBJECT_LRT_OCCLUSION_ONLY) {
-        rt->flags |= LRT_TRIANGLE_NO_INTERSECTION;
-      }
-
-      /* Re-use this field to refer to adjacent info, will be cleared after culling stage. */
-      rt->intersecting_verts = (void *)&orta[i];
-
-      rt = (LineartTriangle *)(((uchar *)rt) + rb->triangle_size);
-    }
-
-    /* Use BM_ELEM_TAG in f->head.hflag to store needed faces in the first iteration. */
-
-    int allocate_la_e = 0;
-    for (i = 0; i < bm->totedge; i++) {
-      e = BM_edge_at_index(bm, i);
-
-      /* Because e->head.hflag is char, so line type flags should not exceed positive 7 bits. */
-      char eflag = lineart_identify_feature_line(
-          rb, e, ort, orv, use_crease, ob->type == OB_FONT, CanFindFreestyle, bm);
-      if (eflag) {
-        /* Only allocate for feature lines (instead of all lines) to save memory. */
-        allocate_la_e++;
-      }
-      /* Here we just use bm's flag for when loading actual lines, then we don't need to call
-       * lineart_identify_feature_line() again, e->head.hflag deleted after loading anyway. Always
-       * set the flag, so hflag stays 0 for lines that are not feature lines. */
-      e->head.hflag = eflag;
-    }
-
-    o_la_e = lineart_mem_aquire_thread(&rb->render_data_pool, sizeof(LineartEdge) * allocate_la_e);
-    o_la_s = lineart_mem_aquire_thread(&rb->render_data_pool,
-                                       sizeof(LineartLineSegment) * allocate_la_e);
-    BLI_spin_lock(&rb->lock_task);
-    reln = lineart_list_append_pointer_pool_sized(
-        &rb->line_buffer_pointers, &rb->render_data_pool, o_la_e, sizeof(LineartElementLinkNode));
-    BLI_spin_unlock(&rb->lock_task);
-    reln->element_count = allocate_la_e;
-    reln->object_ref = orig_ob;
-
-    la_e = o_la_e;
-    la_s = o_la_s;
-    for (i = 0; i < bm->totedge; i++) {
-      e = BM_edge_at_index(bm, i);
-
-      /* Not a feature line, so we skip. */
-      if (!e->head.hflag) {
-        continue;
-      }
-
-      la_e->v1 = &orv[BM_elem_index_get(e->v1)];
-      la_e->v2 = &orv[BM_elem_index_get(e->v2)];
-      la_e->v1_obindex = la_e->v1->index;
-      la_e->v2_obindex = la_e->v2->index;
-      if (e->l) {
-        int findex = BM_elem_index_get(e->l->f);
-        la_e->t1 = lineart_triangle_from_index(rb, ort, findex);
-        lineart_triangle_adjacent_assign(la_e->t1, &orta[findex], la_e);
-        if (e->l->radial_next && e->l->radial_next != e->l) {
-          findex = BM_elem_index_get(e->l->radial_next->f);
-          la_e->t2 = lineart_triangle_from_index(rb, ort, findex);
-          lineart_triangle_adjacent_assign(la_e->t2, &orta[findex], la_e);
-        }
-      }
-      la_e->flags = e->head.hflag;
-      la_e->object_ref = orig_ob;
-      BLI_addtail(&la_e->segments, la_s);
-      if (usage == OBJECT_LRT_INHERIT || usage == OBJECT_LRT_INCLUDE ||
-          usage == OBJECT_LRT_NO_INTERSECTION) {
-        lineart_add_edge_to_list_thread(obi, la_e);
-      }
-
-      la_e++;
-      la_s++;
-    }
-
-    LRT_MESH_FINISH
+  if (orig_ob->lineart.flags & OBJECT_LRT_OWN_CREASE) {
+    use_crease = cosf(M_PI - orig_ob->lineart.crease_threshold);
+  }
+  else {
+    use_crease = rb->crease_threshold;
   }
 
-#undef LRT_MESH_FINISH
+  /* FIXME(Yiming): Hack for getting clean 3D text, the seam that extruded text object creates
+   * erroneous detection on creases. Future configuration should allow options. */
+  if (orig_ob->type == OB_FONT) {
+    reln->flags |= LRT_ELEMENT_BORDER_ONLY;
+  }
+
+  BLI_spin_lock(&rb->lock_task);
+  reln = lineart_list_append_pointer_pool_sized(
+      &rb->triangle_buffer_pointers, &rb->render_data_pool, ort, sizeof(LineartElementLinkNode));
+  BLI_spin_unlock(&rb->lock_task);
+  reln->element_count = bm->totface;
+  reln->object_ref = orig_ob;
+  reln->flags |= (usage == OBJECT_LRT_NO_INTERSECTION ? LRT_ELEMENT_NO_INTERSECTION : 0);
+
+  /* Note this memory is not from pool, will be deleted after culling. */
+  orta = MEM_callocN(sizeof(LineartTriangleAdjacent) * bm->totface, "LineartTriangleAdjacent");
+  /* Link is minimal so we use pool anyway. */
+  lineart_list_append_pointer_pool(&rb->triangle_adjacent_pointers, &rb->render_data_pool, orta);
+
+  for (i = 0; i < bm->totvert; i++) {
+    v = BM_vert_at_index(bm, i);
+    lineart_vert_transform(v, i, orv, new_mv, new_mvp);
+    orv[i].index = i;
+  }
+  /* Register a global index increment. See #lineart_triangle_share_edge() and
+   * #lineart_main_load_geometries() for detailed. It's okay that global_vindex might eventually
+   * overflow, in such large scene it's virtually impossible for two vertex of the same numeric
+   * index to come close together. */
+  obi->global_i_offset = bm->totvert;
+
+  rt = ort;
+  for (i = 0; i < bm->totface; i++) {
+    f = BM_face_at_index(bm, i);
+
+    loop = f->l_first;
+    rt->v[0] = &orv[BM_elem_index_get(loop->v)];
+    loop = loop->next;
+    rt->v[1] = &orv[BM_elem_index_get(loop->v)];
+    loop = loop->next;
+    rt->v[2] = &orv[BM_elem_index_get(loop->v)];
+
+    /* Transparency bit assignment. */
+    Material *mat = BKE_object_material_get(orig_ob, f->mat_nr + 1);
+    rt->transparency_mask = ((mat && (mat->lineart.flags & LRT_MATERIAL_TRANSPARENCY_ENABLED)) ?
+                                 mat->lineart.transparency_mask :
+                                 0);
+
+    double gn[3];
+    copy_v3db_v3fl(gn, f->no);
+    mul_v3_mat3_m4v3_db(rt->gn, normal, gn);
+    normalize_v3_db(rt->gn);
+
+    if (usage == OBJECT_LRT_INTERSECTION_ONLY) {
+      rt->flags |= LRT_TRIANGLE_INTERSECTION_ONLY;
+    }
+    else if (usage == OBJECT_LRT_NO_INTERSECTION || usage == OBJECT_LRT_OCCLUSION_ONLY) {
+      rt->flags |= LRT_TRIANGLE_NO_INTERSECTION;
+    }
+
+    /* Re-use this field to refer to adjacent info, will be cleared after culling stage. */
+    rt->intersecting_verts = (void *)&orta[i];
+
+    rt = (LineartTriangle *)(((uchar *)rt) + rb->triangle_size);
+  }
+
+  /* Use BM_ELEM_TAG in f->head.hflag to store needed faces in the first iteration. */
+
+  int allocate_la_e = 0;
+  for (i = 0; i < bm->totedge; i++) {
+    e = BM_edge_at_index(bm, i);
+
+    /* Because e->head.hflag is char, so line type flags should not exceed positive 7 bits. */
+    char eflag = lineart_identify_feature_line(
+        rb, e, ort, orv, use_crease, orig_ob->type == OB_FONT, CanFindFreestyle, bm);
+    if (eflag) {
+      /* Only allocate for feature lines (instead of all lines) to save memory. */
+      allocate_la_e++;
+    }
+    /* Here we just use bm's flag for when loading actual lines, then we don't need to call
+     * lineart_identify_feature_line() again, e->head.hflag deleted after loading anyway. Always
+     * set the flag, so hflag stays 0 for lines that are not feature lines. */
+    e->head.hflag = eflag;
+  }
+
+  o_la_e = lineart_mem_aquire_thread(&rb->render_data_pool, sizeof(LineartEdge) * allocate_la_e);
+  o_la_s = lineart_mem_aquire_thread(&rb->render_data_pool,
+                                     sizeof(LineartLineSegment) * allocate_la_e);
+  BLI_spin_lock(&rb->lock_task);
+  reln = lineart_list_append_pointer_pool_sized(
+      &rb->line_buffer_pointers, &rb->render_data_pool, o_la_e, sizeof(LineartElementLinkNode));
+  BLI_spin_unlock(&rb->lock_task);
+  reln->element_count = allocate_la_e;
+  reln->object_ref = orig_ob;
+
+  la_e = o_la_e;
+  la_s = o_la_s;
+  for (i = 0; i < bm->totedge; i++) {
+    e = BM_edge_at_index(bm, i);
+
+    /* Not a feature line, so we skip. */
+    if (!e->head.hflag) {
+      continue;
+    }
+
+    la_e->v1 = &orv[BM_elem_index_get(e->v1)];
+    la_e->v2 = &orv[BM_elem_index_get(e->v2)];
+    la_e->v1_obindex = la_e->v1->index;
+    la_e->v2_obindex = la_e->v2->index;
+    if (e->l) {
+      int findex = BM_elem_index_get(e->l->f);
+      la_e->t1 = lineart_triangle_from_index(rb, ort, findex);
+      lineart_triangle_adjacent_assign(la_e->t1, &orta[findex], la_e);
+      if (e->l->radial_next && e->l->radial_next != e->l) {
+        findex = BM_elem_index_get(e->l->radial_next->f);
+        la_e->t2 = lineart_triangle_from_index(rb, ort, findex);
+        lineart_triangle_adjacent_assign(la_e->t2, &orta[findex], la_e);
+      }
+    }
+    la_e->flags = e->head.hflag;
+    la_e->object_ref = orig_ob;
+    BLI_addtail(&la_e->segments, la_s);
+    if (usage == OBJECT_LRT_INHERIT || usage == OBJECT_LRT_INCLUDE ||
+        usage == OBJECT_LRT_NO_INTERSECTION) {
+      lineart_add_edge_to_list_thread(obi, la_e);
+    }
+
+    la_e++;
+    la_s++;
+  }
+
+  /* always free bm as it's a copy from before threading */
+  BM_mesh_free(bm);
 }
 
 static void lineart_object_load_worker(TaskPool *__restrict UNUSED(pool),
@@ -1798,7 +1743,7 @@ static void lineart_object_load_worker(TaskPool *__restrict UNUSED(pool),
 {
   LineartRenderBuffer *rb = olti->rb;
   for (LineartObjectInfo *obi = olti->pending; obi; obi = obi->next) {
-    lineart_geometry_object_load(olti->dg, obi, olti->rb);
+    lineart_geometry_object_load(obi, olti->rb);
   }
 }
 
@@ -1935,44 +1880,88 @@ static void lineart_main_load_geometries(
     LineartObjectInfo *obi = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartObjectInfo));
     obi->override_usage = lineart_usage_check(scene->master_collection, ob, rb);
 
-    /* TODO: Here's the problem, ob is not valid outside DEG_OBJECT_ITER_BEGIN, because this is a
-     * fake one provided for evaluation in-place, but if we want to evaluate in parallel (the
-     * worker assignment code is just below this loop), what could be the best way to do so? do we
-     * have existing marco/apis for doing that? Otherwise generating a final BMesh for each object
-     * and process later won't give that much of a performance boost (can still be a little faster
-     * compared to single-thread). */
-    obi->ob = DEG_get_evaluated_object(depsgraph, ob);
+    /* TODO: We better make it so we can extract BMesh in parallel or at least for those objects
+     * who doesn't have instances or just simply have transformation channel set. */
+    Object *use_ob = DEG_get_evaluated_object(depsgraph, ob);
+    Mesh *use_mesh;
+    BMesh *bm;
 
-    printf("%lld ", obi->ob);
+    if (obi->override_usage == OBJECT_LRT_EXCLUDE) {
+      continue;
+    }
 
+    if (!(use_ob->type == OB_MESH || use_ob->type == OB_MBALL || use_ob->type == OB_CURVE ||
+          use_ob->type == OB_SURF || use_ob->type == OB_FONT)) {
+      continue;
+    }
+    if (use_ob->type == OB_MESH) {
+      use_mesh = use_ob->data;
+    }
+    else {
+      use_mesh = BKE_mesh_new_from_object(NULL, use_ob, false);
+    }
+
+    /* In case we still can not get any mesh geometry data from the object */
+    if (!use_mesh) {
+      continue;
+    }
+
+    if (use_mesh->edit_mesh) {
+      /* Do not use edit_mesh directly because we will modify it, so create a copy. */
+      bm = BM_mesh_copy(use_mesh->edit_mesh->bm);
+    }
+    else {
+      const BMAllocTemplate allocsize = BMALLOC_TEMPLATE_FROM_ME(((Mesh *)(use_mesh)));
+      bm = BM_mesh_create(&allocsize,
+                          &((struct BMeshCreateParams){
+                              .use_toolflags = true,
+                          }));
+      BM_mesh_bm_from_me(bm,
+                         use_mesh,
+                         &((struct BMeshFromMeshParams){
+                             .calc_face_normal = true,
+                         }));
+    }
+
+    /* We don't need the plain "mesh" data anymore, only BMesh post-processing is done in threads.
+     * The workers will free obi->bm */
+    if (ob->type != OB_MESH) {
+      BKE_mesh_free(use_mesh);
+      MEM_freeN(use_mesh);
+    }
+
+    /* Prepare the matrix used for transforming this specific object (instance).  */
+    mul_m4db_m4db_m4fl_uniq(obi->new_mvp, rb->view_projection, ob->obmat);
+    mul_m4db_m4db_m4fl_uniq(obi->new_mv, rb->view, ob->obmat);
+    float imat[4][4];
+    invert_m4_m4(imat, ob->obmat);
+    transpose_m4(imat);
+    copy_m4d_m4(obi->normal, imat);
+
+    obi->original_bm = bm;
+    obi->original_ob = (Object *)(ob->id.orig_id ? ob->id.orig_id : ob);
     obi->next = olti[to_thread].pending;
     olti[to_thread].pending = obi;
 
     to_thread++;
     if (to_thread >= thread_count) {
       to_thread = 0;
-      printf("\n");
-      for (int j = 0; j < thread_count; j++) {
-        printf("%lld ", olti[j].pending->ob);
-      }
-      printf("\n\n");
     }
   }
   DEG_OBJECT_ITER_END;
 
   TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
-  printf("\n");
+
   for (int i = 0; i < thread_count; i++) {
     olti[i].rb = rb;
     olti[i].dg = depsgraph;
     BLI_task_pool_push(tp, (TaskRunFunction)lineart_object_load_worker, &olti[i], 0, NULL);
-    printf("%d ", olti[i].pending ? olti[i].pending->ob->type : 0);
   }
   BLI_task_pool_work_and_wait(tp);
   BLI_task_pool_free(tp);
 
-  /* This step is to serialize vertex index in the whole scene, so lineart_triangle_share_edge()
-   * can work properly from the lack of triangle adjacent info. */
+  /* The step below is to serialize vertex index in the whole scene, so
+   * lineart_triangle_share_edge() can work properly from the lack of triangle adjacent info. */
   int global_i = 0;
 
   for (int i = 0; i < thread_count; i++) {

@@ -351,9 +351,15 @@ typedef struct LineartRenderTaskInfo {
 
 } LineartRenderTaskInfo;
 
+struct BMesh;
+
 typedef struct LineartObjectInfo {
   struct LineartObjectInfo *next;
-  struct Object *ob;
+  struct Object *original_ob;
+  struct BMesh *original_bm;
+  double new_mvp[4][4];
+  double new_mv[4][4];
+  double normal[4][4];
   LineartElementLinkNode *v_reln;
   int override_usage;
   int global_i_offset;
