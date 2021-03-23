@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include "BLI_linklist.h"
 #include "BLI_listbase.h"
 #include "BLI_math.h" /* Needed here for inline functions. */
 #include "BLI_threads.h"
@@ -215,6 +216,7 @@ typedef struct LineartRenderBuffer {
   int tile_count_x, tile_count_y;
   double width_per_tile, height_per_tile;
   double view_projection[4][4];
+  double view[4][4];
 
   struct LineartBoundingArea *initial_bounding_areas;
   unsigned int bounding_area_count;
@@ -348,6 +350,33 @@ typedef struct LineartRenderTaskInfo {
   LineartEdge *edge_mark_end;
 
 } LineartRenderTaskInfo;
+
+typedef struct LineartObjectInfo {
+  struct LineartObjectInfo *next;
+  struct Object *ob;
+  LineartElementLinkNode *v_reln;
+  int override_usage;
+  int global_i_offset;
+
+  /* Threads will add lines inside here, when all threads are done, we combine those into the ones
+   * in LineartRenderBuffer.  */
+  LineartEdge *contour;
+  LineartEdge *contour_last;
+  LineartEdge *crease;
+  LineartEdge *crease_last;
+  LineartEdge *material;
+  LineartEdge *material_last;
+  LineartEdge *edge_mark;
+  LineartEdge *edge_mark_last;
+  LineartEdge *intersection;
+  LineartEdge *intersection_last;
+} LineartObjectInfo;
+
+typedef struct LineartObjectLoadTaskInfo {
+  struct LineartRenderBuffer *rb;
+  struct Depsgraph *dg;
+  LineartObjectInfo *pending; /* LinkNode styled list */
+} LineartObjectLoadTaskInfo;
 
 /**
  * Bounding area diagram:

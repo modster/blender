@@ -1448,6 +1448,66 @@ static void lineart_add_edge_to_list(LineartRenderBuffer *rb, LineartEdge *e)
   }
 }
 
+static void lineart_add_edge_to_list_thread(LineartObjectInfo *obi, LineartEdge *e)
+{
+  switch (e->flags) {
+    case LRT_EDGE_FLAG_CONTOUR:
+      lineart_prepend_edge_direct(&obi->contour, e);
+      if (!obi->contour_last) {
+        obi->contour_last = e;
+      }
+      break;
+    case LRT_EDGE_FLAG_CREASE:
+      lineart_prepend_edge_direct(&obi->crease, e);
+      if (!obi->crease_last) {
+        obi->crease_last = e;
+      }
+      break;
+    case LRT_EDGE_FLAG_MATERIAL:
+      lineart_prepend_edge_direct(&obi->material, e);
+      if (!obi->material_last) {
+        obi->material_last = e;
+      }
+      break;
+    case LRT_EDGE_FLAG_EDGE_MARK:
+      lineart_prepend_edge_direct(&obi->edge_mark, e);
+      if (!obi->edge_mark_last) {
+        obi->edge_mark_last = e;
+      }
+      break;
+    case LRT_EDGE_FLAG_INTERSECTION:
+      lineart_prepend_edge_direct(&obi->intersection, e);
+      if (!obi->intersection_last) {
+        obi->intersection_last = e;
+      }
+      break;
+  }
+}
+
+static void lineart_finalize_object_edge_list(LineartRenderBuffer *rb, LineartObjectInfo *obi)
+{
+  if (obi->contour_last) {
+    obi->contour_last->next = rb->contours;
+    rb->contours = obi->contour;
+  }
+  if (obi->crease_last) {
+    obi->crease_last->next = rb->crease_lines;
+    rb->crease_lines = obi->crease;
+  }
+  if (obi->material_last) {
+    obi->material_last->next = rb->material_lines;
+    rb->material_lines = obi->material;
+  }
+  if (obi->edge_mark) {
+    obi->edge_mark->next = rb->edge_marks;
+    rb->edge_marks = obi->edge_mark;
+  }
+  if (obi->intersection_last) {
+    obi->intersection_last->next = rb->intersection_lines;
+    rb->intersection_lines = obi->intersection;
+  }
+}
+
 static void lineart_triangle_adjacent_assign(LineartTriangle *rt,
                                              LineartTriangleAdjacent *rta,
                                              LineartEdge *e)
@@ -1464,12 +1524,8 @@ static void lineart_triangle_adjacent_assign(LineartTriangle *rt,
 }
 
 static void lineart_geometry_object_load(Depsgraph *dg,
-                                         Object *ob,
-                                         double (*mv_mat)[4],
-                                         double (*mvp_mat)[4],
-                                         LineartRenderBuffer *rb,
-                                         int override_usage,
-                                         int *global_vindex)
+                                         LineartObjectInfo *obi,
+                                         LineartRenderBuffer *rb)
 {
   BMesh *bm;
   BMVert *v;
@@ -1477,6 +1533,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
   BMEdge *e;
   BMLoop *loop;
   LineartEdge *la_e;
+  LineartLineSegment *la_s;
   LineartTriangle *rt;
   LineartTriangleAdjacent *orta;
   double new_mvp[4][4], new_mv[4][4], normal[4][4];
@@ -1484,14 +1541,16 @@ static void lineart_geometry_object_load(Depsgraph *dg,
   LineartElementLinkNode *reln;
   LineartVert *orv;
   LineartEdge *o_la_e;
+  LineartLineSegment *o_la_s;
   LineartTriangle *ort;
   Object *orig_ob;
   int CanFindFreestyle = 0;
-  int i, global_i = (*global_vindex);
+  Object *ob = obi->ob;
+  int i, global_i = 0;
   Mesh *use_mesh;
   float use_crease = 0;
 
-  int usage = override_usage ? override_usage : ob->lineart.usage;
+  int usage = obi->override_usage ? obi->override_usage : ob->lineart.usage;
 
 #define LRT_MESH_FINISH \
   BM_mesh_free(bm); \
@@ -1520,8 +1579,8 @@ static void lineart_geometry_object_load(Depsgraph *dg,
     }
 
     /* First we need to prepare the matrix used for transforming this specific object.  */
-    mul_m4db_m4db_m4fl_uniq(new_mvp, mvp_mat, ob->obmat);
-    mul_m4db_m4db_m4fl_uniq(new_mv, mv_mat, ob->obmat);
+    mul_m4db_m4db_m4fl_uniq(new_mvp, rb->view_projection, ob->obmat);
+    mul_m4db_m4db_m4fl_uniq(new_mv, rb->view, ob->obmat);
 
     invert_m4_m4(imat, ob->obmat);
     transpose_m4(imat);
@@ -1577,13 +1636,16 @@ static void lineart_geometry_object_load(Depsgraph *dg,
 
     /* Only allocate memory for verts and tris as we don't know how many lines we will generate
      * yet. */
-    orv = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartVert) * bm->totvert);
-    ort = lineart_mem_aquire(&rb->render_data_pool, bm->totface * rb->triangle_size);
+    orv = lineart_mem_aquire_thread(&rb->render_data_pool, sizeof(LineartVert) * bm->totvert);
+    ort = lineart_mem_aquire_thread(&rb->render_data_pool, bm->totface * rb->triangle_size);
 
     orig_ob = ob->id.orig_id ? (Object *)ob->id.orig_id : ob;
 
+    BLI_spin_lock(rb->lock_task);
     reln = lineart_list_append_pointer_pool_sized(
         &rb->vertex_buffer_pointers, &rb->render_data_pool, orv, sizeof(LineartElementLinkNode));
+    BLI_spin_unlock(rb->lock_task);
+
     reln->element_count = bm->totvert;
     reln->object_ref = orig_ob;
 
@@ -1600,8 +1662,10 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       reln->flags |= LRT_ELEMENT_BORDER_ONLY;
     }
 
+    BLI_spin_lock(rb->lock_task);
     reln = lineart_list_append_pointer_pool_sized(
         &rb->triangle_buffer_pointers, &rb->render_data_pool, ort, sizeof(LineartElementLinkNode));
+    BLI_spin_unlock(rb->lock_task);
     reln->element_count = bm->totface;
     reln->object_ref = orig_ob;
     reln->flags |= (usage == OBJECT_LRT_NO_INTERSECTION ? LRT_ELEMENT_NO_INTERSECTION : 0);
@@ -1620,7 +1684,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
      * #lineart_main_load_geometries() for detailed. It's okay that global_vindex might eventually
      * overflow, in such large scene it's virtually impossible for two vertex of the same numeric
      * index to come close together. */
-    (*global_vindex) += bm->totvert;
+    obi->global_i_offset += bm->totvert;
 
     rt = ort;
     for (i = 0; i < bm->totface; i++) {
@@ -1676,13 +1740,18 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       e->head.hflag = eflag;
     }
 
-    o_la_e = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartEdge) * allocate_la_e);
+    o_la_e = lineart_mem_aquire_thread(&rb->render_data_pool, sizeof(LineartEdge) * allocate_la_e);
+    o_la_s = lineart_mem_aquire_thread(&rb->render_data_pool,
+                                       sizeof(LineartLineSegment) * allocate_la_e);
+    BLI_spin_lock(rb->lock_task);
     reln = lineart_list_append_pointer_pool_sized(
         &rb->line_buffer_pointers, &rb->render_data_pool, o_la_e, sizeof(LineartElementLinkNode));
+    BLI_spin_unlock(rb->lock_task);
     reln->element_count = allocate_la_e;
     reln->object_ref = orig_ob;
 
     la_e = o_la_e;
+    la_s = o_la_s;
     for (i = 0; i < bm->totedge; i++) {
       e = BM_edge_at_index(bm, i);
 
@@ -1707,22 +1776,29 @@ static void lineart_geometry_object_load(Depsgraph *dg,
       }
       la_e->flags = e->head.hflag;
       la_e->object_ref = orig_ob;
-
-      LineartLineSegment *rls = lineart_mem_aquire(&rb->render_data_pool,
-                                                   sizeof(LineartLineSegment));
-      BLI_addtail(&la_e->segments, rls);
+      BLI_addtail(&la_e->segments, la_s);
       if (usage == OBJECT_LRT_INHERIT || usage == OBJECT_LRT_INCLUDE ||
           usage == OBJECT_LRT_NO_INTERSECTION) {
-        lineart_add_edge_to_list(rb, la_e);
+        lineart_add_edge_to_list_thread(obi, la_e);
       }
 
       la_e++;
+      la_s++;
     }
 
     LRT_MESH_FINISH
   }
 
 #undef LRT_MESH_FINISH
+}
+
+static void lineart_object_load_worker(TaskPool *__restrict UNUSED(pool),
+                                       LineartObjectLoadTaskInfo *olti)
+{
+  LineartRenderBuffer *rb = olti->rb;
+  for (LineartObjectInfo *obi = olti->pending; obi; obi = obi->next) {
+    lineart_geometry_object_load(olti->dg, obi, olti->rb);
+  }
 }
 
 static bool _lineart_object_not_in_source_collection(Collection *source, Object *ob)
@@ -1834,6 +1910,7 @@ static void lineart_main_load_geometries(
   copy_m4_m4_db(rb->view_projection, proj);
 
   unit_m4_db(view);
+  copy_m4_m4_db(rb->view, view);
 
   BLI_listbase_clear(&rb->triangle_buffer_pointers);
   BLI_listbase_clear(&rb->vertex_buffer_pointers);
@@ -1846,16 +1923,53 @@ static void lineart_main_load_geometries(
     flags |= DEG_ITER_OBJECT_FLAG_DUPLI;
   }
 
-  /* This is to serialize vertex index in the whole scene, so lineart_triangle_share_edge() can
-   * work properly from the lack of triangle adjacent info. */
-  int global_i = 0;
+  int thread_count = rb->thread_count;
 
+  /* This memory is in render buffer memory pool. so we don't need to free those after loading. */
+  LineartObjectLoadTaskInfo *olti = lineart_mem_aquire(
+      &rb->render_data_pool, sizeof(LineartObjectLoadTaskInfo) * thread_count);
+  olti->rb = rb;
+  olti->dg = depsgraph;
+
+  int to_thread = 0;
   DEG_OBJECT_ITER_BEGIN (depsgraph, ob, flags) {
-    int usage = lineart_usage_check(scene->master_collection, ob, rb);
+    LineartObjectInfo *obi = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartObjectInfo));
+    obi->override_usage = lineart_usage_check(scene->master_collection, ob, rb);
+    obi->ob = ob;
 
-    lineart_geometry_object_load(depsgraph, ob, view, proj, rb, usage, &global_i);
+    obi->next = olti[to_thread].pending;
+    olti[to_thread].pending = obi;
+
+    to_thread++;
+    if (to_thread >= thread_count) {
+      to_thread = 0;
+    }
   }
   DEG_OBJECT_ITER_END;
+
+  TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
+
+  for (int i = 0; i < thread_count; i++) {
+    BLI_task_pool_push(tp, (TaskRunFunction)lineart_object_load_worker, &olti[i], 0, NULL);
+  }
+  BLI_task_pool_work_and_wait(tp);
+  BLI_task_pool_free(tp);
+
+  /* This step is to serialize vertex index in the whole scene, so lineart_triangle_share_edge()
+   * can work properly from the lack of triangle adjacent info. */
+  int global_i = 0;
+
+  for (int i = 0; i < thread_count; i++) {
+    for (LineartObjectInfo *obi = olti[i].pending; obi; obi = obi->next) {
+      LineartVert *v = (LineartVert *)obi->v_reln->pointer;
+      int v_count = obi->v_reln->element_count;
+      for (int vi = 0; vi < v_count; vi++) {
+        v[vi].index += global_i;
+      }
+      global_i += v_count;
+      lineart_finalize_object_edge_list(rb, obi);
+    }
+  }
 }
 
 /**
