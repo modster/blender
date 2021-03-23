@@ -3890,7 +3890,6 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
                                      uchar transparency_mask,
                                      short thickness,
                                      float opacity,
-                                     float resample_length,
                                      const char *source_vgname,
                                      const char *vgname,
                                      int modifier_flags)
@@ -4030,9 +4029,6 @@ static void lineart_gpencil_generate(LineartRenderBuffer *rb,
       }
     }
 
-    if (resample_length > 0.0001) {
-      BKE_gpencil_stroke_sample(gpencil_object->data, gps, resample_length, false);
-    }
     if (G.debug_value == 4000) {
       BKE_gpencil_stroke_set_random_color(gps);
     }
@@ -4063,7 +4059,6 @@ void MOD_lineart_gpencil_generate(LineartRenderBuffer *rb,
                                   uchar transparency_mask,
                                   short thickness,
                                   float opacity,
-                                  float resample_length,
                                   const char *source_vgname,
                                   const char *vgname,
                                   int modifier_flags)
@@ -4113,7 +4108,6 @@ void MOD_lineart_gpencil_generate(LineartRenderBuffer *rb,
                            transparency_mask,
                            thickness,
                            opacity,
-                           resample_length,
                            source_vgname,
                            vgname,
                            modifier_flags);
