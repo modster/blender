@@ -417,6 +417,11 @@ static bAction *poselib_tempload_enter(bContext *C, wmOperator *op)
   char *asset_name = NULL;
   BLO_library_path_explode(libname, blend_file_path, &group, &asset_name);
 
+  if (group == NULL || asset_name == NULL) {
+    BKE_report(op->reports, RPT_ERROR, TIP_("No asset selected"));
+    return NULL;
+  }
+
   if (strcmp(group, "Action")) {
     BKE_reportf(op->reports,
                 RPT_ERROR,
@@ -623,6 +628,17 @@ static int poselib_blend_exec(bContext *C, wmOperator *op)
   return poselib_blend_exit(C, op);
 }
 
+static bool poselib_asset_in_context(bContext *C)
+{
+  /* TODO: make this work in other areas as well, not just the file/asset browser. */
+  SpaceFile *sfile = CTX_wm_space_file(C);
+  if (sfile == NULL) {
+    return false;
+  }
+
+  return ED_fileselect_has_active_asset(sfile);
+}
+
 /* Poll callback for operators that require existing PoseLib data (with poses) to work. */
 static bool poselib_blend_poll(bContext *C)
 {
@@ -631,7 +647,15 @@ static bool poselib_blend_poll(bContext *C)
     /* Pose lib is only for armatures in pose mode. */
     return false;
   }
-  return true;
+
+  /* Check whether the context has a local datablock for us to use. */
+  ID *id = CTX_data_pointer_get_type(C, "id", &RNA_ID).data;
+  if (id != NULL) {
+    return true;
+  }
+
+  /* Check whether the asset browser can give us a datablock. */
+  return poselib_asset_in_context(C);
 }
 
 void POSELIB_OT_blend_pose(wmOperatorType *ot)

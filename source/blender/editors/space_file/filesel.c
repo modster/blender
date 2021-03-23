@@ -455,6 +455,21 @@ bool ED_fileselect_is_asset_browser(const SpaceFile *sfile)
   return (sfile->browse_mode == FILE_BROWSE_MODE_ASSETS);
 }
 
+bool ED_fileselect_has_active_asset(const struct SpaceFile *sfile)
+{
+  if (!ED_fileselect_is_asset_browser(sfile)) {
+    return false;
+  }
+
+  if (sfile->files == NULL) {
+    return false;
+  }
+
+  const FileSelectParams *params = ED_fileselect_get_active_params(sfile);
+  const FileDirEntry *file = filelist_file_ex(sfile->files, params->active_file, false);
+  return file != NULL;
+}
+
 struct ID *ED_fileselect_active_asset_get(const SpaceFile *sfile)
 {
   if (!ED_fileselect_is_asset_browser(sfile)) {
