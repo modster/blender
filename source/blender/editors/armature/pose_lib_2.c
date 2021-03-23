@@ -117,9 +117,9 @@ static void poselib_backup_posecopy(PoseBlendData *pbd)
   /* See if bone selection is relevant. */
   bool all_bones_selected = true;
   bool no_bones_selected = true;
+  const bArmature *armature = pbd->ob->data;
   LISTBASE_FOREACH (bPoseChannel *, pchan, &pbd->ob->pose->chanbase) {
-    const bool is_selected = (pchan->bone->flag & BONE_SELECTED) != 0 &&
-                             (pchan->bone->flag & BONE_HIDDEN_P) == 0;
+    const bool is_selected = PBONE_SELECTED(armature, pchan->bone);
     all_bones_selected &= is_selected;
     no_bones_selected &= !is_selected;
   }
@@ -133,7 +133,7 @@ static void poselib_backup_posecopy(PoseBlendData *pbd)
       continue;
     }
 
-    if (pbd->is_bone_selection_relevant && (pchan->bone->flag & BONE_SELECTED) == 0) {
+    if (pbd->is_bone_selection_relevant && !PBONE_SELECTED(armature, pchan->bone)) {
       continue;
     }
 
@@ -199,6 +199,7 @@ static void poselib_keytag_pose(bContext *C, Scene *scene, PoseBlendData *pbd)
   const bool autokey = autokeyframe_cfra_can_key(scene, &pbd->ob->id);
 
   /* start tagging/keying */
+  const bArmature *armature = pbd->ob->data;
   for (agrp = act->groups.first; agrp; agrp = agrp->next) {
     /* only for selected bones unless there aren't any selected, in which case all are included  */
     bPoseChannel *pchan = BKE_pose_channel_find_name(pose, agrp->name);
@@ -206,7 +207,7 @@ static void poselib_keytag_pose(bContext *C, Scene *scene, PoseBlendData *pbd)
       continue;
     }
 
-    if (pbd->is_bone_selection_relevant && (pchan->bone->flag & BONE_SELECTED) == 0) {
+    if (pbd->is_bone_selection_relevant && !PBONE_SELECTED(armature, pchan->bone)) {
       continue;
     }
 
