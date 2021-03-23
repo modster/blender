@@ -480,10 +480,8 @@ static bool poselib_blend_init_data(bContext *C, wmOperator *op)
   PoseBlendData *pbd;
   op->customdata = pbd = MEM_callocN(sizeof(PoseBlendData), "PoseLib Preview Data");
 
-  /* TODO(Sybren): properly get action from context. */
   bAction *action = poselib_blend_init_get_action(C, op);
   if (action == NULL) {
-    BKE_report(op->reports, RPT_ERROR, "Context does not contain a pose Action");
     return false;
   }
 
