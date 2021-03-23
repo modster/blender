@@ -1546,7 +1546,7 @@ static void lineart_geometry_object_load(Depsgraph *dg,
   Object *orig_ob;
   int CanFindFreestyle = 0;
   Object *ob = obi->ob;
-  int i, global_i = 0;
+  int i;
   Mesh *use_mesh;
   float use_crease = 0;
 
@@ -1679,13 +1679,13 @@ static void lineart_geometry_object_load(Depsgraph *dg,
     for (i = 0; i < bm->totvert; i++) {
       v = BM_vert_at_index(bm, i);
       lineart_vert_transform(v, i, orv, new_mv, new_mvp);
-      orv[i].index = i + global_i;
+      orv[i].index = i;
     }
     /* Register a global index increment. See #lineart_triangle_share_edge() and
      * #lineart_main_load_geometries() for detailed. It's okay that global_vindex might eventually
      * overflow, in such large scene it's virtually impossible for two vertex of the same numeric
      * index to come close together. */
-    obi->global_i_offset += bm->totvert;
+    obi->global_i_offset = bm->totvert;
 
     rt = ort;
     for (i = 0; i < bm->totface; i++) {
@@ -1763,8 +1763,8 @@ static void lineart_geometry_object_load(Depsgraph *dg,
 
       la_e->v1 = &orv[BM_elem_index_get(e->v1)];
       la_e->v2 = &orv[BM_elem_index_get(e->v2)];
-      la_e->v1_obindex = la_e->v1->index - global_i;
-      la_e->v2_obindex = la_e->v2->index - global_i;
+      la_e->v1_obindex = la_e->v1->index;
+      la_e->v2_obindex = la_e->v2->index;
       if (e->l) {
         int findex = BM_elem_index_get(e->l->f);
         la_e->t1 = lineart_triangle_from_index(rb, ort, findex);
@@ -1934,7 +1934,16 @@ static void lineart_main_load_geometries(
   DEG_OBJECT_ITER_BEGIN (depsgraph, ob, flags) {
     LineartObjectInfo *obi = lineart_mem_aquire(&rb->render_data_pool, sizeof(LineartObjectInfo));
     obi->override_usage = lineart_usage_check(scene->master_collection, ob, rb);
+
+    /* TODO: Here's the problem, ob is not valid outside DEG_OBJECT_ITER_BEGIN, because this is a
+     * fake one provided for evaluation in-place, but if we want to evaluate in parallel (the
+     * worker assignment code is just below this loop), what could be the best way to do so? do we
+     * have existing marco/apis for doing that? Otherwise generating a final BMesh for each object
+     * and process later won't give that much of a performance boost (can still be a little faster
+     * compared to single-thread). */
     obi->ob = DEG_get_evaluated_object(depsgraph, ob);
+
+    printf("%lld ", obi->ob);
 
     obi->next = olti[to_thread].pending;
     olti[to_thread].pending = obi;
@@ -1942,16 +1951,22 @@ static void lineart_main_load_geometries(
     to_thread++;
     if (to_thread >= thread_count) {
       to_thread = 0;
+      printf("\n");
+      for (int j = 0; j < thread_count; j++) {
+        printf("%lld ", olti[j].pending->ob);
+      }
+      printf("\n\n");
     }
   }
   DEG_OBJECT_ITER_END;
 
   TaskPool *tp = BLI_task_pool_create(NULL, TASK_PRIORITY_HIGH);
-
+  printf("\n");
   for (int i = 0; i < thread_count; i++) {
     olti[i].rb = rb;
     olti[i].dg = depsgraph;
     BLI_task_pool_push(tp, (TaskRunFunction)lineart_object_load_worker, &olti[i], 0, NULL);
+    printf("%d ", olti[i].pending ? olti[i].pending->ob->type : 0);
   }
   BLI_task_pool_work_and_wait(tp);
   BLI_task_pool_free(tp);
