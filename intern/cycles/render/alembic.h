@@ -185,7 +185,7 @@ template<typename T> class DataStore {
 
     last_loaded_time = index.source_time;
 
-		assert(index.index < data.size());
+    assert(index.index < data.size());
 
     return CacheLookupResult<T>::new_data(&data[index.index]);
   }
@@ -204,7 +204,7 @@ template<typename T> class DataStore {
       return CacheLookupResult<T>::no_data_found_for_time();
     }
 
-		assert(index.index < data.size());
+    assert(index.index < data.size());
 
     return CacheLookupResult<T>::new_data(&data[index.index]);
   }
@@ -230,7 +230,7 @@ template<typename T> class DataStore {
 
   void add_no_data(double time)
   {
-    index_data_map.push_back({ time, time, -1ul });
+    index_data_map.push_back({time, time, -1ul});
   }
 
   bool is_constant() const
@@ -291,7 +291,7 @@ template<typename T> class DataStore {
       return;
     }
 
-		index_data_map.swap(other.index_data_map);
+    index_data_map.swap(other.index_data_map);
     data.swap(other.data);
     std::swap(frame_offset, other.frame_offset);
   }
@@ -574,7 +574,8 @@ class AlembicProcedural : public Procedural {
   /* Maximum number of frames to hold in cache. */
   NODE_SOCKET_API(int, cache_frame_count)
 
-  /* Whether to preload data in a secondary cache, only valid if cache method is CACHE_FRAME_COUNT. */
+  /* Whether to preload data in a secondary cache, only valid if cache method is CACHE_FRAME_COUNT.
+   */
   NODE_SOCKET_API(bool, use_prefetching)
 
   /* Treat subdivision objects as regular polygon meshes. */

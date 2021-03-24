@@ -851,7 +851,9 @@ void AlembicObject::read_face_sets(SchemaType &schema,
   }
 }
 
-static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono_t> &times, Progress &progress)
+static void compute_vertex_deltas(CachedData &cached_data,
+                                  const ccl::set<chrono_t> &times,
+                                  Progress &progress)
 {
   if (cached_data.vertices.size() == 0 || cached_data.vertices.size() == 1) {
     return;
@@ -859,7 +861,8 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
 
   const ustring deltas_string = ustring("deltas");
 
-  auto &attr_delta = cached_data.add_attribute(deltas_string, cached_data.vertices.get_time_sampling());
+  auto &attr_delta = cached_data.add_attribute(deltas_string,
+                                               cached_data.vertices.get_time_sampling());
   attr_delta.std = ATTR_STD_DELTAS;
   attr_delta.element = ATTR_ELEMENT_VERTEX;
   attr_delta.type_desc = TypeUInt8Array4;
@@ -879,8 +882,10 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
 
     const chrono_t current_time = *begin++;
 
-    const array<float3> *current_vertices = cached_data.vertices.data_for_time_no_check(current_time).get_data_or_null();
-    const array<float3> *previous_vertices = cached_data.vertices.data_for_time_no_check(previous_time).get_data_or_null();
+    const array<float3> *current_vertices =
+        cached_data.vertices.data_for_time_no_check(current_time).get_data_or_null();
+    const array<float3> *previous_vertices =
+        cached_data.vertices.data_for_time_no_check(previous_time).get_data_or_null();
 
     previous_time = current_time;
 
@@ -899,7 +904,8 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
     }
 
     /* We need the triangles, as the vertices in the device arrays are laid out per triangle. */
-    const array<int3> *current_triangles = cached_data.triangles.data_for_time_no_check(current_time).get_data_or_null();
+    const array<int3> *current_triangles =
+        cached_data.triangles.data_for_time_no_check(current_time).get_data_or_null();
 
     if (!current_triangles) {
       cached_data.min_delta.add_no_data(current_time);
@@ -966,7 +972,9 @@ static void compute_vertex_deltas(CachedData &cached_data, const ccl::set<chrono
   }
 }
 
-static void compute_curve_deltas(CachedData &cached_data, const ccl::set<chrono_t> &times, Progress &progress)
+static void compute_curve_deltas(CachedData &cached_data,
+                                 const ccl::set<chrono_t> &times,
+                                 Progress &progress)
 {
   if (cached_data.curve_keys.size() == 0 || cached_data.curve_keys.size() == 1) {
     return;
@@ -974,7 +982,8 @@ static void compute_curve_deltas(CachedData &cached_data, const ccl::set<chrono_
 
   const ustring deltas_string = ustring("deltas");
 
-  auto &attr_delta = cached_data.add_attribute(deltas_string, cached_data.curve_keys.get_time_sampling());
+  auto &attr_delta = cached_data.add_attribute(deltas_string,
+                                               cached_data.curve_keys.get_time_sampling());
   attr_delta.std = ATTR_STD_DELTAS;
   attr_delta.element = ATTR_ELEMENT_CURVE_KEY;
   attr_delta.type_desc = TypeUInt8Array4;
@@ -994,8 +1003,10 @@ static void compute_curve_deltas(CachedData &cached_data, const ccl::set<chrono_
 
     const chrono_t current_time = *begin++;
 
-    const array<float3> *current_curve_keys = cached_data.curve_keys.data_for_time_no_check(current_time).get_data_or_null();
-    const array<float3> *previous_curve_keys = cached_data.curve_keys.data_for_time_no_check(previous_time).get_data_or_null();
+    const array<float3> *current_curve_keys =
+        cached_data.curve_keys.data_for_time_no_check(current_time).get_data_or_null();
+    const array<float3> *previous_curve_keys =
+        cached_data.curve_keys.data_for_time_no_check(previous_time).get_data_or_null();
 
     previous_time = current_time;
 

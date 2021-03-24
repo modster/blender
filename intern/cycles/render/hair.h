@@ -162,7 +162,7 @@ class Hair : public Geometry {
   /* BVH */
   void pack_curve_keys(Device *device,
                        device_vector<float4> &curve_key_co,
-                       device_vector<ushort4>& curve_keys_deltas,
+                       device_vector<ushort4> &curve_keys_deltas,
                        int max_delta_compression_frames);
   void pack_curve_segments(Scene *scene, device_vector<float4>::chunk curve_data);
 

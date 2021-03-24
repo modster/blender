@@ -483,11 +483,12 @@ void Hair::pack_curve_keys(Device *device,
     memcpy(deltas_chunk.data(), attr_delta->data(), curve_keys_size * sizeof(ushort4));
     deltas_chunk.copy_to_device();
 
-    /* Offset and size should be the same for the delta chunk and the original chunk in terms of elements,
-     * they should only differ in terms of bytes. */
+    /* Offset and size should be the same for the delta chunk and the original chunk in terms of
+     * elements, they should only differ in terms of bytes. */
     const size_t offset = deltas_chunk.offset();
     const size_t size = deltas_chunk.size();
-    device->apply_delta_compression(curve_key_co, curve_keys_deltas, offset, size, min_delta, max_delta);
+    device->apply_delta_compression(
+        curve_key_co, curve_keys_deltas, offset, size, min_delta, max_delta);
   }
   else {
     current_delta_frames_count = 0;
@@ -495,7 +496,7 @@ void Hair::pack_curve_keys(Device *device,
 
     for (size_t i = 0; i < curve_keys_size; i++) {
       keys_chunk.data()[i] = make_float4(
-            keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
+          keys_ptr[i].x, keys_ptr[i].y, keys_ptr[i].z, radius_ptr[i]);
     }
 
     keys_chunk.copy_to_device();
@@ -527,7 +528,7 @@ void Hair::pack_curve_segments(Scene *scene, device_vector<float4>::chunk curve_
   curve_data.copy_to_device();
 }
 
-void Hair::pack_primitives(Device */*device*/,
+void Hair::pack_primitives(Device * /*device*/,
                            DeviceScene *dscene,
                            int object,
                            uint visibility,

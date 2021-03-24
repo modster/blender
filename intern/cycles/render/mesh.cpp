@@ -873,11 +873,12 @@ void Mesh::pack_primitives(Device *device,
     memcpy(chunk_data, attr_deltas->data(), num_prims * sizeof(ushort4) * 3);
     deltas_chunk.copy_to_device();
 
-    /* Offset and size should be the same for the delta chunk and the original chunk in terms of elements,
-     * they should only differ in terms of bytes. */
+    /* Offset and size should be the same for the delta chunk and the original chunk in terms of
+     * elements, they should only differ in terms of bytes. */
     const size_t offset = deltas_chunk.offset();
     const size_t size = deltas_chunk.size();
-    device->apply_delta_compression(dscene->prim_tri_verts, *verts_deltas, offset, size, min_delta, max_delta);
+    device->apply_delta_compression(
+        dscene->prim_tri_verts, *verts_deltas, offset, size, min_delta, max_delta);
   }
   else {
     current_delta_frames_count = 0;

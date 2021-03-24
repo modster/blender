@@ -112,7 +112,8 @@ class CUDADevice : public Device {
 
   bool check_peer_access(Device *peer_device) override;
 
-  bool apply_delta_compression(device_memory &, device_memory &, size_t, size_t, float, float) override;
+  bool apply_delta_compression(
+      device_memory &, device_memory &, size_t, size_t, float, float) override;
 
   bool use_adaptive_compilation();
 

@@ -1543,7 +1543,12 @@ class CPUDevice : public Device {
     return true;
   }
 
-  bool apply_delta_compression(device_memory &mem_orig, device_memory &mem_compressed, size_t offset, size_t size, float min_delta, float max_delta) override
+  bool apply_delta_compression(device_memory &mem_orig,
+                               device_memory &mem_compressed,
+                               size_t offset,
+                               size_t size,
+                               float min_delta,
+                               float max_delta) override
   {
     assert(mem_orig.device_pointer != 0);
     assert(mem_compressed.device_pointer != 0);
@@ -1555,7 +1560,8 @@ class CPUDevice : public Device {
     float4 *dst = (float4 *)(mem_orig.device_pointer + offset * sizeof(float4));
 
     for (size_t i = 0; i < size; ++i) {
-      const float4 delta = make_float4((float)(src[i].x), (float)(src[i].y), (float)(src[i].z), (float)(src[i].w));
+      const float4 delta = make_float4(
+          (float)(src[i].x), (float)(src[i].y), (float)(src[i].z), (float)(src[i].w));
       dst[i] += delta * delta_scale + min_delta;
     }
 
