@@ -266,7 +266,7 @@ bool ui_but_contains_point_px_icon(const uiBut *but, ARegion *region, const wmEv
 
 /* x and y are only used in case event is NULL... */
 uiBut *ui_but_find_mouse_over_ex(
-    ARegion *region, const int x, const int y, const bool labeledit, uiButFindPoll find_poll)
+    const ARegion *region, const int x, const int y, const bool labeledit, uiButFindPoll find_poll)
 {
   uiBut *butover = NULL;
 
@@ -307,7 +307,7 @@ uiBut *ui_but_find_mouse_over_ex(
   return butover;
 }
 
-uiBut *ui_but_find_mouse_over(ARegion *region, const wmEvent *event)
+uiBut *ui_but_find_mouse_over(const ARegion *region, const wmEvent *event)
 {
   return ui_but_find_mouse_over_ex(region, event->x, event->y, event->ctrl != 0, NULL);
 }

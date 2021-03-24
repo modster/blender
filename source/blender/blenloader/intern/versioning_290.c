@@ -53,6 +53,7 @@
 #include "BKE_animsys.h"
 #include "BKE_armature.h"
 #include "BKE_asset.h"
+#include "BKE_attribute.h"
 #include "BKE_collection.h"
 #include "BKE_colortools.h"
 #include "BKE_cryptomatte.h"
@@ -1906,6 +1907,25 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
     }
   }
 
+  if (!MAIN_VERSION_ATLEAST(bmain, 293, 14)) {
+    if (!DNA_struct_elem_find(fd->filesdna, "Light", "float", "diff_fac")) {
+      LISTBASE_FOREACH (Light *, light, &bmain->lights) {
+        light->diff_fac = 1.0f;
+        light->volume_fac = 1.0f;
+      }
+    }
+
+    LISTBASE_FOREACH (bNodeTree *, ntree, &bmain->nodetrees) {
+      if (ntree->type == NTREE_GEOMETRY) {
+        LISTBASE_FOREACH (bNode *, node, &ntree->nodes) {
+          if (node->type == GEO_NODE_ATTRIBUTE_FILL) {
+            node->custom2 = ATTR_DOMAIN_AUTO;
+          }
+        }
+      }
+    }
+  }
+
   /**
    * Versioning code until next subversion bump goes here.
    *
@@ -1917,13 +1937,6 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
    */
   {
     /* Keep this block, even when empty. */
-
-    if (!DNA_struct_elem_find(fd->filesdna, "Light", "float", "diff_fac")) {
-      LISTBASE_FOREACH (Light *, light, &bmain->lights) {
-        light->diff_fac = 1.0f;
-        light->volume_fac = 1.0f;
-      }
-    }
   }
 
   {
