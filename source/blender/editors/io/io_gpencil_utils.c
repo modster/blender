@@ -28,6 +28,8 @@
 
 #include "WM_api.h"
 
+#include "io_gpencil.h"
+
 ARegion *get_invoke_region(bContext *C)
 {
   bScreen *screen = CTX_wm_screen(C);

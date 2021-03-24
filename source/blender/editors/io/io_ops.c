@@ -56,8 +56,14 @@ void ED_operatortypes_io(void)
 #endif
 
   WM_operatortype_append(WM_OT_gpencil_import_svg);
+
+#ifdef WITH_PUGIXML
   WM_operatortype_append(WM_OT_gpencil_export_svg);
+#endif
+
+#ifdef WITH_HARU
   WM_operatortype_append(WM_OT_gpencil_export_pdf);
+#endif
 
   WM_operatortype_append(CACHEFILE_OT_open);
   WM_operatortype_append(CACHEFILE_OT_reload);

@@ -84,6 +84,14 @@ if(WITH_INTERNATIONAL)
   add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
+if(WITH_PUGIXML)
+  add_definitions(-DWITH_PUGIXML)
+endif()
+
+if(WITH_HARU)
+  add_definitions(-DWITH_HARU)
+endif()
+
 list(APPEND LIB bf_gpencil)
 
 blender_add_lib(bf_editor_io "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

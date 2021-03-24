@@ -20,19 +20,15 @@
 /** \file
  * \ingroup bgpencil
  */
-#include <iostream>
-#include <list>
-#include <string>
 
-#include "MEM_guardedalloc.h"
+#include "BLI_float3.hh"
+#include "BLI_math.h"
+#include "BLI_span.hh"
+
+#include "DNA_gpencil_types.h"
 
 #include "BKE_gpencil.h"
 #include "BKE_gpencil_geom.h"
-
-#include "BLI_blenlib.h"
-#include "BLI_math.h"
-
-#include "DNA_gpencil_types.h"
 
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
@@ -48,22 +44,18 @@
 
 #include "nanosvg/nanosvg.h"
 
+using blender::MutableSpan;
+
 namespace blender::io::gpencil {
 
 /* Constructor. */
-GpencilImporterSVG::GpencilImporterSVG(const char *filename, const struct GpencilIOParams *iparams)
+GpencilImporterSVG::GpencilImporterSVG(const char *filename, const GpencilIOParams *iparams)
     : GpencilImporter(iparams)
 {
   filename_set(filename);
 }
 
-/* Destructor. */
-GpencilImporterSVG::~GpencilImporterSVG(void)
-{
-  /* Nothing to do yet. */
-}
-
-bool GpencilImporterSVG::read(void)
+bool GpencilImporterSVG::read()
 {
   bool result = true;
   NSVGimage *svg_data = nullptr;
@@ -74,10 +66,7 @@ bool GpencilImporterSVG::read(void)
   }
 
   /* Create grease pencil object. */
-  if (params_.ob == nullptr) {
-    params_.ob = create_object();
-    object_created_ = true;
-  }
+  params_.ob = create_object();
   if (params_.ob == nullptr) {
     std::cout << "Unable to create new object.\n";
     if (svg_data) {
@@ -90,7 +79,7 @@ bool GpencilImporterSVG::read(void)
 
   /* Grease pencil is rotated 90 degrees in X axis by default. */
   float matrix[4][4];
-  float scale[3] = {params_.scale, params_.scale, params_.scale};
+  const float3 scale = float3(params_.scale);
   unit_m4(matrix);
   rotate_m4(matrix, 'X', DEG2RADF(-90.0f));
   rescale_m4(matrix, scale);
@@ -99,11 +88,13 @@ bool GpencilImporterSVG::read(void)
   char prv_id[70] = {"*"};
   int prefix = 0;
   for (NSVGshape *shape = svg_data->shapes; shape; shape = shape->next) {
-    char *layer_id = BLI_sprintfN("%03d_%s", prefix, shape->id);
+    char *layer_id = (shape->id_parent[0] == '\0') ? BLI_sprintfN("Layer_%03d", prefix) :
+                                                     BLI_sprintfN("%s", shape->id_parent);
     if (!STREQ(prv_id, layer_id)) {
       prefix++;
       MEM_freeN(layer_id);
-      layer_id = BLI_sprintfN("%03d_%s", prefix, shape->id);
+      layer_id = (shape->id_parent[0] == '\0') ? BLI_sprintfN("Layer_%03d", prefix) :
+                                                 BLI_sprintfN("%s", shape->id_parent);
       strcpy(prv_id, layer_id);
     }
 
@@ -154,10 +145,8 @@ bool GpencilImporterSVG::read(void)
   LISTBASE_FOREACH (bGPDlayer *, gpl, &gpd_->layers) {
     LISTBASE_FOREACH (bGPDframe *, gpf, &gpl->frames) {
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-        int i;
-        bGPDspoint *pt;
-        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-          sub_v3_v3(&pt->x, gp_center);
+        for (bGPDspoint &pt : MutableSpan(gps->points, gps->totpoints)) {
+          sub_v3_v3(&pt.x, gp_center);
         }
       }
     }
@@ -179,7 +168,7 @@ void GpencilImporterSVG::create_stroke(bGPdata *gpd,
   const int edges = params_.resolution;
   const float step = 1.0f / (float)(edges - 1);
 
-  int totpoints = (path->npts / 3) * params_.resolution;
+  const int totpoints = (path->npts / 3) * params_.resolution;
 
   bGPDstroke *gps = BKE_gpencil_stroke_new(mat_index, totpoints, 1.0f);
   BLI_addtail(&gpf->strokes, gps);
@@ -207,7 +196,7 @@ void GpencilImporterSVG::create_stroke(bGPdata *gpd,
       pt->strength = shape->opacity;
       pt->pressure = 1.0f;
       pt->z = 0.0f;
-      /* TODO: (antoniov) Can be improved loading curve data instead to load stroke. */
+      /* TODO: (antoniov) Can be improved loading curve data instead of loading strokes. */
       interp_v2_v2v2v2v2_cubic(&pt->x, &p[0], &p[2], &p[4], &p[6], a);
 
       /* Scale from milimeters. */

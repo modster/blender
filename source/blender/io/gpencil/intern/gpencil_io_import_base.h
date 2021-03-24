@@ -29,10 +29,10 @@ class GpencilImporter : public GpencilIO {
 
  public:
   GpencilImporter(const struct GpencilIOParams *iparams);
-  virtual bool read(void) = 0;
+  virtual bool read() = 0;
 
  protected:
-  struct Object *create_object(void);
+  struct Object *create_object();
   int32_t create_material(const char *name, const bool stroke, const bool fill);
 
  private:

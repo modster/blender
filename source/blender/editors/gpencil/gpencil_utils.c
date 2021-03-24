@@ -597,7 +597,7 @@ bool ED_gpencil_stroke_material_editable(Object *ob, const bGPDlayer *gpl, const
 }
 
 /* Check whether given stroke is visible for the current material. */
-bool ED_gpencil_stroke_material_visible(Object *ob, const bGPDlayer *gpl, const bGPDstroke *gps)
+bool ED_gpencil_stroke_material_visible(Object *ob, const bGPDstroke *gps)
 {
   /* check if the color is editable */
   MaterialGPencilStyle *gp_style = BKE_gpencil_material_settings(ob, gps->mat_nr + 1);

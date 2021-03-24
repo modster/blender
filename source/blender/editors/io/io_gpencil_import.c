@@ -21,26 +21,14 @@
  * \ingroup editor/io
  */
 
-#include <errno.h>
-#include <string.h>
-
-#include "MEM_guardedalloc.h"
+#include "BLI_path_util.h"
 
 #include "DNA_gpencil_types.h"
 #include "DNA_space_types.h"
 
 #include "BKE_context.h"
 #include "BKE_gpencil.h"
-#include "BKE_main.h"
-#include "BKE_object.h"
 #include "BKE_report.h"
-#include "BKE_scene.h"
-#include "BKE_screen.h"
-
-#include "BLI_listbase.h"
-#include "BLI_path_util.h"
-#include "BLI_string.h"
-#include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
 
@@ -63,7 +51,7 @@
 #include "gpencil_io.h"
 
 /* <-------- SVG single frame import. --------> */
-bool wm_gpencil_import_svg_common_check(bContext *UNUSED(C), wmOperator *op)
+static bool wm_gpencil_import_svg_common_check(bContext *UNUSED(C), wmOperator *op)
 {
 
   char filepath[FILE_MAX];
@@ -78,67 +66,8 @@ bool wm_gpencil_import_svg_common_check(bContext *UNUSED(C), wmOperator *op)
   return false;
 }
 
-static void gpencil_import_common_props(wmOperatorType *ot)
+static int wm_gpencil_import_svg_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
 {
-  PropertyRNA *prop;
-
-  static const EnumPropertyItem target_object_modes[] = {
-      {GP_TARGET_OB_NEW, "NEW", 0, "New Object", ""},
-      {GP_TARGET_OB_SELECTED, "ACTIVE", 0, "Active Object", ""},
-      {0, NULL, 0, NULL, NULL},
-  };
-
-  prop = RNA_def_enum(ot->srna,
-                      "target",
-                      target_object_modes,
-                      GP_TARGET_OB_NEW,
-                      "Target Object",
-                      "Target grease pencil object");
-
-  RNA_def_property_flag(prop, PROP_SKIP_SAVE);
-  RNA_def_int(ot->srna,
-              "resolution",
-              10,
-              1,
-              30,
-              "Resolution",
-              "Resolution of the generated curves",
-              1,
-              20);
-
-  RNA_def_float(ot->srna,
-                "scale",
-                10.0f,
-                0.001f,
-                100.0f,
-                "Scale",
-                "Scale of the final stroke",
-                0.001f,
-                100.0f);
-}
-
-static void ui_gpencil_import_common_settings(uiLayout *layout, PointerRNA *imfptr)
-{
-  uiLayout *box, *row, *col, *sub;
-
-  box = uiLayoutBox(layout);
-  row = uiLayoutRow(box, false);
-  uiItemL(row, IFACE_("Import Options"), ICON_SCENE_DATA);
-
-  col = uiLayoutColumn(box, false);
-
-  sub = uiLayoutColumn(col, true);
-  uiItemR(sub, imfptr, "target", 0, NULL, ICON_NONE);
-  sub = uiLayoutColumn(col, true);
-  uiItemR(sub, imfptr, "resolution", 0, NULL, ICON_NONE);
-  sub = uiLayoutColumn(col, true);
-  uiItemR(sub, imfptr, "scale", 0, NULL, ICON_NONE);
-}
-
-static int wm_gpencil_import_svg_invoke(bContext *C, wmOperator *op, const wmEvent *event)
-{
-  UNUSED_VARS(event);
-
   WM_event_add_fileselect(C, op);
 
   return OPERATOR_RUNNING_MODAL;
@@ -147,15 +76,12 @@ static int wm_gpencil_import_svg_invoke(bContext *C, wmOperator *op, const wmEve
 static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
 {
   Scene *scene = CTX_data_scene(C);
-  Object *ob = CTX_data_active_object(C);
 
   if (!RNA_struct_property_is_set(op->ptr, "filepath")) {
     BKE_report(op->reports, RPT_ERROR, "No filename given");
     return OPERATOR_CANCELLED;
   }
 
-  /* For some reason the region cannot be retrieved from the context.
-   * If a better solution is found in the future, remove this function. */
   ARegion *region = get_invoke_region(C);
   if (region == NULL) {
     BKE_report(op->reports, RPT_ERROR, "Unable to find valid 3D View area");
@@ -168,27 +94,15 @@ static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
 
   /* Set flags. */
   int flag = 0;
-  /* If active object is not a editable grease pencil, set to NULL to create a new object. */
-  eGP_TargetObjectMode target = RNA_enum_get(op->ptr, "target");
-  ob = (target == GP_TARGET_OB_SELECTED) ? CTX_data_active_object(C) : NULL;
-
-  if (ob != NULL) {
-    if (ob->type != OB_GPENCIL) {
-      ob = NULL;
-    }
-    else if (BKE_object_obdata_is_libdata(ob)) {
-      ob = NULL;
-    }
-  }
 
   const int resolution = RNA_int_get(op->ptr, "resolution");
   const float scale = RNA_float_get(op->ptr, "scale");
 
-  struct GpencilIOParams params = {
+  GpencilIOParams params = {
       .C = C,
       .region = region,
       .v3d = v3d,
-      .ob = ob,
+      .ob = NULL,
       .mode = GP_IMPORT_FROM_SVG,
       .frame_start = CFRA,
       .frame_end = CFRA,
@@ -203,13 +117,10 @@ static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
 
   /* Do Import. */
   WM_cursor_wait(1);
-  bool done = gpencil_io_import(filename, &params);
+  const bool done = gpencil_io_import(filename, &params);
   WM_cursor_wait(0);
 
-  if (done) {
-    BKE_report(op->reports, RPT_INFO, "SVG file imported");
-  }
-  else {
+  if (!done) {
     BKE_report(op->reports, RPT_WARNING, "Unable to import SVG");
   }
 
@@ -218,21 +129,16 @@ static int wm_gpencil_import_svg_exec(bContext *C, wmOperator *op)
 
 static void ui_gpencil_import_svg_settings(uiLayout *layout, PointerRNA *imfptr)
 {
-  uiLayout *box;
-
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
-
-  box = uiLayoutBox(layout);
-
-  ui_gpencil_import_common_settings(layout, imfptr);
+  uiLayout *col = uiLayoutColumn(layout, false);
+  uiItemR(col, imfptr, "resolution", 0, NULL, ICON_NONE);
+  uiItemR(col, imfptr, "scale", 0, NULL, ICON_NONE);
 }
 
 static void wm_gpencil_import_svg_draw(bContext *UNUSED(C), wmOperator *op)
 {
-
   PointerRNA ptr;
-
   RNA_pointer_create(NULL, op->type->srna, op->properties, &ptr);
 
   ui_gpencil_import_svg_settings(op->layout, &ptr);
@@ -240,7 +146,7 @@ static void wm_gpencil_import_svg_draw(bContext *UNUSED(C), wmOperator *op)
 
 static bool wm_gpencil_import_svg_poll(bContext *C)
 {
-  if (CTX_wm_window(C) == NULL) {
+  if ((CTX_wm_window(C) == NULL) || (CTX_data_mode_enum(C) != CTX_MODE_OBJECT)) {
     return false;
   }
 
@@ -267,5 +173,23 @@ void WM_OT_gpencil_import_svg(wmOperatorType *ot)
                                  FILE_DEFAULTDISPLAY,
                                  FILE_SORT_DEFAULT);
 
-  gpencil_import_common_props(ot);
+  RNA_def_int(ot->srna,
+              "resolution",
+              10,
+              1,
+              30,
+              "Resolution",
+              "Resolution of the generated strokes",
+              1,
+              20);
+
+  RNA_def_float(ot->srna,
+                "scale",
+                10.0f,
+                0.001f,
+                100.0f,
+                "Scale",
+                "Scale of the final strokes",
+                0.001f,
+                100.0f);
 }

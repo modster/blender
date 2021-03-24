@@ -21,14 +21,13 @@
 /** \file
  * \ingroup bgpencil
  */
-#include "BLI_path_util.h"
-
-#include "DNA_material_types.h"
 
 #include "gpencil_io_export_base.h"
 #include "hpdf.h"
 
 struct GpencilIOParams;
+struct bGPDlayer;
+struct bGPDstroke;
 
 #define PDF_EXPORTER_NAME "PDF Exporter for Grease Pencil"
 #define PDF_EXPORTER_VERSION "v1.0"
@@ -39,11 +38,10 @@ class GpencilExporterPDF : public GpencilExporter {
 
  public:
   GpencilExporterPDF(const char *filename, const struct GpencilIOParams *iparams);
-  ~GpencilExporterPDF(void);
-  bool new_document(void);
-  bool add_newpage(void);
-  bool add_body(void);
-  bool write(void);
+  bool new_document();
+  bool add_newpage();
+  bool add_body();
+  bool write();
 
  protected:
  private:
@@ -54,13 +52,16 @@ class GpencilExporterPDF : public GpencilExporter {
   /* State. */
   HPDF_ExtGState gstate_;
 
-  bool create_document(void);
-  bool add_page(void);
-  void export_gpencil_layers(void);
+  bool create_document();
+  bool add_page();
+  void export_gpencil_layers();
 
-  void export_stroke_to_point(void);
-  void export_stroke_to_polyline(const bool is_fill, const bool normalize);
-  void color_set(const bool do_fill);
+  void export_stroke_to_polyline(bGPDlayer *gpl,
+                                 bGPDstroke *gps,
+                                 const bool is_stroke,
+                                 const bool do_fill,
+                                 const bool normalize);
+  void color_set(bGPDlayer *gpl, const bool do_fill);
 };
 
 }  // namespace blender::io::gpencil

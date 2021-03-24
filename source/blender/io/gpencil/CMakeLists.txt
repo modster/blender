@@ -36,8 +36,6 @@ set(INC
 )
 
 set(INC_SYS
-  ${PUGIXML_INCLUDE_DIR}
-  ${HARU_INCLUDE_DIRS}
 )
 
 set(SRC
@@ -57,21 +55,42 @@ set(SRC
  intern/gpencil_io_import_svg.cc
 
  intern/gpencil_io_export_base.h
- intern/gpencil_io_export_svg.h
- intern/gpencil_io_export_pdf.h
- intern/gpencil_io_export_base.cc
- intern/gpencil_io_export_svg.cc
- intern/gpencil_io_export_pdf.cc
 )
 
 set(LIB
   bf_blenkernel
   bf_blenlib
   bf_io_common
-
-  ${PUGIXML_LIBRARIES}
-  ${HARU_LIBRARIES}
 )
+
+if(WITH_PUGIXML)
+  list(APPEND SRC
+    intern/gpencil_io_export_svg.h
+    intern/gpencil_io_export_svg.cc
+  )
+  list(APPEND INC
+    ${PUGIXML_INCLUDE_DIR}
+  )
+  list(APPEND LIB
+    ${PUGIXML_LIBRARIES}
+  )
+  add_definitions(-DWITH_PUGIXML)
+endif()
+
+if(WITH_HARU)
+  list(APPEND SRC
+    intern/gpencil_io_export_pdf.h
+    intern/gpencil_io_export_pdf.cc
+  )
+  list(APPEND INC
+    ${HARU_INCLUDE_DIRS}
+  )
+  list(APPEND LIB
+    ${HARU_LIBRARIES}
+  )
+  add_definitions(-DWITH_HARU)
+endif()
+
 
 list(APPEND LIB
   ${BOOST_LIBRARIES}

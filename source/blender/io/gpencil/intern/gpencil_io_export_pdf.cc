@@ -20,22 +20,8 @@
 /** \file
  * \ingroup bgpencil
  */
-#include <iostream>
-#include <list>
-#include <string>
 
-#include "MEM_guardedalloc.h"
-
-#include "BKE_context.h"
-#include "BKE_gpencil.h"
-#include "BKE_gpencil_geom.h"
-#include "BKE_main.h"
-#include "BKE_material.h"
-
-#include "BLI_blenlib.h"
-#include "BLI_math.h"
-#include "BLI_string.h"
-#include "BLI_utildefines.h"
+#include "BLI_math_vector.h"
 
 #include "DNA_gpencil_types.h"
 #include "DNA_material_types.h"
@@ -44,18 +30,23 @@
 #include "DNA_screen_types.h"
 #include "DNA_view3d_types.h"
 
+#include "BKE_context.h"
+#include "BKE_gpencil.h"
+#include "BKE_gpencil_geom.h"
+#include "BKE_main.h"
+#include "BKE_material.h"
+
 #include "DEG_depsgraph.h"
 #include "DEG_depsgraph_query.h"
 
 #include "ED_gpencil.h"
+#include "ED_view3d.h"
 
 #ifdef WIN32
 #  include "utfconv.h"
 #endif
 
 #include "UI_view2d.h"
-
-#include "ED_view3d.h"
 
 #include "gpencil_io.h"
 #include "gpencil_io_export_pdf.h"
@@ -68,39 +59,36 @@ static void error_handler(HPDF_STATUS error_no, HPDF_STATUS detail_no, void *UNU
 }
 
 /* Constructor. */
-GpencilExporterPDF::GpencilExporterPDF(const char *filename, const struct GpencilIOParams *iparams)
+GpencilExporterPDF::GpencilExporterPDF(const char *filename, const GpencilIOParams *iparams)
     : GpencilExporter(iparams)
 {
   filename_set(filename);
+
+  invert_axis_[0] = false;
+  invert_axis_[1] = false;
 
   pdf_ = nullptr;
   page_ = nullptr;
   gstate_ = nullptr;
 }
 
-/* Destructor. */
-GpencilExporterPDF::~GpencilExporterPDF(void)
-{
-  /* Nothing to do yet. */
-}
-
-bool GpencilExporterPDF::new_document(void)
+bool GpencilExporterPDF::new_document()
 {
   return create_document();
 }
 
-bool GpencilExporterPDF::add_newpage(void)
+bool GpencilExporterPDF::add_newpage()
 {
   return add_page();
 }
 
-bool GpencilExporterPDF::add_body(void)
+bool GpencilExporterPDF::add_body()
 {
   export_gpencil_layers();
   return true;
 }
 
-bool GpencilExporterPDF::write(void)
+bool GpencilExporterPDF::write()
 {
   /* Support unicode character paths on Windows. */
   HPDF_STATUS res = 0;
@@ -122,7 +110,7 @@ bool GpencilExporterPDF::write(void)
 }
 
 /* Create pdf document. */
-bool GpencilExporterPDF::create_document(void)
+bool GpencilExporterPDF::create_document()
 {
   pdf_ = HPDF_New(error_handler, nullptr);
   if (!pdf_) {
@@ -133,7 +121,7 @@ bool GpencilExporterPDF::create_document(void)
 }
 
 /* Add page. */
-bool GpencilExporterPDF::add_page(void)
+bool GpencilExporterPDF::add_page()
 {
   /* Add a new page object. */
   page_ = HPDF_AddPage(pdf_);
@@ -149,12 +137,10 @@ bool GpencilExporterPDF::add_page(void)
 }
 
 /* Main layer loop. */
-void GpencilExporterPDF::export_gpencil_layers(void)
+void GpencilExporterPDF::export_gpencil_layers()
 {
   /* If is doing a set of frames, the list of objects can change for each frame. */
-  if (params_.frame_mode != GP_EXPORT_FRAME_ACTIVE) {
-    create_object_list();
-  }
+  create_object_list();
 
   const bool is_normalized = ((params_.flag & GP_EXPORT_NORM_THICKNESS) != 0);
 
@@ -169,59 +155,59 @@ void GpencilExporterPDF::export_gpencil_layers(void)
       if (gpl->flag & GP_LAYER_HIDE) {
         continue;
       }
-      gpl_current_set(gpl);
+      prepare_layer_export_matrix(ob, gpl);
 
       bGPDframe *gpf = gpl->actframe;
       if ((gpf == nullptr) || (gpf->strokes.first == nullptr)) {
         continue;
       }
-      gpf_current_set(gpf);
 
       LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
-        if (gps->totpoints == 0) {
+        if (gps->totpoints < 2) {
           continue;
         }
-        if (!ED_gpencil_stroke_material_visible(ob, gpl, gps)) {
+        if (!ED_gpencil_stroke_material_visible(ob, gps)) {
           continue;
         }
         /* Duplicate the stroke to apply any layer thickness change. */
         bGPDstroke *gps_duplicate = BKE_gpencil_stroke_duplicate(gps, true, false);
+        MaterialGPencilStyle *gp_style = BKE_gpencil_material_settings(ob,
+                                                                       gps_duplicate->mat_nr + 1);
 
-        gps_current_set(ob, gps_duplicate, true);
+        const bool is_stroke = ((gp_style->flag & GP_MATERIAL_STROKE_SHOW) &&
+                                (gp_style->stroke_rgba[3] > GPENCIL_ALPHA_OPACITY_THRESH));
+        const bool is_fill = ((gp_style->flag & GP_MATERIAL_FILL_SHOW) &&
+                              (gp_style->fill_rgba[3] > GPENCIL_ALPHA_OPACITY_THRESH));
+        prepare_stroke_export_colors(ob, gps_duplicate);
 
         /* Apply layer thickness change. */
         gps_duplicate->thickness += gpl->line_change;
+        /* Apply object scale to thickness. */
+        gps_duplicate->thickness *= mat4_to_scale(ob->obmat);
         CLAMP_MIN(gps_duplicate->thickness, 1.0f);
-        if (gps_duplicate->totpoints == 1) {
-          export_stroke_to_point();
+        /* Fill. */
+        if ((is_fill) && (params_.flag & GP_EXPORT_FILL)) {
+          /* Fill is exported as polygon for fill and stroke in a different shape. */
+          export_stroke_to_polyline(gpl, gps_duplicate, is_stroke, true, false);
         }
-        else {
-          /* Fill. */
-          if ((material_is_fill()) && (params_.flag & GP_EXPORT_FILL)) {
-            /* Fill is exported as polygon for fill and stroke in a different shape. */
-            export_stroke_to_polyline(true, false);
+
+        /* Stroke. */
+        if (is_stroke) {
+          if (is_normalized) {
+            export_stroke_to_polyline(gpl, gps_duplicate, is_stroke, false, true);
           }
+          else {
+            bGPDstroke *gps_perimeter = BKE_gpencil_stroke_perimeter_from_view(
+                rv3d_, gpd_, gpl, gps_duplicate, 3, diff_mat_.values);
 
-          /* Stroke. */
-          if (material_is_stroke()) {
-            if (is_normalized) {
-              export_stroke_to_polyline(false, true);
+            /* Sample stroke. */
+            if (params_.stroke_sample > 0.0f) {
+              BKE_gpencil_stroke_sample(gpd_eval, gps_perimeter, params_.stroke_sample, false);
             }
-            else {
-              bGPDstroke *gps_perimeter = BKE_gpencil_stroke_perimeter_from_view(
-                  rv3d_, gpd_, gpl, gps_duplicate, 3, diff_mat_);
 
-              gps_current_set(ob, gps_perimeter, false);
+            export_stroke_to_polyline(gpl, gps_perimeter, is_stroke, false, false);
 
-              /* Sample stroke. */
-              if (params_.stroke_sample > 0.0f) {
-                BKE_gpencil_stroke_sample(gpd_eval, gps_perimeter, params_.stroke_sample, false);
-              }
-
-              export_stroke_to_polyline(false, false);
-
-              BKE_gpencil_free_stroke(gps_perimeter);
-            }
+            BKE_gpencil_free_stroke(gps_perimeter);
           }
         }
         BKE_gpencil_free_stroke(gps_duplicate);
@@ -231,76 +217,54 @@ void GpencilExporterPDF::export_gpencil_layers(void)
 }
 
 /**
- * Export a point
- */
-void GpencilExporterPDF::export_stroke_to_point(void)
-{
-  bGPDstroke *gps = gps_current_get();
-
-  BLI_assert(gps->totpoints == 1);
-  float screen_co[2];
-
-  bGPDspoint *pt = &gps->points[0];
-  gpencil_3d_point_to_screen_space(&pt->x, screen_co);
-  /* Radius. */
-  float radius = stroke_point_radius_get(gps);
-
-  HPDF_Page_Circle(page_, screen_co[0], render_y_ - screen_co[1], radius);
-  HPDF_Page_ClosePathFillStroke(page_);
-}
-
-/**
  * Export a stroke using polyline or polygon
  * \param do_fill: True if the stroke is only fill
  */
-void GpencilExporterPDF::export_stroke_to_polyline(const bool do_fill, const bool normalize)
+void GpencilExporterPDF::export_stroke_to_polyline(bGPDlayer *gpl,
+                                                   bGPDstroke *gps,
+                                                   const bool is_stroke,
+                                                   const bool do_fill,
+                                                   const bool normalize)
 {
-  bGPDlayer *gpl = gpl_current_get();
-  bGPDstroke *gps = gps_current_get();
-
-  const bool is_thickness_const = is_stroke_thickness_constant(gps);
   const bool cyclic = ((gps->flag & GP_STROKE_CYCLIC) != 0);
-
-  bGPDspoint *pt = &gps->points[0];
-  float avg_pressure = pt->pressure;
-  if (!is_thickness_const) {
-    avg_pressure = stroke_average_pressure_get(gps);
-  }
+  const float avg_pressure = BKE_gpencil_stroke_average_pressure_get(gps);
 
   /* Get the thickness in pixels using a simple 1 point stroke. */
   bGPDstroke *gps_temp = BKE_gpencil_stroke_duplicate(gps, false, false);
   gps_temp->totpoints = 1;
   gps_temp->points = (bGPDspoint *)MEM_callocN(sizeof(bGPDspoint), "gp_stroke_points");
-  bGPDspoint *pt_src = &gps->points[0];
+  const bGPDspoint *pt_src = &gps->points[0];
   bGPDspoint *pt_dst = &gps_temp->points[0];
   copy_v3_v3(&pt_dst->x, &pt_src->x);
   pt_dst->pressure = avg_pressure;
 
-  float radius = stroke_point_radius_get(gps_temp);
+  const float radius = stroke_point_radius_get(gpl, gps_temp);
 
   BKE_gpencil_free_stroke(gps_temp);
 
-  color_set(do_fill);
+  color_set(gpl, do_fill);
 
-  if (material_is_stroke() && !do_fill) {
+  if (is_stroke && !do_fill) {
     HPDF_Page_SetLineJoin(page_, HPDF_ROUND_JOIN);
     HPDF_Page_SetLineWidth(page_, MAX2((radius * 2.0f) - gpl->line_change, 1.0f));
   }
 
   /* Loop all points. */
-  for (int32_t i = 0; i < gps->totpoints; i++) {
-    pt = &gps->points[i];
-    float screen_co[2];
-    HPDF_STATUS err;
-    if (gpencil_3d_point_to_screen_space(&pt->x, screen_co)) {
-      if (i == 0) {
-        err = HPDF_Page_MoveTo(page_, screen_co[0], render_y_ - screen_co[1]);
-      }
-      else {
-        err = HPDF_Page_LineTo(page_, screen_co[0], render_y_ - screen_co[1]);
-      }
+  for (const int i : IndexRange(gps->totpoints)) {
+    bGPDspoint *pt = &gps->points[i];
+    const float2 screen_co = gpencil_3D_point_to_2D(&pt->x);
+    if (i == 0) {
+      HPDF_Page_MoveTo(page_, screen_co.x, screen_co.y);
+    }
+    else {
+      HPDF_Page_LineTo(page_, screen_co.x, screen_co.y);
     }
   }
+  /* Close cyclic */
+  if (cyclic) {
+    HPDF_Page_ClosePath(page_);
+  }
+
   if (do_fill || !normalize) {
     HPDF_Page_Fill(page_);
   }
@@ -315,10 +279,8 @@ void GpencilExporterPDF::export_stroke_to_polyline(const bool do_fill, const boo
  * Set color
  * @param do_fill: True if the stroke is only fill
  */
-void GpencilExporterPDF::color_set(const bool do_fill)
+void GpencilExporterPDF::color_set(bGPDlayer *gpl, const bool do_fill)
 {
-  bGPDlayer *gpl = gpl_current_get();
-
   const float fill_opacity = fill_color_[3] * gpl->opacity;
   const float stroke_opacity = stroke_color_[3] * stroke_average_opacity_get() * gpl->opacity;
 

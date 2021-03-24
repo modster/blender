@@ -23,8 +23,6 @@
  */
 #include "BLI_path_util.h"
 
-#include "DNA_material_types.h"
-
 #include "gpencil_io_export_base.h"
 #include "pugixml.hpp"
 
@@ -39,10 +37,9 @@ class GpencilExporterSVG : public GpencilExporter {
 
  public:
   GpencilExporterSVG(const char *filename, const struct GpencilIOParams *iparams);
-  ~GpencilExporterSVG(void);
-  bool add_newpage(void);
-  bool add_body(void);
-  bool write(void);
+  bool add_newpage();
+  bool add_body();
+  bool write();
 
  protected:
   static void add_rect(pugi::xml_node node,
@@ -67,16 +64,26 @@ class GpencilExporterSVG : public GpencilExporter {
   pugi::xml_node main_node_;
   /** Frame node  */
   pugi::xml_node frame_node_;
-  void create_document_header(void);
-  void export_gpencil_layers(void);
+  void create_document_header();
+  void export_gpencil_layers();
 
-  void export_stroke_to_point(pugi::xml_node gpl_node);
+  void export_stroke_to_path(struct bGPDlayer *gpl,
+                             struct bGPDstroke *gps,
+                             pugi::xml_node node_gpl,
+                             const bool is_fill);
 
-  void export_stroke_to_path(pugi::xml_node gpl_node, const bool is_fill);
+  void export_stroke_to_polyline(struct bGPDlayer *gpl,
+                                 struct bGPDstroke *gps,
+                                 pugi::xml_node node_gpl,
+                                 const bool is_stroke,
+                                 const bool is_fill);
 
-  void export_stroke_to_polyline(pugi::xml_node gpl_node, const bool is_fill);
+  void color_string_set(struct bGPDlayer *gpl,
+                        struct bGPDstroke *gps,
+                        pugi::xml_node node_gps,
+                        const bool is_fill);
 
-  void color_string_set(pugi::xml_node gps_node, const bool is_fill);
+  std::string rgb_to_hexstr(float color[3]);
 };
 
 }  // namespace blender::io::gpencil

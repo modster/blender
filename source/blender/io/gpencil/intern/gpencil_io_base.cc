@@ -22,25 +22,25 @@
 /** \file
  * \ingroup bgpencil
  */
-#include <algorithm>
-#include <string>
 
-#include "BKE_context.h"
-#include "BKE_gpencil.h"
-#include "BKE_gpencil_geom.h"
-#include "BKE_layer.h"
-#include "BKE_main.h"
-#include "BKE_material.h"
-
-#include "BLI_blenlib.h"
-#include "BLI_math.h"
+#include "BLI_float2.hh"
+#include "BLI_float3.hh"
+#include "BLI_float4x4.hh"
+#include "BLI_path_util.h"
+#include "BLI_span.hh"
 
 #include "DNA_gpencil_types.h"
 #include "DNA_layer_types.h"
 #include "DNA_material_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
-#include "DNA_view3d_types.h"
+
+#include "BKE_camera.h"
+#include "BKE_context.h"
+#include "BKE_gpencil.h"
+#include "BKE_gpencil_geom.h"
+#include "BKE_main.h"
+#include "BKE_material.h"
 
 #include "UI_view2d.h"
 
@@ -51,43 +51,47 @@
 
 #include "gpencil_io_base.h"
 
+using blender::Span;
+
 namespace blender::io::gpencil {
 
 /* Constructor. */
-GpencilIO::GpencilIO(const struct GpencilIOParams *iparams)
+GpencilIO::GpencilIO(const GpencilIOParams *iparams)
 {
-  params_.frame_start = iparams->frame_start;
-  params_.frame_end = iparams->frame_end;
-  params_.frame_cur = iparams->frame_cur;
-  params_.ob = iparams->ob;
-  params_.region = iparams->region;
-  params_.v3d = iparams->v3d;
-  params_.C = iparams->C;
-  params_.mode = iparams->mode;
-  params_.flag = iparams->flag;
-  params_.select_mode = iparams->select_mode;
-  params_.frame_mode = iparams->frame_mode;
-  params_.stroke_sample = iparams->stroke_sample;
-  params_.resolution = iparams->resolution;
-  params_.scale = iparams->scale;
+  params_ = *iparams;
 
   /* Easy access data. */
   bmain_ = CTX_data_main(params_.C);
   depsgraph_ = CTX_data_depsgraph_pointer(params_.C);
   scene_ = CTX_data_scene(params_.C);
   rv3d_ = (RegionView3D *)params_.region->regiondata;
-  gpd_ = (params_.ob != NULL) ? (bGPdata *)params_.ob->data : nullptr;
+  gpd_ = (params_.ob != nullptr) ? (bGPdata *)params_.ob->data : nullptr;
   cfra_ = iparams->frame_cur;
 
-  /* Load list of selected objects. */
-  create_object_list();
-  object_created_ = false;
+  /* Calculate camera matrix. */
+  Object *cam_ob = params_.v3d->camera;
+  if (cam_ob != nullptr) {
+    /* Set up parameters. */
+    CameraParams params;
+    BKE_camera_params_init(&params);
+    BKE_camera_params_from_object(&params, cam_ob);
+
+    /* Compute matrix, viewplane, .. */
+    RenderData *rd = &scene_->r;
+    BKE_camera_params_compute_viewplane(&params, rd->xsch, rd->ysch, rd->xasp, rd->yasp);
+    BKE_camera_params_compute_matrix(&params);
+
+    float viewmat[4][4];
+    invert_m4_m4(viewmat, cam_ob->obmat);
+
+    mul_m4_m4m4(persmat_, params.winmat, viewmat);
+  }
+  else {
+    unit_m4(persmat_);
+  }
 
   winx_ = params_.region->winx;
   winy_ = params_.region->winy;
-
-  invert_axis_[0] = false;
-  invert_axis_[1] = true;
 
   /* Camera rectangle. */
   if (rv3d_->persp == RV3D_CAMOB) {
@@ -103,37 +107,33 @@ GpencilIO::GpencilIO(const struct GpencilIOParams *iparams)
                                  true);
     is_camera_ = true;
     camera_ratio_ = render_x_ / (camera_rect_.xmax - camera_rect_.xmin);
-    offset_[0] = camera_rect_.xmin;
-    offset_[1] = camera_rect_.ymin;
+    offset_.x = camera_rect_.xmin;
+    offset_.y = camera_rect_.ymin;
   }
   else {
     is_camera_ = false;
     /* Calc selected object boundbox. Need set initial value to some variables. */
     camera_ratio_ = 1.0f;
-    offset_[0] = 0.0f;
-    offset_[1] = 0.0f;
+    offset_.x = 0.0f;
+    offset_.y = 0.0f;
 
-    selected_objects_boundbox_set();
+    selected_objects_boundbox_calc();
     rctf boundbox;
     selected_objects_boundbox_get(&boundbox);
 
     render_x_ = boundbox.xmax - boundbox.xmin;
     render_y_ = boundbox.ymax - boundbox.ymin;
-    offset_[0] = boundbox.xmin;
-    offset_[1] = boundbox.ymin;
+    offset_.x = boundbox.xmin;
+    offset_.y = boundbox.ymin;
   }
-
-  gpl_cur_ = nullptr;
-  gpf_cur_ = nullptr;
-  gps_cur_ = nullptr;
 }
 
 /** Create a list of selected objects sorted from back to front */
-void GpencilIO::create_object_list(void)
+void GpencilIO::create_object_list()
 {
   ViewLayer *view_layer = CTX_data_view_layer(params_.C);
 
-  float camera_z_axis[3];
+  float3 camera_z_axis;
   copy_v3_v3(camera_z_axis, rv3d_->viewinv[2]);
   ob_list_.clear();
 
@@ -155,7 +155,7 @@ void GpencilIO::create_object_list(void)
     if (is_camera_) {
       float camera_z = dot_v3v3(camera_z_axis, object->obmat[3]);
       ObjectZ obz = {camera_z, object};
-      ob_list_.push_back(obz);
+      ob_list_.append(obz);
     }
     else {
       float zdepth = 0;
@@ -167,19 +167,18 @@ void GpencilIO::create_object_list(void)
           zdepth = -dot_v3v3(rv3d_->viewinv[2], object->obmat[3]);
         }
         ObjectZ obz = {zdepth * -1.0f, object};
-        ob_list_.push_back(obz);
+        ob_list_.append(obz);
       }
     }
-
-    /* Sort list of objects from point of view. */
-    ob_list_.sort(
-        [](const ObjectZ &obz1, const ObjectZ &obz2) { return obz1.zdepth < obz2.zdepth; });
   }
+  /* Sort list of objects from point of view. */
+  std::sort(ob_list_.begin(), ob_list_.end(), [](const ObjectZ &obz1, const ObjectZ &obz2) {
+    return obz1.zdepth < obz2.zdepth;
+  });
 }
 
 /**
  * Set file input_text full path.
- * \param C: Context.
  * \param filename: Path of the file provided by save dialog.
  */
 void GpencilIO::filename_set(const char *filename)
@@ -188,17 +187,11 @@ void GpencilIO::filename_set(const char *filename)
   BLI_path_abs(filename_, BKE_main_blendfile_path(bmain_));
 }
 
-/**
- * Convert to screenspace
- * \param co: 3D position
- * \param r_co: 2D position
- * \return False if error
- */
-bool GpencilIO::gpencil_3d_point_to_screen_space(const float co[3], float r_co[2])
+/** Convert to screenspace. */
+bool GpencilIO::gpencil_3D_point_to_screen_space(const float3 co, float2 &r_co)
 {
-  float parent_co[3];
-  mul_v3_m4v3(parent_co, diff_mat_, co);
-  float screen_co[2];
+  float3 parent_co = diff_mat_ * co;
+  float2 screen_co;
   eV3DProjTest test = (eV3DProjTest)(V3D_PROJ_RET_OK);
   if (ED_view3d_project_float_global(params_.region, parent_co, screen_co, test) ==
       V3D_PROJ_RET_OK) {
@@ -213,7 +206,7 @@ bool GpencilIO::gpencil_3d_point_to_screen_space(const float co[3], float r_co[2
         r_co[1] = winy_ - r_co[1];
       }
       /* Apply offset and scale. */
-      sub_v2_v2(r_co, offset_);
+      sub_v2_v2(r_co, &offset_.x);
       mul_v2_fl(r_co, camera_ratio_);
 
       return true;
@@ -234,226 +227,110 @@ bool GpencilIO::gpencil_3d_point_to_screen_space(const float co[3], float r_co[2
   return false;
 }
 
-/**
- * Get average pressure
- * \param gps: Pointer to stroke
- * \retun value
- */
-float GpencilIO::stroke_average_pressure_get(struct bGPDstroke *gps)
+/** Convert to render space. */
+float2 GpencilIO::gpencil_3D_point_to_render_space(const float3 co)
 {
-  bGPDspoint *pt = nullptr;
+  float3 parent_co = diff_mat_ * co;
+  mul_m4_v3(persmat_, parent_co);
 
-  if (gps->totpoints == 1) {
-    pt = &gps->points[0];
-    return pt->pressure;
+  parent_co.x = parent_co.x / max_ff(FLT_MIN, parent_co[2]);
+  parent_co.y = parent_co.y / max_ff(FLT_MIN, parent_co[2]);
+
+  float2 r_co;
+  r_co.x = (parent_co.x + 1.0f) / 2.0f * (float)render_x_;
+  r_co.y = (parent_co.y + 1.0f) / 2.0f * (float)render_y_;
+
+  /* Invert X axis. */
+  if (invert_axis_[0]) {
+    r_co.x = (float)render_x_ - r_co.x;
+  }
+  /* Invert Y axis. */
+  if (invert_axis_[1]) {
+    r_co.y = (float)render_y_ - r_co.y;
   }
 
-  float tot = 0.0f;
-  for (int32_t i = 0; i < gps->totpoints; i++) {
-    pt = &gps->points[i];
-    tot += pt->pressure;
-  }
-
-  return tot / (float)gps->totpoints;
+  return r_co;
 }
 
-/**
- * Check if the thickness of the stroke is constant
- * \param gps: Pointer to stroke
- * \retun true if all points thickness are equal.
- */
-bool GpencilIO::is_stroke_thickness_constant(struct bGPDstroke *gps)
+/** Convert to 2D. */
+float2 GpencilIO::gpencil_3D_point_to_2D(const float3 co)
 {
-  if (gps->totpoints == 1) {
-    return true;
+  const bool is_camera = (bool)(rv3d_->persp == RV3D_CAMOB);
+  if (is_camera) {
+    return gpencil_3D_point_to_render_space(co);
   }
+  float2 result;
+  gpencil_3D_point_to_screen_space(co, result);
+  return result;
+}
 
+/** Get radius of point. */
+float GpencilIO::stroke_point_radius_get(bGPDlayer *gpl, bGPDstroke *gps)
+{
   bGPDspoint *pt = &gps->points[0];
-  float prv_pressure = pt->pressure;
-
-  for (int32_t i = 0; i < gps->totpoints; i++) {
-    pt = &gps->points[i];
-    if (pt->pressure != prv_pressure) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-/**
- * Get radius of point
- * \param gps: Stroke
- * \return Radius in pixels
- */
-float GpencilIO::stroke_point_radius_get(struct bGPDstroke *gps)
-{
-  const bGPDlayer *gpl = gpl_current_get();
-  bGPDspoint *pt = nullptr;
-  float v1[2], screen_co[2], screen_ex[2];
-
-  pt = &gps->points[0];
-  gpencil_3d_point_to_screen_space(&pt->x, screen_co);
+  const float2 screen_co = gpencil_3D_point_to_2D(&pt->x);
 
   /* Radius. */
   bGPDstroke *gps_perimeter = BKE_gpencil_stroke_perimeter_from_view(
-      rv3d_, gpd_, gpl, gps, 3, diff_mat_);
+      rv3d_, gpd_, gpl, gps, 3, diff_mat_.values);
 
   pt = &gps_perimeter->points[0];
-  gpencil_3d_point_to_screen_space(&pt->x, screen_ex);
+  const float2 screen_ex = gpencil_3D_point_to_2D(&pt->x);
 
-  sub_v2_v2v2(v1, screen_co, screen_ex);
-  float radius = len_v2(v1);
+  const float2 v1 = screen_co - screen_ex;
+  float radius = v1.length();
   BKE_gpencil_free_stroke(gps_perimeter);
 
   return MAX2(radius, 1.0f);
 }
 
-/**
- * Convert a color to Hex value (#FFFFFF)
- * \param color: Original RGB color
- * \return String with the conversion
- */
-std::string GpencilIO::rgb_to_hexstr(float color[3])
+void GpencilIO::prepare_layer_export_matrix(Object *ob, bGPDlayer *gpl)
 {
-  uint8_t r = color[0] * 255.0f;
-  uint8_t g = color[1] * 255.0f;
-  uint8_t b = color[2] * 255.0f;
-  char hex_string[20];
-  sprintf(hex_string, "#%02X%02X%02X", r, g, b);
-
-  std::string hexstr = hex_string;
-
-  return hexstr;
+  BKE_gpencil_layer_transform_matrix_get(depsgraph_, ob, gpl, diff_mat_.values);
+  diff_mat_ = diff_mat_ * float4x4(gpl->layer_invmat);
 }
 
-/**
- * Convert a color to gray scale.
- * \param color: Color to convert
- */
-void GpencilIO::rgb_to_grayscale(float color[3])
+void GpencilIO::prepare_stroke_export_colors(Object *ob, bGPDstroke *gps)
 {
-  float grayscale = ((0.3f * color[0]) + (0.59f * color[1]) + (0.11f * color[2]));
-  color[0] = grayscale;
-  color[1] = grayscale;
-  color[2] = grayscale;
-}
+  MaterialGPencilStyle *gp_style = BKE_gpencil_material_settings(ob, gps->mat_nr + 1);
 
-/**
- * Convert a full string to lowercase
- * \param input_text: Input input_text
- * \return Lower case string
- */
-std::string GpencilIO::to_lower_string(char *input_text)
-{
-  std::string text = input_text;
-  /* First remove any point of the string. */
-  size_t found = text.find_first_of(".");
-  while (found != std::string::npos) {
-    text[found] = '_';
-    found = text.find_first_of(".", found + 1);
+  /* Stroke color. */
+  copy_v4_v4(stroke_color_, gp_style->stroke_rgba);
+  avg_opacity_ = 0;
+  /* Get average vertex color and apply. */
+  float avg_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+  for (const bGPDspoint &pt : Span(gps->points, gps->totpoints)) {
+    add_v4_v4(avg_color, pt.vert_color);
+    avg_opacity_ += pt.strength;
   }
 
-  std::transform(
-      text.begin(), text.end(), text.begin(), [](unsigned char c) { return std::tolower(c); });
+  mul_v4_v4fl(avg_color, avg_color, 1.0f / (float)gps->totpoints);
+  interp_v3_v3v3(stroke_color_, stroke_color_, avg_color, avg_color[3]);
+  avg_opacity_ /= (float)gps->totpoints;
 
-  return text;
+  /* Fill color. */
+  copy_v4_v4(fill_color_, gp_style->fill_rgba);
+  /* Apply vertex color for fill. */
+  interp_v3_v3v3(fill_color_, fill_color_, gps->vert_color_fill, gps->vert_color_fill[3]);
 }
 
-struct bGPDlayer *GpencilIO::gpl_current_get(void)
-{
-  return gpl_cur_;
-}
-
-void GpencilIO::gpl_current_set(struct bGPDlayer *gpl)
-{
-  gpl_cur_ = gpl;
-  BKE_gpencil_layer_transform_matrix_get(depsgraph_, params_.ob, gpl, diff_mat_);
-  mul_m4_m4m4(diff_mat_, diff_mat_, gpl->layer_invmat);
-}
-
-struct bGPDframe *GpencilIO::gpf_current_get(void)
-{
-  return gpf_cur_;
-}
-
-void GpencilIO::gpf_current_set(struct bGPDframe *gpf)
-{
-  gpf_cur_ = gpf;
-}
-struct bGPDstroke *GpencilIO::gps_current_get(void)
-{
-  return gps_cur_;
-}
-
-void GpencilIO::gps_current_set(struct Object *ob, struct bGPDstroke *gps, const bool set_colors)
-{
-  gps_cur_ = gps;
-  if (set_colors) {
-    gp_style_ = BKE_gpencil_material_settings(ob, gps->mat_nr + 1);
-
-    is_stroke_ = ((gp_style_->flag & GP_MATERIAL_STROKE_SHOW) &&
-                  (gp_style_->stroke_rgba[3] > GPENCIL_ALPHA_OPACITY_THRESH));
-    is_fill_ = ((gp_style_->flag & GP_MATERIAL_FILL_SHOW) &&
-                (gp_style_->fill_rgba[3] > GPENCIL_ALPHA_OPACITY_THRESH));
-
-    /* Stroke color. */
-    copy_v4_v4(stroke_color_, gp_style_->stroke_rgba);
-    avg_opacity_ = 0;
-    /* Get average vertex color and apply. */
-    float avg_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-    for (int32_t i = 0; i < gps->totpoints; i++) {
-      bGPDspoint *pt = &gps->points[i];
-      add_v4_v4(avg_color, pt->vert_color);
-      avg_opacity_ += pt->strength;
-    }
-
-    mul_v4_v4fl(avg_color, avg_color, 1.0f / (float)gps->totpoints);
-    interp_v3_v3v3(stroke_color_, stroke_color_, avg_color, avg_color[3]);
-    avg_opacity_ /= (float)gps->totpoints;
-
-    /* Fill color. */
-    copy_v4_v4(fill_color_, gp_style_->fill_rgba);
-    /* Apply vertex color for fill. */
-    interp_v3_v3v3(fill_color_, fill_color_, gps->vert_color_fill, gps->vert_color_fill[3]);
-  }
-}
-
-struct MaterialGPencilStyle *GpencilIO::gp_style_current_get(void)
-{
-  return gp_style_;
-}
-
-bool GpencilIO::material_is_stroke(void)
-{
-  return is_stroke_;
-}
-
-bool GpencilIO::material_is_fill(void)
-{
-  return is_fill_;
-}
-
-float GpencilIO::stroke_average_opacity_get(void)
+float GpencilIO::stroke_average_opacity_get()
 {
   return avg_opacity_;
 }
 
-bool GpencilIO::is_camera_mode(void)
+bool GpencilIO::is_camera_mode()
 {
   return is_camera_;
 }
 
-/* Calc selected strokes boundbox. */
-void GpencilIO::selected_objects_boundbox_set(void)
+/* Calculate selected strokes boundbox. */
+void GpencilIO::selected_objects_boundbox_calc()
 {
   const float gap = 10.0f;
-  const bGPDspoint *pt;
-  int32_t i;
 
-  float screen_co[2];
-  float r_min[2], r_max[2];
-  INIT_MINMAX2(r_min, r_max);
+  float2 min, max;
+  INIT_MINMAX2(min, max);
 
   for (ObjectZ &obz : ob_list_) {
     Object *ob = obz.ob;
@@ -465,7 +342,7 @@ void GpencilIO::selected_objects_boundbox_set(void)
       if (gpl->flag & GP_LAYER_HIDE) {
         continue;
       }
-      BKE_gpencil_layer_transform_matrix_get(depsgraph_, ob_eval, gpl, diff_mat_);
+      BKE_gpencil_layer_transform_matrix_get(depsgraph_, ob_eval, gpl, diff_mat_.values);
 
       bGPDframe *gpf = gpl->actframe;
       if (gpf == nullptr) {
@@ -476,22 +353,21 @@ void GpencilIO::selected_objects_boundbox_set(void)
         if (gps->totpoints == 0) {
           continue;
         }
-        for (i = 0, pt = gps->points; i < gps->totpoints; i++, pt++) {
-          /* Convert to 2D. */
-          gpencil_3d_point_to_screen_space(&pt->x, screen_co);
-          minmax_v2v2_v2(r_min, r_max, screen_co);
+        for (const bGPDspoint &pt : MutableSpan(gps->points, gps->totpoints)) {
+          const float2 screen_co = gpencil_3D_point_to_2D(&pt.x);
+          minmax_v2v2_v2(min, max, screen_co);
         }
       }
     }
   }
   /* Add small gap. */
-  add_v2_fl(r_min, gap * -1.0f);
-  add_v2_fl(r_max, gap);
+  add_v2_fl(min, gap * -1.0f);
+  add_v2_fl(max, gap);
 
-  select_boundbox_.xmin = r_min[0];
-  select_boundbox_.ymin = r_min[1];
-  select_boundbox_.xmax = r_max[0];
-  select_boundbox_.ymax = r_max[1];
+  select_boundbox_.xmin = min[0];
+  select_boundbox_.ymin = min[1];
+  select_boundbox_.xmax = max[0];
+  select_boundbox_.ymax = max[1];
 }
 
 void GpencilIO::selected_objects_boundbox_get(rctf *boundbox)

@@ -21,12 +21,16 @@
 /** \file
  * \ingroup bgpencil
  */
-#include <list>
-#include <string>
+
+#include "BLI_float2.hh"
+#include "BLI_float3.hh"
+#include "BLI_float4x4.hh"
+#include "BLI_vector.hh"
+
+#include "DNA_space_types.h" /* for FILE_MAX */
 
 #include "gpencil_io.h"
 
-struct ARegion;
 struct Depsgraph;
 struct Main;
 struct Object;
@@ -35,16 +39,15 @@ struct Scene;
 
 struct bGPdata;
 struct bGPDlayer;
-struct bGPDframe;
 struct bGPDstroke;
-struct MaterialGPencilStyle;
+
+using blender::Vector;
 
 namespace blender::io::gpencil {
 
 class GpencilIO {
-
  public:
-  GpencilIO(const struct GpencilIOParams *iparams);
+  GpencilIO(const GpencilIOParams *iparams);
 
   void frame_number_set(const int value);
 
@@ -52,7 +55,7 @@ class GpencilIO {
   GpencilIOParams params_;
 
   bool invert_axis_[2];
-  float diff_mat_[4][4];
+  float4x4 diff_mat_;
   char filename_[FILE_MAX];
 
   /* Used for sorting objects. */
@@ -62,7 +65,7 @@ class GpencilIO {
   };
 
   /** List of included objects. */
-  std::list<ObjectZ> ob_list_;
+  blender::Vector<ObjectZ> ob_list_;
 
   /* Data for easy access. */
   struct Depsgraph *depsgraph_;
@@ -76,54 +79,38 @@ class GpencilIO {
   float camera_ratio_;
   rctf camera_rect_;
 
-  float offset_[2];
+  float2 offset_;
 
   int cfra_;
-  bool object_created_;
 
   float stroke_color_[4], fill_color_[4];
 
-  static std::string rgb_to_hexstr(float color[3]);
-  static void rgb_to_grayscale(float color[3]);
-  static std::string to_lower_string(char *input_text);
-  static float stroke_average_pressure_get(struct bGPDstroke *gps);
-  static bool is_stroke_thickness_constant(struct bGPDstroke *gps);
-
   /* Geometry functions. */
-  bool gpencil_3d_point_to_screen_space(const float co[3], float r_co[2]);
+  bool gpencil_3D_point_to_screen_space(const float3 co, float2 &r_co);
+  float2 gpencil_3D_point_to_render_space(const float3 co);
+  float2 gpencil_3D_point_to_2D(const float3 co);
 
-  float stroke_point_radius_get(struct bGPDstroke *gps);
-  void create_object_list(void);
+  float stroke_point_radius_get(struct bGPDlayer *gpl, struct bGPDstroke *gps);
+  void create_object_list();
 
-  struct MaterialGPencilStyle *gp_style_current_get(void);
-  bool material_is_stroke(void);
-  bool material_is_fill(void);
+  bool is_camera_mode();
 
-  bool is_camera_mode(void);
+  float stroke_average_opacity_get();
 
-  float stroke_average_opacity_get(void);
+  void prepare_layer_export_matrix(struct Object *ob, struct bGPDlayer *gpl);
+  void prepare_stroke_export_colors(struct Object *ob, struct bGPDstroke *gps);
 
-  struct bGPDlayer *gpl_current_get(void);
-  struct bGPDframe *gpf_current_get(void);
-  struct bGPDstroke *gps_current_get(void);
-  void gpl_current_set(struct bGPDlayer *gpl);
-  void gpf_current_set(struct bGPDframe *gpf);
-  void gps_current_set(struct Object *ob, struct bGPDstroke *gps, const bool set_colors);
-
-  void selected_objects_boundbox_set(void);
+  void selected_objects_boundbox_calc();
   void selected_objects_boundbox_get(rctf *boundbox);
   void filename_set(const char *filename);
 
  private:
-  struct bGPDlayer *gpl_cur_;
-  struct bGPDframe *gpf_cur_;
-  struct bGPDstroke *gps_cur_;
-  struct MaterialGPencilStyle *gp_style_;
-  bool is_stroke_;
-  bool is_fill_;
   float avg_opacity_;
   bool is_camera_;
   rctf select_boundbox_;
+
+  /* Camera matrix. */
+  float persmat_[4][4];
 };
 
 }  // namespace blender::io::gpencil

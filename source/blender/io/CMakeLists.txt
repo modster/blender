@@ -37,4 +37,3 @@ if(WITH_USD)
 endif()
 
 add_subdirectory(gpencil)
-

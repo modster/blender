@@ -469,26 +469,7 @@ class TOPBAR_MT_file_import(Menu):
         if bpy.app.build_options.alembic:
             self.layout.operator("wm.alembic_import", text="Alembic (.abc)")
 
-        self.layout.menu("TOPBAR_MT_file_gpencil_import")
-
-
-class TOPBAR_MT_file_gpencil_import(Menu):
-    bl_idname = "TOPBAR_MT_file_gpencil_import"
-    bl_label = "Grease Pencil"
-    bl_owner_use_filter = False
-
-    def draw(self, context):
-        self.layout.operator("wm.gpencil_import_svg", text="Scalable Vector Graphics (.svg)")
-
-
-class TOPBAR_MT_file_gpencil_export(Menu):
-    bl_idname = "TOPBAR_MT_file_gpencil_export"
-    bl_label = "Grease Pencil"
-    bl_owner_use_filter = False
-
-    def draw(self, context):
-        self.layout.operator("wm.gpencil_export_svg", text="Scalable Vector Graphics (.svg)")
-        self.layout.operator("wm.gpencil_export_pdf", text="Portable Document Format (.pdf)")
+        self.layout.operator("wm.gpencil_import_svg", text="SVG as Grease Pencil")
 
 
 class TOPBAR_MT_file_export(Menu):
@@ -506,7 +487,12 @@ class TOPBAR_MT_file_export(Menu):
             self.layout.operator(
                 "wm.usd_export", text="Universal Scene Description (.usd, .usdc, .usda)")
 
-        self.layout.menu("TOPBAR_MT_file_gpencil_export")
+        # Pugixml lib dependency
+        if bpy.app.build_options.pugixml:
+            self.layout.operator("wm.gpencil_export_svg", text="Grease Pencil as SVG")
+        # Haru lib dependency
+        if bpy.app.build_options.haru:
+            self.layout.operator("wm.gpencil_export_pdf", text="Grease Pencil as PDF")
 
 
 class TOPBAR_MT_file_external_data(Menu):
