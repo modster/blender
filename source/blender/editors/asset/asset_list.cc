@@ -472,14 +472,14 @@ void ED_assetlist_iterate(const AssetLibraryReference *library_reference, AssetL
   }
 }
 
-ImBuf *ED_assetlist_asset_image_get(const FileDirEntry *file)
+ImBuf *ED_assetlist_asset_image_get(const AssetHandle *asset_handle)
 {
-  ImBuf *imbuf = filelist_file_getimage(file);
+  ImBuf *imbuf = filelist_file_getimage(asset_handle->file_data);
   if (imbuf) {
     return imbuf;
   }
 
-  return filelist_geticon_image_ex(file);
+  return filelist_geticon_image_ex(asset_handle->file_data);
 }
 
 const char *ED_assetlist_library_path(const AssetLibraryReference *library_reference)

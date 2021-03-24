@@ -48,8 +48,7 @@ void ED_assetlist_storage_tag_main_data_dirty(void);
 void ED_assetlist_storage_id_remap(struct ID *id_old, struct ID *id_new);
 void ED_assetlist_storage_exit(void);
 
-struct FileDirEntry;
-struct ImBuf *ED_assetlist_asset_image_get(const struct FileDirEntry *file);
+struct ImBuf *ED_assetlist_asset_image_get(const AssetHandle *asset_handle);
 const char *ED_assetlist_library_path(const struct AssetLibraryReference *library_reference);
 
 bool ED_assetlist_listen(const struct AssetLibraryReference *library_reference,
