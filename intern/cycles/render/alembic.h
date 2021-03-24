@@ -424,20 +424,20 @@ class AlembicObject : public Node {
                      const int frame,
                      Alembic::AbcGeom::IPolyMeshSchema &schema,
                      Progress &progress,
-                     bool for_prefetch);
+                     bool load_data_for_prefetch);
   bool load_all_data(CachedData &cached_data,
                      AlembicProcedural *proc,
                      const int frame,
                      Alembic::AbcGeom::ISubDSchema &schema,
                      Progress &progress,
-                     bool for_prefetch);
+                     bool load_data_for_prefetch);
   bool load_all_data(CachedData &cached_data,
                      AlembicProcedural *proc,
                      const int frame,
                      const Alembic::AbcGeom::ICurvesSchema &schema,
                      Progress &progress,
                      float default_radius,
-                     bool for_prefetch);
+                     bool load_data_for_prefetch);
 
   bool has_data_loaded(int frame) const;
 
@@ -472,10 +472,10 @@ class AlembicObject : public Node {
   {
     cached_data_.clear();
 
-    if (prefetch_cache) {
-      prefetch_cache->clear();
-      delete prefetch_cache;
-      prefetch_cache = nullptr;
+    if (prefetched_cache_pointer) {
+      prefetched_cache_pointer->clear();
+      delete prefetched_cache_pointer;
+      prefetched_cache_pointer = nullptr;
     }
 
     data_loaded = false;
@@ -490,7 +490,7 @@ class AlembicObject : public Node {
 
   CachedData cached_data_;
   /* cache used to prefetch the next N frames during rendering */
-  CachedData *prefetch_cache;
+  CachedData *prefetched_cache_pointer;
 
   void update_shader_attributes(CachedData &cached_data,
                                 const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,

@@ -743,12 +743,12 @@ NODE_DEFINE(AlembicObject)
 AlembicObject::AlembicObject() : Node(get_node_type())
 {
   schema_type = INVALID;
-  prefetch_cache = nullptr;
+  prefetched_cache_pointer = nullptr;
 }
 
 AlembicObject::~AlembicObject()
 {
-  delete prefetch_cache;
+  delete prefetched_cache_pointer;
 }
 
 void AlembicObject::set_object(Object *object_)
@@ -1079,9 +1079,9 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
                                   const int frame,
                                   IPolyMeshSchema &schema,
                                   Progress &progress,
-                                  bool for_prefetch)
+                                  bool load_data_for_prefetch)
 {
-  if (!for_prefetch && prefetch_cache) {
+  if (!load_data_for_prefetch && prefetched_cache_pointer) {
     swap_prefetch_cache();
     return true;
   }
@@ -1174,9 +1174,9 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
                                   const int frame,
                                   ISubDSchema &schema,
                                   Progress &progress,
-                                  bool for_prefetch)
+                                  bool load_data_for_prefetch)
 {
-  if (!for_prefetch && prefetch_cache) {
+  if (!load_data_for_prefetch && prefetched_cache_pointer) {
     swap_prefetch_cache();
     return true;
   }
@@ -1329,9 +1329,9 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
                                   const ICurvesSchema &schema,
                                   Progress &progress,
                                   float default_radius,
-                                  bool for_prefetch)
+                                  bool load_data_for_prefetch)
 {
-  if (!for_prefetch && prefetch_cache) {
+  if (!load_data_for_prefetch && prefetched_cache_pointer) {
     swap_prefetch_cache();
     return true;
   }
@@ -1491,8 +1491,8 @@ AttributeRequestSet AlembicObject::get_requested_attributes()
 
 void AlembicObject::swap_prefetch_cache()
 {
-  if (prefetch_cache) {
-    cached_data_.swap(*prefetch_cache);
+  if (prefetched_cache_pointer) {
+    cached_data_.swap(*prefetched_cache_pointer);
   }
 }
 
@@ -2479,24 +2479,24 @@ void AlembicProcedural::build_caches(Progress &progress)
 
         if (object->schema_type == AlembicObject::POLY_MESH) {
           if (!object->has_data_loaded(prefetch_frame)) {
-            if (!object->prefetch_cache) {
-              object->prefetch_cache = new CachedData;
+            if (!object->prefetched_cache_pointer) {
+              object->prefetched_cache_pointer = new CachedData;
             }
             IPolyMesh polymesh(object->iobject, Alembic::Abc::kWrapExisting);
             IPolyMeshSchema schema = polymesh.getSchema();
             object->load_all_data(
-                *object->prefetch_cache, this, prefetch_frame, schema, progress, true);
+                *object->prefetched_cache_pointer, this, prefetch_frame, schema, progress, true);
           }
         }
         else if (object->schema_type == AlembicObject::CURVES) {
           if (!object->has_data_loaded(prefetch_frame) || default_radius_is_modified() ||
               object->radius_scale_is_modified()) {
-            if (!object->prefetch_cache) {
-              object->prefetch_cache = new CachedData;
+            if (!object->prefetched_cache_pointer) {
+              object->prefetched_cache_pointer = new CachedData;
             }
             ICurves curves(object->iobject, Alembic::Abc::kWrapExisting);
             ICurvesSchema schema = curves.getSchema();
-            object->load_all_data(*object->prefetch_cache,
+            object->load_all_data(*object->prefetched_cache_pointer,
                                   this,
                                   prefetch_frame,
                                   schema,
@@ -2507,13 +2507,13 @@ void AlembicProcedural::build_caches(Progress &progress)
         }
         else if (object->schema_type == AlembicObject::SUBD) {
           if (!object->has_data_loaded(prefetch_frame)) {
-            if (!object->prefetch_cache) {
-              object->prefetch_cache = new CachedData;
+            if (!object->prefetched_cache_pointer) {
+              object->prefetched_cache_pointer = new CachedData;
             }
             ISubD subd_mesh(object->iobject, Alembic::Abc::kWrapExisting);
             ISubDSchema schema = subd_mesh.getSchema();
             object->load_all_data(
-                *object->prefetch_cache, this, prefetch_frame, schema, progress, true);
+                *object->prefetched_cache_pointer, this, prefetch_frame, schema, progress, true);
           }
         }
 
