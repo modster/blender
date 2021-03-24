@@ -2226,6 +2226,7 @@ void uiTemplateFileSelectPath(uiLayout *layout,
                               struct FileSelectParams *params);
 void uiTemplateAssetView(struct uiLayout *layout,
                          struct bContext *C,
+                         const char *list_id,
                          struct PointerRNA *asset_library_dataptr,
                          const char *asset_library_propname,
                          struct PointerRNA *assets_dataptr,

@@ -572,6 +572,7 @@ static void rna_uiTemplateEventFromKeymapItem(
 
 static void rna_uiTemplateAssetView(uiLayout *layout,
                                     bContext *C,
+                                    const char *list_id,
                                     PointerRNA *asset_library_dataptr,
                                     const char *asset_library_propname,
                                     PointerRNA *assets_dataptr,
@@ -585,6 +586,7 @@ static void rna_uiTemplateAssetView(uiLayout *layout,
   };
   uiTemplateAssetView(layout,
                       C,
+                      list_id,
                       asset_library_dataptr,
                       asset_library_propname,
                       assets_dataptr,
@@ -1736,6 +1738,14 @@ void RNA_api_ui_layout(StructRNA *srna)
   func = RNA_def_function(srna, "template_asset_view", "rna_uiTemplateAssetView");
   RNA_def_function_ui_description(func, "Item. A scrollable list of assets in a grid view");
   RNA_def_function_flag(func, FUNC_USE_CONTEXT);
+  parm = RNA_def_string(func,
+                        "list_id",
+                        NULL,
+                        0,
+                        "",
+                        "Identifier of this asset view. Necessary to tell apart different asset "
+                        "views and to idenify an asset view read from a .blend");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_pointer(func,
                          "asset_library_dataptr",
                          "AnyType",

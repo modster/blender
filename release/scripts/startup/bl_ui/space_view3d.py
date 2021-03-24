@@ -7013,6 +7013,7 @@ class VIEW3D_PT_asset_testing(Panel):
         workspace = context.workspace
 
         layout.template_asset_view(
+            "pose_assets",
             workspace,
             "active_asset_library",
             wm,

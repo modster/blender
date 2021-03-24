@@ -181,6 +181,7 @@ static void asset_view_template_refresh_asset_collection(
 
 void uiTemplateAssetView(uiLayout *layout,
                          bContext *C,
+                         const char *list_id,
                          PointerRNA *asset_library_dataptr,
                          const char *asset_library_propname,
                          PointerRNA *assets_dataptr,
@@ -189,6 +190,11 @@ void uiTemplateAssetView(uiLayout *layout,
                          const char *active_propname,
                          const AssetFilterSettings *filter_settings)
 {
+  if (!list_id || !list_id[0]) {
+    RNA_warning("Asset view needs a valid identifier");
+    return;
+  }
+
   uiLayout *col = uiLayoutColumn(layout, false);
 
   PropertyRNA *asset_library_prop = RNA_struct_find_property(asset_library_dataptr,
@@ -212,7 +218,7 @@ void uiTemplateAssetView(uiLayout *layout,
   uiList *list = uiTemplateList_ex(col,
                                    C,
                                    "UI_UL_asset_view",
-                                   "asset_view",
+                                   list_id,
                                    assets_dataptr,
                                    assets_propname,
                                    active_dataptr,
