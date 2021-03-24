@@ -26,7 +26,8 @@ void register_node_type_function_group(void)
 {
   static bNodeType ntype;
 
-  node_type_base_custom(&ntype, "FunctionNodeGroup", "Group", NODE_CLASS_GROUP, 0);
+  node_type_base_custom(
+      &ntype, "FunctionNodeGroup", "Attribute Processor", NODE_CLASS_ATTRIBUTE, 0);
   ntype.type = NODE_GROUP;
   ntype.poll = fn_node_poll_default;
   ntype.poll_instance = node_group_poll_instance;
