@@ -516,10 +516,6 @@ static void add_uvs(AlembicProcedural *proc,
   ArraySample::Key previous_indices_key;
   ArraySample::Key previous_values_key;
 
-  /* Keys used to determine if the UVs do actually change over time. */
-  ArraySample::Key previous_indices_key;
-  ArraySample::Key previous_values_key;
-
   foreach (chrono_t time, times) {
     if (progress.get_cancel()) {
       return;
@@ -1106,11 +1102,6 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
 
   /* this should be done after get_relevant_sample_times or frame_offset will be invalid! */
   cached_data.set_time_sampling(*time_sampling);
-
-  /* Key used to determine if the triangles change over time, if the key is the same as the
-   * last one, we can avoid creating a new entry in the cache and simply point to the last
-   * frame. */
-  ArraySample::Key previous_key;
 
   /* Key used to determine if the triangles change over time, if the key is the same as the
    * last one, we can avoid creating a new entry in the cache and simply point to the last
