@@ -293,7 +293,7 @@ typedef struct bGPDstroke {
   /** factor xy of shape for dots gradients */
   float aspect_ratio[2];
 
-  /** Factor of opacity for Fill color. */
+  /** Factor of opacity for Fill color (used by opacity modifier). */
   float fill_opacity_fac;
 
   /** Min of the bound box used to speedup painting operators. */
