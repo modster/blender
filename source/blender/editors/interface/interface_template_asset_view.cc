@@ -115,7 +115,9 @@ static void asset_view_draw_item(uiList *ui_list,
                   asset_handle->file_data->preview_icon_id,
                   /* NOLINTNEXTLINE: bugprone-suspicious-enum-usage */
                   UI_HAS_ICON | UI_BUT_ICON_PREVIEW);
-  asset_view_item_but_drag_set(but, list_data, asset_handle);
+  if (!ui_list->custom_drag_opname) {
+    asset_view_item_but_drag_set(but, list_data, asset_handle);
+  }
 }
 
 static void asset_view_listener(uiList *ui_list, wmRegionListenerParams *params)
@@ -188,7 +190,9 @@ void uiTemplateAssetView(uiLayout *layout,
                          const char *assets_propname,
                          PointerRNA *active_dataptr,
                          const char *active_propname,
-                         const AssetFilterSettings *filter_settings)
+                         const AssetFilterSettings *filter_settings,
+                         const char *activate_opname,
+                         const char *drag_opname)
 {
   if (!list_id || !list_id[0]) {
     RNA_warning("Asset view needs a valid identifier");
@@ -231,6 +235,9 @@ void uiTemplateAssetView(uiLayout *layout,
                                    false,
                                    false,
                                    list_data);
+
+  list->custom_activate_opname = activate_opname;
+  list->custom_drag_opname = drag_opname;
 
   if (!list) {
     /* List creation failed. */

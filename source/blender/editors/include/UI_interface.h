@@ -2233,7 +2233,9 @@ void uiTemplateAssetView(struct uiLayout *layout,
                          const char *assets_propname,
                          struct PointerRNA *active_dataptr,
                          const char *active_propname,
-                         const struct AssetFilterSettings *filter_settings);
+                         const struct AssetFilterSettings *filter_settings,
+                         const char *activate_opname,
+                         const char *drag_opname);
 
 /* items */
 void uiItemO(uiLayout *layout, const char *name, int icon, const char *opname);

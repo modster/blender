@@ -579,7 +579,9 @@ static void rna_uiTemplateAssetView(uiLayout *layout,
                                     const char *assets_propname,
                                     PointerRNA *active_dataptr,
                                     const char *active_propname,
-                                    int filter_id_types)
+                                    int filter_id_types,
+                                    const char *activate_opname,
+                                    const char *drag_opname)
 {
   AssetFilterSettings filter_settings = {
       .id_types = filter_id_types ? filter_id_types : FILTER_ID_ALL,
@@ -593,7 +595,9 @@ static void rna_uiTemplateAssetView(uiLayout *layout,
                       assets_propname,
                       active_dataptr,
                       active_propname,
-                      &filter_settings);
+                      &filter_settings,
+                      activate_opname,
+                      drag_opname);
 }
 
 /**
@@ -1779,6 +1783,20 @@ void RNA_api_ui_layout(StructRNA *srna)
   RNA_def_property_enum_items(parm, DummyRNA_NULL_items);
   RNA_def_property_enum_funcs(parm, NULL, NULL, "rna_uiTemplateAssetView_filter_id_types_itemf");
   RNA_def_property_flag(parm, PROP_ENUM_FLAG);
+  RNA_def_string(func,
+                 "activate_operator",
+                 NULL,
+                 0,
+                 "",
+                 "Name of a custom operator to invoke when activating an item");
+  RNA_def_string(func,
+                 "drag_operator",
+                 NULL,
+                 0,
+                 "",
+                 "Name of a custom operator to invoke when starting to drag an item. Never "
+                 "invoked together with the `active_operator` (if set), it's either the drag or "
+                 "the activate one");
 }
 
 #endif
