@@ -484,7 +484,7 @@ static void add_uvs(AlembicProcedural *proc,
                     const int frame,
                     const IV2fGeomParam &uvs,
                     CachedData &cached_data,
-                    Progress &progress)
+                    CacheBuildingProgress &progress)
 {
   if (uvs.getScope() != kFacevaryingScope) {
     return;
@@ -768,7 +768,7 @@ bool AlembicObject::has_data_loaded(int frame) const
 
 void AlembicObject::update_shader_attributes(CachedData &cached_data,
                                              const ICompoundProperty &arb_geom_params,
-                                             Progress &progress)
+                                             CacheBuildingProgress &progress)
 {
   AttributeRequestSet requested_attributes = get_requested_attributes();
 
@@ -853,7 +853,7 @@ void AlembicObject::read_face_sets(SchemaType &schema,
 
 static void compute_vertex_deltas(CachedData &cached_data,
                                   const ccl::set<chrono_t> &times,
-                                  Progress &progress)
+                                  CacheBuildingProgress &progress)
 {
   if (cached_data.vertices.size() == 0 || cached_data.vertices.size() == 1) {
     return;
@@ -974,7 +974,7 @@ static void compute_vertex_deltas(CachedData &cached_data,
 
 static void compute_curve_deltas(CachedData &cached_data,
                                  const ccl::set<chrono_t> &times,
-                                 Progress &progress)
+                                 CacheBuildingProgress &progress)
 {
   if (cached_data.curve_keys.size() == 0 || cached_data.curve_keys.size() == 1) {
     return;
@@ -1074,21 +1074,40 @@ static void compute_curve_deltas(CachedData &cached_data,
   }
 }
 
-bool AlembicObject::load_all_data(CachedData &cached_data,
-                                  AlembicProcedural *proc,
-                                  const int frame,
-                                  IPolyMeshSchema &schema,
-                                  Progress &progress,
-                                  bool load_data_for_prefetch)
+bool AlembicObject::load_data_from_prefetched_cache(AlembicProcedural *proc, const int frame)
 {
-  if (!load_data_for_prefetch && prefetched_cache_pointer) {
-    swap_prefetch_cache();
-    return true;
+  if (prefetched_cache_pointer) {
+    if (prefetched_cache_pointer->has_frame(frame)) {
+      /* Wait until current prefetching is done. */
+      proc->wait_for_prefetching();
+      swap_prefetched_cache();
+      return true;
+    }
+
+    proc->cancel_prefetching();
+    /* Reset all caches, the frame is neither the main cache, nor in the prefetched cache. */
+    clear_all_caches();
   }
 
+  return false;
+}
+
+bool AlembicObject::load_data_in_cache(CachedData &cached_data,
+                                       AlembicProcedural *proc,
+                                       const int frame,
+                                       IPolyMeshSchema &schema,
+                                       CacheBuildingProgress &progress,
+                                       bool load_data_for_prefetch)
+{
   /* Only load data for the original Geometry. */
   if (instance_of) {
     return false;
+  }
+
+  if (!load_data_for_prefetch) {
+    if (load_data_from_prefetched_cache(proc, frame)) {
+      return true;
+    }
   }
 
   cached_data.clear();
@@ -1169,24 +1188,25 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
   return true;
 }
 
-bool AlembicObject::load_all_data(CachedData &cached_data,
-                                  AlembicProcedural *proc,
-                                  const int frame,
-                                  ISubDSchema &schema,
-                                  Progress &progress,
-                                  bool load_data_for_prefetch)
+bool AlembicObject::load_data_in_cache(CachedData &cached_data,
+                                       AlembicProcedural *proc,
+                                       const int frame,
+                                       ISubDSchema &schema,
+                                       CacheBuildingProgress &progress,
+                                       bool load_data_for_prefetch)
 {
-  if (!load_data_for_prefetch && prefetched_cache_pointer) {
-    swap_prefetch_cache();
-    return true;
-  }
-
-  cached_data.clear();
-
   /* Only load data for the original Geometry. */
   if (instance_of) {
     return false;
   }
+
+  if (!load_data_for_prefetch) {
+    if (load_data_from_prefetched_cache(proc, frame)) {
+      return true;
+    }
+  }
+
+  cached_data.clear();
 
   AttributeRequestSet requested_attributes = get_requested_attributes();
 
@@ -1323,25 +1343,26 @@ bool AlembicObject::load_all_data(CachedData &cached_data,
   return true;
 }
 
-bool AlembicObject::load_all_data(CachedData &cached_data,
-                                  AlembicProcedural *proc,
-                                  const int frame,
-                                  const ICurvesSchema &schema,
-                                  Progress &progress,
-                                  float default_radius,
-                                  bool load_data_for_prefetch)
+bool AlembicObject::load_data_in_cache(CachedData &cached_data,
+                                       AlembicProcedural *proc,
+                                       const int frame,
+                                       const ICurvesSchema &schema,
+                                       CacheBuildingProgress &progress,
+                                       float default_radius,
+                                       bool load_data_for_prefetch)
 {
-  if (!load_data_for_prefetch && prefetched_cache_pointer) {
-    swap_prefetch_cache();
-    return true;
-  }
-
-  cached_data.clear();
-
   /* Only load data for the original Geometry. */
   if (instance_of) {
     return false;
   }
+
+  if (!load_data_for_prefetch) {
+    if (load_data_from_prefetched_cache(proc, frame)) {
+      return true;
+    }
+  }
+
+  cached_data.clear();
 
   const TimeSamplingPtr time_sampling = schema.getTimeSampling();
 
@@ -1489,17 +1510,18 @@ AttributeRequestSet AlembicObject::get_requested_attributes()
   return requested_attributes;
 }
 
-void AlembicObject::swap_prefetch_cache()
+void AlembicObject::swap_prefetched_cache()
 {
   if (prefetched_cache_pointer) {
     cached_data_.swap(*prefetched_cache_pointer);
+    prefetched_cache_pointer->clear();
   }
 }
 
 void AlembicObject::read_attribute(CachedData &cached_data,
                                    const ICompoundProperty &arb_geom_params,
                                    const ustring &attr_name,
-                                   Progress &progress)
+                                   CacheBuildingProgress &progress)
 {
   const PropertyHeader *prop = arb_geom_params.getPropertyHeader(attr_name.c_str());
 
@@ -1820,7 +1842,8 @@ void AlembicProcedural::generate(Scene *scene, Progress &progress)
     }
 
     /* Check if the shaders were modified. */
-    if (object->used_shaders_is_modified() && object->get_object() && object->get_object()->get_geometry()) {
+    if (object->used_shaders_is_modified() && object->get_object() &&
+        object->get_object()->get_geometry()) {
       Geometry *geometry = object->get_object()->get_geometry();
       array<Node *> used_shaders = object->get_used_shaders();
       geometry->set_used_shaders(used_shaders);
@@ -1940,6 +1963,18 @@ AlembicObject *AlembicProcedural::get_or_create_object(const ustring &path)
   add_object(object);
 
   return object;
+}
+
+void AlembicProcedural::wait_for_prefetching()
+{
+  prefetch_pool.wait();
+}
+
+void AlembicProcedural::cancel_prefetching()
+{
+  cache_building_progress.set_cancel(true);
+  prefetch_pool.cancel();
+  cache_building_progress.set_cancel(false);
 }
 
 void AlembicProcedural::load_objects(Progress &progress)
@@ -2399,11 +2434,12 @@ void AlembicProcedural::build_caches(Progress &progress)
   size_t memory_used = 0;
 
   bool need_prefetch = false;
+  cache_building_progress.set_progress(progress);
 
   for (Node *node : objects) {
     AlembicObject *object = static_cast<AlembicObject *>(node);
 
-    if (progress.get_cancel()) {
+    if (cache_building_progress.get_cancel()) {
       return;
     }
 
@@ -2413,14 +2449,18 @@ void AlembicProcedural::build_caches(Progress &progress)
       if (!object->has_data_loaded(current_frame)) {
         IPolyMesh polymesh(object->iobject, Alembic::Abc::kWrapExisting);
         IPolyMeshSchema schema = polymesh.getSchema();
-        need_prefetch |= object->load_all_data(
-            object->get_cached_data(), this, current_frame, schema, progress, false);
+        need_prefetch |= object->load_data_in_cache(object->get_cached_data(),
+                                                    this,
+                                                    current_frame,
+                                                    schema,
+                                                    cache_building_progress,
+                                                    false);
       }
       else if (object->need_shader_update) {
         IPolyMesh polymesh(object->iobject, Alembic::Abc::kWrapExisting);
         IPolyMeshSchema schema = polymesh.getSchema();
         object->update_shader_attributes(
-            object->get_cached_data(), schema.getArbGeomParams(), progress);
+            object->get_cached_data(), schema.getArbGeomParams(), cache_building_progress);
       }
     }
     else if (object->schema_type == AlembicObject::CURVES) {
@@ -2428,27 +2468,31 @@ void AlembicProcedural::build_caches(Progress &progress)
           object->radius_scale_is_modified()) {
         ICurves curves(object->iobject, Alembic::Abc::kWrapExisting);
         ICurvesSchema schema = curves.getSchema();
-        need_prefetch |= object->load_all_data(object->get_cached_data(),
-                                               this,
-                                               current_frame,
-                                               schema,
-                                               progress,
-                                               default_radius,
-                                               false);
+        need_prefetch |= object->load_data_in_cache(object->get_cached_data(),
+                                                    this,
+                                                    current_frame,
+                                                    schema,
+                                                    cache_building_progress,
+                                                    default_radius,
+                                                    false);
       }
     }
     else if (object->schema_type == AlembicObject::SUBD) {
       if (!object->has_data_loaded(current_frame)) {
         ISubD subd_mesh(object->iobject, Alembic::Abc::kWrapExisting);
         ISubDSchema schema = subd_mesh.getSchema();
-        need_prefetch |= object->load_all_data(
-            object->get_cached_data(), this, current_frame, schema, progress, false);
+        need_prefetch |= object->load_data_in_cache(object->get_cached_data(),
+                                                    this,
+                                                    current_frame,
+                                                    schema,
+                                                    cache_building_progress,
+                                                    false);
       }
       else if (object->need_shader_update) {
         ISubD subd_mesh(object->iobject, Alembic::Abc::kWrapExisting);
         ISubDSchema schema = subd_mesh.getSchema();
         object->update_shader_attributes(
-            object->get_cached_data(), schema.getArbGeomParams(), progress);
+            object->get_cached_data(), schema.getArbGeomParams(), cache_building_progress);
       }
     }
 
@@ -2473,7 +2517,7 @@ void AlembicProcedural::build_caches(Progress &progress)
       for (Node *node : objects) {
         AlembicObject *object = static_cast<AlembicObject *>(node);
 
-        if (progress.get_cancel()) {
+        if (cache_building_progress.get_cancel()) {
           return;
         }
 
@@ -2484,8 +2528,12 @@ void AlembicProcedural::build_caches(Progress &progress)
             }
             IPolyMesh polymesh(object->iobject, Alembic::Abc::kWrapExisting);
             IPolyMeshSchema schema = polymesh.getSchema();
-            object->load_all_data(
-                *object->prefetched_cache_pointer, this, prefetch_frame, schema, progress, true);
+            object->load_data_in_cache(*object->prefetched_cache_pointer,
+                                       this,
+                                       prefetch_frame,
+                                       schema,
+                                       cache_building_progress,
+                                       true);
           }
         }
         else if (object->schema_type == AlembicObject::CURVES) {
@@ -2496,13 +2544,13 @@ void AlembicProcedural::build_caches(Progress &progress)
             }
             ICurves curves(object->iobject, Alembic::Abc::kWrapExisting);
             ICurvesSchema schema = curves.getSchema();
-            object->load_all_data(*object->prefetched_cache_pointer,
-                                  this,
-                                  prefetch_frame,
-                                  schema,
-                                  progress,
-                                  default_radius,
-                                  true);
+            object->load_data_in_cache(*object->prefetched_cache_pointer,
+                                       this,
+                                       prefetch_frame,
+                                       schema,
+                                       cache_building_progress,
+                                       default_radius,
+                                       true);
           }
         }
         else if (object->schema_type == AlembicObject::SUBD) {
@@ -2512,8 +2560,12 @@ void AlembicProcedural::build_caches(Progress &progress)
             }
             ISubD subd_mesh(object->iobject, Alembic::Abc::kWrapExisting);
             ISubDSchema schema = subd_mesh.getSchema();
-            object->load_all_data(
-                *object->prefetched_cache_pointer, this, prefetch_frame, schema, progress, true);
+            object->load_data_in_cache(*object->prefetched_cache_pointer,
+                                       this,
+                                       prefetch_frame,
+                                       schema,
+                                       cache_building_progress,
+                                       true);
           }
         }
 
@@ -2526,6 +2578,21 @@ void AlembicProcedural::build_caches(Progress &progress)
 
   std::cerr << "AlembicProcedural memory usage : " << string_human_readable_size(memory_used)
             << '\n';
+}
+
+void CacheBuildingProgress::set_progress(Progress &progress)
+{
+  progress_ = &progress;
+}
+
+bool CacheBuildingProgress::get_cancel() const
+{
+  return (progress_ && progress_->get_cancel()) || building_was_canceled;
+}
+
+void CacheBuildingProgress::set_cancel(bool yesno)
+{
+  building_was_canceled = yesno;
 }
 
 CCL_NAMESPACE_END

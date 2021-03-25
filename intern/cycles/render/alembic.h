@@ -247,6 +247,7 @@ template<typename T> class DataStore {
   {
     invalidate_last_loaded_time();
     data.clear();
+    index_data_map.clear();
   }
 
   void invalidate_last_loaded_time()
@@ -380,6 +381,24 @@ struct CachedData {
   size_t memory_used() const;
 
   void swap(CachedData &other);
+
+  bool has_frame(int frame) const
+  {
+    return frame_start <= frame && frame <= frame_end;
+  }
+};
+
+/* Used to query if the cache building was cancelled, either from an external cause,
+ * the render was cancelled, queried through Progress, or by an internal cause, the current
+ * prefetching should be cancelled as the requested frame is not inside of the prefetched cache. */
+class CacheBuildingProgress {
+  Progress *progress_ = nullptr;
+  bool building_was_canceled = false;
+
+ public:
+  void set_progress(Progress &progress);
+  bool get_cancel() const;
+  void set_cancel(bool yesno);
 };
 
 /* Representation of an Alembic object for the AlembicProcedural.
@@ -419,25 +438,25 @@ class AlembicObject : public Node {
   void set_object(Object *object);
   Object *get_object();
 
-  bool load_all_data(CachedData &cached_data,
-                     AlembicProcedural *proc,
-                     const int frame,
-                     Alembic::AbcGeom::IPolyMeshSchema &schema,
-                     Progress &progress,
-                     bool load_data_for_prefetch);
-  bool load_all_data(CachedData &cached_data,
-                     AlembicProcedural *proc,
-                     const int frame,
-                     Alembic::AbcGeom::ISubDSchema &schema,
-                     Progress &progress,
-                     bool load_data_for_prefetch);
-  bool load_all_data(CachedData &cached_data,
-                     AlembicProcedural *proc,
-                     const int frame,
-                     const Alembic::AbcGeom::ICurvesSchema &schema,
-                     Progress &progress,
-                     float default_radius,
-                     bool load_data_for_prefetch);
+  bool load_data_in_cache(CachedData &cached_data,
+                          AlembicProcedural *proc,
+                          const int frame,
+                          Alembic::AbcGeom::IPolyMeshSchema &schema,
+                          CacheBuildingProgress &progress,
+                          bool load_data_for_prefetch);
+  bool load_data_in_cache(CachedData &cached_data,
+                          AlembicProcedural *proc,
+                          const int frame,
+                          Alembic::AbcGeom::ISubDSchema &schema,
+                          CacheBuildingProgress &progress,
+                          bool load_data_for_prefetch);
+  bool load_data_in_cache(CachedData &cached_data,
+                          AlembicProcedural *proc,
+                          const int frame,
+                          const Alembic::AbcGeom::ICurvesSchema &schema,
+                          CacheBuildingProgress &progress,
+                          float default_radius,
+                          bool load_data_for_prefetch);
 
   bool has_data_loaded(int frame) const;
 
@@ -494,12 +513,12 @@ class AlembicObject : public Node {
 
   void update_shader_attributes(CachedData &cached_data,
                                 const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
-                                Progress &progress);
+                                CacheBuildingProgress &progress);
 
   void read_attribute(CachedData &cached_data,
                       const Alembic::AbcGeom::ICompoundProperty &arb_geom_params,
                       const ustring &attr_name,
-                      Progress &progress);
+                      CacheBuildingProgress &progress);
 
   template<typename SchemaType>
   void read_face_sets(SchemaType &schema,
@@ -510,7 +529,9 @@ class AlembicObject : public Node {
 
   AttributeRequestSet get_requested_attributes();
 
-  void swap_prefetch_cache();
+  void swap_prefetched_cache();
+
+  bool load_data_from_prefetched_cache(AlembicProcedural *proc, const int frame);
 };
 
 /* Procedural to render objects from a single Alembic archive.
@@ -527,6 +548,7 @@ class AlembicProcedural : public Procedural {
   bool objects_loaded;
   Scene *scene_;
 
+  CacheBuildingProgress cache_building_progress;
   DedicatedTaskPool prefetch_pool;
 
  public:
@@ -596,6 +618,10 @@ class AlembicProcedural : public Procedural {
 
   /* Returns a pointer to an existing or a newly created AlembicObject for the given path. */
   AlembicObject *get_or_create_object(const ustring &path);
+
+  void wait_for_prefetching();
+
+  void cancel_prefetching();
 
  private:
   /* Load the data for all the objects whose data has not yet been loaded. */
