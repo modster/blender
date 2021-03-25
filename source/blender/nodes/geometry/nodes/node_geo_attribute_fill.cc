@@ -82,6 +82,7 @@ struct SocketMenuInfo {
   bNodeTree *ntree;
   bNode *node;
   bNodeSocket *socket;
+  std::string enum_name;
 };
 
 struct SocketMenuInfoPtr {
@@ -115,14 +116,12 @@ static void draw_socket_menu(bContext *UNUSED(C), uiLayout *layout, void *arg)
   PointerRNA socket_ptr;
   RNA_pointer_create(&socket_info->ntree->id, &RNA_NodeSocket, socket_info->socket, &socket_ptr);
 
-  // uiItemR(layout, &socket_ptr, "hide", 0, "Expose", ICON_NONE);
-
   if (socket_info->socket->flag & SOCK_HIDDEN) {
     PointerRNA expose_props;
     uiItemFullO(layout,
                 "node.expose_input_socket",
                 "Expose",
-                ICON_NONE,
+                ICON_TRACKING_FORWARDS_SINGLE,
                 nullptr,
                 WM_OP_EXEC_DEFAULT,
                 0,
@@ -137,7 +136,7 @@ static void draw_socket_menu(bContext *UNUSED(C), uiLayout *layout, void *arg)
     uiItemFullO(layout,
                 "node.expose_input_socket",
                 "Unexpose",
-                ICON_NONE,
+                ICON_TRACKING_CLEAR_FORWARDS,
                 nullptr,
                 WM_OP_EXEC_DEFAULT,
                 0,
@@ -148,7 +147,9 @@ static void draw_socket_menu(bContext *UNUSED(C), uiLayout *layout, void *arg)
     RNA_boolean_set(&expose_props, "expose", false);
   }
 
-  uiItemsEnumR(layout, &node_ptr, "data_type");
+  if (!socket_info->enum_name.empty()) {
+    uiItemsEnumR(layout, &node_ptr, socket_info->enum_name.c_str());
+  }
 }
 
 static void geo_node_attribute_fill_layout(uiLayout *layout, bContext *C, PointerRNA *node_ptr)
@@ -156,37 +157,66 @@ static void geo_node_attribute_fill_layout(uiLayout *layout, bContext *C, Pointe
   bNodeTree *ntree = (bNodeTree *)node_ptr->owner_id;
   bNode *node = (bNode *)node_ptr->data;
 
-  bNodeSocket *value_socket = nullptr;
-  LISTBASE_FOREACH (bNodeSocket *, socket, &node->inputs) {
-    if ((socket->flag & SOCK_UNAVAIL) == 0 && STREQ(socket->name, "Value")) {
-      value_socket = socket;
-      break;
-    }
-  }
-  PointerRNA socket_ptr;
-  RNA_pointer_create(node_ptr->owner_id, &RNA_NodeSocket, value_socket, &socket_ptr);
+  uiItemR(layout, node_ptr, "domain", 0, IFACE_("Domain"), ICON_NONE);
 
-  uiItemR(layout, node_ptr, "domain", 0, "", ICON_NONE);
-
-  Set<SocketMenuInfoPtr> &set = get_socket_menu_info_set();
   {
+    bNodeSocket *attribute_socket = (bNodeSocket *)BLI_findlink(&node->inputs, 1);
+    PointerRNA socket_ptr;
+    RNA_pointer_create(node_ptr->owner_id, &RNA_NodeSocket, attribute_socket, &socket_ptr);
+
+    Set<SocketMenuInfoPtr> &set = get_socket_menu_info_set();
+    {
+      auto info = SocketMenuInfoPtr{std::make_unique<SocketMenuInfo>()};
+      info.value->ntree = ntree;
+      info.value->node = node;
+      info.value->socket = attribute_socket;
+      set.add(std::move(info));
+    }
+    auto info = SocketMenuInfoPtr{std::make_unique<SocketMenuInfo>()};
+    info.value->ntree = ntree;
+    info.value->node = node;
+    info.value->socket = attribute_socket;
+    SocketMenuInfo *stored_info = set.lookup_key(info).value.get();
+
+    uiLayout *row = uiLayoutRow(layout, false);
+    uiLayout *sub_row = uiLayoutRow(row, false);
+    uiLayoutSetActive(sub_row, (attribute_socket->flag & SOCK_HIDDEN) != 0);
+    attribute_socket->typeinfo->draw(C, sub_row, &socket_ptr, node_ptr, attribute_socket->name);
+    uiItemMenuF(row, "", ICON_DOWNARROW_HLT, draw_socket_menu, stored_info);
+  }
+
+  {
+    bNodeSocket *value_socket = nullptr;
+    LISTBASE_FOREACH (bNodeSocket *, socket, &node->inputs) {
+      if ((socket->flag & SOCK_UNAVAIL) == 0 && STREQ(socket->name, "Value")) {
+        value_socket = socket;
+        break;
+      }
+    }
+    PointerRNA socket_ptr;
+    RNA_pointer_create(node_ptr->owner_id, &RNA_NodeSocket, value_socket, &socket_ptr);
+
+    Set<SocketMenuInfoPtr> &set = get_socket_menu_info_set();
+    {
+      auto info = SocketMenuInfoPtr{std::make_unique<SocketMenuInfo>()};
+      info.value->ntree = ntree;
+      info.value->node = node;
+      info.value->socket = value_socket;
+      info.value->enum_name = "data_type";
+      set.add(std::move(info));
+    }
     auto info = SocketMenuInfoPtr{std::make_unique<SocketMenuInfo>()};
     info.value->ntree = ntree;
     info.value->node = node;
     info.value->socket = value_socket;
-    set.add(std::move(info));
-  }
-  auto info = SocketMenuInfoPtr{std::make_unique<SocketMenuInfo>()};
-  info.value->ntree = ntree;
-  info.value->node = node;
-  info.value->socket = value_socket;
-  SocketMenuInfo *stored_info = set.lookup_key(info).value.get();
+    SocketMenuInfo *stored_info = set.lookup_key(info).value.get();
 
-  uiLayout *row = uiLayoutRow(layout, false);
-  uiLayout *sub_row = uiLayoutRow(row, false);
-  uiLayoutSetActive(sub_row, (value_socket->flag & SOCK_HIDDEN) != 0);
-  value_socket->typeinfo->draw(C, sub_row, &socket_ptr, node_ptr, value_socket->name);
-  uiItemMenuF(row, "", ICON_DOWNARROW_HLT, draw_socket_menu, stored_info);
+    uiLayout *row = uiLayoutRow(layout, false);
+    uiLayout *sub_row = uiLayoutRow(row, false);
+    uiLayoutSetActive(sub_row, (value_socket->flag & SOCK_HIDDEN) != 0);
+    value_socket->typeinfo->draw(C, sub_row, &socket_ptr, node_ptr, value_socket->name);
+    uiItemMenuF(row, "", ICON_DOWNARROW_HLT, draw_socket_menu, stored_info);
+  }
 }
 
 static AttributeDomain get_result_domain(const GeometryComponent &component,
@@ -284,6 +314,6 @@ void register_node_type_geo_attribute_fill()
   node_type_init(&ntype, geo_node_attribute_fill_init);
   node_type_update(&ntype, geo_node_attribute_fill_update);
   ntype.geometry_node_execute = blender::nodes::geo_node_attribute_fill_exec;
-  ntype.draw_buttons = blender::nodes::geo_node_attribute_fill_layout;
+  ntype.draw_buttons_ex = blender::nodes::geo_node_attribute_fill_layout;
   nodeRegisterType(&ntype);
 }
