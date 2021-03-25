@@ -45,6 +45,22 @@ static bNodeSocketTemplate geo_node_transform_out[] = {
 
 namespace blender::nodes {
 
+static void geo_node_transform_layout(uiLayout *layout, bContext *C, PointerRNA *ptr)
+{
+  draw_input_socket(C, layout, ptr, "Translation");
+  draw_input_socket(C, layout, ptr, "Rotation");
+  draw_input_socket(C, layout, ptr, "Scale");
+}
+
+static void geo_node_transform_init(bNodeTree *UNUSED(tree), bNode *node)
+{
+  LISTBASE_FOREACH (bNodeSocket *, socket, &node->inputs) {
+    if (socket->type != SOCK_GEOMETRY) {
+      socket->flag |= SOCK_HIDDEN;
+    }
+  }
+}
+
 static bool use_translate(const float3 rotation, const float3 scale)
 {
   if (compare_ff(rotation.length_squared(), 0.0f, 1e-9f) != 1) {
@@ -193,6 +209,8 @@ void register_node_type_geo_transform()
 
   geo_node_type_base(&ntype, GEO_NODE_TRANSFORM, "Transform", NODE_CLASS_GEOMETRY, 0);
   node_type_socket_templates(&ntype, geo_node_transform_in, geo_node_transform_out);
+  node_type_init(&ntype, blender::nodes::geo_node_transform_init);
   ntype.geometry_node_execute = blender::nodes::geo_node_transform_exec;
+  ntype.draw_buttons_ex = blender::nodes::geo_node_transform_layout;
   nodeRegisterType(&ntype);
 }
