@@ -101,6 +101,11 @@ template<typename T> struct DefaultHash {
       return value.hash();
     }
   }
+
+  template<typename U> uint64_t operator()(const U &value) const
+  {
+    return T::hash_as(value);
+  }
 };
 
 /**

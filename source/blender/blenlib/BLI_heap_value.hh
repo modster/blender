@@ -137,6 +137,19 @@ template<typename T> class HeapValue {
     return value_;
   }
 
+  uint64_t hash() const
+  {
+    if (value_ != nullptr) {
+      return DefaultHash<T>{}(*value_);
+    }
+    return 0;
+  }
+
+  static uint64_t hash_as(const T &value)
+  {
+    return DefaultHash<T>{}(value);
+  }
+
   friend bool operator==(const HeapValue &a, const HeapValue &b)
   {
     if (a.value_ == nullptr && b.value_ == nullptr) {
@@ -177,21 +190,6 @@ template<typename T> class HeapValue {
   friend bool operator!=(const T &a, const HeapValue &b)
   {
     return !(a == b);
-  }
-};
-
-template<typename T> struct DefaultHash<HeapValue<T>> {
-  uint64_t operator()(const HeapValue<T> &value) const
-  {
-    if (value) {
-      return DefaultHash<T>{}(*value);
-    }
-    return 0;
-  }
-
-  uint64_t operator()(const T &value) const
-  {
-    return DefaultHash<T>{}(value);
   }
 };
 
