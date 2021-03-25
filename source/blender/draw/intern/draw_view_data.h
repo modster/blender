@@ -58,6 +58,9 @@ typedef struct ViewportEngineData {
   TextureList *txl;
   PassList *psl;
   StorageList *stl;
+  /** Memory block that will be free using  */
+  void *instance_data;
+
   char info[GPU_INFO_SIZE];
 
   /* we may want to put this elsewhere */

@@ -82,6 +82,7 @@ typedef struct EXTERNAL_Data {
   EXTERNAL_TextureList *txl;
   EXTERNAL_PassList *psl;
   EXTERNAL_StorageList *stl;
+  void *no_instance_data;
   char info[GPU_INFO_SIZE];
 } EXTERNAL_Data;
 
@@ -304,6 +305,7 @@ static DrawEngineType draw_engine_external_type = {
     &external_data_size,
     &external_engine_init,
     &external_engine_free,
+    NULL,
     &external_cache_init,
     &external_cache_populate,
     &external_cache_finish,

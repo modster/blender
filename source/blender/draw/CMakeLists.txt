@@ -81,6 +81,7 @@ set(SRC
   engines/basic/basic_engine.c
   engines/image/image_engine.c
   engines/image/image_shader.c
+  engines/eevee/eevee.cc
   engines/eevee/eevee_engine.c
   engines/eevee/eevee_lightcache.c
   engines/eevee/eevee_lut.c
@@ -154,9 +155,11 @@ set(SRC
   intern/draw_view.h
   intern/smaa_textures.h
   engines/basic/basic_engine.h
+  engines/eevee/eevee.hh
   engines/eevee/eevee_engine.h
   engines/eevee/eevee_lightcache.h
   engines/eevee/eevee_lut.h
+  engines/eevee/eevee_private.h
   engines/external/external_engine.h
   engines/image/image_engine.h
   engines/image/image_private.h

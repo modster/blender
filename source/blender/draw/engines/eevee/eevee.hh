@@ -13,13 +13,12 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Copyright 2016, Blender Foundation.
- */
-
-/** \file
- * \ingroup DNA
+ * Copyright 2021, Blender Foundation.
  */
 
 #pragma once
 
-extern RenderEngineType DRW_engine_viewport_eevee_type;
+typedef struct EEVEE_Instance {
+  EEVEE_Instance(void);
+  ~EEVEE_Instance(void);
+} EEVEE_Instance;

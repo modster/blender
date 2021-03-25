@@ -13,13 +13,43 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Copyright 2016, Blender Foundation.
+ * Copyright 2021, Blender Foundation.
  */
 
-/** \file
- * \ingroup DNA
- */
+#include "GPU_framebuffer.h"
 
-#pragma once
+#include "eevee_private.h"
 
-extern RenderEngineType DRW_engine_viewport_eevee_type;
+#include "eevee.hh"
+
+EEVEE_Instance::EEVEE_Instance(void)
+{
+}
+
+EEVEE_Instance::~EEVEE_Instance(void)
+{
+}
+
+/* -------------------------------------------------------------------- */
+/** \name C interface
+ * \{ */
+
+EEVEE_Instance *EEVEE_instance_alloc(void)
+{
+  return new EEVEE_Instance();
+}
+
+void EEVEE_instance_free(EEVEE_Instance *instance)
+{
+  delete instance;
+}
+
+void EEVEE_instance_draw_viewport(EEVEE_Instance *UNUSED(instance))
+{
+  float color[4] = {1, 0, 0, 1};
+
+  GPUFrameBuffer *fb = GPU_framebuffer_active_get();
+  GPU_framebuffer_clear_color(fb, color);
+}
+
+/** \} */

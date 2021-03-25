@@ -27,23 +27,40 @@
 #include "GPU_framebuffer.h"
 
 #include "eevee_engine.h"
-
-static void eevee_draw_scene(void *UNUSED(vedata))
-{
-  float color[4] = {1, 0, 0, 1};
-
-  GPUFrameBuffer *fb = GPU_framebuffer_active_get();
-  GPU_framebuffer_clear_color(fb, color);
-}
+#include "eevee_private.h"
 
 typedef struct EEVEE_Data {
-  void *engine_type;
+  DrawEngineType *engine_type;
   DRWViewportEmptyList *fbl;
   DRWViewportEmptyList *txl;
   DRWViewportEmptyList *psl;
   DRWViewportEmptyList *stl;
-  // struct EEVEE_Engine *engine;
+  struct EEVEE_Instance *instance_data;
 } EEVEE_Data;
+
+static void eevee_engine_init(void *vedata)
+{
+  EEVEE_Data *ved = (EEVEE_Data *)vedata;
+
+  if (ved->instance_data == NULL) {
+    ved->instance_data = EEVEE_instance_alloc();
+  }
+}
+
+static void eevee_draw_scene(void *vedata)
+{
+  EEVEE_instance_draw_viewport(((EEVEE_Data *)vedata)->instance_data);
+}
+
+static void eevee_engine_free(void)
+{
+  /* Free all static resources. */
+}
+
+static void eevee_instance_free(void *instance_data)
+{
+  EEVEE_instance_free((struct EEVEE_Instance *)instance_data);
+}
 
 static const DrawEngineDataSize eevee_data_size = DRW_VIEWPORT_DATA_SIZE(EEVEE_Data);
 
@@ -52,8 +69,9 @@ DrawEngineType draw_engine_eevee_type = {
     NULL,
     N_("Eevee"),
     &eevee_data_size,
-    NULL,
-    NULL,
+    &eevee_engine_init,
+    &eevee_engine_free,
+    &eevee_instance_free,
     NULL,
     NULL,
     NULL,
