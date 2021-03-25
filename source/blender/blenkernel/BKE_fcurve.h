@@ -193,6 +193,18 @@ void BKE_fcurve_foreach_id(struct FCurve *fcu, struct LibraryForeachIDData *data
 /* find matching F-Curve in the given list of F-Curves */
 struct FCurve *BKE_fcurve_find(ListBase *list, const char rna_path[], const int array_index);
 
+/* Cached f-curve look-ups, use when this needs to be done many times. */
+struct FCurvePathCache;
+struct FCurvePathCache *BKE_fcurve_pathcache_create(ListBase *list);
+void BKE_fcurve_pathcache_destroy(struct FCurvePathCache *fcache);
+struct FCurve *BKE_fcurve_pathcache_find(struct FCurvePathCache *fcache,
+                                         const char rna_path[],
+                                         const int array_index);
+int BKE_fcurve_pathcache_find_array(struct FCurvePathCache *fcache,
+                                    const char *rna_path,
+                                    struct FCurve **fcurve_result,
+                                    int fcurve_result_len);
+
 struct FCurve *BKE_fcurve_iter_step(struct FCurve *fcu_iter, const char rna_path[]);
 
 /* high level function to get an fcurve from C without having the rna */
@@ -244,6 +256,14 @@ bool BKE_fcurve_calc_bounds(struct FCurve *fcu,
                             float *ymax,
                             const bool do_sel_only,
                             const bool include_handles);
+
+float *BKE_fcurves_calc_keyed_frames_ex(struct FCurve **fcurve_array,
+                                        int fcurve_array_len,
+                                        const float interval,
+                                        int *r_frames_len);
+float *BKE_fcurves_calc_keyed_frames(struct FCurve **fcurve_array,
+                                     int fcurve_array_len,
+                                     int *r_frames_len);
 
 void BKE_fcurve_active_keyframe_set(struct FCurve *fcu, const struct BezTriple *active_bezt);
 int BKE_fcurve_active_keyframe_index(const struct FCurve *fcu);
