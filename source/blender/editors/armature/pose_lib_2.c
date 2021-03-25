@@ -386,7 +386,7 @@ static Object *get_poselib_object(bContext *C)
 
 static void poselib_tempload_exit(PoseBlendData *pbd)
 {
-  ED_asset_temporary_id_consumer_free(&pbd->temp_id_consumer);
+  ED_asset_temp_id_consumer_free(&pbd->temp_id_consumer);
 }
 
 static bAction *poselib_blend_init_get_action(bContext *C, wmOperator *op)
@@ -399,8 +399,8 @@ static bAction *poselib_blend_init_get_action(bContext *C, wmOperator *op)
 
   PoseBlendData *pbd = op->customdata;
 
-  pbd->temp_id_consumer = ED_asset_temporary_id_consumer_create(asset_handle);
-  return (bAction *)ED_asset_temporary_id_consumer_get_id(
+  pbd->temp_id_consumer = ED_asset_temp_id_consumer_create(asset_handle);
+  return (bAction *)ED_asset_temp_id_consumer_ensure_local_id(
       pbd->temp_id_consumer, asset_library, ID_AC, CTX_data_main(C), op->reports);
 }
 
