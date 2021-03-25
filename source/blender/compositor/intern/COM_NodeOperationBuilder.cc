@@ -195,7 +195,9 @@ PreviewOperation *NodeOperationBuilder::make_preview_operation() const
   bNodeInstanceHash *previews = m_context->getPreviewHash();
   if (previews) {
     PreviewOperation *operation = new PreviewOperation(m_context->getViewSettings(),
-                                                       m_context->getDisplaySettings());
+                                                       m_context->getDisplaySettings(),
+                                                       m_current_node->getbNode()->preview_xsize,
+                                                       m_current_node->getbNode()->preview_ysize);
     operation->setbNodeTree(m_context->getbNodeTree());
     operation->verifyPreview(previews, m_current_node->getInstanceKey());
     return operation;
@@ -297,7 +299,7 @@ void NodeOperationBuilder::add_input_constant_value(NodeOperationInput *input,
                                                     const NodeInput *node_input)
 {
   switch (input->getDataType()) {
-    case COM_DT_VALUE: {
+    case DataType::Value: {
       float value;
       if (node_input && node_input->getbNodeSocket()) {
         value = node_input->getEditorValueFloat();
@@ -312,7 +314,7 @@ void NodeOperationBuilder::add_input_constant_value(NodeOperationInput *input,
       addLink(op->getOutputSocket(), input);
       break;
     }
-    case COM_DT_COLOR: {
+    case DataType::Color: {
       float value[4];
       if (node_input && node_input->getbNodeSocket()) {
         node_input->getEditorValueColor(value);
@@ -327,7 +329,7 @@ void NodeOperationBuilder::add_input_constant_value(NodeOperationInput *input,
       addLink(op->getOutputSocket(), input);
       break;
     }
-    case COM_DT_VECTOR: {
+    case DataType::Vector: {
       float value[3];
       if (node_input && node_input->getbNodeSocket()) {
         node_input->getEditorValueVector(value);

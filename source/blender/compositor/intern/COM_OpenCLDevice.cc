@@ -43,16 +43,12 @@ OpenCLDevice::OpenCLDevice(cl_context context,
   this->m_program = program;
   this->m_queue = nullptr;
   this->m_vendorID = vendorId;
-}
 
-bool OpenCLDevice::initialize()
-{
   cl_int error;
   this->m_queue = clCreateCommandQueue(this->m_context, this->m_device, 0, &error);
-  return false;
 }
 
-void OpenCLDevice::deinitialize()
+OpenCLDevice::~OpenCLDevice()
 {
   if (this->m_queue) {
     clReleaseCommandQueue(this->m_queue);
@@ -67,7 +63,7 @@ void OpenCLDevice::execute(WorkPackage *work)
 
   executionGroup->determineChunkRect(&rect, chunkNumber);
   MemoryBuffer **inputBuffers = executionGroup->getInputBuffersOpenCL(chunkNumber);
-  MemoryBuffer *outputBuffer = executionGroup->allocateOutputBuffer(chunkNumber, &rect);
+  MemoryBuffer *outputBuffer = executionGroup->allocateOutputBuffer(rect);
 
   executionGroup->getOutputOperation()->executeOpenCLRegion(
       this, &rect, chunkNumber, inputBuffers, outputBuffer);
@@ -93,19 +89,21 @@ cl_mem OpenCLDevice::COM_clAttachMemoryBufferToKernelParameter(cl_kernel kernel,
 
 const cl_image_format *OpenCLDevice::determineImageFormat(MemoryBuffer *memoryBuffer)
 {
-  const cl_image_format *imageFormat;
-  int num_channels = memoryBuffer->get_num_channels();
-  if (num_channels == 1) {
-    imageFormat = &IMAGE_FORMAT_VALUE;
-  }
-  else if (num_channels == 3) {
-    imageFormat = &IMAGE_FORMAT_VECTOR;
-  }
-  else {
-    imageFormat = &IMAGE_FORMAT_COLOR;
+  switch (memoryBuffer->get_num_channels()) {
+    case 1:
+      return &IMAGE_FORMAT_VALUE;
+      break;
+    case 3:
+      return &IMAGE_FORMAT_VECTOR;
+      break;
+    case 4:
+      return &IMAGE_FORMAT_COLOR;
+      break;
+    default:
+      BLI_assert(!"Unsupported num_channels.");
   }
 
-  return imageFormat;
+  return &IMAGE_FORMAT_COLOR;
 }
 
 cl_mem OpenCLDevice::COM_clAttachMemoryBufferToKernelParameter(cl_kernel kernel,
@@ -152,8 +150,8 @@ void OpenCLDevice::COM_clAttachMemoryBufferOffsetToKernelParameter(cl_kernel ker
 {
   if (offsetIndex != -1) {
     cl_int error;
-    rcti *rect = memoryBuffer->getRect();
-    cl_int2 offset = {{rect->xmin, rect->ymin}};
+    const rcti &rect = memoryBuffer->get_rect();
+    cl_int2 offset = {{rect.xmin, rect.ymin}};
 
     error = clSetKernelArg(kernel, offsetIndex, sizeof(cl_int2), &offset);
     if (error != CL_SUCCESS) {

@@ -3429,7 +3429,7 @@ static void std_node_socket_draw(
       }
       break;
     case SOCK_RGBA: {
-      uiLayout *row = uiLayoutSplit(layout, 0.5f, false);
+      uiLayout *row = uiLayoutSplit(layout, 0.4f, false);
       uiItemL(row, text, 0);
 
       const bNodeTree *node_tree = (const bNodeTree *)node_ptr->owner_id;
@@ -3443,7 +3443,7 @@ static void std_node_socket_draw(
       break;
     }
     case SOCK_STRING: {
-      uiLayout *row = uiLayoutSplit(layout, 0.5f, false);
+      uiLayout *row = uiLayoutSplit(layout, 0.4f, false);
       uiItemL(row, text, 0);
 
       const bNodeTree *node_tree = (const bNodeTree *)node_ptr->owner_id;
