@@ -108,25 +108,6 @@ static bool operation_use_input_b(const NodeMathOperation operation)
   return false;
 }
 
-static void geo_node_attribute_math_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
-{
-  bNode *node = (bNode *)ptr->data;
-  NodeAttributeMath *node_storage = (NodeAttributeMath *)node->storage;
-  NodeMathOperation operation = (NodeMathOperation)node_storage->operation;
-
-  uiItemR(layout, ptr, "operation", 0, "", ICON_NONE);
-
-  uiLayoutSetPropSep(layout, true);
-  uiLayoutSetPropDecorate(layout, false);
-  uiItemR(layout, ptr, "input_type_a", 0, IFACE_("A"), ICON_NONE);
-  if (operation_use_input_b(operation)) {
-    uiItemR(layout, ptr, "input_type_b", 0, IFACE_("B"), ICON_NONE);
-  }
-  if (operation_use_input_c(operation)) {
-    uiItemR(layout, ptr, "input_type_c", 0, IFACE_("C"), ICON_NONE);
-  }
-}
-
 static void geo_node_attribute_math_init(bNodeTree *UNUSED(tree), bNode *node)
 {
   NodeAttributeMath *data = (NodeAttributeMath *)MEM_callocN(sizeof(NodeAttributeMath), __func__);
@@ -136,9 +117,32 @@ static void geo_node_attribute_math_init(bNodeTree *UNUSED(tree), bNode *node)
   data->input_type_b = GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE;
   data->input_type_c = GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE;
   node->storage = data;
+
+  LISTBASE_FOREACH (bNodeSocket *, socket, &node->inputs) {
+    if (socket->type != SOCK_GEOMETRY) {
+      socket->flag |= SOCK_HIDDEN;
+    }
+  }
 }
 
 namespace blender::nodes {
+
+static void geo_node_attribute_math_layout(uiLayout *layout, bContext *C, PointerRNA *ptr)
+{
+  bNode *node = (bNode *)ptr->data;
+  NodeAttributeMath *node_storage = (NodeAttributeMath *)node->storage;
+  NodeMathOperation operation = (NodeMathOperation)node_storage->operation;
+
+  uiItemR(layout, ptr, "operation", 0, "", ICON_NONE);
+
+  draw_input_socket(C, layout, ptr, "A", "input_type_a");
+  if (operation_use_input_b(operation)) {
+    draw_input_socket(C, layout, ptr, "B", "input_type_b");
+  }
+  if (operation_use_input_c(operation)) {
+    draw_input_socket(C, layout, ptr, "C", "input_type_c");
+  }
+}
 
 static void geo_node_attribute_math_update(bNodeTree *UNUSED(ntree), bNode *node)
 {
@@ -311,7 +315,7 @@ void register_node_type_geo_attribute_math()
   geo_node_type_base(&ntype, GEO_NODE_ATTRIBUTE_MATH, "Attribute Math", NODE_CLASS_ATTRIBUTE, 0);
   node_type_socket_templates(&ntype, geo_node_attribute_math_in, geo_node_attribute_math_out);
   ntype.geometry_node_execute = blender::nodes::geo_node_attribute_math_exec;
-  ntype.draw_buttons = geo_node_attribute_math_layout;
+  ntype.draw_buttons_ex = blender::nodes::geo_node_attribute_math_layout;
   node_type_update(&ntype, blender::nodes::geo_node_attribute_math_update);
   node_type_init(&ntype, geo_node_attribute_math_init);
   node_type_storage(
