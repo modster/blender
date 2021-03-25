@@ -341,7 +341,6 @@ static void gpencil_curve_draw_update(bContext *C, tGPDcurve_draw *tcd)
   int tot_points = gpc->tot_curve_points;
   bGPDcurve_point *cpt = &gpc->curve_points[tot_points - 1];
   BezTriple *bezt = &cpt->bezt;
-  Brush *brush = tcd->brush;
 
   float co[3];
   switch (tcd->state) {
