@@ -1280,6 +1280,7 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
       }
 
       const pair<int, uint> &info = geometry_to_object_info[geom];
+#if 1
       pool.push(function_bind(&Geometry::pack_primitives,
                               geom,
                               scene->device,
@@ -1289,6 +1290,15 @@ void GeometryManager::pack_bvh(DeviceScene *dscene, Scene *scene, Progress &prog
                               pack_all,
                               &verts_deltas,
                               scene->params.max_delta_compression_frames));
+#else
+      geom->pack_primitives(scene->device,
+                            dscene,
+                            info.first,
+                            info.second,
+                            pack_all,
+                            &verts_deltas,
+                            scene->params.max_delta_compression_frames);
+#endif
     }
     pool.wait_work();
   }
