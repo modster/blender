@@ -849,8 +849,8 @@ static void file_space_subtype_item_extend(bContext *UNUSED(C),
 
 static const char *file_context_dir[] = {
     "active_file",
-    "active_handle",
-    "active_library",
+    "asset_handle",
+    "asset_library",
     "id",
     NULL,
 };
