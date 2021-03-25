@@ -39,7 +39,6 @@
 #include "DNA_armature_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
-#include "DNA_space_types.h"
 
 #include "BKE_action.h"
 #include "BKE_animsys.h"
@@ -59,7 +58,7 @@
 
 #include "UI_interface.h"
 
-#include "ED_fileselect.h"
+#include "ED_asset.h"
 #include "ED_keyframing.h"
 #include "ED_object.h"
 #include "ED_screen.h"
@@ -81,8 +80,8 @@ typedef struct PoseBlendData {
   bool needs_redraw;
   bool is_bone_selection_relevant;
 
-  /* For temp-loading the Action from the pose library, if necessary. */
-  TempLibraryContext *temp_lib_context;
+  /* For temp-loading the Action from the pose library. */
+  AssetTempIDConsumer *temp_id_consumer;
 
   /* Blend factor, interval [0, 1] for interpolating between current and given pose. */
   float blend_factor;
@@ -385,88 +384,24 @@ static Object *get_poselib_object(bContext *C)
   return BKE_object_pose_armature_get(CTX_data_active_object(C));
 }
 
-static const char *poselib_asset_file_path(bContext *C)
-{
-  /* TODO: make this work in other areas as well, not just the file/asset browser. */
-  SpaceFile *sfile = CTX_wm_space_file(C);
-  if (sfile == NULL) {
-    return NULL;
-  }
-  FileAssetSelectParams *params = ED_fileselect_get_asset_params(sfile);
-  if (params == NULL) {
-    return NULL;
-  }
-
-  static char asset_path[FILE_MAX_LIBEXTRA];
-  BLI_path_join(
-      asset_path, sizeof(asset_path), params->base_params.dir, params->base_params.file, NULL);
-  return asset_path;
-}
-
-static bAction *poselib_tempload_enter(bContext *C, wmOperator *op)
-{
-  PoseBlendData *pbd = op->customdata;
-
-  const char *libname = poselib_asset_file_path(C);
-  if (libname == NULL) {
-    return NULL;
-  }
-
-  char blend_file_path[FILE_MAX_LIBEXTRA];
-  char *group = NULL;
-  char *asset_name = NULL;
-  BLO_library_path_explode(libname, blend_file_path, &group, &asset_name);
-
-  if (group == NULL || asset_name == NULL) {
-    BKE_report(op->reports, RPT_ERROR, TIP_("No asset selected"));
-    return NULL;
-  }
-
-  if (strcmp(group, "Action")) {
-    BKE_reportf(op->reports,
-                RPT_ERROR,
-                TIP_("Selected asset \"%s\" is a %s, expected Action"),
-                asset_name,
-                group);
-    return NULL;
-  }
-
-  pbd->temp_lib_context = BLO_library_temp_load_id(
-      CTX_data_main(C), blend_file_path, ID_AC, asset_name, op->reports);
-
-  if (pbd->temp_lib_context == NULL || pbd->temp_lib_context->temp_id == NULL) {
-    BKE_reportf(
-        op->reports, RPT_ERROR, TIP_("Unable to load %s from %s"), asset_name, blend_file_path);
-    return NULL;
-  }
-
-  BLI_assert(GS(pbd->temp_lib_context->temp_id->name) == ID_AC);
-  return (bAction *)pbd->temp_lib_context->temp_id;
-}
-
 static void poselib_tempload_exit(PoseBlendData *pbd)
 {
-  if (pbd->temp_lib_context == NULL) {
-    return;
-  }
-  BLO_library_temp_free(pbd->temp_lib_context);
-  pbd->temp_lib_context = NULL;
+  ED_asset_temporary_id_consumer_free(&pbd->temp_id_consumer);
 }
 
 static bAction *poselib_blend_init_get_action(bContext *C, wmOperator *op)
 {
-  /* 'id' is available when the asset is in the "Current File" library. */
-  ID *id = CTX_data_pointer_get_type(C, "id", &RNA_ID).data;
-  if (id != NULL) {
-    if (GS(id->name) != ID_AC) {
-      BKE_reportf(
-          op->reports, RPT_ERROR, TIP_("Context key 'id' (%s) is not an Action"), id->name);
-      return NULL;
-    }
-    return (bAction *)id;
-  }
+  const AssetLibraryReference *asset_library = CTX_wm_asset_library(C);
+  const AssetHandle *asset_handle =
+      CTX_data_pointer_get_type(C, "asset_handle", &RNA_AssetHandle).data;
+  /* Poll callback should check. */
+  BLI_assert((asset_library != NULL) && (asset_handle != NULL));
 
-  return poselib_tempload_enter(C, op);
+  PoseBlendData *pbd = op->customdata;
+
+  pbd->temp_id_consumer = ED_asset_temporary_id_consumer_create(asset_handle);
+  return (bAction *)ED_asset_temporary_id_consumer_get_id(
+      pbd->temp_id_consumer, asset_library, ID_AC, CTX_data_main(C), op->reports);
 }
 
 /* Return true on success, false if the context isn't suitable. */
@@ -630,13 +565,11 @@ static int poselib_blend_exec(bContext *C, wmOperator *op)
 
 static bool poselib_asset_in_context(bContext *C)
 {
-  /* TODO: make this work in other areas as well, not just the file/asset browser. */
-  SpaceFile *sfile = CTX_wm_space_file(C);
-  if (sfile == NULL) {
-    return false;
-  }
-
-  return ED_fileselect_has_active_asset(sfile);
+  /* Check whether the context provides the asset data needed to add a pose. */
+  const AssetLibraryReference *asset_library = CTX_wm_asset_library(C);
+  const AssetHandle *asset_handle =
+      CTX_data_pointer_get_type(C, "asset_handle", &RNA_AssetHandle).data;
+  return (asset_library) != NULL && (asset_handle != NULL);
 }
 
 /* Poll callback for operators that require existing PoseLib data (with poses) to work. */
@@ -648,13 +581,6 @@ static bool poselib_blend_poll(bContext *C)
     return false;
   }
 
-  /* Check whether the context has a local datablock for us to use. */
-  ID *id = CTX_data_pointer_get_type(C, "id", &RNA_ID).data;
-  if (id != NULL) {
-    return true;
-  }
-
-  /* Check whether the asset browser can give us a datablock. */
   return poselib_asset_in_context(C);
 }
 
