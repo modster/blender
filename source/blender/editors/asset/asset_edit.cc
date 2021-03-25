@@ -187,7 +187,7 @@ class AssetTemporaryIDConsumer : NonCopyable, NonMovable {
   }
 };
 
-AssetTempIDConsumer *ED_asset_temporary_id_consumer_create(const AssetHandle *handle)
+AssetTempIDConsumer *ED_asset_temp_id_consumer_create(const AssetHandle *handle)
 {
   if (!handle) {
     return nullptr;
@@ -196,16 +196,16 @@ AssetTempIDConsumer *ED_asset_temporary_id_consumer_create(const AssetHandle *ha
       OBJECT_GUARDED_NEW(AssetTemporaryIDConsumer, *handle));
 }
 
-void ED_asset_temporary_id_consumer_free(AssetTempIDConsumer **consumer)
+void ED_asset_temp_id_consumer_free(AssetTempIDConsumer **consumer)
 {
   OBJECT_GUARDED_SAFE_DELETE(*consumer, AssetTemporaryIDConsumer);
 }
 
-ID *ED_asset_temporary_id_consumer_get_id(AssetTempIDConsumer *consumer_,
-                                          const AssetLibraryReference *asset_library,
-                                          ID_Type id_type,
-                                          Main *bmain,
-                                          ReportList *reports)
+ID *ED_asset_temp_id_consumer_ensure_local_id(AssetTempIDConsumer *consumer_,
+                                              const AssetLibraryReference *asset_library,
+                                              ID_Type id_type,
+                                              Main *bmain,
+                                              ReportList *reports)
 {
   if (!(consumer_ && asset_library && bmain && reports)) {
     return nullptr;
