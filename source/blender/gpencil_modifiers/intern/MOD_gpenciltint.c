@@ -247,6 +247,18 @@ static void deformPolyline(GpencilModifierData *md,
   }
 }
 
+/* Deform Bezier. */
+static void deformBezier(GpencilModifierData *md,
+                         Depsgraph *depsgraph,
+                         Object *ob,
+                         bGPDlayer *gpl,
+                         bGPDframe *gpf,
+                         bGPDstroke *gps)
+{
+  /* Reuse deformPolyline because the changes are not affecting the geometry. */
+  deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
+}
+
 /* FIXME: Ideally we be doing this on a copy of the main depsgraph
  * (i.e. one where we don't have to worry about restoring state)
  */
@@ -385,7 +397,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Tint = {
     /* copyData */ copyData,
 
     /* deformPolyline */ deformPolyline,
-    /* deformBezier */ NULL,
+    /* deformBezier */ deformBezier,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,
