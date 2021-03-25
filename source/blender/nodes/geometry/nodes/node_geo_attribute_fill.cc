@@ -148,7 +148,7 @@ static void draw_socket_menu(bContext *UNUSED(C), uiLayout *layout, void *arg)
     RNA_boolean_set(&expose_props, "expose", false);
   }
 
-  uiItemR(layout, &node_ptr, "data_type", 0, "Data Type", ICON_NONE);
+  uiItemsEnumR(layout, &node_ptr, "data_type");
 }
 
 static void geo_node_attribute_fill_layout(uiLayout *layout, bContext *C, PointerRNA *node_ptr)
@@ -167,7 +167,6 @@ static void geo_node_attribute_fill_layout(uiLayout *layout, bContext *C, Pointe
   RNA_pointer_create(node_ptr->owner_id, &RNA_NodeSocket, value_socket, &socket_ptr);
 
   uiItemR(layout, node_ptr, "domain", 0, "", ICON_NONE);
-  uiItemR(layout, node_ptr, "data_type", 0, "", ICON_NONE);
 
   Set<SocketMenuInfoPtr> &set = get_socket_menu_info_set();
   {
