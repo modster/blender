@@ -16,6 +16,7 @@
 
 #include "node_geometry_util.hh"
 
+#include "BLI_heap_value.hh"
 #include "BLI_rand.hh"
 
 #include "DNA_mesh_types.h"
@@ -71,192 +72,7 @@ static void geo_node_attribute_fill_update(bNodeTree *UNUSED(ntree), bNode *node
   nodeSetSocketAvailability(socket_value_int32, data_type == CD_PROP_INT32);
 }
 
-namespace blender {
-
-template<typename T> class HeapValue {
- private:
-  T *value_ = nullptr;
-
- public:
-  HeapValue(T value)
-  {
-    value_ = new T(std::move(value));
-  }
-
-  HeapValue(const HeapValue &other)
-  {
-    if (other.value_ != nullptr) {
-      value_ = new T(*other.value_);
-    }
-  }
-
-  HeapValue(HeapValue &&other)
-  {
-    value_ = other.value_;
-    other.value_ = nullptr;
-  }
-
-  ~HeapValue()
-  {
-    delete value_;
-  }
-
-  HeapValue &operator=(const HeapValue &other)
-  {
-    if (this == &other) {
-      return *this;
-    }
-    if (value_ != nullptr) {
-      if (other.value_ != nullptr) {
-        *value_ = *other.value_;
-      }
-      else {
-        delete value_;
-        value_ = nullptr;
-      }
-    }
-    else {
-      if (other.value_ != nullptr) {
-        value_ = new T(*other.value_);
-      }
-      else {
-        /* Do nothing. */
-      }
-    }
-    return *this;
-  }
-
-  HeapValue &operator=(HeapValue &&other)
-  {
-    if (this == &other) {
-      return *this;
-    }
-    delete value_;
-    value_ = other.value_;
-    other.value_ = nullptr;
-    return *this;
-  }
-
-  HeapValue &operator=(T value)
-  {
-    if (value_ == nullptr) {
-      value_ = new T(std::move(value));
-    }
-    else {
-      *value_ = std::move(value);
-    }
-  }
-
-  operator bool() const
-  {
-    return value_ != nullptr;
-  }
-
-  T &operator*()
-  {
-    BLI_assert(value_ != nullptr);
-    return *value_;
-  }
-
-  const T &operator*() const
-  {
-    BLI_assert(value_ != nullptr);
-    return *value_;
-  }
-
-  T *operator->()
-  {
-    BLI_assert(value_ != nullptr);
-    return value_;
-  }
-
-  const T *operator->() const
-  {
-    BLI_assert(value_ != nullptr);
-    return value_;
-  }
-
-  T *get()
-  {
-    return value_;
-  }
-
-  const T *get() const
-  {
-    return value_;
-  }
-
-  friend bool operator==(const HeapValue &a, const HeapValue &b)
-  {
-    if (a.value_ == nullptr && b.value_ == nullptr) {
-      return true;
-    }
-    if (a.value_ == nullptr) {
-      return false;
-    }
-    if (b.value_ == nullptr) {
-      return false;
-    }
-    return *a.value_ == *b.value_;
-  }
-
-  friend bool operator==(const HeapValue &a, const T &b)
-  {
-    if (a.value_ == nullptr) {
-      return false;
-    }
-    return *a.value_ == b;
-  }
-
-  friend bool operator==(const T &a, const HeapValue &b)
-  {
-    return b == a;
-  }
-
-  friend bool operator!=(const HeapValue &a, const HeapValue &b)
-  {
-    return !(a == b);
-  }
-
-  friend bool operator!=(const HeapValue &a, const T &b)
-  {
-    return !(a == b);
-  }
-
-  friend bool operator!=(const T &a, const HeapValue &b)
-  {
-    return !(a == b);
-  }
-};
-
-template<typename T> struct DefaultHash<HeapValue<T>> {
-  uint64_t operator()(const HeapValue<T> &value) const
-  {
-    if (value) {
-      return DefaultHash<T>{}(*value);
-    }
-    return 0;
-  }
-
-  uint64_t operator()(const T &value) const
-  {
-    return DefaultHash<T>{}(value);
-  }
-};
-}  // namespace blender
-
 namespace blender::nodes {
-
-template<typename T1, typename T2, typename T3>
-uint64_t default_hash_3(const T1 &v1, const T2 &v2, const T3 &v3)
-{
-  const uint64_t h1 = DefaultHash<T1>{}(v1);
-  const uint64_t h2 = DefaultHash<T2>{}(v2);
-  const uint64_t h3 = DefaultHash<T3>{}(v3);
-  return (h1 * 73856093) ^ (h2 * 19349663) ^ (h3 * 83492791);
-}
-
-namespace {
 
 struct SocketMenuInfo {
   bNodeTree *ntree;
@@ -274,8 +90,6 @@ struct SocketMenuInfo {
     return a.ntree == b.ntree && a.node == b.node && a.socket == b.socket;
   }
 };
-
-}  // namespace
 
 static Set<HeapValue<SocketMenuInfo>> &get_socket_menu_info_set()
 {

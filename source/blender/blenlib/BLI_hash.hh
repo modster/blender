@@ -222,4 +222,13 @@ template<typename T1, typename T2> struct DefaultHash<std::pair<T1, T2>> {
   }
 };
 
+template<typename T1, typename T2, typename T3>
+uint64_t default_hash_3(const T1 &v1, const T2 &v2, const T3 &v3)
+{
+  const uint64_t h1 = DefaultHash<T1>{}(v1);
+  const uint64_t h2 = DefaultHash<T2>{}(v2);
+  const uint64_t h3 = DefaultHash<T3>{}(v3);
+  return (h1 * 73856093) ^ (h2 * 19349663) ^ (h3 * 83492791);
+}
+
 }  // namespace blender
