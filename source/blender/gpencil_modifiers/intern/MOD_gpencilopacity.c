@@ -171,6 +171,18 @@ static void deformPolyline(GpencilModifierData *md,
   }
 }
 
+/* Deform Bezier. */
+static void deformBezier(GpencilModifierData *md,
+                         Depsgraph *depsgraph,
+                         Object *ob,
+                         bGPDlayer *gpl,
+                         bGPDframe *gpf,
+                         bGPDstroke *gps)
+{
+  /* Reuse deformPolyline because the changes are not affecting the geometry. */
+  deformPolyline(md, depsgraph, ob, gpl, gpf, gps);
+}
+
 static void bakeModifier(Main *UNUSED(bmain),
                          Depsgraph *depsgraph,
                          GpencilModifierData *md,
@@ -282,7 +294,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Opacity = {
     /* copyData */ copyData,
 
     /* deformPolyline */ deformPolyline,
-    /* deformBezier */ NULL,
+    /* deformBezier */ deformBezier,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,
