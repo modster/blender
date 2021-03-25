@@ -303,6 +303,27 @@ class NODE_OT_tree_path_parent(Operator):
         return {'FINISHED'}
 
 
+class NODE_OT_expose_input_socket(Operator):
+    '''Expose socket'''
+    bl_idname = "node.expose_input_socket"
+    bl_label = "Expose Input Socket"
+
+    tree_name: StringProperty()
+    node_name: StringProperty()
+    # Might reference multiple sockets intentionally.
+    socket_name: StringProperty()
+
+    expose: BoolProperty(default=True)
+
+    def execute(self, context):
+        tree = bpy.data.node_groups[self.tree_name]
+        node = tree.nodes[self.node_name]
+        for socket in node.inputs:
+            if socket.name == self.socket_name:
+                socket.hide = not self.expose
+        return {'FINISHED'}
+
+
 classes = (
     NodeSetting,
 
@@ -311,4 +332,5 @@ classes = (
     NODE_OT_add_search,
     NODE_OT_collapse_hide_unused_toggle,
     NODE_OT_tree_path_parent,
+    NODE_OT_expose_input_socket,
 )

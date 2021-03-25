@@ -24,6 +24,8 @@
 #include "UI_interface.h"
 #include "UI_resources.h"
 
+#include "WM_types.h"
+
 static bNodeSocketTemplate geo_node_attribute_fill_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {SOCK_STRING, N_("Attribute")},
@@ -39,14 +41,6 @@ static bNodeSocketTemplate geo_node_attribute_fill_out[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
     {-1, ""},
 };
-
-static void geo_node_attribute_fill_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
-{
-  uiLayoutSetPropSep(layout, true);
-  uiLayoutSetPropDecorate(layout, false);
-  uiItemR(layout, ptr, "domain", 0, "", ICON_NONE);
-  uiItemR(layout, ptr, "data_type", 0, "", ICON_NONE);
-}
 
 static void geo_node_attribute_fill_init(bNodeTree *UNUSED(tree), bNode *node)
 {
@@ -72,6 +66,123 @@ static void geo_node_attribute_fill_update(bNodeTree *UNUSED(ntree), bNode *node
 }
 
 namespace blender::nodes {
+
+template<typename T1, typename T2, typename T3>
+uint64_t default_hash_3(const T1 &v1, const T2 &v2, const T3 &v3)
+{
+  const uint64_t h1 = DefaultHash<T1>{}(v1);
+  const uint64_t h2 = DefaultHash<T2>{}(v2);
+  const uint64_t h3 = DefaultHash<T3>{}(v3);
+  return (h1 * 73856093) ^ (h2 * 19349663) ^ (h3 * 83492791);
+}
+
+namespace {
+
+struct SocketMenuInfo {
+  bNodeTree *ntree;
+  bNode *node;
+  bNodeSocket *socket;
+};
+
+struct SocketMenuInfoPtr {
+  std::unique_ptr<SocketMenuInfo> value;
+
+  friend bool operator==(const SocketMenuInfoPtr &a, const SocketMenuInfoPtr &b)
+  {
+    return a.value->ntree == b.value->ntree && a.value->node == b.value->node &&
+           a.value->socket == b.value->socket;
+  }
+
+  uint64_t hash() const
+  {
+    return default_hash_3(value->ntree, value->node, value->socket);
+  }
+};
+}  // namespace
+
+static Set<SocketMenuInfoPtr> &get_socket_menu_info_set()
+{
+  static Set<SocketMenuInfoPtr> set;
+  return set;
+}
+
+static void draw_socket_menu(bContext *C, uiLayout *layout, void *arg)
+{
+  SocketMenuInfo *socket_info = (SocketMenuInfo *)arg;
+  uiItemL(layout, socket_info->node->name, ICON_NONE);
+  uiItemL(layout, socket_info->socket->name, ICON_NONE);
+
+  PointerRNA node_ptr;
+  RNA_pointer_create(&socket_info->ntree->id, &RNA_Node, socket_info->node, &node_ptr);
+  PointerRNA socket_ptr;
+  RNA_pointer_create(&socket_info->ntree->id, &RNA_NodeSocket, socket_info->socket, &socket_ptr);
+
+  // uiItemR(layout, &socket_ptr, "hide", 0, "Expose", ICON_NONE);
+
+  if (socket_info->socket->flag & SOCK_HIDDEN) {
+    PointerRNA expose_props;
+    uiItemFullO(layout,
+                "node.expose_input_socket",
+                "Expose",
+                ICON_NONE,
+                nullptr,
+                WM_OP_EXEC_DEFAULT,
+                0,
+                &expose_props);
+    RNA_string_set(&expose_props, "tree_name", socket_info->ntree->id.name + 2);
+    RNA_string_set(&expose_props, "node_name", socket_info->node->name);
+    RNA_string_set(&expose_props, "socket_name", socket_info->socket->name);
+    RNA_boolean_set(&expose_props, "expose", true);
+  }
+  else {
+    PointerRNA expose_props;
+    uiItemFullO(layout,
+                "node.expose_input_socket",
+                "Unexpose",
+                ICON_NONE,
+                nullptr,
+                WM_OP_EXEC_DEFAULT,
+                0,
+                &expose_props);
+    RNA_string_set(&expose_props, "tree_name", socket_info->ntree->id.name + 2);
+    RNA_string_set(&expose_props, "node_name", socket_info->node->name);
+    RNA_string_set(&expose_props, "socket_name", socket_info->socket->name);
+    RNA_boolean_set(&expose_props, "expose", false);
+  }
+}
+
+static void geo_node_attribute_fill_layout(uiLayout *layout, bContext *C, PointerRNA *node_ptr)
+{
+  bNodeTree *ntree = (bNodeTree *)node_ptr->owner_id;
+  bNode *node = (bNode *)node_ptr->data;
+  bNodeSocket *socket = (bNodeSocket *)BLI_findlink(&node->inputs, 3);
+
+  PointerRNA socket_ptr;
+  RNA_pointer_create(node_ptr->owner_id, &RNA_NodeSocket, socket, &socket_ptr);
+
+  uiItemR(layout, node_ptr, "domain", 0, "", ICON_NONE);
+  uiItemR(layout, node_ptr, "data_type", 0, "", ICON_NONE);
+
+  Set<SocketMenuInfoPtr> &set = get_socket_menu_info_set();
+  {
+    auto info = SocketMenuInfoPtr{std::make_unique<SocketMenuInfo>()};
+    info.value->ntree = ntree;
+    info.value->node = node;
+    info.value->socket = socket;
+    set.add(std::move(info));
+  }
+  auto info = SocketMenuInfoPtr{std::make_unique<SocketMenuInfo>()};
+  info.value->ntree = ntree;
+  info.value->node = node;
+  info.value->socket = socket;
+  SocketMenuInfo *stored_info = set.lookup_key(info).value.get();
+
+  uiLayout *row = uiLayoutRow(layout, false);
+  uiLayout *sub_row = uiLayoutRow(row, false);
+  uiLayoutSetActive(sub_row, (socket->flag & SOCK_HIDDEN) != 0);
+  socket->typeinfo->draw(C, sub_row, &socket_ptr, node_ptr, "");
+  uiItemMenuF(row, "", ICON_DOWNARROW_HLT, draw_socket_menu, stored_info);
+}
 
 static AttributeDomain get_result_domain(const GeometryComponent &component,
                                          StringRef attribute_name)
@@ -168,6 +279,6 @@ void register_node_type_geo_attribute_fill()
   node_type_init(&ntype, geo_node_attribute_fill_init);
   node_type_update(&ntype, geo_node_attribute_fill_update);
   ntype.geometry_node_execute = blender::nodes::geo_node_attribute_fill_exec;
-  ntype.draw_buttons = geo_node_attribute_fill_layout;
+  ntype.draw_buttons = blender::nodes::geo_node_attribute_fill_layout;
   nodeRegisterType(&ntype);
 }
