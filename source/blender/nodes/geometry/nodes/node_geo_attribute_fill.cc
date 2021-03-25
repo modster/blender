@@ -82,7 +82,7 @@ struct SocketMenuInfo {
 
   uint64_t hash() const
   {
-    return default_hash_3(ntree, node, socket);
+    return get_default_hash_3(ntree, node, socket);
   }
 
   friend bool operator==(const SocketMenuInfo &a, const SocketMenuInfo &b)
