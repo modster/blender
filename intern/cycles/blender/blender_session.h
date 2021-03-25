@@ -48,6 +48,7 @@ class BlenderSession {
                  BL::BlendData &b_data,
                  BL::SpaceView3D &b_v3d,
                  BL::RegionView3D &b_rv3d,
+                 BL::Screen &b_screen,
                  int width,
                  int height);
 
@@ -109,6 +110,7 @@ class BlenderSession {
   BL::Scene b_scene;
   BL::SpaceView3D b_v3d;
   BL::RegionView3D b_rv3d;
+  BL::Screen b_screen;
   string b_rlay_name;
   string b_rview_name;
 

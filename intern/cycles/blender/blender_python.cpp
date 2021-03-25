@@ -225,6 +225,10 @@ static PyObject *create_func(PyObject * /*self*/, PyObject *args)
   /* RNA */
   ID *bScreen = (ID *)PyLong_AsVoidPtr(pyscreen);
 
+  PointerRNA bScreenptr;
+  RNA_pointer_create(NULL, &RNA_Screen, bScreen, &bScreenptr);
+  BL::Screen screen(bScreenptr);
+
   PointerRNA engineptr;
   RNA_pointer_create(NULL, &RNA_RenderEngine, (void *)PyLong_AsVoidPtr(pyengine), &engineptr);
   BL::RenderEngine engine(engineptr);
@@ -258,7 +262,7 @@ static PyObject *create_func(PyObject * /*self*/, PyObject *args)
     int width = region.width();
     int height = region.height();
 
-    session = new BlenderSession(engine, preferences, data, v3d, rv3d, width, height);
+    session = new BlenderSession(engine, preferences, data, v3d, rv3d, screen, width, height);
   }
   else {
     /* offline session or preview render */
