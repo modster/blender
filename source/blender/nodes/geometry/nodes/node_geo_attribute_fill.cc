@@ -144,11 +144,11 @@ static void draw_socket_menu(bContext *UNUSED(C), uiLayout *layout, void *arg)
   }
 }
 
-static void draw_input_socket(bContext *C,
-                              uiLayout *layout,
-                              PointerRNA *node_ptr,
-                              StringRef socket_name,
-                              StringRef additional_enum_prop = "")
+void draw_input_socket(bContext *C,
+                       uiLayout *layout,
+                       PointerRNA *node_ptr,
+                       StringRef socket_name,
+                       StringRef additional_enum_prop)
 {
   bNodeTree *ntree = (bNodeTree *)node_ptr->owner_id;
   bNode *node = (bNode *)node_ptr->data;

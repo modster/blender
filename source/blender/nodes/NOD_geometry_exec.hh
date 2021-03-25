@@ -254,4 +254,10 @@ class GeoNodeExecParams {
   const bNodeSocket *find_available_socket(const StringRef name) const;
 };
 
+void draw_input_socket(bContext *C,
+                       uiLayout *layout,
+                       PointerRNA *node_ptr,
+                       StringRef socket_name,
+                       StringRef additional_enum_prop = "");
+
 }  // namespace blender::nodes
