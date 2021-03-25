@@ -46,6 +46,12 @@ static void geo_node_attribute_fill_init(bNodeTree *UNUSED(tree), bNode *node)
 {
   node->custom1 = CD_PROP_FLOAT;
   node->custom2 = ATTR_DOMAIN_AUTO;
+
+  LISTBASE_FOREACH (bNodeSocket *, socket, &node->inputs) {
+    if (socket->type != SOCK_GEOMETRY) {
+      socket->flag |= SOCK_HIDDEN;
+    }
+  }
 }
 
 static void geo_node_attribute_fill_update(bNodeTree *UNUSED(ntree), bNode *node)
@@ -302,8 +308,10 @@ static void draw_socket_menu(bContext *UNUSED(C), uiLayout *layout, void *arg)
     RNA_boolean_set(&expose_props, "expose", true);
   }
   else {
+    uiLayout *col = uiLayoutColumn(layout, false);
+    uiLayoutSetEnabled(col, (socket_info->socket->flag & SOCK_IN_USE) == 0);
     PointerRNA expose_props;
-    uiItemFullO(layout,
+    uiItemFullO(col,
                 "node.expose_input_socket",
                 "Unexpose",
                 ICON_TRACKING_CLEAR_BACKWARDS,
