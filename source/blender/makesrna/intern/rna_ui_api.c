@@ -572,26 +572,32 @@ static void rna_uiTemplateEventFromKeymapItem(
 
 static void rna_uiTemplateAssetView(uiLayout *layout,
                                     bContext *C,
+                                    const char *list_id,
                                     PointerRNA *asset_library_dataptr,
                                     const char *asset_library_propname,
                                     PointerRNA *assets_dataptr,
                                     const char *assets_propname,
                                     PointerRNA *active_dataptr,
                                     const char *active_propname,
-                                    int filter_id_types)
+                                    int filter_id_types,
+                                    const char *activate_opname,
+                                    const char *drag_opname)
 {
   AssetFilterSettings filter_settings = {
       .id_types = filter_id_types ? filter_id_types : FILTER_ID_ALL,
   };
   uiTemplateAssetView(layout,
                       C,
+                      list_id,
                       asset_library_dataptr,
                       asset_library_propname,
                       assets_dataptr,
                       assets_propname,
                       active_dataptr,
                       active_propname,
-                      &filter_settings);
+                      &filter_settings,
+                      activate_opname,
+                      drag_opname);
 }
 
 /**
@@ -1736,6 +1742,14 @@ void RNA_api_ui_layout(StructRNA *srna)
   func = RNA_def_function(srna, "template_asset_view", "rna_uiTemplateAssetView");
   RNA_def_function_ui_description(func, "Item. A scrollable list of assets in a grid view");
   RNA_def_function_flag(func, FUNC_USE_CONTEXT);
+  parm = RNA_def_string(func,
+                        "list_id",
+                        NULL,
+                        0,
+                        "",
+                        "Identifier of this asset view. Necessary to tell apart different asset "
+                        "views and to idenify an asset view read from a .blend");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_pointer(func,
                          "asset_library_dataptr",
                          "AnyType",
@@ -1769,6 +1783,20 @@ void RNA_api_ui_layout(StructRNA *srna)
   RNA_def_property_enum_items(parm, DummyRNA_NULL_items);
   RNA_def_property_enum_funcs(parm, NULL, NULL, "rna_uiTemplateAssetView_filter_id_types_itemf");
   RNA_def_property_flag(parm, PROP_ENUM_FLAG);
+  RNA_def_string(func,
+                 "activate_operator",
+                 NULL,
+                 0,
+                 "",
+                 "Name of a custom operator to invoke when activating an item");
+  RNA_def_string(func,
+                 "drag_operator",
+                 NULL,
+                 0,
+                 "",
+                 "Name of a custom operator to invoke when starting to drag an item. Never "
+                 "invoked together with the `active_operator` (if set), it's either the drag or "
+                 "the activate one");
 }
 
 #endif

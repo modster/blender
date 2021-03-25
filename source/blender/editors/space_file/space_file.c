@@ -847,7 +847,13 @@ static void file_space_subtype_item_extend(bContext *UNUSED(C),
   }
 }
 
-static const char *file_context_dir[] = {"active_file", "id", NULL};
+static const char *file_context_dir[] = {
+    "active_file",
+    "active_handle",
+    "active_library",
+    "id",
+    NULL,
+};
 
 static int /*eContextResult*/ file_context(const bContext *C,
                                            const char *member,
@@ -876,6 +882,34 @@ static int /*eContextResult*/ file_context(const bContext *C,
     }
 
     CTX_data_pointer_set(result, &screen->id, &RNA_FileSelectEntry, file);
+    return CTX_RESULT_OK;
+  }
+  /* TODO this kind of handle is very weak. We need something proper that doesn't depend on file
+   * data. */
+  if (CTX_data_equals(member, "asset_handle")) {
+    FileDirEntry *file = filelist_file(sfile->files, params->active_file);
+    if (file == NULL || !file->asset_data) {
+      return CTX_RESULT_NO_DATA;
+    }
+
+    BLI_STATIC_ASSERT(sizeof(AssetHandle) == sizeof(FileDirEntry *),
+                      "Expected AssetHandle to match FileDirEntry");
+
+    CTX_data_pointer_set(result, &screen->id, &RNA_AssetHandle, file);
+    return CTX_RESULT_OK;
+  }
+  if (CTX_data_equals(member, "asset_library")) {
+    FileAssetSelectParams *asset_params = ED_fileselect_get_asset_params(sfile);
+
+    BLI_STATIC_ASSERT(offsetof(FileSelectAssetLibraryUID, type) ==
+                          offsetof(AssetLibraryReference, type),
+                      "Expected FileSelectAssetLibraryUID to match AssetLibraryReference");
+    BLI_STATIC_ASSERT(offsetof(FileSelectAssetLibraryUID, custom_library_index) ==
+                          offsetof(AssetLibraryReference, custom_library_index),
+                      "Expected FileSelectAssetLibraryUID to match AssetLibraryReference");
+
+    CTX_data_pointer_set(
+        result, &screen->id, &RNA_AssetLibraryReference, &asset_params->asset_library);
     return CTX_RESULT_OK;
   }
   if (CTX_data_equals(member, "id")) {

@@ -24,13 +24,16 @@
  */
 
 #include <optional>
+#include <string>
 
+#include "BKE_asset.h"
 #include "BKE_context.h"
 #include "BKE_screen.h"
 
 #include "BLI_function_ref.hh"
 #include "BLI_hash.hh"
 #include "BLI_map.hh"
+#include "BLI_path_util.h"
 #include "BLI_utility_mixins.hh"
 
 #include "DNA_asset_types.h"
@@ -153,7 +156,7 @@ class PreviewTimer : NonCopyable {
 class AssetList : NonCopyable {
   FileListWrapper filelist_;
   AssetLibraryReference library_ref_;
-  PreviewTimer previews_timer;
+  PreviewTimer previews_timer_;
 
  public:
   AssetList() = delete;
@@ -277,11 +280,11 @@ void AssetList::ensurePreviewsJob(bContext *C)
   {
     const bool previews_running = filelist_cache_previews_running(files);
     if (previews_running) {
-      previews_timer.ensureRunning(C);
+      previews_timer_.ensureRunning(C);
     }
     else {
       /* Preview is not running, no need to keep generating update events! */
-      previews_timer.stop(C);
+      previews_timer_.stop(C);
     }
   }
 }
@@ -472,14 +475,37 @@ void ED_assetlist_iterate(const AssetLibraryReference *library_reference, AssetL
   }
 }
 
-ImBuf *ED_assetlist_asset_image_get(const FileDirEntry *file)
+std::string ED_assetlist_asset_filepath_get(const AssetLibraryReference &library_reference,
+                                            const AssetHandle &asset_handle)
 {
-  ImBuf *imbuf = filelist_file_getimage(file);
+  if (asset_handle.file_data->id || !asset_handle.file_data->asset_data) {
+    return nullptr;
+  }
+  const char *library_path = ED_assetlist_library_path(&library_reference);
+  if (!library_path) {
+    return nullptr;
+  }
+  const char *asset_relpath = asset_handle.file_data->relpath;
+
+  char path[FILE_MAX_LIBEXTRA];
+  BLI_join_dirfile(path, sizeof(path), library_path, asset_relpath);
+
+  return path;
+}
+
+ID *ED_assetlist_asset_local_id_get(const AssetHandle *asset_handle)
+{
+  return asset_handle->file_data->asset_data ? asset_handle->file_data->id : nullptr;
+}
+
+ImBuf *ED_assetlist_asset_image_get(const AssetHandle *asset_handle)
+{
+  ImBuf *imbuf = filelist_file_getimage(asset_handle->file_data);
   if (imbuf) {
     return imbuf;
   }
 
-  return filelist_geticon_image_ex(file);
+  return filelist_geticon_image_ex(asset_handle->file_data);
 }
 
 const char *ED_assetlist_library_path(const AssetLibraryReference *library_reference)

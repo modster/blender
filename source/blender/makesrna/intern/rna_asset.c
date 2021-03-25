@@ -341,6 +341,13 @@ static void rna_def_asset_handle(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "File Entry", "File data used to refer to the asset");
 }
 
+static void rna_def_asset_library_reference(BlenderRNA *brna)
+{
+  StructRNA *srna = RNA_def_struct(brna, "AssetLibraryReference", NULL);
+  RNA_def_struct_ui_text(
+      srna, "Asset Library Reference", "Identifier to refere to the asset library");
+}
+
 /**
  * \note the UI text and updating has to be set by the caller.
  */
@@ -362,6 +369,7 @@ void RNA_def_asset(BlenderRNA *brna)
   rna_def_asset_tag(brna);
   rna_def_asset_filter_settings(brna);
   rna_def_asset_data(brna);
+  rna_def_asset_library_reference(brna);
   rna_def_asset_handle(brna);
 
   RNA_define_animate_sdna(true);

@@ -73,6 +73,7 @@ extern StructRNA RNA_Attribute;
 extern StructRNA RNA_AttributeGroup;
 extern StructRNA RNA_AssetFilterSettings;
 extern StructRNA RNA_AssetHandle;
+extern StructRNA RNA_AssetLibraryReference;
 extern StructRNA RNA_AssetMetaData;
 extern StructRNA RNA_AssetTag;
 extern StructRNA RNA_BackgroundImage;
