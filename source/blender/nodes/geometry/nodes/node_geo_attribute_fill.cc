@@ -144,59 +144,48 @@ static void draw_socket_menu(bContext *UNUSED(C), uiLayout *layout, void *arg)
   }
 }
 
-static void geo_node_attribute_fill_layout(uiLayout *layout, bContext *C, PointerRNA *node_ptr)
+static void draw_input_socket(bContext *C,
+                              uiLayout *layout,
+                              PointerRNA *node_ptr,
+                              StringRef socket_name,
+                              StringRef additional_enum_prop = "")
 {
   bNodeTree *ntree = (bNodeTree *)node_ptr->owner_id;
   bNode *node = (bNode *)node_ptr->data;
 
-  uiItemR(layout, node_ptr, "domain", 0, IFACE_("Domain"), ICON_NONE);
-
-  {
-    bNodeSocket *attribute_socket = (bNodeSocket *)BLI_findlink(&node->inputs, 1);
-    PointerRNA socket_ptr;
-    RNA_pointer_create(node_ptr->owner_id, &RNA_NodeSocket, attribute_socket, &socket_ptr);
-
-    Set<HeapValue<SocketMenuInfo>> &set = get_socket_menu_info_set();
-    SocketMenuInfo info;
-    info.ntree = ntree;
-    info.node = node;
-    info.socket = attribute_socket;
-    /* Use `lookup_key_as`. */
-    const SocketMenuInfo *stored_info = set.lookup_key_or_add_as(info).get();
-
-    uiLayout *row = uiLayoutRow(layout, false);
-    uiLayout *sub_row = uiLayoutRow(row, false);
-    uiLayoutSetActive(sub_row, (attribute_socket->flag & SOCK_HIDDEN) != 0);
-    attribute_socket->typeinfo->draw(C, sub_row, &socket_ptr, node_ptr, attribute_socket->name);
-    uiItemMenuF(row, "", ICON_DOWNARROW_HLT, draw_socket_menu, (void *)stored_info);
-  }
-
-  {
-    bNodeSocket *value_socket = nullptr;
-    LISTBASE_FOREACH (bNodeSocket *, socket, &node->inputs) {
-      if ((socket->flag & SOCK_UNAVAIL) == 0 && STREQ(socket->name, "Value")) {
-        value_socket = socket;
-        break;
-      }
+  bNodeSocket *socket_to_draw = nullptr;
+  LISTBASE_FOREACH (bNodeSocket *, socket, &node->inputs) {
+    if ((socket->flag & SOCK_UNAVAIL) == 0 && socket->name == socket_name) {
+      socket_to_draw = socket;
+      break;
     }
-    PointerRNA socket_ptr;
-    RNA_pointer_create(node_ptr->owner_id, &RNA_NodeSocket, value_socket, &socket_ptr);
-
-    Set<HeapValue<SocketMenuInfo>> &set = get_socket_menu_info_set();
-    SocketMenuInfo info;
-    info.ntree = ntree;
-    info.node = node;
-    info.socket = value_socket;
-    info.enum_name = "data_type";
-    set.add_as(info);
-    const SocketMenuInfo *stored_info = set.lookup_key_or_add_as(info).get();
-
-    uiLayout *row = uiLayoutRow(layout, false);
-    uiLayout *sub_row = uiLayoutRow(row, false);
-    uiLayoutSetActive(sub_row, (value_socket->flag & SOCK_HIDDEN) != 0);
-    value_socket->typeinfo->draw(C, sub_row, &socket_ptr, node_ptr, value_socket->name);
-    uiItemMenuF(row, "", ICON_DOWNARROW_HLT, draw_socket_menu, (void *)stored_info);
   }
+  if (socket_to_draw == nullptr) {
+    return;
+  }
+  PointerRNA socket_ptr;
+  RNA_pointer_create(&ntree->id, &RNA_NodeSocket, socket_to_draw, &socket_ptr);
+
+  SocketMenuInfo info;
+  info.ntree = ntree;
+  info.node = node;
+  info.socket = socket_to_draw;
+  info.enum_name = additional_enum_prop;
+
+  Set<HeapValue<SocketMenuInfo>> &set = get_socket_menu_info_set();
+  const SocketMenuInfo *stored_info = set.lookup_key_or_add_as(info).get();
+  uiLayout *row = uiLayoutRow(layout, false);
+  uiLayout *sub_row = uiLayoutRow(row, false);
+  uiLayoutSetActive(sub_row, (socket_to_draw->flag & SOCK_HIDDEN) != 0);
+  socket_to_draw->typeinfo->draw(C, sub_row, &socket_ptr, node_ptr, socket_to_draw->name);
+  uiItemMenuF(row, "", ICON_DOWNARROW_HLT, draw_socket_menu, (void *)stored_info);
+}
+
+static void geo_node_attribute_fill_layout(uiLayout *layout, bContext *C, PointerRNA *node_ptr)
+{
+  uiItemR(layout, node_ptr, "domain", 0, IFACE_("Domain"), ICON_NONE);
+  draw_input_socket(C, layout, node_ptr, "Attribute");
+  draw_input_socket(C, layout, node_ptr, "Value", "data_type");
 }
 
 static AttributeDomain get_result_domain(const GeometryComponent &component,
