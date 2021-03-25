@@ -65,6 +65,180 @@ static void geo_node_attribute_fill_update(bNodeTree *UNUSED(ntree), bNode *node
   nodeSetSocketAvailability(socket_value_int32, data_type == CD_PROP_INT32);
 }
 
+namespace blender {
+
+template<typename T> class HeapValue {
+ private:
+  T *value_ = nullptr;
+
+ public:
+  HeapValue(T value)
+  {
+    value_ = new T(std::move(value));
+  }
+
+  HeapValue(const HeapValue &other)
+  {
+    if (other.value_ != nullptr) {
+      value_ = new T(*other.value_);
+    }
+  }
+
+  HeapValue(HeapValue &&other)
+  {
+    value_ = other.value_;
+    other.value_ = nullptr;
+  }
+
+  ~HeapValue()
+  {
+    delete value_;
+  }
+
+  HeapValue &operator=(const HeapValue &other)
+  {
+    if (this == &other) {
+      return *this;
+    }
+    if (value_ != nullptr) {
+      if (other.value_ != nullptr) {
+        *value_ = *other.value_;
+      }
+      else {
+        delete value_;
+        value_ = nullptr;
+      }
+    }
+    else {
+      if (other.value_ != nullptr) {
+        value_ = new T(*other.value_);
+      }
+      else {
+        /* Do nothing. */
+      }
+    }
+    return *this;
+  }
+
+  HeapValue &operator=(HeapValue &&other)
+  {
+    if (this == &other) {
+      return *this;
+    }
+    delete value_;
+    value_ = other.value_;
+    other.value_ = nullptr;
+    return *this;
+  }
+
+  HeapValue &operator=(T value)
+  {
+    if (value_ == nullptr) {
+      value_ = new T(std::move(value));
+    }
+    else {
+      *value_ = std::move(value);
+    }
+  }
+
+  operator bool() const
+  {
+    return value_ != nullptr;
+  }
+
+  T &operator*()
+  {
+    BLI_assert(value_ != nullptr);
+    return *value_;
+  }
+
+  const T &operator*() const
+  {
+    BLI_assert(value_ != nullptr);
+    return *value_;
+  }
+
+  T *operator->()
+  {
+    BLI_assert(value_ != nullptr);
+    return value_;
+  }
+
+  const T *operator->() const
+  {
+    BLI_assert(value_ != nullptr);
+    return value_;
+  }
+
+  T *get()
+  {
+    return value_;
+  }
+
+  const T *get() const
+  {
+    return value_;
+  }
+
+  friend bool operator==(const HeapValue &a, const HeapValue &b)
+  {
+    if (a.value_ == nullptr && b.value_ == nullptr) {
+      return true;
+    }
+    if (a.value_ == nullptr) {
+      return false;
+    }
+    if (b.value_ == nullptr) {
+      return false;
+    }
+    return *a.value_ == *b.value_;
+  }
+
+  friend bool operator==(const HeapValue &a, const T &b)
+  {
+    if (a.value_ == nullptr) {
+      return false;
+    }
+    return *a.value_ == b;
+  }
+
+  friend bool operator==(const T &a, const HeapValue &b)
+  {
+    return b == a;
+  }
+
+  friend bool operator!=(const HeapValue &a, const HeapValue &b)
+  {
+    return !(a == b);
+  }
+
+  friend bool operator!=(const HeapValue &a, const T &b)
+  {
+    return !(a == b);
+  }
+
+  friend bool operator!=(const T &a, const HeapValue &b)
+  {
+    return !(a == b);
+  }
+};
+
+template<typename T> struct DefaultHash<HeapValue<T>> {
+  uint64_t operator()(const HeapValue<T> &value) const
+  {
+    if (value) {
+      return DefaultHash<T>{}(*value);
+    }
+    return 0;
+  }
+
+  uint64_t operator()(const T &value) const
+  {
+    return DefaultHash<T>{}(value);
+  }
+};
+}  // namespace blender
+
 namespace blender::nodes {
 
 template<typename T1, typename T2, typename T3>
@@ -83,27 +257,23 @@ struct SocketMenuInfo {
   bNode *node;
   bNodeSocket *socket;
   std::string enum_name;
-};
-
-struct SocketMenuInfoPtr {
-  std::unique_ptr<SocketMenuInfo> value;
-
-  friend bool operator==(const SocketMenuInfoPtr &a, const SocketMenuInfoPtr &b)
-  {
-    return a.value->ntree == b.value->ntree && a.value->node == b.value->node &&
-           a.value->socket == b.value->socket;
-  }
 
   uint64_t hash() const
   {
-    return default_hash_3(value->ntree, value->node, value->socket);
+    return default_hash_3(ntree, node, socket);
+  }
+
+  friend bool operator==(const SocketMenuInfo &a, const SocketMenuInfo &b)
+  {
+    return a.ntree == b.ntree && a.node == b.node && a.socket == b.socket;
   }
 };
+
 }  // namespace
 
-static Set<SocketMenuInfoPtr> &get_socket_menu_info_set()
+static Set<HeapValue<SocketMenuInfo>> &get_socket_menu_info_set()
 {
-  static Set<SocketMenuInfoPtr> set;
+  static Set<HeapValue<SocketMenuInfo>> set;
   return set;
 }
 
@@ -121,7 +291,7 @@ static void draw_socket_menu(bContext *UNUSED(C), uiLayout *layout, void *arg)
     uiItemFullO(layout,
                 "node.expose_input_socket",
                 "Expose",
-                ICON_TRACKING_FORWARDS_SINGLE,
+                ICON_TRACKING_BACKWARDS_SINGLE,
                 nullptr,
                 WM_OP_EXEC_DEFAULT,
                 0,
@@ -136,7 +306,7 @@ static void draw_socket_menu(bContext *UNUSED(C), uiLayout *layout, void *arg)
     uiItemFullO(layout,
                 "node.expose_input_socket",
                 "Unexpose",
-                ICON_TRACKING_CLEAR_FORWARDS,
+                ICON_TRACKING_CLEAR_BACKWARDS,
                 nullptr,
                 WM_OP_EXEC_DEFAULT,
                 0,
@@ -164,25 +334,19 @@ static void geo_node_attribute_fill_layout(uiLayout *layout, bContext *C, Pointe
     PointerRNA socket_ptr;
     RNA_pointer_create(node_ptr->owner_id, &RNA_NodeSocket, attribute_socket, &socket_ptr);
 
-    Set<SocketMenuInfoPtr> &set = get_socket_menu_info_set();
-    {
-      auto info = SocketMenuInfoPtr{std::make_unique<SocketMenuInfo>()};
-      info.value->ntree = ntree;
-      info.value->node = node;
-      info.value->socket = attribute_socket;
-      set.add(std::move(info));
-    }
-    auto info = SocketMenuInfoPtr{std::make_unique<SocketMenuInfo>()};
-    info.value->ntree = ntree;
-    info.value->node = node;
-    info.value->socket = attribute_socket;
-    SocketMenuInfo *stored_info = set.lookup_key(info).value.get();
+    Set<HeapValue<SocketMenuInfo>> &set = get_socket_menu_info_set();
+    SocketMenuInfo info;
+    info.ntree = ntree;
+    info.node = node;
+    info.socket = attribute_socket;
+    /* Use `lookup_key_as`. */
+    const SocketMenuInfo *stored_info = set.lookup_key_or_add_as(info).get();
 
     uiLayout *row = uiLayoutRow(layout, false);
     uiLayout *sub_row = uiLayoutRow(row, false);
     uiLayoutSetActive(sub_row, (attribute_socket->flag & SOCK_HIDDEN) != 0);
     attribute_socket->typeinfo->draw(C, sub_row, &socket_ptr, node_ptr, attribute_socket->name);
-    uiItemMenuF(row, "", ICON_DOWNARROW_HLT, draw_socket_menu, stored_info);
+    uiItemMenuF(row, "", ICON_DOWNARROW_HLT, draw_socket_menu, (void *)stored_info);
   }
 
   {
@@ -196,26 +360,20 @@ static void geo_node_attribute_fill_layout(uiLayout *layout, bContext *C, Pointe
     PointerRNA socket_ptr;
     RNA_pointer_create(node_ptr->owner_id, &RNA_NodeSocket, value_socket, &socket_ptr);
 
-    Set<SocketMenuInfoPtr> &set = get_socket_menu_info_set();
-    {
-      auto info = SocketMenuInfoPtr{std::make_unique<SocketMenuInfo>()};
-      info.value->ntree = ntree;
-      info.value->node = node;
-      info.value->socket = value_socket;
-      info.value->enum_name = "data_type";
-      set.add(std::move(info));
-    }
-    auto info = SocketMenuInfoPtr{std::make_unique<SocketMenuInfo>()};
-    info.value->ntree = ntree;
-    info.value->node = node;
-    info.value->socket = value_socket;
-    SocketMenuInfo *stored_info = set.lookup_key(info).value.get();
+    Set<HeapValue<SocketMenuInfo>> &set = get_socket_menu_info_set();
+    SocketMenuInfo info;
+    info.ntree = ntree;
+    info.node = node;
+    info.socket = value_socket;
+    info.enum_name = "data_type";
+    set.add_as(info);
+    const SocketMenuInfo *stored_info = set.lookup_key_or_add_as(info).get();
 
     uiLayout *row = uiLayoutRow(layout, false);
     uiLayout *sub_row = uiLayoutRow(row, false);
     uiLayoutSetActive(sub_row, (value_socket->flag & SOCK_HIDDEN) != 0);
     value_socket->typeinfo->draw(C, sub_row, &socket_ptr, node_ptr, value_socket->name);
-    uiItemMenuF(row, "", ICON_DOWNARROW_HLT, draw_socket_menu, stored_info);
+    uiItemMenuF(row, "", ICON_DOWNARROW_HLT, draw_socket_menu, (void *)stored_info);
   }
 }
 
