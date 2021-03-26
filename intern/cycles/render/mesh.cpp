@@ -816,6 +816,9 @@ void Mesh::pack_patches(uint *patch_data, uint vert_offset, uint face_offset, ui
   }
 }
 
+/* Pack the deltas and directly apply them to the original data on the device.
+ * This should only be called if there is a ATTR_STD_DELTAS attribute on the Mesh,
+ * and we do not have to repack the device data for the entire Scene. */
 void Mesh::pack_deltas(Device *device, DeviceScene *dscene, device_vector<ushort4> *verts_deltas)
 {
   const size_t num_prims = num_triangles();
@@ -838,6 +841,8 @@ void Mesh::pack_deltas(Device *device, DeviceScene *dscene, device_vector<ushort
         dscene->prim_tri_verts, *verts_deltas, offset, size, min_delta, max_delta);
 }
 
+/* Pack the topology of the Mesh, or only the vertices if pack_all is false.
+ * This is only called if no deltas are present on the Mesh. */
 void Mesh::pack_topology(DeviceScene *dscene, int object,
                          uint visibility,
                          bool pack_all)

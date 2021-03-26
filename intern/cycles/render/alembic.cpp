@@ -1702,7 +1702,12 @@ void AlembicObject::read_attribute(CachedData &cached_data,
 }
 
 /* Update existing attributes and remove any attribute not in the cached_data, those attributes
- * were added by Cycles (e.g. face normals) */
+ * were added by Cycles (e.g. face normals).
+ * This will also update the deltas, if present, as they are stored as attributes;
+ * min_delta and max_delta are stored separately as they are sockets on the Mesh.
+ * If no deltas are present for the frame (for example, if the topology changed), any existing
+ * delta attribute in the AttributeSet will be removed.
+ */
 static void update_attributes(AttributeSet &attributes, CachedData &cached_data, double frame_time)
 {
   set<Attribute *> cached_attributes;
