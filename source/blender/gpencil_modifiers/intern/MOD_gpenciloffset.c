@@ -123,6 +123,67 @@ static void deformPolyline(GpencilModifierData *md,
   BKE_gpencil_stroke_geometry_update(gpd, gps);
 }
 
+static void deformBezier(GpencilModifierData *md,
+                         Depsgraph *UNUSED(depsgraph),
+                         Object *ob,
+                         bGPDlayer *gpl,
+                         bGPDframe *UNUSED(gpf),
+                         bGPDstroke *gps)
+{
+  OffsetGpencilModifierData *mmd = (OffsetGpencilModifierData *)md;
+  const int def_nr = BKE_object_defgroup_name_index(ob, mmd->vgname);
+
+  float mat[4][4];
+  float loc[3], rot[3], scale[3];
+
+  if (!is_stroke_affected_by_modifier(ob,
+                                      mmd->layername,
+                                      mmd->material,
+                                      mmd->pass_index,
+                                      mmd->layer_pass,
+                                      1,
+                                      gpl,
+                                      gps,
+                                      mmd->flag & GP_OFFSET_INVERT_LAYER,
+                                      mmd->flag & GP_OFFSET_INVERT_PASS,
+                                      mmd->flag & GP_OFFSET_INVERT_LAYERPASS,
+                                      mmd->flag & GP_OFFSET_INVERT_MATERIAL)) {
+    return;
+  }
+  bGPdata *gpd = ob->data;
+  bGPDcurve *gpc = gps->editcurve;
+
+  for (int i = 0; i < gpc->tot_curve_points; i++) {
+    bGPDcurve_point *pt = &gpc->curve_points[i];
+    BezTriple *bezt = &pt->bezt;
+    MDeformVert *dvert = (gpc->dvert != NULL) ? &gpc->dvert[i] : NULL;
+
+    /* Verify vertex group. */
+    const float weight = get_modifier_point_weight(
+        dvert, (mmd->flag & GP_OFFSET_INVERT_VGROUP) != 0, def_nr);
+    if (weight < 0.0f) {
+      continue;
+    }
+    /* Calculate matrix. */
+    mul_v3_v3fl(loc, mmd->loc, weight);
+    mul_v3_v3fl(rot, mmd->rot, weight);
+    mul_v3_v3fl(scale, mmd->scale, weight);
+    add_v3_fl(scale, 1.0);
+    loc_eul_size_to_mat4(mat, loc, rot, scale);
+
+    /* Apply scale to thickness. */
+    float unit_scale = (scale[0] + scale[1] + scale[2]) / 3.0f;
+    pt->pressure *= unit_scale;
+
+    for (int j = 0; j < 3; j++) {
+      mul_m4_v3(mat, bezt->vec[j]);
+    }
+  }
+  gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE; /* Calc geometry data. */
+
+  BKE_gpencil_stroke_geometry_update(gpd, gps);
+}
+
 static void bakeModifier(struct Main *UNUSED(bmain),
                          Depsgraph *depsgraph,
                          GpencilModifierData *md,
@@ -184,7 +245,7 @@ GpencilModifierTypeInfo modifierType_Gpencil_Offset = {
     /* copyData */ copyData,
 
     /* deformPolyline */ deformPolyline,
-    /* deformBezier */ NULL,
+    /* deformBezier */ deformBezier,
     /* generateStrokes */ NULL,
     /* bakeModifier */ bakeModifier,
     /* remapTime */ NULL,
