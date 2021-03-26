@@ -671,6 +671,37 @@ static bool poselib_blend_poll(bContext *C)
   return poselib_asset_in_context(C);
 }
 
+void POSELIB_OT_apply_pose_asset(wmOperatorType *ot)
+{
+  /* Identifiers: */
+  ot->name = "Apply Pose Library Pose";
+  ot->idname = "POSELIB_OT_apply_pose_asset";
+  ot->description = "Apply the given Pose Action to the rig";
+
+  /* Callbacks: */
+  ot->exec = poselib_blend_exec;
+  ot->poll = poselib_blend_poll;
+
+  /* Flags: */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  /* Properties: */
+  RNA_def_float_factor(ot->srna,
+                       "blend_factor",
+                       1.0f,
+                       0.0f,
+                       1.0f,
+                       "Blend Factor",
+                       "Amount that the pose is applied on top of the existing poses",
+                       0.0f,
+                       1.0f);
+  RNA_def_boolean(ot->srna,
+                  "apply_flipped",
+                  false,
+                  "Apply Flipped",
+                  "When enabled, applies the pose flipped over the X-axis");
+}
+
 void POSELIB_OT_blend_pose_asset(wmOperatorType *ot)
 {
   /* Identifiers: */
