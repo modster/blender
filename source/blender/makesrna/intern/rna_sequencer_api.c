@@ -81,17 +81,18 @@ static void rna_Sequence_swap_internal(Sequence *seq_self,
   }
 }
 
-static void rna_Sequences_move_strip_to_meta(ID *id,
-                                             Sequence *seq_self,
-                                             Main *bmain,
-                                             Sequence *meta_dst)
+static void rna_Sequences_move_strip_to_meta(
+    ID *id, Sequence *seq_self, Main *bmain, ReportList *reports, Sequence *meta_dst)
 {
   Scene *scene = (Scene *)id;
+  const char *error_msg;
 
-  /* Move strip to meta */
-  SEQ_edit_move_strip_to_meta(scene, seq_self, meta_dst);
+  /* Move strip to meta. */
+  if (!SEQ_edit_move_strip_to_meta(scene, seq_self, meta_dst, &error_msg)) {
+    BKE_report(reports, RPT_ERROR, error_msg);
+  }
 
-  /* Udate depsgraph */
+  /* Update depsgraph. */
   DEG_relations_tag_update(bmain);
   DEG_id_tag_update(&scene->id, ID_RECALC_SEQUENCER_STRIPS);
 
@@ -651,7 +652,7 @@ void RNA_api_sequence_strip(StructRNA *srna)
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
 
   func = RNA_def_function(srna, "move_to_meta", "rna_Sequences_move_strip_to_meta");
-  RNA_def_function_flag(func, FUNC_USE_SELF_ID | FUNC_USE_MAIN);
+  RNA_def_function_flag(func, FUNC_USE_REPORTS | FUNC_USE_SELF_ID | FUNC_USE_MAIN);
   parm = RNA_def_pointer(func,
                          "meta_sequence",
                          "Sequence",
