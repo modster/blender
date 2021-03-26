@@ -403,7 +403,7 @@ static bAction *poselib_blend_init_get_action(bContext *C, wmOperator *op)
 
   pbd->temp_id_consumer = ED_asset_temp_id_consumer_create(&asset_handle);
   return (bAction *)ED_asset_temp_id_consumer_ensure_local_id(
-      pbd->temp_id_consumer, asset_library, ID_AC, CTX_data_main(C), op->reports);
+      pbd->temp_id_consumer, C, asset_library, ID_AC, CTX_data_main(C), op->reports);
 }
 
 /* Return true on success, false if the context isn't suitable. */

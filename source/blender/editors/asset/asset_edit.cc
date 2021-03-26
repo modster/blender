@@ -34,6 +34,8 @@
 #include "DNA_asset_types.h"
 #include "DNA_space_types.h"
 
+#include "ED_fileselect.h"
+
 #include "MEM_guardedalloc.h"
 
 #include "UI_interface_icons.h"
@@ -159,12 +161,13 @@ class AssetTemporaryIDConsumer : NonCopyable, NonMovable {
     return ED_assetlist_asset_local_id_get(&handle_);
   }
 
-  ID *import_id(const AssetLibraryReference &asset_library,
+  ID *import_id(const bContext *C,
+                const AssetLibraryReference &asset_library,
                 ID_Type id_type,
                 Main &bmain,
                 ReportList &reports)
   {
-    std::string asset_path = ED_assetlist_asset_filepath_get(asset_library, handle_);
+    std::string asset_path = ED_assetlist_asset_filepath_get(C, asset_library, handle_);
     if (asset_path.empty()) {
       return nullptr;
     }
@@ -202,6 +205,7 @@ void ED_asset_temp_id_consumer_free(AssetTempIDConsumer **consumer)
 }
 
 ID *ED_asset_temp_id_consumer_ensure_local_id(AssetTempIDConsumer *consumer_,
+                                              const bContext *C,
                                               const AssetLibraryReference *asset_library,
                                               ID_Type id_type,
                                               Main *bmain,
@@ -215,5 +219,5 @@ ID *ED_asset_temp_id_consumer_ensure_local_id(AssetTempIDConsumer *consumer_,
   if (ID *local_id = consumer->get_local_id()) {
     return local_id;
   }
-  return consumer->import_id(*asset_library, id_type, *bmain, *reports);
+  return consumer->import_id(C, *asset_library, id_type, *bmain, *reports);
 }

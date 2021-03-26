@@ -475,15 +475,36 @@ void ED_assetlist_iterate(const AssetLibraryReference *library_reference, AssetL
   }
 }
 
-std::string ED_assetlist_asset_filepath_get(const AssetLibraryReference &library_reference,
+/* TODO hack to use the File Browser path, so we can keep all the import logic handled by the asset
+ * API. Get rid of this once the File Browser is integrated better with the asset list. */
+static const char *assetlist_library_path_from_sfile_get_hack(const bContext *C)
+{
+  SpaceFile *sfile = CTX_wm_space_file(C);
+  if (!sfile || !ED_fileselect_is_asset_browser(sfile)) {
+    return nullptr;
+  }
+
+  FileAssetSelectParams *asset_select_params = ED_fileselect_get_asset_params(sfile);
+  if (!asset_select_params) {
+    return nullptr;
+  }
+
+  return filelist_dir(sfile->files);
+}
+
+std::string ED_assetlist_asset_filepath_get(const bContext *C,
+                                            const AssetLibraryReference &library_reference,
                                             const AssetHandle &asset_handle)
 {
   if (asset_handle.file_data->id || !asset_handle.file_data->asset_data) {
-    return nullptr;
+    return {};
   }
   const char *library_path = ED_assetlist_library_path(&library_reference);
   if (!library_path) {
-    return nullptr;
+    library_path = assetlist_library_path_from_sfile_get_hack(C);
+  }
+  if (!library_path) {
+    return {};
   }
   const char *asset_relpath = asset_handle.file_data->relpath;
 

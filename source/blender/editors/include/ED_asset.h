@@ -47,6 +47,7 @@ struct AssetLibraryReference ED_asset_library_reference_from_enum_value(int valu
 AssetTempIDConsumer *ED_asset_temp_id_consumer_create(const AssetHandle *handle);
 void ED_asset_temp_id_consumer_free(AssetTempIDConsumer **consumer);
 struct ID *ED_asset_temp_id_consumer_ensure_local_id(AssetTempIDConsumer *consumer,
+                                                     const struct bContext *C,
                                                      const AssetLibraryReference *asset_library,
                                                      ID_Type id_type,
                                                      struct Main *bmain,
@@ -76,7 +77,8 @@ void ED_operatortypes_asset(void);
 
 /* TODO move to C++ asset-list header? */
 #ifdef __cplusplus
-std::string ED_assetlist_asset_filepath_get(const AssetLibraryReference &library_reference,
+std::string ED_assetlist_asset_filepath_get(const bContext *C,
+                                            const AssetLibraryReference &library_reference,
                                             const AssetHandle &asset_handle);
 
 #  include "BLI_function_ref.hh"
