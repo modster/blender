@@ -658,11 +658,11 @@ static bool poselib_blend_poll(bContext *C)
   return poselib_asset_in_context(C);
 }
 
-void POSELIB_OT_blend_pose(wmOperatorType *ot)
+void POSELIB_OT_blend_pose_asset(wmOperatorType *ot)
 {
   /* Identifiers: */
   ot->name = "Blend Pose Library Pose";
-  ot->idname = "POSELIB_OT_blend_pose";
+  ot->idname = "POSELIB_OT_blend_pose_asset";
   ot->description = "Blend the given Pose Action to the rig";
 
   /* Callbacks: */
