@@ -285,31 +285,49 @@ static void poselib_blend_apply(bContext *C, wmOperator *op)
 
 /* ---------------------------- */
 
+static void poselib_blend_set_factor(PoseBlendData *pbd, const float new_factor)
+{
+  pbd->blend_factor = CLAMPIS(new_factor, 0.0f, 1.0f);
+  pbd->needs_redraw = true;
+}
+
+#define BLEND_FACTOR_BY_WAVING_MOUSE_AROUND
+
+#ifdef BLEND_FACTOR_BY_WAVING_MOUSE_AROUND
+static void poselib_slide_mouse_update_blendfactor(PoseBlendData *pbd, const wmEvent *event)
+{
+  const float new_factor = (event->x - pbd->area->v1->vec.x) / ((float)pbd->area->winx);
+  poselib_blend_set_factor(pbd, new_factor);
+}
+#else
 static void poselib_blend_step_factor(PoseBlendData *pbd,
                                       const float blend_factor_step,
                                       const bool reduce_step)
 {
   const float step_size = reduce_step ? blend_factor_step / 10.0f : blend_factor_step;
   const float new_factor = pbd->blend_factor + step_size;
-  pbd->blend_factor = CLAMPIS(new_factor, 0.0f, 1.0f);
-  pbd->needs_redraw = true;
+  poselib_blend_set_factor(pbd, new_factor);
 }
+#endif
 
 /* Return operator return value. */
 static int poselib_blend_handle_event(bContext *UNUSED(C), wmOperator *op, const wmEvent *event)
 {
   PoseBlendData *pbd = op->customdata;
 
+#ifdef BLEND_FACTOR_BY_WAVING_MOUSE_AROUND
+  if (event->type == MOUSEMOVE) {
+    poselib_slide_mouse_update_blendfactor(pbd, event);
+    return OPERATOR_RUNNING_MODAL;
+  }
+#endif
+
   /* only accept 'press' event, and ignore 'release', so that we don't get double actions */
   if (ELEM(event->val, KM_PRESS, KM_NOTHING) == 0) {
-#if 0
-    printf("PoseLib: skipping event with type '%s' and val %d\n",
-           WM_key_event_string(event->type, false),
-           event->val);
-#endif
     return OPERATOR_RUNNING_MODAL;
   }
 
+#ifndef BLEND_FACTOR_BY_WAVING_MOUSE_AROUND
   if (ELEM(event->type,
            EVT_HOMEKEY,
            EVT_PAD0,
@@ -329,6 +347,7 @@ static int poselib_blend_handle_event(bContext *UNUSED(C), wmOperator *op, const
     /* Pass-through of view manipulation events. */
     return OPERATOR_PASS_THROUGH;
   }
+#endif
 
   /* NORMAL EVENT HANDLING... */
   /* searching takes priority over normal activity */
@@ -353,13 +372,15 @@ static int poselib_blend_handle_event(bContext *UNUSED(C), wmOperator *op, const
       pbd->needs_redraw = true;
       break;
 
-    /* TODO(Sybren): use better UI for slider. */
+      /* TODO(Sybren): use better UI for slider. */
+#ifndef BLEND_FACTOR_BY_WAVING_MOUSE_AROUND
     case WHEELUPMOUSE:
       poselib_blend_step_factor(pbd, 0.1f, event->shift);
       break;
     case WHEELDOWNMOUSE:
       poselib_blend_step_factor(pbd, -0.1f, event->shift);
       break;
+#endif
   }
 
   return OPERATOR_RUNNING_MODAL;
@@ -644,7 +665,7 @@ void POSELIB_OT_blend_pose_asset(wmOperatorType *ot)
   ot->poll = poselib_blend_poll;
 
   /* Flags: */
-  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_BLOCKING;
 
   /* Properties: */
   RNA_def_float_factor(ot->srna,
