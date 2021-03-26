@@ -219,8 +219,6 @@ bool BKE_pose_copy_result(struct bPose *to, struct bPose *from);
 /* Clear transforms. */
 void BKE_pose_rest(struct bPose *pose, bool selected_bones_only);
 
-void BKE_action_flip_with_pose(struct bAction *act, struct Object *ob_arm);
-
 /* Tag pose for recalc. Also tag all related data to be recalc. */
 void BKE_pose_tag_recalc(struct Main *bmain, struct bPose *pose);
 
