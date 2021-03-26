@@ -46,6 +46,7 @@
 #include "BKE_armature.h"
 #include "BKE_context.h"
 #include "BKE_idprop.h"
+#include "BKE_lib_id.h"
 #include "BKE_object.h"
 #include "BKE_report.h"
 
@@ -92,6 +93,7 @@ typedef struct PoseBlendData {
 
   Object *ob;   /* Object to work on. */
   bAction *act; /* Pose to blend into the current pose. */
+  bool free_action;
 
   Scene *scene;         /* For auto-keying. */
   struct ScrArea *area; /* For drawing status text. */
@@ -490,10 +492,18 @@ static bool poselib_blend_init_data(bContext *C, wmOperator *op)
     return false;
   }
 
-  /* get basic data */
+  /* Maybe flip the Action. */
+  const bool apply_flipped = RNA_boolean_get(op->ptr, "apply_flipped");
+  if (apply_flipped) {
+    action = (bAction *)BKE_id_copy_ex(NULL, &action->id, NULL, LIB_ID_COPY_LOCALIZE);
+    BKE_action_flip_with_pose(action, ob);
+    pbd->free_action = true;
+  }
+  pbd->act = action;
+
+  /* Get the basic data. */
   pbd->ob = ob;
   pbd->ob->pose = ob->pose;
-  pbd->act = action;
 
   pbd->scene = CTX_data_scene(C);
   pbd->area = CTX_wm_area(C);
@@ -555,6 +565,9 @@ static void poselib_blend_free(wmOperator *op)
   }
 
   poselib_tempload_exit(pbd);
+  if (pbd->free_action) {
+    BKE_id_free(NULL, pbd->act);
+  }
 
   /* Free temp data for operator */
   poselib_backup_free_data(pbd);
@@ -685,4 +698,9 @@ void POSELIB_OT_blend_pose_asset(wmOperatorType *ot)
                        "Amount that the pose is applied on top of the existing poses",
                        0.0f,
                        1.0f);
+  RNA_def_boolean(ot->srna,
+                  "apply_flipped",
+                  false,
+                  "Apply Flipped",
+                  "When enabled, applies the pose flipped over the X-axis");
 }
