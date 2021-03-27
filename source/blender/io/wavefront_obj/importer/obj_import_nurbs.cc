@@ -70,7 +70,7 @@ void CurveFromGeometry::create_curve(Main *bmain, const OBJImportParams &import_
 /**
  * Create a NURBS spline for the Curve converted from Geometry.
  */
-void CurveFromGeometry::create_nurbs(const OBJImportParams &import_params)
+void CurveFromGeometry::create_nurbs(const OBJImportParams & /*import_params */)
 {
   const NurbsElement &nurbs_geometry = curve_geometry_.nurbs_elem();
   Nurb *nurb = static_cast<Nurb *>(blender_curve_->nurb.first);
