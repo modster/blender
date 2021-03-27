@@ -1499,7 +1499,7 @@ static void lineart_finalize_object_edge_list(LineartRenderBuffer *rb, LineartOb
     rb->material_lines = obi->material;
   }
   if (obi->edge_mark) {
-    obi->edge_mark->next = rb->edge_marks;
+    obi->edge_mark_last->next = rb->edge_marks;
     rb->edge_marks = obi->edge_mark;
   }
   if (obi->intersection_last) {
@@ -1898,7 +1898,7 @@ static void lineart_main_load_geometries(
       use_mesh = use_ob->data;
     }
     else {
-      use_mesh = BKE_mesh_new_from_object(NULL, use_ob, false);
+      use_mesh = BKE_mesh_new_from_object(depsgraph, use_ob, true);
     }
 
     /* In case we still can not get any mesh geometry data from the object */
