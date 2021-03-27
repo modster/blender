@@ -33,9 +33,7 @@
 
 #include "ED_gpencil.h"
 
-#include "gpencil_io_import_base.h"
-
-#include "pugixml.hpp"
+#include "gpencil_io_import_base.hh"
 
 namespace blender::io::gpencil {
 

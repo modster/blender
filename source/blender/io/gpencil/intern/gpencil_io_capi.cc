@@ -21,7 +21,7 @@
  * \ingroup bgpencil
  */
 
-#include <stdio.h>
+#include <cstdio>
 
 #include "BLI_listbase.h"
 
@@ -40,14 +40,14 @@
 #include "../gpencil_io.h"
 
 #ifdef WITH_HARU
-#  include "gpencil_io_export_pdf.h"
+#  include "gpencil_io_export_pdf.hh"
 #endif
 
 #ifdef WITH_PUGIXML
-#  include "gpencil_io_export_svg.h"
+#  include "gpencil_io_export_svg.hh"
 #endif
 
-#include "gpencil_io_import_svg.h"
+#include "gpencil_io_import_svg.hh"
 
 #ifdef WITH_HARU
 using blender::io::gpencil::GpencilExporterPDF;
@@ -58,6 +58,7 @@ using blender::io::gpencil::GpencilExporterSVG;
 using blender::io::gpencil::GpencilImporterSVG;
 
 /* Check if frame is included. */
+#ifdef WITH_HARU
 static bool is_keyframe_included(bGPdata *gpd_, const int32_t framenum, const bool use_selected)
 {
   /* Check if exist a frame. */
@@ -75,6 +76,7 @@ static bool is_keyframe_included(bGPdata *gpd_, const int32_t framenum, const bo
   }
   return false;
 }
+#endif
 
 /* Import frame. */
 static bool gpencil_io_import_frame(void *in_importer, const GpencilIOParams &iparams)
@@ -177,7 +179,7 @@ bool gpencil_io_export(const char *filename, GpencilIOParams *iparams)
   Scene *scene_ = CTX_data_scene(iparams->C);
   Object *ob = CTX_data_active_object(iparams->C);
 
-  UNUSED_VARS(depsgraph_, scene_, ob);
+  UNUSED_VARS(filename, depsgraph_, scene_, ob);
 
   switch (iparams->mode) {
 #ifdef WITH_PUGIXML
