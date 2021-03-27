@@ -66,6 +66,39 @@ static void copyData(const GpencilModifierData *md, GpencilModifierData *target)
   BKE_gpencil_modifier_copydata_generic(md, target);
 }
 
+static bool do_modifier(Object *ob,
+                        OffsetGpencilModifierData *mmd,
+                        bGPDlayer *gpl,
+                        bGPDstroke *gps)
+{
+  return is_stroke_affected_by_modifier(ob,
+                                        mmd->layername,
+                                        mmd->material,
+                                        mmd->pass_index,
+                                        mmd->layer_pass,
+                                        1,
+                                        gpl,
+                                        gps,
+                                        mmd->flag & GP_OFFSET_INVERT_LAYER,
+                                        mmd->flag & GP_OFFSET_INVERT_PASS,
+                                        mmd->flag & GP_OFFSET_INVERT_LAYERPASS,
+                                        mmd->flag & GP_OFFSET_INVERT_MATERIAL);
+}
+
+/* Calculate transform matrix. */
+static float prepare_matrix(OffsetGpencilModifierData *mmd, float weight, float r_mat[4][4])
+{
+  float loc[3], rot[3], scale[3];
+
+  mul_v3_v3fl(loc, mmd->loc, weight);
+  mul_v3_v3fl(rot, mmd->rot, weight);
+  mul_v3_v3fl(scale, mmd->scale, weight);
+  add_v3_fl(scale, 1.0);
+  loc_eul_size_to_mat4(r_mat, loc, rot, scale);
+
+  return (scale[0] + scale[1] + scale[2]) / 3.0f;
+}
+
 /* change stroke offsetness */
 static void deformPolyline(GpencilModifierData *md,
                            Depsgraph *UNUSED(depsgraph),
@@ -77,25 +110,11 @@ static void deformPolyline(GpencilModifierData *md,
   OffsetGpencilModifierData *mmd = (OffsetGpencilModifierData *)md;
   const int def_nr = BKE_object_defgroup_name_index(ob, mmd->vgname);
 
-  float mat[4][4];
-  float loc[3], rot[3], scale[3];
-
-  if (!is_stroke_affected_by_modifier(ob,
-                                      mmd->layername,
-                                      mmd->material,
-                                      mmd->pass_index,
-                                      mmd->layer_pass,
-                                      1,
-                                      gpl,
-                                      gps,
-                                      mmd->flag & GP_OFFSET_INVERT_LAYER,
-                                      mmd->flag & GP_OFFSET_INVERT_PASS,
-                                      mmd->flag & GP_OFFSET_INVERT_LAYERPASS,
-                                      mmd->flag & GP_OFFSET_INVERT_MATERIAL)) {
+  if (!do_modifier(ob, mmd, gpl, gps)) {
     return;
   }
-  bGPdata *gpd = ob->data;
 
+  bGPdata *gpd = ob->data;
   for (int i = 0; i < gps->totpoints; i++) {
     bGPDspoint *pt = &gps->points[i];
     MDeformVert *dvert = gps->dvert != NULL ? &gps->dvert[i] : NULL;
@@ -106,15 +125,8 @@ static void deformPolyline(GpencilModifierData *md,
     if (weight < 0.0f) {
       continue;
     }
-    /* Calculate matrix. */
-    mul_v3_v3fl(loc, mmd->loc, weight);
-    mul_v3_v3fl(rot, mmd->rot, weight);
-    mul_v3_v3fl(scale, mmd->scale, weight);
-    add_v3_fl(scale, 1.0);
-    loc_eul_size_to_mat4(mat, loc, rot, scale);
-
-    /* Apply scale to thickness. */
-    float unit_scale = (scale[0] + scale[1] + scale[2]) / 3.0f;
+    float mat[4][4];
+    float unit_scale = prepare_matrix(mmd, weight, mat);
     pt->pressure *= unit_scale;
 
     mul_m4_v3(mat, &pt->x);
@@ -133,23 +145,10 @@ static void deformBezier(GpencilModifierData *md,
   OffsetGpencilModifierData *mmd = (OffsetGpencilModifierData *)md;
   const int def_nr = BKE_object_defgroup_name_index(ob, mmd->vgname);
 
-  float mat[4][4];
-  float loc[3], rot[3], scale[3];
-
-  if (!is_stroke_affected_by_modifier(ob,
-                                      mmd->layername,
-                                      mmd->material,
-                                      mmd->pass_index,
-                                      mmd->layer_pass,
-                                      1,
-                                      gpl,
-                                      gps,
-                                      mmd->flag & GP_OFFSET_INVERT_LAYER,
-                                      mmd->flag & GP_OFFSET_INVERT_PASS,
-                                      mmd->flag & GP_OFFSET_INVERT_LAYERPASS,
-                                      mmd->flag & GP_OFFSET_INVERT_MATERIAL)) {
+  if (!do_modifier(ob, mmd, gpl, gps)) {
     return;
   }
+
   bGPdata *gpd = ob->data;
   bGPDcurve *gpc = gps->editcurve;
 
@@ -164,15 +163,8 @@ static void deformBezier(GpencilModifierData *md,
     if (weight < 0.0f) {
       continue;
     }
-    /* Calculate matrix. */
-    mul_v3_v3fl(loc, mmd->loc, weight);
-    mul_v3_v3fl(rot, mmd->rot, weight);
-    mul_v3_v3fl(scale, mmd->scale, weight);
-    add_v3_fl(scale, 1.0);
-    loc_eul_size_to_mat4(mat, loc, rot, scale);
-
-    /* Apply scale to thickness. */
-    float unit_scale = (scale[0] + scale[1] + scale[2]) / 3.0f;
+    float mat[4][4];
+    float unit_scale = prepare_matrix(mmd, weight, mat);
     pt->pressure *= unit_scale;
 
     for (int j = 0; j < 3; j++) {
