@@ -157,17 +157,22 @@ static const char *get_image_filepath(const bNode *tex_node)
 }
 
 /**
- * Find the Principled-BSDF in the object's node tree.
+ * Find the Principled-BSDF Node in nodetree.
+ * We only want one that feeds directly into a Material Output node
+ * (that is the behavior of the legacy Python exporter).
  */
-static const bNode *find_bsdf_node(const Material *material)
+static const nodes::NodeRef *find_bsdf_node(const nodes::NodeTreeRef *nodetree)
 {
-  if (!material->use_nodes) {
+  if (!nodetree) {
     return nullptr;
   }
-  ListBase *nodes = &material->nodetree->nodes;
-  LISTBASE_FOREACH (const bNode *, curr_node, nodes) {
-    if (curr_node->typeinfo->type == SH_NODE_BSDF_PRINCIPLED) {
-      return curr_node;
+  for (const nodes::NodeRef *node : nodetree->nodes_by_type("ShaderNodeOutputMaterial")) {
+    const nodes::InputSocketRef *node_input_socket0 = node->inputs()[0];
+    for (const nodes::OutputSocketRef *out_sock : node_input_socket0->directly_linked_sockets()) {
+      const nodes::NodeRef &in_node = out_sock->node();
+      if (in_node.typeinfo()->type == SH_NODE_BSDF_PRINCIPLED) {
+        return &in_node;
+      }
     }
   }
   return nullptr;
@@ -176,36 +181,62 @@ static const bNode *find_bsdf_node(const Material *material)
 /**
  * Store properties found either in bNode or material into r_mtl_mat.
  */
-static void store_bsdf_properties(const bNode *bsdf_node,
+static void store_bsdf_properties(const nodes::NodeRef *bsdf_node,
                                   const Material *material,
                                   MTLMaterial &r_mtl_mat)
 {
-  /* Emperical approximation. Importer should use the inverse of this method. */
-  float spec_exponent = (1.0f - material->roughness) * 30;
-  spec_exponent *= spec_exponent;
+  const bNode *bnode = nullptr;
+  if (bsdf_node) {
+    bnode = bsdf_node->bnode();
+  }
+
   /* If p-BSDF is not present, fallback to #Object.Material. */
+  float roughness = material->roughness;
+  if (bnode) {
+    copy_property_from_node(SOCK_FLOAT, bnode, "Roughness", {&roughness, 1});
+  }
+  /* Emperical approximation. Importer should use the inverse of this method. */
+  float spec_exponent = (1.0f - roughness) * 30;
+  spec_exponent *= spec_exponent;
+
   float specular = material->spec;
-  copy_property_from_node(SOCK_FLOAT, bsdf_node, "Specular", {&specular, 1});
+  if (bnode) {
+    copy_property_from_node(SOCK_FLOAT, bnode, "Specular", {&specular, 1});
+  }
+
   float metallic = material->metallic;
-  copy_property_from_node(SOCK_FLOAT, bsdf_node, "Metallic", {&metallic, 1});
+  if (bnode) {
+    copy_property_from_node(SOCK_FLOAT, bnode, "Metallic", {&metallic, 1});
+  }
+
   float refraction_index = 1.0f;
-  copy_property_from_node(SOCK_FLOAT, bsdf_node, "IOR", {&refraction_index, 1});
+  if (bnode) {
+    copy_property_from_node(SOCK_FLOAT, bnode, "IOR", {&refraction_index, 1});
+  }
+
   float dissolved = material->a;
-  copy_property_from_node(SOCK_FLOAT, bsdf_node, "Alpha", {&dissolved, 1});
+  if (bnode) {
+    copy_property_from_node(SOCK_FLOAT, bnode, "Alpha", {&dissolved, 1});
+  }
   const bool transparent = dissolved != 1.0f;
 
   float3 diffuse_col = {material->r, material->g, material->b};
-  copy_property_from_node(SOCK_RGBA, bsdf_node, "Base Color", {diffuse_col, 3});
+  if (bnode) {
+    copy_property_from_node(SOCK_RGBA, bnode, "Base Color", {diffuse_col, 3});
+  }
+
   float3 emission_col{0.0f};
   float emission_strength = 0.0f;
-  copy_property_from_node(SOCK_FLOAT, bsdf_node, "Emission Strength", {&emission_strength, 1});
-  copy_property_from_node(SOCK_RGBA, bsdf_node, "Emission", {emission_col, 3});
+  if (bnode) {
+    copy_property_from_node(SOCK_FLOAT, bnode, "Emission Strength", {&emission_strength, 1});
+    copy_property_from_node(SOCK_RGBA, bnode, "Emission", {emission_col, 3});
+  }
   mul_v3_fl(emission_col, emission_strength);
 
   /* See https://wikipedia.org/wiki/Wavefront_.obj_file for all possible values of illum. */
   /* Highlight on. */
   int illum = 2;
-  if (specular > 0.0f) {
+  if (specular == 0.0f) {
     /* Color on and Ambient on. */
     illum = 1;
   }
@@ -225,7 +256,12 @@ static void store_bsdf_properties(const bNode *bsdf_node,
     illum = 9;
   }
   r_mtl_mat.Ns = spec_exponent;
-  r_mtl_mat.Ka = {metallic, metallic, metallic};
+  if (metallic != 0.0f) {
+    r_mtl_mat.Ka = {metallic, metallic, metallic};
+  }
+  else {
+    r_mtl_mat.Ka = {1.0f, 1.0f, 1.0f};
+  }
   r_mtl_mat.Kd = diffuse_col;
   r_mtl_mat.Ks = {specular, specular, specular};
   r_mtl_mat.Ke = emission_col;
@@ -237,17 +273,16 @@ static void store_bsdf_properties(const bNode *bsdf_node,
 /**
  * Store image texture options and filepaths in r_mtl_mat.
  */
-static void store_image_textures(const bNode *bsdf_node,
+static void store_image_textures(const nodes::NodeRef *bsdf_node,
+                                 const nodes::NodeTreeRef *node_tree,
                                  const Material *material,
                                  MTLMaterial &r_mtl_mat)
 {
-  if (!material || !material->nodetree) {
-    /* No nodetree, no images. */
+  if (!material || !node_tree || !bsdf_node) {
+    /* No nodetree, no images, or no Principled BSDF node. */
     return;
   }
-  /* Need to create a #NodeTreeRef for a faster way to find linked sockets, as opposed to
-   * looping over all the links in a node tree to match two sockets of our interest. */
-  nodes::NodeTreeRef node_tree(material->nodetree);
+  const bNode *bnode = bsdf_node->bnode();
 
   /* Normal Map Texture has two extra tasks of:
    * - finding a Normal Map node before finding a texture node.
@@ -261,16 +296,16 @@ static void store_image_textures(const bNode *bsdf_node,
 
     if (texture_map.key == eMTLSyntaxElement::map_Bump) {
       /* Find sockets linked to destination "Normal" socket in p-bsdf node. */
-      linked_sockets_to_dest_id(bsdf_node, node_tree, "Normal", linked_sockets);
+      linked_sockets_to_dest_id(bnode, *node_tree, "Normal", linked_sockets);
       /* Among the linked sockets, find Normal Map shader node. */
       normal_map_node = get_node_of_type(linked_sockets, SH_NODE_NORMAL_MAP);
 
       /* Find sockets linked to "Color" socket in normal map node. */
-      linked_sockets_to_dest_id(normal_map_node, node_tree, "Color", linked_sockets);
+      linked_sockets_to_dest_id(normal_map_node, *node_tree, "Color", linked_sockets);
     }
     else if (texture_map.key == eMTLSyntaxElement::map_Ke) {
       float emission_strength = 0.0f;
-      copy_property_from_node(SOCK_FLOAT, bsdf_node, "Emission Strength", {&emission_strength, 1});
+      copy_property_from_node(SOCK_FLOAT, bnode, "Emission Strength", {&emission_strength, 1});
       if (emission_strength == 0.0f) {
         continue;
       }
@@ -278,7 +313,7 @@ static void store_image_textures(const bNode *bsdf_node,
     else {
       /* Find sockets linked to the destination socket of interest, in p-bsdf node. */
       linked_sockets_to_dest_id(
-          bsdf_node, node_tree, texture_map.value.dest_socket_id, linked_sockets);
+          bnode, *node_tree, texture_map.value.dest_socket_id, linked_sockets);
     }
 
     /* Among the linked sockets, find Image Texture shader node. */
@@ -292,7 +327,7 @@ static void store_image_textures(const bNode *bsdf_node,
     }
 
     /* Find "Mapping" node if connected to texture node. */
-    linked_sockets_to_dest_id(tex_node, node_tree, "Vector", linked_sockets);
+    linked_sockets_to_dest_id(tex_node, *node_tree, "Vector", linked_sockets);
     const bNode *mapping = get_node_of_type(linked_sockets, SH_NODE_MAPPING);
 
     if (normal_map_node) {
@@ -314,9 +349,16 @@ MTLMaterial mtlmaterial_for_material(const Material *material)
   MTLMaterial mtlmat;
   mtlmat.name = std::string(material->id.name + 2);
   std::replace(mtlmat.name.begin(), mtlmat.name.end(), ' ', '_');
-  const bNode *bsdf_node = find_bsdf_node(material);
+  const nodes::NodeTreeRef *nodetree = nullptr;
+  if (material->nodetree) {
+    nodetree = new nodes::NodeTreeRef(material->nodetree);
+  }
+  const nodes::NodeRef *bsdf_node = find_bsdf_node(nodetree);
   store_bsdf_properties(bsdf_node, material, mtlmat);
-  store_image_textures(bsdf_node, material, mtlmat);
+  store_image_textures(bsdf_node, nodetree, material, mtlmat);
+  if (nodetree) {
+    delete nodetree;
+  }
   return mtlmat;
 }
 

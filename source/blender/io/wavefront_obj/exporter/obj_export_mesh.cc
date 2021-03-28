@@ -242,7 +242,7 @@ int16_t OBJMesh::ith_poly_matnr(const int poly_index) const
 {
   BLI_assert(poly_index < export_mesh_eval_->totpoly);
   const int16_t r_mat_nr = export_mesh_eval_->mpoly[poly_index].mat_nr;
-  return r_mat_nr > 0 ? r_mat_nr : NOT_FOUND;
+  return r_mat_nr >= 0 ? r_mat_nr : NOT_FOUND;
 }
 
 /**

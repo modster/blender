@@ -508,10 +508,7 @@ StringRefNull MTLWriter::mtl_file_path() const
  */
 void MTLWriter::write_bsdf_properties(const MTLMaterial &mtl_material)
 {
-  file_handler_->write<eMTLSyntaxElement::Ni>(mtl_material.Ni);
-  file_handler_->write<eMTLSyntaxElement::d>(mtl_material.d);
   file_handler_->write<eMTLSyntaxElement::Ns>(mtl_material.Ns);
-  file_handler_->write<eMTLSyntaxElement::illum>(mtl_material.illum);
   file_handler_->write<eMTLSyntaxElement::Ka>(
       mtl_material.Ka.x, mtl_material.Ka.y, mtl_material.Ka.z);
   file_handler_->write<eMTLSyntaxElement::Kd>(
@@ -520,6 +517,9 @@ void MTLWriter::write_bsdf_properties(const MTLMaterial &mtl_material)
       mtl_material.Ks.x, mtl_material.Ks.y, mtl_material.Ks.z);
   file_handler_->write<eMTLSyntaxElement::Ke>(
       mtl_material.Ke.x, mtl_material.Ke.y, mtl_material.Ke.z);
+  file_handler_->write<eMTLSyntaxElement::Ni>(mtl_material.Ni);
+  file_handler_->write<eMTLSyntaxElement::d>(mtl_material.d);
+  file_handler_->write<eMTLSyntaxElement::illum>(mtl_material.illum);
 }
 
 /**
@@ -575,6 +575,7 @@ void MTLWriter::write_materials()
             mtlmaterials_.end(),
             [](const MTLMaterial &a, const MTLMaterial &b) { return a.name < b.name; });
   for (const MTLMaterial &mtlmat : mtlmaterials_) {
+    file_handler_->write<eMTLSyntaxElement::string>("\n");
     file_handler_->write<eMTLSyntaxElement::newmtl>(mtlmat.name);
     write_bsdf_properties(mtlmat);
     for (const Map<const eMTLSyntaxElement, tex_map_XX>::Item &texture_map :

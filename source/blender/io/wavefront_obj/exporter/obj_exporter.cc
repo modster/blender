@@ -244,7 +244,10 @@ static void export_frame(Depsgraph *depsgraph,
 
   write_mesh_objects(
       std::move(exportable_as_mesh), *frame_writer, mtl_writer.get(), export_params);
-  mtl_writer->write_materials();
+  if (mtl_writer) {
+    mtl_writer->write_header(export_params.blen_filepath);
+    mtl_writer->write_materials();
+  }
   write_nurbs_curve_objects(std::move(exportable_as_nurbs), *frame_writer);
 }
 
