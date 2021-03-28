@@ -22,12 +22,21 @@
 extern "C" {
 #endif
 
+struct Object;
 struct EEVEE_Instance;
 
 struct EEVEE_Instance *EEVEE_instance_alloc(void);
 void EEVEE_instance_free(struct EEVEE_Instance *instance_data_);
 
+void EEVEE_instance_init(struct EEVEE_Instance *instance);
+
+void EEVEE_instance_cache_init(struct EEVEE_Instance *instance);
+void EEVEE_instance_cache_populate(struct EEVEE_Instance *instance, struct Object *object);
+void EEVEE_instance_cache_finish(struct EEVEE_Instance *instance);
+
 void EEVEE_instance_draw_viewport(struct EEVEE_Instance *instance_data_);
+
+void EEVEE_shared_data_free(void);
 
 #ifdef __cplusplus
 }

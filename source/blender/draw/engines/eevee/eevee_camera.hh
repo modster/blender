@@ -16,9 +16,40 @@
  * Copyright 2021, Blender Foundation.
  */
 
+/** \file
+ * \ingroup eevee
+ */
+
 #pragma once
 
-typedef struct EEVEE_Instance {
-  EEVEE_Instance(void);
-  ~EEVEE_Instance(void);
-} EEVEE_Instance;
+#include "DRW_render.h"
+
+#include "BKE_camera.h"
+
+#include "DNA_camera_types.h"
+#include "DNA_object_types.h"
+
+enum eEEVEECameraType : int32_t {
+  ORTHO = 0,
+  PERSP,
+  PANO_EQUIRECT,
+  PANO_EQUISOLID,
+  PANO_EQUIDISTANT,
+  PANO_MIRROR,
+};
+
+typedef struct EEVEE_Camera {
+ public:
+  eEEVEECameraType projection;
+
+ public:
+  void init(Object *camera_object)
+  {
+    (void)camera_object;
+  }
+
+  void init(const DRWView *drw_view)
+  {
+    (void)drw_view;
+  }
+} EEVEE_Camera;

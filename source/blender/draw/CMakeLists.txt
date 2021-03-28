@@ -81,8 +81,8 @@ set(SRC
   engines/basic/basic_engine.c
   engines/image/image_engine.c
   engines/image/image_shader.c
-  engines/eevee/eevee.cc
   engines/eevee/eevee_engine.c
+  engines/eevee/eevee_engine.cc
   engines/eevee/eevee_lightcache.c
   engines/eevee/eevee_lut.c
   engines/workbench/workbench_data.c
@@ -155,7 +155,6 @@ set(SRC
   intern/draw_view.h
   intern/smaa_textures.h
   engines/basic/basic_engine.h
-  engines/eevee/eevee.hh
   engines/eevee/eevee_engine.h
   engines/eevee/eevee_lightcache.h
   engines/eevee/eevee_lut.h
@@ -177,7 +176,11 @@ set(LIB
   bf_windowmanager
 )
 
-# data_to_c_simple(engines/eevee/shaders/ambient_occlusion_lib.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/accumulator_accumulate_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/accumulator_resolve_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/mesh_frag.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/mesh_lib.glsl SRC)
+data_to_c_simple(engines/eevee/shaders/mesh_vert.glsl SRC)
 
 data_to_c_simple(engines/workbench/shaders/workbench_cavity_lib.glsl SRC)
 data_to_c_simple(engines/workbench/shaders/workbench_common_lib.glsl SRC)

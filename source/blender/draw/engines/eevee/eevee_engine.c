@@ -45,6 +45,8 @@ static void eevee_engine_init(void *vedata)
   if (ved->instance_data == NULL) {
     ved->instance_data = EEVEE_instance_alloc();
   }
+
+  EEVEE_instance_init(ved->instance_data);
 }
 
 static void eevee_draw_scene(void *vedata)
@@ -52,9 +54,24 @@ static void eevee_draw_scene(void *vedata)
   EEVEE_instance_draw_viewport(((EEVEE_Data *)vedata)->instance_data);
 }
 
+static void eevee_cache_init(void *vedata)
+{
+  EEVEE_instance_cache_init(((EEVEE_Data *)vedata)->instance_data);
+}
+
+static void eevee_cache_populate(void *vedata, Object *object)
+{
+  EEVEE_instance_cache_populate(((EEVEE_Data *)vedata)->instance_data, object);
+}
+
+static void eevee_cache_finish(void *vedata)
+{
+  EEVEE_instance_cache_finish(((EEVEE_Data *)vedata)->instance_data);
+}
+
 static void eevee_engine_free(void)
 {
-  /* Free all static resources. */
+  EEVEE_shared_data_free();
 }
 
 static void eevee_instance_free(void *instance_data)
@@ -72,9 +89,9 @@ DrawEngineType draw_engine_eevee_type = {
     &eevee_engine_init,
     &eevee_engine_free,
     &eevee_instance_free,
-    NULL,
-    NULL,
-    NULL,
+    &eevee_cache_init,
+    &eevee_cache_populate,
+    &eevee_cache_finish,
     &eevee_draw_scene,
     NULL,
     NULL,

@@ -16,40 +16,37 @@
  * Copyright 2021, Blender Foundation.
  */
 
+/** \file
+ * \ingroup eevee
+ *
+ * Random Number Generator
+ */
+
+#pragma once
+
 #include "GPU_framebuffer.h"
+#include "GPU_texture.h"
 
-#include "eevee_private.h"
+#include "DRW_render.h"
 
-#include "eevee.hh"
+typedef struct EEVEE_Random {
+  /** 1 based current sample. */
+  uint64_t sample = 1;
+  /** Target sample count. */
+  uint64_t sample_count = 1;
 
-EEVEE_Instance::EEVEE_Instance(void)
-{
-}
+  void reset(void)
+  {
+    sample = 1;
+  }
 
-EEVEE_Instance::~EEVEE_Instance(void)
-{
-}
-
-/* -------------------------------------------------------------------- */
-/** \name C interface
- * \{ */
-
-EEVEE_Instance *EEVEE_instance_alloc(void)
-{
-  return new EEVEE_Instance();
-}
-
-void EEVEE_instance_free(EEVEE_Instance *instance)
-{
-  delete instance;
-}
-
-void EEVEE_instance_draw_viewport(EEVEE_Instance *UNUSED(instance))
-{
-  float color[4] = {1, 0, 0, 1};
-
-  GPUFrameBuffer *fb = GPU_framebuffer_active_get();
-  GPU_framebuffer_clear_color(fb, color);
-}
-
-/** \} */
+  /* Return true if a new iteration is needed. */
+  bool step(void)
+  {
+    if (sample <= sample_count) {
+      sample++;
+      return true;
+    }
+    return false;
+  }
+} EEVEE_Random;

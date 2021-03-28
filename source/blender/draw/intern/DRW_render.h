@@ -62,6 +62,10 @@
 
 #include "DEG_depsgraph.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct GPUBatch;
 struct GPUMaterial;
 struct GPUShader;
@@ -361,6 +365,8 @@ typedef enum {
   /** DO NOT USE. Assumed always enabled. Only used internally. */
   DRW_STATE_PROGRAM_POINT_SIZE = (1u << 31),
 } DRWState;
+
+ENUM_OPERATORS(DRWState, DRW_STATE_PROGRAM_POINT_SIZE)
 
 #define DRW_STATE_DEFAULT \
   (DRW_STATE_WRITE_DEPTH | DRW_STATE_WRITE_COLOR | DRW_STATE_DEPTH_LESS_EQUAL)
@@ -776,3 +782,8 @@ typedef struct DRWContextState {
 } DRWContextState;
 
 const DRWContextState *DRW_context_state_get(void);
+
+
+#ifdef __cplusplus
+}
+#endif
