@@ -75,11 +75,13 @@ class OBJWriter : NonMovable, NonCopyable {
                          const int last_poly_smooth_group) const;
   int16_t write_poly_material(const OBJMesh &obj_mesh_data,
                               const int poly_index,
-                              const int16_t last_poly_mat_nr) const;
+                              const int16_t last_poly_mat_nr,
+                              std::function<const char *(int)> matname_fn) const;
   int16_t write_vertex_group(const OBJMesh &obj_mesh_data,
                              const int poly_index,
                              const int16_t last_poly_vertex_group) const;
-  void write_poly_elements(const OBJMesh &obj_mesh_data);
+  void write_poly_elements(const OBJMesh &obj_mesh_data,
+                           std::function<const char *(int)> matname_fn);
   void write_edges_indices(const OBJMesh &obj_mesh_data) const;
   void write_nurbs_curve(const OBJCurve &obj_nurbs_data) const;
 
@@ -112,13 +114,18 @@ class MTLWriter : NonMovable, NonCopyable {
  private:
   std::unique_ptr<FileHandler<eFileType::MTL>> file_handler_ = nullptr;
   std::string mtl_filepath_;
+  Vector<MTLMaterial> mtlmaterials_;
+  /* Map from a Material* to an index into mtlmaterials_. */
+  Map<const Material *, int> material_map_;
 
  public:
   MTLWriter(const char *obj_filepath) noexcept(false);
 
   void write_header(const char *blen_filepath) const;
+  void write_materials();
   StringRefNull mtl_file_path() const;
-  void append_materials(const OBJMesh &mesh_to_export);
+  Vector<int> add_materials(const OBJMesh &mesh_to_export);
+  const char *mtlmaterial_name(int index);
 
  private:
   void write_bsdf_properties(const MTLMaterial &mtl_material);

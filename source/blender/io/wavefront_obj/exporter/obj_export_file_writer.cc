@@ -21,6 +21,7 @@
  * \ingroup obj
  */
 
+#include <algorithm>
 #include <cstdio>
 
 #include "BKE_blender_version.h"
@@ -260,7 +261,8 @@ int OBJWriter::write_smooth_group(const OBJMesh &obj_mesh_data,
  */
 int16_t OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
                                        const int poly_index,
-                                       const int16_t last_poly_mat_nr) const
+                                       const int16_t last_poly_mat_nr,
+                                       std::function<const char *(int)> matname_fn) const
 {
   if (!export_params_.export_materials || obj_mesh_data.tot_materials() <= 0) {
     return last_poly_mat_nr;
@@ -275,11 +277,15 @@ int16_t OBJWriter::write_poly_material(const OBJMesh &obj_mesh_data,
     file_handler_->write<eOBJSyntaxElement::poly_usemtl>(MATERIAL_GROUP_DISABLED);
     return current_mat_nr;
   }
-  const char *mat_name = obj_mesh_data.get_object_material_name(current_mat_nr);
   if (export_params_.export_object_groups) {
     write_object_group(obj_mesh_data);
   }
+  const char *mat_name = matname_fn(current_mat_nr);
+  if (!mat_name) {
+    mat_name = MATERIAL_GROUP_DISABLED;
+  }
   file_handler_->write<eOBJSyntaxElement::poly_usemtl>(mat_name);
+
   return current_mat_nr;
 }
 
@@ -333,9 +339,12 @@ OBJWriter::func_vert_uv_normal_indices OBJWriter::get_poly_element_writer(
 /**
  * Write polygon elements with at least vertex indices, and conditionally with UV vertex
  * indices and polygon normal indices. Also write groups: smooth, vertex, material.
+ * The matname_fn turns a 0-indexed material slot number in an Object into the
+ * name used in the .obj file.
  * \note UV indices were stored while writing UV vertices.
  */
-void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
+void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data,
+                                    std::function<const char *(int)> matname_fn)
 {
   int last_poly_smooth_group = NEGATIVE_INIT;
   int16_t last_poly_vertex_group = NEGATIVE_INIT;
@@ -360,7 +369,7 @@ void OBJWriter::write_poly_elements(const OBJMesh &obj_mesh_data)
 
     last_poly_smooth_group = write_smooth_group(obj_mesh_data, i, last_poly_smooth_group);
     last_poly_vertex_group = write_vertex_group(obj_mesh_data, i, last_poly_vertex_group);
-    last_poly_mat_nr = write_poly_material(obj_mesh_data, i, last_poly_mat_nr);
+    last_poly_mat_nr = write_poly_material(obj_mesh_data, i, last_poly_mat_nr, matname_fn);
     (this->*poly_element_writer)(
         poly_vertex_indices, obj_mesh_data.uv_indices(i), poly_normal_indices);
   }
@@ -553,40 +562,68 @@ void MTLWriter::write_texture_map(
 }
 
 /**
- * Append the materials of the given object to the .MTL file.
+ * Write all of the material specifications to the MTL file.
+ * For consistency of output from run to run (useful for testing),
+ * the materials are sorted by name before writing.
  */
-void MTLWriter::append_materials(const OBJMesh &mesh_to_export)
+void MTLWriter::write_materials()
 {
-  MaterialWrap mat_wrap;
-  Vector<MTLMaterial> mtl_materials = mat_wrap.fill_materials(mesh_to_export);
-
-#ifndef NDEBUG
-  auto all_items_positive = [](const float3 &triplet) {
-    return triplet.x >= 0.0f && triplet.y >= 0.0f && triplet.z >= 0.0f;
-  };
-#endif
-
-  for (const MTLMaterial &mtl_material : mtl_materials) {
-    file_handler_->write<eMTLSyntaxElement::newmtl>(mtl_material.name);
-    /* At least one material property has not been modified since its initialization. */
-    BLI_assert(all_items_positive({mtl_material.d, mtl_material.Ns, mtl_material.Ni}) &&
-               mtl_material.illum > 0);
-    BLI_assert(all_items_positive(mtl_material.Ka) && all_items_positive(mtl_material.Kd) &&
-               all_items_positive(mtl_material.Ks) && all_items_positive(mtl_material.Ke));
-
-    write_bsdf_properties(mtl_material);
-
-    /* Write image texture maps. */
+  if (mtlmaterials_.size() == 0) {
+    return;
+  }
+  std::sort(mtlmaterials_.begin(),
+            mtlmaterials_.end(),
+            [](const MTLMaterial &a, const MTLMaterial &b) { return a.name < b.name; });
+  for (const MTLMaterial &mtlmat : mtlmaterials_) {
+    file_handler_->write<eMTLSyntaxElement::newmtl>(mtlmat.name);
+    write_bsdf_properties(mtlmat);
     for (const Map<const eMTLSyntaxElement, tex_map_XX>::Item &texture_map :
-         mtl_material.texture_maps.items()) {
-      if (texture_map.value.image_path.empty()) {
-        continue;
+         mtlmat.texture_maps.items()) {
+      if (!texture_map.value.image_path.empty()) {
+        write_texture_map(mtlmat, texture_map);
       }
-      write_texture_map(mtl_material, texture_map);
     }
   }
 }
 
+/**
+ * Add the materials of the given object to MTLWriter, deduping
+ * against ones that are already there.
+ * Return a Vector of indices into mtlmaterials_ that hold the MTLMaterial
+ * that corresponds to each material slot, in order, of the given Object.
+ * Indexes are returned rather than pointers to the MTLMaterials themselves
+ * because the mtlmaterials_ Vector may move around when resized.
+ */
+Vector<int> MTLWriter::add_materials(const OBJMesh &mesh_to_export)
+{
+  Vector<int> r_mtl_indices;
+  r_mtl_indices.resize(mesh_to_export.tot_materials());
+  for (int16_t i = 0; i < mesh_to_export.tot_materials(); i++) {
+    const Material *material = mesh_to_export.get_object_material(i);
+    if (!material) {
+      r_mtl_indices[i] = -1;
+      continue;
+    }
+    int mtlmat_index = material_map_.lookup_default(material, -1);
+    if (mtlmat_index != -1) {
+      r_mtl_indices[i] = mtlmat_index;
+    }
+    else {
+      mtlmaterials_.append(mtlmaterial_for_material(material));
+      r_mtl_indices[i] = mtlmaterials_.size() - 1;
+      material_map_.add_new(material, r_mtl_indices[i]);
+    }
+  }
+  return r_mtl_indices;
+}
+
+const char *MTLWriter::mtlmaterial_name(int index)
+{
+  if (index < 0 || index >= mtlmaterials_.size()) {
+    return nullptr;
+  }
+  return mtlmaterials_[index].name.c_str();
+}
 /** \} */
 
 }  // namespace blender::io::obj

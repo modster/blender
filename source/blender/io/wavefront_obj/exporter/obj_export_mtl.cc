@@ -159,51 +159,47 @@ static const char *get_image_filepath(const bNode *tex_node)
 /**
  * Find the Principled-BSDF in the object's node tree.
  */
-void MaterialWrap::init_bsdf_node(StringRefNull object_name)
+static const bNode *find_bsdf_node(const Material *material)
 {
-  if (!export_mtl_->use_nodes) {
-    fprintf(stderr,
-            "No Principled-BSDF node found in the shader node tree of: '%s'.\n",
-            object_name.c_str());
-    return;
+  if (!material->use_nodes) {
+    return nullptr;
   }
-  ListBase *nodes = &export_mtl_->nodetree->nodes;
+  ListBase *nodes = &material->nodetree->nodes;
   LISTBASE_FOREACH (const bNode *, curr_node, nodes) {
     if (curr_node->typeinfo->type == SH_NODE_BSDF_PRINCIPLED) {
-      bsdf_node_ = curr_node;
-      return;
+      return curr_node;
     }
   }
-  fprintf(stderr,
-          "No Principled-BSDF node found in the shader node tree of: '%s'.\n",
-          object_name.c_str());
+  return nullptr;
 }
 
 /**
- * Store properties found either in p-BSDF node or #Object.Material.
+ * Store properties found either in bNode or material into r_mtl_mat.
  */
-void MaterialWrap::store_bsdf_properties(MTLMaterial &r_mtl_mat) const
+static void store_bsdf_properties(const bNode *bsdf_node,
+                                  const Material *material,
+                                  MTLMaterial &r_mtl_mat)
 {
   /* Emperical approximation. Importer should use the inverse of this method. */
-  float spec_exponent = (1.0f - export_mtl_->roughness) * 30;
+  float spec_exponent = (1.0f - material->roughness) * 30;
   spec_exponent *= spec_exponent;
   /* If p-BSDF is not present, fallback to #Object.Material. */
-  float specular = export_mtl_->spec;
-  copy_property_from_node(SOCK_FLOAT, bsdf_node_, "Specular", {&specular, 1});
-  float metallic = export_mtl_->metallic;
-  copy_property_from_node(SOCK_FLOAT, bsdf_node_, "Metallic", {&metallic, 1});
+  float specular = material->spec;
+  copy_property_from_node(SOCK_FLOAT, bsdf_node, "Specular", {&specular, 1});
+  float metallic = material->metallic;
+  copy_property_from_node(SOCK_FLOAT, bsdf_node, "Metallic", {&metallic, 1});
   float refraction_index = 1.0f;
-  copy_property_from_node(SOCK_FLOAT, bsdf_node_, "IOR", {&refraction_index, 1});
-  float dissolved = export_mtl_->a;
-  copy_property_from_node(SOCK_FLOAT, bsdf_node_, "Alpha", {&dissolved, 1});
+  copy_property_from_node(SOCK_FLOAT, bsdf_node, "IOR", {&refraction_index, 1});
+  float dissolved = material->a;
+  copy_property_from_node(SOCK_FLOAT, bsdf_node, "Alpha", {&dissolved, 1});
   const bool transparent = dissolved != 1.0f;
 
-  float3 diffuse_col = {export_mtl_->r, export_mtl_->g, export_mtl_->b};
-  copy_property_from_node(SOCK_RGBA, bsdf_node_, "Base Color", {diffuse_col, 3});
+  float3 diffuse_col = {material->r, material->g, material->b};
+  copy_property_from_node(SOCK_RGBA, bsdf_node, "Base Color", {diffuse_col, 3});
   float3 emission_col{0.0f};
   float emission_strength = 0.0f;
-  copy_property_from_node(SOCK_FLOAT, bsdf_node_, "Emission Strength", {&emission_strength, 1});
-  copy_property_from_node(SOCK_RGBA, bsdf_node_, "Emission", {emission_col, 3});
+  copy_property_from_node(SOCK_FLOAT, bsdf_node, "Emission Strength", {&emission_strength, 1});
+  copy_property_from_node(SOCK_RGBA, bsdf_node, "Emission", {emission_col, 3});
   mul_v3_fl(emission_col, emission_strength);
 
   /* See https://wikipedia.org/wiki/Wavefront_.obj_file for all possible values of illum. */
@@ -239,17 +235,19 @@ void MaterialWrap::store_bsdf_properties(MTLMaterial &r_mtl_mat) const
 }
 
 /**
- * Store image texture options and filepaths.
+ * Store image texture options and filepaths in r_mtl_mat.
  */
-void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
+static void store_image_textures(const bNode *bsdf_node,
+                                 const Material *material,
+                                 MTLMaterial &r_mtl_mat)
 {
-  if (!export_mtl_ || !export_mtl_->nodetree) {
+  if (!material || !material->nodetree) {
     /* No nodetree, no images. */
     return;
   }
   /* Need to create a #NodeTreeRef for a faster way to find linked sockets, as opposed to
    * looping over all the links in a node tree to match two sockets of our interest. */
-  nodes::NodeTreeRef node_tree(export_mtl_->nodetree);
+  nodes::NodeTreeRef node_tree(material->nodetree);
 
   /* Normal Map Texture has two extra tasks of:
    * - finding a Normal Map node before finding a texture node.
@@ -263,7 +261,7 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
 
     if (texture_map.key == eMTLSyntaxElement::map_Bump) {
       /* Find sockets linked to destination "Normal" socket in p-bsdf node. */
-      linked_sockets_to_dest_id(bsdf_node_, node_tree, "Normal", linked_sockets);
+      linked_sockets_to_dest_id(bsdf_node, node_tree, "Normal", linked_sockets);
       /* Among the linked sockets, find Normal Map shader node. */
       normal_map_node = get_node_of_type(linked_sockets, SH_NODE_NORMAL_MAP);
 
@@ -272,8 +270,7 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
     }
     else if (texture_map.key == eMTLSyntaxElement::map_Ke) {
       float emission_strength = 0.0f;
-      copy_property_from_node(
-          SOCK_FLOAT, bsdf_node_, "Emission Strength", {&emission_strength, 1});
+      copy_property_from_node(SOCK_FLOAT, bsdf_node, "Emission Strength", {&emission_strength, 1});
       if (emission_strength == 0.0f) {
         continue;
       }
@@ -281,7 +278,7 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
     else {
       /* Find sockets linked to the destination socket of interest, in p-bsdf node. */
       linked_sockets_to_dest_id(
-          bsdf_node_, node_tree, texture_map.value.dest_socket_id, linked_sockets);
+          bsdf_node, node_tree, texture_map.value.dest_socket_id, linked_sockets);
     }
 
     /* Among the linked sockets, find Image Texture shader node. */
@@ -311,27 +308,16 @@ void MaterialWrap::store_image_textures(MTLMaterial &r_mtl_mat) const
   }
 }
 
-/**
- * Get the Material data of an Object, for an .MTL file.
- */
-Vector<MTLMaterial> MaterialWrap::fill_materials(const OBJMesh &obj_mesh_data)
+MTLMaterial mtlmaterial_for_material(const Material *material)
 {
-  Vector<MTLMaterial> r_mtl_materials;
-  r_mtl_materials.resize(obj_mesh_data.tot_materials());
-  for (int16_t i = 0; i < obj_mesh_data.tot_materials(); i++) {
-    export_mtl_ = obj_mesh_data.get_object_material(i);
-    if (!export_mtl_) {
-      continue;
-    }
-    r_mtl_materials[i].name = obj_mesh_data.get_object_material_name(i);
-    init_bsdf_node(obj_mesh_data.get_object_name());
-    store_bsdf_properties(r_mtl_materials[i]);
-    if (!export_mtl_) {
-      continue;
-    }
-    store_image_textures(r_mtl_materials[i]);
-  }
-  return r_mtl_materials;
+  BLI_assert(material != nullptr);
+  MTLMaterial mtlmat;
+  mtlmat.name = std::string(material->id.name + 2);
+  std::replace(mtlmat.name.begin(), mtlmat.name.end(), ' ', '_');
+  const bNode *bsdf_node = find_bsdf_node(material);
+  store_bsdf_properties(bsdf_node, material, mtlmat);
+  store_image_textures(bsdf_node, material, mtlmat);
+  return mtlmat;
 }
 
 }  // namespace blender::io::obj

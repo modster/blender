@@ -103,26 +103,5 @@ struct MTLMaterial {
   float map_Bump_strength{-1.0f};
 };
 
-/**
- * Get an Object's material properties from #Object.Material as well as #bNodeTree.
- */
-class MaterialWrap {
- private:
-  /**
-   * One of the object's materials, to be exported.
-   */
-  const Material *export_mtl_ = nullptr;
-  /**
-   * First Principled-BSDF node encountered in the object's node tree.
-   */
-  const bNode *bsdf_node_ = nullptr;
-
- public:
-  Vector<MTLMaterial> fill_materials(const OBJMesh &obj_mesh_data);
-
- private:
-  void init_bsdf_node(StringRefNull object_name);
-  void store_bsdf_properties(MTLMaterial &r_mtl_mat) const;
-  void store_image_textures(MTLMaterial &r_mtl_mat) const;
-};
+MTLMaterial mtlmaterial_for_material(const Material *material);
 }  // namespace blender::io::obj

@@ -149,20 +149,11 @@ filter_supported_objects(Depsgraph *depsgraph, const OBJExportParams &export_par
 
 static void write_mesh_objects(Vector<std::unique_ptr<OBJMesh>> exportable_as_mesh,
                                OBJWriter &obj_writer,
+                               MTLWriter *mtl_writer,
                                const OBJExportParams &export_params)
 {
-  std::unique_ptr<MTLWriter> mtl_writer = nullptr;
-  if (export_params.export_materials) {
-    try {
-      mtl_writer = std::make_unique<MTLWriter>(export_params.filepath);
-    }
-    catch (const std::system_error &ex) {
-      print_exception_error(ex);
-    }
-    if (mtl_writer) {
-      mtl_writer->write_header(export_params.blen_filepath);
-      obj_writer.write_mtllib_name(mtl_writer->mtl_file_path());
-    }
+  if (mtl_writer) {
+    obj_writer.write_mtllib_name(mtl_writer->mtl_file_path());
   }
 
   /* Smooth groups and UV vertex indices may make huge memory allocations, so they should be freed
@@ -171,6 +162,7 @@ static void write_mesh_objects(Vector<std::unique_ptr<OBJMesh>> exportable_as_me
   for (StealUniquePtr<OBJMesh> obj_mesh : exportable_as_mesh) {
     obj_writer.write_object_name(*obj_mesh);
     obj_writer.write_vertex_coords(*obj_mesh);
+    Vector<int> obj_mtlindices;
 
     if (obj_mesh->tot_polygons() > 0) {
       if (export_params.export_smooth_groups) {
@@ -183,9 +175,17 @@ static void write_mesh_objects(Vector<std::unique_ptr<OBJMesh>> exportable_as_me
         obj_writer.write_uv_coords(*obj_mesh);
       }
       if (mtl_writer) {
-        mtl_writer->append_materials(*obj_mesh);
+        obj_mtlindices = mtl_writer->add_materials(*obj_mesh);
       }
-      obj_writer.write_poly_elements(*obj_mesh);
+      /* This function takes a 0-indexed slot index for the obj_mesh object and
+       * returns the material name that we are using in the .obj file for it. */
+      std::function<const char *(int)> matname_fn = [&](int s) -> const char * {
+        if (!mtl_writer || s < 0 || s >= obj_mtlindices.size()) {
+          return nullptr;
+        }
+        return mtl_writer->mtlmaterial_name(obj_mtlindices[s]);
+      };
+      obj_writer.write_poly_elements(*obj_mesh, matname_fn);
     }
     obj_writer.write_edges_indices(*obj_mesh);
 
@@ -227,13 +227,24 @@ static void export_frame(Depsgraph *depsgraph,
     BLI_assert(!"File should be writable by now.");
     return;
   }
+  std::unique_ptr<MTLWriter> mtl_writer = nullptr;
+  if (export_params.export_materials) {
+    try {
+      mtl_writer = std::make_unique<MTLWriter>(export_params.filepath);
+    }
+    catch (const std::system_error &ex) {
+      print_exception_error(ex);
+    }
+  }
 
   frame_writer->write_header();
 
   auto [exportable_as_mesh, exportable_as_nurbs] = filter_supported_objects(depsgraph,
                                                                             export_params);
 
-  write_mesh_objects(std::move(exportable_as_mesh), *frame_writer, export_params);
+  write_mesh_objects(
+      std::move(exportable_as_mesh), *frame_writer, mtl_writer.get(), export_params);
+  mtl_writer->write_materials();
   write_nurbs_curve_objects(std::move(exportable_as_nurbs), *frame_writer);
 }
 
