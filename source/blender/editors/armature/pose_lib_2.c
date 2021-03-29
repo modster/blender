@@ -34,6 +34,7 @@
 
 #include "BLT_translation.h"
 
+#include "DNA_ID.h"
 #include "DNA_action_types.h"
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
@@ -41,6 +42,7 @@
 #include "DNA_scene_types.h"
 
 #include "BKE_action.h"
+#include "BKE_anim_data.h"
 #include "BKE_animsys.h"
 #include "BKE_armature.h"
 #include "BKE_context.h"
@@ -192,13 +194,22 @@ static void poselib_backup_free_data(PoseBlendData *pbd)
 /* Auto-key/tag bones affected by the pose Action. */
 static void poselib_keytag_pose(bContext *C, Scene *scene, PoseBlendData *pbd)
 {
+  if (!autokeyframe_cfra_can_key(scene, &pbd->ob->id)) {
+    return;
+  }
+
+  AnimData *adt = BKE_animdata_from_id(&pbd->ob->id);
+  if (adt != NULL && adt->action != NULL && ID_IS_LINKED(&adt->action->id)) {
+    /* Changes to linked-in Actions are not allowed. */
+    return;
+  }
+
   bPose *pose = pbd->ob->pose;
   bAction *act = pbd->act;
   bActionGroup *agrp;
 
   KeyingSet *ks = ANIM_get_keyingset_for_autokeying(scene, ANIM_KS_WHOLE_CHARACTER_ID);
   ListBase dsources = {NULL, NULL};
-  const bool autokey = autokeyframe_cfra_can_key(scene, &pbd->ob->id);
 
   /* start tagging/keying */
   const bArmature *armature = pbd->ob->data;
