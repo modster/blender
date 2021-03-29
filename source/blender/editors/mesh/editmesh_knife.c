@@ -74,7 +74,7 @@
 /* detect isolated holes and fill them */
 #define USE_NET_ISLAND_CONNECT
 
-#define KMAXDIST 10 /* max mouse distance from edge before not detecting it */
+#define KMAXDIST (10 * U.dpi_fac) /* max mouse distance from edge before not detecting it */
 
 /* WARNING: knife float precision is fragile:
  * be careful before making changes here see: (T43229, T42864, T42459, T41164).
@@ -146,6 +146,8 @@ typedef struct KnifePosData {
   KnifeVert *vert;
   KnifeEdge *edge;
   BMFace *bmface;
+
+  /** When true, the cursor isn't over a face. */
   bool is_space;
 
   float mval[2]; /* mouse screen position (may be non-integral if snapped to something) */
@@ -1081,7 +1083,7 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
 
   if (kcd->prev.vert) {
     immUniformColor3ubv(kcd->colors.point);
-    GPU_point_size(11);
+    GPU_point_size(11 * UI_DPI_FAC);
 
     immBegin(GPU_PRIM_POINTS, 1);
     immVertex3fv(pos, kcd->prev.cage);
@@ -1090,7 +1092,7 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
 
   if (kcd->prev.bmface) {
     immUniformColor3ubv(kcd->colors.curpoint);
-    GPU_point_size(9);
+    GPU_point_size(9 * UI_DPI_FAC);
 
     immBegin(GPU_PRIM_POINTS, 1);
     immVertex3fv(pos, kcd->prev.cage);
@@ -1108,7 +1110,7 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
   }
   else if (kcd->curr.vert) {
     immUniformColor3ubv(kcd->colors.point);
-    GPU_point_size(11);
+    GPU_point_size(11 * UI_DPI_FAC);
 
     immBegin(GPU_PRIM_POINTS, 1);
     immVertex3fv(pos, kcd->curr.cage);
@@ -1117,7 +1119,7 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
 
   if (kcd->curr.bmface) {
     immUniformColor3ubv(kcd->colors.curpoint);
-    GPU_point_size(9);
+    GPU_point_size(9 * UI_DPI_FAC);
 
     immBegin(GPU_PRIM_POINTS, 1);
     immVertex3fv(pos, kcd->curr.cage);
@@ -1150,7 +1152,7 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
     /* draw any snapped verts first */
     rgba_uchar_to_float(fcol, kcd->colors.point_a);
     GPU_batch_uniform_4fv(batch, "color", fcol);
-    GPU_point_size(11);
+    GPU_point_size(11 * UI_DPI_FAC);
     if (snapped_verts_count > 0) {
       GPU_batch_draw_range(batch, 0, snapped_verts_count);
     }
@@ -1158,7 +1160,7 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
     /* now draw the rest */
     rgba_uchar_to_float(fcol, kcd->colors.curpoint_a);
     GPU_batch_uniform_4fv(batch, "color", fcol);
-    GPU_point_size(7);
+    GPU_point_size(7 * UI_DPI_FAC);
     if (other_verts_count > 0) {
       GPU_batch_draw_range(batch, snapped_verts_count, other_verts_count);
     }
@@ -1198,7 +1200,7 @@ static void knifetool_draw(const bContext *UNUSED(C), ARegion *UNUSED(region), v
     KnifeVert *kfv;
 
     immUniformColor3ubv(kcd->colors.point);
-    GPU_point_size(5.0);
+    GPU_point_size(5.0 * UI_DPI_FAC);
 
     GPUBatch *batch = immBeginBatchAtMost(GPU_PRIM_POINTS, BLI_mempool_len(kcd->kverts));
 
@@ -1920,6 +1922,8 @@ static BMFace *knife_find_closest_face(KnifeTool_OpData *kcd,
        * of a true coordinate on the face.
        * This just puts a point 1.0f in front of the view. */
       add_v3_v3v3(co, origin, ray);
+      /* Use this value for the cage location too as it's used to find near edges/vertices. */
+      copy_v3_v3(cageco, co);
     }
   }
 
@@ -1929,64 +1933,68 @@ static BMFace *knife_find_closest_face(KnifeTool_OpData *kcd,
 /**
  * Find the 2d screen space density of vertices within a radius.
  * Used to scale snapping distance for picking edges/verts.
+ *
+ * Arguments `f` and `cageco` should be the result of a call to #knife_find_closest_face.
  */
-static int knife_sample_screen_density(KnifeTool_OpData *kcd, const float radius)
+static int knife_sample_screen_density_from_closest_face(KnifeTool_OpData *kcd,
+                                                         const float radius,
+                                                         BMFace *f,
+                                                         const float cageco[3])
 {
-  BMFace *f;
-  bool is_space;
-  float co[3], cageco[3], sco[2];
+  const float radius_sq = radius * radius;
+  ListBase *list;
+  Ref *ref;
+  float sco[2];
+  float dis_sq;
+  int c = 0;
 
-  BLI_assert(kcd->is_interactive == true);
+  knife_project_v2(kcd, cageco, sco);
 
-  f = knife_find_closest_face(kcd, co, cageco, &is_space);
+  list = knife_get_face_kedges(kcd, f);
+  for (ref = list->first; ref; ref = ref->next) {
+    KnifeEdge *kfe = ref->ref;
+    int i;
 
-  if (f && !is_space) {
-    const float radius_sq = radius * radius;
-    ListBase *list;
-    Ref *ref;
-    float dis_sq;
-    int c = 0;
+    for (i = 0; i < 2; i++) {
+      KnifeVert *kfv = i ? kfe->v2 : kfe->v1;
+      float kfv_sco[2];
 
-    knife_project_v2(kcd, cageco, sco);
+      knife_project_v2(kcd, kfv->cageco, kfv_sco);
 
-    list = knife_get_face_kedges(kcd, f);
-    for (ref = list->first; ref; ref = ref->next) {
-      KnifeEdge *kfe = ref->ref;
-      int i;
-
-      for (i = 0; i < 2; i++) {
-        KnifeVert *kfv = i ? kfe->v2 : kfe->v1;
-        float kfv_sco[2];
-
-        knife_project_v2(kcd, kfv->cageco, kfv_sco);
-
-        dis_sq = len_squared_v2v2(kfv_sco, sco);
-        if (dis_sq < radius_sq) {
-          if (RV3D_CLIPPING_ENABLED(kcd->vc.v3d, kcd->vc.rv3d)) {
-            if (ED_view3d_clipping_test(kcd->vc.rv3d, kfv->cageco, true) == 0) {
-              c++;
-            }
-          }
-          else {
+      dis_sq = len_squared_v2v2(kfv_sco, sco);
+      if (dis_sq < radius_sq) {
+        if (RV3D_CLIPPING_ENABLED(kcd->vc.v3d, kcd->vc.rv3d)) {
+          if (ED_view3d_clipping_test(kcd->vc.rv3d, kfv->cageco, true) == 0) {
             c++;
           }
         }
+        else {
+          c++;
+        }
       }
     }
-
-    return c;
   }
 
-  return 0;
+  return c;
 }
 
-/* returns snapping distance for edges/verts, scaled by the density of the
- * surrounding mesh (in screen space)*/
+/**
+ * \return the snapping distance for edges/verts, scaled by the density of the
+ * surrounding mesh (in screen space).
+ *
+ * \note Face values in `kcd->curr` must be up to date.
+ */
 static float knife_snap_size(KnifeTool_OpData *kcd, float maxsize)
 {
-  float density = (float)knife_sample_screen_density(kcd, maxsize * 2.0f);
+  BLI_assert(kcd->is_interactive == true);
+  int density = 0;
 
-  return min_ff(maxsize / (density * 0.5f), maxsize);
+  if (!kcd->curr.is_space) {
+    density = (float)knife_sample_screen_density_from_closest_face(
+        kcd, maxsize * 2.0f, kcd->curr.bmface, kcd->curr.cage);
+  }
+
+  return density ? min_ff(maxsize / ((float)density * 0.5f), maxsize) : maxsize;
 }
 
 /* p is closest point on edge to the mouse cursor */
@@ -2218,7 +2226,15 @@ static bool knife_snap_angle(KnifeTool_OpData *kcd)
   return true;
 }
 
-static void knife_snap_update_from_mval(KnifeTool_OpData *kcd, const float mval[2])
+/**
+ * \return true when `kcd->curr.co` & `kcd->curr.cage` are set.
+ *
+ * In this case `is_space` is nearly always false.
+ * There are some situations when vertex or edge can be snapped to, when `is_space` is true.
+ * In this case the selection-buffer is used to select the face,
+ * then the closest `vert` or `edge` is set, and those will enable `is_co_set`.
+ */
+static bool knife_snap_update_from_mval(KnifeTool_OpData *kcd, const float mval[2])
 {
   knife_pos_data_clear(&kcd->curr);
   copy_v2_v2(kcd->curr.mval, mval);
@@ -2236,29 +2252,39 @@ static void knife_snap_update_from_mval(KnifeTool_OpData *kcd, const float mval[
   kcd->curr.bmface = knife_find_closest_face(
       kcd, kcd->curr.co, kcd->curr.cage, &kcd->curr.is_space);
 
+  bool is_co_set = false;
+
   if (kcd->curr.bmface) {
+    if (kcd->curr.is_space == false) {
+      is_co_set = true;
+    }
     kcd->curr.vert = knife_find_closest_vert_of_face(
         kcd, kcd->curr.bmface, kcd->curr.co, kcd->curr.cage);
-
-    if (!kcd->curr.vert &&
-        /* no edge snapping while dragging (edges are too sticky when cuts are immediate) */
-        !kcd->is_drag_hold) {
-      kcd->curr.edge = knife_find_closest_edge_of_face(
-          kcd, kcd->curr.bmface, kcd->curr.co, kcd->curr.cage);
+    if (kcd->curr.vert) {
+      is_co_set = true;
+    }
+    else {
+      /* No edge snapping while dragging (edges are too sticky when cuts are immediate). */
+      if (!kcd->is_drag_hold) {
+        kcd->curr.edge = knife_find_closest_edge_of_face(
+            kcd, kcd->curr.bmface, kcd->curr.co, kcd->curr.cage);
+        if (kcd->curr.edge) {
+          is_co_set = true;
+        }
+      }
     }
   }
+  return is_co_set;
 }
 
 /* update active knife edge/vert pointers */
 static int knife_update_active(KnifeTool_OpData *kcd)
 {
-  knife_snap_update_from_mval(kcd, kcd->mval);
-
   /* if no hits are found this would normally default to (0, 0, 0) so instead
    * get a point at the mouse ray closest to the previous point.
    * Note that drawing lines in `free-space` isn't properly supported
    * but there's no guarantee (0, 0, 0) has any geometry either - campbell */
-  if (kcd->curr.vert == NULL && kcd->curr.edge == NULL && kcd->curr.bmface == NULL) {
+  if (!knife_snap_update_from_mval(kcd, kcd->mval)) {
     float origin[3];
     float origin_ofs[3];
 
